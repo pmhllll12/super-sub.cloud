@@ -1,0 +1,35 @@
+---
+---
+
+@import "minima";
+
+.toc-page {
+
+  h2 {
+    color: #2f6feb;
+    font-size: 1.25rem;
+    margin-top: 2.2rem;
+    margin-bottom: 0.6rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid $grey-color-light;
+  }
+
+  h2:first-of-type {
+    margin-top: 1.5rem;
+  }
+
+  h2 a {
+    color: inherit;
+  }
+
+  ul {
+    list-style: none;
+    margin: 0 0 1.5rem;
+    padding-left: 0.25rem;
+  }
+
+  ul li {
+    color: $grey-color;
+    margin: 0.35rem 0;
+  }
+}

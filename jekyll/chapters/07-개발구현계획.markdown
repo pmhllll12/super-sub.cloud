@@ -1,0 +1,70 @@
+---
+layout: page
+title: 개발 구현 계획
+permalink: /07-개발구현계획/
+---
+
+## 1) 개발 환경 및 기술 스택
+
+*(내용 작성 예정)*
+
+## 2) 주요 기능 구현 방안
+
+*(내용 작성 예정)*
+
+## 3) 조직 구성 및 역할 분담
+
+*(내용 작성 예정)*
+
+## 4) 단계별 개발 일정
+
+애자일 스크럼 방식으로 진행한다. 전체 개발 기간(2026.08.20 ~ 2026.10.27, 10주)을 **2주 단위 스프린트 5회**로 나누고, 스프린트마다 스프린트 계획 → 데일리 스탠드업 → 스프린트 리뷰 → 회고를 반복한다.
+
+**팀 역할**
+
+- 백성검 — PM (요구사항/일정 관리, 스프린트 진행, QA 총괄)
+- 정어진 — Flutter 개발 (앱 UI/UX, 화면 구현)
+- 박민호 — 데이터 파이프라인 (영상 수집·전처리, DB, 분석 파이프라인)
+- 정상호 — AI 에이전트 개발 (RAG 검증, 실력 판단 로직)
+
+### 스프린트 로드맵
+
+| Sprint | 기간 | 목표 | 백성검(PM) | 정어진(Flutter) | 박민호(파이프라인) | 정상호(에이전트) |
+|---|---|---|---|---|---|---|
+| [1](/스프린트1/) | 08.20 ~ 08.31 | 요구사항 확정, 개발환경 구축 | 요구사항/일정 확정, 백로그 작성 | 프로젝트 초기 셋업, 화면 설계 | DB 스키마 설계, 데이터 수집 방안 | 에이전트 아키텍처 리서치 |
+| 2 | 09.01 ~ 09.14 | 핵심 기능 프로토타입 | 스프린트 진행, 중간 점검 | 로그인/선수 카드 화면 구현 | 영상 전처리 파이프라인 구축 | RAG 검증 로직 프로토타입 |
+| 3 | 09.15 ~ 09.28 | 기능 고도화 | 진행 점검, 리스크 관리 | 매칭/구인 플로우 구현 | 영상 분석 모델 연동 | 실력 검증·적합도 판단 모델 고도화 |
+| 4 | 09.29 ~ 10.12 | 통합 및 테스트 | 통합 테스트 총괄, QA | 백엔드 연동, 버그 수정 | 파이프라인 성능 튜닝 | 에이전트 정확도 검증(Hit Rate/Recall) |
+| 5 | 10.13 ~ 10.27 | 마무리 및 배포 준비 | 최종 점검, 발표 준비 | 앱 배포 빌드 | 운영 환경 배포 | 최종 검증 및 튜닝 |
+
+### 현재 스프린트 칸반 보드 (Sprint 1 · 08.20 ~ 08.31)
+
+<div class="kanban-board">
+  <div class="kanban-column">
+    <h4>Backlog</h4>
+    <div class="kanban-card"><span class="role-tag role-pm">백성검·PM</span>기능 우선순위 백로그 정리</div>
+    <div class="kanban-card"><span class="role-tag role-flutter">정어진·Flutter</span>선수 카드 컴포넌트 와이어프레임</div>
+    <div class="kanban-card"><span class="role-tag role-pipeline">박민호·파이프라인</span>영상 저장소(스토리지) 후보 조사</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>RAG 검증 평가지표 설계(Hit Rate/Recall@5)</div>
+  </div>
+  <div class="kanban-column">
+    <h4>To Do</h4>
+    <div class="kanban-card"><span class="role-tag role-pm">백성검·PM</span>스프린트 2 계획 회의 준비</div>
+    <div class="kanban-card"><span class="role-tag role-flutter">정어진·Flutter</span>Flutter 프로젝트 초기 셋업</div>
+    <div class="kanban-card"><span class="role-tag role-pipeline">박민호·파이프라인</span>DB 스키마 초안 작성</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>에이전트 처리 흐름 설계</div>
+  </div>
+  <div class="kanban-column">
+    <h4>In Progress</h4>
+    <div class="kanban-card"><span class="role-tag role-pm">백성검·PM</span>요구사항 정의서 작성</div>
+    <div class="kanban-card"><span class="role-tag role-pipeline">박민호·파이프라인</span>생활체육 경기 영상 데이터 수집 방안 검토</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>멀티모달 에이전트 아키텍처 리서치</div>
+  </div>
+  <div class="kanban-column">
+    <h4>Done</h4>
+    <div class="kanban-card"><span class="role-tag role-pm">백성검·PM</span>제안서 사이트(목차/구조) 확정</div>
+    <div class="kanban-card"><span class="role-tag role-pm">백성검·PM</span>GitHub 레포 및 Pages 배포 파이프라인 구축</div>
+  </div>
+</div>
+
+[← 목차로](/toc/)

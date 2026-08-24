@@ -1,0 +1,15 @@
+[Unit]
+Description=Jekyll site preview server (supersub.parkminho.cloud)
+After=network.target
+
+[Service]
+Type=simple
+User=hi
+WorkingDirectory=/home/hi/projects/supersub.parkminho.cloud
+Environment=PATH=/home/hi/.rbenv/shims:/home/hi/.rbenv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/home/hi/.rbenv/shims/bundle exec jekyll serve --host 0.0.0.0 --port 4000 --baseurl ""
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
