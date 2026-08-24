@@ -1,0 +1,34 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="100%" stop-color="#1E3A5F"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22D3EE"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Hexagon backdrop: infra / node network motif -->
+  <polygon points="256,24 458,140 458,372 256,488 54,372 54,140"
+           fill="url(#bg)"/>
+  <polygon points="256,24 458,140 458,372 256,488 54,372 54,140"
+           fill="none" stroke="url(#accent)" stroke-width="8" opacity="0.6"/>
+
+  <!-- Circuit-style corner nodes -->
+  <circle cx="256" cy="24" r="9" fill="url(#accent)"/>
+  <circle cx="458" cy="140" r="9" fill="url(#accent)"/>
+  <circle cx="458" cy="372" r="9" fill="url(#accent)"/>
+  <circle cx="256" cy="488" r="9" fill="url(#accent)"/>
+  <circle cx="54" cy="372" r="9" fill="url(#accent)"/>
+  <circle cx="54" cy="140" r="9" fill="url(#accent)"/>
+
+  <!-- Monogram P -->
+  <text x="256" y="330" font-family="Arial, Helvetica, sans-serif" font-weight="700"
+        font-size="230" fill="#FFFFFF" text-anchor="middle">P</text>
+
+  <!-- Small pulse/check accent under the P, echoing 'monitoring / detection' theme -->
+  <path d="M 176 372 L 216 372 L 236 340 L 266 400 L 286 372 L 336 372"
+        fill="none" stroke="url(#accent)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
