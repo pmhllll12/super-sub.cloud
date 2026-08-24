@@ -23,14 +23,7 @@ user가 대부분의 테이블과 연결되는 허브이므로 전체를 한 장
 도메인 사이의 데이터 흐름이다. 영상이 지표가 되고, 그 지표가 카드(표시)와 매칭(판단) 두 갈래로
 쓰인다는 것이 이 모델의 골격이다.
 
-| 도메인 | 대표 테이블 | 다음 단계로 넘기는 것 |
-|---|---|---|
-| ① 사용자·팀 | user · team · sport | 모든 도메인의 기준(허브) |
-| ② 영상·분석 | video · analysis_metric_value · player_vector | 지표·호칭 근거 → ③, 특징 벡터 → ④, 분석 1건당 크레딧 차감 → ⑥ |
-| ③ 카드·호칭 | player_card · user_title · squad | 공개 카드로 노출 |
-| ④ 매칭 | match · fitness_score · recommendation | 경기 후 → ⑤ |
-| ⑤ 평가·신뢰 | review · review_selection · no_show | 평가자 가중치(집계, 파생 뷰) |
-| ⑥ 과금 | analysis_credit · coach_referral | — |
+![D.1 도메인 간 데이터 흐름]({{ "/assets/erd/d1-overview.svg" | relative_url }}){: class="erd-diagram" }
 
 ## D.2 도메인별 상세
 
@@ -39,50 +32,7 @@ D.3에 별도로 모았다.
 
 ### ① 사용자·팀
 
-**sport**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| code | text | PK |
-| name | text | |
-
-**position**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| sport_code | text | FK → sport |
-| code | text | |
-| name | text | |
-
-**user**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| email | text | |
-| nickname | text | |
-| created_at | timestamptz | |
-
-**team**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| sport_code | text | FK → sport |
-| name | text | |
-| region | text | |
-
-**team_member**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| team_id | uuid | FK → team |
-| user_id | uuid | FK → user |
-| role | text | |
-| joined_at | timestamptz | |
-| left_at | timestamptz | |
+![도메인 ① 사용자·팀 ERD]({{ "/assets/erd/domain1-user-team.svg" | relative_url }}){: class="erd-diagram" }
 
 | 테이블 | 용도 | 1행이 뜻하는 것 |
 |---|---|---|
@@ -100,80 +50,7 @@ D.3에 별도로 모았다.
 지표는 종목마다 항목이 다르므로 컬럼으로 고정하지 않는다. metric_definition에 항목을 정의하고
 analysis_metric_value에 항목당 한 행씩 적재한다.
 
-**video**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| user_id | uuid | FK → user |
-| sport_code | text | FK → sport |
-| s3_key | text | |
-| duration_sec | int | |
-| created_at | timestamptz | |
-
-**video_validation**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| video_id | uuid | FK → video |
-| passed | bool | |
-| reject_reason | text | |
-| checked_at | timestamptz | |
-
-**analysis_job**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| video_id | uuid | FK → video |
-| status | text | |
-| started_at | timestamptz | |
-| finished_at | timestamptz | |
-
-**analysis_metric**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| analysis_job_id | uuid | FK → analysis_job |
-| pipeline_version | text | |
-
-**metric_definition**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| code | text | PK |
-| sport_code | text | FK → sport |
-| name | text | |
-| unit | text | |
-
-**analysis_metric_value**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| analysis_metric_id | uuid | FK → analysis_metric |
-| metric_code | text | FK → metric_definition |
-| value | numeric | |
-
-**analysis_report**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| analysis_metric_id | uuid | FK → analysis_metric |
-| summary_text | text | |
-| model | text | |
-| generated_at | timestamptz | |
-
-**player_vector**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| analysis_metric_id | uuid | FK → analysis_metric |
-| embedding | vector | |
+![도메인 ② 영상·분석 ERD]({{ "/assets/erd/domain2-video-analysis.svg" | relative_url }}){: class="erd-diagram" }
 
 | 테이블 | 용도 | 1행이 뜻하는 것 |
 |---|---|---|
@@ -190,60 +67,7 @@ analysis_metric_value에 항목당 한 행씩 적재한다.
 
 호칭 기준도 종목·항목마다 다르므로 title_criteria에 조건 한 줄씩 나누어 담는다.
 
-**title_definition**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| code | text | PK |
-| sport_code | text | FK → sport |
-| category | text | |
-| label | text | |
-
-**title_criteria**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| title_code | text | FK → title_definition |
-| metric_code | text | FK → metric_definition |
-| operator | text | |
-| threshold_value | numeric | |
-
-**user_title**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| user_id | uuid | FK → user |
-| title_code | text | FK → title_definition |
-| source_metric_id | uuid | FK → analysis_metric (nullable) |
-| granted_at | timestamptz | |
-
-**player_card**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| user_id | uuid | FK → user |
-| public_slug | text | |
-| og_image_key | text | |
-
-**squad**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| team_id | uuid | FK → team |
-| public_slug | text | |
-
-**squad_member**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| squad_id | uuid | FK → squad |
-| player_card_id | uuid | FK → player_card |
-| position_id | uuid | FK → position |
+![도메인 ③ 카드·호칭 ERD]({{ "/assets/erd/domain3-card-title.svg" | relative_url }}){: class="erd-diagram" }
 
 | 테이블 | 용도 | 1행이 뜻하는 것 |
 |---|---|---|
@@ -256,53 +80,7 @@ analysis_metric_value에 항목당 한 행씩 적재한다.
 
 ### ④ 매칭
 
-**match**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| team_id | uuid | FK → team |
-| played_at | timestamptz | |
-| place | text | |
-
-**match_position_need**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| match_id | uuid | FK → match |
-| position_id | uuid | FK → position |
-| head_count | int | |
-
-**match_application**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| match_id | uuid | FK → match |
-| user_id | uuid | FK → user |
-| team_accepted_at | timestamptz | |
-| user_accepted_at | timestamptz | |
-
-**fitness_score**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| match_application_id | uuid | FK → match_application |
-| level_axis | numeric | |
-| role_axis | numeric | |
-| style_axis | numeric | |
-
-**recommendation**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| match_id | uuid | FK → match |
-| candidate_user_id | uuid | FK → user |
-| rank | int | |
-| reason | text | NOT NULL |
+![도메인 ④ 매칭 ERD]({{ "/assets/erd/domain4-matching.svg" | relative_url }}){: class="erd-diagram" }
 
 | 테이블 | 용도 | 1행이 뜻하는 것 |
 |---|---|---|
@@ -317,49 +95,7 @@ analysis_metric_value에 항목당 한 행씩 적재한다.
 평가는 선택형이므로(3.4) 선택지를 review_option에 정의하고 선택 결과를 review_selection에
 행으로 담는다.
 
-**review**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| match_id | uuid | FK → match |
-| reviewer_id | uuid | FK → user |
-| reviewee_id | uuid | FK → user |
-| submitted_at | timestamptz | |
-
-**review_option**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| code | text | PK |
-| category | text | |
-| label | text | |
-
-**review_selection**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| review_id | uuid | PK, FK → review |
-| option_code | text | PK, FK → review_option |
-
-**report**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| reporter_id | uuid | FK → user |
-| target_user_id | uuid | FK → user |
-| reason | text | |
-| created_at | timestamptz | |
-
-**no_show**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| match_id | uuid | FK → match |
-| user_id | uuid | FK → user |
-| recorded_at | timestamptz | |
+![도메인 ⑤ 평가·신뢰 ERD]({{ "/assets/erd/domain5-review-trust.svg" | relative_url }}){: class="erd-diagram" }
 
 | 테이블 | 용도 | 1행이 뜻하는 것 |
 |---|---|---|
@@ -379,33 +115,7 @@ report·no_show는 review와 직접 이어지지 않는다. 제재를 평가 점
 
 ### ⑥ 과금
 
-**analysis_credit**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| user_id | uuid | FK → user |
-| delta | int | |
-| reason | text | |
-| created_at | timestamptz | |
-
-**coach**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| name | text | |
-| contact | text | |
-
-**coach_referral**
-
-| 컬럼 | 타입 | 키 |
-|---|---|---|
-| id | uuid | PK |
-| user_id | uuid | FK → user |
-| coach_id | uuid | FK → coach |
-| fee | numeric | |
-| created_at | timestamptz | |
+![도메인 ⑥ 과금 ERD]({{ "/assets/erd/domain6-billing.svg" | relative_url }}){: class="erd-diagram" }
 
 | 테이블 | 용도 | 1행이 뜻하는 것 |
 |---|---|---|
@@ -515,15 +225,7 @@ fitness_score의 level_axis·role_axis·style_axis는 반복 그룹이 아니다
 SEC-006은 삭제 요청 시 원본과 파생물이 함께 삭제될 것을 요구한다. 영상 한 건의 파생물은 다음
 경로로 이어지므로, 이 체인의 외래키 삭제 규칙을 스키마 확정 시 일괄로 정한다.
 
-```
-video (+ S3 원본)
-  → analysis_job
-    → analysis_metric
-      → analysis_metric_value
-      → analysis_report
-      → player_vector
-      → user_title (source_metric_id 경유)
-```
+![D.6 영상 삭제 연쇄 경로]({{ "/assets/erd/d6-cascade.svg" | relative_url }}){: class="erd-diagram" }
 
 user_title은 호칭 부여의 근거가 되는 지표를 참조한다. 근거가 삭제되면 호칭도 함께 회수되어야
 하므로 이 체인에 포함한다.
@@ -568,4 +270,4 @@ Super-Sub / 슈퍼서브 · 백성검 · 박민호 · 정상호 · 정어진
 
 지표 항목과 평가 선택지는 스프린트 1에서 확정한다. D.8 미확정 사항을 함께 확인한다.
 
-[← 목차로](/toc/)
+[← 목차로]({{ "/toc/" | relative_url }})
