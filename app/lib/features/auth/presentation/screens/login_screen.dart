@@ -6,7 +6,7 @@ import '../../../../core/mock/mock_db.dart';
 import '../../../../core/widgets/refractive_glass.dart';
 import '../../../../core/widgets/sheet_drag_physics.dart';
 import '../../../intro/presentation/screens/glitch_intro_screen.dart'
-    show kIntroInkColor, kIntroPaper;
+    show kIntroInkColor;
 import '../session_controller.dart';
 
 /// 접힘 상태에서 보이는 시트 높이 — 손잡이와 힌트, 이름이 들어간다.
@@ -17,7 +17,7 @@ const double _kSheetCollapsed = 96.0;
 const double _kSheetRadius = 28.0;
 
 /// 사진 위에 얹히는 글자색.
-const Color _kOnPhoto = Color(0xFFF4F3EF);
+const Color _kOnPhoto = Color(0xFFFFFFFF);
 
 const String _kHintUp = '위로 올려 로그인';
 const String _kHintDown = '아래로 내려 닫기';
@@ -249,9 +249,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           FilledButton(
             key: const Key('login-submit'),
             style: FilledButton.styleFrom(
-              backgroundColor: _kOnPhoto,
-              // 밝은 버튼 위에 민트 글자를 얹으면 안 읽힌다 — 어두운 쪽을 쓴다.
-              foregroundColor: kIntroPaper,
+              // 브랜드색을 그대로 주 버튼에 쓴다. 민트가 밝아 글자는 어둡게.
+              backgroundColor: kIntroInkColor,
+              foregroundColor: const Color(0xFF0E2A14),
               minimumSize: const Size.fromHeight(52),
             ),
             onPressed: _busy
