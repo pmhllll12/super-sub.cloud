@@ -38,6 +38,15 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+# 추적 오버레이(scripts/track_overlay.py) 전용 — **기본 설치에 넣지 않는다.**
+# ultralytics는 AGPL-3.0이라, 이 패키지를 링크한 채 서비스를 네트워크로
+# 제공하면 소스 공개 의무가 생긴다. 분석 파이프라인 본체는 RT-DETR(Apache-2.0)로
+# 돌아가므로 서비스 경로에는 영향이 없다. 검수용 시각화에만 쓴다.
+# 상업 배포 전에 미결 항목 1번(EXAONE NC)과 함께 정리해야 한다.
+#
+# lap은 ByteTrack의 헝가리안 매칭에 쓰인다. ultralytics가 실행 시점에 자동으로
+# 설치하는데(AutoUpdate), 그러면 팀원마다 설치 시점이 달라진다. 명시해 고정한다.
+tracking = ["ultralytics>=8.3", "lap>=0.5"]
 
 # PyTorch cu126 휠 인덱스 — 위 torch 주석 참고.
 [tool.uv.sources]

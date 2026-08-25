@@ -7,7 +7,12 @@ from __future__ import annotations
 
 import pytest
 
-from supersub_agent.scoring import RubricError, aggregate, load_rubric
+from supersub_agent.scoring import (
+    RubricError,
+    aggregate,
+    discover_rubrics,
+    load_rubric,
+)
 
 RUBRIC_PATH = "rubrics/football_instep_shot.yaml"
 
@@ -21,7 +26,41 @@ def test_rubric_loads_and_weights_sum_to_one(rubric):
     assert rubric.sport == "football"
     assert rubric.motion == "instep_shot"
     assert abs(sum(c.weight for c in rubric.criteria) - 1.0) < 1e-6
-    assert len(rubric.criteria) == 5
+    assert len(rubric.criteria) == 6
+
+
+def test_discover_rubrics_keys_by_sport_and_motion():
+    """루브릭 추가가 코드 변경이 아니라 파일 추가로 끝나는지."""
+    found = discover_rubrics("rubrics")
+
+    assert "football/instep_shot" in found
+    for key, r in found.items():
+        assert key == f"{r.sport}/{r.motion}", "키는 파일명이 아니라 내용에서 온다"
+
+
+def test_every_rubric_loads_and_is_wellformed():
+    """rubrics/의 모든 파일이 적재 규칙(가중치 합·bands·앵커)을 지키는지.
+
+    새 루브릭을 넣었을 때 여기서 걸린다.
+    """
+    for key, r in discover_rubrics("rubrics").items():
+        assert abs(sum(c.weight for c in r.criteria) - 1.0) < 1e-6, key
+        for c in r.criteria:
+            assert c.band_metric in c.measured_by, f"{key}/{c.id}"
+            assert {a["grade"] for a in c.anchors} == {0, 1, 2}, f"{key}/{c.id}"
+            assert set(c.titles) == {0, 1, 2}, f"{key}/{c.id}: 칭호 누락"
+
+
+def test_duplicate_rubric_key_is_rejected(tmp_path):
+    """같은 (종목, 동작)이 두 파일에 있으면 어느 쪽이 쓰일지 모호하다."""
+    body = ("sport: x\nmotion: y\ncriteria:\n"
+            "  - {id: a, name: A, weight: 1.0, measured_by: [m], "
+            "grades: {0: z, 1: z, 2: z}, " + _BANDS + "}\n")
+    (tmp_path / "one.yaml").write_text(body, encoding="utf-8")
+    (tmp_path / "two.yaml").write_text(body, encoding="utf-8")
+
+    with pytest.raises(RubricError, match="키 중복"):
+        discover_rubrics(tmp_path)
 
 
 def test_rubric_is_flagged_provisional(rubric):
@@ -89,12 +128,14 @@ def test_weight_change_recomputes_without_reanalysis(rubric):
     baseline = aggregate(judgments, rubric)["score"]
     assert baseline == 85  # hip_rotation 가중치 0.15만 손실
 
+    n = len(rubric.criteria)
+    heavy, rest = 0.30, 0.70 / (n - 1)
     reweighted = rubric.__class__(
         sport=rubric.sport,
         motion=rubric.motion,
         version=rubric.version,
         criteria=tuple(
-            c.__class__(**{**c.__dict__, "weight": 0.30 if c.id == "hip_rotation" else 0.175})
+            c.__class__(**{**c.__dict__, "weight": heavy if c.id == "hip_rotation" else rest})
             for c in rubric.criteria
         ),
         grade_bands=rubric.grade_bands,
@@ -104,11 +145,56 @@ def test_weight_change_recomputes_without_reanalysis(rubric):
     assert aggregate(judgments, reweighted)["score"] == 70
 
 
-def test_missing_judgment_is_rejected(rubric):
+def test_missing_judgment_is_rejected_when_expected(rubric):
+    """판정이 실패해 빠진 항목은 오류다 — 조용히 제외되면 점수가 왜곡된다."""
     judgments = _judgments(2, rubric)
     del judgments["trunk_lean"]
     with pytest.raises(ValueError, match="누락"):
+        aggregate(judgments, rubric, expected_ids=rubric.criterion_ids)
+
+
+def test_skipped_criterion_renormalizes_weights(rubric):
+    """도구 미검출로 빠진 항목은 0점이 아니라 제외다.
+
+    빠진 항목을 0점으로 두면 촬영 조건 때문에 선수가 감점된다.
+    남은 항목이 모두 2등급이면 총점은 100점이어야 한다.
+    """
+    judgments = _judgments(2, rubric)
+    del judgments["plant_foot_position"]
+
+    result = aggregate(judgments, rubric)
+
+    assert result["score"] == 100
+    assert [s["criterion_id"] for s in result["skipped"]] == ["plant_foot_position"]
+    # breakdown의 weight는 표시용 4자리 반올림이라 합이 정확히 1.0은 아니다.
+    # 점수는 반올림 전 값으로 계산되므로 score == 100이 실제 검증이다.
+    assert sum(b["weight"] for b in result["breakdown"]) == pytest.approx(1.0, abs=1e-3)
+
+
+def test_unknown_criterion_is_rejected(rubric):
+    judgments = _judgments(2, rubric)
+    judgments["없는항목"] = {"grade": 2, "evidence": "", "metric_ref": ""}
+    with pytest.raises(ValueError, match="루브릭에 없는"):
         aggregate(judgments, rubric)
+
+
+def test_applicable_criteria_drops_tool_dependent_items(rubric):
+    """공이 없는 측정값에서는 도구 기반 항목이 빠진다."""
+    pose_only = {
+        "plant_knee_angle_at_impact": 160.0,
+        "swing_knee_angle_at_impact": 150.0,
+        "trunk_forward_lean_deg_at_impact": 10.0,
+        "hip_rotation_range_deg": 30.0,
+        "swing_hip_flexion_after_impact_deg": 35.0,
+        "follow_through_duration_frames": 8,
+    }
+
+    ids = [c.id for c in rubric.applicable_criteria(pose_only)]
+    assert "plant_foot_position" not in ids
+    assert len(ids) == len(rubric.criteria) - 1
+
+    with_ball = {**pose_only, "plant_foot_to_ball_offset": 0.29}
+    assert len(rubric.applicable_criteria(with_ball)) == len(rubric.criteria)
 
 
 def test_out_of_range_grade_is_rejected(rubric):

@@ -14,3 +14,6 @@ agent/out/
 agent/**/__pycache__/
 agent/.pytest_cache/
 agent/uv.lock
+
+# 모델 가중치 — 실행 시 자동 내려받는다. 저장소에 넣지 않는다.
+agent/*.pt

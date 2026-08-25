@@ -1,0 +1,205 @@
+# 축구 인사이드 패스 채점 루브릭
+#
+# ⚠️ 임계값·가중치·칭호 모두 **지도자 검수 전 임시값**이다.
+#    인스텝 슈팅 루브릭의 기준을 패스 동작 지침에 맞춰 옮겨 잡은 초안이며,
+#    실클립으로 검증되지 않았다. 골든셋 라벨링 시 확정한다 (미결 항목 2번).
+#
+# 이 파일은 **코드 변경 없이** 추가됐다. 인스텝 슈팅과 같은 다리 로직을 쓰므로
+# features.py가 산출하는 지표를 그대로 골라 쓴다 — 루브릭이 데이터라는 증거다.
+#
+# 슈팅과 무엇이 다른가
+#   - 무릎을 끝까지 펴지 않는다. 짧은 스윙으로 정확도를 낸다 → 신전 구간이 낮다
+#   - 상체를 더 세운다. 공을 눌러 띄우지 않는 것이 목적이 아니라 방향이 목적이다
+#   - 팔로스루가 짧다. 슈팅처럼 뻗어 나가면 공이 뜬다
+#   - 디딤발을 공에 더 가까이 붙인다. 방향 정확도가 디딤발 조준에 달려 있다
+
+sport: football
+motion: inside_pass
+sport_ko: 축구
+motion_ko: 인사이드 패스
+version: 0.1
+status: draft
+review_required: true
+pipeline_version: pose-v0.1
+validated_on: ""
+
+kinematics:
+  impact_limb: leg
+  impact_event: extension_peak
+
+criteria:
+  - id: plant_foot_position
+    name: 디딤발 위치
+    weight: 0.25
+    rationale: >-
+      인사이드 패스는 디딤발이 목표 방향을 겨눈다. 슈팅보다 공에 바짝 붙여
+      딛어야 발 안쪽 면이 공 중심을 정확히 민다.
+    measured_by: [plant_foot_to_ball_offset]
+    titles:
+      2: "조준된 디딤발"
+      1: "빗나간 조준"
+      0: "겨누지 않은 발"
+    bands:
+      metric: plant_foot_to_ball_offset
+      2: [[null, 0.4]]
+      1: [[0.4, 0.75]]
+      0: [[0.75, null]]
+    grades:
+      2: "임팩트 시 디딤발과 공의 수평 간격이 어깨너비 0.4배 이내(약 16cm)"
+      1: "0.4~0.75배(약 16~30cm)"
+      0: "0.75배 초과(약 30cm 초과)"
+    anchors:
+      - measured: {plant_foot_to_ball_offset: 0.22}
+        grade: 2
+        evidence: "디딤발이 공 옆 어깨너비 0.22배(약 9cm)에 붙어 방향이 고정됐다"
+      - measured: {plant_foot_to_ball_offset: 0.58}
+        grade: 1
+        evidence: "간격 0.58배(약 23cm)로 조준이 다소 헐겁다"
+      - measured: {plant_foot_to_ball_offset: 0.95}
+        grade: 0
+        evidence: "간격 0.95배(약 38cm)로 디딤발이 공에서 떨어져 방향이 흔들린다"
+
+  - id: swing_knee_extension
+    name: 차는 다리 무릎 신전
+    weight: 0.20
+    rationale: >-
+      패스는 짧은 스윙으로 민다. 슈팅처럼 무릎을 끝까지 펴면 공이 뜨고
+      세기 조절이 안 된다.
+    measured_by: [swing_knee_angle_at_impact]
+    titles:
+      2: "절제된 스윙"
+      1: "과한 스윙"
+      0: "휘둘러 버린 발"
+    bands:
+      metric: swing_knee_angle_at_impact
+      2: [[120, 155]]
+      1: [[155, 170]]
+      0: [[null, 120], [170, null]]
+    grades:
+      2: "임팩트 시 무릎각 120~155도 (짧게 접힌 스윙)"
+      1: "155~170도"
+      0: "170도 초과(완전 신전, 슈팅 동작) 또는 120도 미만"
+    anchors:
+      - measured: {swing_knee_angle_at_impact: 138.0}
+        grade: 2
+        evidence: "무릎각 138도로 스윙이 짧게 절제됐다"
+      - measured: {swing_knee_angle_at_impact: 162.0}
+        grade: 1
+        evidence: "무릎각 162도로 스윙이 다소 커졌다"
+      - measured: {swing_knee_angle_at_impact: 176.0}
+        grade: 0
+        evidence: "무릎각 176도로 완전히 펴져 패스가 아니라 슈팅 궤적이 된다"
+
+  - id: trunk_lean
+    name: 상체 기울기
+    weight: 0.20
+    rationale: >-
+      패스는 공을 누르는 것이 아니라 방향을 주는 동작이다. 상체를 세워
+      시야를 확보하되, 뒤로 젖혀지면 공이 뜬다.
+    measured_by: [trunk_forward_lean_deg_at_impact]
+    titles:
+      2: "세워진 시야"
+      1: "숙인 시야"
+      0: "젖혀진 상체"
+    bands:
+      metric: trunk_forward_lean_deg_at_impact
+      2: [[2, 15]]
+      1: [[15, 25]]
+      0: [[null, 2], [25, null]]
+    grades:
+      2: "임팩트 시 상체 전방 기울기 2~15도"
+      1: "15~25도(과도한 전방)"
+      0: "2도 미만(후방 젖힘) 또는 25도 초과"
+    anchors:
+      - measured: {trunk_forward_lean_deg_at_impact: 8.0}
+        grade: 2
+        evidence: "상체 기울기 8도로 시야를 유지하면서 공 위에 섰다"
+      - measured: {trunk_forward_lean_deg_at_impact: 20.0}
+        grade: 1
+        evidence: "기울기 20도로 상체가 과하게 숙여졌다"
+      - measured: {trunk_forward_lean_deg_at_impact: -3.0}
+        grade: 0
+        evidence: "기울기 -3도로 상체가 젖혀져 패스가 뜬다"
+
+  - id: hip_rotation
+    name: 골반 회전
+    weight: 0.15
+    rationale: >-
+      인사이드 면을 공에 대려면 골반이 열려야 한다. 다만 슈팅만큼 크게 돌면
+      방향 제어를 잃는다.
+    measured_by: [hip_rotation_range_deg]
+    titles:
+      2: "열어 놓은 골반"
+      1: "덜 열린 골반"
+      0: "닫힌 골반"
+    bands:
+      metric: hip_rotation_range_deg
+      2: [[15, 35]]
+      1: [[8, 15], [35, null]]
+      0: [[null, 8]]
+    grades:
+      2: "백스윙~임팩트 구간 골반 회전 15~35도"
+      1: "8~15도 또는 35도 초과(과회전)"
+      0: "8도 미만"
+    anchors:
+      - measured: {hip_rotation_range_deg: 24.0}
+        grade: 2
+        evidence: "골반 회전 24도로 인사이드 면이 공을 향해 열렸다"
+      - measured: {hip_rotation_range_deg: 11.0}
+        grade: 1
+        evidence: "회전 11도로 골반이 덜 열려 면이 비뚤어진다"
+      - measured: {hip_rotation_range_deg: 5.0}
+        grade: 0
+        evidence: "회전 5도로 골반이 닫혀 발끝으로 밀게 된다"
+
+  - id: follow_through
+    name: 팔로스루
+    weight: 0.20
+    rationale: >-
+      패스의 팔로스루는 짧고 방향을 향한다. 슈팅처럼 크게 뻗으면 세기가
+      과해지고 공이 뜬다.
+    measured_by: [swing_hip_flexion_after_impact_deg, follow_through_duration_frames]
+    titles:
+      2: "방향을 남긴 마무리"
+      1: "흘린 마무리"
+      0: "끊긴 마무리"
+    bands:
+      metric: swing_hip_flexion_after_impact_deg
+      2: [[8, 25]]
+      1: [[3, 8], [25, null]]
+      0: [[null, 3]]
+    grades:
+      2: "임팩트 후 고관절 굴곡 8~25도 추가 진행 (짧고 방향성 있는 마무리)"
+      1: "3~8도 또는 25도 초과(슈팅에 가까운 과한 마무리)"
+      0: "3도 미만 (임팩트 직후 정지)"
+    anchors:
+      - measured: {swing_hip_flexion_after_impact_deg: 15.0, follow_through_duration_frames: 4}
+        grade: 2
+        evidence: "임팩트 후 15도 추가 진행으로 방향을 남기고 멈췄다"
+      - measured: {swing_hip_flexion_after_impact_deg: 32.0, follow_through_duration_frames: 8}
+        grade: 1
+        evidence: "32도까지 뻗어 패스보다 슈팅에 가까운 마무리다"
+      - measured: {swing_hip_flexion_after_impact_deg: 1.5, follow_through_duration_frames: 1}
+        grade: 0
+        evidence: "추가 굴곡 1.5도로 임팩트 직후 스윙이 끊겼다"
+
+# 아직 측정할 수 없는 항목.
+deferred:
+  - id: ankle_lock
+    name: 발목 고정
+    blocked_by: >-
+      COCO-17은 발목까지만 있고 발끝·발날이 없다. 인사이드 패스의 핵심인
+      "발목을 잠그고 발 안쪽 면을 세우는" 동작은 관절 하나로 판별할 수 없다.
+      발 키포인트를 내는 모델(예: COCO-WholeBody)이 필요하다.
+  - id: pass_direction_accuracy
+    name: 패스 방향 정확도
+    blocked_by: >-
+      공의 출발 방향은 궤적으로 잴 수 있으나, 의도한 목표 지점을 알 수 없다.
+      목표(동료 위치)를 입력받거나 검출해야 정확도를 정의할 수 있다.
+
+# 총점 등급 구간 (가중합 0.0~1.0 → 100점 환산)
+grade_bands:
+  A: 85
+  B: 70
+  C: 50
+  D: 0

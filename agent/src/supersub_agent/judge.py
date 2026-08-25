@@ -206,8 +206,14 @@ class Judge:
         return self._validate(self._generate_and_parse(messages), criterion, grade)
 
     def judge_all(self, rubric, features: dict[str, Any]) -> dict[str, dict[str, Any]]:
+        """판정 가능한 항목만 처리한다.
+
+        도구가 검출되지 않으면 그 항목은 빠진다 — aggregate가 남은 항목으로
+        가중치를 재정규화한다.
+        """
         return {
-            c.id: self.judge_criterion(c, features) for c in rubric.criteria
+            c.id: self.judge_criterion(c, features)
+            for c in rubric.applicable_criteria(features)
         }
 
     # -- 내부 -----------------------------------------------------------
