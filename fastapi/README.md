@@ -38,14 +38,17 @@ cp .env.example .env          # 값은 각자 채운다
 ```
 app/
   main.py     FastAPI 앱과 라우트
-  config.py   환경변수 (키 이름은 super-sub.cloud 의 .env.example 을 따른다)
+  config.py   환경변수 (키 이름은 저장소 루트의 .env.example 을 따른다)
+docs/
+  api-contract.md   API 계약 초안 (인증 · 선수 카드) — 합의 전
 ```
 
 ## 다음 할 일
 
-1. **API 계약 확정** — 인증(SEC-003)과 선수 카드 조회(player_card).
+1. **API 계약 확정** — 초안은 [`docs/api-contract.md`](docs/api-contract.md).
    스프린트 2(09.01~)에 Flutter 쪽에서 로그인·선수 카드 화면을 구현하므로
    그 전에 엔드포인트 형태가 정해져 있어야 한다.
+   **`user` 테이블에 자격증명 컬럼이 없어 스키마 변경이 선행된다** — 문서의 Q1 참고.
 2. **부록 D ERD → 실제 DDL 검증** — D.6 삭제 연쇄와 D.7 유일 제약 17건이
    아직 문서에만 있다. 로컬 PostgreSQL 에 올려서 성립하는지 확인한다.
 3. **영상 업로드(SFR-001)와 analysis_job 큐** — 데이터 파이프라인과의 접점.
