@@ -14,17 +14,29 @@ const LinearGradient _kFigureFade = LinearGradient(
   stops: [0.62, 0.88, 1],
 );
 
-/// 숨 한 번에 걸리는 시간.
+/// 한 번 끄덕이는 데 걸리는 시간.
 ///
-/// **느려야 한다.** 빠르면 사진이 흔들리는 것으로 보이고, 유리 너머의 굴절이
-/// 같이 출렁여 눈이 피로하다. 9초면 보고 있을 때만 겨우 알아차린다.
-const Duration _kBreath = Duration(seconds: 9);
+/// 9초짜리 숨쉬기였는데 움직이는지 보이지 않아 고개 끄덕임으로 바꿨다.
+/// 3.2초면 눈에 들어오면서도 조급해 보이지 않는다.
+const Duration _kNodPeriod = Duration(milliseconds: 3200);
 
-/// 숨 끝에서의 배율과 올라가는 거리(논리 px).
+/// 끄덕이는 각도(라디안). 약 1.7도.
 ///
-/// 배율 1.5%, 6px. 이보다 크면 "움직인다"가 아니라 "떨린다"로 읽힌다.
-const double _kBreathScale = 1.015;
-const double _kBreathRise = 6;
+/// **평면 사진을 돌리는 것이므로 크면 안 된다.** 넘어가면 얼굴이 도는 게
+/// 아니라 사진이 기우는 것으로 보인다.
+const double _kNodAngle = 0.030;
+
+/// 함께 내려가는 거리(논리 px). 각도만 주면 미끄러지는 느낌이라 무게를 준다.
+const double _kNodDrop = 10;
+
+/// 돌릴 때 가장자리가 비지 않도록 살짝 키운다.
+const double _kNodScale = 1.03;
+
+/// 회전축. 사진에서 목 아래쯤이다(가로 35%, 세로 62%).
+///
+/// **여기가 축이어야 어깨는 그대로 두고 머리만 움직인다.** 가운데를 축으로
+/// 하면 몸통째 기울어 인형처럼 보인다.
+const Alignment _kNodPivot = Alignment(-0.30, 0.24);
 
 /// 유리가 굴절시킬 바탕. 홈과 영상 분석이 같은 것을 쓴다.
 ///
@@ -34,8 +46,8 @@ const double _kBreathRise = 6;
 class FigureBackground extends StatefulWidget {
   const FigureBackground({super.key, this.breathe = false});
 
-  /// 참이면 인물이 아주 느리게 숨쉰다. 홈에서만 켠다 — 다른 화면은 내용이
-  /// 앞에 있어 배경까지 움직이면 산만하다.
+  /// 참이면 인물이 천천히 고개를 끄덕인다. 홈에서만 켠다 — 다른 화면은
+  /// 내용이 앞에 있어 배경까지 움직이면 산만하다.
   final bool breathe;
 
   @override
@@ -50,7 +62,7 @@ class _FigureBackgroundState extends State<FigureBackground>
   void initState() {
     super.initState();
     if (widget.breathe) {
-      _ctrl = AnimationController(vsync: this, duration: _kBreath)
+      _ctrl = AnimationController(vsync: this, duration: _kNodPeriod)
         ..repeat(reverse: true);
     }
   }
@@ -89,14 +101,16 @@ class _FigureBackgroundState extends State<FigureBackground>
             child: figure,
             builder: (context, child) {
               final t = Curves.easeInOut.transform(ctrl.value);
-              return Transform.translate(
-                offset: Offset(0, -_kBreathRise * t),
-                child: Transform.scale(
-                  scale: 1 + (_kBreathScale - 1) * t,
-                  // 위쪽을 붙박아 두고 아래로 자란다 — 가운데를 기준으로
-                  // 하면 머리가 화면 위로 밀려 잘린다.
-                  alignment: Alignment.topCenter,
-                  child: child,
+              return Transform.scale(
+                // 돌리면 가장자리가 빌 수 있어 미리 조금 키워 둔다.
+                scale: _kNodScale,
+                child: Transform.translate(
+                  offset: Offset(0, _kNodDrop * t),
+                  child: Transform.rotate(
+                    angle: _kNodAngle * t,
+                    alignment: _kNodPivot,
+                    child: child,
+                  ),
                 ),
               );
             },
