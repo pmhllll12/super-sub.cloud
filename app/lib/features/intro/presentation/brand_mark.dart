@@ -7,7 +7,7 @@ const String kBrandText = 'SUPERSUB';
 
 /// 착지한 뒤의 글자 크기. 로그인 화면과 비행이 같은 값을 봐야 앉는 순간
 /// 크기가 안 튄다.
-const double kBrandLandedSize = 30;
+const double kBrandLandedSize = 40;
 
 /// 인트로 글자가 날아와 앉는 자리.
 ///
