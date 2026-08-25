@@ -17,6 +17,12 @@ import 'package:super_sub/features/intro/presentation/intro_gate.dart';
 /// 않고, 로딩 인디케이터는 무한 애니메이션이라 pumpAndSettle도 쓰지 않는다
 /// (home_screen_test.dart의 주석 참고).
 Future<ProviderContainer> _pumpApp(WidgetTester tester) async {
+  // **폰 크기로 돌린다.** 기본 800×600은 이 앱의 화면보다 훨씬 짧아, 하단
+  // 바까지 있는 화면에서 내용이 넘친다.
+  tester.view.physicalSize = const Size(1080, 2340);
+  tester.view.devicePixelRatio = 3;
+  addTearDown(tester.view.reset);
+
   // 인트로를 끈다 — 켜 두면 3.1초 동안 모든 라우트를 덮어 착지 화면 대신
   // 인트로만 보인다. 인트로 자체는 glitch_intro_screen_test.dart가 본다.
   final container = ProviderContainer(

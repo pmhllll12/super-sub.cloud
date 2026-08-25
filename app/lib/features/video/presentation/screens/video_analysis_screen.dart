@@ -6,6 +6,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../../../core/widgets/figure_background.dart';
 import '../../../../core/widgets/floating_nav_bar.dart';
 import '../../../../core/widgets/glass_panel.dart';
+import '../chat_pane.dart';
 
 const Color _kBg = Color(0xFF000000);
 const Color _kOnDark = Color(0xFFFFFFFF);
@@ -67,9 +68,9 @@ class _VideoAnalysisScreenState extends ConsumerState<VideoAnalysisScreen> {
                 20,
                 12,
                 20,
-                // 바는 자리를 차지하지 않고 떠 있다 — 아래 판이 바에 먹히지
-                // 않도록 그만큼 띄운다.
-                FloatingNavBar.heightOf(context) + 12,
+                // 바는 자리를 차지하지 않고 떠 있다. 딱 그 높이만큼만 띄워
+                // 판이 바로 위까지 오게 한다.
+                FloatingNavBar.heightOf(context),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -137,12 +138,7 @@ class _VideoAnalysisScreenState extends ConsumerState<VideoAnalysisScreen> {
                   const Expanded(
                     child: GlassPanel(
                       radius: _kPanelRadius,
-                      child: Center(
-                        child: Text(
-                          '분석한 영상이 여기 쌓입니다',
-                          style: TextStyle(color: _kOnDark, fontSize: 15),
-                        ),
-                      ),
+                      child: ChatPane(),
                     ),
                   ),
                 ],
