@@ -52,18 +52,22 @@ permalink: /07-개발구현계획/
     <div class="kanban-card"><span class="role-tag role-pm">백성검·PM</span>스프린트 2 계획 회의 준비</div>
     <div class="kanban-card"><span class="role-tag role-flutter">정어진·Flutter</span>Flutter 프로젝트 초기 셋업</div>
     <div class="kanban-card"><span class="role-tag role-pipeline">박민호·파이프라인</span>DB 스키마 초안 작성</div>
-    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>에이전트 처리 흐름 설계</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>루브릭 지도자 검수 요청(임계값 확정)</div>
   </div>
   <div class="kanban-column">
     <h4>In Progress</h4>
     <div class="kanban-card"><span class="role-tag role-pm">백성검·PM</span>요구사항 정의서 작성</div>
     <div class="kanban-card"><span class="role-tag role-pipeline">박민호·파이프라인</span>생활체육 경기 영상 데이터 수집 방안 검토</div>
-    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>멀티모달 에이전트 아키텍처 리서치</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>실제 슈팅 영상 확보 — 포즈 파이프라인 실클립 검증</div>
   </div>
   <div class="kanban-column">
     <h4>Done</h4>
     <div class="kanban-card"><span class="role-tag role-pm">백성검·PM</span>제안서 사이트(목차/구조) 확정</div>
     <div class="kanban-card"><span class="role-tag role-pm">백성검·PM</span>GitHub 레포 및 Pages 배포 파이프라인 구축</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>멀티모달 에이전트 아키텍처 리서치</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>에이전트 처리 흐름 설계</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>판정 모델 선정·실측 (EXAONE 4.0 1.2B, bf16)</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>측정→판정→합산 구현 및 로컬 확인 UI</div>
   </div>
 </div>
 
