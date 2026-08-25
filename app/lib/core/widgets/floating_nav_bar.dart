@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../design_scale.dart';
 import '../theme/app_theme.dart';
@@ -39,15 +40,22 @@ class FloatingNavBar extends StatelessWidget {
   final ValueListenable<double>? refraction;
 
   /// 인덱스 0(홈)은 로고 알약이 가져갔다. 남은 셋만 아이콘으로 그린다.
+  ///
+  /// **Material Symbols다.** Flutter가 안고 있는 `Icons`는 구형 Material
+  /// Icons라 획이 두껍고 이 글리프들이 없다. 굵기·등급·광학크기는 [_NavIcon]이
+  /// 한 곳에서 준다 — 아이콘마다 다르면 줄이 들쭉날쭉해진다.
+  ///
+  /// 글리프는 이 앱의 구획에 맞춰 골랐다. 원본(`com.sumworship`)의 것은
+  /// 쇼핑백·북마크라 여기서는 뜻이 안 맞는다.
   static const _icons = {
-    1: Icons.videocam_outlined,
-    2: Icons.sports_soccer_outlined,
-    3: Icons.badge_outlined,
+    1: Symbols.videocam,
+    2: Symbols.sports_soccer,
+    3: Symbols.id_card,
   };
 
   /// 탭이 아니라 메뉴를 여는 자리. 인덱스가 아니라 이 표로 가른다.
   static const menuIndex = 4;
-  static const _menuIcon = Icons.menu;
+  static const _menuIcon = Symbols.format_list_bulleted_add;
 
   /// 알약을 시안(290.2×145.8)에서 줄인 비율.
   static const _pillScale = 0.85;
@@ -239,7 +247,16 @@ class _NavIcon extends StatelessWidget {
           scale: active ? 1.0 : restingScale,
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOut,
-          child: Icon(icon, color: Colors.white, size: context.d(76)),
+          // 굵기·등급·광학크기를 여기 한 곳에서 준다. 아이콘마다 다르면
+          // 줄이 들쭉날쭉해진다.
+          child: Icon(
+            icon,
+            color: Colors.white,
+            size: context.d(76),
+            weight: 200,
+            grade: 0,
+            opticalSize: 20,
+          ),
         ),
       ),
     );
