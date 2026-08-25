@@ -155,16 +155,21 @@ class _GlitchIntroScreenState extends State<GlitchIntroScreen>
   @override
   void initState() {
     super.initState();
-    _t.forward().whenComplete(() {
-      if (mounted) widget.onDone();
-    });
+    _start();
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // 이미 실려 있으면 바로 돌아오는 호출이라 그냥 부른다.
-    InkBleedShader.load();
+  /// **지도가 준비된 뒤에 시작한다.**
+  ///
+  /// 안 기다리면 앞부분이 셰이더 없이 도는 물러섬 경로(밋밋한 색 페이드)로
+  /// 나가 잉크가 번지는 게 안 보인다. 기다리는 동안 화면에는 진행도 0의
+  /// 판만 떠 있다 — 어차피 순백 구간이라 보이는 그림은 같다.
+  ///
+  /// `load()`는 이미 실려 있으면 바로 돌아온다.
+  Future<void> _start() async {
+    await InkBleedShader.load();
+    if (!mounted) return;
+    await _t.forward();
+    if (mounted) widget.onDone();
   }
 
   @override
