@@ -1,20 +1,46 @@
 """Super-Sub 백엔드 API 진입점.
 
-지금은 앱이 뜨는 것까지만 확인한다. 실제 엔드포인트는 API 계약을 팀과 맞춘 뒤 붙인다.
+지금은 **스텁**이다. 모든 응답이 고정값이고 DB에 붙지 않는다.
+명세는 `docs/api-contract.md`, 스텁이 받아주는 값은 `app/stubs.py`.
 """
 
 from fastapi import FastAPI
 
+from app import stubs
 from app.config import settings
+from app.errors import install_error_handlers
+from app.routers import auth, cards, users
+
+API_PREFIX = "/api/v1"
+
+_DESCRIPTION = f"""
+생활체육 용병 스카우팅 플랫폼 백엔드.
+
+> ⚠️ **현재 모든 응답이 스텁(고정값)입니다.** DB에 붙지 않습니다.
+
+성공 경로를 보려면 아래 값으로 로그인하십시오. 다른 값은 계약대로 실패합니다.
+
+- 이메일 `{stubs.DEMO_EMAIL}` / 비밀번호 `{stubs.DEMO_PASSWORD}`
+- 공개 카드 슬러그 `{stubs.DEMO_SLUG}`
+
+실패 응답은 모두 `{{"error": {{"code": ..., "message": ...}}}}` 형태입니다.
+`code`로 분기하고 `message`로 분기하지 마십시오.
+"""
 
 app = FastAPI(
     title="Super-Sub API",
-    description="생활체육 용병 스카우팅 플랫폼 백엔드",
+    description=_DESCRIPTION,
     version="0.1.0",
 )
 
+install_error_handlers(app)
 
-@app.get("/health")
+app.include_router(auth.router, prefix=API_PREFIX)
+app.include_router(users.router, prefix=API_PREFIX)
+app.include_router(cards.router, prefix=API_PREFIX)
+
+
+@app.get("/health", tags=["health"])
 def health() -> dict[str, object]:
     """앱 기동 확인용.
 
@@ -25,4 +51,5 @@ def health() -> dict[str, object]:
         "status": "ok",
         "env": settings.app_env,
         "db_configured": settings.db_configured,
+        "stub": True,
     }

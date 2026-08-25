@@ -2,6 +2,8 @@ annotated-doc==0.0.5
 annotated-types==0.8.0
 anyio==4.14.2
 click==8.4.2
+dnspython==2.8.0
+email-validator==2.3.0
 fastapi==0.141.1
 h11==0.16.0
 httptools==0.8.0

@@ -7,3 +7,4 @@
 fastapi
 uvicorn[standard]
 pydantic-settings
+pydantic[email]      # EmailStr — 계약의 INVALID_EMAIL 검증에 필요하다
