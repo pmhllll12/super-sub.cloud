@@ -17,6 +17,23 @@ const Color _kHomeBg = Color(0xFF000000);
 /// 검은 바탕 위의 글자.
 const Color _kOnDark = Color(0xFFFFFFFF);
 
+/// 배경 인물이 화면에서 차지하는 높이 비율.
+///
+/// 위쪽 3분의 2를 인물이 쓰고 아래는 검정으로 잦아든다 — 카드가 얼굴 위에
+/// 겹치지 않게 하려는 것이다.
+const double _kFigureHeightFactor = 0.72;
+
+/// 인물을 검정으로 잦아들게 하는 막.
+///
+/// 사진 자체가 아래로 갈수록 어둡지만 딱 떨어지지는 않는다. 이 막이 그
+/// 나머지를 지워 사진의 아랫변이 선으로 보이지 않게 한다.
+const LinearGradient _kFigureFade = LinearGradient(
+  begin: Alignment.topCenter,
+  end: Alignment.bottomCenter,
+  colors: [Color(0x00000000), Color(0x66000000), Color(0xFF000000)],
+  stops: [0.45, 0.78, 1],
+);
+
 /// 카드 면. 검정 위에 아주 옅은 흰 기 한 겹 — 로그인 버튼과 같은 방식이다.
 final Color _kCardFill = Colors.white.withValues(alpha: 0.06);
 
@@ -165,7 +182,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ],
       ),
       extendBody: true,
-      body: SafeArea(
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // 배경 인물. 위쪽에 걸고 아래는 검정으로 잦아들게 한다.
+          Align(
+            alignment: Alignment.topCenter,
+            child: FractionallySizedBox(
+              heightFactor: _kFigureHeightFactor,
+              child: const Image(
+                image: AssetImage('assets/images/home_figure.jpg'),
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+              ),
+            ),
+          ),
+          Align(
+            alignment: Alignment.topCenter,
+            child: FractionallySizedBox(
+              heightFactor: _kFigureHeightFactor,
+              child: const DecoratedBox(
+                decoration: BoxDecoration(gradient: _kFigureFade),
+                child: SizedBox.expand(),
+              ),
+            ),
+          ),
+          _content(context, nickname),
+        ],
+      ),
+    );
+  }
+
+  Widget _content(BuildContext context, String nickname) {
+    return SafeArea(
         // 종목 목록은 리포지토리에서 온다. 지연·실패·빈 목록이 실제로
         // 발생하므로 네 상태를 AsyncView 한 곳에서 처리한다(스펙 6절).
         child: AsyncView<List<Sport>>(
@@ -216,7 +265,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ],
           ),
         ),
-      ),
     );
   }
 
