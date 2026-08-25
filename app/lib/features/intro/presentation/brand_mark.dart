@@ -42,6 +42,10 @@ class BrandMark extends StatelessWidget {
 
   static TextStyle styleFor(double fontSize, Color color) => TextStyle(
         fontFamily: 'RubikGlitch',
+        // **밑줄 없음을 명시한다.** 인트로 겹은 라우트 밖(= Material 조상이
+        // 없는 자리)에서 그려지는데, 그러면 Flutter가 기본 스타일로 노란
+        // 이중 밑줄을 긋는다. 날아가는 글자에 그 줄이 따라다녔다.
+        decoration: TextDecoration.none,
         // 가변 축이 없는 글꼴이라 무시되지만, 가지런한 Rubik과 나란히 둘 때
         // 살집을 맞추려고 900을 준다 — 인트로가 그 둘을 갈아 끼운다.
         fontVariations: const [FontVariation('wght', 900)],
