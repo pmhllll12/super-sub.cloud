@@ -14,7 +14,12 @@ import '../session_controller.dart';
 const double _kSheetRadius = 28.0;
 
 /// 사진 위에 얹히는 글자색.
-const Color _kOnPhoto = Color(0xFFFFFFFF);
+///
+/// 사진이 밝아(흰 유니폼·밝은 회색 배경) 흰 글자가 묻힌다. 어두운 막을
+/// 걷어낸 뒤로는 글자를 검정으로 두는 편이 읽힌다.
+///
+/// 버튼의 테두리와 면도 이 색을 알파만 달리해 쓴다 — 한 곳만 바꾸면 따라온다.
+const Color _kOnPhoto = Color(0xFF000000);
 
 // --- 로그인 버튼 -------------------------------------------------------
 //
