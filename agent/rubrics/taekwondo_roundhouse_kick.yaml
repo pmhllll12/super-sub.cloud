@@ -1,0 +1,162 @@
+# 태권도 돌려차기 채점 루브릭
+#
+# ⚠️ 임계값은 **지도자 검수 전 임시값**이다 (미결 항목 2번).
+# ⚠️ **실클립 미검증** — 파이프라인이 이 종목 영상에서 지표를 제대로 뽑는지
+#    아직 확인하지 않았다.
+#
+# 축구 인스텝 슈팅과 같은 다리 동작이라 impact_limb은 leg, impact_event는
+# extension_peak이다. 다만 도구가 없어 plant_foot_to_ball_offset을 쓰지 않는다.
+
+sport: taekwondo
+motion: roundhouse_kick
+sport_ko: 태권도
+motion_ko: 돌려차기
+version: 0.1
+status: draft
+review_required: true
+pipeline_version: pose-v0.1
+validated_on: ""
+
+kinematics:
+  impact_limb: leg
+  impact_event: extension_peak
+
+criteria:
+  - id: knee_snap
+    name: 무릎 폄
+    weight: 0.3
+    rationale: >-
+      무릎을 접어 올렸다가 펴며 발끝 속도를 만든다. 임팩트에 이미 다 펴져
+      있으면 가속 구간을 놓친 것이고, 접힌 채 닿으면 밀어 차기가 된다.
+    measured_by: [swing_knee_angle_at_impact]
+    titles:
+      2: "채찍처럼 펴진 다리"
+      1: "덜 펴진 다리"
+      0: "밀어 찬 다리"
+    grades:
+      2: "임팩트 시 무릎각 145~172도"
+      1: "120~145도"
+      0: "172도 초과(임팩트 전 완전 신전) 또는 120도 미만"
+    bands:
+      metric: swing_knee_angle_at_impact
+      2: [[145, 172]]
+      1: [[120, 145]]
+      0: [[null, 120], [172, null]]
+    anchors:
+      - measured: {swing_knee_angle_at_impact: 158.0}
+        grade: 2
+        evidence: "임팩트 시 무릎각 158도로 신전 구간 안에서 닿았다"
+      - measured: {swing_knee_angle_at_impact: 131.0}
+        grade: 1
+        evidence: "무릎각 131도로 신전이 덜 끝난 상태"
+      - measured: {swing_knee_angle_at_impact: 178.0}
+        grade: 0
+        evidence: "무릎각 178도로 임팩트 전에 이미 다 펴졌다"
+
+  - id: hip_rotation
+    name: 골반 회전
+    weight: 0.3
+    rationale: >-
+      돌려차기의 힘은 골반 회전에서 나온다. 골반이 돌지 않으면 다리만
+      휘두르게 되어 위력이 없고 자세가 무너진다.
+    measured_by: [hip_rotation_range_deg]
+    titles:
+      2: "완전히 돌아간 골반"
+      1: "절반만 돈 골반"
+      0: "잠긴 골반"
+    grades:
+      2: "준비~임팩트 구간 골반 회전 범위 45도 이상"
+      1: "25~45도"
+      0: "25도 미만"
+    bands:
+      metric: hip_rotation_range_deg
+      2: [[45, null]]
+      1: [[25, 45]]
+      0: [[null, 25]]
+    anchors:
+      - measured: {hip_rotation_range_deg: 62.0}
+        grade: 2
+        evidence: "골반 회전 범위 62도로 골반이 완전히 돌아갔다"
+      - measured: {hip_rotation_range_deg: 33.0}
+        grade: 1
+        evidence: "회전 범위 33도로 골반 회전이 부족하다"
+      - measured: {hip_rotation_range_deg: 16.0}
+        grade: 0
+        evidence: "회전 범위 16도로 다리만 휘둘렀다"
+
+  - id: pivot_leg
+    name: 축발 버팀
+    weight: 0.2
+    rationale: >-
+      축발이 곧게 서서 회전을 받쳐 줘야 힘이 차는 다리로 전달된다.
+      축발이 굽으면 중심이 내려앉아 위력이 사라진다.
+    measured_by: [plant_knee_angle_at_impact]
+    titles:
+      2: "곧게 선 축발"
+      1: "흔들린 축발"
+      0: "주저앉은 축발"
+    grades:
+      2: "임팩트 시 축발 무릎각 155도 이상"
+      1: "135~155도"
+      0: "135도 미만"
+    bands:
+      metric: plant_knee_angle_at_impact
+      2: [[155, null]]
+      1: [[135, 155]]
+      0: [[null, 135]]
+    anchors:
+      - measured: {plant_knee_angle_at_impact: 168.0}
+        grade: 2
+        evidence: "임팩트 시 축발 무릎각 168도로 곧게 서서 회전을 받쳤다"
+      - measured: {plant_knee_angle_at_impact: 144.0}
+        grade: 1
+        evidence: "축발 무릎각 144도로 중심이 다소 내려앉았다"
+      - measured: {plant_knee_angle_at_impact: 126.0}
+        grade: 0
+        evidence: "축발 무릎각 126도로 주저앉아 위력이 사라졌다"
+
+  - id: recovery
+    name: 회수
+    weight: 0.2
+    rationale: >-
+      찬 뒤 다리를 빠르게 접어 회수해야 다음 동작으로 이어지고 잡히지 않는다.
+      뻗은 채로 두면 반격에 노출된다.
+    measured_by: [follow_through_duration_frames]
+    titles:
+      2: "곧바로 접은 다리"
+      1: "느린 회수"
+      0: "뻗어 둔 다리"
+    grades:
+      2: "임팩트 후 8프레임 이내에 스윙 속도가 30% 아래로 감속"
+      1: "8~16프레임"
+      0: "16프레임 초과"
+    bands:
+      metric: follow_through_duration_frames
+      2: [[null, 8]]
+      1: [[8, 16]]
+      0: [[16, null]]
+    anchors:
+      - measured: {follow_through_duration_frames: 5}
+        grade: 2
+        evidence: "임팩트 후 5프레임 만에 감속, 곧바로 회수했다"
+      - measured: {follow_through_duration_frames: 12}
+        grade: 1
+        evidence: "12프레임에 걸쳐 감속, 회수가 느리다"
+      - measured: {follow_through_duration_frames: 21}
+        grade: 0
+        evidence: "21프레임 동안 다리가 뻗어 있어 반격에 노출된다"
+
+deferred:
+  - id: contact_point
+    name: 타격 부위 (발등)
+    blocked_by: "발가락·발등 키포인트가 필요하다. COCO-17에는 발목까지만 있다."
+  - id: target_height
+    name: 타격 높이 (얼굴/몸통)
+    blocked_by: >-
+      상대나 미트가 검출되어야 기준이 선다. 지금은 단독 촬영만 전제한다.
+
+grade_bands:
+  A: 85
+  B: 70
+  C: 50
+  D: 0

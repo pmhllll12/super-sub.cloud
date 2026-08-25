@@ -1,0 +1,240 @@
+# 축구 인스텝 슈팅 채점 루브릭
+#
+# ⚠️ 이 파일의 각도 임계값은 **지도자 검수 전 임시값**이다.
+#    개발 착수를 위해 일반적인 지도 지침을 근거로 잡은 초안이며,
+#    골든셋 라벨링 시 지도자와 함께 확정해야 한다 (미결 항목 2번).
+#    검수 완료 전까지 이 루브릭으로 산출한 점수를 대외에 노출하지 않는다.
+#
+# 설계 원칙
+#   - 도구가 필요한 항목은 검출되지 않은 영상에서 **제외**된다(0점이 아니다).
+#     남은 항목으로 가중치를 재정규화한다 — 촬영 조건으로 선수를 감점하지 않는다.
+#     검출기가 못 보는 물체(셔틀콕 등)가 필요한 항목은 deferred에 둔다.
+#   - 등급은 0/1/2 이산값. 연속 점수는 가중합으로 코드가 계산한다.
+#   - measured_by에 없는 지표는 판정 근거로 쓸 수 없다.
+#   - 등급은 bands(수치 구간)로 **코드가** 판정한다. 언어 모델은 근거 문장만
+#     쓴다. 구간은 양끝을 포함하며, 2 → 1 → 0 순으로 먼저 맞는 등급을 취한다
+#     (경계값은 높은 등급으로 간다).
+
+sport: football
+motion: instep_shot
+sport_ko: 축구
+motion_ko: 인스텝 슈팅
+version: 0.1
+status: draft
+review_required: true
+pipeline_version: pose-v0.1
+validated_on: >-
+  실클립 1건 (3840×2160 25fps 10.2초, 128프레임). 전 구간 통과, 3회 반복 55점 C
+  동일 (2026-08-25).
+
+kinematics:
+  impact_limb: leg
+  impact_event: extension_peak
+
+criteria:
+  - id: plant_knee_flexion
+    name: 디딤발 무릎 굴곡
+    weight: 0.15
+    rationale: >-
+      디딤발이 충분히 굽어야 상체가 안정되고 체중이 실린다.
+      뻣뻣하게 선 자세는 힘 전달이 끊긴다.
+    measured_by: [plant_knee_angle_at_impact]
+    titles:
+      2: "흔들리지 않는 축"
+      1: "설익은 축"
+      0: "무너지는 축"
+    grades:
+      2: "임팩트 시 디딤발 무릎각 150~170도"
+      1: "170도 초과(굴곡 부족) 또는 135~150도(과굴곡)"
+      0: "135도 미만"
+    bands:
+      metric: plant_knee_angle_at_impact
+      2: [[150, 170]]
+      1: [[135, 150], [170, null]]
+      0: [[null, 135]]
+    anchors:
+      - measured: {plant_knee_angle_at_impact: 158.0}
+        grade: 2
+        evidence: "디딤발 무릎각 158도로 기준 범위 중앙"
+      - measured: {plant_knee_angle_at_impact: 176.4}
+        grade: 1
+        evidence: "무릎각 176.4도로 거의 편 상태, 기준 상한 170도 초과"
+      - measured: {plant_knee_angle_at_impact: 128.2}
+        grade: 0
+        evidence: "무릎각 128.2도로 하한 135도 미달, 과도한 굴곡"
+
+  - id: swing_knee_extension
+    name: 차는 다리 무릎 신전
+    weight: 0.25
+    rationale: >-
+      임팩트 직전 무릎이 접혔다가 펴지며 발등 속도를 만든다.
+      임팩트 시점에 이미 다 펴져 있으면 가속 구간을 놓친 것이다.
+    measured_by: [swing_knee_angle_at_impact]
+    titles:
+      2: "채찍이 된 다리"
+      1: "덜 감긴 채찍"
+      0: "풀린 채찍"
+    grades:
+      2: "임팩트 시 무릎각 140~165도"
+      1: "165~175도"
+      0: "175도 초과(임팩트 전 완전 신전) 또는 140도 미만"
+    bands:
+      metric: swing_knee_angle_at_impact
+      2: [[140, 165]]
+      1: [[165, 175]]
+      0: [[null, 140], [175, null]]
+    anchors:
+      - measured: {swing_knee_angle_at_impact: 152.0}
+        grade: 2
+        evidence: "무릎각 152도로 기준 범위 중앙, 임팩트 시점에 신전 여유 확보"
+      - measured: {swing_knee_angle_at_impact: 171.0}
+        grade: 1
+        evidence: "무릎각 171도로 기준 상한 165도 초과, 과신전 근접"
+      - measured: {swing_knee_angle_at_impact: 179.2}
+        grade: 0
+        evidence: "무릎각 179.2도로 임팩트 전 완전 신전, 가속 구간 소실"
+
+  - id: trunk_lean
+    name: 상체 기울기
+    weight: 0.15
+    rationale: >-
+      상체가 뒤로 젖혀지면 공이 뜬다. 공 위로 상체가 덮이는 자세가 기준이다.
+    measured_by: [trunk_forward_lean_deg_at_impact]
+    titles:
+      2: "공을 눌러 담는 상체"
+      1: "곧추선 상체"
+      0: "젖혀진 상체"
+    grades:
+      2: "임팩트 시 상체 전방 기울기 5~20도"
+      1: "0~5도(수직) 또는 20~30도(과도한 전방)"
+      0: "0도 미만(후방 젖힘) 또는 30도 초과"
+    bands:
+      metric: trunk_forward_lean_deg_at_impact
+      2: [[5, 20]]
+      1: [[0, 5], [20, 30]]
+      0: [[null, 0], [30, null]]
+    anchors:
+      - measured: {trunk_forward_lean_deg_at_impact: 12.4}
+        grade: 2
+        evidence: "상체 전방 기울기 12.4도로 기준 범위 내"
+      - measured: {trunk_forward_lean_deg_at_impact: 2.1}
+        grade: 1
+        evidence: "기울기 2.1도로 거의 수직, 체중 전달 부족"
+      - measured: {trunk_forward_lean_deg_at_impact: -8.7}
+        grade: 0
+        evidence: "기울기 -8.7도로 상체가 뒤로 젖혀짐"
+
+  - id: hip_rotation
+    name: 골반 회전
+    weight: 0.15
+    rationale: >-
+      백스윙에서 임팩트까지 골반이 회전하며 상체 힘이 다리로 전달된다.
+      회전 없이 다리만 휘두르면 힘이 실리지 않는다.
+    measured_by: [hip_rotation_range_deg]
+    titles:
+      2: "활처럼 열리는 골반"
+      1: "절반만 열린 골반"
+      0: "잠긴 골반"
+    grades:
+      2: "백스윙~임팩트 구간 골반 회전 범위 25도 이상"
+      1: "15~25도"
+      0: "15도 미만"
+    bands:
+      metric: hip_rotation_range_deg
+      2: [[25, null]]
+      1: [[15, 25]]
+      0: [[null, 15]]
+    anchors:
+      - measured: {hip_rotation_range_deg: 34.2}
+        grade: 2
+        evidence: "골반 회전 범위 34.2도로 기준 25도 초과"
+      - measured: {hip_rotation_range_deg: 19.8}
+        grade: 1
+        evidence: "회전 범위 19.8도로 중간 구간"
+      - measured: {hip_rotation_range_deg: 9.1}
+        grade: 0
+        evidence: "회전 범위 9.1도로 골반 회전이 거의 없음"
+
+  - id: follow_through
+    name: 팔로스루
+    weight: 0.15
+    rationale: >-
+      임팩트 후 차는 다리가 계속 뻗어 나가야 감속 없이 힘이 전달된다.
+      임팩트 직후 멈추면 공 속도가 죽는다.
+    measured_by: [swing_hip_flexion_after_impact_deg, follow_through_duration_frames]
+    titles:
+      2: "공을 배웅하는 발"
+      1: "짧아진 배웅"
+      0: "멈춰 선 스윙"
+    grades:
+      2: "임팩트 후 차는 다리 고관절 굴곡이 30도 이상 추가 진행"
+      1: "15~30도"
+      0: "15도 미만 (임팩트 직후 정지)"
+    bands:
+      metric: swing_hip_flexion_after_impact_deg
+      2: [[30, null]]
+      1: [[15, 30]]
+      0: [[null, 15]]
+    anchors:
+      - measured: {swing_hip_flexion_after_impact_deg: 41.5, follow_through_duration_frames: 9}
+        grade: 2
+        evidence: "임팩트 후 고관절 굴곡 41.5도 추가 진행"
+      - measured: {swing_hip_flexion_after_impact_deg: 22.0, follow_through_duration_frames: 5}
+        grade: 1
+        evidence: "추가 굴곡 22도로 중간 구간"
+      - measured: {swing_hip_flexion_after_impact_deg: 8.3, follow_through_duration_frames: 2}
+        grade: 0
+        evidence: "추가 굴곡 8.3도로 임팩트 직후 스윙 정지"
+
+  - id: plant_foot_position
+    name: 디딤발 위치
+    weight: 0.15
+    rationale: >-
+      디딤발이 공과 나란해야 몸의 축이 공 위에 선다. 너무 앞에 딛으면 몸이
+      넘어가 공이 눌리고, 너무 뒤에 딛으면 상체가 젖혀져 공이 뜬다.
+    measured_by: [plant_foot_to_ball_offset]
+    titles:
+      2: "자리를 아는 디딤발"
+      1: "어긋난 디딤 자리"
+      0: "헛짚은 디딤 자리"
+    bands:
+      metric: plant_foot_to_ball_offset
+      2: [[null, 0.5]]
+      1: [[0.5, 0.9]]
+      0: [[0.9, null]]
+    grades:
+      2: "임팩트 시 디딤발과 공의 수평 간격이 어깨너비 0.5배 이내(약 20cm)"
+      1: "0.5~0.9배(약 20~36cm)"
+      0: "0.9배 초과(약 36cm 초과)"
+    anchors:
+      - measured: {plant_foot_to_ball_offset: 0.29}
+        grade: 2
+        evidence: "디딤발이 공과 수평으로 어깨너비 0.29배(약 12cm) 떨어져 나란하다"
+      - measured: {plant_foot_to_ball_offset: 0.71}
+        grade: 1
+        evidence: "수평 간격 0.71배(약 28cm)로 공에서 다소 벗어났다"
+      - measured: {plant_foot_to_ball_offset: 1.24}
+        grade: 0
+        evidence: "수평 간격 1.24배(약 50cm)로 디딤발이 공에서 크게 떨어졌다"
+
+# 공 위치 검출기가 붙은 뒤 활성화할 항목.
+# 포즈 추정만으로는 측정할 수 없어 v0.1에서 제외한다.
+deferred:
+  - id: contact_point
+    name: 임팩트 지점
+    blocked_by: "공 검출 필요 — 발등 어느 지점에 맞았는지"
+  - id: swing_acceleration_timing
+    name: 스윙 가속 타이밍
+    blocked_by: >-
+      임팩트 정의와 순환 — segment_phases가 임팩트를 "무릎 신전 각속도가 최대인
+      프레임"으로 정의하므로, 같은 시계열에서 잰 각속도 피크 시점은 정의상 항상
+      임팩트와 일치한다(offset ≡ 0). 판정 근거로 쓰면 모델이 이 0을 결함으로
+      읽는다(실클립에서 25점 항목이 이 이유로 0점 처리됨).
+      공 검출이 붙어 임팩트를 발-공 접촉 시점으로 독립 정의해야 측정 가능해진다.
+
+# 총점 등급 구간 (가중합 0.0~1.0 → 100점 환산)
+grade_bands:
+  A: 85
+  B: 70
+  C: 50
+  D: 0

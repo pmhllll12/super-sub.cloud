@@ -29,10 +29,10 @@ permalink: /
 백성검 · 박민호 · 정상호 · 정어진 (4명)
 
 깃허브 주소
-[https://github.com/paiksunggum/supersub.paiksunggum.com](https://github.com/paiksunggum/supersub.paiksunggum.com)
+[https://github.com/pmhllll12/super-sub.cloud](https://github.com/pmhllll12/super-sub.cloud)
 
 데모 사이트
-[https://supersub.paiksunggum.com](https://supersub.paiksunggum.com)
+[https://supersub.jsangho.com](https://supersub.jsangho.com)
 
 </div>
 

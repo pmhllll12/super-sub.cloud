@@ -1,0 +1,180 @@
+# 농구 레이업 채점 루브릭
+#
+# ⚠️ 이 파일의 각도 임계값은 **지도자 검수 전 임시값**이다.
+#    일반적인 지도 지침을 근거로 잡은 초안이며, 골든셋 라벨링 시 지도자와 함께
+#    확정해야 한다 (미결 항목 2번). 검수 전 점수를 대외에 노출하지 않는다.
+#
+# 임팩트 정의가 축구·점프슛과 다르다 — kinematics.impact_event: distal_apex.
+#   레이업은 팔꿈치를 채는 동작이 아니라 공을 림까지 **들고 올라가는** 동작이라
+#   신전 각속도 피크가 릴리스가 아니라 공을 모아 드라이브를 시작하는 순간에
+#   잡힌다. 실클립에서 extension_peak은 6프레임(체스트 높이에서 공 모으는 중),
+#   distal_apex는 21프레임(림 앞 공중, 팔 완전 신전)을 잡았다. 후자가 릴리스다.
+
+sport: basketball
+motion: layup
+sport_ko: 농구
+motion_ko: 레이업
+version: 0.1
+status: draft
+review_required: true
+pipeline_version: pose-v0.1
+validated_on: >-
+  실클립 1건 (1920×1080 24fps, 드라이브~레이업 구간 1.9초 절취, 46프레임).
+  다리 유효 100% · 팔 유효 87%. 임팩트 21프레임을 오버레이로 육안 확인.
+
+kinematics:
+  impact_limb: arm
+  impact_event: distal_apex
+
+criteria:
+  - id: release_arm_extension
+    name: 슛하는 팔 신전
+    weight: 0.35
+    rationale: >-
+      릴리스 순간 팔이 완전히 뻗어야 공을 가장 높은 지점에서 놓을 수 있다.
+      팔이 굽은 채 놓으면 릴리스 지점이 낮아져 블록에 걸리고 백보드 각도도 얕아진다.
+    measured_by: [swing_elbow_angle_at_impact]
+    titles:
+      2: "끝까지 뻗은 팔"
+      1: "덜 뻗은 팔"
+      0: "접힌 채 놓은 팔"
+    grades:
+      2: "릴리스 시 슛하는 팔 팔꿈치각 160도 이상"
+      1: "140~160도"
+      0: "140도 미만"
+    bands:
+      metric: swing_elbow_angle_at_impact
+      2: [[160, null]]
+      1: [[140, 160]]
+      0: [[null, 140]]
+    anchors:
+      - measured: {swing_elbow_angle_at_impact: 179.2}
+        grade: 2
+        evidence: "릴리스 시 팔꿈치각 179.2도로 완전 신전, 최고점에서 공을 놓았다"
+      - measured: {swing_elbow_angle_at_impact: 148.5}
+        grade: 1
+        evidence: "팔꿈치각 148.5도로 신전이 덜 끝난 상태에서 릴리스"
+      - measured: {swing_elbow_angle_at_impact: 121.0}
+        grade: 0
+        evidence: "팔꿈치각 121도로 팔이 접힌 채 릴리스, 릴리스 지점이 낮다"
+
+  - id: takeoff_leg_extension
+    name: 도약 신전
+    weight: 0.25
+    rationale: >-
+      도약한 다리가 공중에서 곧게 펴져야 높이가 나온다. 무릎이 접힌 채
+      최고점에 이르면 도약을 다 쓰지 못한 것이다.
+    measured_by: [swing_knee_angle_at_impact]
+    titles:
+      2: "끝까지 밀어 올린 도약"
+      1: "덜 펴진 도약"
+      0: "주저앉은 도약"
+    grades:
+      2: "최고점에서 무릎각 165도 이상"
+      1: "145~165도"
+      0: "145도 미만"
+    bands:
+      metric: swing_knee_angle_at_impact
+      2: [[165, null]]
+      1: [[145, 165]]
+      0: [[null, 145]]
+    anchors:
+      - measured: {swing_knee_angle_at_impact: 171.7}
+        grade: 2
+        evidence: "최고점에서 무릎각 171.7도로 다리가 곧게 펴졌다"
+      - measured: {swing_knee_angle_at_impact: 152.3}
+        grade: 1
+        evidence: "무릎각 152.3도로 신전이 덜 끝난 채 최고점 도달"
+      - measured: {swing_knee_angle_at_impact: 132.0}
+        grade: 0
+        evidence: "무릎각 132도로 다리가 접힌 채 최고점, 도약을 다 쓰지 못했다"
+
+  - id: trunk_alignment
+    name: 상체 정렬
+    weight: 0.25
+    rationale: >-
+      드라이브 속도를 안고 뛰어오르므로 상체가 앞으로 쏠리기 쉽다. 상체가 크게
+      기울면 림 아래로 흘러 들어가 각도가 사라지고 착지도 불안정해진다.
+    measured_by: [trunk_forward_lean_deg_at_impact]
+    titles:
+      2: "곧게 세운 상체"
+      1: "흔들린 상체"
+      0: "쏠린 상체"
+    grades:
+      2: "릴리스 시 상체 전방 기울기 -5~20도"
+      1: "20~35도 또는 -15~-5도"
+      0: "35도 초과 또는 -15도 미만"
+    bands:
+      metric: trunk_forward_lean_deg_at_impact
+      2: [[-5, 20]]
+      1: [[-15, -5], [20, 35]]
+      0: [[null, -15], [35, null]]
+    anchors:
+      - measured: {trunk_forward_lean_deg_at_impact: 18.7}
+        grade: 2
+        evidence: "상체 기울기 18.7도로 도약 방향과 정렬된 범위 안"
+      - measured: {trunk_forward_lean_deg_at_impact: 28.4}
+        grade: 1
+        evidence: "기울기 28.4도로 상체가 앞으로 다소 쏠렸다"
+      - measured: {trunk_forward_lean_deg_at_impact: 41.0}
+        grade: 0
+        evidence: "기울기 41도로 상체가 림 아래로 흘러 들어갔다"
+
+  - id: guide_arm
+    name: 반대 팔 처리
+    weight: 0.15
+    rationale: >-
+      반대 팔은 수비와 공 사이를 막고 균형을 잡는 자리다. 완전히 펴서 함께
+      밀면 두 손 슛이 되어 방향이 흔들리고, 아래로 떨어뜨리면 보호가 없다.
+    measured_by: [support_elbow_angle_at_impact]
+    titles:
+      2: "공을 지키는 반대 팔"
+      1: "어정쩡한 반대 팔"
+      0: "같이 밀어버린 반대 팔"
+    grades:
+      2: "릴리스 시 반대 팔 팔꿈치각 90~150도 (굽혀 올려 보호)"
+      1: "150~165도 또는 70~90도"
+      0: "165도 초과(완전 신전, 두 손 밀기) 또는 70도 미만"
+    bands:
+      metric: support_elbow_angle_at_impact
+      2: [[90, 150]]
+      1: [[70, 90], [150, 165]]
+      0: [[null, 70], [165, null]]
+    anchors:
+      - measured: {support_elbow_angle_at_impact: 118.0}
+        grade: 2
+        evidence: "반대 팔 팔꿈치각 118도로 굽혀 올려 공을 보호했다"
+      - measured: {support_elbow_angle_at_impact: 161.7}
+        grade: 1
+        evidence: "팔꿈치각 161.7도로 반대 팔이 거의 펴져 보호 역할이 약하다"
+      - measured: {support_elbow_angle_at_impact: 174.0}
+        grade: 0
+        evidence: "팔꿈치각 174도로 두 손으로 함께 밀어 방향이 흔들린다"
+
+# 포즈 추정만으로는 측정할 수 없어 v0.1에서 제외한 항목.
+deferred:
+  - id: takeoff_foot
+    name: 도약 발 (오른손 레이업 = 왼발 도약)
+    blocked_by: >-
+      지면 접촉 시점 검출 필요. 발목 높이만으로는 도약 발과 뒤따르는 발을
+      가릴 수 없다.
+  - id: release_follow_through
+    name: 릴리스 후 팔 유지
+    blocked_by: >-
+      임팩트 정의와 순환 — impact_event가 distal_apex라 손 최고점이 곧 임팩트다.
+      임팩트 이후 어깨 굴곡 추가 진행(swing_shoulder_flexion_after_impact_deg)은
+      정의상 0에 붙는다(실클립 0.0). 축구 루브릭의 swing_acceleration_timing과
+      같은 종류의 순환이므로 지표로 쓰지 않는다.
+  - id: ball_release_point
+    name: 공을 놓은 지점
+    blocked_by: >-
+      공-손목 분리 시점 검출 필요. 레이업은 공을 림까지 들고 가므로 실클립에서
+      공-손목 거리가 5~33프레임 내내 0.6 부근으로 일정했다 — 분리 사건이 없다.
+      선수가 화면에서 작을수록(실클립 약 150px) 더 붙는다.
+
+# 총점 등급 구간 (가중합 0.0~1.0 → 100점 환산)
+grade_bands:
+  A: 85
+  B: 70
+  C: 50
+  D: 0

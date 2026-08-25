@@ -1,0 +1,162 @@
+# 탁구 포핸드 드라이브 채점 루브릭
+#
+# ⚠️ 임계값은 **지도자 검수 전 임시값**이다 (미결 항목 2번).
+# ⚠️ **실클립 미검증** — 이 종목은 특히 확인이 필요하다. 동작 범위가 작아
+#    (팔꿈치 각도 변화가 축구·농구보다 훨씬 좁다) 포즈 추정 흔들림이 그대로
+#    지표에 실릴 수 있다. 임계값을 검수하기 전에 먼저 실클립으로 지표가
+#    안정적인지부터 확인한다.
+
+sport: table_tennis
+motion: forehand_drive
+sport_ko: 탁구
+motion_ko: 포핸드 드라이브
+version: 0.1
+status: draft
+review_required: true
+pipeline_version: pose-v0.1
+validated_on: ""
+
+kinematics:
+  impact_limb: arm
+  impact_event: extension_peak
+
+criteria:
+  - id: body_rotation
+    name: 몸통 회전
+    weight: 0.35
+    rationale: >-
+      드라이브의 힘은 팔이 아니라 허리 회전에서 나온다. 골반이 돌지 않고
+      팔로만 치면 회전량이 부족해 공이 뜨거나 네트에 걸린다.
+    measured_by: [hip_rotation_range_deg]
+    titles:
+      2: "허리로 치는 드라이브"
+      1: "덜 돌린 허리"
+      0: "팔로만 친 스윙"
+    grades:
+      2: "백스윙~타점 구간 골반 회전 범위 25도 이상"
+      1: "12~25도"
+      0: "12도 미만"
+    bands:
+      metric: hip_rotation_range_deg
+      2: [[25, null]]
+      1: [[12, 25]]
+      0: [[null, 12]]
+    anchors:
+      - measured: {hip_rotation_range_deg: 33.0}
+        grade: 2
+        evidence: "골반 회전 범위 33도로 허리 회전으로 쳤다"
+      - measured: {hip_rotation_range_deg: 17.0}
+        grade: 1
+        evidence: "회전 범위 17도로 허리 회전이 부족하다"
+      - measured: {hip_rotation_range_deg: 7.0}
+        grade: 0
+        evidence: "회전 범위 7도로 팔로만 쳤다"
+
+  - id: contact_arm_angle
+    name: 타점 팔 각도
+    weight: 0.25
+    rationale: >-
+      드라이브는 팔꿈치를 적당히 굽힌 채 감아올린다. 완전히 펴서 치면
+      회전을 걸 수 없고, 너무 접으면 몸에 붙어 공을 밀게 된다.
+    measured_by: [swing_elbow_angle_at_impact]
+    titles:
+      2: "감아올리는 팔"
+      1: "어긋난 팔 각도"
+      0: "밀어친 팔"
+    grades:
+      2: "타점에서 팔꿈치각 100~140도"
+      1: "140~160도 또는 80~100도"
+      0: "160도 초과(완전 신전) 또는 80도 미만"
+    bands:
+      metric: swing_elbow_angle_at_impact
+      2: [[100, 140]]
+      1: [[80, 100], [140, 160]]
+      0: [[null, 80], [160, null]]
+    anchors:
+      - measured: {swing_elbow_angle_at_impact: 121.0}
+        grade: 2
+        evidence: "타점에서 팔꿈치각 121도로 감아올리기 좋은 각도"
+      - measured: {swing_elbow_angle_at_impact: 151.0}
+        grade: 1
+        evidence: "팔꿈치각 151도로 팔이 다소 펴져 회전이 덜 걸린다"
+      - measured: {swing_elbow_angle_at_impact: 168.0}
+        grade: 0
+        evidence: "팔꿈치각 168도로 팔을 펴서 밀어쳤다"
+
+  - id: swing_follow_through
+    name: 스윙 마무리
+    weight: 0.2
+    rationale: >-
+      타점 후 라켓이 이마 앞쪽까지 올라가야 회전이 걸린다.
+      맞고 멈추면 공이 그냥 넘어가기만 한다.
+    measured_by: [swing_shoulder_flexion_after_impact_deg]
+    titles:
+      2: "감아 올린 마무리"
+      1: "짧은 마무리"
+      0: "멈춘 스윙"
+    grades:
+      2: "타점 후 어깨 굴곡이 20도 이상 추가 진행"
+      1: "8~20도"
+      0: "8도 미만"
+    bands:
+      metric: swing_shoulder_flexion_after_impact_deg
+      2: [[20, null]]
+      1: [[8, 20]]
+      0: [[null, 8]]
+    anchors:
+      - measured: {swing_shoulder_flexion_after_impact_deg: 28.0}
+        grade: 2
+        evidence: "타점 후 어깨 굴곡 28도 추가 진행, 라켓이 감아 올라갔다"
+      - measured: {swing_shoulder_flexion_after_impact_deg: 12.0}
+        grade: 1
+        evidence: "추가 굴곡 12도로 마무리가 짧다"
+      - measured: {swing_shoulder_flexion_after_impact_deg: 3.0}
+        grade: 0
+        evidence: "추가 굴곡 3도로 타점 직후 스윙이 멈췄다"
+
+  - id: stance_knee_flexion
+    name: 무릎 굽힘
+    weight: 0.2
+    rationale: >-
+      무릎을 굽혀 낮은 자세를 유지해야 회전을 아래에서 위로 걸 수 있다.
+      선 자세로 치면 상체만 쓰게 되고 다음 공에 대응하기 어렵다.
+    measured_by: [plant_knee_angle_at_impact]
+    titles:
+      2: "낮게 앉은 자세"
+      1: "높은 자세"
+      0: "뻣뻣하게 선 자세"
+    grades:
+      2: "타점에서 무릎각 130~160도"
+      1: "160~172도"
+      0: "172도 초과(선 자세) 또는 130도 미만"
+    bands:
+      metric: plant_knee_angle_at_impact
+      2: [[130, 160]]
+      1: [[160, 172]]
+      0: [[null, 130], [172, null]]
+    anchors:
+      - measured: {plant_knee_angle_at_impact: 147.0}
+        grade: 2
+        evidence: "타점에서 무릎각 147도로 낮은 자세를 유지했다"
+      - measured: {plant_knee_angle_at_impact: 166.0}
+        grade: 1
+        evidence: "무릎각 166도로 자세가 높다"
+      - measured: {plant_knee_angle_at_impact: 177.0}
+        grade: 0
+        evidence: "무릎각 177도로 뻣뻣하게 선 채 쳤다"
+
+deferred:
+  - id: ball_contact_height
+    name: 타구 높이
+    blocked_by: >-
+      탁구공은 작고 빨라 COCO 검출기로 잡히는지 확인되지 않았다.
+      sports_ball 클래스에 속하더라도 검출률부터 실측해야 한다.
+  - id: racket_angle
+    name: 라켓 면 각도
+    blocked_by: "라켓 검출이 실측에서 오검출만 나왔다 (pose.py 주석)."
+
+grade_bands:
+  A: 85
+  B: 70
+  C: 50
+  D: 0
