@@ -3,10 +3,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/sport/current_sport.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/async_view.dart';
 import '../../../auth/presentation/session_controller.dart';
 import '../../../team/data/models/sport.dart';
 import '../../../team/data/sport_providers.dart';
+
+/// 홈의 바탕. 인트로의 잉크가 걷힌 자리를 그대로 이어받는다.
+const Color _kHomeBg = Color(0xFF000000);
+
+/// 검은 바탕 위의 글자.
+const Color _kOnDark = Color(0xFFFFFFFF);
+
+/// 카드 면. 검정 위에 아주 옅은 흰 기 한 겹 — 로그인 버튼과 같은 방식이다.
+final Color _kCardFill = Colors.white.withValues(alpha: 0.06);
 
 /// 홈에서 갈라져 나가는 곳들.
 ///
@@ -74,6 +84,7 @@ class HomeScreen extends ConsumerWidget {
     final nickname = session is SessionLoggedIn ? session.user.nickname : '';
 
     return Scaffold(
+      backgroundColor: _kHomeBg,
       body: SafeArea(
         // 종목 목록은 리포지토리에서 온다. 지연·실패·빈 목록이 실제로
         // 발생하므로 네 상태를 AsyncView 한 곳에서 처리한다(스펙 6절).
@@ -91,7 +102,10 @@ class HomeScreen extends ConsumerWidget {
               const SizedBox(height: 28),
               Text(
                 '무엇을 할까요',
-                style: Theme.of(context).textTheme.titleMedium,
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(color: _kOnDark),
               ),
               const SizedBox(height: 12),
               GridView(
@@ -124,11 +138,15 @@ class HomeScreen extends ConsumerWidget {
         Expanded(
           child: Text(
             '$nickname 님,\n오늘도 뛰어볼까요',
-            style: Theme.of(context).textTheme.headlineSmall,
+            style: Theme.of(context)
+                .textTheme
+                .headlineSmall
+                ?.copyWith(color: _kOnDark),
           ),
         ),
         IconButton(
           key: const Key('home-logout'),
+          color: _kOnDark,
           icon: const Icon(Icons.logout),
           tooltip: '로그아웃',
           onPressed: () =>
@@ -153,6 +171,13 @@ class HomeScreen extends ConsumerWidget {
             key: Key('home-sport-${sport.code}'),
             label: Text(sport.name),
             selected: sport.code == selected,
+            showCheckmark: false,
+            backgroundColor: Colors.transparent,
+            selectedColor: AppTheme.seed,
+            labelStyle: TextStyle(
+              color: sport.code == selected ? _kHomeBg : _kOnDark,
+            ),
+            side: BorderSide(color: _kOnDark.withValues(alpha: 0.25)),
             onSelected: (_) =>
                 ref.read(currentSportProvider.notifier).select(sport.code),
           ),
@@ -168,10 +193,11 @@ class _DestinationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final dim = destination.isReady ? 1.0 : 0.55;
 
     return Card(
+      color: _kCardFill,
+      elevation: 0,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () {
@@ -188,13 +214,16 @@ class _DestinationCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(destination.icon, size: 26, color: scheme.primary),
+              Icon(destination.icon, size: 26, color: AppTheme.seed),
               const Spacer(),
               Opacity(
                 opacity: dim,
                 child: Text(
                   destination.title,
-                  style: Theme.of(context).textTheme.titleSmall,
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleSmall
+                      ?.copyWith(color: _kOnDark),
                 ),
               ),
               const SizedBox(height: 4),
@@ -202,17 +231,19 @@ class _DestinationCard extends StatelessWidget {
                 opacity: dim * 0.8,
                 child: Text(
                   destination.summary,
-                  style: Theme.of(context).textTheme.bodySmall,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: _kOnDark),
                 ),
               ),
               if (!destination.isReady) ...[
                 const SizedBox(height: 6),
                 Text(
                   '준비 중',
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelSmall
-                      ?.copyWith(color: scheme.outline),
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: _kOnDark.withValues(alpha: 0.5),
+                      ),
                 ),
               ],
             ],
