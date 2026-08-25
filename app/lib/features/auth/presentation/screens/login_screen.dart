@@ -6,7 +6,7 @@ import '../../../../core/mock/mock_db.dart';
 import '../../../../core/widgets/refractive_glass.dart';
 import '../../../../core/widgets/sheet_drag_physics.dart';
 import '../../../intro/presentation/screens/glitch_intro_screen.dart'
-    show kIntroInkColor;
+    show kIntroInkColor, kIntroPaper;
 import '../session_controller.dart';
 
 /// 접힘 상태에서 보이는 시트 높이 — 손잡이와 힌트, 이름이 들어간다.
@@ -250,7 +250,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             key: const Key('login-submit'),
             style: FilledButton.styleFrom(
               backgroundColor: _kOnPhoto,
-              foregroundColor: kIntroInkColor,
+              // 밝은 버튼 위에 민트 글자를 얹으면 안 읽힌다 — 어두운 쪽을 쓴다.
+              foregroundColor: kIntroPaper,
               minimumSize: const Size.fromHeight(52),
             ),
             onPressed: _busy

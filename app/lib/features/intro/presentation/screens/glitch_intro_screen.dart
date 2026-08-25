@@ -6,9 +6,12 @@ import '../../../../core/widgets/ink_bleed.dart';
 
 /// 앱을 켜면 한 번 지나가는 인트로.
 ///
-/// **바탕은 흰 종이다.** 여기에 잉크가 번져 어두워지고, 그 위에 얹힌 밝은
+/// **바탕은 어두운 판이다.** 여기에 민트 잉크가 번지고, 그 위에 얹힌 어두운
 /// 글자가 저절로 드러난다 — 글자는 나타나는 게 아니라 처음부터 그 자리에
 /// 있었다.
+///
+/// 원본은 흰 종이에 검은 잉크였다. 밝은 민트를 잉크로 쓰기로 하면서 뒤집었다 —
+/// 바탕(=글자)이 밝으면 민트 잉크와 밝기가 비슷해 글자가 안 읽힌다.
 ///
 /// 연출은 `com.sumworship/mobile`에서 가져왔다. 그쪽의 `FORMA`·`AuthService`·
 /// 홈 색상 의존만 이 프로젝트 것으로 갈아 끼웠고, 잉크의 수치는 건드리지
@@ -17,18 +20,18 @@ import '../../../../core/widgets/ink_bleed.dart';
 /// 바탕색.
 ///
 /// **글자색과 같은 값이어야 한다.** 잉크가 번져야 글자가 드러나는 연출이라,
-/// 둘이 갈리면 글자가 처음부터 보인다.
-const Color kIntroPaper = Color(0xFFF4F3EF);
+/// 둘이 갈리면 글자가 처음부터 보인다. 그리고 [kIntroInkColor]와 밝기가
+/// 충분히 벌어져야 한다 — 그 대비가 글자를 읽히게 하는 유일한 수단이다.
+const Color kIntroPaper = Color(0xFF0E2A14);
 
 /// 글자색. [kIntroPaper]와 같다 — 위 주의 참고.
 const Color kIntroInk = kIntroPaper;
 
-/// 화면을 적시는 잉크의 색.
+/// 화면을 적시는 잉크의 색. 앱 테마의 씨앗색(`AppTheme.seed`)과 같은 민트다.
 ///
-/// 앱 테마의 씨앗색(`AppTheme.seed`, 짙은 초록)을 더 눌러 잉크로 쓴다.
-/// **디자인이 확정되면 이 세 상수는 `AppTheme`으로 옮긴다** — 지금은 인트로
-/// 말고 이 색을 쓰는 화면이 없어서 여기 둔다.
-const Color kIntroInkColor = Color(0xFF0E2A14);
+/// **디자인이 확정되면 이 세 상수는 `AppTheme`으로 옮긴다** — 지금은 인트로와
+/// 로그인 말고 이 색을 쓰는 화면이 없어서 여기 둔다.
+const Color kIntroInkColor = Color(0xFF70ED88);
 
 /// 글자 크기.
 ///
