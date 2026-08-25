@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/auth/data/models/app_user.dart';
+import '../../features/team/data/models/sport.dart';
 import '../../features/team/data/models/team.dart';
 import '../../features/team/data/models/team_member.dart';
-import '../sport/sport.dart';
 
 /// 모든 Mock 리포지토리가 공유하는 단일 인메모리 저장소.
 ///

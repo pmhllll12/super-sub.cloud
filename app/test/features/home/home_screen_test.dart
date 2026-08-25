@@ -31,6 +31,21 @@ Future<ProviderContainer> _pumpLoggedIn(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('종목을 불러오는 동안 로딩을 보여준다', (tester) async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(home: HomeScreen()),
+    ));
+    // 종목 목록도 리포지토리에서 온다 — 첫 프레임은 아직 로딩이다.
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
   testWidgets('닉네임과 현재 종목을 보여준다', (tester) async {
     await _pumpLoggedIn(tester);
     expect(find.textContaining('김용병'), findsOneWidget);
