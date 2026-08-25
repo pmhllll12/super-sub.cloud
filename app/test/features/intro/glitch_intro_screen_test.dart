@@ -4,7 +4,20 @@ import 'package:super_sub/core/widgets/ink_bleed.dart';
 import 'package:super_sub/features/intro/presentation/screens/glitch_intro_screen.dart';
 
 void main() {
-  testWidgets('첫 프레임부터 로고가 바탕과 다른 색으로 떠 있다', (tester) async {
+  test('로고는 종이색으로 시작해 잉크가 번지는 만큼 민트로 물든다', () {
+    // 처음에는 종이와 같은 색이라 안 보인다.
+    expect(introLogoColor(0), kIntroPaper);
+    expect(introLogoColor(0.10), kIntroPaper);
+    // 다 번진 뒤에는 브랜드 민트다.
+    expect(introLogoColor(0.6), kIntroInk);
+    expect(introLogoColor(1.0), kIntroInk);
+    // 사이에서는 둘 다 아니다 — 물드는 중이다.
+    final mid = introLogoColor(0.33);
+    expect(mid, isNot(kIntroPaper));
+    expect(mid, isNot(kIntroInk));
+  });
+
+  testWidgets('첫 프레임에는 로고가 바탕색이라 보이지 않는다', (tester) async {
     await tester.pumpWidget(
       MaterialApp(home: GlitchIntroScreen(onDone: () {})),
     );
@@ -14,10 +27,8 @@ void main() {
     expect(scaffold.backgroundColor, kIntroPaper);
 
     final text = tester.widget<Text>(find.text('SUPERSUB').first);
-    // 로고는 한순간도 사라지면 안 된다 — 바탕색과 같으면 잉크가 덮기 전까지
-    // 보이지 않는다.
-    expect(text.style?.color, kIntroInk);
-    expect(kIntroInk, isNot(kIntroPaper));
+    // 잉크가 아직 안 번진 첫 프레임에서는 종이와 같은 색이다.
+    expect(text.style?.color, kIntroPaper);
 
     // 컨트롤러가 아직 돌고 있다 — 끝까지 흘려보내야 티커가 안 남는다.
     await tester.pump(const Duration(milliseconds: 3200));

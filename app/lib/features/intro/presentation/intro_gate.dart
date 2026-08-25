@@ -156,16 +156,23 @@ class _FlyingBrand extends StatelessWidget {
           final v = _kFlightCurve.transform(t.value);
           final at = Offset.lerp(from, to, v)!;
           final size = lerpDouble(kIntroBrandSize, kBrandLandedSize, v)!;
-          return Positioned(
-            left: at.dx,
-            top: at.dy,
-            child: FractionalTranslation(
-              translation: const Offset(-0.5, -0.5),
-              child: Text(
-                kBrandText,
-                style: BrandMark.styleFor(size, AppTheme.seed),
+          // **Positioned는 Stack의 직접 자식이어야 한다.** 바깥 Stack에
+          // IgnorePointer를 통해 넘기면 배치가 먹지 않아 글자가 안 그려진다 —
+          // 로고가 인트로 끝에서 사라지던 원인이 이것이었다.
+          return Stack(
+            children: [
+              Positioned(
+                left: at.dx,
+                top: at.dy,
+                child: FractionalTranslation(
+                  translation: const Offset(-0.5, -0.5),
+                  child: Text(
+                    kBrandText,
+                    style: BrandMark.styleFor(size, AppTheme.seed),
+                  ),
+                ),
               ),
-            ),
+            ],
           );
         },
       ),
