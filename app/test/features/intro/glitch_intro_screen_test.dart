@@ -53,6 +53,10 @@ void main() {
     await tester.pump();
     expect(done, isFalse);
 
+    // 인트로는 잉크 지도가 준비된 뒤에 애니메이션을 시작한다. 테스트에서는
+    // 셰이더 로드가 실패하고 바로 돌아오지만 그래도 비동기라, 한 번 흘려
+    // 보내야 컨트롤러가 돈다.
+    await tester.pump(const Duration(milliseconds: 50));
     await tester.pump(const Duration(milliseconds: 3700));
     expect(done, isTrue);
   });

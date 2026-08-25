@@ -33,7 +33,10 @@ void main() {
     await tester.enterText(find.byKey(const Key('login-email')), 'x@y.test');
     await tester.enterText(find.byKey(const Key('login-password')), 'pw');
     await tester.tap(find.byKey(const Key('login-submit')));
+    // 버튼은 눌림 애니메이션(340ms)이 끝난 뒤에 동작한다 — 눌린 것이 눈에
+    // 보이고 나서 화면이 움직이게 하려는 것이다.
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     // 탭 시점에 SessionController가 초기화되며 fire-and-forget _restore()
     // (Mock 300ms 지연)도 함께 뜬다. 같은 이유로 pump가 필요한 사례가
     // smoke_test.dart에도 있다 — 이 pump는 login()과 _restore() 양쪽을
@@ -52,7 +55,9 @@ void main() {
     ));
 
     await tester.tap(find.text('팀 관리자'));
+    // 눌림 애니메이션(340ms)을 먼저 흘려보낸다.
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     // 위와 동일 — smoke_test.dart의 pump(500ms) 관용구 참고.
     await tester.pump(const Duration(milliseconds: 500));
 

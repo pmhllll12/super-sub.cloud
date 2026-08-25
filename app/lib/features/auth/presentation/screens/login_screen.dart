@@ -31,19 +31,22 @@ const LinearGradient _kPhotoScrim = LinearGradient(
   stops: [0, 0.55],
 );
 
-/// 버튼 테두리.
-///
-/// **면은 비운다** — 어두운 막을 깔면서 흰 면이 뿌옇게 떴다. 대신 뒤의
-/// 굴절된 사진이 그대로 비치고, 아주 옅은 선이 형태만 세운다.
-///
-/// 버튼 자리에 진짜 유리(BackdropFilter)를 한 겹 더 넣을 수는 없다.
-/// `refractive_glass.dart`가 "자식 안에 유리를 또 넣지 않는다 — 안쪽이 아직
-/// 안 끝난 바깥을 읽어 내용이 프레임째로 사라진다"고 못박아 뒀고, 버튼은
-/// 이미 유리 시트 안이다.
-final Color _kButtonEdge = Colors.white.withValues(alpha: 0.15);
+// --- 로그인 버튼 -------------------------------------------------------
+//
+// 형태는 `com.sumworship`의 로그인 버튼 그대로다 — 알약 테두리에 아주 옅은
+// 면, 누르면 살짝 줄었다 튕겨 돌아온다. 글꼴만 이 프로젝트 것을 쓴다.
 
-/// 버튼 모서리.
-const double _kButtonRadius = 14;
+/// 버튼 높이. 라벨 크기와 따로 둔다 — 라벨을 줄였다고 버튼이 납작해지면 안 된다.
+const double _kButtonHeight = 54.0;
+
+/// 알약이 되도록 높이의 절반.
+const double _kButtonRadius = 27.0;
+
+const TextStyle _kButtonLabel = TextStyle(
+  fontVariations: [FontVariation('wght', 900)],
+  color: _kOnPhoto,
+  fontSize: 16,
+);
 
 /// 유리 세기. 시트가 고정이라 늘 최대다.
 ///
@@ -204,23 +207,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ],
               const SizedBox(height: 22),
-              FilledButton(
+              _GlassButton(
                 key: const Key('login-submit'),
-                style: _glassButton,
-                onPressed: _busy
-                    ? null
-                    : () => _run(
-                          () => ref
-                              .read(notifier)
-                              .login(_email.text, _password.text),
-                        ),
-                child: _busy
-                    ? const SizedBox(
-                        height: 18,
-                        width: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('로그인'),
+                label: '로그인',
+                enabled: !_busy,
+                busy: _busy,
+                onTap: () => _run(
+                  () => ref.read(notifier).login(_email.text, _password.text),
+                ),
               ),
               if (kDebugMode) ...[
                 // 개발용 구획은 실제 로그인과 성격이 다르다 — 사이를 벌려
@@ -240,21 +234,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   label: '개인 사용자 (데이터 있음)',
                   userId: MockDb.playerId,
                   busy: _busy,
-                  style: _glassButton,
                   onTap: (id) => _run(() => ref.read(notifier).loginAs(id)),
                 ),
                 _DevLoginButton(
                   label: '팀 관리자',
                   userId: MockDb.managerId,
                   busy: _busy,
-                  style: _glassButton,
                   onTap: (id) => _run(() => ref.read(notifier).loginAs(id)),
                 ),
                 _DevLoginButton(
                   label: '신규 가입자 (데이터 0건)',
                   userId: MockDb.newbieId,
                   busy: _busy,
-                  style: _glassButton,
                   onTap: (id) => _run(() => ref.read(notifier).loginAs(id)),
                 ),
               ],
@@ -264,24 +255,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
     );
   }
-
-  /// 모든 버튼이 같은 유리 면을 쓴다 — 테두리는 두르지 않는다. 형태를
-  /// 세우는 건 테두리가 아니라 이 면이다.
-  ButtonStyle get _glassButton => FilledButton.styleFrom(
-        backgroundColor: Colors.transparent,
-        foregroundColor: _kOnPhoto,
-        disabledBackgroundColor: Colors.transparent,
-        disabledForegroundColor: _kOnPhoto.withValues(alpha: 0.4),
-        side: BorderSide(color: _kButtonEdge),
-        elevation: 0,
-        // 컴팩트하게 — 높이를 강제하지 않고 패딩으로만 잡는다.
-        minimumSize: Size.zero,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(_kButtonRadius),
-        ),
-      );
 
   Widget _field({
     required Key key,
@@ -319,24 +292,152 @@ class _DevLoginButton extends StatelessWidget {
     required this.userId,
     required this.busy,
     required this.onTap,
-    required this.style,
   });
 
   final String label;
   final String userId;
   final bool busy;
   final void Function(String userId) onTap;
-  final ButtonStyle style;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: FilledButton(
-        style: style,
-        onPressed: busy ? null : () => onTap(userId),
-        child: Text(label),
+      padding: const EdgeInsets.only(bottom: 12),
+      child: _GlassButton(
+        label: label,
+        enabled: !busy,
+        onTap: () => onTap(userId),
       ),
     );
   }
+}
+
+/// 누르면 0.95배로 살짝 줄었다가 통통 튕기듯 돌아온 뒤 [onTap]을 부르는 버튼.
+///
+/// 형태는 `com.sumworship`의 로그인 버튼과 같다 — 면은 거의 비우고 테두리로
+/// 세운다. 시트가 이미 유리라 그 위에 또 면을 얹으면 겹겹이 뿌예진다.
+class _GlassButton extends StatefulWidget {
+  const _GlassButton({
+    super.key,
+    required this.label,
+    required this.onTap,
+    this.enabled = true,
+    this.busy = false,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+  final bool enabled;
+
+  /// 참이면 라벨 대신 인디케이터를 그린다.
+  final bool busy;
+
+  @override
+  State<_GlassButton> createState() => _GlassButtonState();
+}
+
+class _GlassButtonState extends State<_GlassButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _press = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 340),
+  );
+
+  late final Animation<double> _scale = TweenSequence<double>([
+    TweenSequenceItem(
+      weight: 30,
+      tween: Tween(begin: 1.0, end: 0.95)
+          .chain(CurveTween(curve: Curves.easeOut)),
+    ),
+    TweenSequenceItem(
+      weight: 70,
+      tween: Tween(begin: 0.95, end: 1.0)
+          .chain(CurveTween(curve: Curves.easeOutBack)),
+    ),
+  ]).animate(_press);
+
+  @override
+  void dispose() {
+    _press.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleTap() async {
+    if (!widget.enabled || _press.isAnimating) return;
+    // 튕김이 끝난 뒤에 부른다 — 눌린 것이 눈에 보이고 나서 화면이 움직인다.
+    await _press.forward(from: 0);
+    if (!mounted) return;
+    widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _handleTap,
+      child: AnimatedBuilder(
+        animation: _scale,
+        builder: (context, child) =>
+            Transform.scale(scale: _scale.value, child: child),
+        child: SizedBox(
+          height: _kButtonHeight,
+          child: CustomPaint(
+            painter: const _LoginOutline(),
+            child: Center(
+              child: widget.busy
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: _kOnPhoto,
+                      ),
+                    )
+                  : Text(
+                      widget.label,
+                      style: widget.enabled
+                          ? _kButtonLabel
+                          : _kButtonLabel.copyWith(
+                              color: _kOnPhoto.withValues(alpha: 0.4),
+                            ),
+                    ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 버튼의 테두리와 옅은 면.
+class _LoginOutline extends CustomPainter {
+  const _LoginOutline();
+
+  static const double _width = 1.4;
+
+  /// 선의 밝기. **사방이 같다** — 그라데이션을 주면 한쪽만 흰 테두리로 보인다.
+  static const double _lit = 0.75;
+
+  /// 면의 밝기. "덮였다"가 아니라 "밝다"로만 읽힐 만큼.
+  static const double _fill = 0.13;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      const Radius.circular(_kButtonRadius),
+    ).deflate(_width / 2);
+
+    canvas.drawRRect(r, Paint()..color = _kOnPhoto.withValues(alpha: _fill));
+    canvas.drawRRect(
+      r,
+      Paint()
+        ..color = _kOnPhoto.withValues(alpha: _lit)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = _width
+        ..isAntiAlias = true,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_LoginOutline old) => false;
 }
