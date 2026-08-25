@@ -43,6 +43,11 @@ const Alignment _kNodPivot = Alignment(-0.30, 0.24);
 /// **세로를 채우고 오른쪽을 잘라 낸다.** 사진은 세로가 짧아 화면에 맞추면
 /// 좌우가 남는데, 왼쪽에 얼굴이 있으므로 왼쪽을 기준으로 붙이고 오른쪽
 /// (뒤통수 바깥)이 잘리게 둔다.
+///
+/// **인물과 배경이 두 장이다.** 한 장을 통째로 돌리면 사진 가장자리가 드러나
+/// 검은 바탕이 옆에서 새어 나온다. 인물만 알파로 떼어 두면 배경은 가만히
+/// 있고 인물만 움직인다. 배경 판에는 인물 자리를 지운 자국이 옅게 남아 있어,
+/// 인물이 끄덕일 때 드러나는 틈에 검정 대신 제 그림자가 보인다.
 class FigureBackground extends StatefulWidget {
   const FigureBackground({super.key, this.breathe = false});
 
@@ -75,22 +80,26 @@ class _FigureBackgroundState extends State<FigureBackground>
 
   @override
   Widget build(BuildContext context) {
-    final figure = Align(
-      alignment: Alignment.topCenter,
-      child: FractionallySizedBox(
-        heightFactor: _kFigureHeightFactor,
-        child: const Image(
-          image: AssetImage('assets/images/home_figure.jpg'),
-          fit: BoxFit.cover,
-          alignment: Alignment.centerLeft,
-        ),
-      ),
-    );
+    // 두 장이 정확히 같은 자리에 놓여야 겹쳐 보인다 — 같은 비율·같은 정렬.
+    Widget layer(String asset) => Align(
+          alignment: Alignment.topCenter,
+          child: FractionallySizedBox(
+            heightFactor: _kFigureHeightFactor,
+            child: Image(
+              image: AssetImage(asset),
+              fit: BoxFit.cover,
+              alignment: Alignment.centerLeft,
+            ),
+          ),
+        );
+
+    final figure = layer('assets/images/home_cut.png');
 
     final ctrl = _ctrl;
     return Stack(
       fit: StackFit.expand,
       children: [
+        layer('assets/images/home_bg.jpg'),
         if (ctrl == null)
           figure
         else
