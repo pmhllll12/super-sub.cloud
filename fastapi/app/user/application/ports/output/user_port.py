@@ -1,0 +1,40 @@
+"""출력 포트.
+
+유스케이스가 **저장소의 구현을 모르게** 하는 경계다. 지금은 스텁이 이 자리에
+들어가고 DB 가 생기면 PostgreSQL 구현이 들어간다 — 유스케이스는 고치지 않는다.
+
+포트는 **엔티티와 값 객체로 말한다.** DTO 는 인바운드 쪽 경계용이라 여기서 쓰지 않는다.
+"""
+
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from uuid import UUID
+
+from app.user.domain.entities.membership_entity import MembershipEntity
+from app.user.domain.entities.user_entity import UserEntity
+from app.user.domain.value_objects.email_vo import Email
+from app.user.domain.value_objects.password_vo import Password
+
+
+class UserPort(ABC):
+    @abstractmethod
+    def email_exists(self, email: Email) -> bool:
+        """이미 가입된 이메일인지."""
+
+    @abstractmethod
+    def find_by_credentials(
+        self, email: Email, password: Password
+    ) -> UserEntity | None:
+        """자격증명이 맞으면 사용자를, 아니면 None 을 돌려준다.
+
+        **왜 틀렸는지는 알려주지 않는다** — 호출 쪽이 구분하지 못하게 해서
+        가입 여부가 새어 나가는 것을 막는다.
+        """
+
+    @abstractmethod
+    def get(self, user_id: UUID) -> UserEntity | None: ...
+
+    @abstractmethod
+    def list_memberships(self, user_id: UUID) -> list[MembershipEntity]:
+        """탈퇴 이력을 포함한 전체 소속. 거르는 것은 도메인 규칙의 몫이다."""

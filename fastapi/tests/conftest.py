@@ -4,7 +4,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.user.adapter.outbound.stub_repository import DEMO_EMAIL, DEMO_PASSWORD
+from app.user.adapter.outbound.repositories.user_stub_repository import (
+    DEMO_EMAIL,
+    DEMO_PASSWORD,
+)
 
 V1 = "/api/v1"
 
