@@ -61,7 +61,9 @@ header_pages:
 # demo/ is a separate, self-contained Jekyll site (its own _config.yml,
 # Gemfile, layouts) kept here for reference — excluded so it doesn't get
 # built or served as part of this site. supersub-preview.service is the
-# systemd unit for the local preview server, not site content.
+# systemd unit for the local preview server, not site content. fastapi/ is the
+# backend API server source, not site content.
 exclude:
   - demo/
   - supersub-preview.service
+  - fastapi/
