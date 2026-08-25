@@ -26,7 +26,8 @@ Future<ProviderContainer> _pumpLoggedIn(WidgetTester tester) async {
   );
   container.read(currentSportProvider.notifier).select('futsal');
   await tester.pump(const Duration(milliseconds: 500));
-  await tester.pumpAndSettle();
+  // **pumpAndSettle을 쓰지 않는다.** 유리 조각의 테두리를 도는 빛이 무한
+  // 반복이라 영영 안 멎는다.
   return container;
 }
 
@@ -56,7 +57,8 @@ void main() {
   testWidgets('종목 칩으로 전환할 수 있다', (tester) async {
     final container = await _pumpLoggedIn(tester);
     await tester.tap(find.byKey(const Key('home-sport-baseball')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     expect(container.read(currentSportProvider), equals('baseball'));
   });
 

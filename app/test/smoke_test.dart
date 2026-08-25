@@ -11,7 +11,6 @@ void main() {
       child: const SuperSubApp(),
     ));
     await tester.pump(const Duration(milliseconds: 500));
-    await tester.pumpAndSettle();
     expect(find.text('로그인'), findsWidgets);
   });
 }
