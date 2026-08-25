@@ -78,8 +78,8 @@ void main() {
 
   testWidgets('아직 없는 화면은 준비 중으로 표시한다', (tester) async {
     await _pumpLoggedIn(tester);
-    // 프로필만 실제 화면이 있다 — 나머지 다섯은 준비 중이다.
-    expect(find.text('준비 중'), findsNWidgets(5));
+    // 영상 분석과 프로필만 실제 화면이 있다 — 나머지 넷은 준비 중이다.
+    expect(find.text('준비 중'), findsNWidgets(4));
   });
 
   testWidgets('바 메뉴를 열면 로그아웃 칸이 선다', (tester) async {

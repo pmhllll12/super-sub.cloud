@@ -9,6 +9,7 @@ import '../../features/intro/presentation/screens/glitch_intro_screen.dart'
     show kIntroInkColor;
 import '../widgets/ink_bleed.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
+import '../../features/video/presentation/screens/video_analysis_screen.dart';
 
 /// GoRouter를 provider가 매번 다시 만들면 내비게이션 스택이 날아간다.
 /// 그래서 라우터는 한 번만 만들고, 세션 변화는 ValueNotifier로 흘려보내
@@ -72,6 +73,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             child: child,
           ),
         ),
+      ),
+      GoRoute(
+        path: '/videos',
+        builder: (_, _) => const VideoAnalysisScreen(),
       ),
       GoRoute(
         path: '/profile',

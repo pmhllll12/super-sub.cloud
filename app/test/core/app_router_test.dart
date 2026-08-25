@@ -80,6 +80,19 @@ void main() {
     expect(find.text('영상 분석'), findsNothing);
   });
 
+  testWidgets('영상 분석 카드가 자기 화면으로 데려간다', (tester) async {
+    await _pumpHome(tester);
+
+    await tester.ensureVisible(find.text('영상 분석'));
+    await tester.pump();
+    await tester.tap(find.text('영상 분석'));
+    await tester.pump(const Duration(milliseconds: 500));
+
+    // 화면의 제목과 바로 찍는 버튼이 선다.
+    expect(find.byKey(const Key('video-camera')), findsOneWidget);
+    expect(find.text('분석할 영상을 올리세요'), findsOneWidget);
+  });
+
   testWidgets('로그인 상태에서 다른 라우트는 그대로 통과한다', (tester) async {
     await _pumpHome(tester);
 
