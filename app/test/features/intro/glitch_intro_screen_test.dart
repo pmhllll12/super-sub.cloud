@@ -4,17 +4,14 @@ import 'package:super_sub/core/widgets/ink_bleed.dart';
 import 'package:super_sub/features/intro/presentation/screens/glitch_intro_screen.dart';
 
 void main() {
-  test('로고는 종이색으로 시작해 잉크가 번지는 만큼 민트로 물든다', () {
-    // 처음에는 종이와 같은 색이라 안 보인다.
+  test('로고는 종이색으로 시작한다 — 그래서 첫 프레임에는 안 보인다', () {
+    // 바탕과 같은 색이면 잉크가 둘레를 채우기 전까지 묻힌다. 지금은 종이와
+    // 로고가 같은 민트라 이 함수가 사실상 항등이지만, 둘을 다시 갈라 놓아도
+    // "처음에는 바탕색"이라는 성질은 그대로 지켜져야 한다.
     expect(introLogoColor(0), kIntroPaper);
     expect(introLogoColor(0.10), kIntroPaper);
-    // 다 번진 뒤에는 브랜드 민트다.
     expect(introLogoColor(0.6), kIntroInk);
     expect(introLogoColor(1.0), kIntroInk);
-    // 사이에서는 둘 다 아니다 — 물드는 중이다.
-    final mid = introLogoColor(0.33);
-    expect(mid, isNot(kIntroPaper));
-    expect(mid, isNot(kIntroInk));
   });
 
   testWidgets('첫 프레임에는 로고가 바탕색이라 보이지 않는다', (tester) async {
