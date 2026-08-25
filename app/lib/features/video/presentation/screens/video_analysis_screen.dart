@@ -17,6 +17,9 @@ const double _kPanelRadius = 18;
 /// 위쪽 가로 판의 높이.
 const double _kTopPanelHeight = 150;
 
+/// 판과 화면 벽 사이.
+const double _kEdge = 6;
+
 /// 고르는 판 둘의 높이.
 const double _kPickerHeight = 96;
 
@@ -64,19 +67,17 @@ class _VideoAnalysisScreenState extends ConsumerState<VideoAnalysisScreen> {
           const FigureBackground(),
           SafeArea(
             child: Padding(
+              // 판을 화면 벽에 붙인다. 바는 자리를 차지하지 않고 떠 있으므로
+              // 딱 그 높이만큼만 띄워 판이 바로 위까지 오게 한다.
               padding: EdgeInsets.fromLTRB(
-                20,
-                12,
-                20,
-                // 바는 자리를 차지하지 않고 떠 있다. 딱 그 높이만큼만 띄워
-                // 판이 바로 위까지 오게 한다.
+                _kEdge,
+                _kEdge,
+                _kEdge,
                 FloatingNavBar.heightOf(context),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _header(context),
-                  const SizedBox(height: 14),
                   SizedBox(
                     height: _kTopPanelHeight,
                     child: GlassPanel(
@@ -150,30 +151,6 @@ class _VideoAnalysisScreenState extends ConsumerState<VideoAnalysisScreen> {
     );
   }
 
-  Widget _header(BuildContext context) {
-    return Row(
-      children: [
-        IconButton(
-          key: const Key('video-back'),
-          color: _kOnDark,
-          icon: const Icon(Symbols.arrow_back, weight: 300),
-          tooltip: '뒤로',
-          onPressed: () =>
-              context.canPop() ? context.pop() : context.go('/home'),
-        ),
-        const Expanded(
-          child: Text(
-            '영상 분석',
-            style: TextStyle(
-              color: _kOnDark,
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 /// 영상을 어디서 가져올지 고르는 판. 다른 판과 같은 유리다.
