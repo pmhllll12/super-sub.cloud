@@ -66,6 +66,18 @@ class FloatingNavBar extends StatelessWidget {
   static double notchRight(BuildContext context) =>
       context.d(72.7) + context.d(290.2 * _pillScale) + context.d(10.2);
 
+  /// 아이콘 중심 사이의 거리.
+  ///
+  /// **줄이 `spaceEvenly`라 앞뒤에도 같은 틈이 들어간다.** 오른쪽 여백만 보고
+  /// 셈하면 그 틈 하나만큼 어긋난다.
+  static double iconStep(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final row = width - context.d(40) - notchRight(context);
+    final icon = iconWidth(context);
+    const slots = 4;
+    return icon + (row - icon * slots) / (slots + 1);
+  }
+
   /// 바가 화면 아래에서 가리는 높이.
   ///
   /// 바는 자리를 차지하지 않고 떠 있다. 바 밑까지 번지는 화면은 자기 내용을

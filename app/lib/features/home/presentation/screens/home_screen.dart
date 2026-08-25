@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/sport/current_sport.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/async_view.dart';
+import '../../../../core/widgets/bar_menu.dart';
 import '../../../../core/widgets/floating_nav_bar.dart';
 import '../../../auth/presentation/session_controller.dart';
 import '../../../team/data/models/sport.dart';
@@ -76,22 +77,92 @@ const List<_Destination> _kDestinations = [
 ];
 
 /// 앱의 첫 화면. 여기서 모든 곳으로 갈라진다.
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with SingleTickerProviderStateMixin {
+  /// 바 넷째 아이콘에서 열리는 메뉴의 진행도.
+  late final AnimationController _menu = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 420),
+  );
+
+  bool _menuOpen = false;
+
+  @override
+  void dispose() {
+    _menu.dispose();
+    super.dispose();
+  }
+
+  void _toggleMenu() {
+    setState(() => _menuOpen = !_menuOpen);
+    _menuOpen ? _menu.forward() : _menu.reverse();
+  }
+
+  void _closeMenu() {
+    if (!_menuOpen) return;
+    setState(() => _menuOpen = false);
+    _menu.reverse();
+  }
+
+  void _onNavTap(int index) {
+    if (index == FloatingNavBar.menuIndex) {
+      _toggleMenu();
+      return;
+    }
+    _closeMenu();
+    if (index == 0) return; // 이미 홈이다.
+    _notReady();
+  }
+
+  void _onMenuPick(BarMenuItem item) {
+    _closeMenu();
+    switch (item) {
+      case BarMenuItem.logout:
+        ref.read(sessionControllerProvider.notifier).logout();
+      case BarMenuItem.login:
+        // 홈은 로그인한 뒤에만 보이는 화면이라 여기 설 일이 없다.
+        break;
+      case BarMenuItem.credits:
+      case BarMenuItem.coach:
+      case BarMenuItem.settings:
+        _notReady(item.label);
+    }
+  }
+
+  void _notReady([String? what]) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${what ?? '이 기능'} — 준비 중입니다')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final session = ref.watch(sessionControllerProvider);
     final nickname = session is SessionLoggedIn ? session.user.nickname : '';
 
     return Scaffold(
       backgroundColor: _kHomeBg,
       // 바는 SafeArea 밖에 떠 있다 — 안에 넣으면 홈 인디케이터 위에서 잘린다.
-      bottomNavigationBar: FloatingNavBar(
-        currentIndex: 0,
-        onTap: (index) => ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('준비 중입니다')),
-        ),
+      // 메뉴는 바 바로 위에 선다. 닫혀 있어도 자리를 잡아 두어 열릴 때
+      // 바가 밀리지 않는다.
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          BarMenu(
+            open: _menu,
+            loggedIn: ref.watch(sessionControllerProvider) is SessionLoggedIn,
+            step: FloatingNavBar.iconStep(context),
+            onPick: _onMenuPick,
+          ),
+          FloatingNavBar(currentIndex: 0, onTap: _onNavTap),
+        ],
       ),
       extendBody: true,
       body: SafeArea(
@@ -108,12 +179,14 @@ class HomeScreen extends ConsumerWidget {
               20,
               12,
               20,
-              FloatingNavBar.heightOf(context) + 24,
+              FloatingNavBar.heightOf(context) +
+                  BarMenu.heightOf(context) +
+                  24,
             ),
             children: [
-              _header(context, ref, nickname),
+              _header(context, nickname),
               const SizedBox(height: 18),
-              _sportChips(ref, sports),
+              _sportChips(sports),
               const SizedBox(height: 28),
               Text(
                 '무엇을 할까요',
@@ -147,7 +220,7 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _header(BuildContext context, WidgetRef ref, String nickname) {
+  Widget _header(BuildContext context, String nickname) {
     return Row(
       children: [
         Expanded(
@@ -176,7 +249,7 @@ class HomeScreen extends ConsumerWidget {
   /// 예전에는 로그인 직후 "어떤 종목을 하시나요?" 화면이 따로 떴다. 첫 화면이
   /// 질문 하나로 채워지는 것이 이상해서 없애고 여기 칩으로 옮겼다. 아직 고르지
   /// 않았으면 목록의 첫 종목을 쓴다.
-  Widget _sportChips(WidgetRef ref, List<Sport> sports) {
+  Widget _sportChips(List<Sport> sports) {
     final selected = ref.watch(currentSportProvider) ?? sports.first.code;
     return Wrap(
       spacing: 8,

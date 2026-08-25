@@ -79,6 +79,32 @@ void main() {
     expect(find.text('준비 중'), findsNWidgets(5));
   });
 
+  testWidgets('바 메뉴를 열면 로그아웃 칸이 선다', (tester) async {
+    await _pumpLoggedIn(tester);
+    // 닫혀 있을 때는 아무 칸도 세우지 않는다.
+    expect(find.byKey(const Key('barmenu-logout')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('navbar-icon-menu')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.byKey(const Key('barmenu-logout')), findsOneWidget);
+    // 로그인·로그아웃은 함께 설 수 없다.
+    expect(find.byKey(const Key('barmenu-login')), findsNothing);
+  });
+
+  testWidgets('바 메뉴의 로그아웃으로 세션이 끝난다', (tester) async {
+    final container = await _pumpLoggedIn(tester);
+
+    await tester.tap(find.byKey(const Key('navbar-icon-menu')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.byKey(const Key('barmenu-logout')));
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(container.read(sessionControllerProvider), isA<SessionLoggedOut>());
+  });
+
   testWidgets('로그아웃 버튼이 있다', (tester) async {
     final container = await _pumpLoggedIn(tester);
     await tester.tap(find.byKey(const Key('home-logout')));
