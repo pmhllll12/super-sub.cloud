@@ -153,10 +153,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           // 여기만 바꾸면 비행도 따라온다.
           const SizedBox(height: 96),
           // 인트로의 글자가 날아와 앉는 자리다 — 같은 위젯, 같은 글꼴.
+          // 인트로의 글자가 날아와 앉는 자리이자, 홈으로 갈 때 하단 바의
+          // 알약으로 다시 날아가는 출발점이다.
           Center(
-            child: BrandMark(
-              key: kBrandLandingKey,
-              fontSize: kBrandLandedSize,
+            child: brandHero(
+              child: BrandMark(
+                key: kBrandLandingKey,
+                fontSize: kBrandLandedSize,
+              ),
             ),
           ),
           Expanded(child: _form()),

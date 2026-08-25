@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/sport/current_sport.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/async_view.dart';
+import '../../../../core/widgets/floating_nav_bar.dart';
 import '../../../auth/presentation/session_controller.dart';
 import '../../../team/data/models/sport.dart';
 import '../../../team/data/sport_providers.dart';
@@ -85,6 +86,14 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: _kHomeBg,
+      // 바는 SafeArea 밖에 떠 있다 — 안에 넣으면 홈 인디케이터 위에서 잘린다.
+      bottomNavigationBar: FloatingNavBar(
+        currentIndex: 0,
+        onTap: (index) => ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('준비 중입니다')),
+        ),
+      ),
+      extendBody: true,
       body: SafeArea(
         // 종목 목록은 리포지토리에서 온다. 지연·실패·빈 목록이 실제로
         // 발생하므로 네 상태를 AsyncView 한 곳에서 처리한다(스펙 6절).
@@ -94,7 +103,13 @@ class HomeScreen extends ConsumerWidget {
           emptyMessage: '등록된 종목이 없습니다',
           onRetry: () => ref.invalidate(sportsProvider),
           data: (sports) => ListView(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+            // 바가 자리를 차지하지 않고 떠 있으므로 그만큼 띄운다.
+            padding: EdgeInsets.fromLTRB(
+              20,
+              12,
+              20,
+              FloatingNavBar.heightOf(context) + 24,
+            ),
             children: [
               _header(context, ref, nickname),
               const SizedBox(height: 18),

@@ -1,3 +1,5 @@
+import 'dart:ui' show lerpDouble;
+
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -63,6 +65,88 @@ class BrandMark extends StatelessWidget {
         opacity: flying ? 0 : 1,
         child: Text(kBrandText, style: styleFor(fontSize, color)),
       ),
+    );
+  }
+}
+
+/// 로그인의 로고가 하단 바의 알약으로 날아갈 때 쓰는 짝지음표.
+///
+/// **한 화면에 이 표를 단 것이 둘 있으면 터진다.** 붙이는 곳은 화면마다
+/// 하나여야 한다 — 로그인에 하나, 홈의 알약에 하나.
+const String kBrandHeroTag = 'supersub-brand';
+
+/// 날아가는 동안 그려지는 글자.
+///
+/// 크기는 [FittedBox]가 상자에 맞춰 줄이므로 **여기 숫자는 비율의 기준일
+/// 뿐**이고 화면에 그대로 나오지 않는다.
+final TextStyle _kFlightStyle =
+    BrandMark.styleFor(kIntroBrandSizeForFlight, AppTheme.seed);
+
+/// 비행 글자의 기준 크기. 큰 쪽에서 줄여 그려야 흐려지지 않는다.
+const double kIntroBrandSizeForFlight = 72;
+
+/// 로고를 화면 사이로 날려 보내는 껍데기.
+///
+/// **비행 중에는 양쪽 위젯을 쓰지 않고 이 껍데기가 직접 그린다.**
+///
+/// Hero는 자식을 확대·축소하지 않는다 — 보간된 상자에 자식을 다시 배치할
+/// 뿐이다. 그래서 큰 글자를 그대로 태우면 작은 상자에 억지로 들어가며 튀고,
+/// 기본 동작대로 도착지 위젯을 쓰면 비행이 시작되는 순간 글자가 한 번 팍
+/// 바뀐다. [FittedBox]가 상자에 맞춰 실제로 줄여 주면 이어서 작아진다.
+///
+/// **`createRectTween`을 반드시 준다.** 안 주면 `MaterialApp`이 깔아 둔
+/// `MaterialRectArcTween`이 먹는데, 그것은 상자의 모서리를 각각 호를 따라
+/// 옮겨 도중에 폭과 높이가 부풀었다 줄어든다.
+Widget brandHero({required Widget child}) => Hero(
+      tag: kBrandHeroTag,
+      createRectTween: (begin, end) => BrandFlight(begin: begin, end: end),
+      flightShuttleBuilder: (_, _, _, _, _) => Material(
+        // 오버레이에는 Material이 없다. 투명한 것 하나를 깔아 준다 — 없으면
+        // 노란 밑줄이 그어진다.
+        type: MaterialType.transparency,
+        child: FittedBox(
+          fit: BoxFit.contain,
+          child: Text(kBrandText, style: _kFlightStyle),
+        ),
+      ),
+      child: child,
+    );
+
+/// 로고가 날아가는 길.
+///
+/// **크기는 곧게, 길은 휘게.** 곧은 보간은 글자가 일정한 속도로 비스듬히
+/// 미끄러져 기계처럼 보인다. 가운데점만 2차 베지에로 휘고 시간에 완급을 준다.
+///
+/// 조절점은 `(출발 x, 도착 y)`다 — 먼저 떨어지고 끝에서 옆으로 붙는 길이라,
+/// 세로로 긴 이 비행에서 자연스럽다.
+class BrandFlight extends Tween<Rect?> {
+  BrandFlight({
+    required super.begin,
+    required super.end,
+    this.curve = Curves.easeInOutCubic,
+  });
+
+  final Curve curve;
+
+  /// 2차 베지에 위의 점. 조절점은 출발의 가로, 도착의 세로다.
+  static Offset bow(Offset from, Offset to, double t) {
+    final c = Offset(from.dx, to.dy);
+    final u = 1 - t;
+    return Offset(
+      u * u * from.dx + 2 * u * t * c.dx + t * t * to.dx,
+      u * u * from.dy + 2 * u * t * c.dy + t * t * to.dy,
+    );
+  }
+
+  @override
+  Rect? lerp(double t) {
+    final a = begin!;
+    final b = end!;
+    final e = curve.transform(t.clamp(0.0, 1.0));
+    return Rect.fromCenter(
+      center: bow(a.center, b.center, e),
+      width: lerpDouble(a.width, b.width, e)!,
+      height: lerpDouble(a.height, b.height, e)!,
     );
   }
 }
