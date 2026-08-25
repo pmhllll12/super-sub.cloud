@@ -11,17 +11,11 @@ Widget _wrap() => const ProviderScope(
 void main() {
   testWidgets('이메일과 비밀번호 입력란이 있다', (tester) async {
     await tester.pumpWidget(_wrap());
-    // LoginScreen.build()가 sessionControllerProvider.notifier를 읽는 순간
-    // SessionController가 fire-and-forget _restore()(Mock 300ms 지연)를
-    // 시작한다. pump로 흘려보내지 않으면 테스트 종료 시 타이머가 남아
-    // "A Timer is still pending" 실패가 난다.
-    await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(TextField), findsNWidgets(2));
   });
 
   testWidgets('개발용 바로 진입 계정 3종이 있다', (tester) async {
     await tester.pumpWidget(_wrap());
-    await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('개인 사용자 (데이터 있음)'), findsOneWidget);
     expect(find.text('팀 관리자'), findsOneWidget);
     expect(find.text('신규 가입자 (데이터 0건)'), findsOneWidget);
@@ -33,6 +27,10 @@ void main() {
     await tester.enterText(find.byKey(const Key('login-password')), 'pw');
     await tester.tap(find.byKey(const Key('login-submit')));
     await tester.pump();
+    // 탭 시점에 SessionController가 초기화되며 fire-and-forget _restore()
+    // (Mock 300ms 지연)도 함께 뜬다. 같은 이유로 pump가 필요한 사례가
+    // smoke_test.dart에도 있다 — 이 pump는 login()과 _restore() 양쪽을
+    // 모두 흘려보낸다.
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('등록되지 않은 이메일입니다'), findsOneWidget);
   });
@@ -47,6 +45,7 @@ void main() {
     ));
     await tester.tap(find.text('팀 관리자'));
     await tester.pump();
+    // 위와 동일 — smoke_test.dart의 pump(500ms) 관용구 참고.
     await tester.pump(const Duration(milliseconds: 500));
 
     expect(container.read(sessionControllerProvider), isA<SessionLoggedIn>());

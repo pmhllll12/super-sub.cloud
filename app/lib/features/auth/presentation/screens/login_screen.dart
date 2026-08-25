@@ -42,8 +42,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final controller = ref.read(sessionControllerProvider.notifier);
-
     return Scaffold(
       appBar: AppBar(title: const Text('로그인')),
       body: SingleChildScrollView(
@@ -77,7 +75,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               onPressed: _busy
                   ? null
                   : () => _run(
-                        () => controller.login(_email.text, _password.text),
+                        () => ref
+                            .read(sessionControllerProvider.notifier)
+                            .login(_email.text, _password.text),
                       ),
               child: _busy
                   ? const SizedBox(
@@ -100,19 +100,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 label: '개인 사용자 (데이터 있음)',
                 userId: MockDb.playerId,
                 busy: _busy,
-                onTap: (id) => _run(() => controller.loginAs(id)),
+                onTap: (id) => _run(
+                  () => ref.read(sessionControllerProvider.notifier).loginAs(id),
+                ),
               ),
               _DevLoginButton(
                 label: '팀 관리자',
                 userId: MockDb.managerId,
                 busy: _busy,
-                onTap: (id) => _run(() => controller.loginAs(id)),
+                onTap: (id) => _run(
+                  () => ref.read(sessionControllerProvider.notifier).loginAs(id),
+                ),
               ),
               _DevLoginButton(
                 label: '신규 가입자 (데이터 0건)',
                 userId: MockDb.newbieId,
                 busy: _busy,
-                onTap: (id) => _run(() => controller.loginAs(id)),
+                onTap: (id) => _run(
+                  () => ref.read(sessionControllerProvider.notifier).loginAs(id),
+                ),
               ),
             ],
           ],
