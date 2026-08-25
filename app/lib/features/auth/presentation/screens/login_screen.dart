@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/mock/mock_db.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/refractive_glass.dart';
+import '../../../intro/presentation/brand_mark.dart';
 import '../../../intro/presentation/screens/glitch_intro_screen.dart'
     show kIntroInkColor;
 import '../session_controller.dart';
@@ -112,17 +113,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: 28),
-          const Center(
-            child: Text(
-              'SUPERSUB',
-              style: TextStyle(
-                fontFamily: 'Rubik',
-                fontVariations: [FontVariation('wght', 900)],
-                fontSize: 30,
-                height: 1,
-                letterSpacing: 1.4,
-                color: _kOnPhoto,
-              ),
+          // 인트로의 글자가 날아와 앉는 자리다 — 같은 위젯, 같은 글꼴.
+          Center(
+            child: BrandMark(
+              key: kBrandLandingKey,
+              fontSize: kBrandLandedSize,
+              color: _kOnPhoto,
             ),
           ),
           Expanded(child: _form()),

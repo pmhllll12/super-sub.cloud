@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../../../../core/widgets/ink_bleed.dart';
+import '../brand_mark.dart';
 
 /// 앱을 켜면 한 번 지나가는 인트로.
 ///
@@ -36,7 +37,7 @@ const Color kIntroInkColor = Color(0xFF000000);
 ///
 /// 원본은 다섯 글자(`FORMA`)에 72였다. 여기는 여덟 글자라 같은 크기면 폭이
 /// 넘친다. 44로 줄이고, 아래 자간도 같은 비율(44/72)로 줄였다.
-const double _kIntroSize = 44;
+const double kIntroBrandSize = 44;
 
 /// 전체 길이. 순백 200 + 번짐 2400 + 머묾 500.
 ///
@@ -46,15 +47,19 @@ const double _kIntroSize = 44;
 const Duration kIntroDuration = Duration(milliseconds: 3100);
 
 /// 인트로에서 앱 화면으로 넘어가는 데 걸리는 시간.
-const Duration kIntroExitDuration = Duration(milliseconds: 2000);
+///
+/// **잉크가 다 걷히는 2.0초보다 길다.** 남는 1초는 글자가 로그인 자리로
+/// 날아가는 시간이다 — 잉크가 먼저 끝나고 글자만 더 난다. 원본도 같다.
+const Duration kIntroExitDuration = Duration(milliseconds: 3000);
 
-/// 잉크가 벗겨지는 진행에 씌우는 곡선.
+/// 잉크가 벗겨지는 진행에 씌우는 곡선. **앞 2/3에 몰아 둔다** — 글자가 나는
+/// 3초에 잉크까지 늘어나면 성긴 꼬리만 길어져 지루하다.
 ///
 /// **끝을 길게 끈다.** 덮인 넓이가 진행도와 그대로 비례하므로 선형으로 두면
 /// 마지막에 남은 성긴 점들이 한순간에 다 사라져 "퐉" 하고 꺼지는 것처럼
 /// 보인다. 감속을 주면 넓이가 일찍 줄고 성긴 꼬리에 시간이 많이 배당돼
 /// 서서히 걷히는 것으로 읽힌다.
-const Curve kIntroExitPeel = Curves.easeOutQuad;
+const Curve kIntroExitPeel = Interval(0, 2 / 3, curve: Curves.easeOutQuad);
 
 /// 흔들림 값을 붙잡아 두는 시간.
 ///
@@ -206,17 +211,21 @@ class _GlitchText extends StatelessWidget {
         // 가변 폰트라 굵기는 FontVariation으로 준다 — fontWeight만 주면 가변
         // 축이 안 움직인다. Glitch 쪽은 축이 없어 무시된다.
         fontVariations: const [FontVariation('wght', 900)],
-        fontSize: _kIntroSize,
+        fontSize: kIntroBrandSize,
         color: kIntroInk,
         height: 1,
         // 가지런한 Rubik이 Glitch보다 좁아, 그 차이를 자간으로 메운다.
         // 원본의 값(2 / 3.4)은 크기 72 기준이므로 크기 비율(44/72)로 줄였다.
-        letterSpacing: glitched ? 1.2 : 2.1,
+        // 깨진 쪽은 BrandMark와 같은 값이어야 한다 — 인트로가 끝나면
+        // 그 글자가 그대로 로그인 자리로 날아간다.
+        letterSpacing: glitched
+            ? BrandMark.letterSpacingFor(kIntroBrandSize)
+            : BrandMark.letterSpacingFor(kIntroBrandSize) + 0.9,
       );
 
   @override
   Widget build(BuildContext context) {
-    const text = 'SUPERSUB';
+    const text = kBrandText;
     final rnd = Random(seed);
     // 띠마다 다른 만큼 어긋난다. 세로로는 밀지 않는다 — 가로로만 찢어져야
     // 신호가 어긋난 화면처럼 보인다.
