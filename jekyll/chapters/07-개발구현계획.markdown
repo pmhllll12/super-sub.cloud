@@ -46,19 +46,22 @@ permalink: /07-개발구현계획/
     <div class="kanban-card"><span class="role-tag role-flutter">정어진·Flutter</span>선수 카드 컴포넌트 와이어프레임</div>
     <div class="kanban-card"><span class="role-tag role-pipeline">박민호·파이프라인</span>영상 저장소(스토리지) 후보 조사</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>RAG 검증 평가지표 설계(Hit Rate/Recall@5)</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>골든셋 라벨링 후 QWK 측정</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>포즈 추출 최적화 — 입력 해상도 하향 시 키포인트 품질 영향 검토</div>
+    <div class="kanban-card"><span class="role-tag role-pm">백성검·PM</span>골든셋 라벨링 지도자 섭외(미결 2번)</div>
   </div>
   <div class="kanban-column">
     <h4>To Do</h4>
     <div class="kanban-card"><span class="role-tag role-pm">백성검·PM</span>스프린트 2 계획 회의 준비</div>
     <div class="kanban-card"><span class="role-tag role-flutter">정어진·Flutter</span>Flutter 프로젝트 초기 셋업</div>
     <div class="kanban-card"><span class="role-tag role-pipeline">박민호·파이프라인</span>DB 스키마 초안 작성</div>
-    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>루브릭 지도자 검수 요청(임계값 확정)</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>루브릭 지도자 검수 요청(임계값·칭호 문구 확정)</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>측정값 MySQL 적재(analysis_metric_value)</div>
   </div>
   <div class="kanban-column">
     <h4>In Progress</h4>
     <div class="kanban-card"><span class="role-tag role-pm">백성검·PM</span>요구사항 정의서 작성</div>
     <div class="kanban-card"><span class="role-tag role-pipeline">박민호·파이프라인</span>생활체육 경기 영상 데이터 수집 방안 검토</div>
-    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>실제 슈팅 영상 확보 — 포즈 파이프라인 실클립 검증</div>
   </div>
   <div class="kanban-column">
     <h4>Done</h4>
@@ -68,6 +71,9 @@ permalink: /07-개발구현계획/
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>에이전트 처리 흐름 설계</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>판정 모델 선정·실측 (EXAONE 4.0 1.2B, bf16)</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>측정→판정→합산 구현 및 로컬 확인 UI</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>실클립 전 구간 통과 — 4K 25fps 10.2초 클립 검증</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>등급 판정 코드 이관 — 루브릭 bands 도입, 경계값 오판 해소</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>선수 카드 칭호 체계 — 루브릭 titles</div>
   </div>
 </div>
 
