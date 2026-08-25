@@ -56,7 +56,7 @@ const Color kIntroInkColor = Color(0xFF000000);
 ///
 /// 원본은 다섯 글자(`FORMA`)에 72였다. 여기는 여덟 글자라 같은 크기면 폭이
 /// 넘친다. 자간은 [BrandMark.letterSpacingFor]가 크기에 비례해 계산한다.
-const double kIntroBrandSize = 60;
+const double kIntroBrandSize = 52;
 
 /// 전체 길이. 순백 200 + 번짐 2400 + 머묾 500.
 ///

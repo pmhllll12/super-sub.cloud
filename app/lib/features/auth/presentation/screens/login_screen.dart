@@ -31,13 +31,16 @@ const LinearGradient _kPhotoScrim = LinearGradient(
   stops: [0, 0.55],
 );
 
-/// 버튼에 얹는 흰 기.
+/// 버튼 테두리.
 ///
-/// **흐림(BackdropFilter)을 쓰지 않는다.** 버튼은 이미 유리 시트 안에 있고,
+/// **면은 비운다** — 어두운 막을 깔면서 흰 면이 뿌옇게 떴다. 대신 뒤의
+/// 굴절된 사진이 그대로 비치고, 아주 옅은 선이 형태만 세운다.
+///
+/// 버튼 자리에 진짜 유리(BackdropFilter)를 한 겹 더 넣을 수는 없다.
 /// `refractive_glass.dart`가 "자식 안에 유리를 또 넣지 않는다 — 안쪽이 아직
-/// 안 끝난 바깥을 읽어 내용이 프레임째로 사라진다. 층을 내고 싶으면 흐림
-/// 없이 색만 얹는다"고 못박아 뒀다. 이 옅은 흰 면이 그 한 겹이다.
-final Color _kGlassFill = Colors.white.withValues(alpha: 0.20);
+/// 안 끝난 바깥을 읽어 내용이 프레임째로 사라진다"고 못박아 뒀고, 버튼은
+/// 이미 유리 시트 안이다.
+final Color _kButtonEdge = Colors.white.withValues(alpha: 0.22);
 
 /// 버튼 모서리.
 const double _kButtonRadius = 14;
@@ -141,7 +144,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 28),
+          // 로고를 상단에서 넉넉히 내린다. 인트로 글자가 날아와 앉는 곳이라
+          // 이 값이 곧 비행의 도착점이다 — GlobalKey로 실제 좌표를 읽으므로
+          // 여기만 바꾸면 비행도 따라온다.
+          const SizedBox(height: 96),
           // 인트로의 글자가 날아와 앉는 자리다 — 같은 위젯, 같은 글꼴.
           Center(
             child: BrandMark(
@@ -258,10 +264,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   /// 모든 버튼이 같은 유리 면을 쓴다 — 테두리는 두르지 않는다. 형태를
   /// 세우는 건 테두리가 아니라 이 면이다.
   ButtonStyle get _glassButton => FilledButton.styleFrom(
-        backgroundColor: _kGlassFill,
+        backgroundColor: Colors.transparent,
         foregroundColor: _kOnPhoto,
-        disabledBackgroundColor: _kGlassFill,
+        disabledBackgroundColor: Colors.transparent,
         disabledForegroundColor: _kOnPhoto.withValues(alpha: 0.4),
+        side: BorderSide(color: _kButtonEdge),
         elevation: 0,
         // 컴팩트하게 — 높이를 강제하지 않고 패딩으로만 잡는다.
         minimumSize: Size.zero,
