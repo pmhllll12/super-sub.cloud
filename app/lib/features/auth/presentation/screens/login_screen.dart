@@ -163,12 +163,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Widget _form() {
     final notifier = sessionControllerProvider.notifier;
-    // **Center가 스크롤 뷰를 감싼다.** 내용이 짧으면 남은 자리 한가운데에
-    // 놓이고, 키보드가 올라와 자리가 모자라면 그때부터 스크롤된다.
-    return Center(
+    // **위쪽에 붙인다.** 가운데 정렬로 두면 로고와 폼 사이가 벌어져 둘이
+    // 따로 노는 덩어리로 읽힌다. 키보드가 올라와 자리가 모자라면 그때부터
+    // 스크롤된다.
+    return Align(
+      alignment: Alignment.topCenter,
       child: SingleChildScrollView(
         padding: EdgeInsets.only(
-          top: 24,
+          top: 28,
           bottom: MediaQuery.of(context).viewInsets.bottom + 24,
         ),
         // 입력란과 버튼이 **같은 폭**이다 — 여기서 한 번 정하고 아래는 전부
@@ -221,7 +223,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     : const Text('로그인'),
               ),
               if (kDebugMode) ...[
-                const SizedBox(height: 24),
+                // 개발용 구획은 실제 로그인과 성격이 다르다 — 사이를 벌려
+                // 한 덩어리로 안 읽히게 한다.
+                const SizedBox(height: 44),
                 Text(
                   '개발용 바로 진입',
                   textAlign: TextAlign.center,
