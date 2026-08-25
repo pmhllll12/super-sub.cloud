@@ -1,15 +1,17 @@
 """Super-Sub 백엔드 API 진입점.
 
 지금은 **스텁**이다. 모든 응답이 고정값이고 DB에 붙지 않는다.
-명세는 `docs/api-contract.md`, 스텁이 받아주는 값은 `app/stubs.py`.
+명세는 `docs/api-contract.md`, 구조 설명은 `README.md`.
 """
 
 from fastapi import FastAPI
 
-from app import stubs
+from app.cards.router import router as cards_router
+from app.cards.stub_repository import DEMO_SLUG
 from app.config import settings
 from app.errors import install_error_handlers
-from app.routers import auth, cards, users
+from app.identity.router import auth_router, users_router
+from app.identity.stub_repository import DEMO_EMAIL, DEMO_PASSWORD
 
 API_PREFIX = "/api/v1"
 
@@ -20,8 +22,8 @@ _DESCRIPTION = f"""
 
 성공 경로를 보려면 아래 값으로 로그인하십시오. 다른 값은 계약대로 실패합니다.
 
-- 이메일 `{stubs.DEMO_EMAIL}` / 비밀번호 `{stubs.DEMO_PASSWORD}`
-- 공개 카드 슬러그 `{stubs.DEMO_SLUG}`
+- 이메일 `{DEMO_EMAIL}` / 비밀번호 `{DEMO_PASSWORD}`
+- 공개 카드 슬러그 `{DEMO_SLUG}`
 
 실패 응답은 모두 `{{"error": {{"code": ..., "message": ...}}}}` 형태입니다.
 `code`로 분기하고 `message`로 분기하지 마십시오.
@@ -35,9 +37,8 @@ app = FastAPI(
 
 install_error_handlers(app)
 
-app.include_router(auth.router, prefix=API_PREFIX)
-app.include_router(users.router, prefix=API_PREFIX)
-app.include_router(cards.router, prefix=API_PREFIX)
+for _router in (auth_router, users_router, cards_router):
+    app.include_router(_router, prefix=API_PREFIX)
 
 
 @app.get("/health", tags=["health"])
