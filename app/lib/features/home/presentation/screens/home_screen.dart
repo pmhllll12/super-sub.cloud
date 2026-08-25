@@ -19,9 +19,9 @@ const Color _kOnDark = Color(0xFFFFFFFF);
 
 /// 배경 인물이 화면에서 차지하는 높이 비율.
 ///
-/// 위쪽 3분의 2를 인물이 쓰고 아래는 검정으로 잦아든다 — 카드가 얼굴 위에
-/// 겹치지 않게 하려는 것이다.
-const double _kFigureHeightFactor = 0.72;
+/// 인물이 화면 대부분을 쓰고 맨 아래에서만 검정으로 잦아든다. 0.72였는데
+/// 아래가 너무 일찍 검어져 인물이 잘려 보였다.
+const double _kFigureHeightFactor = 0.88;
 
 /// 인물을 검정으로 잦아들게 하는 막.
 ///
@@ -30,8 +30,8 @@ const double _kFigureHeightFactor = 0.72;
 const LinearGradient _kFigureFade = LinearGradient(
   begin: Alignment.topCenter,
   end: Alignment.bottomCenter,
-  colors: [Color(0x00000000), Color(0x66000000), Color(0xFF000000)],
-  stops: [0.45, 0.78, 1],
+  colors: [Color(0x00000000), Color(0x4D000000), Color(0xFF000000)],
+  stops: [0.62, 0.88, 1],
 );
 
 /// 카드 면. 검정 위에 아주 옅은 흰 기 한 겹 — 로그인 버튼과 같은 방식이다.
