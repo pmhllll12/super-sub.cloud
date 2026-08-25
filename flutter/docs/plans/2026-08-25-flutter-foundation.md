@@ -8,19 +8,19 @@
 
 **Tech Stack:** Flutter 3.44.2 / Dart 3.12.2 · flutter_riverpod · go_router · uuid · flutter_test
 
-**Spec:** `app/docs/2026-08-25-flutter-app-design.md`
+**Spec:** `flutter/docs/2026-08-25-flutter-app-design.md`
 
 ## Global Constraints
 
-- **작업 경로는 `app/` 안으로 한정한다.** `jekyll/`, `_config.yml`, `_posts/`, `_layouts/`, `assets/`, 루트 `.gitignore`를 포함한 저장소 루트의 어떤 파일도 수정하지 않는다.
-- 루트 `.gitignore`를 건드리지 않기 위해 Flutter의 무시 규칙은 `app/.gitignore`에 둔다.
+- **작업 경로는 `flutter/` 안으로 한정한다.** `jekyll/`, `_config.yml`, `_posts/`, `_layouts/`, `assets/`, 루트 `.gitignore`를 포함한 저장소 루트의 어떤 파일도 수정하지 않는다.
+- 루트 `.gitignore`를 건드리지 않기 위해 Flutter의 무시 규칙은 `flutter/.gitignore`에 둔다.
 - 백엔드가 없다. 네트워크 호출 코드를 작성하지 않는다. 모든 데이터는 `MockDb`에서 나온다.
 - **모든 리포지토리 메서드는 `Future`를 반환한다.** 동기 반환이 하나라도 있으면 API 전환 시 그 화면을 다시 짠다.
 - **Mock은 진짜처럼 굴어야 한다.** 모든 응답에 200~500ms 지연을 넣고, 실패와 빈 결과를 재현할 수 있어야 한다.
 - 리포지토리 인터페이스는 도메인 모델로만 말한다. `Map<String, dynamic>`이나 DTO를 반환하지 않는다.
 - **코드 생성(freezed/json_serializable)을 이 단계에서는 쓰지 않는다.** 스펙 2.2에서 권장했으나, 지금은 JSON이 존재하지 않으므로(Mock 전용) 직렬화 코드 생성은 근거 없는 선반영이다. 손으로 쓴 불변 클래스(`const` 생성자 + `copyWith` + `==`/`hashCode`)를 쓰고, 도입은 API 스펙이 정해지는 단계 7에서 재검토한다.
 - 커밋은 각 태스크 끝에서 한다. 푸시는 하지 않는다 (사용자가 직접 한다).
-- 모든 명령은 `app/` 디렉터리에서 실행한다.
+- 모든 명령은 `flutter/` 디렉터리에서 실행한다.
 
 ---
 
@@ -29,7 +29,7 @@
 이 계획이 만드는 파일이다.
 
 ```
-app/
+flutter/
   pubspec.yaml                                     Task 1
   .gitignore                                       Task 1 (flutter create가 생성)
   lib/
@@ -78,8 +78,8 @@ app/
 ### Task 1: 프로젝트 생성과 앱 뼈대
 
 **Files:**
-- Create: `app/pubspec.yaml`, `app/.gitignore`, `app/lib/main.dart`, `app/lib/app.dart`, `app/lib/core/theme/app_theme.dart`
-- Test: `app/test/smoke_test.dart`
+- Create: `flutter/pubspec.yaml`, `flutter/.gitignore`, `flutter/lib/main.dart`, `flutter/lib/app.dart`, `flutter/lib/core/theme/app_theme.dart`
+- Test: `flutter/test/smoke_test.dart`
 
 **Interfaces:**
 - Consumes: 없음 (첫 태스크)
@@ -87,10 +87,10 @@ app/
 
 - [ ] **Step 1: Flutter 프로젝트를 현재 디렉터리에 생성한다**
 
-`app/docs/`가 이미 있으므로 비어 있지 않은 디렉터리에 생성하는 형태다. `flutter create`는 기존 파일을 덮어쓰지 않는다.
+`flutter/docs/`가 이미 있으므로 비어 있지 않은 디렉터리에 생성하는 형태다. `flutter create`는 기존 파일을 덮어쓰지 않는다.
 
 ```bash
-cd app
+cd flutter
 flutter create --org cloud.supersub --project-name super_sub --platforms=android,ios .
 ```
 
@@ -99,7 +99,7 @@ flutter create --org cloud.supersub --project-name super_sub --platforms=android
 버전을 손으로 적지 않는다. `pub add`가 설치된 Flutter SDK와 호환되는 최신 버전을 고르게 한다.
 
 ```bash
-cd app
+cd flutter
 flutter pub add flutter_riverpod go_router uuid
 flutter pub add dev:flutter_lints
 ```
@@ -109,10 +109,10 @@ flutter pub add dev:flutter_lints
 `flutter create`가 만든 `test/widget_test.dart`는 삭제하고 아래를 만든다.
 
 ```bash
-rm -f app/test/widget_test.dart
+rm -f flutter/test/widget_test.dart
 ```
 
-`app/test/smoke_test.dart`:
+`flutter/test/smoke_test.dart`:
 
 ```dart
 import 'package:flutter_test/flutter_test.dart';
@@ -131,14 +131,14 @@ void main() {
 - [ ] **Step 4: 테스트를 돌려 실패를 확인한다**
 
 ```bash
-cd app && flutter test test/smoke_test.dart
+cd flutter && flutter test test/smoke_test.dart
 ```
 
 기대: `app.dart`가 없어 컴파일 실패 (`Target of URI doesn't exist`).
 
 - [ ] **Step 5: 테마를 만든다**
 
-`app/lib/core/theme/app_theme.dart`:
+`flutter/lib/core/theme/app_theme.dart`:
 
 ```dart
 import 'package:flutter/material.dart';
@@ -167,7 +167,7 @@ class AppTheme {
 
 - [ ] **Step 6: 앱 위젯과 진입점을 만든다**
 
-`app/lib/app.dart` — 이 단계에서는 아직 라우터가 없으므로 `MaterialApp`을 쓴다. Task 5에서 `MaterialApp.router`로 바꾼다.
+`flutter/lib/app.dart` — 이 단계에서는 아직 라우터가 없으므로 `MaterialApp`을 쓴다. Task 5에서 `MaterialApp.router`로 바꾼다.
 
 ```dart
 import 'package:flutter/material.dart';
@@ -191,7 +191,7 @@ class SuperSubApp extends StatelessWidget {
 }
 ```
 
-`app/lib/main.dart`:
+`flutter/lib/main.dart`:
 
 ```dart
 import 'package:flutter/material.dart';
@@ -207,7 +207,7 @@ void main() {
 - [ ] **Step 7: 테스트가 통과하는지 확인한다**
 
 ```bash
-cd app && flutter test test/smoke_test.dart && flutter analyze
+cd flutter && flutter test test/smoke_test.dart && flutter analyze
 ```
 
 기대: 테스트 PASS, analyze 이슈 0건.
@@ -215,7 +215,7 @@ cd app && flutter test test/smoke_test.dart && flutter analyze
 - [ ] **Step 8: 커밋한다**
 
 ```bash
-git add app/
+git add flutter/
 git commit -m "feat(app): Flutter 프로젝트 셋업과 앱 뼈대"
 ```
 
@@ -224,8 +224,8 @@ git commit -m "feat(app): Flutter 프로젝트 셋업과 앱 뼈대"
 ### Task 2: 도메인 모델 (Sport · AppUser · Team · TeamMember)
 
 **Files:**
-- Create: `app/lib/core/sport/sport.dart`, `app/lib/features/auth/data/models/app_user.dart`, `app/lib/features/team/data/models/team.dart`, `app/lib/features/team/data/models/team_member.dart`
-- Test: `app/test/features/team/team_member_test.dart`
+- Create: `flutter/lib/core/sport/sport.dart`, `flutter/lib/features/auth/data/models/app_user.dart`, `flutter/lib/features/team/data/models/team.dart`, `flutter/lib/features/team/data/models/team_member.dart`
+- Test: `flutter/test/features/team/team_member_test.dart`
 
 **Interfaces:**
 - Consumes: 없음
@@ -240,7 +240,7 @@ git commit -m "feat(app): Flutter 프로젝트 셋업과 앱 뼈대"
 
 ERD의 `team_member.left_at`은 소프트 삭제다. 이 불변식을 모델에 못박는다.
 
-`app/test/features/team/team_member_test.dart`:
+`flutter/test/features/team/team_member_test.dart`:
 
 ```dart
 import 'package:flutter_test/flutter_test.dart';
@@ -289,14 +289,14 @@ void main() {
 - [ ] **Step 2: 테스트를 돌려 실패를 확인한다**
 
 ```bash
-cd app && flutter test test/features/team/team_member_test.dart
+cd flutter && flutter test test/features/team/team_member_test.dart
 ```
 
 기대: 컴파일 실패 (`team_member.dart` 없음).
 
 - [ ] **Step 3: 모델 4개를 만든다**
 
-`app/lib/core/sport/sport.dart`:
+`flutter/lib/core/sport/sport.dart`:
 
 ```dart
 /// ERD `sport` 테이블. 현재 풋살·야구 2행.
@@ -315,7 +315,7 @@ class Sport {
 }
 ```
 
-`app/lib/features/auth/data/models/app_user.dart`:
+`flutter/lib/features/auth/data/models/app_user.dart`:
 
 ```dart
 /// ERD `user` 테이블. Dart 코어의 이름과 겹치지 않도록 AppUser로 둔다.
@@ -352,7 +352,7 @@ class AppUser {
 }
 ```
 
-`app/lib/features/team/data/models/team.dart`:
+`flutter/lib/features/team/data/models/team.dart`:
 
 ```dart
 /// ERD `team` 테이블. 종목은 팀이 결정한다 (match에는 sport_code가 없다).
@@ -382,7 +382,7 @@ class Team {
 }
 ```
 
-`app/lib/features/team/data/models/team_member.dart`:
+`flutter/lib/features/team/data/models/team_member.dart`:
 
 ```dart
 enum TeamRole { member, manager }
@@ -430,7 +430,7 @@ class TeamMember {
 - [ ] **Step 4: 테스트가 통과하는지 확인한다**
 
 ```bash
-cd app && flutter test test/features/team/team_member_test.dart && flutter analyze
+cd flutter && flutter test test/features/team/team_member_test.dart && flutter analyze
 ```
 
 기대: 3개 테스트 PASS.
@@ -438,7 +438,7 @@ cd app && flutter test test/features/team/team_member_test.dart && flutter analy
 - [ ] **Step 5: 커밋한다**
 
 ```bash
-git add app/lib app/test
+git add flutter/lib flutter/test
 git commit -m "feat(app): Sport/AppUser/Team/TeamMember 도메인 모델"
 ```
 
@@ -447,8 +447,8 @@ git commit -m "feat(app): Sport/AppUser/Team/TeamMember 도메인 모델"
 ### Task 3: MockDb — 인메모리 저장소와 시드 계정 3종
 
 **Files:**
-- Create: `app/lib/core/mock/mock_db.dart`
-- Test: `app/test/core/mock_db_test.dart`
+- Create: `flutter/lib/core/mock/mock_db.dart`
+- Test: `flutter/test/core/mock_db_test.dart`
 
 **Interfaces:**
 - Consumes: Task 2의 `Sport`, `AppUser`, `Team`, `TeamMember`, `TeamRole`
@@ -460,7 +460,7 @@ git commit -m "feat(app): Sport/AppUser/Team/TeamMember 도메인 모델"
 
 - [ ] **Step 1: 실패하는 테스트를 쓴다**
 
-`app/test/core/mock_db_test.dart`:
+`flutter/test/core/mock_db_test.dart`:
 
 ```dart
 import 'package:flutter_test/flutter_test.dart';
@@ -513,14 +513,14 @@ void main() {
 - [ ] **Step 2: 테스트를 돌려 실패를 확인한다**
 
 ```bash
-cd app && flutter test test/core/mock_db_test.dart
+cd flutter && flutter test test/core/mock_db_test.dart
 ```
 
 기대: 컴파일 실패 (`mock_db.dart` 없음).
 
 - [ ] **Step 3: MockDb를 만든다**
 
-`app/lib/core/mock/mock_db.dart`:
+`flutter/lib/core/mock/mock_db.dart`:
 
 ```dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -640,7 +640,7 @@ final mockDbProvider = Provider<MockDb>((ref) => MockDb());
 - [ ] **Step 4: 테스트가 통과하는지 확인한다**
 
 ```bash
-cd app && flutter test test/core/mock_db_test.dart && flutter analyze
+cd flutter && flutter test test/core/mock_db_test.dart && flutter analyze
 ```
 
 기대: 6개 테스트 PASS.
@@ -648,7 +648,7 @@ cd app && flutter test test/core/mock_db_test.dart && flutter analyze
 - [ ] **Step 5: 커밋한다**
 
 ```bash
-git add app/lib app/test
+git add flutter/lib flutter/test
 git commit -m "feat(app): MockDb 인메모리 저장소와 시드 계정 3종"
 ```
 
@@ -657,8 +657,8 @@ git commit -m "feat(app): MockDb 인메모리 저장소와 시드 계정 3종"
 ### Task 4: AuthRepository — 인터페이스 · Mock · 계약 테스트
 
 **Files:**
-- Create: `app/lib/features/auth/data/models/session.dart`, `app/lib/features/auth/data/auth_repository.dart`, `app/lib/features/auth/data/auth_repository_mock.dart`, `app/lib/features/auth/data/auth_providers.dart`
-- Test: `app/test/contract/auth_repository_contract.dart`, `app/test/features/auth/auth_repository_mock_test.dart`
+- Create: `flutter/lib/features/auth/data/models/session.dart`, `flutter/lib/features/auth/data/auth_repository.dart`, `flutter/lib/features/auth/data/auth_repository_mock.dart`, `flutter/lib/features/auth/data/auth_providers.dart`
+- Test: `flutter/test/contract/auth_repository_contract.dart`, `flutter/test/features/auth/auth_repository_mock_test.dart`
 
 **Interfaces:**
 - Consumes: Task 2의 `AppUser`, Task 3의 `MockDb` · `mockDbProvider`
@@ -674,7 +674,7 @@ git commit -m "feat(app): MockDb 인메모리 저장소와 시드 계정 3종"
 
 이것이 "provider 한 줄 교체"를 실제로 보장하는 장치다. 인터페이스에 대해 한 번 쓰고, 지금은 Mock에 물리고, API가 나오면 같은 파일을 `ApiAuthRepository`에 물린다.
 
-`app/test/contract/auth_repository_contract.dart`:
+`flutter/test/contract/auth_repository_contract.dart`:
 
 ```dart
 import 'package:flutter_test/flutter_test.dart';
@@ -746,7 +746,7 @@ void runAuthRepositoryContract(
 }
 ```
 
-`app/test/features/auth/auth_repository_mock_test.dart`:
+`flutter/test/features/auth/auth_repository_mock_test.dart`:
 
 ```dart
 import 'package:super_sub/core/mock/mock_db.dart';
@@ -767,14 +767,14 @@ void main() {
 - [ ] **Step 2: 테스트를 돌려 실패를 확인한다**
 
 ```bash
-cd app && flutter test test/features/auth/auth_repository_mock_test.dart
+cd flutter && flutter test test/features/auth/auth_repository_mock_test.dart
 ```
 
 기대: 컴파일 실패 (`auth_repository.dart` 없음).
 
 - [ ] **Step 3: 세션 모델과 인터페이스를 만든다**
 
-`app/lib/features/auth/data/models/session.dart`:
+`flutter/lib/features/auth/data/models/session.dart`:
 
 ```dart
 import 'app_user.dart';
@@ -792,7 +792,7 @@ class Session {
 }
 ```
 
-`app/lib/features/auth/data/auth_repository.dart`:
+`flutter/lib/features/auth/data/auth_repository.dart`:
 
 ```dart
 import 'models/session.dart';
@@ -825,7 +825,7 @@ abstract class AuthRepository {
 
 - [ ] **Step 4: Mock 구현체와 provider를 만든다**
 
-`app/lib/features/auth/data/auth_repository_mock.dart`:
+`flutter/lib/features/auth/data/auth_repository_mock.dart`:
 
 ```dart
 import '../../../core/mock/mock_db.dart';
@@ -878,7 +878,7 @@ class MockAuthRepository implements AuthRepository {
 }
 ```
 
-`app/lib/features/auth/data/auth_providers.dart`:
+`flutter/lib/features/auth/data/auth_providers.dart`:
 
 ```dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -899,7 +899,7 @@ final authRepositoryProvider = Provider<AuthRepository>(
 - [ ] **Step 5: 테스트가 통과하는지 확인한다**
 
 ```bash
-cd app && flutter test test/features/auth/ && flutter analyze
+cd flutter && flutter test test/features/auth/ && flutter analyze
 ```
 
 기대: 계약 테스트 8개 PASS.
@@ -907,7 +907,7 @@ cd app && flutter test test/features/auth/ && flutter analyze
 - [ ] **Step 6: 커밋한다**
 
 ```bash
-git add app/lib app/test
+git add flutter/lib flutter/test
 git commit -m "feat(app): AuthRepository 인터페이스와 Mock 구현, 계약 테스트"
 ```
 
@@ -916,9 +916,9 @@ git commit -m "feat(app): AuthRepository 인터페이스와 Mock 구현, 계약 
 ### Task 5: 세션 컨트롤러와 라우터 분기
 
 **Files:**
-- Create: `app/lib/features/auth/presentation/session_controller.dart`, `app/lib/core/router/app_router.dart`
-- Modify: `app/lib/app.dart` (MaterialApp → MaterialApp.router)
-- Test: `app/test/features/auth/session_controller_test.dart`
+- Create: `flutter/lib/features/auth/presentation/session_controller.dart`, `flutter/lib/core/router/app_router.dart`
+- Modify: `flutter/lib/app.dart` (MaterialApp → MaterialApp.router)
+- Test: `flutter/test/features/auth/session_controller_test.dart`
 
 **Interfaces:**
 - Consumes: Task 4의 `AuthRepository`, `authRepositoryProvider`, `Session`, `AuthException`
@@ -930,7 +930,7 @@ git commit -m "feat(app): AuthRepository 인터페이스와 Mock 구현, 계약 
 
 - [ ] **Step 1: 실패하는 테스트를 쓴다**
 
-`app/test/features/auth/session_controller_test.dart`:
+`flutter/test/features/auth/session_controller_test.dart`:
 
 ```dart
 import 'package:flutter_test/flutter_test.dart';
@@ -996,14 +996,14 @@ void main() {
 - [ ] **Step 2: 테스트를 돌려 실패를 확인한다**
 
 ```bash
-cd app && flutter test test/features/auth/session_controller_test.dart
+cd flutter && flutter test test/features/auth/session_controller_test.dart
 ```
 
 기대: 컴파일 실패 (`session_controller.dart` 없음).
 
 - [ ] **Step 3: 세션 컨트롤러를 만든다**
 
-`app/lib/features/auth/presentation/session_controller.dart`:
+`flutter/lib/features/auth/presentation/session_controller.dart`:
 
 ```dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1074,7 +1074,7 @@ final sessionControllerProvider =
 - [ ] **Step 4: 테스트가 통과하는지 확인한다**
 
 ```bash
-cd app && flutter test test/features/auth/session_controller_test.dart
+cd flutter && flutter test test/features/auth/session_controller_test.dart
 ```
 
 기대: 6개 테스트 PASS.
@@ -1083,7 +1083,7 @@ cd app && flutter test test/features/auth/session_controller_test.dart
 
 화면은 Task 7~10에서 만들므로, 지금은 자리표시 위젯으로 라우트만 연결한다. 각 태스크가 해당 자리표시를 실제 화면으로 교체한다.
 
-`app/lib/core/router/app_router.dart`:
+`flutter/lib/core/router/app_router.dart`:
 
 ```dart
 import 'package:flutter/material.dart';
@@ -1155,7 +1155,7 @@ class _Placeholder extends StatelessWidget {
 
 - [ ] **Step 6: app.dart를 라우터에 연결한다**
 
-`app/lib/app.dart` 전체를 아래로 교체한다.
+`flutter/lib/app.dart` 전체를 아래로 교체한다.
 
 ```dart
 import 'package:flutter/material.dart';
@@ -1179,7 +1179,7 @@ class SuperSubApp extends ConsumerWidget {
 }
 ```
 
-`app/test/smoke_test.dart`를 아래로 교체한다. 이제 첫 화면은 로그인이다.
+`flutter/test/smoke_test.dart`를 아래로 교체한다. 이제 첫 화면은 로그인이다.
 
 ```dart
 import 'package:flutter_test/flutter_test.dart';
@@ -1199,7 +1199,7 @@ void main() {
 - [ ] **Step 7: 전체 테스트와 정적 분석을 돌린다**
 
 ```bash
-cd app && flutter test && flutter analyze
+cd flutter && flutter test && flutter analyze
 ```
 
 기대: 전부 PASS, analyze 이슈 0건.
@@ -1207,7 +1207,7 @@ cd app && flutter test && flutter analyze
 - [ ] **Step 8: 커밋한다**
 
 ```bash
-git add app/lib app/test
+git add flutter/lib flutter/test
 git commit -m "feat(app): 세션 컨트롤러와 go_router 진입 분기"
 ```
 
@@ -1216,8 +1216,8 @@ git commit -m "feat(app): 세션 컨트롤러와 go_router 진입 분기"
 ### Task 6: 공통 비동기 상태 위젯
 
 **Files:**
-- Create: `app/lib/core/widgets/async_view.dart`
-- Test: `app/test/core/async_view_test.dart`
+- Create: `flutter/lib/core/widgets/async_view.dart`
+- Test: `flutter/test/core/async_view_test.dart`
 
 **Interfaces:**
 - Consumes: 없음 (Flutter/Riverpod만)
@@ -1228,7 +1228,7 @@ git commit -m "feat(app): 세션 컨트롤러와 go_router 진입 분기"
 
 스펙 6절의 네 가지 상태(로딩·성공·빈 결과·오류)를 화면마다 다시 짜지 않기 위한 위젯이다.
 
-`app/test/core/async_view_test.dart`:
+`flutter/test/core/async_view_test.dart`:
 
 ```dart
 import 'package:flutter/material.dart';
@@ -1290,14 +1290,14 @@ void main() {
 - [ ] **Step 2: 테스트를 돌려 실패를 확인한다**
 
 ```bash
-cd app && flutter test test/core/async_view_test.dart
+cd flutter && flutter test test/core/async_view_test.dart
 ```
 
 기대: 컴파일 실패 (`async_view.dart` 없음).
 
 - [ ] **Step 3: 위젯을 만든다**
 
-`app/lib/core/widgets/async_view.dart`:
+`flutter/lib/core/widgets/async_view.dart`:
 
 ```dart
 import 'package:flutter/material.dart';
@@ -1353,7 +1353,7 @@ class AsyncView<T> extends StatelessWidget {
 - [ ] **Step 4: 테스트가 통과하는지 확인한다**
 
 ```bash
-cd app && flutter test test/core/async_view_test.dart && flutter analyze
+cd flutter && flutter test test/core/async_view_test.dart && flutter analyze
 ```
 
 기대: 4개 테스트 PASS.
@@ -1361,7 +1361,7 @@ cd app && flutter test test/core/async_view_test.dart && flutter analyze
 - [ ] **Step 5: 커밋한다**
 
 ```bash
-git add app/lib app/test
+git add flutter/lib flutter/test
 git commit -m "feat(app): 로딩/빈/오류 공통 처리 위젯 AsyncView"
 ```
 
@@ -1370,9 +1370,9 @@ git commit -m "feat(app): 로딩/빈/오류 공통 처리 위젯 AsyncView"
 ### Task 7: 로그인 화면과 개발용 바로 진입
 
 **Files:**
-- Create: `app/lib/features/auth/presentation/screens/login_screen.dart`
-- Modify: `app/lib/core/router/app_router.dart` (`/login`의 `_Placeholder`를 `LoginScreen`으로 교체)
-- Test: `app/test/features/auth/login_screen_test.dart`
+- Create: `flutter/lib/features/auth/presentation/screens/login_screen.dart`
+- Modify: `flutter/lib/core/router/app_router.dart` (`/login`의 `_Placeholder`를 `LoginScreen`으로 교체)
+- Test: `flutter/test/features/auth/login_screen_test.dart`
 
 **Interfaces:**
 - Consumes: Task 5의 `sessionControllerProvider`, Task 4의 `AuthException`, Task 3의 `MockDb.playerId` · `MockDb.managerId` · `MockDb.newbieId`
@@ -1380,7 +1380,7 @@ git commit -m "feat(app): 로딩/빈/오류 공통 처리 위젯 AsyncView"
 
 - [ ] **Step 1: 실패하는 테스트를 쓴다**
 
-`app/test/features/auth/login_screen_test.dart`:
+`flutter/test/features/auth/login_screen_test.dart`:
 
 ```dart
 import 'package:flutter/material.dart';
@@ -1436,14 +1436,14 @@ void main() {
 - [ ] **Step 2: 테스트를 돌려 실패를 확인한다**
 
 ```bash
-cd app && flutter test test/features/auth/login_screen_test.dart
+cd flutter && flutter test test/features/auth/login_screen_test.dart
 ```
 
 기대: 컴파일 실패 (`login_screen.dart` 없음).
 
 - [ ] **Step 3: 로그인 화면을 만든다**
 
-`app/lib/features/auth/presentation/screens/login_screen.dart`:
+`flutter/lib/features/auth/presentation/screens/login_screen.dart`:
 
 ```dart
 import 'package:flutter/foundation.dart' show kDebugMode;
@@ -1595,7 +1595,7 @@ class _DevLoginButton extends StatelessWidget {
 
 - [ ] **Step 4: 라우터를 실제 화면에 연결한다**
 
-`app/lib/core/router/app_router.dart`에서 `/login` 라우트를 교체하고 import를 추가한다.
+`flutter/lib/core/router/app_router.dart`에서 `/login` 라우트를 교체하고 import를 추가한다.
 
 ```dart
 import '../../features/auth/presentation/screens/login_screen.dart';
@@ -1611,7 +1611,7 @@ import '../../features/auth/presentation/screens/login_screen.dart';
 - [ ] **Step 5: 테스트가 통과하는지 확인한다**
 
 ```bash
-cd app && flutter test && flutter analyze
+cd flutter && flutter test && flutter analyze
 ```
 
 기대: 로그인 화면 테스트 4개를 포함해 전부 PASS.
@@ -1619,7 +1619,7 @@ cd app && flutter test && flutter analyze
 - [ ] **Step 6: 커밋한다**
 
 ```bash
-git add app/lib app/test
+git add flutter/lib flutter/test
 git commit -m "feat(app): 로그인 화면과 개발용 바로 진입(kDebugMode)"
 ```
 
@@ -1628,9 +1628,9 @@ git commit -m "feat(app): 로그인 화면과 개발용 바로 진입(kDebugMode
 ### Task 8: 종목 전역 컨텍스트와 온보딩 화면
 
 **Files:**
-- Create: `app/lib/core/sport/current_sport.dart`, `app/lib/features/onboarding/presentation/screens/sport_screen.dart`
-- Modify: `app/lib/core/router/app_router.dart` (`/onboarding/sport` 연결 + redirect 규칙 추가)
-- Test: `app/test/features/onboarding/sport_screen_test.dart`
+- Create: `flutter/lib/core/sport/current_sport.dart`, `flutter/lib/features/onboarding/presentation/screens/sport_screen.dart`
+- Modify: `flutter/lib/core/router/app_router.dart` (`/onboarding/sport` 연결 + redirect 규칙 추가)
+- Test: `flutter/test/features/onboarding/sport_screen_test.dart`
 
 **Interfaces:**
 - Consumes: Task 3의 `mockDbProvider`(종목 목록), Task 5의 `SessionState`
@@ -1645,7 +1645,7 @@ git commit -m "feat(app): 로그인 화면과 개발용 바로 진입(kDebugMode
 
 - [ ] **Step 1: 실패하는 테스트를 쓴다**
 
-`app/test/features/onboarding/sport_screen_test.dart`:
+`flutter/test/features/onboarding/sport_screen_test.dart`:
 
 ```dart
 import 'package:flutter/material.dart';
@@ -1683,14 +1683,14 @@ void main() {
 - [ ] **Step 2: 테스트를 돌려 실패를 확인한다**
 
 ```bash
-cd app && flutter test test/features/onboarding/sport_screen_test.dart
+cd flutter && flutter test test/features/onboarding/sport_screen_test.dart
 ```
 
 기대: 컴파일 실패.
 
 - [ ] **Step 3: 종목 컨텍스트를 만든다**
 
-`app/lib/core/sport/current_sport.dart`:
+`flutter/lib/core/sport/current_sport.dart`:
 
 ```dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1718,7 +1718,7 @@ final currentSportProvider =
 
 - [ ] **Step 4: 온보딩 화면을 만든다**
 
-`app/lib/features/onboarding/presentation/screens/sport_screen.dart`:
+`flutter/lib/features/onboarding/presentation/screens/sport_screen.dart`:
 
 ```dart
 import 'package:flutter/material.dart';
@@ -1763,7 +1763,7 @@ class SportScreen extends ConsumerWidget {
 
 - [ ] **Step 5: 라우터에 연결하고 진입 규칙을 추가한다**
 
-`app/lib/core/router/app_router.dart`에 import를 추가한다.
+`flutter/lib/core/router/app_router.dart`에 import를 추가한다.
 
 ```dart
 import '../../features/onboarding/presentation/screens/sport_screen.dart';
@@ -1828,7 +1828,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 - [ ] **Step 6: 테스트가 통과하는지 확인한다**
 
 ```bash
-cd app && flutter test && flutter analyze
+cd flutter && flutter test && flutter analyze
 ```
 
 기대: 전부 PASS.
@@ -1836,7 +1836,7 @@ cd app && flutter test && flutter analyze
 - [ ] **Step 7: 커밋한다**
 
 ```bash
-git add app/lib app/test
+git add flutter/lib flutter/test
 git commit -m "feat(app): 종목 전역 컨텍스트와 온보딩 화면"
 ```
 
@@ -1845,9 +1845,9 @@ git commit -m "feat(app): 종목 전역 컨텍스트와 온보딩 화면"
 ### Task 9: 홈 화면
 
 **Files:**
-- Create: `app/lib/features/home/presentation/screens/home_screen.dart`
-- Modify: `app/lib/core/router/app_router.dart` (`/home` 연결)
-- Test: `app/test/features/home/home_screen_test.dart`
+- Create: `flutter/lib/features/home/presentation/screens/home_screen.dart`
+- Modify: `flutter/lib/core/router/app_router.dart` (`/home` 연결)
+- Test: `flutter/test/features/home/home_screen_test.dart`
 
 **Interfaces:**
 - Consumes: Task 5의 `sessionControllerProvider` · `SessionLoggedIn`, Task 8의 `currentSportProvider`, Task 3의 `mockDbProvider`
@@ -1855,7 +1855,7 @@ git commit -m "feat(app): 종목 전역 컨텍스트와 온보딩 화면"
 
 - [ ] **Step 1: 실패하는 테스트를 쓴다**
 
-`app/test/features/home/home_screen_test.dart`:
+`flutter/test/features/home/home_screen_test.dart`:
 
 ```dart
 import 'package:flutter/material.dart';
@@ -1910,14 +1910,14 @@ void main() {
 - [ ] **Step 2: 테스트를 돌려 실패를 확인한다**
 
 ```bash
-cd app && flutter test test/features/home/home_screen_test.dart
+cd flutter && flutter test test/features/home/home_screen_test.dart
 ```
 
 기대: 컴파일 실패.
 
 - [ ] **Step 3: 홈 화면을 만든다**
 
-`app/lib/features/home/presentation/screens/home_screen.dart`:
+`flutter/lib/features/home/presentation/screens/home_screen.dart`:
 
 ```dart
 import 'package:flutter/material.dart';
@@ -2019,7 +2019,7 @@ class HomeScreen extends ConsumerWidget {
 
 - [ ] **Step 4: 라우터에 연결한다**
 
-`app/lib/core/router/app_router.dart`에 import를 추가하고 `/home` 라우트를 교체한다.
+`flutter/lib/core/router/app_router.dart`에 import를 추가하고 `/home` 라우트를 교체한다.
 
 ```dart
 import '../../features/home/presentation/screens/home_screen.dart';
@@ -2032,7 +2032,7 @@ import '../../features/home/presentation/screens/home_screen.dart';
 - [ ] **Step 5: 테스트가 통과하는지 확인한다**
 
 ```bash
-cd app && flutter test && flutter analyze
+cd flutter && flutter test && flutter analyze
 ```
 
 기대: 전부 PASS.
@@ -2040,7 +2040,7 @@ cd app && flutter test && flutter analyze
 - [ ] **Step 6: 커밋한다**
 
 ```bash
-git add app/lib app/test
+git add flutter/lib flutter/test
 git commit -m "feat(app): 홈 화면 (종목 전환·로그아웃)"
 ```
 
@@ -2049,9 +2049,9 @@ git commit -m "feat(app): 홈 화면 (종목 전환·로그아웃)"
 ### Task 10: 프로필 화면과 수정 바텀시트
 
 **Files:**
-- Create: `app/lib/features/profile/presentation/screens/profile_screen.dart`
-- Modify: `app/lib/core/router/app_router.dart` (`/profile` 연결), `app/lib/features/auth/presentation/session_controller.dart` (`updateNickname` 추가)
-- Test: `app/test/features/profile/profile_screen_test.dart`
+- Create: `flutter/lib/features/profile/presentation/screens/profile_screen.dart`
+- Modify: `flutter/lib/core/router/app_router.dart` (`/profile` 연결), `flutter/lib/features/auth/presentation/session_controller.dart` (`updateNickname` 추가)
+- Test: `flutter/test/features/profile/profile_screen_test.dart`
 
 **Interfaces:**
 - Consumes: Task 5의 `sessionControllerProvider` · `SessionLoggedIn`, Task 2의 `AppUser.copyWith`
@@ -2061,7 +2061,7 @@ git commit -m "feat(app): 홈 화면 (종목 전환·로그아웃)"
 
 - [ ] **Step 1: 실패하는 테스트를 쓴다**
 
-`app/test/features/profile/profile_screen_test.dart`:
+`flutter/test/features/profile/profile_screen_test.dart`:
 
 ```dart
 import 'package:flutter/material.dart';
@@ -2111,14 +2111,14 @@ void main() {
 - [ ] **Step 2: 테스트를 돌려 실패를 확인한다**
 
 ```bash
-cd app && flutter test test/features/profile/profile_screen_test.dart
+cd flutter && flutter test test/features/profile/profile_screen_test.dart
 ```
 
 기대: 컴파일 실패.
 
 - [ ] **Step 3: 세션 컨트롤러에 닉네임 변경을 추가한다**
 
-`app/lib/features/auth/presentation/session_controller.dart`의 `SessionController` 안에 아래 메서드를 추가한다.
+`flutter/lib/features/auth/presentation/session_controller.dart`의 `SessionController` 안에 아래 메서드를 추가한다.
 
 ```dart
   void updateNickname(String nickname) {
@@ -2130,7 +2130,7 @@ cd app && flutter test test/features/profile/profile_screen_test.dart
 
 - [ ] **Step 4: 프로필 화면을 만든다**
 
-`app/lib/features/profile/presentation/screens/profile_screen.dart`:
+`flutter/lib/features/profile/presentation/screens/profile_screen.dart`:
 
 ```dart
 import 'package:flutter/material.dart';
@@ -2230,7 +2230,7 @@ class ProfileScreen extends ConsumerWidget {
 
 - [ ] **Step 5: 라우터에 연결하고 자리표시 위젯을 정리한다**
 
-`app/lib/core/router/app_router.dart`에 import를 추가하고 `/profile` 라우트를 교체한다.
+`flutter/lib/core/router/app_router.dart`에 import를 추가하고 `/profile` 라우트를 교체한다.
 
 ```dart
 import '../../features/profile/presentation/screens/profile_screen.dart';
@@ -2245,7 +2245,7 @@ import '../../features/profile/presentation/screens/profile_screen.dart';
 - [ ] **Step 6: 전체 테스트와 정적 분석을 돌린다**
 
 ```bash
-cd app && flutter test && flutter analyze
+cd flutter && flutter test && flutter analyze
 ```
 
 기대: 전부 PASS, analyze 이슈 0건.
@@ -2253,7 +2253,7 @@ cd app && flutter test && flutter analyze
 - [ ] **Step 7: 시뮬레이터에서 직접 확인한다**
 
 ```bash
-cd app && open -a Simulator && flutter run
+cd flutter && open -a Simulator && flutter run
 ```
 
 확인할 것: 로그인 화면 진입 → "팀 관리자" 바로 진입 → 종목 선택 → 홈에 닉네임 표시 →
@@ -2262,7 +2262,7 @@ cd app && open -a Simulator && flutter run
 - [ ] **Step 8: 커밋한다**
 
 ```bash
-git add app/lib app/test
+git add flutter/lib flutter/test
 git commit -m "feat(app): 프로필 화면과 닉네임 수정 바텀시트"
 ```
 
@@ -2270,10 +2270,10 @@ git commit -m "feat(app): 프로필 화면과 닉네임 수정 바텀시트"
 
 ## 완료 기준
 
-- `cd app && flutter test` 전부 통과
-- `cd app && flutter analyze` 이슈 0건
+- `cd flutter && flutter test` 전부 통과
+- `cd flutter && flutter analyze` 이슈 0건
 - 시뮬레이터에서 로그인 → 종목 선택 → 홈 → 프로필 → 로그아웃 왕복이 동작
-- `app/` 밖의 파일이 하나도 수정되지 않음 (`git status`로 확인)
+- `flutter/` 밖의 파일이 하나도 수정되지 않음 (`git status`로 확인)
 - `AuthRepository` 계약 테스트가 존재하며, 이후 `ApiAuthRepository`에 그대로 재사용 가능
 
 ## 다음 계획서

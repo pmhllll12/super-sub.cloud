@@ -15,13 +15,13 @@
 
 | 항목 | 결정 |
 |---|---|
-| 작업 경로 | 저장소의 `app/` 디렉터리 **안으로만** 한정 |
+| 작업 경로 | 저장소의 `flutter/` 디렉터리 **안으로만** 한정 |
 | 건드리지 않는 것 | `jekyll/`, `_config.yml`, `_posts/`, `_layouts/`, `assets/`, 루트 파일 전부 |
 | 백엔드 | 없음. Mock 구현체로 전 화면을 동작시키고, API가 나오면 구현체만 교체 |
 | 역할 범위 | 개인(용병)과 팀 관리자 두 역할을 한 앱에서 처리 |
 | 대상 플랫폼 | Android / iOS (웹은 공개 카드 딥링크 확인용으로만 고려) |
 
-`app/`은 다섯 브랜치(`main` `paik` `jin` `min` `ho`) 어디에도 존재하지 않는 새 경로다.
+`flutter/`은 다섯 브랜치(`main` `paik` `jin` `min` `ho`) 어디에도 존재하지 않는 새 경로다.
 따라서 이 작업은 다른 사람의 브랜치와 git 충돌이 발생하지 않는다.
 
 ---
@@ -87,7 +87,7 @@ ERD의 6도메인을 거의 그대로 feature로 옮긴다. 각 feature 안에 �
 ### 2.3 디렉터리 구조
 
 ```
-app/
+flutter/
   lib/
     main.dart
     app.dart                      # MaterialApp.router
@@ -130,7 +130,7 @@ features/match/
 ```
 
 **루트 `.gitignore`를 수정하지 않는다.** Flutter의 `build/`, `.dart_tool/` 등은
-`app/.gitignore`에 둔다. git은 하위 디렉터리의 `.gitignore`를 그대로 적용한다.
+`flutter/.gitignore`에 둔다. git은 하위 디렉터리의 `.gitignore`를 그대로 적용한다.
 
 ---
 
@@ -457,9 +457,9 @@ void runMatchRepositoryContract(String name, MatchRepository Function() build) {
 
 ## 11. 팀 전달 사항 (머지 시점)
 
-`app/` 밖은 건드리지 않았다. 아래는 다른 사람이 처리해야 할 항목이다.
+`flutter/` 밖은 건드리지 않았다. 아래는 다른 사람이 처리해야 할 항목이다.
 
-1. `_config.yml`의 `exclude:`에 `app/` 추가 — 없으면 Flutter 소스가 사이트에 함께 복사된다.
+1. `_config.yml`의 `exclude:`에 `flutter/` 추가 — 없으면 Flutter 소스가 사이트에 함께 복사된다.
    (배포 워크플로가 `--baseurl`을 덮어쓰므로 빌드가 깨지지는 않는다.)
 2. `_config.yml`의 `baseurl`·`url`이 이전 저장소(`supersub.parkminho.cloud`) 값으로 남아 있다.
    배포는 워크플로가 덮어써서 정상이나 `url:`은 틀린 절대 주소를 만든다.
@@ -489,5 +489,5 @@ void runMatchRepositoryContract(String name, MatchRepository Function() build) {
 
 - `intl`이 스펙 2.2에서 선택되었으나 `pubspec.yaml`에 없다. 날짜가 `2026.3.2` 형태로 문자열 보간되고 있다. 경기 시각을 표시하는 화면부터 필요해진다
 - `uuid`가 선언되었으나 쓰이지 않는다. Mock의 ID 생성에 쓰거나 제거한다
-- `pubspec.yaml`의 description과 `app/README.md`가 `flutter create` 기본값 그대로다
+- `pubspec.yaml`의 description과 `flutter/README.md`가 `flutter create` 기본값 그대로다
 - 스펙 9.2의 불변식 테스트 4종(카드에 수치 없음 · 미획득 호칭 미표시 · 추천에 사유 렌더 · 평가에 `TextField` 없음)은 대상 위젯이 계획 1에 없어 시도하지 않았다. **계획 2~4에 각각 명시적 태스크로 넣는다** — 스펙 1절의 원칙을 지키는 장치이므로 조용히 누락되기 가장 쉽다
