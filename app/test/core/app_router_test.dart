@@ -69,7 +69,11 @@ void main() {
   testWidgets('홈에서 로그아웃하면 로그인으로 돌아간다', (tester) async {
     await _pumpHome(tester);
 
-    await tester.tap(find.byKey(const Key('home-logout')));
+    // 로그아웃은 하단 바 넷째 아이콘에서 열리는 메뉴 안에 있다.
+    await tester.tap(find.byKey(const Key('navbar-icon-menu')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.byKey(const Key('barmenu-logout')));
     await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.text('로그인'), findsWidgets);

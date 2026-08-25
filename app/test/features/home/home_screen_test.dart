@@ -46,9 +46,10 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsNothing);
   });
 
-  testWidgets('닉네임과 현재 종목을 보여준다', (tester) async {
+  testWidgets('로고와 현재 종목을 보여준다', (tester) async {
     await _pumpLoggedIn(tester);
-    expect(find.textContaining('김용병'), findsOneWidget);
+    // 로고는 화면 위쪽 가운데와 하단 바 알약 두 곳에 선다.
+    expect(find.text('SUPERSUB'), findsNWidgets(2));
     expect(find.text('풋살'), findsOneWidget);
   });
 
@@ -105,10 +106,4 @@ void main() {
     expect(container.read(sessionControllerProvider), isA<SessionLoggedOut>());
   });
 
-  testWidgets('로그아웃 버튼이 있다', (tester) async {
-    final container = await _pumpLoggedIn(tester);
-    await tester.tap(find.byKey(const Key('home-logout')));
-    await tester.pump(const Duration(milliseconds: 500));
-    expect(container.read(sessionControllerProvider), isA<SessionLoggedOut>());
-  });
 }

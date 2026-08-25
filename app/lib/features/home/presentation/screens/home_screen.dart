@@ -7,6 +7,8 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/async_view.dart';
 import '../../../../core/widgets/bar_menu.dart';
 import '../../../../core/widgets/floating_nav_bar.dart';
+import '../../../../core/widgets/refractive_glass.dart';
+import '../../../intro/presentation/brand_mark.dart';
 import '../../../auth/presentation/session_controller.dart';
 import '../../../team/data/models/sport.dart';
 import '../../../team/data/sport_providers.dart';
@@ -34,8 +36,14 @@ const LinearGradient _kFigureFade = LinearGradient(
   stops: [0.62, 0.88, 1],
 );
 
-/// 카드 면. 검정 위에 아주 옅은 흰 기 한 겹 — 로그인 버튼과 같은 방식이다.
-final Color _kCardFill = Colors.white.withValues(alpha: 0.06);
+/// 유리 세기. 홈의 유리는 늘 서 있다.
+const Animation<double> _kGlassOn = AlwaysStoppedAnimation<double>(1);
+
+/// 가장자리가 뒤를 끌어당기는 정도.
+const double _kWarp = 3;
+
+/// 카드 모서리.
+const double _kCardRadius = 18;
 
 /// 홈에서 갈라져 나가는 곳들.
 ///
@@ -236,7 +244,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   24,
             ),
             children: [
-              _header(context, nickname),
+              _brand(),
               const SizedBox(height: 18),
               _sportChips(sports),
               const SizedBox(height: 28),
@@ -271,29 +279,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  Widget _header(BuildContext context, String nickname) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            '$nickname 님,\n오늘도 뛰어볼까요',
-            style: Theme.of(context)
-                .textTheme
-                .headlineSmall
-                ?.copyWith(color: _kOnDark),
-          ),
-        ),
-        IconButton(
-          key: const Key('home-logout'),
-          color: _kOnDark,
-          icon: const Icon(Icons.logout),
-          tooltip: '로그아웃',
-          onPressed: () =>
-              ref.read(sessionControllerProvider.notifier).logout(),
-        ),
-      ],
-    );
-  }
+  /// 화면 위쪽 가운데에 앉는 로고.
+  ///
+  /// **Hero 표를 달지 않는다.** 로그인에서 날아온 글자가 앉는 자리는 하단 바의
+  /// 알약이고, 한 화면에 같은 표가 둘이면 터진다. 이 글자는 그냥 글자다.
+  Widget _brand() => const Center(
+        child: BrandMark(fontSize: kBrandLandedSize),
+      );
 
   /// 종목 전환.
   ///
@@ -302,23 +294,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   /// 않았으면 목록의 첫 종목을 쓴다.
   Widget _sportChips(List<Sport> sports) {
     final selected = ref.watch(currentSportProvider) ?? sports.first.code;
-    return Wrap(
-      spacing: 8,
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         for (final sport in sports)
-          ChoiceChip(
-            key: Key('home-sport-${sport.code}'),
-            label: Text(sport.name),
-            selected: sport.code == selected,
-            showCheckmark: false,
-            backgroundColor: Colors.transparent,
-            selectedColor: AppTheme.seed,
-            labelStyle: TextStyle(
-              color: sport.code == selected ? _kHomeBg : _kOnDark,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 5),
+            child: _GlassChip(
+              key: Key('home-sport-${sport.code}'),
+              label: sport.name,
+              selected: sport.code == selected,
+              onTap: () =>
+                  ref.read(currentSportProvider.notifier).select(sport.code),
             ),
-            side: BorderSide(color: _kOnDark.withValues(alpha: 0.25)),
-            onSelected: (_) =>
-                ref.read(currentSportProvider.notifier).select(sport.code),
           ),
       ],
     );
@@ -334,10 +322,8 @@ class _DestinationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final dim = destination.isReady ? 1.0 : 0.55;
 
-    return Card(
-      color: _kCardFill,
-      elevation: 0,
-      clipBehavior: Clip.antiAlias,
+    return _GlassPanel(
+      radius: _kCardRadius,
       child: InkWell(
         onTap: () {
           if (destination.route case final route?) {
@@ -386,6 +372,75 @@ class _DestinationCard extends StatelessWidget {
                 ),
               ],
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 뒤를 굴절시키는 유리 한 조각.
+///
+/// 로그인 시트의 버튼과 달리 여기는 **진짜 유리를 쓸 수 있다** — 홈의 카드는
+/// 다른 유리 안에 들어 있지 않다. 유리 안의 유리가 금지인 이유는
+/// `refractive_glass.dart` 주석 참고.
+class _GlassPanel extends StatelessWidget {
+  const _GlassPanel({required this.radius, required this.child});
+
+  final double radius;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: LayoutBuilder(
+        builder: (context, box) => RefractiveGlass(
+          notch: GlassNotch(
+            left: 0,
+            right: box.maxWidth,
+            depth: box.maxHeight,
+            radius: radius,
+            pill: true,
+          ),
+          strength: _kGlassOn,
+          warp: _kWarp,
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+/// 종목을 고르는 유리 알약.
+class _GlassChip extends StatelessWidget {
+  const _GlassChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _GlassPanel(
+      radius: 22,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+          child: Text(
+            label,
+            style: TextStyle(
+              // 고른 것만 브랜드색으로 선다 — 유리 면은 둘이 같다.
+              color: selected ? AppTheme.seed : _kOnDark,
+              fontSize: 14,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+            ),
           ),
         ),
       ),
