@@ -8,22 +8,16 @@ Widget _wrap() => const ProviderScope(
       child: MaterialApp(home: LoginScreen()),
     );
 
-/// 시트를 끝까지 아래로 접는다.
-///
-/// 시트는 펼친 채로 시작한다 — 인트로가 끝나면 바로 로그인 폼이 나와야 하기
-/// 때문이다. 접힘 상태를 보려면 밀어 내려야 한다.
-Future<void> _closeSheet(WidgetTester tester) async {
-  await tester.drag(find.byType(LoginScreen), const Offset(0, 600));
-  // 안착 애니메이션(340ms)을 흘려보낸다. pumpAndSettle은 쓰지 않는다 —
-  // 로딩 인디케이터가 뜨면 무한 애니메이션이라 끝나지 않는다.
-  await tester.pump();
-  await tester.pump(const Duration(milliseconds: 400));
-}
-
 void main() {
   testWidgets('이메일과 비밀번호 입력란이 있다', (tester) async {
     await tester.pumpWidget(_wrap());
     expect(find.byType(TextField), findsNWidgets(2));
+  });
+
+  testWidgets('시트가 고정이라 여닫는 힌트가 없다', (tester) async {
+    await tester.pumpWidget(_wrap());
+    expect(find.textContaining('올려'), findsNothing);
+    expect(find.textContaining('내려'), findsNothing);
   });
 
   testWidgets('개발용 바로 진입 계정 3종이 있다', (tester) async {
@@ -31,25 +25,6 @@ void main() {
     expect(find.text('개인 사용자 (데이터 있음)'), findsOneWidget);
     expect(find.text('팀 관리자'), findsOneWidget);
     expect(find.text('신규 가입자 (데이터 0건)'), findsOneWidget);
-  });
-
-  testWidgets('펼친 채로 시작하고, 접으면 올리라는 힌트로 바뀐다', (tester) async {
-    await tester.pumpWidget(_wrap());
-
-    Opacity opacityOf(String text) => tester.widget<Opacity>(
-          find.ancestor(
-            of: find.text(text),
-            matching: find.byType(Opacity),
-          ).first,
-        );
-
-    expect(opacityOf('아래로 내려 닫기').opacity, 1);
-    expect(opacityOf('위로 올려 로그인').opacity, 0);
-
-    await _closeSheet(tester);
-
-    expect(opacityOf('아래로 내려 닫기').opacity, 0);
-    expect(opacityOf('위로 올려 로그인').opacity, 1);
   });
 
   testWidgets('없는 이메일로 로그인하면 오류 문구가 뜬다', (tester) async {

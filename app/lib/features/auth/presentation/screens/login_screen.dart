@@ -5,13 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/mock/mock_db.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/refractive_glass.dart';
-import '../../../../core/widgets/sheet_drag_physics.dart';
 import '../../../intro/presentation/screens/glitch_intro_screen.dart'
     show kIntroInkColor;
 import '../session_controller.dart';
-
-/// 접힘 상태에서 보이는 시트 높이 — 손잡이와 힌트, 이름이 들어간다.
-const double _kSheetCollapsed = 96.0;
 
 /// 시트 윗모서리 반지름. **클립과 셰이더가 같은 값을 봐야** 굴절이 모서리에서
 /// 어긋나지 않는다.
@@ -20,8 +16,11 @@ const double _kSheetRadius = 28.0;
 /// 사진 위에 얹히는 글자색.
 const Color _kOnPhoto = Color(0xFFFFFFFF);
 
-const String _kHintUp = '위로 올려 로그인';
-const String _kHintDown = '아래로 내려 닫기';
+/// 유리 세기. 시트가 고정이라 늘 최대다.
+///
+/// 끌어올리는 시트였을 때는 진행도를 그대로 넘겼다 — 올라오는 만큼만 유리가
+/// 서야 접힌 상태에 뿌연 띠가 안 남았다. 고정이 되면서 그 이유가 사라졌다.
+const Animation<double> _kGlassOn = AlwaysStoppedAnimation<double>(1);
 
 /// 사진 한 장 위로 유리 시트가 올라오는 로그인 화면.
 ///
@@ -37,22 +36,9 @@ class LoginScreen extends ConsumerStatefulWidget {
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen>
-    with SingleTickerProviderStateMixin {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
-
-  /// 시트 진행도 0(접힘)~1(펼침). **유리의 세기가 곧 이 값이다** — 늘 켜 두면
-  /// 접힌 상태에서도 화면 아래에 뿌연 띠가 남는다.
-  ///
-  /// **펼친 채로 시작한다.** 인트로가 끝나면 곧바로 로그인 폼이 나와야지,
-  /// 사용자가 한 번 더 끌어올려야 하면 안 된다. 아래로 밀어 접으면 사진이
-  /// 드러나고, 다시 올리면 돌아온다.
-  late final AnimationController _sheet = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 340),
-    value: 1,
-  );
 
   bool _busy = false;
   String? _error;
@@ -61,7 +47,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   void dispose() {
     _email.dispose();
     _password.dispose();
-    _sheet.dispose();
     super.dispose();
   }
 
@@ -79,18 +64,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     }
   }
 
-  void _onDragUpdate(DragUpdateDetails d, SheetDragPhysics physics) {
-    _sheet.value = physics.advance(_sheet.value, d.delta.dy);
-  }
-
-  void _onDragEnd(DragEndDetails d, SheetDragPhysics physics) {
-    final expand = physics.shouldExpand(
-      _sheet.value,
-      d.velocity.pixelsPerSecond.dy,
-    );
-    _sheet.animateTo(expand ? 1.0 : 0.0, curve: Curves.easeOutCubic);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -99,46 +72,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       // 그 순간이 안 보인다.
       backgroundColor: kIntroInkColor,
       resizeToAvoidBottomInset: false,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final expanded = constraints.biggest.height;
-          final physics = SheetDragPhysics(
-            travel: expanded - _kSheetCollapsed,
-          );
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onVerticalDragUpdate: (d) => _onDragUpdate(d, physics),
-            onVerticalDragEnd: (d) => _onDragEnd(d, physics),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                const Positioned.fill(
-                  child: Image(
-                    image: AssetImage('assets/images/player_mono.jpg'),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                _sheetLayer(expanded, physics.travel),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _sheetLayer(double expanded, double travel) {
-    return AnimatedBuilder(
-      animation: _sheet,
-      // **시트 몸통을 `child`로 빼면 안 된다.** 그러면 한 번만 지어 두고 자리만
-      // 옮기는데, 굴절 유리는 자기 화면 자리를 **페인트할 때** 읽는다. 다시
-      // 칠해지지 않으면 옛 자리를 문 채 그려져 올릴 때마다 깜빡인다.
-      builder: (context, _) => Positioned(
-        left: 0,
-        right: 0,
-        bottom: -travel * (1 - _sheet.value),
-        height: expanded,
-        child: _sheetBody(),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          const Image(
+            image: AssetImage('assets/images/player_mono.jpg'),
+            fit: BoxFit.cover,
+          ),
+          _sheetBody(),
+        ],
       ),
     );
   }
@@ -157,7 +99,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             radius: _kSheetRadius,
             pill: true,
           ),
-          strength: _sheet,
+          strength: _kGlassOn,
           child: _sheetColumn(),
         ),
       ),
@@ -165,57 +107,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }
 
   Widget _sheetColumn() {
-    final p = _sheet.value;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const SizedBox(height: 14),
-        Center(
-          child: Container(
-            width: 44,
-            height: 4,
-            decoration: BoxDecoration(
-              color: _kOnPhoto.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(2),
+    return SafeArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 28),
+          const Center(
+            child: Text(
+              'SUPERSUB',
+              style: TextStyle(
+                fontFamily: 'Rubik',
+                fontVariations: [FontVariation('wght', 900)],
+                fontSize: 30,
+                height: 1,
+                letterSpacing: 1.4,
+                color: _kOnPhoto,
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 10),
-        // 글자 둘을 **같은 자리에 겹쳐** 교차시킨다. 따로 두면 글자가 바뀔 때
-        // 아래 이름이 위아래로 튄다.
-        SizedBox(
-          height: 18,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Opacity(opacity: 1 - p, child: const _Hint(_kHintUp)),
-              Opacity(opacity: p, child: const _Hint(_kHintDown)),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Center(
-          child: Text(
-            'SUPERSUB',
-            style: TextStyle(
-              fontFamily: 'Rubik',
-              fontVariations: [FontVariation('wght', 900)],
-              fontSize: 30,
-              height: 1,
-              letterSpacing: 1.4,
-              color: _kOnPhoto,
-            ),
-          ),
-        ),
-        // 접혀 있을 때는 폼이 안 보여야 한다. 시트가 절반쯤 올라온 뒤부터
-        // 떠오르게 한다.
-        Expanded(
-          child: Opacity(
-            opacity: ((p - 0.35) / 0.65).clamp(0.0, 1.0),
-            child: _form(),
-          ),
-        ),
-      ],
+          Expanded(child: _form()),
+        ],
+      ),
     );
   }
 
@@ -340,23 +252,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       ),
     );
   }
-}
-
-class _Hint extends StatelessWidget {
-  const _Hint(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Text(
-        text,
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          color: _kOnPhoto.withValues(alpha: 0.75),
-          fontSize: 13,
-          letterSpacing: 0.3,
-        ),
-      );
 }
 
 class _DevLoginButton extends StatelessWidget {
