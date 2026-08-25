@@ -88,9 +88,15 @@ void main() {
     await tester.tap(find.text('영상 분석'));
     await tester.pump(const Duration(milliseconds: 500));
 
-    // 화면의 제목과 바로 찍는 버튼이 선다.
-    expect(find.byKey(const Key('video-camera')), findsOneWidget);
-    expect(find.text('분석할 영상을 올리세요'), findsOneWidget);
+    expect(find.text('분석할 영상을 골라주세요'), findsOneWidget);
+
+    // 판을 누르면 어디서 가져올지 둘로 펼쳐진다.
+    await tester.tap(find.byKey(const Key('video-pick')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.byKey(const Key('video-pick-camera')), findsOneWidget);
+    expect(find.byKey(const Key('video-pick-gallery')), findsOneWidget);
   });
 
   testWidgets('로그인 상태에서 다른 라우트는 그대로 통과한다', (tester) async {
