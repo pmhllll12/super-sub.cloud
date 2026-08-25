@@ -22,7 +22,7 @@ const Color _kOnPhoto = Color(0xFFFFFFFF);
 /// `refractive_glass.dart`가 "자식 안에 유리를 또 넣지 않는다 — 안쪽이 아직
 /// 안 끝난 바깥을 읽어 내용이 프레임째로 사라진다. 층을 내고 싶으면 흐림
 /// 없이 색만 얹는다"고 못박아 뒀다. 이 옅은 흰 면이 그 한 겹이다.
-final Color _kGlassFill = Colors.white.withValues(alpha: 0.12);
+final Color _kGlassFill = Colors.white.withValues(alpha: 0.20);
 
 /// 버튼 모서리.
 const double _kButtonRadius = 14;
@@ -165,63 +165,75 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             const SizedBox(height: 14),
             Text(
               _error!,
+              textAlign: TextAlign.center,
               style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 13),
             ),
           ],
           const SizedBox(height: 22),
-          FilledButton(
-            key: const Key('login-submit'),
-            style: _glassButton,
-            onPressed: _busy
-                ? null
-                : () => _run(
-                      () => ref
-                          .read(notifier)
-                          .login(_email.text, _password.text),
+          // **버튼 넷이 한 IntrinsicWidth 안에 있다.** 그래야 넷의 폭이 가장
+          // 긴 라벨('신규 가입자 (데이터 0건)')에 함께 맞춰진다. 따로 두면
+          // 각자 제 라벨만큼만 넓어져 들쭉날쭉해진다.
+          Center(
+            child: IntrinsicWidth(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  FilledButton(
+                    key: const Key('login-submit'),
+                    style: _glassButton,
+                    onPressed: _busy
+                        ? null
+                        : () => _run(
+                              () => ref
+                                  .read(notifier)
+                                  .login(_email.text, _password.text),
+                            ),
+                    child: _busy
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('로그인'),
+                  ),
+                  if (kDebugMode) ...[
+                    const SizedBox(height: 24),
+                    Text(
+                      '개발용 바로 진입',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: _kOnPhoto.withValues(alpha: 0.7),
+                        fontSize: 12,
+                        letterSpacing: 0.4,
+                      ),
                     ),
-            child: _busy
-                ? const SizedBox(
-                    height: 18,
-                    width: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('로그인'),
-          ),
-          if (kDebugMode) ...[
-            const SizedBox(height: 28),
-            Divider(color: _kOnPhoto.withValues(alpha: 0.2)),
-            const SizedBox(height: 10),
-            Text(
-              '개발용 바로 진입',
-              style: TextStyle(
-                color: _kOnPhoto.withValues(alpha: 0.7),
-                fontSize: 12,
-                letterSpacing: 0.4,
+                    const SizedBox(height: 10),
+                    _DevLoginButton(
+                      label: '개인 사용자 (데이터 있음)',
+                      userId: MockDb.playerId,
+                      busy: _busy,
+                      style: _glassButton,
+                      onTap: (id) => _run(() => ref.read(notifier).loginAs(id)),
+                    ),
+                    _DevLoginButton(
+                      label: '팀 관리자',
+                      userId: MockDb.managerId,
+                      busy: _busy,
+                      style: _glassButton,
+                      onTap: (id) => _run(() => ref.read(notifier).loginAs(id)),
+                    ),
+                    _DevLoginButton(
+                      label: '신규 가입자 (데이터 0건)',
+                      userId: MockDb.newbieId,
+                      busy: _busy,
+                      style: _glassButton,
+                      onTap: (id) => _run(() => ref.read(notifier).loginAs(id)),
+                    ),
+                  ],
+                ],
               ),
             ),
-            const SizedBox(height: 10),
-            _DevLoginButton(
-              label: '개인 사용자 (데이터 있음)',
-              userId: MockDb.playerId,
-              busy: _busy,
-              style: _glassButton,
-              onTap: (id) => _run(() => ref.read(notifier).loginAs(id)),
-            ),
-            _DevLoginButton(
-              label: '팀 관리자',
-              userId: MockDb.managerId,
-              busy: _busy,
-              style: _glassButton,
-              onTap: (id) => _run(() => ref.read(notifier).loginAs(id)),
-            ),
-            _DevLoginButton(
-              label: '신규 가입자 (데이터 0건)',
-              userId: MockDb.newbieId,
-              busy: _busy,
-              style: _glassButton,
-              onTap: (id) => _run(() => ref.read(notifier).loginAs(id)),
-            ),
-          ],
+          ),
         ],
       ),
     );
@@ -235,7 +247,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         disabledBackgroundColor: _kGlassFill,
         disabledForegroundColor: _kOnPhoto.withValues(alpha: 0.4),
         elevation: 0,
-        minimumSize: const Size.fromHeight(52),
+        // 컴팩트하게 — 높이를 강제하지 않고 패딩으로만 잡는다.
+        minimumSize: Size.zero,
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(_kButtonRadius),
         ),
@@ -289,7 +304,7 @@ class _DevLoginButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 8),
       child: FilledButton(
         style: style,
         onPressed: busy ? null : () => onTap(userId),
