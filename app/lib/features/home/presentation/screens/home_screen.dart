@@ -190,10 +190,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             alignment: Alignment.topCenter,
             child: FractionallySizedBox(
               heightFactor: _kFigureHeightFactor,
+              // **세로를 채우고 오른쪽을 잘라 낸다.** 사진은 세로가 짧아
+              // 화면에 맞추면 좌우가 남는데, 왼쪽에 얼굴이 있으므로 왼쪽을
+              // 기준으로 붙이고 오른쪽(뒤통수 바깥)이 잘리게 둔다.
               child: const Image(
                 image: AssetImage('assets/images/home_figure.jpg'),
                 fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
+                alignment: Alignment.centerLeft,
               ),
             ),
           ),

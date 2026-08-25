@@ -12,6 +12,8 @@ class SuperSubApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
       title: 'Super-Sub',
+      // 디버그 빌드 오른쪽 위의 빨간 띠를 감춘다.
+      debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       routerConfig: ref.watch(routerProvider),
