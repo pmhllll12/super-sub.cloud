@@ -52,13 +52,31 @@ void main() {
     expect(find.text('풋살'), findsOneWidget);
   });
 
-  testWidgets('종목을 전환할 수 있다', (tester) async {
+  testWidgets('종목 칩으로 전환할 수 있다', (tester) async {
     final container = await _pumpLoggedIn(tester);
-    await tester.tap(find.byKey(const Key('home-sport-switch')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('야구').last);
+    await tester.tap(find.byKey(const Key('home-sport-baseball')));
     await tester.pumpAndSettle();
     expect(container.read(currentSportProvider), equals('baseball'));
+  });
+
+  testWidgets('갈라져 나가는 곳들을 모두 보여 준다', (tester) async {
+    await _pumpLoggedIn(tester);
+    for (final title in const [
+      '영상 분석',
+      '용병 매칭',
+      '내 선수 카드',
+      '내 팀',
+      '레슨 · 코치',
+      '내 프로필',
+    ]) {
+      expect(find.text(title), findsOneWidget, reason: title);
+    }
+  });
+
+  testWidgets('아직 없는 화면은 준비 중으로 표시한다', (tester) async {
+    await _pumpLoggedIn(tester);
+    // 프로필만 실제 화면이 있다 — 나머지 다섯은 준비 중이다.
+    expect(find.text('준비 중'), findsNWidgets(5));
   });
 
   testWidgets('로그아웃 버튼이 있다', (tester) async {

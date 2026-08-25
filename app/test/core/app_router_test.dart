@@ -5,13 +5,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:super_sub/app.dart';
 import 'package:super_sub/core/mock/mock_db.dart';
-import 'package:super_sub/core/sport/current_sport.dart';
 import 'package:super_sub/features/auth/presentation/session_controller.dart';
 import 'package:super_sub/features/intro/presentation/intro_gate.dart';
 
 /// redirect는 앱의 내비게이션 정책 전체를 담고 있다 — 복원 중, 로그아웃,
-/// 종목 미선택, 온보딩 라우트에 남은 로그인 사용자, 통과. 다섯 갈래를 모두
-/// 착지 화면으로 확인한다.
+/// 로그인 화면에 남은 로그인 사용자, 통과. 네 갈래를 모두 착지 화면으로
+/// 확인한다. 종목은 더 이상 진입 조건이 아니다(홈의 칩으로 옮겼다).
 ///
 /// 관용구 주의: Mock은 300ms 지연을 흉내내고 위젯 테스트의 가짜 시계는
 /// pump로만 흐른다. pumpWidget 전에 Mock Future를 await하면 영원히 끝나지
@@ -37,7 +36,6 @@ Future<ProviderContainer> _pumpHome(WidgetTester tester) async {
   unawaited(
     container.read(sessionControllerProvider.notifier).loginAs(MockDb.playerId),
   );
-  container.read(currentSportProvider.notifier).select('futsal');
   await tester.pump(const Duration(milliseconds: 500));
   return container;
 }
@@ -60,24 +58,12 @@ void main() {
     expect(find.text('로그인'), findsWidgets);
   });
 
-  testWidgets('로그인했지만 종목을 안 골랐으면 온보딩에 착지한다', (tester) async {
-    final container = await _pumpApp(tester);
-    unawaited(
-      container
-          .read(sessionControllerProvider.notifier)
-          .loginAs(MockDb.playerId),
-    );
-    await tester.pump(const Duration(milliseconds: 500));
-
-    expect(find.text('종목 선택'), findsOneWidget);
-    expect(find.text('로그인'), findsNothing);
-  });
-
-  testWidgets('종목까지 고르면 홈에 착지한다', (tester) async {
+  testWidgets('로그인하면 종목을 안 골라도 홈에 착지한다', (tester) async {
     await _pumpHome(tester);
 
-    expect(find.text('홈'), findsOneWidget);
-    expect(find.text('종목 선택'), findsNothing);
+    // 홈은 갈라져 나가는 곳들을 보여 준다.
+    expect(find.text('무엇을 할까요'), findsOneWidget);
+    expect(find.text('로그인'), findsNothing);
   });
 
   testWidgets('홈에서 로그아웃하면 로그인으로 돌아간다', (tester) async {
@@ -87,12 +73,15 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.text('로그인'), findsWidgets);
-    expect(find.text('홈'), findsNothing);
+    expect(find.text('무엇을 할까요'), findsNothing);
   });
 
-  testWidgets('로그인·종목이 모두 갖춰지면 다른 라우트는 그대로 통과한다', (tester) async {
+  testWidgets('로그인 상태에서 다른 라우트는 그대로 통과한다', (tester) async {
     await _pumpHome(tester);
 
+    // 홈이 스크롤되는 허브라 카드가 화면 밖에 있을 수 있다.
+    await tester.ensureVisible(find.text('내 프로필'));
+    await tester.pump();
     await tester.tap(find.text('내 프로필'));
     await tester.pump(const Duration(milliseconds: 500));
 
