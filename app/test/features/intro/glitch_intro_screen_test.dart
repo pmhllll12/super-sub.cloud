@@ -28,7 +28,7 @@ void main() {
     expect(text.style?.color, kIntroPaper);
 
     // 컨트롤러가 아직 돌고 있다 — 끝까지 흘려보내야 티커가 안 남는다.
-    await tester.pump(const Duration(milliseconds: 3200));
+    await tester.pump(const Duration(milliseconds: 3700));
   });
 
   testWidgets('잉크 페인터가 화면에 있다', (tester) async {
@@ -42,7 +42,7 @@ void main() {
         .map((w) => w.painter);
     expect(painters, contains(isA<InkBleedPainter>()));
 
-    await tester.pump(const Duration(milliseconds: 3200));
+    await tester.pump(const Duration(milliseconds: 3700));
   });
 
   testWidgets('다 흐르면 onDone이 불린다', (tester) async {
@@ -53,7 +53,7 @@ void main() {
     await tester.pump();
     expect(done, isFalse);
 
-    await tester.pump(const Duration(milliseconds: 3200));
+    await tester.pump(const Duration(milliseconds: 3700));
     expect(done, isTrue);
   });
 

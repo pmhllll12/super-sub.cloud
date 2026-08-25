@@ -3,17 +3,16 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 
-/// 순백 구간이 끝나는 컨트롤러 값. 200ms / 3100ms.
+/// 순백 구간이 끝나는 컨트롤러 값. 700ms / 3600ms.
 ///
-/// **`glitch_intro_screen.dart`의 `_kIntroDuration`(지금 3100ms)과 이 3.1이
+/// **`glitch_intro_screen.dart`의 `kIntroDuration`(지금 3600ms)과 이 3.6이
 /// 서로를 모른다.** 전체 길이를 바꾸면 이 나눗셈의 분모도 같이 바꿔야
 /// 한다 — 안 그러면 순백·번짐 구간의 비율이 조용히 어긋난다. 테스트에도
-/// 3100이 그대로 박혀 있다(`test/ink_bleed_test.dart`,
-/// `test/glitch_intro_test.dart`).
-const double _kDryEnd = 0.20 / 3.1;
+/// 3600이 그대로 박혀 있다(`test/core/ink_bleed_test.dart`).
+const double _kDryEnd = 0.70 / 3.6;
 
-/// 번짐이 끝나는 컨트롤러 값. 2600ms / 3100ms. 위 [_kDryEnd]와 같은 주의.
-const double _kWetEnd = 2.60 / 3.1;
+/// 번짐이 끝나는 컨트롤러 값. 3100ms / 3600ms. 위 [_kDryEnd]와 같은 주의.
+const double _kWetEnd = 3.10 / 3.6;
 
 /// 컨트롤러 값 [t](0~1)를 잉크 진행도(0~1)로 옮긴다.
 ///

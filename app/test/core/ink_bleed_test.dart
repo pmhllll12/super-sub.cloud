@@ -6,11 +6,11 @@ void main() {
   group('inkProgress', () {
     test('순백 구간에서는 0이다', () {
       expect(inkProgress(0), 0);
-      expect(inkProgress(0.06), 0);
+      expect(inkProgress(0.18), 0);
     });
 
     test('머묾 구간에서는 1이다', () {
-      expect(inkProgress(0.84), 1);
+      expect(inkProgress(0.87), 1);
       expect(inkProgress(1.0), 1);
     });
 
@@ -25,22 +25,22 @@ void main() {
 
     test('번짐 절반 지점에 65%가 젖는다', () {
       // 참조 영상에서 잰 값이다. 선형(50%)도 easeOutCubic(88%)도 아니다.
-      const dry = 0.20 / 3.1;
-      const wet = 2.60 / 3.1;
+      const dry = 0.70 / 3.6;
+      const wet = 3.10 / 3.6;
       expect(inkProgress(dry + (wet - dry) * 0.5), closeTo(0.65, 0.005));
     });
 
-    test('p=0.60이 1.28초 언저리다', () {
+    test('p=0.60이 1.78초 언저리다', () {
       // 글리치가 여기서 시작한다. 너무 이르면 글자가 아직 안 읽히고,
-      // 너무 늦으면 머묾 구간을 침범한다. 3100은 kIntroDuration과 묶여 있다.
+      // 너무 늦으면 머묾 구간을 침범한다. 3600은 kIntroDuration과 묶여 있다.
       var hit = -1.0;
-      for (var i = 0; i <= 3100; i++) {
-        if (inkProgress(i / 3100) >= 0.60) {
+      for (var i = 0; i <= 3600; i++) {
+        if (inkProgress(i / 3600) >= 0.60) {
           hit = i / 1000;
           break;
         }
       }
-      expect(hit, closeTo(1.28, 0.06));
+      expect(hit, closeTo(1.78, 0.06));
     });
   });
 

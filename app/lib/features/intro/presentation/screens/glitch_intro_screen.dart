@@ -62,12 +62,12 @@ const Color kIntroInkColor = Color(0xFF000000);
 /// 넘친다. 자간은 [BrandMark.letterSpacingFor]가 크기에 비례해 계산한다.
 const double kIntroBrandSize = 52;
 
-/// 전체 길이. 순백 200 + 번짐 2400 + 머묾 500.
+/// 전체 길이. 민트 판만 보이는 700 + 번짐 2400 + 머묾 500.
 ///
-/// **`ink_bleed.dart`의 `_kDryEnd`·`_kWetEnd`가 이 3100을 하드코딩한 3.1로
-/// 나눗셈에 쓴다.** 여기를 바꾸면 그쪽도 같이 바꿔야 순백·번짐 구간의 비율이
-/// 안 어긋난다. 테스트에도 3100이 그대로 박혀 있다(`test/core/ink_bleed_test.dart`).
-const Duration kIntroDuration = Duration(milliseconds: 3100);
+/// **`ink_bleed.dart`의 `_kDryEnd`·`_kWetEnd`가 이 3600을 하드코딩한 3.6으로
+/// 나눗셈에 쓴다.** 여기를 바꾸면 그쪽도 같이 바꿔야 구간 비율이 안 어긋난다.
+/// 테스트에도 3600이 그대로 박혀 있다(`test/core/ink_bleed_test.dart`).
+const Duration kIntroDuration = Duration(milliseconds: 3600);
 
 /// 인트로에서 앱 화면으로 넘어가는 데 걸리는 시간.
 ///
