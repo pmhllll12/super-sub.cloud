@@ -1,7 +1,7 @@
 # API 계약 초안 — 인증 · 선수 카드
 
 > **상태:** 구현됨 — **단 전부 스텁(고정 응답)이고 DB에 붙지 않는다** · 2026-08-25 확인
-> **확인:** `cd fastapi && .venv/bin/pytest` → `39 passed`
+> **확인:** `cd fastapi && .venv/bin/pytest` → `60 passed`
 > **메모:** 스프린트 2(09.01~)의 Flutter 화면 두 개(로그인 · 선수 카드)에 필요한
 > 최소 범위. 응답 형태는 확정이고 **값만 고정**이다. 실제 조회는 DB가 생긴 뒤에 채운다.
 
@@ -17,8 +17,8 @@
 | 공개 카드 슬러그 | `hong-gildong-4f2a` |
 
 `/docs`(Swagger UI)에도 같은 안내가 떠 있다. 정의는 각 컨텍스트의
-`stub_repository.py`에 있고 DB가 붙으면 그 파일들이 사라진다 — 갈아끼우는 지점은
-`app/deps.py` 한 곳이다.
+`adapter/outbound/stub_repository.py`에 있고 DB가 붙으면 그 파일들이 사라진다 — 갈아끼우는 지점은
+각 컨텍스트의 `dependencies.py` 다.
 
 대상: **정어진**(이 API를 호출하는 쪽), **박민호**(스키마 소유), **백성검**(범위 판단).
 
@@ -287,6 +287,12 @@ Pydantic 검증에 걸리면 `code`는 항상 `VALIDATION_ERROR` 하나이고 `m
    그리고 401을 `UNAUTHORIZED`/`INVALID_TOKEN`으로 나눠 처리하는지.
 2. **DDL을 쓰고 실제 PostgreSQL에 올려 확인한다.** 부록 D는 문서일 뿐이고
    D.6 삭제 연쇄·D.7 유일제약 18건이 아직 코드가 아니다. 로컬에 올려보면 바로 판별된다.
-3. **스텁을 실제 조회로 교체한다.** `app/stubs.py`를 지우고 리포지터리 계층을 넣는다.
+3. **스텁을 실제 조회로 교체한다.** 각 컨텍스트의 `adapter/outbound/stub_repository.py`를
+   `pg_repository.py`로 바꾸고 그 컨텍스트의 `dependencies.py`만 고친다.
    응답 형태는 그대로이므로 **정어진 쪽은 고칠 것이 없어야 한다.**
-4. 비밀번호 해싱(bcrypt)과 JWT 발급을 실제로 붙인다. 지금은 고정 문자열이다.
+4. 비밀번호 해싱(bcrypt)과 진짜 JWT 를 붙인다. 지금은 `app/security.py`가 서명 없는
+   스텁 토큰을 발급한다.
+
+> **토큰 값은 계약이 아니다.** 지금은 `stub-token-for-<uuid>` 형태지만 JWT 로 바뀐다.
+> 클라이언트는 로그인 응답의 `access_token` 을 **그대로 담아 보내기만** 하면 된다 —
+> 값을 파싱하거나 하드코딩하지 말 것.

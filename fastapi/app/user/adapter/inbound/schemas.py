@@ -1,4 +1,8 @@
-"""사용자·팀 HTTP 모델. 계약 문서 2장."""
+"""사용자 컨텍스트의 HTTP 모델. 계약 문서 2장.
+
+**도메인 모델과 별개다.** 이쪽은 바깥과의 약속이라 함부로 못 바꾸고,
+도메인은 안쪽 사정이라 자유롭게 바꾼다.
+"""
 
 from __future__ import annotations
 
@@ -6,8 +10,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field
 
-from app.identity.domain import MAX_NICKNAME_LENGTH, MIN_PASSWORD_LENGTH
 from app.shared import Rfc3339
+from app.user.domain.value_objects import MAX_NICKNAME_LENGTH, MIN_PASSWORD_LENGTH
 
 
 class SignupRequest(BaseModel):
@@ -34,7 +38,7 @@ class UserResponse(BaseModel):
     created_at: Rfc3339
 
 
-class TeamMembership(BaseModel):
+class TeamMembershipResponse(BaseModel):
     team_id: UUID
     name: str
     region: str
@@ -44,5 +48,5 @@ class TeamMembership(BaseModel):
 
 
 class MeResponse(UserResponse):
-    # 지금 소속된 팀만. 거르는 규칙은 domain.active_memberships 에 있다.
-    teams: list[TeamMembership]
+    # 지금 소속된 팀만. 거르는 규칙은 domain/rules.py 에 있다.
+    teams: list[TeamMembershipResponse]

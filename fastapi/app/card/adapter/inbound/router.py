@@ -1,30 +1,28 @@
-"""카드·호칭 HTTP 경계. 계약 문서 3장."""
+"""카드 컨텍스트의 HTTP 경계. 계약 문서 3장."""
 
 from __future__ import annotations
 
-from typing import Annotated
-
-from fastapi import APIRouter, Depends
-
-from app.cards.domain import Card, PublicCard
-from app.cards.schemas import (
+from app.card.adapter.inbound.schemas import (
     CardOwnerResponse,
     CardResponse,
     PublicCardResponse,
     TitleResponse,
 )
-from app.cards.service import CardService
-from app.deps import CurrentUserId, get_card_service
+from app.card.dependencies import MyCard, PublicCardQuery
+from app.card.domain.entities import Card, PublicCard
+from app.deps import CurrentUserId
+from fastapi import APIRouter
 
 router = APIRouter(tags=["cards"])
-
-_Service = Annotated[CardService, Depends(get_card_service)]
 
 
 def _titles(card: Card | PublicCard) -> list[TitleResponse]:
     return [
         TitleResponse(
-            code=t.code, label=t.label, category=t.category, granted_at=t.granted_at
+            code=t.code,
+            label=t.label,
+            category=str(t.category),
+            granted_at=t.granted_at,
         )
         for t in card.titles
     ]
@@ -35,11 +33,11 @@ def _owner(card: Card | PublicCard) -> CardOwnerResponse:
 
 
 @router.get("/me/card", response_model=CardResponse)
-def read_my_card(user_id: CurrentUserId, service: _Service) -> CardResponse:
-    card = service.my_card(user_id)
+def read_my_card(user_id: CurrentUserId, use_case: MyCard) -> CardResponse:
+    card = use_case(user_id)
     return CardResponse(
         id=card.id,
-        public_slug=card.public_slug,
+        public_slug=str(card.public_slug),
         og_image_key=card.og_image_key,
         user=_owner(card),
         titles=_titles(card),
@@ -47,11 +45,13 @@ def read_my_card(user_id: CurrentUserId, service: _Service) -> CardResponse:
 
 
 @router.get("/cards/{public_slug}", response_model=PublicCardResponse)
-def read_public_card(public_slug: str, service: _Service) -> PublicCardResponse:
+def read_public_card(
+    public_slug: str, use_case: PublicCardQuery
+) -> PublicCardResponse:
     """공유용이라 인증하지 않는다 (SFR-009)."""
-    card = service.public_card(public_slug)
+    card = use_case(public_slug)
     return PublicCardResponse(
-        public_slug=card.public_slug,
+        public_slug=str(card.public_slug),
         og_image_key=card.og_image_key,
         user=_owner(card),
         titles=_titles(card),

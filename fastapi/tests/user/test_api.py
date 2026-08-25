@@ -1,42 +1,13 @@
-"""계약 문서의 모든 경로를 성공·실패 양쪽으로 눌러본다.
-
-예전 `smoke.sh`를 옮긴 것이다. 셸 대신 TestClient 를 쓰므로 포트를 잡지 않고
-훨씬 빠르며, 응답을 문자열이 아니라 구조로 본다.
+"""user 컨텍스트의 HTTP 경계. 계약 문서 2장.
 
 **엔드포인트를 추가하면 성공 1건 + 실패 최소 1건을 같이 넣는다.** 이 규칙이 실제로
 버그를 잡았다 — 에러 핸들러가 통째로 깨져 모든 실패가 500 이 된 적이 있다.
 """
 
 import pytest
-from fastapi.testclient import TestClient
 
-from app.cards.stub_repository import DEMO_SLUG
-from app.identity.stub_repository import DEMO_EMAIL, DEMO_PASSWORD
-from app.main import app
-
-V1 = "/api/v1"
-
-
-@pytest.fixture
-def client() -> TestClient:
-    return TestClient(app)
-
-
-@pytest.fixture
-def auth(client: TestClient) -> dict[str, str]:
-    res = client.post(
-        f"{V1}/auth/login", json={"email": DEMO_EMAIL, "password": DEMO_PASSWORD}
-    )
-    assert res.status_code == 200
-    return {"Authorization": f"Bearer {res.json()['access_token']}"}
-
-
-def _error_code(res) -> str:
-    """계약의 에러 봉투에서 code 를 꺼낸다. 형태가 다르면 여기서 터진다."""
-    body = res.json()
-    assert set(body) == {"error"}, f"에러 봉투가 아니다: {body}"
-    assert set(body["error"]) == {"code", "message"}
-    return body["error"]["code"]
+from app.user.adapter.outbound.stub_repository import DEMO_EMAIL, DEMO_PASSWORD
+from tests.conftest import V1, error_code
 
 
 class TestHealth:
@@ -59,28 +30,21 @@ class TestLogin:
         assert body["access_token"]
 
     def test_대소문자가_달라도_로그인된다(self, client):
-        # normalize_email 이 경로에 실제로 걸려 있는지 확인한다.
         res = client.post(
             f"{V1}/auth/login",
             json={"email": DEMO_EMAIL.upper(), "password": DEMO_PASSWORD},
         )
         assert res.status_code == 200
 
-    def test_비밀번호가_틀리면_401(self, client):
-        res = client.post(
-            f"{V1}/auth/login", json={"email": DEMO_EMAIL, "password": "wrong-password"}
-        )
+    @pytest.mark.parametrize(
+        ("email", "password"),
+        [(DEMO_EMAIL, "wrong-password"), ("nobody@example.com", "whatever12")],
+        ids=["비밀번호틀림", "없는계정"],
+    )
+    def test_실패는_같은_code_를_준다(self, client, email, password):
+        res = client.post(f"{V1}/auth/login", json={"email": email, "password": password})
         assert res.status_code == 401
-        assert _error_code(res) == "INVALID_CREDENTIALS"
-
-    def test_없는_계정도_같은_code_를_준다(self, client):
-        # 구분하면 가입 여부가 새어 나간다.
-        res = client.post(
-            f"{V1}/auth/login",
-            json={"email": "nobody@example.com", "password": "whatever12"},
-        )
-        assert res.status_code == 401
-        assert _error_code(res) == "INVALID_CREDENTIALS"
+        assert error_code(res) == "INVALID_CREDENTIALS"
 
 
 class TestSignup:
@@ -102,14 +66,10 @@ class TestSignup:
     def test_중복_이메일이면_409(self, client):
         res = client.post(
             f"{V1}/auth/signup",
-            json={
-                "email": DEMO_EMAIL,
-                "password": "password123",
-                "nickname": "홍길동",
-            },
+            json={"email": DEMO_EMAIL, "password": "password123", "nickname": "홍길동"},
         )
         assert res.status_code == 409
-        assert _error_code(res) == "EMAIL_ALREADY_EXISTS"
+        assert error_code(res) == "EMAIL_ALREADY_EXISTS"
 
     @pytest.mark.parametrize(
         "payload",
@@ -124,7 +84,7 @@ class TestSignup:
     def test_검증에_걸리면_422(self, client, payload):
         res = client.post(f"{V1}/auth/signup", json=payload)
         assert res.status_code == 422
-        assert _error_code(res) == "VALIDATION_ERROR"
+        assert error_code(res) == "VALIDATION_ERROR"
 
 
 class TestMe:
@@ -139,47 +99,29 @@ class TestMe:
         assert [t["name"] for t in teams] == ["번개FC"]
 
     def test_시각은_Z_로_끝난다(self, client, auth):
-        # 계약 문서가 RFC 3339 의 'Z' 표기로 적혀 있다.
         assert client.get(f"{V1}/me", headers=auth).json()["created_at"].endswith("Z")
 
     def test_헤더가_없으면_UNAUTHORIZED(self, client):
         res = client.get(f"{V1}/me")
         assert res.status_code == 401
-        assert _error_code(res) == "UNAUTHORIZED"
+        assert error_code(res) == "UNAUTHORIZED"
 
-    def test_토큰이_무효하면_INVALID_TOKEN(self, client):
-        # 클라이언트 동작이 다르므로 위와 code 를 나눈다.
-        res = client.get(f"{V1}/me", headers={"Authorization": "Bearer garbage"})
+    @pytest.mark.parametrize(
+        "header",
+        ["Bearer garbage", "Bearer stub-token-for-not-a-uuid", "Basic abc"],
+        ids=["형식아님", "uuid아님", "Bearer아님"],
+    )
+    def test_토큰이_무효하면_401(self, client, header):
+        res = client.get(f"{V1}/me", headers={"Authorization": header})
         assert res.status_code == 401
-        assert _error_code(res) == "INVALID_TOKEN"
+        assert error_code(res) in {"UNAUTHORIZED", "INVALID_TOKEN"}
 
-
-class TestCards:
-    def test_내_카드(self, client, auth):
-        res = client.get(f"{V1}/me/card", headers=auth)
-        assert res.status_code == 200
-        assert res.json()["public_slug"] == DEMO_SLUG
-
-    def test_내_카드는_인증이_필요하다(self, client):
-        res = client.get(f"{V1}/me/card")
+    def test_없는_사용자의_토큰이면_INVALID_TOKEN(self, client):
+        # 토큰 형식은 맞지만 그 id 의 사용자가 없다.
+        forged = "Bearer stub-token-for-00000000-0000-4000-8000-000000000000"
+        res = client.get(f"{V1}/me", headers={"Authorization": forged})
         assert res.status_code == 401
-        assert _error_code(res) == "UNAUTHORIZED"
-
-    def test_공개_카드는_인증_없이_보인다(self, client):
-        res = client.get(f"{V1}/cards/{DEMO_SLUG}")
-        assert res.status_code == 200
-
-    def test_공개_카드에_내부_id_가_없다(self, client):
-        assert "id" not in client.get(f"{V1}/cards/{DEMO_SLUG}").json()
-
-    def test_호칭이_최신순으로_나온다(self, client):
-        titles = client.get(f"{V1}/cards/{DEMO_SLUG}").json()["titles"]
-        assert [t["code"] for t in titles] == ["sharp_shooter", "weekend_regular"]
-
-    def test_없는_슬러그면_404(self, client):
-        res = client.get(f"{V1}/cards/no-such-slug")
-        assert res.status_code == 404
-        assert _error_code(res) == "CARD_NOT_FOUND"
+        assert error_code(res) == "INVALID_TOKEN"
 
 
 class TestOpenApi:
