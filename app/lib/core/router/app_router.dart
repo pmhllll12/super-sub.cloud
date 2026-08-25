@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/session_controller.dart';
 
 /// GoRouter를 provider가 매번 다시 만들면 내비게이션 스택이 날아간다.
@@ -34,7 +35,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/login',
-        builder: (_, _) => const _Placeholder('로그인'),
+        builder: (_, _) => const LoginScreen(),
       ),
       GoRoute(
         path: '/onboarding/sport',
