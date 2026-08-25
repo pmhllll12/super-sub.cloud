@@ -7,6 +7,7 @@ import 'package:super_sub/app.dart';
 import 'package:super_sub/core/mock/mock_db.dart';
 import 'package:super_sub/core/sport/current_sport.dart';
 import 'package:super_sub/features/auth/presentation/session_controller.dart';
+import 'package:super_sub/features/intro/presentation/intro_gate.dart';
 
 /// redirect는 앱의 내비게이션 정책 전체를 담고 있다 — 복원 중, 로그아웃,
 /// 종목 미선택, 온보딩 라우트에 남은 로그인 사용자, 통과. 다섯 갈래를 모두
@@ -17,7 +18,11 @@ import 'package:super_sub/features/auth/presentation/session_controller.dart';
 /// 않고, 로딩 인디케이터는 무한 애니메이션이라 pumpAndSettle도 쓰지 않는다
 /// (home_screen_test.dart의 주석 참고).
 Future<ProviderContainer> _pumpApp(WidgetTester tester) async {
-  final container = ProviderContainer();
+  // 인트로를 끈다 — 켜 두면 3.1초 동안 모든 라우트를 덮어 착지 화면 대신
+  // 인트로만 보인다. 인트로 자체는 glitch_intro_screen_test.dart가 본다.
+  final container = ProviderContainer(
+    overrides: [introEnabledProvider.overrideWithValue(false)],
+  );
   addTearDown(container.dispose);
 
   await tester.pumpWidget(UncontrolledProviderScope(
