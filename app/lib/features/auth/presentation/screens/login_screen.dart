@@ -44,9 +44,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   /// 시트 진행도 0(접힘)~1(펼침). **유리의 세기가 곧 이 값이다** — 늘 켜 두면
   /// 접힌 상태에서도 화면 아래에 뿌연 띠가 남는다.
+  ///
+  /// **펼친 채로 시작한다.** 인트로가 끝나면 곧바로 로그인 폼이 나와야지,
+  /// 사용자가 한 번 더 끌어올려야 하면 안 된다. 아래로 밀어 접으면 사진이
+  /// 드러나고, 다시 올리면 돌아온다.
   late final AnimationController _sheet = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 340),
+    value: 1,
   );
 
   bool _busy = false;

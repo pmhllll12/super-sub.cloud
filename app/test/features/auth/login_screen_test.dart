@@ -8,13 +8,12 @@ Widget _wrap() => const ProviderScope(
       child: MaterialApp(home: LoginScreen()),
     );
 
-/// 시트를 끝까지 끌어올린다.
+/// 시트를 끝까지 아래로 접는다.
 ///
-/// 접힌 상태에서는 폼이 화면 밖이라 탭이 닿지 않는다 — 위젯 트리에는 있으니
-/// `find`는 되지만 `tap`은 못 한다. 실제 사용자도 올려야 쓸 수 있으므로
-/// 테스트도 같은 길을 지난다.
-Future<void> _openSheet(WidgetTester tester) async {
-  await tester.drag(find.byType(LoginScreen), const Offset(0, -600));
+/// 시트는 펼친 채로 시작한다 — 인트로가 끝나면 바로 로그인 폼이 나와야 하기
+/// 때문이다. 접힘 상태를 보려면 밀어 내려야 한다.
+Future<void> _closeSheet(WidgetTester tester) async {
+  await tester.drag(find.byType(LoginScreen), const Offset(0, 600));
   // 안착 애니메이션(340ms)을 흘려보낸다. pumpAndSettle은 쓰지 않는다 —
   // 로딩 인디케이터가 뜨면 무한 애니메이션이라 끝나지 않는다.
   await tester.pump();
@@ -34,7 +33,7 @@ void main() {
     expect(find.text('신규 가입자 (데이터 0건)'), findsOneWidget);
   });
 
-  testWidgets('접혀 있으면 올리라는 힌트가, 펼치면 내리라는 힌트가 진하다', (tester) async {
+  testWidgets('펼친 채로 시작하고, 접으면 올리라는 힌트로 바뀐다', (tester) async {
     await tester.pumpWidget(_wrap());
 
     Opacity opacityOf(String text) => tester.widget<Opacity>(
@@ -44,18 +43,17 @@ void main() {
           ).first,
         );
 
-    expect(opacityOf('위로 올려 로그인').opacity, 1);
-    expect(opacityOf('아래로 내려 닫기').opacity, 0);
-
-    await _openSheet(tester);
-
-    expect(opacityOf('위로 올려 로그인').opacity, 0);
     expect(opacityOf('아래로 내려 닫기').opacity, 1);
+    expect(opacityOf('위로 올려 로그인').opacity, 0);
+
+    await _closeSheet(tester);
+
+    expect(opacityOf('아래로 내려 닫기').opacity, 0);
+    expect(opacityOf('위로 올려 로그인').opacity, 1);
   });
 
   testWidgets('없는 이메일로 로그인하면 오류 문구가 뜬다', (tester) async {
     await tester.pumpWidget(_wrap());
-    await _openSheet(tester);
 
     await tester.enterText(find.byKey(const Key('login-email')), 'x@y.test');
     await tester.enterText(find.byKey(const Key('login-password')), 'pw');
@@ -77,7 +75,6 @@ void main() {
       container: container,
       child: const MaterialApp(home: LoginScreen()),
     ));
-    await _openSheet(tester);
 
     await tester.tap(find.text('팀 관리자'));
     await tester.pump();
