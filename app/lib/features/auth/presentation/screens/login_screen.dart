@@ -16,21 +16,6 @@ const double _kSheetRadius = 28.0;
 /// 사진 위에 얹히는 글자색.
 const Color _kOnPhoto = Color(0xFFFFFFFF);
 
-/// 사진과 유리 사이에 까는 어두운 막.
-///
-/// **사진이 밝다** — 흰 유니폼과 밝은 회색 배경이라, 그 위에 흰 글자를 얹으면
-/// 읽히지 않는다. 유리 면(흰색)을 더 올리면 배경이 같이 밝아져 역효과다.
-/// 대비를 세우는 유일한 방법은 뒤를 어둡게 하는 것이다.
-///
-/// 위는 옅고 아래로 갈수록 진하다 — 사진은 위쪽에서 살아 있고, 폼이 놓이는
-/// 아래쪽만 충분히 어두워진다. 위 20%, 화면 55% 지점부터 66%로 평평하다.
-const LinearGradient _kPhotoScrim = LinearGradient(
-  begin: Alignment.topCenter,
-  end: Alignment.bottomCenter,
-  colors: [Color(0x33000000), Color(0xA8000000)],
-  stops: [0, 0.55],
-);
-
 // --- 로그인 버튼 -------------------------------------------------------
 //
 // 형태는 `com.sumworship`의 로그인 버튼 그대로다 — 알약 테두리에 아주 옅은
@@ -110,10 +95,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           const Image(
             image: AssetImage('assets/images/player_mono.jpg'),
             fit: BoxFit.cover,
-          ),
-          const DecoratedBox(
-            decoration: BoxDecoration(gradient: _kPhotoScrim),
-            child: SizedBox.expand(),
           ),
           _sheetBody(),
         ],
