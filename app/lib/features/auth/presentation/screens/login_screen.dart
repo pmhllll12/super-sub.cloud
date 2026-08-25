@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/mock/mock_db.dart';
-import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/refractive_glass.dart';
 import '../../../intro/presentation/brand_mark.dart';
 import '../../../intro/presentation/screens/glitch_intro_screen.dart'
@@ -16,6 +15,17 @@ const double _kSheetRadius = 28.0;
 
 /// 사진 위에 얹히는 글자색.
 const Color _kOnPhoto = Color(0xFFFFFFFF);
+
+/// 버튼에 얹는 흰 기.
+///
+/// **흐림(BackdropFilter)을 쓰지 않는다.** 버튼은 이미 유리 시트 안에 있고,
+/// `refractive_glass.dart`가 "자식 안에 유리를 또 넣지 않는다 — 안쪽이 아직
+/// 안 끝난 바깥을 읽어 내용이 프레임째로 사라진다. 층을 내고 싶으면 흐림
+/// 없이 색만 얹는다"고 못박아 뒀다. 이 옅은 흰 면이 그 한 겹이다.
+final Color _kGlassFill = Colors.white.withValues(alpha: 0.12);
+
+/// 버튼 모서리.
+const double _kButtonRadius = 14;
 
 /// 유리 세기. 시트가 고정이라 늘 최대다.
 ///
@@ -161,12 +171,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           const SizedBox(height: 22),
           FilledButton(
             key: const Key('login-submit'),
-            style: FilledButton.styleFrom(
-              // 브랜드 민트를 주 버튼에 쓴다. 민트가 밝아 글자는 검정으로.
-              backgroundColor: AppTheme.seed,
-              foregroundColor: Colors.black,
-              minimumSize: const Size.fromHeight(52),
-            ),
+            style: _glassButton,
             onPressed: _busy
                 ? null
                 : () => _run(
@@ -199,18 +204,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               label: '개인 사용자 (데이터 있음)',
               userId: MockDb.playerId,
               busy: _busy,
+              style: _glassButton,
               onTap: (id) => _run(() => ref.read(notifier).loginAs(id)),
             ),
             _DevLoginButton(
               label: '팀 관리자',
               userId: MockDb.managerId,
               busy: _busy,
+              style: _glassButton,
               onTap: (id) => _run(() => ref.read(notifier).loginAs(id)),
             ),
             _DevLoginButton(
               label: '신규 가입자 (데이터 0건)',
               userId: MockDb.newbieId,
               busy: _busy,
+              style: _glassButton,
               onTap: (id) => _run(() => ref.read(notifier).loginAs(id)),
             ),
           ],
@@ -218,6 +226,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
     );
   }
+
+  /// 모든 버튼이 같은 유리 면을 쓴다 — 테두리는 두르지 않는다. 형태를
+  /// 세우는 건 테두리가 아니라 이 면이다.
+  ButtonStyle get _glassButton => FilledButton.styleFrom(
+        backgroundColor: _kGlassFill,
+        foregroundColor: _kOnPhoto,
+        disabledBackgroundColor: _kGlassFill,
+        disabledForegroundColor: _kOnPhoto.withValues(alpha: 0.4),
+        elevation: 0,
+        minimumSize: const Size.fromHeight(52),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(_kButtonRadius),
+        ),
+      );
 
   Widget _field({
     required Key key,
@@ -255,22 +277,24 @@ class _DevLoginButton extends StatelessWidget {
     required this.userId,
     required this.busy,
     required this.onTap,
+    required this.style,
   });
 
   final String label;
   final String userId;
   final bool busy;
   final void Function(String userId) onTap;
+  final ButtonStyle style;
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton(
-      style: OutlinedButton.styleFrom(
-        foregroundColor: _kOnPhoto,
-        side: BorderSide(color: _kOnPhoto.withValues(alpha: 0.3)),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: FilledButton(
+        style: style,
+        onPressed: busy ? null : () => onTap(userId),
+        child: Text(label),
       ),
-      onPressed: busy ? null : () => onTap(userId),
-      child: Text(label),
     );
   }
 }

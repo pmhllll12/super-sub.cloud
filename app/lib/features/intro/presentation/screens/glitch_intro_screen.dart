@@ -67,18 +67,17 @@ const Duration kIntroDuration = Duration(milliseconds: 3100);
 
 /// 인트로에서 앱 화면으로 넘어가는 데 걸리는 시간.
 ///
-/// **잉크가 다 걷히는 2.0초보다 길다.** 남는 1초는 글자가 로그인 자리로
-/// 날아가는 시간이다 — 잉크가 먼저 끝나고 글자만 더 난다. 원본도 같다.
-const Duration kIntroExitDuration = Duration(milliseconds: 3000);
+/// **잉크와 로고가 같이 끝난다.** 원본은 여기가 3.0초라 잉크가 끝난 뒤 글자만
+/// 1초 더 날았는데, 그 꼬리를 잘라 2.0초로 맞췄다.
+const Duration kIntroExitDuration = Duration(milliseconds: 2000);
 
-/// 잉크가 벗겨지는 진행에 씌우는 곡선. **앞 2/3에 몰아 둔다** — 글자가 나는
-/// 3초에 잉크까지 늘어나면 성긴 꼬리만 길어져 지루하다.
+/// 잉크가 벗겨지는 진행에 씌우는 곡선.
 ///
 /// **끝을 길게 끈다.** 덮인 넓이가 진행도와 그대로 비례하므로 선형으로 두면
 /// 마지막에 남은 성긴 점들이 한순간에 다 사라져 "퐉" 하고 꺼지는 것처럼
 /// 보인다. 감속을 주면 넓이가 일찍 줄고 성긴 꼬리에 시간이 많이 배당돼
 /// 서서히 걷히는 것으로 읽힌다.
-const Curve kIntroExitPeel = Interval(0, 2 / 3, curve: Curves.easeOutQuad);
+const Curve kIntroExitPeel = Curves.easeOutQuad;
 
 /// 흔들림 값을 붙잡아 두는 시간.
 ///
