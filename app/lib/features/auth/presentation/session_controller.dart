@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/sport/current_sport.dart';
 import '../data/auth_providers.dart';
 import '../data/models/app_user.dart';
 
@@ -58,6 +59,11 @@ class SessionController extends Notifier<SessionState> {
 
   Future<void> logout() async {
     await ref.read(authRepositoryProvider).logout();
+    // 종목은 사용자에게 매달린 컨텍스트다. 지우지 않으면 다른 계정으로
+    // 로그인했을 때 이전 사용자의 종목으로 홈에 착지하고, 단계 2부터는
+    // 모든 리포지토리 호출이 sportCode로 키잉되므로(스펙 3절) 잘못된
+    // 데이터를 부르게 된다.
+    ref.read(currentSportProvider.notifier).clear();
     state = const SessionLoggedOut();
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:super_sub/core/mock/mock_db.dart';
+import 'package:super_sub/core/sport/current_sport.dart';
 import 'package:super_sub/features/auth/data/auth_repository.dart';
 import 'package:super_sub/features/auth/presentation/session_controller.dart';
 
@@ -54,5 +55,17 @@ void main() {
     await c.login('player@supersub.test', 'any');
     await c.logout();
     expect(container.read(sessionControllerProvider), isA<SessionLoggedOut>());
+  });
+
+  test('로그아웃하면 선택한 종목도 지워진다', () async {
+    final c = container.read(sessionControllerProvider.notifier);
+    await c.login('player@supersub.test', 'any');
+    container.read(currentSportProvider.notifier).select('futsal');
+    expect(container.read(currentSportProvider), equals('futsal'));
+
+    await c.logout();
+    // 남아 있으면 다른 계정으로 로그인했을 때 이전 사용자의 종목으로
+    // 홈에 착지한다.
+    expect(container.read(currentSportProvider), isNull);
   });
 }

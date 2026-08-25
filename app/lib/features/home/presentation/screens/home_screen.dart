@@ -58,7 +58,7 @@ class HomeScreen extends ConsumerWidget {
             child: ListTile(
               title: const Text('내 프로필'),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.go('/profile'),
+              onTap: () => context.push('/profile'),
             ),
           ),
         ],

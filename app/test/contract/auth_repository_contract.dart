@@ -3,8 +3,13 @@ import 'package:super_sub/features/auth/data/auth_repository.dart';
 
 /// AuthRepository의 모든 구현체가 지켜야 하는 계약.
 ///
+/// 이 파일은 나중에 ApiAuthRepository에 **그대로** 물려 돌린다. 그것이
+/// "provider 한 줄 교체"를 실제로 보장하는 장치다(스펙 9.1). 따라서 여기에는
+/// 인증 프로토콜의 성질만 둔다 — Mock에만 해당하는 의무(지연 하한 같은 것)나
+/// 개발용 편의 기능(loginAs)은 구현체별 테스트 파일로 내린다.
+///
 /// [build]는 매 테스트마다 깨끗한 구현체를 만들어 돌려준다.
-/// [knownEmail]은 그 구현체에 존재하는 계정의 이메일이다.
+/// [knownEmail]·[knownUserId]는 그 구현체에 존재하는 계정의 이메일과 id다.
 void runAuthRepositoryContract(
   String name,
   AuthRepository Function() build, {
@@ -45,23 +50,5 @@ void runAuthRepositoryContract(
       expect(await repo.restoreSession(), isNull);
     });
 
-    test('loginAs로 특정 사용자로 바로 진입한다', () async {
-      final session = await repo.loginAs(knownUserId);
-      expect(session.user.id, equals(knownUserId));
-    });
-
-    test('없는 사용자로 loginAs하면 AuthException을 던진다', () async {
-      expect(
-        () => repo.loginAs('u-does-not-exist'),
-        throwsA(isA<AuthException>()),
-      );
-    });
-
-    test('응답은 즉시 오지 않는다 (지연이 있다)', () async {
-      final sw = Stopwatch()..start();
-      await repo.login(email: knownEmail, password: 'any');
-      sw.stop();
-      expect(sw.elapsedMilliseconds, greaterThanOrEqualTo(100));
-    });
   });
 }

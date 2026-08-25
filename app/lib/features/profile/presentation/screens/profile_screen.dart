@@ -24,7 +24,7 @@ class ProfileScreen extends ConsumerWidget {
             key: const Key('profile-edit'),
             icon: const Icon(Icons.edit),
             tooltip: '프로필 수정',
-            onPressed: () => _showEditSheet(context, ref, user.nickname),
+            onPressed: () => _showEditSheet(context, user.nickname),
           ),
         ],
       ),
@@ -50,26 +50,30 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  void _showEditSheet(BuildContext context, WidgetRef ref, String current) {
+  void _showEditSheet(BuildContext context, String current) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (sheetContext) => _EditNicknameSheet(current: current, ref: ref),
+      builder: (sheetContext) => _EditNicknameSheet(current: current),
     );
   }
 }
 
-class _EditNicknameSheet extends StatefulWidget {
-  const _EditNicknameSheet({required this.current, required this.ref});
+/// 서브뷰는 부모의 [WidgetRef]를 생성자로 받지 않는다.
+///
+/// 스펙 5.3의 서브뷰 17개는 대부분 바텀시트·다이얼로그다. 부모 ref를 넘기는
+/// 방식은 부모가 시트보다 오래 살아 있을 때만 우연히 동작하므로, 시트가
+/// 스스로 ConsumerStatefulWidget이 되어 자기 ref를 갖는 것을 기본형으로 둔다.
+class _EditNicknameSheet extends ConsumerStatefulWidget {
+  const _EditNicknameSheet({required this.current});
 
   final String current;
-  final WidgetRef ref;
 
   @override
-  State<_EditNicknameSheet> createState() => _EditNicknameSheetState();
+  ConsumerState<_EditNicknameSheet> createState() => _EditNicknameSheetState();
 }
 
-class _EditNicknameSheetState extends State<_EditNicknameSheet> {
+class _EditNicknameSheetState extends ConsumerState<_EditNicknameSheet> {
   late final TextEditingController _controller =
       TextEditingController(text: widget.current);
 
@@ -103,7 +107,7 @@ class _EditNicknameSheetState extends State<_EditNicknameSheet> {
           FilledButton(
             key: const Key('profile-save'),
             onPressed: () {
-              widget.ref
+              ref
                   .read(sessionControllerProvider.notifier)
                   .updateNickname(_controller.text);
               Navigator.of(context).pop();
