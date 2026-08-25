@@ -16,6 +16,21 @@ const double _kSheetRadius = 28.0;
 /// 사진 위에 얹히는 글자색.
 const Color _kOnPhoto = Color(0xFFFFFFFF);
 
+/// 사진과 유리 사이에 까는 어두운 막.
+///
+/// **사진이 밝다** — 흰 유니폼과 밝은 회색 배경이라, 그 위에 흰 글자를 얹으면
+/// 읽히지 않는다. 유리 면(흰색)을 더 올리면 배경이 같이 밝아져 역효과다.
+/// 대비를 세우는 유일한 방법은 뒤를 어둡게 하는 것이다.
+///
+/// 위는 옅고 아래로 갈수록 진하다 — 사진은 위쪽에서 살아 있고, 폼이 놓이는
+/// 아래쪽만 충분히 어두워진다.
+const LinearGradient _kPhotoScrim = LinearGradient(
+  begin: Alignment.topCenter,
+  end: Alignment.bottomCenter,
+  colors: [Color(0x4D000000), Color(0xC2000000)],
+  stops: [0, 0.55],
+);
+
 /// 버튼에 얹는 흰 기.
 ///
 /// **흐림(BackdropFilter)을 쓰지 않는다.** 버튼은 이미 유리 시트 안에 있고,
@@ -89,6 +104,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           const Image(
             image: AssetImage('assets/images/player_mono.jpg'),
             fit: BoxFit.cover,
+          ),
+          const DecoratedBox(
+            decoration: BoxDecoration(gradient: _kPhotoScrim),
+            child: SizedBox.expand(),
           ),
           _sheetBody(),
         ],
@@ -201,7 +220,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   '개발용 바로 진입',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: _kOnPhoto.withValues(alpha: 0.7),
+                    color: _kOnPhoto.withValues(alpha: 0.85),
                     fontSize: 12,
                     letterSpacing: 0.4,
                   ),
@@ -260,7 +279,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     bool obscure = false,
     TextInputType? keyboardType,
   }) {
-    final line = _kOnPhoto.withValues(alpha: 0.35);
+    final line = _kOnPhoto.withValues(alpha: 0.55);
     return TextField(
       key: key,
       controller: controller,
@@ -271,7 +290,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       cursorColor: _kOnPhoto,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: _kOnPhoto.withValues(alpha: 0.7)),
+        labelStyle: TextStyle(color: _kOnPhoto.withValues(alpha: 0.85)),
         enabledBorder: UnderlineInputBorder(
           borderSide: BorderSide(color: line),
         ),
