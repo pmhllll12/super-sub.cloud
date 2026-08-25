@@ -1,0 +1,194 @@
+# 농구 점프슛 채점 루브릭
+#
+# ⚠️ 임계값은 **지도자 검수 전 임시값**이다 (미결 항목 2번).
+# ⚠️ **실클립 미검증** — validated_on이 비어 있다. 파이프라인이 이 종목 영상에서
+#    지표를 제대로 뽑는지 아직 확인하지 않았다.
+#
+# 레이업(basketball_layup.yaml)과 임팩트 정의가 다르다. 점프슛은 팔꿈치를 채서
+# 공을 던지는 동작이라 축구 인스텝과 구조가 같고, 신전 각속도 피크가 곧 릴리스다.
+
+sport: basketball
+motion: jump_shot
+sport_ko: 농구
+motion_ko: 점프슛
+version: 0.1
+status: draft
+review_required: true
+pipeline_version: pose-v0.1
+validated_on: ""
+
+kinematics:
+  impact_limb: arm
+  impact_event: extension_peak
+
+criteria:
+  - id: release_arm_extension
+    name: 슛하는 팔 신전
+    weight: 0.3
+    rationale: >-
+      릴리스 시 팔꿈치가 펴지며 공에 속도를 준다. 이미 다 펴진 뒤에 놓으면
+      가속 구간을 놓치고, 덜 펴진 채 놓으면 거리가 나오지 않는다.
+    measured_by: [swing_elbow_angle_at_impact]
+    titles:
+      2: "펴지며 놓는 팔"
+      1: "덜 펴진 릴리스"
+      0: "타이밍 놓친 팔"
+    grades:
+      2: "릴리스 시 팔꿈치각 150~172도"
+      1: "135~150도"
+      0: "172도 초과(릴리스 전 완전 신전) 또는 135도 미만"
+    bands:
+      metric: swing_elbow_angle_at_impact
+      2: [[150, 172]]
+      1: [[135, 150]]
+      0: [[null, 135], [172, null]]
+    anchors:
+      - measured: {swing_elbow_angle_at_impact: 161.0}
+        grade: 2
+        evidence: "릴리스 시 팔꿈치각 161도로 신전 구간 안에서 공을 놓았다"
+      - measured: {swing_elbow_angle_at_impact: 142.0}
+        grade: 1
+        evidence: "팔꿈치각 142도로 신전이 덜 끝난 상태"
+      - measured: {swing_elbow_angle_at_impact: 178.0}
+        grade: 0
+        evidence: "팔꿈치각 178도로 릴리스 전에 이미 다 펴졌다"
+
+  - id: guide_hand
+    name: 가이드 핸드
+    weight: 0.2
+    rationale: >-
+      반대 손은 공을 받쳐 주기만 하고 밀지 않는다. 함께 펴지면 두 손이 공에
+      힘을 주어 좌우로 흔들린다.
+    measured_by: [support_elbow_angle_at_impact]
+    titles:
+      2: "받치기만 한 손"
+      1: "간섭하는 손"
+      0: "같이 밀어버린 손"
+    grades:
+      2: "릴리스 시 반대 팔 팔꿈치각 80~140도 (굽혀 받침)"
+      1: "140~160도 또는 60~80도"
+      0: "160도 초과(함께 신전) 또는 60도 미만"
+    bands:
+      metric: support_elbow_angle_at_impact
+      2: [[80, 140]]
+      1: [[60, 80], [140, 160]]
+      0: [[null, 60], [160, null]]
+    anchors:
+      - measured: {support_elbow_angle_at_impact: 112.0}
+        grade: 2
+        evidence: "가이드 핸드 팔꿈치각 112도로 굽혀 받치는 자세"
+      - measured: {support_elbow_angle_at_impact: 151.0}
+        grade: 1
+        evidence: "팔꿈치각 151도로 반대 팔이 펴지며 간섭한다"
+      - measured: {support_elbow_angle_at_impact: 171.0}
+        grade: 0
+        evidence: "팔꿈치각 171도로 두 손이 함께 공을 밀었다"
+
+  - id: follow_through
+    name: 팔로스루
+    weight: 0.2
+    rationale: >-
+      릴리스 후 팔이 림 쪽으로 계속 뻗어 나가야 방향이 유지된다.
+      놓자마자 팔을 내리면 회전과 궤도가 흔들린다.
+    measured_by: [swing_shoulder_flexion_after_impact_deg]
+    titles:
+      2: "림을 가리키는 손"
+      1: "짧은 팔로스루"
+      0: "거둬들인 손"
+    grades:
+      2: "릴리스 후 어깨 굴곡이 20도 이상 추가 진행"
+      1: "8~20도"
+      0: "8도 미만 (릴리스 직후 정지)"
+    bands:
+      metric: swing_shoulder_flexion_after_impact_deg
+      2: [[20, null]]
+      1: [[8, 20]]
+      0: [[null, 8]]
+    anchors:
+      - measured: {swing_shoulder_flexion_after_impact_deg: 31.0}
+        grade: 2
+        evidence: "릴리스 후 어깨 굴곡 31도 추가 진행, 팔이 림을 향해 남았다"
+      - measured: {swing_shoulder_flexion_after_impact_deg: 12.0}
+        grade: 1
+        evidence: "추가 굴곡 12도로 팔로스루가 짧다"
+      - measured: {swing_shoulder_flexion_after_impact_deg: 3.0}
+        grade: 0
+        evidence: "추가 굴곡 3도로 릴리스 직후 팔을 거두었다"
+
+  - id: trunk_alignment
+    name: 상체 정렬
+    weight: 0.15
+    rationale: >-
+      점프슛은 수직으로 뛰어 수직으로 내려와야 한다. 상체가 뒤로 젖혀지거나
+      앞으로 쏠리면 거리가 매번 달라진다.
+    measured_by: [trunk_forward_lean_deg_at_impact]
+    titles:
+      2: "수직으로 선 상체"
+      1: "기운 상체"
+      0: "무너진 상체"
+    grades:
+      2: "릴리스 시 상체 전방 기울기 -8~12도"
+      1: "12~25도 또는 -20~-8도"
+      0: "25도 초과 또는 -20도 미만"
+    bands:
+      metric: trunk_forward_lean_deg_at_impact
+      2: [[-8, 12]]
+      1: [[-20, -8], [12, 25]]
+      0: [[null, -20], [25, null]]
+    anchors:
+      - measured: {trunk_forward_lean_deg_at_impact: 4.0}
+        grade: 2
+        evidence: "상체 기울기 4도로 거의 수직"
+      - measured: {trunk_forward_lean_deg_at_impact: 18.0}
+        grade: 1
+        evidence: "기울기 18도로 상체가 앞으로 기울었다"
+      - measured: {trunk_forward_lean_deg_at_impact: -26.0}
+        grade: 0
+        evidence: "기울기 -26도로 상체가 크게 젖혀졌다"
+
+  - id: leg_drive
+    name: 하체 신전
+    weight: 0.15
+    rationale: >-
+      다리가 펴지며 만든 힘이 상체를 거쳐 공에 전달된다. 무릎이 접힌 채
+      릴리스하면 팔로만 던지게 되어 거리가 나오지 않는다.
+    measured_by: [swing_knee_angle_at_impact]
+    titles:
+      2: "밀어 올린 하체"
+      1: "덜 쓴 하체"
+      0: "쓰지 않은 하체"
+    grades:
+      2: "릴리스 시 무릎각 160도 이상"
+      1: "140~160도"
+      0: "140도 미만"
+    bands:
+      metric: swing_knee_angle_at_impact
+      2: [[160, null]]
+      1: [[140, 160]]
+      0: [[null, 140]]
+    anchors:
+      - measured: {swing_knee_angle_at_impact: 172.0}
+        grade: 2
+        evidence: "릴리스 시 무릎각 172도로 하체를 끝까지 밀어 올렸다"
+      - measured: {swing_knee_angle_at_impact: 149.0}
+        grade: 1
+        evidence: "무릎각 149도로 하체 신전이 덜 끝났다"
+      - measured: {swing_knee_angle_at_impact: 128.0}
+        grade: 0
+        evidence: "무릎각 128도로 다리가 접힌 채 릴리스, 팔로만 던졌다"
+
+deferred:
+  - id: release_height
+    name: 릴리스 높이
+    blocked_by: "신장 기준 필요 — 어깨너비 정규화로는 절대 높이를 낼 수 없다."
+  - id: elbow_alignment
+    name: 팔꿈치 정렬 (공 아래)
+    blocked_by: >-
+      정면 촬영 전제 필요. COCO-17로는 팔꿈치가 공 아래 있는지 좌우 성분으로만
+      추정되는데, 촬영 축이 바뀌면 같은 자세가 다른 값을 낸다.
+
+grade_bands:
+  A: 85
+  B: 70
+  C: 50
+  D: 0

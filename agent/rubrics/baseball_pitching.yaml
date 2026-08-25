@@ -1,0 +1,189 @@
+# 야구 투구 채점 루브릭
+#
+# ⚠️ 임계값은 **지도자 검수 전 임시값**이다 (미결 항목 2번).
+# ⚠️ **실클립 미검증** — 파이프라인이 이 종목 영상에서 지표를 제대로 뽑는지
+#    아직 확인하지 않았다.
+
+sport: baseball
+motion: pitching
+sport_ko: 야구
+motion_ko: 투구
+version: 0.1
+status: draft
+review_required: true
+pipeline_version: pose-v0.1
+validated_on: ""
+
+kinematics:
+  impact_limb: arm
+  impact_event: extension_peak
+
+criteria:
+  - id: release_arm_extension
+    name: 릴리스 팔 신전
+    weight: 0.25
+    rationale: >-
+      팔꿈치가 펴지며 공을 놓아야 속도가 실린다. 릴리스 전에 이미 다 펴져
+      있으면 가속 구간을 놓친 것이고, 덜 펴진 채 놓으면 제구가 흔들린다.
+    measured_by: [swing_elbow_angle_at_impact]
+    titles:
+      2: "채고 나가는 팔"
+      1: "덜 채인 팔"
+      0: "타이밍 놓친 팔"
+    grades:
+      2: "릴리스 시 팔꿈치각 150~172도"
+      1: "130~150도"
+      0: "172도 초과(릴리스 전 완전 신전) 또는 130도 미만"
+    bands:
+      metric: swing_elbow_angle_at_impact
+      2: [[150, 172]]
+      1: [[130, 150]]
+      0: [[null, 130], [172, null]]
+    anchors:
+      - measured: {swing_elbow_angle_at_impact: 162.0}
+        grade: 2
+        evidence: "릴리스 시 팔꿈치각 162도로 신전 구간 안에서 공을 놓았다"
+      - measured: {swing_elbow_angle_at_impact: 138.0}
+        grade: 1
+        evidence: "팔꿈치각 138도로 신전이 덜 끝난 상태에서 릴리스"
+      - measured: {swing_elbow_angle_at_impact: 177.0}
+        grade: 0
+        evidence: "팔꿈치각 177도로 릴리스 전에 이미 다 펴졌다"
+
+  - id: hip_shoulder_separation
+    name: 골반 회전
+    weight: 0.25
+    rationale: >-
+      골반이 먼저 열리고 상체가 뒤따라야 힘이 순서대로 전달된다.
+      골반 회전 없이 팔로만 던지면 속도가 나오지 않고 어깨에 부담이 쌓인다.
+    measured_by: [hip_rotation_range_deg]
+    titles:
+      2: "먼저 열리는 골반"
+      1: "덜 열린 골반"
+      0: "잠긴 골반"
+    grades:
+      2: "준비~릴리스 구간 골반 회전 범위 40도 이상"
+      1: "20~40도"
+      0: "20도 미만"
+    bands:
+      metric: hip_rotation_range_deg
+      2: [[40, null]]
+      1: [[20, 40]]
+      0: [[null, 20]]
+    anchors:
+      - measured: {hip_rotation_range_deg: 55.0}
+        grade: 2
+        evidence: "골반 회전 범위 55도로 골반이 먼저 열렸다"
+      - measured: {hip_rotation_range_deg: 28.0}
+        grade: 1
+        evidence: "회전 범위 28도로 골반 회전이 부족하다"
+      - measured: {hip_rotation_range_deg: 13.0}
+        grade: 0
+        evidence: "회전 범위 13도로 팔로만 던졌다"
+
+  - id: stride_leg_block
+    name: 디딤발 버팀
+    weight: 0.2
+    rationale: >-
+      앞다리가 버텨 줘야 회전이 상체로 넘어간다. 앞무릎이 계속 굽으면
+      힘이 앞으로 새고 릴리스 지점이 낮아진다.
+    measured_by: [plant_knee_angle_at_impact]
+    titles:
+      2: "버텨 주는 앞다리"
+      1: "밀리는 앞다리"
+      0: "주저앉은 앞다리"
+    grades:
+      2: "릴리스 시 앞무릎각 150도 이상"
+      1: "130~150도"
+      0: "130도 미만"
+    bands:
+      metric: plant_knee_angle_at_impact
+      2: [[150, null]]
+      1: [[130, 150]]
+      0: [[null, 130]]
+    anchors:
+      - measured: {plant_knee_angle_at_impact: 163.0}
+        grade: 2
+        evidence: "릴리스 시 앞무릎각 163도로 앞다리가 버텨 줬다"
+      - measured: {plant_knee_angle_at_impact: 141.0}
+        grade: 1
+        evidence: "앞무릎각 141도로 앞다리가 다소 밀렸다"
+      - measured: {plant_knee_angle_at_impact: 118.0}
+        grade: 0
+        evidence: "앞무릎각 118도로 앞다리가 주저앉아 힘이 샜다"
+
+  - id: trunk_tilt
+    name: 상체 기울기
+    weight: 0.15
+    rationale: >-
+      릴리스에서 상체가 앞으로 넘어가야 공이 낮게 간다.
+      상체가 서 있거나 젖혀지면 공이 뜬다.
+    measured_by: [trunk_forward_lean_deg_at_impact]
+    titles:
+      2: "넘어가는 상체"
+      1: "곧추선 상체"
+      0: "젖혀진 상체"
+    grades:
+      2: "릴리스 시 상체 전방 기울기 15~40도"
+      1: "0~15도 또는 40~55도"
+      0: "0도 미만(후방 젖힘) 또는 55도 초과"
+    bands:
+      metric: trunk_forward_lean_deg_at_impact
+      2: [[15, 40]]
+      1: [[0, 15], [40, 55]]
+      0: [[null, 0], [55, null]]
+    anchors:
+      - measured: {trunk_forward_lean_deg_at_impact: 27.0}
+        grade: 2
+        evidence: "상체 기울기 27도로 릴리스에서 앞으로 넘어갔다"
+      - measured: {trunk_forward_lean_deg_at_impact: 8.0}
+        grade: 1
+        evidence: "기울기 8도로 상체가 아직 서 있다"
+      - measured: {trunk_forward_lean_deg_at_impact: -6.0}
+        grade: 0
+        evidence: "기울기 -6도로 상체가 젖혀져 공이 뜬다"
+
+  - id: arm_deceleration
+    name: 팔 감속
+    weight: 0.15
+    rationale: >-
+      릴리스 후 팔이 몸을 가로질러 내려오며 감속해야 어깨·팔꿈치가 보호된다.
+      급히 멈추면 부상 위험이 크다.
+    measured_by: [swing_shoulder_flexion_after_impact_deg]
+    titles:
+      2: "안전하게 감속한 팔"
+      1: "짧은 감속"
+      0: "급정지한 팔"
+    grades:
+      2: "릴리스 후 어깨 굴곡이 30도 이상 추가 진행"
+      1: "12~30도"
+      0: "12도 미만"
+    bands:
+      metric: swing_shoulder_flexion_after_impact_deg
+      2: [[30, null]]
+      1: [[12, 30]]
+      0: [[null, 12]]
+    anchors:
+      - measured: {swing_shoulder_flexion_after_impact_deg: 41.0}
+        grade: 2
+        evidence: "릴리스 후 어깨 굴곡 41도 추가 진행, 팔이 몸을 가로질렀다"
+      - measured: {swing_shoulder_flexion_after_impact_deg: 17.0}
+        grade: 1
+        evidence: "추가 굴곡 17도로 감속 구간이 짧다"
+      - measured: {swing_shoulder_flexion_after_impact_deg: 5.0}
+        grade: 0
+        evidence: "추가 굴곡 5도로 릴리스 직후 팔이 급정지했다"
+
+deferred:
+  - id: release_point_consistency
+    name: 릴리스 포인트 일관성
+    blocked_by: "투구 여러 개를 한 단위로 묶는 구조가 없다 — 현재는 클립 1건 단위다."
+  - id: ball_grip
+    name: 그립
+    blocked_by: "손가락 키포인트가 필요하다. COCO-17에는 손목까지만 있다."
+
+grade_bands:
+  A: 85
+  B: 70
+  C: 50
+  D: 0

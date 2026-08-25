@@ -6,8 +6,9 @@
 #    검수 완료 전까지 이 루브릭으로 산출한 점수를 대외에 노출하지 않는다.
 #
 # 설계 원칙
-#   - 모든 항목은 포즈 추정만으로 측정 가능해야 한다.
-#     공 위치가 필요한 항목은 객체 검출기가 붙기 전까지 deferred에 둔다.
+#   - 도구가 필요한 항목은 검출되지 않은 영상에서 **제외**된다(0점이 아니다).
+#     남은 항목으로 가중치를 재정규화한다 — 촬영 조건으로 선수를 감점하지 않는다.
+#     검출기가 못 보는 물체(셔틀콕 등)가 필요한 항목은 deferred에 둔다.
 #   - 등급은 0/1/2 이산값. 연속 점수는 가중합으로 코드가 계산한다.
 #   - measured_by에 없는 지표는 판정 근거로 쓸 수 없다.
 #   - 등급은 bands(수치 구간)로 **코드가** 판정한다. 언어 모델은 근거 문장만
@@ -16,15 +17,24 @@
 
 sport: football
 motion: instep_shot
+sport_ko: 축구
+motion_ko: 인스텝 슈팅
 version: 0.1
 status: draft
 review_required: true
 pipeline_version: pose-v0.1
+validated_on: >-
+  실클립 1건 (3840×2160 25fps 10.2초, 128프레임). 전 구간 통과, 3회 반복 55점 C
+  동일 (2026-08-25).
+
+kinematics:
+  impact_limb: leg
+  impact_event: extension_peak
 
 criteria:
   - id: plant_knee_flexion
     name: 디딤발 무릎 굴곡
-    weight: 0.20
+    weight: 0.15
     rationale: >-
       디딤발이 충분히 굽어야 상체가 안정되고 체중이 실린다.
       뻣뻣하게 선 자세는 힘 전달이 끊긴다.
@@ -86,7 +96,7 @@ criteria:
 
   - id: trunk_lean
     name: 상체 기울기
-    weight: 0.20
+    weight: 0.15
     rationale: >-
       상체가 뒤로 젖혀지면 공이 뜬다. 공 위로 상체가 덮이는 자세가 기준이다.
     measured_by: [trunk_forward_lean_deg_at_impact]
@@ -147,7 +157,7 @@ criteria:
 
   - id: follow_through
     name: 팔로스루
-    weight: 0.20
+    weight: 0.15
     rationale: >-
       임팩트 후 차는 다리가 계속 뻗어 나가야 감속 없이 힘이 전달된다.
       임팩트 직후 멈추면 공 속도가 죽는다.
@@ -176,12 +186,40 @@ criteria:
         grade: 0
         evidence: "추가 굴곡 8.3도로 임팩트 직후 스윙 정지"
 
+  - id: plant_foot_position
+    name: 디딤발 위치
+    weight: 0.15
+    rationale: >-
+      디딤발이 공과 나란해야 몸의 축이 공 위에 선다. 너무 앞에 딛으면 몸이
+      넘어가 공이 눌리고, 너무 뒤에 딛으면 상체가 젖혀져 공이 뜬다.
+    measured_by: [plant_foot_to_ball_offset]
+    titles:
+      2: "자리를 아는 디딤발"
+      1: "어긋난 디딤 자리"
+      0: "헛짚은 디딤 자리"
+    bands:
+      metric: plant_foot_to_ball_offset
+      2: [[null, 0.5]]
+      1: [[0.5, 0.9]]
+      0: [[0.9, null]]
+    grades:
+      2: "임팩트 시 디딤발과 공의 수평 간격이 어깨너비 0.5배 이내(약 20cm)"
+      1: "0.5~0.9배(약 20~36cm)"
+      0: "0.9배 초과(약 36cm 초과)"
+    anchors:
+      - measured: {plant_foot_to_ball_offset: 0.29}
+        grade: 2
+        evidence: "디딤발이 공과 수평으로 어깨너비 0.29배(약 12cm) 떨어져 나란하다"
+      - measured: {plant_foot_to_ball_offset: 0.71}
+        grade: 1
+        evidence: "수평 간격 0.71배(약 28cm)로 공에서 다소 벗어났다"
+      - measured: {plant_foot_to_ball_offset: 1.24}
+        grade: 0
+        evidence: "수평 간격 1.24배(약 50cm)로 디딤발이 공에서 크게 떨어졌다"
+
 # 공 위치 검출기가 붙은 뒤 활성화할 항목.
 # 포즈 추정만으로는 측정할 수 없어 v0.1에서 제외한다.
 deferred:
-  - id: plant_foot_position
-    name: 디딤발 위치
-    blocked_by: "공 검출 필요 — 발목과 공 중심 사이 거리·각도"
   - id: contact_point
     name: 임팩트 지점
     blocked_by: "공 검출 필요 — 발등 어느 지점에 맞았는지"

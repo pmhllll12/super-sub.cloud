@@ -50,7 +50,11 @@ def main() -> None:
     t0 = time.time()
     try:
         pose = extract_keypoints(args.video, target_fps=args.fps)
-        features = extract_features(pose.keypoints)
+        # 임팩트 정의와 도구 궤적을 루브릭에서 받아 넘긴다. 넘기지 않으면 팔
+        # 루브릭도 다리로 측정되고, 도구 기반 항목이 통째로 빠진다.
+        features = extract_features(
+            pose.keypoints, pose.objects, rubric.impact_limb, rubric.impact_event
+        )
     except InsufficientQuality as exc:
         print(f"\n분석 중단: {exc}")
         raise SystemExit(2) from exc

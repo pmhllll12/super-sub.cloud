@@ -12,7 +12,7 @@ import pytest
 
 from supersub_agent import features as F
 from supersub_agent.features import InsufficientQuality, extract_features, joint_angle
-from supersub_agent.scoring import load_rubric
+from supersub_agent.scoring import discover_rubrics
 
 THIGH = 100.0
 SHIN = 100.0
@@ -166,9 +166,140 @@ def test_undetected_frames_do_not_become_impact():
     assert feats["trunk_forward_lean_deg_at_impact"] == base["trunk_forward_lean_deg_at_impact"]
 
 
-def test_pipeline_covers_every_rubric_metric():
+def _with_arm_swing(seq: np.ndarray) -> np.ndarray:
+    """왼팔이 크게 휘둘리는 시퀀스로 만든다 (팔 기반 종목 흉내).
+
+    build_sequence는 팔 키포인트를 (0,0)으로 두므로 여기서 채워 넣는다.
+    """
+    out = seq.copy()
+    n, release = len(out), 20
+    for i in range(n):
+        # 무릎과 같은 모양: 접혔다가 펴진다. 신전 각속도 피크가 구간 안쪽에
+        # 있어야 위상 분할이 성립한다(끝에 걸리면 경계 가드에 막힌다).
+        if i <= release:
+            angle = 160.0 - 90.0 * np.sin(np.pi * i / release)
+        else:
+            angle = 160.0 + 5.0 * (i - release) / max(1, n - 1 - release)
+
+        for side, sign in (("l", -1.0), ("r", 1.0)):
+            sh = F.L_SHOULDER if side == "l" else F.R_SHOULDER
+            el = F.L_ELBOW if side == "l" else F.R_ELBOW
+            wr = F.L_WRIST if side == "l" else F.R_WRIST
+            # 오른팔은 거의 정지 → 스윙 팔은 왼팔로 판별돼야 한다.
+            a = np.radians(angle if side == "l" else 90.0)
+            out[i, el, :2] = out[i, sh, :2] + np.array([sign * 30.0, 40.0])
+            # 팔꿈치를 꼭짓점으로 한 각도가 정확히 a가 되도록 손목을 놓는다.
+            # 방향을 그대로 각도로 쓰면 joint_angle이 다른 값을 낸다.
+            back = out[i, sh, :2] - out[i, el, :2]
+            base = np.arctan2(back[1], back[0])
+            out[i, wr, :2] = out[i, el, :2] + 45.0 * np.array(
+                [np.cos(base + sign * a), np.sin(base + sign * a)]
+            )
+        out[i, [F.L_ELBOW, F.R_ELBOW, F.L_WRIST, F.R_WRIST], 2] = 0.9
+    return out
+
+
+def test_arm_limb_shares_the_leg_machinery():
+    """팔도 같은 위상 분할 로직으로 돈다 — 농구·테니스가 열리는 지점."""
+    seq = _with_arm_swing(build_sequence())
+
+    swing, support = F.identify_limb(F.normalize(seq), "arm")
+
+    assert swing == F.LIMB_CHAINS["arm"]["left"], "손목이 더 움직인 쪽이 스윙"
+    assert support == F.LIMB_CHAINS["arm"]["right"]
+
+    feats = extract_features(seq, None, impact_limb="arm")
+    assert "swing_elbow_angle_at_impact" in feats
+    assert 0 < feats["impact_frame"] < len(seq) - 1
+
+
+def test_arm_metrics_are_dropped_when_arm_is_unreliable():
+    """팔 신뢰도가 낮으면 팔 지표를 내지 않는다 — 튀는 값을 근거로 주지 않는다."""
+    seq = _with_arm_swing(build_sequence())
+    seq[:, [F.L_ELBOW, F.R_ELBOW, F.L_WRIST, F.R_WRIST], 2] = 0.05
+
+    feats = extract_features(seq, None, impact_limb="leg")
+
+    assert "swing_elbow_angle_at_impact" not in feats
+    assert "swing_knee_angle_at_impact" in feats, "다리 지표는 그대로 나온다"
+
+
+def test_hip_rotation_survives_angle_wraparound():
+    """골반이 ±180 경계에 걸쳐도 회전량이 부풀지 않는다.
+
+    arctan2는 -180~180을 돌려주므로 언랩하지 않으면 ptp가 360에 가까워진다.
+    농구 클립에서 실제 회전 12.7도가 359.0도로 나왔던 버그다.
+    """
+    seq = build_sequence()
+
+    baseline = extract_features(seq)["hip_rotation_range_deg"]
+
+    # 포즈 전체를 180도 회전해 골반 방향각을 ±180 경계 위로 옮긴다.
+    # 관절 각도는 회전 불변이므로 동작은 그대로고 좌표계만 달라진다.
+    rotated = seq.copy()
+    rotated[:, :, :2] = -rotated[:, :, :2]
+
+    assert extract_features(rotated)["hip_rotation_range_deg"] == pytest.approx(
+        baseline, abs=0.2
+    )
+
+
+def test_unknown_limb_is_rejected():
+    with pytest.raises(ValueError, match="impact_limb"):
+        extract_features(build_sequence(), None, impact_limb="tail")
+
+
+@pytest.mark.parametrize("key", sorted(discover_rubrics("rubrics")))
+def test_pipeline_covers_every_rubric_metric(key):
     """루브릭이 요구하는 지표를 파이프라인이 전부 산출하는지 —
-    두 파일이 따로 수정돼 어긋나는 것을 막는 계약 테스트."""
-    rubric = load_rubric("rubrics/football_instep_shot.yaml")
-    feats = extract_features(build_sequence())
+    두 파일이 따로 수정돼 어긋나는 것을 막는 계약 테스트.
+
+    **rubrics/의 모든 파일을 돈다.** 종목이 늘어나면 이 테스트도 함께 늘어야
+    한다 — 한 파일만 검사하면 새로 추가한 루브릭의 measured_by 오타가 실영상을
+    넣기 전까지 드러나지 않는다.
+    """
+    rubric = discover_rubrics("rubrics")[key]
+    seq = _with_arm_swing(build_sequence())
+    feats = extract_features(seq, None, rubric.impact_limb, rubric.impact_event)
     F.verify_rubric_coverage(rubric, feats)
+
+
+@pytest.mark.parametrize("event", F.IMPACT_EVENTS)
+def test_impact_events_pick_different_frames(event):
+    """임팩트 사건 정의가 실제로 다른 프레임을 고르는지.
+
+    레이업처럼 채찍질이 없는 동작은 신전 각속도 피크가 릴리스가 아니다.
+    실클립에서 extension_peak은 6프레임(공을 모으는 중), distal_apex는
+    21프레임(림 앞 최고점)을 잡았다.
+    """
+    seq = _with_arm_swing(build_sequence())
+    swing, _ = F.identify_limb(F.normalize(seq), "arm")
+
+    phases = F.segment_phases(F.normalize(seq), swing, "arm", event)
+
+    assert 0 < phases.impact < len(seq) - 1
+
+
+def test_unknown_impact_event_is_rejected():
+    seq = _with_arm_swing(build_sequence())
+    swing, _ = F.identify_limb(F.normalize(seq), "arm")
+
+    with pytest.raises(ValueError, match="impact_event"):
+        F.segment_phases(F.normalize(seq), swing, "arm", "vibes")
+
+
+def test_distal_apex_ignores_undetected_frames():
+    """미검출 프레임이 최고점으로 잡히지 않는지.
+
+    검출 실패 프레임은 좌표가 (0,0)이라 골반 중심을 빼면 몸 위쪽으로 튄다.
+    마스킹하지 않으면 항상 그 프레임이 최고점이 된다 — extension_peak이
+    NaN에서 겪었던 것과 같은 종류의 함정이다.
+    """
+    seq = _with_arm_swing(build_sequence())
+    seq[3] = 0.0            # 3프레임을 통째로 미검출 처리
+    norm = F.normalize(seq)
+    swing, _ = F.identify_limb(norm, "arm")
+
+    phases = F.segment_phases(norm, swing, "arm", "distal_apex")
+
+    assert phases.impact != 3

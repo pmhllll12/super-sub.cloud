@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -81,6 +82,15 @@ class Criterion:
         """해당 등급의 칭호. 정의되지 않았으면 항목명으로 대체한다."""
         return self.titles.get(grade) or self.name
 
+    def is_applicable(self, features: dict[str, Any]) -> bool:
+        """이 항목을 판정할 근거 지표가 모두 측정됐는지.
+
+        도구 기반 지표는 공이 검출되지 않은 영상에서 빠진다. 그런 항목은 판정하지
+        않고 가중치에서도 제외한다 — 측정하지 못한 것을 0점으로 매기면 촬영
+        조건이 나빴다는 이유로 선수가 감점된다.
+        """
+        return all(m in features for m in self.measured_by)
+
     def grade_for(self, features: dict[str, Any]) -> int:
         """측정값을 구간과 대조해 등급을 결정한다.
 
@@ -115,6 +125,28 @@ class Rubric:
     grade_bands: dict[str, int]
     review_required: bool
     pipeline_version: str
+    # 임팩트를 정의할 사지 — "leg"(축구 슈팅) 또는 "arm"(농구 슛·테니스 스트로크).
+    # 루브릭이 선언하고 features.extract_features가 따른다.
+    impact_limb: str = "leg"
+    # 임팩트로 삼을 사건 — "extension_peak"(채찍질) 또는 "distal_apex"(들어올림).
+    impact_event: str = "extension_peak"
+    # 화면 표기용 한글 이름. 없으면 sport·motion을 그대로 쓴다.
+    sport_ko: str = ""
+    motion_ko: str = ""
+    # 이 루브릭으로 실제 영상을 끝까지 돌려 본 근거. 비어 있으면 미검증이다.
+    # 임계값이 임시값인 것(review_required)과는 다른 문제다 — 이쪽은 파이프라인이
+    # 그 종목 영상에서 지표를 뽑을 수 있는지 자체를 확인했는가를 뜻한다.
+    validated_on: str = ""
+
+    @property
+    def key(self) -> str:
+        """루브릭 식별자 "종목/동작". 루브릭은 (종목, 동작) 단위로 하나씩 있다."""
+        return f"{self.sport}/{self.motion}"
+
+    @property
+    def label(self) -> str:
+        """사람이 읽을 이름. UI의 종목 선택이 이걸 쓴다."""
+        return f"{self.sport_ko or self.sport} · {self.motion_ko or self.motion}"
 
     @property
     def criterion_ids(self) -> tuple[str, ...]:
@@ -126,9 +158,41 @@ class Rubric:
                 return c
         raise KeyError(criterion_id)
 
+    def applicable_criteria(self, features: dict[str, Any]) -> tuple[Criterion, ...]:
+        """이번 영상에서 판정 가능한 항목만 고른다.
+
+        도구가 검출되지 않으면 그 도구를 쓰는 항목이 빠지고, 남은 항목들로만
+        가중치를 재정규화해 총점을 낸다 (aggregate 참고).
+        """
+        applicable = tuple(c for c in self.criteria if c.is_applicable(features))
+        if not applicable:
+            raise RubricError("판정 가능한 항목이 하나도 없음 — 측정값이 비었다")
+        return applicable
+
     def required_metrics(self) -> set[str]:
         """모든 항목이 근거로 삼는 지표 이름의 합집합."""
         return {m for c in self.criteria for m in c.measured_by}
+
+
+def discover_rubrics(directory: str | Path) -> dict[str, Rubric]:
+    """디렉터리의 루브릭을 모두 읽어 "sport/motion" 키로 돌려준다.
+
+    루브릭 추가가 코드 변경이 아니라 **파일 추가**가 되도록 하는 진입점이다.
+    파일명이 아니라 파일 안의 sport·motion을 키로 삼는다 — 이름과 내용이
+    어긋나는 것을 막는다.
+    """
+    found: dict[str, Rubric] = {}
+    for path in sorted(Path(directory).glob("*.yaml")):
+        rubric = load_rubric(path)
+        if rubric.key in found:
+            raise RubricError(
+                f"루브릭 키 중복 {rubric.key!r}: {path.name}. "
+                "sport·motion 조합은 파일마다 고유해야 한다."
+            )
+        found[rubric.key] = rubric
+    if not found:
+        raise RubricError(f"루브릭을 찾지 못함: {directory}")
+    return found
 
 
 def load_rubric(path: str | Path) -> Rubric:
@@ -176,44 +240,97 @@ def load_rubric(path: str | Path) -> Rubric:
         grade_bands=raw.get("grade_bands", {"A": 85, "B": 70, "C": 50, "D": 0}),
         review_required=bool(raw.get("review_required", False)),
         pipeline_version=raw.get("pipeline_version", "unknown"),
+        impact_limb=_parse_choice(raw, "impact_limb", ("leg", "arm")),
+        impact_event=_parse_choice(
+            raw, "impact_event", ("extension_peak", "distal_apex")
+        ),
+        sport_ko=raw.get("sport_ko", ""),
+        motion_ko=raw.get("motion_ko", ""),
+        validated_on=raw.get("validated_on", ""),
     )
 
 
-def aggregate(judgments: dict[str, dict[str, Any]], rubric: Rubric) -> dict[str, Any]:
+def _parse_choice(raw: dict[str, Any], field_name: str, allowed: tuple[str, ...]) -> str:
+    """kinematics 블록의 열거형 필드를 읽고 검증한다.
+
+    기본값은 allowed의 첫 값이다 — 이 필드들이 생기기 전에 쓴 루브릭이 그대로
+    동작해야 하므로, 옛 동작(다리·신전 각속도)을 첫 값으로 둔다.
+    """
+    value = (raw.get("kinematics") or {}).get(field_name, allowed[0])
+    if value not in allowed:
+        raise RubricError(
+            f"kinematics.{field_name}은 {list(allowed)} 중 하나여야 한다: {value!r}"
+        )
+    return value
+
+
+def aggregate(
+    judgments: dict[str, dict[str, Any]],
+    rubric: Rubric,
+    expected_ids: Iterable[str] | None = None,
+) -> dict[str, Any]:
     """항목별 판정을 총점으로 합산한다.
 
     judgments: {criterion_id: {"grade": int, "evidence": str, "metric_ref": str}}
     """
-    missing = set(rubric.criterion_ids) - judgments.keys()
-    if missing:
-        raise ValueError(f"판정이 누락된 항목: {sorted(missing)}")
+    unknown = judgments.keys() - set(rubric.criterion_ids)
+    if unknown:
+        raise ValueError(f"루브릭에 없는 항목의 판정: {sorted(unknown)}")
+
+    # expected_ids를 주면 그 목록은 반드시 다 채워져 있어야 한다. 도구 미검출로
+    # 빠지는 것과 판정이 실패해 빠지는 것을 구분하기 위한 장치다 — 주지 않으면
+    # 없는 항목이 조용히 제외되므로, 파이프라인은 항상 넘긴다.
+    if expected_ids is not None:
+        missing = set(expected_ids) - judgments.keys()
+        if missing:
+            raise ValueError(f"판정이 누락된 항목: {sorted(missing)}")
+
+    judged = [c for c in rubric.criteria if c.id in judgments]
+    if not judged:
+        raise ValueError("판정이 하나도 없음")
+
+    # 판정된 항목만으로 가중치를 재정규화한다. 도구 미검출로 빠진 항목이 있어도
+    # 남은 항목의 상대 비중이 유지되고 총점은 100점 만점을 지킨다.
+    # 빠진 항목을 0점으로 두면 촬영 조건 때문에 선수가 감점된다.
+    total_weight = sum(c.weight for c in judged)
+    if total_weight <= 0:
+        raise ValueError("판정된 항목의 가중치 합이 0")
 
     ratio = 0.0
     breakdown = []
-    for c in rubric.criteria:
+    for c in judged:
         j = judgments[c.id]
         grade = int(j["grade"])
         if grade not in (0, 1, 2):
             raise ValueError(f"{c.id}: 등급은 0/1/2만 허용, 받은 값 {grade}")
-        contribution = c.weight * (grade / MAX_GRADE)
+        weight = c.weight / total_weight
+        contribution = weight * (grade / MAX_GRADE)
         ratio += contribution
         breakdown.append(
             {
                 "criterion_id": c.id,
                 "name": c.name,
                 "grade": grade,
-                "weight": c.weight,
+                "weight": round(weight, 4),
                 "contribution": round(contribution * 100, 1),
                 "evidence": j.get("evidence", ""),
                 "metric_ref": j.get("metric_ref", ""),
             }
         )
 
+    skipped = [
+        {"criterion_id": c.id, "name": c.name, "weight": c.weight}
+        for c in rubric.criteria
+        if c.id not in judgments
+    ]
+
     score = round(ratio * 100)
     return {
         "score": score,
         "grade": _band(score, rubric.grade_bands),
         "breakdown": breakdown,
+        # 측정하지 못해 판정에서 빠진 항목 — 0점이 아니라 제외다.
+        "skipped": skipped,
         "rubric_version": rubric.version,
         "pipeline_version": rubric.pipeline_version,
         # 검수 전 루브릭으로 낸 점수는 대외 노출하지 않는다.
