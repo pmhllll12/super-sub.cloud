@@ -47,7 +47,7 @@ class MockDb {
       AppUser(
         id: playerId,
         email: 'player@supersub.test',
-        nickname: '김용병',
+        nickname: '백성검',
         createdAt: DateTime(2026, 3, 2),
       ),
       AppUser(

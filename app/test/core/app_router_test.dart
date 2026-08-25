@@ -62,7 +62,7 @@ void main() {
     await _pumpHome(tester);
 
     // 홈은 갈라져 나가는 곳들을 보여 준다.
-    expect(find.text('무엇을 할까요'), findsOneWidget);
+    expect(find.text('영상 분석'), findsOneWidget);
     expect(find.text('로그인'), findsNothing);
   });
 
@@ -77,7 +77,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.text('로그인'), findsWidgets);
-    expect(find.text('무엇을 할까요'), findsNothing);
+    expect(find.text('영상 분석'), findsNothing);
   });
 
   testWidgets('로그인 상태에서 다른 라우트는 그대로 통과한다', (tester) async {

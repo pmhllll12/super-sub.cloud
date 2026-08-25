@@ -32,7 +32,7 @@ Future<ProviderContainer> _pump(WidgetTester tester, String userId) async {
 void main() {
   testWidgets('닉네임과 이메일을 보여준다', (tester) async {
     await _pump(tester, MockDb.playerId);
-    expect(find.text('김용병'), findsOneWidget);
+    expect(find.text('백성검'), findsOneWidget);
     expect(find.text('player@supersub.test'), findsOneWidget);
   });
 

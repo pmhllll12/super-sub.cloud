@@ -258,14 +258,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               const SizedBox(height: 18),
               _sportChips(sports),
               const SizedBox(height: 28),
-              Text(
-                '무엇을 할까요',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(color: _kOnDark),
+              // 지금 로그인한 사람의 이름.
+              Center(
+                child: Text(
+                  nickname,
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(color: _kOnDark),
+                ),
               ),
-              const SizedBox(height: 12),
+              // 카드 줄을 조금 더 내려 이름과 붙어 보이지 않게 한다.
+              const SizedBox(height: 32),
               GridView(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -319,8 +323,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               key: Key('home-sport-${sport.code}'),
               label: sport.name,
               selected: sport.code == selected,
-              sheen: _sheen,
-              phase: sports.indexOf(sport) * 0.17,
+
               onTap: () =>
                   ref.read(currentSportProvider.notifier).select(sport.code),
             ),
@@ -413,15 +416,15 @@ class _GlassPanel extends StatelessWidget {
   const _GlassPanel({
     required this.radius,
     required this.child,
-    required this.sheen,
+    this.sheen,
     this.phase = 0,
   });
 
   final double radius;
   final Widget child;
 
-  /// 테두리를 도는 빛의 위상(0~1을 반복).
-  final Animation<double> sheen;
+  /// 테두리를 도는 빛의 위상(0~1을 반복). null이면 도는 빛 없이 옅은 선만.
+  final Animation<double>? sheen;
 
   /// 이 조각만큼 늦게 돈다. 전부 같은 위상이면 한꺼번에 반짝여 기계처럼 보인다.
   final double phase;
@@ -470,7 +473,7 @@ class _TravelingEdge extends CustomPainter {
     required this.radius,
   });
 
-  final Animation<double> progress;
+  final Animation<double>? progress;
   final double phase;
   final double radius;
 
@@ -494,7 +497,9 @@ class _TravelingEdge extends CustomPainter {
         ..color = Colors.white.withValues(alpha: 0.10),
     );
 
-    final t = (progress.value + phase) % 1.0;
+    final anim = progress;
+    if (anim == null) return; // 도는 빛 없이 옅은 선만 남긴다.
+    final t = (anim.value + phase) % 1.0;
     final shader = SweepGradient(
       colors: const [
         Color(0x00FFFFFF),
@@ -529,22 +534,18 @@ class _GlassChip extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
-    required this.sheen,
-    required this.phase,
   });
 
   final String label;
   final bool selected;
   final VoidCallback onTap;
-  final Animation<double> sheen;
-  final double phase;
 
   @override
   Widget build(BuildContext context) {
     return _GlassPanel(
+      // 칩에는 도는 빛을 두지 않는다 — 작은 알약에서는 선이 쉴 새 없이
+      // 돌아 시선을 끈다.
       radius: 22,
-      sheen: sheen,
-      phase: phase,
       child: InkWell(
         onTap: onTap,
         child: Padding(
