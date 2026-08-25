@@ -60,6 +60,12 @@ class SessionController extends Notifier<SessionState> {
     await ref.read(authRepositoryProvider).logout();
     state = const SessionLoggedOut();
   }
+
+  void updateNickname(String nickname) {
+    final current = state;
+    if (current is! SessionLoggedIn) return;
+    state = SessionLoggedIn(current.user.copyWith(nickname: nickname));
+  }
 }
 
 final sessionControllerProvider =

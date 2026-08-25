@@ -6,6 +6,7 @@ import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/session_controller.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
 import '../../features/onboarding/presentation/screens/sport_screen.dart';
+import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../sport/current_sport.dart';
 
 /// GoRouter를 provider가 매번 다시 만들면 내비게이션 스택이 날아간다.
@@ -63,20 +64,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/profile',
-        builder: (_, _) => const _Placeholder('프로필'),
+        builder: (_, _) => const ProfileScreen(),
       ),
     ],
   );
 });
-
-class _Placeholder extends StatelessWidget {
-  const _Placeholder(this.label);
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: Text(label)),
-        body: Center(child: Text(label)),
-      );
-}
