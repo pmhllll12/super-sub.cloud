@@ -138,103 +138,100 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Widget _form() {
     final notifier = sessionControllerProvider.notifier;
-    return SingleChildScrollView(
-      padding: EdgeInsets.only(
-        left: 28,
-        right: 28,
-        top: 28,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 28,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _field(
-            key: const Key('login-email'),
-            controller: _email,
-            label: '이메일',
-            keyboardType: TextInputType.emailAddress,
-          ),
-          const SizedBox(height: 14),
-          _field(
-            key: const Key('login-password'),
-            controller: _password,
-            label: '비밀번호',
-            obscure: true,
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 14),
-            Text(
-              _error!,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 13),
-            ),
-          ],
-          const SizedBox(height: 22),
-          // **버튼 넷이 한 IntrinsicWidth 안에 있다.** 그래야 넷의 폭이 가장
-          // 긴 라벨('신규 가입자 (데이터 0건)')에 함께 맞춰진다. 따로 두면
-          // 각자 제 라벨만큼만 넓어져 들쭉날쭉해진다.
-          Center(
-            child: IntrinsicWidth(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  FilledButton(
-                    key: const Key('login-submit'),
-                    style: _glassButton,
-                    onPressed: _busy
-                        ? null
-                        : () => _run(
-                              () => ref
-                                  .read(notifier)
-                                  .login(_email.text, _password.text),
-                            ),
-                    child: _busy
-                        ? const SizedBox(
-                            height: 18,
-                            width: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('로그인'),
-                  ),
-                  if (kDebugMode) ...[
-                    const SizedBox(height: 24),
-                    Text(
-                      '개발용 바로 진입',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: _kOnPhoto.withValues(alpha: 0.7),
-                        fontSize: 12,
-                        letterSpacing: 0.4,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    _DevLoginButton(
-                      label: '개인 사용자 (데이터 있음)',
-                      userId: MockDb.playerId,
-                      busy: _busy,
-                      style: _glassButton,
-                      onTap: (id) => _run(() => ref.read(notifier).loginAs(id)),
-                    ),
-                    _DevLoginButton(
-                      label: '팀 관리자',
-                      userId: MockDb.managerId,
-                      busy: _busy,
-                      style: _glassButton,
-                      onTap: (id) => _run(() => ref.read(notifier).loginAs(id)),
-                    ),
-                    _DevLoginButton(
-                      label: '신규 가입자 (데이터 0건)',
-                      userId: MockDb.newbieId,
-                      busy: _busy,
-                      style: _glassButton,
-                      onTap: (id) => _run(() => ref.read(notifier).loginAs(id)),
-                    ),
-                  ],
-                ],
+    // **Center가 스크롤 뷰를 감싼다.** 내용이 짧으면 남은 자리 한가운데에
+    // 놓이고, 키보드가 올라와 자리가 모자라면 그때부터 스크롤된다.
+    return Center(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.only(
+          top: 24,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        ),
+        // 입력란과 버튼이 **같은 폭**이다 — 여기서 한 번 정하고 아래는 전부
+        // stretch로 따라간다. 좌우 여백을 패딩으로 주면 둘이 갈라진다.
+        child: FractionallySizedBox(
+          widthFactor: 2 / 3,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _field(
+                key: const Key('login-email'),
+                controller: _email,
+                label: '이메일',
+                keyboardType: TextInputType.emailAddress,
               ),
-            ),
+              const SizedBox(height: 14),
+              _field(
+                key: const Key('login-password'),
+                controller: _password,
+                label: '비밀번호',
+                obscure: true,
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 14),
+                Text(
+                  _error!,
+                  textAlign: TextAlign.center,
+                  style:
+                      const TextStyle(color: Color(0xFFFF8A80), fontSize: 13),
+                ),
+              ],
+              const SizedBox(height: 22),
+              FilledButton(
+                key: const Key('login-submit'),
+                style: _glassButton,
+                onPressed: _busy
+                    ? null
+                    : () => _run(
+                          () => ref
+                              .read(notifier)
+                              .login(_email.text, _password.text),
+                        ),
+                child: _busy
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('로그인'),
+              ),
+              if (kDebugMode) ...[
+                const SizedBox(height: 24),
+                Text(
+                  '개발용 바로 진입',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _kOnPhoto.withValues(alpha: 0.7),
+                    fontSize: 12,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                _DevLoginButton(
+                  label: '개인 사용자 (데이터 있음)',
+                  userId: MockDb.playerId,
+                  busy: _busy,
+                  style: _glassButton,
+                  onTap: (id) => _run(() => ref.read(notifier).loginAs(id)),
+                ),
+                _DevLoginButton(
+                  label: '팀 관리자',
+                  userId: MockDb.managerId,
+                  busy: _busy,
+                  style: _glassButton,
+                  onTap: (id) => _run(() => ref.read(notifier).loginAs(id)),
+                ),
+                _DevLoginButton(
+                  label: '신규 가입자 (데이터 0건)',
+                  userId: MockDb.newbieId,
+                  busy: _busy,
+                  style: _glassButton,
+                  onTap: (id) => _run(() => ref.read(notifier).loginAs(id)),
+                ),
+              ],
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -249,7 +246,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         elevation: 0,
         // 컴팩트하게 — 높이를 강제하지 않고 패딩으로만 잡는다.
         minimumSize: Size.zero,
-        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(_kButtonRadius),
