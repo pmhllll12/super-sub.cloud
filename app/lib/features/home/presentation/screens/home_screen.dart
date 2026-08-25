@@ -180,8 +180,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // 홈에서만 인물이 아주 느리게 숨쉰다.
-          const FigureBackground(breathe: true),
+          const FigureBackground(),
           _content(context, nickname),
         ],
       ),

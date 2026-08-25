@@ -14,118 +14,35 @@ const LinearGradient _kFigureFade = LinearGradient(
   stops: [0.62, 0.88, 1],
 );
 
-/// 한 번 끄덕이는 데 걸리는 시간.
-///
-/// 9초짜리 숨쉬기였는데 움직이는지 보이지 않아 고개 끄덕임으로 바꿨다.
-/// 3.2초면 눈에 들어오면서도 조급해 보이지 않는다.
-const Duration _kNodPeriod = Duration(milliseconds: 3200);
-
-/// 끄덕이는 각도(라디안). 약 0.8도.
-///
-/// **평면 사진을 돌리는 것이므로 크면 안 된다.** 축이 발치라 지레가 길어
-/// 이 각도로도 머리는 눈에 띄게 움직인다.
-const double _kNodAngle = 0.014;
-
-/// 함께 내려가는 거리(논리 px). 각도만 주면 미끄러지는 느낌이라 무게를 준다.
-const double _kNodDrop = 5;
-
-/// 돌릴 때 가장자리가 비지 않도록 살짝 키운다.
-const double _kNodScale = 1.03;
-
-/// 회전축. 사진 **아래끝**이다.
-///
-/// 목 아래(세로 62%)를 축으로 뒀더니 축보다 아래에 있는 가슴·어깨가 머리와
-/// **반대 방향으로** 돌아 몸이 뒤틀려 보였다. 축을 발치로 내리면 전부 같은
-/// 방향으로 기울고, 축에서 먼 머리가 가장 많이 움직인다 — 몸을 실어 끄덕이는
-/// 모양이 된다.
-const Alignment _kNodPivot = Alignment(-0.30, 1);
-
 /// 유리가 굴절시킬 바탕. 홈과 영상 분석이 같은 것을 쓴다.
 ///
 /// **세로를 채우고 오른쪽을 잘라 낸다.** 사진은 세로가 짧아 화면에 맞추면
 /// 좌우가 남는데, 왼쪽에 얼굴이 있으므로 왼쪽을 기준으로 붙이고 오른쪽
 /// (뒤통수 바깥)이 잘리게 둔다.
 ///
-/// **인물과 배경이 두 장이다.** 한 장을 통째로 돌리면 사진 가장자리가 드러나
-/// 검은 바탕이 옆에서 새어 나온다. 인물만 알파로 떼어 두면 배경은 가만히
-/// 있고 인물만 움직인다. 배경 판에는 인물 자리를 지운 자국이 옅게 남아 있어,
-/// 인물이 끄덕일 때 드러나는 틈에 검정 대신 제 그림자가 보인다.
-class FigureBackground extends StatefulWidget {
-  const FigureBackground({super.key, this.breathe = false});
-
-  /// 참이면 인물이 천천히 고개를 끄덕인다. 홈에서만 켠다 — 다른 화면은
-  /// 내용이 앞에 있어 배경까지 움직이면 산만하다.
-  final bool breathe;
-
-  @override
-  State<FigureBackground> createState() => _FigureBackgroundState();
-}
-
-class _FigureBackgroundState extends State<FigureBackground>
-    with SingleTickerProviderStateMixin {
-  AnimationController? _ctrl;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.breathe) {
-      _ctrl = AnimationController(vsync: this, duration: _kNodPeriod)
-        ..repeat(reverse: true);
-    }
-  }
-
-  @override
-  void dispose() {
-    _ctrl?.dispose();
-    super.dispose();
-  }
+/// **가만히 있는다.** 한때 인물이 숨쉬거나 고개를 끄덕이게 해 봤다. 사진을
+/// 통째로 돌리면 가장자리가 드러나고, 인물만 알파로 떼어 돌려도 평면이라
+/// 몸이 접히는 것처럼 보였다. 제대로 하려면 머리와 몸을 따로 떼야 하는데
+/// 그만한 값어치가 없어 걷어냈다(git 이력에 남아 있다).
+class FigureBackground extends StatelessWidget {
+  const FigureBackground({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // 두 장이 정확히 같은 자리에 놓여야 겹쳐 보인다 — 같은 비율·같은 정렬.
-    Widget layer(String asset) => Align(
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Align(
           alignment: Alignment.topCenter,
           child: FractionallySizedBox(
             heightFactor: _kFigureHeightFactor,
-            child: Image(
-              image: AssetImage(asset),
+            child: const Image(
+              image: AssetImage('assets/images/home_figure.jpg'),
               fit: BoxFit.cover,
               alignment: Alignment.centerLeft,
             ),
           ),
-        );
-
-    final figure = layer('assets/images/home_cut.png');
-
-    final ctrl = _ctrl;
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        layer('assets/images/home_bg.jpg'),
-        if (ctrl == null)
-          figure
-        else
-          AnimatedBuilder(
-            animation: ctrl,
-            // 사진은 한 번만 짓고 변환만 매 프레임 바꾼다 — 다시 지으면
-            // 큰 이미지를 프레임마다 배치하게 된다.
-            child: figure,
-            builder: (context, child) {
-              final t = Curves.easeInOut.transform(ctrl.value);
-              return Transform.scale(
-                // 돌리면 가장자리가 빌 수 있어 미리 조금 키워 둔다.
-                scale: _kNodScale,
-                child: Transform.translate(
-                  offset: Offset(0, _kNodDrop * t),
-                  child: Transform.rotate(
-                    angle: _kNodAngle * t,
-                    alignment: _kNodPivot,
-                    child: child,
-                  ),
-                ),
-              );
-            },
-          ),
+        ),
         Align(
           alignment: Alignment.topCenter,
           child: FractionallySizedBox(
