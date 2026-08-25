@@ -15,11 +15,22 @@ const double _kSheetRadius = 28.0;
 
 /// 사진 위에 얹히는 글자색.
 ///
-/// 사진이 밝아(흰 유니폼·밝은 회색 배경) 흰 글자가 묻힌다. 어두운 막을
-/// 걷어낸 뒤로는 글자를 검정으로 두는 편이 읽힌다.
-///
 /// 버튼의 테두리와 면도 이 색을 알파만 달리해 쓴다 — 한 곳만 바꾸면 따라온다.
-const Color _kOnPhoto = Color(0xFF000000);
+const Color _kOnPhoto = Color(0xFFFFFFFF);
+
+/// 사진과 유리 사이에 까는 어두운 막.
+///
+/// 사진이 밝아(흰 유니폼·밝은 회색 배경) 흰 글자가 묻힌다. 유리 면(흰색)을
+/// 더 올리면 배경이 같이 밝아져 역효과라, 뒤를 살짝 눌러 준다.
+///
+/// **위아래가 같은 값이다** — 폼이 화면 위쪽에 있어 아래만 어둡게 할 이유가
+/// 없다. 그라데이션 형태로 두는 것은 나중에 위아래를 다시 갈라 놓기 쉽게
+/// 하기 위해서다.
+const LinearGradient _kPhotoScrim = LinearGradient(
+  begin: Alignment.topCenter,
+  end: Alignment.bottomCenter,
+  colors: [Color(0x26000000), Color(0x26000000)],
+);
 
 // --- 로그인 버튼 -------------------------------------------------------
 //
@@ -100,6 +111,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           const Image(
             image: AssetImage('assets/images/player_mono.jpg'),
             fit: BoxFit.cover,
+          ),
+          const DecoratedBox(
+            decoration: BoxDecoration(gradient: _kPhotoScrim),
+            child: SizedBox.expand(),
           ),
           _sheetBody(),
         ],
