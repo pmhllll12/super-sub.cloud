@@ -77,10 +77,29 @@ class _EditNicknameSheetState extends ConsumerState<_EditNicknameSheet> {
   late final TextEditingController _controller =
       TextEditingController(text: widget.current);
 
+  bool _busy = false;
+  String? _error;
+
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  /// login_screen.dart와 같은 관용구다. 저장은 리포지토리를 거치므로
+  /// 지연·실패가 실제로 발생한다(스펙 4.3).
+  Future<void> _run(Future<void> Function() action) async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await action();
+    } catch (e) {
+      if (mounted) setState(() => _error = '$e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
@@ -101,18 +120,36 @@ class _EditNicknameSheetState extends ConsumerState<_EditNicknameSheet> {
           TextField(
             key: const Key('profile-nickname'),
             controller: _controller,
+            enabled: !_busy,
             decoration: const InputDecoration(labelText: '닉네임'),
           ),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              _error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
           const SizedBox(height: 16),
           FilledButton(
             key: const Key('profile-save'),
-            onPressed: () {
-              ref
-                  .read(sessionControllerProvider.notifier)
-                  .updateNickname(_controller.text);
-              Navigator.of(context).pop();
-            },
-            child: const Text('저장'),
+            onPressed: _busy
+                ? null
+                : () => _run(() async {
+                      await ref
+                          .read(sessionControllerProvider.notifier)
+                          .updateNickname(_controller.text);
+                      // 실패하면 _run이 예외를 잡아 오류를 띄우므로
+                      // 여기까지 오지 않는다 — 시트는 성공했을 때만 닫힌다.
+                      if (context.mounted) Navigator.of(context).pop();
+                    }),
+            child: _busy
+                ? const SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('저장'),
           ),
         ],
       ),

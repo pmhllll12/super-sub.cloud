@@ -44,6 +44,30 @@ void runAuthRepositoryContract(
       expect(restored!.user.email, equals(knownEmail));
     });
 
+    test('프로필 수정 결과는 서버가 돌려준 사용자다', () async {
+      await repo.login(email: knownEmail, password: 'any');
+      final updated = await repo.updateProfile(nickname: '바뀐이름');
+      expect(updated.nickname, equals('바뀐이름'));
+      // id는 서버 소유라 프로필 수정으로 바뀌지 않는다.
+      expect(updated.id, equals(knownUserId));
+    });
+
+    test('프로필 수정은 로그아웃·재로그인 후에도 유지된다', () async {
+      await repo.login(email: knownEmail, password: 'any');
+      await repo.updateProfile(nickname: '바뀐이름');
+      await repo.logout();
+
+      final again = await repo.login(email: knownEmail, password: 'any');
+      expect(again.user.nickname, equals('바뀐이름'));
+    });
+
+    test('로그인하지 않으면 프로필을 수정할 수 없다', () async {
+      expect(
+        () => repo.updateProfile(nickname: '바뀐이름'),
+        throwsA(isA<AuthException>()),
+      );
+    });
+
     test('로그아웃하면 세션이 사라진다', () async {
       await repo.login(email: knownEmail, password: 'any');
       await repo.logout();

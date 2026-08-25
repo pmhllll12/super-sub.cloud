@@ -1,5 +1,6 @@
 import '../../../core/mock/mock_db.dart';
 import 'auth_repository.dart';
+import 'models/app_user.dart';
 import 'models/session.dart';
 
 class MockAuthRepository implements AuthRepository {
@@ -38,6 +39,25 @@ class MockAuthRepository implements AuthRepository {
   Future<void> logout() async {
     await Future<void>.delayed(_delay);
     _current = null;
+  }
+
+  @override
+  Future<AppUser> updateProfile({required String nickname}) async {
+    await Future<void>.delayed(_delay);
+    final session = _current;
+    if (session == null) {
+      throw const AuthException('로그인이 필요합니다');
+    }
+    final index = _db.users.indexWhere((u) => u.id == session.user.id);
+    if (index < 0) {
+      throw const AuthException('존재하지 않는 사용자입니다');
+    }
+    // 저장소에 실제로 써넣는다. 세션 상태만 바꾸면 로그아웃 후 다시
+    // 로그인했을 때 이전 닉네임이 돌아온다.
+    final updated = _db.users[index].copyWith(nickname: nickname);
+    _db.users[index] = updated;
+    _current = Session(user: updated);
+    return updated;
   }
 
   @override

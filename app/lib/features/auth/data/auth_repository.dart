@@ -1,3 +1,4 @@
+import 'models/app_user.dart';
 import 'models/session.dart';
 
 class AuthException implements Exception {
@@ -21,6 +22,12 @@ abstract class AuthRepository {
   Future<Session> loginAs(String userId);
 
   Future<void> logout();
+
+  /// 로그인한 사용자의 프로필을 수정하고 **서버가 확정한 사용자**를 돌려준다.
+  ///
+  /// 호출부는 자기가 보낸 값이 아니라 돌려받은 값을 쓴다 — id·생성 시각 같은
+  /// 서버 소유 필드가 응답에만 있기 때문이다(스펙 4.1 규칙 3).
+  Future<AppUser> updateProfile({required String nickname});
 
   Future<Session?> restoreSession();
 }

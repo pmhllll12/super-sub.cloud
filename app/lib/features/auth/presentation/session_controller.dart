@@ -67,10 +67,13 @@ class SessionController extends Notifier<SessionState> {
     state = const SessionLoggedOut();
   }
 
-  void updateNickname(String nickname) {
-    final current = state;
-    if (current is! SessionLoggedIn) return;
-    state = SessionLoggedIn(current.user.copyWith(nickname: nickname));
+  Future<void> updateNickname(String nickname) async {
+    final updated = await ref
+        .read(authRepositoryProvider)
+        .updateProfile(nickname: nickname);
+    if (!ref.mounted) return;
+    // 보낸 값이 아니라 돌려받은 사용자로 상태를 채운다(스펙 4.1 규칙 3).
+    state = SessionLoggedIn(updated);
   }
 }
 
