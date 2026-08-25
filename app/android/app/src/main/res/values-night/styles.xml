@@ -13,6 +13,7 @@
 
          This Theme is only used starting with V2 of Flutter's Android embedding. -->
     <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
-        <item name="android:windowBackground">?android:colorBackground</item>
+        <!-- 흰 종이로 시작하는 인트로와 이어지도록 흰색으로 고정한다. -->
+        <item name="android:windowBackground">@android:color/white</item>
     </style>
 </resources>

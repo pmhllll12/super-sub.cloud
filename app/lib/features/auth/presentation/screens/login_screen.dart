@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/mock/mock_db.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/refractive_glass.dart';
 import '../../../../core/widgets/sheet_drag_physics.dart';
 import '../../../intro/presentation/screens/glitch_intro_screen.dart'
@@ -249,9 +250,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           FilledButton(
             key: const Key('login-submit'),
             style: FilledButton.styleFrom(
-              // 브랜드색을 그대로 주 버튼에 쓴다. 민트가 밝아 글자는 어둡게.
-              backgroundColor: kIntroInkColor,
-              foregroundColor: const Color(0xFF0E2A14),
+              // 브랜드 민트를 주 버튼에 쓴다. 민트가 밝아 글자는 검정으로.
+              backgroundColor: AppTheme.seed,
+              foregroundColor: Colors.black,
               minimumSize: const Size.fromHeight(52),
             ),
             onPressed: _busy

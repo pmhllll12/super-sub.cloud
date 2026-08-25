@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Modify this file to customize your launch splash screen -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="?android:colorBackground" />
+    <!-- 인트로가 흰 종이에서 시작한다. 시스템 배경색을 쓰면
+         다크 모드에서 검은 화면이 먼저 지나간다. -->
+    <item android:drawable="@android:color/white" />
 
     <!-- You can insert your own image assets here -->
     <!-- <item>
