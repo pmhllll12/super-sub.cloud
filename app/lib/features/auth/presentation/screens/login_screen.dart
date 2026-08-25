@@ -118,7 +118,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             child: BrandMark(
               key: kBrandLandingKey,
               fontSize: kBrandLandedSize,
-              color: _kOnPhoto,
             ),
           ),
           Expanded(child: _form()),

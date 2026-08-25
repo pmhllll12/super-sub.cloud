@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_theme.dart';
+
 /// 앱 이름. 인트로와 로그인이 같은 글자를 쓴다.
 const String kBrandText = 'SUPERSUB';
 
@@ -28,7 +30,7 @@ class BrandMark extends StatelessWidget {
   const BrandMark({
     super.key,
     required this.fontSize,
-    this.color = Colors.white,
+    this.color = AppTheme.seed,
   });
 
   final double fontSize;

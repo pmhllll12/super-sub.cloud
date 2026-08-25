@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/widgets/ink_bleed.dart';
+import '../../../core/theme/app_theme.dart';
 import 'brand_mark.dart';
 import 'screens/glitch_intro_screen.dart';
 
@@ -162,7 +163,7 @@ class _FlyingBrand extends StatelessWidget {
               translation: const Offset(-0.5, -0.5),
               child: Text(
                 kBrandText,
-                style: BrandMark.styleFor(size, Colors.white),
+                style: BrandMark.styleFor(size, AppTheme.seed),
               ),
             ),
           );

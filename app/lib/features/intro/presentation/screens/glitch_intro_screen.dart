@@ -3,12 +3,17 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../../../../core/widgets/ink_bleed.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../brand_mark.dart';
 
 /// 앱을 켜면 한 번 지나가는 인트로.
 ///
-/// **바탕은 흰 종이다.** 여기에 검은 잉크가 번지고, 그 위에 얹힌 흰 글자가
-/// 저절로 드러난다 — 글자는 나타나는 게 아니라 처음부터 그 자리에 있었다.
+/// **바탕은 흰 종이다.** 여기에 검은 잉크가 번지고, 그 위에 민트 로고가
+/// 처음부터 떠 있다.
+///
+/// 원본은 글자색을 종이색과 같게 두어 잉크가 덮어야 드러나게 했다. 여기서는
+/// 로고가 한순간도 사라지면 안 되므로 그 방식을 쓰지 않는다 — 흰 종이 위의
+/// 민트로 시작해, 검은 잉크가 그 둘레를 채우고, 로고는 그대로 남는다.
 ///
 /// 원본(`com.sumworship`)은 아이보리 종이에 와인색 잉크였다. 구조는 그대로
 /// 두고 두 색만 바꿨다 — 종이는 순백으로, 잉크는 검정으로.
@@ -19,12 +24,14 @@ import '../brand_mark.dart';
 
 /// 바탕색.
 ///
-/// **글자색과 같은 값이어야 한다.** 잉크가 번져야 글자가 드러나는 연출이라,
-/// 둘이 갈리면 글자가 처음부터 보인다.
+/// 잉크가 번지기 전의 바탕. 안드로이드 창 배경도 같은 흰색으로 맞춰 뒀다
+/// (`android/app/src/main/res`) — 안 그러면 인트로 앞에 검은 화면이 지나간다.
 const Color kIntroPaper = Color(0xFFFFFFFF);
 
-/// 글자색. [kIntroPaper]와 같다 — 위 주의 참고.
-const Color kIntroInk = kIntroPaper;
+/// 로고 색. 브랜드 민트다.
+///
+/// **종이색과 같게 두면 안 된다** — 그러면 잉크가 덮기 전까지 로고가 안 보인다.
+const Color kIntroInk = AppTheme.seed;
 
 /// 화면을 적시는 잉크의 색.
 ///

@@ -4,7 +4,7 @@ import 'package:super_sub/core/widgets/ink_bleed.dart';
 import 'package:super_sub/features/intro/presentation/screens/glitch_intro_screen.dart';
 
 void main() {
-  testWidgets('바탕과 글자색이 같다 — 잉크가 번져야 글자가 드러난다', (tester) async {
+  testWidgets('첫 프레임부터 로고가 바탕과 다른 색으로 떠 있다', (tester) async {
     await tester.pumpWidget(
       MaterialApp(home: GlitchIntroScreen(onDone: () {})),
     );
@@ -14,7 +14,10 @@ void main() {
     expect(scaffold.backgroundColor, kIntroPaper);
 
     final text = tester.widget<Text>(find.text('SUPERSUB').first);
-    expect(text.style?.color, kIntroPaper);
+    // 로고는 한순간도 사라지면 안 된다 — 바탕색과 같으면 잉크가 덮기 전까지
+    // 보이지 않는다.
+    expect(text.style?.color, kIntroInk);
+    expect(kIntroInk, isNot(kIntroPaper));
 
     // 컨트롤러가 아직 돌고 있다 — 끝까지 흘려보내야 티커가 안 남는다.
     await tester.pump(const Duration(milliseconds: 3200));
