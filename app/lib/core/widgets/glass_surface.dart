@@ -10,7 +10,9 @@ const double kGlassBlur = 2.4;
 ///
 /// 겹쳐 놓으면 알아서 층이 진다 — 레일 몸통 위의 원 버튼, 토글 트랙 위의
 /// 손잡이는 같은 값을 두 번 얹은 것이라 한 겹만큼 더 밝다.
-final Color kGlassFill = Colors.white.withValues(alpha: 0.10);
+/// 원본은 0.10이었다. 이 앱은 시트가 화면을 통째로 덮어 그만큼이면
+/// 회색 판처럼 읽혀 0.04로 낮췄다 — 유리의 존재는 굴절이 드러낸다.
+final Color kGlassFill = Colors.white.withValues(alpha: 0.04);
 
 /// 둥근 유리 조각 — 뒤를 살짝 흐리고 그 위에 옅은 흰 기를 얹는다.
 /// 테두리는 두르지 않는다.

@@ -23,11 +23,11 @@ const Color _kOnPhoto = Color(0xFFFFFFFF);
 /// 대비를 세우는 유일한 방법은 뒤를 어둡게 하는 것이다.
 ///
 /// 위는 옅고 아래로 갈수록 진하다 — 사진은 위쪽에서 살아 있고, 폼이 놓이는
-/// 아래쪽만 충분히 어두워진다.
+/// 아래쪽만 충분히 어두워진다. 위 20%, 화면 55% 지점부터 66%로 평평하다.
 const LinearGradient _kPhotoScrim = LinearGradient(
   begin: Alignment.topCenter,
   end: Alignment.bottomCenter,
-  colors: [Color(0x4D000000), Color(0xC2000000)],
+  colors: [Color(0x33000000), Color(0xA8000000)],
   stops: [0, 0.55],
 );
 
@@ -40,7 +40,7 @@ const LinearGradient _kPhotoScrim = LinearGradient(
 /// `refractive_glass.dart`가 "자식 안에 유리를 또 넣지 않는다 — 안쪽이 아직
 /// 안 끝난 바깥을 읽어 내용이 프레임째로 사라진다"고 못박아 뒀고, 버튼은
 /// 이미 유리 시트 안이다.
-final Color _kButtonEdge = Colors.white.withValues(alpha: 0.22);
+final Color _kButtonEdge = Colors.white.withValues(alpha: 0.15);
 
 /// 버튼 모서리.
 const double _kButtonRadius = 14;
