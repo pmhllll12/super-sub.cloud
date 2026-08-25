@@ -65,6 +65,7 @@ flutter:
 
   shaders:
     - shaders/ink_bleed.frag
+    - shaders/liquid_glass.frag
 
   # 네트워크가 없는 기기에서도 항상 같게 보이도록 폰트 파일을 번들로 넣는다.
   # 인트로가 가지런한 Rubik으로 시작해 흔들리는 도중 RubikGlitch로 갈아 끼운다.
