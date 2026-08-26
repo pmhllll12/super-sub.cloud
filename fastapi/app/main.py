@@ -22,11 +22,10 @@ API_PREFIX = "/api/v1"
 _DESCRIPTION = f"""
 생활체육 용병 스카우팅 플랫폼 백엔드.
 
-> ⚠️ **인증(가입·로그인·/me)은 PostgreSQL에 붙었습니다.** 카드(`/me/card`,
-> `/cards/{{slug}}`)는 아직 스텁(고정값)입니다.
+**모든 엔드포인트가 PostgreSQL에 붙어 있습니다.** 고정 응답은 더 이상 없습니다.
 
-아래 데모 계정은 개발 DB에 넣어 둔 실제 계정입니다. **새로 가입해서 그 계정으로
-로그인해도 됩니다.** 다른 값은 계약대로 실패합니다.
+아래 데모 계정과 카드는 개발 DB에 넣어 둔 실제 데이터입니다. **새로 가입해서 그
+계정으로 로그인해도 됩니다.** 다른 값은 계약대로 실패합니다.
 
 구글 로그인(`POST /auth/google`)은 **`id_token`**(access_token 아님)을 받습니다.
 서버에 `GOOGLE_CLIENT_IDS`가 없으면 503으로 떨어집니다.
@@ -62,5 +61,7 @@ def health() -> dict[str, object]:
         "status": "ok",
         "env": settings.app_env,
         "db_configured": settings.db_configured,
-        "stub": True,
+        # 2026-08-26 에 카드까지 DB 로 옮기면서 False 가 됐다. 필드를 지우지 않는
+        # 이유는 클라이언트가 이미 읽고 있을 수 있어서다 — 계약에서 빼는 것은 별건이다.
+        "stub": False,
     }

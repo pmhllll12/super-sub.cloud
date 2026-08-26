@@ -5,6 +5,8 @@ from fastapi.testclient import TestClient
 
 from app.core.config import settings
 from app.main import app
+from app.card.adapter.outbound.stub.card_stub_repository import StubCardRepository
+from app.card.dependencies.card_repository_provider import get_card_repository
 from app.user.adapter.outbound.stub.user_stub_repository import (
     DEMO_EMAIL,
     DEMO_PASSWORD,
@@ -28,10 +30,12 @@ def client() -> TestClient:
     실제 PostgreSQL 구현은 `@pytest.mark.db` 가 붙은 테스트가 따로 검사한다.
     """
     app.dependency_overrides[get_user_repository] = StubUserRepository
+    app.dependency_overrides[get_card_repository] = StubCardRepository
     try:
         yield TestClient(app)
     finally:
         app.dependency_overrides.pop(get_user_repository, None)
+        app.dependency_overrides.pop(get_card_repository, None)
 
 
 @pytest.fixture

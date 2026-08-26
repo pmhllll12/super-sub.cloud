@@ -1,15 +1,16 @@
 # API 계약 초안 — 인증 · 선수 카드
 
-> **상태:** 구현됨 — **인증(비밀번호·구글)은 PostgreSQL에 붙었고, 카드는 아직 스텁이다** · 2026-08-26 확인
-> **확인:** `cd fastapi && .venv/bin/pytest` → `117 passed`
-> (DB가 없는 환경에서는 `99 passed, 18 skipped`. 통합 테스트만 건너뛴다)
+> **상태:** 구현됨 — **전부 PostgreSQL에 붙었다. 고정 응답은 없다** · 2026-08-26 확인
+> **확인:** `cd fastapi && .venv/bin/pytest` → `127 passed`
+> (DB가 없는 환경에서는 `99 passed, 28 skipped`. 통합 테스트만 건너뛴다)
 > **메모:** 스프린트 2(09.01~)의 Flutter 화면 두 개(로그인 · 선수 카드)에 필요한
 > 최소 범위. **응답 형태는 2026-08-25 이후 바뀌지 않았다** — 화면 쪽에서 고칠 것은 없다.
 
 | 엔드포인트 | 상태 |
 |---|---|
-| `POST /auth/signup` · `POST /auth/login` · `GET /me` | **실제 DB** — 아무 계정이나 가입해서 쓸 수 있다 |
-| `GET /me/card` · `GET /cards/{slug}` | 스텁(고정 응답). 아래 슬러그만 성공한다 |
+| `POST /auth/signup` · `POST /auth/login` · `POST /auth/google` | **실제 DB** |
+| `GET /me` · `PATCH /me` | **실제 DB** |
+| `GET /me/card` · `GET /cards/{slug}` | **실제 DB** (2026-08-26에 스텁을 걷어냈다) |
 
 ## 눌러볼 수 있는 값
 
@@ -19,14 +20,18 @@
 | 데모 비밀번호 | `supersub2026` |
 | 공개 카드 슬러그 | `hong-gildong-4f2a` (스텁) |
 
-**인증은 이제 실제 DB다.** 위 데모 계정은 개발 DB에 넣어 둔 실물이고,
+**전부 실제 DB다.** 위 데모 계정과 카드는 개발 DB에 넣어 둔 실물이고,
 `POST /auth/signup`으로 **새 계정을 만들어 그걸로 로그인해도 된다.**
-새 계정은 소속 팀이 없으므로 `GET /me`의 `teams`가 **빈 배열**로 온다 —
-빈 배열이 정상 상태라는 점을 화면에서 확인해 둘 것.
 
-카드는 아직 스텁이라 위 슬러그만 성공한다. 정의는
-`app/card/adapter/outbound/stub/card_stub_repository.py`에 있고, DB가 붙으면
-그 디렉터리째 사라진다 — 갈아끼우는 지점은 `app/card/dependencies/` 다.
+🔴 **새 계정은 빈 상태로 온다.** 화면에서 이 두 가지를 확인해 둘 것.
+
+| 화면 | 빈 상태 |
+|---|---|
+| `GET /me` | `teams`가 **빈 배열** (소속 팀이 없다) |
+| `GET /me/card` | **404 `CARD_NOT_FOUND`** — 카드는 가입만으로 생기지 않는다 |
+
+카드가 어느 시점에 생기는지는 아직 미정이다(5절). 지금은 개발 DB에 넣어 둔 데모
+카드 하나뿐이므로, 새 계정으로는 카드 화면을 볼 수 없다.
 
 `/docs`(Swagger UI)에도 같은 안내가 떠 있다.
 
