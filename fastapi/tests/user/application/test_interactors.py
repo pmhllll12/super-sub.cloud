@@ -11,11 +11,12 @@ import pytest
 from app.core.errors import ApiError
 from app.core.security import verify_access_token
 from app.user.application.dtos.login_dto import LoginCommand
-from app.user.application.dtos.me_dto import MeQuery
+from app.user.application.dtos.me_dto import MeQuery, UpdateMeCommand
 from app.user.application.dtos.signup_dto import SignupCommand
 from app.user.application.ports.output.user_port import UserPort
 from app.user.application.use_cases.login_interactor import LoginInteractor
 from app.user.application.use_cases.me_interactor import MeInteractor
+from app.user.application.use_cases.update_me_interactor import UpdateMeInteractor
 from app.user.application.use_cases.signup_interactor import SignupInteractor
 from app.user.domain.entities.membership_entity import MembershipEntity
 from app.user.domain.entities.user_entity import UserEntity
@@ -57,6 +58,7 @@ class FakeUserRepository(UserPort):
         # 외부 신원 쪽도 같은 방식으로 남긴다.
         self.identities: dict[tuple[str, str], UserEntity] = {}
         self.linked: list[tuple[UUID, str, str]] = []
+        self.renamed: list[tuple[UUID, Nickname]] = []
 
     def email_exists(self, email: Email) -> bool:
         return email == Email.of(_EMAIL)
@@ -89,6 +91,9 @@ class FakeUserRepository(UserPort):
 
     def get(self, user_id: UUID) -> UserEntity | None:
         return self.user if user_id == _USER_ID else None
+
+    def update_nickname(self, user_id: UUID, nickname: Nickname) -> None:
+        self.renamed.append((user_id, nickname))
 
     def list_memberships(self, user_id: UUID) -> list[MembershipEntity]:
         return list(self.memberships)
@@ -170,3 +175,52 @@ class TestMeInteractor:
         with pytest.raises(ApiError) as exc:
             MeInteractor(FakeUserRepository())(MeQuery(user_id=uuid4()))
         assert exc.value.code == "INVALID_TOKEN"
+
+
+class TestUpdateMeInteractor:
+    def test_바뀐_닉네임으로_돌려준다(self):
+        repo = FakeUserRepository()
+        result = UpdateMeInteractor(repo)(
+            UpdateMeCommand(user_id=_USER_ID, nickname="새이름")
+        )
+        assert result.nickname == "새이름"
+
+    def test_저장소에_저장을_요청한다(self):
+        """돌려주는 값만 바꾸고 저장을 안 하면 새로고침에 되돌아간다."""
+        repo = FakeUserRepository()
+        UpdateMeInteractor(repo)(
+            UpdateMeCommand(user_id=_USER_ID, nickname="새이름")
+        )
+        assert [str(n) for _, n in repo.renamed] == ["새이름"]
+
+    def test_앞뒤_공백은_값_객체가_정규화한다(self):
+        repo = FakeUserRepository()
+        result = UpdateMeInteractor(repo)(
+            UpdateMeCommand(user_id=_USER_ID, nickname="  새이름  ")
+        )
+        assert result.nickname == "새이름"
+        assert str(repo.renamed[0][1]) == "새이름", "저장되는 값도 정규화돼야 한다"
+
+    def test_없는_사용자면_INVALID_TOKEN(self):
+        """조회(`MeInteractor`)와 같은 판단이어야 화면 동작이 갈리지 않는다."""
+        repo = FakeUserRepository()
+        with pytest.raises(ApiError) as exc:
+            UpdateMeInteractor(repo)(
+                UpdateMeCommand(user_id=uuid4(), nickname="새이름")
+            )
+        assert exc.value.status_code == 401
+        assert exc.value.code == "INVALID_TOKEN"
+        assert repo.renamed == [], "없는 사용자인데 저장을 시도했다"
+
+    def test_teams_는_조회와_같게_나온다(self):
+        """수정 응답만 형태가 다르면 클라이언트가 파서를 두 벌 든다."""
+        repo = FakeUserRepository(
+            [
+                _membership("번개FC", None),
+                _membership("옛날FC", datetime(2026, 6, 30, tzinfo=timezone.utc)),
+            ]
+        )
+        result = UpdateMeInteractor(repo)(
+            UpdateMeCommand(user_id=_USER_ID, nickname="새이름")
+        )
+        assert [t.name for t in result.teams] == ["번개FC"]

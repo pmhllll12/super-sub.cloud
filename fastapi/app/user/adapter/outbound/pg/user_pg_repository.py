@@ -31,6 +31,7 @@ from app.user.application.ports.output.user_port import UserPort
 from app.user.domain.entities.membership_entity import MembershipEntity
 from app.user.domain.entities.user_entity import UserEntity
 from app.user.domain.value_objects.email_vo import Email
+from app.user.domain.value_objects.nickname_vo import Nickname
 from app.user.domain.value_objects.password_vo import Password
 
 
@@ -186,6 +187,15 @@ class UserPgRepository(UserPort):
     def get(self, user_id: UUID) -> UserEntity | None:
         row = self._session.get(UserOrm, user_id)
         return to_user_entity(row) if row is not None else None
+
+    def update_nickname(self, user_id: UUID, nickname: Nickname) -> None:
+        row = self._session.get(UserOrm, user_id)
+        if row is None:
+            # 존재 확인은 유스케이스가 이미 했다. 그 사이에 사라졌다면 조용히 넘긴다 —
+            # 여기서 던지면 같은 판단이 두 곳에 생긴다.
+            return
+        row.nickname = str(nickname)
+        self._session.commit()
 
     def list_memberships(self, user_id: UUID) -> list[MembershipEntity]:
         """탈퇴 이력을 포함한 전체 소속. 거르는 것은 도메인 규칙의 몫이다."""

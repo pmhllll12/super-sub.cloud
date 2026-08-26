@@ -13,6 +13,18 @@ class MeQuery:
 
 
 @dataclass(frozen=True)
+class UpdateMeCommand:
+    """인바운드 → 유스케이스.
+
+    결과는 조회와 **같은 `MeResult`** 다. 수정 응답만 형태가 다르면 클라이언트가
+    파서를 두 벌 들고 있어야 한다.
+    """
+
+    user_id: UUID
+    nickname: str
+
+
+@dataclass(frozen=True)
 class MembershipResult:
     team_id: UUID
     name: str
