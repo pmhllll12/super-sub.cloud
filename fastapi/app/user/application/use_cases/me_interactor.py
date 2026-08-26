@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.errors import ApiError
+from app.core.errors import ApiError
 from app.user.application.dtos.me_dto import MembershipResult, MeQuery, MeResult
 from app.user.application.ports.input.me_use_case import MeUseCase
 from app.user.application.ports.output.user_port import UserPort

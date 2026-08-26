@@ -21,7 +21,7 @@ from app.card.domain.entities.title_entity import TitleEntity
 from app.card.domain.value_objects.card_owner_vo import CardOwner
 from app.card.domain.value_objects.public_slug_vo import PublicSlug
 from app.card.domain.value_objects.title_category_vo import TitleCategory
-from app.user.adapter.outbound.repositories.user_stub_repository import DEMO_USER_ID
+from app.user.adapter.outbound.stub.user_stub_repository import DEMO_USER_ID
 
 DEMO_SLUG = "hong-gildong-4f2a"
 

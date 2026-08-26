@@ -7,12 +7,12 @@
 from fastapi import FastAPI
 
 from app.card.adapter.inbound.api.v1.card_router import card_router
-from app.card.adapter.outbound.repositories.card_stub_repository import DEMO_SLUG
-from app.config import settings
-from app.errors import install_error_handlers
+from app.card.adapter.outbound.stub.card_stub_repository import DEMO_SLUG
+from app.core.config import settings
+from app.core.errors import install_error_handlers
 from app.user.adapter.inbound.api.v1.auth_router import auth_router
 from app.user.adapter.inbound.api.v1.me_router import me_router
-from app.user.adapter.outbound.repositories.user_stub_repository import (
+from app.user.adapter.outbound.stub.user_stub_repository import (
     DEMO_EMAIL,
     DEMO_PASSWORD,
 )

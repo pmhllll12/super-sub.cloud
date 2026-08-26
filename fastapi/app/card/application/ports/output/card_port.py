@@ -1,4 +1,4 @@
-"""출력 포트. 구현은 `adapter/outbound/repositories/`."""
+"""출력 포트. 구현은 `adapter/outbound/` — 지금은 `stub/`, DB 가 붙으면 `pg/`."""
 
 from __future__ import annotations
 

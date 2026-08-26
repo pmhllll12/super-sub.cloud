@@ -9,7 +9,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from app.shared import Rfc3339
+from app.core.shared import Rfc3339
 
 
 class TitleResponse(BaseModel):

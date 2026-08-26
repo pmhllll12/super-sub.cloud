@@ -16,11 +16,15 @@ from pathlib import Path
 APP = Path(__file__).resolve().parent.parent / "app"
 CONTEXTS = ("user", "card")
 
-# 컨텍스트에 속하지 않는 공용 모듈. 어느 계층에서든 임포트해도 된다.
-SHARED = {"app.errors", "app.security", "app.shared", "app.config", "app.deps"}
+# 컨텍스트에 속하지 않는 공용 모듈은 전부 `app/core/` 아래에 둔다.
+#
+# 예전에는 이름을 하나씩 적은 집합이었다. 그러면 **공용 파일을 추가할 때마다 목록을
+# 손으로 늘려야 하고, 까먹는 순간 그 파일은 검사에서 조용히 빠진다.** 통과와 구별이
+# 안 되는 검사가 된다. 디렉터리로 규칙을 정하면 새 파일이 자동으로 포함된다.
+CORE = APP / "core"
 
 # 유일하게 허용된 컨텍스트 간 임포트. 스텁끼리라 DB 가 붙으면 함께 사라진다.
-STUB_CROSS_IMPORT = "app/card/adapter/outbound/repositories/card_stub_repository.py"
+STUB_CROSS_IMPORT = "app/card/adapter/outbound/stub/card_stub_repository.py"
 
 
 def _modules(path: Path) -> list[str]:
@@ -124,19 +128,31 @@ class TestContextBoundary:
 
         cross = [m for m in _modules(path) if m.startswith("app.user.")]
         assert cross == [
-            "app.user.adapter.outbound.repositories.user_stub_repository"
+            "app.user.adapter.outbound.stub.user_stub_repository"
         ], "스텁의 컨텍스트 간 임포트가 늘었다"
 
 
 class TestSharedModules:
     def test_공용_모듈은_컨텍스트를_모른다(self):
-        """`app/security.py` 같은 공용이 특정 컨텍스트를 알면 공용이 아니다."""
+        """`app/core/security.py` 같은 공용이 특정 컨텍스트를 알면 공용이 아니다."""
         offenders = []
-        for name in SHARED:
-            path = APP.parent / (name.replace(".", "/") + ".py")
-            if not path.exists():
+        for path in sorted(CORE.rglob("*.py")):
+            if "__pycache__" in path.parts:
                 continue
+            rel = str(path.relative_to(APP.parent)).replace("\\", "/")
             for mod in _modules(path):
                 if any(mod.startswith(f"app.{c}.") for c in CONTEXTS):
-                    offenders.append(f"{name} → {mod}")
+                    offenders.append(f"{rel} → {mod}")
         assert not offenders, "공용 모듈이 컨텍스트를 임포트했다:\n  " + "\n  ".join(offenders)
+
+    def test_app_루트에는_컨텍스트와_main_만_둔다(self):
+        """공용 모듈이 루트로 흩어지면 `app/` 이 컨텍스트와 공용을 겸하게 된다.
+
+        위 규칙(`app/core/` 아래는 전부 공용)이 성립하려면 **루트에 공용이 없어야**
+        한다. 루트에 새로 만들면 어느 검사에도 안 걸리므로 여기서 막는다.
+        """
+        allowed = {"__init__.py", "main.py"}
+        strays = sorted(p.name for p in APP.glob("*.py") if p.name not in allowed)
+        assert not strays, (
+            "공용 모듈은 app/core/ 에 둔다. 루트에 남은 파일:\n  " + "\n  ".join(strays)
+        )

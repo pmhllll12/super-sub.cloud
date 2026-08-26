@@ -8,8 +8,8 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from app.errors import ApiError
-from app.security import verify_access_token
+from app.core.errors import ApiError
+from app.core.security import verify_access_token
 from app.user.application.dtos.login_dto import LoginCommand
 from app.user.application.dtos.me_dto import MeQuery
 from app.user.application.dtos.signup_dto import SignupCommand

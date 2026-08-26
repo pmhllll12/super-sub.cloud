@@ -9,7 +9,7 @@ from typing import Annotated
 
 from fastapi import Depends
 
-from app.card.adapter.outbound.repositories.card_stub_repository import (
+from app.card.adapter.outbound.stub.card_stub_repository import (
     StubCardRepository,
 )
 from app.card.application.ports.output.card_port import CardPort

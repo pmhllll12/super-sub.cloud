@@ -10,7 +10,7 @@ from app.card.application.ports.output.card_port import CardPort
 from app.card.application.use_cases.card_assembler import to_public_card_result
 from app.card.domain.rules.card_rules import to_public, visible_titles
 from app.card.domain.value_objects.public_slug_vo import PublicSlug
-from app.errors import ApiError
+from app.core.errors import ApiError
 
 
 class PublicCardInteractor(PublicCardUseCase):

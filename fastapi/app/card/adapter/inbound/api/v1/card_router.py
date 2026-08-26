@@ -20,7 +20,7 @@ from app.card.application.dtos.card_dto import (
 )
 from app.card.dependencies.my_card_provider import MyCardUseCaseDep
 from app.card.dependencies.public_card_provider import PublicCardUseCaseDep
-from app.deps import CurrentUserId
+from app.core.deps import CurrentUserId
 
 card_router = APIRouter(tags=["cards"])
 

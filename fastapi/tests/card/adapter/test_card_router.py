@@ -1,6 +1,6 @@
 """card/adapter/inbound/api/v1/card_router.py — 계약 문서 3장."""
 
-from app.card.adapter.outbound.repositories.card_stub_repository import DEMO_SLUG
+from app.card.adapter.outbound.stub.card_stub_repository import DEMO_SLUG
 from tests.conftest import V1, error_code
 
 

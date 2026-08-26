@@ -10,7 +10,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from app.shared import Rfc3339
+from app.core.shared import Rfc3339
 from app.user.domain.value_objects.nickname_vo import MAX_NICKNAME_LENGTH
 from app.user.domain.value_objects.password_vo import MIN_PASSWORD_LENGTH
 

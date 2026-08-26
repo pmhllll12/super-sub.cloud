@@ -6,7 +6,7 @@
 
 import pytest
 
-from app.user.adapter.outbound.repositories.user_stub_repository import (
+from app.user.adapter.outbound.stub.user_stub_repository import (
     DEMO_EMAIL,
     DEMO_PASSWORD,
 )

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.deps import CurrentUserId
+from app.core.deps import CurrentUserId
 from app.user.adapter.inbound.api.schemas.me_schema import MeResponse
 from app.user.application.dtos.me_dto import MeQuery, MeResult
 from app.user.dependencies.me_provider import MeUseCaseDep

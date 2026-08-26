@@ -9,7 +9,7 @@ from app.card.application.ports.input.my_card_use_case import MyCardUseCase
 from app.card.application.ports.output.card_port import CardPort
 from app.card.application.use_cases.card_assembler import to_my_card_result
 from app.card.domain.rules.card_rules import visible_titles
-from app.errors import ApiError
+from app.core.errors import ApiError
 
 
 class MyCardInteractor(MyCardUseCase):

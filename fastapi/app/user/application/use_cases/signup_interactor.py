@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from app.errors import ApiError
+from app.core.errors import ApiError
 from app.user.application.dtos.signup_dto import SignupCommand, SignupResult
 from app.user.application.ports.input.signup_use_case import SignupUseCase
 from app.user.application.ports.output.user_port import UserPort

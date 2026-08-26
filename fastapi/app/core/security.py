@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from app.errors import ApiError
+from app.core.errors import ApiError
 
 # 계약 문서 0장 — 리프레시 없이 액세스 토큰 하나로 간다.
 TOKEN_EXPIRES_IN = 7 * 24 * 60 * 60  # 7일

@@ -10,7 +10,7 @@ from typing import Annotated
 
 from fastapi import Depends
 
-from app.user.adapter.outbound.repositories.user_stub_repository import (
+from app.user.adapter.outbound.stub.user_stub_repository import (
     StubUserRepository,
 )
 from app.user.application.ports.output.user_port import UserPort
