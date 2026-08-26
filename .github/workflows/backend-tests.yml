@@ -44,9 +44,9 @@ jobs:
       JWT_SECRET: ci-only-secret-not-for-deploy
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           # 로컬과 같은 버전. requirements.lock.txt 를 이 버전에서 뽑았다.
           python-version: "3.14"
