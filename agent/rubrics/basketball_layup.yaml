@@ -48,7 +48,7 @@ criteria:
       0: "140도 미만"
     bands:
       metric: swing_elbow_angle_at_impact
-      2: [[160, null]]
+      2: [[160, 180]]
       1: [[140, 160]]
       0: [[null, 140]]
     anchors:
@@ -79,7 +79,7 @@ criteria:
       0: "145도 미만"
     bands:
       metric: swing_knee_angle_at_impact
-      2: [[165, null]]
+      2: [[165, 180]]
       1: [[145, 165]]
       0: [[null, 145]]
     anchors:

@@ -57,6 +57,12 @@ def _parse_bands(entry: dict[str, Any]) -> tuple[str, dict[int, tuple[Interval, 
             intervals.append((lo, hi))
         if not intervals:
             raise RubricError(f"{entry['id']}: {grade}등급 구간이 비어 있음")
+        if grade != 0 and any(lo is None or hi is None for lo, hi in intervals):
+            raise RubricError(
+                f"{entry['id']}: {grade}등급 구간의 끝이 열려 있음 {intervals!r}. "
+                "열린 끝은 0등급에만 둔다 — 위가 열린 상위 등급은 측정 오류를 "
+                "만점으로 만든다."
+            )
         bands[grade] = tuple(intervals)
 
     return metric, bands
@@ -91,6 +97,29 @@ class Criterion:
         """
         return all(m in features for m in self.measured_by)
 
+    def band_margin(self, features: dict[str, Any]) -> float:
+        """측정값이 자기 등급 구간의 **안쪽에 얼마나 들어와 있는지** (0~0.5).
+
+        구간 폭 대비 가까운 경계까지의 거리다. 경계 위면 0, 한가운데면 0.5,
+        열린 끝(0등급) 쪽은 0.5로 본다.
+
+        장단점 표기에 쓴다. 경계에 걸친 값을 "장점"이라고 부르면 다음 클립에서
+        뒤집힌다 — 선수 카드에 남는 문구는 한 프레임 차이로 바뀌지 않는 것만
+        올린다 (CONFIDENT_MARGIN).
+        """
+        if self.band_metric not in features:
+            return 0.0
+        value = float(features[self.band_metric])
+        for lo, hi in self.bands[self.grade_for(features)]:
+            if (lo is None or value >= lo) and (hi is None or value <= hi):
+                if lo is None or hi is None:
+                    return 0.5
+                width = hi - lo
+                if width <= 0:
+                    return 0.0
+                return min(value - lo, hi - value) / width
+        return 0.0
+
     def grade_for(self, features: dict[str, Any]) -> int:
         """측정값을 구간과 대조해 등급을 결정한다.
 
@@ -114,6 +143,9 @@ class Criterion:
             f"{self.id}: {self.band_metric}={value}가 어느 등급 구간에도 없음. "
             "루브릭 bands가 값 범위를 모두 덮지 않는다."
         )
+
+
+CONFIDENT_MARGIN = 0.2
 
 
 @dataclass(frozen=True)

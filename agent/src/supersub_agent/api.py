@@ -26,7 +26,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from .features import InsufficientQuality, extract_features, verify_rubric_coverage
 from .judge import Judge
-from .scoring import RubricError, aggregate, discover_rubrics
+from .scoring import CONFIDENT_MARGIN, RubricError, aggregate, discover_rubrics
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 RUBRIC_DIR = ROOT / "rubrics"
@@ -167,7 +167,13 @@ def run_pipeline(
 
     by_id = {c.id: c for c in rubric.criteria}
     for item in result["breakdown"]:
-        item["title"] = by_id[item["criterion_id"]].title_for(item["grade"])
+        criterion = by_id[item["criterion_id"]]
+        item["title"] = criterion.title_for(item["grade"])
+        # 등급 구간 안쪽 여유 — 화면이 장단점을 고르는 기준이다.
+        # 경계에 걸친 값은 다음 클립에서 등급이 뒤집히므로 장단점으로 올리지 않는다.
+        margin = criterion.band_margin(features)
+        item["margin"] = round(margin, 3)
+        item["confident"] = margin >= CONFIDENT_MARGIN
 
     return {
         "source": source,
@@ -324,7 +330,7 @@ code{font:.85em ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--mut)}
 .cmp{color:var(--mut);font-size:.84rem;margin-top:.25rem}
 .err{color:#dc2626}
 .mut{color:var(--mut);font-size:.86rem}
-/* 장단점 — 등급을 그대로 쓴다. 2=장점, 1=보완 필요, 0=단점. */
+/* 장단점 — 선정 기준은 prosCons 참고 (등급 + 경계 여유 + 배점 상위 2개). */
 .pc{display:grid;grid-template-columns:1fr 1fr;gap:1.4rem}
 @media(max-width:640px){.pc{grid-template-columns:1fr}}
 .pc section{min-width:0}
@@ -436,14 +442,25 @@ $('#file').onchange=e=>{
   e.target.value='';   // 같은 파일을 다시 고를 수 있게
 };
 
-// 등급을 장단점으로 옮긴다. 2=장점, 1=보완 필요, 0=단점 — 루브릭의 등급 정의
-// 그대로이므로 별도 임계값을 두지 않는다. 1을 단점에 합치면 부분 득점한 항목이
-// 실패로 보이므로 따로 둔다.
+// 장단점 선정 기준. 등급만으로 가르지 않는다.
+//
+//   장점 = 2등급 + 경계에서 충분히 안쪽(confident) + 배점 상위 2개
+//   단점 = 0등급 + 경계에서 충분히 안쪽 + 배점 상위 2개
+//   나머지(1등급, 경계에 걸친 2·0등급) = 보완 필요
+//
+// 경계에 걸린 값을 장단점으로 올리지 않는 이유는 그 문구가 선수 카드에 남기
+// 때문이다. 밴드 경계에서 1도 차이로 등급이 갈리는 값은 다음 클립에서 뒤집힌다.
+// 개수를 2개로 끊는 이유는 단점 3개가 나열되면 카드가 아니라 진단서가 돼서다.
+const MAX_POINTS=2;
 function prosCons(r){
   const items=r.breakdown;
   // 배점이 큰 항목이 먼저 오게 한다 — 점수는 표기하지 않지만 순서로는 남긴다.
   const bucket=g=>items.filter(b=>b.grade===g).sort((a,b)=>b.weight-a.weight);
-  const pro=bucket(2), part=bucket(1), con=bucket(0);
+  const solid=g=>bucket(g).filter(b=>b.confident!==false);
+  const pro=solid(2).slice(0,MAX_POINTS), con=solid(0).slice(0,MAX_POINTS);
+  const shown=new Set([...pro,...con].map(b=>b.criterion_id));
+  const part=items.filter(b=>!shown.has(b.criterion_id))
+                  .sort((a,b)=>b.weight-a.weight);
 
   // 칭호가 먼저, 설명이 뒤. 칭호는 루브릭의 titles에서 온다.
   const li=b=>`<li><div class="ttl">${b.title||b.name}</div>

@@ -45,7 +45,7 @@ criteria:
       0: "겨누지 않은 발"
     bands:
       metric: plant_foot_to_ball_offset
-      2: [[null, 0.4]]
+      2: [[0, 0.4]]
       1: [[0.4, 0.75]]
       0: [[0.75, null]]
     grades:
@@ -139,7 +139,7 @@ criteria:
     bands:
       metric: hip_rotation_range_deg
       2: [[15, 35]]
-      1: [[8, 15], [35, null]]
+      1: [[8, 15], [35, 180]]
       0: [[null, 8]]
     grades:
       2: "백스윙~임팩트 구간 골반 회전 15~35도"
@@ -170,7 +170,7 @@ criteria:
     bands:
       metric: swing_hip_flexion_after_impact_deg
       2: [[8, 25]]
-      1: [[3, 8], [25, null]]
+      1: [[3, 8], [25, 180]]
       0: [[null, 3]]
     grades:
       2: "임팩트 후 고관절 굴곡 8~25도 추가 진행 (짧고 방향성 있는 마무리)"

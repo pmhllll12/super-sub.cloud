@@ -58,6 +58,37 @@ MIN_CONFIDENCE = 0.3
 # 다리는 0.3에서도 안정적이라 그대로 둔다.
 LIMB_MIN_CONFIDENCE = {"leg": 0.3, "arm": 0.6}
 
+# 골반·어깨 축을 각도로 쓸 수 있는 최소 투영 길이 (어깨너비 = 1.0 기준).
+#
+# 몸통이 카메라를 향하면 좌우 두 점이 겹쳐 보여 축이 짧아지고, 그 각도는 작은
+# 키포인트 오차에도 크게 흔들린다. 야구 투구 실클립에서 골반 축이 0.44로 줄어든
+# 프레임이 분리각 81.2도를 냈다 — 축이 제대로 보이는 프레임에서는 49.9도였다.
+MIN_AXIS_LENGTH = 0.6
+
+# 지표별 물리적으로 가능한 범위. 벗어난 값은 등급이 아니라 **측정 실패**로 뺀다.
+#
+# 밴드를 양끝에서 닫아도(scoring._parse_bands) 그것만으로는 부족하다. 닫힌 밴드는
+# 범위 밖 값을 0등급으로 떨어뜨리는데, 측정이 깨진 것을 "못한 것"으로 채점하는
+# 셈이기 때문이다. 촬영 조건으로 선수를 감점하지 않는다는 원칙(도구 미검출 처리)이
+# 여기에도 그대로 적용된다 — 잴 수 없었으면 그 항목을 빼고 나머지로 채점한다.
+#
+# 각도 지표의 상한 180은 기하학적 최대다(joint_angle은 arccos 기반이라 0~180).
+# 나머지는 사람 몸에서 나올 수 있는 범위로 잡되, 실측 분포가 쌓이면 다시 본다.
+PLAUSIBLE_RANGE: dict[str, tuple[float, float]] = {
+    "plant_knee_angle_at_impact": (0.0, 180.0),
+    "swing_knee_angle_at_impact": (0.0, 180.0),
+    "swing_elbow_angle_at_impact": (0.0, 180.0),
+    "support_elbow_angle_at_impact": (0.0, 180.0),
+    # 상체가 앞뒤로 90도를 넘으면 뒤집힌 자세다 — 측정이 깨진 것으로 본다.
+    "trunk_forward_lean_deg_at_impact": (-90.0, 90.0),
+    # 준비~임팩트 구간의 골반 축 회전. 축 기준(mod 180)이라 180이 상한이다.
+    "hip_rotation_range_deg": (0.0, 180.0),
+    # 두 축의 차이를 -90~90으로 접은 절대값.
+    "hip_shoulder_separation_deg": (0.0, 90.0),
+    "swing_hip_flexion_after_impact_deg": (0.0, 180.0),
+    "swing_shoulder_flexion_after_impact_deg": (0.0, 180.0),
+}
+
 # 도구가 검출된 영상에서만 나오는 지표. 이 모듈이 산출할 수 있다는 선언이며,
 # verify_rubric_coverage가 이 목록만 면제한다 (루브릭 오타는 계속 걸린다).
 TOOL_DEPENDENT_METRICS = frozenset({"plant_foot_to_ball_offset"})
@@ -68,6 +99,8 @@ LIMB_DEPENDENT_METRICS = frozenset({
     "swing_elbow_angle_at_impact",
     "support_elbow_angle_at_impact",
     "swing_shoulder_flexion_after_impact_deg",
+    # 어깨·골반 네 점이 모두 잡힌 프레임에서만 나온다.
+    "hip_shoulder_separation_deg",
 })
 
 
@@ -139,6 +172,16 @@ def normalize_track(track: np.ndarray, kps: np.ndarray) -> np.ndarray:
     out = track.astype(np.float64).copy()
     out[:, :2] = (out[:, :2] - hip_center) / scale
     return out
+
+
+def _axis_deg(vec: np.ndarray) -> np.ndarray:
+    """방향 벡터를 **축 각도**(0~180)로 바꾼다.
+
+    골반·어깨처럼 좌우 두 점을 잇는 선은 방향이 아니라 축이다 — 좌우 라벨이
+    뒤바뀌어도 같은 자세이므로, 벡터 각도로 다루면 라벨 스왑이 180도 회전으로
+    잘못 읽힌다 (야구 투구 실클립에서 실제로 발생).
+    """
+    return np.degrees(np.arctan2(vec[:, 1], vec[:, 0])) % 180.0
 
 
 def valid_frames(
@@ -401,23 +444,47 @@ def extract_features(
     trunk = shoulder_c - hip_c
     trunk_lean = float(np.degrees(np.arctan2(trunk[0], -trunk[1])))
 
-    # 골반 회전 — 좌우 골반 벡터 방향각의 백스윙~임팩트 구간 변화폭.
+    # 골반 회전 — 골반 축 방향의 백스윙~임팩트 구간 변화폭.
     #
-    # **각도를 언랩하고 유효 프레임만 본다.** arctan2는 -180~180을 돌려주므로
-    # 골반이 그 경계에 걸치면 ptp가 360에 가까운 값을 낸다 — 농구 클립에서
-    # 실제 회전 12.7도가 359.0도로 나왔다. 축구 클립도 방향각이 -172~178이라
-    # 경계 위에 있었고, 값이 멀쩡했던 것은 구간이 우연히 경계를 안 넘어서다.
+    # **벡터가 아니라 축으로 본다(mod 180).** 좌우 골반을 잇는 벡터로 재면
+    # 몸이 돌아 좌/우 키포인트 라벨이 뒤바뀌는 순간 각도가 180도 점프한다 —
+    # 야구 투구 실클립에서 프레임 6→7에 -4.5도 → -183.8도로 뛰었고, 실제 회전
+    # 83도가 181.1도로 부풀어 **오측정이 최고 등급 장점이 됐다.** 골반의 방향은
+    # 축이므로 좌우가 뒤집혀도 같은 자세다. mod 180으로 접으면 이 점프가 사라진다.
+    #
+    # 언랩은 그대로 필요하다. 접은 각도도 0~180 경계를 넘나들면 ptp가 부풀고,
     # 미검출 프레임은 골반 벡터가 (0,0)이라 각도가 0으로 튀므로 함께 제외한다.
     leg_usable = valid_frames(norm, "leg")
-    hip_vec = xy[:, L_HIP] - xy[:, R_HIP]
-    hip_angle = np.arctan2(hip_vec[:, 1], hip_vec[:, 0])
+    hip_axis = _axis_deg(xy[:, L_HIP] - xy[:, R_HIP])
+    shoulder_axis = _axis_deg(xy[:, L_SHOULDER] - xy[:, R_SHOULDER])
     tb_start, tb_end = phases.takeback
     span_idx = [f for f in range(tb_start, tb_end + 1) if leg_usable[f]]
     if len(span_idx) >= 2:
-        unwrapped = np.degrees(np.unwrap(hip_angle[span_idx]))
+        unwrapped = np.unwrap(hip_axis[span_idx], period=180.0)
         hip_rotation_range = float(np.ptp(unwrapped))
     else:
         hip_rotation_range = 0.0
+
+    # 골반-어깨 분리 — 골반이 얼마나 **먼저** 열렸는가.
+    #
+    # 회전량(위)과 다른 값이다. 회전량은 몸이 화면에서 돈 총량이라 카메라를 등지고
+    # 도는 동작에서 커지기만 하고, "골반이 먼저 열리고 상체가 뒤따랐는가"는 담지
+    # 못한다. 야구 루브릭의 hip_shoulder_separation 항목이 뜻하는 것은 이쪽이다.
+    #
+    # 두 축의 차이를 -90~90으로 접어 절대값을 쓰고, 준비 구간의 **최댓값**을
+    # 취한다 — 분리는 앞발이 닿는 즈음 최대가 되고 릴리스에서 다시 좁혀진다.
+    #
+    # **몸통이 카메라를 향한 프레임은 뺀다.** 투영된 축이 짧아질수록 그 각도는
+    # 불안정해진다 — 야구 투구 실클립에서 골반 축 길이가 0.44(정면)로 줄어든
+    # 프레임이 분리각 81.2도를 냈다. 같은 클립의 축이 제대로 보이는 프레임에서는
+    # 49.9도였다. 2D 투영으로 잴 수 없는 구간이므로 값을 만들지 않는다.
+    trunk_ok = (
+        (norm[:, [L_SHOULDER, R_SHOULDER, L_HIP, R_HIP], 2] >= MIN_CONFIDENCE).all(axis=1)
+        & (np.linalg.norm(xy[:, L_HIP] - xy[:, R_HIP], axis=1) >= MIN_AXIS_LENGTH)
+        & (np.linalg.norm(xy[:, L_SHOULDER] - xy[:, R_SHOULDER], axis=1) >= MIN_AXIS_LENGTH)
+    )
+    sep = np.abs((shoulder_axis - hip_axis + 90.0) % 180.0 - 90.0)
+    sep_idx = [f for f in range(tb_start, tb_end + 1) if trunk_ok[f]]
 
     # 팔로스루 — 임팩트 후 차는 다리 고관절 굴곡이 얼마나 더 진행됐는가.
     def hip_flexion(frame: int) -> float:
@@ -449,6 +516,11 @@ def extract_features(
         "follow_through_duration_frames": int(decel),
         "impact_frame": int(t),
     }
+
+    # 몸통 키포인트가 부실하면 분리각을 내지 않는다 — 도구 미검출과 같은 규약으로
+    # 그 지표를 쓰는 항목만 판정에서 빠지고, 남은 항목으로 가중치가 재정규화된다.
+    if len(sep_idx) >= 2:
+        features["hip_shoulder_separation_deg"] = round(float(sep[sep_idx].max()), 1)
 
     # 팔 지표 — 다리와 구조가 같다. 임팩트를 다리로 정의한 종목에서도 함께
     # 산출한다(상체 자세를 근거로 삼는 항목이 있을 수 있다). 신뢰도가 낮으면
@@ -505,7 +577,21 @@ def extract_features(
             offset_x = abs(float(xy[t, plant_ankle][0] - ball_at_impact[0]))
             features["plant_foot_to_ball_offset"] = round(offset_x, 2)
 
-    return features
+    return _drop_implausible(features)
+
+
+def _drop_implausible(features: dict[str, float | int]) -> dict[str, float | int]:
+    """물리적으로 불가능한 측정값을 뺀다 — 0등급이 아니라 미측정으로 다룬다.
+
+    야구 투구 실클립에서 골반 회전 181.1도가 "40도 이상"이라는 열린 밴드에 걸려
+    **최고 등급 장점으로 표시됐다.** 라벨 스왑에서 온 오측정이었다. 정의를 고쳐
+    그 원인은 없앴지만, 다음 오측정도 같은 경로로 새어 나가지 않게 막는다.
+    """
+    return {
+        k: v for k, v in features.items()
+        if k not in PLAUSIBLE_RANGE
+        or PLAUSIBLE_RANGE[k][0] <= float(v) <= PLAUSIBLE_RANGE[k][1]
+    }
 
 
 def verify_rubric_coverage(rubric, features: dict) -> None:
@@ -517,7 +603,9 @@ def verify_rubric_coverage(rubric, features: dict) -> None:
     다만 **이 모듈이 산출할 수 있다고 선언한 것**만 면제한다. 루브릭에 오타가
     나면 선언 목록에 없으므로 여전히 걸린다.
     """
-    optional = TOOL_DEPENDENT_METRICS | LIMB_DEPENDENT_METRICS
+    # PLAUSIBLE_RANGE의 지표는 범위 밖이면 빠질 수 있으므로 함께 면제한다.
+    # **이름이 정확히 일치하는 것만** 면제되므로 루브릭 오타는 그대로 걸린다.
+    optional = TOOL_DEPENDENT_METRICS | LIMB_DEPENDENT_METRICS | PLAUSIBLE_RANGE.keys()
     missing = rubric.required_metrics() - features.keys() - optional
     if missing:
         raise ValueError(

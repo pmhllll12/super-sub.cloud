@@ -302,6 +302,70 @@ def test_hip_rotation_survives_angle_wraparound():
     )
 
 
+def test_hip_rotation_survives_left_right_label_swap():
+    """좌우 골반 라벨이 뒤바뀌어도 회전량이 180도 부풀지 않는다.
+
+    몸이 돌아 등을 보이면 포즈 모델의 좌/우 배정이 뒤집힌다. 골반을 벡터로
+    다루면 그 순간 각도가 180도 점프한다 — 야구 투구 실클립에서 프레임 6→7에
+    -4.5도 → -183.8도로 뛰었고, 실제 회전 83도가 181.1도로 부풀어 **오측정이
+    최고 등급 장점으로 표시됐다.** 골반은 방향이 아니라 축이다.
+    """
+    seq = build_sequence()
+    vec = seq[:, F.L_HIP, :2] - seq[:, F.R_HIP, :2]
+
+    # 축 각도는 양 끝점을 맞바꿔도 그대로다.
+    assert F._axis_deg(vec) == pytest.approx(F._axis_deg(-vec))
+
+    swapped = seq.copy()
+    half = len(swapped) // 2
+    swapped[half:, [F.L_HIP, F.R_HIP]] = swapped[half:, [F.R_HIP, F.L_HIP]]
+
+    # 스왑은 다리 체인의 몸통쪽 관절을 바꾸므로 임팩트 프레임이 조금 달라지고,
+    # 그만큼 구간도 달라진다. 여기서 막으려는 것은 그 오차가 아니라 **180도가
+    # 통째로 실리는 것**이다.
+    swapped_range = extract_features(swapped)["hip_rotation_range_deg"]
+    assert swapped_range < 90.0, f"라벨 스왑이 회전량에 실렸다: {swapped_range}"
+
+
+def test_separation_is_dropped_when_torso_faces_the_camera():
+    """몸통이 정면이면 분리각을 내지 않는다 — 잴 수 없는 값을 만들지 않는다.
+
+    투영된 축이 짧아질수록 각도는 작은 오차에도 크게 흔들린다. 야구 투구
+    실클립에서 골반 축 길이가 0.44로 줄어든 프레임이 분리각 81.2도를 냈다
+    (축이 제대로 보이는 프레임에서는 49.9도).
+    """
+    seq = build_sequence()
+    assert "hip_shoulder_separation_deg" in extract_features(seq)
+
+    # 골반 두 점을 중앙으로 모아 축을 짧게 만든다 = 골반이 카메라를 향한 상태.
+    # 어깨는 정규화 스케일(어깨너비 중앙값)이라 함께 줄이면 상쇄되므로 놔둔다.
+    facing = seq.copy()
+    mid = (facing[:, F.L_HIP, :2] + facing[:, F.R_HIP, :2]) / 2.0
+    for j in (F.L_HIP, F.R_HIP):
+        facing[:, j, :2] = mid + (facing[:, j, :2] - mid) * 0.2
+
+    feats = extract_features(facing)
+    assert "hip_shoulder_separation_deg" not in feats
+    assert "swing_knee_angle_at_impact" in feats, "다리 지표는 그대로 나온다"
+
+
+def test_implausible_measurements_are_dropped_not_graded():
+    """물리적으로 불가능한 값은 0등급이 아니라 미측정으로 빠진다.
+
+    닫힌 밴드만으로는 부족하다 — 범위 밖 값을 0등급으로 떨어뜨리면 측정이 깨진
+    것을 "못한 것"으로 채점하게 된다. 촬영 조건으로 선수를 감점하지 않는다는
+    원칙(도구 미검출 처리)이 여기에도 적용된다.
+    """
+    ok = {"hip_rotation_range_deg": 34.0, "swing_knee_angle_at_impact": 152.0}
+    assert F._drop_implausible(dict(ok)) == ok
+
+    broken = {**ok, "hip_rotation_range_deg": 181.1}
+    dropped = F._drop_implausible(broken)
+
+    assert "hip_rotation_range_deg" not in dropped
+    assert dropped["swing_knee_angle_at_impact"] == 152.0, "나머지는 남는다"
+
+
 def test_unknown_limb_is_rejected():
     with pytest.raises(ValueError, match="impact_limb"):
         extract_features(build_sequence(), None, impact_limb="tail")

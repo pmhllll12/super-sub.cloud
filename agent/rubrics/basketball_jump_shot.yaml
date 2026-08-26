@@ -111,7 +111,7 @@ criteria:
       0: "8도 미만 (릴리스 직후 정지)"
     bands:
       metric: swing_shoulder_flexion_after_impact_deg
-      2: [[20, null]]
+      2: [[20, 180]]
       1: [[8, 20]]
       0: [[null, 8]]
     anchors:
@@ -173,7 +173,7 @@ criteria:
       0: "140도 미만"
     bands:
       metric: swing_knee_angle_at_impact
-      2: [[160, null]]
+      2: [[160, 180]]
       1: [[140, 160]]
       0: [[null, 140]]
     anchors:

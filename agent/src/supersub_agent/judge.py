@@ -44,17 +44,49 @@ CRITERION_SCHEMA = {
     "additionalProperties": False,
 }
 
-SYSTEM = """당신은 축구 기술 평가관입니다. 항목의 등급은 이미 확정되어 주어집니다.
-당신의 일은 그 등급이 왜 나왔는지 선수에게 설명하는 문장을 쓰는 것입니다.
+SYSTEM_TEMPLATE = """당신은 {sport} 기술 평가관입니다. 항목의 등급은 이미 확정되어
+주어집니다. 당신의 일은 그 등급이 왜 나왔는지 선수에게 설명하는 문장을 쓰는 것입니다.
 
 - 주어진 등급을 전제로 씁니다. 등급을 다시 판정하거나 반박하지 않습니다.
-- 제공된 측정값만 인용합니다. 없는 수치를 추정해서 쓰지 않습니다.
-- 측정값이 해당 등급 기준의 어디에 위치하는지 짚어 줍니다.
+- **수치는 주어진 것만 씁니다.** 기준 구간은 이미 문장으로 제공되므로, 숫자를
+  새로 만들거나 범위를 넓혀 쓰지 않습니다.
+- 측정값이 그 기준의 어디에 위치하는지 짚고, 무엇을 고치면 되는지 한 마디 붙입니다.
 
 출력 필드
 - evidence: 근거 문장 1~2개. 예: "임팩트 시 무릎각 141.7도로 2등급 기준
   140~165도 범위의 하단에 있다. 조금 더 펴서 차면 발등 속도가 붙는다."
 - metric_ref: 근거가 된 측정값의 이름."""
+
+# 종목 이름이 없으면 종목을 특정하지 않는 표현을 쓴다.
+SPORT_NAMES = {"football": "축구", "baseball": "야구", "basketball": "농구"}
+
+
+def system_prompt(sport: str = "") -> str:
+    """종목에 맞는 평가관 프롬프트.
+
+    고정 문구로 두면 야구 결과를 축구 평가관이 쓴다 — 실제로 그랬다.
+    """
+    return SYSTEM_TEMPLATE.format(sport=SPORT_NAMES.get(sport, "생활체육"))
+
+
+def band_text(criterion, grade: int) -> str:
+    """확정된 등급의 수치 구간을 문장으로 만든다.
+
+    모델에게 구간을 **문장으로 확정해 주는** 자리다. 등급 정의만 주면 모델이
+    없는 상한을 지어낸다 — 실클립에서 "40도 이상"인 기준을 "40~165도"라고 써
+    선수 화면에 환각 수치가 나갔다.
+    """
+    parts = []
+    for lo, hi in criterion.bands.get(grade, ()):
+        if lo is None and hi is None:
+            continue
+        if lo is None:
+            parts.append(f"{hi:g} 이하")
+        elif hi is None:
+            parts.append(f"{lo:g} 이상")
+        else:
+            parts.append(f"{lo:g}~{hi:g}")
+    return " 또는 ".join(parts) if parts else ""
 
 # transformers 5.15는 EXAONE 4.0/4.5를 네이티브 지원한다(원격 코드 불필요).
 # EXAONE 3.5는 trust_remote_code에 의존하는데, 그 원격 코드가
@@ -92,11 +124,15 @@ def build_prompt(criterion, metrics: dict[str, Any], grade: int) -> str:
 
     lines.append("\n측정값 (이 숫자만 신뢰할 것):")
     lines.append(json.dumps(metrics, ensure_ascii=False, indent=2))
+    band = band_text(criterion, grade)
     lines.append(
         f"\n확정된 등급은 {grade}등급입니다. "
         f"{criterion.band_metric}={metrics.get(criterion.band_metric)}가 "
-        f"{grade}등급 기준에 해당하기 때문입니다."
+        + (f"{grade}등급 구간({band})에 들어가기 때문입니다."
+           if band else f"{grade}등급 기준에 해당하기 때문입니다.")
     )
+    if band:
+        lines.append(f"이 구간({band}) 외의 수치를 기준으로 인용하지 마세요.")
     lines.append("이 등급에 대한 근거 문장을 JSON으로 출력하세요.")
     return "\n".join(lines)
 
@@ -178,7 +214,9 @@ class Judge:
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-    def judge_criterion(self, criterion, features: dict[str, Any]) -> dict[str, Any]:
+    def judge_criterion(
+        self, criterion, features: dict[str, Any], sport: str = ""
+    ) -> dict[str, Any]:
         if self._model is None:
             raise RuntimeError("load()를 먼저 호출하세요.")
 
@@ -186,7 +224,7 @@ class Judge:
         # 등급은 코드가 정한다. 모델은 이 등급을 전제로 근거 문장만 쓴다.
         grade = criterion.grade_for(features)
         messages = [
-            {"role": "system", "content": SYSTEM},
+            {"role": "system", "content": system_prompt(sport)},
             {"role": "user", "content": build_prompt(criterion, metrics, grade)},
         ]
 
@@ -212,7 +250,7 @@ class Judge:
         가중치를 재정규화한다.
         """
         return {
-            c.id: self.judge_criterion(c, features)
+            c.id: self.judge_criterion(c, features, rubric.sport)
             for c in rubric.applicable_criteria(features)
         }
 
