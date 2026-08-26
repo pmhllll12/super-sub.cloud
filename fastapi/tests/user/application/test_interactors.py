@@ -51,9 +51,15 @@ class FakeUserRepository(UserPort):
             created_at=datetime(2026, 7, 13, tzinfo=timezone.utc),
         )
         self.memberships = memberships or []
+        # 저장된 것을 눈으로 확인할 수 있게 남긴다. 인터랙터가 실제로 저장을
+        # 호출하는지는 이 목록으로 검사한다.
+        self.created: list[tuple[UserEntity, Password]] = []
 
     def email_exists(self, email: Email) -> bool:
         return email == Email.of(_EMAIL)
+
+    def create(self, user: UserEntity, password: Password) -> None:
+        self.created.append((user, password))
 
     def find_by_credentials(
         self, email: Email, password: Password

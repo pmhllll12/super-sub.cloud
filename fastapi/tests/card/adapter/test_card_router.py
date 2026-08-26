@@ -1,6 +1,9 @@
 """card/adapter/inbound/api/v1/card_router.py — 계약 문서 3장."""
 
 from app.card.adapter.outbound.stub.card_stub_repository import DEMO_SLUG
+from uuid import UUID
+
+from app.core.security import issue_access_token
 from tests.conftest import V1, error_code
 
 
@@ -16,8 +19,13 @@ class TestMyCard:
         assert error_code(res) == "UNAUTHORIZED"
 
     def test_카드가_없는_사용자면_404(self, client):
-        forged = "Bearer stub-token-for-00000000-0000-4000-8000-000000000000"
-        res = client.get(f"{V1}/me/card", headers={"Authorization": forged})
+        # 예전에는 "Bearer stub-token-for-<uuid>" 를 손으로 적어 넣었다. 토큰에
+        # 서명이 없어서 가능했던 것이고, **그건 곧 아무나 남의 id 로 인증할 수
+        # 있었다는 뜻이다.** 이제는 서명된 토큰을 실제로 발급해서 쓴다.
+        token = issue_access_token(UUID("00000000-0000-4000-8000-000000000000"))
+        res = client.get(
+            f"{V1}/me/card", headers={"Authorization": f"Bearer {token}"}
+        )
         assert res.status_code == 404
         assert error_code(res) == "CARD_NOT_FOUND"
 

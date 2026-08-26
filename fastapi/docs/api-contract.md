@@ -1,24 +1,34 @@
 # API 계약 초안 — 인증 · 선수 카드
 
-> **상태:** 구현됨 — **단 전부 스텁(고정 응답)이고 DB에 붙지 않는다** · 2026-08-25 확인
-> **확인:** `cd fastapi && .venv/bin/pytest` → `60 passed`
+> **상태:** 구현됨 — **인증은 PostgreSQL에 붙었고, 카드는 아직 스텁이다** · 2026-08-26 확인
+> **확인:** `cd fastapi && .venv/bin/pytest` → `80 passed`
+> (DB가 없는 환경에서는 `72 passed, 8 skipped`. 통합 테스트만 건너뛴다)
 > **메모:** 스프린트 2(09.01~)의 Flutter 화면 두 개(로그인 · 선수 카드)에 필요한
-> 최소 범위. 응답 형태는 확정이고 **값만 고정**이다. 실제 조회는 DB가 생긴 뒤에 채운다.
+> 최소 범위. **응답 형태는 2026-08-25 이후 바뀌지 않았다** — 화면 쪽에서 고칠 것은 없다.
 
-## 스텁이 받아주는 값
+| 엔드포인트 | 상태 |
+|---|---|
+| `POST /auth/signup` · `POST /auth/login` · `GET /me` | **실제 DB** — 아무 계정이나 가입해서 쓸 수 있다 |
+| `GET /me/card` · `GET /cards/{slug}` | 스텁(고정 응답). 아래 슬러그만 성공한다 |
 
-지금은 아래만 성공하고 나머지는 계약대로 실패한다. **에러 경로도 눌러볼 수 있게**
-일부러 좁게 잡았다.
+## 눌러볼 수 있는 값
 
 | | |
 |---|---|
-| 이메일 | `demo@super-sub.example` |
-| 비밀번호 | `supersub2026` |
-| 공개 카드 슬러그 | `hong-gildong-4f2a` |
+| 데모 이메일 | `demo@super-sub.example` |
+| 데모 비밀번호 | `supersub2026` |
+| 공개 카드 슬러그 | `hong-gildong-4f2a` (스텁) |
 
-`/docs`(Swagger UI)에도 같은 안내가 떠 있다. 정의는 각 컨텍스트의
-`adapter/outbound/stub_repository.py`에 있고 DB가 붙으면 그 파일들이 사라진다 — 갈아끼우는 지점은
-각 컨텍스트의 `dependencies.py` 다.
+**인증은 이제 실제 DB다.** 위 데모 계정은 개발 DB에 넣어 둔 실물이고,
+`POST /auth/signup`으로 **새 계정을 만들어 그걸로 로그인해도 된다.**
+새 계정은 소속 팀이 없으므로 `GET /me`의 `teams`가 **빈 배열**로 온다 —
+빈 배열이 정상 상태라는 점을 화면에서 확인해 둘 것.
+
+카드는 아직 스텁이라 위 슬러그만 성공한다. 정의는
+`app/card/adapter/outbound/stub/card_stub_repository.py`에 있고, DB가 붙으면
+그 디렉터리째 사라진다 — 갈아끼우는 지점은 `app/card/dependencies/` 다.
+
+`/docs`(Swagger UI)에도 같은 안내가 떠 있다.
 
 대상: **백성검**(이 API를 호출하는 쪽), **박민호**(범위 판단). 스키마는 내가 소유한다.
 

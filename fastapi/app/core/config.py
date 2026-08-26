@@ -19,6 +19,12 @@ class Settings(BaseSettings):
 
     app_env: str = "local"
 
+    # --- 인증 ---------------------------------------------------------------
+    # 🔴 비어 있으면 토큰을 발급하지 않는다(503). 조용한 기본값을 두면 그 값으로
+    #    서명된 토큰을 누구나 만들 수 있으므로, 없으면 크게 실패하는 편이 낫다.
+    #    운영 값은 배포 환경의 비밀 저장소에서 주입한다.
+    jwt_secret: str = ""
+
     # --- Aurora PostgreSQL (pgvector) ---
     rds_host: str = ""
     rds_port: int = 5432

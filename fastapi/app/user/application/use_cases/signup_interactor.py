@@ -16,6 +16,7 @@ from app.user.application.ports.output.user_port import UserPort
 from app.user.domain.entities.user_entity import UserEntity
 from app.user.domain.value_objects.email_vo import Email
 from app.user.domain.value_objects.nickname_vo import Nickname
+from app.user.domain.value_objects.password_vo import Password
 
 
 class SignupInteractor(SignupUseCase):
@@ -27,14 +28,14 @@ class SignupInteractor(SignupUseCase):
         if self._repository.email_exists(email):
             raise ApiError(409, "EMAIL_ALREADY_EXISTS", "이미 가입된 이메일입니다.")
 
-        # 스텁이라 저장하지 않는다. 비밀번호도 아직 해싱하지 않는다 — 저장할 곳이
-        # 없기 때문이고, DB 가 붙을 때 Password 에서 bcrypt 해시를 만든다.
         entity = UserEntity(
             id=uuid4(),
             email=email,
             nickname=Nickname.of(command.nickname),
             created_at=datetime.now(timezone.utc),
         )
+        # 어떻게 보관하는지(해싱)는 저장소의 사정이다. 여기서는 평문을 넘긴다.
+        self._repository.create(entity, Password(command.password))
         return SignupResult(
             id=entity.id,
             email=str(entity.email),

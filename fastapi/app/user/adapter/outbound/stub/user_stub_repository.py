@@ -69,6 +69,13 @@ class StubUserRepository(UserPort):
     def email_exists(self, email: Email) -> bool:
         return email == Email.of(DEMO_EMAIL)
 
+    def create(self, user: UserEntity, password: Password) -> None:
+        """스텁은 고정 데이터라 저장하지 않는다.
+
+        가입 응답 형태를 확인하는 데는 이걸로 충분하다. **실제로 저장되는지는
+        DB 를 붙인 테스트(`tests/user/adapter/test_auth_db.py`)가 검사한다.**
+        """
+
     def find_by_credentials(
         self, email: Email, password: Password
     ) -> UserEntity | None:

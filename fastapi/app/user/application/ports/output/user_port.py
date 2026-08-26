@@ -23,6 +23,17 @@ class UserPort(ABC):
         """이미 가입된 이메일인지."""
 
     @abstractmethod
+    def create(self, user: UserEntity, password: Password) -> None:
+        """사용자와 자격증명을 함께 저장한다.
+
+        **평문 비밀번호를 받는다.** 어떻게 보관할지(해싱 방식)는 저장소의 사정이지
+        유스케이스가 알 일이 아니다 — 알고리즘을 바꿔도 이 위쪽은 그대로다.
+
+        이메일이 이미 있으면 409 로 떨어진다. 유스케이스가 `email_exists` 로 먼저
+        확인하지만, 동시 요청 두 건은 그 검사만으로 막지 못하므로 저장소도 막는다.
+        """
+
+    @abstractmethod
     def find_by_credentials(
         self, email: Email, password: Password
     ) -> UserEntity | None:
