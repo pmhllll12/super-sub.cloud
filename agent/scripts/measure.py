@@ -8,7 +8,7 @@
 문장이 아니라 수치만 필요하다.
 
 --limb은 임팩트를 정의할 사지다(루브릭의 kinematics.impact_limb과 같은 값).
-축구 슈팅은 leg, 농구 슛·배구 스파이크·테니스 서브는 arm이다.
+축구 슈팅은 leg, 농구 슛·야구 투구는 arm이다.
 """
 
 from __future__ import annotations
@@ -37,6 +37,11 @@ def main() -> None:
         choices=["extension_peak", "distal_apex"],
         help="임팩트로 삼을 사건 (루브릭의 kinematics.impact_event와 같은 값)",
     )
+    ap.add_argument(
+        "--side", default="auto", choices=["auto", "left", "right"],
+        help="스윙 측(던지는 팔·차는 발). 자동 판별은 팔 종목에서 약하다 "
+             "— identify_limb 참고",
+    )
     ap.add_argument("--fps", type=int, default=15)
     args = ap.parse_args()
 
@@ -46,9 +51,10 @@ def main() -> None:
 
     # 사지별 유효 프레임 비율 — 어느 쪽 임계로 갈지 판단하는 근거다.
     for limb in ("leg", "arm"):
+        side = args.side if limb == args.limb else "auto"
         try:
-            ratio = check_quality(pose.keypoints, limb=limb)
-            print(f"  {limb:<4} 유효 프레임 {ratio:.0%}")
+            ratio = check_quality(pose.keypoints, limb=limb, side=side)
+            print(f"  {limb:<4} 유효 프레임 {ratio:.0%} (스윙 측 {side})")
         except InsufficientQuality as exc:
             print(f"  {limb:<4} 품질 미달 — {exc}")
 
@@ -57,13 +63,14 @@ def main() -> None:
 
     try:
         features = extract_features(
-            pose.keypoints, pose.objects, args.limb, args.event
+            pose.keypoints, pose.objects, args.limb, args.event, args.side
         )
     except InsufficientQuality as exc:
         print(f"\n측정 불가: {exc}")
         raise SystemExit(2) from exc
 
     print(f"\n[측정] impact_limb={args.limb} impact_event={args.event} "
+          f"swing_side={args.side} "
           f"· 임팩트 {features['impact_frame']}프레임 "
           f"({pose.frame_to_seconds(int(features['impact_frame'])):.2f}초)")
     print(json.dumps(features, ensure_ascii=False, indent=2))

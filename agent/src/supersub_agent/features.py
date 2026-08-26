@@ -40,8 +40,8 @@ LIMB_NAMES = {"leg": "하반신", "arm": "상반신"}
 # 임팩트를 어느 사건으로 정의할지. 루브릭의 kinematics.impact_event가 고른다.
 #
 #   extension_peak — 스윙 관절의 신전 각속도가 최대인 프레임.
-#       채찍처럼 말단을 던지는 동작. 축구 슈팅, 농구 점프슛, 배구 스파이크,
-#       테니스 서브, 야구 투구가 여기 속한다.
+#       채찍처럼 말단을 던지는 동작. 축구 슈팅, 농구 점프슛, 야구 투구가
+#       여기 속한다.
 #   distal_apex    — 스윙 체인 말단(손/발)이 가장 높이 올라간 프레임.
 #       **들어올려 놓는** 동작. 농구 레이업이 대표적이다 — 팔꿈치를 채지 않고
 #       공을 림까지 들고 가므로 신전 각속도 피크가 릴리스가 아니라 팔을 들기
@@ -58,6 +58,37 @@ MIN_CONFIDENCE = 0.3
 # 다리는 0.3에서도 안정적이라 그대로 둔다.
 LIMB_MIN_CONFIDENCE = {"leg": 0.3, "arm": 0.6}
 
+# 골반·어깨 축을 각도로 쓸 수 있는 최소 투영 길이 (어깨너비 = 1.0 기준).
+#
+# 몸통이 카메라를 향하면 좌우 두 점이 겹쳐 보여 축이 짧아지고, 그 각도는 작은
+# 키포인트 오차에도 크게 흔들린다. 야구 투구 실클립에서 골반 축이 0.44로 줄어든
+# 프레임이 분리각 81.2도를 냈다 — 축이 제대로 보이는 프레임에서는 49.9도였다.
+MIN_AXIS_LENGTH = 0.6
+
+# 지표별 물리적으로 가능한 범위. 벗어난 값은 등급이 아니라 **측정 실패**로 뺀다.
+#
+# 밴드를 양끝에서 닫아도(scoring._parse_bands) 그것만으로는 부족하다. 닫힌 밴드는
+# 범위 밖 값을 0등급으로 떨어뜨리는데, 측정이 깨진 것을 "못한 것"으로 채점하는
+# 셈이기 때문이다. 촬영 조건으로 선수를 감점하지 않는다는 원칙(도구 미검출 처리)이
+# 여기에도 그대로 적용된다 — 잴 수 없었으면 그 항목을 빼고 나머지로 채점한다.
+#
+# 각도 지표의 상한 180은 기하학적 최대다(joint_angle은 arccos 기반이라 0~180).
+# 나머지는 사람 몸에서 나올 수 있는 범위로 잡되, 실측 분포가 쌓이면 다시 본다.
+PLAUSIBLE_RANGE: dict[str, tuple[float, float]] = {
+    "plant_knee_angle_at_impact": (0.0, 180.0),
+    "swing_knee_angle_at_impact": (0.0, 180.0),
+    "swing_elbow_angle_at_impact": (0.0, 180.0),
+    "support_elbow_angle_at_impact": (0.0, 180.0),
+    # 상체가 앞뒤로 90도를 넘으면 뒤집힌 자세다 — 측정이 깨진 것으로 본다.
+    "trunk_forward_lean_deg_at_impact": (-90.0, 90.0),
+    # 준비~임팩트 구간의 골반 축 회전. 축 기준(mod 180)이라 180이 상한이다.
+    "hip_rotation_range_deg": (0.0, 180.0),
+    # 두 축의 차이를 -90~90으로 접은 절대값.
+    "hip_shoulder_separation_deg": (0.0, 90.0),
+    "swing_hip_flexion_after_impact_deg": (0.0, 180.0),
+    "swing_shoulder_flexion_after_impact_deg": (0.0, 180.0),
+}
+
 # 도구가 검출된 영상에서만 나오는 지표. 이 모듈이 산출할 수 있다는 선언이며,
 # verify_rubric_coverage가 이 목록만 면제한다 (루브릭 오타는 계속 걸린다).
 TOOL_DEPENDENT_METRICS = frozenset({"plant_foot_to_ball_offset"})
@@ -68,6 +99,8 @@ LIMB_DEPENDENT_METRICS = frozenset({
     "swing_elbow_angle_at_impact",
     "support_elbow_angle_at_impact",
     "swing_shoulder_flexion_after_impact_deg",
+    # 어깨·골반 네 점이 모두 잡힌 프레임에서만 나온다.
+    "hip_shoulder_separation_deg",
 })
 
 
@@ -141,12 +174,30 @@ def normalize_track(track: np.ndarray, kps: np.ndarray) -> np.ndarray:
     return out
 
 
-def valid_frames(kps: np.ndarray, limb: str = "leg") -> np.ndarray:
+def _axis_deg(vec: np.ndarray) -> np.ndarray:
+    """방향 벡터를 **축 각도**(0~180)로 바꾼다.
+
+    골반·어깨처럼 좌우 두 점을 잇는 선은 방향이 아니라 축이다 — 좌우 라벨이
+    뒤바뀌어도 같은 자세이므로, 벡터 각도로 다루면 라벨 스왑이 180도 회전으로
+    잘못 읽힌다 (야구 투구 실클립에서 실제로 발생).
+    """
+    return np.degrees(np.arctan2(vec[:, 1], vec[:, 0])) % 180.0
+
+
+def valid_frames(
+    kps: np.ndarray, limb: str = "leg", chain: Chain | None = None
+) -> np.ndarray:
     """해당 사지 키포인트를 신뢰할 수 있는 프레임 마스크 (T,).
 
     사람이 검출되지 않은 프레임은 pose.py가 신뢰도 0으로 채우므로 여기서 걸린다.
+
+    chain을 주면 그 체인의 세 관절만 본다. 좌우 양쪽을 모두 요구하면 한쪽이
+    가려진 동작이 통째로 막히기 때문이다 (check_quality 참고).
     """
-    joints = sorted({j for chain in LIMB_CHAINS[limb].values() for j in chain})
+    if chain is None:
+        joints = sorted({j for c in LIMB_CHAINS[limb].values() for j in c})
+    else:
+        joints = sorted(set(chain))
     threshold = LIMB_MIN_CONFIDENCE[limb]
     return (kps[:, joints, 2] >= threshold).all(axis=1)
 
@@ -178,19 +229,38 @@ def _apex_frame(height: np.ndarray, usable: np.ndarray) -> int:
 
 
 def check_quality(
-    kps: np.ndarray, min_valid_ratio: float = 0.7, limb: str = "leg"
+    kps: np.ndarray,
+    min_valid_ratio: float = 0.7,
+    limb: str = "leg",
+    side: str = "auto",
 ) -> float:
-    """해당 사지 키포인트의 유효 프레임 비율을 반환한다."""
-    ratio = float(valid_frames(kps, limb).mean())
+    """**스윙 측** 사지 키포인트의 유효 프레임 비율을 반환한다.
+
+    좌우 양쪽을 함께 요구하지 않는다. 야구 투구 실클립(2160×3840 25fps, 투구
+    구간 3.6초)에서 던지는 팔은 98%인데 글러브 팔이 50%라 전체로는 48%가 되어
+    반려됐다 — 와인드업에서 글러브가 반대쪽 손을 덮기 때문이며, 촬영을 다시
+    해도 사라지지 않는 가림이다. 투구 루브릭이 근거로 쓰는 지표는 모두 던지는
+    팔에서 나오므로, 쓰지도 않는 팔 때문에 98%짜리 입력을 버리게 된다.
+
+    지지 측은 여기서 막지 않고 **지표 단위로** 빠진다 (LIMB_DEPENDENT_METRICS).
+    농구 점프슛처럼 지지 팔(가이드 핸드)을 실제로 채점하는 루브릭은 그 지표가
+    빠지면서 해당 항목이 판정에서 제외되고 가중치가 재정규화된다.
+    """
+    # 스윙 측 판별은 **정규화 후** 좌표로 한다. 원좌표에서는 몸 전체의 이동이
+    # 좌우 이동량에 함께 실려 반대쪽을 스윙으로 집는다.
+    swing, _ = identify_limb(normalize(kps), limb, side)
+    ratio = float(valid_frames(kps, limb, swing).mean())
     if ratio < min_valid_ratio:
         raise InsufficientQuality(
-            f"{LIMB_NAMES[limb]} 키포인트 유효 프레임 비율 {ratio:.0%} < "
+            f"{LIMB_NAMES[limb]} 스윙 측 키포인트 유효 프레임 비율 {ratio:.0%} < "
             f"기준 {min_valid_ratio:.0%}. 재촬영이 필요하다."
         )
     return ratio
 
 
-def identify_limb(kps: np.ndarray, limb: str = "leg") -> tuple[Chain, Chain]:
+def identify_limb(
+    kps: np.ndarray, limb: str = "leg", side: str = "auto"
+) -> tuple[Chain, Chain]:
     """(스윙 측, 지지 측) 관절 체인을 판별한다.
 
     스윙 측은 말단 관절(발목/손목)이 더 크게 움직인 쪽이다. 축구에서는 차는
@@ -198,8 +268,28 @@ def identify_limb(kps: np.ndarray, limb: str = "leg") -> tuple[Chain, Chain]:
 
     실클립에서 공 궤적이 이 판별을 뒷받침했다 — 디딤발로 지목된 쪽이 공 옆에
     붙어 있고(간격 일정), 차는 발로 지목된 쪽이 공으로 빠르게 접근했다.
+
+    **팔 종목에서는 이 자동 판별이 약하다.** 실클립 세 건으로 확인한 것:
+
+      - 야구 투구: 던지는 왼팔 18.2 대 글러브 오른팔 27.6으로 **뒤집힌다.**
+        12.5fps에서 릴리스는 두 프레임 안에 끝나 경로가 짧은 반면, 글러브 팔은
+        내내 크게 돌기 때문이다. 잘못 잡힌 관절이 프레임마다 튀며 경로를 쌓는
+        것도 더해진다(글러브 팔 신뢰도 0.3~0.6).
+      - 농구 레이업: 16.30 대 16.09로 **1% 차이**로 갈린다. 맞는 쪽을 골랐지만
+        근거라고 하기 어려운 차이다.
+
+    본 프레임만 세거나 관측 비율로 할인하거나 손 높이로 바꿔 봐도, 세 클립을
+    동시에 맞히는 통계는 찾지 못했다(야구를 맞히면 레이업이 뒤집힌다). 그래서
+    자동 판별은 그대로 두고 **side로 지정할 수 있게** 열어 둔다 — 던지는 팔·차는
+    발은 업로드하는 사람이 아는 값이고, 틀리면 조용히 반대쪽을 채점하게 된다.
     """
     chains = LIMB_CHAINS[limb]
+    if side in ("left", "right"):
+        other = "right" if side == "left" else "left"
+        return chains[side], chains[other]
+    if side != "auto":
+        raise ValueError(f"side는 auto·left·right 중 하나여야 한다: {side!r}")
+
     xy = kps[:, :, :2]
 
     def travel(chain: Chain) -> float:
@@ -221,9 +311,9 @@ def chain_series(kps: np.ndarray, chain: Chain) -> np.ndarray:
     )
 
 
-def identify_legs(kps: np.ndarray) -> tuple[int, int]:
+def identify_legs(kps: np.ndarray, side: str = "auto") -> tuple[int, int]:
     """(차는 다리, 디딤발)의 무릎 인덱스. identify_limb의 다리 전용 래퍼."""
-    swing, support = identify_limb(kps, "leg")
+    swing, support = identify_limb(kps, "leg", side)
     return swing[1], support[1]
 
 
@@ -260,7 +350,9 @@ def segment_phases(
         swing = LIMB_CHAINS["leg"]["left" if swing == L_KNEE else "right"]
 
     series = chain_series(kps, swing)
-    usable = valid_frames(kps, limb) & np.isfinite(series)
+    # 임팩트는 스윙 측 관절로 정의한다. 반대쪽이 가려진 프레임까지 후보에서
+    # 빼면 임팩트가 실제 지점 밖으로 밀린다 (야구 투구 실클립).
+    usable = valid_frames(kps, limb, swing) & np.isfinite(series)
     if event == "extension_peak":
         impact = _peak_frame(np.gradient(series), usable)
     else:
@@ -303,6 +395,7 @@ def extract_features(
     objects: dict[str, np.ndarray] | None = None,
     impact_limb: str = "leg",
     impact_event: str = "extension_peak",
+    swing_side: str = "auto",
 ) -> dict[str, float | int]:
     """루브릭이 요구하는 지표를 모두 산출한다.
 
@@ -313,21 +406,27 @@ def extract_features(
     (scoring.Rubric.applicable_criteria).
 
     impact_limb은 임팩트를 정의할 사지다 (루브릭의 kinematics.impact_limb).
-    축구 슈팅은 다리, 농구 슛·테니스 스트로크는 팔이다. 어느 쪽이든 다리·팔
+    축구 슈팅은 다리, 농구 슛·야구 투구는 팔이다. 어느 쪽이든 다리·팔
     지표를 **둘 다** 산출하고, 루브릭이 measured_by로 쓸 것을 고른다.
 
     impact_event는 임팩트로 삼을 사건이다 (루브릭의 kinematics.impact_event).
     채찍질하는 동작은 extension_peak, 들어올려 놓는 동작은 distal_apex다.
+
+    swing_side는 스윙 측을 직접 지정한다("left"/"right"). 기본값 "auto"는
+    이동량으로 판별하는데, 팔 종목에서는 이 판별이 약하다(identify_limb 참고).
+    던지는 팔·차는 발을 아는 사람이 지정하면 그 실패를 없앨 수 있다.
     """
     if impact_limb not in LIMB_CHAINS:
         raise ValueError(
             f"impact_limb은 {sorted(LIMB_CHAINS)} 중 하나여야 한다: {impact_limb!r}"
         )
 
-    check_quality(kps, limb=impact_limb)
+    check_quality(kps, limb=impact_limb, side=swing_side)
     norm = normalize(kps)
-    swing_knee, plant_knee = identify_legs(norm)
-    swing_chain, support_chain = identify_limb(norm, impact_limb)
+    swing_knee, plant_knee = identify_legs(
+        norm, swing_side if impact_limb == "leg" else "auto"
+    )
+    swing_chain, support_chain = identify_limb(norm, impact_limb, swing_side)
     phases = segment_phases(norm, swing_chain, impact_limb, impact_event)
     t = phases.impact
 
@@ -345,23 +444,47 @@ def extract_features(
     trunk = shoulder_c - hip_c
     trunk_lean = float(np.degrees(np.arctan2(trunk[0], -trunk[1])))
 
-    # 골반 회전 — 좌우 골반 벡터 방향각의 백스윙~임팩트 구간 변화폭.
+    # 골반 회전 — 골반 축 방향의 백스윙~임팩트 구간 변화폭.
     #
-    # **각도를 언랩하고 유효 프레임만 본다.** arctan2는 -180~180을 돌려주므로
-    # 골반이 그 경계에 걸치면 ptp가 360에 가까운 값을 낸다 — 농구 클립에서
-    # 실제 회전 12.7도가 359.0도로 나왔다. 축구 클립도 방향각이 -172~178이라
-    # 경계 위에 있었고, 값이 멀쩡했던 것은 구간이 우연히 경계를 안 넘어서다.
+    # **벡터가 아니라 축으로 본다(mod 180).** 좌우 골반을 잇는 벡터로 재면
+    # 몸이 돌아 좌/우 키포인트 라벨이 뒤바뀌는 순간 각도가 180도 점프한다 —
+    # 야구 투구 실클립에서 프레임 6→7에 -4.5도 → -183.8도로 뛰었고, 실제 회전
+    # 83도가 181.1도로 부풀어 **오측정이 최고 등급 장점이 됐다.** 골반의 방향은
+    # 축이므로 좌우가 뒤집혀도 같은 자세다. mod 180으로 접으면 이 점프가 사라진다.
+    #
+    # 언랩은 그대로 필요하다. 접은 각도도 0~180 경계를 넘나들면 ptp가 부풀고,
     # 미검출 프레임은 골반 벡터가 (0,0)이라 각도가 0으로 튀므로 함께 제외한다.
     leg_usable = valid_frames(norm, "leg")
-    hip_vec = xy[:, L_HIP] - xy[:, R_HIP]
-    hip_angle = np.arctan2(hip_vec[:, 1], hip_vec[:, 0])
+    hip_axis = _axis_deg(xy[:, L_HIP] - xy[:, R_HIP])
+    shoulder_axis = _axis_deg(xy[:, L_SHOULDER] - xy[:, R_SHOULDER])
     tb_start, tb_end = phases.takeback
     span_idx = [f for f in range(tb_start, tb_end + 1) if leg_usable[f]]
     if len(span_idx) >= 2:
-        unwrapped = np.degrees(np.unwrap(hip_angle[span_idx]))
+        unwrapped = np.unwrap(hip_axis[span_idx], period=180.0)
         hip_rotation_range = float(np.ptp(unwrapped))
     else:
         hip_rotation_range = 0.0
+
+    # 골반-어깨 분리 — 골반이 얼마나 **먼저** 열렸는가.
+    #
+    # 회전량(위)과 다른 값이다. 회전량은 몸이 화면에서 돈 총량이라 카메라를 등지고
+    # 도는 동작에서 커지기만 하고, "골반이 먼저 열리고 상체가 뒤따랐는가"는 담지
+    # 못한다. 야구 루브릭의 hip_shoulder_separation 항목이 뜻하는 것은 이쪽이다.
+    #
+    # 두 축의 차이를 -90~90으로 접어 절대값을 쓰고, 준비 구간의 **최댓값**을
+    # 취한다 — 분리는 앞발이 닿는 즈음 최대가 되고 릴리스에서 다시 좁혀진다.
+    #
+    # **몸통이 카메라를 향한 프레임은 뺀다.** 투영된 축이 짧아질수록 그 각도는
+    # 불안정해진다 — 야구 투구 실클립에서 골반 축 길이가 0.44(정면)로 줄어든
+    # 프레임이 분리각 81.2도를 냈다. 같은 클립의 축이 제대로 보이는 프레임에서는
+    # 49.9도였다. 2D 투영으로 잴 수 없는 구간이므로 값을 만들지 않는다.
+    trunk_ok = (
+        (norm[:, [L_SHOULDER, R_SHOULDER, L_HIP, R_HIP], 2] >= MIN_CONFIDENCE).all(axis=1)
+        & (np.linalg.norm(xy[:, L_HIP] - xy[:, R_HIP], axis=1) >= MIN_AXIS_LENGTH)
+        & (np.linalg.norm(xy[:, L_SHOULDER] - xy[:, R_SHOULDER], axis=1) >= MIN_AXIS_LENGTH)
+    )
+    sep = np.abs((shoulder_axis - hip_axis + 90.0) % 180.0 - 90.0)
+    sep_idx = [f for f in range(tb_start, tb_end + 1) if trunk_ok[f]]
 
     # 팔로스루 — 임팩트 후 차는 다리 고관절 굴곡이 얼마나 더 진행됐는가.
     def hip_flexion(frame: int) -> float:
@@ -394,16 +517,26 @@ def extract_features(
         "impact_frame": int(t),
     }
 
+    # 몸통 키포인트가 부실하면 분리각을 내지 않는다 — 도구 미검출과 같은 규약으로
+    # 그 지표를 쓰는 항목만 판정에서 빠지고, 남은 항목으로 가중치가 재정규화된다.
+    if len(sep_idx) >= 2:
+        features["hip_shoulder_separation_deg"] = round(float(sep[sep_idx].max()), 1)
+
     # 팔 지표 — 다리와 구조가 같다. 임팩트를 다리로 정의한 종목에서도 함께
     # 산출한다(상체 자세를 근거로 삼는 항목이 있을 수 있다). 신뢰도가 낮으면
     # NaN이 되므로 판정 근거로 쓰기 전에 걸러야 한다.
-    arm_swing, arm_support = identify_limb(norm, "arm")
+    arm_swing, arm_support = identify_limb(
+        norm, "arm", swing_side if impact_limb == "arm" else "auto"
+    )
     arm_swing_series = chain_series(norm, arm_swing)
     arm_support_series = chain_series(norm, arm_support)
-    arm_usable = valid_frames(norm, "arm") & np.isfinite(arm_swing_series)
+    arm_usable = valid_frames(norm, "arm", arm_swing) & np.isfinite(arm_swing_series)
+    arm_support_usable = valid_frames(norm, "arm", arm_support)
     if arm_usable[t]:
         features["swing_elbow_angle_at_impact"] = round(float(arm_swing_series[t]), 1)
-        if np.isfinite(arm_support_series[t]):
+        # 지지 팔은 스윙 팔과 따로 본다. 야구 투구처럼 글러브가 반대쪽 손을
+        # 덮는 동작에서는 이 지표만 빠지고 나머지는 그대로 나온다.
+        if arm_support_usable[t] and np.isfinite(arm_support_series[t]):
             features["support_elbow_angle_at_impact"] = round(
                 float(arm_support_series[t]), 1
             )
@@ -444,7 +577,21 @@ def extract_features(
             offset_x = abs(float(xy[t, plant_ankle][0] - ball_at_impact[0]))
             features["plant_foot_to_ball_offset"] = round(offset_x, 2)
 
-    return features
+    return _drop_implausible(features)
+
+
+def _drop_implausible(features: dict[str, float | int]) -> dict[str, float | int]:
+    """물리적으로 불가능한 측정값을 뺀다 — 0등급이 아니라 미측정으로 다룬다.
+
+    야구 투구 실클립에서 골반 회전 181.1도가 "40도 이상"이라는 열린 밴드에 걸려
+    **최고 등급 장점으로 표시됐다.** 라벨 스왑에서 온 오측정이었다. 정의를 고쳐
+    그 원인은 없앴지만, 다음 오측정도 같은 경로로 새어 나가지 않게 막는다.
+    """
+    return {
+        k: v for k, v in features.items()
+        if k not in PLAUSIBLE_RANGE
+        or PLAUSIBLE_RANGE[k][0] <= float(v) <= PLAUSIBLE_RANGE[k][1]
+    }
 
 
 def verify_rubric_coverage(rubric, features: dict) -> None:
@@ -456,7 +603,9 @@ def verify_rubric_coverage(rubric, features: dict) -> None:
     다만 **이 모듈이 산출할 수 있다고 선언한 것**만 면제한다. 루브릭에 오타가
     나면 선언 목록에 없으므로 여전히 걸린다.
     """
-    optional = TOOL_DEPENDENT_METRICS | LIMB_DEPENDENT_METRICS
+    # PLAUSIBLE_RANGE의 지표는 범위 밖이면 빠질 수 있으므로 함께 면제한다.
+    # **이름이 정확히 일치하는 것만** 면제되므로 루브릭 오타는 그대로 걸린다.
+    optional = TOOL_DEPENDENT_METRICS | LIMB_DEPENDENT_METRICS | PLAUSIBLE_RANGE.keys()
     missing = rubric.required_metrics() - features.keys() - optional
     if missing:
         raise ValueError(

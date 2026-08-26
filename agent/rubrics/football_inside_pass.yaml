@@ -18,6 +18,10 @@ motion: inside_pass
 sport_ko: 축구
 motion_ko: 인사이드 패스
 version: 0.1
+# status: 사용자 선택지에 올릴지 여부 — active만 오른다.
+#   draft는 파일은 갖추었으나 아직 열지 않은 동작이다. 임계값 검수 여부는
+#   review_required가 따로 들고 있다 (두 축은 다르다: 열려 있어도 검수 전일 수
+#   있고, 검수가 끝나도 범위 밖이라 닫아 둘 수 있다).
 status: draft
 review_required: true
 pipeline_version: pose-v0.1
@@ -41,7 +45,7 @@ criteria:
       0: "겨누지 않은 발"
     bands:
       metric: plant_foot_to_ball_offset
-      2: [[null, 0.4]]
+      2: [[0, 0.4]]
       1: [[0.4, 0.75]]
       0: [[0.75, null]]
     grades:
@@ -135,7 +139,7 @@ criteria:
     bands:
       metric: hip_rotation_range_deg
       2: [[15, 35]]
-      1: [[8, 15], [35, null]]
+      1: [[8, 15], [35, 180]]
       0: [[null, 8]]
     grades:
       2: "백스윙~임팩트 구간 골반 회전 15~35도"
@@ -166,7 +170,7 @@ criteria:
     bands:
       metric: swing_hip_flexion_after_impact_deg
       2: [[8, 25]]
-      1: [[3, 8], [25, null]]
+      1: [[3, 8], [25, 180]]
       0: [[null, 3]]
     grades:
       2: "임팩트 후 고관절 굴곡 8~25도 추가 진행 (짧고 방향성 있는 마무리)"

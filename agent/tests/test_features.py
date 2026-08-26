@@ -200,7 +200,7 @@ def _with_arm_swing(seq: np.ndarray) -> np.ndarray:
 
 
 def test_arm_limb_shares_the_leg_machinery():
-    """팔도 같은 위상 분할 로직으로 돈다 — 농구·테니스가 열리는 지점."""
+    """팔도 같은 위상 분할 로직으로 돈다 — 농구·야구가 열리는 지점."""
     seq = _with_arm_swing(build_sequence())
 
     swing, support = F.identify_limb(F.normalize(seq), "arm")
@@ -224,6 +224,64 @@ def test_arm_metrics_are_dropped_when_arm_is_unreliable():
     assert "swing_knee_angle_at_impact" in feats, "다리 지표는 그대로 나온다"
 
 
+def _hide_support_arm(seq: np.ndarray, noise: float = 60.0) -> np.ndarray:
+    """지지(오른) 팔을 가려진 것처럼 만든다 — 낮은 신뢰도 + 튀는 좌표.
+
+    야구 투구 실클립의 글러브 팔이 이렇다. 와인드업에서 글러브가 반대쪽 손을
+    덮어 신뢰도가 0.3~0.6으로 떨어지고, 그 프레임의 좌표는 프레임마다 튄다.
+    """
+    out = seq.copy()
+    rng = np.random.default_rng(0)
+    joints = [F.R_SHOULDER, F.R_ELBOW, F.R_WRIST]
+    hidden = np.flatnonzero(np.arange(len(out)) % 2 == 1)   # 절반이 가려진다
+    idx = np.ix_(hidden, joints)
+    coords = out[idx]
+    coords[:, :, :2] += rng.normal(0.0, noise, (len(hidden), len(joints), 2))
+    coords[:, :, 2] = 0.35
+    out[idx] = coords
+    return out
+
+
+def test_gate_looks_at_the_swing_side_only():
+    """지지 팔이 가려져도 스윙 팔이 보이면 분석한다.
+
+    야구 투구 실클립(투구 구간 3.6초)에서 던지는 팔은 98%인데 글러브 팔이 50%라
+    양쪽을 함께 요구하면 48%로 반려됐다. 투구 루브릭이 쓰는 지표는 모두 던지는
+    팔에서 나오므로, 쓰지도 않는 팔 때문에 입력을 버리게 된다.
+    """
+    seq = _hide_support_arm(_with_arm_swing(build_sequence()))
+
+    assert F.check_quality(seq, limb="arm", side="left") >= 0.7
+
+    feats = extract_features(seq, None, impact_limb="arm", swing_side="left")
+    assert "swing_elbow_angle_at_impact" in feats
+    assert "support_elbow_angle_at_impact" not in feats, "가려진 팔 지표는 빠진다"
+
+
+def test_swing_side_can_be_given_explicitly():
+    """스윙 측을 지정하면 자동 판별을 쓰지 않는다.
+
+    자동 판별은 이동량으로 고르는데 팔 종목에서 약하다 — 야구 투구 실클립에서
+    던지는 왼팔 18.2 대 글러브 오른팔 27.6으로 뒤집혔고, 농구 레이업은 16.30
+    대 16.09로 1% 차이였다(identify_limb 참고). 던지는 팔을 아는 사람이
+    지정하면 그 실패가 사라진다.
+    """
+    # 오른팔이 크게 튀어 자동 판별이 오른팔을 스윙으로 집는 시퀀스.
+    seq = _hide_support_arm(_with_arm_swing(build_sequence()), noise=200.0)
+    norm = F.normalize(seq)
+    assert F.identify_limb(norm, "arm")[0] == F.LIMB_CHAINS["arm"]["right"]
+
+    swing, support = F.identify_limb(norm, "arm", "left")
+
+    assert swing == F.LIMB_CHAINS["arm"]["left"]
+    assert support == F.LIMB_CHAINS["arm"]["right"]
+
+
+def test_unknown_swing_side_is_rejected():
+    with pytest.raises(ValueError, match="side"):
+        F.identify_limb(F.normalize(build_sequence()), "leg", "왼쪽")
+
+
 def test_hip_rotation_survives_angle_wraparound():
     """골반이 ±180 경계에 걸쳐도 회전량이 부풀지 않는다.
 
@@ -242,6 +300,70 @@ def test_hip_rotation_survives_angle_wraparound():
     assert extract_features(rotated)["hip_rotation_range_deg"] == pytest.approx(
         baseline, abs=0.2
     )
+
+
+def test_hip_rotation_survives_left_right_label_swap():
+    """좌우 골반 라벨이 뒤바뀌어도 회전량이 180도 부풀지 않는다.
+
+    몸이 돌아 등을 보이면 포즈 모델의 좌/우 배정이 뒤집힌다. 골반을 벡터로
+    다루면 그 순간 각도가 180도 점프한다 — 야구 투구 실클립에서 프레임 6→7에
+    -4.5도 → -183.8도로 뛰었고, 실제 회전 83도가 181.1도로 부풀어 **오측정이
+    최고 등급 장점으로 표시됐다.** 골반은 방향이 아니라 축이다.
+    """
+    seq = build_sequence()
+    vec = seq[:, F.L_HIP, :2] - seq[:, F.R_HIP, :2]
+
+    # 축 각도는 양 끝점을 맞바꿔도 그대로다.
+    assert F._axis_deg(vec) == pytest.approx(F._axis_deg(-vec))
+
+    swapped = seq.copy()
+    half = len(swapped) // 2
+    swapped[half:, [F.L_HIP, F.R_HIP]] = swapped[half:, [F.R_HIP, F.L_HIP]]
+
+    # 스왑은 다리 체인의 몸통쪽 관절을 바꾸므로 임팩트 프레임이 조금 달라지고,
+    # 그만큼 구간도 달라진다. 여기서 막으려는 것은 그 오차가 아니라 **180도가
+    # 통째로 실리는 것**이다.
+    swapped_range = extract_features(swapped)["hip_rotation_range_deg"]
+    assert swapped_range < 90.0, f"라벨 스왑이 회전량에 실렸다: {swapped_range}"
+
+
+def test_separation_is_dropped_when_torso_faces_the_camera():
+    """몸통이 정면이면 분리각을 내지 않는다 — 잴 수 없는 값을 만들지 않는다.
+
+    투영된 축이 짧아질수록 각도는 작은 오차에도 크게 흔들린다. 야구 투구
+    실클립에서 골반 축 길이가 0.44로 줄어든 프레임이 분리각 81.2도를 냈다
+    (축이 제대로 보이는 프레임에서는 49.9도).
+    """
+    seq = build_sequence()
+    assert "hip_shoulder_separation_deg" in extract_features(seq)
+
+    # 골반 두 점을 중앙으로 모아 축을 짧게 만든다 = 골반이 카메라를 향한 상태.
+    # 어깨는 정규화 스케일(어깨너비 중앙값)이라 함께 줄이면 상쇄되므로 놔둔다.
+    facing = seq.copy()
+    mid = (facing[:, F.L_HIP, :2] + facing[:, F.R_HIP, :2]) / 2.0
+    for j in (F.L_HIP, F.R_HIP):
+        facing[:, j, :2] = mid + (facing[:, j, :2] - mid) * 0.2
+
+    feats = extract_features(facing)
+    assert "hip_shoulder_separation_deg" not in feats
+    assert "swing_knee_angle_at_impact" in feats, "다리 지표는 그대로 나온다"
+
+
+def test_implausible_measurements_are_dropped_not_graded():
+    """물리적으로 불가능한 값은 0등급이 아니라 미측정으로 빠진다.
+
+    닫힌 밴드만으로는 부족하다 — 범위 밖 값을 0등급으로 떨어뜨리면 측정이 깨진
+    것을 "못한 것"으로 채점하게 된다. 촬영 조건으로 선수를 감점하지 않는다는
+    원칙(도구 미검출 처리)이 여기에도 적용된다.
+    """
+    ok = {"hip_rotation_range_deg": 34.0, "swing_knee_angle_at_impact": 152.0}
+    assert F._drop_implausible(dict(ok)) == ok
+
+    broken = {**ok, "hip_rotation_range_deg": 181.1}
+    dropped = F._drop_implausible(broken)
+
+    assert "hip_rotation_range_deg" not in dropped
+    assert dropped["swing_knee_angle_at_impact"] == 152.0, "나머지는 남는다"
 
 
 def test_unknown_limb_is_rejected():

@@ -20,58 +20,58 @@ permalink: /07-개발구현계획/
 
 애자일 스크럼 방식으로 진행한다. 전체 개발 기간(2026.08.20 ~ 2026.10.27, 10주)을 **2주 단위 스프린트 5회**로 나누고, 스프린트마다 스프린트 계획 → 데일리 스탠드업 → 스프린트 리뷰 → 회고를 반복한다.
 
-> ⚠️ **이 부분 변경 필요** — 팀 역할이 바뀌었습니다. 저장소 `CLAUDE.md` 7~10줄이 최신입니다.
-> 이 문서의 담당자 표기를 **세 군데** 고쳐 주세요 — 아래 팀 역할 목록, 스프린트 로드맵
-> 표의 머리글, 그리고 스프린트별 칸반 카드의 이름표.
-> 고친 뒤 **다시 확인하고 이 안내 문단을 지워 주세요.**
+**팀 역할** (2026.08.26 재배정)
 
-**팀 역할**
-
-- 백성검 — PM (요구사항/일정 관리, 스프린트 진행, QA 총괄)
-- 정어진 — Flutter 개발 (앱 UI/UX, 화면 구현)
-- 박민호 — 데이터 파이프라인 (영상 수집·전처리, DB, 분석 파이프라인)
+- 박민호 — PM (요구사항/일정 관리, 스프린트 진행, QA 총괄)
+- 백성검 — 프론트·웹 (앱 UI/UX, 화면 구현, 웹 페이지)
+- 정어진 — 백엔드·파이프라인 (DB·API, 영상 수집·전처리, 분석 파이프라인, 배포)
 - 정상호 — AI 에이전트 개발 (RAG 검증, 실력 판단 로직)
 
 ### 스프린트 로드맵
 
-| Sprint | 기간 | 목표 | 백성검(PM) | 정어진(Flutter) | 박민호(파이프라인) | 정상호(에이전트) |
+| Sprint | 기간 | 목표 | 박민호(PM) | 백성검(프론트·웹) | 정어진(백엔드·파이프라인) | 정상호(에이전트) |
 |---|---|---|---|---|---|---|
 | [1]({{ "/스프린트1/" | relative_url }}) | 08.20 ~ 08.31 | 요구사항 확정, 개발환경 구축 | 요구사항/일정 확정, 백로그 작성 | 프로젝트 초기 셋업, 화면 설계 | DB 스키마 설계, 데이터 수집 방안 | 에이전트 아키텍처 리서치 |
-| 2 | 09.01 ~ 09.14 | 핵심 기능 프로토타입 | 스프린트 진행, 중간 점검 | 로그인/선수 카드 화면 구현 | 영상 전처리 파이프라인 구축 | RAG 검증 로직 프로토타입 |
-| 3 | 09.15 ~ 09.28 | 기능 고도화 | 진행 점검, 리스크 관리 | 매칭/구인 플로우 구현 | 영상 분석 모델 연동 | 실력 검증·적합도 판단 모델 고도화 |
-| 4 | 09.29 ~ 10.12 | 통합 및 테스트 | 통합 테스트 총괄, QA | 백엔드 연동, 버그 수정 | 파이프라인 성능 튜닝 | 에이전트 정확도 검증(Hit Rate/Recall) |
-| 5 | 10.13 ~ 10.27 | 마무리 및 배포 준비 | 최종 점검, 발표 준비 | 앱 배포 빌드 | 운영 환경 배포 | 최종 검증 및 튜닝 |
+| 2 | 09.01 ~ 09.14 | 핵심 기능 프로토타입 | 스프린트 진행, 중간 점검 | 로그인/선수 카드 화면 구현 | API 규격 확정, 영상 전처리 파이프라인 구축 | RAG 검증 로직 프로토타입 |
+| 3 | 09.15 ~ 09.28 | 기능 고도화 | 진행 점검, 리스크 관리 | 매칭/구인 플로우 구현 | 영상 분석 모델 연동, 벡터 저장·검색 | 실력 검증·적합도 판단 모델 고도화 |
+| 4 | 09.29 ~ 10.12 | 통합 및 테스트 | 통합 테스트 총괄, QA | 화면 통합, 버그 수정 | 파이프라인 성능 튜닝, 추천 API | 에이전트 정확도 검증(Hit Rate/Recall) |
+| 5 | 10.13 ~ 10.27 | 마무리 및 배포 준비 | 최종 점검, 발표 준비 | 앱 배포 빌드, 웹 페이지 마감 | 운영 환경 배포 | 최종 검증 및 튜닝 |
+
+백엔드와 파이프라인이 정어진 한 사람에게 묶여 있다. API 규격과 색인 스키마가 각각 백성검·정상호의 착수 조건이므로, 이 영역은 **구현보다 규격을 먼저 낸다.**
 
 ### 현재 스프린트 칸반 보드 (Sprint 1 · 08.20 ~ 08.31)
 
 <div class="kanban-board">
   <div class="kanban-column">
     <h4>Backlog</h4>
-    <div class="kanban-card"><span class="role-tag role-pm">백성검·PM</span>기능 우선순위 백로그 정리</div>
-    <div class="kanban-card"><span class="role-tag role-flutter">정어진·Flutter</span>선수 카드 컴포넌트 와이어프레임</div>
-    <div class="kanban-card"><span class="role-tag role-pipeline">박민호·파이프라인</span>영상 저장소(스토리지) 후보 조사</div>
+    <div class="kanban-card"><span class="role-tag role-pm">박민호·PM</span>기능 우선순위 백로그 정리</div>
+    <div class="kanban-card"><span class="role-tag role-front">백성검·프론트/웹</span>선수 카드 컴포넌트 와이어프레임</div>
+    <div class="kanban-card"><span class="role-tag role-backend">정어진·백엔드/파이프라인</span>영상 저장소(스토리지) 후보 조사</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>RAG 검증 평가지표 설계(Hit Rate/Recall@5)</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>골든셋 라벨링 후 QWK 측정</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>포즈 추출 최적화 — 입력 해상도 하향 시 키포인트 품질 영향 검토</div>
-    <div class="kanban-card"><span class="role-tag role-pm">백성검·PM</span>골든셋 라벨링 지도자 섭외(미결 2번)</div>
+    <div class="kanban-card"><span class="role-tag role-pm">박민호·PM</span>골든셋 라벨링 지도자 섭외(미결 2번)</div>
   </div>
   <div class="kanban-column">
     <h4>To Do</h4>
-    <div class="kanban-card"><span class="role-tag role-pm">백성검·PM</span>스프린트 2 계획 회의 준비</div>
-    <div class="kanban-card"><span class="role-tag role-flutter">정어진·Flutter</span>Flutter 프로젝트 초기 셋업</div>
-    <div class="kanban-card"><span class="role-tag role-pipeline">박민호·파이프라인</span>DB 스키마 초안 작성</div>
+    <div class="kanban-card"><span class="role-tag role-pm">박민호·PM</span>스프린트 2 계획 회의 준비</div>
+    <div class="kanban-card"><span class="role-tag role-front">백성검·프론트/웹</span>Flutter 프로젝트 인수 — 화면 구현 이어받기</div>
+    <div class="kanban-card"><span class="role-tag role-backend">정어진·백엔드/파이프라인</span>DB 스키마 초안 작성</div>
+    <div class="kanban-card"><span class="role-tag role-backend">정어진·백엔드/파이프라인</span>API 규격 초안 회람 (백성검·정상호 착수 조건)</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>루브릭 지도자 검수 요청(임계값·칭호 문구 확정)</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>측정값 MySQL 적재(analysis_metric_value)</div>
   </div>
   <div class="kanban-column">
     <h4>In Progress</h4>
-    <div class="kanban-card"><span class="role-tag role-pm">백성검·PM</span>요구사항 정의서 작성</div>
-    <div class="kanban-card"><span class="role-tag role-pipeline">박민호·파이프라인</span>생활체육 경기 영상 데이터 수집 방안 검토</div>
+    <div class="kanban-card"><span class="role-tag role-pm">박민호·PM</span>요구사항 정의서 작성</div>
+    <div class="kanban-card"><span class="role-tag role-backend">정어진·백엔드/파이프라인</span>생활체육 경기 영상 데이터 수집 방안 검토</div>
   </div>
   <div class="kanban-column">
     <h4>Done</h4>
-    <div class="kanban-card"><span class="role-tag role-pm">백성검·PM</span>제안서 사이트(목차/구조) 확정</div>
-    <div class="kanban-card"><span class="role-tag role-pm">백성검·PM</span>GitHub 레포 및 Pages 배포 파이프라인 구축</div>
+    <div class="kanban-card"><span class="role-tag role-pm">박민호·PM</span>역할 재배정 확정 (08.26) — 로드맵·칸반 반영</div>
+    <div class="kanban-card"><span class="role-tag role-front">백성검·프론트/웹</span>제안서 사이트(목차/구조) 확정</div>
+    <div class="kanban-card"><span class="role-tag role-front">백성검·프론트/웹</span>GitHub 레포 및 Pages 배포 파이프라인 구축</div>
+    <div class="kanban-card"><span class="role-tag role-backend">정어진·백엔드/파이프라인</span>Flutter 앱 골격·로그인·홈·영상 분석 화면 구현 (재배정 전 작업, 백성검에게 인계)</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>멀티모달 에이전트 아키텍처 리서치</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>에이전트 처리 흐름 설계</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>판정 모델 선정·실측 (EXAONE 4.0 1.2B, bf16)</div>
@@ -79,6 +79,7 @@ permalink: /07-개발구현계획/
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>실클립 전 구간 통과 — 4K 25fps 10.2초 클립 검증</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>등급 판정 코드 이관 — 루브릭 bands 도입, 경계값 오판 해소</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>선수 카드 칭호 체계 — 루브릭 titles</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>지원 범위 확정 — 축구·야구·농구 종목당 1동작(미결 3번 해소)</div>
   </div>
 </div>
 

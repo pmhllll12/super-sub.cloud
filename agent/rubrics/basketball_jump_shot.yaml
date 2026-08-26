@@ -1,21 +1,31 @@
 # 농구 점프슛 채점 루브릭
 #
 # ⚠️ 임계값은 **지도자 검수 전 임시값**이다 (미결 항목 2번).
-# ⚠️ **실클립 미검증** — validated_on이 비어 있다. 파이프라인이 이 종목 영상에서
-#    지표를 제대로 뽑는지 아직 확인하지 않았다.
+# ⚠️ **임팩트 정의 재검토 필요** — 실클립에서 측정은 통과했으나(validated_on),
+#    신전 각속도 피크가 릴리스가 아니라 신전 **중간**에 잡힌다 (미결 5번).
 #
 # 레이업(basketball_layup.yaml)과 임팩트 정의가 다르다. 점프슛은 팔꿈치를 채서
-# 공을 던지는 동작이라 축구 인스텝과 구조가 같고, 신전 각속도 피크가 곧 릴리스다.
+# 공을 던지는 동작이라 축구 인스텝과 구조가 같다고 보고 extension_peak을 골랐는데,
+# 실클립에서는 팔을 던지는 동작이 축구의 발 접촉과 달리 피크 이후에도 신전이
+# 이어졌다. 야구 투구도 같다.
 
 sport: basketball
 motion: jump_shot
 sport_ko: 농구
 motion_ko: 점프슛
 version: 0.1
-status: draft
+# status: 사용자 선택지에 올릴지 여부 — active만 오른다.
+#   draft는 파일은 갖추었으나 아직 열지 않은 동작이다. 임계값 검수 여부는
+#   review_required가 따로 들고 있다 (두 축은 다르다: 열려 있어도 검수 전일 수
+#   있고, 검수가 끝나도 범위 밖이라 닫아 둘 수 있다).
+status: active
 review_required: true
 pipeline_version: pose-v0.1
-validated_on: ""
+validated_on: >-
+  실클립 1건 (점프슛, 73프레임). 측정까지 통과 (2026-08-26). 야구 투구와 같은
+  문제가 있다 — extension_peak이 신전 중간(팔꿈치 112.7도)을 잡는다. 품질 게이트를
+  스윙 측으로 좁히기 전에는 지지 팔이 가려진 프레임이 후보에서 함께 빠지면서
+  릴리스에 가까운 39프레임(159.3도)이 잡혔는데, 그건 우연이었다 (미결 5번).
 
 kinematics:
   impact_limb: arm
@@ -101,7 +111,7 @@ criteria:
       0: "8도 미만 (릴리스 직후 정지)"
     bands:
       metric: swing_shoulder_flexion_after_impact_deg
-      2: [[20, null]]
+      2: [[20, 180]]
       1: [[8, 20]]
       0: [[null, 8]]
     anchors:
@@ -163,7 +173,7 @@ criteria:
       0: "140도 미만"
     bands:
       metric: swing_knee_angle_at_impact
-      2: [[160, null]]
+      2: [[160, 180]]
       1: [[140, 160]]
       0: [[null, 140]]
     anchors:
