@@ -63,10 +63,12 @@ header_pages:
 # built or served as part of this site. supersub-preview.service is the
 # systemd unit for the local preview server, not site content.
 # agent/ is the Python implementation of the AI analysis agent (see
-# chapter 6). flutter/ is the Flutter app implementation. Both are source
-# code, not site content — excluded from the build.
+# chapter 6). flutter/ is the Flutter app implementation. fastapi/ is the
+# backend API server source. All three are source code, not site
+# content — excluded from the build.
 exclude:
   - demo/
   - agent/
   - flutter/
   - supersub-preview.service
+  - fastapi/

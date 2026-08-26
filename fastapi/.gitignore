@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 환경변수 — 실제 값이 들어가는 파일은 커밋하지 않는다.
+# .env.example 만 커밋한다 (팀 super-sub.cloud 저장소와 같은 규칙).
+.env
+.env.local
+
+# 개인 노트 / 에디터
+.idea/
+.vscode/

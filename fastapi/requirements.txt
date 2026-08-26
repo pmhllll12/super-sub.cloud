@@ -1,0 +1,10 @@
+# Super-Sub 백엔드 API 의존성
+#
+# 여기는 직접 쓰는 것만 적는다. 실제로 깔린 전체 버전은 requirements.lock.txt 에 있다.
+# 의존성을 바꾸면 다시 고정한다:
+#   .venv/bin/pip freeze > requirements.lock.txt
+
+fastapi
+uvicorn[standard]
+pydantic-settings
+pydantic[email]      # EmailStr — 계약의 INVALID_EMAIL 검증에 필요하다
