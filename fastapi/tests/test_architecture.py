@@ -156,3 +156,26 @@ class TestSharedModules:
         assert not strays, (
             "공용 모듈은 app/core/ 에 둔다. 루트에 남은 파일:\n  " + "\n  ".join(strays)
         )
+
+
+class TestOrmRegistration:
+    def test_모든_ORM_이_alembic_env_에_등록돼_있다(self):
+        """등록이 빠진 모델은 Alembic 에게 "DB 에만 있는 테이블"로 보인다.
+
+        `--autogenerate` 가 그런 테이블에 **DROP TABLE 을 만든다.** 인접 저장소에서
+        13개 테이블이 삭제 후보가 된 적이 있다. 사람이 기억하는 대신 여기서 막는다.
+
+        등록을 `app/core/database.py` 가 아니라 `alembic/env.py` 가 하는 이유는
+        `app/core/` 가 컨텍스트를 임포트하면 안 되기 때문이다(위 TestSharedModules).
+        """
+        env = (APP.parent / "alembic" / "env.py").read_text(encoding="utf-8")
+        missing = []
+        for path in sorted(APP.rglob("*_orm.py")):
+            if "__pycache__" in path.parts:
+                continue
+            if path.stem not in env:
+                missing.append(str(path.relative_to(APP.parent)).replace("\\", "/"))
+        assert not missing, (
+            "alembic/env.py 에 등록되지 않은 ORM 이 있다 — DROP TABLE 이 생성된다:\n  "
+            + "\n  ".join(missing)
+        )

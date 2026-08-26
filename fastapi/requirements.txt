@@ -8,3 +8,14 @@ fastapi
 uvicorn[standard]
 pydantic-settings
 pydantic[email]      # EmailStr — 계약의 INVALID_EMAIL 검증에 필요하다
+
+# --- DB ---------------------------------------------------------------------
+sqlalchemy           # 2.x. 동기로 쓴다 — 라우터·인터랙터가 전부 def 다
+psycopg[binary]      # psycopg3. SQLAlchemy URL 에 +psycopg 를 붙여야 한다
+alembic              # 스키마 변경
+
+# --- 인증 (해싱·JWT 교체 작업에서 쓴다) ---------------------------------------
+# passlib 을 쓰지 않는다 — bcrypt 4.x/5.x 버전 감지에서 깨진 사례가 있어
+# bcrypt 를 직접 호출한다.
+bcrypt
+pyjwt[crypto]        # crypto 는 구글 ID 토큰(RS256) 검증에 필요해진다
