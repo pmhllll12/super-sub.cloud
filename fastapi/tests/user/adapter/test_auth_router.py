@@ -99,6 +99,7 @@ class TestOpenApi:
             "/health",
             f"{V1}/auth/signup",
             f"{V1}/auth/login",
+            f"{V1}/auth/google",
             f"{V1}/me",
             f"{V1}/me/card",
             V1 + "/cards/{public_slug}",

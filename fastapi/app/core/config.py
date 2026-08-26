@@ -25,6 +25,16 @@ class Settings(BaseSettings):
     #    운영 값은 배포 환경의 비밀 저장소에서 주입한다.
     jwt_secret: str = ""
 
+    # 구글 ID 토큰의 aud 로 허용할 클라이언트 ID 들. 쉼표로 구분한다.
+    # 🔴 **안드로이드·iOS·웹이 각각 다른 클라이언트 ID 를 받는다.** 하나만 넣으면
+    #    나머지 플랫폼의 토큰이 aud 불일치로 전부 거부된다.
+    # 비어 있으면 구글 로그인이 503 으로 떨어진다 — 조용히 통과시키지 않는다.
+    google_client_ids: str = ""
+
+    @property
+    def google_audiences(self) -> list[str]:
+        return [c.strip() for c in self.google_client_ids.split(",") if c.strip()]
+
     # --- Aurora PostgreSQL (pgvector) ---
     rds_host: str = ""
     rds_port: int = 5432

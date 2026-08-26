@@ -83,6 +83,21 @@ class StubUserRepository(UserPort):
             return _USER
         return None
 
+    def find_by_identity(self, provider: str, subject: str) -> UserEntity | None:
+        """스텁에는 연결된 외부 계정이 없다. 항상 "처음 온 사람"으로 답한다."""
+        return None
+
+    def find_by_email(self, email: Email) -> UserEntity | None:
+        return _USER if email == Email.of(DEMO_EMAIL) else None
+
+    def link_identity(self, user_id: UUID, provider: str, subject: str) -> None:
+        """스텁은 저장하지 않는다."""
+
+    def create_with_identity(
+        self, user: UserEntity, provider: str, subject: str
+    ) -> None:
+        """스텁은 저장하지 않는다."""
+
     def get(self, user_id: UUID) -> UserEntity | None:
         return _USER if user_id == DEMO_USER_ID else None
 

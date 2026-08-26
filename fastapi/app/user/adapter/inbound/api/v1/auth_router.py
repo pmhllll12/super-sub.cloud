@@ -9,13 +9,19 @@ from __future__ import annotations
 from fastapi import APIRouter, status
 
 from app.user.adapter.inbound.api.schemas.auth_schema import (
+    GoogleLoginSchema,
     LoginSchema,
     SignupResponse,
     SignupSchema,
     TokenResponse,
 )
-from app.user.application.dtos.login_dto import LoginCommand, LoginResult
+from app.user.application.dtos.login_dto import (
+    GoogleLoginCommand,
+    LoginCommand,
+    LoginResult,
+)
 from app.user.application.dtos.signup_dto import SignupCommand, SignupResult
+from app.user.dependencies.google_login_provider import GoogleLoginUseCaseDep
 from app.user.dependencies.login_provider import LoginUseCaseDep
 from app.user.dependencies.signup_provider import SignupUseCaseDep
 
@@ -36,3 +42,14 @@ def signup(body: SignupSchema, use_case: SignupUseCaseDep) -> SignupResult:
 @auth_router.post("/login", response_model=TokenResponse)
 def login(body: LoginSchema, use_case: LoginUseCaseDep) -> LoginResult:
     return use_case(LoginCommand(email=body.email, password=body.password))
+
+
+@auth_router.post("/google", response_model=TokenResponse)
+def google_login(
+    body: GoogleLoginSchema, use_case: GoogleLoginUseCaseDep
+) -> LoginResult:
+    """구글 ID 토큰으로 로그인한다. 처음이면 계정이 만들어진다.
+
+    응답은 비밀번호 로그인과 **같다** — 클라이언트는 이후 흐름을 하나로 유지한다.
+    """
+    return use_case(GoogleLoginCommand(id_token=body.id_token))

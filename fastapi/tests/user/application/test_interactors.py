@@ -54,6 +54,9 @@ class FakeUserRepository(UserPort):
         # 저장된 것을 눈으로 확인할 수 있게 남긴다. 인터랙터가 실제로 저장을
         # 호출하는지는 이 목록으로 검사한다.
         self.created: list[tuple[UserEntity, Password]] = []
+        # 외부 신원 쪽도 같은 방식으로 남긴다.
+        self.identities: dict[tuple[str, str], UserEntity] = {}
+        self.linked: list[tuple[UUID, str, str]] = []
 
     def email_exists(self, email: Email) -> bool:
         return email == Email.of(_EMAIL)
@@ -67,6 +70,22 @@ class FakeUserRepository(UserPort):
         if email == Email.of(_EMAIL) and password.value == _PASSWORD:
             return self.user
         return None
+
+    def find_by_identity(self, provider: str, subject: str) -> UserEntity | None:
+        return self.identities.get((provider, subject))
+
+    def find_by_email(self, email: Email) -> UserEntity | None:
+        return self.user if email == Email.of(_EMAIL) else None
+
+    def link_identity(self, user_id: UUID, provider: str, subject: str) -> None:
+        self.linked.append((user_id, provider, subject))
+        self.identities[(provider, subject)] = self.user
+
+    def create_with_identity(
+        self, user: UserEntity, provider: str, subject: str
+    ) -> None:
+        self.created.append((user, Password("")))
+        self.identities[(provider, subject)] = user
 
     def get(self, user_id: UUID) -> UserEntity | None:
         return self.user if user_id == _USER_ID else None

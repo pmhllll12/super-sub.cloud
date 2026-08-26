@@ -44,6 +44,32 @@ class UserPort(ABC):
         """
 
     @abstractmethod
+    def find_by_identity(self, provider: str, subject: str) -> UserEntity | None:
+        """외부 제공자 계정에 연결된 사용자. 없으면 None.
+
+        **이메일이 아니라 `subject` 로 찾는다** — 이메일은 바뀔 수 있다.
+        """
+
+    @abstractmethod
+    def find_by_email(self, email: Email) -> UserEntity | None:
+        """이메일로 사용자를 찾는다. 외부 신원을 기존 계정에 연결할 때만 쓴다."""
+
+    @abstractmethod
+    def link_identity(self, user_id: UUID, provider: str, subject: str) -> None:
+        """기존 사용자에게 외부 계정을 연결한다."""
+
+    @abstractmethod
+    def create_with_identity(
+        self, user: UserEntity, provider: str, subject: str
+    ) -> None:
+        """외부 계정으로 처음 들어온 사람을 만든다.
+
+        **비밀번호가 없다.** `user_credential` 행을 만들지 않으므로 이 계정은
+        비밀번호 로그인이 불가능하다 — 나중에 비밀번호를 설정하는 기능이 생기면
+        그때 자격증명을 추가한다.
+        """
+
+    @abstractmethod
     def get(self, user_id: UUID) -> UserEntity | None: ...
 
     @abstractmethod

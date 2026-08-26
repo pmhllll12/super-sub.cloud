@@ -26,6 +26,16 @@ class LoginSchema(BaseModel):
     password: str
 
 
+class GoogleLoginSchema(BaseModel):
+    """Flutter 의 `google_sign_in` 이 받아 온 ID 토큰을 그대로 넘긴다.
+
+    액세스 토큰(`access_token`)이 아니라 **ID 토큰**이다. 둘을 바꿔 보내면
+    서명 검증에서 401 이 난다.
+    """
+
+    id_token: str = Field(min_length=1)
+
+
 class SignupResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -31,6 +31,7 @@ from app.core.database import Base, sqlalchemy_url  # noqa: E402
 from app.user.adapter.outbound.orm import team_member_orm  # noqa: E402,F401
 from app.user.adapter.outbound.orm import team_orm  # noqa: E402,F401
 from app.user.adapter.outbound.orm import user_credential_orm  # noqa: E402,F401
+from app.user.adapter.outbound.orm import user_identity_orm  # noqa: E402,F401
 from app.user.adapter.outbound.orm import user_orm  # noqa: E402,F401
 # ---------------------------------------------------------------------------
 

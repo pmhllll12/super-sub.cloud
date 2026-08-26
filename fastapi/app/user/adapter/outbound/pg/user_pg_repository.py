@@ -25,6 +25,7 @@ from app.user.adapter.outbound.mappers.user_mapper import (
 from app.user.adapter.outbound.orm.team_member_orm import TeamMemberOrm
 from app.user.adapter.outbound.orm.team_orm import TeamOrm
 from app.user.adapter.outbound.orm.user_credential_orm import UserCredentialOrm
+from app.user.adapter.outbound.orm.user_identity_orm import UserIdentityOrm
 from app.user.adapter.outbound.orm.user_orm import UserOrm
 from app.user.application.ports.output.user_port import UserPort
 from app.user.domain.entities.membership_entity import MembershipEntity
@@ -110,6 +111,77 @@ class UserPgRepository(UserPort):
         if not verify_password(password.value, credential.password_hash):
             return None
         return to_user_entity(user_row)
+
+    def find_by_identity(self, provider: str, subject: str) -> UserEntity | None:
+        stmt = (
+            select(UserOrm)
+            .join(UserIdentityOrm, UserIdentityOrm.user_id == UserOrm.id)
+            .where(
+                UserIdentityOrm.provider == provider,
+                UserIdentityOrm.subject == subject,
+            )
+        )
+        row = self._session.execute(stmt).scalar_one_or_none()
+        return to_user_entity(row) if row is not None else None
+
+    def find_by_email(self, email: Email) -> UserEntity | None:
+        stmt = select(UserOrm).where(UserOrm.email == str(email))
+        row = self._session.execute(stmt).scalar_one_or_none()
+        return to_user_entity(row) if row is not None else None
+
+    def link_identity(self, user_id: UUID, provider: str, subject: str) -> None:
+        self._session.add(
+            UserIdentityOrm(
+                id=uuid4(),
+                user_id=user_id,
+                provider=provider,
+                subject=subject,
+                created_at=datetime.now(timezone.utc),
+            )
+        )
+        try:
+            self._session.commit()
+        except IntegrityError as exc:
+            self._session.rollback()
+            if _is_unique_violation(exc):
+                # 동시 요청 두 건이 같은 계정을 연결하려 한 경우다. 이미 연결돼
+                # 있다는 뜻이므로 호출 쪽이 다시 조회하면 된다.
+                raise ApiError(
+                    409, "IDENTITY_ALREADY_LINKED", "이미 연결된 계정입니다."
+                ) from exc
+            raise
+
+    def create_with_identity(
+        self, user: UserEntity, provider: str, subject: str
+    ) -> None:
+        self._session.add(
+            UserOrm(
+                id=user.id,
+                email=str(user.email),
+                nickname=str(user.nickname),
+                created_at=user.created_at,
+            )
+        )
+        try:
+            # user 를 먼저 내보내야 아래 외래키가 성립한다(create 와 같은 이유).
+            self._session.flush()
+            self._session.add(
+                UserIdentityOrm(
+                    id=uuid4(),
+                    user_id=user.id,
+                    provider=provider,
+                    subject=subject,
+                    created_at=datetime.now(timezone.utc),
+                )
+            )
+            self._session.commit()
+        except IntegrityError as exc:
+            self._session.rollback()
+            if _is_unique_violation(exc):
+                raise ApiError(
+                    409, "EMAIL_ALREADY_EXISTS", "이미 가입된 이메일입니다."
+                ) from exc
+            raise
 
     def get(self, user_id: UUID) -> UserEntity | None:
         row = self._session.get(UserOrm, user_id)

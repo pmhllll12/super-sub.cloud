@@ -28,6 +28,9 @@ _DESCRIPTION = f"""
 아래 데모 계정은 개발 DB에 넣어 둔 실제 계정입니다. **새로 가입해서 그 계정으로
 로그인해도 됩니다.** 다른 값은 계약대로 실패합니다.
 
+구글 로그인(`POST /auth/google`)은 **`id_token`**(access_token 아님)을 받습니다.
+서버에 `GOOGLE_CLIENT_IDS`가 없으면 503으로 떨어집니다.
+
 - 이메일 `{DEMO_EMAIL}` / 비밀번호 `{DEMO_PASSWORD}`
 - 공개 카드 슬러그 `{DEMO_SLUG}`
 
