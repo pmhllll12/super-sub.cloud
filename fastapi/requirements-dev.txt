@@ -1,0 +1,5 @@
+# 개발·테스트 전용. 배포에는 requirements.txt 만 쓴다.
+-r requirements.txt
+
+pytest
+httpx2         # starlette.testclient 가 요구한다 (httpx 는 deprecated 경고를 낸다)

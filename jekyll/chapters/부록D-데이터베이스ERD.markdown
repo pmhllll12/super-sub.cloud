@@ -7,10 +7,10 @@ permalink: /부록D-데이터베이스ERD/
 Super-Sub 플랫폼의 데이터 모델이다. 3장 서비스 기능과 5장 요구사항에서 도출했다.
 각자 담당 도메인부터 보면 된다.
 
-**33 테이블 · 6 도메인 · 1~3정규형 준수**
+**34 테이블 · 6 도메인 · 1~3정규형 준수**
 
 본 부록은 3장에서 정의한 서비스 기능과 5장 요구사항(SFR·SEC)에서 도출한 데이터 모델이다.
-33개 테이블을 6개 도메인으로 나누어 정리한다.
+34개 테이블을 6개 도메인으로 나누어 정리한다.
 
 제1정규형부터 제3정규형까지 준수한다. 비원자 값(jsonb), 이행 종속 컬럼, 파생·집계 컬럼을 두지
 않는다. 정규화 근거와 그에 따른 조회 비용은 D.4에서 다룬다.
@@ -34,14 +34,19 @@ D.3에 별도로 모았다.
 
 ![도메인 ① 사용자·팀 ERD]({{ "/assets/erd/domain1-user-team.svg" | relative_url }}){: class="erd-diagram" }
 
-> 위 그림에는 user_credential이 아직 반영되어 있지 않다. 표가 최신이다.
-> 컬럼은 `id uuid PK` · `user_id uuid FK→user` · `password_hash text` ·
-> `updated_at timestamptz` 넷이다.
+> 위 그림에는 user_credential과 user_identity가 아직 반영되어 있지 않다.
+> **표가 최신이다.** 그림은 좌표가 직접 박힌 수작업 SVG라 갱신 비용이 커서 미뤄 둔다.
+>
+> - `user_credential` — `id uuid PK` · `user_id uuid FK→user` · `password_hash text` ·
+>   `updated_at timestamptz`
+> - `user_identity` — `id uuid PK` · `user_id uuid FK→user` · `provider text` ·
+>   `subject text` · `created_at timestamptz`
 
 | 테이블 | 용도 | 1행이 뜻하는 것 |
 |---|---|---|
 | user | 계정과 신원 (SEC-003) | 가입한 사람 1명 |
 | user_credential | 로그인 자격증명. 비밀번호 해시를 user에 두지 않고 분리한다. 소셜 로그인을 추가할 때 user를 건드리지 않아도 되고, 자격증명 조회 경로를 따로 제한할 수 있다 | 한 사람의 자격증명 1건 |
+| user_identity | 외부 제공자(구글 등) 계정과의 연결. provider가 준 고유 ID(subject)를 그대로 보관한다. **이메일로 사람을 식별하지 않는다** — 이메일은 바뀔 수 있고 재사용될 수도 있다 | 한 사람의 한 제공자 연결 1건 |
 | team | 동호회 | 등록된 팀 1개 |
 | team_member | 소속과 역할. 탈퇴 후에도 경기·평가 이력이 남아야 하므로 left_at으로 소프트 삭제한다. 재가입이 가능하므로 joined_at을 함께 둔다 | 한 사람의 한 팀 소속 구간 1건 |
 | sport | 풋살·야구 종목 코드 | 종목 1개 (현재 2행) |
@@ -137,7 +142,7 @@ report·no_show는 review와 직접 이어지지 않는다. 제재를 평가 점
 
 ## D.3 도메인을 잇는 외래키
 
-도메인 경계를 넘는 외래키를 한곳에 모았다. 대부분이 user를 향하며, 이것이 33개 테이블을 한
+도메인 경계를 넘는 외래키를 한곳에 모았다. 대부분이 user를 향하며, 이것이 34개 테이블을 한
 장에 그릴 수 없는 이유다.
 
 | 출발 테이블 | 컬럼 | 도착 | 의미 |
@@ -235,8 +240,10 @@ SEC-006은 삭제 요청 시 원본과 파생물이 함께 삭제될 것을 요�
 user_title은 호칭 부여의 근거가 되는 지표를 참조한다. 근거가 삭제되면 호칭도 함께 회수되어야
 하므로 이 체인에 포함한다.
 
-계정 탈퇴는 별개의 경로다. user가 삭제되면 user_credential도 함께 삭제된다(ON DELETE CASCADE).
-자격증명은 계정에 완전히 종속되며 단독으로 남을 이유가 없다. 반면 team_member는 left_at으로
+계정 탈퇴는 별개의 경로다. user가 삭제되면 user_credential과 user_identity도 함께
+삭제된다(ON DELETE CASCADE). 자격증명과 외부 계정 연결은 계정에 완전히 종속되며 단독으로
+남을 이유가 없다. 특히 user_identity가 남으면 **같은 구글 계정으로 다시 가입할 때 사라진
+사용자를 가리키게 된다.** 반면 team_member는 left_at으로
 소프트 삭제하므로 이 연쇄에 넣지 않는다 — 경기·평가 이력이 참조하고 있다.
 
 ## D.7 주요 제약조건
@@ -247,6 +254,8 @@ user_title은 호칭 부여의 근거가 되는 지표를 참조한다. 근거�
 |---|---|---|
 | user | email | 계정 식별 |
 | user_credential | user_id | 사용자당 자격증명 1건 |
+| user_identity | (provider, subject) | 한 외부 계정이 두 사용자에 붙는 것을 막는다 |
+| user_identity | (user_id, provider) | 한 사용자가 같은 제공자를 두 번 연결하지 못하게 한다 |
 | position | (sport_code, code) | 포지션 약칭이 종목 간 겹칠 수 있다 |
 | video_validation | video_id | 영상당 검사 결과 1건 |
 | analysis_metric | analysis_job_id | 작업당 지표 집합 1건 |
