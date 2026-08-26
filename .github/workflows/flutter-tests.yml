@@ -1,0 +1,36 @@
+name: Flutter 테스트
+
+on:
+  push:
+    paths:
+      - "flutter/**"
+      - ".github/workflows/flutter-tests.yml"
+  pull_request:
+    paths:
+      - "flutter/**"
+      - ".github/workflows/flutter-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flutter
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          # 채널만 적으면 stable 이 올라갈 때마다 CI 결과가 달라진다.
+          # 로컬과 같은 버전으로 박는다 (pubspec 의 sdk 제약은 ^3.12.2).
+          flutter-version: "3.44.2"
+          channel: stable
+          cache: true
+
+      - name: 의존성
+        run: flutter pub get
+
+      # 위젯 테스트라 기기·에뮬레이터가 필요 없다. 안드로이드 SDK 도 안 쓴다.
+      - name: 테스트
+        run: flutter test

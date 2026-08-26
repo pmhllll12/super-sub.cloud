@@ -1,0 +1,80 @@
+name: 백엔드 테스트
+
+# `fastapi/` 가 바뀔 때만 돈다. 사이트 문서만 고친 커밋에서 파이썬 CI 가 도는 것은
+# 낭비이고, 무엇보다 **관계없는 실패가 쌓이면 아무도 안 보게 된다.**
+on:
+  push:
+    paths:
+      - "fastapi/**"
+      - ".github/workflows/backend-tests.yml"
+  pull_request:
+    paths:
+      - "fastapi/**"
+      - ".github/workflows/backend-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fastapi
+
+    # 🔴 **DB 를 띄운다.** 없어도 테스트는 초록색으로 끝나지만(통합 테스트가 skip 된다)
+    # 그러면 저장·조회를 한 줄도 검증하지 않는 CI 가 된다. 실제로 외래키 순서 버그를
+    # 잡아낸 것이 이 통합 테스트였다.
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: supersub
+          POSTGRES_PASSWORD: supersub_ci
+          POSTGRES_DB: supersub
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      APP_ENV: local
+      DATABASE_URL: postgresql://supersub:supersub_ci@127.0.0.1:5432/supersub
+      # 운영 값이 아니다. 없으면 토큰 발급이 503 이라 인증 테스트가 통째로 무너진다.
+      JWT_SECRET: ci-only-secret-not-for-deploy
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # 로컬과 같은 버전. requirements.lock.txt 를 이 버전에서 뽑았다.
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: fastapi/requirements.lock.txt
+
+      # lock 을 쓴다 — requirements-dev.txt 는 버전을 안 박아서 CI 와 로컬이 갈린다.
+      - name: 의존성 설치
+        run: pip install -r requirements.lock.txt
+
+      # 빈 DB 에 스키마를 만든다. create_all 이 아니라 마이그레이션이 정본이다.
+      - name: 마이그레이션
+        run: alembic upgrade head
+
+      - name: ORM 과 DB 가 일치하는가
+        run: alembic check
+
+      - name: 전체 테스트
+        run: pytest -q
+
+      # 🔴 이 단계가 이 워크플로의 핵심이다.
+      # `pytest` 는 DB 가 없으면 통합 테스트를 **skip 하고 초록색으로 끝난다.**
+      # 그러면 "통과했다"와 "DB 코드를 한 줄도 안 돌렸다"가 구별되지 않는다.
+      - name: DB 통합 테스트가 정말 돌았는지 확인
+        run: |
+          set -o pipefail
+          pytest -q -m db | tee /tmp/db-tests.txt
+          if grep -q "skipped" /tmp/db-tests.txt; then
+            echo "::error::DB 통합 테스트가 skip 됐다 — PostgreSQL 서비스에 못 붙었다는 뜻이다"
+            exit 1
+          fi
