@@ -8,7 +8,7 @@
 문장이 아니라 수치만 필요하다.
 
 --limb은 임팩트를 정의할 사지다(루브릭의 kinematics.impact_limb과 같은 값).
-축구 슈팅은 leg, 농구 슛·배구 스파이크·테니스 서브는 arm이다.
+축구 슈팅은 leg, 농구 슛·야구 투구는 arm이다.
 """
 
 from __future__ import annotations

@@ -125,7 +125,7 @@ class Rubric:
     grade_bands: dict[str, int]
     review_required: bool
     pipeline_version: str
-    # 임팩트를 정의할 사지 — "leg"(축구 슈팅) 또는 "arm"(농구 슛·테니스 스트로크).
+    # 임팩트를 정의할 사지 — "leg"(축구 슈팅) 또는 "arm"(농구 슛·야구 투구).
     # 루브릭이 선언하고 features.extract_features가 따른다.
     impact_limb: str = "leg"
     # 임팩트로 삼을 사건 — "extension_peak"(채찍질) 또는 "distal_apex"(들어올림).

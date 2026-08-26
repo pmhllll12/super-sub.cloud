@@ -200,7 +200,7 @@ def _with_arm_swing(seq: np.ndarray) -> np.ndarray:
 
 
 def test_arm_limb_shares_the_leg_machinery():
-    """팔도 같은 위상 분할 로직으로 돈다 — 농구·테니스가 열리는 지점."""
+    """팔도 같은 위상 분할 로직으로 돈다 — 농구·야구가 열리는 지점."""
     seq = _with_arm_swing(build_sequence())
 
     swing, support = F.identify_limb(F.normalize(seq), "arm")
