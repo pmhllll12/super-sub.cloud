@@ -101,5 +101,11 @@ class StubUserRepository(UserPort):
     def get(self, user_id: UUID) -> UserEntity | None:
         return _USER if user_id == DEMO_USER_ID else None
 
+    def update_nickname(self, user_id: UUID, nickname: Nickname) -> None:
+        """스텁은 고정 데이터라 저장하지 않는다.
+
+        응답 형태 확인에는 충분하다 — 실제로 반영되는지는 DB 테스트가 본다.
+        """
+
     def list_memberships(self, user_id: UUID) -> list[MembershipEntity]:
         return list(_MEMBERSHIPS)

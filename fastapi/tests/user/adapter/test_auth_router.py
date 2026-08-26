@@ -18,7 +18,8 @@ class TestHealth:
         res = client.get("/health")
         assert res.status_code == 200
         assert res.json()["status"] == "ok"
-        assert res.json()["stub"] is True
+        # 카드까지 DB 로 옮긴 뒤로 스텁 경로가 없다(2026-08-26).
+        assert res.json()["stub"] is False
 
 
 class TestLogin:

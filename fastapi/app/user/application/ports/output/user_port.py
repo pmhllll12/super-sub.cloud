@@ -14,6 +14,7 @@ from uuid import UUID
 from app.user.domain.entities.membership_entity import MembershipEntity
 from app.user.domain.entities.user_entity import UserEntity
 from app.user.domain.value_objects.email_vo import Email
+from app.user.domain.value_objects.nickname_vo import Nickname
 from app.user.domain.value_objects.password_vo import Password
 
 
@@ -71,6 +72,14 @@ class UserPort(ABC):
 
     @abstractmethod
     def get(self, user_id: UUID) -> UserEntity | None: ...
+
+    @abstractmethod
+    def update_nickname(self, user_id: UUID, nickname: Nickname) -> None:
+        """닉네임을 바꾼다. 없는 사용자면 아무 일도 하지 않는다.
+
+        존재 확인은 유스케이스가 이미 한다(없으면 401). 여기서 또 던지면 같은
+        판단이 두 곳에 생긴다.
+        """
 
     @abstractmethod
     def list_memberships(self, user_id: UUID) -> list[MembershipEntity]:
