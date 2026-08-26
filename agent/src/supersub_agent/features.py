@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -57,6 +58,20 @@ MIN_CONFIDENCE = 0.3
 # 그대로 섞여서다. 0.6으로 올리면 유효 73%로 줄지만 시계열이 매끄러워진다.
 # 다리는 0.3에서도 안정적이라 그대로 둔다.
 LIMB_MIN_CONFIDENCE = {"leg": 0.3, "arm": 0.6}
+
+# 품질 게이트가 요구할 관절 — 체인의 몸통쪽부터 몇 개인가 (check_quality).
+#
+#   arm 2 — 어깨·팔꿈치만 본다. 손목은 **프레임 단위로만** 반영한다(valid_frames).
+#       손목은 가려지기 쉬운데(투구 와인드업의 글러브, 슛의 공) 팔 루브릭이
+#       손목을 쓰는 곳은 팔꿈치각 하나뿐이다. 전 구간 70%를 요구하면 그 한
+#       지표 때문에 나머지를 통째로 버린다. 실측: 손목을 필수에서 빼면 최종
+#       산출이 야구 3,444클립에서 21.1%→70.8%, 농구 134클립에서 11.2%→39.6%로
+#       늘고, 두 조건 모두 통과한 클립의 측정값은 100% 동일했다.
+#   leg 3 — 발목까지 전부 요구한다. 무릎각이 joint_angle(엉덩이, 무릎, 발목)이라
+#       발목이 빠지면 각도 자체가 NaN이 되고, 임팩트를 그 각도의 신전 각속도
+#       피크로 정의하므로 임팩트마저 못 찾는다. 축구 17건에서 발목 신뢰도를
+#       0으로 만들자 17/17 전부 실패했다 — 팔과 달리 여기서는 뺄 수 없다.
+GATE_JOINTS = {"arm": 2, "leg": 3}
 
 # 골반·어깨 축을 각도로 쓸 수 있는 최소 투영 길이 (어깨너비 = 1.0 기준).
 #
@@ -185,14 +200,15 @@ def _axis_deg(vec: np.ndarray) -> np.ndarray:
 
 
 def valid_frames(
-    kps: np.ndarray, limb: str = "leg", chain: Chain | None = None
+    kps: np.ndarray, limb: str = "leg", chain: Sequence[int] | None = None
 ) -> np.ndarray:
     """해당 사지 키포인트를 신뢰할 수 있는 프레임 마스크 (T,).
 
     사람이 검출되지 않은 프레임은 pose.py가 신뢰도 0으로 채우므로 여기서 걸린다.
 
-    chain을 주면 그 체인의 세 관절만 본다. 좌우 양쪽을 모두 요구하면 한쪽이
-    가려진 동작이 통째로 막히기 때문이다 (check_quality 참고).
+    chain을 주면 그 관절들만 본다. 좌우 양쪽을 모두 요구하면 한쪽이 가려진
+    동작이 통째로 막히기 때문이다 (check_quality 참고). 체인 전체가 아니라
+    **앞 몇 관절만** 넘어오기도 한다 — 품질 게이트가 그렇게 쓴다(GATE_JOINTS).
     """
     if chain is None:
         joints = sorted({j for c in LIMB_CHAINS[limb].values() for j in c})
@@ -242,18 +258,26 @@ def check_quality(
     해도 사라지지 않는 가림이다. 투구 루브릭이 근거로 쓰는 지표는 모두 던지는
     팔에서 나오므로, 쓰지도 않는 팔 때문에 98%짜리 입력을 버리게 된다.
 
-    지지 측은 여기서 막지 않고 **지표 단위로** 빠진다 (LIMB_DEPENDENT_METRICS).
-    농구 점프슛처럼 지지 팔(가이드 핸드)을 실제로 채점하는 루브릭은 그 지표가
-    빠지면서 해당 항목이 판정에서 제외되고 가중치가 재정규화된다.
+    스윙 측에서도 **체인 전체를 요구하지 않는다.** 사지마다 몇 관절을 볼지는
+    GATE_JOINTS가 정한다 — 팔은 어깨·팔꿈치까지, 다리는 발목까지다. 팔에서
+    손목을 뺀 것은 그것이 팔꿈치각 하나에만 쓰이기 때문이고, 다리에서 발목을
+    남긴 것은 그것이 무릎각의 구성 요소라 빠지면 임팩트조차 못 찾기 때문이다.
+
+    게이트에서 빠진 관절(팔의 손목)은 **지표 단위로** 걸러진다 — 프레임별
+    valid_frames 마스크가 그대로 남아 있고, 산출되지 않은 지표는
+    LIMB_DEPENDENT_METRICS 규약에 따라 해당 채점 항목이 판정에서 제외되며
+    가중치가 재정규화된다. 지지 측 지표도 같은 경로로 처리된다.
     """
     # 스윙 측 판별은 **정규화 후** 좌표로 한다. 원좌표에서는 몸 전체의 이동이
     # 좌우 이동량에 함께 실려 반대쪽을 스윙으로 집는다.
     swing, _ = identify_limb(normalize(kps), limb, side)
-    ratio = float(valid_frames(kps, limb, swing).mean())
+    gate_chain = swing[:GATE_JOINTS[limb]]
+    ratio = float(valid_frames(kps, limb, gate_chain).mean())
     if ratio < min_valid_ratio:
         raise InsufficientQuality(
-            f"{LIMB_NAMES[limb]} 스윙 측 키포인트 유효 프레임 비율 {ratio:.0%} < "
-            f"기준 {min_valid_ratio:.0%}. 재촬영이 필요하다."
+            f"{LIMB_NAMES[limb]} 스윙 측 키포인트({len(gate_chain)}개 관절) "
+            f"유효 프레임 비율 {ratio:.0%} < 기준 {min_valid_ratio:.0%}. "
+            "재촬영이 필요하다."
         )
     return ratio
 

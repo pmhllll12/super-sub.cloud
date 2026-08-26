@@ -258,6 +258,71 @@ def test_gate_looks_at_the_swing_side_only():
     assert "support_elbow_angle_at_impact" not in feats, "가려진 팔 지표는 빠진다"
 
 
+def _thin_out(seq: np.ndarray, joints: list[int], ratio: float = 0.5) -> np.ndarray:
+    """해당 관절을 일정 비율의 프레임에서만 검출된 것으로 만든다.
+
+    전 구간을 0으로 만들지 않는 이유는 실제 상황이 그렇지 않아서다 — 손목은
+    가려졌다 보였다 한다. 완전히 0이면 게이트를 통과해도 임팩트를 못 찾는다.
+    """
+    out = seq.copy()
+    hidden = np.arange(len(out)) % 2 == 1 if ratio == 0.5 else \
+        np.arange(len(out)) >= int(len(out) * ratio)
+    out[np.ix_(np.flatnonzero(hidden), joints)] = np.concatenate(
+        [out[np.ix_(np.flatnonzero(hidden), joints)][:, :, :2],
+         np.zeros((int(hidden.sum()), len(joints), 1))], axis=2
+    )
+    return out
+
+
+def test_arm_gate_passes_when_only_the_wrist_is_thin():
+    """팔: 어깨·팔꿈치가 충분하면 손목이 부족해도 통과한다.
+
+    손목은 팔 루브릭에서 팔꿈치각 하나에만 쓰인다. 전 구간 70%를 요구하면 그
+    지표 하나 때문에 나머지를 통째로 버린다 — 야구 3,444클립에서 21.1%→70.8%,
+    농구 134클립에서 11.2%→39.6%로 갈린 지점이다.
+    """
+    seq = _thin_out(_with_arm_swing(build_sequence()), [F.L_WRIST])
+
+    swing = F.LIMB_CHAINS["arm"]["left"]
+    assert F.valid_frames(seq, "arm", swing).mean() < 0.7, "손목까지 보면 미달"
+    assert F.check_quality(seq, limb="arm", side="left") >= 0.7
+
+    feats = extract_features(seq, None, impact_limb="arm", swing_side="left")
+    assert "swing_elbow_angle_at_impact" in feats, "손목이 유효한 프레임에서 나온다"
+
+
+def test_arm_gate_still_fails_when_the_elbow_is_thin():
+    """팔: 팔꿈치가 부족하면 여전히 막는다 — 게이트가 느슨해지면 안 된다."""
+    seq = _thin_out(_with_arm_swing(build_sequence()), [F.L_ELBOW])
+
+    with pytest.raises(InsufficientQuality, match="유효 프레임 비율"):
+        F.check_quality(seq, limb="arm", side="left")
+
+
+def test_leg_gate_still_requires_the_ankle():
+    """다리: 발목이 부족하면 막는다 — 팔과 달리 여기서는 뺄 수 없다.
+
+    무릎각이 joint_angle(엉덩이, 무릎, 발목)이라 발목이 빠지면 각도 자체가
+    NaN이 되고, 임팩트를 그 각도의 신전 각속도 피크로 정의하므로 임팩트마저
+    못 찾는다. 축구 17건에서 발목 신뢰도를 0으로 만들자 17/17 전부 실패했다.
+    """
+    seq = _thin_out(build_sequence(), [F.L_ANKLE, F.R_ANKLE])
+
+    hip_knee = F.LIMB_CHAINS["leg"]["left"][:2]
+    assert F.valid_frames(seq, "leg", hip_knee).mean() >= 0.7, "엉덩이·무릎은 충분"
+
+    with pytest.raises(InsufficientQuality, match="유효 프레임 비율"):
+        F.check_quality(seq, limb="leg")
+
+
+def test_leg_gate_passes_on_normal_input():
+    """다리: 세 관절이 모두 충분하면 그대로 통과한다."""
+    seq = build_sequence()
+
+    assert F.check_quality(seq, limb="leg") >= 0.7
+    assert "swing_knee_angle_at_impact" in extract_features(seq)
+
+
 def test_swing_side_can_be_given_explicitly():
     """스윙 측을 지정하면 자동 판별을 쓰지 않는다.
 
