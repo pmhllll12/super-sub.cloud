@@ -79,6 +79,7 @@ permalink: /07-개발구현계획/
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>실클립 전 구간 통과 — 4K 25fps 10.2초 클립 검증</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>등급 판정 코드 이관 — 루브릭 bands 도입, 경계값 오판 해소</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>선수 카드 칭호 체계 — 루브릭 titles</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>지원 범위 확정 — 축구·야구·농구 종목당 1동작(미결 3번 해소)</div>
   </div>
 </div>
 

@@ -184,6 +184,8 @@ def run_pipeline(
             "label": rubric.label,
             "version": rubric.version,
             "review_required": rubric.review_required,
+            # 닫아 둔 동작을 키로 직접 돌린 결과인지 드러낸다.
+            "status": rubric.status,
             "validated_on": rubric.validated_on,
             "impact_limb": rubric.impact_limb,
             "impact_event": rubric.impact_event,
@@ -199,7 +201,12 @@ def run_pipeline(
 
 @app.get("/api/rubrics")
 def api_rubrics() -> JSONResponse:
-    """사용 가능한 루브릭 목록. UI의 종목 선택이 이걸 읽는다."""
+    """열려 있는 루브릭 목록. UI의 종목 선택이 이걸 읽는다.
+
+    status가 draft인 것은 빼고 내려준다 — 지금 여는 범위는 종목당 한 동작이다
+    (축구 인스텝 슈팅·야구 투구·농구 점프슛). 닫아 둔 동작도 키를 직접 주면
+    분석은 되므로, 검수·실측은 UI를 열지 않고도 계속 돌릴 수 있다.
+    """
     rubrics = discover_rubrics(RUBRIC_DIR)
     return JSONResponse({
         "default": DEFAULT_RUBRIC,
@@ -210,7 +217,7 @@ def api_rubrics() -> JSONResponse:
              # 실클립으로 확인된 루브릭인지. UI가 미검증 항목에 표시를 단다.
              "validated": bool(r.validated_on), "validated_on": r.validated_on,
              "criteria_count": len(r.criteria)}
-            for r in rubrics.values()
+            for r in rubrics.values() if r.is_active
         ],
     })
 

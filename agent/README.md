@@ -58,12 +58,43 @@ transformers 버전 창에만 맞는다 — 4.x에서는 `RopeParameters` import
 8GB에 들어가면서 네이티브인 것은 4.0 1.2B뿐이라 이것을 기본값으로 둔다
 (`judge.MODELS`). 3.5 계열은 항목으로 남겨 두었으나 쓰려면 버전 고정이 필요하다.
 
+## 지원 범위
+
+채점 기준은 **(종목, 동작) 단위**로만 쓸 수 있다. 같은 지표가 동작에 따라
+반대로 채점되기 때문이다 — 임팩트 시 무릎각 176도는 인스텝 슈팅에서 1등급,
+인사이드 패스에서는 0등급("패스가 아니라 슈팅 궤적")이다. 농구는 더 분명해서
+점프슛은 `extension_peak`, 레이업은 `distal_apex`로 임팩트로 삼는 프레임
+자체가 다르다. "축구용 루브릭 하나"는 성립하지 않는다.
+
+지금 여는 범위는 **종목당 한 동작**이다. 동작을 하나 여는 실제 비용은 YAML
+작성이 아니라 임계값 실측·지도자 검수·검증 클립 확보이며, 열린 동작이 늘면
+검수 대상이 그만큼 늘어난다.
+
+| 루브릭 | status | 검수 | 실클립 |
+|---|---|---|---|
+| 축구 인스텝 슈팅 | active | 전 | 통과 |
+| 야구 투구 | active | 전 | 미확인 |
+| 농구 점프슛 | active | 전 | 미확인 |
+| 축구 인사이드 패스 | draft | 전 | 미확인 |
+| 농구 레이업 | draft | 전 | 통과 |
+
+`status`는 **범위**(지금 여는 동작인가), `review_required`는 **검수**(임계값이
+확정됐는가)로 축이 다르다. 위 표처럼 열려 있으면서 검수 전일 수 있다(결과에
+`provisional`로 표기된다). draft는 `/api/rubrics` 목록에서 빠지지만 키를 직접
+주면 분석은 되므로, 검수·실측은 UI를 열지 않고도 돌릴 수 있다. 계약 테스트는
+draft도 포함해 돌기 때문에, 닫혀 있는 동안 파이프라인이 바뀌어 지표가 어긋나면
+여는 시점이 아니라 그때 걸린다.
+
 ## 구성
 
 ```
 agent/
-├── rubrics/
-│   └── football_instep_shot.yaml   # 채점 기준 + bands(등급 구간) + titles(칭호)
+├── rubrics/                        # 채점 기준 + bands(등급 구간) + titles(칭호)
+│   ├── football_instep_shot.yaml   # active — 종목당 한 동작만 연다
+│   ├── baseball_pitching.yaml      # active
+│   ├── basketball_jump_shot.yaml   # active
+│   ├── football_inside_pass.yaml   # draft — 검수 대기, 선택지에 안 뜬다
+│   └── basketball_layup.yaml       # draft
 ├── src/supersub_agent/
 │   ├── pose.py       # OpenCV 디코딩 + RT-DETR 검출 + ViTPose 추정
 │   ├── features.py   # 정규화 → 구간 분할 → 채점 지표 산출

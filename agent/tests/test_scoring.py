@@ -68,6 +68,64 @@ def test_rubric_is_flagged_provisional(rubric):
     assert rubric.review_required is True
 
 
+def test_open_scope_is_one_motion_per_sport():
+    """지금 여는 범위는 종목당 한 동작이다.
+
+    동작을 하나 여는 비용은 YAML 작성이 아니라 임계값 실측·지도자 검수·검증
+    클립이다. 열린 동작이 늘면 검수 대상이 함께 늘어야 하므로, 늘리는 순간
+    여기서 걸리게 둔다.
+    """
+    active = {k for k, r in discover_rubrics("rubrics").items() if r.is_active}
+
+    assert active == {
+        "football/instep_shot",
+        "baseball/pitching",
+        "basketball/jump_shot",
+    }
+    sports = [k.split("/")[0] for k in active]
+    assert len(sports) == len(set(sports)), "한 종목에 두 동작이 열려 있다"
+
+
+def test_closed_motions_stay_loadable():
+    """닫아 둔 동작도 적재는 된다 — 검수·실측을 UI와 무관하게 돌리기 위해서다.
+
+    계약 테스트(test_pipeline_covers_every_rubric_metric)도 이 파일들을 계속
+    돌므로, 닫혀 있는 동안 파이프라인이 바뀌어 지표가 어긋나면 여는 시점이
+    아니라 그때 걸린다.
+    """
+    closed = {k: r for k, r in discover_rubrics("rubrics").items() if not r.is_active}
+
+    assert set(closed) == {"football/inside_pass", "basketball/layup"}
+    for key, r in closed.items():
+        assert r.criteria, key
+        assert r.status == "draft", key
+
+
+def test_unknown_status_is_rejected(tmp_path):
+    """오타로 조용히 닫히면 안 된다 — 열려야 할 동작이 사라지는 쪽이 못 찾는다."""
+    (tmp_path / "one.yaml").write_text(
+        "sport: x\nmotion: y\nstatus: enabled\ncriteria:\n"
+        "  - {id: a, name: A, weight: 1.0, measured_by: [m], "
+        "grades: {0: z, 1: z, 2: z}, " + _BANDS + "}\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RubricError, match="status"):
+        discover_rubrics(tmp_path)
+
+
+def test_status_defaults_to_active(tmp_path):
+    """status를 안 쓴 옛 루브릭은 그대로 열린 것으로 본다."""
+    (tmp_path / "one.yaml").write_text(
+        "sport: x\nmotion: y\ncriteria:\n"
+        "  - {id: a, name: A, weight: 1.0, measured_by: [m], "
+        "grades: {0: z, 1: z, 2: z}, " + _BANDS + "}\n",
+        encoding="utf-8",
+    )
+
+    assert discover_rubrics(tmp_path)["x/y"].is_active
+
+
 def test_every_criterion_has_measurable_basis(rubric):
     """근거 지표가 없는 항목은 판정할 수 없다."""
     for c in rubric.criteria:

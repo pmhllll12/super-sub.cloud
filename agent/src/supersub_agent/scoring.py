@@ -137,6 +137,21 @@ class Rubric:
     # 임계값이 임시값인 것(review_required)과는 다른 문제다 — 이쪽은 파이프라인이
     # 그 종목 영상에서 지표를 뽑을 수 있는지 자체를 확인했는가를 뜻한다.
     validated_on: str = ""
+    # 사용자에게 내보낼지 여부 — "active"만 선택지에 오른다.
+    #
+    # review_required와 축이 다르다. 이쪽은 **범위**(지금 여는 동작인가), 저쪽은
+    # **검수**(임계값이 확정됐는가)다. 열려 있으면서 검수 전일 수 있고(지금 세
+    # 루브릭이 그렇다, 결과에 provisional로 표기된다), 검수가 끝나도 범위 밖이라
+    # 닫아 둘 수 있다.
+    #
+    # "draft"를 지우지 않고 두는 이유는 임계값·칭호가 이미 들어 있어서다. 계약
+    # 테스트는 draft도 포함해 돌므로, 닫아 둔 동안 파이프라인이 바뀌어 지표가
+    # 어긋나면 여는 시점이 아니라 그때 걸린다.
+    status: str = "active"
+
+    @property
+    def is_active(self) -> bool:
+        return self.status == "active"
 
     @property
     def key(self) -> str:
@@ -247,7 +262,20 @@ def load_rubric(path: str | Path) -> Rubric:
         sport_ko=raw.get("sport_ko", ""),
         motion_ko=raw.get("motion_ko", ""),
         validated_on=raw.get("validated_on", ""),
+        status=_parse_status(raw),
     )
+
+
+def _parse_status(raw: dict[str, Any]) -> str:
+    """루브릭을 사용자에게 내보낼지 읽는다. 기본은 active다.
+
+    오타가 나면 조용히 닫히는 것이 아니라 적재에서 걸리게 한다 — 열려 있어야
+    할 동작이 선택지에서 사라지는 쪽이 더 알아채기 어렵다.
+    """
+    value = raw.get("status", "active")
+    if value not in ("active", "draft"):
+        raise RubricError(f"status는 'active' 또는 'draft'여야 한다: {value!r}")
+    return value
 
 
 def _parse_choice(raw: dict[str, Any], field_name: str, allowed: tuple[str, ...]) -> str:
