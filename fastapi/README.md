@@ -171,7 +171,7 @@ router ◀──Result DTO── 인터랙터 ◀──────────�
 
 ## 다음 할 일
 
-1. **정어진에게 `/docs` 공유** — `titles`가 빈 배열인 화면 처리와
+1. **백성검에게 `/docs` 공유** — `titles`가 빈 배열인 화면 처리와
    401 두 종류(`UNAUTHORIZED`/`INVALID_TOKEN`) 분기를 확인해야 한다.
 2. **DDL 작성과 검증** — 부록 D는 문서일 뿐이라 D.6 삭제 연쇄와 D.7 유일제약 18건이
    아직 코드가 아니다. 실제 PostgreSQL에 올려서 확인한다. alembic 도 이때.

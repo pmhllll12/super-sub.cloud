@@ -5,7 +5,7 @@
     {"error": {"code": "...", "message": "..."}}
 
 FastAPI 기본값은 `{"detail": ...}`라 그대로 두면 검증 실패(422)만 형태가 달라진다.
-그러면 정어진 쪽에서 분기를 두 벌 짜야 하므로 핸들러로 덮어쓴다.
+그러면 백성검 쪽에서 분기를 두 벌 짜야 하므로 핸들러로 덮어쓴다.
 """
 
 from fastapi import FastAPI, Request
