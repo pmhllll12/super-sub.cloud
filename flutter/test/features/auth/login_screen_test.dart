@@ -1,11 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:super_sub/core/mock/mock_db.dart';
+import 'package:super_sub/features/auth/data/auth_providers.dart';
+import 'package:super_sub/features/auth/data/auth_repository_mock.dart';
 import 'package:super_sub/features/auth/presentation/screens/login_screen.dart';
 import 'package:super_sub/features/auth/presentation/session_controller.dart';
 
-Widget _wrap() => const ProviderScope(
-      child: MaterialApp(home: LoginScreen()),
+// 화면·세션 로직 테스트는 실제 API가 아니라 Mock을 상대한다 — 빠르고
+// 결정적이며, 백엔드 없이도 돈다. ApiAuthRepository 자체의 동작은
+// auth_repository_api_test.dart(있다면)가 따로 본다.
+final _authOverride = authRepositoryProvider.overrideWith(
+  (ref) => MockAuthRepository(ref.watch(mockDbProvider)),
+);
+
+Widget _wrap() => ProviderScope(
+      overrides: [_authOverride],
+      child: const MaterialApp(home: LoginScreen()),
     );
 
 void main() {
@@ -46,7 +57,7 @@ void main() {
   });
 
   testWidgets('바로 진입 버튼을 누르면 세션이 생긴다', (tester) async {
-    final container = ProviderContainer();
+    final container = ProviderContainer(overrides: [_authOverride]);
     addTearDown(container.dispose);
 
     await tester.pumpWidget(UncontrolledProviderScope(

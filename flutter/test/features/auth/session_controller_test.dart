@@ -2,14 +2,24 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:super_sub/core/mock/mock_db.dart';
 import 'package:super_sub/core/sport/current_sport.dart';
+import 'package:super_sub/features/auth/data/auth_providers.dart';
 import 'package:super_sub/features/auth/data/auth_repository.dart';
+import 'package:super_sub/features/auth/data/auth_repository_mock.dart';
 import 'package:super_sub/features/auth/presentation/session_controller.dart';
 
 void main() {
   late ProviderContainer container;
 
   setUp(() {
-    container = ProviderContainer();
+    // 이 테스트는 SessionController의 상태 전이 로직을 보는 것이지 어느
+    // 백엔드에 붙었는지는 관심사가 아니다 — 빠르고 결정적인 Mock을 쓴다.
+    container = ProviderContainer(
+      overrides: [
+        authRepositoryProvider.overrideWith(
+          (ref) => MockAuthRepository(ref.watch(mockDbProvider)),
+        ),
+      ],
+    );
     addTearDown(container.dispose);
   });
 

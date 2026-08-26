@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android 9+는 기본적으로 평문(HTTP) 트래픽을 막는다. 로컬 개발 중인
+    fastapi/ 백엔드(api_config.dart 기본값)는 아직 TLS가 없으므로, 기기
+    자신을 가리키는 루프백 주소에 한해서만 예외를 둔다.
+
+    실제 서버 도메인은 나중에 HTTPS로 붙을 것이므로 여기 목록을 넓힐
+    필요는 없다 — api_config.dart의 기본값이 바뀔 때만 같이 늘린다.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- adb reverse tcp:8000 tcp:8000 (실기기) -->
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+        <!-- 안드로이드 에뮬레이터에서 호스트 PC를 가리키는 별칭 -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>

@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:super_sub/app.dart';
 import 'package:super_sub/core/mock/mock_db.dart';
+import 'package:super_sub/features/auth/data/auth_providers.dart';
+import 'package:super_sub/features/auth/data/auth_repository_mock.dart';
 import 'package:super_sub/features/auth/presentation/session_controller.dart';
 import 'package:super_sub/features/intro/presentation/intro_gate.dart';
 
@@ -26,7 +28,12 @@ Future<ProviderContainer> _pumpApp(WidgetTester tester) async {
   // 인트로를 끈다 — 켜 두면 3.1초 동안 모든 라우트를 덮어 착지 화면 대신
   // 인트로만 보인다. 인트로 자체는 glitch_intro_screen_test.dart가 본다.
   final container = ProviderContainer(
-    overrides: [introEnabledProvider.overrideWithValue(false)],
+    overrides: [
+      introEnabledProvider.overrideWithValue(false),
+      authRepositoryProvider.overrideWith(
+        (ref) => MockAuthRepository(ref.watch(mockDbProvider)),
+      ),
+    ],
   );
   addTearDown(container.dispose);
 

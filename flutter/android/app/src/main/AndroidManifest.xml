@@ -1,7 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- fastapi/ 백엔드 호출에 필요하다 — Flutter 템플릿은 기본적으로 debug/profile
+         빌드에만 이 권한을 넣는다(개발 도구용). 앱이 실제로 네트워크를 쓰므로
+         release 빌드가 참조하는 main에도 있어야 한다. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="super_sub"
         android:name="${applicationName}"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"

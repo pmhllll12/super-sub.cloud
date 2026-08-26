@@ -5,11 +5,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:super_sub/core/mock/mock_db.dart';
 import 'package:super_sub/core/sport/current_sport.dart';
+import 'package:super_sub/features/auth/data/auth_providers.dart';
+import 'package:super_sub/features/auth/data/auth_repository_mock.dart';
 import 'package:super_sub/features/auth/presentation/session_controller.dart';
 import 'package:super_sub/features/home/presentation/screens/home_screen.dart';
 
 Future<ProviderContainer> _pumpLoggedIn(WidgetTester tester) async {
-  final container = ProviderContainer();
+  final container = ProviderContainer(
+    overrides: [
+      authRepositoryProvider.overrideWith(
+        (ref) => MockAuthRepository(ref.watch(mockDbProvider)),
+      ),
+    ],
+  );
   addTearDown(container.dispose);
 
   await tester.pumpWidget(UncontrolledProviderScope(
