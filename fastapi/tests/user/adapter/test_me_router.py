@@ -29,8 +29,14 @@ class TestMe:
 
     @pytest.mark.parametrize(
         "header",
-        ["Bearer garbage", "Bearer stub-token-for-not-a-uuid", "Basic abc"],
-        ids=["형식아님", "uuid아님", "Bearer아님"],
+        [
+            "Bearer garbage",
+            # JWT 모양인데 서명만 틀렸다. 앞의 "garbage" 와 다른 경로를 지난다 —
+            # 이쪽은 디코드까지 가서 서명 검증에서 걸린다.
+            "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ4In0.bogus",
+            "Basic abc",
+        ],
+        ids=["형식아님", "서명틀림", "Bearer아님"],
     )
     def test_토큰이_무효하면_401(self, client, header):
         res = client.get(f"{V1}/me", headers={"Authorization": header})
