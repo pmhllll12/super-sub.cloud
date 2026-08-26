@@ -144,13 +144,16 @@ def run_pipeline(
     rubric_key: str | None = None,
     frames: list[np.ndarray] | None = None,
     fps: float = 12.0,
+    swing_side: str = "auto",
 ) -> dict:
     rubric = get_rubric(rubric_key)
 
     t0 = time.time()
     # 임팩트를 어느 사지의 어느 사건으로 정의할지는 루브릭이 선언한다.
+    # 스윙이 어느 쪽인지는 루브릭이 알 수 없다 — 선수마다 다르므로 올리는
+    # 사람이 지정하고, 지정이 없으면 이동량으로 판별한다(팔 종목에서 약하다).
     features = extract_features(
-        keypoints, objects, rubric.impact_limb, rubric.impact_event
+        keypoints, objects, rubric.impact_limb, rubric.impact_event, swing_side
     )
     verify_rubric_coverage(rubric, features)
     measure_s = time.time() - t0
@@ -189,6 +192,7 @@ def run_pipeline(
             "validated_on": rubric.validated_on,
             "impact_limb": rubric.impact_limb,
             "impact_event": rubric.impact_event,
+            "swing_side": swing_side,
             "criteria": [
                 {"id": c.id, "name": c.name, "weight": c.weight,
                  "measured_by": list(c.measured_by),
@@ -240,14 +244,18 @@ def api_rubric(rubric: str | None = None) -> JSONResponse:
 
 
 @app.post("/api/analyze/synthetic")
-def api_synthetic(rubric: str | None = None) -> JSONResponse:
+def api_synthetic(rubric: str | None = None, side: str = "auto") -> JSONResponse:
     return JSONResponse(
-        run_pipeline(synthetic_keypoints(), "synthetic", rubric_key=rubric)
+        run_pipeline(
+            synthetic_keypoints(), "synthetic", rubric_key=rubric, swing_side=side
+        )
     )
 
 
 @app.post("/api/analyze/video")
-async def api_video(file: UploadFile, rubric: str | None = None) -> JSONResponse:
+async def api_video(
+    file: UploadFile, rubric: str | None = None, side: str = "auto"
+) -> JSONResponse:
     from .pose import extract_keypoints
 
     suffix = Path(file.filename or "clip.mp4").suffix or ".mp4"
@@ -261,7 +269,7 @@ async def api_video(file: UploadFile, rubric: str | None = None) -> JSONResponse
         return JSONResponse(
             run_pipeline(
                 pose.keypoints, file.filename or "video", pose.objects, rubric,
-                frames=pose.frames, fps=pose.sampled_fps,
+                frames=pose.frames, fps=pose.sampled_fps, swing_side=side,
             )
         )
     except InsufficientQuality as exc:
@@ -357,6 +365,12 @@ code{font:.85em ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--mut)}
 <div class="row">
   <label class="mut" for="rubric">채점 기준</label>
   <select id="rubric"></select>
+  <label class="mut" for="side">스윙 측</label>
+  <select id="side">
+    <option value="auto">자동 판별</option>
+    <option value="left">왼쪽</option>
+    <option value="right">오른쪽</option>
+  </select>
   <button id="syn">합성 데이터로 실행</button>
   <button class="ghost" id="pick">영상 업로드해서 실행</button>
   <input type="file" id="file" accept="video/*" hidden>
@@ -408,7 +422,10 @@ function showValidation(){
 sel.onchange=showValidation;
 loadRubrics();
 
-const q=()=>'?rubric='+encodeURIComponent(sel.value||'');
+// 스윙 측(던지는 팔·차는 발)은 사람이 지정할 수 있다. 자동 판별은 이동량으로
+// 고르는데 팔 종목에서 약하다 — 야구 투구 실클립에서 글러브 팔을 집었다.
+const q=()=>'?rubric='+encodeURIComponent(sel.value||'')
+  +'&side='+encodeURIComponent($('#side').value||'auto');
 
 $('#syn').onclick=()=>call('/api/analyze/synthetic'+q(),{method:'POST'});
 $('#pick').onclick=()=>$('#file').click();

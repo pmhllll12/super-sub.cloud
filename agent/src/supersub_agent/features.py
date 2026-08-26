@@ -141,12 +141,20 @@ def normalize_track(track: np.ndarray, kps: np.ndarray) -> np.ndarray:
     return out
 
 
-def valid_frames(kps: np.ndarray, limb: str = "leg") -> np.ndarray:
+def valid_frames(
+    kps: np.ndarray, limb: str = "leg", chain: Chain | None = None
+) -> np.ndarray:
     """해당 사지 키포인트를 신뢰할 수 있는 프레임 마스크 (T,).
 
     사람이 검출되지 않은 프레임은 pose.py가 신뢰도 0으로 채우므로 여기서 걸린다.
+
+    chain을 주면 그 체인의 세 관절만 본다. 좌우 양쪽을 모두 요구하면 한쪽이
+    가려진 동작이 통째로 막히기 때문이다 (check_quality 참고).
     """
-    joints = sorted({j for chain in LIMB_CHAINS[limb].values() for j in chain})
+    if chain is None:
+        joints = sorted({j for c in LIMB_CHAINS[limb].values() for j in c})
+    else:
+        joints = sorted(set(chain))
     threshold = LIMB_MIN_CONFIDENCE[limb]
     return (kps[:, joints, 2] >= threshold).all(axis=1)
 
@@ -178,19 +186,38 @@ def _apex_frame(height: np.ndarray, usable: np.ndarray) -> int:
 
 
 def check_quality(
-    kps: np.ndarray, min_valid_ratio: float = 0.7, limb: str = "leg"
+    kps: np.ndarray,
+    min_valid_ratio: float = 0.7,
+    limb: str = "leg",
+    side: str = "auto",
 ) -> float:
-    """해당 사지 키포인트의 유효 프레임 비율을 반환한다."""
-    ratio = float(valid_frames(kps, limb).mean())
+    """**스윙 측** 사지 키포인트의 유효 프레임 비율을 반환한다.
+
+    좌우 양쪽을 함께 요구하지 않는다. 야구 투구 실클립(2160×3840 25fps, 투구
+    구간 3.6초)에서 던지는 팔은 98%인데 글러브 팔이 50%라 전체로는 48%가 되어
+    반려됐다 — 와인드업에서 글러브가 반대쪽 손을 덮기 때문이며, 촬영을 다시
+    해도 사라지지 않는 가림이다. 투구 루브릭이 근거로 쓰는 지표는 모두 던지는
+    팔에서 나오므로, 쓰지도 않는 팔 때문에 98%짜리 입력을 버리게 된다.
+
+    지지 측은 여기서 막지 않고 **지표 단위로** 빠진다 (LIMB_DEPENDENT_METRICS).
+    농구 점프슛처럼 지지 팔(가이드 핸드)을 실제로 채점하는 루브릭은 그 지표가
+    빠지면서 해당 항목이 판정에서 제외되고 가중치가 재정규화된다.
+    """
+    # 스윙 측 판별은 **정규화 후** 좌표로 한다. 원좌표에서는 몸 전체의 이동이
+    # 좌우 이동량에 함께 실려 반대쪽을 스윙으로 집는다.
+    swing, _ = identify_limb(normalize(kps), limb, side)
+    ratio = float(valid_frames(kps, limb, swing).mean())
     if ratio < min_valid_ratio:
         raise InsufficientQuality(
-            f"{LIMB_NAMES[limb]} 키포인트 유효 프레임 비율 {ratio:.0%} < "
+            f"{LIMB_NAMES[limb]} 스윙 측 키포인트 유효 프레임 비율 {ratio:.0%} < "
             f"기준 {min_valid_ratio:.0%}. 재촬영이 필요하다."
         )
     return ratio
 
 
-def identify_limb(kps: np.ndarray, limb: str = "leg") -> tuple[Chain, Chain]:
+def identify_limb(
+    kps: np.ndarray, limb: str = "leg", side: str = "auto"
+) -> tuple[Chain, Chain]:
     """(스윙 측, 지지 측) 관절 체인을 판별한다.
 
     스윙 측은 말단 관절(발목/손목)이 더 크게 움직인 쪽이다. 축구에서는 차는
@@ -198,8 +225,28 @@ def identify_limb(kps: np.ndarray, limb: str = "leg") -> tuple[Chain, Chain]:
 
     실클립에서 공 궤적이 이 판별을 뒷받침했다 — 디딤발로 지목된 쪽이 공 옆에
     붙어 있고(간격 일정), 차는 발로 지목된 쪽이 공으로 빠르게 접근했다.
+
+    **팔 종목에서는 이 자동 판별이 약하다.** 실클립 세 건으로 확인한 것:
+
+      - 야구 투구: 던지는 왼팔 18.2 대 글러브 오른팔 27.6으로 **뒤집힌다.**
+        12.5fps에서 릴리스는 두 프레임 안에 끝나 경로가 짧은 반면, 글러브 팔은
+        내내 크게 돌기 때문이다. 잘못 잡힌 관절이 프레임마다 튀며 경로를 쌓는
+        것도 더해진다(글러브 팔 신뢰도 0.3~0.6).
+      - 농구 레이업: 16.30 대 16.09로 **1% 차이**로 갈린다. 맞는 쪽을 골랐지만
+        근거라고 하기 어려운 차이다.
+
+    본 프레임만 세거나 관측 비율로 할인하거나 손 높이로 바꿔 봐도, 세 클립을
+    동시에 맞히는 통계는 찾지 못했다(야구를 맞히면 레이업이 뒤집힌다). 그래서
+    자동 판별은 그대로 두고 **side로 지정할 수 있게** 열어 둔다 — 던지는 팔·차는
+    발은 업로드하는 사람이 아는 값이고, 틀리면 조용히 반대쪽을 채점하게 된다.
     """
     chains = LIMB_CHAINS[limb]
+    if side in ("left", "right"):
+        other = "right" if side == "left" else "left"
+        return chains[side], chains[other]
+    if side != "auto":
+        raise ValueError(f"side는 auto·left·right 중 하나여야 한다: {side!r}")
+
     xy = kps[:, :, :2]
 
     def travel(chain: Chain) -> float:
@@ -221,9 +268,9 @@ def chain_series(kps: np.ndarray, chain: Chain) -> np.ndarray:
     )
 
 
-def identify_legs(kps: np.ndarray) -> tuple[int, int]:
+def identify_legs(kps: np.ndarray, side: str = "auto") -> tuple[int, int]:
     """(차는 다리, 디딤발)의 무릎 인덱스. identify_limb의 다리 전용 래퍼."""
-    swing, support = identify_limb(kps, "leg")
+    swing, support = identify_limb(kps, "leg", side)
     return swing[1], support[1]
 
 
@@ -260,7 +307,9 @@ def segment_phases(
         swing = LIMB_CHAINS["leg"]["left" if swing == L_KNEE else "right"]
 
     series = chain_series(kps, swing)
-    usable = valid_frames(kps, limb) & np.isfinite(series)
+    # 임팩트는 스윙 측 관절로 정의한다. 반대쪽이 가려진 프레임까지 후보에서
+    # 빼면 임팩트가 실제 지점 밖으로 밀린다 (야구 투구 실클립).
+    usable = valid_frames(kps, limb, swing) & np.isfinite(series)
     if event == "extension_peak":
         impact = _peak_frame(np.gradient(series), usable)
     else:
@@ -303,6 +352,7 @@ def extract_features(
     objects: dict[str, np.ndarray] | None = None,
     impact_limb: str = "leg",
     impact_event: str = "extension_peak",
+    swing_side: str = "auto",
 ) -> dict[str, float | int]:
     """루브릭이 요구하는 지표를 모두 산출한다.
 
@@ -318,16 +368,22 @@ def extract_features(
 
     impact_event는 임팩트로 삼을 사건이다 (루브릭의 kinematics.impact_event).
     채찍질하는 동작은 extension_peak, 들어올려 놓는 동작은 distal_apex다.
+
+    swing_side는 스윙 측을 직접 지정한다("left"/"right"). 기본값 "auto"는
+    이동량으로 판별하는데, 팔 종목에서는 이 판별이 약하다(identify_limb 참고).
+    던지는 팔·차는 발을 아는 사람이 지정하면 그 실패를 없앨 수 있다.
     """
     if impact_limb not in LIMB_CHAINS:
         raise ValueError(
             f"impact_limb은 {sorted(LIMB_CHAINS)} 중 하나여야 한다: {impact_limb!r}"
         )
 
-    check_quality(kps, limb=impact_limb)
+    check_quality(kps, limb=impact_limb, side=swing_side)
     norm = normalize(kps)
-    swing_knee, plant_knee = identify_legs(norm)
-    swing_chain, support_chain = identify_limb(norm, impact_limb)
+    swing_knee, plant_knee = identify_legs(
+        norm, swing_side if impact_limb == "leg" else "auto"
+    )
+    swing_chain, support_chain = identify_limb(norm, impact_limb, swing_side)
     phases = segment_phases(norm, swing_chain, impact_limb, impact_event)
     t = phases.impact
 
@@ -397,13 +453,18 @@ def extract_features(
     # 팔 지표 — 다리와 구조가 같다. 임팩트를 다리로 정의한 종목에서도 함께
     # 산출한다(상체 자세를 근거로 삼는 항목이 있을 수 있다). 신뢰도가 낮으면
     # NaN이 되므로 판정 근거로 쓰기 전에 걸러야 한다.
-    arm_swing, arm_support = identify_limb(norm, "arm")
+    arm_swing, arm_support = identify_limb(
+        norm, "arm", swing_side if impact_limb == "arm" else "auto"
+    )
     arm_swing_series = chain_series(norm, arm_swing)
     arm_support_series = chain_series(norm, arm_support)
-    arm_usable = valid_frames(norm, "arm") & np.isfinite(arm_swing_series)
+    arm_usable = valid_frames(norm, "arm", arm_swing) & np.isfinite(arm_swing_series)
+    arm_support_usable = valid_frames(norm, "arm", arm_support)
     if arm_usable[t]:
         features["swing_elbow_angle_at_impact"] = round(float(arm_swing_series[t]), 1)
-        if np.isfinite(arm_support_series[t]):
+        # 지지 팔은 스윙 팔과 따로 본다. 야구 투구처럼 글러브가 반대쪽 손을
+        # 덮는 동작에서는 이 지표만 빠지고 나머지는 그대로 나온다.
+        if arm_support_usable[t] and np.isfinite(arm_support_series[t]):
             features["support_elbow_angle_at_impact"] = round(
                 float(arm_support_series[t]), 1
             )

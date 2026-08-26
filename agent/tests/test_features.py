@@ -224,6 +224,64 @@ def test_arm_metrics_are_dropped_when_arm_is_unreliable():
     assert "swing_knee_angle_at_impact" in feats, "다리 지표는 그대로 나온다"
 
 
+def _hide_support_arm(seq: np.ndarray, noise: float = 60.0) -> np.ndarray:
+    """지지(오른) 팔을 가려진 것처럼 만든다 — 낮은 신뢰도 + 튀는 좌표.
+
+    야구 투구 실클립의 글러브 팔이 이렇다. 와인드업에서 글러브가 반대쪽 손을
+    덮어 신뢰도가 0.3~0.6으로 떨어지고, 그 프레임의 좌표는 프레임마다 튄다.
+    """
+    out = seq.copy()
+    rng = np.random.default_rng(0)
+    joints = [F.R_SHOULDER, F.R_ELBOW, F.R_WRIST]
+    hidden = np.flatnonzero(np.arange(len(out)) % 2 == 1)   # 절반이 가려진다
+    idx = np.ix_(hidden, joints)
+    coords = out[idx]
+    coords[:, :, :2] += rng.normal(0.0, noise, (len(hidden), len(joints), 2))
+    coords[:, :, 2] = 0.35
+    out[idx] = coords
+    return out
+
+
+def test_gate_looks_at_the_swing_side_only():
+    """지지 팔이 가려져도 스윙 팔이 보이면 분석한다.
+
+    야구 투구 실클립(투구 구간 3.6초)에서 던지는 팔은 98%인데 글러브 팔이 50%라
+    양쪽을 함께 요구하면 48%로 반려됐다. 투구 루브릭이 쓰는 지표는 모두 던지는
+    팔에서 나오므로, 쓰지도 않는 팔 때문에 입력을 버리게 된다.
+    """
+    seq = _hide_support_arm(_with_arm_swing(build_sequence()))
+
+    assert F.check_quality(seq, limb="arm", side="left") >= 0.7
+
+    feats = extract_features(seq, None, impact_limb="arm", swing_side="left")
+    assert "swing_elbow_angle_at_impact" in feats
+    assert "support_elbow_angle_at_impact" not in feats, "가려진 팔 지표는 빠진다"
+
+
+def test_swing_side_can_be_given_explicitly():
+    """스윙 측을 지정하면 자동 판별을 쓰지 않는다.
+
+    자동 판별은 이동량으로 고르는데 팔 종목에서 약하다 — 야구 투구 실클립에서
+    던지는 왼팔 18.2 대 글러브 오른팔 27.6으로 뒤집혔고, 농구 레이업은 16.30
+    대 16.09로 1% 차이였다(identify_limb 참고). 던지는 팔을 아는 사람이
+    지정하면 그 실패가 사라진다.
+    """
+    # 오른팔이 크게 튀어 자동 판별이 오른팔을 스윙으로 집는 시퀀스.
+    seq = _hide_support_arm(_with_arm_swing(build_sequence()), noise=200.0)
+    norm = F.normalize(seq)
+    assert F.identify_limb(norm, "arm")[0] == F.LIMB_CHAINS["arm"]["right"]
+
+    swing, support = F.identify_limb(norm, "arm", "left")
+
+    assert swing == F.LIMB_CHAINS["arm"]["left"]
+    assert support == F.LIMB_CHAINS["arm"]["right"]
+
+
+def test_unknown_swing_side_is_rejected():
+    with pytest.raises(ValueError, match="side"):
+        F.identify_limb(F.normalize(build_sequence()), "leg", "왼쪽")
+
+
 def test_hip_rotation_survives_angle_wraparound():
     """골반이 ±180 경계에 걸쳐도 회전량이 부풀지 않는다.
 

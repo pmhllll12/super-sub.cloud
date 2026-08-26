@@ -16,7 +16,13 @@ version: 0.1
 status: active
 review_required: true
 pipeline_version: pose-v0.1
-validated_on: ""
+validated_on: >-
+  실클립 1건 (2160×3840 25fps, 투구 구간 3.6초 절취, 46프레임). 측정까지 통과
+  — 던지는 팔 98%, 글러브 팔 50%라 스윙 측을 left로 지정해야 한다 (2026-08-26).
+  **다만 임팩트 프레임이 릴리스보다 이르다.** extension_peak이 신전 중간
+  (팔꿈치 61도, 25fps 샘플링에서 102도)을 잡는데, 이 루브릭의 release_arm_extension
+  은 릴리스 시점(150~172도)을 전제한다. 임팩트 정의 또는 bands 중 하나를
+  지도자 검수 때 맞춰야 한다 (미결 5번).
 
 kinematics:
   impact_limb: arm
