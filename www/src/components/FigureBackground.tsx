@@ -1,13 +1,12 @@
-import { forwardRef } from 'react'
-
 // flutter/lib/core/widgets/figure_background.dart 를 옮긴 것. 홈과 영상 분석이 같은 걸 쓴다.
 //
 // 화면 위쪽 88% 에 사진을 깔고(BoxFit.cover) 그 위에 아래로 갈수록 검게
-// 잦아드는 막을 덮어 사진의 아랫변이 선으로 보이지 않게 지운다. 앱과 달리
-// 그 자체로는 애니메이션이 없다 — 정지 상태가 기본이다. 홈 화면만 이 위에
-// 아주 미세한 마우스 시차를 얹으려고 ref 를 받는다(forwardRef): ref 가 있으면
-// HomeParallax 가 이 컴포넌트의 최상위 div 에 transform 을 직접 써서 배경을
-// 살짝 움직인다. ref 를 안 주는 화면(영상 분석 등)은 원래대로 가만히 있다.
+// 잦아드는 막을 덮어 사진의 아랫변이 선으로 보이지 않게 지운다. 정지
+// 상태 — 마우스를 움직여도 배경 사진은 그대로다(사용자 요청: "배경
+// 사진은 안 움직이게 하자" — 예전엔 홈 화면에서 아주 미세한 마우스
+// 시차를 얹으려고 forwardRef 로 ref 를 받았지만, 배경을 고정하기로 하며
+// 그 ref 를 쓰는 곳이 없어져 걷어냈다. 워드마크·카드 층은 계속
+// 움직인다 — 배경만 고정되면 오히려 그 층들이 떠 있는 느낌이 산다).
 const FIGURE_HEIGHT_PERCENT = 88
 
 // 앱의 세로 사진은 인물이 진짜 왼쪽 가장자리에 있어 Alignment.centerLeft(0%)로
@@ -16,10 +15,9 @@ const FIGURE_HEIGHT_PERCENT = 88
 // 잘려 나간다. 좁은 화면에서도 얼굴이 살아 있도록 실측으로 맞춘 값이다.
 const FIGURE_OBJECT_POSITION = '46% center'
 
-const FigureBackground = forwardRef<HTMLDivElement>(function FigureBackground(_props, ref) {
+export default function FigureBackground() {
   return (
     <div
-      ref={ref}
       aria-hidden="true"
       style={{
         position: 'fixed',
@@ -63,6 +61,4 @@ const FigureBackground = forwardRef<HTMLDivElement>(function FigureBackground(_p
       </div>
     </div>
   )
-})
-
-export default FigureBackground
+}

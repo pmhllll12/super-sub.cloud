@@ -21,7 +21,6 @@ export default function DestinationCard({
   className = '',
   phase = 0,
   locked = false,
-  tabIndex,
 }: {
   title: string
   icon: string
@@ -35,9 +34,6 @@ export default function DestinationCard({
    *  돌려보낼 카드. 링크는 그대로 두고 안내문만 "준비 중입니다" 자리에
    *  "로그인이 필요합니다"로 바꿔 보여준다. */
   locked?: boolean
-  /** 캐러셀 무한 루프의 복제본(aria-hidden)에 -1 을 준다 — 화면엔 보여도
-   *  탭 순서·스크린리더에서는 원본 한 벌만 걸린다. */
-  tabIndex?: number
 }) {
   const ready = Boolean(href)
   // 준비 중/로그인 필요 안내문 — 항상 같은 자리(같은 높이)를 차지해야
@@ -75,7 +71,7 @@ export default function DestinationCard({
 
   if (href) {
     return (
-      <Link href={href} className="block" tabIndex={tabIndex}>
+      <Link href={href} className="block">
         {inner}
       </Link>
     )

@@ -1,11 +1,11 @@
 'use client'
 
+import Link from 'next/link'
 import { useRef, type CSSProperties } from 'react'
 import BrandMark from '@/components/ui/BrandMark'
 import DestinationCard from '@/components/DestinationCard'
 import FigureBackground from '@/components/FigureBackground'
-import LogoutButton from '@/components/LogoutButton'
-import PillButton from '@/components/ui/PillButton'
+import LogoutButton, { HEADER_LINK_CLASS, HEADER_LINK_HOVER_CLASS } from '@/components/LogoutButton'
 import { useCarouselFlow } from '@/lib/useCarouselFlow'
 import { useMouseParallax } from '@/lib/useMouseParallax'
 
@@ -22,36 +22,31 @@ export type Destination = {
 
 /**
  * 배경 사진 위에 얹힌 요소들을 마우스를 따라 아주 미세하게 움직여 시차
- * (입체감)를 낸다. 뒤 → 앞으로 갈수록 크게 움직인다: 배경 < 워드마크 ·
- * 인사말 < 카드 캐러셀. 실제 로직(보간 · rAF · reduced-motion/터치 예외)은
- * `useMouseParallax` 가 맡는다.
+ * (입체감)를 낸다. 배경 사진은 고정 — 사용자 요청("배경 사진은 안
+ * 움직이게 하자")으로 시차를 걷어냈다. 워드마크 · 인사말과 카드
+ * 캐러셀만 움직인다: 뒤(워드마크 · 인사말) → 앞(카드)으로 갈수록 크게.
+ * 배경이 고정이라 오히려 이 두 층이 그 위에 떠 있는 느낌이 산다.
+ * 실제 로직(보간 · rAF · reduced-motion/터치 예외)은 `useMouseParallax`
+ * 가 맡는다.
  *
  * 배율은 화면에서 마우스를 끝에서 끝까지 움직여 보며 눈으로 정했다: 가장
  * 크게 움직이는 카드 층도 최대 {@link FRONT_STRENGTH}px 를 넘지 않는다
  * (요청한 "10~20px 상한" 안에서, 시차가 보이되 멀미 나지 않는 지점).
- * 배경은 그 1/5 이하로 — "거의 안 움직이는" 정도로만 흔들린다.
  *
  * 카드 캐러셀은 같은 층(frontRef)에 두 가지가 동시에 걸려 있다: 이
  * `useMouseParallax` 는 `transform` 으로 박스 전체를 살짝 흔들고,
  * `useCarouselFlow` 는 그 안의 `scrollLeft` 로 카드 줄을 흐르게 한다.
  * 서로 다른 CSS 속성이라 부딪히지 않는다(자세한 이유는
- * `lib/useCarouselFlow.ts` 코멘트).
+ * `lib/useCarouselFlow.ts` 코멘트). 카드는 6장 한 벌뿐 — 무한 루프 없이
+ * 양 끝에서 멈춘다.
  *
  * `page.tsx`(서버 컴포넌트)는 이 컴포넌트를 감싸기만 하고, 마우스가 필요한
  * 화면(인사말 · 카드)은 여기로 prop 으로 내려받는다. `/` 는 로그인 여부와
  * 무관하게 항상 이 화면이다 — `user` 가 있으면 닉네임 + 로그아웃을, 없으면
  * 로그인 · 회원가입 버튼을 인사말 자리에 보여준다.
  */
-const BACKGROUND_STRENGTH = 3
 const MID_STRENGTH = 7
 const FRONT_STRENGTH = 14
-
-// 캐러셀 무한 루프 — 카드 목록을 이만큼 이어붙이고 가운데 벌에서
-// 시작한다. 3벌이면 앞뒤로 한 벌씩 버퍼가 생겨 마우스를 어느 쪽으로
-// 옮기든(왼쪽으로 계속/오른쪽으로 계속) 진짜 스크롤 끝(clamp)에 닿기 전에
-// `useCarouselFlow` 가 항상 한 벌 폭만큼 티 안 나게 되돌린다.
-const LOOP_COPIES = 3
-const REAL_COPY_INDEX = 1 // 스크린리더 · 탭 순서에 걸리는 "진짜" 한 벌 — 시작 위치와 같은 가운데 벌.
 
 export default function HomeParallax({
   user,
@@ -60,24 +55,18 @@ export default function HomeParallax({
   user: { nickname: string } | null
   destinations: Destination[]
 }) {
-  const bgRef = useRef<HTMLDivElement>(null)
   const midRef = useRef<HTMLDivElement>(null)
   const frontRef = useRef<HTMLDivElement>(null)
 
   useMouseParallax([
-    { ref: bgRef, strength: BACKGROUND_STRENGTH },
     { ref: midRef, strength: MID_STRENGTH },
     { ref: frontRef, strength: FRONT_STRENGTH },
   ])
-  useCarouselFlow(frontRef, LOOP_COPIES)
-
-  const looped = Array.from({ length: LOOP_COPIES }, (_, copy) =>
-    destinations.map((d, i) => ({ ...d, copy, i, real: copy === REAL_COPY_INDEX })),
-  ).flat()
+  useCarouselFlow(frontRef)
 
   return (
     <>
-      <FigureBackground ref={bgRef} />
+      <FigureBackground />
 
       {/* 헤더 — 워드마크 좌상단, 인사말 우상단. 화면에 고정해 캐러셀이
           가로로 얼마나 흐르든 그 자리에 그대로 있는다. 글래스 테두리
@@ -89,44 +78,52 @@ export default function HomeParallax({
       >
         <BrandMark size={26} />
         {user ? (
-          <div className="flex items-center gap-3">
-            <p className="text-sm font-medium" style={{ color: 'var(--ss-fg)' }}>
+          <div className="flex items-center gap-1">
+            <span className={HEADER_LINK_CLASS} style={{ color: 'var(--ss-fg)' }}>
               {user.nickname}
-            </p>
+            </span>
             <LogoutButton />
           </div>
         ) : (
-          <div className="flex flex-wrap justify-end gap-3">
-            <PillButton href="/login">로그인</PillButton>
-            <PillButton href="/signup" variant="ghost">
+          <div className="flex items-center gap-1">
+            <Link href="/login" className={`${HEADER_LINK_CLASS} ${HEADER_LINK_HOVER_CLASS}`} style={{ color: 'var(--ss-accent)' }}>
+              로그인
+            </Link>
+            <Link href="/signup" className={`${HEADER_LINK_CLASS} ${HEADER_LINK_HOVER_CLASS}`} style={{ color: 'var(--ss-fg)' }}>
               회원가입
-            </PillButton>
+            </Link>
           </div>
         )}
       </div>
 
-      {/* 카드 캐러셀 — 화면 아래쪽에 깔고, 가로로 무한히 흐른다. 위쪽은
-          지금은 비워 둔다(참고 디자인처럼 나중에 소개 문구가 들어갈
-          자리). 아래쪽 여백은 글래스 테두리 판(--ss-frame-content-pad,
-          48px)에 안 가리도록 최소 확보하고, 로그인 상태면 하단
-          내비바(FloatingNavBar, 실측 높이 80px)에도 안 가리게 그만큼
-          더 띄운다. */}
+      {/* 카드 캐러셀 — 화면 아래쪽에 깔고, 가로로 흐른다(6장 한 벌, 양
+          끝에서 멈춤). 위쪽은 지금은 비워 둔다(참고 디자인처럼 나중에
+          소개 문구가 들어갈 자리). z-10 으로 아래 유리판(.ss-frame,
+          z:0)보다 위에 그려야 카드가 판에 덮이지 않는다. 좌우 padding 은
+          유리판 안쪽 여백과 같은 값(--ss-frame-content-pad)을 써서,
+          캐러셀 자신의 스크롤 뷰포트가 판 안쪽에서만 시작·끝나게 한다 —
+          카드가 이 뷰포트 밖으로는 애초에 그려지지 않으니(overflow-x:
+          auto 가 자신의 박스 기준으로 자른다) 판 밖으로 삐져나갈 수
+          없다. 아래쪽 여백은 판에 안 가리도록 최소 확보하고, 로그인
+          상태면 하단 내비바(FloatingNavBar, 실측 높이 80px)에도 안
+          가리게 그만큼 더 띄운다. */}
       <div
-        className="relative flex min-h-screen w-full items-end"
-        style={{ paddingBottom: user ? 'calc(var(--ss-frame-content-pad) + 80px)' : 'var(--ss-frame-content-pad)' }}
+        className="relative z-10 flex min-h-screen w-full items-end"
+        style={{
+          paddingBottom: user ? 'calc(var(--ss-frame-content-pad) + 80px)' : 'var(--ss-frame-content-pad)',
+          paddingLeft: 'var(--ss-frame-content-pad)',
+          paddingRight: 'var(--ss-frame-content-pad)',
+        }}
       >
         <div ref={frontRef} className="ss-carousel w-full" style={{ willChange: 'transform' }}>
           <div className="ss-carousel-track">
-            {looped.map(({ copy, i, real, ...d }) => (
+            {destinations.map((d, i) => (
               <div
-                key={`${copy}-${d.title}`}
+                key={d.title}
                 className="ss-carousel-item"
-                aria-hidden={real ? undefined : true}
                 style={
                   {
-                    // 계단처럼 규칙적으로 어긋나게 — 짝수 번째는 위로, 홀수
-                    // 번째는 아래로. 복제본도 원본과 같은 i(0~5) 를 쓰므로
-                    // 루프 이음매에서도 어긋남 패턴이 똑같이 이어진다.
+                    // 계단처럼 규칙적으로 어긋나게 — 짝수 번째는 위로, 홀수 번째는 아래로.
                     '--ss-card-offset':
                       i % 2 === 0 ? 'calc(var(--ss-card-stagger) * -1)' : 'var(--ss-card-stagger)',
                   } as CSSProperties
@@ -139,7 +136,6 @@ export default function HomeParallax({
                   href={d.href}
                   phase={i * 0.13}
                   locked={Boolean(d.authRequired) && !user}
-                  tabIndex={real ? undefined : -1}
                 />
               </div>
             ))}
@@ -147,9 +143,24 @@ export default function HomeParallax({
         </div>
       </div>
 
-      {/* 화면을 감싸는 글래스 테두리 판 — 클릭을 막으면 안 되므로
-          pointer-events: none (CSS, .ss-frame). 장식일 뿐이라 스크린리더에서 숨긴다. */}
-      <div aria-hidden="true" className="ss-frame" />
+      {/* 화면 전체를 덮는 유리판 — 로그인 카드와 같은 재질로 배경 사진 위,
+          헤더·카드 아래(z-index, .ss-frame)에 깐다. 클릭을 막으면 안
+          되므로 pointer-events: none(CSS). 장식일 뿐이라 스크린리더에서
+          숨긴다. backdrop-filter 는 여기 인라인 style 로 준다 —
+          globals.css 클래스에 두면 Lightning CSS 가 color-mix() 지원
+          여부에 따라 규칙을 @supports 로 쪼개는 과정에서(다른
+          color-mix 쓰는 선언과 한 규칙에 있었더니) 표준 backdrop-filter
+          선언이 통째로 날아가는 걸 실측(curl 로 받은 실제 CSS 확인)으로
+          발견했다 — GlassPanel(카드) 도 이미 이 값을 인라인으로 준다,
+          같은 이유. */}
+      <div
+        aria-hidden="true"
+        className="ss-frame"
+        style={{
+          backdropFilter: 'blur(var(--ss-glass-blur)) saturate(var(--ss-glass-saturate))',
+          WebkitBackdropFilter: 'blur(var(--ss-glass-blur)) saturate(var(--ss-glass-saturate))',
+        }}
+      />
     </>
   )
 }
