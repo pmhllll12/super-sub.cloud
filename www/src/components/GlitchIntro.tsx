@@ -62,6 +62,22 @@ const EDGE_GPU = 0.02
 const BOIL = 0.06
 
 /**
+ * 지도가 "가운데→바깥" 큰 구조(r)를 ±로 흔드는 세기. CPU·GPU 공용 —
+ * 눈으로 비교해 골랐다: 0.15 미만이면 경계가 너무 매끈해 로딩 스피너 같은
+ * 원으로 보이고, 0.4를 넘으면 지도가 다시 큰 구조를 만들어버려(반복 무늬가
+ * 여러 중심을 만들던 이전 문제로 회귀) 가운데부터 번지는 게 안 보인다.
+ */
+const DETAIL = 0.28
+
+/**
+ * `ink_field.png`를 화면 픽셀에 맞춰 반복시킬 때의 배율 — **WebGL 경로용.**
+ * 1.0(1:1)이면 무늬가 굵다. 1보다 작을수록 지도가 더 자주 반복돼(거울
+ * 반복이라 이음매는 안 생긴다) 알갱이가 고와진다. 0.6 아래로는 디테일이
+ * 지글거리는 노이즈로 무너져 잉크 느낌이 사라져 그 직전에서 멈췄다.
+ */
+const FIELD_SCALE_GPU = 0.6
+
+/**
  * 잉크 캔버스에만 거는 CSS blur(px, 표시 크기 기준) — **CPU 폴백 전용.**
  *
  * 확대로 생긴 격자를 지우는 데 가장 효과적이었다 — GPU 컴포지팅이라 거의
@@ -176,12 +192,13 @@ void main() {
 /** GL1/GL2 공용 본문. `SAMPLE`·`OUT_COLOR` 매크로만 헤더에서 갈아 끼운다. */
 const FRAGMENT_BODY = `
 uniform vec2 uSize;       // 캔버스 크기, 실제 화면 픽셀(framebuffer px)
-uniform vec2 uFieldSize;  // uField 원본 텍셀 크기 — 화면 픽셀과 1:1로 맞춰 반복하는 주기(웹 전용 추가)
+uniform vec2 uFieldSize;  // uField 원본 텍셀 크기 × uFieldScale — 화면 픽셀과 맞춰 반복하는 주기(웹 전용 추가)
 uniform float uProgress;
 uniform float uSeed;
 uniform float uBoil;
 uniform float uEdge;
 uniform float uErase;
+uniform float uDetail;    // 지도가 경계를 흐트러뜨리는 세기 — 큰 구조(중심→가장자리)는 항상 r이 만든다
 uniform vec3 uInk;
 uniform sampler2D uField;
 
@@ -206,12 +223,26 @@ float mirrorFold(float x) {
 void main() {
   vec2 frag = vec2(gl_FragCoord.x, uSize.y - gl_FragCoord.y);
   vec2 clampedFrag = clamp(frag, vec2(0.5), uSize - 0.5);
-  // cover로 늘려 맞추지 않는다 — 화면 픽셀과 지도 텍셀을 1:1로 두고
-  // 모자라는 만큼 거울 반복(mirror tile)한다(위 mirrorFold 참고).
+  // cover로 늘려 맞추지 않는다 — 화면 픽셀과 지도 텍셀을 uFieldScale 배로
+  // 맞추고 모자라는 만큼 거울 반복(mirror tile)한다(위 mirrorFold 참고).
   vec2 period = clampedFrag / uFieldSize;
   vec2 uv = vec2(mirrorFold(period.x), mirrorFold(period.y));
 
-  float order = SAMPLE(uField, uv).r;
+  // 큰 구조(어디부터 번지는가)는 화면 중심에서의 거리 r이 만든다. x/y를
+  // 각각 uSize로 나누면 화면비가 정사각이 아닐 때 원이 타원으로 찌그러진다
+  // — 대신 픽셀 단위(실제 정사각 픽셀) 거리를 구하고, 대각선 절반이라는
+  // 스칼라 하나로 나눠 등방성을 지킨다. 대각선 기준이라 네 모서리까지
+  // r=1 미만으로 채워진다.
+  vec2 centerOffset = frag - uSize * 0.5;
+  float halfDiag = length(uSize) * 0.5;
+  float r = length(centerOffset) / max(halfDiag, 1.0);
+
+  // 지도는 그 r을 ±로 흔드는 디테일일 뿐 — 큰 구조는 만들지 않는다(경계를
+  // 잉크처럼 불규칙하게 만드는 역할). [0,1]로 다시 묶어 두는 이유는 아래
+  // "젖는 중" 문턱 스윕이 이 범위를 기준으로 짜여 있어서다 — 넘치면 dry
+  // 구간(progress=0)에도 중심 근처가 먼저 물드는 티가 난다.
+  float detail = SAMPLE(uField, uv).r - 0.5;
+  float order = clamp(r + detail * uDetail, 0.0, 1.0);
   float n = hash(frag, uSeed) - 0.5;
 
   float boil = uBoil * uProgress * (1.0 - uProgress) * 4.0;
@@ -244,6 +275,7 @@ const UNIFORM_NAMES = [
   'uBoil',
   'uEdge',
   'uErase',
+  'uDetail',
   'uInk',
   'uField',
 ] as const
@@ -502,10 +534,17 @@ export default function GlitchIntro({ onDone }: { onDone: () => void }) {
       glc.bindTexture(glc.TEXTURE_2D, texture)
       glc.uniform1i(uniforms.uField, 0)
       glc.uniform2f(uniforms.uSize, canvas.width, canvas.height)
-      glc.uniform2f(uniforms.uFieldSize, img.naturalWidth || 1, img.naturalHeight || 1)
+      // FIELD_SCALE_GPU < 1이면 화면 픽셀 기준 지도 주기가 짧아져(더 자주
+      // 거울 반복) 무늬가 더 작게(곱게) 보인다 — 위 FIELD_SCALE_GPU 참고.
+      glc.uniform2f(
+        uniforms.uFieldSize,
+        (img.naturalWidth || 1) * FIELD_SCALE_GPU,
+        (img.naturalHeight || 1) * FIELD_SCALE_GPU,
+      )
       glc.uniform1f(uniforms.uBoil, BOIL)
       glc.uniform1f(uniforms.uEdge, EDGE_GPU)
       glc.uniform1f(uniforms.uErase, 0)
+      glc.uniform1f(uniforms.uDetail, DETAIL)
       glc.uniform3f(uniforms.uInk, 0, 0, 0)
 
       // 글자 레이어(container의 기존 자식)보다 뒤에 와야 한다 — DOM 순서가
@@ -585,8 +624,22 @@ export default function GlitchIntro({ onDone }: { onDone: () => void }) {
       const { dx, dy, dw, dh } = coverRect(img.naturalWidth, img.naturalHeight, gridW, gridH)
       octx.drawImage(img, dx, dy, dw, dh)
       const data = octx.getImageData(0, 0, gridW, gridH).data
+      // 큰 구조(가운데→바깥)는 그리드 픽셀에서의 중심거리 r이 만들고, 지도는
+      // 그 r을 ±DETAIL만큼 흔드는 디테일로만 쓴다 — WebGL 경로와 같은
+      // 역할 분리(위 FRAGMENT_BODY 참고). r은 프레임마다 안 바뀌니 여기서
+      // 한 번만 계산해 orderMap에 합쳐 둔다(렌더 루프에 비용을 더하지 않음).
+      const halfDiag = Math.sqrt(gridW * gridW + gridH * gridH) / 2
       const orderMap = new Float32Array(gridW * gridH)
-      for (let i = 0; i < orderMap.length; i++) orderMap[i] = data[i * 4] / 255
+      let oi = 0
+      for (let y = 0; y < gridH; y++) {
+        for (let x = 0; x < gridW; x++, oi++) {
+          const dxc = x - gridW / 2
+          const dyc = y - gridH / 2
+          const r = Math.min(1, Math.sqrt(dxc * dxc + dyc * dyc) / halfDiag)
+          const detail = data[oi * 4] / 255 - 0.5
+          orderMap[oi] = clamp(r + detail * DETAIL, 0, 1)
+        }
+      }
 
       canvas.width = gridW
       canvas.height = gridH
