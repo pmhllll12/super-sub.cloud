@@ -105,8 +105,16 @@ export default function HomeParallax({
         )}
       </div>
 
-      {/* 카드 캐러셀 — 화면 세로 가운데, 가로로 무한히 흐른다. */}
-      <div className="relative flex min-h-screen w-full items-center">
+      {/* 카드 캐러셀 — 화면 아래쪽에 깔고, 가로로 무한히 흐른다. 위쪽은
+          지금은 비워 둔다(참고 디자인처럼 나중에 소개 문구가 들어갈
+          자리). 아래쪽 여백은 글래스 테두리 판(--ss-frame-content-pad,
+          48px)에 안 가리도록 최소 확보하고, 로그인 상태면 하단
+          내비바(FloatingNavBar, 실측 높이 80px)에도 안 가리게 그만큼
+          더 띄운다. */}
+      <div
+        className="relative flex min-h-screen w-full items-end"
+        style={{ paddingBottom: user ? 'calc(var(--ss-frame-content-pad) + 80px)' : 'var(--ss-frame-content-pad)' }}
+      >
         <div ref={frontRef} className="ss-carousel w-full" style={{ willChange: 'transform' }}>
           <div className="ss-carousel-track">
             {looped.map(({ copy, i, real, ...d }) => (
