@@ -15,6 +15,21 @@ describe('홈 화면 — /', () => {
     expect(screen.getAllByText('준비 중입니다')).toHaveLength(3)
   })
 
+  it('로그인 안 했으면 로그인 전용 카드(영상 분석 · 내 선수 카드 · 내 프로필)에 로그인 필요 안내를 보여주되 링크는 살아 있다', () => {
+    render(<HomeBody user={null} />)
+    expect(screen.getAllByText('로그인이 필요합니다')).toHaveLength(3)
+    expect(screen.getByRole('link', { name: /영상 분석/ })).toHaveAttribute('href', '/analysis')
+    expect(screen.getByRole('link', { name: /내 선수 카드/ })).toHaveAttribute('href', '/me/card')
+    expect(screen.getByRole('link', { name: /내 프로필/ })).toHaveAttribute('href', '/me')
+  })
+
+  it('로그인했으면 로그인 전용 카드에 로그인 필요 안내를 보여주지 않는다', () => {
+    render(<HomeBody user={{ nickname: '홍길동' }} />)
+    expect(screen.queryByText('로그인이 필요합니다')).toBeNull()
+    // 아직 준비 안 된 3장(용병 매칭 · 내 팀 · 레슨 · 코치)은 로그인 여부와 무관하다.
+    expect(screen.getAllByText('준비 중입니다')).toHaveLength(3)
+  })
+
   it('로그인 안 했으면 인사말 자리에 로그인 · 회원가입 버튼을 보여준다', () => {
     render(<HomeBody user={null} />)
     expect(screen.getByRole('link', { name: '로그인' })).toHaveAttribute('href', '/login')

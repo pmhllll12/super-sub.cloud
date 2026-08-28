@@ -8,7 +8,16 @@ import LogoutButton from '@/components/LogoutButton'
 import PillButton from '@/components/ui/PillButton'
 import { useMouseParallax } from '@/lib/useMouseParallax'
 
-export type Destination = { title: string; icon: string; summary: string; href?: string }
+export type Destination = {
+  title: string
+  icon: string
+  summary: string
+  href?: string
+  /** 이 목적지가 결국 requireUser() 에 걸리는 로그인 전용 경로인가 — 로그인
+   *  안 한 사람에게는 "로그인이 필요합니다" 안내를 보여준다(링크 자체는
+   *  살려 둔다, 눌러야 /login 으로 보내는 지금 방식 그대로). */
+  authRequired?: boolean
+}
 
 /**
  * 배경 사진 위에 얹힌 요소들을 마우스를 따라 아주 미세하게 움직여 시차
@@ -85,6 +94,7 @@ export default function HomeParallax({
             summary={d.summary}
             href={d.href}
             phase={i * 0.13}
+            locked={Boolean(d.authRequired) && !user}
           />
         ))}
       </div>

@@ -7,15 +7,20 @@ import FloatingNavBar from '@/components/ui/FloatingNavBar'
 // flutter/lib/features/home/presentation/screens/home_screen.dart 의 _kDestinations 와 같은 순서 · 같은 뜻.
 // '내 선수 카드' 는 앱엔 아직 route 가 없지만(미완성) 웹엔 /me/card 가 실재하므로 여기선 링크를 건다.
 //
-// 카드 6장은 로그인 여부와 무관하게 항상 보인다. 로그인이 필요한 카드
-// (/me/card, /me)를 로그인 안 한 채 누르면 그 경로의 requireUser() 가
-// 알아서 /login 으로 돌려보낸다 — 여기서 따로 막지 않는다.
+// 카드 6장은 로그인 여부와 무관하게 항상 보인다. href 가 있는 세 카드
+// (/analysis, /me/card, /me)는 전부 그 경로의 requireUser() 에 걸리는
+// 로그인 전용 화면이다 — 로그인 안 한 채 누르면 결국 /login 으로 돌아간다.
+// 그 사실을 카드에 미리 적어 두려고(눌러 보기 전엔 몰랐던 예전 방식 대신)
+// authRequired: true 로 표시한다 — HomeParallax 가 로그인 여부와 대조해
+// "로그인이 필요합니다" 안내문을 보여줄지 정한다. 링크 자체는 그대로
+// 살아 있다 — 카드를 비활성으로 막지 않는다.
 const DESTINATIONS: Destination[] = [
   {
     title: '영상 분석',
     icon: 'videocam',
     summary: '경기 영상을 올리면\n실력 리포트가 나옵니다',
     href: '/analysis',
+    authRequired: true,
   },
   {
     title: '용병 매칭',
@@ -27,6 +32,7 @@ const DESTINATIONS: Destination[] = [
     icon: 'id_card',
     summary: '호칭을 모으고\n카드를 공유합니다',
     href: '/me/card',
+    authRequired: true,
   },
   {
     title: '내 팀',
@@ -43,6 +49,7 @@ const DESTINATIONS: Destination[] = [
     icon: 'person',
     summary: '닉네임과\n가입 정보',
     href: '/me',
+    authRequired: true,
   },
 ]
 
