@@ -28,6 +28,9 @@ describe('선수 카드', () => {
     const { container } = render(<PlayerCardView card={card} />)
     expect(container.textContent).not.toMatch(/[0-9]+\s*점/)
     expect(container.textContent).not.toMatch(/등급/)
+    expect(container.textContent).not.toMatch(/★|☆/) // 별점
+    expect(container.textContent).not.toMatch(/[0-9]+\s*%/) // 백분율
+    expect(container.textContent).not.toMatch(/[0-9]+\.[0-9]/) // 소수 점수
     expect(container.querySelector('progress')).toBeNull()
     expect(container.querySelector('meter')).toBeNull()
   })

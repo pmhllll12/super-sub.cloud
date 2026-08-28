@@ -1,16 +1,22 @@
 import type { Metadata } from 'next'
+import { cache } from 'react'
 import { notFound } from 'next/navigation'
 import PlayerCardView from '@/components/PlayerCardView'
 import { BackendError, getBackend, type PublicPlayerCard } from '@/server/backend'
 
-async function load(slug: string): Promise<PublicPlayerCard | null> {
+/**
+ * generateMetadata 와 페이지 컴포넌트가 같은 slug 로 각각 호출한다.
+ * load 는 fetch 가 아니라 모듈 함수라 Next 의 fetch 중복 제거가 적용되지
+ * 않으므로 React cache() 로 직접 묶는다 — 요청당 백엔드 호출을 한 번으로 줄인다.
+ */
+const load = cache(async (slug: string): Promise<PublicPlayerCard | null> => {
   try {
     return await getBackend().getPublicCard(slug)
   } catch (e) {
     if (e instanceof BackendError && e.status === 404) return null
     throw e
   }
-}
+})
 
 export async function generateMetadata({
   params,
