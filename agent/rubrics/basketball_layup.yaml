@@ -15,6 +15,10 @@ motion: layup
 sport_ko: 농구
 motion_ko: 레이업
 version: 0.1
+# status: 사용자 선택지에 올릴지 여부 — active만 오른다.
+#   draft는 파일은 갖추었으나 아직 열지 않은 동작이다. 임계값 검수 여부는
+#   review_required가 따로 들고 있다 (두 축은 다르다: 열려 있어도 검수 전일 수
+#   있고, 검수가 끝나도 범위 밖이라 닫아 둘 수 있다).
 status: draft
 review_required: true
 pipeline_version: pose-v0.1
@@ -44,7 +48,7 @@ criteria:
       0: "140도 미만"
     bands:
       metric: swing_elbow_angle_at_impact
-      2: [[160, null]]
+      2: [[160, 180]]
       1: [[140, 160]]
       0: [[null, 140]]
     anchors:
@@ -75,7 +79,7 @@ criteria:
       0: "145도 미만"
     bands:
       metric: swing_knee_angle_at_impact
-      2: [[165, null]]
+      2: [[165, 180]]
       1: [[145, 165]]
       0: [[null, 145]]
     anchors:

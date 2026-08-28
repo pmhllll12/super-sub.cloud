@@ -4,9 +4,11 @@
 
 ## 팀 구성
 
+(2026.08.26 재배정)
+
 - **박민호** — PM (요구사항/일정 관리, 스프린트 진행, QA 총괄)
 - **백성검** — 프론트·웹 (Flutter 앱 UI/UX, 화면 구현, 웹 페이지)
-- **정어진** — 데이터 파이프라인 (영상 수집·전처리, DB, 분석 파이프라인)
+- **정어진** — 백엔드·파이프라인 (DB·API, 영상 수집·전처리, 분석 파이프라인, 배포)
 - **정상호** — AI 에이전트 개발 (RAG 검증, 실력 판단 로직)
 
 개발 기간: 2026.08.20 ~ 2026.10.27 (10주)
@@ -68,7 +70,7 @@ permalink: /<번호>-<슬러그>/   # 부록은 /부록A-<슬러그>/
 
 ### 스프린트 로드맵 & 칸반 (챕터 7 "개발 구현 계획" 전용 규칙)
 - `07-개발구현계획.markdown`의 "4) 단계별 개발 일정"에 스프린트 로드맵 표(전체 5개 스프린트 × 담당자별 태스크)와 **현재 진행 중인 스프린트**의 칸반 보드를 유지합니다.
-- 칸반 보드는 `<div class="kanban-board">` > `<div class="kanban-column">`(Backlog/To Do/In Progress/Done) > `<div class="kanban-card"><span class="role-tag role-{pm|flutter|pipeline|agent}">이름·역할</span>태스크</div>` 구조를 사용합니다 (스타일은 `assets/main.scss`에 정의됨).
+- 칸반 보드는 `<div class="kanban-board">` > `<div class="kanban-column">`(Backlog/To Do/In Progress/Done) > `<div class="kanban-card"><span class="role-tag role-{pm|front|backend|agent}">이름·역할</span>태스크</div>` 구조를 사용합니다 (스타일은 `assets/main.scss`에 정의됨).
 - 칸반 보드는 **항상 현재 스프린트 상태만** 반영합니다. 스프린트가 끝나면: (1) 로드맵 표의 해당 Sprint 번호를 `jekyll/sprints/스프린트N.markdown` 링크로 연결 (2) 그 스프린트의 일자별 진행 내역을 `jekyll/sprints/스프린트N.markdown`에 표로 기록 (3) 칸반 보드를 다음 스프린트 내용으로 교체.
 - 스프린트 로그 페이지 형식: `permalink: /스프린트N/`, 날짜별 표(담당자 4명을 컬럼으로), 하단에 `[← 개발 구현 계획으로](/07-개발구현계획/)`.
 

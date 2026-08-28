@@ -9,10 +9,20 @@ motion: pitching
 sport_ko: 야구
 motion_ko: 투구
 version: 0.1
-status: draft
+# status: 사용자 선택지에 올릴지 여부 — active만 오른다.
+#   draft는 파일은 갖추었으나 아직 열지 않은 동작이다. 임계값 검수 여부는
+#   review_required가 따로 들고 있다 (두 축은 다르다: 열려 있어도 검수 전일 수
+#   있고, 검수가 끝나도 범위 밖이라 닫아 둘 수 있다).
+status: active
 review_required: true
 pipeline_version: pose-v0.1
-validated_on: ""
+validated_on: >-
+  실클립 1건 (2160×3840 25fps, 투구 구간 3.6초 절취, 46프레임). 측정까지 통과
+  — 던지는 팔 98%, 글러브 팔 50%라 스윙 측을 left로 지정해야 한다 (2026-08-26).
+  **다만 임팩트 프레임이 릴리스보다 이르다.** extension_peak이 신전 중간
+  (팔꿈치 61도, 25fps 샘플링에서 102도)을 잡는데, 이 루브릭의 release_arm_extension
+  은 릴리스 시점(150~172도)을 전제한다. 임팩트 정의 또는 bands 중 하나를
+  지도자 검수 때 맞춰야 한다 (미결 5번).
 
 kinematics:
   impact_limb: arm
@@ -51,35 +61,36 @@ criteria:
         evidence: "팔꿈치각 177도로 릴리스 전에 이미 다 펴졌다"
 
   - id: hip_shoulder_separation
-    name: 골반 회전
+    name: 골반-어깨 분리
     weight: 0.25
     rationale: >-
-      골반이 먼저 열리고 상체가 뒤따라야 힘이 순서대로 전달된다.
-      골반 회전 없이 팔로만 던지면 속도가 나오지 않고 어깨에 부담이 쌓인다.
-    measured_by: [hip_rotation_range_deg]
+      골반이 먼저 열리고 상체가 뒤따라야 힘이 순서대로 전달된다. 두 축이 벌어진
+      정도가 그 순서를 드러낸다. 골반과 상체가 함께 돌면(분리 0에 가까움) 팔로만
+      던지는 동작이라 속도가 나오지 않고 어깨에 부담이 쌓인다.
+    measured_by: [hip_shoulder_separation_deg]
     titles:
       2: "먼저 열리는 골반"
       1: "덜 열린 골반"
-      0: "잠긴 골반"
+      0: "함께 도는 몸통"
     grades:
-      2: "준비~릴리스 구간 골반 회전 범위 40도 이상"
-      1: "20~40도"
-      0: "20도 미만"
+      2: "준비~릴리스 구간 최대 분리각 30~70도"
+      1: "15~30도"
+      0: "15도 미만(함께 돌았다) 또는 70도 초과(측정 오류 의심)"
     bands:
-      metric: hip_rotation_range_deg
-      2: [[40, null]]
-      1: [[20, 40]]
-      0: [[null, 20]]
+      metric: hip_shoulder_separation_deg
+      2: [[30, 70]]
+      1: [[15, 30]]
+      0: [[null, 15], [70, null]]
     anchors:
-      - measured: {hip_rotation_range_deg: 55.0}
+      - measured: {hip_shoulder_separation_deg: 46.0}
         grade: 2
-        evidence: "골반 회전 범위 55도로 골반이 먼저 열렸다"
-      - measured: {hip_rotation_range_deg: 28.0}
+        evidence: "최대 분리각 46도로 골반이 상체보다 먼저 열렸다"
+      - measured: {hip_shoulder_separation_deg: 22.0}
         grade: 1
-        evidence: "회전 범위 28도로 골반 회전이 부족하다"
-      - measured: {hip_rotation_range_deg: 13.0}
+        evidence: "분리각 22도로 골반이 먼저 열리는 정도가 부족하다"
+      - measured: {hip_shoulder_separation_deg: 9.0}
         grade: 0
-        evidence: "회전 범위 13도로 팔로만 던졌다"
+        evidence: "분리각 9도로 골반과 상체가 거의 함께 돌았다"
 
   - id: stride_leg_block
     name: 디딤발 버팀
@@ -98,7 +109,7 @@ criteria:
       0: "130도 미만"
     bands:
       metric: plant_knee_angle_at_impact
-      2: [[150, null]]
+      2: [[150, 180]]
       1: [[130, 150]]
       0: [[null, 130]]
     anchors:
@@ -160,7 +171,7 @@ criteria:
       0: "12도 미만"
     bands:
       metric: swing_shoulder_flexion_after_impact_deg
-      2: [[30, null]]
+      2: [[30, 180]]
       1: [[12, 30]]
       0: [[null, 12]]
     anchors:

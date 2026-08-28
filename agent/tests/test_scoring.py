@@ -68,6 +68,81 @@ def test_rubric_is_flagged_provisional(rubric):
     assert rubric.review_required is True
 
 
+def test_open_scope_is_one_motion_per_sport():
+    """지금 여는 범위는 종목당 한 동작이다.
+
+    동작을 하나 여는 비용은 YAML 작성이 아니라 임계값 실측·지도자 검수·검증
+    클립이다. 열린 동작이 늘면 검수 대상이 함께 늘어야 하므로, 늘리는 순간
+    여기서 걸리게 둔다.
+    """
+    active = {k for k, r in discover_rubrics("rubrics").items() if r.is_active}
+
+    assert active == {
+        "football/instep_shot",
+        "baseball/pitching",
+        "basketball/jump_shot",
+    }
+    sports = [k.split("/")[0] for k in active]
+    assert len(sports) == len(set(sports)), "한 종목에 두 동작이 열려 있다"
+
+
+def test_closed_motions_stay_loadable():
+    """닫아 둔 동작도 적재는 된다 — 검수·실측을 UI와 무관하게 돌리기 위해서다.
+
+    계약 테스트(test_pipeline_covers_every_rubric_metric)도 이 파일들을 계속
+    돌므로, 닫혀 있는 동안 파이프라인이 바뀌어 지표가 어긋나면 여는 시점이
+    아니라 그때 걸린다.
+    """
+    closed = {k: r for k, r in discover_rubrics("rubrics").items() if not r.is_active}
+
+    assert set(closed) == {"football/inside_pass", "basketball/layup"}
+    for key, r in closed.items():
+        assert r.criteria, key
+        assert r.status == "draft", key
+
+
+def test_open_ended_top_bands_are_rejected(tmp_path):
+    """상위 등급 구간의 끝이 열려 있으면 적재에서 막는다.
+
+    위가 열린 2등급은 측정 오류를 만점으로 만든다 — 야구 투구 실클립에서 골반
+    회전 181.1도(좌우 라벨 스왑으로 부풀려진 값)가 "40도 이상"에 걸려 장점으로
+    표시됐다. 0등급만 열어 둔다.
+    """
+    body = ("sport: x\nmotion: y\ncriteria:\n"
+            "  - {id: a, name: A, weight: 1.0, measured_by: [m], "
+            "grades: {0: z, 1: z, 2: z}, "
+            "bands: {metric: m, 2: [[2, null]], 1: [[1, 2]], 0: [[null, 1]]}}\n")
+    (tmp_path / "one.yaml").write_text(body, encoding="utf-8")
+
+    with pytest.raises(RubricError, match="열려 있음"):
+        discover_rubrics(tmp_path)
+
+
+def test_unknown_status_is_rejected(tmp_path):
+    """오타로 조용히 닫히면 안 된다 — 열려야 할 동작이 사라지는 쪽이 못 찾는다."""
+    (tmp_path / "one.yaml").write_text(
+        "sport: x\nmotion: y\nstatus: enabled\ncriteria:\n"
+        "  - {id: a, name: A, weight: 1.0, measured_by: [m], "
+        "grades: {0: z, 1: z, 2: z}, " + _BANDS + "}\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RubricError, match="status"):
+        discover_rubrics(tmp_path)
+
+
+def test_status_defaults_to_active(tmp_path):
+    """status를 안 쓴 옛 루브릭은 그대로 열린 것으로 본다."""
+    (tmp_path / "one.yaml").write_text(
+        "sport: x\nmotion: y\ncriteria:\n"
+        "  - {id: a, name: A, weight: 1.0, measured_by: [m], "
+        "grades: {0: z, 1: z, 2: z}, " + _BANDS + "}\n",
+        encoding="utf-8",
+    )
+
+    assert discover_rubrics(tmp_path)["x/y"].is_active
+
+
 def test_every_criterion_has_measurable_basis(rubric):
     """근거 지표가 없는 항목은 판정할 수 없다."""
     for c in rubric.criteria:
@@ -205,7 +280,8 @@ def test_out_of_range_grade_is_rejected(rubric):
         aggregate(judgments, rubric)
 
 
-_BANDS = "bands: {metric: m, 2: [[2, null]], 1: [[1, 2]], 0: [[null, 1]]}"
+# 상위 등급의 열린 끝은 이제 적재에서 막힌다 — 0등급만 열어 둔다.
+_BANDS = "bands: {metric: m, 2: [[2, 3]], 1: [[1, 2]], 0: [[null, 1]]}"
 
 
 def _minimal_rubric(tmp_path, *, weight=0.5, bands=_BANDS):
@@ -260,3 +336,21 @@ def test_grade_for_rejects_uncovered_value(tmp_path):
     assert c.grade_for({"m": 2.5}) == 2
     with pytest.raises(RubricError, match="어느 등급 구간에도 없음"):
         c.grade_for({"m": 10.0})
+
+
+def test_band_text_states_the_actual_interval(rubric):
+    """근거 문장에 들어갈 기준 구간은 코드가 만든다.
+
+    등급 정의만 주면 모델이 없는 상한을 지어낸다 — 실클립에서 "40도 이상"인
+    기준이 화면에 "40~165도"로 나갔다. 구간을 문장으로 확정해 넘긴다.
+    """
+    from supersub_agent.judge import band_text, system_prompt
+
+    c = rubric.get("hip_rotation")
+    assert band_text(c, 2) == "25~180"
+    assert band_text(c, 1) == "15~25"
+    assert band_text(c, 0) == "15 이하"
+
+    assert "축구" in system_prompt("football")
+    assert "야구" in system_prompt("baseball")
+    assert "생활체육" in system_prompt(""), "모르는 종목은 특정하지 않는다"

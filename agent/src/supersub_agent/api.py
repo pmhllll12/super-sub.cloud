@@ -26,7 +26,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from .features import InsufficientQuality, extract_features, verify_rubric_coverage
 from .judge import Judge
-from .scoring import RubricError, aggregate, discover_rubrics
+from .scoring import CONFIDENT_MARGIN, RubricError, aggregate, discover_rubrics
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 RUBRIC_DIR = ROOT / "rubrics"
@@ -144,13 +144,16 @@ def run_pipeline(
     rubric_key: str | None = None,
     frames: list[np.ndarray] | None = None,
     fps: float = 12.0,
+    swing_side: str = "auto",
 ) -> dict:
     rubric = get_rubric(rubric_key)
 
     t0 = time.time()
     # 임팩트를 어느 사지의 어느 사건으로 정의할지는 루브릭이 선언한다.
+    # 스윙이 어느 쪽인지는 루브릭이 알 수 없다 — 선수마다 다르므로 올리는
+    # 사람이 지정하고, 지정이 없으면 이동량으로 판별한다(팔 종목에서 약하다).
     features = extract_features(
-        keypoints, objects, rubric.impact_limb, rubric.impact_event
+        keypoints, objects, rubric.impact_limb, rubric.impact_event, swing_side
     )
     verify_rubric_coverage(rubric, features)
     measure_s = time.time() - t0
@@ -164,7 +167,13 @@ def run_pipeline(
 
     by_id = {c.id: c for c in rubric.criteria}
     for item in result["breakdown"]:
-        item["title"] = by_id[item["criterion_id"]].title_for(item["grade"])
+        criterion = by_id[item["criterion_id"]]
+        item["title"] = criterion.title_for(item["grade"])
+        # 등급 구간 안쪽 여유 — 화면이 장단점을 고르는 기준이다.
+        # 경계에 걸친 값은 다음 클립에서 등급이 뒤집히므로 장단점으로 올리지 않는다.
+        margin = criterion.band_margin(features)
+        item["margin"] = round(margin, 3)
+        item["confident"] = margin >= CONFIDENT_MARGIN
 
     return {
         "source": source,
@@ -184,9 +193,12 @@ def run_pipeline(
             "label": rubric.label,
             "version": rubric.version,
             "review_required": rubric.review_required,
+            # 닫아 둔 동작을 키로 직접 돌린 결과인지 드러낸다.
+            "status": rubric.status,
             "validated_on": rubric.validated_on,
             "impact_limb": rubric.impact_limb,
             "impact_event": rubric.impact_event,
+            "swing_side": swing_side,
             "criteria": [
                 {"id": c.id, "name": c.name, "weight": c.weight,
                  "measured_by": list(c.measured_by),
@@ -199,7 +211,12 @@ def run_pipeline(
 
 @app.get("/api/rubrics")
 def api_rubrics() -> JSONResponse:
-    """사용 가능한 루브릭 목록. UI의 종목 선택이 이걸 읽는다."""
+    """열려 있는 루브릭 목록. UI의 종목 선택이 이걸 읽는다.
+
+    status가 draft인 것은 빼고 내려준다 — 지금 여는 범위는 종목당 한 동작이다
+    (축구 인스텝 슈팅·야구 투구·농구 점프슛). 닫아 둔 동작도 키를 직접 주면
+    분석은 되므로, 검수·실측은 UI를 열지 않고도 계속 돌릴 수 있다.
+    """
     rubrics = discover_rubrics(RUBRIC_DIR)
     return JSONResponse({
         "default": DEFAULT_RUBRIC,
@@ -210,7 +227,7 @@ def api_rubrics() -> JSONResponse:
              # 실클립으로 확인된 루브릭인지. UI가 미검증 항목에 표시를 단다.
              "validated": bool(r.validated_on), "validated_on": r.validated_on,
              "criteria_count": len(r.criteria)}
-            for r in rubrics.values()
+            for r in rubrics.values() if r.is_active
         ],
     })
 
@@ -233,14 +250,18 @@ def api_rubric(rubric: str | None = None) -> JSONResponse:
 
 
 @app.post("/api/analyze/synthetic")
-def api_synthetic(rubric: str | None = None) -> JSONResponse:
+def api_synthetic(rubric: str | None = None, side: str = "auto") -> JSONResponse:
     return JSONResponse(
-        run_pipeline(synthetic_keypoints(), "synthetic", rubric_key=rubric)
+        run_pipeline(
+            synthetic_keypoints(), "synthetic", rubric_key=rubric, swing_side=side
+        )
     )
 
 
 @app.post("/api/analyze/video")
-async def api_video(file: UploadFile, rubric: str | None = None) -> JSONResponse:
+async def api_video(
+    file: UploadFile, rubric: str | None = None, side: str = "auto"
+) -> JSONResponse:
     from .pose import extract_keypoints
 
     suffix = Path(file.filename or "clip.mp4").suffix or ".mp4"
@@ -254,7 +275,7 @@ async def api_video(file: UploadFile, rubric: str | None = None) -> JSONResponse
         return JSONResponse(
             run_pipeline(
                 pose.keypoints, file.filename or "video", pose.objects, rubric,
-                frames=pose.frames, fps=pose.sampled_fps,
+                frames=pose.frames, fps=pose.sampled_fps, swing_side=side,
             )
         )
     except InsufficientQuality as exc:
@@ -309,7 +330,7 @@ code{font:.85em ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--mut)}
 .cmp{color:var(--mut);font-size:.84rem;margin-top:.25rem}
 .err{color:#dc2626}
 .mut{color:var(--mut);font-size:.86rem}
-/* 장단점 — 등급을 그대로 쓴다. 2=장점, 1=보완 필요, 0=단점. */
+/* 장단점 — 선정 기준은 prosCons 참고 (등급 + 경계 여유 + 배점 상위 2개). */
 .pc{display:grid;grid-template-columns:1fr 1fr;gap:1.4rem}
 @media(max-width:640px){.pc{grid-template-columns:1fr}}
 .pc section{min-width:0}
@@ -350,6 +371,12 @@ code{font:.85em ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--mut)}
 <div class="row">
   <label class="mut" for="rubric">채점 기준</label>
   <select id="rubric"></select>
+  <label class="mut" for="side">스윙 측</label>
+  <select id="side">
+    <option value="auto">자동 판별</option>
+    <option value="left">왼쪽</option>
+    <option value="right">오른쪽</option>
+  </select>
   <button id="syn">합성 데이터로 실행</button>
   <button class="ghost" id="pick">영상 업로드해서 실행</button>
   <input type="file" id="file" accept="video/*" hidden>
@@ -401,7 +428,10 @@ function showValidation(){
 sel.onchange=showValidation;
 loadRubrics();
 
-const q=()=>'?rubric='+encodeURIComponent(sel.value||'');
+// 스윙 측(던지는 팔·차는 발)은 사람이 지정할 수 있다. 자동 판별은 이동량으로
+// 고르는데 팔 종목에서 약하다 — 야구 투구 실클립에서 글러브 팔을 집었다.
+const q=()=>'?rubric='+encodeURIComponent(sel.value||'')
+  +'&side='+encodeURIComponent($('#side').value||'auto');
 
 $('#syn').onclick=()=>call('/api/analyze/synthetic'+q(),{method:'POST'});
 $('#pick').onclick=()=>$('#file').click();
@@ -412,14 +442,25 @@ $('#file').onchange=e=>{
   e.target.value='';   // 같은 파일을 다시 고를 수 있게
 };
 
-// 등급을 장단점으로 옮긴다. 2=장점, 1=보완 필요, 0=단점 — 루브릭의 등급 정의
-// 그대로이므로 별도 임계값을 두지 않는다. 1을 단점에 합치면 부분 득점한 항목이
-// 실패로 보이므로 따로 둔다.
+// 장단점 선정 기준. 등급만으로 가르지 않는다.
+//
+//   장점 = 2등급 + 경계에서 충분히 안쪽(confident) + 배점 상위 2개
+//   단점 = 0등급 + 경계에서 충분히 안쪽 + 배점 상위 2개
+//   나머지(1등급, 경계에 걸친 2·0등급) = 보완 필요
+//
+// 경계에 걸린 값을 장단점으로 올리지 않는 이유는 그 문구가 선수 카드에 남기
+// 때문이다. 밴드 경계에서 1도 차이로 등급이 갈리는 값은 다음 클립에서 뒤집힌다.
+// 개수를 2개로 끊는 이유는 단점 3개가 나열되면 카드가 아니라 진단서가 돼서다.
+const MAX_POINTS=2;
 function prosCons(r){
   const items=r.breakdown;
   // 배점이 큰 항목이 먼저 오게 한다 — 점수는 표기하지 않지만 순서로는 남긴다.
   const bucket=g=>items.filter(b=>b.grade===g).sort((a,b)=>b.weight-a.weight);
-  const pro=bucket(2), part=bucket(1), con=bucket(0);
+  const solid=g=>bucket(g).filter(b=>b.confident!==false);
+  const pro=solid(2).slice(0,MAX_POINTS), con=solid(0).slice(0,MAX_POINTS);
+  const shown=new Set([...pro,...con].map(b=>b.criterion_id));
+  const part=items.filter(b=>!shown.has(b.criterion_id))
+                  .sort((a,b)=>b.weight-a.weight);
 
   // 칭호가 먼저, 설명이 뒤. 칭호는 루브릭의 titles에서 온다.
   const li=b=>`<li><div class="ttl">${b.title||b.name}</div>
