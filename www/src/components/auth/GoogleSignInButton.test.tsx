@@ -55,12 +55,28 @@ describe('GoogleSignInButton', () => {
     // 우리가 임의로 바꾸지 않는다 — 표준 옵션만 넘기는지 확인한다.
     expect(options).toEqual(
       expect.objectContaining({
-        theme: 'filled_black',
+        theme: 'outline',
         shape: 'pill',
         size: 'large',
-        text: 'continue_with',
+        text: 'signin_with',
         locale: 'ko',
       }),
     )
+  })
+
+  it('text prop 으로 문구를 바꿀 수 있다(회원가입 화면의 signup_with)', async () => {
+    vi.stubEnv('NEXT_PUBLIC_GOOGLE_CLIENT_ID', 'test-client-id.apps.googleusercontent.com')
+    const initialize = vi.fn()
+    const renderButton = vi.fn()
+    window.google = { accounts: { id: { initialize, renderButton } } }
+
+    const { default: GoogleSignInButton } = await import('./GoogleSignInButton')
+    render(<GoogleSignInButton onError={() => {}} text="signup_with" />)
+
+    await waitFor(() => {
+      expect(renderButton).toHaveBeenCalledTimes(1)
+    })
+    const [, options] = renderButton.mock.calls[0]
+    expect(options).toEqual(expect.objectContaining({ text: 'signup_with' }))
   })
 })

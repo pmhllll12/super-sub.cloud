@@ -55,13 +55,19 @@ const MAX_BUTTON_WIDTH = 400
  * 그리는 버튼을 클릭하면 팝업 창이 뜨는 방식이라 이 문제가 없다.
  *
  * 구글이 버튼 마크업을 직접 그리므로 완전한 커스텀 스타일은 불가능하다.
- * 대신 우리 카드가 검정 배경(`--ss-bg`)이라 `filled_black` 테마가 잘
- * 어울려 이 옵션을 그대로 쓴다(구글 브랜드 마크/문구는 임의 변경 금지).
+ * `filled_black` 테마는 검정 카드 위에서 검정 버튼이 되어 사실상 안
+ * 보였다(DOM/JS 는 정상 동작 — 대비가 없어 육안으로만 안 보이는 문제였다).
+ * 그래서 밝은(흰 배경) `outline` 테마로 바꾼다 — 구글 브랜드 4색 G 로고가
+ * 그대로 나오고, 검정 카드 위에서 잘 도드라진다(구글 브랜드 마크/문구는
+ * 임의 변경 금지).
  */
 export default function GoogleSignInButton({
   onError,
+  text = 'signin_with',
 }: {
   onError: (message: string) => void
+  /** signin_with(…로 로그인) / signup_with(…로 가입) — 페이지 문맥에 맞게 지정 */
+  text?: 'signin_with' | 'signup_with'
 }) {
   const router = useRouter()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -83,10 +89,10 @@ export default function GoogleSignInButton({
     const measuredWidth = containerRef.current.offsetWidth
     const width = String(measuredWidth > 0 ? Math.min(measuredWidth, MAX_BUTTON_WIDTH) : MAX_BUTTON_WIDTH)
     window.google.accounts.id.renderButton(containerRef.current, {
-      theme: 'filled_black',
+      theme: 'outline',
       shape: 'pill',
       size: 'large',
-      text: 'continue_with',
+      text,
       locale: 'ko',
       width,
     })
@@ -124,7 +130,15 @@ export default function GoogleSignInButton({
         strategy="afterInteractive"
         onLoad={initialize}
       />
-      <div ref={containerRef} className="flex w-full justify-center" />
+      {/* 구글이 그리는 버튼은 자체 높이(large 여도 ~44px)가 --ss-btn-h(54px)
+          보다 낮아 로그인 버튼과 나란히 두면 자리가 어긋난다. 바깥 래퍼의
+          높이를 --ss-btn-h 로 고정하고 세로 가운데 정렬해, 버튼 자체
+          높이는 구글이 그린 대로 두되 "차지하는 자리"만 맞춘다. 래퍼는
+          클릭을 가로채는 오버레이가 아니라 순수 정렬용이라 버튼 클릭에
+          영향이 없다. */}
+      <div className="flex w-full items-center justify-center" style={{ height: 'var(--ss-btn-h)' }}>
+        <div ref={containerRef} className="flex w-full justify-center" />
+      </div>
     </>
   )
 }

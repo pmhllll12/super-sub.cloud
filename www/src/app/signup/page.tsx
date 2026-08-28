@@ -82,7 +82,7 @@ export default function SignupPage() {
         <PillButton type="submit" disabled={busy} className="mt-2 w-full">
           가입하기
         </PillButton>
-        <GoogleSignInButton onError={setError} />
+        <GoogleSignInButton onError={setError} text="signup_with" />
       </form>
     </AuthShell>
   )
