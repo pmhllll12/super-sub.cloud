@@ -87,12 +87,13 @@ export default function SignupPage() {
       </div>
 
       {/* 아치 모양 사진 판 — 위 두 모서리만 --ss-radius-arch 로 크게 둥글린다.
-          사진은 자르지 않는다(contain). 판보다 세로가 짧으면 아래에 붙인다.
+          사진은 자르지 않는다(contain). 판은 화면 높이에 딱 맞춘다 —
+          min-h-screen 이면 위 여백만큼 길어져 아래가 잘린다.
           좁은 화면에서는 아예 숨겨(폼이 밀려나지 않도록) lg 이상에서만 보인다. */}
-      <div className="relative hidden lg:flex lg:min-h-screen lg:items-stretch lg:pt-10 lg:pl-8">
+      <div className="relative hidden overflow-hidden lg:flex lg:h-screen lg:items-stretch lg:pt-10 lg:pl-8">
         <div
           aria-hidden="true"
-          className="w-full bg-contain bg-bottom bg-no-repeat"
+          className="w-full bg-contain bg-center bg-no-repeat"
           style={{
             backgroundImage: "url('/login_figure.jpg')",
             borderRadius: 'var(--ss-radius-arch) var(--ss-radius-arch) 0 0',
