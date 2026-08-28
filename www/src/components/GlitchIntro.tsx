@@ -371,11 +371,18 @@ function GlitchText({
     whiteSpace: 'nowrap',
   }
 
-  if (amplitude <= 0) {
+  const shifts = bandShifts(seed, amplitude)
+
+  // 어긋난 띠가 하나도 없으면 **자르지 않고 통짜로** 그린다.
+  //
+  // 자르기만 해도 조각 경계가 가는 가로줄로 보인다(글자 높이를 7로 나눈
+  // 자리가 정수 픽셀에 안 떨어져 생기는 틈). 예전엔 진폭이 0보다 크면 늘
+  // 어딘가 어긋나 있어서 드러나지 않았는데, 흔들림을 드문드문하게 바꾸면서
+  // **"진폭은 있는데 이번 칸은 조용한" 순간이 대부분**이 됐다 — 그 순간마다
+  // 멀쩡한 글자에 줄이 그어져 보였다.
+  if (shifts.every((shift) => shift === 0)) {
     return <span style={style}>{BRAND_TEXT}</span>
   }
-
-  const shifts = bandShifts(seed, amplitude)
 
   return (
     <span style={{ position: 'relative', display: 'inline-block' }}>
@@ -388,7 +395,9 @@ function GlitchText({
             ...style,
             position: 'absolute',
             inset: 0,
-            clipPath: `inset(${(i / BANDS) * 100}% 0 ${100 - ((i + 1) / BANDS) * 100}% 0)`,
+            // 아래쪽을 0.5px 넘겨 이웃 조각과 겹친다 — 딱 맞추면 경계가
+            // 정수 픽셀에 안 떨어져 그 사이로 배경이 비쳐 줄로 보인다.
+            clipPath: `inset(${(i / BANDS) * 100}% 0 calc(${100 - ((i + 1) / BANDS) * 100}% - 0.5px) 0)`,
             transform: `translateX(${shift}em)`,
           }}
         >

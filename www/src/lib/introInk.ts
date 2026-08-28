@@ -89,6 +89,13 @@ export function glitchAmplitudeAt(p: number): number {
 export const MAX_SHIFT_EM = 22 / 52
 
 /**
+ * 이보다 작게 어긋난 것은 **안 어긋난 것으로 친다**(글자 크기 기준 em, 52px
+ * 에서 1px). `r³` 분포는 0 근처 값을 잔뜩 만드는데, 눈에는 안 보이면서 글자를
+ * 조각내게 만들어 **조각 경계만 가로줄로 드러낸다**(`GlitchIntro` 주석 참고).
+ */
+export const MIN_SHIFT_EM = 1 / 52
+
+/**
  * 한 순간(`HOLD_MS` 한 칸)에 무언가 어긋날 확률 — `amplitude` 를 곱해 쓴다.
  * 나머지 순간은 **정확히 정지**다.
  */
@@ -136,6 +143,7 @@ export function bandShifts(seed: number, amplitude: number): number[] {
   return Array.from({ length: BANDS }, () => {
     if (next() > SLICE_CHANCE) return 0
     const r = next() * 2 - 1
-    return r * r * r * amplitude * MAX_SHIFT_EM
+    const shift = r * r * r * amplitude * MAX_SHIFT_EM
+    return Math.abs(shift) < MIN_SHIFT_EM ? 0 : shift
   })
 }

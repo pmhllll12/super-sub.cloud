@@ -7,6 +7,7 @@ import {
   WET_MS,
   BANDS,
   HOLD_MS,
+  MIN_SHIFT_EM,
   bandShifts,
   glitchAmplitudeAt,
   inkProgress,
@@ -132,6 +133,15 @@ describe('bandShifts — 흔들림이 규칙적으로 보이면 안 된다', () 
     }
     runs.push(n)
     expect(new Set(runs).size).toBeGreaterThan(2)
+  })
+
+  // 눈에 안 보일 만큼 작게 어긋나면 글자만 조각나고 어긋남은 안 보인다 —
+  // 조각 경계가 가로줄로 드러난다(GlitchIntro 가 "전부 0이면 통짜로" 그린다).
+  it('눈에 안 보일 만큼 작게 어긋나지 않는다 — 그런 건 0으로 친다', () => {
+    const tiny = wholeIntro()
+      .flat()
+      .filter((s) => s !== 0 && Math.abs(s) < MIN_SHIFT_EM)
+    expect(tiny).toEqual([])
   })
 
   it('크기가 한쪽으로 쏠린다 — 대부분 작고 가끔 크다', () => {
