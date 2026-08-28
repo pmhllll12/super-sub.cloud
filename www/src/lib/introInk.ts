@@ -16,12 +16,6 @@ export const WET_END = 3.1 / 3.6
 /** 전체 인트로 길이(ms). 민트만 700 + 번짐 2400 + 머묾 500. */
 export const TOTAL_MS = 3600
 
-/** 문턱 경계 폭. */
-export const EDGE = 0.02
-
-/** 끓음 최대 폭. 문턱값을 이만큼 흔든다. */
-export const BOIL = 0.06
-
 /** 흔들림 값을 붙잡아 두는 시간(ms). 매 프레임 새로 뽑으면 지글거림이 된다. */
 export const HOLD_MS = 45
 

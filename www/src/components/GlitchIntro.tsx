@@ -4,8 +4,6 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { letterSpacingFor } from './ui/BrandMark'
 import {
   BANDS,
-  BOIL,
-  EDGE,
   HOLD_MS,
   SWAP_AT,
   TOTAL_MS,
@@ -21,13 +19,43 @@ const BRAND_SIZE = 52
 
 /**
  * 저해상도 캔버스의 긴 변 길이(px). 전체 해상도로 CPU 픽셀 루프를 돌리면
- * 느리다 — 480~640 사이로 그려 CSS로 확대한다. 잉크가 부드러운 노이즈라
- * 확대해도 자연스럽다.
+ * 느리다 — 낮춰 그려 CSS로 확대한다.
+ *
+ * **1400으로 실측해 정했다.** 안쪽 루프는 "지도값과 문턱값 비교 후 알파
+ * 1픽셀 쓰기"뿐이라 저해상도에서는 여유가 크다 — 정사각형에 가까운 화면비가
+ * 최악의 경우인데(긴 변 기준 그리드가 두 변 다 꽉 찬다), 900×900 뷰포트·
+ * Apple Silicon 헤드리스 Chromium 기준으로 프레임당 평균 7.85ms, p95
+ * 9.5ms였다. 2000까지 올리면 p95가 17.4ms로 16ms 예산을 넘는다(같은 뷰포트
+ * 평균 13.73ms). 1400은 실제(더 느릴 수 있는) 기기와 이 프레임 안에서 함께
+ * 도는 React 리렌더·컴포지팅을 위한 여유를 절반 가까이 남긴다.
  */
-const GRID_LONG_EDGE = 560
+const GRID_LONG_EDGE = 1400
 
 /** `ink_field.png`의 실제 크기(세로가 긴 인물 사진). `cover`로 채운다. */
 const FIELD_SRC = '/ink_field.png'
+
+/**
+ * 문턱 경계 폭.
+ *
+ * Flutter 셰이더(`ink_bleed.frag`)의 `uEdge`는 0.02다 — 하지만 그건
+ * **픽셀마다** 계산하는 값이라 0.02로도 경계가 부드럽다. 여기는 저해상도
+ * 캔버스를 CSS로 확대하는 방식이라 같은 0.02가 또렷한 계단으로 보인다.
+ * 0.06~0.12 사이를 눈으로 비교해 0.09를 골랐다 — 이보다 좁으면 격자가
+ * 남고, 넓으면 잉크가 안개처럼 퍼져 "번진다"는 느낌 대신 흐릿해진다.
+ */
+const EDGE = 0.09
+
+/** 끓음 최대 폭. 문턱값을 이만큼 흔든다. */
+const BOIL = 0.06
+
+/**
+ * 잉크 캔버스에만 거는 CSS blur(px, 표시 크기 기준).
+ *
+ * 확대로 생긴 격자를 지우는 데 가장 효과적이었다 — GPU 컴포지팅이라 거의
+ * 공짜다. **글자 레이어에는 걸지 않는다** — 글자가 흐려지면 글리치(띠
+ * 어긋남)가 죽는다.
+ */
+const INK_BLUR_PX = 1.5
 
 function clamp(x: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, x))
@@ -301,8 +329,16 @@ export default function GlitchIntro({ onDone }: { onDone: () => void }) {
     >
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 h-full w-full"
-        style={{ imageRendering: 'auto' }}
+        className="absolute h-full w-full"
+        // blur가 가장자리를 살짝 안으로 깎아 먹는다 — 컨테이너보다 약간
+        // 크게 그려 overflow-hidden으로 잘라내면 그 티가 안 난다.
+        style={{
+          inset: '-4px',
+          width: 'calc(100% + 8px)',
+          height: 'calc(100% + 8px)',
+          imageRendering: 'auto',
+          filter: `blur(${INK_BLUR_PX}px)`,
+        }}
       />
       <div className="absolute inset-0 flex items-center justify-center">
         <GlitchText glitched={glitched} amplitude={amplitude} seed={seedStep} />
