@@ -3,6 +3,10 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { apiErrorMessage, apiPost } from '@/lib/api/client'
+import BrandMark from '@/components/ui/BrandMark'
+import Field from '@/components/ui/Field'
+import GlassPanel from '@/components/ui/GlassPanel'
+import PillButton from '@/components/ui/PillButton'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -28,43 +32,40 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-6">
-      <h1 className="text-2xl font-bold">로그인</h1>
-      <form onSubmit={onSubmit} className="flex flex-col gap-4">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm text-neutral-500">이메일</span>
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="rounded-lg border px-3 py-2"
-          />
-        </label>
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm text-neutral-500">비밀번호</span>
-          <input
-            type="password"
-            required
-            minLength={8}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="rounded-lg border px-3 py-2"
-          />
-        </label>
-        {error && (
-          <p role="alert" className="text-sm text-red-600">
-            {error}
-          </p>
-        )}
-        <button
-          type="submit"
-          disabled={busy}
-          className="rounded-lg bg-neutral-900 px-4 py-2.5 text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
-        >
-          로그인
-        </button>
-      </form>
+    <main className="relative flex min-h-screen items-center justify-center px-6 py-16">
+      <div
+        aria-hidden="true"
+        className="fixed inset-0 -z-10 bg-cover bg-center"
+        style={{ backgroundImage: "url('/player_mono.jpg')" }}
+      >
+        <div className="absolute inset-0" style={{ background: 'var(--ss-scrim)' }} />
+      </div>
+
+      <GlassPanel className="w-full max-w-[420px] px-8 py-10">
+        <div className="flex flex-col items-center gap-8">
+          <BrandMark size={40} />
+          <h1 className="sr-only">로그인</h1>
+          <form onSubmit={onSubmit} className="flex w-full flex-col gap-4">
+            <Field label="이메일" type="email" value={email} onChange={setEmail} required />
+            <Field
+              label="비밀번호"
+              type="password"
+              value={password}
+              onChange={setPassword}
+              required
+              minLength={8}
+            />
+            {error && (
+              <p role="alert" className="text-sm" style={{ color: 'var(--ss-error)' }}>
+                {error}
+              </p>
+            )}
+            <PillButton type="submit" disabled={busy} className="mt-2 w-full">
+              로그인
+            </PillButton>
+          </form>
+        </div>
+      </GlassPanel>
     </main>
   )
 }
