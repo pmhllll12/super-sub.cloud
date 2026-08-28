@@ -6,6 +6,7 @@ import {
   HOLD_MS,
   SWAP_AT,
   TOTAL_MS,
+  bandShifts,
   glitchAmplitudeAt,
   inkProgress,
 } from '@/lib/introInk'
@@ -131,28 +132,6 @@ function hash(x: number, y: number, seed: number): number {
   const qy = b + d
   const qz = a + d
   return frac((qx + qy) * qz)
-}
-
-/**
- * 띠가 최대로 어긋나는 폭 — **글자 크기 기준(em)이다.**
- *
- * 앱은 글자가 52px 고정이라 14px 로 못박았는데, 웹은 글자가 화면 폭을
- * 따라가므로(BRAND_SIZE) 같은 픽셀 값을 쓰면 큰 화면에서 흔들림만 상대적으로
- * 작아져 밋밋해진다. 그래서 그 비율(14 / 52)을 그대로 em 으로 옮긴다 —
- * 어느 크기에서도 앱과 같은 세기로 보인다.
- */
-const MAX_SHIFT_EM = 14 / 52
-
-/** `seed`로 결정되는 [-1, 1) 사이 값 7개(띠 수만큼). 표준 mulberry32 PRNG. */
-function bandShifts(seed: number, amplitude: number): number[] {
-  let a = seed >>> 0
-  const next = () => {
-    a = (a + 0x6d2b79f5) | 0
-    let t = Math.imul(a ^ (a >>> 15), 1 | a)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-  return Array.from({ length: BANDS }, () => (next() * 2 - 1) * amplitude * MAX_SHIFT_EM)
 }
 
 /** 화면을 `cover`로 채우는 그리기 사각형(대상 캔버스 기준) — CPU 폴백용. */

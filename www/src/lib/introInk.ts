@@ -64,11 +64,78 @@ export function inkProgress(t: number): number {
  * 정지였다. 2026-08-28 에 웹만 이 방식으로 바꿨다 — "글자가 보이면 바로
  * 흔들리고, 다 번지면 그때 멈춘다". 앱과 갈린 자리다.
  *
- * 뒤로 갈수록 잦아든다(`1 - p³`). 끝에서 뚝 끊지 않고 잦아들다 멎어야
- * 로고로 "굳는" 것처럼 보인다 — p 가 0.8 을 넘어서야 눈에 띄게 가라앉는
- * 곡선이라, 번짐 대부분의 구간에서는 세기가 살아 있다.
+ * 뒤로 갈수록 잦아들되 **끝에 가서야** 잦아든다(`1 - p⁶`). 처음엔 `1 - p³`
+ * 였는데, 그러면 마지막 1.2초가 통째로 죽어 "다 번지기도 전에 멈춘 것"처럼
+ * 보였다(실측). 6제곱은 p=0.9 에서도 세기가 0.47 남아 있다가 마지막에
+ * 급히 떨어진다 — 번지는 내내 살아 있고, 그러면서도 뚝 끊기지 않는다.
  */
 export function glitchAmplitudeAt(p: number): number {
   if (p <= 0 || p >= 1) return 0
-  return 1 - p * p * p
+  const p3 = p * p * p
+  return 1 - p3 * p3
+}
+
+/**
+ * 띠가 어긋나는 최대 폭 — **글자 크기 기준(em)이다.**
+ *
+ * 앱은 글자가 52px 고정이라 14px 로 못박았는데, 웹은 글자가 화면 폭을
+ * 따라가므로(`GlitchIntro` 의 `BRAND_SIZE`) 같은 픽셀 값을 쓰면 큰 화면에서
+ * 흔들림만 상대적으로 작아진다. 그래서 비율을 em 으로 옮겼다.
+ *
+ * 값이 22/52 로 앱(14/52)보다 큰 이유는 아래 분포 때문이다 — 앱은 매 순간
+ * 모든 띠를 균등하게 흔들어 14px 이 곧 **평균**이지만, 여기서는 대부분
+ * 가만히 있다가 드물게 크게 튄다. 이건 **정점**이지 평균이 아니다.
+ */
+export const MAX_SHIFT_EM = 22 / 52
+
+/**
+ * 한 순간(`HOLD_MS` 한 칸)에 무언가 어긋날 확률 — `amplitude` 를 곱해 쓴다.
+ * 나머지 순간은 **정확히 정지**다.
+ */
+export const TEAR_CHANCE = 0.55
+
+/** 터지는 순간에 띠 하나가 어긋날 확률. 7개 중 서넛만 움직인다. */
+export const SLICE_CHANCE = 0.45
+
+/** 표준 mulberry32 PRNG — 같은 seed 면 같은 수열이다. */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0
+  return () => {
+    a = (a + 0x6d2b79f5) | 0
+    let t = Math.imul(a ^ (a >>> 15), 1 | a)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+/**
+ * `seed` 로 결정되는 띠별 가로 어긋남(em). `BANDS` 개.
+ *
+ * **규칙적으로 흔들면 글리치가 아니라 그냥 떨림으로 보인다.** 앱처럼 매 칸
+ * 모든 띠를 흔드는 방식은 버스트 3회 사이의 정적이 있어서 성립했는데, 웹은
+ * 번지는 내내 흔들기로 해서 그 정적이 사라졌고 — 그래서 인위적으로 보였다.
+ *
+ * 정적을 **분포 안으로** 되돌린다. 세 가지가 겹쳐 불규칙해진다:
+ *
+ * 1. **대부분의 순간은 통째로 정지한다** (`TEAR_CHANCE`). 터지는 칸이 몇 개
+ *    연달아 걸리기도 하고 한참 안 걸리기도 해서, 45ms 격자를 그대로 쓰면서도
+ *    리듬이 불규칙해진다 — 메트로놈처럼 들리던 게 사라진다
+ * 2. **터질 때도 일부 띠만 움직인다** (`SLICE_CHANCE`). 나머지는 제자리라
+ *    "화면이 떠는" 게 아니라 "글자가 잘려 어긋난" 것으로 읽힌다. 움직이는 띠가
+ *    붙어 나오면 그만큼 두꺼운 조각이 되어 조각 높이까지 매번 달라진다
+ * 3. **크기가 한쪽으로 쏠린다** (`r³`). 대부분 작게, 가끔 크게 —
+ *    균등분포는 전부 비슷한 크기로 흔들려 기계처럼 보인다
+ */
+export function bandShifts(seed: number, amplitude: number): number[] {
+  const still = () => new Array<number>(BANDS).fill(0)
+  if (amplitude <= 0) return still()
+
+  const next = mulberry32(seed)
+  if (next() > TEAR_CHANCE * amplitude) return still()
+
+  return Array.from({ length: BANDS }, () => {
+    if (next() > SLICE_CHANCE) return 0
+    const r = next() * 2 - 1
+    return r * r * r * amplitude * MAX_SHIFT_EM
+  })
 }
