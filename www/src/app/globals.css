@@ -35,6 +35,22 @@
   --ss-glass-bg: rgba(255, 255, 255, 0.08);
   --ss-glass-border: rgba(255, 255, 255, 0.12);
   --ss-glass-blur: 20px;
+
+  /* 웹 전용 — Flutter 소스에서 옮겨온 값이 아님 */
+  --ss-field-radius: 14px;
+}
+
+/* Field 컴포넌트 — 라벨/힌트/포커스 테두리는 전부 --ss-fg 의 불투명도 변형이다 (흰색 리터럴 금지) */
+.ss-field-label {
+  color: color-mix(in srgb, var(--ss-fg) 60%, transparent);
+}
+
+.ss-field-hint {
+  color: color-mix(in srgb, var(--ss-fg) 40%, transparent);
+}
+
+.ss-field-input:focus {
+  border-color: color-mix(in srgb, var(--ss-fg) 40%, transparent);
 }
 
 body {
