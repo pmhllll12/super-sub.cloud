@@ -7,9 +7,10 @@ const MUTED = 'color-mix(in srgb, var(--ss-fg) 60%, transparent)'
  * 로그인/회원가입 공통 껍데기 — 배경 위에 뜬 카드.
  *
  * 화면 전체에 어둡게 깐 사진, 그 위에 둥근 카드. 카드 왼쪽 절반은 같은
- * 사진(위: 브랜드 마크, 아래: 헤드라인) — lg 미만에서는 통째로 숨겨 폼만
+ * 사진 위에 헤드라인만 아래쪽에 얹는다 — lg 미만에서는 통째로 숨겨 폼만
  * 남긴다(375px 에서도 폼이 화면 안에 들어와야 하니까). 오른쪽 절반이
- * 실제 폼 — 그 내용(이메일/비밀번호 등)은 각 페이지가 children 으로 준다.
+ * 실제 폼 — 워드마크(BrandMark)를 폼 칸 맨 위에 두고, 그 아래 내용
+ * (이메일/비밀번호 등)은 각 페이지가 children 으로 준다.
  *
  * GlassPanel 을 카드 전체에 두른다 — 사진 칸은 불투명한 <img> 가 위에
  * 덮이니 블러의 영향을 안 받고, 폼 칸은 GlassPanel 의 반투명+블러 배경이
@@ -65,8 +66,7 @@ export default function AuthShell({
                   'linear-gradient(to top, color-mix(in srgb, var(--ss-bg) 90%, transparent) 0%, color-mix(in srgb, var(--ss-bg) 10%, transparent) 45%, color-mix(in srgb, var(--ss-bg) 70%, transparent) 100%)',
               }}
             />
-            <div className="relative flex h-full flex-col justify-between p-12">
-              <BrandMark size={32} />
+            <div className="relative flex h-full flex-col justify-end p-12">
               <div className="flex max-w-md flex-col gap-3">
                 <h2
                   className="text-4xl leading-tight font-semibold"
@@ -84,18 +84,27 @@ export default function AuthShell({
           {/* 카드 오른쪽 — 폼 칸. 카드가 커져도 입력칸이 화면 폭만큼
               늘어지면 읽기 나빠지니, 안쪽 내용은 max-w-sm 으로 가운데
               정렬한다. 세로가 짧은 화면(예: 1440×800)에서 폼이 카드보다
-              길어지면 페이지 전체가 아니라 이 칸만 스크롤되게 한다. */}
+              길어지면 페이지 전체가 아니라 이 칸만 스크롤되게 한다.
+              워드마크는 폼 칸 맨 위, 카드 전체에서 유일하게 쓰인다 —
+              사진 칸에는 더 이상 없다. 375px 에서도 안 넘치도록 좁은
+              화면에서는 작은 크기를 쓰고 sm 이상에서 더 키운다(둘 다
+              "SUPERSUB" 텍스트라 한쪽은 항상 display:none 이라 접근성
+              트리에 중복으로 안 잡힌다). formTitle 은 더는 화면에 안
+              보이지만, 페이지에 제목이 있어야 하니 sr-only <h1>으로
+              남긴다(랜딩 페이지 `<BrandMark /><h1 className="sr-only">`
+              패턴과 동일). */}
           <div className="flex flex-col overflow-y-auto p-6 sm:p-10 lg:p-12">
             <div className="m-auto flex w-full max-w-sm flex-col gap-8 py-6">
-              <BrandMark size={28} className="lg:hidden" />
-              <div className="flex flex-col gap-2">
-                <h1 className="text-2xl font-semibold sm:text-3xl">{formTitle}</h1>
+              <div className="flex flex-col items-center gap-3 text-center">
+                <BrandMark size={34} className="sm:hidden" />
+                <BrandMark size={48} className="hidden sm:inline" />
+                <h1 className="sr-only">{formTitle}</h1>
                 <p className="text-sm" style={{ color: MUTED }}>
                   {formDescription}
                 </p>
               </div>
               {children}
-              {footer}
+              <div className="flex flex-col items-center gap-3 text-center">{footer}</div>
             </div>
           </div>
         </GlassPanel>
