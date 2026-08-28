@@ -52,13 +52,14 @@ export default async function HomePage() {
         {user.nickname}
       </p>
       <div className="grid w-full grid-cols-2 gap-3">
-        {DESTINATIONS.map((d) => (
+        {DESTINATIONS.map((d, i) => (
           <DestinationCard
             key={d.title}
             title={d.title}
             icon={d.icon}
             summary={d.summary}
             href={d.href}
+            phase={i * 0.13}
           />
         ))}
       </div>

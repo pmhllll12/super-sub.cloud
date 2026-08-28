@@ -11,6 +11,7 @@ export default function DestinationCard({
   href,
   summary,
   className = '',
+  phase = 0,
 }: {
   title: string
   icon: string
@@ -18,11 +19,14 @@ export default function DestinationCard({
   /** 앱 home_screen.dart 의 두 줄 설명. `\n` 으로 줄바꿈을 나타낸다. */
   summary?: string
   className?: string
+  /** GlassPanel 테두리를 도는 빛의 시작 위상(0~1) — 여러 카드가 한꺼번에 반짝이지 않게 어긋낸다. */
+  phase?: number
 }) {
   const ready = Boolean(href)
 
   const inner = (
     <GlassPanel
+      phase={phase}
       className={`flex h-full flex-col items-center justify-center gap-2 px-4 py-6 text-center ${className}`}
     >
       <span

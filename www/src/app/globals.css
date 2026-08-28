@@ -66,3 +66,69 @@ body {
   color: var(--ss-fg);
   font-family: var(--font-rubik), system-ui, sans-serif;
 }
+
+/* 카드 테두리를 도는 얇은 흰 빛 — flutter/lib/core/widgets/glass_panel.dart 의
+   _TravelingEdge 를 그대로 옮긴 것. 늘 켜진 옅은 밑선(흰색 알파 0.10) 위에,
+   좁고 밝은 구간(흰색 알파 0.9)만 도는 conic-gradient 를 얹는다 — Flutter 의
+   SweepGradient 와 같은 원리. 점을 좌표로 움직이면 모서리에서 속도가 튀니
+   좌표가 아니라 각도(--ss-edge-angle)로 돌린다.
+   @property 로 등록해야 각도가 부드럽게 보간된다 — 등록 없이 커스텀
+   프로퍼티를 그냥 애니메이션하면 값이 이산적으로(중간에 뚝) 바뀐다.
+   지원하지 않는 브라우저에서는 이 등록 자체가 무시돼 회전이 멈추고 정지
+   상태가 되지만, background 의 두 번째 레이어(늘 켜진 10% 밑선)는 레이어
+   순서와 무관하게 그대로 보인다. */
+@property --ss-edge-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes ss-edge-spin {
+  to {
+    --ss-edge-angle: 360deg;
+  }
+}
+
+.ss-traveling-edge {
+  position: relative;
+}
+
+.ss-traveling-edge::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  /* 선 굵기 1px — 아주 얇아야 유리가 아니라 상자로 안 보인다(padding 으로
+     만든 폭을 아래 mask 가 테두리만 남기고 안쪽을 파낸다). */
+  padding: 1px;
+  pointer-events: none;
+  background:
+    conic-gradient(
+      from var(--ss-edge-angle),
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0) 42%,
+      rgba(255, 255, 255, 0.9) 50%,
+      rgba(255, 255, 255, 0) 58%,
+      rgba(255, 255, 255, 0) 100%
+    ),
+    rgba(255, 255, 255, 0.1);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: ss-edge-spin 6s linear infinite;
+  /* phase(0~1) 만큼 음수 딜레이를 줘 시작 각도를 어긋낸다 — 조각마다 위상을
+     어긋내 한꺼번에 반짝이지 않게 하는 앱의 phase 와 같은 목적. */
+  animation-delay: calc(var(--ss-edge-phase, 0) * -6s);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-traveling-edge::after {
+    animation: none;
+    background: rgba(255, 255, 255, 0.1);
+  }
+}
