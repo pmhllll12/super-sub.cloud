@@ -17,7 +17,7 @@ export default function LoginPage() {
     setBusy(true)
     try {
       await apiPost('/api/auth/login', { email, password })
-      router.push('/me')
+      router.push('/home')
       router.refresh()
     } catch (err) {
       // message 가 아니라 code 로 분기해야 할 곳이 생기면 여기서 나눈다.
