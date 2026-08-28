@@ -7,6 +7,7 @@ import { apiErrorMessage, apiPost } from '@/lib/api/client'
 import BrandMark from '@/components/ui/BrandMark'
 import Field from '@/components/ui/Field'
 import PillButton from '@/components/ui/PillButton'
+import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 
 const MUTED = 'color-mix(in srgb, var(--ss-fg) 60%, transparent)'
 const FAINT = 'color-mix(in srgb, var(--ss-fg) 40%, transparent)'
@@ -62,6 +63,7 @@ export default function LoginPage() {
           <PillButton type="submit" disabled={busy} className="mt-2 w-full">
             로그인
           </PillButton>
+          <GoogleSignInButton onError={setError} />
         </form>
         <p className="max-w-sm text-xs" style={{ color: FAINT }}>
           계속 진행하면 이용약관과 개인정보처리방침에 동의하는 것으로 간주됩니다.
