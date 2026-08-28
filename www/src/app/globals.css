@@ -19,8 +19,38 @@
   }
 }
 
+:root {
+  --ss-bg: #000000;
+  --ss-fg: #ffffff;
+  --ss-accent: #70ed88;
+  --ss-error: #ff8a80;
+  --ss-scrim: rgba(0, 0, 0, 0.15);
+
+  --ss-radius-sheet: 28px;
+  --ss-btn-h: 54px;
+  --ss-btn-r: 27px;
+  --ss-btn-label: 16px;
+  --ss-brand-size: 34px;
+
+  /* 글래스 — flutter/lib/core/widgets/glass_panel.dart 를 옮긴 것 */
+  --ss-glass-bg: rgba(255, 255, 255, 0.08);
+  --ss-glass-border: rgba(255, 255, 255, 0.12);
+  --ss-glass-blur: 20px;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--ss-bg);
+  color: var(--ss-fg);
+  font-family: var(--font-rubik), system-ui, sans-serif;
+}
+
+/* 앱의 잉크 질감. 화면 전체에 아주 옅게 깐다. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: url("/ink_field.png") center / cover no-repeat;
+  opacity: 0.06;
+  pointer-events: none;
+  z-index: 0;
 }

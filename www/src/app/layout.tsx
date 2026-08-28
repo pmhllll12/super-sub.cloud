@@ -1,14 +1,17 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Rubik, Rubik_Glitch } from "next/font/google";
+import "material-symbols/outlined.css";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const rubik = Rubik({
+  variable: "--font-rubik",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+// 워드마크 전용. 본문에 쓰지 않는다.
+const rubikGlitch = Rubik_Glitch({
+  variable: "--font-rubik-glitch",
+  weight: "400",
   subsets: ["latin"],
 });
 
@@ -19,11 +22,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="en" className="h-full antialiased">
+      <body
+        className={`${rubik.variable} ${rubikGlitch.variable} min-h-full flex flex-col`}
+      >
+        {children}
+      </body>
     </html>
   );
 }
