@@ -172,10 +172,14 @@ describe('bandShifts — 흔들림이 규칙적으로 보이면 안 된다', () 
       .flat()
       .filter((s) => s !== 0)
       .map(Math.abs)
-    const peak = Math.max(...sizes)
-    const small = sizes.filter((s) => s < peak / 2).length
-    // 균등분포라면 절반쯤이 정점의 절반을 넘는다. r³ 은 그보다 훨씬 쏠린다.
-    expect(small / sizes.length).toBeGreaterThan(0.7)
+      .sort((a, b) => a - b)
+    const peak = sizes[sizes.length - 1]
+    const median = sizes[Math.floor(sizes.length / 2)]
+    // 균등분포라면 중앙값이 정점의 절반쯤이고 절반이 그 위에 있다.
+    // `r³` 은 아래쪽으로 쏠린다 — 다만 MIN_SHIFT_EM 아래를 잘라내므로
+    // (그 값들은 아예 0이 된다) 남은 분포의 쏠림은 그만큼 완만해진다.
+    expect(median).toBeLessThan(peak * 0.45)
+    expect(sizes.filter((s) => s < peak / 2).length / sizes.length).toBeGreaterThan(0.55)
   })
 
   it('번지는 내내 흔들린다 — 앞뒤 어느 한쪽으로 몰려 있지 않다', () => {
