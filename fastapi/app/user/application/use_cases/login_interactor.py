@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.core.errors import ApiError
+from app.core.logging import log_auth_event
 from app.core.security import TOKEN_EXPIRES_IN, issue_access_token
 from app.user.application.dtos.login_dto import LoginCommand, LoginResult
 from app.user.application.ports.input.login_use_case import LoginUseCase
@@ -26,6 +27,9 @@ class LoginInteractor(LoginUseCase):
                 401, "INVALID_CREDENTIALS", "이메일 또는 비밀번호가 올바르지 않습니다."
             )
 
+        # 실패는 `ApiError` 핸들러가 한자리에서 남긴다. 성공은 여기서만 사용자 id 를
+        # 알 수 있어서(응답에는 토큰뿐이다) 이 자리에 둔다.
+        log_auth_event("login_success", user_id=user.id)
         return LoginResult(
             access_token=issue_access_token(user.id),
             expires_in=TOKEN_EXPIRES_IN,

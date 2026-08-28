@@ -1,6 +1,7 @@
 """Super-Sub 백엔드 API 진입점.
 
-지금은 **스텁**이다. 모든 응답이 고정값이고 DB에 붙지 않는다.
+**모든 엔드포인트가 PostgreSQL 에 붙어 있다** (2026-08-26 에 카드까지 옮기면서
+스텁이 사라졌다). 스텁 구현은 테스트에서 저장소를 갈아끼울 때만 쓴다.
 명세는 `docs/api-contract.md`, 구조 설명은 `README.md`.
 """
 
@@ -10,12 +11,16 @@ from app.card.adapter.inbound.api.v1.card_router import card_router
 from app.card.adapter.outbound.stub.card_stub_repository import DEMO_SLUG
 from app.core.config import settings
 from app.core.errors import install_error_handlers
+from app.core.logging import configure_logging
 from app.user.adapter.inbound.api.v1.auth_router import auth_router
 from app.user.adapter.inbound.api.v1.me_router import me_router
 from app.user.adapter.outbound.stub.user_stub_repository import (
     DEMO_EMAIL,
     DEMO_PASSWORD,
 )
+
+# 라우터가 붙기 전에 부른다 — 기동 중에 나는 로그도 형식을 갖추게 된다.
+configure_logging()
 
 API_PREFIX = "/api/v1"
 
