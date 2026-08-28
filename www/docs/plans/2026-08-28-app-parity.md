@@ -787,6 +787,27 @@ export const INTRO_SEEN_KEY = 'supersub_intro_seen'
 
 `glitch` 가 참이면 `ss-glitch` 클래스와 `data-text="SUPERSUB"` 를 단다 (`::before`/`::after` 가 `attr(data-text)` 를 읽는다).
 
+- [ ] **Step 5b: 로그인한 사람은 `/` 에서 `/home` 으로 보낸다**
+
+`www/src/app/page.tsx` (랜딩) 에 넣는다. 지금은 이미 쓰고 있는 사람이 `/` 에 들어와도 "Super-Sub 는 이런 서비스입니다" 를 다시 본다. 앱의 라우터도 로그인돼 있으면 로그인 화면을 건너뛰고 홈으로 보낸다 (`flutter/lib/core/router/app_router.dart` 의 redirect).
+
+**쿠키의 존재만 본다. 백엔드를 부르지 않는다.**
+
+```tsx
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
+import { SESSION_COOKIE } from '@/server/session'
+
+export default async function Home() {
+  if ((await cookies()).get(SESSION_COOKIE)) redirect('/home')
+  // …기존 랜딩 마크업
+}
+```
+
+토큰이 썩었으면 `/home` 의 `requireUser()` 가 `/login` 으로 보낸다 — 한 번 더 튀지만, **공개 랜딩에서 매번 백엔드를 부르는 것보다 낫다.** 랜딩은 공유 링크로 열리는 자리라 빨라야 한다.
+
+> ⚠️ 랜딩 테스트(`www/src/app/page.test.tsx`)가 `Home` 을 직접 렌더한다. 서버 컴포넌트가 되면서 `cookies()` 를 부르므로 테스트가 깨질 수 있다. 그러면 **마크업 부분을 이름있는 export 로 빼고**(Task 10 의 `AnalysisBody` 와 같은 방식) 테스트는 그쪽을 렌더한다. 테스트를 약하게 고치지 말 것.
+
 - [ ] **Step 6: `IntroGate` 를 만든다**
 
 `'use client'`. `usePathname()` 과 `sessionStorage` 를 읽어 `shouldPlayIntro` 로 판단하고, 참이면 검은 전면 오버레이에 `<BrandMark glitch size={72} />` 를 2.5초 띄운 뒤 사라진다. 끝나면 `sessionStorage.setItem(INTRO_SEEN_KEY, '1')`.
