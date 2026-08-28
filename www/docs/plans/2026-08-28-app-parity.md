@@ -667,10 +667,322 @@ git commit -m "feat(www): 랜딩과 영상 분석 화면 — 글리치 워드마
 
 ---
 
+### Task 8: 글리치 워드마크와 인트로
+
+**Files:**
+- Modify: `www/src/components/ui/BrandMark.tsx`
+- Modify: `www/src/app/globals.css`
+- Create: `www/src/components/IntroGate.tsx`
+- Create: `www/src/lib/intro.ts`
+- Test: `www/src/lib/intro.test.ts`
+- Test: `www/src/components/ui/BrandMark.test.tsx` (기존 파일에 추가)
+
+**Interfaces:**
+- Consumes: Task 2의 `BrandMark`
+- Produces:
+  - `<BrandMark glitch?: boolean />`
+  - `shouldPlayIntro(pathname: string, seen: boolean): boolean` — 순수 함수
+  - `<IntroGate />` — 클라이언트 컴포넌트
+
+**설계 메모:** 판단(언제 재생하나)을 순수 함수로 빼고, DOM·타이머·`sessionStorage` 는 얇은 껍데기로 둔다. 그래야 규칙을 테스트할 수 있다.
+
+- [ ] **Step 1: 실패하는 테스트를 쓴다**
+
+`www/src/lib/intro.test.ts`:
+
+```ts
+import { shouldPlayIntro } from './intro'
+
+describe('인트로 재생 규칙', () => {
+  it('앱 진입에서는 재생한다', () => {
+    expect(shouldPlayIntro('/', false)).toBe(true)
+    expect(shouldPlayIntro('/login', false)).toBe(true)
+  })
+
+  it('공개 카드 링크에서는 재생하지 않는다 — 공유 링크의 목적을 깨뜨린다', () => {
+    expect(shouldPlayIntro('/c/hong-gildong-4f2a', false)).toBe(false)
+  })
+
+  it('이미 본 세션에서는 재생하지 않는다', () => {
+    expect(shouldPlayIntro('/', true)).toBe(false)
+    expect(shouldPlayIntro('/login', true)).toBe(false)
+  })
+
+  it('로그인한 화면에서는 재생하지 않는다', () => {
+    expect(shouldPlayIntro('/home', false)).toBe(false)
+    expect(shouldPlayIntro('/me', false)).toBe(false)
+  })
+})
+```
+
+`BrandMark.test.tsx` 에 추가:
+
+```tsx
+it('glitch 를 주면 애니메이션 클래스가 붙는다', () => {
+  const { container } = render(<BrandMark glitch />)
+  expect(container.firstElementChild?.className).toMatch(/ss-glitch/)
+})
+
+it('기본값은 글리치가 아니다', () => {
+  const { container } = render(<BrandMark />)
+  expect(container.firstElementChild?.className).not.toMatch(/ss-glitch/)
+})
+```
+
+- [ ] **Step 2: 실패 확인**
+
+Run: `cd www && npm test -- "intro|BrandMark"`
+Expected: FAIL
+
+- [ ] **Step 3: `shouldPlayIntro` 를 구현한다**
+
+```ts
+/** 인트로를 재생할 자리. 앱 진입 두 곳뿐이다. */
+const ENTRY_PATHS = ['/', '/login']
+
+export function shouldPlayIntro(pathname: string, seen: boolean): boolean {
+  if (seen) return false
+  return ENTRY_PATHS.includes(pathname)
+}
+
+export const INTRO_SEEN_KEY = 'supersub_intro_seen'
+```
+
+- [ ] **Step 4: 글리치 애니메이션을 CSS 로 쓴다**
+
+`globals.css` 에 넣는다. 앱의 인트로는 글자가 지지직대다 굳는다 — 색 어긋남(chromatic split)과 잘림(clip)이 핵심이다.
+
+```css
+@keyframes ss-glitch-shift {
+  0%, 100% { transform: translate(0); }
+  20% { transform: translate(-2px, 1px); }
+  40% { transform: translate(2px, -1px); }
+  60% { transform: translate(-1px, -1px); }
+  80% { transform: translate(1px, 1px); }
+}
+
+.ss-glitch {
+  position: relative;
+  animation: ss-glitch-shift 220ms steps(2, end) infinite;
+}
+
+/* 색이 어긋난 두 겹. 원본 글자 위아래로 살짝 벌어진다. */
+.ss-glitch::before,
+.ss-glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.ss-glitch::before { color: #ff4d4d; transform: translate(-2px, 0); mix-blend-mode: screen; }
+.ss-glitch::after  { color: #4dd2ff; transform: translate(2px, 0);  mix-blend-mode: screen; }
+
+/* 움직임을 원치 않는 사용자에게는 흔들지 않는다. */
+@media (prefers-reduced-motion: reduce) {
+  .ss-glitch, .ss-glitch::before, .ss-glitch::after { animation: none; transform: none; }
+}
+```
+
+- [ ] **Step 5: `BrandMark` 에 `glitch` 를 붙인다**
+
+`glitch` 가 참이면 `ss-glitch` 클래스와 `data-text="SUPERSUB"` 를 단다 (`::before`/`::after` 가 `attr(data-text)` 를 읽는다).
+
+- [ ] **Step 6: `IntroGate` 를 만든다**
+
+`'use client'`. `usePathname()` 과 `sessionStorage` 를 읽어 `shouldPlayIntro` 로 판단하고, 참이면 검은 전면 오버레이에 `<BrandMark glitch size={72} />` 를 2.5초 띄운 뒤 사라진다. 끝나면 `sessionStorage.setItem(INTRO_SEEN_KEY, '1')`.
+
+**`sessionStorage` 접근은 반드시 try/catch 로 감싼다** — 사파리 프라이빗 모드 등에서 던진다. 던지면 인트로를 건너뛰고 화면을 보여준다. 인트로 때문에 앱이 안 열리면 안 된다.
+
+루트 `layout.tsx` 에 얹는다.
+
+- [ ] **Step 7: 통과 확인 → 전체 테스트 → 빌드 → 커밋**
+
+```bash
+git add www/
+git commit -m "feat(www): 글리치 워드마크와 인트로 — 공유 링크에서는 건너뛴다"
+```
+
+---
+
+### Task 9: 로고 비행 (FLIP)
+
+**Files:**
+- Create: `www/src/lib/flight.ts`
+- Test: `www/src/lib/flight.test.ts`
+- Modify: `www/src/app/login/page.tsx`
+- Modify: `www/src/components/ui/FloatingNavBar.tsx`
+
+**Interfaces:**
+- Consumes: Task 3의 `FloatingNavBar`, Task 5의 로그인 화면
+- Produces: `computeFlight(from: Rect, to: Rect): { dx: number; dy: number; scale: number }` — 순수 함수
+
+**설계 메모:** 앱은 `GlobalKey` 로 착지점의 화면 좌표를 읽어 글자를 직접 날린다(`brand_mark.dart` 주석). 웹도 같은 발상이다 — `getBoundingClientRect` 로 두 좌표를 재고 `transform` 으로 옮긴다. **계산을 순수 함수로 빼서 테스트한다.**
+
+- [ ] **Step 1: 실패하는 테스트를 쓴다**
+
+```ts
+import { computeFlight } from './flight'
+
+const rect = (x: number, y: number, w: number, h: number) => ({
+  left: x, top: y, width: w, height: h,
+})
+
+describe('로고 비행 계산', () => {
+  it('중심에서 중심으로 옮기는 거리를 준다', () => {
+    const from = rect(100, 100, 200, 40)   // 중심 (200, 120)
+    const to = rect(500, 700, 100, 20)     // 중심 (550, 710)
+    const { dx, dy } = computeFlight(from, to)
+    expect(dx).toBeCloseTo(350)
+    expect(dy).toBeCloseTo(590)
+  })
+
+  it('폭 비율로 크기를 줄인다', () => {
+    const from = rect(0, 0, 200, 40)
+    const to = rect(0, 0, 100, 20)
+    expect(computeFlight(from, to).scale).toBeCloseTo(0.5)
+  })
+
+  it('같은 자리면 움직이지 않는다', () => {
+    const r = rect(10, 20, 30, 40)
+    expect(computeFlight(r, r)).toEqual({ dx: 0, dy: 0, scale: 1 })
+  })
+})
+```
+
+- [ ] **Step 2: 실패 확인 → 구현 → 통과 확인**
+
+```ts
+export type FlightRect = { left: number; top: number; width: number; height: number }
+
+export function computeFlight(from: FlightRect, to: FlightRect) {
+  const fromCx = from.left + from.width / 2
+  const fromCy = from.top + from.height / 2
+  const toCx = to.left + to.width / 2
+  const toCy = to.top + to.height / 2
+  return {
+    dx: toCx - fromCx,
+    dy: toCy - fromCy,
+    scale: from.width === 0 ? 1 : to.width / from.width,
+  }
+}
+```
+
+Run: `cd www && npm test -- flight`
+Expected: PASS (3 tests)
+
+- [ ] **Step 3: 착지점에 표식을 단다**
+
+`FloatingNavBar.tsx` 의 로고 알약에 `data-flight-target="brand"` 를 단다.
+
+- [ ] **Step 4: 로그인 성공 때 날린다**
+
+로그인 화면의 `<BrandMark />` 에 ref 를 달고, `apiPost` 가 성공한 뒤 `router.push('/home')` 하기 전에:
+
+1. 출발 좌표를 잰다
+2. `router.push('/home')` 후 착지점(`[data-flight-target="brand"]`)이 나타나기를 기다린다
+3. 복제한 글자를 `position: fixed` 로 띄우고 `computeFlight` 값으로 `transform` 애니메이션
+4. 끝나면 복제를 지운다
+
+**착지점을 못 찾으면 그냥 넘어간다.** 연출 때문에 로그인이 막히면 안 된다. `prefers-reduced-motion` 이면 건너뛴다.
+
+- [ ] **Step 5: 로그인 테스트가 여전히 통과하는지 확인한다**
+
+Run: `cd www && npm test -- login/page`
+Expected: PASS — 기존 2개. **깨지면 연출이 로직을 침범한 것이다.**
+
+- [ ] **Step 6: 전체 테스트 → 빌드 → 손 확인 → 커밋**
+
+```bash
+git add www/
+git commit -m "feat(www): 로고 비행 — 로그인 글자가 하단 바 노치로 날아간다"
+```
+
+---
+
+### Task 10: 잉크 전환
+
+**Files:**
+- Create: `www/src/lib/ink.ts`
+- Test: `www/src/lib/ink.test.ts`
+- Create: `www/src/components/InkTransition.tsx`
+- Modify: `www/src/app/login/page.tsx`
+
+**Interfaces:**
+- Consumes: `/ink_field.png` (Task 1에서 복사됨)
+- Produces: `inkThreshold(elapsed: number, duration: number): number` — 순수 함수
+
+**설계 메모:** `ink_bleed.frag` 를 WebGL 로 옮기지 않는다. `ink_field.png` 가 원래 그 셰이더가 샘플링하는 잉크 맵이므로, **canvas 2D 에서 그 이미지를 마스크로 쓰고 임계값을 애니메이션**하면 같은 재질의 "잉크가 걷히는" 연출이 나온다.
+
+> ⚠️ **결과가 원본과 얼마나 같을지는 만들어봐야 안다.** 어설프면 넣지 않는 편이 낫다 — 어중간한 연출은 없는 것만 못하다. 구현 후 손으로 보고, 아니다 싶으면 그렇게 보고할 것.
+
+- [ ] **Step 1: 실패하는 테스트를 쓴다**
+
+```ts
+import { inkThreshold } from './ink'
+
+describe('잉크 임계값', () => {
+  it('시작에는 완전히 덮여 있다', () => {
+    expect(inkThreshold(0, 1000)).toBe(0)
+  })
+
+  it('끝에는 완전히 걷힌다', () => {
+    expect(inkThreshold(1000, 1000)).toBe(1)
+  })
+
+  it('시간을 넘겨도 1 을 넘지 않는다', () => {
+    expect(inkThreshold(5000, 1000)).toBe(1)
+  })
+
+  it('단조증가한다', () => {
+    const xs = [0, 250, 500, 750, 1000].map((t) => inkThreshold(t, 1000))
+    for (let i = 1; i < xs.length; i++) expect(xs[i]).toBeGreaterThan(xs[i - 1])
+  })
+})
+```
+
+- [ ] **Step 2: 실패 확인 → 구현 → 통과 확인**
+
+```ts
+/** 잉크가 걷힌 정도. 0 이면 완전히 덮인 상태, 1 이면 다 걷힌 상태. */
+export function inkThreshold(elapsed: number, duration: number): number {
+  if (duration <= 0) return 1
+  const t = Math.min(1, Math.max(0, elapsed / duration))
+  // 끝에서 부드럽게 멎는다.
+  return 1 - Math.pow(1 - t, 3)
+}
+```
+
+- [ ] **Step 3: `InkTransition` 을 만든다**
+
+`'use client'`. 전면 canvas 를 띄우고, `/ink_field.png` 를 그린 뒤 `globalCompositeOperation` 과 `inkThreshold` 로 잉크가 걷히는 모습을 매 프레임 그린다. 끝나면 canvas 를 제거한다.
+
+- 이미지 로드에 실패하면 **연출 없이 즉시 끝낸다** (`onerror`)
+- `prefers-reduced-motion` 이면 재생하지 않는다
+- 마무리 시 `cancelAnimationFrame` 으로 정리한다
+
+- [ ] **Step 4: 로그인 → 홈 전환에 건다**
+
+Task 9의 로고 비행과 **같은 전환에서 함께** 재생된다 (앱도 그렇다 — 잉크가 걷히는 위에 로고가 날아간다).
+
+- [ ] **Step 5: 손으로 보고 판단한다**
+
+```bash
+cd www && USE_MOCK=1 npm run dev
+```
+
+데모 계정으로 로그인해 전환을 본다. **앱의 느낌이 안 나면 그대로 보고한다** — 억지로 통과시키지 말 것.
+
+- [ ] **Step 6: 전체 테스트 → 빌드 → 커밋**
+
+```bash
+git add www/
+git commit -m "feat(www): 잉크 전환 — 셰이더 대신 잉크 맵을 canvas 마스크로 쓴다"
+```
+
+---
+
 ## 이 계획에 넣지 않은 것
 
-- **프래그먼트 셰이더 2개** — GLSL 이라 WebGL 이식이 필요하다. 별도 작업
-- **로그인 → 홈 잉크 전환** — 위 셰이더에 의존한다
-- **2.5초 인트로 게이트** — 랜딩은 공유 링크로 열리는 자리라 첫 화면을 막으면 안 된다
-- **로고 비행 연출** — 하단 바를 유지했으므로 도착지는 살아 있다. View Transitions API 지원이 고르지 않아 이번에는 넣지 않는다
+- **`liquid_glass.frag`** — 글래스는 CSS `backdrop-filter` 로 대신한다. 굴절까지 옮기려면 WebGL 이 필요하고 그 값어치가 없다
+- **`design_scale` 의 1080px 환산** — 데스크톱 재배치라 옮기지 않는다
 - **용병 매칭 · 내 팀 · 레슨·코치** — 백엔드가 없다. 홈에 "준비 중" 카드로만 둔다
