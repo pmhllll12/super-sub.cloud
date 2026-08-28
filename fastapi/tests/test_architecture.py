@@ -14,7 +14,7 @@ import ast
 from pathlib import Path
 
 APP = Path(__file__).resolve().parent.parent / "app"
-CONTEXTS = ("user", "card")
+CONTEXTS = ("user", "card", "analysis")
 
 # 컨텍스트에 속하지 않는 공용 모듈은 전부 `app/core/` 아래에 둔다.
 #
