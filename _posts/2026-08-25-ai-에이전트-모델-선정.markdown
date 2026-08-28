@@ -1,7 +1,8 @@
 ---
-layout: post
+layout: default
 title: "AI 에이전트 판정 모델을 EXAONE 3.5 7.8B로 선정"
 date: 2026-08-25
+nav_exclude: true
 ---
 
 자세 분석 에이전트의 판정 모델을 결정하고, 그 내용을 서비스 제안 3)·4)절과

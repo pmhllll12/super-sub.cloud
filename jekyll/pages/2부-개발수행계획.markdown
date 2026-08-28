@@ -1,0 +1,11 @@
+---
+layout: default
+title: II 부. 개발 수행 계획
+permalink: /2부-개발수행계획/
+has_children: true
+nav_order: 2
+---
+
+# II 부. 개발 수행 계획
+
+요구사항 분석, 시스템 설계, 개발 구현 계획, 테스트 및 검증 계획, 산출물 및 향후 계획을 다룹니다.

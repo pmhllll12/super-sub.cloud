@@ -1,7 +1,8 @@
 ---
-layout: page
+layout: default
 title: 표지
 permalink: /
+nav_exclude: true
 ---
 
 <div markdown="1" style="text-align: center; margin-top: 2rem;">

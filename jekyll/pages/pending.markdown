@@ -1,7 +1,8 @@
 ---
-layout: page
+layout: default
 title: 미결 항목
 permalink: /pending/
+nav_order: 5
 ---
 
 ## 1. EXAONE 라이선스 — 상업적 이용 가능 여부

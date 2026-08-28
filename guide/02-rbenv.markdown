@@ -1,7 +1,8 @@
 ---
-layout: page
+layout: default
 title: "2. rbenv 설치 및 셀 초기화"
 permalink: /guide/02-rbenv/
+nav_exclude: true
 ---
 
 ```bash

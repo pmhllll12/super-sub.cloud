@@ -1,7 +1,8 @@
 ---
-layout: post
+layout: default
 title: "역할 재배정과 지원 종목 3개로 축소"
 date: 2026-08-26
+nav_exclude: true
 ---
 
 ## 역할 재배정

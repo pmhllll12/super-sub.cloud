@@ -28,15 +28,24 @@ url: "https://pmhllll12.github.io" # the base hostname & protocol for your site,
 github_username:  pmhllll12
 
 # Build settings
-theme: minima
+theme: just-the-docs
 plugins:
   - jekyll-feed
 
-# Navigation
-header_pages:
-  - jekyll/pages/toc.markdown
-  - jekyll/pages/devlog.markdown
-  - jekyll/pages/pending.markdown
+# Just the Docs 테마 설정 (dev.life-tutorial.com과 동일 테마)
+color_scheme: light
+search_enabled: true
+heading_anchors: true
+back_to_top: true
+back_to_top_text: "위로"
+nav_sort: case_sensitive # 각 페이지의 nav_order 값을 그대로 따름
+
+aux_links:
+  "GitHub":
+    - "https://github.com/pmhllll12/super-sub.cloud"
+aux_links_new_tab: true
+
+footer_content: "Copyright &copy; 2026 Super-Sub"
 
 # Exclude from processing.
 # The following items will not be processed, by default.

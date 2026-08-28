@@ -1,7 +1,8 @@
 ---
-layout: page
+layout: default
 title: "5. 새 Jekyll 사이트 생성"
 permalink: /guide/05-new-site/
+nav_exclude: true
 ---
 
 원하는 경로(예: `~/projects/fin.ragtaylor.com`)에서 아래 명령으로 기본 사이트를 생성합니다.

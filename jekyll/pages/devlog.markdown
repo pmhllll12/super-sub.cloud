@@ -1,7 +1,8 @@
 ---
-layout: page
+layout: default
 title: 개발 로그
 permalink: /devlog/
+nav_order: 4
 ---
 
 {% if site.posts.size > 0 %}

@@ -1,7 +1,9 @@
 ---
-layout: page
+layout: default
 title: 데이터베이스 ERD
 permalink: /부록D-데이터베이스ERD/
+parent: 부록
+nav_order: 4
 ---
 
 Super-Sub 플랫폼의 데이터 모델이다. 3장 서비스 기능과 5장 요구사항에서 도출했다.
