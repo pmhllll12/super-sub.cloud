@@ -36,17 +36,6 @@ export default function LoginPage() {
 
   return (
     <main className="relative flex min-h-screen items-center justify-center px-6 py-16">
-      {/* 사진을 화면 폭 전체로 늘리면(초광폭 데스크톱) 세로로 극단적으로 잘려 무엇을
-          찍었는지 알아볼 수 없다. 원본에 가까운 폭의 판으로 가운데 제한하고 위쪽
-          (얼굴·상반신 쪽)을 기준으로 앉힌다. */}
-      <div
-        aria-hidden="true"
-        className="fixed inset-y-0 left-1/2 w-full max-w-2xl -translate-x-1/2 overflow-hidden bg-cover bg-top -z-10"
-        style={{ backgroundImage: "url('/player_mono.jpg')" }}
-      >
-        <div className="absolute inset-0" style={{ background: 'var(--ss-scrim-strong)' }} />
-      </div>
-
       <GlassPanel className="w-full max-w-[420px] px-8 py-10">
         <div className="flex flex-col items-center gap-8">
           <BrandMark size={40} />
