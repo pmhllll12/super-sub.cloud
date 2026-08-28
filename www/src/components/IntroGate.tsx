@@ -19,7 +19,7 @@ export default function IntroGate() {
     setPlaying(true)
   }, [pathname])
 
-  // GlitchIntro가 자기 애니메이션(3600ms) 끝에 스스로 부른다 — 이미지 로드에
+  // GlitchIntro가 자기 애니메이션(번짐 + 걷힘) 끝에 스스로 부른다 — 이미지 로드에
   // 실패하면 애니메이션 없이 바로 부른다. `INTRO_DONE_EVENT`는 "인트로가 끝난
   // 뒤에" 뭔가 해야 하는 쪽을 위해 남겨 둔 신호다(지금은 구독자가 없다 —
   // `/` 가 곧 홈이라 인트로 밑에 이미 있던 화면이 그대로 보이면 그만이다).

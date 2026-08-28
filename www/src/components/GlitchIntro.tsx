@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import {
   BANDS,
+  ERASE_MS,
   HOLD_MS,
   SWAP_AT,
   TOTAL_MS,
   bandShifts,
+  eraseProgress,
   glitchAmplitudeAt,
   inkProgress,
 } from '@/lib/introInk'
@@ -45,6 +47,26 @@ const BRAND_TRACKING = `calc(${BRAND_SIZE} * 1.2 / 44)`
  * 도는 React 리렌더·컴포지팅을 위한 여유를 절반 가까이 남긴다.
  */
 const GRID_LONG_EDGE = 1400
+
+/**
+ * 워드마크가 제자리로 날아가는 곡선. 앞이 빠르고 뒤가 아주 부드럽게 멎는다 —
+ * 잉크가 걷히는 것과 같은 성격이라 둘이 한 동작으로 읽힌다.
+ *
+ * 시간은 `ERASE_MS` 를 그대로 쓴다. 따로 두면 글자가 먼저 앉아 있는데 배경만
+ * 남거나 그 반대가 되어, 두 동작이 하나로 안 보인다.
+ */
+const FLIGHT_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)'
+
+/**
+ * 인트로가 끝나며 워드마크가 날아가 앉을 자리 — `BrandMark` 가 붙이는 표식.
+ *
+ * 반응형으로 크기가 다른 사본이 둘 이상 있을 수 있어(예: `AuthShell` 의
+ * 34px/48px) **실제로 보이는 것 하나**를 고른다.
+ */
+function visibleBrandMark(): HTMLElement | null {
+  const marks = Array.from(document.querySelectorAll<HTMLElement>('[data-brand-mark]'))
+  return marks.find((el) => el.getBoundingClientRect().width > 0) ?? null
+}
 
 /** `ink_field.png`의 실제 크기(세로가 긴 인물 사진). `cover`로 채운다. */
 const FIELD_SRC = '/ink_field.png'
@@ -427,6 +449,8 @@ function GlitchText({
  */
 export default function GlitchIntro({ onDone }: { onDone: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const inkRef = useRef<HTMLDivElement>(null)
+  const markRef = useRef<HTMLSpanElement>(null)
   const [glitched, setGlitched] = useState(false)
   const [amplitude, setAmplitude] = useState(0)
   const [seedStep, setSeedStep] = useState(0)
@@ -435,7 +459,10 @@ export default function GlitchIntro({ onDone }: { onDone: () => void }) {
     let cancelled = false
     let rafId = 0
     let done = false
+    let exiting = false
     let start: number | null = null
+    /** 비행 때 감춘 목적지 워드마크를 되살린다(멱등). */
+    let restoreDest: () => void = () => {}
 
     let reducedMotion = false
     try {
@@ -447,16 +474,18 @@ export default function GlitchIntro({ onDone }: { onDone: () => void }) {
     const finish = () => {
       if (done) return
       done = true
+      // 되살린 뒤에 언마운트해야 한 프레임도 워드마크가 비지 않는다.
+      restoreDest()
       onDone()
     }
 
     // 어느 경로(GPU/CPU)든 이 두 훅만 채우면 tick()은 신경 쓸 필요가 없다.
-    let renderFrame: ((p: number, seed: number) => void) | null = null
+    let renderFrame: ((p: number, seed: number, erase: boolean) => void) | null = null
     let cleanupRender: () => void = () => {}
 
     /** WebGL2 → WebGL1 순으로 컨텍스트를 얻어 셰이더 경로를 세운다. 실패하면 false. */
     function trySetupGpu(img: HTMLImageElement): boolean {
-      const container = containerRef.current
+      const container = inkRef.current
       if (!container) return false
 
       const canvas = document.createElement('canvas')
@@ -555,9 +584,9 @@ export default function GlitchIntro({ onDone }: { onDone: () => void }) {
       glc.uniform1f(uniforms.uDetail, DETAIL)
       glc.uniform3f(uniforms.uInk, 0, 0, 0)
 
-      // 글자 레이어(container의 기존 자식)보다 뒤에 와야 한다 — DOM 순서가
-      // 곧 쌓임 순서다. appendChild면 글자를 덮어 버린다.
-      container.insertBefore(canvas, container.firstChild)
+      // 잉크 레이어 안에 넣는다 — 이 레이어 자체가 글자 레이어보다 뒤라
+      // 순서를 따로 맞출 필요가 없다.
+      container.appendChild(canvas)
 
       let lost = false
       const onContextLost = (e: Event) => {
@@ -570,10 +599,13 @@ export default function GlitchIntro({ onDone }: { onDone: () => void }) {
       }
       canvas.addEventListener('webglcontextlost', onContextLost, false)
 
-      renderFrame = (p, seed) => {
+      renderFrame = (p, seed, erase) => {
         if (lost) return
         glc.uniform1f(uniforms.uProgress, p)
         glc.uniform1f(uniforms.uSeed, seed)
+        // uErase=1이면 알파가 뒤집힌다(a = 1 - inked) — 같은 알갱이로 잉크가
+        // 역으로 걷힌다. 셰이더에 이미 있던 유니폼이라 새로 만든 게 아니다.
+        glc.uniform1f(uniforms.uErase, erase ? 1 : 0)
         glc.drawArrays(glc.TRIANGLE_STRIP, 0, 4)
       }
       cleanupRender = () => {
@@ -590,7 +622,7 @@ export default function GlitchIntro({ onDone }: { onDone: () => void }) {
 
     /** CPU(canvas 2D) 폴백 — WebGL을 못 쓰거나 셰이더가 실패했을 때. */
     function startCpu(img: HTMLImageElement) {
-      const container = containerRef.current
+      const container = inkRef.current
       if (!container) {
         finish()
         return
@@ -659,10 +691,10 @@ export default function GlitchIntro({ onDone }: { onDone: () => void }) {
       const outImage = outCtx.createImageData(gridW, gridH)
       const buf = outImage.data
 
-      // 글자 레이어보다 뒤에 와야 한다 — 위 GPU 경로와 같은 이유.
-      container.insertBefore(canvas, container.firstChild)
+      // 잉크 레이어 안에 넣는다 — 위 GPU 경로와 같다.
+      container.appendChild(canvas)
 
-      renderFrame = (p, seed) => {
+      renderFrame = (p, seed, erase) => {
         const boilAmt = BOIL * p * (1 - p) * 4
         const threshold = mix(-EDGE_CPU, 1 + EDGE_CPU, p)
 
@@ -673,11 +705,13 @@ export default function GlitchIntro({ onDone }: { onDone: () => void }) {
             const n = hash(x, y, seed) - 0.5
             const th = threshold + n * boilAmt
             const inked = smoothstep(order - EDGE_CPU, order + EDGE_CPU, th)
+            // GPU 경로의 uErase와 같은 뒤집기.
+            const a = erase ? 1 - inked : inked
             const o = i * 4
             buf[o] = 0
             buf[o + 1] = 0
             buf[o + 2] = 0
-            buf[o + 3] = Math.round(inked * 255)
+            buf[o + 3] = Math.round(a * 255)
           }
         }
         outCtx.putImageData(outImage, 0, 0)
@@ -687,20 +721,83 @@ export default function GlitchIntro({ onDone }: { onDone: () => void }) {
       }
     }
 
+    /**
+     * 인트로에서 화면으로 넘어가는 마지막 구간을 시작한다 — 딱 한 번만.
+     *
+     * 두 동작이 같은 시간 동안 함께 일어난다:
+     * 1. 잉크가 **역으로 걷힌다**(`tick` 의 erase 구간). 번질 때와 같은
+     *    알갱이라 점 단위로 사라지며 밑의 화면이 드러난다
+     * 2. 워드마크가 `BrandMark` 자리로 **날아가 앉는다**(FLIP)
+     *
+     * 잉크가 걷히기 시작하는 순간 화면은 아직 완전히 검다(진행도 1에서는
+     * 모든 픽셀이 불투명하다). 그래서 그 밑의 민트 종이를 이때 치워도
+     * 보이는 게 달라지지 않는다 — 치워야 걷힌 자리로 민트가 아니라 실제
+     * 화면이 보인다.
+     */
+    function startExit() {
+      inkRef.current?.style.setProperty('background', 'transparent')
+
+      const mark = markRef.current
+      if (reducedMotion || !mark) return
+
+      const dest = visibleBrandMark()
+      if (!dest) return
+
+      const from = mark.getBoundingClientRect()
+      const to = dest.getBoundingClientRect()
+      if (!from.width || !to.width) return
+
+      // 두 워드마크는 글꼴·자간 공식이 같아서(BrandMark.letterSpacingFor)
+      // 크기만 다르다 — 회전·비틀림 없이 균등 확대·축소 하나로 정확히 겹친다.
+      const scale = to.width / from.width
+      const dx = to.left + to.width / 2 - (from.left + from.width / 2)
+      const dy = to.top + to.height / 2 - (from.top + from.height / 2)
+
+      // 날아가는 동안 목적지의 워드마크는 감춘다 — 같은 글자가 둘로 보인다.
+      // 도착하면 되살린다(둘이 픽셀 단위로 겹쳐 있어 바뀌는 게 안 보인다).
+      dest.style.visibility = 'hidden'
+      restoreDest = () => {
+        dest.style.visibility = ''
+        restoreDest = () => {}
+      }
+
+      mark.animate(
+        [
+          { transform: 'translate(0px, 0px) scale(1)' },
+          { transform: `translate(${dx}px, ${dy}px) scale(${scale})` },
+        ],
+        { duration: ERASE_MS, easing: FLIGHT_EASING, fill: 'forwards' },
+      )
+    }
+
     function tick(now: number) {
       if (cancelled) return
       if (start === null) start = now
       const elapsed = now - start
-      const t = Math.min(elapsed / TOTAL_MS, 1)
-      const p = inkProgress(t)
 
-      renderFrame?.(p, Math.round(elapsed))
+      // 1) 번지는 구간 — 잉크가 퍼지고 글자가 흔들린다.
+      if (elapsed < TOTAL_MS) {
+        const p = inkProgress(elapsed / TOTAL_MS)
+        renderFrame?.(p, Math.round(elapsed), false)
+        setGlitched(p >= SWAP_AT)
+        setAmplitude(reducedMotion ? 0 : glitchAmplitudeAt(p))
+        setSeedStep(Math.floor(elapsed / HOLD_MS))
+        rafId = requestAnimationFrame(tick)
+        return
+      }
 
-      setGlitched(p >= SWAP_AT)
-      setAmplitude(reducedMotion ? 0 : glitchAmplitudeAt(p))
-      setSeedStep(Math.floor(elapsed / HOLD_MS))
+      // 2) 걷히는 구간 — 잉크가 역으로 사라지고 글자는 제자리로 날아간다.
+      if (!exiting) {
+        exiting = true
+        setGlitched(true)
+        setAmplitude(0)
+        startExit()
+      }
 
-      if (elapsed >= TOTAL_MS) {
+      const e = Math.min((elapsed - TOTAL_MS) / ERASE_MS, 1)
+      renderFrame?.(eraseProgress(e), Math.round(elapsed), true)
+
+      if (e >= 1) {
         finish()
         return
       }
@@ -747,21 +844,26 @@ export default function GlitchIntro({ onDone }: { onDone: () => void }) {
       cancelled = true
       cancelAnimationFrame(rafId)
       cleanupRender()
+      // 비행 도중에 언마운트되면(경로 이동 등) 목적지 워드마크가 감춰진 채
+      // 남는다 — 여기서도 되살린다.
+      restoreDest()
     }
     // onDone은 IntroGate에서 useCallback으로 안정적으로 넘어온다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (
-    <div
-      ref={containerRef}
-      className="fixed inset-0 z-50 overflow-hidden"
-      style={{ background: 'var(--ss-accent)' }}
-    >
-      {/* 잉크 캔버스는 GPU/CPU 경로가 이 컨테이너에 직접 붙였다 뗀다 —
-          두 경로가 컨텍스트 종류(webgl/2d)가 다른 캔버스가 필요해서다. */}
+    <div ref={containerRef} className="fixed inset-0 z-50 overflow-hidden">
+      {/* 잉크 레이어 — 민트 종이와 그 위의 잉크 캔버스. GPU/CPU 경로가 이
+          div에 캔버스를 직접 붙였다 뗀다(두 경로가 컨텍스트 종류가 다른
+          캔버스를 쓴다). **글자와 레이어를 나눈 이유**는 끝에서 잉크만
+          걷어내고 글자는 남겨 제자리로 날려보내야 하기 때문이다. */}
+      <div ref={inkRef} className="absolute inset-0" style={{ background: 'var(--ss-accent)' }} />
       <div className="absolute inset-0 flex items-center justify-center">
-        <GlitchText glitched={glitched} amplitude={amplitude} seed={seedStep} />
+        {/* 비행하는 주체 — 이 래퍼의 상자가 곧 글자의 상자다(FLIP 기준). */}
+        <span ref={markRef} className="inline-block">
+          <GlitchText glitched={glitched} amplitude={amplitude} seed={seedStep} />
+        </span>
       </div>
     </div>
   )

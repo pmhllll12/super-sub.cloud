@@ -12,6 +12,10 @@ export default function BrandMark({
 }) {
   return (
     <span
+      // 인트로가 끝날 때 워드마크가 날아와 앉는 자리다 — GlitchIntro 가 이
+      // 표식으로 목적지를 찾는다. 화면에 둘 이상 있으면(반응형으로 크기가
+      // 다른 사본) 실제로 보이는 것 하나를 고른다.
+      data-brand-mark=""
       className={`select-none ${className}`}
       style={{
         fontFamily: 'var(--font-rubik-glitch)',

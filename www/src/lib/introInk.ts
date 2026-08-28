@@ -23,6 +23,15 @@ export const WET_MS = 3000
 /** 다 번진 뒤 머무는 시간. */
 export const SETTLE_MS = 500
 
+/**
+ * 잉크가 **역으로 걷히는** 시간 — 인트로에서 화면으로 넘어가는 구간이다.
+ *
+ * 번질 때와 같은 알갱이(같은 셰이더의 `uErase`)로 되돌려, 검게 덮인 화면이
+ * 점 단위로 사라지며 그 밑의 화면이 드러난다. 워드마크가 제자리로 날아가는
+ * 시간(`GlitchIntro` 의 비행)과 같은 길이라 둘이 함께 끝난다.
+ */
+export const ERASE_MS = 700
+
 /** 전체 인트로 길이(ms). */
 export const TOTAL_MS = DRY_MS + WET_MS + SETTLE_MS
 
@@ -146,4 +155,17 @@ export function bandShifts(seed: number, amplitude: number): number[] {
     const shift = r * r * r * amplitude * MAX_SHIFT_EM
     return Math.abs(shift) < MIN_SHIFT_EM ? 0 : shift
   })
+}
+
+/**
+ * 걷히는 진행도(0~1) — 앞이 빠르고 뒤가 느리다(`1 − (1−e)²`).
+ *
+ * 번질 때(`inkProgress`)와 방향이 반대다. 번짐은 "천천히 스며드는" 것이고
+ * 이건 "확 걷히는" 것이라, 앞에서 대부분을 걷어내고 남은 자락만 마무리한다.
+ */
+export function eraseProgress(e: number): number {
+  if (e <= 0) return 0
+  if (e >= 1) return 1
+  const rest = 1 - e
+  return 1 - rest * rest
 }

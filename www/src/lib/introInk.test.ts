@@ -9,6 +9,7 @@ import {
   HOLD_MS,
   MIN_SHIFT_EM,
   bandShifts,
+  eraseProgress,
   glitchAmplitudeAt,
   inkProgress,
 } from './introInk'
@@ -30,6 +31,28 @@ describe('inkProgress', () => {
     const mid = DRY_END + (WET_END - DRY_END) / 2
     expect(inkProgress(mid)).not.toBeCloseTo(0.5, 5)
     expect(inkProgress(mid)).toBeCloseTo(0.65, 5)
+  })
+})
+
+describe('eraseProgress — 잉크가 역으로 걷힌다', () => {
+  it('양 끝은 0과 1이다', () => {
+    expect(eraseProgress(0)).toBe(0)
+    expect(eraseProgress(1)).toBe(1)
+    expect(eraseProgress(-1)).toBe(0)
+    expect(eraseProgress(2)).toBe(1)
+  })
+
+  it('앞이 빠르다 — 번짐(inkProgress)과 반대로 "확 걷히고" 자락만 남는다', () => {
+    // 절반 시점에 이미 3/4가 걷혀 있다.
+    expect(eraseProgress(0.5)).toBeCloseTo(0.75, 5)
+    expect(eraseProgress(0.5)).toBeGreaterThan(0.5)
+  })
+
+  it('단조증가한다 — 걷히다 되돌아오지 않는다', () => {
+    const samples = [0, 0.2, 0.4, 0.6, 0.8, 1].map(eraseProgress)
+    for (let i = 1; i < samples.length; i++) {
+      expect(samples[i]).toBeGreaterThan(samples[i - 1])
+    }
   })
 })
 
