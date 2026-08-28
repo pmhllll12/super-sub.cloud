@@ -32,7 +32,7 @@ permalink: /
 [https://github.com/pmhllll12/super-sub.cloud](https://github.com/pmhllll12/super-sub.cloud)
 
 데모 사이트
-[https://supersub.jsangho.com](https://supersub.jsangho.com)
+[https://supersub-ai.com](https://supersub-ai.com)
 
 </div>
 
