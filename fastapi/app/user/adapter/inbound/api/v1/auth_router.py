@@ -6,8 +6,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 
+from app.core.rate_limit import limit_auth_requests
 from app.user.adapter.inbound.api.schemas.auth_schema import (
     GoogleLoginSchema,
     LoginSchema,
@@ -25,7 +26,10 @@ from app.user.dependencies.google_login_provider import GoogleLoginUseCaseDep
 from app.user.dependencies.login_provider import LoginUseCaseDep
 from app.user.dependencies.signup_provider import SignupUseCaseDep
 
-auth_router = APIRouter(prefix="/auth", tags=["auth"])
+# 라우터에 달아 둔다 — **여기 추가되는 엔드포인트가 자동으로 제한을 받는다**(SEC-009).
+auth_router = APIRouter(
+    prefix="/auth", tags=["auth"], dependencies=[Depends(limit_auth_requests)]
+)
 
 
 @auth_router.post(

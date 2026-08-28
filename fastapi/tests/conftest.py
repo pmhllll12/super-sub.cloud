@@ -22,6 +22,18 @@ if not settings.jwt_secret:
     settings.jwt_secret = "test-only-secret-not-for-deploy"
 
 
+@pytest.fixture(autouse=True)
+def _fresh_rate_limit():
+    """요청 제한 상태를 검사마다 비운다(SEC-009).
+
+    프로세스 안에 쌓이는 값이라 안 비우면 **검사 순서에 따라 뒤쪽이 429 로 깨진다.**
+    제한이 실제로 걸리는지는 `tests/test_rate_limit.py` 가 따로 본다.
+    """
+    from app.core.rate_limit import auth_limiter
+
+    auth_limiter.reset()
+
+
 @pytest.fixture
 def client() -> TestClient:
     """**저장소를 스텁으로 갈아끼운 클라이언트.**
