@@ -52,12 +52,15 @@
      presentation/screens/home_screen.dart)로 카드 높이를 못박는데, 한글
      두 줄 설명 칸이라 비율로 두면 화면 폭에 따라 글자가 잘리기 때문이다
      (주석 원문: "비율 대신 높이를 못박는다"). 웹은 카드 폭이 앱 위젯보다
-     훨씬 넓어(그리드 2열, 카드당 약 300px 안팎) 148px 을 그대로 옮기면
-     좁아서, 같은 콘텐츠(아이콘+제목+설명 2줄+안내문 1줄)가 실측으로
-     들어가는 값을 새로 잡았다. 아이콘·제목·설명 2줄·안내문 1줄이 모두
-     들어가는 가장 큰 콘텐츠(준비 중/로그인 필요 안내문이 있는 카드) 기준
-     실측으로 잡은 값이라, 이보다 줄이면 잘릴 수 있다. */
+     훨씬 넓어 148px 을 그대로 옮기면 좁아서, 같은 콘텐츠(아이콘+제목+설명
+     2줄+안내문 1줄)가 실측으로 들어가는 값을 새로 잡았다. 아이콘·제목·
+     설명 2줄·안내문 1줄이 모두 들어가는 가장 큰 콘텐츠(준비 중/로그인
+     필요 안내문이 있는 카드) 기준 실측으로 잡은 값이라, 이보다 줄이면
+     잘릴 수 있다. */
   --ss-card-h: 190px;
+  /* 캐러셀(가로 한 줄)로 바뀌면서 카드 폭도 그리드 열 폭에 기대지 않고
+     직접 고정한다 — 아이콘+제목+설명 2줄이 넉넉히 들어가는 값. */
+  --ss-card-w: 280px;
   /* 호버 시 확대 배율 — 눈에 띄되 촌스럽지 않은 지점(1.02~1.04 권장)에서 골랐다. */
   --ss-card-hover-scale: 1.03;
   /* 커서를 따라다니는 후광의 반경과 색. 어두운 사진 배경 위라 흰빛은 바로
@@ -66,6 +69,24 @@
      정도로만 보이게 낮췄다. 실측(스크린샷 리뷰)으로 18% → 12% 로 낮춘 값. */
   --ss-card-glow-radius: 200px;
   --ss-card-glow-color: color-mix(in srgb, var(--ss-accent) 12%, transparent);
+  /* 캐러셀 카드 사이 간격 — 세로 어긋남(stagger)과 별개로 가로 간격도
+     한 곳에서만 정한다. */
+  --ss-carousel-gap: 24px;
+  /* 카드마다 세로로 어긋나는 폭 — 계단처럼 보이되 과하지 않게, 카드
+     높이(190px)의 약 20%(38px)에서 실측으로 잡았다. */
+  --ss-card-stagger: 38px;
+
+  /* 화면을 감싸는 글래스 테두리 판(홈 캐러셀 전용). 뷰포트 가장자리에서
+     10px 띄우고, 그 자리에서 --ss-frame-thickness 두께만큼만 유리
+     재질(블러+채도)을 두르고 가운데는 완전히 비워 아래 내용을 가리지
+     않는다 — ss-traveling-edge::after 와 같은 padding+mask(content-box,
+     exclude) "링" 기법을 카드 1px 대신 이만큼 두껍게 쓴 것. 내용(워드마크
+     ·인사말·카드)은 이 두 값의 합(10+28=38px)보다 더 안쪽에 있어야
+     테두리 판에 가려지지 않는다 — --ss-frame-content-pad 가 그 안전
+     여백이다. */
+  --ss-frame-inset: 10px;
+  --ss-frame-thickness: 28px;
+  --ss-frame-content-pad: 48px;
 }
 
 /* Field 컴포넌트 — 라벨/힌트/포커스 테두리는 전부 --ss-fg 의 불투명도 변형이다 (흰색 리터럴 금지) */
@@ -204,4 +225,83 @@ body {
   .ss-card-glow:focus-visible::before {
     opacity: 1;
   }
+}
+
+/* 홈 캐러셀 — 가로 한 줄. `scrollLeft` 로 흐르게 한다(lib/useCarouselFlow.ts).
+   같은 요소에 마우스 시차(useMouseParallax)가 `transform` 을 쓰지만
+   scrollLeft 와는 서로 다른 속성이라 부딪히지 않는다. 스크롤바는 시각
+   장치가 아니라 흐름 그 자체를 보여주는 자리라 감춘다 — reduced-motion/
+   터치 사용자는 여전히 손으로 끌 수 있다(스크롤 자체는 살아 있다,
+   보이지만 않을 뿐). */
+.ss-carousel {
+  /* 세로 어긋남(--ss-card-stagger) 만큼 위아래로 여유를 둔다 — 이 여유가
+     없으면 위로 어긋난 카드가 컨테이너 위쪽 경계를 넘어가 overflow-y:
+     hidden 에 잘린다(실측으로 확인된 버그, 아래 .ss-carousel-track 코멘트
+     참고). */
+  height: calc(var(--ss-card-h) + var(--ss-card-stagger) * 2 + 24px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  /* .ss-carousel-track(카드 한 줄, 높이 = 카드 높이만)을 이 컨테이너의
+     세로 가운데 놓는다 — 이게 없으면 트랙이 컨테이너 맨 위에 붙어서 위로
+     어긋난 카드의 여유가 통째로 없어진다(카드가 그대로 위쪽에서 잘림). */
+  display: flex;
+  align-items: center;
+}
+
+.ss-carousel::-webkit-scrollbar {
+  display: none;
+}
+
+.ss-carousel-track {
+  display: flex;
+  align-items: center;
+  gap: var(--ss-carousel-gap);
+  width: max-content;
+  /* .ss-carousel 자체가 flex 컨테이너(세로 가운데 정렬용)라 이 트랙도 그
+     flex 항목이다 — flex-shrink 기본값(1)을 두면 좁은 화면에서 트랙이
+     자기 내용(모든 카드 폭의 합)보다 좁게 눌려 카드끼리 겹친다. 항목처럼
+     이 트랙도 줄어들지 않게 못박는다. */
+  flex: none;
+}
+
+/* 카드 한 장 한 장을 감싸는 캐러셀 항목 — 세로 어긋남(계단 효과)을 여기서
+   준다. GlassPanel(카드 자체)의 호버 확대(transform: scale)와 같은
+   요소에 있으면 인라인 style 의 transform 이 :hover 스타일시트 규칙을
+   항상 이겨서 확대가 안 먹는다 — 그래서 어긋남은 카드 바깥의 이 래퍼가
+   맡고, 확대는 안쪽 GlassPanel 이 맡는다(요소가 다르니 각자의 transform
+   이 부딪히지 않는다). */
+.ss-carousel-item {
+  flex: none;
+  transform: translateY(var(--ss-card-offset, 0px));
+}
+
+/* 화면을 감싸는 글래스 테두리 판. padding+mask(content-box, exclude) 로
+   가운데를 완전히 비워 아래 캐러셀·워드마크를 가리지 않는다 — 자세한
+   원리는 위 --ss-frame-* 변수 코멘트. pointer-events: none 이 핵심 —
+   이 판이 뷰포트 대부분을 덮고 있으니 빠뜨리면 뒤 요소가 통째로 안
+   눌린다. */
+.ss-frame {
+  position: fixed;
+  inset: var(--ss-frame-inset);
+  z-index: 30;
+  pointer-events: none;
+  border-radius: var(--ss-radius-sheet);
+  padding: var(--ss-frame-thickness);
+  background:
+    linear-gradient(to bottom, color-mix(in srgb, var(--ss-fg) 8%, transparent), transparent 60%),
+    var(--ss-glass-bg);
+  backdrop-filter: blur(var(--ss-glass-blur)) saturate(var(--ss-glass-saturate));
+  -webkit-backdrop-filter: blur(var(--ss-glass-blur)) saturate(var(--ss-glass-saturate));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ss-fg) 14%, transparent);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
 }

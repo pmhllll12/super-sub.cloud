@@ -7,9 +7,11 @@ const FAINT = 'color-mix(in srgb, var(--ss-fg) 40%, transparent)'
 
 // 카드 6장이 공유하는 값 — 카드마다 다르게 주지 않는다. 높이는
 // `globals.css` 의 `--ss-card-h` (아이콘+제목+설명 2줄+안내문 1줄이 여유
-// 있게 들어가는 값, 앱의 mainAxisExtent: 148 과 같은 이유로 못박음).
+// 있게 들어가는 값, 앱의 mainAxisExtent: 148 과 같은 이유로 못박음). 폭은
+// `--ss-card-w` — 캐러셀(가로 한 줄)이라 그리드 열 폭에 기대지 않고
+// 카드 스스로 정한다.
 const PANEL_CLASS =
-  'flex flex-col items-center justify-center gap-2 px-4 py-6 text-center h-[var(--ss-card-h)]'
+  'flex flex-col items-center justify-center gap-2 px-4 py-6 text-center h-[var(--ss-card-h)] w-[var(--ss-card-w)]'
 
 export default function DestinationCard({
   title,
@@ -19,6 +21,7 @@ export default function DestinationCard({
   className = '',
   phase = 0,
   locked = false,
+  tabIndex,
 }: {
   title: string
   icon: string
@@ -32,6 +35,9 @@ export default function DestinationCard({
    *  돌려보낼 카드. 링크는 그대로 두고 안내문만 "준비 중입니다" 자리에
    *  "로그인이 필요합니다"로 바꿔 보여준다. */
   locked?: boolean
+  /** 캐러셀 무한 루프의 복제본(aria-hidden)에 -1 을 준다 — 화면엔 보여도
+   *  탭 순서·스크린리더에서는 원본 한 벌만 걸린다. */
+  tabIndex?: number
 }) {
   const ready = Boolean(href)
   // 준비 중/로그인 필요 안내문 — 항상 같은 자리(같은 높이)를 차지해야
@@ -69,7 +75,7 @@ export default function DestinationCard({
 
   if (href) {
     return (
-      <Link href={href} className="block">
+      <Link href={href} className="block" tabIndex={tabIndex}>
         {inner}
       </Link>
     )

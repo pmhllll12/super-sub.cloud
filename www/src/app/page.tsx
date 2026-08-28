@@ -58,20 +58,20 @@ const DESTINATIONS: Destination[] = [
  * 되면서 테스트가 이 함수를 직접 렌더한다(쿠키/백엔드 호출 분기를 타지
  * 않는다).
  *
+ * 홈은 격자가 아니라 화면 전체를 쓰는 캐러셀이라 `(app)` 레이아웃처럼
+ * `max-w-[1120px]` 로 가운데 폭을 좁힐 이유가 없다 — 워드마크(좌상단) ·
+ * 인사말(우상단) · 글래스 테두리 판까지 `HomeParallax` 가 전부
+ * `position: fixed` 로 화면 전체 기준으로 배치한다.
+ *
  * 하단 내비바는 로그인했을 때만 보여준다 — 로그인 안 한 사람은 갈 데가
- * 대부분 막혀 있어 의미가 없다. `(app)` 레이아웃(`max-w-[1120px] px-6
- * pb-32` + `FloatingNavBar`)과 같은 모양을, 내비바가 있을 때만 반영한다
- * (`pb-32` 는 내비바에 콘텐츠가 가리지 않게 하는 여백이라 내비바가 없으면
- * 필요 없다).
+ * 대부분 막혀 있어 의미가 없다. 캐러셀은 세로로 스크롤하는 화면이
+ * 아니라(카드가 화면 세로 가운데 고정) 내비바를 위한 별도 아래쪽 여백이
+ * 필요 없다 — 내비바는 늘 `fixed` 라 그 위에 얹힌다.
  */
 export function HomeBody({ user }: { user: Pick<User, 'nickname'> | null }) {
   return (
     <>
-      <div className={`mx-auto max-w-[1120px] px-6 ${user ? 'pb-32' : ''}`}>
-        <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center gap-10 py-16">
-          <HomeParallax user={user} destinations={DESTINATIONS} />
-        </main>
-      </div>
+      <HomeParallax user={user} destinations={DESTINATIONS} />
       {user && <FloatingNavBar />}
     </>
   )
