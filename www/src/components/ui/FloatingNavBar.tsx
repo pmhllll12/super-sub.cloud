@@ -32,7 +32,7 @@ const NAV_ITEMS: NavEntry[] = [
 
 export default function FloatingNavBar() {
   const pathname = usePathname()
-  const homeActive = pathname === '/home'
+  const homeActive = pathname === '/'
 
   return (
     // inset-x-0 로 뷰포트 전체 폭을 차지하므로, 알약 바깥의 빈 공간은 클릭을 그냥 통과시킨다.
@@ -40,7 +40,7 @@ export default function FloatingNavBar() {
     <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-6">
       <GlassPanel className="pointer-events-auto flex w-full max-w-[560px] items-center gap-2 px-3 py-2">
         <Link
-          href="/home"
+          href="/"
           aria-label="홈"
           aria-current={homeActive ? 'page' : undefined}
           className="flex shrink-0 items-center px-2"

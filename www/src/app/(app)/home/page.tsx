@@ -1,50 +1,11 @@
-import HomeParallax, { type Destination } from '@/components/HomeParallax'
-import { requireUser } from '@/server/currentUser'
+import { redirect } from 'next/navigation'
 
-// flutter/lib/features/home/presentation/screens/home_screen.dart 의 _kDestinations 와 같은 순서 · 같은 뜻.
-// '내 선수 카드' 는 앱엔 아직 route 가 없지만(미완성) 웹엔 /me/card 가 실재하므로 여기선 링크를 건다.
-const DESTINATIONS: Destination[] = [
-  {
-    title: '영상 분석',
-    icon: 'videocam',
-    summary: '경기 영상을 올리면\n실력 리포트가 나옵니다',
-    href: '/analysis',
-  },
-  {
-    title: '용병 매칭',
-    icon: 'sports_soccer',
-    summary: '경기를 찾고\n지원 현황을 봅니다',
-  },
-  {
-    title: '내 선수 카드',
-    icon: 'id_card',
-    summary: '호칭을 모으고\n카드를 공유합니다',
-    href: '/me/card',
-  },
-  {
-    title: '내 팀',
-    icon: 'groups',
-    summary: '팀원과 스쿼드를\n관리합니다',
-  },
-  {
-    title: '레슨 · 코치',
-    icon: 'school',
-    summary: '제휴 코치와\n연결합니다',
-  },
-  {
-    title: '내 프로필',
-    icon: 'person',
-    summary: '닉네임과\n가입 정보',
-    href: '/me',
-  },
-]
-
-export default async function HomePage() {
-  const user = await requireUser()
-
-  return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center gap-10 px-6 py-16">
-      <HomeParallax nickname={user.nickname} destinations={DESTINATIONS} />
-    </main>
-  )
+// `/` 가 홈이 됐다(랜딩과 런처를 하나로 합쳤다). 이 자리는 기존 링크가
+// 깨지지 않도록만 남겨 둔다 — 로그인/구글 로그인 화면이 로그인 성공 뒤
+// `router.push('/home')` 을 부르고(다른 에이전트가 그 화면들을 작업
+// 중이라 여기서 손댈 수 없다), 북마크·공유된 옛 링크도 있을 수 있다.
+// 로그인 여부와 무관하게 그냥 `/` 로 보낸다 — `/` 자체가 로그인 여부에
+// 맞는 모습을 알아서 그린다.
+export default function LegacyHomeRedirect() {
+  redirect('/')
 }

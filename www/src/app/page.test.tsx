@@ -1,19 +1,41 @@
 import { render, screen } from '@testing-library/react'
-import { LandingBody } from './page'
+import { HomeBody } from './page'
 
-describe('랜딩 페이지', () => {
-  it('워드마크를 보여준다', () => {
-    render(<LandingBody />)
+// FloatingNavBar(usePathname) · LogoutButton(useRouter) 이 둘 다 필요로 한다.
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/',
+  useRouter: () => ({ refresh: vi.fn() }),
+}))
+
+describe('홈 화면 — /', () => {
+  it('워드마크와 목적지 카드는 로그인 여부와 무관하게 보인다', () => {
+    render(<HomeBody user={null} />)
     expect(screen.getByText('SUPERSUB')).toBeInTheDocument()
+    expect(screen.getByText(/경기 영상을 올리면/)).toBeInTheDocument()
+    expect(screen.getAllByText('준비 중입니다')).toHaveLength(3)
   })
 
-  it('제목 요소를 가진다', () => {
-    render(<LandingBody />)
-    expect(screen.getByRole('heading', { name: /Super-Sub/i })).toBeInTheDocument()
-  })
-
-  it('로그인으로 가는 링크가 있다', () => {
-    render(<LandingBody />)
+  it('로그인 안 했으면 인사말 자리에 로그인 · 회원가입 버튼을 보여준다', () => {
+    render(<HomeBody user={null} />)
     expect(screen.getByRole('link', { name: '로그인' })).toHaveAttribute('href', '/login')
+    expect(screen.getByRole('link', { name: '회원가입' })).toHaveAttribute('href', '/signup')
+  })
+
+  it('로그인 안 했으면 하단 내비바를 보여주지 않는다 — 갈 데가 대부분 막혀 있다', () => {
+    render(<HomeBody user={null} />)
+    expect(screen.queryByRole('link', { name: '홈' })).toBeNull()
+  })
+
+  it('로그인했으면 인사말 자리에 닉네임과 로그아웃을 보여준다', () => {
+    render(<HomeBody user={{ nickname: '홍길동' }} />)
+    expect(screen.getByText('홍길동')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '로그아웃' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: '로그인' })).toBeNull()
+    expect(screen.queryByRole('link', { name: '회원가입' })).toBeNull()
+  })
+
+  it('로그인했으면 하단 내비바를 보여준다', () => {
+    render(<HomeBody user={{ nickname: '홍길동' }} />)
+    expect(screen.getByRole('link', { name: '홈' })).toHaveAttribute('href', '/')
   })
 })

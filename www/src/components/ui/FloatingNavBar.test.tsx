@@ -1,12 +1,12 @@
 import { render, screen } from '@testing-library/react'
 import FloatingNavBar from './FloatingNavBar'
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/home' }))
+vi.mock('next/navigation', () => ({ usePathname: () => '/' }))
 
 describe('하단 내비바', () => {
   it('로고가 홈으로 간다', () => {
     render(<FloatingNavBar />)
-    expect(screen.getByRole('link', { name: '홈' })).toHaveAttribute('href', '/home')
+    expect(screen.getByRole('link', { name: '홈' })).toHaveAttribute('href', '/')
   })
 
   it('앱과 같은 목적지를 그린다', () => {
