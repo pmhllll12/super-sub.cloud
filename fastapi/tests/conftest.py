@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import settings
+from app.core.deps import get_token_version_reader
 from app.main import app
 from app.card.adapter.outbound.stub.card_stub_repository import StubCardRepository
 from app.card.dependencies.card_repository_provider import get_card_repository
@@ -22,6 +23,30 @@ if not settings.jwt_secret:
     settings.jwt_secret = "test-only-secret-not-for-deploy"
 
 
+@pytest.fixture(autouse=True)
+def _fresh_rate_limit():
+    """요청 제한 상태를 검사마다 비운다(SEC-009).
+
+    프로세스 안에 쌓이는 값이라 안 비우면 **검사 순서에 따라 뒤쪽이 429 로 깨진다.**
+    제한이 실제로 걸리는지는 `tests/test_rate_limit.py` 가 따로 본다.
+    """
+    from app.core.rate_limit import auth_limiter
+
+    auth_limiter.reset()
+
+
+def _stub_token_version_reader():
+    """스텁 클라이언트에서 토큰 버전 대조를 통과시킨다.
+
+    기본 구현은 DB 를 읽는데(SEC-004), 계약 테스트는 DB 없이 돌아야 한다. 스텁이
+    발급하는 토큰의 버전은 0 이므로 여기서도 0 을 돌려준다.
+
+    **폐기가 실제로 동작하는지는 여기서 검사하지 않는다** — 항상 0 을 주므로
+    막히지 않는다. 그쪽은 `tests/user/adapter/test_token_revocation_db.py` 가 본다.
+    """
+    return lambda user_id: 0
+
+
 @pytest.fixture
 def client() -> TestClient:
     """**저장소를 스텁으로 갈아끼운 클라이언트.**
@@ -31,11 +56,13 @@ def client() -> TestClient:
     """
     app.dependency_overrides[get_user_repository] = StubUserRepository
     app.dependency_overrides[get_card_repository] = StubCardRepository
+    app.dependency_overrides[get_token_version_reader] = _stub_token_version_reader
     try:
         yield TestClient(app)
     finally:
         app.dependency_overrides.pop(get_user_repository, None)
         app.dependency_overrides.pop(get_card_repository, None)
+        app.dependency_overrides.pop(get_token_version_reader, None)
 
 
 @pytest.fixture

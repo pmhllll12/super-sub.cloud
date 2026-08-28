@@ -107,5 +107,23 @@ class StubUserRepository(UserPort):
         응답 형태 확인에는 충분하다 — 실제로 반영되는지는 DB 테스트가 본다.
         """
 
+    def has_password(self, user_id: UUID) -> bool:
+        """스텁 계정은 비밀번호 로그인이 되는 계정이다."""
+        return True
+
+    def delete(self, user_id: UUID) -> None:
+        """스텁은 고정 데이터라 지우지 않는다. 연쇄 확인은 DB 테스트가 본다."""
+
+    def change_password(self, user_id: UUID, password: Password) -> None:
+        """스텁은 고정 데이터라 바꾸지 않는다. 실제 반영은 DB 테스트가 본다."""
+
+    def bump_token_version(self, user_id: UUID) -> None:
+        """스텁은 고정 데이터라 올리지 않는다.
+
+        폐기가 **실제로 토큰을 끊는지**는 DB 테스트가 본다
+        (`tests/user/adapter/test_token_revocation_db.py`). 여기서 흉내 내면
+        "스텁에서만 되는 폐기"가 되어 오히려 헷갈린다.
+        """
+
     def list_memberships(self, user_id: UUID) -> list[MembershipEntity]:
         return list(_MEMBERSHIPS)

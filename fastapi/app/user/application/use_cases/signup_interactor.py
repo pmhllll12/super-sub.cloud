@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from app.core.errors import ApiError
+from app.core.logging import log_auth_event
 from app.user.application.dtos.signup_dto import SignupCommand, SignupResult
 from app.user.application.ports.input.signup_use_case import SignupUseCase
 from app.user.application.ports.output.user_port import UserPort
@@ -36,6 +37,8 @@ class SignupInteractor(SignupUseCase):
         )
         # 어떻게 보관하는지(해싱)는 저장소의 사정이다. 여기서는 평문을 넘긴다.
         self._repository.create(entity, Password(command.password))
+        # 계정 생성은 나중에 되짚을 일이 가장 많은 사건이다(탈퇴·삭제 연쇄·남용 조사).
+        log_auth_event("signup_success", user_id=entity.id)
         return SignupResult(
             id=entity.id,
             email=str(entity.email),

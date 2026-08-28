@@ -59,6 +59,11 @@ class FakeUserRepository(UserPort):
         self.identities: dict[tuple[str, str], UserEntity] = {}
         self.linked: list[tuple[UUID, str, str]] = []
         self.renamed: list[tuple[UUID, Nickname]] = []
+        self.bumped: list[UUID] = []
+        self.passwords: list[tuple[UUID, Password]] = []
+        self.deleted: list[UUID] = []
+        # 비밀번호 로그인이 되는 계정인지. 탈퇴가 비밀번호를 요구할지 가른다.
+        self.password_set = True
 
     def email_exists(self, email: Email) -> bool:
         return email == Email.of(_EMAIL)
@@ -94,6 +99,18 @@ class FakeUserRepository(UserPort):
 
     def update_nickname(self, user_id: UUID, nickname: Nickname) -> None:
         self.renamed.append((user_id, nickname))
+
+    def change_password(self, user_id: UUID, password: Password) -> None:
+        self.passwords.append((user_id, password))
+
+    def has_password(self, user_id: UUID) -> bool:
+        return self.password_set
+
+    def delete(self, user_id: UUID) -> None:
+        self.deleted.append(user_id)
+
+    def bump_token_version(self, user_id: UUID) -> None:
+        self.bumped.append(user_id)
 
     def list_memberships(self, user_id: UUID) -> list[MembershipEntity]:
         return list(self.memberships)
@@ -143,7 +160,10 @@ class TestLoginInteractor:
         result = LoginInteractor(FakeUserRepository())(
             LoginCommand(email=_EMAIL, password=_PASSWORD)
         )
-        assert verify_access_token(f"Bearer {result.access_token}") == _USER_ID
+        token = verify_access_token(f"Bearer {result.access_token}")
+        assert token.user_id == _USER_ID
+        # 발급 시점의 토큰 버전이 실려야 폐기 대조가 가능하다(SEC-004).
+        assert token.version == 0
 
     @pytest.mark.parametrize(
         ("email", "password"),

@@ -26,7 +26,7 @@ class TeamMemberOrm(Base):
         Uuid, ForeignKey("team.id"), nullable=False
     )
     user_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("user.id"), nullable=False
+        Uuid, ForeignKey("user.id", ondelete="CASCADE"), nullable=False
     )
     role: Mapped[str] = mapped_column(String(20), nullable=False)
     joined_at: Mapped[datetime] = mapped_column(

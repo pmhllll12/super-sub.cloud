@@ -25,6 +25,23 @@ class UpdateMeCommand:
 
 
 @dataclass(frozen=True)
+class ChangePasswordCommand:
+    """비밀번호 변경. **현재 비밀번호를 함께 받는다** — 토큰만으로는 바꿀 수 없다."""
+
+    user_id: UUID
+    current_password: str
+    new_password: str
+
+
+@dataclass(frozen=True)
+class DeleteMeCommand:
+    """탈퇴. 비밀번호가 있는 계정만 `password` 를 요구한다."""
+
+    user_id: UUID
+    password: str | None = None
+
+
+@dataclass(frozen=True)
 class MembershipResult:
     team_id: UUID
     name: str

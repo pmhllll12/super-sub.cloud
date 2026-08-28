@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from app.core.errors import ApiError
+from app.core.logging import log_auth_event
 from app.core.security import TOKEN_EXPIRES_IN, issue_access_token
 from app.user.application.dtos.login_dto import GoogleLoginCommand, LoginResult
 from app.user.application.ports.input.google_login_use_case import GoogleLoginUseCase
@@ -43,8 +44,9 @@ class GoogleLoginInteractor(GoogleLoginUseCase):
         if user is None:
             user = self._link_or_create(identity)
 
+        log_auth_event("login_success", provider=identity.provider, user_id=user.id)
         return LoginResult(
-            access_token=issue_access_token(user.id),
+            access_token=issue_access_token(user.id, user.token_version),
             expires_in=TOKEN_EXPIRES_IN,
         )
 
