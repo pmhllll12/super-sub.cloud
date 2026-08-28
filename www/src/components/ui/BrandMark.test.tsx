@@ -13,15 +13,3 @@ describe('BrandMark', () => {
     expect(letterSpacingFor(88)).toBeCloseTo(2.4)
   })
 })
-
-describe('BrandMark glitch', () => {
-  it('glitch 를 주면 애니메이션 클래스가 붙는다', () => {
-    const { container } = render(<BrandMark glitch />)
-    expect(container.firstElementChild?.className).toMatch(/ss-glitch/)
-  })
-
-  it('기본값은 글리치가 아니다', () => {
-    const { container } = render(<BrandMark />)
-    expect(container.firstElementChild?.className).not.toMatch(/ss-glitch/)
-  })
-})

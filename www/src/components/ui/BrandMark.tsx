@@ -5,18 +5,14 @@ export function letterSpacingFor(size: number): number {
 
 export default function BrandMark({
   size = 34,
-  glitch = false,
   className = '',
 }: {
   size?: number
-  /** 참이면 인트로에서 쓰는 색 어긋남 애니메이션(`ss-glitch`, globals.css)이 붙는다. */
-  glitch?: boolean
   className?: string
 }) {
   return (
     <span
-      className={`select-none ${glitch ? 'ss-glitch' : ''} ${className}`}
-      data-text={glitch ? 'SUPERSUB' : undefined}
+      className={`select-none ${className}`}
       style={{
         fontFamily: 'var(--font-rubik-glitch)',
         fontSize: `${size}px`,

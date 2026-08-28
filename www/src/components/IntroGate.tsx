@@ -1,12 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
-import BrandMark from './ui/BrandMark'
+import GlitchIntro from './GlitchIntro'
 import { INTRO_SEEN_KEY, shouldPlayIntro } from '@/lib/intro'
-
-/** 앱 인트로와 같은 길이. 지지직대다 굳고, 잠깐 멎었다가 사라진다. */
-const INTRO_DURATION_MS = 2500
 
 /**
  * `sessionStorage` 접근은 사파리 프라이빗 모드 등에서 던질 수 있다.
@@ -29,7 +26,7 @@ function markIntroSeen(): void {
   }
 }
 
-/** 앱 진입점(`/`, `/login`)에서 세션당 한 번, 글리치 워드마크를 잠깐 띄운다. */
+/** 앱 진입점(`/`, `/login`)에서 세션당 한 번, 잉크 번짐 인트로를 띄운다. */
 export default function IntroGate() {
   const pathname = usePathname()
   const [playing, setPlaying] = useState(false)
@@ -41,22 +38,16 @@ export default function IntroGate() {
     // 가능하다 — 렌더 중에는 계산할 수 없는 값이라 effect 안에서 켠다.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPlaying(true)
-    const timer = setTimeout(() => {
-      setPlaying(false)
-      markIntroSeen()
-    }, INTRO_DURATION_MS)
-
-    return () => clearTimeout(timer)
   }, [pathname])
+
+  // GlitchIntro가 자기 애니메이션(3600ms) 끝에 스스로 부른다 — 이미지 로드에
+  // 실패하면 애니메이션 없이 바로 부른다.
+  const handleDone = useCallback(() => {
+    setPlaying(false)
+    markIntroSeen()
+  }, [])
 
   if (!playing) return null
 
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: 'var(--ss-bg)' }}
-    >
-      <BrandMark glitch size={72} />
-    </div>
-  )
+  return <GlitchIntro onDone={handleDone} />
 }
