@@ -21,24 +21,6 @@ vi.mock('next/script', () => ({
   },
 }))
 
-/** 구글이 renderButton 호출 시 실제로 만드는 자식 노드 하나를 흉내낸다.
- * getBoundingClientRect 를 스텁해 "구글이 그려낸 실제 크기"를 지정한다 —
- * jsdom 은 레이아웃을 계산하지 않아 기본값은 전부 0이다. */
-function stubRect(el: Element, rect: Partial<DOMRect>) {
-  vi.spyOn(el, 'getBoundingClientRect').mockReturnValue({
-    x: 0,
-    y: 0,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: 0,
-    height: 0,
-    toJSON() {},
-    ...rect,
-  } as DOMRect)
-}
-
 describe('GoogleSignInButton', () => {
   afterEach(() => {
     vi.unstubAllEnvs()
@@ -99,59 +81,55 @@ describe('GoogleSignInButton', () => {
     expect(options).toEqual(expect.objectContaining({ text: 'signup_with' }))
   })
 
-  it('구글 로고 없이 글자만 있는 우리 PillButton 모양 장식을 그리고, 스크린리더에는 감춘다', async () => {
-    vi.stubEnv('NEXT_PUBLIC_GOOGLE_CLIENT_ID', 'test-client-id.apps.googleusercontent.com')
-    window.google = { accounts: { id: { initialize: vi.fn(), renderButton: vi.fn() } } }
-
-    const { default: GoogleSignInButton } = await import('./GoogleSignInButton')
-    const { container } = render(<GoogleSignInButton onError={() => {}} text="signup_with" />)
-
-    const decorative = container.querySelector('[aria-hidden="true"]')
-    expect(decorative).not.toBeNull()
-    expect(decorative?.textContent).toBe('Google 계정으로 가입')
-    // 로고(이미지/아이콘)를 함께 그리지 않는다 — 글자만.
-    expect(decorative?.querySelector('img, svg')).toBeNull()
-  })
-
-  it('구글이 그린 실제 버튼을 우리 버튼 자리 위에 폭·높이 모두 정확히 겹치도록 스케일을 맞춘다', async () => {
+  // 🔴 회귀 방지 — 2026-08-28.
+  // 한때 우리 PillButton 모양 장식을 그리고 구글 버튼을 opacity:0 으로 그 위에
+  // 겹쳤다. 구글은 버튼이 실제로 보이지 않으면 클릭을 무시한다(클릭재킹 방지).
+  // 콘솔에 에러 한 줄도 안 남고 그냥 무반응이라 원인 찾기가 아주 어렵다.
+  it('구글 버튼을 감추거나 덮지 않는다 — 투명 오버레이/장식 버튼을 두지 않는다', async () => {
     vi.stubEnv('NEXT_PUBLIC_GOOGLE_CLIENT_ID', 'test-client-id.apps.googleusercontent.com')
     const renderButton = vi.fn((parent: HTMLElement) => {
-      // 구글이 실제로 만드는 자식 노드 — 우리 버튼(예: 320×54)보다
-      // 작다(예: 200×40)고 가정한다. large 사이즈의 실제 렌더 높이는
-      // --ss-btn-h(54px)보다 늘 낮다. 실제 브라우저에서는 자기 크기를
-      // 지정하지 않은 parent(googleContainerRef, absolute + shrink-to-fit)
-      // 가 이 자식을 그대로 감싸 같은 크기로 측정된다 — jsdom 은 레이아웃을
-      // 계산하지 않으므로 parent 쪽도 같은 크기로 함께 스텁해준다.
-      const el = document.createElement('div')
-      parent.appendChild(el)
-      stubRect(el, { width: 200, height: 40, right: 200, bottom: 40 })
-      stubRect(parent, { width: 200, height: 40, right: 200, bottom: 40 })
+      parent.appendChild(document.createElement('div'))
     })
     window.google = { accounts: { id: { initialize: vi.fn(), renderButton } } }
 
     const { default: GoogleSignInButton } = await import('./GoogleSignInButton')
     const { container } = render(<GoogleSignInButton onError={() => {}} />)
 
+    await waitFor(() => {
+      expect(renderButton).toHaveBeenCalledTimes(1)
+    })
+
+    // 투명하게 만드는 어떤 장치도 없어야 한다.
+    expect(container.querySelector('[class*="opacity-0"]')).toBeNull()
+    expect(container.querySelector('[style*="opacity"]')).toBeNull()
+    // 구글 버튼을 가릴 형제(장식 버튼)도 두지 않는다 — 구글이 그린 것 하나뿐이다.
+    expect(container.querySelector('[aria-hidden="true"]')).toBeNull()
     const wrapper = container.querySelector('[data-testid="google-signin-wrapper"]') as HTMLElement
-    stubRect(wrapper, { width: 320, height: 54, right: 320, bottom: 54 })
+    expect(wrapper.children).toHaveLength(1)
+  })
+
+  it('카드 폭에 맞춰 구글 버튼 폭을 픽셀로 넘기고, 리사이즈되면 다시 그린다', async () => {
+    vi.stubEnv('NEXT_PUBLIC_GOOGLE_CLIENT_ID', 'test-client-id.apps.googleusercontent.com')
+    const renderButton = vi.fn()
+    window.google = { accounts: { id: { initialize: vi.fn(), renderButton } } }
+
+    const { default: GoogleSignInButton } = await import('./GoogleSignInButton')
+    const { container } = render(<GoogleSignInButton onError={() => {}} />)
+
+    const wrapper = container.querySelector('[data-testid="google-signin-wrapper"]') as HTMLElement
+    // jsdom 은 레이아웃을 계산하지 않아 offsetWidth 가 늘 0이다 — 실제 폭을 흉내낸다.
+    Object.defineProperty(wrapper, 'offsetWidth', { value: 320, configurable: true })
 
     await waitFor(() => {
       expect(renderButton).toHaveBeenCalledTimes(1)
     })
 
-    // fitOverlay 는 wrapper 크기가 아직 0×0(jsdom 기본값)일 때 한 번 실행돼
-    // 아무 것도 하지 않으므로, wrapper 크기를 스텁한 뒤 리사이즈 이벤트로
-    // 다시 재계산시킨다 — 실제 화면에서도 동일한 경로(window resize →
-    // renderGoogleButton → fitOverlay)로 재계산된다.
     window.dispatchEvent(new Event('resize'))
 
     await waitFor(() => {
-      const target = container.querySelector(
-        '[data-testid="google-signin-wrapper"] > div:last-child > div',
-      ) as HTMLElement
-      // 320/200 = 1.6, 54/40 = 1.35 — 폭·높이 각각 다른 비율로 늘어나
-      // 우리 버튼 자리를 정확히 채운다.
-      expect(target.style.transform).toBe('scale(1.6, 1.35)')
+      expect(renderButton).toHaveBeenCalledTimes(2)
     })
+    const [, options] = renderButton.mock.calls[1]
+    expect(options).toEqual(expect.objectContaining({ width: '320' }))
   })
 })

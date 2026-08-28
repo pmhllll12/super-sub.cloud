@@ -44,6 +44,13 @@
   /* 웹 전용 — Flutter 소스에서 옮겨온 값이 아님 */
   --ss-field-radius: 14px;
 
+  /* 구글이 그리는 "Sign in with Google" 버튼의 실제 높이(size: 'large').
+     우리가 정한 값이 아니라 구글이 정한 값이라 바꿀 수 없다 — 인증 화면은
+     반대로 이 값에 --ss-btn-h 를 맞춘다(GoogleSignInButton.tsx 주석 참고).
+     실측값이다: 구글이 그린 알약(.nsm7Bb-HzV7m-LgbsSe)이 40px · 반경 20px.
+     바깥 래퍼가 아니라 이 알약이 눈에 보이는 크기라 여기에 맞춰야 나란해진다. */
+  --ss-google-btn-h: 40px;
+
   /* 로그인·회원가입 오른쪽 사진 판 — 위 두 모서리만 이 값으로 크게 둥글려 아치 모양을 낸다. */
   --ss-radius-arch: 260px;
 

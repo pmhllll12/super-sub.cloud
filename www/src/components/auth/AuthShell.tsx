@@ -132,7 +132,20 @@ export default function AuthShell({
               WebkitBackdropFilter: 'blur(var(--ss-glass-blur))',
             }}
           >
-            <div className="m-auto flex w-full max-w-sm flex-col gap-8 py-6">
+            {/* 이 열의 버튼 높이는 구글이 정한다. 구글이 그리는 로그인
+                버튼은 높이 44px 고정이고 우리가 바꿀 수 없으므로(감추면
+                클릭 자체가 막힌다 — GoogleSignInButton.tsx 주석), 반대로
+                우리 PillButton 을 그 높이에 맞춘다. 전역 --ss-btn-h(54px,
+                앱의 _kButtonHeight)는 건드리지 않고 이 열에서만 덮는다. */}
+            <div
+              className="m-auto flex w-full max-w-sm flex-col gap-8 py-6"
+              style={
+                {
+                  '--ss-btn-h': 'var(--ss-google-btn-h)',
+                  '--ss-btn-r': 'calc(var(--ss-google-btn-h) / 2)',
+                } as React.CSSProperties
+              }
+            >
               <div className="flex flex-col items-center gap-3 text-center">
                 <BrandMark size={34} className="sm:hidden" />
                 <BrandMark size={48} className="hidden sm:inline" />
