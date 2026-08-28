@@ -35,12 +35,37 @@
   --ss-glass-bg: rgba(255, 255, 255, 0.08);
   --ss-glass-border: rgba(255, 255, 255, 0.12);
   --ss-glass-blur: 20px;
+  /* 리퀴드 글래스 느낌을 더하는 값 — blur 만으로는 뒤 색이 흐려지기만 하고
+     "유리" 로 안 보인다. saturate 를 살짝 얹어 뒤 배경색이 조금 더
+     진해지게 한다(실제 유리를 통과한 빛이 진해 보이는 것과 같은 원리).
+     과하면 사진이 촌스럽게 번들거려서 1.4 정도(40% 더 진하게)로 멈췄다. */
+  --ss-glass-saturate: 1.4;
 
   /* 웹 전용 — Flutter 소스에서 옮겨온 값이 아님 */
   --ss-field-radius: 14px;
 
   /* 로그인·회원가입 오른쪽 사진 판 — 위 두 모서리만 이 값으로 크게 둥글려 아치 모양을 낸다. */
   --ss-radius-arch: 260px;
+
+  /* 목적지 카드(홈 화면) 전용 — 카드마다 다른 값이 들어가지 않도록 여기
+     한 곳에서만 정한다. 앱은 mainAxisExtent: 148(flutter/lib/features/home/
+     presentation/screens/home_screen.dart)로 카드 높이를 못박는데, 한글
+     두 줄 설명 칸이라 비율로 두면 화면 폭에 따라 글자가 잘리기 때문이다
+     (주석 원문: "비율 대신 높이를 못박는다"). 웹은 카드 폭이 앱 위젯보다
+     훨씬 넓어(그리드 2열, 카드당 약 300px 안팎) 148px 을 그대로 옮기면
+     좁아서, 같은 콘텐츠(아이콘+제목+설명 2줄+안내문 1줄)가 실측으로
+     들어가는 값을 새로 잡았다. 아이콘·제목·설명 2줄·안내문 1줄이 모두
+     들어가는 가장 큰 콘텐츠(준비 중/로그인 필요 안내문이 있는 카드) 기준
+     실측으로 잡은 값이라, 이보다 줄이면 잘릴 수 있다. */
+  --ss-card-h: 190px;
+  /* 호버 시 확대 배율 — 눈에 띄되 촌스럽지 않은 지점(1.02~1.04 권장)에서 골랐다. */
+  --ss-card-hover-scale: 1.03;
+  /* 커서를 따라다니는 후광의 반경과 색. 어두운 사진 배경 위라 흰빛은 바로
+     튀어서 글자를 덮는다 — 흰색 대신 브랜드 민트(--ss-accent)를 아주
+     옅게(12%) 섞어 "카드가 빛난다"가 아니라 "커서 근처가 살짝 밝아진다"
+     정도로만 보이게 낮췄다. 실측(스크린샷 리뷰)으로 18% → 12% 로 낮춘 값. */
+  --ss-card-glow-radius: 200px;
+  --ss-card-glow-color: color-mix(in srgb, var(--ss-accent) 12%, transparent);
 }
 
 /* Field 컴포넌트 — 라벨/힌트/포커스 테두리는 전부 --ss-fg 의 불투명도 변형이다 (흰색 리터럴 금지) */
@@ -130,5 +155,53 @@ body {
   .ss-traveling-edge::after {
     animation: none;
     background: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* 호버 상호작용(GlassPanel `interactive` prop) — 살짝 확대 + 커서를 따라
+   도는 후광. 기본 상태(움직임 없음)와 값이 갈리므로 prefers-reduced-motion
+   일 때는 스케일도 후광도 아예 켜지 않는다(트랜지션도 없음 — 트랜지션만
+   지워봤자 최종 상태는 그대로 커지고 빛나 버리므로 hover 규칙 자체를
+   미디어 쿼리 밖으로 안 뺀다). */
+.ss-card-interactive {
+  transition: transform 200ms ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ss-card-interactive:hover,
+  .ss-card-interactive:focus-visible {
+    transform: scale(var(--ss-card-hover-scale));
+  }
+}
+
+/* 후광 — ::before 에 커서 좌표(GlassPanel 이 rAF 로 쓰는
+   --ss-card-glow-x/y)를 중심으로 한 radial-gradient. z-index: -1 로
+   박아 카드 자신의 배경보다는 위, 아이콘·글자(z-index 없는 일반 흐름
+   콘텐츠)보다는 아래에 놓는다 — GlassPanel 자체가 backdrop-filter 로
+   독립된 쌓임 맥락을 만들어서 여기 z-index 는 이 카드 안에서만
+   유효하다. */
+.ss-card-glow {
+  position: relative;
+}
+
+.ss-card-glow::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms ease;
+  background: radial-gradient(
+    var(--ss-card-glow-radius) circle at var(--ss-card-glow-x, 50%) var(--ss-card-glow-y, 50%),
+    var(--ss-card-glow-color),
+    transparent 70%
+  );
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ss-card-glow:hover::before,
+  .ss-card-glow:focus-visible::before {
+    opacity: 1;
   }
 }
