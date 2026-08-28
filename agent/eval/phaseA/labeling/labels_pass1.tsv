@@ -1,0 +1,159 @@
+# Phase B-0 subject ground truth — 1차 라벨
+# clip_id  ratio(20|50|80)  box_index(또는 n)
+# 판정 기준: 그 프레임에서 "분석 대상인 타자"인 후보. 타자를 특정할 수 없으면 n.
+
+0Fet8TyoNR4	20	0
+0Fet8TyoNR4	50	0
+0Fet8TyoNR4	80	0
+
+3R1kvNrGJK0	20	0	# 주황 유니폼 타자, 타석
+3R1kvNrGJK0	50	1	# 헬멧 쓴 주황 선수. [0]은 심판
+3R1kvNrGJK0	80	n	# 플레이 종료, 심판/포수만 식별 가능
+
+3USSmzO001k	20	1	# [0]은 설명 중인 코치
+3USSmzO001k	50	1
+3USSmzO001k	80	1
+
+5-jBTNp5IQA	20	0
+5-jBTNp5IQA	50	0	# 타격 후 주루
+5-jBTNp5IQA	80	n	# 카메라가 조명/관중석으로 이동
+
+6hrcRyIYTrA	20	0
+6hrcRyIYTrA	50	0	# 주루
+6hrcRyIYTrA	80	n	# 카메라 이동, 전경에 코치
+
+8gmHKqDxXdg	20	0
+8gmHKqDxXdg	50	0
+8gmHKqDxXdg	80	0
+
+Atzrde5uGcM	20	0
+Atzrde5uGcM	50	0
+Atzrde5uGcM	80	0
+
+C7icGyrdROM	20	0
+C7icGyrdROM	50	0
+C7icGyrdROM	80	0
+
+CFjNxCZhn_8	20	n	# 펜스 너머 원거리, 타자 특정 불가
+CFjNxCZhn_8	50	n
+CFjNxCZhn_8	80	n
+
+Fz16t9SrF3U	20	n	# 포수/심판만. 타자 미출현
+Fz16t9SrF3U	50	2	# 배트 든 타자 명확
+Fz16t9SrF3U	80	n
+
+GS-PcxmaHmQ	20	1	# [0]은 코치
+GS-PcxmaHmQ	50	0
+GS-PcxmaHmQ	80	0
+
+IYFifBJ9lH8	20	n	# 피사체 과소, 타격/투구 판별 불가 (K400 라벨 노이즈 의심)
+IYFifBJ9lH8	50	n
+IYFifBJ9lH8	80	n
+
+IeDin6oB-IY	20	0
+IeDin6oB-IY	50	4	# 심판이 앞을 가림
+IeDin6oB-IY	80	n
+
+LXjM7nBZcak	20	0
+LXjM7nBZcak	50	1	# [0]은 전경 관중 머리
+LXjM7nBZcak	80	n	# 관중 짐만 촬영
+
+LhD_fnHt_xg	20	0
+LhD_fnHt_xg	50	0
+LhD_fnHt_xg	80	0
+
+N5zWQkoLM3M	20	1	# [0]은 전경 초록옷
+N5zWQkoLM3M	50	2
+N5zWQkoLM3M	80	2
+
+O2GSaYqH8JY	20	0
+O2GSaYqH8JY	50	0
+O2GSaYqH8JY	80	0
+
+V_whuvMjg_8	20	0
+V_whuvMjg_8	50	0
+V_whuvMjg_8	80	0
+
+X6dC9pu5H3k	20	0
+X6dC9pu5H3k	50	6	# 전경 헬멧이 큰 박스
+X6dC9pu5H3k	80	0
+
+YNMHMKb5Md4	20	0
+YNMHMKb5Md4	50	0
+YNMHMKb5Md4	80	0
+
+ZMy0t-CSZiU	20	0
+ZMy0t-CSZiU	50	0
+ZMy0t-CSZiU	80	0
+
+ZS-wgeg2qkI	20	0
+ZS-wgeg2qkI	50	0
+ZS-wgeg2qkI	80	0
+
+Zp9aDp2YTBw	20	n	# 농구 코트, 배트/타격 없음 (K400 라벨 노이즈)
+Zp9aDp2YTBw	50	n
+Zp9aDp2YTBw	80	n
+
+bh6Cvz2orzQ	20	1	# [0]은 전경 흰옷 구경꾼
+bh6Cvz2orzQ	50	1
+bh6Cvz2orzQ	80	1
+
+cDRi9AzrapA	20	0
+cDRi9AzrapA	50	0
+cDRi9AzrapA	80	0
+
+e8uB0GZsVOQ	20	0
+e8uB0GZsVOQ	50	0
+e8uB0GZsVOQ	80	0
+
+g_wHimPF9o8	20	0
+g_wHimPF9o8	50	0
+g_wHimPF9o8	80	n	# 타자 이탈, 포수/심판만
+
+gg5xRWjw3f8	20	0
+gg5xRWjw3f8	50	0
+gg5xRWjw3f8	80	0
+
+goeDWOVL95g	20	0
+goeDWOVL95g	50	0
+goeDWOVL95g	80	0
+
+h_3LqD2Pl-E	20	n	# 타이틀 카드 — 후보 0개
+h_3LqD2Pl-E	50	0
+h_3LqD2Pl-E	80	0
+
+hz-SpF35_BE	20	0
+hz-SpF35_BE	50	0
+hz-SpF35_BE	80	0
+
+idueIYDAbZc	20	1	# [0]은 포수
+idueIYDAbZc	50	0
+idueIYDAbZc	80	2
+
+ihWykL5mYRI	20	0
+ihWykL5mYRI	50	0
+ihWykL5mYRI	80	0
+
+mTP2kap9cIw	20	0
+mTP2kap9cIw	50	0
+mTP2kap9cIw	80	0
+
+sGKeqfxwq5E	20	2	# [0]은 포수(노랑)
+sGKeqfxwq5E	50	2	# [0]은 심판
+sGKeqfxwq5E	80	n	# 타자 주루 이탈
+
+sYl2jCqsSKo	20	0
+sYl2jCqsSKo	50	0
+sYl2jCqsSKo	80	n	# 성인 코치만 식별, 타자 불명
+
+w-AQcjcoDyA	20	0	# 전경 신발 클로즈업 너머 타자
+w-AQcjcoDyA	50	0
+w-AQcjcoDyA	80	0
+
+wjJDs0qmwqE	20	0
+wjJDs0qmwqE	50	0
+wjJDs0qmwqE	80	0
+
+xMIUw5mi3Eo	20	0
+xMIUw5mi3Eo	50	0
+xMIUw5mi3Eo	80	0

@@ -1,0 +1,13 @@
+{
+ "weights_note": "pose_quality 항 제거 후 정규화한 임시 가중치. production 값 아님.",
+ "W_A": {
+  "centrality": 0.6923076923076923,
+  "size": 0.3076923076923077
+ },
+ "W_B": {
+  "centrality": 0.4666666666666666,
+  "size": 0.19999999999999998,
+  "continuity": 0.3333333333333333
+ },
+ "det_threshold": 0.5
+}

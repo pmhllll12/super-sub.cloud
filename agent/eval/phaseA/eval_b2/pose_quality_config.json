@@ -1,0 +1,14 @@
+{
+ "pose_quality": "mean(17 keypoint confidences) from ViTPose",
+ "valid_joint_count": "count(conf >= 0.3)",
+ "joint_threshold": 0.3,
+ "joint_threshold_note": "관측용 값. production features.LIMB_MIN_CONFIDENCE(leg .3/arm .6)와 무관.",
+ "det_threshold": 0.5,
+ "model": "usyd-community/vitpose-base-simple",
+ "max_batch": 24,
+ "oom_events": 0,
+ "total_seconds": 368.7,
+ "clip_mean_seconds": 8.8,
+ "clip_median_seconds": 6.2,
+ "total_candidates": 20677
+}

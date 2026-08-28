@@ -1,0 +1,120 @@
+39 clips
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  49%|████▉     | 377/764 [00:00<00:00, 3758.32it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 4250.60it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3450.87it/s]
+[1/39] 0Fet8TyoNR4 115f 28s objs=['baseball_bat', 'sports_ball']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  41%|████▏     | 316/764 [00:00<00:00, 3155.95it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3865.17it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3515.01it/s]
+[2/39] 3R1kvNrGJK0 150f 28s objs=['baseball_bat']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  54%|█████▍    | 416/764 [00:00<00:00, 4120.33it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 5049.60it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3485.46it/s]
+[3/39] 3USSmzO001k 150f 26s objs=['baseball_bat', 'tennis_racket']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  41%|████      | 315/764 [00:00<00:00, 3144.63it/s]Loading weights:  82%|████████▏ | 630/764 [00:00<00:00, 2811.29it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3388.95it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3184.77it/s]
+[4/39] 5-jBTNp5IQA 150f 26s objs=[]
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  49%|████▉     | 376/764 [00:00<00:00, 3749.27it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 4724.30it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3752.29it/s]
+[5/39] 6hrcRyIYTrA 150f 26s objs=['baseball_bat']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  42%|████▏     | 322/764 [00:00<00:00, 3188.64it/s]Loading weights:  84%|████████▍ | 641/764 [00:00<00:00, 3160.31it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3674.17it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3894.16it/s]
+[6/39] 8gmHKqDxXdg 100f 19s objs=['baseball_bat', 'sports_ball']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  44%|████▎     | 333/764 [00:00<00:00, 3319.07it/s]Loading weights:  87%|████████▋ | 665/764 [00:00<00:00, 3242.45it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3674.24it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3295.38it/s]
+[7/39] Atzrde5uGcM 150f 25s objs=['baseball_bat']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  40%|███▉      | 303/764 [00:00<00:00, 3024.51it/s]Loading weights:  79%|███████▉  | 606/764 [00:00<00:00, 2778.10it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3435.16it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 4334.78it/s]
+[8/39] C7icGyrdROM 150f 23s objs=['baseball_bat']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  42%|████▏     | 320/764 [00:00<00:00, 3189.99it/s]Loading weights:  84%|████████▎ | 639/764 [00:00<00:00, 3004.97it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3546.45it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3077.78it/s]
+[9/39] CFjNxCZhn_8 150f 27s objs=[]
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  43%|████▎     | 327/764 [00:00<00:00, 3253.21it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 4021.80it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3754.82it/s]
+[10/39] Fz16t9SrF3U 150f 26s objs=[]
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  41%|████      | 315/764 [00:00<00:00, 3140.98it/s]Loading weights:  82%|████████▏ | 630/764 [00:00<00:00, 2960.54it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3542.95it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3490.56it/s]
+[11/39] GS-PcxmaHmQ 150f 24s objs=['baseball_bat', 'sports_ball']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  44%|████▎     | 334/764 [00:00<00:00, 3321.64it/s]Loading weights:  87%|████████▋ | 667/764 [00:00<00:00, 3250.81it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3667.00it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3951.87it/s]
+[12/39] IYFifBJ9lH8 150f 25s objs=[]
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  43%|████▎     | 325/764 [00:00<00:00, 3216.86it/s]Loading weights:  85%|████████▍ | 647/764 [00:00<00:00, 2915.85it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3419.29it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3165.37it/s]
+[13/39] IeDin6oB-IY 150f 25s objs=[]
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  47%|████▋     | 362/764 [00:00<00:00, 3596.41it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3898.90it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3323.52it/s]
+[14/39] LXjM7nBZcak 96f 19s objs=[]
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  43%|████▎     | 329/764 [00:00<00:00, 3273.18it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3897.63it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3591.09it/s]
+[15/39] LhD_fnHt_xg 122f 24s objs=[]
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  41%|████      | 312/764 [00:00<00:00, 3095.43it/s]Loading weights:  81%|████████▏ | 622/764 [00:00<00:00, 2842.14it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3451.08it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3116.15it/s]
+[16/39] N5zWQkoLM3M 150f 25s objs=['sports_ball']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  42%|████▏     | 322/764 [00:00<00:00, 3206.99it/s]Loading weights:  84%|████████▍ | 643/764 [00:00<00:00, 2801.03it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3327.56it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3430.30it/s]
+[17/39] O2GSaYqH8JY 150f 27s objs=['sports_ball', 'tennis_racket']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  48%|████▊     | 364/764 [00:00<00:00, 3627.79it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3824.46it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3928.71it/s]
+[18/39] V_whuvMjg_8 120f 22s objs=['baseball_bat', 'sports_ball']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  41%|████      | 315/764 [00:00<00:00, 3133.50it/s]Loading weights:  82%|████████▏ | 629/764 [00:00<00:00, 2827.70it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3398.85it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3589.55it/s]
+[19/39] X6dC9pu5H3k 135f 22s objs=['baseball_bat']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  42%|████▏     | 323/764 [00:00<00:00, 3226.71it/s]Loading weights:  85%|████████▍ | 646/764 [00:00<00:00, 2789.77it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3299.08it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3984.34it/s]
+[20/39] YNMHMKb5Md4 87f 20s objs=['baseball_bat']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  41%|████      | 314/764 [00:00<00:00, 3126.87it/s]Loading weights:  82%|████████▏ | 627/764 [00:00<00:00, 2729.21it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3317.72it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3247.12it/s]
+[21/39] ZMy0t-CSZiU 150f 25s objs=['baseball_bat']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  43%|████▎     | 330/764 [00:00<00:00, 3283.53it/s]Loading weights:  86%|████████▋ | 659/764 [00:00<00:00, 3221.30it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3671.31it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3582.00it/s]
+[22/39] ZS-wgeg2qkI 150f 26s objs=['baseball_bat']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  49%|████▊     | 371/764 [00:00<00:00, 3682.94it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 4363.60it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3098.73it/s]
+[23/39] Zp9aDp2YTBw 120f 21s objs=['sports_ball']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  42%|████▏     | 322/764 [00:00<00:00, 3215.40it/s]Loading weights:  84%|████████▍ | 644/764 [00:00<00:00, 2747.71it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3261.03it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3642.11it/s]
+[24/39] bh6Cvz2orzQ 150f 24s objs=['baseball_bat', 'sports_ball']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  44%|████▎     | 334/764 [00:00<00:00, 3331.60it/s]Loading weights:  87%|████████▋ | 668/764 [00:00<00:00, 3185.27it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3598.22it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3386.51it/s]
+[25/39] cDRi9AzrapA 125f 22s objs=['baseball_bat']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 8221.78it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 2995.39it/s]
+[26/39] e8uB0GZsVOQ 120f 22s objs=['sports_ball']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  48%|████▊     | 365/764 [00:00<00:00, 3632.25it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3954.31it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 4266.43it/s]
+[27/39] g_wHimPF9o8 150f 25s objs=['baseball_bat']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  62%|██████▏   | 470/764 [00:00<00:00, 4673.93it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 5827.39it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3272.68it/s]
+[28/39] gg5xRWjw3f8 150f 24s objs=['baseball_bat']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  51%|█████     | 388/764 [00:00<00:00, 3879.73it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 4509.79it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3890.35it/s]
+[29/39] goeDWOVL95g 73f 17s objs=['baseball_bat', 'sports_ball']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  44%|████▎     | 334/764 [00:00<00:00, 3334.43it/s]Loading weights:  87%|████████▋ | 668/764 [00:00<00:00, 3038.71it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3459.09it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3945.98it/s]
+[30/39] h_3LqD2Pl-E 150f 23s objs=['sports_ball']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  43%|████▎     | 330/764 [00:00<00:00, 3265.02it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3809.79it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 4186.88it/s]
+[31/39] hz-SpF35_BE 150f 23s objs=['baseball_bat']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  40%|███▉      | 303/764 [00:00<00:00, 3010.53it/s]Loading weights:  79%|███████▉  | 605/764 [00:00<00:00, 2846.56it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3531.88it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 4139.59it/s]
+[32/39] idueIYDAbZc 148f 23s objs=[]
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  45%|████▍     | 340/764 [00:00<00:00, 3377.66it/s]Loading weights:  89%|████████▊ | 678/764 [00:00<00:00, 3201.57it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3579.73it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3719.78it/s]
+[33/39] ihWykL5mYRI 150f 24s objs=['baseball_bat']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  46%|████▌     | 351/764 [00:00<00:00, 3504.15it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3873.78it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3639.19it/s]
+[34/39] mTP2kap9cIw 150f 23s objs=[]
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  43%|████▎     | 327/764 [00:00<00:00, 3258.09it/s]Loading weights:  85%|████████▌ | 653/764 [00:00<00:00, 3135.49it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3599.76it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3533.23it/s]
+[35/39] sGKeqfxwq5E 150f 24s objs=['baseball_bat']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  43%|████▎     | 325/764 [00:00<00:00, 3232.87it/s]Loading weights:  85%|████████▍ | 649/764 [00:00<00:00, 3080.44it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3577.59it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3721.54it/s]
+[36/39] sYl2jCqsSKo 150f 25s objs=['baseball_bat']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  43%|████▎     | 330/764 [00:00<00:00, 3298.19it/s]Loading weights:  86%|████████▋ | 660/764 [00:00<00:00, 2993.77it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3392.24it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3359.86it/s]
+[37/39] w-AQcjcoDyA 147f 25s objs=[]
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  43%|████▎     | 329/764 [00:00<00:00, 3283.20it/s]Loading weights:  86%|████████▌ | 658/764 [00:00<00:00, 3202.67it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3662.13it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3667.74it/s]
+[38/39] wjJDs0qmwqE 150f 25s objs=['sports_ball']
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  42%|████▏     | 321/764 [00:00<00:00, 3181.91it/s]Loading weights:  84%|████████▍ | 640/764 [00:00<00:00, 3002.16it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3535.20it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 4460.71it/s]
+[39/39] xMIUw5mi3Eo 146f 24s objs=['baseball_bat']
+EXTRACT DONE
