@@ -23,8 +23,8 @@ email: pmhllll12@gmail.com
 description: >- # this means to ignore newlines until "baseurl:"
   생활체육 경기 영상을 멀티모달로 분석하여 용병을 구인하고 RAG 검증을 자동화하는
   플랫폼(Hit Rate 90%, Recall@5 90% 달성) 개발 제안서입니다.
-baseurl: "/supersub.parkminho.cloud" # the subpath of your site, e.g. /blog
-url: "https://pmhllll12.github.io" # the base hostname & protocol for your site, e.g. http://example.com
+baseurl: "" # dev.supersub-ai.com 루트에 배포하므로 서브패스 없음
+url: "https://dev.supersub-ai.com" # the base hostname & protocol for your site, e.g. http://example.com
 github_username:  pmhllll12
 
 # Build settings
