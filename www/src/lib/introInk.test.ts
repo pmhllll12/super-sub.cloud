@@ -1,13 +1,14 @@
 import {
+  BANDS,
+  BURST_COUNT,
   DRY_END,
   DRY_MS,
+  HOLD_MS,
+  MAX_SHIFT_EM,
   SETTLE_MS,
   TOTAL_MS,
   WET_END,
   WET_MS,
-  BANDS,
-  HOLD_MS,
-  MIN_SHIFT_EM,
   bandShifts,
   eraseProgress,
   glitchAmplitudeAt,
@@ -56,38 +57,51 @@ describe('eraseProgress — 잉크가 역으로 걷힌다', () => {
   })
 })
 
-describe('glitchAmplitudeAt', () => {
-  it('잉크가 번지기 전에는 0 — 민트 종이만 보이는 동안은 흔들리지 않는다', () => {
+describe('glitchAmplitudeAt — 흔들리는 때는 세 번뿐이다(앱과 같다)', () => {
+  it('버스트 밖에서는 정확히 0 — 사이의 정적이 있어야 터지는 순간이 산다', () => {
     expect(glitchAmplitudeAt(0)).toBe(0)
-    expect(glitchAmplitudeAt(-0.1)).toBe(0)
-  })
-
-  it('다 번지면 0 — 흔들림이 멎고 워드마크로 굳는다', () => {
+    expect(glitchAmplitudeAt(0.5)).toBe(0)
+    expect(glitchAmplitudeAt(0.72)).toBe(0) // 1버스트 끝(0.71)과 2버스트 시작(0.76) 사이
+    expect(glitchAmplitudeAt(0.84)).toBe(0) // 2버스트 끝(0.83)과 3버스트 시작(0.88) 사이
+    expect(glitchAmplitudeAt(0.95)).toBe(0) // 3버스트(0.93) 이후
     expect(glitchAmplitudeAt(1)).toBe(0)
-    expect(glitchAmplitudeAt(1.2)).toBe(0)
   })
 
-  it('번지는 내내 흔들린다 — 중간에 정적 구간이 없다', () => {
-    for (const p of [0.01, 0.1, 0.3, 0.5, 0.7, 0.9, 0.99]) {
-      expect(glitchAmplitudeAt(p)).toBeGreaterThan(0)
+  it('버스트 시작 지점에서는 그 버스트의 세기 그대로다', () => {
+    expect(glitchAmplitudeAt(0.62)).toBeCloseTo(1.0, 5)
+    expect(glitchAmplitudeAt(0.76)).toBeCloseTo(0.72, 5)
+    expect(glitchAmplitudeAt(0.88)).toBeCloseTo(0.4, 5)
+  })
+
+  it('버스트 안에서 뒤로 갈수록 진폭이 작아진다', () => {
+    const early = glitchAmplitudeAt(0.63)
+    const mid = glitchAmplitudeAt(0.665)
+    const late = glitchAmplitudeAt(0.7)
+    expect(early).toBeGreaterThan(mid)
+    expect(mid).toBeGreaterThan(late)
+  })
+
+  it('버스트 끝(end)은 포함하지 않는다 — 다음 정적 구간이 즉시 0이다', () => {
+    expect(glitchAmplitudeAt(0.71)).toBe(0)
+    expect(glitchAmplitudeAt(0.83)).toBe(0)
+    expect(glitchAmplitudeAt(0.93)).toBe(0)
+  })
+
+  it(`인트로 한 판에 정확히 ${BURST_COUNT}번 흔들린다`, () => {
+    const steps = Math.floor(TOTAL_MS / HOLD_MS)
+    const runs: number[] = []
+    let n = 0
+    for (let i = 0; i < steps; i++) {
+      const a = glitchAmplitudeAt(inkProgress((i * HOLD_MS) / TOTAL_MS))
+      if (a > 0) {
+        n++
+      } else if (n) {
+        runs.push(n)
+        n = 0
+      }
     }
-  })
-
-  it('글자가 드러나는 순간 가장 세고, 뒤로 갈수록 잦아든다', () => {
-    const samples = [0.01, 0.25, 0.5, 0.75, 0.95].map(glitchAmplitudeAt)
-    for (let i = 1; i < samples.length; i++) {
-      expect(samples[i]).toBeLessThan(samples[i - 1])
-    }
-    expect(samples[0]).toBeCloseTo(1, 2)
-  })
-
-  it('끝에 가서야 잦아든다 — 그전까지는 세기가 살아 있다', () => {
-    // 1 - p³ 이던 시절엔 여기서 이미 0.27 까지 떨어져 마지막 1.2초가
-    // 통째로 죽었다. 번지는 동안 계속 흔들려야 한다.
-    expect(glitchAmplitudeAt(0.9)).toBeGreaterThan(0.4)
-    expect(glitchAmplitudeAt(0.5)).toBeGreaterThan(0.9)
-    // 그러면서도 끝에서는 뚝 끊기지 않고 잦아들어 있어야 한다.
-    expect(glitchAmplitudeAt(0.99)).toBeLessThan(0.1)
+    if (n) runs.push(n)
+    expect(runs).toHaveLength(BURST_COUNT)
   })
 })
 
@@ -104,94 +118,30 @@ describe('구간 길이', () => {
   })
 })
 
-describe('bandShifts — 흔들림이 규칙적으로 보이면 안 된다', () => {
-  /** 인트로 한 판을 그대로 돌려 45ms 칸마다의 띠 어긋남을 모은다. */
-  function wholeIntro() {
-    const steps = Math.floor(TOTAL_MS / HOLD_MS)
-    return Array.from({ length: steps }, (_, i) =>
-      bandShifts(i, glitchAmplitudeAt(inkProgress((i * HOLD_MS) / TOTAL_MS))),
-    )
-  }
-
+describe('bandShifts', () => {
   it('같은 seed 면 같은 결과다 — 프레임마다 다시 뽑히지 않는다', () => {
     expect(bandShifts(42, 1)).toEqual(bandShifts(42, 1))
-    // seed 가 다르면 결과도 갈린다 — 이웃한 두 seed 가 나란히 "정지"일 수도
-    // 있으니(대부분의 순간이 정지다) 낱개가 아니라 무리로 본다.
-    const distinct = new Set(
-      Array.from({ length: 50 }, (_, i) => JSON.stringify(bandShifts(i, 1))),
-    )
-    expect(distinct.size).toBeGreaterThan(10)
+    expect(bandShifts(42, 1)).not.toEqual(bandShifts(43, 1))
   })
 
-  it('진폭이 0이면 전부 0 — 번지기 전과 다 번진 뒤는 완전히 정지다', () => {
+  it('띠 수만큼 준다', () => {
+    expect(bandShifts(1, 1)).toHaveLength(BANDS)
+  })
+
+  // 버스트 밖에서 조각내면 조각 경계가 가로줄로 보인다 — GlitchIntro 가
+  // "전부 0이면 통짜로" 그리도록, 여기서 정확히 0을 줘야 한다.
+  it('진폭이 0이면 전부 0 — 버스트 밖에서는 글자를 자르지 않는다', () => {
     expect(bandShifts(7, 0)).toEqual(new Array(BANDS).fill(0))
   })
 
-  it('대부분의 순간은 정지해 있다 — 쉬지 않고 떨면 글리치가 아니라 진동이다', () => {
-    const frames = wholeIntro()
-    const still = frames.filter((f) => f.every((s) => s === 0)).length
-    expect(still / frames.length).toBeGreaterThan(0.5)
-  })
-
-  it('터질 때도 일부 띠만 움직인다 — 전부 움직이면 화면이 떠는 것으로 보인다', () => {
-    const moving = wholeIntro()
-      .map((f) => f.filter((s) => s !== 0).length)
-      .filter((n) => n > 0)
-    const average = moving.reduce((a, b) => a + b, 0) / moving.length
-    expect(average).toBeGreaterThan(1)
-    expect(average).toBeLessThan(BANDS - 1)
-  })
-
-  it('터짐과 정적의 길이가 제각각이다 — 한 박자로 반복되면 기계처럼 보인다', () => {
-    const active = wholeIntro().map((f) => f.some((s) => s !== 0))
-    const runs: number[] = []
-    let n = 1
-    for (let i = 1; i < active.length; i++) {
-      if (active[i] === active[i - 1]) {
-        n++
-      } else {
-        runs.push(n)
-        n = 1
+  it('진폭에 비례한다 — 최대 어긋남이 MAX_SHIFT_EM 을 넘지 않는다', () => {
+    for (let seed = 0; seed < 50; seed++) {
+      for (const shift of bandShifts(seed, 1)) {
+        expect(Math.abs(shift)).toBeLessThanOrEqual(MAX_SHIFT_EM)
       }
+      const half = bandShifts(seed, 0.5)
+      const full = bandShifts(seed, 1)
+      half.forEach((v, i) => expect(v).toBeCloseTo(full[i] / 2, 10))
     }
-    runs.push(n)
-    expect(new Set(runs).size).toBeGreaterThan(2)
-  })
-
-  // 눈에 안 보일 만큼 작게 어긋나면 글자만 조각나고 어긋남은 안 보인다 —
-  // 조각 경계가 가로줄로 드러난다(GlitchIntro 가 "전부 0이면 통짜로" 그린다).
-  it('눈에 안 보일 만큼 작게 어긋나지 않는다 — 그런 건 0으로 친다', () => {
-    const tiny = wholeIntro()
-      .flat()
-      .filter((s) => s !== 0 && Math.abs(s) < MIN_SHIFT_EM)
-    expect(tiny).toEqual([])
-  })
-
-  it('크기가 한쪽으로 쏠린다 — 대부분 작고 가끔 크다', () => {
-    const sizes = wholeIntro()
-      .flat()
-      .filter((s) => s !== 0)
-      .map(Math.abs)
-      .sort((a, b) => a - b)
-    const peak = sizes[sizes.length - 1]
-    const median = sizes[Math.floor(sizes.length / 2)]
-    // 균등분포라면 중앙값이 정점의 절반쯤이고 절반이 그 위에 있다.
-    // `r³` 은 아래쪽으로 쏠린다 — 다만 MIN_SHIFT_EM 아래를 잘라내므로
-    // (그 값들은 아예 0이 된다) 남은 분포의 쏠림은 그만큼 완만해진다.
-    expect(median).toBeLessThan(peak * 0.45)
-    expect(sizes.filter((s) => s < peak / 2).length / sizes.length).toBeGreaterThan(0.55)
-  })
-
-  it('번지는 내내 흔들린다 — 앞뒤 어느 한쪽으로 몰려 있지 않다', () => {
-    const frames = wholeIntro()
-    // 잉크가 번지는 구간(민트만 보이는 앞과 머무는 뒤를 뺀 가운데)을 반으로 갈라 본다.
-    const wet = frames.filter((_, i) => {
-      const p = inkProgress((i * HOLD_MS) / TOTAL_MS)
-      return p > 0 && p < 1
-    })
-    const half = Math.floor(wet.length / 2)
-    const count = (a: number[][]) => a.filter((f) => f.some((s) => s !== 0)).length
-    expect(count(wet.slice(0, half))).toBeGreaterThan(0)
-    expect(count(wet.slice(half))).toBeGreaterThan(0)
   })
 })

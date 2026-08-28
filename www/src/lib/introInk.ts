@@ -3,9 +3,10 @@
  *
  * 원본: `flutter/lib/core/widgets/ink_bleed.dart` (`inkProgress`),
  * `flutter/lib/features/intro/presentation/screens/glitch_intro_screen.dart`
- * (`glitchAmplitudeAt`, `_kSwapAt`). 수치는 참조 영상에서 잰 값이라 근거
- * 없이 바꾸지 않는다 — **단 구간 길이와 흔들림 곡선 둘은 2026-08-28 에
- * 요청을 받아 웹만 따로 정했다.** 각 상수 주석에 앱 값을 함께 적어 뒀다.
+ * (`glitchAmplitudeAt`, 버스트 표, `_kSwapAt`). 수치는 참조 영상에서 잰
+ * 값이라 근거 없이 바꾸지 않는다 — **흔들림은 앱 그대로다.** 웹만 다른 것은
+ * 구간 길이(아래)와 어긋남의 단위(px → em)뿐이고, 각 상수 주석에 앱 값을
+ * 함께 적어 뒀다.
  */
 
 /**
@@ -44,18 +45,8 @@ export const WET_END = (DRY_MS + WET_MS) / TOTAL_MS
 /** 흔들림 값을 붙잡아 두는 시간(ms). 매 프레임 새로 뽑으면 지글거림이 된다. */
 export const HOLD_MS = 45
 
-/**
- * 글자를 끊는 가로 띠 수.
- *
- * 앱은 7개(굵은 조각 몇 개가 크게 어긋난다)인데 웹은 **22개**로 늘렸다 —
- * 도착점인 `BrandMark`(RubikGlitch)의 글자 자체가 **얇은 선으로 어긋난
- * 모양**이라, 흔들림도 같은 결이어야 인트로와 최종 로고가 한 물건으로
- * 읽힌다. 72px 글자에서 한 띠가 약 3.3px, 52px 에서 약 2.4px 이다.
- *
- * 띠가 얇아진 만큼 한 번에 어긋나는 곳도 많아진다 — `SLICE_CHANCE` 는
- * 그대로라 22개 중 열 곳 안팎이 동시에 움직인다.
- */
-export const BANDS = 22
+/** 글자를 끊는 가로 띠 수. 앱과 같다. */
+export const BANDS = 7
 
 /** 가지런한 Rubik이 깨진 RubikGlitch로 바뀌는 잉크 진행도. */
 export const SWAP_AT = 0.795
@@ -74,65 +65,47 @@ export function inkProgress(t: number): number {
 }
 
 /**
+ * 지지직대는 구간 — `[시작, 끝, 세기]`, **잉크 진행도 기준**이다.
+ * 버스트는 이 세 번뿐이고 그 사이는 진폭이 정확히 0이다. **앱 그대로다.**
+ *
+ * 2026-08-28 에 웹만 다르게 가려고 두 번 시도했다가 둘 다 되돌렸다:
+ * 번지는 내내 연속으로 흔들기(→ 글리치가 아니라 진동으로 보였다), 확률로
+ * 드문드문 터뜨리기(→ 몇 번 터질지 통제가 안 돼 어수선했다). 참조 영상에서
+ * 잰 이 표가 가장 낫다 — 근거 없이 바꾸지 말 것.
+ */
+const BURSTS: readonly [start: number, end: number, power: number][] = [
+  [0.62, 0.71, 1.0],
+  [0.76, 0.83, 0.72],
+  [0.88, 0.93, 0.4],
+]
+
+/** 흔들리는 구간이 몇 번인지 — 테스트가 이 수를 본다. */
+export const BURST_COUNT = BURSTS.length
+
+/**
  * 잉크 진행도 `p`에서 얼마나 세게 흔들릴지(0~1).
  *
- * **번지는 내내 흔들린다.** 잉크가 번지기 시작해 글자가 드러나는 순간부터
- * 흔들리기 시작하고, 다 번지면 멈춰 `BrandMark` 와 같은 워드마크로 굳는다.
- *
- * 앱은 버스트 세 번(0.62~0.71 / 0.76~0.83 / 0.88~0.93)이고 그 사이엔 정확히
- * 정지였다. 2026-08-28 에 웹만 이 방식으로 바꿨다 — "글자가 보이면 바로
- * 흔들리고, 다 번지면 그때 멈춘다". 앱과 갈린 자리다.
- *
- * 뒤로 갈수록 잦아들되 **끝에 가서야** 잦아든다(`1 - p⁶`). 처음엔 `1 - p³`
- * 였는데, 그러면 마지막 1.2초가 통째로 죽어 "다 번지기도 전에 멈춘 것"처럼
- * 보였다(실측). 6제곱은 p=0.9 에서도 세기가 0.47 남아 있다가 마지막에
- * 급히 떨어진다 — 번지는 내내 살아 있고, 그러면서도 뚝 끊기지 않는다.
+ * 버스트 안에서도 뒤로 갈수록 잦아든다(`power * (1 - into²)`). 버스트
+ * 밖에서는 항상 0 — **사이의 정적이 있어야 터지는 순간이 산다.**
  */
 export function glitchAmplitudeAt(p: number): number {
-  if (p <= 0 || p >= 1) return 0
-  const p3 = p * p * p
-  return 1 - p3 * p3
+  for (const [start, end, power] of BURSTS) {
+    if (p < start || p >= end) continue
+    const into = (p - start) / (end - start)
+    return power * (1 - into * into)
+  }
+  return 0
 }
 
 /**
- * 띠가 어긋나는 최대 폭 — **글자 크기 기준(em)이다.**
+ * 띠가 어긋나는 폭 — **글자 크기 기준(em)이다.**
  *
  * 앱은 글자가 52px 고정이라 14px 로 못박았는데, 웹은 글자가 화면 폭을
  * 따라가므로(`GlitchIntro` 의 `BRAND_SIZE`) 같은 픽셀 값을 쓰면 큰 화면에서
- * 흔들림만 상대적으로 작아진다. 그래서 비율을 em 으로 옮겼다.
- *
- * **얇은 띠에는 큰 어긋남이 안 어울린다.** 한때 22/52(72px 글자에서 30px)로
- * 뒀다가 되돌린 값이다 — 3px 두께의 선이 30px 씩 밀려나면 글리치가 아니라
- * 글자에서 떨어져 나간 조각으로 보인다. 띠를 얇게 만들었으면 어긋나는 양도
- * 같이 줄여야 한다.
- *
- * 이건 **정점**이지 평균이 아니다(앱의 14/52 는 매 순간 균등하게 흔들 때의
- * 평균값이다). `r³` 분포라 실제 대부분은 이보다 훨씬 작다 — 72px 글자에서
- * 흔한 값이 3px 안팎, 드물게 11px 까지다.
+ * 흔들림만 상대적으로 작아진다. 그래서 비율을 em 으로 옮겼다 — 52px 에서는
+ * 앱과 정확히 같은 14px 이다. **단위만 바꾼 것이지 세기는 앱 그대로다.**
  */
-export const MAX_SHIFT_EM = 8 / 52
-
-/**
- * 이보다 작게 어긋난 것은 **안 어긋난 것으로 친다**(글자 크기 기준 em, 52px
- * 에서 1px). `r³` 분포는 0 근처 값을 잔뜩 만드는데, 눈에는 안 보이면서 글자를
- * 조각내게 만들어 **조각 경계만 가로줄로 드러낸다**(`GlitchIntro` 주석 참고).
- */
-export const MIN_SHIFT_EM = 1 / 52
-
-/**
- * 한 순간(`HOLD_MS` 한 칸)에 무언가 어긋날 확률 — `amplitude` 를 곱해 쓴다.
- * 나머지 순간은 **정확히 정지**다.
- */
-export const TEAR_CHANCE = 0.55
-
-/**
- * 터지는 순간에 띠 하나가 어긋날 확률.
- *
- * 실제로 움직이는 비율은 이보다 낮다 — `r³` 로 뽑은 값 중 `MIN_SHIFT_EM`
- * 미만은 0으로 되돌리기 때문이다(정점을 줄인 지금은 절반가량이 걸린다).
- * 0.4 면 22개 중 네댓 곳이 동시에 어긋난다.
- */
-export const SLICE_CHANCE = 0.4
+export const MAX_SHIFT_EM = 14 / 52
 
 /** 표준 mulberry32 PRNG — 같은 seed 면 같은 수열이다. */
 function mulberry32(seed: number): () => number {
@@ -146,36 +119,16 @@ function mulberry32(seed: number): () => number {
 }
 
 /**
- * `seed` 로 결정되는 띠별 가로 어긋남(em). `BANDS` 개.
+ * `seed` 로 결정되는 띠별 가로 어긋남(em). `BANDS` 개. **앱 그대로다** —
+ * 버스트가 도는 동안 일곱 띠가 매 칸 각각 다르게 어긋난다.
  *
- * **규칙적으로 흔들면 글리치가 아니라 그냥 떨림으로 보인다.** 앱처럼 매 칸
- * 모든 띠를 흔드는 방식은 버스트 3회 사이의 정적이 있어서 성립했는데, 웹은
- * 번지는 내내 흔들기로 해서 그 정적이 사라졌고 — 그래서 인위적으로 보였다.
- *
- * 정적을 **분포 안으로** 되돌린다. 세 가지가 겹쳐 불규칙해진다:
- *
- * 1. **대부분의 순간은 통째로 정지한다** (`TEAR_CHANCE`). 터지는 칸이 몇 개
- *    연달아 걸리기도 하고 한참 안 걸리기도 해서, 45ms 격자를 그대로 쓰면서도
- *    리듬이 불규칙해진다 — 메트로놈처럼 들리던 게 사라진다
- * 2. **터질 때도 일부 띠만 움직인다** (`SLICE_CHANCE`). 나머지는 제자리라
- *    "화면이 떠는" 게 아니라 "글자가 잘려 어긋난" 것으로 읽힌다. 움직이는 띠가
- *    붙어 나오면 그만큼 두꺼운 조각이 되어 조각 높이까지 매번 달라진다
- * 3. **크기가 한쪽으로 쏠린다** (`r³`). 대부분 작게, 가끔 크게 —
- *    균등분포는 전부 비슷한 크기로 흔들려 기계처럼 보인다
+ * 진폭이 0이면(버스트 밖) 전부 0을 준다. `GlitchIntro` 가 이때 글자를
+ * 자르지 않고 통짜로 그린다 — 자르기만 해도 조각 경계가 가로줄로 보인다.
  */
 export function bandShifts(seed: number, amplitude: number): number[] {
-  const still = () => new Array<number>(BANDS).fill(0)
-  if (amplitude <= 0) return still()
-
+  if (amplitude <= 0) return new Array<number>(BANDS).fill(0)
   const next = mulberry32(seed)
-  if (next() > TEAR_CHANCE * amplitude) return still()
-
-  return Array.from({ length: BANDS }, () => {
-    if (next() > SLICE_CHANCE) return 0
-    const r = next() * 2 - 1
-    const shift = r * r * r * amplitude * MAX_SHIFT_EM
-    return Math.abs(shift) < MIN_SHIFT_EM ? 0 : shift
-  })
+  return Array.from({ length: BANDS }, () => (next() * 2 - 1) * amplitude * MAX_SHIFT_EM)
 }
 
 /**
