@@ -63,14 +63,3 @@ body {
   color: var(--ss-fg);
   font-family: var(--font-rubik), system-ui, sans-serif;
 }
-
-/* 앱의 잉크 질감. 화면 전체에 아주 옅게 깐다. */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background: url("/ink_field.png") center / cover no-repeat;
-  opacity: 0.06;
-  pointer-events: none;
-  z-index: 0;
-}
