@@ -142,11 +142,21 @@ function coverRect(
 //    원점(y 아래로 증가, 2D 캔버스·CPU 폴백과 같은 좌표계)이다. 텍스처는
 //    기본 업로드(UNPACK_FLIP_Y_WEBGL=false)로 두면 v=0이 이미 이미지의 첫
 //    행(맨 위)이라 이 y-뒤집기 하나로 CPU 폴백과 같은 결과가 나온다.
-// 2. `coverUV` — `ink_field.png`(1080×2340 세로 인물 사진)를 CPU 폴백의
-//    `coverRect`와 같은 "cover" 방식으로 화면에 맞춘다. 원본 앱은 위젯이
-//    지도와 같은 화면비로 굽혀 있어 이 변환이 필요 없었지만, 웹은 임의의
-//    뷰포트 화면비를 받으므로 필요하다. `uFieldSize`는 그래서 추가한
-//    유니폼이다(원본 8개 + 샘플러에는 없다).
+// 2. **지도를 늘려 덮지 않고, 원래 크기(1:1)로 반복(tile)한다.** 처음엔
+//    `ink_field.png`(1080×2340)를 화면에 "cover"로 늘려 맞췄는데, 그러면
+//    2560px 폭 화면에서 지도 무늬 자체가 2.4배로 확대돼 GPU가 픽셀마다
+//    계산해도 알갱이가 굵게 나왔다 — 앱은 1080px 폰 화면이라 지도가 항상
+//    원래 배율로 쓰인다. 화면의 실제 픽셀과 지도의 텍셀을 1:1로 맞추고,
+//    화면이 지도보다 크면 그만큼 반복한다. `uFieldSize`(원본 텍셀 크기)는
+//    그래서 추가한 유니폼이다(원본 8개 + 샘플러에는 없다).
+//
+//    **그냥 반복(REPEAT/fract)하면 이음매가 보였다.** `ink_field.png`는
+//    이어 붙게(tileable) 구운 지도가 아니라서 타일 경계에서 밝기가 뚝
+//    끊기는 선이 났다. 대신 좌표를 삼각파로 접는 거울 반복(mirror tile,
+//    셰이더의 `mirrorFold`)을 쓴다 — 정의상 경계의 마지막 텍셀이 스스로와
+//    맞붙으므로 이음매가 생길 수 없다. 덕분에 텍스처 래핑도 GL1/GL2 모두
+//    그냥 `CLAMP_TO_EDGE`로 둔다(REPEAT류의 NPOT 제약을 아예 피한다) —
+//    아래 `trySetupGpu`의 텍스처 파라미터 설정 참고.
 // ---------------------------------------------------------------------------
 
 const VERTEX_GL2 = `#version 300 es
@@ -166,7 +176,7 @@ void main() {
 /** GL1/GL2 공용 본문. `SAMPLE`·`OUT_COLOR` 매크로만 헤더에서 갈아 끼운다. */
 const FRAGMENT_BODY = `
 uniform vec2 uSize;       // 캔버스 크기, 실제 화면 픽셀(framebuffer px)
-uniform vec2 uFieldSize;  // uField 원본 텍셀 크기 — cover 계산용(웹 전용 추가)
+uniform vec2 uFieldSize;  // uField 원본 텍셀 크기 — 화면 픽셀과 1:1로 맞춰 반복하는 주기(웹 전용 추가)
 uniform float uProgress;
 uniform float uSeed;
 uniform float uBoil;
@@ -181,17 +191,25 @@ float hash(vec2 p, float seed) {
   return fract((q.x + q.y) * q.z);
 }
 
-vec2 coverUV(vec2 f, vec2 size, vec2 fieldSize) {
-  float scale = max(size.x / fieldSize.x, size.y / fieldSize.y);
-  vec2 disp = fieldSize * scale;
-  vec2 offset = (size - disp) * 0.5;
-  return (f - offset) / disp;
+// 좌표 하나(어느 축이든)를 삼각파로 접어 [0,1] 안에 넣는다 — 매 정수
+// 경계마다 앞뒤가 거울처럼 맞붙는다. ink_field.png는 이어 붙게(tileable)
+// 구운 지도가 아니라서 그냥 반복(REPEAT/fract)하면 타일 경계에서 밝기가
+// 뚝 끊기는 선이 보였다 — 거울 반복은 정의상 경계에서 항상 같은 값과
+// 만나므로(마지막 텍셀이 스스로와 맞붙는다) 이음매가 생길 수가 없다.
+// REPEAT/MIRRORED_REPEAT 같은 하드웨어 래핑도 필요 없다(WebGL1은 NPOT
+// 텍스처에 어차피 못 쓴다) — CLAMP_TO_EDGE로 두고 여기서 좌표만 접는다.
+float mirrorFold(float x) {
+  float t = fract(x * 0.5) * 2.0;
+  return 1.0 - abs(t - 1.0);
 }
 
 void main() {
   vec2 frag = vec2(gl_FragCoord.x, uSize.y - gl_FragCoord.y);
   vec2 clampedFrag = clamp(frag, vec2(0.5), uSize - 0.5);
-  vec2 uv = coverUV(clampedFrag, uSize, uFieldSize);
+  // cover로 늘려 맞추지 않는다 — 화면 픽셀과 지도 텍셀을 1:1로 두고
+  // 모자라는 만큼 거울 반복(mirror tile)한다(위 mirrorFold 참고).
+  vec2 period = clampedFrag / uFieldSize;
+  vec2 uv = vec2(mirrorFold(period.x), mirrorFold(period.y));
 
   float order = SAMPLE(uField, uv).r;
   float n = hash(frag, uSeed) - 0.5;
@@ -447,6 +465,11 @@ export default function GlitchIntro({ onDone }: { onDone: () => void }) {
       glc.bindTexture(glc.TEXTURE_2D, texture)
       glc.texParameteri(glc.TEXTURE_2D, glc.TEXTURE_MIN_FILTER, glc.LINEAR)
       glc.texParameteri(glc.TEXTURE_2D, glc.TEXTURE_MAG_FILTER, glc.LINEAR)
+      // REPEAT/MIRRORED_REPEAT 둘 다 필요 없다 — 반복은 셰이더의 mirrorFold가
+      // 좌표를 접어서 흉내 낸다(위 FRAGMENT_BODY 참고). uv가 항상 [0,1]
+      // 안이라 CLAMP_TO_EDGE로도 충분하고, WebGL1의 NPOT(1080×2340처럼
+      // 2의 거듭제곱이 아닌 텍스처) REPEAT 제약도 자연히 피한다 — GL1/GL2
+      // 둘 다 같은 값을 쓴다.
       glc.texParameteri(glc.TEXTURE_2D, glc.TEXTURE_WRAP_S, glc.CLAMP_TO_EDGE)
       glc.texParameteri(glc.TEXTURE_2D, glc.TEXTURE_WRAP_T, glc.CLAMP_TO_EDGE)
       try {
