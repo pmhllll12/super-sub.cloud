@@ -1,0 +1,39 @@
+clip_id,ratio,frame,n_candidates,ai_box_index,ai_note,ai_confidence
+3R1kvNrGJK0,0.20,30,11,0,batter with bat in stance at plate,high
+5-jBTNp5IQA,0.20,30,10,0,batter with bat in stance; catcher and umpire excluded,high
+5-jBTNp5IQA,0.50,75,9,0,batter-runner in red jersey after contact,medium
+5-jBTNp5IQA,0.80,119,20,uncertain,camera on stands and dugout; no batter identifiable,low
+6hrcRyIYTrA,0.20,30,5,0,batter just after swing with bat on ground,high
+8gmHKqDxXdg,0.50,50,2,0,batter in stance holding bat indoors,high
+CFjNxCZhn_8,0.80,119,11,0,player carrying bat near plate,medium
+Fz16t9SrF3U,0.50,75,6,2,batter no.8 in stance with bat,high
+Fz16t9SrF3U,0.80,119,8,uncertain,only umpire and catcher clear; batter not identifiable,low
+IeDin6oB-IY,0.20,30,9,0,batter with red helmet and bat at plate,high
+IeDin6oB-IY,0.50,75,9,4,batter with red helmet at plate; foreground adult crossing,high
+LXjM7nBZcak,0.50,48,13,uncertain,spectators fill frame; no batting scene visible,low
+LhD_fnHt_xg,0.50,61,2,0,batter in stance in indoor cage,high
+LhD_fnHt_xg,0.80,97,2,0,batter mid-swing in indoor cage,high
+N5zWQkoLM3M,0.20,30,5,1,batter holding bat in cage; foreground person cut off at frame edge,medium
+N5zWQkoLM3M,0.50,75,4,2,batter mid-swing in cage,medium
+N5zWQkoLM3M,0.80,119,6,2,batter follow-through in cage,medium
+X6dC9pu5H3k,0.50,67,7,1,batter-runner in helmet on baseline,medium
+Zp9aDp2YTBw,0.20,24,2,none,no bat and no batting scene in frame,high
+Zp9aDp2YTBw,0.50,60,2,none,no bat and no batting scene in frame,high
+bh6Cvz2orzQ,0.20,30,9,1,batter mid-swing in cage; foreground observer excluded,high
+bh6Cvz2orzQ,0.50,75,4,1,batter mid-swing in cage,high
+bh6Cvz2orzQ,0.80,119,4,1,batter with bat back to camera,high
+g_wHimPF9o8,0.20,30,8,0,batter in stance at plate,high
+g_wHimPF9o8,0.50,75,7,0,batter in stance at plate,high
+hz-SpF35_BE,0.20,30,5,0,batter in stance in outdoor cage,high
+hz-SpF35_BE,0.50,75,3,0,batter mid-swing in outdoor cage,high
+hz-SpF35_BE,0.80,119,3,0,batter follow-through in outdoor cage,high
+idueIYDAbZc,0.80,118,7,2,player holding bat walking; catcher in gear excluded,medium
+sGKeqfxwq5E,0.50,75,8,2,batter mid-swing; catcher and umpire excluded,high
+sYl2jCqsSKo,0.20,30,8,0,batter mid-swing with bat,high
+sYl2jCqsSKo,0.50,75,3,0,batter-runner in red jersey running to first,high
+sYl2jCqsSKo,0.80,119,3,2,runner in red overlapping fielder in navy,medium
+10_penalty1.avi,,0,2,0,kick taker standing over ball; keeper excluded,high
+10_penalty1.avi,,21,2,1,kick taker striking ball; keeper excluded,high
+10_penalty1.avi,,24,2,0,kick taker after contact; keeper excluded,high
+10_penalty1.avi,,26,2,0,kick taker follow-through; keeper diving excluded,high
+10_penalty1.avi,,27,2,0,kick taker follow-through; keeper excluded,high

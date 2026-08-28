@@ -1,0 +1,6 @@
+clip_id,ratio,frame,n_candidates,image,human_box_index,human_note
+10_penalty1.avi,,0,2,eval_b2/review_cases/SOCCER_10_penalty1@f000.jpg,0,kick taker standing over ball; keeper excluded
+10_penalty1.avi,,21,2,eval_b2/review_cases/SOCCER_10_penalty1@f021.jpg,1,kick taker striking ball; keeper excluded
+10_penalty1.avi,,24,2,eval_b2/review_cases/SOCCER_10_penalty1@f024.jpg,0,kick taker after contact; keeper excluded
+10_penalty1.avi,,26,2,eval_b2/review_cases/SOCCER_10_penalty1@f026.jpg,0,kick taker follow-through; keeper diving excluded
+10_penalty1.avi,,27,2,eval_b2/review_cases/SOCCER_10_penalty1@f027.jpg,0,kick taker follow-through; keeper excluded

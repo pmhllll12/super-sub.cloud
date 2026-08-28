@@ -1,0 +1,458 @@
+{
+  "provenance": {
+    "label_source": "claude_visual_review",
+    "human_verified": false,
+    "selector_blinded": true,
+    "source_labels_modified": false,
+    "phase": "B-3 AI Visual Review Fallback",
+    "created": "2026-08-28",
+    "reviewer": "Claude Opus 5 — independent visual review of rendered candidate frames",
+    "inputs": [
+      "eval_b3/review_input.csv",
+      "eval_b3/soccer_review_input.csv",
+      "eval_b2/review_cases/*.jpg"
+    ],
+    "not_read": [
+      "eval_b2/review_cases.csv",
+      "labels.json",
+      "baseline/a/b selector outputs",
+      "existing GT"
+    ],
+    "limitation": "이 라벨은 사람 검수자가 확인한 것이 아니다. AI-reviewed / unverified. verified GT 로 취급하거나 최종 selector 확정 근거로 단독 사용할 수 없다."
+  },
+  "summary": {
+    "total": 38,
+    "baseball": 33,
+    "soccer": 5,
+    "candidate_selected": 33,
+    "none": 2,
+    "uncertain": 3,
+    "confidence": {
+      "high": 27,
+      "medium": 8,
+      "low": 3
+    },
+    "unambiguous_ratio": 0.711,
+    "usable_for_scoring": 33
+  },
+  "labels": [
+    {
+      "clip_id": "3R1kvNrGJK0",
+      "ratio": 0.2,
+      "frame": 30,
+      "sport": "baseball",
+      "n_candidates": 11,
+      "image": "eval_b2/review_cases/3R1kvNrGJK0@0.20.jpg",
+      "ai_box_index": 0,
+      "ai_note": "batter with bat in stance at plate",
+      "ai_confidence": "high"
+    },
+    {
+      "clip_id": "5-jBTNp5IQA",
+      "ratio": 0.2,
+      "frame": 30,
+      "sport": "baseball",
+      "n_candidates": 10,
+      "image": "eval_b2/review_cases/5-jBTNp5IQA@0.20.jpg",
+      "ai_box_index": 0,
+      "ai_note": "batter with bat in stance; catcher and umpire excluded",
+      "ai_confidence": "high"
+    },
+    {
+      "clip_id": "5-jBTNp5IQA",
+      "ratio": 0.5,
+      "frame": 75,
+      "sport": "baseball",
+      "n_candidates": 9,
+      "image": "eval_b2/review_cases/5-jBTNp5IQA@0.50.jpg",
+      "ai_box_index": 0,
+      "ai_note": "batter-runner in red jersey after contact",
+      "ai_confidence": "medium"
+    },
+    {
+      "clip_id": "5-jBTNp5IQA",
+      "ratio": 0.8,
+      "frame": 119,
+      "sport": "baseball",
+      "n_candidates": 20,
+      "image": "eval_b2/review_cases/5-jBTNp5IQA@0.80.jpg",
+      "ai_box_index": "uncertain",
+      "ai_note": "camera on stands and dugout; no batter identifiable",
+      "ai_confidence": "low"
+    },
+    {
+      "clip_id": "6hrcRyIYTrA",
+      "ratio": 0.2,
+      "frame": 30,
+      "sport": "baseball",
+      "n_candidates": 5,
+      "image": "eval_b2/review_cases/6hrcRyIYTrA@0.20.jpg",
+      "ai_box_index": 0,
+      "ai_note": "batter just after swing with bat on ground",
+      "ai_confidence": "high"
+    },
+    {
+      "clip_id": "8gmHKqDxXdg",
+      "ratio": 0.5,
+      "frame": 50,
+      "sport": "baseball",
+      "n_candidates": 2,
+      "image": "eval_b2/review_cases/8gmHKqDxXdg@0.50.jpg",
+      "ai_box_index": 0,
+      "ai_note": "batter in stance holding bat indoors",
+      "ai_confidence": "high"
+    },
+    {
+      "clip_id": "CFjNxCZhn_8",
+      "ratio": 0.8,
+      "frame": 119,
+      "sport": "baseball",
+      "n_candidates": 11,
+      "image": "eval_b2/review_cases/CFjNxCZhn_8@0.80.jpg",
+      "ai_box_index": 0,
+      "ai_note": "player carrying bat near plate",
+      "ai_confidence": "medium"
+    },
+    {
+      "clip_id": "Fz16t9SrF3U",
+      "ratio": 0.5,
+      "frame": 75,
+      "sport": "baseball",
+      "n_candidates": 6,
+      "image": "eval_b2/review_cases/Fz16t9SrF3U@0.50.jpg",
+      "ai_box_index": 2,
+      "ai_note": "batter no.8 in stance with bat",
+      "ai_confidence": "high"
+    },
+    {
+      "clip_id": "Fz16t9SrF3U",
+      "ratio": 0.8,
+      "frame": 119,
+      "sport": "baseball",
+      "n_candidates": 8,
+      "image": "eval_b2/review_cases/Fz16t9SrF3U@0.80.jpg",
+      "ai_box_index": "uncertain",
+      "ai_note": "only umpire and catcher clear; batter not identifiable",
+      "ai_confidence": "low"
+    },
+    {
+      "clip_id": "IeDin6oB-IY",
+      "ratio": 0.2,
+      "frame": 30,
+      "sport": "baseball",
+      "n_candidates": 9,
+      "image": "eval_b2/review_cases/IeDin6oB-IY@0.20.jpg",
+      "ai_box_index": 0,
+      "ai_note": "batter with red helmet and bat at plate",
+      "ai_confidence": "high"
+    },
+    {
+      "clip_id": "IeDin6oB-IY",
+      "ratio": 0.5,
+      "frame": 75,
+      "sport": "baseball",
+      "n_candidates": 9,
+      "image": "eval_b2/review_cases/IeDin6oB-IY@0.50.jpg",
+      "ai_box_index": 4,
+      "ai_note": "batter with red helmet at plate; foreground adult crossing",
+      "ai_confidence": "high"
+    },
+    {
+      "clip_id": "LXjM7nBZcak",
+      "ratio": 0.5,
+      "frame": 48,
+      "sport": "baseball",
+      "n_candidates": 13,
+      "image": "eval_b2/review_cases/LXjM7nBZcak@0.50.jpg",
+      "ai_box_index": "uncertain",
+      "ai_note": "spectators fill frame; no batting scene visible",
+      "ai_confidence": "low"
+    },
+    {
+      "clip_id": "LhD_fnHt_xg",
+      "ratio": 0.5,
+      "frame": 61,
+      "sport": "baseball",
+      "n_candidates": 2,
+      "image": "eval_b2/review_cases/LhD_fnHt_xg@0.50.jpg",
+      "ai_box_index": 0,
+      "ai_note": "batter in stance in indoor cage",
+      "ai_confidence": "high"
+    },
+    {
+      "clip_id": "LhD_fnHt_xg",
+      "ratio": 0.8,
+      "frame": 97,
+      "sport": "baseball",
+      "n_candidates": 2,
+      "image": "eval_b2/review_cases/LhD_fnHt_xg@0.80.jpg",
+      "ai_box_index": 0,
+      "ai_note": "batter mid-swing in indoor cage",
+      "ai_confidence": "high"
+    },
+    {
+      "clip_id": "N5zWQkoLM3M",
+      "ratio": 0.2,
+      "frame": 30,
+      "sport": "baseball",
+      "n_candidates": 5,
+      "image": "eval_b2/review_cases/N5zWQkoLM3M@0.20.jpg",
+      "ai_box_index": 1,
+      "ai_note": "batter holding bat in cage; foreground person cut off at frame edge",
+      "ai_confidence": "medium"
+    },
+    {
+      "clip_id": "N5zWQkoLM3M",
+      "ratio": 0.5,
+      "frame": 75,
+      "sport": "baseball",
+      "n_candidates": 4,
+      "image": "eval_b2/review_cases/N5zWQkoLM3M@0.50.jpg",
+      "ai_box_index": 2,
+      "ai_note": "batter mid-swing in cage",
+      "ai_confidence": "medium"
+    },
+    {
+      "clip_id": "N5zWQkoLM3M",
+      "ratio": 0.8,
+      "frame": 119,
+      "sport": "baseball",
+      "n_candidates": 6,
+      "image": "eval_b2/review_cases/N5zWQkoLM3M@0.80.jpg",
+      "ai_box_index": 2,
+      "ai_note": "batter follow-through in cage",
+      "ai_confidence": "medium"
+    },
+    {
+      "clip_id": "X6dC9pu5H3k",
+      "ratio": 0.5,
+      "frame": 67,
+      "sport": "baseball",
+      "n_candidates": 7,
+      "image": "eval_b2/review_cases/X6dC9pu5H3k@0.50.jpg",
+      "ai_box_index": 1,
+      "ai_note": "batter-runner in helmet on baseline",
+      "ai_confidence": "medium"
+    },
+    {
+      "clip_id": "Zp9aDp2YTBw",
+      "ratio": 0.2,
+      "frame": 24,
+      "sport": "baseball",
+      "n_candidates": 2,
+      "image": "eval_b2/review_cases/Zp9aDp2YTBw@0.20.jpg",
+      "ai_box_index": "none",
+      "ai_note": "no bat and no batting scene in frame",
+      "ai_confidence": "high"
+    },
+    {
+      "clip_id": "Zp9aDp2YTBw",
+      "ratio": 0.5,
+      "frame": 60,
+      "sport": "baseball",
+      "n_candidates": 2,
+      "image": "eval_b2/review_cases/Zp9aDp2YTBw@0.50.jpg",
+      "ai_box_index": "none",
+      "ai_note": "no bat and no batting scene in frame",
+      "ai_confidence": "high"
+    },
+    {
+      "clip_id": "bh6Cvz2orzQ",
+      "ratio": 0.2,
+      "frame": 30,
+      "sport": "baseball",
+      "n_candidates": 9,
+      "image": "eval_b2/review_cases/bh6Cvz2orzQ@0.20.jpg",
+      "ai_box_index": 1,
+      "ai_note": "batter mid-swing in cage; foreground observer excluded",
+      "ai_confidence": "high"
+    },
+    {
+      "clip_id": "bh6Cvz2orzQ",
+      "ratio": 0.5,
+      "frame": 75,
+      "sport": "baseball",
+      "n_candidates": 4,
+      "image": "eval_b2/review_cases/bh6Cvz2orzQ@0.50.jpg",
+      "ai_box_index": 1,
+      "ai_note": "batter mid-swing in cage",
+      "ai_confidence": "high"
+    },
+    {
+      "clip_id": "bh6Cvz2orzQ",
+      "ratio": 0.8,
+      "frame": 119,
+      "sport": "baseball",
+      "n_candidates": 4,
+      "image": "eval_b2/review_cases/bh6Cvz2orzQ@0.80.jpg",
+      "ai_box_index": 1,
+      "ai_note": "batter with bat back to camera",
+      "ai_confidence": "high"
+    },
+    {
+      "clip_id": "g_wHimPF9o8",
+      "ratio": 0.2,
+      "frame": 30,
+      "sport": "baseball",
+      "n_candidates": 8,
+      "image": "eval_b2/review_cases/g_wHimPF9o8@0.20.jpg",
+      "ai_box_index": 0,
+      "ai_note": "batter in stance at plate",
+      "ai_confidence": "high"
+    },
+    {
+      "clip_id": "g_wHimPF9o8",
+      "ratio": 0.5,
+      "frame": 75,
+      "sport": "baseball",
+      "n_candidates": 7,
+      "image": "eval_b2/review_cases/g_wHimPF9o8@0.50.jpg",
+      "ai_box_index": 0,
+      "ai_note": "batter in stance at plate",
+      "ai_confidence": "high"
+    },
+    {
+      "clip_id": "hz-SpF35_BE",
+      "ratio": 0.2,
+      "frame": 30,
+      "sport": "baseball",
+      "n_candidates": 5,
+      "image": "eval_b2/review_cases/hz-SpF35_BE@0.20.jpg",
+      "ai_box_index": 0,
+      "ai_note": "batter in stance in outdoor cage",
+      "ai_confidence": "high"
+    },
+    {
+      "clip_id": "hz-SpF35_BE",
+      "ratio": 0.5,
+      "frame": 75,
+      "sport": "baseball",
+      "n_candidates": 3,
+      "image": "eval_b2/review_cases/hz-SpF35_BE@0.50.jpg",
+      "ai_box_index": 0,
+      "ai_note": "batter mid-swing in outdoor cage",
+      "ai_confidence": "high"
+    },
+    {
+      "clip_id": "hz-SpF35_BE",
+      "ratio": 0.8,
+      "frame": 119,
+      "sport": "baseball",
+      "n_candidates": 3,
+      "image": "eval_b2/review_cases/hz-SpF35_BE@0.80.jpg",
+      "ai_box_index": 0,
+      "ai_note": "batter follow-through in outdoor cage",
+      "ai_confidence": "high"
+    },
+    {
+      "clip_id": "idueIYDAbZc",
+      "ratio": 0.8,
+      "frame": 118,
+      "sport": "baseball",
+      "n_candidates": 7,
+      "image": "eval_b2/review_cases/idueIYDAbZc@0.80.jpg",
+      "ai_box_index": 2,
+      "ai_note": "player holding bat walking; catcher in gear excluded",
+      "ai_confidence": "medium"
+    },
+    {
+      "clip_id": "sGKeqfxwq5E",
+      "ratio": 0.5,
+      "frame": 75,
+      "sport": "baseball",
+      "n_candidates": 8,
+      "image": "eval_b2/review_cases/sGKeqfxwq5E@0.50.jpg",
+      "ai_box_index": 2,
+      "ai_note": "batter mid-swing; catcher and umpire excluded",
+      "ai_confidence": "high"
+    },
+    {
+      "clip_id": "sYl2jCqsSKo",
+      "ratio": 0.2,
+      "frame": 30,
+      "sport": "baseball",
+      "n_candidates": 8,
+      "image": "eval_b2/review_cases/sYl2jCqsSKo@0.20.jpg",
+      "ai_box_index": 0,
+      "ai_note": "batter mid-swing with bat",
+      "ai_confidence": "high"
+    },
+    {
+      "clip_id": "sYl2jCqsSKo",
+      "ratio": 0.5,
+      "frame": 75,
+      "sport": "baseball",
+      "n_candidates": 3,
+      "image": "eval_b2/review_cases/sYl2jCqsSKo@0.50.jpg",
+      "ai_box_index": 0,
+      "ai_note": "batter-runner in red jersey running to first",
+      "ai_confidence": "high"
+    },
+    {
+      "clip_id": "sYl2jCqsSKo",
+      "ratio": 0.8,
+      "frame": 119,
+      "sport": "baseball",
+      "n_candidates": 3,
+      "image": "eval_b2/review_cases/sYl2jCqsSKo@0.80.jpg",
+      "ai_box_index": 2,
+      "ai_note": "runner in red overlapping fielder in navy",
+      "ai_confidence": "medium"
+    },
+    {
+      "clip_id": "10_penalty1.avi",
+      "ratio": null,
+      "frame": 0,
+      "sport": "soccer",
+      "n_candidates": 2,
+      "image": "eval_b2/review_cases/SOCCER_10_penalty1@f000.jpg",
+      "ai_box_index": 0,
+      "ai_note": "kick taker standing over ball; keeper excluded",
+      "ai_confidence": "high"
+    },
+    {
+      "clip_id": "10_penalty1.avi",
+      "ratio": null,
+      "frame": 21,
+      "sport": "soccer",
+      "n_candidates": 2,
+      "image": "eval_b2/review_cases/SOCCER_10_penalty1@f021.jpg",
+      "ai_box_index": 1,
+      "ai_note": "kick taker striking ball; keeper excluded",
+      "ai_confidence": "high"
+    },
+    {
+      "clip_id": "10_penalty1.avi",
+      "ratio": null,
+      "frame": 24,
+      "sport": "soccer",
+      "n_candidates": 2,
+      "image": "eval_b2/review_cases/SOCCER_10_penalty1@f024.jpg",
+      "ai_box_index": 0,
+      "ai_note": "kick taker after contact; keeper excluded",
+      "ai_confidence": "high"
+    },
+    {
+      "clip_id": "10_penalty1.avi",
+      "ratio": null,
+      "frame": 26,
+      "sport": "soccer",
+      "n_candidates": 2,
+      "image": "eval_b2/review_cases/SOCCER_10_penalty1@f026.jpg",
+      "ai_box_index": 0,
+      "ai_note": "kick taker follow-through; keeper diving excluded",
+      "ai_confidence": "high"
+    },
+    {
+      "clip_id": "10_penalty1.avi",
+      "ratio": null,
+      "frame": 27,
+      "sport": "soccer",
+      "n_candidates": 2,
+      "image": "eval_b2/review_cases/SOCCER_10_penalty1@f027.jpg",
+      "ai_box_index": 0,
+      "ai_note": "kick taker follow-through; keeper excluded",
+      "ai_confidence": "high"
+    }
+  ]
+}

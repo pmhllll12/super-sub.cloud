@@ -1,0 +1,8 @@
+case_id,clip_id,frame,n_candidates,image,human_box_index,human_note
+T0-01,3USSmzO001k,119,3,images/T0_3USSmzO001k@0.80.jpg,,
+T0-02,5-jBTNp5IQA,75,9,images/T0_5-jBTNp5IQA@0.50.jpg,,
+T0-03,IeDin6oB-IY,75,9,images/T0_IeDin6oB-IY@0.50.jpg,,
+T0-04,N5zWQkoLM3M,75,4,images/T0_N5zWQkoLM3M@0.50.jpg,,
+T0-05,N5zWQkoLM3M,119,6,images/T0_N5zWQkoLM3M@0.80.jpg,,
+T0-06,X6dC9pu5H3k,107,6,images/T0_X6dC9pu5H3k@0.80.jpg,,
+T0-07,sYl2jCqsSKo,119,3,images/T0_sYl2jCqsSKo@0.80.jpg,,

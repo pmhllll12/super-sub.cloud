@@ -1,0 +1,42 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  43%|████▎     | 331/764 [00:00<00:00, 3296.45it/s]Loading weights:  87%|████████▋ | 661/764 [00:00<00:00, 3156.20it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3602.99it/s]
+[1] 0Fet8TyoNR4 115f  후보/프레임 med 1  10s
+[2] 3R1kvNrGJK0 150f  후보/프레임 med 9  15s
+[3] 3USSmzO001k 150f  후보/프레임 med 2  12s
+[4] 5-jBTNp5IQA 150f  후보/프레임 med 11  11s
+[5] 6hrcRyIYTrA 150f  후보/프레임 med 7  11s
+[6] 8gmHKqDxXdg 100f  후보/프레임 med 2  6s
+[7] Atzrde5uGcM 150f  후보/프레임 med 14  10s
+[8] C7icGyrdROM 150f  후보/프레임 med 1  9s
+[9] CFjNxCZhn_8 150f  후보/프레임 med 12  11s
+[10] Fz16t9SrF3U 150f  후보/프레임 med 5  11s
+[11] GS-PcxmaHmQ 150f  후보/프레임 med 2  9s
+[12] IYFifBJ9lH8 150f  후보/프레임 med 2  9s
+[13] IeDin6oB-IY 150f  후보/프레임 med 9  10s
+[14] LXjM7nBZcak 96f  후보/프레임 med 10  7s
+[15] LhD_fnHt_xg 122f  후보/프레임 med 2  9s
+[16] N5zWQkoLM3M 150f  후보/프레임 med 5  10s
+[17] O2GSaYqH8JY 150f  후보/프레임 med 1  11s
+[18] V_whuvMjg_8 120f  후보/프레임 med 1  7s
+[19] X6dC9pu5H3k 135f  후보/프레임 med 7  8s
+[20] YNMHMKb5Md4 87f  후보/프레임 med 1  6s
+[21] ZMy0t-CSZiU 150f  후보/프레임 med 26  10s
+[22] ZS-wgeg2qkI 150f  후보/프레임 med 10  10s
+[23] Zp9aDp2YTBw 120f  후보/프레임 med 2  7s
+[24] bh6Cvz2orzQ 150f  후보/프레임 med 4  9s
+[25] cDRi9AzrapA 125f  후보/프레임 med 20  8s
+[26] e8uB0GZsVOQ 120f  후보/프레임 med 1  9s
+[27] g_wHimPF9o8 150f  후보/프레임 med 8  10s
+[28] gg5xRWjw3f8 150f  후보/프레임 med 1  9s
+[29] goeDWOVL95g 73f  후보/프레임 med 1  4s
+[30] h_3LqD2Pl-E 150f  후보/프레임 med 1  9s
+[31] hz-SpF35_BE 150f  후보/프레임 med 4  9s
+[32] idueIYDAbZc 148f  후보/프레임 med 6  9s
+[33] ihWykL5mYRI 150f  후보/프레임 med 1  9s
+[34] mTP2kap9cIw 150f  후보/프레임 med 1  9s
+[35] sGKeqfxwq5E 150f  후보/프레임 med 8  9s
+[36] sYl2jCqsSKo 150f  후보/프레임 med 4  10s
+[37] w-AQcjcoDyA 147f  후보/프레임 med 1  11s
+[38] wjJDs0qmwqE 150f  후보/프레임 med 1  10s
+[39] xMIUw5mi3Eo 146f  후보/프레임 med 6  9s
+CANDIDATES DONE

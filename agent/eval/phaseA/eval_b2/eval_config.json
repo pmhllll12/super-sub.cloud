@@ -1,0 +1,27 @@
+{
+ "weights": {
+  "A": {
+   "centrality": 0.6923076923076923,
+   "size": 0.3076923076923077
+  },
+  "B": {
+   "centrality": 0.4666666666666666,
+   "size": 0.19999999999999998,
+   "continuity": 0.3333333333333333
+  },
+  "A_pose": {
+   "centrality": 0.45,
+   "pose_quality": 0.35,
+   "size": 0.2
+  },
+  "B_pose": {
+   "centrality": 0.35,
+   "pose_quality": 0.25,
+   "size": 0.15,
+   "continuity": 0.25
+  }
+ },
+ "det_threshold": 0.5,
+ "switch_iou": 0.3,
+ "note": "사전 고정 가중치. 튜닝·sweep 없음. production 값 아님."
+}

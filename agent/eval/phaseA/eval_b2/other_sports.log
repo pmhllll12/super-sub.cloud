@@ -1,0 +1,31 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  43%|████▎     | 332/764 [00:00<00:00, 3307.71it/s]Loading weights:  87%|████████▋ | 663/764 [00:00<00:00, 3069.34it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3501.06it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3626.82it/s]
+[1/22] baseball_pitch_trim.mp4     46f multi=  0 changed={'A': 0, 'B': 0, 'A_pose': 0, 'B_pose': 0}
+[2/22] bball_layup_trim.mp4        23f multi=  0 changed={'A': 0, 'B': 0, 'A_pose': 0, 'B_pose': 0}
+[3/22] bball_shot.mp4              73f multi=  0 changed={'A': 0, 'B': 0, 'A_pose': 0, 'B_pose': 0}
+[4/22] 10_penalty1.avi             31f multi= 31 changed={'A': 5, 'B': 5, 'A_pose': 5, 'B_pose': 5}
+[5/22] 11_freekick.avi             33f multi=  1 changed={'A': 0, 'B': 0, 'A_pose': 0, 'B_pose': 0}
+[6/22] 12_penalty.avi              58f multi=  0 changed={'A': 0, 'B': 0, 'A_pose': 0, 'B_pose': 0}
+[7/22] 13_freekick.avi             51f multi=  1 changed={'A': 0, 'B': 0, 'A_pose': 0, 'B_pose': 0}
+[8/22] 14_penalty.avi              41f multi=  0 changed={'A': 0, 'B': 0, 'A_pose': 0, 'B_pose': 0}
+[9/22] 14_penalty1.avi             38f multi=  0 changed={'A': 0, 'B': 0, 'A_pose': 0, 'B_pose': 0}
+[10/22] 16_penalty1.avi             32f multi=  7 changed={'A': 0, 'B': 0, 'A_pose': 0, 'B_pose': 0}
+[11/22] 18_freekick.avi             29f multi=  0 changed={'A': 0, 'B': 0, 'A_pose': 0, 'B_pose': 0}
+[12/22] 18_freekick1.avi            22f multi=  0 changed={'A': 0, 'B': 0, 'A_pose': 0, 'B_pose': 0}
+[13/22] 18_freekick3.avi            31f multi=  0 changed={'A': 0, 'B': 0, 'A_pose': 0, 'B_pose': 0}
+[14/22] 19_freekick.avi             29f multi=  0 changed={'A': 0, 'B': 0, 'A_pose': 0, 'B_pose': 0}
+[15/22] 19_freekick1.avi            32f multi=  1 changed={'A': 0, 'B': 0, 'A_pose': 0, 'B_pose': 0}
+[16/22] 19_freekick2.avi            69f multi=  0 changed={'A': 0, 'B': 0, 'A_pose': 0, 'B_pose': 0}
+[17/22] 21_freekick.avi             35f multi=  3 changed={'A': 0, 'B': 0, 'A_pose': 0, 'B_pose': 0}
+[18/22] 23_freekick.avi             29f multi=  4 changed={'A': 0, 'B': 0, 'A_pose': 0, 'B_pose': 0}
+[19/22] 25_freekick.avi             23f multi=  0 changed={'A': 0, 'B': 0, 'A_pose': 0, 'B_pose': 0}
+[20/22] 25_freekick1.avi            22f multi=  0 changed={'A': 0, 'B': 0, 'A_pose': 0, 'B_pose': 0}
+[21/22] OpenPose_5T.avi             32f multi=  4 changed={'A': 0, 'B': 0, 'A_pose': 0, 'B_pose': 0}
+[22/22] Y1.avi                      16f multi=  0 changed={'A': 0, 'B': 0, 'A_pose': 0, 'B_pose': 0}
+
+OTHER SPORTS DONE  영상 22개  총 795프레임  다인 52프레임
+  A        baseline과 다른 프레임 5  (0.63% of frames)
+  B        baseline과 다른 프레임 5  (0.63% of frames)
+  A_pose   baseline과 다른 프레임 5  (0.63% of frames)
+  B_pose   baseline과 다른 프레임 5  (0.63% of frames)

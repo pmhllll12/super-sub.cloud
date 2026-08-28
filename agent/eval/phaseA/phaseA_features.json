@@ -1,0 +1,1947 @@
+{
+ "0Fet8TyoNR4": {
+  "arm_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 155.5,
+   "swing_knee_angle_at_impact": 164.2,
+   "trunk_forward_lean_deg_at_impact": 2.0,
+   "hip_rotation_range_deg": 6.4,
+   "swing_hip_flexion_after_impact_deg": 20.9,
+   "follow_through_duration_frames": 11,
+   "impact_frame": 11,
+   "hip_shoulder_separation_deg": 9.7,
+   "swing_elbow_angle_at_impact": 93.1,
+   "support_elbow_angle_at_impact": 6.6,
+   "swing_shoulder_flexion_after_impact_deg": 54.8,
+   "plant_foot_to_ball_offset": 3.43
+  },
+  "arm_ext_left": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 155.5,
+   "swing_knee_angle_at_impact": 164.2,
+   "trunk_forward_lean_deg_at_impact": 2.0,
+   "hip_rotation_range_deg": 6.4,
+   "swing_hip_flexion_after_impact_deg": 20.9,
+   "follow_through_duration_frames": 11,
+   "impact_frame": 11,
+   "hip_shoulder_separation_deg": 9.7,
+   "swing_elbow_angle_at_impact": 93.1,
+   "support_elbow_angle_at_impact": 6.6,
+   "swing_shoulder_flexion_after_impact_deg": 54.8,
+   "plant_foot_to_ball_offset": 3.43
+  },
+  "arm_ext_right": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 158.1,
+   "swing_knee_angle_at_impact": 163.5,
+   "trunk_forward_lean_deg_at_impact": 3.0,
+   "hip_rotation_range_deg": 6.4,
+   "swing_hip_flexion_after_impact_deg": 19.7,
+   "follow_through_duration_frames": 4,
+   "impact_frame": 12,
+   "hip_shoulder_separation_deg": 23.3,
+   "swing_elbow_angle_at_impact": 123.7,
+   "support_elbow_angle_at_impact": 179.6,
+   "swing_shoulder_flexion_after_impact_deg": 31.2,
+   "plant_foot_to_ball_offset": 7.38
+  },
+  "leg_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 임팩트 추정 프레임(113)이 분석 가능 구간(0~114) 경계에 있음. 동작 전후가 잘린 영상으로 보인다."
+  },
+  "arm_apex_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 157.0,
+   "swing_knee_angle_at_impact": 161.8,
+   "trunk_forward_lean_deg_at_impact": -3.1,
+   "hip_rotation_range_deg": 42.9,
+   "swing_hip_flexion_after_impact_deg": 8.0,
+   "follow_through_duration_frames": 25,
+   "impact_frame": 41,
+   "hip_shoulder_separation_deg": 23.3,
+   "swing_elbow_angle_at_impact": 92.4,
+   "support_elbow_angle_at_impact": 104.1,
+   "swing_shoulder_flexion_after_impact_deg": 18.6,
+   "plant_foot_to_ball_offset": 6.31
+  }
+ },
+ "3R1kvNrGJK0": {
+  "arm_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 179.7,
+   "swing_knee_angle_at_impact": 176.7,
+   "trunk_forward_lean_deg_at_impact": 0.2,
+   "hip_rotation_range_deg": 9.9,
+   "swing_hip_flexion_after_impact_deg": 2.2,
+   "follow_through_duration_frames": 29,
+   "impact_frame": 120,
+   "hip_shoulder_separation_deg": 7.2,
+   "swing_elbow_angle_at_impact": 5.6,
+   "swing_shoulder_flexion_after_impact_deg": 1.0
+  },
+  "arm_ext_left": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 179.7,
+   "swing_knee_angle_at_impact": 176.7,
+   "trunk_forward_lean_deg_at_impact": 0.2,
+   "hip_rotation_range_deg": 9.9,
+   "swing_hip_flexion_after_impact_deg": 2.2,
+   "follow_through_duration_frames": 29,
+   "impact_frame": 120,
+   "hip_shoulder_separation_deg": 7.2,
+   "swing_elbow_angle_at_impact": 5.6,
+   "swing_shoulder_flexion_after_impact_deg": 1.0
+  },
+  "arm_ext_right": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 179.0,
+   "swing_knee_angle_at_impact": 174.7,
+   "trunk_forward_lean_deg_at_impact": -0.0,
+   "hip_rotation_range_deg": 9.9,
+   "swing_hip_flexion_after_impact_deg": 0.0,
+   "follow_through_duration_frames": 6,
+   "impact_frame": 125,
+   "hip_shoulder_separation_deg": 7.2,
+   "swing_elbow_angle_at_impact": 94.6,
+   "swing_shoulder_flexion_after_impact_deg": 0.0
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 175.6,
+   "swing_knee_angle_at_impact": 171.5,
+   "trunk_forward_lean_deg_at_impact": 3.2,
+   "hip_rotation_range_deg": 8.2,
+   "swing_hip_flexion_after_impact_deg": 11.9,
+   "follow_through_duration_frames": 7,
+   "impact_frame": 48,
+   "hip_shoulder_separation_deg": 7.2,
+   "swing_elbow_angle_at_impact": 142.2,
+   "support_elbow_angle_at_impact": 114.2,
+   "swing_shoulder_flexion_after_impact_deg": 18.8
+  },
+  "arm_apex_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 179.7,
+   "swing_knee_angle_at_impact": 176.7,
+   "trunk_forward_lean_deg_at_impact": 0.6,
+   "hip_rotation_range_deg": 9.9,
+   "swing_hip_flexion_after_impact_deg": 1.1,
+   "follow_through_duration_frames": 33,
+   "impact_frame": 116,
+   "hip_shoulder_separation_deg": 7.2,
+   "swing_elbow_angle_at_impact": 8.5,
+   "swing_shoulder_flexion_after_impact_deg": 1.6
+  }
+ },
+ "3USSmzO001k": {
+  "arm_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 158.6,
+   "swing_knee_angle_at_impact": 178.9,
+   "trunk_forward_lean_deg_at_impact": -3.0,
+   "hip_rotation_range_deg": 13.9,
+   "swing_hip_flexion_after_impact_deg": 2.7,
+   "follow_through_duration_frames": 3,
+   "impact_frame": 106,
+   "hip_shoulder_separation_deg": 19.1,
+   "swing_elbow_angle_at_impact": 173.6,
+   "support_elbow_angle_at_impact": 173.0,
+   "swing_shoulder_flexion_after_impact_deg": 10.2
+  },
+  "arm_ext_left": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 158.6,
+   "swing_knee_angle_at_impact": 178.9,
+   "trunk_forward_lean_deg_at_impact": -3.0,
+   "hip_rotation_range_deg": 13.9,
+   "swing_hip_flexion_after_impact_deg": 2.7,
+   "follow_through_duration_frames": 3,
+   "impact_frame": 106,
+   "hip_shoulder_separation_deg": 19.1,
+   "swing_elbow_angle_at_impact": 173.6,
+   "support_elbow_angle_at_impact": 173.0,
+   "swing_shoulder_flexion_after_impact_deg": 10.2
+  },
+  "arm_ext_right": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 162.8,
+   "swing_knee_angle_at_impact": 170.8,
+   "trunk_forward_lean_deg_at_impact": -2.0,
+   "hip_rotation_range_deg": 5.9,
+   "swing_hip_flexion_after_impact_deg": 1.7,
+   "follow_through_duration_frames": 2,
+   "impact_frame": 24,
+   "hip_shoulder_separation_deg": 12.2,
+   "swing_elbow_angle_at_impact": 162.8,
+   "support_elbow_angle_at_impact": 130.3,
+   "swing_shoulder_flexion_after_impact_deg": 0.0
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 130.2,
+   "swing_knee_angle_at_impact": 174.0,
+   "trunk_forward_lean_deg_at_impact": -3.8,
+   "hip_rotation_range_deg": 34.2,
+   "swing_hip_flexion_after_impact_deg": 8.6,
+   "follow_through_duration_frames": 11,
+   "impact_frame": 138,
+   "hip_shoulder_separation_deg": 19.1
+  },
+  "arm_apex_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 172.9,
+   "swing_knee_angle_at_impact": 170.3,
+   "trunk_forward_lean_deg_at_impact": 5.0,
+   "hip_rotation_range_deg": 3.7,
+   "swing_hip_flexion_after_impact_deg": 4.3,
+   "follow_through_duration_frames": 43,
+   "impact_frame": 3,
+   "hip_shoulder_separation_deg": 19.1,
+   "swing_elbow_angle_at_impact": 161.4,
+   "swing_shoulder_flexion_after_impact_deg": 0.0
+  }
+ },
+ "5-jBTNp5IQA": {
+  "arm_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 41% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_left": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 41% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_right": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 149.8,
+   "swing_knee_angle_at_impact": 144.8,
+   "trunk_forward_lean_deg_at_impact": 15.5,
+   "hip_rotation_range_deg": 1.5,
+   "swing_hip_flexion_after_impact_deg": 17.7,
+   "follow_through_duration_frames": 1,
+   "impact_frame": 6,
+   "hip_shoulder_separation_deg": 13.8,
+   "swing_elbow_angle_at_impact": 25.1,
+   "support_elbow_angle_at_impact": 37.8,
+   "swing_shoulder_flexion_after_impact_deg": 50.8
+  },
+  "leg_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 하반신 스윙 측 키포인트(3개 관절) 유효 프레임 비율 57% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_apex_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 41% < 기준 70%. 재촬영이 필요하다."
+  }
+ },
+ "6hrcRyIYTrA": {
+  "arm_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 162.5,
+   "swing_knee_angle_at_impact": 174.3,
+   "trunk_forward_lean_deg_at_impact": -1.2,
+   "hip_rotation_range_deg": 105.3,
+   "swing_hip_flexion_after_impact_deg": 10.2,
+   "follow_through_duration_frames": 4,
+   "impact_frame": 97,
+   "hip_shoulder_separation_deg": 14.1,
+   "swing_elbow_angle_at_impact": 79.8,
+   "support_elbow_angle_at_impact": 174.2,
+   "swing_shoulder_flexion_after_impact_deg": 0.0
+  },
+  "arm_ext_left": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 162.5,
+   "swing_knee_angle_at_impact": 174.3,
+   "trunk_forward_lean_deg_at_impact": -1.2,
+   "hip_rotation_range_deg": 105.3,
+   "swing_hip_flexion_after_impact_deg": 10.2,
+   "follow_through_duration_frames": 4,
+   "impact_frame": 97,
+   "hip_shoulder_separation_deg": 14.1,
+   "swing_elbow_angle_at_impact": 79.8,
+   "support_elbow_angle_at_impact": 174.2,
+   "swing_shoulder_flexion_after_impact_deg": 0.0
+  },
+  "arm_ext_right": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 150.6,
+   "swing_knee_angle_at_impact": 64.1,
+   "trunk_forward_lean_deg_at_impact": 13.7,
+   "hip_rotation_range_deg": 23.9,
+   "swing_hip_flexion_after_impact_deg": 10.2,
+   "follow_through_duration_frames": 21,
+   "impact_frame": 45,
+   "hip_shoulder_separation_deg": 10.1,
+   "swing_elbow_angle_at_impact": 119.5,
+   "support_elbow_angle_at_impact": 162.5,
+   "swing_shoulder_flexion_after_impact_deg": 72.6
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 169.1,
+   "swing_knee_angle_at_impact": 98.7,
+   "trunk_forward_lean_deg_at_impact": 17.8,
+   "hip_rotation_range_deg": 27.9,
+   "swing_hip_flexion_after_impact_deg": 62.3,
+   "follow_through_duration_frames": 4,
+   "impact_frame": 62,
+   "hip_shoulder_separation_deg": 14.1,
+   "swing_elbow_angle_at_impact": 61.5,
+   "swing_shoulder_flexion_after_impact_deg": 52.8
+  },
+  "arm_apex_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 12.3,
+   "swing_knee_angle_at_impact": 16.6,
+   "trunk_forward_lean_deg_at_impact": -1.3,
+   "hip_rotation_range_deg": 105.3,
+   "swing_hip_flexion_after_impact_deg": 3.2,
+   "follow_through_duration_frames": 7,
+   "impact_frame": 135,
+   "hip_shoulder_separation_deg": 14.1,
+   "swing_elbow_angle_at_impact": 83.6,
+   "support_elbow_angle_at_impact": 171.2,
+   "swing_shoulder_flexion_after_impact_deg": 0.0
+  }
+ },
+ "8gmHKqDxXdg": {
+  "arm_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 175.3,
+   "swing_knee_angle_at_impact": 163.6,
+   "trunk_forward_lean_deg_at_impact": 2.5,
+   "hip_rotation_range_deg": 67.5,
+   "swing_hip_flexion_after_impact_deg": 0.0,
+   "follow_through_duration_frames": 3,
+   "impact_frame": 88,
+   "hip_shoulder_separation_deg": 26.4,
+   "swing_elbow_angle_at_impact": 3.6,
+   "support_elbow_angle_at_impact": 14.8,
+   "swing_shoulder_flexion_after_impact_deg": 7.3,
+   "plant_foot_to_ball_offset": 6.77
+  },
+  "arm_ext_left": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 175.3,
+   "swing_knee_angle_at_impact": 163.6,
+   "trunk_forward_lean_deg_at_impact": 2.5,
+   "hip_rotation_range_deg": 67.5,
+   "swing_hip_flexion_after_impact_deg": 0.0,
+   "follow_through_duration_frames": 3,
+   "impact_frame": 88,
+   "hip_shoulder_separation_deg": 26.4,
+   "swing_elbow_angle_at_impact": 3.6,
+   "support_elbow_angle_at_impact": 14.8,
+   "swing_shoulder_flexion_after_impact_deg": 7.3,
+   "plant_foot_to_ball_offset": 6.77
+  },
+  "arm_ext_right": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 179.1,
+   "swing_knee_angle_at_impact": 172.3,
+   "trunk_forward_lean_deg_at_impact": 3.3,
+   "hip_rotation_range_deg": 47.4,
+   "swing_hip_flexion_after_impact_deg": 12.7,
+   "follow_through_duration_frames": 7,
+   "impact_frame": 65,
+   "hip_shoulder_separation_deg": 26.4,
+   "swing_elbow_angle_at_impact": 174.7,
+   "swing_shoulder_flexion_after_impact_deg": 66.7,
+   "plant_foot_to_ball_offset": 5.14
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 140.8,
+   "swing_knee_angle_at_impact": 178.9,
+   "trunk_forward_lean_deg_at_impact": 7.0,
+   "hip_rotation_range_deg": 37.3,
+   "swing_hip_flexion_after_impact_deg": 13.2,
+   "follow_through_duration_frames": 8,
+   "impact_frame": 18,
+   "hip_shoulder_separation_deg": 26.0,
+   "swing_elbow_angle_at_impact": 4.7,
+   "support_elbow_angle_at_impact": 19.2,
+   "swing_shoulder_flexion_after_impact_deg": 50.0,
+   "plant_foot_to_ball_offset": 3.97
+  },
+  "arm_apex_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 168.7,
+   "swing_knee_angle_at_impact": 179.4,
+   "trunk_forward_lean_deg_at_impact": 2.4,
+   "hip_rotation_range_deg": 39.3,
+   "swing_hip_flexion_after_impact_deg": 4.1,
+   "follow_through_duration_frames": 10,
+   "impact_frame": 62,
+   "hip_shoulder_separation_deg": 26.4,
+   "swing_elbow_angle_at_impact": 145.9,
+   "swing_shoulder_flexion_after_impact_deg": 0.0,
+   "plant_foot_to_ball_offset": 4.85
+  }
+ },
+ "Atzrde5uGcM": {
+  "arm_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 53% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_left": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 53% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_right": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 176.2,
+   "swing_knee_angle_at_impact": 178.9,
+   "trunk_forward_lean_deg_at_impact": 0.5,
+   "hip_rotation_range_deg": 75.7,
+   "swing_hip_flexion_after_impact_deg": 0.0,
+   "follow_through_duration_frames": 2,
+   "impact_frame": 131,
+   "hip_shoulder_separation_deg": 32.4,
+   "swing_elbow_angle_at_impact": 160.6,
+   "support_elbow_angle_at_impact": 148.3,
+   "swing_shoulder_flexion_after_impact_deg": 11.2
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 150.0,
+   "swing_knee_angle_at_impact": 122.4,
+   "trunk_forward_lean_deg_at_impact": -13.3,
+   "hip_rotation_range_deg": 75.7,
+   "swing_hip_flexion_after_impact_deg": 35.5,
+   "follow_through_duration_frames": 9,
+   "impact_frame": 118,
+   "hip_shoulder_separation_deg": 32.4,
+   "swing_elbow_angle_at_impact": 178.0,
+   "support_elbow_angle_at_impact": 151.5,
+   "swing_shoulder_flexion_after_impact_deg": 29.3
+  },
+  "arm_apex_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 53% < 기준 70%. 재촬영이 필요하다."
+  }
+ },
+ "C7icGyrdROM": {
+  "arm_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 166.0,
+   "swing_knee_angle_at_impact": 175.6,
+   "trunk_forward_lean_deg_at_impact": 26.7,
+   "hip_rotation_range_deg": 11.2,
+   "swing_hip_flexion_after_impact_deg": 16.4,
+   "follow_through_duration_frames": 2,
+   "impact_frame": 17,
+   "hip_shoulder_separation_deg": 27.6,
+   "swing_elbow_angle_at_impact": 171.0,
+   "support_elbow_angle_at_impact": 104.5,
+   "swing_shoulder_flexion_after_impact_deg": 29.9
+  },
+  "arm_ext_left": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 152.1,
+   "swing_knee_angle_at_impact": 177.1,
+   "trunk_forward_lean_deg_at_impact": 5.7,
+   "hip_rotation_range_deg": 17.5,
+   "swing_hip_flexion_after_impact_deg": 0.2,
+   "follow_through_duration_frames": 1,
+   "impact_frame": 31,
+   "hip_shoulder_separation_deg": 29.5,
+   "swing_elbow_angle_at_impact": 126.5,
+   "support_elbow_angle_at_impact": 155.2,
+   "swing_shoulder_flexion_after_impact_deg": 70.9
+  },
+  "arm_ext_right": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 166.0,
+   "swing_knee_angle_at_impact": 175.6,
+   "trunk_forward_lean_deg_at_impact": 26.7,
+   "hip_rotation_range_deg": 11.2,
+   "swing_hip_flexion_after_impact_deg": 16.4,
+   "follow_through_duration_frames": 2,
+   "impact_frame": 17,
+   "hip_shoulder_separation_deg": 27.6,
+   "swing_elbow_angle_at_impact": 171.0,
+   "support_elbow_angle_at_impact": 104.5,
+   "swing_shoulder_flexion_after_impact_deg": 29.9
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 162.9,
+   "swing_knee_angle_at_impact": 127.1,
+   "trunk_forward_lean_deg_at_impact": 14.0,
+   "hip_rotation_range_deg": 7.6,
+   "swing_hip_flexion_after_impact_deg": 19.9,
+   "follow_through_duration_frames": 3,
+   "impact_frame": 9,
+   "hip_shoulder_separation_deg": 12.3,
+   "swing_elbow_angle_at_impact": 121.3,
+   "support_elbow_angle_at_impact": 130.5,
+   "swing_shoulder_flexion_after_impact_deg": 42.6
+  },
+  "arm_apex_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 162.7,
+   "swing_knee_angle_at_impact": 177.4,
+   "trunk_forward_lean_deg_at_impact": 24.7,
+   "hip_rotation_range_deg": 13.2,
+   "swing_hip_flexion_after_impact_deg": 18.6,
+   "follow_through_duration_frames": 1,
+   "impact_frame": 18,
+   "hip_shoulder_separation_deg": 29.5,
+   "swing_elbow_angle_at_impact": 175.4,
+   "support_elbow_angle_at_impact": 85.8,
+   "swing_shoulder_flexion_after_impact_deg": 30.4
+  }
+ },
+ "CFjNxCZhn_8": {
+  "arm_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 52% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_left": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 162.5,
+   "swing_knee_angle_at_impact": 127.8,
+   "trunk_forward_lean_deg_at_impact": -13.0,
+   "hip_rotation_range_deg": 115.2,
+   "swing_hip_flexion_after_impact_deg": 2.5,
+   "follow_through_duration_frames": 1,
+   "impact_frame": 23,
+   "hip_shoulder_separation_deg": 33.4,
+   "swing_elbow_angle_at_impact": 100.4,
+   "swing_shoulder_flexion_after_impact_deg": 31.1
+  },
+  "arm_ext_right": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 52% < 기준 70%. 재촬영이 필요하다."
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 151.8,
+   "swing_knee_angle_at_impact": 113.3,
+   "trunk_forward_lean_deg_at_impact": -28.3,
+   "hip_rotation_range_deg": 115.2,
+   "swing_hip_flexion_after_impact_deg": 55.1,
+   "follow_through_duration_frames": 7,
+   "impact_frame": 15,
+   "hip_shoulder_separation_deg": 33.4,
+   "swing_elbow_angle_at_impact": 122.3,
+   "swing_shoulder_flexion_after_impact_deg": 72.0
+  },
+  "arm_apex_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 52% < 기준 70%. 재촬영이 필요하다."
+  }
+ },
+ "Fz16t9SrF3U": {
+  "arm_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 173.8,
+   "swing_knee_angle_at_impact": 168.6,
+   "trunk_forward_lean_deg_at_impact": 0.4,
+   "hip_rotation_range_deg": 5.1,
+   "swing_hip_flexion_after_impact_deg": 0.9,
+   "follow_through_duration_frames": 6,
+   "impact_frame": 27,
+   "hip_shoulder_separation_deg": 6.4,
+   "swing_elbow_angle_at_impact": 162.9,
+   "support_elbow_angle_at_impact": 173.5,
+   "swing_shoulder_flexion_after_impact_deg": 32.2
+  },
+  "arm_ext_left": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 173.8,
+   "swing_knee_angle_at_impact": 168.6,
+   "trunk_forward_lean_deg_at_impact": 0.4,
+   "hip_rotation_range_deg": 5.1,
+   "swing_hip_flexion_after_impact_deg": 0.9,
+   "follow_through_duration_frames": 6,
+   "impact_frame": 27,
+   "hip_shoulder_separation_deg": 6.4,
+   "swing_elbow_angle_at_impact": 162.9,
+   "support_elbow_angle_at_impact": 173.5,
+   "swing_shoulder_flexion_after_impact_deg": 32.2
+  },
+  "arm_ext_right": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 171.8,
+   "swing_knee_angle_at_impact": 112.7,
+   "trunk_forward_lean_deg_at_impact": 4.4,
+   "hip_rotation_range_deg": 15.9,
+   "swing_hip_flexion_after_impact_deg": 21.8,
+   "follow_through_duration_frames": 1,
+   "impact_frame": 105,
+   "hip_shoulder_separation_deg": 6.4,
+   "swing_elbow_angle_at_impact": 117.3,
+   "support_elbow_angle_at_impact": 151.7,
+   "swing_shoulder_flexion_after_impact_deg": 1.2
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 174.8,
+   "swing_knee_angle_at_impact": 174.9,
+   "trunk_forward_lean_deg_at_impact": -6.0,
+   "hip_rotation_range_deg": 15.9,
+   "swing_hip_flexion_after_impact_deg": 2.5,
+   "follow_through_duration_frames": 8,
+   "impact_frame": 106,
+   "hip_shoulder_separation_deg": 6.4,
+   "swing_elbow_angle_at_impact": 158.9,
+   "support_elbow_angle_at_impact": 170.0,
+   "swing_shoulder_flexion_after_impact_deg": 2.2
+  },
+  "arm_apex_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 159.7,
+   "swing_knee_angle_at_impact": 159.9,
+   "trunk_forward_lean_deg_at_impact": 0.3,
+   "hip_rotation_range_deg": 9.1,
+   "swing_hip_flexion_after_impact_deg": 23.5,
+   "follow_through_duration_frames": 2,
+   "impact_frame": 60,
+   "hip_shoulder_separation_deg": 6.4,
+   "swing_elbow_angle_at_impact": 42.0,
+   "support_elbow_angle_at_impact": 129.4,
+   "swing_shoulder_flexion_after_impact_deg": 0.0
+  }
+ },
+ "GS-PcxmaHmQ": {
+  "arm_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 158.2,
+   "swing_knee_angle_at_impact": 130.9,
+   "trunk_forward_lean_deg_at_impact": -18.0,
+   "hip_rotation_range_deg": 0.0,
+   "swing_hip_flexion_after_impact_deg": 17.6,
+   "follow_through_duration_frames": 3,
+   "impact_frame": 126,
+   "hip_shoulder_separation_deg": 25.1,
+   "swing_elbow_angle_at_impact": 178.4,
+   "support_elbow_angle_at_impact": 160.5,
+   "swing_shoulder_flexion_after_impact_deg": 111.1,
+   "plant_foot_to_ball_offset": 0.99
+  },
+  "arm_ext_left": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 158.2,
+   "swing_knee_angle_at_impact": 130.9,
+   "trunk_forward_lean_deg_at_impact": -18.0,
+   "hip_rotation_range_deg": 0.0,
+   "swing_hip_flexion_after_impact_deg": 17.6,
+   "follow_through_duration_frames": 3,
+   "impact_frame": 126,
+   "hip_shoulder_separation_deg": 25.1,
+   "swing_elbow_angle_at_impact": 178.4,
+   "support_elbow_angle_at_impact": 160.5,
+   "swing_shoulder_flexion_after_impact_deg": 111.1,
+   "plant_foot_to_ball_offset": 0.99
+  },
+  "arm_ext_right": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 149.1,
+   "swing_knee_angle_at_impact": 133.4,
+   "trunk_forward_lean_deg_at_impact": -13.1,
+   "hip_rotation_range_deg": 0.0,
+   "swing_hip_flexion_after_impact_deg": 21.7,
+   "follow_through_duration_frames": 4,
+   "impact_frame": 125,
+   "hip_shoulder_separation_deg": 25.1,
+   "swing_elbow_angle_at_impact": 71.3,
+   "support_elbow_angle_at_impact": 51.9,
+   "swing_shoulder_flexion_after_impact_deg": 148.0,
+   "plant_foot_to_ball_offset": 0.95
+  },
+  "leg_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 하반신 스윙 측 키포인트(3개 관절) 유효 프레임 비율 17% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_apex_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 123.5,
+   "swing_knee_angle_at_impact": 125.4,
+   "trunk_forward_lean_deg_at_impact": -11.4,
+   "hip_rotation_range_deg": 7.5,
+   "swing_hip_flexion_after_impact_deg": 0.0,
+   "follow_through_duration_frames": 2,
+   "impact_frame": 147,
+   "hip_shoulder_separation_deg": 25.1,
+   "swing_elbow_angle_at_impact": 154.3,
+   "support_elbow_angle_at_impact": 95.6,
+   "swing_shoulder_flexion_after_impact_deg": 0.0
+  }
+ },
+ "IYFifBJ9lH8": {
+  "arm_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 174.4,
+   "swing_knee_angle_at_impact": 144.4,
+   "trunk_forward_lean_deg_at_impact": -17.7,
+   "hip_rotation_range_deg": 24.8,
+   "swing_hip_flexion_after_impact_deg": 0.0,
+   "follow_through_duration_frames": 23,
+   "impact_frame": 126,
+   "hip_shoulder_separation_deg": 14.1,
+   "swing_elbow_angle_at_impact": 179.7,
+   "support_elbow_angle_at_impact": 118.2,
+   "swing_shoulder_flexion_after_impact_deg": 0.0
+  },
+  "arm_ext_left": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 174.4,
+   "swing_knee_angle_at_impact": 144.4,
+   "trunk_forward_lean_deg_at_impact": -17.7,
+   "hip_rotation_range_deg": 24.8,
+   "swing_hip_flexion_after_impact_deg": 0.0,
+   "follow_through_duration_frames": 23,
+   "impact_frame": 126,
+   "hip_shoulder_separation_deg": 14.1,
+   "swing_elbow_angle_at_impact": 179.7,
+   "support_elbow_angle_at_impact": 118.2,
+   "swing_shoulder_flexion_after_impact_deg": 0.0
+  },
+  "arm_ext_right": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 176.2,
+   "swing_knee_angle_at_impact": 154.5,
+   "trunk_forward_lean_deg_at_impact": 0.7,
+   "hip_rotation_range_deg": 21.9,
+   "swing_hip_flexion_after_impact_deg": 31.0,
+   "follow_through_duration_frames": 1,
+   "impact_frame": 91,
+   "hip_shoulder_separation_deg": 10.0,
+   "swing_elbow_angle_at_impact": 27.4,
+   "support_elbow_angle_at_impact": 25.7,
+   "swing_shoulder_flexion_after_impact_deg": 143.0
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 161.4,
+   "swing_knee_angle_at_impact": 160.2,
+   "trunk_forward_lean_deg_at_impact": -0.4,
+   "hip_rotation_range_deg": 21.9,
+   "swing_hip_flexion_after_impact_deg": 3.0,
+   "follow_through_duration_frames": 1,
+   "impact_frame": 80,
+   "hip_shoulder_separation_deg": 10.0,
+   "swing_elbow_angle_at_impact": 154.4,
+   "support_elbow_angle_at_impact": 156.9,
+   "swing_shoulder_flexion_after_impact_deg": 89.7
+  },
+  "arm_apex_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 174.4,
+   "swing_knee_angle_at_impact": 152.1,
+   "trunk_forward_lean_deg_at_impact": -3.9,
+   "hip_rotation_range_deg": 21.9,
+   "swing_hip_flexion_after_impact_deg": 26.5,
+   "follow_through_duration_frames": 2,
+   "impact_frame": 105,
+   "hip_shoulder_separation_deg": 10.0,
+   "swing_elbow_angle_at_impact": 16.7,
+   "support_elbow_angle_at_impact": 25.2,
+   "swing_shoulder_flexion_after_impact_deg": 81.6
+  }
+ },
+ "IeDin6oB-IY": {
+  "arm_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 65% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_left": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 124.2,
+   "swing_knee_angle_at_impact": 146.2,
+   "trunk_forward_lean_deg_at_impact": -28.0,
+   "swing_hip_flexion_after_impact_deg": 53.8,
+   "follow_through_duration_frames": 1,
+   "impact_frame": 92,
+   "hip_shoulder_separation_deg": 60.1,
+   "swing_elbow_angle_at_impact": 173.1,
+   "swing_shoulder_flexion_after_impact_deg": 18.8
+  },
+  "arm_ext_right": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 65% < 기준 70%. 재촬영이 필요하다."
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 94.1,
+   "swing_knee_angle_at_impact": 179.6,
+   "trunk_forward_lean_deg_at_impact": -25.7,
+   "swing_hip_flexion_after_impact_deg": 37.8,
+   "follow_through_duration_frames": 2,
+   "impact_frame": 94,
+   "hip_shoulder_separation_deg": 60.1
+  },
+  "arm_apex_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 65% < 기준 70%. 재촬영이 필요하다."
+  }
+ },
+ "LXjM7nBZcak": {
+  "arm_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 23% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_left": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 23% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_right": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 34% < 기준 70%. 재촬영이 필요하다."
+  },
+  "leg_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 하반신 스윙 측 키포인트(3개 관절) 유효 프레임 비율 25% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_apex_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 23% < 기준 70%. 재촬영이 필요하다."
+  }
+ },
+ "LhD_fnHt_xg": {
+  "arm_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 66% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_left": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 174.3,
+   "swing_knee_angle_at_impact": 176.4,
+   "trunk_forward_lean_deg_at_impact": -1.7,
+   "hip_rotation_range_deg": 32.2,
+   "swing_hip_flexion_after_impact_deg": 5.0,
+   "follow_through_duration_frames": 13,
+   "impact_frame": 79,
+   "hip_shoulder_separation_deg": 19.0,
+   "swing_elbow_angle_at_impact": 171.0,
+   "support_elbow_angle_at_impact": 169.6,
+   "swing_shoulder_flexion_after_impact_deg": 60.8
+  },
+  "arm_ext_right": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 66% < 기준 70%. 재촬영이 필요하다."
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 151.1,
+   "swing_knee_angle_at_impact": 152.7,
+   "trunk_forward_lean_deg_at_impact": -0.0,
+   "hip_rotation_range_deg": 32.2,
+   "swing_hip_flexion_after_impact_deg": 45.7,
+   "follow_through_duration_frames": 1,
+   "impact_frame": 78,
+   "hip_shoulder_separation_deg": 19.0,
+   "swing_elbow_angle_at_impact": 19.0,
+   "swing_shoulder_flexion_after_impact_deg": 0.0
+  },
+  "arm_apex_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 66% < 기준 70%. 재촬영이 필요하다."
+  }
+ },
+ "N5zWQkoLM3M": {
+  "arm_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 178.0,
+   "swing_knee_angle_at_impact": 176.2,
+   "trunk_forward_lean_deg_at_impact": -1.7,
+   "hip_rotation_range_deg": 11.2,
+   "swing_hip_flexion_after_impact_deg": 9.6,
+   "follow_through_duration_frames": 3,
+   "impact_frame": 23,
+   "hip_shoulder_separation_deg": 12.9,
+   "swing_elbow_angle_at_impact": 167.8,
+   "swing_shoulder_flexion_after_impact_deg": 63.2,
+   "plant_foot_to_ball_offset": 1.31
+  },
+  "arm_ext_left": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 27% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_right": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 178.0,
+   "swing_knee_angle_at_impact": 176.2,
+   "trunk_forward_lean_deg_at_impact": -1.7,
+   "hip_rotation_range_deg": 11.2,
+   "swing_hip_flexion_after_impact_deg": 9.6,
+   "follow_through_duration_frames": 3,
+   "impact_frame": 23,
+   "hip_shoulder_separation_deg": 12.9,
+   "swing_elbow_angle_at_impact": 167.8,
+   "swing_shoulder_flexion_after_impact_deg": 63.2,
+   "plant_foot_to_ball_offset": 1.31
+  },
+  "leg_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 임팩트 추정 프레임(149)이 분석 가능 구간(0~149) 경계에 있음. 동작 전후가 잘린 영상으로 보인다."
+  },
+  "arm_apex_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 167.0,
+   "swing_knee_angle_at_impact": 144.3,
+   "trunk_forward_lean_deg_at_impact": 24.2,
+   "hip_rotation_range_deg": 39.8,
+   "swing_hip_flexion_after_impact_deg": 47.4,
+   "follow_through_duration_frames": 31,
+   "impact_frame": 118,
+   "hip_shoulder_separation_deg": 14.7,
+   "swing_elbow_angle_at_impact": 76.3,
+   "swing_shoulder_flexion_after_impact_deg": 4.5,
+   "plant_foot_to_ball_offset": 4.95
+  }
+ },
+ "O2GSaYqH8JY": {
+  "arm_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 177.6,
+   "swing_knee_angle_at_impact": 178.0,
+   "trunk_forward_lean_deg_at_impact": -1.5,
+   "hip_rotation_range_deg": 60.1,
+   "swing_hip_flexion_after_impact_deg": 1.2,
+   "follow_through_duration_frames": 8,
+   "impact_frame": 118,
+   "hip_shoulder_separation_deg": 24.7,
+   "swing_elbow_angle_at_impact": 163.2,
+   "support_elbow_angle_at_impact": 175.8,
+   "swing_shoulder_flexion_after_impact_deg": 1.2,
+   "plant_foot_to_ball_offset": 7.6
+  },
+  "arm_ext_left": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 178.9,
+   "swing_knee_angle_at_impact": 178.9,
+   "trunk_forward_lean_deg_at_impact": -7.2,
+   "hip_rotation_range_deg": 54.0,
+   "swing_hip_flexion_after_impact_deg": 2.3,
+   "follow_through_duration_frames": 1,
+   "impact_frame": 100,
+   "hip_shoulder_separation_deg": 12.4,
+   "swing_elbow_angle_at_impact": 93.2,
+   "support_elbow_angle_at_impact": 146.8,
+   "swing_shoulder_flexion_after_impact_deg": 127.4,
+   "plant_foot_to_ball_offset": 7.65
+  },
+  "arm_ext_right": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 177.6,
+   "swing_knee_angle_at_impact": 178.0,
+   "trunk_forward_lean_deg_at_impact": -1.5,
+   "hip_rotation_range_deg": 60.1,
+   "swing_hip_flexion_after_impact_deg": 1.2,
+   "follow_through_duration_frames": 8,
+   "impact_frame": 118,
+   "hip_shoulder_separation_deg": 24.7,
+   "swing_elbow_angle_at_impact": 163.2,
+   "support_elbow_angle_at_impact": 175.8,
+   "swing_shoulder_flexion_after_impact_deg": 1.2,
+   "plant_foot_to_ball_offset": 7.6
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 147.0,
+   "swing_knee_angle_at_impact": 163.9,
+   "trunk_forward_lean_deg_at_impact": -6.8,
+   "hip_rotation_range_deg": 54.0,
+   "swing_hip_flexion_after_impact_deg": 22.1,
+   "follow_through_duration_frames": 6,
+   "impact_frame": 43,
+   "hip_shoulder_separation_deg": 9.6,
+   "plant_foot_to_ball_offset": 6.87
+  },
+  "arm_apex_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 172.3,
+   "swing_knee_angle_at_impact": 173.5,
+   "trunk_forward_lean_deg_at_impact": 2.3,
+   "hip_rotation_range_deg": 5.9,
+   "swing_hip_flexion_after_impact_deg": 23.2,
+   "follow_through_duration_frames": 126,
+   "impact_frame": 23,
+   "hip_shoulder_separation_deg": 2.8,
+   "swing_elbow_angle_at_impact": 63.6,
+   "support_elbow_angle_at_impact": 141.8,
+   "swing_shoulder_flexion_after_impact_deg": 22.1,
+   "plant_foot_to_ball_offset": 7.91
+  }
+ },
+ "V_whuvMjg_8": {
+  "arm_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 47% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_left": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 47% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_right": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 98.0,
+   "swing_knee_angle_at_impact": 170.6,
+   "trunk_forward_lean_deg_at_impact": 16.7,
+   "hip_rotation_range_deg": 26.8,
+   "swing_hip_flexion_after_impact_deg": 5.7,
+   "follow_through_duration_frames": 1,
+   "impact_frame": 108,
+   "hip_shoulder_separation_deg": 42.9,
+   "swing_elbow_angle_at_impact": 176.6,
+   "swing_shoulder_flexion_after_impact_deg": 29.4,
+   "plant_foot_to_ball_offset": 6.7
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 149.9,
+   "swing_knee_angle_at_impact": 137.7,
+   "trunk_forward_lean_deg_at_impact": 11.9,
+   "hip_rotation_range_deg": 8.5,
+   "swing_hip_flexion_after_impact_deg": 46.0,
+   "follow_through_duration_frames": 3,
+   "impact_frame": 37,
+   "hip_shoulder_separation_deg": 15.2,
+   "swing_elbow_angle_at_impact": 29.0,
+   "swing_shoulder_flexion_after_impact_deg": 39.9,
+   "plant_foot_to_ball_offset": 7.17
+  },
+  "arm_apex_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 47% < 기준 70%. 재촬영이 필요하다."
+  }
+ },
+ "X6dC9pu5H3k": {
+  "arm_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 40% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_left": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 27% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_right": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 40% < 기준 70%. 재촬영이 필요하다."
+  },
+  "leg_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 하반신 스윙 측 키포인트(3개 관절) 유효 프레임 비율 42% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_apex_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 40% < 기준 70%. 재촬영이 필요하다."
+  }
+ },
+ "YNMHMKb5Md4": {
+  "arm_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 28.8,
+   "swing_knee_angle_at_impact": 24.2,
+   "trunk_forward_lean_deg_at_impact": 4.8,
+   "hip_rotation_range_deg": 0.0,
+   "swing_hip_flexion_after_impact_deg": 6.9,
+   "follow_through_duration_frames": 3,
+   "impact_frame": 70,
+   "hip_shoulder_separation_deg": 28.5,
+   "swing_elbow_angle_at_impact": 154.7,
+   "support_elbow_angle_at_impact": 99.6,
+   "swing_shoulder_flexion_after_impact_deg": 15.5
+  },
+  "arm_ext_left": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 37.3,
+   "swing_knee_angle_at_impact": 111.6,
+   "trunk_forward_lean_deg_at_impact": 24.7,
+   "hip_rotation_range_deg": 0.0,
+   "swing_hip_flexion_after_impact_deg": 33.0,
+   "follow_through_duration_frames": 30,
+   "impact_frame": 56,
+   "hip_shoulder_separation_deg": 28.5,
+   "swing_elbow_angle_at_impact": 10.8,
+   "support_elbow_angle_at_impact": 31.6,
+   "swing_shoulder_flexion_after_impact_deg": 33.8
+  },
+  "arm_ext_right": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 28.8,
+   "swing_knee_angle_at_impact": 24.2,
+   "trunk_forward_lean_deg_at_impact": 4.8,
+   "hip_rotation_range_deg": 0.0,
+   "swing_hip_flexion_after_impact_deg": 6.9,
+   "follow_through_duration_frames": 3,
+   "impact_frame": 70,
+   "hip_shoulder_separation_deg": 28.5,
+   "swing_elbow_angle_at_impact": 154.7,
+   "support_elbow_angle_at_impact": 99.6,
+   "swing_shoulder_flexion_after_impact_deg": 15.5
+  },
+  "leg_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 하반신 스윙 측 키포인트(3개 관절) 유효 프레임 비율 3% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_apex_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 47.3,
+   "swing_knee_angle_at_impact": 49.8,
+   "trunk_forward_lean_deg_at_impact": 24.9,
+   "hip_rotation_range_deg": 0.0,
+   "swing_hip_flexion_after_impact_deg": 29.9,
+   "follow_through_duration_frames": 54,
+   "impact_frame": 32,
+   "hip_shoulder_separation_deg": 28.5,
+   "swing_elbow_angle_at_impact": 75.2,
+   "support_elbow_angle_at_impact": 82.7,
+   "swing_shoulder_flexion_after_impact_deg": 23.5
+  }
+ },
+ "ZMy0t-CSZiU": {
+  "arm_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 140.6,
+   "swing_knee_angle_at_impact": 143.5,
+   "trunk_forward_lean_deg_at_impact": -13.1,
+   "hip_rotation_range_deg": 3.4,
+   "swing_hip_flexion_after_impact_deg": 5.2,
+   "follow_through_duration_frames": 102,
+   "impact_frame": 47,
+   "hip_shoulder_separation_deg": 23.0,
+   "swing_elbow_angle_at_impact": 145.1,
+   "support_elbow_angle_at_impact": 134.8,
+   "swing_shoulder_flexion_after_impact_deg": 25.4
+  },
+  "arm_ext_left": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 177.6,
+   "swing_knee_angle_at_impact": 148.0,
+   "trunk_forward_lean_deg_at_impact": -19.3,
+   "hip_rotation_range_deg": 7.4,
+   "swing_hip_flexion_after_impact_deg": 5.3,
+   "follow_through_duration_frames": 1,
+   "impact_frame": 123,
+   "hip_shoulder_separation_deg": 28.0,
+   "swing_elbow_angle_at_impact": 114.3,
+   "swing_shoulder_flexion_after_impact_deg": 61.9
+  },
+  "arm_ext_right": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 140.6,
+   "swing_knee_angle_at_impact": 143.5,
+   "trunk_forward_lean_deg_at_impact": -13.1,
+   "hip_rotation_range_deg": 3.4,
+   "swing_hip_flexion_after_impact_deg": 5.2,
+   "follow_through_duration_frames": 102,
+   "impact_frame": 47,
+   "hip_shoulder_separation_deg": 23.0,
+   "swing_elbow_angle_at_impact": 145.1,
+   "support_elbow_angle_at_impact": 134.8,
+   "swing_shoulder_flexion_after_impact_deg": 25.4
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 178.8,
+   "swing_knee_angle_at_impact": 163.4,
+   "trunk_forward_lean_deg_at_impact": -16.8,
+   "hip_rotation_range_deg": 6.9,
+   "swing_hip_flexion_after_impact_deg": 11.7,
+   "follow_through_duration_frames": 1,
+   "impact_frame": 104,
+   "hip_shoulder_separation_deg": 28.0,
+   "swing_elbow_angle_at_impact": 76.6,
+   "support_elbow_angle_at_impact": 150.4,
+   "swing_shoulder_flexion_after_impact_deg": 21.3
+  },
+  "arm_apex_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 155.7,
+   "swing_knee_angle_at_impact": 148.0,
+   "trunk_forward_lean_deg_at_impact": -18.5,
+   "hip_rotation_range_deg": 6.9,
+   "swing_hip_flexion_after_impact_deg": 15.8,
+   "follow_through_duration_frames": 9,
+   "impact_frame": 78,
+   "hip_shoulder_separation_deg": 28.0,
+   "swing_elbow_angle_at_impact": 174.7,
+   "support_elbow_angle_at_impact": 135.9,
+   "swing_shoulder_flexion_after_impact_deg": 0.8
+  }
+ },
+ "ZS-wgeg2qkI": {
+  "arm_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 55% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_left": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 55% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_right": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 114.1,
+   "swing_knee_angle_at_impact": 141.1,
+   "trunk_forward_lean_deg_at_impact": -28.6,
+   "hip_rotation_range_deg": 27.7,
+   "swing_hip_flexion_after_impact_deg": 21.5,
+   "follow_through_duration_frames": 4,
+   "impact_frame": 128,
+   "hip_shoulder_separation_deg": 20.4,
+   "swing_elbow_angle_at_impact": 72.4,
+   "swing_shoulder_flexion_after_impact_deg": 26.9
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 168.4,
+   "swing_knee_angle_at_impact": 174.9,
+   "trunk_forward_lean_deg_at_impact": 22.4,
+   "hip_rotation_range_deg": 5.0,
+   "swing_hip_flexion_after_impact_deg": 47.0,
+   "follow_through_duration_frames": 27,
+   "impact_frame": 4,
+   "hip_shoulder_separation_deg": 7.6
+  },
+  "arm_apex_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 55% < 기준 70%. 재촬영이 필요하다."
+  }
+ },
+ "Zp9aDp2YTBw": {
+  "arm_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 65% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_left": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 157.9,
+   "swing_knee_angle_at_impact": 169.6,
+   "trunk_forward_lean_deg_at_impact": 10.0,
+   "hip_rotation_range_deg": 74.0,
+   "swing_hip_flexion_after_impact_deg": 0.0,
+   "follow_through_duration_frames": 1,
+   "impact_frame": 40,
+   "hip_shoulder_separation_deg": 16.9,
+   "swing_elbow_angle_at_impact": 80.0,
+   "support_elbow_angle_at_impact": 106.4,
+   "swing_shoulder_flexion_after_impact_deg": 71.7,
+   "plant_foot_to_ball_offset": 38.95
+  },
+  "arm_ext_right": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 65% < 기준 70%. 재촬영이 필요하다."
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 174.7,
+   "swing_knee_angle_at_impact": 167.9,
+   "trunk_forward_lean_deg_at_impact": 8.1,
+   "hip_rotation_range_deg": 67.8,
+   "swing_hip_flexion_after_impact_deg": 26.3,
+   "follow_through_duration_frames": 50,
+   "impact_frame": 24,
+   "hip_shoulder_separation_deg": 15.8,
+   "plant_foot_to_ball_offset": 37.33
+  },
+  "arm_apex_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 65% < 기준 70%. 재촬영이 필요하다."
+  }
+ },
+ "bh6Cvz2orzQ": {
+  "arm_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 26% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_left": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 26% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_right": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 6.8,
+   "swing_knee_angle_at_impact": 49.2,
+   "trunk_forward_lean_deg_at_impact": 5.5,
+   "hip_rotation_range_deg": 9.7,
+   "swing_hip_flexion_after_impact_deg": 6.3,
+   "follow_through_duration_frames": 2,
+   "impact_frame": 18,
+   "swing_elbow_angle_at_impact": 163.8,
+   "swing_shoulder_flexion_after_impact_deg": 79.2,
+   "plant_foot_to_ball_offset": 2.2
+  },
+  "leg_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 하반신 스윙 측 키포인트(3개 관절) 유효 프레임 비율 25% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_apex_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 26% < 기준 70%. 재촬영이 필요하다."
+  }
+ },
+ "cDRi9AzrapA": {
+  "arm_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 64% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_left": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 165.8,
+   "swing_knee_angle_at_impact": 164.7,
+   "trunk_forward_lean_deg_at_impact": -13.9,
+   "hip_rotation_range_deg": 13.0,
+   "swing_hip_flexion_after_impact_deg": 12.9,
+   "follow_through_duration_frames": 1,
+   "impact_frame": 25,
+   "hip_shoulder_separation_deg": 29.5,
+   "swing_elbow_angle_at_impact": 117.6,
+   "swing_shoulder_flexion_after_impact_deg": 17.6
+  },
+  "arm_ext_right": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 64% < 기준 70%. 재촬영이 필요하다."
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 170.4,
+   "swing_knee_angle_at_impact": 177.9,
+   "trunk_forward_lean_deg_at_impact": -6.2,
+   "hip_rotation_range_deg": 13.0,
+   "swing_hip_flexion_after_impact_deg": 0.0,
+   "follow_through_duration_frames": 1,
+   "impact_frame": 4,
+   "hip_shoulder_separation_deg": 20.6,
+   "swing_elbow_angle_at_impact": 75.3,
+   "support_elbow_angle_at_impact": 109.2,
+   "swing_shoulder_flexion_after_impact_deg": 19.1
+  },
+  "arm_apex_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 64% < 기준 70%. 재촬영이 필요하다."
+  }
+ },
+ "e8uB0GZsVOQ": {
+  "arm_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 2% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_left": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 5% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_right": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 2% < 기준 70%. 재촬영이 필요하다."
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 172.8,
+   "swing_knee_angle_at_impact": 173.4,
+   "trunk_forward_lean_deg_at_impact": -79.9,
+   "hip_rotation_range_deg": 20.1,
+   "swing_hip_flexion_after_impact_deg": 110.1,
+   "follow_through_duration_frames": 1,
+   "impact_frame": 106,
+   "hip_shoulder_separation_deg": 14.7
+  },
+  "arm_apex_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 2% < 기준 70%. 재촬영이 필요하다."
+  }
+ },
+ "g_wHimPF9o8": {
+  "arm_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 49% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_left": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 49% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_right": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 155.1,
+   "swing_knee_angle_at_impact": 163.8,
+   "trunk_forward_lean_deg_at_impact": 1.1,
+   "hip_rotation_range_deg": 26.9,
+   "swing_hip_flexion_after_impact_deg": 10.0,
+   "follow_through_duration_frames": 1,
+   "impact_frame": 80,
+   "hip_shoulder_separation_deg": 15.9,
+   "swing_elbow_angle_at_impact": 57.2,
+   "support_elbow_angle_at_impact": 127.4,
+   "swing_shoulder_flexion_after_impact_deg": 83.4
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 140.9,
+   "swing_knee_angle_at_impact": 159.1,
+   "trunk_forward_lean_deg_at_impact": 21.6,
+   "hip_rotation_range_deg": 35.1,
+   "swing_hip_flexion_after_impact_deg": 7.5,
+   "follow_through_duration_frames": 8,
+   "impact_frame": 102,
+   "hip_shoulder_separation_deg": 15.9,
+   "swing_elbow_angle_at_impact": 133.5,
+   "swing_shoulder_flexion_after_impact_deg": 51.9
+  },
+  "arm_apex_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 49% < 기준 70%. 재촬영이 필요하다."
+  }
+ },
+ "gg5xRWjw3f8": {
+  "arm_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 151.1,
+   "swing_knee_angle_at_impact": 162.9,
+   "trunk_forward_lean_deg_at_impact": 11.8,
+   "hip_rotation_range_deg": 42.1,
+   "swing_hip_flexion_after_impact_deg": 13.3,
+   "follow_through_duration_frames": 13,
+   "impact_frame": 96,
+   "hip_shoulder_separation_deg": 19.8,
+   "swing_elbow_angle_at_impact": 83.4,
+   "support_elbow_angle_at_impact": 60.8,
+   "swing_shoulder_flexion_after_impact_deg": 36.9
+  },
+  "arm_ext_left": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 151.1,
+   "swing_knee_angle_at_impact": 162.9,
+   "trunk_forward_lean_deg_at_impact": 11.8,
+   "hip_rotation_range_deg": 42.1,
+   "swing_hip_flexion_after_impact_deg": 13.3,
+   "follow_through_duration_frames": 13,
+   "impact_frame": 96,
+   "hip_shoulder_separation_deg": 19.8,
+   "swing_elbow_angle_at_impact": 83.4,
+   "support_elbow_angle_at_impact": 60.8,
+   "swing_shoulder_flexion_after_impact_deg": 36.9
+  },
+  "arm_ext_right": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 163.8,
+   "swing_knee_angle_at_impact": 159.2,
+   "trunk_forward_lean_deg_at_impact": 14.8,
+   "hip_rotation_range_deg": 80.8,
+   "swing_hip_flexion_after_impact_deg": 6.1,
+   "follow_through_duration_frames": 2,
+   "impact_frame": 107,
+   "hip_shoulder_separation_deg": 19.8,
+   "swing_elbow_angle_at_impact": 102.8,
+   "swing_shoulder_flexion_after_impact_deg": 56.7
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 158.3,
+   "swing_knee_angle_at_impact": 126.2,
+   "trunk_forward_lean_deg_at_impact": 9.8,
+   "hip_rotation_range_deg": 39.1,
+   "swing_hip_flexion_after_impact_deg": 22.6,
+   "follow_through_duration_frames": 2,
+   "impact_frame": 92,
+   "hip_shoulder_separation_deg": 14.7,
+   "swing_elbow_angle_at_impact": 169.4,
+   "support_elbow_angle_at_impact": 91.8,
+   "swing_shoulder_flexion_after_impact_deg": 18.9
+  },
+  "arm_apex_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 163.8,
+   "swing_knee_angle_at_impact": 164.4,
+   "trunk_forward_lean_deg_at_impact": 2.3,
+   "hip_rotation_range_deg": 29.8,
+   "swing_hip_flexion_after_impact_deg": 10.9,
+   "follow_through_duration_frames": 5,
+   "impact_frame": 62,
+   "hip_shoulder_separation_deg": 6.0,
+   "swing_elbow_angle_at_impact": 89.1,
+   "support_elbow_angle_at_impact": 106.8,
+   "swing_shoulder_flexion_after_impact_deg": 0.0
+  }
+ },
+ "goeDWOVL95g": {
+  "arm_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 177.3,
+   "swing_knee_angle_at_impact": 178.5,
+   "trunk_forward_lean_deg_at_impact": 14.2,
+   "swing_hip_flexion_after_impact_deg": 22.8,
+   "follow_through_duration_frames": 1,
+   "impact_frame": 54,
+   "hip_shoulder_separation_deg": 38.4,
+   "swing_elbow_angle_at_impact": 160.1,
+   "swing_shoulder_flexion_after_impact_deg": 7.0,
+   "plant_foot_to_ball_offset": 7.2
+  },
+  "arm_ext_left": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 168.4,
+   "swing_knee_angle_at_impact": 165.1,
+   "trunk_forward_lean_deg_at_impact": -7.7,
+   "swing_hip_flexion_after_impact_deg": 9.0,
+   "follow_through_duration_frames": 11,
+   "impact_frame": 42,
+   "hip_shoulder_separation_deg": 38.4,
+   "swing_elbow_angle_at_impact": 173.4,
+   "swing_shoulder_flexion_after_impact_deg": 1.9,
+   "plant_foot_to_ball_offset": 7.26
+  },
+  "arm_ext_right": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 177.3,
+   "swing_knee_angle_at_impact": 178.5,
+   "trunk_forward_lean_deg_at_impact": 14.2,
+   "swing_hip_flexion_after_impact_deg": 22.8,
+   "follow_through_duration_frames": 1,
+   "impact_frame": 54,
+   "hip_shoulder_separation_deg": 38.4,
+   "swing_elbow_angle_at_impact": 160.1,
+   "swing_shoulder_flexion_after_impact_deg": 7.0,
+   "plant_foot_to_ball_offset": 7.2
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 154.7,
+   "swing_knee_angle_at_impact": 165.1,
+   "trunk_forward_lean_deg_at_impact": -14.7,
+   "swing_hip_flexion_after_impact_deg": 22.8,
+   "follow_through_duration_frames": 18,
+   "impact_frame": 35,
+   "hip_shoulder_separation_deg": 7.3,
+   "plant_foot_to_ball_offset": 11.03
+  },
+  "arm_apex_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 167.2,
+   "swing_knee_angle_at_impact": 177.4,
+   "trunk_forward_lean_deg_at_impact": -2.4,
+   "hip_rotation_range_deg": 3.5,
+   "swing_hip_flexion_after_impact_deg": 0.0,
+   "follow_through_duration_frames": 65,
+   "impact_frame": 7,
+   "hip_shoulder_separation_deg": 4.8,
+   "swing_elbow_angle_at_impact": 100.6,
+   "support_elbow_angle_at_impact": 117.7,
+   "swing_shoulder_flexion_after_impact_deg": 24.9,
+   "plant_foot_to_ball_offset": 6.72
+  }
+ },
+ "h_3LqD2Pl-E": {
+  "arm_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 55% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_left": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 63% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_right": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 55% < 기준 70%. 재촬영이 필요하다."
+  },
+  "leg_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 하반신 스윙 측 키포인트(3개 관절) 유효 프레임 비율 69% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_apex_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 55% < 기준 70%. 재촬영이 필요하다."
+  }
+ },
+ "hz-SpF35_BE": {
+  "arm_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 153.1,
+   "swing_knee_angle_at_impact": 176.1,
+   "trunk_forward_lean_deg_at_impact": -16.4,
+   "hip_rotation_range_deg": 139.2,
+   "swing_hip_flexion_after_impact_deg": 3.0,
+   "follow_through_duration_frames": 3,
+   "impact_frame": 111,
+   "hip_shoulder_separation_deg": 35.0,
+   "swing_elbow_angle_at_impact": 163.1,
+   "swing_shoulder_flexion_after_impact_deg": 65.2
+  },
+  "arm_ext_left": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 39% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_right": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 153.1,
+   "swing_knee_angle_at_impact": 176.1,
+   "trunk_forward_lean_deg_at_impact": -16.4,
+   "hip_rotation_range_deg": 139.2,
+   "swing_hip_flexion_after_impact_deg": 3.0,
+   "follow_through_duration_frames": 3,
+   "impact_frame": 111,
+   "hip_shoulder_separation_deg": 35.0,
+   "swing_elbow_angle_at_impact": 163.1,
+   "swing_shoulder_flexion_after_impact_deg": 65.2
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 171.7,
+   "swing_knee_angle_at_impact": 169.9,
+   "trunk_forward_lean_deg_at_impact": 5.2,
+   "swing_hip_flexion_after_impact_deg": 10.7,
+   "follow_through_duration_frames": 3,
+   "impact_frame": 140,
+   "hip_shoulder_separation_deg": 35.0,
+   "swing_elbow_angle_at_impact": 111.3,
+   "support_elbow_angle_at_impact": 124.7,
+   "swing_shoulder_flexion_after_impact_deg": 2.0
+  },
+  "arm_apex_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 141.2,
+   "swing_knee_angle_at_impact": 147.6,
+   "trunk_forward_lean_deg_at_impact": -16.3,
+   "hip_rotation_range_deg": 139.2,
+   "swing_hip_flexion_after_impact_deg": 30.7,
+   "follow_through_duration_frames": 12,
+   "impact_frame": 38,
+   "hip_shoulder_separation_deg": 18.7,
+   "swing_elbow_angle_at_impact": 53.5,
+   "swing_shoulder_flexion_after_impact_deg": 0.0
+  }
+ },
+ "idueIYDAbZc": {
+  "arm_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 67% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_left": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 67% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_right": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 37.7,
+   "swing_knee_angle_at_impact": 50.0,
+   "trunk_forward_lean_deg_at_impact": 26.8,
+   "hip_rotation_range_deg": 31.8,
+   "swing_hip_flexion_after_impact_deg": 117.1,
+   "follow_through_duration_frames": 2,
+   "impact_frame": 6,
+   "hip_shoulder_separation_deg": 18.2,
+   "swing_elbow_angle_at_impact": 96.6,
+   "support_elbow_angle_at_impact": 170.3,
+   "swing_shoulder_flexion_after_impact_deg": 62.9
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 174.2,
+   "swing_knee_angle_at_impact": 173.1,
+   "trunk_forward_lean_deg_at_impact": 9.1,
+   "hip_rotation_range_deg": 32.6,
+   "swing_hip_flexion_after_impact_deg": 23.5,
+   "follow_through_duration_frames": 16,
+   "impact_frame": 8,
+   "hip_shoulder_separation_deg": 18.2,
+   "swing_elbow_angle_at_impact": 85.5,
+   "support_elbow_angle_at_impact": 33.1,
+   "swing_shoulder_flexion_after_impact_deg": 123.5
+  },
+  "arm_apex_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 67% < 기준 70%. 재촬영이 필요하다."
+  }
+ },
+ "ihWykL5mYRI": {
+  "arm_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 127.2,
+   "swing_knee_angle_at_impact": 179.4,
+   "trunk_forward_lean_deg_at_impact": -14.5,
+   "swing_hip_flexion_after_impact_deg": 6.9,
+   "follow_through_duration_frames": 10,
+   "impact_frame": 139,
+   "hip_shoulder_separation_deg": 30.9,
+   "swing_elbow_angle_at_impact": 169.9,
+   "support_elbow_angle_at_impact": 101.0,
+   "swing_shoulder_flexion_after_impact_deg": 42.5
+  },
+  "arm_ext_left": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 127.2,
+   "swing_knee_angle_at_impact": 179.4,
+   "trunk_forward_lean_deg_at_impact": -14.5,
+   "swing_hip_flexion_after_impact_deg": 6.9,
+   "follow_through_duration_frames": 10,
+   "impact_frame": 139,
+   "hip_shoulder_separation_deg": 30.9,
+   "swing_elbow_angle_at_impact": 169.9,
+   "support_elbow_angle_at_impact": 101.0,
+   "swing_shoulder_flexion_after_impact_deg": 42.5
+  },
+  "arm_ext_right": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 126.0,
+   "swing_knee_angle_at_impact": 175.1,
+   "trunk_forward_lean_deg_at_impact": -13.2,
+   "hip_rotation_range_deg": 14.4,
+   "swing_hip_flexion_after_impact_deg": 14.4,
+   "follow_through_duration_frames": 14,
+   "impact_frame": 45,
+   "hip_shoulder_separation_deg": 21.7,
+   "swing_elbow_angle_at_impact": 116.2,
+   "support_elbow_angle_at_impact": 139.0,
+   "swing_shoulder_flexion_after_impact_deg": 171.9
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 175.3,
+   "swing_knee_angle_at_impact": 153.9,
+   "trunk_forward_lean_deg_at_impact": -11.3,
+   "swing_hip_flexion_after_impact_deg": 1.9,
+   "follow_through_duration_frames": 1,
+   "impact_frame": 136,
+   "hip_shoulder_separation_deg": 30.9,
+   "swing_elbow_angle_at_impact": 119.1,
+   "support_elbow_angle_at_impact": 143.0,
+   "swing_shoulder_flexion_after_impact_deg": 38.2
+  },
+  "arm_apex_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 147.5,
+   "swing_knee_angle_at_impact": 177.2,
+   "trunk_forward_lean_deg_at_impact": -2.4,
+   "swing_hip_flexion_after_impact_deg": 14.9,
+   "follow_through_duration_frames": 90,
+   "impact_frame": 59,
+   "hip_shoulder_separation_deg": 21.7,
+   "swing_elbow_angle_at_impact": 153.0,
+   "support_elbow_angle_at_impact": 135.0,
+   "swing_shoulder_flexion_after_impact_deg": 0.0
+  }
+ },
+ "mTP2kap9cIw": {
+  "arm_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 10% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_left": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 10% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_right": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 67% < 기준 70%. 재촬영이 필요하다."
+  },
+  "leg_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 하반신 스윙 측 키포인트(3개 관절) 유효 프레임 비율 3% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_apex_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 10% < 기준 70%. 재촬영이 필요하다."
+  }
+ },
+ "sGKeqfxwq5E": {
+  "arm_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 67% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_left": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 67% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_right": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 153.9,
+   "swing_knee_angle_at_impact": 117.4,
+   "trunk_forward_lean_deg_at_impact": 62.5,
+   "hip_rotation_range_deg": 45.4,
+   "swing_hip_flexion_after_impact_deg": 118.9,
+   "follow_through_duration_frames": 62,
+   "impact_frame": 87,
+   "hip_shoulder_separation_deg": 15.8,
+   "swing_elbow_angle_at_impact": 131.0,
+   "swing_shoulder_flexion_after_impact_deg": 54.6
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 24.5,
+   "swing_knee_angle_at_impact": 35.5,
+   "trunk_forward_lean_deg_at_impact": 26.2,
+   "hip_rotation_range_deg": 19.8,
+   "swing_hip_flexion_after_impact_deg": 129.3,
+   "follow_through_duration_frames": 1,
+   "impact_frame": 70,
+   "hip_shoulder_separation_deg": 15.8
+  },
+  "arm_apex_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 67% < 기준 70%. 재촬영이 필요하다."
+  }
+ },
+ "sYl2jCqsSKo": {
+  "arm_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 62% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_left": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 58% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_right": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 62% < 기준 70%. 재촬영이 필요하다."
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 153.0,
+   "swing_knee_angle_at_impact": 166.6,
+   "hip_rotation_range_deg": 61.5,
+   "swing_hip_flexion_after_impact_deg": 125.6,
+   "follow_through_duration_frames": 10,
+   "impact_frame": 24,
+   "hip_shoulder_separation_deg": 3.0
+  },
+  "arm_apex_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 62% < 기준 70%. 재촬영이 필요하다."
+  }
+ },
+ "w-AQcjcoDyA": {
+  "arm_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 69% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_left": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 174.7,
+   "swing_knee_angle_at_impact": 161.2,
+   "trunk_forward_lean_deg_at_impact": 5.5,
+   "hip_rotation_range_deg": 34.2,
+   "swing_hip_flexion_after_impact_deg": 18.1,
+   "follow_through_duration_frames": 32,
+   "impact_frame": 114,
+   "hip_shoulder_separation_deg": 30.6,
+   "swing_elbow_angle_at_impact": 114.8,
+   "swing_shoulder_flexion_after_impact_deg": 26.3
+  },
+  "arm_ext_right": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 69% < 기준 70%. 재촬영이 필요하다."
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 159.9,
+   "swing_knee_angle_at_impact": 137.2,
+   "trunk_forward_lean_deg_at_impact": -6.3,
+   "hip_rotation_range_deg": 21.1,
+   "swing_hip_flexion_after_impact_deg": 13.8,
+   "follow_through_duration_frames": 1,
+   "impact_frame": 25,
+   "hip_shoulder_separation_deg": 30.6,
+   "swing_elbow_angle_at_impact": 154.5,
+   "support_elbow_angle_at_impact": 178.1,
+   "swing_shoulder_flexion_after_impact_deg": 28.9
+  },
+  "arm_apex_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 69% < 기준 70%. 재촬영이 필요하다."
+  }
+ },
+ "wjJDs0qmwqE": {
+  "arm_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 177.8,
+   "swing_knee_angle_at_impact": 156.5,
+   "trunk_forward_lean_deg_at_impact": -18.4,
+   "hip_rotation_range_deg": 26.8,
+   "swing_hip_flexion_after_impact_deg": 28.2,
+   "follow_through_duration_frames": 3,
+   "impact_frame": 132,
+   "hip_shoulder_separation_deg": 36.5,
+   "swing_elbow_angle_at_impact": 133.9,
+   "support_elbow_angle_at_impact": 133.4,
+   "swing_shoulder_flexion_after_impact_deg": 88.5,
+   "plant_foot_to_ball_offset": 0.77
+  },
+  "arm_ext_left": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 173.5,
+   "swing_knee_angle_at_impact": 158.4,
+   "trunk_forward_lean_deg_at_impact": -19.7,
+   "hip_rotation_range_deg": 23.2,
+   "swing_hip_flexion_after_impact_deg": 31.5,
+   "follow_through_duration_frames": 1,
+   "impact_frame": 61,
+   "hip_shoulder_separation_deg": 36.5,
+   "swing_elbow_angle_at_impact": 87.1,
+   "support_elbow_angle_at_impact": 149.6,
+   "swing_shoulder_flexion_after_impact_deg": 47.3,
+   "plant_foot_to_ball_offset": 6.07
+  },
+  "arm_ext_right": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 177.8,
+   "swing_knee_angle_at_impact": 156.5,
+   "trunk_forward_lean_deg_at_impact": -18.4,
+   "hip_rotation_range_deg": 26.8,
+   "swing_hip_flexion_after_impact_deg": 28.2,
+   "follow_through_duration_frames": 3,
+   "impact_frame": 132,
+   "hip_shoulder_separation_deg": 36.5,
+   "swing_elbow_angle_at_impact": 133.9,
+   "support_elbow_angle_at_impact": 133.4,
+   "swing_shoulder_flexion_after_impact_deg": 88.5,
+   "plant_foot_to_ball_offset": 0.77
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 175.4,
+   "swing_knee_angle_at_impact": 147.6,
+   "trunk_forward_lean_deg_at_impact": -11.9,
+   "hip_rotation_range_deg": 26.8,
+   "swing_hip_flexion_after_impact_deg": 36.4,
+   "follow_through_duration_frames": 1,
+   "impact_frame": 130,
+   "hip_shoulder_separation_deg": 36.5,
+   "plant_foot_to_ball_offset": 0.8
+  },
+  "arm_apex_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 141.1,
+   "swing_knee_angle_at_impact": 170.5,
+   "trunk_forward_lean_deg_at_impact": -4.6,
+   "hip_rotation_range_deg": 24.2,
+   "swing_hip_flexion_after_impact_deg": 16.7,
+   "follow_through_duration_frames": 3,
+   "impact_frame": 66,
+   "hip_shoulder_separation_deg": 36.5,
+   "swing_elbow_angle_at_impact": 94.7,
+   "swing_shoulder_flexion_after_impact_deg": 6.3,
+   "plant_foot_to_ball_offset": 3.41
+  }
+ },
+ "xMIUw5mi3Eo": {
+  "arm_ext_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 45% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_left": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 45% < 기준 70%. 재촬영이 필요하다."
+  },
+  "arm_ext_right": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 70% < 기준 70%. 재촬영이 필요하다."
+  },
+  "leg_ext_auto": {
+   "ok": true,
+   "plant_knee_angle_at_impact": 127.7,
+   "swing_knee_angle_at_impact": 115.4,
+   "trunk_forward_lean_deg_at_impact": -14.3,
+   "hip_rotation_range_deg": 65.3,
+   "swing_hip_flexion_after_impact_deg": 12.3,
+   "follow_through_duration_frames": 1,
+   "impact_frame": 89,
+   "hip_shoulder_separation_deg": 23.8
+  },
+  "arm_apex_auto": {
+   "ok": false,
+   "err": "InsufficientQuality: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 45% < 기준 70%. 재촬영이 필요하다."
+  }
+ }
+}

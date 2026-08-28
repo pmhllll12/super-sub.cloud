@@ -83,6 +83,9 @@ has_children: true
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>등급 판정 코드 이관 — 루브릭 bands 도입, 경계값 오판 해소</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>선수 카드 칭호 체계 — 루브릭 titles</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>지원 범위 확정 — 축구·야구·농구 종목당 1동작(미결 3번 해소)</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>외부 포즈 데이터 검증 — 3,444클립, 신뢰도 임계값의 모델 종속성 확인</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>팔 품질 게이트에서 손목 제외 — 지표 산출률 21%→71%</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>분석 대상 selector 평가 — 격리 판독 60건, 이 데이터셋으로는 A/B 판별 불가 확인(미결 8번)</div>
   </div>
 </div>
 

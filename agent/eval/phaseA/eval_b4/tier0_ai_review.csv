@@ -1,0 +1,8 @@
+clip_ratio,a_pose_box,b_pose_box,old_gt,ai_box_index,ai_confidence,blind_status,outcome_old,outcome_ai
+3USSmzO001k@0.80,0,1,1,1,high,contaminated_prior_exposure,B,B
+5-jBTNp5IQA@0.50,1,0,0,0,medium,b3_blind,B,B
+IeDin6oB-IY@0.50,0,4,4,4,high,b3_blind,B,B
+N5zWQkoLM3M@0.50,2,1,2,2,medium,b3_blind,A,A
+N5zWQkoLM3M@0.80,2,1,2,2,medium,b3_blind,A,A
+X6dC9pu5H3k@0.80,4,0,0,uncertain,low,contaminated_prior_exposure,B,excluded
+sYl2jCqsSKo@0.80,1,0,,2,medium,b3_blind,excluded,neither
