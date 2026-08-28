@@ -28,7 +28,9 @@ class VideoOrm(Base):
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     # 업로더(부록 D.3). SEC-006 의 삭제 연쇄가 여기서 시작한다.
-    user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("user.id"), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("user.id", ondelete="CASCADE"), nullable=False
+    )
     sport_code: Mapped[str] = mapped_column(String(20), nullable=False)
 
     # 객체 저장소 키. 원본은 앱 서버를 지나지 않는다(PER-002).

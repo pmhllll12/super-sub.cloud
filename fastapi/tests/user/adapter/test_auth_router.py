@@ -120,6 +120,7 @@ class TestOpenApi:
             f"{V1}/auth/google",
             f"{V1}/auth/logout-all",
             f"{V1}/me",
+            f"{V1}/me/password",
             f"{V1}/me/card",
             V1 + "/cards/{public_slug}",
         }

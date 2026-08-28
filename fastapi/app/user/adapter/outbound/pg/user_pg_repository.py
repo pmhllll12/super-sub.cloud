@@ -197,6 +197,49 @@ class UserPgRepository(UserPort):
         row.nickname = str(nickname)
         self._session.commit()
 
+    def change_password(self, user_id: UUID, password: Password) -> None:
+        try:
+            password_hash = hash_password(password.value)
+        except PasswordTooLongError as exc:
+            # 72바이트를 넘으면 **자르지 않고 거부한다**(SEC-002). 가입과 같은 판단이다.
+            raise ApiError(422, "VALIDATION_ERROR", str(exc)) from exc
+
+        now = datetime.now(timezone.utc)
+        row = self._session.execute(
+            select(UserCredentialOrm).where(UserCredentialOrm.user_id == user_id)
+        ).scalar_one_or_none()
+
+        if row is None:
+            # 구글로만 가입한 계정에는 자격증명 행이 없다. 여기서 만들어 주면
+            # 그때부터 비밀번호 로그인도 된다.
+            self._session.add(
+                UserCredentialOrm(
+                    id=uuid4(),
+                    user_id=user_id,
+                    password_hash=password_hash,
+                    updated_at=now,
+                )
+            )
+        else:
+            row.password_hash = password_hash
+            row.updated_at = now
+        self._session.commit()
+
+    def has_password(self, user_id: UUID) -> bool:
+        stmt = select(UserCredentialOrm.id).where(
+            UserCredentialOrm.user_id == user_id
+        )
+        return self._session.execute(stmt).scalar_one_or_none() is not None
+
+    def delete(self, user_id: UUID) -> None:
+        # 자격증명·외부 신원·카드·호칭·소속·영상 체인은 **외래키 연쇄**가 함께 지운다
+        # (부록 D.6). 여기서 하나씩 지우면 테이블이 늘 때마다 빠뜨린다.
+        row = self._session.get(UserOrm, user_id)
+        if row is None:
+            return
+        self._session.delete(row)
+        self._session.commit()
+
     def bump_token_version(self, user_id: UUID) -> None:
         # 🔴 읽고 더해서 쓰지 않는다. `token_version + 1` 을 DB 가 계산해야 동시에
         #    두 번 불려도 한 번이 덮이지 않는다 — 폐기는 덜 되면 의미가 없다.

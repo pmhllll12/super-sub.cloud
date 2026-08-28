@@ -28,7 +28,7 @@ class AnalysisReportOrm(Base):
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     analysis_metric_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("analysis_metric.id"), nullable=False
+        Uuid, ForeignKey("analysis_metric.id", ondelete="CASCADE"), nullable=False
     )
     # 선수에게 보여줄 코멘트. 두 문장 이내, 총점·등급 숫자를 넣지 않는다(3장 4).
     summary: Mapped[str] = mapped_column(Text, nullable=False)

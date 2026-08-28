@@ -27,7 +27,7 @@ class AnalysisMetricValueOrm(Base):
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     analysis_metric_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("analysis_metric.id"), nullable=False
+        Uuid, ForeignKey("analysis_metric.id", ondelete="CASCADE"), nullable=False
     )
     # 정의에 없는 코드가 들어오면 여기서 막힌다 — 오타 하나가 조용히 새 지표가 되는
     # 것을 외래키로 방지한다.

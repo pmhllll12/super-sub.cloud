@@ -24,7 +24,7 @@ class AnalysisJobOrm(Base):
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     video_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("video.id"), nullable=False
+        Uuid, ForeignKey("video.id", ondelete="CASCADE"), nullable=False
     )
 
     # queued · running · succeeded · failed. 값 목록을 DB 제약으로 걸지 않는 이유는

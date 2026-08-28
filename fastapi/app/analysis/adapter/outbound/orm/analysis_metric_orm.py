@@ -26,7 +26,7 @@ class AnalysisMetricOrm(Base):
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     analysis_job_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("analysis_job.id"), nullable=False
+        Uuid, ForeignKey("analysis_job.id", ondelete="CASCADE"), nullable=False
     )
     pipeline_version: Mapped[str] = mapped_column(String(40), nullable=False)
     created_at: Mapped[datetime] = mapped_column(

@@ -82,6 +82,29 @@ class UserPort(ABC):
         """
 
     @abstractmethod
+    def change_password(self, user_id: UUID, password: Password) -> None:
+        """비밀번호를 바꾼다. **평문을 받는다** — 해싱은 저장소의 사정이다(`create` 와 같다).
+
+        비밀번호가 없던 계정(구글로만 가입)에 부르면 자격증명을 새로 만든다.
+        """
+
+    @abstractmethod
+    def has_password(self, user_id: UUID) -> bool:
+        """비밀번호 자격증명이 있는 계정인지.
+
+        구글로만 가입한 계정에는 없다. 탈퇴할 때 **비밀번호를 요구할지 가르는 기준**이라
+        "자격증명 조회 실패"와 구분해야 한다 — 둘을 합치면 소셜 계정이 탈퇴할 수 없다.
+        """
+
+    @abstractmethod
+    def delete(self, user_id: UUID) -> None:
+        """계정을 지운다. **파생 데이터는 외래키 연쇄가 함께 지운다**(부록 D.6).
+
+        연쇄를 코드로 짜지 않는 이유는 삭제 경로가 늘 때마다 빠뜨리기 때문이다.
+        어떤 테이블이 따라 지워지는지는 스키마가 정본이다.
+        """
+
+    @abstractmethod
     def bump_token_version(self, user_id: UUID) -> None:
         """그 사용자의 토큰 버전을 1 올린다 — **기존 토큰이 전부 무효가 된다**(SEC-004).
 
