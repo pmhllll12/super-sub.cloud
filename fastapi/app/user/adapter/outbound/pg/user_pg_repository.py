@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -195,6 +195,16 @@ class UserPgRepository(UserPort):
             # 여기서 던지면 같은 판단이 두 곳에 생긴다.
             return
         row.nickname = str(nickname)
+        self._session.commit()
+
+    def bump_token_version(self, user_id: UUID) -> None:
+        # 🔴 읽고 더해서 쓰지 않는다. `token_version + 1` 을 DB 가 계산해야 동시에
+        #    두 번 불려도 한 번이 덮이지 않는다 — 폐기는 덜 되면 의미가 없다.
+        self._session.execute(
+            update(UserOrm)
+            .where(UserOrm.id == user_id)
+            .values(token_version=UserOrm.token_version + 1)
+        )
         self._session.commit()
 
     def list_memberships(self, user_id: UUID) -> list[MembershipEntity]:

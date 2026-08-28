@@ -82,5 +82,13 @@ class UserPort(ABC):
         """
 
     @abstractmethod
+    def bump_token_version(self, user_id: UUID) -> None:
+        """그 사용자의 토큰 버전을 1 올린다 — **기존 토큰이 전부 무효가 된다**(SEC-004).
+
+        읽고 더해서 쓰지 않고 **DB 안에서 증가시킨다.** 동시에 두 번 불려도 값이
+        덮이지 않아야 하고, 폐기는 한 번이라도 덜 되면 의미가 없다.
+        """
+
+    @abstractmethod
     def list_memberships(self, user_id: UUID) -> list[MembershipEntity]:
         """탈퇴 이력을 포함한 전체 소속. 거르는 것은 도메인 규칙의 몫이다."""

@@ -107,5 +107,13 @@ class StubUserRepository(UserPort):
         응답 형태 확인에는 충분하다 — 실제로 반영되는지는 DB 테스트가 본다.
         """
 
+    def bump_token_version(self, user_id: UUID) -> None:
+        """스텁은 고정 데이터라 올리지 않는다.
+
+        폐기가 **실제로 토큰을 끊는지**는 DB 테스트가 본다
+        (`tests/user/adapter/test_token_revocation_db.py`). 여기서 흉내 내면
+        "스텁에서만 되는 폐기"가 되어 오히려 헷갈린다.
+        """
+
     def list_memberships(self, user_id: UUID) -> list[MembershipEntity]:
         return list(_MEMBERSHIPS)

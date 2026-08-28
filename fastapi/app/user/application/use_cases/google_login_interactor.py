@@ -46,7 +46,7 @@ class GoogleLoginInteractor(GoogleLoginUseCase):
 
         log_auth_event("login_success", provider=identity.provider, user_id=user.id)
         return LoginResult(
-            access_token=issue_access_token(user.id),
+            access_token=issue_access_token(user.id, user.token_version),
             expires_in=TOKEN_EXPIRES_IN,
         )
 

@@ -22,3 +22,5 @@ class UserEntity:
     email: Email
     nickname: Nickname
     created_at: datetime
+    # 발급한 토큰을 무효로 만들 때 올리는 값(SEC-004). 새 계정은 0 에서 시작한다.
+    token_version: int = 0

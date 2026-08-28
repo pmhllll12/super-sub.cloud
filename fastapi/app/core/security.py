@@ -15,6 +15,7 @@ HS256(대칭키)을 쓴다. 발급과 검증을 같은 프로세스가 하므로
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from uuid import UUID
 
 import jwt
@@ -38,18 +39,32 @@ def _secret() -> str:
     return settings.jwt_secret
 
 
-def issue_access_token(user_id: UUID) -> str:
+@dataclass(frozen=True)
+class AccessToken:
+    """검증을 통과한 토큰이 들고 있던 것.
+
+    `version` 은 **여기서 판정하지 않는다.** 지금 유효한 버전인지는 DB 를 봐야 알 수
+    있고, 이 모듈은 DB 를 모른다 — 대조는 `app/core/deps.py` 가 한다.
+    """
+
+    user_id: UUID
+    version: int
+
+
+def issue_access_token(user_id: UUID, token_version: int = 0) -> str:
     now = int(time.time())
     payload = {
         "sub": str(user_id),
+        # 토큰 폐기용(SEC-004). 발급 시점의 사용자 버전을 박아 둔다.
+        "ver": token_version,
         "iat": now,
         "exp": now + TOKEN_EXPIRES_IN,
     }
     return jwt.encode(payload, _secret(), algorithm=_ALGORITHM)
 
 
-def verify_access_token(authorization: str | None) -> UUID:
-    """`Authorization: Bearer <token>` 을 검사하고 사용자 id 를 돌려준다.
+def verify_access_token(authorization: str | None) -> AccessToken:
+    """`Authorization: Bearer <token>` 을 검사하고 담긴 값을 돌려준다.
 
     401 을 두 가지로 나눈다. **클라이언트 동작이 다르기 때문이다** — 헤더가 없으면
     로그인 화면으로, 토큰이 무효하면 토큰을 버리고 재로그인으로 보낸다.
@@ -60,7 +75,9 @@ def verify_access_token(authorization: str | None) -> UUID:
     token = authorization.removeprefix("Bearer ").strip()
     try:
         payload = jwt.decode(token, _secret(), algorithms=[_ALGORITHM])
-        return UUID(payload["sub"])
+        # `ver` 이 없으면 0 으로 본다. SEC-004 를 넣기 전에 발급된 토큰이 클라이언트에
+        # 남아 있을 수 있어서다 — 그것들까지 한꺼번에 끊을 이유는 없다.
+        return AccessToken(user_id=UUID(payload["sub"]), version=payload.get("ver", 0))
     except ApiError:
         raise
     except (jwt.InvalidTokenError, KeyError, ValueError) as exc:
