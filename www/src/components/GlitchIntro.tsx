@@ -382,10 +382,18 @@ function GlitchText({
   amplitude: number
   seed: number
 }) {
+  // 깨진 뒤(RubikGlitch)의 스타일은 `BrandMark` 와 **한 글자도 달라선 안 된다**
+  // — 인트로가 끝나면 이 글자가 그대로 그 자리로 날아가 앉기 때문이다.
+  //
+  // 굵기가 그 함정이었다. RubikGlitch 는 굵기가 하나뿐인 장식 글꼴이라
+  // `font-weight: 900` 을 주면 브라우저가 **가짜 굵게(synthetic bold)** 를
+  // 입힌다 — 자간·폭은 그대로라 측정으로는 안 잡히고 **획 두께만** 굵어져서,
+  // 날아가 앉은 글자가 원래 워드마크보다 두껍게 보였다. 900 은 가변 글꼴인
+  // Rubik(깨지기 전)에만 뜻이 있다.
   const style: CSSProperties = {
     fontFamily: glitched ? 'var(--font-rubik-glitch)' : 'var(--font-rubik)',
-    fontWeight: 900,
-    fontVariationSettings: "'wght' 900",
+    fontWeight: glitched ? undefined : 900,
+    fontVariationSettings: glitched ? undefined : "'wght' 900",
     fontSize: BRAND_SIZE,
     letterSpacing: glitched ? BRAND_TRACKING : `calc(${BRAND_TRACKING} + 0.9px)`,
     color: 'var(--ss-accent)',
@@ -407,7 +415,7 @@ function GlitchText({
   }
 
   return (
-    <span style={{ position: 'relative', display: 'inline-block' }}>
+    <span style={{ position: 'relative', display: 'inline-block', lineHeight: 1 }}>
       {/* 크기만 잡는 숨은 사본 — 아래 절대배치 띠들의 기준 상자가 된다. */}
       <span style={{ ...style, visibility: 'hidden' }}>{BRAND_TEXT}</span>
       {shifts.map((shift, i) => (
@@ -860,8 +868,11 @@ export default function GlitchIntro({ onDone }: { onDone: () => void }) {
           걷어내고 글자는 남겨 제자리로 날려보내야 하기 때문이다. */}
       <div ref={inkRef} className="absolute inset-0" style={{ background: 'var(--ss-accent)' }} />
       <div className="absolute inset-0 flex items-center justify-center">
-        {/* 비행하는 주체 — 이 래퍼의 상자가 곧 글자의 상자다(FLIP 기준). */}
-        <span ref={markRef} className="inline-block">
+        {/* 비행하는 주체 — 이 래퍼의 상자가 곧 글자의 상자다(FLIP 기준).
+            `lineHeight: 1` 이 필요하다. 없으면 이 inline-block 의 상자가
+            글꼴 기본 줄높이(1.18배)로 커져서, 목적지 `BrandMark`(줄높이 1)와
+            **상자 중심은 맞아도 글자 중심이 어긋난다.** */}
+        <span ref={markRef} className="inline-block" style={{ lineHeight: 1 }}>
           <GlitchText glitched={glitched} amplitude={amplitude} seed={seedStep} />
         </span>
       </div>
