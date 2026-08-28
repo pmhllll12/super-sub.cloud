@@ -72,3 +72,4 @@ exclude:
   - flutter/
   - supersub-preview.service
   - fastapi/
+  - www/
