@@ -1,5 +1,6 @@
 import BrandMark from '@/components/ui/BrandMark'
 import DestinationCard from '@/components/DestinationCard'
+import FigureBackground from '@/components/FigureBackground'
 import { requireUser } from '@/server/currentUser'
 
 // flutter/lib/features/home/presentation/screens/home_screen.dart 의 _kDestinations 와 같은 순서 · 같은 뜻.
@@ -45,6 +46,7 @@ export default async function HomePage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center gap-10 px-6 py-16">
+      <FigureBackground />
       <BrandMark />
       <p className="text-lg font-medium" style={{ color: 'var(--ss-fg)' }}>
         {user.nickname}

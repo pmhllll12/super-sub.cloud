@@ -1,5 +1,6 @@
 import { requireUser } from '@/server/currentUser'
 import GlassPanel from '@/components/ui/GlassPanel'
+import FigureBackground from '@/components/FigureBackground'
 
 const MUTED = 'color-mix(in srgb, var(--ss-fg) 60%, transparent)'
 
@@ -10,6 +11,7 @@ export default async function AnalysisPage() {
 
   return (
     <main className="mx-auto flex min-h-[70vh] max-w-2xl flex-col items-center justify-center px-6 py-16">
+      <FigureBackground />
       <GlassPanel className="flex w-full flex-col items-center gap-3 px-8 py-16 text-center">
         <span className="material-symbols-outlined text-4xl" aria-hidden="true" style={{ color: 'var(--ss-accent)' }}>
           videocam
