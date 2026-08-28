@@ -7,6 +7,12 @@ const DEMO_PASSWORD = 'supersub2026'
 const DEMO_TOKEN = 'mock-access-token-demo'
 const EXPIRES_IN = 604800
 
+/**
+ * 이메일 -> 비밀번호. User/SignupResult 는 계약 응답 형태라 비밀번호를 넣지 않는다 —
+ * 그래서 별도로 둔다. 프로세스가 살아 있는 동안만 유지된다.
+ */
+const passwords = new Map<string, string>([[DEMO_EMAIL, DEMO_PASSWORD]])
+
 /** 프로세스가 살아 있는 동안만 유지된다. mock 이므로 이걸로 충분하다. */
 const users = new Map<string, User>([
   [
@@ -73,13 +79,14 @@ export const mockBackend: Backend = {
     }
     // 가입한 계정은 빈 상태로 온다 — 계약서가 강조하는 지점이다.
     users.set(`mock-access-token-${result.id}`, { ...result, teams: [] })
+    passwords.set(email, password) // 로그인 때 비교할 수 있도록 기억해 둔다
     return result
   },
 
   async login({ email, password }) {
     // 이메일이 없는 경우와 비밀번호가 틀린 경우를 구분하지 않는다.
     const entry = [...users.entries()].find(([, u]) => u.email === email)
-    const ok = entry && (email !== DEMO_EMAIL || password === DEMO_PASSWORD)
+    const ok = entry && password === passwords.get(email)
     if (!entry || !ok || password.length < 8) {
       throw new BackendError(401, 'INVALID_CREDENTIALS', '이메일 또는 비밀번호가 올바르지 않습니다.')
     }

@@ -43,6 +43,24 @@ describe('mockBackend', () => {
     ).rejects.toMatchObject({ status: 409, code: 'EMAIL_ALREADY_EXISTS' })
   })
 
+  it('가입한 계정은 맞는 비밀번호로만 로그인된다 — 8자 이상이어도 틀리면 거부한다', async () => {
+    await mockBackend.signup({
+      email: '비번확인@example.com',
+      password: 'correct-password',
+      nickname: '비번확인',
+    })
+
+    await expect(
+      mockBackend.login({ email: '비번확인@example.com', password: 'wrong-password' }),
+    ).rejects.toMatchObject({ status: 401, code: 'INVALID_CREDENTIALS' })
+
+    const t = await mockBackend.login({
+      email: '비번확인@example.com',
+      password: 'correct-password',
+    })
+    expect(t.access_token).toBeTruthy()
+  })
+
   it('토큰이 유효하지 않으면 getMe 가 INVALID_TOKEN 을 던진다', async () => {
     await expect(mockBackend.getMe('가짜토큰')).rejects.toMatchObject({
       status: 401,
