@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { letterSpacingFor } from './ui/BrandMark'
 import {
   BANDS,
   HOLD_MS,
@@ -14,8 +13,21 @@ import {
 /** 앱 이름. `flutter/lib/features/intro/presentation/brand_mark.dart`의 `kBrandText`. */
 const BRAND_TEXT = 'SUPERSUB'
 
-/** 인트로 글자 크기. */
-const BRAND_SIZE = 52
+/**
+ * 인트로 글자 크기. 화면 폭을 따라간다 — 앱은 한 손 크기라 52px 고정이면
+ * 됐지만, 웹은 같은 값이 넓은 화면에서 우표만 하게 보인다.
+ *
+ * `clamp(52px, 5vw, 72px)` — 좁은 화면(375px)에서는 지금까지와 같은 52px
+ * 이고(그때 글자가 이미 화면 폭의 85% 다 — 더 키우면 `SUPERSUB` 여덟 글자가
+ * 화면 밖으로 나간다), 넓은 화면에서 **1.4배**까지 커진다. 상한을 한 번
+ * 168px(세 배)까지 올려 봤다가 되돌린 값이다 — 화면을 꽉 채워 부담스러웠다.
+ *
+ * 자간은 `BrandMark.letterSpacingFor`(size × 1.2 / 44)와 같은 공식을 CSS
+ * `calc()` 로 옮긴 것이다 — 크기가 반응형이라 자바스크립트 쪽에서 숫자로
+ * 계산할 수가 없다. 가지런한 Rubik 쪽에만 0.9px 을 더하는 것도 그대로다.
+ */
+const BRAND_SIZE = 'clamp(52px, 5vw, 72px)'
+const BRAND_TRACKING = `calc(${BRAND_SIZE} * 1.2 / 44)`
 
 /**
  * 저해상도 캔버스의 긴 변 길이(px). **CPU 폴백 전용.** 전체 해상도로 CPU
@@ -121,6 +133,16 @@ function hash(x: number, y: number, seed: number): number {
   return frac((qx + qy) * qz)
 }
 
+/**
+ * 띠가 최대로 어긋나는 폭 — **글자 크기 기준(em)이다.**
+ *
+ * 앱은 글자가 52px 고정이라 14px 로 못박았는데, 웹은 글자가 화면 폭을
+ * 따라가므로(BRAND_SIZE) 같은 픽셀 값을 쓰면 큰 화면에서 흔들림만 상대적으로
+ * 작아져 밋밋해진다. 그래서 그 비율(14 / 52)을 그대로 em 으로 옮긴다 —
+ * 어느 크기에서도 앱과 같은 세기로 보인다.
+ */
+const MAX_SHIFT_EM = 14 / 52
+
 /** `seed`로 결정되는 [-1, 1) 사이 값 7개(띠 수만큼). 표준 mulberry32 PRNG. */
 function bandShifts(seed: number, amplitude: number): number[] {
   let a = seed >>> 0
@@ -130,7 +152,7 @@ function bandShifts(seed: number, amplitude: number): number[] {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
   }
-  return Array.from({ length: BANDS }, () => (next() * 2 - 1) * amplitude * 14)
+  return Array.from({ length: BANDS }, () => (next() * 2 - 1) * amplitude * MAX_SHIFT_EM)
 }
 
 /** 화면을 `cover`로 채우는 그리기 사각형(대상 캔버스 기준) — CPU 폴백용. */
@@ -363,10 +385,8 @@ function GlitchText({
     fontFamily: glitched ? 'var(--font-rubik-glitch)' : 'var(--font-rubik)',
     fontWeight: 900,
     fontVariationSettings: "'wght' 900",
-    fontSize: `${BRAND_SIZE}px`,
-    letterSpacing: glitched
-      ? `${letterSpacingFor(BRAND_SIZE)}px`
-      : `${letterSpacingFor(BRAND_SIZE) + 0.9}px`,
+    fontSize: BRAND_SIZE,
+    letterSpacing: glitched ? BRAND_TRACKING : `calc(${BRAND_TRACKING} + 0.9px)`,
     color: 'var(--ss-accent)',
     lineHeight: 1,
     whiteSpace: 'nowrap',
@@ -390,7 +410,7 @@ function GlitchText({
             position: 'absolute',
             inset: 0,
             clipPath: `inset(${(i / BANDS) * 100}% 0 ${100 - ((i + 1) / BANDS) * 100}% 0)`,
-            transform: `translateX(${shift}px)`,
+            transform: `translateX(${shift}em)`,
           }}
         >
           {BRAND_TEXT}
