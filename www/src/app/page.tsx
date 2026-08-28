@@ -5,10 +5,14 @@ const MUTED = 'color-mix(in srgb, var(--ss-fg) 60%, transparent)'
 
 export default function Home() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-6xl flex-col items-center gap-10 px-6 py-16 lg:flex-row lg:justify-between lg:gap-16">
-      <div className="flex w-full max-w-lg flex-col items-start gap-6 lg:w-1/2">
+    <main className="grid min-h-screen w-full grid-cols-1 lg:grid-cols-2">
+      <div className="flex flex-col items-start justify-center gap-6 px-6 py-16 sm:px-12 lg:px-16 xl:px-24">
         <BrandMark size={72} />
-        <p className="text-lg" style={{ color: MUTED }}>
+        <h1 className="sr-only">Super-Sub</h1>
+        <p
+          className="max-w-md text-lg"
+          style={{ color: MUTED, wordBreak: 'keep-all' }}
+        >
           생활체육 경기 영상을 분석해 용병을 찾고, 실력을 검증합니다.
         </p>
         <div className="flex flex-wrap gap-3">
@@ -19,10 +23,9 @@ export default function Home() {
         </div>
       </div>
 
-      <div
-        className="relative aspect-square w-full max-w-lg overflow-hidden lg:w-1/2"
-        style={{ borderRadius: 'var(--ss-radius-sheet)' }}
-      >
+      {/* 앱 로그인 화면(_kPhotoScrim)과 같은 재질 — 사진을 꽉 채우고 스크림을 얹는다.
+          작은 카드처럼 보이지 않도록 모서리를 둥글리지 않는다(화면 가장자리까지 닿는 판). */}
+      <div className="relative min-h-[45vh] w-full overflow-hidden lg:min-h-screen">
         <div
           aria-hidden="true"
           className="absolute inset-0 bg-cover bg-center"

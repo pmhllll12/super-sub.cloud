@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { apiErrorMessage, apiPost } from '@/lib/api/client'
@@ -7,6 +8,8 @@ import BrandMark from '@/components/ui/BrandMark'
 import Field from '@/components/ui/Field'
 import GlassPanel from '@/components/ui/GlassPanel'
 import PillButton from '@/components/ui/PillButton'
+
+const MUTED = 'color-mix(in srgb, var(--ss-fg) 60%, transparent)'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -33,12 +36,15 @@ export default function LoginPage() {
 
   return (
     <main className="relative flex min-h-screen items-center justify-center px-6 py-16">
+      {/* 사진을 화면 폭 전체로 늘리면(초광폭 데스크톱) 세로로 극단적으로 잘려 무엇을
+          찍었는지 알아볼 수 없다. 원본에 가까운 폭의 판으로 가운데 제한하고 위쪽
+          (얼굴·상반신 쪽)을 기준으로 앉힌다. */}
       <div
         aria-hidden="true"
-        className="fixed inset-0 -z-10 bg-cover bg-center"
+        className="fixed inset-y-0 left-1/2 w-full max-w-2xl -translate-x-1/2 overflow-hidden bg-cover bg-top -z-10"
         style={{ backgroundImage: "url('/player_mono.jpg')" }}
       >
-        <div className="absolute inset-0" style={{ background: 'var(--ss-scrim)' }} />
+        <div className="absolute inset-0" style={{ background: 'var(--ss-scrim-strong)' }} />
       </div>
 
       <GlassPanel className="w-full max-w-[420px] px-8 py-10">
@@ -64,6 +70,12 @@ export default function LoginPage() {
               로그인
             </PillButton>
           </form>
+          <p className="text-sm" style={{ color: MUTED }}>
+            계정이 없으신가요?{' '}
+            <Link href="/signup" style={{ color: 'var(--ss-accent)' }}>
+              회원가입
+            </Link>
+          </p>
         </div>
       </GlassPanel>
     </main>

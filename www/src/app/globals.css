@@ -24,6 +24,9 @@
   --ss-accent: #70ed88;
   --ss-error: #ff8a80;
   --ss-scrim: rgba(0, 0, 0, 0.15);
+  /* 웹 전용 — 전면 배경 사진 위에 폼을 얹는 화면(로그인·회원가입)에서 --ss-scrim 만으로는
+     대비가 부족해 추가했다. --ss-scrim 값 자체는 Flutter 소스 검증값이라 건드리지 않는다. */
+  --ss-scrim-strong: rgba(0, 0, 0, 0.6);
 
   --ss-radius-sheet: 28px;
   --ss-btn-h: 54px;
@@ -47,6 +50,11 @@
 
 .ss-field-hint {
   color: color-mix(in srgb, var(--ss-fg) 40%, transparent);
+}
+
+.ss-field-input {
+  /* 배경이 무엇이든(사진이든 검은 화면이든) 경계가 또렷하도록 살짝 어둡게 깐다. */
+  background: color-mix(in srgb, var(--ss-bg) 35%, transparent);
 }
 
 .ss-field-input:focus {

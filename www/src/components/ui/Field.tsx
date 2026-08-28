@@ -27,10 +27,10 @@ export default function Field({
         minLength={minLength}
         maxLength={maxLength}
         onChange={(e) => onChange(e.target.value)}
-        className="ss-field-input bg-transparent px-4 py-3 outline-none"
+        className="ss-field-input px-4 py-3 outline-none"
         style={{
           borderRadius: 'var(--ss-field-radius)',
-          border: '1px solid var(--ss-glass-border)',
+          border: '1px solid color-mix(in srgb, var(--ss-fg) 35%, transparent)',
         }}
       />
       {hint && <span className="ss-field-hint text-xs">{hint}</span>}
