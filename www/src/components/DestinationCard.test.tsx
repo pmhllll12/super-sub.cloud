@@ -12,4 +12,18 @@ describe('목적지 카드', () => {
     expect(screen.queryByRole('link')).toBeNull()
     expect(screen.getByText(/준비 중/)).toBeInTheDocument()
   })
+
+  it('두 줄 설명을 보여준다', () => {
+    render(
+      <DestinationCard
+        title="영상 분석"
+        icon="videocam"
+        href="/analysis"
+        summary={'경기 영상을 올리면\n실력 리포트가 나옵니다'}
+      />,
+    )
+    const link = screen.getByRole('link', { name: /영상 분석/ })
+    expect(link.textContent).toContain('경기 영상을 올리면')
+    expect(link.textContent).toContain('실력 리포트가 나옵니다')
+  })
 })

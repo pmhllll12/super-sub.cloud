@@ -9,11 +9,14 @@ export default function DestinationCard({
   title,
   icon,
   href,
+  summary,
   className = '',
 }: {
   title: string
   icon: string
   href?: string
+  /** 앱 home_screen.dart 의 두 줄 설명. `\n` 으로 줄바꿈을 나타낸다. */
+  summary?: string
   className?: string
 }) {
   const ready = Boolean(href)
@@ -32,6 +35,11 @@ export default function DestinationCard({
       <span className="text-sm font-medium" style={{ color: ready ? 'var(--ss-fg)' : MUTED }}>
         {title}
       </span>
+      {summary && (
+        <span className="whitespace-pre-line text-xs leading-snug" style={{ color: MUTED }}>
+          {summary}
+        </span>
+      )}
       {!ready && (
         <span className="text-xs" style={{ color: FAINT }}>
           준비 중입니다
