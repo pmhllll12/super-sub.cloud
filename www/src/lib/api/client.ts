@@ -15,11 +15,11 @@ export class ApiCallError extends Error {
  * 같은 오리진의 /api/* 만 부른다. 브라우저는 FastAPI 주소를 모른다.
  * 쿠키는 same-origin 이라 자동으로 실린다.
  */
-export async function apiPost<T>(path: string, body: unknown): Promise<T> {
+async function send<T>(method: 'POST' | 'PATCH', path: string, body: unknown): Promise<T> {
   let res: Response
   try {
     res = await fetch(path, {
-      method: 'POST',
+      method,
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     })
@@ -37,4 +37,12 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
     )
   }
   return data as T
+}
+
+export const apiPost = <T>(path: string, body: unknown) => send<T>('POST', path, body)
+export const apiPatch = <T>(path: string, body: unknown) => send<T>('PATCH', path, body)
+
+/** 화면이 보여줄 에러 문구. 서버가 준 message 를 그대로 쓰고, 그 외에는 일반 문구로 떨어진다. */
+export function apiErrorMessage(err: unknown): string {
+  return err instanceof ApiCallError ? err.message : '알 수 없는 오류입니다.'
 }

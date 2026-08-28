@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { ApiCallError, apiPost } from '@/lib/api/client'
+import { apiErrorMessage, apiPost } from '@/lib/api/client'
 
 export default function SignupPage() {
   const router = useRouter()
@@ -21,7 +21,7 @@ export default function SignupPage() {
       // 가입은 로그인이 아니다. 세션이 없으니 로그인 화면으로 보낸다.
       router.push('/login')
     } catch (err) {
-      setError(err instanceof ApiCallError ? err.message : '알 수 없는 오류입니다.')
+      setError(apiErrorMessage(err))
     } finally {
       setBusy(false)
     }

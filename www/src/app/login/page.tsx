@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { ApiCallError, apiPost } from '@/lib/api/client'
+import { apiErrorMessage, apiPost } from '@/lib/api/client'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -21,7 +21,7 @@ export default function LoginPage() {
       router.refresh()
     } catch (err) {
       // message 가 아니라 code 로 분기해야 할 곳이 생기면 여기서 나눈다.
-      setError(err instanceof ApiCallError ? err.message : '알 수 없는 오류입니다.')
+      setError(apiErrorMessage(err))
     } finally {
       setBusy(false)
     }
