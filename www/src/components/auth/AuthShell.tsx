@@ -54,11 +54,17 @@ export default function AuthShell({
           강제하지 않는다(그래야 375px 에서도 넘치지 않는다). 카드 자체는
           더 이상 GlassPanel 이 아니다 — 사진 칸(불투명 이미지)과 폼 칸(글라스)
           이 서로 다른 재질이라 바깥은 모서리만 잡는 투명 틀로 두고, 각
-          칸이 자기 몫의 배경을 스스로 그린다. */}
+          칸이 자기 몫의 배경을 스스로 그린다.
+
+          도는 테두리 빛(ss-traveling-edge)은 이 바깥 래퍼에 준다 — 카드가
+          사진 칸+폼 칸 두 조각이라도 빛은 "카드 하나"의 둘레를 한 바퀴
+          돌아야 한다. 안쪽 폼 칸에 따로 주면 오른쪽 절반만 돈다(예전 버그).
+          `border-radius: inherit` 로 그려지는 링이라 바깥 래퍼의 둥근
+          모서리를 그대로 따라간다. */}
       <div className="w-full max-w-[1600px] lg:h-[min(90vh,920px)]">
         <div
-          className="relative grid h-full w-full grid-cols-1 overflow-hidden lg:grid-cols-2"
-          style={{ borderRadius: 'var(--ss-radius-sheet)' }}
+          className="ss-traveling-edge relative grid h-full w-full grid-cols-1 overflow-hidden lg:grid-cols-2"
+          style={{ borderRadius: 'var(--ss-radius-sheet)', border: '1px solid var(--ss-glass-border)' }}
         >
           {/* 카드 왼쪽 — 사진 칸. 좁은 화면에서는 숨긴다(폼만 남기기 위해). */}
           <div className="relative hidden lg:block">
@@ -110,16 +116,18 @@ export default function AuthShell({
               남긴다(랜딩 페이지 `<BrandMark /><h1 className="sr-only">`
               패턴과 동일).
 
-              GlassPanel 과 같은 값(--ss-glass-bg/border/blur)으로 직접
-              유리 재질을 낸다 — lg 이상에서는 폼 칸이 카드 오른쪽 절반이라
-              왼쪽 모서리는 사진과 맞닿아 각지고 오른쪽만 둥글다(lg 미만은
-              폼 칸이 카드 전체라 네 모서리 다 둥글다). ss-traveling-edge 로
-              같은 도는 테두리 빛도 그대로 재사용한다. */}
+              GlassPanel 과 같은 값(--ss-glass-bg/blur)으로 직접 유리
+              재질(반투명+블러)을 낸다 — lg 이상에서는 폼 칸이 카드 오른쪽
+              절반이라 왼쪽 모서리는 사진과 맞닿아 각지고 오른쪽만
+              둥글다(lg 미만은 폼 칸이 카드 전체라 네 모서리 다 둥글다).
+              테두리(고정 선 + 도는 빛)는 더 이상 여기서 그리지 않는다 —
+              바깥 카드 래퍼(위)가 카드 전체 둘레를 한 번에 돈다. 여기서도
+              그리면 바깥 것과 같은 자리(위/오른쪽/아래 변)에 겹쳐 두
+              겹으로 보인다. */}
           <div
-            className="ss-traveling-edge relative flex flex-col overflow-y-auto rounded-[var(--ss-radius-sheet)] p-6 sm:p-10 lg:rounded-l-none lg:p-12"
+            className="relative flex flex-col overflow-y-auto rounded-[var(--ss-radius-sheet)] p-6 sm:p-10 lg:rounded-l-none lg:p-12"
             style={{
               background: 'var(--ss-glass-bg)',
-              border: '1px solid var(--ss-glass-border)',
               backdropFilter: 'blur(var(--ss-glass-blur))',
               WebkitBackdropFilter: 'blur(var(--ss-glass-blur))',
             }}
