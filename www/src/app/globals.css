@@ -74,3 +74,33 @@ body::before {
   pointer-events: none;
   z-index: 0;
 }
+
+/* 글리치 워드마크 — 인트로 전용. 색 어긋남(chromatic split)과 흔들림이 핵심이다. */
+@keyframes ss-glitch-shift {
+  0%, 100% { transform: translate(0); }
+  20% { transform: translate(-2px, 1px); }
+  40% { transform: translate(2px, -1px); }
+  60% { transform: translate(-1px, -1px); }
+  80% { transform: translate(1px, 1px); }
+}
+
+.ss-glitch {
+  position: relative;
+  animation: ss-glitch-shift 220ms steps(2, end) infinite;
+}
+
+/* 색이 어긋난 두 겹. 원본 글자 위아래로 살짝 벌어진다. */
+.ss-glitch::before,
+.ss-glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.ss-glitch::before { color: #ff4d4d; transform: translate(-2px, 0); mix-blend-mode: screen; }
+.ss-glitch::after  { color: #4dd2ff; transform: translate(2px, 0);  mix-blend-mode: screen; }
+
+/* 움직임을 원치 않는 사용자에게는 흔들지 않는다. */
+@media (prefers-reduced-motion: reduce) {
+  .ss-glitch, .ss-glitch::before, .ss-glitch::after { animation: none; transform: none; }
+}

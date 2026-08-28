@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Rubik, Rubik_Glitch } from "next/font/google";
 import "material-symbols/outlined.css";
 import "./globals.css";
+import IntroGate from "@/components/IntroGate";
 
 const rubik = Rubik({
   variable: "--font-rubik",
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body
         className={`${rubik.variable} ${rubikGlitch.variable} min-h-full flex flex-col`}
       >
+        <IntroGate />
         {children}
       </body>
     </html>

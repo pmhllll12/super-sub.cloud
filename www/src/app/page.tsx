@@ -1,9 +1,16 @@
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
 import BrandMark from '@/components/ui/BrandMark'
 import PillButton from '@/components/ui/PillButton'
+import { SESSION_COOKIE } from '@/server/session'
 
 const MUTED = 'color-mix(in srgb, var(--ss-fg) 60%, transparent)'
 
-export default function Home() {
+/**
+ * 마크업만 따로 뺀 것 — `Home` 이 서버 컴포넌트로 `cookies()` 를 부르게 되면서
+ * 테스트가 이 함수를 직접 렌더한다(리다이렉트 분기를 타지 않는다).
+ */
+export function LandingBody() {
   return (
     <main className="grid min-h-screen w-full grid-cols-1 lg:grid-cols-2">
       <div className="flex flex-col items-start justify-center gap-6 px-6 py-16 sm:px-12 lg:px-16 xl:px-24">
@@ -35,4 +42,14 @@ export default function Home() {
       </div>
     </main>
   )
+}
+
+// 이미 로그인한 사람이 / 에 들어와 제품 소개를 다시 보는 건 어색하다 — 앱의
+// 라우터도 로그인돼 있으면 로그인 화면을 건너뛰고 홈으로 보낸다.
+// 쿠키 존재만 확인하고 백엔드는 부르지 않는다 — 랜딩은 공유 링크로도 열리는
+// 자리라 매번 왕복을 넣지 않는다. 썩은 토큰은 /home 의 requireUser() 가
+// 로그인으로 돌려보낸다 — 한 번 더 튀지만 그 편이 낫다.
+export default async function Home() {
+  if ((await cookies()).get(SESSION_COOKIE)) redirect('/home')
+  return <LandingBody />
 }
