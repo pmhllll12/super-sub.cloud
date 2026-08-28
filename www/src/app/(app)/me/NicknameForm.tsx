@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { apiErrorMessage, apiPatch } from '@/lib/api/client'
+import Field from '@/components/ui/Field'
+import PillButton from '@/components/ui/PillButton'
 
 export default function NicknameForm({ nickname }: { nickname: string }) {
   const router = useRouter()
@@ -28,35 +30,21 @@ export default function NicknameForm({ nickname }: { nickname: string }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-3">
-      <label className="flex flex-col gap-1.5">
-        <span className="text-sm text-neutral-500">닉네임</span>
-        <input
-          type="text"
-          minLength={1}
-          maxLength={20}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          className="rounded-lg border px-3 py-2"
-        />
-      </label>
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      <Field label="닉네임" value={value} onChange={setValue} minLength={1} maxLength={20} />
       {error && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm" style={{ color: 'var(--ss-error)' }}>
           {error}
         </p>
       )}
       {saved && (
-        <p role="status" className="text-sm text-green-600">
+        <p role="status" className="text-sm" style={{ color: 'var(--ss-accent)' }}>
           저장했습니다.
         </p>
       )}
-      <button
-        type="submit"
-        disabled={busy}
-        className="self-start rounded-lg border px-4 py-2 disabled:opacity-50"
-      >
+      <PillButton type="submit" disabled={busy} className="self-start">
         저장
-      </button>
+      </PillButton>
     </form>
   )
 }

@@ -51,7 +51,7 @@ export default async function PublicCardPage({
   if (!card) notFound()
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-16">
+    <main className="mx-auto flex min-h-screen max-w-xl items-center justify-center px-6 py-16">
       <PlayerCardView card={card} />
     </main>
   )
