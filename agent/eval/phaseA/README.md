@@ -59,16 +59,44 @@ selector를 고르기 위한 오프라인 평가다. production 파이프라인(
    않는다.** 실제로 blind였던 5건만 보면 **A 2 : B 2**이므로, **독립 검증
    기준으로는 B-pose 우위가 확정되지 않는다.**
 
+### B-5에서 추가된 것 — 검수를 더 해도 갈리지 않는다
+
+오염된 2건 때문에 **격리 디렉터리에서 60건을 처음부터 다시 판독**했다
+(Tier 0 7건 + Tier 1 53건, `eval_b4/clean_review_report.md`).
+
+9. **오염을 걷어내면 Tier 0는 A-pose 쪽으로 뒤집힌다.** clean 판독 기준
+   **A 3 : B 2**(margin −1). 라벨 출처별로 `labels.json` +2 → 오염 포함 AI +1 →
+   clean −1로 이동한다(`eval_b4/clean_review_sensitivity.csv`).
+10. **표본을 60건으로 넓히면 방향은 다시 B지만 유의하지 않다.** 판정 가능 43건에서
+    **B 26 : A 17**(60.5%), 정확 이항 p = 0.22. 클립 클러스터 부트스트랩 95% CI
+    **[0.395, 0.800]** 로 0.5를 포함하고, 클립 단위 부호검정도 B 11 : A 7,
+    p = 0.48이다(`eval_b4/clean_review_ab_test.json`).
+11. **남은 우세는 표본 선정으로 설명된다.** Tier 1은 `info_score` 상위에서 뽑혔고
+    그 점수에는 `b_locked`(2.0)와 `a_pose_switch`(1.0)라는 **A/B 비대칭 항**이
+    들어 있다. B의 우세는 `a_pose_switch=1` 층에 몰려 있고(B 18 : A 10) 그 층을
+    벗어나면 거의 사라진다(B 8 : A 7). 이 표본의 승률을 전체 불일치 프레임의
+    승률로 읽으면 안 된다(`eval_b4/clean_review_ab_covariates.csv`).
+12. **검수를 더 해도 이 데이터셋에서는 갈리지 않는다.** 관측된 60.5%가 참값이라
+    가정해도 α=0.05·power=0.80이면 판정 가능 **340건**(design effect 1.92 보정)이
+    필요한데, run당 1프레임 규약에서 이 데이터셋의 상한은 검수 **69장 / 판정 약
+    49건**이다. 이미 60장을 봤고 남은 여유는 9장이다. **7배 부족하다.**
+13. **승패는 클립 안에서 몰린다.** 2건 이상 판정된 11클립 중 6클립이 만장일치다.
+    특히 regression 케이스 `N5zWQkoLM3M`은 **A 4 : B 0**으로 오염 없는 독립
+    판독이 6번의 진단을 그대로 재현했고, 반대로 `3USSmzO001k`은 **B 5 : A 0**이다.
+    즉 데이터가 말하는 것은 "어느 selector가 낫다"가 아니라 **continuity는 처음
+    잡은 대상이 맞으면 이기고 틀리면 진다**는 것이다. 질문을 "어느 selector인가"
+    에서 **"continuity를 언제 신뢰할 것인가"** 로 바꿔야 한다.
+
 ## AI-reviewed GT ≠ human-verified GT
 
-**사람 검수자를 확보하지 못해(human review unavailable) B-3·B-4의 라벨은
+**사람 검수자를 확보하지 못해(human review unavailable) B-3·B-4·B-5의 라벨은
 Claude가 단독 판독한 것이다.**
 
-| | `labeling/labels.json` | `eval_b3/labels_ai_reviewed.json` |
-|---|---|---|
-| 판독 주체 | Claude 1차 | Claude 독립 재판독 |
-| 사람 검증 | **없음** | **없음** |
-| provenance | `labeler: "Claude (에이전트) 1차 — 사람 검수 필요"` | `human_verified: false` |
+| | `labeling/labels.json` | `eval_b3/labels_ai_reviewed.json` | `eval_b4/*_ai_clean_blind_review.csv` |
+|---|---|---|---|
+| 판독 주체 | Claude 1차 | Claude 독립 재판독 | Claude 격리 재판독 (B-5) |
+| 사람 검증 | **없음** | **없음** | **없음** |
+| provenance | `labeler: "Claude (에이전트) 1차 — 사람 검수 필요"` | `human_verified: false` | `human_verified: false` |
 
 `labels_ai_reviewed.json`의 provenance는 **변경 금지**다:
 
@@ -85,6 +113,31 @@ Claude가 단독 판독한 것이다.**
   이미 기존 GT와 양쪽 selector 선택이 노출된 상태에서 판독했다. blind가 아니며
   `eval_b4/tier0_ai_review.csv`의 `blind_status` 열에
   `contaminated_prior_exposure`로 기록돼 있다. **하필 판별에 결정적인 두 건이다.**
+  → **B-5에서 이 2건을 포함해 60건 전부를 격리 재판독했다.**
+
+B-5 판독(`eval_b4/ai_clean_blind_review_provenance.json`)의 조건과 그 한계도
+provenance에 그대로 적혀 있다. **변경 금지**다.
+
+```json
+"label_source": "ai_independent_blind_review",
+"human_verified": false,
+"selector_blinded": true,
+"gt_blinded": true,
+"prior_ai_review_blinded": true,
+"fresh_context": false,
+"inaccessible_source_root": false,
+"source_labels_modified": false
+```
+
+- 판독 입력은 격리 디렉터리(`/mnt/d/blind_review_run1/`)의 안내문·양식·이미지 60장
+  뿐이었다. 그 사본이 `eval_b4/review_packet/`이다.
+- `fresh_context: false` — 시스템 프롬프트에 프로젝트 CLAUDE.md와 메모리 **제목**
+  목록이 이미 들어 있었다. 프레임별 정답에 해당하는 정보는 그 안에 없다.
+- `inaccessible_source_root: false` — 원본 디렉터리가 기술적으로는 접근 가능한
+  상태였다. 실제로 열지 않았지만 물리적으로 차단되지는 않았다.
+
+그래서 B-5 결과는 **"B-pose 우위가 확증되지 않는다"는 부정적 결론의 근거로는
+쓰되, production selector를 확정하는 근거로는 쓰지 않는다.**
 
 이 라벨들은 **production selector 확정의 근거로 단독 사용할 수 없다.**
 
@@ -126,18 +179,43 @@ Claude가 단독 판독한 것이다.**
   `b4_review_input.csv`(Tier 1 blind form 53건), `b4_selection_rationale.csv`,
   `regression_watchlist.csv`, `tier0_*`(Tier 0 7건 판독·민감도),
   `tier0_sensitivity.md`
-- 핵심: 5,404프레임 중 A-pose≠B-pose 596건(11.0%), 실질 run 69개, GT 있는 것 7건.
+- 핵심: 5,404프레임 중 A-pose≠B-pose 596건(11.0%), 연속 불일치 run 104개
+  (그중 검수 대상으로 뽑을 수 있는 run 62개), GT 있는 것 7건.
   두 selector는 합의 프레임 91건에서 **둘 다 81/91로 동일**하므로 순위는 이 7건이
   전부 결정한다.
+  > 이 줄에 처음 적혀 있던 "실질 run 69개"는 B-5에서 다시 세어 보니 틀린 값이었다.
+  > `ab_disagreement_frames.csv`를 클립별 연속 프레임으로 묶으면 104개이고,
+  > `select_b4.py`의 선정 풀(`different_person=1`, `min_box_frac≥0.015`,
+  > GT 없는 프레임) 기준으로는 62개다. 상한 계산(위 12번)은 62개를 쓴다.
+
+### Phase B-5 — 오염 제거 격리 재판독 + A/B 검정
+B-4의 결정적 2건이 blind가 아니었으므로, 격리 디렉터리에서 60건을 처음부터 다시
+판독하고(Tier 0 7 + Tier 1 53) 그 결과로 A/B를 실제로 검정했다.
+
+- 입력: `eval_b4/review_packet/`(안내문 + 양식 + 이미지 60장), `ab_disagreement_frames.csv`
+- 출력: `clean_review_report.md`, `clean_review_ab_*.{csv,json}`,
+  `clean_review_{comparison,gt_comparison,sensitivity,t0_grid,tier1_summary}.csv`,
+  `tier0_ai_clean_blind_review.csv`, `tier1_ai_clean_blind_review.csv`,
+  `ai_clean_blind_review_provenance.json`
+- 판독: 후보 선택 46 / none 3 / uncertain 11, confidence high 32·medium 17·low 11
+- 결과: 판정 43건에서 **B 26 : A 17**(p = 0.22), 클러스터 CI [0.395, 0.800],
+  Tier 0만 보면 **A 3 : B 2**. **필요 표본 340건 vs 데이터셋 상한 49건 —
+  이 데이터셋에서는 결론이 나지 않는다.**
 
 ## 다음 단계 (미실행)
 
-1. **최소**: `3USSmzO001k@0.80`, `X6dC9pu5H3k@0.80` 2건을 **사람이** 판독.
-   이 둘만으로 margin이 +2 / 0 / −2로 갈린다.
-2. **권장**: Tier 0 7건 + Tier 1 약 60건 = 67건 사람 검수.
-   65% 수준의 우세를 α=0.05로 검출하려면 판정 가능 52건이 필요하다.
-3. Tier 1 이미지는 아직 렌더하지 않았다 — N 확정 후
-   `select_b4.py` → `render_b4.py` 순서로 실행한다.
+1. **A/B를 프레임 정확도로 가르는 시도는 접는다.** 위 12번 — 같은 39클립 안에서는
+   검수를 아무리 더 해도 α=0.05로 갈리지 않는다는 것이 B-5의 결론이다.
+   (B-4에서 적었던 "67건 사람 검수" 계획은 필요 표본을 340건으로 다시 계산하면서
+   폐기했다. 52건이라는 옛 추정은 클러스터를 무시하고 효과크기를 65%로 잡은 값이다.)
+2. **라벨이 필요 없는 기준으로 옮긴다.** 우리 지표는 프레임 시계열 위에서
+   계산되므로 클립 중간에 대상이 바뀌면 관절각 궤적 자체가 오염된다. switching
+   빈도(A-pose 6.8% → B-pose 1.8%)와 **잘못된 대상에 고착된 구간의 길이**는 사람
+   라벨 없이 측정할 수 있고, 위 13번의 트레이드오프를 그대로 정량화한다.
+3. **클립을 늘린다면** 26클립·104run이 병목이다. 같은 클립에서 프레임을 더 뽑는
+   것은 design effect만 키운다.
+4. **사람 검수는 여전히 확보되지 않았다.** `labels.json`과
+   `labels_ai_reviewed.json`은 손대지 않았고 B-5 판독도 GT로 승격하지 않았다.
 
 ## 이 사본에 넣지 않은 것
 
@@ -150,14 +228,21 @@ Claude가 단독 판독한 것이다.**
 | `cache/`, `candidates/` | 2.1 MB | 포즈·후보 npz. 모델 재실행으로 재생성 |
 | `cand_*.jpg` | 0.5 MB | 후보 시각화 4장 |
 | `ann/val.csv` | 792 KB | Kinetics 전체 val 인덱스(3rd-party). `hb_val.csv`만 보존 |
+| `eval_b4/review_cases/` | 6.9 MB | Tier 1 렌더 53장. **같은 이미지가 `review_packet/images/`에 `T1_*.jpg`로 들어 있어 중복이다** |
 
 ### 검수 evidence 이미지는 포함했다
 
-`eval_b2/review_cases/`(38장, 5.0 MB)와 `eval_b4/tier0_cases/`(7장, 0.8 MB)는
-다른 이미지와 달리 **git에 포함한다.** 스크립트로 재생성은 가능하지만
-(`make_review_set.py` / `render_tier0.py`), 원본 영상 `clips/`가 있어야 하고
-무엇보다 **AI 판독이 실제로 보고 판단한 대상 그 자체**다. 판독 근거를 사후에
-검증하려면 이 이미지가 있어야 한다. 중간 산출물이 아니라 **evidence**로 취급한다.
+`eval_b2/review_cases/`(38장, 5.0 MB), `eval_b4/tier0_cases/`(7장, 0.8 MB),
+`eval_b4/review_packet/`(안내문·양식 + 이미지 60장, 7.7 MB)는 다른 이미지와 달리
+**git에 포함한다.** 스크립트로 재생성은 가능하지만
+(`make_review_set.py` / `render_tier0.py` / `render_b4.py`), 원본 영상 `clips/`가
+있어야 하고 무엇보다 **AI 판독이 실제로 보고 판단한 대상 그 자체**다. 판독 근거를
+사후에 검증하려면 이 이미지가 있어야 한다. 중간 산출물이 아니라 **evidence**로
+취급한다.
+
+`review_packet/`은 특히 **B-5 판독에 주어진 입력 전부**다 — 판독자는 이 폴더
+바깥을 보지 않았다고 provenance에 기록돼 있으므로, 그 주장을 검증하려면 폴더
+내용 자체가 남아 있어야 한다.
 
 렌더 규약(모든 후보 같은 색·같은 굵기, index와 검출점수만 표시, selector 선택·GT
 미표시)이 이미지 자체에 남아 있으므로, blind 조건이 지켜졌는지도 이 파일들로
@@ -186,7 +271,14 @@ uv run python /mnt/d/supersub-phaseA/eval_b3/report_b3.py
 uv run python /mnt/d/supersub-phaseA/eval_b4/design_b4.py
 uv run python /mnt/d/supersub-phaseA/eval_b4/select_b4.py
 python3 /mnt/d/supersub-phaseA/eval_b4/sensitivity_b4.py
+
+# B-5 (clean 판독 결과 분석 — 표준 라이브러리만 쓰므로 python3로 충분)
+python3 /mnt/d/supersub-phaseA/eval_b4/clean_review_analysis.py
+python3 /mnt/d/supersub-phaseA/eval_b4/clean_review_ab_test.py
 ```
+
+B-5의 두 스크립트는 `ab_disagreement_frames.csv`와 판독 CSV만 읽으므로 모델·영상
+없이 그대로 재현된다. 부트스트랩은 `SEED = 20260828`으로 고정돼 있다.
 
 필요한 것:
 - `candidates/*.npz`, `cache/*.npz` — 없으면 `candidates.py`, `extract.py`부터
@@ -195,15 +287,21 @@ python3 /mnt/d/supersub-phaseA/eval_b4/sensitivity_b4.py
 - `agent/src/supersub_agent/pose.py` — 검출·포즈 모델 상수 (읽기 전용으로 참조)
 
 selector 구현은 `eval_b2/eval_b2.py` 한 곳에만 있고 `eval_b3.py`·`design_b4.py`가
-import한다. **가중치나 선택 로직을 수정하면 B-2~B-4 결과 전체가 무효가 된다.**
+import한다. **가중치나 선택 로직을 수정하면 B-2~B-5 결과 전체가 무효가 된다.**
 
 ## 주요 파일
 
 | 파일 | 내용 |
 |---|---|
+| `eval_b4/clean_review_report.md` | B-5 전체 결과 — **먼저 읽을 것** |
+| `eval_b4/clean_review_ab_test.json` | 검정·부트스트랩·소요표본·데이터셋 상한 요약 |
+| `eval_b4/clean_review_ab_frames.csv` | clean 판독 60건 전수 (판독값·A/B 선택·승자·공변량) |
+| `eval_b4/clean_review_ab_covariates.csv` | 표본 vs 모집단 공변량 — 선정 편향의 근거 |
+| `eval_b4/ai_clean_blind_review_provenance.json` | B-5 판독 조건과 그 한계 (**수정 금지**) |
+| `eval_b4/review_packet/` | B-5 판독자가 본 입력 전부 (안내문·양식·이미지 60장) |
 | `eval_b2/report_b2.md` | B-2 5종 비교 전체 결과 |
 | `eval_b3/report_b3.md` | AI-reviewed GT 재평가, B-2 대비 3층 비교 |
-| `eval_b4/tier0_sensitivity.md` | B-pose +2 우위의 민감도 — **가장 중요** |
+| `eval_b4/tier0_sensitivity.md` | B-pose +2 우위의 민감도 (B-4 시점 — B-5가 갱신함) |
 | `eval_b4/ab_origin_trace.csv` | B-pose가 정체성을 획득한 시점 추적 (7/7 결과) |
 | `eval_b4/ab_disagreement_frames.csv` | A-pose≠B-pose 596프레임 전수 |
 | `eval_b4/regression_watchlist.csv` | failure mode 3건 추적 |
