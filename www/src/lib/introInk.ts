@@ -44,8 +44,18 @@ export const WET_END = (DRY_MS + WET_MS) / TOTAL_MS
 /** 흔들림 값을 붙잡아 두는 시간(ms). 매 프레임 새로 뽑으면 지글거림이 된다. */
 export const HOLD_MS = 45
 
-/** 글자를 끊는 가로 띠 수. */
-export const BANDS = 7
+/**
+ * 글자를 끊는 가로 띠 수.
+ *
+ * 앱은 7개(굵은 조각 몇 개가 크게 어긋난다)인데 웹은 **22개**로 늘렸다 —
+ * 도착점인 `BrandMark`(RubikGlitch)의 글자 자체가 **얇은 선으로 어긋난
+ * 모양**이라, 흔들림도 같은 결이어야 인트로와 최종 로고가 한 물건으로
+ * 읽힌다. 72px 글자에서 한 띠가 약 3.3px, 52px 에서 약 2.4px 이다.
+ *
+ * 띠가 얇아진 만큼 한 번에 어긋나는 곳도 많아진다 — `SLICE_CHANCE` 는
+ * 그대로라 22개 중 열 곳 안팎이 동시에 움직인다.
+ */
+export const BANDS = 22
 
 /** 가지런한 Rubik이 깨진 RubikGlitch로 바뀌는 잉크 진행도. */
 export const SWAP_AT = 0.795
@@ -110,8 +120,14 @@ export const MIN_SHIFT_EM = 1 / 52
  */
 export const TEAR_CHANCE = 0.55
 
-/** 터지는 순간에 띠 하나가 어긋날 확률. 7개 중 서넛만 움직인다. */
-export const SLICE_CHANCE = 0.45
+/**
+ * 터지는 순간에 띠 하나가 어긋날 확률.
+ *
+ * 실제로 움직이는 비율은 이보다 낮다 — `r³` 로 뽑은 값 중 `MIN_SHIFT_EM`
+ * 미만은 0으로 되돌리기 때문이다(약 3분의 1이 걸린다). 0.6 이면 22개 중
+ * 여덟 곳 안팎이 동시에 어긋난다.
+ */
+export const SLICE_CHANCE = 0.6
 
 /** 표준 mulberry32 PRNG — 같은 seed 면 같은 수열이다. */
 function mulberry32(seed: number): () => number {
