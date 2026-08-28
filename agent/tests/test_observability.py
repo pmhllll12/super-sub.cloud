@@ -367,6 +367,20 @@ def test_cli_scripts_opt_out_explicitly():
         assert "observe=False" in src, f"{name}에 observe=False가 없다"
 
 
+def test_offline_evaluation_opts_out_explicitly():
+    """Phase A 오프라인 추출이 서비스 입력 sink를 오염시키지 않아야 한다.
+
+    이 스크립트는 39클립을 한 번에 돌린다. observe 기본값(True)에 걸리면 한 번의
+    재실행으로 서비스 입력 분포가 통째로 뒤집힌다 — 실제 서비스 레코드가 0건인
+    지금은 39건이 전부 서비스 입력으로 보이게 된다.
+    """
+    from pathlib import Path as _P
+    src = (_P(__file__).resolve().parent.parent / "eval" / "phaseA" / "extract.py"
+           ).read_text(encoding="utf-8")
+    assert "extract_keypoints(" in src
+    assert "observe=False" in src, "eval/phaseA/extract.py에 observe=False가 없다"
+
+
 def test_production_pose_result_always_has_candidate_counts(
         tmp_path, monkeypatch, stub_models):
     """production 생성 경로에서 candidate_counts가 비는 일이 없어야 한다."""

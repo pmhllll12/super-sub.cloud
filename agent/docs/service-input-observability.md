@@ -81,7 +81,16 @@ extract_keypoints(video, observe=True, rubric_key=None)   # observe 기본값 Tr
 | 향후 백엔드 job worker → `extract_keypoints()` | ✅ 자동 (배선 불필요) |
 | `POST /api/analyze/synthetic` | ❌ — 합성 키포인트라 영상도 후보도 없다. **서비스 입력이 아니므로 기록하지 않는다** |
 | `scripts/analyze.py`, `scripts/measure.py` | ❌ — `observe=False` **명시적** 제외 |
-| `eval/phaseA/extract.py` 등 오프라인 평가 | ❌ — 서비스 입력이 아니다 |
+| `eval/phaseA/extract.py` (Phase A 오프라인 추출) | ❌ — `observe=False` **명시적** 제외 |
+
+> ⚠️ `eval/phaseA/extract.py`는 저장소 사본을 고쳤다. 그런데 README의 재현 절차는
+> **`/mnt/d/supersub-phaseA/`의 원본을 실행**하라고 안내한다(스크립트가 그 경로를
+> 하드코딩하고 있다). 그 원본은 보존 대상이라 고치지 않았으므로, 거기서 재실행할
+> 때는 `SUPERSUB_METRICS_SINK`를 임시 경로로 돌려 서비스 sink를 비켜 가야 한다.
+>
+> ```bash
+> SUPERSUB_METRICS_SINK=/tmp/offline.jsonl python3 /mnt/d/supersub-phaseA/extract.py
+> ```
 
 CLI·오프라인 평가를 제외하는 이유는 개발 중 반복 실행이 서비스 입력 분포에
 섞이면 그 분포로 내리는 판단이 오염되기 때문이다. **실제 서비스 입력과 오프라인
