@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
 import BrandMark from '@/components/ui/BrandMark'
+import LandingGate from '@/components/LandingGate'
 import PillButton from '@/components/ui/PillButton'
 import { SESSION_COOKIE } from '@/server/session'
 
@@ -45,11 +45,23 @@ export function LandingBody() {
 }
 
 // 이미 로그인한 사람이 / 에 들어와 제품 소개를 다시 보는 건 어색하다 — 앱의
-// 라우터도 로그인돼 있으면 로그인 화면을 건너뛰고 홈으로 보낸다.
-// 쿠키 존재만 확인하고 백엔드는 부르지 않는다 — 랜딩은 공유 링크로도 열리는
+// 라우터도 로그인돼 있으면 로그인 화면을 건너뛰고 홈으로 보낸다. **하지만
+// 여기서 곧바로 redirect() 하지 않는다** — 그러면 이 요청 자체가 서버에서
+// `/home`으로 응답돼 루트 레이아웃의 `IntroGate`가 뜰 기회조차 없다. 주소창에
+// `/`를 직접 쳐서 들어오는 경우(세션당 인트로 1회 규칙이 노리는 바로 그
+// 경로)에도 로그인한 사람은 인트로를 영영 못 보게 된다.
+//
+// 대신 쿠키 존재만 서버에서 확인해 `loggedIn`을 클라이언트에 내려주고,
+// 실제 이동은 `LandingGate`가 (인트로가 재생 중이면 끝난 뒤에) 맡는다.
+// 쿠키 확인만 하고 백엔드는 부르지 않는다 — 랜딩은 공유 링크로도 열리는
 // 자리라 매번 왕복을 넣지 않는다. 썩은 토큰은 /home 의 requireUser() 가
 // 로그인으로 돌려보낸다 — 한 번 더 튀지만 그 편이 낫다.
 export default async function Home() {
-  if ((await cookies()).get(SESSION_COOKIE)) redirect('/home')
-  return <LandingBody />
+  const loggedIn = Boolean((await cookies()).get(SESSION_COOKIE))
+  return (
+    <>
+      <LandingGate loggedIn={loggedIn} />
+      <LandingBody />
+    </>
+  )
 }
