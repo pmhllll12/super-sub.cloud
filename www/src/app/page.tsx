@@ -1,6 +1,5 @@
-import { cookies } from 'next/headers'
-import { BackendError, getBackend, type User } from '@/server/backend'
-import { SESSION_COOKIE } from '@/server/session'
+import { type User } from '@/server/backend'
+import { requireUser } from '@/server/currentUser'
 import HomeParallax, { type Destination } from '@/components/HomeParallax'
 import FloatingNavBar from '@/components/ui/FloatingNavBar'
 
@@ -78,23 +77,16 @@ export function HomeBody({ user }: { user: Pick<User, 'nickname'> | null }) {
 }
 
 // `/` 가 곧 홈이다 — 앱처럼 홈이 하나뿐이다(공개 랜딩과 로그인 후 런처로
-// 나뉘어 있지 않다). 인트로(`IntroGate`, 루트 레이아웃)를 지나면 로그인
-// 여부와 무관하게 이 화면이 나오고, 인사말 자리만 갈린다: 로그인했으면
-// 닉네임 + 로그아웃, 안 했으면 로그인 · 회원가입 버튼(`HomeParallax`).
+// 나뉘어 있지 않다). 인트로(`IntroGate`, 루트 레이아웃)를 지나면 이 화면이 나온다.
 //
-// 쿠키만 있고 토큰이 썩었으면(백엔드가 401) 로그아웃 상태로 취급한다 —
-// 로그인으로 튕기지 않는다. 홈은 로그인 없이도 정상 화면이라 여기서까지
-// 리다이렉트할 이유가 없다(보호된 카드를 눌렀을 때만 그 경로가 알아서
-// /login 으로 보낸다).
+// 2026-08-28 부터 **로그인해야 들어올 수 있다.** 앞단의 `proxy.ts` 가 쿠키
+// 없는 요청을 이미 `/login` 으로 보내지만, 그건 쿠키가 "있는지"까지만 본다 —
+// 썩은 토큰을 들고 온 경우까지 막으려면 여기서 백엔드에 확인해야 한다.
+// `requireUser()` 가 그 일을 하고, 401 이면 `/login` 으로 보낸다.
+//
+// `HomeBody` 는 여전히 `user: null` 을 받을 수 있게 두었다 — 인사말 자리가
+// 갈리는 마크업은 테스트가 직접 렌더해 검증한다.
 export default async function Home() {
-  const token = (await cookies()).get(SESSION_COOKIE)?.value
-  let user: User | null = null
-  if (token) {
-    try {
-      user = await getBackend().getMe(token)
-    } catch (e) {
-      if (!(e instanceof BackendError && e.status === 401)) throw e
-    }
-  }
+  const user: User = await requireUser()
   return <HomeBody user={user} />
 }

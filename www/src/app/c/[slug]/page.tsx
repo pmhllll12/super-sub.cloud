@@ -3,6 +3,7 @@ import { cache } from 'react'
 import { notFound } from 'next/navigation'
 import PlayerCardView from '@/components/PlayerCardView'
 import { BackendError, getBackend, type PublicPlayerCard } from '@/server/backend'
+import { requireUser } from '@/server/currentUser'
 
 /**
  * generateMetadata 와 페이지 컴포넌트가 같은 slug 로 각각 호출한다.
@@ -46,6 +47,12 @@ export default async function PublicCardPage({
 }: {
   params: Promise<{ slug: string }>
 }) {
+  // 2026-08-28 부터 공유 링크도 로그인해야 열린다. 앞단의 `proxy.ts` 가 쿠키
+  // 없는 요청을 이미 막지만, 썩은 토큰까지 걸러내려면 여기서 확인해야 한다.
+  // 카드를 불러오기 **전에** 세운다 — 로그인하지 않은 사람에게 백엔드 조회
+  // 결과(존재 여부조차)를 흘리지 않기 위해서다.
+  await requireUser()
+
   const { slug } = await params
   const card = await load(slug)
   if (!card) notFound()
