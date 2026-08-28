@@ -2,9 +2,8 @@
 
 import Script from 'next/script'
 import { useRouter } from 'next/navigation'
-import { useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { apiErrorMessage, apiPost } from '@/lib/api/client'
-import PillButton from '@/components/ui/PillButton'
 
 /**
  * 구글 클라이언트 ID 는 원래 공개되는 값이라 NEXT_PUBLIC_ 이 맞다 (백엔드
@@ -16,36 +15,16 @@ import PillButton from '@/components/ui/PillButton'
  */
 const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
 
-/**
- * 공식 구글 "G" 마크(4색). 외부 이미지 대신 인라인 SVG 로 넣는다 — 요청이
- * 늘지 않고, 로드 실패로 빈칸이 될 일도 없다. 브랜드 가이드가 정한 4색
- * 조합이라 색을 바꾸거나 단색화하지 않는다. 장식이므로 버튼의 접근 가능한
- * 이름(텍스트)에 안 섞이도록 aria-hidden.
- */
-function GoogleGlyph() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" className="shrink-0">
-      <path
-        fill="#4285F4"
-        d="M17.64 9.2045c0-.6381-.0573-1.2518-.1636-1.8409H9v3.4814h4.8436c-.2086 1.125-.8427 2.0782-1.7959 2.7164v2.2581h2.9087c1.7018-1.5668 2.6836-3.874 2.6836-6.615z"
-      />
-      <path
-        fill="#34A853"
-        d="M9 18c2.43 0 4.4673-.8059 5.9564-2.1805l-2.9087-2.2581c-.8059.54-1.8368.8591-3.0477.8591-2.3436 0-4.3282-1.5831-5.036-3.7104H.9573v2.3318C2.4382 15.9832 5.4818 18 9 18z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M3.964 10.71c-.18-.54-.2822-1.1168-.2822-1.71s.1023-1.17.2823-1.71V4.9582H.9573C.3477 6.1732 0 7.5477 0 9s.3477 2.8268.9573 4.0418L3.964 10.71z"
-      />
-      <path
-        fill="#EA4335"
-        d="M9 3.5795c1.3214 0 2.5077.4541 3.4405 1.346l2.5813-2.5813C13.4632.8918 11.4259 0 9 0 5.4818 0 2.4382 2.0168.9573 4.9582L3.964 7.29C4.6718 5.1627 6.6564 3.5795 9 3.5795z"
-      />
-    </svg>
-  )
-}
-
 type GoogleCredentialResponse = { credential: string }
+
+type RenderButtonOptions = {
+  theme?: 'outline' | 'filled_blue' | 'filled_black'
+  size?: 'large' | 'medium' | 'small'
+  text?: 'signin_with' | 'signup_with' | 'continue_with' | 'signin'
+  shape?: 'rectangular' | 'pill' | 'circle' | 'square'
+  locale?: string
+  width?: string
+}
 
 declare global {
   interface Window {
@@ -56,16 +35,28 @@ declare global {
             client_id: string
             callback: (resp: GoogleCredentialResponse) => void
           }) => void
-          prompt: () => void
+          renderButton: (parent: HTMLElement, options: RenderButtonOptions) => void
         }
       }
     }
   }
 }
 
+const MAX_BUTTON_WIDTH = 400
+
 /**
- * Google Identity Services 로 id_token 을 받아 /api/auth/google 로 넘긴다.
- * 응답 형태가 비밀번호 로그인과 같으므로 성공 후 이동 경로도 같다(/home).
+ * Google Identity Services 의 `renderButton`(팝업 방식)으로 id_token 을 받아
+ * /api/auth/google 로 넘긴다. 응답 형태가 비밀번호 로그인과 같으므로 성공
+ * 후 이동 경로도 같다(/home).
+ *
+ * One Tap(`prompt()`) 은 FedCM 의 통제를 받아 클릭에 반응하는 용도로
+ * 부적합하다 — 한 번 닫으면 쿨다운이 걸리고 브라우저의 "타사 로그인"
+ * 설정에 막히면 이유 없이 AbortError 로 중단된다. `renderButton` 은 구글이
+ * 그리는 버튼을 클릭하면 팝업 창이 뜨는 방식이라 이 문제가 없다.
+ *
+ * 구글이 버튼 마크업을 직접 그리므로 완전한 커스텀 스타일은 불가능하다.
+ * 대신 우리 카드가 검정 배경(`--ss-bg`)이라 `filled_black` 테마가 잘
+ * 어울려 이 옵션을 그대로 쓴다(구글 브랜드 마크/문구는 임의 변경 금지).
  */
 export default function GoogleSignInButton({
   onError,
@@ -73,26 +64,10 @@ export default function GoogleSignInButton({
   onError: (message: string) => void
 }) {
   const router = useRouter()
-  const [ready, setReady] = useState(false)
-  const [busy, setBusy] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
   const initialized = useRef(false)
 
-  if (!CLIENT_ID) return null
-
-  function initialize() {
-    if (initialized.current || !window.google) return
-    initialized.current = true
-    window.google.accounts.id.initialize({
-      client_id: CLIENT_ID as string,
-      callback: (resp) => {
-        void handleCredential(resp.credential)
-      },
-    })
-    setReady(true)
-  }
-
   async function handleCredential(idToken: string) {
-    setBusy(true)
     try {
       await apiPost('/api/auth/google', { id_token: idToken })
       router.push('/home')
@@ -100,14 +75,46 @@ export default function GoogleSignInButton({
     } catch (err) {
       // 503 GOOGLE_LOGIN_NOT_CONFIGURED 도 서버가 준 message 를 그대로 보여준다.
       onError(apiErrorMessage(err))
-    } finally {
-      setBusy(false)
     }
   }
 
-  function onClick() {
-    window.google?.accounts.id.prompt()
+  function renderGoogleButton() {
+    if (!window.google || !containerRef.current) return
+    const measuredWidth = containerRef.current.offsetWidth
+    const width = String(measuredWidth > 0 ? Math.min(measuredWidth, MAX_BUTTON_WIDTH) : MAX_BUTTON_WIDTH)
+    window.google.accounts.id.renderButton(containerRef.current, {
+      theme: 'filled_black',
+      shape: 'pill',
+      size: 'large',
+      text: 'continue_with',
+      locale: 'ko',
+      width,
+    })
   }
+
+  function initialize() {
+    if (initialized.current || !window.google || !CLIENT_ID) return
+    initialized.current = true
+    window.google.accounts.id.initialize({
+      client_id: CLIENT_ID,
+      callback: (resp) => {
+        void handleCredential(resp.credential)
+      },
+    })
+    renderGoogleButton()
+  }
+
+  // 카드 폭은 반응형(max-w-sm)이라, 구글 버튼의 고정 픽셀 폭도 뷰포트가
+  // 바뀔 때마다 다시 맞춰준다.
+  useEffect(() => {
+    function onResize() {
+      renderGoogleButton()
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  if (!CLIENT_ID) return null
 
   return (
     <>
@@ -117,16 +124,7 @@ export default function GoogleSignInButton({
         strategy="afterInteractive"
         onLoad={initialize}
       />
-      <PillButton
-        type="button"
-        variant="ghost"
-        disabled={!ready || busy}
-        onClick={onClick}
-        className="w-full gap-2"
-      >
-        <GoogleGlyph />
-        Google로 계속하기
-      </PillButton>
+      <div ref={containerRef} className="flex w-full justify-center" />
     </>
   )
 }

@@ -1,13 +1,31 @@
-import { render, screen } from '@testing-library/react'
+import { render, waitFor } from '@testing-library/react'
+import { useEffect } from 'react'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+}))
+
+// next/script 는 실제 브라우저에서만 <script> 로드 이벤트를 쏘므로, jsdom
+// 에서는 커밋(마운트) 후 onLoad 를 호출하는 걸로 대체한다 — 렌더 도중에
+// 부르면 형제 요소의 ref 가 아직 안 붙어 있어(GoogleSignInButton 의
+// containerRef) 실제 순서와 달라진다. 우리가 검증할 대상은 "스크립트가
+// 로드된 뒤 초기화/렌더가 일어나는가"이지 next/script 자체의 로딩 동작이
+// 아니다.
+vi.mock('next/script', () => ({
+  default: function MockScript({ onLoad }: { onLoad?: () => void }) {
+    useEffect(() => {
+      onLoad?.()
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 시 1회만
+    }, [])
+    return null
+  },
 }))
 
 describe('GoogleSignInButton', () => {
   afterEach(() => {
     vi.unstubAllEnvs()
     vi.resetModules()
+    delete (window as unknown as { google?: unknown }).google
   })
 
   it('NEXT_PUBLIC_GOOGLE_CLIENT_ID 가 없으면 아무것도 그리지 않는다', async () => {
@@ -17,12 +35,32 @@ describe('GoogleSignInButton', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('NEXT_PUBLIC_GOOGLE_CLIENT_ID 가 있으면 버튼을 그린다(로드 전에는 비활성)', async () => {
+  it('NEXT_PUBLIC_GOOGLE_CLIENT_ID 가 있으면 구글 identity services 를 초기화하고 renderButton(팝업 방식)을 호출한다', async () => {
     vi.stubEnv('NEXT_PUBLIC_GOOGLE_CLIENT_ID', 'test-client-id.apps.googleusercontent.com')
+    const initialize = vi.fn()
+    const renderButton = vi.fn()
+    window.google = { accounts: { id: { initialize, renderButton } } }
+
     const { default: GoogleSignInButton } = await import('./GoogleSignInButton')
     render(<GoogleSignInButton onError={() => {}} />)
-    const button = screen.getByRole('button', { name: 'Google로 계속하기' })
-    expect(button).toBeInTheDocument()
-    expect(button).toBeDisabled()
+
+    await waitFor(() => {
+      expect(initialize).toHaveBeenCalledWith(
+        expect.objectContaining({ client_id: 'test-client-id.apps.googleusercontent.com' }),
+      )
+    })
+    expect(renderButton).toHaveBeenCalledTimes(1)
+    const [, options] = renderButton.mock.calls[0]
+    // One Tap(prompt) 이 아니라 팝업 방식이어야 하고, 구글 브랜드 마크/문구는
+    // 우리가 임의로 바꾸지 않는다 — 표준 옵션만 넘기는지 확인한다.
+    expect(options).toEqual(
+      expect.objectContaining({
+        theme: 'filled_black',
+        shape: 'pill',
+        size: 'large',
+        text: 'continue_with',
+        locale: 'ko',
+      }),
+    )
   })
 })
