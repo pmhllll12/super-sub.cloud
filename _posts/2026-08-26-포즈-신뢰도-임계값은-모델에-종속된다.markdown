@@ -1,7 +1,8 @@
 ---
-layout: post
+layout: default
 title: "포즈 신뢰도 임계값은 모델에 종속된다 — 외부 포즈 3,444클립 검증"
 date: 2026-08-26
+nav_exclude: true
 ---
 
 골든셋 후보로 받은 PitcherMotion(MLB 투구 포즈 3,444클립, 60fps, KAPAO 추출)을

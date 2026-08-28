@@ -1,7 +1,8 @@
 ---
-layout: post
+layout: default
 title: "선수 식별 selector — 이 데이터셋으로는 A/B가 갈리지 않는다"
 date: 2026-08-28
+nav_exclude: true
 ---
 
 영상에 여러 사람이 잡힐 때 **누구를 분석 대상으로 고를 것인가**를 정하는
