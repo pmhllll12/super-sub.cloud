@@ -1,11 +1,9 @@
-import BrandMark from '@/components/ui/BrandMark'
-import DestinationCard from '@/components/DestinationCard'
-import FigureBackground from '@/components/FigureBackground'
+import HomeParallax, { type Destination } from '@/components/HomeParallax'
 import { requireUser } from '@/server/currentUser'
 
 // flutter/lib/features/home/presentation/screens/home_screen.dart 의 _kDestinations 와 같은 순서 · 같은 뜻.
 // '내 선수 카드' 는 앱엔 아직 route 가 없지만(미완성) 웹엔 /me/card 가 실재하므로 여기선 링크를 건다.
-const DESTINATIONS: { title: string; icon: string; summary: string; href?: string }[] = [
+const DESTINATIONS: Destination[] = [
   {
     title: '영상 분석',
     icon: 'videocam',
@@ -46,23 +44,7 @@ export default async function HomePage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center gap-10 px-6 py-16">
-      <FigureBackground />
-      <BrandMark />
-      <p className="text-lg font-medium" style={{ color: 'var(--ss-fg)' }}>
-        {user.nickname}
-      </p>
-      <div className="grid w-full grid-cols-2 gap-3">
-        {DESTINATIONS.map((d, i) => (
-          <DestinationCard
-            key={d.title}
-            title={d.title}
-            icon={d.icon}
-            summary={d.summary}
-            href={d.href}
-            phase={i * 0.13}
-          />
-        ))}
-      </div>
+      <HomeParallax nickname={user.nickname} destinations={DESTINATIONS} />
     </main>
   )
 }
