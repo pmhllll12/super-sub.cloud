@@ -1,0 +1,19 @@
+basis,T0-01,T0-06,margin_b_minus_a,verdict
+나머지 5건 = labels.json,B,B,2,B 우세
+나머지 5건 = labels.json,B,A,0,동률
+나머지 5건 = labels.json,B,uncertain,1,B 우세
+나머지 5건 = labels.json,A,B,0,동률
+나머지 5건 = labels.json,A,A,-2,A 우세
+나머지 5건 = labels.json,A,uncertain,-1,A 우세
+나머지 5건 = labels.json,uncertain,B,1,B 우세
+나머지 5건 = labels.json,uncertain,A,-1,A 우세
+나머지 5건 = labels.json,uncertain,uncertain,0,동률
+나머지 5건 = clean AI,B,B,1,B 우세
+나머지 5건 = clean AI,B,A,-1,A 우세
+나머지 5건 = clean AI,B,uncertain,0,동률
+나머지 5건 = clean AI,A,B,-1,A 우세
+나머지 5건 = clean AI,A,A,-3,A 우세
+나머지 5건 = clean AI,A,uncertain,-2,A 우세
+나머지 5건 = clean AI,uncertain,B,0,동률
+나머지 5건 = clean AI,uncertain,A,-2,A 우세
+나머지 5건 = clean AI,uncertain,uncertain,-1,A 우세

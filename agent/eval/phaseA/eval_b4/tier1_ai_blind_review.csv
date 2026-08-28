@@ -1,0 +1,54 @@
+clip_id,frame,n_candidates,image,ai_box_index,ai_note,confidence,blind_status
+3R1kvNrGJK0,40,9,images/T1_3R1kvNrGJK0@f040.jpg,0,batter with bat at plate; catcher in gear excluded,high,blind_ai_review
+3R1kvNrGJK0,132,10,images/T1_3R1kvNrGJK0@f132.jpg,0,batter carrying bat; umpire excluded,high,blind_ai_review
+3R1kvNrGJK0,138,10,images/T1_3R1kvNrGJK0@f138.jpg,1,batter with bat; umpire excluded,high,blind_ai_review
+3R1kvNrGJK0,148,8,images/T1_3R1kvNrGJK0@f148.jpg,1,batter with bat; umpire excluded,high,blind_ai_review
+3USSmzO001k,32,2,images/T1_3USSmzO001k@f032.jpg,1,player holding bat; instructor gesturing excluded,high,blind_ai_review
+3USSmzO001k,76,3,images/T1_3USSmzO001k@f076.jpg,1,player holding bat; instructor excluded,high,blind_ai_review
+3USSmzO001k,118,4,images/T1_3USSmzO001k@f118.jpg,1,player with bat clearly visible; instructor excluded,high,blind_ai_review
+3USSmzO001k,133,2,images/T1_3USSmzO001k@f133.jpg,1,same player holding bat; instructor excluded,high,blind_ai_review
+5-jBTNp5IQA,73,11,images/T1_5-jBTNp5IQA@f073.jpg,2,runner leaving batter's box beside umpire,medium,blind_ai_review
+5-jBTNp5IQA,92,7,images/T1_5-jBTNp5IQA@f092.jpg,0,runner in red on basepath; foreground figure cut off,medium,blind_ai_review
+6hrcRyIYTrA,35,6,images/T1_6hrcRyIYTrA@f035.jpg,0,batter just after swing with bat on ground,high,blind_ai_review
+6hrcRyIYTrA,46,7,images/T1_6hrcRyIYTrA@f046.jpg,1,batter-runner in helmet; coach excluded,high,blind_ai_review
+6hrcRyIYTrA,50,8,images/T1_6hrcRyIYTrA@f050.jpg,0,batter-runner in helmet; coach excluded,high,blind_ai_review
+6hrcRyIYTrA,69,10,images/T1_6hrcRyIYTrA@f069.jpg,9,"batter-runner in helmet at frame edge, partly cut off",medium,blind_ai_review
+8gmHKqDxXdg,15,2,images/T1_8gmHKqDxXdg@f015.jpg,0,batter in stance; feeder bent over excluded,high,blind_ai_review
+Atzrde5uGcM,139,14,images/T1_Atzrde5uGcM@f139.jpg,uncertain,dispersed field scene; no batting setup identifiable,low,blind_ai_review
+C7icGyrdROM,33,2,images/T1_C7icGyrdROM@f033.jpg,0,figure mid-swing in cage; image dark and blurred,medium,blind_ai_review
+CFjNxCZhn_8,11,11,images/T1_CFjNxCZhn_8@f011.jpg,2,player carrying bat; crouching catcher excluded,medium,blind_ai_review
+CFjNxCZhn_8,14,11,images/T1_CFjNxCZhn_8@f014.jpg,1,player with bat; catcher excluded,medium,blind_ai_review
+CFjNxCZhn_8,28,15,images/T1_CFjNxCZhn_8@f028.jpg,12,figure beside crouching catcher; boxes overlap heavily,low,blind_ai_review
+CFjNxCZhn_8,92,17,images/T1_CFjNxCZhn_8@f092.jpg,2,player standing beside catcher at plate,medium,blind_ai_review
+Fz16t9SrF3U,43,5,images/T1_Fz16t9SrF3U@f043.jpg,uncertain,only umpire and geared catcher clear; batter not identifiable,low,blind_ai_review
+Fz16t9SrF3U,59,6,images/T1_Fz16t9SrF3U@f059.jpg,4,batter in stance with bat; catcher and umpire excluded,high,blind_ai_review
+Fz16t9SrF3U,85,6,images/T1_Fz16t9SrF3U@f085.jpg,2,batter no.8 after swing; catcher excluded,high,blind_ai_review
+Fz16t9SrF3U,97,6,images/T1_Fz16t9SrF3U@f097.jpg,1,batter-runner no.8; catcher fielding ball excluded,high,blind_ai_review
+GS-PcxmaHmQ,32,2,images/T1_GS-PcxmaHmQ@f032.jpg,1,batter in stance with bat; coach at tee excluded,high,blind_ai_review
+IeDin6oB-IY,71,10,images/T1_IeDin6oB-IY@f071.jpg,4,batter with red helmet at tee; adult crossing foreground excluded,medium,blind_ai_review
+LXjM7nBZcak,38,9,images/T1_LXjM7nBZcak@f038.jpg,uncertain,"two helmeted players, cannot tell which is batter",low,blind_ai_review
+LXjM7nBZcak,66,12,images/T1_LXjM7nBZcak@f066.jpg,uncertain,"single player visible, role unclear; spectators dominate",low,blind_ai_review
+N5zWQkoLM3M,76,4,images/T1_N5zWQkoLM3M@f076.jpg,3,batter swinging in cage; foreground person cut off at edge,medium,blind_ai_review
+N5zWQkoLM3M,86,8,images/T1_N5zWQkoLM3M@f086.jpg,1,batter in cage; foreground person cut off at edge,medium,blind_ai_review
+N5zWQkoLM3M,133,4,images/T1_N5zWQkoLM3M@f133.jpg,2,batter in cage; foreground person cut off at edge,medium,blind_ai_review
+X6dC9pu5H3k,61,7,images/T1_X6dC9pu5H3k@f061.jpg,0,batter-runner in helmet on the base path; coach excluded,high,blind_ai_review
+X6dC9pu5H3k,124,6,images/T1_X6dC9pu5H3k@f124.jpg,uncertain,foreground helmet head only; adult in red appears to be a coach,low,blind_ai_review
+Zp9aDp2YTBw,15,2,images/T1_Zp9aDp2YTBw@f015.jpg,none,not a batting scene; no bat present,high,blind_ai_review
+Zp9aDp2YTBw,64,2,images/T1_Zp9aDp2YTBw@f064.jpg,none,not a batting scene; no bat present,high,blind_ai_review
+bh6Cvz2orzQ,50,2,images/T1_bh6Cvz2orzQ@f050.jpg,1,batter mid-swing in cage; foreground observer excluded,high,blind_ai_review
+g_wHimPF9o8,102,9,images/T1_g_wHimPF9o8@f102.jpg,uncertain,runner cluster boxes overlap; index not assignable,low,blind_ai_review
+hz-SpF35_BE,16,2,images/T1_hz-SpF35_BE@f016.jpg,0,batter with bat in outdoor cage,high,blind_ai_review
+hz-SpF35_BE,50,5,images/T1_hz-SpF35_BE@f050.jpg,0,batter mid-swing in outdoor cage,high,blind_ai_review
+hz-SpF35_BE,126,5,images/T1_hz-SpF35_BE@f126.jpg,uncertain,two overlapping boxes on batter region; index unclear,low,blind_ai_review
+hz-SpF35_BE,143,4,images/T1_hz-SpF35_BE@f143.jpg,0,batter with bat; observer behind pole excluded,high,blind_ai_review
+idueIYDAbZc,78,3,images/T1_idueIYDAbZc@f078.jpg,2,batter holding bat; catcher in gear excluded,high,blind_ai_review
+idueIYDAbZc,104,5,images/T1_idueIYDAbZc@f104.jpg,3,batter with helmet and bat; catcher excluded,high,blind_ai_review
+idueIYDAbZc,110,8,images/T1_idueIYDAbZc@f110.jpg,3,batter after swing with bat on ground; catcher excluded,high,blind_ai_review
+idueIYDAbZc,117,9,images/T1_idueIYDAbZc@f117.jpg,3,batter walking with bat on ground; catcher and umpire excluded,high,blind_ai_review
+sGKeqfxwq5E,41,7,images/T1_sGKeqfxwq5E@f041.jpg,1,batter in stance with bat; catcher in yellow excluded,high,blind_ai_review
+sGKeqfxwq5E,97,7,images/T1_sGKeqfxwq5E@f097.jpg,2,batter running after swing; catcher and umpire excluded,high,blind_ai_review
+sYl2jCqsSKo,82,3,images/T1_sYl2jCqsSKo@f082.jpg,1,batter-runner in red with helmet; coach and fielder excluded,high,blind_ai_review
+sYl2jCqsSKo,107,2,images/T1_sYl2jCqsSKo@f107.jpg,none,only fielder and coach in frame,medium,blind_ai_review
+sYl2jCqsSKo,123,2,images/T1_sYl2jCqsSKo@f123.jpg,none,only fielder and coach in frame,medium,blind_ai_review
+sYl2jCqsSKo,142,6,images/T1_sYl2jCqsSKo@f142.jpg,uncertain,foreground helmet close-up vs distant red player; cannot resolve,low,blind_ai_review
+w-AQcjcoDyA,24,2,images/T1_w-AQcjcoDyA@f024.jpg,0,distant figure with bat behind net; foreground shows only shoes,low,blind_ai_review

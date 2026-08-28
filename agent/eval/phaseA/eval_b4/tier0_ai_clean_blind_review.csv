@@ -1,0 +1,8 @@
+case,clip_id,frame,n_candidates,image,human_box_index,human_note,confidence
+T0-01,3USSmzO001k,119,3,images/T0_3USSmzO001k@0.80.jpg,1,네이비 저지 선수가 배트를 들고 서 있음 (흰옷은 지도자),high
+T0-02,5-jBTNp5IQA,75,9,images/T0_5-jBTNp5IQA@0.50.jpg,uncertain,철망 너머 흐릿한 주자 여럿 배트나 타석 확인 불가,low
+T0-03,IeDin6oB-IY,75,9,images/T0_IeDin6oB-IY@0.50.jpg,4,빨간 헬멧 쓴 선수가 홈플레이트에 서 있음 (위 박스는 뒤쪽 심판),high
+T0-04,N5zWQkoLM3M,75,4,images/T0_N5zWQkoLM3M@0.50.jpg,2,케이지 안에서 배트를 들고 타격 자세 (좌측 끝 인물은 배트 세우고 대기),medium
+T0-05,N5zWQkoLM3M,119,6,images/T0_N5zWQkoLM3M@0.80.jpg,2,가운데 케이지에서 배트 든 동일 인물 좌측 끝 인물도 배트 보유해 다소 애매,medium
+T0-06,X6dC9pu5H3k,107,6,images/T0_X6dC9pu5H3k@0.80.jpg,4,전경에 타격 헬멧 쓴 머리만 보임 나머지는 반바지 코치와 구경꾼,medium
+T0-07,sYl2jCqsSKo,119,3,images/T0_sYl2jCqsSKo@0.80.jpg,2,헬멧 쓴 빨간 저지 주자가 글러브 낀 수비수 뒤에 가려짐,medium
