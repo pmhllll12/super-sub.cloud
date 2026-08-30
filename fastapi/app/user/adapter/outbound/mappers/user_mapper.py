@@ -26,6 +26,7 @@ def to_user_entity(row: UserOrm) -> UserEntity:
         email=Email.of(row.email),
         nickname=Nickname.of(row.nickname),
         created_at=row.created_at,
+        token_version=row.token_version,
     )
 
 

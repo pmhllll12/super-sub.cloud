@@ -1,0 +1,3 @@
+covariate,population_frames,population_runs,reviewed_sample,decided_sample,info_score_weight
+b_locked,0.633,0.548,0.767,0.884,2.0
+a_pose_switch,0.208,0.394,0.633,0.651,1.0

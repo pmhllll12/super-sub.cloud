@@ -45,7 +45,8 @@ def main() -> None:
     ap.add_argument("--fps", type=int, default=15)
     args = ap.parse_args()
 
-    pose = extract_keypoints(args.video, target_fps=args.fps)
+    # observe=False — 측정용 CLI는 서비스 입력이 아니다 (analyze.py와 같은 이유).
+    pose = extract_keypoints(args.video, target_fps=args.fps, observe=False)
     print(f"[포즈] {len(pose.keypoints)}프레임 · 원본 {pose.source_fps:.1f}fps "
           f"· 실효 {pose.sampled_fps:.2f}fps")
 

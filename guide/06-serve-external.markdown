@@ -1,7 +1,8 @@
 ---
-layout: page
+layout: default
 title: "6. 서버에서 외부 접근 가능하게 실행"
 permalink: /guide/06-serve-external/
+nav_exclude: true
 ---
 
 헤드리스 서버라면 외부에서 접근해야 하므로 아래와 같이 실행하세요.

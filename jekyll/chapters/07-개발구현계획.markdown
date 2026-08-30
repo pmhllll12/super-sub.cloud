@@ -1,7 +1,10 @@
 ---
-layout: page
+layout: default
 title: 개발 구현 계획
 permalink: /07-개발구현계획/
+parent: II 부. 개발 수행 계획
+nav_order: 3
+has_children: true
 ---
 
 ## 1) 개발 환경 및 기술 스택
@@ -23,7 +26,7 @@ permalink: /07-개발구현계획/
 **팀 역할** (2026.08.26 재배정)
 
 - 박민호 — PM (요구사항/일정 관리, 스프린트 진행, QA 총괄)
-- 백성검 — 프론트·웹 (앱 UI/UX, 화면 구현, 웹 페이지)
+- 백성검 — 프론트·웹 (Flutter 앱 UI/UX, 화면 구현, 웹 페이지)
 - 정어진 — 백엔드·파이프라인 (DB·API, 영상 수집·전처리, 분석 파이프라인, 배포)
 - 정상호 — AI 에이전트 개발 (RAG 검증, 실력 판단 로직)
 
@@ -55,7 +58,7 @@ permalink: /07-개발구현계획/
   <div class="kanban-column">
     <h4>To Do</h4>
     <div class="kanban-card"><span class="role-tag role-pm">박민호·PM</span>스프린트 2 계획 회의 준비</div>
-    <div class="kanban-card"><span class="role-tag role-front">백성검·프론트/웹</span>Flutter 프로젝트 인수 — 화면 구현 이어받기</div>
+    <div class="kanban-card"><span class="role-tag role-front">백성검·프론트/웹</span>Flutter 화면 구현 이어가기</div>
     <div class="kanban-card"><span class="role-tag role-backend">정어진·백엔드/파이프라인</span>DB 스키마 초안 작성</div>
     <div class="kanban-card"><span class="role-tag role-backend">정어진·백엔드/파이프라인</span>API 규격 초안 회람 (백성검·정상호 착수 조건)</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>루브릭 지도자 검수 요청(임계값·칭호 문구 확정)</div>
@@ -69,9 +72,9 @@ permalink: /07-개발구현계획/
   <div class="kanban-column">
     <h4>Done</h4>
     <div class="kanban-card"><span class="role-tag role-pm">박민호·PM</span>역할 재배정 확정 (08.26) — 로드맵·칸반 반영</div>
-    <div class="kanban-card"><span class="role-tag role-front">백성검·프론트/웹</span>제안서 사이트(목차/구조) 확정</div>
-    <div class="kanban-card"><span class="role-tag role-front">백성검·프론트/웹</span>GitHub 레포 및 Pages 배포 파이프라인 구축</div>
-    <div class="kanban-card"><span class="role-tag role-backend">정어진·백엔드/파이프라인</span>Flutter 앱 골격·로그인·홈·영상 분석 화면 구현 (재배정 전 작업, 백성검에게 인계)</div>
+    <div class="kanban-card"><span class="role-tag role-pm">박민호·PM</span>제안서 사이트(목차/구조) 확정</div>
+    <div class="kanban-card"><span class="role-tag role-pm">박민호·PM</span>GitHub 레포 및 Pages 배포 파이프라인 구축</div>
+    <div class="kanban-card"><span class="role-tag role-front">백성검·프론트/웹</span>Flutter 앱 골격·로그인·홈·영상 분석 화면 구현</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>멀티모달 에이전트 아키텍처 리서치</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>에이전트 처리 흐름 설계</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>판정 모델 선정·실측 (EXAONE 4.0 1.2B, bf16)</div>
@@ -80,6 +83,9 @@ permalink: /07-개발구현계획/
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>등급 판정 코드 이관 — 루브릭 bands 도입, 경계값 오판 해소</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>선수 카드 칭호 체계 — 루브릭 titles</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>지원 범위 확정 — 축구·야구·농구 종목당 1동작(미결 3번 해소)</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>외부 포즈 데이터 검증 — 3,444클립, 신뢰도 임계값의 모델 종속성 확인</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>팔 품질 게이트에서 손목 제외 — 지표 산출률 21%→71%</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>분석 대상 selector 평가 — 격리 판독 60건, 이 데이터셋으로는 A/B 판별 불가 확인(미결 8번)</div>
   </div>
 </div>
 

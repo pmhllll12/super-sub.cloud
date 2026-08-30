@@ -97,6 +97,10 @@ class FakeRepo(UserPort):
     def find_by_credentials(self, email, password): ...
     def get(self, user_id: UUID) -> UserEntity | None: ...
     def update_nickname(self, user_id: UUID, nickname: Nickname) -> None: ...
+    def change_password(self, user_id: UUID, password: Password) -> None: ...
+    def has_password(self, user_id: UUID) -> bool: ...
+    def delete(self, user_id: UUID) -> None: ...
+    def bump_token_version(self, user_id: UUID) -> None: ...
     def list_memberships(self, user_id: UUID) -> list[MembershipEntity]: ...
 
 
@@ -113,7 +117,8 @@ class TestFirstTime:
 
         assert len(repo.created) == 1
         assert str(repo.created[0].email) == "newcomer@super-sub.example"
-        assert verify_access_token(f"Bearer {result.access_token}") == repo.created[0].id
+        token = verify_access_token(f"Bearer {result.access_token}")
+        assert token.user_id == repo.created[0].id
 
     def test_표시_이름이_상한을_넘으면_자른다(self):
         """자르지 않으면 저장 시점에 터진다 — 사용자가 고칠 수 없는 실패다."""
@@ -143,7 +148,7 @@ class TestEmailCollision:
 
         assert repo.created == []
         assert repo.linked == [(EXISTING_ID, "google", "google-sub-1")]
-        assert verify_access_token(f"Bearer {result.access_token}") == EXISTING_ID
+        assert verify_access_token(f"Bearer {result.access_token}").user_id == EXISTING_ID
 
     def test_확인되지_않은_이메일이면_연결하지_않는다(self):
         """🔴 연결해 주면 아무 이메일이나 적어 남의 계정을 가져갈 수 있다."""

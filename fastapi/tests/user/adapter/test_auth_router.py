@@ -93,6 +93,23 @@ class TestSignup:
         assert error_code(res) == "VALIDATION_ERROR"
 
 
+class TestLogoutAll:
+    """폐기가 **실제로 토큰을 끊는지**는 `test_token_revocation_db.py` 가 본다.
+
+    여기서는 계약만 본다 — 인증이 필요한가, 성공하면 무엇을 주는가.
+    """
+
+    def test_토큰이_없으면_401(self, client):
+        res = client.post(f"{V1}/auth/logout-all")
+        assert res.status_code == 401
+        assert error_code(res) == "UNAUTHORIZED"
+
+    def test_성공하면_204_이고_본문이_없다(self, client, auth):
+        res = client.post(f"{V1}/auth/logout-all", headers=auth)
+        assert res.status_code == 204
+        assert res.content == b""
+
+
 class TestOpenApi:
     def test_계약의_경로가_전부_열려_있다(self, client):
         paths = set(client.get("/openapi.json").json()["paths"])
@@ -101,7 +118,9 @@ class TestOpenApi:
             f"{V1}/auth/signup",
             f"{V1}/auth/login",
             f"{V1}/auth/google",
+            f"{V1}/auth/logout-all",
             f"{V1}/me",
+            f"{V1}/me/password",
             f"{V1}/me/card",
             V1 + "/cards/{public_slug}",
         }

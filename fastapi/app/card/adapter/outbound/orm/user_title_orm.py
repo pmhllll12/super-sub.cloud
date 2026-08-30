@@ -27,7 +27,7 @@ class UserTitleOrm(Base):
     # 다루지만 계정 탈퇴 시의 처리는 정하지 않았다. 정해지지 않은 것을 여기서
     # 임의로 정하면 나중에 스키마와 문서가 어긋난다.
     user_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("user.id"), nullable=False
+        Uuid, ForeignKey("user.id", ondelete="CASCADE"), nullable=False
     )
     title_code: Mapped[str] = mapped_column(
         String(40), ForeignKey("title_definition.code"), nullable=False

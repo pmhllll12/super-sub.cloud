@@ -1,0 +1,54 @@
+{
+  "label_source": "ai_blind_review",
+  "human_verified": false,
+  "source_labels_modified": false,
+  "review_packet_only": true,
+  "created": "2026-08-28",
+  "reviewer": "Claude Opus 5 — image-only review of eval_b4/review_packet",
+  "inputs": [
+    "eval_b4/review_packet/INSTRUCTIONS.md",
+    "eval_b4/review_packet/tier0_form.csv",
+    "eval_b4/review_packet/tier1_form.csv",
+    "eval_b4/review_packet/images/*.jpg"
+  ],
+  "selector_blinded": {
+    "tier1": true,
+    "tier0": "partial — 7건 중 5건만. 아래 caveat 참고"
+  },
+  "caveat": "이 판독은 B-3·B-4 분석을 수행한 것과 같은 세션에서 이루어졌다. Tier 0의 T0-01(3USSmzO001k@0.80)과 T0-06(X6dC9pu5H3k@0.80)은 판독 전에 기존 GT와 A-pose/B-pose 선택값이 이미 노출된 상태였으므로 blind가 아니다 (blind_status=prior_exposure_not_blind). 나머지 Tier 0 5건은 Phase B-3에서 blind로 내린 판정을 그대로 유지한 것이다. Tier 1 53건은 GT가 존재하지 않는 프레임이고 개별 프레임의 selector 선택값을 본 적이 없다.",
+  "not_read_during_review": [
+    "labeling/labels.json",
+    "eval_b3/labels_ai_reviewed.json",
+    "eval_b4/tier0_ai_review.csv",
+    "eval_b4/tier0_sensitivity.csv",
+    "eval_b4/tier0_sensitivity.md",
+    "eval_b4/ab_origin_trace.csv",
+    "eval_b4/ab_disagreement_frames.csv",
+    "eval_b4/b4_selection_rationale.csv",
+    "eval_b4/regression_watchlist.csv"
+  ],
+  "summary": {
+    "tier0": {
+      "n": 7,
+      "candidate": 6,
+      "none": 0,
+      "uncertain": 1,
+      "confidence": {
+        "high": 2,
+        "medium": 4,
+        "low": 1
+      }
+    },
+    "tier1": {
+      "n": 53,
+      "candidate": 41,
+      "none": 4,
+      "uncertain": 8,
+      "confidence": {
+        "high": 30,
+        "medium": 13,
+        "low": 10
+      }
+    }
+  }
+}

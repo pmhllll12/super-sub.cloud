@@ -1,7 +1,8 @@
 ---
-layout: page
+layout: default
 title: "1. 빌드 의존성 패키지 설치"
 permalink: /guide/01-dependencies/
+nav_exclude: true
 ---
 
 ```bash

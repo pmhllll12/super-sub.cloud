@@ -1,0 +1,8 @@
+clip_id,ratio,frame,n_candidates,image,human_box_index,human_note
+3USSmzO001k,0.80,119,3,eval_b4/tier0_cases/3USSmzO001k@0.80.jpg,,
+5-jBTNp5IQA,0.50,75,9,eval_b4/tier0_cases/5-jBTNp5IQA@0.50.jpg,,
+IeDin6oB-IY,0.50,75,9,eval_b4/tier0_cases/IeDin6oB-IY@0.50.jpg,,
+N5zWQkoLM3M,0.50,75,4,eval_b4/tier0_cases/N5zWQkoLM3M@0.50.jpg,,
+N5zWQkoLM3M,0.80,119,6,eval_b4/tier0_cases/N5zWQkoLM3M@0.80.jpg,,
+X6dC9pu5H3k,0.80,107,6,eval_b4/tier0_cases/X6dC9pu5H3k@0.80.jpg,,
+sYl2jCqsSKo,0.80,119,3,eval_b4/tier0_cases/sYl2jCqsSKo@0.80.jpg,,

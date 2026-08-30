@@ -1,0 +1,4 @@
+clip_id,ratio,frame,n_candidates,n_candidates_ge50,gt_box_index,baseline_box,A_box,B_box,A_pose_box,B_pose_box,baseline_correct,A_correct,B_correct,A_pose_correct,B_pose_correct,b_pose_continuity,ab_pose_disagree,discriminates_a_vs_b,failure_mode
+LhD_fnHt_xg,0.50,61,2,2,0,0,1,1,1,1,1,0,0,0,0,0.869,0,0,A-pose·B-pose 공통 실패 (A/B 판별에는 무효)
+LhD_fnHt_xg,0.80,97,2,2,0,0,1,1,1,1,1,0,0,0,0,0.951,0,0,A-pose·B-pose 공통 실패 (A/B 판별에는 무효)
+N5zWQkoLM3M,0.50,75,4,3,2,2,2,1,2,1,1,1,0,1,0,0.828,1,1,continuity가 오답 대상에 고착

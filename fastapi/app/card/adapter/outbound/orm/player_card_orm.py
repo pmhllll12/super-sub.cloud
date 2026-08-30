@@ -20,7 +20,7 @@ class PlayerCardOrm(Base):
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     user_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("user.id"), nullable=False
+        Uuid, ForeignKey("user.id", ondelete="CASCADE"), nullable=False
     )
     # 공개 조회는 이것으로만 받는다. 내부 id 를 밖에 내보내지 않기 위해서다(SFR-009).
     public_slug: Mapped[str] = mapped_column(String(80), nullable=False)

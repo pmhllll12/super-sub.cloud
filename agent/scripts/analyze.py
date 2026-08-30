@@ -49,7 +49,9 @@ def main() -> None:
     # --- 측정 (결정론적) ------------------------------------------------
     t0 = time.time()
     try:
-        pose = extract_keypoints(args.video, target_fps=args.fps)
+        # observe=False — CLI는 서비스 입력이 아니다. 개발 중 반복 실행이
+        # 서비스 입력 분포에 섞이면 그 분포로 내리는 판단이 오염된다.
+        pose = extract_keypoints(args.video, target_fps=args.fps, observe=False)
         # 임팩트 정의와 도구 궤적을 루브릭에서 받아 넘긴다. 넘기지 않으면 팔
         # 루브릭도 다리로 측정되고, 도구 기반 항목이 통째로 빠진다.
         features = extract_features(

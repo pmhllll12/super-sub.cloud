@@ -1,7 +1,8 @@
 ---
-layout: page
+layout: default
 title: "3. rbenv로 Ruby 본체 설치"
 permalink: /guide/03-ruby-install/
+nav_exclude: true
 ---
 
 ```bash

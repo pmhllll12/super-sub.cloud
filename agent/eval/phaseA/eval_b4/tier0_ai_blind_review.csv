@@ -1,0 +1,8 @@
+clip_id,frame,n_candidates,image,ai_box_index,ai_note,confidence,blind_status
+3USSmzO001k,119,3,images/T0_3USSmzO001k@0.80.jpg,1,batter holding bat; instructor with raised hand excluded,high,prior_exposure_not_blind
+5-jBTNp5IQA,75,9,images/T0_5-jBTNp5IQA@0.50.jpg,0,batter-runner in red jersey after contact,medium,blind_ai_review
+IeDin6oB-IY,75,9,images/T0_IeDin6oB-IY@0.50.jpg,4,batter with red helmet at plate; foreground adult crossing,high,blind_ai_review
+N5zWQkoLM3M,75,4,images/T0_N5zWQkoLM3M@0.50.jpg,2,batter mid-swing in cage; foreground person cut off at edge,medium,blind_ai_review
+N5zWQkoLM3M,119,6,images/T0_N5zWQkoLM3M@0.80.jpg,2,batter follow-through in cage,medium,blind_ai_review
+X6dC9pu5H3k,107,6,images/T0_X6dC9pu5H3k@0.80.jpg,uncertain,foreground helmet shows head only; adult in red appears to be a coach,low,prior_exposure_not_blind
+sYl2jCqsSKo,119,3,images/T0_sYl2jCqsSKo@0.80.jpg,2,runner in red overlapping fielder in navy,medium,blind_ai_review

@@ -19,6 +19,10 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+# 의존 방향은 pose → observability 한쪽뿐이다 (observability는 표준 라이브러리만
+# 쓴다). 반대 방향 import를 추가하면 순환이 되므로 그러지 않는다.
+from . import observability
+
 PERSON_DETECTOR = "PekingU/rtdetr_r50vd_coco_o365"
 POSE_MODEL = "usyd-community/vitpose-base-simple"
 COCO_PERSON_LABEL = 0
@@ -45,6 +49,14 @@ TRACKED_LABELS = {
 MIN_TOOL_CONFIDENCE = 0.8
 MIN_CONFIDENT_FRAMES = 3
 
+# _largest_person_box가 후보로 인정하는 검출 점수 하한.
+#
+# **이 값은 selector의 동작 기준이므로 바꾸지 않는다.** 여기 상수로 꺼내 둔 것은
+# 관측(_count_person_candidates)이 selector와 **같은 후보 집합**을 세게 하려는
+# 것뿐이다. 둘이 어긋나면 "후보가 2명인데 selector는 1명만 봤다"는 식으로
+# 기록이 실제 동작을 설명하지 못한다. 두 값이 같은지는 테스트가 지킨다.
+PERSON_ELIGIBLE_THRESHOLD = 0.5
+
 
 @dataclass
 class PoseResult:
@@ -55,6 +67,18 @@ class PoseResult:
     # 도구 궤적: 이름 → (T, 3) [중심 x, 중심 y, 신뢰도].
     # 미검출 프레임은 신뢰도 0으로 채운다 — 키포인트와 같은 규약이다.
     objects: dict[str, np.ndarray] = field(default_factory=dict)
+    # 프레임별 person candidate 수 (raw, eligible). 분석 대상 선택 **이전**의
+    # 관측값이며 선택 결과와는 무관하다 — 누가 대상이었는지는 여기서 알 수 없다.
+    # 기본값이 빈 리스트라 이 필드를 모르는 기존 호출부는 그대로 동작한다.
+    candidate_counts: list[tuple[int, int]] = field(default_factory=list)
+
+    def eligible_candidate_counts(self) -> list[int]:
+        """selector가 실제로 후보로 보는 사람 수 (프레임별)."""
+        return [e for _, e in self.candidate_counts]
+
+    def raw_candidate_counts(self) -> list[int]:
+        """검출기가 person으로 낸 것 전부 (프레임별)."""
+        return [r for r, _ in self.candidate_counts]
 
     def frame_to_seconds(self, frame: int) -> float:
         """샘플링된 프레임 인덱스를 원본 영상의 시각(초)으로 환산한다."""
@@ -121,6 +145,29 @@ def _largest_person_box(detections, threshold: float = 0.5):
     return best
 
 
+def _count_person_candidates(
+    detections, threshold: float = PERSON_ELIGIBLE_THRESHOLD
+) -> tuple[int, int]:
+    """프레임 하나에서 person 후보 수를 센다 — (raw, eligible).
+
+    **선택 이전에, 검출 결과가 아직 온전할 때 세야 한다.** _largest_person_box는
+    가장 큰 것 하나만 남기고 나머지를 버리므로 그 뒤에는 복원할 수 없다.
+
+    raw       — 검출기가 person으로 낸 것 전부(후처리 임계값을 통과한 것).
+    eligible  — 그중 selector가 후보로 인정하는 것(점수 >= threshold).
+
+    detections를 읽기만 하고 바꾸지 않는다. 선택 결과에 영향을 주지 않는다.
+    """
+    raw = eligible = 0
+    for score, label in zip(detections["scores"], detections["labels"]):
+        if int(label) != COCO_PERSON_LABEL:
+            continue
+        raw += 1
+        if float(score) >= threshold:
+            eligible += 1
+    return raw, eligible
+
+
 def _tracked_centers(detections, threshold: float = 0.3) -> dict[str, tuple[float, float, float]]:
     """프레임 하나에서 관심 도구의 중심좌표를 뽑는다.
 
@@ -142,10 +189,40 @@ def _tracked_centers(detections, threshold: float = 0.3) -> dict[str, tuple[floa
     return found
 
 
+def _record_input_observation(result: PoseResult, rubric_key: str | None) -> None:
+    """입력 분포 관측을 남긴다.
+
+    **기록은 진입점이 아니라 여기서 보장한다.** 관측값(후보 수·fps)이 만들어지는
+    곳이 extract_keypoints이고, 서비스 분석이 이 함수를 지나지 않을 수는 없다.
+    HTTP 핸들러 쪽에 붙여 두면 새 호출자(job worker 등)가 생길 때마다 사람이
+    기억해야 하고, 빠뜨려도 아무 신호가 없다.
+    """
+    observability.record(
+        observability.build_record(
+            source_fps=result.source_fps,
+            sampled_fps=result.sampled_fps,
+            eligible_counts=result.eligible_candidate_counts(),
+            raw_counts=result.raw_candidate_counts(),
+            rubric_key=rubric_key,
+        )
+    )
+
+
 def extract_keypoints(
-    video_path: str | Path, target_fps: int = 15, device: str | None = None
+    video_path: str | Path,
+    target_fps: int = 15,
+    device: str | None = None,
+    observe: bool = True,
+    rubric_key: str | None = None,
 ) -> PoseResult:
-    """영상에서 대상 선수의 키포인트 시계열을 추출한다."""
+    """영상에서 대상 선수의 키포인트 시계열을 추출한다.
+
+    observe — 서비스 입력 관측 레코드를 남길지. **기본값이 True인 것이 핵심이다**:
+      새 호출자는 아무것도 하지 않아도 관측에 포함되고, 빠지려면 명시해야 한다.
+      CLI·오프라인 평가처럼 서비스 입력이 아닌 경로는 observe=False를 준다
+      (scripts/analyze.py, scripts/measure.py).
+    rubric_key — 관측 레코드에 붙일 라벨일 뿐이고 포즈 추출에는 쓰이지 않는다.
+    """
     import torch
     from transformers import (
         AutoProcessor,
@@ -163,6 +240,9 @@ def extract_keypoints(
 
     all_kps: list[np.ndarray] = []
     kept_frames: list[np.ndarray] = []
+    # 프레임별 person 후보 수 — 사람이 없던 프레임도 (0, 0)으로 채운다.
+    # 빠뜨리면 다중인원 비율의 분모가 어긋난다.
+    cand_counts: list[tuple[int, int]] = []
     # 프레임마다 도구 검출 결과를 모은다. 사람이 없는 프레임에도 공은 있을 수
     # 있으므로 person 분기와 독립적으로 기록한다.
     obj_frames: list[dict[str, tuple[float, float, float]]] = []
@@ -179,6 +259,8 @@ def extract_keypoints(
             )[0]
 
             obj_frames.append(_tracked_centers(detections))
+            # 관측은 선택보다 **먼저** 한다 — 아래에서 후보가 버려지기 때문이다.
+            cand_counts.append(_count_person_candidates(detections))
 
             box = _largest_person_box(detections)
             if box is None:
@@ -212,13 +294,17 @@ def extract_keypoints(
         if device == "cuda":
             torch.cuda.empty_cache()
 
-    return PoseResult(
+    result = PoseResult(
         keypoints=np.stack(all_kps),
         frames=kept_frames,
         source_fps=src_fps,
         sampled_fps=sampled_fps,
         objects=stack_object_tracks(obj_frames),
+        candidate_counts=cand_counts,
     )
+    if observe:
+        _record_input_observation(result, rubric_key)
+    return result
 
 
 def stack_object_tracks(

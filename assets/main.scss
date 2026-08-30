@@ -1,7 +1,8 @@
 ---
 ---
 
-@import "minima";
+// Just the Docs 테마가 기본 스타일을 제공합니다. 아래는 이 프로젝트 콘텐츠 전용
+// 추가 스타일(ERD 이미지, 칸반 보드)이며 _includes/head_custom.html에서 불러옵니다.
 
 .erd-diagram {
   display: block;
@@ -12,43 +13,6 @@
   border-radius: 6px;
   background: #fcfaf4;
   padding: 0.6rem;
-}
-
-.toc-page {
-
-  h2 {
-    color: $text-color;
-    font-size: 1.35rem;
-    margin-top: 2.4rem;
-    margin-bottom: 0.8rem;
-    padding-bottom: 0.6rem;
-    border-bottom: 1px solid $grey-color-light;
-  }
-
-  h2:first-of-type {
-    margin-top: 1.5rem;
-  }
-
-  h3 {
-    color: #2f6feb;
-    font-size: 1.05rem;
-    margin-top: 1.4rem;
-    margin-bottom: 0.4rem;
-  }
-
-  h3 a {
-    color: inherit;
-  }
-
-  ol {
-    margin: 0 0 0.5rem;
-    padding-left: 2.2rem;
-    color: $text-color;
-  }
-
-  ol li {
-    margin: 0.2rem 0;
-  }
 }
 
 .kanban-board {
@@ -71,14 +35,14 @@
   margin: 0 0 0.75rem;
   font-size: 0.8rem;
   font-weight: 700;
-  color: $grey-color-dark;
+  color: #586069;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .kanban-card {
   background: #fff;
-  border: 1px solid $grey-color-light;
+  border: 1px solid #e8e8e8;
   border-radius: 6px;
   padding: 0.6rem 0.7rem;
   margin-bottom: 0.6rem;

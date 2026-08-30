@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import DateTime, String, Uuid
+from sqlalchemy import DateTime, Integer, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -27,4 +27,13 @@ class UserOrm(Base):
     nickname: Mapped[str] = mapped_column(String(20), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
+    )
+
+    # 🔴 토큰 폐기용(SEC-004). 발급한 토큰에 이 값을 실어 두고 검증할 때 대조한다.
+    # 값을 올리면 그 사용자의 **기존 토큰이 전부 무효**가 된다.
+    #
+    # 리프레시 토큰 회전을 도입하지 않은 이유는 `MEMORY.md` 2026-08-27 에 있다 —
+    # 우리에게 필요한 것은 갱신이 아니라 **폐기 능력** 하나뿐이었다.
+    token_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0"
     )

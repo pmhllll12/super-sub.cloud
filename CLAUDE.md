@@ -7,7 +7,7 @@
 (2026.08.26 재배정)
 
 - **박민호** — PM (요구사항/일정 관리, 스프린트 진행, QA 총괄)
-- **백성검** — 프론트·웹 (앱 UI/UX, 화면 구현, 웹 페이지)
+- **백성검** — 프론트·웹 (Flutter 앱 UI/UX, 화면 구현, 웹 페이지)
 - **정어진** — 백엔드·파이프라인 (DB·API, 영상 수집·전처리, 분석 파이프라인, 배포)
 - **정상호** — AI 에이전트 개발 (RAG 검증, 실력 판단 로직)
 
@@ -38,51 +38,73 @@ Jekyll 소스 루트는 **저장소 루트 자체**입니다 (`_config.yml`이 �
 - **`guide/`**: 개발환경 셋업 가이드 (7단계, 기존 자료 — 목차에는 연결되어 있지 않음)
 - **`demo/`**: 완전히 별개의 연습용 Jekyll 사이트(영상자료 디지털화 사업 RFP 템플릿). 자체 `_config.yml`/`Gemfile`/레이아웃을 가진 독립 사이트라 루트 `_config.yml`의 `exclude:`에 등록되어 이 사이트 빌드에 포함되지 않습니다. **이 프로젝트 작업 중에는 건드리지 않습니다.**
 - **`jekyll/`**: 계속 늘어나는 이 프로젝트의 콘텐츠 `.md` 파일 전용 폴더 (depth-2: `jekyll/<분류>/<파일>`)
-  - `jekyll/pages/` — `index.markdown`(표지, `permalink: /`), `toc.markdown`(목차), `devlog.markdown`(개발 로그 목록), `pending.markdown`(미결 항목)
-  - `jekyll/chapters/` — 목차의 9개 챕터 + 부록 A~C 페이지 (`01-사업개요.markdown` ~ `09-산출물및향후계획.markdown`, `부록A-용어정의.markdown` ~ `부록C-참고자료.markdown`)
+  - `jekyll/pages/` — `index.markdown`(표지, `permalink: /`), `toc.markdown`(구 목차, 지금은 사이드바 대신 쓰이지 않는 레거시 링크용 — 아래 "목차" 절 참고), `devlog.markdown`(개발 로그 목록), `pending.markdown`(미결 항목), `1부-제안개요.markdown`/`2부-개발수행계획.markdown`/`부록.markdown`(사이드바 상위 그룹 랜딩 페이지, `has_children: true`)
+  - `jekyll/chapters/` — 9개 챕터 + 부록 A~D 페이지 (`01-사업개요.markdown` ~ `09-산출물및향후계획.markdown`, `부록A-용어정의.markdown` ~ `부록D-데이터베이스ERD.markdown`)
   - `jekyll/sprints/` — 스프린트별 일자별 진행 로그 페이지 (`스프린트1.markdown`, `스프린트2.markdown`, …)
 
 새로운 종류의 콘텐츠가 생기면 `jekyll/` 아래 알맞은 하위 폴더를 만들어 넣습니다. **콘텐츠 md 파일을 저장소 루트나 `jekyll/` 최상단에 바로 만들지 않습니다.**
 
 파일 위치는 `permalink` front matter와 무관합니다 (Jekyll은 permalink 기준으로 URL을 생성하므로 파일을 옮겨도 링크는 안 깨집니다).
 
+## 테마 (Just the Docs)
+
+이 사이트는 `dev.life-tutorial.com`을 참고해 **Just the Docs** Jekyll 테마(`_config.yml`의
+`theme: just-the-docs`)를 씁니다. 좌측 사이드바 트리·검색·"위로" 버튼 등 UI는 테마가
+기본 제공하며, 이 저장소 쪽에서 직접 만든 레이아웃은 없습니다 (`_layouts/`도 없음).
+이 프로젝트 전용 커스텀 CSS(ERD 이미지, 칸반 보드)는 `assets/main.scss`에 있고
+`_includes/head_custom.html`이 그걸 테마 `<head>`에 끼워 넣습니다. 테마 기본 폰트·톤은
+그대로 두고 손대지 않습니다.
+
+사이드바 트리는 프론트매터의 `nav_order`(형제 간 정렬)와 `parent`/`grand_parent`(최대
+3단계 중첩), `has_children: true`(하위 페이지를 거느리는 상위 페이지)로 자동 생성됩니다.
+사이드바에 안 보이게 하려면 `nav_exclude: true`를 씁니다 (`index.markdown`, 구 `toc.markdown`,
+`_posts/`의 모든 글, `404.html`이 이렇게 되어 있음).
+
 ## 페이지 작성 규칙
+
+### 상위 그룹 랜딩 페이지 (`jekyll/pages/1부-제안개요.markdown`, `2부-개발수행계획.markdown`, `부록.markdown`)
+사이드바 트리의 1단계 그룹(`I 부`/`II 부`/`부록`)을 만들기 위한 페이지입니다. `has_children: true`로
+선언해두면 Just the Docs가 이 페이지 본문 아래에 자식 페이지 목록을 자동으로 붙여줍니다. 새 그룹이
+필요할 때만 추가하고, 그 외엔 건드릴 필요 없습니다.
 
 ### 챕터 페이지 (`jekyll/chapters/`)
 ```yaml
 ---
-layout: page
+layout: default
 title: <챕터 제목>
 permalink: /<번호>-<슬러그>/   # 부록은 /부록A-<슬러그>/
+parent: I 부. 제안 개요        # 또는 "II 부. 개발 수행 계획" / "부록" — 위 랜딩 페이지의 title과 정확히 일치해야 함
+nav_order: <부 안에서의 순서>
 ---
 ```
 - 하위 세부항목은 `## N) 세부항목명` 헤딩으로 구분합니다.
 - 아직 안 쓴 내용은 `*(내용 작성 예정)*`로 표시합니다.
-- 페이지 맨 아래에 `[← 목차로](/toc/)`를 넣어 목차와 서로 이동 가능하게 합니다.
+- 페이지 맨 아래에 `[← 목차로](/toc/)`를 넣어 구 목차 페이지와 서로 이동 가능하게 합니다 (사이드바가
+  주 내비게이션이라 필수는 아니지만 기존 관례상 유지).
+- 챕터 7("개발 구현 계획")처럼 하위에 스프린트 로그를 거느리는 페이지는 `has_children: true`도 함께 씁니다.
 
-### 목차 (`jekyll/pages/toc.markdown`)
-- `layout: toc` (커스텀 레이아웃, `_layouts/toc.html` + `assets/main.scss`의 `.toc-page` 스타일 적용)
-- `## N 부. <제목>` 또는 `## 부록` — 큰 제목 + 구분선 (파트 단위 구분)
-- `### N. [챕터명](permalink)` — 파란색 링크, 실제 챕터 페이지로 연결
-- 하위 세부항목은 `1. 2. 3. ...` kramdown 순서 리스트 문법을 그대로 사용해 실제 `<ol>`로 렌더링합니다 (이스케이프 불필요 — `demo/` 프로젝트와 규칙이 다르니 주의).
-- 새 챕터를 추가할 때: (1) `jekyll/chapters/`에 페이지 생성 (2) `toc.markdown`에 `### N. [제목](permalink)` + 하위 목록 추가.
-- 맨 아래 `[← 표지]({{ "/" | relative_url }})` 유지.
+### 구 목차 (`jekyll/pages/toc.markdown`)
+Just the Docs 사이드바가 목차 역할을 대신하므로, 이 페이지는 `nav_exclude: true`로 사이드바에서
+숨긴 **레거시 페이지**입니다. 표지(`index.markdown`)의 "목차 →" 링크와 각 챕터 하단 "← 목차로"
+링크가 아직 이 페이지(`/toc/`)를 가리키므로 삭제하지 않고 내용만 유지합니다. 새 챕터를 추가해도
+이 페이지를 갱신할 필요는 없습니다 — 사이드바 트리(`parent`/`nav_order`)만 맞으면 자동으로 반영됩니다.
 
 ### 스프린트 로드맵 & 칸반 (챕터 7 "개발 구현 계획" 전용 규칙)
 - `07-개발구현계획.markdown`의 "4) 단계별 개발 일정"에 스프린트 로드맵 표(전체 5개 스프린트 × 담당자별 태스크)와 **현재 진행 중인 스프린트**의 칸반 보드를 유지합니다.
 - 칸반 보드는 `<div class="kanban-board">` > `<div class="kanban-column">`(Backlog/To Do/In Progress/Done) > `<div class="kanban-card"><span class="role-tag role-{pm|front|backend|agent}">이름·역할</span>태스크</div>` 구조를 사용합니다 (스타일은 `assets/main.scss`에 정의됨).
 - 칸반 보드는 **항상 현재 스프린트 상태만** 반영합니다. 스프린트가 끝나면: (1) 로드맵 표의 해당 Sprint 번호를 `jekyll/sprints/스프린트N.markdown` 링크로 연결 (2) 그 스프린트의 일자별 진행 내역을 `jekyll/sprints/스프린트N.markdown`에 표로 기록 (3) 칸반 보드를 다음 스프린트 내용으로 교체.
-- 스프린트 로그 페이지 형식: `permalink: /스프린트N/`, 날짜별 표(담당자 4명을 컬럼으로), 하단에 `[← 개발 구현 계획으로](/07-개발구현계획/)`.
+- 스프린트 로그 페이지 형식: `permalink: /스프린트N/`, `parent: 개발 구현 계획`, `grand_parent: II 부. 개발 수행 계획`, `nav_order: N`(사이드바에서 챕터 7 하위에 중첩), 날짜별 표(담당자 4명을 컬럼으로), 하단에 `[← 개발 구현 계획으로](/07-개발구현계획/)`.
 
 ## 진행사항(개발 로그) 작성 규칙
 
 - **그날그날의 의사결정/이슈/변경사항**처럼 날짜가 있는 업데이트는 정적 페이지가 아니라 **Jekyll 포스트(`_posts/`, 저장소 루트)로 남깁니다.** 파일명은 `YYYY-MM-DD-짧은-제목.markdown`.
-- front matter 예시:
+- front matter 예시 (Just the Docs엔 `post` 레이아웃이 없으므로 `default` + `nav_exclude` 사용):
   ```yaml
   ---
-  layout: post
+  layout: default
   title: "<이번 업데이트 한 줄 요약>"
   date: YYYY-MM-DD
+  nav_exclude: true
   ---
   ```
 - `jekyll/pages/devlog.markdown`(`/devlog/`)이 `_posts/`의 글을 자동으로 나열하므로 별도로 목록을 관리할 필요는 없습니다.

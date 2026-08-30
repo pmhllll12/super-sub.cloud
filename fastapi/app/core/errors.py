@@ -13,6 +13,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.core.logging import log_api_error
+
 
 class ApiError(Exception):
     """계약에 정의된 에러를 낼 때 쓴다."""
@@ -42,7 +44,10 @@ _FALLBACK_CODES = {
 
 def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(ApiError)
-    async def _api_error(_: Request, exc: ApiError) -> JSONResponse:
+    async def _api_error(request: Request, exc: ApiError) -> JSONResponse:
+        # 로그인 실패(`INVALID_CREDENTIALS`)와 토큰 거부(`UNAUTHORIZED` ·
+        # `INVALID_TOKEN`)가 전부 여기를 지난다 — SEC-010 의 실패 쪽은 이 한 줄이다.
+        log_api_error(request, exc.status_code, exc.code)
         return JSONResponse(
             status_code=exc.status_code, content=_body(exc.code, exc.message)
         )

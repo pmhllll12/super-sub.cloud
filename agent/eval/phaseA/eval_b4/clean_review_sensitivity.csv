@@ -1,0 +1,4 @@
+scenario,valid_count,a_wins,b_wins,neither_or_excluded,a_correct,b_correct,denominator,a_accuracy,b_accuracy,margin_b_minus_a
+A. 기존 labels.json,6,2,4,1,83,85,97,0.8557,0.8763,2
+B. 기존 AI-reviewed(오염 포함),6,2,3,2,83,84,97,0.8557,0.8660,1
+C. clean independent AI review,6,3,2,2,84,83,97,0.8660,0.8557,-1
