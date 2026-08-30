@@ -96,8 +96,12 @@ export default function AuthShell({
                   <span className="block">안개 속에서도,</span>
                   <span className="block">실력은 숨지 않습니다.</span>
                 </h2>
-                <p className="text-sm" style={{ color: MUTED }}>
-                  생활체육 경기 영상을 분석해 용병을 찾고, 실력을 검증합니다.
+                {/* 이 문구도 헤드라인처럼 줄바꿈을 고정한다 — 폭에 따라
+                    "실력을" 같은 한 도막만 아래로 떨어지면 보기 나쁘다.
+                    쉼표에서 끊어 두 줄로 나눈다. */}
+                <p className="text-sm" style={{ color: MUTED, wordBreak: 'keep-all' }}>
+                  <span className="block">생활체육 경기 영상을 분석해 용병을 찾고,</span>
+                  <span className="block">실력을 검증합니다.</span>
                 </p>
               </div>
             </div>
