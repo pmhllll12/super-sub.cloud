@@ -609,26 +609,3 @@ body {
   object-position: top center;
   filter: grayscale(1) contrast(1.06);
 }
-
-/* 오른쪽 아래 원형 배지만 남는다 — 검은 막대와 형광 알약은 뺐다. */
-.ss-pcard-foot {
-  position: relative;
-  z-index: 2;
-  margin-top: auto;
-  display: flex;
-  justify-content: flex-end;
-}
-
-/* 오른쪽 끝 원형 배지 — 참고 디자인의 공 아이콘 자리. */
-.ss-pcard-badge {
-  display: inline-flex;
-  height: 34px;
-  width: 34px;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  background: var(--ss-pcard-fg);
-  font-size: 20px;
-  color: var(--ss-pcard-bg);
-}

@@ -53,21 +53,20 @@ export default function PlayerCardView({ card }: { card: PublicPlayerCard }) {
           <img src="/player_cutout.png" alt="" decoding="async" />
         </div>
 
-        {/* 오른쪽 아래 원형 배지 — 참고 디자인의 공 아이콘 자리. 검은
-            막대와 형광 알약은 뺐다(사용자 요청). */}
-        <footer className="ss-pcard-foot">
-          <h2 className="sr-only">호칭</h2>
-          <ul className="sr-only">
-            {card.titles.map((t) => (
-              <li key={t.code}>
-                {t.category} {t.label}
-              </li>
-            ))}
-          </ul>
-          <span className="ss-pcard-badge material-symbols-outlined" aria-hidden="true">
-            sports_soccer
-          </span>
-        </footer>
+        {/* 참고 디자인 맨 아래의 검은 막대 · 형광 알약 · 원형 배지는
+            전부 뺐다(사용자 요청) — 카드 얼굴에는 워드마크 · 머리글 ·
+            별명 · 인물만 남는다.
+
+            받은 호칭은 화면에 그리지 않지만 목록으로는 남긴다. 카드에
+            무엇이 담겼는지 읽어 주는 기계는 알 수 있어야 한다. */}
+        <h2 className="sr-only">호칭</h2>
+        <ul className="sr-only">
+          {card.titles.map((t) => (
+            <li key={t.code}>
+              {t.category} {t.label}
+            </li>
+          ))}
+        </ul>
       </div>
     </article>
   )
