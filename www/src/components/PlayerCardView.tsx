@@ -1,4 +1,5 @@
 import type { PublicPlayerCard } from '@/server/backend'
+import PlayerCardBrush from './PlayerCardBrush'
 import BrandMark from './ui/BrandMark'
 
 /**
@@ -38,6 +39,10 @@ export default function PlayerCardView({ card }: { card: PublicPlayerCard }) {
   return (
     <article className="ss-pcard" aria-label={card.user.nickname}>
       <div className="ss-pcard-inner">
+        {/* 인물 뒤 검은 붓자국. 사람마다 다르되 늘 같은 모양이다 —
+            자세한 이유는 PlayerCardBrush 주석 참고. */}
+        <PlayerCardBrush seed={card.public_slug} />
+
         <header className="ss-pcard-top">
           <BrandMark size={22} />
           <p className="ss-pcard-kicker">PLAYER CARD</p>
