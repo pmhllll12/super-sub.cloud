@@ -430,7 +430,7 @@ body {
   margin-left: 1.2em;
 }
 
-/* 하단 줄 — 번호 목록만 오른쪽에 둔다. */
+/* 오른쪽 아래 구석 — 로그아웃 아이콘 하나. */
 .ss-home-footer {
   position: fixed;
   inset-inline: 0;
@@ -440,48 +440,17 @@ body {
   align-items: flex-end;
   justify-content: flex-end;
   padding: var(--ss-home-content-pad);
-  /* 글자만 있는 줄이라 가운데 빈 자리는 클릭을 통과시킨다 — 그 아래
-     내비바가 있다. 실제 링크(번호 목록)에서만 되돌린다. */
+  /* 줄 전체가 화면 폭을 차지하지만 실제 내용은 오른쪽 구석뿐이라, 빈
+     자리는 클릭을 통과시킨다.
+
+     🔴 되살리는 선택자를 `a` 로 좁혀 뒀다가 로그아웃(<button>)이 안
+     눌렸다. 여기 무엇이 들어올지는 이 규칙이 알 바가 아니다 — 자식
+     전부에서 되살린다. */
   pointer-events: none;
 }
 
-.ss-home-footer a {
+.ss-home-footer > * {
   pointer-events: auto;
-}
-
-/* 우하단 번호 목록 — 레퍼런스의 투어 목록. 제목 ─── 번호. */
-.ss-home-index {
-  pointer-events: auto;
-  min-width: 260px;
-  font-size: 0.8125rem;
-}
-
-.ss-home-index-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 3px 0;
-  color: color-mix(in srgb, var(--ss-fg) 60%, transparent);
-  transition: color 160ms ease;
-}
-
-.ss-home-index li[data-active='true'] .ss-home-index-row {
-  color: var(--ss-accent);
-}
-
-.ss-home-index-title {
-  white-space: nowrap;
-}
-
-/* 제목과 번호를 잇는 가는 선 — 남는 폭을 전부 먹는다. */
-.ss-home-index-rule {
-  flex: 1 1 auto;
-  height: 1px;
-  background: color-mix(in srgb, var(--ss-fg) 24%, transparent);
-}
-
-.ss-home-index-no {
-  font-variant-numeric: tabular-nums;
 }
 
 /* 좁은 화면 — 헤드라인 옆 짝과 하단 줄이 서로를 밀어내지 않게 접는다
@@ -491,9 +460,6 @@ body {
     display: none;
   }
 
-  .ss-home-index {
-    display: none;
-  }
 }
 
 /* ── 선수 카드 (세로 포스터형) ─────────────────────────────────────────── */
@@ -518,15 +484,15 @@ body {
 
   width: 100%;
   max-width: calc(var(--ss-pcard-base-w) * 1px);
-  /* 바깥 비율을 여기서 못박는다 — 작게 줄인 사본(.ss-pcard-mini)이 이
-     값에 기대어 자리를 잡는다. 안쪽에만 비율을 주면 바깥 높이가 테두리
-     두께에 따라 달라져서, 줄인 사본이 조용히 어긋난다. */
+  /* 비율을 여기서 못박는다 — 작게 줄인 사본(.ss-pcard-mini)이 이 값에
+     기대어 자리를 잡는다. 안쪽에만 주면 바깥 높이가 달라져 사본이
+     조용히 어긋난다.
+
+     한때 여기에 검은 테두리(padding + 어두운 배경)를 둘러 참고 디자인의
+     두 겹 짜임을 흉내 냈는데 걷어냈다 — 카드가 어두운 화면 위에 놓이니
+     테두리가 배경에 묻혀 두께만 먹었다. 지금은 이 요소가 자리만 잡고
+     보이는 건 전부 안쪽(.ss-pcard-inner)이다. */
   aspect-ratio: 3 / 4.1;
-  /* 바깥 검은 테두리. 안쪽 카드보다 모서리를 더 크게 둥글려야 두 겹이
-     같은 두께로 보인다(안쪽 반지름 + 테두리 두께). */
-  border-radius: 34px;
-  background: var(--ss-pcard-fg);
-  padding: 14px;
 }
 
 .ss-pcard-inner {
@@ -535,7 +501,7 @@ body {
   height: 100%;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 20px;
+  border-radius: 24px;
   background: var(--ss-pcard-bg);
   padding: 20px 18px;
   color: var(--ss-pcard-fg);
@@ -664,4 +630,49 @@ body {
   max-width: none;
   transform: scale(calc(var(--ss-pcard-mini-w) / var(--ss-pcard-base-w)));
   transform-origin: top left;
+}
+
+/* 헤더 오른쪽 — 카드와 그 아래 '내 프로필' 글자. */
+.ss-home-profile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.ss-home-profile-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  /* 배경 사진이 밝은 자리도 있어 불투명도를 깎으면 묻힌다 — 완전한 흰색. */
+  color: var(--ss-fg);
+}
+
+/* 로그아웃 — 화면 오른쪽 아래 구석. 아이콘 아래에 글자를 단다.
+   배경 사진이 밝은 자리도 있어 불투명도를 깎지 않는다 — 완전한 흰색. */
+.ss-logout {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 10px;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  color: var(--ss-fg);
+  transition: opacity 160ms ease;
+}
+
+.ss-logout:hover,
+.ss-logout:focus-visible {
+  opacity: 0.7;
+}
+
+.ss-logout:disabled {
+  opacity: 0.4;
+}
+
+/* Material Symbols 는 가변 글꼴이라 채움 · 굵기 · 광학 크기를 축으로 준다:
+   채움 없음(FILL 0), 가장 가는 굵기(wght 100), 광학 크기 24. */
+.ss-logout-icon {
+  font-size: 26px;
+  font-variation-settings: 'FILL' 0, 'wght' 100, 'GRAD' 0, 'opsz' 24;
 }

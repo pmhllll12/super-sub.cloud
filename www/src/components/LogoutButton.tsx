@@ -26,6 +26,8 @@ export const HEADER_LINK_CLASS = 'inline-flex items-center rounded-full px-2 py-
 export const HEADER_LINK_HOVER_CLASS = 'underline-offset-4 hover:underline'
 
 /**
+ * 화면 오른쪽 아래 구석의 로그아웃 아이콘.
+ *
  * `/api/auth/logout` 은 세션 쿠키를 지우기만 하고 어디로도 보내지 않는다.
  * `/` 가 이미 홈이라 이동할 필요가 없다 — `router.refresh()` 로 서버
  * 컴포넌트(`Home`)를 다시 그리게 해서 "로그인 함" 모습이 그 자리에서
@@ -54,13 +56,14 @@ export default function LogoutButton() {
 
   return (
     <div className="flex flex-col items-center gap-1">
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={busy}
-        className={`${HEADER_LINK_CLASS} ${HEADER_LINK_HOVER_CLASS}`}
-        style={{ color: 'color-mix(in srgb, var(--ss-fg) 70%, transparent)' }}
-      >
+      {/* 아이콘 아래에 글자를 단다. 이름은 그 글자에서 나오므로
+          aria-label 을 따로 주지 않는다 — 주면 글자를 덮어써서 둘이
+          어긋날 여지가 생긴다. 아이콘 쪽은 장식이라 숨긴다.
+          모양 · 굵기는 globals.css 의 .ss-logout 참고. */}
+      <button type="button" onClick={onClick} disabled={busy} className="ss-logout">
+        <span className="ss-logout-icon material-symbols-outlined" aria-hidden="true">
+          logout
+        </span>
         로그아웃
       </button>
       {error && (

@@ -6,7 +6,6 @@ import type { PublicPlayerCard } from '@/server/backend'
 import PlayerCardView from '@/components/PlayerCardView'
 import BrandMark from '@/components/ui/BrandMark'
 import FigureBackground from '@/components/FigureBackground'
-import HomeIndexList from '@/components/HomeIndexList'
 import HomeNav, { type Destination } from '@/components/HomeNav'
 import LogoutButton, { HEADER_LINK_CLASS, HEADER_LINK_HOVER_CLASS } from '@/components/LogoutButton'
 
@@ -23,9 +22,9 @@ export type { Destination }
  * 배경 사진을 절반 넘게 가려서, 목적지는 위쪽 **글자**로만 적고 카드는
  * 그 글자를 가리켰을 때만 아래로 떠오르게 바꿨다(`HomeNav`).
  *
- * 지금 가리킨 목적지(`active`)를 여기서 쥔다 — 위쪽 글자와 우하단 번호
- * 목록이 **같은 항목을 같이 밝혀야** 해서다(레퍼런스에서 04 번이 그렇다).
- * 어느 쪽에 마우스를 올려도 반대쪽이 따라 밝아진다.
+ * 지금 가리킨 목적지(`active`)를 여기서 쥔다. 한때 우하단 번호 목록과
+ * 강조를 맞추려고 올려 둔 상태인데, 그 목록을 지운 지금은 상단 글자
+ * 내비만 쓴다 — 목록이 다시 생길 자리를 남겨 둔 것이다.
  *
  * 🔴 **글자는 마우스를 따라 움직이지 않는다.** 한때 마우스 시차로 헤더와
  * 헤드라인을 미세하게 흔들었는데(`useMouseParallax`), 글자가 화면을
@@ -69,26 +68,21 @@ export default function HomeStage({
         </div>
 
         {user ? (
-          <div className="flex shrink-0 items-start gap-3">
-            {/* '내 프로필' 자리다 — 목적지 글자 줄에 같은 항목을 또 두지
-                않는다(사용자 요청). 카드가 있으면 그 카드를 작게 줄여
-                보여주고, 없으면 닉네임 글자로 대신한다. 어느 쪽이든
-                누르면 /me 로 간다. */}
+          /* '내 프로필' 자리다 — 목적지 글자 줄에 같은 항목을 또 두지
+             않는다(사용자 요청). 카드가 있으면 그 카드를 작게 줄여
+             보여주고, 없으면 닉네임 글자로 대신한다. 어느 쪽이든 누르면
+             /me 로 가고, 카드 아래에 무엇인지 적어 둔다 — 카드만 있으면
+             눌러 보기 전엔 어디로 가는지 알 수 없다. */
+          <Link href="/me" className="ss-home-profile shrink-0">
             {card ? (
-              <Link href="/me" aria-label={`${user.nickname} 프로필`} className="ss-pcard-mini">
+              <span className="ss-pcard-mini">
                 <PlayerCardView card={card} />
-              </Link>
+              </span>
             ) : (
-              <Link
-                href="/me"
-                className={`${HEADER_LINK_CLASS} ${HEADER_LINK_HOVER_CLASS}`}
-                style={{ color: 'var(--ss-fg)' }}
-              >
-                {user.nickname}
-              </Link>
+              <span style={{ color: 'var(--ss-fg)' }}>{user.nickname}</span>
             )}
-            <LogoutButton />
-          </div>
+            <span className="ss-home-profile-label">내 프로필</span>
+          </Link>
         ) : (
           <div className="flex shrink-0 items-center gap-1">
             <Link href="/login" className={`${HEADER_LINK_CLASS} ${HEADER_LINK_HOVER_CLASS}`} style={{ color: 'var(--ss-accent)' }}>
@@ -135,12 +129,13 @@ export default function HomeStage({
         </div>
       </div>
 
-      {/* 하단 줄 — 번호 목록만. 왼쪽에 있던 SCROLL DOWN · 소셜 링크는
-          지웠다: 이 화면은 스크롤되지 않아 SCROLL DOWN 이 참말이 아니었고,
-          소셜은 실제 계정이 없어 글자만 있었다. */}
-      <div className="ss-home-footer">
-        <HomeIndexList destinations={destinations} active={active} onActivate={setActive} />
-      </div>
+      {/* 오른쪽 아래 구석 — 로그아웃 아이콘 하나. 여기 있던 01~05 번호
+          목록은 지웠다(상단 글자 내비와 같은 목록이라 두 벌이었다). */}
+      {user && (
+        <div className="ss-home-footer">
+          <LogoutButton />
+        </div>
+      )}
     </>
   )
 }
