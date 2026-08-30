@@ -20,6 +20,16 @@ describe('스쿼드', () => {
     expect(screen.getByText('THREE LUNGS')).toBeInTheDocument()
   })
 
+  // + 만 눌리면 카드를 눌렀는데 아무 일도 안 일어나는 순간이 생긴다.
+  it('카드 전체가 버튼이다 — + 는 장식일 뿐이다', () => {
+    const { container } = render(<SquadPanel card={CARD} />)
+    const seat = screen.getByRole('button', { name: 'GK 자리에 선수 넣기' })
+    // 버튼 안에 카드가 통째로 들어 있고, 그 안에 또 버튼이 있지 않다.
+    expect(seat.querySelector('.ss-pcard')).not.toBeNull()
+    expect(seat.querySelector('button')).toBeNull()
+    expect(container.querySelector('.ss-squad-plus')).toHaveAttribute('aria-hidden', 'true')
+  })
+
   it('빈 카드에도 같은 머리글이 있다 — 눌러 보기 전에 무슨 자리인지 안다', () => {
     render(<SquadPanel card={CARD} />)
     expect(screen.getAllByText('PLAYER CARD')).toHaveLength(5)

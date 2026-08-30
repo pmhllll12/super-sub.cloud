@@ -118,8 +118,10 @@ export default function SquadSuggest({
       </header>
 
       <ul className="ss-suggest-list">
-        {list.map((s) => (
-          <li key={s.name}>
+        {list.map((s, i) => (
+          /* 차례로 들어온다 — 판만 통째로 나타나면 툭 튀어나온 느낌이다.
+             순번은 CSS 가 지연으로 쓴다(--ss-i). */
+          <li key={s.name} style={{ '--ss-i': i } as React.CSSProperties}>
             <button type="button" className="ss-suggest-item" onClick={() => onPick(s.name)}>
               {/* 카드가 될 자리를 알려 주는 표식. 워드마크를 넣어 봤지만
                   작은 크기에서는 읽히지도 않고 글자 위로 넘쳐서 뺐다. */}

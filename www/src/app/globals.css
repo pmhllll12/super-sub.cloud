@@ -977,7 +977,8 @@ body {
   backdrop-filter: blur(var(--ss-glass-blur)) saturate(var(--ss-glass-saturate));
   -webkit-backdrop-filter: blur(var(--ss-glass-blur)) saturate(var(--ss-glass-saturate));
   padding: 16px;
-  animation: ss-suggest-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: left center;
+  animation: ss-suggest-in 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* 물러나는 중 — 아직 DOM 에 있지만 누를 수 있으면 안 된다. */
@@ -986,17 +987,20 @@ body {
   animation: ss-suggest-out 200ms ease-in both;
 }
 
-/* 오른쪽에서 미끄러져 나온다. 살짝 작게 시작해 제 크기로 펴지면 "밀려
-   나온다"보다 "펼쳐진다"로 읽힌다 — transform-origin 을 왼쪽에 두어
-   스쿼드 판에 붙은 채로 자라게 한다. */
+/* 스쿼드 판 쪽에서 펼쳐지듯 나온다. 왼쪽 변을 기준으로 삼아(origin)
+   판에 붙은 채로 자라야 "밀려 나온다"가 아니라 "펼쳐진다"로 읽힌다.
+   clip-path 로 왼쪽부터 드러나는 것을 같이 걸어 두면 미끄러지는 것보다
+   훨씬 차분하다 — 판 전체가 통째로 이동하지 않기 때문이다. */
 @keyframes ss-suggest-in {
   from {
     opacity: 0;
-    transform: translateX(-14px) scaleX(0.96);
+    transform: translateX(-10px) scale(0.985);
+    clip-path: inset(0 100% 0 0 round var(--ss-radius-sheet));
   }
   to {
     opacity: 1;
-    transform: translateX(0) scaleX(1);
+    transform: translateX(0) scale(1);
+    clip-path: inset(0 0 0 0 round var(--ss-radius-sheet));
   }
 }
 
@@ -1013,8 +1017,11 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .ss-suggest,
-  .ss-suggest[data-state='closing'] {
+  .ss-suggest[data-state='closing'],
+  .ss-suggest[data-state='open'] .ss-suggest-head,
+  .ss-suggest[data-state='open'] .ss-suggest-list > li {
     animation-duration: 1ms;
+    animation-delay: 0ms;
   }
 }
 
@@ -1050,6 +1057,30 @@ body {
 .ss-suggest-close:hover,
 .ss-suggest-close:focus-visible {
   color: var(--ss-fg);
+}
+
+/* 머리글과 후보가 판보다 한 박자 늦게, 차례로 들어온다 — 판만 통째로
+   나타나면 툭 튀어나온 느낌이다. 닫힐 때는 이 계단을 쓰지 않는다(판이
+   통째로 물러나는 게 빠르고 깔끔하다). */
+.ss-suggest[data-state='open'] .ss-suggest-head,
+.ss-suggest[data-state='open'] .ss-suggest-list > li {
+  animation: ss-suggest-item-in 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(140ms + var(--ss-i, 0) * 60ms);
+}
+
+.ss-suggest[data-state='open'] .ss-suggest-head {
+  animation-delay: 100ms;
+}
+
+@keyframes ss-suggest-item-in {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 /* 목록이 판의 남는 키를 다 쓴다. 후보가 많아지면 여기서만 스크롤한다. */
@@ -1127,4 +1158,16 @@ body {
 .ss-suggest-notes > span::before {
   content: '· ';
   color: color-mix(in srgb, var(--ss-fg) 45%, transparent);
+}
+
+/* 빈 자리 카드 — 카드 전체가 버튼이다. 눌리는 곳이라는 게 손에 잡히게
+   살짝 떠오른다. */
+.ss-squad-seat-btn {
+  cursor: pointer;
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ss-squad-seat-btn:hover,
+.ss-squad-seat-btn:focus-visible {
+  transform: translateY(-4px);
 }

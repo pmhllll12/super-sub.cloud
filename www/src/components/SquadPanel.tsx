@@ -108,40 +108,50 @@ export default function SquadPanel({ card }: { card?: PublicPlayerCard | null })
           const name = mates[slot.area] ?? null
           return (
             <div key={slot.area} className="ss-squad-seat" style={{ gridArea: slot.area }}>
-              <div className="ss-pcard-mini">
-                {slot.mine && card ? (
-                  <PlayerCardView card={card} />
-                ) : (
-                  <SquadCardFrame>
-                    {slot.mine ? (
+              {slot.mine ? (
+                <div className="ss-pcard-mini">
+                  {card ? (
+                    <PlayerCardView card={card} />
+                  ) : (
+                    <SquadCardFrame>
                       <p className="ss-squad-note">아직 카드가 없습니다</p>
-                    ) : name ? (
-                      <button
-                        type="button"
-                        aria-label={`${name} 빼기`}
-                        className="ss-squad-name"
-                        onClick={() => setMates((prev) => ({ ...prev, [slot.area]: null }))}
-                      >
-                        {name}
-                      </button>
+                    </SquadCardFrame>
+                  )}
+                </div>
+              ) : (
+                /* 🔴 카드 **전체**가 버튼이다. 가운데 + 만 눌리면 카드를
+                   눌렀는데 아무 일도 안 일어나는 순간이 생긴다.
+                   버튼이 곧 .ss-pcard-mini 여야 한다 — 그 규칙이 카드를
+                   직접 자식으로 찾기 때문에(> .ss-pcard) 사이에 다른
+                   요소를 끼우면 축소가 통째로 풀린다. */
+                <button
+                  type="button"
+                  className="ss-pcard-mini ss-squad-seat-btn"
+                  aria-label={
+                    name ? `${name} 빼기` : `${slot.label} 자리에 선수 넣기`
+                  }
+                  aria-expanded={name ? undefined : picking?.area === slot.area}
+                  onClick={() => {
+                    if (name) {
+                      setMates((prev) => ({ ...prev, [slot.area]: null }))
+                      return
+                    }
+                    clearTimeout(timer.current)
+                    setClosing(null)
+                    setPicking(slot)
+                  }}
+                >
+                  <SquadCardFrame>
+                    {name ? (
+                      <span className="ss-squad-name">{name}</span>
                     ) : (
-                      <button
-                        type="button"
-                        aria-label={`${slot.label} 자리에 선수 넣기`}
-                        aria-expanded={picking?.area === slot.area}
-                        className="ss-squad-plus material-symbols-outlined"
-                        onClick={() => {
-                          clearTimeout(timer.current)
-                          setClosing(null)
-                          setPicking(slot)
-                        }}
-                      >
+                      <span className="ss-squad-plus material-symbols-outlined" aria-hidden="true">
                         add
-                      </button>
+                      </span>
                     )}
                   </SquadCardFrame>
-                )}
-              </div>
+                </button>
+              )}
               <span className="ss-squad-pos">{slot.label}</span>
             </div>
           )
