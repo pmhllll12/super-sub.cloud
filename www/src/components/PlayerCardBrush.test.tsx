@@ -25,7 +25,8 @@ describe('카드 붓자국', () => {
     const HALF = 70 // viewBox 는 100×140
 
     for (const g of container.querySelectorAll('g')) {
-      const [, tx, ty] = /translate\(([-\d.]+) ([-\d.]+)\)/.exec(
+      // 세로만 본다 — 가로 위치는 이 규칙과 무관하다.
+      const [, , ty] = /translate\(([-\d.]+) ([-\d.]+)\)/.exec(
         g.getAttribute('transform') ?? '',
       )!
       const [, deg] = /rotate\(([-\d.]+)\)/.exec(g.getAttribute('transform') ?? '')!
