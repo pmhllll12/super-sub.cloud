@@ -567,7 +567,15 @@ body {
   font-family: var(--font-card), var(--font-rubik), system-ui, serif;
   font-size: clamp(1.75rem, 15cqw, 3.25rem);
   /* 🔴 font-weight 를 주지 않는다 — Young Serif 는 굵기가 400 하나뿐이라
-     올리면 가짜 굵게(synthetic bold)만 걸린다. */
+     올리면 가짜 굵게(synthetic bold)만 걸린다.
+
+     더 묵직하게 보이려고 **글자와 같은 색 테두리를 덧그려 획을 불린다.**
+     가짜 굵게와 달리 자폭과 자간이 그대로라 글자 사이가 벌어지지 않고,
+     세리프의 가는 획(헤어라인)만 굵어져 글꼴의 대비가 살아 있는 채로
+     무게가 붙는다. paint-order 로 테두리를 글자 **아래**에 깔아야 획
+     안쪽으로 파고들지 않는다. */
+  -webkit-text-stroke: 1.5px var(--ss-pcard-fg);
+  paint-order: stroke fill;
   letter-spacing: -0.01em;
   line-height: 1.02;
   color: var(--ss-pcard-fg);
