@@ -562,7 +562,9 @@ body {
 .ss-pcard-alias {
   position: relative;
   z-index: 2;
-  margin-top: 26px;
+  /* 워드마크 · 머리글에서 한 뼘 띄운다. 붙여 두면 세 덩어리가 한 덩어리로
+     읽히고, 인물과의 겹침도 얕아진다. */
+  margin-top: 52px;
   text-align: center;
   font-family: var(--font-card), var(--font-rubik), system-ui, serif;
   font-size: clamp(1.75rem, 15cqw, 3.25rem);
