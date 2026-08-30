@@ -772,14 +772,17 @@ body {
   color: var(--ss-fg);
 }
 
+/* 판 안 글자는 전부 완전한 흰색이다 — 배경 사진이 밝은 자리도 있어
+   불투명도를 깎으면 묻힌다. */
 .ss-squad-head p {
   font-size: 0.6875rem;
-  color: color-mix(in srgb, var(--ss-fg) 55%, transparent);
+  color: var(--ss-fg);
 }
 
 /* 포메이션 — 위가 공격, 아래가 골키퍼다. 가운데 열에 FW · MF · GK 가
    서고 수비 둘이 양옆으로 벌어진다. */
 .ss-squad-board {
+  position: relative;
   display: grid;
   /* 1-2-1 — 위가 공격이다: FW 하나, MF 둘, DF 하나, GK. */
   grid-template-areas:
@@ -794,7 +797,29 @@ body {
   justify-items: center;
 }
 
+/* 경기장 선 — 카드보다 뒤에 깔린다. 흰 선이지만 아주 옅게 둔다:
+   진하면 카드보다 선이 먼저 보인다. */
+.ss-squad-pitch {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: color-mix(in srgb, var(--ss-fg) 22%, transparent);
+  stroke-width: 0.6;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+/* 가운데 점만 채운다 — 선으로 그리면 안 보인다. */
+.ss-squad-pitch-dot {
+  fill: color-mix(in srgb, var(--ss-fg) 30%, transparent);
+  stroke: none;
+}
+
 .ss-squad-seat {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -805,7 +830,7 @@ body {
   font-size: 0.625rem;
   font-weight: 700;
   letter-spacing: 0.1em;
-  color: color-mix(in srgb, var(--ss-fg) 55%, transparent);
+  color: var(--ss-fg);
 }
 
 /* 빈 카드의 가운데 — 머리글 아래 남는 자리를 다 쓴다. */

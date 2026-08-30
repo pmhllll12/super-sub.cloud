@@ -56,6 +56,27 @@ export default function SquadPanel({ card }: { card?: PublicPlayerCard | null })
       </header>
 
       <div className="ss-squad-board">
+        {/* 경기장 선 — 장식이라 스크린리더에서 숨긴다. preserveAspectRatio
+            를 none 으로 두어 판이 어떤 비율이 되든 선이 판을 꽉 채운다
+            (원은 그만큼 타원이 되지만, 배경 장식이라 그편이 낫다 —
+            비율을 지키면 위아래에 선 없는 빈 띠가 생긴다). */}
+        <svg
+          className="ss-squad-pitch"
+          viewBox="0 0 100 140"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <rect x="1" y="1" width="98" height="138" rx="3" />
+          <line x1="1" y1="70" x2="99" y2="70" />
+          <circle cx="50" cy="70" r="14" />
+          <circle className="ss-squad-pitch-dot" cx="50" cy="70" r="1.2" />
+          <rect x="27" y="1" width="46" height="20" />
+          <rect x="38" y="1" width="24" height="9" />
+          <rect x="27" y="119" width="46" height="20" />
+          <rect x="38" y="130" width="24" height="9" />
+        </svg>
+
         {SLOTS.map((slot) => {
           const name = mates[slot.area] ?? null
           return (
