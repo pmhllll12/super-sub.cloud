@@ -70,8 +70,10 @@ export default function AuthShell({
           0.6%만 달라지고 최대 차이가 4(255 중)라 **눈에 보이지 않았다** —
           뒤가 부드러운 연기 그라디언트라 5px 밀어도 거의 같은 색이 온다.
           같은 자리에서 잰 값: scale 20 → 2.1% · 최대차 15, scale 60 →
-          13.7% · 최대차 38. 눈에 보이는 최소치인 20 으로 둔다(더 키우면
-          유리가 아니라 물결·열기가 된다).
+          13.7% · 최대차 38. 눈에 보이는 최소치는 20 이었지만 "있는 듯
+          없는 듯"이라 60 으로 올렸다 — 뒤 형태가 확실히 휘어 두께 있는
+          유리를 통과한 것으로 읽힌다. 더 키우면 유리가 아니라 물결·열기가
+          되므로 여기서 멈춘다.
 
           seed 를 고정해 두어 새로고침해도 같은 무늬가 나온다.
 
@@ -80,7 +82,7 @@ export default function AuthShell({
       <svg width="0" height="0" aria-hidden="true" focusable="false" className="absolute">
         <filter id="ss-glass-warp" x="-10%" y="-10%" width="120%" height="120%" colorInterpolationFilters="sRGB">
           <feTurbulence type="fractalNoise" baseFrequency="0.006 0.01" numOctaves="2" seed="7" result="warp" />
-          <feDisplacementMap in="SourceGraphic" in2="warp" scale="20" xChannelSelector="R" yChannelSelector="G" />
+          <feDisplacementMap in="SourceGraphic" in2="warp" scale="60" xChannelSelector="R" yChannelSelector="G" />
         </filter>
       </svg>
 
