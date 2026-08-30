@@ -776,10 +776,24 @@ body {
   width: max-content;
 }
 
+/* 스쿼드 판 — 뒤를 흐린다(블러는 컴포넌트에서 인라인으로, 이유는 거기
+   주석 참고). 추천 판은 반대로 블러가 없어 뒤가 그대로 비친다 — 둘을
+   맞바꿔 봤다가 이 조합이 낫다고 판단해 되돌렸다. GlassPanel 을 쓰지
+   않는 것은 도는 테두리 빛이 함께 딸려오기 때문이다. */
 .ss-squad {
   --ss-pcard-mini-w: 94;
   /* 모서리 꺾쇠가 뻗는 길이. 끝은 서서히 사라진다(아래 mask). */
   --ss-squad-corner: 110px;
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--ss-radius-sheet);
+  background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--ss-fg) 10%, transparent),
+      transparent 40%
+    ),
+    var(--ss-glass-bg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ss-bg) 20%, transparent);
   padding: 14px 16px 16px;
 }
 
@@ -926,13 +940,8 @@ body {
   color: color-mix(in srgb, var(--ss-pcard-fg) 55%, transparent);
 }
 
-/* 판 테두리 — 도는 빛(GlassPanel 의 ss-traveling-edge) 대신 **네 모서리
-   꺾쇠**만 둔다. 빛이 계속 도는 건 시선을 끌어 카드보다 테두리를 먼저
-   보게 만든다. */
-.ss-squad.ss-traveling-edge::after {
-  display: none;
-}
-
+/* 판 테두리는 **네 모서리 꺾쇠**뿐이다. 도는 빛(GlassPanel)을 쓰지 않는
+   이유이기도 하다 — 빛이 계속 돌면 카드보다 테두리를 먼저 보게 된다. */
 /* 테두리를 한 겹 그린 뒤 마스크로 모서리만 남긴다 — 선을 네 조각으로
    따로 그리면 둥근 모서리에서 이음매가 보인다. 각 모서리에 둔
    radial-gradient 가 안쪽은 불투명, 바깥으로 갈수록 투명해서 꺾쇠 끝이
@@ -983,8 +992,6 @@ body {
       transparent 40%
     ),
     var(--ss-glass-bg);
-  backdrop-filter: blur(var(--ss-glass-blur)) saturate(var(--ss-glass-saturate));
-  -webkit-backdrop-filter: blur(var(--ss-glass-blur)) saturate(var(--ss-glass-saturate));
   padding: 16px;
   transform-origin: left center;
   animation: ss-suggest-in 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
