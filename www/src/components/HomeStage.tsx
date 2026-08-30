@@ -1,13 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import BrandMark from '@/components/ui/BrandMark'
 import FigureBackground from '@/components/FigureBackground'
 import HomeIndexList from '@/components/HomeIndexList'
 import HomeNav, { type Destination } from '@/components/HomeNav'
 import LogoutButton, { HEADER_LINK_CLASS, HEADER_LINK_HOVER_CLASS } from '@/components/LogoutButton'
-import { useMouseParallax } from '@/lib/useMouseParallax'
 
 export type { Destination }
 
@@ -27,19 +26,11 @@ export type { Destination }
  * 목록이 **같은 항목을 같이 밝혀야** 해서다(레퍼런스에서 04 번이 그렇다).
  * 어느 쪽에 마우스를 올려도 반대쪽이 따라 밝아진다.
  *
- * 마우스를 따라 요소를 아주 미세하게 움직여 시차(입체감)를 낸다. 배경
- * 사진은 고정 — 사용자 요청("배경 사진은 안 움직이게 하자")으로 시차를
- * 걷어냈다. 뒤(헤더) → 앞(헤드라인)으로 갈수록 크게 움직인다. 배율은
- * 화면에서 마우스를 끝에서 끝까지 움직여 보며 눈으로 정했다: 가장 크게
- * 움직이는 층도 {@link FRONT_STRENGTH}px 를 넘지 않는다(요청한 "10~20px
- * 상한" 안에서, 시차가 보이되 멀미 나지 않는 지점). 실제 로직(보간 · rAF ·
- * reduced-motion/터치 예외)은 `useMouseParallax` 가 맡는다.
- *
- * `page.tsx`(서버 컴포넌트)는 이 컴포넌트를 감싸기만 하고, 마우스가 필요한
- * 부분은 여기로 prop 으로 내려받는다.
+ * 🔴 **글자는 마우스를 따라 움직이지 않는다.** 한때 마우스 시차로 헤더와
+ * 헤드라인을 미세하게 흔들었는데(`useMouseParallax`), 글자가 화면을
+ * 채우는 지금 배치에서는 읽는 내내 흔들려 어지러웠다 — 사용자 요청으로
+ * 걷어냈다. 되살릴 거면 배경이나 사진 층에만 걸 것.
  */
-const MID_STRENGTH = 7
-const FRONT_STRENGTH = 14
 
 // 레퍼런스의 `Meeting Point / Price / Duration` 자리. 아직 없는 기능을
 // 있는 것처럼 적지 않는다 — 세 번째 칸은 준비 중인 목적지를 그대로 적는다.
@@ -51,21 +42,14 @@ const INFO_BLOCKS = [
 
 const SOCIALS = ['FACEBOOK', 'INSTAGRAM', 'TIKTOK']
 
-export default function HomeParallax({
+export default function HomeStage({
   user,
   destinations,
 }: {
   user: { nickname: string } | null
   destinations: Destination[]
 }) {
-  const midRef = useRef<HTMLDivElement>(null)
-  const frontRef = useRef<HTMLDivElement>(null)
   const [active, setActive] = useState<string | null>(null)
-
-  useMouseParallax([
-    { ref: midRef, strength: MID_STRENGTH },
-    { ref: frontRef, strength: FRONT_STRENGTH },
-  ])
 
   return (
     <>
@@ -73,9 +57,8 @@ export default function HomeParallax({
 
       {/* 헤더 — 워드마크 · 목적지 글자 · 인사말. 화면에 고정한다. */}
       <div
-        ref={midRef}
         className="fixed inset-x-0 top-0 z-20 flex items-start justify-between gap-8"
-        style={{ padding: 'var(--ss-home-content-pad)', willChange: 'transform' }}
+        style={{ padding: 'var(--ss-home-content-pad)' }}
       >
         <BrandMark size={26} />
 
@@ -90,9 +73,16 @@ export default function HomeParallax({
 
         {user ? (
           <div className="flex shrink-0 items-center gap-1">
-            <span className={HEADER_LINK_CLASS} style={{ color: 'var(--ss-fg)' }}>
+            {/* 닉네임이 곧 '내 프로필'이다 — 목적지 글자 줄에 같은 항목을
+                또 두지 않는다(사용자 요청). 자기 이름을 눌러 자기 화면으로
+                가는 건 어디서나 하는 동작이라 따로 설명이 필요 없다. */}
+            <Link
+              href="/me"
+              className={`${HEADER_LINK_CLASS} ${HEADER_LINK_HOVER_CLASS}`}
+              style={{ color: 'var(--ss-fg)' }}
+            >
               {user.nickname}
-            </span>
+            </Link>
             <LogoutButton />
           </div>
         ) : (
@@ -109,11 +99,7 @@ export default function HomeParallax({
 
       {/* 헤드라인 · 보조 문구 · 정보 블록. 로그인 화면과 같은 문구를 쓴다 —
           두 화면이 한 목소리로 들리게. */}
-      <div
-        ref={frontRef}
-        className="ss-home-stage"
-        style={{ padding: 'var(--ss-home-content-pad)', willChange: 'transform' }}
-      >
+      <div className="ss-home-stage" style={{ padding: 'var(--ss-home-content-pad)' }}>
         <div className="flex items-start justify-between gap-8">
           <h1 className="ss-home-headline">
             안개 속에서도,

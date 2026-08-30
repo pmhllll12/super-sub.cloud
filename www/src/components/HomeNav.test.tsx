@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import HomeNav from './HomeNav'
 import type { Destination } from './HomeNav'
@@ -40,13 +40,15 @@ describe('홈 글자 내비 — 상단', () => {
     expect(screen.getByText(/경기 영상을 올리면/)).toBeInTheDocument()
   })
 
+  // 바로 없애지 않고 흐려지며 물러난다 — 사라질 때까지 기다린다.
   it('마우스를 치우면 카드가 사라진다', async () => {
     const user = userEvent.setup()
     setup()
     const item = screen.getByRole('button', { name: '영상 분석' })
     await user.hover(item)
+    expect(screen.getByText(/경기 영상을 올리면/)).toBeInTheDocument()
     await user.unhover(item)
-    expect(screen.queryByText(/경기 영상을 올리면/)).toBeNull()
+    await waitFor(() => expect(screen.queryByText(/경기 영상을 올리면/)).toBeNull())
   })
 
   // 터치 · 키보드에서는 hover 가 없다 — 눌러도 나와야 한다.
@@ -59,7 +61,35 @@ describe('홈 글자 내비 — 상단', () => {
     expect(screen.getByText(/경기 영상을 올리면/)).toBeInTheDocument()
     await user.click(item)
     await user.unhover(item)
-    expect(screen.queryByText(/경기 영상을 올리면/)).toBeNull()
+    await waitFor(() => expect(screen.queryByText(/경기 영상을 올리면/)).toBeNull())
+  })
+
+  // 🔴 회귀 방지 — 눌러서 고정한 카드가 화면에 계속 떠 있었다.
+  it('눌러 띄운 카드는 다른 데를 누르면 사라진다', async () => {
+    const user = userEvent.setup()
+    render(
+      <div>
+        <HomeNav destinations={DESTINATIONS} loggedIn active={null} onActivate={() => {}} />
+        <p>바깥</p>
+      </div>,
+    )
+    const item = screen.getByRole('button', { name: '영상 분석' })
+    await user.click(item)
+    await user.unhover(item)
+    expect(screen.getByText(/경기 영상을 올리면/)).toBeInTheDocument()
+    await user.click(screen.getByText('바깥'))
+    await waitFor(() => expect(screen.queryByText(/경기 영상을 올리면/)).toBeNull())
+  })
+
+  it('눌러 띄운 카드는 Esc 로도 사라진다', async () => {
+    const user = userEvent.setup()
+    setup()
+    const item = screen.getByRole('button', { name: '영상 분석' })
+    await user.click(item)
+    await user.unhover(item)
+    expect(screen.getByText(/경기 영상을 올리면/)).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByText(/경기 영상을 올리면/)).toBeNull())
   })
 
   it('키보드로 글자에 닿아도 카드가 나온다', async () => {

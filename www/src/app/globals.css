@@ -256,7 +256,10 @@ body {
 }
 
 /* 글자 아래로 떠오르는 작은 판. 글자 칸 가운데에 맞춰 매단다 — 화면
-   오른쪽 끝 칸에서도 판이 잘리지 않게 translateX 로 중앙 정렬한다. */
+   오른쪽 끝 칸에서도 판이 잘리지 않게 translateX 로 중앙 정렬한다.
+   가운데 정렬을 transform 으로 하므로 나타남/사라짐도 같은 transform
+   안에서 처리해야 한다(따로 주면 서로 덮어쓴다) — 그래서 keyframes 쪽에
+   -50% 가 다시 적혀 있다. 시간은 HomeNav 의 CARD_EXIT_MS 와 같아야 한다. */
 .ss-home-nav-card {
   position: absolute;
   top: 100%;
@@ -264,6 +267,42 @@ body {
   z-index: 30;
   transform: translateX(-50%);
   padding-top: 8px;
+  animation: ss-card-in 180ms ease-out both;
+}
+
+/* 물러나는 중 — 아직 DOM 에 있지만 누를 수 있으면 안 된다. */
+.ss-home-nav-card[data-state='closing'] {
+  pointer-events: none;
+  animation: ss-card-out 180ms ease-in both;
+}
+
+@keyframes ss-card-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes ss-card-out {
+  from {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-home-nav-card,
+  .ss-home-nav-card[data-state='closing'] {
+    animation-duration: 1ms;
+  }
 }
 
 /* 헤드라인 · 정보 블록이 놓이는 층. 헤더(위) 와 하단 줄 사이를 채운다. */

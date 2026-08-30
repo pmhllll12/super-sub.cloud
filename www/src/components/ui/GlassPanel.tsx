@@ -24,7 +24,7 @@ import { useEffect, useRef, type CSSProperties, type MouseEvent as ReactMouseEve
  * (`.ss-card-interactive`/`.ss-card-glow`)가 하고, 여기서는 mousemove 마다
  * 커서 좌표(`--ss-card-glow-x/y`)만 requestAnimationFrame 으로 묶어 DOM에
  * 직접 쓴다(리액트 상태를 거치면 프레임마다 리렌더가 붙는다 —
- * `lib/useMouseParallax.ts` 와 같은 이유). `prefers-reduced-motion: reduce`
+ * `prefers-reduced-motion` 을 존중하는 다른 움직임들과 같은 이유). `prefers-reduced-motion: reduce`
  * 면 좌표 갱신 자체를 하지 않는다(CSS 쪽도 이중으로 꺼둔다).
  */
 export default function GlassPanel({

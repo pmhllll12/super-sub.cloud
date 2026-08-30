@@ -8,10 +8,11 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn() }),
 }))
 
-const TITLES = ['영상 분석', '용병 매칭', '내 프로필', '내 팀', '레슨 · 상점', '경기장 예약']
+// '내 프로필'은 이 줄에 없다 — 우상단 닉네임이 그 자리다.
+const TITLES = ['영상 분석', '용병 매칭', '내 팀', '레슨 · 상점', '경기장 예약']
 
 describe('홈 화면 — /', () => {
-  it('워드마크와 목적지 6개를 글자로 적는다', () => {
+  it('워드마크와 목적지 글자를 적는다', () => {
     render(<HomeBody user={null} />)
     expect(screen.getByText('SUPERSUB')).toBeInTheDocument()
     for (const t of TITLES) {
@@ -37,13 +38,16 @@ describe('홈 화면 — /', () => {
     )
   })
 
-  // '내 선수 카드'는 '내 프로필'에 합쳤다 — 홈에 따로 있지 않다.
-  it('내 선수 카드는 따로 없고 내 프로필이 /me 로 간다', async () => {
-    const user = userEvent.setup()
+  // '내 선수 카드'는 '내 프로필'에, '내 프로필'은 닉네임 자리에 합쳤다.
+  it('목적지 글자에 내 선수 카드도 내 프로필도 없다', () => {
     render(<HomeBody user={{ nickname: '홍길동' }} />)
     expect(screen.queryByRole('button', { name: '내 선수 카드' })).toBeNull()
-    await user.hover(screen.getByRole('button', { name: '내 프로필' }))
-    expect(screen.getByRole('link', { name: /선수 카드와/ })).toHaveAttribute('href', '/me')
+    expect(screen.queryByRole('button', { name: '내 프로필' })).toBeNull()
+  })
+
+  it('닉네임이 곧 내 프로필 링크다', () => {
+    render(<HomeBody user={{ nickname: '홍길동' }} />)
+    expect(screen.getByRole('link', { name: '홍길동' })).toHaveAttribute('href', '/me')
   })
 
   it('아직 갈 곳이 없는 목적지는 카드에 준비 중이라고 적는다', async () => {
@@ -64,12 +68,14 @@ describe('홈 화면 — /', () => {
     )
   })
 
-  it('우하단에 01~06 번호 목록을 적는다', () => {
+  it('우하단 번호 목록이 목적지 글자와 같은 것을 같은 수만큼 센다', () => {
     const { container } = render(<HomeBody user={null} />)
     const list = container.querySelector('.ss-home-index') as HTMLElement
     expect(within(list).getByText('01')).toBeInTheDocument()
-    expect(within(list).getByText('06')).toBeInTheDocument()
-    expect(within(list).getAllByRole('listitem')).toHaveLength(6)
+    expect(within(list).getAllByRole('listitem')).toHaveLength(TITLES.length)
+    for (const t of TITLES) {
+      expect(within(list).getByText(t)).toBeInTheDocument()
+    }
   })
 
   it('레퍼런스처럼 헤드라인과 하단 글자를 적는다', () => {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import DestinationCard from './DestinationCard'
 
 export type Destination = {
@@ -32,7 +32,18 @@ export type Destination = {
  * - `click` — 눌러서 **고정**한다. 터치에는 hover 가 없어 이것뿐이다.
  *   한 번 더 누르면 풀린다. 고정된 것과 지금 가리킨 것이 다르면 가리킨
  *   쪽이 이긴다(`hovered ?? pinned`).
+ *
+ * 고정한 카드는 **다른 데를 누르거나 Esc 를 누르면** 풀린다 — 안 그러면
+ * 한 번 누른 카드가 화면에 계속 떠 있는다.
+ *
+ * 사라질 때는 바로 없애지 않고 {@link CARD_EXIT_MS} 동안 흐려지며
+ * 물러난다. 그동안 DOM 에 남겨 둬야 해서(`exiting`) 지금 떠 있는 것과
+ * 지금 사라지는 중인 것을 따로 센다.
  */
+// 카드가 나타나고 사라지는 시간 — globals.css 의 ss-card-in/out 과 같아야
+// 한다. 여기가 짧으면 애니메이션 도중에 잘리고, 길면 사라진 자리가 남는다.
+const CARD_EXIT_MS = 180
+
 export default function HomeNav({
   destinations,
   loggedIn,
@@ -45,9 +56,44 @@ export default function HomeNav({
   active: string | null
   onActivate: (title: string | null) => void
 }) {
+  const navRef = useRef<HTMLElement>(null)
   const [hovered, setHovered] = useState<string | null>(null)
   const [pinned, setPinned] = useState<string | null>(null)
   const shown = hovered ?? pinned
+
+  // 방금까지 떠 있다가 지금 물러나는 중인 카드. 애니메이션이 끝날 때까지만 산다.
+  const [exiting, setExiting] = useState<string | null>(null)
+  const prevShown = useRef<string | null>(null)
+  useEffect(() => {
+    const prev = prevShown.current
+    prevShown.current = shown
+    if (!prev || prev === shown) return
+    setExiting(prev)
+    const t = setTimeout(() => setExiting((e) => (e === prev ? null : e)), CARD_EXIT_MS)
+    return () => clearTimeout(t)
+  }, [shown])
+
+  // 고정해 둔 카드는 바깥을 누르거나 Esc 를 누르면 풀린다. pointerdown 으로
+  // 잡는다 — click 은 마우스를 뗄 때라 그 사이 화면이 이미 바뀌어 있을 수 있다.
+  useEffect(() => {
+    if (pinned === null) return
+    function onPointerDown(e: PointerEvent) {
+      if (navRef.current?.contains(e.target as Node)) return
+      setPinned(null)
+      onActivate(null)
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return
+      setPinned(null)
+      onActivate(null)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [pinned, onActivate])
 
   function show(title: string | null) {
     setHovered(title)
@@ -55,10 +101,11 @@ export default function HomeNav({
   }
 
   return (
-    <nav aria-label="목적지">
+    <nav ref={navRef} aria-label="목적지">
       <ul className="flex flex-wrap items-center justify-end gap-x-6 gap-y-2">
         {destinations.map((d) => {
           const open = shown === d.title
+          const closing = !open && exiting === d.title
           return (
             <li
               key={d.title}
@@ -86,8 +133,8 @@ export default function HomeNav({
                 {d.title}
               </button>
 
-              {open && (
-                <div className="ss-home-nav-card">
+              {(open || closing) && (
+                <div className="ss-home-nav-card" data-state={closing ? 'closing' : 'open'}>
                   <DestinationCard
                     compact
                     title={d.title}

@@ -1,19 +1,21 @@
 import { type User } from '@/server/backend'
 import { requireUser } from '@/server/currentUser'
-import HomeParallax from '@/components/HomeParallax'
+import HomeStage from '@/components/HomeStage'
 import { type Destination } from '@/components/HomeNav'
 import FloatingNavBar from '@/components/ui/FloatingNavBar'
 
-// 홈 상단 글자 내비에 적히는 6개. 앱(flutter/.../home_screen.dart)의
+// 홈 상단 글자 내비에 적히는 목적지. 앱(flutter/.../home_screen.dart)의
 // _kDestinations 에서 출발했지만 2026-08-30 에 웹에서 다시 골랐다:
 //   - '내 선수 카드'를 '내 프로필'에 합쳤다(카드는 이제 /me 안에 있다)
 //   - '레슨 · 코치'를 '레슨 · 상점'으로
-//   - '경기장 예약'을 새로 넣어 6개를 맞췄다
+//   - '경기장 예약'을 새로 넣었다
+//   - 그리고 '내 프로필'을 이 줄에서 뺐다 — 우상단 **닉네임**이 그 자리다
+//     (`HomeStage`). 같은 곳으로 가는 항목을 한 화면에 둘 두지 않는다.
 //
-// href 가 있는 두 곳(/analysis, /me)은 그 경로의 requireUser() 에 걸리는
-// 로그인 전용 화면이다 — authRequired: true 로 표시해 두면 로그인 안 한
-// 사람에게 카드가 "로그인이 필요합니다"를 미리 보여준다(링크는 살려 둔다).
-// 나머지 넷은 아직 갈 곳이 없어 카드에 "준비 중입니다"가 뜬다.
+// href 가 있는 '영상 분석'은 requireUser() 에 걸리는 로그인 전용 화면이다 —
+// authRequired: true 로 표시해 두면 로그인 안 한 사람에게 카드가 "로그인이
+// 필요합니다"를 미리 보여준다(링크는 살려 둔다). 나머지는 아직 갈 곳이
+// 없어 카드에 "준비 중입니다"가 뜬다.
 const DESTINATIONS: Destination[] = [
   {
     title: '영상 분석',
@@ -26,13 +28,6 @@ const DESTINATIONS: Destination[] = [
     title: '용병 매칭',
     icon: 'sports_soccer',
     summary: '경기를 찾고\n지원 현황을 봅니다',
-  },
-  {
-    title: '내 프로필',
-    icon: 'person',
-    summary: '선수 카드와\n가입 정보',
-    href: '/me',
-    authRequired: true,
   },
   {
     title: '내 팀',
@@ -58,7 +53,7 @@ const DESTINATIONS: Destination[] = [
  *
  * 홈은 격자가 아니라 화면 한 장을 통째로 쓰므로 `(app)` 레이아웃처럼
  * `max-w-[1120px]` 로 가운데 폭을 좁히지 않는다 — 헤더 · 하단 줄을
- * `HomeParallax` 가 `position: fixed` 로 화면 전체 기준으로 배치한다.
+ * `HomeStage` 가 `position: fixed` 로 화면 전체 기준으로 배치한다.
  *
  * 하단 내비바는 로그인했을 때만 보여준다 — 로그인 안 한 사람은 갈 데가
  * 대부분 막혀 있어 의미가 없다. 세로로 스크롤하는 화면이 아니라 내비바를
@@ -67,7 +62,7 @@ const DESTINATIONS: Destination[] = [
 export function HomeBody({ user }: { user: Pick<User, 'nickname'> | null }) {
   return (
     <>
-      <HomeParallax user={user} destinations={DESTINATIONS} />
+      <HomeStage user={user} destinations={DESTINATIONS} />
       {user && <FloatingNavBar />}
     </>
   )
