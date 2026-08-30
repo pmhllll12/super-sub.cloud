@@ -234,6 +234,18 @@ body {
 
 /* ── 홈 한 화면 (레퍼런스 Nile Travel 배치) ────────────────────────────── */
 
+/* 🔴 헤더 줄은 화면 폭을 다 차지하지만 실제 내용은 왼쪽 워드마크 ·
+   가운데 글자 · 오른쪽 프로필뿐이다. 빈 자리가 클릭을 먹으면 그 아래
+   것을 누를 수 없다 — 추천 판의 닫기 버튼이 실제로 그렇게 막혔다.
+   빈 자리는 통과시키고 자식에서만 되살린다(하단 줄과 같은 방식). */
+.ss-home-header {
+  pointer-events: none;
+}
+
+.ss-home-header > * {
+  pointer-events: auto;
+}
+
 /* 헤더에서 목적지 글자가 들어가는 칸. 레퍼런스처럼 **가운데가 아니라
    오른쪽**에 붙인다 — 워드마크(왼쪽)와 닉네임(오른쪽) 사이에서 남는 폭을
    다 쓰되 글자는 오른쪽 끝으로 몰린다. 좁아지면 줄바꿈해 양옆을 밀어내지
@@ -944,11 +956,16 @@ body {
    미끄러져 나오는 동안 판 밑으로 파고들지 않게 z 를 올린다. */
 .ss-suggest {
   position: absolute;
+  /* 왼쪽 스쿼드 판과 **같은 키**로 선다 — 나란히 놓이는 두 판이 아래끝이
+     어긋나면 붙어 있는 한 벌로 안 읽힌다. */
   top: 0;
+  bottom: 0;
   left: 100%;
   z-index: 3;
+  display: flex;
+  flex-direction: column;
   margin-left: 12px;
-  width: 248px;
+  width: 380px;
   border-radius: var(--ss-radius-sheet);
   border: 1px solid var(--ss-glass-border);
   background: linear-gradient(
@@ -1035,19 +1052,23 @@ body {
   color: var(--ss-fg);
 }
 
+/* 목록이 판의 남는 키를 다 쓴다. 후보가 많아지면 여기서만 스크롤한다. */
 .ss-suggest-list {
   display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+  overflow-y: auto;
 }
 
 .ss-suggest-item {
   display: flex;
   width: 100%;
-  align-items: center;
-  gap: 10px;
-  border-radius: 12px;
-  padding: 8px;
+  align-items: flex-start;
+  gap: 12px;
+  border-radius: 14px;
+  padding: 12px;
   text-align: left;
   background: color-mix(in srgb, var(--ss-fg) 5%, transparent);
   transition: background 160ms ease;
@@ -1061,7 +1082,7 @@ body {
 /* 목록 속 작은 카드 — 실제 선수 카드와 같은 비율(3:4.1)로 두어 이게
    카드가 될 자리라는 게 읽힌다. */
 .ss-suggest-card {
-  width: 30px;
+  width: 62px;
   flex: none;
   aspect-ratio: 3 / 4.1;
   border-radius: 5px;
@@ -1082,6 +1103,28 @@ body {
 }
 
 .ss-suggest-title {
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   color: var(--ss-accent);
+}
+
+/* 영상 분석이 정리한 특징 — 한 줄에 하나씩. 앞에 점을 찍어 목록으로
+   읽히게 한다(리스트 태그를 겹쳐 쓰면 버튼 안에 목록이 들어가 버린다). */
+.ss-suggest-notes {
+  display: flex;
+  margin-top: 6px;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--ss-fg) 70%, transparent);
+}
+
+.ss-suggest-notes > span {
+  padding-left: 10px;
+  text-indent: -10px;
+}
+
+.ss-suggest-notes > span::before {
+  content: '· ';
+  color: color-mix(in srgb, var(--ss-fg) 45%, transparent);
 }

@@ -54,7 +54,7 @@ export default function HomeStage({
         // 워드마크 · 목적지 글자 · 인사말 세 덩어리 사이는 목적지 글자
         // **칸 사이(40px)보다 넉넉히** 띄운다 — 안 그러면 닉네임이 목적지
         // 글자 하나처럼 붙어 읽힌다(실측: 32px 이면 그렇게 보였다).
-        className="fixed inset-x-0 top-0 z-20 flex items-start justify-between gap-16"
+        className="ss-home-header fixed inset-x-0 top-0 z-20 flex items-start justify-between gap-16"
         style={{ padding: 'var(--ss-home-content-pad)' }}
       >
         <BrandMark size={26} />
