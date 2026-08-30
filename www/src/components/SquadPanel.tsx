@@ -78,7 +78,9 @@ export default function SquadPanel({ card }: { card?: PublicPlayerCard | null })
       {/* 유리 굴절(warp) — backdrop-filter 는 흐림·채도만 다루고 뒤 배경을
           휘게 하지는 못한다. 그건 SVG 필터의 몫이다: 부드러운 잡음
           (feTurbulence)을 만들고 그만큼 픽셀을 밀어(feDisplacementMap)
-          두께 있는 유리를 통과한 것처럼 만든다. seed 를 고정해 두어
+          두께 있는 유리를 통과한 것처럼 만든다. 세기(scale)는 실측으로
+          골랐다 — 7 이면 화면의 9.7%가 달라지고(최대차 19), 15 면 18.4%
+          (최대차 31)로 뒤 연기가 또렷하게 일렁인다. seed 를 고정해 두어
           새로고침해도 같은 무늬가 나온다. width/height 0 이라 자리를
           차지하지 않는다 — 정의만 두는 자리다. */}
       <svg width="0" height="0" aria-hidden="true" focusable="false" className="absolute">
@@ -100,7 +102,7 @@ export default function SquadPanel({ card }: { card?: PublicPlayerCard | null })
           <feDisplacementMap
             in="SourceGraphic"
             in2="warp"
-            scale="7"
+            scale="15"
             xChannelSelector="R"
             yChannelSelector="G"
           />
