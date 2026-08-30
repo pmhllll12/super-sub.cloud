@@ -62,6 +62,10 @@
      세로로 긴 카드(폭:높이 = 3:4 = 0.75)를 쓴다 — 210:280 이 정확히
      0.75 이고, 아이콘+제목+설명 2줄+안내문 1줄이 justify-center 로
      세로 가운데 모여도 위아래에 자연스러운 여백이 남는 높이다. */
+  /* 홈의 큰 영문 글자(OWN THE PITCH · FIND YOUR SQUAD) 색. 배경 사진과
+     같은 계열의 짙은 남색이라 흰 글자처럼 튀지 않고 사진에 잠긴다. */
+  --ss-display-fg: #263242;
+
   --ss-card-w: 210px;
   /* 홈 글자 nav 에서 글자 아래 떠오르는 작은 판의 폭 — 글자 한 칸보다
      넉넉하되 옆 글자를 다 덮지는 않는 크기. 높이는 내용에 맡긴다. */
@@ -362,7 +366,7 @@ body {
   font-size: clamp(2.25rem, 5.56vw, 6rem);
   line-height: 1.16;
   letter-spacing: 0.01em;
-  color: var(--ss-fg);
+  color: var(--ss-display-fg);
 }
 
 /* 왼쪽 헤드라인. */
