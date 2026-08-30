@@ -75,7 +75,50 @@ export default function SquadPanel({ card }: { card?: PublicPlayerCard | null })
        나간 부분이 통째로 잘린다 — 실제로 그렇게 안 보였다. 자리 잡기는
        이 바깥 상자가 맡고, 두 판은 그 안에서 좌표를 잡는다. */
     <div className="ss-squad-wrap">
-      <section className="ss-squad" aria-label="내 스쿼드">
+      {/* 유리 굴절(warp) — backdrop-filter 는 흐림·채도만 다루고 뒤 배경을
+          휘게 하지는 못한다. 그건 SVG 필터의 몫이다: 부드러운 잡음
+          (feTurbulence)을 만들고 그만큼 픽셀을 밀어(feDisplacementMap)
+          두께 있는 유리를 통과한 것처럼 만든다. seed 를 고정해 두어
+          새로고침해도 같은 무늬가 나온다. width/height 0 이라 자리를
+          차지하지 않는다 — 정의만 두는 자리다. */}
+      <svg width="0" height="0" aria-hidden="true" focusable="false" className="absolute">
+        <filter
+          id="ss-squad-warp"
+          x="-10%"
+          y="-10%"
+          width="120%"
+          height="120%"
+          colorInterpolationFilters="sRGB"
+        >
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency="0.006 0.01"
+            numOctaves="2"
+            seed="4"
+            result="warp"
+          />
+          <feDisplacementMap
+            in="SourceGraphic"
+            in2="warp"
+            scale="7"
+            xChannelSelector="R"
+            yChannelSelector="G"
+          />
+        </filter>
+      </svg>
+
+      <section
+        className="ss-squad"
+        aria-label="내 스쿼드"
+        // 🔴 backdrop-filter 는 **인라인으로** 준다. globals.css 에 두면
+        // 같은 규칙의 color-mix() 때문에 Lightning CSS 가 @supports 로
+        // 쪼개는 과정에서 통째로 떨어뜨린다(추천 판에서 실제로 그렇게
+        // 날아갔다 — 계산값 none). 흐림 없이 굴절만 건다.
+        style={{
+          backdropFilter: 'url(#ss-squad-warp)',
+          WebkitBackdropFilter: 'url(#ss-squad-warp)',
+        }}
+      >
       <div className="ss-squad-board">
         {/* 머리글이 경기장 선 **안쪽**에 앉아야 한다 — 판 위쪽에 따로
             두면 선 밖으로 나간다. 선을 그리는 상자 안에 넣고 위 여백을
