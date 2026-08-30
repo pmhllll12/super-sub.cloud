@@ -105,7 +105,7 @@ export default function HomeStage({
       <div className="ss-home-stage" style={{ padding: 'var(--ss-home-content-pad)' }}>
         <div className="flex items-start justify-between gap-8">
           {/* 레퍼런스(THE CAMEL / AND / THE WHEEL)처럼 스텐실 글꼴로 두 줄.
-              Bigshot One 은 라틴만 있어 한글을 못 쓴다 — 그래서 문구도 영문이다.
+              Abril Fatface 는 라틴만 있어 한글을 못 쓴다 — 그래서 문구도 영문이다.
 
               PITCH 의 P 가 윗줄 THE 의 T 와 같은 자리에서 시작해야 해서
               (사용자 요청) 낱말 셋을 2열 그리드에 앉힌다: OWN | THE 가

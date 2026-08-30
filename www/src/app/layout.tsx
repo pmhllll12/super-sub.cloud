@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Bigshot_One, Rubik, Rubik_Glitch } from "next/font/google";
+import { Abril_Fatface, Rubik, Rubik_Glitch } from "next/font/google";
 import "material-symbols/outlined.css";
 import "./globals.css";
 import IntroGate from "@/components/IntroGate";
@@ -20,7 +20,7 @@ const rubikGlitch = Rubik_Glitch({
 // 글꼴. 굵기가 400 하나뿐이라 font-weight 를 올려도 가짜 굵게(synthetic
 // bold)만 걸린다 — 주지 않는다. 라틴만 있고 한글 글리프가 없으므로
 // 한글에 쓰지 않는다.
-const bigshotOne = Bigshot_One({
+const abrilFatface = Abril_Fatface({
   variable: "--font-display",
   weight: "400",
   subsets: ["latin"],
@@ -35,7 +35,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className="h-full antialiased">
       <body
-        className={`${rubik.variable} ${rubikGlitch.variable} ${bigshotOne.variable} min-h-full flex flex-col`}
+        className={`${rubik.variable} ${rubikGlitch.variable} ${abrilFatface.variable} min-h-full flex flex-col`}
       >
         <IntroGate />
         {children}

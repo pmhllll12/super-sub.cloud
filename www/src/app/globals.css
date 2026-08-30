@@ -352,7 +352,7 @@ body {
 /* 큰 스텐실 글자 — 왼쪽 헤드라인(OWN THE PITCH)과 오른쪽 짝
    (FIND YOUR SQUAD)이 **같은 글꼴 · 같은 크기**로 마주 본다. 크기를 한
    군데서만 정하려고 두 곳이 이 클래스를 같이 쓴다.
-   🔴 font-weight 를 주지 않는다: Bigshot One 은 굵기가 400 하나뿐인 장식
+   🔴 font-weight 를 주지 않는다: Abril Fatface 는 굵기가 400 하나뿐인 장식
    글꼴이라 700 을 주면 브라우저가 가짜 굵게(synthetic bold)를 입혀 획만
    지저분해진다(워드마크 RubikGlitch 에서 똑같이 겪었다). */
 .ss-home-display {
@@ -372,7 +372,7 @@ body {
      여백 없이 layout 이 보장한다).
 
      칸 사이는 낱말 사이 공백 몫이다. 글꼴이 정한 space 폭을 그대로
-     쓰면(Bigshot One 은 0.16em) 이 크기에서 OWN 과 THE 가 붙어 읽힌다 —
+     쓰면(Abril Fatface 는 0.18em) 이 크기에서 OWN 과 THE 가 붙어 읽힌다 —
      획이 굵고 side bearing 이 좁은 디스플레이 글꼴이라 그렇다. 눈으로
      떨어져 보이는 0.35em 으로 넓혀 둔다. 글꼴을 바꿔도 이 값은 대체로
      그대로 쓸 수 있다(글꼴의 space 폭에 매지 않았다). */
