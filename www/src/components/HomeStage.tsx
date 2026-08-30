@@ -98,6 +98,10 @@ export default function HomeStage({
       {/* 헤드라인 · 보조 문구 · 정보 블록. 로그인 화면과 같은 문구를 쓴다 —
           두 화면이 한 목소리로 들리게. */}
       <div className="ss-home-stage" style={{ padding: 'var(--ss-home-content-pad)' }}>
+        {/* 🔴 좌우를 바꾸는 건 **order** 로 한다(사용자 요청). DOM 에서는
+            h1 이 먼저다 — 읽어 주는 기계는 제목을 먼저 만나야 한다.
+            마크업 순서를 뒤집으면 화면은 맞아도 읽는 순서가 뒤집힌다.
+            둘 다 누를 수 없는 글자라 초점 순서 문제는 없다. */}
         <div className="flex items-start justify-between gap-8">
           {/* 레퍼런스(THE CAMEL / AND / THE WHEEL)처럼 스텐실 글꼴로 두 줄.
               Abril Fatface 는 라틴만 있어 한글을 못 쓴다 — 그래서 문구도 영문이다.
@@ -110,7 +114,7 @@ export default function HomeStage({
 
               낱말이 각자 span 이라 사이에 공백 문자가 없다 — 그냥 두면
               접근성 이름이 "OWNTHEPITCH" 로 붙어 읽힌다. 이름을 따로 준다. */}
-          <h1 className="ss-home-display ss-home-headline" aria-label="OWN THE PITCH">
+          <h1 className="ss-home-display ss-home-headline order-2" aria-label="OWN THE PITCH">
             <span className="ss-home-headline-first">OWN</span>
             <span>T</span>
             <span>HE</span>
@@ -121,7 +125,7 @@ export default function HomeStage({
               세 줄. 줄이 내려갈수록 시작점이 조금씩 오른쪽으로 밀린다
               (사용자 요청, 레퍼런스의 THE CAMEL / AND / THE WHEEL 처럼
               계단 모양). 여기도 낱말이 각자 span 이라 이름을 따로 준다. */}
-          <p className="ss-home-display ss-home-subhead" aria-label="FIND YOUR SQUAD">
+          <p className="ss-home-display ss-home-subhead order-1" aria-label="FIND YOUR SQUAD">
             <span>FIND</span>
             <span>YOUR</span>
             <span>SQUAD</span>
