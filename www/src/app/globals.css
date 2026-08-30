@@ -542,7 +542,10 @@ body {
   gap: 12px;
 }
 
+/* 카드의 영문은 전용 세리프(Young Serif)로 찍는다. 워드마크만 예외 —
+   그건 브랜드 글꼴(RubikGlitch)이라 건드리지 않는다. */
 .ss-pcard-kicker {
+  font-family: var(--font-card), var(--font-rubik), system-ui, serif;
   font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0.14em;
@@ -561,10 +564,12 @@ body {
   z-index: 2;
   margin-top: 26px;
   text-align: center;
+  font-family: var(--font-card), var(--font-rubik), system-ui, serif;
   font-size: clamp(1.75rem, 15cqw, 3.25rem);
-  font-weight: 900;
-  letter-spacing: -0.03em;
-  line-height: 0.95;
+  /* 🔴 font-weight 를 주지 않는다 — Young Serif 는 굵기가 400 하나뿐이라
+     올리면 가짜 굵게(synthetic bold)만 걸린다. */
+  letter-spacing: -0.01em;
+  line-height: 1.02;
   color: var(--ss-pcard-fg);
 }
 

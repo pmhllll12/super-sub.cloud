@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Abril_Fatface, Rubik, Rubik_Glitch } from "next/font/google";
+import { Abril_Fatface, Rubik, Rubik_Glitch, Young_Serif } from "next/font/google";
 import "material-symbols/outlined.css";
 import "./globals.css";
 import IntroGate from "@/components/IntroGate";
@@ -26,6 +26,14 @@ const abrilFatface = Abril_Fatface({
   subsets: ["latin"],
 });
 
+// 선수 카드의 영문 전용 세리프. 여기도 굵기가 400 하나뿐이라 font-weight
+// 를 올리면 가짜 굵게(synthetic bold)만 걸린다 — 주지 않는다.
+const youngSerif = Young_Serif({
+  variable: "--font-card",
+  weight: "400",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
   title: "Super-Sub",
   description: "생활체육 경기 영상을 분석해 용병을 찾고, 실력을 검증합니다.",
@@ -35,7 +43,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className="h-full antialiased">
       <body
-        className={`${rubik.variable} ${rubikGlitch.variable} ${abrilFatface.variable} min-h-full flex flex-col`}
+        className={`${rubik.variable} ${rubikGlitch.variable} ${abrilFatface.variable} ${youngSerif.variable} min-h-full flex flex-col`}
       >
         <IntroGate />
         {children}
