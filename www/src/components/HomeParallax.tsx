@@ -1,52 +1,55 @@
 'use client'
 
 import Link from 'next/link'
-import { useRef, type CSSProperties } from 'react'
+import { useRef, useState } from 'react'
 import BrandMark from '@/components/ui/BrandMark'
-import DestinationCard from '@/components/DestinationCard'
 import FigureBackground from '@/components/FigureBackground'
+import HomeIndexList from '@/components/HomeIndexList'
+import HomeNav, { type Destination } from '@/components/HomeNav'
 import LogoutButton, { HEADER_LINK_CLASS, HEADER_LINK_HOVER_CLASS } from '@/components/LogoutButton'
-import { useCarouselFlow } from '@/lib/useCarouselFlow'
 import { useMouseParallax } from '@/lib/useMouseParallax'
 
-export type Destination = {
-  title: string
-  icon: string
-  summary: string
-  href?: string
-  /** 이 목적지가 결국 requireUser() 에 걸리는 로그인 전용 경로인가 — 로그인
-   *  안 한 사람에게는 "로그인이 필요합니다" 안내를 보여준다(링크 자체는
-   *  살려 둔다, 눌러야 /login 으로 보내는 지금 방식 그대로). */
-  authRequired?: boolean
-}
+export type { Destination }
 
 /**
- * 배경 사진 위에 얹힌 요소들을 마우스를 따라 아주 미세하게 움직여 시차
- * (입체감)를 낸다. 배경 사진은 고정 — 사용자 요청("배경 사진은 안
- * 움직이게 하자")으로 시차를 걷어냈다. 워드마크 · 인사말과 카드
- * 캐러셀만 움직인다: 뒤(워드마크 · 인사말) → 앞(카드)으로 갈수록 크게.
- * 배경이 고정이라 오히려 이 두 층이 그 위에 떠 있는 느낌이 산다.
- * 실제 로직(보간 · rAF · reduced-motion/터치 예외)은 `useMouseParallax`
- * 가 맡는다.
+ * 홈 한 화면 — 배경 사진 위에 글자를 얹는 레퍼런스(Nile Travel) 배치다.
  *
- * 배율은 화면에서 마우스를 끝에서 끝까지 움직여 보며 눈으로 정했다: 가장
- * 크게 움직이는 카드 층도 최대 {@link FRONT_STRENGTH}px 를 넘지 않는다
- * (요청한 "10~20px 상한" 안에서, 시차가 보이되 멀미 나지 않는 지점).
+ *   워드마크        영상분석 용병매칭 …        닉네임 로그아웃
+ *   헤드라인(큰 글자)                          보조 문구
+ *   정보 블록 3열
+ *   SCROLL DOWN  소셜                          01~06 번호 목록
  *
- * 카드 캐러셀은 같은 층(frontRef)에 두 가지가 동시에 걸려 있다: 이
- * `useMouseParallax` 는 `transform` 으로 박스 전체를 살짝 흔들고,
- * `useCarouselFlow` 는 그 안의 `scrollLeft` 로 카드 줄을 흐르게 한다.
- * 서로 다른 CSS 속성이라 부딪히지 않는다(자세한 이유는
- * `lib/useCarouselFlow.ts` 코멘트). 카드는 6장 한 벌뿐 — 무한 루프 없이
- * 양 끝에서 멈춘다.
+ * 예전에는 화면 아래에 카드 6장이 가로로 흐르는 캐러셀이 있었다. 카드가
+ * 배경 사진을 절반 넘게 가려서, 목적지는 위쪽 **글자**로만 적고 카드는
+ * 그 글자를 가리켰을 때만 아래로 떠오르게 바꿨다(`HomeNav`).
+ *
+ * 지금 가리킨 목적지(`active`)를 여기서 쥔다 — 위쪽 글자와 우하단 번호
+ * 목록이 **같은 항목을 같이 밝혀야** 해서다(레퍼런스에서 04 번이 그렇다).
+ * 어느 쪽에 마우스를 올려도 반대쪽이 따라 밝아진다.
+ *
+ * 마우스를 따라 요소를 아주 미세하게 움직여 시차(입체감)를 낸다. 배경
+ * 사진은 고정 — 사용자 요청("배경 사진은 안 움직이게 하자")으로 시차를
+ * 걷어냈다. 뒤(헤더) → 앞(헤드라인)으로 갈수록 크게 움직인다. 배율은
+ * 화면에서 마우스를 끝에서 끝까지 움직여 보며 눈으로 정했다: 가장 크게
+ * 움직이는 층도 {@link FRONT_STRENGTH}px 를 넘지 않는다(요청한 "10~20px
+ * 상한" 안에서, 시차가 보이되 멀미 나지 않는 지점). 실제 로직(보간 · rAF ·
+ * reduced-motion/터치 예외)은 `useMouseParallax` 가 맡는다.
  *
  * `page.tsx`(서버 컴포넌트)는 이 컴포넌트를 감싸기만 하고, 마우스가 필요한
- * 화면(인사말 · 카드)은 여기로 prop 으로 내려받는다. `/` 는 로그인 여부와
- * 무관하게 항상 이 화면이다 — `user` 가 있으면 닉네임 + 로그아웃을, 없으면
- * 로그인 · 회원가입 버튼을 인사말 자리에 보여준다.
+ * 부분은 여기로 prop 으로 내려받는다.
  */
 const MID_STRENGTH = 7
 const FRONT_STRENGTH = 14
+
+// 레퍼런스의 `Meeting Point / Price / Duration` 자리. 아직 없는 기능을
+// 있는 것처럼 적지 않는다 — 세 번째 칸은 준비 중인 목적지를 그대로 적는다.
+const INFO_BLOCKS = [
+  { heading: '시작하기', body: '영상 한 편이면 됩니다\n올린 뒤 기다리면 됩니다' },
+  { heading: '무엇이 나오나', body: '점수가 아니라 호칭입니다\n잘한 것에 이름을 붙입니다' },
+  { heading: '준비 중', body: '용병 매칭 · 내 팀\n레슨 · 상점 · 경기장 예약' },
+]
+
+const SOCIALS = ['FACEBOOK', 'INSTAGRAM', 'TIKTOK']
 
 export default function HomeParallax({
   user,
@@ -57,35 +60,43 @@ export default function HomeParallax({
 }) {
   const midRef = useRef<HTMLDivElement>(null)
   const frontRef = useRef<HTMLDivElement>(null)
+  const [active, setActive] = useState<string | null>(null)
 
   useMouseParallax([
     { ref: midRef, strength: MID_STRENGTH },
     { ref: frontRef, strength: FRONT_STRENGTH },
   ])
-  useCarouselFlow(frontRef)
 
   return (
     <>
       <FigureBackground />
 
-      {/* 헤더 — 워드마크 좌상단, 인사말 우상단. 화면에 고정해 캐러셀이
-          가로로 얼마나 흐르든 그 자리에 그대로 있는다. 뷰포트 가장자리에
-          붙지 않도록 --ss-home-content-pad 만큼 안쪽으로 들인다. */}
+      {/* 헤더 — 워드마크 · 목적지 글자 · 인사말. 화면에 고정한다. */}
       <div
         ref={midRef}
-        className="fixed inset-x-0 top-0 z-20 flex items-start justify-between"
+        className="fixed inset-x-0 top-0 z-20 flex items-start justify-between gap-8"
         style={{ padding: 'var(--ss-home-content-pad)', willChange: 'transform' }}
       >
         <BrandMark size={26} />
+
+        <div className="ss-home-nav-slot">
+          <HomeNav
+            destinations={destinations}
+            loggedIn={Boolean(user)}
+            active={active}
+            onActivate={setActive}
+          />
+        </div>
+
         {user ? (
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
             <span className={HEADER_LINK_CLASS} style={{ color: 'var(--ss-fg)' }}>
               {user.nickname}
             </span>
             <LogoutButton />
           </div>
         ) : (
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
             <Link href="/login" className={`${HEADER_LINK_CLASS} ${HEADER_LINK_HOVER_CLASS}`} style={{ color: 'var(--ss-accent)' }}>
               로그인
             </Link>
@@ -96,48 +107,52 @@ export default function HomeParallax({
         )}
       </div>
 
-      {/* 카드 캐러셀 — 화면 아래쪽에 깔고, 가로로 흐른다(6장 한 벌, 양
-          끝에서 멈춤). 위쪽은 지금은 비워 둔다(참고 디자인처럼 나중에
-          소개 문구가 들어갈 자리). 좌우 padding(--ss-home-content-pad)은
-          캐러셀 자신의 스크롤 뷰포트를 그만큼 안쪽에서 시작·끝나게 한다 —
-          카드가 이 뷰포트 밖으로는 애초에 그려지지 않는다(overflow-x:
-          auto 가 자신의 박스 기준으로 자른다). 로그인 상태면 하단
-          내비바(FloatingNavBar, 실측 높이 80px)에 안 가리게 아래쪽을
-          그만큼 더 띄운다. */}
+      {/* 헤드라인 · 보조 문구 · 정보 블록. 로그인 화면과 같은 문구를 쓴다 —
+          두 화면이 한 목소리로 들리게. */}
       <div
-        className="relative z-10 flex min-h-screen w-full items-end"
-        style={{
-          paddingBottom: user ? 'calc(var(--ss-home-content-pad) + 80px)' : 'var(--ss-home-content-pad)',
-          paddingLeft: 'var(--ss-home-content-pad)',
-          paddingRight: 'var(--ss-home-content-pad)',
-        }}
+        ref={frontRef}
+        className="ss-home-stage"
+        style={{ padding: 'var(--ss-home-content-pad)', willChange: 'transform' }}
       >
-        <div ref={frontRef} className="ss-carousel w-full" style={{ willChange: 'transform' }}>
-          <div className="ss-carousel-track">
-            {destinations.map((d, i) => (
-              <div
-                key={d.title}
-                className="ss-carousel-item"
-                style={
-                  {
-                    // 계단처럼 규칙적으로 어긋나게 — 짝수 번째는 위로, 홀수 번째는 아래로.
-                    '--ss-card-offset':
-                      i % 2 === 0 ? 'calc(var(--ss-card-stagger) * -1)' : 'var(--ss-card-stagger)',
-                  } as CSSProperties
-                }
-              >
-                <DestinationCard
-                  title={d.title}
-                  icon={d.icon}
-                  summary={d.summary}
-                  href={d.href}
-                  phase={i * 0.13}
-                  locked={Boolean(d.authRequired) && !user}
-                />
-              </div>
-            ))}
-          </div>
+        <div className="flex items-start justify-between gap-8">
+          <h1 className="ss-home-headline">
+            안개 속에서도,
+            <br />
+            실력은
+            <br />
+            숨지 않습니다.
+          </h1>
+          <p className="ss-home-meta">
+            생활체육 경기 영상 분석
+            <br />
+            용병 스카우팅 &amp; 실력 검증
+          </p>
         </div>
+
+        <dl className="ss-home-info">
+          {INFO_BLOCKS.map((b) => (
+            <div key={b.heading}>
+              <dt>{b.heading}</dt>
+              <dd>{b.body}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+
+      {/* 하단 줄 — 가운데는 비워 둔다(로그인했으면 FloatingNavBar 가 그 자리). */}
+      <div className="ss-home-footer">
+        <div className="ss-home-footer-left">
+          <span className="ss-home-scroll">
+            SCROLL DOWN <span aria-hidden="true">↓</span>
+          </span>
+          <ul className="ss-home-socials">
+            {SOCIALS.map((s) => (
+              <li key={s}>{s}</li>
+            ))}
+          </ul>
+        </div>
+
+        <HomeIndexList destinations={destinations} active={active} onActivate={setActive} />
       </div>
     </>
   )

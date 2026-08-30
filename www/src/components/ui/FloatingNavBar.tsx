@@ -23,10 +23,12 @@ type NavEntry = NavLink | NavDisabled
 
 // 앱(flutter/lib/core/widgets/floating_nav_bar.dart)과 같은 글리프 · 같은 뜻.
 // sports_soccer 는 앱에서도 "축구·매칭"을 가리키므로 홈에 쓰지 않는다 — 아직 준비 중인 자리.
+//
+// '내 선수 카드'(id_card)는 여기 없다 — 카드를 '내 프로필'(/me)에 합치면서
+// 갈 곳이 같아졌고, 같은 데로 가는 칸을 둘 둘 이유가 없다.
 const NAV_ITEMS: NavEntry[] = [
   { href: '/analysis', label: '영상 분석', icon: 'videocam' },
   { label: '용병 매칭 (준비 중)', icon: 'sports_soccer', disabled: true },
-  { href: '/me/card', label: '내 선수 카드', icon: 'id_card' },
   { href: '/me', label: '내 프로필', icon: 'person' },
 ]
 

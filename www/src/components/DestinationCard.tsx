@@ -8,10 +8,15 @@ const FAINT = 'color-mix(in srgb, var(--ss-fg) 40%, transparent)'
 // 카드 6장이 공유하는 값 — 카드마다 다르게 주지 않는다. 높이는
 // `globals.css` 의 `--ss-card-h` (아이콘+제목+설명 2줄+안내문 1줄이 여유
 // 있게 들어가는 값, 앱의 mainAxisExtent: 148 과 같은 이유로 못박음). 폭은
-// `--ss-card-w` — 캐러셀(가로 한 줄)이라 그리드 열 폭에 기대지 않고
-// 카드 스스로 정한다.
+// `--ss-card-w` — 카드 스스로 정한다(놓이는 자리의 폭에 기대지 않는다).
 const PANEL_CLASS =
   'flex flex-col items-center justify-center gap-2 px-4 py-6 text-center h-[var(--ss-card-h)] w-[var(--ss-card-w)]'
+
+// 홈 상단 글자 nav 에서 글자 아래 떠오르는 작은 판. 같은 내용을 같은 순서로
+// 그리되 크기만 줄인다 — 별도 컴포넌트를 만들면 두 벌이 따로 늙는다.
+// 뜨는 자리가 좁으므로 높이를 내용에 맡긴다(고정 높이를 주지 않는다).
+const COMPACT_PANEL_CLASS =
+  'flex flex-col items-center justify-center gap-1.5 px-4 py-5 text-center w-[var(--ss-card-compact-w)]'
 
 export default function DestinationCard({
   title,
@@ -21,6 +26,7 @@ export default function DestinationCard({
   className = '',
   phase = 0,
   locked = false,
+  compact = false,
 }: {
   title: string
   icon: string
@@ -34,6 +40,8 @@ export default function DestinationCard({
    *  돌려보낼 카드. 링크는 그대로 두고 안내문만 "준비 중입니다" 자리에
    *  "로그인이 필요합니다"로 바꿔 보여준다. */
   locked?: boolean
+  /** 홈 글자 nav 에서 떠오르는 작은 판 — 같은 내용, 줄어든 크기. */
+  compact?: boolean
 }) {
   const ready = Boolean(href)
   // 준비 중/로그인 필요 안내문 — 항상 같은 자리(같은 높이)를 차지해야
@@ -43,10 +51,14 @@ export default function DestinationCard({
   const notice = !ready ? '준비 중입니다' : locked ? '로그인이 필요합니다' : null
 
   const inner = (
-    <GlassPanel phase={phase} interactive className={`${PANEL_CLASS} ${className}`}>
+    <GlassPanel
+      phase={phase}
+      interactive
+      className={`${compact ? COMPACT_PANEL_CLASS : PANEL_CLASS} ${className}`}
+    >
       <span
         aria-hidden="true"
-        className="material-symbols-outlined text-3xl"
+        className={`material-symbols-outlined ${compact ? 'text-2xl' : 'text-3xl'}`}
         style={{ color: ready ? 'var(--ss-accent)' : FAINT }}
       >
         {icon}
