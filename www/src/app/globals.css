@@ -552,41 +552,21 @@ body {
 /* 이름 — 카드에서 가장 큰 글자. 참고 디자인의 굵은 압축 산세 자리다.
    한글이라 디스플레이 글꼴(라틴 전용)을 못 쓰므로 본문 글꼴을 가장
    굵게 쓰고 자간을 좁혀 한 덩어리로 보이게 한다. */
+/* 사진이 없으므로 이름이 카드 가운데를 차지한다 — 남는 세로 공간을
+   모두 먹고 그 안에서 가운데 정렬한다. */
 .ss-pcard-name {
   position: relative;
   z-index: 2;
-  margin-top: 10px;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   font-size: clamp(2.25rem, 17cqw, 3.75rem);
   font-weight: 900;
   letter-spacing: -0.045em;
   line-height: 0.98;
   color: var(--ss-pcard-fg);
-}
-
-/* 사진 — 이름 아래에서 올라와 카드 아랫부분을 채운다.
-   원본(public/player_mono.jpg, 768×1344 세로)에는 **얼굴이 없다** — 위가
-   턱에서 잘려 있고 상반신과 공이 전부다. 그래서 얼굴을 찾아 올릴 게
-   아니라 공과 가슴이 오게 세로 위치를 잡는다(object-position).
-   참고 디자인은 배경이 지워진 누끼라 흰 바탕에 인물만 떠 있는데, 우리
-   사진은 배경이 붙은 사각형이라 위쪽을 흰색으로 잦아들게 해 이름 아래로
-   스며들게 한다 — 누끼 이미지가 생기면 이 마스크는 걷어도 된다. */
-.ss-pcard-figure {
-  position: absolute;
-  z-index: 1;
-  inset-inline: 0;
-  top: 30%;
-  bottom: 0;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 16%);
-  mask-image: linear-gradient(to bottom, transparent 0%, #000 16%);
-}
-
-.ss-pcard-figure img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center 52%;
-  filter: grayscale(1) contrast(1.1);
 }
 
 /* 맨 아래 두 줄 — 위에 호칭 알약, 아래에 검은 막대 · 원형 배지.
