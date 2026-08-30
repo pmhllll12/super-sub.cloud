@@ -11,28 +11,24 @@
  * 선수 카드의 별명(ALIAS)을 붙박이로 둔 것과 같은 이유 · 같은 방식이다.
  */
 const SUGGESTIONS: Record<string, { name: string; title: string; notes: string[] }[]> = {
+  // 자리마다 추천 수가 다르다 — 분석에서 걸러진 만큼만 온다.
   GK: [
     {
       name: '김선우',
       title: '반응이 빠른',
-      notes: ['가까운 거리 슈팅 대응이 빠릅니다', '골문 앞을 넓게 씁니다', '후반에도 집중이 떨어지지 않습니다'],
+      notes: ['가까운 거리 슈팅 대응이 빠릅니다', '골문 앞을 넓게 씁니다'],
     },
     {
       name: '오재현',
       title: '공중볼에 강한',
       notes: ['코너와 크로스에서 먼저 나옵니다', '수비와 말을 많이 맞춥니다'],
     },
-    {
-      name: '한지수',
-      title: '발밑이 좋은',
-      notes: ['빌드업의 시작점 역할을 합니다', '압박을 받아도 짧은 패스를 고릅니다'],
-    },
   ],
   DF: [
     {
       name: '박도현',
       title: '몸싸움이 강한',
-      notes: ['1대1에서 잘 밀리지 않습니다', '세컨볼을 자주 따냅니다', '경고를 거의 받지 않습니다'],
+      notes: ['1대1에서 잘 밀리지 않습니다', '세컨볼을 자주 따냅니다'],
     },
     {
       name: '이건우',
@@ -44,12 +40,17 @@ const SUGGESTIONS: Record<string, { name: string; title: string; notes: string[]
       title: '전진 패스가 좋은',
       notes: ['수비에서 공격으로 한 번에 넘깁니다', '전환 순간에 앞을 먼저 봅니다'],
     },
+    {
+      name: '서준혁',
+      title: '위치 선정이 좋은',
+      notes: ['라인을 잘 맞춥니다', '오프사이드를 유도합니다'],
+    },
   ],
   MF: [
     {
       name: '최유진',
       title: '시야가 넓은',
-      notes: ['반대편 빈 공간을 자주 찾습니다', '한 박자 빠른 패스를 넣습니다', '경기 속도를 조절합니다'],
+      notes: ['반대편 빈 공간을 자주 찾습니다', '한 박자 빠른 패스를 넣습니다'],
     },
     {
       name: '강태원',
@@ -66,7 +67,7 @@ const SUGGESTIONS: Record<string, { name: string; title: string; notes: string[]
     {
       name: '조현우',
       title: '슈팅이 매서운',
-      notes: ['박스 안에서 망설이지 않습니다', '먼 거리 슈팅도 시도합니다', '왼발과 오른발을 모두 씁니다'],
+      notes: ['박스 안에서 망설이지 않습니다', '왼발과 오른발을 모두 씁니다'],
     },
     {
       name: '임재민',
@@ -77,6 +78,16 @@ const SUGGESTIONS: Record<string, { name: string; title: string; notes: string[]
       name: '신동현',
       title: '결정력이 좋은',
       notes: ['적은 기회에서 마무리합니다', '몸을 등지고 받아 돌아섭니다'],
+    },
+    {
+      name: '문태호',
+      title: '연계가 좋은',
+      notes: ['등지고 받아 내주는 데 능합니다', '2대1을 잘 만듭니다'],
+    },
+    {
+      name: '배준영',
+      title: '스피드가 빠른',
+      notes: ['측면에서 한 번에 제칩니다', '역습 때 가장 먼저 달립니다'],
     },
   ],
 }
@@ -103,10 +114,10 @@ export default function SquadSuggest({
       aria-label={`${position} 추천 선수`}
     >
       <header className="ss-suggest-head">
-        <div>
-          <p className="ss-suggest-kicker">AI 추천</p>
-          <h3>{position} 자리</h3>
-        </div>
+        {/* 한 줄로 가운데에 — 무슨 자리에 몇 명이 왔는지가 곧 제목이다. */}
+        <h3>
+          AI 추천 {position} {list.length}명
+        </h3>
         <button
           type="button"
           aria-label="추천 닫기"

@@ -46,16 +46,18 @@ describe('스쿼드', () => {
     render(<SquadPanel card={CARD} />)
     await user.click(screen.getByRole('button', { name: 'GK 자리에 선수 넣기' }))
     expect(screen.getByRole('complementary', { name: 'GK 추천 선수' })).toBeInTheDocument()
-    expect(screen.getByText('AI 추천')).toBeInTheDocument()
+    // 제목이 곧 몇 명이 왔는지다 — 자리마다 추천 수가 다르다.
+    expect(screen.getByRole('heading', { name: 'AI 추천 GK 2명' })).toBeInTheDocument()
     // 이름을 적는 칸은 없다.
     expect(screen.queryByRole('textbox')).toBeNull()
   })
 
-  it('자리마다 다른 추천이 나온다', async () => {
+  it('자리마다 다른 추천이, 다른 수만큼 나온다', async () => {
     const user = userEvent.setup()
     render(<SquadPanel card={CARD} />)
     await user.click(screen.getAllByRole('button', { name: 'MF 자리에 선수 넣기' })[0])
-    expect(screen.getByRole('complementary', { name: 'MF 추천 선수' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'AI 추천 MF 3명' })).toBeInTheDocument()
+    expect(screen.getAllByRole('listitem')).toHaveLength(3)
   })
 
   it('추천에서 고르면 그 자리에 앉고 판이 닫힌다', async () => {

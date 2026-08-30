@@ -77,12 +77,15 @@ export default function SquadPanel({ card }: { card?: PublicPlayerCard | null })
        유리판과 추천 판은 그 안에서 좌표를 잡는다. */
     <div className="ss-squad-wrap">
       <GlassPanel className="ss-squad">
-      <header className="ss-squad-head">
-        <h2>MY SQUAD</h2>
-        <p>풋살 5인</p>
-      </header>
-
       <div className="ss-squad-board">
+        {/* 머리글이 경기장 선 **안쪽**에 앉아야 한다 — 판 위쪽에 따로
+            두면 선 밖으로 나간다. 선을 그리는 상자 안에 넣고 위 여백을
+            그만큼 준다(globals.css). */}
+        <header className="ss-squad-head">
+          <h2>MY SQUAD</h2>
+          <p>풋살 5인</p>
+        </header>
+
         {/* 경기장 선 — 장식이라 스크린리더에서 숨긴다. preserveAspectRatio
             를 none 으로 두어 판이 어떤 비율이 되든 선이 판을 꽉 채운다
             (원은 그만큼 타원이 되지만, 배경 장식이라 그편이 낫다 —
