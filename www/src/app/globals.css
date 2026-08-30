@@ -430,6 +430,18 @@ body {
   margin-left: 1.2em;
 }
 
+/* 줄이 내려갈수록 글자가 커진다 — 마지막 줄이 제 크기고 위로 갈수록
+   7px 씩 작다(사용자 요청). em 이 아니라 px 로 빼는 게 요청 그대로다:
+   화면이 넓어져 기준 크기가 커져도 줄 사이 차이는 7px 로 일정하다.
+   1em 은 부모(.ss-home-display)가 정한 기준 크기다. */
+.ss-home-subhead > span:nth-child(1) {
+  font-size: calc(1em - 14px);
+}
+
+.ss-home-subhead > span:nth-child(2) {
+  font-size: calc(1em - 7px);
+}
+
 /* 오른쪽 아래 구석 — 로그아웃 아이콘 하나. */
 .ss-home-footer {
   position: fixed;
