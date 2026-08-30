@@ -98,37 +98,33 @@ export default function HomeStage({
       {/* 헤드라인 · 보조 문구 · 정보 블록. 로그인 화면과 같은 문구를 쓴다 —
           두 화면이 한 목소리로 들리게. */}
       <div className="ss-home-stage" style={{ padding: 'var(--ss-home-content-pad)' }}>
-        {/* 🔴 좌우를 바꾸는 건 **order** 로 한다(사용자 요청). DOM 에서는
-            h1 이 먼저다 — 읽어 주는 기계는 제목을 먼저 만나야 한다.
-            마크업 순서를 뒤집으면 화면은 맞아도 읽는 순서가 뒤집힌다.
-            둘 다 누를 수 없는 글자라 초점 순서 문제는 없다. */}
         <div className="flex items-start justify-between gap-8">
-          {/* 레퍼런스(THE CAMEL / AND / THE WHEEL)처럼 스텐실 글꼴로 두 줄.
-              Abril Fatface 는 라틴만 있어 한글을 못 쓴다 — 그래서 문구도 영문이다.
+          {/* 왼쪽 — 두 줄짜리 그리드. 둘째 줄이 윗줄 **두 번째 낱말의 둘째
+              글자** 자리에서 시작한다(사용자 요청). 그래서 그 낱말을
+              첫 글자와 나머지로 쪼개 3열(FIND | Y | OUR)에 앉히고, 둘째
+              줄은 앞 두 칸을 비워 셋째 칸에 온다 — 눈대중 여백 없이
+              layout 이 자리를 맞춘다.
 
-              PITCH 의 P 가 윗줄 THE 의 **H** 와 같은 자리에서 시작해야
-              해서(사용자 요청) 3열 그리드에 앉힌다: OWN | T | HE 가 첫
-              줄, 둘째 줄은 앞 두 칸을 비우고 PITCH 가 셋째 칸(HE 가 있는
-              칸)에 온다. 그래서 THE 가 T 와 HE 로 쪼개져 있다 — 눈대중
-              여백 없이 layout 이 자리를 맞춘다.
+              🔴 자리와 글자는 따로 논다. 좌우를 맞바꿀 때 덩어리째 옮기지
+              않고 **글자만** 옮겼다 — 각 자리의 짜임(왼쪽은 이 그리드,
+              오른쪽은 계단)은 그대로 두라는 요청이었다.
 
               낱말이 각자 span 이라 사이에 공백 문자가 없다 — 그냥 두면
-              접근성 이름이 "OWNTHEPITCH" 로 붙어 읽힌다. 이름을 따로 준다. */}
-          <h1 className="ss-home-display ss-home-headline order-2" aria-label="OWN THE PITCH">
-            <span className="ss-home-headline-first">OWN</span>
-            <span>T</span>
-            <span>HE</span>
-            <span className="ss-home-headline-second">PITCH</span>
+              접근성 이름이 "FINDYOURSQUAD" 로 붙어 읽힌다. 이름을 따로 준다. */}
+          <h1 className="ss-home-display ss-home-headline" aria-label="FIND YOUR SQUAD">
+            <span className="ss-home-headline-first">FIND</span>
+            <span>Y</span>
+            <span>OUR</span>
+            <span className="ss-home-headline-second">SQUAD</span>
           </h1>
 
-          {/* 오른쪽 짝 — 헤드라인과 같은 글꼴 · 같은 크기(ss-home-display)로
-              세 줄. 줄이 내려갈수록 시작점이 조금씩 오른쪽으로 밀린다
-              (사용자 요청, 레퍼런스의 THE CAMEL / AND / THE WHEEL 처럼
-              계단 모양). 여기도 낱말이 각자 span 이라 이름을 따로 준다. */}
-          <p className="ss-home-display ss-home-subhead order-1" aria-label="FIND YOUR SQUAD">
-            <span>FIND</span>
-            <span>YOUR</span>
-            <span>SQUAD</span>
+          {/* 오른쪽 — 왼쪽과 같은 글꼴 · 같은 크기(ss-home-display)로 세 줄.
+              줄이 내려갈수록 시작점이 조금씩 오른쪽으로 밀린다(계단).
+              여기도 낱말이 각자 span 이라 이름을 따로 준다. */}
+          <p className="ss-home-display ss-home-subhead" aria-label="OWN THE PITCH">
+            <span>OWN</span>
+            <span>THE</span>
+            <span>PITCH</span>
           </p>
         </div>
       </div>
