@@ -388,7 +388,13 @@ body {
    비슷해 보여서, 한 단 위로 띄워 종속돼 보이게 한다. */
 .ss-home-headline {
   font-size: calc(var(--ss-display-size) - 60px);
-
+  /* 아래 판과 **같은 가운데선**에 놓는다. 판의 왼쪽 변을 정하는 식을
+     그대로 쓰고 판 폭의 절반(244)을 더해 판의 가운데를 얻은 뒤,
+     translateX(-50%)로 이 글자를 그 선에 맞춘다 — 글자 폭을 몰라도 되고
+     문구가 바뀌어도 따라온다. 값의 유래는 .ss-squad 주석 참고. */
+  width: max-content;
+  margin-left: calc(max(-120px, 21.333vw - 412px) + 244px);
+  transform: translateX(-50%);
 }
 
 /* 오른쪽 짝(OWN / THE / PITCH) — 첫 줄이 왼쪽 헤드라인의 다음 줄
