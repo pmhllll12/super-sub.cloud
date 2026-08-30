@@ -358,20 +358,26 @@ body {
 .ss-home-headline {
   font-family: var(--font-plaster), var(--font-rubik), system-ui, sans-serif;
   /* 레퍼런스에서 잰 크기(8.3vw ≈ 1440px 에서 120px)는 너무 컸다 —
-     사용자 요청으로 1440px 기준 65px 이 되는 4.5vw 로 줄인다.
+     사용자 요청으로 1440px 기준 70px 이 되는 4.86vw 로 줄인다.
      좁은 화면에서 32px 아래로는 안 내려가고, 넓어도 80px 을 넘지 않는다. */
-  font-size: clamp(2rem, 4.5vw, 5rem);
+  font-size: clamp(2rem, 4.86vw, 5rem);
   line-height: 1.16;
   letter-spacing: 0.01em;
   color: var(--ss-fg);
-  /* 제 내용 폭(가장 긴 줄)만 차지해야 둘째 줄을 그 오른쪽 변에 붙일 수 있다. */
-  display: flex;
+  /* 낱말 셋(OWN | THE / _ | PITCH)을 2열 그리드에 앉힌다 — 둘째 줄
+     PITCH 의 왼쪽 변이 윗줄 THE 의 왼쪽 변과 자동으로 맞는다(눈대중
+     여백 없이 layout 이 보장한다). 칸 사이는 낱말 사이 공백 몫이라
+     Plaster 의 space 폭을 그대로 준다 — canvas 로 재 보니 0.5em 이다
+     (advance 기준: 'OWN THE' 와 'OWNTHE' 의 폭 차이). */
+  display: grid;
   width: fit-content;
-  flex-direction: column;
+  grid-template-columns: auto auto;
+  column-gap: 0.5em;
 }
 
-.ss-home-headline-end {
-  text-align: right;
+/* 둘째 줄 — 첫 칸을 비우고 둘째 칸(THE 가 있던 칸)에 앉는다. */
+.ss-home-headline-second {
+  grid-column: 2;
 }
 
 /* 헤드라인 반대편(오른쪽 위)의 두 줄 보조 문구 — 레퍼런스의 지명 나열 자리. */
