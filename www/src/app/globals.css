@@ -389,6 +389,7 @@ body {
 .ss-home-headline {
   font-size: calc(var(--ss-display-size) - 45px);
   margin-top: -120px;
+  margin-left: 120px;
 }
 
 /* 오른쪽 짝(OWN / THE / PITCH) — 첫 줄이 왼쪽 헤드라인의 다음 줄
