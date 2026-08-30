@@ -357,10 +357,9 @@ body {
    지저분해진다(워드마크 RubikGlitch 에서 똑같이 겪었다). */
 .ss-home-display {
   font-family: var(--font-chicle), var(--font-rubik), system-ui, sans-serif;
-  /* 레퍼런스에서 잰 크기(8.3vw ≈ 1440px 에서 120px)는 너무 컸다 —
-     사용자 요청으로 1440px 기준 70px 이 되는 4.86vw 로 줄인다.
-     좁은 화면에서 32px 아래로는 안 내려가고, 넓어도 80px 을 넘지 않는다. */
-  font-size: clamp(2rem, 4.86vw, 5rem);
+  /* 1440px 기준 80px 이 되는 5.56vw. 좁은 화면에서 36px 아래로는 안
+     내려가고, 넓어도 96px 을 넘지 않는다. */
+  font-size: clamp(2.25rem, 5.56vw, 6rem);
   line-height: 1.16;
   letter-spacing: 0.01em;
   color: var(--ss-fg);
@@ -370,14 +369,16 @@ body {
 .ss-home-headline {
   /* 낱말 셋(OWN | THE / _ | PITCH)을 2열 그리드에 앉힌다 — 둘째 줄
      PITCH 의 왼쪽 변이 윗줄 THE 의 왼쪽 변과 자동으로 맞는다(눈대중
-     여백 없이 layout 이 보장한다). 칸 사이는 낱말 사이 공백 몫이라
-     쓰는 글꼴의 space 폭을 그대로 준다 — canvas 로 재면 Chicle 은
-     0.13em 이다(advance 기준: 'OWN THE' 와 'OWNTHE' 의 폭 차이).
-     글꼴을 바꾸면 이 값도 다시 재야 한다 — Plaster 때는 0.5em 이었다. */
+     여백 없이 layout 이 보장한다).
+
+     칸 사이는 낱말 사이 공백 몫이다. 처음엔 글꼴이 정한 space 폭을
+     그대로 줬는데(Chicle 은 0.13em) 이 크기에서는 OWN 과 THE 가 붙어
+     읽혔다 — 글자가 굵고 side bearing 이 좁은 글꼴이라 그렇다. 눈으로
+     떨어져 보이는 0.35em 으로 넓힌다. */
   display: grid;
   width: fit-content;
   grid-template-columns: auto auto;
-  column-gap: 0.13em;
+  column-gap: 0.35em;
 }
 
 /* 둘째 줄 — 첫 칸을 비우고 둘째 칸(THE 가 있던 칸)에 앉는다. */
@@ -386,8 +387,10 @@ body {
 }
 
 /* 오른쪽 짝(FIND / YOUR / SQUAD) — 줄이 내려갈수록 시작점이 한 칸씩
-   오른쪽으로 밀린다. 계단 폭은 낱말 사이 공백(0.5em)의 절반쯤이 알맞았다
-   — 더 주면 SQUAD 가 화면 오른쪽 여백을 먹는다. */
+   오른쪽으로 밀린다. 0.25em 씩은 계단인지 어긋난 건지 모를 만큼 작아서
+   0.6em 씩으로 키웠다. 블록이 오른쪽 변에 붙어 있으므로(부모의
+   justify-between) 계단을 키우면 SQUAD 가 밀려나는 게 아니라 FIND 가
+   왼쪽으로 물러난다 — 오른쪽 여백을 먹지 않는다. */
 .ss-home-subhead {
   display: flex;
   width: fit-content;
@@ -396,11 +399,11 @@ body {
 }
 
 .ss-home-subhead > span:nth-child(2) {
-  margin-left: 0.25em;
+  margin-left: 0.6em;
 }
 
 .ss-home-subhead > span:nth-child(3) {
-  margin-left: 0.5em;
+  margin-left: 1.2em;
 }
 
 /* 레퍼런스의 `Meeting Point / Price / Duration` 3열. */
