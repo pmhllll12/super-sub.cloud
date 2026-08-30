@@ -131,9 +131,13 @@ export default function AuthShell({
           <div
             className="relative flex flex-col overflow-y-auto rounded-[var(--ss-radius-sheet)] p-6 sm:p-10 lg:rounded-l-none lg:p-12"
             style={{
-              background: 'var(--ss-glass-bg)',
-              backdropFilter: 'blur(var(--ss-glass-blur))',
-              WebkitBackdropFilter: 'blur(var(--ss-glass-blur))',
+              // 전역 유리 값(--ss-glass-*)보다 **옅고 덜 흐리게** 이 칸에서만
+              // 덮는다. 뒤에 연기가 비치는 자리라 20px 로 뭉개고 흰색을 8%
+              // 얹으면 그 결이 죽어 그냥 반투명 검은 판으로 보인다. 다른
+              // 유리(GlassPanel 을 쓰는 화면)는 그대로 둔다.
+              background: 'color-mix(in srgb, var(--ss-fg) 4%, transparent)',
+              backdropFilter: 'blur(8px) saturate(var(--ss-glass-saturate))',
+              WebkitBackdropFilter: 'blur(8px) saturate(var(--ss-glass-saturate))',
             }}
           >
             {/* 이 열의 버튼 높이는 구글이 정한다. 구글이 그리는 로그인
