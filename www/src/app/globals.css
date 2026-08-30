@@ -349,13 +349,13 @@ body {
   gap: 48px;
 }
 
-/* 레퍼런스의 큰 제목 자리 — 스텐실 글꼴(Plaster)로 화면을 채운다.
+/* 큰 스텐실 글자 — 왼쪽 헤드라인(OWN THE PITCH)과 오른쪽 짝
+   (FIND YOUR SQUAD)이 **같은 글꼴 · 같은 크기**로 마주 본다. 크기를 한
+   군데서만 정하려고 두 곳이 이 클래스를 같이 쓴다.
    🔴 font-weight 를 주지 않는다: Plaster 는 굵기가 400 하나뿐인 장식
    글꼴이라 700 을 주면 브라우저가 가짜 굵게(synthetic bold)를 입혀 획만
-   지저분해진다(워드마크 RubikGlitch 에서 똑같이 겪었다).
-   글꼴 자체의 줄 사이가 넓어 line-height 를 1 아래로 당겨야 두 줄이
-   레퍼런스처럼 붙는다. */
-.ss-home-headline {
+   지저분해진다(워드마크 RubikGlitch 에서 똑같이 겪었다). */
+.ss-home-display {
   font-family: var(--font-plaster), var(--font-rubik), system-ui, sans-serif;
   /* 레퍼런스에서 잰 크기(8.3vw ≈ 1440px 에서 120px)는 너무 컸다 —
      사용자 요청으로 1440px 기준 70px 이 되는 4.86vw 로 줄인다.
@@ -364,6 +364,10 @@ body {
   line-height: 1.16;
   letter-spacing: 0.01em;
   color: var(--ss-fg);
+}
+
+/* 왼쪽 헤드라인. */
+.ss-home-headline {
   /* 낱말 셋(OWN | THE / _ | PITCH)을 2열 그리드에 앉힌다 — 둘째 줄
      PITCH 의 왼쪽 변이 윗줄 THE 의 왼쪽 변과 자동으로 맞는다(눈대중
      여백 없이 layout 이 보장한다). 칸 사이는 낱말 사이 공백 몫이라
@@ -380,13 +384,22 @@ body {
   grid-column: 2;
 }
 
-/* 헤드라인 반대편(오른쪽 위)의 두 줄 보조 문구 — 레퍼런스의 지명 나열 자리. */
-.ss-home-meta {
-  flex: none;
-  text-align: right;
-  font-size: 0.875rem;
-  line-height: 1.6;
-  color: color-mix(in srgb, var(--ss-fg) 70%, transparent);
+/* 오른쪽 짝(FIND / YOUR / SQUAD) — 줄이 내려갈수록 시작점이 한 칸씩
+   오른쪽으로 밀린다. 계단 폭은 낱말 사이 공백(0.5em)의 절반쯤이 알맞았다
+   — 더 주면 SQUAD 가 화면 오른쪽 여백을 먹는다. */
+.ss-home-subhead {
+  display: flex;
+  width: fit-content;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.ss-home-subhead > span:nth-child(2) {
+  margin-left: 0.25em;
+}
+
+.ss-home-subhead > span:nth-child(3) {
+  margin-left: 0.5em;
 }
 
 /* 레퍼런스의 `Meeting Point / Price / Duration` 3열. */
@@ -484,10 +497,10 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* 좁은 화면 — 헤드라인 옆 보조 문구와 하단 줄이 서로를 밀어내지 않게
-   세로로 쌓고, 번호 목록은 접는다(상단 글자 내비로 충분하다). */
+/* 좁은 화면 — 헤드라인 옆 짝과 하단 줄이 서로를 밀어내지 않게 접는다
+   (번호 목록은 상단 글자 내비로 충분하다). */
 @media (max-width: 720px) {
-  .ss-home-meta {
+  .ss-home-subhead {
     display: none;
   }
 

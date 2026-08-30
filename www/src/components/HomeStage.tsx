@@ -114,15 +114,20 @@ export default function HomeStage({
 
               낱말이 각자 span 이라 사이에 공백 문자가 없다 — 그냥 두면
               접근성 이름이 "OWNTHEPITCH" 로 붙어 읽힌다. 이름을 따로 준다. */}
-          <h1 className="ss-home-headline" aria-label="OWN THE PITCH">
+          <h1 className="ss-home-display ss-home-headline" aria-label="OWN THE PITCH">
             <span>OWN</span>
             <span>THE</span>
             <span className="ss-home-headline-second">PITCH</span>
           </h1>
-          <p className="ss-home-meta">
-            생활체육 경기 영상 분석
-            <br />
-            용병 스카우팅 &amp; 실력 검증
+
+          {/* 오른쪽 짝 — 헤드라인과 같은 글꼴 · 같은 크기(ss-home-display)로
+              세 줄. 줄이 내려갈수록 시작점이 조금씩 오른쪽으로 밀린다
+              (사용자 요청, 레퍼런스의 THE CAMEL / AND / THE WHEEL 처럼
+              계단 모양). 여기도 낱말이 각자 span 이라 이름을 따로 준다. */}
+          <p className="ss-home-display ss-home-subhead" aria-label="FIND YOUR SQUAD">
+            <span>FIND</span>
+            <span>YOUR</span>
+            <span>SQUAD</span>
           </p>
         </div>
 

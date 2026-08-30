@@ -79,7 +79,9 @@ describe('홈 화면 — /', () => {
 
   it('레퍼런스처럼 헤드라인과 하단 글자를 적는다', () => {
     render(<HomeBody user={null} />)
-    expect(screen.getByRole('heading', { name: /OWN THE[\s\S]*PITCH/ })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'OWN THE PITCH' })).toBeInTheDocument()
+    // 오른쪽 짝 — 헤드라인과 같은 글꼴 · 같은 크기로 마주 본다.
+    expect(screen.getByLabelText('FIND YOUR SQUAD')).toBeInTheDocument()
     expect(screen.getByText(/SCROLL DOWN/)).toBeInTheDocument()
     expect(screen.getByText('INSTAGRAM')).toBeInTheDocument()
     expect(screen.getByText('시작하기')).toBeInTheDocument()
