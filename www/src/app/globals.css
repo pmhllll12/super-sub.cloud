@@ -349,13 +349,29 @@ body {
   gap: 48px;
 }
 
-/* 레퍼런스의 큰 제목 자리. 화면 폭을 따라가되 아주 커지지는 않게 clamp. */
+/* 레퍼런스의 큰 제목 자리 — 스텐실 글꼴(Plaster)로 화면을 채운다.
+   🔴 font-weight 를 주지 않는다: Plaster 는 굵기가 400 하나뿐인 장식
+   글꼴이라 700 을 주면 브라우저가 가짜 굵게(synthetic bold)를 입혀 획만
+   지저분해진다(워드마크 RubikGlitch 에서 똑같이 겪었다).
+   글꼴 자체의 줄 사이가 넓어 line-height 를 1 아래로 당겨야 두 줄이
+   레퍼런스처럼 붙는다. */
 .ss-home-headline {
-  font-size: clamp(2.25rem, 6vw, 4.5rem);
-  font-weight: 700;
-  line-height: 1.08;
-  letter-spacing: -0.01em;
+  font-family: var(--font-plaster), var(--font-rubik), system-ui, sans-serif;
+  /* 레퍼런스에서 잰 값에 맞춘다: 대문자 높이가 화면 폭의 약 5.5%
+     (1702px 화면에서 94px). Plaster 의 대문자 높이가 em 의 약 0.7 이라
+     글자 크기는 그 비율의 1/0.7 ≈ 8.3vw 다(실측으로 맞췄다). */
+  font-size: clamp(2.625rem, 8.3vw, 9rem);
+  line-height: 1.16;
+  letter-spacing: 0.01em;
   color: var(--ss-fg);
+  /* 제 내용 폭(가장 긴 줄)만 차지해야 둘째 줄을 그 오른쪽 변에 붙일 수 있다. */
+  display: flex;
+  width: fit-content;
+  flex-direction: column;
+}
+
+.ss-home-headline-end {
+  text-align: right;
 }
 
 /* 헤드라인 반대편(오른쪽 위)의 두 줄 보조 문구 — 레퍼런스의 지명 나열 자리. */

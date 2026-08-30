@@ -104,12 +104,13 @@ export default function HomeStage({
           두 화면이 한 목소리로 들리게. */}
       <div className="ss-home-stage" style={{ padding: 'var(--ss-home-content-pad)' }}>
         <div className="flex items-start justify-between gap-8">
+          {/* 레퍼런스(THE CAMEL / AND / THE WHEEL)처럼 스텐실 글꼴로 두 줄.
+              Plaster 는 라틴만 있어 한글을 못 쓴다 — 그래서 문구도 영문이다.
+              둘째 줄은 오른쪽 끝에 맞춘다(사용자 요청) — h1 이 제 내용
+              폭(가장 긴 줄인 OWN THE)만 차지하므로 그 오른쪽 변에 붙는다. */}
           <h1 className="ss-home-headline">
-            안개 속에서도,
-            <br />
-            실력은
-            <br />
-            숨지 않습니다.
+            <span>OWN THE</span>
+            <span className="ss-home-headline-end">PITCH</span>
           </h1>
           <p className="ss-home-meta">
             생활체육 경기 영상 분석

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Rubik, Rubik_Glitch } from "next/font/google";
+import { Plaster, Rubik, Rubik_Glitch } from "next/font/google";
 import "material-symbols/outlined.css";
 import "./globals.css";
 import IntroGate from "@/components/IntroGate";
@@ -16,6 +16,15 @@ const rubikGlitch = Rubik_Glitch({
   subsets: ["latin"],
 });
 
+// 홈 헤드라인("OWN THE / PITCH") 전용 스텐실 글꼴. 굵기가 400 하나뿐이라
+// font-weight 를 올려도 가짜 굵게(synthetic bold)만 걸린다 — 주지 않는다.
+// 라틴만 있고 한글 글리프가 없으므로 한글에 쓰지 않는다.
+const plaster = Plaster({
+  variable: "--font-plaster",
+  weight: "400",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
   title: "Super-Sub",
   description: "생활체육 경기 영상을 분석해 용병을 찾고, 실력을 검증합니다.",
@@ -25,7 +34,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className="h-full antialiased">
       <body
-        className={`${rubik.variable} ${rubikGlitch.variable} min-h-full flex flex-col`}
+        className={`${rubik.variable} ${rubikGlitch.variable} ${plaster.variable} min-h-full flex flex-col`}
       >
         <IntroGate />
         {children}

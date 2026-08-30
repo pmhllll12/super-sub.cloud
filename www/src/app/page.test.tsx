@@ -80,7 +80,7 @@ describe('홈 화면 — /', () => {
 
   it('레퍼런스처럼 헤드라인과 하단 글자를 적는다', () => {
     render(<HomeBody user={null} />)
-    expect(screen.getByRole('heading', { name: /실력은[\s\S]*숨지 않습니다/ })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /OWN THE[\s\S]*PITCH/ })).toBeInTheDocument()
     expect(screen.getByText(/SCROLL DOWN/)).toBeInTheDocument()
     expect(screen.getByText('INSTAGRAM')).toBeInTheDocument()
     expect(screen.getByText('시작하기')).toBeInTheDocument()
