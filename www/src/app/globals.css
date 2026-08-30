@@ -361,28 +361,23 @@ body {
      내려가고, 넓어도 96px 을 넘지 않는다. */
   font-size: clamp(2.25rem, 5.56vw, 6rem);
   line-height: 1.16;
-  letter-spacing: 0.01em;
+  /* 획이 굵은 디스플레이 글꼴이라 윤곽선만 남기면 글자끼리 붙어 보인다.
+     자간을 조금 벌려 선 하나하나가 숨 쉬게 한다. */
+  letter-spacing: 0.03em;
 
-  /* 유리 글자 — 카드(GlassPanel)와 같은 결로 읽히게 한다: 글자 속이
-     반투명해 뒤 사진이 비치고, 가장자리만 옅게 밝다.
+  /* 속이 빈 유리 글자 — 안쪽 채움을 아예 걷고 가는 윤곽선만 남긴다.
+     뒤 사진이 글자 속으로 그대로 비쳐서 판유리에 새긴 것처럼 읽힌다.
 
-     ⚠️ 카드처럼 **글자 안을 흐리게(backdrop-filter) 하는 건 CSS 로 안
-     된다.** backdrop-filter 는 요소의 상자 전체에 걸리고
-     background-clip: text 는 그걸 글자 모양으로 잘라 주지 않는다 —
-     하려면 같은 글자를 SVG mask 로 한 벌 더 그려야 한다(웹폰트를 그
-     SVG 안에 심어야 해서 값이 비싸다). 그래서 '반투명 + 옅은 테두리'
-     까지만 한다.
+     선 굵기는 em 이 아니라 px 이다. em 으로 주면 화면이 넓어질수록
+     선까지 같이 굵어져 '가는 선'이라는 성격이 사라진다 — 글자 크기와
+     무관하게 늘 가늘어야 한다.
 
-     속은 위가 밝고 아래로 갈수록 옅어진다 — 유리에 빛이 얹힌 느낌. */
+     ⚠️ 카드(GlassPanel)처럼 **글자 안을 흐리게(backdrop-filter) 하는
+     건 CSS 로 안 된다.** backdrop-filter 는 요소의 상자 전체에 걸리고
+     background-clip: text 가 그걸 글자 모양으로 잘라 주지 않는다 —
+     하려면 같은 글자를 SVG mask 로 한 벌 더 그려야 한다. */
   color: transparent;
-  background-image: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--ss-fg) 55%, transparent),
-    color-mix(in srgb, var(--ss-fg) 18%, transparent)
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-stroke: 1px color-mix(in srgb, var(--ss-fg) 55%, transparent);
+  -webkit-text-stroke: 0.75px color-mix(in srgb, var(--ss-fg) 80%, transparent);
 }
 
 /* 왼쪽 헤드라인 — 3열 그리드(OWN | T | HE)에 앉힌다. 둘째 줄 PITCH 를
