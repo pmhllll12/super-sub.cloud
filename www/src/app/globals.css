@@ -62,6 +62,10 @@
      세로로 긴 카드(폭:높이 = 3:4 = 0.75)를 쓴다 — 210:280 이 정확히
      0.75 이고, 아이콘+제목+설명 2줄+안내문 1줄이 justify-center 로
      세로 가운데 모여도 위아래에 자연스러운 여백이 남는 높이다. */
+  /* 큰 영문 글자의 줄 간격. 오른쪽 덩어리(FIND YOUR SQUAD)를 한 줄
+     내리는 값이기도 하다 — 아래 .ss-home-subhead 참고. */
+  --ss-display-lh: 1.16;
+
   --ss-card-w: 210px;
   /* 홈 글자 nav 에서 글자 아래 떠오르는 작은 판의 폭 — 글자 한 칸보다
      넉넉하되 옆 글자를 다 덮지는 않는 크기. 높이는 내용에 맡긴다. */
@@ -360,22 +364,17 @@ body {
   /* 1440px 기준 80px 이 되는 5.56vw. 좁은 화면에서 36px 아래로는 안
      내려가고, 넓어도 96px 을 넘지 않는다. */
   font-size: clamp(2.25rem, 5.56vw, 6rem);
-  line-height: 1.16;
+  /* 오른쪽 덩어리를 정확히 '한 줄' 내리는 데도 쓰인다(.ss-home-subhead) —
+     둘이 어긋나면 FIND 가 PITCH 줄에 안 맞으므로 값을 변수로 묶어 둔다. */
+  line-height: var(--ss-display-lh);
   /* 획이 굵은 디스플레이 글꼴이라 윤곽선만 남기면 글자끼리 붙어 보인다.
      자간을 조금 벌려 선 하나하나가 숨 쉬게 한다. */
   letter-spacing: 0.03em;
 
-  /* 유리 글자 — 손댈수록 촌스러워졌다. 대각선 광택 띠, 그림자, 테두리를
-     차례로 걷어내고 남은 건 **균일한 반투명 채움 하나**다. 글자 모양은
-     굵은 디스플레이 글꼴이 이미 충분히 세게 잡아 주므로, 유리는 그저
-     그 모양이 옅게 비치기만 하면 된다.
-
-     ⚠️ 카드(GlassPanel)처럼 **글자 안쪽을 흐리게(backdrop-filter) 하는
-     건 CSS 로 안 된다.** backdrop-filter 는 요소의 상자 전체에 걸리고
-     background-clip: text 가 그걸 글자 모양으로 잘라 주지 않는다 —
-     하려면 같은 글자를 SVG mask 로 한 벌 더 그려야 한다(웹폰트를 그 SVG
-     안에 심어야 해서 값이 비싸다). */
-  color: color-mix(in srgb, var(--ss-fg) 8%, transparent);
+  /* 그냥 흰 글자다. 유리 재질(반투명 채움 · 광택 띠 · 윤곽선)을 여러 번
+     시도했지만 촌스럽거나 배경 밝기에 따라 사라져서 전부 걷어냈다.
+     굵은 디스플레이 글꼴이라 흰색 그대로가 가장 또렷하다. */
+  color: var(--ss-fg);
 }
 
 /* 왼쪽 헤드라인 — 3열 그리드(OWN | T | HE)에 앉힌다. 둘째 줄 PITCH 를
@@ -405,7 +404,12 @@ body {
   grid-column: 3;
 }
 
-/* 오른쪽 짝(FIND / YOUR / SQUAD) — 줄이 내려갈수록 시작점이 한 칸씩
+/* 오른쪽 짝(FIND / YOUR / SQUAD) — FIND 가 왼쪽 헤드라인의 둘째 줄
+   (PITCH)과 같은 높이에서 시작하도록 덩어리째 **정확히 한 줄** 내린다
+   (사용자 요청). 한 줄 = 글자 크기 × 줄 간격이라 --ss-display-lh 를
+   그대로 곱한다 — 줄 간격을 고치면 이 내림도 같이 따라온다.
+
+   줄이 내려갈수록 시작점이 한 칸씩
    오른쪽으로 밀린다. 0.25em 씩은 계단인지 어긋난 건지 모를 만큼 작아서
    0.6em 씩으로 키웠다. 블록이 오른쪽 변에 붙어 있으므로(부모의
    justify-between) 계단을 키우면 SQUAD 가 밀려나는 게 아니라 FIND 가
@@ -415,6 +419,7 @@ body {
   width: fit-content;
   flex-direction: column;
   align-items: flex-start;
+  margin-top: calc(var(--ss-display-lh) * 1em);
 }
 
 .ss-home-subhead > span:nth-child(2) {
