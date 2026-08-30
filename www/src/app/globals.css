@@ -357,10 +357,10 @@ body {
    레퍼런스처럼 붙는다. */
 .ss-home-headline {
   font-family: var(--font-plaster), var(--font-rubik), system-ui, sans-serif;
-  /* 레퍼런스에서 잰 값에 맞춘다: 대문자 높이가 화면 폭의 약 5.5%
-     (1702px 화면에서 94px). Plaster 의 대문자 높이가 em 의 약 0.7 이라
-     글자 크기는 그 비율의 1/0.7 ≈ 8.3vw 다(실측으로 맞췄다). */
-  font-size: clamp(2.625rem, 8.3vw, 9rem);
+  /* 레퍼런스에서 잰 크기(8.3vw ≈ 1440px 에서 120px)는 너무 컸다 —
+     사용자 요청으로 1440px 기준 65px 이 되는 4.5vw 로 줄인다.
+     좁은 화면에서 32px 아래로는 안 내려가고, 넓어도 80px 을 넘지 않는다. */
+  font-size: clamp(2rem, 4.5vw, 5rem);
   line-height: 1.16;
   letter-spacing: 0.01em;
   color: var(--ss-fg);
