@@ -739,6 +739,8 @@ body {
    크기로 잡았다. */
 .ss-squad {
   --ss-pcard-mini-w: 94;
+  /* 모서리 꺾쇠가 뻗는 길이. 끝은 서서히 사라진다(아래 mask). */
+  --ss-squad-corner: 110px;
   /* 🔴 흐름에서 뺀다. 판이 세로로 길어지면 왼쪽 덩어리가 통째로 커지고,
      화면 가운데 정렬(.ss-home-stage) 때문에 **헤드라인이 위로 밀린다.**
      판을 헤드라인 아래에 매달아 두면 헤드라인 자리는 제 높이로만
@@ -869,7 +871,7 @@ body {
   font-size: 120px;
   line-height: 1;
   font-variation-settings: 'FILL' 0, 'wght' 700, 'GRAD' 0, 'opsz' 24;
-  color: var(--ss-pitch-green);
+  color: var(--ss-pcard-fg);
 }
 
 .ss-squad-plus:hover,
@@ -905,4 +907,37 @@ body {
   font-size: 10px;
   line-height: 1.3;
   color: color-mix(in srgb, var(--ss-pcard-fg) 55%, transparent);
+}
+
+/* 판 테두리 — 도는 빛(GlassPanel 의 ss-traveling-edge) 대신 **네 모서리
+   꺾쇠**만 둔다. 빛이 계속 도는 건 시선을 끌어 카드보다 테두리를 먼저
+   보게 만든다. */
+.ss-squad.ss-traveling-edge::after {
+  display: none;
+}
+
+/* 테두리를 한 겹 그린 뒤 마스크로 모서리만 남긴다 — 선을 네 조각으로
+   따로 그리면 둥근 모서리에서 이음매가 보인다. 각 모서리에 둔
+   radial-gradient 가 안쪽은 불투명, 바깥으로 갈수록 투명해서 꺾쇠 끝이
+   저절로 흐려진다. */
+.ss-squad::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 55%, transparent);
+  border-radius: inherit;
+  pointer-events: none;
+  -webkit-mask-image:
+    radial-gradient(var(--ss-squad-corner) var(--ss-squad-corner) at 0 0, #000 55%, transparent 100%),
+    radial-gradient(var(--ss-squad-corner) var(--ss-squad-corner) at 100% 0, #000 55%, transparent 100%),
+    radial-gradient(var(--ss-squad-corner) var(--ss-squad-corner) at 0 100%, #000 55%, transparent 100%),
+    radial-gradient(var(--ss-squad-corner) var(--ss-squad-corner) at 100% 100%, #000 55%, transparent 100%);
+  mask-image:
+    radial-gradient(var(--ss-squad-corner) var(--ss-squad-corner) at 0 0, #000 55%, transparent 100%),
+    radial-gradient(var(--ss-squad-corner) var(--ss-squad-corner) at 100% 0, #000 55%, transparent 100%),
+    radial-gradient(var(--ss-squad-corner) var(--ss-squad-corner) at 0 100%, #000 55%, transparent 100%),
+    radial-gradient(var(--ss-squad-corner) var(--ss-squad-corner) at 100% 100%, #000 55%, transparent 100%);
+  -webkit-mask-composite: source-over;
+  mask-composite: add;
 }
