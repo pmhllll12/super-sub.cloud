@@ -464,8 +464,10 @@ body {
    기준 크기는 --ss-display-size 다. */
 .ss-home-subhead > span:nth-child(1) {
   font-size: calc(var(--ss-display-size) - 19px);
-  /* 첫 줄도 4px 왼쪽으로(사용자 요청). 아래 두 줄은 건드리지 않았다. */
-  margin-left: -4px;
+  /* 첫 줄은 16px 왼쪽으로(사용자 요청, 눈으로 맞춘 값). 그래서 W 가
+     아랫줄 T 보다 11px 쯤 왼쪽에 선다 — 계산으로 맞춘 자리가 아니라
+     보기 좋은 자리다. 아래 두 줄은 건드리지 않았다. */
+  margin-left: -16px;
 }
 
 .ss-home-subhead > span:nth-child(2) {
