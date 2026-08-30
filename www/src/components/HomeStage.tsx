@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import type { PublicPlayerCard } from '@/server/backend'
 import PlayerCardView from '@/components/PlayerCardView'
+import SquadPanel from '@/components/SquadPanel'
 import BrandMark from '@/components/ui/BrandMark'
 import FigureBackground from '@/components/FigureBackground'
 import HomeNav, { type Destination } from '@/components/HomeNav'
@@ -104,7 +105,13 @@ export default function HomeStage({
               그 장치가 통째로 필요 없어졌다 — 낱말을 span 으로 쪼갤 이유도,
               접근성 이름을 따로 줄 이유도 없다(그냥 글자 하나라 그대로
               읽힌다). 크기는 오른쪽 덩어리보다 한참 작다(아래 CSS). */}
-          <h1 className="ss-home-display ss-home-headline">FIND YOUR SQUAD</h1>
+          {/* 왼쪽 덩어리 — 헤드라인과 그 바로 아래 스쿼드 판. 자리
+              잡기(위로 · 오른쪽으로)는 이 묶음이 맡는다. 안쪽 글자에
+              margin 을 주면 판이 따라오지 않는다. */}
+          <div className="ss-home-left">
+            <h1 className="ss-home-display ss-home-headline">FIND YOUR SQUAD</h1>
+            <SquadPanel />
+          </div>
 
           {/* 오른쪽 — 왼쪽과 같은 글꼴 · 같은 크기(ss-home-display)로 세 줄.
               줄이 내려갈수록 시작점이 조금씩 오른쪽으로 밀린다(계단).
