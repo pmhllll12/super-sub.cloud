@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { PlayerCard } from '@/server/backend'
 import SquadPanel from './SquadPanel'
@@ -17,7 +17,6 @@ describe('스쿼드', () => {
     expect(container.querySelectorAll('.ss-pcard')).toHaveLength(5)
     expect(screen.getAllByRole('button', { name: /자리에 선수 넣기/ })).toHaveLength(4)
     expect(['FW', 'MF', 'DF', 'GK'].every((p) => screen.getAllByText(p).length > 0)).toBe(true)
-    // 내 카드는 빈 카드가 아니라 진짜 카드다.
     expect(screen.getByText('THREE LUNGS')).toBeInTheDocument()
   })
 
@@ -26,42 +25,59 @@ describe('스쿼드', () => {
     expect(screen.getAllByText('PLAYER CARD')).toHaveLength(5)
   })
 
-  it('+ 를 누르면 이름을 넣을 수 있다', async () => {
-    const user = userEvent.setup()
+  it('가만히 두면 추천 판이 없다', () => {
     render(<SquadPanel card={CARD} />)
-    await user.click(screen.getAllByRole('button', { name: 'MF 자리에 선수 넣기' })[0])
-    await user.type(screen.getAllByLabelText('MF 선수 이름')[0], '김철수{Enter}')
-    expect(screen.getByRole('button', { name: '김철수 빼기' })).toBeInTheDocument()
+    expect(screen.queryByRole('complementary')).toBeNull()
   })
 
-  it('빈 이름은 넣지 않는다', async () => {
-    const user = userEvent.setup()
-    render(<SquadPanel card={CARD} />)
-    await user.click(screen.getAllByRole('button', { name: 'MF 자리에 선수 넣기' })[0])
-    await user.type(screen.getAllByLabelText('MF 선수 이름')[0], '   {Enter}')
-    expect(screen.getAllByRole('button', { name: /자리에 선수 넣기/ })).toHaveLength(4)
-    expect(['FW', 'MF', 'DF', 'GK'].every((p) => screen.getAllByText(p).length > 0)).toBe(true)
-  })
-
-  it('Esc 를 누르면 넣지 않고 닫는다', async () => {
+  // 이름을 직접 적는 게 아니라 추천에서 고른다.
+  it('빈 자리를 누르면 그 포지션의 추천 판이 나온다', async () => {
     const user = userEvent.setup()
     render(<SquadPanel card={CARD} />)
     await user.click(screen.getByRole('button', { name: 'GK 자리에 선수 넣기' }))
-    await user.type(screen.getByLabelText('GK 선수 이름'), '박민호{Escape}')
-    expect(screen.queryByText('박민호')).toBeNull()
+    expect(screen.getByRole('complementary', { name: 'GK 추천 선수' })).toBeInTheDocument()
+    expect(screen.getByText('AI 추천')).toBeInTheDocument()
+    // 이름을 적는 칸은 없다.
+    expect(screen.queryByRole('textbox')).toBeNull()
+  })
+
+  it('자리마다 다른 추천이 나온다', async () => {
+    const user = userEvent.setup()
+    render(<SquadPanel card={CARD} />)
+    await user.click(screen.getAllByRole('button', { name: 'MF 자리에 선수 넣기' })[0])
+    expect(screen.getByRole('complementary', { name: 'MF 추천 선수' })).toBeInTheDocument()
+  })
+
+  it('추천에서 고르면 그 자리에 앉고 판이 닫힌다', async () => {
+    const user = userEvent.setup()
+    render(<SquadPanel card={CARD} />)
+    await user.click(screen.getByRole('button', { name: 'DF 자리에 선수 넣기' }))
+    await user.click(screen.getByRole('button', { name: /박도현/ }))
+    expect(screen.getByRole('button', { name: '박도현 빼기' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('complementary')).toBeNull())
+  })
+
+  it('닫기 버튼과 Esc 로 닫는다', async () => {
+    const user = userEvent.setup()
+    render(<SquadPanel card={CARD} />)
+    await user.click(screen.getByRole('button', { name: 'GK 자리에 선수 넣기' }))
+    await user.click(screen.getByRole('button', { name: '추천 닫기' }))
+    await waitFor(() => expect(screen.queryByRole('complementary')).toBeNull())
+
+    await user.click(screen.getByRole('button', { name: 'GK 자리에 선수 넣기' }))
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('complementary')).toBeNull())
   })
 
   it('넣은 선수를 눌러 뺀다', async () => {
     const user = userEvent.setup()
     render(<SquadPanel card={CARD} />)
-    await user.click(screen.getAllByRole('button', { name: 'MF 자리에 선수 넣기' })[0])
-    await user.type(screen.getAllByLabelText('MF 선수 이름')[0], '김철수{Enter}')
-    await user.click(screen.getByRole('button', { name: '김철수 빼기' }))
-    expect(screen.getAllByRole('button', { name: /자리에 선수 넣기/ })).toHaveLength(4)
-    expect(['FW', 'MF', 'DF', 'GK'].every((p) => screen.getAllByText(p).length > 0)).toBe(true)
+    await user.click(screen.getByRole('button', { name: 'DF 자리에 선수 넣기' }))
+    await user.click(screen.getByRole('button', { name: /박도현/ }))
+    await user.click(screen.getByRole('button', { name: '박도현 빼기' }))
+    expect(screen.getByRole('button', { name: 'DF 자리에 선수 넣기' })).toBeInTheDocument()
   })
 
-  // 카드가 아직 없는 사람도 자리는 보여야 한다.
   it('내 카드가 없으면 그 자리에 그렇게 적는다', () => {
     const { container } = render(<SquadPanel card={null} />)
     expect(container.querySelectorAll('.ss-pcard')).toHaveLength(5)

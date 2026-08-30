@@ -737,10 +737,10 @@ body {
    카드 폭은 --ss-pcard-mini-w 가 정한다 — 헤더의 작은 카드와 같은 방식
    (제 크기로 그린 뒤 통째로 줄인다). 세 칸이 배경 인물과 안 겹치는
    크기로 잡았다. */
-.ss-squad {
-  --ss-pcard-mini-w: 94;
-  /* 모서리 꺾쇠가 뻗는 길이. 끝은 서서히 사라진다(아래 mask). */
-  --ss-squad-corner: 110px;
+/* 스쿼드 판과 추천 판을 함께 담는 상자 — 자리 잡기를 여기서 한다.
+   추천 판은 유리판의 형제여야 한다(유리판이 overflow: hidden 이라 자식으로
+   두면 밖으로 나간 부분이 잘린다, SquadPanel 주석 참고). */
+.ss-squad-wrap {
   /* 🔴 흐름에서 뺀다. 판이 세로로 길어지면 왼쪽 덩어리가 통째로 커지고,
      화면 가운데 정렬(.ss-home-stage) 때문에 **헤드라인이 위로 밀린다.**
      판을 헤드라인 아래에 매달아 두면 헤드라인 자리는 제 높이로만
@@ -762,6 +762,12 @@ body {
   left: max(-120px, calc(21.333vw - 423px));
   margin-top: 18px;
   width: max-content;
+}
+
+.ss-squad {
+  --ss-pcard-mini-w: 94;
+  /* 모서리 꺾쇠가 뻗는 길이. 끝은 서서히 사라진다(아래 mask). */
+  --ss-squad-corner: 110px;
   padding: 14px 16px 16px;
 }
 
@@ -890,16 +896,6 @@ body {
   overflow-wrap: anywhere;
 }
 
-.ss-squad-input {
-  width: 100%;
-  min-width: 0;
-  border-bottom: 1px solid var(--ss-pcard-fg);
-  background: transparent;
-  text-align: center;
-  font-size: 15px;
-  color: var(--ss-pcard-fg);
-  outline: none;
-}
 
 .ss-squad-note {
   padding: 0 8px;
@@ -940,4 +936,152 @@ body {
     radial-gradient(var(--ss-squad-corner) var(--ss-squad-corner) at 100% 100%, #000 55%, transparent 100%);
   -webkit-mask-composite: source-over;
   mask-composite: add;
+}
+
+/* ── 추천 판 (스쿼드 빈 자리를 누르면 오른쪽에서 나온다) ─────────────── */
+
+/* 스쿼드 판 **바깥** 오른쪽에 붙는다. 판 안에 두면 카드를 덮는다.
+   미끄러져 나오는 동안 판 밑으로 파고들지 않게 z 를 올린다. */
+.ss-suggest {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  z-index: 3;
+  margin-left: 12px;
+  width: 248px;
+  border-radius: var(--ss-radius-sheet);
+  border: 1px solid var(--ss-glass-border);
+  background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--ss-fg) 10%, transparent),
+      transparent 40%
+    ),
+    var(--ss-glass-bg);
+  backdrop-filter: blur(var(--ss-glass-blur)) saturate(var(--ss-glass-saturate));
+  -webkit-backdrop-filter: blur(var(--ss-glass-blur)) saturate(var(--ss-glass-saturate));
+  padding: 16px;
+  animation: ss-suggest-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* 물러나는 중 — 아직 DOM 에 있지만 누를 수 있으면 안 된다. */
+.ss-suggest[data-state='closing'] {
+  pointer-events: none;
+  animation: ss-suggest-out 200ms ease-in both;
+}
+
+/* 오른쪽에서 미끄러져 나온다. 살짝 작게 시작해 제 크기로 펴지면 "밀려
+   나온다"보다 "펼쳐진다"로 읽힌다 — transform-origin 을 왼쪽에 두어
+   스쿼드 판에 붙은 채로 자라게 한다. */
+@keyframes ss-suggest-in {
+  from {
+    opacity: 0;
+    transform: translateX(-14px) scaleX(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scaleX(1);
+  }
+}
+
+@keyframes ss-suggest-out {
+  from {
+    opacity: 1;
+    transform: translateX(0) scaleX(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-10px) scaleX(0.97);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-suggest,
+  .ss-suggest[data-state='closing'] {
+    animation-duration: 1ms;
+  }
+}
+
+.ss-suggest-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ss-suggest-kicker {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--ss-accent);
+}
+
+.ss-suggest-head h3 {
+  margin-top: 2px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ss-fg);
+}
+
+.ss-suggest-close {
+  font-size: 18px;
+  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+  color: color-mix(in srgb, var(--ss-fg) 60%, transparent);
+  transition: color 160ms ease;
+}
+
+.ss-suggest-close:hover,
+.ss-suggest-close:focus-visible {
+  color: var(--ss-fg);
+}
+
+.ss-suggest-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ss-suggest-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  border-radius: 12px;
+  padding: 8px;
+  text-align: left;
+  background: color-mix(in srgb, var(--ss-fg) 5%, transparent);
+  transition: background 160ms ease;
+}
+
+.ss-suggest-item:hover,
+.ss-suggest-item:focus-visible {
+  background: color-mix(in srgb, var(--ss-fg) 12%, transparent);
+}
+
+/* 목록 속 작은 카드 — 실제 선수 카드와 같은 비율(3:4.1)로 두어 이게
+   카드가 될 자리라는 게 읽힌다. */
+.ss-suggest-card {
+  width: 30px;
+  flex: none;
+  aspect-ratio: 3 / 4.1;
+  border-radius: 5px;
+  background: var(--ss-pcard-bg, #91ea92);
+}
+
+.ss-suggest-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ss-suggest-name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ss-fg);
+}
+
+.ss-suggest-title {
+  font-size: 0.6875rem;
+  color: var(--ss-accent);
 }

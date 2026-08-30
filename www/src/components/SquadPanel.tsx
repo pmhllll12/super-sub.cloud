@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { PublicPlayerCard } from '@/server/backend'
 import PlayerCardView from '@/components/PlayerCardView'
 import GlassPanel from '@/components/ui/GlassPanel'
 import BrandMark from '@/components/ui/BrandMark'
+import SquadSuggest from '@/components/SquadSuggest'
 
 /**
  * 홈 첫 화면의 스쿼드 판 — 판 하나 위에 선수 카드를 **포지션 자리대로**
@@ -28,6 +29,10 @@ import BrandMark from '@/components/ui/BrandMark'
 /** 판 위의 자리. `area` 는 globals.css 의 grid-template-areas 이름이다. */
 type Slot = { area: string; label: string; mine?: boolean }
 
+// 추천 판이 닫히며 물러나는 시간 — globals.css 의 ss-suggest-out 과 같아야
+// 한다. 짧으면 애니메이션 도중에 잘리고, 길면 사라진 자리가 남는다.
+const SUGGEST_EXIT_MS = 200
+
 const SLOTS: Slot[] = [
   { area: 'fw', label: 'FW', mine: true },
   { area: 'ml', label: 'MF' },
@@ -38,18 +43,40 @@ const SLOTS: Slot[] = [
 
 export default function SquadPanel({ card }: { card?: PublicPlayerCard | null }) {
   const [mates, setMates] = useState<Record<string, string | null>>({})
-  const [editing, setEditing] = useState<string | null>(null)
-  const [draft, setDraft] = useState('')
+  // 지금 추천을 열어 둔 자리. null 이면 닫혀 있다.
+  const [picking, setPicking] = useState<Slot | null>(null)
+  // 닫히는 중인 자리 — 물러나는 동안 DOM 에 남겨 둬야 애니메이션이 보인다.
+  const [closing, setClosing] = useState<Slot | null>(null)
+  const timer = useRef(0)
 
-  function commit(area: string) {
-    const name = draft.trim()
-    if (name) setMates((prev) => ({ ...prev, [area]: name }))
-    setEditing(null)
-    setDraft('')
+  useEffect(() => () => clearTimeout(timer.current), [])
+
+  function close() {
+    setClosing(picking)
+    setPicking(null)
+    clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => setClosing(null), SUGGEST_EXIT_MS)
   }
 
+  // 열려 있는 동안 Esc 로 닫는다 — 바깥을 누르는 것과 같은 자리에 둔다.
+  useEffect(() => {
+    if (!picking) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') close()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  })
+
+  const shown = picking ?? closing
+
   return (
-    <GlassPanel className="ss-squad">
+    /* 🔴 추천 판은 유리판의 **형제**다. GlassPanel 이 overflow: hidden 이라
+       (도는 빛을 자르려고) 자식으로 두면 판 밖으로 나간 부분이 통째로
+       잘린다 — 실제로 그렇게 안 보였다. 자리 잡기는 이 바깥 상자가 맡고,
+       유리판과 추천 판은 그 안에서 좌표를 잡는다. */
+    <div className="ss-squad-wrap">
+      <GlassPanel className="ss-squad">
       <header className="ss-squad-head">
         <h2>MY SQUAD</h2>
         <p>풋살 5인</p>
@@ -88,22 +115,6 @@ export default function SquadPanel({ card }: { card?: PublicPlayerCard | null })
                   <SquadCardFrame>
                     {slot.mine ? (
                       <p className="ss-squad-note">아직 카드가 없습니다</p>
-                    ) : editing === slot.area ? (
-                      <input
-                        autoFocus
-                        aria-label={`${slot.label} 선수 이름`}
-                        className="ss-squad-input"
-                        value={draft}
-                        onChange={(e) => setDraft(e.target.value)}
-                        onBlur={() => commit(slot.area)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') commit(slot.area)
-                          if (e.key === 'Escape') {
-                            setEditing(null)
-                            setDraft('')
-                          }
-                        }}
-                      />
                     ) : name ? (
                       <button
                         type="button"
@@ -117,10 +128,12 @@ export default function SquadPanel({ card }: { card?: PublicPlayerCard | null })
                       <button
                         type="button"
                         aria-label={`${slot.label} 자리에 선수 넣기`}
+                        aria-expanded={picking?.area === slot.area}
                         className="ss-squad-plus material-symbols-outlined"
                         onClick={() => {
-                          setEditing(slot.area)
-                          setDraft('')
+                          clearTimeout(timer.current)
+                          setClosing(null)
+                          setPicking(slot)
                         }}
                       >
                         add
@@ -134,7 +147,22 @@ export default function SquadPanel({ card }: { card?: PublicPlayerCard | null })
           )
         })}
       </div>
-    </GlassPanel>
+
+      </GlassPanel>
+
+      {/* 추천 판 — 스쿼드 판 오른쪽에서 미끄러져 나온다. */}
+      {shown && (
+        <SquadSuggest
+          position={shown.label}
+          closing={picking === null}
+          onClose={close}
+          onPick={(name) => {
+            setMates((prev) => ({ ...prev, [shown.area]: name }))
+            close()
+          }}
+        />
+      )}
+    </div>
   )
 }
 
