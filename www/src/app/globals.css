@@ -552,21 +552,31 @@ body {
 /* 이름 — 카드에서 가장 큰 글자. 참고 디자인의 굵은 압축 산세 자리다.
    한글이라 디스플레이 글꼴(라틴 전용)을 못 쓰므로 본문 글꼴을 가장
    굵게 쓰고 자간을 좁혀 한 덩어리로 보이게 한다. */
-/* 사진이 없으므로 이름이 카드 가운데를 차지한다 — 남는 세로 공간을
-   모두 먹고 그 안에서 가운데 정렬한다. */
-.ss-pcard-name {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  flex: 1 1 auto;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  font-size: clamp(2.25rem, 17cqw, 3.75rem);
-  font-weight: 900;
-  letter-spacing: -0.045em;
-  line-height: 0.98;
-  color: var(--ss-pcard-fg);
+/* 누끼 인물 — 카드 **아래 절반만** 차지한다(top: 50%). 사용자가 정한
+   규칙이다: 카드 세로 가운데 위로는 넘어가지 않는다. 위쪽 절반은
+   워드마크와 머리글의 자리다.
+
+   **위를 그 가운데선에 붙이고**(top center) 아래로 넘치는 만큼은 카드가
+   자른다 — 참고 디자인도 선수 아랫도리가 카드 밖으로 나간다.
+
+   가로 폭은 카드의 68% 다. 100% 로 채워 봤더니 상자가 가로로 납작해져
+   (352×246) 헬멧만 남고 상체가 통째로 잘렸다 — 상자를 세로로 세울수록
+   같은 높이에 사람이 더 많이 들어온다. 참고 디자인의 선수도 카드 폭의
+   60% 남짓을 차지한다. 흑백도 원본과 같다. */
+.ss-pcard-figure {
+  position: absolute;
+  z-index: 1;
+  inset-inline: 16%;
+  top: 50%;
+  bottom: 0;
+}
+
+.ss-pcard-figure img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  filter: grayscale(1) contrast(1.06);
 }
 
 /* 맨 아래 두 줄 — 위에 호칭 알약, 아래에 검은 막대 · 원형 배지.

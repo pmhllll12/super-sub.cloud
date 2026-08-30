@@ -12,11 +12,18 @@ const card = {
 }
 
 describe('선수 카드', () => {
-  it('닉네임과 받은 호칭을 보여준다', () => {
+  it('받은 호칭을 보여준다', () => {
     render(<PlayerCardView card={card} />)
-    expect(screen.getByRole('heading', { name: '홍길동' })).toBeInTheDocument()
     expect(screen.getByText('슈팅이 매서운')).toBeInTheDocument()
     expect(screen.getByText('주말 개근')).toBeInTheDocument()
+  })
+
+  // 카드에 이름을 글자로 적지 않는다(인물이 가운데를 차지한다). 그래도
+  // 누구 카드인지는 읽어 주는 기계에 남아야 한다.
+  it('닉네임을 글자로 적지 않되 카드의 이름으로는 남긴다', () => {
+    render(<PlayerCardView card={card} />)
+    expect(screen.queryByRole('heading', { name: '홍길동' })).toBeNull()
+    expect(screen.getByRole('article', { name: '홍길동' })).toBeInTheDocument()
   })
 
   it('호칭이 없으면 빈 상태를 보여준다', () => {

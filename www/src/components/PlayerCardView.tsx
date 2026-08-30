@@ -3,16 +3,17 @@ import BrandMark from './ui/BrandMark'
 
 /**
  * 세로 포스터형 선수 카드 — 참고 디자인(MOJO 시즌 카드)의 짜임이다.
- * 검은 테두리 안에 **흰 카드**가 들어 있고, 위에서부터 워드마크 · 작은
- * 머리글 · 굵은 검은 이름이 쌓이며 맨 아래에 형광 알약과 검은 막대 ·
- * 원형 배지가 온다.
+ * 검은 테두리 안에 **흰 카드**가 들어 있고, 위에 워드마크와 작은 머리글,
+ * 아래 절반에 누끼 인물, 맨 아래에 형광 알약과 검은 막대 · 원형 배지가 온다.
  *
- * 🔴 **인물 사진을 넣지 않는다.** 참고 디자인의 중앙에는 선수 사진이
- * 있지만 우리에겐 그 자리에 넣을 것이 없다 — 계약(api-contract.md)에
- * 사용자 사진 필드가 아예 없고(`og_image_key` 는 서버가 만드는 공유
- * 미리보기 이미지의 키다), 한때 `public/player_mono.jpg` 라는 스톡
- * 사진을 깔아 뒀는데 **모든 사람의 카드에 같은 남의 사진**이 박히는
- * 꼴이었다. 사진 필드가 계약에 생기면 그때 이 자리를 연다.
+ * 인물은 `public/player_cutout.png` — 배경이 검던 원본에서 사람만 떼어
+ * 낸 것이다(만든 과정은 커밋 메시지 참고). **카드 세로 가운데 위로는
+ * 올라오지 않는다** — 위쪽 절반은 워드마크와 머리글의 자리다.
+ *
+ * 🔴 카드에 **닉네임을 글자로 적지 않는다.** 참고 디자인처럼 인물이
+ * 가운데를 차지하는 그림이라 이름이 들어갈 자리가 없다. 다만 카드가
+ * 누구 것인지는 읽어 주는 기계에도 남아야 하므로 article 의 이름으로
+ * 준다(aria-label).
  *
  * 🔴 사이트 전체가 어두운 화면인데 이 카드만 밝다. 의도한 것이다 —
  * 참고 디자인이 그렇고, 카드는 밖으로 공유되는 물건이라 어디에 놓여도
@@ -27,14 +28,19 @@ import BrandMark from './ui/BrandMark'
  */
 export default function PlayerCardView({ card }: { card: PublicPlayerCard }) {
   return (
-    <article className="ss-pcard">
+    <article className="ss-pcard" aria-label={card.user.nickname}>
       <div className="ss-pcard-inner">
         <header className="ss-pcard-top">
           <BrandMark size={22} color="var(--ss-pcard-fg)" />
           <p className="ss-pcard-kicker">PLAYER CARD</p>
         </header>
 
-        <h1 className="ss-pcard-name">{card.user.nickname}</h1>
+        {/* 누끼 인물 — 장식이라 스크린리더에서 숨긴다. 아래 절반만
+            차지하게 두어(top: 50%) 카드 가운데 위로 넘어가지 않는다. */}
+        <div className="ss-pcard-figure" aria-hidden="true">
+          {/* eslint-disable-next-line @next/next/no-img-element -- 카드 장식용 고정 이미지 */}
+          <img src="/player_cutout.png" alt="" decoding="async" />
+        </div>
 
         {/* 맨 아래 두 줄. 참고 디자인은 [검은 막대][형광 알약][원형 배지]가
             한 줄인데, 그건 알약이 하나(날짜)일 때 이야기다 — 호칭은 여러
