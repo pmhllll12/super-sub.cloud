@@ -88,7 +88,13 @@ export default function AuthShell({
 
       <div className="w-full max-w-[1600px] lg:h-[min(90vh,920px)]">
         <div
-          className="ss-traveling-edge relative grid h-full w-full grid-cols-1 overflow-hidden lg:grid-cols-2"
+          // 사진 칸을 폼 칸보다 넓게 — 반반이면 사진이 답답했다(사용자 요청).
+          // 다만 **넓은 화면(xl)에서만** 그렇게 한다: 폼 안쪽 내용이
+          // max-w-sm(384px) + 좌우 여백 48px 씩이라 폼 칸이 480px 밑으로
+          // 내려가면 눌린다. lg(1024px)에서 6:4 로 나누면 폼 칸이 390px 라
+          // 내용이 294px 로 찌그러졌다(실측). xl 부터는 여유가 있다 —
+          // 1280px 에서 폼 칸 493px, 내용은 384px 그대로다.
+          className="ss-traveling-edge relative grid h-full w-full grid-cols-1 overflow-hidden lg:grid-cols-2 xl:grid-cols-[3fr_2fr]"
           style={{ borderRadius: 'var(--ss-radius-sheet)', border: '1px solid var(--ss-glass-border)' }}
         >
           {/* 카드 왼쪽 — 사진 칸. 좁은 화면에서는 숨긴다(폼만 남기기 위해). */}
