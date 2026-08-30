@@ -107,16 +107,18 @@ export default function HomeStage({
           {/* 레퍼런스(THE CAMEL / AND / THE WHEEL)처럼 스텐실 글꼴로 두 줄.
               Abril Fatface 는 라틴만 있어 한글을 못 쓴다 — 그래서 문구도 영문이다.
 
-              PITCH 의 P 가 윗줄 THE 의 T 와 같은 자리에서 시작해야 해서
-              (사용자 요청) 낱말 셋을 2열 그리드에 앉힌다: OWN | THE 가
-              첫 줄, 둘째 줄은 첫 칸을 비우고 PITCH 가 둘째 칸에 온다.
-              왼쪽 정렬을 그리드가 보장하므로 눈대중 여백이 필요 없다.
+              PITCH 의 P 가 윗줄 THE 의 **H** 와 같은 자리에서 시작해야
+              해서(사용자 요청) 3열 그리드에 앉힌다: OWN | T | HE 가 첫
+              줄, 둘째 줄은 앞 두 칸을 비우고 PITCH 가 셋째 칸(HE 가 있는
+              칸)에 온다. 그래서 THE 가 T 와 HE 로 쪼개져 있다 — 눈대중
+              여백 없이 layout 이 자리를 맞춘다.
 
               낱말이 각자 span 이라 사이에 공백 문자가 없다 — 그냥 두면
               접근성 이름이 "OWNTHEPITCH" 로 붙어 읽힌다. 이름을 따로 준다. */}
           <h1 className="ss-home-display ss-home-headline" aria-label="OWN THE PITCH">
-            <span>OWN</span>
-            <span>THE</span>
+            <span className="ss-home-headline-first">OWN</span>
+            <span>T</span>
+            <span>HE</span>
             <span className="ss-home-headline-second">PITCH</span>
           </h1>
 

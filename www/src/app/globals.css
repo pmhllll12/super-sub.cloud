@@ -362,29 +362,54 @@ body {
   font-size: clamp(2.25rem, 5.56vw, 6rem);
   line-height: 1.16;
   letter-spacing: 0.01em;
-  color: var(--ss-fg);
+
+  /* 유리 글자 — 카드(GlassPanel)와 같은 결로 읽히게 한다: 글자 속이
+     반투명해 뒤 사진이 비치고, 가장자리만 옅게 밝다.
+
+     ⚠️ 카드처럼 **글자 안을 흐리게(backdrop-filter) 하는 건 CSS 로 안
+     된다.** backdrop-filter 는 요소의 상자 전체에 걸리고
+     background-clip: text 는 그걸 글자 모양으로 잘라 주지 않는다 —
+     하려면 같은 글자를 SVG mask 로 한 벌 더 그려야 한다(웹폰트를 그
+     SVG 안에 심어야 해서 값이 비싸다). 그래서 '반투명 + 옅은 테두리'
+     까지만 한다.
+
+     속은 위가 밝고 아래로 갈수록 옅어진다 — 유리에 빛이 얹힌 느낌. */
+  color: transparent;
+  background-image: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--ss-fg) 55%, transparent),
+    color-mix(in srgb, var(--ss-fg) 18%, transparent)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-stroke: 1px color-mix(in srgb, var(--ss-fg) 55%, transparent);
 }
 
-/* 왼쪽 헤드라인. */
-.ss-home-headline {
-  /* 낱말 셋(OWN | THE / _ | PITCH)을 2열 그리드에 앉힌다 — 둘째 줄
-     PITCH 의 왼쪽 변이 윗줄 THE 의 왼쪽 변과 자동으로 맞는다(눈대중
-     여백 없이 layout 이 보장한다).
+/* 왼쪽 헤드라인 — 3열 그리드(OWN | T | HE)에 앉힌다. 둘째 줄 PITCH 를
+   셋째 칸에 두면 P 의 왼쪽 변이 윗줄 H 의 왼쪽 변과 자동으로 맞는다
+   (사용자 요청, 눈대중 여백 없이 layout 이 보장한다). 그래서 THE 가
+   T 와 HE 로 쪼개져 있다.
 
-     칸 사이는 낱말 사이 공백 몫이다. 글꼴이 정한 space 폭을 그대로
-     쓰면(Abril Fatface 는 0.18em) 이 크기에서 OWN 과 THE 가 붙어 읽힌다 —
-     획이 굵고 side bearing 이 좁은 디스플레이 글꼴이라 그렇다. 눈으로
-     떨어져 보이는 0.35em 으로 넓혀 둔다. 글꼴을 바꿔도 이 값은 대체로
-     그대로 쓸 수 있다(글꼴의 space 폭에 매지 않았다). */
+   칸 사이(column-gap)를 쓰지 않는다 — T 와 HE 사이는 한 낱말 안이라
+   붙어야 하고 OWN 과 T 사이만 벌어져야 하는데, gap 은 모든 칸에 똑같이
+   먹기 때문이다. 낱말 사이는 첫 칸의 오른쪽 여백으로 준다. */
+.ss-home-headline {
   display: grid;
   width: fit-content;
-  grid-template-columns: auto auto;
-  column-gap: 0.35em;
+  grid-template-columns: auto auto auto;
 }
 
-/* 둘째 줄 — 첫 칸을 비우고 둘째 칸(THE 가 있던 칸)에 앉는다. */
+/* 낱말 사이 공백 몫. 글꼴이 정한 space 폭을 그대로 쓰면(Abril Fatface 는
+   0.18em) 이 크기에서 OWN 과 THE 가 붙어 읽힌다 — 획이 굵고 side bearing
+   이 좁은 디스플레이 글꼴이라 그렇다. 눈으로 떨어져 보이는 0.35em 으로
+   넓혀 둔다(글꼴의 space 폭에 매지 않아 글꼴을 바꿔도 그대로 쓴다). */
+.ss-home-headline-first {
+  margin-right: 0.35em;
+}
+
+/* 둘째 줄 — 앞 두 칸을 비우고 셋째 칸(HE 가 있는 칸)에 앉는다. */
 .ss-home-headline-second {
-  grid-column: 2;
+  grid-column: 3;
 }
 
 /* 오른쪽 짝(FIND / YOUR / SQUAD) — 줄이 내려갈수록 시작점이 한 칸씩
