@@ -144,10 +144,12 @@ export default function SquadPanel({ card }: { card?: PublicPlayerCard | null })
  */
 function SquadCardFrame({ children }: { children: React.ReactNode }) {
   return (
-    <article className="ss-pcard">
+    <article className="ss-pcard ss-pcard-blank">
       <div className="ss-pcard-inner">
         <header className="ss-pcard-top">
-          <BrandMark size={22} color="var(--ss-pcard-fg)" />
+          {/* 빈 카드는 바탕이 희어서 워드마크를 검게 찍을 이유가 없다 —
+              브랜드 민트로 둔다(채워진 카드는 연두 바탕이라 그 반대다). */}
+          <BrandMark size={22} color="var(--ss-accent)" />
           <p className="ss-pcard-kicker">PLAYER CARD</p>
         </header>
         <div className="ss-squad-seat-body">{children}</div>
