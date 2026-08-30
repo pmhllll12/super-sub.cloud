@@ -22,6 +22,9 @@
   --ss-bg: #000000;
   --ss-fg: #ffffff;
   --ss-accent: #70ed88;
+  /* 잔디 초록 — 스쿼드 빈 카드의 + 와 홈 헤드라인의 PITCH 가 같이 쓴다.
+     강조색(--ss-accent)보다 조금 더 노란 쪽이라 나란히 놓아도 안 겹친다. */
+  --ss-pitch-green: #a6e89b;
   --ss-error: #ff8a80;
   --ss-scrim: rgba(0, 0, 0, 0.15);
 
@@ -463,6 +466,9 @@ body {
 
 .ss-home-subhead > span:nth-child(3) {
   font-size: calc(var(--ss-display-size) - 5px);
+  /* 마지막 낱말만 잔디 초록 — 스쿼드 판의 + 와 같은 색이라 한 화면에서
+     두 덩어리가 서로를 가리킨다. */
+  color: var(--ss-pitch-green);
 }
 
 /* 오른쪽 아래 구석 — 로그아웃 아이콘 하나. */
@@ -863,8 +869,7 @@ body {
   font-size: 120px;
   line-height: 1;
   font-variation-settings: 'FILL' 0, 'wght' 700, 'GRAD' 0, 'opsz' 24;
-  /* 카드 글자와 같은 완전한 검정 — 옅게 두면 빈 자리가 흐릿해 보인다. */
-  color: var(--ss-pcard-fg);
+  color: var(--ss-pitch-green);
 }
 
 .ss-squad-plus:hover,
