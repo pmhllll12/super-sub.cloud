@@ -776,17 +776,16 @@ body {
   width: max-content;
 }
 
-/* 스쿼드 판 — 뒤를 흐린다(블러는 컴포넌트에서 인라인으로, 이유는 거기
-   주석 참고). 추천 판은 반대로 블러가 없어 뒤가 그대로 비친다 — 둘을
-   맞바꿔 봤다가 이 조합이 낫다고 판단해 되돌렸다. GlassPanel 을 쓰지
-   않는 것은 도는 테두리 빛이 함께 딸려오기 때문이다. */
+/* 스쿼드 판 — **직각 모서리에 블러 없음.** 뒤가 그대로 비친다. 유리
+   재질(반투명 + 블러 + 둥근 모서리)을 여러 조합으로 해 봤지만 경기장
+   판에는 각진 편이 맞는다. GlassPanel 을 쓰지 않는 이유이기도 하다 —
+   그건 블러와 둥근 모서리, 도는 테두리 빛을 한 벌로 딸려 보낸다. */
 .ss-squad {
   --ss-pcard-mini-w: 94;
   /* 모서리 꺾쇠가 뻗는 길이. 끝은 서서히 사라진다(아래 mask). */
   --ss-squad-corner: 110px;
   position: relative;
   overflow: hidden;
-  border-radius: var(--ss-radius-sheet);
   background: linear-gradient(
       to bottom,
       color-mix(in srgb, var(--ss-fg) 10%, transparent),

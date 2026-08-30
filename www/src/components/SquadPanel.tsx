@@ -75,19 +75,7 @@ export default function SquadPanel({ card }: { card?: PublicPlayerCard | null })
        나간 부분이 통째로 잘린다 — 실제로 그렇게 안 보였다. 자리 잡기는
        이 바깥 상자가 맡고, 두 판은 그 안에서 좌표를 잡는다. */
     <div className="ss-squad-wrap">
-      <section
-        className="ss-squad"
-        aria-label="내 스쿼드"
-        // 🔴 블러는 **인라인으로** 준다. globals.css 에 두면 같은 규칙의
-        // color-mix() 때문에 Lightning CSS 가 @supports 로 쪼개는 과정에서
-        // 표준 backdrop-filter 를 통째로 떨어뜨린다(추천 판에서 실제로
-        // 그렇게 날아갔다 — 계산값 none). GlassPanel · FigureBackground 도
-        // 같은 이유로 이미 인라인이다.
-        style={{
-          backdropFilter: 'blur(var(--ss-glass-blur)) saturate(var(--ss-glass-saturate))',
-          WebkitBackdropFilter: 'blur(var(--ss-glass-blur)) saturate(var(--ss-glass-saturate))',
-        }}
-      >
+      <section className="ss-squad" aria-label="내 스쿼드">
       <div className="ss-squad-board">
         {/* 머리글이 경기장 선 **안쪽**에 앉아야 한다 — 판 위쪽에 따로
             두면 선 밖으로 나간다. 선을 그리는 상자 안에 넣고 위 여백을
