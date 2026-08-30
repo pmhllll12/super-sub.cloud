@@ -405,8 +405,7 @@ body {
   color: color-mix(in srgb, var(--ss-fg) 70%, transparent);
 }
 
-/* 하단 줄 — 왼쪽(SCROLL DOWN · 소셜) 과 오른쪽(번호 목록). 가운데는
-   비워 둔다: 로그인했으면 FloatingNavBar 가 거기 뜬다. */
+/* 하단 줄 — 왼쪽(SCROLL DOWN · 소셜) 과 오른쪽(번호 목록). */
 .ss-home-footer {
   position: fixed;
   inset-inline: 0;

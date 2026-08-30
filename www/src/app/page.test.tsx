@@ -2,9 +2,8 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HomeBody } from './page'
 
-// FloatingNavBar(usePathname) · LogoutButton(useRouter) 이 둘 다 필요로 한다.
+// LogoutButton 이 useRouter 를 쓴다.
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/',
   useRouter: () => ({ refresh: vi.fn() }),
 }))
 
@@ -92,11 +91,6 @@ describe('홈 화면 — /', () => {
     expect(screen.getByRole('link', { name: '회원가입' })).toHaveAttribute('href', '/signup')
   })
 
-  it('로그인 안 했으면 하단 내비바를 보여주지 않는다 — 갈 데가 대부분 막혀 있다', () => {
-    render(<HomeBody user={null} />)
-    expect(screen.queryByRole('link', { name: '홈' })).toBeNull()
-  })
-
   it('로그인했으면 인사말 자리에 닉네임과 로그아웃을 보여준다', () => {
     render(<HomeBody user={{ nickname: '홍길동' }} />)
     expect(screen.getByText('홍길동')).toBeInTheDocument()
@@ -105,8 +99,9 @@ describe('홈 화면 — /', () => {
     expect(screen.queryByRole('link', { name: '회원가입' })).toBeNull()
   })
 
-  it('로그인했으면 하단 내비바를 보여준다', () => {
+  // 하단 내비바는 없앴다 — 목적지가 상단 글자 줄에 이미 다 있다.
+  it('하단 내비바가 없다', () => {
     render(<HomeBody user={{ nickname: '홍길동' }} />)
-    expect(screen.getByRole('link', { name: '홈' })).toHaveAttribute('href', '/')
+    expect(screen.queryByRole('link', { name: '홈' })).toBeNull()
   })
 })

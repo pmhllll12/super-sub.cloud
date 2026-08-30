@@ -129,7 +129,7 @@ export default function HomeStage({
         </dl>
       </div>
 
-      {/* 하단 줄 — 가운데는 비워 둔다(로그인했으면 FloatingNavBar 가 그 자리). */}
+      {/* 하단 줄 — 왼쪽(SCROLL DOWN · 소셜)과 오른쪽(번호 목록). */}
       <div className="ss-home-footer">
         <div className="ss-home-footer-left">
           <span className="ss-home-scroll">

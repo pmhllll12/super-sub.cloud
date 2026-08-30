@@ -2,7 +2,6 @@ import { type User } from '@/server/backend'
 import { requireUser } from '@/server/currentUser'
 import HomeStage from '@/components/HomeStage'
 import { type Destination } from '@/components/HomeNav'
-import FloatingNavBar from '@/components/ui/FloatingNavBar'
 
 // 홈 상단 글자 내비에 적히는 목적지. 앱(flutter/.../home_screen.dart)의
 // _kDestinations 에서 출발했지만 2026-08-30 에 웹에서 다시 골랐다:
@@ -54,16 +53,11 @@ const DESTINATIONS: Destination[] = [
  * 홈은 격자가 아니라 화면 한 장을 통째로 쓰므로 `(app)` 레이아웃처럼
  * `max-w-[1120px]` 로 가운데 폭을 좁히지 않는다 — 헤더 · 하단 줄을
  * `HomeStage` 가 `position: fixed` 로 화면 전체 기준으로 배치한다.
- *
- * 하단 내비바는 로그인했을 때만 보여준다 — 로그인 안 한 사람은 갈 데가
- * 대부분 막혀 있어 의미가 없다. 세로로 스크롤하는 화면이 아니라 내비바를
- * 위한 별도 아래쪽 여백이 필요 없다 — 내비바는 늘 `fixed` 라 위에 얹힌다.
  */
 export function HomeBody({ user }: { user: Pick<User, 'nickname'> | null }) {
   return (
     <>
       <HomeStage user={user} destinations={DESTINATIONS} />
-      {user && <FloatingNavBar />}
     </>
   )
 }
