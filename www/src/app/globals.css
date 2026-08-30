@@ -726,7 +726,7 @@ body {
    (제 크기로 그린 뒤 통째로 줄인다). 세 칸이 배경 인물과 안 겹치는
    크기로 잡았다. */
 .ss-squad {
-  --ss-pcard-mini-w: 62;
+  --ss-pcard-mini-w: 88;
   /* 🔴 흐름에서 뺀다. 판이 세로로 길어지면 왼쪽 덩어리가 통째로 커지고,
      화면 가운데 정렬(.ss-home-stage) 때문에 **헤드라인이 위로 밀린다.**
      판을 헤드라인 아래에 매달아 두면 헤드라인 자리는 제 높이로만
@@ -763,14 +763,15 @@ body {
    서고 수비 둘이 양옆으로 벌어진다. */
 .ss-squad-board {
   display: grid;
+  /* 1-2-1 — 위가 공격이다: FW 하나, MF 둘, DF 하나, GK. */
   grid-template-areas:
     '.  fw .'
-    '.  mf .'
-    'dl .  dr'
+    'ml .  mr'
+    '.  df .'
     '.  gk .';
   /* 가로를 넉넉히 벌린다 — 세로로만 길면 판이 기둥처럼 보이고 포메이션
      으로 안 읽힌다. 세로 간격은 반대로 좁혀 키를 줄인다. */
-  column-gap: 64px;
+  column-gap: 96px;
   row-gap: 6px;
   justify-items: center;
 }

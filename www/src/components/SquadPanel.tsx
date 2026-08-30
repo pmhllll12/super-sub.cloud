@@ -11,7 +11,8 @@ import BrandMark from '@/components/ui/BrandMark'
  * 앉힌다(참고: 축구 게임의 스쿼드 화면). 한 줄로 늘어놓지 않는 이유가
  * 그것이다 — 누가 어느 자리인지가 배치로 읽혀야 한다.
  *
- * 풋살 5인: FW · MF · DF 둘 · GK. 내 카드는 가운데(MF)에 놓는다.
+ * 풋살 5인, 1-2-1 포메이션: GK · DF 하나 · MF 둘 · FW 하나.
+ * 내 카드는 맨 위(FW)에 놓는다 — 가운데 열의 맨 앞이라 눈이 먼저 간다.
  * 나머지 넷은 빈 카드 — 같은 틀 · 같은 머리글(SUPERSUB · PLAYER CARD)에
  * 가운데 + 만 있다. 눌러 보기 전에 무슨 자리인지 알 수 있어야 해서다.
  *
@@ -28,10 +29,10 @@ import BrandMark from '@/components/ui/BrandMark'
 type Slot = { area: string; label: string; mine?: boolean }
 
 const SLOTS: Slot[] = [
-  { area: 'fw', label: 'FW' },
-  { area: 'mf', label: 'MF', mine: true },
-  { area: 'dl', label: 'DF' },
-  { area: 'dr', label: 'DF' },
+  { area: 'fw', label: 'FW', mine: true },
+  { area: 'ml', label: 'MF' },
+  { area: 'mr', label: 'MF' },
+  { area: 'df', label: 'DF' },
   { area: 'gk', label: 'GK' },
 ]
 

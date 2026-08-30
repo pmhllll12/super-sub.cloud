@@ -29,16 +29,16 @@ describe('스쿼드', () => {
   it('+ 를 누르면 이름을 넣을 수 있다', async () => {
     const user = userEvent.setup()
     render(<SquadPanel card={CARD} />)
-    await user.click(screen.getByRole('button', { name: 'FW 자리에 선수 넣기' }))
-    await user.type(screen.getByLabelText('FW 선수 이름'), '김철수{Enter}')
+    await user.click(screen.getAllByRole('button', { name: 'MF 자리에 선수 넣기' })[0])
+    await user.type(screen.getAllByLabelText('MF 선수 이름')[0], '김철수{Enter}')
     expect(screen.getByRole('button', { name: '김철수 빼기' })).toBeInTheDocument()
   })
 
   it('빈 이름은 넣지 않는다', async () => {
     const user = userEvent.setup()
     render(<SquadPanel card={CARD} />)
-    await user.click(screen.getByRole('button', { name: 'FW 자리에 선수 넣기' }))
-    await user.type(screen.getByLabelText('FW 선수 이름'), '   {Enter}')
+    await user.click(screen.getAllByRole('button', { name: 'MF 자리에 선수 넣기' })[0])
+    await user.type(screen.getAllByLabelText('MF 선수 이름')[0], '   {Enter}')
     expect(screen.getAllByRole('button', { name: /자리에 선수 넣기/ })).toHaveLength(4)
     expect(['FW', 'MF', 'DF', 'GK'].every((p) => screen.getAllByText(p).length > 0)).toBe(true)
   })
@@ -54,8 +54,8 @@ describe('스쿼드', () => {
   it('넣은 선수를 눌러 뺀다', async () => {
     const user = userEvent.setup()
     render(<SquadPanel card={CARD} />)
-    await user.click(screen.getByRole('button', { name: 'FW 자리에 선수 넣기' }))
-    await user.type(screen.getByLabelText('FW 선수 이름'), '김철수{Enter}')
+    await user.click(screen.getAllByRole('button', { name: 'MF 자리에 선수 넣기' })[0])
+    await user.type(screen.getAllByLabelText('MF 선수 이름')[0], '김철수{Enter}')
     await user.click(screen.getByRole('button', { name: '김철수 빼기' }))
     expect(screen.getAllByRole('button', { name: /자리에 선수 넣기/ })).toHaveLength(4)
     expect(['FW', 'MF', 'DF', 'GK'].every((p) => screen.getAllByText(p).length > 0)).toBe(true)
