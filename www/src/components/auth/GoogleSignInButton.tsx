@@ -142,11 +142,19 @@ export default function GoogleSignInButton({
 
   return (
     <>
+      {/* 🔴 onLoad 가 아니라 onReady 다. onLoad 는 스크립트를 실제로 내려받는
+          첫 번째 마운트에서만 온다 — next/script 의 loadScript 가 이미 실은
+          스크립트(LoadCache)면 그대로 return 하기 때문이다. 로그아웃은
+          router.refresh() 뿐이고 requireUser() 의 redirect('/login') 도
+          클라이언트 사이드 이동이라 페이지가 새로 뜨지 않아서, onLoad 로는
+          로그아웃하고 돌아온 로그인 화면에 버튼이 아예 안 그려졌다.
+          onReady 는 첫 로드 때도, 그 뒤 재마운트마다도 온다(공식 문서가
+          구글 지도 재초기화를 같은 이유로 이 방식으로 안내한다). */}
       <Script
         id="google-identity-services"
         src="https://accounts.google.com/gsi/client"
         strategy="afterInteractive"
-        onLoad={initialize}
+        onReady={initialize}
       />
       {/* 스크립트가 붙기 전에도 자리를 잡아 둔다 — 버튼이 뒤늦게 나타나며
           아래 문구를 밀어내리지 않게 한다. */}

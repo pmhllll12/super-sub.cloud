@@ -5,16 +5,37 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }))
 
-// next/script 는 실제 브라우저에서만 <script> 로드 이벤트를 쏘므로, jsdom
-// 에서는 커밋(마운트) 후 onLoad 를 호출하는 걸로 대체한다 — 렌더 도중에
-// 부르면 형제 요소의 ref 가 아직 안 붙어 있어(GoogleSignInButton 의
-// wrapperRef/googleContainerRef) 실제 순서와 달라진다. 우리가 검증할 대상은
-// "스크립트가 로드된 뒤 초기화/렌더가 일어나는가"이지 next/script 자체의
-// 로딩 동작이 아니다.
+// next/script 는 실제 브라우저에서만 <script> 로드 이벤트를 쏘므로 jsdom
+// 에서는 흉내낸다. 커밋(마운트) 후에 부른다 — 렌더 도중에 부르면 형제
+// 요소의 ref 가 아직 안 붙어 있어(GoogleSignInButton 의 wrapperRef/
+// googleContainerRef) 실제 순서와 달라진다.
+//
+// 🔴 **onLoad 는 첫 로드 때 한 번뿐이고, 재마운트 때는 onReady 만 온다.**
+// next/script 의 loadScript 는 이미 실은 스크립트(LoadCache)면 그대로
+// return 해서 onLoad 를 다시 부르지 않는다. 이 mock 이 예전에는 매 마운트
+// 마다 onLoad 를 불러서 실제와 달랐고, 그 때문에 "로그아웃하고 로그인
+// 화면으로 돌아오면 구글 버튼이 사라진다"는 버그를 테스트가 놓쳤다.
+const scriptLoadCache = new Set<string>()
+
 vi.mock('next/script', () => ({
-  default: function MockScript({ onLoad }: { onLoad?: () => void }) {
+  default: function MockScript({
+    id,
+    src,
+    onLoad,
+    onReady,
+  }: {
+    id?: string
+    src?: string
+    onLoad?: () => void
+    onReady?: () => void
+  }) {
     useEffect(() => {
-      onLoad?.()
+      const cacheKey = id ?? src ?? ''
+      if (!scriptLoadCache.has(cacheKey)) {
+        scriptLoadCache.add(cacheKey)
+        onLoad?.()
+      }
+      onReady?.()
       // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 시 1회만
     }, [])
     return null
@@ -25,6 +46,7 @@ describe('GoogleSignInButton', () => {
   afterEach(() => {
     vi.unstubAllEnvs()
     vi.resetModules()
+    scriptLoadCache.clear()
     delete (window as unknown as { google?: unknown }).google
   })
 
@@ -106,6 +128,37 @@ describe('GoogleSignInButton', () => {
     expect(container.querySelector('[aria-hidden="true"]')).toBeNull()
     const wrapper = container.querySelector('[data-testid="google-signin-wrapper"]') as HTMLElement
     expect(wrapper.children).toHaveLength(1)
+  })
+
+  // 🔴 회귀 방지 — 2026-08-30.
+  // 로그아웃하고 로그인 화면으로 돌아오면 구글 버튼이 사라져 있었다.
+  // 로그아웃은 router.refresh() 뿐이라 페이지가 새로 뜨지 않는다 —
+  // requireUser() 의 redirect('/login') 이 클라이언트 사이드 이동이라
+  // GSI 스크립트는 이미 실려 있고, next/script 는 그 경우 onLoad 를 다시
+  // 부르지 않는다(loadScript 가 LoadCache 를 보고 바로 return 한다).
+  // 그래서 재마운트에도 불리는 onReady 로 초기화해야 한다.
+  it('스크립트가 이미 실린 뒤 재마운트돼도(로그아웃 → 로그인 화면) 버튼을 다시 그린다', async () => {
+    vi.stubEnv('NEXT_PUBLIC_GOOGLE_CLIENT_ID', 'test-client-id.apps.googleusercontent.com')
+    const renderButton = vi.fn((parent: HTMLElement) => {
+      parent.appendChild(document.createElement('div'))
+    })
+    window.google = { accounts: { id: { initialize: vi.fn(), renderButton } } }
+
+    const { default: GoogleSignInButton } = await import('./GoogleSignInButton')
+
+    const first = render(<GoogleSignInButton onError={() => {}} />)
+    await waitFor(() => {
+      expect(renderButton).toHaveBeenCalledTimes(1)
+    })
+    first.unmount()
+
+    // 스크립트는 이미 실려 있다 — 이번 마운트에는 onLoad 가 오지 않는다.
+    const { container } = render(<GoogleSignInButton onError={() => {}} />)
+    await waitFor(() => {
+      expect(renderButton).toHaveBeenCalledTimes(2)
+    })
+    const wrapper = container.querySelector('[data-testid="google-signin-wrapper"]') as HTMLElement
+    expect(wrapper.querySelector('div')?.children.length).toBeGreaterThan(0)
   })
 
   it('카드 폭에 맞춰 구글 버튼 폭을 픽셀로 넘기고, 리사이즈되면 다시 그린다', async () => {
