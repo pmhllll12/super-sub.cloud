@@ -552,6 +552,22 @@ body {
 /* 이름 — 카드에서 가장 큰 글자. 참고 디자인의 굵은 압축 산세 자리다.
    한글이라 디스플레이 글꼴(라틴 전용)을 못 쓰므로 본문 글꼴을 가장
    굵게 쓰고 자간을 좁혀 한 덩어리로 보이게 한다. */
+/* 가운데 큰 별명 — 참고 디자인의 제목 자리. 워드마크 아래에서 시작해
+   인물(카드 세로 절반부터)과 살짝 겹친다. 인물보다 위(z)라 겹치는 부분은
+   글자가 이긴다 — 참고 디자인에서도 제목이 선수 앞에 있다.
+   크기는 카드 폭에 맨다(cqw, 안쪽 카드를 container 로 선언해 뒀다). */
+.ss-pcard-alias {
+  position: relative;
+  z-index: 2;
+  margin-top: 26px;
+  text-align: center;
+  font-size: clamp(1.75rem, 15cqw, 3.25rem);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 0.95;
+  color: var(--ss-pcard-fg);
+}
+
 /* 누끼 인물 — 카드 **아래 절반만** 차지한다(top: 50%). 사용자가 정한
    규칙이다: 카드 세로 가운데 위로는 넘어가지 않는다. 위쪽 절반은
    워드마크와 머리글의 자리다.
@@ -579,67 +595,13 @@ body {
   filter: grayscale(1) contrast(1.06);
 }
 
-/* 맨 아래 두 줄 — 위에 호칭 알약, 아래에 검은 막대 · 원형 배지.
-   사진 위에 놓인다. */
+/* 오른쪽 아래 원형 배지만 남는다 — 검은 막대와 형광 알약은 뺐다. */
 .ss-pcard-foot {
   position: relative;
   z-index: 2;
   margin-top: auto;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
-}
-
-.ss-pcard-foot-row {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  gap: 8px;
-}
-
-/* 참고 디자인 왼쪽의 검은 막대. 남는 폭을 먹어 알약을 오른쪽으로 민다. */
-.ss-pcard-bar {
-  height: 34px;
-  min-width: 40px;
-  flex: 1 1 auto;
-  border-radius: 6px;
-  background: var(--ss-pcard-fg);
-}
-
-.ss-pcard-empty {
-  border-radius: 999px;
-  background: var(--ss-accent);
-  padding: 8px 14px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--ss-pcard-fg);
-}
-
-.ss-pcard-titles {
-  display: flex;
-  flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 6px;
-}
-
-/* 호칭 알약 — 참고 디자인의 형광 알약. 받은 것만 오므로 미달 표식이 없다. */
-.ss-pcard-titles li {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  border-radius: 999px;
-  background: var(--ss-accent);
-  padding: 8px 14px;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  color: var(--ss-pcard-fg);
-}
-
-.ss-pcard-title-category {
-  font-size: 0.6875rem;
-  font-weight: 500;
-  opacity: 0.6;
 }
 
 /* 오른쪽 끝 원형 배지 — 참고 디자인의 공 아이콘 자리. */
