@@ -388,7 +388,7 @@ body {
    비슷해 보여서, 한 단 위로 띄워 종속돼 보이게 한다. */
 .ss-home-headline {
   font-size: calc(var(--ss-display-size) - 45px);
-  margin-top: -56px;
+  margin-top: -120px;
 }
 
 /* 오른쪽 짝(OWN / THE / PITCH) — 첫 줄이 왼쪽 헤드라인의 다음 줄
