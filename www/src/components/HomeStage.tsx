@@ -14,9 +14,8 @@ export type { Destination }
  * 홈 한 화면 — 배경 사진 위에 글자를 얹는 레퍼런스(Nile Travel) 배치다.
  *
  *   워드마크        영상분석 용병매칭 …        닉네임 로그아웃
- *   헤드라인(큰 글자)                          보조 문구
- *   정보 블록 3열
- *   SCROLL DOWN  소셜                          01~06 번호 목록
+ *   OWN THE / PITCH                     FIND / YOUR / SQUAD
+ *                                              01~05 번호 목록
  *
  * 예전에는 화면 아래에 카드 6장이 가로로 흐르는 캐러셀이 있었다. 카드가
  * 배경 사진을 절반 넘게 가려서, 목적지는 위쪽 **글자**로만 적고 카드는
@@ -31,16 +30,6 @@ export type { Destination }
  * 채우는 지금 배치에서는 읽는 내내 흔들려 어지러웠다 — 사용자 요청으로
  * 걷어냈다. 되살릴 거면 배경이나 사진 층에만 걸 것.
  */
-
-// 레퍼런스의 `Meeting Point / Price / Duration` 자리. 아직 없는 기능을
-// 있는 것처럼 적지 않는다 — 세 번째 칸은 준비 중인 목적지를 그대로 적는다.
-const INFO_BLOCKS = [
-  { heading: '시작하기', body: '영상 한 편이면 됩니다\n올린 뒤 기다리면 됩니다' },
-  { heading: '무엇이 나오나', body: '점수가 아니라 호칭입니다\n잘한 것에 이름을 붙입니다' },
-  { heading: '준비 중', body: '용병 매칭 · 내 팀\n레슨 · 상점 · 경기장 예약' },
-]
-
-const SOCIALS = ['FACEBOOK', 'INSTAGRAM', 'TIKTOK']
 
 export default function HomeStage({
   user,
@@ -132,30 +121,12 @@ export default function HomeStage({
             <span>SQUAD</span>
           </p>
         </div>
-
-        <dl className="ss-home-info">
-          {INFO_BLOCKS.map((b) => (
-            <div key={b.heading}>
-              <dt>{b.heading}</dt>
-              <dd>{b.body}</dd>
-            </div>
-          ))}
-        </dl>
       </div>
 
-      {/* 하단 줄 — 왼쪽(SCROLL DOWN · 소셜)과 오른쪽(번호 목록). */}
+      {/* 하단 줄 — 번호 목록만. 왼쪽에 있던 SCROLL DOWN · 소셜 링크는
+          지웠다: 이 화면은 스크롤되지 않아 SCROLL DOWN 이 참말이 아니었고,
+          소셜은 실제 계정이 없어 글자만 있었다. */}
       <div className="ss-home-footer">
-        <div className="ss-home-footer-left">
-          <span className="ss-home-scroll">
-            SCROLL DOWN <span aria-hidden="true">↓</span>
-          </span>
-          <ul className="ss-home-socials">
-            {SOCIALS.map((s) => (
-              <li key={s}>{s}</li>
-            ))}
-          </ul>
-        </div>
-
         <HomeIndexList destinations={destinations} active={active} onActivate={setActive} />
       </div>
     </>

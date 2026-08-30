@@ -77,14 +77,19 @@ describe('홈 화면 — /', () => {
     }
   })
 
-  it('레퍼런스처럼 헤드라인과 하단 글자를 적는다', () => {
+  it('마주 보는 큰 글자 두 덩어리를 적는다', () => {
     render(<HomeBody user={null} />)
     expect(screen.getByRole('heading', { name: 'OWN THE PITCH' })).toBeInTheDocument()
     // 오른쪽 짝 — 헤드라인과 같은 글꼴 · 같은 크기로 마주 본다.
     expect(screen.getByLabelText('FIND YOUR SQUAD')).toBeInTheDocument()
-    expect(screen.getByText(/SCROLL DOWN/)).toBeInTheDocument()
-    expect(screen.getByText('INSTAGRAM')).toBeInTheDocument()
-    expect(screen.getByText('시작하기')).toBeInTheDocument()
+  })
+
+  // 스크롤되지 않는 화면이라 SCROLL DOWN 이 참말이 아니었고, 소셜은 실제
+  // 계정이 없어 글자만 있었다 — 둘 다 지웠다.
+  it('SCROLL DOWN 과 소셜 글자를 두지 않는다', () => {
+    render(<HomeBody user={null} />)
+    expect(screen.queryByText(/SCROLL DOWN/)).toBeNull()
+    expect(screen.queryByText('INSTAGRAM')).toBeNull()
   })
 
   it('로그인 안 했으면 인사말 자리에 로그인 · 회원가입 버튼을 보여준다', () => {

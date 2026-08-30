@@ -430,29 +430,7 @@ body {
   margin-left: 1.2em;
 }
 
-/* 레퍼런스의 `Meeting Point / Price / Duration` 3열. */
-.ss-home-info {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 24px 48px;
-  max-width: 860px;
-}
-
-.ss-home-info dt {
-  font-size: 0.875rem;
-  font-weight: 700;
-  color: var(--ss-fg);
-}
-
-.ss-home-info dd {
-  margin-top: 6px;
-  white-space: pre-line;
-  font-size: 0.875rem;
-  line-height: 1.6;
-  color: color-mix(in srgb, var(--ss-fg) 70%, transparent);
-}
-
-/* 하단 줄 — 왼쪽(SCROLL DOWN · 소셜) 과 오른쪽(번호 목록). */
+/* 하단 줄 — 번호 목록만 오른쪽에 둔다. */
 .ss-home-footer {
   position: fixed;
   inset-inline: 0;
@@ -460,8 +438,7 @@ body {
   z-index: 20;
   display: flex;
   align-items: flex-end;
-  justify-content: space-between;
-  gap: 32px;
+  justify-content: flex-end;
   padding: var(--ss-home-content-pad);
   /* 글자만 있는 줄이라 가운데 빈 자리는 클릭을 통과시킨다 — 그 아래
      내비바가 있다. 실제 링크(번호 목록)에서만 되돌린다. */
@@ -470,24 +447,6 @@ body {
 
 .ss-home-footer a {
   pointer-events: auto;
-}
-
-.ss-home-footer-left {
-  display: flex;
-  align-items: center;
-  gap: 32px;
-}
-
-.ss-home-scroll,
-.ss-home-socials {
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  color: color-mix(in srgb, var(--ss-fg) 60%, transparent);
-}
-
-.ss-home-socials {
-  display: flex;
-  gap: 24px;
 }
 
 /* 우하단 번호 목록 — 레퍼런스의 투어 목록. 제목 ─── 번호. */
@@ -534,9 +493,5 @@ body {
 
   .ss-home-index {
     display: none;
-  }
-
-  .ss-home-footer-left {
-    gap: 20px;
   }
 }
