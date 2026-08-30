@@ -44,7 +44,8 @@ export default function PlayerCardView({ card }: { card: PublicPlayerCard }) {
         <PlayerCardBrush seed={card.public_slug} />
 
         <header className="ss-pcard-top">
-          <BrandMark size={22} />
+          {/* 바탕이 연두라 강조색(민트) 워드마크는 묻힌다 — 검게 찍는다. */}
+          <BrandMark size={22} color="var(--ss-pcard-fg)" />
           <p className="ss-pcard-kicker">PLAYER CARD</p>
         </header>
 
