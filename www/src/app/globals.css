@@ -62,10 +62,6 @@
      세로로 긴 카드(폭:높이 = 3:4 = 0.75)를 쓴다 — 210:280 이 정확히
      0.75 이고, 아이콘+제목+설명 2줄+안내문 1줄이 justify-center 로
      세로 가운데 모여도 위아래에 자연스러운 여백이 남는 높이다. */
-  /* 홈의 큰 영문 글자(OWN THE PITCH · FIND YOUR SQUAD) 색. 배경 사진과
-     같은 계열의 짙은 남색이라 흰 글자처럼 튀지 않고 사진에 잠긴다. */
-  --ss-display-fg: #263242;
-
   --ss-card-w: 210px;
   /* 홈 글자 nav 에서 글자 아래 떠오르는 작은 판의 폭 — 글자 한 칸보다
      넉넉하되 옆 글자를 다 덮지는 않는 크기. 높이는 내용에 맡긴다. */
@@ -356,17 +352,17 @@ body {
 /* 큰 스텐실 글자 — 왼쪽 헤드라인(OWN THE PITCH)과 오른쪽 짝
    (FIND YOUR SQUAD)이 **같은 글꼴 · 같은 크기**로 마주 본다. 크기를 한
    군데서만 정하려고 두 곳이 이 클래스를 같이 쓴다.
-   🔴 font-weight 를 주지 않는다: Chicle 은 굵기가 400 하나뿐인 장식
+   🔴 font-weight 를 주지 않는다: Bigshot One 은 굵기가 400 하나뿐인 장식
    글꼴이라 700 을 주면 브라우저가 가짜 굵게(synthetic bold)를 입혀 획만
    지저분해진다(워드마크 RubikGlitch 에서 똑같이 겪었다). */
 .ss-home-display {
-  font-family: var(--font-chicle), var(--font-rubik), system-ui, sans-serif;
+  font-family: var(--font-display), var(--font-rubik), system-ui, sans-serif;
   /* 1440px 기준 80px 이 되는 5.56vw. 좁은 화면에서 36px 아래로는 안
      내려가고, 넓어도 96px 을 넘지 않는다. */
   font-size: clamp(2.25rem, 5.56vw, 6rem);
   line-height: 1.16;
   letter-spacing: 0.01em;
-  color: var(--ss-display-fg);
+  color: var(--ss-fg);
 }
 
 /* 왼쪽 헤드라인. */
@@ -375,10 +371,11 @@ body {
      PITCH 의 왼쪽 변이 윗줄 THE 의 왼쪽 변과 자동으로 맞는다(눈대중
      여백 없이 layout 이 보장한다).
 
-     칸 사이는 낱말 사이 공백 몫이다. 처음엔 글꼴이 정한 space 폭을
-     그대로 줬는데(Chicle 은 0.13em) 이 크기에서는 OWN 과 THE 가 붙어
-     읽혔다 — 글자가 굵고 side bearing 이 좁은 글꼴이라 그렇다. 눈으로
-     떨어져 보이는 0.35em 으로 넓힌다. */
+     칸 사이는 낱말 사이 공백 몫이다. 글꼴이 정한 space 폭을 그대로
+     쓰면(Bigshot One 은 0.16em) 이 크기에서 OWN 과 THE 가 붙어 읽힌다 —
+     획이 굵고 side bearing 이 좁은 디스플레이 글꼴이라 그렇다. 눈으로
+     떨어져 보이는 0.35em 으로 넓혀 둔다. 글꼴을 바꿔도 이 값은 대체로
+     그대로 쓸 수 있다(글꼴의 space 폭에 매지 않았다). */
   display: grid;
   width: fit-content;
   grid-template-columns: auto auto;
