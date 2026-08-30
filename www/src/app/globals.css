@@ -383,11 +383,11 @@ body {
   color: var(--ss-fg);
 }
 
-/* 왼쪽 헤드라인 — 한 줄. 오른쪽 덩어리(계단 세 줄)보다 45px 작다.
+/* 왼쪽 헤드라인 — 한 줄. 오른쪽 덩어리(계단 세 줄)보다 60px 작다.
    위치도 위로 올린다 — 오른쪽 덩어리와 같은 줄에서 시작하면 무게가
    비슷해 보여서, 한 단 위로 띄워 종속돼 보이게 한다. */
 .ss-home-headline {
-  font-size: calc(var(--ss-display-size) - 45px);
+  font-size: calc(var(--ss-display-size) - 60px);
   margin-top: -120px;
   margin-left: 120px;
 }
