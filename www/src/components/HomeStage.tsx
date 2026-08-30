@@ -99,24 +99,12 @@ export default function HomeStage({
           두 화면이 한 목소리로 들리게. */}
       <div className="ss-home-stage" style={{ padding: 'var(--ss-home-content-pad)' }}>
         <div className="flex items-start justify-between gap-8">
-          {/* 왼쪽 — 두 줄짜리 그리드. 둘째 줄이 윗줄 **두 번째 낱말의 둘째
-              글자** 자리에서 시작한다(사용자 요청). 그래서 그 낱말을
-              첫 글자와 나머지로 쪼개 3열(FIND | Y | OUR)에 앉히고, 둘째
-              줄은 앞 두 칸을 비워 셋째 칸에 온다 — 눈대중 여백 없이
-              layout 이 자리를 맞춘다.
-
-              🔴 자리와 글자는 따로 논다. 좌우를 맞바꿀 때 덩어리째 옮기지
-              않고 **글자만** 옮겼다 — 각 자리의 짜임(왼쪽은 이 그리드,
-              오른쪽은 계단)은 그대로 두라는 요청이었다.
-
-              낱말이 각자 span 이라 사이에 공백 문자가 없다 — 그냥 두면
-              접근성 이름이 "FINDYOURSQUAD" 로 붙어 읽힌다. 이름을 따로 준다. */}
-          <h1 className="ss-home-display ss-home-headline" aria-label="FIND YOUR SQUAD">
-            <span className="ss-home-headline-first">FIND</span>
-            <span>Y</span>
-            <span>OUR</span>
-            <span className="ss-home-headline-second">SQUAD</span>
-          </h1>
+          {/* 왼쪽 — 한 줄. 한때 두 줄 그리드로 쪼개(FIND | Y | OUR /
+              SQUAD) 둘째 줄을 윗줄 둘째 글자에 맞췄는데, 한 줄로 바꾸면서
+              그 장치가 통째로 필요 없어졌다 — 낱말을 span 으로 쪼갤 이유도,
+              접근성 이름을 따로 줄 이유도 없다(그냥 글자 하나라 그대로
+              읽힌다). 크기는 오른쪽 덩어리보다 한참 작다(아래 CSS). */}
+          <h1 className="ss-home-display ss-home-headline">FIND YOUR SQUAD</h1>
 
           {/* 오른쪽 — 왼쪽과 같은 글꼴 · 같은 크기(ss-home-display)로 세 줄.
               줄이 내려갈수록 시작점이 조금씩 오른쪽으로 밀린다(계단).

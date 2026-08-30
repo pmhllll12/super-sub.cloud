@@ -383,35 +383,16 @@ body {
   color: var(--ss-fg);
 }
 
-/* 왼쪽 헤드라인 — 3열 그리드(OWN | T | HE)에 앉힌다. 둘째 줄 PITCH 를
-   셋째 칸에 두면 P 의 왼쪽 변이 윗줄 H 의 왼쪽 변과 자동으로 맞는다
-   (사용자 요청, 눈대중 여백 없이 layout 이 보장한다). 그래서 THE 가
-   T 와 HE 로 쪼개져 있다.
-
-   칸 사이(column-gap)를 쓰지 않는다 — T 와 HE 사이는 한 낱말 안이라
-   붙어야 하고 OWN 과 T 사이만 벌어져야 하는데, gap 은 모든 칸에 똑같이
-   먹기 때문이다. 낱말 사이는 첫 칸의 오른쪽 여백으로 준다. */
+/* 왼쪽 헤드라인 — 한 줄. 오른쪽 덩어리(계단 세 줄)보다 45px 작다.
+   위치도 위로 올린다 — 오른쪽 덩어리와 같은 줄에서 시작하면 무게가
+   비슷해 보여서, 한 단 위로 띄워 종속돼 보이게 한다. */
 .ss-home-headline {
-  display: grid;
-  width: fit-content;
-  grid-template-columns: auto auto auto;
+  font-size: calc(var(--ss-display-size) - 45px);
+  margin-top: -56px;
 }
 
-/* 낱말 사이 공백 몫. 글꼴이 정한 space 폭을 그대로 쓰면(Abril Fatface 는
-   0.18em) 이 크기에서 OWN 과 THE 가 붙어 읽힌다 — 획이 굵고 side bearing
-   이 좁은 디스플레이 글꼴이라 그렇다. 눈으로 떨어져 보이는 0.35em 으로
-   넓혀 둔다(글꼴의 space 폭에 매지 않아 글꼴을 바꿔도 그대로 쓴다). */
-.ss-home-headline-first {
-  margin-right: 0.35em;
-}
-
-/* 둘째 줄 — 앞 두 칸을 비우고 셋째 칸(HE 가 있는 칸)에 앉는다. */
-.ss-home-headline-second {
-  grid-column: 3;
-}
-
-/* 오른쪽 짝(FIND / YOUR / SQUAD) — FIND 가 왼쪽 헤드라인의 둘째 줄
-   (PITCH)과 같은 높이에서 시작하도록 덩어리째 **정확히 한 줄** 내린다
+/* 오른쪽 짝(OWN / THE / PITCH) — 첫 줄이 왼쪽 헤드라인의 다음 줄
+   높이에서 시작하도록 덩어리째 **정확히 한 줄** 내린다
    (사용자 요청). 한 줄 = 글자 크기 × 줄 간격이라 --ss-display-lh 를
    그대로 곱한다 — 줄 간격을 고치면 이 내림도 같이 따라온다.
 
