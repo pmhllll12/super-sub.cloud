@@ -352,11 +352,11 @@ body {
 /* 큰 스텐실 글자 — 왼쪽 헤드라인(OWN THE PITCH)과 오른쪽 짝
    (FIND YOUR SQUAD)이 **같은 글꼴 · 같은 크기**로 마주 본다. 크기를 한
    군데서만 정하려고 두 곳이 이 클래스를 같이 쓴다.
-   🔴 font-weight 를 주지 않는다: Plaster 는 굵기가 400 하나뿐인 장식
+   🔴 font-weight 를 주지 않는다: Chicle 은 굵기가 400 하나뿐인 장식
    글꼴이라 700 을 주면 브라우저가 가짜 굵게(synthetic bold)를 입혀 획만
    지저분해진다(워드마크 RubikGlitch 에서 똑같이 겪었다). */
 .ss-home-display {
-  font-family: var(--font-plaster), var(--font-rubik), system-ui, sans-serif;
+  font-family: var(--font-chicle), var(--font-rubik), system-ui, sans-serif;
   /* 레퍼런스에서 잰 크기(8.3vw ≈ 1440px 에서 120px)는 너무 컸다 —
      사용자 요청으로 1440px 기준 70px 이 되는 4.86vw 로 줄인다.
      좁은 화면에서 32px 아래로는 안 내려가고, 넓어도 80px 을 넘지 않는다. */
@@ -371,12 +371,13 @@ body {
   /* 낱말 셋(OWN | THE / _ | PITCH)을 2열 그리드에 앉힌다 — 둘째 줄
      PITCH 의 왼쪽 변이 윗줄 THE 의 왼쪽 변과 자동으로 맞는다(눈대중
      여백 없이 layout 이 보장한다). 칸 사이는 낱말 사이 공백 몫이라
-     Plaster 의 space 폭을 그대로 준다 — canvas 로 재 보니 0.5em 이다
-     (advance 기준: 'OWN THE' 와 'OWNTHE' 의 폭 차이). */
+     쓰는 글꼴의 space 폭을 그대로 준다 — canvas 로 재면 Chicle 은
+     0.13em 이다(advance 기준: 'OWN THE' 와 'OWNTHE' 의 폭 차이).
+     글꼴을 바꾸면 이 값도 다시 재야 한다 — Plaster 때는 0.5em 이었다. */
   display: grid;
   width: fit-content;
   grid-template-columns: auto auto;
-  column-gap: 0.5em;
+  column-gap: 0.13em;
 }
 
 /* 둘째 줄 — 첫 칸을 비우고 둘째 칸(THE 가 있던 칸)에 앉는다. */
