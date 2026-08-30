@@ -630,7 +630,10 @@ body {
    축소한다(transform). 그러면 안쪽 여백 · 글자 · 붓자국이 전부 같은
    비율로 작아진다. */
 .ss-pcard-mini {
-  --ss-pcard-mini-w: 92;
+  /* 🔴 --ss-pcard-mini-w 를 여기서 **선언하지 않는다.** 선언해 두면
+     조상이 준 값(예: 스쿼드 판의 62)을 자기 값이 덮어써서, 바깥에서
+     크기를 줄여도 카드가 그대로 남는다 — 실제로 그렇게 안 줄어들었다.
+     쓰는 자리마다 기본값 92 를 곁들여 읽는다. */
   --ss-pcard-base-w: 380;
   /* 🔴 자식을 흐름에서 뺀다(아래 position: absolute). transform 은 그리는
      크기만 줄이고 **배치 크기는 원래대로 남긴다** — 흐름에 두면 부모가
@@ -638,7 +641,7 @@ body {
      실측으로 확인했다: 빼기 전 부모 높이 519px, 뺀 뒤 126px. */
   position: relative;
   display: block;
-  width: calc(var(--ss-pcard-mini-w) * 1px);
+  width: calc(var(--ss-pcard-mini-w, 92) * 1px);
   aspect-ratio: 3 / 4.1;
   transition: transform 200ms ease;
 }
@@ -657,7 +660,7 @@ body {
   left: 0;
   width: calc(var(--ss-pcard-base-w) * 1px);
   max-width: none;
-  transform: scale(calc(var(--ss-pcard-mini-w) / var(--ss-pcard-base-w)));
+  transform: scale(calc(var(--ss-pcard-mini-w, 92) / var(--ss-pcard-base-w)));
   transform-origin: top left;
 }
 
@@ -711,103 +714,131 @@ body {
    놓는다(실측 1440px: 코 끝 x=615 → 가운데 307). 안쪽 글자에 margin 을
    주면 판이 따라오지 않아 둘이 어긋난다. */
 .ss-home-left {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+  position: relative;
   margin-top: -120px;
   margin-left: 120px;
 }
 
-/* 스쿼드 판 — 배경 인물과 겹치지 않도록 폭을 못박는다. */
+/* 스쿼드 판 — 판 하나 위에 카드를 포지션 자리대로 앉힌다(축구 게임의
+   스쿼드 화면처럼). 한 줄로 늘어놓으면 누가 어느 자리인지 안 읽힌다.
+
+   카드 폭은 --ss-pcard-mini-w 가 정한다 — 헤더의 작은 카드와 같은 방식
+   (제 크기로 그린 뒤 통째로 줄인다). 세 칸이 배경 인물과 안 겹치는
+   크기로 잡았다. */
 .ss-squad {
-  width: 340px;
-  padding: 20px;
+  --ss-pcard-mini-w: 62;
+  /* 🔴 흐름에서 뺀다. 판이 세로로 길어지면 왼쪽 덩어리가 통째로 커지고,
+     화면 가운데 정렬(.ss-home-stage) 때문에 **헤드라인이 위로 밀린다.**
+     판을 헤드라인 아래에 매달아 두면 헤드라인 자리는 제 높이로만
+     정해진다 — 판을 키우거나 줄여도 위 글자가 안 움직인다. */
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 18px;
+  width: max-content;
+  padding: 14px 16px 16px;
 }
 
 .ss-squad-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
+  gap: 16px;
   margin-bottom: 14px;
 }
 
 .ss-squad-head h2 {
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.14em;
   color: var(--ss-fg);
 }
 
 .ss-squad-head p {
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
+  font-size: 0.6875rem;
   color: color-mix(in srgb, var(--ss-fg) 55%, transparent);
 }
 
-.ss-squad-list {
+/* 포메이션 — 위가 공격, 아래가 골키퍼다. 가운데 열에 FW · MF · GK 가
+   서고 수비 둘이 양옆으로 벌어진다. */
+.ss-squad-board {
+  display: grid;
+  grid-template-areas:
+    '.  fw .'
+    '.  mf .'
+    'dl .  dr'
+    '.  gk .';
+  /* 가로를 넉넉히 벌린다 — 세로로만 길면 판이 기둥처럼 보이고 포메이션
+     으로 안 읽힌다. 세로 간격은 반대로 좁혀 키를 줄인다. */
+  column-gap: 64px;
+  row-gap: 6px;
+  justify-items: center;
+}
+
+.ss-squad-seat {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-
-.ss-squad-list li {
-  display: flex;
   align-items: center;
-  gap: 10px;
-  border-radius: 12px;
-  padding: 8px 10px;
-  background: color-mix(in srgb, var(--ss-fg) 5%, transparent);
+  gap: 4px;
 }
 
-/* 자리 이름(GK · DF …) — 글자 수가 달라도 칸이 흔들리지 않게 폭을 준다. */
-.ss-squad-slot {
-  width: 28px;
-  flex: none;
-  font-size: 0.6875rem;
+.ss-squad-pos {
+  font-size: 0.625rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  color: var(--ss-accent);
+  letter-spacing: 0.1em;
+  color: color-mix(in srgb, var(--ss-fg) 55%, transparent);
 }
 
-.ss-squad-name {
+/* 빈 카드의 가운데 — 머리글 아래 남는 자리를 다 쓴다. */
+.ss-squad-seat-body {
+  position: relative;
+  z-index: 2;
+  display: flex;
   flex: 1 1 auto;
-  font-size: 0.875rem;
-  color: var(--ss-fg);
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
 }
 
-.ss-squad-add {
-  flex: 1 1 auto;
-  text-align: left;
-  font-size: 0.8125rem;
-  color: color-mix(in srgb, var(--ss-fg) 45%, transparent);
+.ss-squad-plus {
+  font-size: 44px;
+  line-height: 1;
+  font-weight: 300;
+  color: color-mix(in srgb, var(--ss-pcard-fg) 45%, transparent);
   transition: color 160ms ease;
 }
 
-.ss-squad-add:hover,
-.ss-squad-add:focus-visible {
-  color: var(--ss-fg);
+.ss-squad-plus:hover,
+.ss-squad-plus:focus-visible {
+  color: var(--ss-pcard-fg);
 }
 
-/* 입력칸 — 줄 안에서 바로 고친다. 별도 창을 띄우면 다섯 칸을 채우는
-   동안 화면이 계속 열렸다 닫힌다. */
+/* 넣은 선수 이름 — 카드 가운데. 누르면 뺀다. */
+.ss-squad-name {
+  padding: 0 8px;
+  font-family: var(--font-card), var(--font-rubik), system-ui, serif;
+  font-size: 20px;
+  line-height: 1.05;
+  text-align: center;
+  color: var(--ss-pcard-fg);
+  overflow-wrap: anywhere;
+}
+
 .ss-squad-input {
-  flex: 1 1 auto;
+  width: 100%;
   min-width: 0;
-  border-bottom: 1px solid var(--ss-accent);
+  border-bottom: 1px solid var(--ss-pcard-fg);
   background: transparent;
-  font-size: 0.875rem;
-  color: var(--ss-fg);
+  text-align: center;
+  font-size: 15px;
+  color: var(--ss-pcard-fg);
   outline: none;
 }
 
-.ss-squad-remove {
-  flex: none;
-  font-size: 18px;
-  color: color-mix(in srgb, var(--ss-fg) 45%, transparent);
-  transition: color 160ms ease;
-}
-
-.ss-squad-remove:hover,
-.ss-squad-remove:focus-visible {
-  color: var(--ss-fg);
+.ss-squad-note {
+  padding: 0 8px;
+  text-align: center;
+  font-size: 10px;
+  line-height: 1.3;
+  color: color-mix(in srgb, var(--ss-pcard-fg) 55%, transparent);
 }

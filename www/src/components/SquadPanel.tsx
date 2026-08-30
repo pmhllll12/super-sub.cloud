@@ -1,100 +1,135 @@
 'use client'
 
 import { useState } from 'react'
+import type { PublicPlayerCard } from '@/server/backend'
+import PlayerCardView from '@/components/PlayerCardView'
 import GlassPanel from '@/components/ui/GlassPanel'
+import BrandMark from '@/components/ui/BrandMark'
 
 /**
- * 홈 첫 화면의 스쿼드 판 — 풋살 5인을 채워 넣는 자리다.
+ * 홈 첫 화면의 스쿼드 판 — 판 하나 위에 선수 카드를 **포지션 자리대로**
+ * 앉힌다(참고: 축구 게임의 스쿼드 화면). 한 줄로 늘어놓지 않는 이유가
+ * 그것이다 — 누가 어느 자리인지가 배치로 읽혀야 한다.
+ *
+ * 풋살 5인: FW · MF · DF 둘 · GK. 내 카드는 가운데(MF)에 놓는다.
+ * 나머지 넷은 빈 카드 — 같은 틀 · 같은 머리글(SUPERSUB · PLAYER CARD)에
+ * 가운데 + 만 있다. 눌러 보기 전에 무슨 자리인지 알 수 있어야 해서다.
  *
  * ⚠️ **아직 서버에 저장하지 않는다.** 계약(api-contract.md)에 스쿼드를
  * 만들거나 사람을 넣는 엔드포인트가 없다 — `GET /me` 의 `teams` 는 이미
- * 소속된 팀을 읽기만 하는 값이다. 그래서 지금은 이 컴포넌트의 상태로만
- * 들고 있고 새로고침하면 사라진다. 백엔드가 생기면 아래 setSquad 를
- * 부르는 자리 셋(추가 · 지우기)을 API 호출로 바꾸면 된다.
- *
- * 브라우저에 저장(localStorage)하지 않은 것도 일부러다 — 서버가 붙는
- * 순간 상태가 두 곳에 생겨 어느 쪽이 진짜인지 헷갈린다.
+ * 소속된 팀을 읽기만 하는 값이다. 지금은 이 컴포넌트의 상태로만 들고
+ * 있고 새로고침하면 사라진다. 백엔드가 생기면 setMates 를 부르는 자리
+ * 둘(넣기 · 빼기)을 API 호출로 바꾸면 된다. 브라우저 저장도 일부러 안
+ * 넣었다 — 서버가 붙는 순간 상태가 두 곳에 생겨 어느 쪽이 진짜인지
+ * 헷갈린다.
  */
 
-// 풋살 5인의 자리. 이름은 고정이고 사람만 채운다 — 자리를 사용자가
-// 정하게 하면 5인 스쿼드라는 성격이 흐려진다.
-const SLOTS = ['GK', 'DF', 'DF', 'MF', 'FW'] as const
+/** 판 위의 자리. `area` 는 globals.css 의 grid-template-areas 이름이다. */
+type Slot = { area: string; label: string; mine?: boolean }
 
-export default function SquadPanel() {
-  const [squad, setSquad] = useState<(string | null)[]>(() => SLOTS.map(() => null))
-  // 지금 이름을 입력받고 있는 칸. null 이면 입력 중인 칸이 없다.
-  const [editing, setEditing] = useState<number | null>(null)
+const SLOTS: Slot[] = [
+  { area: 'fw', label: 'FW' },
+  { area: 'mf', label: 'MF', mine: true },
+  { area: 'dl', label: 'DF' },
+  { area: 'dr', label: 'DF' },
+  { area: 'gk', label: 'GK' },
+]
+
+export default function SquadPanel({ card }: { card?: PublicPlayerCard | null }) {
+  const [mates, setMates] = useState<Record<string, string | null>>({})
+  const [editing, setEditing] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
 
-  function commit(i: number) {
+  function commit(area: string) {
     const name = draft.trim()
-    if (name) setSquad((prev) => prev.map((v, n) => (n === i ? name : v)))
+    if (name) setMates((prev) => ({ ...prev, [area]: name }))
     setEditing(null)
     setDraft('')
   }
-
-  const filled = squad.filter(Boolean).length
 
   return (
     <GlassPanel className="ss-squad">
       <header className="ss-squad-head">
         <h2>MY SQUAD</h2>
-        <p>
-          {filled} / {SLOTS.length}
-        </p>
+        <p>풋살 5인</p>
       </header>
 
-      <ul className="ss-squad-list">
-        {SLOTS.map((slot, i) => {
-          const name = squad[i]
+      <div className="ss-squad-board">
+        {SLOTS.map((slot) => {
+          const name = mates[slot.area] ?? null
           return (
-            <li key={i}>
-              <span className="ss-squad-slot">{slot}</span>
-
-              {editing === i ? (
-                <input
-                  autoFocus
-                  aria-label={`${slot} 선수 이름`}
-                  className="ss-squad-input"
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onBlur={() => commit(i)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') commit(i)
-                    if (e.key === 'Escape') {
-                      setEditing(null)
-                      setDraft('')
-                    }
-                  }}
-                />
-              ) : name ? (
-                <>
-                  <span className="ss-squad-name">{name}</span>
-                  <button
-                    type="button"
-                    aria-label={`${name} 빼기`}
-                    className="ss-squad-remove material-symbols-outlined"
-                    onClick={() => setSquad((prev) => prev.map((v, n) => (n === i ? null : v)))}
-                  >
-                    close
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  className="ss-squad-add"
-                  onClick={() => {
-                    setEditing(i)
-                    setDraft('')
-                  }}
-                >
-                  + 선수 추가
-                </button>
-              )}
-            </li>
+            <div key={slot.area} className="ss-squad-seat" style={{ gridArea: slot.area }}>
+              <div className="ss-pcard-mini">
+                {slot.mine && card ? (
+                  <PlayerCardView card={card} />
+                ) : (
+                  <SquadCardFrame>
+                    {slot.mine ? (
+                      <p className="ss-squad-note">아직 카드가 없습니다</p>
+                    ) : editing === slot.area ? (
+                      <input
+                        autoFocus
+                        aria-label={`${slot.label} 선수 이름`}
+                        className="ss-squad-input"
+                        value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        onBlur={() => commit(slot.area)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commit(slot.area)
+                          if (e.key === 'Escape') {
+                            setEditing(null)
+                            setDraft('')
+                          }
+                        }}
+                      />
+                    ) : name ? (
+                      <button
+                        type="button"
+                        aria-label={`${name} 빼기`}
+                        className="ss-squad-name"
+                        onClick={() => setMates((prev) => ({ ...prev, [slot.area]: null }))}
+                      >
+                        {name}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        aria-label={`${slot.label} 자리에 선수 넣기`}
+                        className="ss-squad-plus"
+                        onClick={() => {
+                          setEditing(slot.area)
+                          setDraft('')
+                        }}
+                      >
+                        +
+                      </button>
+                    )}
+                  </SquadCardFrame>
+                )}
+              </div>
+              <span className="ss-squad-pos">{slot.label}</span>
+            </div>
           )
         })}
-      </ul>
+      </div>
     </GlassPanel>
+  )
+}
+
+/**
+ * 빈 카드의 틀. 선수 카드와 **같은 클래스**를 쓴다 — 따로 만들면 카드
+ * 모양을 바꿀 때 두 벌이 따로 늙는다. 가운데 자리만 비워서 넘겨받는다.
+ */
+function SquadCardFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <article className="ss-pcard">
+      <div className="ss-pcard-inner">
+        <header className="ss-pcard-top">
+          <BrandMark size={22} color="var(--ss-pcard-fg)" />
+          <p className="ss-pcard-kicker">PLAYER CARD</p>
+        </header>
+        <div className="ss-squad-seat-body">{children}</div>
+      </div>
+    </article>
   )
 }

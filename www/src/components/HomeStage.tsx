@@ -110,7 +110,7 @@ export default function HomeStage({
               margin 을 주면 판이 따라오지 않는다. */}
           <div className="ss-home-left">
             <h1 className="ss-home-display ss-home-headline">FIND YOUR SQUAD</h1>
-            <SquadPanel />
+            <SquadPanel card={card} />
           </div>
 
           {/* 오른쪽 — 왼쪽과 같은 글꼴 · 같은 크기(ss-home-display)로 세 줄.

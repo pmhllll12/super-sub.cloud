@@ -22,7 +22,8 @@ const TITLES = ['영상 분석', '용병 매칭', '내 팀', '레슨 · 상점',
 describe('홈 화면 — /', () => {
   it('워드마크와 목적지 글자를 적는다', () => {
     render(<HomeBody user={null} />)
-    expect(screen.getByText('SUPERSUB')).toBeInTheDocument()
+    // 워드마크는 헤더 · 헤더의 작은 카드 · 스쿼드 판의 빈 카드에 각각 있다.
+    expect(screen.getAllByText('SUPERSUB').length).toBeGreaterThan(0)
     for (const t of TITLES) {
       expect(screen.getByRole('button', { name: t })).toBeInTheDocument()
     }
@@ -65,7 +66,8 @@ describe('홈 화면 — /', () => {
     expect(link).toHaveAttribute('href', '/me')
     // 헤더에 들어간 것이 선수 카드 그 자체여야 한다 — 따로 만든 축소판이 아니다.
     expect(link.querySelector('.ss-pcard')).not.toBeNull()
-    expect(screen.getByText('THREE LUNGS')).toBeInTheDocument()
+    // 같은 카드가 스쿼드 판 가운데에도 있으므로 헤더 것만 집는다.
+    expect(link.querySelector('.ss-pcard-alias')?.textContent).toBe('THREE LUNGS')
   })
 
   // 카드만 있으면 눌러 보기 전엔 어디로 가는지 알 수 없다.
