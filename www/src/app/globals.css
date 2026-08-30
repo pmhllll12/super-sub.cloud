@@ -510,9 +510,18 @@ body {
      흑백 인물을 얹는다. 흰 바탕일 때보다 자국과 인물이 또렷하게 뜬다. */
   --ss-pcard-bg: #91ea92;
   --ss-pcard-fg: #0b0b0b;
+  /* 카드가 제 크기로 그려질 때의 폭(px 단위 없는 수). 줄인 사본은 이
+     폭으로 그린 뒤 transform 으로 축소한다 — 안쪽 글자까지 통째로 같은
+     비율로 작아져야 해서다. 폭만 줄이면 워드마크·머리글이 제 크기로
+     남아 짜임이 깨진다. */
+  --ss-pcard-base-w: 380;
 
   width: 100%;
-  max-width: 380px;
+  max-width: calc(var(--ss-pcard-base-w) * 1px);
+  /* 바깥 비율을 여기서 못박는다 — 작게 줄인 사본(.ss-pcard-mini)이 이
+     값에 기대어 자리를 잡는다. 안쪽에만 비율을 주면 바깥 높이가 테두리
+     두께에 따라 달라져서, 줄인 사본이 조용히 어긋난다. */
+  aspect-ratio: 3 / 4.1;
   /* 바깥 검은 테두리. 안쪽 카드보다 모서리를 더 크게 둥글려야 두 겹이
      같은 두께로 보인다(안쪽 반지름 + 테두리 두께). */
   border-radius: 34px;
@@ -523,7 +532,7 @@ body {
 .ss-pcard-inner {
   position: relative;
   display: flex;
-  aspect-ratio: 3 / 4.2;
+  height: 100%;
   flex-direction: column;
   overflow: hidden;
   border-radius: 20px;
@@ -619,4 +628,40 @@ body {
   object-fit: cover;
   object-position: top center;
   filter: grayscale(1) contrast(1.06);
+}
+
+/* 작게 줄인 카드 — 홈 헤더에서 닉네임 자리를 대신한다. 폭만 줄이면 안쪽
+   글자 크기가 그대로 남아 짜임이 깨지므로, 제 크기로 그린 뒤 통째로
+   축소한다(transform). 그러면 안쪽 여백 · 글자 · 붓자국이 전부 같은
+   비율로 작아진다. */
+.ss-pcard-mini {
+  --ss-pcard-mini-w: 92;
+  --ss-pcard-base-w: 380;
+  /* 🔴 자식을 흐름에서 뺀다(아래 position: absolute). transform 은 그리는
+     크기만 줄이고 **배치 크기는 원래대로 남긴다** — 흐름에 두면 부모가
+     줄기 전 크기(380×519)에 맞춰 늘어나서 aspect-ratio 가 무시된다.
+     실측으로 확인했다: 빼기 전 부모 높이 519px, 뺀 뒤 126px. */
+  position: relative;
+  display: block;
+  width: calc(var(--ss-pcard-mini-w) * 1px);
+  aspect-ratio: 3 / 4.1;
+  transition: transform 200ms ease;
+}
+
+.ss-pcard-mini:hover,
+.ss-pcard-mini:focus-visible {
+  transform: translateY(-2px);
+}
+
+/* transform 으로 줄인 요소는 **줄기 전 크기로 자리를 차지한다** — 그래서
+   바깥 상자(.ss-pcard-mini)가 줄어든 크기를 따로 들고 있어야 헤더가
+   밀리지 않는다. 왼쪽 위를 기준으로 줄여 두 상자의 좌상단을 맞춘다. */
+.ss-pcard-mini > .ss-pcard {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(var(--ss-pcard-base-w) * 1px);
+  max-width: none;
+  transform: scale(calc(var(--ss-pcard-mini-w) / var(--ss-pcard-base-w)));
+  transform-origin: top left;
 }

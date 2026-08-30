@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { PlayerCard } from '@/server/backend'
 import { HomeBody } from './page'
 
 // LogoutButton 이 useRouter 를 쓴다.
@@ -8,6 +9,14 @@ vi.mock('next/navigation', () => ({
 }))
 
 // '내 프로필'은 이 줄에 없다 — 우상단 닉네임이 그 자리다.
+const CARD: PlayerCard = {
+  id: 'c1',
+  public_slug: 'hong-gildong-4f2a',
+  og_image_key: 'cards/7b4d.png',
+  user: { id: 'u1', nickname: '홍길동' },
+  titles: [],
+}
+
 const TITLES = ['영상 분석', '용병 매칭', '내 팀', '레슨 · 상점', '경기장 예약']
 
 describe('홈 화면 — /', () => {
@@ -44,9 +53,19 @@ describe('홈 화면 — /', () => {
     expect(screen.queryByRole('button', { name: '내 프로필' })).toBeNull()
   })
 
-  it('닉네임이 곧 내 프로필 링크다', () => {
+  // 카드가 아직 없는 사람에게는 닉네임 글자가 그 자리를 대신한다.
+  it('카드가 없으면 닉네임이 곧 내 프로필 링크다', () => {
     render(<HomeBody user={{ nickname: '홍길동' }} />)
     expect(screen.getByRole('link', { name: '홍길동' })).toHaveAttribute('href', '/me')
+  })
+
+  it('카드가 있으면 그 카드를 눌러 프로필로 간다', () => {
+    render(<HomeBody user={{ nickname: '홍길동' }} card={CARD} />)
+    const link = screen.getByRole('link', { name: '홍길동 프로필' })
+    expect(link).toHaveAttribute('href', '/me')
+    // 헤더에 들어간 것이 선수 카드 그 자체여야 한다 — 따로 만든 축소판이 아니다.
+    expect(link.querySelector('.ss-pcard')).not.toBeNull()
+    expect(screen.getByText('THREE LUNGS')).toBeInTheDocument()
   })
 
   it('아직 갈 곳이 없는 목적지는 카드에 준비 중이라고 적는다', async () => {

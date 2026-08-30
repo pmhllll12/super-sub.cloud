@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
+import type { PublicPlayerCard } from '@/server/backend'
+import PlayerCardView from '@/components/PlayerCardView'
 import BrandMark from '@/components/ui/BrandMark'
 import FigureBackground from '@/components/FigureBackground'
 import HomeIndexList from '@/components/HomeIndexList'
@@ -33,9 +35,12 @@ export type { Destination }
 
 export default function HomeStage({
   user,
+  card,
   destinations,
 }: {
   user: { nickname: string } | null
+  /** 로그인한 사람의 선수 카드. 아직 카드가 없으면 null 이다. */
+  card?: PublicPlayerCard | null
   destinations: Destination[]
 }) {
   const [active, setActive] = useState<string | null>(null)
@@ -64,17 +69,24 @@ export default function HomeStage({
         </div>
 
         {user ? (
-          <div className="flex shrink-0 items-center gap-1">
-            {/* 닉네임이 곧 '내 프로필'이다 — 목적지 글자 줄에 같은 항목을
-                또 두지 않는다(사용자 요청). 자기 이름을 눌러 자기 화면으로
-                가는 건 어디서나 하는 동작이라 따로 설명이 필요 없다. */}
-            <Link
-              href="/me"
-              className={`${HEADER_LINK_CLASS} ${HEADER_LINK_HOVER_CLASS}`}
-              style={{ color: 'var(--ss-fg)' }}
-            >
-              {user.nickname}
-            </Link>
+          <div className="flex shrink-0 items-start gap-3">
+            {/* '내 프로필' 자리다 — 목적지 글자 줄에 같은 항목을 또 두지
+                않는다(사용자 요청). 카드가 있으면 그 카드를 작게 줄여
+                보여주고, 없으면 닉네임 글자로 대신한다. 어느 쪽이든
+                누르면 /me 로 간다. */}
+            {card ? (
+              <Link href="/me" aria-label={`${user.nickname} 프로필`} className="ss-pcard-mini">
+                <PlayerCardView card={card} />
+              </Link>
+            ) : (
+              <Link
+                href="/me"
+                className={`${HEADER_LINK_CLASS} ${HEADER_LINK_HOVER_CLASS}`}
+                style={{ color: 'var(--ss-fg)' }}
+              >
+                {user.nickname}
+              </Link>
+            )}
             <LogoutButton />
           </div>
         ) : (

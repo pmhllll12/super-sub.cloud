@@ -1,5 +1,8 @@
-import { type User } from '@/server/backend'
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
+import { BackendError, getBackend, type PlayerCard, type User } from '@/server/backend'
 import { requireUser } from '@/server/currentUser'
+import { SESSION_COOKIE } from '@/server/session'
 import HomeStage from '@/components/HomeStage'
 import { type Destination } from '@/components/HomeNav'
 
@@ -54,12 +57,14 @@ const DESTINATIONS: Destination[] = [
  * `max-w-[1120px]` 로 가운데 폭을 좁히지 않는다 — 헤더 · 하단 줄을
  * `HomeStage` 가 `position: fixed` 로 화면 전체 기준으로 배치한다.
  */
-export function HomeBody({ user }: { user: Pick<User, 'nickname'> | null }) {
-  return (
-    <>
-      <HomeStage user={user} destinations={DESTINATIONS} />
-    </>
-  )
+export function HomeBody({
+  user,
+  card = null,
+}: {
+  user: Pick<User, 'nickname'> | null
+  card?: PlayerCard | null
+}) {
+  return <HomeStage user={user} card={card} destinations={DESTINATIONS} />
 }
 
 // `/` 가 곧 홈이다 — 앱처럼 홈이 하나뿐이다(공개 랜딩과 로그인 후 런처로
@@ -74,5 +79,19 @@ export function HomeBody({ user }: { user: Pick<User, 'nickname'> | null }) {
 // 갈리는 마크업은 테스트가 직접 렌더해 검증한다.
 export default async function Home() {
   const user: User = await requireUser()
-  return <HomeBody user={user} />
+
+  // 헤더의 프로필 자리에 선수 카드를 작게 보여준다 — /me 와 같은 카드다.
+  // 카드가 아직 없는 것은 정상이라 화면 안에서 닉네임 글자로 대신한다.
+  const token = (await cookies()).get(SESSION_COOKIE)?.value
+  let card: PlayerCard | null = null
+  if (token) {
+    try {
+      card = await getBackend().getMyCard(token)
+    } catch (e) {
+      if (e instanceof BackendError && e.status === 401) redirect('/login')
+      if (!(e instanceof BackendError && e.code === 'CARD_NOT_FOUND')) throw e
+    }
+  }
+
+  return <HomeBody user={user} card={card} />
 }
