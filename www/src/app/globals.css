@@ -440,7 +440,13 @@ body {
    곱해야 한다 — 그래서 1em 이 아니라 (1em - 19px) 처럼 그 줄의 실제
    크기를 다시 적는다. 글꼴이나 문구가 바뀌면 다시 재야 한다. */
 .ss-home-subhead > span:nth-child(2) {
-  margin-left: calc(0.723 * (var(--ss-display-size) - 19px));
+  /* 계산상 자리에서 4px 만 왼쪽으로(사용자 요청) — 눈으로 보면 T 가 W
+     보다 아주 살짝 오른쪽으로 보인다.
+
+     ⚠️ 이 4px 때문에 H 가 아랫줄 P 보다 3.6px 왼쪽에 선다. **알고 두는
+     것이다** — PITCH 는 옮기지 않기로 했다. 정렬을 되살리려고 아랫줄에
+     같은 -4px 를 더하지 말 것. */
+  margin-left: calc(0.723 * (var(--ss-display-size) - 19px) - 4px);
 }
 
 .ss-home-subhead > span:nth-child(3) {
@@ -458,6 +464,8 @@ body {
    기준 크기는 --ss-display-size 다. */
 .ss-home-subhead > span:nth-child(1) {
   font-size: calc(var(--ss-display-size) - 19px);
+  /* 첫 줄도 4px 왼쪽으로(사용자 요청). 아래 두 줄은 건드리지 않았다. */
+  margin-left: -4px;
 }
 
 .ss-home-subhead > span:nth-child(2) {
