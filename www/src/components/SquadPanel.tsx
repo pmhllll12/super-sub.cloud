@@ -117,13 +117,13 @@ export default function SquadPanel({ card }: { card?: PublicPlayerCard | null })
                       <button
                         type="button"
                         aria-label={`${slot.label} 자리에 선수 넣기`}
-                        className="ss-squad-plus"
+                        className="ss-squad-plus material-symbols-outlined"
                         onClick={() => {
                           setEditing(slot.area)
                           setDraft('')
                         }}
                       >
-                        +
+                        add
                       </button>
                     )}
                   </SquadCardFrame>

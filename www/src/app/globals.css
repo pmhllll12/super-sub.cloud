@@ -844,17 +844,21 @@ body {
   min-height: 0;
 }
 
+/* 빈 자리의 + — Material Symbols 의 add. 가변 글꼴이라 축으로 굵기 ·
+   채움 · 광학 크기를 준다: 채움 없음(FILL 0), 가장 굵게(wght 700),
+   광학 크기 24. 카드 가운데를 크게 채워야 "여기 누르면 된다"가 바로
+   읽힌다. */
 .ss-squad-plus {
-  font-size: 44px;
+  font-size: 120px;
   line-height: 1;
-  font-weight: 300;
-  color: color-mix(in srgb, var(--ss-pcard-fg) 45%, transparent);
-  transition: color 160ms ease;
+  font-variation-settings: 'FILL' 0, 'wght' 700, 'GRAD' 0, 'opsz' 24;
+  /* 카드 글자와 같은 완전한 검정 — 옅게 두면 빈 자리가 흐릿해 보인다. */
+  color: var(--ss-pcard-fg);
 }
 
 .ss-squad-plus:hover,
 .ss-squad-plus:focus-visible {
-  color: var(--ss-pcard-fg);
+  opacity: 0.6;
 }
 
 /* 넣은 선수 이름 — 카드 가운데. 누르면 뺀다. */
