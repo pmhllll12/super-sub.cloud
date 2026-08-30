@@ -80,13 +80,12 @@
      비율을 유지한다. */
   --ss-card-stagger: 56px;
 
-  /* 화면 전체를 덮는 유리판(홈 캐러셀 전용, .ss-frame). 뷰포트 가장자리에서
-     10px 띄우고 그 안쪽 전부를 로그인 카드와 같은 유리 재질로 채운다.
-     내용(워드마크·인사말·카드)은 이 판 위에 놓이지만, 그래도 판의 둥근
-     모서리 안쪽에 여유를 두고 배치해야 시각적으로 답답하지 않다 —
-     --ss-frame-content-pad 가 그 안전 여백이다. */
-  --ss-frame-inset: 10px;
-  --ss-frame-content-pad: 48px;
+  /* 홈(캐러셀 화면)의 내용이 뷰포트 가장자리에서 떨어지는 여백 —
+     워드마크·인사말(헤더)과 카드 캐러셀이 같은 값을 쓴다.
+     한때 이 자리에 화면 전체를 덮는 유리판(.ss-frame)이 있었고 이 값은
+     그 판 안쪽의 안전 여백이었다. 판은 걷어냈지만(배경 사진을 가렸다)
+     내용을 가장자리에서 들이는 역할은 그대로 필요해 값은 남긴다. */
+  --ss-home-content-pad: 48px;
 }
 
 /* Field 컴포넌트 — 라벨/힌트/포커스 테두리는 전부 --ss-fg 의 불투명도 변형이다 (흰색 리터럴 금지) */
@@ -278,32 +277,3 @@ body {
   transform: translateY(var(--ss-card-offset, 0px));
 }
 
-/* 화면 전체를 덮는 유리판 — 로그인 카드와 같은 재질(반투명 배경 +
-   backdrop-filter 흐림+채도 + 옅은 하이라이트 + 테두리)을 뷰포트
-   가장자리에서 10px 띈 자리에 통째로 채워 두른다("로그인 창처럼 투명한
-   글래스 판을 전체 창이랑 10px 만 거리두고 전체 덮어줘" — 처음엔 이걸
-   테두리(가운데를 mask 로 뚫은 링)로 잘못 읽어서 고쳤다).
-   배경 사진을 이 판이 흐리게 만드는 게 의도다(유리를 통해 보이는 느낌)
-   — 다만 --ss-glass-blur/saturate 는 카드에도 쓰는 값 그대로라 인물
-   실루엣은 여전히 알아볼 수 있을 만큼만 흐려진다.
-   층 순서는 배경 사진(z:-1) → 이 판(z:0) → 헤더·카드(z:10~20) 다:
-   판이 카드보다 위에 있으면 카드를 덮어 버리므로 z-index 를 낮게 잡고,
-   pointer-events: none 으로 클릭도 그 아래(카드·버튼)까지 그대로
-   통과시킨다. */
-.ss-frame {
-  position: fixed;
-  inset: var(--ss-frame-inset);
-  z-index: 0;
-  pointer-events: none;
-  border-radius: var(--ss-radius-sheet);
-  background:
-    linear-gradient(to bottom, color-mix(in srgb, var(--ss-fg) 8%, transparent), transparent 60%),
-    var(--ss-glass-bg);
-  /* backdrop-filter 는 인라인 style 로 준다 — HomeParallax.tsx 의 코멘트 참고. */
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ss-fg) 14%, transparent);
-  /* 뷰포트 대부분을 덮는 큰 backdrop-filter 라, 승격 없이는 헤더·카드가
-     시차로 매 프레임 transform 을 바꿀 때마다 이 블러를 다시 계산해
-     프레임이 크게 떨어졌다(실측 약 43fps → translateZ(0) 뒤 약 168fps).
-     GPU 레이어로 승격해 한 번만 계산하고 캐시하게 한다. */
-  transform: translateZ(0);
-}

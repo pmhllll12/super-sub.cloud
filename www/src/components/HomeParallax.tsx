@@ -69,12 +69,12 @@ export default function HomeParallax({
       <FigureBackground />
 
       {/* 헤더 — 워드마크 좌상단, 인사말 우상단. 화면에 고정해 캐러셀이
-          가로로 얼마나 흐르든 그 자리에 그대로 있는다. 글래스 테두리
-          판(--ss-frame-*) 두께 + 여백만큼 안쪽으로 들여야 판에 안 가린다. */}
+          가로로 얼마나 흐르든 그 자리에 그대로 있는다. 뷰포트 가장자리에
+          붙지 않도록 --ss-home-content-pad 만큼 안쪽으로 들인다. */}
       <div
         ref={midRef}
         className="fixed inset-x-0 top-0 z-20 flex items-start justify-between"
-        style={{ padding: 'var(--ss-frame-content-pad)', willChange: 'transform' }}
+        style={{ padding: 'var(--ss-home-content-pad)', willChange: 'transform' }}
       >
         <BrandMark size={26} />
         {user ? (
@@ -98,21 +98,18 @@ export default function HomeParallax({
 
       {/* 카드 캐러셀 — 화면 아래쪽에 깔고, 가로로 흐른다(6장 한 벌, 양
           끝에서 멈춤). 위쪽은 지금은 비워 둔다(참고 디자인처럼 나중에
-          소개 문구가 들어갈 자리). z-10 으로 아래 유리판(.ss-frame,
-          z:0)보다 위에 그려야 카드가 판에 덮이지 않는다. 좌우 padding 은
-          유리판 안쪽 여백과 같은 값(--ss-frame-content-pad)을 써서,
-          캐러셀 자신의 스크롤 뷰포트가 판 안쪽에서만 시작·끝나게 한다 —
-          카드가 이 뷰포트 밖으로는 애초에 그려지지 않으니(overflow-x:
-          auto 가 자신의 박스 기준으로 자른다) 판 밖으로 삐져나갈 수
-          없다. 아래쪽 여백은 판에 안 가리도록 최소 확보하고, 로그인
-          상태면 하단 내비바(FloatingNavBar, 실측 높이 80px)에도 안
-          가리게 그만큼 더 띄운다. */}
+          소개 문구가 들어갈 자리). 좌우 padding(--ss-home-content-pad)은
+          캐러셀 자신의 스크롤 뷰포트를 그만큼 안쪽에서 시작·끝나게 한다 —
+          카드가 이 뷰포트 밖으로는 애초에 그려지지 않는다(overflow-x:
+          auto 가 자신의 박스 기준으로 자른다). 로그인 상태면 하단
+          내비바(FloatingNavBar, 실측 높이 80px)에 안 가리게 아래쪽을
+          그만큼 더 띄운다. */}
       <div
         className="relative z-10 flex min-h-screen w-full items-end"
         style={{
-          paddingBottom: user ? 'calc(var(--ss-frame-content-pad) + 80px)' : 'var(--ss-frame-content-pad)',
-          paddingLeft: 'var(--ss-frame-content-pad)',
-          paddingRight: 'var(--ss-frame-content-pad)',
+          paddingBottom: user ? 'calc(var(--ss-home-content-pad) + 80px)' : 'var(--ss-home-content-pad)',
+          paddingLeft: 'var(--ss-home-content-pad)',
+          paddingRight: 'var(--ss-home-content-pad)',
         }}
       >
         <div ref={frontRef} className="ss-carousel w-full" style={{ willChange: 'transform' }}>
@@ -142,25 +139,6 @@ export default function HomeParallax({
           </div>
         </div>
       </div>
-
-      {/* 화면 전체를 덮는 유리판 — 로그인 카드와 같은 재질로 배경 사진 위,
-          헤더·카드 아래(z-index, .ss-frame)에 깐다. 클릭을 막으면 안
-          되므로 pointer-events: none(CSS). 장식일 뿐이라 스크린리더에서
-          숨긴다. backdrop-filter 는 여기 인라인 style 로 준다 —
-          globals.css 클래스에 두면 Lightning CSS 가 color-mix() 지원
-          여부에 따라 규칙을 @supports 로 쪼개는 과정에서(다른
-          color-mix 쓰는 선언과 한 규칙에 있었더니) 표준 backdrop-filter
-          선언이 통째로 날아가는 걸 실측(curl 로 받은 실제 CSS 확인)으로
-          발견했다 — GlassPanel(카드) 도 이미 이 값을 인라인으로 준다,
-          같은 이유. */}
-      <div
-        aria-hidden="true"
-        className="ss-frame"
-        style={{
-          backdropFilter: 'blur(var(--ss-glass-blur)) saturate(var(--ss-glass-saturate))',
-          WebkitBackdropFilter: 'blur(var(--ss-glass-blur)) saturate(var(--ss-glass-saturate))',
-        }}
-      />
     </>
   )
 }
