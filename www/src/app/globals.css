@@ -849,7 +849,9 @@ body {
   height: 100%;
   fill: none;
   stroke: var(--ss-fg);
-  stroke-width: 0.6;
+  /* non-scaling-stroke 라 이 값이 그대로 화면 픽셀이다 — viewBox 배율에
+     안 눌린다. 흰색으로 바꾸고 나니 0.6 도 굵어 보여 0.5 로 내렸다. */
+  stroke-width: 0.5;
   vector-effect: non-scaling-stroke;
   pointer-events: none;
 }
