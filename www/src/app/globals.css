@@ -393,7 +393,7 @@ body {
      translateX(-50%)로 이 글자를 그 선에 맞춘다 — 글자 폭을 몰라도 되고
      문구가 바뀌어도 따라온다. 값의 유래는 .ss-squad 주석 참고. */
   width: max-content;
-  margin-left: calc(max(-120px, 21.333vw - 412px) + 244px);
+  margin-left: calc(max(-120px, 21.333vw - 423px) + 255px);
   transform: translateX(-50%);
 }
 
@@ -721,7 +721,7 @@ body {
    주면 판이 따라오지 않아 둘이 어긋난다. */
 .ss-home-left {
   position: relative;
-  margin-top: -120px;
+  margin-top: -150px;
   margin-left: 120px;
 }
 
@@ -732,7 +732,7 @@ body {
    (제 크기로 그린 뒤 통째로 줄인다). 세 칸이 배경 인물과 안 겹치는
    크기로 잡았다. */
 .ss-squad {
-  --ss-pcard-mini-w: 88;
+  --ss-pcard-mini-w: 94;
   /* 🔴 흐름에서 뺀다. 판이 세로로 길어지면 왼쪽 덩어리가 통째로 커지고,
      화면 가운데 정렬(.ss-home-stage) 때문에 **헤드라인이 위로 밀린다.**
      판을 헤드라인 아래에 매달아 두면 헤드라인 자리는 제 높이로만
@@ -747,11 +747,11 @@ body {
      1700 · 1920)에서 재 보니 **늘 화면 폭의 42.67%** 였다. 그 절반이
      목표 가운데(21.333vw)다.
 
-     여기서 빼는 412px = 판 폭의 절반(244) + 이 판을 담은 상자의 x(168,
+     여기서 빼는 423px = 판 폭의 절반(255) + 이 판을 담은 상자의 x(168,
      화면 여백 48 + 왼쪽 덩어리 margin 120). max() 는 아주 좁은 화면에서
      판이 화면 밖으로 나가지 않게 막는 바닥이다(-120px 이면 판 왼쪽이
      화면 여백선인 48px 에 선다). */
-  left: max(-120px, calc(21.333vw - 412px));
+  left: max(-120px, calc(21.333vw - 423px));
   margin-top: 18px;
   width: max-content;
   padding: 14px 16px 16px;
@@ -781,8 +781,12 @@ body {
 
 /* 포메이션 — 위가 공격, 아래가 골키퍼다. 가운데 열에 FW · MF · GK 가
    서고 수비 둘이 양옆으로 벌어진다. */
+/* 경기장 선은 이 상자를 꽉 채우고(.ss-squad-pitch, inset 0) 카드는 그
+   안쪽에 놓여야 한다 — 여백이 없으면 맨 위 카드와 맨 아래 이름표가 선을
+   물고 나간다. 아래를 더 두는 것은 이름표가 카드 밑에 붙기 때문이다. */
 .ss-squad-board {
   position: relative;
+  padding: 16px 18px 8px;
   display: grid;
   /* 1-2-1 — 위가 공격이다: FW 하나, MF 둘, DF 하나, GK. */
   grid-template-areas:
@@ -792,7 +796,7 @@ body {
     '.  gk .';
   /* 가로를 넉넉히 벌린다 — 세로로만 길면 판이 기둥처럼 보이고 포메이션
      으로 안 읽힌다. 세로 간격은 반대로 좁혀 키를 줄인다. */
-  column-gap: 96px;
+  column-gap: 80px;
   row-gap: 6px;
   justify-items: center;
 }
