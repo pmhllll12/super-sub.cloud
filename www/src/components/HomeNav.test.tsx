@@ -132,6 +132,17 @@ describe('홈 글자 내비 — 상단', () => {
     expect(onActivate).toHaveBeenCalledWith('용병 매칭')
   })
 
+  // 레퍼런스처럼 오른쪽 끝부터 차례로 나타난다 — 맨 오른쪽이 0번.
+  it('등장 순번을 오른쪽 끝부터 매긴다', () => {
+    const { container } = setup()
+    const items = [...container.querySelectorAll('.ss-home-nav-list > li')]
+    expect(items).toHaveLength(DESTINATIONS.length)
+    expect(items.map((li) => (li as HTMLElement).style.getPropertyValue('--ss-nav-i'))).toEqual([
+      '1',
+      '0',
+    ])
+  })
+
   it('부모가 정한 현재 항목을 강조한다', () => {
     setup({ active: '용병 매칭' })
     expect(screen.getByRole('button', { name: '용병 매칭' })).toHaveAttribute('data-active', 'true')

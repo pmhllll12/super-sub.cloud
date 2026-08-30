@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import DestinationCard from './DestinationCard'
 
 export type Destination = {
@@ -102,14 +102,18 @@ export default function HomeNav({
 
   return (
     <nav ref={navRef} aria-label="목적지">
-      <ul className="flex flex-wrap items-center justify-end gap-x-6 gap-y-2">
-        {destinations.map((d) => {
+      <ul className="ss-home-nav-list">
+        {destinations.map((d, i) => {
           const open = shown === d.title
           const closing = !open && exiting === d.title
           return (
             <li
               key={d.title}
               className="relative"
+              // 화면에 들어올 때 **오른쪽 끝부터** 차례로 나타난다 — 맨
+              // 오른쪽이 0번, 왼쪽으로 갈수록 늦다. globals.css 가 이
+              // 순번(--ss-nav-i)에 계단 간격을 곱해 지연으로 쓴다.
+              style={{ '--ss-nav-i': destinations.length - 1 - i } as CSSProperties}
               onMouseEnter={() => show(d.title)}
               onMouseLeave={() => show(null)}
               // 포커스가 이 항목(글자 + 떠오른 카드) 밖으로 나갈 때만 닫는다 —
