@@ -1,52 +1,7 @@
-import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
-import { BackendError, getBackend, type PlayerCard, type User } from '@/server/backend'
-import { requireUser } from '@/server/currentUser'
-import { SESSION_COOKIE } from '@/server/session'
+import { type PlayerCard, type User } from '@/server/backend'
+import { getMyCardOrNull, requireUser } from '@/server/currentUser'
 import HomeStage from '@/components/HomeStage'
-import { type Destination } from '@/components/HomeNav'
-
-// 홈 상단 글자 내비에 적히는 목적지. 앱(flutter/.../home_screen.dart)의
-// _kDestinations 에서 출발했지만 2026-08-30 에 웹에서 다시 골랐다:
-//   - '내 선수 카드'를 '내 프로필'에 합쳤다(카드는 이제 /me 안에 있다)
-//   - '레슨 · 코치'를 '레슨 · 상점'으로
-//   - '경기장 예약'을 새로 넣었다
-//   - 그리고 '내 프로필'을 이 줄에서 뺐다 — 우상단 **닉네임**이 그 자리다
-//     (`HomeStage`). 같은 곳으로 가는 항목을 한 화면에 둘 두지 않는다.
-//
-// href 가 있는 '영상 분석'은 requireUser() 에 걸리는 로그인 전용 화면이다 —
-// authRequired: true 로 표시해 두면 로그인 안 한 사람에게 카드가 "로그인이
-// 필요합니다"를 미리 보여준다(링크는 살려 둔다). 나머지는 아직 갈 곳이
-// 없어 카드에 "준비 중입니다"가 뜬다.
-const DESTINATIONS: Destination[] = [
-  {
-    title: '영상 분석',
-    icon: 'videocam',
-    summary: '경기 영상을 올리면\n실력 리포트가 나옵니다',
-    href: '/analysis',
-    authRequired: true,
-  },
-  {
-    title: '용병 매칭',
-    icon: 'sports_soccer',
-    summary: '경기를 찾고\n지원 현황을 봅니다',
-  },
-  {
-    title: '내 팀',
-    icon: 'groups',
-    summary: '팀원과 스쿼드를\n관리합니다',
-  },
-  {
-    title: '레슨 · 상점',
-    icon: 'storefront',
-    summary: '제휴 코치와 장비를\n한자리에서',
-  },
-  {
-    title: '경기장 예약',
-    icon: 'stadium',
-    summary: '가까운 구장을 찾고\n시간을 잡습니다',
-  },
-]
+import { DEFAULT_FEATURED, DESTINATIONS, FEATURED } from '@/lib/destinations'
 
 /**
  * 마크업만 따로 뺀 것 — `Home` 이 서버 컴포넌트로 쿠키 · 백엔드를 부르게
@@ -64,7 +19,15 @@ export function HomeBody({
   user: Pick<User, 'nickname'> | null
   card?: PlayerCard | null
 }) {
-  return <HomeStage user={user} card={card} destinations={DESTINATIONS} />
+  return (
+    <HomeStage
+      user={user}
+      card={card}
+      destinations={DESTINATIONS}
+      featured={FEATURED}
+      defaultActive={DEFAULT_FEATURED}
+    />
+  )
 }
 
 // `/` 가 곧 홈이다 — 앱처럼 홈이 하나뿐이다(공개 랜딩과 로그인 후 런처로
@@ -80,18 +43,9 @@ export function HomeBody({
 export default async function Home() {
   const user: User = await requireUser()
 
-  // 헤더의 프로필 자리에 선수 카드를 작게 보여준다 — /me 와 같은 카드다.
+  // 헤더의 프로필 자리와 스쿼드 판 가운데가 같은 카드를 쓴다 — /me 와도 같다.
   // 카드가 아직 없는 것은 정상이라 화면 안에서 닉네임 글자로 대신한다.
-  const token = (await cookies()).get(SESSION_COOKIE)?.value
-  let card: PlayerCard | null = null
-  if (token) {
-    try {
-      card = await getBackend().getMyCard(token)
-    } catch (e) {
-      if (e instanceof BackendError && e.status === 401) redirect('/login')
-      if (!(e instanceof BackendError && e.code === 'CARD_NOT_FOUND')) throw e
-    }
-  }
+  const card = await getMyCardOrNull()
 
   return <HomeBody user={user} card={card} />
 }

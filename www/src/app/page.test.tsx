@@ -6,6 +6,9 @@ import { HomeBody } from './page'
 // LogoutButton 이 useRouter 를 쓴다.
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn() }),
+  // 등장 애니메이션이 "이번에 인트로가 도는가"를 경로로 판단한다
+  // (`useIntroDone`). 테스트에서는 이미 본 것으로 쳐 바로 들어오게 둔다.
+  usePathname: () => '/',
 }))
 
 // '내 프로필'은 이 줄에 없다 — 우상단 닉네임이 그 자리다.
@@ -17,7 +20,9 @@ const CARD: PlayerCard = {
   titles: [],
 }
 
-const TITLES = ['영상 분석', '용병 매칭', '내 팀', '레슨 · 상점', '경기장 예약']
+// 상단 글자 줄 셋 + 헤드라인 자리의 알약 둘. 알약으로 옮기면서 이름도
+// '용병 매칭'→'용병 찾기', '내 팀'→'팀 찾기' 로 바꿨다.
+const TITLES = ['영상 분석', '레슨 · 상점', '경기장 예약', '용병 찾기', '팀 찾기', '지인 찾기']
 
 describe('홈 화면 — /', () => {
   it('워드마크와 목적지 글자를 적는다', () => {
@@ -76,11 +81,15 @@ describe('홈 화면 — /', () => {
     expect(screen.getByText('내 프로필')).toBeInTheDocument()
   })
 
-  it('아직 갈 곳이 없는 목적지는 카드에 준비 중이라고 적는다', async () => {
+  // 🔴 '준비 중입니다' 는 안 적는다(사용자 요청) — 개발 진행 상태는 화면이
+  // 할 말이 아니다. 갈 곳이 없으면 **링크가 아닌 것**으로 이미 드러난다.
+  it('아직 갈 곳이 없는 목적지는 카드가 링크가 아니다', async () => {
     const user = userEvent.setup()
     render(<HomeBody user={{ nickname: '홍길동' }} />)
     await user.hover(screen.getByRole('button', { name: '경기장 예약' }))
-    expect(screen.getByText('준비 중입니다')).toBeInTheDocument()
+    expect(screen.getByText(/가까운 구장을 찾고/)).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /가까운 구장을 찾고/ })).toBeNull()
+    expect(screen.queryByText('준비 중입니다')).toBeNull()
   })
 
   it('로그인 안 했으면 로그인 전용 목적지 카드에 안내를 붙이되 링크는 살아 있다', async () => {
@@ -122,8 +131,12 @@ describe('홈 화면 — /', () => {
   })
 
   // 하단 내비바는 없앴다 — 목적지가 상단 글자 줄에 이미 다 있다.
-  it('하단 내비바가 없다', () => {
+  // 홈으로 가는 링크는 헤더의 워드마크 하나뿐이다(모든 화면이 같이 쓰는
+  // SiteHeader). 둘 이상이면 내비바가 되살아났다는 뜻이다.
+  it('하단 내비바가 없다 — 홈 링크는 워드마크 하나뿐이다', () => {
     render(<HomeBody user={{ nickname: '홍길동' }} />)
-    expect(screen.queryByRole('link', { name: '홈' })).toBeNull()
+    const home = screen.getAllByRole('link', { name: '홈' })
+    expect(home).toHaveLength(1)
+    expect(home[0].textContent).toContain('SUPERSUB')
   })
 })
