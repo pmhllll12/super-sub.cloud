@@ -41,3 +41,30 @@ export type PlayerCard = {
 
 /** GET /cards/{slug} — 공개용. id 가 없다. */
 export type PublicPlayerCard = Omit<PlayerCard, 'id'>
+
+/** GET /admin/users 목록 항목. */
+export type AdminUser = {
+  id: string
+  email: string
+  nickname: string
+  created_at: string
+}
+
+export type AdminUserListResult = {
+  items: AdminUser[]
+  total: number
+  page: number
+  size: number
+}
+
+/** `Team` 과 달리 나간 소속도 포함하므로 `left_at` 을 갖는다. */
+export type AdminMembership = Team & { left_at: string | null }
+
+export type AdminUserDetail = {
+  id: string
+  email: string
+  nickname: string
+  created_at: string
+  teams: AdminMembership[]
+  has_card: boolean
+}

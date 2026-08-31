@@ -1,6 +1,14 @@
 import { BackendError } from './errors'
 import type { Backend } from './gateway'
-import type { AuthToken, PlayerCard, PublicPlayerCard, SignupResult, User } from './types'
+import type {
+  AdminUser,
+  AdminUserDetail,
+  AuthToken,
+  PlayerCard,
+  PublicPlayerCard,
+  SignupResult,
+  User,
+} from './types'
 
 const DEMO_EMAIL = 'demo@super-sub.example'
 const DEMO_PASSWORD = 'supersub2026'
@@ -60,6 +68,18 @@ const card: PlayerCard = {
 function requireUser(token: string): User {
   const u = users.get(token)
   if (!u) throw new BackendError(401, 'INVALID_TOKEN', '다시 로그인해 주세요.')
+  return u
+}
+
+/**
+ * 실제 백엔드는 `ADMIN_EMAILS` 화이트리스트로 관리자를 가른다(계약 문서 3-2절).
+ * mock 에는 그 목록이 없으므로 **데모 계정만 관리자로 취급한다.**
+ */
+function requireAdmin(token: string): User {
+  const u = requireUser(token)
+  if (u.email !== DEMO_EMAIL) {
+    throw new BackendError(403, 'FORBIDDEN', '관리자만 접근할 수 있습니다.')
+  }
   return u
 }
 
@@ -128,5 +148,45 @@ export const mockBackend: Backend = {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- 의도적으로 버리는 필드
     const { id: _id, ...rest } = card
     return rest as PublicPlayerCard
+  },
+
+  async listUsers(token, { q, page = 1, size = 20 }) {
+    requireAdmin(token)
+    let all = [...users.values()]
+    if (q) {
+      const needle = q.toLowerCase()
+      all = all.filter(
+        (u) => u.email.toLowerCase().includes(needle) || u.nickname.toLowerCase().includes(needle),
+      )
+    }
+    const total = all.length
+    const start = (page - 1) * size
+    const items: AdminUser[] = all
+      .slice(start, start + size)
+      .map(({ id, email, nickname, created_at }) => ({ id, email, nickname, created_at }))
+    return { items, total, page, size }
+  },
+
+  async getUserDetail(token, userId) {
+    requireAdmin(token)
+    const u = [...users.values()].find((u) => u.id === userId)
+    if (!u) throw new BackendError(404, 'USER_NOT_FOUND', '회원을 찾을 수 없습니다.')
+    const detail: AdminUserDetail = {
+      id: u.id,
+      email: u.email,
+      nickname: u.nickname,
+      created_at: u.created_at,
+      // mock 은 나간 소속을 따로 기억하지 않는다 — 지금 소속만 left_at: null 로 보여준다.
+      teams: u.teams.map((t) => ({ ...t, left_at: null })),
+      has_card: u.email === DEMO_EMAIL,
+    }
+    return detail
+  },
+
+  async forceDeleteUser(token, userId) {
+    requireAdmin(token)
+    const entry = [...users.entries()].find(([, u]) => u.id === userId)
+    if (!entry) throw new BackendError(404, 'USER_NOT_FOUND', '회원을 찾을 수 없습니다.')
+    users.delete(entry[0])
   },
 }

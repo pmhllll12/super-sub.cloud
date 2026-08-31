@@ -1,4 +1,12 @@
-import type { AuthToken, PlayerCard, PublicPlayerCard, SignupResult, User } from './types'
+import type {
+  AdminUserDetail,
+  AdminUserListResult,
+  AuthToken,
+  PlayerCard,
+  PublicPlayerCard,
+  SignupResult,
+  User,
+} from './types'
 
 /**
  * FastAPI 와의 유일한 접점. Route Handler 만 이걸 쓴다.
@@ -12,4 +20,11 @@ export interface Backend {
   updateMe(token: string, input: { nickname: string }): Promise<User>
   getMyCard(token: string): Promise<PlayerCard>
   getPublicCard(slug: string): Promise<PublicPlayerCard>
+  /** 관리자 전용. 관리자가 아니면 403 FORBIDDEN 이 던져진다. */
+  listUsers(
+    token: string,
+    params: { q?: string; page?: number; size?: number },
+  ): Promise<AdminUserListResult>
+  getUserDetail(token: string, userId: string): Promise<AdminUserDetail>
+  forceDeleteUser(token: string, userId: string): Promise<void>
 }
