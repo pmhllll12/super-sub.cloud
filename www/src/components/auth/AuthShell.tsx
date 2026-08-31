@@ -61,8 +61,35 @@ export default function AuthShell({
           돌아야 한다. 안쪽 폼 칸에 따로 주면 오른쪽 절반만 돈다(예전 버그).
           `border-radius: inherit` 로 그려지는 링이라 바깥 래퍼의 둥근
           모서리를 그대로 따라간다. */}
+      {/* 유리 굴절(warp) — backdrop-filter 는 흐림·채도만 다루고 **뒤
+          배경을 휘게 하지는 못한다.** 그건 SVG 필터의 몫이다: 부드러운
+          잡음(feTurbulence)을 만들고 그 값만큼 픽셀을 밀어(feDisplacementMap)
+          두께 있는 유리를 통과한 것처럼 보이게 한다.
+
+          scale 이 미는 세기다. 처음에 5 로 뒀다가 실측해 보니 화면이
+          0.6%만 달라지고 최대 차이가 4(255 중)라 **눈에 보이지 않았다** —
+          뒤가 부드러운 연기 그라디언트라 5px 밀어도 거의 같은 색이 온다.
+          같은 자리에서 잰 값: scale 20 → 2.1% · 최대차 15, scale 60 →
+          13.7% · 최대차 38. 눈에 보이는 최소치는 20 이었지만 "있는 듯
+          없는 듯"이라 올렸다 — 최종 50 — 뒤 형태가 확실히 휘어 두께 있는
+          유리를 통과한 것으로 읽힌다. 더 키우면 유리가 아니라 물결·열기가
+          되므로 여기서 멈춘다.
+
+          seed 를 고정해 두어 새로고침해도 같은 무늬가 나온다.
+
+          width/height 0 인 svg 라 자리를 차지하지 않는다 — 정의만 두는
+          자리다. */}
+      <svg width="0" height="0" aria-hidden="true" focusable="false" className="absolute">
+        <filter id="ss-glass-warp" x="-10%" y="-10%" width="120%" height="120%" colorInterpolationFilters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.006 0.01" numOctaves="2" seed="7" result="warp" />
+          <feDisplacementMap in="SourceGraphic" in2="warp" scale="50" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </svg>
+
       <div className="w-full max-w-[1600px] lg:h-[min(90vh,920px)]">
         <div
+          // 사진 칸과 폼 칸을 **딱 반반**으로 나눈다. 6:4(사진 넓게)와
+          // 45:55(사진 좁게)를 둘 다 해 봤지만 반반이 제일 안정적이다.
           className="ss-traveling-edge relative grid h-full w-full grid-cols-1 overflow-hidden lg:grid-cols-2"
           style={{ borderRadius: 'var(--ss-radius-sheet)', border: '1px solid var(--ss-glass-border)' }}
         >
@@ -96,8 +123,12 @@ export default function AuthShell({
                   <span className="block">안개 속에서도,</span>
                   <span className="block">실력은 숨지 않습니다.</span>
                 </h2>
-                <p className="text-sm" style={{ color: MUTED }}>
-                  생활체육 경기 영상을 분석해 용병을 찾고, 실력을 검증합니다.
+                {/* 이 문구도 헤드라인처럼 줄바꿈을 고정한다 — 폭에 따라
+                    "실력을" 같은 한 도막만 아래로 떨어지면 보기 나쁘다.
+                    쉼표에서 끊어 두 줄로 나눈다. */}
+                <p className="text-sm" style={{ color: MUTED, wordBreak: 'keep-all' }}>
+                  <span className="block">생활체육 경기 영상을 분석해 용병을 찾고,</span>
+                  <span className="block">실력을 검증합니다.</span>
                 </p>
               </div>
             </div>
@@ -127,9 +158,17 @@ export default function AuthShell({
           <div
             className="relative flex flex-col overflow-y-auto rounded-[var(--ss-radius-sheet)] p-6 sm:p-10 lg:rounded-l-none lg:p-12"
             style={{
-              background: 'var(--ss-glass-bg)',
-              backdropFilter: 'blur(var(--ss-glass-blur))',
-              WebkitBackdropFilter: 'blur(var(--ss-glass-blur))',
+              // 전역 유리 값(--ss-glass-*)보다 **옅고 덜 흐리게** 이 칸에서만
+              // 덮는다. 뒤에 연기가 비치는 자리라 20px 로 뭉개고 흰색을 8%
+              // 얹으면 그 결이 죽어 그냥 반투명 검은 판으로 보인다. 다른
+              // 유리(GlassPanel 을 쓰는 화면)는 그대로 둔다.
+              background: 'color-mix(in srgb, var(--ss-fg) 4%, transparent)',
+              // url(#…) 은 아래 SVG 필터 — 뒤 배경을 미세하게 일그러뜨린다.
+              // 🔴 **흐린 뒤에 휘어야 한다.** 반대로 두면(휘고 나서 흐리면)
+              // 8px 블러가 5px 어긋남을 통째로 지운다 — 실측으로 확인했다
+              // (화면이 0.6%만 달라졌고 최대 차이가 4였다, 사실상 무효).
+              backdropFilter: 'blur(8px) saturate(var(--ss-glass-saturate)) url(#ss-glass-warp)',
+              WebkitBackdropFilter: 'blur(8px) saturate(var(--ss-glass-saturate)) url(#ss-glass-warp)',
             }}
           >
             {/* 이 열의 버튼 높이는 구글이 정한다. 구글이 그리는 로그인

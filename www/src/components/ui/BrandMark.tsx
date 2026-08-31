@@ -6,9 +6,12 @@ export function letterSpacingFor(size: number): number {
 export default function BrandMark({
   size = 34,
   className = '',
+  color = 'var(--ss-accent)',
 }: {
   size?: number
   className?: string
+  /** 밝은 바탕 위(선수 카드)에서는 강조색 대신 검게 찍어야 읽힌다. */
+  color?: string
 }) {
   return (
     <span
@@ -21,7 +24,7 @@ export default function BrandMark({
         fontFamily: 'var(--font-rubik-glitch)',
         fontSize: `${size}px`,
         letterSpacing: `${letterSpacingFor(size)}px`,
-        color: 'var(--ss-accent)',
+        color,
         lineHeight: 1,
       }}
     >

@@ -7,10 +7,12 @@ describe('목적지 카드', () => {
     expect(screen.getByRole('link', { name: /영상 분석/ })).toHaveAttribute('href', '/analysis')
   })
 
-  it('준비 중인 곳은 링크가 아니고 그렇게 표시한다', () => {
+  // 🔴 '준비 중입니다' 는 안 적는다(사용자 요청) — 개발 진행 상태는 화면이
+  // 할 말이 아니고, 갈 곳이 없으면 **링크가 아닌 것**으로 이미 드러난다.
+  it('갈 곳이 없으면 링크가 아니다 — 준비 중이라고 적지도 않는다', () => {
     render(<DestinationCard title="용병 매칭" icon="sports_soccer" />)
     expect(screen.queryByRole('link')).toBeNull()
-    expect(screen.getByText(/준비 중/)).toBeInTheDocument()
+    expect(screen.queryByText(/준비 중/)).toBeNull()
   })
 
   it('두 줄 설명을 보여준다', () => {

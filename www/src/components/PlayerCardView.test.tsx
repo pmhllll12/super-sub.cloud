@@ -12,16 +12,25 @@ const card = {
 }
 
 describe('선수 카드', () => {
-  it('닉네임과 받은 호칭을 보여준다', () => {
+  // 카드 얼굴에는 별명 하나뿐이다. 호칭은 화면 밖 목록으로만 남는다 —
+  // 카드에 무엇이 담겼는지 읽어 주는 기계가 알 수 있어야 해서다.
+  it('받은 호칭을 화면 밖 목록으로 남긴다', () => {
     render(<PlayerCardView card={card} />)
-    expect(screen.getByRole('heading', { name: '홍길동' })).toBeInTheDocument()
-    expect(screen.getByText('슈팅이 매서운')).toBeInTheDocument()
-    expect(screen.getByText('주말 개근')).toBeInTheDocument()
+    expect(screen.getByText(/슈팅이 매서운/)).toBeInTheDocument()
+    expect(screen.getByText(/주말 개근/)).toBeInTheDocument()
   })
 
-  it('호칭이 없으면 빈 상태를 보여준다', () => {
-    render(<PlayerCardView card={{ ...card, titles: [] }} />)
-    expect(screen.getByText(/아직 받은 호칭이 없습니다/)).toBeInTheDocument()
+  it('가운데에 별명을 크게 적는다', () => {
+    render(<PlayerCardView card={card} />)
+    expect(screen.getByText('THREE LUNGS')).toBeInTheDocument()
+  })
+
+  // 카드에 이름을 글자로 적지 않는다(인물이 가운데를 차지한다). 그래도
+  // 누구 카드인지는 읽어 주는 기계에 남아야 한다.
+  it('닉네임을 글자로 적지 않되 카드의 이름으로는 남긴다', () => {
+    render(<PlayerCardView card={card} />)
+    expect(screen.queryByRole('heading', { name: '홍길동' })).toBeNull()
+    expect(screen.getByRole('article', { name: '홍길동' })).toBeInTheDocument()
   })
 
   it('수치를 그리지 않는다 — 점수·등급·별점이 없어야 한다', () => {
