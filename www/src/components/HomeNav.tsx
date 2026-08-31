@@ -49,17 +49,56 @@ export default function HomeNav({
   loggedIn,
   active,
   onActivate,
+  variant = 'text',
+  label = '목적지',
+  picked = null,
+  onPick,
 }: {
   destinations: Destination[]
   loggedIn: boolean
   /** 지금 강조할 목적지 제목 — 우하단 번호 목록과 맞추려고 부모가 쥔다. */
   active: string | null
   onActivate: (title: string | null) => void
+  /**
+   * `text` — 헤더의 자간 넓은 글자 줄(기본).
+   * `pill` — 유리 알약 버튼. 헤드라인 자리에 두는 주요 목적지용이다.
+   *
+   * 동작은 둘이 **완전히 같다**(가리키면 카드, 눌러서 고정, Esc 로 해제).
+   * 생김새만 갈린다 — 그래서 컴포넌트를 따로 만들지 않았다. 따로 만들면
+   * 고정 · 해제 · 포커스 규칙이 두 벌로 갈라져 따로 늙는다.
+   */
+  variant?: 'text' | 'pill'
+  /** `<nav>` 의 이름. 한 화면에 둘 이상 두면 서로 달라야 한다. */
+  label?: string
+  /**
+   * 지금 골라져 있는 항목(`pill` 전용) — **부모가 쥔다.**
+   *
+   * 🔴 알약의 선택은 이 컴포넌트 안에 두면 안 된다. 판의 × 로 닫는 것처럼
+   * **바깥에서 선택이 풀리는 일**이 있어서, 안에 들고 있으면 알약만 골라진
+   * 채로 남는다. 글자 줄의 `pinned`(눌러 띄워 둔 카드)와는 다른 것이다.
+   */
+  picked?: string | null
+  /**
+   * **눌러서 고른** 항목(`pill` 전용). `onActivate` 는 가리키기만 해도 불리므로
+   * "이 사람이 실제로 고른 것"은 이쪽으로만 알 수 있다 — 알약이 판을 여는
+   * 것 같은 실제 동작을 붙이려면 이걸 쓴다.
+   */
+  onPick?: (title: string) => void
 }) {
+  const pill = variant === 'pill'
   const navRef = useRef<HTMLElement>(null)
   const [hovered, setHovered] = useState<string | null>(null)
   const [pinned, setPinned] = useState<string | null>(null)
-  const shown = hovered ?? pinned
+  /** 지금 골라져 있는 것 — 알약은 부모가, 글자 줄은 자기가 쥔다. */
+  const selection = pill ? picked : pinned
+  /**
+   * 🔴 **알약에서는 고른 것과 떠 있는 것이 다르다.**
+   * 글자 줄에서 `pinned` 는 "눌러서 띄워 둔 카드"지만, 알약에서 누르는 것은
+   * **고르는 행위**다 — 누르면 설명이 사라져야 한다(사용자 요청). 그래서
+   * 알약은 `pinned` 를 '골라 둔 것'으로만 쓰고, 떠 있는 것은 지금 가리킨
+   * 것(`hovered`)뿐이다.
+   */
+  const shown = pill ? hovered : (hovered ?? pinned)
 
   // 방금까지 떠 있다가 지금 물러나는 중인 카드. 애니메이션이 끝날 때까지만 산다.
   const [exiting, setExiting] = useState<string | null>(null)
@@ -75,8 +114,10 @@ export default function HomeNav({
 
   // 고정해 둔 카드는 바깥을 누르거나 Esc 를 누르면 풀린다. pointerdown 으로
   // 잡는다 — click 은 마우스를 뗄 때라 그 사이 화면이 이미 바뀌어 있을 수 있다.
+  // 알약은 여기서 빠진다 — 골라 둔 것은 바깥을 눌렀다고 풀리면 안 된다
+  // (띄워 둔 카드가 아니라 선택이다).
   useEffect(() => {
-    if (pinned === null) return
+    if (pinned === null || pill) return
     function onPointerDown(e: PointerEvent) {
       if (navRef.current?.contains(e.target as Node)) return
       setPinned(null)
@@ -93,16 +134,16 @@ export default function HomeNav({
       document.removeEventListener('pointerdown', onPointerDown)
       document.removeEventListener('keydown', onKeyDown)
     }
-  }, [pinned, onActivate])
+  }, [pinned, pill, onActivate])
 
   function show(title: string | null) {
     setHovered(title)
-    onActivate(title ?? pinned)
+    onActivate(title ?? selection)
   }
 
   return (
-    <nav ref={navRef} aria-label="목적지">
-      <ul className="ss-home-nav-list">
+    <nav ref={navRef} aria-label={label}>
+      <ul className={`ss-home-nav-list${pill ? ' ss-home-nav-list--pill' : ''}`}>
         {destinations.map((d, i) => {
           const open = shown === d.title
           const closing = !open && exiting === d.title
@@ -110,10 +151,12 @@ export default function HomeNav({
             <li
               key={d.title}
               className="relative"
-              // 화면에 들어올 때 **오른쪽 끝부터** 차례로 나타난다 — 맨
-              // 오른쪽이 0번, 왼쪽으로 갈수록 늦다. globals.css 가 이
-              // 순번(--ss-nav-i)에 계단 간격을 곱해 지연으로 쓴다.
-              style={{ '--ss-nav-i': destinations.length - 1 - i } as CSSProperties}
+              // 등장 순번. globals.css 가 이 값(--ss-nav-i)에 계단 간격을
+              // 곱해 지연으로 쓴다. 둘의 **순서가 서로 반대**다(둘 다 사용자
+              // 요청이라 하나로 못 합친다):
+              //   글자 줄 — 맨 **왼쪽**('영상 분석')이 0번
+              //   알약    — 맨 **오른쪽**('팀 찾기')이 0번
+              style={{ '--ss-nav-i': pill ? destinations.length - 1 - i : i } as CSSProperties}
               onMouseEnter={() => show(d.title)}
               onMouseLeave={() => show(null)}
               // 포커스가 이 항목(글자 + 떠오른 카드) 밖으로 나갈 때만 닫는다 —
@@ -125,14 +168,39 @@ export default function HomeNav({
               <button
                 type="button"
                 data-active={active === d.title ? 'true' : undefined}
+                // 눌러서 **골라 둔** 것. 가리키기만 한 것(data-active)과
+                // 달라야 한다 — 고른 것만 안쪽이 옅게 칠해진다.
+                data-selected={pill && selection === d.title ? 'true' : undefined}
                 aria-expanded={open}
                 onFocus={() => show(d.title)}
                 onClick={() => {
+                  if (pill) {
+                    // 누르는 것은 **고르는 것**이다 — 설명은 사라진다.
+                    // hovered 를 비워야 마우스가 아직 위에 있어도 안 뜬다.
+                    // 선택 자체는 부모가 들고 있다(picked).
+                    setHovered(null)
+                    onActivate(d.title)
+                    onPick?.(d.title)
+                    return
+                  }
                   const next = pinned === d.title ? null : d.title
                   setPinned(next)
                   onActivate(next)
                 }}
-                className="ss-home-nav-item"
+                className={`ss-home-nav-item${pill ? ' ss-home-nav-item--pill' : ''}`}
+                // 🔴 backdrop-filter 는 **인라인으로만** 준다 — globals.css 에
+                // 두면 Lightning CSS 를 지나며 떨어져 나간 전례가 있다(추천
+                // 판에서 계산값 none). GlassPanel 도 같은 방식이다.
+                style={
+                  pill
+                    ? {
+                        backdropFilter:
+                          'blur(var(--ss-glass-blur)) saturate(var(--ss-glass-saturate))',
+                        WebkitBackdropFilter:
+                          'blur(var(--ss-glass-blur)) saturate(var(--ss-glass-saturate))',
+                      }
+                    : undefined
+                }
               >
                 {d.title}
               </button>
@@ -141,6 +209,9 @@ export default function HomeNav({
                 <div className="ss-home-nav-card" data-state={closing ? 'closing' : 'open'}>
                   <DestinationCard
                     compact
+                    // 알약 위로 뜨는 판은 아이콘 · 제목을 뺀다 — 제목이 바로
+                    // 아래 알약에 이미 있고, 판이 짧아야 위로 떠도 안 잘린다.
+                    bare={pill}
                     title={d.title}
                     icon={d.icon}
                     summary={d.summary}

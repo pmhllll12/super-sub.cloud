@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PublicPlayerCard } from '@/server/backend'
 import PlayerCardView from '@/components/PlayerCardView'
-import BrandMark from '@/components/ui/BrandMark'
+import BlankPlayerCard from '@/components/BlankPlayerCard'
 import SquadSuggest from '@/components/SquadSuggest'
+import SquadFriends from '@/components/SquadFriends'
 
 /**
  * 홈 첫 화면의 스쿼드 판 — 판 하나 위에 선수 카드를 **포지션 자리대로**
@@ -40,15 +41,51 @@ const SLOTS: Slot[] = [
   { area: 'gk', label: 'GK' },
 ]
 
-export default function SquadPanel({ card }: { card?: PublicPlayerCard | null }) {
+export default function SquadPanel({
+  card,
+  friendSearch = false,
+  onCloseFriendSearch,
+}: {
+  card?: PublicPlayerCard | null
+  /** 알약 '지인 찾기' 가 골라져 있는가 — 켜지면 판 옆에 지인 찾기가 열린다. */
+  friendSearch?: boolean
+  onCloseFriendSearch?: () => void
+}) {
   const [mates, setMates] = useState<Record<string, string | null>>({})
+  /**
+   * 지인 찾기에서 골라 둔 사람. 정해져 있으면 **빈 자리 버튼의 뜻이 바뀐다**
+   * — 원래는 "AI 추천 열기"지만 이때는 "여기 넣기"다. 자리를 여기서 안 고르고
+   * 진짜 판을 누르게 한 이유는 SquadFriends 주석에 있다.
+   */
+  const [placing, setPlacing] = useState<string | null>(null)
+  // 지인 찾기 판이 DOM 에 있는가 — 닫힐 때 물러나는 동안 남아 있어야 한다.
+  const [friendVisible, setFriendVisible] = useState(false)
   // 지금 추천을 열어 둔 자리. null 이면 닫혀 있다.
   const [picking, setPicking] = useState<Slot | null>(null)
   // 닫히는 중인 자리 — 물러나는 동안 DOM 에 남겨 둬야 애니메이션이 보인다.
   const [closing, setClosing] = useState<Slot | null>(null)
   const timer = useRef(0)
 
-  useEffect(() => () => clearTimeout(timer.current), [])
+  const friendTimer = useRef(0)
+  useEffect(() => () => {
+    clearTimeout(timer.current)
+    clearTimeout(friendTimer.current)
+  }, [])
+
+  // 지인 찾기가 켜지면 바로 띄우고, 꺼지면 물러나는 시간만큼 남겨 둔다.
+  // 고르던 사람도 같이 지운다 — 판이 없는데 자리만 깜빡이면 안 된다.
+  useEffect(() => {
+    if (friendSearch) {
+      clearTimeout(friendTimer.current)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFriendVisible(true)
+      return
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPlacing(null)
+    friendTimer.current = window.setTimeout(() => setFriendVisible(false), SUGGEST_EXIT_MS)
+    return () => clearTimeout(friendTimer.current)
+  }, [friendSearch])
 
   function close() {
     setClosing(picking)
@@ -67,7 +104,21 @@ export default function SquadPanel({ card }: { card?: PublicPlayerCard | null })
     return () => document.removeEventListener('keydown', onKey)
   })
 
-  const shown = picking ?? closing
+  /**
+   * 이미 판에 들어가 있는 사람 → 그 자리 이름. 지인 목록이 이걸로 "여기
+   * 있음" 표식을 붙이고 다시 못 고르게 막는다 — 없으면 같은 사람을 두 자리에
+   * 넣을 수 있다.
+   */
+  const placed = Object.fromEntries(
+    SLOTS.flatMap((slot) => {
+      const name = mates[slot.area]
+      return name ? [[name, slot.label] as const] : []
+    }),
+  )
+
+  // 🔴 두 판(추천 · 지인)은 **같은 자리**에 뜬다 — 동시에 열면 겹친다.
+  // 지인 찾기가 열려 있는 동안에는 추천을 그리지 않는다.
+  const shown = friendSearch ? null : (picking ?? closing)
 
   return (
     /* 🔴 추천 판은 스쿼드 판의 **형제**다. 스쿼드 판이 overflow: hidden
@@ -121,7 +172,9 @@ export default function SquadPanel({ card }: { card?: PublicPlayerCard | null })
           WebkitBackdropFilter: 'url(#ss-squad-warp)',
         }}
       >
-      <div className="ss-squad-board">
+      {/* 반짝임의 **시계**가 여기 하나 있다 — 자리마다 걸면 위상이 어긋난다
+          (globals.css 의 --ss-beckon-t 주석 참고). */}
+      <div className="ss-squad-board" data-placing={placing ? 'true' : undefined}>
         {/* 머리글이 경기장 선 **안쪽**에 앉아야 한다 — 판 위쪽에 따로
             두면 선 밖으로 나간다. 선을 그리는 상자 안에 넣고 위 여백을
             그만큼 준다(globals.css). */}
@@ -160,9 +213,9 @@ export default function SquadPanel({ card }: { card?: PublicPlayerCard | null })
                   {card ? (
                     <PlayerCardView card={card} />
                   ) : (
-                    <SquadCardFrame>
+                    <BlankPlayerCard>
                       <p className="ss-squad-note">아직 카드가 없습니다</p>
-                    </SquadCardFrame>
+                    </BlankPlayerCard>
                   )}
                 </div>
               ) : (
@@ -174,13 +227,28 @@ export default function SquadPanel({ card }: { card?: PublicPlayerCard | null })
                 <button
                   type="button"
                   className="ss-pcard-mini ss-squad-seat-btn"
+                  // 고른 지인이 있으면 이 버튼은 "여기 넣기"다 — 깜빡이는
+                  // 것만으로는 스크린리더에서 아무 차이가 없다.
+                  data-placing={!name && placing ? 'true' : undefined}
                   aria-label={
-                    name ? `${name} 빼기` : `${slot.label} 자리에 선수 넣기`
+                    name
+                      ? `${name} 빼기`
+                      : placing
+                        ? `${slot.label} 자리에 ${placing} 넣기`
+                        : `${slot.label} 자리에 선수 넣기`
                   }
-                  aria-expanded={name ? undefined : picking?.area === slot.area}
+                  aria-expanded={
+                    name || placing ? undefined : picking?.area === slot.area
+                  }
                   onClick={() => {
                     if (name) {
                       setMates((prev) => ({ ...prev, [slot.area]: null }))
+                      return
+                    }
+                    if (placing) {
+                      setMates((prev) => ({ ...prev, [slot.area]: placing }))
+                      // 판은 열어 둔다 — 여러 명을 이어서 넣는 게 보통이다.
+                      setPlacing(null)
                       return
                     }
                     clearTimeout(timer.current)
@@ -188,7 +256,7 @@ export default function SquadPanel({ card }: { card?: PublicPlayerCard | null })
                     setPicking(slot)
                   }}
                 >
-                  <SquadCardFrame>
+                  <BlankPlayerCard>
                     {name ? (
                       <span className="ss-squad-name">{name}</span>
                     ) : (
@@ -196,7 +264,17 @@ export default function SquadPanel({ card }: { card?: PublicPlayerCard | null })
                         add
                       </span>
                     )}
-                  </SquadCardFrame>
+                  </BlankPlayerCard>
+                  {/* 빼는 표식 — 카드 오른쪽 위. 카드 **전체**가 이미 빼기
+                      버튼이라(aria-label) 이건 장식이고 누를 수 있는 요소가
+                      아니다. 버튼 안에 버튼을 두지 않는다.
+                      카드의 형제로 둔다 — .ss-pcard-mini 는 카드를 직접
+                      자식으로 찾으므로(> .ss-pcard) 감싸면 축소가 풀린다. */}
+                  {name && (
+                    <span className="ss-squad-remove material-symbols-outlined" aria-hidden="true">
+                      cancel
+                    </span>
+                  )}
                 </button>
               )}
               <span className="ss-squad-pos">{slot.label}</span>
@@ -206,6 +284,17 @@ export default function SquadPanel({ card }: { card?: PublicPlayerCard | null })
       </div>
 
       </section>
+
+      {/* 지인 찾기 판 — 추천 판과 **같은 자리**에 같은 방식으로 나온다. */}
+      {friendVisible && (
+        <SquadFriends
+          placing={placing}
+          placed={placed}
+          closing={!friendSearch}
+          onChoose={setPlacing}
+          onClose={() => onCloseFriendSearch?.()}
+        />
+      )}
 
       {/* 추천 판 — 스쿼드 판 오른쪽에서 미끄러져 나온다. */}
       {shown && (
@@ -220,25 +309,5 @@ export default function SquadPanel({ card }: { card?: PublicPlayerCard | null })
         />
       )}
     </div>
-  )
-}
-
-/**
- * 빈 카드의 틀. 선수 카드와 **같은 클래스**를 쓴다 — 따로 만들면 카드
- * 모양을 바꿀 때 두 벌이 따로 늙는다. 가운데 자리만 비워서 넘겨받는다.
- */
-function SquadCardFrame({ children }: { children: React.ReactNode }) {
-  return (
-    <article className="ss-pcard ss-pcard-blank">
-      <div className="ss-pcard-inner">
-        <header className="ss-pcard-top">
-          {/* 빈 카드는 바탕이 희어서 워드마크를 검게 찍을 이유가 없다 —
-              브랜드 민트로 둔다(채워진 카드는 연두 바탕이라 그 반대다). */}
-          <BrandMark size={22} color="var(--ss-accent)" />
-          <p className="ss-pcard-kicker">PLAYER CARD</p>
-        </header>
-        <div className="ss-squad-seat-body">{children}</div>
-      </div>
-    </article>
   )
 }

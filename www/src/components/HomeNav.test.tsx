@@ -100,19 +100,33 @@ describe('홈 글자 내비 — 상단', () => {
     expect(screen.getByText(/경기 영상을 올리면/)).toBeInTheDocument()
   })
 
+  // 작은 판은 제목을 안 그린다(글자 줄에 이미 있다) — 링크의 이름은 설명이다.
   it('나온 카드를 누르면 그 페이지로 간다', async () => {
     const user = userEvent.setup()
     setup()
     await user.hover(screen.getByRole('button', { name: '영상 분석' }))
-    expect(screen.getByRole('link', { name: /영상 분석/ })).toHaveAttribute('href', '/analysis')
+    expect(screen.getByRole('link', { name: /경기 영상을 올리면/ })).toHaveAttribute(
+      'href',
+      '/analysis',
+    )
+  })
+
+  it('작은 판에는 제목을 다시 적지 않는다', async () => {
+    const user = userEvent.setup()
+    setup()
+    await user.hover(screen.getByRole('button', { name: '영상 분석' }))
+    // '영상 분석' 이라고 적힌 것은 글자 줄의 버튼 하나뿐이어야 한다.
+    expect(screen.getAllByText('영상 분석')).toHaveLength(1)
   })
 
   it('준비 중인 곳은 카드가 나오되 링크가 아니다', async () => {
     const user = userEvent.setup()
     setup()
     await user.hover(screen.getByRole('button', { name: '용병 매칭' }))
-    expect(screen.getByText('준비 중입니다')).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /용병 매칭/ })).toBeNull()
+    expect(screen.getByText(/경기를 찾고/)).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /경기를 찾고/ })).toBeNull()
+    // '준비 중입니다' 는 안 적는다 — 링크가 아닌 것으로 이미 드러난다.
+    expect(screen.queryByText('준비 중입니다')).toBeNull()
   })
 
   it('로그인 안 했으면 로그인 전용 카드에 안내를 붙이되 링크는 살려 둔다', async () => {
@@ -120,7 +134,10 @@ describe('홈 글자 내비 — 상단', () => {
     setup({ loggedIn: false })
     await user.hover(screen.getByRole('button', { name: '영상 분석' }))
     expect(screen.getByText('로그인이 필요합니다')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /영상 분석/ })).toHaveAttribute('href', '/analysis')
+    expect(screen.getByRole('link', { name: /경기 영상을 올리면/ })).toHaveAttribute(
+      'href',
+      '/analysis',
+    )
   })
 
   // 우하단 번호 목록과 강조를 맞추기 위해 부모가 현재 항목을 안다.
@@ -132,15 +149,20 @@ describe('홈 글자 내비 — 상단', () => {
     expect(onActivate).toHaveBeenCalledWith('용병 매칭')
   })
 
-  // 레퍼런스처럼 오른쪽 끝부터 차례로 나타난다 — 맨 오른쪽이 0번.
-  it('등장 순번을 오른쪽 끝부터 매긴다', () => {
-    const { container } = setup()
+  function order(container: HTMLElement) {
     const items = [...container.querySelectorAll('.ss-home-nav-list > li')]
     expect(items).toHaveLength(DESTINATIONS.length)
-    expect(items.map((li) => (li as HTMLElement).style.getPropertyValue('--ss-nav-i'))).toEqual([
-      '1',
-      '0',
-    ])
+    return items.map((li) => (li as HTMLElement).style.getPropertyValue('--ss-nav-i'))
+  }
+
+  // 두 변형의 순서가 서로 반대다 — 둘 다 사용자가 고른 것이라 하나로
+  // 합칠 수 없다. 어긋나면 등장이 뒤집히므로 양쪽을 다 잡아 둔다.
+  it('글자 줄은 맨 왼쪽부터 등장한다', () => {
+    expect(order(setup().container)).toEqual(['0', '1'])
+  })
+
+  it('알약은 맨 오른쪽부터 등장한다', () => {
+    expect(order(setup({ variant: 'pill' }).container)).toEqual(['1', '0'])
   })
 
   it('부모가 정한 현재 항목을 강조한다', () => {

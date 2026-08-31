@@ -10,6 +10,8 @@
  * 지우고 그 응답을 그대로 흘려 넣으면 된다(카드 목록의 모양은 그대로다).
  * 선수 카드의 별명(ALIAS)을 붙박이로 둔 것과 같은 이유 · 같은 방식이다.
  */
+import BlankPlayerCard from '@/components/BlankPlayerCard'
+
 const SUGGESTIONS: Record<string, { name: string; title: string; notes: string[] }[]> = {
   // 자리마다 추천 수가 다르다 — 분석에서 걸러진 만큼만 온다.
   GK: [
@@ -112,6 +114,18 @@ export default function SquadSuggest({
       className="ss-suggest"
       data-state={closing ? 'closing' : 'open'}
       aria-label={`${position} 추천 선수`}
+      // 🔴 backdrop-filter 는 **인라인으로** 준다. globals.css 에 두면 같은
+      // 규칙의 color-mix() 때문에 Lightning CSS 가 통째로 떨어뜨린다(계산값
+      // none) — 이 판에서 실제로 그렇게 날아갔었다.
+      //
+      // 스쿼드 판은 굴절(warp)만 걸지만 여기는 **흐림**이다. 굴절은 대비를
+      // 하나도 낮추지 못해서, 뒤 연기가 또렷한 채로 글자 사이를 지나간다.
+      // 어두운 막(globals.css)이 밝기를 눌러 주고 흐림이 무늬를 지운다 —
+      // 둘 다 있어야 어느 배경 위에서든 읽힌다.
+      style={{
+        backdropFilter: 'blur(var(--ss-glass-blur)) saturate(var(--ss-glass-saturate))',
+        WebkitBackdropFilter: 'blur(var(--ss-glass-blur)) saturate(var(--ss-glass-saturate))',
+      }}
     >
       <header className="ss-suggest-head">
         {/* 한 줄로 가운데에 — 무슨 자리에 몇 명이 왔는지가 곧 제목이다. */}
@@ -134,9 +148,14 @@ export default function SquadSuggest({
              순번은 CSS 가 지연으로 쓴다(--ss-i). */
           <li key={s.name} style={{ '--ss-i': i } as React.CSSProperties}>
             <button type="button" className="ss-suggest-item" onClick={() => onPick(s.name)}>
-              {/* 카드가 될 자리를 알려 주는 표식. 워드마크를 넣어 봤지만
-                  작은 크기에서는 읽히지도 않고 글자 위로 넘쳐서 뺐다. */}
-              <span className="ss-suggest-card" aria-hidden="true" />
+              {/* 카드가 될 자리를 알려 주는 표식 — 빈 선수 카드를 그대로
+                  줄여 놓는다(스쿼드 판의 빈 자리와 같은 틀). **`+` 는 넣지
+                  않는다** — 누르는 곳은 이 줄 전체지 카드가 아니다.
+                  ⚠️ `.ss-pcard-mini` 는 카드를 **직접 자식**으로 찾으므로
+                  (`> .ss-pcard`) 사이에 다른 요소를 끼우면 축소가 풀린다. */}
+              <span className="ss-suggest-card ss-pcard-mini" aria-hidden="true">
+                <BlankPlayerCard />
+              </span>
               <span className="ss-suggest-text">
                 <span className="ss-suggest-name">{s.name}</span>
                 <span className="ss-suggest-title">{s.title}</span>
