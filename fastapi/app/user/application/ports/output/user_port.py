@@ -115,3 +115,22 @@ class UserPort(ABC):
     @abstractmethod
     def list_memberships(self, user_id: UUID) -> list[MembershipEntity]:
         """탈퇴 이력을 포함한 전체 소속. 거르는 것은 도메인 규칙의 몫이다."""
+
+    @abstractmethod
+    def list_users(
+        self, *, q: str | None, offset: int, limit: int
+    ) -> tuple[list[UserEntity], int]:
+        """회원 관리 admin 화면의 목록. `q` 는 이메일·닉네임 부분일치 검색이다.
+
+        두 번째 값은 `q` 를 적용한 뒤의 **전체 건수**(페이지네이션용)다 — 반환된
+        목록의 길이가 아니다.
+        """
+
+    @abstractmethod
+    def has_card(self, user_id: UUID) -> bool:
+        """선수 카드를 등록했는지.
+
+        `player_card` 는 `card` 컨텍스트의 테이블이다. 포트에 이 메서드가 있어도
+        `user` 가 `card` 를 임포트하는 것은 아니다 — 구현(`UserPgRepository`)이
+        `table()`/`column()` 원시 쿼리로 읽는다(`app/core/deps.py` 와 같은 이유).
+        """

@@ -4,13 +4,14 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import settings
-from app.core.deps import get_token_version_reader
+from app.core.deps import get_token_version_reader, get_user_email_reader
 from app.main import app
 from app.card.adapter.outbound.stub.card_stub_repository import StubCardRepository
 from app.card.dependencies.card_repository_provider import get_card_repository
 from app.user.adapter.outbound.stub.user_stub_repository import (
     DEMO_EMAIL,
     DEMO_PASSWORD,
+    DEMO_USER_ID,
     StubUserRepository,
 )
 from app.user.dependencies.user_repository_provider import get_user_repository
@@ -47,6 +48,11 @@ def _stub_token_version_reader():
     return lambda user_id: 0
 
 
+def _stub_user_email_reader():
+    """`require_admin` 이 대조할 이메일. 스텁 데모 사용자만 안다."""
+    return lambda user_id: DEMO_EMAIL if user_id == DEMO_USER_ID else None
+
+
 @pytest.fixture
 def client() -> TestClient:
     """**저장소를 스텁으로 갈아끼운 클라이언트.**
@@ -57,12 +63,14 @@ def client() -> TestClient:
     app.dependency_overrides[get_user_repository] = StubUserRepository
     app.dependency_overrides[get_card_repository] = StubCardRepository
     app.dependency_overrides[get_token_version_reader] = _stub_token_version_reader
+    app.dependency_overrides[get_user_email_reader] = _stub_user_email_reader
     try:
         yield TestClient(app)
     finally:
         app.dependency_overrides.pop(get_user_repository, None)
         app.dependency_overrides.pop(get_card_repository, None)
         app.dependency_overrides.pop(get_token_version_reader, None)
+        app.dependency_overrides.pop(get_user_email_reader, None)
 
 
 @pytest.fixture

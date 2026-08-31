@@ -115,6 +115,22 @@ class FakeUserRepository(UserPort):
     def list_memberships(self, user_id: UUID) -> list[MembershipEntity]:
         return list(self.memberships)
 
+    def list_users(
+        self, *, q: str | None, offset: int, limit: int
+    ) -> tuple[list[UserEntity], int]:
+        users = [self.user]
+        if q:
+            needle = q.lower()
+            users = [
+                u
+                for u in users
+                if needle in str(u.email).lower() or needle in str(u.nickname).lower()
+            ]
+        return users[offset : offset + limit], len(users)
+
+    def has_card(self, user_id: UUID) -> bool:
+        return False
+
 
 class TestSignupInteractor:
     def test_이메일을_정규화해서_돌려준다(self):

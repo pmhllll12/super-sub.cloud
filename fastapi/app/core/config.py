@@ -65,5 +65,15 @@ class Settings(BaseSettings):
         """접속 대상이 정해져 있는지. 아직 RDS 인스턴스가 없어 기본값은 False다."""
         return bool(self.database_url or self.rds_host)
 
+    # --- 관리자 ---------------------------------------------------------------
+    # 회원 관리 admin 화면에 들어갈 수 있는 이메일. 쉼표로 구분한다.
+    # 🔴 `user` 테이블에 role 컬럼이 없어 화이트리스트로 가른다 — 관리자가 늘어나
+    #    마이그레이션이 아깝지 않은 시점이 오면 `is_admin` 컬럼으로 옮긴다.
+    admin_emails: str = ""
+
+    @property
+    def admin_email_set(self) -> frozenset[str]:
+        return frozenset(e.strip().lower() for e in self.admin_emails.split(",") if e.strip())
+
 
 settings = Settings()

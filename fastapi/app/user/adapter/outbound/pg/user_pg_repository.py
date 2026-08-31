@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from sqlalchemy import select, update
+from sqlalchemy import column, func, or_, select, table, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -262,3 +262,33 @@ class UserPgRepository(UserPort):
             to_membership_entity(member, team)
             for member, team in self._session.execute(stmt).all()
         ]
+
+    def list_users(
+        self, *, q: str | None, offset: int, limit: int
+    ) -> tuple[list[UserEntity], int]:
+        stmt = select(UserOrm)
+        count_stmt = select(func.count()).select_from(UserOrm)
+        if q:
+            # 이메일은 Email.of 로 소문자 정규화해 저장하지만 닉네임은 아니라서
+            # 둘 다 대소문자를 가리지 않는 ilike 로 맞춘다.
+            condition = or_(
+                UserOrm.email.ilike(f"%{q}%"), UserOrm.nickname.ilike(f"%{q}%")
+            )
+            stmt = stmt.where(condition)
+            count_stmt = count_stmt.where(condition)
+
+        total = self._session.execute(count_stmt).scalar_one()
+        stmt = stmt.order_by(UserOrm.created_at.desc()).offset(offset).limit(limit)
+        rows = self._session.execute(stmt).scalars().all()
+        return [to_user_entity(row) for row in rows], total
+
+    def has_card(self, user_id: UUID) -> bool:
+        """`player_card` 는 `card` 컨텍스트의 테이블이다.
+
+        `app/core/deps.py` 의 토큰 버전 조회와 같은 이유로 ORM 을 임포트하지 않고
+        `table()`/`column()` 원시 쿼리로 읽는다 — 그래야 `user` 가 `card` 를
+        임포트하지 않는다(`tests/test_architecture.py` 의 컨텍스트 경계 검사).
+        """
+        card_table = table("player_card", column("user_id"))
+        stmt = select(card_table.c.user_id).where(card_table.c.user_id == user_id)
+        return self._session.execute(stmt).first() is not None
