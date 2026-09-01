@@ -10,11 +10,28 @@
 `git pull` 로 받았다면 Claude 에게 이렇게 주면 된다.
 
 ```
-fastapi/docs/client-contract-changes.md 를 읽고 "조치 필요"로 표시된 것만 처리해줘.
+fastapi/docs/client-contract-changes.md 를 읽고, 각 항목의 "먼저 확인"을 실제로
+돌려봐. 이미 만족하는 항목은 손대지 말고 무엇이 이미 되어 있는지만 알려줘.
+만족하지 않는 것만 고쳐줘.
 ```
 
-**"조치 필요"만 골라 놓았다.** 이미 잘 도는 것은 `✅ 조치 불필요` 로 표시하고
-왜 그런지도 적었다 — 멀쩡한 코드를 건드리지 않기 위해서다.
+## 🔴 고치기 전에 — **이미 되어 있는지 먼저 확인한다**
+
+**이 문서는 2026-09-01 의 코드를 읽고 썼다.** 그 뒤에 **다른 방식으로 이미
+해결됐을 수 있다.** 그래서 항목마다 **「만족해야 할 성질」과 「먼저 확인」** 을 두었다.
+
+| 확인 결과 | 무엇을 하나 |
+|---|---|
+| **이미 만족한다** | 🔴 **손대지 않는다.** 형태가 아래 제안과 달라도 **목적이 달성됐으면 그대로 둔다** |
+| 만족하지 않는다 | 그때만 고친다 |
+| 판단이 애매하다 | 고치지 말고 **물어본다** (백엔드: 정어진) |
+
+🔴 **아래에 적은 파일 이름·함수 이름·코드 조각은 예시지 규격이 아니다.**
+지켜야 하는 것은 **「만족해야 할 성질」 한 줄뿐**이고, 그것을 어떻게 이루는지는
+클라이언트 쪽 사정이다. **제안과 다르게 되어 있다는 이유로 고치지 말 것.**
+
+> 이미 잘 도는 것은 `✅ 조치 불필요` 로 표시하고 왜 그런지도 적었다 — 멀쩡한 코드를
+> 건드리는 것이 이 문서가 낼 수 있는 가장 나쁜 결과다.
 
 ---
 
@@ -50,36 +67,49 @@ fastapi/docs/client-contract-changes.md 를 읽고 "조치 필요"로 표시된 
 창 안에 계속 들어오면 카운터가 계속 차 있다. 자동 재시도 로직이 있다면 **429 에서는
 반드시 멈춰야 한다.**
 
-### www — 조치 필요
+### 만족해야 할 성질
 
-에러 자체는 이미 화면에 뜬다. `ApiCallError` 가 `status` 와 `code` 를 들고 있고
-(`src/lib/api/client.ts`) 로그인 화면이 `apiErrorMessage(err)` 로 서버 문구를
-그대로 보여준다. **부족한 것은 "다시 누르지 못하게" 하는 쪽이다.**
+> **인증 요청이 429 로 거부되면, 사용자가 곧바로 같은 요청을 다시 보낼 수 없다.**
 
-- `src/lib/api/client.ts` — `apiErrorMessage` 옆에 판별 헬퍼를 하나 둔다.
+방식은 상관없다 — 버튼 잠금 · 쿨다운 타이머 · 카운트다운 안내 · 전역 재시도 정책
+어느 쪽이든 **"429 직후 재요청이 안 나간다"** 면 만족이다. 자동 재시도 로직이
+있다면 429 에서 멈추기만 해도 된다.
 
-  ```ts
-  /** 429. 창은 60초이고 Retry-After 는 없다 — 그 안에 다시 부르면 계속 막힌다. */
-  export function isRateLimited(err: unknown): boolean {
-    return err instanceof ApiCallError && err.code === 'TOO_MANY_REQUESTS'
-  }
-  ```
-
-- `src/app/login/page.tsx` · `src/app/signup/page.tsx` — `catch (err)` 에서
-  `isRateLimited(err)` 면 제출 버튼을 **일정 시간 잠근다.** 지금은 `setError` 만 하고
-  버튼이 바로 다시 눌린다.
-- `src/components/auth/GoogleSignInButton.tsx` — `onError` 로 문구만 올린다.
-  같은 처리가 필요하다.
-
-**확인**
+### 먼저 확인
 
 ```bash
-grep -rn "TOO_MANY_REQUESTS" www/src        # 지금은 결과 없음
+grep -rnE "TOO_MANY_REQUESTS|\b429\b" www/src flutter/lib
 ```
 
-### Flutter — 조치 필요 (4번을 먼저 해야 한다)
+> ⚠️ **`429` 를 단어 경계 없이 찾으면 오탐이 난다.** `www/src/lib/introInk.ts` 와
+> `PlayerCardBrush.tsx` 의 난수 상수 `4294967296` 이 걸린다. 위처럼 `\b429\b` 로 찾는다.
 
-`code` 를 버리고 있어서 **429 를 분기할 수단이 없다.** 4번을 먼저 처리한다.
+- **결과가 있으면** → 그 코드를 읽고 **429 뒤 재요청이 막히는지** 본다.
+  막힌다면 ✅ **손대지 않는다.**
+- **결과가 없으면** → grep 에 안 걸리는 방식일 수도 있다. 로그인·가입·구글 로그인의
+  제출 핸들러를 열어 **실패 후 버튼이 곧바로 다시 눌리는지** 확인한다.
+  쿨다운이 이미 있으면(코드와 무관하게 걸려 있으면) ✅ 그대로 둔다.
+- 둘 다 아니면 → 아래를 참고해 고친다.
+
+### 아직이라면 — 참고용 제안 (규격 아님)
+
+2026-09-01 기준으로 `www` 는 에러 문구까지는 이미 잘 보여준다. `ApiCallError` 가
+`status` 와 `code` 를 들고 있고(`src/lib/api/client.ts`) 로그인 화면이
+`apiErrorMessage(err)` 로 서버 문구를 띄운다. **비어 있는 것은 "다시 누르지 못하게"
+하는 쪽뿐이다.**
+
+```ts
+// src/lib/api/client.ts — 판별 헬퍼 예시
+/** 429. 창은 60초이고 Retry-After 는 없다 — 그 안에 다시 부르면 계속 막힌다. */
+export function isRateLimited(err: unknown): boolean {
+  return err instanceof ApiCallError && err.code === 'TOO_MANY_REQUESTS'
+}
+```
+
+이걸 `src/app/login/page.tsx` · `src/app/signup/page.tsx` 의 `catch (err)` 와
+`src/components/auth/GoogleSignInButton.tsx` 의 `onError` 에서 써서 제출을 잠근다.
+
+**Flutter 는 4번이 선행 조건이다** — `code` 를 버리고 있어 429 를 분기할 수단이 없다.
 
 ---
 
@@ -96,9 +126,16 @@ grep -rn "TOO_MANY_REQUESTS" www/src        # 지금은 결과 없음
 가 그대로 뜨고 버튼도 정상으로 돌아온다.** 고장 나지 않는다.
 
 🟡 **원하면** 자기 자신일 때 버튼을 아예 그리지 않는 편이 낫다 — 지금은
-`window.confirm` 까지 통과한 뒤에야 실패한다. 현재 로그인 사용자 id 는
-`src/server/currentUser.ts` 로 얻을 수 있고, 상세 페이지가 서버 컴포넌트라
-`ForceDeleteButton` 을 조건부로 렌더하면 된다.
+`window.confirm` 까지 통과한 뒤에야 실패한다.
+
+**먼저 확인** — 이미 감춰져 있으면 손대지 않는다.
+
+```bash
+grep -rn "currentUser\|CANNOT_DELETE_SELF" www/src/app/admin
+```
+
+없다면: 현재 로그인 사용자 id 는 `src/server/currentUser.ts` 로 얻을 수 있고,
+상세 페이지가 서버 컴포넌트라 `ForceDeleteButton` 을 조건부로 렌더하면 된다.
 
 ---
 
@@ -114,6 +151,14 @@ grep -rn "TOO_MANY_REQUESTS" www/src        # 지금은 결과 없음
 
 `src/app/admin/users/AdminSearchForm.tsx` 는 문자열을 그대로 넘기므로 **틀린 데가
 없다.** 사용자가 `%` 를 와일드카드로 기대할 수 있다는 점만 안내 문구로 다루면 된다.
+
+🔴 **검색어를 클라이언트에서 가공하지 말 것.** `%` 를 떼거나 이스케이프하면
+오히려 어긋난다 — 백엔드가 이미 리터럴로 다룬다. 그런 처리가 들어가 있다면
+그것이 고칠 대상이다.
+
+```bash
+grep -rn "replace\|encodeURI" www/src/app/admin/users/AdminSearchForm.tsx   # 가공이 있는지
+```
 
 ---
 
@@ -135,20 +180,30 @@ throw AuthException(
 구별할 수 없다. 원래 주석에 "코드는 화면 쪽에서 필요해지면 그때 노출한다"고 적혀
 있는데, **지금이 그때다.**
 
-### 조치
+### 만족해야 할 성질
+
+> **화면 코드가 에러의 종류(`code` 또는 HTTP 상태)를 구별할 수 있다.**
+
+`AuthException` 에 필드를 더하든, 예외 타입을 나누든, 결과 객체로 바꾸든 상관없다.
+
+### 먼저 확인
+
+```bash
+grep -n "code\|statusCode" flutter/lib/features/auth/data/auth_repository.dart
+```
+
+- **`code`·`statusCode` 를 들고 있거나 예외 타입이 나뉘어 있으면** → ✅ 이미 열려
+  있다. **손대지 않는다.**
+- 없으면 → 아래를 참고해 연다.
+
+### 아직이라면 — 참고용 제안 (규격 아님)
 
 - `auth_repository.dart` — `AuthException` 에 `code` 와 `status` 를 넣는다.
   기존 호출부(`auth_repository_mock.dart` 등)가 `const AuthException('문구')` 로
-  부르고 있으므로 **새 필드는 선택 인자로** 두면 그쪽을 안 고쳐도 된다.
+  부르고 있으므로 **새 필드를 선택 인자로** 두면 그쪽을 안 고쳐도 된다.
 - `auth_repository_api.dart` — `_decode` 에서 `error['code']` 와
   `response.statusCode` 를 함께 실어 던진다.
 - 그 다음 1번(429)을 처리한다.
-
-**확인**
-
-```bash
-grep -rn "code" flutter/lib/features/auth/data/auth_repository.dart   # 지금은 없다
-```
 
 ---
 
