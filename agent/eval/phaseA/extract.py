@@ -35,7 +35,9 @@ for i, p in enumerate(clips, 1):
         **{f"obj_{k}": v for k, v in r.objects.items()},
     )
     fd = FRAMES/cid; fd.mkdir(exist_ok=True)
-    for t, fr in enumerate(r.frames):
+    # PoseResult는 프레임을 들고 있지 않다 — 저장 직전에 다시 디코딩한다.
+    # read_frames가 결정적이라 추출 때 본 것과 같은 프레임·같은 순서다.
+    for t, fr in enumerate(r.load_frames()):
         h, w = fr.shape[:2]
         if w > 480:
             fr = cv2.resize(fr, (480, int(h*480/w)), interpolation=cv2.INTER_AREA)

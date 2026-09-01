@@ -60,10 +60,22 @@ PERSON_ELIGIBLE_THRESHOLD = 0.5
 
 @dataclass
 class PoseResult:
+    """분석 결과. **원본 프레임은 들고 있지 않는다.**
+
+    프레임은 채점에 전혀 쓰이지 않는다 — extract_features는 키포인트와 도구
+    궤적만 받는다. 쓰이는 곳은 미리보기 렌더링뿐인데, 그것은 판정이 끝난 뒤에
+    일어난다. 그런데도 프레임을 들고 있으면 4K 300장(≈7GB)이 포즈 추출부터
+    판정 모델 적재까지 내내 메모리에 남는다. 그래서 **다시 얻는 방법**만
+    들고 있다가 렌더링 시점에 재디코딩한다(`load_frames`).
+    """
+
     keypoints: np.ndarray      # (T, 17, 3) — x, y, confidence
-    frames: list[np.ndarray]   # 샘플링된 원본 프레임 (오버레이용)
     source_fps: float
     sampled_fps: float         # 실효 샘플링 fps (목표값이 아니라 src_fps / step)
+    # 프레임을 다시 얻는 데 필요한 것. video_path가 None이면 프레임이 없는
+    # 결과다(합성 키포인트 경로) — load_frames()가 None을 돌려준다.
+    video_path: str | None = None
+    target_fps: int = 15       # 추출 때 쓴 값. 재디코딩이 같은 프레임을 골라야 한다.
     # 도구 궤적: 이름 → (T, 3) [중심 x, 중심 y, 신뢰도].
     # 미검출 프레임은 신뢰도 0으로 채운다 — 키포인트와 같은 규약이다.
     objects: dict[str, np.ndarray] = field(default_factory=dict)
@@ -79,6 +91,23 @@ class PoseResult:
     def raw_candidate_counts(self) -> list[int]:
         """검출기가 person으로 낸 것 전부 (프레임별)."""
         return [r for r, _ in self.candidate_counts]
+
+    def load_frames(self) -> list[np.ndarray] | None:
+        """오버레이용 원본 프레임을 그 자리에서 다시 디코딩한다.
+
+        **같은 프레임이 나오는 근거는 read_frames가 결정적이라는 것뿐이다** —
+        경로·target_fps가 같으면 같은 인덱스(idx % step == 0)를 고른다. 그래서
+        추출 때 쓴 target_fps를 결과가 함께 들고 다닌다. 파일이 사라진 뒤에
+        부르면 read_frames가 그대로 예외를 낸다(업로드 임시 파일 수명 주의).
+
+        재디코딩 비용은 포즈 추출(모델 적재 제외)의 10% 수준이다 — 실측
+        1080p 11.3ms/장 대 104.6ms/장, 4K 34.2ms/장 대 351.1ms/장.
+        프레임이 없는 결과(합성 경로)에서는 None을 돌려준다.
+        """
+        if self.video_path is None:
+            return None
+        frames, _, _ = read_frames(self.video_path, self.target_fps)
+        return frames
 
     def frame_to_seconds(self, frame: int) -> float:
         """샘플링된 프레임 인덱스를 원본 영상의 시각(초)으로 환산한다."""
@@ -222,6 +251,10 @@ def extract_keypoints(
       CLI·오프라인 평가처럼 서비스 입력이 아닌 경로는 observe=False를 준다
       (scripts/analyze.py, scripts/measure.py).
     rubric_key — 관측 레코드에 붙일 라벨일 뿐이고 포즈 추출에는 쓰이지 않는다.
+
+    **결과는 원본 프레임을 들고 나가지 않는다.** 오버레이가 필요한 호출자는
+    PoseResult.load_frames()로 그때 다시 디코딩한다 — 그 사이 영상 파일이
+    남아 있어야 한다(api_video의 임시 파일은 응답을 만들 때까지 산다).
     """
     import torch
     from transformers import (
@@ -239,7 +272,6 @@ def extract_keypoints(
     pose_model = VitPoseForPoseEstimation.from_pretrained(POSE_MODEL).to(device).eval()
 
     all_kps: list[np.ndarray] = []
-    kept_frames: list[np.ndarray] = []
     # 프레임별 person 후보 수 — 사람이 없던 프레임도 (0, 0)으로 채운다.
     # 빠뜨리면 다중인원 비율의 분모가 어긋난다.
     cand_counts: list[tuple[int, int]] = []
@@ -265,8 +297,9 @@ def extract_keypoints(
             box = _largest_person_box(detections)
             if box is None:
                 # 사람이 검출되지 않은 프레임은 신뢰도 0으로 채운다.
+                # (프레임을 버리지 않는다 — 키포인트 인덱스 t가 곧 샘플링된
+                #  프레임 인덱스 t여야 재디코딩한 프레임과 짝이 맞는다.)
                 all_kps.append(np.zeros((17, 3)))
-                kept_frames.append(frame)
                 continue
 
             pose_inputs = pose_processor(
@@ -286,7 +319,6 @@ def extract_keypoints(
                 axis=1,
             )
             all_kps.append(kps)
-            kept_frames.append(frame)
     finally:
         # 판정 모델을 올릴 VRAM을 비운다.
         del detector, pose_model
@@ -296,9 +328,12 @@ def extract_keypoints(
 
     result = PoseResult(
         keypoints=np.stack(all_kps),
-        frames=kept_frames,
         source_fps=src_fps,
         sampled_fps=sampled_fps,
+        # 프레임 대신 다시 얻는 방법을 넘긴다. 여기서 frames를 놓아 주므로
+        # 판정 모델이 올라갈 때 원본 프레임이 메모리에 남지 않는다.
+        video_path=str(video_path),
+        target_fps=target_fps,
         objects=stack_object_tracks(obj_frames),
         candidate_counts=cand_counts,
     )

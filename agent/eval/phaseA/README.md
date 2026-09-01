@@ -281,7 +281,10 @@ B-5의 두 스크립트는 `ab_disagreement_frames.csv`와 판독 CSV만 읽으�
 없이 그대로 재현된다. 부트스트랩은 `SEED = 20260828`으로 고정돼 있다.
 
 필요한 것:
-- `candidates/*.npz`, `cache/*.npz` — 없으면 `candidates.py`, `extract.py`부터
+- `candidates/*.npz`, `cache/*.npz` — 없으면 `candidates.py`, `extract.py`부터.
+  **2026-09-01에 이 저장소의 `candidates/`·`cache/`로 백업했다**(합 1.78MB,
+  md5 대조 완료). 다만 스크립트가 `/mnt/d` 경로를 하드코딩하므로 그 사본은
+  아직 읽히지 않는다 — [`PRESERVED_ASSETS.md`](PRESERVED_ASSETS.md) 참고
 - `clips/*.mp4` — 이미지 렌더 시에만 필요
 - `labeling/targets.py` — 모든 평가 스크립트가 `sys.path`에 추가해 import한다
 - `agent/src/supersub_agent/pose.py` — 검출·포즈 모델 상수 (읽기 전용으로 참조)
@@ -307,3 +310,5 @@ import한다. **가중치나 선택 로직을 수정하면 B-2~B-5 결과 전체
 | `eval_b4/regression_watchlist.csv` | failure mode 3건 추적 |
 | `eval_b3/labels_ai_reviewed.json` | AI 판독 라벨 + provenance (**수정 금지**) |
 | `labeling/labels.json` | 1차 라벨 (**수정 금지**) |
+| `PRESERVED_ASSETS.md` | `candidates/`·`cache/` 백업의 내용·생성 경위·한계 |
+| `eval_b6/RERUN.md` | **B-6을 다시 돌리기 전에 읽을 것** — 소요·비결정성·대조 절차 |
