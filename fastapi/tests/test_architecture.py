@@ -179,3 +179,41 @@ class TestOrmRegistration:
             "alembic/env.py 에 등록되지 않은 ORM 이 있다 — DROP TABLE 이 생성된다:\n  "
             + "\n  ".join(missing)
         )
+
+
+class TestMigrationPrivileges:
+    """마이그레이션은 **앱 계정**으로 돈다. 그 계정이 못 하는 일을 넣으면 안 된다."""
+
+    def test_마이그레이션이_확장을_만들지_않는다(self):
+        """`CREATE EXTENSION` 은 마이그레이션이 아니라 환경 준비 단계의 일이다.
+
+        🔴 **확장마다 필요한 권한이 다르다.** `trusted = true` 인 확장(`hstore` 등)은
+        DB 소유자면 만들 수 있지만, **`vector` 는 trusted 가 아니라 슈퍼유저여야 한다.**
+        실측(2026-09-01, 로컬 PostgreSQL 18):
+
+            supersub 는 supersub DB 의 소유자이고 슈퍼유저가 아니다
+              CREATE EXTENSION hstore        -> 만들어졌다 (trusted)
+              CREATE EXTENSION postgres_fdw  -> permission denied to create extension
+
+        그래서 `vector` 를 마이그레이션에 넣으면 **배포에서 권한 오류로 멈춘다** —
+        그것도 마이그레이션 도중이라 스키마가 반쯤 올라간 상태로 멈춘다.
+
+        ⚠️ **로컬에서 통과했다는 것이 근거가 되지 못한다.** 컨테이너로 띄운
+        PostgreSQL 은 초기 사용자가 슈퍼유저인 경우가 많아 그런 환경에서는
+        조용히 통과한다. 그래서 권한이 아니라 **글자로** 막는다.
+
+        준비 절차는 `docs/deployment.md` 에 있다.
+        """
+        versions = APP.parent / "alembic" / "versions"
+        offenders = []
+        for path in sorted(versions.glob("*.py")):
+            if "__pycache__" in path.parts:
+                continue
+            text = path.read_text(encoding="utf-8").lower()
+            if "create extension" in text:
+                offenders.append(str(path.relative_to(APP.parent)).replace("\\", "/"))
+        assert not offenders, (
+            "마이그레이션에 CREATE EXTENSION 이 있다 — 앱 계정 권한으로는 배포에서 멈춘다.\n"
+            "확장은 docs/deployment.md 의 준비 단계에서 슈퍼유저가 만든다:\n  "
+            + "\n  ".join(offenders)
+        )
