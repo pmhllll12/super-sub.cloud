@@ -15,7 +15,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 - 전체 규격 — `fastapi/docs/api-contract.md`
 - 🔴 **반영할 변경 목록 — `fastapi/docs/client-contract-changes.md`**
-  (미결 항목 10번 · `jekyll/pages/pending.markdown`)
+  (`jekyll/pages/pending.markdown` 의 「클라이언트의 백엔드 계약 반영」)
 
 🔴 **고치기 전에 그 문서의 「먼저 확인」을 실제로 돌린다. 이미 됐으면 손대지 않는다.**
 처리 방식의 정본은 저장소 루트 `CLAUDE.md` 의 「미결 항목」 절이다 — 여기서
