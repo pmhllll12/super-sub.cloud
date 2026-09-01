@@ -341,7 +341,7 @@ Pydantic 검증에 걸리면 `code`는 항상 `VALIDATION_ERROR` 하나이고 `m
   "created_at": "2026-08-25T10:30:00Z",
   "teams": [
     { "team_id": "9a2e...", "name": "번개FC", "region": "서울 강남",
-      "sport_code": "futsal", "role": "member", "joined_at": "2026-07-01T00:00:00Z" }
+      "sport_code": "football", "role": "member", "joined_at": "2026-07-01T00:00:00Z" }
   ]
 }
 ```
@@ -668,7 +668,7 @@ A를 권하는 이유는 데이터가 이미 그렇게 말하고 있어서다 �
   "created_at": "2026-07-13T10:30:00Z",
   "teams": [
     { "team_id": "9a2e...", "name": "번개FC", "region": "서울 강남",
-      "sport_code": "futsal", "role": "member",
+      "sport_code": "football", "role": "member",
       "joined_at": "2026-07-01T00:00:00Z", "left_at": null }
   ],
   "has_card": true

@@ -181,6 +181,39 @@ class TestOrmRegistration:
         )
 
 
+class TestForeignKeyTargets:
+    def test_외래키가_가리키는_테이블이_런타임_metadata_에_있다(self):
+        """문자열 `ForeignKey("sport.code")` 는 **같은 metadata 에 대상이 있어야**
+        해석된다. 없으면 앱이 그 모델을 처음 쓰는 순간 죽는다.
+
+            NoReferencedTableError: ... could not find table 'sport'
+
+        🔴 **`alembic/env.py` 의 등록은 이걸 막아 주지 않는다.** 그쪽은 마이그레이션
+        때만 임포트되고 런타임에는 아무 역할도 하지 않는다. 실제로 2026-09-01 에
+        `sport` 를 추가하면서 이 구멍에 빠졌다 — env.py 에는 등록했는데 리포지토리가
+        없는 모델이라 코드 경로로는 로드되지 않았고, DB 테스트 18건이 한꺼번에 깨졌다.
+
+        참조만 되고 아무도 임포트하지 않는 모델은 그 컨텍스트의 `orm/__init__.py`
+        에서 끌어온다.
+        """
+        import app.main  # noqa: F401  — 앱이 실제로 로드하는 경로를 그대로 태운다
+        from app.core.database import Base
+
+        known = set(Base.metadata.tables)
+        dangling = sorted(
+            f"{table.name}.{fk.parent.name} -> {fk.target_fullname}"
+            for table in Base.metadata.tables.values()
+            for fk in table.foreign_keys
+            if fk.target_fullname.split(".")[0] not in known
+        )
+        assert not dangling, (
+            "외래키 대상 테이블이 런타임 metadata 에 없다 — 그 모델을 쓰는 순간 "
+            "NoReferencedTableError 로 죽는다.\n"
+            "해당 컨텍스트의 orm/__init__.py 에서 임포트할 것:\n  "
+            + "\n  ".join(dangling)
+        )
+
+
 class TestMigrationPrivileges:
     """마이그레이션은 **앱 계정**으로 돈다. 그 계정이 못 하는 일을 넣으면 안 된다."""
 
