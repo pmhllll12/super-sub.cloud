@@ -125,7 +125,6 @@ def test_briefly_visible_but_confident_tool_is_kept():
 def test_object_detection_ratio():
     result = PoseResult(
         keypoints=np.zeros((4, 17, 3)),
-        frames=[],
         source_fps=25.0,
         sampled_fps=12.5,
         objects={"sports_ball": np.array([
@@ -185,10 +184,59 @@ def test_frame_to_seconds_uses_effective_fps():
     """
     result = PoseResult(
         keypoints=np.zeros((128, 17, 3)),
-        frames=[],
         source_fps=25.0,
         sampled_fps=12.5,
     )
 
     assert result.frame_to_seconds(44) == pytest.approx(3.52)
     assert result.frame_to_seconds(0) == 0.0
+
+
+# ── 프레임은 보관하지 않고 렌더링 시점에 다시 디코딩한다 ────────────────────
+#
+# 프레임은 채점에 쓰이지 않는다(extract_features는 키포인트와 도구 궤적만
+# 받는다). 쓰이는 곳은 판정이 끝난 뒤의 미리보기뿐인데, 그때까지 4K 300장을
+# 들고 있으면 판정 모델과 메모리가 겹친다. 재디코딩이 원본과 **같은 프레임**을
+# 준다는 것이 이 교체의 전제이므로 여기서 지킨다.
+
+def test_pose_result_does_not_hold_frames():
+    """결과가 프레임을 들고 다니면 안 된다 — 계약이 되돌아가는 것을 막는다."""
+    result = PoseResult(keypoints=np.zeros((2, 17, 3)), source_fps=30.0, sampled_fps=15.0)
+
+    assert not hasattr(result, "frames")
+
+
+def test_load_frames_reproduces_the_original_decode(tmp_path):
+    """재디코딩이 추출 때 본 프레임과 화소까지 같아야 한다."""
+    clip = write_clip(tmp_path / "c.avi", n_frames=12, fps=30.0)
+    original, _, sampled_fps = read_frames(clip, target_fps=15)
+
+    result = PoseResult(
+        keypoints=np.zeros((len(original), 17, 3)), source_fps=30.0,
+        sampled_fps=sampled_fps, video_path=clip, target_fps=15,
+    )
+    reloaded = result.load_frames()
+
+    assert len(reloaded) == len(original)
+    assert all(np.array_equal(a, b) for a, b in zip(original, reloaded))
+
+
+def test_load_frames_uses_the_recorded_target_fps(tmp_path):
+    """추출 때 쓴 target_fps로 다시 골라야 한다 — 다른 값이면 다른 프레임이다."""
+    clip = write_clip(tmp_path / "c.avi", n_frames=12, fps=30.0)
+    kps = np.zeros((12, 17, 3))
+
+    dense = PoseResult(keypoints=kps, source_fps=30.0, sampled_fps=30.0,
+                       video_path=clip, target_fps=30).load_frames()
+    sparse = PoseResult(keypoints=kps, source_fps=30.0, sampled_fps=15.0,
+                        video_path=clip, target_fps=15).load_frames()
+
+    assert len(dense) == 12
+    assert len(sparse) == 6
+
+
+def test_load_frames_is_none_without_a_video():
+    """합성 키포인트 경로에는 영상이 없다 — 미리보기 없이 채점만 한다."""
+    result = PoseResult(keypoints=np.zeros((3, 17, 3)), source_fps=30.0, sampled_fps=15.0)
+
+    assert result.load_frames() is None
