@@ -115,3 +115,89 @@ class TestAuthEndpoints:
 
         res = client.post(f"{V1}/auth/login", json={"email": "x@example.com"})
         assert res.status_code == 429
+
+
+class TestRetryAfter:
+    """429 에 `Retry-After` 를 싣는다.
+
+    없으면 클라이언트가 **언제 풀리는지 알 수 없어** 스스로 타이머를 만들어야 하고,
+    그 값이 서버 창과 어긋나면 너무 일찍 두드리거나 필요 이상으로 기다린다.
+    """
+
+    def test_거부된_요청은_창을_밀지_않는다(self):
+        """🔴 이것이 `Retry-After` 를 신뢰할 수 있게 하는 전제다.
+
+        거부를 카운트에 넣으면 재시도할 때마다 만료 시각이 뒤로 밀려 **알려 준
+        시간이 지나도 안 풀린다.** `check` 가 거부 경로에서 `append` 하지 않는
+        것을 여기서 지킨다.
+        """
+        import time
+
+        limiter = SlidingWindowLimiter(limit=1, window_seconds=0.3)
+        limiter.check("출처")
+
+        deadline = time.monotonic() + 0.2
+        while time.monotonic() < deadline:  # 거부되는 동안 계속 두드린다
+            with pytest.raises(ApiError):
+                limiter.check("출처")
+
+        time.sleep(0.15)  # 최초 요청으로부터 창이 지났다
+        limiter.check("출처")  # 두드린 것과 무관하게 풀려야 한다
+
+    def test_남은_시간을_초로_알려준다(self):
+        limiter = SlidingWindowLimiter(limit=1, window_seconds=60)
+        limiter.check("출처")
+
+        with pytest.raises(ApiError) as caught:
+            limiter.check("출처")
+
+        retry_after = caught.value.headers["Retry-After"]
+        assert retry_after.isdigit(), "정수 초여야 한다 (HTTP-date 를 쓰지 않는다)"
+        assert 1 <= int(retry_after) <= 60
+
+    def test_기다릴수록_값이_줄어든다(self):
+        """고정값이 아니라 **남은 시간**임을 확인한다."""
+        import time
+
+        limiter = SlidingWindowLimiter(limit=1, window_seconds=10)
+        limiter.check("출처")
+
+        with pytest.raises(ApiError) as first:
+            limiter.check("출처")
+        time.sleep(1.1)
+        with pytest.raises(ApiError) as later:
+            limiter.check("출처")
+
+        assert int(later.value.headers["Retry-After"]) < int(
+            first.value.headers["Retry-After"]
+        )
+
+    def test_올림한다(self):
+        """내림하면 알려 준 그 시각에 다시 429 를 맞는다."""
+        limiter = SlidingWindowLimiter(limit=1, window_seconds=0.4)
+        limiter.check("출처")
+
+        with pytest.raises(ApiError) as caught:
+            limiter.check("출처")
+        assert caught.value.headers["Retry-After"] == "1"  # 0.4 초 → 0 이 아니라 1
+
+    def test_HTTP_응답에도_실린다(self, client):
+        for _ in range(AUTH_LIMIT):
+            client.post(
+                f"{V1}/auth/login",
+                json={"email": DEMO_EMAIL, "password": "wrong-password"},
+            )
+
+        res = client.post(
+            f"{V1}/auth/login", json={"email": DEMO_EMAIL, "password": DEMO_PASSWORD}
+        )
+        assert res.status_code == 429
+        assert res.headers["Retry-After"].isdigit()
+
+    def test_다른_에러에는_붙지_않는다(self, client):
+        """`Retry-After` 는 429 의 계약이다. 401 에 붙으면 뜻이 달라진다."""
+        res = client.post(
+            f"{V1}/auth/login", json={"email": DEMO_EMAIL, "password": "wrong-password"}
+        )
+        assert res.status_code == 401
+        assert "Retry-After" not in res.headers

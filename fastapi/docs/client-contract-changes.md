@@ -60,20 +60,34 @@ fastapi/docs/client-contract-changes.md 를 읽고, 각 항목의 "먼저 확인
 { "error": { "code": "TOO_MANY_REQUESTS", "message": "요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요." } }
 ```
 
-⚠️ **`Retry-After` 헤더는 아직 없다.** 언제 풀리는지 서버가 알려주지 않으므로
-클라이언트가 **자체적으로 간격을 두어야** 한다. 창은 60초다.
+✅ **`Retry-After` 가 붙었다** (2026-09-01, 커밋은 아래 "바뀐 점"). **정수 초**이고
+고정값이 아니라 **그 시점에 남은 시간**이다. 올림한 값이라 그만큼 기다리면 반드시
+한 자리가 비어 있다. **자체 타이머를 만들 필요가 없다.**
 
-🔴 **여기서 즉시 재시도하면 제한이 영영 안 풀린다.** 창이 60초라서, 재시도가
-창 안에 계속 들어오면 카운터가 계속 차 있다. 자동 재시도 로직이 있다면 **429 에서는
-반드시 멈춰야 한다.**
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 37
+```
+
+> 🔴 **바뀐 점 — 앞서 "Retry-After 가 없다"고 전달한 것을 정정합니다.** 그때는
+> 없었고 09-01 에 붙였습니다. 자체 타이머를 이미 만드셨다면 **서버 값을 쓰는 쪽으로
+> 바꾸는 편이 낫습니다** — 서버 창과 어긋날 일이 없습니다.
+>
+> 같이 정정합니다: **"즉시 재시도하면 제한이 영영 안 풀린다"고 적었는데 과장이었습니다.**
+> 거부된 요청은 카운터에 넣지 않아서 **재시도가 만료 시각을 밀지는 않습니다.** 다만
+> 창이 지나기 전에는 계속 거부되므로 **무의미하고 서버 자원만 씁니다.**
 
 ### 만족해야 할 성질
 
-> **인증 요청이 429 로 거부되면, 사용자가 곧바로 같은 요청을 다시 보낼 수 없다.**
+> **인증 요청이 429 로 거부되면, `Retry-After` 가 지나기 전에는 같은 요청이 다시
+> 나가지 않는다.**
 
-방식은 상관없다 — 버튼 잠금 · 쿨다운 타이머 · 카운트다운 안내 · 전역 재시도 정책
-어느 쪽이든 **"429 직후 재요청이 안 나간다"** 면 만족이다. 자동 재시도 로직이
-있다면 429 에서 멈추기만 해도 된다.
+방식은 상관없다 — 버튼 잠금 · 쿨다운 · 카운트다운 안내 · 전역 재시도 정책 어느
+쪽이든 **"429 직후 재요청이 안 나간다"** 면 만족이다. 자동 재시도 로직이 있다면
+429 에서 멈추기만 해도 된다.
+
+**대기 시간은 서버가 준 `Retry-After` 를 쓴다.** 임의의 상수(예: 무조건 60초)를
+넣으면 필요 이상으로 기다리게 된다 — 남은 시간은 그보다 짧은 경우가 대부분이다.
 
 ### 먼저 확인
 
@@ -93,14 +107,33 @@ grep -rnE "TOO_MANY_REQUESTS|\b429\b" www/src flutter/lib
 
 ### 아직이라면 — 참고용 제안 (규격 아님)
 
-2026-09-01 기준으로 `www` 는 에러 문구까지는 이미 잘 보여준다. `ApiCallError` 가
-`status` 와 `code` 를 들고 있고(`src/lib/api/client.ts`) 로그인 화면이
-`apiErrorMessage(err)` 로 서버 문구를 띄운다. **비어 있는 것은 "다시 누르지 못하게"
-하는 쪽뿐이다.**
+#### 🔴 www — `Retry-After` 는 **지금 브라우저까지 오지 않는다** (프록시가 버린다)
+
+2026-09-01 에 확인한 것이다. `www` 는 프록시라 헤더가 세 곳을 지나야 하는데
+**중간에 끊긴다.** 헤더를 쓰려면 이어 주어야 한다.
+
+| 자리 | 지금 | 필요한 것 |
+|---|---|---|
+| `src/server/backend/errors.ts` | `BackendError` 가 `status`·`code`·`message` 만 갖는다 | 백엔드 응답의 `Retry-After` 를 함께 들고 온다 |
+| `src/app/api/auth/*/route.ts` | `NextResponse.json(errorResponseBody(e), { status })` — **헤더를 안 싣는다** | 429 면 `Retry-After` 를 응답 헤더에 싣는다 |
+| `src/lib/api/client.ts` | `send()` 가 `res.headers` 를 안 읽는다 | `res.headers.get('retry-after')` 를 `ApiCallError` 에 싣는다 |
+
+**Flutter 는 백엔드를 직접 부르므로 헤더가 그대로 온다** — 이 문제가 없다.
+
+> 💬 **세 곳을 고치는 게 번거로우면 말해 주세요.** 백엔드가 에러 본문에도
+> `retry_after` 를 넣어 드릴 수 있습니다(프록시가 본문은 그대로 넘기므로 고칠 곳이
+> 한 곳으로 줍니다). 헤더가 HTTP 표준이고 다른 헤더도 언젠가 필요할 것 같아
+> **일단 헤더만** 두었습니다. 편한 쪽으로 맞추겠습니다.
+
+#### 화면 쪽 — 참고용 예시
+
+에러 문구까지는 이미 잘 나온다. `ApiCallError` 가 `status` 와 `code` 를 들고 있고
+(`src/lib/api/client.ts`) 로그인 화면이 `apiErrorMessage(err)` 로 서버 문구를 띄운다.
+**비어 있는 것은 "다시 누르지 못하게" 하는 쪽이다.**
 
 ```ts
 // src/lib/api/client.ts — 판별 헬퍼 예시
-/** 429. 창은 60초이고 Retry-After 는 없다 — 그 안에 다시 부르면 계속 막힌다. */
+/** 429. 대기 시간은 서버가 준 Retry-After(초)를 쓴다 — 임의의 상수를 두지 않는다. */
 export function isRateLimited(err: unknown): boolean {
   return err instanceof ApiCallError && err.code === 'TOO_MANY_REQUESTS'
 }
@@ -108,6 +141,7 @@ export function isRateLimited(err: unknown): boolean {
 
 이걸 `src/app/login/page.tsx` · `src/app/signup/page.tsx` 의 `catch (err)` 와
 `src/components/auth/GoogleSignInButton.tsx` 의 `onError` 에서 써서 제출을 잠근다.
+잠그는 시간은 위 표대로 `Retry-After` 를 끌어온 뒤 그 값을 쓴다.
 
 **Flutter 는 4번이 선행 조건이다** — `code` 를 버리고 있어 429 를 분기할 수단이 없다.
 
