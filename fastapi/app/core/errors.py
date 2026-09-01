@@ -17,12 +17,24 @@ from app.core.logging import log_api_error
 
 
 class ApiError(Exception):
-    """계약에 정의된 에러를 낼 때 쓴다."""
+    """계약에 정의된 에러를 낼 때 쓴다.
 
-    def __init__(self, status_code: int, code: str, message: str) -> None:
+    `headers` 는 **응답 헤더가 계약의 일부인 경우**에만 쓴다 — 지금은 429 의
+    `Retry-After` 하나다. 본문에 담을 수 있는 것을 헤더로 옮기지 않는다.
+    """
+
+    def __init__(
+        self,
+        status_code: int,
+        code: str,
+        message: str,
+        *,
+        headers: dict[str, str] | None = None,
+    ) -> None:
         self.status_code = status_code
         self.code = code
         self.message = message
+        self.headers = headers
 
 
 def _body(code: str, message: str) -> dict[str, dict[str, str]]:
@@ -49,7 +61,9 @@ def install_error_handlers(app: FastAPI) -> None:
         # `INVALID_TOKEN`)가 전부 여기를 지난다 — SEC-010 의 실패 쪽은 이 한 줄이다.
         log_api_error(request, exc.status_code, exc.code)
         return JSONResponse(
-            status_code=exc.status_code, content=_body(exc.code, exc.message)
+            status_code=exc.status_code,
+            content=_body(exc.code, exc.message),
+            headers=exc.headers,
         )
 
     @app.exception_handler(RequestValidationError)

@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import math
 import threading
 import time
 from collections import deque
@@ -63,10 +64,20 @@ class SlidingWindowLimiter:
                 hits.popleft()
 
             if len(hits) >= self._limit:
+                # 🔴 **거부된 요청은 세지 않는다**(여기서 append 하지 않는다).
+                #    세면 재시도할수록 창이 밀려 영영 안 풀린다 — 오타를 반복한
+                #    사람이 그 사이 아무것도 못 하게 된다.
+                #
+                # 가장 오래된 기록이 창을 벗어나면 자리가 하나 난다. 그때까지의
+                # 시간을 **올림해서** 초로 알려 준다 — 내림하면 그 시각에 다시
+                # 걸린다.
+                wait = self._window - (now - hits[0])
+                retry_after = max(1, math.ceil(wait))
                 raise ApiError(
                     429,
                     "TOO_MANY_REQUESTS",
                     "요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.",
+                    headers={"Retry-After": str(retry_after)},
                 )
             hits.append(now)
 

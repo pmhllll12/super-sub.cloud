@@ -7,9 +7,8 @@
 쓰든 바뀌지 않는 부분이라 지금 확정할 수 있고, 버킷·리전 같은 접속 정보는 설정으로
 빠진다. 저장소가 정해져도 이 컬럼은 그대로다.
 
-🔴 `sport_code` 는 부록 D.3 이 `sport` 테이블을 가리키는 외래키로 정의하지만
-**그 테이블이 아직 없다.** 지금은 코드 문자열만 둔다 — `sport` 가 생기면 외래키를
-추가하는 마이그레이션을 따로 낸다.
+`sport_code` 는 부록 D.3 대로 `sport` 를 가리키는 외래키다(2026-09-01 연결).
+그전에는 문자열이라 오타가 그대로 새 종목이 됐다.
 """
 
 from __future__ import annotations
@@ -31,7 +30,11 @@ class VideoOrm(Base):
     user_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("user.id", ondelete="CASCADE"), nullable=False
     )
-    sport_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    # `sport` 는 `user` 컨텍스트에 있지만 **문자열 참조라 임포트하지 않는다** —
+    # 컨텍스트 경계 검사(`tests/test_architecture.py`)를 지키는 방식이다.
+    sport_code: Mapped[str] = mapped_column(
+        String(20), ForeignKey("sport.code"), nullable=False
+    )
 
     # 객체 저장소 키. 원본은 앱 서버를 지나지 않는다(PER-002).
     storage_key: Mapped[str] = mapped_column(String(255), nullable=False)

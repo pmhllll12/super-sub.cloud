@@ -28,6 +28,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.core.database import Base, sqlalchemy_url  # noqa: E402
 
 # --- 모델 등록 (여기 없는 테이블은 DROP 대상이 된다) ------------------------
+from app.user.adapter.outbound.orm import position_orm  # noqa: E402,F401
+from app.user.adapter.outbound.orm import sport_orm  # noqa: E402,F401
 from app.user.adapter.outbound.orm import team_member_orm  # noqa: E402,F401
 from app.user.adapter.outbound.orm import team_orm  # noqa: E402,F401
 from app.user.adapter.outbound.orm import user_credential_orm  # noqa: E402,F401

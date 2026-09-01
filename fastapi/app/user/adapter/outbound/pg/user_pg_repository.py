@@ -44,6 +44,23 @@ def _is_unique_violation(exc: IntegrityError) -> bool:
     return getattr(getattr(exc, "orig", None), "sqlstate", None) == _UNIQUE_VIOLATION
 
 
+# LIKE 패턴에서 특별한 뜻을 갖는 문자. 검색어에 들어오면 리터럴로 바꿔야 한다.
+_LIKE_ESCAPE = "\\"
+
+
+def _escape_like(value: str) -> str:
+    """LIKE 메타문자를 리터럴로 만든다.
+
+    🔴 역슬래시를 **먼저** 바꾼다. 나중에 바꾸면 `%` 를 감싸려고 붙인 이스케이프
+    문자까지 다시 이스케이프되어 패턴이 깨진다.
+    """
+    return (
+        value.replace(_LIKE_ESCAPE, _LIKE_ESCAPE * 2)
+        .replace("%", f"{_LIKE_ESCAPE}%")
+        .replace("_", f"{_LIKE_ESCAPE}_")
+    )
+
+
 class UserPgRepository(UserPort):
     def __init__(self, session: Session) -> None:
         self._session = session
@@ -271,8 +288,12 @@ class UserPgRepository(UserPort):
         if q:
             # 이메일은 Email.of 로 소문자 정규화해 저장하지만 닉네임은 아니라서
             # 둘 다 대소문자를 가리지 않는 ilike 로 맞춘다.
+            # 🔴 `%`·`_` 는 LIKE 메타문자다. 그대로 넘기면 검색어가 패턴이 되어
+            #    `q="%"` 한 글자로 전체가 걸린다 — 리터럴로 이스케이프한다.
+            pattern = f"%{_escape_like(q)}%"
             condition = or_(
-                UserOrm.email.ilike(f"%{q}%"), UserOrm.nickname.ilike(f"%{q}%")
+                UserOrm.email.ilike(pattern, escape=_LIKE_ESCAPE),
+                UserOrm.nickname.ilike(pattern, escape=_LIKE_ESCAPE),
             )
             stmt = stmt.where(condition)
             count_stmt = count_stmt.where(condition)

@@ -2,14 +2,14 @@
 
 호칭의 **종류**다. 누가 받았는지는 `user_title` 이 담는다.
 
-⚠️ 부록 D.3 에 `sport_code -> sport` 외래키가 있으나 `sport` 테이블이 아직 없어서
-컬럼만 둔다. 그 도메인이 들어올 때 마이그레이션으로 제약을 건다 —
-`team.sport_code` 와 같은 상태다.
+`sport_code` 는 부록 D.3 대로 `sport` 를 가리키는 외래키다(2026-09-01 연결).
+`sport` 는 `user` 컨텍스트에 있지만 **문자열 참조라 임포트하지 않는다** —
+컨텍스트 경계 검사(`tests/test_architecture.py`)를 지키는 방식이다.
 """
 
 from __future__ import annotations
 
-from sqlalchemy import String
+from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -25,4 +25,6 @@ class TitleDefinitionOrm(Base):
     # DB 에 CHECK 를 걸지 않은 이유는 분류가 늘어날 때 마이그레이션이 필요해지기
     # 때문이고, 애플리케이션이 이미 막고 있다.
     category: Mapped[str] = mapped_column(String(10), nullable=False)
-    sport_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    sport_code: Mapped[str] = mapped_column(
+        String(20), ForeignKey("sport.code"), nullable=False
+    )

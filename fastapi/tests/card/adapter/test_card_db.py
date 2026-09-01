@@ -51,12 +51,12 @@ def card(db_client, db_session):
 
     db_session.add(
         TitleDefinitionOrm(
-            code=codes[0], label="주말 개근", category="활동", sport_code="futsal"
+            code=codes[0], label="주말 개근", category="활동", sport_code="football"
         )
     )
     db_session.add(
         TitleDefinitionOrm(
-            code=codes[1], label="슈팅이 매서운", category="강점", sport_code="futsal"
+            code=codes[1], label="슈팅이 매서운", category="강점", sport_code="football"
         )
     )
     db_session.add(
