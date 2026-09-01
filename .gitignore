@@ -17,3 +17,9 @@ agent/uv.lock
 
 # 모델 가중치 — 실행 시 자동 내려받는다. 저장소에 넣지 않는다.
 agent/*.pt
+
+# macOS
+.DS_Store
+
+# Node — www/ 의 것은 www/.gitignore 가 맡지만, 루트에서 받은 것도 넣지 않는다.
+node_modules/

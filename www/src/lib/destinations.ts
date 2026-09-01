@@ -69,6 +69,8 @@ export const DESTINATIONS: Destination[] = [
     title: '레슨 · 상점',
     icon: 'add_business',
     summary: '제휴 코치와 장비를\n한자리에서',
+    href: '/market',
+    authRequired: true,
   },
   {
     title: '경기장 예약',

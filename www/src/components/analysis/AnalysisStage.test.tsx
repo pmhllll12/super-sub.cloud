@@ -1,6 +1,19 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import AnalysisStage from './AnalysisStage'
+
+/**
+ * 🔴 검출기는 대역으로 세운다. 진짜를 부르면 jsdom 에서 WebGL 도 망도 없어
+ * **로드가 실패하고 화면이 "따라가기 꺼짐" 으로 넘어간다** — 그러면 네모에
+ * 관한 것은 하나도 시험할 수 없다. 무거운 tfjs 를 안 싣는 덤도 있다.
+ */
+vi.mock('@/lib/personDetector', () => ({
+  warmUpDetector: () => Promise.resolve({}),
+  warmUpRefine: () => Promise.resolve({}),
+  detectPeople: () => Promise.resolve([{ box: { x: 0.3, y: 0.2, w: 0.25, h: 0.5 }, score: 0.9 }]),
+  // 2단계는 없어도 되는 덤이다 — 못 하면 1단계 관절을 쓴다.
+  refinePose: () => Promise.resolve(null),
+}))
 
 describe('영상 분석 화면', () => {
   // 🔴 버튼을 붙였다 뗐다 하면 그 순간 판의 키가 확 바뀌어 안쪽 것들이 툭
@@ -31,6 +44,43 @@ describe('영상 분석 화면', () => {
     expect(text).not.toMatch(/\d+\s*%/)
     expect(container.querySelector('progress')).toBeNull()
     expect(container.querySelector('meter')).toBeNull()
+  })
+
+  // 🔴 기본값을 축구로 박아 두면 야구 영상이 축구 루브릭으로 조용히 채점된다.
+  it('종목은 처음에 아무것도 골라져 있지 않다', () => {
+    render(<AnalysisStage />)
+    for (const name of ['축구', '야구', '농구']) {
+      expect(screen.getByRole('button', { name })).toHaveAttribute('aria-pressed', 'false')
+    }
+  })
+
+  // 창 틀 흉내로 뒀던 장식 점 둘은 없앴다(사용자 요청) — 누를 수 있는 것은
+  // 하나뿐인데 셋이 나란히 있으면 나머지도 눌리는 것처럼 보인다.
+  it('창 틀 머리줄의 점은 하나뿐이다', () => {
+    const { container } = render(<AnalysisStage />)
+    expect(container.querySelectorAll('.ss-shot-dot')).toHaveLength(1)
+  })
+
+  // 🔴 올리기 전에 알아야 다시 안 찍는다. 셋 다 실제로 겪은 실패다 —
+  // 카메라가 따라 움직이면 놓치고, 몸이 잘리면 볼 관절이 없고, 비슷한 옷을
+  // 입은 사람이 옆에 있으면 헷갈린다.
+  it('어떻게 찍어야 하는지 떨구는 자리에 적어 둔다', () => {
+    render(<AnalysisStage />)
+    expect(screen.getByText(/카메라는 고정/)).toBeInTheDocument()
+    expect(screen.getByText(/온몸이 화면 안에/)).toBeInTheDocument()
+    expect(screen.getByText(/혼자 나올수록/)).toBeInTheDocument()
+  })
+
+  it('영상을 고르면 찍는 법 안내는 자리를 비운다', async () => {
+    URL.createObjectURL = vi.fn(() => 'blob:test')
+    URL.revokeObjectURL = vi.fn()
+    const user = userEvent.setup()
+    render(<AnalysisStage />)
+    await user.upload(
+      screen.getByLabelText('분석할 영상') as HTMLInputElement,
+      new File(['x'], 'clip.mp4', { type: 'video/mp4' }),
+    )
+    expect(screen.queryByText(/카메라는 고정/)).toBeNull()
   })
 
   it('영상을 고르기 전에도 무엇을 해 주는지 적어 둔다', () => {
@@ -84,6 +134,27 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     URL.revokeObjectURL = vi.fn()
   })
 
+  /**
+   * 영상 위에 네모를 끌어 그리고 확정한다.
+   *
+   * jsdom 은 상자 크기를 0 으로 답하고 포인터 붙잡기가 없어서, 그 둘만
+   * 흉내 낸다 — 나머지는 진짜 코드가 돈다.
+   */
+  async function drawSubject(user: ReturnType<typeof userEvent.setup>) {
+    const layer = document.querySelector('.ss-shot-pick') as HTMLElement
+    const rect = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue({ width: 400, height: 300, left: 0, top: 0 } as DOMRect)
+    HTMLElement.prototype.setPointerCapture = () => {}
+    await user.pointer([
+      { keys: '[MouseLeft>]', target: layer, coords: { clientX: 120, clientY: 60 } },
+      { target: layer, coords: { clientX: 220, clientY: 260 } },
+      { keys: '[/MouseLeft]', target: layer, coords: { clientX: 220, clientY: 260 } },
+    ])
+    rect.mockRestore()
+    await user.click(screen.getByRole('button', { name: '이 사람으로 분석' }))
+  }
+
   function pick() {
     const view = render(<AnalysisStage />)
     const input = screen.getByLabelText('분석할 영상') as HTMLInputElement
@@ -105,6 +176,49 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     expect(screen.queryByLabelText('분석 진행')).toBeNull()
   })
 
+  // 🔴 에이전트가 종목을 알아야 세세하게 본다 — 루브릭이 종목마다 다르다.
+  it('영상만 골라서는 시작할 수 없고, 종목까지 골라야 풀린다', async () => {
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+
+    const startBtn = screen.getByRole('button', { name: '분석 시작하기' })
+    expect(startBtn).toBeDisabled()
+    // 왜 잠겼는지 화면에 적어 둔다 — 잠긴 버튼만 있으면 이유를 알 길이 없다.
+    expect(screen.getByText('종목을 먼저 골라 주세요')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '야구' }))
+    expect(screen.getByRole('button', { name: '야구' })).toHaveAttribute('aria-pressed', 'true')
+    expect(startBtn).toBeEnabled()
+  })
+
+  // 돌고 있는 분석의 루브릭을 도중에 갈아끼우는 셈이 된다.
+  it('시작한 뒤에는 종목을 바꿀 수 없다', async () => {
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '농구' }))
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+
+    // 고른 것은 그대로 보인다 — 무엇으로 보고 있는지가 분석 내내 남아야 한다.
+    expect(screen.getByRole('button', { name: '농구' })).toHaveAttribute('aria-pressed', 'true')
+    for (const name of ['축구', '야구', '농구']) {
+      expect(screen.getByRole('button', { name })).toBeDisabled()
+    }
+  })
+
+  // 같은 사람이 연달아 올리는 클립은 대개 같은 종목이다.
+  it('영상을 물러도 고른 종목은 남는다', async () => {
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '축구' }))
+    await user.click(screen.getByRole('button', { name: '영상 닫기' }))
+
+    await screen.findByLabelText('분석할 영상', {}, { timeout: 2000 })
+    expect(screen.getByRole('button', { name: '축구' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
   // 🔴 시작 전에는 오른쪽 판이 아직 없다 — 여기서 못 무르면 잘못 고른 영상을
   // 되돌릴 길이 아예 없다.
   it('창 틀의 닫기 점으로 고른 영상을 무른다', async () => {
@@ -120,11 +234,119 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     expect(screen.getByRole('button', { name: '분석 시작하기' })).toBeDisabled()
   })
 
+  // 🔴 시작을 누른 뒤 pause() 를 부르는데도 영상이 저 혼자 0초 → 3초로 흘러가
+  // 있었다(사용자 지적). 어디서 다시 트는지 좁히는 대신 규칙을 못박았다 —
+  // 묶는 동안 재생은 우리 재생 단추와 대상 확정, 그 둘에서만 시작한다.
+  it('묶는 동안 우리가 시키지 않은 재생은 곧바로 도로 세운다', async () => {
+    const pauseSpy = vi
+      .spyOn(HTMLMediaElement.prototype, 'pause')
+      .mockImplementation(() => {})
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '축구' }))
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+
+    pauseSpy.mockClear()
+    fireEvent.play(document.querySelector('video') as HTMLVideoElement)
+    expect(pauseSpy).toHaveBeenCalled()
+    pauseSpy.mockRestore()
+  })
+
+  it('사용자가 재생을 누른 것은 막지 않는다', async () => {
+    const pauseSpy = vi
+      .spyOn(HTMLMediaElement.prototype, 'pause')
+      .mockImplementation(() => {})
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '축구' }))
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+
+    await user.click(screen.getByRole('button', { name: '재생' }))
+    pauseSpy.mockClear()
+    fireEvent.play(document.querySelector('video') as HTMLVideoElement)
+    expect(pauseSpy).not.toHaveBeenCalled()
+    pauseSpy.mockRestore()
+  })
+
+  // 🔴 관절은 MoveNet 이 사람마다 이미 주고 있던 값이다 — 상자만 쓰고 버리던
+  // 것을 그린다. 자세 분석 앱이라 관절이 덤이 아니라 본론이다.
+  it('따라가는 사람 위에 관절 막대기를 그릴 자리를 둔다', async () => {
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '축구' }))
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await screen.findByRole('button', { name: '이 사람으로 분석' }, { timeout: 2500 })
+    await drawSubject(user)
+
+    expect(document.querySelector('.ss-shot-pose')).not.toBeNull()
+    expect(document.querySelector('.ss-shot-bone')).not.toBeNull()
+    expect(document.querySelector('.ss-shot-joint')).not.toBeNull()
+    // 🔴 화면의 나머지 사람들도 회색으로 그린다 — 초록 하나만 있으면 나머지가
+    // 검출이 안 된 건지 그냥 안 그린 건지 알 수 없다.
+    expect(document.querySelector('.ss-shot-bone-other')).not.toBeNull()
+    expect(document.querySelector('.ss-shot-joint-other')).not.toBeNull()
+  })
+
+  // 🔴 회색이 먼저 와야 초록이 그 위에 그려진다 — 겹쳐 선 사람들 사이에서
+  // 내 사람이 묻히면 안 된다.
+  it('내 사람 막대기가 나머지 사람들 위에 온다', async () => {
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '축구' }))
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await screen.findByRole('button', { name: '이 사람으로 분석' }, { timeout: 2500 })
+    await drawSubject(user)
+
+    const paths = [...document.querySelectorAll('.ss-shot-pose path')]
+    const other = paths.findIndex((p) => p.classList.contains('ss-shot-bone-other'))
+    const mine = paths.findIndex(
+      (p) => p.classList.contains('ss-shot-bone') && !p.classList.contains('ss-shot-bone-other'),
+    )
+    expect(other).toBeLessThan(mine)
+  })
+
+  // 🔴 판이 줄어드는 0.8초 동안 네모만 남아 있으면 무엇을 가리키는지 알 수
+  // 없다 — 닫기 점이든 '다른 영상' 이든 누른 그 순간 걷힌다(사용자 요청).
+  it('닫기 점을 누르면 따라가는 네모가 곧바로 사라진다', async () => {
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '축구' }))
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await screen.findByRole('button', { name: '이 사람으로 분석' }, { timeout: 2500 })
+    await drawSubject(user)
+    expect(document.querySelector('.ss-shot-track')).not.toBeNull()
+
+    await user.click(screen.getByRole('button', { name: '영상 닫기' }))
+    // 판이 다 줄기를 기다리지 않는다 — 누른 즉시다.
+    expect(document.querySelector('.ss-shot-track')).toBeNull()
+  })
+
+  it("'다른 영상' 을 눌러도 마찬가지다", async () => {
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '축구' }))
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await screen.findByRole('button', { name: '이 사람으로 분석' }, { timeout: 2500 })
+    await drawSubject(user)
+    expect(document.querySelector('.ss-shot-track')).not.toBeNull()
+
+    await user.click(screen.getByRole('button', { name: '다른 영상' }))
+    expect(document.querySelector('.ss-shot-track')).toBeNull()
+  })
+
   // 창 틀의 닫기 자리이므로 시작한 뒤에도 그대로 있어야 한다.
   it('시작한 뒤에도 닫기 점이 남아 있고, 누르면 고르기 전으로 돌아간다', async () => {
     const user = userEvent.setup()
     const { input, file } = pick()
     await user.upload(input, file)
+    // 종목을 골라야 시작이 풀린다.
+    await user.click(screen.getByRole('button', { name: '축구' }))
     await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
 
     await user.click(screen.getByRole('button', { name: '영상 닫기' }))
@@ -150,6 +372,7 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     const user = userEvent.setup()
     const { input, file } = pick()
     await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '축구' }))
     await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
 
     const stage = document.querySelector('.ss-shot')
@@ -164,7 +387,80 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     // 버튼은 DOM 에 남되 **잠긴다** — 붙였다 뗐다 하면 판의 키가 확 바뀌어
     // 안쪽 것들이 툭 떨어진다. 접히는 것은 CSS 가 한다.
     expect(screen.getByRole('button', { name: '분석 시작하기' })).toBeDisabled()
-    // 오른쪽 판이 뜬 뒤부터 단계가 돈다.
-    expect(await screen.findByLabelText('분석 진행', {}, { timeout: 2500 })).toBeInTheDocument()
+
+    // 🔴 오른쪽 판이 떠도 **아직 단계는 안 돈다** — 누구를 볼지부터 정한다.
+    await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 })
+    expect(screen.queryByLabelText('분석 진행')).toBeNull()
+
+    // 대상이 정해지면 그때부터 돈다.
+    await user.click(screen.getByRole('button', { name: '자동으로 고르기' }))
+    expect(await screen.findByLabelText('분석 진행')).toBeInTheDocument()
+  })
+
+  // 🔴 검출기는 사람을 여럿 찾아내고 지금은 **가장 큰 박스**를 자동으로 고른다
+  // (pose.py 의 _largest_person_box) — 카메라에 가까운 사람일 뿐이다. 미결 8번의
+  // 결론("continuity 는 처음 잡은 대상이 맞으면 이긴다")을 사람이 찍어 해소한다.
+  it('다 자란 화면에서 분석할 사람을 먼저 묶는다', async () => {
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '축구' }))
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+
+    // 영상 위에 묶는 판이 뜨고, 무엇을 하라는 것인지 거기에도 적혀 있다.
+    expect(document.querySelector('.ss-shot-pick')).not.toBeNull()
+    expect(screen.getByText('분석할 사람을 끌어서 네모로 묶어 주세요')).toBeInTheDocument()
+
+    // 아직 아무것도 안 그렸으니 '이 사람으로 분석' 은 잠겨 있다.
+    await screen.findByRole('button', { name: '이 사람으로 분석' }, { timeout: 2500 })
+    expect(screen.getByRole('button', { name: '이 사람으로 분석' })).toBeDisabled()
+    // 오른쪽 판 머리도 아직 '보고 있습니다' 가 아니다.
+    expect(screen.getByRole('heading', { name: '분석할 사람' })).toBeInTheDocument()
+  })
+
+  // 🔴 첫 프레임에 그 사람이 안 나올 수 있다 — 돌려 보고 세운 뒤 묶어야 한다.
+  it('묶는 동안 영상을 돌려 보고 세울 수 있다', async () => {
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '축구' }))
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+
+    expect(screen.getByRole('button', { name: '재생' })).toBeInTheDocument()
+    expect(screen.getByLabelText('영상 위치')).toBeInTheDocument()
+    // 기본 컨트롤은 꺼 둔다 — 묶는 판에 덮여 못 누르는데 보이기만 하면
+    // 우리 컨트롤과 둘로 읽힌다.
+    expect(document.querySelector('video')).not.toHaveAttribute('controls')
+  })
+
+  // 🔴 막대를 끄는 pointerdown 이 묶는 판으로 올라가면 그 순간 네모가 그려진다.
+  it('재생 막대를 만져도 네모가 그려지지 않는다', async () => {
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '축구' }))
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+
+    await user.pointer({ target: screen.getByLabelText('영상 위치'), keys: '[MouseLeft]' })
+    expect(document.querySelector('.ss-shot-pick-box')).toBeNull()
+    await screen.findByRole('button', { name: '이 사람으로 분석' }, { timeout: 2500 })
+    expect(screen.getByRole('button', { name: '이 사람으로 분석' })).toBeDisabled()
+  })
+
+  // 대상을 정하고 나면 묶는 판이 걷히고 그 사람을 따라간다.
+  it('대상을 정하면 묶는 판이 걷히고 진행이 시작된다', async () => {
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '축구' }))
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+
+    await user.click(
+      await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }),
+    )
+
+    expect(document.querySelector('.ss-shot-pick')).toBeNull()
+    expect(await screen.findByLabelText('분석 진행')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '보고 있습니다' })).toBeInTheDocument()
   })
 })

@@ -52,6 +52,14 @@ export const LEAVE_MS = 900
  */
 type Ctx = {
   leaving: boolean
+  /**
+   * 나가는 중이면 **가려는 곳**, 아니면 null.
+   *
+   * 🔴 배경 사진이 이걸 본다(`AppFigure`). 화면마다 배경이 다른데, 갈 곳의
+   * 배경이 **지금과 같으면 배경은 가만히 있어야** 한다 — 같은 사진이 나갔다
+   * 들어오면 이유 없이 깜빡인 것으로 보인다. 그걸 알려면 목적지가 필요하다.
+   */
+  leavingTo: string | null
   leaveTo: ((href: string) => void) | null
   /** 화면 맨 위 줄(SiteHeader)을 지금 내보내야 하는가. */
   chromeHidden: boolean
@@ -60,6 +68,7 @@ type Ctx = {
 
 const LeaveContext = createContext<Ctx>({
   leaving: false,
+  leavingTo: null,
   leaveTo: null,
   chromeHidden: false,
   setChromeHidden: null,
@@ -68,6 +77,11 @@ const LeaveContext = createContext<Ctx>({
 /** 지금 화면이 나가는 중인가 — `data-enter` 를 정할 때 쓴다. */
 export function useLeaving(): boolean {
   return useContext(LeaveContext).leaving
+}
+
+/** 나가는 중이면 가려는 곳. 배경 사진이 방향과 필요 여부를 정할 때 쓴다. */
+export function useLeavingTo(): string | null {
+  return useContext(LeaveContext).leavingTo
 }
 
 /**
@@ -111,6 +125,8 @@ export function PageTransitionProvider({ children }: { children: React.ReactNode
    * 아예 생기지 않는다.
    */
   const [leavingFrom, setLeavingFrom] = useState<string | null>(null)
+  /** 가려는 곳. `leavingFrom` 과 짝이라 같이 세우고 같이 버린다. */
+  const [leavingTo, setLeavingTo] = useState<string | null>(null)
   const [chromeHidden, setChromeHidden] = useState(false)
   const leaving = leavingFrom !== null && leavingFrom === pathname
   const timer = useRef(0)
@@ -119,6 +135,8 @@ export function PageTransitionProvider({ children }: { children: React.ReactNode
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLeavingFrom(null)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLeavingTo(null)
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setChromeHidden(false)
     return () => clearTimeout(timer.current)
@@ -137,6 +155,7 @@ export function PageTransitionProvider({ children }: { children: React.ReactNode
         return
       }
       setLeavingFrom(pathname)
+      setLeavingTo(href)
       clearTimeout(timer.current)
       timer.current = window.setTimeout(() => router.push(href), LEAVE_MS)
     },
@@ -144,7 +163,9 @@ export function PageTransitionProvider({ children }: { children: React.ReactNode
   )
 
   return (
-    <LeaveContext.Provider value={{ leaving, leaveTo, chromeHidden, setChromeHidden }}>
+    <LeaveContext.Provider
+      value={{ leaving, leavingTo: leaving ? leavingTo : null, leaveTo, chromeHidden, setChromeHidden }}
+    >
       {children}
     </LeaveContext.Provider>
   )
