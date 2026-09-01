@@ -1,0 +1,6 @@
+video,frame,n_candidates,ai_box_index,ai_confidence,ai_note,baseline_box,baseline_correct,A_box,A_correct,A_verdict,B_box,B_correct,B_verdict,A_pose_box,A_pose_correct,A_pose_verdict,B_pose_box,B_pose_correct,B_pose_verdict
+10_penalty1.avi,0,2,0,high,kick taker standing over ball; keeper excluded,1,0,0,1,개선,0,1,개선,0,1,개선,0,1,개선
+10_penalty1.avi,21,2,1,high,kick taker striking ball; keeper excluded,0,0,1,1,개선,1,1,개선,1,1,개선,1,1,개선
+10_penalty1.avi,24,2,0,high,kick taker after contact; keeper excluded,1,0,0,1,개선,0,1,개선,0,1,개선,0,1,개선
+10_penalty1.avi,26,2,0,high,kick taker follow-through; keeper diving excluded,1,0,0,1,개선,0,1,개선,0,1,개선,0,1,개선
+10_penalty1.avi,27,2,0,high,kick taker follow-through; keeper excluded,1,0,0,1,개선,0,1,개선,0,1,개선,0,1,개선

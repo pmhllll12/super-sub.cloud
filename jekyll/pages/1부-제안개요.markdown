@@ -1,0 +1,11 @@
+---
+layout: default
+title: I 부. 제안 개요
+permalink: /1부-제안개요/
+has_children: true
+nav_order: 1
+---
+
+# I 부. 제안 개요
+
+사업 배경, 현황 및 문제 정의, 서비스 제안, 시장 및 수익 모델을 다룹니다.

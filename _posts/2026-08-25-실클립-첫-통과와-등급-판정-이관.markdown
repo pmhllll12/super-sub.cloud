@@ -1,7 +1,8 @@
 ---
-layout: post
+layout: default
 title: "실제 슈팅 영상이 처음 전 구간을 통과했다 — 그리고 등급 판정을 코드로 내렸다"
 date: 2026-08-25
+nav_exclude: true
 ---
 
 앞선 글에서 가장 앞에 두었던 "실제 슈팅 영상 확보"를 처리했다. 4K 25fps 10.2초

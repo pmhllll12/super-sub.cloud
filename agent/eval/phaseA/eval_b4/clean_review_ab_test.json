@@ -1,0 +1,58 @@
+{
+  "n_reviewed": 60,
+  "n_decided": 43,
+  "a_wins": 17,
+  "b_wins": 26,
+  "b_share": 0.6047,
+  "binomial_p_two_sided_frames": 0.2221,
+  "clip_level": {
+    "B": 11,
+    "A": 7,
+    "tie": 4,
+    "binomial_p_two_sided": 0.4807
+  },
+  "cluster_bootstrap_b_share_ci95": [
+    0.3953,
+    0.8
+  ],
+  "cluster_bootstrap_iters": 20000,
+  "seed": 20260828,
+  "within_clip_unanimity": {
+    "decided_clips": 19,
+    "unanimous_clips": 14,
+    "clips_with_2plus_decided": 11,
+    "unanimous_among_those": 6
+  },
+  "neutral_stratum": {
+    "subset": "비대칭항 둘 다 0 (중립 표본)",
+    "n_reviewed": 4,
+    "a_wins": 0,
+    "b_wins": 1,
+    "neither": 0,
+    "excluded": 3,
+    "n_decided": 1,
+    "b_share": "1.000",
+    "margin_b_minus_a": 1,
+    "p_two_sided": "1.0000"
+  },
+  "power": {
+    "assumed_b_share": 0.6047,
+    "alpha": 0.05,
+    "power": 0.8,
+    "design_effect_from_cluster_bootstrap": 1.917,
+    "n_decided_needed_simple": 177,
+    "n_decided_needed_clustered": 340,
+    "n_decided_now": 43,
+    "additional_decided_needed": 297
+  },
+  "ceiling_on_this_dataset": {
+    "clips_with_disagreement": 26,
+    "disagreement_frames": 596,
+    "runs_total": 104,
+    "runs_reviewable": 62,
+    "max_reviewable_frames": 69,
+    "max_decided_frames": 49,
+    "already_reviewed": 60,
+    "sufficient": false
+  }
+}

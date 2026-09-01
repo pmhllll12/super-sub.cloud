@@ -1,0 +1,8 @@
+case,clip_frame,existing_gt,clean_ai_result,agreement,disagreement_type,clean_confidence
+T0-01,3USSmzO001k@119,1,1,1,candidate index 동일,high
+T0-02,5-jBTNp5IQA@75,0,uncertain,0,GT candidate vs AI uncertain,low
+T0-03,IeDin6oB-IY@75,4,4,1,candidate index 동일,high
+T0-04,N5zWQkoLM3M@75,2,2,1,candidate index 동일,medium
+T0-05,N5zWQkoLM3M@119,2,2,1,candidate index 동일,medium
+T0-06,X6dC9pu5H3k@107,0,4,0,candidate index 다름,medium
+T0-07,sYl2jCqsSKo@119,null,2,,GT none vs AI candidate,medium

@@ -1,0 +1,34 @@
+clip_id,ratio,frame,n_candidates,image,human_box_index,human_note
+3R1kvNrGJK0,0.20,30,11,eval_b2/review_cases/3R1kvNrGJK0@0.20.jpg,0,batter with bat in stance at plate
+5-jBTNp5IQA,0.20,30,10,eval_b2/review_cases/5-jBTNp5IQA@0.20.jpg,0,batter with bat in stance; catcher and umpire excluded
+5-jBTNp5IQA,0.50,75,9,eval_b2/review_cases/5-jBTNp5IQA@0.50.jpg,0,batter-runner in red jersey after contact
+5-jBTNp5IQA,0.80,119,20,eval_b2/review_cases/5-jBTNp5IQA@0.80.jpg,uncertain,camera on stands and dugout; no batter identifiable
+6hrcRyIYTrA,0.20,30,5,eval_b2/review_cases/6hrcRyIYTrA@0.20.jpg,0,batter just after swing with bat on ground
+8gmHKqDxXdg,0.50,50,2,eval_b2/review_cases/8gmHKqDxXdg@0.50.jpg,0,batter in stance holding bat indoors
+CFjNxCZhn_8,0.80,119,11,eval_b2/review_cases/CFjNxCZhn_8@0.80.jpg,0,player carrying bat near plate
+Fz16t9SrF3U,0.50,75,6,eval_b2/review_cases/Fz16t9SrF3U@0.50.jpg,2,batter no.8 in stance with bat
+Fz16t9SrF3U,0.80,119,8,eval_b2/review_cases/Fz16t9SrF3U@0.80.jpg,uncertain,only umpire and catcher clear; batter not identifiable
+IeDin6oB-IY,0.20,30,9,eval_b2/review_cases/IeDin6oB-IY@0.20.jpg,0,batter with red helmet and bat at plate
+IeDin6oB-IY,0.50,75,9,eval_b2/review_cases/IeDin6oB-IY@0.50.jpg,4,batter with red helmet at plate; foreground adult crossing
+LXjM7nBZcak,0.50,48,13,eval_b2/review_cases/LXjM7nBZcak@0.50.jpg,uncertain,spectators fill frame; no batting scene visible
+LhD_fnHt_xg,0.50,61,2,eval_b2/review_cases/LhD_fnHt_xg@0.50.jpg,0,batter in stance in indoor cage
+LhD_fnHt_xg,0.80,97,2,eval_b2/review_cases/LhD_fnHt_xg@0.80.jpg,0,batter mid-swing in indoor cage
+N5zWQkoLM3M,0.20,30,5,eval_b2/review_cases/N5zWQkoLM3M@0.20.jpg,1,batter holding bat in cage; foreground person cut off at frame edge
+N5zWQkoLM3M,0.50,75,4,eval_b2/review_cases/N5zWQkoLM3M@0.50.jpg,2,batter mid-swing in cage
+N5zWQkoLM3M,0.80,119,6,eval_b2/review_cases/N5zWQkoLM3M@0.80.jpg,2,batter follow-through in cage
+X6dC9pu5H3k,0.50,67,7,eval_b2/review_cases/X6dC9pu5H3k@0.50.jpg,1,batter-runner in helmet on baseline
+Zp9aDp2YTBw,0.20,24,2,eval_b2/review_cases/Zp9aDp2YTBw@0.20.jpg,none,no bat and no batting scene in frame
+Zp9aDp2YTBw,0.50,60,2,eval_b2/review_cases/Zp9aDp2YTBw@0.50.jpg,none,no bat and no batting scene in frame
+bh6Cvz2orzQ,0.20,30,9,eval_b2/review_cases/bh6Cvz2orzQ@0.20.jpg,1,batter mid-swing in cage; foreground observer excluded
+bh6Cvz2orzQ,0.50,75,4,eval_b2/review_cases/bh6Cvz2orzQ@0.50.jpg,1,batter mid-swing in cage
+bh6Cvz2orzQ,0.80,119,4,eval_b2/review_cases/bh6Cvz2orzQ@0.80.jpg,1,batter with bat back to camera
+g_wHimPF9o8,0.20,30,8,eval_b2/review_cases/g_wHimPF9o8@0.20.jpg,0,batter in stance at plate
+g_wHimPF9o8,0.50,75,7,eval_b2/review_cases/g_wHimPF9o8@0.50.jpg,0,batter in stance at plate
+hz-SpF35_BE,0.20,30,5,eval_b2/review_cases/hz-SpF35_BE@0.20.jpg,0,batter in stance in outdoor cage
+hz-SpF35_BE,0.50,75,3,eval_b2/review_cases/hz-SpF35_BE@0.50.jpg,0,batter mid-swing in outdoor cage
+hz-SpF35_BE,0.80,119,3,eval_b2/review_cases/hz-SpF35_BE@0.80.jpg,0,batter follow-through in outdoor cage
+idueIYDAbZc,0.80,118,7,eval_b2/review_cases/idueIYDAbZc@0.80.jpg,2,player holding bat walking; catcher in gear excluded
+sGKeqfxwq5E,0.50,75,8,eval_b2/review_cases/sGKeqfxwq5E@0.50.jpg,2,batter mid-swing; catcher and umpire excluded
+sYl2jCqsSKo,0.20,30,8,eval_b2/review_cases/sYl2jCqsSKo@0.20.jpg,0,batter mid-swing with bat
+sYl2jCqsSKo,0.50,75,3,eval_b2/review_cases/sYl2jCqsSKo@0.50.jpg,0,batter-runner in red jersey running to first
+sYl2jCqsSKo,0.80,119,3,eval_b2/review_cases/sYl2jCqsSKo@0.80.jpg,2,runner in red overlapping fielder in navy

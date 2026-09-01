@@ -127,3 +127,20 @@ class StubUserRepository(UserPort):
 
     def list_memberships(self, user_id: UUID) -> list[MembershipEntity]:
         return list(_MEMBERSHIPS)
+
+    def list_users(
+        self, *, q: str | None, offset: int, limit: int
+    ) -> tuple[list[UserEntity], int]:
+        users = [_USER]
+        if q:
+            needle = q.lower()
+            users = [
+                u
+                for u in users
+                if needle in str(u.email).lower() or needle in str(u.nickname).lower()
+            ]
+        return users[offset : offset + limit], len(users)
+
+    def has_card(self, user_id: UUID) -> bool:
+        """데모 사용자에게는 `card_stub_repository.py` 의 데모 카드가 있다."""
+        return user_id == DEMO_USER_ID

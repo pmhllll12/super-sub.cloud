@@ -1,0 +1,3228 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-rubik);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+:root {
+  --ss-bg: #000000;
+  --ss-fg: #ffffff;
+  --ss-accent: #70ed88;
+  /* 잔디 초록 — 스쿼드 빈 카드의 + 와 홈 헤드라인의 PITCH 가 같이 쓴다.
+     강조색(--ss-accent)보다 조금 더 노란 쪽이라 나란히 놓아도 안 겹친다. */
+  --ss-pitch-green: #a6e89b;
+  --ss-error: #ff8a80;
+  --ss-scrim: rgba(0, 0, 0, 0.15);
+
+  --ss-radius-sheet: 28px;
+  --ss-btn-h: 54px;
+  --ss-btn-r: 27px;
+  --ss-btn-label: 16px;
+  --ss-brand-size: 34px;
+
+  /* 글래스 — flutter/lib/core/widgets/glass_panel.dart 를 옮긴 것 */
+  --ss-glass-bg: rgba(255, 255, 255, 0.08);
+  --ss-glass-border: rgba(255, 255, 255, 0.12);
+  --ss-glass-blur: 20px;
+  /* 리퀴드 글래스 느낌을 더하는 값 — blur 만으로는 뒤 색이 흐려지기만 하고
+     "유리" 로 안 보인다. saturate 를 살짝 얹어 뒤 배경색이 조금 더
+     진해지게 한다(실제 유리를 통과한 빛이 진해 보이는 것과 같은 원리).
+     과하면 사진이 촌스럽게 번들거려서 1.4 정도(40% 더 진하게)로 멈췄다. */
+  --ss-glass-saturate: 1.4;
+
+  /* 웹 전용 — Flutter 소스에서 옮겨온 값이 아님 */
+  --ss-field-radius: 14px;
+
+  /* 구글이 그리는 "Sign in with Google" 버튼의 실제 높이(size: 'large').
+     우리가 정한 값이 아니라 구글이 정한 값이라 바꿀 수 없다 — 인증 화면은
+     반대로 이 값에 --ss-btn-h 를 맞춘다(GoogleSignInButton.tsx 주석 참고).
+     실측값이다: 구글이 그린 알약(.nsm7Bb-HzV7m-LgbsSe)이 40px · 반경 20px.
+     바깥 래퍼가 아니라 이 알약이 눈에 보이는 크기라 여기에 맞춰야 나란해진다. */
+  --ss-google-btn-h: 40px;
+
+  /* 로그인·회원가입 오른쪽 사진 판 — 위 두 모서리만 이 값으로 크게 둥글려 아치 모양을 낸다. */
+  --ss-radius-arch: 260px;
+
+  /* 목적지 카드(홈 화면) 전용 — 카드마다 다른 값이 들어가지 않도록 여기
+     한 곳에서만 정한다. 앱은 mainAxisExtent: 148(flutter/lib/features/home/
+     presentation/screens/home_screen.dart)로 카드 높이를 못박는데, 한글
+     두 줄 설명 칸이라 비율로 두면 화면 폭에 따라 글자가 잘리기 때문이다
+     (주석 원문: "비율 대신 높이를 못박는다"). 웹은 참고 디자인에 맞춰
+     세로로 긴 카드(폭:높이 = 3:4 = 0.75)를 쓴다 — 210:280 이 정확히
+     0.75 이고, 아이콘+제목+설명 2줄+안내문 1줄이 justify-center 로
+     세로 가운데 모여도 위아래에 자연스러운 여백이 남는 높이다. */
+  /* 큰 영문 글자의 줄 간격. OWN / THE / PITCH 덩어리를 한 줄 내리는
+     값이기도 하다 — 아래 .ss-home-subhead 참고. */
+  --ss-display-lh: 1.16;
+
+  /* 등장 애니메이션이 공유하는 이징 — 빠르게 나와 부드럽게 멎는다. */
+  --ss-enter-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  /* 🔴 나갈 때의 이징. 한때 easeIn(`cubic-bezier(0.55, 0, 1, 0.45)`)이었는데
+     **끝에서 채찍처럼 가속해** 마지막이 툭 끊겨 보였다(사용자 지적: "퐉 간다").
+     양끝이 다 부드러운 곡선으로 바꾸고, 대신 **불투명도를 먼저 0 으로 보내**
+     빠른 구간을 눈에서 지운다(아래 keyframes 의 65% 지점). */
+  --ss-leave-ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* 배경 사진(FigureBackground)이 앉는 상자와 자르는 기준. 영상 분석 화면의
+     큰 글자가 **같은 값**으로 마스크를 잘라야 인물 그림자와 딱 맞는다. */
+  --ss-figure-h: 88%;
+  --ss-figure-pos: 46% center;
+
+  --ss-card-w: 210px;
+  /* 홈 글자 nav 에서 글자 아래 떠오르는 작은 판의 폭 — 글자 한 칸보다
+     넉넉하되 옆 글자를 다 덮지는 않는 크기. 높이는 내용에 맡긴다. */
+  --ss-card-compact-w: 152px;
+  /* 작은 판의 키 — **셋이 똑같아야 한다.** 번갈아 뜨는 자리라 크기가 다르면
+     글자를 옮길 때마다 판이 커졌다 작아졌다 한다. 아이콘 + 설명 두 줄이
+     들어가는 값이다(제목도 '준비 중입니다' 도 안 그린다). */
+  --ss-card-compact-h: 96px;
+  --ss-card-h: 280px;
+  /* 호버 시 확대 배율 — 눈에 띄되 촌스럽지 않은 지점(1.02~1.04 권장)에서 골랐다. */
+  --ss-card-hover-scale: 1.03;
+  /* 커서를 따라다니는 후광의 반경과 색. 어두운 사진 배경 위라 흰빛은 바로
+     튀어서 글자를 덮는다 — 흰색 대신 브랜드 민트(--ss-accent)를 아주
+     옅게(12%) 섞어 "카드가 빛난다"가 아니라 "커서 근처가 살짝 밝아진다"
+     정도로만 보이게 낮췄다. 실측(스크린샷 리뷰)으로 18% → 12% 로 낮춘 값. */
+  --ss-card-glow-radius: 200px;
+  --ss-card-glow-color: color-mix(in srgb, var(--ss-accent) 12%, transparent);
+  /* 캐러셀 카드 사이 간격 — 세로 어긋남(stagger)과 별개로 가로 간격도
+     한 곳에서만 정한다. */
+  /* 홈(캐러셀 화면)의 내용이 뷰포트 가장자리에서 떨어지는 여백 —
+     워드마크·인사말(헤더)과 카드 캐러셀이 같은 값을 쓴다.
+     한때 이 자리에 화면 전체를 덮는 유리판(.ss-frame)이 있었고 이 값은
+     그 판 안쪽의 안전 여백이었다. 판은 걷어냈지만(배경 사진을 가렸다)
+     내용을 가장자리에서 들이는 역할은 그대로 필요해 값은 남긴다. */
+  --ss-home-content-pad: 48px;
+}
+
+/* Field 컴포넌트 — 라벨/힌트/포커스 테두리는 전부 --ss-fg 의 불투명도 변형이다 (흰색 리터럴 금지) */
+.ss-field-label {
+  color: color-mix(in srgb, var(--ss-fg) 60%, transparent);
+}
+
+.ss-field-hint {
+  color: color-mix(in srgb, var(--ss-fg) 40%, transparent);
+}
+
+.ss-field-input {
+  /* 배경이 무엇이든(사진이든 검은 화면이든) 경계가 또렷하도록 살짝 어둡게 깐다. */
+  background: color-mix(in srgb, var(--ss-bg) 35%, transparent);
+}
+
+.ss-field-input:focus {
+  border-color: color-mix(in srgb, var(--ss-fg) 40%, transparent);
+}
+
+body {
+  background: var(--ss-bg);
+  color: var(--ss-fg);
+  font-family: var(--font-rubik), system-ui, sans-serif;
+  /* 🔴 홈 등장 애니메이션이 요소를 **화면 밖(±vw)** 에서 끌고 들어온다.
+     그동안 넘친 만큼이 가로 스크롤로 잡히면 스크롤바가 번쩍인다.
+     `hidden` 이 아니라 `clip` 이다 — hidden 은 스크롤 컨테이너를 만들어
+     position: sticky · 스크롤 앵커링에 영향을 준다. */
+  overflow-x: clip;
+}
+
+/* 카드 테두리를 도는 얇은 흰 빛 — flutter/lib/core/widgets/glass_panel.dart 의
+   _TravelingEdge 를 그대로 옮긴 것. 늘 켜진 옅은 밑선(흰색 알파 0.10) 위에,
+   좁고 밝은 구간(흰색 알파 0.9)만 도는 conic-gradient 를 얹는다 — Flutter 의
+   SweepGradient 와 같은 원리. 점을 좌표로 움직이면 모서리에서 속도가 튀니
+   좌표가 아니라 각도(--ss-edge-angle)로 돌린다.
+   @property 로 등록해야 각도가 부드럽게 보간된다 — 등록 없이 커스텀
+   프로퍼티를 그냥 애니메이션하면 값이 이산적으로(중간에 뚝) 바뀐다.
+   지원하지 않는 브라우저에서는 이 등록 자체가 무시돼 회전이 멈추고 정지
+   상태가 되지만, background 의 두 번째 레이어(늘 켜진 10% 밑선)는 레이어
+   순서와 무관하게 그대로 보인다. */
+@property --ss-edge-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes ss-edge-spin {
+  to {
+    --ss-edge-angle: 360deg;
+  }
+}
+
+.ss-traveling-edge {
+  position: relative;
+}
+
+.ss-traveling-edge::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  /* 선 굵기 1px — 아주 얇아야 유리가 아니라 상자로 안 보인다(padding 으로
+     만든 폭을 아래 mask 가 테두리만 남기고 안쪽을 파낸다). */
+  padding: 1px;
+  pointer-events: none;
+  background:
+    conic-gradient(
+      from var(--ss-edge-angle),
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0) 42%,
+      rgba(255, 255, 255, 0.9) 50%,
+      rgba(255, 255, 255, 0) 58%,
+      rgba(255, 255, 255, 0) 100%
+    ),
+    rgba(255, 255, 255, 0.1);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: ss-edge-spin 6s linear infinite;
+  /* phase(0~1) 만큼 음수 딜레이를 줘 시작 각도를 어긋낸다 — 조각마다 위상을
+     어긋내 한꺼번에 반짝이지 않게 하는 앱의 phase 와 같은 목적. */
+  animation-delay: calc(var(--ss-edge-phase, 0) * -6s);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-traveling-edge::after {
+    animation: none;
+    background: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* 호버 상호작용(GlassPanel `interactive` prop) — 살짝 확대 + 커서를 따라
+   도는 후광. 기본 상태(움직임 없음)와 값이 갈리므로 prefers-reduced-motion
+   일 때는 스케일도 후광도 아예 켜지 않는다(트랜지션도 없음 — 트랜지션만
+   지워봤자 최종 상태는 그대로 커지고 빛나 버리므로 hover 규칙 자체를
+   미디어 쿼리 밖으로 안 뺀다). */
+.ss-card-interactive {
+  transition: transform 200ms ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ss-card-interactive:hover,
+  .ss-card-interactive:focus-visible {
+    transform: scale(var(--ss-card-hover-scale));
+  }
+}
+
+/* 후광 — ::before 에 커서 좌표(GlassPanel 이 rAF 로 쓰는
+   --ss-card-glow-x/y)를 중심으로 한 radial-gradient. z-index: -1 로
+   박아 카드 자신의 배경보다는 위, 아이콘·글자(z-index 없는 일반 흐름
+   콘텐츠)보다는 아래에 놓는다 — GlassPanel 자체가 backdrop-filter 로
+   독립된 쌓임 맥락을 만들어서 여기 z-index 는 이 카드 안에서만
+   유효하다. */
+.ss-card-glow {
+  position: relative;
+}
+
+.ss-card-glow::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms ease;
+  background: radial-gradient(
+    var(--ss-card-glow-radius) circle at var(--ss-card-glow-x, 50%) var(--ss-card-glow-y, 50%),
+    var(--ss-card-glow-color),
+    transparent 70%
+  );
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ss-card-glow:hover::before,
+  .ss-card-glow:focus-visible::before {
+    opacity: 1;
+  }
+}
+
+
+
+/* ── 홈 한 화면 (레퍼런스 Nile Travel 배치) ────────────────────────────── */
+
+/* 🔴 헤더 줄은 화면 폭을 다 차지하지만 실제 내용은 왼쪽 워드마크 ·
+   가운데 글자 · 오른쪽 프로필뿐이다. 빈 자리가 클릭을 먹으면 그 아래
+   것을 누를 수 없다 — 추천 판의 닫기 버튼이 실제로 그렇게 막혔다.
+   빈 자리는 통과시키고 **누르는 것에서만** 되살린다(하단 줄과 같은 방식).
+
+   🔴 바로 아래 자식(`> *`)까지만 되살렸더니 부족했다. 목적지 글자를 담는 칸
+   (.ss-home-nav-slot)이 `flex: 1 1 auto` 로 가운데를 가로질러서, 그 아래 놓인
+   영상 분석 창 틀의 **닫기 점이 여전히 막혔다.** 잎사귀(a · button · input)
+   에서만 되살린다.
+   ⚠️ 조상이 none 이어도 자손에서 일어난 이벤트는 그대로 위로 전해진다 —
+   글자에 대면 카드가 뜨는 동작(li 의 onMouseEnter)은 그대로다. */
+.ss-home-header,
+.ss-home-header * {
+  pointer-events: none;
+}
+
+.ss-home-header a,
+.ss-home-header button,
+.ss-home-header input {
+  pointer-events: auto;
+}
+
+/* 헤더에서 목적지 글자가 들어가는 칸. 레퍼런스처럼 **가운데가 아니라
+   오른쪽**에 붙인다 — 워드마크(왼쪽)와 닉네임(오른쪽) 사이에서 남는 폭을
+   다 쓰되 글자는 오른쪽 끝으로 몰린다. 좁아지면 줄바꿈해 양옆을 밀어내지
+   않는다. */
+.ss-home-nav-slot {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* 칸 사이 간격 — 레퍼런스처럼 넉넉하게 띄운다. */
+.ss-home-nav-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  column-gap: 40px;
+  row-gap: 8px;
+}
+
+/* 목적지 글자 한 칸 — 레퍼런스의 `TOURS ABOUT US …` 처럼 자간 넓은 작은
+   글자. 배경 사진이 어두워 **완전한 흰색**으로 둔다(불투명도를 깎으면
+   밝은 연기 위에서 읽히지 않는다). 지금 가리킨 칸만 강조색으로 바뀐다. */
+.ss-home-nav-item {
+  padding: 12px 2px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  color: var(--ss-fg);
+  transition: color 160ms ease;
+  cursor: pointer;
+}
+
+.ss-home-nav-item:hover,
+.ss-home-nav-item:focus-visible,
+.ss-home-nav-item[data-active='true'] {
+  color: var(--ss-accent);
+}
+
+/* ── 알약 변형 (variant="pill") ────────────────────────────────────────
+   헤드라인 자리의 주요 목적지. 글자 줄과 **동작은 같고 생김새만 다르다**
+   (HomeNav 주석 참고). 왼쪽 정렬이고 칸 사이도 글자 줄(40px)보다 좁다 —
+   알약은 제 테두리가 경계를 만들어 주므로 그만큼 안 띄워도 갈린다. */
+.ss-home-nav-list--pill {
+  justify-content: flex-start;
+  column-gap: 10px;
+}
+
+/* 알약 위로 뜨는 **글자만** — 판이 없다(DestinationCard 의 bare).
+   판이 없으면 배경 사진이 글자 바로 뒤에 오므로 두 가지로 버틴다:
+   완전한 흰색, 그리고 아주 옅은 검은 그림자. 그림자는 어두운 자리에서는
+   보이지 않고 밝은 연기 위에서만 글자 테두리를 만들어 준다 —
+   판 하나를 더 까는 것보다 훨씬 덜 거슬린다. */
+.ss-nav-bare {
+  width: var(--ss-card-compact-w);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  letter-spacing: 0;
+  color: var(--ss-fg);
+  text-shadow: 0 1px 6px var(--ss-bg);
+}
+
+/* 🔴 **알약의 판은 위로 뜬다.** 글자 줄은 화면 맨 위에 있어 아래로 떨어져야
+   하지만, 알약은 화면 한가운데라 아래로 뜨면 바로 밑의 스쿼드 판과 겹쳐
+   글자가 서로 비쳐 안 읽힌다(실제로 그랬다). 가운데 정렬을 transform 으로
+   하므로 나타남/사라짐도 같은 transform 안에서 처리해야 한다 — 그래서
+   keyframes 가 따로 있다(-50% 가 다시 적혀 있는 이유도 같다). */
+.ss-home-nav-list--pill .ss-home-nav-card {
+  top: auto;
+  bottom: 100%;
+  padding-top: 0;
+  /* 판이 없어 글자가 알약에 바로 붙어 보인다 — 여백을 좀 더 준다. */
+  padding-bottom: 14px;
+  animation-name: ss-card-in-up;
+}
+
+.ss-home-nav-list--pill .ss-home-nav-card[data-state='closing'] {
+  animation-name: ss-card-out-up;
+}
+
+/* 아래에서 올라온다 — 뜨는 방향과 같아야 "알약에서 나왔다"로 읽힌다. */
+@keyframes ss-card-in-up {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes ss-card-out-up {
+  from {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+}
+
+.ss-home-nav-item--pill {
+  /* 알약 — 반지름을 높이보다 크게 잡아 두면 높이가 바뀌어도 늘 알약이다. */
+  border-radius: 999px;
+  padding: 8px 20px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+
+  /* 🔴 **가늘어 보이게 하는 것은 굵기가 아니라 불투명도다.** 0.5px 로
+     줬더니 둥근 모서리에서 기기 픽셀에 안 떨어져 선이 **끊기고 우툴두툴**
+     해졌다(직선 구간만 진하고 곡선이 흐려진다). 1px 로 또렷하게 긋고 흰색을
+     45% 로 낮춘다 — 굵기는 일정한데 인상은 더 가볍다. */
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 45%, transparent);
+
+  /* 🔴 **안은 아무것도 칠하지 않는다.** 배경 사진이 그대로 비쳐야 한다.
+     흰 7% 를 얹었을 때도 뿌연 막으로 보였다 — 유리의 재질은 색이 아니라
+     아래의 흐림(backdrop-filter)이 낸다. */
+  background-color: transparent;
+
+  /* 흐림(backdrop-filter)은 여기 없다 — HomeNav 가 **인라인으로** 준다.
+     globals.css 에 두면 Lightning CSS 를 지나며 떨어져 나간 전례가 있다.
+     비치는 알약에서는 이 흐림이 유일한 유리 재질이라 더 중요하다. */
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+/* 대기만 하면 **선만 또렷해진다.** 안을 칠하면 비치는 맛이 사라지고,
+   떠오르게(translateY) 하면 가는 선이 흔들려 보인다 — 굵기는 그대로 두고
+   불투명도만 올린다. 글자색이 강조색으로 바뀌는 것은 글자 줄과 공유하는
+   규칙이 이미 하고 있다(위). */
+.ss-home-nav-item--pill:hover,
+.ss-home-nav-item--pill:focus-visible,
+.ss-home-nav-item--pill[data-active='true'] {
+  border-color: var(--ss-fg);
+}
+
+/* 눌러서 **골라 둔** 알약만 안쪽이 옅게 칠해진다 — 가리키기만 한 것과
+   갈려야 "지금 이게 골라져 있다"가 읽힌다. 8%: 배경이 비치는 건 그대로고
+   테두리 안쪽이 한 겹 밝아진 정도만 느껴지는 선이다. */
+.ss-home-nav-item--pill[data-selected='true'] {
+  background-color: color-mix(in srgb, var(--ss-fg) 8%, transparent);
+  border-color: var(--ss-fg);
+}
+
+
+/* 글자 아래로 떠오르는 작은 판. 글자 칸 가운데에 맞춰 매단다 — 화면
+   오른쪽 끝 칸에서도 판이 잘리지 않게 translateX 로 중앙 정렬한다.
+   가운데 정렬을 transform 으로 하므로 나타남/사라짐도 같은 transform
+   안에서 처리해야 한다(따로 주면 서로 덮어쓴다) — 그래서 keyframes 쪽에
+   -50% 가 다시 적혀 있다. 시간은 HomeNav 의 CARD_EXIT_MS 와 같아야 한다. */
+.ss-home-nav-card {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  z-index: 30;
+  transform: translateX(-50%);
+  padding-top: 8px;
+  animation: ss-card-in 180ms ease-out both;
+}
+
+/* 물러나는 중 — 아직 DOM 에 있지만 누를 수 있으면 안 된다. */
+.ss-home-nav-card[data-state='closing'] {
+  pointer-events: none;
+  animation: ss-card-out 180ms ease-in both;
+}
+
+@keyframes ss-card-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes ss-card-out {
+  from {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-home-nav-card,
+  .ss-home-nav-card[data-state='closing'],
+  .ss-home-nav-list > li {
+    animation-duration: 1ms;
+    animation-delay: 0ms;
+  }
+}
+
+/* 헤드라인 · 정보 블록이 놓이는 층. 헤더(위) 와 하단 줄 사이를 채운다. */
+.ss-home-stage {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  min-height: 100svh;
+  flex-direction: column;
+  justify-content: center;
+  gap: 48px;
+}
+
+/* 큰 스텐실 글자 — 지금은 오른쪽 덩어리(OWN / THE / PITCH) 하나뿐이다.
+   왼쪽에 마주 보던 `FIND YOUR SQUAD` 는 유리 알약 버튼으로 바뀌었다
+   (.ss-home-featured). 크기를 한 군데서 정하려고 남겨 둔 클래스다.
+   🔴 font-weight 를 주지 않는다: Abril Fatface 는 굵기가 400 하나뿐인 장식
+   글꼴이라 700 을 주면 브라우저가 가짜 굵게(synthetic bold)를 입혀 획만
+   지저분해진다(워드마크 RubikGlitch 에서 똑같이 겪었다). */
+.ss-home-display {
+  font-family: var(--font-display), var(--font-rubik), system-ui, sans-serif;
+  /* 1440px 기준 80px 이 되는 5.56vw. 좁은 화면에서 36px 아래로는 안
+     내려가고, 넓어도 96px 을 넘지 않는다.
+
+     🔴 변수로 한 번 더 잡아 둔다. 아랫줄들이 이 값을 기준으로 제 크기와
+     들여쓰기를 계산하는데, **margin 안의 1em 은 부모가 아니라 그 요소
+     자신의 글자 크기**로 풀린다 — 줄마다 크기를 다르게 준 지금 그걸
+     기준으로 삼으면 조용히 어긋난다(실측 10.7px). */
+  --ss-display-size: clamp(2.25rem, 5.56vw, 6rem);
+  font-size: var(--ss-display-size);
+  /* 오른쪽 덩어리를 정확히 '한 줄' 내리는 데도 쓰인다(.ss-home-subhead) —
+     둘이 어긋나면 FIND 가 PITCH 줄에 안 맞으므로 값을 변수로 묶어 둔다. */
+  line-height: var(--ss-display-lh);
+  /* 획이 굵은 디스플레이 글꼴이라 윤곽선만 남기면 글자끼리 붙어 보인다.
+     자간을 조금 벌려 선 하나하나가 숨 쉬게 한다. */
+  letter-spacing: 0.03em;
+
+  /* 그냥 흰 글자다. 유리 재질(반투명 채움 · 광택 띠 · 윤곽선)을 여러 번
+     시도했지만 촌스럽거나 배경 밝기에 따라 사라져서 전부 걷어냈다.
+     굵은 디스플레이 글꼴이라 흰색 그대로가 가장 또렷하다. */
+  color: var(--ss-fg);
+}
+
+/* 주요 목적지 알약 줄 — 옛 헤드라인(`FIND YOUR SQUAD`)이 있던 자리다.
+   자리 잡기 식은 그 글자가 쓰던 것을 그대로 물려받았다.
+
+   아래 판과 **같은 가운데선**에 놓는다. 판의 왼쪽 변을 정하는 식을 그대로
+   쓰고 판 폭의 절반(255)을 더해 판의 가운데를 얻은 뒤, translateX(-50%)로
+   이 줄을 그 선에 맞춘다 — 줄 폭을 몰라도 되고 항목이 늘어도 따라온다.
+   값의 유래는 .ss-squad 주석 참고. */
+.ss-home-featured {
+  width: max-content;
+  margin-left: calc(max(-120px, 21.333vw - 423px) + 255px);
+  transform: translateX(-50%);
+  /* 판까지 한 뼘. 옛 글자가 갖고 있던 아래 여백을 대신한다. */
+  margin-bottom: 4px;
+}
+
+/* 오른쪽 짝(OWN / THE / PITCH) — 첫 줄이 왼쪽 헤드라인의 다음 줄
+   높이에서 시작하도록 덩어리째 **정확히 한 줄** 내린다
+   (사용자 요청). 한 줄 = 글자 크기 × 줄 간격이라 --ss-display-lh 를
+   그대로 곱한다 — 줄 간격을 고치면 이 내림도 같이 따라온다.
+
+   줄이 내려갈수록 시작점이 한 칸씩
+   오른쪽으로 밀린다. 0.25em 씩은 계단인지 어긋난 건지 모를 만큼 작아서
+   0.6em 씩으로 키웠다. 블록이 오른쪽 변에 붙어 있으므로(부모의
+   justify-between) 계단을 키우면 SQUAD 가 밀려나는 게 아니라 FIND 가
+   왼쪽으로 물러난다 — 오른쪽 여백을 먹지 않는다. */
+.ss-home-subhead {
+  display: flex;
+  width: fit-content;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-top: calc(var(--ss-display-lh) * 1em);
+}
+
+/* 계단 폭은 눈대중 값이 아니라 **윗줄 첫 글자의 폭**이다. 그래야
+   OWN 의 W 가 아랫줄 T 와, THE 의 H 가 아랫줄 P 와 같은 세로선에
+   선다(사용자 요청).
+
+   두 비율은 Abril Fatface 의 글자 폭을 canvas 로 재서 얻었다 —
+   커닝까지 포함한 값이라 'OW' 폭에서 'W' 폭을 뺀 것을 쓴다(글자 하나만
+   재면 커닝이 빠져 몇 px 어긋난다):
+     O = 0.693em, T = 0.683em
+   줄마다 글자 크기가 다르므로(아래 nth-child 참고) 각 줄의 제 크기를
+   곱해야 한다 — 그래서 1em 이 아니라 (1em - 19px) 처럼 그 줄의 실제
+   크기를 다시 적는다. 글꼴이나 문구가 바뀌면 다시 재야 한다. */
+.ss-home-subhead > span:nth-child(2) {
+  /* 계산상 자리에서 4px 만 왼쪽으로(사용자 요청) — 눈으로 보면 T 가 W
+     보다 아주 살짝 오른쪽으로 보인다.
+
+     ⚠️ 이 4px 때문에 H 가 아랫줄 P 보다 3.6px 왼쪽에 선다. **알고 두는
+     것이다** — PITCH 는 옮기지 않기로 했다. 정렬을 되살리려고 아랫줄에
+     같은 -4px 를 더하지 말 것. */
+  margin-left: calc(0.723 * (var(--ss-display-size) - 19px) - 4px);
+}
+
+.ss-home-subhead > span:nth-child(3) {
+  margin-left: calc(
+    0.723 * (var(--ss-display-size) - 19px) + 0.713 * (var(--ss-display-size) - 12px)
+  );
+}
+
+/* 줄이 내려갈수록 글자가 커진다 — 위로 갈수록 7px 씩 작다(사용자 요청).
+   거기에 세 줄 모두 5px 을 더 뺀다: 왼쪽 덩어리보다 한 단 작아야 두
+   덩어리가 같은 무게로 부딪히지 않는다.
+
+   em 이 아니라 px 로 빼는 게 요청 그대로다 — 화면이 넓어져 기준 크기가
+   커져도 줄 사이 차이는 7px 로 일정하다(em 이면 그 차이도 같이 커진다).
+   기준 크기는 --ss-display-size 다. */
+.ss-home-subhead > span:nth-child(1) {
+  font-size: calc(var(--ss-display-size) - 19px);
+  /* 첫 줄은 16px 왼쪽으로(사용자 요청, 눈으로 맞춘 값). 그래서 W 가
+     아랫줄 T 보다 11px 쯤 왼쪽에 선다 — 계산으로 맞춘 자리가 아니라
+     보기 좋은 자리다. 아래 두 줄은 건드리지 않았다. */
+  margin-left: -16px;
+}
+
+.ss-home-subhead > span:nth-child(2) {
+  font-size: calc(var(--ss-display-size) - 12px);
+}
+
+.ss-home-subhead > span:nth-child(3) {
+  font-size: calc(var(--ss-display-size) - 5px);
+  /* 마지막 낱말만 잔디 초록 — 스쿼드 판의 + 와 같은 색이라 한 화면에서
+     두 덩어리가 서로를 가리킨다. */
+  color: var(--ss-pitch-green);
+}
+
+/* 오른쪽 아래 구석 — 로그아웃 아이콘 하나. */
+.ss-home-footer {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: var(--ss-home-content-pad);
+  /* 줄 전체가 화면 폭을 차지하지만 실제 내용은 오른쪽 구석뿐이라, 빈
+     자리는 클릭을 통과시킨다.
+
+     🔴 되살리는 선택자를 `a` 로 좁혀 뒀다가 로그아웃(<button>)이 안
+     눌렸다. 여기 무엇이 들어올지는 이 규칙이 알 바가 아니다 — 자식
+     전부에서 되살린다. */
+  pointer-events: none;
+}
+
+.ss-home-footer > * {
+  pointer-events: auto;
+}
+
+/* 목적지 카드의 아이콘 — 셋이 같은 결이어야 해서 한곳에서 정한다.
+   구글 폰트에서 고른 값 그대로: 채움 없음 · 굵기 100(가장 가늘게) ·
+   그레이드 0 · 광학 크기 20. 색은 완전한 흰색이다(DestinationCard 주석). */
+.ss-dest-icon {
+  color: var(--ss-fg);
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 100,
+    'GRAD' 0,
+    'opsz' 20;
+}
+
+/* ══ 홈 등장 — 인트로가 걷히면 각자 바깥에서 제자리로 ═══════════════════
+
+   `HomeStage` 가 세 덩어리(헤더 · 무대 · 바닥줄)에 `data-enter` 를 건다.
+   'false' 인 동안에는 아무것도 제자리에 없고, 'true' 가 되는 순간 각자
+   제 방향에서 들어온다. 시작 신호는 `useIntroDone()` — 인트로가 걷히는
+   순간이다. **인트로 밑에서 미리 돌면 안 된다**: 걷혔을 땐 이미 다 끝나
+   있어 아무 일도 없었던 것처럼 보인다.
+
+   🔴 **워드마크는 여기서 빠진다.** 인트로의 글자가 그 자리로 날아와 앉으므로
+   (`GlitchIntro` 의 FLIP 착지) 따로 등장시키면 같은 글자가 두 번 나타난다.
+
+   🔴 **거리는 화면 밖까지다**(±vw · vh). 몇십 px 만 밀면 "나타났다"로
+   보일 뿐 "바깥에서 들어왔다"로 안 읽힌다 — 그래서 시간도 길다(0.9~1.15초).
+
+   시간표(인트로가 걷힌 뒤):
+     0ms    상단 글자 줄 — 오른쪽 밖에서, 맨 왼쪽('영상 분석')부터
+     120    내 프로필 카드 — 아래 밖에서 작게 떠올라 커진다
+     260    알약 — 왼쪽 밖에서, 오른쪽('팀 찾기')부터
+     380    스쿼드 판 — 아래 밖에서, 절반 크기에서 제 크기로
+     620    OWN → 780 THE → 940 PITCH — 오른쪽 밖에서
+     1150   로그아웃
+   끝나는 건 약 2.1초. 겹쳐 두는 것이 중요하다 — 하나가 끝나야 다음이
+   시작하면 뚝뚝 끊기고 훨씬 길게 느껴진다.
+   겹쳐 두는 것이 중요하다. 하나가 끝나야 다음이 시작하면 뚝뚝 끊겨 보인다. */
+
+/* 시작 전 — 제자리에 없다.
+
+   🔴 바닥줄만 선택자 모양이 다르다. `data-enter` 가 헤더 · 무대에서는
+   **조상**에 붙지만 바닥줄에서는 **그 요소 자신**(.ss-home-footer)에 붙는다 —
+   자손 결합자(`[data-enter] .ss-home-footer`)로 쓰면 한 번도 안 걸려서
+   로그아웃만 처음부터 제자리에 박혀 있었다. 붙여 써야 한다. */
+[data-enter='false'] .ss-home-nav-list > li,
+[data-enter='false'] .ss-home-profile,
+[data-enter='false'] .ss-squad-wrap,
+[data-enter='false'] .ss-home-subhead > span,
+.ss-home-footer[data-enter='false'] > * {
+  opacity: 0;
+}
+
+/* 오른쪽 화면 밖에서 — 글자 줄. 순서는 맨 **왼쪽**('영상 분석')이 먼저다
+   (--ss-nav-i 0, 사용자 요청). 들어오는 방향과 순서가 반대라 먼저 온 것이
+   가장 멀리까지 간다. */
+[data-enter='true'] .ss-home-nav-list > li {
+  animation: ss-enter-right 900ms var(--ss-enter-ease) both;
+  animation-delay: calc(var(--ss-nav-i, 0) * 90ms);
+}
+
+/* 왼쪽 화면 밖에서 — 알약. 들어오는 방향은 왼쪽이지만 **순서는 오른쪽
+   ('팀 찾기')이 먼저**다(사용자 요청). 글자 줄과 순서가 반대라 순번 계산도
+   갈린다(HomeNav 주석 참고). */
+[data-enter='true'] .ss-home-nav-list--pill > li {
+  animation-name: ss-enter-left;
+  animation-duration: 950ms;
+  animation-delay: calc(260ms + var(--ss-nav-i, 0) * 120ms);
+}
+
+/* 화면 아래 밖에서 **작게** 떠올라 제 크기가 된다 — 멀리 있던 것이
+   다가오는 것처럼. 갈 길이 가장 멀어 가장 길다.
+
+   🔴 **아래 `animation-delay` 를 영상 분석 화면이 같이 쓴다**(AnalysisStage 의
+   PANEL_IN_MS) — 왼쪽 검은 판이 이 카드와 **한 몸으로** 밀려 들어와야 해서다.
+   값을 고치면 그쪽도 같이 고칠 것. */
+[data-enter='true'] .ss-home-profile {
+  animation: ss-enter-rise-grow 1150ms var(--ss-enter-ease) both;
+  animation-delay: 120ms;
+}
+
+/* 화면 아래 밖에서 위로, **절반 크기에서 제 크기로**(사용자 요청).
+   판이 화면 높이만큼 크므로 110vh 를 내려 둔다.
+
+   기준점은 **위 가운데**다(transform-origin). 가운데(기본값)로 두면 커지는
+   동안 판의 윗변이 위로 밀려 올라가 알약과의 간격이 출렁인다 — 위를 못박아
+   두면 판이 알약 밑에서 아래로 펼쳐지는 것처럼 보인다. */
+[data-enter='true'] .ss-squad-wrap {
+  transform-origin: 50% 0;
+  animation: ss-enter-up-grow 1050ms var(--ss-enter-ease) both;
+  animation-delay: 380ms;
+}
+
+/* 오른쪽 화면 밖에서 한 줄씩 — OWN → THE → PITCH. */
+[data-enter='true'] .ss-home-subhead > span {
+  animation: ss-enter-right-far 950ms var(--ss-enter-ease) both;
+}
+[data-enter='true'] .ss-home-subhead > span:nth-child(1) {
+  animation-delay: 620ms;
+}
+[data-enter='true'] .ss-home-subhead > span:nth-child(2) {
+  animation-delay: 780ms;
+}
+[data-enter='true'] .ss-home-subhead > span:nth-child(3) {
+  animation-delay: 940ms;
+}
+
+/* 맨 마지막 — 로그아웃. PITCH 가 자리를 잡을 즈음 들어온다. */
+.ss-home-footer[data-enter='true'] > * {
+  animation: ss-enter-right 850ms var(--ss-enter-ease) both;
+  animation-delay: 1150ms;
+}
+
+/* 거리는 **화면 밖까지**다. 28px 짜리 미세한 밀림은 "나타났다"로 보일 뿐
+   "바깥에서 들어왔다"로 안 읽힌다(사용자 지적). vw · vh 로 매어 두면 화면
+   폭이 달라져도 늘 밖에서 출발한다.
+   50vw: 이 요소들은 오른쪽 변 가까이에 있어 화면 폭의 절반이면 이미 밖이다.
+   판·카드는 세로로 화면을 거의 채우므로 110vh 를 준다. */
+@keyframes ss-enter-right {
+  from {
+    opacity: 0;
+    transform: translateX(50vw);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ss-enter-left {
+  from {
+    opacity: 0;
+    transform: translateX(-60vw);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ss-enter-right-far {
+  from {
+    opacity: 0;
+    transform: translateX(70vw);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ss-enter-up-grow {
+  from {
+    opacity: 0;
+    transform: translateY(110vh) scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 작게, 화면 아래 밖에서 → 제 크기로. 0.3 아래로 내리면 카드 속 글자가
+   뭉개진 채 지나가는 구간이 길어져 지저분하다. */
+@keyframes ss-enter-rise-grow {
+  from {
+    opacity: 0;
+    transform: translateY(110vh) scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 움직임을 줄이라고 한 사람에게는 제자리에서 그냥 나타난다 — 순서만 남긴다. */
+@media (prefers-reduced-motion: reduce) {
+  [data-enter='true'] .ss-home-nav-list > li,
+  [data-enter='true'] .ss-home-profile,
+  [data-enter='true'] .ss-squad-wrap,
+  [data-enter='true'] .ss-home-subhead > span,
+  .ss-home-footer[data-enter='true'] > * {
+    animation-name: ss-enter-fade;
+    animation-duration: 220ms;
+  }
+}
+
+/* ── 나갈 때 — **들어온 방향 그대로 되나간다** ────────────────────────
+   `data-enter='out'` 은 `lib/pageTransition.tsx` 가 켠다. 링크를 가로채
+   이 상태를 켜고 애니메이션이 끝난 뒤에 이동하므로, 여기서 가장 늦게
+   끝나는 시각(240 + 400 = 640ms)이 그쪽의 `LEAVE_MS` 와 같아야 한다.
+
+   🔴 **순서는 들어올 때의 거꾸로다** — 마지막에 들어온 것(로그아웃)이 먼저
+   나가고 처음 들어온 것(글자 줄)이 마지막에 나간다. 같은 순서로 내보내면
+   들어오는 장면을 빨리 감기 한 것처럼 보인다.
+
+   이징도 반대다. 들어올 땐 빠르게 나와 부드럽게 멎지만(easeOut), 나갈 땐
+   천천히 떼서 빠르게 사라진다(easeIn) — 그래야 "빠져나간다"로 읽힌다. */
+[data-enter='out'] .ss-home-nav-list > li,
+[data-enter='out'] .ss-home-profile,
+[data-enter='out'] .ss-squad-wrap,
+[data-enter='out'] .ss-home-subhead > span,
+.ss-home-footer[data-enter='out'] > * {
+  animation-duration: 560ms;
+  animation-timing-function: var(--ss-leave-ease);
+  animation-fill-mode: both;
+}
+
+/* 오른쪽으로 되나간다 — 오른쪽에서 들어왔던 것들. */
+[data-enter='out'] .ss-home-nav-list > li {
+  animation-name: ss-leave-right;
+  animation-delay: calc(240ms - var(--ss-nav-i, 0) * 45ms);
+}
+
+[data-enter='out'] .ss-home-subhead > span {
+  animation-name: ss-leave-right-far;
+}
+/* PITCH → THE → OWN. 들어온 차례의 거꾸로다. */
+[data-enter='out'] .ss-home-subhead > span:nth-child(1) {
+  animation-delay: 150ms;
+}
+[data-enter='out'] .ss-home-subhead > span:nth-child(2) {
+  animation-delay: 75ms;
+}
+[data-enter='out'] .ss-home-subhead > span:nth-child(3) {
+  animation-delay: 0ms;
+}
+
+.ss-home-footer[data-enter='out'] > * {
+  animation-name: ss-leave-right;
+  animation-delay: 0ms;
+}
+
+/* 왼쪽으로 되나간다 — 왼쪽에서 들어왔던 알약. */
+[data-enter='out'] .ss-home-nav-list--pill > li {
+  animation-name: ss-leave-left;
+  animation-delay: calc(180ms - var(--ss-nav-i, 0) * 45ms);
+}
+
+/* 아래로 되내려간다 — 아래에서 올라왔던 것들. */
+[data-enter='out'] .ss-squad-wrap {
+  animation-name: ss-leave-down-shrink;
+  animation-delay: 120ms;
+}
+
+[data-enter='out'] .ss-home-profile {
+  animation-name: ss-leave-down-shrink;
+  animation-delay: 180ms;
+}
+
+/* 🔴 **거리는 들어올 때보다 짧다.** 들어올 땐 화면 밖(±vw)에서 오는 것을
+   보여 줘야 하지만, 나갈 때는 **사라지는 것을 보여 주는 게 아니라 비켜 주는
+   것**이라 멀리 보낼 이유가 없다. 50vw 를 460ms 에 가로지르면 마지막이
+   빨라져 툭 끊겨 보인다.
+
+   그리고 **불투명도를 65% 지점에 이미 0 으로** 보낸다. 남은 35% 는 눈에
+   안 보이는 채로 움직이므로, 어느 속도로 끝나든 "퐉" 하는 순간이 없다. */
+@keyframes ss-leave-right {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  65% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(24vw);
+  }
+}
+
+@keyframes ss-leave-left {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  65% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-28vw);
+  }
+}
+
+@keyframes ss-leave-right-far {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  65% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(34vw);
+  }
+}
+
+/* 커지며 올라왔으니 작아지며 내려간다. */
+@keyframes ss-leave-down-shrink {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  65% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(38vh) scale(0.78);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-enter='out'] .ss-home-nav-list > li,
+  [data-enter='out'] .ss-home-profile,
+  [data-enter='out'] .ss-squad-wrap,
+  [data-enter='out'] .ss-home-subhead > span,
+  .ss-home-footer[data-enter='out'] > * {
+    animation-name: ss-leave-fade;
+    animation-duration: 120ms;
+    animation-delay: 0ms;
+  }
+}
+
+@keyframes ss-leave-fade {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes ss-enter-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 좁은 화면 — 헤드라인 옆 짝과 하단 줄이 서로를 밀어내지 않게 접는다
+   (번호 목록은 상단 글자 내비로 충분하다). */
+@media (max-width: 720px) {
+  .ss-home-subhead {
+    display: none;
+  }
+
+}
+
+/* ── 선수 카드 (세로 포스터형) ─────────────────────────────────────────── */
+
+/* 참고 디자인(MOJO 시즌 카드)을 그대로 옮긴 것. 검은 테두리 안에 흰 카드가
+   들어 있고, 위에서부터 워드마크 · 머리글 · 굵은 검은 이름 · 흑백 사진이
+   쌓이며 맨 아래에 검은 막대 · 형광 알약 · 검은 원형 배지가 한 줄로 온다.
+
+   🔴 사이트는 어두운데 이 카드만 밝다 — 의도한 것이다. 카드는 밖으로
+   공유되는 물건이라 어디에 놓여도 같은 얼굴이어야 해서, 색을 사이트
+   토큰이 아니라 카드 전용 토큰에서 가져온다. */
+.ss-pcard {
+  /* 참고 디자인(NFL 카드)처럼 바탕에 색을 깔고 그 위에 검은 붓자국과
+     흑백 인물을 얹는다. 흰 바탕일 때보다 자국과 인물이 또렷하게 뜬다. */
+  --ss-pcard-bg: #91ea92;
+  --ss-pcard-fg: #0b0b0b;
+  /* 카드가 제 크기로 그려질 때의 폭(px 단위 없는 수). 줄인 사본은 이
+     폭으로 그린 뒤 transform 으로 축소한다 — 안쪽 글자까지 통째로 같은
+     비율로 작아져야 해서다. 폭만 줄이면 워드마크·머리글이 제 크기로
+     남아 짜임이 깨진다. */
+  --ss-pcard-base-w: 380;
+
+  width: 100%;
+  max-width: calc(var(--ss-pcard-base-w) * 1px);
+  /* 비율을 여기서 못박는다 — 작게 줄인 사본(.ss-pcard-mini)이 이 값에
+     기대어 자리를 잡는다. 안쪽에만 주면 바깥 높이가 달라져 사본이
+     조용히 어긋난다.
+
+     한때 여기에 검은 테두리(padding + 어두운 배경)를 둘러 참고 디자인의
+     두 겹 짜임을 흉내 냈는데 걷어냈다 — 카드가 어두운 화면 위에 놓이니
+     테두리가 배경에 묻혀 두께만 먹었다. 지금은 이 요소가 자리만 잡고
+     보이는 건 전부 안쪽(.ss-pcard-inner)이다. */
+  aspect-ratio: 3 / 4.1;
+}
+
+.ss-pcard-inner {
+  position: relative;
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 24px;
+  background: var(--ss-pcard-bg);
+  padding: 20px 18px;
+  color: var(--ss-pcard-fg);
+  /* 이름 크기를 카드 폭(cqw)에 매기 위해 컨테이너로 선언한다 — 이게
+     없으면 cqw 가 무효가 되어 clamp 의 최소값으로 주저앉는다. */
+  container-type: inline-size;
+}
+
+.ss-pcard-top {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 카드의 영문은 전용 세리프(Young Serif)로 찍는다. 워드마크만 예외 —
+   그건 브랜드 글꼴(RubikGlitch)이라 건드리지 않는다. */
+.ss-pcard-kicker {
+  font-family: var(--font-card), var(--font-rubik), system-ui, serif;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: color-mix(in srgb, var(--ss-pcard-fg) 70%, transparent);
+}
+
+/* 이름 — 카드에서 가장 큰 글자. 참고 디자인의 굵은 압축 산세 자리다.
+   한글이라 디스플레이 글꼴(라틴 전용)을 못 쓰므로 본문 글꼴을 가장
+   굵게 쓰고 자간을 좁혀 한 덩어리로 보이게 한다. */
+/* 가운데 큰 별명 — 참고 디자인의 제목 자리. 워드마크 아래에서 시작해
+   인물(카드 세로 절반부터)과 살짝 겹친다. 인물보다 위(z)라 겹치는 부분은
+   글자가 이긴다 — 참고 디자인에서도 제목이 선수 앞에 있다.
+   크기는 카드 폭에 맨다(cqw, 안쪽 카드를 container 로 선언해 뒀다). */
+.ss-pcard-alias {
+  position: relative;
+  z-index: 2;
+  /* 워드마크 · 머리글에서 한 뼘 띄운다. 붙여 두면 세 덩어리가 한 덩어리로
+     읽히고, 인물과의 겹침도 얕아진다. */
+  margin-top: 52px;
+  text-align: center;
+  font-family: var(--font-card), var(--font-rubik), system-ui, serif;
+  font-size: clamp(1.75rem, 15cqw, 3.25rem);
+  /* 🔴 font-weight 를 주지 않는다 — Young Serif 는 굵기가 400 하나뿐이라
+     올리면 가짜 굵게(synthetic bold)만 걸린다.
+
+     더 묵직하게 보이려고 **글자와 같은 색 테두리를 덧그려 획을 불린다.**
+     가짜 굵게와 달리 자폭과 자간이 그대로라 글자 사이가 벌어지지 않고,
+     세리프의 가는 획(헤어라인)만 굵어져 글꼴의 대비가 살아 있는 채로
+     무게가 붙는다. paint-order 로 테두리를 글자 **아래**에 깔아야 획
+     안쪽으로 파고들지 않는다. */
+  -webkit-text-stroke: 1.5px var(--ss-pcard-fg);
+  paint-order: stroke fill;
+  letter-spacing: -0.01em;
+  line-height: 1.02;
+  color: var(--ss-pcard-fg);
+}
+
+/* 인물 뒤 붓자국 — 카드 바닥(흰색)과 인물 사이에 깔린다. 인물보다
+   뒤(z: 0)라 자국이 어깨 뒤로 지나가는 것처럼 보인다. */
+.ss-pcard-brush {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  fill: var(--ss-pcard-fg);
+}
+
+/* 누끼 인물 — 카드 **아래 절반만** 차지한다(top: 50%). 사용자가 정한
+   규칙이다: 카드 세로 가운데 위로는 넘어가지 않는다. 위쪽 절반은
+   워드마크와 머리글의 자리다.
+
+   **위를 그 가운데선에 붙이고**(top center) 아래로 넘치는 만큼은 카드가
+   자른다 — 참고 디자인도 선수 아랫도리가 카드 밖으로 나간다.
+
+   가로 폭은 카드의 68% 다. 100% 로 채워 봤더니 상자가 가로로 납작해져
+   (352×246) 헬멧만 남고 상체가 통째로 잘렸다 — 상자를 세로로 세울수록
+   같은 높이에 사람이 더 많이 들어온다. 참고 디자인의 선수도 카드 폭의
+   60% 남짓을 차지한다. 흑백도 원본과 같다. */
+.ss-pcard-figure {
+  position: absolute;
+  z-index: 1;
+  inset-inline: 16%;
+  top: 50%;
+  bottom: 0;
+}
+
+.ss-pcard-figure img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  filter: grayscale(1) contrast(1.06);
+}
+
+/* 작게 줄인 카드 — 홈 헤더에서 닉네임 자리를 대신한다. 폭만 줄이면 안쪽
+   글자 크기가 그대로 남아 짜임이 깨지므로, 제 크기로 그린 뒤 통째로
+   축소한다(transform). 그러면 안쪽 여백 · 글자 · 붓자국이 전부 같은
+   비율로 작아진다. */
+.ss-pcard-mini {
+  /* 🔴 --ss-pcard-mini-w 를 여기서 **선언하지 않는다.** 선언해 두면
+     조상이 준 값(예: 스쿼드 판의 62)을 자기 값이 덮어써서, 바깥에서
+     크기를 줄여도 카드가 그대로 남는다 — 실제로 그렇게 안 줄어들었다.
+     쓰는 자리마다 기본값 92 를 곁들여 읽는다. */
+  --ss-pcard-base-w: 380;
+  /* 🔴 자식을 흐름에서 뺀다(아래 position: absolute). transform 은 그리는
+     크기만 줄이고 **배치 크기는 원래대로 남긴다** — 흐름에 두면 부모가
+     줄기 전 크기(380×519)에 맞춰 늘어나서 aspect-ratio 가 무시된다.
+     실측으로 확인했다: 빼기 전 부모 높이 519px, 뺀 뒤 126px. */
+  position: relative;
+  display: block;
+  width: calc(var(--ss-pcard-mini-w, 92) * 1px);
+  aspect-ratio: 3 / 4.1;
+  transition: transform 200ms ease;
+}
+
+.ss-pcard-mini:hover,
+.ss-pcard-mini:focus-visible {
+  transform: translateY(-2px);
+}
+
+/* transform 으로 줄인 요소는 **줄기 전 크기로 자리를 차지한다** — 그래서
+   바깥 상자(.ss-pcard-mini)가 줄어든 크기를 따로 들고 있어야 헤더가
+   밀리지 않는다. 왼쪽 위를 기준으로 줄여 두 상자의 좌상단을 맞춘다. */
+.ss-pcard-mini > .ss-pcard {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(var(--ss-pcard-base-w) * 1px);
+  max-width: none;
+  transform: scale(calc(var(--ss-pcard-mini-w, 92) / var(--ss-pcard-base-w)));
+  transform-origin: top left;
+}
+
+/* 헤더 오른쪽 — 카드와 그 아래 '내 프로필' 글자. */
+.ss-home-profile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.ss-home-profile-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  /* 배경 사진이 밝은 자리도 있어 불투명도를 깎으면 묻힌다 — 완전한 흰색. */
+  color: var(--ss-fg);
+}
+
+/* 로그아웃 — 화면 오른쪽 아래 구석. 아이콘 아래에 글자를 단다.
+   배경 사진이 밝은 자리도 있어 불투명도를 깎지 않는다 — 완전한 흰색. */
+.ss-logout {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 10px;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  color: var(--ss-fg);
+  transition: opacity 160ms ease;
+}
+
+.ss-logout:hover,
+.ss-logout:focus-visible {
+  opacity: 0.7;
+}
+
+.ss-logout:disabled {
+  opacity: 0.4;
+}
+
+/* Material Symbols 는 가변 글꼴이라 채움 · 굵기 · 광학 크기를 축으로 준다:
+   채움 없음(FILL 0), 가장 가는 굵기(wght 100), 광학 크기 24. */
+.ss-logout-icon {
+  font-size: 26px;
+  font-variation-settings: 'FILL' 0, 'wght' 100, 'GRAD' 0, 'opsz' 24;
+}
+
+/* 홈 왼쪽 덩어리 — 헤드라인 + 스쿼드 판. 자리 잡기를 여기서 한 번에
+   한다: 위로 120px 올리고, 화면 왼쪽 끝과 배경 인물의 코 사이 한가운데에
+   놓는다(실측 1440px: 코 끝 x=615 → 가운데 307). 안쪽 글자에 margin 을
+   주면 판이 따라오지 않아 둘이 어긋난다. */
+.ss-home-left {
+  position: relative;
+  margin-top: -150px;
+  margin-left: 120px;
+}
+
+/* 스쿼드 판 — 판 하나 위에 카드를 포지션 자리대로 앉힌다(축구 게임의
+   스쿼드 화면처럼). 한 줄로 늘어놓으면 누가 어느 자리인지 안 읽힌다.
+
+   카드 폭은 --ss-pcard-mini-w 가 정한다 — 헤더의 작은 카드와 같은 방식
+   (제 크기로 그린 뒤 통째로 줄인다). 세 칸이 배경 인물과 안 겹치는
+   크기로 잡았다. */
+/* 스쿼드 판과 추천 판을 함께 담는 상자 — 자리 잡기를 여기서 한다.
+   추천 판은 유리판의 형제여야 한다(유리판이 overflow: hidden 이라 자식으로
+   두면 밖으로 나간 부분이 잘린다, SquadPanel 주석 참고). */
+.ss-squad-wrap {
+  /* 🔴 흐름에서 뺀다. 판이 세로로 길어지면 왼쪽 덩어리가 통째로 커지고,
+     화면 가운데 정렬(.ss-home-stage) 때문에 **헤드라인이 위로 밀린다.**
+     판을 헤드라인 아래에 매달아 두면 헤드라인 자리는 제 높이로만
+     정해진다 — 판을 키우거나 줄여도 위 글자가 안 움직인다. */
+  position: absolute;
+  top: 100%;
+  /* 화면 왼쪽 끝과 배경 인물의 코 사이 한가운데에 놓는다(사용자 요청).
+
+     🔴 **고정 px 로 박으면 안 된다.** 배경 사진이 cover 라 화면 폭이
+     바뀌면 인물도 같이 움직인다 — 1440px 에서 잰 값(-105px)을 박아 뒀더니
+     다른 폭에서는 한쪽으로 치우쳐 보였다. 코의 자리를 네 폭(1280 · 1440 ·
+     1700 · 1920)에서 재 보니 **늘 화면 폭의 42.67%** 였다. 그 절반이
+     목표 가운데(21.333vw)다.
+
+     여기서 빼는 423px = 판 폭의 절반(255) + 이 판을 담은 상자의 x(168,
+     화면 여백 48 + 왼쪽 덩어리 margin 120). max() 는 아주 좁은 화면에서
+     판이 화면 밖으로 나가지 않게 막는 바닥이다(-120px 이면 판 왼쪽이
+     화면 여백선인 48px 에 선다). */
+  left: max(-120px, calc(21.333vw - 423px));
+  margin-top: 18px;
+  width: max-content;
+}
+
+/* 스쿼드 판 — **판이라 할 것이 없다.** 직각, 블러 없음, 바탕색 없음.
+   경기장 선과 모서리 꺾쇠만 남아 배경 사진 위에 선을 그어 놓은 모양이다.
+   유리 재질(반투명 + 블러 + 둥근 모서리)을 여러 조합으로 해 봤지만
+   경기장에는 이쪽이 맞는다. GlassPanel 을 쓰지 않는 이유이기도 하다 —
+   그건 블러와 둥근 모서리, 도는 테두리 빛을 한 벌로 딸려 보낸다. */
+.ss-squad {
+  --ss-pcard-mini-w: 94;
+  /* 모서리 꺾쇠가 뻗는 길이. 끝은 서서히 사라진다(아래 mask). */
+  --ss-squad-corner: 110px;
+  position: relative;
+  overflow: hidden;
+  /* 바탕을 아예 두지 않는다 — 반투명 흰색(--ss-glass-bg)과 위쪽 하이라이트,
+     안쪽 그림자까지 전부 걷었다. 남는 것은 경기장 선과 모서리 꺾쇠뿐이라
+     배경 사진 위에 선만 그어 놓은 것처럼 보인다. */
+  padding: 14px 16px 16px;
+}
+
+/* 경기장 선 안쪽 위에 얹힌다. 선(테두리 rect)이 상자 가장자리에서
+   1/100 쯤 들어와 있으므로 그보다 더 안쪽에 둔다. */
+.ss-squad-head {
+  position: absolute;
+  z-index: 1;
+  top: 16px;
+  inset-inline: 22px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ss-squad-head h2 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--ss-fg);
+}
+
+/* 판 안 글자는 전부 완전한 흰색이다 — 배경 사진이 밝은 자리도 있어
+   불투명도를 깎으면 묻힌다. */
+.ss-squad-head p {
+  font-size: 0.6875rem;
+  color: var(--ss-fg);
+}
+
+/* 포메이션 — 위가 공격, 아래가 골키퍼다. 가운데 열에 FW · MF · GK 가
+   서고 수비 둘이 양옆으로 벌어진다. */
+/* 경기장 선은 이 상자를 꽉 채우고(.ss-squad-pitch, inset 0) 카드는 그
+   안쪽에 놓여야 한다 — 여백이 없으면 맨 위 카드와 맨 아래 이름표가 선을
+   물고 나간다. 아래를 더 두는 것은 이름표가 카드 밑에 붙기 때문이다. */
+.ss-squad-board {
+  position: relative;
+  /* 위 여백이 머리글(MY SQUAD · 풋살 5인)의 자리다 — 그 머리글이 이
+     상자 안에 있어야 경기장 선 안쪽에 앉는다. */
+  padding: 46px 22px 8px;
+  display: grid;
+  /* 1-2-1 — 위가 공격이다: FW 하나, MF 둘, DF 하나, GK. */
+  grid-template-areas:
+    '.  fw .'
+    'ml .  mr'
+    '.  df .'
+    '.  gk .';
+  /* 가로를 넉넉히 벌린다 — 세로로만 길면 판이 기둥처럼 보이고 포메이션
+     으로 안 읽힌다. 세로 간격은 반대로 좁혀 키를 줄인다. */
+  column-gap: 80px;
+  row-gap: 6px;
+  justify-items: center;
+}
+
+/* 아직 비어 있는 카드 — 바탕이 희다. 채워진 카드(연두)와 한눈에 갈려야
+   "여기는 아직 자리"라는 게 읽힌다. 글자 · + 는 그대로 검정이고
+   워드마크만 브랜드 민트다(SquadPanel 주석 참고). */
+.ss-pcard-blank {
+  --ss-pcard-bg: #ffffff;
+}
+
+/* 경기장 선 — 카드보다 뒤에 깔린다. 완전한 흰색이다. */
+.ss-squad-pitch {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: var(--ss-fg);
+  /* non-scaling-stroke 라 이 값이 그대로 화면 픽셀이다 — viewBox 배율에
+     안 눌린다. 흰색으로 바꾸고 나니 0.6 도 굵어 보여 0.4 로 내렸다. 그 아래로
+     내려가면 화면에 따라 선이 끊겨 보인다. */
+  stroke-width: 0.4;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+/* 가운데 점만 채운다 — 선으로 그리면 안 보인다. */
+.ss-squad-pitch-dot {
+  fill: var(--ss-fg);
+  stroke: none;
+}
+
+.ss-squad-seat {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.ss-squad-pos {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--ss-fg);
+}
+
+/* 빈 카드의 가운데 — 머리글 아래 남는 자리를 다 쓴다. */
+.ss-squad-seat-body {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+
+/* 빈 자리의 + — Material Symbols 의 add. 가변 글꼴이라 축으로 굵기 ·
+   채움 · 광학 크기를 준다: 채움 없음(FILL 0), 가장 굵게(wght 700),
+   광학 크기 24. 카드 가운데를 크게 채워야 "여기 누르면 된다"가 바로
+   읽힌다. */
+.ss-squad-plus {
+  font-size: 120px;
+  line-height: 1;
+  font-variation-settings: 'FILL' 0, 'wght' 700, 'GRAD' 0, 'opsz' 24;
+  color: var(--ss-pcard-fg);
+}
+
+.ss-squad-plus:hover,
+.ss-squad-plus:focus-visible {
+  opacity: 0.6;
+}
+
+/* 넣은 선수 이름 — 카드 가운데. 누르면 뺀다. */
+.ss-squad-name {
+  padding: 0 8px;
+  font-family: var(--font-card), var(--font-rubik), system-ui, serif;
+  font-size: 20px;
+  line-height: 1.05;
+  text-align: center;
+  color: var(--ss-pcard-fg);
+  overflow-wrap: anywhere;
+}
+
+
+.ss-squad-note {
+  padding: 0 8px;
+  text-align: center;
+  font-size: 10px;
+  line-height: 1.3;
+  color: color-mix(in srgb, var(--ss-pcard-fg) 55%, transparent);
+}
+
+/* 판 테두리는 **네 모서리 꺾쇠**뿐이다. 도는 빛(GlassPanel)을 쓰지 않는
+   이유이기도 하다 — 빛이 계속 돌면 카드보다 테두리를 먼저 보게 된다. */
+/* 테두리를 한 겹 그린 뒤 마스크로 모서리만 남긴다 — 선을 네 조각으로
+   따로 그리면 둥근 모서리에서 이음매가 보인다. 각 모서리에 둔
+   radial-gradient 가 안쪽은 불투명, 바깥으로 갈수록 투명해서 꺾쇠 끝이
+   저절로 흐려진다. */
+.ss-squad::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 55%, transparent);
+  border-radius: inherit;
+  pointer-events: none;
+  -webkit-mask-image:
+    radial-gradient(var(--ss-squad-corner) var(--ss-squad-corner) at 0 0, #000 55%, transparent 100%),
+    radial-gradient(var(--ss-squad-corner) var(--ss-squad-corner) at 100% 0, #000 55%, transparent 100%),
+    radial-gradient(var(--ss-squad-corner) var(--ss-squad-corner) at 0 100%, #000 55%, transparent 100%),
+    radial-gradient(var(--ss-squad-corner) var(--ss-squad-corner) at 100% 100%, #000 55%, transparent 100%);
+  mask-image:
+    radial-gradient(var(--ss-squad-corner) var(--ss-squad-corner) at 0 0, #000 55%, transparent 100%),
+    radial-gradient(var(--ss-squad-corner) var(--ss-squad-corner) at 100% 0, #000 55%, transparent 100%),
+    radial-gradient(var(--ss-squad-corner) var(--ss-squad-corner) at 0 100%, #000 55%, transparent 100%),
+    radial-gradient(var(--ss-squad-corner) var(--ss-squad-corner) at 100% 100%, #000 55%, transparent 100%);
+  -webkit-mask-composite: source-over;
+  mask-composite: add;
+}
+
+/* ── 추천 판 (스쿼드 빈 자리를 누르면 오른쪽에서 나온다) ─────────────── */
+
+/* 스쿼드 판 **바깥** 오른쪽에 붙는다. 판 안에 두면 카드를 덮는다.
+   미끄러져 나오는 동안 판 밑으로 파고들지 않게 z 를 올린다. */
+.ss-suggest {
+  position: absolute;
+  /* 왼쪽 스쿼드 판과 **같은 키**로 선다 — 나란히 놓이는 두 판이 아래끝이
+     어긋나면 붙어 있는 한 벌로 안 읽힌다. */
+  top: 0;
+  bottom: 0;
+  left: 100%;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  margin-left: 12px;
+  width: 380px;
+  /* 🔴 모서리 반지름을 변수로 둔다 — 펼쳐지는 애니메이션의 clip-path 가 같은
+     값을 써야 해서다(따로 적으면 한쪽만 고쳐 모서리가 어긋난다).
+
+     **각지다.** 왼쪽 스쿼드 판이 직각(선만 그은 판)이라 나란히 섰을 때
+     그쪽과 결이 맞는다. 판 · 안쪽 판때기가 다 0 이어야 한 벌로 읽힌다 —
+     하나만 둥글면 그것만 덧붙인 것처럼 보인다. */
+  --ss-suggest-radius: 0px;
+  border-radius: var(--ss-suggest-radius);
+  border: 1px solid var(--ss-glass-border);
+  /* 🔴 **여기는 유리 그대로다 — 어둡게 덮지 않는다.** 뒤 배경이 비쳐야
+     판이 화면 위에 떠 있는 것으로 읽힌다. 글씨를 읽히게 하는 일은 판이
+     아니라 **각 후보의 판때기**(.ss-suggest-item)가 맡는다. 판까지 어둡게
+     칠했다가 유리감이 통째로 죽어서 되돌린 자리다. */
+  background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--ss-fg) 10%, transparent),
+      transparent 40%
+    ),
+    var(--ss-glass-bg);
+  padding: 16px;
+  transform-origin: left center;
+  animation: ss-suggest-in 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* 물러나는 중 — 아직 DOM 에 있지만 누를 수 있으면 안 된다. */
+.ss-suggest[data-state='closing'] {
+  pointer-events: none;
+  animation: ss-suggest-out 200ms ease-in both;
+}
+
+/* 스쿼드 판 쪽에서 펼쳐지듯 나온다. 왼쪽 변을 기준으로 삼아(origin)
+   판에 붙은 채로 자라야 "밀려 나온다"가 아니라 "펼쳐진다"로 읽힌다.
+   clip-path 로 왼쪽부터 드러나는 것을 같이 걸어 두면 미끄러지는 것보다
+   훨씬 차분하다 — 판 전체가 통째로 이동하지 않기 때문이다.
+
+   ⚠️ 더 세게 "종이가 펴지는" 연출을 두 번 시도했다가 둘 다 되돌렸다:
+   (1) 원근 안에서 rotateY 로 문짝처럼 여는 것, (2) 거기에 scaleX 로 좁게
+   접었다 펴며 접힌 자국(줄무늬)을 벌리는 것. 둘 다 이 차분한 것보다
+   못했다. 칸마다 각도가 다른 **진짜 아코디언**은 판 표면을 조각으로 쪼개
+   서로의 오른쪽 변에 3D 경첩으로 매달아야 하는데, 안에 든 글자를 쪼갤 수
+   없어 표면만 따로 그리는 장식 층이 필요하다 — 그만한 값어치가 없다고
+   보고 접었다. 같은 길로 다시 가지 않도록 남긴다. */
+@keyframes ss-suggest-in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px) scale(0.985);
+    clip-path: inset(0 100% 0 0 round var(--ss-suggest-radius));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    clip-path: inset(0 0 0 0 round var(--ss-suggest-radius));
+  }
+}
+
+@keyframes ss-suggest-out {
+  from {
+    opacity: 1;
+    transform: translateX(0) scaleX(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-10px) scaleX(0.97);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-suggest,
+  .ss-suggest[data-state='closing'],
+  .ss-suggest[data-state='open'] .ss-suggest-head,
+  .ss-suggest[data-state='open'] .ss-suggest-list > li {
+    animation-duration: 1ms;
+    animation-delay: 0ms;
+  }
+}
+
+.ss-suggest-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 14px;
+  min-height: 24px;
+}
+
+/* 제목은 한 줄로 판 가운데에. 닫기 버튼은 오른쪽 위에 겹쳐 두어야
+   제목이 판의 진짜 가운데에 온다 — 나란히 두면 버튼 폭만큼 밀린다. */
+.ss-suggest-head h3 {
+  width: 100%;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ss-fg);
+}
+
+.ss-suggest-close {
+  position: absolute;
+  right: 0;
+  top: 0;
+  font-size: 18px;
+  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+  color: color-mix(in srgb, var(--ss-fg) 60%, transparent);
+  transition: color 160ms ease;
+}
+
+.ss-suggest-close:hover,
+.ss-suggest-close:focus-visible {
+  color: var(--ss-fg);
+}
+
+/* 머리글과 후보가 판보다 한 박자 늦게, 차례로 들어온다 — 판만 통째로
+   나타나면 툭 튀어나온 느낌이다. 닫힐 때는 이 계단을 쓰지 않는다(판이
+   통째로 물러나는 게 빠르고 깔끔하다). */
+.ss-suggest[data-state='open'] .ss-suggest-head,
+.ss-suggest[data-state='open'] .ss-suggest-list > li {
+  animation: ss-suggest-item-in 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(140ms + var(--ss-i, 0) * 60ms);
+}
+
+.ss-suggest[data-state='open'] .ss-suggest-head {
+  animation-delay: 100ms;
+}
+
+@keyframes ss-suggest-item-in {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 목록이 판의 남는 키를 다 쓴다. 후보가 많아지면 여기서만 스크롤한다. */
+.ss-suggest-list {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.ss-suggest-item {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  gap: 12px;
+  /* 판과 같이 각지다 — 지인 찾기의 줄(.ss-friends-row)도 마찬가지다. */
+  border-radius: 0;
+  padding: 12px;
+  text-align: left;
+  /* 🔴 **읽히게 하는 검은 막은 여기에 있다.** 바깥 판(.ss-suggest)은 유리로
+     두고, 글자가 얹히는 이 판때기만 어둡게 깐다 — 판 전체를 칠하면 유리감이
+     죽는다. 흰 반투명(--ss-glass-bg)만 쓰던 때는 뒤 배경을 **밝히기만** 해서
+     인물 사진의 흰 연기 위에서 흰 글씨가 통째로 묻혔다.
+     🔴 **진하기는 지인 찾기의 줄(.ss-friends-row)과 같은 값이다** — 두 판이
+     같은 자리에 번갈아 뜨므로 한쪽만 어두우면 판이 바뀐 게 아니라 화면이
+     어두워진 것처럼 보인다. 한쪽을 고치면 다른 쪽도 같이 고칠 것.
+     55%: 실측한 가장 밝은 연기(255) 위에서 흰 글씨가 4.1:1 이다. 78% 였을
+     때(9:1)보다 낮지만, 옆 판과 같은 값으로 맞추는 쪽을 골랐다.
+
+     🔴 **`background` 단축에 층을 쌓아 쓰지 않는다.** 단축에서 색을 놓을 수
+     있는 것은 **마지막 층뿐**이라, 색(--ss-glass-bg) 뒤에 한 층을 더 붙이면
+     그 색이 중간 층이 되어 문법 위반이 된다. var() 가 끼어 있으면 파싱이
+     아니라 **계산 시점**에 무효가 되어(invalid at computed-value time) 속성이
+     통째로 초기값 — 배경이 아예 투명해지고 콘솔에도 아무것도 안 남는다.
+     바깥 판에서 실제로 그렇게 날아갔다(실측 197). 색은 background-color,
+     겹치는 층은 background-image 로 나눠 쓴다. */
+  background-color: color-mix(in srgb, var(--ss-bg) 55%, transparent);
+  /* 유리 틴트 — 색이지만 이미지 층이라 단색 그라디언트로 편다. */
+  background-image: linear-gradient(var(--ss-glass-bg), var(--ss-glass-bg));
+  /* 떠오르는 느낌은 **막을 걷어서** 낸다(55 → 40%). 틴트를 밝히는 쪽으로
+     하면 background-image 가 바뀌어 전이가 뚝뚝 끊긴다. */
+  transition: background-color 160ms ease;
+}
+
+.ss-suggest-item:hover,
+.ss-suggest-item:focus-visible {
+  background-color: color-mix(in srgb, var(--ss-bg) 40%, transparent);
+}
+
+/* 목록 속 작은 카드 — 색만 칠한 사각형이 아니라 **빈 선수 카드를 그대로
+   줄인 것**이다(.ss-pcard-mini 가 통째로 축소한다). 스쿼드 판의 빈 자리와
+   같은 틀이라 "이 사람을 고르면 저기에 저 카드가 앉는다"가 그림으로 이어진다.
+   폭·비율은 .ss-pcard-mini 가 --ss-pcard-mini-w 로 잡는다 — 여기서는 그 값만
+   준다(그 규칙 안에서 선언하면 다른 자리의 크기까지 덮는다).
+   100: 62 였을 때는 머리글이 4px 도 안 되어 흰 얼룩으로만 보였다. */
+.ss-suggest-card {
+  --ss-pcard-mini-w: 100;
+  flex: none;
+}
+
+.ss-suggest-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ss-suggest-name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ss-fg);
+}
+
+.ss-suggest-title {
+  font-size: 0.75rem;
+  color: var(--ss-accent);
+}
+
+/* 영상 분석이 정리한 특징 — 한 줄에 하나씩. 앞에 점을 찍어 목록으로
+   읽히게 한다(리스트 태그를 겹쳐 쓰면 버튼 안에 목록이 들어가 버린다). */
+.ss-suggest-notes {
+  display: flex;
+  margin-top: 6px;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  /* 🔴 **불투명한 흰색이다.** 70% 로 두면 판 뒤 밝은 연기 위에서 글자가
+     묻힌다 — 어두운 막(.ss-suggest)이 밝기를 눌러도 반투명한 글자는 그
+     막까지 같이 비쳐 흐려진다. 이름과 같은 흰색으로 두고, 위계는 크기로만
+     낸다(이름 0.8125rem / 설명 0.75rem). 초록 소제목은 건드리지 않는다. */
+  color: var(--ss-fg);
+}
+
+.ss-suggest-notes > span {
+  padding-left: 10px;
+  text-indent: -10px;
+}
+
+.ss-suggest-notes > span::before {
+  content: '· ';
+  color: var(--ss-fg);
+}
+
+/* ── 지인 찾기 판 ─────────────────────────────────────────────────────
+   추천 판(.ss-suggest)과 **같은 자리 · 같은 재질**이라 그 클래스를 같이
+   쓰고, 다른 점만 여기서 덮는다. 둘은 동시에 열리지 않는다(SquadPanel). */
+
+/* 🔴 추천 판과 달리 **내용만큼만** 선다(bottom: auto). 스쿼드 판 키에 맞춰
+   두면(.ss-suggest) 즐겨찾기가 비었을 때 판만 덩그러니 길다 — 사람 수에 따라
+   줄었다 늘었다 하고, 스쿼드 판 키까지 차면 그 안에서 스크롤한다.
+
+   모서리는 추천 판과 같이 각지다(.ss-suggest 의 --ss-suggest-radius). */
+.ss-friends {
+  bottom: auto;
+  max-height: 100%;
+}
+
+.ss-friends-search {
+  width: 100%;
+  border-radius: 0;
+  border: 1px solid var(--ss-glass-border);
+  background-color: color-mix(in srgb, var(--ss-bg) 45%, transparent);
+  padding: 9px 16px;
+  font-size: 0.8125rem;
+  color: var(--ss-fg);
+  transition: border-color 160ms ease;
+}
+
+.ss-friends-search::placeholder {
+  color: color-mix(in srgb, var(--ss-fg) 45%, transparent);
+}
+
+.ss-friends-search:focus-visible {
+  outline: none;
+  border-color: var(--ss-accent);
+}
+
+/* 다음에 할 일 — 왼쪽 판의 빈 자리가 깜빡이지만 글로도 있어야 한다. */
+.ss-friends-hint {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--ss-fg);
+}
+
+.ss-friends-hint b {
+  font-weight: 600;
+  color: var(--ss-accent);
+}
+
+/* 목록만 스크롤한다 — 머리글 · 검색창 · 안내문은 늘 보여야 한다.
+   `flex: 0 1 auto` 다: 늘리지 않고(0) 남으면 줄인다(1). `1 1 auto` 로 두면
+   목록이 짧아도 판의 남은 키를 다 먹어서 판이 안 줄어든다. */
+.ss-friends-list {
+  display: flex;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 0 1 auto;
+  margin-top: 10px;
+  flex-direction: column;
+  gap: 6px;
+  /* 끝까지 굴렸을 때 뒤 화면이 따라 움직이지 않게 막는다. */
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  /* 가는 막대 하나만 — 기본 스크롤바는 유리판 위에서 툭 튀어 보인다. */
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ss-fg) 30%, transparent) transparent;
+}
+
+/* 줄은 절대 눌리지 않는다 — 목록이 길어지면 줄어드는 게 아니라 스크롤이다. */
+.ss-friends-list > li {
+  flex: none;
+}
+
+/* 한 사람 한 줄. 추천 판의 판때기(.ss-suggest-item)와 같은 결이지만 카드
+   자리가 없어 훨씬 납작하다 — 여기서는 이름을 훑는 것이 전부다. */
+.ss-friends-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-radius: 0;
+  border: 1px solid transparent;
+  padding: 9px 12px;
+  text-align: left;
+  /* 추천 판의 판때기(.ss-suggest-item)와 **같은 값**이다 — 두 판이 같은
+     자리에 번갈아 뜨므로 한쪽만 어두우면 화면이 어두워진 것처럼 보인다. */
+  background-color: color-mix(in srgb, var(--ss-bg) 55%, transparent);
+  background-image: linear-gradient(var(--ss-glass-bg), var(--ss-glass-bg));
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.ss-friends-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+/* 이미 판에 들어가 있는 사람 — 흐리게 두고 어느 자리인지 적는다.
+   `:not(:disabled)` 로 좁혀 두지 않으면 못 고르는 줄에도 호버가 걸려
+   누를 수 있는 것처럼 보인다. */
+.ss-friends-row:not(:disabled):hover,
+.ss-friends-row:not(:disabled):focus-visible {
+  background-color: color-mix(in srgb, var(--ss-bg) 40%, transparent);
+}
+
+.ss-friends-row[data-placed='true'] {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.ss-friends-in {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ss-accent);
+}
+
+.ss-friends-in .material-symbols-outlined {
+  font-size: 16px;
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 500,
+    'GRAD' 0,
+    'opsz' 20;
+}
+
+/* 골라 둔 사람 — 왼쪽 판에서 깜빡이는 빈 자리와 **같은 강조색**이라야
+   "이 사람을 저기 넣는 중"이 한 덩어리로 읽힌다. */
+.ss-friends-row[data-chosen='true'] {
+  border-color: var(--ss-accent);
+}
+
+.ss-friends-name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ss-fg);
+}
+
+.ss-friends-note {
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--ss-fg) 70%, transparent);
+}
+
+.ss-friends-empty {
+  padding: 18px 0;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: color-mix(in srgb, var(--ss-fg) 70%, transparent);
+}
+
+/* 지인을 골라 둔 동안 — 빈 자리가 "여기 눌러라" 하고 부른다.
+   🔴 테두리는 **버튼(.ss-pcard-mini)** 에 건다. 안쪽 카드는 transform 으로
+   0.247배 줄어 있어 거기에 2px 을 주면 화면에서 0.5px 이 된다. 반지름도
+   같은 비율로 환산해야 카드 모서리와 맞는다(카드 반지름 24px). */
+/* ── 빈 자리가 부르는 반짝임 ─────────────────────────────────────────
+   🔴 **시계는 판에 하나뿐이다. 자리마다 애니메이션을 걸지 않는다.**
+   두 번 데었다:
+     1. 자리마다 걸었더니, [data-placing] 이 붙는 시각이 자리마다 달라
+        **위상이 어긋났다** — 사람을 넣었다 뺀 자리만 혼자 엇박이었다.
+     2. 그래서 넷을 늘 돌려 두고 색만 켜고 껐더니, 하필 어두운 골에서
+        켜지는 경우 **"잠깐 멈췄다가" 반짝이는** 것처럼 보였다.
+   판(.ss-squad-board)이 시계 하나를 돌리고 자리들은 그 값을 읽기만 한다.
+   그러면 (1) 넷이 늘 같은 값을 보니 어긋날 수가 없고, (2) 고르는 순간
+   시계가 처음부터 도니 켜지는 지점을 우리가 정할 수 있다.
+
+   시작값이 1(가장 밝음)인 것이 (2)의 핵심이다 — 켜자마자 환하게 뜬 뒤
+   숨을 쉰다. 0 에서 시작하면 다시 "멈췄다가 반짝"이 된다. */
+@property --ss-beckon-t {
+  syntax: '<number>';
+  inherits: true;
+  /* 시계가 안 돌 때(움직임 줄이기)는 이 값이 그대로 쓰여 **환하게 켜진 채**
+     멈춘다 — 테두리가 통째로 사라지지 않게 하는 장치이기도 하다. */
+  initial-value: 1;
+}
+
+.ss-squad-seat-btn {
+  border-radius: calc(24px * var(--ss-pcard-mini-w, 92) / var(--ss-pcard-base-w, 380));
+}
+
+.ss-squad-board[data-placing='true'] {
+  animation: ss-beckon-clock 1.6s ease-in-out infinite;
+}
+
+@keyframes ss-beckon-clock {
+  0%,
+  100% {
+    --ss-beckon-t: 1;
+  }
+  50% {
+    --ss-beckon-t: 0.15;
+  }
+}
+
+.ss-squad-seat-btn[data-placing='true'] {
+  box-shadow: 0 0 0 calc(2px + 2px * var(--ss-beckon-t))
+    color-mix(in srgb, var(--ss-accent) calc(40% + 60% * var(--ss-beckon-t)), transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-squad-board[data-placing='true'] {
+    animation: none;
+  }
+}
+
+/* 넣은 사람을 빼는 표식 — 카드 오른쪽 위. 카드 전체가 이미 '빼기' 버튼이라
+   (aria-label) 이건 **장식**이고, 버튼 안에 버튼을 또 두지 않는다.
+
+   🔴 카드가 아니라 **버튼(.ss-pcard-mini)** 에 붙인다. 안쪽 카드는 transform
+   으로 0.247배 줄어 있어 거기 얹으면 20px 아이콘이 화면에서 5px 이 된다.
+   강조 테두리를 버튼에 건 것과 같은 이유다. */
+.ss-squad-remove {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  z-index: 3;
+  border-radius: 999px;
+  /* 흰 카드와 어두운 배경 어느 쪽에 걸쳐도 아이콘이 살아 있게, 제 바탕을
+     깔고 앉는다. */
+  background: var(--ss-bg);
+  font-size: 20px;
+  line-height: 1;
+  /* 구글 폰트에서 고른 값 그대로: 굵기 300 · 그레이드 200 · 광학 크기 20. */
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 300,
+    'GRAD' 200,
+    'opsz' 20;
+  color: var(--ss-error);
+}
+
+
+
+/* 빈 자리 카드 — 카드 전체가 버튼이다. 눌리는 곳이라는 게 손에 잡히게
+   살짝 떠오른다. */
+.ss-squad-seat-btn {
+  cursor: pointer;
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ss-squad-seat-btn:hover,
+.ss-squad-seat-btn:focus-visible {
+  transform: translateY(-4px);
+}
+
+
+/* ══ 영상 분석 (/analysis) ═══════════════════════════════════════════
+   화면 한 장을 통째로 쓰는 연출이다(레퍼런스: Grenada — 왼쪽 검은 기둥 +
+   오른쪽 사진). 순서는 AnalysisStage 주석에 있다.
+
+   🔴 **자리를 바꾸는 것은 전부 transform 이다.** 화면 절반을 옮기는 움직임이라
+   left·width 로 하면 매 프레임 레이아웃을 다시 계산해 끊긴다. 판들은 늘 DOM 에
+   있고 밖으로 밀어 둔 것뿐이다 — 붙였다 뗐다 하면 시작 프레임이 튄다. */
+
+.ss-shot {
+  /* 헤더는 흐름에 있고(z-20) 이 무대는 그 아래 화면 전체를 깐다. 헤더에
+     바탕이 없어서 무대가 그대로 비쳐 보이는 것이 맞는 그림이다. */
+  position: fixed;
+  z-index: 0;
+  inset: 0;
+  overflow: hidden;
+  /* 왼쪽 판의 폭. 배경 사진이 비켜 주는 거리도 **같은 값**이다 — 따로 적으면
+     둘이 어긋나 사진 왼쪽에 틈이 생기거나 판이 사진을 덮는다. */
+  --ss-shot-panel-w: min(46vw, 640px);
+  /* 미는 데 쓰는 곡선 · 시간. 세 층(사진 · 판 · 영상)이 **같은 값**을 써야
+     한 몸으로 움직인다. */
+  --ss-shot-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ss-shot-dur: 900ms;
+  /* 오른쪽 리포트 · 대화 판의 폭. 판이 뜨면 왼쪽 영상 자리가 그만큼 물러난다 —
+     둘이 같은 값을 봐야 겹치지도, 뜨지도 않는다. */
+  --ss-shot-side-w: min(420px, 34vw);
+  /* 판의 좌우 여백. 창 틀도 오른쪽 판도 이 값에 맞춰 선다. */
+  --ss-shot-pad-x: clamp(14px, 1.4vw, 24px);
+  /* 창 틀이 쓸 수 있는 키와 폭. 오른쪽 판이 뜨면 폭에서 그만큼 뺀다.
+
+     🔴 키는 **화면 높이에서 나머지를 뺀 값**과 56vh 중 작은 쪽이다. 세로 영상은
+     폭이 좁아 자리가 남으므로 아래로 더 길게 쓸 수 있는데, 고정값으로는 그
+     자리를 못 썼다. 빼는 470px = 판 위아래 여백(140 + 64) + 제목 · 설명(115) +
+     사이 간격(36) + 머리줄(44) + 시작 버튼(44) + 여유. 이 셈이 맞아야
+     **위가 안 잘리고 아래도 안 남는다.** */
+  --ss-frame-h: min(56vh, calc(100vh - 530px));
+  --ss-frame-avail-w: calc(100vw - var(--ss-shot-pad-x) * 2);
+  /* 🔴 **틀의 비율은 늘 가로 하나다**(16:9). 한때 영상의 비율을 그대로 따라가게
+     했는데, 세로 영상이 오면 틀이 같이 좁고 길어져서 머리줄이 워드마크와 겹치고
+     옆이 텅 비었다 — 화면마다 틀 모양이 달라지는 셈이었다.
+     틀은 고정하고 **영상만 그 안에서 가운데**에 놓는다(object-fit: contain).
+     세로 영상은 좌우에 검은 자리가 남지만, 그게 맞는 그림이다.
+
+     창 틀의 실제 폭 · 키는 **무대에서 한 번만 계산하고 창 틀과 오른쪽 판이 같이
+     읽는다** — 각자 계산하면 오른쪽 판이 창 틀보다 길어진다(실제로 그랬다). */
+  --ss-frame-r: 1.7778;
+  --ss-frame-w: min(var(--ss-frame-avail-w), calc(var(--ss-frame-h) * var(--ss-frame-r)));
+  --ss-frame-inner-h: calc(var(--ss-frame-w) / var(--ss-frame-r));
+  /* 창 틀의 모서리와 선 — 오른쪽 판이 **같은 값**을 써서 한 벌로 보인다. */
+  /* 창 틀과 오른쪽 판 사이의 틈. 예전엔 여백이 두 번 겹쳐 38px 이나 벌어졌다. */
+  --ss-frame-gap: 12px;
+  --ss-frame-radius: 12px;
+  --ss-frame-line: color-mix(in srgb, var(--ss-fg) 55%, transparent);
+  /* 자랄 때의 곡선 — 살짝 넘겼다 돌아온다(쫀득함). 나머지 움직임에는 안 쓴다:
+     밀려 나가는 것이 되튀면 그냥 튕긴 것처럼 보인다. */
+  --ss-shot-grow-ease: cubic-bezier(0.34, 1.5, 0.64, 1);
+}
+
+/* 떠날 때 — **들어온 것을 그대로 되감는다.** data-panel · data-video 가 꺼지는
+   것만으로 판은 왼쪽으로, 사진은 원래 자리로 돌아간다(따로 만들 규칙이 없다).
+   곡선만 나가는 쪽으로 바꾸고 **시간은 들어올 때와 거의 같게** 둔다. 한때
+   600ms 로 줄였더니 판과 사진이 훅 지나가 버려서 "너무 빨리 사라진다"는
+   말을 들었다 — 들어올 땐 900ms 인데 나갈 때만 3분의 1 이 빠르니 다른
+   화면처럼 느껴진다. LEAVE_MS(pageTransition) 안에는 들어가야 한다. */
+/* ── 1단계: 시작하면 **판 위의 것들이 먼저 나간다** ────────────────
+   제목 · 설명은 왼쪽으로, 시작 버튼은 아래로. 헤더는 `useHideChrome` 이 따로
+   내보낸다(들어온 방향 그대로 — 다른 화면으로 갈 때와 같은 규칙을 탄다).
+
+   🔴 **배경 사진은 여기서 안 나간다.** 판이 자랄 때 **같이** 밀려나야
+   한다(사용자 요청) — 그래야 되돌아올 때도 "판이 줄면서 사진이 돌아오고,
+   그 다음 나머지가 나타난다"로 되감긴다. 사진을 미는 일은 판 폭
+   (`--ss-shot-panel-w`)이 이미 하고 있으므로 여기서 따로 적을 것이 없다. */
+.ss-shot[data-video='true'] .ss-shot-head {
+  opacity: 0;
+  transform: translateX(-40vw);
+}
+
+.ss-shot[data-video='true'] .ss-shot-start {
+  opacity: 0;
+  transform: translateY(26vh);
+  pointer-events: none;
+}
+
+/* ── 2단계: 다 빠지면 **판이 화면 폭까지 자란다** ────────────────────
+   `--ss-shot-panel-w` 는 판의 폭이자 안쪽 창 틀의 폭이다 — 하나만 바꾸면
+   둘이 같이 커진다. 위아래 여백도 줄여 틀이 화면을 거의 꽉 채운다.
+   `--ss-shot-lift` 는 0 으로 — 올려 둘 이유가 없다, 이제 가운데가 맞다. */
+.ss-shot[data-grown='true'] {
+  --ss-shot-panel-w: 100vw;
+  /* 머리줄 키 — 워드마크(26px + 글리치 번짐)가 넉넉히 들어가는 값. */
+  --ss-frame-bar-h: 68px;
+  /* 🔴 **0 이다.** 글자가 상자보다 위로 뜬 줄 알고 5px 을 빼 왔는데, 그만큼
+     머리줄이 위로 올라가서 로고가 아래로 치우쳤다. 실제로는 뜨지 않는다:
+     BrandMark 는 `line-height: 1` 이라 상자 키가 곧 글자 크기(26px)이고,
+     대문자만 있는 워드마크는 밑선~대문자 높이의 한가운데가 **상자 한가운데와
+     같다.** 나중에 글꼴이나 line-height 가 바뀌면 여기만 조절할 것. */
+  --ss-mark-ink-rise: 0px;
+  /* 창 틀이 시작하는 높이. **워드마크가 머리줄 한가운데에 오는 자리**다:
+       워드마크 가운데 = 헤더 여백 + 26/2 − 잉크 뜸
+       머리줄 가운데   = 여기 + 머리줄 키/2
+     오른쪽 판도 이 값을 읽어 창 틀과 위를 맞춘다. */
+  --ss-shot-top: calc(
+    var(--ss-home-content-pad) + 13px - var(--ss-frame-bar-h) / 2 - var(--ss-mark-ink-rise)
+  );
+  --ss-frame-h: 84vh;
+  --ss-frame-avail-w: calc(
+    100vw - var(--ss-shot-pad-x) - var(--ss-shot-side-w) - var(--ss-frame-gap) * 2
+  );
+}
+
+/* 이때 제목 · 설명이 **접힌다.** 그래야 창 틀이 그 키를 가져간다 — 이미
+   왼쪽으로 빠져나가 안 보이므로 접히는 것이 눈에 안 띈다. */
+.ss-shot[data-grown='true'] .ss-shot-head {
+  max-height: 0;
+  margin-bottom: -18px;
+  pointer-events: none;
+}
+
+/* 🔴 **워드마크가 창 틀 머리줄의 한가운데에 오도록** 잡은 값들이다. 헤더의
+   나머지는 비켜도 워드마크는 남으므로(인트로 글자가 앉는 자리라 등장 · 퇴장에서
+   빠져 있다), 그것만 머리줄 위에 어정쩡하게 떠 있었다.
+
+   두 번 헛짚었다:
+     · 여백 9  — 줄이 얇아 **워드마크가 위 테두리에 걸쳤다.**
+     · 아래만 8 — 줄이 다시 얇아져 이번엔 **아래 선에도 걸쳤다.**
+   줄은 **대칭으로 두툼하게**(26) 두어 로고가 넉넉히 들어가게 하고, 치우쳐
+   보이는 것은 줄을 통째로 **위로 당겨서** 잡는다.
+
+     워드마크 상자 가운데 = 헤더 여백 + 26/2
+     보이는 가운데        = 그보다 --ss-mark-ink-rise 만큼 위   (글리치 글꼴의
+                            획이 상자 위로 더 번진다)
+     머리줄 가운데        = 판 위 여백 + 머리줄 여백 + 26/2     (알약 키도 26)
+
+   셋을 같게 두면 **판 위 여백 = 헤더 여백 − 머리줄 여백 − 잉크 뜸** 이다.
+   숫자가 아니라 식이라 셋 중 무엇을 바꿔도 따라온다. 아직 어긋나면
+   `--ss-mark-ink-rise` 하나만 조절할 것 — 키우면 줄이 위로 간다. */
+.ss-shot[data-grown='true'] .ss-shot-panel {
+  --ss-shot-lift: 0px;
+  /* 🔴 가운데가 아니라 **위에서부터** 쌓는다. 가운데 정렬이면 창 틀의 윗변이
+     남는 자리에 따라 달라져서, 오른쪽 판과 워드마크가 어디에 맞춰야 할지
+     알 수 없다. 위를 못박아야 셋이 같은 선에 선다. */
+  justify-content: flex-start;
+  padding-top: var(--ss-shot-top);
+  padding-bottom: 28px;
+  /* 쫀득하게 — 살짝 넘겼다 돌아온다. */
+  transition:
+    width 640ms var(--ss-shot-grow-ease),
+    padding 640ms var(--ss-shot-grow-ease),
+    transform var(--ss-shot-dur) var(--ss-shot-ease);
+}
+
+/* 🔴 영상이 들어오면 **틀이 영상 비율을 따라간다.** 16:10 으로 못박아 두면
+   16:9 영상에서 좌우에 검은 띠가 생겨 잘린 것처럼 보인다.
+   키를 정하고 폭을 비율에서 얻는다(그 반대가 아니다) — 그래야 화면이 낮아도
+   틀이 세로로 넘치지 않는다. 폭은 판을 넘지 않는 선에서 줄어든다. */
+/* 🔴 틀의 폭은 **안쪽 영상 상자와 같다.** `fit-content` 로 두었더니 머리줄의
+   긴 파일 이름이 폭을 정해서, 세로 영상일 때 영상은 좁은데 틀만 넓고 오른쪽이
+   텅 비었다. 폭을 못박으면 이름은 알약 안에서 `…` 로 줄고 틀은 영상을 감싼다. */
+.ss-shot[data-picked='true'] .ss-shot-frame {
+  align-self: center;
+  width: var(--ss-frame-w);
+  max-width: 100%;
+}
+
+/* 🔴 **남는 쪽에 맞춰 키운다.** `aspect-ratio` + `height` 로 두면 키가 늘 이기고,
+   폭이 모자랄 때는 `max-width` 에 잘리면서 **위아래로 검은 띠**가 생긴다 —
+   영상은 작아지고 오른쪽 판과는 멀어졌다.
+   쓸 수 있는 폭과 "키 × 비율" 중 **작은 쪽**을 폭으로 잡고 키를 거기서 되계산하면,
+   가로로 넉넉하면 키가, 세로로 넉넉하면 폭이 자연스럽게 자리를 다 쓴다. */
+.ss-shot[data-picked='true'] .ss-shot-frame-body {
+  aspect-ratio: auto;
+  /* 🔴 폭은 **틀을 그대로 따른다**(100%). 틀과 똑같이 `--ss-frame-w` 를 주고
+     `max-width: none` 을 걸었더니, 틀은 `max-width: 100%` 에 걸려 줄어드는데
+     안쪽 상자는 안 줄어 **틀 밖으로 넘쳤다** — 넘친 만큼 잘리면서 영상이
+     한쪽으로 치우쳐 보였다. 폭을 정하는 곳은 틀 하나여야 한다. */
+  width: 100%;
+  height: var(--ss-frame-inner-h);
+  max-width: none;
+  max-height: none;
+  transition:
+    width var(--ss-shot-dur) var(--ss-shot-ease),
+    height var(--ss-shot-dur) var(--ss-shot-ease);
+}
+
+.ss-shot[data-grown='true'] .ss-shot-frame-body {
+  transition:
+    width 640ms var(--ss-shot-grow-ease),
+    height 640ms var(--ss-shot-grow-ease);
+}
+
+/* 오른쪽 판이 뜨면 영상 자리가 그만큼 물러나고 **왼쪽에 붙는다**. 가운데에
+   두면 오른쪽 판 밑으로 밀려 들어간다. */
+/* 🔴 **자랄 때 이미 오른쪽 판 자리를 비워 둔다.** 예전에는 화면 폭을 다 쓰게
+   자란 뒤, 오른쪽 판이 뜨는 순간 다시 줄었다 — 한 동작이어야 할 것이 두 번
+   움직였다(사용자 지적). `data-side` 가 아니라 `data-grown` 에서 빼 두면
+   **처음부터 최종 자리로** 자라고, 오른쪽 판은 그 빈자리로 미끄러져 들어오기만
+   한다. 판 여백은 그 자리 + 틈 딱 그만큼이다. */
+.ss-shot[data-grown='true'] .ss-shot-panel {
+  padding-right: calc(var(--ss-shot-side-w) + var(--ss-frame-gap) * 2);
+}
+
+/* 🔴 **가운데다.** 왼쪽에 붙여 두었더니 세로 영상에서 틀이 좁아지면서 머리줄의
+   제목 알약이 워드마크와 겹치고, 오른쪽은 텅 비었다. 가로 영상은 폭이 남는 자리를
+   다 채우므로 가운데든 왼쪽이든 결과가 같다 — 그래서 티가 안 났을 뿐이다.
+   가운데로 두면 두 경우가 같은 규칙으로 맞는다(오른쪽 판 자리는 판 여백이
+   이미 비워 두었으므로, 그 왼쪽 영역의 가운데다). */
+.ss-shot[data-grown='true'] .ss-shot-frame {
+  align-self: center;
+}
+
+.ss-shot[data-grown='true'] .ss-shot-frame-bar {
+  transition: padding 640ms var(--ss-shot-grow-ease);
+}
+
+.ss-shot[data-leaving='true'] {
+  --ss-shot-dur: 820ms;
+  --ss-shot-ease: var(--ss-leave-ease);
+}
+
+/* 사진의 왼쪽 변을 검정으로 잦아들게 하는 막. 판이 비켜 준 자리에서 사진이
+   뚝 시작하니 검은 판과의 경계가 칼처럼 보였다 — 사진 아래쪽을 지우는 막과
+   같은 방식인데, 이번엔 가로다.
+
+   🔴 **사진에 마스크를 씌우지 않고 따로 한 겹으로 둔다.** 마스크로 했더니
+   화면을 드나들 때 **딱 나타났다 사라졌다** 했다 — 그라데이션의 모양은
+   전이가 안 되기 때문이다. 한 겹으로 빼 두면 불투명도를 전이시킬 수 있어서
+   판이 들어오고 나갈 때 같이 스며들고 스며 나간다.
+
+   판과 **같은 거리 · 같은 시간 · 같은 곡선**으로 움직인다 — 사진과 한 몸처럼
+   붙어 있어야 늘 그 왼쪽 변에 걸린다. */
+.ss-shot-fade {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to right, var(--ss-bg) 0, transparent 9%);
+  opacity: 0;
+  transition:
+    transform var(--ss-shot-dur) var(--ss-shot-ease),
+    opacity 420ms ease;
+}
+
+.ss-shot[data-panel='true'] .ss-shot-fade {
+  opacity: 1;
+  transform: translateX(var(--ss-shot-panel-w));
+}
+
+/* 배경 사진 — 판이 들어온 만큼 오른쪽으로 비켜 준다.
+   FigureBackground 는 z-index: -1 이라 무대 안에서 맨 뒤에 깔린다. */
+.ss-shot-figure {
+  transition:
+    transform var(--ss-shot-dur) var(--ss-shot-ease),
+    opacity 600ms ease;
+}
+
+.ss-shot[data-panel='true'] .ss-shot-figure {
+  transform: translateX(var(--ss-shot-panel-w));
+}
+
+/* 배경 사진 위의 큰 글자 — **인물 그림자 뒤로 들어간다.**
+
+   🔴 방법은 마스크가 아니라 **덮기**다. 사진에서 그림자만 오려 낸 조각
+   (.ss-shot-cut)을 글자 위에 다시 덮는다 — 겹치는 부분만 가려지고 나머지는
+   그대로 보인다.
+
+   마스크로 두 번 실패했다:
+     · 한 겹  — 그림자 알파가 0 이 아니라 0.06 이라 윤곽이 흐릿하게 비쳤다.
+     · 세 겹(밝기³) — 그림자는 지웠지만 **밝은 연기까지 같이 깎여** 글자가
+       흐려졌다. 밝기를 그대로 알파로 쓰는 한 이 둘은 같이 못 잡는다.
+   덮기는 문턱을 우리가 정하므로(0.08~0.13) 그 위는 손대지 않는다.
+
+   `overlay` 혼합은 그대로 둔다 — 연기 위에서 환하게 뜨는 그 느낌은 이게 낸다.
+
+   상자와 자르는 기준(--ss-figure-h · --ss-figure-pos)은 사진과 같은 값이다.
+
+   글꼴은 홈의 큰 글자와 같은 것(Abril Fatface) — 두 화면이 한 목소리로. */
+.ss-shot-mark {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--ss-figure-h);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  padding-right: clamp(24px, 4vw, 88px);
+  font-family: var(--font-display), var(--font-rubik), system-ui, serif;
+  font-size: clamp(2.5rem, 7vw, 8rem);
+  line-height: 0.98;
+  letter-spacing: 0.01em;
+  color: var(--ss-fg);
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  /* 묶음 자체는 안 움직인다 — 줄마다 따로 나가고 들어온다(아래). */
+}
+
+/* 🔴 나가는 셋이 **판과 같은 시간 · 같은 곡선**으로 움직인다. 판만 쫀득한
+   곡선으로 640ms 에 자라고 나머지는 900ms 로 흐르면, 판은 벌써 다 컸는데
+   사진이 뒤늦게 따라오는 것처럼 보인다 — 한 동작이 아니라 둘로 읽힌다.
+   되돌아올 때는 이 규칙이 빠지므로 기본값(900ms)으로 차분하게 돌아온다. */
+.ss-shot[data-grown='true'] .ss-shot-figure,
+.ss-shot[data-grown='true'] .ss-shot-fade,
+.ss-shot[data-grown='true'] .ss-shot-cut {
+  transition-duration: 640ms;
+  transition-timing-function: var(--ss-shot-grow-ease);
+}
+
+/* 줄마다 왼쪽으로 미는 정도가 다르다 — 실루엣 가장자리가 비스듬해서, 줄마다
+   글자를 삼키기 시작하는 자리가 다르기 때문이다. 어디까지 보일지는 사용자가
+   줄마다 정했다:
+
+     VIDEO     O 의 한가운데까지
+     ANALYSIS  마지막 S 의 한가운데까지
+     AGENT     통째로 다 보이게
+
+   세 줄이 오른쪽 정렬이라 **오른쪽 여백을 주면 그만큼 왼쪽으로** 간다. 글자
+   크기에 매어(em) 두어 화면 폭이 달라져도 글자 대비 같은 자리에서 잘린다.
+   ⚠️ 눈으로 맞춘 값이다 — 사진이나 글꼴이 바뀌면 다시 재야 한다. */
+.ss-shot-mark > span:nth-child(1) {
+  margin-right: 1.9em;
+}
+
+.ss-shot-mark > span:nth-child(2) {
+  margin-right: 1.7em;
+}
+
+/* ⚠️ 셋째 줄(AGENT)을 아래로 내려 봤다가 되돌렸다 — 검은 그라데이션 바로
+   위까지 내렸더니 세 줄이 한 덩어리로 안 읽히고 따로 떨어진 글자가 됐다.
+   세로 자리는 건드리지 않는다. 가로만 줄마다 다르다(위). */
+.ss-shot-mark > span:nth-child(3) {
+  margin-right: 1.2em;
+}
+
+/* ── 큰 글자의 등장 · 퇴장 ─────────────────────────────────────────
+   🔴 **한 줄씩 차례로** 움직인다(사용자 요청):
+     들어올 때  VIDEO → ANALYSIS → AGENT   (위에서 아래로)
+     나갈 때    AGENT → ANALYSIS → VIDEO   (아래에서 위로)
+   들어온 차례의 거꾸로다. 같은 차례로 내보내면 들어오는 장면을 빨리 감기 한
+   것처럼 보인다(홈의 등장 · 퇴장에서 이미 겪었다).
+
+   🔴 줄마다 따로 움직이므로 **묶음(.ss-shot-mark)에는 transform 을 주지
+   않는다.** 둘 다 주면 겹쳐서 두 배로 밀려난다.
+
+   나타나기 시작하는 시각은 `data-mark` 가 정한다(AnalysisStage 의 MARK_IN_MS)
+   — 사진이 다 비켜선 뒤다. CSS 지연으로 두면 되돌아올 때도 그만큼 기다리게
+   되어 글자만 뒤늦게 나타난다. */
+.ss-shot-mark > span {
+  opacity: 0;
+}
+
+.ss-shot[data-mark='true'] .ss-shot-mark > span {
+  animation: ss-mark-in 760ms var(--ss-shot-ease) both;
+}
+
+.ss-shot[data-mark='true'] .ss-shot-mark > span:nth-child(2) {
+  animation-delay: 140ms;
+}
+
+.ss-shot[data-mark='true'] .ss-shot-mark > span:nth-child(3) {
+  animation-delay: 280ms;
+}
+
+@keyframes ss-mark-in {
+  from {
+    opacity: 0;
+    transform: translateX(38vw);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 시작하면 오른쪽으로 — 제목 · 설명 · 헤더와 같은 1단계다. AGENT 가 먼저.
+   위 규칙과 자리싸움이 나므로 **반드시 뒤에** 있어야 한다(같은 무게라 순서가
+   이긴다). */
+.ss-shot[data-video='true'] .ss-shot-mark > span {
+  animation: ss-mark-out 460ms var(--ss-leave-ease) both;
+}
+
+.ss-shot[data-video='true'] .ss-shot-mark > span:nth-child(3) {
+  animation-delay: 0ms;
+}
+
+.ss-shot[data-video='true'] .ss-shot-mark > span:nth-child(2) {
+  animation-delay: 90ms;
+}
+
+.ss-shot[data-video='true'] .ss-shot-mark > span:nth-child(1) {
+  animation-delay: 180ms;
+}
+
+/* 60% 지점에 이미 투명해진다 — 남은 구간의 빠른 움직임이 눈에 안 띈다
+   (홈의 퇴장과 같은 방식). */
+@keyframes ss-mark-out {
+  0% {
+    opacity: 1;
+    transform: none;
+  }
+  60% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(56vw);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-shot[data-mark='true'] .ss-shot-mark > span,
+  .ss-shot[data-video='true'] .ss-shot-mark > span {
+    animation-name: ss-enter-fade;
+    animation-duration: 200ms;
+  }
+}
+
+/* 오려 낸 그림자 — 글자 바로 위(z 1, 글자 뒤에 오는 형제라 위에 그려진다).
+   상자 · 자르기가 배경 사진과 **한 글자도 다르면 안 된다**(FigureBackground).
+
+   🔴 **사진이 비켜서면 이 조각도 똑같이 비켜야 한다.** 판이 들어올 때 사진은
+   오른쪽으로 `--ss-shot-panel-w` 만큼 움직이는데(.ss-shot-figure), 조각을 그대로
+   두었더니 **실루엣이 두 개로 보였다** — 원래 자리의 그림자와 비켜선 사진의
+   그림자가 같이 있는 꼴이다. 이동 · 시간 · 곡선을 사진과 같은 값으로 묶는다. */
+.ss-shot-cut {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--ss-figure-h);
+  pointer-events: none;
+  transition:
+    transform var(--ss-shot-dur) var(--ss-shot-ease),
+    opacity 600ms ease;
+}
+
+.ss-shot[data-panel='true'] .ss-shot-cut {
+  transform: translateX(var(--ss-shot-panel-w));
+}
+
+.ss-shot-cut img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: var(--ss-figure-pos);
+  filter: url('#ss-shadow-cut');
+  /* 🔴 아래쪽을 같은 결로 잦아들게 만든다. 배경 사진은 아래로 갈수록 검게
+     지우는 막을 덮고 있는데(FigureBackground 의 linear-gradient), 이 조각은
+     그 막 **위에** 그려져서 그 부분을 도로 밝게 만든다 — 사진 상자가 끝나는
+     88% 자리에 **가로선이 뚝 생겼다.** 막과 짝이 되는 값(1 → 0.7 → 0)으로
+     이 조각도 같이 사라지게 한다. 두 값은 같이 고칠 것. */
+  mask-image: linear-gradient(to bottom, #000 62%, #000000b3 88%, #0000 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 62%, #000000b3 88%, #0000 100%);
+}
+
+/* 좁은 화면에서는 판이 화면을 다 덮으므로 글자를 그릴 자리가 없다. */
+@media (max-width: 900px) {
+  .ss-shot-mark,
+  .ss-shot-cut {
+    display: none;
+  }
+}
+
+/* ── 왼쪽 검은 판 ─────────────────────────────────────────────────── */
+
+/* 🔴 **가운데 줄(영상 자리)이 판의 정확한 세로 가운데에 온다**(사용자 요청).
+   `justify-content: center` 로 전체를 묶어 가운데 두면 제목 · 설명까지 셈에
+   들어가 영상 자리가 아래로 밀린다. 위아래를 `1fr` 로 똑같이 두고 가운데
+   칸만 `auto` 로 두면 그 칸이 판의 한가운데다.
+   위 여백은 헤더(워드마크)가 앉는 자리라 비워 둔다. */
+.ss-shot-panel {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  /* 🔴 **격자를 쓰지 않는다.** `1fr auto 1fr` 로 영상 자리를 판의 정확한
+     한가운데에 두려고 했는데, 제목 · 설명이 첫 칸에 갇히면서 자리가 모자랄
+     때마다 **제목만 위로 떨어져 나갔다**(칸이 내용보다 작아지면 넘치는 쪽이
+     밀려난다). 두 번 고쳤는데 두 번 다 그랬다.
+
+     지금은 그냥 세로로 쌓고 **묶음째 가운데**에 둔다. 제목 → 설명 → 영상
+     자리가 언제나 붙어 있고, 칸이 모자라 어긋날 여지 자체가 없다. 영상
+     자리의 한가운데가 판의 한가운데에서 조금 내려오지만, 갈라져 보이는
+     것보다 낫다. */
+  display: flex;
+  width: var(--ss-shot-panel-w);
+  flex-direction: column;
+  /* 🔴 `safe` 가 핵심이다. 내용이 판보다 길어지면 그냥 `center` 는 **위아래로
+     똑같이 넘쳐서 위쪽이 잘린다** — 스크롤로도 못 닿는다. 영상을 고르면 시작
+     버튼만큼 길어지는데, 그때 설명 글이 그렇게 잘려 나갔다.
+     `safe center` 는 넘치는 순간 위 정렬로 물러나므로 위쪽이 안 잘린다. */
+  justify-content: safe center;
+  gap: 18px;
+  /* 🔴 아래 여백으로 **묶음을 위로 올린다**(사용자 요청). 가운데 정렬은
+     `(위 여백 + 높이 − 아래 여백) / 2` 자리에 오므로, 아래를 `2 × lift` 만큼
+     늘리면 묶음이 정확히 `lift` 만큼 올라간다. 위 여백은 그대로 둔다 —
+     그건 헤더(워드마크)가 앉는 자리라 줄이면 제목이 그 밑으로 파고든다.
+     더 올리고 싶으면 이 숫자 하나만 키우면 된다. */
+  /* 묶음을 이만큼 위로 올린다(아래 여백을 2배로 줘서). 0 으로 뒀더니 글자와
+     틀이 통째로 내려앉았다 — 대신 **위 여백에서 갚는다**(아래 padding 참고).
+     이 값을 키우면 그만큼 영상 자리가 줄어드니 --ss-frame-h 도 같이 볼 것. */
+  --ss-shot-lift: 48px;
+  /* 좌우 여백은 좁게 — 창 틀이 검은 판의 양 끝에 **거의 닿아야** 한다
+     (사용자 요청). 틀은 이 판의 내용 폭을 그대로 쓰므로 여백을 줄이는 것이
+     곧 틀을 넓히는 것이다. */
+  /* 위 여백 96 — 워드마크(48~74)를 지나는 선이면 충분하다. 140 이나 두던 것을
+     줄여서, 묶음을 올리는 데 쓰는 아래 여백만큼을 되찾는다. */
+  padding: 96px var(--ss-shot-pad-x) calc(64px + var(--ss-shot-lift) * 2);
+  text-align: center;
+  /* 그래도 안 들어가면(아주 낮은 창) 판 안에서 스크롤한다 — 잘려서 시작
+     버튼이 사라지는 것보다 낫다. */
+  overflow-y: auto;
+  background: var(--ss-bg);
+  /* 밖에서 대기 — 101% 다. 100% 면 소수점 반올림에 따라 오른쪽 변이 1px
+     비쳐서, 들어오기 전부터 검은 선이 보인다. */
+  transform: translateX(-101%);
+  /* 폭도 같이 전이시킨다 — 시작하면 이 값이 화면 폭으로 바뀌면서 판이 자란다.
+     안쪽 창 틀은 판의 내용 폭을 그대로 쓰므로 따로 손댈 것이 없다. */
+  transition:
+    transform var(--ss-shot-dur) var(--ss-shot-ease),
+    width var(--ss-shot-dur) var(--ss-shot-ease),
+    padding var(--ss-shot-dur) var(--ss-shot-ease);
+}
+
+.ss-shot[data-panel='true'] .ss-shot-panel {
+  transform: translateX(0);
+}
+
+/* 제목과 설명 — 둘 사이만 조금 좁게. 자리 잡기는 판이 한다(위). */
+.ss-shot-head {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  /* 🔴 접힐 때 **흐름에서 빠지지 않는다.** `position: absolute` 로 빼면 그
+     순간 판의 키가 확 바뀌어 안쪽 것들이 툭 떨어진다 — 특히 되돌아올 때
+     눈에 띄었다. 키를 0 까지 **전이시켜** 접는다. 상한(240)은 내용보다
+     넉넉하기만 하면 된다(auto 는 전이가 안 된다).
+     margin-bottom 은 판의 gap(18) 을 상쇄한다 — 키가 0 이어도 간격은 남는다. */
+  /* 🔴 **눌리지 않는다**(flex: none). 세로 flex 의 항목은 기본으로 줄어들 수
+     있는데, 여기엔 `overflow: hidden` 이 걸려 있어서 자리가 빠듯해지면 스스로
+     눌리며 **설명 아랫줄을 잘라냈다** — 잘린 줄도 모르게 조용히 일어난다.
+     못박아 두면 모자랄 때 판이 넘치고(safe center · overflow-y) 글자는 남는다. */
+  flex: none;
+  overflow: hidden;
+  /* 접을 때 0 까지 줄이려고 둔 상한이다. 내용(제목 + 두 줄 설명)보다 넉넉해야
+     한다 — 모자라면 설명이 잘린다. */
+  max-height: 320px;
+  transition:
+    opacity 380ms ease,
+    transform 420ms var(--ss-leave-ease),
+    max-height 460ms var(--ss-shot-ease),
+    margin-bottom 460ms var(--ss-shot-ease);
+}
+
+.ss-shot-panel h1 {
+  font-size: clamp(1.75rem, 3vw, 2.75rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ss-fg);
+}
+
+.ss-shot-lead {
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: color-mix(in srgb, var(--ss-fg) 70%, transparent);
+}
+
+/* ── 브라우저 창 모양의 틀 ─────────────────────────────────────────
+   참고한 화면에서 **신호등 점과 주소 알약만** 남겼다(사용자 요청).
+   테두리는 이 틀이 맡으므로 안쪽 떨구는 자리에는 점선을 두지 않는다. */
+.ss-shot-frame {
+  flex: none;
+  overflow: hidden;
+  /* 🔴 **가늘어 보이게 하는 것은 굵기가 아니라 불투명도다.** 0.5px 은 둥근
+     모서리에서 기기 픽셀에 안 떨어져 선이 끊기고 우툴두툴해진다 — 알약
+     버튼에서 이미 겪었다. 1px 로 또렷하게 긋고 흰색을 55% 로 낮춘다:
+     굵기는 일정한데 인상은 더 가늘고 덜 밝다(사용자 요청). */
+  border: 1px solid var(--ss-frame-line);
+  border-radius: var(--ss-frame-radius);
+  background-color: color-mix(in srgb, var(--ss-fg) 3%, transparent);
+  text-align: left;
+}
+
+/* ⚠️ 바를 밝게 · 알약을 검게 뒤집어 봤다가 되돌렸다 — 바가 밝아지면 그 줄이
+   화면에서 제일 먼저 눈에 들어와서, 정작 봐야 할 영상 자리보다 세진다. */
+.ss-shot-frame-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* 안쪽 선은 바깥 테두리보다 한 단 더 옅다 — 같으면 두 선이 같은 무게로
+     읽혀 틀이 격자처럼 보인다. */
+  border-bottom: 1px solid color-mix(in srgb, var(--ss-fg) 38%, transparent);
+  /* 🔴 키를 **못박는다**(여백에서 되짚지 않는다). 오른쪽 리포트 판이 창 틀과
+     위아래를 맞추려면 이 키를 알아야 하는데, 여백 + 안쪽 내용으로 추측하면
+     알약 · 아이콘의 줄 높이에 따라 몇 px 씩 어긋난다 — 실제로 두 판의 키가
+     달랐다. 숫자 하나로 두면 둘이 같은 값을 본다. */
+  height: var(--ss-frame-bar-h, 44px);
+  padding: 0 12px;
+  /* 🔴 여백을 **전이시킨다.** 자랄 때 이 값이 9 → 26 으로 바뀌면서 줄의 키가
+     44 → 78 로 **한 프레임에** 변한다 — 판과 창 틀은 부드럽게 움직이는데 이
+     줄만 툭 자라고 툭 줄어서, 안쪽 것들이 떨어지는 것처럼 보였다. */
+  transition: padding var(--ss-shot-dur) var(--ss-shot-ease);
+  /* 점 하나의 크기와 사이 간격. 아래 빈 자리(::after)가 이 값으로 계산되므로
+     크기를 바꿔도 제목 알약의 가운데 정렬이 안 어긋난다. */
+  --ss-dot: 13px;
+  --ss-dot-gap: 8px;
+}
+
+/* 점이 오른쪽에 있으므로 **왼쪽**에 같은 폭의 빈 자리를 만들어 알약을 진짜
+   가운데에 놓는다 — margin: auto 만으로는 점만큼 왼쪽으로 밀린다.
+   폭을 손으로 적지 않고 점 크기에서 계산한다(따로 적으면 한쪽만 고친다). */
+.ss-shot-frame-bar::before {
+  content: '';
+  width: calc(var(--ss-dot) * 3 + var(--ss-dot-gap) * 2);
+  flex: none;
+}
+
+.ss-shot-dots {
+  display: flex;
+  flex: none;
+  gap: var(--ss-dot-gap);
+}
+
+.ss-shot-dot {
+  width: var(--ss-dot);
+  height: var(--ss-dot);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ss-fg) 22%, transparent);
+}
+
+/* 누를 수 있는 첫 점만 색이 산다 — 장식과 버튼이 같아 보이면 안 된다. */
+.ss-shot-dot-close {
+  cursor: pointer;
+  background: color-mix(in srgb, var(--ss-error) 70%, transparent);
+  transition: background 160ms ease;
+}
+
+.ss-shot-dot-close:hover,
+.ss-shot-dot-close:focus-visible {
+  background: var(--ss-error);
+}
+
+/* 주소 알약 자리 — 여기에 고른 영상의 이름이 뜬다. */
+.ss-shot-frame-title {
+  display: flex;
+  overflow: hidden;
+  min-width: 0;
+  max-width: 68%;
+  margin: 0 auto;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 4px 14px;
+  background: color-mix(in srgb, var(--ss-fg) 8%, transparent);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--ss-fg) 75%, transparent);
+}
+
+.ss-shot-frame-title .material-symbols-outlined {
+  flex: none;
+  font-size: 15px;
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 300,
+    'GRAD' 0,
+    'opsz' 20;
+}
+
+/* 틀 안쪽 — 떨구는 자리든 고른 영상이든 여기서 크기를 정한다. */
+.ss-shot-frame-body {
+  /* 🔴 **폭을 못박는다.** flex 항목에 `aspect-ratio` 가 있고 키가 정해지면
+     (여기서는 max-height 로 잘린다) 폭이 늘어나는(stretch) 대신 **비율에서
+     계산된다** — 그래서 떨구는 자리만 `38vh × 1.6` 폭이 되어 머리줄보다
+     좁았다. 영상이 들어왔을 때는 반대로 그 계산이 필요해서(틀이 영상을
+     감싼다) `data-picked` 쪽에서 다시 auto 로 돌려놓는다. */
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  /* 시작할 때 판 폭과 **같은 시간 · 같은 곡선**으로 커진다 — 따로 놀면 틀만
+     늦게 자라 한 동작으로 안 읽힌다. */
+  transition: max-height var(--ss-shot-dur) var(--ss-shot-ease);
+  /* 세로가 짧은 창에서 틀이 화면을 다 먹지 않게 — 비율보다 이쪽이 이긴다.
+     제목 · 설명 · 시작 버튼이 다 들어가고도 남는 선이다(42vh 로는 낮은 창에서
+     넘쳐서 설명 글이 위로 잘려 나갔다). */
+  max-height: 38vh;
+}
+
+/* 🔴 영상 위에 뜨는 `1.00` 배속 뱃지를 감춘다.
+
+   ⚠️ **우리가 그리는 것이 아니다.** 브라우저에 깔린 영상 배속 확장(Video Speed
+   Controller 계열)이 모든 사이트의 `<video>` 옆에 끼워 넣는 조각이다. 그래서
+   코드를 아무리 뒤져도 안 나온다.
+
+   이 화면에서만(.ss-shot 안) 감춘다 — 그 확장을 쓰는 사람에게서 기능을 통째로
+   뺏지 않기 위해서다. 클래스 이름은 확장이 정한 것이라, 확장이 바뀌면 이 규칙은
+   조용히 무효가 된다(그때는 뱃지가 다시 보일 뿐 화면이 깨지지는 않는다). */
+.ss-shot .vsc-controller {
+  display: none !important;
+}
+
+.ss-shot-frame-body video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--ss-bg);
+  object-fit: contain;
+  transition: opacity 420ms ease;
+}
+
+/* 🔴 닫는 동안 **미리 흐려 둔다.** 영상은 판이 다 줄어든 뒤에야 DOM 에서
+   빠지는데, 그때까지 또렷하면 마지막에 뚝 끊긴 것처럼 보인다. */
+.ss-shot[data-closing='true'] .ss-shot-frame-body video {
+  opacity: 0;
+}
+
+/* 영상이 빠진 자리에 떨구는 자리가 들어설 때도 스며들게 — 서로 자리를
+   주고받는 것이라 한쪽만 부드러우면 소용이 없다. */
+.ss-shot-drop {
+  animation: ss-enter-fade 360ms ease both;
+}
+
+.ss-shot-drop {
+  display: flex;
+  height: 100%;
+  cursor: pointer;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--ss-fg);
+  transition: background-color 160ms ease;
+}
+
+.ss-shot-drop:hover,
+.ss-shot-drop:focus-within,
+.ss-shot-drop[data-dragging='true'] {
+  background-color: color-mix(in srgb, var(--ss-fg) 6%, transparent);
+}
+
+/* 아이콘도 완전한 흰색이다(사용자 요청) — 목적지 카드의 아이콘과 같은 판단:
+   강조색으로 두면 그것만 "누를 곳"처럼 튄다. 여기서는 판 전체가 눌린다. */
+.ss-shot-drop .material-symbols-outlined {
+  font-size: 34px;
+  /* 구글 폰트에서 고른 값 그대로: 채움 없음 · 굵기 200 · 그레이드 0 ·
+     광학 크기 20. */
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 200,
+    'GRAD' 0,
+    'opsz' 20;
+  color: var(--ss-fg);
+}
+
+.ss-shot-drop strong {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.ss-shot-drop-note {
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--ss-fg) 65%, transparent);
+}
+
+/* 알약.
+
+   🔴 **`align-self: center` 가 없으면 판 폭을 통째로 먹는다.** 판이 세로
+   flex 라 자식이 기본으로 가로로 늘어난다(stretch) — `inline-flex` 를 줘도
+   그건 안쪽 배치 방식일 뿐이라 막지 못한다. 글자만큼만 차지하게 한다.
+
+   키는 전역 --ss-btn-h(54px, 앱의 _kButtonHeight)보다 **10px 작다.** 이 화면의
+   버튼은 폼의 큰 알약이 아니라 영상 아래 붙는 작은 것이라 그 크기가 과했다
+   (사용자 요청). 전역 값은 건드리지 않는다 — 다른 화면이 쓴다. */
+.ss-shot-start {
+  display: inline-flex;
+  flex: none;
+  align-self: center;
+  /* 🔴 **없을 때가 기본이다.** 영상을 고르면 펴지고(아래 data-picked), 판이
+     자라면 다시 접힌다. 붙였다 뗐다 하지 않는 이유는 AnalysisStage 주석 참고 —
+     그 순간 판의 키가 확 바뀌어 안쪽 것들이 툭 떨어진다. */
+  height: 0;
+  margin-top: -18px;
+  border-width: 0;
+  opacity: 0;
+  pointer-events: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--ss-btn-r);
+  padding: 0 26px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  /* 유리 알약 — 강조색을 꽉 채우지 않고 **흰색 10%** 만 얹는다(사용자 요청).
+     흐림(backdrop-filter)은 AnalysisStage 가 **인라인으로** 준다: globals.css
+     에 두면 Lightning CSS 를 지나며 떨어져 나간 전례가 있다. */
+  border: 1px solid var(--ss-glass-border);
+  background-color: color-mix(in srgb, var(--ss-fg) 10%, transparent);
+  color: var(--ss-fg);
+  overflow: hidden;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    opacity 380ms ease,
+    transform 420ms var(--ss-leave-ease),
+    height 460ms var(--ss-shot-ease),
+    margin-top 460ms var(--ss-shot-ease);
+}
+
+/* 영상을 고르면 펴진다. */
+.ss-shot[data-picked='true'] .ss-shot-start {
+  height: calc(var(--ss-btn-h) - 10px);
+  margin-top: 0;
+  border-width: 1px;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ss-shot-start:hover,
+.ss-shot-start:focus-visible {
+  border-color: var(--ss-fg);
+  background-color: color-mix(in srgb, var(--ss-fg) 18%, transparent);
+}
+
+/* 판이 자라면 다시 접힌다. **data-picked 규칙보다 뒤**에 있어야 이긴다
+   (같은 무게라 순서가 정한다). */
+.ss-shot[data-grown='true'] .ss-shot-start {
+  height: 0;
+  margin-top: -18px;
+  border-width: 0;
+  pointer-events: none;
+}
+
+/* ── 오른쪽 떠 있는 판 ─────────────────────────────────────────────── */
+
+/* 영상 위에 떠 있는 유리 한 장(레퍼런스: Prompt 패널). 헤더의 프로필 카드
+   아래에서 시작한다 — 겹치면 카드를 못 누른다. */
+/* 🔴 **창 틀과 나란한 한 벌이다**(사용자 요청). 예전에는 화면 오른쪽을 세로로
+   꽉 채웠는데 옆의 창 틀보다 훨씬 길어서 따로 노는 판처럼 보였다. 시작하는
+   높이(--ss-shot-top)와 키(창 틀 머리줄 + 안쪽 상자)를 **창 틀에서 그대로
+   가져와** 위아래가 딱 맞는다. 모서리 · 선도 같은 값을 쓴다. */
+.ss-shot-side {
+  position: absolute;
+  z-index: 2;
+  top: var(--ss-shot-top, clamp(170px, 24vh, 260px));
+  /* 오른쪽 끝까지의 거리 = 창 틀과의 거리(사용자 요청). 둘 다 --ss-frame-gap
+     하나를 본다 — 따로 적으면 한쪽만 고치게 된다. */
+  right: var(--ss-frame-gap);
+  bottom: auto;
+  display: flex;
+  /* 창 틀과 **같은 키**: 머리줄 + 안쪽 상자(실제 키) + 위아래 테두리 2px.
+     `--ss-frame-h` 가 아니라 `--ss-frame-inner-h` 다 — 앞엣것은 "쓸 수 있는
+     키"고 실제 키는 폭에 걸려 더 작을 수 있다. */
+  height: calc(var(--ss-frame-inner-h, 60vh) + var(--ss-frame-bar-h, 44px) + 2px);
+  width: var(--ss-shot-side-w);
+  flex-direction: column;
+  gap: 12px;
+  /* 외곽선은 없다(사용자 요청) — 창 틀은 창이라 테두리가 있어야 하지만
+     이쪽은 그 옆에 놓인 글 판이라, 선이 있으면 창이 둘로 보인다. */
+  border: none;
+  border-radius: var(--ss-frame-radius);
+  padding: 18px;
+  background-color: color-mix(in srgb, var(--ss-bg) 62%, transparent);
+  background-image: linear-gradient(var(--ss-glass-bg), var(--ss-glass-bg));
+  /* 밖에서 대기. 판이 뜨기 전에는 눌리지도 않아야 한다 — 영상 위 투명한
+     자리가 클릭을 먹으면 재생 버튼이 안 눌린다. */
+  /* 오른쪽 화면 밖에서 왼쪽으로 미끄러져 들어온다. 불투명도는 **먼저** 차서
+     (300ms) 움직이는 동안 이미 보인다 — 다 와서야 나타나면 그냥 뜬 것처럼
+     보인다. */
+  transform: translateX(calc(100% + var(--ss-frame-gap) + 24px));
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 620ms var(--ss-shot-ease),
+    opacity 300ms ease;
+}
+
+.ss-shot[data-side='true'] .ss-shot-side {
+  transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ss-shot-side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ss-shot-side-head h2 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ss-fg);
+}
+
+.ss-shot-again {
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 40%, transparent);
+  padding: 5px 12px;
+  font-size: 0.75rem;
+  color: var(--ss-fg);
+  transition: border-color 160ms ease;
+}
+
+.ss-shot-again:hover,
+.ss-shot-again:focus-visible {
+  border-color: var(--ss-fg);
+}
+
+/* 판 안이 길어지면 여기서만 스크롤한다 — 대화 입력칸은 늘 바닥에 붙어 있다. */
+.ss-shot-side .ss-report,
+.ss-shot-side .ss-steps {
+  overflow-y: auto;
+  min-height: 0;
+  flex: 0 1 auto;
+  padding: 0;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ss-fg) 30%, transparent) transparent;
+}
+
+/* 대화는 판 안에 있으므로 유리를 또 쓰지 않는다(앱 refractive_glass 주석). */
+.ss-shot-side .ss-chat {
+  border: none;
+  background: none;
+  padding: 0;
+  border-top: 1px solid color-mix(in srgb, var(--ss-fg) 12%, transparent);
+  padding-top: 12px;
+  min-height: 0;
+}
+
+/* 🔴 입력칸을 **판 바닥에** 붙인다. 대화 상자는 남는 자리를 다 받는데, 안쪽
+   로그가 `max-height: 30vh` 에 묶여 있어 그만큼만 차지하고 **아래가 통째로
+   비었다**. 로그는 남는 만큼 늘리고, 입력칸은 `margin-top: auto` 로 바닥까지
+   민다 — 둘 중 하나만 해서는 안 된다(로그만 늘리면 대화가 쌓였을 때 입력칸이
+   다시 떠오른다). */
+.ss-shot-side .ss-chat-log {
+  max-height: none;
+}
+
+.ss-shot-side .ss-chat-form {
+  margin-top: auto;
+}
+
+@media (max-width: 900px) {
+  /* 좁은 화면에서는 좌우로 못 나눈다 — 판이 화면을 다 덮고, 오른쪽 판은
+     아래에서 올라오는 시트가 된다. */
+  .ss-shot {
+    --ss-shot-panel-w: 100vw;
+  }
+
+  /* 좁으면 헤더도 낮아진다 — 위 여백을 그만큼 돌려준다. */
+  .ss-shot-panel {
+    padding-top: 108px;
+  }
+
+  .ss-shot-side {
+    top: auto;
+    right: var(--ss-shot-pad-x);
+    bottom: var(--ss-shot-pad-x);
+    left: var(--ss-shot-pad-x);
+    width: auto;
+    height: auto;
+    max-height: 70vh;
+    transform: translateY(calc(100% + 40px));
+  }
+
+  /* 시트는 아래에서 올라오므로 왼쪽 자리를 물릴 필요가 없다. */
+  .ss-shot[data-side='true'] .ss-shot-panel {
+    padding-right: clamp(14px, 1.4vw, 24px);
+  }
+
+  .ss-shot[data-side='true'] .ss-shot-side {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-shot-figure,
+  .ss-shot-panel,
+  .ss-shot-side {
+    transition-duration: 1ms;
+  }
+
+}
+
+/* ── 진행 단계 ────────────────────────────────────────────────────── */
+
+.ss-steps {
+  display: flex;
+  flex-direction: column;
+}
+
+.ss-step {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 9px 0 9px 2px;
+}
+
+/* 점과 점을 잇는 선 — 마지막 칸에는 없다(아래로 흘러내려 보인다). */
+.ss-step:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 22px;
+  bottom: -4px;
+  width: 1px;
+  background: color-mix(in srgb, var(--ss-fg) 20%, transparent);
+}
+
+.ss-step-dot {
+  margin-top: 4px;
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ss-fg) 25%, transparent);
+}
+
+.ss-step[data-state='done'] .ss-step-dot {
+  background: var(--ss-accent);
+}
+
+/* 지금 하는 단계만 숨을 쉰다 — 여러 개가 같이 뛰면 어디가 지금인지 모른다. */
+.ss-step[data-state='now'] .ss-step-dot {
+  background: var(--ss-accent);
+  animation: ss-step-now 1.4s ease-in-out infinite;
+}
+
+@keyframes ss-step-now {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ss-accent) 60%, transparent);
+  }
+  60% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-step[data-state='now'] .ss-step-dot {
+    animation: none;
+  }
+}
+
+.ss-step-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ss-step-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ss-fg);
+}
+
+.ss-step[data-state='todo'] .ss-step-label {
+  color: color-mix(in srgb, var(--ss-fg) 55%, transparent);
+}
+
+.ss-step-note {
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--ss-fg) 60%, transparent);
+}
+
+/* ── 리포트 ───────────────────────────────────────────────────────── */
+
+.ss-report {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}
+
+.ss-report h2 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ss-fg);
+}
+
+.ss-report h3 {
+  margin-top: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: color-mix(in srgb, var(--ss-fg) 70%, transparent);
+}
+
+.ss-report-summary {
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--ss-fg);
+}
+
+.ss-report-traits {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--ss-fg) 80%, transparent);
+}
+
+.ss-report-traits > li {
+  padding-left: 10px;
+  text-indent: -10px;
+}
+
+.ss-report-traits > li::before {
+  content: '· ';
+  color: color-mix(in srgb, var(--ss-fg) 45%, transparent);
+}
+
+/* 받은 호칭 — 알약. 못 받은 것은 아예 그리지 않으므로 빈 자리도 없다. */
+.ss-report-titles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ss-report-titles > li {
+  border: 1px solid color-mix(in srgb, var(--ss-accent) 55%, transparent);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--ss-accent);
+}
+
+.ss-report-scenes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--ss-fg) 80%, transparent);
+}
+
+.ss-report-scenes b {
+  display: inline-block;
+  width: 42px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ss-accent);
+}
+
+/* ── 대화 ─────────────────────────────────────────────────────────── */
+
+/* 🔴 키를 짧게 잡는다. 왼쪽 열(영상 + 단계 다섯)이 훨씬 길어서, 오른쪽을
+   넉넉히 두면 **입력칸이 화면 밖으로 밀려난다** — 물어보려면 스크롤부터
+   해야 했다. 대화가 쌓이면 그때 로그 안에서 스크롤한다. */
+.ss-chat {
+  display: flex;
+  min-height: 220px;
+  flex: 1 1 auto;
+  flex-direction: column;
+  padding: 12px;
+}
+
+.ss-chat-log {
+  display: flex;
+  overflow-y: auto;
+  min-height: 0;
+  max-height: 30vh;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ss-fg) 30%, transparent) transparent;
+}
+
+/* 안내는 **위쪽**에 붙인다. 가운데(margin: auto)로 두면 빈 판 한복판에
+   떠서 실제보다 훨씬 아래에 있는 것처럼 보인다. */
+.ss-chat-empty {
+  margin: 8px auto auto;
+  text-align: center;
+  font-size: 0.75rem;
+  line-height: 1.7;
+  color: color-mix(in srgb, var(--ss-fg) 60%, transparent);
+}
+
+/* 말풍선은 **유리를 또 쓰지 않는다** — 유리 판 안에 유리를 겹치면 안쪽이
+   아직 안 끝난 바깥을 읽는다(앱 refractive_glass.dart 주석). 색만 얹는다. */
+.ss-chat-bubble {
+  max-width: 84%;
+  border-radius: 12px;
+  padding: 8px 11px;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  background-color: color-mix(in srgb, var(--ss-fg) 10%, transparent);
+  color: var(--ss-fg);
+}
+
+.ss-chat-bubble[data-mine='true'] {
+  align-self: flex-end;
+  background-color: color-mix(in srgb, var(--ss-accent) 22%, transparent);
+}
+
+.ss-chat-typing {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 11px;
+}
+
+.ss-chat-typing > span {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ss-fg) 60%, transparent);
+  animation: ss-chat-typing 1.1s ease-in-out infinite;
+}
+
+.ss-chat-typing > span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.ss-chat-typing > span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes ss-chat-typing {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-chat-typing > span {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+.ss-chat-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ss-chat-input {
+  min-width: 0;
+  flex: 1 1 auto;
+  border-radius: 999px;
+  border: 1px solid var(--ss-glass-border);
+  background-color: color-mix(in srgb, var(--ss-bg) 45%, transparent);
+  padding: 9px 14px;
+  font-size: 0.8125rem;
+  color: var(--ss-fg);
+  transition: border-color 160ms ease;
+}
+
+.ss-chat-input::placeholder {
+  color: color-mix(in srgb, var(--ss-fg) 45%, transparent);
+}
+
+.ss-chat-input:focus-visible {
+  outline: none;
+  border-color: var(--ss-accent);
+}
+
+.ss-chat-send {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--ss-accent);
+  font-size: 20px;
+  color: var(--ss-bg);
+  transition: opacity 160ms ease;
+}
+
+.ss-chat-send:disabled {
+  opacity: 0.35;
+}

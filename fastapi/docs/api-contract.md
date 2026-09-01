@@ -11,6 +11,7 @@
 | `POST /auth/signup` · `POST /auth/login` · `POST /auth/google` | **실제 DB** |
 | `GET /me` · `PATCH /me` | **실제 DB** |
 | `GET /me/card` · `GET /cards/{slug}` | **실제 DB** (2026-08-26에 스텁을 걷어냈다) |
+| `GET /admin/users` · `GET /admin/users/{id}` · `DELETE /admin/users/{id}` | **실제 DB** (2026-08-31 추가, 3-2절) |
 
 ## 눌러볼 수 있는 값
 
@@ -557,6 +558,70 @@ ASM-003). 그래서 (1)은 이미 어딘가에 있는 파일의 **키만 등록*
 
 > ⚠️ 7장 칸반과 스프린트 1 로그에 **"측정값 MySQL 적재"** 라고 적혀 있는데,
 > 이 프로젝트의 저장소는 **PostgreSQL + pgvector**다(부록 D). 표기를 바로잡아야 한다.
+
+---
+
+## 3-2. 회원 관리 (admin)
+
+> **상태:** 구현됨 · 2026-08-31 추가
+> **대상:** 관리자 화면(웹). 일반 사용자는 이 경로를 쓸 일이 없다.
+
+`user` 테이블에 role 컬럼이 없어 관리자 여부는 `ADMIN_EMAILS`(환경변수, 쉼표 구분)
+화이트리스트로 가른다. 위 세 엔드포인트 모두 `Authorization` 토큰의 주인 이메일이
+그 목록에 있어야 통과한다 — 없거나 목록이 비어 있으면 `403 FORBIDDEN`이다.
+
+### `GET /api/v1/admin/users`
+
+`?q=`(이메일·닉네임 부분일치) · `?page=`(기본 1) · `?size=`(기본 20, 최대 100).
+
+`200 OK`
+
+```json
+{
+  "items": [
+    { "id": "3f1c...", "email": "demo@super-sub.example", "nickname": "홍길동",
+      "created_at": "2026-07-13T10:30:00Z" }
+  ],
+  "total": 1,
+  "page": 1,
+  "size": 20
+}
+```
+
+### `GET /api/v1/admin/users/{user_id}`
+
+`GET /me`와 달리 **나간 팀도 포함한 소속 이력 전체**와 `has_card`를 준다.
+
+`200 OK`
+
+```json
+{
+  "id": "3f1c...", "email": "demo@super-sub.example", "nickname": "홍길동",
+  "created_at": "2026-07-13T10:30:00Z",
+  "teams": [
+    { "team_id": "9a2e...", "name": "번개FC", "region": "서울 강남",
+      "sport_code": "futsal", "role": "member",
+      "joined_at": "2026-07-01T00:00:00Z", "left_at": null }
+  ],
+  "has_card": true
+}
+```
+
+| 에러 | code |
+|---|---|
+| 404 | `USER_NOT_FOUND` |
+
+### `DELETE /api/v1/admin/users/{user_id}`
+
+강제 탈퇴. `DELETE /me`와 달리 **비밀번호를 요구하지 않는다** — 관리자 인증이
+이미 그 자리를 대신한다. 파생 데이터가 외래키 연쇄로 함께 지워지는 것은 `DELETE /me`와
+같다(부록 D.6).
+
+`204 No Content`
+
+| 에러 | code |
+|---|---|
+| 404 | `USER_NOT_FOUND` |
 
 ---
 

@@ -23,20 +23,29 @@ email: pmhllll12@gmail.com
 description: >- # this means to ignore newlines until "baseurl:"
   생활체육 경기 영상을 멀티모달로 분석하여 용병을 구인하고 RAG 검증을 자동화하는
   플랫폼(Hit Rate 90%, Recall@5 90% 달성) 개발 제안서입니다.
-baseurl: "/supersub.parkminho.cloud" # the subpath of your site, e.g. /blog
-url: "https://pmhllll12.github.io" # the base hostname & protocol for your site, e.g. http://example.com
+baseurl: "" # dev.supersub-ai.com 루트에 배포하므로 서브패스 없음
+url: "https://dev.supersub-ai.com" # the base hostname & protocol for your site, e.g. http://example.com
 github_username:  pmhllll12
 
 # Build settings
-theme: minima
+theme: just-the-docs
 plugins:
   - jekyll-feed
 
-# Navigation
-header_pages:
-  - jekyll/pages/toc.markdown
-  - jekyll/pages/devlog.markdown
-  - jekyll/pages/pending.markdown
+# Just the Docs 테마 설정 (dev.life-tutorial.com과 동일 테마)
+color_scheme: light
+search_enabled: true
+heading_anchors: true
+back_to_top: true
+back_to_top_text: "위로"
+nav_sort: case_sensitive # 각 페이지의 nav_order 값을 그대로 따름
+
+aux_links:
+  "GitHub":
+    - "https://github.com/pmhllll12/super-sub.cloud"
+aux_links_new_tab: true
+
+footer_content: "Copyright &copy; 2026 Super-Sub"
 
 # Exclude from processing.
 # The following items will not be processed, by default.
@@ -72,3 +81,4 @@ exclude:
   - flutter/
   - supersub-preview.service
   - fastapi/
+  - www/

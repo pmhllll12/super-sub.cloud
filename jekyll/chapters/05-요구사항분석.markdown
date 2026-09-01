@@ -1,7 +1,9 @@
 ---
-layout: page
+layout: default
 title: 요구사항 분석
 permalink: /05-요구사항분석/
+parent: II 부. 개발 수행 계획
+nav_order: 1
 ---
 
 ## 1) 기능 요구사항

@@ -21,6 +21,7 @@ from fastapi import Depends, Header
 from sqlalchemy import column, select, table
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import get_session
 from app.core.errors import ApiError
 from app.core.security import verify_access_token
@@ -66,3 +67,44 @@ def current_user_id(
 
 
 CurrentUserId = Annotated[UUID, Depends(current_user_id)]
+
+
+class UserEmailReader(Protocol):
+    """사용자의 이메일을 읽는다. 사용자가 없으면 `None`."""
+
+    def __call__(self, user_id: UUID) -> str | None: ...
+
+
+def get_user_email_reader(
+    session: Annotated[Session, Depends(get_session)],
+) -> UserEmailReader:
+    """`current_user_id` 위에서 관리자 여부를 가리는 데만 쓴다.
+
+    `table()`/`column()` 로 읽는 이유는 위 `get_token_version_reader` 와 같다 —
+    `app/core` 는 `user` 컨텍스트를 임포트하면 안 된다.
+    """
+    user_table = table("user", column("id"), column("email"))
+
+    def read(user_id: UUID) -> str | None:
+        stmt = select(user_table.c.email).where(user_table.c.id == user_id)
+        return session.execute(stmt).scalar_one_or_none()
+
+    return read
+
+
+def require_admin(
+    user_id: CurrentUserId,
+    read_email: UserEmailReader = Depends(get_user_email_reader),
+) -> UUID:
+    """회원 관리 admin 화면 전용 게이트.
+
+    🔴 `settings.admin_emails` 가 비어 있으면 **아무도** 통과하지 못한다 — 조용한
+    기본값을 두면 배포 환경에 값을 안 넣었을 때 누구나 admin 을 들어오게 된다.
+    """
+    email = read_email(user_id)
+    if email is None or email.strip().lower() not in settings.admin_email_set:
+        raise ApiError(403, "FORBIDDEN", "관리자만 접근할 수 있습니다.")
+    return user_id
+
+
+CurrentAdminUserId = Annotated[UUID, Depends(require_admin)]

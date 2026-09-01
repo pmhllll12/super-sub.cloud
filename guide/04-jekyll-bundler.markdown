@@ -1,7 +1,8 @@
 ---
-layout: page
+layout: default
 title: "4. Jekyll과 Bundler 설치"
 permalink: /guide/04-jekyll-bundler/
+nav_exclude: true
 ---
 
 ```bash

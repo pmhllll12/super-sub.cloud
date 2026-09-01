@@ -12,6 +12,7 @@ from app.card.adapter.outbound.stub.card_stub_repository import DEMO_SLUG
 from app.core.config import settings
 from app.core.errors import install_error_handlers
 from app.core.logging import configure_logging
+from app.user.adapter.inbound.api.v1.admin_router import admin_router
 from app.user.adapter.inbound.api.v1.auth_router import auth_router
 from app.user.adapter.inbound.api.v1.me_router import me_router
 from app.user.adapter.outbound.stub.user_stub_repository import (
@@ -68,7 +69,7 @@ app = FastAPI(
 install_error_handlers(app)
 
 # 컨텍스트가 늘면 여기에 한 줄씩 추가한다 (video · match · review · billing).
-for _router in (auth_router, me_router, card_router):
+for _router in (auth_router, me_router, card_router, admin_router):
     app.include_router(_router, prefix=API_PREFIX)
 
 

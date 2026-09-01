@@ -1,7 +1,8 @@
 ---
-layout: toc
+layout: default
 title: 목차
 permalink: /toc/
+nav_exclude: true
 ---
 
 ## I 부. 제안 개요

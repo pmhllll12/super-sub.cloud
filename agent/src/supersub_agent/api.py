@@ -271,7 +271,9 @@ async def api_video(
         tmp_path = Path(tmp.name)
 
     try:
-        pose = extract_keypoints(tmp_path)
+        # 입력 분포 관측은 extract_keypoints 안에서 일어난다(observe 기본 True).
+        # 여기서 따로 기록하면 한 분석이 두 번 남는다.
+        pose = extract_keypoints(tmp_path, rubric_key=rubric)
         return JSONResponse(
             run_pipeline(
                 pose.keypoints, file.filename or "video", pose.objects, rubric,

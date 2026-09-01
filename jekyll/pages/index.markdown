@@ -1,7 +1,8 @@
 ---
-layout: page
+layout: default
 title: 표지
 permalink: /
+nav_exclude: true
 ---
 
 <div markdown="1" style="text-align: center; margin-top: 2rem;">
@@ -32,7 +33,7 @@ permalink: /
 [https://github.com/pmhllll12/super-sub.cloud](https://github.com/pmhllll12/super-sub.cloud)
 
 데모 사이트
-[https://supersub.jsangho.com](https://supersub.jsangho.com)
+[https://supersub-ai.com](https://supersub-ai.com)
 
 </div>
 
