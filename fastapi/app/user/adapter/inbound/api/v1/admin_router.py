@@ -56,8 +56,12 @@ def read_user(
 @admin_router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(
     user_id: UUID,
-    _admin_id: CurrentAdminUserId,
+    admin_id: CurrentAdminUserId,
     use_case: ForceDeleteUserUseCaseDep,
 ) -> None:
-    """관리자가 회원을 강제 탈퇴시킨다. `DELETE /me` 와 달리 비밀번호를 요구하지 않는다."""
-    use_case(ForceDeleteUserCommand(user_id=user_id))
+    """관리자가 회원을 강제 탈퇴시킨다. `DELETE /me` 와 달리 비밀번호를 요구하지 않는다.
+
+    누른 관리자의 id 를 함께 넘긴다 — 감사 로그에 남기고, 자기 자신을 지우려는
+    호출을 인터랙터가 막는 데 쓴다.
+    """
+    use_case(ForceDeleteUserCommand(user_id=user_id, admin_id=admin_id))

@@ -74,9 +74,15 @@ class TestUserDetail:
 
 
 class TestForceDelete:
-    def test_비밀번호_없이_지운다(self, client, auth, as_admin):
+    """성공 경로(204)는 여기 없다 — 스텁 저장소에 사용자가 데모 하나뿐이라
+    "남을 지운다"를 만들 수 없다. `tests/user/adapter/test_admin_db.py` 가 맡는다.
+    """
+
+    def test_자기_자신은_지울_수_없다(self, client, auth, as_admin):
+        """지운 사람이 사라지면 감사 기록의 상대가 없어진다. 본인 탈퇴는 `DELETE /me` 다."""
         res = client.delete(f"{V1}/admin/users/{DEMO_USER_ID}", headers=auth)
-        assert res.status_code == 204
+        assert res.status_code == 409
+        assert error_code(res) == "CANNOT_DELETE_SELF"
 
     def test_없는_회원이면_NOT_FOUND(self, client, auth, as_admin):
         other = UUID("00000000-0000-4000-8000-000000000000")

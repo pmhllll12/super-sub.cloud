@@ -64,3 +64,6 @@ class AdminUserDetailResult:
 @dataclass(frozen=True)
 class ForceDeleteUserCommand:
     user_id: UUID
+    # 되돌릴 수 없는 동작이라 **누가 눌렀는지**를 감사 로그에 남긴다. 지워진 사람만
+    # 남으면 사후에 추적할 수 없다 (5장 SEC-010).
+    admin_id: UUID
