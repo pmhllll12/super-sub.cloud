@@ -15,15 +15,44 @@ import { useState } from 'react'
  * 🔴 나중에 B(예약 · 결제)로 갈 때 **이 시트만 바뀐다.** "연락처가 열린다"를
  * "시간을 고르고 결제한다"로 바꾸면 되고, 목록 · 상세는 그대로다.
  */
+/** 신청 단추. 🔴 신청서와 **떨어져 있다** — 단추는 머리글 오른쪽에 남고 신청서는
+    머리글 **아래**에서 펴진다(사용자 요청). 그래서 여는 상태는 밖(`CoachDetail`)이
+    쥐고, 여기서는 모양만 맡는다. */
+export function LessonApplyButton({
+  onClick,
+  /** 신청서가 펴져 있는가 — 그동안 이 단추는 흐려져 물러난다. */
+  hidden,
+}: {
+  onClick: () => void
+  hidden: boolean
+}) {
+  return (
+    <button
+      type="button"
+      className="ss-apply-open"
+      data-hidden={hidden}
+      // 흐려진 동안에는 자판으로도 안 걸린다 — 보이지 않는 것을 누를 수는 없다.
+      inert={hidden || undefined}
+      onClick={onClick}
+    >
+      레슨 신청
+    </button>
+  )
+}
+
 export default function LessonApply({
   coachName,
   /** 내 리포트에서 고를 수 있는 항목. 지금은 자리 표시다. */
   myFindings,
+  /** 펴져 있는가. 단추가 머리글에 따로 있으므로 밖에서 받는다. */
+  open,
+  onClose,
 }: {
   coachName: string
   myFindings: string[]
+  open: boolean
+  onClose: () => void
 }) {
-  const [open, setOpen] = useState(false)
   const [sent, setSent] = useState(false)
   const [picked, setPicked] = useState<string[]>([])
 
@@ -43,17 +72,18 @@ export default function LessonApply({
     )
   }
 
-  if (!open) {
-    return (
-      <button type="button" className="ss-apply-open" onClick={() => setOpen(true)}>
-        레슨 신청
-      </button>
-    )
-  }
-
   return (
+    /* 🔴 **높이를 격자 칸(0fr ↔ 1fr)으로 여닫는다.** `max-height` 로 하면 넉넉한
+       값을 미리 찍어 둬야 하고, 그 값이 실제 높이와 다른 만큼 여는 동안 빨라졌다
+       느려진다(거름망 서랍과 같은 방식).
+       🔴 접혀 있을 때는 **낭독기에도 없어야** 한다 — 눈에만 안 보이게 하면 폼
+       칸들이 그대로 읽히고 자판 이동에도 걸린다. */
+    <div className="ss-apply-drawer" data-open={open} aria-hidden={!open}>
+      <div className="ss-apply-drawer-inner">
     <form
       className="ss-apply"
+      // 접힌 동안에는 자판으로도 안 걸린다.
+      inert={!open || undefined}
       onSubmit={(e) => {
         e.preventDefault()
         setSent(true)
@@ -94,10 +124,15 @@ export default function LessonApply({
         <button type="submit" className="ss-apply-send">
           신청 보내기
         </button>
-        <button type="button" className="ss-shot-pick-auto" onClick={() => setOpen(false)}>
+        {/* 🔴 '신청 보내기' 와 **같은 크기 · 같은 글자**다(사용자 요청). 하는 일이
+            반대라 색만 다르다 — 크기가 다르면 둘 중 하나가 덜 중요한 조작으로
+            보이는데, 여기서는 둘 다 이 신청서를 끝내는 길이다. */}
+        <button type="button" className="ss-apply-close" onClick={onClose}>
           닫기
         </button>
       </div>
     </form>
+      </div>
+    </div>
   )
 }
