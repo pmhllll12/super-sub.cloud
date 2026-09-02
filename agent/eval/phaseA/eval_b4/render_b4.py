@@ -5,7 +5,7 @@
 (B-2 make_review_set.py / B-3와 동일 규약). selector가 무엇을 골랐는지는
 이미지에도 b4_review_input.csv에도 들어가지 않는다.
 
-    uv run python /mnt/d/supersub-phaseA/eval_b4/render_b4.py
+    uv run python eval/phaseA/eval_b4/render_b4.py
 """
 
 from __future__ import annotations
