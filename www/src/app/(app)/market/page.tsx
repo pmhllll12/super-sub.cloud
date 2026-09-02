@@ -1,8 +1,8 @@
 import HeroFit from '@/components/HeroFit'
 import PageEnter from '@/components/PageEnter'
 import HeroGate from '@/components/HeroGate'
-import { TransitionLink } from '@/lib/pageTransition'
-import { COACHES, PRODUCTS, SPORT_LABEL, won } from '@/lib/market'
+import { COACHES, PRODUCTS } from '@/lib/market'
+import MarketGates from './MarketGates'
 
 /**
  * 레슨 · 상점 **입구**.
@@ -15,9 +15,6 @@ import { COACHES, PRODUCTS, SPORT_LABEL, won } from '@/lib/market'
  * 설계: `www/docs/2026-09-01-레슨-상점-설계.md`
  */
 export default function MarketPage() {
-  const coach = COACHES[0]
-  const picks = PRODUCTS.slice(0, 3)
-
   return (
     <PageEnter className="ss-market ss-market-entry">
       {/* 🔴 이 화면은 **굴러가지 않는다**(사용자 요청). 한 화면 안에서 표지 글이
@@ -92,44 +89,9 @@ export default function MarketPage() {
         </div>
       </HeroFit>
 
-      {/* 🔴 두 문은 표지 글과 **같은 자리에 겹쳐** 있다. 굴러가는 화면이 아니라
-          한 화면이므로, 표지 글이 나간 뒤 이 자리에 들어온다(globals.css). */}
-      <div className="ss-market-gates">
-        <div className="ss-market-gate-wrap ss-market-gate-l">
-          <TransitionLink href="/market/coaches" className="ss-market-gate">
-            <span className="ss-market-gate-kind">레슨</span>
-            <strong>같은 잣대로 잰 코치</strong>
-            <p>
-              코치도 영상을 올려 우리 분석을 받습니다. 자기소개가 아니라 리포트를
-              보고 고르세요.
-            </p>
-            <span className="ss-market-gate-peek">
-              <b>{coach.name}</b> · {SPORT_LABEL[coach.sport]} · {coach.region}
-              <em>{coach.tagline}</em>
-            </span>
-            <span className="ss-market-gate-go">코치 보기 →</span>
-          </TransitionLink>
-        </div>
-
-        <div className="ss-market-gate-wrap ss-market-gate-r">
-          <TransitionLink href="/market/shop" className="ss-market-gate">
-            <span className="ss-market-gate-kind">상점</span>
-            <strong>영상에 나온 장비</strong>
-            <p>
-              제휴 브랜드의 장비를 모아 둡니다. 구매는 브랜드에서 하고, 그 장비가
-              나온 영상을 같이 볼 수 있습니다.
-            </p>
-            <span className="ss-market-gate-peek ss-market-gate-picks">
-              {picks.map((p) => (
-                <em key={p.id}>
-                  {p.brand} {p.name} · {won(p.price)}
-                </em>
-              ))}
-            </span>
-            <span className="ss-market-gate-go">장비 보기 →</span>
-          </TransitionLink>
-        </div>
-      </div>
+      {/* 두 문과 그 옆으로 펼쳐지는 목록 판. 열림/닫힘이 화면 안의 상태라
+          거기서부터는 클라이언트다(`MarketGates`). */}
+      <MarketGates coaches={COACHES} products={PRODUCTS} />
     </PageEnter>
   )
 }
