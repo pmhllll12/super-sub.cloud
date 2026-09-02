@@ -14,6 +14,8 @@ from app.user.adapter.outbound.stub.user_stub_repository import (
     DEMO_USER_ID,
     StubUserRepository,
 )
+from app.user.adapter.outbound.stub.team_stub_repository import StubTeamRepository
+from app.user.dependencies.team_providers import get_team_repository
 from app.user.dependencies.user_repository_provider import get_user_repository
 
 V1 = "/api/v1"
@@ -62,6 +64,7 @@ def client() -> TestClient:
     """
     app.dependency_overrides[get_user_repository] = StubUserRepository
     app.dependency_overrides[get_card_repository] = StubCardRepository
+    app.dependency_overrides[get_team_repository] = StubTeamRepository
     app.dependency_overrides[get_token_version_reader] = _stub_token_version_reader
     app.dependency_overrides[get_user_email_reader] = _stub_user_email_reader
     try:
@@ -69,6 +72,7 @@ def client() -> TestClient:
     finally:
         app.dependency_overrides.pop(get_user_repository, None)
         app.dependency_overrides.pop(get_card_repository, None)
+        app.dependency_overrides.pop(get_team_repository, None)
         app.dependency_overrides.pop(get_token_version_reader, None)
         app.dependency_overrides.pop(get_user_email_reader, None)
 
