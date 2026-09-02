@@ -415,6 +415,35 @@ curl -s http://127.0.0.1:8000/v1/chat/completions \
     "max_tokens":64,"temperature":0}' | python3 -m json.tool
 ```
 
+### 5-4. 포즈 모델 미리 받기
+
+**EXAONE만 챙기면 절반이다.** 서비스 경로의 비전 인식은 RT-DETR + ViTPose이고,
+`pose.py`가 이 둘을 **실행 시점에 HuggingFace에서** 내려받는다
+(`from_pretrained`). 그냥 두면 첫 분석이 S3에서 영상을 받은 **다음에** 모델을
+받으러 나간다 — 이그레스가 막혀 있거나 HF가 레이트리밋을 걸면 거기서 실패하고,
+그때까지 쓴 시간이 버려진다.
+
+```bash
+cd ~/super-sub.cloud/agent
+uv run python -c "
+from transformers import AutoProcessor, RTDetrForObjectDetection, VitPoseForPoseEstimation
+from supersub_agent.pose import PERSON_DETECTOR, POSE_MODEL
+for name, cls in ((PERSON_DETECTOR, RTDetrForObjectDetection), (POSE_MODEL, VitPoseForPoseEstimation)):
+    AutoProcessor.from_pretrained(name); cls.from_pretrained(name)
+    print('받음:', name)
+"
+```
+
+**확인:**
+```bash
+du -sh ~/.cache/huggingface/hub/*    # rtdetr, vitpose 두 항목이 보여야 한다
+```
+
+EXAONE과 달리 S3에 두지 않는 이유는 **바뀌지 않는 공개 가중치**라서다. EXAONE은
+vLLM이 매 기동마다 읽어야 하고 인스턴스를 새로 만들 때마다 필요하지만, 이 둘은
+HF 캐시에 한 번 들어가면 끝이다. 이그레스를 아예 막는 구성으로 갈 거라면 그때
+같은 방식으로 S3에 올린다.
+
 ---
 
 ## 6. 에이전트 실행 — S3 영상 → 분석 → S3 리포트
@@ -537,6 +566,7 @@ sudo systemctl restart supersub-vllm
 | `botocore ... NoCredentialsError` | 인스턴스 프로파일이 안 붙었다 | `aws sts get-caller-identity`. 비면 인스턴스에 IAM 역할 연결 |
 | `AccessDenied`인데 자격증명은 있음 | 정책 접두사 밖을 건드렸다 | 2-A 정책은 `videos/` 읽기·`reports/` 쓰기뿐이다. `videos/`에 쓰려 한 것은 아닌지 |
 | 서버는 뜨는데 첫 판정이 타임아웃 | 첫 요청에 워밍업이 겹친다 | 5-3의 curl로 미리 한 번 깨워 둔다 |
+| 영상은 받았는데 측정에서 멈춤/느림 | RT-DETR·ViTPose를 그때 HF에서 받고 있다 | 5-4를 먼저 돌린다. 이그레스가 막혔으면 그쪽부터 |
 
 로그:
 ```bash
