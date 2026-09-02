@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import type { PublicPlayerCard } from '@/server/backend'
 import SquadPanel from '@/components/SquadPanel'
-import FigureBackground from '@/components/FigureBackground'
 import SiteHeader from '@/components/SiteHeader'
 import HomeNav, { type Destination } from '@/components/HomeNav'
 import { FRIEND_SEARCH } from '@/lib/destinations'
@@ -79,7 +78,6 @@ export default function HomeStage({
 
   return (
     <>
-      <FigureBackground />
 
       {/* 헤더는 모든 화면이 같이 쓴다(SiteHeader). 홈에서만 화면에
           고정한다 — 한 화면을 통째로 쓰는 배치라 흐름에 두면 가운데 정렬이

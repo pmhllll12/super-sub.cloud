@@ -1990,6 +1990,11 @@ body {
   /* 자랄 때의 곡선 — 살짝 넘겼다 돌아온다(쫀득함). 나머지 움직임에는 안 쓴다:
      밀려 나가는 것이 되튀면 그냥 튕긴 것처럼 보인다. */
   --ss-shot-grow-ease: cubic-bezier(0.34, 1.5, 0.64, 1);
+  /* 🔴 **종목을 아직 안 골랐다**고 알리는 깜빡임 한 벌. 안내 줄과 종목 알약이
+     **같은 박자로** 깜빡여야 둘이 한 가지를 말하는 것으로 읽힌다 — 값을 두
+     군데 적으면 한쪽만 고치게 되므로 여기 하나로 둔다.
+     한 바퀴 1.8초는 완전히 사라졌다 나오면서도 안 튀는 길이다(사용자 요청). */
+  --ss-shot-blink: ss-shot-blink 1.8s ease-in-out infinite;
 }
 
 /* 떠날 때 — **들어온 것을 그대로 되감는다.** data-panel · data-video 가 꺼지는
@@ -2523,7 +2528,19 @@ body {
 /* ⚠️ 바를 밝게 · 알약을 검게 뒤집어 봤다가 되돌렸다 — 바가 밝아지면 그 줄이
    화면에서 제일 먼저 눈에 들어와서, 정작 봐야 할 영상 자리보다 세진다. */
 .ss-shot-frame-bar {
-  display: flex;
+  /* 🔴 **격자다**(flex 가 아니라). 오른쪽에 종목 알약이 붙으면서 그 폭이
+     글자 길이에 따라 달라졌는데, 예전처럼 왼쪽에 같은 폭의 빈 자리를
+     만들어(::before) 알약을 가운데 두는 방법은 그 폭을 CSS 로 알 수가 없다.
+     `1fr auto 1fr` 은 양쪽 칸이 저절로 같은 몫을 가져가므로 **오른쪽에
+     무엇이 오든** 가운데 칸이 줄의 정확한 한가운데다.
+     양쪽이 `minmax(0, 1fr)` 이 아니라 `1fr` 인 것에 유의 — 자리가 빠듯할 때
+     오른쪽 칸이 내용보다 작아져 알약이 잘려 나가면 안 된다.
+     🔴 가운데는 반대로 **`minmax(0, auto)`** 여야 한다. 그냥 `auto` 면 최소
+     크기가 내용을 따라가서, **긴 파일 이름 하나가 줄을 통째로 넘치게 만든다**
+     (제목 알약에 걸어 둔 말줄임이 아예 안 걸린다 — 줄어들 수가 없으니까).
+     0 까지 줄어들 수 있게 열어 두면 그때부터 말줄임이 일한다. */
+  display: grid;
+  grid-template-columns: 1fr minmax(0, auto) 1fr;
   align-items: center;
   gap: 10px;
   /* 안쪽 선은 바깥 테두리보다 한 단 더 옅다 — 같으면 두 선이 같은 무게로
@@ -2545,19 +2562,90 @@ body {
   --ss-dot-gap: 8px;
 }
 
-/* 점이 오른쪽에 있으므로 **왼쪽**에 같은 폭의 빈 자리를 만들어 알약을 진짜
-   가운데에 놓는다 — margin: auto 만으로는 점만큼 왼쪽으로 밀린다.
-   폭을 손으로 적지 않고 점 크기에서 계산한다(따로 적으면 한쪽만 고친다). */
-.ss-shot-frame-bar::before {
-  content: '';
-  width: calc(var(--ss-dot) * 3 + var(--ss-dot-gap) * 2);
-  flex: none;
+/* 머리줄 오른쪽 한 벌 — 종목 알약 셋과 닫기 점. 격자의 셋째 칸이다. */
+.ss-shot-bar-right {
+  display: flex;
+  grid-column: 3;
+  align-items: center;
+  justify-self: end;
+  gap: var(--ss-dot-gap);
 }
 
-.ss-shot-dots {
+/* ── 종목 알약 ─────────────────────────────────────────────────────
+   🔴 **기본값이 없다**(AnalysisStage 의 SPORTS 주석). 셋 다 안 골라진 채로
+   시작하고, 고르기 전에는 '분석 시작하기' 가 잠긴다 — 축구를 미리 골라 두면
+   야구 영상이 축구 루브릭으로 조용히 채점된다.
+
+   창 틀 머리줄(44px) 안에 들어가야 해서 폼의 알약보다 훨씬 작다. 크기를
+   `--ss-btn-h` 계열에서 끌어오지 않고 여기서 정하는 이유다 — 전역 값은
+   다른 화면이 쓴다. */
+.ss-shot-sports {
   display: flex;
   flex: none;
-  gap: var(--ss-dot-gap);
+  gap: 4px;
+}
+
+/* 🔴 **안은 완전히 비우고 선 하나로만 그린다**(사용자 요청). 채워 두었더니
+   창 틀 머리줄 위에 검은 덩어리 셋이 얹힌 꼴이라 영상 이름과 무게가 같았다.
+
+   🔴 "엄청 얇게" 를 **0.5px 로 만들지 않는다.** 둥근 모서리에서 기기 픽셀에
+   안 떨어져 선이 끊기고 우툴두툴해진다 — 창 틀 테두리와 알약 버튼에서 이미
+   두 번 겪었다. 굵기는 1px 로 또렷하게 긋고 **흰색의 불투명도를 낮춰**
+   가늘어 보이게 한다(`--ss-frame-line` 과 같은 방식, 한 단 더 옅게).
+   글자와 아이콘은 반대로 **온전한 흰색**이라, 선은 물러나고 이름이 선다. */
+.ss-shot-sport {
+  display: inline-flex;
+  height: 26px;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 40%, transparent);
+  border-radius: 999px;
+  padding: 0 10px;
+  background-color: transparent;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  color: var(--ss-fg);
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.ss-shot-sport .material-symbols-outlined {
+  flex: none;
+  font-size: 15px;
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 300,
+    'GRAD' 0,
+    'opsz' 20;
+}
+
+/* 얹으면 **선만** 또렷해진다 — 안은 계속 비어 있다. */
+.ss-shot-sport:hover:not(:disabled),
+.ss-shot-sport:focus-visible {
+  border-color: var(--ss-fg);
+}
+
+/* 🔴 **고른 것 하나만 안이 찬다.** 나머지가 완전히 비어 있으므로(위) 이
+   옅은 채움이 "지금 이것" 을 말하는 유일한 표시다 — 색만 바꾸면 색을 못
+   가리는 눈에는 셋이 똑같아 보인다. 선도 흐린 흰색에서 강조색으로 또렷해져
+   밝기까지 같이 달라진다. */
+.ss-shot-sport[aria-pressed='true'] {
+  border-color: var(--ss-accent);
+  background-color: color-mix(in srgb, var(--ss-accent) 18%, transparent);
+  color: var(--ss-accent);
+}
+
+/* 시작한 뒤에는 못 바꾼다. 고른 것은 그대로 보이고 나머지만 잦아든다 —
+   무엇으로 보고 있는지가 분석 내내 남아야 한다. */
+.ss-shot-sport:disabled {
+  cursor: default;
+}
+
+.ss-shot-sport:disabled:not([aria-pressed='true']) {
+  opacity: 0.35;
 }
 
 .ss-shot-dot {
@@ -2584,8 +2672,10 @@ body {
   display: flex;
   overflow: hidden;
   min-width: 0;
-  max-width: 68%;
-  margin: 0 auto;
+  /* 격자의 가운데 칸이다 — `margin: 0 auto` 로 가운데를 만들지 않는다.
+     그렇게 하면 양쪽 칸의 폭이 다를 때(오른쪽에만 알약이 있다) 자기 칸
+     안에서만 가운데라 줄 전체로는 어긋난다. */
+  grid-column: 2;
   align-items: center;
   gap: 6px;
   border-radius: 999px;
@@ -2594,7 +2684,10 @@ body {
   font-size: 0.75rem;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: color-mix(in srgb, var(--ss-fg) 75%, transparent);
+  /* 🔴 **온전한 흰색**이다(사용자 요청). 75% 로 낮춰 뒀더니 종목 알약의
+     흰 글자 옆에서 혼자 흐려 보였다 — 같은 줄에 있는 글자끼리는 무게가
+     같아야 한다. 물러나는 것은 글자가 아니라 알약의 바탕(8%)이 맡는다. */
+  color: var(--ss-fg);
 }
 
 .ss-shot-frame-title .material-symbols-outlined {
@@ -2623,6 +2716,9 @@ body {
      제목 · 설명 · 시작 버튼이 다 들어가고도 남는 선이다(42vh 로는 낮은 창에서
      넘쳐서 설명 글이 위로 잘려 나갔다). */
   max-height: 38vh;
+  /* 분석 대상을 묶는 판(.ss-shot-pick)이 이 상자를 덮으므로 기준이 되어야
+     한다. 흐름에는 영향이 없다. */
+  position: relative;
 }
 
 /* 🔴 영상 위에 뜨는 `1.00` 배속 뱃지를 감춘다.
@@ -2651,6 +2747,345 @@ body {
    빠지는데, 그때까지 또렷하면 마지막에 뚝 끊긴 것처럼 보인다. */
 .ss-shot[data-closing='true'] .ss-shot-frame-body video {
   opacity: 0;
+}
+
+/* ── 분석할 사람을 끌어서 묶는 판 ─────────────────────────────────────
+   🔴 영상 **위**를 통째로 덮는다. 판이 다 자란 화면에서만 나오므로 이 상자가
+   곧 화면이고, 여기서 그은 네모가 그대로 대상자가 된다.
+
+   🔴 `touch-action: none` 이 **꼭 있어야 한다.** 없으면 폰에서 손가락을
+   끄는 동안 브라우저가 그걸 스크롤 · 확대로 가로채 가서 pointermove 가
+   중간에 끊긴다 — 네모가 그리다 말고 멎는다.
+
+   🔴 `user-select: none` 도 같이. 안 그러면 끌 때 위의 안내 글자가 파랗게
+   선택되며 딸려 온다. */
+.ss-shot-pick {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  /* 바깥을 살짝 어둡게 — 여기서 할 일이 있다는 신호다. 영상은 그대로 보인다. */
+  background-color: color-mix(in srgb, var(--ss-bg) 28%, transparent);
+}
+
+/* 그은 네모. 🔴 **선 하나로만** 그린다 — 안을 채우면 정작 묶으려는 사람이
+   가려져서 잘 묶었는지 확인할 수가 없다. 바깥 그림자로 대비를 만든다
+   (밝은 영상에서 강조색 선만으로는 묻힌다). */
+.ss-shot-pick-box {
+  position: absolute;
+  border: 2px solid var(--ss-accent);
+  border-radius: 4px;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--ss-bg) 70%, transparent),
+    0 0 0 9999px color-mix(in srgb, var(--ss-bg) 30%, transparent);
+  pointer-events: none;
+}
+
+/* 영상 위 안내 — 네모를 긋기 시작하면 비켜 준다(그리는 자리를 가리므로). */
+.ss-shot-pick-lead {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  padding: 10px 22px;
+  background-color: color-mix(in srgb, var(--ss-bg) 72%, transparent);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--ss-fg);
+  pointer-events: none;
+  transition: opacity 260ms ease;
+}
+
+.ss-shot-pick-lead[data-drawn='true'] {
+  opacity: 0;
+}
+
+/* ── 묶는 동안 쓰는 재생 컨트롤 ───────────────────────────────────────
+   🔴 브라우저 기본 컨트롤을 되살리는 대신 **직접 만든다.** 묶는 판이 영상 위를
+   덮는데, 컨트롤 자리에만 구멍을 내려면 그 높이를 알아야 한다 — 브라우저마다
+   다르고 우리가 정할 수 없는 값이다. 판을 온전히 두고 안에 넣는 편이 낫다.
+
+   🔴 자리는 `bottom` 고정이다. 영상 비율이 어떻든 판의 아래에 붙는다. */
+.ss-shot-scrub {
+  position: absolute;
+  z-index: 1;
+  right: 14px;
+  bottom: 14px;
+  left: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--ss-glass-border);
+  border-radius: 999px;
+  padding: 8px 14px;
+  background-color: color-mix(in srgb, var(--ss-bg) 78%, transparent);
+  /* 판 전체가 십자선이라 여기서는 되돌린다 — 여기선 그릴 수 없다. */
+  cursor: default;
+}
+
+.ss-shot-scrub-play {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background-color: transparent;
+  color: var(--ss-fg);
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+
+.ss-shot-scrub-play:hover,
+.ss-shot-scrub-play:focus-visible {
+  background-color: color-mix(in srgb, var(--ss-fg) 16%, transparent);
+}
+
+.ss-shot-scrub-play .material-symbols-outlined {
+  font-size: 22px;
+  font-variation-settings:
+    'FILL' 1,
+    'wght' 300,
+    'GRAD' 0,
+    'opsz' 24;
+}
+
+/* 🔴 `range` 를 쓴 이유는 키보드다 — 화살표로 자리를 옮길 수 있어야 끌 수
+   없는 사람도 프레임을 고를 수 있다. 생김새만 우리 것으로 바꾼다. */
+.ss-shot-scrub-bar {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 4px;
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: 999px;
+  background-color: color-mix(in srgb, var(--ss-fg) 25%, transparent);
+  cursor: pointer;
+}
+
+.ss-shot-scrub-bar::-webkit-slider-thumb {
+  width: 13px;
+  height: 13px;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  border-radius: 999px;
+  background-color: var(--ss-accent);
+}
+
+.ss-shot-scrub-bar::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border: 0;
+  border-radius: 999px;
+  background-color: var(--ss-accent);
+}
+
+/* 숫자가 바뀌어도 폭이 안 흔들리게 — 안 그러면 막대가 매초 미세하게 줄었다
+   늘었다 한다. */
+.ss-shot-scrub-time {
+  flex: none;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--ss-fg) 70%, transparent);
+}
+
+/* 오른쪽 판 쪽 안내와 버튼 두 개. */
+.ss-shot-pickside {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: color-mix(in srgb, var(--ss-fg) 78%, transparent);
+}
+
+.ss-shot-pickside b {
+  font-weight: 600;
+  color: var(--ss-accent);
+}
+
+.ss-shot-pickside-note {
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--ss-fg) 50%, transparent);
+}
+
+.ss-shot-pick-acts {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+
+.ss-shot-pick-go,
+.ss-shot-pick-auto {
+  display: inline-flex;
+  height: 34px;
+  align-items: center;
+  border: 1px solid var(--ss-glass-border);
+  border-radius: 999px;
+  padding: 0 16px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    opacity 160ms ease;
+}
+
+.ss-shot-pick-go {
+  border-color: color-mix(in srgb, var(--ss-accent) 70%, transparent);
+  background-color: color-mix(in srgb, var(--ss-accent) 18%, transparent);
+  color: var(--ss-accent);
+}
+
+.ss-shot-pick-go:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--ss-accent) 28%, transparent);
+}
+
+/* 네모를 긋기 전에는 잠긴다 — 무엇으로 분석하라는 건지가 없다. */
+.ss-shot-pick-go:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.ss-shot-pick-auto {
+  background-color: transparent;
+  color: color-mix(in srgb, var(--ss-fg) 70%, transparent);
+}
+
+.ss-shot-pick-auto:hover {
+  border-color: var(--ss-fg);
+  color: var(--ss-fg);
+}
+
+/* ── 따라가는 네모 ────────────────────────────────────────────────────
+   🔴 판은 **클릭을 안 먹는다.** 영상 위를 통째로 덮는데 그대로 두면 재생
+   컨트롤이 죽는다 — 가로로 꽉 찬 것이 빈 자리에서도 클릭을 먹는 그 문제다
+   (홈 바닥줄 · 추천 판 · 창 틀 닫기 점에서 세 번 데였다). */
+.ss-shot-track {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* 🔴 자리 · 크기에 **CSS 전이를 걸지 않는다.** 부드럽게 만드는 일은
+   `lib/smoothBox.ts` 가 매 프레임 값을 눅여서 한다 — 자리는 빠르게, 크기는 그
+   네 배 천천히. 전이는 그 둘을 따로 다룰 수 없고, 검출이 건너뛸 때 빈 코트를
+   가로질러 미끄러지는 것도 못 막는다.
+
+   처음 한 장은 자리가 정해지기 전이라 감춰 둔다 — rAF 가 첫 좌표를 쓰면서
+   불투명도를 되살린다. 안 그러면 왼쪽 위 구석에 네모가 한 번 번쩍인다. */
+.ss-shot-track-box {
+  position: absolute;
+  opacity: 0;
+  border: 2px solid var(--ss-accent);
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ss-bg) 60%, transparent);
+  transition:
+    border-color 200ms ease,
+    opacity 220ms ease;
+}
+
+/* 놓친 동안에는 네모를 세워 두고 색을 뺀다 — 강조색 그대로면 여전히 맞게
+   따라가는 것으로 보인다. */
+.ss-shot[data-video='true'] .ss-shot-track[data-lost='true'] .ss-shot-track-box {
+  border-color: color-mix(in srgb, var(--ss-fg) 55%, transparent);
+  border-style: dashed;
+}
+
+/* ── 관절 막대기 ─────────────────────────────────────────────────────
+   따라가는 판 전체를 덮는다 — 관절은 상자 밖으로도 나갈 수 있다(팔을 뻗으면
+   상자가 그만큼 못 따라온다). */
+.ss-shot-pose {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* 뼈는 가늘게, 관절은 굵게 — 굵기 차이만으로 마디가 읽힌다. */
+.ss-shot-bone {
+  fill: none;
+  stroke: var(--ss-accent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  /* 밝은 코트 위에서도 선이 살아 있게 — 바깥에 어두운 테를 두른다. */
+  filter: drop-shadow(0 0 1.5px color-mix(in srgb, var(--ss-bg) 85%, transparent));
+}
+
+/* 길이 0 인 선 + 둥근 끝 = 점. 원을 17개 만들 것 없다. */
+.ss-shot-joint {
+  fill: none;
+  stroke: var(--ss-fg);
+  stroke-width: 5;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 1.5px color-mix(in srgb, var(--ss-bg) 85%, transparent));
+}
+
+/* ── 나머지 사람들 ────────────────────────────────────────────────────
+   🔴 **화면의 모두를 그린다**(사용자 요청). 회색은 "찾긴 했지만 지금 보는
+   사람은 아니다" 는 뜻이다 — 초록 하나만 있으면 나머지가 검출이 안 된 건지
+   그냥 안 그린 건지 알 수 없다.
+
+   가늘고 흐리게 — 내 사람과 다투면 안 된다. */
+.ss-shot-bone-other {
+  stroke: color-mix(in srgb, var(--ss-fg) 75%, transparent);
+  stroke-width: 2;
+}
+
+.ss-shot-joint-other {
+  stroke: color-mix(in srgb, var(--ss-fg) 85%, transparent);
+  stroke-width: 4;
+}
+
+.ss-shot-track-tag {
+  position: absolute;
+  bottom: 100%;
+  left: -2px;
+  margin-bottom: 4px;
+  border-radius: 4px;
+  padding: 2px 7px;
+  background-color: color-mix(in srgb, var(--ss-accent) 88%, transparent);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--ss-bg);
+}
+
+.ss-shot-track[data-lost='true'] .ss-shot-track-tag {
+  background-color: color-mix(in srgb, var(--ss-fg) 70%, transparent);
+}
+
+/* 오른쪽 판의 알림 한 줄 — 놓쳤을 때만 나온다. */
+.ss-shot-lost {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 22%, transparent);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: color-mix(in srgb, var(--ss-fg) 72%, transparent);
+}
+
+.ss-shot-lost span {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 /* 영상이 빠진 자리에 떨구는 자리가 들어설 때도 스며들게 — 서로 자리를
@@ -2701,6 +3136,40 @@ body {
   color: color-mix(in srgb, var(--ss-fg) 65%, transparent);
 }
 
+/* 찍는 법 세 줄. 떨구라는 말보다 작고 흐리게 — 읽히되 앞서지 않는다. */
+.ss-shot-tips {
+  display: flex;
+  max-width: min(520px, 92%);
+  margin-top: 16px;
+  padding-top: 14px;
+  flex-direction: column;
+  gap: 7px;
+  border-top: 1px solid color-mix(in srgb, var(--ss-fg) 12%, transparent);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  text-align: left;
+  color: color-mix(in srgb, var(--ss-fg) 55%, transparent);
+}
+
+.ss-shot-tips li {
+  /* 점은 글자 앞에 두고 줄이 넘어가도 들여쓰기가 유지되게 한다. */
+  padding-left: 12px;
+  text-indent: -12px;
+}
+
+.ss-shot-tips li::before {
+  content: '·';
+  margin-right: 6px;
+  color: color-mix(in srgb, var(--ss-accent) 70%, transparent);
+}
+
+/* 🔴 줄표 **앞**은 온전한 흰색이다(사용자 요청). 시키는 말과 그 까닭을
+   밝기로 갈라, 눈이 앞쪽만 훑고 지나갈 수 있게 한다. */
+.ss-shot-tips b {
+  font-weight: 600;
+  color: var(--ss-fg);
+}
+
 /* 알약.
 
    🔴 **`align-self: center` 가 없으면 판 폭을 통째로 먹는다.** 판이 세로
@@ -2710,6 +3179,94 @@ body {
    키는 전역 --ss-btn-h(54px, 앱의 _kButtonHeight)보다 **10px 작다.** 이 화면의
    버튼은 폼의 큰 알약이 아니라 영상 아래 붙는 작은 것이라 그 크기가 과했다
    (사용자 요청). 전역 값은 건드리지 않는다 — 다른 화면이 쓴다. */
+/* 영상은 골랐는데 종목을 안 골랐을 때만 펴지는 한 줄.
+
+   🔴 시작 버튼과 **똑같은 방식으로 접는다**(키 0 + 음수 margin 으로 판의
+   gap 상쇄). 붙였다 뗐다 하면 그 순간 판의 키가 확 바뀌어 안쪽 것들이 툭
+   떨어진다 — 시작 버튼에서 이미 겪었다. */
+.ss-shot-hint {
+  flex: none;
+  align-self: center;
+  overflow: hidden;
+  height: 0;
+  margin-top: -18px;
+  opacity: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  /* 🔴 강조색이다(사용자 요청) — 흐린 흰색으로 뒀더니 "나온 줄도 몰랐다".
+     잠긴 버튼이 왜 안 눌리는지 알려 주는 유일한 줄이라 눈에 띄어야 한다. */
+  color: var(--ss-accent);
+  transition:
+    opacity 380ms ease,
+    height 460ms var(--ss-shot-ease),
+    margin-top 460ms var(--ss-shot-ease);
+}
+
+/* 계속 깜빡인다(사용자 요청). 🔴 **안쪽 글자**에 건다 — 바깥 <p> 는 펴고
+   접는 전이를 하는데, 같은 요소에 무한 애니메이션을 걸면 그 전이를 덮어써
+   펴질 때 툭 나타난다.
+
+   🔴 **0 까지 갔다 온다**(사용자 요청) — 35% 에서 되돌렸더니 사라지지 않고
+   숨쉬는 것으로 보였다. 완전히 없어졌다 다시 나와야 한다.
+
+   🔴 다만 **끊지 않는다.** 홀드를 넣어 딱딱 켜고 끄는 것도 해 봤는데
+   스트로브처럼 튀었다 — 키프레임은 1 ↔ 0 둘뿐이고 `ease-in-out` 이 그
+   사이를 내내 부드럽게 오간다. 한 바퀴를 1.8초로 길게 잡아 사라지는 데도
+   나오는 데도 0.9초씩 쓴다.
+
+   🔴 **접혀 있는 동안에는 아예 안 돈다**(늘 돌려 두지 않는다). 종목 알약도
+   같이 깜빡이는데, 한쪽만 미리 돌고 있으면 나중에 붙는 쪽과 **위상이
+   어긋나** 둘이 엇갈려 깜빡인다 — 스쿼드 빈 자리에서 겪은 것과 같은 함정이다.
+   같은 순간에 같이 붙으면 브라우저가 둘의 시작 시각을 같게 잡는다. */
+.ss-shot-hint > span {
+  display: inline-block;
+}
+
+/* 종목을 아직 안 골랐을 때만 — 안내 줄과 종목 알약이 **같이** 깜빡인다.
+   알약까지 깜빡이는 것은 "종목이 어디 있는지" 를 같이 가리키기 위해서다
+   (사용자 요청) — 안내 줄만 깜빡이면 무엇을 누르라는 건지 찾아야 한다. */
+.ss-shot[data-picked='true']:not([data-sport]) .ss-shot-hint > span,
+.ss-shot[data-picked='true']:not([data-sport]) .ss-shot-sport {
+  animation: var(--ss-shot-blink);
+}
+
+@keyframes ss-shot-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0;
+  }
+}
+
+/* 깜빡임에 멀미하는 사람이 있다. 색과 글자만으로도 충분히 눈에 띈다. */
+@media (prefers-reduced-motion: reduce) {
+  .ss-shot[data-picked='true']:not([data-sport]) .ss-shot-hint > span,
+  .ss-shot[data-picked='true']:not([data-sport]) .ss-shot-sport {
+    animation: none;
+  }
+}
+
+/* 🔴 `:not([data-sport])` 다 — 무대 루트에 종목이 안 적혀 있을 때만이다.
+   `data-picked` 규칙과 짝이라, 영상을 고르기 전에는 아예 펴지지 않는다. */
+.ss-shot[data-picked='true']:not([data-sport]) .ss-shot-hint {
+  /* 글자 크기(15px)에 줄높이가 얹힌 값보다 넉넉해야 한다 — 모자라면
+     `overflow: hidden` 이 아랫부분을 조용히 잘라낸다. */
+  height: 22px;
+  margin-top: 0;
+  opacity: 1;
+}
+
+/* 판이 자라면 같이 접힌다 — 그때는 이미 종목이 골라져 있지만, 되돌아오는
+   길에 한 프레임 스치는 것을 막는다. **위 규칙보다 뒤**에 있어야 이긴다. */
+.ss-shot[data-grown='true'] .ss-shot-hint {
+  height: 0;
+  margin-top: -18px;
+  opacity: 0;
+}
+
 .ss-shot-start {
   display: inline-flex;
   flex: none;
@@ -3225,4 +3782,1219 @@ body {
 
 .ss-chat-send:disabled {
   opacity: 0.35;
+}
+
+/* ── 레슨 · 상점 ──────────────────────────────────────────────────────
+   설계 근거: `www/docs/2026-09-01-레슨-상점-설계.md`
+
+   이 묶음은 **위에서 아래로 읽는 문서**다(홈 · 영상 분석처럼 한 화면을 통째로
+   쓰는 연출이 아니다). `(app)` 레이아웃이 이미 폭과 좌우 여백을 잡아 주므로
+   여기서는 세로 흐름만 만든다. */
+.ss-market {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 48px 0 24px;
+}
+
+.ss-market-head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ss-market-head h1 {
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ss-fg);
+}
+
+.ss-market-head p {
+  max-width: 46rem;
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: color-mix(in srgb, var(--ss-fg) 68%, transparent);
+}
+
+.ss-market-head b {
+  font-weight: 600;
+  color: var(--ss-fg);
+}
+
+.ss-market-back {
+  align-self: flex-start;
+  font-size: 0.8125rem;
+  color: color-mix(in srgb, var(--ss-fg) 55%, transparent);
+  transition: color 160ms ease;
+}
+
+.ss-market-back:hover {
+  color: var(--ss-fg);
+}
+
+/* ── 입구의 두 갈래 ───────────────────────────────────────────────────
+   🔴 좌우로 나누지만 **폭이 좁으면 위아래로 쌓인다**(auto-fit). 앱 이식
+   지침 §2-2 — 폰은 세로라 옆에 판을 펼칠 자리가 없다. 브레이크포인트로
+   배치를 갈아끼우지 않고 격자가 알아서 접히게 둔다. */
+.ss-market-gates {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  gap: 18px;
+}
+
+/* 🔴 이 화면은 **굴러가지 않는다**(사용자 요청). 표지 글과 두 문이 한 화면을
+   번갈아 쓴다 — 그래서 두 문은 흐름에서 빼서 같은 자리에 겹쳐 둔다.
+
+   🔴 `absolute` 가 아니라 **`fixed`** 다. `absolute` 로 두면 기준이 이 페이지
+   상자가 되는데, 그 상자를 기준으로 폭을 재는 것이 하나 더 있다 — 표지 글이
+   본문 칸을 빠져나오려고 쓰는 음수 여백(`.ss-market-intro`)이다. 둘이 얽히면서
+   표지 글이 한 글자 폭으로 찌부러졌다(실제로 두 번 그랬다). `fixed` 는 기준이
+   화면이라 이 페이지 상자에 아무 영향도 주지 않는다. */
+.ss-market-entry .ss-market-gates {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  align-content: center;
+  /* 본문 칸(가운데 1120px)과 같은 자리에 오도록 좌우를 들인다. */
+  padding: 0 max(24px, calc((100vw - 1120px) / 2));
+}
+
+/* 시작 자리는 화면 **완전 바깥**이다. 왼쪽 문은 왼쪽, 오른쪽 문은 오른쪽. */
+.ss-market-gate-wrap {
+  opacity: 0;
+  transition:
+    transform 500ms cubic-bezier(0.25, 0.6, 0.3, 1),
+    opacity 380ms ease;
+}
+
+.ss-market-gate-l {
+  transform: translateX(calc(-100% - 60vw));
+}
+
+.ss-market-gate-r {
+  transform: translateX(calc(100% + 60vw));
+}
+
+/* 🔴 **표지 글이 다 나간 뒤에** 들어온다(사용자 요청). 그 시간(650ms + 마지막
+   지연 210ms)만큼 늦춘다 — 겹치면 한 화면에서 두 벌이 동시에 움직여 어지럽다. */
+[data-ss-scrolled='true'] .ss-market-gate-wrap {
+  opacity: 1;
+  transform: none;
+  transition-delay: 900ms;
+}
+
+/* 되돌아갈 때는 문이 **먼저** 나간다. 그 뒤에 표지 글이 온다(HeroGate). */
+[data-ss-gates='out'] .ss-market-gate-wrap {
+  opacity: 0;
+  transition-delay: 0ms;
+}
+
+[data-ss-gates='out'] .ss-market-gate-l {
+  transform: translateX(calc(-100% - 60vw));
+}
+
+[data-ss-gates='out'] .ss-market-gate-r {
+  transform: translateX(calc(100% + 60vw));
+}
+
+/* 🔴 굴림 자체를 없앤다. 한 화면이 전부라 굴릴 것이 없고, 굴러가면 표지 글이
+   옆으로 나가는 동안 위로도 밀려 어긋난다.
+
+   🔴 `display: block` 이 **반드시 같이 가야 한다.** `body` 는 세로 flex 이고 그
+   안의 본문 칸은 `mx-auto`(좌우 여백 auto) 인데, flex 에서 가로 여백이 auto 면
+   늘어나기(stretch)가 꺼지고 **내용만큼만** 넓어진다. 이 화면은 표지 글도 두 문도
+   흐름 밖(absolute · fixed)이라 흐름에 남는 내용이 없어서, 칸이 0 으로 줄고 글이
+   한 글자 폭으로 찌부러졌다(실제로 세 번 그랬다). 평범한 블록으로 두면 칸이 제
+   폭을 갖고 `mx-auto` 도 원래 뜻대로 가운데 정렬로 돌아온다. */
+body:has(.ss-market-entry) {
+  display: block;
+  overflow: hidden;
+}
+
+/* 🔴 **입구의 첫 화면은 사진과 제목만 쓴다**(사용자 요청).
+   두 문이 처음부터 조금이라도 보이면 관찰기가 곧바로 켜져서, 스크롤해서
+   양옆에서 들어오는 연출이 **일어날 자리가 없다** — 내려오기도 전에 이미
+   끝나 있다. 제목 덩어리에 한 화면만큼 키를 줘서 문을 화면 밖으로 민다.
+
+   `100svh` 다(`vh` 가 아니라). 모바일에서 주소창이 접혔다 펴질 때 `vh` 는
+   그때마다 달라져서 화면이 덜컥거린다.
+
+   낮은 창에서도 제목이 안 눌리게 하한(320px)을 둔다. 150 은 위의 헤더와
+   여백 몫이다 — 그만큼 빼야 문이 딱 화면 아래에 걸린다. */
+.ss-market-entry .ss-market-head {
+  /* 🔴 `min-height` 가 아니라 **`height`** 다. 최소 높이로 두면 글이 그보다
+     길 때 칸이 같이 늘어나 바닥이 화면 밖으로 나가고, 그러면 아래 배율로
+     줄여도 소용이 없다(줄이는 기준점 자체가 화면 밖이므로). 높이를 못 박아야
+     바닥이 늘 화면 바닥이다. 값은 HeroFit 이 재서 넣는다 — 아래 값은 JS 가
+     돌기 전 한 순간용이다. */
+  height: var(--ss-hero-h, max(320px, calc(100svh - 220px)));
+  position: relative;
+}
+
+/* 글 덩어리. 🔴 **바닥에 못 박는다** — 위쪽은 아치 글자와 인물의 머리가 쓰는
+   자리다. 흐름에 두면 넘칠 때 아래로 밀려 나가므로 절대 배치로 바닥에 붙이고,
+   넘치는 만큼은 배율로 줄여 첫 화면 안에 넣는다(HeroFit).
+   🔴 절대 배치라 이 칸의 높이 = **글의 원래 높이**다 — HeroFit 이 얼마나
+   줄여야 하는지 재는 값이 바로 이것이라, 흐름으로 되돌리면 안 된다. */
+.ss-market-entry .ss-hero-fit {
+  position: absolute;
+  right: 0;
+  /* 🔴 아래 여백은 **여기서** 준다. 칸 높이에서 빼면 칸 바닥이 화면 바닥보다
+     위로 올라가고, 그만큼 다음 판이 첫 화면에 걸친다(실제로 그랬다). */
+  bottom: var(--ss-hero-pad, 16px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  transform: scale(var(--ss-fit, 1));
+  transform-origin: 0 100%;
+}
+
+/* 사진의 빈 자리(왼쪽)에 앉는 글.
+ *
+ * 🔴 이 덩어리는 **첫 화면 안에 다 들어와야 한다.** 스크롤을 내려야 보이면
+ *    아래 두 문(레슨/상점)이 나오는 자리와 겹쳐서, 내려도 안 읽히고 잘린
+ *    채로만 보인다. 그래서 글자 크기와 간격이 취향이 아니라 **제약**이다 —
+ *    여기 값을 키우려면 위 min-height 안에 들어오는지 먼저 재 볼 것.
+ * 🔴 폭을 좁게 묶는 것도 조건이다 — 넓어지면 인물 위로 글이 올라간다.
+ * 🔴 글자와 간격을 **svh 로 묶은** 이유가 그것이다. px 로 두면 창이 낮을 때만
+ *    넘쳐서, 내 창에선 멀쩡하고 남의 창에선 잘린다. svh 로 두면 창 높이가
+ *    얼마든 이 덩어리가 화면의 같은 비율만 쓴다. */
+.ss-market-intro {
+  display: flex;
+  max-width: min(30rem, 46%);
+  /* 🔴 칸은 **늘린 채로 둔다**(align-items 를 건드리지 않는다). 줄이면 두 칸의
+     폭이 글 길이대로 달라져서, 사이를 가르는 선 길이도 서로 어긋난다. */
+  text-align: center;
+  /* 🔴 본문 칸(가운데 1120px)을 **빠져나온다.** 배경 사진은 화면 전체를 덮는데
+     글만 가운데 칸에 갇혀 있으면, 넓은 창일수록 글이 화면 한가운데로 밀려 인물과
+     겹친다. 칸의 왼쪽 여백만큼 되밀어 화면 왼쪽 끝에 붙인 뒤, 가장자리 여백을
+     직접 준다 — 창이 넓어져도 인물에서 멀어질 뿐 가까워지지 않는다. */
+  margin-left: calc((100vw - 100%) / -2 + clamp(76px, 11vw, 220px));
+  flex-direction: column;
+  gap: clamp(14px, 2.8svh, 26px);
+}
+
+.ss-market-intro section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.ss-market-intro-kind {
+  /* 세로 칸의 자식이라 자리를 안 정해 주면 폭이 통째로 늘어난다. */
+  display: inline-flex;
+  align-self: center;
+  align-items: center;
+  gap: 8px;
+  /* 🔴 알약. 안은 **완전 투명**, 테두리는 **엄청 얇은 흰색**(사용자 요청) —
+     배경 사진이 그대로 비쳐야 해서 채우지 않는다. 분석 화면의 종목 알약
+     (.ss-shot-sport) 과 같은 결이다. */
+  border: 1px solid #fff;
+  border-radius: 999px;
+  padding: 5px 13px;
+  background-color: transparent;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  /* 🔴 초록(--ss-accent) 이 아니라 **완전 흰색**이다(사용자 요청). */
+  color: #fff;
+}
+
+/* 갈래를 가리키는 그림. 딱지 글자와 같은 흰색으로 나란히 선다. */
+.ss-market-intro-kind .material-symbols-outlined {
+  color: #fff;
+  font-size: 22px;
+  font-variation-settings: 'FILL' 0, 'wght' 200, 'GRAD' 0, 'opsz' 24;
+}
+
+.ss-market-intro h2 {
+  font-size: clamp(1.25rem, 2.7svh, 1.625rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ss-fg);
+}
+
+.ss-market-intro p {
+  font-size: clamp(0.875rem, 1.6svh, 1rem);
+  line-height: 1.7;
+  color: color-mix(in srgb, var(--ss-fg) 68%, transparent);
+}
+
+/* 🔴 굵은 부분을 **본문과 같은 색으로 되돌린다.** 흰색으로 띄우면 문단 안이
+   얼룩덜룩해져 읽는 눈이 자꾸 끊긴다 — 흰색은 제목(h2) 하나만 쓴다. 강조는
+   굵기로만 한다.
+   `color: inherit` 를 굳이 적는 이유: 위쪽 `.ss-market-head b` 가 흰색을 주는데
+   특정도가 같아서, 여기서 색을 안 적으면 그 값이 그대로 살아난다(실제로 그랬다). */
+.ss-market-intro b {
+  color: inherit;
+  font-weight: 600;
+}
+
+/* 두 갈래를 가르는 선. */
+.ss-market-rule {
+  /* 🔴 글보다 짧게(사용자 요청). 칸 폭을 다 쓰면 선이 글 밖으로 삐져나가
+     덩어리를 가르는 것이 아니라 상자를 두른 것처럼 보인다. */
+  width: 70%;
+  align-self: center;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--ss-fg) 16%, transparent);
+  margin: 0;
+}
+
+/* 넷이 **차례로 왼쪽 화면 밖에서** 미끄러져 들어온다(사용자 요청).
+ *
+ * 🔴 시작 자리가 `-100%` 가 아니라 거기에 `30vw` 를 더한 값인 이유: 이 덩어리는
+ *    화면 왼쪽 끝이 아니라 안쪽(margin-left) 에 있어서, 제 폭만큼만 밀면
+ *    **왼쪽 여백에 걸쳐 반쯤 보인 채로 시작한다.** 여백만큼 더 밀어야 진짜
+ *    안 보이는 곳에서 나온다.
+ * 🔴 나갈 때는 이 앱의 규칙대로 **들어온 방향 그대로** 되나간다. */
+[data-enter='false'] .ss-market-in {
+  opacity: 0;
+}
+
+[data-enter='true'] .ss-market-in {
+  animation: ss-market-in 760ms var(--ss-shot-ease, cubic-bezier(0.22, 1, 0.36, 1)) both;
+  animation-delay: calc(var(--ss-in-i, 0) * 120ms);
+}
+
+[data-enter='out'] .ss-market-in {
+  animation: ss-market-out 520ms var(--ss-leave-ease) both;
+  animation-delay: max(0ms, calc(120ms - var(--ss-in-i, 0) * 40ms));
+}
+
+/* 내리기 시작하면 **아래 것부터 차례로** 왼쪽 화면 밖으로 나간다(사용자 요청).
+ * 위로 되올리면 이 규칙이 빠지고 진입 연출이 다시 걸려, **위 것부터 차례로**
+ * 왼쪽 밖에서 들어온다.
+ *
+ * 🔴 이름이 **달라야 한다**. 처음엔 진입 연출을 `reverse` 로 되감았는데, 이름이
+ *    같으면 브라우저는 "같은 애니메이션이 계속 돌고 있다"고 보고 **다시 시작하지
+ *    않는다** — 이미 다 지난 시간에서 이어 붙어 끝 자리만 툭 나왔다. 이름이
+ *    바뀌어야 처음부터 다시 돈다. 그래서 되감기 대신 제 이름을 가진 짝을 둔다
+ *    (자리는 `ss-market-in` 의 `from` 과 같은 값을 쓴다 — 한쪽만 고치지 말 것).
+ * 🔴 전환(transition)이 아니라 **애니메이션**인 것도 그대로 중요하다. 이 넷은
+ *    진입 연출이 `both` 로 계속 걸려 있어 전환으로는 자리를 못 바꾼다. */
+[data-ss-scrolled='true'] .ss-market-in {
+  animation: ss-market-away 650ms cubic-bezier(0.5, 0, 0.3, 1) both;
+  animation-delay: calc((3 - var(--ss-in-i, 0)) * 70ms);
+}
+
+@keyframes ss-market-away {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(calc(-100% - 30vw));
+  }
+}
+
+@keyframes ss-market-in {
+  from {
+    opacity: 0;
+    transform: translateX(calc(-100% - 30vw));
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ss-market-out {
+  0% {
+    opacity: 1;
+    transform: none;
+  }
+
+  70% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(calc(-100% - 30vw));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-enter='true'] .ss-market-in,
+  [data-enter='out'] .ss-market-in {
+    animation-name: ss-enter-fade;
+    animation-duration: 200ms;
+    animation-delay: 0ms;
+  }
+}
+
+/* 아래로 내리라는 안내.
+ *
+ * 🔴 **완전 흰색**이다(사용자 요청). 설명이 아니라 다음 동작을 가리키는 것이라
+ *    눈에 먼저 들어와야 한다. 선택자에 `.ss-market-intro` 를 굳이 붙이는 이유:
+ *    바로 위 `.ss-market-intro p` 가 회색을 주는데 그쪽 특정도가 더 높아서,
+ *    `.ss-market-scroll` 만으로는 흰색이 안 먹는다(실제로 회색으로 나왔다).
+ * 🔴 설명에서 **멀찍이 떨어뜨린다**(사용자 요청). 붙여 두면 설명의 마지막 줄로
+ *    읽혀서 "내리라"는 말이 안 보인다. 이 덩어리는 바닥에 붙어 있으므로 위
+ *    여백을 주면 안내는 그대로 있고 설명이 위로 올라간다. */
+.ss-market-intro .ss-market-scroll {
+  /* 🔴 그림을 글자 **바로 왼쪽**에 붙이되, 선의 가운데에 맞는 것은 **글자**여야
+     한다. 둘을 그냥 묶어 가운데를 잡으면 글자가 그림 폭의 절반만큼 오른쪽으로
+     밀리므로, 오른쪽에 그림 폭(30 + 사이 8)만큼 안여백을 줘서 그 절반을 되민다
+     — 셈이 정확히 상쇄된다.
+     한때 그림을 흐름 밖(absolute)으로 빼 봤는데, 그러면 브라우저가 그 자리를
+     글자 앞이 아니라 **줄 상자의 왼쪽 끝**으로 잡아서 저 혼자 멀찍이 떨어졌다
+     (사용자 지적). */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding-right: 38px;
+  margin-top: clamp(28px, 6.5svh, 76px);
+  color: #fff;
+  font-size: 1.0625rem;
+  font-weight: 500;
+}
+
+/* 껍데기를 한 겹 두는 이유: 안쪽 그림이 제 흔들림(transform)을 쓰므로, 자리를
+   잡는 쪽과 흔드는 쪽을 갈라 둬야 서로 덮어쓰지 않는다. */
+.ss-market-scroll-icon {
+  display: flex;
+}
+
+.ss-market-scroll .material-symbols-outlined {
+  /* 🔴 글자는 흰색인데 **그림만 초록**이다(사용자 요청). 이 화면에서 초록은
+     레슨 · 상점을 가리키는 색이라, 그리로 내려가라는 표시와 결이 맞는다. */
+  color: var(--ss-accent);
+  font-size: 30px;
+  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+  /* 내리라는 뜻이 한눈에 들어오게 위아래로 흔든다. 🔴 폭이 4px 일 땐 움직이는
+     줄도 몰랐다 — 흔드는 폭을 키우고 옅어졌다 진해지는 것을 같이 준다. */
+  animation: ss-market-scroll-nudge 1.5s ease-in-out infinite;
+}
+
+@keyframes ss-market-scroll-nudge {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: translateY(-5px);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translateY(7px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-market-scroll .material-symbols-outlined {
+    animation: none;
+  }
+}
+
+/* 🔴 이 화면에서만 헤더를 **붙여 둔다**(사용자 요청). 이 그룹은 원래 헤더를
+   흐름에 두는데(위에서 아래로 읽는 문서라 그게 맞다), 이 화면은 한 번 내려서
+   두 문에 닿는 것이 전부인 **표지**라 워드마크와 목적지가 사라지면 갈 곳을
+   잃는다. `sticky` 라 자리를 새로 차지하지 않아 첫 화면 셈도 그대로다. */
+body:has(.ss-market-entry) .ss-home-header {
+  position: sticky;
+  top: 0;
+}
+
+/* 🔴 좁은 화면에서도 **폭을 다 쓰지 않는다.** `none` 으로 풀어 뒀더니 글이
+   화면 끝까지 퍼져 인물 위로 올라탔다(사용자 지적). 화면 기준으로 다시 묶는다. */
+@media (max-width: 900px) {
+  .ss-market-intro {
+    max-width: min(30rem, 50vw);
+  }
+}
+
+/* Reveal 껍데기가 격자 칸이 된다 — 자리 잡기는 `.ss-reveal-slot` 이 한다. */
+
+.ss-market-gate {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--ss-glass-border);
+  /* 🔴 `--ss-radius-arch`(260px) 를 쓰면 안 된다 — 그건 로그인 화면의 아치
+     전용 값이라 카드가 통째로 알약이 된다. 실제로 그렇게 나왔다. */
+  border-radius: 20px;
+  padding: 26px 24px 22px;
+  background-color: color-mix(in srgb, var(--ss-fg) 4%, transparent);
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease,
+    transform 200ms var(--ss-shot-ease, ease);
+}
+
+.ss-market-gate:hover {
+  border-color: color-mix(in srgb, var(--ss-fg) 45%, transparent);
+  background-color: color-mix(in srgb, var(--ss-fg) 8%, transparent);
+  transform: translateY(-2px);
+}
+
+.ss-market-gate-kind {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ss-accent);
+}
+
+.ss-market-gate strong {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--ss-fg);
+}
+
+.ss-market-gate p {
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: color-mix(in srgb, var(--ss-fg) 62%, transparent);
+}
+
+/* 안을 살짝 들여다보게 하는 줄 — 눌러야 뭐가 있는지 아는 문은 안 눌린다. */
+.ss-market-gate-peek {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 4px;
+  border-top: 1px solid color-mix(in srgb, var(--ss-fg) 12%, transparent);
+  padding-top: 12px;
+  font-size: 0.8125rem;
+  color: color-mix(in srgb, var(--ss-fg) 55%, transparent);
+}
+
+.ss-market-gate-peek b {
+  font-weight: 600;
+  color: color-mix(in srgb, var(--ss-fg) 85%, transparent);
+}
+
+.ss-market-gate-peek em {
+  font-style: normal;
+}
+
+.ss-market-gate-go {
+  margin-top: 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ss-accent);
+}
+
+/* ── 거름망 ───────────────────────────────────────────────────────────
+   🔴 종목 알약은 영상 분석의 `.ss-shot-sport` 를 **그대로 쓴다.** 같은 뜻의
+   것에 다른 모양을 주지 않는다 — 사용자가 이미 한 번 배운 조작이다. */
+.ss-market-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
+.ss-market-empty,
+.ss-coach-empty {
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: color-mix(in srgb, var(--ss-fg) 50%, transparent);
+}
+
+/* ── 코치 목록 ────────────────────────────────────────────────────────*/
+.ss-coach-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  gap: 14px;
+}
+
+.ss-coach-card {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--ss-glass-border);
+  border-radius: 16px;
+  padding: 20px;
+  background-color: color-mix(in srgb, var(--ss-fg) 4%, transparent);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.ss-coach-card:hover {
+  border-color: color-mix(in srgb, var(--ss-fg) 45%, transparent);
+  background-color: color-mix(in srgb, var(--ss-fg) 8%, transparent);
+}
+
+.ss-coach-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ss-coach-card-head b {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--ss-fg);
+}
+
+.ss-coach-card-head span {
+  font-size: 0.8125rem;
+  color: color-mix(in srgb, var(--ss-fg) 55%, transparent);
+}
+
+.ss-coach-card-tagline {
+  font-size: 0.875rem;
+  color: color-mix(in srgb, var(--ss-fg) 72%, transparent);
+}
+
+/* 🔴 간판 자리 — 강조색 테두리로 다른 줄과 구분한다. 여기 들어가는 것은
+   **우리가 잰 것**뿐이고, 코치가 적은 말은 위의 tagline 에 있다. */
+.ss-coach-card-analysis {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: auto;
+  border: 1px solid color-mix(in srgb, var(--ss-accent) 35%, transparent);
+  border-radius: 12px;
+  padding: 11px 12px;
+  background-color: color-mix(in srgb, var(--ss-accent) 7%, transparent);
+}
+
+.ss-coach-card-analysis em {
+  font-size: 0.75rem;
+  font-style: normal;
+  font-weight: 600;
+  color: var(--ss-accent);
+}
+
+/* 받은 호칭. 🔴 **수치는 없다**(부록 D.5) — 이 알약이 곧 그 원칙이다. */
+.ss-coach-titles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.ss-coach-titles b {
+  border: 1px solid color-mix(in srgb, var(--ss-accent) 50%, transparent);
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ss-accent);
+}
+
+.ss-coach-card-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.8125rem;
+  color: color-mix(in srgb, var(--ss-fg) 72%, transparent);
+}
+
+.ss-coach-card-foot i {
+  font-style: normal;
+  color: color-mix(in srgb, var(--ss-fg) 45%, transparent);
+}
+
+/* ── 코치 상세 ────────────────────────────────────────────────────────*/
+.ss-coach-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ss-coach-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--ss-fg) 12%, transparent);
+  padding-top: 24px;
+}
+
+.ss-coach-sec h2 {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--ss-fg);
+}
+
+.ss-coach-sec h3 {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--ss-fg) 60%, transparent);
+}
+
+/* 🔴 간판 절만 강조색 바탕을 깐다 — 차례가 곧 주장이다. */
+.ss-coach-analysis {
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--ss-accent) 30%, transparent);
+  padding: 22px 22px 24px;
+  background-color: color-mix(in srgb, var(--ss-accent) 6%, transparent);
+}
+
+.ss-coach-analysis-why {
+  font-size: 0.8125rem;
+  color: color-mix(in srgb, var(--ss-fg) 60%, transparent);
+}
+
+.ss-coach-analysis-why b {
+  font-weight: 600;
+  color: var(--ss-accent);
+}
+
+.ss-coach-summary {
+  font-size: 0.9375rem;
+  line-height: 1.75;
+  color: var(--ss-fg);
+}
+
+.ss-coach-video {
+  align-self: flex-start;
+  margin-top: 4px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ss-accent);
+}
+
+.ss-coach-verified {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ss-coach-verified li {
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 25%, transparent);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 0.8125rem;
+  color: color-mix(in srgb, var(--ss-fg) 78%, transparent);
+}
+
+.ss-coach-verified li::before {
+  content: '✓';
+  margin-right: 6px;
+  color: var(--ss-accent);
+}
+
+.ss-coach-reviews {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ss-coach-reviews li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.875rem;
+}
+
+.ss-coach-reviews b {
+  font-weight: 600;
+  color: var(--ss-fg);
+}
+
+.ss-coach-reviews p {
+  line-height: 1.7;
+  color: color-mix(in srgb, var(--ss-fg) 72%, transparent);
+}
+
+.ss-coach-reviews time {
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--ss-fg) 40%, transparent);
+}
+
+.ss-coach-info {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 20px;
+  font-size: 0.875rem;
+}
+
+.ss-coach-info dt {
+  color: color-mix(in srgb, var(--ss-fg) 50%, transparent);
+}
+
+.ss-coach-info dd {
+  color: color-mix(in srgb, var(--ss-fg) 82%, transparent);
+}
+
+/* ── 레슨 신청 ────────────────────────────────────────────────────────*/
+.ss-apply-open,
+.ss-apply-send {
+  display: inline-flex;
+  height: calc(var(--ss-btn-h) - 10px);
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--ss-accent) 70%, transparent);
+  border-radius: var(--ss-btn-r);
+  padding: 0 22px;
+  background-color: color-mix(in srgb, var(--ss-accent) 18%, transparent);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ss-accent);
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+
+.ss-apply-open:hover,
+.ss-apply-send:hover {
+  background-color: color-mix(in srgb, var(--ss-accent) 28%, transparent);
+}
+
+.ss-apply {
+  display: flex;
+  width: min(420px, 100%);
+  flex-direction: column;
+  gap: 14px;
+  border: 1px solid var(--ss-glass-border);
+  border-radius: 16px;
+  padding: 20px;
+  background-color: color-mix(in srgb, var(--ss-fg) 5%, transparent);
+}
+
+.ss-apply fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ss-apply legend {
+  margin-bottom: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ss-fg);
+}
+
+/* 🔴 내 리포트에서 고르는 줄 — 이게 이 신청서의 전부다. */
+.ss-apply-pick {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: color-mix(in srgb, var(--ss-fg) 80%, transparent);
+  cursor: pointer;
+}
+
+.ss-apply-pick input {
+  margin-top: 3px;
+  accent-color: var(--ss-accent);
+}
+
+.ss-apply-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--ss-fg) 55%, transparent);
+}
+
+.ss-apply-field input,
+.ss-apply-field textarea {
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 22%, transparent);
+  border-radius: 10px;
+  padding: 9px 11px;
+  background-color: transparent;
+  font-size: 0.875rem;
+  color: var(--ss-fg);
+}
+
+.ss-apply-field input:focus,
+.ss-apply-field textarea:focus {
+  border-color: var(--ss-accent);
+  outline: none;
+}
+
+.ss-apply-row {
+  display: flex;
+  gap: 10px;
+}
+
+.ss-apply-row > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.ss-apply-acts {
+  display: flex;
+  gap: 8px;
+}
+
+.ss-apply-done {
+  display: flex;
+  width: min(420px, 100%);
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid color-mix(in srgb, var(--ss-accent) 40%, transparent);
+  border-radius: 16px;
+  padding: 18px 20px;
+  background-color: color-mix(in srgb, var(--ss-accent) 8%, transparent);
+  font-size: 0.875rem;
+}
+
+.ss-apply-done b {
+  font-weight: 600;
+  color: var(--ss-accent);
+}
+
+.ss-apply-done p {
+  line-height: 1.7;
+  color: color-mix(in srgb, var(--ss-fg) 72%, transparent);
+}
+
+.ss-apply-done a {
+  color: var(--ss-fg);
+  text-decoration: underline;
+}
+
+/* 🔴 영상 분석 화면에서는 레이아웃이 깐 배경 사진을 감춘다.
+   그 화면은 왼쪽 판이 들어오면서 **자기 사진을 오른쪽으로 민다**. 이 정지
+   사진을 그대로 두면 밀려난 자리로 비쳐서 사진이 둘로 보인다 — 오려 낸
+   그림자가 둘로 보이던 것과 같은 종류의 사고다. */
+body:has(.ss-shot) .ss-app-figure {
+  display: none;
+}
+
+/* ── 배경 사진이 화면과 같이 흐른다 ───────────────────────────────────
+   🔴 이 앱은 **들어온 방향 그대로 되나간다.** 내용은 옆으로 밀려 나가는데
+   배경만 제자리에서 녹으면 두 층이 따로 논다(사용자 지적) — 그래서 배경도
+   같은 방향으로 흐른다.
+
+   시간은 `pageTransition` 의 LEAVE_MS(900) · `AppFigure` 의 MOVE_MS 와
+   **같은 값**이라야 한다. 내용이 다 빠져나간 순간에 배경도 다 빠져나가 있어야
+   한 동작으로 읽힌다.
+
+   🔴 옮기는 양은 **14%뿐**이다. 배경은 크고 느린 층이라 많이 움직이면 화면이
+   흔들린 것처럼 보인다 — 앞 층보다 조금만 움직이는 것이 깊이를 만든다. */
+.ss-app-figure-out {
+  animation: ss-figure-out 900ms var(--ss-leave-ease) both;
+}
+
+.ss-app-figure-in {
+  animation: ss-figure-in 900ms var(--ss-shot-ease, cubic-bezier(0.22, 1, 0.36, 1)) both;
+}
+
+@keyframes ss-figure-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(-14%);
+  }
+}
+
+@keyframes ss-figure-in {
+  from {
+    opacity: 0;
+    transform: translateX(14%);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 움직임을 줄이라고 한 사람에게는 자리를 옮기지 않고 밝기만 바꾼다.
+   (전환 자체도 `leaveTo` 에서 건너뛰므로 여기 오는 일이 드물다) */
+@media (prefers-reduced-motion: reduce) {
+  .ss-app-figure-out,
+  .ss-app-figure-in {
+    animation-duration: 200ms;
+  }
+
+  @keyframes ss-figure-out {
+    to {
+      opacity: 0;
+      transform: none;
+    }
+  }
+
+  @keyframes ss-figure-in {
+    from {
+      opacity: 0;
+      transform: none;
+    }
+  }
+}
+
+/* ── 문서형 화면의 등장 · 퇴장 ────────────────────────────────────────
+   `PageEnter` 가 신호(`data-enter`)를 켜고, 움직일 것들이 `ss-rise` 를 단다.
+
+   🔴 홈의 것과 **폭이 다르다.** 홈은 화면을 통째로 쓰는 연출이라 50vw 씩
+   날아다니지만, 여기는 위에서 아래로 읽는 문서다 — 그만큼 움직이면 글을
+   읽으려는 사람을 방해한다. 32px 만 움직인다.
+
+   🔴 **아래에서 위로 올라온다**(사용자 요청). 옆으로 미끄러지게 해 봤는데,
+   위에서 아래로 읽는 화면에서는 글이 옆으로 지나가는 것이 읽는 방향과 어긋나
+   눈에 잘 안 들어왔다. 아래에서 올라오면 **읽어 내려가는 방향과 같은 축**이라
+   차례로 쌓이는 것이 그대로 보인다.
+
+   나갈 때는 이 앱의 규칙대로 **들어온 방향 그대로**, 즉 다시 아래로 내려간다.
+   배경 사진은 그 사이 왼쪽으로 밀리는데, 층이 서로 다른 축으로 움직이는 것이
+   깊이를 만든다. */
+[data-enter='false'] .ss-rise {
+  opacity: 0;
+}
+
+[data-enter='true'] .ss-rise {
+  animation: ss-rise-in 620ms var(--ss-shot-ease, cubic-bezier(0.22, 1, 0.36, 1)) both;
+  animation-delay: calc(var(--ss-rise-i, 0) * 70ms);
+}
+
+/* 🔴 나갈 때는 **들어온 차례의 거꾸로다.** 같은 순서로 내보내면 들어오는
+   장면을 빨리 감기 한 것처럼 보인다(홈에서 이미 겪은 것). */
+[data-enter='out'] .ss-rise {
+  animation: ss-rise-out 560ms var(--ss-leave-ease) both;
+  animation-delay: max(0ms, calc(140ms - var(--ss-rise-i, 0) * 60ms));
+}
+
+@keyframes ss-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(32px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 65% 지점에 이미 투명해진다 — 남은 구간의 빠른 움직임이 눈에 안 띈다
+   (홈 · 영상 분석의 퇴장과 같은 방식). */
+@keyframes ss-rise-out {
+  0% {
+    opacity: 1;
+    transform: none;
+  }
+
+  65% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(26px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-enter='true'] .ss-rise,
+  [data-enter='out'] .ss-rise {
+    animation-name: ss-enter-fade;
+    animation-duration: 200ms;
+    animation-delay: 0ms;
+  }
+}
+
+/* ── 배경에 깔리는 큰 글자와 그 앞의 사람 ─────────────────────────────
+   레퍼런스처럼 **글자가 사람 뒤로 지나간다.** 차례가 전부다:
+
+     사진  →  큰 글자  →  오려 낸 사람  →  (본문)
+
+   🔴 영상 분석 화면도 같은 그림을 만들지만 **방법이 다르다.** 거기는 홈
+   사진의 인물이 거의 검은 실루엣이라 밝기만으로 오려낼 수 있어서 SVG 필터를
+   쓴다(`#ss-shadow-cut`). 이 사진은 인물이 밝게 조명돼 있어 그 방법이 안
+   통해서, 진짜로 오려 낸 그림을 따로 둔다(`scripts/cutout.swift`). */
+/* 🔴 **화면 폭에 딱 맞춘다.** 크기를 vw 로 잡으면 문구가 길어질 때 양끝이
+   잘려 안 읽힌다(사용자 지적) — SVG 의 viewBox 가 폭을 1000 으로 고정하고
+   `textLength` 가 거기에 글자를 맞추므로, 문구를 바꿔도 늘 들어찬다.
+
+   높이는 폭에서 따라온다(viewBox 비율). 한 줄이면 화면 폭의 11.8% 다. */
+.ss-figure-mark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  overflow: visible;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* 글자 하나. 들어올 때 **저마다 다른 화면 밖에서** 날아 들어오고, 나갈 때는
+   **그 자리로 되돌아 나간다**(사용자 요청). 어디로 갈지는 컴포넌트가 차례로부터
+   늘 같은 값을 내므로, 들어온 자리와 나가는 자리가 저절로 같다. */
+.ss-figure-mark-ch {
+  /* 내리기 시작하면 아치를 타고 나간다 — 아래 `[data-ss-scrolled]` 규칙이
+     자리를 바꾸고, 어떻게 흐를지는 여기서 한 번만 정한다.
+     🔴 곡선의 **앞부분이 완만해야** 한다. ease-out 계열은 첫 순간에 확 튀어
+     나가서, 손가락을 대자마자 사라지는 것으로 보였다(사용자 지적). 갈 거리가
+     1600 이나 되므로 시간도 넉넉히 준다.
+     🔴 시간이 **오고 갈 때 서로 다르다.** 나갈 때는 천천히(아래 규칙), 돌아올
+     때는 표지 글과 보조를 맞춰 빠르게(여기) — 전환은 **가는 쪽 규칙의 시간**을
+     쓰므로 이렇게 나눠 적으면 한 속성으로 두 속도가 나온다. */
+  transition:
+    transform 900ms cubic-bezier(0.25, 0.6, 0.3, 1),
+    opacity 700ms ease;
+  will-change: transform, opacity;
+}
+
+/* 🔴 `animation: none` 이 있어야 한다. 들어올 때 쓴 연출이 `both` 로 채워져
+   있어서, 그대로 두면 그 마지막 값(제자리)이 이 자리를 계속 덮어쓴다 —
+   전환은 애니메이션을 못 이긴다. 위로 되올리면 이 규칙이 빠지면서 들어올 때의
+   연출이 다시 걸려, 처음 들어왔던 모습 그대로 돌아온다. */
+[data-ss-scrolled='true'] .ss-figure-mark-ch {
+  animation: none;
+  transition:
+    transform 900ms cubic-bezier(0.45, 0, 0.25, 1),
+    opacity 750ms ease;
+  opacity: 0;
+  transform: translate(calc(var(--ss-ch-ax, 0) * 1px), calc(var(--ss-ch-ay, 0) * 1px));
+}
+
+/* 🔴 마지막 글자가 끝나는 시각(지연 × 글자 수 + 길이)이 `AppFigure` 의
+   `MOVE_MS + MARK_TAIL_MS` 안에 들어와야 한다. 넘으면 층이 먼저 걷혀서 가다 만
+   글자가 제자리로 튕긴다 — 그게 "휙 오는" 느낌의 정체였다.
+   🔴 곡선도 완만한 것으로 바꿨다. `(0.22, 1, ...)` 은 처음에 거의 순간이동하고
+   끝에서 기어오는 커브라, 먼 거리를 건널 때 앞부분이 특히 급해 보인다. */
+.ss-app-figure-in .ss-figure-mark-ch {
+  animation: ss-mark-ch-in 1000ms cubic-bezier(0.25, 0.6, 0.3, 1) both;
+  animation-delay: calc(var(--ss-ch-i, 0) * 32ms);
+}
+
+.ss-app-figure-out .ss-figure-mark-ch {
+  animation: ss-mark-ch-out 780ms cubic-bezier(0.6, 0, 0.7, 0.35) both;
+  animation-delay: calc(var(--ss-ch-i, 0) * 22ms);
+}
+
+/* 🔴 **이미 나가 있으면 다시 부르지 않는다.**
+ *
+ * 위 두 규칙(화면을 오가는 연출)은 `from` 이 제자리라, 스크롤로 이미 내보낸
+ * 글자에까지 걸리면 **제자리로 한 번 돌아왔다가** 흩어진다 — 아래로 내려간
+ * 자리에서 다른 화면으로 갔는데 TRAIN & GEAR UP 이 다시 뜨던 것이 이것이다
+ * (사용자 지적). 나간 상태 규칙은 이 둘보다 **앞에** 있어서 특정도가 같으면
+ * 지므로, 여기서 한 단계 올려 다시 못 걸리게 한다. */
+[data-ss-scrolled='true'] .ss-app-figure-in .ss-figure-mark-ch,
+[data-ss-scrolled='true'] .ss-app-figure-out .ss-figure-mark-ch {
+  animation: none;
+}
+
+@keyframes ss-mark-ch-in {
+  from {
+    opacity: 0;
+    transform: translate(calc(var(--ss-ch-dx, 0) * 1px), calc(var(--ss-ch-dy, 0) * 1px));
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ss-mark-ch-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+
+  to {
+    opacity: 0;
+    transform: translate(calc(var(--ss-ch-dx, 0) * 1px), calc(var(--ss-ch-dy, 0) * 1px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-app-figure-in .ss-figure-mark-ch,
+  .ss-app-figure-out .ss-figure-mark-ch {
+    animation-name: ss-enter-fade;
+    animation-duration: 200ms;
+    animation-delay: 0ms;
+  }
+}
+
+.ss-figure-mark text {
+  font-family: var(--font-poster), var(--font-rubik), system-ui, sans-serif;
+  /* 🔴 굵기를 주지 않는다 — Shrikhand 는 굵기가 400 하나뿐인 장식 글꼴이라
+     올리면 가짜 굵게(synthetic bold)만 걸려 획이 지저분해진다. */
+  /**
+   * viewBox 안의 값이다 — 화면 크기와 무관하다.
+   *
+   * 🔴 `FigureBackground` 의 `MARK_FIT`(930) 과 **짝**이다. 이 크기에서 글자
+   * 자연 폭이 그 값에 가깝게 나와야 자간이 원래대로 붙는다.
+   *   118 → 겹쳤고(자간이 음수)   96 → 흩어졌다(자간이 넓게 벌어짐)
+   * 둘 다 사용자 지적으로 드러났다. 한쪽만 고치면 다시 어긋난다.
+   */
+  font-size: 104px;
+  /* 🔴 짙은 초록(사용자 요청). 앱의 초록(--ss-accent) 을 어둠 쪽으로 섞어 만든다
+     — 별개의 색을 박아 두면 나중에 앱 색이 바뀔 때 여기만 남는다. 배경 글자라
+     본문보다 가라앉아야 하고, 그렇다고 배경에 묻히면 안 된다. */
+  fill: color-mix(in srgb, var(--ss-accent) 40%, #04301a);
+}
+
+/* 오려 낸 사람 — 사진과 **같은 상자 · 같은 자르기**다(FigureBackground 주석). */
+.ss-figure-cut {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* 🔴 아래쪽을 사진과 **같은 결로** 잦아들게 한다. 배경 사진은 아래로 갈수록
+     검게 지우는 막을 덮고 있는데, 이 그림은 그 막 **위**에 그려져서 그 부분을
+     도로 밝게 만든다 — 사진 상자가 끝나는 자리에 가로선이 생긴다. 영상 분석의
+     `.ss-shot-cut img` 와 같은 값을 쓴다. 두 값은 같이 고칠 것. */
+  mask-image: linear-gradient(to bottom, #000 62%, #000000b3 88%, #0000 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 62%, #000000b3 88%, #0000 100%);
+}
+
+/* 화면 끝까지 채우는 사진에는 잦아들 아랫변이 없다 — 막을 벗긴다.
+   🔴 사진 쪽 막과 **짝**이다. 한쪽만 벗기면 오려 낸 사람만 아래가 잘려
+   보인다. */
+.ss-figure-cut-bleed {
+  mask-image: none;
+  -webkit-mask-image: none;
+}
+
+/* 좁은 화면에서는 글자를 그릴 자리가 없다 — 사람도 글자도 다 잘린다. */
+@media (max-width: 900px) {
+  .ss-figure-mark {
+    display: none;
+  }
+}
+
+/* ── 스크롤에 묶여 화면 바깥에서 들어오는 것 ──────────────────────────
+   시작 자리는 **화면 완전 바깥**이고, 끝까지 내리면 딱 제자리에 도착한다
+   (사용자 요청). 자리는 `Reveal` 이 스크롤을 재서 매 프레임 직접 쓴다 —
+   CSS 는 **처음 상태와 성질**만 정한다.
+
+   🔴 껍데기가 두 겹이다. 바깥(`slot`)은 절대 안 움직이고 안쪽(`ss-reveal`)만
+   나간다 — 관찰기가 바깥을 봐야 한다. 안쪽을 보면 화면 밖으로 나간 순간
+   "안 보인다"가 되어 스스로 멎고 그대로 굳는다.
+
+   🔴 기본값이 **안 보이는 상태**다(사용자 요청). JS 가 붙으면서 곧바로 제
+   진행률을 써 넣는다. */
+.ss-reveal-slot {
+  display: flex;
+}
+
+.ss-reveal-slot > .ss-reveal {
+  width: 100%;
+  opacity: 0;
+  /* 자리는 `transform` 으로만 옮긴다 — `left`/`margin` 을 건드리면 프레임이
+     떨어진다.
+     🔴 **속도를 CSS 가 갖는다.** 스크롤 양에 묶여 있을 때는 굴리는 속도가 그대로
+     연출의 속도라 매번 다르게 보였다 — 바닥에 닿았는지만 JS 가 알려 주고, 어떻게
+     흐를지는 여기서 한 번만 정한다. */
+  transition:
+    transform 500ms cubic-bezier(0.25, 0.6, 0.3, 1),
+    opacity 380ms ease;
+  will-change: transform;
+}
+
+/* 옆으로 화면 밖까지 나가지만 가로 스크롤바는 안 생긴다 — `body` 가 이미
+   `overflow-x: clip` 이다(위쪽 규칙). */
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-reveal-slot > .ss-reveal {
+    opacity: 1;
+    transform: none;
+  }
 }
