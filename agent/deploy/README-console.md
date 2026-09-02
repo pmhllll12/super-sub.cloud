@@ -57,7 +57,8 @@ EC2 안에서 SSH로 하는 작업이라 콘솔이 필요 없다.
 | 항목 | 값 |
 |---|---|
 | 버킷 유형 | 범용 |
-| 버킷 이름 | `supersub-ai-070605553723` |
+| **버킷 네임스페이스** | **글로벌 네임스페이스** ← 기본값. "계정 리전 네임스페이스(권장)"를 고르지 않는다 |
+| 버킷 이름 | `supersub-ai` |
 | 리전 | 아시아 태평양(서울) ap-northeast-2 |
 | 객체 소유권 | ACL 비활성화됨 (권장) — 기본값 |
 | **모든 퍼블릭 액세스 차단** | **체크 유지** (기본값) |
@@ -66,6 +67,11 @@ EC2 안에서 SSH로 하는 작업이라 콘솔이 필요 없다.
 
 버킷 이름에 계정번호를 붙이는 것은 S3 이름이 **전 세계에서 유일**해야 하기
 때문이다. 이미 쓰이는 이름이면 거부된다.
+
+**네임스페이스는 "글로벌"로 둔다.** 콘솔이 "계정 리전 네임스페이스"를 권장으로
+표시하지만, 그쪽은 버킷 이름 규칙과 주소 지정 방식이 다르다. `storage.py`가
+쓰는 `s3://버킷/키` 형식과 런북의 ARN(`arn:aws:s3:::버킷`)이 전부 글로벌
+네임스페이스를 전제하므로, 여기서 바꾸면 IAM 정책과 코드를 함께 고쳐야 한다.
 
 **버킷 버저닝**은 기본이 "비활성화"라 직접 켜야 한다. 리포트를 덮어써도
 이전 것이 남는다.
@@ -99,8 +105,8 @@ reports/    분석 리포트 (출력)
       "Principal": "*",
       "Action": "s3:*",
       "Resource": [
-        "arn:aws:s3:::supersub-ai-070605553723",
-        "arn:aws:s3:::supersub-ai-070605553723/*"
+        "arn:aws:s3:::supersub-ai",
+        "arn:aws:s3:::supersub-ai/*"
       ],
       "Condition": { "Bool": { "aws:SecureTransport": "false" } }
     }
@@ -130,7 +136,7 @@ reports/    분석 리포트 (출력)
       "Sid": "ListOnlyOurPrefixes",
       "Effect": "Allow",
       "Action": "s3:ListBucket",
-      "Resource": "arn:aws:s3:::supersub-ai-070605553723",
+      "Resource": "arn:aws:s3:::supersub-ai",
       "Condition": {
         "StringLike": { "s3:prefix": ["videos/*", "models/*", "reports/*"] }
       }
@@ -140,15 +146,15 @@ reports/    분석 리포트 (출력)
       "Effect": "Allow",
       "Action": "s3:GetObject",
       "Resource": [
-        "arn:aws:s3:::supersub-ai-070605553723/videos/*",
-        "arn:aws:s3:::supersub-ai-070605553723/models/*"
+        "arn:aws:s3:::supersub-ai/videos/*",
+        "arn:aws:s3:::supersub-ai/models/*"
       ]
     },
     {
       "Sid": "WriteReports",
       "Effect": "Allow",
       "Action": "s3:PutObject",
-      "Resource": "arn:aws:s3:::supersub-ai-070605553723/reports/*"
+      "Resource": "arn:aws:s3:::supersub-ai/reports/*"
     }
   ]
 }
@@ -350,7 +356,7 @@ nvidia-smi          # Tesla T4, 15360MiB
 df -h /             # 여유 60GB 이상
 free -g             # 총 15GB 내외
 aws sts get-caller-identity   # 역할을 붙였으면 계정이 나온다
-aws s3 ls s3://supersub-ai-070605553723/
+aws s3 ls s3://supersub-ai/
 ```
 
 `aws sts get-caller-identity`가 자격증명 없다고 하면 인스턴스 프로파일이 안

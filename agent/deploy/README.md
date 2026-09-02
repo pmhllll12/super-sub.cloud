@@ -93,20 +93,23 @@ T4는 Turing(SM 7.5)이고 bf16 네이티브 지원이 없다. vLLM은 compute c
 버킷 하나에 접두사로 용도를 나눈다. 버킷을 셋으로 쪼개면 IAM 정책도 셋이 된다.
 
 ```
-s3://supersub-ai-<계정번호>/
+s3://supersub-ai/
 ├── videos/      # 원본 영상 (입력)
 ├── models/      # EXAONE 가중치
 └── reports/     # 분석 리포트 (출력)
 ```
 
-이름은 전역 유일해야 하므로 계정번호를 붙인다. 리전은 서울(`ap-northeast-2`)을
+S3 이름은 **전 세계에서 유일**해야 한다. `supersub-ai`가 비어 있어 그대로 썼다
+(2026-09-02 생성). 다른 계정에서 다시 만들 때 이미 쓰이고 있으면 계정번호를
+뒤에 붙이고, **그 이름을 IAM 정책·vllm.env·분석 명령 인자에 모두 반영**한다.
+리전은 서울(`ap-northeast-2`)을
 가정한다 — **EC2와 반드시 같은 리전**이어야 한다(리전이 다르면 영상마다 리전 간
 전송료가 붙는다).
 
 ```bash
 export AWS_REGION=ap-northeast-2
 export ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
-export BUCKET=supersub-ai-$ACCOUNT
+export BUCKET=supersub-ai        # 2026-09-02 콘솔에서 이 이름으로 생성됨
 
 aws s3api create-bucket --bucket "$BUCKET" --region "$AWS_REGION" \
   --create-bucket-configuration LocationConstraint="$AWS_REGION"
