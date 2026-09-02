@@ -21,6 +21,31 @@ EC2 안에서 SSH로 하는 작업이라 콘솔이 필요 없다.
 - 콘솔 화면의 문구·배치는 AWS가 수시로 바꾼다. **버튼 이름이 조금 달라도
   하는 일이 같으면 그대로 진행한다.**
 
+> 🔴 **[5-1 할당량 확인](#5-1-할당량-먼저-확인)을 제일 먼저 한다.** 증액이
+> 필요하면 승인에 수 시간\~며칠 걸리고 그동안 EC2를 못 만든다. 신청만 걸어 두고
+> 1\~4장(S3·IAM·VPC·보안그룹)을 진행하면 기다리는 시간이 겹친다. 1\~4장은
+> 전부 무료거나 거의 무료라 먼저 만들어 둬도 손해가 없다.
+
+### 필요한 권한 — 먼저 확인할 것
+
+이 런북은 **계정에 리소스를 만들 수 있는 권한**을 가정한다. 제한된 IAM 사용자로는
+중간에 막힌다. 2026-09-02에 `ho`로 실제로 막혔다 —
+`servicequotas:ListAWSDefaultServiceQuotas` 액세스 거부.
+
+| 장 | 필요한 것 | 없으면 |
+|---|---|---|
+| 5-1 할당량 | `servicequotas:ListAWSDefaultServiceQuotas`, `RequestServiceQuotaIncrease` | GPU 할당량을 보지도 신청하지도 못한다 |
+| 1 S3 | `s3:CreateBucket`, `PutBucketPolicy`, `PutBucketVersioning`, `PutEncryptionConfiguration` | 버킷을 못 만든다 |
+| 2 IAM | `iam:CreateRole`, `CreatePolicy`, `AttachRolePolicy`, `PassRole` | 역할을 못 만든다 → **2-C로 우회 가능** |
+| 3 VPC | `ec2:CreateVpc`, `CreateSubnet`, `CreateInternetGateway`, `CreateRouteTable`, `CreateVpcEndpoint` | VPC를 못 만든다 → 기본 VPC로 우회 가능(격리 포기) |
+| 4 보안그룹 | `ec2:CreateSecurityGroup`, `AuthorizeSecurityGroupIngress` | 우회 불가 |
+| 5 EC2 | `ec2:RunInstances`, `CreateKeyPair`, `iam:PassRole` | 우회 불가 |
+
+**우회 가능한 것은 2장(IAM 역할)과 3장(VPC)뿐이다.** 나머지가 막히면 계정
+관리자에게 권한을 받거나 대신 만들어 달라고 해야 한다 — 미결 항목에 올릴 것.
+
+확인은 **IAM → 사용자 → 해당 사용자 → 권한** 탭에서 붙은 정책을 보면 된다.
+
 ---
 
 ## 1. S3 버킷
