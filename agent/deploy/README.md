@@ -1,11 +1,28 @@
 # AWS 배포 런북 — 독립 GPU 환경에 분석 에이전트 올리기
 
-팀 프로젝트 인프라와 **완전히 분리된** AI 전용 계정/VPC에 S3 + EC2(g4dn.xlarge)를
-세우고, EXAONE 4.0 1.2B를 vLLM으로 띄운 뒤 S3 영상을 분석해 리포트를 S3로
-되돌려 놓는 데까지의 순서다.
+AI 전용 VPC에 S3 + EC2(g4dn.xlarge)를 세우고, EXAONE 4.0 1.2B를 vLLM으로 띄운 뒤
+S3 영상을 분석해 리포트를 S3로 되돌려 놓는 데까지의 순서다.
 
 각 단계는 **확인 명령으로 끝난다.** 그게 없으면 실패가 다음 단계에서 다른
 증상으로 나타난다.
+
+> ### 격리 수준 — "완전히 분리"가 아니다
+>
+> 처음 계획은 **AI 전용 계정**이었지만, 실제로 쓰는 계정(`0706-0555-3723`,
+> IAM 사용자 `ho`)이 **팀 프로젝트와 같은 계정**이다. 계정 경계는 공유되므로
+> 아래는 공유된다.
+>
+> | 공유되는 것 | 분리되는 것 |
+> |---|---|
+> | 결제·비용 (태그로 구분은 된다) | 네트워크 — 전용 VPC (3-1) |
+> | 서비스 할당량 (G 인스턴스 vCPU 등) | EC2의 데이터 접근 — IAM 역할이 AI 버킷 세 접두사만 허용 (2-A) |
+> | 루트·관리자 권한의 영향 범위 | 스토리지 — 전용 버킷 |
+>
+> **실질적으로 중요한 것은 확보된다.** EC2 인스턴스는 팀 데이터를 읽지 못하고
+> (`videos/`엔 쓰지도 못한다), 네트워크도 갈라져 있다. 남는 위험은 계정 단위
+> 사고(관리자 실수, 할당량 소진, 결제 정지)가 양쪽에 함께 미친다는 것이다.
+> 상용 단계에서 계정을 가르려면 그때 옮겨야 하고, **VPC는 생성 후 바꿀 수 없어
+> 인스턴스를 다시 만들어야 한다** — 지금 전용 VPC로 시작해 두면 그 이사가 쉬워진다.
 
 ---
 
@@ -218,12 +235,69 @@ aws s3 ls s3://$BUCKET/
 
 ## 3. EC2 GPU 인스턴스 생성
 
-### 3-1. 보안 그룹
+### 3-1. 전용 VPC — **추가 비용 없음**
+
+팀 계정을 공유해 쓰므로(계정 `0706-0555-3723`) 네트워크만이라도 갈라 둔다.
+기본 VPC에 넣으면 팀 리소스와 같은 네트워크에 놓이고, 나중에 옮기려면
+**인스턴스를 다시 만들어야 한다** — VPC는 생성 후 바꿀 수 없다.
+
+돈 걱정은 하지 않아도 된다. **VPC·서브넷·라우팅 테이블·인터넷 게이트웨이·
+보안 그룹은 전부 무료다.** 요금이 붙는 것은 **NAT 게이트웨이**(월 $45 안팎)인데
+여기서는 쓰지 않는다 — 인스턴스를 퍼블릭 서브넷에 두고 IGW로 직접 나간다.
+퍼블릭 IPv4 주소 요금(월 $3.6 안팎)은 기본 VPC에서도 똑같이 내므로 차이가 아니다.
+
+```bash
+# CIDR은 기본 VPC(172.31.0.0/16)와 겹치지 않게 잡는다.
+export VPC=$(aws ec2 create-vpc --cidr-block 10.20.0.0/16 \
+  --tag-specifications 'ResourceType=vpc,Tags=[{Key=Name,Value=supersub-ai-vpc},{Key=Project,Value=supersub-agent}]' \
+  --query Vpc.VpcId --output text)
+
+# DNS 이름이 켜져 있어야 인스턴스가 퍼블릭 DNS를 받고 HF·apt를 해석한다.
+aws ec2 modify-vpc-attribute --vpc-id "$VPC" --enable-dns-support
+aws ec2 modify-vpc-attribute --vpc-id "$VPC" --enable-dns-hostnames
+
+export SUBNET=$(aws ec2 create-subnet --vpc-id "$VPC" \
+  --cidr-block 10.20.1.0/24 --availability-zone ${AWS_REGION}a \
+  --tag-specifications 'ResourceType=subnet,Tags=[{Key=Name,Value=supersub-ai-public}]' \
+  --query Subnet.SubnetId --output text)
+aws ec2 modify-subnet-attribute --subnet-id "$SUBNET" --map-public-ip-on-launch
+
+# 인터넷 게이트웨이 — 무료다. 이게 없으면 모델도 apt도 못 받는다.
+export IGW=$(aws ec2 create-internet-gateway \
+  --tag-specifications 'ResourceType=internet-gateway,Tags=[{Key=Name,Value=supersub-ai-igw}]' \
+  --query InternetGateway.InternetGatewayId --output text)
+aws ec2 attach-internet-gateway --vpc-id "$VPC" --internet-gateway-id "$IGW"
+
+export RTB=$(aws ec2 create-route-table --vpc-id "$VPC" \
+  --tag-specifications 'ResourceType=route-table,Tags=[{Key=Name,Value=supersub-ai-rtb}]' \
+  --query RouteTable.RouteTableId --output text)
+aws ec2 create-route --route-table-id "$RTB" \
+  --destination-cidr-block 0.0.0.0/0 --gateway-id "$IGW"
+aws ec2 associate-route-table --route-table-id "$RTB" --subnet-id "$SUBNET"
+
+# S3 게이트웨이 엔드포인트 — **무료이고 켜 두는 편이 낫다.**
+# 영상·모델 트래픽이 인터넷을 타지 않고 AWS 내부로 간다(빠르고, 나중에
+# 이그레스를 막는 구성으로 갈 때 S3만은 계속 된다).
+aws ec2 create-vpc-endpoint --vpc-id "$VPC" \
+  --service-name com.amazonaws.${AWS_REGION}.s3 \
+  --route-table-ids "$RTB"
+```
+
+**확인:**
+```bash
+aws ec2 describe-vpcs --vpc-ids "$VPC" --query 'Vpcs[0].[VpcId,CidrBlock,State]' --output text
+aws ec2 describe-route-tables --route-table-ids "$RTB" \
+  --query 'RouteTables[0].Routes[].[DestinationCidrBlock,GatewayId]' --output text
+# 0.0.0.0/0 → igw-... 와 S3 prefix list → vpce-... 두 줄이 보여야 한다
+```
+
+> **여기서 만든 것 중 유료는 없다.** 나중에 정리할 때는 EC2 → 엔드포인트 →
+> IGW → 서브넷 → VPC 순서로 지운다(의존 때문에 역순으로는 안 지워진다).
+
+### 3-2. 보안 그룹
 
 ```bash
 export MY_IP=$(curl -s https://checkip.amazonaws.com)
-export VPC=$(aws ec2 describe-vpcs --filters Name=isDefault,Values=true \
-  --query 'Vpcs[0].VpcId' --output text)
 
 export SG=$(aws ec2 create-security-group --group-name supersub-ai-sg \
   --description "Super-Sub AI agent (isolated)" --vpc-id "$VPC" \
@@ -245,7 +319,7 @@ ssh -i ~/.ssh/supersub-ai.pem -L 8000:127.0.0.1:8000 ubuntu@<EC2-IP>
 # 이제 로컬 http://127.0.0.1:8000/v1/models 가 EC2의 vLLM이다
 ```
 
-### 3-2. AMI 고르기
+### 3-3. AMI 고르기
 
 **Deep Learning OSS Nvidia Driver AMI (Ubuntu 22.04)** — NVIDIA 드라이버·CUDA가
 미리 깔려 있다. AMI ID는 리전·시점마다 바뀌므로 이름으로 찾는다:
@@ -258,7 +332,7 @@ aws ec2 describe-images --owners amazon \
 
 가장 최근 것의 `ImageId`를 쓴다.
 
-### 3-3. 인스턴스 실행
+### 3-4. 인스턴스 실행
 
 ```bash
 aws ec2 create-key-pair --key-name supersub-ai \
@@ -270,6 +344,8 @@ aws ec2 run-instances \
   --instance-type g4dn.xlarge \
   --key-name supersub-ai \
   --security-group-ids "$SG" \
+  --subnet-id "$SUBNET" \
+  --associate-public-ip-address \
   --iam-instance-profile Name=supersub-ai-ec2 \
   --block-device-mappings '[{"DeviceName":"/dev/sda1",
      "Ebs":{"VolumeSize":150,"VolumeType":"gp3","DeleteOnTermination":true,
@@ -289,7 +365,7 @@ df -h /             # 여유 60GB 이상
 free -g             # 총 15GB 내외 — 미결 9번(4K host RAM)을 기억할 것
 ```
 
-### 3-4. 비용 — 끄는 습관을 먼저 만든다
+### 3-5. 비용 — 끄는 습관을 먼저 만든다
 
 g4dn.xlarge 온디맨드는 **시간당 약 $0.5\~0.8**(리전마다 다르다, 콘솔 요금
 계산기로 확인할 것)이고, 켜 두면 **월 $400\~600**이다. 지금은 상시 서비스가
@@ -593,8 +669,8 @@ nvidia-smi -l 2                                   # GPU 사용량 추적
   인증·타임아웃·동시성 설계가 먼저다.
 - **다중 인스턴스 / 오토스케일링** — 한 대다.
 - **모니터링·알림** — CloudWatch 에이전트를 안 붙였다. `journalctl`로 본다.
-- **VPC 분리** — 기본 VPC를 쓴다. 계정 자체가 분리돼 있다면 충분하고,
-  같은 계정에 팀 인프라가 있다면 전용 VPC를 파는 편이 낫다.
+- **계정 분리** — 팀 계정을 공유한다(위 "격리 수준"). 네트워크는 전용 VPC로
+  갈랐지만 결제·할당량·관리자 권한은 공유된다. 상용 단계의 판단거리다.
 
 ## 관련
 
