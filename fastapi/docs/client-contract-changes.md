@@ -2,7 +2,7 @@
 
 > **받는 사람:** 백성검 (프론트·웹 — `www/`, `flutter/`)
 > **보낸 사람:** 정어진 (백엔드 — `fastapi/`)
-> **상태:** 전달 · 2026-09-01 (**10번을 09-02 에 덧붙였다**)
+> **상태:** 전달 · 2026-09-01 (**10·11번을 09-02 에 덧붙였다**)
 > **확인:** 아래 각 항목의 "확인" 명령을 돌리면 반영 여부가 바로 나온다.
 
 ## 이 문서를 쓰는 법
@@ -44,6 +44,7 @@ fastapi/docs/client-contract-changes.md 를 읽고, 각 항목의 "먼저 확인
 | 3 | `GET /admin/users` 의 `q` 는 **패턴이 아니라 글자** | 🟡 선택 | — |
 | 4 | Flutter 가 에러 `code` 를 버린다 | ✅ 조치 불필요 | 🔴 **1번의 선행 조건** |
 | 10 | **`POST /me/card` 신설** — 카드는 이제 여기서만 생긴다 (09-02) | 🟡 선택 | 🟡 선택 |
+| 11 | 🔴 **웹이 mock 에 고정돼 있다** — 실제 백엔드를 못 부른다 (09-02) | 🔴 조치 필요 | 🟡 절반 붙음 |
 | 5 | `PATCH /me/password` — 성공하면 **토큰 전부 폐기** | ⏳ 아직 안 쓴다 | ⏳ 아직 안 쓴다 |
 | 6 | `DELETE /me` · `POST /auth/logout-all` | ⏳ 아직 안 쓴다 | ⏳ 아직 안 쓴다 |
 | 7 | 401 `INVALID_TOKEN` 에 "폐기된 토큰"이 추가됐다 | ✅ 조치 불필요 | ✅ 조치 불필요 |
@@ -306,6 +307,79 @@ grep -rn "me/card" www/src flutter/lib | grep -i "post\|create"
 - `og_image_key` 를 이미지 주소로 **그리지 않는다.** 규칙대로 값은 채우지만
   **그 위치에 파일이 아직 없다** (생성기 미구현). 지금처럼 고정 장식 이미지를 쓰면 된다
 - 슬러그를 클라이언트에서 만들지 않는다. 서버가 무작위로 만든다(SEC-005)
+
+---
+
+## 11. 🔴 웹이 **가짜 데이터에 고정**돼 있습니다 (2026-09-02 확인)
+
+> 09-02 에 덧붙인 항목입니다. 고장이 난 것이 아니라 **아직 안 이어진 자리**를
+> 적어 두는 것입니다 — 지금 어디에도 기록이 없어서 나중에 "웹이 왜 백엔드를 못
+> 보지"를 다시 조사하게 됩니다.
+
+백엔드가 2026-09-02 부터 EC2 에서 돕니다(계약: 이 폴더의 `api-contract.md`).
+그런데 웹은 실제 백엔드를 **부를 수 없는 상태**입니다.
+
+```ts
+// www/src/server/backend/index.ts
+export function getBackend(): Backend {
+  if (process.env.USE_MOCK === '1') return mockBackend
+  // Task 11 에서 fastapiBackend 로 바꾼다.
+  return mockBackend        // ← 환경변수와 무관하게 언제나 mock
+}
+```
+
+구조는 이미 다 있습니다 — 브라우저는 같은 오리진의 `/api/*` 만 부르고(`lib/api/client.ts`),
+라우트 핸들러 8개가 `getBackend()` 를 거칩니다. **바꿔 끼울 자리 하나가 비어 있는 것**입니다.
+
+### 만족해야 할 성질
+
+**`USE_MOCK` 이 켜져 있지 않으면 실제 FastAPI 를 부를 것.** 파일 이름·구현 방식은
+클라이언트 쪽 사정입니다(`fastapiBackend` 는 기존 주석의 이름일 뿐 규격이 아닙니다).
+
+- 백엔드 주소는 **서버 전용 환경변수**로 받습니다. `NEXT_PUBLIC_` 을 붙이면 브라우저
+  번들에 박혀서, 같은 오리진만 부른다는 지금 설계가 무너집니다
+- 에러 봉투는 그대로입니다 — `{"error":{"code","message"}}`. `mock.ts` 가 던지는
+  `BackendError(status, code, message)` 를 그대로 쓰면 화면 쪽은 고칠 것이 없습니다
+- 🔴 **`Retry-After` 는 세 곳에서 버려집니다**(1번 항목). 실제 백엔드를 붙이는 김에
+  함께 이으면 두 번 고치지 않습니다
+
+### 먼저 확인
+
+```bash
+grep -c 'return mockBackend' www/src/server/backend/index.ts      # 2 면 아직 mock 고정
+grep -rn 'BACKEND_URL\|API_BASE' www/src www/.env* 2>/dev/null | wc -l   # 0 이면 주소를 모른다
+grep -rln 'fetch(' www/src/server/backend/ | grep -v mock | wc -l  # 0 이면 밖을 부르는 구현이 없다
+```
+
+2026-09-02 기준 **2 · 0 · 0** 입니다. 셋 다 바뀌면 붙은 것입니다.
+
+### 앱(`flutter`)은 절반 붙어 있습니다
+
+`apiBaseUrl`(`core/network/api_config.dart`)로 실제 호출을 하는데 **쓰는 곳이
+`auth_repository_api.dart` 하나뿐**입니다 — 로그인만 실물이고 카드·팀·경기 화면은
+아직 API 를 부르지 않습니다.
+
+```bash
+grep -rl 'apiBaseUrl' flutter/lib --include='*.dart' | wc -l   # 2 (정의 1 + 쓰는 곳 1)
+```
+
+기본 주소가 `http://127.0.0.1:8000/api/v1` 이라 **로컬에서 백엔드를 띄우면 지금도
+로그인이 됩니다.** 다른 주소를 볼 때는 `--dart-define=API_BASE_URL=...` 입니다.
+
+### 🔴 배포본끼리 붙는 것은 아직 막혀 있습니다
+
+EC2 의 보안 그룹이 **22번만** 열려 있어 Vercel 의 웹도, 폰의 앱도 배포된 백엔드에
+닿지 못합니다(미결 8번, 담당 박민호). 열리면 nginx·TLS 는 백엔드 쪽에서 잇겠습니다.
+
+**다만 위 구현은 지금 해도 됩니다** — 로컬에서 `uvicorn` 을 띄우고 `USE_MOCK` 을 끄면
+바로 확인됩니다. 포트 개방을 기다릴 필요가 없습니다.
+
+### 하지 말아야 할 것
+
+- `mock.ts` 를 **지우지 않습니다.** 계약 테스트가 DB 없이 도는 근거고, 백엔드가 없을
+  때 화면을 보는 수단입니다. `USE_MOCK=1` 로 남겨 둡니다
+- 브라우저에서 FastAPI 를 **직접 부르지 않습니다.** 지금 설계는 "브라우저는 같은
+  오리진만" 이고, 바꾸면 CORS·쿠키·토큰 보관이 전부 딸려 옵니다
 
 ---
 
