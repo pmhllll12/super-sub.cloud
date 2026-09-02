@@ -131,15 +131,40 @@ agent/
 ├── src/supersub_agent/
 │   ├── pose.py       # OpenCV 디코딩 + RT-DETR 검출 + ViTPose 추정
 │   ├── features.py   # 정규화 → 구간 분할 → 채점 지표 산출
-│   ├── judge.py      # EXAONE 근거 문장 생성 (bf16, 스키마 강제)
+│   ├── judge.py      # EXAONE 근거 문장 생성 (로컬 bf16 | vLLM HTTP, 스키마 강제)
 │   ├── scoring.py    # 루브릭 적재 + 등급 구간 판정 + 가중합
+│   ├── storage.py    # S3 입출력 (선택 의존성 boto3)
 │   └── api.py        # 로컬 확인용 FastAPI + 웹 UI
 ├── scripts/
 │   ├── spike_exaone.py  # 8GB 적재·속도·스키마 강제 검증
 │   ├── analyze.py       # CLI 단건 분석
+│   ├── analyze_s3.py    # S3 영상 분석 → S3 리포트 (EC2용)
 │   └── demo.py          # 재현성 반복 실행
+├── deploy/           # AWS EC2 배포 — 런북·vLLM 기동·systemd
 └── tests/
 ```
+
+## 판정 백엔드 — 로컬 적재와 vLLM
+
+`Judge`가 두 갈래다. **기본은 지금까지와 같은 로컬 transformers 적재**이고,
+환경변수 `SUPERSUB_VLLM_URL`이 있을 때만 이미 떠 있는 vLLM 서버로 HTTP 호출한다.
+
+```bash
+# 로컬 WSL — 변수 없음 → 기존 경로 그대로
+uv run python scripts/analyze.py data/shot01.mp4
+
+# EC2 — vLLM이 8000에 떠 있다
+export SUPERSUB_VLLM_URL=http://127.0.0.1:8000
+uv run python scripts/analyze_s3.py s3://버킷/videos/pitch01.mp4 --out s3://버킷/reports
+```
+
+`api.py`·`analyze.py`는 고치지 않았다. T4 16GB에서는 vLLM이 GPU 일부를 상주로
+잡고 있어야 하는데, 그러면 판정 때마다 EXAONE을 적재·해제하는 로컬 경로와
+메모리가 겹친다. vLLM에 맡기면 판정 쪽 GPU 사용이 상수가 되고 남는 자리를
+포즈 모델이 쓴다. 어느 백엔드든 **등급은 모델이 정하지 않는다** —
+`scoring.Criterion.grade_for`가 정한 값을 그대로 싣는다.
+
+배포 절차는 [`deploy/README.md`](deploy/README.md)에 있다.
 
 ### 로컬 확인용 웹 UI
 

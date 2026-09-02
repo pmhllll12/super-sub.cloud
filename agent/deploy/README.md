@@ -1,0 +1,560 @@
+# AWS 배포 런북 — 독립 GPU 환경에 분석 에이전트 올리기
+
+팀 프로젝트 인프라와 **완전히 분리된** AI 전용 계정/VPC에 S3 + EC2(g4dn.xlarge)를
+세우고, EXAONE 4.0 1.2B를 vLLM으로 띄운 뒤 S3 영상을 분석해 리포트를 S3로
+되돌려 놓는 데까지의 순서다.
+
+각 단계는 **확인 명령으로 끝난다.** 그게 없으면 실패가 다음 단계에서 다른
+증상으로 나타난다.
+
+---
+
+## 0. 시작 전 — 이 배포가 건드리는 것 넷
+
+넘어가도 되지만, 나중에 되돌리기 비싼 것들이라 먼저 적는다.
+
+### (1) EXAONE 4.0은 비상업(NC) 라이선스다 — 미결 1번
+
+`EXAONE AI Model License Agreement 1.2 - NC`다. 개발·검증 목적의 EC2 구동은
+문제없지만, **이 인스턴스가 외부 사용자에게 서비스를 제공하는 순간** 미결 1번이
+열린 채로 상용 경로에 들어간다. 지금 단계(내부 검증)에서는 진행하되, 서비스
+오픈 전에 결론이 필요하다.
+
+### (2) `yolo11n.pt`는 서비스 경로가 쓰지 않는다
+
+유일한 사용처가 `scripts/track_overlay.py`(검수용 추적 오버레이 영상)다.
+분석 파이프라인의 비전 인식은 **RT-DETR(사람 검출) + ViTPose(포즈)** 이고 둘 다
+Apache-2.0이다. `pyproject.toml:42`에 이유가 적혀 있다 — **ultralytics는
+AGPL-3.0**이라 링크한 채 네트워크 서비스를 제공하면 소스 공개 의무가 생긴다.
+
+그래서 이 런북은 **EC2에 `--extra tracking`을 설치하지 않는다.** 분석 품질에는
+영향이 없다(서비스 경로가 원래 YOLO를 안 쓴다). 오버레이가 필요하면 로컬에서
+뽑는다.
+
+### (3) T4는 bfloat16을 못 쓴다
+
+T4는 Turing(SM 7.5)이고 bf16 네이티브 지원이 없다. vLLM은 compute capability
+8.0 미만에서 `--dtype bfloat16`을 **명시적으로 거부한다.** `serve_vllm.sh`가
+`--dtype float16`으로 고정해 둔 이유다. (`judge.py`의 로컬 경로가 bf16인 것은
+개발 GPU 기준이고, EC2에서는 그 경로를 안 탄다.)
+
+### (4) g4dn.xlarge의 호스트 RAM은 16GB뿐이다 — 미결 9번
+
+미결 9번이 "4K 입력에서 host RAM이 먼저 터진다"이다. `pose.py`가 300프레임으로
+막고 있지만 4K 300장은 그것만으로 수 GB다. **4K 원본을 그대로 넣지 말고**
+업로드 전에 1080p로 줄이거나, 터지면 인스턴스를 g4dn.2xlarge(32GB)로 올린다.
+
+### 포트 배치
+
+`api.py`가 이미 8000을 문서화하고 있어 vLLM과 충돌한다. 이렇게 나눈다.
+
+| 포트 | 무엇 | 노출 |
+|---|---|---|
+| 8000 | vLLM (OpenAI 호환) | **127.0.0.1 전용 — 보안 그룹에 열지 않는다** |
+| 8080 | `api.py` (필요할 때만) | 팀 IP만 |
+| 22 | SSH | 내 IP만 |
+
+**vLLM은 인증이 없다.** 0.0.0.0에 묶고 보안 그룹을 열면 그 순간 누구나 GPU를
+쓸 수 있다. 루프백에 두고, 밖에서 봐야 하면 SSH 터널을 쓴다.
+
+---
+
+## 1. S3 버킷 생성 및 보안 설정
+
+버킷 하나에 접두사로 용도를 나눈다. 버킷을 셋으로 쪼개면 IAM 정책도 셋이 된다.
+
+```
+s3://supersub-ai-<계정번호>/
+├── videos/      # 원본 영상 (입력)
+├── models/      # EXAONE 가중치
+└── reports/     # 분석 리포트 (출력)
+```
+
+이름은 전역 유일해야 하므로 계정번호를 붙인다. 리전은 서울(`ap-northeast-2`)을
+가정한다 — **EC2와 반드시 같은 리전**이어야 한다(리전이 다르면 영상마다 리전 간
+전송료가 붙는다).
+
+```bash
+export AWS_REGION=ap-northeast-2
+export ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+export BUCKET=supersub-ai-$ACCOUNT
+
+aws s3api create-bucket --bucket "$BUCKET" --region "$AWS_REGION" \
+  --create-bucket-configuration LocationConstraint="$AWS_REGION"
+```
+
+### 보안 설정 넷 — 순서대로
+
+```bash
+# (1) 퍼블릭 액세스 전면 차단. 기본값이지만 명시해 둔다.
+aws s3api put-public-access-block --bucket "$BUCKET" \
+  --public-access-block-configuration \
+  BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+
+# (2) 기본 암호화(SSE-S3) + 버킷 키 — 요청당 KMS 비용 없이 암호화된다.
+aws s3api put-bucket-encryption --bucket "$BUCKET" \
+  --server-side-encryption-configuration '{
+    "Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"},
+              "BucketKeyEnabled":true}]}'
+
+# (3) 버저닝 — 리포트를 덮어써도 이전 것이 남는다.
+aws s3api put-bucket-versioning --bucket "$BUCKET" \
+  --versioning-configuration Status=Enabled
+
+# (4) 평문 HTTP 거부.
+aws s3api put-bucket-policy --bucket "$BUCKET" --policy "{
+  \"Version\":\"2012-10-17\",
+  \"Statement\":[{
+    \"Sid\":\"DenyInsecureTransport\",
+    \"Effect\":\"Deny\",\"Principal\":\"*\",\"Action\":\"s3:*\",
+    \"Resource\":[\"arn:aws:s3:::$BUCKET\",\"arn:aws:s3:::$BUCKET/*\"],
+    \"Condition\":{\"Bool\":{\"aws:SecureTransport\":\"false\"}}}]}"
+```
+
+**확인:**
+```bash
+aws s3api get-public-access-block --bucket "$BUCKET" \
+  --query PublicAccessBlockConfiguration
+# 네 값이 모두 true여야 한다.
+```
+
+### 수명주기 (선택)
+
+원본 영상은 분석이 끝나면 다시 안 읽는다. 90일 뒤 저비용 계층으로 내린다.
+
+```bash
+aws s3api put-bucket-lifecycle-configuration --bucket "$BUCKET" \
+  --lifecycle-configuration '{"Rules":[{
+    "ID":"videos-to-ia","Status":"Enabled",
+    "Filter":{"Prefix":"videos/"},
+    "Transitions":[{"Days":90,"StorageClass":"STANDARD_IA"}]}]}'
+```
+
+`models/`에는 걸지 않는다 — 인스턴스를 새로 띄울 때마다 읽는다.
+
+---
+
+## 2. IAM — EC2가 S3에 접근하는 방법
+
+요청하신 `aws configure` 방식도 아래 2-B에 적었지만, **2-A(인스턴스 역할)를
+권합니다.** 이유는 하나다: `aws configure`는 장기 액세스 키를 EC2 디스크
+(`~/.aws/credentials`)에 평문으로 남기고, 그 디스크는 스냅샷·AMI·백업에 그대로
+딸려 나간다. 역할은 키가 없고 자동으로 교체된다.
+
+### 2-A. 인스턴스 프로파일 (권장)
+
+```bash
+# 신뢰 정책 — EC2만 이 역할을 맡을 수 있다.
+cat > /tmp/trust.json <<'EOF'
+{"Version":"2012-10-17","Statement":[{"Effect":"Allow",
+ "Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}
+EOF
+
+aws iam create-role --role-name supersub-ai-ec2 \
+  --assume-role-policy-document file:///tmp/trust.json
+
+# 최소 권한 — 이 버킷의 세 접두사만. 다른 팀 버킷은 보이지도 않는다.
+cat > /tmp/policy.json <<EOF
+{"Version":"2012-10-17","Statement":[
+ {"Sid":"ListOnlyOurPrefixes","Effect":"Allow","Action":"s3:ListBucket",
+  "Resource":"arn:aws:s3:::$BUCKET",
+  "Condition":{"StringLike":{"s3:prefix":["videos/*","models/*","reports/*"]}}},
+ {"Sid":"ReadInputsAndModel","Effect":"Allow","Action":"s3:GetObject",
+  "Resource":["arn:aws:s3:::$BUCKET/videos/*","arn:aws:s3:::$BUCKET/models/*"]},
+ {"Sid":"WriteReports","Effect":"Allow","Action":["s3:PutObject"],
+  "Resource":"arn:aws:s3:::$BUCKET/reports/*"}]}
+EOF
+
+aws iam put-role-policy --role-name supersub-ai-ec2 \
+  --policy-name supersub-s3 --policy-document file:///tmp/policy.json
+
+aws iam create-instance-profile --instance-profile-name supersub-ai-ec2
+aws iam add-role-to-instance-profile \
+  --instance-profile-name supersub-ai-ec2 --role-name supersub-ai-ec2
+```
+
+`videos/`에 쓰기 권한이 없는 게 의도다 — 영상 업로드는 사람이 하고, EC2는
+읽기만 한다. EC2가 털려도 원본을 지우지 못한다.
+
+### 2-B. `aws configure` (요청하신 방식)
+
+역할을 못 쓰는 상황이면 IAM 사용자를 만들어 같은 정책을 붙이고 키로 설정한다.
+
+```bash
+aws iam create-user --user-name supersub-ai-agent
+aws iam put-user-policy --user-name supersub-ai-agent \
+  --policy-name supersub-s3 --policy-document file:///tmp/policy.json
+aws iam create-access-key --user-name supersub-ai-agent   # 이 출력은 한 번만 보인다
+```
+
+EC2 안에서:
+```bash
+aws configure
+#   AWS Access Key ID     : (위 출력)
+#   AWS Secret Access Key : (위 출력)
+#   Default region name   : ap-northeast-2
+#   Default output format : json
+chmod 600 ~/.aws/credentials
+```
+
+이 경로를 쓴다면 **키를 90일마다 교체**하고, 인스턴스를 AMI로 굽기 전에
+`~/.aws/credentials`를 지운다.
+
+**확인 (어느 방식이든 EC2 안에서):**
+```bash
+aws sts get-caller-identity
+aws s3 ls s3://$BUCKET/
+```
+
+---
+
+## 3. EC2 GPU 인스턴스 생성
+
+### 3-1. 보안 그룹
+
+```bash
+export MY_IP=$(curl -s https://checkip.amazonaws.com)
+export VPC=$(aws ec2 describe-vpcs --filters Name=isDefault,Values=true \
+  --query 'Vpcs[0].VpcId' --output text)
+
+export SG=$(aws ec2 create-security-group --group-name supersub-ai-sg \
+  --description "Super-Sub AI agent (isolated)" --vpc-id "$VPC" \
+  --query GroupId --output text)
+
+# SSH — 내 IP만.
+aws ec2 authorize-security-group-ingress --group-id "$SG" \
+  --protocol tcp --port 22 --cidr "$MY_IP/32"
+
+# 8080(api.py)은 **필요할 때만** 연다. 지금은 열지 않는다.
+# aws ec2 authorize-security-group-ingress --group-id "$SG" \
+#   --protocol tcp --port 8080 --cidr "$MY_IP/32"
+```
+
+**8000(vLLM)은 열지 않는다.** 루프백에 묶여 있고, 밖에서 봐야 하면 터널을 쓴다:
+
+```bash
+ssh -i ~/.ssh/supersub-ai.pem -L 8000:127.0.0.1:8000 ubuntu@<EC2-IP>
+# 이제 로컬 http://127.0.0.1:8000/v1/models 가 EC2의 vLLM이다
+```
+
+### 3-2. AMI 고르기
+
+**Deep Learning OSS Nvidia Driver AMI (Ubuntu 22.04)** — NVIDIA 드라이버·CUDA가
+미리 깔려 있다. AMI ID는 리전·시점마다 바뀌므로 이름으로 찾는다:
+
+```bash
+aws ec2 describe-images --owners amazon \
+  --filters 'Name=name,Values=Deep Learning OSS Nvidia Driver AMI GPU PyTorch*Ubuntu 22.04*' \
+  --query 'reverse(sort_by(Images,&CreationDate))[:3].[ImageId,Name]' --output table
+```
+
+가장 최근 것의 `ImageId`를 쓴다.
+
+### 3-3. 인스턴스 실행
+
+```bash
+aws ec2 create-key-pair --key-name supersub-ai \
+  --query KeyMaterial --output text > ~/.ssh/supersub-ai.pem
+chmod 400 ~/.ssh/supersub-ai.pem
+
+aws ec2 run-instances \
+  --image-id <위에서 찾은 AMI> \
+  --instance-type g4dn.xlarge \
+  --key-name supersub-ai \
+  --security-group-ids "$SG" \
+  --iam-instance-profile Name=supersub-ai-ec2 \
+  --block-device-mappings '[{"DeviceName":"/dev/sda1",
+     "Ebs":{"VolumeSize":150,"VolumeType":"gp3","DeleteOnTermination":true,
+            "Encrypted":true}}]' \
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=supersub-ai},{Key=Project,Value=supersub-agent}]'
+```
+
+**EBS를 150GB로 잡은 이유.** DLAMI 자체가 이미 50\~90GB를 쓴다. 여기에
+HuggingFace 캐시(EXAONE + RT-DETR + ViTPose)와 임시 영상이 더해진다. 100GB로
+시작하면 모델 두어 개 받다가 꽉 찬다. gp3는 GB당 과금이라 50GB 더 잡아도 월
+몇 달러 차이다.
+
+**확인 (SSH 접속 후):**
+```bash
+nvidia-smi          # Tesla T4, 15360MiB 가 보여야 한다
+df -h /             # 여유 60GB 이상
+free -g             # 총 15GB 내외 — 미결 9번(4K host RAM)을 기억할 것
+```
+
+### 3-4. 비용 — 끄는 습관을 먼저 만든다
+
+g4dn.xlarge 온디맨드는 **시간당 약 $0.5\~0.8**(리전마다 다르다, 콘솔 요금
+계산기로 확인할 것)이고, 켜 두면 **월 $400\~600**이다. 지금은 상시 서비스가
+아니라 검증 단계이므로 쓸 때만 켠다.
+
+```bash
+export IID=<인스턴스 ID>
+aws ec2 stop-instances  --instance-ids "$IID"   # 중지 — EBS 요금만 남는다
+aws ec2 start-instances --instance-ids "$IID"   # 재개 (퍼블릭 IP는 바뀐다)
+```
+
+중지해도 EBS(150GB gp3, 월 $15 내외)와 모델 캐시는 남으므로 다시 켜면 바로
+쓸 수 있다. 퍼블릭 IP 고정이 필요하면 Elastic IP를 붙이되, **미사용 EIP는
+따로 과금**되므로 인스턴스를 없앨 때 같이 해제한다.
+
+---
+
+## 4. EC2 초기 세팅
+
+```bash
+ssh -i ~/.ssh/supersub-ai.pem ubuntu@<EC2-IP>
+
+# --- 저장소 (ho 브랜치) ---
+sudo apt-get update && sudo apt-get install -y git ffmpeg
+git clone -b ho https://github.com/jsangho/super-sub.cloud.git ~/super-sub.cloud
+cd ~/super-sub.cloud/agent
+
+# --- uv + 의존성 ---
+curl -LsSf https://astral.sh/uv/install.sh | sh
+source "$HOME/.local/bin/env"
+uv sync --extra aws          # ← tracking(ultralytics/AGPL)은 넣지 않는다. 0절 (2) 참고
+
+# --- 확인 ---
+uv run python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"
+# True Tesla T4
+uv run python -m pytest -q   # GPU 없이 도는 테스트들 — 전부 통과해야 한다
+```
+
+> `pyproject.toml`이 torch를 cu126 인덱스로 고정하고 있다(WSL 드라이버 사정).
+> DLAMI의 드라이버가 더 최신이라 cu126 휠은 정상 동작한다. `torch.cuda.is_available()`이
+> False면 여기서 멈추고 드라이버/휠 조합부터 맞춘다 — 뒤 단계가 전부 이것에 걸린다.
+
+---
+
+## 5. EXAONE 4.0 1.2B → S3 → vLLM
+
+### 5-1. 모델을 받아 S3에 올린다 (최초 1회)
+
+EC2에서 받아서 올린다. 로컬에서 올리면 집 회선으로 5GB를 올려야 한다.
+
+```bash
+cd ~/super-sub.cloud/agent
+uv run pip install "huggingface_hub[cli]"
+
+uv run hf download LGAI-EXAONE/EXAONE-4.0-1.2B \
+  --local-dir /opt/supersub/models/exaone-4.0-1.2b
+
+# 안전텐서·설정·토크나이저만 올린다. .cache 같은 부산물은 뺀다.
+aws s3 sync /opt/supersub/models/exaone-4.0-1.2b \
+  s3://$BUCKET/models/exaone-4.0-1.2b \
+  --exclude ".cache/*" --exclude "*.lock"
+```
+
+`/opt/supersub`에 권한이 없으면 먼저:
+`sudo mkdir -p /opt/supersub/models && sudo chown -R ubuntu:ubuntu /opt/supersub`
+
+**확인:**
+```bash
+aws s3 ls s3://$BUCKET/models/exaone-4.0-1.2b/
+# config.json, tokenizer_config.json, model*.safetensors 가 보여야 한다
+```
+
+> **왜 S3에 두는가.** vLLM은 `s3://`를 직접 읽지 못한다 — `sync_model.sh`가
+> 기동 전에 로컬로 받아 놓고 그 경로로 띄운다. 이렇게 해 두면 인스턴스를 지웠다
+> 새로 만들어도 HuggingFace를 다시 안 거치고(수 분 절약, 레이트리밋 없음)
+> **모든 인스턴스가 똑같은 가중치**를 쓴다.
+
+### 5-2. vLLM 설치
+
+```bash
+uv pip install vllm
+
+# EXAONE 4.0 지원 여부를 여기서 확인한다. 아키텍처가 Exaone4ForCausalLM이라
+# 오래된 vLLM은 "not supported"로 죽는다.
+uv run python -c "import vllm; print(vllm.__version__)"
+uv run python -c "
+from vllm.model_executor.models.registry import ModelRegistry
+print([a for a in ModelRegistry.get_supported_archs() if 'xaone' in a.lower()])"
+# Exaone4ForCausalLM 이 나와야 한다. 없으면 vLLM을 최신으로 올린다.
+```
+
+### 5-3. 서버 기동
+
+```bash
+sudo mkdir -p /etc/supersub
+sudo cp deploy/vllm.env.example /etc/supersub/vllm.env
+sudo sed -i "s|내-버킷-이름|$BUCKET|" /etc/supersub/vllm.env
+sudo chmod 600 /etc/supersub/vllm.env
+
+sudo cp deploy/supersub-vllm.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now supersub-vllm
+```
+
+**확인:**
+```bash
+curl -s http://127.0.0.1:8000/v1/models | python3 -m json.tool
+# id 가 "LGAI-EXAONE/EXAONE-4.0-1.2B" 여야 한다 (judge.py의 MODELS와 같은 값)
+
+nvidia-smi --query-gpu=memory.used,memory.total --format=csv
+# 5000MiB 내외 / 15360MiB — 나머지가 포즈 모델 몫이다
+```
+
+GPU 사용량이 13GB 이상이면 `SUPERSUB_GPU_FRACTION`이 안 먹은 것이다. 그대로
+두면 다음 단계의 포즈 추출이 OOM으로 죽는다.
+
+**한 문장 생성까지 확인:**
+```bash
+curl -s http://127.0.0.1:8000/v1/chat/completions \
+  -H 'Content-Type: application/json' -d '{
+    "model":"LGAI-EXAONE/EXAONE-4.0-1.2B",
+    "messages":[{"role":"user","content":"한 문장으로 자기소개 해줘."}],
+    "max_tokens":64,"temperature":0}' | python3 -m json.tool
+```
+
+---
+
+## 6. 에이전트 실행 — S3 영상 → 분석 → S3 리포트
+
+### 6-1. 판정을 vLLM으로 보내는 스위치
+
+```bash
+echo 'export SUPERSUB_VLLM_URL=http://127.0.0.1:8000' >> ~/.bashrc
+source ~/.bashrc
+```
+
+이 환경변수 하나가 백엔드를 정한다. **있으면 vLLM, 없으면 지금까지처럼
+로컬 적재**다(`judge.py`). `api.py`도 `analyze.py`도 고칠 필요가 없고, 로컬
+WSL 개발은 변수가 없으니 그대로다.
+
+### 6-2. 파이프라인 한 바퀴
+
+```bash
+# 영상 올리기 (로컬에서)
+aws s3 cp ./pitch01.mp4 s3://$BUCKET/videos/pitch01.mp4
+
+# 분석 (EC2에서)
+cd ~/super-sub.cloud/agent
+uv run python scripts/analyze_s3.py s3://$BUCKET/videos/pitch01.mp4 \
+  --rubric rubrics/baseball_pitching.yaml \
+  --out s3://$BUCKET/reports \
+  --side left
+```
+
+무슨 일이 일어나는가:
+
+| | |
+|---|---|
+| 1 | `storage.download` — S3 원본을 임시 디렉터리로. 분석이 끝나면 지운다 |
+| 2 | `pose.extract_keypoints` — RT-DETR로 사람 검출, ViTPose로 COCO-17 포즈. `target_fps=30`, 최대 300프레임 |
+| 3 | `features.extract_features` — 정규화 → 임팩트 구간 분할 → 루브릭이 요구하는 지표 산출. `--side`는 루브릭의 `impact_limb`에만 적용된다 |
+| 4 | `scoring.Criterion.grade_for` — **등급을 코드가 정한다.** 모델이 아니다 |
+| 5 | `Judge` → vLLM `/v1/chat/completions` — 확정된 등급의 **근거 문장만** 생성. 항목 하나씩, `temperature=0`, `guided_json`으로 스키마 강제 |
+| 6 | `storage.upload_json` — `s3://버킷/reports/pitch01/<타임스탬프>.json` |
+
+리포트에는 측정값·판정·타이밍과 함께 `code_version`(git 커밋)과
+`judge_backend`가 들어간다. 수동 배포라 EC2 코드 시점이 리포트마다 다를 수
+있어서다.
+
+**확인:**
+```bash
+aws s3 ls s3://$BUCKET/reports/pitch01/
+aws s3 cp s3://$BUCKET/reports/pitch01/<타임스탬프>.json - | python3 -m json.tool | head -40
+```
+
+### 6-3. 툴 콜링에 대해
+
+지금 `Judge`는 **툴 콜링을 하지 않는다.** 의도된 설계다 — `judge.py` 첫머리에
+있듯 EXAONE 4.0 1.2B는 경계값 비교(141.7이 140\~165 안인지)를 **재현되게
+틀렸고**, 그래서 등급 결정을 `scoring.Criterion.grade_for`(코드)로 옮겼다.
+모델의 역할은 확정된 등급에 대한 설명 문장 생성 하나다.
+
+vLLM은 OpenAI 호환이라 `tools`/`tool_choice`를 받을 수 있으므로 나중에 열 수는
+있다. 다만 **지금 정확도 근거로는 1.2B에 판단을 되돌릴 이유가 없다.** 열려면
+그 전에 "무엇을 모델이 정하게 할 것인가"를 정하고 근거를 남겨야 한다.
+
+---
+
+## 7. 수동 배포 운영 (`git pull origin ho`)
+
+```
+로컬(WSL) ──push──> GitHub(ho) ──pull──> EC2 ──restart──> vLLM
+```
+
+### 로컬에서
+
+```bash
+cd ~/projects/super-sub.cloud
+git checkout ho
+# ... 작업 ...
+uv run --directory agent python -m pytest -q     # 푸시 전에 통과시킨다
+git push origin ho
+```
+
+> 푸시가 403이면 `GITHUB_TOKEN` 환경변수를 빼고 다시 시도한다(이 저장소의
+> 알려진 함정이다).
+
+### EC2에서
+
+```bash
+cd ~/super-sub.cloud && ./agent/deploy/deploy.sh
+```
+
+`deploy.sh`가 하는 일: 작업 트리 청결 확인 → `git pull origin ho` →
+`uv sync --extra aws` → `systemctl restart supersub-vllm` → **`/v1/models`가
+응답할 때까지 기다렸다가 확인.** 마지막 단계가 핵심이다 — 재시작만 하고 끝내면
+기동 실패를 다음 분석 때 알게 된다.
+
+**EC2에서 코드를 직접 고치지 않는다.** `deploy.sh`가 더러운 작업 트리에서
+멈추는 이유다. 고치면 다음 pull이 충돌하거나 덮어쓰고, 그때부터 어떤 코드가
+도는지 아무도 모른다. 급하면 로컬에서 고쳐 푸시한다.
+
+### 되돌리기
+
+```bash
+cd ~/super-sub.cloud
+git log --oneline -10
+git checkout <좋았던 커밋>          # detached HEAD — 임시 조치다
+sudo systemctl restart supersub-vllm
+# 원인을 고친 뒤에는 반드시 ho로 돌아온다: git checkout ho && git pull origin ho
+```
+
+---
+
+## 8. 트러블슈팅
+
+| 증상 | 원인 | 조치 |
+|---|---|---|
+| `Bfloat16 is only supported on GPUs with compute capability of at least 8.0` | T4에 bf16을 요구했다 | `serve_vllm.sh`가 `--dtype float16`인지 확인. 직접 `vllm serve`를 친 것이면 그 옵션을 빼먹은 것 |
+| `Judge.load()`가 `... 를 서빙하지 않는다` | `--served-model-name`이 `judge.py`의 `MODELS["1.2B"]`와 다르다 | `/etc/supersub/vllm.env`의 `SUPERSUB_SERVED_NAME`을 `LGAI-EXAONE/EXAONE-4.0-1.2B`로 |
+| 포즈 추출에서 CUDA OOM | vLLM이 GPU를 너무 잡았다 | `nvidia-smi`로 확인 후 `SUPERSUB_GPU_FRACTION`을 0.30으로 낮추고 재시작 |
+| vLLM 기동 중 OOM | KV 캐시 + CUDA 그래프 | `SUPERSUB_ENFORCE_EAGER=1` 확인, `SUPERSUB_MAX_MODEL_LEN`을 2048로 |
+| 분석 중 프로세스가 조용히 죽음(OOMKilled) | **호스트 RAM**이지 GPU가 아니다. 미결 9번 | `dmesg | tail`로 확인. 4K 영상을 1080p로 줄이거나 g4dn.2xlarge로 |
+| `vllm serve`가 `Exaone4ForCausalLM ... not supported` | vLLM이 오래됐다 | 5-2의 확인 명령을 돌리고 vLLM 업그레이드 |
+| `botocore ... NoCredentialsError` | 인스턴스 프로파일이 안 붙었다 | `aws sts get-caller-identity`. 비면 인스턴스에 IAM 역할 연결 |
+| `AccessDenied`인데 자격증명은 있음 | 정책 접두사 밖을 건드렸다 | 2-A 정책은 `videos/` 읽기·`reports/` 쓰기뿐이다. `videos/`에 쓰려 한 것은 아닌지 |
+| 서버는 뜨는데 첫 판정이 타임아웃 | 첫 요청에 워밍업이 겹친다 | 5-3의 curl로 미리 한 번 깨워 둔다 |
+
+로그:
+```bash
+sudo journalctl -u supersub-vllm -f              # vLLM 실시간
+sudo journalctl -u supersub-vllm -n 200 --no-pager
+nvidia-smi -l 2                                   # GPU 사용량 추적
+```
+
+---
+
+## 9. 아직 안 한 것
+
+이 런북이 **덮지 않는** 것들이다. 지금 필요 없어서 뺐지 실수가 아니다.
+
+- **자동 트리거** — S3 이벤트나 폴링 워커가 없다. 수동 CLI 1건 실행이다.
+  중복 처리·재시도·상태 저장이 필요해지면 그때 만든다.
+- **`api.py`를 EC2에서 서비스로 띄우기** — 8080 유닛을 만들지 않았다.
+  인증·타임아웃·동시성 설계가 먼저다.
+- **다중 인스턴스 / 오토스케일링** — 한 대다.
+- **모니터링·알림** — CloudWatch 에이전트를 안 붙였다. `journalctl`로 본다.
+- **VPC 분리** — 기본 VPC를 쓴다. 계정 자체가 분리돼 있다면 충분하고,
+  같은 계정에 팀 인프라가 있다면 전용 VPC를 파는 편이 낫다.
+
+## 관련
+
+- 미결 1번(EXAONE NC 라이선스), 9번(4K host RAM), 19번(이 배포가 연 것):
+  [`jekyll/pages/pending.markdown`](../../jekyll/pages/pending.markdown)
+- 파이프라인 구조·스윙 측 지정: [`agent/README.md`](../README.md)
+- 판정 백엔드 두 갈래: `src/supersub_agent/judge.py`의 `Judge` docstring

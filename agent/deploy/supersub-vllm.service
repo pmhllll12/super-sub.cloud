@@ -1,0 +1,39 @@
+# EXAONE 4.0 1.2B vLLM 추론 서버 (T4 / g4dn.xlarge)
+#
+# 설치:
+#   sudo cp agent/deploy/supersub-vllm.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now supersub-vllm
+#
+# 환경값은 /etc/supersub/vllm.env 에 둔다 (유닛 파일은 저장소에 커밋되므로
+# 버킷 이름 같은 배포별 값을 여기 적지 않는다).
+
+[Unit]
+Description=Super-Sub EXAONE 4.0 1.2B (vLLM OpenAI-compatible server)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/super-sub.cloud/agent
+EnvironmentFile=/etc/supersub/vllm.env
+
+# 모델이 없으면 기동 전에 S3에서 받는다. 새 인스턴스로 갈아타도 손댈 것이 없다.
+ExecStartPre=/home/ubuntu/super-sub.cloud/agent/deploy/sync_model.sh
+ExecStart=/home/ubuntu/super-sub.cloud/agent/deploy/serve_vllm.sh
+
+# 모델 적재에 시간이 걸린다 — 기본 타임아웃으로는 기동 중에 죽는다.
+TimeoutStartSec=900
+Restart=on-failure
+RestartSec=10
+
+# GPU를 잡은 채 죽으면 다음 기동이 OOM으로 막힌다. 확실히 정리시킨다.
+KillSignal=SIGINT
+TimeoutStopSec=60
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

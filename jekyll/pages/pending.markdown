@@ -902,4 +902,26 @@ Sprint 번호를 `jekyll/sprints/스프린트N.markdown` 링크로 연결 (2) �
 - **정답 불필요**
 - **담당**: 정상호 · **기한**: 미정 (다른 기계에서 재실행할 일이 생길 때)
 
+## 19. AWS 배포가 라이선스 두 건을 상용 경로 앞에 세웠다 (2026.09.02)
+
+분석 에이전트를 독립 AWS 환경(S3 + g4dn.xlarge)에 올리는 절차를
+[`agent/deploy/README.md`](https://github.com/jsangho/super-sub.cloud/blob/ho/agent/deploy/README.md)에
+정리했다. 내부 검증용으로는 그대로 진행하면 되지만, **이 인스턴스가 외부
+사용자에게 서비스를 제공하는 순간** 아래 두 건이 동시에 열린다.
+
+- **EXAONE 4.0은 NC(비상업) 라이선스다** — 미결 1번 그대로다. 배포가 그 결정을
+  앞당겼을 뿐 새로운 문제는 아니다
+- **ultralytics는 AGPL-3.0이다** — `pyproject.toml:42`의 판단대로 EC2에는
+  `--extra tracking`을 **설치하지 않았다.** `yolo11n.pt`는 `scripts/track_overlay.py`
+  (검수용 오버레이) 전용이고 서비스 경로의 비전 인식은 RT-DETR + ViTPose
+  (Apache-2.0)다. 서비스 경로에 YOLO를 넣자는 제안이 나오면 소스 공개 의무를
+  먼저 판단해야 한다
+
+지금 조치는 "설치하지 않는다"로 충분하지만, **결정이 코드가 아니라 배포 절차에만
+적혀 있다.** 다른 사람이 EC2에서 `uv sync --extra tracking`을 치면 조용히 넘어간다.
+
+- 상용 배포 시점에 (1) EXAONE 대체 모델 또는 상용 라이선스 (2) YOLO 사용 범위를
+  한 번에 정리한다. 둘 다 "지금 급하지 않지만 늦으면 비싼" 종류다
+- **담당**: 박민호(PM 판단 필요) · **제기**: 정상호 · **기한**: 서비스 오픈 전
+
 [← 표지]({{ "/" | relative_url }})
