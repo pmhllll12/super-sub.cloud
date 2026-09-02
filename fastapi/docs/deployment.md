@@ -302,7 +302,58 @@ ssh supersub 'cd ~/supersub/app && git pull && cd fastapi \
 |---|---|
 | **80·443 개방 · nginx · TLS** | 지금은 SSH 터널로만 본다. 열 때 순서는 4절 |
 | **`pgvector`** | AL2023 저장소에 **패키지가 없다.** 지금 마이그레이션은 `vector` 를 안 써서 없이도 돌았다 — `player_vector` 가 들어올 때 소스 빌드(`gcc` 필요)를 해야 한다 |
-| **백업** | `pg_dump` 크론이 없다. 디스크도 8GB 공유라 보관 위치를 함께 정해야 한다 |
+| ~~백업~~ | ✅ 2026-09-02 에 걸었다 — 7절. **다만 같은 디스크에 쌓인다**(밖으로 옮기는 것은 별도) |
 | **로그 회전·모니터링** | journald 기본값에 기대고 있다 |
+
+---
+
+## 7. 백업 (2026-09-02)
+
+하루 한 번 `pg_dump` 로 뜬다. **`cronie` 를 깔지 않고 systemd 타이머를 썼다** —
+앱 서비스와 같은 방식이라 로그가 journald 한 곳에 모이고 패키지가 늘지 않는다.
+
+| | |
+|---|---|
+| 언제 | 매일 **18:20 UTC = 03:20 KST** (서버 시간대는 UTC 다) |
+| 무엇 | `pg_dump -Fc --no-owner --no-privileges` (압축 custom 포맷) |
+| 어디 | `/var/backups/supersub/supersub-<날짜>-<시각>.dump` (0700 디렉터리 · 0600 파일) |
+| 얼마나 | **14개**(2주치). 지금 한 개가 35KB 다 |
+| 놓쳤을 때 | `Persistent=true` — 서버가 꺼져 있었으면 켜진 뒤 한 번 돈다 |
+
+```bash
+systemctl list-timers supersub-backup.timer    # 다음 실행 시각
+sudo systemctl start supersub-backup.service   # 지금 한 번
+journalctl -u supersub-backup -n 20            # 결과·실패 이유
+ls -lt /var/backups/supersub | head            # 최근 파일이 어제 것보다 새로운가
+```
+
+### 순서가 중요한 곳 하나
+
+스크립트는 **먼저 뜨고 나중에 지운다.** 반대로 하면 새 백업이 실패한 날 옛 백업까지
+사라진다. 쓰는 중에 죽어도 반쪽 파일이 남지 않도록 `.part` 로 받아서 옮긴다.
+
+### 🔴 복원까지 해봤다 — 안 해본 백업은 백업이 아니다
+
+임시 DB(`restorecheck`)를 만들어 넣고 원본과 대조했다. **운영 DB 는 건드리지 않는다.**
+
+```bash
+DUMP=$(ls -1t /var/backups/supersub/supersub-*.dump | head -1)
+sudo -u postgres createdb -O supersub restorecheck
+pg_restore --no-owner --no-privileges -d "${DATABASE_URL%/supersub}/restorecheck" "$DUMP"
+# 원본과 대조: 테이블 수 · 주요 행 수 · alembic_version
+sudo -u postgres dropdb restorecheck
+```
+
+2026-09-02 결과 — **테이블 20 · user 1 · team 1 · match 1 · position 11 ·
+alembic `69f3d0e97ffd`** 가 양쪽 동일했다.
+
+### 이 백업이 막아 주지 못하는 것
+
+🔴 **같은 디스크에 쌓인다.** 실수로 지운 데이터를 되돌리는 데는 쓸 수 있지만
+**인스턴스가 통째로 죽으면 백업도 같이 죽는다.** 재해 복구가 되려면 밖으로 옮겨야
+하고(S3 등) 그건 비용·권한이 걸린 별도 결정이다.
+
+디스크도 8GB 를 앱·DB·백업이 나눠 쓴다. 지금은 35KB 짜리 14개라 무시할 수 있지만,
+영상 메타·분석 결과가 쌓이면 **보관 개수와 위치를 다시 봐야 한다.**
 
 ---
