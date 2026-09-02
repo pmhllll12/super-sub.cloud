@@ -18,9 +18,10 @@ import { useLeaving } from '@/lib/pageTransition'
  * 동안 위로도 같이 올라가 두 축이 섞여 보인다(사용자 지적). 굴림 자체를 없애면
  * (globals.css 의 `body:has(.ss-market-entry) { overflow: hidden }`) 옆으로만 간다.
  *
- * 🔴 신호는 `<html>` 의 두 속성으로 흘린다. 이걸 보고 움직여야 하는 것이 페이지
- * 안(표지 글 · 두 문)과 루트(`AppFigure` 의 아치 글자)로 흩어져 있어 공통 조상이
- * 문서뿐이다.
+ * 🔴 신호는 `<html>` 의 두 속성으로 흘린다. 원래는 이걸 보고 움직여야 하는 것이
+ * 페이지 안(표지 글 · 두 문)과 루트(`AppFigure` 의 아치 글자)로 흩어져 있어
+ * 공통 조상이 문서뿐이었다. **아치 글자는 2026-09-02 에 스크롤에서 뗐고**
+ * (globals.css 의 `.ss-figure-mark-ch` 주석 참고) 지금 남은 것은 페이지 안뿐이다.
  *   `data-ss-scrolled='true'`  표지 글이 나가 있다
  *   `data-ss-gates='out'`      두 문이 나가는 중이다(되돌아가는 길)
  */
@@ -31,8 +32,11 @@ const GATES_OUT_MS = 520
 /**
  * 화면을 떠난 뒤 "나갔다" 는 표시를 지우기까지 기다리는 시간.
  *
- * `AppFigure` 가 나가는 배경 층을 걷는 시각(`MOVE_MS + MARK_TAIL_MS`)보다
- * 넉넉해야 한다 — 그 전에 지우면 나가던 아치 글자가 되돌아온다.
+ * 아치 글자가 이 표시를 보고 움직이던 시절의 것이다 — 그때는 `AppFigure` 가
+ * 나가는 배경 층을 걷는 시각(`MOVE_MS + MARK_TAIL_MS`)보다 넉넉해야 했고,
+ * 그 전에 지우면 나가던 글자가 되돌아왔다. 지금은 아치가 이 표시를 안 보므로
+ * (globals.css 의 `.ss-figure-mark-ch` 주석) **실질적인 효과가 없다.** 표시가
+ * 조금 남아 있어도 이 화면 밖에서는 아무도 안 보기에 그대로 둔다.
  */
 const LEAVE_TAIL_MS = 1600
 
