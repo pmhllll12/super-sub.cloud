@@ -1,8 +1,8 @@
 # API 계약 초안 — 인증 · 선수 카드
 
 > **상태:** 구현됨 — **전부 PostgreSQL에 붙었다. 고정 응답은 없다** · 2026-09-02 확인
-> **확인:** `cd fastapi && .venv/bin/pytest` → `253 passed`
-> (DB가 없는 환경에서는 `173 passed, 80 skipped`. 통합 테스트만 건너뛴다)
+> **확인:** `cd fastapi && .venv/bin/pytest` → `277 passed`
+> (DB가 없는 환경에서는 `191 passed, 86 skipped`. 통합 테스트만 건너뛴다)
 > **메모:** 스프린트 2(09.01~)의 Flutter 화면 두 개(로그인 · 선수 카드)에 필요한
 > 최소 범위. **응답 형태는 2026-08-25 이후 바뀌지 않았다** — 화면 쪽에서 고칠 것은 없다.
 
@@ -13,6 +13,7 @@
 | `GET /me/card` · `GET /cards/{slug}` | **실제 DB** (2026-08-26에 스텁을 걷어냈다) |
 | `POST /me/card` | **실제 DB** (2026-09-02 추가 — 카드는 여기서만 생긴다, 3장) |
 | `POST /teams` · `GET /teams/{id}` · `POST`·`DELETE /teams/{id}/members` | **실제 DB** (2026-09-02 추가, 3-3절) |
+| `POST /teams/{id}/matches` · `GET /matches/{id}` | **실제 DB** (2026-09-02 추가, 3-4절) |
 | `GET /admin/users` · `GET /admin/users/{id}` · `DELETE /admin/users/{id}` | **실제 DB** (2026-08-31 추가, 3-2절) |
 
 ## 눌러볼 수 있는 값
@@ -819,6 +820,90 @@ A를 권하는 이유는 데이터가 이미 그렇게 말하고 있어서다 �
 🔴 **마지막 주장이 나가면 아무도 남을 넣을 수 없는 팀이 된다.** 소유권 이양 API 가
 아직 없어 되돌릴 방법이 없으므로 미리 막는다. 팀 해체도 같은 이유로 아직 없다 —
 필요해지면 이양과 함께 낸다.
+
+---
+
+## 3-4. 경기 등록 (2026-09-02 추가)
+
+팀이 경기를 열고 **필요한 포지션과 인원**을 함께 적는다(SFR-010). 지원·적합도·추천
+(`match_application` · `fitness_score` · `recommendation`)은 다음 단계다.
+
+| | |
+|---|---|
+| 누가 | **주장(`owner`)만** 등록한다. 상대 팀·지원자에게 이 팀의 약속이 되기 때문이다 |
+| 종목 | **경기에 종목이 없다.** 주최 팀이 결정한다(부록 D.4 — 컬럼을 두면 "중복이자 모순 가능성") |
+| 포지션 | 문자열 한 컬럼이 아니라 **행으로** 나눈다(`match_position_need`). 경기당 포지션 1행이다 |
+
+### `POST /api/v1/teams/{team_id}/matches`
+
+인증 필요. 주장만.
+
+```json
+{
+  "played_at": "2026-09-10T19:00:00+09:00",
+  "place": "강남 풋살장 2구장",
+  "needs": [
+    { "position_code": "GK", "head_count": 1 },
+    { "position_code": "FW", "head_count": 2 }
+  ]
+}
+```
+
+`201 Created` — 아래 `GET /matches/{id}` 와 같은 형태.
+
+| 에러 | code |
+|---|---|
+| 403 | `FORBIDDEN` — 주장이 아니다(소속이 아닌 경우도 포함) |
+| 404 | `TEAM_NOT_FOUND` |
+| 422 | `PAST_MATCH` — 지난 시각이다 |
+| 422 | `UNKNOWN_POSITION` — **이 팀 종목에** 없는 포지션 코드다 |
+| 422 | `DUPLICATE_POSITION` — 같은 포지션을 두 번 적었다 |
+| 422 | `VALIDATION_ERROR` — 인원이 1 미만이거나 `needs` 가 비었다 |
+
+🔴 **포지션 코드는 종목 안에서만 뜻이 있다.** 야구의 `C` 는 포수, 농구의 `C` 는
+센터다. 그래서 코드만으로 찾지 않고 **팀 종목으로 좁혀서** 찾는다 — 축구 팀에 `P`
+(투수)를 적으면 `UNKNOWN_POSITION` 이다.
+
+### `GET /api/v1/matches/{match_id}`
+
+인증 필요. 모집 글이라 소속이 아니어도 본다.
+
+```json
+{
+  "id": "5c2a...", "team_id": "9a1e...",
+  "played_at": "2026-09-10T10:00:00Z",
+  "place": "강남 풋살장 2구장",
+  "needs": [
+    { "position_code": "FW", "position_label": "공격수", "head_count": 2 },
+    { "position_code": "GK", "position_label": "골키퍼", "head_count": 1 }
+  ]
+}
+```
+
+| 에러 | code |
+|---|---|
+| 404 | `MATCH_NOT_FOUND` |
+
+### 아직 없는 것
+
+- **목록** (`GET /teams/{id}/matches` · 지역·종목으로 찾기) — 화면이 정해진 뒤에 낸다.
+  지금은 등록하고 그 id 로 다시 읽는 데까지다
+- **수정·취소** — 지원이 붙기 시작하면 취소의 뜻이 달라진다(지원자에게 알려야 한다).
+  `match_application` 과 함께 설계한다
+- **지원·적합도·추천** — SFR-006·007. 도메인 ④ 의 나머지 셋이다
+
+### 포지션 목록은 마이그레이션이 넣는다
+
+`position` 은 08-31 에 **빈 테이블**로 만들어 두고 "참조하는 쪽이 들어올 때 채운다"고
+적어 두었다. `match_position_need` 가 그 참조라 `20260902_match_tables` 가 채웠다.
+
+| 종목 | 코드 |
+|---|---|
+| `football` | `GK` 골키퍼 · `DF` 수비수 · `MF` 미드필더 · `FW` 공격수 |
+| `baseball` | `P` 투수 · `C` 포수 · `IF` 내야수 · `OF` 외야수 |
+| `basketball` | `G` 가드 · `F` 포워드 · `C` 센터 |
+
+**확정된 목록이 아니다.** 스쿼드(`squad_member`)가 들어올 때 세분화가 필요하면 늘린다.
 
 ---
 
