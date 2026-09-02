@@ -398,16 +398,26 @@ ssh supersub 'systemctl is-active postgresql supersub-api'   # 켠 뒤 확인
 `~/.ssh/config` 의 `HostName` 도, DNS 레코드도 어긋난다. 2026-09-02 에 붙이기로
 했다(미결 8번, 박민호).
 
+### 탄력적 IP 를 붙인 뒤에 할 일 (내 몫)
+
+붙이는 것은 **정어진이 직접 한다**(2026-09-02 결정. DNS 는 박민호). 붙이면 지금
+IP 가 반납되므로 **그 자리에서 셋을 고쳐야 SSH 와 문서가 안 어긋난다.**
+
+```bash
+# 1) 내 접속 설정
+# ~/.ssh/config 의 supersub 항목에서 HostName 을 새 IP 로 고친다 (편집기로)
+ssh-keygen -R <옛 IP>
+ssh supersub 'uptime'                                        # 붙는지 확인
+
+# 2) 박민호에게 새 IP 를 **직접** 전달한다 (저장소에 적지 않는다 — 공개 저장소다)
+# 3) 개인 노트(_notes/MEMORY.md)의 접속 정보도 함께 고친다
+```
+
+**저장소에는 IP 를 적지 않는다** — 공개 저장소다. 미결 8번에는 "전달했다"만 적고
+값 자체는 팀에 직접 넘긴다.
+
 - 꺼져 있는 동안 **EBS 요금은 계속 나간다** — 디스크는 남아 있다
 - 탄력적 IP 는 **인스턴스가 꺼져 있는 동안 과금**된다. 자주 끄면 알고 있어야 한다
 - 백업 타이머는 `Persistent=true` 라 꺼져 있어 놓친 실행을 **켠 뒤 한 번** 돈다
-
-### 주소가 바뀌었을 때
-
-```bash
-# 새 IP 를 콘솔에서 확인한 뒤
-sed -i 's/^\(\s*HostName\).*/\1 <새 IP>/' ~/.ssh/config   # supersub 항목
-ssh-keygen -R <옛 IP>                                      # known_hosts 정리
-```
 
 ---
