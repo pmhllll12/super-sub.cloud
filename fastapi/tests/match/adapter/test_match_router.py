@@ -168,3 +168,59 @@ class TestReadMatch:
         res = client.get(f"{V1}/matches/{uuid4()}", headers=_headers(uuid4()))
         assert res.status_code == 404
         assert error_code(res) == "MATCH_NOT_FOUND"
+
+
+class TestListTeamMatches:
+    """`GET /teams/{id}/matches` — 다가오는 경기만, 이른 것부터."""
+
+    def _create(self, client, football, days, place):
+        return client.post(
+            f"{V1}/teams/{football['id']}/matches",
+            json={
+                "played_at": _future(days),
+                "place": place,
+                "needs": [{"position_code": "GK", "head_count": 1}],
+            },
+            headers=_headers(football["owner"]),
+        )
+
+    def test_인증이_필요하다(self, client, football):
+        assert client.get(f"{V1}/teams/{football['id']}/matches").status_code == 401
+
+    def test_이른_경기가_앞에_온다(self, client, football):
+        self._create(client, football, 9, "늦은 경기")
+        self._create(client, football, 3, "이른 경기")
+
+        res = client.get(
+            f"{V1}/teams/{football['id']}/matches", headers=_headers(uuid4())
+        )
+        assert res.status_code == 200, res.text
+        assert [m["place"] for m in res.json()] == ["이른 경기", "늦은 경기"]
+
+    def test_필요_포지션이_함께_온다(self, client, football):
+        """목록만 보고 무엇을 모집하는지 알 수 있어야 한다."""
+        self._create(client, football, 5, "강남")
+        body = client.get(
+            f"{V1}/teams/{football['id']}/matches", headers=_headers(uuid4())
+        ).json()
+        assert body[0]["needs"][0]["position_label"] == "골키퍼"
+
+    def test_경기가_없으면_빈_배열(self, client, football):
+        res = client.get(
+            f"{V1}/teams/{football['id']}/matches", headers=_headers(uuid4())
+        )
+        assert res.json() == []
+
+    def test_없는_팀은_404(self, client):
+        """🔴 빈 배열이 아니다 — 오타 난 id 를 "경기가 없구나"로 읽으면 안 된다."""
+        res = client.get(f"{V1}/teams/{uuid4()}/matches", headers=_headers(uuid4()))
+        assert res.status_code == 404
+        assert error_code(res) == "TEAM_NOT_FOUND"
+
+    def test_소속이_아니어도_본다(self, client, football):
+        """모집 글이다 — 지원할 사람이 봐야 한다."""
+        self._create(client, football, 4, "강남")
+        res = client.get(
+            f"{V1}/teams/{football['id']}/matches", headers=_headers(uuid4())
+        )
+        assert len(res.json()) == 1

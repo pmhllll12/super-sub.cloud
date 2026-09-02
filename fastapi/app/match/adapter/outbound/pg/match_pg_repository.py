@@ -129,6 +129,59 @@ class MatchPgRepository(MatchPort):
             needs=self._needs(match_id),
         )
 
+    def list_upcoming_matches(
+        self, team_id: UUID, now: datetime
+    ) -> list[MatchEntity]:
+        """필요 포지션은 **한 번에** 읽는다.
+
+        경기마다 따로 읽으면 목록 길이만큼 쿼리가 는다(N+1). 목록은 화면에서 자주
+        열리는 자리라 여기서 미리 막아 둔다.
+        """
+        stmt = (
+            select(MatchOrm)
+            .where(MatchOrm.team_id == team_id, MatchOrm.played_at > now)
+            .order_by(MatchOrm.played_at.asc())
+        )
+        rows = list(self._session.execute(stmt).scalars())
+        needs = self._needs_of([row.id for row in rows])
+        return [
+            MatchEntity(
+                id=row.id,
+                team_id=row.team_id,
+                played_at=row.played_at,
+                place=row.place,
+                needs=needs.get(row.id, []),
+            )
+            for row in rows
+        ]
+
+    def _needs_of(self, match_ids: list[UUID]) -> dict[UUID, list[PositionNeedEntity]]:
+        if not match_ids:
+            return {}
+        stmt = (
+            select(
+                MatchPositionNeedOrm.match_id,
+                MatchPositionNeedOrm.position_id,
+                MatchPositionNeedOrm.head_count,
+                _position.c.code,
+                _position.c.label,
+            )
+            .join(_position, _position.c.id == MatchPositionNeedOrm.position_id)
+            .where(MatchPositionNeedOrm.match_id.in_(match_ids))
+            .order_by(_position.c.code.asc())
+        )
+        found: dict[UUID, list[PositionNeedEntity]] = {}
+        for row in self._session.execute(stmt):
+            found.setdefault(row.match_id, []).append(
+                PositionNeedEntity(
+                    position_id=row.position_id,
+                    code=row.code,
+                    label=row.label,
+                    head_count=row.head_count,
+                )
+            )
+        return found
+
     def _needs(self, match_id: UUID) -> list[PositionNeedEntity]:
         stmt = (
             select(

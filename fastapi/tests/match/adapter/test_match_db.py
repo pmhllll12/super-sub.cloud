@@ -200,3 +200,68 @@ class TestReadMatchFromDb:
         assert res.json()["needs"] == [
             {"position_code": "MF", "position_label": "미드필더", "head_count": 3}
         ]
+
+
+class TestListTeamMatchesFromDb:
+    def test_지난_경기는_목록에서_빠진다(self, db_client, db_session, world):
+        """🔴 등록은 미래만 되지만 **그 뒤로 시간이 흐른다.**
+
+        `find_match` 로는 여전히 읽힌다 — 기록이 사라지는 것이 아니라 모집 목록에서
+        빠질 뿐이다.
+        """
+        upcoming = _create(
+            db_client, world, "football", [{"position_code": "GK", "head_count": 1}]
+        ).json()
+        past = _create(
+            db_client, world, "football", [{"position_code": "FW", "head_count": 2}]
+        ).json()
+        db_session.execute(
+            text("update match set played_at = now() - interval '1 day' where id = :m"),
+            {"m": past["id"]},
+        )
+        db_session.commit()
+
+        res = db_client.get(
+            f"{V1}/teams/{world['teams']['football']}/matches",
+            headers=world["member"]["headers"],
+        )
+        assert res.status_code == 200, res.text
+        assert [m["id"] for m in res.json()] == [upcoming["id"]]
+
+        # 지난 경기도 id 로는 읽힌다
+        assert (
+            db_client.get(
+                f"{V1}/matches/{past['id']}", headers=world["member"]["headers"]
+            ).status_code
+            == 200
+        )
+
+    def test_다른_팀_경기는_섞이지_않는다(self, db_client, world):
+        _create(db_client, world, "football", [{"position_code": "GK", "head_count": 1}])
+        _create(db_client, world, "baseball", [{"position_code": "P", "head_count": 1}])
+
+        res = db_client.get(
+            f"{V1}/teams/{world['teams']['baseball']}/matches",
+            headers=world["owner"]["headers"],
+        )
+        assert len(res.json()) == 1
+        assert res.json()[0]["needs"][0]["position_label"] == "투수"
+
+    def test_필요_포지션을_한_번에_읽는다(self, db_client, world):
+        """N+1 을 막는 경로다. 결과가 경기마다 제대로 갈리는지 본다."""
+        for needs in (
+            [{"position_code": "GK", "head_count": 1}],
+            [
+                {"position_code": "FW", "head_count": 2},
+                {"position_code": "MF", "head_count": 3},
+            ],
+        ):
+            assert (
+                _create(db_client, world, "football", needs).status_code == 201
+            )
+
+        body = db_client.get(
+            f"{V1}/teams/{world['teams']['football']}/matches",
+            headers=world["owner"]["headers"],
+        ).json()
+        assert sorted(len(m["needs"]) for m in body) == [1, 2]

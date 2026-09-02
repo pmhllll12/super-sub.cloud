@@ -21,6 +21,7 @@ from app.match.application.dtos.match_dto import (
     CreateMatchCommand,
     MatchQuery,
     MatchResult,
+    TeamMatchesQuery,
     PositionNeedInput,
 )
 from app.match.dependencies.match_providers import (
@@ -28,6 +29,7 @@ from app.match.dependencies.match_providers import (
     ApplyToMatchUseCaseDep,
     CreateMatchUseCaseDep,
     ListApplicationsUseCaseDep,
+    ListTeamMatchesUseCaseDep,
     ReadMatchUseCaseDep,
 )
 
@@ -60,6 +62,20 @@ def create_match(
             ],
         )
     )
+
+
+@match_router.get(
+    "/teams/{team_id}/matches", response_model=list[MatchResponse]
+)
+def list_team_matches(
+    team_id: UUID, user_id: CurrentUserId, use_case: ListTeamMatchesUseCaseDep
+) -> list[MatchResult]:
+    """그 팀의 **다가오는** 경기. 이른 것이 앞에 온다.
+
+    지난 경기는 담기지 않는다 — 목록은 모집 글이다. 지난 경기도
+    `GET /matches/{id}` 로는 여전히 읽힌다.
+    """
+    return use_case(TeamMatchesQuery(team_id=team_id))
 
 
 @match_router.get("/matches/{match_id}", response_model=MatchResponse)

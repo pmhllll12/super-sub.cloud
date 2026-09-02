@@ -12,6 +12,7 @@ from app.match.application.dtos.match_dto import (
     CreateMatchCommand,
     MatchQuery,
     MatchResult,
+    TeamMatchesQuery,
 )
 
 
@@ -25,6 +26,12 @@ class ReadMatchUseCase(ABC):
     @abstractmethod
     def __call__(self, query: MatchQuery) -> MatchResult:
         """경기 1건. 없으면 404."""
+
+
+class ListTeamMatchesUseCase(ABC):
+    @abstractmethod
+    def __call__(self, query: TeamMatchesQuery) -> list[MatchResult]:
+        """그 팀의 다가오는 경기 목록."""
 class ApplyToMatchUseCase(ABC):
     @abstractmethod
     def __call__(self, command: ApplyCommand) -> ApplicationResult:

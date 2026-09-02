@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 from uuid import UUID
 
 from app.match.domain.entities.application_entity import ApplicationEntity
@@ -40,6 +41,16 @@ class MatchPort(ABC):
 
     @abstractmethod
     def find_match(self, match_id: UUID) -> MatchEntity | None: ...
+
+    @abstractmethod
+    def list_upcoming_matches(
+        self, team_id: UUID, now: datetime
+    ) -> list[MatchEntity]:
+        """그 팀의 **다가오는** 경기. 이른 것이 앞에 온다.
+
+        지난 경기를 빼는 것은 목록이 **모집 글**이기 때문이다. 지난 경기도
+        `find_match` 로는 여전히 읽힌다 — 기록이 사라지는 것이 아니다.
+        """
 
     @abstractmethod
     def user_exists(self, user_id: UUID) -> bool: ...

@@ -128,3 +128,13 @@ class StubMatchRepository(StubApplicationsMixin, MatchPort):
 
     def find_match(self, match_id: UUID) -> MatchEntity | None:
         return _MATCHES.get(match_id)
+
+    def list_upcoming_matches(
+        self, team_id: UUID, now: datetime
+    ) -> list[MatchEntity]:
+        found = [
+            m
+            for m in _MATCHES.values()
+            if m.team_id == team_id and m.played_at > now
+        ]
+        return sorted(found, key=lambda m: m.played_at)

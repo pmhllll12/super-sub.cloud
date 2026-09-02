@@ -11,9 +11,11 @@ from app.match.application.dtos.match_dto import (
     CreateMatchCommand,
     MatchQuery,
     MatchResult,
+    TeamMatchesQuery,
 )
 from app.match.application.ports.input.match_use_cases import (
     CreateMatchUseCase,
+    ListTeamMatchesUseCase,
     ReadMatchUseCase,
 )
 from app.match.application.ports.output.match_port import MatchPort
@@ -77,3 +79,23 @@ class ReadMatchInteractor(ReadMatchUseCase):
         if match is None:
             raise ApiError(404, "MATCH_NOT_FOUND", "경기를 찾을 수 없습니다.")
         return to_match_result(match)
+
+
+class ListTeamMatchesInteractor(ListTeamMatchesUseCase):
+    def __init__(self, repository: MatchPort) -> None:
+        self._repository = repository
+
+    def __call__(self, query: TeamMatchesQuery) -> list[MatchResult]:
+        """팀이 없으면 404 다.
+
+        빈 배열로 답하면 **없는 팀과 경기 없는 팀이 같아 보인다** — 클라이언트가
+        오타 난 id 를 "아직 경기가 없구나"로 읽는다.
+        """
+        if not self._repository.team_exists(query.team_id):
+            raise ApiError(404, "TEAM_NOT_FOUND", "팀을 찾을 수 없습니다.")
+
+        matches = self._repository.list_upcoming_matches(
+            query.team_id, datetime.now(timezone.utc)
+        )
+        return [to_match_result(m) for m in matches]
+

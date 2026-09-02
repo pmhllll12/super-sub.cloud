@@ -23,6 +23,11 @@ class CreateMatchCommand:
 
 
 @dataclass(frozen=True)
+class TeamMatchesQuery:
+    team_id: UUID
+
+
+@dataclass(frozen=True)
 class MatchQuery:
     match_id: UUID
 
