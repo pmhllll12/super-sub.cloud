@@ -1,7 +1,13 @@
 """card/adapter/inbound/api/v1/card_router.py — 계약 문서 3장."""
 
-from app.card.adapter.outbound.stub.card_stub_repository import DEMO_SLUG
-from uuid import UUID
+from uuid import UUID, uuid4
+
+import pytest
+
+from app.card.adapter.outbound.stub.card_stub_repository import (
+    DEMO_SLUG,
+    reset_created_cards,
+)
 
 from app.core.security import issue_access_token
 from tests.conftest import V1, error_code
@@ -53,3 +59,65 @@ class TestPublicCard:
         res = client.get(f"{V1}/cards/no-such-slug")
         assert res.status_code == 404
         assert error_code(res) == "CARD_NOT_FOUND"
+
+
+class TestCreateMyCard:
+    """POST /me/card — 계약 문서 3-2절. 카드는 요청할 때 생긴다."""
+
+    @pytest.fixture(autouse=True)
+    def _clean_stub(self):
+        """스텁이 만든 카드는 모듈에 남는다. 검사 사이에 새지 않게 비운다."""
+        reset_created_cards()
+        yield
+        reset_created_cards()
+
+    def _token(self, user_id=None) -> dict[str, str]:
+        return {"Authorization": f"Bearer {issue_access_token(user_id or uuid4())}"}
+
+    def test_인증이_필요하다(self, client):
+        res = client.post(f"{V1}/me/card")
+        assert res.status_code == 401
+        assert error_code(res) == "UNAUTHORIZED"
+
+    def test_없던_카드를_만들면_201(self, client):
+        res = client.post(f"{V1}/me/card", headers=self._token())
+        assert res.status_code == 201, res.text
+        assert res.json()["public_slug"]
+
+    def test_갓_만든_카드에는_호칭이_없다(self, client):
+        """호칭은 분석 결과로 붙는다. 생성 시점에 있을 수 없다."""
+        res = client.post(f"{V1}/me/card", headers=self._token())
+        assert res.json()["titles"] == []
+
+    def test_두_번째부터는_200_이고_슬러그가_같다(self, client):
+        """멱등이다 — 재시도해도 공유 링크가 바뀌면 안 된다."""
+        headers = self._token()
+        first = client.post(f"{V1}/me/card", headers=headers)
+        second = client.post(f"{V1}/me/card", headers=headers)
+        assert (first.status_code, second.status_code) == (201, 200)
+        assert first.json()["public_slug"] == second.json()["public_slug"]
+        assert first.json()["id"] == second.json()["id"]
+
+    def test_이미_카드가_있으면_그것을_돌려준다(self, client, auth):
+        res = client.post(f"{V1}/me/card", headers=auth)
+        assert res.status_code == 200
+        assert res.json()["public_slug"] == DEMO_SLUG
+
+    def test_만든_카드가_바로_조회된다(self, client):
+        headers = self._token()
+        created = client.post(f"{V1}/me/card", headers=headers).json()
+        read = client.get(f"{V1}/me/card", headers=headers)
+        assert read.status_code == 200
+        assert read.json()["public_slug"] == created["public_slug"]
+
+    def test_사람마다_슬러그가_다르다(self, client):
+        a = client.post(f"{V1}/me/card", headers=self._token()).json()
+        b = client.post(f"{V1}/me/card", headers=self._token()).json()
+        assert a["public_slug"] != b["public_slug"]
+
+    def test_수치가_실려_나가지_않는다(self, client):
+        """부록 D.5 — 생성 응답도 조회와 같은 모델을 쓴다."""
+        from app.card.domain.rules.card_rules import FORBIDDEN_CARD_FIELDS
+
+        body = client.post(f"{V1}/me/card", headers=self._token()).json()
+        assert not (set(body) & FORBIDDEN_CARD_FIELDS)

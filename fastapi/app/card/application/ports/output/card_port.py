@@ -17,3 +17,20 @@ class CardPort(ABC):
 
     @abstractmethod
     def find_by_slug(self, slug: PublicSlug) -> CardEntity | None: ...
+    @abstractmethod
+    def create_for_owner(self, user_id: UUID) -> CardEntity:
+        """카드를 만들어 돌려준다. **이미 있으면 있는 것을 돌려준다.**
+
+        슬러그 생성이 구현 쪽에 있는 이유: 유일 제약에 걸렸을 때 **다시 뽑아
+        재시도할 수 있는 곳이 저장소뿐**이다. 규칙 자체는 도메인에 있다
+        (`PublicSlug.generate`).
+        """
+
+    @abstractmethod
+    def create_for_owner(self, user_id: UUID) -> CardEntity:
+        """카드를 만들어 돌려준다. **이미 있으면 있는 것을 돌려준다.**
+
+        슬러그 생성이 구현 쪽에 있는 이유: 유일 제약에 걸렸을 때 **다시 뽑아
+        재시도할 수 있는 곳이 저장소뿐**이다. 규칙 자체는 도메인에 있다
+        (`PublicSlug.generate`).
+        """

@@ -113,6 +113,32 @@ def card(db_client, db_session):
     db_session.commit()
 
 
+@pytest.fixture
+def fresh_account(db_client, db_session):
+    """카드가 **없는** 계정 하나. 끝나면 카드까지 지운다."""
+    email = f"newcard-{uuid.uuid4().hex[:12]}@super-sub.example"
+    signup = db_client.post(
+        f"{V1}/auth/signup",
+        json={"email": email, "password": PASSWORD, "nickname": "새사람"},
+    )
+    assert signup.status_code == 201, signup.text
+    user_id = uuid.UUID(signup.json()["id"])
+    login = db_client.post(
+        f"{V1}/auth/login", json={"email": email, "password": PASSWORD}
+    )
+    assert login.status_code == 200
+
+    yield {
+        "user_id": user_id,
+        "headers": {"Authorization": f"Bearer {login.json()['access_token']}"},
+    }
+
+    db_session.execute(
+        text("delete from player_card where user_id = :u"), {"u": str(user_id)}
+    )
+    db_session.execute(text('delete from "user" where email = :e'), {"e": email})
+    db_session.commit()
+
 class TestMyCardFromDb:
     def test_DB_의_카드를_돌려준다(self, db_client, card):
         res = db_client.get(f"{V1}/me/card", headers=card["headers"])
@@ -188,3 +214,70 @@ class TestPublicCardFromDb:
         res = db_client.get(f"{V1}/cards/no-such-slug-here")
         assert res.status_code == 404
         assert error_code(res) == "CARD_NOT_FOUND"
+
+
+class TestCreateMyCardInDb:
+    """카드 생성을 **실제 PostgreSQL** 에 대고 확인한다.
+
+    스텁이 답할 수 없는 것들이다 — 행이 실제로 남는가, 두 번째 요청이 행을 하나로
+    유지하는가, 저장한 슬러그로 공개 조회가 열리는가.
+    """
+
+    def _row(self, db_session, user_id):
+        return db_session.execute(
+            text(
+                "select id, public_slug, og_image_key from player_card "
+                "where user_id = :u"
+            ),
+            {"u": str(user_id)},
+        ).one()
+
+    def test_행이_실제로_남는다(self, db_client, db_session, fresh_account):
+        res = db_client.post(f"{V1}/me/card", headers=fresh_account["headers"])
+        assert res.status_code == 201, res.text
+
+        body = res.json()
+        row = self._row(db_session, fresh_account["user_id"])
+        assert str(row.id) == body["id"]
+        assert row.public_slug == body["public_slug"]
+
+    def test_og_키가_카드_id_로_정해진다(self, db_client, db_session, fresh_account):
+        """규칙은 `card_rules.og_image_key_for` 하나뿐이다.
+
+        ⚠️ 그 경로에 파일이 있다는 뜻은 아니다 — 생성기는 아직 없다.
+        """
+        db_client.post(f"{V1}/me/card", headers=fresh_account["headers"])
+        row = self._row(db_session, fresh_account["user_id"])
+        assert row.og_image_key == f"cards/{row.id}.png"
+
+    def test_두_번_불러도_행은_하나다(self, db_client, db_session, fresh_account):
+        headers = fresh_account["headers"]
+        first = db_client.post(f"{V1}/me/card", headers=headers)
+        second = db_client.post(f"{V1}/me/card", headers=headers)
+        assert (first.status_code, second.status_code) == (201, 200), second.text
+        assert first.json()["public_slug"] == second.json()["public_slug"]
+
+        count = db_session.execute(
+            text("select count(*) from player_card where user_id = :u"),
+            {"u": str(fresh_account["user_id"])},
+        ).scalar_one()
+        assert count == 1
+
+    def test_만든_카드가_인증_없이_열린다(self, db_client, fresh_account):
+        """생성과 공개 조회가 이어지는지 본다 (SFR-009)."""
+        slug = db_client.post(
+            f"{V1}/me/card", headers=fresh_account["headers"]
+        ).json()["public_slug"]
+
+        res = db_client.get(f"{V1}/cards/{slug}")
+        assert res.status_code == 200, res.text
+        # 닉네임이 `user` 테이블에서 읽힌다 — 카드는 복사해 두지 않는다.
+        assert res.json()["user"]["nickname"] == "새사람"
+
+    def test_슬러그가_이름에서_유도되지_않는다(self, db_client, fresh_account):
+        """SEC-005 — 이름을 알아도 공개 주소를 맞힐 수 없어야 한다."""
+        slug = db_client.post(
+            f"{V1}/me/card", headers=fresh_account["headers"]
+        ).json()["public_slug"]
+        assert "새사람" not in slug
+        assert len(slug) >= 16

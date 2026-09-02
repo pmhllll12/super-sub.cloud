@@ -6,6 +6,10 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
+from uuid import UUID
+
 from app.card.domain.entities.card_entity import CardEntity, PublicCardEntity
 from app.card.domain.entities.title_entity import TitleEntity
 
@@ -17,6 +21,34 @@ FORBIDDEN_CARD_FIELDS = frozenset(
         "grade", "point", "points", "ability", "abilities", "overall", "tier",
     }
 )
+
+
+def og_image_key_for(card_id: UUID) -> str:
+    """공유 미리보기 이미지의 저장 키.
+
+    ⚠️ **아직 그 위치에 파일이 없다.** 이미지 생성도, 파일을 어디에 둘지도 정해지지
+    않았다(SFR-001 의 저장 위치 결정과 같은 갈래다). 지금은 **키를 정하는 규칙만**
+    두고 값을 채운다 — 컬럼이 NOT NULL 이라 비워 둘 수 없고, 나중에 생성기가
+    붙을 때 이 규칙이 그대로 경로가 된다.
+
+    지금 이 값을 그리는 클라이언트는 없다(`www` 의 카드 화면은 고정 장식 이미지를
+    쓴다). 그리기 시작하면 **생성기가 먼저 있어야 한다.**
+    """
+    return f"cards/{card_id}.png"
+
+
+def og_image_key_for(card_id: UUID) -> str:
+    """공유 미리보기 이미지의 저장 키.
+
+    ⚠️ **아직 그 위치에 파일이 없다.** 이미지 생성도, 파일을 어디에 둘지도 정해지지
+    않았다(SFR-001 의 저장 위치 결정과 같은 갈래다). 지금은 **키를 정하는 규칙만**
+    두고 값을 채운다 — 컬럼이 NOT NULL 이라 비워 둘 수 없고, 나중에 생성기가 붙을
+    때 이 규칙이 그대로 경로가 된다.
+
+    지금 이 값을 그리는 클라이언트는 없다(`www` 의 카드 화면은 고정 장식 이미지를
+    쓴다). 그리기 시작하면 **생성기가 먼저 있어야 한다.**
+    """
+    return f"cards/{card_id}.png"
 
 
 def to_public(card: CardEntity) -> PublicCardEntity:

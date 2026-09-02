@@ -13,11 +13,12 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from app.card.application.ports.output.card_port import CardPort
 from app.card.domain.entities.card_entity import CardEntity
 from app.card.domain.entities.title_entity import TitleEntity
+from app.card.domain.rules.card_rules import og_image_key_for
 from app.card.domain.value_objects.card_owner_vo import CardOwner
 from app.card.domain.value_objects.public_slug_vo import PublicSlug
 from app.card.domain.value_objects.title_category_vo import TitleCategory
@@ -56,9 +57,45 @@ _CARD = CardEntity(
 )
 
 
+# 생성 계약을 DB 없이 검사하려면 요청 사이에 남아야 한다. 저장소 인스턴스는 요청마다
+# 새로 만들어지므로(프로바이더가 클래스 자체다) 모듈에 둔다.
+_CREATED: dict[UUID, CardEntity] = {}
+
+
+def reset_created_cards() -> None:
+    """만들어 둔 카드를 비운다. **검사 사이에 상태가 새지 않게** 쓴다."""
+    _CREATED.clear()
+
+
 class StubCardRepository(CardPort):
     def find_by_owner(self, user_id: UUID) -> CardEntity | None:
-        return _CARD if user_id == DEMO_USER_ID else None
+        if user_id == DEMO_USER_ID:
+            return _CARD
+        return _CREATED.get(user_id)
 
     def find_by_slug(self, slug: PublicSlug) -> CardEntity | None:
-        return _CARD if slug == PublicSlug(DEMO_SLUG) else None
+        if slug == PublicSlug(DEMO_SLUG):
+            return _CARD
+        return next((c for c in _CREATED.values() if c.public_slug == slug), None)
+
+    def create_for_owner(self, user_id: UUID) -> CardEntity:
+        """멱등하게 만든다.
+
+        ⚠️ **주인 닉네임을 모른다.** 스텁은 `user` 테이블을 읽지 않으므로(데모
+        사용자만 이름을 안다) 고정 문자열을 넣는다. 닉네임이 실제로 `user` 에서
+        읽히는지는 `tests/card/adapter/test_card_db.py` 가 본다.
+        """
+        existing = self.find_by_owner(user_id)
+        if existing is not None:
+            return existing
+
+        card_id = uuid4()
+        card = CardEntity(
+            id=card_id,
+            public_slug=PublicSlug.generate(),
+            og_image_key=og_image_key_for(card_id),
+            owner=CardOwner(id=user_id, nickname="스텁 사용자"),
+            titles=[],
+        )
+        _CREATED[user_id] = card
+        return card

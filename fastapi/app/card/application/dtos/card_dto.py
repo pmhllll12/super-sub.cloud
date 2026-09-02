@@ -18,6 +18,16 @@ class MyCardQuery:
 
 
 @dataclass(frozen=True)
+class CreateMyCardCommand:
+    user_id: UUID
+
+
+@dataclass(frozen=True)
+class CreateMyCardCommand:
+    user_id: UUID
+
+
+@dataclass(frozen=True)
 class PublicCardQuery:
     public_slug: str
 
@@ -43,6 +53,30 @@ class MyCardResult:
     og_image_key: str
     user: CardOwnerResult
     titles: list[TitleResult] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class MyCardCreation:
+    """생성 요청의 결과.
+
+    `created` 가 응답 코드를 가른다 — 만들었으면 201, 이미 있었으면 200이다.
+    카드 자체는 두 경우가 같으므로 `MyCardResult` 를 그대로 싣는다.
+    """
+
+    card: MyCardResult
+    created: bool
+
+
+@dataclass(frozen=True)
+class MyCardCreation:
+    """생성 요청의 결과.
+
+    `created` 가 응답 코드를 가른다 — 만들었으면 201, 이미 있었으면 200이다.
+    카드 자체는 두 경우가 같으므로 `MyCardResult` 를 그대로 싣는다.
+    """
+
+    card: MyCardResult
+    created: bool
 
 
 @dataclass(frozen=True)
