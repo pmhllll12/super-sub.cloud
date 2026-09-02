@@ -173,6 +173,10 @@ alembic check        # "No new upgrade operations detected." 여야 한다
 
 ## 4. 리버스 프록시·로드밸런서 뒤에 둘 때
 
+> **주소는 `api.supersub-ai.com` 으로 정했다**(2026-09-02). 도메인 관리는
+> 박민호이므로 A 레코드와 탄력적 IP 는 그쪽에서 만든다 — 미결 8번.
+> 포트 개방은 **아직 하지 않기로 했다**. 지금은 SSH 터널로 쓴다(6-6 절).
+
 🔴 **`X-Forwarded-For` 를 신뢰하도록 설정하지 않으면** 인증 로그의 `client` 와
 **요청 제한(SEC-009)의 키가 전부 LB 주소가 된다.** 즉 모든 사용자가 한 덩어리로
 묶여 서로의 제한에 걸린다.
@@ -376,5 +380,34 @@ df -h /                     # 30G 로 보이면 끝
 
 디스크(30GB)를 앱·DB·백업이 나눠 쓴다. 지금은 35KB 짜리 14개라 무시할 수 있지만,
 영상 메타·분석 결과가 쌓이면 **보관 개수와 위치를 다시 봐야 한다.**
+
+---
+
+## 8. 인스턴스를 껐다 켤 때 (2026-09-02)
+
+비용 때문에 주기적으로 끈다. **서비스는 알아서 돌아온다** — `postgresql`·
+`supersub-api`·`supersub-backup.timer` 가 전부 `enabled` 라 부팅하면 스스로 뜬다.
+
+```bash
+ssh supersub 'systemctl is-enabled postgresql supersub-api supersub-backup.timer'
+# 셋 다 enabled 여야 한다. disabled 가 보이면 그건 껐다 켠 뒤 안 뜬다는 뜻이다
+ssh supersub 'systemctl is-active postgresql supersub-api'   # 켠 뒤 확인
+```
+
+🔴 **탄력적 IP 가 없으면 공인 IP 가 바뀐다.** 켤 때마다 새 주소를 받으므로
+`~/.ssh/config` 의 `HostName` 도, DNS 레코드도 어긋난다. 2026-09-02 에 붙이기로
+했다(미결 8번, 박민호).
+
+- 꺼져 있는 동안 **EBS 요금은 계속 나간다** — 디스크는 남아 있다
+- 탄력적 IP 는 **인스턴스가 꺼져 있는 동안 과금**된다. 자주 끄면 알고 있어야 한다
+- 백업 타이머는 `Persistent=true` 라 꺼져 있어 놓친 실행을 **켠 뒤 한 번** 돈다
+
+### 주소가 바뀌었을 때
+
+```bash
+# 새 IP 를 콘솔에서 확인한 뒤
+sed -i 's/^\(\s*HostName\).*/\1 <새 IP>/' ~/.ssh/config   # supersub 항목
+ssh-keygen -R <옛 IP>                                      # known_hosts 정리
+```
 
 ---
