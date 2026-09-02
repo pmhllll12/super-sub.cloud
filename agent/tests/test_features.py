@@ -299,6 +299,47 @@ def test_arm_gate_still_fails_when_the_elbow_is_thin():
         F.check_quality(seq, limb="arm", side="left")
 
 
+def _mirror_legs(seq: np.ndarray) -> np.ndarray:
+    """다리 좌우를 통째로 맞바꾼다 — 스윙 다리가 오른쪽인 시퀀스를 만든다.
+
+    build_sequence는 스윙 팔도 스윙 다리도 왼쪽이라 둘을 구별할 수 없다.
+    실제 동작은 반대쪽인 경우가 많다(오른손 투수의 디딤발은 왼발).
+    """
+    out = seq.copy()
+    out[:, [F.L_HIP, F.R_HIP]] = out[:, [F.R_HIP, F.L_HIP]]
+    out[:, [F.L_KNEE, F.R_KNEE]] = out[:, [F.R_KNEE, F.L_KNEE]]
+    out[:, [F.L_ANKLE, F.R_ANKLE]] = out[:, [F.R_ANKLE, F.L_ANKLE]]
+    return out
+
+
+def test_manual_side_applies_to_the_impact_limb_only():
+    """수동 side는 impact_limb에만 적용된다 — **버그가 아니라 의도다.**
+
+    "왼쪽"이 팔과 다리에서 같은 것을 가리키지 않는다. 오른손 투수의 디딤발은
+    왼발이고, 오른발 인스텝 슈팅에서 크게 도는 팔은 왼팔이다. 사람이 아는 값은
+    동작을 정의하는 사지 한쪽("던지는 팔은 왼쪽")뿐이며, 그 값을 반대쪽 사지에
+    그대로 넘기면 상당수 동작에서 **정확히 틀린 쪽**을 지정하게 된다. 평가셋
+    39클립에서 자동 판별된 팔 측과 다리 측은 44%에서만 일치했다 — 한 값이
+    둘을 대신할 수 없다는 뜻이다.
+
+    이 테스트는 "일관성"을 이유로 반대쪽까지 전달하는 변경을 막는다.
+    """
+    # 스윙 팔은 왼쪽, 스윙 다리는 오른쪽 — 반대쪽인 실제 동작을 흉내낸다.
+    seq = _mirror_legs(_with_arm_swing(build_sequence()))
+    norm = F.normalize(seq)
+    assert F.identify_limb(norm, "arm")[0] == F.LIMB_CHAINS["arm"]["left"]
+    assert F.identify_legs(norm)[0] == F.R_KNEE, "자동 판별로는 오른 다리가 스윙"
+
+    feats = extract_features(seq, None, impact_limb="arm", swing_side="left")
+    t = feats["impact_frame"]
+
+    # 다리는 side="left"를 받지 않았으므로 auto 판별 그대로 오른 다리다.
+    right_knee = F.chain_series(norm, F.LIMB_CHAINS["leg"]["right"])[t]
+    left_knee = F.chain_series(norm, F.LIMB_CHAINS["leg"]["left"])[t]
+    assert feats["swing_knee_angle_at_impact"] == pytest.approx(right_knee, abs=0.05)
+    assert feats["plant_knee_angle_at_impact"] == pytest.approx(left_knee, abs=0.05)
+
+
 def test_leg_gate_still_requires_the_ankle():
     """다리: 발목이 부족하면 막는다 — 팔과 달리 여기서는 뺄 수 없다.
 
