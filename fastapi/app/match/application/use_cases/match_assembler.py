@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from app.match.application.dtos.match_dto import MatchResult, PositionNeedResult
+from app.match.application.dtos.match_dto import (
+    ApplicationResult,
+    MatchResult,
+    PositionNeedResult,
+)
+from app.match.domain.entities.application_entity import ApplicationEntity
 from app.match.domain.entities.match_entity import MatchEntity
 
 
@@ -21,3 +26,20 @@ def to_match_result(match: MatchEntity) -> MatchResult:
             for n in match.needs
         ],
     )
+
+
+def to_application_result(application: ApplicationEntity) -> ApplicationResult:
+    """`confirmed` 는 저장된 값이 아니라 **두 시각에서 계산된다**(부록 D.5).
+
+    클라이언트가 두 시각을 보고 스스로 판단하게 두면 확정 조건이 화면마다 갈린다.
+    """
+    return ApplicationResult(
+        id=application.id,
+        match_id=application.match_id,
+        user_id=application.user_id,
+        nickname=application.nickname,
+        team_accepted_at=application.team_accepted_at,
+        user_accepted_at=application.user_accepted_at,
+        confirmed=application.is_confirmed,
+    )
+

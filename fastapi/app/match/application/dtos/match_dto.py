@@ -41,3 +41,33 @@ class MatchResult:
     played_at: datetime
     place: str
     needs: list[PositionNeedResult] = field(default_factory=list)
+@dataclass(frozen=True)
+class ApplyCommand:
+    actor_id: UUID
+    match_id: UUID
+    # None 이면 본인이 지원한다. 값이 있으면 주장이 그 사람에게 제안한다.
+    user_id: UUID | None = None
+
+
+@dataclass(frozen=True)
+class AcceptApplicationCommand:
+    actor_id: UUID
+    match_id: UUID
+    application_id: UUID
+
+
+@dataclass(frozen=True)
+class ApplicationsQuery:
+    actor_id: UUID
+    match_id: UUID
+
+
+@dataclass(frozen=True)
+class ApplicationResult:
+    id: UUID
+    match_id: UUID
+    user_id: UUID
+    nickname: str
+    team_accepted_at: datetime | None
+    user_accepted_at: datetime | None
+    confirmed: bool

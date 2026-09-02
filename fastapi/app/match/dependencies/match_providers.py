@@ -10,10 +10,18 @@ from sqlalchemy.orm import Session
 from app.core.database import get_session
 from app.match.adapter.outbound.pg.match_pg_repository import MatchPgRepository
 from app.match.application.ports.input.match_use_cases import (
+    AcceptApplicationUseCase,
+    ApplyToMatchUseCase,
     CreateMatchUseCase,
+    ListApplicationsUseCase,
     ReadMatchUseCase,
 )
 from app.match.application.ports.output.match_port import MatchPort
+from app.match.application.use_cases.application_interactors import (
+    AcceptApplicationInteractor,
+    ApplyToMatchInteractor,
+    ListApplicationsInteractor,
+)
 from app.match.application.use_cases.match_interactors import (
     CreateMatchInteractor,
     ReadMatchInteractor,
@@ -41,3 +49,27 @@ CreateMatchUseCaseDep = Annotated[
     CreateMatchUseCase, Depends(get_create_match_use_case)
 ]
 ReadMatchUseCaseDep = Annotated[ReadMatchUseCase, Depends(get_read_match_use_case)]
+
+
+def get_apply_use_case(repository: MatchRepositoryDep) -> ApplyToMatchUseCase:
+    return ApplyToMatchInteractor(repository)
+
+
+def get_accept_use_case(repository: MatchRepositoryDep) -> AcceptApplicationUseCase:
+    return AcceptApplicationInteractor(repository)
+
+
+def get_list_applications_use_case(
+    repository: MatchRepositoryDep,
+) -> ListApplicationsUseCase:
+    return ListApplicationsInteractor(repository)
+
+
+ApplyToMatchUseCaseDep = Annotated[ApplyToMatchUseCase, Depends(get_apply_use_case)]
+AcceptApplicationUseCaseDep = Annotated[
+    AcceptApplicationUseCase, Depends(get_accept_use_case)
+]
+ListApplicationsUseCaseDep = Annotated[
+    ListApplicationsUseCase, Depends(get_list_applications_use_case)
+]
+

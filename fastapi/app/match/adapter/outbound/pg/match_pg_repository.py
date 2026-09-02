@@ -13,17 +13,25 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from sqlalchemy import column, select, table
+from sqlalchemy import column, func, select, table, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.errors import ApiError
+from app.match.adapter.outbound.orm.match_application_orm import (
+    MatchApplicationOrm,
+)
 from app.match.adapter.outbound.orm.match_orm import MatchOrm
 from app.match.adapter.outbound.orm.match_position_need_orm import (
     MatchPositionNeedOrm,
 )
 from app.match.application.ports.output.match_port import MatchPort
+from app.match.domain.entities.application_entity import ApplicationEntity
 from app.match.domain.entities.match_entity import MatchEntity, PositionNeedEntity
+from app.match.domain.rules.application_rules import SIDE_TEAM, SIDE_USER
 
 # 소유하지 않는 테이블에서 **읽기만** 한다. 위 docstring 참조.
 _team = table("team", column("id"), column("sport_code"))
@@ -37,6 +45,14 @@ _team_member = table(
 _position = table(
     "position", column("id"), column("sport_code"), column("code"), column("label")
 )
+_user = table("user", column("id"), column("nickname"))
+
+# PostgreSQL 의 unique_violation. 컨텍스트끼리 임포트하지 않으므로 상수를 여기에도 둔다.
+_UNIQUE_VIOLATION = "23505"
+
+
+def _is_unique_violation(exc: IntegrityError) -> bool:
+    return getattr(getattr(exc, "orig", None), "sqlstate", None) == _UNIQUE_VIOLATION
 
 
 class MatchPgRepository(MatchPort):
@@ -134,3 +150,125 @@ class MatchPgRepository(MatchPort):
             )
             for row in self._session.execute(stmt)
         ]
+
+    # ------------------------------------------------------------------
+    # 지원·제안 (`match_application`)
+    # ------------------------------------------------------------------
+
+    def user_exists(self, user_id: UUID) -> bool:
+        stmt = select(_user.c.id).where(_user.c.id == user_id)
+        return self._session.execute(stmt).first() is not None
+
+    def find_application(
+        self, match_id: UUID, user_id: UUID
+    ) -> ApplicationEntity | None:
+        return self._load_application(
+            (MatchApplicationOrm.match_id == match_id)
+            & (MatchApplicationOrm.user_id == user_id)
+        )
+
+    def find_application_by_id(
+        self, application_id: UUID
+    ) -> ApplicationEntity | None:
+        return self._load_application(MatchApplicationOrm.id == application_id)
+
+    def list_applications(self, match_id: UUID) -> list[ApplicationEntity]:
+        """먼저 시작된 건이 앞에 온다.
+
+        `created_at` 이 없으므로(부록 D 의 ERD 에 없다) **먼저 찬 시각**으로 센다 —
+        지원이면 `user_accepted_at`, 제안이면 `team_accepted_at` 이 그 값이다.
+        """
+        started = func.least(
+            func.coalesce(
+                MatchApplicationOrm.user_accepted_at,
+                MatchApplicationOrm.team_accepted_at,
+            ),
+            func.coalesce(
+                MatchApplicationOrm.team_accepted_at,
+                MatchApplicationOrm.user_accepted_at,
+            ),
+        )
+        stmt = (
+            select(MatchApplicationOrm, _user.c.nickname)
+            .join(_user, _user.c.id == MatchApplicationOrm.user_id)
+            .where(MatchApplicationOrm.match_id == match_id)
+            .order_by(started.asc())
+        )
+        return [
+            self._to_application(row, nickname)
+            for row, nickname in self._session.execute(stmt).all()
+        ]
+
+    def create_application(
+        self, match_id: UUID, user_id: UUID, side: str
+    ) -> ApplicationEntity:
+        """시작한 쪽 시각만 채운다. 나머지는 상대가 수락할 때 찬다."""
+        now = datetime.now(timezone.utc)
+        row = MatchApplicationOrm(
+            id=uuid4(),
+            match_id=match_id,
+            user_id=user_id,
+            user_accepted_at=now if side == SIDE_USER else None,
+            team_accepted_at=now if side == SIDE_TEAM else None,
+        )
+        self._session.add(row)
+        try:
+            self._session.commit()
+        except IntegrityError as exc:
+            self._session.rollback()
+            # 유스케이스가 먼저 걸러도 동시 요청 두 건은 통과한다.
+            # `uq_match_application` 이 마지막 방어선이다.
+            if _is_unique_violation(exc):
+                raise ApiError(
+                    409, "ALREADY_APPLIED", "이미 지원·제안된 건이 있습니다."
+                ) from exc
+            raise
+
+        loaded = self.find_application_by_id(row.id)
+        if loaded is None:
+            raise RuntimeError("지원 건을 만들었는데 다시 읽히지 않는다")
+        return loaded
+
+    def accept_application(self, application_id: UUID, side: str) -> ApplicationEntity:
+        column_name = (
+            MatchApplicationOrm.user_accepted_at
+            if side == SIDE_USER
+            else MatchApplicationOrm.team_accepted_at
+        )
+        self._session.execute(
+            update(MatchApplicationOrm)
+            .where(
+                MatchApplicationOrm.id == application_id,
+                # 🔴 비어 있을 때만 채운다. 이미 찬 값을 덮으면 수락 시각이 뒤로
+                # 밀려 "언제 확정됐나"가 틀어진다.
+                column_name.is_(None),
+            )
+            .values({column_name: datetime.now(timezone.utc)})
+        )
+        self._session.commit()
+
+        loaded = self.find_application_by_id(application_id)
+        if loaded is None:
+            raise RuntimeError("수락한 지원 건이 사라졌다")
+        return loaded
+
+    def _load_application(self, where) -> ApplicationEntity | None:
+        stmt = (
+            select(MatchApplicationOrm, _user.c.nickname)
+            .join(_user, _user.c.id == MatchApplicationOrm.user_id)
+            .where(where)
+        )
+        row = self._session.execute(stmt).first()
+        if row is None:
+            return None
+        return self._to_application(row[0], row[1])
+
+    def _to_application(self, row, nickname: str) -> ApplicationEntity:
+        return ApplicationEntity(
+            id=row.id,
+            match_id=row.match_id,
+            user_id=row.user_id,
+            nickname=nickname,
+            team_accepted_at=row.team_accepted_at,
+            user_accepted_at=row.user_accepted_at,
+        )

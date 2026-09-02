@@ -45,3 +45,25 @@ class MatchResponse(BaseModel):
     played_at: Rfc3339
     place: str
     needs: list[PositionNeedResponse]
+class ApplicationResponse(BaseModel):
+    """지원·제안 1건.
+
+    🔴 **`confirmed` 는 서버가 계산한다.** 두 시각을 클라이언트가 보고 판단하게 두면
+    확정 조건이 화면마다 갈린다(부록 D.5 — 매칭 확정은 사람이 한다).
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    match_id: UUID
+    user_id: UUID
+    nickname: str
+    team_accepted_at: Rfc3339 | None
+    user_accepted_at: Rfc3339 | None
+    confirmed: bool
+
+
+class ApplySchema(BaseModel):
+    """`user_id` 를 비우면 **본인이 지원**한다. 채우면 주장이 그 사람에게 제안한다."""
+
+    user_id: UUID | None = None

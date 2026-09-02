@@ -11,6 +11,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from uuid import UUID
 
+from app.match.domain.entities.application_entity import ApplicationEntity
 from app.match.domain.entities.match_entity import MatchEntity, PositionNeedEntity
 
 
@@ -39,3 +40,34 @@ class MatchPort(ABC):
 
     @abstractmethod
     def find_match(self, match_id: UUID) -> MatchEntity | None: ...
+
+    @abstractmethod
+    def user_exists(self, user_id: UUID) -> bool: ...
+
+    @abstractmethod
+    def find_application(
+        self, match_id: UUID, user_id: UUID
+    ) -> ApplicationEntity | None:
+        """경기당 1인 1건이라 이 둘이면 유일하다(부록 D.7)."""
+
+    @abstractmethod
+    def find_application_by_id(
+        self, application_id: UUID
+    ) -> ApplicationEntity | None: ...
+
+    @abstractmethod
+    def list_applications(self, match_id: UUID) -> list[ApplicationEntity]: ...
+
+    @abstractmethod
+    def create_application(
+        self, match_id: UUID, user_id: UUID, side: str
+    ) -> ApplicationEntity:
+        """지원(`side="user"`)이나 제안(`side="team"`)을 만든다.
+
+        **시작한 쪽의 시각만 채운다.** 나머지 한쪽은 상대가 수락할 때 찬다 —
+        그 둘이 다 차야 확정이다(부록 D.5).
+        """
+
+    @abstractmethod
+    def accept_application(self, application_id: UUID, side: str) -> ApplicationEntity:
+        """비어 있던 쪽 시각을 채운다."""

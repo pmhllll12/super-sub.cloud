@@ -1,8 +1,8 @@
 # API 계약 초안 — 인증 · 선수 카드
 
 > **상태:** 구현됨 — **전부 PostgreSQL에 붙었다. 고정 응답은 없다** · 2026-09-02 확인
-> **확인:** `cd fastapi && .venv/bin/pytest` → `277 passed`
-> (DB가 없는 환경에서는 `191 passed, 86 skipped`. 통합 테스트만 건너뛴다)
+> **확인:** `cd fastapi && .venv/bin/pytest` → `309 passed`
+> (DB가 없는 환경에서는 `217 passed, 92 skipped`. 통합 테스트만 건너뛴다)
 > **메모:** 스프린트 2(09.01~)의 Flutter 화면 두 개(로그인 · 선수 카드)에 필요한
 > 최소 범위. **응답 형태는 2026-08-25 이후 바뀌지 않았다** — 화면 쪽에서 고칠 것은 없다.
 
@@ -14,6 +14,7 @@
 | `POST /me/card` | **실제 DB** (2026-09-02 추가 — 카드는 여기서만 생긴다, 3장) |
 | `POST /teams` · `GET /teams/{id}` · `POST`·`DELETE /teams/{id}/members` | **실제 DB** (2026-09-02 추가, 3-3절) |
 | `POST /teams/{id}/matches` · `GET /matches/{id}` | **실제 DB** (2026-09-02 추가, 3-4절) |
+| `POST`·`GET /matches/{id}/applications` · `POST .../accept` | **실제 DB** (2026-09-02 추가, 3-5절) |
 | `GET /admin/users` · `GET /admin/users/{id}` · `DELETE /admin/users/{id}` | **실제 DB** (2026-08-31 추가, 3-2절) |
 
 ## 눌러볼 수 있는 값
@@ -904,6 +905,91 @@ A를 권하는 이유는 데이터가 이미 그렇게 말하고 있어서다 �
 | `basketball` | `G` 가드 · `F` 포워드 · `C` 센터 |
 
 **확정된 목록이 아니다.** 스쿼드(`squad_member`)가 들어올 때 세분화가 필요하면 늘린다.
+
+---
+
+## 3-5. 지원과 제안 (2026-09-02 추가)
+
+경기 1건에 대한 한 사람의 지원 1건이다. **사람이 지원**하거나 **팀이 제안**하고,
+**양쪽이 다 수락해야 확정**이다.
+
+### 🔴 상태값이 없다 — 두 시각으로 읽는다
+
+부록 D.5 의 「매칭 확정은 사람이 한다」를 스키마로 강제한 자리다. `status` 하나로
+두면 확정 조건이 코드에만 남는다.
+
+| 채워진 것 | 뜻 |
+|---|---|
+| `user_accepted_at` 만 | 사람이 **지원**했다. 팀의 수락을 기다린다 |
+| `team_accepted_at` 만 | 팀이 **제안**했다. 그 사람의 수락을 기다린다 |
+| 둘 다 | **확정** (`confirmed: true`) |
+
+`confirmed` 는 **서버가 계산해서 내려준다.** 두 시각만 주고 클라이언트가 판단하게
+두면 확정 조건이 화면마다 갈린다.
+
+### `POST /api/v1/matches/{match_id}/applications`
+
+인증 필요. **본문을 비우면 본인이 지원**한다. `user_id` 를 담으면 주장이 제안한다.
+
+```json
+{ "user_id": "3f1c..." }
+```
+
+`201 Created`
+
+```json
+{
+  "id": "8d2f...", "match_id": "5c2a...", "user_id": "3f1c...",
+  "nickname": "홍길동",
+  "team_accepted_at": null,
+  "user_accepted_at": "2026-09-02T05:00:00Z",
+  "confirmed": false
+}
+```
+
+| 에러 | code |
+|---|---|
+| 403 | `FORBIDDEN` — 주장이 아닌데 남을 제안했다 |
+| 404 | `MATCH_NOT_FOUND` · `USER_NOT_FOUND` |
+| 409 | `ALREADY_APPLIED` — 경기당 1인 1건이다(부록 D.7) |
+| 409 | `TEAM_MEMBER_CANNOT_APPLY` — **그 팀 소속**이다 |
+| 422 | `PAST_MATCH` — 이미 지난 경기다 |
+
+> `TEAM_MEMBER_CANNOT_APPLY` 는 **앱이 정한 규칙**이다. 이 서비스는 팀에 없는 사람을
+> 부르는 용병 매칭이라(1장) 소속 선수의 "지원"은 뜻이 없고 적합도(SFR-006)도 외부인
+> 기준으로 계산된다. 팀 내부 참가 신청까지 담게 되면 `application_rules.can_apply`
+> 를 고친다.
+
+### `POST /api/v1/matches/{match_id}/applications/{application_id}/accept`
+
+인증 필요. **비어 있는 반대쪽**을 채운다. 둘 다 차면 `confirmed` 가 참이 된다.
+
+`200 OK` — 위와 같은 형태.
+
+| 에러 | code |
+|---|---|
+| 403 | `FORBIDDEN` — 이 건과 무관한 사람이다 |
+| 404 | `MATCH_NOT_FOUND` · `APPLICATION_NOT_FOUND` |
+| 409 | `ALREADY_ACCEPTED` — 자기 쪽은 이미 차 있다 |
+
+🔴 **무관한 사람에게 404 가 아니라 403 을 준다.** 404 로 주면 "그 id 의 지원 건이
+있는가"가 응답으로 새어 나간다. 반대로 **없는 id 는 404** 다 — 관계된 사람에게는
+없다는 사실을 알려야 한다.
+
+### `GET /api/v1/matches/{match_id}/applications`
+
+인증 필요. **주장은 전부, 그 외에는 자기 건만** 본다 — 지원자 명단은 팀의 정보다.
+먼저 시작된 건이 앞에 온다(`created_at` 이 없으므로 먼저 찬 수락 시각으로 센다).
+
+`200 OK` — 위 형태의 배열.
+
+### 아직 없는 것
+
+- **취소·거절** — 지원을 물리거나 팀이 거절하는 경로. 스키마에 거절 시각 컬럼이
+  없어서(부록 D 의 ERD 에 없다) 행을 지울지 컬럼을 늘릴지부터 정해야 한다
+- **적합도**(`fitness_score`, SFR-006) · **추천**(`recommendation`, SFR-007) —
+  도메인 ④ 의 나머지 둘
+- 확정 뒤의 알림 — 알림 인프라가 없다
 
 ---
 
