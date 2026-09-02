@@ -791,6 +791,7 @@ ssh supersub 'systemctl is-active postgresql supersub-api'   # active active
   ⚠️ **같은 디스크에 쌓입니다** — 인스턴스가 죽으면 함께 사라지므로 밖으로
   옮기는 것(S3 등)은 비용이 걸린 별도 결정입니다
 - 아직 없는 것: nginx·TLS · `pgvector`(저장소에 패키지가 없어 소스 빌드 필요)
+- 콘솔에서 무엇을 누르는지는 개발 로그 [박민호 님께 — 탄력적 IP와 api 서브도메인]({{ "/devlog/" | relative_url }})에 적어 두었습니다
 - **담당**: 박민호(탄력적 IP·DNS·포트) · **제기**: 정어진 · **기한**: ⑴⑵ 는 지금, 포트는 외부 공개가 필요할 때
 
 ### 9. `agent/`·`flutter/` 에 진입점 문서가 없습니다 (2026-09-02)
