@@ -33,7 +33,7 @@ sys.path.insert(0, "/mnt/d/supersub-phaseA/labeling")
 sys.path.insert(0, "/home/ho/projects/super-sub.cloud/agent/src")
 from targets import clip_ids, load_candidates  # noqa: E402
 
-from supersub_agent.pose import POSE_MODEL, read_frames  # noqa: E402  (읽기 전용 import)
+from supersub_agent.pose import DEFAULT_TARGET_FPS, POSE_MODEL, read_frames  # noqa: E402  (읽기 전용 import)
 
 ROOT = Path("/mnt/d/supersub-phaseA")
 OUT = ROOT / "eval_b2"
@@ -58,7 +58,7 @@ def main() -> None:
 
     for i, cid in enumerate(clip_ids(), 1):
         per_frame, wh, _ = load_candidates(cid)
-        frames, _, _ = read_frames(str(ROOT / "clips" / f"{cid}.mp4"), target_fps=15)
+        frames, _, _ = read_frames(str(ROOT / "clips" / f"{cid}.mp4"), target_fps=DEFAULT_TARGET_FPS)
         if len(frames) != len(per_frame):
             raise RuntimeError(f"{cid}: 프레임 {len(frames)} != 후보캐시 {len(per_frame)}")
 

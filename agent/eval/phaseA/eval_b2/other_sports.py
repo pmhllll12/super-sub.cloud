@@ -21,6 +21,7 @@ import torch
 sys.path.insert(0, "/home/ho/projects/super-sub.cloud/agent/src")
 from supersub_agent.pose import (  # noqa: E402  (읽기 전용)
     COCO_PERSON_LABEL,
+    DEFAULT_TARGET_FPS,
     PERSON_DETECTOR,
     POSE_MODEL,
     read_frames,
@@ -62,7 +63,7 @@ def main() -> None:
 
     for vi, p in enumerate(vids, 1):
         t0 = time.time()
-        frames, _, _ = read_frames(str(p), target_fps=15)
+        frames, _, _ = read_frames(str(p), target_fps=DEFAULT_TARGET_FPS)
         prev = {m: None for m in MODES}
         n_multi = 0
         picks_hist = {m: [] for m in MODES}

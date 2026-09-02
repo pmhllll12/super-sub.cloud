@@ -9,7 +9,7 @@ dev="cuda" if torch.cuda.is_available() else "cpu"
 proc=AutoProcessor.from_pretrained(P.PERSON_DETECTOR)
 det=RTDetrForObjectDetection.from_pretrained(P.PERSON_DETECTOR).to(dev).eval()
 for p in sorted(Path("/home/ho/projects/super-sub.cloud/agent/data").glob("*.mp4")):
-    frames,src,sf=P.read_frames(str(p),target_fps=15)
+    frames,src,sf=P.read_frames(str(p),target_fps=P.DEFAULT_TARGET_FPS)
     cnt=[];agree=[];ious=[];prev=None
     for fr in frames:
         rgb=cv2.cvtColor(fr,cv2.COLOR_BGR2RGB)

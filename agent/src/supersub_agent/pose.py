@@ -27,6 +27,19 @@ PERSON_DETECTOR = "PekingU/rtdetr_r50vd_coco_o365"
 POSE_MODEL = "usyd-community/vitpose-base-simple"
 COCO_PERSON_LABEL = 0
 
+# 샘플링 목표 fps의 **단일 진실원**. 서비스도 평가도 이 값을 쓴다.
+#
+# 15에서 30으로 올렸다(2026-09-02). 15fps에서는 임팩트가 실제로 일어난 프레임이
+# 격자에 없는 경우가 많아 **측정 자체가 성립하지 않았다** — 밴드 적중 31.8%가
+# 30fps에서 49.8%로 올라간다. 더 정확해진 것이 아니라 **다른 프레임을 고르게
+# 된 것**이고, 어느 쪽이 옳은지는 정답이 있어야 말할 수 있다(미결 5번 보류).
+# 60까지 올려도 +3.7pp뿐이고 평가셋 39클립 중 38건이 30fps 이하라 30에서 멈춘다.
+#
+# 평가 스크립트가 리터럴 15를 들고 있어서 서비스와 갈라져 있었다(미결 10번).
+# 리터럴을 쓰지 말고 이 상수를 import해서 쓸 것 — 값이 바뀌면 같이 따라와야
+# 평가가 서비스의 동작점을 재는 의미가 있다.
+DEFAULT_TARGET_FPS = 30
+
 # 검출기는 COCO 80클래스를 내는데 지금까지 person만 쓰고 나머지를 버렸다.
 # 도구 검출에 새 모델은 필요 없다 — 같은 forward 결과를 재사용하므로 추론 비용이
 # 늘지 않는다. 셔틀콕처럼 COCO에 없는 물체는 별도 학습이 필요하다.
@@ -75,7 +88,7 @@ class PoseResult:
     # 프레임을 다시 얻는 데 필요한 것. video_path가 None이면 프레임이 없는
     # 결과다(합성 키포인트 경로) — load_frames()가 None을 돌려준다.
     video_path: str | None = None
-    target_fps: int = 15       # 추출 때 쓴 값. 재디코딩이 같은 프레임을 골라야 한다.
+    target_fps: int = DEFAULT_TARGET_FPS   # 추출 때 쓴 값. 재디코딩이 같은 프레임을 골라야 한다.
     # 도구 궤적: 이름 → (T, 3) [중심 x, 중심 y, 신뢰도].
     # 미검출 프레임은 신뢰도 0으로 채운다 — 키포인트와 같은 규약이다.
     objects: dict[str, np.ndarray] = field(default_factory=dict)
@@ -122,7 +135,7 @@ class PoseResult:
 
 
 def read_frames(
-    video_path: str | Path, target_fps: int = 15, max_frames: int = 300
+    video_path: str | Path, target_fps: int = DEFAULT_TARGET_FPS, max_frames: int = 300
 ) -> tuple[list[np.ndarray], float, float]:
     """OpenCV로 디코딩하고 target_fps에 가장 가까운 정수 간격으로 다운샘플링한다.
 
@@ -239,7 +252,7 @@ def _record_input_observation(result: PoseResult, rubric_key: str | None) -> Non
 
 def extract_keypoints(
     video_path: str | Path,
-    target_fps: int = 15,
+    target_fps: int = DEFAULT_TARGET_FPS,
     device: str | None = None,
     observe: bool = True,
     rubric_key: str | None = None,

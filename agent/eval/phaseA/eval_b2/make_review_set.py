@@ -111,14 +111,14 @@ def main() -> None:
     print(f"review cases: {len(rows)}  (clips {len({r['clip_id'] for r in rows})})")
 
     # 렌더 — 프레임 디코딩은 클립당 한 번만 한다
-    from supersub_agent.pose import read_frames
+    from supersub_agent.pose import DEFAULT_TARGET_FPS, read_frames
     need = defaultdict(list)
     for r in rows:
         need[r["clip_id"]].append(r)
     for cid, rs in need.items():
         per_frame, wh, _ = load_candidates(cid)
         vid = ROOT / "clips" / f"{cid}.mp4"
-        frames_img, _, _ = read_frames(str(vid), target_fps=15)
+        frames_img, _, _ = read_frames(str(vid), target_fps=DEFAULT_TARGET_FPS)
         for r in rs:
             f = int(r["frame"])
             img = draw(frames_img[f], per_frame[f], wh)

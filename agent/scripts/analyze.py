@@ -24,7 +24,7 @@ from supersub_agent.features import (  # noqa: E402
     verify_rubric_coverage,
 )
 from supersub_agent.judge import Judge  # noqa: E402
-from supersub_agent.pose import extract_keypoints  # noqa: E402
+from supersub_agent.pose import DEFAULT_TARGET_FPS, extract_keypoints  # noqa: E402
 from supersub_agent.scoring import aggregate, load_rubric  # noqa: E402
 
 
@@ -33,7 +33,7 @@ def main() -> None:
     ap.add_argument("video", type=Path)
     ap.add_argument("--rubric", default="rubrics/football_instep_shot.yaml")
     ap.add_argument("--model", default="1.2B", choices=["1.2B", "2.4B", "7.8B"])
-    ap.add_argument("--fps", type=int, default=15)
+    ap.add_argument("--fps", type=int, default=DEFAULT_TARGET_FPS)
     ap.add_argument(
         "--repeat", type=int, default=1,
         help="같은 측정값으로 판정을 N회 반복해 재현성을 확인한다.",

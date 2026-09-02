@@ -48,9 +48,9 @@ def sampled_frames(clip_path: Path) -> list[np.ndarray]:
     production pose.read_frames를 그대로 import한다 — 여기서 규칙을 다시 쓰면
     간격이 어긋나 후보 배열과 프레임이 대응하지 않는다. 읽기만 하고 고치지 않는다.
     """
-    from supersub_agent.pose import read_frames
+    from supersub_agent.pose import DEFAULT_TARGET_FPS, read_frames
 
-    frames, _, _ = read_frames(str(clip_path), target_fps=15)
+    frames, _, _ = read_frames(str(clip_path), target_fps=DEFAULT_TARGET_FPS)
     return frames
 
 

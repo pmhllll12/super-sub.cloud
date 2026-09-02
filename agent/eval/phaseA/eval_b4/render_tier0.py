@@ -56,7 +56,7 @@ def draw(frame, boxes, wh):
 
 
 def main() -> None:
-    from supersub_agent.pose import read_frames
+    from supersub_agent.pose import DEFAULT_TARGET_FPS, read_frames
 
     OUT.mkdir(exist_ok=True)
     need = defaultdict(list)
@@ -66,7 +66,7 @@ def main() -> None:
     form = []
     for cid, items in need.items():
         per_frame, wh, _ = load_candidates(cid)
-        imgs, _, _ = read_frames(str(ROOT / "clips" / f"{cid}.mp4"), target_fps=15)
+        imgs, _, _ = read_frames(str(ROOT / "clips" / f"{cid}.mp4"), target_fps=DEFAULT_TARGET_FPS)
         for ratio, f in items:
             img = draw(imgs[f], per_frame[f], wh)
             hdr = np.zeros((30, img.shape[1], 3), np.uint8)
