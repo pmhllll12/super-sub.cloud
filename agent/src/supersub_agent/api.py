@@ -19,6 +19,7 @@ import re
 import time
 import uuid
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 from fastapi import FastAPI, HTTPException, UploadFile
@@ -27,6 +28,9 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from .features import InsufficientQuality, extract_features, verify_rubric_coverage
 from .judge import Judge
 from .scoring import CONFIDENT_MARGIN, RubricError, aggregate, discover_rubrics
+
+if TYPE_CHECKING:                      # pose는 무겁다(torch·cv2) — 실행 시에는 늦게 부른다
+    from .pose import PoseResult
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 RUBRIC_DIR = ROOT / "rubrics"
@@ -142,10 +146,16 @@ def run_pipeline(
     source: str,
     objects: dict[str, np.ndarray] | None = None,
     rubric_key: str | None = None,
-    frames: list[np.ndarray] | None = None,
+    pose: "PoseResult | None" = None,
     fps: float = 12.0,
     swing_side: str = "auto",
 ) -> dict:
+    """pose — 오버레이용 프레임의 **출처**. 프레임 자체가 아니다.
+
+    프레임은 미리보기에만 쓰이고 미리보기는 판정이 끝난 뒤에 만든다. 리스트로
+    받으면 측정·판정이 끝날 때까지 4K 300장을 붙들고 있게 되므로, 필요한
+    시점에 load_frames()로 다시 디코딩한다. 합성 경로는 None을 준다.
+    """
     rubric = get_rubric(rubric_key)
 
     t0 = time.time()
@@ -174,6 +184,10 @@ def run_pipeline(
         margin = criterion.band_margin(features)
         item["margin"] = round(margin, 3)
         item["confident"] = margin >= CONFIDENT_MARGIN
+
+    # 프레임은 **여기서** 얻는다 — 판정까지 다 끝난 뒤라 메모리에 겹치지 않는다.
+    # 두 미리보기가 같은 목록을 나눠 쓰므로 디코딩은 한 번뿐이다.
+    frames = pose.load_frames() if pose is not None else None
 
     return {
         "source": source,
@@ -274,10 +288,12 @@ async def api_video(
         # 입력 분포 관측은 extract_keypoints 안에서 일어난다(observe 기본 True).
         # 여기서 따로 기록하면 한 분석이 두 번 남는다.
         pose = extract_keypoints(tmp_path, rubric_key=rubric)
+        # 미리보기 렌더링(= 프레임 재디코딩)이 이 try 안에서 끝나야 한다.
+        # finally가 임시 파일을 지우므로 그 뒤에는 프레임을 얻을 수 없다.
         return JSONResponse(
             run_pipeline(
                 pose.keypoints, file.filename or "video", pose.objects, rubric,
-                frames=pose.frames, fps=pose.sampled_fps, swing_side=side,
+                pose=pose, fps=pose.sampled_fps, swing_side=side,
             )
         )
     except InsufficientQuality as exc:

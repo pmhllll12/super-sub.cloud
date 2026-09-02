@@ -210,7 +210,7 @@ def test_pose_result_still_constructs_without_candidate_counts():
     """이 필드를 모르는 기존 호출부가 그대로 동작한다."""
     import numpy as np
     r = PoseResult(
-        keypoints=np.zeros((3, 17, 3)), frames=[], source_fps=30, sampled_fps=15)
+        keypoints=np.zeros((3, 17, 3)), source_fps=30, sampled_fps=15)
     assert r.candidate_counts == []
     assert r.eligible_candidate_counts() == []
     assert r.frame_to_seconds(15) == pytest.approx(1.0)   # 기존 동작 유지
@@ -219,7 +219,7 @@ def test_pose_result_still_constructs_without_candidate_counts():
 def test_pose_result_exposes_both_count_views():
     import numpy as np
     r = PoseResult(
-        keypoints=np.zeros((2, 17, 3)), frames=[], source_fps=30, sampled_fps=15,
+        keypoints=np.zeros((2, 17, 3)), source_fps=30, sampled_fps=15,
         candidate_counts=[(3, 1), (2, 2)])
     assert r.raw_candidate_counts() == [3, 2]
     assert r.eligible_candidate_counts() == [1, 2]
@@ -390,6 +390,21 @@ def test_production_pose_result_always_has_candidate_counts(
 
     assert len(result.candidate_counts) == len(result.keypoints)
     assert all(e == 2 for e in result.eligible_candidate_counts())
+
+
+def test_production_result_can_get_its_frames_back(tmp_path, monkeypatch, stub_models):
+    """결과가 프레임을 들고 있지 않아도 렌더링 경로가 되찾을 수 있어야 한다.
+
+    프레임 t와 키포인트 t가 같은 장면이어야 오버레이가 맞는다 — 개수가 어긋나면
+    미리보기가 다른 프레임에 스켈레톤을 그린다.
+    """
+    monkeypatch.setenv("SUPERSUB_METRICS_SINK", str(tmp_path / "m.jsonl"))
+    clip = _write_clip(tmp_path / "c.avi", n_frames=6, fps=30.0)
+
+    result = pose_mod.extract_keypoints(clip, device="cpu", target_fps=15)
+
+    assert result.video_path == clip and result.target_fps == 15
+    assert len(result.load_frames()) == len(result.keypoints)
 
 
 def test_sink_failure_does_not_break_extraction(tmp_path, monkeypatch, stub_models):

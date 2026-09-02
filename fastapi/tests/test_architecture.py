@@ -179,3 +179,74 @@ class TestOrmRegistration:
             "alembic/env.py 에 등록되지 않은 ORM 이 있다 — DROP TABLE 이 생성된다:\n  "
             + "\n  ".join(missing)
         )
+
+
+class TestForeignKeyTargets:
+    def test_외래키가_가리키는_테이블이_런타임_metadata_에_있다(self):
+        """문자열 `ForeignKey("sport.code")` 는 **같은 metadata 에 대상이 있어야**
+        해석된다. 없으면 앱이 그 모델을 처음 쓰는 순간 죽는다.
+
+            NoReferencedTableError: ... could not find table 'sport'
+
+        🔴 **`alembic/env.py` 의 등록은 이걸 막아 주지 않는다.** 그쪽은 마이그레이션
+        때만 임포트되고 런타임에는 아무 역할도 하지 않는다. 실제로 2026-09-01 에
+        `sport` 를 추가하면서 이 구멍에 빠졌다 — env.py 에는 등록했는데 리포지토리가
+        없는 모델이라 코드 경로로는 로드되지 않았고, DB 테스트 18건이 한꺼번에 깨졌다.
+
+        참조만 되고 아무도 임포트하지 않는 모델은 그 컨텍스트의 `orm/__init__.py`
+        에서 끌어온다.
+        """
+        import app.main  # noqa: F401  — 앱이 실제로 로드하는 경로를 그대로 태운다
+        from app.core.database import Base
+
+        known = set(Base.metadata.tables)
+        dangling = sorted(
+            f"{table.name}.{fk.parent.name} -> {fk.target_fullname}"
+            for table in Base.metadata.tables.values()
+            for fk in table.foreign_keys
+            if fk.target_fullname.split(".")[0] not in known
+        )
+        assert not dangling, (
+            "외래키 대상 테이블이 런타임 metadata 에 없다 — 그 모델을 쓰는 순간 "
+            "NoReferencedTableError 로 죽는다.\n"
+            "해당 컨텍스트의 orm/__init__.py 에서 임포트할 것:\n  "
+            + "\n  ".join(dangling)
+        )
+
+
+class TestMigrationPrivileges:
+    """마이그레이션은 **앱 계정**으로 돈다. 그 계정이 못 하는 일을 넣으면 안 된다."""
+
+    def test_마이그레이션이_확장을_만들지_않는다(self):
+        """`CREATE EXTENSION` 은 마이그레이션이 아니라 환경 준비 단계의 일이다.
+
+        🔴 **확장마다 필요한 권한이 다르다.** `trusted = true` 인 확장(`hstore` 등)은
+        DB 소유자면 만들 수 있지만, **`vector` 는 trusted 가 아니라 슈퍼유저여야 한다.**
+        실측(2026-09-01, 로컬 PostgreSQL 18):
+
+            supersub 는 supersub DB 의 소유자이고 슈퍼유저가 아니다
+              CREATE EXTENSION hstore        -> 만들어졌다 (trusted)
+              CREATE EXTENSION postgres_fdw  -> permission denied to create extension
+
+        그래서 `vector` 를 마이그레이션에 넣으면 **배포에서 권한 오류로 멈춘다** —
+        그것도 마이그레이션 도중이라 스키마가 반쯤 올라간 상태로 멈춘다.
+
+        ⚠️ **로컬에서 통과했다는 것이 근거가 되지 못한다.** 컨테이너로 띄운
+        PostgreSQL 은 초기 사용자가 슈퍼유저인 경우가 많아 그런 환경에서는
+        조용히 통과한다. 그래서 권한이 아니라 **글자로** 막는다.
+
+        준비 절차는 `docs/deployment.md` 에 있다.
+        """
+        versions = APP.parent / "alembic" / "versions"
+        offenders = []
+        for path in sorted(versions.glob("*.py")):
+            if "__pycache__" in path.parts:
+                continue
+            text = path.read_text(encoding="utf-8").lower()
+            if "create extension" in text:
+                offenders.append(str(path.relative_to(APP.parent)).replace("\\", "/"))
+        assert not offenders, (
+            "마이그레이션에 CREATE EXTENSION 이 있다 — 앱 계정 권한으로는 배포에서 멈춘다.\n"
+            "확장은 docs/deployment.md 의 준비 단계에서 슈퍼유저가 만든다:\n  "
+            + "\n  ".join(offenders)
+        )

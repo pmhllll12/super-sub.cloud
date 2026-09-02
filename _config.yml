@@ -82,3 +82,8 @@ exclude:
   - supersub-preview.service
   - fastapi/
   - www/
+  # 팀·개인용 작업 지침이라 공개 사이트에 실을 것이 아니다.
+  # ⚠️ 이건 **Jekyll 발행 제외**일 뿐 git 과는 무관하다 — CLAUDE.md 는 그대로
+  #    저장소에 있고 pull 하면 받는다(fastapi/ 와 같다).
+  - CLAUDE.md
+  - CLAUDE.local.md

@@ -104,7 +104,7 @@ def seed_teams(session: Session) -> list[str]:
     ]:
         if _missing(session, TeamOrm, team_id):
             session.add(
-                TeamOrm(id=team_id, name=name, region=region, sport_code="futsal")
+                TeamOrm(id=team_id, name=name, region=region, sport_code="football")
             )
             done.append(f"team:{name}")
     session.flush()
@@ -141,7 +141,7 @@ def seed_card(session: Session) -> list[str]:
         if _missing(session, TitleDefinitionOrm, code):
             session.add(
                 TitleDefinitionOrm(
-                    code=code, label=label, category=category, sport_code="futsal"
+                    code=code, label=label, category=category, sport_code="football"
                 )
             )
             done.append(f"title_definition:{code}")

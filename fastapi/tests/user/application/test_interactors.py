@@ -34,7 +34,7 @@ def _membership(name: str, left_at: datetime | None) -> MembershipEntity:
         team_id=uuid4(),
         name=name,
         region="서울",
-        sport_code="futsal",
+        sport_code="football",
         role="member",
         joined_at=datetime(2026, 7, 1, tzinfo=timezone.utc),
         left_at=left_at,
