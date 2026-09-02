@@ -88,21 +88,45 @@ def sampled_length(nframes_src: int, src_fps: float, target_fps: int) -> int:
     return min(MAX_FRAMES, math.ceil(nframes_src / sampling_step(src_fps, target_fps)))
 
 
-def remap_label_frame(label_frame: int, src_fps: float, target_fps: int) -> int:
-    """labels.json의 frame(15fps 샘플 인덱스)을 target_fps의 샘플 인덱스로.
+def step_of_cache(src_fps: float, sampled_fps: float) -> int:
+    """**npz가 실제로 어느 격자인지**를 저장된 sampled_fps에서 직접 읽는다.
 
-    target_fps == LABEL_TARGET_FPS 이면 항등이다.
+    read_frames가 `sampled_fps = src_fps / step`으로 저장하므로 정확히 복원된다.
+
+    목표 fps 상수를 참조하지 않는 것이 요점이다. 캐시는 그것이 만들어질 때의
+    격자를 그대로 들고 있고, 상수는 나중에 바뀐다 — 상수를 믿으면 캐시를 다시
+    뽑기 전까지 **옛 격자에 새 인덱스를 적용**하게 된다.
+    """
+    return max(1, round(src_fps / sampled_fps))
+
+
+def remap_label_frame(
+    label_frame: int,
+    src_fps: float,
+    target_fps: int | None = None,
+    *,
+    step_now: int | None = None,
+) -> int:
+    """labels.json의 frame(15fps 샘플 인덱스)을 현재 격자의 샘플 인덱스로.
+
+    격자는 둘 중 하나로 지정한다 — 목표 fps(`target_fps`)이거나, 캐시에서 읽어
+    낸 실제 step(`step_now`)이다. **캐시를 읽을 때는 step_now 쪽을 쓴다.**
+
+    step_now == step_label 이면 항등이다.
 
     step 배수가 정수가 아니면 원본 프레임이 새 격자에 **없다**는 뜻이다. 이
     데이터셋에서는 발생하지 않지만(39클립 전부 배수 2.0 또는 1.0), 조용히
     반올림해 다른 프레임을 가리키게 두면 안 되므로 막는다.
     """
     step_label = sampling_step(src_fps, LABEL_TARGET_FPS)
-    step_now = sampling_step(src_fps, target_fps)
+    if step_now is None:
+        if target_fps is None:
+            raise ValueError("target_fps 또는 step_now 중 하나는 있어야 한다")
+        step_now = sampling_step(src_fps, target_fps)
     source_index = label_frame * step_label
     if source_index % step_now:
         raise ValueError(
-            f"원본 프레임 {source_index}가 target_fps={target_fps}의 격자에 없다 "
+            f"원본 프레임 {source_index}가 현재 격자에 없다 "
             f"(step {step_label}→{step_now}). 라벨을 다시 붙여야 한다."
         )
     return source_index // step_now
@@ -150,7 +174,7 @@ def clip_ids() -> list[str]:
     return sorted(p.stem for p in CAND.glob("*.npz"))
 
 
-def enumerate_targets(target_fps: int = LABEL_TARGET_FPS) -> list[dict]:
+def enumerate_targets(target_fps: int | None = None) -> list[dict]:
     """라벨 대상 117개를 결정론적으로 만든다.
 
     반환 순서가 곧 라벨링 순서이고, 평가 스크립트도 같은 순서를 재현한다.
@@ -160,23 +184,28 @@ def enumerate_targets(target_fps: int = LABEL_TARGET_FPS) -> list[dict]:
     격자에서 ratio를 다시 계산하지 않는다 — 그러면 반올림 때문에 저장된 라벨과
     다른 순간을 가리킨다(이 데이터셋 117개 중 42개).
 
-    target_fps == LABEL_TARGET_FPS 이면 환산이 항등이라 이전 동작과 같다.
+    **격자는 후보 캐시에서 읽는다** (`step_of_cache`). 목표 fps 상수를 기본값으로
+    두면 캐시를 다시 뽑기 전에 상수만 바뀌었을 때 **옛 격자에 새 인덱스를
+    적용**하게 된다 — 조용히 어긋나고 아무 예외도 나지 않는다. target_fps를
+    명시하면 그 값을 대신 쓴다(검증용).
     """
     specs = clip_specs()
     targets: list[dict] = []
     for cid in clip_ids():
-        per_frame, _, _ = load_candidates(cid)
+        per_frame, _, cache_fps = load_candidates(cid)
         n_frames = len(per_frame)
         spec = specs[cid]
+        step_now = (sampling_step(spec["fps"], target_fps) if target_fps is not None
+                    else step_of_cache(spec["fps"], cache_fps))
         # 라벨이 붙은 격자의 길이. 현재 npz가 어느 fps로 뽑혔든 이 값은 같다.
         n_label = sampled_length(spec["nframes"], spec["fps"], LABEL_TARGET_FPS)
         for ratio in RATIOS:
             label_frame = frame_at(n_label, ratio)
-            t = remap_label_frame(label_frame, spec["fps"], target_fps)
+            t = remap_label_frame(label_frame, spec["fps"], step_now=step_now)
             if not 0 <= t < n_frames:
                 raise ValueError(
                     f"{cid}: 환산 프레임 {t}가 후보 캐시 범위(0~{n_frames - 1}) 밖이다. "
-                    f"라벨 격자 {n_label}프레임, target_fps={target_fps}."
+                    f"라벨 격자 {n_label}프레임, 현재 step={step_now}."
                 )
             targets.append(
                 {

@@ -22,7 +22,9 @@ ROOT = Path("/mnt/d/supersub-phaseA")
 B4 = ROOT / "eval_b4"
 OUT = B4 / "review_cases"
 
-sys.path.insert(0, str(ROOT / "labeling"))
+# 코드는 저장소, 데이터는 /mnt/d. /mnt/d 사본은 갱신되지 않아 조용히 옛
+# 동작을 한다 (2026-09-02에 실제로 겪었다).
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "labeling"))
 sys.path.insert(0, "/home/ho/projects/super-sub.cloud/agent/src")
 from targets import load_candidates  # noqa: E402
 

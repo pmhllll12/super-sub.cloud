@@ -39,8 +39,10 @@ PHASE_A = Path("/mnt/d/supersub-phaseA")
 AGENT = Path("/home/ho/projects/super-sub.cloud/agent")
 OUT = Path(__file__).resolve().parent
 
-sys.path.insert(0, str(PHASE_A / "eval_b2"))
-sys.path.insert(0, str(PHASE_A / "labeling"))
+# 코드는 저장소, 데이터는 /mnt/d. /mnt/d 사본은 갱신되지 않아 조용히 옛
+# 동작을 한다 (2026-09-02에 실제로 겪었다).
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "eval_b2"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "labeling"))
 sys.path.insert(0, str(AGENT / "src"))
 
 import eval_b2 as e2  # noqa: E402  (selector 구현 — 읽기 전용 import)
