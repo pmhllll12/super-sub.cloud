@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
-import { useLeaving } from '@/lib/pageTransition'
+import { useEffect, useRef, useState } from 'react'
+import { useHideChrome, useLeaving } from '@/lib/pageTransition'
 
 /**
  * 한 화면을 **번갈아 쓴다.**
@@ -24,6 +24,13 @@ import { useLeaving } from '@/lib/pageTransition'
  * (globals.css 의 `.ss-figure-mark-ch` 주석 참고) 지금 남은 것은 페이지 안뿐이다.
  *   `data-ss-scrolled='true'`  표지 글이 나가 있다
  *   `data-ss-gates='out'`      두 문이 나가는 중이다(되돌아가는 길)
+ *
+ * 🔴 **맨 위 줄(목적지 글자 · 내 프로필)도 같이 나간다**(사용자 요청). 두 문이
+ * 화면 왼쪽에 서면 위쪽 항목들은 이 화면에서 할 일이 없고, 남아 있으면 아치
+ * 글자 · 두 판과 함께 셋이 겹쳐 어수선하다. 헤더는 **레이아웃**이 그리므로 이
+ * 표시로는 못 건드린다 — 라우팅을 건너 살아 있는 `useHideChrome()` 으로
+ * 말을 건다(영상 분석에서 판이 화면을 채울 때 쓰는 것과 같은 길). 워드마크는
+ * 그 연출에서 빠져 있어 그대로 남는다(globals.css 의 `[data-enter]` 주석).
  */
 
 /** 두 문이 다 나가고 표지 글이 돌아오기까지. `globals.css` 의 500ms 와 짝이다. */
@@ -60,6 +67,13 @@ let generation = 0
 
 export default function HeroGate() {
   /**
+   * 두 문이 나와 있는가. 표시(`data-ss-scrolled`)와 같은 값이지만 **React 쪽에도**
+   * 둔다 — 헤더는 CSS 선택자가 닿지 않는 레이아웃에 있어 상태로만 말할 수 있다.
+   */
+  const [away, setAway] = useState(false)
+  useHideChrome(away)
+
+  /**
    * 🔴 떠나는 중에는 아무것도 되돌리지 않는다 — 있던 자리 그대로 나가야 한다.
    * ref 로 들고 있는 이유는 아래 effect 를 다시 걸지 않기 위해서다.
    */
@@ -83,27 +97,34 @@ export default function HeroGate() {
     set('ssScrolled', 'false')
     set('ssGates', null)
 
-    const away = () => el.dataset.ssScrolled === 'true'
+    /** 🔴 정본은 **표시**다 — 위 state 는 헤더에 전할 사본일 뿐이다. */
+    const out = () => el.dataset.ssScrolled === 'true'
 
     const show = () => {
-      if (away()) return
+      if (out()) return
       set('ssGates', null)
       set('ssScrolled', 'true')
+      setAway(true)
     }
 
     /** 문이 먼저 나가고, 그 뒤에 표지 글이 돌아온다. */
     const back0 = () => {
-      if (!away() || back) return
+      if (!out() || back) return
       set('ssGates', 'out')
       back = window.setTimeout(() => {
         back = 0
         set('ssScrolled', 'false')
         set('ssGates', null)
+        // 헤더는 표지 글과 **같이** 돌아온다 — 두 문이 다 나간 뒤다.
+        setAway(false)
       }, GATES_OUT_MS)
     }
 
     const move = (dir: number) => {
       if (dir === 0 || leavingRef.current) return
+      // 🔴 목록 판이 펼쳐져 있으면 **굴림은 그쪽 것**이다(`MarketGates` 가
+      //    이 표시를 켠다). 안 그러면 목록을 위로 굴리다 두 문까지 나간다.
+      if (el.dataset.ssDetail === 'open') return
       if (dir > 0) show()
       else back0()
     }
