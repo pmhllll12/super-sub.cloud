@@ -6,12 +6,15 @@ GPU도 네트워크도 쓰지 않는다. vLLM 서버는 urllib을 가로채 흉�
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import sys
 import urllib.error
 from io import BytesIO
 from pathlib import Path
 
+import cv2
+import numpy as np
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
@@ -167,3 +170,78 @@ def test_judging_without_load_still_fails_loudly(monkeypatch):
     monkeypatch.setenv(VLLM_URL_ENV, "http://127.0.0.1:8000")
     with pytest.raises(RuntimeError, match="load"):
         Judge().judge_criterion(object(), {})
+
+
+# -- 미리보기 (analyze_s3.py) ---------------------------------------------
+
+def _load_analyze_s3():
+    spec = importlib.util.spec_from_file_location(
+        "analyze_s3", Path(__file__).resolve().parent.parent / "scripts" / "analyze_s3.py"
+    )
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["analyze_s3"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _fake_pose(tmp_path, n=8, w=96, h=128):
+    """실제 영상 파일 + 지어낸 키포인트로 PoseResult를 만든다.
+
+    load_frames()가 파일을 다시 디코딩하므로 진짜 파일이어야 한다 — 그 재디코딩이
+    미리보기 경로의 핵심이라 흉내내면 검사할 것이 없어진다.
+    """
+    from supersub_agent.pose import PoseResult
+
+    path = tmp_path / "clip.mp4"
+    writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), 10.0, (w, h))
+    assert writer.isOpened()
+    for _ in range(n):
+        writer.write(np.full((h, w, 3), 90, dtype=np.uint8))
+    writer.release()
+
+    kps = np.zeros((n, 17, 3), dtype=np.float64)
+    kps[:, :, 0] = np.linspace(20, w - 20, 17)
+    kps[:, :, 1] = np.linspace(20, h - 20, 17)
+    kps[:, :, 2] = 0.9
+    return PoseResult(
+        keypoints=kps, source_fps=10.0, sampled_fps=10.0,
+        video_path=str(path), target_fps=10,
+    )
+
+
+def test_build_previews_makes_both_artifacts(tmp_path):
+    """임팩트 정지화면과 추적 영상 둘 다 나온다 — 그림이 EC2 산출물에 실린다."""
+    a3 = _load_analyze_s3()
+    pose = _fake_pose(tmp_path)
+    out = a3.build_previews(pose, impact=3, work=tmp_path)
+
+    assert set(out) == {"impact_image", "tracked_video"}
+    assert out["impact_image"].stat().st_size > 0
+    assert out["tracked_video"].stat().st_size > 0
+
+
+def test_build_previews_returns_nothing_without_frames(tmp_path):
+    """합성 키포인트 경로에는 영상이 없다 — 조용히 빈 결과를 돌려준다."""
+    from supersub_agent.pose import PoseResult
+
+    a3 = _load_analyze_s3()
+    pose = PoseResult(
+        keypoints=np.zeros((4, 17, 3)), source_fps=10.0, sampled_fps=10.0,
+        video_path=None,
+    )
+    assert a3.build_previews(pose, impact=1, work=tmp_path) == {}
+
+
+def test_preview_failure_does_not_break_the_analysis(tmp_path, monkeypatch):
+    """렌더링이 실패해도 측정·판정은 유효하다 — 미리보기는 검수 편의다."""
+    a3 = _load_analyze_s3()
+    pose = _fake_pose(tmp_path)
+
+    def boom(*a, **k):
+        raise RuntimeError("인코더를 열 수 없습니다")
+
+    monkeypatch.setattr(a3, "render_tracked_clip", boom)
+    out = a3.build_previews(pose, impact=3, work=tmp_path)
+
+    assert "tracked_video" not in out
+    assert "impact_image" in out, "먼저 만들어진 것은 남는다"

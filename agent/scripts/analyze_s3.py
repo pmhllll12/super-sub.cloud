@@ -16,6 +16,7 @@ systemd 유닛이 그 변수를 준다.
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import subprocess
 import sys
@@ -33,7 +34,14 @@ from supersub_agent.features import (  # noqa: E402
     verify_rubric_coverage,
 )
 from supersub_agent.judge import Judge  # noqa: E402
-from supersub_agent.pose import DEFAULT_TARGET_FPS, extract_keypoints  # noqa: E402
+from supersub_agent.pose import (  # noqa: E402
+    DEFAULT_TARGET_FPS,
+    crop_to_person,
+    draw_overlay,
+    encode_preview,
+    extract_keypoints,
+    render_tracked_clip,
+)
 from supersub_agent.scoring import aggregate, load_rubric  # noqa: E402
 
 
@@ -53,6 +61,43 @@ def code_version() -> str:
         return out.stdout.strip()
     except (subprocess.SubprocessError, OSError):
         return "unknown"
+
+
+def build_previews(pose, impact: int, work: Path) -> dict[str, Path]:
+    """스켈레톤 미리보기 두 장을 만든다 — 임팩트 정지화면과 추적 영상.
+
+    **판정이 끝난 뒤에 부른다.** PoseResult가 프레임을 들고 있지 않은 것이 바로
+    이것 때문이다(pose.PoseResult 참고) — 4K 300장이면 약 7GB라, 포즈 추출부터
+    판정 모델 적재까지 내내 들고 있으면 호스트 RAM이 먼저 터진다(미결 9번).
+    여기서 재디코딩하는 비용은 포즈 추출의 10% 수준이다.
+
+    추가 추론이 없다. 이미 얻은 키포인트로 그리기만 한다 — 그림에 나오는 것은
+    ViTPose가 낸 관절이고, YOLO는 이 경로에 없다.
+
+    실패해도 분석을 막지 않는다. 미리보기는 검수 편의지 산출물의 본체가 아니다.
+    """
+    out: dict[str, Path] = {}
+    frames = pose.load_frames()
+    if not frames:
+        return out
+
+    try:
+        if 0 <= impact < len(frames):
+            kps = pose.keypoints[impact]
+            uri = encode_preview(crop_to_person(draw_overlay(frames[impact], kps), kps))
+            still = work / "impact.jpg"
+            still.write_bytes(base64.b64decode(uri.split(",", 1)[1]))
+            out["impact_image"] = still
+
+        clip = work / "tracked.webm"
+        render_tracked_clip(
+            frames, pose.keypoints, clip, pose.sampled_fps, impact=impact
+        )
+        out["tracked_video"] = clip
+    except Exception as exc:  # noqa: BLE001 — 미리보기 실패가 분석을 막지 않는다
+        print(f"  ⚠️ 미리보기 생성 실패 ({type(exc).__name__}: {exc}) — 계속한다")
+
+    return out
 
 
 def main() -> None:
@@ -80,8 +125,10 @@ def main() -> None:
           f"({len(rubric.criteria)}개 항목)")
 
     # --- 내려받기 --------------------------------------------------------
-    # 임시 디렉터리에 받는다. g4dn.xlarge의 EBS를 원본 영상으로 채우면
-    # 모델 캐시(수 GB)와 자리를 다투므로 분석이 끝나면 지운다.
+    # 임시 디렉터리에 받고 **끝까지 살려 둔다.** 미리보기 렌더링이 원본을 다시
+    # 디코딩하기 때문이다(PoseResult가 프레임을 들고 있지 않으므로). 붙들고
+    # 있는 것은 디스크지 RAM이 아니라 EBS 150GB에서는 값이 싸다 — 대신 4K
+    # 300장(약 7GB)이 판정 내내 RAM에 남는 것을 피한다.
     with tempfile.TemporaryDirectory(prefix="supersub-") as tmp:
         _, key = storage.parse_s3_uri(args.video)
         local = Path(tmp) / Path(key).name
@@ -111,33 +158,43 @@ def main() -> None:
               f"(실효 {pose.sampled_fps:.2f}fps), swing_side={args.side}, "
               f"{measure_s:.1f}초")
 
-    # --- 판정 -------------------------------------------------------------
-    # 임시 디렉터리 밖이다. PoseResult는 원본 프레임을 들고 있지 않으므로
-    # (pose.PoseResult 참고) 영상 파일을 지운 뒤에도 keypoints를 쓸 수 있고,
-    # 4K 원본을 판정이 끝날 때까지 붙들지 않는다. load_frames()를 부르면
-    # 파일이 없어 실패하므로 여기서는 부르지 않는다.
-    judge = Judge(model_size=args.model)
-    t0 = time.time()
-    judge.load()
-    print(f"[판정] 백엔드 {judge.backend} ({judge.model_id}), "
-          f"준비 {time.time() - t0:.1f}초")
+        # --- 판정 ---------------------------------------------------------
+        # 프레임은 여기서도 메모리에 없다 — PoseResult가 키포인트만 들고 있다.
+        judge = Judge(model_size=args.model)
+        t0 = time.time()
+        judge.load()
+        print(f"[판정] 백엔드 {judge.backend} ({judge.model_id}), "
+              f"준비 {time.time() - t0:.1f}초")
 
-    t0 = time.time()
-    try:
-        judgments = judge.judge_all(rubric, features)
-        result = aggregate(judgments, rubric)
-    finally:
-        judge.unload()
-    judge_s = time.time() - t0
+        t0 = time.time()
+        try:
+            judgments = judge.judge_all(rubric, features)
+            result = aggregate(judgments, rubric)
+        finally:
+            judge.unload()
+        judge_s = time.time() - t0
 
-    for item in result["breakdown"]:
-        print(f"  {item['grade']}등급  {item['name']:<16} {item['evidence']}")
-    print(f"\n총점 {result['score']}점 ({result['grade']})"
-          f"{'  [provisional]' if result['provisional'] else ''}")
+        for item in result["breakdown"]:
+            print(f"  {item['grade']}등급  {item['name']:<16} {item['evidence']}")
+        print(f"\n총점 {result['score']}점 ({result['grade']})"
+              f"{'  [provisional]' if result['provisional'] else ''}")
+
+        # --- 미리보기 ------------------------------------------------------
+        # 판정이 끝난 뒤다. 프레임을 다시 디코딩하므로 판정 모델과 겹치지 않는다.
+        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+        stem = Path(storage.parse_s3_uri(args.video)[1]).stem
+        t0 = time.time()
+        previews = build_previews(pose, int(features["impact_frame"]), Path(tmp))
+        preview_s = time.time() - t0
+
+        preview_uris: dict[str, str] = {}
+        for kind, path in previews.items():
+            uri = storage.join_uri(args.out, stem, stamp, path.name)
+            storage.upload_file(path, uri, region=args.region)
+            preview_uris[kind] = uri
+            print(f"  미리보기 {kind}: {path.stat().st_size / 1e6:.2f}MB → {uri}")
 
     # --- 리포트 업로드 -----------------------------------------------------
-    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    stem = Path(storage.parse_s3_uri(args.video)[1]).stem
     target = storage.join_uri(args.out, stem, f"{stamp}.json")
 
     report = {
@@ -158,10 +215,15 @@ def main() -> None:
         "frames": int(len(pose.keypoints)),
         "judge_backend": judge.backend,
         "judge_model": judge.model_id,
+        # 스켈레톤은 ViTPose 키포인트로 그린 것이다 — 추가 추론이 없고
+        # YOLO는 이 경로에 없다. 비어 있으면 렌더링에 실패한 것이고,
+        # 그래도 위의 측정·판정은 그대로 유효하다.
+        "previews": preview_uris,
         "timing": {
             "fetch_s": round(fetch_s, 2),
             "measure_s": round(measure_s, 2),
             "judge_s": round(judge_s, 2),
+            "preview_s": round(preview_s, 2),
         },
         "features": features,
         "result": result,
