@@ -1,14 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PublicPlayerCard } from '@/server/backend'
 import SquadPanel from '@/components/SquadPanel'
 import SiteHeader from '@/components/SiteHeader'
 import HomeNav, { type Destination } from '@/components/HomeNav'
 import { FRIEND_SEARCH } from '@/lib/destinations'
 import { useIntroDone } from '@/lib/useIntroDone'
-import { useLeaving } from '@/lib/pageTransition'
+import { useHideChrome, useLeaving } from '@/lib/pageTransition'
 import LogoutButton from '@/components/LogoutButton'
+import HomeFeed from '@/components/HomeFeed'
 
 export type { Destination }
 
@@ -64,7 +65,169 @@ export default function HomeStage({
    */
   const leaving = useLeaving()
   const entered = useIntroDone()
-  const enter = leaving ? 'out' : entered ? 'true' : 'false'
+
+  /**
+   * 아래로 굴리면 **화면이 통째로 비켜난다**(사용자 요청).
+   *
+   * 다른 화면으로 갈 때와 **같은 나가는 연출**을 쓴다 — 덩어리들이 들어온 방향
+   * 그대로 되나가고(`data-enter='out'`), 그다음에 배경이 위로 빠지면서 아래에서
+   * 완전한 검정이 올라온다(globals.css 의 `ss-home-out` 규칙들).
+   *
+   * 🔴 굴림 자체가 화면을 옮기지는 않는다. 홈은 한 화면짜리라 굴릴 것이 없고,
+   * 굴림은 **신호로만** 쓴다(레슨 · 상점 입구의 `HeroGate` 와 같은 방식).
+   */
+  const [out, setOut] = useState(false)
+  /**
+   * 🔴 지금 상태를 **ref 로도** 들고 있는다. 굴림 듣기는 한 번만 걸고 다시 걸지
+   * 않으므로(다시 걸면 굴리는 도중에 손잡이가 바뀐다) 그 안에서 읽는 값이 늘
+   * 최신이어야 한다.
+   */
+  const outRef = useRef(out)
+  useEffect(() => {
+    outRef.current = out
+  }, [out])
+  /**
+   * 영상 모음으로 내려간 것을 **기록에 한 걸음으로 남긴다**(사용자 요청).
+   *
+   * 🔴 안 남기면 브라우저 뒤로 가기가 이 화면을 통째로 떠나 **직전 주소**로 간다
+   * (사용자 지적: 영상 모음에서 뒤로 갔더니 `/analysis` 가 나왔다). 주소는 그대로
+   * 두고 표시만 쌓아, 뒤로 가기가 "홈 화면으로 되올라가기" 가 되게 한다 —
+   * 레슨 · 상점 판이 쓰는 방식과 같다(`MarketGates`).
+   */
+  const stepped = useRef(false)
+  /**
+   * 🔴 떠나는 중인지를 **ref 로도** 들고 있는다. 아래 굴림 듣기는 한 번만 걸고
+   * 다시 걸지 않으므로(다시 걸면 굴리는 도중에 손잡이가 바뀐다), 그 안에서
+   * 읽는 값은 늘 최신이어야 한다.
+   */
+  const leavingRef = useRef(leaving)
+  useEffect(() => {
+    leavingRef.current = leaving
+  }, [leaving])
+
+  /**
+   * 내려가고 올라오는 **유일한 길**. 상태를 직접 바꾸지 않고 **기록을 통해** 바꾼다
+   * — 그래야 화면과 브라우저의 뒤로/앞으로가 같은 것을 가리킨다.
+   */
+  const goOut = useCallback((next: boolean) => {
+    if (next === outRef.current) return
+    if (next) {
+      stepped.current = true
+      window.history.pushState({ ssHome: 'feed' }, '')
+      setOut(true)
+      return
+    }
+    // 내려온 걸음이 있으면 되감는다(실제 되돌리기는 `popstate` 가 한다).
+    if (stepped.current) {
+      window.history.back()
+      return
+    }
+    setOut(false)
+  }, [])
+
+  /** 뒤로/앞으로를 받아 화면을 그 걸음에 맞춘다. */
+  useEffect(() => {
+    const onPop = (e: PopStateEvent) => {
+      const feed = (e.state as { ssHome?: string } | null)?.ssHome === 'feed'
+      stepped.current = feed
+      setOut(feed)
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+
+  /**
+   * 🔴 다시 태어나도 기록에 적힌 자리로 돌아온다 — 라우터가 이 나무를 다시 그리면
+   * 상태가 처음값으로 돌아가 영상 모음이 저 혼자 닫힌다(`MarketGates` 와 같은 함정).
+   */
+  useEffect(() => {
+    if ((window.history.state as { ssHome?: string } | null)?.ssHome !== 'feed') return
+    stepped.current = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setOut(true)
+  }, [])
+
+  useEffect(() => {
+    /**
+     * 🔴 트랙패드는 한 번 굴리는 동안 `deltaY` 가 0 이나 아주 작은 반대 부호로도
+     * 들어온다 — 죽은 구간을 두지 않으면 내리는 몸짓 한가운데에 "올린다"가
+     * 섞여 방금 내보낸 것을 도로 불러들인다(`HeroGate` 에서 이미 겪었다).
+     */
+    const DEAD = 4
+    let touchY = 0
+
+    const move = (dir: number) => {
+      // 떠나는 중에는 아무것도 되돌리지 않는다 — 있던 자리 그대로 나가야 한다.
+      if (dir === 0 || leavingRef.current) return
+      goOut(dir > 0)
+    }
+    const dirOf = (d: number) => (d > DEAD ? 1 : d < -DEAD ? -1 : 0)
+
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) return
+      move(dirOf(e.deltaY))
+    }
+    const onTouchStart = (e: TouchEvent) => {
+      touchY = e.touches[0]?.clientY ?? 0
+    }
+    const onTouchMove = (e: TouchEvent) => {
+      // 손가락이 위로 = 내용은 아래로 = 내리는 것.
+      move(dirOf(touchY - (e.touches[0]?.clientY ?? 0)))
+    }
+    /** 자판으로도 오갈 수 있어야 한다 — 굴림이 없으니 이게 유일한 다른 길이다. */
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') move(1)
+      else if (e.key === 'ArrowUp' || e.key === 'PageUp') move(-1)
+    }
+
+    window.addEventListener('wheel', onWheel, { passive: true })
+    window.addEventListener('touchstart', onTouchStart, { passive: true })
+    window.addEventListener('touchmove', onTouchMove, { passive: true })
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('wheel', onWheel)
+      window.removeEventListener('touchstart', onTouchStart)
+      window.removeEventListener('touchmove', onTouchMove)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [goOut])
+
+  /**
+   * 🔴 배경 사진은 **레이아웃**이 그린다(`AppFigure`) — 이 컴포넌트에서 못
+   * 건드린다. 그래서 표시를 문서에 걸어 CSS 가 움직이게 한다.
+   */
+  useEffect(() => {
+    const el = document.documentElement
+    if (out) el.dataset.ssHomeOut = 'true'
+    else delete el.dataset.ssHomeOut
+    return () => {
+      delete el.dataset.ssHomeOut
+    }
+  }, [out])
+
+  /**
+   * 🔴 내려가 있는 동안 **워드마크는 눌린다**(사용자 요청) — 누르면 홈 화면으로
+   * 되올라간다. 지금 화면이 이미 `/` 라 링크로는 아무 일도 안 일어나므로, 클릭을
+   * 가로채 되올리기로 바꾼다. 헤더는 레이아웃이 그리므로 손댈 수가 없어 문서에서
+   * 잡는다(누르기 **전에** 가로채야 해서 캡처 단계다).
+   */
+  useEffect(() => {
+    if (!out) return
+    const onClick = (e: MouseEvent) => {
+      const mark = (e.target as HTMLElement | null)?.closest?.('[aria-label="홈"]')
+      if (!mark) return
+      e.preventDefault()
+      e.stopPropagation()
+      goOut(false)
+    }
+    document.addEventListener('click', onClick, true)
+    return () => document.removeEventListener('click', onClick, true)
+  }, [out, goOut])
+
+  /** 헤더도 같이 나간다 — 다른 화면으로 갈 때와 같은 길을 쓴다. */
+  useHideChrome(out)
+
+  const enter = leaving || out ? 'out' : entered ? 'true' : 'false'
   /** 알약 줄에서 지금 가리킨 것. 헤더의 글자 줄과는 따로 논다. */
   const [active, setActive] = useState<string | null>(defaultActive)
   const activate = (title: string | null) => setActive(title ?? defaultActive)
@@ -78,6 +241,12 @@ export default function HomeStage({
 
   return (
     <>
+      {/* 🔴 아래에서 올라오는 **완전한 검정**(사용자 요청). 배경 사진(z-index -1)
+          위, 무대(z-index 10) 아래에 깔려 사진만 덮는다. 덩어리들이 다 빠져나간
+          뒤에 움직이도록 늦춘다(globals.css). */}
+      <div className="ss-home-outro" data-up={out} aria-hidden={!out}>
+        <HomeFeed active={out} />
+      </div>
 
       {/* 헤더는 모든 화면이 같이 쓴다(SiteHeader). 홈에서만 화면에
           고정한다 — 한 화면을 통째로 쓰는 배치라 흐름에 두면 가운데 정렬이
@@ -141,6 +310,19 @@ export default function HomeStage({
             <span>PITCH</span>
           </h1>
         </div>
+
+        {/* 🔴 **내리면 무엇이 나오는지 미리 말한다**(사용자 요청). 레슨 · 상점
+            입구와 같은 안내이고 같은 모양을 쓴다 — 같은 뜻의 것에 다른 모양을
+            주지 않는다. 다른 것은 가리키는 곳뿐이라 글만 바꾼다.
+            무대 **안**에 두므로 아래로 내릴 때 나머지와 같이 나간다. */}
+        <p className="ss-market-scroll ss-home-hint">
+          {/* 그림을 한 겹 싸는 이유 — 껍데기는 자리를 잡고, 안쪽 그림은 제
+              흔들림(transform)을 쓴다. 한 겹으로 하면 둘이 서로 덮어쓴다. */}
+          <span className="ss-market-scroll-icon" aria-hidden="true">
+            <span className="material-symbols-outlined">keyboard_double_arrow_down</span>
+          </span>
+          아래로 내려 영상 둘러보기
+        </p>
       </div>
 
       {/* 오른쪽 아래 구석 — 로그아웃 아이콘 하나. 여기 있던 01~05 번호
