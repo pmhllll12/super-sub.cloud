@@ -7,6 +7,7 @@
 
 from fastapi import FastAPI
 
+from app.analysis.adapter.inbound.api.v1.video_router import video_router
 from app.card.adapter.inbound.api.v1.card_router import card_router
 from app.card.adapter.outbound.stub.card_stub_repository import DEMO_SLUG
 from app.core.config import settings
@@ -70,13 +71,18 @@ app = FastAPI(
 
 install_error_handlers(app)
 
-# 컨텍스트가 늘면 여기에 한 줄씩 추가한다 (video · review · billing).
+# 컨텍스트가 늘면 여기에 한 줄씩 추가한다 (review · billing).
+#
+# 영상은 별도 컨텍스트가 아니라 `analysis` 안에 있다 — 부록 D 가 도메인 ② 를
+# **영상·분석 하나로** 묶었고, `video` 와 `analysis_job` 이 같은 삭제 연쇄·같은
+# 화면(`/videos` 의 분석 상태)에 걸려 있어 가르면 원시 쿼리만 늘어난다.
 for _router in (
     auth_router,
     me_router,
     team_router,
     match_router,
     card_router,
+    video_router,
     admin_router,
 ):
     app.include_router(_router, prefix=API_PREFIX)

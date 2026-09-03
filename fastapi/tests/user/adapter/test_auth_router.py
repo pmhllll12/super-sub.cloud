@@ -131,6 +131,8 @@ class TestOpenApi:
             V1 + "/matches/{match_id}",
             V1 + "/matches/{match_id}/applications",
             V1 + "/matches/{match_id}/applications/{application_id}/accept",
+            f"{V1}/videos",
+            f"{V1}/videos/upload-url",
             f"{V1}/admin/users",
             V1 + "/admin/users/{user_id}",
         }
