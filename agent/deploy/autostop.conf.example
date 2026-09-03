@@ -1,0 +1,32 @@
+# /etc/supersub/autostop.conf 의 예시.
+#
+#   sudo mkdir -p /etc/supersub
+#   sudo cp agent/deploy/autostop.conf.example /etc/supersub/autostop.conf
+#
+# 없어도 동작한다 — 아래 값이 스크립트의 기본값과 같다. 배포마다 다르게 하고
+# 싶을 때만 만든다. systemd EnvironmentFile 로도 읽히므로 `KEY=값` 형식만 쓴다
+# (따옴표·주석 뒤 값·셸 확장 금지).
+
+# 아무도 안 붙어 있고 일도 없을 때 기다리는 시간(분)
+IDLE_MINUTES=30
+
+# SSH 세션은 열려 있는데 일은 없을 때(분). 터미널을 켜 둔 채 퇴근한 경우다 —
+# 사람이 붙어 있다고 무한정 봐주면 이 타이머가 막으려던 상황이 그대로 된다.
+SSH_IDLE_MINUTES=120
+
+# 무엇을 하고 있든 이만큼 지나면 끈다(시간). 위 둘이 오판해도 이건 걸린다.
+# 평일 10시간 근무를 가정하면 12가 무난하다.
+MAX_UPTIME_HOURS=12
+
+# 이 값(%)을 넘으면 GPU가 일하는 중으로 본다.
+GPU_UTIL_BUSY=10
+
+# 이 패턴이 프로세스 목록에 걸리면 일하는 중으로 본다. GPU를 아직 안 쓰는
+# 구간(영상 디코딩, 모델 다운로드, S3 전송)이 있어서 GPU 사용률만으로는 부족하다.
+#
+# 🔴 맨 앞(`^`)을 고정한 이유가 있다. pgrep -f 는 명령줄 **어디에나** 그 문자열이
+# 있으면 걸려서, 파일 이름만 적으면 `vim analyze.py` 도 "작업 중"이 된다 —
+# 편집기를 열어 둔 채 자리를 뜨면 영영 안 꺼진다. 실제로 실행하는 인터프리터만
+# 걸리게 묶어 둔 것이니, 고칠 때도 이 성질을 지킬 것.
+# POSIX 확장 정규식이다 (`\S` 같은 GNU 확장은 안 된다).
+BUSY_PATTERN=^[^[:space:]]*(python[0-9.]*|uv)[[:space:]].*(analyze_s3|analyze|measure|track_overlay)\.py|^[^[:space:]]*hf[[:space:]]+download|^[^[:space:]]*aws[[:space:]]+s3
