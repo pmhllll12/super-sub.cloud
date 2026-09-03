@@ -45,14 +45,17 @@ VLLM_BIN="${SUPERSUB_VLLM_BIN:-/opt/supersub/vllm-venv/bin/vllm}"
   exit 1
 }
 
+# 모델은 **위치 인자**로 준다. `--model` 은 vLLM 0.28 에서 경고를 내고 곧 없어진다.
+# `--disable-log-requests` 는 0.28 에서 **삭제됐다** — 기본이 "안 남김"이 되고
+# 반대 플래그(`--enable-log-requests`)만 남았다. 그대로 두면 `unrecognized
+# arguments` 로 기동조차 못 한다(2026-09-03).
 args=(
-  --model "$MODEL_DIR"
+  "$MODEL_DIR"
   --served-model-name "$SERVED_NAME"
   --host "$HOST" --port "$PORT"
   --dtype float16
   --gpu-memory-utilization "$GPU_FRACTION"
   --max-model-len "$MAX_LEN"
-  --disable-log-requests
 )
 [[ "$ENFORCE_EAGER" == "1" ]] && args+=(--enforce-eager)
 
