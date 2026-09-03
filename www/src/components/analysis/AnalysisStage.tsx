@@ -1299,8 +1299,29 @@ export default function AnalysisStage() {
       <aside className="ss-shot-side" aria-label="리포트와 대화">
         <header className="ss-shot-side-head">
           <h2>{done ? '리포트' : subject ? '보고 있습니다' : '분석할 사람'}</h2>
-          <button type="button" className="ss-shot-again" onClick={reset}>
-            다른 영상
+          {/* 🔴 **리포트가 다 나온 뒤에만 눌린다**(사용자 요청) — 저장하는 것이
+              분석 결과까지 포함한 한 벌이라, 아직 도는 중에 누르면 무엇이 저장된
+              것인지 알 수 없다.
+
+              🔴 **아직 아무 데도 안 보낸다.** 영상을 우리 서버(EC2)에 올리는
+              일은 백엔드 몫이고 계약에 그 경로가 아직 없다(5장 ASM-003 객체
+              저장소 미정, 3-1 은 적재만 있고 조회는 미뤄져 있다). **여기가 그
+              자리다** — 경로가 생기면 아래 `onClick` 안에서 부르면 되고, 보낼
+              것은 `file`(고른 영상)과 지금 화면에 그린 리포트다.
+              미결 항목: 「분석한 영상을 우리 서버에 저장하는 경로」
+
+              ⚠️ 이 자리에 있던 **'다른 영상'** 은 없앴다(사용자 요청). 고르기 전으로
+              되돌리는 길은 창 틀의 **닫기 점**(`영상 닫기`)에 그대로 있다 —
+              길이 하나 없어진 것이 아니라 자리를 옮긴 것이다. */}
+          <button
+            type="button"
+            className="ss-shot-again"
+            disabled={!done}
+            onClick={() => {
+              // 경로가 생기면 여기서 부른다(위 주석).
+            }}
+          >
+            저장
           </button>
         </header>
 

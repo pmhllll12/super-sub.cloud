@@ -3424,8 +3424,16 @@ body::-webkit-scrollbar {
   transition: border-color 160ms ease;
 }
 
-.ss-shot-again:hover,
-.ss-shot-again:focus-visible {
+/* 🔴 잠겨 있는 동안은 **눌리지 않는다는 것이 보여야** 한다 — 리포트가 다 나오기
+   전에는 저장할 것이 없다. 흐리게만 두고 자리는 그대로 둔다(없애면 리포트가
+   끝나는 순간 머리글이 흔들린다). */
+.ss-shot-again:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ss-shot-again:not(:disabled):hover,
+.ss-shot-again:not(:disabled):focus-visible {
   border-color: var(--ss-fg);
 }
 
