@@ -451,70 +451,53 @@ export default function MarketGates({
           className="ss-market-detail"
           data-open={open ? 'true' : 'false'}
           data-leaving={leaving}
-          // 코치 상세는 제목이 **왼쪽**에서 시작해 닫기 단추와 같은 자리를 쓴다 —
-          // 그때만 글을 단추 아래로 내린다(globals.css).
-          data-coach={coach ? 'true' : 'false'}
           // 나가 있는 동안에는 화면 낭독기에도 없는 것이어야 한다 — 창 밖으로
           // 밀어 두는 것은 눈에만 안 보이게 할 뿐이라 낭독기는 다 읽는다.
           aria-hidden={!open}
         >
           <div className="ss-market-detail-body" ref={body}>
-            {/* 🔴 돌아가는 단추는 **굴러가는 칸 안**에 있다(사용자 요청) — 밖에
-                띄워 두면 글이 그 밑을 지나며 겹친다. 다만 놓는 자리가 갈래마다
-                다르다:
-                  목록 — 간판과 **같은 줄**(간판이 가운데라 안 겹친다)
-                  상세 — 이름이 왼쪽에서 시작해 같은 줄에 못 둔다. 이름 위. */}
-            {coach ? (
-              /* 🔴 목록 화면(`/market/coaches/{id}`)과 **같은 알맹이**를 쓴다 —
-                 다른 것은 머리글과 돌아가는 길뿐이다. 영상 링크는 끈다: 판 안에서
-                 누르면 화면이 통째로 갈려 "이 판에서만 바뀐다"가 깨진다. */
-              <>
+            {/* 🔴 머리 띠는 **목록이든 상세든 똑같다**(사용자 요청) — 돌아가는
+                단추와 간판 한 줄이 상아색 띠 안에 있고, 그 아래에 얇은 선이 있다.
+                예전에는 상세에서만 단추를 이름 위에 따로 두었는데(이름이 왼쪽에서
+                시작해 간판과 같은 줄에 못 둔다는 이유), 띠가 생기면서 그 이유가
+                없어졌다 — 이름은 띠 **아래** 제 줄에서 시작한다.
+
+                🔴 꼬리표와 한글 제목을 빼고 **간판 한 줄**만 둔다(사용자 요청).
+                글꼴은 배경 아치(TRAIN & GEAR UP)와 같은 것(`--font-poster`,
+                Shrikhand)이라 두 화면이 한 목소리로 읽힌다. 상점 쪽도 같은
+                짜임이라 짝이 되는 말을 쓴다. */}
+            <div className="ss-market-detail-topline">
               <button
                 type="button"
                 className="ss-market-detail-close"
                 onClick={backOne}
                 // 하는 일이 자리마다 다르므로 이름도 다르다 — 낭독기는 이 말만 읽는다.
-                aria-label="코치 목록으로"
+                aria-label={coach ? '코치 목록으로' : '목록 닫기'}
               >
                 <span className="material-symbols-outlined" aria-hidden="true">
                   chevron_backward
                 </span>
               </button>
+              <div className="ss-market-detail-head">
+                {/* ⚠️ 상점 쪽 간판은 **BEST SELLERS**(복수)다 — 목록을 이끄는
+                    말이라 한 상품을 가리키는 단수(BEST SELLER)가 아니다.
+                    ⚠️ 다만 지금 목록은 **잘 팔린 순이 아니다**(mock 이라 판매
+                    수가 없다). 판매 수가 생기면 그 순서로 세워야 이 말이
+                    사실이 된다 — 미결로 둔다. */}
+                <h2>{shown === 'shop' ? 'BEST SELLERS' : 'FIND YOUR COACH'}</h2>
+              </div>
+            </div>
+
+            {coach ? (
+              /* 🔴 목록 화면(`/market/coaches/{id}`)과 **같은 알맹이**를 쓴다 —
+                 다른 것은 머리글과 돌아가는 길뿐이다. 영상 링크는 끈다: 판 안에서
+                 누르면 화면이 통째로 갈려 "이 판에서만 바뀐다"가 깨진다. */
               <CoachDetail coach={coach} video={false} />
-              </>
+            ) : shown === 'shop' ? (
+              <ShopList products={products} />
             ) : (
-              <>
-                {/* 🔴 꼬리표와 한글 제목을 빼고 **간판 한 줄**만 둔다(사용자 요청).
-                    글꼴은 배경 아치(TRAIN & GEAR UP)와 같은 것(`--font-poster`,
-                    Shrikhand)이라 두 화면이 한 목소리로 읽힌다. 상점 쪽도 같은
-                    짜임이라 짝이 되는 말을 쓴다. */}
-                <div className="ss-market-detail-topline">
-                  <button
-                    type="button"
-                    className="ss-market-detail-close"
-                    onClick={backOne}
-                    aria-label={coach ? '코치 목록으로' : '목록 닫기'}
-                  >
-                    <span className="material-symbols-outlined" aria-hidden="true">
-                      chevron_backward
-                    </span>
-                  </button>
-                  <div className="ss-market-detail-head">
-                    {/* ⚠️ 상점 쪽 간판은 **BEST SELLERS**(복수)다 — 목록을 이끄는
-                        말이라 한 상품을 가리키는 단수(BEST SELLER)가 아니다.
-                        ⚠️ 다만 지금 목록은 **잘 팔린 순이 아니다**(mock 이라 판매
-                        수가 없다). 판매 수가 생기면 그 순서로 세워야 이 말이
-                        사실이 된다 — 미결로 둔다. */}
-                    <h2>{shown === 'shop' ? 'BEST SELLERS' : 'FIND YOUR COACH'}</h2>
-                  </div>
-                </div>
-                {shown === 'shop' ? (
-                  <ShopList products={products} />
-                ) : (
-                  /* 고르면 **이 판 안에서** 상세로 바뀐다 — 화면을 갈지 않는다. */
-                  <CoachList coaches={coaches} onPick={pick} />
-                )}
-              </>
+              /* 고르면 **이 판 안에서** 상세로 바뀐다 — 화면을 갈지 않는다. */
+              <CoachList coaches={coaches} onPick={pick} />
             )}
           </div>
         </aside>
