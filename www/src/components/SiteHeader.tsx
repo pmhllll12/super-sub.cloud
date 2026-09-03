@@ -27,19 +27,12 @@ export default function SiteHeader({
   card = null,
   destinations,
   fixed = false,
-  tagline = false,
 }: {
   user: { nickname: string } | null
   card?: PublicPlayerCard | null
   destinations: Destination[]
   /** 홈처럼 화면에 고정할 것인가. 기본은 흐름에 둔다. */
   fixed?: boolean
-  /**
-   * 워드마크 옆에 "AI SCOUTING" 한 줄 소개를 붙일 것인가(사용자 요청,
-   * 2026-09-03). 홈에서만 켠다 — `(app)` 레이아웃의 모든 화면이 이 헤더를
-   * 같이 쓰는데, 깊은 화면까지 소개 문구가 따라가면 군더더기가 된다.
-   */
-  tagline?: boolean
 }) {
   /**
    * 인트로가 걷히면 각자 바깥에서 제자리로 들어온다(globals.css 의
@@ -81,28 +74,11 @@ export default function SiteHeader({
       style={{ padding: 'var(--ss-home-content-pad)' }}
       data-enter={enter}
     >
-      {/* 워드마크 자리. 소개 문구가 있어도 이 앵커 안에는 로고만 둔다 —
-          `[data-ss-home-out='true']` 전환에서 이 앵커의 세로 이동량을 제 키의
-          100%로 셈하므로(아래 globals.css), 문구가 들어가 키가 늘면 그 셈이
-          같이 틀어진다. */}
-      <div className="ss-home-brandrow">
-        {/* 홈으로 가는 길. 인트로의 글자가 날아와 앉는 자리이기도 하다
-            (`[data-brand-mark]` 로 찾는다 — BrandMark 참고). */}
-        <TransitionLink href="/" aria-label="홈">
-          <BrandMark size={26} />
-        </TransitionLink>
-
-        {tagline && (
-          <p className="ss-home-tagline">
-            <span className="ss-home-tagline-eyebrow">AI SCOUTING</span>
-            <span className="ss-home-tagline-body">
-              자동으로 용병찾고 매칭과
-              <br />
-              경기장 예약까지 해줍니다
-            </span>
-          </p>
-        )}
-      </div>
+      {/* 홈으로 가는 길. 인트로의 글자가 날아와 앉는 자리이기도 하다
+          (`[data-brand-mark]` 로 찾는다 — BrandMark 참고). */}
+      <TransitionLink href="/" aria-label="홈">
+        <BrandMark size={26} />
+      </TransitionLink>
 
       <div className="ss-home-nav-slot">
         <HomeNav
