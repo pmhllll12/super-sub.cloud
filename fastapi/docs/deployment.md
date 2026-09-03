@@ -312,7 +312,7 @@ ssh supersub 'cd ~/supersub/app && git pull && cd fastapi \
 | **`pgvector`** | AL2023 저장소에 **패키지가 없다.** 지금 마이그레이션은 `vector` 를 안 써서 없이도 돌았다 — `player_vector` 가 들어올 때 소스 빌드(`gcc` 필요)를 해야 한다 |
 | ~~백업~~ | ✅ 2026-09-02 에 걸었다 — 7절. **다만 같은 디스크에 쌓인다**(밖으로 옮기는 것은 별도) |
 | **로그 회전·모니터링** | journald 기본값에 기대고 있다 |
-| 🔴 **업로드용 S3 버킷 설정** | 버킷은 계정에 있지만 서버 `.env` 에 `S3_BUCKET` 이 없어 업로드 경로가 503 이다 — 아래 9절 |
+| ~~업로드용 S3 버킷 설정~~ | ✅ **2026-09-03 에 켰다** — 9절. 끝에서 끝까지 확인했다 |
 
 ---
 
@@ -451,13 +451,28 @@ ssh supersub 'systemctl is-active postgresql supersub-api supersub-backup.timer'
 
 ## 9. 업로드용 S3 버킷 — `supersub-ai` (2026-09-03 확정)
 
-> **상태:** 진행중 · 2026-09-03 확인
-> **확인:** `ssh supersub 'grep -c S3_BUCKET ~/supersub/app/fastapi/.env'` → `0` 이면 아직
-> **메모:** 버킷과 접두사는 정해졌다. **서버에 IAM 역할이 없고 boto3 도 아직 없다** — 아래 「서버에서 켤 때」
+> **상태:** ✅ **켰다** · 2026-09-03 — 서버에서 끝에서 끝까지 태워 봤다
+> **확인:** `ssh supersub 'grep -c S3_BUCKET ~/supersub/app/fastapi/.env'` → `1`
+
+**09-03 에 실제로 확인한 것** (`smoke_upload.sh` 를 서버에서 돌렸다):
+
+| 단계 | 결과 |
+|---|---|
+| `POST /videos/upload-url` | 사전 서명 URL 발급, `expires_in: 900` |
+| 안 올린 키로 `POST /videos` | **422 `FILE_NOT_UPLOADED`** ← `s3:ListBucket` 이 붙었다는 증거다 |
+| 사전 서명 URL 로 S3 에 PUT | **200** |
+| `POST /videos` | `passed: true` · `analysis_status: "queued"` |
+| 4K 로 등록 | `passed: false` · 사유 `"해상도가 상한을 넘습니다: 3840x2160 (상한 1920x1080)"` |
+| `GET /videos` | 둘 다, 최근 것이 앞에 |
+| 검사 계정 삭제 | `user` 하나를 지우니 `video`·`video_validation`·`analysis_job` 까지 함께 사라졌다 (**SEC-006 실물 확인**) |
 
 ⚠️ 09-03 에 이 확인 명령의 경로를 `/opt/supersub/.env` 로 **짐작해서 적었다가 고쳤다.**
 실제 경로는 `~/supersub/app/fastapi/.env` 다(6-3 절에 처음부터 적혀 있었다).
 **짐작한 경로는 "0 건"이 아니라 "파일 없음"을 내고, 그것을 미착수로 오독한다.**
+
+⚠️ **연기 검사가 S3 에 1KB 객체 둘을 남겼다.** 역할에 `s3:DeleteObject` 가 없어
+서버에서 지울 수 없다 — 콘솔에서 `videos/` 아래를 한 번 비우면 된다. **클립 삭제
+기능을 만들 때 정책에 `s3:DeleteObject` 를 더해야 한다**(지금은 일부러 뺐다).
 
 | | |
 |---|---|
@@ -580,35 +595,39 @@ iam:ListInstanceProfiles … because no identity-based policy allows it
   사전 서명 URL 로만 오가므로 **공개 접근은 차단이어야 한다** — 아니면 남의 클립을
   URL 추측으로 볼 수 있다. 한 번 확인할 것
 
-### 서버에서 켤 때 — **순서가 중요하다** (2026-09-03 실측)
+### 켠 순서 — **이 순서가 중요하다** (2026-09-03 에 이대로 했다)
 
-09-03 에 서버에 붙어 확인한 실제 상태다.
-
-| 확인한 것 | 결과 |
-|---|---|
-| `.env` | `~/supersub/app/fastapi/.env` (0600). 키 다섯 — `S3_BUCKET` **없음** |
-| IAM 인스턴스 역할 | 🔴 **없다.** 메타데이터의 `iam/security-credentials/` 가 404 다 |
-| `boto3` | 🔴 **없다.** 서버 venv 가 09-03 의 `requirements.txt` 이전이다 |
-| 서버가 보는 브랜치 | `jin` — **`main` 병합을 기다리지 않아도 배포된다** |
+```
+(1) IAM 역할 붙이기          ← 콘솔 작업. 이것부터
+(2) git pull + pip install   ← boto3 가 들어온다
+(3) alembic upgrade head     ← video_validation · squad
+(4) .env 에 S3_BUCKET·AWS_REGION
+(5) systemctl restart supersub-api
+```
 
 🔴 **`S3_BUCKET` 을 IAM 역할보다 먼저 넣으면 안 된다.** 넣는 순간 `get_storage` 가
 통과해서 boto3 가 자격증명을 찾다 실패하고, **깨끗한 503 이 500 으로 바뀐다.**
 "설정이 없다"는 신호가 "서버가 터졌다"로 보이게 된다.
 
+(1) 은 인스턴스가 켜져 있어도 붙고 **재시작도 필요 없다** — 몇 초 안에 메타데이터에
+자격증명이 뜬다. 정책은 `videos/` 접두사로 좁힌다(위 「서버에 줄 권한」).
+
+**서버가 보는 브랜치는 `jin` 이다** — `main` 병합을 기다리지 않아도 배포된다.
+
+역할이 붙었는지는 서버에서 이렇게 본다.
+
+```bash
+ssh supersub 'TOKEN=$(curl -s -X PUT http://169.254.169.254/latest/api/token \
+  -H "X-aws-ec2-metadata-token-ttl-seconds: 60"); \
+  curl -s -H "X-aws-ec2-metadata-token: $TOKEN" \
+  http://169.254.169.254/latest/meta-data/iam/security-credentials/'
 ```
-(1) IAM 역할 붙이기          ← 콘솔 작업. 이것부터
-(2) git pull + pip install   ← boto3 가 들어온다
-(3) alembic upgrade head     ← video_validation
-(4) .env 에 S3_BUCKET·AWS_REGION
-(5) systemctl restart supersub-api
-```
 
-(1) 은 인스턴스가 켜져 있어도 붙일 수 있다. 정책은 `videos/` 접두사로 좁힌다
-(위 「서버에 줄 권한」).
+역할 이름이 찍히면 붙은 것이고, 404 HTML 이 나오면 아직이다.
 
-### 그때까지
+### 꺼져 있을 때는
 
-`S3_BUCKET` 이 비어 있으므로 업로드 경로는 503(`STORAGE_NOT_CONFIGURED`)이다.
+`S3_BUCKET` 이 비어 있으면 업로드 경로는 503(`STORAGE_NOT_CONFIGURED`)이다.
 **다른 경로는 영향이 없다** — 저장소는 업로드 유스케이스에서만 주입된다.
 
 ---
