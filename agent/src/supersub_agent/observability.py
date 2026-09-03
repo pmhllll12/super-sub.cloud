@@ -38,12 +38,29 @@ _log = logging.getLogger(__name__)
 # 호출되지만, 볼륨이 안 붙은 환경에서는 매 분석마다 같은 줄이 쌓인다.
 _WARNED_ONCE = False
 
+# sink 우회 흔적도 프로세스당 한 번만 남긴다 — 같은 이유다.
+_REDIRECT_NOTED_ONCE = False
+
 # 기록 위치. agent/data/ 는 .gitignore 대상이라 런타임 데이터가 커밋되지 않는다.
 # 환경변수로 덮어쓸 수 있게 둔다 — 배포마다 볼륨이 다르다.
 DEFAULT_SINK = (
     Path(__file__).resolve().parent.parent.parent
     / "data" / "observability" / "service_input_metrics.jsonl"
 )
+
+# **우회 흔적.** `SUPERSUB_METRICS_SINK`로 우회했을 때 기본 위치 옆에 한 줄 남긴다.
+# (명시적 `sink=` 인자는 호출부 코드에 보이므로 남기지 않는다 — `record` 참고.)
+#
+# 왜 별도 파일인가: 관측 레코드는 "그대로 한 행으로 INSERT할 수 있는 평면 구조"
+# 여야 한다(위 모듈 설명). 표식을 같은 JSONL에 섞으면 그 계약이 깨진다.
+#
+# 왜 필요한가: `SUPERSUB_METRICS_SINK`로 우회하면 기본 위치는 **비어 있는 채로
+# 남는다.** 그래서 "서비스 분석 0건"이 (a)진짜 0건 (b)sink 고장 (c)다른 곳에
+# 기록됨 을 구분하지 못한다. 2026-08-31에 실제로 (c)를 (a)로 읽었다 —
+# 개발 확인용으로 /tmp에 돌려 둔 상태에서 프로덕션 경로로 3건이 돌았다.
+# 읽는 시점에 환경변수가 안 걸려 있으면 로그만으로는 되짚을 수 없으므로,
+# **기본 위치에 흔적을 남겨** 나중에 읽는 사람이 알 수 있게 한다.
+REDIRECT_LOG = DEFAULT_SINK.parent / "sink_redirects.jsonl"
 
 # 히스토그램에서 이 값 이상을 한 칸으로 묶는다. 표시용 상한일 뿐이고
 # frames_with_ge2_person 같은 집계값은 원본 카운트로 계산한다.
@@ -118,12 +135,85 @@ def build_record(
     return rec
 
 
+def resolve_sink(sink: str | os.PathLike | None = None) -> tuple[Path, str]:
+    """어느 sink를 쓰는지와 **왜 그것인지**를 함께 돌려준다.
+
+    origin은 `"argument"` · `"env"` · `"default"` 중 하나다. 경로만으로는
+    우회 여부를 알 수 없어서 — 환경변수가 기본 경로와 같은 값을 담고 있을 수도
+    있고, 반대로 인자로 기본과 다른 경로를 줄 수도 있다 — 출처를 따로 돌려준다.
+
+    쓰는 쪽(`record`)·읽는 쪽(`load`)·보고 스크립트가 **같은 해석**을 쓰게
+    한 곳에 모아 둔다. 세 곳에 같은 `sink or env or DEFAULT` 를 복사해 두면
+    하나만 고쳐졌을 때 "어디에 썼는지"와 "어디를 읽는지"가 갈린다.
+    """
+    if sink is not None:
+        return Path(sink), "argument"
+    env = os.environ.get("SUPERSUB_METRICS_SINK")
+    if env:
+        return Path(env), "env"
+    return DEFAULT_SINK, "default"
+
+
+def _note_redirect(path: Path, origin: str) -> None:
+    """기본 위치에 "여기가 아니라 저기에 썼다"는 흔적을 남긴다 (프로세스당 1회).
+
+    최선 노력이다 — 실패해도 분석을 막지 않는다. 기본 위치가 쓰기 불가라서
+    우회한 경우에는 흔적도 못 남기는데, 그때는 경고 로그가 유일한 단서다.
+    """
+    global _REDIRECT_NOTED_ONCE
+    if _REDIRECT_NOTED_ONCE:
+        return
+    _REDIRECT_NOTED_ONCE = True
+
+    _log.warning(
+        "서비스 입력 관측을 기본 위치가 아닌 곳에 기록한다 (%s, 출처 %s). "
+        "기본 위치(%s)는 비어 있게 되므로 '분석 0건'으로 읽히지 않도록 "
+        "%s 에 흔적을 남긴다.", path, origin, DEFAULT_SINK, REDIRECT_LOG)
+
+    line = json.dumps({
+        "at": datetime.now(timezone.utc).isoformat(),
+        "sink": str(path),
+        "origin": origin,
+        "pid": os.getpid(),
+    }, ensure_ascii=False) + "\n"
+    try:
+        REDIRECT_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with open(REDIRECT_LOG, "a", encoding="utf-8") as fh:
+            fh.write(line)
+    except OSError as exc:
+        _log.warning("우회 흔적을 남기지 못했다 (%s: %s).", REDIRECT_LOG, exc)
+
+
+def load_redirects() -> list[dict]:
+    """기본 위치에 남은 우회 흔적. 없으면 빈 목록이다.
+
+    "분석 0건"을 읽었을 때 **다른 곳에 기록됐을 가능성**을 되짚는 데 쓴다.
+    """
+    if not REDIRECT_LOG.exists():
+        return []
+    out = []
+    for line in REDIRECT_LOG.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            out.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return out
+
+
 def record(rec: dict, sink: str | os.PathLike | None = None) -> Path | None:
     """레코드 한 줄을 append한다. 실패하면 None을 돌려준다.
 
     **저장 실패(OSError)는 삼킨다** — 디스크가 차거나 볼륨이 안 붙었다고 해서
     사용자의 분석이 실패하면 안 된다. 다만 **프로세스당 한 번 경고를 남긴다**:
     조용히 넘기면 "서비스 입력이 0건"과 "sink가 고장남"을 구분할 수 없다.
+
+    **환경변수로 sink를 우회하면 기본 위치에 흔적을 남긴다** (프로세스당 1회,
+    `REDIRECT_LOG`). 우회하면 기본 위치가 비어 있게 되어 "분석 0건"이 진짜
+    0건인지 다른 곳에 기록된 것인지 구분되지 않는다 — 2026-08-31에 실제로
+    혼동했다. 명시적 `sink=` 인자는 호출부에 보이므로 흔적을 남기지 않는다.
 
     **직렬화 오류는 삼키지 않는다.** build_record가 내는 값은 전부 우리가
     통제하는 기본형이므로, 직렬화가 깨졌다면 그것은 운영 환경 문제가 아니라
@@ -132,7 +222,13 @@ def record(rec: dict, sink: str | os.PathLike | None = None) -> Path | None:
     """
     line = json.dumps(rec, ensure_ascii=False) + "\n"   # TypeError는 그대로 올린다
 
-    path = Path(sink or os.environ.get("SUPERSUB_METRICS_SINK") or DEFAULT_SINK)
+    path, origin = resolve_sink(sink)
+    # **환경변수 우회만 흔적을 남긴다.** 명시적 `sink=` 인자는 호출부 코드에
+    # 그대로 보이는 의도적 선택이라 나중에 되짚을 수 있다. 사고를 낸 것은
+    # 눈에 안 보이고 읽는 시점엔 이미 사라져 있는 환경변수 쪽이다.
+    # 인자까지 흔적을 남기면 테스트·도구가 부를 때마다 쌓여 신호가 죽는다.
+    if origin == "env":
+        _note_redirect(path, origin)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "a", encoding="utf-8") as fh:
@@ -150,7 +246,7 @@ def record(rec: dict, sink: str | os.PathLike | None = None) -> Path | None:
 
 def load(sink: str | os.PathLike | None = None) -> list[dict]:
     """기록된 레코드를 읽는다. 깨진 줄은 건너뛴다(append 중 잘린 줄 대비)."""
-    path = Path(sink or os.environ.get("SUPERSUB_METRICS_SINK") or DEFAULT_SINK)
+    path, _ = resolve_sink(sink)
     if not path.exists():
         return []
     out = []

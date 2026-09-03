@@ -38,6 +38,13 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+# S3 입출력(storage.py, scripts/analyze_s3.py) 전용 — EC2 배포에서만 필요하다.
+# 로컬 WSL 개발은 S3를 쓰지 않으므로 기본 설치에 넣지 않는다. storage.py가
+# boto3를 함수 안에서 import하므로 없어도 모듈 import는 통과한다.
+#
+# 판정을 vLLM으로 보내는 경로(judge.py의 base_url)는 여기 없다 —
+# urllib(표준 라이브러리)로 호출해서 의존성이 늘지 않는다.
+aws = ["boto3>=1.35"]
 # 추적 오버레이(scripts/track_overlay.py) 전용 — **기본 설치에 넣지 않는다.**
 # ultralytics는 AGPL-3.0이라, 이 패키지를 링크한 채 서비스를 네트워크로
 # 제공하면 소스 공개 의무가 생긴다. 분석 파이프라인 본체는 RT-DETR(Apache-2.0)로
@@ -68,3 +75,18 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/supersub_agent"]
+
+# 테스트 수집은 tests/ 로만 한정한다.
+#
+# eval/ 에는 조사용 스크립트가 있고 그중 `eval_b4/clean_review_ab_test.py` 는
+# 파일명이 pytest 기본 수집 패턴 `*_test.py` 에 걸린다. 수집은 **모듈을
+# import** 하므로, 모듈 수준에 실행 코드가 있으면 테스트를 돌리는 것만으로
+# 그 스크립트가 실행되어 산출물(/mnt/d/supersub-phaseA/eval_b4 의 5개)을
+# 덮어쓴다. 테스트는 그대로 통과하므로 신호도 남지 않는다.
+#
+# 그 스크립트에는 `__main__` 가드도 넣어 두었다 — 이중 방어다. 설정은 실행
+# 위치나 명시 인자(`pytest eval/...`)로 우회될 수 있고, 가드는 import 자체를
+# 무해하게 만든다. 어느 하나만으로는 부족하다.
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = ["eval", "data", "out", "scripts", ".venv", "*.egg-info"]

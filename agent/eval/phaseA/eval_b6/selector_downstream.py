@@ -39,8 +39,10 @@ PHASE_A = Path("/mnt/d/supersub-phaseA")
 AGENT = Path("/home/ho/projects/super-sub.cloud/agent")
 OUT = Path(__file__).resolve().parent
 
-sys.path.insert(0, str(PHASE_A / "eval_b2"))
-sys.path.insert(0, str(PHASE_A / "labeling"))
+# 코드는 저장소, 데이터는 /mnt/d. /mnt/d 사본은 갱신되지 않아 조용히 옛
+# 동작을 한다 (2026-09-02에 실제로 겪었다).
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "eval_b2"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "labeling"))
 sys.path.insert(0, str(AGENT / "src"))
 
 import eval_b2 as e2  # noqa: E402  (selector 구현 — 읽기 전용 import)
@@ -50,6 +52,7 @@ from supersub_agent import features as F  # noqa: E402  (읽기 전용)
 from supersub_agent import scoring as S  # noqa: E402
 from supersub_agent.pose import (  # noqa: E402
     COCO_PERSON_LABEL,
+    DEFAULT_TARGET_FPS,
     PERSON_DETECTOR,
     POSE_MODEL,
     read_frames,
@@ -161,7 +164,7 @@ def track1(pproc, pmodel, dev) -> list[dict]:
                 if gi is not None:
                     need.setdefault(t, set()).add(int(gi))
 
-        frames, _, _ = read_frames(str(PHASE_A / "clips" / f"{cid}.mp4"), target_fps=15)
+        frames, _, _ = read_frames(str(PHASE_A / "clips" / f"{cid}.mp4"), target_fps=DEFAULT_TARGET_FPS)
         if len(frames) != len(per_frame):
             raise RuntimeError(f"{cid}: 프레임 {len(frames)} != 후보 {len(per_frame)}")
 
@@ -225,7 +228,7 @@ def track2(dproc, dmodel, pproc, pmodel, dev, rubrics) -> list[dict]:
             continue
         rubric = rubrics[rkey]
 
-        frames, _, _ = read_frames(str(p), target_fps=15)
+        frames, _, _ = read_frames(str(p), target_fps=DEFAULT_TARGET_FPS)
         prev = {m: None for m in MODES}
         picks = {m: [] for m in MODES}
         kps_seq = {m: [] for m in MODES}

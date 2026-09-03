@@ -2,6 +2,7 @@
 
     uv run python scripts/analyze.py data/shot01.mp4
     uv run python scripts/analyze.py data/shot01.mp4 --repeat 5   # 재현성 확인
+    uv run python scripts/analyze.py data/pitch.mp4 --side left    # 던지는 팔 지정
 
 8GB VRAM 제약 때문에 포즈 모델과 판정 모델을 동시에 올리지 않는다.
 포즈 추출을 모두 끝내고 GPU를 비운 뒤 판정 모델을 적재한다.
@@ -24,7 +25,7 @@ from supersub_agent.features import (  # noqa: E402
     verify_rubric_coverage,
 )
 from supersub_agent.judge import Judge  # noqa: E402
-from supersub_agent.pose import extract_keypoints  # noqa: E402
+from supersub_agent.pose import DEFAULT_TARGET_FPS, extract_keypoints  # noqa: E402
 from supersub_agent.scoring import aggregate, load_rubric  # noqa: E402
 
 
@@ -33,7 +34,12 @@ def main() -> None:
     ap.add_argument("video", type=Path)
     ap.add_argument("--rubric", default="rubrics/football_instep_shot.yaml")
     ap.add_argument("--model", default="1.2B", choices=["1.2B", "2.4B", "7.8B"])
-    ap.add_argument("--fps", type=int, default=15)
+    ap.add_argument(
+        "--side", default="auto", choices=["auto", "left", "right"],
+        help="스윙 측(던지는 팔·차는 발). 루브릭의 impact_limb에만 적용되고 "
+             "반대쪽 사지는 auto로 남는다 — extract_features 참고",
+    )
+    ap.add_argument("--fps", type=int, default=DEFAULT_TARGET_FPS)
     ap.add_argument(
         "--repeat", type=int, default=1,
         help="같은 측정값으로 판정을 N회 반복해 재현성을 확인한다.",
@@ -55,7 +61,8 @@ def main() -> None:
         # 임팩트 정의와 도구 궤적을 루브릭에서 받아 넘긴다. 넘기지 않으면 팔
         # 루브릭도 다리로 측정되고, 도구 기반 항목이 통째로 빠진다.
         features = extract_features(
-            pose.keypoints, pose.objects, rubric.impact_limb, rubric.impact_event
+            pose.keypoints, pose.objects, rubric.impact_limb, rubric.impact_event,
+            args.side,
         )
     except InsufficientQuality as exc:
         print(f"\n분석 중단: {exc}")
@@ -63,7 +70,8 @@ def main() -> None:
     measure_s = time.time() - t0
 
     verify_rubric_coverage(rubric, features)
-    print(f"[측정] {len(pose.keypoints)}프레임, {measure_s:.1f}초")
+    print(f"[측정] {len(pose.keypoints)}프레임, swing_side={args.side}, "
+          f"{measure_s:.1f}초")
     print(json.dumps(features, ensure_ascii=False, indent=2))
 
     # --- 판정 (언어 모델) -----------------------------------------------

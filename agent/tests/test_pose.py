@@ -7,6 +7,8 @@ extract_keypoints는 GPU와 가중치가 있어야 하므로 여기서 검사하
 from __future__ import annotations
 
 import base64
+import logging
+import math
 
 import cv2
 import numpy as np
@@ -72,6 +74,121 @@ def test_max_frames_caps_the_clip(tmp_path):
 def test_missing_file_is_rejected(tmp_path):
     with pytest.raises(FileNotFoundError):
         read_frames(tmp_path / "없는파일.mp4")
+
+
+# --- 분석 창은 초로 정한다 (미결 7번 「인접 결함 두 건」) --------------------
+
+def test_analysis_window_is_the_same_duration_across_source_fps(tmp_path):
+    """**같은 실시간 길이를 본다** — 소스 fps가 달라도.
+
+    프레임 수로만 막으면 300장이 30fps에서 10.0초, 24fps에서 12.5초가 되어
+    같은 동작의 두 인코딩이 서로 다른 구간을 분석하게 된다. 그 차이는 아무
+    데도 기록되지 않는다.
+    """
+    seen = {}
+    for fps in (24.0, 25.0, 30.0):
+        clip = write_clip(tmp_path / f"c{int(fps)}.avi", n_frames=int(fps * 6), fps=fps)
+        frames, _, sampled = read_frames(clip, target_fps=30, max_seconds=2.0)
+        seen[fps] = len(frames) / sampled          # 실제로 덮은 초
+
+    for fps, covered in seen.items():
+        assert covered == pytest.approx(2.0, abs=0.05), f"{fps}fps 에서 {covered}초"
+
+
+def test_seconds_budget_keeps_frame_count_proportional_to_fps(tmp_path):
+    """초로 막으면 장수는 fps에 비례한다 — 24fps 2초는 48장, 30fps 2초는 60장."""
+    c24 = write_clip(tmp_path / "a.avi", n_frames=200, fps=24.0)
+    c30 = write_clip(tmp_path / "b.avi", n_frames=200, fps=30.0)
+
+    assert len(read_frames(c24, target_fps=30, max_seconds=2.0)[0]) == 48
+    assert len(read_frames(c30, target_fps=30, max_seconds=2.0)[0]) == 60
+
+
+def test_ntsc_fps_does_not_lose_a_frame_at_the_boundary(tmp_path):
+    """29.97fps·10초에서 300장이다 — 299장이 아니다.
+
+    예산을 내림으로 잡으면 29.97 × 10 = 299.7 → 299장이 되어 **기존 동작이
+    조용히 한 장 줄어든다.** NTSC 소스가 평가셋의 절반이라 경계가 실제로 걸린다.
+    """
+    clip = write_clip(tmp_path / "c.avi", n_frames=300, fps=29.97)
+
+    frames, _, _ = read_frames(clip, target_fps=30, max_seconds=10.0)
+
+    assert len(frames) == 300
+
+
+def test_frame_cap_still_guards_memory_when_seconds_budget_is_larger(tmp_path):
+    """실효 fps가 목표를 넘으면 초 예산이 프레임 예산을 넘어선다 — 가드가 이긴다.
+
+    40fps에 target 30을 주면 step=round(1.33)=1이라 실효 40fps다. 10초면
+    400장이 되어 미결 9번(host RAM)의 상한을 넘는다.
+    """
+    clip = write_clip(tmp_path / "c.avi", n_frames=400, fps=40.0)
+
+    frames, _, sampled = read_frames(
+        clip, target_fps=30, max_frames=300, max_seconds=10.0
+    )
+
+    assert sampled == pytest.approx(40.0)      # 목표를 넘는 실효 fps
+    assert len(frames) == 300                  # 초 예산 400 이 아니라 가드 300
+
+
+def test_low_effective_fps_warns(tmp_path, caplog):
+    """절벽은 경고한다 — 다만 이 경고가 fps 불변성을 뜻하지는 않는다."""
+    clip = write_clip(tmp_path / "c.avi", n_frames=20, fps=10.0)
+
+    with caplog.at_level(logging.WARNING, logger="supersub_agent.pose"):
+        read_frames(clip, target_fps=30)
+
+    assert any("실효 샘플링 fps" in r.message for r in caplog.records)
+
+
+@pytest.mark.parametrize("fps", [23.976, 24.0, 25.0, 29.97, 30.0])
+def test_common_cinema_and_ntsc_fps_do_not_warn(tmp_path, caplog, fps):
+    """흔한 소스는 경고하지 않는다 — **NTSC 24(23.976)를 포함해서.**
+
+    한계를 목표의 80%(=24.0)로 두면 23.976이 아슬아슬하게 걸린다. 평가셋에
+    실제로 있는 흔한 소스이고, 흔한 입력이 매번 경고를 내면 그 경고는 읽히지
+    않게 된다.
+    """
+    clip = write_clip(tmp_path / "c.avi", n_frames=48, fps=fps)
+
+    with caplog.at_level(logging.WARNING, logger="supersub_agent.pose"):
+        read_frames(clip, target_fps=30)
+
+    assert not [r for r in caplog.records if "실효 샘플링 fps" in r.message]
+
+
+def test_unbounded_window_keeps_only_the_memory_guard(tmp_path):
+    """`max_seconds=inf` 는 "창 제한 없음"이다 — 예전 동작(장수만)을 그대로 낸다."""
+    clip = write_clip(tmp_path / "c.avi", n_frames=400, fps=30.0)
+
+    frames, _, _ = read_frames(
+        clip, target_fps=30, max_frames=300, max_seconds=math.inf
+    )
+
+    assert len(frames) == 300
+
+
+def test_reload_uses_the_same_caps_as_extraction(tmp_path):
+    """재디코딩이 추출과 **같은 장수**를 잘라야 한다.
+
+    상한을 결과가 들고 다니지 않으면, 좁은 창으로 추출해 놓고 미리보기만
+    기본값으로 다시 읽어 프레임이 키포인트보다 길어진다 — 인덱스가 어긋난다.
+    """
+    clip = write_clip(tmp_path / "c.avi", n_frames=200, fps=30.0)
+    frames, src, sampled = read_frames(clip, target_fps=30, max_seconds=2.0)
+
+    result = PoseResult(
+        keypoints=np.zeros((len(frames), 17, 3)),
+        source_fps=src,
+        sampled_fps=sampled,
+        video_path=clip,
+        target_fps=30,
+        max_seconds=2.0,
+    )
+
+    assert len(result.load_frames()) == len(frames) == 60
 
 
 def test_object_tracks_fill_missing_frames_with_zero_confidence():

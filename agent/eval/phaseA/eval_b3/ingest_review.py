@@ -15,7 +15,10 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-sys.path.insert(0, "/mnt/d/supersub-phaseA/labeling")
+# targets.py 는 **저장소 것**을 쓴다. /mnt/d 에도 사본이 있지만 그쪽은 갱신되지
+# 않아 조용히 옛 동작을 한다 (2026-09-02에 실제로 겪었다 — 라벨 재매핑이
+# 반영되지 않은 채 B-1/B-2가 돌았다). 데이터는 /mnt/d, 코드는 저장소다.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "labeling"))
 from targets import enumerate_targets, load_candidates, target_key  # noqa: E402
 
 B3 = Path("/mnt/d/supersub-phaseA/eval_b3")

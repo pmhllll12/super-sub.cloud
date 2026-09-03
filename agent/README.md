@@ -94,17 +94,25 @@ draft도 포함해 돌기 때문에, 닫혀 있는 동안 파이프라인이 바
 ## 스윙 측 지정
 
 던지는 팔·차는 발은 기본적으로 말단 관절의 이동량으로 판별하는데, **팔 종목에서
-이 판별이 약하다.** 야구 투구 실클립에서 던지는 왼팔 18.2 대 글러브 오른팔
-27.6으로 뒤집혔고(글러브 팔은 신뢰도 0.3~0.6짜리가 프레임마다 튀며 경로를 쌓는다),
-농구 레이업은 16.30 대 16.09로 1% 차이였다. 관측 비율로 할인하거나 손 최고점으로
-바꿔 봐도 한 클립을 맞히면 다른 클립이 뒤집힌다.
+이 판별이 약하다.** 현재 동작점(실효 25fps)의 야구 투구 실클립에서 던지는 왼팔
+23.5 대 글러브 오른팔 33.1로 뒤집히고, 농구 레이업은 18.7 대 17.1로 8.7% 차이다.
+관측 비율로 할인하거나 손 최고점으로 바꿔 봐도 한 클립을 맞히면 다른 클립이
+뒤집힌다. `target_fps`를 15에서 30으로 올려도 뒤집힘은 남았다(마진 34% → 29%).
+재계산은 `eval/pending6_side/`가 GPU 없이 한다.
 
 그래서 사람이 지정할 수 있게 열어 두었다. 지정이 없으면 기존 자동 판별을 쓴다.
 
 ```
 uv run python scripts/measure.py data/pitch.mp4 --limb arm --side left
+uv run python scripts/analyze.py data/pitch.mp4 --rubric rubrics/baseball_pitching.yaml --side left
 POST /api/analyze/video?rubric=baseball/pitching&side=left
 ```
+
+**지정한 값은 루브릭의 `impact_limb`에만 적용되고, 반대쪽 사지는 언제나 auto다.**
+"왼쪽"이 팔과 다리에서 같은 것을 가리키지 않기 때문이다 — 오른손 투수의 디딤발은
+왼발이고, 오른발 슈팅에서 크게 도는 팔은 왼팔이다(평가셋 39클립에서 자동 판별된
+팔 측과 다리 측이 44%에서만 일치했다). 그래서 팔 루브릭에 `side=left`를 줘도
+다리 지표는 auto 판별로 나온다.
 
 품질 게이트도 이 스윙 측만 본다. 좌우를 함께 요구하면 와인드업에서 글러브가
 반대쪽 손을 덮는 투구가 통째로 반려된다(던지는 팔 98%, 글러브 팔 50% → 전체 48%).
@@ -123,15 +131,40 @@ agent/
 ├── src/supersub_agent/
 │   ├── pose.py       # OpenCV 디코딩 + RT-DETR 검출 + ViTPose 추정
 │   ├── features.py   # 정규화 → 구간 분할 → 채점 지표 산출
-│   ├── judge.py      # EXAONE 근거 문장 생성 (bf16, 스키마 강제)
+│   ├── judge.py      # EXAONE 근거 문장 생성 (로컬 bf16 | vLLM HTTP, 스키마 강제)
 │   ├── scoring.py    # 루브릭 적재 + 등급 구간 판정 + 가중합
+│   ├── storage.py    # S3 입출력 (선택 의존성 boto3)
 │   └── api.py        # 로컬 확인용 FastAPI + 웹 UI
 ├── scripts/
 │   ├── spike_exaone.py  # 8GB 적재·속도·스키마 강제 검증
 │   ├── analyze.py       # CLI 단건 분석
+│   ├── analyze_s3.py    # S3 영상 분석 → S3 리포트 (EC2용)
 │   └── demo.py          # 재현성 반복 실행
+├── deploy/           # AWS EC2 배포 — 런북·vLLM 기동·systemd
 └── tests/
 ```
+
+## 판정 백엔드 — 로컬 적재와 vLLM
+
+`Judge`가 두 갈래다. **기본은 지금까지와 같은 로컬 transformers 적재**이고,
+환경변수 `SUPERSUB_VLLM_URL`이 있을 때만 이미 떠 있는 vLLM 서버로 HTTP 호출한다.
+
+```bash
+# 로컬 WSL — 변수 없음 → 기존 경로 그대로
+uv run python scripts/analyze.py data/shot01.mp4
+
+# EC2 — vLLM이 8000에 떠 있다
+export SUPERSUB_VLLM_URL=http://127.0.0.1:8000
+uv run python scripts/analyze_s3.py s3://버킷/videos/pitch01.mp4 --out s3://버킷/reports
+```
+
+`api.py`·`analyze.py`는 고치지 않았다. T4 16GB에서는 vLLM이 GPU 일부를 상주로
+잡고 있어야 하는데, 그러면 판정 때마다 EXAONE을 적재·해제하는 로컬 경로와
+메모리가 겹친다. vLLM에 맡기면 판정 쪽 GPU 사용이 상수가 되고 남는 자리를
+포즈 모델이 쓴다. 어느 백엔드든 **등급은 모델이 정하지 않는다** —
+`scoring.Criterion.grade_for`가 정한 값을 그대로 싣는다.
+
+배포 절차는 [`deploy/README.md`](deploy/README.md)에 있다.
 
 ### 로컬 확인용 웹 UI
 

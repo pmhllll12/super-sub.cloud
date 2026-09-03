@@ -17,7 +17,10 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-sys.path.insert(0, "/mnt/d/supersub-phaseA/labeling")
+# targets.py 는 **저장소 것**을 쓴다. /mnt/d 에도 사본이 있지만 그쪽은 갱신되지
+# 않아 조용히 옛 동작을 한다 (2026-09-02에 실제로 겪었다 — 라벨 재매핑이
+# 반영되지 않은 채 B-1/B-2가 돌았다). 데이터는 /mnt/d, 코드는 저장소다.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "labeling"))
 sys.path.insert(0, "/home/ho/projects/super-sub.cloud/agent/src")
 from targets import RATIOS, enumerate_targets, load_candidates, target_key  # noqa: E402
 
@@ -111,14 +114,14 @@ def main() -> None:
     print(f"review cases: {len(rows)}  (clips {len({r['clip_id'] for r in rows})})")
 
     # 렌더 — 프레임 디코딩은 클립당 한 번만 한다
-    from supersub_agent.pose import read_frames
+    from supersub_agent.pose import DEFAULT_TARGET_FPS, read_frames
     need = defaultdict(list)
     for r in rows:
         need[r["clip_id"]].append(r)
     for cid, rs in need.items():
         per_frame, wh, _ = load_candidates(cid)
         vid = ROOT / "clips" / f"{cid}.mp4"
-        frames_img, _, _ = read_frames(str(vid), target_fps=15)
+        frames_img, _, _ = read_frames(str(vid), target_fps=DEFAULT_TARGET_FPS)
         for r in rs:
             f = int(r["frame"])
             img = draw(frames_img[f], per_frame[f], wh)

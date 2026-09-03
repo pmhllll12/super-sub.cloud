@@ -1,6 +1,6 @@
 """대상 선수 라벨링 CLI — 117개 대상을 하나씩 묻는다.
 
-    uv run python /mnt/d/supersub-phaseA/labeling/label_cli.py
+    uv run python eval/phaseA/labeling/label_cli.py
 
 라벨러가 답할 것은 하나다: **이 프레임에서 실제 분석 대상인 타자는 몇 번 후보인가?**
 

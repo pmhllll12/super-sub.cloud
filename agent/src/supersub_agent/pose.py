@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import base64
 import gc
+import logging
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -23,9 +25,46 @@ import numpy as np
 # 쓴다). 반대 방향 import를 추가하면 순환이 되므로 그러지 않는다.
 from . import observability
 
+# 표준 logging만 쓴다 — observability.py 와 같은 규약이다.
+_log = logging.getLogger(__name__)
+
 PERSON_DETECTOR = "PekingU/rtdetr_r50vd_coco_o365"
 POSE_MODEL = "usyd-community/vitpose-base-simple"
 COCO_PERSON_LABEL = 0
+
+# 샘플링 목표 fps의 **단일 진실원**. 서비스도 평가도 이 값을 쓴다.
+#
+# 15에서 30으로 올렸다(2026-09-02). 15fps에서는 임팩트가 실제로 일어난 프레임이
+# 격자에 없는 경우가 많아 **측정 자체가 성립하지 않았다** — 밴드 적중 31.8%가
+# 30fps에서 49.8%로 올라간다. 더 정확해진 것이 아니라 **다른 프레임을 고르게
+# 된 것**이고, 어느 쪽이 옳은지는 정답이 있어야 말할 수 있다(미결 5번 보류).
+# 60까지 올려도 +3.7pp뿐이고 평가셋 39클립 중 38건이 30fps 이하라 30에서 멈춘다.
+#
+# 평가 스크립트가 리터럴 15를 들고 있어서 서비스와 갈라져 있었다(미결 10번).
+# 리터럴을 쓰지 말고 이 상수를 import해서 쓸 것 — 값이 바뀌면 같이 따라와야
+# 평가가 서비스의 동작점을 재는 의미가 있다.
+DEFAULT_TARGET_FPS = 30
+
+# **분석 창(초).** 몇 초까지 볼 것인가 — 소스 fps와 무관한 값이다.
+# 10.0인 이유: 현재 동작점(target 30, step 1)에서 300장이 정확히 10.0초라
+# 기존 동작을 그대로 보존한다. 평가셋 39클립이 전부 10초 이하라 무변화다.
+DEFAULT_MAX_SECONDS = 10.0
+
+# **메모리 가드(장).** 분석 의도가 아니라 미결 9번(4K에서 host RAM이 먼저
+# 터진다)이 정한 상한이다. 4K 300장이 약 7GB이고 g4dn.xlarge의 host RAM은
+# 16GB다. 창을 넓히고 싶으면 DEFAULT_MAX_SECONDS를 올릴 것 — 이 값을 올리면
+# 메모리 한계를 올리는 것이지 창을 넓히는 것이 아니다.
+DEFAULT_MAX_FRAMES = 300
+
+# 실효 fps가 목표의 이 비율보다 낮으면 경고한다. **절벽만 막는다** —
+# 미결 7번이 확인했듯 30↔60에서도 등급이 37% 바뀌므로, 이 경고가 fps 불변성을
+# 뜻하지는 않는다.
+#
+# 0.75인 이유: target 30에서 한계가 22.5fps다. **0.8(=24.0)로 두면 NTSC 24인
+# 23.976fps가 아슬아슬하게 걸린다** — 평가셋에 실제로 있고 흔한 소스다.
+# 흔한 입력이 매번 경고를 내면 그 경고는 읽히지 않게 된다. 24 계열은 통과하고
+# 10fps 같은 절벽은 걸리는 자리가 0.75다.
+LOW_FPS_WARN_RATIO = 0.75
 
 # 검출기는 COCO 80클래스를 내는데 지금까지 person만 쓰고 나머지를 버렸다.
 # 도구 검출에 새 모델은 필요 없다 — 같은 forward 결과를 재사용하므로 추론 비용이
@@ -75,7 +114,12 @@ class PoseResult:
     # 프레임을 다시 얻는 데 필요한 것. video_path가 None이면 프레임이 없는
     # 결과다(합성 키포인트 경로) — load_frames()가 None을 돌려준다.
     video_path: str | None = None
-    target_fps: int = 15       # 추출 때 쓴 값. 재디코딩이 같은 프레임을 골라야 한다.
+    target_fps: int = DEFAULT_TARGET_FPS   # 추출 때 쓴 값. 재디코딩이 같은 프레임을 골라야 한다.
+    # 상한도 함께 들고 다닌다. 재디코딩이 **같은 장수**를 잘라야 하기 때문이다 —
+    # 추출은 좁은 창으로 하고 재디코딩만 기본값으로 하면 미리보기가 키포인트보다
+    # 길어져 프레임과 인덱스가 어긋난다. 기본값을 쓰면 기존 호출부는 그대로다.
+    max_frames: int = DEFAULT_MAX_FRAMES
+    max_seconds: float = DEFAULT_MAX_SECONDS
     # 도구 궤적: 이름 → (T, 3) [중심 x, 중심 y, 신뢰도].
     # 미검출 프레임은 신뢰도 0으로 채운다 — 키포인트와 같은 규약이다.
     objects: dict[str, np.ndarray] = field(default_factory=dict)
@@ -96,9 +140,9 @@ class PoseResult:
         """오버레이용 원본 프레임을 그 자리에서 다시 디코딩한다.
 
         **같은 프레임이 나오는 근거는 read_frames가 결정적이라는 것뿐이다** —
-        경로·target_fps가 같으면 같은 인덱스(idx % step == 0)를 고른다. 그래서
-        추출 때 쓴 target_fps를 결과가 함께 들고 다닌다. 파일이 사라진 뒤에
-        부르면 read_frames가 그대로 예외를 낸다(업로드 임시 파일 수명 주의).
+        경로·target_fps·상한이 같으면 같은 인덱스(idx % step == 0)를 같은 개수만큼
+        고른다. 그래서 추출 때 쓴 값들을 결과가 함께 들고 다닌다. 파일이 사라진
+        뒤에 부르면 read_frames가 그대로 예외를 낸다(업로드 임시 파일 수명 주의).
 
         재디코딩 비용은 포즈 추출(모델 적재 제외)의 10% 수준이다 — 실측
         1080p 11.3ms/장 대 104.6ms/장, 4K 34.2ms/장 대 351.1ms/장.
@@ -106,7 +150,9 @@ class PoseResult:
         """
         if self.video_path is None:
             return None
-        frames, _, _ = read_frames(self.video_path, self.target_fps)
+        frames, _, _ = read_frames(
+            self.video_path, self.target_fps, self.max_frames, self.max_seconds
+        )
         return frames
 
     def frame_to_seconds(self, frame: int) -> float:
@@ -122,7 +168,10 @@ class PoseResult:
 
 
 def read_frames(
-    video_path: str | Path, target_fps: int = 15, max_frames: int = 300
+    video_path: str | Path,
+    target_fps: int = DEFAULT_TARGET_FPS,
+    max_frames: int = DEFAULT_MAX_FRAMES,
+    max_seconds: float = DEFAULT_MAX_SECONDS,
 ) -> tuple[list[np.ndarray], float, float]:
     """OpenCV로 디코딩하고 target_fps에 가장 가까운 정수 간격으로 다운샘플링한다.
 
@@ -131,6 +180,21 @@ def read_frames(
     간격이 정수라 target_fps를 그대로 달성하지 못한다 — 25fps 영상에 target 15를
     주면 step=round(1.67)=2, 즉 실효 12.5fps다. 목표값을 실효값인 양 기록하면
     프레임 인덱스를 시각으로 환산할 때 20% 어긋난다.
+
+    **상한이 둘이고 역할이 다르다** (미결 7번 「인접 결함 두 건」).
+
+      max_seconds — **분석 창.** 몇 초까지 볼 것인가. 소스 fps와 무관하다.
+      max_frames  — **메모리 가드.** 몇 장까지 들 것인가. 미결 9번(4K에서 host
+                    RAM이 먼저 터진다)이 정한 값이며 분석 의도가 아니다.
+
+    프레임 수만으로 막으면 **덮는 실시간 길이가 fps에 따라 달라진다** — 300장은
+    30fps에서 10.0초지만 24fps에서는 12.5초다. 같은 동작을 담은 두 인코딩이 서로
+    다른 구간을 분석하게 되고, 그 차이는 아무 데도 기록되지 않는다. 그래서 창은
+    초로 정하고 프레임 수는 자원 보호로만 남긴다.
+
+    둘 중 **먼저 걸리는 쪽**이 이긴다. 실효 fps가 목표를 넘는 소스(40fps에
+    target 30이면 step=1이라 실효 40fps)에서는 초 예산이 프레임 예산을 넘어서므로
+    메모리 가드가 필요하다.
     """
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
@@ -138,10 +202,30 @@ def read_frames(
 
     src_fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     step = max(1, round(src_fps / target_fps))
+    sampled_fps = src_fps / step
+
+    # t < max_seconds 인 프레임의 개수. k 번째 표본의 시각이 k / sampled_fps 이므로
+    # k < max_seconds * sampled_fps 이고, 개수는 그 값의 올림이다.
+    # (내림을 쓰면 29.97fps·10초에서 299장이 되어 300장이던 기존 동작이 조용히
+    #  한 장 줄어든다. 경계에서 동작이 바뀌지 않게 올림을 쓴다.)
+    # math.inf 는 "창 제한 없음"이다 — 메모리 가드만 남긴다. ceil(inf)가
+    # OverflowError 를 내므로 먼저 걸러낸다.
+    if math.isfinite(max_seconds):
+        limit = min(max_frames, max(1, math.ceil(max_seconds * sampled_fps)))
+    else:
+        limit = max_frames
+
+    if sampled_fps < target_fps * LOW_FPS_WARN_RATIO:
+        _log.warning(
+            "실효 샘플링 fps가 목표보다 크게 낮습니다: %.2f < %d (소스 %.2ffps, step %d). "
+            "프레임 간격이 넓어 임팩트 추정이 거칠어집니다. "
+            "이 경고는 절벽만 막으며 fps 불변성을 보장하지 않습니다 (미결 7번).",
+            sampled_fps, target_fps, src_fps, step,
+        )
 
     frames: list[np.ndarray] = []
     idx = 0
-    while len(frames) < max_frames:
+    while len(frames) < limit:
         ok, frame = cap.read()
         if not ok:
             break
@@ -152,7 +236,7 @@ def read_frames(
 
     if not frames:
         raise ValueError(f"프레임을 읽지 못했습니다: {video_path}")
-    return frames, src_fps, src_fps / step
+    return frames, src_fps, sampled_fps
 
 
 def _largest_person_box(detections, threshold: float = 0.5):
@@ -239,10 +323,12 @@ def _record_input_observation(result: PoseResult, rubric_key: str | None) -> Non
 
 def extract_keypoints(
     video_path: str | Path,
-    target_fps: int = 15,
+    target_fps: int = DEFAULT_TARGET_FPS,
     device: str | None = None,
     observe: bool = True,
     rubric_key: str | None = None,
+    max_frames: int = DEFAULT_MAX_FRAMES,
+    max_seconds: float = DEFAULT_MAX_SECONDS,
 ) -> PoseResult:
     """영상에서 대상 선수의 키포인트 시계열을 추출한다.
 
@@ -264,7 +350,9 @@ def extract_keypoints(
     )
 
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-    frames, src_fps, sampled_fps = read_frames(video_path, target_fps)
+    frames, src_fps, sampled_fps = read_frames(
+        video_path, target_fps, max_frames, max_seconds
+    )
 
     det_processor = AutoProcessor.from_pretrained(PERSON_DETECTOR)
     detector = RTDetrForObjectDetection.from_pretrained(PERSON_DETECTOR).to(device).eval()
@@ -334,6 +422,8 @@ def extract_keypoints(
         # 판정 모델이 올라갈 때 원본 프레임이 메모리에 남지 않는다.
         video_path=str(video_path),
         target_fps=target_fps,
+        max_frames=max_frames,
+        max_seconds=max_seconds,
         objects=stack_object_tracks(obj_frames),
         candidate_counts=cand_counts,
     )

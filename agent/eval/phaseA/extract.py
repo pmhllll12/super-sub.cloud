@@ -26,7 +26,7 @@ for i, p in enumerate(clips, 1):
         # observe=False — 오프라인 평가는 서비스 입력이 아니다. 기본값이 True라
         # 그냥 두면 39클립이 서비스 입력 관측 sink에 쌓여 다중인원 노출·fps
         # 분포를 오염시킨다. 추출 결과(keypoints·objects·fps)에는 영향이 없다.
-        r = pose.extract_keypoints(str(p), target_fps=15, observe=False)
+        r = pose.extract_keypoints(str(p), target_fps=pose.DEFAULT_TARGET_FPS, observe=False)
     except Exception as e:
         print(f"[{i}/{len(clips)}] FAIL {cid}: {type(e).__name__}: {e}", flush=True)
         np.savez_compressed(CACHE/f"{cid}.ERROR.npz", err=str(e)); continue

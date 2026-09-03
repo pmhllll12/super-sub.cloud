@@ -24,8 +24,10 @@ B3 = ROOT / "eval_b3"
 B4 = ROOT / "eval_b4"
 B4.mkdir(exist_ok=True)
 
-sys.path.insert(0, str(B2))
-sys.path.insert(0, str(ROOT / "labeling"))
+# 코드는 저장소, 데이터는 /mnt/d. /mnt/d 사본은 갱신되지 않아 조용히 옛
+# 동작을 한다 (2026-09-02에 실제로 겪었다).
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "eval_b2"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "labeling"))
 from targets import enumerate_targets, load_candidates, target_key  # noqa: E402
 
 import eval_b2 as e2  # noqa: E402  selector 구현·가중치의 유일한 출처
