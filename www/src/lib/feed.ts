@@ -36,6 +36,14 @@ export type FeedClip = {
    * 크기가 바뀌어 화면이 한 번 덜컥한다. API 가 붙으면 서버가 같이 준다.
    */
   aspect: string
+  /**
+   * 댓글.
+   *
+   * ⚠️ **전부 mock 이고 아무 데도 안 보낸다** — 계약(5장)에 댓글이 없다. 화면에서
+   * 쓴 것은 그 자리에서만 붙고 새로고침하면 사라진다(좋아요와 같은 규칙).
+   * 계약이 생기면 이 배열을 지우고 응답을 흘려 넣으면 된다.
+   */
+  comments: { by: string; text: string }[]
 }
 
 export const FEED: FeedClip[] = [
@@ -48,6 +56,11 @@ export const FEED: FeedClip[] = [
     src: '/coach-c001.mp4',
     // 1080 × 1920 — 폰으로 세로로 찍은 것.
     aspect: '1080 / 1920',
+    comments: [
+      { by: '오세진', text: '디딤발 자리 좋다. 이거 몇 개째야?' },
+      { by: '정하늘', text: '해 지기 직전 빛이 예쁘게 나왔네요' },
+      { by: '김도현', text: '스무 개쯤 던지고 겨우 하나 건졌습니다' },
+    ],
   },
   {
     id: 'f-002',
@@ -57,6 +70,10 @@ export const FEED: FeedClip[] = [
     what: '수요일 저녁 마포 코트',
     src: '/coach-c002.mp4',
     aspect: '1280 / 720',
+    comments: [
+      { by: '박민호', text: '수요일 저녁이면 자리 있나요?' },
+      { by: '정하늘', text: '여섯 시 넘으면 대체로 비어 있어요' },
+    ],
   },
   {
     id: 'f-003',
@@ -66,5 +83,11 @@ export const FEED: FeedClip[] = [
     what: '릴리스 직전 어깨가 열리는 자리',
     src: '/coach-c003.mp4',
     aspect: '1920 / 1080',
+    comments: [
+      { by: '김도현', text: '어깨 열리는 타이밍이 확실히 보이네요' },
+      { by: '오세진', text: '느리게 돌려 보면 더 잘 보입니다' },
+      { by: '정하늘', text: '이 각도 좋다' },
+      { by: '박민호', text: '다음엔 정면에서도 한 번 찍어 주세요' },
+    ],
   },
 ]

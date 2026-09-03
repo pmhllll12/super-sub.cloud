@@ -6902,6 +6902,33 @@ body:has(.ss-home-stage) {
   z-index: 2;
 }
 
+/* 🔴 다음 영상은 **왼쪽에서 오른쪽으로 들어온다**(사용자 요청). 들어오는 칸만
+   움직이고 나가는 칸은 제자리에서 흐려진다 — 둘 다 움직이면 화면을 가로지르는
+   행렬이 되어, 예전에 걷어낸 그 모습으로 돌아간다(위 주석).
+
+   🔴 **짧게** 들어온다(7%). 화면을 가로질러 오게 하면 "옆 칸이 지나가는 것은
+   안 보여야 한다"는 앞선 요청과 부딪힌다 — 들어오는 방향만 읽히면 된다.
+
+   🔴 `data-here` 는 넘길 때마다 **다른 요소**로 옮겨 가므로, 새로 붙은 칸에서
+   애니메이션이 늘 처음부터 돈다(같은 요소에 같은 이름을 다시 걸면 안 도는 함정을
+   여기서는 안 밟는다).
+   🔴 불투명도는 건드리지 않는다 — 그건 위 규칙의 전환이 맡는다. 애니메이션이
+   잡은 속성은 전환이 못 이기므로 둘이 같은 속성을 쥐면 흐리기가 통째로 죽는다. */
+@media (prefers-reduced-motion: no-preference) {
+  .ss-feed-frame[data-here='true'] {
+    animation: ss-feed-slide-in 520ms var(--ss-home-out-ease) both;
+  }
+}
+
+@keyframes ss-feed-slide-in {
+  from {
+    transform: translateX(-7%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
 /* 🔴 쉬는 칸은 **같은 자리에서 안 보이게만** 한다. 흐려지는 동안(420ms)은 보이고
    다 흐려진 뒤에 자리를 뜬다 — `visibility` 는 중간값이 없어 지연만 준다. */
 .ss-feed-frame:not([data-here='true']) {
@@ -6958,9 +6985,9 @@ body:has(.ss-home-stage) {
 .ss-feed-list {
   position: absolute;
   z-index: 4;
-  /* 🔴 자리는 **`HomeFeed` 가 잰다** — 가로는 지금 영상의 오른쪽 끝 옆, 세로는
-     그 영상의 한가운데다(사용자 요청). 영상마다 폭도 키도 달라 CSS 로는 못 잡는다.
-     제 키의 절반만큼 올려서 **가운데 줄**이 그 자리에 오게 한다. */
+  /* 🔴 자리는 **`HomeFeed` 가 잰다** — 가로는 늘 화면 오른쪽 끝, 세로는 지금
+     영상의 한가운데다(사용자 요청). 목록 폭도 영상 키도 창마다 달라 CSS 로는
+     못 잡는다. 제 키의 절반만큼 올려서 **가운데 줄**이 그 자리에 오게 한다. */
   top: var(--ss-feed-list-y, 50%);
   left: var(--ss-feed-list-x, 50%);
   display: flex;
@@ -6970,16 +6997,23 @@ body:has(.ss-home-stage) {
      때마다 자리를 새로 잡느라 한 번 튄다. */
   opacity: 0;
   pointer-events: none;
-  transform: translateY(-50%) translateX(24px);
+  transform: translateY(-50%) translateX(32px);
   transition:
     opacity 320ms ease,
     transform 520ms var(--ss-home-out-ease);
 }
 
+/* 🔴 **영상이 먼저 비켜서고 그 다음에 목록이 나온다**(사용자 요청). 같이 시작하면
+   가로 영상에서 목록이 아직 제자리에 있는 영상 위로 겹쳐 들어온다.
+   기다리는 시간은 `HomeFeed` 가 준다 — **비켜설 것이 없으면(세로 영상) 0** 이다.
+   안 그러면 아무 일도 안 일어나는 동안 목록만 늦게 나온다.
+   ⚠️ 닫을 때는 기다리지 않는다(이 규칙은 열렸을 때만 걸린다) — 닫는 것은 영상이
+   제자리로 돌아오는 것과 같이 일어나도 겹칠 것이 없다. */
 .ss-feed-list[data-open='true'] {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(-50%);
+  transition-delay: var(--ss-feed-list-delay, 0ms);
 }
 
 
@@ -7032,10 +7066,25 @@ body:has(.ss-home-stage) {
   background-color: color-mix(in srgb, var(--ss-fg) 10%, transparent);
 }
 
-/* 지금 보는 것 — 누를 수 없고, 그 사실이 보여야 한다. */
+/* 🔴 **고른 것만 밝다**(사용자 요청) — 지금 보는 줄이 환하고 나머지는 어둡다.
+
+   ⚠️ 전에는 **반대**였다: 지금 보는 줄을 흐리게 해서 "여긴 이미 와 있다"를
+   말했다. 되돌리지 말 것 — 목록에서 눈이 먼저 가야 하는 것은 **지금 보는 것**이다.
+   누를 수 없다는 것은 커서로만 말한다. */
 .ss-feed-list button:disabled {
   cursor: default;
+}
+
+.ss-feed-list button:not([data-here='true']) {
   opacity: 0.45;
+  transition:
+    background-color 160ms ease,
+    opacity 160ms ease;
+}
+
+/* 가져다 대면 밝아진다 — 어두운 줄도 누를 수 있다는 것을 그때 말한다. */
+.ss-feed-list button:not([data-here='true']):hover {
+  opacity: 1;
 }
 
 .ss-feed-list video {
@@ -7045,6 +7094,144 @@ body:has(.ss-home-stage) {
   border-radius: 6px;
   background-color: #000000;
   object-fit: cover;
+}
+
+/* ── 댓글창 ───────────────────────────────────────────────────────────
+   🔴 목록과 **같은 자리**를 쓴다(사용자 요청) — 한 번에 하나만 뜬다. 자리(가로 ·
+   세로)와 기다리는 시간은 `HomeFeed` 가 같은 변수로 준다.
+   🔴 목록보다 **넓다.** 글 여러 줄이 들어오는 자리라 미리보기 목록 폭으로는
+   한 문장이 서너 줄로 접힌다. 그래서 가로 영상은 이만큼 더 비켜서야 하고,
+   `HomeFeed` 의 `measure` 가 **나올 판을 재는** 이유가 이것이다.
+
+   🔴 그렇다고 **마음대로 넓힐 수는 없다.** 영상은 "왼쪽으로 비켜설 뿐 화면 밖으로
+   안 나간다"는 규칙이 있어(사용자 요청) 비켜설 수 있는 거리가 정해져 있는데,
+   판이 그보다 넓으면 **모자란 만큼 영상 위로 겹친다**(360px 으로 뒀다가 32px 이
+   겹쳤다 — 실측). 넓은 16:9 영상이 비켜설 수 있는 만큼 안에서 잡는다. */
+.ss-feed {
+  --ss-feed-comments-w: clamp(230px, 19vw, 290px);
+}
+
+.ss-feed-comments {
+  position: absolute;
+  z-index: 4;
+  top: var(--ss-feed-list-y, 50%);
+  left: var(--ss-feed-list-x, 50%);
+  display: flex;
+  width: var(--ss-feed-comments-w);
+  max-height: min(70vh, 620px);
+  flex-direction: column;
+  gap: 12px;
+  /* 닫혀 있을 때는 목록과 같이 **오른쪽 밖**에서 기다린다. */
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) translateX(32px);
+  transition:
+    opacity 320ms ease,
+    transform 520ms var(--ss-home-out-ease);
+}
+
+.ss-feed-comments[data-open='true'] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(-50%);
+  /* 🔴 자리가 빈 뒤에 나온다 — 영상이 비켜서고, 목록이 나가고 나서다. */
+  transition-delay: var(--ss-feed-list-delay, 0ms);
+}
+
+.ss-feed-comments-head {
+  flex: none;
+  font-size: 0.8125rem;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--ss-fg) 55%, transparent);
+}
+
+.ss-feed-comments-head b {
+  color: var(--ss-fg);
+}
+
+/* 목록과 같은 굴림 규칙 — 막대는 감추고 위아래 끝은 흐린다. */
+/* 🔴 **댓글 사이는 넓게, 이름과 본문 사이는 좁게**(사용자 지적 — 어디까지가
+   한 댓글인지 헷갈렸다). 선을 긋지 않고 간격만으로 가른다: 이 판은 "테두리도
+   바탕도 없이 글만" 이 규칙이라(목록과 같다) 선이 들어오면 그 결이 깨진다.
+   두 간격의 차이가 충분히 커야 묶음이 읽힌다 — 14 대 3 은 모자랐다. */
+.ss-feed-comments ul {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 22px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.ss-feed-comments ul::-webkit-scrollbar {
+  display: none;
+}
+
+.ss-feed-comments li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+}
+
+.ss-feed-comments li b {
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--ss-fg) 62%, transparent);
+}
+
+.ss-feed-comments li span {
+  color: var(--ss-fg);
+}
+
+/* 내가 방금 쓴 것 — 남의 것과 구분이 되어야 "붙었다"가 읽힌다. */
+.ss-feed-comments li[data-mine='true'] b {
+  color: var(--ss-accent);
+}
+
+.ss-feed-comments-write {
+  display: flex;
+  flex: none;
+  align-items: center;
+  border-top: 1px solid color-mix(in srgb, var(--ss-fg) 14%, transparent);
+  padding-top: 10px;
+  gap: 8px;
+}
+
+.ss-feed-comments-write label {
+  flex: 1;
+  min-width: 0;
+}
+
+.ss-feed-comments-write input {
+  width: 100%;
+  border: 0;
+  background: none;
+  color: var(--ss-fg);
+  font-size: 0.8125rem;
+}
+
+.ss-feed-comments-write input::placeholder {
+  color: color-mix(in srgb, var(--ss-fg) 40%, transparent);
+}
+
+.ss-feed-comments-write button {
+  display: flex;
+  flex: none;
+  border: 0;
+  padding: 4px;
+  background: none;
+  color: var(--ss-accent);
+  cursor: pointer;
+}
+
+.ss-feed-comments-write button:disabled {
+  color: color-mix(in srgb, var(--ss-fg) 30%, transparent);
+  cursor: default;
+}
+
+.ss-feed-comments-write .material-symbols-outlined {
+  font-size: 20px;
 }
 
 .ss-feed-list span {
