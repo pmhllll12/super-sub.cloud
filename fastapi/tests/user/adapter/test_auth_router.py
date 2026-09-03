@@ -133,6 +133,10 @@ class TestOpenApi:
             V1 + "/matches/{match_id}/applications/{application_id}/accept",
             f"{V1}/videos",
             f"{V1}/videos/upload-url",
+            V1 + "/teams/{team_id}/squad",
+            V1 + "/teams/{team_id}/squad/members",
+            V1 + "/teams/{team_id}/squad/members/{member_id}",
+            V1 + "/squads/{public_slug}",
             f"{V1}/admin/users",
             V1 + "/admin/users/{user_id}",
         }

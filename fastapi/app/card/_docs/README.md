@@ -12,7 +12,7 @@
 |---|---|
 | `player_card` | `domain/entities/card_entity.py` |
 | `user_title` + `title_definition` | `domain/entities/title_entity.py` |
-| `squad` · `squad_member` | 아직 없음 — 팀 스쿼드 화면이 생길 때 |
+| `squad` · `squad_member` | `domain/entities/squad_entity.py` (2026-09-03) |
 
 ## 인바운드 → 아웃바운드
 
@@ -32,6 +32,12 @@ card_schema.py            from_attributes 로 DTO → 응답 스키마
 
 **`PublicCardResult` 에는 `id` 가 없다.** 공개 카드가 내부 식별자를 싣지 않는 것이
 DTO 단계에서 이미 강제된다 — 응답 스키마에서 빼는 것에만 의존하지 않는다.
+
+스쿼드(2026-09-03)도 같은 줄기다 — `squad_router.py` → `squad_use_cases.py` →
+`squad_interactors.py` → `squad_port.py` → `squad_pg_repository.py`. 다른 점은
+**`user` 컨텍스트의 테이블 넷**(`team`·`team_member`·`position`·`user`)을 원시
+쿼리로 읽는다는 것이고, 그래서 `tests/card/adapter/test_squad_db.py` 가 컬럼 이름의
+유일한 방어선이다.
 
 ## 🔴 이 컨텍스트가 지키는 설계 원칙 (부록 D.5)
 
