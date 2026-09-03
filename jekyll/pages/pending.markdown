@@ -974,7 +974,7 @@ RT-DETR을 다시 돌려야 하는데, 그 클립은 Kinetics/YouTube 원본이�
 
 모두 "no identity-based policy allows the action"이다.
 
-## 🔴 2026.09.03 — GPU 할당량이 **0으로 확정**됐다. 이제 EC2가 막힌다
+### 🔴 2026.09.03 — GPU 할당량이 **0으로 확정**됐다. 이제 EC2가 막힌다 (16번 갱신)
 
 Service Quotas 화면을 못 보므로 **인스턴스 시작을 눌러서** 확인했다. 이것이
 권한 없이 할당량을 아는 유일한 방법이고, 거부되면 과금이 없어 공짜다.
@@ -989,7 +989,7 @@ S3 우회 경로가 있다는 뜻이었고 그 부분은 지금도 맞다. 그�
 우회 경로가 없다** — GPU 인스턴스를 아예 못 만든다. 증액 승인 전까지
 EC2 검증 전체가 멈춘다.
 
-### ✅ 신청은 했다 (2026.09.03) — 승인 대기
+#### ✅ 신청은 했다 (2026.09.03) — 승인 대기
 
 **"Running On-Demand G and VT instances" 증액을 신청했다.** Service Quotas
 화면이 막혀 있어도 **거부 메시지에 붙어 있는 `aws.amazon.com/contact-us/ec2-request`
