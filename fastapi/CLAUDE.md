@@ -4,6 +4,24 @@
 > 고쳐야 할 일이 생기면 **미결 항목(`jekyll/pages/pending.markdown`)에 올려 주세요** —
 > 급하면 직접 고쳐도 되지만 아래 관례는 지켜야 CI가 통과합니다.
 
+## 🔴 2026-09-03 부터 여기서 셋이 일합니다 — 먼저 볼 것
+
+미구현 도메인 둘을 나눴습니다. **자기 몫이 있는지부터 보십시오.**
+
+| 패킷 | 도메인 | 담당 |
+|---|---|---|
+| A | 과금 (`analysis_credit` · `coach` · `coach_referral`) | **백성검** |
+| B | 평가·신뢰 (`review` · `review_option` · `review_selection` · `report` · `no_show`) | **박민호** |
+
+**지시서는 `docs/backend-work-split.md` 입니다** — 만족해야 할 성질, 확인 명령,
+하지 말아야 할 것이 패킷마다 붙어 있습니다.
+
+🔴 **공유 파일 5곳은 건드리지 마십시오.** `app/main.py` · `alembic/env.py` ·
+`tests/conftest.py` · `tests/user/adapter/test_auth_router.py` ·
+`alembic/versions/` 의 `down_revision`. **배선은 정어진이 합니다** — 특히
+마이그레이션 체인은 동시에 만들면 head 가 둘이 되어 자동 병합이 안 됩니다.
+다 만드셨으면 브랜치에 푸시하고 알려 주십시오.
+
 Python 3.14 · FastAPI · SQLAlchemy(동기) · PostgreSQL 18 + pgvector · Alembic.
 
 ```bash
