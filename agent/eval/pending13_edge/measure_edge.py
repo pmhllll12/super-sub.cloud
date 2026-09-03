@@ -13,7 +13,7 @@
   (4) 끝단 단측차분과 안쪽 중심차분의 **잡음 증폭 비**
 
   usage:
-    uv run python eval/pending13_edge/measure_edge.py [--cache DIR] [--json OUT]
+    uv run python eval/pending13_edge/measure_edge.py [--target 30|15] [--cache DIR] [--json OUT]
 """
 from __future__ import annotations
 
@@ -25,12 +25,9 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "phaseA"))
 from supersub_agent import features as F  # noqa: E402
-
-# 저장소 사본은 target 15(150프레임)이고, target 30 재실행 산출은 /mnt/d 에 있다.
-# 미결 14번(경로 하드코딩)·11번(단일 사본)이 여기서도 걸린다 — 그래서 인자로 받는다.
-DEFAULT_CACHE = Path("/mnt/d/supersub-phaseA/cache")
-REPO_CACHE = Path(__file__).resolve().parents[1] / "phaseA" / "cache"
+from paths import cache_dir  # noqa: E402
 
 CONFIGS = {
     "arm_ext_auto": ("arm", "auto"),
@@ -139,14 +136,19 @@ def noise_amplification(series: np.ndarray, usable: np.ndarray) -> float | None:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--cache", type=Path, default=DEFAULT_CACHE)
+    ap.add_argument("--target", type=int, default=30, choices=(15, 30),
+                    help="동작점 target_fps (기본 30 — 현재 동작점)")
+    ap.add_argument("--cache", type=Path, help="캐시 폴더를 직접 지정 (--target 무시)")
     ap.add_argument("--json", type=Path)
     args = ap.parse_args()
 
-    cache = args.cache
+    try:
+        cache = args.cache if args.cache else cache_dir(args.target)
+    except (FileNotFoundError, ValueError) as e:
+        print(e, file=sys.stderr)
+        return 2
     if not cache.is_dir():
         print(f"캐시 폴더가 없다: {cache}", file=sys.stderr)
-        print(f"저장소 사본을 쓰려면: --cache {REPO_CACHE}", file=sys.stderr)
         return 2
 
     paths = sorted(p for p in cache.glob("*.npz") if ".ERROR" not in p.name)

@@ -5,8 +5,16 @@
 채로 무엇이 얼마나 일어나는지만 쟀다.**
 
 ```bash
-uv run python eval/pending13_edge/measure_edge.py                      # target 30 (/mnt/d)
-uv run python eval/pending13_edge/measure_edge.py --cache eval/phaseA/cache   # target 15 (저장소)
+uv run python eval/pending13_edge/measure_edge.py              # target 30 (현재 동작점)
+uv run python eval/pending13_edge/measure_edge.py --target 15  # target 15
+```
+
+**둘 다 저장소만으로 돈다** — `/mnt/d` 가 없어도 된다 (2026-09-03에 캐시를
+저장소로 들여왔다). 확인:
+
+```bash
+SUPERSUB_PHASEA_ROOT=/nonexistent \
+  uv run python eval/pending13_edge/measure_edge.py --target 30
 ```
 
 ## 결론 먼저 — 끝단은 문제의 8%다
@@ -78,17 +86,25 @@ argmax 를 정한 나머지 24건은 그대로 조용히 남는다. **드러나�
 > 두 공식을 각각 적용해 산포를 비교했다. 어느 쪽이 틀렸다는 뜻이 아니라 같은
 > 이름으로 다른 것을 재고 있으니, 인용할 때 정의를 함께 적을 것.
 
-## 🔴 항목의 재현 경로는 낡았다
+## 항목의 재현 경로가 낡아 있었다 — 고쳤다 (2026-09-03)
 
 항목은 "재현은 `agent/eval/phaseA/cache/gg5xRWjw3f8.npz` 로 GPU 없이 된다"고
-적었는데, **그 파일은 target 15(150프레임)** 라 `f297~f299` 가 아예 없다.
-target 30(300프레임) 캐시는 `/mnt/d/supersub-phaseA/cache/` 에만 있다.
+적었는데, **그 파일은 target 15(150프레임)** 라 `f297~f299` 가 아예 없었다.
+target 30 캐시가 `/mnt/d` 에만 있었기 때문이다 — **저장소에 보존해 둔 캐시가
+현재 동작점과 달랐다.** 미결 11번·14번에 적혀 있지 않던 사실이다.
 
-- **결론 자체는 저장소만으로 재현된다** — 위 표의 target 15 수치가 그것이다
-- **위 사례의 프레임 번호는 재현되지 않는다** — /mnt/d 가 필요하다
-- 미결 11번(단일 사본)·14번(경로 하드코딩)이 여기서 다시 걸린다. 저장소에
-  보존해 둔 캐시가 **현재 동작점(target 30)과 다르다**는 것은 그 항목들에
-  적혀 있지 않던 사실이다
+그래서 캐시를 저장소로 들여오고 이름에 동작점을 넣었다.
+
+| | |
+|---|---|
+| `eval/phaseA/cache_target15/` · `cache_target30/` | 키포인트 (1.3MB / 2.4MB) |
+| `eval/phaseA/candidates_target15/` · `candidates_target30/` | 검출 후보 (652KB / 2.2MB) |
+| [`eval/phaseA/paths.py`](../phaseA/paths.py) | 어디서 읽을지 정하는 곳 |
+
+md5 전수 대조로 `/mnt/d` 원본과 동일함을 확인했고(39/39, 78/78), 저장소
+사본으로 다시 잰 결과가 `/mnt/d` 로 잰 것과 **바이트 동일**하다.
+
+**이제 위 사례의 프레임 번호까지 저장소만으로 재현된다.**
 
 ## 산출물
 

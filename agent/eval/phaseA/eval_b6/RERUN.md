@@ -35,7 +35,7 @@ JSON으로 찍는다. **파일로 남기지 않으므로 그 출력을 따로 �
 
 | 자산 | 위치 | 없으면 |
 |---|---|---|
-| `candidates/*.npz` (589KB) | `/mnt/d/supersub-phaseA/candidates/` · **백업 `../candidates/`** | Track 1 실행 불가 |
+| `candidates/*.npz` | `/mnt/d/supersub-phaseA/candidates/` · **저장소 `../candidates_target{15,30}/`** | Track 1 실행 불가 |
 | `clips/*.mp4` (130MB) | `/mnt/d/supersub-phaseA/clips/` · **백업 없음** | Track 1 실행 불가 |
 | `eval_b2/pose_quality.csv` | 저장소 `../eval_b2/` (동일본 `/mnt/d`) | Track 1 selector 실행 불가 |
 | `eval_b2/eval_b2.py`, `labeling/targets.py` | 저장소·`/mnt/d` 동일 (diff 확인) | import 실패 |
@@ -43,8 +43,11 @@ JSON으로 찍는다. **파일로 남기지 않으므로 그 출력을 따로 �
 | 루브릭 | `agent/rubrics/` | Track 2 등급 산출 불가 |
 | 모델 가중치 | HF 캐시 (`usyd-community/vitpose-base-simple`, `PekingU/rtdetr_r50vd_coco_o365`) | 재다운로드 약 2.4GB |
 
-경로는 `selector_downstream.py`가 `/mnt/d/supersub-phaseA`로 하드코딩하고 있다.
-저장소의 `../candidates/`·`../cache/` 사본은 **백업이며 지금은 읽히지 않는다**
+경로는 `selector_downstream.py`가 `/mnt/d/supersub-phaseA`로 **여전히
+하드코딩**하고 있다(미결 14번). 다만 2026-09-03에 저장소 사본이
+`../cache_target{15,30}/`·`../candidates_target{15,30}/`로 바뀌고
+[`../paths.py`](../paths.py)를 거쳐 **읽히게 됐다** — 앞서 "백업이며 읽히지
+않는다"고 적은 것을 정정한다. 이 스크립트를 그쪽으로 옮기는 것은 아직이다
 ([`../PRESERVED_ASSETS.md`](../PRESERVED_ASSETS.md) 참고).
 
 ## 비결정성 요소
