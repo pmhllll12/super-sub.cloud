@@ -251,7 +251,7 @@ export default function HomeStage({
       {/* 헤더는 모든 화면이 같이 쓴다(SiteHeader). 홈에서만 화면에
           고정한다 — 한 화면을 통째로 쓰는 배치라 흐름에 두면 가운데 정렬이
           밀린다. */}
-      <SiteHeader user={user} card={card} destinations={destinations} fixed />
+      <SiteHeader user={user} card={card} destinations={destinations} fixed tagline />
 
       {/* 헤드라인 · 보조 문구 · 정보 블록. 로그인 화면과 같은 문구를 쓴다 —
           두 화면이 한 목소리로 들리게. */}
