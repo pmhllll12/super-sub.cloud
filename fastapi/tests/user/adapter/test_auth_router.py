@@ -128,6 +128,7 @@ class TestOpenApi:
             V1 + "/teams/{team_id}/members",
             V1 + "/teams/{team_id}/members/{member_id}",
             V1 + "/teams/{team_id}/matches",
+            f"{V1}/matches",
             V1 + "/matches/{match_id}",
             V1 + "/matches/{match_id}/applications",
             V1 + "/matches/{match_id}/applications/{application_id}/accept",

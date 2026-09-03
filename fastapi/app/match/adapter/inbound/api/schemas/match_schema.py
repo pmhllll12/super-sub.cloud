@@ -45,6 +45,37 @@ class MatchResponse(BaseModel):
     played_at: Rfc3339
     place: str
     needs: list[PositionNeedResponse]
+class MatchListingResponse(BaseModel):
+    """탐색 목록 한 줄.
+
+    `MatchResponse` 와 달리 **팀 이름·지역·종목이 함께 온다.** 용병이 경기를 고르는
+    기준이 그 셋이라, 없으면 화면이 팀을 한 건씩 다시 물어야 한다.
+
+    🔴 종목은 여전히 **팀이 결정한다**(부록 D.4). 여기 실린 값은 저장된 것이 아니라
+    `team` 에서 읽어 온 것이라 팀 종목과 어긋날 수가 없다.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    team_id: UUID
+    team_name: str
+    region: str
+    sport_code: str
+    played_at: Rfc3339
+    place: str
+    needs: list[PositionNeedResponse]
+
+
+class MatchSearchResponse(BaseModel):
+    """`GET /admin/users` 와 같은 페이지 형식이다."""
+
+    items: list[MatchListingResponse]
+    total: int
+    page: int
+    size: int
+
+
 class ApplicationResponse(BaseModel):
     """지원·제안 1건.
 

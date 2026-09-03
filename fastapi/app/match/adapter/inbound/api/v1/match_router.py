@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Query, status
 
 from app.core.deps import CurrentUserId
 from app.match.adapter.inbound.api.schemas.match_schema import (
@@ -12,6 +12,7 @@ from app.match.adapter.inbound.api.schemas.match_schema import (
     ApplySchema,
     CreateMatchSchema,
     MatchResponse,
+    MatchSearchResponse,
 )
 from app.match.application.dtos.match_dto import (
     AcceptApplicationCommand,
@@ -21,6 +22,8 @@ from app.match.application.dtos.match_dto import (
     CreateMatchCommand,
     MatchQuery,
     MatchResult,
+    MatchSearchQuery,
+    MatchSearchResult,
     TeamMatchesQuery,
     PositionNeedInput,
 )
@@ -31,6 +34,7 @@ from app.match.dependencies.match_providers import (
     ListApplicationsUseCaseDep,
     ListTeamMatchesUseCaseDep,
     ReadMatchUseCaseDep,
+    SearchMatchesUseCaseDep,
 )
 
 match_router = APIRouter(tags=["matches"])
@@ -76,6 +80,30 @@ def list_team_matches(
     `GET /matches/{id}` 로는 여전히 읽힌다.
     """
     return use_case(TeamMatchesQuery(team_id=team_id))
+
+
+@match_router.get("/matches", response_model=MatchSearchResponse)
+def search_matches(
+    user_id: CurrentUserId,
+    use_case: SearchMatchesUseCaseDep,
+    sport_code: str | None = None,
+    region: str | None = None,
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+) -> MatchSearchResult:
+    """종목·지역으로 **다가오는** 경기를 찾는다 (SFR-010 의 반대편).
+
+    🔴 **팀 id 를 몰라도 되는 유일한 경로다.** 다른 목록(`/teams/{id}/matches`)은
+    그 팀을 이미 알아야 하므로, 용병이 지원할 경기를 찾을 수단이 없었다.
+
+    `region` 은 부분 일치이고 대소문자를 가리지 않는다. 종목 코드가 실재하지
+    않으면 빈 배열이 아니라 422 다 — 오타와 "경기가 없다"를 가르기 위해서다.
+    """
+    return use_case(
+        MatchSearchQuery(
+            sport_code=sport_code, region=region, page=page, size=size
+        )
+    )
 
 
 @match_router.get("/matches/{match_id}", response_model=MatchResponse)

@@ -13,7 +13,11 @@ from datetime import datetime
 from uuid import UUID
 
 from app.match.domain.entities.application_entity import ApplicationEntity
-from app.match.domain.entities.match_entity import MatchEntity, PositionNeedEntity
+from app.match.domain.entities.match_entity import (
+    MatchEntity,
+    MatchListingEntity,
+    PositionNeedEntity,
+)
 
 
 class MatchPort(ABC):
@@ -50,6 +54,33 @@ class MatchPort(ABC):
 
         지난 경기를 빼는 것은 목록이 **모집 글**이기 때문이다. 지난 경기도
         `find_match` 로는 여전히 읽힌다 — 기록이 사라지는 것이 아니다.
+        """
+
+    @abstractmethod
+    def sport_exists(self, sport_code: str) -> bool:
+        """종목 코드가 실재하는가.
+
+        탐색에서 오타 난 코드를 **빈 결과가 아니라 에러**로 돌려주기 위해 쓴다 —
+        빈 배열로 답하면 "그런 종목이 없다"와 "그 종목 경기가 없다"가 같아 보인다.
+        """
+
+    @abstractmethod
+    def search_upcoming(
+        self,
+        *,
+        sport_code: str | None,
+        region: str | None,
+        now: datetime,
+        offset: int,
+        limit: int,
+    ) -> tuple[list[MatchListingEntity], int]:
+        """**다가오는** 경기를 종목·지역으로 좁혀 찾는다. `(목록, 전체 건수)`.
+
+        이른 것이 앞에 온다 — 목록은 모집 글이고 임박한 것이 급하다.
+
+        지난 경기를 빼는 이유는 `list_upcoming_matches` 와 같다. **여기서는 더
+        중요하다** — 팀 목록은 그 팀 사람이 보지만 이 목록은 지원할 곳을 찾는
+        사람이 본다.
         """
 
     @abstractmethod

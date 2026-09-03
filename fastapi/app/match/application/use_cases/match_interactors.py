@@ -11,15 +11,21 @@ from app.match.application.dtos.match_dto import (
     CreateMatchCommand,
     MatchQuery,
     MatchResult,
+    MatchSearchQuery,
+    MatchSearchResult,
     TeamMatchesQuery,
 )
 from app.match.application.ports.input.match_use_cases import (
     CreateMatchUseCase,
     ListTeamMatchesUseCase,
     ReadMatchUseCase,
+    SearchMatchesUseCase,
 )
 from app.match.application.ports.output.match_port import MatchPort
-from app.match.application.use_cases.match_assembler import to_match_result
+from app.match.application.use_cases.match_assembler import (
+    to_listing_result,
+    to_match_result,
+)
 from app.match.domain.entities.match_entity import MatchEntity
 from app.match.domain.rules.match_rules import can_register, is_registrable
 
@@ -79,6 +85,37 @@ class ReadMatchInteractor(ReadMatchUseCase):
         if match is None:
             raise ApiError(404, "MATCH_NOT_FOUND", "경기를 찾을 수 없습니다.")
         return to_match_result(match)
+
+
+class SearchMatchesInteractor(SearchMatchesUseCase):
+    """종목·지역으로 다가오는 경기를 찾는다.
+
+    **이 경로가 없으면 용병은 지원할 경기를 찾을 수 없다** — 다른 목록은 전부
+    팀 id 를 알아야 한다.
+    """
+
+    def __init__(self, repository: MatchPort) -> None:
+        self._repository = repository
+
+    def __call__(self, query: MatchSearchQuery) -> MatchSearchResult:
+        if query.sport_code and not self._repository.sport_exists(query.sport_code):
+            # 🔴 빈 배열로 답하지 않는다. 오타 난 종목과 "그 종목 경기가 없다"가
+            #    같아 보이면 사용자는 없는 것을 계속 기다린다.
+            raise ApiError(422, "UNKNOWN_SPORT", "지원하지 않는 종목입니다.")
+
+        listings, total = self._repository.search_upcoming(
+            sport_code=query.sport_code,
+            region=query.region,
+            now=datetime.now(timezone.utc),
+            offset=(query.page - 1) * query.size,
+            limit=query.size,
+        )
+        return MatchSearchResult(
+            items=[to_listing_result(listing) for listing in listings],
+            total=total,
+            page=query.page,
+            size=query.size,
+        )
 
 
 class ListTeamMatchesInteractor(ListTeamMatchesUseCase):

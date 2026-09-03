@@ -16,6 +16,7 @@ from app.match.application.ports.input.match_use_cases import (
     ListApplicationsUseCase,
     ListTeamMatchesUseCase,
     ReadMatchUseCase,
+    SearchMatchesUseCase,
 )
 from app.match.application.ports.output.match_port import MatchPort
 from app.match.application.use_cases.application_interactors import (
@@ -27,6 +28,7 @@ from app.match.application.use_cases.match_interactors import (
     CreateMatchInteractor,
     ListTeamMatchesInteractor,
     ReadMatchInteractor,
+    SearchMatchesInteractor,
 )
 
 
@@ -45,6 +47,17 @@ def get_create_match_use_case(repository: MatchRepositoryDep) -> CreateMatchUseC
 
 def get_read_match_use_case(repository: MatchRepositoryDep) -> ReadMatchUseCase:
     return ReadMatchInteractor(repository)
+
+
+def get_search_matches_use_case(
+    repository: MatchRepositoryDep,
+) -> SearchMatchesUseCase:
+    return SearchMatchesInteractor(repository)
+
+
+SearchMatchesUseCaseDep = Annotated[
+    SearchMatchesUseCase, Depends(get_search_matches_use_case)
+]
 
 
 CreateMatchUseCaseDep = Annotated[
