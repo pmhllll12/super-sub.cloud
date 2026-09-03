@@ -150,6 +150,31 @@ from pg_available_extensions where name = 'vector';
 | `ADMIN_EMAILS` | 회원 관리 admin 이 통째로 403 | fail-**closed** |
 | `JWT_SECRET` | 로그인이 503(`AUTH_NOT_CONFIGURED`). 조용한 기본값은 두지 않았다 | fail-closed |
 | `GOOGLE_CLIENT_IDS` | 구글 로그인이 503. **플랫폼마다 클라이언트 ID 가 다르니 쉼표로 전부** | fail-closed |
+
+#### 🔴 `GOOGLE_CLIENT_IDS` 가 비어 있었다 (2026-09-03 발견·해소)
+
+배포 서버의 `.env` 에 키는 있는데 **값이 비어 있었다.** 그래서 웹에서 "Google
+계정으로 로그인"을 누르면 **503 `GOOGLE_LOGIN_NOT_CONFIGURED`** 였다 — 이메일
+로그인은 멀쩡했기 때문에 겉으로는 "로그인이 안 된다"로만 보였다.
+
+값은 **웹 번들에서 찾을 수 있다.** 클라이언트 ID 는 비밀이 아니라 페이지에 박혀
+나간다(비밀은 `client_secret` 이고 우리 백엔드는 그것을 쓰지 않는다 — `id_token`
+의 `aud` 만 대조한다).
+
+```bash
+curl -s https://<웹 주소>/login -o /tmp/login.html
+grep -o '"/_next/static[^"]*\.js"' /tmp/login.html | tr -d '"' | sort -u > /tmp/js.txt
+while read -r p; do curl -s "https://<웹 주소>$p"; done < /tmp/js.txt \
+  | grep -o '[0-9][0-9a-z-]*\.apps\.googleusercontent\.com' | sort -u
+```
+
+⚠️ **플랫폼마다 ID 가 다르다.** 지금 넣은 것은 **웹 것 하나뿐**이라, Flutter 가
+구글 로그인을 붙이면 그 앱의 ID 를 **쉼표로 덧붙여야** 한다. 안 그러면 앱 토큰이
+`aud` 불일치로 전부 거부된다.
+
+> **판별:** `POST /auth/google` 에 아무 문자열이나 `id_token` 으로 보내 본다.
+> **503 이면 설정이 없는 것**이고, **401 `INVALID_GOOGLE_TOKEN` 이면 설정은 된 것**
+> 이다(가짜 토큰이라 401 이 맞다).
 | `S3_BUCKET` | 업로드 경로가 503(`STORAGE_NOT_CONFIGURED`). 로컬 디렉터리로 흘리는 기본값은 두지 않았다 | fail-closed |
 | `AWS_REGION` | boto3 가 기본 리전을 못 찾으면 S3 호출이 죽는다. EC2 에서는 인스턴스 메타데이터로도 잡히지만 명시하는 편이 낫다 | — |
 
