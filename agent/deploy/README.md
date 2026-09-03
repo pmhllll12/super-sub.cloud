@@ -236,8 +236,21 @@ chmod 600 ~/.aws/credentials
 **확인 (어느 방식이든 EC2 안에서):**
 ```bash
 aws sts get-caller-identity
-aws s3 ls s3://$BUCKET/
+# Arn 이 assumed-role/supersub-ai-ec2/i-... 이면 역할이 붙은 것이다
+
+# 🔴 **접두사를 붙여서** 나열한다. `aws s3 ls s3://$BUCKET/` (루트)는
+# 이 정책에서 **항상 거부된다** — ListBucket 에 s3:prefix 조건을 걸어
+# videos/·models/·reports/ 만 열어 두었기 때문이다. 거부가 정상이다.
+aws s3 ls s3://$BUCKET/videos/
+
+# 권한이 의도대로 좁혀졌는지 — 아래는 **실패해야 맞다.**
+echo probe > /tmp/_probe.txt
+aws s3 cp /tmp/_probe.txt s3://$BUCKET/reports/_probe.txt   # 성공해야 한다
+aws s3 cp /tmp/_probe.txt s3://$BUCKET/videos/_probe.txt    # AccessDenied 가 정상
 ```
+
+> `reports/` 에 남은 `_probe.txt` 는 EC2 에서 지울 수 없다 — 정책에
+> `DeleteObject` 가 없다(그것도 의도다). 콘솔에서 지운다.
 
 ---
 
@@ -507,7 +520,7 @@ EC2에서 받아서 올린다. 로컬에서 올리면 집 회선으로 5GB를 �
 
 ```bash
 cd ~/super-sub.cloud/agent
-uv run pip install "huggingface_hub[cli]"
+uv pip install "huggingface_hub[cli]"   # ← uv run pip 이 아니다. 아래 참고
 
 uv run hf download LGAI-EXAONE/EXAONE-4.0-1.2B \
   --local-dir /opt/supersub/models/exaone-4.0-1.2b
@@ -521,6 +534,12 @@ aws s3 sync /opt/supersub/models/exaone-4.0-1.2b \
 `/opt/supersub`에 권한이 없으면 먼저:
 `sudo mkdir -p /opt/supersub/models && sudo chown -R ubuntu:ubuntu /opt/supersub`
 
+> 🔴 **`uv run pip` 이 아니라 `uv pip` 이다.** uv가 만든 venv에는 pip이 없어서
+> `uv run pip` 은 **시스템 pip으로 떨어지고**, Ubuntu 26.04(DLAMI 2026-09)에서는
+> PEP 668이 이를 거부한다(`externally-managed-environment`). 2026-09-03에 실제로
+> 여기서 멈췄다 — `set -e` 스크립트 안이면 뒤 단계가 통째로 건너뛰어지므로
+> 다운로드가 된 줄 알고 넘어가기 쉽다.
+
 **확인:**
 ```bash
 aws s3 ls s3://$BUCKET/models/exaone-4.0-1.2b/
@@ -532,32 +551,56 @@ aws s3 ls s3://$BUCKET/models/exaone-4.0-1.2b/
 > 새로 만들어도 HuggingFace를 다시 안 거치고(수 분 절약, 레이트리밋 없음)
 > **모든 인스턴스가 똑같은 가중치**를 쓴다.
 
-### 5-2. vLLM 설치
+### 5-2. vLLM 설치 — **에이전트 venv 가 아니라 전용 venv 에**
+
+🔴 **`agent/` 안에서 `uv pip install vllm` 을 하지 않는다.** vLLM 휠은 자기가
+빌드된 torch 에만 맞는 C 확장을 들고 오는데, `pyproject.toml` 은 torch 를
+cu126 · `<2.9` 로 고정한다(WSL 개발기 드라이버 사정). 같은 venv 에 넣으면
+둘 중 하나가 반드시 깨진다 — 2026-09-03 에 `import vllm` 이
+`undefined symbol: torch_list_size` 로 죽었고, 되돌리려고 `uv sync` 를 돌렸더니
+정리 과정에서 torch 가 `libcusparseLt.so.0` 을 잃어 **에이전트까지 못 쓰게
+됐다**(`rm -rf .venv && uv sync --extra aws` 로 복구).
+
+vLLM 서버는 별도 프로세스라 venv 를 나눠도 아무 손해가 없다.
 
 ```bash
-uv pip install vllm
+uv venv /opt/supersub/vllm-venv --python 3.12
+VIRTUAL_ENV=/opt/supersub/vllm-venv uv pip install vllm
 
 # EXAONE 4.0 지원 여부를 여기서 확인한다. 아키텍처가 Exaone4ForCausalLM이라
 # 오래된 vLLM은 "not supported"로 죽는다.
-uv run python -c "import vllm; print(vllm.__version__)"
-uv run python -c "
+/opt/supersub/vllm-venv/bin/python -c "
+import vllm, torch
+print(vllm.__version__, torch.__version__, torch.cuda.is_available())
 from vllm.model_executor.models.registry import ModelRegistry
 print([a for a in ModelRegistry.get_supported_archs() if 'xaone' in a.lower()])"
 # Exaone4ForCausalLM 이 나와야 한다. 없으면 vLLM을 최신으로 올린다.
 ```
+
+2026-09-03 기준 이 조합은 **vllm 0.28.0 / torch 2.13.0+cu130** 이고 T4 에서
+`cuda True` 다. 전용 venv 라 cu130 을 그대로 써도 된다 — cu126 고정은 WSL
+개발기 사정이고 DLAMI 드라이버는 그보다 최신이다. `serve_vllm.sh` 가
+`SUPERSUB_VLLM_BIN`(기본 `/opt/supersub/vllm-venv/bin/vllm`)으로 이 venv 를
+가리킨다.
 
 ### 5-3. 서버 기동
 
 ```bash
 sudo mkdir -p /etc/supersub
 sudo cp deploy/vllm.env.example /etc/supersub/vllm.env
-sudo sed -i "s|내-버킷-이름|$BUCKET|" /etc/supersub/vllm.env
 sudo chmod 600 /etc/supersub/vllm.env
+
+# IAM 역할이 없으면(README-console 2-C) S3를 건너뛴다 — 5-1에서 HF로 받은
+# /opt/supersub/models/exaone-4.0-1.2b 를 그대로 쓴다.
+sudo sed -i 's|^SUPERSUB_MODEL_S3=.*|SUPERSUB_MODEL_S3=|' /etc/supersub/vllm.env
 
 sudo cp deploy/supersub-vllm.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now supersub-vllm
 ```
+
+> 예시 파일에 버킷 이름(`supersub-ai`)이 이미 들어 있다. 다른 버킷을 쓸 때만
+> `SUPERSUB_MODEL_S3` 줄을 고친다.
 
 **확인:**
 ```bash

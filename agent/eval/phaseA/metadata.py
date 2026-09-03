@@ -26,7 +26,25 @@ VISUAL = {
  "xMIUw5mi3Eo": ("측면","다인","중간","완전","명확","명확","late","슬로모션. peak 3~4프레임 늦음, 포수 큼"),
  "h_3LqD2Pl-E": ("사선","단일","큼","반복","명확","명확","near","앞 33프레임이 타이틀 카드(사람 없음)"),
  "sGKeqfxwq5E": ("측면","다인","중간","완전","명확","가림","hit","경기 영상, 타자·포수·심판"),
- "w-AQcjcoDyA": ("측면","단일","해당없음","불명","가림","미검출","unusable","신발 클로즈업. 타자가 피사체가 아님"),
+ # 🔴 정정 (2026.09.03). 옛 판독은 "신발 클로즈업. 타자가 피사체가 아님"이었는데
+ # **틀렸다** — 스켈레톤이 붙은 사람이 타자가 맞고, 신발은 앞에 있던 다른 사람이
+ # 찍힌 것이다. 미결 6번 판독(side_form.csv)에서 subject_ok=y 로 확인됐다.
+ # 그 오진에 딸려 있던 두 칸을 `None`으로 비워 **자동 산출로 되돌린다**:
+ #   player_scale "해당없음"  — 대상이 없다는 전제로 매긴 값이다. 대상이 있으므로
+ #                              subject_scale=0.568 에 나머지 19클립과 같은 규칙이
+ #                              적용된다 (>=0.5 → "큼")
+ #   peak_verdict "unusable"  — 이 표의 범례가 "대상 자체를 못 봄"이라고 정의한다.
+ #                              전제가 무너졌고 peak 위치는 다시 보지 않았으므로
+ #                              "미검증"으로 돌아간다
+ # 손으로 새 값을 적어 넣지 않는 이유는 **출처를 지키기 위해서다** — 그러면 그
+ # 칸이 판독인지 산출인지 알 수 없게 된다.
+ # `single_or_multi = 단일`은 손대지 않는다 — 앞사람의 신발만 걸렸을 수 있어
+ # "다인"이라고 단정할 근거가 아직 없다. 다시 볼 때 함께 확인할 것.
+ # `usable_for_phase_B`(파생값)는 no 그대로다 — bat 가림·ball 미검출이라는
+ # 별개 사유가 남아 있고, 그것까지 이 정정으로 뒤집을 근거는 없다.
+ "w-AQcjcoDyA": ("측면","단일",None,"불명","가림","미검출",None,
+                 "타자가 피사체가 맞다(2026.09.03 정정). 앞사람 신발이 함께 잡힘 — "
+                 "옛 판독 '타자가 피사체가 아님'은 오진이었다"),
 }
 
 pose = {r["clip_id"]: r for r in csv.DictReader(open(ROOT/"phaseA_pose.csv"))}
@@ -48,7 +66,11 @@ for cid in sorted(pose):
       "resolution": f"{s['w']}x{s['h']}",
       "fps": s["fps"],
       "camera_angle": v[0] if v else "미검증",
-      "player_scale": v[2] if v else ("작음" if sc and sc<0.3 else "큼" if sc and sc>=0.5 else "중간"),
+      # 육안 판독이 `None`을 두면 **자동 산출로 되돌린다.** 판독이 틀린 것으로
+      # 밝혀졌을 때 손으로 값을 새로 적어 넣으면 그 값의 출처를 알 수 없게 되므로,
+      # 나머지 19클립과 같은 규칙이 다시 적용되게 한다 (w-AQcjcoDyA 참고).
+      "player_scale": (v[2] if v and v[2] else
+                       ("작음" if sc and sc<0.3 else "큼" if sc and sc>=0.5 else "중간")),
       "subject_scale_auto": a["subject_scale"],
       "single_or_multi": v[1] if v else "미검증",
       "swing_visible": v[3] if v else "미검증",
@@ -59,7 +81,7 @@ for cid in sorted(pose):
       "gate_leg": "pass" if num(p["gate_leg"]) is not None else "fail",
       "switch_frac": a["switch_frac"],
       "rot_peak": p["rp_peak_frame"], "rot_pos": p["rp_peak_pos"], "rot_npeaks": p["rp_n_peaks"],
-      "peak_verdict": v[6] if v else "미검증",
+      "peak_verdict": v[6] if v and v[6] else "미검증",
       "bat_track": p["obj_baseball_bat"] or "",
       "usable_for_phase_B": "",
       "notes": v[7] if v else "",
