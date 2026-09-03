@@ -398,7 +398,7 @@ ssh -i ~/.ssh/supersub-ai.pem ubuntu@<EC2-IP>
 
 # --- 저장소 (ho 브랜치) ---
 sudo apt-get update && sudo apt-get install -y git ffmpeg
-git clone -b ho https://github.com/jsangho/super-sub.cloud.git ~/super-sub.cloud
+git clone -b ho https://github.com/pmhllll12/super-sub.cloud.git ~/super-sub.cloud
 cd ~/super-sub.cloud/agent
 
 # --- uv + 의존성 ---

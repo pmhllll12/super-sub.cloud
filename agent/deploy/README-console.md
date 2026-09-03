@@ -264,7 +264,7 @@ reports/    분석 리포트 (출력)
 | 라우팅 테이블 | `rtb-0ce520e8702eed3cf` |
 | S3 VPC 엔드포인트 | `vpce-08de1d25618fd91cb` |
 | 보안 그룹 | `sg-009e6466aa918ad5d` (`supersub-ai-sg`, SSH 22 / 내 IP) |
-| 키 페어 | *(5-2에서 생성)* |
+| 키 페어 | `supersub-ai` (RSA 2048, `.pem`) — WSL 사본은 `~/.ssh/supersub-ai.pem` (권한 400) |
 | EC2 인스턴스 | *(5-3에서 생성)* |
 
 **여기까지는 과금이 없다.** S3는 담은 용량만큼, 나머지는 전부 무료다.
@@ -326,6 +326,19 @@ g4dn.xlarge는 vCPU 4개라 **4 이상**이어야 한다. 0이면 같은 화면�
 걸어 둔다"는 목적이었는데, 걸 수가 없어서 기다림을 앞당길 방법이 없기
 때문이다.
 
+**결과 (2026-09-03): 0이었다.** 5-3에서 시작을 눌러 확인했다.
+
+> You have requested more vCPU capacity than your current vCPU limit of **0**
+> allows for the instance bucket that the specified instance type belongs to.
+
+**과금은 없다** — 인스턴스가 만들어지지 않았고 "개시 시작: 실패함"에서 멈췄다.
+Service Quotas 화면을 못 봐도 **시작을 눌러 보면 알 수 있다**는 것이 이번에
+확인됐다. 권한이 없을 때 쓸 수 있는 유일한 확인 수단이고, 공짜다.
+
+**「실패한 작업 재시도」는 소용없다.** 할당량은 재시도로 바뀌지 않는다.
+증액이 승인돼야 한다 — 미결 항목
+「AWS 계정에서 `ho`가 IAM·할당량을 못 쓴다」.
+
 ### 5-2. 키 페어
 
 **EC2 → 키 페어 → 키 페어 생성**
@@ -353,7 +366,7 @@ chmod 400 ~/.ssh/supersub-ai.pem
 | 항목 | 값 |
 |---|---|
 | 이름 | `supersub-ai` |
-| **AMI** | **모든 AMI 찾아보기** → `Deep Learning OSS Nvidia Driver AMI GPU PyTorch` 검색 → **Ubuntu 22.04** 최신 버전 |
+| **AMI** | **모든 AMI 찾아보기** → `Deep Learning OSS Nvidia Driver AMI GPU PyTorch` 검색 → **Ubuntu** 판 (아래 참고) |
 | 인스턴스 유형 | **`g4dn.xlarge`** |
 | 키 페어 | `supersub-ai` |
 
@@ -365,6 +378,18 @@ chmod 400 ~/.ssh/supersub-ai.pem
 | 서브넷 | `supersub-ai-subnet-public1-...` |
 | 퍼블릭 IP 자동 할당 | **활성화** |
 | 방화벽 | **기존 보안 그룹 선택** → `supersub-ai-sg` |
+
+> **AMI는 Ubuntu 판을 고른다 — Amazon Linux가 아니다.** 검색하면 둘이 나온다.
+> 이 저장소의 런북·`deploy.sh`·systemd 유닛이 전부 Ubuntu 기준이다(SSH 사용자가
+> `ubuntu`, 패키지가 `apt`). Amazon Linux를 고르면 사용자명이 `ec2-user`라
+> 접속 명령부터 달라진다.
+>
+> **버전은 AWS가 올린다.** 2026-09-02 기준으로는 22.04였는데 2026-09-03에
+> 확인하니 빠른 시작 목록에 **Ubuntu 26.04(`ami-0781efef12b1da68e`)** 만 있다.
+> **목록에 있는 최신 Ubuntu 판을 고르면 된다** — 버전을 맞출 필요는 없다.
+> `uv`가 자체 Python 3.12를 받아 쓰고 torch도 cu126 휠을 직접 받으므로 OS
+> 기본 파이썬과 무관하다. AMI ID도 리전·시점마다 바뀌므로 위 ID를 그대로
+> 믿지 말고 화면에 뜬 것을 쓴다.
 
 **스토리지 구성**
 

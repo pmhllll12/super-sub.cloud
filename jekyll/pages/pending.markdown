@@ -334,7 +334,7 @@ usable이 되면서(손목 0.95) 구간이 0~299로 늘어나 오염이 노출�
 `identify_limb` 주석이 적어 둔 원인("12.5fps에서 릴리스가 두 프레임 안에 끝나
 던지는 팔의 경로가 짧다")은 **실측과 반대**였다 — 경로가 두 프레임에 몰린 쪽은
 글러브 팔이다(32% 대 21%). 주석을 실측으로 고쳤고, **뒤집힘의 원인은 여전히
-미상**이다. 근거와 절차: [`agent/eval/pending6_side/README.md`](https://github.com/jsangho/super-sub.cloud/blob/ho/agent/eval/pending6_side/README.md)
+미상**이다. 근거와 절차: [`agent/eval/pending6_side/README.md`](https://github.com/pmhllll12/super-sub.cloud/blob/ho/agent/eval/pending6_side/README.md)
 
 어느 쪽이 옳은지는 **라벨이 있어야** 말할 수 있다. 다음 단계는 판별 통계를
 바꾸는 것이 아니라 두 클립의 스윙 측을 사람이 라벨하는 것이다.
@@ -826,7 +826,7 @@ RT-DETR을 다시 돌려야 하는데, 그 클립은 Kinetics/YouTube 원본이�
 ### 15. AWS 배포가 라이선스 두 건을 상용 경로 앞에 세웠다 (2026.09.02)
 
 분석 에이전트를 독립 AWS 환경(S3 + g4dn.xlarge)에 올리는 절차를
-[`agent/deploy/README.md`](https://github.com/jsangho/super-sub.cloud/blob/ho/agent/deploy/README.md)에
+[`agent/deploy/README.md`](https://github.com/pmhllll12/super-sub.cloud/blob/ho/agent/deploy/README.md)에
 정리했다. 내부 검증용으로는 그대로 진행하면 되지만, **이 인스턴스가 외부
 사용자에게 서비스를 제공하는 순간** 아래 두 건이 동시에 열린다.
 
@@ -859,6 +859,21 @@ RT-DETR을 다시 돌려야 하는데, 그 클립은 Kinetics/YouTube 원본이�
 
 모두 "no identity-based policy allows the action"이다.
 
+## 🔴 2026.09.03 — GPU 할당량이 **0으로 확정**됐다. 이제 EC2가 막힌다
+
+Service Quotas 화면을 못 보므로 **인스턴스 시작을 눌러서** 확인했다. 이것이
+권한 없이 할당량을 아는 유일한 방법이고, 거부되면 과금이 없어 공짜다.
+
+> You have requested more vCPU capacity than your current vCPU limit of **0**
+> allows for the instance bucket that the specified instance type belongs to.
+
+`g4dn.xlarge` · 서울 · 온디맨드. 인스턴스는 만들어지지 않았고 **과금 없다.**
+
+**아래에 "이 항목이 EC2 진행을 막지는 않는다"고 적었던 것을 정정한다.** 그것은
+S3 우회 경로가 있다는 뜻이었고 그 부분은 지금도 맞다. 그러나 **할당량 0은
+우회 경로가 없다** — GPU 인스턴스를 아예 못 만든다. 증액 승인 전까지
+EC2 검증 전체가 멈춘다.
+
 **막히는 것 둘.**
 
 1. **EC2가 S3에 닿을 방법이 없다.** 인스턴스 역할을 못 만들고, 대안이던
@@ -877,17 +892,27 @@ RT-DETR을 다시 돌려야 하는데, 그 클립은 Kinetics/YouTube 원본이�
 - (b) 관리자가 대신 만들어 주기: EC2용 역할 `supersub-ai-ec2` — 신뢰 주체 EC2,
   권한은 `supersub-ai` 버킷의 `videos/`·`models/` 읽기와 `reports/` 쓰기만.
   정책 JSON은
-  [`agent/deploy/README-console.md`](https://github.com/jsangho/super-sub.cloud/blob/ho/agent/deploy/README-console.md)
+  [`agent/deploy/README-console.md`](https://github.com/pmhllll12/super-sub.cloud/blob/ho/agent/deploy/README-console.md)
   2-1에 그대로 있다
-- 그리고 **"Running On-Demand G and VT instances" 할당량을 8 이상으로** 신청.
-  4면 `g4dn.xlarge`만 되고, 호스트 RAM이 부족해 `g4dn.2xlarge`로 올릴 때
-  (미결 9번) 다시 며칠을 기다린다
+- 🔴 **그리고 이것이 지금 급합니다** — **"Running On-Demand G and VT instances"
+  할당량을 8 이상으로** 신청. **현재 0으로 확정**이라 승인 전에는 GPU 검증을
+  시작할 수 없습니다. 4가 아니라 8인 것은, 4면 `g4dn.xlarge` 하나로 묶여서
+  호스트 RAM이 모자라 `g4dn.2xlarge`로 올릴 때(미결 9번) **승인을 다시 며칠
+  기다리게** 되기 때문입니다. 승인 소요는 AWS가 정하고 수 시간\~며칠입니다
 
 (b)가 최소 권한 원칙에 맞는다. (a)는 `ho`에게 IAM 권한을 상시로 주는 것이라
 팀 계정에서는 과할 수 있다.
 
-- **담당**: 정어진(배포·AWS 계정) · **제기**: 정상호 · **기한**: EC2 검증 후
-  S3 연동을 켤 때까지
+**둘의 급한 정도가 다릅니다.** 역할(IAM)은 없어도 S3 우회로 검증이 되지만,
+할당량은 우회가 없습니다. **할당량부터** 부탁드립니다.
+
+| | |
+|---|---|
+| 확인 | 승인 뒤 `g4dn.xlarge` 시작이 `VcpuLimitExceeded` 없이 뜨면 된 것입니다 |
+| 하지 말 것 | 이미 만들어 둔 VPC·서브넷·보안그룹(`vpc-05572ffad8380565d` 등)을 새로 만들지 않기 — 그대로 씁니다 |
+
+- **담당**: 정어진(배포·AWS 계정) · **제기**: 정상호 · **기한**: **할당량은 즉시**
+  (EC2 검증이 여기서 멈춰 있음) · IAM 역할은 S3 연동을 켤 때까지
 
 ## jin (정어진)
 
