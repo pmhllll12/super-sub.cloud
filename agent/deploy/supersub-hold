@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# 자동 종료를 잠시 보류한다 — 오래 걸리는 작업 앞에 건다.
+#
+#   sudo supersub-hold 4h      # 4시간 보류
+#   sudo supersub-hold 90m     # 90분
+#   sudo supersub-hold off     # 즉시 해제
+#   sudo supersub-hold         # 남은 보류 시간 확인
+#
+# **만료가 있는 것이 요점이다.** 타이머를 `systemctl stop` 해서 멈추면 다시
+# 켜는 것을 잊고, 그러면 자동 종료가 없는 것과 같아진다 — 이 도구가 막으려던
+# 바로 그 상황이다. 보류는 시간이 지나면 저절로 풀린다.
+set -euo pipefail
+
+# autostop.sh 와 **같은 설정을 읽는다.** 여기서 경로를 따로 박아 두면,
+# /etc/supersub/autostop.conf 에서 HOLD_FILE 을 바꿨을 때 두 쪽이 서로 다른
+# 파일을 보게 된다 — 보류를 걸었는데 자동 종료는 못 보고 그냥 꺼진다.
+CONF=/etc/supersub/autostop.conf
+# shellcheck source=/dev/null
+[[ -r $CONF ]] && . "$CONF"
+
+HOLD_FILE="${HOLD_FILE:-/run/supersub-autostop.hold}"
+
+# 머리말 주석을 그대로 도움말로 쓴다. 줄 번호를 박지 않고 **첫 비주석 줄에서
+# 멈춘다** — 범위를 고정해 두면 위에 한 줄만 더해도 도움말이 어긋난다.
+usage() { awk 'NR>1 { if (!/^#/) exit; sub(/^# ?/, ""); print }' "$0"; exit "${1:-0}"; }
+
+arg="${1:-}"
+
+if [[ -z $arg ]]; then
+  if [[ -e $HOLD_FILE ]]; then
+    until_ts=$(tr -dc '0-9' < "$HOLD_FILE" | head -c 20)
+    if [[ -n $until_ts ]]; then
+      left=$(( until_ts - $(date +%s) ))
+      if (( left > 0 )); then
+        echo "보류 중 — $(date -d "@$until_ts" '+%F %T') 까지 ($(( left / 60 ))분 남음)"
+      else
+        echo "보류 만료됨 — 다음 판정에서 풀린다"
+      fi
+    else
+      echo "보류 중 — 만료 없음. 해제: sudo supersub-hold off"
+    fi
+  else
+    echo "보류 없음 — 자동 종료가 동작 중이다"
+  fi
+  exit 0
+fi
+
+case "$arg" in
+  -h|--help) usage 0 ;;
+  off|none|clear)
+    rm -f "$HOLD_FILE"
+    echo "보류 해제 — 자동 종료가 다시 동작한다"
+    exit 0
+    ;;
+esac
+
+# 4h / 90m / 3600(초) 를 받는다.
+if   [[ $arg =~ ^([0-9]+)h$ ]]; then secs=$(( BASH_REMATCH[1] * 3600 ))
+elif [[ $arg =~ ^([0-9]+)m$ ]]; then secs=$(( BASH_REMATCH[1] * 60 ))
+elif [[ $arg =~ ^([0-9]+)$  ]]; then secs=$(( BASH_REMATCH[1] ))
+else
+  echo "시간을 이해하지 못했다: $arg" >&2
+  usage 1 >&2
+fi
+
+if (( secs <= 0 )); then
+  echo "0보다 커야 한다" >&2
+  exit 1
+fi
+
+until_ts=$(( $(date +%s) + secs ))
+echo "$until_ts" > "$HOLD_FILE"
+echo "보류 설정 — $(date -d "@$until_ts" '+%F %T') 까지 ($(( secs / 60 ))분)"
+echo "그 전에 풀려면: sudo supersub-hold off"

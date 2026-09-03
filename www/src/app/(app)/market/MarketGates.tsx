@@ -82,6 +82,12 @@ export default function MarketGates({
   /** 판 안 굴림 자리. 목록 ↔ 상세를 오갈 때 맨 위에서 시작해야 한다. */
   const body = useRef<HTMLDivElement | null>(null)
   /**
+   * 머리 띠(간판 줄). 🔴 굴러도 **자리에 남아야** 해서(사용자 요청) `sticky` 인데,
+   * 바로 아래 줄(거름망 · 코치 이름)도 같이 남으려면 **띠가 얼마나 높은지**를
+   * 알아야 한다 — 그 값을 아래 effect 가 재서 CSS 에 넘긴다.
+   */
+  const topline = useRef<HTMLDivElement | null>(null)
+  /**
    * 지금 이 화면 안에서 **몇 걸음 들어와 있나**(0 = 아무것도 안 열림).
    *
    * 🔴 판이 열리고 코치를 고르는 것은 주소를 안 바꾼다(사용자 요청). 그래서
@@ -288,6 +294,27 @@ export default function MarketGates({
     }
   }, [open])
 
+  /**
+   * 머리 띠의 키를 재서 `--ss-md-topline-h` 로 넘긴다.
+   *
+   * 🔴 **값을 CSS 에 적어 둘 수 없다.** 띠의 키는 여백(`clamp`)과 간판 글자
+   * 크기(`clamp`)에서 나오므로 창 폭에 따라 달라진다 — 고정 px 을 적으면 어떤
+   * 폭에서는 아래 줄이 띠를 덮고, 어떤 폭에서는 사이가 벌어진다.
+   * 🔴 창 크기만 듣지 않고 `ResizeObserver` 로 **띠 자체**를 본다. 글꼴이 늦게
+   * 실려 띠가 한 번 더 커지는 경우가 있어서다(간판은 Shrikhand 다).
+   */
+  useEffect(() => {
+    const el = topline.current
+    const scope = body.current
+    if (!el || !scope) return
+    const ro = new ResizeObserver(() => {
+      scope.style.setProperty('--ss-md-topline-h', `${el.offsetHeight}px`)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+    // 판이 열릴 때 띠가 새로 생기므로 그때 다시 건다.
+  }, [open, coachId, shown])
+
   /** 열려 있으면 Esc 로 닫는다 — 덮는 판에는 물러날 길이 늘 있어야 한다. */
   useEffect(() => {
     if (!open) return
@@ -451,70 +478,53 @@ export default function MarketGates({
           className="ss-market-detail"
           data-open={open ? 'true' : 'false'}
           data-leaving={leaving}
-          // 코치 상세는 제목이 **왼쪽**에서 시작해 닫기 단추와 같은 자리를 쓴다 —
-          // 그때만 글을 단추 아래로 내린다(globals.css).
-          data-coach={coach ? 'true' : 'false'}
           // 나가 있는 동안에는 화면 낭독기에도 없는 것이어야 한다 — 창 밖으로
           // 밀어 두는 것은 눈에만 안 보이게 할 뿐이라 낭독기는 다 읽는다.
           aria-hidden={!open}
         >
           <div className="ss-market-detail-body" ref={body}>
-            {/* 🔴 돌아가는 단추는 **굴러가는 칸 안**에 있다(사용자 요청) — 밖에
-                띄워 두면 글이 그 밑을 지나며 겹친다. 다만 놓는 자리가 갈래마다
-                다르다:
-                  목록 — 간판과 **같은 줄**(간판이 가운데라 안 겹친다)
-                  상세 — 이름이 왼쪽에서 시작해 같은 줄에 못 둔다. 이름 위. */}
-            {coach ? (
-              /* 🔴 목록 화면(`/market/coaches/{id}`)과 **같은 알맹이**를 쓴다 —
-                 다른 것은 머리글과 돌아가는 길뿐이다. 영상 링크는 끈다: 판 안에서
-                 누르면 화면이 통째로 갈려 "이 판에서만 바뀐다"가 깨진다. */
-              <>
+            {/* 🔴 머리 띠는 **목록이든 상세든 똑같다**(사용자 요청) — 돌아가는
+                단추와 간판 한 줄이 상아색 띠 안에 있고, 그 아래에 얇은 선이 있다.
+                예전에는 상세에서만 단추를 이름 위에 따로 두었는데(이름이 왼쪽에서
+                시작해 간판과 같은 줄에 못 둔다는 이유), 띠가 생기면서 그 이유가
+                없어졌다 — 이름은 띠 **아래** 제 줄에서 시작한다.
+
+                🔴 꼬리표와 한글 제목을 빼고 **간판 한 줄**만 둔다(사용자 요청).
+                글꼴은 배경 아치(TRAIN & GEAR UP)와 같은 것(`--font-poster`,
+                Shrikhand)이라 두 화면이 한 목소리로 읽힌다. 상점 쪽도 같은
+                짜임이라 짝이 되는 말을 쓴다. */}
+            <div className="ss-market-detail-topline" ref={topline}>
               <button
                 type="button"
                 className="ss-market-detail-close"
                 onClick={backOne}
                 // 하는 일이 자리마다 다르므로 이름도 다르다 — 낭독기는 이 말만 읽는다.
-                aria-label="코치 목록으로"
+                aria-label={coach ? '코치 목록으로' : '목록 닫기'}
               >
                 <span className="material-symbols-outlined" aria-hidden="true">
                   chevron_backward
                 </span>
               </button>
+              <div className="ss-market-detail-head">
+                {/* ⚠️ 상점 쪽 간판은 **BEST SELLERS**(복수)다 — 목록을 이끄는
+                    말이라 한 상품을 가리키는 단수(BEST SELLER)가 아니다.
+                    ⚠️ 다만 지금 목록은 **잘 팔린 순이 아니다**(mock 이라 판매
+                    수가 없다). 판매 수가 생기면 그 순서로 세워야 이 말이
+                    사실이 된다 — 미결로 둔다. */}
+                <h2>{shown === 'shop' ? 'BEST SELLERS' : 'FIND YOUR COACH'}</h2>
+              </div>
+            </div>
+
+            {coach ? (
+              /* 🔴 목록 화면(`/market/coaches/{id}`)과 **같은 알맹이**를 쓴다 —
+                 다른 것은 머리글과 돌아가는 길뿐이다. 영상 링크는 끈다: 판 안에서
+                 누르면 화면이 통째로 갈려 "이 판에서만 바뀐다"가 깨진다. */
               <CoachDetail coach={coach} video={false} />
-              </>
+            ) : shown === 'shop' ? (
+              <ShopList products={products} />
             ) : (
-              <>
-                {/* 🔴 꼬리표와 한글 제목을 빼고 **간판 한 줄**만 둔다(사용자 요청).
-                    글꼴은 배경 아치(TRAIN & GEAR UP)와 같은 것(`--font-poster`,
-                    Shrikhand)이라 두 화면이 한 목소리로 읽힌다. 상점 쪽도 같은
-                    짜임이라 짝이 되는 말을 쓴다. */}
-                <div className="ss-market-detail-topline">
-                  <button
-                    type="button"
-                    className="ss-market-detail-close"
-                    onClick={backOne}
-                    aria-label={coach ? '코치 목록으로' : '목록 닫기'}
-                  >
-                    <span className="material-symbols-outlined" aria-hidden="true">
-                      chevron_backward
-                    </span>
-                  </button>
-                  <div className="ss-market-detail-head">
-                    {/* ⚠️ 상점 쪽 간판은 **BEST SELLERS**(복수)다 — 목록을 이끄는
-                        말이라 한 상품을 가리키는 단수(BEST SELLER)가 아니다.
-                        ⚠️ 다만 지금 목록은 **잘 팔린 순이 아니다**(mock 이라 판매
-                        수가 없다). 판매 수가 생기면 그 순서로 세워야 이 말이
-                        사실이 된다 — 미결로 둔다. */}
-                    <h2>{shown === 'shop' ? 'BEST SELLERS' : 'FIND YOUR COACH'}</h2>
-                  </div>
-                </div>
-                {shown === 'shop' ? (
-                  <ShopList products={products} />
-                ) : (
-                  /* 고르면 **이 판 안에서** 상세로 바뀐다 — 화면을 갈지 않는다. */
-                  <CoachList coaches={coaches} onPick={pick} />
-                )}
-              </>
+              /* 고르면 **이 판 안에서** 상세로 바뀐다 — 화면을 갈지 않는다. */
+              <CoachList coaches={coaches} onPick={pick} />
             )}
           </div>
         </aside>

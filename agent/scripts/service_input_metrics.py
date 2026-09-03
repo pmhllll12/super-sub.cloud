@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import os
 import sys
 from pathlib import Path
 
@@ -35,13 +34,46 @@ def bucket(v: float | None) -> str:
     return "unknown"
 
 
+def _report_redirects(origin: str) -> None:
+    """0건일 때, **다른 sink로 기록된 적이 있는지**를 알려 준다.
+
+    2026-08-31의 혼선이 정확히 이 자리였다 — 개발 확인용으로 sink를 /tmp로
+    돌려 둔 상태에서 프로덕션 경로로 3건이 돌았는데, 나중에 환경변수 없이 읽고
+    "서비스 분석 0건"으로 결론지었다. 그때 환경변수는 이미 사라진 뒤라 되짚을
+    단서가 없었다. 기본 위치에 남긴 흔적이 그 단서다.
+    """
+    marks = obs.load_redirects()
+    if not marks:
+        if origin == "default":
+            print("  우회 흔적도 없다 — 정말 분석이 없었을 가능성이 높다.")
+        return
+    print()
+    print(f"  🔴 다른 sink로 기록된 적이 있다 ({len(marks)}회). 0건을 "
+          "'분석이 없었다'로 읽으면 안 된다:")
+    for m in marks[-5:]:
+        print(f"     {m.get('at', '?')}  →  {m.get('sink', '?')}"
+              f"  (출처 {m.get('origin', '?')}, pid {m.get('pid', '?')})")
+    if len(marks) > 5:
+        print(f"     … 그 외 {len(marks) - 5}회. 전체는 {obs.REDIRECT_LOG}")
+    print("  그 경로를 --sink 로 지정해 다시 볼 것.")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--sink", default=None, help="JSONL 경로 (기본: 환경변수/기본 sink)")
     ap.add_argument("--csv", default=None, help="클립 단위 표를 CSV로 저장")
     args = ap.parse_args()
 
-    path = Path(args.sink or os.environ.get("SUPERSUB_METRICS_SINK") or obs.DEFAULT_SINK)
+    # 어느 sink를 읽는지는 **항상** 먼저 밝힌다. 숫자만 보고 "서비스 전체"로
+    # 읽으면 우회된 파일의 부분집합을 전체로 오해한다.
+    path, origin = obs.resolve_sink(args.sink)
+    label = {"argument": "--sink 인자", "env": "SUPERSUB_METRICS_SINK 환경변수",
+             "default": "기본 위치"}[origin]
+    print(f"sink: {path}  ({label})")
+    if origin != "default":
+        print("  ⚠ 기본 위치가 아니다 — 여기 숫자는 이 파일에 기록된 분석만 담는다.")
+    print()
+
     recs = obs.load(args.sink)
     if not recs:
         # "sink가 없다"와 "sink는 있는데 비어 있다"를 구분한다 — 전자는 아직
@@ -53,6 +85,7 @@ def main() -> int:
         else:
             print(f"  sink는 있으나 유효한 레코드가 0건이다: {path}")
             print(f"  파일 크기 {path.stat().st_size}바이트 — 기록 경로가 고장났을 수 있다.")
+        _report_redirects(origin)
         print("  숫자를 만들지 않는다.")
         return 1
 

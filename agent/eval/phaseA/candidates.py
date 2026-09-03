@@ -22,7 +22,7 @@ for i, p in enumerate(sorted((ROOT/"clips").glob("*.mp4")), 1):
     f = OUT/f"{cid}.npz"
     if f.exists(): print(f"[{i}] skip {cid}", flush=True); continue
     t0 = time.time()
-    frames, src_fps, sfps = P.read_frames(str(p), target_fps=15)
+    frames, src_fps, sfps = P.read_frames(str(p), target_fps=P.DEFAULT_TARGET_FPS)
     per_frame, tools = [], []
     for fr in frames:
         rgb = cv2.cvtColor(fr, cv2.COLOR_BGR2RGB)

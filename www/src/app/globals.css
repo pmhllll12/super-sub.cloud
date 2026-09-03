@@ -3424,9 +3424,27 @@ body::-webkit-scrollbar {
   transition: border-color 160ms ease;
 }
 
-.ss-shot-again:hover,
-.ss-shot-again:focus-visible {
+/* 🔴 잠겨 있는 동안은 **눌리지 않는다는 것이 보여야** 한다 — 리포트가 다 나오기
+   전에는 저장할 것이 없다. 흐리게만 두고 자리는 그대로 둔다(없애면 리포트가
+   끝나는 순간 머리글이 흔들린다). */
+.ss-shot-again:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ss-shot-again:not(:disabled):hover,
+.ss-shot-again:not(:disabled):focus-visible {
   border-color: var(--ss-fg);
+}
+
+/* 저장 반려·오류 사유 — 성공은 버튼 글자("저장됨")로 충분해 여기 안 쓴다.
+   `.ss-shot-side` 의 flex 자식이라 좌우 여백·위 간격은 그 판의 padding·gap
+   을 그대로 받는다 — 여기서 따로 안 준다. */
+.ss-shot-save-msg {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--ss-error);
 }
 
 /* 판 안이 길어지면 여기서만 스크롤한다 — 대화 입력칸은 늘 바닥에 붙어 있다. */
@@ -3963,41 +3981,70 @@ body::-webkit-scrollbar {
   flex-direction: column;
   gap: 18px;
   inset: 0;
-  padding: clamp(24px, 4vh, 56px) clamp(24px, 4vw, 64px);
-  /* 🔴 이 판만 **흑백이 뒤집힌다**(사용자 요청). 바탕은 완전한 흰색이고, 원래
-     흰색이던 것(글 · × · 도는 토막 · 테두리)은 완전한 검정이 된다.
+  /* 🔴 안쪽 여백은 **판이 아니라 굴림 칸(`.ss-market-detail-body`)이 가진다.**
+     판이 쥐고 있으면 굴림 칸의 상자가 그만큼 안으로 들어와서, 그 안의 것은
+     **판 끝까지 닿는 띠**(머리글의 밝은 바탕)를 그릴 수 없다 — 음수 여백으로
+     빼내도 굴림 칸이 거기서 자르거나 가로 굴림을 만든다. 여기서는 값만 정하고
+     쓰는 것은 아래 칸이다. 오른쪽만 4px 넓은 것은 굴림 막대 자리다(막대는
+     감췄지만 글이 판 끝에 딱 붙는 것을 막는다). */
+  /* 🔴 **양옆 여백**이다. 64px 이던 것을 줄였다(사용자 지적 — 왼쪽 칸은 더 왼쪽
+     으로, 오른쪽 칸은 더 오른쪽으로 넓히라는 것이 곧 이 값을 줄이라는 뜻이다).
+     머리 띠 · 거름망 줄 · 카드 목록이 **모두 이 하나를 읽으므로** 여기만 줄이면
+     셋의 왼쪽 끝이 그대로 나란한 채로 같이 넓어진다. 목록만 따로 넓히면 거름망
+     줄과 어긋나 보인다. */
+  --ss-md-pad-x: clamp(16px, 1.6vw, 28px);
+  --ss-md-pad-y: clamp(24px, 4vh, 56px);
+  --ss-md-pad-r: calc(var(--ss-md-pad-x) + 4px);
+  /* 🔴 머리 띠의 **위 여백만** 판 여백과 따로 둔다(사용자 지적 — 띠가 세로로
+     너무 길었다). 띠는 판 여백을 음수로 걷어내고 제 여백을 다시 넣는 구조라
+     (`.ss-market-detail-topline`) 이 값만 줄이면 띠가 그만큼 얇아진다. 뒤로
+     단추도 흐름 밖이라 같은 값을 읽는다 — 한쪽만 고치면 단추가 어긋난다. */
+  --ss-md-head-pad-t: clamp(16px, 2.2vh, 28px);
+  /* 🔴 거름망 줄의 **위아래 여백은 같은 값 하나**에서 나온다(사용자 요청). 위는
+     선 아래 몫이고 아래는 띠가 끝나는 몫인데, 두 곳에 따로 적어 두면 한쪽만
+     고쳐져 줄이 위아래로 어긋난다. */
+  --ss-md-filter-pad: 8px;
+  /* 🔴 머리 띠의 종이색. 띠 바탕 · 휘슬 · 선 · 상세의 강조가 **같은 값**을 써야
+     둘이 한 화면의 것으로 읽힌다 — 두 곳에 따로 적어 두면 한쪽만 바뀐다.
+     🔴 **빈티지 쪽으로 옮긴 값**이다(사용자 요청). 전에 쓰던 #f4f5ee 는 초록기가
+     살짝 도는 차가운 상아색이라 종이보다 플라스틱에 가까웠다. 노랑·주황 쪽으로
+     기울여 **바랜 종이**로 만든다 — 짙은 초록과 크림은 오래된 운동장 간판의
+     짝이라 이 화면의 결과 맞는다. 초록 위 7.96:1 로 여전히 또렷하다.
+     🔴 **채도를 초록에 맞춰 낮춘 값**이다. 초록이 hsl(146, 17%, 24%) 로 아주
+     흐린 색인데 크림만 44% 로 진하면(#f0e9d8) 한쪽만 갓 칠한 것처럼 튄다 —
+     빈티지는 색상보다 **둘 다 바래 보이는 것**이 요점이라 29% 로 내렸다.
+     🔴 카드 바탕(`.ss-coach-card` 의 `--ss-surface`)도 **같은 결로 같이 옮겼다.**
+     한쪽만 바꾸면 밝은 것이 둘인데 하나는 차갑고 하나는 따뜻해 서로 튄다. */
+  --ss-md-paper: #ebe7db;
+  padding: 0;
+  /* 🔴 **바탕색의 손잡이는 이 한 줄이다**(사용자 지정 #33483c — 짙은 숲 초록).
+     아래 `background-color` 가 이 값을 읽고, 카드 · 거름망 알약 · 펴진 판은
+     전부 `--ss-fg` 를 이 위에 섞어 쓰므로(`color-mix`) 여기만 바꾸면 판 전체가
+     따라온다. 색을 하나하나 칠하지 않는 이유가 이것이다 — 손으로 칠하면
+     빠뜨린 곳이 반드시 남는다.
 
-     🔴 색을 하나하나 뒤집지 않는다. 이 판 안의 색은 거의 다 `--ss-fg` 에서
-     나오므로(직접 쓰거나 `color-mix` 로 섞어 쓴다) **변수 하나만 갈아 끼우면**
-     글 · 테두리 · 카드 바탕이 한꺼번에 따라온다. 손으로 뒤집으면 빠뜨린 곳이
-     반드시 남는다.
-     `--ss-glass-border` 는 흰색 알파라 흰 바탕에서 사라지므로 같이 뒤집는다. */
-  --ss-fg: #000000;
-  --ss-glass-border: rgba(0, 0, 0, 0.12);
-  /* 🔴 초록도 **이 판에서만** 갈아 끼운다(사용자 지정 #50695c). 앱의 민트
-     (`--ss-accent` #70ed88)는 검은 화면에서 뜨라고 고른 밝은 색이라 흰 바탕에서는
-     글씨가 바탕에 녹는다. 여기서만 덮으므로 앱 색은 그대로다 — 나중에 브랜드
-     색이 바뀌어도 이 줄 하나만 다시 보면 된다. */
-  --ss-accent: #50695c;
-  --ss-surface: #ffffff;
-  /* 🔴 **브라우저에게도 밝은 판이라고 알린다.** 안 알리면 OS 가 어두운 모드일 때
-     `select` 를 펼친 목록처럼 **브라우저가 직접 그리는 것**들이 어두운 모드 색으로
-     나와 흰 판과 따로 논다. 우리 CSS 는 펼친 목록까지 미치지 못한다. */
-  color-scheme: light;
-  /* 🔴 **브라우저에게도 밝은 판이라고 알린다.** 안 알리면 OS 가 어두운 모드일 때
-     `select` · 손잡이 · 펼친 목록 같은 **브라우저가 직접 그리는 것**들이 어두운
-     모드 색(옅은 회색 글씨)으로 나와, 흰 바탕에서 글자가 안 보인다(사용자 지적).
-     우리 CSS 로 글자색을 아무리 검정으로 줘도 펼친 목록까지는 못 미친다. */
-  color-scheme: light;
+     🔴 **다시 밝은 바탕으로 갈 때는 이 줄만 바꿔서는 안 된다.** 이 판은 한동안
+     흰색(→ 종이빛 #e5dbcc)이었고, 그동안은 판 안에서만 흑백을 뒤집어 두었다:
+     `--ss-fg: #000000` · `--ss-glass-border: rgba(0, 0, 0, 0.12)` ·
+     `--ss-accent: #50695c`(앱 민트가 흰 바탕에 녹아서 고른 값) ·
+     `color-scheme: light`. 어두운 바탕에 그 넷을 남기면 **검은 글씨가 초록에
+     묻는다**(명도비 2.13:1, 못 읽는다). 그래서 지금은 뒤집기를 통째로 걷어내
+     사이트 기본값으로 돌아왔다 — 흰 글씨 9.85:1, 앱 민트 #70ed88 6.64:1. */
+  --ss-surface: #33483c;
+  /* 🔴 **브라우저에게도 어두운 판이라고 알린다.** 안 알리면 `select` 를 펼친
+     목록처럼 **브라우저가 직접 그리는 것**들이 판과 따로 노는 색으로 나온다 —
+     우리 CSS 는 펼친 목록까지 미치지 못한다. 판이 흰색이던 때는 같은 이유로
+     `light` 였다(그때는 어두운 모드 OS 에서 글자가 안 보인다는 지적이 있었다). */
+  color-scheme: dark;
 
-  background-color: #ffffff;
+  background-color: var(--ss-surface);
   /* 쉬는 자리는 창 **왼쪽 바깥**이다. 투명도는 건드리지 않는다 — 창이 이미
      가려 주므로, 흐리게까지 하면 미끄러지는 동안 판이 유령처럼 비친다.
 
      🔴 `-100%` 가 아니라 **2px 더** 보낸다. 딱 `-100%` 면 판의 오른쪽 변이 창의
      왼쪽 변과 **같은 자리**에 놓이는데, 창 폭이 정수가 아닐 때(1703 − 595 =
-     1108.x) 반올림하면서 흰 판이 반 픽셀 삐져나와 **세로 흰 줄**로 보인다
-     (사용자 지적). 판이 흰색이 된 뒤로 눈에 띄기 시작했다. */
+     1108.x) 반올림하면서 판이 반 픽셀 삐져나와 **세로 줄**로 보인다
+     (사용자 지적). 판이 바탕과 다른 색이 된 뒤로 눈에 띄기 시작했다. */
   transform: translateX(calc(-100% - 2px));
   transition: transform 520ms cubic-bezier(0.25, 0.6, 0.3, 1);
 }
@@ -4018,10 +4065,221 @@ body::-webkit-scrollbar {
   min-height: 44px;
 }
 
+/* 🔴 **거름망 줄 아래의 선까지가 머리다**(사용자 요청) — 그 위는 밝은 바탕에
+   초록 글씨고, 아래(목록)는 초록 바탕 그대로다. 선은 원래 있던
+   `.ss-filterbar-wrap` 의 아랫선이 그대로 경계가 된다.
+
+   🔴 여기서도 색을 하나하나 칠하지 않는다. 간판 · 뒤로 · 거름망 알약 · 정렬은
+   전부 `--ss-fg` 에서 나오므로 **띠에서만 그 값을 갈아 끼운다.** 초록은 판
+   바탕(#33483c)과 같은 값이라 밝은 띠와 초록 판이 한 색으로 읽힌다(8.97:1).
+
+   🔴 바탕은 카드(#ecede7)보다 **한 단 밝은** 상아색이다(사용자 지정 #f4f5ee).
+   같은 값으로 두면 띠와 카드가 한 덩어리로 붙어 카드가 안 떨어져 나온다.
+
+   🔴 띠는 **판 끝까지 닿아야** 한다. 안 그러면 가운데 뜬 밝은 상자로 보인다.
+   굴림 칸의 여백을 음수 여백으로 빼내고 같은 크기를 제 안쪽 여백으로 도로
+   넣는다 — 글의 자리는 그대로고 바탕만 넓어진다. (이것이 되려면 여백이
+   굴림 칸에 있어야 한다. 위 `.ss-market-detail` 주석.) */
+.ss-market-detail-topline,
+.ss-market-detail .ss-filterbar-wrap,
+/* 코치 상세의 이름 줄(이름 · 종목 · 값 · 레슨 신청)도 **같은 띠 안**이다
+   (사용자 요청) — 목록에서 거름망 줄이 맡는 자리를 상세에서는 이 줄이 맡는다. */
+.ss-market-detail .ss-market-head {
+  --ss-fg: #33483c;
+  /* 🔴 초록 강조색도 같이 갈아 끼운다. 앱 민트(#70ed88)는 상아색 위에서 1.26:1 로
+     녹는데, 레슨 신청 단추가 이 값으로 그려진다 — 안 바꾸면 단추가 사라진다. */
+  --ss-accent: #33483c;
+  --ss-surface: var(--ss-md-paper);
+  margin-right: calc(var(--ss-md-pad-r) * -1);
+  margin-left: calc(var(--ss-md-pad-x) * -1);
+  padding-right: var(--ss-md-pad-r);
+  padding-left: var(--ss-md-pad-x);
+  background-color: var(--ss-surface);
+  /* 정렬은 `select` 라 펼친 목록을 **브라우저가 직접 그린다.** 판은 `dark` 인데
+     이 띠만 밝으므로 여기서 되돌린다(판 주석과 같은 이야기). */
+  color-scheme: light;
+  /* 🔴 **눌리지 않게 못박는다.** 굴림 칸이 세로 flex 라 안의 내용이 칸보다 길면
+     항목들이 먼저 줄어드는데, 간판 줄은 `min-height` 를 제 값으로 갖고 있어
+     (`min-height: auto` 가 아니라) **그만큼까지 눌린다** — 코치 상세처럼 내용이
+     긴 자리에서 띠가 납작해지며 간판 글자가 띠 밖으로 삐져나왔다(사용자 지적). */
+  flex: none;
+}
+
+.ss-market-detail-topline {
+  /* 위쪽도 판 끝까지. 🔴 **걷어내는 값(음수 여백)과 다시 넣는 값(안쪽 여백)이
+     달라도 된다** — 걷어내는 쪽은 굴림 칸의 여백과 같아야 띠가 판 끝에 닿고,
+     다시 넣는 쪽은 순전히 "간판 위에 얼마나 비울까"다. 띠를 얇게 하려고 둘을
+     갈랐다. */
+  margin-top: calc(var(--ss-md-pad-y) * -1);
+  padding-top: var(--ss-md-head-pad-t);
+  /* 🔴 간판과 거름망 사이의 틈도 같은 색이어야 띠가 한 장으로 읽힌다 — 그건
+     아래 `:has` 규칙이 한다. 여기(안쪽 여백)는 실제로 비울 만큼만 넣는다. */
+  /* 🔴 간판과 거름망 사이에 **머리카락 선 하나**(사용자 요청). 색은 새로 만들지
+     않고 이 띠의 글자색(`--ss-fg`, 판 바탕과 같은 초록)을 그대로 쓴다 — 띠 안에
+     초록이 둘이 되면 어느 쪽이 이 화면의 초록인지 흐려진다.
+     선을 넣느라 띠가 도로 두꺼워지지 않게 아래 여백을 14 → 8px 로 줄이고, 선
+     아래쪽 8px 은 거름망 줄이 가진다(`.ss-market-detail .ss-filterbar-wrap`) —
+     위아래가 같아야 선이 두 줄 사이 **가운데**에 놓인다. 한쪽만 고치지 말 것. */
+  padding-bottom: var(--ss-md-filter-pad);
+  border-bottom: 1px solid var(--ss-fg);
+}
+
+/* 🔴 판 안에서는 이름이 **줄 가운데**다(사용자 요청). 간판 줄과 같은 짜임이다 —
+   가운데 것은 흐름에 두고, 오른쪽 것(레슨 신청)만 흐름 밖으로 뺀다. 단추를 흐름에
+   두면 이름이 그 폭만큼 왼쪽으로 밀려 진짜 가운데가 아니게 된다.
+   ⚠️ 제 주소로 여는 화면(`/market/coaches/{id}`)은 그대로 왼쪽 정렬이다 — 거기는
+   이 띠가 없어서 가운데로 모으면 기댈 자리가 없다. */
+.ss-market-detail .ss-coach-title {
+  position: relative;
+  justify-content: center;
+  text-align: center;
+}
+
+/* 🔴 단추 **안쪽은 투명**이다(사용자 요청). 초록을 18% 깔던 것이 상아색 위에서
+   탁한 회록색으로 보였다 — 어두운 판에서 민트를 깔던 값을 그대로 물려받은 탓이다.
+   가져다 대면 아주 옅게만 든다(누를 수 있는 것이라는 표시는 남긴다). */
+.ss-market-detail .ss-coach-title .ss-apply-open {
+  background-color: transparent;
+}
+
+.ss-market-detail .ss-coach-title .ss-apply-open:hover {
+  background-color: color-mix(in srgb, var(--ss-accent) 12%, transparent);
+}
+
+/* 🔴 이름과 신청 단추는 **한 줄**이고, 단추는 그 오른쪽에 **떠 있다**(사용자 요청).
+   흐름에 두면 이름이 단추 폭의 절반만큼 왼쪽으로 밀려 가운데가 아니게 된다.
+   `left: 100%` 이 곧 "이름 오른쪽 끝"이다 — 이름 길이가 달라도 따라간다. */
+/* 🔴 **`inline-block` 이다.** 이유가 둘 다 중요하다:
+     ① 상자가 **이름 글자 폭**으로 줄어든다 — 그래야 `left: 100%` 가 "이름
+        오른쪽"이 된다. 블록이면 상자가 아래 한 줄(종목 · 지역 · 값)만큼 넓어서
+        단추가 그 줄 끝으로 밀려난다.
+     ② 가운데 정렬이 **글 정렬을 그대로 따른다** — 판 안에서는 가운데,
+        제 주소로 여는 화면에서는 왼쪽. flex 로 두면 이름이 늘 왼쪽에 붙어
+        판 안에서 가운데가 아니게 된다(실제로 그렇게 어긋났다). */
+.ss-coach-name {
+  position: relative;
+  display: inline-block;
+}
+
+.ss-coach-name .ss-apply-open {
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  /* 🔴 **폭을 제 내용으로 못박는다.** 흐름 밖의 것은 기댈 폭이 없으면 부모의
+     남은 자리에 맞추는데, `left: 100%` 라 남은 자리가 **0** 이다 — 글자가 한 자씩
+     세로로 접혔다(사용자 지적). */
+  width: max-content;
+  margin-left: 12px;
+  transform: translateY(-50%);
+}
+
+/* 🔴 흐려질 때의 `transform` 은 **세로 가운데로 옮기는 것과 같이** 적는다. 한
+   속성이라 나중 것이 앞 것을 통째로 덮는다 — 축소만 적으면 단추가 가운데에서
+   튕겨 위로 올라간다. */
+.ss-coach-name .ss-apply-open[data-hidden='true'] {
+  transform: translateY(-50%) scale(0.96);
+}
+
+/* 🔴 단추가 **깜빡인다**(사용자 요청) — 이 화면에서 다음에 할 일이 이것 하나라
+   눈이 가야 한다. 껐다 켜는 것이 아니라 **옅어졌다 돌아온다**: 완전히 사라졌다
+   나타나면 읽는 동안 거슬리고, 마침 안 보일 때 누르려던 손이 헛돈다. */
+@keyframes ss-apply-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ss-coach-name .ss-apply-open {
+    animation: ss-apply-blink 1.6s ease-in-out infinite;
+  }
+
+  /* 가져다 대거나 초점이 오면 멈춘다 — 이미 찾은 것을 계속 부를 이유가 없고,
+     누르는 동안 흐려지면 눌린 것인지 알기 어렵다. */
+  .ss-coach-name .ss-apply-open:hover,
+  .ss-coach-name .ss-apply-open:focus-visible,
+  /* 🔴 신청서가 펴지면 **반드시 멈춘다.** 깜빡임이 `opacity` 를 쥐고 있으면
+     흐려지며 물러나는 전환이 못 이긴다(이 저장소에서 되풀이된 함정). */
+  .ss-coach-name .ss-apply-open[data-hidden='true'] {
+    animation: none;
+  }
+}
+
+/* 이름 줄의 위아래. 위쪽은 거름망 줄과 같은 값이라야 선이 가운데에 오고,
+   아래쪽은 **띠가 끝나는 몫**이다 — 이름과 그 아래 한 줄이 두 줄짜리라 거름망
+   알약 한 줄보다 조금 더 벌린다. */
+.ss-market-detail .ss-market-head {
+  padding-top: var(--ss-md-filter-pad);
+  padding-bottom: 18px;
+}
+
+/* 거름망 줄의 위아래. 위쪽은 **선 아래 몫**이라 간판 줄의 `padding-bottom` 과
+   같아야 선이 가운데에 오고, 아래쪽은 **띠가 끝나는 몫**이다. 둘을 한 값으로
+   묶어 둔다 — 판 안에서만 준다(화면 목록 `/market/coaches` 에는 이 선이 없어
+   위 여백도 필요 없고, 아래 여백은 그쪽 기본값 14px 그대로다). */
+.ss-market-detail .ss-filterbar-wrap {
+  padding-top: var(--ss-md-filter-pad);
+}
+
+/* 🔴 **굴려도 머리는 자리에 남는다**(사용자 요청). 띠가 두 줄(간판 줄 + 그 아래
+   거름망 · 코치 이름 줄)이라 **둘 다** 붙여야 한 장으로 남는다 — 위만 붙이면
+   아래 줄이 그 밑으로 빨려 들어가 띠가 반쪽이 된다.
+
+   🔴 아래 줄이 설 자리(`top`)는 **위 줄의 키**다. 그 값은 여백과 간판 글자
+   크기가 `clamp` 라 창 폭마다 달라지므로 CSS 에 적을 수 없다 —
+   `MarketGates` 가 재서 `--ss-md-topline-h` 로 넘겨준다(그 주석 참고).
+   못 받았을 때(0px)도 겹치기만 할 뿐 깨지지는 않는다.
+
+   🔴 쌓임 순서: 위 줄이 아래 줄보다 앞이어야 한다. 둘이 만나는 자리에서 아래
+   줄이 위로 올라오면 간판 글자가 잘린다. */
+.ss-market-detail-topline {
+  position: sticky;
+  /* 🔴 **0 이 아니라 음수 여백만큼**이다. 이 띠는 굴림 칸의 위 여백을 음수 여백
+     으로 걷어내 판 끝에 닿아 있는데(위 `margin-top`), `sticky` 는 **테두리 상자가
+     아니라 바깥 여백까지 포함한 상자**를 붙일 자리 안에 가둔다 — `top: 0` 으로
+     두면 그 음수 여백만큼 띠가 아래로 밀려 **위에 초록 띠 한 줄이 생긴다**
+     (사용자 지적. 굴리기 전에도 생기므로 붙이기 전부터 어긋난다).
+     걷어낸 값을 그대로 되돌려 주면 테두리 상자가 판 끝에 선다. */
+  top: calc(var(--ss-md-pad-y) * -1);
+  z-index: 3;
+}
+
+.ss-market-detail .ss-filterbar-wrap,
+.ss-market-detail .ss-market-head {
+  position: sticky;
+  /* 🔴 **판 끝을 기준으로 잰다.** `top` 은 굴림 칸의 안쪽 여백 **안쪽**에서 세므로,
+     위 띠처럼 `-pad-y` 가 곧 판 끝이다 — 거기서 띠 키만큼 내려온 자리가 이 줄이다.
+     `top: <띠 키>` 로만 두면 여백만큼 더 내려가 **둘 사이가 초록 띠로 벌어진다**
+     (사용자 지적 — 실측 77px 자리에 105px 로 섰다). */
+  top: calc(var(--ss-md-topline-h, 0px) - var(--ss-md-pad-y));
+  z-index: 2;
+}
+
+.ss-market-detail .ss-filterbar {
+  padding-bottom: var(--ss-md-filter-pad);
+}
+
+/* 🔴 굴림 칸의 `gap`(26px)을 지우는 것은 **거름망 줄이 바로 뒤에 올 때뿐**이다.
+   목록에서는 간판과 거름망이 한 장의 띠라 그 사이가 벌어지면 안 되지만, 코치
+   상세에서는 띠가 간판 줄 하나로 끝나고 그 아래 이름 줄은 **띄워야** 한다.
+   🔴 `gap` 을 고치면 이 값도 같이 고칠 것(안 그러면 띠가 두 장으로 갈라진다). */
+.ss-market-detail-topline:has(+ .ss-filterbar-wrap),
+.ss-market-detail-topline:has(+ .ss-market-head) {
+  margin-bottom: -26px;
+}
+
+/* 🔴 단추는 띠 안에서 **흐름 밖**이라 기준이 띠의 안쪽 상자가 아니라 **바깥
+   상자**다 — 위에서 띠를 판 끝까지 늘렸으므로 여백만큼 도로 밀어 주지 않으면
+   판의 맨 귀퉁이로 올라가 붙는다. */
 .ss-market-detail-topline .ss-market-detail-close {
   position: absolute;
-  top: 2px;
-  left: 2px;
+  top: calc(var(--ss-md-head-pad-t) + 2px);
+  left: calc(var(--ss-md-pad-x) + 2px);
   margin: 0;
 }
 
@@ -4038,6 +4296,11 @@ body::-webkit-scrollbar {
      올리면 가짜 굵게만 걸려 획이 지저분해진다(아치 글자와 같은 이유). */
   font-family: var(--font-poster), var(--font-rubik), system-ui, sans-serif;
   font-size: clamp(1.75rem, 3.2vw, 3rem);
+  /* 🔴 줄높이를 **글자 크기에 붙인다.** Shrikhand 는 장식 글꼴이라 기본 줄상자가
+     글자보다 한참 높고(1.3배 남짓), 한 줄짜리 간판이라 그 여분이 통째로 띠의
+     키가 된다(사용자 지적). 대문자 라틴 한 줄뿐이라 내려긋는 획이 없어 1.05
+     로도 안 잘린다 — 한글이나 소문자가 들어오면 여기부터 다시 볼 것. */
+  line-height: 1.05;
   letter-spacing: 0.01em;
   text-align: center;
   color: var(--ss-fg);
@@ -4161,6 +4424,14 @@ body::-webkit-scrollbar {
    문지기가 굴림을 듣지 않게 `data-ss-detail` 로 알린다(`MarketGates`). */
 .ss-market-detail-body {
   min-height: 0;
+  /* 🔴 **머리 띠가 스크롤에서 절대 안 움직여야 한다**(사용자 요청). 붙여 두는
+     것(`sticky`)만으로는 한 자리가 남는다 — macOS 의 **고무줄 굴림**이다. 맨
+     위에서 더 올리면 브라우저가 칸 전체를 아래로 늘였다 되돌리는데, 그때는
+     붙여 둔 것도 같이 딸려 내려간다. 굴림 값이 안 바뀌므로 코드로는 안 잡히고
+     **손으로 굴려 봐야만** 보인다(헤드리스 실측에서는 띠가 0에 붙어 있었다).
+     🔴 `contain` 이 아니라 `none` 이다 — `contain` 은 뒤 화면으로 굴림이 넘어가는
+     것만 막고 고무줄은 그대로 둔다. */
+  overscroll-behavior: none;
   /* 🔴 굴림 막대는 **안 보이게** 한다(사용자 요청). 판이 화면 오른쪽을 통째로
      쓰는데 그 끝에 회색 막대가 서면 판의 테두리처럼 보인다. 굴리는 것 자체는
      그대로다. */
@@ -4173,7 +4444,9 @@ body::-webkit-scrollbar {
   flex-direction: column;
   gap: 26px;
   overflow-y: auto;
-  padding-right: 4px;
+  /* 위 `.ss-market-detail` 이 정한 값을 여기서 쓴다(그 주석 참고). */
+  padding: var(--ss-md-pad-y) var(--ss-md-pad-r) var(--ss-md-pad-y)
+    var(--ss-md-pad-x);
 }
 
 .ss-market-detail-body::-webkit-scrollbar {
@@ -5100,6 +5373,20 @@ body:has(.ss-market-entry) .ss-home-header {
   gap: 12px;
 }
 
+/* 🔴 **센 것과 고르는 것 사이의 세로 선**(사용자 요청). 둘 다 같은 무리 안에
+   나란히 있어서 "3명"이 정렬의 값처럼 읽혔다.
+
+   색은 새로 만들지 않고 `--ss-fg` 를 쓴다 — 판 안에서는 초록(#33483c), 화면
+   목록(`/market/coaches`)에서는 흰색이 되어 **자리마다 알아서 맞는다.** 값을
+   박아 두면 어두운 쪽에서 안 보인다.
+
+   여백은 무리의 `gap`(12px)과 같은 값을 왼쪽에 더해, 선이 센 것과 고르개
+   **가운데**에 놓이게 한다. */
+.ss-filterbar-end > .ss-sortfield {
+  border-left: 1px solid var(--ss-fg);
+  padding-left: 12px;
+}
+
 /* 고르개 하나. `select` 든 눌러 펴는 판이든 겉모습은 같다. */
 .ss-filterfield {
   position: relative;
@@ -5228,7 +5515,7 @@ body:has(.ss-market-entry) .ss-home-header {
   border-radius: 14px;
   padding: 14px 16px;
   /* 🔴 바탕은 **불투명**이어야 한다 — 반투명이면 아래 목록 글자가 비쳐 겹친다.
-     판마다 바탕색이 달라(검은 화면 · 흰 판) `--ss-surface` 를 읽는다. */
+     판마다 바탕색이 달라(검은 화면 · 초록 판) `--ss-surface` 를 읽는다. */
   background-color: var(--ss-surface);
   box-shadow: 0 12px 32px color-mix(in srgb, #000 45%, transparent);
 }
@@ -5334,9 +5621,12 @@ body:has(.ss-market-entry) .ss-home-header {
 }
 
 /* ── 코치 목록 ────────────────────────────────────────────────────────*/
-/* 🔴 **한 줄에 둘**이다(사용자 요청) — 카드마다 오른쪽에 영상이 붙어 가로로
+/* 🔴 **한 줄에 둘**이다(사용자 요청). 카드마다 오른쪽에 영상이 붙어 가로로
    길어졌으므로, 셋씩 놓으면 글도 영상도 다 좁아진다. 좁은 창에서는 한 줄에
-   하나로 접힌다. */
+   하나로 접힌다.
+   ⚠️ 한 줄에 하나로 바꿔 본 적이 있다(코치가 홀수일 때 마지막 줄 절반이 비는
+   것이 눈에 걸려서). **되돌렸다** — 카드가 두 배로 넓어지자 영상이 제 반쪽
+   안에서 훨씬 작아 보였다. 빈 자리 한 칸보다 그쪽이 나빴다. */
 .ss-coach-list {
   display: grid;
   gap: 14px;
@@ -5346,6 +5636,13 @@ body:has(.ss-market-entry) .ss-home-header {
 @media (min-width: 900px) {
   .ss-coach-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* 한 줄에 하나로 접히는 폭에서는 카드의 바닥 키를 끈다(위 주석). */
+@media (max-width: 900px) {
+  .ss-coach-card {
+    min-height: 0;
   }
 }
 
@@ -5360,29 +5657,70 @@ body:has(.ss-market-entry) .ss-home-header {
      링크(`<a>`)라 같은 일이 안 생겨 늦게 드러났다. */
   width: 100%;
   height: 100%;
+  /* 🔴 **바닥 키**(사용자 요청 — 박스를 키워 달라). 글 쪽만으로는 220px 남짓이라
+     영상이 띠처럼 얇게 눌렸다. 키가 커지면 영상 칸도 같이 커진다(칸의 폭이 키에서
+     나오므로 — 아래 `.ss-coach-card-clip`).
+     좁은 창(한 줄에 하나)에서는 끈다: 카드가 화면 폭을 다 쓰는데 키까지 못 박으면
+     가로 영상이 상한(62%)에 걸려 위아래가 남는다. */
+  min-height: 260px;
   align-items: stretch;
-  gap: 16px;
-  border: 1px solid var(--ss-glass-border);
-  /* 모서리는 **아주 조금만** 둥글다(사용자 요청). 16px 때는 오른쪽 절반의 영상이
-     깎여 네 귀퉁이만 잘린 화면으로 보였고, 0 은 너무 날이 섰다. */
-  border-radius: 6px;
+  /* 🔴 글과 영상 사이의 **틈은 없다.** 둘을 정확히 반씩 나누고 그 경계에 선을
+     그으므로(아래 `.ss-coach-card-text` 의 오른쪽 선), 틈이 있으면 선이 어느
+     쪽 것인지 애매해진다. */
+  gap: 0;
+  /* 🔴 외곽선은 **가운데 선과 같은 초록**이다(사용자 요청). 한 번 없앴다가
+     되살린 자리다 — 없으면 밝은 카드가 초록 판 위에 떠 있는 것처럼만 보이고,
+     가운데 선만 남아 그 선이 카드의 것인지 판의 것인지 흐려졌다.
+     🔴 값을 따로 적지 않고 `--ss-accent` 를 읽는다. 외곽선과 가운데 선이 **한
+     값**이라야 둘이 같은 테두리로 읽힌다. */
+  border: 1px solid var(--ss-accent);
+  /* 🔴 모서리는 **직각**이다(사용자 요청). 16px → 6px → 0 으로 내려온 자리다 —
+     초록 테두리가 생기면서 각진 편이 선과 한 덩어리로 읽힌다. */
+  border-radius: 0;
   /* 영상이 카드 모서리까지 꽉 차야 하므로 안쪽 여백은 **글 쪽에서만** 준다. */
   padding: 0;
   overflow: hidden;
-  background-color: color-mix(in srgb, var(--ss-fg) 4%, transparent);
+  /* 🔴 **카드 안은 판과 반대로 밝다**(사용자 지정 #ecede7). 판이 짙은 초록이라
+     카드까지 초록을 옅게 섞으면(예전처럼 `--ss-fg` 4%) 카드가 판에서 안 떨어져
+     나온다 — 밝은 타일로 놓아야 한 장 한 장이 집힌다.
+
+     🔴 색을 하나하나 칠하지 않는다. 카드 안의 글 · 테두리 · 간판 상자 · 호칭
+     알약은 전부 `--ss-fg` 와 `--ss-accent` 에서 나오므로(직접 쓰거나 `color-mix`
+     로 섞는다) **이 네 줄만 갈아 끼우면** 안쪽이 통째로 따라온다.
+     · `--ss-fg` 는 검정으로 뒤집는다 — 판에서 물려받은 흰색이면 밝은 카드에서
+       글씨가 사라진다(명도비 1.18:1).
+     · `--ss-accent` 는 판 색(#33483c)을 그대로 쓴다 — 앱 민트(#70ed88)는 밝은
+       바탕에서 1.26:1 로 녹는다. 판과 같은 초록이라 두 층이 한 색으로 읽힌다
+       (검정 15.61:1, 이 초록 7.32:1). 카드 가운데 선도 이 값이다. */
+  /* 띠(`--ss-md-paper` #ebe7db)보다 **한 단 어두운 같은 크림**이다 — 띠 위에
+     놓인 카드가 제 모양으로 떨어져 나오려면 둘이 같은 값이면 안 된다. 색상과
+     채도는 띠와 맞추고(45°/27%) 밝기만 4% 내렸다. */
+  --ss-surface: #e3dece;
+  --ss-fg: #000000;
+  --ss-accent: #33483c;
+  background-color: var(--ss-surface);
+  /* 카드 안의 글은 저마다 제 색을 `--ss-fg` 에서 받아 가지만, 여기서 한 번 더
+     못박는다 — 카드는 `<button>` 이라 클래스 없는 글이 하나라도 생기면 판에서
+     물려받은 **흰색**이 그대로 내려와 밝은 카드에서 사라진다. */
+  color: var(--ss-fg);
   text-align: left;
-  transition:
-    background-color 160ms ease,
-    border-color 160ms ease;
 }
 
-/* 글 쪽 — 카드의 절반보다 조금 넓게 잡는다. */
+/* 글 쪽 — **정확히 절반**이다. 늘어나게 두면 글이 짧은 카드마다 경계가 다른
+   자리에 서서, 한 줄에 하나씩 쌓인 카드들의 가운데 선이 들쭉날쭉해진다.
+
+   🔴 **카드 가운데 선이 이 요소의 오른쪽 선이다**(사용자 요청, 색은 판과 같은
+   초록 = `--ss-accent`). 따로 요소를 만들지 않는 이유: 경계는 이미 여기라
+   하나를 더 두면 반쪽 폭을 두 곳에서 정하게 되고, 한쪽만 고치면 선과 경계가
+   어긋난다. 테두리 상자 셈(`border-box`)이라 선 두께는 절반 안에 든다. */
 .ss-coach-card-text {
   display: flex;
   min-width: 0;
-  flex: 1 1 auto;
+  flex: none;
+  width: 50%;
   flex-direction: column;
   gap: 10px;
+  border-right: 1px solid var(--ss-accent);
   padding: 20px;
 }
 
@@ -5392,13 +5730,27 @@ body:has(.ss-market-entry) .ss-home-header {
 
    🔴 영상은 **잘라 채우지 않고 통째로 넣는다**(사용자 요청). `cover` 는 칸을
    꽉 채우는 대신 세로 영상의 위아래를 베어 무슨 장면인지 안 읽혔다. `contain`
-   은 다 보여 주는 대신 남는 자리가 생기므로, 그 자리를 **검정**으로 깐다 —
-   흰 판 위라 밝은 회색을 깔면 영상이 아니라 빈칸으로 보인다. */
+   은 다 보여 주는 대신 남는 자리가 생기는데, 그 자리는 **카드 바탕색**이다
+   (`--ss-surface` 를 읽으므로 카드 색을 바꾸면 같이 따라온다).
+
+   🔴 그런데 칸을 **반으로 못 박아 두면** 그 남는 자리가 커진다 — 세로 영상이
+   가운데 좁게 서고 양옆이 다 비었다(사용자 지적). 그래서 **폭이 영상 생김새를
+   따라간다.** 비율은 CSS 가 알 수 없으므로 영상을 읽고 나서 `CoachList` 가
+   `--ss-clip-ar` 로 넣어 준다(아직 못 읽었거나 클립이 없으면 16:9).
+
+   🔴 높이는 예전 그대로 **카드가 정한다**(늘어나기). 영상의 원래 크기가 카드
+   키를 정하게 두면 세로 영상 하나에 카드가 네 배로 길어진다 — 영상을 흐름 밖에
+   둔 것도 같은 이유다(아래).
+   상한 · 하한을 같이 두는 이유: 가로로 긴 영상이 카드를 다 먹지 않게, 그리고
+   비율이 아직 안 들어왔을 때 칸이 0으로 접히지 않게. */
 .ss-coach-card-clip {
   position: relative;
-  width: 50%;
-  flex: none;
-  background-color: #000000;
+  /* 글 쪽이 반을 못 박았으므로 **나머지 반**이다. 영상은 이 안에 들어가므로
+     🔴 **가운데 선을 넘지 않는다**(사용자 요청) — 넘게 하려면 이 칸을 넓히는
+     수밖에 없고, 그러면 선이 가운데가 아니게 된다. */
+  min-width: 0;
+  flex: 1 1 auto;
+  background-color: var(--ss-surface);
 }
 
 /* 🔴 영상은 **흐름 밖**이다(절대 배치). 흐름에 두면 `height: 100%` 가 기댈 곳이
@@ -5416,9 +5768,59 @@ body:has(.ss-market-entry) .ss-home-header {
   object-fit: contain;
 }
 
-.ss-coach-card:hover {
-  border-color: color-mix(in srgb, var(--ss-fg) 45%, transparent);
-  background-color: color-mix(in srgb, var(--ss-fg) 8%, transparent);
+/* 🔴 누르면 카드 둘레에 **흰 테두리**가 돌던 것을 없앤다(사용자 지적). 우리가
+   그린 것이 아니라 **브라우저가 그리는 초점 표시**(focus ring)다 — 크롬은 어느
+   바탕에서도 보이라고 검은 고리 바깥에 흰 고리를 한 겹 더 두른다. 카드가
+   `<button>`(판 안) · `<a>`(목록 화면)라 초점이 앉는다.
+
+   🔴 **초점이 어느 상태로 오든 다 지운다**(사용자 재지적 — 손으로 누른 것만
+   지웠더니 여전히 보였다). 보통은 지우는 대신 우리 색으로 다시 그리지만, 여기는
+   **줄이 커지는 표시가 이미 있다** — `.ss-coach-list > li:focus-within` 이 자판으로
+   왔을 때도 카드를 키운다(아래). 그래서 자판 쓰는 사람이 지금 어디에 있는지를
+   잃지 않는다. 이 조건이 깨지면(확대를 없애거나 움직임 줄이기를 켠 사람) 여기에
+   초점 표시를 도로 만들어야 한다.
+   `-webkit-tap-highlight-color` 는 손가락으로 눌렀을 때 안드로이드 크롬이 씌우는
+   회색 막이다 — 같은 이유로 끈다. */
+.ss-coach-card:focus,
+.ss-coach-card:focus-visible {
+  outline: none;
+}
+
+.ss-coach-card {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 🔴 가져다 대면 **색이 아니라 크기**가 바뀐다(사용자 요청).
+
+   🔴 커지는 것은 카드가 아니라 **줄(`li`)** 이다. 카드에 걸면 그림만 커지고
+   과녁은 원래 크기 그대로라, 커진 가장자리에 손이 올라간 순간 줄 밖이 되어
+   카드가 줄었다 커졌다 **떤다.** 줄에 걸면 변형이 맞히기에도 반영되어 과녁도
+   같이 커진다. 영상을 켜고 끄는 것도 같은 줄이 듣고 있어 둘이 어긋나지 않는다.
+
+   크기는 사이트가 이미 쓰는 값 하나(`--ss-card-hover-scale`)를 그대로 읽는다.
+   격자 항목이라 `position` 없이도 `z-index` 가 먹는다 — 커진 카드가 옆 카드
+   위로 올라와야 테두리가 잘리지 않는다.
+
+   🔴 움직임을 줄여 달라고 한 사람에게는 **아예 켜지 않는다.** 트랜지션만
+   지우면 결국 커진 채로 남으므로 hover 규칙째 미디어 쿼리 안에 둔다(위
+   `.ss-card-interactive` 와 같은 방식). */
+/* 상품 목록(`.ss-shop-grid`)도 **같은 규칙을 나눠 쓴다** — 한 판에 사는 카드
+   둘이 다르게 반응하면 따로 논다. */
+.ss-coach-list > li,
+.ss-shop-grid > li {
+  transition: transform 240ms cubic-bezier(0.25, 0.6, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ss-coach-list > li:hover,
+  /* 자판으로 옮겨 다닐 때도 같은 표시가 있어야 한다 — 초점은 줄이 아니라 그
+     안의 단추 · 링크에 앉으므로 `:focus-within` 이다. */
+  .ss-coach-list > li:focus-within,
+  .ss-shop-grid > li:hover,
+  .ss-shop-grid > li:focus-within {
+    z-index: 1;
+    transform: scale(var(--ss-card-hover-scale));
+  }
 }
 
 .ss-coach-card-head {
@@ -5484,8 +5886,8 @@ body:has(.ss-market-entry) .ss-home-header {
 .ss-coach-titles b {
   border: 1px solid color-mix(in srgb, var(--ss-accent) 50%, transparent);
   border-radius: 999px;
-  padding: 2px 9px;
-  font-size: 0.75rem;
+  padding: 1px 8px;
+  font-size: 0.6875rem;
   font-weight: 600;
   color: var(--ss-accent);
 }
@@ -5504,7 +5906,361 @@ body:has(.ss-market-entry) .ss-home-header {
   color: color-mix(in srgb, var(--ss-fg) 45%, transparent);
 }
 
+/* 목록 머리 — 휘슬과 그 아래 한 마디. 가운데로 모으고 목록과는 조금 더 띄운다
+   (굴림 칸의 `gap` 만으로는 그림 · 글 · 카드가 같은 간격이라 셋이 한 줄로
+   읽힌다). */
+.ss-coach-lead {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  /* 🔴 글 아래에 **얇은 선**(사용자 요청) — 머리(휘슬 · 한 마디)와 목록을 가른다.
+     머리 띠의 선이 초록 위 상아색이었던 것과 짝이 되게, 여기는 초록 바탕 위
+     상아색이다. 값은 띠와 같은 `--ss-md-paper` 를 읽는다(주신 #ecede8 과 명도가
+     1.07 밖에 안 갈리는 값이라, 상아색을 둘로 늘리는 대신 하나로 묶었다).
+
+     🔴 선은 **판 끝까지** 간다(사용자 요청). 머리 띠와 같은 방식이다 — 굴림 칸의
+     여백을 음수 여백으로 걷어내고 같은 크기를 제 안쪽 여백으로 도로 넣는다.
+     글은 가운데 정렬이라 자리가 그대로다.
+
+     🔴 위아래 여백은 **같은 값**이다(사용자 요청). 위쪽 자리는 원래 굴림 칸의
+     `gap`(26px)이 만들던 것이라 손댈 수가 없었다 — 그래서 그 `gap` 을 음수
+     여백으로 지우고 아래와 같은 14px 을 제 여백으로 넣는다. 🔴 `gap` 을 고치면
+     이 음수 여백도 같이 고칠 것. */
+  margin-top: -26px;
+  margin-right: calc(var(--ss-md-pad-r) * -1);
+  margin-left: calc(var(--ss-md-pad-x) * -1);
+  padding-top: 14px;
+  padding-right: var(--ss-md-pad-r);
+  padding-bottom: 14px;
+  padding-left: var(--ss-md-pad-x);
+  border-bottom: 1px solid var(--ss-md-paper);
+  margin-bottom: 6px;
+  text-align: center;
+}
+
+.ss-coach-lead p {
+  max-width: 34rem;
+  font-size: 0.9375rem;
+  line-height: 1.75;
+  /* 바탕이 초록이라 흰 글씨를 그대로 쓰면 목록보다 세게 읽힌다 — 띠와 같은
+     상아색을 조금 물려 **간판 아래 한 마디**의 무게로 낮춘다. */
+  color: color-mix(in srgb, var(--ss-md-paper, #f4f5ee) 78%, transparent);
+}
+
+.ss-coach-lead p b {
+  font-weight: 600;
+  color: var(--ss-md-paper, #f4f5ee);
+}
+
+/* 🔴 목록 머리의 **휘슬**(사용자 요청). 선 아래 초록 자리의 가운데에 놓여
+   "여기부터 코치"라는 표시가 된다 — 글이 아니라 그림이라 간판(FIND YOUR COACH)
+   과 겹쳐 읽히지 않는다.
+
+   색은 머리 띠와 **같은 상아색**(`--ss-md-paper`)이다. 판 밖(화면 목록
+   `/market/coaches`)에서는 그 변수가 없으므로 같은 값을 대비로 적어 둔다 —
+   거기도 어두운 바탕이라 그대로 보인다.
+
+   🔴 낭독기에는 없는 것이다(`aria-hidden`). 목록에 이미 제목이 있어 이 그림이
+   나르는 새 정보가 없다. */
+.ss-coach-list-mark {
+  display: flex;
+  justify-content: center;
+  color: var(--ss-md-paper, #f4f5ee);
+}
+
+.ss-coach-list-mark .material-symbols-outlined {
+  font-size: 40px;
+  /* 구글 폰트에서 고른 그대로 — 가는 획(300)에 40px 시각 크기. */
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 300,
+    'GRAD' 0,
+    'opsz' 40;
+}
+
+/* 🔴 상점의 배너. **판 끝까지 꽉 찬다**(사용자 요청) — 머리 띠와 같은 방식으로
+   굴림 칸의 여백을 음수 여백으로 걷어낸다. 비율은 사진 그대로 두고 폭만 맞춘다
+   (잘라 채우면 신발이 잘린다).
+   판 밖(제 주소로 여는 상점 화면)에는 이 변수가 없으므로 그때는 그냥 폭만 채운다. */
+.ss-market-detail .ss-shop-banner {
+  /* 🔴 위쪽도 붙인다(사용자 지적) — 굴림 칸의 틈(26px)이 거름망 줄과 사진 사이에
+     들어가 **초록 띠 한 줄**로 보였다. 사진은 머리 띠 아랫선에서 바로 시작해야
+     한 장으로 읽힌다. 🔴 `gap` 을 고치면 이 값도 같이 고칠 것. */
+  margin-top: -26px;
+  margin-right: calc(var(--ss-md-pad-r) * -1);
+  margin-left: calc(var(--ss-md-pad-x) * -1);
+}
+
+.ss-shop-banner img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* 🔴 굴리면 **사진만 위로 올라가며 사라진다**(사용자 요청). 머리 띠는 붙어서
+   남고(위), 아래 것들은 굴림 그대로 따라 올라온다.
+
+   진행도(0~1)는 `ShopList` 가 굴림 자리를 듣고 `--ss-shop-banner-p` 에 넣는다 —
+   여기서는 그 값을 읽어 그리기만 한다.
+
+   🔴 올라가는 것은 **레이아웃이 아니라 그림**이다(`transform`). 사진의 키를
+   줄이면 아래 것들이 그만큼 튀어 올라 굴림과 싸운다 — 굴림이 옮기는 거리에
+   조금 더 얹어 주는 정도라야 "사진만 먼저 빠진다"로 읽힌다.
+
+   🔴 움직임을 줄여 달라고 한 사람에게는 **올라가는 것만** 끈다. 흐려지는 것은
+   자리가 안 움직이므로 그대로 둔다. */
+.ss-shop-banner {
+  --ss-shop-banner-p: 0;
+  opacity: calc(1 - var(--ss-shop-banner-p));
+  /* 이 둘만 바뀐다고 미리 알린다 — 굴리는 동안 매 프레임 다시 칠하지 않는다. */
+  will-change: opacity, transform;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ss-shop-banner {
+    transform: translateY(calc(var(--ss-shop-banner-p) * -56px));
+  }
+}
+
+
+/* 🔴 **사진 바로 아래**에 두는 간판 글자(사용자 요청). 상품 목록을 안 그리는
+   동안 배너 밑이 초록으로 비어 있어서, 그 머리에 한 마디를 세워 둔다.
+
+   ⚠️ 한때 이 글자를 **사진 위에** 큼직하게 얹었다(뒤로 보냈다가 앞으로, 다시 맨
+   위로). 셋 다 사용자가 보고 물렸다 — 사진은 그대로 두고 글자는 아래 빈 자리로
+   내려왔다. 되돌리지 말 것.
+
+   🔴 **상품 목록이 생기면 이 자리는 목록에게 내준다**(`ShopList` 의 주석 참고).
+   그때 이 글자는 지워야 한다 — 목록 아래에 남으면 뜬금없어진다. */
+.ss-shop-word {
+  /* 🔴 사진과 상자들 **사이 한가운데**에 선다(사용자 요청).
+     🔴 그래서 여백을 위아래 **한 값**으로 준다(`margin-block`). 위와 아래를 따로
+     적으면 한쪽만 고쳐져 간판이 슬그머니 한쪽으로 붙는다 — 실제 틈은 여기에
+     굴림 칸의 `gap`(26px)이 위아래로 똑같이 더해진 값이다.
+     🔴 `flex: none` 으로 못박는다: 세로 flex 항목은 자리가 빠듯하면 스스로
+     눌리며 조용히 잘린다(이 저장소에서 되풀이된 함정). */
+  flex: none;
+  margin-block: 14px;
+  text-align: center;
+}
+
+.ss-shop-word-title {
+  /* 🔴 판 머리의 간판(BEST SELLERS, Shrikhand)과 **다른 글꼴**이다(사용자 지정
+     — Anton). 좁고 굵은 산세리프라 같은 자리에 서도 머리와 안 겨룬다.
+     🔴 굵기를 주지 않는다 — Anton 도 400 하나뿐이라 올리면 가짜 굵게만 걸린다. */
+  font-family: var(--font-sign), var(--font-rubik), system-ui, sans-serif;
+  font-size: clamp(2rem, 5vw, 4.5rem);
+  line-height: 1.05;
+  letter-spacing: 0.01em;
+  /* 머리 띠 · 선과 같은 종이색. 초록 위 7.96:1 로 또렷하다. */
+  color: var(--ss-md-paper);
+}
+
+/* 간판 아래 한 줄(사용자 지정 문구).
+   🔴 **글꼴을 주지 않는다.** 한글이라 Anton(라틴 전용)을 물리면 OS 기본 글꼴로
+   떨어져 위 줄과 따로 논다 — 본문 글꼴 그대로 둔다.
+   🔴 위 줄과의 틈은 **여기서** 준다. 굴림 칸의 `gap`(26px)에 맡기면 제목과
+   설명 사이가 절 사이만큼 벌어진다 — 그래서 둘을 한 상자로 묶어 뒀다. */
+.ss-shop-word-sub {
+  margin-top: 8px;
+  /* 왼쪽 두 문의 설명(`.ss-market-gate p`)과 같은 크기 · 줄높이다 — 같은 뜻의
+     글에 다른 크기를 주지 않는다. */
+  font-size: 1.0625rem;
+  line-height: 1.75;
+  color: color-mix(in srgb, var(--ss-md-paper) 72%, transparent);
+}
+
+/* ── 상점 목록 ────────────────────────────────────────────────────────*/
+/* 🔴 **한 줄에 넷**이다(사용자 요청, 레퍼런스 "Explore Our Collection").
+   코치 카드는 오른쪽에 영상이 붙어 가로로 길어 둘씩이지만(위), 상품 카드는
+   세로로 서므로 넷이 들어간다. */
+.ss-shop-grid {
+  /* 🔴 **상자들만 살짝 위로 당긴다**(사용자 요청). 간판이 띠에 붙는 자리에서
+     아랫줄이 잘려서다 — 간판 위 여백도, 카드 크기도 건드리지 않고 여기만 줄인다.
+     32px 인 이유: 그 자리에서 아랫줄이 **32px 모자랐다**(900px 창, 실측). 간판과
+     상자 사이가 40px(굴림 칸의 틈 26 + 간판의 아래 여백 14)이라 그 안에서 뺀다.
+     ⚠️ 더 짧은 창에서는 이걸로도 다 안 들어온다 — 그건 **다음 자리로 한 걸음**
+     가면 되는 일이지 여기를 더 줄일 일이 아니다.
+     🔴 여기서 위 여백을 **더하지는** 않는다 — 간판(`.ss-shop-word`)이 제
+     `margin-block` 으로 위아래 똑같이 벌려 두므로, 더하면 간판이 사진 쪽으로
+     붙어 "사이 한가운데"가 깨진다.
+     🔴 `flex: none` 으로 못박는다: 세로 flex 항목은 자리가 빠듯하면 스스로
+     눌리며 조용히 잘린다(이 저장소에서 되풀이된 함정). */
+  flex: none;
+  margin-top: -32px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+/* 좁은 창에서는 둘로 접는다 — 넷을 그대로 두면 카드 폭이 브랜드 이름도 못 담는다.
+   판이 화면을 덮는 폭(위 `.ss-market-detail` 의 미디어 쿼리)과 같은 자리다. */
+@media (max-width: 900px) {
+  .ss-shop-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.ss-shop-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  /* 🔴 코치 카드(`.ss-coach-card`)와 **같은 세 값**을 쓴다 — 한 판 위의 카드
+     둘이 다른 색이면 따로 논다. 색을 하나하나 칠하지 않고 이 셋만 갈아 끼우면
+     글 · 테두리 · 단추가 한꺼번에 따라온다. */
+  --ss-surface: #e3dece;
+  --ss-fg: #000000;
+  --ss-accent: #33483c;
+  /* 🔴 **바닥 키.** 사진 자리(위)가 남는 자리를 다 먹는 구조라, 키를 안 박으면
+     카드가 글 높이로 쪼그라들어 사진 자리가 없어진다. 한 줄의 카드들은 격자가
+     서로 키를 맞춰 주므로 이 값은 **가장 짧은 카드의 바닥**이다.
+     ⚠️ 아랫줄이 잘린다고 해서 한때 230 까지 내렸다가 **되돌렸다**(사용자 지적 —
+     카드가 작아졌다). 짧은 창에서 두 줄이 한 화면에 다 안 들어오는 것은 카드를
+     깎아서 풀 일이 아니라 **다음 자리로 한 걸음 더 가면 되는 일**이다
+     (`ShopList` 의 걸음 목록 참고). */
+  min-height: 320px;
+  border: 1px solid var(--ss-accent);
+  /* 모서리는 직각이다 — 코치 카드와 같은 이유(초록 테두리와 한 덩어리로 읽힌다). */
+  border-radius: 0;
+  background-color: var(--ss-surface);
+  /* 링크라 클래스 없는 글이 생기면 판에서 물려받은 **흰색**이 내려온다 — 밝은
+     카드에서 사라지므로 여기서 한 번 못박는다(코치 카드와 같은 함정). */
+  color: var(--ss-fg);
+  text-align: left;
+}
+
+/* 사진이 들어올 자리. 지금은 브랜드 이름을 얹은 판이다.
+   🔴 **남는 자리를 다 차지한다**(`flex: 1`). 그래야 아래 글이 바닥에 붙고
+   둘 사이의 선이 **글 바로 위까지 내려온다**(사용자 요청). 전에는 이 판을
+   비율(4/3)로 못박아 두어서 선이 카드 한가운데에 떠 있었다.
+   ⚠️ 비율(`aspect-ratio`)과 flex 늘어나기를 **같이 쓰지 않는다** — 이 저장소에서
+   이미 겪었다(폭 상한에서 키가 역산되어 카드가 900px 넘게 길어졌다). 키는 카드의
+   `min-height` 가 정하고 이 판은 남는 만큼만 가져간다.
+   🔴 사진이 오면 같은 상자에 `<Image>` 만 넣으면 된다. */
+.ss-shop-card-plate {
+  flex: 1;
+  /* 브랜드는 **가운데 위**다(사용자 요청) — 판 한가운데에 두면 사진이 들어올
+     자리를 글이 차지한 것처럼 보인다. */
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  min-height: 0;
+  padding: 14px 10px;
+  border-bottom: 1px solid var(--ss-accent);
+  /* 🔴 **초록으로 칠하지 않는다.** `--ss-accent` 가 판 바탕과 같은 #33483c 라
+     초록으로 칠하면 판에 녹아 사라진다(테두리도 같은 초록이라 카드 윗부분이
+     통째로 없어 보였다 — 실제로 그렇게 나왔다). 카드 안은 판과 반대로 밝아야
+     한다는 규칙 그대로, 띠와 같은 종이색을 깔고 글자를 초록으로 뒤집는다.
+     아래 몸(`--ss-surface` #e3dece)보다 한 단 밝아 둘이 층으로 읽힌다. */
+  background-color: var(--ss-md-paper);
+  color: var(--ss-accent);
+  /* 간판(STORE)과 **같은 글꼴**이다 — 브랜드는 전부 라틴이라 Anton 이 맞는다.
+     🔴 굵기를 주지 않는다(Anton 은 400 하나뿐이라 가짜 굵게만 걸린다). */
+  font-family: var(--font-sign), var(--font-rubik), system-ui, sans-serif;
+  font-size: clamp(0.95rem, 1.4vw, 1.375rem);
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+/* 카드의 아랫줄 — **글은 왼쪽 아래, 단추는 오른쪽**이다(사용자 요청).
+   🔴 `flex: none` 으로 못박는다: 위 판이 남는 자리를 다 가져가므로, 이쪽이
+   눌릴 수 있게 두면 글이 조용히 잘린다(이 저장소에서 되풀이된 함정). */
+.ss-shop-card-body {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px 14px;
+}
+
+.ss-shop-card-text {
+  /* 🔴 **줄어들 수 있어야 한다.** flex 항목의 최소 폭은 기본이 "내용만큼"이라,
+     안 풀어 주면 상품 이름이 긴 카드에서 단추를 밖으로 밀어낸다. */
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ss-shop-card-text > b {
+  font-size: 1rem;
+  line-height: 1.35;
+  /* 🔴 **두 줄 자리를 늘 잡는다.** 이름 길이가 카드마다 달라서, 안 잡으면 이름이
+     두 줄인 카드만 아랫줄이 두꺼워지고 **한 줄에 놓인 카드들의 선이 서로 어긋난다**
+     (실제로 그렇게 나왔다 — "드라이핏 트레이닝 탑" 만 선이 위로 올라갔다).
+     짧은 이름 아래가 조금 비는 것보다 선이 한 줄로 서는 편이 낫다. */
+  min-height: 2.7em;
+}
+
+.ss-shop-card-desc {
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: color-mix(in srgb, var(--ss-fg) 62%, transparent);
+}
+
+/* 나가는 단추. 🔴 **줄어들지 않는다**(`flex: none`) — 안 박으면 이름이 긴
+   카드에서 단추가 눌려 글자가 한 자씩 접힌다. 글줄과 바닥을 맞춘다(위 `body` 의
+   `align-items: flex-end`). */
+.ss-shop-card-go {
+  flex: none;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--ss-accent);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  color: var(--ss-accent);
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+/* 가져다 대면 단추가 뒤집힌다 — 줄이 커지는 것(위)과 함께 "이게 눌린다"를 말한다. */
+.ss-shop-card:hover .ss-shop-card-go,
+.ss-shop-card:focus-visible .ss-shop-card-go {
+  background-color: var(--ss-accent);
+  color: var(--ss-surface);
+}
+
+
 /* ── 코치 상세 ────────────────────────────────────────────────────────*/
+/* 🔴 절과 절 사이의 선은 **판 끝까지** 가고 색도 **상아색**이다(사용자 요청).
+   머리 띠의 아랫선 · 머리글 아래 선과 같은 선이므로 같은 값(`--ss-md-paper`)을
+   읽는다 — 여기만 옅은 흰색으로 두면 한 화면에 선이 두 종류가 된다.
+
+   끝까지 가는 방법은 머리 띠와 같다: 굴림 칸의 여백을 음수 여백으로 걷어내고
+   같은 크기를 제 안쪽 여백으로 도로 넣는다(글 자리는 그대로).
+
+   🔴 **간판 절은 뺀다**(`:not(.ss-coach-analysis)`). 그 절은 제 테두리를 두른
+   둥근 상자라, 같이 늘리면 상자가 판 밖으로 삐져나간다. 그 절은 위 선도
+   제 테두리로 덮여 원래 안 보인다. */
+.ss-market-detail .ss-coach-sec:not(.ss-coach-analysis) {
+  margin-right: calc(var(--ss-md-pad-r) * -1);
+  margin-left: calc(var(--ss-md-pad-x) * -1);
+  padding-right: var(--ss-md-pad-r);
+  padding-left: var(--ss-md-pad-x);
+  border-top-color: var(--ss-md-paper);
+}
+
+/* 🔴 판 안에서는 강조색이 **상아색**이다(사용자 요청 — 글자도 상자 테두리도).
+   앱 민트(#70ed88)는 검은 화면에서 뜨라고 고른 색이라 이 짙은 초록 위에서는
+   저 혼자 형광으로 튄다. 머리 띠 · 카드 · 선이 전부 초록과 상아색 둘로만
+   되어 있어서, 여기만 제3의 색이 끼면 화면이 세 목소리로 읽힌다.
+
+   🔴 값을 하나하나 칠하지 않는다. 이 절 안의 강조는 전부 `--ss-accent` 에서
+   나오므로(간판 상자 테두리 · 바탕 6% · 호칭 알약 · 0:04 같은 시각 · ✓ 표)
+   **이 한 줄만 갈아 끼우면** 다 따라온다. 상아색은 띠와 같은 `--ss-md-paper` 다
+   (초록 위 8.97:1).
+   ⚠️ 카드(`.ss-coach-card`)와 머리 띠는 저마다 `--ss-accent` 를 제 값으로
+   덮고 있으므로 여기 영향을 받지 않는다 — 그쪽은 바탕이 밝아 반대로 초록이다. */
+.ss-market-detail .ss-coach-sec {
+  --ss-accent: var(--ss-md-paper);
+}
 .ss-coach-title {
   display: flex;
   flex-wrap: wrap;
@@ -5513,36 +6269,134 @@ body:has(.ss-market-entry) .ss-home-header {
   gap: 16px;
 }
 
+/* 🔴 글과 단추를 한 단씩 줄이고 위아래를 조인 자리다(사용자 요청). 한 판 안에
+   절이 다섯이라, 절마다 조금씩 헐렁하면 아래쪽 후기까지 한참 굴려야 닿는다. */
 .ss-coach-sec {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   border-top: 1px solid color-mix(in srgb, var(--ss-fg) 12%, transparent);
-  padding-top: 24px;
+  padding-top: 18px;
 }
 
 .ss-coach-sec h2 {
-  font-size: 1.0625rem;
+  font-size: 0.9375rem;
   font-weight: 600;
   color: var(--ss-fg);
 }
 
 .ss-coach-sec h3 {
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: color-mix(in srgb, var(--ss-fg) 60%, transparent);
 }
 
-/* 🔴 간판 절만 강조색 바탕을 깐다 — 차례가 곧 주장이다. */
+/* 🔴 간판 절만 강조색 바탕을 깐다 — 차례가 곧 주장이다.
+   🔴 이 절만 **가로**다: 왼쪽에 글, 오른쪽에 그 리포트를 만든 장면(사용자 요청).
+   다른 절들은 위 `.ss-coach-sec` 그대로 세로다. */
 .ss-coach-analysis {
-  border-radius: 18px;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 18px;
+  border-radius: 14px;
   border: 1px solid color-mix(in srgb, var(--ss-accent) 30%, transparent);
-  padding: 22px 22px 24px;
+  /* 위아래가 **같은 값**이다(사용자 요청). 아래만 2px 더 주던 것을 걷어냈다. */
+  padding: 16px 18px;
   background-color: color-mix(in srgb, var(--ss-accent) 6%, transparent);
 }
 
+/* 글 쪽. 원래 절이 갖고 있던 세로 짜임을 그대로 이어받는다. */
+.ss-coach-analysis-body {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 🔴 장면 자리. **폭만 정하고 높이는 글이 정한다**(늘어나기) — 영상의 원래
+   크기가 높이를 정하게 두면 세로 영상 하나에 절이 통째로 길어진다(목록 카드에서
+   이미 밟은 함정이라 여기서도 영상을 흐름 밖에 둔다).
+   🔴 **잘라 채우지 않는다**(`contain`) — 무슨 장면인지 읽혀야 위의 시각과 이어진다.
+   그래서 세로 영상에서는 양옆이 남는다. 남는 자리는 상자 바탕 그대로 둔다. */
+.ss-coach-analysis-clip {
+  position: relative;
+  width: 38%;
+  flex: none;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.ss-coach-analysis-clip video {
+  position: absolute;
+  display: block;
+  width: 100%;
+  height: 100%;
+  inset: 0;
+  object-fit: contain;
+}
+
+/* 🔴 넘기는 단추는 **영상 양옆 가운데에 얹는다**(사용자 요청) — 화살표 둘뿐이고
+   바탕도 테두리도 없다. 자리를 따로 차지하면 영상이 그만큼 좁아진다.
+
+   영상 위에 놓이므로 밝은 장면에서도 보여야 한다: 색은 종이색이고 그림자를
+   한 겹 깔아 흰 하늘 위에서도 윤곽이 남는다. */
+.ss-coach-clip-nav {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  display: flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--ss-md-paper, #ebe7db);
+  filter: drop-shadow(0 1px 3px rgb(0 0 0 / 55%));
+  cursor: pointer;
+  opacity: 0.85;
+  transform: translateY(-50%);
+  transition: opacity 160ms ease;
+}
+
+.ss-coach-clip-nav:hover,
+.ss-coach-clip-nav:focus-visible {
+  opacity: 1;
+}
+
+.ss-coach-clip-nav[data-side='prev'] {
+  left: 2px;
+}
+
+.ss-coach-clip-nav[data-side='next'] {
+  right: 2px;
+}
+
+.ss-coach-clip-nav .material-symbols-outlined {
+  font-size: 26px;
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 300,
+    'GRAD' 0,
+    'opsz' 24;
+}
+
+/* 좁은 창에서는 옆에 둘 자리가 없다 — 글 아래로 내리고 가로로 눕힌다. */
+@media (max-width: 720px) {
+  .ss-coach-analysis {
+    flex-direction: column;
+  }
+
+  .ss-coach-analysis-clip {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+  }
+}
+
 .ss-coach-analysis-why {
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   color: color-mix(in srgb, var(--ss-fg) 60%, transparent);
 }
 
@@ -5552,8 +6406,8 @@ body:has(.ss-market-entry) .ss-home-header {
 }
 
 .ss-coach-summary {
-  font-size: 0.9375rem;
-  line-height: 1.75;
+  font-size: 0.875rem;
+  line-height: 1.65;
   color: var(--ss-fg);
 }
 
@@ -5574,8 +6428,8 @@ body:has(.ss-market-entry) .ss-home-header {
 .ss-coach-verified li {
   border: 1px solid color-mix(in srgb, var(--ss-fg) 25%, transparent);
   border-radius: 999px;
-  padding: 4px 12px;
-  font-size: 0.8125rem;
+  padding: 3px 10px;
+  font-size: 0.75rem;
   color: color-mix(in srgb, var(--ss-fg) 78%, transparent);
 }
 
@@ -5635,15 +6489,17 @@ body:has(.ss-market-entry) .ss-home-header {
 .ss-apply-send,
 .ss-apply-close {
   display: inline-flex;
-  height: calc(var(--ss-btn-h) - 10px);
+  /* 🔴 전역 `--ss-btn-h`(54px, 앱의 `_kButtonHeight`)는 **건드리지 않는다** —
+     다른 화면이 쓴다. 여기서 빼는 값만 키워 이 셋만 작아진다(사용자 요청). */
+  height: calc(var(--ss-btn-h) - 18px);
   flex: none;
   align-items: center;
   justify-content: center;
   border: 1px solid color-mix(in srgb, var(--ss-accent) 70%, transparent);
   border-radius: var(--ss-btn-r);
-  padding: 0 22px;
+  padding: 0 18px;
   background-color: color-mix(in srgb, var(--ss-accent) 18%, transparent);
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--ss-accent);
   cursor: pointer;
@@ -5688,8 +6544,24 @@ body:has(.ss-market-entry) .ss-home-header {
   grid-template-rows: 0fr;
   transition:
     grid-template-rows 360ms cubic-bezier(0.25, 0.6, 0.3, 1),
+    /* 접혀 있을 때 당겨 두는 여백(아래 주석)도 높이와 **같은 시간**으로 푼다 —
+       안 그러면 펴는 순간 아래 것들이 한 번 툭 뛴다. */ margin-top 360ms
+      cubic-bezier(0.25, 0.6, 0.3, 1),
     opacity 200ms ease;
   opacity: 0;
+}
+
+/* 🔴 접혀 있는 동안에는 세로 칸의 틈이 **두 번** 들어간다 — 머리글↔신청서,
+   신청서↔간판 절. 신청서는 키가 0이라 눈에는 틈 하나가 두 배로 보인다
+   (사용자 지적: 간판 상자 위가 아래보다 넓다). 접혀 있을 때만 한 번을 도로
+   당긴다. 🔴 두 자리의 틈 값이 다르므로(판 26px · 제 주소 화면 28px) 각각 적는다
+   — 한 값으로 묶으면 한쪽이 어긋난다. */
+.ss-market-detail .ss-apply-drawer:not([data-open='true']) {
+  margin-top: -26px;
+}
+
+.ss-market .ss-apply-drawer:not([data-open='true']) {
+  margin-top: -28px;
 }
 
 .ss-apply-drawer[data-open='true'] {
@@ -5710,7 +6582,26 @@ body:has(.ss-market-entry) .ss-home-header {
   }
 }
 
+/* 🔴 신청서는 **종이 위에 쓴다**(사용자 요청) — 초록 위에 초록을 5% 얹던 것을
+   머리 띠와 같은 종이색으로 바꿨다. 적는 자리는 화면의 일부가 아니라 한 장의
+   종이로 보이는 편이 무엇을 하는 자리인지 바로 읽힌다.
+
+   🔴 카드와 **같은 방식**으로 뒤집는다 — 색을 하나하나 칠하지 않고 이 네 줄만
+   갈아 끼우면 글 · 테두리 · 입력칸 · 체크상자 · 단추가 전부 따라온다(다 `--ss-fg`
+   와 `--ss-accent` 에서 나온다). 안 뒤집으면 흰 글씨가 종이 위에서 사라진다.
+
+   🔴 `color-scheme: light` 가 꼭 있어야 한다. 희망 날짜가 `<input type="date">`
+   라 **달력 아이콘과 펼쳐지는 달력을 브라우저가 직접 그린다** — 어두운 모드로
+   두면 밝은 종이 위에 어두운 달력이 뜨고 아이콘이 안 보인다.
+
+   `--ss-md-paper` 는 판(`.ss-market-detail`)이 들고 있는 값이라, 판 밖(제 주소로
+   여는 화면)에서는 같은 값을 대비로 적어 둔다. */
 .ss-apply {
+  --ss-surface: var(--ss-md-paper, #ebe7db);
+  --ss-fg: #000000;
+  --ss-glass-border: rgba(0, 0, 0, 0.14);
+  --ss-accent: #33483c;
+  color-scheme: light;
   display: flex;
   width: min(420px, 100%);
   flex-direction: column;
@@ -5718,7 +6609,8 @@ body:has(.ss-market-entry) .ss-home-header {
   border: 1px solid var(--ss-glass-border);
   border-radius: 16px;
   padding: 20px;
-  background-color: color-mix(in srgb, var(--ss-fg) 5%, transparent);
+  background-color: var(--ss-surface);
+  color: var(--ss-fg);
 }
 
 .ss-apply fieldset {
@@ -5793,7 +6685,14 @@ body:has(.ss-market-entry) .ss-home-header {
   gap: 8px;
 }
 
+/* 보낸 뒤의 알림도 **같은 종이 위**다 — 신청서가 있던 자리에 그대로 들어서므로
+   둘의 바탕이 다르면 종이가 한 번 갈린 것으로 보인다. 초록기는 종이색에 8%만
+   섞어 남긴다(투명이 아니라 종이색에 섞는다 — 투명으로 두면 뒤의 초록 판이
+   비쳐 종이가 아니게 된다). */
 .ss-apply-done {
+  --ss-surface: var(--ss-md-paper, #ebe7db);
+  --ss-fg: #000000;
+  --ss-accent: #33483c;
   display: flex;
   width: min(420px, 100%);
   flex-direction: column;
@@ -5801,8 +6700,9 @@ body:has(.ss-market-entry) .ss-home-header {
   border: 1px solid color-mix(in srgb, var(--ss-accent) 40%, transparent);
   border-radius: 16px;
   padding: 18px 20px;
-  background-color: color-mix(in srgb, var(--ss-accent) 8%, transparent);
+  background-color: color-mix(in srgb, var(--ss-accent) 8%, var(--ss-surface));
   font-size: 0.875rem;
+  color: var(--ss-fg);
 }
 
 .ss-apply-done b {
@@ -6012,6 +6912,33 @@ body:has(.ss-home-stage) {
   z-index: 2;
 }
 
+/* 🔴 다음 영상은 **왼쪽에서 오른쪽으로 들어온다**(사용자 요청). 들어오는 칸만
+   움직이고 나가는 칸은 제자리에서 흐려진다 — 둘 다 움직이면 화면을 가로지르는
+   행렬이 되어, 예전에 걷어낸 그 모습으로 돌아간다(위 주석).
+
+   🔴 **짧게** 들어온다(7%). 화면을 가로질러 오게 하면 "옆 칸이 지나가는 것은
+   안 보여야 한다"는 앞선 요청과 부딪힌다 — 들어오는 방향만 읽히면 된다.
+
+   🔴 `data-here` 는 넘길 때마다 **다른 요소**로 옮겨 가므로, 새로 붙은 칸에서
+   애니메이션이 늘 처음부터 돈다(같은 요소에 같은 이름을 다시 걸면 안 도는 함정을
+   여기서는 안 밟는다).
+   🔴 불투명도는 건드리지 않는다 — 그건 위 규칙의 전환이 맡는다. 애니메이션이
+   잡은 속성은 전환이 못 이기므로 둘이 같은 속성을 쥐면 흐리기가 통째로 죽는다. */
+@media (prefers-reduced-motion: no-preference) {
+  .ss-feed-frame[data-here='true'] {
+    animation: ss-feed-slide-in 520ms var(--ss-home-out-ease) both;
+  }
+}
+
+@keyframes ss-feed-slide-in {
+  from {
+    transform: translateX(-7%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
 /* 🔴 쉬는 칸은 **같은 자리에서 안 보이게만** 한다. 흐려지는 동안(420ms)은 보이고
    다 흐려진 뒤에 자리를 뜬다 — `visibility` 는 중간값이 없어 지연만 준다. */
 .ss-feed-frame:not([data-here='true']) {
@@ -6068,9 +6995,9 @@ body:has(.ss-home-stage) {
 .ss-feed-list {
   position: absolute;
   z-index: 4;
-  /* 🔴 자리는 **`HomeFeed` 가 잰다** — 가로는 지금 영상의 오른쪽 끝 옆, 세로는
-     그 영상의 한가운데다(사용자 요청). 영상마다 폭도 키도 달라 CSS 로는 못 잡는다.
-     제 키의 절반만큼 올려서 **가운데 줄**이 그 자리에 오게 한다. */
+  /* 🔴 자리는 **`HomeFeed` 가 잰다** — 가로는 늘 화면 오른쪽 끝, 세로는 지금
+     영상의 한가운데다(사용자 요청). 목록 폭도 영상 키도 창마다 달라 CSS 로는
+     못 잡는다. 제 키의 절반만큼 올려서 **가운데 줄**이 그 자리에 오게 한다. */
   top: var(--ss-feed-list-y, 50%);
   left: var(--ss-feed-list-x, 50%);
   display: flex;
@@ -6080,16 +7007,23 @@ body:has(.ss-home-stage) {
      때마다 자리를 새로 잡느라 한 번 튄다. */
   opacity: 0;
   pointer-events: none;
-  transform: translateY(-50%) translateX(24px);
+  transform: translateY(-50%) translateX(32px);
   transition:
     opacity 320ms ease,
     transform 520ms var(--ss-home-out-ease);
 }
 
+/* 🔴 **영상이 먼저 비켜서고 그 다음에 목록이 나온다**(사용자 요청). 같이 시작하면
+   가로 영상에서 목록이 아직 제자리에 있는 영상 위로 겹쳐 들어온다.
+   기다리는 시간은 `HomeFeed` 가 준다 — **비켜설 것이 없으면(세로 영상) 0** 이다.
+   안 그러면 아무 일도 안 일어나는 동안 목록만 늦게 나온다.
+   ⚠️ 닫을 때는 기다리지 않는다(이 규칙은 열렸을 때만 걸린다) — 닫는 것은 영상이
+   제자리로 돌아오는 것과 같이 일어나도 겹칠 것이 없다. */
 .ss-feed-list[data-open='true'] {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(-50%);
+  transition-delay: var(--ss-feed-list-delay, 0ms);
 }
 
 
@@ -6142,10 +7076,25 @@ body:has(.ss-home-stage) {
   background-color: color-mix(in srgb, var(--ss-fg) 10%, transparent);
 }
 
-/* 지금 보는 것 — 누를 수 없고, 그 사실이 보여야 한다. */
+/* 🔴 **고른 것만 밝다**(사용자 요청) — 지금 보는 줄이 환하고 나머지는 어둡다.
+
+   ⚠️ 전에는 **반대**였다: 지금 보는 줄을 흐리게 해서 "여긴 이미 와 있다"를
+   말했다. 되돌리지 말 것 — 목록에서 눈이 먼저 가야 하는 것은 **지금 보는 것**이다.
+   누를 수 없다는 것은 커서로만 말한다. */
 .ss-feed-list button:disabled {
   cursor: default;
+}
+
+.ss-feed-list button:not([data-here='true']) {
   opacity: 0.45;
+  transition:
+    background-color 160ms ease,
+    opacity 160ms ease;
+}
+
+/* 가져다 대면 밝아진다 — 어두운 줄도 누를 수 있다는 것을 그때 말한다. */
+.ss-feed-list button:not([data-here='true']):hover {
+  opacity: 1;
 }
 
 .ss-feed-list video {
@@ -6155,6 +7104,144 @@ body:has(.ss-home-stage) {
   border-radius: 6px;
   background-color: #000000;
   object-fit: cover;
+}
+
+/* ── 댓글창 ───────────────────────────────────────────────────────────
+   🔴 목록과 **같은 자리**를 쓴다(사용자 요청) — 한 번에 하나만 뜬다. 자리(가로 ·
+   세로)와 기다리는 시간은 `HomeFeed` 가 같은 변수로 준다.
+   🔴 목록보다 **넓다.** 글 여러 줄이 들어오는 자리라 미리보기 목록 폭으로는
+   한 문장이 서너 줄로 접힌다. 그래서 가로 영상은 이만큼 더 비켜서야 하고,
+   `HomeFeed` 의 `measure` 가 **나올 판을 재는** 이유가 이것이다.
+
+   🔴 그렇다고 **마음대로 넓힐 수는 없다.** 영상은 "왼쪽으로 비켜설 뿐 화면 밖으로
+   안 나간다"는 규칙이 있어(사용자 요청) 비켜설 수 있는 거리가 정해져 있는데,
+   판이 그보다 넓으면 **모자란 만큼 영상 위로 겹친다**(360px 으로 뒀다가 32px 이
+   겹쳤다 — 실측). 넓은 16:9 영상이 비켜설 수 있는 만큼 안에서 잡는다. */
+.ss-feed {
+  --ss-feed-comments-w: clamp(230px, 19vw, 290px);
+}
+
+.ss-feed-comments {
+  position: absolute;
+  z-index: 4;
+  top: var(--ss-feed-list-y, 50%);
+  left: var(--ss-feed-list-x, 50%);
+  display: flex;
+  width: var(--ss-feed-comments-w);
+  max-height: min(70vh, 620px);
+  flex-direction: column;
+  gap: 12px;
+  /* 닫혀 있을 때는 목록과 같이 **오른쪽 밖**에서 기다린다. */
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) translateX(32px);
+  transition:
+    opacity 320ms ease,
+    transform 520ms var(--ss-home-out-ease);
+}
+
+.ss-feed-comments[data-open='true'] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(-50%);
+  /* 🔴 자리가 빈 뒤에 나온다 — 영상이 비켜서고, 목록이 나가고 나서다. */
+  transition-delay: var(--ss-feed-list-delay, 0ms);
+}
+
+.ss-feed-comments-head {
+  flex: none;
+  font-size: 0.8125rem;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--ss-fg) 55%, transparent);
+}
+
+.ss-feed-comments-head b {
+  color: var(--ss-fg);
+}
+
+/* 목록과 같은 굴림 규칙 — 막대는 감추고 위아래 끝은 흐린다. */
+/* 🔴 **댓글 사이는 넓게, 이름과 본문 사이는 좁게**(사용자 지적 — 어디까지가
+   한 댓글인지 헷갈렸다). 선을 긋지 않고 간격만으로 가른다: 이 판은 "테두리도
+   바탕도 없이 글만" 이 규칙이라(목록과 같다) 선이 들어오면 그 결이 깨진다.
+   두 간격의 차이가 충분히 커야 묶음이 읽힌다 — 14 대 3 은 모자랐다. */
+.ss-feed-comments ul {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 22px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.ss-feed-comments ul::-webkit-scrollbar {
+  display: none;
+}
+
+.ss-feed-comments li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+}
+
+.ss-feed-comments li b {
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--ss-fg) 62%, transparent);
+}
+
+.ss-feed-comments li span {
+  color: var(--ss-fg);
+}
+
+/* 내가 방금 쓴 것 — 남의 것과 구분이 되어야 "붙었다"가 읽힌다. */
+.ss-feed-comments li[data-mine='true'] b {
+  color: var(--ss-accent);
+}
+
+.ss-feed-comments-write {
+  display: flex;
+  flex: none;
+  align-items: center;
+  border-top: 1px solid color-mix(in srgb, var(--ss-fg) 14%, transparent);
+  padding-top: 10px;
+  gap: 8px;
+}
+
+.ss-feed-comments-write label {
+  flex: 1;
+  min-width: 0;
+}
+
+.ss-feed-comments-write input {
+  width: 100%;
+  border: 0;
+  background: none;
+  color: var(--ss-fg);
+  font-size: 0.8125rem;
+}
+
+.ss-feed-comments-write input::placeholder {
+  color: color-mix(in srgb, var(--ss-fg) 40%, transparent);
+}
+
+.ss-feed-comments-write button {
+  display: flex;
+  flex: none;
+  border: 0;
+  padding: 4px;
+  background: none;
+  color: var(--ss-accent);
+  cursor: pointer;
+}
+
+.ss-feed-comments-write button:disabled {
+  color: color-mix(in srgb, var(--ss-fg) 30%, transparent);
+  cursor: default;
+}
+
+.ss-feed-comments-write .material-symbols-outlined {
+  font-size: 20px;
 }
 
 .ss-feed-list span {

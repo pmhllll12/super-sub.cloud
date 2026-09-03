@@ -1,0 +1,22 @@
+# 5분마다 유휴 판정을 돌린다.
+#
+#   sudo systemctl enable --now supersub-autostop.timer
+#   systemctl list-timers supersub-autostop.timer     # 다음 실행 시각
+#   journalctl -u supersub-autostop -n 30 --no-pager  # 판정 기록
+#
+# 잠시 꺼 두려면 타이머를 멈추기보다 **보류 파일**을 쓴다 — 타이머를 멈추면
+# 다시 켜는 것을 잊는다. 보류는 만료가 있다:  sudo supersub-hold 4h
+
+[Unit]
+Description=Super-Sub 유휴 자동 종료 타이머
+
+[Timer]
+# 부팅 3분 뒤 첫 판정. 기동 직후엔 아직 아무것도 안 돌고 있어서 바로 판정하면
+# 유휴로 잡힌다 — 어차피 IDLE_MINUTES 를 채워야 꺼지지만, 로그가 지저분해진다.
+OnBootSec=3min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Persistent=false
+
+[Install]
+WantedBy=timers.target

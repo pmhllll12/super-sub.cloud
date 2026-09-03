@@ -186,6 +186,101 @@ def test_load_skips_a_truncated_line(tmp_path):
     assert [r["analysis_id"] for r in obs.load(sink)] == ["ok"]
 
 
+# ── E-2. sink 우회는 흔적을 남긴다 (미결 12번) ──────────────────────────────
+
+def test_resolve_sink_reports_why_not_just_where(tmp_path, monkeypatch):
+    """경로만으로는 우회 여부를 알 수 없다 — 출처를 함께 돌려준다."""
+    monkeypatch.delenv("SUPERSUB_METRICS_SINK", raising=False)
+    assert obs.resolve_sink() == (obs.DEFAULT_SINK, "default")
+
+    monkeypatch.setenv("SUPERSUB_METRICS_SINK", str(tmp_path / "env.jsonl"))
+    assert obs.resolve_sink() == (tmp_path / "env.jsonl", "env")
+
+    # 인자가 환경변수를 이긴다
+    assert obs.resolve_sink(tmp_path / "arg.jsonl") == (tmp_path / "arg.jsonl", "argument")
+
+
+def test_env_override_leaves_a_breadcrumb_at_the_default_location(tmp_path, monkeypatch):
+    """우회하면 **기본 위치에** 흔적이 남는다 — "0건"을 되짚을 단서다.
+
+    2026-08-31: 개발용으로 sink를 /tmp에 돌려 둔 채 프로덕션 경로로 3건이
+    돌았는데, 나중에 환경변수 없이 읽고 "서비스 분석 0건"으로 결론지었다.
+    """
+    monkeypatch.setenv("SUPERSUB_METRICS_SINK", str(tmp_path / "elsewhere.jsonl"))
+
+    obs.record(obs.build_record(source_fps=30, sampled_fps=30, eligible_counts=[1]))
+
+    marks = obs.load_redirects()
+    assert len(marks) == 1
+    assert marks[0]["sink"] == str(tmp_path / "elsewhere.jsonl")
+    assert marks[0]["origin"] == "env"
+
+
+def test_default_sink_leaves_no_breadcrumb(tmp_path, monkeypatch):
+    """우회가 아니면 흔적을 남기지 않는다 — 흔해지면 신호가 아니게 된다."""
+    monkeypatch.delenv("SUPERSUB_METRICS_SINK", raising=False)
+    monkeypatch.setattr(obs, "DEFAULT_SINK", tmp_path / "default.jsonl")
+
+    obs.record(obs.build_record(source_fps=30, sampled_fps=30, eligible_counts=[1]))
+
+    assert obs.load_redirects() == []
+
+
+def test_explicit_sink_argument_leaves_no_breadcrumb(tmp_path, monkeypatch):
+    """명시적 인자는 흔적을 남기지 않는다 — 호출부 코드에 그대로 보인다.
+
+    되짚을 수 없어서 사고가 난 것은 **환경변수** 쪽이다. 인자까지 남기면
+    테스트·도구가 부를 때마다 쌓여 신호가 죽는다.
+    """
+    monkeypatch.delenv("SUPERSUB_METRICS_SINK", raising=False)
+
+    obs.record(obs.build_record(source_fps=30, sampled_fps=30, eligible_counts=[1]),
+               tmp_path / "explicit.jsonl")
+
+    assert obs.load_redirects() == []
+
+
+def test_breadcrumb_is_written_once_per_process(tmp_path, monkeypatch):
+    """분석마다가 아니라 프로세스당 한 번이다 — 실패 경고와 같은 규약."""
+    monkeypatch.setenv("SUPERSUB_METRICS_SINK", str(tmp_path / "e.jsonl"))
+
+    for _ in range(5):
+        obs.record(obs.build_record(source_fps=30, sampled_fps=30, eligible_counts=[1]))
+
+    assert len(obs.load_redirects()) == 1
+
+
+def test_breadcrumb_does_not_pollute_the_metrics_jsonl(tmp_path, monkeypatch):
+    """흔적은 **별도 파일**이다.
+
+    관측 레코드는 "그대로 한 행으로 INSERT할 수 있는 평면 구조"여야 한다
+    (모듈 설명). 표식을 같은 파일에 섞으면 그 계약이 깨진다.
+    """
+    sink = tmp_path / "m.jsonl"
+    monkeypatch.setenv("SUPERSUB_METRICS_SINK", str(sink))
+
+    obs.record(obs.build_record(source_fps=30, sampled_fps=30, eligible_counts=[1]))
+
+    got = obs.load(sink)
+    assert len(got) == 1
+    assert "analysis_id" in got[0]
+    assert all("sink" not in r for r in got), "표식이 레코드에 섞이면 안 된다"
+
+
+def test_breadcrumb_failure_does_not_break_recording(tmp_path, monkeypatch):
+    """흔적을 못 남겨도 관측 자체는 계속된다 — 최선 노력이다."""
+    blocked = tmp_path / "file.txt"
+    blocked.write_text("not a directory")
+    monkeypatch.setattr(obs, "REDIRECT_LOG", blocked / "nested" / "r.jsonl")
+    sink = tmp_path / "m.jsonl"
+    monkeypatch.setenv("SUPERSUB_METRICS_SINK", str(sink))
+
+    path = obs.record(obs.build_record(source_fps=30, sampled_fps=30, eligible_counts=[1]))
+
+    assert path == sink
+    assert len(obs.load(sink)) == 1
+
+
 def test_aggregate_separates_clip_and_frame_units(tmp_path):
     recs = [
         obs.build_record(source_fps=30, sampled_fps=15, eligible_counts=[1, 1, 1, 1]),

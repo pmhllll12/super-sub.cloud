@@ -10,7 +10,7 @@ det=RTDetrForObjectDetection.from_pretrained(P.PERSON_DETECTOR).to(dev).eval()
 ps_=sorted(Path("/home/ho/projects/super-sub.cloud/agent/data/goldenset/soccerkicks_video").glob("*.avi"))[:8]
 tot=[]
 for p in ps_:
-    frames,src,sf=P.read_frames(str(p),target_fps=15)
+    frames,src,sf=P.read_frames(str(p),target_fps=P.DEFAULT_TARGET_FPS)
     cnt=[];agree=[]
     for fr in frames:
         rgb=cv2.cvtColor(fr,cv2.COLOR_BGR2RGB)

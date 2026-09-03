@@ -207,13 +207,38 @@ export default function CoachList({
             {/* 🔴 **거른 결과를 숫자로.** 접힌 단추만 있으면 방금 고른 것이
                 목록을 좁혔는지가 목록을 세어 봐야 안다. */}
             <span className="ss-filterbar-count">
-              코치 <b>{shown.length}</b>
-              {filtered ? <em> / {coaches.length}</em> : null}
+              검색된 코치 <b>{shown.length}</b>명
+              {filtered ? <em> / 전체 {coaches.length}명</em> : null}
             </span>
             <SortSelect value={sort} options={[...COACH_SORTS]} onChange={setSort} />
           </>
         }
       />
+
+      {/* 🔴 거름망 줄과 목록 **사이**다 — 선 아래 초록 자리의 머리다. 위(띠)에
+          두면 간판과 둘이 겹쳐 읽힌다.
+
+          🔴 **판 안에서만** 낸다(`onPick` 이 있으면 판이다). 목록 화면
+          (`/market/coaches`)은 제 머리글에 이미 같은 말이 있어서, 거기까지 내면
+          한 화면에 같은 문장이 두 번 나온다. */}
+      {onPick ? (
+        <div className="ss-coach-lead">
+          <span className="ss-coach-list-mark" aria-hidden="true">
+            <span className="material-symbols-outlined">sports</span>
+          </span>
+          {/* 🔴 이 화면의 **주장**이다 — 다른 곳은 코치가 자기 실력을 자기소개로
+              쓰지만 우리는 같은 잣대로 잰 것을 보여준다. 판에는 간판(FIND YOUR
+              COACH)뿐이라 이 말이 없으면 목록이 그냥 코치 목록으로 읽힌다.
+              ⚠️ 여기 적은 셋(영상 · 리포트 · 후기)은 **카드와 상세에 실제로 있는
+              것**이다(`.ss-coach-card-clip` · `.ss-coach-card-analysis` ·
+              `.ss-coach-reviews`). 셋 중 하나를 화면에서 빼면 이 문장도 고칠 것. */}
+          <p>
+            코치도 수강생과 <b>같은 분석</b>을 받습니다.
+            <br />
+            상세한 코치의 영상, 리포트, 후기를 보고 자유롭게 고르세요.
+          </p>
+        </div>
+      ) : null}
 
       {shown.length === 0 ? (
         <p className="ss-market-empty">조건에 맞는 코치가 아직 없습니다.</p>

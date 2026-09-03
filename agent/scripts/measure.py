@@ -25,7 +25,7 @@ from supersub_agent.features import (  # noqa: E402
     check_quality,
     extract_features,
 )
-from supersub_agent.pose import extract_keypoints  # noqa: E402
+from supersub_agent.pose import DEFAULT_TARGET_FPS, extract_keypoints  # noqa: E402
 
 
 def main() -> None:
@@ -42,7 +42,7 @@ def main() -> None:
         help="스윙 측(던지는 팔·차는 발). 자동 판별은 팔 종목에서 약하다 "
              "— identify_limb 참고",
     )
-    ap.add_argument("--fps", type=int, default=15)
+    ap.add_argument("--fps", type=int, default=DEFAULT_TARGET_FPS)
     args = ap.parse_args()
 
     # observe=False — 측정용 CLI는 서비스 입력이 아니다 (analyze.py와 같은 이유).

@@ -124,6 +124,19 @@ const SPORTS = [
 type SportKey = (typeof SPORTS)[number]['key']
 
 /**
+ * 화면의 종목 키를 백엔드 `sport_code` 로 바꾼다. 화면은 `soccer`, 백엔드
+ * `sport` 테이블은 `football` 이다 — 이름이 갈려 있다는 것은 미결 항목에도
+ * 올라와 있다(패킷 A 13번). 백엔드가 정본(`sport` 의 기본키라 외래키가
+ * 걸린다)이라 여기 **경계에서만** 맞춘다. 화면 쪽 키를 통째로 바꾸는 것은
+ * 더 큰 결정이라 하지 않는다.
+ */
+const SPORT_CODE: Record<SportKey, string> = {
+  soccer: 'football',
+  baseball: 'baseball',
+  basketball: 'basketball',
+}
+
+/**
  * 분석 대상(선수)을 묶은 네모. 0~1 정규화 좌표다.
  *
  * 🔴 **누구를 볼지 사람이 정한다.** 검출기는 사람을 여럿 찾아내고(`pose.py` 의
@@ -298,6 +311,17 @@ export default function AnalysisStage() {
    */
   const [closing, setClosing] = useState(false)
   const [file, setFile] = useState<{ name: string; url: string } | null>(null)
+  /**
+   * `file` 은 미리보기용 object URL 만 쥔다 — 저장(서버 업로드)에는 원본 바이트가
+   * 필요해서 고른 `File` 을 따로 ref 로 둔다. state 로 두지 않는 이유: 리렌더를
+   * 일으킬 값이 아니고, `pick()` 과 `저장` 클릭 사이에서만 읽힌다.
+   */
+  const pickedFileRef = useRef<File | null>(null)
+  /** 저장(서버 업로드) 진행 상태 — 미결 「분석한 영상을 우리 서버에 저장하는 경로」(paik-1). */
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'rejected' | 'error'>(
+    'idle',
+  )
+  const [saveMessage, setSaveMessage] = useState<string | null>(null)
   /**
    * 고른 종목. **기본값을 두지 않는다** — 위 SPORTS 주석 참고.
    *
@@ -741,6 +765,9 @@ export default function AnalysisStage() {
   /** 영상을 고른다 — 아직 시작은 아니다. 판 안에서 먼저 보여 준다. */
   function pick(picked: File | undefined) {
     if (!picked) return
+    pickedFileRef.current = picked
+    setSaveState('idle')
+    setSaveMessage(null)
     setFile({ name: picked.name, url: URL.createObjectURL(picked) })
   }
 
@@ -880,6 +907,9 @@ export default function AnalysisStage() {
       setStarted(false)
       setClosing(false)
       setFile(null)
+      pickedFileRef.current = null
+      setSaveState('idle')
+      setSaveMessage(null)
       setSubject(null)
       targetRef.current = null
       shownRef.current = null
@@ -891,6 +921,65 @@ export default function AnalysisStage() {
       setDone(false)
       if (inputRef.current) inputRef.current.value = ''
     }, SHRINK_MS)
+  }
+
+  /**
+   * 영상을 우리 서버(EC2)에 올린다 — 미결 「분석한 영상을 우리 서버에 저장하는
+   * 경로」(paik-1). 계약 3-6절의 클립 업로드 경로(jin-12)를 그대로 쓴다:
+   * 화면의 가짜 리포트는 여기서 같이 저장하지 않는다 — 그 저장 형식은 아직
+   * 계약에 없다(담당 정어진). 영상을 올리면 **서버가 진짜로** 분석한다.
+   *
+   * 🔴 원본은 앱 서버를 지나지 않는다(PER-002) — 두 번째 단계는 브라우저가
+   * S3 사전 서명 URL에 직접 PUT 한다.
+   */
+  async function saveToServer() {
+    const picked = pickedFileRef.current
+    const video = previewRef.current
+    if (!picked || !sport || saveState === 'saving') return
+
+    setSaveState('saving')
+    setSaveMessage(null)
+    try {
+      const upload = await fetch('/api/videos/upload-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content_type: picked.type, size_bytes: picked.size }),
+      })
+      const uploadBody = await upload.json()
+      if (!upload.ok) throw new Error(uploadBody?.error?.message ?? '업로드 자리를 못 받았습니다.')
+      const { storage_key, upload_url } = uploadBody as { storage_key: string; upload_url: string }
+
+      const put = await fetch(upload_url, {
+        method: 'PUT',
+        headers: { 'Content-Type': picked.type },
+        body: picked,
+      })
+      if (!put.ok) throw new Error('S3 업로드가 실패했습니다.')
+
+      const register = await fetch('/api/videos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sport_code: SPORT_CODE[sport],
+          storage_key,
+          duration_ms: Math.round((duration || 0) * 1000),
+          width: video?.videoWidth ?? 0,
+          height: video?.videoHeight ?? 0,
+        }),
+      })
+      const registerBody = await register.json()
+      if (!register.ok) throw new Error(registerBody?.error?.message ?? '등록에 실패했습니다.')
+
+      if (registerBody.passed) {
+        setSaveState('saved')
+      } else {
+        setSaveState('rejected')
+        setSaveMessage(registerBody.reject_reason ?? '규격에 맞지 않아 반려됐습니다.')
+      }
+    } catch (e) {
+      setSaveState('error')
+      setSaveMessage(e instanceof Error ? e.message : '저장하지 못했습니다.')
+    }
   }
 
   return (
@@ -1299,10 +1388,42 @@ export default function AnalysisStage() {
       <aside className="ss-shot-side" aria-label="리포트와 대화">
         <header className="ss-shot-side-head">
           <h2>{done ? '리포트' : subject ? '보고 있습니다' : '분석할 사람'}</h2>
-          <button type="button" className="ss-shot-again" onClick={reset}>
-            다른 영상
+          {/* 🔴 **리포트가 다 나온 뒤에만 눌린다**(사용자 요청) — 저장하는 것이
+              분석 결과까지 포함한 한 벌이라, 아직 도는 중에 누르면 무엇이 저장된
+              것인지 알 수 없다.
+
+              **미결 「분석한 영상을 우리 서버에 저장하는 경로」(paik-1) 해소** —
+              계약 3-6절 클립 업로드 경로(jin-12)로 영상을 올린다(`saveToServer`).
+              이 화면의 가짜 리포트는 같이 안 보낸다 — 그 저장 형식은 아직
+              계약에 없다. 올라간 영상은 **서버가 진짜로** 분석한다.
+
+              ⚠️ 이 자리에 있던 **'다른 영상'** 은 없앴다(사용자 요청). 고르기 전으로
+              되돌리는 길은 창 틀의 **닫기 점**(`영상 닫기`)에 그대로 있다 —
+              길이 하나 없어진 것이 아니라 자리를 옮긴 것이다. */}
+          <button
+            type="button"
+            className="ss-shot-again"
+            disabled={!done || saveState === 'saving'}
+            onClick={saveToServer}
+          >
+            {saveState === 'saving'
+              ? '올리는 중…'
+              : saveState === 'saved'
+                ? '저장됨'
+                : saveState === 'rejected'
+                  ? '반려됨'
+                  : saveState === 'error'
+                    ? '다시 시도'
+                    : '저장'}
           </button>
         </header>
+
+        {/* 반려·오류 사유 — 성공(saved)은 버튼 글자로 충분해 따로 안 그린다. */}
+        {saveMessage && (saveState === 'rejected' || saveState === 'error') && (
+          <p className="ss-shot-save-msg" data-tone={saveState}>
+            {saveMessage}
+          </p>
+        )}
 
         {/* 시작을 누르기 전에는 단계도 리포트도 그리지 않는다 — 판이 화면
             밖에 있더라도 아무 일도 없는 진행 표시가 DOM 에 남으면 안 된다.
