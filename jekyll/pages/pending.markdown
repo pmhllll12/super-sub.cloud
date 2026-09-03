@@ -1359,7 +1359,7 @@ ssh supersub 'systemctl is-active postgresql supersub-api'   # active active
 - **담당**: 정상호(`agent/`) · 백성검(`flutter/`) · **제기**: 정어진 · **기한**: 스프린트 2 안
 - 관련: 루트 `CLAUDE.md` 「작업을 시작할 때」 (2026-09-02 추가)
 
-### 10. 웹이 가짜 데이터에 고정돼 있습니다 — 백엔드는 떠 있습니다 (2026-09-02)
+### 10. 웹이 가짜 데이터에 고정돼 있습니다 — 백엔드는 떠 있습니다 (2026-09-02) ✅ 해소 (2026.09.03)
 
 백엔드가 EC2에서 돌기 시작했는데(8번), **웹은 실제 백엔드를 부를 수 없는 상태**입니다.
 `getBackend()` 가 환경변수와 무관하게 언제나 `mockBackend` 를 돌려줍니다 —
@@ -1383,6 +1383,36 @@ ssh supersub 'systemctl is-active postgresql supersub-api'   # active active
 
 - 상세(만족해야 할 성질·확인 명령 셋·하지 말 것): `fastapi/docs/client-contract-changes.md` **11번**
 - **담당**: 백성검 · **제기**: 정어진 · **기한**: 스프린트 2 안
+
+#### 처리 — paik-1 저장 버튼을 테스트하다 로그인이 막혀서 오늘 끝냈습니다 (2026-09-03, 박민호)
+
+**백성검 님 담당 항목을 제가 먼저 처리했습니다** — paik-1(영상 저장) 테스트 중
+"토큰이 유효하지 않다"로 막혀서, 원인을 보니 로그인이 여전히 mock이라 실제
+서버로 보낼 토큰 자체가 가짜였습니다. `Backend` 실제 게이트웨이가 없으면
+그날그날 막힐 게 뻔해서 오늘 안에 끝냈습니다.
+
+- 만든 것: `www/src/server/backend/fastapiBackend.ts` (`Backend` 10개 메서드
+  전부 — signup·login·loginWithGoogle·getMe·updateMe·getMyCard·getPublicCard·
+  listUsers·getUserDetail·forceDeleteUser). `www/src/app/api/**` 라우트
+  핸들러는 전부 `getBackend()`만 불렀어서 **한 줄도 안 고쳤습니다**
+- `getBackend()`가 이제 `USE_MOCK=1`이 아니면 `fastapiBackend`를 돌려줍니다
+- 🔴 **시험은 `vitest.config.ts`에 `env: { USE_MOCK: '1' }`를 넣어 그대로
+  mock을 봅니다** — 안 넣으면 시험이 존재하지 않는 백엔드로 네트워크 호출을
+  시도합니다
+- ⚠️ **Vercel의 Preview 환경엔 `BACKEND_BASE_URL`이 없습니다**(Production에만
+  넣었습니다). 지금 상태로 Preview 배포(PR마다 자동으로 뜨는 것)에서 로그인하면
+  전부 503(`BACKEND_NOT_CONFIGURED`)입니다 — 깨진 게 아니라 설정이 없는
+  것뿐입니다. Preview에서도 mock으로 계속 확인하시려면 Vercel
+  Environment Variables에서 `USE_MOCK=1`을 **Preview** 환경에 추가해 주세요
+- 확인: `grep -c 'return mockBackend' www/src/server/backend/index.ts` → 1
+  (mock 분기 하나만 남음)
+- 검증: `tsc --noEmit`·`eslint`·`next build`·시험 250개 전부 통과. 실제
+  EC2까지는 오늘 nginx+HTTPS를 새로 올려서 `https://api.supersub-ai.com`으로
+  직접 확인했습니다(미결 jin 8번 참고)
+- 🔴 **백성검 님께**: 원래 담당 항목이라 알려드립니다. 로그인·회원가입·프로필·
+  관리자 화면이 오늘부터 **실제 DB를 봅니다** — mock의 데모 계정
+  (`demo@super-sub.example`)은 이제 안 먹힙니다. 실제 계정으로 가입해서
+  써야 합니다. 이상하게 동작하는 화면 있으면 여기 남겨주세요
 
 ### 11. 업로드 길이 상한 60초와 `max_frames=300`이 안 맞습니다 (정상호 님, 2026-09-03)
 
