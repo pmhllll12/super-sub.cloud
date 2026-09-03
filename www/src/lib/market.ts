@@ -72,6 +72,17 @@ export type Coach = {
      * 값이 없으면 카드는 `poster` 만 보여 준다(`CoachList`).
      */
     clipUrl?: string
+    /**
+     * 상세에서 **좌우로 넘겨 보는 이 코치의 다른 장면들.**
+     *
+     * 🔴 첫 번째가 `clipUrl` 과 같아야 한다 — 목록 카드에서 보던 장면이 상세를
+     * 열자마자 그대로 이어져야 "같은 코치의 같은 영상"으로 읽힌다.
+     * ⚠️ 지금은 **저장소에 있는 세 파일을 돌려 쓰는 자리 표시**다. 코치마다
+     * 진짜 다른 영상이 생기려면 객체 저장소가 먼저 정해져야 한다(위 주석) —
+     * 🔴 그때까지 **파일을 더 넣지 말 것.**
+     * 값이 없거나 하나뿐이면 상세는 넘기는 단추를 아예 안 그린다.
+     */
+    clips?: string[]
     /** 그 장면의 멈춘 그림. 영상이 오기 전까지 카드에 보이는 것이다. */
     clipPoster?: string
   }
@@ -101,6 +112,7 @@ export const COACHES: Coach[] = [
       ],
       videoSlug: 'coach-kim-01',
       clipUrl: '/coach-c001.mp4',
+      clips: ['/coach-c001.mp4', '/coach-c002.mp4', '/coach-c003.mp4'],
     },
     verified: ['신원 확인', '생활체육지도사 2급', '선수 이력 5년'],
     reviews: [
@@ -126,6 +138,7 @@ export const COACHES: Coach[] = [
       ],
       videoSlug: 'coach-jung-01',
       clipUrl: '/coach-c002.mp4',
+      clips: ['/coach-c002.mp4', '/coach-c003.mp4', '/coach-c001.mp4'],
     },
     verified: ['신원 확인', '대학 선수 이력 4년'],
     reviews: [{ by: '최OO', text: '영상으로 먼저 보고 만나서 설명이 짧았습니다.', at: '2026-08-25' }],
@@ -148,6 +161,7 @@ export const COACHES: Coach[] = [
       ],
       videoSlug: 'coach-oh-01',
       clipUrl: '/coach-c003.mp4',
+      clips: ['/coach-c003.mp4', '/coach-c001.mp4', '/coach-c002.mp4'],
     },
     verified: ['신원 확인', '생활체육지도사 2급', '실업팀 이력 3년'],
     reviews: [],

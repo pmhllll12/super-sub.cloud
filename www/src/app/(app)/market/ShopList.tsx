@@ -1,7 +1,8 @@
 'use client'
 
+import Image from 'next/image'
 import { useState } from 'react'
-import { SPORT_LABEL, won, type Product, type SportCode } from '@/lib/market'
+import { SPORT_LABEL, type Product, type SportCode } from '@/lib/market'
 import { FilterBar, SortSelect } from './FilterBar'
 
 /**
@@ -74,45 +75,37 @@ export default function ShopList({ products }: { products: Product[] }) {
         }
       />
 
-      {shown.length === 0 ? (
-        <p className="ss-market-empty">조건에 맞는 상품이 아직 없습니다.</p>
-      ) : (
-        <ul className="ss-coach-list">
-          {shown.map((p) => (
-            <li key={p.id}>
-              <a
-                href={p.href}
-                className="ss-coach-card"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <span className="ss-coach-card-head">
-                  <b>{p.brand}</b>
-                  <span>
-                    {SPORT_LABEL[p.sport]} · {p.category}
-                  </span>
-                </span>
+      {/* 🔴 상품 칸을 걷어내고 **배너 한 장**만 둔다(사용자 요청). 지금 상점은
+          자리 표시라(제휴 링크 · mock 데이터, `docs/2026-09-01-레슨-상점-설계.md`)
+          빈 칸 여섯이 서 있는 것보다 한 장이 낫다는 판단이다.
 
-                <span className="ss-coach-card-tagline">{p.name}</span>
+          🔴 목록을 **지운 것이 아니라 안 그리는 것**이다 — `products` · 거름망 ·
+          정렬은 그대로 살아 있고 위 줄이 세는 수도 진짜 값이다. 상품 사진이
+          생기면 이 자리에 `<ul className="ss-coach-list">` 를 도로 넣으면 된다
+          (지운 모양은 `CoachList` 의 카드와 같은 짜임이었다).
 
-                {/* 🔴 우리만 가진 것 — 이 상품이 **어떤 영상에 나왔는지**다.
-                    브랜드 사이트에는 없는 정보라 이것이 여기서 보는 이유다. */}
-                <span className="ss-coach-card-analysis">
-                  <em>영상에 태그된 장비</em>
-                  <span className="ss-coach-titles">
-                    <b>영상 {p.videoCount}개</b>
-                  </span>
-                </span>
+          ⚠️ 사진은 **자리 표시**다(`public/shop-banner.jpg`, 사용자 제공). 실제
+          상품 그림이 오면 갈아 끼운다. 원본(4.8MB PNG)을 2400px JPEG 449KB 로
+          줄여 넣었다 — 저장소에 원본을 그대로 넣지 말 것.
 
-                <span className="ss-coach-card-foot">
-                  {won(p.price)}
-                  <i>브랜드에서 보기 ↗</i>
-                </span>
-              </a>
-            </li>
-          ))}
-        </ul>
-      )}
+          ⚠️ **벽 쪽이 뭉개져 보이는 것은 우리가 줄여서가 아니다.** 받은 파일
+          자체가 이미 한 번 압축된 그림을 화면에서 캡처한 것이라, 어두운 벽의
+          매끈한 그러데이션에 블록이 배어 있다(원본 픽셀에서 확인). 여기서 더
+          살릴 수 있는 정보가 없다 — **브랜드 원본 파일**을 받아 갈아 끼우는 것이
+          유일한 해결이다. 그때까지는 다시 압축하며 더 망가뜨리지 않도록 품질을
+          높게(96) 잡아 둔다. */}
+      <div className="ss-shop-banner">
+        {/* `next/image` 로 둔다 — 이 화면에서 **가장 큰 그림**이라 기기 폭에 맞는
+            크기로 잘라 보내는 값이 크다(`sizes`). 비율은 원본 그대로고, 폭 맞추기와
+            높이 자동은 `globals.css` 가 한다. */}
+        <Image
+          src="/shop-banner.jpg"
+          alt="SUPERSUB 축구화"
+          width={2400}
+          height={901}
+          sizes="100vw"
+        />
+      </div>
     </>
   )
 }

@@ -326,7 +326,9 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     expect(document.querySelector('.ss-shot-track')).toBeNull()
   })
 
-  it("'다른 영상' 을 눌러도 마찬가지다", async () => {
+  // 🔴 이 자리에 있던 '다른 영상' 은 **저장**으로 바뀌었다(사용자 요청). 되돌리는
+  // 길은 위 닫기 점 하나뿐이므로 그쪽 검사가 이 자리의 검사를 겸한다.
+  it('리포트가 끝나기 전에는 저장이 잠겨 있다', async () => {
     const user = userEvent.setup()
     const { input, file } = pick()
     await user.upload(input, file)
@@ -334,10 +336,8 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
     await screen.findByRole('button', { name: '이 사람으로 분석' }, { timeout: 2500 })
     await drawSubject(user)
-    expect(document.querySelector('.ss-shot-track')).not.toBeNull()
 
-    await user.click(screen.getByRole('button', { name: '다른 영상' }))
-    expect(document.querySelector('.ss-shot-track')).toBeNull()
+    expect(screen.getByRole('button', { name: '저장' })).toBeDisabled()
   })
 
   // 창 틀의 닫기 자리이므로 시작한 뒤에도 그대로 있어야 한다.
