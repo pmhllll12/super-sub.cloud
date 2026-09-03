@@ -4,8 +4,14 @@
 #   sudo cp agent/deploy/autostop.conf.example /etc/supersub/autostop.conf
 #
 # 없어도 동작한다 — 아래 값이 스크립트의 기본값과 같다. 배포마다 다르게 하고
-# 싶을 때만 만든다. systemd EnvironmentFile 로도 읽히므로 `KEY=값` 형식만 쓴다
-# (따옴표·주석 뒤 값·셸 확장 금지).
+# 싶을 때만 만든다.
+#
+# 🔴 이 파일은 **읽는 쪽이 둘**이다 — `autostop.sh` 가 bash 로 `source` 하고,
+# `supersub-autostop.service` 가 `EnvironmentFile=` 로 읽는다. 그래서 `KEY=값`
+# 한 줄 형식을 지키고(주석 뒤 값·셸 확장 금지), **공백이나 `(` `|` 가 들어가는
+# 값은 작은따옴표로 감싼다.** 안 감싸면 bash 쪽이 문법 오류로 죽는다
+# (2026-09-03 에 BUSY_PATTERN 이 그랬다). 큰따옴표가 아니라 작은따옴표인 이유는
+# systemd 가 큰따옴표 안에서는 C 이스케이프를 해석해 `\.` 이 바뀔 수 있어서다.
 
 # 아무도 안 붙어 있고 일도 없을 때 기다리는 시간(분)
 IDLE_MINUTES=30
@@ -29,4 +35,4 @@ GPU_UTIL_BUSY=10
 # 편집기를 열어 둔 채 자리를 뜨면 영영 안 꺼진다. 실제로 실행하는 인터프리터만
 # 걸리게 묶어 둔 것이니, 고칠 때도 이 성질을 지킬 것.
 # POSIX 확장 정규식이다 (`\S` 같은 GNU 확장은 안 된다).
-BUSY_PATTERN=^[^[:space:]]*(python[0-9.]*|uv)[[:space:]].*(analyze_s3|analyze|measure|track_overlay)\.py|^[^[:space:]]*hf[[:space:]]+download|^[^[:space:]]*aws[[:space:]]+s3
+BUSY_PATTERN='^[^[:space:]]*(python[0-9.]*|uv)[[:space:]].*(analyze_s3|analyze|measure|track_overlay)\.py|^[^[:space:]]*hf[[:space:]]+download|^[^[:space:]]*aws[[:space:]]+s3'
