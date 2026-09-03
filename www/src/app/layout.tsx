@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import {
   Abril_Fatface,
+  Anton,
   Grenze,
   Rakkas,
   Rubik,
@@ -81,6 +82,19 @@ const rakkas = Rakkas({
   subsets: ["latin"],
 });
 
+// 상점 배너 아래 한 마디("STORE") 전용(사용자 지정, Anton). 좁고 굵은 산세리프
+// 라 짧은 대문자 한 단어가 간판처럼 읽힌다.
+//
+// 🔴 굵기가 400 하나뿐인 장식 글꼴이라 **font-weight 를 주지 않는다** — 올리면
+// 가짜 굵게(synthetic bold)만 걸려 획이 지저분해진다(Abril Fatface · Shrikhand ·
+// Rakkas · RubikGlitch 에서 이미 겪었다).
+// 🔴 라틴만 쓴다 — 한글에 쓰지 않는다(다른 장식 글꼴들과 같은 규칙).
+const anton = Anton({
+  variable: "--font-sign",
+  weight: "400",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
   title: "Super-Sub",
   description: "생활체육 경기 영상을 분석해 용병을 찾고, 실력을 검증합니다.",
@@ -90,7 +104,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className="h-full antialiased">
       <body
-        className={`${rubik.variable} ${rubikGlitch.variable} ${abrilFatface.variable} ${shrikhand.variable} ${youngSerif.variable} ${grenze.variable} ${rakkas.variable} min-h-full flex flex-col`}
+        className={`${rubik.variable} ${rubikGlitch.variable} ${abrilFatface.variable} ${shrikhand.variable} ${youngSerif.variable} ${grenze.variable} ${rakkas.variable} ${anton.variable} min-h-full flex flex-col`}
       >
         <IntroGate />
         {/* 화면을 떠날 때 들어온 방향 그대로 되나가게 한다. 라우팅을 건너

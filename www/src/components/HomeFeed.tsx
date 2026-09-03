@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { FEED } from '@/lib/feed'
 
 /**
@@ -28,7 +28,22 @@ export default function HomeFeed({ active }: { active: boolean }) {
    * 🔴 펼치면 보던 영상은 **왼쪽으로 비켜설 뿐 화면 밖으로 안 나간다** — 목록을
    * 훑는 동안에도 지금 보던 것이 계속 보여야 "잠깐 옆을 본다"가 된다.
    */
-  const [library, setLibrary] = useState(false)
+  const [side, setSide] = useState<'none' | 'list' | 'comments'>('none')
+  /** 오른쪽에 무언가 나와 있는가 — 영상이 비켜서는지를 이 값으로 정한다. */
+  const library = side !== 'none'
+  /**
+   * 나오는 판이 **얼마나 기다렸다** 나올지(ms).
+   *
+   * 🔴 자리가 비어야 나온다: 가로 영상이면 영상이 먼저 비켜서고, 이미 다른 판이
+   * 나와 있었으면 그것이 먼저 오른쪽으로 나간 뒤다(사용자 요청).
+   */
+  const [enterDelay, setEnterDelay] = useState(0)
+  /**
+   * 화면에서 쓴 댓글. ⚠️ **아무 데도 안 보낸다**(계약 5장에 댓글이 없다) —
+   * 좋아요와 같은 규칙으로 이 화면 안에서만 붙고 새로고침하면 사라진다.
+   */
+  const [wrote, setWrote] = useState<Record<string, string[]>>({})
+  const [draft, setDraft] = useState('')
   /**
    * 목록이 열렸을 때 영상이 **왼쪽으로 비켜서는 양**(px).
    *
@@ -42,11 +57,22 @@ export default function HomeFeed({ active }: { active: boolean }) {
   /**
    * 목록이 서는 자리(px, 판 왼쪽에서).
    *
-   * 🔴 **지금 영상의 오른쪽 끝 바로 옆**이다(사용자 요청) — 화면 오른쪽 끝에
-   * 붙이면 세로 영상일 때 저 혼자 멀찍이 떨어진다. 영상마다 폭이 다르므로 CSS
-   * 로는 못 하고 여기서 잰다. 화면을 넘지 않게 오른쪽 끝에서 멈춘다.
+   * 🔴 **늘 화면 오른쪽 끝**이다(사용자 요청) — 가로든 세로든 같은 자리에 박아
+   * 둔다. 목록 폭이 `clamp` 라 창마다 달라서 CSS 로는 못 잡고 여기서 잰다.
+   *
+   * ⚠️ 한때 **지금 영상의 오른쪽 끝 바로 옆**에 붙였다(세로 영상일 때 목록이 저
+   * 혼자 멀찍이 떨어져 보인다는 이유였다). 되돌렸다 — 영상마다 목록이 다른 자리에
+   * 서니 넘길 때마다 목록이 좌우로 움직여, 고정된 차림표로 안 읽혔다.
    */
   const [listX, setListX] = useState(0)
+  /**
+   * 댓글창이 서는 자리(px).
+   *
+   * 🔴 **목록과 따로 둔다.** 둘이 한 변수를 같이 보면, 판을 바꿀 때 그 값이
+   * 바뀌면서 **나가는 중인 판까지 옆으로 툭 뛴다** — 번갈아 누를 때 버벅이는
+   * 것처럼 보였던 원인이다(사용자 지적). 폭이 다르니 서는 자리도 다르다.
+   */
+  const [commentsX, setCommentsX] = useState(0)
   /**
    * 목록의 **세로 가운데**(px). 🔴 가운데 줄이 영상의 세로 한가운데에 오게
    * 맞춘다(사용자 요청) — 영상마다 키가 달라 CSS 로는 못 잡는다.
@@ -71,16 +97,23 @@ export default function HomeFeed({ active }: { active: boolean }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [active])
 
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useLayoutEffect(() => {
-    if (!library) {
-      setShift(0)
-      return
-    }
+  /**
+   * 자리를 재서 상태 셋(비켜설 양 · 목록의 가로 · 세로)을 갱신한다.
+   *
+   * 🔴 **여는 손짓에서도 이걸 먼저 부른다.** effect 에만 두면 목록이 열린 뒤에야
+   * 값이 들어와서, 그 사이 한 프레임이 옛 값으로 그려진다 — 특히 "영상이 먼저
+   * 비켜서고 목록이 나온다"의 기다리는 시간(`--ss-feed-list-delay`)이 0 인 채로
+   * 전환이 시작돼 둘이 같이 움직였다(실측으로 확인했다).
+   */
+  const measure = useCallback((which: 'list' | 'comments') => {
     const stage = box.current?.querySelector('.ss-feed-stage')
     const frame = box.current?.querySelector('.ss-feed-frame[data-here="true"]')
-    const list = box.current?.querySelector('.ss-feed-list')
-    if (!stage || !frame || !list) return
+    // 🔴 **나올 판을 잰다.** 댓글창이 목록보다 넓어서, 늘 목록을 재면 가로 영상이
+    //    덜 비켜서고 댓글창이 영상 위로 파고든다.
+    const 목록 = box.current?.querySelector('.ss-feed-list')
+    const 댓글 = box.current?.querySelector('.ss-feed-comments')
+    const list = which === 'comments' ? 댓글 : 목록
+    if (!stage || !frame || !list || !목록 || !댓글) return 0
 
     const s = stage.getBoundingClientRect()
     const 목록폭 = list.getBoundingClientRect().width
@@ -102,8 +135,13 @@ export default function HomeFeed({ active }: { active: boolean }) {
     const 옮김 = Math.max(0, Math.min(필요, 여유))
 
     setShift(옮김)
-    // 목록은 옮긴 뒤의 오른쪽 끝 옆에 선다. 그래도 화면을 넘으면 가장자리에 멈춘다.
-    setListX(Math.min(오른끝 - 옮김 + 사이, window.innerWidth - 가장자리 - 목록폭))
+    // 🔴 두 판 모두 **늘 화면 오른쪽 끝**이다 — 영상 폭을 따라다니지 않는다.
+    //    위 `필요` 도 판이 여기 있다고 보고 비켜설 양을 계산한다(둘이 같은 자리를
+    //    봐야 세로 영상에서 0 이 나온다).
+    // 🔴 **둘 다 지금 정한다.** 나오는 쪽만 정하면 나가는 쪽이 옛 자리에 남거나,
+    //    한 변수를 같이 쓰면 나가는 판이 옆으로 툭 뛴다.
+    setListX(window.innerWidth - 가장자리 - 목록.getBoundingClientRect().width)
+    setCommentsX(window.innerWidth - 가장자리 - 댓글.getBoundingClientRect().width)
 
     // 세로는 **영상의 한가운데**에 맞춘다. 목록이 제 키의 절반만큼 위로 올라가
     // 있으므로(CSS 의 translateY(-50%)) 여기서는 가운데 좌표만 주면 된다.
@@ -114,7 +152,35 @@ export default function HomeFeed({ active }: { active: boolean }) {
     // 반쯤 지워진다.
     const ul = list.querySelector('ul')
     if (ul) ul.dataset.scroll = ul.scrollHeight > ul.clientHeight ? 'true' : 'false'
-  }, [library, i, active])
+    return 옮김
+  }, [])
+
+  /**
+   * 오른쪽 판을 연다 — 같은 것을 다시 누르면 닫힌다.
+   *
+   * 🔴 **재는 것이 먼저다**(위 `measure` 주석). 그리고 기다리는 시간을 여기서
+   * 정한다: 이미 다른 판이 나와 있었으면 그것이 오른쪽으로 나갈 시간까지,
+   * 아니면 영상이 비켜설 시간만, 비켜설 것이 없으면 0.
+   */
+  const openSide = (next: 'list' | 'comments') => {
+    if (side === next) {
+      setEnterDelay(0)
+      setSide('none')
+      return
+    }
+    const moved = measure(next) ?? 0
+    setEnterDelay(side !== 'none' ? 460 : moved > 0 ? 360 : 0)
+    setSide(next)
+  }
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useLayoutEffect(() => {
+    if (side === 'none') {
+      setShift(0)
+      return
+    }
+    measure(side)
+  }, [side, i, active, measure])
   /* eslint-enable react-hooks/set-state-in-effect */
 
   /**
@@ -242,7 +308,15 @@ export default function HomeFeed({ active }: { active: boolean }) {
               mood_heart
             </span>
           </button>
-          <button type="button" aria-label="댓글">
+          {/* 🔴 누르면 오른쪽에 **댓글창**이 나온다(사용자 요청). 목록과 **같은
+              자리**를 쓰므로 둘이 같이 떠 있지 않는다 — 목록이 나와 있었으면
+              그것이 먼저 오른쪽으로 나간다(`openSide`). */}
+          <button
+            type="button"
+            aria-pressed={side === 'comments'}
+            aria-label="댓글"
+            onClick={() => openSide('comments')}
+          >
             <span className="material-symbols-outlined" aria-hidden="true">
               comment
             </span>
@@ -256,9 +330,9 @@ export default function HomeFeed({ active }: { active: boolean }) {
               것과 닫는 것이 한 자리라 다시 누르면 접힌다. */}
           <button
             type="button"
-            aria-pressed={library}
+            aria-pressed={side === 'list'}
             aria-label="영상 목록"
-            onClick={() => setLibrary((v) => !v)}
+            onClick={() => openSide('list')}
           >
             <span className="material-symbols-outlined" aria-hidden="true">
               video_library
@@ -273,12 +347,17 @@ export default function HomeFeed({ active }: { active: boolean }) {
           제목만 떠 있다. 목록처럼 보이게 만드는 것은 줄 간격뿐이다. */}
       <aside
         className="ss-feed-list"
-        data-open={library}
-        aria-hidden={!library}
+        data-open={side === 'list'}
+        aria-hidden={side !== 'list'}
         style={
           {
             '--ss-feed-list-x': `${Math.round(listX)}px`,
             '--ss-feed-list-y': `${Math.round(listY)}px`,
+            /* 🔴 **영상이 비켜선 다음에** 목록이 나온다(사용자 요청) — 같이
+               시작하면 가로 영상에서 목록이 영상 위로 겹쳐 들어온다.
+               🔴 비켜설 것이 없으면(세로 영상) **기다리지 않는다.** 아무 일도
+               안 일어나는 동안 목록만 늦게 나오면 굼떠 보인다. */
+            '--ss-feed-list-delay': `${enterDelay}ms`,
           } as React.CSSProperties
         }
       >
@@ -303,6 +382,75 @@ export default function HomeFeed({ active }: { active: boolean }) {
             </li>
           ))}
         </ul>
+      </aside>
+
+      {/* 🔴 **댓글창**(사용자 요청). 목록과 **같은 자리 · 같은 짜임**이다 — 판도
+          테두리도 없이 글만 떠 있고, 나오고 들어가는 것도 같은 방식이다.
+          둘이 같은 자리를 쓰므로 한 번에 하나만 떠 있다(`side`).
+
+          ⚠️ **아무 데도 안 보낸다** — 계약(5장)에 댓글이 없다. 쓴 것은 이 화면
+          안에서만 붙고 새로고침하면 사라진다(좋아요와 같은 규칙). */}
+      <aside
+        className="ss-feed-comments"
+        data-open={side === 'comments'}
+        aria-hidden={side !== 'comments'}
+        aria-label="댓글"
+        style={
+          {
+            '--ss-feed-list-x': `${Math.round(commentsX)}px`,
+            '--ss-feed-list-y': `${Math.round(listY)}px`,
+            '--ss-feed-list-delay': `${enterDelay}ms`,
+          } as React.CSSProperties
+        }
+      >
+        <p className="ss-feed-comments-head">
+          댓글 <b>{FEED[i].comments.length + (wrote[FEED[i].id]?.length ?? 0)}</b>
+        </p>
+        <ul>
+          {FEED[i].comments.map((c, n) => (
+            <li key={`${c.by}-${n}`}>
+              <b>{c.by}</b>
+              <span>{c.text}</span>
+            </li>
+          ))}
+          {/* 이 화면에서 쓴 것은 아래에 붙는다 — 방금 쓴 것이 눈에 보여야 한다. */}
+          {(wrote[FEED[i].id] ?? []).map((text, n) => (
+            <li key={`mine-${n}`} data-mine="true">
+              <b>나</b>
+              <span>{text}</span>
+            </li>
+          ))}
+        </ul>
+        <form
+          className="ss-feed-comments-write"
+          onSubmit={(e) => {
+            e.preventDefault()
+            const text = draft.trim()
+            if (!text) return
+            setWrote((prev) => ({
+              ...prev,
+              [FEED[i].id]: [...(prev[FEED[i].id] ?? []), text],
+            }))
+            setDraft('')
+          }}
+        >
+          <label>
+            <span className="sr-only">댓글 쓰기</span>
+            <input
+              type="text"
+              value={draft}
+              placeholder="댓글 쓰기"
+              onChange={(e) => setDraft(e.target.value)}
+            />
+          </label>
+          {/* 빈 칸으로는 못 보낸다 — 눌러도 아무 일이 없으면 고장으로 읽힌다. */}
+          <button type="submit" disabled={!draft.trim()}>
+            <span className="material-symbols-outlined" aria-hidden="true">
+              send
+            </span>
+            <span className="sr-only">보내기</span>
+          </button>
+        </form>
       </aside>
     </div>
   )
