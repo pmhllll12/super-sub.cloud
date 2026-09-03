@@ -9,6 +9,7 @@ from fastapi import FastAPI
 
 from app.analysis.adapter.inbound.api.v1.video_router import video_router
 from app.card.adapter.inbound.api.v1.card_router import card_router
+from app.card.adapter.inbound.api.v1.squad_router import squad_router
 from app.card.adapter.outbound.stub.card_stub_repository import DEMO_SLUG
 from app.core.config import settings
 from app.core.errors import install_error_handlers
@@ -82,6 +83,7 @@ for _router in (
     team_router,
     match_router,
     card_router,
+    squad_router,
     video_router,
     admin_router,
 ):

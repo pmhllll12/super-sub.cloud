@@ -4,17 +4,40 @@ from __future__ import annotations
 
 from app.match.application.dtos.match_dto import (
     ApplicationResult,
+    MatchListingResult,
     MatchResult,
     PositionNeedResult,
 )
 from app.match.domain.entities.application_entity import ApplicationEntity
-from app.match.domain.entities.match_entity import MatchEntity
+from app.match.domain.entities.match_entity import MatchEntity, MatchListingEntity
 
 
 def to_match_result(match: MatchEntity) -> MatchResult:
     return MatchResult(
         id=match.id,
         team_id=match.team_id,
+        played_at=match.played_at,
+        place=match.place,
+        needs=[
+            PositionNeedResult(
+                position_code=n.code,
+                position_label=n.label,
+                head_count=n.head_count,
+            )
+            for n in match.needs
+        ],
+    )
+
+
+def to_listing_result(listing: MatchListingEntity) -> MatchListingResult:
+    """탐색 한 줄. 팀 값을 **평평하게** 펴서 내보낸다."""
+    match = listing.match
+    return MatchListingResult(
+        id=match.id,
+        team_id=match.team_id,
+        team_name=listing.team_name,
+        region=listing.region,
+        sport_code=listing.sport_code,
         played_at=match.played_at,
         place=match.place,
         needs=[

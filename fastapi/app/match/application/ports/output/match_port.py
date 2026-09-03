@@ -13,7 +13,11 @@ from datetime import datetime
 from uuid import UUID
 
 from app.match.domain.entities.application_entity import ApplicationEntity
-from app.match.domain.entities.match_entity import MatchEntity, PositionNeedEntity
+from app.match.domain.entities.match_entity import (
+    MatchEntity,
+    MatchListingEntity,
+    PositionNeedEntity,
+)
 
 
 class MatchPort(ABC):
@@ -43,6 +47,41 @@ class MatchPort(ABC):
     def find_match(self, match_id: UUID) -> MatchEntity | None: ...
 
     @abstractmethod
+    def update_match(
+        self,
+        match_id: UUID,
+        *,
+        played_at: datetime | None,
+        place: str | None,
+        needs: list[PositionNeedEntity] | None,
+    ) -> None:
+        """경기를 고친다. `None` 인 항목은 건드리지 않는다.
+
+        `needs` 를 주면 **기존 행을 지우고 새로 넣는다** — 부분 갱신은 "어느
+        포지션을 빼라"를 표현할 수 없어서다. 지우기와 넣기는 **같은 트랜잭션**에서
+        일어난다. 갈리면 필요 포지션이 사라진 경기가 남는다.
+        """
+
+    @abstractmethod
+    def count_applications(self, match_id: UUID) -> int:
+        """그 경기의 지원·제안 건수.
+
+        취소 전에 본다. **DB 의 외래키가 이미 막고 있지만**(`match_application` 의
+        삭제 규칙이 RESTRICT 다) 그대로 두면 500 이 나므로, 여기서 세어 뜻이 있는
+        에러로 돌려준다.
+        """
+
+    @abstractmethod
+    def delete_match(self, match_id: UUID) -> None:
+        """경기를 지운다. 필요 포지션도 함께 지운다.
+
+        🔴 **취소를 행 삭제로 표현한다.** 부록 D 의 `match` 에는 상태 컬럼이 없고
+        D.8 도 취소를 다루지 않는다 — **ERD 에 없는 컬럼은 늘리지 않는다.**
+        대신 스키마가 이미 말하고 있는 것을 따른다: 지원이 붙은 경기는 외래키가
+        막는다.
+        """
+
+    @abstractmethod
     def list_upcoming_matches(
         self, team_id: UUID, now: datetime
     ) -> list[MatchEntity]:
@@ -50,6 +89,33 @@ class MatchPort(ABC):
 
         지난 경기를 빼는 것은 목록이 **모집 글**이기 때문이다. 지난 경기도
         `find_match` 로는 여전히 읽힌다 — 기록이 사라지는 것이 아니다.
+        """
+
+    @abstractmethod
+    def sport_exists(self, sport_code: str) -> bool:
+        """종목 코드가 실재하는가.
+
+        탐색에서 오타 난 코드를 **빈 결과가 아니라 에러**로 돌려주기 위해 쓴다 —
+        빈 배열로 답하면 "그런 종목이 없다"와 "그 종목 경기가 없다"가 같아 보인다.
+        """
+
+    @abstractmethod
+    def search_upcoming(
+        self,
+        *,
+        sport_code: str | None,
+        region: str | None,
+        now: datetime,
+        offset: int,
+        limit: int,
+    ) -> tuple[list[MatchListingEntity], int]:
+        """**다가오는** 경기를 종목·지역으로 좁혀 찾는다. `(목록, 전체 건수)`.
+
+        이른 것이 앞에 온다 — 목록은 모집 글이고 임박한 것이 급하다.
+
+        지난 경기를 빼는 이유는 `list_upcoming_matches` 와 같다. **여기서는 더
+        중요하다** — 팀 목록은 그 팀 사람이 보지만 이 목록은 지원할 곳을 찾는
+        사람이 본다.
         """
 
     @abstractmethod

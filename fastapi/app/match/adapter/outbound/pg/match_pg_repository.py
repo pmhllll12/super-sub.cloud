@@ -16,7 +16,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from sqlalchemy import column, func, select, table, update
+from sqlalchemy import column, delete, func, select, table, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -30,11 +30,18 @@ from app.match.adapter.outbound.orm.match_position_need_orm import (
 )
 from app.match.application.ports.output.match_port import MatchPort
 from app.match.domain.entities.application_entity import ApplicationEntity
-from app.match.domain.entities.match_entity import MatchEntity, PositionNeedEntity
+from app.match.domain.entities.match_entity import (
+    MatchEntity,
+    MatchListingEntity,
+    PositionNeedEntity,
+)
 from app.match.domain.rules.application_rules import SIDE_TEAM, SIDE_USER
 
 # 소유하지 않는 테이블에서 **읽기만** 한다. 위 docstring 참조.
-_team = table("team", column("id"), column("sport_code"))
+_team = table(
+    "team", column("id"), column("sport_code"), column("name"), column("region")
+)
+_sport = table("sport", column("code"))
 _team_member = table(
     "team_member",
     column("team_id"),
@@ -55,6 +62,25 @@ def _is_unique_violation(exc: IntegrityError) -> bool:
     return getattr(getattr(exc, "orig", None), "sqlstate", None) == _UNIQUE_VIOLATION
 
 
+# LIKE 패턴에서 특별한 뜻을 갖는 문자. 검색어에 들어오면 리터럴로 바꿔야 한다.
+# `user` 쪽 저장소에 같은 함수가 있지만 **가져오지 않는다** — 컨텍스트끼리
+# 임포트하지 않기 때문이다(`tests/test_architecture.py`).
+_LIKE_ESCAPE = "\\"
+
+
+def _escape_like(value: str) -> str:
+    """LIKE 메타문자를 리터럴로 만든다.
+
+    🔴 역슬래시를 **먼저** 바꾼다. 나중에 바꾸면 `%` 를 감싸려고 붙인 이스케이프
+    문자까지 다시 이스케이프되어 패턴이 깨진다.
+    """
+    return (
+        value.replace(_LIKE_ESCAPE, _LIKE_ESCAPE * 2)
+        .replace("%", f"{_LIKE_ESCAPE}%")
+        .replace("_", f"{_LIKE_ESCAPE}_")
+    )
+
+
 class MatchPgRepository(MatchPort):
     def __init__(self, session: Session) -> None:
         self._session = session
@@ -62,6 +88,82 @@ class MatchPgRepository(MatchPort):
     def team_exists(self, team_id: UUID) -> bool:
         stmt = select(_team.c.id).where(_team.c.id == team_id)
         return self._session.execute(stmt).first() is not None
+
+    def sport_exists(self, sport_code: str) -> bool:
+        stmt = select(_sport.c.code).where(_sport.c.code == sport_code)
+        return self._session.execute(stmt).first() is not None
+
+    def search_upcoming(
+        self,
+        *,
+        sport_code: str | None,
+        region: str | None,
+        now: datetime,
+        offset: int,
+        limit: int,
+    ) -> tuple[list[MatchListingEntity], int]:
+        conditions = [MatchOrm.played_at > now]
+        if sport_code:
+            conditions.append(_team.c.sport_code == sport_code)
+        if region:
+            # 🔴 `%`·`_` 는 LIKE 메타문자다. 그대로 넘기면 검색어가 패턴이 되어
+            #    `region="%"` 한 글자로 전체가 걸린다 — 리터럴로 이스케이프한다.
+            #    (`user_pg_repository` 의 `q` 와 같은 판단이다.)
+            conditions.append(
+                _team.c.region.ilike(
+                    f"%{_escape_like(region)}%", escape=_LIKE_ESCAPE
+                )
+            )
+
+        joined = MatchOrm.__table__.join(_team, _team.c.id == MatchOrm.team_id)
+
+        total = self._session.execute(
+            select(func.count()).select_from(joined).where(*conditions)
+        ).scalar_one()
+        if total == 0:
+            return [], 0
+
+        rows = (
+            self._session.execute(
+                select(
+                    MatchOrm.id,
+                    MatchOrm.team_id,
+                    MatchOrm.played_at,
+                    MatchOrm.place,
+                    _team.c.name,
+                    _team.c.region,
+                    _team.c.sport_code,
+                )
+                .select_from(joined)
+                .where(*conditions)
+                # 이른 것이 앞에 온다 — 임박한 모집이 급하다.
+                .order_by(MatchOrm.played_at)
+                .offset(offset)
+                .limit(limit)
+            )
+            .tuples()
+            .all()
+        )
+        if not rows:
+            # 마지막 페이지를 넘겨 요청한 경우다. `total` 은 그대로 돌려준다.
+            return [], total
+
+        needs = self._needs_of([r[0] for r in rows])
+        return [
+            MatchListingEntity(
+                match=MatchEntity(
+                    id=r[0],
+                    team_id=r[1],
+                    played_at=r[2],
+                    place=r[3],
+                    needs=needs.get(r[0], []),
+                ),
+                team_name=r[4],
+                region=r[5],
+                sport_code=r[6],
+            )
+            for r in rows
+        ], total
 
     def team_role_of(self, team_id: UUID, user_id: UUID) -> str | None:
         """**나간 소속은 세지 않는다.** 재가입 이력이 여러 행으로 남기 때문이다."""
@@ -115,6 +217,61 @@ class MatchPgRepository(MatchPort):
                     head_count=need.head_count,
                 )
             )
+        self._session.commit()
+
+    def update_match(
+        self,
+        match_id: UUID,
+        *,
+        played_at: datetime | None,
+        place: str | None,
+        needs: list[PositionNeedEntity] | None,
+    ) -> None:
+        """`None` 인 항목은 건드리지 않는다. **한 트랜잭션에서** 끝낸다."""
+        changes = {}
+        if played_at is not None:
+            changes["played_at"] = played_at
+        if place is not None:
+            changes["place"] = place
+        if changes:
+            self._session.execute(
+                update(MatchOrm).where(MatchOrm.id == match_id).values(**changes)
+            )
+
+        if needs is not None:
+            # 🔴 지우고 새로 넣는다. 같은 트랜잭션이라 중간 상태가 밖에서 안 보인다 —
+            #    갈리면 필요 포지션이 사라진 경기가 남는다.
+            self._session.execute(
+                delete(MatchPositionNeedOrm).where(
+                    MatchPositionNeedOrm.match_id == match_id
+                )
+            )
+            for need in needs:
+                self._session.add(
+                    MatchPositionNeedOrm(
+                        id=uuid4(),
+                        match_id=match_id,
+                        position_id=need.position_id,
+                        head_count=need.head_count,
+                    )
+                )
+        self._session.commit()
+
+    def count_applications(self, match_id: UUID) -> int:
+        return self._session.execute(
+            select(func.count())
+            .select_from(MatchApplicationOrm)
+            .where(MatchApplicationOrm.match_id == match_id)
+        ).scalar_one()
+
+    def delete_match(self, match_id: UUID) -> None:
+        """필요 포지션을 먼저 지운다 — 외래키가 그 순서를 요구한다."""
+        self._session.execute(
+            delete(MatchPositionNeedOrm).where(
+                MatchPositionNeedOrm.match_id == match_id
+            )
+        )
+        self._session.execute(delete(MatchOrm).where(MatchOrm.id == match_id))
         self._session.commit()
 
     def find_match(self, match_id: UUID) -> MatchEntity | None:

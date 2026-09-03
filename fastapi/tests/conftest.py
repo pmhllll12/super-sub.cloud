@@ -20,7 +20,12 @@ from app.match.dependencies.match_providers import get_match_repository
 from app.core.deps import get_token_version_reader, get_user_email_reader
 from app.main import app
 from app.card.adapter.outbound.stub.card_stub_repository import StubCardRepository
+from app.card.adapter.outbound.stub.squad_stub_repository import (
+    StubSquadRepository,
+    reset_squads,
+)
 from app.card.dependencies.card_repository_provider import get_card_repository
+from app.card.dependencies.squad_providers import get_squad_repository
 from app.user.adapter.outbound.stub.user_stub_repository import (
     DEMO_EMAIL,
     DEMO_PASSWORD,
@@ -79,6 +84,7 @@ def client() -> TestClient:
     app.dependency_overrides[get_card_repository] = StubCardRepository
     app.dependency_overrides[get_team_repository] = StubTeamRepository
     app.dependency_overrides[get_match_repository] = StubMatchRepository
+    app.dependency_overrides[get_squad_repository] = StubSquadRepository
     app.dependency_overrides[get_video_repository] = StubVideoRepository
     # 🔴 저장소도 갈아끼운다. 안 끼우면 `S3_BUCKET` 이 없어 503 이 나는데,
     #    그건 계약이 아니라 **환경 문제**라 계약 테스트가 그걸 검사하면 안 된다.
@@ -86,6 +92,7 @@ def client() -> TestClient:
     app.dependency_overrides[get_token_version_reader] = _stub_token_version_reader
     app.dependency_overrides[get_user_email_reader] = _stub_user_email_reader
     reset_videos()
+    reset_squads()
     try:
         yield TestClient(app)
     finally:
@@ -93,6 +100,7 @@ def client() -> TestClient:
         app.dependency_overrides.pop(get_card_repository, None)
         app.dependency_overrides.pop(get_team_repository, None)
         app.dependency_overrides.pop(get_match_repository, None)
+        app.dependency_overrides.pop(get_squad_repository, None)
         app.dependency_overrides.pop(get_video_repository, None)
         app.dependency_overrides.pop(get_storage, None)
         app.dependency_overrides.pop(get_token_version_reader, None)

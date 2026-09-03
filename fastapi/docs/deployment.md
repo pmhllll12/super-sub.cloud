@@ -312,7 +312,7 @@ ssh supersub 'cd ~/supersub/app && git pull && cd fastapi \
 | **`pgvector`** | AL2023 저장소에 **패키지가 없다.** 지금 마이그레이션은 `vector` 를 안 써서 없이도 돌았다 — `player_vector` 가 들어올 때 소스 빌드(`gcc` 필요)를 해야 한다 |
 | ~~백업~~ | ✅ 2026-09-02 에 걸었다 — 7절. **다만 같은 디스크에 쌓인다**(밖으로 옮기는 것은 별도) |
 | **로그 회전·모니터링** | journald 기본값에 기대고 있다 |
-| 🔴 **업로드용 S3 버킷 설정** | 버킷은 계정에 있지만 서버 `.env` 에 `S3_BUCKET` 이 없어 업로드 경로가 503 이다 — 아래 9절 |
+| ~~업로드용 S3 버킷 설정~~ | ✅ **2026-09-03 에 켰다** — 9절. 끝에서 끝까지 확인했다 |
 
 ---
 
@@ -414,32 +414,29 @@ ssh supersub 'systemctl is-active postgresql supersub-api'   # 켠 뒤 확인
 
 ⚠️ 요율은 바뀔 수 있다. 콘솔의 요금 페이지에서 한 번 확인하고 붙인다.
 
-> **상태:** 진행 전 · 2026-09-03 · **콘솔 작업이라 사용자가 한다**
-> **확인:** 인스턴스를 껐다 켠 뒤에도 `ssh supersub` 가 그대로 붙으면 된 것이다
+> **상태:** ✅ 붙였다 · 2026-09-03
+> **확인:** `ssh supersub 'uptime'` — 껐다 켠 뒤에도 그대로 붙으면 된 것이다
 
-🔴 **계정에 이미 있는 탄력적 IP 는 우리 것이 아니다** (2026-09-03 확인). 그것은
-**중지된 다른 인스턴스**에 붙어 있다 — 가져오지 말고 **새로 하나 할당해서
-`supersub` 인스턴스에 붙인다.** 이름이 비슷해 헷갈리기 쉬운 자리다.
+**주소가 이제 고정이다.** 아래 「껐다 켠 뒤에 할 일」은 더 필요 없고, **DNS A
+레코드도 이제 만들 수 있다**(미결 8번 — 박민호).
 
-⚠️ 그 다른 인스턴스는 **중지된 채로 탄력적 IP 를 붙잡고 있어 미사용 과금**(월 약
-$3.6)이 나가고 있다. 우리 것이 아니라 손대지 않았고, 미결 8번에 적어 알렸다.
+🔴 **계정에 탄력적 IP 가 둘이다. 우리 것은 `supersub` 인스턴스에 붙은 쪽이다.**
+나머지 하나는 **중지된 다른 인스턴스**의 것이라 손대지 않는다 — 목록에서 이름이
+비슷해 헷갈리기 쉬운 자리라 **「연결된 인스턴스 ID」로 가른다.**
 
-붙이고 나면 아래 「껐다 켠 뒤에 할 일」이 통째로 필요 없어지고, **DNS A 레코드도
-그때부터 만들 수 있다**(주소가 안 바뀌므로).
+⚠️ 그 다른 인스턴스는 중지된 채로 탄력적 IP 를 붙잡고 있어 **미사용 과금**(월 약
+$3.6)이 나가고 있다. 우리 것이 아니라 손대지 않았고 미결 8번에 적어 알렸다.
 
-### 껐다 켠 뒤에 할 일 (탄력적 IP 를 붙이기 전까지만)
+⚠️ **CloudShell 은 `jin` 계정 권한으로 열리지 않는다**(`cloudshell:CreateEnvironment`
+없음). 콘솔 클릭으로는 됐다 — CLI 로 할 일이 생기면 이 차이를 먼저 확인한다.
 
-탄력적 IP 가 없으면 **주소가 바뀐다.** 켠 뒤 이 순서로 한 번 정리한다.
+### ~~껐다 켠 뒤에 할 일~~ — 탄력적 IP 를 붙여 없어졌다 (2026-09-03)
+
+주소가 안 바뀌므로 켠 뒤에 **서비스 확인만** 하면 된다. 셋 다 `enabled` 라 부팅하면
+스스로 뜬다.
 
 ```bash
-# 1) 내 접속 설정
-# ~/.ssh/config 의 supersub 항목에서 HostName 을 새 IP 로 고친다 (편집기로)
-ssh-keygen -R <옛 IP>
-ssh supersub 'uptime'                                        # 붙는지 확인
-
-# 2) 개인 노트(_notes/MEMORY.md)의 접속 정보도 함께 고친다
-# 3) 서비스 확인 — 부팅하면 알아서 뜬다
-ssh supersub 'systemctl is-active postgresql supersub-api'
+ssh supersub 'systemctl is-active postgresql supersub-api supersub-backup.timer'
 ```
 
 **저장소에는 IP 를 적지 않는다** — 공개 저장소다. 팀에 알릴 일이 있으면 값은 직접
@@ -454,13 +451,28 @@ ssh supersub 'systemctl is-active postgresql supersub-api'
 
 ## 9. 업로드용 S3 버킷 — `supersub-ai` (2026-09-03 확정)
 
-> **상태:** 진행중 · 2026-09-03 확인
-> **확인:** `ssh supersub 'grep -c S3_BUCKET ~/supersub/app/fastapi/.env'` → `0` 이면 아직
-> **메모:** 버킷과 접두사는 정해졌다. **서버에 IAM 역할이 없고 boto3 도 아직 없다** — 아래 「서버에서 켤 때」
+> **상태:** ✅ **켰다** · 2026-09-03 — 서버에서 끝에서 끝까지 태워 봤다
+> **확인:** `ssh supersub 'grep -c S3_BUCKET ~/supersub/app/fastapi/.env'` → `1`
+
+**09-03 에 실제로 확인한 것** (`smoke_upload.sh` 를 서버에서 돌렸다):
+
+| 단계 | 결과 |
+|---|---|
+| `POST /videos/upload-url` | 사전 서명 URL 발급, `expires_in: 900` |
+| 안 올린 키로 `POST /videos` | **422 `FILE_NOT_UPLOADED`** ← `s3:ListBucket` 이 붙었다는 증거다 |
+| 사전 서명 URL 로 S3 에 PUT | **200** |
+| `POST /videos` | `passed: true` · `analysis_status: "queued"` |
+| 4K 로 등록 | `passed: false` · 사유 `"해상도가 상한을 넘습니다: 3840x2160 (상한 1920x1080)"` |
+| `GET /videos` | 둘 다, 최근 것이 앞에 |
+| 검사 계정 삭제 | `user` 하나를 지우니 `video`·`video_validation`·`analysis_job` 까지 함께 사라졌다 (**SEC-006 실물 확인**) |
 
 ⚠️ 09-03 에 이 확인 명령의 경로를 `/opt/supersub/.env` 로 **짐작해서 적었다가 고쳤다.**
 실제 경로는 `~/supersub/app/fastapi/.env` 다(6-3 절에 처음부터 적혀 있었다).
 **짐작한 경로는 "0 건"이 아니라 "파일 없음"을 내고, 그것을 미착수로 오독한다.**
+
+⚠️ **연기 검사가 S3 에 1KB 객체 둘을 남겼다.** 역할에 `s3:DeleteObject` 가 없어
+서버에서 지울 수 없다 — 콘솔에서 `videos/` 아래를 한 번 비우면 된다. **클립 삭제
+기능을 만들 때 정책에 `s3:DeleteObject` 를 더해야 한다**(지금은 일부러 뺐다).
 
 | | |
 |---|---|
@@ -502,14 +514,70 @@ aws s3 ls s3://supersub-ai/      # 접두사 구조도 함께 본다
 > 09-03 에 위 표의 앞 둘을 "버킷 단위라 나눌 수 없다"고 잘못 적었다가 고쳤다.
 > **버킷 단위로 남는 것은 CORS 와 일괄 삭제 둘뿐이다.**
 
-### 서버에 줄 권한
+### 서버에 줄 권한 — 인스턴스 역할 (2026-09-03)
 
 클립은 앱 서버를 지나지 않고 사용자가 사전 서명 URL 로 S3 에 직접 올린다(PER-002).
 서버가 하는 일은 **URL 발급과 HEAD** 뿐이라 필요한 권한이 좁다.
 
-EC2 인스턴스 역할에 **`videos/` 접두사에 대한 `PutObject`·`GetObject`·`HeadObject`**
-만 준다. 🔴 **장기 액세스 키를 서버 `.env` 에 두지 않는다** — boto3 가 인스턴스
-역할을 먼저 찾는다(`.env.example` 의 AWS 절).
+🔴 **장기 액세스 키를 서버 `.env` 에 두지 않는다** — boto3 가 인스턴스 역할을
+먼저 찾는다(`.env.example` 의 AWS 절).
+
+⚠️ **`s3:HeadObject` 라는 IAM 액션은 없다.** 09-03 에 그렇게 적었다가 고쳤다 —
+HEAD 요청은 **`s3:GetObject`** 로 인가된다. 없는 액션을 정책에 적으면 조용히
+아무 효과가 없고, **문법 오류도 안 난다.**
+
+붙일 인라인 정책은 이것이다.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SupersubVideoObjects",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject"],
+      "Resource": "arn:aws:s3:::supersub-ai/videos/*"
+    },
+    {
+      "Sid": "SupersubBucketList",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::supersub-ai"
+    }
+  ]
+}
+```
+
+#### 🔴 `s3:ListBucket` 이 왜 필요한가 — 404 와 403 을 가르기 위해서다
+
+없는 키에 `head_object` 를 하면 **`s3:ListBucket` 이 있어야 404** 가 오고, 없으면
+**403** 이 온다. `s3_storage.py` 는 404 만 "안 올라왔다"(`None`)로 읽고 403 은
+정책 문제로 보아 그대로 올린다 — **"권한이 없다"를 "파일이 없다"로 읽지 않기
+위해서다.**
+
+그래서 `ListBucket` 이 빠지면 아직 안 올린 클립을 등록할 때 깨끗한 422
+`FILE_NOT_UPLOADED` 대신 **500** 이 난다.
+
+⚠️ `s3:prefix` 조건으로 좁히고 싶겠지만 **HeadObject 는 `s3:prefix` 를 넘기지
+않아서** 조건이 안 맞아 다시 403 이 된다. 버킷 전체에 주되, 이것으로 열리는 것은
+**키 이름 목록뿐**이고 `models/`·`reports/` 의 **내용은 못 읽는다**(위 `Resource`
+가 `videos/*` 로 좁혀져 있다).
+
+#### 🔴 `jin` 계정으로는 붙일 수 없다 (2026-09-03 확인)
+
+콘솔에서 막힌다.
+
+```
+User: arn:aws:iam::…:user/jin is not authorized to perform:
+iam:ListInstanceProfiles … because no identity-based policy allows it
+```
+
+**계정 소유자(박민호)가 해야 한다.** 그쪽 콘솔에서는 오류 없이 역할 목록이 뜬다.
+미결 8번에 정책 JSON 과 함께 올려 두었다.
+
+⚠️ **이미 있는 `pmh12-role` 을 그냥 붙이지 않는다.** 다른 인스턴스용으로 만든
+역할이라 무엇이 들어 있는지 모른다 — 넓으면 필요 이상으로 열리고, 좁으면 S3 가
+안 된다. **새 역할에 위 정책 하나만** 붙이는 편이 낫다.
 
 ### CORS — 브라우저에서 올릴 때만 필요하다
 
@@ -527,35 +595,39 @@ EC2 인스턴스 역할에 **`videos/` 접두사에 대한 `PutObject`·`GetObje
   사전 서명 URL 로만 오가므로 **공개 접근은 차단이어야 한다** — 아니면 남의 클립을
   URL 추측으로 볼 수 있다. 한 번 확인할 것
 
-### 서버에서 켤 때 — **순서가 중요하다** (2026-09-03 실측)
+### 켠 순서 — **이 순서가 중요하다** (2026-09-03 에 이대로 했다)
 
-09-03 에 서버에 붙어 확인한 실제 상태다.
-
-| 확인한 것 | 결과 |
-|---|---|
-| `.env` | `~/supersub/app/fastapi/.env` (0600). 키 다섯 — `S3_BUCKET` **없음** |
-| IAM 인스턴스 역할 | 🔴 **없다.** 메타데이터의 `iam/security-credentials/` 가 404 다 |
-| `boto3` | 🔴 **없다.** 서버 venv 가 09-03 의 `requirements.txt` 이전이다 |
-| 서버가 보는 브랜치 | `jin` — **`main` 병합을 기다리지 않아도 배포된다** |
+```
+(1) IAM 역할 붙이기          ← 콘솔 작업. 이것부터
+(2) git pull + pip install   ← boto3 가 들어온다
+(3) alembic upgrade head     ← video_validation · squad
+(4) .env 에 S3_BUCKET·AWS_REGION
+(5) systemctl restart supersub-api
+```
 
 🔴 **`S3_BUCKET` 을 IAM 역할보다 먼저 넣으면 안 된다.** 넣는 순간 `get_storage` 가
 통과해서 boto3 가 자격증명을 찾다 실패하고, **깨끗한 503 이 500 으로 바뀐다.**
 "설정이 없다"는 신호가 "서버가 터졌다"로 보이게 된다.
 
+(1) 은 인스턴스가 켜져 있어도 붙고 **재시작도 필요 없다** — 몇 초 안에 메타데이터에
+자격증명이 뜬다. 정책은 `videos/` 접두사로 좁힌다(위 「서버에 줄 권한」).
+
+**서버가 보는 브랜치는 `jin` 이다** — `main` 병합을 기다리지 않아도 배포된다.
+
+역할이 붙었는지는 서버에서 이렇게 본다.
+
+```bash
+ssh supersub 'TOKEN=$(curl -s -X PUT http://169.254.169.254/latest/api/token \
+  -H "X-aws-ec2-metadata-token-ttl-seconds: 60"); \
+  curl -s -H "X-aws-ec2-metadata-token: $TOKEN" \
+  http://169.254.169.254/latest/meta-data/iam/security-credentials/'
 ```
-(1) IAM 역할 붙이기          ← 콘솔 작업. 이것부터
-(2) git pull + pip install   ← boto3 가 들어온다
-(3) alembic upgrade head     ← video_validation
-(4) .env 에 S3_BUCKET·AWS_REGION
-(5) systemctl restart supersub-api
-```
 
-(1) 은 인스턴스가 켜져 있어도 붙일 수 있다. 정책은 `videos/` 접두사로 좁힌다
-(위 「서버에 줄 권한」).
+역할 이름이 찍히면 붙은 것이고, 404 HTML 이 나오면 아직이다.
 
-### 그때까지
+### 꺼져 있을 때는
 
-`S3_BUCKET` 이 비어 있으므로 업로드 경로는 503(`STORAGE_NOT_CONFIGURED`)이다.
+`S3_BUCKET` 이 비어 있으면 업로드 경로는 503(`STORAGE_NOT_CONFIGURED`)이다.
 **다른 경로는 영향이 없다** — 저장소는 업로드 유스케이스에서만 주입된다.
 
 ---

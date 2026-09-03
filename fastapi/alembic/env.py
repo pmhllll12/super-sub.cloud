@@ -35,6 +35,8 @@ from app.user.adapter.outbound.orm import team_orm  # noqa: E402,F401
 from app.user.adapter.outbound.orm import user_credential_orm  # noqa: E402,F401
 from app.user.adapter.outbound.orm import user_identity_orm  # noqa: E402,F401
 from app.card.adapter.outbound.orm import player_card_orm  # noqa: E402,F401
+from app.card.adapter.outbound.orm import squad_member_orm  # noqa: E402,F401
+from app.card.adapter.outbound.orm import squad_orm  # noqa: E402,F401
 from app.card.adapter.outbound.orm import title_definition_orm  # noqa: E402,F401
 from app.card.adapter.outbound.orm import user_title_orm  # noqa: E402,F401
 from app.user.adapter.outbound.orm import user_orm  # noqa: E402,F401

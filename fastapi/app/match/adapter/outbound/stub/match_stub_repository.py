@@ -12,7 +12,11 @@ from uuid import UUID, uuid4
 
 from app.match.application.ports.output.match_port import MatchPort
 from app.match.domain.entities.application_entity import ApplicationEntity
-from app.match.domain.entities.match_entity import MatchEntity, PositionNeedEntity
+from app.match.domain.entities.match_entity import (
+    MatchEntity,
+    MatchListingEntity,
+    PositionNeedEntity,
+)
 from app.match.domain.rules.application_rules import SIDE_TEAM, SIDE_USER
 
 _POSITIONS = {
@@ -22,21 +26,32 @@ _POSITIONS = {
 }
 
 _TEAMS: dict[UUID, str] = {}
+# 팀의 표시용 값(이름·지역). 탐색 목록에만 쓰여서 `_TEAMS` 와 나눠 뒀다 —
+# 합치면 종목을 읽는 자리가 전부 바뀐다.
+_TEAM_META: dict[UUID, tuple[str, str]] = {}
 _ROLES: dict[tuple[UUID, UUID], str] = {}
 _MATCHES: dict[UUID, MatchEntity] = {}
 
 
 def reset_matches() -> None:
     _TEAMS.clear()
+    _TEAM_META.clear()
     _ROLES.clear()
     _MATCHES.clear()
     _APPLICATIONS.clear()
     _USERS.clear()
 
 
-def register_team(team_id: UUID, sport_code: str) -> None:
-    """스텁에는 `team` 테이블이 없다. 검사가 "이 팀은 이 종목"이라고 알려 준다."""
+def register_team(
+    team_id: UUID, sport_code: str, name: str = "스텁 팀", region: str = "서울"
+) -> None:
+    """스텁에는 `team` 테이블이 없다. 검사가 "이 팀은 이 종목"이라고 알려 준다.
+
+    `name`·`region` 은 **탐색 목록에만** 쓰인다. 기본값을 둔 이유는 기존 검사가
+    종목만 넘기고 있어서다 — 탐색을 보는 검사만 값을 채운다.
+    """
     _TEAMS[team_id] = sport_code
+    _TEAM_META[team_id] = (name, region)
 
 
 def register_role(team_id: UUID, user_id: UUID, role: str) -> None:
@@ -108,8 +123,64 @@ class StubMatchRepository(StubApplicationsMixin, MatchPort):
     def team_exists(self, team_id: UUID) -> bool:
         return team_id in _TEAMS
 
+    def sport_exists(self, sport_code: str) -> bool:
+        return sport_code in _POSITIONS
+
+    def search_upcoming(
+        self,
+        *,
+        sport_code: str | None,
+        region: str | None,
+        now: datetime,
+        offset: int,
+        limit: int,
+    ) -> tuple[list[MatchListingEntity], int]:
+        found = []
+        for match in _MATCHES.values():
+            if match.played_at <= now:
+                continue
+            name, team_region = _TEAM_META.get(match.team_id, ("스텁 팀", "서울"))
+            if sport_code and _TEAMS.get(match.team_id) != sport_code:
+                continue
+            # 실물은 ilike 부분 일치다. 대소문자는 한글에 뜻이 없지만 맞춰 둔다.
+            if region and region.lower() not in team_region.lower():
+                continue
+            found.append(
+                MatchListingEntity(
+                    match=match,
+                    team_name=name,
+                    region=team_region,
+                    sport_code=_TEAMS.get(match.team_id, ""),
+                )
+            )
+
+        found.sort(key=lambda listing: listing.match.played_at)
+        return found[offset : offset + limit], len(found)
+
     def team_role_of(self, team_id: UUID, user_id: UUID) -> str | None:
         return _ROLES.get((team_id, user_id))
+
+    def update_match(
+        self,
+        match_id: UUID,
+        *,
+        played_at: datetime | None,
+        place: str | None,
+        needs: list[PositionNeedEntity] | None,
+    ) -> None:
+        match = _MATCHES[match_id]
+        _MATCHES[match_id] = replace(
+            match,
+            played_at=played_at if played_at is not None else match.played_at,
+            place=place if place is not None else match.place,
+            needs=needs if needs is not None else match.needs,
+        )
+
+    def count_applications(self, match_id: UUID) -> int:
+        return sum(1 for a in _APPLICATIONS.values() if a.match_id == match_id)
+
+    def delete_match(self, match_id: UUID) -> None:
+        _MATCHES.pop(match_id, None)
 
     def find_positions(
         self, team_id: UUID, codes: list[str]
