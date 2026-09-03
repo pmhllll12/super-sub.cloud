@@ -11,12 +11,14 @@
 | `review_packet/images/*.jpg` | 클립당 1장, 39장 (10.0MB) |
 | `review_packet/side_form.csv` | 빈 서식 39행 |
 | `AFTER_LABELS.md` | 라벨 확보 후 계산 명세 (사전 등록) |
+| `labeled_stats.py` | 그 명세의 구현. **라벨을 보기 전에 썼다** — 빈 서식이면 멈춘다 |
 | `reference_AFTER_LABELING.csv` | 🔴 대조표 — **라벨 전에 열지 않는다** |
 | `make_packet.py` · `side_stats.py` | 생성 스크립트 |
 
 ```bash
 uv run python eval/pending6_side/labeling/side_stats.py    # 대조표 재생성
 uv run python eval/pending6_side/labeling/make_packet.py   # 이미지 재생성 (/mnt/d 필요)
+uv run python eval/pending6_side/labeling/labeled_stats.py # 라벨 확보 후 집계
 ```
 
 ## 🔴 이 평가셋은 전부 야구 **타격**이다 — 두 손 스윙
