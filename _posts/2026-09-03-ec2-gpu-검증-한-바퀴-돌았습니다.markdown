@@ -1,0 +1,120 @@
+---
+layout: default
+title: "EC2 GPU 검증이 한 바퀴 돌았습니다 — 런북에서 막히던 곳 일곱을 고쳤습니다"
+date: 2026-09-03
+nav_exclude: true
+---
+
+# EC2 GPU 검증이 한 바퀴 돌았습니다
+
+아침에 올린 [「GPU 할당량이 0이라 EC2 검증이 멈췄습니다」]({{ "/devlog/" | relative_url }})의
+후속입니다. **할당량이 승인됐고, 인스턴스가 떴고, 분석이 끝까지 돌았습니다.**
+
+- 인스턴스 `i-0ea81b71b57c047ff` (`supersub-ai`, g4dn.xlarge, ap-northeast-2a)
+- Ubuntu 26.04 DLAMI · Tesla T4 15360MiB · gp3 150GB
+- 어제 만들어 둔 VPC·서브넷·보안그룹·키 페어를 **그대로** 썼습니다
+
+## 돌아간 것
+
+| | |
+|---|---|
+| 의존성 | `uv sync --extra aws` · `torch.cuda.is_available()` **True** |
+| 테스트 | `pytest -q` — **161 통과** |
+| 모델 | EXAONE 4.0 1.2B 2.4G · RT-DETR 165M · ViTPose 328M |
+| vLLM | systemd 상시 기동 · GPU **5441 / 15360 MiB** (나머지가 포즈 몫) |
+| 분석 | 측정 33초 → 판정 12\~17초 |
+| 재현성 | 같은 영상 3회 **[62, 62, 62] 표준편차 0.00** — 기준 3점 이내 충족 |
+| **S3 경로** | `analyze_s3.py` 한 바퀴 — 아래 |
+
+역할이 붙은 뒤 `analyze_s3.py`로 **S3 입출력까지** 확인했습니다. 총 1분 6초:
+
+```
+[입력] s3://supersub-ai/videos/baseball_pitch_trim.mp4 → 9.1MB, 1.0초
+[측정] 92프레임 (실효 25.00fps), 32.8초
+[판정] 백엔드 vllm (LGAI-EXAONE/EXAONE-4.0-1.2B)
+  미리보기 impact.jpg   0.15MB → s3://.../reports/baseball_pitch_trim/<ts>/
+  미리보기 tracked.webm 6.35MB → s3://.../reports/baseball_pitch_trim/<ts>/
+저장: s3://supersub-ai/reports/baseball_pitch_trim/<ts>.json
+{"fetch_s": 1.04, "measure_s": 32.78, "judge_s": 16.75, "preview_s": 13.36}
+```
+
+`judge_backend`가 `vllm`으로 리포트에 실렸습니다 — 로컬 적재가 아니라 실제로
+서버를 거쳤다는 뜻입니다.
+
+농구 레이업 클립은 92점(A), 축구 인스텝 루브릭으로 돌린 클립은 62점(C)이
+나왔고, 항목마다 근거 문장이 붙었습니다. **등급은 코드가 정하고 모델은 근거
+문장만 씁니다** — 그 구조가 실제 서버에서도 그대로 동작했습니다.
+
+야구 투구 루브릭은 같은 클립을 **거부했습니다.**
+
+> 분석 중단: 상반신 스윙 측 키포인트(2개 관절) 유효 프레임 비율 51% < 기준 70%.
+
+이것도 정상 동작입니다. 상반신을 보는 루브릭인데 팔 키포인트가 절반밖에
+안 잡히는 영상이라 품질 게이트가 걸렸습니다.
+
+## 🔴 런북대로 하면 막히는 곳이 일곱 있었습니다
+
+인스턴스가 뜬 뒤부터는 **시간당 $0.647이 나가는 상태**라, 여기서 막히면
+돈이 새면서 막힙니다. 전부 고쳐서 올렸습니다.
+
+1. **`uv run pip` → `uv pip`** — uv가 만든 venv엔 pip이 없어 시스템 pip으로
+   떨어지고, Ubuntu 26.04의 PEP 668이 거부합니다. `set -e` 스크립트 안이라
+   **뒤 단계가 통째로 건너뛰어져** 모델을 받은 줄 알고 넘어갈 뻔했습니다
+2. **vLLM을 에이전트 venv에 넣으면 안 됩니다.** vLLM 휠은 자기가 빌드된
+   torch에만 맞는 C 확장을 들고 오는데 `pyproject.toml`은 torch를
+   cu126·`<2.9`로 고정합니다. `import vllm`이 `undefined symbol:
+   torch_list_size`로 죽었고, 되돌리려고 돌린 `uv sync`가 이번엔 torch의
+   `libcusparseLt.so.0`을 걷어내 **에이전트까지 못 쓰게 됐습니다.**
+   `/opt/supersub/vllm-venv`로 분리했습니다 — 서버는 별도 프로세스라
+   venv를 나눠도 손해가 없습니다
+3. **`--disable-log-requests`가 vLLM 0.28에서 삭제됐습니다.** 남아 있으면
+   `unrecognized arguments`로 기동조차 못 하고, `Restart=on-failure`라
+   **재시작만 반복합니다**(실제로 36번 돌았습니다). `--model`도 위치 인자로
+   바꿨습니다
+4. **`sync_model.sh`가 S3를 건너뛰지 못했습니다.** IAM 역할이 붙기 전에는
+   `ExecStartPre`가 `aws s3 sync`에서 죽어, 가중치가 디스크에 멀쩡히 있는데도
+   vLLM이 못 떴습니다. `SUPERSUB_MODEL_S3`가 비면 로컬본을 쓰게 했습니다
+5. **`autostop.conf`의 `BUSY_PATTERN`에 따옴표가 없었습니다.** 이 파일은
+   읽는 쪽이 둘(bash `source` + systemd `EnvironmentFile`)인데, 안 감싸면
+   bash가 `(`에서 죽습니다. **자동 종료 설치가 4단계에서 멈췄습니다** —
+   비용을 막으려고 만든 장치가 비용 때문에 급한 순간에 안 깔린 셈입니다
+6. **`analyze.py`가 `out/`을 만들지 않았습니다.** 마지막 줄이라 측정과 판정을
+   다 하고 **결과만 잃었습니다**
+7. **S3 확인 명령이 루트 나열이었습니다.** 2-1 정책은 `ListBucket`에
+   `s3:prefix` 조건을 걸어서 `aws s3 ls s3://supersub-ai/`는 **항상**
+   거부됩니다. 역할이 제대로 붙었는데도 권한 문제로 읽히기 딱 좋습니다
+
+커밋 `b3be03b` · `788bbe1` · `a985fed` · `94aa3f1`.
+
+## 자동 종료를 먼저 깔았습니다
+
+**끄는 걸 잊는 것이 이 배포의 가장 큰 비용 위험**이라, 분석보다 먼저
+걸었습니다. 설치 전에 콘솔에서 **종료 동작이 `중지`인 것을 확인**했습니다 —
+`종료`였다면 이 스크립트가 인스턴스와 EBS를 지웁니다.
+
+- 유휴 30분(접속 없음) / 120분(접속만 있고 작업 없음) / 최대 가동 12시간
+- 5분 주기 판정, `enabled`·`active` 확인
+- 오래 걸리는 작업 앞에는 `sudo supersub-hold 4h` (타이머를 멈추지 마세요 —
+  다시 켜는 걸 잊으면 없는 것과 같습니다)
+
+## 정어진 님께 — 미결 16번을 닫았습니다
+
+할당량과 IAM 역할 **둘 다** 해결됐습니다. 감사합니다.
+
+역할이 붙은 뒤 **권한이 의도한 만큼만 열렸는지**까지 확인했습니다.
+`videos/`·`models/`·`reports/` 나열과 `reports/` 쓰기는 되고,
+**`videos/` 쓰기는 `AccessDenied`** 입니다 — 영상 업로드는 사람이 하고 EC2는
+읽기만 하는 설계가 그대로 동작합니다.
+
+`models/`에도 쓰기 권한이 없어서, EXAONE 가중치는 S3에 올리지 않고
+HuggingFace에서 받은 로컬본을 씁니다. 필요해지면 콘솔에서 사람이 올리면
+됩니다. 상세는
+[미결 항목 「AWS 계정에서 `ho`가 IAM·할당량을 못 쓴다」]({{ "/pending/" | relative_url }})에
+경과까지 남겨 두었습니다.
+
+## 다음
+
+- 골든셋으로 실제 판정 품질을 봅니다 (지금 점수는 전부 `provisional` —
+  지도자 검수 전 임시 루브릭입니다)
+- 인스턴스는 **쓸 때만 켭니다.** 방치하면 월 $490이고 하루 2시간이면 월 $53,
+  9배 차이입니다

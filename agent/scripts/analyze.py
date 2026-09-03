@@ -106,7 +106,10 @@ def main() -> None:
         print(f"\n재현성: {args.repeat}회 {scores}  표준편차 {sd:.2f}")
         print(f"  기준 3점 이내 — {'충족' if sd <= 3 else '미달'}")
 
+    # 마지막 단계라 여기서 죽으면 측정·판정을 다 하고 결과만 잃는다.
+    # out/ 이 없는 새 체크아웃(EC2 등)에서 실제로 그랬다.
     out = Path("out") / f"{args.video.stem}_result.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(
         json.dumps({"features": features, "result": result}, ensure_ascii=False, indent=2),
         encoding="utf-8",
