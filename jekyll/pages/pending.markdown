@@ -1012,4 +1012,19 @@ ssh supersub 'systemctl is-active postgresql supersub-api'   # active active
 마이그레이션 파일은 쓰시되 `down_revision` 만 `None` 으로 두십시오. 다 되면
 자기 브랜치에 푸시하고 알려 주시면 제가 잇습니다.
 
+## min (박민호)
+
+### 1. 패킷 A(과금) 진행 상황을 알려주세요
+
+패킷 B(평가·신뢰)는 `review_option` 초기 목록을 확정하고 마이그레이션을
+`min`에 푸시했습니다(jin 구역 14번 진행 참고). 패킷 A(과금 — `analysis_credit` ·
+`coach` · `coach_referral`, `fastapi/docs/backend-work-split.md` 패킷 A)는 지금
+어디까지 되어 있는지 궁금합니다.
+
+- 확인: `git grep -n "analysis_credit" -- fastapi/app` (`paik` 브랜치 기준)
+- 막힌 게 있으면 여기 남겨 주세요 — 특히 패킷 A 문서에 적힌 종목 코드
+  불일치(`football` vs `soccer`)와 미결 10번(웹이 mock에 고정) 순서 문제가
+  먼저 걸릴 수 있다고 되어 있습니다
+- **담당**: 백성검 · **제기**: 박민호 · **기한**: 확인되는 대로
+
 [← 표지]({{ "/" | relative_url }})
