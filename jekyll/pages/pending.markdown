@@ -1100,4 +1100,21 @@ ho 구역 2번(골든셋 라벨링 주체 확보)이 제 담당으로 되어 있
 
 - **담당**: 정상호 · **제기**: 박민호 · **기한**: 확인되는 대로
 
+### 5. 로컬 미리보기 서비스가 딴 저장소를 보고 있었습니다 ✅ 해소 (2026.09.03)
+
+`CLAUDE.md`는 `supersub-preview.service`가 **이 저장소 루트**를
+`WorkingDirectory`로 상시 구동 중이라고 적어 두었는데, 실제로는
+`/home/hi/projects/supersub.parkminho.cloud`(전혀 다른 git remote를 가진
+별개 프로젝트)를 보고 있었습니다. 그래서 스프린트2 로그를 새로 만들어도
+`http://localhost:4000/스프린트2/`가 404였습니다.
+
+- **원인**: 서비스 파일(`/etc/systemd/system/supersub-preview.service`)의
+  `WorkingDirectory`가 옛 경로 그대로 남아 있었습니다. `demo/`용
+  `jekyll-preview.service`(4001포트)는 처음부터 올바르게 설정돼 있었습니다.
+- **처리**: `WorkingDirectory`를 `/home/hi/projects/super-sub.cloud`로
+  고치고 `daemon-reload`·`restart` 했습니다(박민호, sudo 필요해 직접 실행).
+- **확인**: `curl localhost:4000/스프린트2/` · `/pending/` 둘 다 200, 칸반
+  보드도 `Sprint 2 · 09.01` 표시 확인.
+- **담당**: 박민호 · **기한**: —
+
 [← 표지]({{ "/" | relative_url }})
