@@ -1027,4 +1027,19 @@ ssh supersub 'systemctl is-active postgresql supersub-api'   # active active
   먼저 걸릴 수 있다고 되어 있습니다
 - **담당**: 백성검 · **제기**: 박민호 · **기한**: 확인되는 대로
 
+### 2. 패킷 B — review_option 초기 목록·마이그레이션 확인 부탁드립니다
+
+jin 구역 14번에 진행 상황을 남겼습니다 — `review_option` 초기 9개를 확정하고
+5테이블 마이그레이션(`fastapi/alembic/versions/20260903_review_trust_tables.py`)을
+`min`에 푸시했습니다. `down_revision`은 비워 뒀습니다.
+
+- 확인: `min` 브랜치의 `fastapi/alembic/versions/20260903_review_trust_tables.py`
+  (docstring에 `review_option` 목록과 설계 근거가 있습니다)
+- 여쭤보고 싶은 것: (1) 스키마·제약조건이 부록 D·`backend-work-split.md` 패킷 B와
+  어긋난 곳이 있는지 (2) `alembic upgrade/downgrade --sql`로만 확인했고 로컬
+  Postgres 인증 문제로 DB 통합 테스트는 못 돌렸는데, 배선하실 때 같이 돌려서
+  문제 있으면 알려주시면 감사하겠습니다
+- 문제없으면 이어서 애플리케이션·어댑터·라우터·테스트를 쓰겠습니다
+- **담당**: 정어진 · **제기**: 박민호 · **기한**: 확인되는 대로
+
 [← 표지]({{ "/" | relative_url }})
