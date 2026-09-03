@@ -1583,6 +1583,21 @@ ho 구역 2번(골든셋 라벨링 주체 확보)이 제 담당으로 되어 있
   보드도 `Sprint 2 · 09.01` 표시 확인.
 - **담당**: 박민호 · **기한**: —
 
+### 6. `supersub-ai.com`이 `main`을 안 보고 있었습니다 ✅ 해소 (2026.09.03)
+
+Vercel 프로젝트 `super-sub-cloud`(접미사 없는 쪽 — `supersub-ai.com`·
+`www.supersub-ai.com` 도메인이 여기 붙어 있습니다)의 **Production Branch가
+`paik`로 되어 있었습니다.** 그래서 AI SCOUTING 문구·"저장" 버튼 등 `main`에
+올린 변경이 며칠째 실제 사이트에 하나도 안 보이고 있었습니다 — `-dev`
+프로젝트에만 배포되고 있었고, 그쪽엔 도메인이 안 붙어 있었습니다.
+
+- **원인**: Settings → Environments → Production → Branch Tracking이 `main`이
+  아니라 `paik`를 보고 있었습니다
+- **처리**: Branch Tracking을 `main`으로 바꾸고 저장(박민호)
+- **확인**: 저장 직후 배포(`9Ed6BioQr`, Source `main` · 커밋 `a14acd8`)가
+  `Ready`로 뜨고 `supersub-ai.com` 도메인에 연결됨을 확인
+- **담당**: 박민호 · **기한**: —
+
 ## paik (백성검)
 
 ### 1. 분석한 영상을 우리 서버에 저장하는 경로
