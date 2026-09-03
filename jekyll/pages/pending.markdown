@@ -924,4 +924,48 @@ Sprint 번호를 `jekyll/sprints/스프린트N.markdown` 링크로 연결 (2) �
   한 번에 정리한다. 둘 다 "지금 급하지 않지만 늦으면 비싼" 종류다
 - **담당**: 박민호(PM 판단 필요) · **제기**: 정상호 · **기한**: 서비스 오픈 전
 
+## 20. AWS 계정에서 `ho`가 IAM·할당량을 못 쓴다 (2026.09.02)
+
+분석 에이전트를 올릴 AWS 자원을 콘솔에서 직접 만들고 있는데(계정
+`0706-0555-3723`, 서울), IAM 사용자 `ho`의 권한이 서비스별로 갈려 있다.
+
+| 서비스 | 되나 | 확인된 것 |
+|---|---|---|
+| S3 | ✅ | 버킷 `supersub-ai` 생성, 버킷 정책 적용 |
+| EC2 · VPC | ✅ | VPC·서브넷·IGW·라우팅·S3 엔드포인트·보안그룹 생성 |
+| **IAM** | ❌ | `ListUsers`·`ListRoles` 거부, 정책·역할 생성 거부 |
+| **Service Quotas** | ❌ | `ListAWSDefaultServiceQuotas` 거부, 증액 요청 버튼 비활성 |
+
+모두 "no identity-based policy allows the action"이다.
+
+**막히는 것 둘.**
+
+1. **EC2가 S3에 닿을 방법이 없다.** 인스턴스 역할을 못 만들고, 대안이던
+   "권한 좁힌 IAM 사용자 + 키"도 그 사용자를 못 만들어 함께 막힌다
+2. **GPU 인스턴스 할당량을 확인·신청할 수 없다.** 신규 계정은 G 계열 vCPU가
+   0인 경우가 많은데, 0이면 `g4dn.xlarge` 시작이 거부된다. 신청도 못 한다
+
+**지금은 막히지 않는다.** S3 없이도 검증이 된다 — 모델은 EC2가 HuggingFace에서
+직접 받고, 영상·리포트는 `scp`로 오간다. `analyze_s3.py`는 코드와 테스트가 이미
+있으니 권한이 열리는 날 켜면 된다. 그래서 **이 항목이 EC2 진행을 막지는 않는다.**
+
+**요청 — 계정 관리자에게.** 아래 중 하나면 된다.
+
+- (a) `ho`에게 `iam:CreateRole`·`CreatePolicy`·`AttachRolePolicy`·`PassRole`과
+  `servicequotas:ListAWSDefaultServiceQuotas`·`RequestServiceQuotaIncrease` 부여
+- (b) 관리자가 대신 만들어 주기: EC2용 역할 `supersub-ai-ec2` — 신뢰 주체 EC2,
+  권한은 `supersub-ai` 버킷의 `videos/`·`models/` 읽기와 `reports/` 쓰기만.
+  정책 JSON은
+  [`agent/deploy/README-console.md`](https://github.com/jsangho/super-sub.cloud/blob/ho/agent/deploy/README-console.md)
+  2-1에 그대로 있다
+- 그리고 **"Running On-Demand G and VT instances" 할당량을 8 이상으로** 신청.
+  4면 `g4dn.xlarge`만 되고, 호스트 RAM이 부족해 `g4dn.2xlarge`로 올릴 때
+  (미결 9번) 다시 며칠을 기다린다
+
+(b)가 최소 권한 원칙에 맞는다. (a)는 `ho`에게 IAM 권한을 상시로 주는 것이라
+팀 계정에서는 과할 수 있다.
+
+- **담당**: 정어진(배포·AWS 계정) · **제기**: 정상호 · **기한**: EC2 검증 후
+  S3 연동을 켤 때까지
+
 [← 표지]({{ "/" | relative_url }})
