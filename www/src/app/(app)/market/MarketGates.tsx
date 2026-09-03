@@ -82,6 +82,12 @@ export default function MarketGates({
   /** 판 안 굴림 자리. 목록 ↔ 상세를 오갈 때 맨 위에서 시작해야 한다. */
   const body = useRef<HTMLDivElement | null>(null)
   /**
+   * 머리 띠(간판 줄). 🔴 굴러도 **자리에 남아야** 해서(사용자 요청) `sticky` 인데,
+   * 바로 아래 줄(거름망 · 코치 이름)도 같이 남으려면 **띠가 얼마나 높은지**를
+   * 알아야 한다 — 그 값을 아래 effect 가 재서 CSS 에 넘긴다.
+   */
+  const topline = useRef<HTMLDivElement | null>(null)
+  /**
    * 지금 이 화면 안에서 **몇 걸음 들어와 있나**(0 = 아무것도 안 열림).
    *
    * 🔴 판이 열리고 코치를 고르는 것은 주소를 안 바꾼다(사용자 요청). 그래서
@@ -288,6 +294,27 @@ export default function MarketGates({
     }
   }, [open])
 
+  /**
+   * 머리 띠의 키를 재서 `--ss-md-topline-h` 로 넘긴다.
+   *
+   * 🔴 **값을 CSS 에 적어 둘 수 없다.** 띠의 키는 여백(`clamp`)과 간판 글자
+   * 크기(`clamp`)에서 나오므로 창 폭에 따라 달라진다 — 고정 px 을 적으면 어떤
+   * 폭에서는 아래 줄이 띠를 덮고, 어떤 폭에서는 사이가 벌어진다.
+   * 🔴 창 크기만 듣지 않고 `ResizeObserver` 로 **띠 자체**를 본다. 글꼴이 늦게
+   * 실려 띠가 한 번 더 커지는 경우가 있어서다(간판은 Shrikhand 다).
+   */
+  useEffect(() => {
+    const el = topline.current
+    const scope = body.current
+    if (!el || !scope) return
+    const ro = new ResizeObserver(() => {
+      scope.style.setProperty('--ss-md-topline-h', `${el.offsetHeight}px`)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+    // 판이 열릴 때 띠가 새로 생기므로 그때 다시 건다.
+  }, [open, coachId, shown])
+
   /** 열려 있으면 Esc 로 닫는다 — 덮는 판에는 물러날 길이 늘 있어야 한다. */
   useEffect(() => {
     if (!open) return
@@ -466,7 +493,7 @@ export default function MarketGates({
                 글꼴은 배경 아치(TRAIN & GEAR UP)와 같은 것(`--font-poster`,
                 Shrikhand)이라 두 화면이 한 목소리로 읽힌다. 상점 쪽도 같은
                 짜임이라 짝이 되는 말을 쓴다. */}
-            <div className="ss-market-detail-topline">
+            <div className="ss-market-detail-topline" ref={topline}>
               <button
                 type="button"
                 className="ss-market-detail-close"

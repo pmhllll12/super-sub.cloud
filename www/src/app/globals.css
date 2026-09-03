@@ -4216,6 +4216,40 @@ body::-webkit-scrollbar {
   padding-top: var(--ss-md-filter-pad);
 }
 
+/* 🔴 **굴려도 머리는 자리에 남는다**(사용자 요청). 띠가 두 줄(간판 줄 + 그 아래
+   거름망 · 코치 이름 줄)이라 **둘 다** 붙여야 한 장으로 남는다 — 위만 붙이면
+   아래 줄이 그 밑으로 빨려 들어가 띠가 반쪽이 된다.
+
+   🔴 아래 줄이 설 자리(`top`)는 **위 줄의 키**다. 그 값은 여백과 간판 글자
+   크기가 `clamp` 라 창 폭마다 달라지므로 CSS 에 적을 수 없다 —
+   `MarketGates` 가 재서 `--ss-md-topline-h` 로 넘겨준다(그 주석 참고).
+   못 받았을 때(0px)도 겹치기만 할 뿐 깨지지는 않는다.
+
+   🔴 쌓임 순서: 위 줄이 아래 줄보다 앞이어야 한다. 둘이 만나는 자리에서 아래
+   줄이 위로 올라오면 간판 글자가 잘린다. */
+.ss-market-detail-topline {
+  position: sticky;
+  /* 🔴 **0 이 아니라 음수 여백만큼**이다. 이 띠는 굴림 칸의 위 여백을 음수 여백
+     으로 걷어내 판 끝에 닿아 있는데(위 `margin-top`), `sticky` 는 **테두리 상자가
+     아니라 바깥 여백까지 포함한 상자**를 붙일 자리 안에 가둔다 — `top: 0` 으로
+     두면 그 음수 여백만큼 띠가 아래로 밀려 **위에 초록 띠 한 줄이 생긴다**
+     (사용자 지적. 굴리기 전에도 생기므로 붙이기 전부터 어긋난다).
+     걷어낸 값을 그대로 되돌려 주면 테두리 상자가 판 끝에 선다. */
+  top: calc(var(--ss-md-pad-y) * -1);
+  z-index: 3;
+}
+
+.ss-market-detail .ss-filterbar-wrap,
+.ss-market-detail .ss-market-head {
+  position: sticky;
+  /* 🔴 **판 끝을 기준으로 잰다.** `top` 은 굴림 칸의 안쪽 여백 **안쪽**에서 세므로,
+     위 띠처럼 `-pad-y` 가 곧 판 끝이다 — 거기서 띠 키만큼 내려온 자리가 이 줄이다.
+     `top: <띠 키>` 로만 두면 여백만큼 더 내려가 **둘 사이가 초록 띠로 벌어진다**
+     (사용자 지적 — 실측 77px 자리에 105px 로 섰다). */
+  top: calc(var(--ss-md-topline-h, 0px) - var(--ss-md-pad-y));
+  z-index: 2;
+}
+
 .ss-market-detail .ss-filterbar {
   padding-bottom: var(--ss-md-filter-pad);
 }
@@ -4380,6 +4414,14 @@ body::-webkit-scrollbar {
    문지기가 굴림을 듣지 않게 `data-ss-detail` 로 알린다(`MarketGates`). */
 .ss-market-detail-body {
   min-height: 0;
+  /* 🔴 **머리 띠가 스크롤에서 절대 안 움직여야 한다**(사용자 요청). 붙여 두는
+     것(`sticky`)만으로는 한 자리가 남는다 — macOS 의 **고무줄 굴림**이다. 맨
+     위에서 더 올리면 브라우저가 칸 전체를 아래로 늘였다 되돌리는데, 그때는
+     붙여 둔 것도 같이 딸려 내려간다. 굴림 값이 안 바뀌므로 코드로는 안 잡히고
+     **손으로 굴려 봐야만** 보인다(헤드리스 실측에서는 띠가 0에 붙어 있었다).
+     🔴 `contain` 이 아니라 `none` 이다 — `contain` 은 뒤 화면으로 굴림이 넘어가는
+     것만 막고 고무줄은 그대로 둔다. */
+  overscroll-behavior: none;
   /* 🔴 굴림 막대는 **안 보이게** 한다(사용자 요청). 판이 화면 오른쪽을 통째로
      쓰는데 그 끝에 회색 막대가 서면 판의 테두리처럼 보인다. 굴리는 것 자체는
      그대로다. */
@@ -5752,7 +5794,10 @@ body:has(.ss-market-entry) .ss-home-header {
    🔴 움직임을 줄여 달라고 한 사람에게는 **아예 켜지 않는다.** 트랜지션만
    지우면 결국 커진 채로 남으므로 hover 규칙째 미디어 쿼리 안에 둔다(위
    `.ss-card-interactive` 와 같은 방식). */
-.ss-coach-list > li {
+/* 상품 목록(`.ss-shop-grid`)도 **같은 규칙을 나눠 쓴다** — 한 판에 사는 카드
+   둘이 다르게 반응하면 따로 논다. */
+.ss-coach-list > li,
+.ss-shop-grid > li {
   transition: transform 240ms cubic-bezier(0.25, 0.6, 0.3, 1);
 }
 
@@ -5760,7 +5805,9 @@ body:has(.ss-market-entry) .ss-home-header {
   .ss-coach-list > li:hover,
   /* 자판으로 옮겨 다닐 때도 같은 표시가 있어야 한다 — 초점은 줄이 아니라 그
      안의 단추 · 링크에 앉으므로 `:focus-within` 이다. */
-  .ss-coach-list > li:focus-within {
+  .ss-coach-list > li:focus-within,
+  .ss-shop-grid > li:hover,
+  .ss-shop-grid > li:focus-within {
     z-index: 1;
     transform: scale(var(--ss-card-hover-scale));
   }
@@ -5940,6 +5987,236 @@ body:has(.ss-market-entry) .ss-home-header {
   width: 100%;
   height: auto;
 }
+
+/* 🔴 굴리면 **사진만 위로 올라가며 사라진다**(사용자 요청). 머리 띠는 붙어서
+   남고(위), 아래 것들은 굴림 그대로 따라 올라온다.
+
+   진행도(0~1)는 `ShopList` 가 굴림 자리를 듣고 `--ss-shop-banner-p` 에 넣는다 —
+   여기서는 그 값을 읽어 그리기만 한다.
+
+   🔴 올라가는 것은 **레이아웃이 아니라 그림**이다(`transform`). 사진의 키를
+   줄이면 아래 것들이 그만큼 튀어 올라 굴림과 싸운다 — 굴림이 옮기는 거리에
+   조금 더 얹어 주는 정도라야 "사진만 먼저 빠진다"로 읽힌다.
+
+   🔴 움직임을 줄여 달라고 한 사람에게는 **올라가는 것만** 끈다. 흐려지는 것은
+   자리가 안 움직이므로 그대로 둔다. */
+.ss-shop-banner {
+  --ss-shop-banner-p: 0;
+  opacity: calc(1 - var(--ss-shop-banner-p));
+  /* 이 둘만 바뀐다고 미리 알린다 — 굴리는 동안 매 프레임 다시 칠하지 않는다. */
+  will-change: opacity, transform;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ss-shop-banner {
+    transform: translateY(calc(var(--ss-shop-banner-p) * -56px));
+  }
+}
+
+
+/* 🔴 **사진 바로 아래**에 두는 간판 글자(사용자 요청). 상품 목록을 안 그리는
+   동안 배너 밑이 초록으로 비어 있어서, 그 머리에 한 마디를 세워 둔다.
+
+   ⚠️ 한때 이 글자를 **사진 위에** 큼직하게 얹었다(뒤로 보냈다가 앞으로, 다시 맨
+   위로). 셋 다 사용자가 보고 물렸다 — 사진은 그대로 두고 글자는 아래 빈 자리로
+   내려왔다. 되돌리지 말 것.
+
+   🔴 **상품 목록이 생기면 이 자리는 목록에게 내준다**(`ShopList` 의 주석 참고).
+   그때 이 글자는 지워야 한다 — 목록 아래에 남으면 뜬금없어진다. */
+.ss-shop-word {
+  /* 🔴 사진과 상자들 **사이 한가운데**에 선다(사용자 요청).
+     🔴 그래서 여백을 위아래 **한 값**으로 준다(`margin-block`). 위와 아래를 따로
+     적으면 한쪽만 고쳐져 간판이 슬그머니 한쪽으로 붙는다 — 실제 틈은 여기에
+     굴림 칸의 `gap`(26px)이 위아래로 똑같이 더해진 값이다.
+     🔴 `flex: none` 으로 못박는다: 세로 flex 항목은 자리가 빠듯하면 스스로
+     눌리며 조용히 잘린다(이 저장소에서 되풀이된 함정). */
+  flex: none;
+  margin-block: 14px;
+  text-align: center;
+}
+
+.ss-shop-word-title {
+  /* 🔴 판 머리의 간판(BEST SELLERS, Shrikhand)과 **다른 글꼴**이다(사용자 지정
+     — Anton). 좁고 굵은 산세리프라 같은 자리에 서도 머리와 안 겨룬다.
+     🔴 굵기를 주지 않는다 — Anton 도 400 하나뿐이라 올리면 가짜 굵게만 걸린다. */
+  font-family: var(--font-sign), var(--font-rubik), system-ui, sans-serif;
+  font-size: clamp(2rem, 5vw, 4.5rem);
+  line-height: 1.05;
+  letter-spacing: 0.01em;
+  /* 머리 띠 · 선과 같은 종이색. 초록 위 7.96:1 로 또렷하다. */
+  color: var(--ss-md-paper);
+}
+
+/* 간판 아래 한 줄(사용자 지정 문구).
+   🔴 **글꼴을 주지 않는다.** 한글이라 Anton(라틴 전용)을 물리면 OS 기본 글꼴로
+   떨어져 위 줄과 따로 논다 — 본문 글꼴 그대로 둔다.
+   🔴 위 줄과의 틈은 **여기서** 준다. 굴림 칸의 `gap`(26px)에 맡기면 제목과
+   설명 사이가 절 사이만큼 벌어진다 — 그래서 둘을 한 상자로 묶어 뒀다. */
+.ss-shop-word-sub {
+  margin-top: 8px;
+  /* 왼쪽 두 문의 설명(`.ss-market-gate p`)과 같은 크기 · 줄높이다 — 같은 뜻의
+     글에 다른 크기를 주지 않는다. */
+  font-size: 1.0625rem;
+  line-height: 1.75;
+  color: color-mix(in srgb, var(--ss-md-paper) 72%, transparent);
+}
+
+/* ── 상점 목록 ────────────────────────────────────────────────────────*/
+/* 🔴 **한 줄에 넷**이다(사용자 요청, 레퍼런스 "Explore Our Collection").
+   코치 카드는 오른쪽에 영상이 붙어 가로로 길어 둘씩이지만(위), 상품 카드는
+   세로로 서므로 넷이 들어간다. */
+.ss-shop-grid {
+  /* 🔴 **상자들만 살짝 위로 당긴다**(사용자 요청). 간판이 띠에 붙는 자리에서
+     아랫줄이 잘려서다 — 간판 위 여백도, 카드 크기도 건드리지 않고 여기만 줄인다.
+     32px 인 이유: 그 자리에서 아랫줄이 **32px 모자랐다**(900px 창, 실측). 간판과
+     상자 사이가 40px(굴림 칸의 틈 26 + 간판의 아래 여백 14)이라 그 안에서 뺀다.
+     ⚠️ 더 짧은 창에서는 이걸로도 다 안 들어온다 — 그건 **다음 자리로 한 걸음**
+     가면 되는 일이지 여기를 더 줄일 일이 아니다.
+     🔴 여기서 위 여백을 **더하지는** 않는다 — 간판(`.ss-shop-word`)이 제
+     `margin-block` 으로 위아래 똑같이 벌려 두므로, 더하면 간판이 사진 쪽으로
+     붙어 "사이 한가운데"가 깨진다.
+     🔴 `flex: none` 으로 못박는다: 세로 flex 항목은 자리가 빠듯하면 스스로
+     눌리며 조용히 잘린다(이 저장소에서 되풀이된 함정). */
+  flex: none;
+  margin-top: -32px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+/* 좁은 창에서는 둘로 접는다 — 넷을 그대로 두면 카드 폭이 브랜드 이름도 못 담는다.
+   판이 화면을 덮는 폭(위 `.ss-market-detail` 의 미디어 쿼리)과 같은 자리다. */
+@media (max-width: 900px) {
+  .ss-shop-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.ss-shop-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  /* 🔴 코치 카드(`.ss-coach-card`)와 **같은 세 값**을 쓴다 — 한 판 위의 카드
+     둘이 다른 색이면 따로 논다. 색을 하나하나 칠하지 않고 이 셋만 갈아 끼우면
+     글 · 테두리 · 단추가 한꺼번에 따라온다. */
+  --ss-surface: #e3dece;
+  --ss-fg: #000000;
+  --ss-accent: #33483c;
+  /* 🔴 **바닥 키.** 사진 자리(위)가 남는 자리를 다 먹는 구조라, 키를 안 박으면
+     카드가 글 높이로 쪼그라들어 사진 자리가 없어진다. 한 줄의 카드들은 격자가
+     서로 키를 맞춰 주므로 이 값은 **가장 짧은 카드의 바닥**이다.
+     ⚠️ 아랫줄이 잘린다고 해서 한때 230 까지 내렸다가 **되돌렸다**(사용자 지적 —
+     카드가 작아졌다). 짧은 창에서 두 줄이 한 화면에 다 안 들어오는 것은 카드를
+     깎아서 풀 일이 아니라 **다음 자리로 한 걸음 더 가면 되는 일**이다
+     (`ShopList` 의 걸음 목록 참고). */
+  min-height: 320px;
+  border: 1px solid var(--ss-accent);
+  /* 모서리는 직각이다 — 코치 카드와 같은 이유(초록 테두리와 한 덩어리로 읽힌다). */
+  border-radius: 0;
+  background-color: var(--ss-surface);
+  /* 링크라 클래스 없는 글이 생기면 판에서 물려받은 **흰색**이 내려온다 — 밝은
+     카드에서 사라지므로 여기서 한 번 못박는다(코치 카드와 같은 함정). */
+  color: var(--ss-fg);
+  text-align: left;
+}
+
+/* 사진이 들어올 자리. 지금은 브랜드 이름을 얹은 판이다.
+   🔴 **남는 자리를 다 차지한다**(`flex: 1`). 그래야 아래 글이 바닥에 붙고
+   둘 사이의 선이 **글 바로 위까지 내려온다**(사용자 요청). 전에는 이 판을
+   비율(4/3)로 못박아 두어서 선이 카드 한가운데에 떠 있었다.
+   ⚠️ 비율(`aspect-ratio`)과 flex 늘어나기를 **같이 쓰지 않는다** — 이 저장소에서
+   이미 겪었다(폭 상한에서 키가 역산되어 카드가 900px 넘게 길어졌다). 키는 카드의
+   `min-height` 가 정하고 이 판은 남는 만큼만 가져간다.
+   🔴 사진이 오면 같은 상자에 `<Image>` 만 넣으면 된다. */
+.ss-shop-card-plate {
+  flex: 1;
+  /* 브랜드는 **가운데 위**다(사용자 요청) — 판 한가운데에 두면 사진이 들어올
+     자리를 글이 차지한 것처럼 보인다. */
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  min-height: 0;
+  padding: 14px 10px;
+  border-bottom: 1px solid var(--ss-accent);
+  /* 🔴 **초록으로 칠하지 않는다.** `--ss-accent` 가 판 바탕과 같은 #33483c 라
+     초록으로 칠하면 판에 녹아 사라진다(테두리도 같은 초록이라 카드 윗부분이
+     통째로 없어 보였다 — 실제로 그렇게 나왔다). 카드 안은 판과 반대로 밝아야
+     한다는 규칙 그대로, 띠와 같은 종이색을 깔고 글자를 초록으로 뒤집는다.
+     아래 몸(`--ss-surface` #e3dece)보다 한 단 밝아 둘이 층으로 읽힌다. */
+  background-color: var(--ss-md-paper);
+  color: var(--ss-accent);
+  /* 간판(STORE)과 **같은 글꼴**이다 — 브랜드는 전부 라틴이라 Anton 이 맞는다.
+     🔴 굵기를 주지 않는다(Anton 은 400 하나뿐이라 가짜 굵게만 걸린다). */
+  font-family: var(--font-sign), var(--font-rubik), system-ui, sans-serif;
+  font-size: clamp(0.95rem, 1.4vw, 1.375rem);
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+/* 카드의 아랫줄 — **글은 왼쪽 아래, 단추는 오른쪽**이다(사용자 요청).
+   🔴 `flex: none` 으로 못박는다: 위 판이 남는 자리를 다 가져가므로, 이쪽이
+   눌릴 수 있게 두면 글이 조용히 잘린다(이 저장소에서 되풀이된 함정). */
+.ss-shop-card-body {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px 14px;
+}
+
+.ss-shop-card-text {
+  /* 🔴 **줄어들 수 있어야 한다.** flex 항목의 최소 폭은 기본이 "내용만큼"이라,
+     안 풀어 주면 상품 이름이 긴 카드에서 단추를 밖으로 밀어낸다. */
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ss-shop-card-text > b {
+  font-size: 1rem;
+  line-height: 1.35;
+  /* 🔴 **두 줄 자리를 늘 잡는다.** 이름 길이가 카드마다 달라서, 안 잡으면 이름이
+     두 줄인 카드만 아랫줄이 두꺼워지고 **한 줄에 놓인 카드들의 선이 서로 어긋난다**
+     (실제로 그렇게 나왔다 — "드라이핏 트레이닝 탑" 만 선이 위로 올라갔다).
+     짧은 이름 아래가 조금 비는 것보다 선이 한 줄로 서는 편이 낫다. */
+  min-height: 2.7em;
+}
+
+.ss-shop-card-desc {
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: color-mix(in srgb, var(--ss-fg) 62%, transparent);
+}
+
+/* 나가는 단추. 🔴 **줄어들지 않는다**(`flex: none`) — 안 박으면 이름이 긴
+   카드에서 단추가 눌려 글자가 한 자씩 접힌다. 글줄과 바닥을 맞춘다(위 `body` 의
+   `align-items: flex-end`). */
+.ss-shop-card-go {
+  flex: none;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--ss-accent);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  color: var(--ss-accent);
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+/* 가져다 대면 단추가 뒤집힌다 — 줄이 커지는 것(위)과 함께 "이게 눌린다"를 말한다. */
+.ss-shop-card:hover .ss-shop-card-go,
+.ss-shop-card:focus-visible .ss-shop-card-go {
+  background-color: var(--ss-accent);
+  color: var(--ss-surface);
+}
+
 
 /* ── 코치 상세 ────────────────────────────────────────────────────────*/
 /* 🔴 절과 절 사이의 선은 **판 끝까지** 가고 색도 **상아색**이다(사용자 요청).
