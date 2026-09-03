@@ -520,39 +520,32 @@ Pydantic 검증에 걸리면 `code`는 항상 `VALIDATION_ERROR` 하나이고 `m
 ### 흐름
 
 ```
-(1) POST /videos    클립을 등록한다      -> video_id · analysis_job_id
+(1) 사용자가 클립을 올린다                (3-6절 — analysis_job 이 queued 로 생긴다)
 (2) 에이전트가 분석                       (측정 -> 판정 -> 합산)
 (3) POST /analyses  결과를 제출한다      -> analysis_metric_id
 ```
 
-업로드 전송 경로(사전 서명 URL)는 **객체 저장소가 정해지지 않아 아직 없다**(5장
-ASM-003). 그래서 (1)은 이미 어딘가에 있는 파일의 **키만 등록**한다. 저장소가 정해져도
-이 규격은 바뀌지 않는다 — 바뀌는 것은 키를 어떻게 얻느냐다.
+### 🔴 `POST /videos` 를 정정합니다 (2026-09-03)
 
-### `POST /api/v1/videos`
+**앞서 이 자리에 적었던 `POST /api/v1/videos` 규격은 폐기합니다.** 그때는 객체
+저장소가 안 정해져서(5장 ASM-003) "이미 어딘가에 있는 파일의 키만 등록한다"고
+적었는데, 09-03 에 **S3 + 사전 서명 URL** 로 정해지면서 그 엔드포인트가 사용자
+업로드 경로로 실제 구현됐습니다. 정본은 **3-6절**입니다.
 
-```json
-{
-  "sport_code": "football",
-  "storage_key": "videos/2026/08/28/abc.mp4",
-  "duration_ms": 10200,
-  "side": "right"
-}
-```
+무엇이 달라졌는지:
 
-`201 Created`
-
-```json
-{ "video_id": "3f1c...", "analysis_job_id": "9a2e...", "status": "queued" }
-```
-
-`side`는 **던지는 팔·차는 발**이다. 자동 판별이 팔 종목에서 신뢰할 수 없어
-(5장 CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트의 자동 판별을 쓴다.
-
-| 에러 | code | 언제 |
+| | 옛 초안 | 지금 (3-6절) |
 |---|---|---|
-| 422 | `UNKNOWN_SPORT` | 지원하지 않는 종목 코드 |
-| 422 | `VALIDATION_ERROR` | 필수 필드 누락·형식 오류 |
+| 키를 얻는 법 | 밖에서 정해 온다 | `POST /videos/upload-url` 이 발급한다 |
+| 키 형태 | `videos/2026/08/28/abc.mp4` | `videos/<user_id>/<uuid>.mp4` — **업로더가 들어간다** |
+| 요청 필드 | `sport_code`·`storage_key`·`duration_ms`·`side` | `width`·`height` 가 **추가**됐다(규격 검사) |
+| 응답 | `{video_id, analysis_job_id, status}` | `{id, passed, reject_reason, analysis_job_id, analysis_status, …}` |
+| 규격 위반 | 없던 개념 | **201 이고 `passed: false`** 다 |
+
+**에이전트가 이 경로로 클립을 등록할 일은 없어졌습니다.** 사용자가 올린 것을 받아
+분석하는 것이 흐름이라, 에이전트가 하는 일은 (2)·(3) 뿐입니다. 자체적으로 클립을
+넣어 시험해야 하면 저장 키가 업로더에 묶여 있어 그대로는 안 되니, 필요하면
+말씀해 주십시오 — 서비스 자격증명으로 넣는 경로를 따로 내겠습니다.
 
 ### `POST /api/v1/analyses`
 
@@ -1004,6 +997,147 @@ A를 권하는 이유는 데이터가 이미 그렇게 말하고 있어서다 �
 - **적합도**(`fitness_score`, SFR-006) · **추천**(`recommendation`, SFR-007) —
   도메인 ④ 의 나머지 둘
 - 확정 뒤의 알림 — 알림 인프라가 없다
+
+---
+
+## 3-6. 클립 업로드 (2026-09-03 추가)
+
+SFR-001. 사용자가 자기 클립을 올리고, 서버가 규격을 검사해 **반려 사유를 값으로
+남기는** 경로다.
+
+> **상태:** 구현됨 · 2026-09-03
+> **확인:** `git grep -n "video_validation" -- fastapi/app` → 결과가 있으면 들어왔다
+
+### 두 번에 나눠 부른다
+
+```
+(1) POST /videos/upload-url   올릴 자리를 받는다  -> storage_key · upload_url
+(2) PUT  <upload_url>          S3 에 직접 올린다   (앱 서버를 지나지 않는다)
+(3) POST /videos               등록하고 검사한다   -> passed · reject_reason
+```
+
+원본이 앱 서버를 지나지 않는 것이 PER-002 다. 서버가 아는 것은 **키와 크기**뿐이다.
+
+### 🔴 반려는 실패가 아니다 — `201` 이다
+
+규격에 안 맞는 클립을 422 로 돌려보내면 **사유가 아무 데도 안 남는다.** SFR-001 이
+요구하는 것은 그 반대다. 그래서 반려도 `201 Created` 로 답하고 `passed: false` 와
+사유를 본문에 싣는다. **등록은 성공했고, 그 클립이 분석 대상이 아닐 뿐이다.**
+
+클라이언트는 **`passed` 로 분기한다.** 상태 코드로 분기하면 반려를 놓친다.
+
+422 로 내는 것은 등록 자체가 성립하지 않는 경우뿐이다 — 종목이 없다, 파일이 안
+올라와 있다, 남의 저장 키다.
+
+### 상한 (2026-09-03 결정)
+
+| 항목 | 값 |
+|---|---|
+| 용량 | 200MB |
+| 길이 | 60초 |
+| 해상도 | 1920x1080 |
+| 형식 | `video/mp4` · `video/quicktime` |
+
+🔴 **길이 상한이 에이전트의 프레임 상한과 아직 안 맞는다.**
+`agent/src/supersub_agent/pose.py` 의
+`max_frames=300` 은 `target_fps=15` 기준 **20초분**이라 60초 클립은 앞 20초만
+분석된다. 미결 항목으로 올렸다 — 정해지면 여기 값이 바뀐다.
+
+### `POST /api/v1/videos/upload-url`
+
+```json
+{ "content_type": "video/mp4", "size_bytes": 52428800 }
+```
+
+`200 OK`
+
+```json
+{
+  "storage_key": "videos/3f1c.../9a2e....mp4",
+  "upload_url": "https://<bucket>.s3.<region>.amazonaws.com/...",
+  "expires_in": 900
+}
+```
+
+🔴 **`upload_url` 에 PUT 할 때 `Content-Type` 을 요청한 값 그대로 보내야 한다.**
+서명에 들어 있어서 다르면 S3 가 거절한다.
+
+⚠️ **이 URL 은 용량 상한을 강제하지 못한다.** 사전 서명 PUT 은 크기를 조건으로 걸
+수 없다. `size_bytes` 는 헛걸음을 줄이려고 미리 받는 값이고, 진짜 상한은 등록할 때
+저장소에 물어 **실측으로** 건다.
+
+| 에러 | code | 언제 |
+|---|---|---|
+| 422 | `UNSUPPORTED_FORMAT` | 받지 않는 형식 |
+| 422 | `FILE_TOO_LARGE` | `size_bytes` 가 상한을 넘는다 |
+| 503 | `STORAGE_NOT_CONFIGURED` | 서버에 `S3_BUCKET` 이 없다 |
+
+### `POST /api/v1/videos`
+
+```json
+{
+  "sport_code": "football",
+  "storage_key": "videos/3f1c.../9a2e....mp4",
+  "duration_ms": 10200,
+  "width": 1920,
+  "height": 1080,
+  "side": "right"
+}
+```
+
+`201 Created`
+
+```json
+{
+  "id": "7c05...",
+  "sport_code": "football",
+  "storage_key": "videos/3f1c.../9a2e....mp4",
+  "duration_ms": 10200,
+  "side": "right",
+  "created_at": "2026-09-03T09:00:00Z",
+  "passed": true,
+  "reject_reason": null,
+  "analysis_job_id": "9a2e...",
+  "analysis_status": "queued"
+}
+```
+
+반려면 `passed: false` · `reject_reason: "해상도가 상한을 넘습니다: 3840x2160
+(상한 1920x1080)"` · `analysis_job_id: null` 이다. **반려된 클립은 분석하지 않는다** —
+규격 검사를 두는 이유가 그것이다.
+
+`duration_ms`·`width`·`height` 는 **클라이언트가 잰 값**이다. 서버가 다시 재려면
+원본을 내려받아야 하고 그러면 PER-002 가 무너진다. 용량만은 저장소에 물어 실측한다.
+
+`side` 는 던지는 팔·차는 발이다. 자동 판별이 팔 종목에서 신뢰할 수 없어(5장
+CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트의 자동 판별을 쓴다.
+
+| 에러 | code | 언제 |
+|---|---|---|
+| 403 | `FORBIDDEN` | 남에게 발급된 저장 키다 |
+| 422 | `UNKNOWN_SPORT` | 지원하지 않는 종목 코드 |
+| 422 | `FILE_NOT_UPLOADED` | 그 키에 올라온 파일이 없다 |
+| 503 | `STORAGE_NOT_CONFIGURED` | 서버에 `S3_BUCKET` 이 없다 |
+
+**저장 키에 업로더가 들어 있다**(`videos/<user_id>/<uuid>.<확장자>`). 등록할 때 그
+접두사를 대조하므로 남이 올린 객체를 자기 영상으로 등록할 수 없다.
+
+### `GET /api/v1/videos`
+
+내 영상 목록. **최근 것이 앞에 온다.** 한 줄의 모양은 `POST /videos` 응답과 같다.
+
+`analysis_status` 는 그 영상의 **가장 최근** 분석 작업 상태다(`queued` · `running` ·
+`succeeded` · `failed`). 같은 영상을 다시 분석하면 작업이 여러 건이 되는데 목록은
+최근 것만 보여준다. 반려된 클립은 작업이 없어 `null` 이다.
+
+플러터 `/videos` 화면(영상 상세 펼침 + 규격 반려 사유 바텀시트)이 이 응답 하나로
+그려진다.
+
+### 아직 없는 것
+
+- **삭제** — 올린 클립을 지우는 경로. S3 객체까지 함께 지워야 해서 순서를 정해야 한다
+- **재분석** — `analysis_job` 은 여러 건을 허용하지만 만드는 경로가 업로드뿐이다
+- **분석 결과 적재**(`POST /analyses`) — 3-1 절. `metric_definition` 합의가 선행이다
 
 ---
 
