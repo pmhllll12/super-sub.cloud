@@ -499,14 +499,70 @@ aws s3 ls s3://supersub-ai/      # 접두사 구조도 함께 본다
 > 09-03 에 위 표의 앞 둘을 "버킷 단위라 나눌 수 없다"고 잘못 적었다가 고쳤다.
 > **버킷 단위로 남는 것은 CORS 와 일괄 삭제 둘뿐이다.**
 
-### 서버에 줄 권한
+### 서버에 줄 권한 — 인스턴스 역할 (2026-09-03)
 
 클립은 앱 서버를 지나지 않고 사용자가 사전 서명 URL 로 S3 에 직접 올린다(PER-002).
 서버가 하는 일은 **URL 발급과 HEAD** 뿐이라 필요한 권한이 좁다.
 
-EC2 인스턴스 역할에 **`videos/` 접두사에 대한 `PutObject`·`GetObject`·`HeadObject`**
-만 준다. 🔴 **장기 액세스 키를 서버 `.env` 에 두지 않는다** — boto3 가 인스턴스
-역할을 먼저 찾는다(`.env.example` 의 AWS 절).
+🔴 **장기 액세스 키를 서버 `.env` 에 두지 않는다** — boto3 가 인스턴스 역할을
+먼저 찾는다(`.env.example` 의 AWS 절).
+
+⚠️ **`s3:HeadObject` 라는 IAM 액션은 없다.** 09-03 에 그렇게 적었다가 고쳤다 —
+HEAD 요청은 **`s3:GetObject`** 로 인가된다. 없는 액션을 정책에 적으면 조용히
+아무 효과가 없고, **문법 오류도 안 난다.**
+
+붙일 인라인 정책은 이것이다.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SupersubVideoObjects",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject"],
+      "Resource": "arn:aws:s3:::supersub-ai/videos/*"
+    },
+    {
+      "Sid": "SupersubBucketList",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::supersub-ai"
+    }
+  ]
+}
+```
+
+#### 🔴 `s3:ListBucket` 이 왜 필요한가 — 404 와 403 을 가르기 위해서다
+
+없는 키에 `head_object` 를 하면 **`s3:ListBucket` 이 있어야 404** 가 오고, 없으면
+**403** 이 온다. `s3_storage.py` 는 404 만 "안 올라왔다"(`None`)로 읽고 403 은
+정책 문제로 보아 그대로 올린다 — **"권한이 없다"를 "파일이 없다"로 읽지 않기
+위해서다.**
+
+그래서 `ListBucket` 이 빠지면 아직 안 올린 클립을 등록할 때 깨끗한 422
+`FILE_NOT_UPLOADED` 대신 **500** 이 난다.
+
+⚠️ `s3:prefix` 조건으로 좁히고 싶겠지만 **HeadObject 는 `s3:prefix` 를 넘기지
+않아서** 조건이 안 맞아 다시 403 이 된다. 버킷 전체에 주되, 이것으로 열리는 것은
+**키 이름 목록뿐**이고 `models/`·`reports/` 의 **내용은 못 읽는다**(위 `Resource`
+가 `videos/*` 로 좁혀져 있다).
+
+#### 🔴 `jin` 계정으로는 붙일 수 없다 (2026-09-03 확인)
+
+콘솔에서 막힌다.
+
+```
+User: arn:aws:iam::…:user/jin is not authorized to perform:
+iam:ListInstanceProfiles … because no identity-based policy allows it
+```
+
+**계정 소유자(박민호)가 해야 한다.** 그쪽 콘솔에서는 오류 없이 역할 목록이 뜬다.
+미결 8번에 정책 JSON 과 함께 올려 두었다.
+
+⚠️ **이미 있는 `pmh12-role` 을 그냥 붙이지 않는다.** 다른 인스턴스용으로 만든
+역할이라 무엇이 들어 있는지 모른다 — 넓으면 필요 이상으로 열리고, 좁으면 S3 가
+안 된다. **새 역할에 위 정책 하나만** 붙이는 편이 낫다.
 
 ### CORS — 브라우저에서 올릴 때만 필요하다
 
