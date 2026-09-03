@@ -61,6 +61,19 @@ export type Coach = {
     scenes: { at: string; what: string }[]
     /** 이 리포트가 나온 영상. `/v/[slug]` 로 간다. */
     videoSlug: string
+    /**
+     * 목록 카드 옆에서 **소리 없이 도는 대표 장면**.
+     *
+     * ⚠️ 지금은 셋 다 **저장소에 넣어 둔 자리 표시 클립**이다(사용자 제공,
+     * `public/coach-c00N.mp4`). 계약에 영상 조회가 아직 없어서다(5장 ASM-003,
+     * 객체 저장소 미정) — 그쪽이 정해지면 여기 값이 그 주소로 바뀐다.
+     * 🔴 영상은 저장소를 무겁게 한다(지금 셋이 16MB). 코치가 늘 때마다 파일을
+     * 더 넣지 말고 객체 저장소 이야기를 먼저 꺼낼 것.
+     * 값이 없으면 카드는 `poster` 만 보여 준다(`CoachList`).
+     */
+    clipUrl?: string
+    /** 그 장면의 멈춘 그림. 영상이 오기 전까지 카드에 보이는 것이다. */
+    clipPoster?: string
   }
   /** 우리가 확인한 것. 코치가 적는 것이 아니라 **우리가 확인한 것**만 적는다. */
   verified: string[]
@@ -87,6 +100,7 @@ export const COACHES: Coach[] = [
         { at: '0:11', what: '팔로스루' },
       ],
       videoSlug: 'coach-kim-01',
+      clipUrl: '/coach-c001.mp4',
     },
     verified: ['신원 확인', '생활체육지도사 2급', '선수 이력 5년'],
     reviews: [
@@ -111,6 +125,7 @@ export const COACHES: Coach[] = [
         { at: '0:06', what: '릴리스' },
       ],
       videoSlug: 'coach-jung-01',
+      clipUrl: '/coach-c002.mp4',
     },
     verified: ['신원 확인', '대학 선수 이력 4년'],
     reviews: [{ by: '최OO', text: '영상으로 먼저 보고 만나서 설명이 짧았습니다.', at: '2026-08-25' }],
@@ -132,6 +147,7 @@ export const COACHES: Coach[] = [
         { at: '0:08', what: '임팩트' },
       ],
       videoSlug: 'coach-oh-01',
+      clipUrl: '/coach-c003.mp4',
     },
     verified: ['신원 확인', '생활체육지도사 2급', '실업팀 이력 3년'],
     reviews: [],

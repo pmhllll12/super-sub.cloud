@@ -58,7 +58,8 @@ AGPL-3.0**이라 링크한 채 네트워크 서비스를 제공하면 소스 공
 `track_overlay.py`를 실행하면 `from ultralytics import YOLO`에서 멈춘다.
 막아 둔 것이 아니라 **설치를 안 해서 안 되는 것**이므로, 누가
 `uv sync --extra tracking`을 치면 그때부터는 된다(ultralytics가 가중치를 자동으로
-내려받는다). 미결 19번이 이 점을 다룬다.
+내려받는다). 미결 항목 「AWS 배포가 라이선스 두 건을 상용 경로 앞에 세웠다」가
+이 점을 다룬다.
 
 ### (3) T4는 bfloat16을 못 쓴다
 

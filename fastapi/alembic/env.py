@@ -44,6 +44,13 @@ from app.analysis.adapter.outbound.orm import analysis_metric_value_orm  # noqa:
 from app.analysis.adapter.outbound.orm import analysis_report_orm  # noqa: E402,F401
 from app.analysis.adapter.outbound.orm import metric_definition_orm  # noqa: E402,F401
 from app.analysis.adapter.outbound.orm import video_orm  # noqa: E402,F401
+from app.match.adapter.outbound.orm import (  # noqa: E402,F401
+    match_application_orm,
+)
+from app.match.adapter.outbound.orm import match_orm  # noqa: E402,F401
+from app.match.adapter.outbound.orm import (  # noqa: E402,F401
+    match_position_need_orm,
+)
 # ---------------------------------------------------------------------------
 
 config = context.config

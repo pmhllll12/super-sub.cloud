@@ -4,6 +4,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import settings
+from app.match.adapter.outbound.stub.match_stub_repository import (
+    StubMatchRepository,
+)
+from app.match.dependencies.match_providers import get_match_repository
 from app.core.deps import get_token_version_reader, get_user_email_reader
 from app.main import app
 from app.card.adapter.outbound.stub.card_stub_repository import StubCardRepository
@@ -14,6 +18,8 @@ from app.user.adapter.outbound.stub.user_stub_repository import (
     DEMO_USER_ID,
     StubUserRepository,
 )
+from app.user.adapter.outbound.stub.team_stub_repository import StubTeamRepository
+from app.user.dependencies.team_providers import get_team_repository
 from app.user.dependencies.user_repository_provider import get_user_repository
 
 V1 = "/api/v1"
@@ -62,6 +68,8 @@ def client() -> TestClient:
     """
     app.dependency_overrides[get_user_repository] = StubUserRepository
     app.dependency_overrides[get_card_repository] = StubCardRepository
+    app.dependency_overrides[get_team_repository] = StubTeamRepository
+    app.dependency_overrides[get_match_repository] = StubMatchRepository
     app.dependency_overrides[get_token_version_reader] = _stub_token_version_reader
     app.dependency_overrides[get_user_email_reader] = _stub_user_email_reader
     try:
@@ -69,6 +77,8 @@ def client() -> TestClient:
     finally:
         app.dependency_overrides.pop(get_user_repository, None)
         app.dependency_overrides.pop(get_card_repository, None)
+        app.dependency_overrides.pop(get_team_repository, None)
+        app.dependency_overrides.pop(get_match_repository, None)
         app.dependency_overrides.pop(get_token_version_reader, None)
         app.dependency_overrides.pop(get_user_email_reader, None)
 

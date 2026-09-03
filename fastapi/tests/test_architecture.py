@@ -14,7 +14,7 @@ import ast
 from pathlib import Path
 
 APP = Path(__file__).resolve().parent.parent / "app"
-CONTEXTS = ("user", "card", "analysis")
+CONTEXTS = ("user", "card", "analysis", "match")
 
 # 컨텍스트에 속하지 않는 공용 모듈은 전부 `app/core/` 아래에 둔다.
 #
@@ -25,6 +25,17 @@ CORE = APP / "core"
 
 # 유일하게 허용된 컨텍스트 간 임포트. 스텁끼리라 DB 가 붙으면 함께 사라진다.
 STUB_CROSS_IMPORT = "app/card/adapter/outbound/stub/card_stub_repository.py"
+
+
+def _in_layer(module: str, layer: str) -> bool:
+    """모듈 경로가 그 계층을 지나는가.
+
+    🔴 **부분 문자열로 보면 안 된다.** `".application" in mod` 로 검사하던 때
+    `app.match.domain.entities.application_entity` 가 걸렸다 — 파일 이름이
+    `application_` 으로 시작한다는 이유로 "도메인이 애플리케이션 계층을 임포트했다"가
+    된 것이다(2026-09-02). 계층은 경로의 **한 조각**이므로 조각으로 센다.
+    """
+    return layer in module.split(".")
 
 
 def _modules(path: Path) -> list[str]:
@@ -73,8 +84,8 @@ class TestLayering:
                     mod.startswith("fastapi")
                     or mod.startswith("pydantic")
                     or mod.startswith("sqlalchemy")
-                    or ".application" in mod
-                    or ".adapter" in mod
+                    or _in_layer(mod, "application")
+                    or _in_layer(mod, "adapter")
                 )
                 if bad:
                     offenders.append(f"{rel} → {mod}")
@@ -86,7 +97,7 @@ class TestLayering:
             if "/application/" not in rel:
                 continue
             for mod in _modules(path):
-                if mod.startswith("fastapi") or ".adapter" in mod:
+                if mod.startswith("fastapi") or _in_layer(mod, "adapter"):
                     offenders.append(f"{rel} → {mod}")
         assert not offenders, "애플리케이션이 어댑터·HTTP를 임포트했다:\n  " + "\n  ".join(
             offenders

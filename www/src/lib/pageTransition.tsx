@@ -44,6 +44,24 @@ import {
 export const LEAVE_MS = 900
 
 /**
+ * Navigation API 중 우리가 쓰는 만큼만 적어 둔 모양.
+ *
+ * 🔴 `lib.dom` 에 아직 없어서 직접 적는다 — `any` 로 두면 오타가 그대로 지나간다.
+ * 브라우저에 없을 수도 있으므로 쓰는 쪽에서 있는지 먼저 본다.
+ */
+type NavigateEventLike = Event & {
+  navigationType: 'push' | 'replace' | 'reload' | 'traverse'
+  cancelable: boolean
+  hashChange: boolean
+  downloadRequest: string | null
+  destination: { url: string; key?: string }
+}
+
+type NavigationEventTarget = EventTarget & {
+  traverseTo: (key: string) => { finished: Promise<unknown> }
+}
+
+/**
  * `leaveTo` 가 null 이면 **provider 밖**이다.
  *
  * 🔴 그때 링크는 **평범한 링크로 되돌아가야 한다.** 기본값을 빈 함수로 두면
@@ -161,6 +179,57 @@ export function PageTransitionProvider({ children }: { children: React.ReactNode
     },
     [router, pathname],
   )
+
+  /**
+   * 🔴 **뒤로 · 앞으로 가기도 링크와 똑같이 나갔다 들어온다**(사용자 요청).
+   *
+   * 링크는 우리가 클릭을 가로채 나가는 연출을 돌린 뒤에 옮기지만, 브라우저의
+   * 뒤로/앞으로 단추는 그 길을 안 지난다 — 화면이 툭 갈려서 나가는 연출만 빠진
+   * 반쪽이 된다(사용자 지적).
+   *
+   * 그래서 **오가는 것 자체를 한 번 물린다**: 이동을 취소하고(preventDefault),
+   * 나가는 연출을 돌리고, 끝나면 **같은 자리로 다시 보낸다**(`traverseTo`).
+   * 링크가 하는 일과 순서가 같으므로 보이는 것도 같다.
+   *
+   * 🔴 **주소가 같은 이동은 그냥 보낸다.** 화면 안에서 판을 여닫는 걸음도
+   * 기록에 쌓이는데(`MarketGates`), 그건 화면을 떠나는 것이 아니라서 나가는
+   * 연출을 돌리면 안 된다.
+   *
+   * ⚠️ Navigation API 가 있는 브라우저(크롬 계열)에서만 걸린다. 없으면 지금까지처럼
+   * 뒤로/앞으로가 곧바로 갈린다 — 기능이 죽는 것이 아니라 연출만 빠진다.
+   */
+  useEffect(() => {
+    const nav = (window as unknown as { navigation?: NavigationEventTarget }).navigation
+    if (!nav) return
+
+    let replaying = false
+
+    const onNavigate = (e: NavigateEventLike) => {
+      if (replaying) return
+      if (e.navigationType !== 'traverse' || !e.cancelable) return
+      if (e.hashChange || e.downloadRequest !== null) return
+      // 같은 주소면 화면을 떠나는 것이 아니다(판 여닫기 등) — 손대지 않는다.
+      if (e.destination.url === window.location.href) return
+      const key = e.destination.key
+      if (!key) return
+      // 움직임을 줄이라고 한 사람에게는 기다릴 이유가 없다(링크와 같은 규칙).
+      if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+
+      e.preventDefault()
+      setLeavingFrom(window.location.pathname)
+      setLeavingTo(new URL(e.destination.url).pathname)
+      clearTimeout(timer.current)
+      timer.current = window.setTimeout(() => {
+        replaying = true
+        nav.traverseTo(key).finished.catch(() => {}).finally(() => {
+          replaying = false
+        })
+      }, LEAVE_MS)
+    }
+
+    nav.addEventListener('navigate', onNavigate as EventListener)
+    return () => nav.removeEventListener('navigate', onNavigate as EventListener)
+  }, [])
 
   return (
     <LeaveContext.Provider
