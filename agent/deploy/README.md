@@ -236,8 +236,21 @@ chmod 600 ~/.aws/credentials
 **확인 (어느 방식이든 EC2 안에서):**
 ```bash
 aws sts get-caller-identity
-aws s3 ls s3://$BUCKET/
+# Arn 이 assumed-role/supersub-ai-ec2/i-... 이면 역할이 붙은 것이다
+
+# 🔴 **접두사를 붙여서** 나열한다. `aws s3 ls s3://$BUCKET/` (루트)는
+# 이 정책에서 **항상 거부된다** — ListBucket 에 s3:prefix 조건을 걸어
+# videos/·models/·reports/ 만 열어 두었기 때문이다. 거부가 정상이다.
+aws s3 ls s3://$BUCKET/videos/
+
+# 권한이 의도대로 좁혀졌는지 — 아래는 **실패해야 맞다.**
+echo probe > /tmp/_probe.txt
+aws s3 cp /tmp/_probe.txt s3://$BUCKET/reports/_probe.txt   # 성공해야 한다
+aws s3 cp /tmp/_probe.txt s3://$BUCKET/videos/_probe.txt    # AccessDenied 가 정상
 ```
+
+> `reports/` 에 남은 `_probe.txt` 는 EC2 에서 지울 수 없다 — 정책에
+> `DeleteObject` 가 없다(그것도 의도다). 콘솔에서 지운다.
 
 ---
 
