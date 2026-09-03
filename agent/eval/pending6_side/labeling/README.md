@@ -46,7 +46,7 @@ uv run python eval/pending6_side/labeling/labeled_stats.py # 라벨 확보 후 �
 |---|---|
 | 사람이 실제로 본 것 | 20/39. 나머지 19는 `camera_angle`부터 `미검증`이다 |
 | 라벨이 의심되는 것 | `IYFifBJ9lH8` — "실내 트랙. 라벨 의심(투구로 보임)" |
-| 스켈레톤이 타자가 아닌 것 | `O2GSaYqH8JY`(공 줍는 코치) · `3R1kvNrGJK0`(심판/포수) · `w-AQcjcoDyA`(신발 클로즈업) |
+| 스켈레톤이 타자가 아닌 것 | `O2GSaYqH8JY`(공 줍는 코치) · `3R1kvNrGJK0`(심판/포수). ~~`w-AQcjcoDyA`~~는 **오진이었다** — 판독에서 `subject_ok = y`로 확인됐다 (2026.09.03 정정) |
 | `usable_for_phase_B` | yes 7 · maybe 6 · **no 26** |
 
 그래서 `subject_ok` 칸이 장식이 아니다 — **분모를 정하는 칸**이다.
