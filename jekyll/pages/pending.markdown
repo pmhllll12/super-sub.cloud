@@ -988,6 +988,18 @@ ssh supersub 'systemctl is-active postgresql supersub-api'   # active active
 - 관례: `fastapi/CLAUDE.md`
 - **담당**: 박민호 · **제기**: 정어진 · **기한**: 스프린트 3
 
+#### 진행 (2026-09-03, 박민호)
+
+`review_option` 초기 목록을 확정하고 5테이블 마이그레이션을 `min` 브랜치에
+푸시했습니다(`fastapi/alembic/versions/20260903_review_trust_tables.py`,
+`down_revision`은 비워 뒀습니다). 매너·실력·재매칭 의사는 긍정형만 담고 부정
+신호는 `caution` 두 개(포지션 불일치·재매칭 비선호)로 제한해 D.8이 미뤄 둔
+"피해 상한 설계"를 선택지 구성으로 반영했습니다 — 근거는 마이그레이션 docstring에.
+
+`alembic upgrade/downgrade --sql`로 양방향 확인했고 기존(DB 제외) 테스트는
+영향 없습니다. **아직 애플리케이션·어댑터·라우터·테스트는 안 썼습니다** — 이
+초기 목록으로 괜찮은지부터 확인받고 이어서 씁니다.
+
 #### 두 분 공통 — 🔴 공유 파일 5곳은 제가 배선합니다
 
 `app/main.py` · `alembic/env.py` · `tests/conftest.py` ·
