@@ -849,4 +849,58 @@ ssh supersub 'systemctl is-active postgresql supersub-api'   # active active
 - 상세(만족해야 할 성질·확인 명령 셋·하지 말 것): `fastapi/docs/client-contract-changes.md` **11번**
 - **담당**: 백성검 · **제기**: 정어진 · **기한**: 스프린트 2 안
 
+### 11. 업로드 길이 상한 60초와 `max_frames=300`이 안 맞습니다 (정상호 님, 2026-09-03)
+
+클립 업로드(SFR-001)를 열면서 길이 상한을 **60초**로 정했습니다. 그런데
+`agent/src/supersub_agent/pose.py` 의 `max_frames=300` 은 `target_fps=15` 기준
+**20초분**이라, 60초 클립을 올리면 **에이전트가 앞 20초만 보고** 뒷부분은 아예
+분석에 들어가지 않습니다.
+
+**업로드는 통과인데 분석은 잘린다** — 사용자에게는 아무 표시도 안 납니다. 규격
+검사를 둔 이유가 "안 되는 것은 이유를 붙여 반려한다"인데, 이 경우는 조용히 절반만
+됩니다.
+
+| | |
+|---|---|
+| 판단해 주실 것 | 60초를 그대로 두고 `max_frames` 를 올릴지, 아니면 업로드 상한을 에이전트가 실제로 보는 길이로 낮출지 |
+| 참고 | 4K 에서 host RAM 이 먼저 터지는 것(`ho` 9번)과 같은 축입니다. 프레임 수를 올리면 그쪽 여유가 줄어듭니다 |
+| 확인 | `grep -n "max_frames" agent/src/supersub_agent/pose.py` · `grep -n "MAX_DURATION_MS" fastapi/app/analysis/domain/rules/video_rules.py` |
+| 하지 말 것 | 제 쪽 상한만 조용히 낮추지 않겠습니다 — 사용자가 정한 값이라 근거 없이 되돌리면 왜 60초였는지가 사라집니다 |
+
+**정해 주시면 제가 `video_rules.py` 의 값 하나만 고치면 됩니다.** 반대로 `agent/`
+쪽을 올리기로 하면 제 쪽은 그대로 둡니다.
+
+- 상세: `fastapi/docs/api-contract.md` **3-6절** 「상한」
+- **담당**: 정상호 · **제기**: 정어진 · **기한**: 스프린트 2 안
+
+### 12. 클립 업로드가 열렸습니다 — 붙일 자리가 생겼습니다 (2026-09-03 신설)
+
+`/videos`, `/videos/upload` 화면이 설계에는 있는데 부를 백엔드가 없었습니다.
+2026-09-03 에 열었습니다.
+
+**두 번 나눠 부릅니다.** 원본이 앱 서버를 지나지 않기 때문입니다(PER-002).
+
+```
+(1) POST /videos/upload-url  -> {storage_key, upload_url, expires_in}
+(2) PUT  <upload_url>         S3 로 직접. Content-Type 을 (1)과 같게
+(3) POST /videos              -> {passed, reject_reason, analysis_status, ...}
+```
+
+🔴 **규격에 안 맞아도 201 입니다.** 반려 사유를 값으로 남기는 것이 이 경로의
+목적(SFR-001)이라 422 로 돌려보내지 않습니다. **상태 코드가 아니라 `passed` 로
+분기해 주십시오** — 코드로 분기하면 반려를 놓칩니다.
+
+| | |
+|---|---|
+| 만족해야 할 성질 | 클립을 올릴 수 있을 것 · **반려 사유가 사용자에게 보일 것** · 분석 상태를 목록에서 볼 수 있을 것 |
+| 확인 | `grep -rn "upload-url" www/src flutter/lib` → 결과가 있으면 이미 붙인 것입니다 |
+| 하지 말 것 | `storage_key` 를 클라이언트에서 만들지 않기(403입니다) · (2)의 `Content-Type` 바꾸지 않기(S3가 거절합니다) · 파일을 앱 서버로 보내지 않기 |
+
+⚠️ **서버에 버킷이 아직 없어 지금은 503(`STORAGE_NOT_CONFIGURED`)입니다.** 만들어지면
+알려 드리겠습니다 — 클라이언트 잘못이 아닙니다.
+
+- 상세(상한·에러 코드·하지 말 것): `fastapi/docs/client-contract-changes.md` **12번**
+- 전체 규격: `fastapi/docs/api-contract.md` **3-6절**
+- **담당**: 백성검 · **제기**: 정어진 · **기한**: 스프린트 2 안
+
 [← 표지]({{ "/" | relative_url }})
