@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import {
   Abril_Fatface,
+  Grenze,
+  Rakkas,
   Rubik,
   Rubik_Glitch,
   Shrikhand,
@@ -55,6 +57,30 @@ const youngSerif = Young_Serif({
   subsets: ["latin"],
 });
 
+// 거름망 줄의 `Filters :` 전용(사용자 지정). 좁고 각진 세리프라 알약들
+// 옆에서 이름표처럼 읽힌다.
+//
+// 🔴 굵기를 적어 준다. Google 쪽에서 가변 축을 가진 글꼴이라도 `next/font` 는
+// 정적 굵기를 받아 오므로, 안 적으면 빌드에서 막힌다.
+// 🔴 라틴만 있다 — 한글에 쓰지 않는다(다른 장식 글꼴들과 같은 규칙).
+const grenze = Grenze({
+  variable: "--font-label",
+  weight: ["400", "600"],
+  subsets: ["latin"],
+});
+
+// 홈의 큰 영문 헤드라인("OWN THE PITCH") 전용(사용자 지정, Rakkas).
+//
+// 🔴 굵기가 400 하나뿐인 장식 글꼴이라 **font-weight 를 주지 않는다** — 올리면
+// 가짜 굵게(synthetic bold)만 걸려 획이 지저분해진다(Abril Fatface · Shrikhand ·
+// RubikGlitch 에서 이미 겪었다).
+// 🔴 라틴만 쓴다 — 한글에 쓰지 않는다(다른 장식 글꼴들과 같은 규칙).
+const rakkas = Rakkas({
+  variable: "--font-headline",
+  weight: "400",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
   title: "Super-Sub",
   description: "생활체육 경기 영상을 분석해 용병을 찾고, 실력을 검증합니다.",
@@ -64,7 +90,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className="h-full antialiased">
       <body
-        className={`${rubik.variable} ${rubikGlitch.variable} ${abrilFatface.variable} ${shrikhand.variable} ${youngSerif.variable} min-h-full flex flex-col`}
+        className={`${rubik.variable} ${rubikGlitch.variable} ${abrilFatface.variable} ${shrikhand.variable} ${youngSerif.variable} ${grenze.variable} ${rakkas.variable} min-h-full flex flex-col`}
       >
         <IntroGate />
         {/* 화면을 떠날 때 들어온 방향 그대로 되나가게 한다. 라우팅을 건너

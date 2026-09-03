@@ -61,29 +61,6 @@ const MARK_FIT = 930
  * 거리는 viewBox 폭(1000)보다 넉넉히 크게 잡는다 — 상자 안 어디에 있든 그만큼
  * 밀면 화면 밖이다.
  */
-/**
- * 글자가 **아치를 타고 바깥으로** 빠져나가는 방향(내리기 시작했을 때).
- *
- * 🔴 그냥 좌우로 밀면 아치를 벗어나 직선으로 미끄러진다. 원호 위의 그 자리에서
- * **접선 방향**으로 밀어야 글자가 제 곡선을 따라 흘러 나간다 — 가운데 글자는
- * 거의 옆으로, 양끝 글자는 아치가 꺾이는 만큼 아래로 흐른다.
- *
- * 왼쪽 절반("TRAIN &")은 왼쪽 아래로, 오른쪽 절반("GEAR UP")은 오른쪽 아래로
- * 간다(사용자 요청). 가르는 자리가 마침 `&` 뒤의 빈칸이라 따로 셀 것이 없다.
- */
-function arcExitOf(k: number, n: number): { ax: number; ay: number } {
-  const phiMax = Math.asin((500 - MARK_INSET) / MARK_R)
-  const t = n > 1 ? k / (n - 1) : 0.5
-  const phi = -phiMax + t * 2 * phiMax
-  // 안쪽으로 향하는 쪽이 아니라 **제 편 바깥쪽**으로.
-  const way = t < 0.5 ? -1 : 1
-  const dist = 1600
-  return {
-    ax: Math.round(way * Math.cos(phi) * dist),
-    ay: Math.round(way * Math.sin(phi) * dist),
-  }
-}
-
 function offsetOf(k: number): { dx: number; dy: number } {
   const r = (n: number) => {
     const x = Math.sin(n * 12.9898) * 43758.5453
@@ -243,8 +220,6 @@ export default function FigureBackground({
                       {
                         '--ss-ch-dx': offsetOf(i * 100 + k).dx,
                         '--ss-ch-dy': offsetOf(i * 100 + k).dy,
-                        '--ss-ch-ax': arcExitOf(k, line.length).ax,
-                        '--ss-ch-ay': arcExitOf(k, line.length).ay,
                         '--ss-ch-i': k,
                       } as React.CSSProperties
                     }
