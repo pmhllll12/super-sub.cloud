@@ -128,16 +128,26 @@ def load() -> tuple[list[dict], dict[str, dict]]:
     return labels, ref
 
 
-def denominators(labels: list[dict]) -> tuple[list[dict], dict]:
-    """명세 0절 — 분모 두 벌과 제외 사유별 건수."""
-    total = len(labels)
+def denominators(labels: list[dict], ref: dict[str, dict]) -> tuple[list[dict], dict]:
+    """명세 0절 — 분모 두 벌과 제외 사유별 건수.
+
+    **전체 분모는 서식이 아니라 대조표에서 온다.** 서식에는 판독된 것만 남고
+    (판독자가 "타자가 아니거나 스윙이 아니다"로 뺀 27건은 행 자체가 없다),
+    그러면 39라는 수가 파일에서 사라진다. 명세 0절이 요구하는 두 벌 중 한 벌이
+    없어지는 것이라 대조표(39행)를 전체 명단으로 쓴다 — 사유는 `EXCLUDED.md`.
+    """
+    total = len(ref)
+    pre = total - len(labels)          # 판독 단계에서 행이 빠진 것
     excluded = [r for r in labels if r["subject_ok"].strip() == "n"]
     kept = [r for r in labels if r["subject_ok"].strip() != "n"]
 
     print("=" * 66)
     print("A. 유효 분모 (명세 0절)")
     print("=" * 66)
-    print(f"  전체                          {total}건")
+    print(f"  전체 (대조표 기준)            {total}건")
+    print(f"  판독 단계 제외                {pre}건  "
+          f"(타자 아님 또는 스윙 아님 — EXCLUDED.md)")
+    print(f"  → 서식에 남은 것              {len(labels)}건")
     print(f"  subject_ok = n (제외)         {len(excluded)}건"
           + (f"  {[r['clip_id'] for r in excluded]}" if excluded else ""))
     print(f"  → 클립 단위 유효 분모         {len(kept)}건")
@@ -281,13 +291,16 @@ def both_and_top_hand(kept, ref, stats) -> None:
     print()
 
 
-def subject_ok_report(labels) -> None:
+def subject_ok_report(labels, ref) -> None:
     print("=" * 66)
     print("C. subject_ok — 미결 8번(selector)으로 넘길 값")
     print("=" * 66)
     n = sum(1 for r in labels if r["subject_ok"].strip() == "n")
     y = sum(1 for r in labels if r["subject_ok"].strip() == "y")
-    print(f"  y {y} · n {n} · 미기입 {len(labels) - y - n}")
+    print(f"  y {y} · n {n} · 서식에 없음 {len(ref) - len(labels)}")
+    print("  🔴 **39건 전수의 답이 아니다.** 판독 단계에서 빠진 클립은 y/n 이")
+    print("     매겨지지 않았고, 그중에 selector 가 틀린 것이 섞여 있을 수 있다")
+    print("     (O2GSaYqH8JY 가 실제로 그 경우다 — EXCLUDED.md).")
     if n:
         print(f"  n: {[r['clip_id'] for r in labels if r['subject_ok'].strip() == 'n']}")
     print("  🔴 selector 실패와 **검출 실패**는 다르다 — 후보가 1개뿐이었던")
@@ -306,17 +319,23 @@ def power() -> None:
     print()
     print("  39건이 답하는 것은 \"쓸 만한가/못 쓰는가\"이지 \"얼마나 좋은가\"가 아니다.")
     print()
+    # 표는 사전 등록 문안 그대로 찍는다(고치지 않는다). 다만 마지막 줄의 전제가
+    # 실제 라벨과 어긋나므로 각주를 단다 — 표를 고치면 등록의 뜻이 없어진다.
+    print("  ※ 표의 마지막 줄은 39건 전수에 subject_ok 가 매겨진다는 전제로")
+    print("    등록됐다. 실제 판독은 12건에만 매겨졌으므로 그 줄은 지금")
+    print("    성립하지 않는다 (C절 참고). 등록 문안이라 표는 고치지 않는다.")
+    print()
 
 
 def main() -> int:
     labels, ref = load()
-    kept, stats = denominators(labels)
+    kept, stats = denominators(labels, ref)
     accuracy(kept, ref, stats)
     by_margin(kept, ref)
     fps_split(kept, ref)
     overall_by_fps(kept, ref)
     both_and_top_hand(kept, ref, stats)
-    subject_ok_report(labels)
+    subject_ok_report(labels, ref)
     power()
     print("명세: AFTER_LABELS.md · 라벨을 보고 이 스크립트를 고치지 않는다.")
     return 0
