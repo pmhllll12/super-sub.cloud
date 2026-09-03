@@ -1603,4 +1603,31 @@ ho 구역 2번(골든셋 라벨링 주체 확보)이 제 담당으로 되어 있
 
 - **담당**: 정어진 · **제기**: 백성검 · **기한**: 스프린트 3 (조정 가능)
 
+#### 진행 — 붙였지만 "리포트를 저장"이 아니라 "영상을 올려 진짜 분석" (2026-09-03, 박민호)
+
+객체 저장소는 이미 정해져 있었습니다 — jin-12번에서 연 클립 업로드(계약 3-6절,
+S3 사전 서명 URL)가 그것입니다. 그래서 **새 저장 형식을 정하는 대신 그 경로를
+그대로 재사용**했습니다. 대가가 하나 있습니다: **이 화면의 가짜(mock) 리포트는
+같이 저장되지 않습니다.** 버튼을 누르면 영상만 올라가고, 서버가 그 영상을
+**진짜로** 분석합니다 — "분석 결과까지 한 벌"이라던 원래 설계와 다릅니다.
+리포트를 정말 한 벌로 저장하려면 그 저장 형식(담당 정어진)이 먼저 필요해서,
+이번엔 하지 않았습니다.
+
+- 만든 것: `www/src/app/api/videos/upload-url`·`www/src/app/api/videos`
+  (라우트 핸들러) · `www/src/server/backend/fastapiCall.ts`
+- 🔴 **`Backend`/`getBackend()` 를 거치지 않습니다.** 그 인터페이스는 아직
+  영상을 모르고 `getBackend()` 는 `USE_MOCK` 과 무관하게 늘 mock 을 반환합니다
+  (jin-10, 아직 미완료) — `fastapiCall.ts` 는 그 앞에 좁게 낸 임시 길입니다.
+  jin-10 이 진짜 게이트웨이(`fastapiBackend`)를 만들면 이 파일은 그리로
+  흡수돼야 합니다
+- 종목 코드는 화면(`soccer`) → 백엔드(`football`) 로 경계에서 변환합니다
+  (`SPORT_CODE` 상수, `AnalysisStage.tsx`)
+- 확인: `grep -n "callFastApi" www/src/app/api/videos/route.ts www/src/app/api/videos/upload-url/route.ts` · 시험 `npx vitest run src/components/analysis/AnalysisStage.test.tsx`
+- 검증: `tsc --noEmit`·`next build`·`eslint`·시험(새 시험 2개 포함 250개) 전부
+  통과. 다만 이 환경엔 EC2 로 가는 경로(DNS 미설정·포트 미개방)도 SSH 도 없어
+  **실제 EC2 까지 붙는 것은 확인 못 했습니다** — 로컬에서 SSH 터널로 확인
+  부탁드립니다
+- 다음: 리포트까지 한 벌로 저장하려면 그 규격(정어진)이 필요합니다. 정해지면
+  이어서 붙이겠습니다
+
 [← 표지]({{ "/" | relative_url }})

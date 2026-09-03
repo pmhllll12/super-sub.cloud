@@ -463,4 +463,139 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     expect(await screen.findByLabelText('분석 진행')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '보고 있습니다' })).toBeInTheDocument()
   })
+
+  // 🔴 미결 「분석한 영상을 우리 서버에 저장하는 경로」(paik-1) — 화면의 가짜
+  // 리포트는 안 보내고, 영상만 계약 3-6절 경로(jin-12)로 올린다. 세 호출의
+  // 순서·본문이 계약과 맞는지가 이 시험의 본론이다.
+  it('저장을 누르면 업로드 자리를 받고, S3 에 올리고, 등록한다', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+      const url = String(input)
+      if (url === '/api/videos/upload-url') {
+        return new Response(
+          JSON.stringify({
+            storage_key: 'videos/u1/abc.mp4',
+            upload_url: 'https://bucket.s3.example.com/abc.mp4?sig=1',
+            expires_in: 900,
+          }),
+          { status: 200 },
+        )
+      }
+      if (url.startsWith('https://bucket.s3.example.com/')) {
+        return new Response(null, { status: 200 })
+      }
+      if (url === '/api/videos') {
+        return new Response(
+          JSON.stringify({
+            id: 'v1',
+            sport_code: 'football',
+            storage_key: 'videos/u1/abc.mp4',
+            duration_ms: 0,
+            side: null,
+            created_at: '2026-09-03T00:00:00Z',
+            passed: true,
+            reject_reason: null,
+            analysis_job_id: 'job1',
+            analysis_status: 'queued',
+          }),
+          { status: 201 },
+        )
+      }
+      throw new Error(`예상하지 못한 요청: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '축구' }))
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await user.click(
+      await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }),
+    )
+
+    // 다섯 단계(각 1.1초)가 다 돌아야 저장이 풀린다.
+    await waitFor(() => expect(screen.getByRole('button', { name: '저장' })).toBeEnabled(), {
+      timeout: 8000,
+    })
+
+    await user.click(screen.getByRole('button', { name: '저장' }))
+    await screen.findByRole('button', { name: '저장됨' }, { timeout: 3000 })
+
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    const [uploadUrlCall, s3Call, registerCall] = fetchMock.mock.calls
+
+    expect(uploadUrlCall![0]).toBe('/api/videos/upload-url')
+    expect(JSON.parse(uploadUrlCall![1]!.body as string)).toEqual({
+      content_type: 'video/mp4',
+      size_bytes: 1,
+    })
+
+    expect(String(s3Call![0])).toBe('https://bucket.s3.example.com/abc.mp4?sig=1')
+    expect(s3Call![1]!.method).toBe('PUT')
+    expect((s3Call![1]!.headers as Record<string, string>)['Content-Type']).toBe('video/mp4')
+
+    expect(registerCall![0]).toBe('/api/videos')
+    const registerBody = JSON.parse(registerCall![1]!.body as string)
+    // 화면 종목 키(soccer)가 아니라 백엔드 sport 코드(football)로 나가야 한다.
+    expect(registerBody.sport_code).toBe('football')
+    expect(registerBody.storage_key).toBe('videos/u1/abc.mp4')
+    expect(typeof registerBody.duration_ms).toBe('number')
+    expect(typeof registerBody.width).toBe('number')
+    expect(typeof registerBody.height).toBe('number')
+
+    vi.unstubAllGlobals()
+  }, 10000)
+
+  it('반려되면 사유를 보여준다', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+      const url = String(input)
+      if (url === '/api/videos/upload-url') {
+        return new Response(
+          JSON.stringify({
+            storage_key: 'videos/u1/abc.mp4',
+            upload_url: 'https://bucket.s3.example.com/abc.mp4?sig=1',
+            expires_in: 900,
+          }),
+          { status: 200 },
+        )
+      }
+      if (url.startsWith('https://bucket.s3.example.com/')) {
+        return new Response(null, { status: 200 })
+      }
+      return new Response(
+        JSON.stringify({
+          id: 'v1',
+          sport_code: 'football',
+          storage_key: 'videos/u1/abc.mp4',
+          duration_ms: 0,
+          side: null,
+          created_at: '2026-09-03T00:00:00Z',
+          passed: false,
+          reject_reason: '길이가 상한을 넘습니다: 90초 (상한 60초)',
+          analysis_job_id: null,
+          analysis_status: null,
+        }),
+        { status: 201 },
+      )
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '축구' }))
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await user.click(
+      await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }),
+    )
+    await waitFor(() => expect(screen.getByRole('button', { name: '저장' })).toBeEnabled(), {
+      timeout: 8000,
+    })
+
+    await user.click(screen.getByRole('button', { name: '저장' }))
+    await screen.findByRole('button', { name: '반려됨' }, { timeout: 3000 })
+    expect(screen.getByText(/길이가 상한을 넘습니다/)).toBeInTheDocument()
+
+    vi.unstubAllGlobals()
+  }, 10000)
 })

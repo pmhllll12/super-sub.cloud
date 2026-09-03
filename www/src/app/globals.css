@@ -3471,6 +3471,16 @@ body::-webkit-scrollbar {
   border-color: var(--ss-fg);
 }
 
+/* 저장 반려·오류 사유 — 성공은 버튼 글자("저장됨")로 충분해 여기 안 쓴다.
+   `.ss-shot-side` 의 flex 자식이라 좌우 여백·위 간격은 그 판의 padding·gap
+   을 그대로 받는다 — 여기서 따로 안 준다. */
+.ss-shot-save-msg {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--ss-error);
+}
+
 /* 판 안이 길어지면 여기서만 스크롤한다 — 대화 입력칸은 늘 바닥에 붙어 있다. */
 .ss-shot-side .ss-report,
 .ss-shot-side .ss-steps {
