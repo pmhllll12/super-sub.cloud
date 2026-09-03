@@ -13,13 +13,16 @@ from app.match.adapter.inbound.api.schemas.match_schema import (
     CreateMatchSchema,
     MatchResponse,
     MatchSearchResponse,
+    UpdateMatchSchema,
 )
 from app.match.application.dtos.match_dto import (
     AcceptApplicationCommand,
     ApplicationResult,
     ApplicationsQuery,
     ApplyCommand,
+    CancelMatchCommand,
     CreateMatchCommand,
+    UpdateMatchCommand,
     MatchQuery,
     MatchResult,
     MatchSearchQuery,
@@ -33,8 +36,10 @@ from app.match.dependencies.match_providers import (
     CreateMatchUseCaseDep,
     ListApplicationsUseCaseDep,
     ListTeamMatchesUseCaseDep,
+    CancelMatchUseCaseDep,
     ReadMatchUseCaseDep,
     SearchMatchesUseCaseDep,
+    UpdateMatchUseCaseDep,
 )
 
 match_router = APIRouter(tags=["matches"])
@@ -112,6 +117,55 @@ def read_match(
 ) -> MatchResult:
     """경기 1건과 필요 포지션. 인증만 하면 누구나 본다 — 모집 글이다."""
     return use_case(MatchQuery(match_id=match_id))
+@match_router.patch("/matches/{match_id}", response_model=MatchResponse)
+def update_match(
+    match_id: UUID,
+    body: UpdateMatchSchema,
+    user_id: CurrentUserId,
+    use_case: UpdateMatchUseCaseDep,
+) -> MatchResult:
+    """경기를 고친다. **주장만, 그리고 지난 경기는 못 고친다.**
+
+    보낸 항목만 바뀐다. `needs` 를 보내면 통째로 갈아 끼운다.
+
+    ⚠️ **지원자가 있어도 막지 않는다.** 시각·장소가 바뀌면 알려야 하지만 알림
+    인프라가 없어서 **지원자에게 알림이 가지 않는다** — 사람이 따로 알려야 한다.
+    """
+    return use_case(
+        UpdateMatchCommand(
+            actor_id=user_id,
+            match_id=match_id,
+            played_at=body.played_at,
+            place=body.place,
+            needs=(
+                None
+                if body.needs is None
+                else [
+                    PositionNeedInput(
+                        position_code=n.position_code, head_count=n.head_count
+                    )
+                    for n in body.needs
+                ]
+            ),
+        )
+    )
+
+
+@match_router.delete(
+    "/matches/{match_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+def cancel_match(
+    match_id: UUID, user_id: CurrentUserId, use_case: CancelMatchUseCaseDep
+) -> None:
+    """경기를 취소한다. **주장만.**
+
+    🔴 **지원이 하나라도 붙었으면 409 다.** 스키마에 취소 상태가 없어 취소는
+    행 삭제인데, 지원이 붙은 경기는 외래키가 막는다 — 그리고 지원자에게 알릴
+    방법이 없으므로 **사람이 먼저 정리해야 한다.**
+    """
+    use_case(CancelMatchCommand(actor_id=user_id, match_id=match_id))
+
+
 @match_router.post(
     "/matches/{match_id}/applications",
     response_model=ApplicationResponse,

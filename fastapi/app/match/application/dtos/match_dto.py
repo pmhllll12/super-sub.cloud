@@ -23,6 +23,30 @@ class CreateMatchCommand:
 
 
 @dataclass(frozen=True)
+class UpdateMatchCommand:
+    """경기를 고친다. **`None` 은 "안 바꾼다"는 뜻이다.**
+
+    셋 다 `null` 이 뜻을 갖지 않는 값이라(시각·장소·필요 포지션은 비울 수 없다)
+    "안 보냄"과 "null 로 지움"을 가를 필요가 없다.
+
+    `needs` 를 보내면 **통째로 갈아 끼운다.** 부분 갱신은 "어느 포지션을 빼라"를
+    표현할 방법이 없어 뜻이 애매해진다.
+    """
+
+    actor_id: UUID
+    match_id: UUID
+    played_at: datetime | None = None
+    place: str | None = None
+    needs: list[PositionNeedInput] | None = None
+
+
+@dataclass(frozen=True)
+class CancelMatchCommand:
+    actor_id: UUID
+    match_id: UUID
+
+
+@dataclass(frozen=True)
 class TeamMatchesQuery:
     team_id: UUID
 

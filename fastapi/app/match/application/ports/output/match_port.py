@@ -47,6 +47,41 @@ class MatchPort(ABC):
     def find_match(self, match_id: UUID) -> MatchEntity | None: ...
 
     @abstractmethod
+    def update_match(
+        self,
+        match_id: UUID,
+        *,
+        played_at: datetime | None,
+        place: str | None,
+        needs: list[PositionNeedEntity] | None,
+    ) -> None:
+        """경기를 고친다. `None` 인 항목은 건드리지 않는다.
+
+        `needs` 를 주면 **기존 행을 지우고 새로 넣는다** — 부분 갱신은 "어느
+        포지션을 빼라"를 표현할 수 없어서다. 지우기와 넣기는 **같은 트랜잭션**에서
+        일어난다. 갈리면 필요 포지션이 사라진 경기가 남는다.
+        """
+
+    @abstractmethod
+    def count_applications(self, match_id: UUID) -> int:
+        """그 경기의 지원·제안 건수.
+
+        취소 전에 본다. **DB 의 외래키가 이미 막고 있지만**(`match_application` 의
+        삭제 규칙이 RESTRICT 다) 그대로 두면 500 이 나므로, 여기서 세어 뜻이 있는
+        에러로 돌려준다.
+        """
+
+    @abstractmethod
+    def delete_match(self, match_id: UUID) -> None:
+        """경기를 지운다. 필요 포지션도 함께 지운다.
+
+        🔴 **취소를 행 삭제로 표현한다.** 부록 D 의 `match` 에는 상태 컬럼이 없고
+        D.8 도 취소를 다루지 않는다 — **ERD 에 없는 컬럼은 늘리지 않는다.**
+        대신 스키마가 이미 말하고 있는 것을 따른다: 지원이 붙은 경기는 외래키가
+        막는다.
+        """
+
+    @abstractmethod
     def list_upcoming_matches(
         self, team_id: UUID, now: datetime
     ) -> list[MatchEntity]:

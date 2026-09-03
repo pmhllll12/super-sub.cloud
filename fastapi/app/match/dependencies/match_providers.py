@@ -12,11 +12,13 @@ from app.match.adapter.outbound.pg.match_pg_repository import MatchPgRepository
 from app.match.application.ports.input.match_use_cases import (
     AcceptApplicationUseCase,
     ApplyToMatchUseCase,
+    CancelMatchUseCase,
     CreateMatchUseCase,
     ListApplicationsUseCase,
     ListTeamMatchesUseCase,
     ReadMatchUseCase,
     SearchMatchesUseCase,
+    UpdateMatchUseCase,
 )
 from app.match.application.ports.output.match_port import MatchPort
 from app.match.application.use_cases.application_interactors import (
@@ -25,10 +27,12 @@ from app.match.application.use_cases.application_interactors import (
     ListApplicationsInteractor,
 )
 from app.match.application.use_cases.match_interactors import (
+    CancelMatchInteractor,
     CreateMatchInteractor,
     ListTeamMatchesInteractor,
     ReadMatchInteractor,
     SearchMatchesInteractor,
+    UpdateMatchInteractor,
 )
 
 
@@ -47,6 +51,22 @@ def get_create_match_use_case(repository: MatchRepositoryDep) -> CreateMatchUseC
 
 def get_read_match_use_case(repository: MatchRepositoryDep) -> ReadMatchUseCase:
     return ReadMatchInteractor(repository)
+
+
+def get_update_match_use_case(repository: MatchRepositoryDep) -> UpdateMatchUseCase:
+    return UpdateMatchInteractor(repository)
+
+
+def get_cancel_match_use_case(repository: MatchRepositoryDep) -> CancelMatchUseCase:
+    return CancelMatchInteractor(repository)
+
+
+UpdateMatchUseCaseDep = Annotated[
+    UpdateMatchUseCase, Depends(get_update_match_use_case)
+]
+CancelMatchUseCaseDep = Annotated[
+    CancelMatchUseCase, Depends(get_cancel_match_use_case)
+]
 
 
 def get_search_matches_use_case(

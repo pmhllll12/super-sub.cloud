@@ -16,7 +16,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from sqlalchemy import column, func, select, table, update
+from sqlalchemy import column, delete, func, select, table, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -217,6 +217,61 @@ class MatchPgRepository(MatchPort):
                     head_count=need.head_count,
                 )
             )
+        self._session.commit()
+
+    def update_match(
+        self,
+        match_id: UUID,
+        *,
+        played_at: datetime | None,
+        place: str | None,
+        needs: list[PositionNeedEntity] | None,
+    ) -> None:
+        """`None` 인 항목은 건드리지 않는다. **한 트랜잭션에서** 끝낸다."""
+        changes = {}
+        if played_at is not None:
+            changes["played_at"] = played_at
+        if place is not None:
+            changes["place"] = place
+        if changes:
+            self._session.execute(
+                update(MatchOrm).where(MatchOrm.id == match_id).values(**changes)
+            )
+
+        if needs is not None:
+            # 🔴 지우고 새로 넣는다. 같은 트랜잭션이라 중간 상태가 밖에서 안 보인다 —
+            #    갈리면 필요 포지션이 사라진 경기가 남는다.
+            self._session.execute(
+                delete(MatchPositionNeedOrm).where(
+                    MatchPositionNeedOrm.match_id == match_id
+                )
+            )
+            for need in needs:
+                self._session.add(
+                    MatchPositionNeedOrm(
+                        id=uuid4(),
+                        match_id=match_id,
+                        position_id=need.position_id,
+                        head_count=need.head_count,
+                    )
+                )
+        self._session.commit()
+
+    def count_applications(self, match_id: UUID) -> int:
+        return self._session.execute(
+            select(func.count())
+            .select_from(MatchApplicationOrm)
+            .where(MatchApplicationOrm.match_id == match_id)
+        ).scalar_one()
+
+    def delete_match(self, match_id: UUID) -> None:
+        """필요 포지션을 먼저 지운다 — 외래키가 그 순서를 요구한다."""
+        self._session.execute(
+            delete(MatchPositionNeedOrm).where(
+                MatchPositionNeedOrm.match_id == match_id
+            )
+        )
+        self._session.execute(delete(MatchOrm).where(MatchOrm.id == match_id))
         self._session.commit()
 
     def find_match(self, match_id: UUID) -> MatchEntity | None:

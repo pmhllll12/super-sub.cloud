@@ -9,7 +9,9 @@ from app.match.application.dtos.match_dto import (
     ApplicationResult,
     ApplicationsQuery,
     ApplyCommand,
+    CancelMatchCommand,
     CreateMatchCommand,
+    UpdateMatchCommand,
     MatchQuery,
     MatchResult,
     MatchSearchQuery,
@@ -34,6 +36,18 @@ class ListTeamMatchesUseCase(ABC):
     @abstractmethod
     def __call__(self, query: TeamMatchesQuery) -> list[MatchResult]:
         """그 팀의 다가오는 경기 목록."""
+
+
+class UpdateMatchUseCase(ABC):
+    @abstractmethod
+    def __call__(self, command: UpdateMatchCommand) -> MatchResult:
+        """경기를 고친다. **주장만 할 수 있고, 지난 경기는 못 고친다.**"""
+
+
+class CancelMatchUseCase(ABC):
+    @abstractmethod
+    def __call__(self, command: CancelMatchCommand) -> None:
+        """경기를 취소한다. **지원이 하나라도 붙었으면 막힌다.**"""
 
 
 class SearchMatchesUseCase(ABC):

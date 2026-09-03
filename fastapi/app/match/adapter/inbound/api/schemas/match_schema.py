@@ -27,6 +27,21 @@ class CreateMatchSchema(BaseModel):
     needs: list[PositionNeedSchema] = Field(min_length=1)
 
 
+class UpdateMatchSchema(BaseModel):
+    """경기를 고친다. **보낸 것만 바뀐다.**
+
+    셋 다 `null` 이 뜻을 갖지 않는 값이라(시각·장소·필요 포지션은 비울 수 없다)
+    "안 보냄"과 "null"을 가르지 않았다.
+
+    🔴 `needs` 를 보내면 **통째로 갈아 끼운다.** 부분 갱신은 "어느 포지션을 빼라"를
+    표현할 방법이 없어 뜻이 애매해진다.
+    """
+
+    played_at: datetime | None = None
+    place: str | None = Field(default=None, min_length=1, max_length=120)
+    needs: list[PositionNeedSchema] | None = Field(default=None, min_length=1)
+
+
 class PositionNeedResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

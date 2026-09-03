@@ -160,6 +160,28 @@ class StubMatchRepository(StubApplicationsMixin, MatchPort):
     def team_role_of(self, team_id: UUID, user_id: UUID) -> str | None:
         return _ROLES.get((team_id, user_id))
 
+    def update_match(
+        self,
+        match_id: UUID,
+        *,
+        played_at: datetime | None,
+        place: str | None,
+        needs: list[PositionNeedEntity] | None,
+    ) -> None:
+        match = _MATCHES[match_id]
+        _MATCHES[match_id] = replace(
+            match,
+            played_at=played_at if played_at is not None else match.played_at,
+            place=place if place is not None else match.place,
+            needs=needs if needs is not None else match.needs,
+        )
+
+    def count_applications(self, match_id: UUID) -> int:
+        return sum(1 for a in _APPLICATIONS.values() if a.match_id == match_id)
+
+    def delete_match(self, match_id: UUID) -> None:
+        _MATCHES.pop(match_id, None)
+
     def find_positions(
         self, team_id: UUID, codes: list[str]
     ) -> dict[str, PositionNeedEntity]:
