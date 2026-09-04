@@ -1,10 +1,15 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { ApiError, GoogleGenAI, type Content, type FunctionDeclaration } from '@google/genai'
 import { NextResponse, type NextRequest } from 'next/server'
 import { BackendError, getBackend } from '@/server/backend'
 import { withAuth } from '@/server/handler'
 
 /**
  * 흐름 B(모집 등록 돕기) 챗봇 서버 — LLM 키가 사는 유일한 곳이다(미결 `min` 7번).
+ *
+ * 🔴 **Claude가 아니라 Gemini다(2026-09-04 정정).** Claude API는 이 계정이
+ * Free(평가) 플랜이라 결제 없이는 크레딧이 없어 막혔다 — Google AI Studio는
+ * 카드 없이 바로 쓸 수 있는 무료 등급이 있어 Gemini로 바꿨다. 나머지 설계
+ * (도구 하나·실제 쓰기는 안 함·DB 저장 없음)는 그대로다.
  *
  * 🔴 **DB 저장이 없다.** 대화 이력은 클라이언트가 매 요청마다 통째로 들고 와서
  * 되돌려 준다 — 새로고침하면 사라진다(열린 질문 3번 결정 그대로, 정어진에게
@@ -16,7 +21,7 @@ import { withAuth } from '@/server/handler'
  * — LLM의 자연어 해석 오류가 곧바로 쓰기로 이어지는 경로를 막는 안전장치다.
  */
 
-const MODEL = 'claude-opus-5'
+const MODEL = 'gemini-2.5-flash'
 
 /** 마이그레이션에 박힌 값이 정본이다 — 조회 API가 없어 하드코딩한다
  *  (api-contract.md "포지션 목록은 마이그레이션이 넣는다"). */
@@ -27,12 +32,14 @@ const POSITIONS: Record<string, Record<string, string>> = {
   basketball: { G: '가드', F: '포워드', C: '센터' },
 }
 
-const PROPOSE_TOOL: Anthropic.Tool = {
-  name: 'propose_match_registration',
+const PROPOSE_TOOL_NAME = 'propose_match_registration'
+
+const PROPOSE_TOOL: FunctionDeclaration = {
+  name: PROPOSE_TOOL_NAME,
   description:
     '슬롯 4개(팀·시각·장소·필요 포지션)가 다 채워지고 사용자가 구두로 확인했을 때만 부른다. ' +
     '실제로 경기를 등록하지 않는다 — 확인 카드를 화면에 띄우는 신호일 뿐이다.',
-  input_schema: {
+  parametersJsonSchema: {
     type: 'object',
     properties: {
       team_id: { type: 'string', description: '시스템 프롬프트에 준 팀 목록 중 하나의 team_id' },
@@ -48,14 +55,11 @@ const PROPOSE_TOOL: Anthropic.Tool = {
             head_count: { type: 'integer', minimum: 1 },
           },
           required: ['position_code', 'head_count'],
-          additionalProperties: false,
         },
       },
     },
     required: ['team_id', 'played_at', 'place', 'needs'],
-    additionalProperties: false,
   },
-  strict: true,
 }
 
 type ChatBody = { message?: unknown; history?: unknown }
@@ -107,14 +111,13 @@ function systemPrompt(ownerTeams: { team_id: string; name: string; sport_code: s
 }
 
 function toBackendError(e: unknown): BackendError {
-  if (e instanceof Anthropic.RateLimitError) {
-    return new BackendError(429, 'CHAT_RATE_LIMITED', '잠시 후 다시 시도해 주세요.')
-  }
-  if (e instanceof Anthropic.AuthenticationError) {
-    return new BackendError(500, 'CHAT_MISCONFIGURED', 'AI 서비스 인증에 실패했습니다.')
-  }
-  if (e instanceof Anthropic.APIError) {
-    return new BackendError(502, 'CHAT_UPSTREAM_ERROR', 'AI 서비스와 통신하지 못했습니다.')
+  if (e instanceof ApiError) {
+    if (e.status === 429) {
+      return new BackendError(429, 'CHAT_RATE_LIMITED', '잠시 후 다시 시도해 주세요.')
+    }
+    if (e.status === 401 || e.status === 403) {
+      return new BackendError(500, 'CHAT_MISCONFIGURED', 'AI 서비스 인증에 실패했습니다.')
+    }
   }
   return new BackendError(502, 'CHAT_UPSTREAM_ERROR', 'AI 서비스와 통신하지 못했습니다.')
 }
@@ -136,7 +139,7 @@ export async function POST(req: NextRequest) {
         { status: 422 },
       )
     }
-    const priorHistory = Array.isArray(body.history) ? (body.history as Anthropic.MessageParam[]) : []
+    const priorHistory = Array.isArray(body.history) ? (body.history as Content[]) : []
 
     const me = await getBackend().getMe(token)
     const ownerTeams = me.teams.filter((t) => t.role === 'owner')
@@ -150,47 +153,46 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    if (!process.env.ANTHROPIC_API_KEY) {
-      throw new BackendError(503, 'CHAT_NOT_CONFIGURED', 'ANTHROPIC_API_KEY가 설정되어 있지 않습니다.')
+    if (!process.env.GEMINI_API_KEY) {
+      throw new BackendError(503, 'CHAT_NOT_CONFIGURED', 'GEMINI_API_KEY가 설정되어 있지 않습니다.')
     }
 
-    const messages: Anthropic.MessageParam[] = [
+    const messages: Content[] = [
       ...priorHistory,
-      { role: 'user', content: body.message },
+      { role: 'user', parts: [{ text: body.message }] },
     ]
 
-    const client = new Anthropic()
-    let response: Anthropic.Message
+    const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+    let response: Awaited<ReturnType<typeof client.models.generateContent>>
     try {
-      response = await client.messages.create({
+      response = await client.models.generateContent({
         model: MODEL,
-        max_tokens: 4096,
-        output_config: { effort: 'low' },
-        system: systemPrompt(ownerTeams),
-        tools: [PROPOSE_TOOL],
-        messages,
+        contents: messages,
+        config: {
+          systemInstruction: systemPrompt(ownerTeams),
+          tools: [{ functionDeclarations: [PROPOSE_TOOL] }],
+        },
       })
     } catch (e) {
       throw toBackendError(e)
     }
 
-    const reply = response.content
-      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-      .map((b) => b.text)
-      .join('\n')
-      .trim()
+    const reply = (response.text ?? '').trim()
+    const toolCall = response.functionCalls?.find((fc) => fc.name === PROPOSE_TOOL_NAME)
 
-    const toolUse = response.content.find(
-      (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'propose_match_registration',
-    )
+    // 모델 턴을 그대로 되돌려 준다 — 다음 요청에서 이 history를 이어 보내면
+    // functionCall이 있었다는 사실까지 대화 맥락에 남는다.
+    const modelTurn: Content = response.candidates?.[0]?.content ?? {
+      role: 'model',
+      parts: [{ text: reply }],
+    }
+    messages.push(modelTurn)
 
-    messages.push({ role: 'assistant', content: response.content })
-
-    if (!toolUse) {
+    if (!toolCall) {
       return NextResponse.json({ history: messages, reply, proposal: null })
     }
 
-    const input = toolUse.input as {
+    const input = toolCall.args as {
       team_id: string
       played_at: string
       place: string
@@ -199,15 +201,17 @@ export async function POST(req: NextRequest) {
     const team = ownerTeams.find((t) => t.team_id === input.team_id)
     const labels = team ? POSITIONS[team.sport_code] : undefined
 
-    // 다음 사용자 턴이 이 tool_use 와 짝을 이루는 tool_result 없이 오면 API가
-    // 어긋난다 — 실제로 등록을 실행하지 않았으므로 안내 문구로 짝을 닫아 둔다.
+    // 다음 사용자 턴이 이 functionCall과 짝을 이루는 functionResponse 없이 오면
+    // 대화 맥락이 어긋난다 — 실제로 등록을 실행하지 않았으므로 안내로 짝을 닫는다.
     messages.push({
       role: 'user',
-      content: [
+      parts: [
         {
-          type: 'tool_result',
-          tool_use_id: toolUse.id,
-          content: '확인 카드를 사용자에게 보여줬습니다. 사용자의 다음 입력을 기다립니다.',
+          functionResponse: {
+            id: toolCall.id,
+            name: PROPOSE_TOOL_NAME,
+            response: { status: 'shown_to_user', note: '확인 카드를 사용자에게 보여줬습니다.' },
+          },
         },
       ],
     })

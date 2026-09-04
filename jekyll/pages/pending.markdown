@@ -2696,11 +2696,10 @@ www/src/app/api/chat/route.ts  (신규)  ← LLM API 키가 사는 유일한 곳
   → 실패(422 PAST_MATCH 등): 위 에러 매핑 표의 문구 그대로 인라인 표시
 ```
 
-**4) LLM 선택 (열린 질문 4번에 대한 제 결론)**: **Claude API(Anthropic)**를
-씁니다. EXAONE의 NC 라이선스 문제와 완전히 분리됩니다. 실제 구현은
-`claude-opus-5` + `effort: low`로 냈습니다(가벼운 슬롯 채우기라 low가 충분,
-비용·지연을 아낍니다). 정상호에게는 "EXAONE을 쓰지 않는다"는 결론만 자문으로
-확인받으면 됩니다.
+**4) LLM 선택 (열린 질문 4번에 대한 제 결론)**: ~~Claude API(Anthropic)~~
+**→ Gemini로 정정했습니다(아래 "구현 설계" 절 끝의 🔴 정정 참고).** 어느 쪽이든
+EXAONE의 NC 라이선스 문제와는 완전히 분리됩니다. 정상호에게는 "EXAONE을
+쓰지 않는다"는 결론만 자문으로 확인받으면 됩니다.
 
 **5) UI — 새 컴포넌트 하나**
 
@@ -2713,16 +2712,32 @@ www/src/app/api/chat/route.ts  (신규)  ← LLM API 키가 사는 유일한 곳
 
 위 설계 그대로 냈습니다.
 
-- `www/src/app/api/chat/route.ts`(신규) — `claude-opus-5` + `effort: low`,
-  도구는 `propose_match_registration` 하나. 실제 쓰기는 안 합니다
+- `www/src/app/api/chat/route.ts`(신규) — 도구는 `propose_match_registration`
+  하나. 실제 쓰기는 안 합니다
 - `www/src/app/api/teams/[teamId]/matches/route.ts`(신규) — 확인 카드의
   [등록] 버튼이 부르는 일반 API. `gateway.ts`·`fastapiBackend.ts`·`mock.ts`에
   `createTeamMatch` 추가
 - `www/src/components/MatchBot.tsx`(신규) — `용병 찾기` 알약을 누르면 열리는
   떠 있는 채팅 판. 스쿼드 판과 무관해 `SquadPanel` 안이 아니라 `HomeStage`에
   독립적으로 얹었습니다(`destinations.ts`에 `MATCH_BOT` 상수 추가)
-- `.env.example`에 `ANTHROPIC_API_KEY` 추가 — 비어 있으면 챗봇이 503
-  `CHAT_NOT_CONFIGURED`를 냅니다(실제 키는 여기 아닌 `.env`에)
+
+#### 🔴 정정 (2026-09-04 늦게) — Claude가 아니라 Gemini로 바꿨습니다
+
+**LLM 계정에 카드가 등록 안 된 Free(평가) 플랜이라 Claude API 호출이 전부
+`400 credit balance too low`로 막혔습니다.** Google AI Studio는 카드 없이
+바로 쓰는 무료 등급이 있어 그쪽으로 바꿨습니다 — 나머지 설계(도구 하나·실제
+쓰기는 화면 버튼이 함·DB 저장 없음)는 그대로입니다.
+
+- `@anthropic-ai/sdk` 제거, `@google/genai`(`^2.21.0`) 설치
+- 모델: `gemini-2.5-flash` (무료 등급 포함, 가벼운 슬롯 채우기엔 충분)
+- `history`가 이제 Anthropic `MessageParam[]`이 아니라 Gemini `Content[]`
+  (`{role: 'user'|'model', parts: [...]}`) — **`assistant`가 아니라 `model`**
+  이 어시스턴트 역할입니다
+- `.env.example`의 키 이름을 `ANTHROPIC_API_KEY` → **`GEMINI_API_KEY`**로
+  바꿨습니다(https://aistudio.google.com/apikey 에서 카드 없이 발급)
+- 실제 설치된 SDK의 타입 정의(`node_modules/@google/genai/dist/genai.d.ts`)를
+  직접 읽고 맞췄습니다 — `parametersJsonSchema`·`response.candidates[0].content`·
+  `response.functionCalls`·`ApiError.status` 전부 확인 후 작성했습니다
 
 🔴 **발견한 것 — 팀을 만드는 화면이 아직 없습니다.** `POST /teams`가
 계약에는 있는데 `www`의 `Backend` 인터페이스가 그걸 감싼 적이 없습니다.
@@ -2737,7 +2752,8 @@ test` (299 passed, 신규 20건 — mock 6·라우트 4·컴포넌트 5·챗봇 
 다른 곳은 이 값을 안 써서 안전합니다).
 
 **아직 안 한 것**: 흐름 A(경기 찾기·지원), 실제 브라우저에서 눈으로 확인
-(`ANTHROPIC_API_KEY` 없이는 LLM 왕복까지는 못 봄), 위 "팀 만들기 화면 없음".
+(로컬에 `GEMINI_API_KEY`가 아직 안 들어가 있어 LLM 왕복까지는 못 봄), 위
+"팀 만들기 화면 없음".
 
 - **담당**: 박민호(직접 구현) · **자문**: 정상호(AI 자원·라이선스) · **연동**: 정어진(기존 API, 필요시 계약 문의) · **제기**: 박민호 · **기한**: 이번 스프린트(흐름 B) · 나머지는 다음 스프린트 계획 시
 
