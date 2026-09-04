@@ -2697,9 +2697,10 @@ www/src/app/api/chat/route.ts  (신규)  ← LLM API 키가 사는 유일한 곳
 ```
 
 **4) LLM 선택 (열린 질문 4번에 대한 제 결론)**: **Claude API(Anthropic)**를
-씁니다. EXAONE의 NC 라이선스 문제와 완전히 분리되고, tool use를 잘 지원하고,
-이 정도 슬롯 채우기엔 가벼운 모델(Haiku급)로 충분해 비용도 크지 않습니다.
-정상호에게는 "EXAONE을 쓰지 않는다"는 결론만 자문으로 확인받으면 됩니다.
+씁니다. EXAONE의 NC 라이선스 문제와 완전히 분리됩니다. 실제 구현은
+`claude-opus-5` + `effort: low`로 냈습니다(가벼운 슬롯 채우기라 low가 충분,
+비용·지연을 아낍니다). 정상호에게는 "EXAONE을 쓰지 않는다"는 결론만 자문으로
+확인받으면 됩니다.
 
 **5) UI — 새 컴포넌트 하나**
 
@@ -2707,6 +2708,36 @@ www/src/app/api/chat/route.ts  (신규)  ← LLM API 키가 사는 유일한 곳
 현황을 보여주는 사이드 카드(팀/시각/장소/포지션이 채워질 때마다 갱신) + 확인
 카드의 [등록] 버튼. 기존 `SquadPanel`류 판(글래스 스타일)과 톤을 맞춥니다.
 표지의 `용병 찾기` 버튼(지금 `href` 없음)을 눌렀을 때 여는 것으로 잡습니다.
+
+#### ✅ 흐름 B 구현 완료 (2026-09-04, 박민호)
+
+위 설계 그대로 냈습니다.
+
+- `www/src/app/api/chat/route.ts`(신규) — `claude-opus-5` + `effort: low`,
+  도구는 `propose_match_registration` 하나. 실제 쓰기는 안 합니다
+- `www/src/app/api/teams/[teamId]/matches/route.ts`(신규) — 확인 카드의
+  [등록] 버튼이 부르는 일반 API. `gateway.ts`·`fastapiBackend.ts`·`mock.ts`에
+  `createTeamMatch` 추가
+- `www/src/components/MatchBot.tsx`(신규) — `용병 찾기` 알약을 누르면 열리는
+  떠 있는 채팅 판. 스쿼드 판과 무관해 `SquadPanel` 안이 아니라 `HomeStage`에
+  독립적으로 얹었습니다(`destinations.ts`에 `MATCH_BOT` 상수 추가)
+- `.env.example`에 `ANTHROPIC_API_KEY` 추가 — 비어 있으면 챗봇이 503
+  `CHAT_NOT_CONFIGURED`를 냅니다(실제 키는 여기 아닌 `.env`에)
+
+🔴 **발견한 것 — 팀을 만드는 화면이 아직 없습니다.** `POST /teams`가
+계약에는 있는데 `www`의 `Backend` 인터페이스가 그걸 감싼 적이 없습니다.
+그래서 주장인 팀이 하나도 없는 계정은 이 챗봇이 "먼저 팀을 만들어야 해요"라고
+안내는 하지만 **실제로 만들 화면이 없어 막다른 곳**입니다. 다음 스프린트
+후보로 올려 둡니다 — 담당은 아직 안 정했습니다.
+
+**확인**: `git grep -n "createTeamMatch" -- www/src` · `cd www && npm run
+test` (299 passed, 신규 20건 — mock 6·라우트 4·컴포넌트 5·챗봇 라우트 3)
+· `npx tsc --noEmit` 통과. 데모 계정(`demo@super-sub.example`)의 팀 역할을
+`member`→`owner`로 바꿨습니다(주장 전용 흐름을 데모로 확인하려면 필요했고,
+다른 곳은 이 값을 안 써서 안전합니다).
+
+**아직 안 한 것**: 흐름 A(경기 찾기·지원), 실제 브라우저에서 눈으로 확인
+(`ANTHROPIC_API_KEY` 없이는 LLM 왕복까지는 못 봄), 위 "팀 만들기 화면 없음".
 
 - **담당**: 박민호(직접 구현) · **자문**: 정상호(AI 자원·라이선스) · **연동**: 정어진(기존 API, 필요시 계약 문의) · **제기**: 박민호 · **기한**: 이번 스프린트(흐름 B) · 나머지는 다음 스프린트 계획 시
 
