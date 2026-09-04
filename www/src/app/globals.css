@@ -9495,3 +9495,10 @@ body:has(.ss-profile) {
   opacity: 0.45;
   cursor: default;
 }
+
+/* 카드 꾸미기의 「초기화 · 저장」 줄. 알약 두 개가 나란히 선다. */
+.ss-card-actions {
+  display: flex;
+  align-self: flex-start;
+  gap: 8px;
+}
