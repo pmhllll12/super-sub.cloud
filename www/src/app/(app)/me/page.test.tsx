@@ -153,14 +153,19 @@ describe('내 프로필 — /me', () => {
   })
 
   // 🔴 사용자 요청의 핵심 — 분석 영상과 그냥 올린 영상이 알약으로 갈린다.
-  it('두 갈래를 알약으로 나누고 각각 몇 편인지 적는다', () => {
+  it('두 갈래를 알약으로 나눈다', () => {
     render(<MeBody user={USER} card={CARD} videos={VIDEOS} matches={[]} />)
     const analyzed = screen.getByRole('tab', { name: /분석 영상/ })
-    const uploaded = screen.getByRole('tab', { name: /업로드 영상/ })
-    // VIDEOS: 분석 작업이 걸린 것 1편(v1), 걸리지 않은 것 2편(v2 · 반려 v3).
-    expect(analyzed).toHaveTextContent('1')
-    expect(uploaded).toHaveTextContent('2')
+    expect(screen.getByRole('tab', { name: /업로드 영상/ })).toBeInTheDocument()
     expect(analyzed).toHaveAttribute('aria-selected', 'true')
+  })
+
+  /* 🔴 알약에 편수를 **안 적는다**(사용자 요청). 몇 편인지는 영상 아래
+     `1 / N` 이 이미 말하고 있어서 같은 말을 두 번 하던 자리였다. */
+  it('알약에 편수를 적지 않는다', () => {
+    render(<MeBody user={USER} card={CARD} videos={VIDEOS} matches={[]} />)
+    expect(screen.getByRole('tab', { name: '분석 영상' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: '업로드 영상' })).toBeInTheDocument()
   })
 
   /**

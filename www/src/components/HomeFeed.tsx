@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { FEED } from '@/lib/feed'
+import { feedWith } from '@/lib/feed'
+import { listPublished, type PublishedClip } from '@/lib/published'
 
 /**
  * 홈을 내리면 나오는 **영상 모음** — 필름 한 줄이 화면 가운데를 지나간다.
@@ -18,7 +19,7 @@ import { FEED } from '@/lib/feed'
  * 🔴 **뜬 상태에서만 산다.** 홈이 아직 위에 있을 때는 이 판이 화면 밖에 있으므로
  * 영상을 틀지 않는다 — 안 보이는 영상을 트는 것은 데이터만 쓰는 일이다.
  */
-export default function HomeFeed({ active }: { active: boolean }) {
+export default function HomeFeed({ active, by }: { active: boolean; by: string }) {
   const [i, setI] = useState(0)
   /** 좋아요를 누른 영상. ⚠️ 이 화면 안에서만 산다(계약에 좋아요가 없다). */
   const [liked, setLiked] = useState<string[]>([])
@@ -81,7 +82,21 @@ export default function HomeFeed({ active }: { active: boolean }) {
   const box = useRef<HTMLDivElement>(null)
 
   /** 앞뒤로 **끝없이** 돈다 — 마지막에서 오른쪽으로 가면 처음으로. */
-  const go = (step: number) => setI((prev) => (prev + step + FEED.length) % FEED.length)
+  /**
+   * 내가 공개로 돌린 클립.
+   *
+   * 🔴 그릴 때 저장소를 읽지 않는다 — 서버에는 그 값이 없어서 서버가 그린 첫
+   * 화면과 브라우저가 그린 것이 갈리면 하이드레이션이 깨진다. 붙은 뒤에 읽는다.
+   *
+   * ⚠️ 아직 **내 것만** 붙는다. 남의 공개 영상은 계약에 목록도 재생 주소도
+   * 없어서(미결) 못 가져온다.
+   */
+  const [published, setPublished] = useState<PublishedClip[]>([])
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- 저장소는 서버에 없다. 붙은 뒤에 읽어야 하이드레이션이 안 깨진다.
+  useEffect(() => setPublished(listPublished()), [])
+  const clips = feedWith(published, by)
+
+  const go = (step: number) => setI((prev) => (prev + step + clips.length) % clips.length)
 
   /**
    * 🔴 좌우 화살표는 이 판이 떠 있을 때만 듣는다. 위아래는 홈이 쓰므로
@@ -216,7 +231,7 @@ export default function HomeFeed({ active }: { active: boolean }) {
         style={{ '--ss-feed-shift': `${Math.round(shift)}px` } as React.CSSProperties}
       >
         <ul className="ss-feed-strip">
-          {FEED.map((c, n) => {
+          {clips.map((c, n) => {
             /**
              * 🔴 칸들은 **다 같은 자리에 겹쳐** 있고 지금 것만 보인다(사용자 요청).
              * 옆으로 늘어놓았더니 넘길 때 다른 영상이 화면을 가로질러 지나갔다 —
@@ -260,11 +275,11 @@ export default function HomeFeed({ active }: { active: boolean }) {
       <div className="ss-feed-bar">
         {/* 왼쪽 알약 — 지금 보는 영상이 누구의 무엇인지. */}
         <p className="ss-feed-pill ss-feed-who">
-          <b>{FEED[i].by}</b>
+          <b>{clips[i].by}</b>
           {/* 가르는 선. 낭독기는 이걸 읽을 필요가 없다 — 이름과 제목은 이미
               따로 읽힌다. */}
           <i aria-hidden="true">|</i>
-          <span>{FEED[i].title}</span>
+          <span>{clips[i].title}</span>
         </p>
 
         {/* 🔴 넘기는 길은 **이 단추 둘뿐**이다(사용자 요청). 손짓(가로 굴림)으로도
@@ -292,13 +307,13 @@ export default function HomeFeed({ active }: { active: boolean }) {
         <div className="ss-feed-pill ss-feed-react">
           <button
             type="button"
-            aria-pressed={liked.includes(FEED[i].id)}
+            aria-pressed={liked.includes(clips[i].id)}
             aria-label="좋아요"
             onClick={() =>
               setLiked((prev) =>
-                prev.includes(FEED[i].id)
-                  ? prev.filter((x) => x !== FEED[i].id)
-                  : [...prev, FEED[i].id],
+                prev.includes(clips[i].id)
+                  ? prev.filter((x) => x !== clips[i].id)
+                  : [...prev, clips[i].id],
               )
             }
           >
@@ -362,7 +377,7 @@ export default function HomeFeed({ active }: { active: boolean }) {
         }
       >
         <ul>
-          {FEED.map((c, n) => (
+          {clips.map((c, n) => (
             <li key={c.id}>
               <button
                 type="button"
@@ -404,17 +419,17 @@ export default function HomeFeed({ active }: { active: boolean }) {
         }
       >
         <p className="ss-feed-comments-head">
-          댓글 <b>{FEED[i].comments.length + (wrote[FEED[i].id]?.length ?? 0)}</b>
+          댓글 <b>{clips[i].comments.length + (wrote[clips[i].id]?.length ?? 0)}</b>
         </p>
         <ul>
-          {FEED[i].comments.map((c, n) => (
+          {clips[i].comments.map((c, n) => (
             <li key={`${c.by}-${n}`}>
               <b>{c.by}</b>
               <span>{c.text}</span>
             </li>
           ))}
           {/* 이 화면에서 쓴 것은 아래에 붙는다 — 방금 쓴 것이 눈에 보여야 한다. */}
-          {(wrote[FEED[i].id] ?? []).map((text, n) => (
+          {(wrote[clips[i].id] ?? []).map((text, n) => (
             <li key={`mine-${n}`} data-mine="true">
               <b>나</b>
               <span>{text}</span>
@@ -429,7 +444,7 @@ export default function HomeFeed({ active }: { active: boolean }) {
             if (!text) return
             setWrote((prev) => ({
               ...prev,
-              [FEED[i].id]: [...(prev[FEED[i].id] ?? []), text],
+              [clips[i].id]: [...(prev[clips[i].id] ?? []), text],
             }))
             setDraft('')
           }}
