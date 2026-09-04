@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import type { PublicPlayerCard } from '@/server/backend'
 import PlayerCardView from '@/components/PlayerCardView'
@@ -9,6 +9,9 @@ import HomeNav, { type Destination } from '@/components/HomeNav'
 import { HEADER_LINK_CLASS, HEADER_LINK_HOVER_CLASS } from '@/components/LogoutButton'
 import { useIntroDone } from '@/lib/useIntroDone'
 import { TransitionLink, useChromeHidden, useLeaving } from '@/lib/pageTransition'
+
+/** 프로필에서 로고가 가운데였다는 표시 — 홈이 되돌아오는 연출을 켤 때 읽는다. */
+const MARK_WAS_CENTERED = 'ss-mark-was-centered'
 
 /**
  * 화면 맨 위 줄 — 워드마크 · 목적지 글자 · 내 프로필.
@@ -58,6 +61,59 @@ export default function SiteHeader({
   const pathname = usePathname()
   const shown = destinations.filter((d) => d.href !== pathname)
 
+  /**
+   * 🔴 **프로필 화면에서는 목적지 글자도 '내 프로필'도 내보내지 않는다**
+   * (사용자 요청). 위 `shown` 이 "지금 보고 있는 화면은 목적지에서 뺀다"는
+   * 규칙인데, 이 화면은 그 규칙을 **줄 전체에** 적용한 셈이다. 남는 길은
+   * 워드마크(홈)뿐이다.
+   *
+   * 🔴 **DOM 에서 빼지 않고 안 보이게만 한다.** 목적지 글자 칸은
+   * `flex: 1 1 auto` 에 `justify-content: flex-end` 라(globals.css), 한쪽
+   * 덩어리가 없어지면 남은 것들이 자리를 다시 나눠 갖는다 — 화면을 오갈
+   * 때마다 글자 줄이 좌우로 튄다(실측: 프로필만 빼도 그랬다). 자리를
+   * 남기면 그 튐이 없다.
+   *
+   * `visibility: hidden` 이라 링크는 눌리지도, 탭으로 잡히지도, 읽어 주는
+   * 기계에 걸리지도 않는다. 헤더가 통째로 타는 등장 · 퇴장 연출
+   * (`data-enter`)은 그대로다 — 다른 화면에서와 같은 방식으로 사라졌다가
+   * 같은 방식으로 돌아온다.
+   */
+  const bare = pathname === '/me'
+
+  /**
+   * 🔴 **되돌아오는 연출**을 위한 표시.
+   *
+   * 로고가 가운데로 가는 것은 프로필에서 애니메이션으로 보이는데, 거기서
+   * **나갈 때**는 안 보였다 — 홈은 `(app)` 그룹 밖이라 헤더가 새로 태어나고,
+   * 새 헤더는 자기가 어디서 왔는지 모른 채 처음부터 왼쪽에 있기 때문이다.
+   *
+   * 그래서 프로필에 있는 동안 표시를 남겨 두고, 홈이 그것을 보고 한 번만
+   * 되돌아오는 연출을 켠다. `sessionStorage` 인 것은 새로고침이나 새 탭까지
+   * 따라오면 안 되기 때문이다.
+   */
+  const [returning, setReturning] = useState(false)
+
+  useEffect(() => {
+    try {
+      if (bare) {
+        sessionStorage.setItem(MARK_WAS_CENTERED, '1')
+        return
+      }
+      // 홈에서만 되돌린다 — 다른 화면으로 빠져나갈 때는 로고가 원래 왼쪽이라
+      // 움직일 것이 없다. 표시는 어디로 갔든 지운다(한 번만 도는 연출이다).
+      const had = sessionStorage.getItem(MARK_WAS_CENTERED)
+      if (had) sessionStorage.removeItem(MARK_WAS_CENTERED)
+      // 🔴 이 상태만은 **렌더 중에 맞출 수 없다.** `sessionStorage` 는
+      // 브라우저에만 있어서, 렌더 중에 읽으면 서버가 그린 것과 달라져
+      // hydration 이 깨진다. 마운트한 뒤에 한 번 읽는 수밖에 없다.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (had && pathname === '/') setReturning(true)
+    } catch {
+      // 사생활 보호 모드 등에서 sessionStorage 가 막힐 수 있다 — 연출 하나
+      // 때문에 헤더가 죽지 않게 조용히 넘어간다.
+    }
+  }, [bare, pathname])
+
   return (
     <div
       // 워드마크 · 목적지 글자 · 인사말 세 덩어리 사이는 목적지 글자
@@ -76,11 +132,17 @@ export default function SiteHeader({
     >
       {/* 홈으로 가는 길. 인트로의 글자가 날아와 앉는 자리이기도 하다
           (`[data-brand-mark]` 로 찾는다 — BrandMark 참고). */}
-      <TransitionLink href="/" aria-label="홈">
+      <TransitionLink
+        href="/"
+        aria-label="홈"
+        className={`ss-home-mark${bare ? ' ss-home-mark-center' : ''}${
+          returning ? ' ss-home-mark-returning' : ''
+        }`}
+      >
         <BrandMark size={26} />
       </TransitionLink>
 
-      <div className="ss-home-nav-slot">
+      <div className={`ss-home-nav-slot${bare ? ' ss-home-gone' : ''}`}>
         <HomeNav
           destinations={shown}
           loggedIn={Boolean(user)}
@@ -95,7 +157,10 @@ export default function SiteHeader({
            보여주고, 없으면 닉네임 글자로 대신한다. 어느 쪽이든 누르면
            /me 로 가고, 카드 아래에 무엇인지 적어 둔다 — 카드만 있으면
            눌러 보기 전엔 어디로 가는지 알 수 없다. */
-        <TransitionLink href="/me" className="ss-home-profile shrink-0">
+        <TransitionLink
+          href="/me"
+          className={`ss-home-profile shrink-0${bare ? ' ss-home-gone' : ''}`}
+        >
           {card ? (
             <span className="ss-pcard-mini">
               <PlayerCardView card={card} />

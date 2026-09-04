@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import {
   Abril_Fatface,
   Anton,
+  Freckle_Face,
   Grenze,
   Rakkas,
   Rubik,
@@ -95,6 +96,19 @@ const anton = Anton({
   subsets: ["latin"],
 });
 
+// 프로필 화면의 큰 머리글("MY PROFILE") 전용(사용자 지정, Freckle Face).
+// 손으로 뭉갠 듯한 굵은 대문자라 판 위에 얹는 한 마디에 맞는다.
+//
+// 🔴 굵기가 400 하나뿐인 장식 글꼴이라 **font-weight 를 주지 않는다** — 올리면
+// 가짜 굵게(synthetic bold)만 걸려 획이 지저분해진다(Anton · Abril Fatface 등에서
+// 이미 겪었다).
+// 🔴 라틴만 쓴다 — 한글에 쓰지 않는다(다른 장식 글꼴들과 같은 규칙).
+const freckleFace = Freckle_Face({
+  variable: "--font-profile",
+  weight: "400",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
   title: "Super-Sub",
   description: "생활체육 경기 영상을 분석해 용병을 찾고, 실력을 검증합니다.",
@@ -104,7 +118,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className="h-full antialiased">
       <body
-        className={`${rubik.variable} ${rubikGlitch.variable} ${abrilFatface.variable} ${shrikhand.variable} ${youngSerif.variable} ${grenze.variable} ${rakkas.variable} ${anton.variable} min-h-full flex flex-col`}
+        className={`${rubik.variable} ${rubikGlitch.variable} ${abrilFatface.variable} ${shrikhand.variable} ${youngSerif.variable} ${grenze.variable} ${rakkas.variable} ${anton.variable} ${freckleFace.variable} min-h-full flex flex-col`}
       >
         <IntroGate />
         {/* 화면을 떠날 때 들어온 방향 그대로 되나가게 한다. 라우팅을 건너

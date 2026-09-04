@@ -76,6 +76,19 @@ const DEFAULT_FIGURE = { src: '/home_figure.jpg' }
  * 심으면 새 페이지를 만들 때마다 빠뜨린다.
  */
 const BY_PREFIX: { prefix: string; figure: Omit<Figure, 'phase'> }[] = [
+  // 내 프로필. 종목 콜라주 한 장(사용자 지정).
+  {
+    prefix: '/me',
+    figure: {
+      /* 🔴 그림을 갈 때는 **파일 이름도 같이 바꾼다.** 같은 이름으로 덮어쓰면
+         브라우저가 캐시된 옛 그림을 계속 쓴다 — 실제로 그렇게 겪었다
+         (새 창에서는 새 그림, 쓰던 창에서는 옛 그림). */
+      src: '/me_collage.jpg',
+      // 🔴 아래를 검게 잦아들게 하지 않는다 — 그림이 화면을 통째로 쓰는
+      // 콜라주라, 막을 씌우면 아래쪽 조각만 어둠에 잠긴다.
+      bleed: true,
+    },
+  },
   // 레슨 · 상점. 인물이 가운데에서 오른쪽에 있어 그만큼 밀어 둔다.
   {
     prefix: '/market',
@@ -120,6 +133,9 @@ const BY_PREFIX: { prefix: string; figure: Omit<Figure, 'phase'> }[] = [
  * 🔴 로그인 · 회원가입(`AuthShell`)은 자기 배경을 `-z-10` 에 따로 깐다. 이
  * 층은 `-1` 이라 그 위에 놓여 **그 화면의 배경을 덮어 버린다.** 공유 카드와
  * 관리자 화면도 배경 사진을 쓰지 않는다.
+ *
+ * ⚠️ `/me` 는 여기 있다가 나갔다. 검정 단색 → 홈과 같은 사진 → 다시 검정을
+ * 거쳐, 지금은 **제 그림**(위 BY_PREFIX 의 종목 콜라주)을 쓴다.
  */
 const NO_FIGURE = ['/login', '/signup', '/c/', '/admin']
 

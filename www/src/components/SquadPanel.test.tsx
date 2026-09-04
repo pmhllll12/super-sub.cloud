@@ -1,7 +1,32 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { PlayerCard } from '@/server/backend'
+import type { PlayerCard, Squad } from '@/server/backend'
 import SquadPanel from './SquadPanel'
+
+/** 서버가 준 스쿼드 — MF 둘과 GK 하나가 등재돼 있다. */
+const SQUAD: Squad = {
+  id: 'sq1',
+  team_id: 't1',
+  public_slug: 'aB3xK9mQ2pL7vN4t',
+  members: [
+    {
+      id: 'sm1',
+      player_card_id: 'c9',
+      card_public_slug: 'kim-4f2a',
+      nickname: '김철수',
+      position_code: 'MF',
+      position_label: '미드필더',
+    },
+    {
+      id: 'sm2',
+      player_card_id: 'c8',
+      card_public_slug: 'lee-1a2b',
+      nickname: '이영희',
+      position_code: 'GK',
+      position_label: '골키퍼',
+    },
+  ],
+}
 
 const CARD: PlayerCard = {
   id: 'c1',
@@ -10,6 +35,22 @@ const CARD: PlayerCard = {
   user: { id: 'u1', nickname: '홍길동' },
   titles: [],
 }
+
+describe('스쿼드 — 서버에서 읽기', () => {
+  // 🔴 09-03 에 `GET /teams/{id}/squad` 가 생겼다. 이게 없으면 화면은 다시
+  // 새로고침마다 빈 판이 된다.
+  it('등재된 사람을 자리에 앉힌다', () => {
+    render(<SquadPanel card={CARD} squad={SQUAD} />)
+    expect(screen.getByText('김철수')).toBeInTheDocument()
+    expect(screen.getByText('이영희')).toBeInTheDocument()
+  })
+
+  // 내 자리(FW)는 `card` 가 그린다 — 서버 목록에 내가 있어도 두 번 나오면 안 된다.
+  it('스쿼드가 없으면 빈 판을 그린다', () => {
+    render(<SquadPanel card={CARD} squad={null} />)
+    expect(screen.queryByText('김철수')).toBeNull()
+  })
+})
 
 describe('스쿼드', () => {
   it('판 위에 카드 다섯 장을 포지션 자리대로 앉힌다', () => {

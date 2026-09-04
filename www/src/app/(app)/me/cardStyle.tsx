@@ -1,0 +1,121 @@
+'use client'
+
+import { createContext, useContext, useMemo, useState } from 'react'
+
+/**
+ * 카드 꾸미기 설정.
+ *
+ * ⚠️ **아직 서버에 저장되지 않는다.** 계약에 카드를 꾸미는 필드가 없어서
+ * (미결 paik 3번), 지금은 이 화면을 벗어나면 사라진다. 브라우저 저장도 일부러
+ * 안 넣었다 — 서버가 붙는 순간 상태가 두 곳에 생겨 어느 쪽이 진짜인지
+ * 헷갈린다(`SquadPanel` 이 같은 이유로 안 넣었다).
+ *
+ * 🔴 **여기 담긴 이름들이 곧 계약에 요청할 필드 목록**이다. 화면에서 무엇이
+ * 필요한지 먼저 굳혀 두면, 규격을 낼 때 짐작으로 정하지 않아도 된다.
+ */
+export type CardStyle = {
+  /** 카드 바탕. */
+  bg: string
+  /** 워드마크(SUPERSUB) 색. */
+  logo: string
+  /** 가운데 큰 글자. 비우면 카드에 글자가 없다. */
+  text: string
+  /** 그 글자의 색. */
+  textColor: string
+  /**
+   * 글자 자리 — 카드 폭 · 높이에 대한 백분율(가운데 기준).
+   * 🔴 `PLAYER CARD` 머리글 **아래로만** 갈 수 있다(사용자 요청) — 위로
+   *   올라가면 로고와 머리글을 덮는다. 그 하한이 `TEXT_MIN_Y` 다.
+   */
+  textX: number
+  textY: number
+  /**
+   * 올린 사진. **브라우저 안에만 있다**(파일을 읽은 data URL) — 카드 이미지를
+   * 올릴 자리가 계약에 정해져 있지 않아서 서버로 보내지 않는다.
+   * `og_image_key` 가 "그 위치에 파일이 아직 없다" 인 것과 같은 자리다.
+   */
+  photo: string | null
+  /** 사진 크기(1 이 원래 크기). */
+  photoScale: number
+  /** 사진 위치 — 카드 폭 · 높이에 대한 백분율. */
+  photoX: number
+  photoY: number
+  /**
+   * 사진을 어떻게 놓는가.
+   *
+   * `cutout` — 지금까지의 모습. 사람만 오려 낸 그림이 **아래 절반**에 서고
+   *   위쪽은 바탕색 · 글자의 자리다.
+   * `full` — **누끼를 안 딴 사진**을 카드 전체에 깐다(사용자 요청). 오려 내는
+   *   수고 없이 카드를 만들 수 있는 길이다.
+   */
+  mode: 'cutout' | 'full'
+  /** 뒤에 깔리는 자국. `-1` 이면 아무것도 안 깐다. */
+  brush: number
+  brushColor: string
+  brushScale: number
+  brushX: number
+  brushY: number
+}
+
+/** 글자가 올라갈 수 있는 가장 위 — 이보다 위는 로고와 머리글의 자리다. */
+export const TEXT_MIN_Y = 24
+
+/** 지금 카드가 그려지는 모습 그대로 — 아무것도 안 고친 상태가 이 값이다. */
+export const DEFAULT_CARD_STYLE: CardStyle = {
+  bg: '#91ea92',
+  logo: '#0b0b0b',
+  text: 'THREE LUNGS',
+  textColor: '#0b0b0b',
+  // 지금 카드에서 글자가 앉아 있는 자리 그대로.
+  textX: 50,
+  textY: 34,
+  photo: null,
+  photoScale: 1,
+  photoX: 0,
+  photoY: 0,
+  mode: 'cutout',
+  brush: 0,
+  brushColor: '#0b0b0b',
+  brushScale: 1,
+  brushX: 0,
+  brushY: 0,
+}
+
+type Ctx = {
+  style: CardStyle
+  set: (patch: Partial<CardStyle>) => void
+  reset: () => void
+}
+
+const CardStyleContext = createContext<Ctx | null>(null)
+
+/**
+ * 카드와 편집기가 **같은 값을 본다**. 둘이 화면에서 떨어져 있어서(카드는 선
+ * 위, 편집기는 선 아래) 상태를 한쪽이 들고 있을 수가 없다.
+ */
+export function CardStyleProvider({ children }: { children: React.ReactNode }) {
+  const [style, setStyle] = useState<CardStyle>(DEFAULT_CARD_STYLE)
+  const value = useMemo<Ctx>(
+    () => ({
+      style,
+      set: (patch) => setStyle((prev) => ({ ...prev, ...patch })),
+      reset: () => setStyle(DEFAULT_CARD_STYLE),
+    }),
+    [style],
+  )
+  return <CardStyleContext.Provider value={value}>{children}</CardStyleContext.Provider>
+}
+
+/**
+ * 🔴 provider 밖에서도 **죽지 않는다.** 카드는 편집 모드가 아닐 때도 그려지고
+ * (홈 헤더 · 스쿼드 판 · 공개 카드 화면), 그때는 기본값이 맞다.
+ */
+export function useCardStyle(): Ctx {
+  return (
+    useContext(CardStyleContext) ?? {
+      style: DEFAULT_CARD_STYLE,
+      set: () => {},
+      reset: () => {},
+    }
+  )
+}

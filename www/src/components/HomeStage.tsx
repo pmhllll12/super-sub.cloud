@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { PublicPlayerCard } from '@/server/backend'
+import type { PublicPlayerCard, Squad } from '@/server/backend'
 import SquadPanel from '@/components/SquadPanel'
 import SiteHeader from '@/components/SiteHeader'
 import HomeNav, { type Destination } from '@/components/HomeNav'
@@ -37,6 +37,7 @@ export type { Destination }
 export default function HomeStage({
   user,
   card,
+  squad = null,
   destinations,
   featured = [],
   defaultActive = null,
@@ -44,6 +45,8 @@ export default function HomeStage({
   user: { nickname: string } | null
   /** 로그인한 사람의 선수 카드. 아직 카드가 없으면 null 이다. */
   card?: PublicPlayerCard | null
+  /** 팀의 스쿼드. 팀이 없거나 아직 안 만들었으면 null 이다. */
+  squad?: Squad | null
   destinations: Destination[]
   /**
    * 헤드라인 자리에 **유리 알약 버튼**으로 크게 내놓는 목적지들.
@@ -288,6 +291,7 @@ export default function HomeStage({
             </div>
             <SquadPanel
               card={card}
+              squad={squad}
               friendSearch={friendSearch}
               // 판의 × 로 닫으면 알약 선택도 같이 풀려야 한다 — 안 그러면
               // 고른 채로 판만 없어져 다시 눌러도 안 열린다.
