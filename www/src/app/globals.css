@@ -9285,3 +9285,137 @@ body:has(.ss-profile) {
   color: color-mix(in srgb, var(--ss-error) 85%, var(--ss-fg));
 }
 
+/* 흐름 B(모집 등록 돕기) 챗봇 — "용병 찾기" 알약이 연다(미결 min 7번).
+   backdrop-filter는 컴포넌트에서 인라인으로 준다(위 규칙과 같은 이유). */
+.ss-matchbot {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  width: min(380px, calc(100vw - 32px));
+  max-height: min(560px, calc(100vh - 48px));
+  border-radius: 16px;
+  border: 1px solid var(--ss-glass-border);
+  background: var(--ss-glass-bg);
+  padding: 16px;
+  color: var(--ss-fg);
+}
+
+.ss-matchbot-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+  min-height: 24px;
+}
+
+.ss-matchbot-head h3 {
+  width: 100%;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.ss-matchbot-close {
+  position: absolute;
+  right: 0;
+  top: 0;
+  font-size: 18px;
+  color: var(--ss-fg);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.ss-matchbot-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.ss-matchbot-msg {
+  font-size: 0.85rem;
+  line-height: 1.4;
+  padding: 8px 12px;
+  border-radius: 12px;
+  max-width: 85%;
+}
+
+.ss-matchbot-msg[data-role='assistant'] {
+  align-self: flex-start;
+  background: color-mix(in srgb, var(--ss-fg) 12%, transparent);
+}
+
+.ss-matchbot-msg[data-role='user'] {
+  align-self: flex-end;
+  background: color-mix(in srgb, var(--ss-accent) 30%, transparent);
+}
+
+.ss-matchbot-msg[data-role='system'] {
+  align-self: center;
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.ss-matchbot-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--ss-glass-border);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+}
+
+.ss-matchbot-card button {
+  align-self: flex-end;
+  border-radius: var(--ss-field-radius);
+  background: var(--ss-accent);
+  color: var(--ss-bg);
+  border: none;
+  padding: 8px 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ss-matchbot-error {
+  color: var(--ss-error);
+}
+
+.ss-matchbot-input {
+  display: flex;
+  gap: 8px;
+}
+
+.ss-matchbot-input input {
+  flex: 1;
+  border-radius: var(--ss-field-radius);
+  border: 1px solid var(--ss-glass-border);
+  background: transparent;
+  color: var(--ss-fg);
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
+
+.ss-matchbot-input button {
+  border-radius: var(--ss-field-radius);
+  background: var(--ss-accent);
+  color: var(--ss-bg);
+  border: none;
+  padding: 8px 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ss-matchbot-input button:disabled,
+.ss-matchbot-card button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+

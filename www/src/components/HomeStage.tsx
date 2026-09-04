@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PublicPlayerCard, Squad } from '@/server/backend'
 import SquadPanel from '@/components/SquadPanel'
+import MatchBot from '@/components/MatchBot'
 import SiteHeader from '@/components/SiteHeader'
 import HomeNav, { type Destination } from '@/components/HomeNav'
-import { FRIEND_SEARCH } from '@/lib/destinations'
+import { FRIEND_SEARCH, MATCH_BOT } from '@/lib/destinations'
 import { useIntroDone } from '@/lib/useIntroDone'
 import { useHideChrome, useLeaving } from '@/lib/pageTransition'
 import LogoutButton from '@/components/LogoutButton'
@@ -241,6 +242,7 @@ export default function HomeStage({
    */
   const [picked, setPicked] = useState<string | null>(defaultActive)
   const friendSearch = picked === FRIEND_SEARCH
+  const matchBot = picked === MATCH_BOT
 
   return (
     <>
@@ -336,6 +338,16 @@ export default function HomeStage({
           <LogoutButton />
         </div>
       )}
+
+      {/* 스쿼드 판과 달리 자리(포지션 슬롯)와 무관해 그 판 안에 넣지 않고
+          독립된 떠 있는 판으로 연다 — SquadPanel 은 스쿼드 레이아웃 전용이다. */}
+      <MatchBot
+        open={matchBot}
+        onClose={() => {
+          setPicked(defaultActive)
+          setActive(defaultActive)
+        }}
+      />
     </>
   )
 }

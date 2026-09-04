@@ -109,6 +109,16 @@ export type Match = {
 }
 
 /**
+ * `POST /teams/{id}/matches` 의 요청 본문 (api-contract.md 3-4절).
+ * `MatchNeed`와 달리 `position_label`이 없다 — 서버가 채워서 돌려준다.
+ */
+export type CreateMatchInput = {
+  played_at: string
+  place: string
+  needs: { position_code: string; head_count: number }[]
+}
+
+/**
  * 내가 올린 클립 한 줄 — `GET /videos` (api-contract.md 3-6절).
  * `POST /videos` 의 응답과 **같은 모양**이다.
  *
