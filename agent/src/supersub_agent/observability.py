@@ -112,6 +112,7 @@ def build_record(
     analyzed_at: str | None = None,
     subject=None,
     subject_box_frames: int = 0,
+    subject_area_jumps: int = 0,
 ) -> dict:
     """분석 1건의 관측 레코드를 만든다.
 
@@ -135,14 +136,18 @@ def build_record(
         rec["raw_multi_person_frame_ratio"] = raw["multi_person_frame_ratio"]
         rec["raw_candidate_count_histogram"] = raw["candidate_count_histogram"]
     if subject is not None:
-        rec.update(summarize_subject_selection(subject, subject_box_frames))
+        rec.update(
+            summarize_subject_selection(subject, subject_box_frames, subject_area_jumps)
+        )
     return rec
 
 
 # 관측 레코드에 실을 대상 선택 필드 — **전부 스칼라다.** 레코드는 "그대로 한 행으로
 # INSERT할 수 있는 평면 구조"여야 한다(모듈 설명). 선택 박스 시계열 자체는 결과
 # 봉투로 나가고 여기에는 넣지 않는다.
-def summarize_subject_selection(subject, subject_box_frames: int) -> dict:
+def summarize_subject_selection(
+    subject, subject_box_frames: int, subject_area_jumps: int = 0
+) -> dict:
     """대상을 어떻게 골랐는지를 평면 스칼라로.
 
     🔴 **여기서 재는 것도 정확성이 아니다.** "사람이 지정했는가", "못 맞춰
@@ -162,6 +167,9 @@ def summarize_subject_selection(subject, subject_box_frames: int) -> dict:
         # 찍은 시각이 분석 창 밖이었는가 (업로드 60초 대 창 10초).
         "subject_at_clamped": subject.clamped,
         "subject_continuity_breaks": subject.continuity_breaks,
+        # 🔴 끊김 0이 "잘 따라갔다"는 뜻이 아니다 — 신원이 바뀔 때는 겹침이
+        # 넉넉하다. 넓이가 크게 뛴 횟수가 그 의심을 센다(pose.count_area_jumps).
+        "subject_area_jumps": subject_area_jumps,
         # 대상을 실제로 고른 프레임 수 — 0에 가까우면 분석 자체가 빈 것이다.
         "subject_box_frames": subject_box_frames,
     }

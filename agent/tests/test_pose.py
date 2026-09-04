@@ -527,3 +527,27 @@ def test_subject_envelope_admits_it_knows_nothing_on_the_synthetic_path():
 
     assert env["known"] is False
     assert "합성" in env["why"]
+
+
+def test_area_jump_counts_a_likely_identity_switch():
+    """🔴 `continuity_breaks`가 못 잡는 실패를 이쪽이 센다.
+
+    신원이 바뀔 때는 겹침이 넉넉해서 "끊김"으로 안 잡힌다. 실측
+    (`3R1kvNrGJK0`)에서 타자 트랙이 심판으로 갈아탔을 때 끊김은 0이었고
+    넓이는 2.5배 뛰었다.
+    """
+    small = (0.0, 0.0, 10.0, 10.0)
+    big = (0.0, 0.0, 20.0, 20.0)        # 넓이 4배
+    assert pose.count_area_jumps([small, small, big, big]) == 1
+
+
+def test_area_jump_ignores_gradual_growth():
+    """카메라로 다가오면 넓이는 실제로 커진다 — 그것까지 세면 신호가 죽는다."""
+    boxes = [(0.0, 0.0, 10.0 + i, 10.0 + i) for i in range(10)]
+    assert pose.count_area_jumps(boxes) == 0
+
+
+def test_area_jump_skips_frames_without_a_box():
+    """박스가 없는 프레임은 `continuity_breaks` 쪽 이야기다."""
+    box = (0.0, 0.0, 10.0, 10.0)
+    assert pose.count_area_jumps([box, None, box]) == 0

@@ -155,6 +155,43 @@ class SubjectSelection:
         return self.source == "specified"
 
 
+# 인접 프레임에서 선택 박스 넓이가 이 배수 이상 뛰면 **대상이 바뀐 것으로 의심**한다.
+#
+# 🔴 **막는 값이 아니라 세는 값이다.** 사람이 카메라 쪽으로 다가오면 넓이는 실제로
+# 커지므로, 이것으로 후보를 거르면 정상 동작을 막는다. 그래서 선택에는 관여하지
+# 않고 **몇 번 뛰었는지만** 결과·관측에 남긴다.
+#
+# 왜 필요한가: `continuity_breaks`가 **이 실패를 못 잡는다.** 그쪽은 "겹치는 후보가
+# 하나도 없다"를 세는데, 신원이 바뀔 때는 겹침이 넉넉하다. 실제로 `3R1kvNrGJK0`
+# 에서 타자를 따라가던 트랙이 110프레임에서 심판으로 갈아탔는데 끊김은 0이었고,
+# 그 뒤 190프레임(63%)을 다른 사람으로 분석했다 — 넓이는 2.5배 뛰었다.
+#
+# 2.0인 근거는 **그 사례 하나뿐이다.** 분포가 쌓이면 다시 본다.
+SUBJECT_AREA_JUMP = 2.0
+
+
+def count_area_jumps(
+    boxes: list[tuple[float, float, float, float] | None],
+    factor: float = SUBJECT_AREA_JUMP,
+) -> int:
+    """인접 프레임 사이에서 선택 박스 넓이가 크게 뛴 횟수.
+
+    **대상이 바뀌었을 가능성의 신호다.** 확정이 아니다 — 원근으로도 커진다.
+    둘 중 하나가 없는 프레임은 건너뛴다(그건 `continuity_breaks` 쪽 이야기다).
+    """
+    jumps = 0
+    for before, after in zip(boxes, boxes[1:]):
+        if before is None or after is None:
+            continue
+        a = before[2] * before[3]
+        b = after[2] * after[3]
+        if a <= 0 or b <= 0:
+            continue
+        if max(a, b) / min(a, b) >= factor:
+            jumps += 1
+    return jumps
+
+
 def _iou(a: tuple[float, float, float, float], b: tuple[float, float, float, float]) -> float:
     """두 xywh 박스의 IoU. 겹치지 않으면 0이다."""
     ax, ay, aw, ah = a
@@ -608,6 +645,10 @@ def subject_envelope(result: "PoseResult | None", frame_count: int) -> dict:
         # 찍은 시각이 분석 창 밖이라 끝으로 당겨졌는가.
         "at_clamped": selection.clamped,
         "continuity_breaks": selection.continuity_breaks,
+        # 🔴 **끊김 0이 "잘 따라갔다"는 뜻이 아니다.** 신원이 바뀔 때는 겹침이
+        # 넉넉해서 끊김으로 안 잡힌다. 넓이가 크게 뛴 횟수를 함께 낸다 —
+        # 확정이 아니라 의심 신호다(count_area_jumps).
+        "area_jumps": count_area_jumps(result.subject_boxes),
         "frame_size": list(result.frame_size) if result.frame_size else None,
         "frames_with_box": result.subject_box_frames(),
         "frames": frame_count,
@@ -656,6 +697,7 @@ def _record_input_observation(result: PoseResult, rubric_key: str | None) -> Non
             # 자주 실패하는가"를 정답 없이 잰다 (미결 18번 → 12번).
             subject=result.subject_selection,
             subject_box_frames=result.subject_box_frames(),
+            subject_area_jumps=count_area_jumps(result.subject_boxes),
         )
     )
 
