@@ -376,7 +376,7 @@ UCF101(클립 단위) · UPLIFT·MultiSports·Penn Action·BBDB(전부 Grade A �
 | **층 4 판독 소요 시간** | 측정된 바 없다 |
 | **`swing_arm`이 도출인지 실제 상관인지** | 12건으로는 못 가른다. 위 층 2 (b) 참고 |
 | **판독 12건의 표본 편향 정도** | 남은 27건 대비 다중후보 비율 같은 층화 지표를 이 회차에서 재지 않았다(새 분석 금지) |
-| **`labeled_stats.py` 실행 결과** | 저장소에 없다. 돌렸는지 커밋 이력으로 확정 불가 |
+| ~~`labeled_stats.py` 실행 결과~~ | ✅ **2026.09.04에 돌렸다** — [`labeling/RESULTS.md`](https://github.com/pmhllll12/super-sub.cloud/blob/ho/agent/eval/pending6_side/labeling/RESULTS.md) |
 
 ---
 

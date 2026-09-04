@@ -67,6 +67,14 @@ nav_order: 6
 
 ### ① 미결 6번 마무리 — 스윙 측
 
+> **2026.09.04 진행.** 서식 결함 정리 ✅(`review_packet2/`) · 12건 계산
+> ✅([`RESULTS.md`](https://github.com/pmhllll12/super-sub.cloud/blob/ho/agent/eval/pending6_side/labeling/RESULTS.md)).
+> **남은 것은 27건 판독 하나**이고, 그건 사람이 해야 한다 — AI가 채우면
+> 정답으로 승격이 안 된다.
+>
+> 나온 값: 다리 4/11 = 36.4% [15.2%, 64.6%] · 팔은 분모 8건이라 **정확도를
+> 내지 않았다**(6/8) · `both` 4/12 · `top_hand` 일치 5/12.
+
 | | |
 |---|---|
 | 무엇을 | 판독이 들어온 12건으로 사전 등록 명세를 돌리고, **뺀 27건을 사유별로 분류**하고, 서식 결함을 정리한다 |
@@ -207,7 +215,8 @@ cat agent/eval/pending6_side/labeling/EXCLUDED.md
 |---|---|
 | `pending6_side/labeling/review_packet/side_form.csv` | **12건 기입 완료** (머리줄 포함 13행) |
 | `pending6_side/labeling/EXCLUDED.md` | 뺀 27건의 명단·사유 기록됨. 🔴 `subject_ok = n`과 `na` **두 사유가 합쳐졌고 되돌릴 수 없다** |
-| `pending6_side/labeling/labeled_stats.py` | 라벨 보기 전에 코드로 굳혔다. **실행 결과가 저장소에 없다** |
+| `pending6_side/labeling/labeled_stats.py` | 라벨 보기 전에 굳혔고 **2026.09.04에 실행했다** — 결과는 `labeling/RESULTS.md` |
+| `pending6_side/labeling/review_packet2/` | 2차 판독 서식 4회차. **비어 있다 — 사람이 채워야 한다** |
 | `phaseA/` 캐시 사본 | `cache_target{15,30}` · `candidates_target{15,30}` 저장소에 있음 |
 
 ---
