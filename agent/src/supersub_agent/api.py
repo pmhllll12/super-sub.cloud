@@ -188,6 +188,17 @@ def build_timebase(
     }
 
 
+def build_subject(pose: "PoseResult | None", frame_count: int) -> dict:
+    """결과 봉투의 `subject` 블록. 규칙은 `pose.subject_envelope`에 하나만 둔다.
+
+    S3 워커(`scripts/analyze_s3.py`)도 같은 함수를 쓴다 — 두 벌로 두면
+    한쪽에만 필드가 늘어나 경로에 따라 봉투가 달라진다.
+    """
+    from .pose import subject_envelope
+
+    return subject_envelope(pose, frame_count)
+
+
 def run_pipeline(
     keypoints: np.ndarray,
     source: str,
@@ -242,6 +253,8 @@ def run_pipeline(
         "features": features,
         # 프레임 단위 값이 어느 격자 위에 있는지와, 그것이 몇 초인지 (미결 7번 E-3).
         "timebase": build_timebase(features, int(keypoints.shape[0]), pose),
+        # **누구를** 분석했는지와 어떻게 골랐는지 (미결 18번).
+        "subject": build_subject(pose, int(keypoints.shape[0])),
         # 정지화면은 영상의 poster로 쓴다 — 로딩 전에도 자세가 보인다.
         "preview": impact_preview(frames, keypoints, int(features["impact_frame"])),
         "preview_video": tracked_preview(
@@ -321,11 +334,39 @@ def api_synthetic(rubric: str | None = None, side: str = "auto") -> JSONResponse
     )
 
 
+def parse_subject(box: str | None, at_ms: float | None):
+    """질의 인자를 SubjectRequest로. 규칙은 `pose.parse_subject_spec`가 갖고 있다.
+
+    여기서 하는 일은 **오류를 HTTP 422로 옮기는 것뿐**이다 — 무엇이 올바른
+    지정인가는 CLI와 같아야 한다.
+    """
+    from .pose import parse_subject_spec
+
+    try:
+        return parse_subject_spec(box, at_ms)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
 @app.post("/api/analyze/video")
 async def api_video(
-    file: UploadFile, rubric: str | None = None, side: str = "auto"
+    file: UploadFile,
+    rubric: str | None = None,
+    side: str = "auto",
+    subject_box: str | None = None,
+    subject_at_ms: float | None = None,
 ) -> JSONResponse:
+    """subject_box — 분석할 사람의 **정규화 0~1** 박스 `"x,y,w,h"`.
+    subject_at_ms — 그 박스를 그린 영상 시각(밀리초).
+
+    둘 다 **선택**이다. 없으면 지금까지의 동작 그대로이고 결과가 한 비트도
+    달라지지 않는다 — `side`와 같은 규칙이다. `side`와는 **직교한다**:
+    `side`는 대상을 고른 뒤 그 사람의 어느 팔·발인지고(미결 6번), 이건
+    **누구인지**다.
+    """
     from .pose import extract_keypoints
+
+    subject = parse_subject(subject_box, subject_at_ms)
 
     suffix = Path(file.filename or "clip.mp4").suffix or ".mp4"
     # copyfileobj로 청크 복사한다 — file.read()는 클립 전체를 한 번에 RAM에 올린다.
@@ -336,7 +377,7 @@ async def api_video(
     try:
         # 입력 분포 관측은 extract_keypoints 안에서 일어난다(observe 기본 True).
         # 여기서 따로 기록하면 한 분석이 두 번 남는다.
-        pose = extract_keypoints(tmp_path, rubric_key=rubric)
+        pose = extract_keypoints(tmp_path, rubric_key=rubric, subject=subject)
         # 미리보기 렌더링(= 프레임 재디코딩)이 이 try 안에서 끝나야 한다.
         # finally가 임시 파일을 지우므로 그 뒤에는 프레임을 얻을 수 없다.
         return JSONResponse(

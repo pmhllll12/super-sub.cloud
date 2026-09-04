@@ -533,3 +533,80 @@ def test_serialization_error_is_not_swallowed():
     """직렬화 오류는 운영 문제가 아니라 프로그래밍 오류다. 조용히 넘기지 않는다."""
     with pytest.raises(TypeError):
         obs.record({"bad": object()}, "/dev/null")
+
+
+# --- 분석 대상 지정이 관측·결과에 남는가 (미결 18번) -------------------------
+
+
+def test_auto_path_still_records_which_box_was_analyzed(tmp_path, monkeypatch, stub_models):
+    """지정이 없어도 **고른 박스는 남는다.**
+
+    `candidate_counts`는 선택 *이전*이라 누가 대상이었는지 모른다. 이 값이
+    있어야 미결 8번이 사후에 확인할 거리가 생긴다.
+    """
+    monkeypatch.setenv("SUPERSUB_METRICS_SINK", str(tmp_path / "m.jsonl"))
+    clip = _write_clip(tmp_path / "c.avi", n_frames=4)
+
+    result = pose_mod.extract_keypoints(clip, device="cpu")
+
+    assert result.subject_selection.source == "auto"
+    assert result.frame_size == (64, 48)
+    # 대역 검출기가 내는 두 사람 중 큰 쪽 — 지금까지의 동작 그대로다.
+    assert result.subject_boxes == [(0.0, 0.0, 30.0, 40.0)] * len(result.keypoints)
+    assert result.subject_box_frames() == len(result.keypoints)
+
+
+def test_specifying_a_person_changes_which_box_is_analyzed(tmp_path, monkeypatch, stub_models):
+    """찍은 사람이 **가장 큰 사람이 아닐 때** 실제로 갈리는가.
+
+    대역 검출기가 내는 두 박스는 x1y1x2y2다 — [0,0,30,40]과 [30,0,40,20],
+    즉 xywh 로는 큰 사람 (0,0,30,40)과 작은 사람 (30,0,10,20)이다.
+    작은 쪽을 찍으면 자동 선택과 다른 답이 나와야 한다.
+    """
+    monkeypatch.setenv("SUPERSUB_METRICS_SINK", str(tmp_path / "m.jsonl"))
+    clip = _write_clip(tmp_path / "c.avi", n_frames=4)
+
+    subject = pose_mod.SubjectRequest(
+        box=(30 / 64, 0.0, 10 / 64, 20 / 48), at_ms=0.0
+    )
+    result = pose_mod.extract_keypoints(clip, device="cpu", subject=subject)
+
+    assert result.subject_selection.source == "specified"
+    assert result.subject_boxes == [(30.0, 0.0, 10.0, 20.0)] * len(result.keypoints)
+
+
+def test_the_record_says_how_the_subject_was_chosen(tmp_path, monkeypatch, stub_models):
+    """관측에 스칼라로 남아야 "지정이 얼마나 자주 실패하는가"를 잰다."""
+    sink = tmp_path / "m.jsonl"
+    monkeypatch.setenv("SUPERSUB_METRICS_SINK", str(sink))
+    clip = _write_clip(tmp_path / "c.avi", n_frames=4)
+
+    pose_mod.extract_keypoints(clip, device="cpu")
+
+    rec = obs.load()[-1]
+    assert rec["subject_source"] == "auto"
+    assert rec["subject_specified"] is False
+    assert rec["subject_fallback"] is False
+    assert rec["subject_box_frames"] == 4
+    # 평면 구조 계약 — 중첩된 값이 섞이면 한 행으로 INSERT할 수 없다.
+    for key, value in rec.items():
+        if key.startswith("subject_"):
+            assert not isinstance(value, (dict, list)), key
+
+
+def test_a_missed_specification_is_recorded_as_a_fallback(tmp_path, monkeypatch, stub_models):
+    """🔴 못 맞춘 것이 관측에 남아야 실패율을 셀 수 있다."""
+    sink = tmp_path / "m.jsonl"
+    monkeypatch.setenv("SUPERSUB_METRICS_SINK", str(sink))
+    clip = _write_clip(tmp_path / "c.avi", n_frames=4)
+
+    # 아무도 없는 화면 아래쪽을 찍었다 (대역 검출기의 두 박스는 위쪽에 있다).
+    subject = pose_mod.SubjectRequest(box=(0.0, 0.9, 0.1, 0.1), at_ms=0.0)
+    result = pose_mod.extract_keypoints(clip, device="cpu", subject=subject)
+
+    rec = obs.load()[-1]
+    assert rec["subject_source"] == "fallback"
+    assert rec["subject_fallback"] is True
+    assert result.subject_selection.why
+    # 떨어졌어도 분석은 계속된다 — 자동 선택 결과가 그대로다.
+    assert result.subject_boxes == [(0.0, 0.0, 30.0, 40.0)] * 4

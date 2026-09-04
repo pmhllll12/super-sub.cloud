@@ -41,7 +41,9 @@ from supersub_agent.pose import (  # noqa: E402
     draw_overlay,
     encode_preview,
     extract_keypoints,
+    parse_subject_spec,
     render_tracked_clip,
+    subject_envelope,
 )
 from supersub_agent.scoring import aggregate, load_rubric  # noqa: E402
 
@@ -116,10 +118,26 @@ def main() -> None:
     )
     ap.add_argument("--fps", type=int, default=DEFAULT_TARGET_FPS)
     ap.add_argument("--region", default=None, help="S3 리전 (미지정 시 기본 설정)")
+    ap.add_argument(
+        "--subject-box", default=None, metavar="x,y,w,h",
+        help="분석할 사람의 **정규화 0~1** 박스. 사람이 화면에서 찍은 값이다. "
+             "🔴 표시 해상도 픽셀이 아니다 — 주지 않으면 지금까지처럼 자동으로 고른다",
+    )
+    ap.add_argument(
+        "--subject-at-ms", type=float, default=None,
+        help="--subject-box 를 그린 영상 시각(밀리초). 박스를 주면 함께 주어야 한다",
+    )
     args = ap.parse_args()
 
     if not storage.is_s3_uri(args.video) or not storage.is_s3_uri(args.out):
         raise SystemExit("video와 --out은 모두 s3:// 형식이어야 한다.")
+
+    # 규칙은 pose.parse_subject_spec 하나뿐이다 — HTTP도 같은 것을 쓴다.
+    # 여기서는 오류를 종료 코드로 옮기기만 한다.
+    try:
+        subject = parse_subject_spec(args.subject_box, args.subject_at_ms)
+    except ValueError as exc:
+        raise SystemExit(f"대상 지정이 잘못됐다: {exc}") from exc
 
     rubric = load_rubric(args.rubric)
     print(f"루브릭: {rubric.sport}/{rubric.motion} v{rubric.version} "
@@ -144,7 +162,9 @@ def main() -> None:
         try:
             # observe=False — 배치 분석은 서비스 입력이 아니다. 기본값 True로
             # 두면 이 실행이 서비스 입력 분포 관측에 섞인다.
-            pose = extract_keypoints(local, target_fps=args.fps, observe=False)
+            pose = extract_keypoints(
+                local, target_fps=args.fps, observe=False, subject=subject
+            )
             features = extract_features(
                 pose.keypoints, pose.objects, rubric.impact_limb,
                 rubric.impact_event, args.side,
@@ -232,6 +252,10 @@ def main() -> None:
             "judge_s": round(judge_s, 2),
             "preview_s": round(preview_s, 2),
         },
+        # **누구를** 분석했는지 — 지정/자동/폴백과 선택 박스 시계열.
+        # 🔴 폴백을 조용히 넘기지 않는다. 이것이 없으면 "찍은 사람이 실제로
+        # 분석됐는가"를 사후에 확인할 방법이 없다 (미결 18번).
+        "subject": subject_envelope(pose, int(len(pose.keypoints))),
         "features": features,
         "result": result,
     }

@@ -110,6 +110,8 @@ def build_record(
     analysis_id: str | None = None,
     rubric_key: str | None = None,
     analyzed_at: str | None = None,
+    subject=None,
+    subject_box_frames: int = 0,
 ) -> dict:
     """분석 1건의 관측 레코드를 만든다.
 
@@ -132,7 +134,37 @@ def build_record(
         rec["raw_frames_with_ge2_person"] = raw["frames_with_ge2_person"]
         rec["raw_multi_person_frame_ratio"] = raw["multi_person_frame_ratio"]
         rec["raw_candidate_count_histogram"] = raw["candidate_count_histogram"]
+    if subject is not None:
+        rec.update(summarize_subject_selection(subject, subject_box_frames))
     return rec
+
+
+# 관측 레코드에 실을 대상 선택 필드 — **전부 스칼라다.** 레코드는 "그대로 한 행으로
+# INSERT할 수 있는 평면 구조"여야 한다(모듈 설명). 선택 박스 시계열 자체는 결과
+# 봉투로 나가고 여기에는 넣지 않는다.
+def summarize_subject_selection(subject, subject_box_frames: int) -> dict:
+    """대상을 어떻게 골랐는지를 평면 스칼라로.
+
+    🔴 **여기서 재는 것도 정확성이 아니다.** "사람이 지정했는가", "못 맞춰
+    떨어졌는가"는 라벨 없이 셀 수 있지만 "옳은 사람을 골랐는가"는 아니다.
+    그래도 이 값들이 있어야 **"사람 지정이 얼마나 자주 실패하는가"** 를
+    정답 없이 잰다 — 없으면 실패가 통계로 남지 않는다.
+    """
+    return {
+        # "auto" | "specified" | "fallback"
+        "subject_source": subject.source,
+        "subject_specified": subject.source != "auto",
+        # 지정이 있었는데 못 맞춘 비율의 분자가 된다.
+        "subject_fallback": subject.source == "fallback",
+        "subject_anchor_frame": subject.anchor_frame,
+        "subject_anchor_iou": subject.anchor_iou,
+        "subject_grid_offset_frames": subject.grid_offset_frames,
+        # 찍은 시각이 분석 창 밖이었는가 (업로드 60초 대 창 10초).
+        "subject_at_clamped": subject.clamped,
+        "subject_continuity_breaks": subject.continuity_breaks,
+        # 대상을 실제로 고른 프레임 수 — 0에 가까우면 분석 자체가 빈 것이다.
+        "subject_box_frames": subject_box_frames,
+    }
 
 
 def resolve_sink(sink: str | os.PathLike | None = None) -> tuple[Path, str]:
