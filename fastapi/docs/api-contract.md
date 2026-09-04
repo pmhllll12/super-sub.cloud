@@ -16,6 +16,7 @@
 | `POST`·`GET /teams/{id}/matches` · `GET /matches/{id}` | **실제 DB** (2026-09-02 추가, 3-4절) |
 | `POST`·`GET /matches/{id}/applications` · `POST .../accept` · `DELETE .../{application_id}` | **실제 DB** (2026-09-02 추가 · 무르기·거절은 2026-09-04, 3-5절) |
 | `GET /admin/users` · `GET /admin/users/{id}` · `DELETE /admin/users/{id}` | **실제 DB** (2026-08-31 추가, 3-2절) |
+| `POST /internal/analysis-jobs/claim` · `PATCH /internal/analysis-jobs/{id}` | **실제 DB** (2026-09-04 추가 — **워커 전용**, 3-8절) |
 
 ## 눌러볼 수 있는 값
 
@@ -1401,6 +1402,104 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
   삭제 규칙을 기본(RESTRICT)으로 둔 것도 같은 이유다
 - **포지션 바꾸기** — 지금은 빼고 다시 넣어야 한다. 화면이 요구하면 낸다
 - **여러 스쿼드** — 이름 컬럼이 필요하다(위 「팀당 하나로 다룬다」)
+
+---
+
+## 3-8. 분석 작업 큐 — **워커 전용** (2026-09-04 추가)
+
+미결 `ho` 17번(S3 에 영상이 올라와도 분석이 돌지 않는다)의 백엔드 쪽이다.
+`POST /videos` 가 `analysis_job` 을 `queued` 로 만들어 두는데 **꺼내 가는 것이
+없었다.** 여기가 그 자리다.
+
+```
+POST /videos ──> analysis_job(queued)
+                      │
+   워커가 주기적으로 ─┴─> POST /internal/analysis-jobs/claim   (running 으로)
+                            │ 분석 실행 (agent/scripts/analyze_s3.py)
+                            └─> PATCH /internal/analysis-jobs/{id}  (succeeded|failed)
+```
+
+### 🔴 워커가 **가져간다**(pull). 서버가 밀지 않는다
+
+| 왜 | |
+|---|---|
+| GPU 인스턴스가 **자동 종료**된다 | 밀어 주는 방식은 대상이 꺼져 있으면 실패한다. 가져가는 방식이면 켜질 때 밀린 것을 처리한다 |
+| 루브릭을 고르려면 **종목이 필요**하다 | S3 의 `videos/` 와 `reports/` 를 비교하는 방식으로는 알 수 없다 — 그 값은 DB 에 있다 |
+| `analysis_job` 이 **이미 상태의 정본**이다 | S3 비교는 이것을 우회해 진실을 둘로 만든다 |
+| nginx `proxy_read_timeout` 기본 **60초** | 오래 도는 쪽이 워커고 서버는 짧게 답한다. 동기 호출로 만들면 여기서 끊긴다 |
+| EC2 에 `videos/` **쓰기 권한이 필요 없다** | 미결 `ho` 17번의 「하지 말 것」을 그대로 지킨다 |
+
+### 인증 — 사람 토큰이 아니다
+
+`X-Worker-Token` 헤더에 공유 시크릿을 넣는다(`WORKER_TOKEN`). 워커는 기계라
+사용자 계정에 묶지 않는다 — 묶으면 그 계정이 탈퇴하거나 토큰이 폐기될 때
+파이프라인이 조용히 멈춘다.
+
+🔴 **`WORKER_TOKEN` 이 비어 있으면 이 경로는 전부 401 이다**(fail-closed).
+`ADMIN_EMAILS` 와 같은 이유다.
+
+### `POST /api/v1/internal/analysis-jobs/claim`
+
+가장 오래된 `queued` 하나를 `running` 으로 바꾸고 돌려준다.
+
+`200 OK`
+```json
+{
+  "job_id": "…", "video_id": "…",
+  "storage_key": "videos/<user_id>/<uuid>.mp4",
+  "sport_code": "baseball", "side": "right", "duration_ms": 4200
+}
+```
+
+**`204 No Content` — 큐가 비었다. 오류가 아니다.** 오류로 다루면 워커 로그가 빈
+폴링으로 가득 찬다.
+
+`POST` 인 이유는 **상태를 바꾸기 때문**이다. 이름이 조회처럼 보여도 이 호출은 작업을
+하나 소비한다 — `GET` 으로 두면 프록시·클라이언트가 마음대로 재시도해서 작업이
+조용히 사라진다.
+
+🔴 **동작(루브릭)이 응답에 없다.** 담을 자리가 아직 없어서다(미결 `jin` 17번).
+`sport_code` 만으로는 축구·농구에서 루브릭이 **둘로 갈린다.**
+
+| 종목 | 루브릭 | 정해지나 |
+|---|---|---|
+| baseball | `baseball_pitching` | ✅ |
+| basketball | `basketball_jump_shot` · `basketball_layup` | ❌ |
+| football | `football_instep_shot` · `football_inside_pass` | ❌ |
+
+**갈리는 종목은 실행하지 말고 `failed` 로 보고한다.** `analyze_s3.py --rubric` 의
+기본값은 `football_instep_shot` 이라, 안 주면 농구를 축구 루브릭으로 채점하고
+**그 결과가 틀렸다는 것이 값에 나타나지 않는다.**
+
+### `PATCH /api/v1/internal/analysis-jobs/{job_id}`
+
+```json
+{ "status": "succeeded" }
+{ "status": "failed", "failure_reason": "품질 게이트 미달" }
+```
+
+`204 No Content`.
+
+| 에러 | code | 뜻 |
+|---|---|---|
+| 404 | `JOB_NOT_FOUND` | 없는 작업이다 |
+| 409 | `JOB_NOT_RUNNING` | 집지 않았거나 이미 끝났다. **재시도해도 소용없다** |
+| 422 | `INVALID_JOB_STATUS` | `queued`·`running` 으로는 보고할 수 없다 |
+
+**`finished_at` 을 받지 않는다.** 워커의 시계가 어긋나면 소요 시간이 음수가 된다 —
+서버가 찍는다. 같은 이유로 `started_at` 은 `claim` 이 찍는다. 🔴 이 두 시각의 차이가
+**PER-001 이 보려는 값**이라, `queued` 를 바로 끝낼 수 있게 두면 `started_at` 이 빈
+채 `finished_at` 만 차서 그 값이 망가진다.
+
+### 아직 없는 것
+
+- 🔴 **적재(`POST /analyses`)** — 미결 `jin` 1번(적재 규격)이 먼저다.
+  `metric_definition` 이 **0 행**이라 지금 만들면 외래키에서 전부 거부된다.
+  그때까지 워커의 산출물은 `reports/` 의 JSON 이다
+- **재시도** — `failed` 를 다시 `queued` 로 되돌리는 경로. 재시도 정책(횟수·간격)이
+  정해지지 않아 열지 않았다. 지금은 사람이 다시 올려야 한다
+- **작업 취소·타임아웃** — `running` 인 채 워커가 죽으면 그대로 남는다. 되찾는 규칙
+  (몇 분 지나면 `queued` 로 되돌린다 등)이 필요하다
 
 ---
 

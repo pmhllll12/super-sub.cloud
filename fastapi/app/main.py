@@ -7,6 +7,7 @@
 
 from fastapi import FastAPI
 
+from app.analysis.adapter.inbound.api.v1.job_router import job_router
 from app.analysis.adapter.inbound.api.v1.video_router import video_router
 from app.card.adapter.inbound.api.v1.card_router import card_router
 from app.card.adapter.inbound.api.v1.squad_router import squad_router
@@ -85,6 +86,7 @@ for _router in (
     card_router,
     squad_router,
     video_router,
+    job_router,
     admin_router,
 ):
     app.include_router(_router, prefix=API_PREFIX)

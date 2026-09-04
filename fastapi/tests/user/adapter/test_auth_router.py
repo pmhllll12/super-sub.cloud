@@ -141,4 +141,6 @@ class TestOpenApi:
             V1 + "/squads/{public_slug}",
             f"{V1}/admin/users",
             V1 + "/admin/users/{user_id}",
+            f"{V1}/internal/analysis-jobs/claim",
+            V1 + "/internal/analysis-jobs/{job_id}",
         }
