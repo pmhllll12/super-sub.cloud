@@ -250,7 +250,7 @@ export default function HomeStage({
           위, 무대(z-index 10) 아래에 깔려 사진만 덮는다. 덩어리들이 다 빠져나간
           뒤에 움직이도록 늦춘다(globals.css). */}
       <div className="ss-home-outro" data-up={out} aria-hidden={!out}>
-        <HomeFeed active={out} />
+        <HomeFeed active={out} by={user?.nickname ?? '나'} />
       </div>
 
       {/* 헤더는 모든 화면이 같이 쓴다(SiteHeader). 홈에서만 화면에

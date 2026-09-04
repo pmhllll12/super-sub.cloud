@@ -143,7 +143,9 @@ function ColorRow({
 
 /** 1단계 — 바탕 · 로고 · 글자와 그 색. 사진 · 붓은 다음 단계다. */
 function CardLooks() {
-  const { style, set, reset } = useCardStyle()
+  const { style, set, reset, save } = useCardStyle()
+  /** 방금 저장했는가 — `null` 이면 아직 아무 말도 안 한다. */
+  const [savedOk, setSavedOk] = useState<boolean | null>(null)
   return (
     <div className="ss-card-looks">
       <dl>
@@ -172,9 +174,35 @@ function CardLooks() {
         />
       </dl>
 
-      <button type="button" className="ss-profile-tab self-start" onClick={reset}>
-        처음 모습으로
-      </button>
+      {/* 🔴 **초기화는 화면의 값만** 되돌린다. 담아 둔 것까지 지우면 되돌리기가
+          곧 삭제가 되어 무섭게 쓰인다 — 되돌린 뒤 저장을 눌러야 저장본도 바뀐다. */}
+      <div className="ss-card-actions">
+        <button type="button" className="ss-profile-tab" onClick={reset}>
+          초기화
+        </button>
+        <button
+          type="button"
+          className="ss-profile-tab"
+          data-on="true"
+          onClick={() => setSavedOk(save())}
+        >
+          저장
+        </button>
+      </div>
+
+      {/* ⚠️ 서버가 아니라 이 브라우저에 담긴다는 것을 숨기지 않는다 — 다른
+          기기에서 안 보일 때 고장으로 읽힌다(계약에 필드가 없다, 미결 paik 3번). */}
+      {savedOk === true && (
+        <p className="ss-profile-publish-note" role="status">
+          저장했습니다 — 아직 이 브라우저에만 담깁니다. 공개 카드 링크에는 반영되지
+          않습니다.
+        </p>
+      )}
+      {savedOk === false && (
+        <p className="ss-profile-video-reason" role="alert">
+          저장하지 못했습니다. 올린 사진이 너무 크면 담을 자리가 모자랍니다.
+        </p>
+      )}
     </div>
   )
 }

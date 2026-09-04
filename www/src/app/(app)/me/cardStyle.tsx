@@ -1,14 +1,19 @@
 'use client'
 
-import { createContext, useContext, useMemo, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { loadCardStyle, saveCardStyle } from './cardStyleStore'
 
 /**
  * 카드 꾸미기 설정.
  *
- * ⚠️ **아직 서버에 저장되지 않는다.** 계약에 카드를 꾸미는 필드가 없어서
- * (미결 paik 3번), 지금은 이 화면을 벗어나면 사라진다. 브라우저 저장도 일부러
- * 안 넣었다 — 서버가 붙는 순간 상태가 두 곳에 생겨 어느 쪽이 진짜인지
- * 헷갈린다(`SquadPanel` 이 같은 이유로 안 넣었다).
+ * ⚠️ **아직 서버에 저장되지 않는다.** 계약에 카드를 꾸미는 필드가 없다
+ * (미결 paik 3번).
+ *
+ * 🔴 **앞서 "브라우저 저장도 일부러 안 넣었다"고 적었던 것을 정정한다**
+ * (2026-09-04, 사용자 요청). 근거는 "서버가 붙으면 상태가 두 곳에 생긴다"
+ * 였는데, 저장이 아예 없으면 **편집기를 닫는 순간 꾸민 것이 전부 사라져**
+ * 기능이 성립하지 않았다. 지금은 `cardStyleStore.ts` 한 파일이 그 자리를
+ * 맡고, 서버가 생기면 그 파일만 지우면 된다.
  *
  * 🔴 **여기 담긴 이름들이 곧 계약에 요청할 필드 목록**이다. 화면에서 무엇이
  * 필요한지 먼저 굳혀 두면, 규격을 낼 때 짐작으로 정하지 않아도 된다.
@@ -84,7 +89,10 @@ export const DEFAULT_CARD_STYLE: CardStyle = {
 type Ctx = {
   style: CardStyle
   set: (patch: Partial<CardStyle>) => void
+  /** 화면의 값만 처음으로 되돌린다 — **저장해 둔 것은 건드리지 않는다.** */
   reset: () => void
+  /** 지금 값을 담아 둔다. 실패하면 `false`(사진이 크면 한도를 넘는다). */
+  save: () => boolean
 }
 
 const CardStyleContext = createContext<Ctx | null>(null)
@@ -95,11 +103,21 @@ const CardStyleContext = createContext<Ctx | null>(null)
  */
 export function CardStyleProvider({ children }: { children: React.ReactNode }) {
   const [style, setStyle] = useState<CardStyle>(DEFAULT_CARD_STYLE)
+
+  /* 🔴 담아 둔 값을 **그릴 때 읽지 않는다.** 서버에는 없는 값이라 서버가 그린
+     첫 화면과 브라우저가 그린 것이 갈려 하이드레이션이 깨진다. */
+  useEffect(() => {
+    const saved = loadCardStyle(DEFAULT_CARD_STYLE)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 위 주석 참고.
+    if (saved) setStyle(saved)
+  }, [])
+
   const value = useMemo<Ctx>(
     () => ({
       style,
       set: (patch) => setStyle((prev) => ({ ...prev, ...patch })),
       reset: () => setStyle(DEFAULT_CARD_STYLE),
+      save: () => saveCardStyle(style),
     }),
     [style],
   )
@@ -116,6 +134,7 @@ export function useCardStyle(): Ctx {
       style: DEFAULT_CARD_STYLE,
       set: () => {},
       reset: () => {},
+      save: () => false,
     }
   )
 }

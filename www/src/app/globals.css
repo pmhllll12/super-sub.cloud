@@ -8376,6 +8376,7 @@ body:has(.ss-shot) .ss-app-figure {
 
 .ss-profile-body,
 .ss-profile-tabs,
+.ss-profile-upload,
 .ss-profile-video-player,
 .ss-profile-video-nav {
   animation: ss-p-from-top 460ms var(--ss-home-out-ease) 1080ms both;
@@ -8432,6 +8433,7 @@ body:has(.ss-shot) .ss-app-figure {
 
 .ss-profile[data-leaving='true'] .ss-profile-body,
 .ss-profile[data-leaving='true'] .ss-profile-tabs,
+.ss-profile[data-leaving='true'] .ss-profile-upload,
 .ss-profile[data-leaving='true'] .ss-profile-video-player,
 .ss-profile[data-leaving='true'] .ss-profile-video-nav {
   animation: ss-p-to-top 260ms ease both;
@@ -8494,6 +8496,7 @@ body:has(.ss-shot) .ss-app-figure {
   .ss-profile-video-rule,
   .ss-profile-body,
   .ss-profile-tabs,
+  .ss-profile-upload,
   .ss-profile-video-player,
   .ss-profile-video-nav,
   .ss-profile-id-main,
@@ -8503,6 +8506,7 @@ body:has(.ss-shot) .ss-app-figure {
       .ss-profile-title,
       .ss-profile-body,
       .ss-profile-tabs,
+      .ss-profile-upload,
       .ss-profile-video-player,
       .ss-profile-video-nav,
       .ss-profile-id-main,
@@ -9100,11 +9104,6 @@ body:has(.ss-profile) {
   background: color-mix(in srgb, var(--ss-fg) 12%, transparent);
 }
 
-.ss-profile-tab-count {
-  font-size: 0.72rem;
-  color: currentColor;
-}
-
 /* 한 편만 그리므로 예전의 목록 규칙(.ss-profile-videos)은 걷어냈다. */
 
 /* 넘기는 줄 — 영상 아래. */
@@ -9422,3 +9421,220 @@ body:has(.ss-profile) {
   cursor: not-allowed;
 }
 
+/* ── 올리기 · 공개 (2026-09-04) ────────────────────────────────
+   알약 줄 옆에 업로드가 붙는다.
+
+   🔴 **감싼 줄에는 들고 남 연출을 걸지 않는다.** `.ss-profile-tabs` 는
+   `CardEditor` 의 알약 줄도 쓰는 클래스라, 연출을 이 줄로 옮기면 **거기
+   연출이 같이 없어진다**(실측으로 잡았다 — `querySelector` 가 왼쪽 칸의
+   그것을 먼저 집었다). 그래서 원래 선택자를 그대로 두고 `.ss-profile-upload`
+   만 같은 목록에 넣는다. 부모까지 걸면 둘이 겹쳐 움직인다. */
+.ss-profile-tabrow {
+  display: flex;
+  align-items: center;
+  /* 🔴 `space-between` 을 쓰지 않는다. 이 줄은 `.ss-profile-right`(그리드,
+     `justify-items: center`)의 칸이라 **폭이 내용만큼**이다 — 벌릴 여백이
+     없어서 아무 일도 안 하고, 읽는 사람만 헷갈린다. 줄 전체가 가운데 서고
+     알약과 업로드는 `gap` 으로만 떨어진다(원래 알약 줄과 같은 자리다). */
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* 알약과 같은 모양이되 **안이 옅게 차 있다** — 고르는 것이 아니라 하는 것이라
+   탭들 사이에서 저 혼자 눌리는 자리로 읽혀야 한다. */
+.ss-profile-upload {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--ss-fg);
+  background: color-mix(in srgb, var(--ss-fg) 12%, transparent);
+  font-size: 0.85rem;
+  color: var(--ss-fg);
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+
+.ss-profile-upload:hover,
+.ss-profile-upload:focus-within {
+  background: color-mix(in srgb, var(--ss-fg) 22%, transparent);
+}
+
+.ss-profile-upload[data-busy='true'] {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* 🔴 `display: none` 으로 감추지 않는다 — 감춘 입력은 초점을 못 받아서
+   자판만 쓰는 사람은 파일을 고를 길이 아예 없어진다. 크기만 0 으로 만들고
+   자리는 남긴다(감싼 `<label>` 이 클릭을 넘겨 준다). */
+.ss-profile-upload input[type='file'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ss-profile-upload .material-symbols-outlined {
+  font-size: 17px;
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 300,
+    'GRAD' 0,
+    'opsz' 20;
+}
+
+.ss-profile-notice {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--ss-fg) 78%, transparent);
+}
+
+/* 고른 파일 — 크기를 재는 영상과 종목을 묻는 줄. */
+.ss-profile-picked {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 30%, transparent);
+  border-radius: 14px;
+}
+
+/* 🔴 작아도 **DOM 에 실제로 있어야** 한다. 크기를 여기서 재기 때문이다 —
+   `display: none` 이면 브라우저가 메타데이터를 안 읽는다. */
+.ss-profile-picked-preview {
+  flex: none;
+  width: 72px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ss-fg) 12%, transparent);
+}
+
+.ss-profile-picked-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ss-profile-picked-name {
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--ss-fg) 70%, transparent);
+}
+
+.ss-profile-picked-hint {
+  font-size: 0.72rem;
+  color: color-mix(in srgb, var(--ss-fg) 55%, transparent);
+}
+
+/* 공개 여부 — 업로드 갈래에서만 나온다. */
+.ss-profile-publish {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.ss-profile-publish-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 40%, transparent);
+  font-size: 0.76rem;
+  color: var(--ss-fg);
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.ss-profile-publish-toggle:hover,
+.ss-profile-publish-toggle:focus-visible {
+  border-color: var(--ss-fg);
+}
+
+/* 켜진 것은 안이 찬다 — 색만 바꾸면 색을 못 가리는 눈에는 둘이 같아 보인다
+   (종목 알약과 같은 판단이다). */
+.ss-profile-publish-toggle[data-on='true'] {
+  border-color: var(--ss-fg);
+  background: color-mix(in srgb, var(--ss-fg) 16%, transparent);
+}
+
+.ss-profile-publish-toggle .material-symbols-outlined {
+  font-size: 16px;
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 300,
+    'GRAD' 0,
+    'opsz' 20;
+}
+
+.ss-profile-publish-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.ss-profile-publish-form label {
+  font-size: 0.72rem;
+  color: color-mix(in srgb, var(--ss-fg) 60%, transparent);
+}
+
+.ss-profile-publish-form input {
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 30%, transparent);
+  background-color: transparent;
+  font-size: 0.82rem;
+  color: var(--ss-fg);
+}
+
+.ss-profile-publish-form input:focus-visible {
+  outline: none;
+  border-color: var(--ss-fg);
+}
+
+.ss-profile-publish-note {
+  margin-top: 2px;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--ss-fg) 55%, transparent);
+}
+
+.ss-profile-publish-save {
+  align-self: flex-start;
+  margin-top: 4px;
+  height: 30px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--ss-fg);
+  background: color-mix(in srgb, var(--ss-fg) 12%, transparent);
+  font-size: 0.78rem;
+  color: var(--ss-fg);
+  cursor: pointer;
+}
+
+.ss-profile-publish-save:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* 카드 꾸미기의 「초기화 · 저장」 줄. 알약 두 개가 나란히 선다. */
+.ss-card-actions {
+  display: flex;
+  align-self: flex-start;
+  gap: 8px;
+}
