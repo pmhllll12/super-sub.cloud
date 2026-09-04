@@ -1,0 +1,70 @@
+{
+  "features": {
+    "plant_knee_angle_at_impact": 24.3,
+    "swing_knee_angle_at_impact": 29.0,
+    "trunk_forward_lean_deg_at_impact": 4.8,
+    "hip_rotation_range_deg": 0.0,
+    "swing_hip_flexion_after_impact_deg": 6.4,
+    "follow_through_duration_frames": 1,
+    "impact_frame": 140,
+    "hip_shoulder_separation_deg": 28.5,
+    "swing_elbow_angle_at_impact": 154.8,
+    "support_elbow_angle_at_impact": 99.5,
+    "swing_shoulder_flexion_after_impact_deg": 17.7
+  },
+  "result": {
+    "score": 48,
+    "grade": "D",
+    "breakdown": [
+      {
+        "criterion_id": "lead_arm_extension",
+        "name": "리드 팔(보텀핸드) 신전",
+        "grade": 0,
+        "weight": 0.25,
+        "contribution": 0.0,
+        "evidence": "임팩트 시 리드 팔 팔꿈치각 99.5도로 0등급 기준(115도 미만)에 해당하여 접촉 시 완전히 접혀 있음을 확인했습니다.",
+        "metric_ref": "support_elbow_angle_at_impact"
+      },
+      {
+        "criterion_id": "hip_shoulder_separation",
+        "name": "골반-어깨 분리",
+        "grade": 2,
+        "weight": 0.25,
+        "contribution": 25.0,
+        "evidence": "hip_shoulder_separation_deg=28.5는 2등급 기준(25~60도)에 해당하며, 골반이 상체보다 먼저 열리는 정상적인 힘 전달 순서를 보여줍니다.",
+        "metric_ref": "hip_shoulder_separation_deg"
+      },
+      {
+        "criterion_id": "hip_rotation",
+        "name": "골반 회전",
+        "grade": 0,
+        "weight": 0.2,
+        "contribution": 0.0,
+        "evidence": "골반 회전 각도 0.0도로 0등급 기준(18도 미만)에 해당하며, 하체 회전 부재로 상체 중심 스윙이 확인됨",
+        "metric_ref": "hip_rotation_range_deg"
+      },
+      {
+        "criterion_id": "trunk_posture",
+        "name": "상체 유지",
+        "grade": 2,
+        "weight": 0.15,
+        "contribution": 15.0,
+        "evidence": "임팩트 시 상체 기울기 각도가 4.8도로 2등급 기준(-25~25도) 범위 내에 위치하여 안정적인 자세를 유지했다.",
+        "metric_ref": "trunk_forward_lean_deg_at_impact"
+      },
+      {
+        "criterion_id": "follow_through",
+        "name": "팔로스루",
+        "grade": 1,
+        "weight": 0.15,
+        "contribution": 7.5,
+        "evidence": "임팩트 후 어깨 굴곡이 17.7도로 1등급 기준(10~25도)에 해당하며, 추가 감속 없이 배트 속도 유지에 적합한 기술을 보여줍니다.",
+        "metric_ref": "swing_shoulder_flexion_after_impact_deg"
+      }
+    ],
+    "skipped": [],
+    "rubric_version": "0.1",
+    "pipeline_version": "pose-v0.1",
+    "provisional": true
+  }
+}
