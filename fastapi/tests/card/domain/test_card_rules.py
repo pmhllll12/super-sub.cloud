@@ -13,8 +13,12 @@ from app.card.adapter.inbound.api.schemas.card_schema import (
 )
 from app.card.domain.entities.card_entity import CardEntity
 from app.card.domain.entities.title_entity import TitleEntity
+import pytest
+
 from app.card.domain.rules.card_rules import (
     FORBIDDEN_CARD_FIELDS,
+    MAX_TAGLINE,
+    normalize_tagline,
     to_public,
     visible_titles,
 )
@@ -105,3 +109,36 @@ class TestDesignPrinciples:
 class TestTitleCategory:
     def test_부록_D_가_정의한_셋만_있다(self):
         assert {c.value for c in TitleCategory} == {"강점", "활동", "용병"}
+
+
+class TestNormalizeTagline:
+    """카드에 들어가는 한 줄을 저장할 모양으로 만드는 규칙 (미결 `paik` 3번).
+
+    🔴 **HTTP 계약 테스트로는 이 규칙이 안 걸린다.** `UpdateMyCardSchema` 의
+    `max_length` 가 앞단에서 막아 버려서, 라우터를 거치면 길이 분기까지 오지
+    않는다 — 변이(자르기로 바꿈)를 넣어도 계약 테스트가 전부 통과했다.
+    **규칙은 규칙이 있는 층에서 검사한다.**
+    """
+
+    def test_앞뒤_공백을_턴다(self):
+        assert normalize_tagline("  숨은 왼발  ") == "숨은 왼발"
+
+    @pytest.mark.parametrize("empty", [None, "", "   ", "\t\n"])
+    def test_빈_것은_None_이다(self, empty):
+        """"안 정했다"와 "지웠다"를 나눌 이유가 없다 — 둘 다 안 보이는 게 맞다."""
+        assert normalize_tagline(empty) is None
+
+    def test_상한까지는_그대로다(self):
+        value = "가" * MAX_TAGLINE
+        assert normalize_tagline(value) == value
+
+    def test_상한을_넘으면_거부한다(self):
+        """🔴 **조용히 자르지 않는다.** 자르면 쓴 것과 보이는 것이 달라지고,
+        알아차리는 시점은 카드를 공유한 뒤다."""
+        with pytest.raises(ValueError):
+            normalize_tagline("가" * (MAX_TAGLINE + 1))
+
+    def test_공백을_턴_뒤의_길이로_잰다(self):
+        """앞뒤 공백 때문에 거부되면 사람은 왜 막혔는지 모른다."""
+        value = "가" * MAX_TAGLINE
+        assert normalize_tagline(f"   {value}   ") == value

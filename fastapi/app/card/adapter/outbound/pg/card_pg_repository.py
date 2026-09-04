@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from uuid import UUID, uuid4
 
-from sqlalchemy import column, select, table
+from sqlalchemy import column, select, table, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -62,6 +62,20 @@ class CardPgRepository(CardPort):
 
     def find_by_slug(self, slug: PublicSlug) -> CardEntity | None:
         return self._load(PlayerCardOrm.public_slug == str(slug))
+
+    def update_tagline(self, user_id: UUID, tagline: str | None) -> CardEntity | None:
+        # 🔴 `values()` 에 `tagline` 하나만 둔다. 슬러그·이미지 키를 여기서
+        #    바꿀 수 있게 열어 두면 언젠가 누가 쓴다 — 공유된 링크가 죽는다.
+        changed = self._session.execute(
+            update(PlayerCardOrm)
+            .where(PlayerCardOrm.user_id == user_id)
+            .values(tagline=tagline)
+        ).rowcount
+        if not changed:
+            self._session.rollback()
+            return None
+        self._session.commit()
+        return self.find_by_owner(user_id)
 
     def create_for_owner(self, user_id: UUID) -> CardEntity:
         """카드를 만든다. 이미 있으면 있는 것을 돌려준다 (멱등).
