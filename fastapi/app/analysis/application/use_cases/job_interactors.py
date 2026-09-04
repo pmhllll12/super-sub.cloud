@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from app.analysis.application.dtos.job_dto import ClaimedJobResult, FinishJobCommand
 from app.analysis.application.ports.input.job_use_cases import (
     ClaimJobUseCase,
@@ -11,12 +13,27 @@ from app.analysis.application.ports.output.job_port import JobPort
 from app.analysis.domain.rules.job_rules import is_terminal
 from app.core.errors import ApiError
 
+# 회수는 **조용히 일어나면 안 된다.** 작업이 되돌려졌다는 것은 워커나 인스턴스에
+# 무슨 일이 있었다는 뜻이라, 나중에 "왜 두 번 분석됐나"를 되짚을 자리가 필요하다.
+logger = logging.getLogger("supersub.analysis")
+
 
 class ClaimJobInteractor(ClaimJobUseCase):
-    def __init__(self, repository: JobPort) -> None:
+    def __init__(self, repository: JobPort, timeout_minutes: int) -> None:
         self._repository = repository
+        self._timeout_minutes = timeout_minutes
 
     def __call__(self) -> ClaimedJobResult | None:
+        # 🔴 집기 **전에** 멈춘 것을 회수한다. 별도 스케줄러를 두지 않는 이유는
+        #    워커가 주기적으로 이 경로를 부르기 때문이다 — 회수가 필요한 시점은
+        #    정확히 "누군가 일을 달라고 할 때"고, 그때마다 돈다. 타이머·크론을
+        #    새로 만들면 그것이 죽었는지 또 확인해야 한다.
+        requeued, failed = self._repository.reclaim_stale(self._timeout_minutes)
+        if requeued or failed:
+            logger.warning(
+                "멈춘 분석 작업을 회수했다: 큐로 %d 건, 실패로 %d 건", requeued, failed
+            )
+
         job = self._repository.claim_next()
         if job is None:
             return None

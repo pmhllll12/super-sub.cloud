@@ -28,6 +28,18 @@ class JobPort(ABC):
         """
 
     @abstractmethod
+    def reclaim_stale(self, timeout_minutes: int) -> tuple[int, int]:
+        """오래 `running` 인 작업을 회수한다. `(다시 큐에 넣은 수, 실패로 끝낸 수)`.
+
+        워커가 **보고 없이 죽으면** 작업이 그대로 남는다. 스스로 `failed` 를
+        보고하고 끝나는 경우는 해당하지 않는다 — 여기가 잡는 것은 크래시·강제
+        종료·**인스턴스 정지**다(GPU 는 유휴 30분에 자동 종료된다).
+
+        🔴 **한 번은 큐로, 두 번째는 실패로** 보낸다. 되돌리기만 하면 워커를
+        죽이는 클립이 큐를 영원히 돌게 된다(`job_rules.reclaim_target`).
+        """
+
+    @abstractmethod
     def finish(
         self, job_id: UUID, status: str, failure_reason: str | None
     ) -> str | None:

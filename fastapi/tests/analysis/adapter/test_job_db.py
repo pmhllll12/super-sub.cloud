@@ -180,3 +180,83 @@ def test_finish_는_running_일_때만_바꾼다(db_session, queued):
 
 def test_없는_작업은_missing_이다(db_session):
     assert JobPgRepository(_new_session()).finish(uuid.uuid4(), "failed", None) == "missing"
+
+
+def _stall(db_session, job_id, minutes):
+    """그 작업이 `minutes` 분 전에 시작된 것처럼 만든다."""
+    db_session.execute(
+        text("update analysis_job set started_at = now() - make_interval(mins => :m) "
+             "where id = :i"),
+        {"m": minutes, "i": job_id},
+    )
+    db_session.commit()
+
+
+def test_회수는_아직_도는_것을_건드리지_않는다(db_session, queued):
+    """🔴 임계 시간이 짧으면 돌고 있는 작업을 빼앗아 같은 클립을 두 번 분석한다."""
+    claimed = JobPgRepository(_new_session()).claim_next()
+    assert claimed is not None
+
+    requeued, failed = JobPgRepository(_new_session()).reclaim_stale(30)
+    assert (requeued, failed) == (0, 0)
+
+    db_session.expire_all()
+    assert db_session.get(AnalysisJobOrm, claimed.job_id).status == RUNNING
+
+
+def test_오래_멈춘_것은_큐로_돌아온다(db_session, queued):
+    claimed = JobPgRepository(_new_session()).claim_next()
+    assert claimed is not None
+    _stall(db_session, claimed.job_id, 999)
+
+    requeued, failed = JobPgRepository(_new_session()).reclaim_stale(30)
+    assert (requeued, failed) == (1, 0)
+
+    db_session.expire_all()
+    row = db_session.get(AnalysisJobOrm, claimed.job_id)
+    assert row.status == QUEUED
+    assert row.started_at is None
+    assert "회수됨" in (row.failure_reason or "")
+
+
+def test_두_번째로_멈추면_실패로_끝난다(db_session, queued):
+    """되돌리기만 하면 워커를 죽이는 클립이 큐를 영원히 돈다."""
+    claimed = JobPgRepository(_new_session()).claim_next()
+    assert claimed is not None
+    _stall(db_session, claimed.job_id, 999)
+    assert JobPgRepository(_new_session()).reclaim_stale(30) == (1, 0)
+
+    again = JobPgRepository(_new_session()).claim_next()
+    assert again is not None and again.job_id == claimed.job_id
+    _stall(db_session, claimed.job_id, 999)
+
+    assert JobPgRepository(_new_session()).reclaim_stale(30) == (0, 1)
+
+    db_session.expire_all()
+    row = db_session.get(AnalysisJobOrm, claimed.job_id)
+    assert row.status == "failed"
+    assert row.finished_at is not None
+
+
+def test_되돌린_행은_running_에서_빠진다(db_session, queued):
+    """두 UPDATE 가 겹치지 않게 만드는 **불변식**을 고정한다.
+
+    되돌리는 쪽이 `status` 를 `queued` 로 바꾸기 때문에 그 행은 `running` 조건에서
+    빠지고, 그래서 같은 호출의 다른 문장에 다시 걸리지 않는다.
+
+    ⚠️ 처음에는 "순서를 뒤집으면 깨진다"는 검사를 뒀는데 **순서를 뒤집어도
+    통과했다** — 순서가 아니라 이 불변식이 지키고 있어서다. 판별 못 하는 검사를
+    두면 안 되므로 지키는 것을 직접 본다.
+    """
+    claimed = JobPgRepository(_new_session()).claim_next()
+    assert claimed is not None
+    _stall(db_session, claimed.job_id, 999)
+
+    assert JobPgRepository(_new_session()).reclaim_stale(30) == (1, 0)
+
+    db_session.expire_all()
+    row = db_session.get(AnalysisJobOrm, claimed.job_id)
+    assert row.status == QUEUED, "되돌렸는데 running 이면 다음 문장에 또 걸린다"
+
+    # 곧바로 한 번 더 회수해도 아무 일이 없어야 한다 (이미 running 이 아니다).
+    assert JobPgRepository(_new_session()).reclaim_stale(30) == (0, 0)

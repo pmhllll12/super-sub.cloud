@@ -17,6 +17,7 @@ from app.analysis.application.use_cases.job_interactors import (
     ClaimJobInteractor,
     FinishJobInteractor,
 )
+from app.core.config import settings
 from app.core.database import get_session
 
 
@@ -30,7 +31,7 @@ JobRepositoryDep = Annotated[JobPort, Depends(get_job_repository)]
 
 
 def get_claim_job_use_case(repository: JobRepositoryDep) -> ClaimJobUseCase:
-    return ClaimJobInteractor(repository)
+    return ClaimJobInteractor(repository, settings.analysis_job_timeout_minutes)
 
 
 def get_finish_job_use_case(repository: JobRepositoryDep) -> FinishJobUseCase:

@@ -9,12 +9,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from app.analysis.application.ports.output.job_port import JobPort
 from app.analysis.domain.entities.job_entity import ClaimedJobEntity
-from app.analysis.domain.rules.job_rules import QUEUED, RUNNING
+from app.analysis.domain.rules.job_rules import (
+    FAILED,
+    QUEUED,
+    RECLAIM_FINAL,
+    RECLAIM_FIRST,
+    RUNNING,
+)
 
 
 @dataclass
@@ -28,6 +34,7 @@ class _Row:
     created_at: datetime
     status: str = QUEUED
     failure_reason: str | None = None
+    started_at: datetime | None = None
 
 
 _JOBS: dict[UUID, _Row] = {}
@@ -76,6 +83,7 @@ class StubJobRepository(JobPort):
             return None
         row = min(waiting, key=lambda r: r.created_at)   # 오래된 것부터
         row.status = RUNNING
+        row.started_at = datetime.now(timezone.utc)
         return ClaimedJobEntity(
             job_id=row.job_id,
             video_id=row.video_id,
@@ -84,6 +92,25 @@ class StubJobRepository(JobPort):
             side=row.side,
             duration_ms=row.duration_ms,
         )
+
+    def reclaim_stale(self, timeout_minutes: int) -> tuple[int, int]:
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=timeout_minutes)
+        requeued = failed = 0
+        for row in _JOBS.values():
+            if row.status != RUNNING or row.started_at is None:
+                continue
+            if row.started_at >= cutoff:
+                continue
+            if row.failure_reason is None:
+                row.status = QUEUED
+                row.started_at = None
+                row.failure_reason = RECLAIM_FIRST
+                requeued += 1
+            else:
+                row.status = FAILED
+                row.failure_reason = RECLAIM_FINAL
+                failed += 1
+        return requeued, failed
 
     def finish(
         self, job_id: UUID, status: str, failure_reason: str | None

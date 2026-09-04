@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from sqlalchemy import select, update
@@ -15,7 +15,13 @@ from app.analysis.adapter.outbound.orm.analysis_job_orm import AnalysisJobOrm
 from app.analysis.adapter.outbound.orm.video_orm import VideoOrm
 from app.analysis.application.ports.output.job_port import JobPort
 from app.analysis.domain.entities.job_entity import ClaimedJobEntity
-from app.analysis.domain.rules.job_rules import QUEUED, RUNNING
+from app.analysis.domain.rules.job_rules import (
+    FAILED,
+    QUEUED,
+    RECLAIM_FINAL,
+    RECLAIM_FIRST,
+    RUNNING,
+)
 
 
 class JobPgRepository(JobPort):
@@ -66,6 +72,50 @@ class JobPgRepository(JobPort):
             side=video.side,
             duration_ms=video.duration_ms,
         )
+
+    def reclaim_stale(self, timeout_minutes: int) -> tuple[int, int]:
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=timeout_minutes)
+        stale = (
+            AnalysisJobOrm.status == RUNNING,
+            AnalysisJobOrm.started_at < cutoff,
+        )
+
+        # 두 UPDATE 는 **서로 겹치지 않는다.** 큐로 되돌리는 쪽이 `status` 를
+        # `queued` 로 바꾸므로, 되돌린 행은 `stale`(= `running`) 조건에서 빠져
+        # 나머지 한 문장에 다시 걸리지 않는다. 그래서 **순서는 결과를 바꾸지
+        # 않는다** — 읽는 순서(끝낼 것 먼저, 되살릴 것 나중)로 두었을 뿐이다.
+        #
+        # ⚠️ 처음에 "순서를 바꾸면 되돌린 것이 곧바로 실패로 간다"고 적었는데
+        #    **틀렸다.** 순서를 뒤집는 변이를 넣어도 검사가 통과해서 알았다.
+        #    🔴 되돌리는 쪽이 `status` 를 안 바꾸게 고치면 그때는 순서가
+        #    중요해진다 — 조건이 `running` 하나에만 기대고 있다.
+        failed = self._session.execute(
+            update(AnalysisJobOrm)
+            .where(*stale, AnalysisJobOrm.failure_reason.is_not(None))
+            .values(
+                status=FAILED,
+                failure_reason=RECLAIM_FINAL,
+                finished_at=datetime.now(timezone.utc),
+            )
+        ).rowcount
+
+        requeued = self._session.execute(
+            update(AnalysisJobOrm)
+            .where(*stale, AnalysisJobOrm.failure_reason.is_(None))
+            .values(
+                status=QUEUED,
+                started_at=None,
+                # 회수했다는 것을 남긴다. 다음에 또 멈추면 이 값이 있어서
+                # 실패로 간다 — 컬럼을 안 늘리고 횟수를 한 번 세는 방법이다.
+                failure_reason=RECLAIM_FIRST,
+            )
+        ).rowcount
+
+        if failed or requeued:
+            self._session.commit()
+        else:
+            self._session.rollback()
+        return requeued, failed
 
     def finish(
         self, job_id: UUID, status: str, failure_reason: str | None

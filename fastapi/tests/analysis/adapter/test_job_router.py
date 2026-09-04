@@ -188,3 +188,73 @@ class TestFinish:
         res = client.patch(_job(job_id), json={"status": bad}, headers=_hdr())
         assert res.status_code == 422
         assert status_of(job_id) == "running"     # 안 바뀐다
+
+
+class TestReclaim:
+    """워커가 **보고 없이 죽은** 작업을 되찾는다.
+
+    🔴 이 경로가 없으면 GPU 인스턴스가 분석 도중 자동 종료될 때마다 작업이
+    `running` 인 채 영영 남는다.
+    """
+
+    def _stall(self, job_id, minutes):
+        """그 작업이 `minutes` 분 전에 시작된 것처럼 만든다."""
+        from app.analysis.adapter.outbound.stub.job_stub_repository import _JOBS
+
+        _JOBS[job_id].started_at = datetime.now(timezone.utc) - timedelta(
+            minutes=minutes
+        )
+
+    def test_오래_멈춘_것을_다시_큐에_넣는다(self, client):
+        stalled = uuid4()
+        enqueue(stalled, uuid4())
+        assert client.post(CLAIM, headers=_hdr()).status_code == 200
+        assert status_of(stalled) == "running"
+
+        self._stall(stalled, 999)
+
+        # 다음 claim 이 회수하고, 회수된 그것을 다시 집는다.
+        res = client.post(CLAIM, headers=_hdr())
+        assert res.status_code == 200
+        assert res.json()["job_id"] == str(stalled)
+        assert "회수됨" in (failure_reason_of(stalled) or "")
+
+    def test_아직_도는_것은_건드리지_않는다(self, client):
+        """🔴 임계 시간이 짧으면 **돌고 있는 작업을 빼앗아** 두 번 분석한다."""
+        running = uuid4()
+        enqueue(running, uuid4())
+        assert client.post(CLAIM, headers=_hdr()).status_code == 200
+
+        # 방금 집었으니 회수 대상이 아니다 — 큐는 비어 있어야 한다.
+        assert client.post(CLAIM, headers=_hdr()).status_code == 204
+        assert status_of(running) == "running"
+        assert failure_reason_of(running) is None
+
+    def test_두_번째로_멈추면_실패로_끝낸다(self, client):
+        """되돌리기만 하면 워커를 죽이는 클립이 큐를 영원히 돈다."""
+        poison = uuid4()
+        enqueue(poison, uuid4())
+
+        assert client.post(CLAIM, headers=_hdr()).status_code == 200
+        self._stall(poison, 999)                      # 1회차 사망
+
+        assert client.post(CLAIM, headers=_hdr()).status_code == 200   # 회수 + 재집기
+        self._stall(poison, 999)                      # 2회차 사망
+
+        # 이번에는 큐로 안 돌아온다 — 실패로 끝난다.
+        assert client.post(CLAIM, headers=_hdr()).status_code == 204
+        assert status_of(poison) == "failed"
+
+    def test_회수가_성공_보고를_덮지_않는다(self, client):
+        """회수 표시가 남아 있어도 성공하면 사유가 비어야 한다."""
+        job_id = uuid4()
+        enqueue(job_id, uuid4())
+        assert client.post(CLAIM, headers=_hdr()).status_code == 200
+        self._stall(job_id, 999)
+        assert client.post(CLAIM, headers=_hdr()).status_code == 200   # 회수 + 재집기
+
+        assert client.patch(
+            _job(job_id), json={"status": "succeeded"}, headers=_hdr()
+        ).status_code == 204
+        assert status_of(job_id) == "succeeded"
+        assert failure_reason_of(job_id) is None
