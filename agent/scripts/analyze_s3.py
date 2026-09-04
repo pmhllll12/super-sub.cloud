@@ -31,6 +31,7 @@ from supersub_agent import storage  # noqa: E402
 from supersub_agent.features import (  # noqa: E402
     InsufficientQuality,
     extract_features,
+    frame_metrics_as_seconds,
     verify_rubric_coverage,
 )
 from supersub_agent.judge import Judge  # noqa: E402
@@ -213,6 +214,12 @@ def main() -> None:
         "target_fps": args.fps,
         "sampled_fps": round(float(pose.sampled_fps), 2),
         "frames": int(len(pose.keypoints)),
+        # 프레임 단위 지표를 초로 (미결 7번 E-3). `sampled_fps`가 바로 위에
+        # 있어도 읽는 쪽이 나눠 주기를 기대하면 안 된다 — 어느 것이 인덱스이고
+        # 어느 것이 길이인지는 features 모듈만 안다.
+        "frame_metrics_seconds": frame_metrics_as_seconds(
+            features, float(pose.sampled_fps)
+        ),
         "judge_backend": judge.backend,
         "judge_model": judge.model_id,
         # 스켈레톤은 ViTPose 키포인트로 그린 것이다 — 추가 추론이 없고

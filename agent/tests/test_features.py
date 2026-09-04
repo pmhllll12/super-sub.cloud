@@ -531,3 +531,61 @@ def test_distal_apex_ignores_undetected_frames():
     phases = F.segment_phases(norm, swing, "arm", "distal_apex")
 
     assert phases.impact != 3
+
+
+# --- 프레임 단위 지표의 물리 시간 표기 (미결 7번 E-3) ----------------------
+
+
+def test_every_frame_valued_metric_is_declared():
+    """🔴 **이 검사가 E-3의 본체다.**
+
+    프레임 단위 지표를 새로 만들고 선언을 빼먹으면, 그 값은 격자 정보 없이
+    밖으로 나간다 — 그것이 이 결함이 생긴 방식이다. 이름으로 걸러 잡는다.
+
+    이름이 `_frame`/`_frames`로 끝나지 않는 프레임 단위 지표를 만들면 이
+    검사는 못 잡는다. 그래서 **이름 규약도 함께 강제한다**(아래 반대 방향).
+    """
+    feats = extract_features(build_sequence())
+    declared = F.FRAME_INDEX_METRICS | F.FRAME_DURATION_METRICS
+
+    by_name = {k for k in feats if k.endswith(("_frame", "_frames"))}
+    assert by_name <= declared, (
+        f"프레임 단위로 보이는데 선언되지 않았다: {sorted(by_name - declared)}. "
+        "FRAME_INDEX_METRICS 또는 FRAME_DURATION_METRICS 에 넣을 것"
+    )
+    # 반대 방향 — 선언해 놓고 이름이 규약을 벗어나면 다음 사람이 못 찾는다.
+    assert all(k.endswith(("_frame", "_frames")) for k in declared)
+
+    # 두 목록은 겹치지 않는다. 인덱스와 길이는 뜻이 다르다.
+    assert not (F.FRAME_INDEX_METRICS & F.FRAME_DURATION_METRICS)
+
+
+def test_frame_metrics_are_converted_with_the_effective_fps():
+    feats = {"impact_frame": 62, "follow_through_duration_frames": 8}
+
+    # 실효 25fps: 62/25 = 2.48초, 8/25 = 0.32초
+    assert F.frame_metrics_as_seconds(feats, 25.0) == {
+        "impact_frame": 2.48,
+        "follow_through_duration_frames": 0.32,
+    }
+    # 같은 프레임 번호가 다른 격자에서는 다른 순간이다 — 이것이 요점이다.
+    assert F.frame_metrics_as_seconds(feats, 12.5)["impact_frame"] == 4.96
+
+
+def test_unknown_grid_yields_no_seconds_instead_of_a_made_up_number():
+    """🔴 모르면 지어내지 않는다. 그럴듯한 기본값이 이 결함의 원인이었다."""
+    feats = {"impact_frame": 62}
+    for bad in (0.0, -1.0, float("nan"), float("inf")):
+        assert F.frame_metrics_as_seconds(feats, bad) == {}
+
+
+def test_conversion_does_not_touch_the_features_dict():
+    """`features`가 그대로여야 판정 입력이 같고, 기존 평가와 비교가 끊기지 않는다."""
+    feats = extract_features(build_sequence())
+    before = dict(feats)
+
+    F.frame_metrics_as_seconds(feats, 30.0)
+
+    assert feats == before
+    # 시간 값이 측정 이름공간으로 새어 들어가지 않았다.
+    assert not any(k.endswith("_seconds") for k in feats)
