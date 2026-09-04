@@ -150,6 +150,31 @@ from pg_available_extensions where name = 'vector';
 | `ADMIN_EMAILS` | 회원 관리 admin 이 통째로 403 | fail-**closed** |
 | `JWT_SECRET` | 로그인이 503(`AUTH_NOT_CONFIGURED`). 조용한 기본값은 두지 않았다 | fail-closed |
 | `GOOGLE_CLIENT_IDS` | 구글 로그인이 503. **플랫폼마다 클라이언트 ID 가 다르니 쉼표로 전부** | fail-closed |
+
+#### 🔴 `GOOGLE_CLIENT_IDS` 가 비어 있었다 (2026-09-03 발견·해소)
+
+배포 서버의 `.env` 에 키는 있는데 **값이 비어 있었다.** 그래서 웹에서 "Google
+계정으로 로그인"을 누르면 **503 `GOOGLE_LOGIN_NOT_CONFIGURED`** 였다 — 이메일
+로그인은 멀쩡했기 때문에 겉으로는 "로그인이 안 된다"로만 보였다.
+
+값은 **웹 번들에서 찾을 수 있다.** 클라이언트 ID 는 비밀이 아니라 페이지에 박혀
+나간다(비밀은 `client_secret` 이고 우리 백엔드는 그것을 쓰지 않는다 — `id_token`
+의 `aud` 만 대조한다).
+
+```bash
+curl -s https://<웹 주소>/login -o /tmp/login.html
+grep -o '"/_next/static[^"]*\.js"' /tmp/login.html | tr -d '"' | sort -u > /tmp/js.txt
+while read -r p; do curl -s "https://<웹 주소>$p"; done < /tmp/js.txt \
+  | grep -o '[0-9][0-9a-z-]*\.apps\.googleusercontent\.com' | sort -u
+```
+
+⚠️ **플랫폼마다 ID 가 다르다.** 지금 넣은 것은 **웹 것 하나뿐**이라, Flutter 가
+구글 로그인을 붙이면 그 앱의 ID 를 **쉼표로 덧붙여야** 한다. 안 그러면 앱 토큰이
+`aud` 불일치로 전부 거부된다.
+
+> **판별:** `POST /auth/google` 에 아무 문자열이나 `id_token` 으로 보내 본다.
+> **503 이면 설정이 없는 것**이고, **401 `INVALID_GOOGLE_TOKEN` 이면 설정은 된 것**
+> 이다(가짜 토큰이라 401 이 맞다).
 | `S3_BUCKET` | 업로드 경로가 503(`STORAGE_NOT_CONFIGURED`). 로컬 디렉터리로 흘리는 기본값은 두지 않았다 | fail-closed |
 | `AWS_REGION` | boto3 가 기본 리전을 못 찾으면 S3 호출이 죽는다. EC2 에서는 인스턴스 메타데이터로도 잡히지만 명시하는 편이 낫다 | — |
 
@@ -175,15 +200,41 @@ alembic check        # "No new upgrade operations detected." 여야 한다
 
 ## 4. 리버스 프록시·로드밸런서 뒤에 둘 때
 
-> **주소 이름은 `api.supersub-ai.com` 으로 정해 두었다**(2026-09-02).
-> **A 레코드는 탄력적 IP 를 붙인 뒤에 만든다** — 그전에는 인스턴스를 껐다 켤 때마다
-> 주소가 바뀌어 레코드가 곧 틀어진다(8절). 09-03 에 탄력적 IP 를 붙이기로 정했으니
-> **그것이 A 레코드의 선행 조건이다.** 인증서·포트 개방은 여전히 외부 공개를
-> 결정하는 날 함께 한다. 지금은 SSH 터널로 쓴다(6-6 절).
+> **✅ 2026-09-03 에 박민호가 다 세웠다.** `https://api.supersub-ai.com` 이 밖에서
+> 200 을 낸다 — A 레코드(가비아) · 80·443 개방 · nginx · Let's Encrypt 까지.
+> `http` 는 301 로 넘어간다. 이 절의 "그날 함께 한다"는 서술이 그날이 됐다.
+>
+> ```bash
+> curl -s -o /dev/null -w '%{http_code}\n' https://api.supersub-ai.com/health   # 200
+> ```
 
 🔴 **`X-Forwarded-For` 를 신뢰하도록 설정하지 않으면** 인증 로그의 `client` 와
 **요청 제한(SEC-009)의 키가 전부 LB 주소가 된다.** 즉 모든 사용자가 한 덩어리로
 묶여 서로의 제한에 걸린다.
+
+### ✅ 그것도 09-03 에 붙었다 — **systemd drop-in 이다**
+
+박민호가 유닛 파일을 고치는 대신 **드롭인으로 덮었다.** 그래서 `supersub-api.service`
+본체(저장소의 것)에는 안 보인다.
+
+```
+/etc/systemd/system/supersub-api.service.d/override.conf
+
+[Service]
+ExecStart=
+ExecStart=… uvicorn app.main:app --host 127.0.0.1 --port 8000 \
+  --proxy-headers --forwarded-allow-ips=127.0.0.1
+```
+
+⚠️ **빈 `ExecStart=` 가 먼저 있어야 한다.** systemd 에서 `ExecStart` 는 누적되므로
+비우지 않으면 두 번 뜨려 한다.
+
+🔴 **`--forwarded-allow-ips` 를 `*` 로 열지 않는다.** nginx 가 같은 호스트에 있으므로
+`127.0.0.1` 이면 충분하고, 넓히면 **클라이언트가 `X-Forwarded-For` 를 위조해 요청
+제한을 우회**할 수 있다.
+
+> **확인:** `systemctl cat supersub-api | grep proxy-headers` — 안 걸리면 드롭인이
+> 없는 것이고, 그러면 SEC-009 가 모든 사용자를 한 덩어리로 묶는다.
 
 같은 이유로 DB 접속은 `sslmode=verify-full` 을 쓴다. 기본값으로 둔 `require` 는
 **암호화만 하고 인증서를 검증하지 않아** 중간자 공격을 막지 못한다.
@@ -308,7 +359,7 @@ ssh supersub 'cd ~/supersub/app && git pull && cd fastapi \
 
 | 무엇 | 왜 |
 |---|---|
-| **80·443 개방 · nginx · TLS** | 지금은 SSH 터널로만 본다. 열 때 순서는 4절 |
+| ~~80·443 개방 · nginx · TLS~~ | ✅ **2026-09-03 에 박민호가 세웠다** — 4절. `https://api.supersub-ai.com` 이 밖에서 200 을 낸다 |
 | **`pgvector`** | AL2023 저장소에 **패키지가 없다.** 지금 마이그레이션은 `vector` 를 안 써서 없이도 돌았다 — `player_vector` 가 들어올 때 소스 빌드(`gcc` 필요)를 해야 한다 |
 | ~~백업~~ | ✅ 2026-09-02 에 걸었다 — 7절. **다만 같은 디스크에 쌓인다**(밖으로 옮기는 것은 별도) |
 | **로그 회전·모니터링** | journald 기본값에 기대고 있다 |
