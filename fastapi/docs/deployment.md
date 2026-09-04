@@ -308,6 +308,19 @@ python3.14 -m venv .venv
 | `JWT_SECRET` | `openssl rand -base64 48` |
 | `ADMIN_EMAILS` | **비어 있다** → 회원 관리 admin 은 403. 쓰려면 이메일을 넣는다 |
 | `GOOGLE_CLIENT_IDS` | 비어 있다 → 구글 로그인은 503 |
+| `WORKER_TOKEN` | **2026-09-04 에 넣었다** → 분석 워커 경로가 열렸다. 비어 있으면 `/internal/analysis-jobs/*` 가 **전부 401** 이다 |
+
+#### 🔴 `~` 를 원격 명령에 그대로 쓰지 않는다 (2026-09-04 에 밟았다)
+
+```bash
+ssh supersub "wc -l < ~/supersub/app/fastapi/.env"      # ❌ /home/henry 를 본다
+ssh supersub 'wc -l < "$HOME/supersub/app/fastapi/.env"' # ✅ 원격에서 확장된다
+```
+
+**큰따옴표로 감싸면 `~` 와 `$HOME` 이 로컬(WSL)에서 먼저 확장된다.** 원격 홈은
+`/home/ec2-user` 인데 `/home/henry` 를 가리켜 `No such file or directory` 가 났다.
+쓰기 명령이었으면 **엉뚱한 곳에 파일을 만들 뻔했다** — 다행히 없는 경로라 실패했다.
+원격에 보낼 명령은 **작은따옴표**로 감싼다.
 
 ### 6-4. 마이그레이션
 

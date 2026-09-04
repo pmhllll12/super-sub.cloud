@@ -118,6 +118,9 @@ class StubApplicationsMixin:
         _APPLICATIONS[application_id] = app
         return app
 
+    def delete_application(self, application_id: UUID) -> None:
+        _APPLICATIONS.pop(application_id, None)
+
 
 class StubMatchRepository(StubApplicationsMixin, MatchPort):
     def team_exists(self, team_id: UUID) -> bool:
