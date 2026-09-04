@@ -50,6 +50,7 @@ fastapi/docs/client-contract-changes.md 를 읽고, 각 항목의 "먼저 확인
 | 14 | **경기 수정·취소 신설** — `needs` 는 통째로 갈린다. 지원 붙으면 409 (09-03) | 🟡 선택 | 🟡 선택 |
 | 15 | **지원 무르기·거절 신설** — 14번의 409 를 푼다. 되돌릴 수 없다 (09-04) | 🟡 선택 | 🟡 선택 |
 | 16 | **평가·신뢰 신설** — 점수 없는 선택형. 순서 정렬 금지. 14일 (09-04) | 🟡 선택 | 🟡 선택 |
+| 17 | **구성원에 카드 참조** — 스쿼드 등재가 열린다. 없으면 `null` (09-04) | 🔴 **paik 2번 해소** | 🟡 선택 |
 | 5 | `PATCH /me/password` — 성공하면 **토큰 전부 폐기** | ⏳ 아직 안 쓴다 | ⏳ 아직 안 쓴다 |
 | 6 | `DELETE /me` · `POST /auth/logout-all` | ⏳ 아직 안 쓴다 | ⏳ 아직 안 쓴다 |
 | 7 | 401 `INVALID_TOKEN` 에 "폐기된 토큰"이 추가됐다 | ✅ 조치 불필요 | ✅ 조치 불필요 |
@@ -643,6 +644,43 @@ grep -rn "review-options\|/reviews\|/no-shows\|/reports" www/src flutter/lib
 ```
 
 결과가 있으면 이미 붙인 것입니다 — **손대지 않습니다.**
+
+---
+
+## 17. 🟡 구성원 목록에 **카드 참조**가 실립니다 — 스쿼드 등재가 열립니다 (2026-09-04 추가)
+
+미결 `paik` 2번 그대로입니다. `GET /api/v1/teams/{team_id}` 의 `members[]` 에 두
+값이 늘었습니다.
+
+```json
+{ "user_id": "…", "nickname": "홍길동", "role": "owner", "joined_at": "…",
+  "player_card_id": "7b2d…", "card_public_slug": "brave-tiger-1234" }
+```
+
+| 값 | 쓰는 곳 |
+|---|---|
+| `player_card_id` | **스쿼드 등재** — `POST /teams/{id}/squad/members` 가 받는 값 |
+| `card_public_slug` | **카드로 가는 링크** — `GET /cards/{slug}` |
+
+말씀하신 대로 **등재에 쓸 값과 링크에 쓸 값을 나눠** 실었습니다. 하나만 주면
+화면이 나머지를 얻을 경로가 없습니다.
+
+### 🔴 카드가 없는 구성원은 둘 다 `null` 입니다
+
+**그래도 목록에는 남습니다** — 「하지 말 것」에 적어 주신 그대로입니다. 화면에서
+`player_card_id` 가 `null` 인 사람은 **등재 버튼을 비활성**으로 두시면 됩니다
+(누르면 서버가 막지만, 눌러 보고 알게 하는 것보다 낫습니다).
+
+### 먼저 확인
+
+```bash
+curl -s -H "Authorization: Bearer $T" $API/teams/$TEAM | jq '.members[0]'
+```
+
+`player_card_id` 가 보이면 반영된 것입니다.
+
+⚠️ 스키마는 안 바꿨습니다 — `player_card` 를 조인해서 실어 주는 것뿐이라
+**기존 필드는 그대로**입니다.
 
 ---
 

@@ -195,3 +195,57 @@ class TestLeaveTeam:
     def test_인증이_필요하다(self, client, team, owner):
         res = client.delete(f"{V1}/teams/{team['id']}/members/{owner['id']}")
         assert res.status_code == 401
+
+
+class TestMemberCardReference:
+    """구성원 목록이 **그 사람의 카드를 가리킬 수 있는가** (미결  2번).
+
+    스쿼드 등재()가  를 받는데
+    그 값을 얻을 경로가 없었다 —  는 ··
+    · 까지만 줬고, 남의 카드 슬러그를 알 방법도 없었다.
+    """
+
+    def test_카드가_있으면_등재에_쓸_값과_링크에_쓸_값이_둘_다_온다(
+        self, client, owner
+    ):
+        from app.user.adapter.outbound.stub.team_stub_repository import register_card
+
+        card_id = uuid4()
+        register_card(owner["id"], card_id, "brave-tiger-1234")
+
+        res = client.post(f"{V1}/teams", json=TEAM, headers=owner["headers"])
+        member = res.json()["members"][0]
+        assert member["player_card_id"] == str(card_id)
+        assert member["card_public_slug"] == "brave-tiger-1234"
+
+    def test_카드가_없으면_null_이지만_목록에는_남는다(self, client, owner, team):
+        """🔴 안쪽 조인으로 걸면 카드 없는 사람이 통째로 사라진다 —
+        팀에는 여전히 있는 사람이다(그쪽 「하지 말 것」)."""
+        member = team["members"][0]
+        assert member["user_id"] == str(owner["id"])   # 목록에 남아 있다
+        assert member["player_card_id"] is None
+        assert member["card_public_slug"] is None
+
+    def test_카드가_있는_사람과_없는_사람이_섞여도_둘_다_나온다(self, client, owner):
+        from app.user.adapter.outbound.stub.team_stub_repository import (
+            register_card,
+            register_user,
+        )
+
+        other = uuid4()
+        register_user(other)
+        register_card(other, uuid4(), "quiet-heron-9876")
+
+        created = client.post(f"{V1}/teams", json=TEAM, headers=owner["headers"])
+        team_id = created.json()["id"]
+        client.post(
+            f"{V1}/teams/{team_id}/members",
+            json={"user_id": str(other)},
+            headers=owner["headers"],
+        )
+
+        res = client.get(f"{V1}/teams/{team_id}", headers=owner["headers"])
+        by_user = {m["user_id"]: m for m in res.json()["members"]}
+        assert len(by_user) == 2
+        assert by_user[str(owner["id"])]["card_public_slug"] is None
+        assert by_user[str(other)]["card_public_slug"] == "quiet-heron-9876"
