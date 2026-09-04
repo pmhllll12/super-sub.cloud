@@ -16,6 +16,7 @@ from app.match.application.dtos.match_dto import (
     MatchResult,
     MatchSearchQuery,
     MatchSearchResult,
+    RemoveApplicationCommand,
     TeamMatchesQuery,
 )
 
@@ -64,6 +65,12 @@ class AcceptApplicationUseCase(ABC):
     @abstractmethod
     def __call__(self, command: AcceptApplicationCommand) -> ApplicationResult:
         """반대쪽이 수락한다. **둘 다 차면 확정이다.**"""
+
+
+class RemoveApplicationUseCase(ABC):
+    @abstractmethod
+    def __call__(self, command: RemoveApplicationCommand) -> None:
+        """지원을 없앤다 — 당사자면 무르기, 주장이면 거절이다."""
 
 
 class ListApplicationsUseCase(ABC):
