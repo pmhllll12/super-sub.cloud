@@ -551,3 +551,57 @@ def test_area_jump_skips_frames_without_a_box():
     """박스가 없는 프레임은 `continuity_breaks` 쪽 이야기다."""
     box = (0.0, 0.0, 10.0, 10.0)
     assert pose.count_area_jumps([box, None, box]) == 0
+
+
+def test_a_suspected_switch_downgrades_the_claim():
+    """🔴 봉투가 **하지 않은 일을 했다고 말하지 않는다.**
+
+    추적은 아직 못 고쳤다. 그렇다고 `specified` 하나로 내보내면 화면이
+    "지정하신 분으로 분석했습니다"라고 쓰게 된다 — 63%가 다른 사람이어도.
+    """
+    small = (0.0, 0.0, 10.0, 40.0)
+    big = (0.0, 0.0, 40.0, 40.0)        # 넓이 4배 — 갈아탄 것으로 의심
+    # 찍은 사람(small)이 3프레임째부터 후보에서 사라진다. 겹침은 남아 있어
+    # 끊김으로는 안 잡히고, 트랙이 조용히 big 으로 옮겨 간다 —
+    # 실클립에서 타자가 심판 앞을 지날 때 일어난 일과 같은 모양이다.
+    candidates = [[small, big], [small, big], [big], [big]]
+    boxes, selection = pose.select_subject_boxes(
+        [big] * 4, candidates,
+        pose.SubjectRequest(box=(0.0, 0.0, 0.1, 1.0), at_ms=0.0),
+        30.0, (100, 40),
+    )
+
+    assert boxes == [small, small, big, big]
+    assert selection.continuity_breaks == 0, "겹침이 있어 끊김으로는 안 잡힌다"
+
+    assert selection.source == "specified_uncertain"
+    assert selection.used_specification is True, "지정을 쓴 것은 맞다"
+    assert selection.is_uncertain is True
+    assert selection.area_jumps >= 1
+    assert "바뀌었을 수 있다" in selection.why
+
+
+def test_a_clean_track_keeps_the_plain_claim():
+    """의심이 없으면 낮추지 않는다 — 늘 의심이면 그 표시는 읽히지 않는다."""
+    box = (0.0, 0.0, 20.0, 40.0)
+    _, selection = pose.select_subject_boxes(
+        [box] * 4, [[box]] * 4,
+        pose.SubjectRequest(box=(0.0, 0.0, 0.2, 1.0), at_ms=0.0),
+        30.0, (100, 40),
+    )
+
+    assert selection.source == "specified"
+    assert selection.area_jumps == 0
+    assert selection.why == ""
+
+
+def test_auto_keeps_its_name_but_still_counts_jumps():
+    """auto 는 "이 사람을 따라갔다"고 주장한 적이 없다 — 낮출 주장이 없다."""
+    small = (0.0, 0.0, 10.0, 10.0)
+    big = (0.0, 0.0, 40.0, 40.0)
+    _, selection = pose.select_subject_boxes(
+        [small, big, big], [[]] * 3, None, 30.0, (100, 40)
+    )
+
+    assert selection.source == "auto"
+    assert selection.area_jumps == 1

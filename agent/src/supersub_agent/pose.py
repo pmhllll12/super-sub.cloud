@@ -135,10 +135,18 @@ class SubjectSelection:
     신뢰도로는 드러나지 않으므로 선택 자체를 남겨야 한다.
     """
 
-    # "auto"      — 지정이 없었다. 지금까지의 동작(`_largest_person_box`).
-    # "specified" — 지정한 자리에서 후보를 찾아 그 사람을 따라갔다.
-    # "fallback"  — 지정은 있었으나 못 맞춰 자동으로 떨어졌다.
-    #               🔴 조용히 떨어지면 사용자는 자기가 찍은 대로 분석된 줄 안다.
+    # "auto"                 — 지정이 없었다. 지금까지의 동작(`_largest_person_box`).
+    # "specified"            — 지정한 사람을 끝까지 따라간 것으로 **보인다.**
+    # "specified_uncertain"  — 지정한 자리에서는 찾았는데 **도중에 대상이 바뀌었을
+    #                          의심이 있다**(`area_jumps > 0`).
+    # "fallback"             — 지정은 있었으나 못 맞춰 자동으로 떨어졌다.
+    #
+    # 🔴 **`specified`와 `specified_uncertain`을 가른 이유가 이 필드의 요점이다.**
+    # 추적은 아직 못 고쳤다 — 실클립에서 타자를 따라가던 트랙이 심판으로
+    # 갈아타 190프레임(63%)을 다른 사람으로 분석했다. 그런데도 `specified`
+    # 하나로 내보내면 결과 봉투가 **하지 않은 일을 했다고 말한다.**
+    # 고치지 못한 것을 숨기지 않는 것과, 안 한 일을 했다고 하지 않는 것은
+    # 다른 문제다 — 뒤쪽은 지금 고칠 수 있고 그래서 고쳤다.
     source: str = "auto"
     why: str = ""
     anchor_frame: int | None = None
@@ -148,11 +156,22 @@ class SubjectSelection:
     # 지정 시각이 분석 창 밖이라 끝으로 당겨졌는가 (업로드 60초 대 창 10초).
     clamped: bool = False
     # 이어가다 겹치는 후보가 없어 연속성을 끊은 프레임 수.
+    #
+    # 🔴 **0이 "잘 따라갔다"는 뜻이 아니다.** 신원이 바뀔 때는 겹침이 넉넉해서
+    # 여기 안 걸린다 — 위 실클립에서 이 값은 0이었다. 그것을 아래가 잡는다.
     continuity_breaks: int = 0
+    # 인접 프레임에서 선택 박스 넓이가 크게 뛴 횟수 (count_area_jumps).
+    area_jumps: int = 0
 
     @property
     def used_specification(self) -> bool:
-        return self.source == "specified"
+        """사람이 찍은 지정을 **썼는가.** 끝까지 맞았는가와는 다른 물음이다."""
+        return self.source.startswith("specified")
+
+    @property
+    def is_uncertain(self) -> bool:
+        """도중에 대상이 바뀌었을 의심이 있는가."""
+        return self.source == "specified_uncertain"
 
 
 # 인접 프레임에서 선택 박스 넓이가 이 배수 이상 뛰면 **대상이 바뀐 것으로 의심**한다.
@@ -504,7 +523,12 @@ def select_subject_boxes(
     형태). 지정 경로는 새 경로이며 평가가 그것을 잰 적이 없다.
     """
     if subject is None:
-        return auto_boxes, SubjectSelection(source="auto")
+        # auto 는 "이 사람을 따라갔다"고 주장한 적이 없으므로 source 를 낮추지
+        # 않는다. 그래도 넓이 점프는 센다 — 자동 선택이 얼마나 튀는지가
+        # 미결 8번이 정답 없이 물을 수 있는 것 중 하나다.
+        return auto_boxes, SubjectSelection(
+            source="auto", area_jumps=count_area_jumps(auto_boxes)
+        )
 
     n = len(auto_boxes)
     width, height = frame_size
@@ -563,13 +587,23 @@ def select_subject_boxes(
     walk(range(anchor + 1, n), best_box)
     walk(range(anchor - 1, -1, -1), best_box)
 
+    # 🔴 **주장을 사실에 맞춘다.** 넓이가 크게 뛴 자리가 있으면 도중에 대상이
+    # 바뀌었을 수 있고, 그러면 "지정한 사람을 분석했다"는 말이 틀린다.
+    # 추적을 고친 것이 아니라 **하지 않은 일을 했다고 말하지 않는 것**이다.
+    jumps = count_area_jumps(chosen)
     return chosen, SubjectSelection(
-        source="specified",
+        source="specified_uncertain" if jumps else "specified",
+        why=(
+            f"닻({anchor}프레임)에서는 찾았으나 이후 선택 박스 넓이가 "
+            f"{SUBJECT_AREA_JUMP:g}배 이상 뛴 자리가 {jumps}곳 있다 — "
+            "도중에 다른 사람으로 바뀌었을 수 있다"
+        ) if jumps else "",
         anchor_frame=anchor,
         anchor_iou=round(best_iou, 3),
         grid_offset_frames=offset,
         clamped=clamped,
         continuity_breaks=breaks,
+        area_jumps=jumps,
     )
 
 
@@ -648,9 +682,10 @@ def subject_envelope(result: "PoseResult | None", frame_count: int) -> dict:
         "at_clamped": selection.clamped,
         "continuity_breaks": selection.continuity_breaks,
         # 🔴 **끊김 0이 "잘 따라갔다"는 뜻이 아니다.** 신원이 바뀔 때는 겹침이
-        # 넉넉해서 끊김으로 안 잡힌다. 넓이가 크게 뛴 횟수를 함께 낸다 —
-        # 확정이 아니라 의심 신호다(count_area_jumps).
-        "area_jumps": count_area_jumps(result.subject_boxes),
+        # 넉넉해서 끊김으로 안 잡힌다. 넓이가 크게 뛴 횟수가 그 의심을 센다.
+        # **selection 이 이미 센 값을 쓴다** — 여기서 다시 세면 같은 규칙이
+        # 두 벌이 되고 한쪽만 고쳐졌을 때 source 와 숫자가 어긋난다.
+        "area_jumps": selection.area_jumps,
         "frame_size": list(result.frame_size) if result.frame_size else None,
         "frames_with_box": result.subject_box_frames(),
         "frames": frame_count,
@@ -699,7 +734,7 @@ def _record_input_observation(result: PoseResult, rubric_key: str | None) -> Non
             # 자주 실패하는가"를 정답 없이 잰다 (미결 18번 → 12번).
             subject=result.subject_selection,
             subject_box_frames=result.subject_box_frames(),
-            subject_area_jumps=count_area_jumps(result.subject_boxes),
+            subject_area_jumps=result.subject_selection.area_jumps,
         )
     )
 

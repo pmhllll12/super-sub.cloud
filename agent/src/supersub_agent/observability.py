@@ -156,9 +156,11 @@ def summarize_subject_selection(
     정답 없이 잰다 — 없으면 실패가 통계로 남지 않는다.
     """
     return {
-        # "auto" | "specified" | "fallback"
+        # "auto" | "specified" | "specified_uncertain" | "fallback"
         "subject_source": subject.source,
-        "subject_specified": subject.source != "auto",
+        "subject_specified": subject.source.startswith("specified"),
+        # 지정을 썼는데 도중에 대상이 바뀌었을 의심이 있는 비율의 분자가 된다.
+        "subject_uncertain": subject.source == "specified_uncertain",
         # 지정이 있었는데 못 맞춘 비율의 분자가 된다.
         "subject_fallback": subject.source == "fallback",
         "subject_anchor_frame": subject.anchor_frame,
