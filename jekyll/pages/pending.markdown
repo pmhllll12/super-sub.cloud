@@ -2613,6 +2613,101 @@ basketball: G 가드 · F 포워드 · C 센터
 3. **날짜가 모호함**("다음 달 아무 때나") — 구체적인 날짜 하나로 좁혀질 때까지
    되물음. 모호한 값을 그대로 API에 보내지 않습니다
 
+#### 구현 설계 (2026-09-04) — `www` 기존 관례 그대로 얹습니다
+
+`www/src/server/backend/gateway.ts`의 주석대로 **"화면 코드는 백엔드 타입을 보지
+않는다 — 같은 오리진 `/api/*`만 부른다."** 챗봇도 이 규칙을 그대로 따릅니다.
+`fastapi/`나 `정어진`에게 새로 요청하는 것이 없습니다 — 아래 셋 다 `www` 안에서
+끝납니다.
+
+**1) 새로 낼 것 — 기존 API를 감싸는 조각 (기존 파일 3곳에 얹는 정도, 새 엔드포인트 아님)**
+
+| 파일 | 하는 일 |
+|---|---|
+| `www/src/server/backend/gateway.ts` | `Backend` 인터페이스에 `createTeamMatch(token, teamId, input)` 한 줄 추가 (`addSquadMember`와 같은 모양) |
+| `www/src/server/backend/fastapiBackend.ts` | `callFastApi<Match>('/teams/{id}/matches', { method: 'POST', ... })` — 기존 패턴 그대로 |
+| `www/src/server/backend/mock.ts` | 로컬 개발용 목업 (기존 mock 관례) |
+| `www/src/app/api/teams/[teamId]/matches/route.ts` **(신규 파일)** | `POST`, `withAuth` 패턴, `played_at`·`place`·`needs[]` 형태 검증 후 `getBackend().createTeamMatch(...)` 호출 — `squad/members/route.ts`를 그대로 본떴습니다 |
+
+**2) 챗봇 자체 — LLM 호출은 반드시 서버(Route Handler)에서만**
+
+```
+www/src/app/api/chat/route.ts  (신규)  ← LLM API 키가 사는 유일한 곳
+```
+
+- 브라우저는 이 라우트만 부릅니다. LLM 키가 클라이언트 번들에 들어가면 안 됩니다
+- 매 요청마다 **그동안의 대화 전체**를 클라이언트가 함께 보냅니다(표준 챗봇
+  패턴) — 서버는 세션을 들고 있지 않습니다. **DB 저장 없음**(열린 질문 3번
+  결정 그대로, 새로고침하면 대화가 사라집니다)
+- 대화 시작 시 서버가 **`GET /me`를 먼저 불러 `role: "owner"`인 팀 목록과
+  각 `sport_code`를 시스템 프롬프트에 미리 넣어 줍니다.** LLM이 매번 "팀
+  목록 조회" 도구를 부르게 하지 않는 이유 — 한 대화 동안 안 바뀌는 값이라
+  왕복을 아낍니다. 오늘 날짜(서울 시간대)도 같이 넣어 "이번 주 토요일" 같은
+  상대 표현을 풀 수 있게 합니다
+
+**3) LLM 도구(tool) 하나만 씁니다 — 실제 등록은 이 도구가 안 합니다**
+
+```json
+{
+  "name": "propose_match_registration",
+  "description": "슬롯 4개(팀·시각·장소·필요 포지션)가 다 채워지고 사용자가 구두로 확인했을 때만 부른다. 실제로 경기를 등록하지 않는다 — 확인 카드를 화면에 띄우는 신호일 뿐이다.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "team_id":   { "type": "string" },
+      "played_at": { "type": "string", "description": "ISO 8601, +09:00" },
+      "place":     { "type": "string" },
+      "needs": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "position_code": { "type": "string" },
+            "head_count":    { "type": "integer", "minimum": 1 }
+          },
+          "required": ["position_code", "head_count"]
+        }
+      }
+    },
+    "required": ["team_id", "played_at", "place", "needs"]
+  }
+}
+```
+
+🔴 **실제 쓰기(`POST /teams/{id}/matches`)는 이 도구가 아니라 화면의 [등록] 버튼
+클릭이 부릅니다.** LLM이 슬롯을 다 채우면 `/api/chat` 응답에 확인 카드 데이터를
+실어 보내고, 프론트가 그걸 그려 사용자가 버튼을 누르면 그때 (1)에서 만든
+`POST /api/teams/{teamId}/matches`를 **일반 API 콜로** 부릅니다 — 챗봇 대화를
+한 번 더 거치지 않습니다. LLM의 자연어 해석 오류가 그대로 쓰기로 이어지는
+경로를 막는 안전장치입니다(accept 자동화를 뺀 것과 같은 원칙 — 열린 질문 2번).
+
+**시퀀스**
+
+```
+브라우저(챗봇 UI)
+  → POST /api/chat { messages, ... }             (서버가 team 목록 이미 앎)
+  → Claude API 호출, tool: propose_match_registration
+  ← 슬롯 부족  → 되묻는 문장만
+  ← 슬롯 완성  → 확인 카드 데이터(team·시각·장소·needs)
+브라우저: 확인 카드 렌더 + [등록] 버튼
+사용자가 [등록] 클릭
+  → POST /api/teams/{teamId}/matches  (일반 API, 챗봇 경유 안 함)
+  → 성공: FastAPI 201 → 대화창에 "등록됐어요" 이어붙임
+  → 실패(422 PAST_MATCH 등): 위 에러 매핑 표의 문구 그대로 인라인 표시
+```
+
+**4) LLM 선택 (열린 질문 4번에 대한 제 결론)**: **Claude API(Anthropic)**를
+씁니다. EXAONE의 NC 라이선스 문제와 완전히 분리되고, tool use를 잘 지원하고,
+이 정도 슬롯 채우기엔 가벼운 모델(Haiku급)로 충분해 비용도 크지 않습니다.
+정상호에게는 "EXAONE을 쓰지 않는다"는 결론만 자문으로 확인받으면 됩니다.
+
+**5) UI — 새 컴포넌트 하나**
+
+`www/src/components/MatchBot.tsx` (가칭) — 메시지 목록 + 입력창 + 슬롯 채움
+현황을 보여주는 사이드 카드(팀/시각/장소/포지션이 채워질 때마다 갱신) + 확인
+카드의 [등록] 버튼. 기존 `SquadPanel`류 판(글래스 스타일)과 톤을 맞춥니다.
+표지의 `용병 찾기` 버튼(지금 `href` 없음)을 눌렀을 때 여는 것으로 잡습니다.
+
 - **담당**: 박민호(직접 구현) · **자문**: 정상호(AI 자원·라이선스) · **연동**: 정어진(기존 API, 필요시 계약 문의) · **제기**: 박민호 · **기한**: 이번 스프린트(흐름 B) · 나머지는 다음 스프린트 계획 시
 
 ## paik (백성검)
