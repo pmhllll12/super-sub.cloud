@@ -4,6 +4,9 @@ import type {
   AdminUserDetail,
   AdminUserListResult,
   AuthToken,
+  Match,
+  MyVideo,
+  Squad,
   PlayerCard,
   PublicPlayerCard,
   SignupResult,
@@ -41,12 +44,70 @@ export const fastapiBackend: Backend = {
     return callFastApi<User>('/me', { method: 'PATCH', token, body: { nickname } })
   },
 
+  async changePassword(token, body) {
+    await callFastApi<null>('/me/password', { method: 'PATCH', token, body })
+  },
+
+  async deleteMe(token, { password }) {
+    await callFastApi<null>('/me', {
+      method: 'DELETE',
+      token,
+      // 🔴 비밀번호가 없는 계정(구글 전용)은 **본문 없이** 부른다 —
+      // 요구하면 그 사람은 탈퇴할 방법이 사라진다(계약 2장).
+      body: password ? { password } : undefined,
+    })
+  },
+
   getMyCard(token) {
     return callFastApi<PlayerCard>('/me/card', { method: 'GET', token })
   },
 
+  createMyCard(token) {
+    return callFastApi<PlayerCard>('/me/card', { method: 'POST', token })
+  },
+
   getPublicCard(slug) {
     return callFastApi<PublicPlayerCard>(`/cards/${encodeURIComponent(slug)}`, { method: 'GET' })
+  },
+
+  listMyVideos(token) {
+    return callFastApi<MyVideo[]>('/videos', { method: 'GET', token })
+  },
+
+  listTeamMatches(token, teamId) {
+    return callFastApi<Match[]>(`/teams/${encodeURIComponent(teamId)}/matches`, {
+      method: 'GET',
+      token,
+    })
+  },
+
+  getSquad(token, teamId) {
+    return callFastApi<Squad>(`/teams/${encodeURIComponent(teamId)}/squad`, {
+      method: 'GET',
+      token,
+    })
+  },
+
+  createSquad(token, teamId) {
+    return callFastApi<Squad>(`/teams/${encodeURIComponent(teamId)}/squad`, {
+      method: 'POST',
+      token,
+    })
+  },
+
+  addSquadMember(token, teamId, body) {
+    return callFastApi<Squad>(`/teams/${encodeURIComponent(teamId)}/squad/members`, {
+      method: 'POST',
+      token,
+      body,
+    })
+  },
+
+  removeSquadMember(token, teamId, memberId) {
+    return callFastApi<Squad>(
+      `/teams/${encodeURIComponent(teamId)}/squad/members/${encodeURIComponent(memberId)}`,
+      { method: 'DELETE', token },
+    )
   },
 
   listUsers(token, { q, page = 1, size = 20 }) {

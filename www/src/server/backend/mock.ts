@@ -4,6 +4,9 @@ import type {
   AdminUser,
   AdminUserDetail,
   AuthToken,
+  Match,
+  MyVideo,
+  Squad,
   PlayerCard,
   PublicPlayerCard,
   SignupResult,
@@ -13,6 +16,8 @@ import type {
 const DEMO_EMAIL = 'demo@super-sub.example'
 const DEMO_PASSWORD = 'supersub2026'
 const DEMO_TOKEN = 'mock-access-token-demo'
+/** 데모 계정이 속한 팀. 스쿼드 · 경기가 이 id 를 함께 읽는다. */
+const DEMO_TEAM_ID = '9a2e0000-0000-4000-8000-000000000002'
 const EXPIRES_IN = 604800
 
 /**
@@ -83,6 +88,126 @@ function requireAdmin(token: string): User {
   return u
 }
 
+/**
+ * 데모 계정이 올린 클립들 — **최근 것이 앞에 온다**(계약 3-6절).
+ *
+ * 🔴 `storage_key` 에 **`public/` 의 목업 영상 경로**를 넣었다(사용자 요청:
+ * "우리 목업으로 넣었던 영상 3개를 내가 업로드한 영상이라 생각하고"). 화면은
+ * `/` 로 시작하는 키만 그대로 재생한다(`page.tsx` 의 `previewSrc`) — 진짜
+ * 백엔드가 주는 키(`videos/<user_id>/<uuid>.mp4`)는 조회용 주소가 아직
+ * 없어서(계약 3-6절 "아직 없는 것") 그림 없이 메타만 나온다.
+ *
+ * 🔴 세 상태를 일부러 갈라 두었다 — 화면이 구분해서 그려야 하는 것이
+ * 그것이다: 분석까지 끝난 것 · 분석 중인 것 · 분석 없이 올리기만 한 것.
+ */
+const DEMO_VIDEOS: MyVideo[] = [
+  {
+    id: 'v1',
+    sport_code: 'football',
+    storage_key: '/coach-c002.mp4',
+    duration_ms: 13000,
+    side: null,
+    created_at: '2026-09-03T09:00:00Z',
+    passed: true,
+    reject_reason: null,
+    analysis_job_id: 'j1',
+    analysis_status: 'succeeded',
+  },
+  {
+    id: 'v2',
+    sport_code: 'football',
+    storage_key: '/coach-c001.mp4',
+    duration_ms: 5000,
+    side: 'right',
+    created_at: '2026-09-02T14:20:00Z',
+    passed: true,
+    reject_reason: null,
+    analysis_job_id: 'j2',
+    analysis_status: 'running',
+  },
+  {
+    id: 'v3',
+    sport_code: 'futsal',
+    storage_key: '/coach-c003.mp4',
+    duration_ms: 15600,
+    side: null,
+    created_at: '2026-09-01T11:05:00Z',
+    passed: true,
+    reject_reason: null,
+    // 분석을 걸지 않고 올리기만 한 클립.
+    analysis_job_id: null,
+    analysis_status: null,
+  },
+]
+
+/**
+ * 번개FC 의 **다가오는** 경기들. 계약대로 이른 것이 앞에 온다.
+ * 🔴 지난 경기는 이 목록에 없다 — mock 도 그 성질을 지킨다.
+ */
+const DEMO_MATCHES: Match[] = [
+  {
+    id: 'm1',
+    team_id: '9a2e0000-0000-4000-8000-000000000002',
+    played_at: '2026-09-10T10:00:00Z',
+    place: '강남 풋살장 2구장',
+    needs: [
+      { position_code: 'FW', position_label: '공격수', head_count: 2 },
+      { position_code: 'GK', position_label: '골키퍼', head_count: 1 },
+    ],
+  },
+  {
+    id: 'm2',
+    team_id: '9a2e0000-0000-4000-8000-000000000002',
+    played_at: '2026-09-17T19:30:00Z',
+    place: '잠실 실내구장 A',
+    needs: [{ position_code: 'MF', position_label: '미드필더', head_count: 1 }],
+  },
+]
+
+/**
+ * 데모 팀의 스쿼드. 처음에는 **한 자리만 차 있다** — 내 카드가 FW 에 있고
+ * 나머지는 빈 자리다. 화면이 "채워진 자리"와 "빈 자리"를 둘 다 그려야 하기
+ * 때문이다.
+ *
+ * 🔴 mock 은 이걸 **바꿔 가며 들고 있는다.** 등재 · 제외가 서버 없이도
+ * 돌아야 화면을 확인할 수 있고, 그래야 실물에 붙였을 때 달라지는 것이
+ * 화면이 아니라 데이터뿐이다.
+ */
+let demoSquad: Squad | null = {
+  id: 'sq1',
+  team_id: DEMO_TEAM_ID,
+  public_slug: 'aB3xK9mQ2pL7vN4t',
+  members: [
+    {
+      id: 'sm1',
+      player_card_id: '5e7a0000-0000-4000-8000-000000000001',
+      card_public_slug: 'hong-gildong-4f2a',
+      nickname: '홍길동',
+      position_code: 'FW',
+      position_label: '공격수',
+    },
+    {
+      id: 'sm2',
+      player_card_id: '5e7a0000-0000-4000-8000-000000000002',
+      card_public_slug: 'kim-chulsoo-1a2b',
+      nickname: '김철수',
+      position_code: 'MF',
+      position_label: '미드필더',
+    },
+    {
+      id: 'sm3',
+      player_card_id: '5e7a0000-0000-4000-8000-000000000003',
+      card_public_slug: 'lee-younghee-9c8d',
+      nickname: '이영희',
+      position_code: 'GK',
+      position_label: '골키퍼',
+    },
+  ],
+}
+
+/** `POST /me/card` 로 생긴 카드들. 데모 계정은 위 `card` 를 그대로 쓴다. */
+const made = new Map<string, PlayerCard>()
+
 export const mockBackend: Backend = {
   async signup({ email, password, nickname }) {
     if ([...users.values()].some((u) => u.email === email)) {
@@ -132,13 +257,66 @@ export const mockBackend: Backend = {
     return next
   },
 
+  async changePassword(token, { current_password, new_password }) {
+    const u = requireUser(token)
+    if (passwords.get(u.email) !== current_password) {
+      throw new BackendError(401, 'INVALID_CREDENTIALS', '현재 비밀번호가 올바르지 않습니다.')
+    }
+    if (new_password.length < 8) {
+      throw new BackendError(422, 'VALIDATION_ERROR', '비밀번호는 8자 이상이어야 합니다.')
+    }
+    passwords.set(u.email, new_password)
+    // 🔴 계약대로 **기존 토큰을 전부 무효로** 만든다(SEC-004). 이걸 빼면
+    // 화면이 "다시 로그인" 을 건너뛰어도 잘 도는 것처럼 보여, 실물에서만
+    // 터지는 차이가 생긴다.
+    for (const [t, user] of [...users.entries()]) {
+      if (user.email === u.email) users.delete(t)
+    }
+  },
+
+  async deleteMe(token, { password }) {
+    const u = requireUser(token)
+    const known = passwords.get(u.email)
+    if (known !== undefined) {
+      if (password === undefined) {
+        throw new BackendError(422, 'PASSWORD_REQUIRED', '비밀번호가 필요합니다.')
+      }
+      if (known !== password) {
+        throw new BackendError(401, 'INVALID_CREDENTIALS', '비밀번호가 올바르지 않습니다.')
+      }
+    }
+    for (const [t, user] of [...users.entries()]) {
+      if (user.email === u.email) users.delete(t)
+    }
+    passwords.delete(u.email)
+  },
+
   async getMyCard(token) {
     const u = requireUser(token)
-    if (u.email !== DEMO_EMAIL) {
-      // 가입만으로는 카드가 생기지 않는다.
-      throw new BackendError(404, 'CARD_NOT_FOUND', '아직 선수 카드가 없습니다.')
+    if (u.email === DEMO_EMAIL) return card
+    const mine = made.get(u.id)
+    // 가입만으로는 카드가 생기지 않는다 — **부탁해야** 생긴다(계약 3장).
+    if (!mine) throw new BackendError(404, 'CARD_NOT_FOUND', '아직 선수 카드가 없습니다.')
+    return mine
+  },
+
+  async createMyCard(token) {
+    const u = requireUser(token)
+    // 🔴 **멱등이다.** 이미 있으면 그대로 돌려준다 — 슬러그가 바뀌면 이미
+    // 공유한 주소가 죽는다(계약 3장).
+    if (u.email === DEMO_EMAIL) return card
+    const has = made.get(u.id)
+    if (has) return has
+    const fresh: PlayerCard = {
+      id: `card-${u.id}`,
+      public_slug: `${u.nickname}-${u.id.slice(0, 4)}`,
+      og_image_key: `cards/card-${u.id}.png`,
+      user: { id: u.id, nickname: u.nickname },
+      // 🔴 호칭은 **빈 배열**이다 — 분석 결과로 붙으므로 만드는 시점에 있을 수 없다.
+      titles: [],
     }
-    return card
+    made.set(u.id, fresh)
+    return fresh
   },
 
   async getPublicCard(slug) {
@@ -148,6 +326,80 @@ export const mockBackend: Backend = {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- 의도적으로 버리는 필드
     const { id: _id, ...rest } = card
     return rest as PublicPlayerCard
+  },
+
+  async listMyVideos(token) {
+    requireUser(token)
+    return DEMO_VIDEOS
+  },
+
+  async listTeamMatches(token, teamId) {
+    requireUser(token)
+    return DEMO_MATCHES.filter((m) => m.team_id === teamId)
+  },
+
+  async getSquad(token, teamId) {
+    requireUser(token)
+    // 🔴 아직 안 만들었으면 404 다 — 빈 스쿼드를 돌려주면 "만들지 않은 것"과
+    // "비어 있는 것"이 화면에서 같아 보인다(계약 3-7절).
+    if (!demoSquad || demoSquad.team_id !== teamId) {
+      throw new BackendError(404, 'SQUAD_NOT_FOUND', '스쿼드를 아직 만들지 않았습니다.')
+    }
+    return demoSquad
+  },
+
+  async createSquad(token, teamId) {
+    requireUser(token)
+    // 멱등이다 — 두 번 불러도 슬러그가 바뀌지 않는다.
+    if (demoSquad && demoSquad.team_id === teamId) return demoSquad
+    demoSquad = { id: 'sq1', team_id: teamId, public_slug: 'aB3xK9mQ2pL7vN4t', members: [] }
+    return demoSquad
+  },
+
+  async addSquadMember(token, teamId, { player_card_id, position_code }) {
+    requireUser(token)
+    if (!demoSquad || demoSquad.team_id !== teamId) {
+      throw new BackendError(404, 'SQUAD_NOT_FOUND', '스쿼드를 아직 만들지 않았습니다.')
+    }
+    if (demoSquad.members.some((m) => m.player_card_id === player_card_id)) {
+      throw new BackendError(409, 'ALREADY_ENLISTED', '이미 등재된 카드입니다.')
+    }
+    const labels: Record<string, string> = {
+      GK: '골키퍼',
+      DF: '수비수',
+      MF: '미드필더',
+      FW: '공격수',
+    }
+    if (!labels[position_code]) {
+      throw new BackendError(422, 'UNKNOWN_POSITION', '이 종목에 없는 포지션입니다.')
+    }
+    demoSquad = {
+      ...demoSquad,
+      members: [
+        ...demoSquad.members,
+        {
+          id: `sm${demoSquad.members.length + 1}`,
+          player_card_id,
+          card_public_slug: 'hong-gildong-4f2a',
+          nickname: '홍길동',
+          position_code,
+          position_label: labels[position_code],
+        },
+      ],
+    }
+    return demoSquad
+  },
+
+  async removeSquadMember(token, teamId, memberId) {
+    requireUser(token)
+    if (!demoSquad || demoSquad.team_id !== teamId) {
+      throw new BackendError(404, 'SQUAD_NOT_FOUND', '스쿼드를 아직 만들지 않았습니다.')
+    }
+    if (!demoSquad.members.some((m) => m.id === memberId)) {
+      throw new BackendError(404, 'MEMBER_NOT_FOUND', '그 등재를 찾을 수 없습니다.')
+    }
+    demoSquad = { ...demoSquad, members: demoSquad.members.filter((m) => m.id !== memberId) }
+    return demoSquad
   },
 
   async listUsers(token, { q, page = 1, size = 20 }) {
