@@ -462,6 +462,14 @@ class MatchPgRepository(MatchPort):
             raise RuntimeError("수락한 지원 건이 사라졌다")
         return loaded
 
+    def delete_application(self, application_id: UUID) -> None:
+        self._session.execute(
+            delete(MatchApplicationOrm).where(
+                MatchApplicationOrm.id == application_id
+            )
+        )
+        self._session.commit()
+
     def _load_application(self, where) -> ApplicationEntity | None:
         stmt = (
             select(MatchApplicationOrm, _user.c.nickname)

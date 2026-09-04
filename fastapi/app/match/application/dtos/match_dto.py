@@ -128,6 +128,15 @@ class AcceptApplicationCommand:
 
 
 @dataclass(frozen=True)
+class RemoveApplicationCommand:
+    """무르기(당사자)와 거절(주장)이 같은 명령이다 — 둘 다 행을 지운다."""
+
+    actor_id: UUID
+    match_id: UUID
+    application_id: UUID
+
+
+@dataclass(frozen=True)
 class ApplicationsQuery:
     actor_id: UUID
     match_id: UUID
