@@ -81,6 +81,14 @@ export const fastapiBackend: Backend = {
     })
   },
 
+  createTeamMatch(token, teamId, input) {
+    return callFastApi<Match>(`/teams/${encodeURIComponent(teamId)}/matches`, {
+      method: 'POST',
+      token,
+      body: input,
+    })
+  },
+
   getSquad(token, teamId) {
     return callFastApi<Squad>(`/teams/${encodeURIComponent(teamId)}/squad`, {
       method: 'GET',

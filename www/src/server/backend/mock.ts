@@ -41,7 +41,10 @@ const users = new Map<string, User>([
           name: '번개FC',
           region: '서울 강남',
           sport_code: 'futsal',
-          role: 'member',
+          // 🔴 'owner'다 — 데모 계정으로 주장 전용 흐름(경기 등록 등)까지
+          // 확인할 수 있어야 한다. 다른 곳은 이 값을 아직 안 쓴다(2026-09-04
+          // 기준 실측 — 바꿔도 기존 동작에 영향 없음).
+          role: 'owner',
           joined_at: '2026-07-01T00:00:00Z',
         },
       ],
@@ -336,6 +339,44 @@ export const mockBackend: Backend = {
   async listTeamMatches(token, teamId) {
     requireUser(token)
     return DEMO_MATCHES.filter((m) => m.team_id === teamId)
+  },
+
+  async createTeamMatch(token, teamId, { played_at, place, needs }) {
+    const u = requireUser(token)
+    const team = u.teams.find((t) => t.team_id === teamId)
+    if (!team) throw new BackendError(404, 'TEAM_NOT_FOUND', '그 팀을 찾을 수 없습니다.')
+    if (team.role !== 'owner') {
+      throw new BackendError(403, 'FORBIDDEN', '주장만 경기를 등록할 수 있습니다.')
+    }
+    if (new Date(played_at).getTime() <= Date.now()) {
+      throw new BackendError(422, 'PAST_MATCH', '지난 시각입니다.')
+    }
+    if (needs.length === 0) {
+      throw new BackendError(422, 'VALIDATION_ERROR', '필요 포지션이 비어 있습니다.')
+    }
+    const labels: Record<string, string> = { GK: '골키퍼', DF: '수비수', MF: '미드필더', FW: '공격수' }
+    const seen = new Set<string>()
+    for (const n of needs) {
+      if (n.head_count < 1) {
+        throw new BackendError(422, 'VALIDATION_ERROR', '인원은 1명 이상이어야 합니다.')
+      }
+      if (seen.has(n.position_code)) {
+        throw new BackendError(422, 'DUPLICATE_POSITION', '같은 포지션을 두 번 적었습니다.')
+      }
+      seen.add(n.position_code)
+      if (!labels[n.position_code]) {
+        throw new BackendError(422, 'UNKNOWN_POSITION', '이 팀 종목에 없는 포지션입니다.')
+      }
+    }
+    const match: Match = {
+      id: `m${DEMO_MATCHES.length + 1}`,
+      team_id: teamId,
+      played_at,
+      place,
+      needs: needs.map((n) => ({ ...n, position_label: labels[n.position_code] })),
+    }
+    DEMO_MATCHES.push(match)
+    return match
   },
 
   async getSquad(token, teamId) {

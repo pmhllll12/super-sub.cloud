@@ -23,7 +23,7 @@ import sys
 import tempfile
 import time
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
@@ -31,6 +31,7 @@ from supersub_agent import storage  # noqa: E402
 from supersub_agent.features import (  # noqa: E402
     InsufficientQuality,
     extract_features,
+    frame_metrics_as_seconds,
     verify_rubric_coverage,
 )
 from supersub_agent.judge import Judge  # noqa: E402
@@ -40,7 +41,9 @@ from supersub_agent.pose import (  # noqa: E402
     draw_overlay,
     encode_preview,
     extract_keypoints,
+    parse_subject_spec,
     render_tracked_clip,
+    subject_envelope,
 )
 from supersub_agent.scoring import aggregate, load_rubric  # noqa: E402
 
@@ -100,50 +103,73 @@ def build_previews(pose, impact: int, work: Path) -> dict[str, Path]:
     return out
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("video", help="s3://버킷/키 형식의 원본 영상")
-    ap.add_argument("--rubric", default="rubrics/football_instep_shot.yaml")
-    ap.add_argument("--model", default="1.2B", choices=["1.2B", "2.4B", "7.8B"])
-    ap.add_argument(
-        "--out", required=True,
-        help="리포트를 올릴 s3:// 접두사 (예: s3://버킷/reports)",
-    )
-    ap.add_argument(
-        "--side", default="auto", choices=["auto", "left", "right"],
-        help="스윙 측(던지는 팔·차는 발). 루브릭의 impact_limb에만 적용된다",
-    )
-    ap.add_argument("--fps", type=int, default=DEFAULT_TARGET_FPS)
-    ap.add_argument("--region", default=None, help="S3 리전 (미지정 시 기본 설정)")
-    args = ap.parse_args()
+def report_slug(key: str) -> str:
+    """리포트를 놓을 자리 — **파일 이름만 쓰지 않는다.**
 
-    if not storage.is_s3_uri(args.video) or not storage.is_s3_uri(args.out):
-        raise SystemExit("video와 --out은 모두 s3:// 형식이어야 한다.")
+    옛 규칙은 파일 stem 하나였다. 그러면 프론트가 올리는
+    `videos/<A>/clip.mp4` 와 `videos/<B>/clip.mp4` 가 **둘 다**
+    `reports/clip/` 으로 가서 타임스탬프로만 갈린다 — 나중에 어느 업로드의
+    결과인지 되짚을 수 없다(미결 17번에 고치겠다고 적어 둔 것이다).
 
-    rubric = load_rubric(args.rubric)
-    print(f"루브릭: {rubric.sport}/{rubric.motion} v{rubric.version} "
-          f"({len(rubric.criteria)}개 항목)")
+    그래서 **바로 위 폴더를 함께 쓴다.** `videos/` 바로 아래 파일은 위 폴더가
+    `videos` 뿐이므로 옛 경로를 그대로 유지한다 — 이미 올라간 리포트가
+    떠내려가지 않는다.
+    """
+    parts = PurePosixPath(key).parts
+    stem = PurePosixPath(key).stem
+    parent = parts[-2] if len(parts) >= 2 else ""
+    return f"{parent}/{stem}" if parent and parent != "videos" else stem
 
+
+def resolve_videos(uri: str, region: str | None) -> list[str]:
+    """인자로 받은 것이 파일이든 **폴더든** 분석할 영상 목록으로 바꾼다.
+
+    🔴 **S3에는 폴더가 없다.** 콘솔이 폴더로 보여주는 `videos/<UUID>/` 는 그냥
+    키 접두사이고, 그 접두사를 그대로 `download` 에 넘기면 "그런 키 없음"으로
+    죽는다. 프론트가 `videos/<UUID>/<파일>.mp4` 로 올리므로 **폴더를 줬는데
+    아무것도 안 돈다**가 그 증상이다.
+
+    영상 확장자로 끝나면 객체 하나로 보고 그대로 쓴다. 아니면 접두사로 보고
+    아래를 훑는다. 0바이트 객체(`videos/` 표식, 끊긴 업로드)는 빠진다.
+    """
+    if uri.lower().endswith(storage.VIDEO_SUFFIXES):
+        return [uri]
+    found = storage.find_videos(uri, region=region)
+    if not found:
+        raise SystemExit(
+            f"영상을 찾지 못했다: {uri}\n"
+            "  · 폴더라면 그 안에 영상 객체가 있는지 확인할 것 "
+            "(0바이트 객체와 사이드카는 제외된다)\n"
+            "  · 콘솔에 폴더로 보여도 실제 객체가 없을 수 있다 — 업로드가 "
+            "중간에 끊기면 그렇게 남는다"
+        )
+    return found
+
+
+def analyze_one(video: str, args, rubric, subject) -> None:
+    """영상 한 편을 분석해 리포트를 올린다."""
     # --- 내려받기 --------------------------------------------------------
     # 임시 디렉터리에 받고 **끝까지 살려 둔다.** 미리보기 렌더링이 원본을 다시
     # 디코딩하기 때문이다(PoseResult가 프레임을 들고 있지 않으므로). 붙들고
     # 있는 것은 디스크지 RAM이 아니라 EBS 150GB에서는 값이 싸다 — 대신 4K
     # 300장(약 7GB)이 판정 내내 RAM에 남는 것을 피한다.
     with tempfile.TemporaryDirectory(prefix="supersub-") as tmp:
-        _, key = storage.parse_s3_uri(args.video)
+        _, key = storage.parse_s3_uri(video)
         local = Path(tmp) / Path(key).name
         t0 = time.time()
-        storage.download(args.video, local, region=args.region)
+        storage.download(video, local, region=args.region)
         fetch_s = time.time() - t0
         size_mb = local.stat().st_size / 1e6
-        print(f"[입력] {args.video} → {size_mb:.1f}MB, {fetch_s:.1f}초")
+        print(f"[입력] {video} → {size_mb:.1f}MB, {fetch_s:.1f}초")
 
         # --- 측정 (결정론적) ---------------------------------------------
         t0 = time.time()
         try:
             # observe=False — 배치 분석은 서비스 입력이 아니다. 기본값 True로
             # 두면 이 실행이 서비스 입력 분포 관측에 섞인다.
-            pose = extract_keypoints(local, target_fps=args.fps, observe=False)
+            pose = extract_keypoints(
+                local, target_fps=args.fps, observe=False, subject=subject
+            )
             features = extract_features(
                 pose.keypoints, pose.objects, rubric.impact_limb,
                 rubric.impact_event, args.side,
@@ -182,23 +208,23 @@ def main() -> None:
         # --- 미리보기 ------------------------------------------------------
         # 판정이 끝난 뒤다. 프레임을 다시 디코딩하므로 판정 모델과 겹치지 않는다.
         stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-        stem = Path(storage.parse_s3_uri(args.video)[1]).stem
+        slug = report_slug(storage.parse_s3_uri(video)[1])
         t0 = time.time()
         previews = build_previews(pose, int(features["impact_frame"]), Path(tmp))
         preview_s = time.time() - t0
 
         preview_uris: dict[str, str] = {}
         for kind, path in previews.items():
-            uri = storage.join_uri(args.out, stem, stamp, path.name)
+            uri = storage.join_uri(args.out, slug, stamp, path.name)
             storage.upload_file(path, uri, region=args.region)
             preview_uris[kind] = uri
             print(f"  미리보기 {kind}: {path.stat().st_size / 1e6:.2f}MB → {uri}")
 
     # --- 리포트 업로드 -----------------------------------------------------
-    target = storage.join_uri(args.out, stem, f"{stamp}.json")
+    target = storage.join_uri(args.out, slug, f"{stamp}.json")
 
     report = {
-        "source_video": args.video,
+        "source_video": video,
         "analyzed_at": stamp,
         "code_version": code_version(),
         "rubric": {
@@ -213,6 +239,12 @@ def main() -> None:
         "target_fps": args.fps,
         "sampled_fps": round(float(pose.sampled_fps), 2),
         "frames": int(len(pose.keypoints)),
+        # 프레임 단위 지표를 초로 (미결 7번 E-3). `sampled_fps`가 바로 위에
+        # 있어도 읽는 쪽이 나눠 주기를 기대하면 안 된다 — 어느 것이 인덱스이고
+        # 어느 것이 길이인지는 features 모듈만 안다.
+        "frame_metrics_seconds": frame_metrics_as_seconds(
+            features, float(pose.sampled_fps)
+        ),
         "judge_backend": judge.backend,
         "judge_model": judge.model_id,
         # 스켈레톤은 ViTPose 키포인트로 그린 것이다 — 추가 추론이 없고
@@ -225,12 +257,95 @@ def main() -> None:
             "judge_s": round(judge_s, 2),
             "preview_s": round(preview_s, 2),
         },
+        # **누구를** 분석했는지 — 지정/자동/폴백과 선택 박스 시계열.
+        # 🔴 폴백을 조용히 넘기지 않는다. 이것이 없으면 "찍은 사람이 실제로
+        # 분석됐는가"를 사후에 확인할 방법이 없다 (미결 18번).
+        "subject": subject_envelope(pose, int(len(pose.keypoints))),
         "features": features,
         "result": result,
     }
     storage.upload_json(report, target, region=args.region)
     print(f"\n저장: {target}")
     print(json.dumps(report["timing"], ensure_ascii=False))
+
+
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("video", help="s3://버킷/키(영상) 또는 s3://버킷/접두사(폴더)")
+    ap.add_argument("--rubric", default="rubrics/football_instep_shot.yaml")
+    ap.add_argument("--model", default="1.2B", choices=["1.2B", "2.4B", "7.8B"])
+    ap.add_argument(
+        "--out", required=True,
+        help="리포트를 올릴 s3:// 접두사 (예: s3://버킷/reports)",
+    )
+    ap.add_argument(
+        "--side", default="auto", choices=["auto", "left", "right"],
+        help="스윙 측(던지는 팔·차는 발). 루브릭의 impact_limb에만 적용된다",
+    )
+    ap.add_argument("--fps", type=int, default=DEFAULT_TARGET_FPS)
+    ap.add_argument("--region", default=None, help="S3 리전 (미지정 시 기본 설정)")
+    ap.add_argument(
+        "--subject-box", default=None, metavar="x,y,w,h",
+        help="분석할 사람의 **정규화 0~1** 박스. 사람이 화면에서 찍은 값이다. "
+             "🔴 표시 해상도 픽셀이 아니다 — 주지 않으면 지금까지처럼 자동으로 고른다",
+    )
+    ap.add_argument(
+        "--subject-at-ms", type=float, default=None,
+        help="--subject-box 를 그린 영상 시각(밀리초). 박스를 주면 함께 주어야 한다",
+    )
+    ap.add_argument(
+        "--skip-analyzed", action="store_true",
+        help="리포트가 이미 있는 영상은 건너뛴다. 🔴 이것이 큐 소비의 최소 형태다 "
+             "— videos/ 와 reports/ 를 비교해 안 돈 것만 처리한다(미결 17번 「나」)",
+    )
+    args = ap.parse_args()
+
+    if not storage.is_s3_uri(args.video) or not storage.is_s3_uri(args.out):
+        raise SystemExit("video와 --out은 모두 s3:// 형식이어야 한다.")
+
+    # 규칙은 pose.parse_subject_spec 하나뿐이다 — HTTP도 같은 것을 쓴다.
+    # 여기서는 오류를 종료 코드로 옮기기만 한다.
+    try:
+        subject = parse_subject_spec(args.subject_box, args.subject_at_ms)
+    except ValueError as exc:
+        raise SystemExit(f"대상 지정이 잘못됐다: {exc}") from exc
+
+    rubric = load_rubric(args.rubric)
+    print(f"루브릭: {rubric.sport}/{rubric.motion} v{rubric.version} "
+          f"({len(rubric.criteria)}개 항목)")
+
+    videos = resolve_videos(video_uri := args.video, args.region)
+    if len(videos) > 1 and subject is not None:
+        raise SystemExit(
+            f"{video_uri} 아래에 영상이 {len(videos)}편이다. 대상 지정"
+            "(--subject-box)은 한 편에만 뜻이 있으므로 영상 하나를 직접 지정할 것."
+        )
+
+    print(f"대상 {len(videos)}편")
+    failed = 0
+    for i, video in enumerate(videos, 1):
+        print(f"\n[{i}/{len(videos)}] {video}")
+        if args.skip_analyzed and storage.object_exists(
+            storage.join_uri(args.out, report_slug(storage.parse_s3_uri(video)[1])) + "/",
+            region=args.region,
+        ):
+            print("  이미 리포트가 있다 — 건너뛴다")
+            continue
+        try:
+            analyze_one(video, args, rubric, subject)
+        except SystemExit as exc:
+            # 🔴 한 편이 전체를 막지 않는다. 품질 게이트(종료 코드 2)는 흔하고,
+            #    거기서 멈추면 뒤의 멀쩡한 영상이 영영 안 돈다.
+            failed += 1
+            print(f"  ✗ 건너뜀: {exc}")
+
+    if failed:
+        print(f"\n{failed}/{len(videos)}편 실패")
+    # 🔴 일부 실패는 0으로 끝낸다 — 스캔은 "돌 수 있는 것을 돌리는" 작업이고,
+    #    한 편의 품질 미달로 워커가 실패로 표시되면 재시도가 무한히 돈다.
+    #    영상 하나만 준 경우에는 analyze_one 의 종료 코드가 그대로 올라간다.
 
 
 if __name__ == "__main__":

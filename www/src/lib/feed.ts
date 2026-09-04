@@ -9,6 +9,8 @@
  * (저장소에 있는 영상이 그것뿐이라서다) — 계약에 영상 조회가 생기면
  * (5장 ASM-003, 객체 저장소 미정) 이 상수를 지우고 응답을 흘려 넣으면 된다.
  */
+import type { PublishedClip } from './published'
+
 export type FeedClip = {
   id: string
   /** 큰 글자로 얹히는 제목. 짧을수록 좋다. */
@@ -91,3 +93,28 @@ export const FEED: FeedClip[] = [
     ],
   },
 ]
+
+/**
+ * 원래 목록 앞에 **내가 공개한 클립**을 얹는다.
+ *
+ * ⚠️ 남의 공개 영상은 아직 못 붙인다 — 계약에 공개 클립 목록도, 재생용 주소도
+ * 없다(미결로 올렸다). 그때까지 이 자리에 늘어나는 것은 **내 것뿐**이다.
+ */
+export function feedWith(published: PublishedClip[], by: string): FeedClip[] {
+  return [
+    ...published.map((c) => ({
+      // 🔴 원래 목록과 겹치지 않게 접두사를 붙인다. id 는 리액트 key 이자
+      // 좋아요의 기준이라, 겹치면 남의 영상에 불이 켜진다.
+      id: `pub-${c.id}`,
+      title: c.title,
+      by,
+      at: c.at,
+      what: c.what,
+      src: c.src,
+      aspect: c.aspect,
+      // ⚠️ 계약 5장에 댓글이 없다 — 없는 것을 지어내지 않는다.
+      comments: [],
+    })),
+    ...FEED,
+  ]
+}

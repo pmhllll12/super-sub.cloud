@@ -2,6 +2,7 @@ import type {
   AdminUserDetail,
   AdminUserListResult,
   AuthToken,
+  CreateMatchInput,
   PlayerCard,
   PublicPlayerCard,
   Match,
@@ -41,6 +42,8 @@ export interface Backend {
   listMyVideos(token: string): Promise<MyVideo[]>
   /** 그 팀의 **다가오는** 경기. 이른 것이 앞에 온다. */
   listTeamMatches(token: string, teamId: string): Promise<Match[]>
+  /** 경기를 새로 연다. 주장만 — 아니면 403 `FORBIDDEN`. */
+  createTeamMatch(token: string, teamId: string, input: CreateMatchInput): Promise<Match>
   /** 팀의 스쿼드. 소속이면 본다. **아직 없으면 404 SQUAD_NOT_FOUND** 다. */
   getSquad(token: string, teamId: string): Promise<Squad>
   /** 스쿼드를 연다. **멱등** — 이미 있으면 그것을 그대로 돌려준다. 주장만. */

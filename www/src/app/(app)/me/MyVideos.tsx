@@ -1,7 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { MyVideo } from '@/server/backend'
+import { SPORTS, SPORT_CODE, type SportKey } from '@/lib/sports'
+import { checkClip, uploadClip, type ClipMeta } from '@/lib/uploadClip'
+import { listPublished, publish, unpublish } from '@/lib/published'
 
 /**
  * 내가 올린 클립 — **두 갈래로 갈라 한 번에 한 편만** 보여준다(사용자 요청).
@@ -77,8 +80,56 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
    */
   const [showControls, setShowControls] = useState(false)
 
-  const analyzed = videos.filter((v) => v.analysis_job_id !== null)
-  const uploaded = videos.filter((v) => v.analysis_job_id === null)
+  /**
+   * 이 화면에서 방금 올린 것. ⚠️ **새로고침하면 사라진다** — 목록은 서버가 주는
+   * 것이고(`listMyVideos`) 여기서 다시 받아 오지 않는다. 올린 직후에 목록에
+   * 안 나타나면 올라간 건지 알 수가 없어서 앞에 얹어 둔다.
+   */
+  const [added, setAdded] = useState<MyVideo[]>([])
+  /** 고른 파일. 크기를 재기 전에는 아직 못 올린다. */
+  const [picked, setPicked] = useState<File | null>(null)
+  const [pickedUrl, setPickedUrl] = useState<string | null>(null)
+  const [meta, setMeta] = useState<ClipMeta | null>(null)
+  /** 거른 사유 · 반려 사유 · 실패 사유가 다 여기로 나온다. */
+  const [notice, setNotice] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  /**
+   * 공개로 돌린 영상들.
+   *
+   * 🔴 `listPublished()` 를 그릴 때 부르지 않는다 — 저장소는 서버에 없으므로
+   * 서버가 그린 첫 화면과 브라우저가 그린 것이 갈려 하이드레이션이 깨진다.
+   * 붙은 **뒤에** 한 번 읽는다.
+   */
+  const [pubIds, setPubIds] = useState<string[]>([])
+  /** 공개 폼이 열린 영상 id 와 적고 있는 값. */
+  const [form, setForm] = useState<{ id: string; title: string; what: string } | null>(null)
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- 위 주석 참고: 붙은 뒤에 읽어야 한다.
+  useEffect(() => setPubIds(listPublished().map((c) => c.id)), [])
+
+  useEffect(() => {
+    if (!picked) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 주소는 파일에서 만들어야 하고, 만든 것은 정리에서 거둬야 한다.
+      setPickedUrl(null)
+      return
+    }
+    // jsdom 에는 없다 — 없으면 미리보기만 없고 재는 일은 그대로 돈다.
+    let url: string | null = null
+    try {
+      url = URL.createObjectURL(picked)
+    } catch {
+      url = null
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 위와 같다.
+    setPickedUrl(url)
+    return () => {
+      if (url) URL.revokeObjectURL(url)
+    }
+  }, [picked])
+
+  const all = [...added, ...videos]
+  const analyzed = all.filter((v) => v.analysis_job_id !== null)
+  const uploaded = all.filter((v) => v.analysis_job_id === null)
 
   const [tab, setTab] = useState<TabKey>(analyzed.length > 0 ? 'analyzed' : 'uploaded')
   const [at, setAt] = useState(0)
@@ -104,15 +155,97 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
     })
   }
 
+  /**
+   * 파일을 골랐다. 🔴 **형식·용량은 여기서 막는다** — 그 둘은 `upload-url` 이
+   * 422 로 튕겨 아무 데도 안 남는다. 길이·해상도는 반대로 서버가 반려 사유로
+   * 남겨야 하는 것이라(SFR-001) 여기서 가로채지 않는다.
+   */
+  function onPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] ?? null
+    // 🔴 같은 파일을 다시 골라도 change 가 오게 비운다. 안 그러면 반려된 영상을
+    // 고쳐서 다시 고를 때 아무 일도 안 일어난다.
+    e.target.value = ''
+    setNotice(null)
+    setMeta(null)
+    if (!f) return
+    const bad = checkClip(f)
+    if (bad) {
+      setPicked(null)
+      setNotice(bad)
+      return
+    }
+    setPicked(f)
+  }
+
+  async function send(sport: SportKey) {
+    if (!picked || !meta || busy) return
+    setBusy(true)
+    setNotice(null)
+    try {
+      const saved = await uploadClip({
+        file: picked,
+        sportCode: SPORT_CODE[sport],
+        meta,
+        analyze: false,
+      })
+      setAdded((prev) => [saved, ...prev])
+      setPicked(null)
+      setMeta(null)
+      if (!saved.passed) {
+        setNotice(saved.reject_reason ?? '규격에 맞지 않아 반려됐습니다.')
+      } else {
+        /* 🔴 **보낸 뜻이 아니라 돌아온 응답을 믿는다.** 계약이 아직 `analyze` 를
+           모르므로 백엔드가 그것을 무시하고 분석을 걸 수 있다 — 그러면
+           `analysis_job_id` 가 채워져 오고, 그때는 「분석 영상」이 사실이다. */
+        setTab(saved.analysis_job_id === null ? 'uploaded' : 'analyzed')
+        setAt(0)
+      }
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : '올리지 못했습니다.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function togglePublish(target: MyVideo) {
+    if (pubIds.includes(target.id)) {
+      unpublish(target.id)
+      setPubIds((prev) => prev.filter((x) => x !== target.id))
+      setForm(null)
+      return
+    }
+    // 켜는 것만으로는 안 올린다 — 제목이 있어야 영상 모음에서 이름이 생긴다.
+    setForm({ id: target.id, title: '', what: '' })
+  }
+
+  function savePublish(target: MyVideo) {
+    if (!form || !form.title.trim()) return
+    publish({
+      id: target.id,
+      title: form.title.trim(),
+      what: form.what.trim(),
+      /* 조회용 주소가 없어(계약 3-6절 "아직 없는 것") 실제 백엔드가 준 키는
+         영상 모음에서도 안 틀린다 — `previewSrc` 와 같은 한계다. */
+      src: previewSrc(target) ?? target.storage_key,
+      aspect: ratio ? `${ratio} / 1` : '16 / 9',
+      at: target.created_at.slice(0, 10),
+    })
+    setPubIds((prev) => [...prev, target.id])
+    setForm(null)
+  }
+
   return (
     <>
+      <div className="ss-profile-tabrow">
       <div className="ss-profile-tabs" role="tablist" aria-label="내 영상">
+        {/* 🔴 편수를 **안 적는다**(사용자 요청). 몇 편인지는 영상 아래 `1 / N`
+            이 이미 말하고 있어서 같은 말이 두 곳에 있던 자리다. */}
         {(
           [
-            ['analyzed', '분석 영상', analyzed.length],
-            ['uploaded', '업로드 영상', uploaded.length],
+            ['analyzed', '분석 영상'],
+            ['uploaded', '업로드 영상'],
           ] as const
-        ).map(([key, label, count]) => (
+        ).map(([key, label]) => (
           <button
             key={key}
             type="button"
@@ -123,10 +256,80 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
             onClick={() => pick(key)}
           >
             {label}
-            <span className="ss-profile-tab-count">{count}</span>
           </button>
         ))}
       </div>
+
+      {/* 🔴 `accept` 는 **힌트일 뿐**이다 — 파일 고르기 창에서 거름망을 "모든
+          파일" 로 바꾸면 무엇이든 들어온다. 진짜 관문은 `checkClip` 이다. */}
+      <label className="ss-profile-upload" data-busy={busy ? 'true' : undefined}>
+        <input
+          type="file"
+          accept="video/*"
+          aria-label="올릴 영상"
+          disabled={busy}
+          onChange={onPick}
+        />
+        <span className="material-symbols-outlined" aria-hidden="true">
+          upload
+        </span>
+        업로드
+      </label>
+      </div>
+
+      {/* 올리는 중에 무슨 일이 있었는지 — 거른 사유 · 반려 사유 · 실패 사유. */}
+      {notice && (
+        <p className="ss-profile-notice" role="alert">
+          {notice}
+        </p>
+      )}
+
+      {picked && (
+        <div className="ss-profile-picked">
+          {/* 🔴 크기를 재려고 둔다. 서버가 다시 재려면 원본을 받아야 하고 그러면
+              PER-002 가 무너진다 — 잰 값을 우리가 실어 보낸다(계약 3-6절). */}
+          <video
+            data-picked="true"
+            className="ss-profile-picked-preview"
+            src={pickedUrl ?? undefined}
+            muted
+            playsInline
+            preload="metadata"
+            onLoadedMetadata={(e) => {
+              const el = e.currentTarget
+              setMeta({
+                duration_ms: Math.round((el.duration || 0) * 1000),
+                width: el.videoWidth || 0,
+                height: el.videoHeight || 0,
+              })
+            }}
+          />
+          <div className="ss-profile-picked-ask">
+            <p className="ss-profile-picked-name">{picked.name}</p>
+            {/* 🔴 기본값을 축구로 박아 두면 야구 영상이 축구 루브릭으로 조용히
+                채점된다 — 고르는 순간 올라간다. */}
+            <span className="ss-shot-sports" role="group" aria-label="종목">
+              {SPORTS.map((sp) => (
+                <button
+                  key={sp.key}
+                  type="button"
+                  className="ss-shot-sport"
+                  disabled={!meta || busy}
+                  onClick={() => send(sp.key)}
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    {sp.icon}
+                  </span>
+                  {sp.label}
+                </button>
+              ))}
+            </span>
+            <p className="ss-profile-picked-hint">
+              {busy ? '올리는 중입니다…' : '종목을 고르면 올라갑니다.'}
+            </p>
+          </div>
+        </div>
+      )}
 
       {!v ? (
         <p className="ss-profile-muted">
@@ -180,6 +383,58 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
               🔴 반려 사유만 남긴다 — 그건 알약이 대신해 줄 수 없고, 없으면
               왜 안 됐는지 알 데가 사라진다. */}
           {v.reject_reason && <p className="ss-profile-video-reason">{v.reject_reason}</p>}
+
+          {/* 🔴 **업로드 갈래에서만** 낸다. 분석을 건 영상은 리포트를 보려고 올린
+              것이고, 영상 모음은 올린 장면을 훑는 자리다 — 성격이 다르다. */}
+          {tab === 'uploaded' && (
+            <div className="ss-profile-publish">
+              <button
+                type="button"
+                className="ss-profile-publish-toggle"
+                data-on={pubIds.includes(v.id) ? 'true' : undefined}
+                aria-pressed={pubIds.includes(v.id)}
+                onClick={() => togglePublish(v)}
+              >
+                <span className="material-symbols-outlined" aria-hidden="true">
+                  {pubIds.includes(v.id) ? 'visibility' : 'visibility_off'}
+                </span>
+                {pubIds.includes(v.id) ? '공개 중' : '공개'}
+              </button>
+
+              {form?.id === v.id && (
+                <div className="ss-profile-publish-form">
+                  <label htmlFor="ss-pub-title">제목</label>
+                  <input
+                    id="ss-pub-title"
+                    value={form.title}
+                    maxLength={40}
+                    onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  />
+                  <label htmlFor="ss-pub-what">한 줄 설명</label>
+                  <input
+                    id="ss-pub-what"
+                    value={form.what}
+                    maxLength={60}
+                    onChange={(e) => setForm({ ...form, what: e.target.value })}
+                  />
+                  {/* ⚠️ 서버에 공개 여부를 둘 자리가 아직 없다(미결). 그것을
+                      숨기면 다른 기기에서 안 보일 때 고장으로 읽힌다. */}
+                  <p className="ss-profile-publish-note">
+                    아직 이 브라우저에만 남습니다 — 다른 기기나 다른 사람에게는 보이지
+                    않습니다.
+                  </p>
+                  <button
+                    type="button"
+                    className="ss-profile-publish-save"
+                    disabled={!form.title.trim()}
+                    onClick={() => savePublish(v)}
+                  >
+                    공개하기
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
             {/* 🔴 **한 편뿐이어도 그린다**(사용자 요청) — `1 / 1` 이 보여야 갈래
                 안에 몇 편이 있는지 알 수 있고, 갈래를 바꿔도 줄이 사라졌다

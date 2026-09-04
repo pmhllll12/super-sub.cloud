@@ -6,6 +6,8 @@ import FigureBackground from '@/components/FigureBackground'
 import { useHideChrome, useLeaving } from '@/lib/pageTransition'
 import type { Box } from '@/lib/box'
 import { smoothStep } from '@/lib/smoothBox'
+import { SPORTS, SPORT_CODE, type SportKey } from '@/lib/sports'
+import { uploadClip } from '@/lib/uploadClip'
 import {
   EDGES,
   L_SHOULDER,
@@ -115,26 +117,7 @@ const SHRINK_MS = 820
  * ⚠️ 계약(api-contract.md 3-1)의 영상 등록에 **종목 필드가 아직 없다.** 지금은
  * 화면 안에만 있고 서버로 나가지 않는다 — 리포트 조회 규격을 낼 때 같이 낸다.
  */
-const SPORTS = [
-  { key: 'soccer', label: '축구', icon: 'sports_soccer' },
-  { key: 'baseball', label: '야구', icon: 'sports_baseball' },
-  { key: 'basketball', label: '농구', icon: 'sports_basketball' },
-] as const
-
-type SportKey = (typeof SPORTS)[number]['key']
-
-/**
- * 화면의 종목 키를 백엔드 `sport_code` 로 바꾼다. 화면은 `soccer`, 백엔드
- * `sport` 테이블은 `football` 이다 — 이름이 갈려 있다는 것은 미결 항목에도
- * 올라와 있다(패킷 A 13번). 백엔드가 정본(`sport` 의 기본키라 외래키가
- * 걸린다)이라 여기 **경계에서만** 맞춘다. 화면 쪽 키를 통째로 바꾸는 것은
- * 더 큰 결정이라 하지 않는다.
- */
-const SPORT_CODE: Record<SportKey, string> = {
-  soccer: 'football',
-  baseball: 'baseball',
-  basketball: 'basketball',
-}
+/* 정의는 `lib/sports.ts` 에 있다 — 내 프로필의 업로드와 **같은 목록**을 쓴다. */
 
 /**
  * 분석 대상(선수)을 묶은 네모. 0~1 정규화 좌표다.
@@ -940,41 +923,21 @@ export default function AnalysisStage() {
     setSaveState('saving')
     setSaveMessage(null)
     try {
-      const upload = await fetch('/api/videos/upload-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content_type: picked.type, size_bytes: picked.size }),
-      })
-      const uploadBody = await upload.json()
-      if (!upload.ok) throw new Error(uploadBody?.error?.message ?? '업로드 자리를 못 받았습니다.')
-      const { storage_key, upload_url } = uploadBody as { storage_key: string; upload_url: string }
-
-      const put = await fetch(upload_url, {
-        method: 'PUT',
-        headers: { 'Content-Type': picked.type },
-        body: picked,
-      })
-      if (!put.ok) throw new Error('S3 업로드가 실패했습니다.')
-
-      const register = await fetch('/api/videos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sport_code: SPORT_CODE[sport],
-          storage_key,
+      const saved = await uploadClip({
+        file: picked,
+        sportCode: SPORT_CODE[sport],
+        meta: {
           duration_ms: Math.round((duration || 0) * 1000),
           width: video?.videoWidth ?? 0,
           height: video?.videoHeight ?? 0,
-        }),
+        },
       })
-      const registerBody = await register.json()
-      if (!register.ok) throw new Error(registerBody?.error?.message ?? '등록에 실패했습니다.')
 
-      if (registerBody.passed) {
+      if (saved.passed) {
         setSaveState('saved')
       } else {
         setSaveState('rejected')
-        setSaveMessage(registerBody.reject_reason ?? '규격에 맞지 않아 반려됐습니다.')
+        setSaveMessage(saved.reject_reason ?? '규격에 맞지 않아 반려됐습니다.')
       }
     } catch (e) {
       setSaveState('error')

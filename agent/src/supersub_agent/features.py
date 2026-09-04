@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -117,6 +118,51 @@ LIMB_DEPENDENT_METRICS = frozenset({
     # 어깨·골반 네 점이 모두 잡힌 프레임에서만 나온다.
     "hip_shoulder_separation_deg",
 })
+
+# --- 프레임 단위 지표 (미결 7번 E-3) ---------------------------------------
+#
+# **프레임 수는 그 자체로 뜻이 없다.** 62프레임이 몇 초인지는 어느 격자에서
+# 뽑았는지에 달려 있고, 그 격자는 소스 fps마다 다르다 — `read_frames`가
+# `step = max(1, round(src_fps / target_fps))`로 솎으므로 25fps 소스에 target 15를
+# 주면 실효 12.5fps다. 목표값을 실효값인 양 읽으면 **20% 어긋난다**(pose.read_frames).
+#
+# 그래서 프레임 단위 값을 내보내는 자리에는 **물리 시간을 함께** 붙인다.
+# 아래 두 목록이 "무엇이 프레임 단위인가"의 선언이고,
+# `test_features.py`가 새 지표가 여기 빠지면 걸리게 지킨다.
+#
+# 🔴 **`features` 딕셔너리 자체는 바꾸지 않는다.** 시간은 결과 봉투의 별도
+# 블록(`timebase`)으로 나간다 — `features`는 루브릭·판정·적재가 읽는 측정
+# 이름공간이고, 격자 정보는 선수에 대한 측정이 아니다. 여기에 키를 더하면
+# 판정 입력이 달라져 기존 평가(B-2~B-6)와 비교가 끊긴다.
+
+# 값이 **샘플링된 프레임 인덱스**인 지표. 시각으로 읽으려면 나눈다.
+FRAME_INDEX_METRICS = frozenset({"impact_frame"})
+
+# 값이 **프레임 개수(지속시간)**인 지표. 초로 읽으려면 같은 수로 나눈다.
+FRAME_DURATION_METRICS = frozenset({"follow_through_duration_frames"})
+
+
+def frame_metrics_as_seconds(
+    features: dict, sampled_fps: float
+) -> dict[str, float]:
+    """프레임 단위 지표를 초로 환산한다. **원본 `features`를 건드리지 않는다.**
+
+    인덱스든 개수든 나누는 수는 같다(`sampled_fps`). 둘을 목록으로 갈라 둔 것은
+    뜻이 달라서다 — 인덱스는 *언제*이고 개수는 *얼마나 오래*다. 읽는 쪽이
+    그걸 구분해야 "임팩트 2.07초"와 "팔로스루 0.27초"를 섞지 않는다.
+
+    `sampled_fps`가 0 이하이거나 유한하지 않으면 **빈 dict를 돌려준다** —
+    모르는 격자에서 시간을 지어내지 않는다. 그것이 이 결함의 원인이었다.
+    """
+    if not sampled_fps or not math.isfinite(sampled_fps) or sampled_fps <= 0:
+        return {}
+    out: dict[str, float] = {}
+    for key in FRAME_INDEX_METRICS | FRAME_DURATION_METRICS:
+        value = features.get(key)
+        if value is None:
+            continue
+        out[key] = round(float(value) / sampled_fps, 3)
+    return out
 
 
 class InsufficientQuality(ValueError):

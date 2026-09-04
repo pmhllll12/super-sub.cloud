@@ -95,7 +95,15 @@ def test_closed_motions_stay_loadable():
     """
     closed = {k: r for k, r in discover_rubrics("rubrics").items() if not r.is_active}
 
-    assert set(closed) == {"football/inside_pass", "basketball/layup"}
+    assert set(closed) == {
+        "football/inside_pass",
+        "basketball/layup",
+        # 야구 타격 — 야구는 pitching이 이미 열려 있어 "종목당 한 동작" 범위에
+        # 안 들어간다. 그래도 파일을 둔 것은 JHMDB 관절 정답 54건(swing_baseball)이
+        # 루브릭을 기다리고 있어서다 — 스크립트는 status를 보지 않으므로
+        # 닫힌 채로 돌릴 수 있다. 미결 3번 · 19번.
+        "baseball/batting",
+    }
     for key, r in closed.items():
         assert r.criteria, key
         assert r.status == "draft", key

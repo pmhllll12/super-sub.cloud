@@ -454,11 +454,27 @@ sudo ./agent/deploy/install_autostop.sh --shutdown-behavior-verified
 
 **판정 기준** (`/etc/supersub/autostop.conf`에서 바꾼다).
 
-| 상황 | 기다리는 시간 |
-|---|---|
-| 접속도 작업도 없음 | 30분 |
-| 접속은 있으나 작업 없음 (터미널 켜 두고 퇴근) | 120분 |
-| 무엇을 하든 (최후의 안전장치) | 12시간 |
+| 상황 | 스크립트 기본값 | 🔴 `supersub-ai`에 **깔린 값** |
+|---|---|---|
+| 접속도 작업도 없음 | 30분 | **90분** |
+| 접속은 있으나 작업 없음 (터미널 켜 두고 퇴근) | 120분 | **240분** |
+| 무엇을 하든 (최후의 안전장치) | 12시간 | **18시간** |
+
+🔴 **두 값이 다르다.** 2026-09-04에 `supersub-ai`의
+`/etc/supersub/autostop.conf`만 올렸고 **스크립트 기본값(`autostop.sh`)과
+`autostop.conf.example`은 그대로 두었다** — 그 둘은 "기본값이 무엇인가"를
+설명하는 자리라 배포 한 대의 사정으로 바꾸면 다음 배포가 그 값을 물려받는다.
+되돌리려면 인스턴스에서 한 줄이다(백업이 `autostop.conf.bak.20260904`에 있다):
+
+```bash
+sudo sed -i -e 's/^IDLE_MINUTES=90$/IDLE_MINUTES=30/' \
+            -e 's/^SSH_IDLE_MINUTES=240$/SSH_IDLE_MINUTES=120/' \
+            -e 's/^MAX_UPTIME_HOURS=18$/MAX_UPTIME_HOURS=12/' /etc/supersub/autostop.conf
+```
+
+**최악의 경우 비용이 늘었다** — 잊고 두면 12시간 $7.8에서 **18시간 $11.6**이
+된다(온디맨드 $0.647/시간). 오래 걸리는 작업 앞에는 여전히 `supersub-hold`가
+맞는 도구다. 이쪽은 만료가 있고 저쪽은 없다.
 
 "작업 중"은 **GPU 사용률 10% 초과** 또는 **분석 프로세스 실행 중**이다.
 

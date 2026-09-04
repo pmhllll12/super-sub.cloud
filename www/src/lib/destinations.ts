@@ -15,6 +15,12 @@ import { type Destination } from '@/components/HomeNav'
  */
 export const FRIEND_SEARCH = '지인 찾기'
 
+/**
+ * 마찬가지로 제목이 곧 판단이다 — 누르면 `MatchBot`(흐름 B 챗봇)이 열린다
+ * (미결 `min` 7번). 아래 FEATURED 의 제목과 **글자까지 같아야** 한다.
+ */
+export const MATCH_BOT = '용병 찾기'
+
 // 홈 상단 글자 내비에 적히는 목적지. 앱(flutter/.../home_screen.dart)의
 // _kDestinations 에서 출발했지만 2026-08-30 에 웹에서 다시 골랐다:
 //   - '내 선수 카드'를 '내 프로필'에 합쳤다(카드는 이제 /me 안에 있다)
@@ -35,7 +41,8 @@ export const FRIEND_SEARCH = '지인 찾기'
 // 둘 두지 않는다(우상단 '내 프로필'을 글자 줄에서 뺀 것과 같은 규칙).
 export const FEATURED: Destination[] = [
   {
-    title: '용병 찾기',
+    // 🔴 제목이 위 MATCH_BOT과 **글자까지 같아야** 한다 — 누르면 `MatchBot`이 연다.
+    title: MATCH_BOT,
     icon: 'sports_soccer',
     summary: '사람이 모자란 경기에\n뛸 사람을 찾습니다',
   },

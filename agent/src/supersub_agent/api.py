@@ -25,7 +25,12 @@ import numpy as np
 from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
-from .features import InsufficientQuality, extract_features, verify_rubric_coverage
+from .features import (
+    InsufficientQuality,
+    extract_features,
+    frame_metrics_as_seconds,
+    verify_rubric_coverage,
+)
 from .judge import Judge
 from .scoring import CONFIDENT_MARGIN, RubricError, aggregate, discover_rubrics
 
@@ -141,6 +146,59 @@ def api_preview(name: str) -> FileResponse:
     return FileResponse(path, media_type="video/webm")
 
 
+def build_timebase(
+    features: dict, frame_count: int, pose: "PoseResult | None"
+) -> dict:
+    """프레임 단위 값이 놓인 격자와 그 물리 시간 (미결 7번 E-3).
+
+    **`frames: 300`도 `impact_frame: 62`도 그 자체로는 뜻이 없다.** 어느 격자에서
+    솎은 것인지 모르면 초로 옮길 수 없고, 목표 fps를 실효 fps인 양 쓰면 20%
+    어긋난다(`pose.read_frames`). 그래서 값과 격자를 **같은 봉투에** 넣는다.
+
+    🔴 **모르면 지어내지 않는다.** 합성 키포인트 경로에는 소스 영상이 없어
+    실효 fps가 정의되지 않는다. 그때는 `known: false`를 내고 초를 붙이지
+    않는다 — 그럴듯한 기본값(예전 `fps=12.0`)을 채워 넣는 것이 이 결함이
+    생긴 방식이다.
+
+    🔴 **`features`를 바꾸지 않는다.** 여기서 만든 것은 결과 봉투의 형제
+    블록이라 판정 입력이 그대로다 — 기존 평가(B-2~B-6)와 비교가 끊기지 않는다.
+    """
+    if pose is None:
+        return {
+            "known": False,
+            "why": "합성 키포인트 경로 — 소스 영상이 없어 실효 fps가 정의되지 않는다",
+            "frames": frame_count,
+        }
+
+    sampled_fps = float(pose.sampled_fps)
+    seconds = frame_metrics_as_seconds(features, sampled_fps)
+    return {
+        "known": True,
+        # 원본 fps와 실효 fps는 다르다. 둘 다 적어야 어디서 솎였는지 보인다.
+        "source_fps": round(float(pose.source_fps), 4),
+        "sampled_fps": round(sampled_fps, 4),
+        "target_fps": int(pose.target_fps),
+        # step = 원본 몇 장마다 한 장을 남겼는가. sampled_fps에서 되짚은 값이다.
+        "step": max(1, round(float(pose.source_fps) / sampled_fps)) if sampled_fps else None,
+        "frames": frame_count,
+        "analyzed_seconds": round(frame_count / sampled_fps, 3),
+        # 프레임 단위 지표를 초로. 어느 것이 인덱스이고 어느 것이 길이인지는
+        # features.FRAME_INDEX_METRICS / FRAME_DURATION_METRICS 가 선언한다.
+        "seconds": seconds,
+    }
+
+
+def build_subject(pose: "PoseResult | None", frame_count: int) -> dict:
+    """결과 봉투의 `subject` 블록. 규칙은 `pose.subject_envelope`에 하나만 둔다.
+
+    S3 워커(`scripts/analyze_s3.py`)도 같은 함수를 쓴다 — 두 벌로 두면
+    한쪽에만 필드가 늘어나 경로에 따라 봉투가 달라진다.
+    """
+    from .pose import subject_envelope
+
+    return subject_envelope(pose, frame_count)
+
+
 def run_pipeline(
     keypoints: np.ndarray,
     source: str,
@@ -193,6 +251,10 @@ def run_pipeline(
         "source": source,
         "frames": int(keypoints.shape[0]),
         "features": features,
+        # 프레임 단위 값이 어느 격자 위에 있는지와, 그것이 몇 초인지 (미결 7번 E-3).
+        "timebase": build_timebase(features, int(keypoints.shape[0]), pose),
+        # **누구를** 분석했는지와 어떻게 골랐는지 (미결 18번).
+        "subject": build_subject(pose, int(keypoints.shape[0])),
         # 정지화면은 영상의 poster로 쓴다 — 로딩 전에도 자세가 보인다.
         "preview": impact_preview(frames, keypoints, int(features["impact_frame"])),
         "preview_video": tracked_preview(
@@ -272,11 +334,39 @@ def api_synthetic(rubric: str | None = None, side: str = "auto") -> JSONResponse
     )
 
 
+def parse_subject(box: str | None, at_ms: float | None):
+    """질의 인자를 SubjectRequest로. 규칙은 `pose.parse_subject_spec`가 갖고 있다.
+
+    여기서 하는 일은 **오류를 HTTP 422로 옮기는 것뿐**이다 — 무엇이 올바른
+    지정인가는 CLI와 같아야 한다.
+    """
+    from .pose import parse_subject_spec
+
+    try:
+        return parse_subject_spec(box, at_ms)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
 @app.post("/api/analyze/video")
 async def api_video(
-    file: UploadFile, rubric: str | None = None, side: str = "auto"
+    file: UploadFile,
+    rubric: str | None = None,
+    side: str = "auto",
+    subject_box: str | None = None,
+    subject_at_ms: float | None = None,
 ) -> JSONResponse:
+    """subject_box — 분석할 사람의 **정규화 0~1** 박스 `"x,y,w,h"`.
+    subject_at_ms — 그 박스를 그린 영상 시각(밀리초).
+
+    둘 다 **선택**이다. 없으면 지금까지의 동작 그대로이고 결과가 한 비트도
+    달라지지 않는다 — `side`와 같은 규칙이다. `side`와는 **직교한다**:
+    `side`는 대상을 고른 뒤 그 사람의 어느 팔·발인지고(미결 6번), 이건
+    **누구인지**다.
+    """
     from .pose import extract_keypoints
+
+    subject = parse_subject(subject_box, subject_at_ms)
 
     suffix = Path(file.filename or "clip.mp4").suffix or ".mp4"
     # copyfileobj로 청크 복사한다 — file.read()는 클립 전체를 한 번에 RAM에 올린다.
@@ -287,7 +377,7 @@ async def api_video(
     try:
         # 입력 분포 관측은 extract_keypoints 안에서 일어난다(observe 기본 True).
         # 여기서 따로 기록하면 한 분석이 두 번 남는다.
-        pose = extract_keypoints(tmp_path, rubric_key=rubric)
+        pose = extract_keypoints(tmp_path, rubric_key=rubric, subject=subject)
         # 미리보기 렌더링(= 프레임 재디코딩)이 이 try 안에서 끝나야 한다.
         # finally가 임시 파일을 지우므로 그 뒤에는 프레임을 얻을 수 없다.
         return JSONResponse(
@@ -507,6 +597,15 @@ function render(d){
   // provisional이고, 칭호가 선수 카드에 쓸 산출물이기 때문이다.
   // 개발 확인용으로 접어서 남겨 둔다.
   let h='';
+  // 🔴 프레임 번호만 보여주지 않는다 (미결 7번 E-3). "62프레임"은 사람이 읽을
+  // 수 있는 값이 아니고, 어느 격자인지 모르면 되짚을 수도 없다. 격자를 모르는
+  // 경로(합성)에서는 초를 **지어내지 않고** 프레임만 적는다.
+  const impactAt = () => {
+    const f = d.features.impact_frame;
+    const s = d.timebase && d.timebase.known && d.timebase.seconds
+      ? d.timebase.seconds.impact_frame : null;
+    return s == null ? `${f}프레임` : `${s.toFixed(2)}초 · ${f}프레임`;
+  };
   if(d.preview_video||d.preview){
     // 영상이 있으면 영상, 없으면 임팩트 정지화면으로 떨어진다.
     const media = d.preview_video
@@ -515,7 +614,7 @@ function render(d){
       : `<img src="${d.preview}" alt="임팩트 순간 스켈레톤">`;
     h+=`<div class="card shot">${media}
       <div class="mut">대상 선수를 따라가며 그린 골격입니다.
-        빨간 테두리가 임팩트(${d.features.impact_frame}프레임) —
+        빨간 테두리가 임팩트(${impactAt()}) —
         에이전트가 이 자세를 근거로 채점했습니다.</div>
     </div>`;
   }
