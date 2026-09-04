@@ -20,6 +20,8 @@ def to_team_result(
                 nickname=m.nickname,
                 role=str(m.role),
                 joined_at=m.joined_at,
+                player_card_id=m.player_card_id,
+                card_public_slug=m.card_public_slug,
             )
             for m in members
         ],

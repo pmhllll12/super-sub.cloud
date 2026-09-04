@@ -62,7 +62,35 @@ def to_public(card: CardEntity) -> PublicCardEntity:
         og_image_key=card.og_image_key,
         owner=card.owner,
         titles=list(card.titles),
+        # 공유 링크에도 나간다 — 카드에 크게 박히는 값이라 없으면 남이 보는
+        # 카드만 밋밋해진다.
+        tagline=card.tagline,
     )
+
+
+# 카드에 한 줄로 들어가는 길이. ORM 도 같은 값이다 —
+# **여기가 규칙이고 저쪽은 저장 한계다.**
+MAX_TAGLINE = 20
+
+
+def normalize_tagline(raw: str | None) -> str | None:
+    """사람이 쓴 한 줄을 저장할 모양으로 만든다.
+
+    - 앞뒤 공백을 턴다
+    - **빈 문자열은 `None` 으로** 본다. "지웠다"와 "빈칸을 넣었다"를 나눌 이유가
+      없고, 나누면 화면이 빈 줄을 그리게 된다
+
+    🔴 **길이는 자르지 않고 거부한다.** 조용히 자르면 사람이 쓴 것과 보이는 것이
+    달라지고, 그것을 알아차리는 시점은 카드를 공유한 뒤다.
+    """
+    if raw is None:
+        return None
+    cleaned = raw.strip()
+    if not cleaned:
+        return None
+    if len(cleaned) > MAX_TAGLINE:
+        raise ValueError(f"{MAX_TAGLINE}자를 넘을 수 없다")
+    return cleaned
 
 
 def visible_titles(granted: list[TitleEntity]) -> list[TitleEntity]:

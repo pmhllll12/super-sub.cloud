@@ -143,4 +143,8 @@ class TestOpenApi:
             V1 + "/admin/users/{user_id}",
             f"{V1}/internal/analysis-jobs/claim",
             V1 + "/internal/analysis-jobs/{job_id}",
+            f"{V1}/review-options",
+            V1 + "/matches/{match_id}/reviews",
+            V1 + "/matches/{match_id}/no-shows",
+            f"{V1}/reports",
         }

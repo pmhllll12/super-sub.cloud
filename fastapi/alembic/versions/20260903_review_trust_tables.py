@@ -67,7 +67,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = 'a3d0764cefa5'
-down_revision: Union[str, Sequence[str], None] = None  # 🔴 정어진이 병합할 때 채운다
+down_revision: Union[str, Sequence[str], None] = "d52e8f1a6b34"  # 정어진이 병합하며 이었다 (2026-09-04)
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

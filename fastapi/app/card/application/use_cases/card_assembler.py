@@ -40,6 +40,7 @@ def to_my_card_result(card: CardEntity) -> MyCardResult:
         og_image_key=card.og_image_key,
         user=_owner(card.owner),
         titles=_titles(card.titles),
+        tagline=card.tagline,
     )
 
 
@@ -49,4 +50,5 @@ def to_public_card_result(card: PublicCardEntity) -> PublicCardResult:
         og_image_key=card.og_image_key,
         user=_owner(card.owner),
         titles=_titles(card.titles),
+        tagline=card.tagline,
     )

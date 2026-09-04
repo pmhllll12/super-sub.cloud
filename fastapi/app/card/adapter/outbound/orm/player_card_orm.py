@@ -25,6 +25,10 @@ class PlayerCardOrm(Base):
     # 공개 조회는 이것으로만 받는다. 내부 id 를 밖에 내보내지 않기 위해서다(SFR-009).
     public_slug: Mapped[str] = mapped_column(String(80), nullable=False)
     og_image_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    # 사람이 정하는 한 줄(미결 `paik` 3번). `user.nickname`(이름)과도
+    # `user_title`(분석이 주는 호칭)과도 다른 값이다 — 이것만 사람이 고른다.
+    # 🔴 부록 D 에 없는 컬럼이다(2026-09-04 에 늘렸다). ERD 갱신은 미결 항목.
+    tagline: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     __table_args__ = (
         # 부록 D.7 — 사용자당 카드 1건, 슬러그 중복 방지.

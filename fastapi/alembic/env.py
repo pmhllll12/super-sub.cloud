@@ -53,6 +53,11 @@ from app.match.adapter.outbound.orm import (  # noqa: E402,F401
     match_application_orm,
 )
 from app.match.adapter.outbound.orm import match_orm  # noqa: E402,F401
+from app.review.adapter.outbound.orm import no_show_orm  # noqa: E402,F401
+from app.review.adapter.outbound.orm import report_orm  # noqa: E402,F401
+from app.review.adapter.outbound.orm import review_option_orm  # noqa: E402,F401
+from app.review.adapter.outbound.orm import review_orm  # noqa: E402,F401
+from app.review.adapter.outbound.orm import review_selection_orm  # noqa: E402,F401
 from app.match.adapter.outbound.orm import (  # noqa: E402,F401
     match_position_need_orm,
 )

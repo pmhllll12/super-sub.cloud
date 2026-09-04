@@ -183,3 +183,59 @@ class TestMembershipInDb:
             headers=headers,
         )
         assert db_client.get(f"{V1}/me", headers=headers).json()["teams"] == []
+
+
+class TestMemberCardReference:
+    """구성원 목록이 **실제 `player_card` 를 조인해서** 카드를 가리키는가.
+
+    스텁은 딕셔너리로 흉내 내므로 조인이 맞는지 못 본다. 여기가 방어선이다 —
+    🔴 `player_card` 는 `card` 컨텍스트라 원시 쿼리로 읽는다. **저쪽 컬럼
+    이름이 바뀌면 파이썬이 안 잡아 준다.**
+    """
+
+    def test_카드를_만들면_구성원_목록에_실린다(self, db_client, db_session, people):
+        owner = people["owner"]
+        team = _create(db_client, people)
+        url = f"{V1}/teams/{team['id']}"
+
+        # 카드가 없는 동안은 둘 다 null 이어야 한다.
+        before = db_client.get(url, headers=owner["headers"]).json()["members"][0]
+        assert before["player_card_id"] is None
+        assert before["card_public_slug"] is None
+
+        created = db_client.post(f"{V1}/me/card", headers=owner["headers"])
+        assert created.status_code in (200, 201), created.text
+        slug = created.json()["public_slug"]
+
+        after = db_client.get(url, headers=owner["headers"]).json()["members"][0]
+        assert after["card_public_slug"] == slug
+        assert after["player_card_id"] is not None
+
+        # 🔴 등재에 쓸 값이 실제 `player_card.id` 와 같아야 한다 — 다르면
+        #    스쿼드 등재가 외래키에서 거부된다.
+        real_id = db_session.execute(
+            text("select id from player_card where user_id = :u"),
+            {"u": owner["id"]},
+        ).scalar_one()
+        assert after["player_card_id"] == str(real_id)
+
+    def test_카드가_없는_구성원도_목록에_남는다(self, db_client, db_session, people):
+        """🔴 안쪽 조인이면 여기서 사라진다. 팀에는 여전히 있는 사람이다."""
+        owner, member = people["owner"], people["member"]
+        team = _create(db_client, people)
+        db_client.post(
+            f"{V1}/teams/{team['id']}/members",
+            json={"user_id": str(member["id"])},
+            headers=owner["headers"],
+        )
+        db_client.post(f"{V1}/me/card", headers=owner["headers"])
+
+        members = db_client.get(
+            f"{V1}/teams/{team['id']}", headers=owner["headers"]
+        ).json()["members"]
+        by_user = {m["user_id"]: m for m in members}
+
+        assert len(by_user) == 2, "카드 없는 구성원이 조인에서 빠졌다"
+        assert by_user[str(owner["id"])]["player_card_id"] is not None
+        assert by_user[str(member["id"])]["player_card_id"] is None
+
