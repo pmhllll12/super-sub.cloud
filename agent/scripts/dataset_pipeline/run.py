@@ -196,6 +196,8 @@ def main() -> None:
     ap.add_argument("--side", default="auto", choices=("auto", "left", "right"))
     ap.add_argument("--split", default=None, help="출처의 분할 (soccer/baseball)")
     ap.add_argument("--event", default=None, help="이벤트/라벨로 거른다")
+    ap.add_argument("--local-dir", default=None,
+                    help="이미 가진 폴더를 쓴다 (내려받지 않는다). 종목보다 우선한다")
     args = ap.parse_args()
 
     settings = config.Settings(
@@ -210,7 +212,13 @@ def main() -> None:
         kw["split"] = args.split
     if args.event:
         kw["event" if args.sport == "soccer" else "label"] = args.event
-    source = sources.get_source(args.sport, **kw)
+    if args.local_dir:
+        # 로컬 폴더에는 split·event 개념이 없다. 조용히 무시하지 않고 막는다.
+        if kw:
+            raise SystemExit("--local-dir 에는 --split/--event 를 함께 쓸 수 없다")
+        source = sources.get_source(args.sport, local_dir=args.local_dir)
+    else:
+        source = sources.get_source(args.sport, **kw)
 
     print(f"저장 위치: {config.root()}  (명세의 {config.DEFAULT_ROOT})")
     print(f"출처: {type(source).__name__}")

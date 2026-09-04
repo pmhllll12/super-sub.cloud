@@ -47,6 +47,26 @@ Ball out of play), 야구 12,965건(Called Strike 8,240 · Ball 4,725).
 여기 결과는 **다른 모집단의 새 측정**이다. 그래서 산출물이
 `<root>/<종목>/results/` 에 따로 쌓이고 `agent/eval/` 로 들어가지 않는다.
 
+## 🔴 먼저 이것부터 — 이미 가진 클립이 세 후보보다 낫다
+
+```bash
+uv run python -m scripts.dataset_pipeline.run --sport soccer \
+  --rubric rubrics/football_instep_shot.yaml \
+  --local-dir data/goldenset/soccerkicks_video --batch-size 19 --batches 1
+```
+
+2026-09-04 실행: **19건 중 18건 성공**(315초). 1건은 품질 게이트가 "임팩트 추정
+프레임(0)이 구간 경계"로 정확하게 반려했다. **공이 15/18에서 검출**됐다.
+
+| 가진 것 | 해상도 · fps |
+|---|---|
+| `data/goldenset/soccerkicks_video` 19건 | 522×358 ~ **1280×720**, 24~30fps |
+| `data/bball_shot.mp4` · `bball_layup_trim.mp4` | **1920×1080**, 24fps |
+| `data/baseball_pitch_trim.mp4` | **2160×3840**, 25fps |
+
+전부 **단독 선수 · 단일 동작**이고 게이트도 대용량 다운로드도 필요 없다.
+`--local-dir` 은 어느 종목에서나 쓸 수 있다.
+
 ## 저장 위치
 
 명세의 `D:/sports_dataset` 을 지금 OS에 맞게 번역한다 — 이 기계는 WSL2라

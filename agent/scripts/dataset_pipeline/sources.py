@@ -270,7 +270,55 @@ class PLNBALocal:
         return dest
 
 
-def get_source(sport: str, **kw) -> Source:
+class LocalFolder:
+    """이미 가진 폴더를 그대로 카탈로그로 쓴다.
+
+    🔴 **먼저 이것부터 보라.** 2026-09-04에 세 공개 데이터셋을 뒤지고 나서
+    확인한 것인데, **저장소가 이미 들고 있는 클립이 후보들보다 낫다.**
+
+    | 가진 것 | 해상도 · fps | 후보 |
+    |---|---|---|
+    | `data/goldenset/soccerkicks_video` 19건 | 522×358 \~ **1280×720**, 24\~30fps | UCF101 축구 320×240 |
+    | `data/bball_shot.mp4` · `bball_layup_trim.mp4` | **1920×1080**, 24fps | SpaceJam **171×128 · 16프레임** |
+    | `data/baseball_pitch_trim.mp4` | **2160×3840**, 25fps | Roboflow 포즈 = **정지 이미지** |
+
+    전부 **단독 선수 · 단일 동작**이라 방송 이벤트 클립의 문제(여러 선수 · 컷
+    전환)가 없다. 게이트도 28GB 다운로드도 바이두넷디스크도 필요 없다.
+
+    ⚠️ 그래도 **자세 정답은 없다.** 축구 킥의 `contact_frame` 은 공-발목
+    최근접에서 자동 도출한 참조이고 ±2프레임 불확실성을 갖는다(미결 5번 정정).
+    """
+
+    key = "local"
+    SUFFIXES = (".mp4", ".avi", ".mkv", ".mov", ".webm")
+
+    def __init__(self, path: str | Path, sport: str = "soccer") -> None:
+        self.folder = Path(path)
+        self.key = sport
+
+    def catalog(self) -> list[ClipRef]:
+        if not self.folder.exists():
+            raise SystemExit(f"폴더가 없다: {self.folder}")
+        files = sorted(p for p in self.folder.rglob("*")
+                       if p.suffix.lower() in self.SUFFIXES)
+        if not files:
+            raise SystemExit(f"영상이 없다: {self.folder}")
+        return [ClipRef(clip_id=p.stem, remote=str(p), label=p.parent.name)
+                for p in files]
+
+    def fetch(self, clip: ClipRef, dest_dir: Path) -> Path:
+        # 🔴 원본을 옮기지 않고 복사한다 — 배치 정리(delete/s3)가 원본을
+        # 지우면 저장소의 자산이 사라진다.
+        dest = dest_dir / config.safe_name(
+            clip.clip_id, Path(clip.remote).suffix or ".mp4")
+        dest.write_bytes(Path(clip.remote).read_bytes())
+        return dest
+
+
+def get_source(sport: str, local_dir: str | None = None, **kw) -> Source:
+    # 로컬 폴더가 주어지면 그것이 이긴다 — 종목과 무관하게 쓴다.
+    if local_dir:
+        return LocalFolder(local_dir, sport=sport)
     if sport == "soccer":
         return SoccerNet10s(**kw)
     if sport == "baseball":
