@@ -17,6 +17,7 @@
 | `POST`·`GET /matches/{id}/applications` · `POST .../accept` · `DELETE .../{application_id}` | **실제 DB** (2026-09-02 추가 · 무르기·거절은 2026-09-04, 3-5절) |
 | `GET /admin/users` · `GET /admin/users/{id}` · `DELETE /admin/users/{id}` | **실제 DB** (2026-08-31 추가, 3-2절) |
 | `POST /internal/analysis-jobs/claim` · `PATCH /internal/analysis-jobs/{id}` | **실제 DB** (2026-09-04 추가 — **워커 전용**, 3-8절) |
+| `GET /review-options` · `POST /matches/{id}/reviews` · `POST /matches/{id}/no-shows` · `POST /reports` | **실제 DB** (2026-09-04 추가, 3-9절) |
 
 ## 눌러볼 수 있는 값
 
@@ -1524,6 +1525,100 @@ RAM 이 터지는 것 — 미결 `ho` 9번)이 큐를 영원히 돌게 된다. �
 
 ⚠️ 별도 스케줄러를 두지 않았다. 회수가 필요한 시점은 정확히 "누군가 일을 달라고
 할 때"이고, 타이머를 새로 만들면 **그 타이머가 살아 있는지를 또 확인해야 한다.**
+
+---
+
+## 3-9. 평가·신뢰 (2026-09-04 추가)
+
+부록 D 도메인 ⑤. SFR-008. 스키마는 박민호가 09-03 에 냈고(`2649dd9`) 응용 계층은
+정어진이 09-04 에 썼다.
+
+### 🔴 설계가 강제하는 것 셋
+
+| | |
+|---|---|
+| **평가는 선택형이다**(3.4) | `review` 에 총점·별점이 없다. 고른 것이 `review_selection` 에 **행으로** 남는다. 나쁜 평가 하나가 줄 수 있는 피해에 상한을 두기 위해서다 |
+| **신뢰도는 저장하지 않는다**(D.4) | 집계로 나오는 파생값이다. **소급 생성이 불가능한 것은 원자료뿐**이라 평가자·시점·선택 결과만 남긴다 |
+| **제재는 평가와 분리한다**(3.5) | `report`·`no_show` 는 `review` 와 이어지지 않는다. **평가를 안 해도 신고할 수 있다** |
+
+### 정한 것 (2026-09-04, 정어진)
+
+패킷 B 문서가 「정해야 할 것」으로 남겨 둔 셋이다. 🔴 **PM 판단이 다르면
+`app/review/domain/rules/review_rules.py` 만 고치면 된다** — 숫자와 권한이 전부
+거기 모여 있다.
+
+| 무엇 | 정한 값 | 왜 |
+|---|---|---|
+| **평가 가능 기간** | 경기 후 **14일** | 용병 경기는 주말에 몰린다. 7일이면 토요일 경기를 다음 주말에 여는 사람이 놓친다. 무기한은 **기억이 흐려진 평가**를 받는데 그건 신뢰도 원자료의 질을 떨어뜨린다 |
+| **불참 기록 권한** | **주최 팀 주장만** | 제재 기록이라 만들 수 있는 사람을 좁힌다. 누구나 붙이면 사이가 틀어진 상대에게 서로 붙일 수 있고, **스키마에 기록자 컬럼이 없어** 누가 붙였는지도 못 따진다 |
+| **선택지 노출 순서** | `sort_order` 컬럼 | `ORDER BY category` 는 「주의」가 맨 앞에 온다. 코드에 순서를 박으면 마이그레이션과 두 곳이 된다. 🔴 **부록 D 에 없는 컬럼이라 ERD 갱신이 필요하다** |
+
+### `GET /api/v1/review-options`
+
+인증 필요. 선택지 전부.
+
+```json
+[{"code": "manner_time", "category": "manner", "label": "시간을 잘 지켰다"}, …]
+```
+
+🔴 **배열의 순서가 화면 노출 순서다**(매너 · 실력 · 재매칭 · 주의).
+`category` 로 묶어 그리되 **순서는 서버가 준 것을 그대로** 쓸 것 — 알파벳순으로
+정렬하면 `caution` 이 맨 앞에 온다.
+
+### `POST /api/v1/matches/{match_id}/reviews`
+
+```json
+{"reviewee_id": "…", "option_codes": ["manner_time", "skill_teamplay"]}
+```
+
+`201` — `{id, match_id, reviewer_id, reviewee_id, submitted_at, selected_codes}`.
+**점수 필드가 없다.**
+
+| 에러 | code |
+|---|---|
+| 403 | `FORBIDDEN` — 내가 이 경기의 **확정** 참가자가 아니다 |
+| 404 | `MATCH_NOT_FOUND` |
+| 409 | `ALREADY_REVIEWED` — 경기당 1회 (**DB 유일 제약**, 부록 D.7) |
+| 422 | `MATCH_NOT_PLAYED` · `REVIEW_WINDOW_CLOSED` · `SELF_REVIEW` · `NOT_A_PARTICIPANT` · `UNKNOWN_OPTION` · `NO_OPTION_SELECTED` |
+
+⚠️ **「아직 안 끝났다」와 「기간이 지났다」를 가른다.** 화면이 다르게 안내해야 한다.
+
+**확정된 참가자끼리만** 평가한다 — `match_application` 의 두 수락 시각이 다 찬
+행이다(부록 D.5). 서로 평가하는 것은 둘 다 된다(유일 제약이 방향까지 본다).
+
+### `POST /api/v1/matches/{match_id}/no-shows`
+
+```json
+{"user_id": "…"}
+```
+
+`201`. 🔴 **주최 팀 주장만.**
+
+| 에러 | code |
+|---|---|
+| 403 | `FORBIDDEN` — 주장이 아니다 |
+| 409 | `ALREADY_RECORDED` — 경기당 1인 1건 (DB 제약) |
+| 422 | `MATCH_NOT_PLAYED` · `NOT_A_PARTICIPANT` |
+
+### `POST /api/v1/reports`
+
+```json
+{"target_user_id": "…", "reason": "자유 텍스트"}
+```
+
+`201` — `{id, target_user_id, created_at}`.
+
+⚠️ **신고 내용을 되돌려주지 않는다.** 신고자에게도 사본을 주면 그 응답이 떠돌고,
+대상에게는 더더욱 보이면 안 된다.
+
+**중복을 막지 않는다** — 같은 사람을 여러 번 신고할 수 있다. 그리고 **평가와
+무관하다**: 참가자가 아니어도 신고할 수 있다.
+
+### 아직 없는 것
+
+- **신고 처리** — 접수만 한다. 관리자 화면이 생기면 붙인다
+- **평가 조회** — 내가 받은 평가를 보는 경로. 신뢰도 표시 화면이 정해지면 낸다
+- **불참 취소** — 잘못 기록한 것을 무르는 경로
 
 ---
 

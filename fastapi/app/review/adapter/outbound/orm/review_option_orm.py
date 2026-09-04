@@ -8,15 +8,15 @@
 값은 마이그레이션(`20260903_review_trust_tables`)이 넣는다. **초기 9개가 곧 평가
 화면의 내용 전부다.**
 
-🔴 **노출 순서를 담을 컬럼이 없다.** 마이그레이션 docstring 이 "순서가 화면 노출
-순서다"라고 적었지만 SQL 은 `ORDER BY` 없이 순서를 보장하지 않는다 — 실제로 `label`
-하나를 고치자 그 행이 맨 끝으로 갔다(2026-09-04 확인). 어떻게 할지는 미결 `min`
-2번 회신의 (2)번이 답을 기다리고 있다.
+🔴 **`sort_order` 는 부록 D 에 없는 컬럼이다**(2026-09-04 에 늘렸다 —
+`20260904_review_option_sort_order`). 원래 마이그레이션이 "순서가 화면 노출
+순서다"라고 적었는데 담을 자리가 없었고, SQL 은 `ORDER BY` 없이 행 순서를 보장하지
+않는다. ERD 갱신은 미결 항목으로 올렸다.
 """
 
 from __future__ import annotations
 
-from sqlalchemy import String
+from sqlalchemy import Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -29,3 +29,5 @@ class ReviewOptionOrm(Base):
     # manner · skill · repeat · caution. 화면이 이 값으로 묶어 보여 준다.
     category: Mapped[str] = mapped_column(String(20), nullable=False)
     label: Mapped[str] = mapped_column(String(60), nullable=False)
+    # 작을수록 앞. 10 씩 띄워 두어 사이에 끼울 수 있다.
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False)
