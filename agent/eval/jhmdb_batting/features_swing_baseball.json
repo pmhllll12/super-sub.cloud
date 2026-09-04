@@ -1,0 +1,820 @@
+{
+ "source": "JHMDB joint_positions (CC BY 4.0) — 사람이 붙인 15관절",
+ "action": "swing_baseball",
+ "rubric": "rubrics/baseball_batting.yaml",
+ "swing_side": "auto",
+ "caveat": [
+  "가림 정보가 없어 신뢰도를 1.0으로 채웠다 — 품질 게이트가 걸리지 않는다. 영상 경로의 features_ok 와 같은 뜻이 아니다",
+  "원본 fps 가 없어 프레임을 초로 환산하지 않는다 (미결 7번 E-3)",
+  "공 궤적이 없어 도구 의존 지표는 산출되지 않는다",
+  "정답은 관절이지 자세 등급이 아니다 — 정확도가 아니라 측정이다"
+ ],
+ "counted": {
+  "clips": 54,
+  "ok": 46
+ },
+ "records": [
+  {
+   "clip": "8YearOldHitsaHomeRunBaseball_swing_baseball_f_cm_np1_fr_bad_0",
+   "frames": 31,
+   "features": {
+    "plant_knee_angle_at_impact": 174.8,
+    "swing_knee_angle_at_impact": 178.3,
+    "trunk_forward_lean_deg_at_impact": 26.5,
+    "hip_rotation_range_deg": 51.1,
+    "swing_hip_flexion_after_impact_deg": 13.7,
+    "follow_through_duration_frames": 1,
+    "impact_frame": 19,
+    "swing_elbow_angle_at_impact": 136.3,
+    "support_elbow_angle_at_impact": 163.5,
+    "swing_shoulder_flexion_after_impact_deg": 83.0
+   }
+  },
+  {
+   "clip": "BaseballSwingAnalysis_swing_baseball_f_nm_np1_fr_med_11",
+   "frames": 30,
+   "features": {
+    "plant_knee_angle_at_impact": 130.8,
+    "swing_knee_angle_at_impact": 119.3,
+    "trunk_forward_lean_deg_at_impact": 10.8,
+    "hip_rotation_range_deg": 15.4,
+    "swing_hip_flexion_after_impact_deg": 5.8,
+    "follow_through_duration_frames": 12,
+    "impact_frame": 17,
+    "hip_shoulder_separation_deg": 15.4,
+    "swing_elbow_angle_at_impact": 144.7,
+    "support_elbow_angle_at_impact": 11.5,
+    "swing_shoulder_flexion_after_impact_deg": 37.7
+   }
+  },
+  {
+   "clip": "BaseballSwingAnalysis_swing_baseball_f_nm_np1_fr_med_12",
+   "frames": 30,
+   "features": {
+    "plant_knee_angle_at_impact": 113.9,
+    "swing_knee_angle_at_impact": 136.8,
+    "trunk_forward_lean_deg_at_impact": 7.8,
+    "hip_rotation_range_deg": 24.4,
+    "swing_hip_flexion_after_impact_deg": 45.1,
+    "follow_through_duration_frames": 4,
+    "impact_frame": 16,
+    "hip_shoulder_separation_deg": 8.5,
+    "swing_elbow_angle_at_impact": 104.6,
+    "support_elbow_angle_at_impact": 129.3,
+    "swing_shoulder_flexion_after_impact_deg": 80.8
+   }
+  },
+  {
+   "clip": "BaseballSwingAnalysis_swing_baseball_f_nm_np1_fr_med_8",
+   "frames": 30,
+   "features": {
+    "plant_knee_angle_at_impact": 146.8,
+    "swing_knee_angle_at_impact": 179.2,
+    "trunk_forward_lean_deg_at_impact": 9.8,
+    "hip_rotation_range_deg": 11.4,
+    "swing_hip_flexion_after_impact_deg": 0.0,
+    "follow_through_duration_frames": 1,
+    "impact_frame": 14,
+    "hip_shoulder_separation_deg": 11.5,
+    "swing_elbow_angle_at_impact": 137.2,
+    "support_elbow_angle_at_impact": 167.7,
+    "swing_shoulder_flexion_after_impact_deg": 47.3
+   }
+  },
+  {
+   "clip": "BaseballSwingAnalysis_swing_baseball_f_nm_np1_fr_med_9",
+   "skipped": "입력 품질 미달: 임팩트 추정 프레임(29)이 분석 가능 구간(0~29) 경계에 있음. 동작 전후가 잘린 영상으로 보인다."
+  },
+  {
+   "clip": "BaseballSwingAnalysis_swing_baseball_u_nm_np1_ba_med_0",
+   "frames": 30,
+   "features": {
+    "plant_knee_angle_at_impact": 170.5,
+    "swing_knee_angle_at_impact": 164.2,
+    "trunk_forward_lean_deg_at_impact": 19.6,
+    "hip_rotation_range_deg": 38.7,
+    "swing_hip_flexion_after_impact_deg": 3.5,
+    "follow_through_duration_frames": 9,
+    "impact_frame": 20,
+    "hip_shoulder_separation_deg": 76.9,
+    "swing_elbow_angle_at_impact": 143.1,
+    "support_elbow_angle_at_impact": 161.9,
+    "swing_shoulder_flexion_after_impact_deg": 33.9
+   }
+  },
+  {
+   "clip": "BaseballSwingAnalysis_swing_baseball_u_nm_np1_ba_med_1",
+   "frames": 30,
+   "features": {
+    "plant_knee_angle_at_impact": 159.5,
+    "swing_knee_angle_at_impact": 159.4,
+    "trunk_forward_lean_deg_at_impact": -11.2,
+    "hip_rotation_range_deg": 43.9,
+    "swing_hip_flexion_after_impact_deg": 0.1,
+    "follow_through_duration_frames": 5,
+    "impact_frame": 24,
+    "hip_shoulder_separation_deg": 80.8,
+    "swing_elbow_angle_at_impact": 58.8,
+    "support_elbow_angle_at_impact": 125.1,
+    "swing_shoulder_flexion_after_impact_deg": 0.0
+   }
+  },
+  {
+   "clip": "BaseballSwingAnalysis_swing_baseball_u_nm_np1_ba_med_2",
+   "frames": 30,
+   "features": {
+    "plant_knee_angle_at_impact": 158.0,
+    "swing_knee_angle_at_impact": 162.0,
+    "trunk_forward_lean_deg_at_impact": 13.7,
+    "hip_rotation_range_deg": 7.3,
+    "swing_hip_flexion_after_impact_deg": 26.7,
+    "follow_through_duration_frames": 7,
+    "impact_frame": 22,
+    "hip_shoulder_separation_deg": 50.5,
+    "swing_elbow_angle_at_impact": 172.1,
+    "support_elbow_angle_at_impact": 75.2,
+    "swing_shoulder_flexion_after_impact_deg": 7.2
+   }
+  },
+  {
+   "clip": "BaseballSwingAnalysis_swing_baseball_u_nm_np1_ba_med_3",
+   "frames": 30,
+   "features": {
+    "plant_knee_angle_at_impact": 150.8,
+    "swing_knee_angle_at_impact": 148.3,
+    "trunk_forward_lean_deg_at_impact": 18.4,
+    "hip_rotation_range_deg": 42.3,
+    "swing_hip_flexion_after_impact_deg": 7.8,
+    "follow_through_duration_frames": 6,
+    "impact_frame": 23,
+    "hip_shoulder_separation_deg": 75.7,
+    "swing_elbow_angle_at_impact": 117.7,
+    "support_elbow_angle_at_impact": 74.8,
+    "swing_shoulder_flexion_after_impact_deg": 50.2
+   }
+  },
+  {
+   "clip": "BaseballSwingAnalysis_swing_baseball_u_nm_np1_ba_med_4",
+   "frames": 30,
+   "features": {
+    "plant_knee_angle_at_impact": 119.7,
+    "swing_knee_angle_at_impact": 125.3,
+    "trunk_forward_lean_deg_at_impact": 20.4,
+    "hip_rotation_range_deg": 13.1,
+    "swing_hip_flexion_after_impact_deg": 17.4,
+    "follow_through_duration_frames": 5,
+    "impact_frame": 19,
+    "hip_shoulder_separation_deg": 53.2,
+    "swing_elbow_angle_at_impact": 153.0,
+    "support_elbow_angle_at_impact": 168.6,
+    "swing_shoulder_flexion_after_impact_deg": 8.3
+   }
+  },
+  {
+   "clip": "BaseballSwingAnalysis_swing_baseball_u_nm_np1_fr_med_10",
+   "frames": 30,
+   "features": {
+    "plant_knee_angle_at_impact": 171.6,
+    "swing_knee_angle_at_impact": 168.0,
+    "trunk_forward_lean_deg_at_impact": 13.8,
+    "hip_rotation_range_deg": 15.9,
+    "swing_hip_flexion_after_impact_deg": 3.6,
+    "follow_through_duration_frames": 1,
+    "impact_frame": 13,
+    "hip_shoulder_separation_deg": 31.4,
+    "swing_elbow_angle_at_impact": 144.4,
+    "support_elbow_angle_at_impact": 175.2,
+    "swing_shoulder_flexion_after_impact_deg": 41.9
+   }
+  },
+  {
+   "clip": "BaseballSwingAnalysis_swing_baseball_u_nm_np1_fr_med_13",
+   "frames": 30,
+   "features": {
+    "plant_knee_angle_at_impact": 160.8,
+    "swing_knee_angle_at_impact": 161.4,
+    "trunk_forward_lean_deg_at_impact": 5.3,
+    "hip_rotation_range_deg": 4.0,
+    "swing_hip_flexion_after_impact_deg": 11.7,
+    "follow_through_duration_frames": 8,
+    "impact_frame": 14,
+    "hip_shoulder_separation_deg": 17.3,
+    "swing_elbow_angle_at_impact": 92.6,
+    "support_elbow_angle_at_impact": 155.0,
+    "swing_shoulder_flexion_after_impact_deg": 14.8
+   }
+  },
+  {
+   "clip": "Faith_Rewarded_swing_baseball_f_cm_np1_ba_bad_11",
+   "skipped": "입력 품질 미달: 임팩트 추정 프레임(25)이 분석 가능 구간(0~25) 경계에 있음. 동작 전후가 잘린 영상으로 보인다."
+  },
+  {
+   "clip": "Faith_Rewarded_swing_baseball_f_nm_np0_fr_bad_67",
+   "frames": 25,
+   "features": {
+    "plant_knee_angle_at_impact": 166.0,
+    "swing_knee_angle_at_impact": 126.6,
+    "trunk_forward_lean_deg_at_impact": 1.5,
+    "hip_rotation_range_deg": 27.2,
+    "swing_hip_flexion_after_impact_deg": 12.1,
+    "follow_through_duration_frames": 1,
+    "impact_frame": 10,
+    "hip_shoulder_separation_deg": 29.4,
+    "swing_elbow_angle_at_impact": 150.4,
+    "support_elbow_angle_at_impact": 68.9,
+    "swing_shoulder_flexion_after_impact_deg": 36.3
+   }
+  },
+  {
+   "clip": "Faith_Rewarded_swing_baseball_f_nm_np1_ba_bad_22",
+   "skipped": "입력 품질 미달: 임팩트 추정 프레임(19)이 분석 가능 구간(0~19) 경계에 있음. 동작 전후가 잘린 영상으로 보인다."
+  },
+  {
+   "clip": "Faith_Rewarded_swing_baseball_f_nm_np1_ba_med_23",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 173.2,
+    "swing_knee_angle_at_impact": 151.0,
+    "trunk_forward_lean_deg_at_impact": -4.3,
+    "hip_rotation_range_deg": 16.7,
+    "swing_hip_flexion_after_impact_deg": 0.0,
+    "follow_through_duration_frames": 1,
+    "impact_frame": 22,
+    "hip_shoulder_separation_deg": 54.0,
+    "swing_elbow_angle_at_impact": 163.9,
+    "support_elbow_angle_at_impact": 133.5,
+    "swing_shoulder_flexion_after_impact_deg": 0.0
+   }
+  },
+  {
+   "clip": "Faith_Rewarded_swing_baseball_f_nm_np1_fr_bad_26",
+   "frames": 17,
+   "features": {
+    "plant_knee_angle_at_impact": 131.9,
+    "swing_knee_angle_at_impact": 171.1,
+    "trunk_forward_lean_deg_at_impact": -8.9,
+    "hip_rotation_range_deg": 13.9,
+    "swing_hip_flexion_after_impact_deg": 1.4,
+    "follow_through_duration_frames": 2,
+    "impact_frame": 14,
+    "hip_shoulder_separation_deg": 15.3,
+    "swing_elbow_angle_at_impact": 115.0,
+    "support_elbow_angle_at_impact": 93.5,
+    "swing_shoulder_flexion_after_impact_deg": 0.0
+   }
+  },
+  {
+   "clip": "Faith_Rewarded_swing_baseball_f_nm_np1_fr_bad_72",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 157.9,
+    "swing_knee_angle_at_impact": 137.6,
+    "trunk_forward_lean_deg_at_impact": -0.3,
+    "hip_rotation_range_deg": 15.1,
+    "swing_hip_flexion_after_impact_deg": 27.3,
+    "follow_through_duration_frames": 1,
+    "impact_frame": 11,
+    "hip_shoulder_separation_deg": 20.7,
+    "swing_elbow_angle_at_impact": 6.8,
+    "support_elbow_angle_at_impact": 135.1,
+    "swing_shoulder_flexion_after_impact_deg": 173.8
+   }
+  },
+  {
+   "clip": "Faith_Rewarded_swing_baseball_f_nm_np1_fr_med_75",
+   "frames": 25,
+   "features": {
+    "plant_knee_angle_at_impact": 119.4,
+    "swing_knee_angle_at_impact": 154.7,
+    "trunk_forward_lean_deg_at_impact": -3.3,
+    "hip_rotation_range_deg": 27.4,
+    "swing_hip_flexion_after_impact_deg": 38.7,
+    "follow_through_duration_frames": 3,
+    "impact_frame": 8,
+    "swing_elbow_angle_at_impact": 70.1,
+    "support_elbow_angle_at_impact": 141.8,
+    "swing_shoulder_flexion_after_impact_deg": 171.8
+   }
+  },
+  {
+   "clip": "HittingaSingle_swing_baseball_f_cm_np1_fr_med_0",
+   "frames": 17,
+   "features": {
+    "plant_knee_angle_at_impact": 150.9,
+    "swing_knee_angle_at_impact": 118.8,
+    "trunk_forward_lean_deg_at_impact": 5.3,
+    "hip_rotation_range_deg": 4.2,
+    "swing_hip_flexion_after_impact_deg": 0.0,
+    "follow_through_duration_frames": 1,
+    "impact_frame": 3,
+    "hip_shoulder_separation_deg": 13.2,
+    "swing_elbow_angle_at_impact": 39.7,
+    "support_elbow_angle_at_impact": 110.5,
+    "swing_shoulder_flexion_after_impact_deg": 119.4
+   }
+  },
+  {
+   "clip": "Hittingadouble(BXbaseball)_swing_baseball_f_nm_np1_ba_bad_0",
+   "skipped": "입력 품질 미달: 임팩트 추정 프레임(28)이 분석 가능 구간(0~29) 경계에 있음. 동작 전후가 잘린 영상으로 보인다."
+  },
+  {
+   "clip": "HowtoswingaBaseballbat_swing_baseball_f_nm_np1_le_bad_0",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 158.4,
+    "swing_knee_angle_at_impact": 138.3,
+    "trunk_forward_lean_deg_at_impact": -15.9,
+    "hip_rotation_range_deg": 10.9,
+    "swing_hip_flexion_after_impact_deg": 32.3,
+    "follow_through_duration_frames": 1,
+    "impact_frame": 13,
+    "swing_elbow_angle_at_impact": 17.7,
+    "support_elbow_angle_at_impact": 162.9,
+    "swing_shoulder_flexion_after_impact_deg": 0.0
+   }
+  },
+  {
+   "clip": "Tannerafterwecorrected_swing_baseball_f_cm_np1_fr_bad_0",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 164.9,
+    "swing_knee_angle_at_impact": 106.6,
+    "trunk_forward_lean_deg_at_impact": -11.3,
+    "hip_rotation_range_deg": 24.1,
+    "swing_hip_flexion_after_impact_deg": 7.2,
+    "follow_through_duration_frames": 1,
+    "impact_frame": 18,
+    "hip_shoulder_separation_deg": 6.4,
+    "swing_elbow_angle_at_impact": 103.1,
+    "support_elbow_angle_at_impact": 137.4,
+    "swing_shoulder_flexion_after_impact_deg": 170.3
+   }
+  },
+  {
+   "clip": "Tannerafterwecorrected_swing_baseball_f_cm_np1_fr_bad_1",
+   "frames": 30,
+   "features": {
+    "plant_knee_angle_at_impact": 114.6,
+    "swing_knee_angle_at_impact": 170.1,
+    "trunk_forward_lean_deg_at_impact": -6.6,
+    "hip_rotation_range_deg": 11.9,
+    "swing_hip_flexion_after_impact_deg": 25.8,
+    "follow_through_duration_frames": 5,
+    "impact_frame": 15,
+    "hip_shoulder_separation_deg": 18.4,
+    "swing_elbow_angle_at_impact": 79.4,
+    "support_elbow_angle_at_impact": 130.8,
+    "swing_shoulder_flexion_after_impact_deg": 174.3
+   }
+  },
+  {
+   "clip": "Tannerafterwecorrected_swing_baseball_f_cm_np1_fr_bad_2",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 101.2,
+    "swing_knee_angle_at_impact": 171.3,
+    "trunk_forward_lean_deg_at_impact": -4.7,
+    "hip_rotation_range_deg": 12.9,
+    "swing_hip_flexion_after_impact_deg": 26.8,
+    "follow_through_duration_frames": 3,
+    "impact_frame": 20,
+    "hip_shoulder_separation_deg": 15.7,
+    "swing_elbow_angle_at_impact": 142.4,
+    "support_elbow_angle_at_impact": 98.3,
+    "swing_shoulder_flexion_after_impact_deg": 24.9
+   }
+  },
+  {
+   "clip": "hittingofftee2_swing_baseball_f_nm_np1_fr_med_0",
+   "skipped": "입력 품질 미달: 임팩트 추정 프레임(39)이 분석 가능 구간(0~39) 경계에 있음. 동작 전후가 잘린 영상으로 보인다."
+  },
+  {
+   "clip": "hittingofftee2_swing_baseball_f_nm_np1_fr_med_1",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 112.1,
+    "swing_knee_angle_at_impact": 170.9,
+    "trunk_forward_lean_deg_at_impact": 23.7,
+    "hip_rotation_range_deg": 32.8,
+    "swing_hip_flexion_after_impact_deg": 0.0,
+    "follow_through_duration_frames": 2,
+    "impact_frame": 36,
+    "hip_shoulder_separation_deg": 69.3,
+    "swing_elbow_angle_at_impact": 150.5,
+    "support_elbow_angle_at_impact": 88.5,
+    "swing_shoulder_flexion_after_impact_deg": 19.5
+   }
+  },
+  {
+   "clip": "hittingofftee2_swing_baseball_f_nm_np1_fr_med_10",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 96.1,
+    "swing_knee_angle_at_impact": 164.3,
+    "trunk_forward_lean_deg_at_impact": 9.3,
+    "hip_rotation_range_deg": 31.6,
+    "swing_hip_flexion_after_impact_deg": 21.2,
+    "follow_through_duration_frames": 1,
+    "impact_frame": 33,
+    "hip_shoulder_separation_deg": 87.9,
+    "swing_elbow_angle_at_impact": 37.6,
+    "support_elbow_angle_at_impact": 59.7,
+    "swing_shoulder_flexion_after_impact_deg": 55.4
+   }
+  },
+  {
+   "clip": "hittingofftee2_swing_baseball_f_nm_np1_fr_med_11",
+   "skipped": "입력 품질 미달: 임팩트 추정 프레임(38)이 분석 가능 구간(0~39) 경계에 있음. 동작 전후가 잘린 영상으로 보인다."
+  },
+  {
+   "clip": "hittingofftee2_swing_baseball_f_nm_np1_fr_med_3",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 143.1,
+    "swing_knee_angle_at_impact": 152.0,
+    "trunk_forward_lean_deg_at_impact": 14.1,
+    "hip_rotation_range_deg": 18.1,
+    "swing_hip_flexion_after_impact_deg": 4.2,
+    "follow_through_duration_frames": 5,
+    "impact_frame": 16,
+    "hip_shoulder_separation_deg": 59.6,
+    "swing_elbow_angle_at_impact": 60.3,
+    "support_elbow_angle_at_impact": 102.1,
+    "swing_shoulder_flexion_after_impact_deg": 79.0
+   }
+  },
+  {
+   "clip": "hittingofftee2_swing_baseball_f_nm_np1_fr_med_4",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 112.0,
+    "swing_knee_angle_at_impact": 167.6,
+    "trunk_forward_lean_deg_at_impact": 20.0,
+    "hip_rotation_range_deg": 45.0,
+    "swing_hip_flexion_after_impact_deg": 0.0,
+    "follow_through_duration_frames": 5,
+    "impact_frame": 34,
+    "hip_shoulder_separation_deg": 87.7,
+    "swing_elbow_angle_at_impact": 70.7,
+    "support_elbow_angle_at_impact": 84.4,
+    "swing_shoulder_flexion_after_impact_deg": 84.9
+   }
+  },
+  {
+   "clip": "hittingofftee2_swing_baseball_f_nm_np1_fr_med_5",
+   "skipped": "입력 품질 미달: 임팩트 추정 프레임(39)이 분석 가능 구간(0~39) 경계에 있음. 동작 전후가 잘린 영상으로 보인다."
+  },
+  {
+   "clip": "hittingofftee2_swing_baseball_f_nm_np1_fr_med_6",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 110.0,
+    "swing_knee_angle_at_impact": 161.4,
+    "trunk_forward_lean_deg_at_impact": 30.3,
+    "hip_rotation_range_deg": 33.7,
+    "swing_hip_flexion_after_impact_deg": 9.7,
+    "follow_through_duration_frames": 1,
+    "impact_frame": 26,
+    "hip_shoulder_separation_deg": 69.9,
+    "swing_elbow_angle_at_impact": 105.9,
+    "support_elbow_angle_at_impact": 87.7,
+    "swing_shoulder_flexion_after_impact_deg": 88.9
+   }
+  },
+  {
+   "clip": "hittingofftee2_swing_baseball_f_nm_np1_fr_med_7",
+   "skipped": "입력 품질 미달: 임팩트 추정 프레임(39)이 분석 가능 구간(0~39) 경계에 있음. 동작 전후가 잘린 영상으로 보인다."
+  },
+  {
+   "clip": "hittingofftee2_swing_baseball_f_nm_np1_fr_med_8",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 105.1,
+    "swing_knee_angle_at_impact": 148.3,
+    "trunk_forward_lean_deg_at_impact": 26.9,
+    "hip_rotation_range_deg": 35.5,
+    "swing_hip_flexion_after_impact_deg": 11.9,
+    "follow_through_duration_frames": 3,
+    "impact_frame": 36,
+    "hip_shoulder_separation_deg": 60.1,
+    "swing_elbow_angle_at_impact": 131.6,
+    "support_elbow_angle_at_impact": 92.0,
+    "swing_shoulder_flexion_after_impact_deg": 18.9
+   }
+  },
+  {
+   "clip": "hittingofftee2_swing_baseball_f_nm_np1_fr_med_9",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 152.9,
+    "swing_knee_angle_at_impact": 170.8,
+    "trunk_forward_lean_deg_at_impact": 15.3,
+    "hip_rotation_range_deg": 7.3,
+    "swing_hip_flexion_after_impact_deg": 9.0,
+    "follow_through_duration_frames": 1,
+    "impact_frame": 18,
+    "hip_shoulder_separation_deg": 59.1,
+    "swing_elbow_angle_at_impact": 52.6,
+    "support_elbow_angle_at_impact": 90.9,
+    "swing_shoulder_flexion_after_impact_deg": 34.5
+   }
+  },
+  {
+   "clip": "practicingmybaseballswing2009_swing_baseball_f_cm_np1_fr_med_12",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 152.7,
+    "swing_knee_angle_at_impact": 167.4,
+    "trunk_forward_lean_deg_at_impact": -5.6,
+    "hip_rotation_range_deg": 13.2,
+    "swing_hip_flexion_after_impact_deg": 14.7,
+    "follow_through_duration_frames": 1,
+    "impact_frame": 12,
+    "hip_shoulder_separation_deg": 11.0,
+    "swing_elbow_angle_at_impact": 35.8,
+    "support_elbow_angle_at_impact": 40.2,
+    "swing_shoulder_flexion_after_impact_deg": 69.0
+   }
+  },
+  {
+   "clip": "practicingmybaseballswing2009_swing_baseball_f_cm_np1_fr_med_13",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 176.8,
+    "swing_knee_angle_at_impact": 158.9,
+    "trunk_forward_lean_deg_at_impact": -4.4,
+    "hip_rotation_range_deg": 9.2,
+    "swing_hip_flexion_after_impact_deg": 13.1,
+    "follow_through_duration_frames": 2,
+    "impact_frame": 4,
+    "swing_elbow_angle_at_impact": 96.8,
+    "support_elbow_angle_at_impact": 29.5,
+    "swing_shoulder_flexion_after_impact_deg": 134.0
+   }
+  },
+  {
+   "clip": "practicingmybaseballswing2009_swing_baseball_f_cm_np1_fr_med_14",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 167.9,
+    "swing_knee_angle_at_impact": 141.5,
+    "trunk_forward_lean_deg_at_impact": -6.0,
+    "hip_rotation_range_deg": 24.7,
+    "swing_hip_flexion_after_impact_deg": 55.2,
+    "follow_through_duration_frames": 3,
+    "impact_frame": 11,
+    "swing_elbow_angle_at_impact": 137.9,
+    "support_elbow_angle_at_impact": 20.3,
+    "swing_shoulder_flexion_after_impact_deg": 58.1
+   }
+  },
+  {
+   "clip": "practicingmybaseballswing2009_swing_baseball_f_cm_np1_fr_med_15",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 95.6,
+    "swing_knee_angle_at_impact": 123.4,
+    "trunk_forward_lean_deg_at_impact": 0.6,
+    "hip_rotation_range_deg": 15.8,
+    "swing_hip_flexion_after_impact_deg": 3.7,
+    "follow_through_duration_frames": 2,
+    "impact_frame": 17,
+    "hip_shoulder_separation_deg": 14.3,
+    "swing_elbow_angle_at_impact": 42.6,
+    "support_elbow_angle_at_impact": 96.4,
+    "swing_shoulder_flexion_after_impact_deg": 111.5
+   }
+  },
+  {
+   "clip": "practicingmybaseballswing2009_swing_baseball_f_cm_np1_fr_med_16",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 111.2,
+    "swing_knee_angle_at_impact": 121.1,
+    "trunk_forward_lean_deg_at_impact": 9.9,
+    "hip_rotation_range_deg": 32.2,
+    "swing_hip_flexion_after_impact_deg": 9.4,
+    "follow_through_duration_frames": 17,
+    "impact_frame": 22,
+    "hip_shoulder_separation_deg": 5.9,
+    "swing_elbow_angle_at_impact": 151.6,
+    "support_elbow_angle_at_impact": 130.4,
+    "swing_shoulder_flexion_after_impact_deg": 8.4
+   }
+  },
+  {
+   "clip": "practicingmybaseballswing2009_swing_baseball_f_cm_np1_fr_med_17",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 141.0,
+    "swing_knee_angle_at_impact": 178.9,
+    "trunk_forward_lean_deg_at_impact": -1.5,
+    "hip_rotation_range_deg": 14.7,
+    "swing_hip_flexion_after_impact_deg": 29.6,
+    "follow_through_duration_frames": 26,
+    "impact_frame": 13,
+    "swing_elbow_angle_at_impact": 129.2,
+    "support_elbow_angle_at_impact": 2.2,
+    "swing_shoulder_flexion_after_impact_deg": 124.2
+   }
+  },
+  {
+   "clip": "practicingmybaseballswing2009_swing_baseball_f_cm_np1_fr_med_18",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 151.3,
+    "swing_knee_angle_at_impact": 131.2,
+    "trunk_forward_lean_deg_at_impact": -7.2,
+    "hip_rotation_range_deg": 36.3,
+    "swing_hip_flexion_after_impact_deg": 0.0,
+    "follow_through_duration_frames": 1,
+    "impact_frame": 34,
+    "hip_shoulder_separation_deg": 26.6,
+    "swing_elbow_angle_at_impact": 117.7,
+    "support_elbow_angle_at_impact": 149.3,
+    "swing_shoulder_flexion_after_impact_deg": 0.0
+   }
+  },
+  {
+   "clip": "practicingmybaseballswing2009_swing_baseball_f_cm_np1_fr_med_19",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 156.6,
+    "swing_knee_angle_at_impact": 127.8,
+    "trunk_forward_lean_deg_at_impact": -7.4,
+    "hip_rotation_range_deg": 23.0,
+    "swing_hip_flexion_after_impact_deg": 44.4,
+    "follow_through_duration_frames": 1,
+    "impact_frame": 20,
+    "swing_elbow_angle_at_impact": 125.5,
+    "support_elbow_angle_at_impact": 61.9,
+    "swing_shoulder_flexion_after_impact_deg": 41.5
+   }
+  },
+  {
+   "clip": "practicingmybaseballswing2009_swing_baseball_f_cm_np1_fr_med_2",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 155.9,
+    "swing_knee_angle_at_impact": 151.4,
+    "trunk_forward_lean_deg_at_impact": 4.4,
+    "hip_rotation_range_deg": 10.9,
+    "swing_hip_flexion_after_impact_deg": 4.7,
+    "follow_through_duration_frames": 28,
+    "impact_frame": 11,
+    "swing_elbow_angle_at_impact": 16.3,
+    "support_elbow_angle_at_impact": 51.6,
+    "swing_shoulder_flexion_after_impact_deg": 133.0
+   }
+  },
+  {
+   "clip": "practicingmybaseballswing2009_swing_baseball_f_cm_np1_fr_med_4",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 120.0,
+    "swing_knee_angle_at_impact": 131.3,
+    "trunk_forward_lean_deg_at_impact": -6.3,
+    "hip_rotation_range_deg": 7.4,
+    "swing_hip_flexion_after_impact_deg": 13.3,
+    "follow_through_duration_frames": 1,
+    "impact_frame": 18,
+    "hip_shoulder_separation_deg": 9.3,
+    "swing_elbow_angle_at_impact": 104.7,
+    "support_elbow_angle_at_impact": 40.2,
+    "swing_shoulder_flexion_after_impact_deg": 143.4
+   }
+  },
+  {
+   "clip": "practicingmybaseballswing2009_swing_baseball_f_cm_np1_fr_med_5",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 129.9,
+    "swing_knee_angle_at_impact": 149.5,
+    "trunk_forward_lean_deg_at_impact": -3.1,
+    "hip_rotation_range_deg": 15.1,
+    "swing_hip_flexion_after_impact_deg": 23.6,
+    "follow_through_duration_frames": 14,
+    "impact_frame": 25,
+    "swing_elbow_angle_at_impact": 172.7,
+    "support_elbow_angle_at_impact": 134.3,
+    "swing_shoulder_flexion_after_impact_deg": 23.3
+   }
+  },
+  {
+   "clip": "practicingmybaseballswing2009_swing_baseball_f_cm_np1_fr_med_6",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 166.0,
+    "swing_knee_angle_at_impact": 167.7,
+    "trunk_forward_lean_deg_at_impact": 2.8,
+    "hip_rotation_range_deg": 24.8,
+    "swing_hip_flexion_after_impact_deg": 13.2,
+    "follow_through_duration_frames": 2,
+    "impact_frame": 11,
+    "hip_shoulder_separation_deg": 12.3,
+    "swing_elbow_angle_at_impact": 63.8,
+    "support_elbow_angle_at_impact": 20.8,
+    "swing_shoulder_flexion_after_impact_deg": 100.7
+   }
+  },
+  {
+   "clip": "practicingmybaseballswing2009_swing_baseball_f_cm_np1_fr_med_7",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 116.9,
+    "swing_knee_angle_at_impact": 121.6,
+    "trunk_forward_lean_deg_at_impact": 0.0,
+    "hip_rotation_range_deg": 27.2,
+    "swing_hip_flexion_after_impact_deg": 0.0,
+    "follow_through_duration_frames": 16,
+    "impact_frame": 23,
+    "hip_shoulder_separation_deg": 6.4,
+    "swing_elbow_angle_at_impact": 178.9,
+    "support_elbow_angle_at_impact": 119.0,
+    "swing_shoulder_flexion_after_impact_deg": 25.3
+   }
+  },
+  {
+   "clip": "practicingmybaseballswing2009_swing_baseball_f_cm_np1_fr_med_8",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 140.8,
+    "swing_knee_angle_at_impact": 172.8,
+    "trunk_forward_lean_deg_at_impact": 0.0,
+    "hip_rotation_range_deg": 12.1,
+    "swing_hip_flexion_after_impact_deg": 24.2,
+    "follow_through_duration_frames": 1,
+    "impact_frame": 9,
+    "hip_shoulder_separation_deg": 12.4,
+    "swing_elbow_angle_at_impact": 74.0,
+    "support_elbow_angle_at_impact": 19.1,
+    "swing_shoulder_flexion_after_impact_deg": 134.5
+   }
+  },
+  {
+   "clip": "practicingmybaseballswing2009_swing_baseball_f_cm_np1_fr_med_9",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 169.1,
+    "swing_knee_angle_at_impact": 178.1,
+    "trunk_forward_lean_deg_at_impact": -6.2,
+    "hip_rotation_range_deg": 15.4,
+    "swing_hip_flexion_after_impact_deg": 12.1,
+    "follow_through_duration_frames": 1,
+    "impact_frame": 11,
+    "hip_shoulder_separation_deg": 16.9,
+    "swing_elbow_angle_at_impact": 49.9,
+    "support_elbow_angle_at_impact": 150.8,
+    "swing_shoulder_flexion_after_impact_deg": 12.7
+   }
+  },
+  {
+   "clip": "practicingmybaseballswing2009_swing_baseball_u_cm_np1_fr_med_0",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 143.2,
+    "swing_knee_angle_at_impact": 145.0,
+    "trunk_forward_lean_deg_at_impact": -3.6,
+    "hip_rotation_range_deg": 21.6,
+    "swing_hip_flexion_after_impact_deg": 58.3,
+    "follow_through_duration_frames": 1,
+    "impact_frame": 21,
+    "swing_elbow_angle_at_impact": 52.5,
+    "support_elbow_angle_at_impact": 135.7,
+    "swing_shoulder_flexion_after_impact_deg": 154.1
+   }
+  },
+  {
+   "clip": "practicingmybaseballswing2009_swing_baseball_u_cm_np1_fr_med_1",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 132.8,
+    "swing_knee_angle_at_impact": 138.7,
+    "trunk_forward_lean_deg_at_impact": 2.8,
+    "hip_rotation_range_deg": 12.1,
+    "swing_hip_flexion_after_impact_deg": 2.8,
+    "follow_through_duration_frames": 1,
+    "impact_frame": 20,
+    "swing_elbow_angle_at_impact": 92.3,
+    "support_elbow_angle_at_impact": 153.2,
+    "swing_shoulder_flexion_after_impact_deg": 172.3
+   }
+  },
+  {
+   "clip": "practicingmybaseballswing2009_swing_baseball_u_cm_np1_fr_med_10",
+   "frames": 40,
+   "features": {
+    "plant_knee_angle_at_impact": 128.6,
+    "swing_knee_angle_at_impact": 142.1,
+    "trunk_forward_lean_deg_at_impact": -3.9,
+    "hip_rotation_range_deg": 21.3,
+    "swing_hip_flexion_after_impact_deg": 41.3,
+    "follow_through_duration_frames": 1,
+    "impact_frame": 25,
+    "swing_elbow_angle_at_impact": 151.6,
+    "support_elbow_angle_at_impact": 104.3,
+    "swing_shoulder_flexion_after_impact_deg": 132.1
+   }
+  }
+ ]
+}

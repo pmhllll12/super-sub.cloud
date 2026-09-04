@@ -96,6 +96,133 @@ MIN_CONFIDENT_FRAMES = 3
 # 기록이 실제 동작을 설명하지 못한다. 두 값이 같은지는 테스트가 지킨다.
 PERSON_ELIGIBLE_THRESHOLD = 0.5
 
+# 사람이 찍은 박스가 그 후보를 가리킨다고 볼 최소 IoU (미결 18번).
+#
+# **임시값이다.** 손으로 그린 네모는 검출 박스보다 헐겁게 잡히므로(화면의
+# 예시가 그렇다) 완전 일치를 요구할 수 없고, 그렇다고 0으로 두면 화면 반대편
+# 사람도 "찍은 사람"이 된다. 0.3은 그 사이에서 흔히 쓰는 값이다.
+#
+# 🔴 **이 값을 고르는 근거는 아직 없다.** 그래서 실제 IoU를 결과와 관측에
+# 남긴다(`SubjectSelection.anchor_iou`) — 분포가 쌓이면 그때 다시 본다.
+# 값 자체보다 **못 맞췄을 때 조용히 넘어가지 않는 것**이 이 기능의 요점이다.
+MIN_ANCHOR_IOU = 0.3
+
+
+@dataclass(frozen=True)
+class SubjectRequest:
+    """사람이 지정한 분석 대상 — 어느 사람을, 언제 찍었는가.
+
+    box는 **정규화 0~1**의 (x, y, w, h)다. 표시 해상도가 아니라 원본 기준이며
+    레터박스 여백은 프론트가 이미 걷어낸다(`toVideoBox`). 픽셀로 받으면
+    화면 크기가 다른 기기에서 조용히 어긋난다 — 계약에 정규화라고 못박는다.
+
+    at_ms는 그 박스를 그린 순간의 영상 시각(밀리초)이다. 🔴 **그 순간이 샘플
+    격자에 없을 수 있다** — `step`으로 솎기 때문이다. 가장 가까운 프레임에
+    붙이고 어긋난 정도를 기록한다(`SubjectSelection.grid_offset_frames`).
+    """
+
+    box: tuple[float, float, float, float]
+    at_ms: float
+
+
+@dataclass(frozen=True)
+class SubjectSelection:
+    """대상을 **어떻게** 골랐는가. 결과와 관측에 그대로 실린다.
+
+    🔴 **이것이 없으면 "찍은 사람이 실제로 분석됐는가"를 확인할 방법이 없다.**
+    `candidate_counts`는 선택 *이전* 관측이라 누가 대상이었는지를 모른다.
+    특히 ViTPose는 top-down이라 **엉뚱한 박스를 줘도 자신 있게 관절을 낸다** —
+    신뢰도로는 드러나지 않으므로 선택 자체를 남겨야 한다.
+    """
+
+    # "auto"                 — 지정이 없었다. 지금까지의 동작(`_largest_person_box`).
+    # "specified"            — 지정한 사람을 끝까지 따라간 것으로 **보인다.**
+    # "specified_uncertain"  — 지정한 자리에서는 찾았는데 **도중에 대상이 바뀌었을
+    #                          의심이 있다**(`area_jumps > 0`).
+    # "fallback"             — 지정은 있었으나 못 맞춰 자동으로 떨어졌다.
+    #
+    # 🔴 **`specified`와 `specified_uncertain`을 가른 이유가 이 필드의 요점이다.**
+    # 추적은 아직 못 고쳤다 — 실클립에서 타자를 따라가던 트랙이 심판으로
+    # 갈아타 190프레임(63%)을 다른 사람으로 분석했다. 그런데도 `specified`
+    # 하나로 내보내면 결과 봉투가 **하지 않은 일을 했다고 말한다.**
+    # 고치지 못한 것을 숨기지 않는 것과, 안 한 일을 했다고 하지 않는 것은
+    # 다른 문제다 — 뒤쪽은 지금 고칠 수 있고 그래서 고쳤다.
+    source: str = "auto"
+    why: str = ""
+    anchor_frame: int | None = None
+    anchor_iou: float | None = None
+    # 지정 시각과 실제 격자 프레임의 어긋남(프레임). 최대 step/2다.
+    grid_offset_frames: float | None = None
+    # 지정 시각이 분석 창 밖이라 끝으로 당겨졌는가 (업로드 60초 대 창 10초).
+    clamped: bool = False
+    # 이어가다 겹치는 후보가 없어 연속성을 끊은 프레임 수.
+    #
+    # 🔴 **0이 "잘 따라갔다"는 뜻이 아니다.** 신원이 바뀔 때는 겹침이 넉넉해서
+    # 여기 안 걸린다 — 위 실클립에서 이 값은 0이었다. 그것을 아래가 잡는다.
+    continuity_breaks: int = 0
+    # 인접 프레임에서 선택 박스 넓이가 크게 뛴 횟수 (count_area_jumps).
+    area_jumps: int = 0
+
+    @property
+    def used_specification(self) -> bool:
+        """사람이 찍은 지정을 **썼는가.** 끝까지 맞았는가와는 다른 물음이다."""
+        return self.source.startswith("specified")
+
+    @property
+    def is_uncertain(self) -> bool:
+        """도중에 대상이 바뀌었을 의심이 있는가."""
+        return self.source == "specified_uncertain"
+
+
+# 인접 프레임에서 선택 박스 넓이가 이 배수 이상 뛰면 **대상이 바뀐 것으로 의심**한다.
+#
+# 🔴 **막는 값이 아니라 세는 값이다.** 사람이 카메라 쪽으로 다가오면 넓이는 실제로
+# 커지므로, 이것으로 후보를 거르면 정상 동작을 막는다. 그래서 선택에는 관여하지
+# 않고 **몇 번 뛰었는지만** 결과·관측에 남긴다.
+#
+# 왜 필요한가: `continuity_breaks`가 **이 실패를 못 잡는다.** 그쪽은 "겹치는 후보가
+# 하나도 없다"를 세는데, 신원이 바뀔 때는 겹침이 넉넉하다. 실제로 `3R1kvNrGJK0`
+# 에서 타자를 따라가던 트랙이 110프레임에서 심판으로 갈아탔는데 끊김은 0이었고,
+# 그 뒤 190프레임(63%)을 다른 사람으로 분석했다. **그 자리의 넓이비가 5.5배**라
+# 이 신호는 정확히 한 번, 갈아탄 프레임에서만 걸렸다(같은 클립의 자동 트랙은 0회).
+#
+# 2.0인 근거는 **그 사례 하나뿐이다.** 한 클립에서 맞았다고 검증된 것이 아니다 —
+# 분포가 쌓이면 다시 본다.
+SUBJECT_AREA_JUMP = 2.0
+
+
+def count_area_jumps(
+    boxes: list[tuple[float, float, float, float] | None],
+    factor: float = SUBJECT_AREA_JUMP,
+) -> int:
+    """인접 프레임 사이에서 선택 박스 넓이가 크게 뛴 횟수.
+
+    **대상이 바뀌었을 가능성의 신호다.** 확정이 아니다 — 원근으로도 커진다.
+    둘 중 하나가 없는 프레임은 건너뛴다(그건 `continuity_breaks` 쪽 이야기다).
+    """
+    jumps = 0
+    for before, after in zip(boxes, boxes[1:]):
+        if before is None or after is None:
+            continue
+        a = before[2] * before[3]
+        b = after[2] * after[3]
+        if a <= 0 or b <= 0:
+            continue
+        if max(a, b) / min(a, b) >= factor:
+            jumps += 1
+    return jumps
+
+
+def _iou(a: tuple[float, float, float, float], b: tuple[float, float, float, float]) -> float:
+    """두 xywh 박스의 IoU. 겹치지 않으면 0이다."""
+    ax, ay, aw, ah = a
+    bx, by, bw, bh = b
+    ix = max(0.0, min(ax + aw, bx + bw) - max(ax, bx))
+    iy = max(0.0, min(ay + ah, by + bh) - max(ay, by))
+    inter = ix * iy
+    union = aw * ah + bw * bh - inter
+    return float(inter / union) if union > 0 else 0.0
+
 
 @dataclass
 class PoseResult:
@@ -127,6 +254,43 @@ class PoseResult:
     # 관측값이며 선택 결과와는 무관하다 — 누가 대상이었는지는 여기서 알 수 없다.
     # 기본값이 빈 리스트라 이 필드를 모르는 기존 호출부는 그대로 동작한다.
     candidate_counts: list[tuple[int, int]] = field(default_factory=list)
+    # 프레임별로 **실제 분석한 사람의 박스** (원 픽셀 xywh). 못 고른 프레임은 None.
+    # candidate_counts 가 선택 *이전*이라면 이쪽은 선택 *결과*다 — 둘 다 있어야
+    # "몇 명 중에 누구를 봤는가"가 사후에 확인된다 (미결 8번·18번).
+    subject_boxes: list[tuple[float, float, float, float] | None] = field(
+        default_factory=list
+    )
+    # 위 박스를 어떤 좌표계에서 읽어야 하는지 — (너비, 높이) 픽셀.
+    # 없으면 정규화해 내보낼 수 없다.
+    frame_size: tuple[int, int] | None = None
+    # 대상을 어떻게 골랐는가. 기본값은 지금까지의 동작(auto)이라 이 필드를
+    # 모르는 기존 호출부가 그대로 맞다.
+    subject_selection: SubjectSelection = field(default_factory=SubjectSelection)
+
+    def subject_box_frames(self) -> int:
+        """대상을 실제로 고른 프레임 수."""
+        return sum(1 for b in self.subject_boxes if b is not None)
+
+    def normalized_subject_boxes(self) -> list[list[float] | None]:
+        """선택 박스를 정규화 0~1로. 프레임 크기를 모르면 전부 None이다.
+
+        프론트가 보내는 좌표계와 **같은 좌표계로 돌려준다** — 그래야 "찍은
+        박스와 실제로 분석한 박스"의 IoU를 화면 크기 없이 바로 잴 수 있다.
+        """
+        if not self.frame_size:
+            return [None] * len(self.subject_boxes)
+        w, h = self.frame_size
+        if w <= 0 or h <= 0:
+            return [None] * len(self.subject_boxes)
+        out: list[list[float] | None] = []
+        for box in self.subject_boxes:
+            if box is None:
+                out.append(None)
+                continue
+            x, y, bw, bh = box
+            out.append([round(x / w, 6), round(y / h, 6),
+                        round(bw / w, 6), round(bh / h, 6)])
+        return out
 
     def eligible_candidate_counts(self) -> list[int]:
         """selector가 실제로 후보로 보는 사람 수 (프레임별)."""
@@ -281,6 +445,255 @@ def _count_person_candidates(
     return raw, eligible
 
 
+def _eligible_person_boxes(
+    detections, threshold: float = PERSON_ELIGIBLE_THRESHOLD
+) -> list[tuple[float, float, float, float]]:
+    """프레임 하나의 person 후보 박스 전부 (xywh).
+
+    `_largest_person_box`는 가장 큰 것 하나만 남기고 나머지를 **버린다.**
+    사람이 찍은 자리와 맞춰 보려면 버려지기 전 목록이 필요하다.
+    임계값을 selector와 같은 상수로 두어 "후보"의 뜻이 갈리지 않게 한다.
+    """
+    out: list[tuple[float, float, float, float]] = []
+    for score, label, box in zip(
+        detections["scores"], detections["labels"], detections["boxes"]
+    ):
+        if int(label) != COCO_PERSON_LABEL or float(score) < threshold:
+            continue
+        x1, y1, x2, y2 = [float(v) for v in box]
+        out.append((x1, y1, x2 - x1, y2 - y1))
+    return out
+
+
+def anchor_frame_for(at_ms: float, sampled_fps: float, frame_count: int) -> tuple[int, float, bool]:
+    """지정 시각을 **샘플 격자의 프레임 인덱스**로 옮긴다.
+
+    돌려주는 것은 (프레임, 격자 어긋남, 창 밖이었는가)다.
+
+    `labeling/targets.py:remap_label_frame`과 같은 산술의 다른 방향이다 —
+    저쪽은 격자→격자이고 이쪽은 시각→격자인데 **같은 함정을 공유한다**:
+    그 순간이 격자에 없을 수 있다. 🔴 **저쪽은 예외를 던지지만 여기서는
+    던지지 않는다** — 서비스가 사용자의 클릭 하나로 분석을 통째로 거부하면
+    안 된다. 가장 가까운 프레임에 붙이고 **어긋난 정도를 돌려준다.**
+
+    창 밖(업로드 60초 대 분석 창 10초)이면 끝 프레임으로 당기고 그 사실을
+    함께 돌려준다. 조용히 당기면 사용자는 자기가 찍은 순간이 분석된 줄 안다.
+    """
+    if frame_count <= 0:
+        raise ValueError("프레임이 없다")
+    if not sampled_fps or not math.isfinite(sampled_fps) or sampled_fps <= 0:
+        raise ValueError(f"실효 fps를 모른다: {sampled_fps!r}")
+
+    exact = (at_ms / 1000.0) * sampled_fps
+    # 정확히 절반인 지점은 **뒤쪽으로** 붙인다(round-half-up). 파이썬 기본
+    # `round`는 짝수로 붙어서(banker's rounding) 12.5→12, 13.5→14가 된다 —
+    # 같은 0.5인데 방향이 갈리면 왜 그 프레임인지 설명할 수 없다.
+    snapped = math.floor(exact + 0.5)
+    clamped = not (0 <= snapped < frame_count)
+    frame = max(0, min(frame_count - 1, snapped))
+    return frame, round(abs(exact - snapped), 3), clamped
+
+
+def select_subject_boxes(
+    auto_boxes: list[tuple[float, float, float, float] | None],
+    candidates: list[list[tuple[float, float, float, float]]],
+    subject: SubjectRequest | None,
+    sampled_fps: float,
+    frame_size: tuple[int, int],
+) -> tuple[list[tuple[float, float, float, float] | None], SubjectSelection]:
+    """프레임별로 분석할 사람의 박스를 정한다.
+
+    🔴 **지정이 없으면 `auto_boxes`를 그대로 돌려준다** — 목록을 새로 만들지
+    않고 같은 값을 넘긴다. 그래야 지정이 없을 때 ViTPose 입력이 **한 비트도
+    달라지지 않고**, 기존 평가(B-1~B-6)와의 비교가 끊기지 않는다.
+
+    지정이 있으면 두 단계다.
+
+      1. **닻** — 찍은 프레임에서 찍은 박스와 IoU가 가장 큰 후보를 고른다.
+         `MIN_ANCHOR_IOU`에 못 미치면 **못 맞춘 것**이고 자동으로 떨어진다.
+      2. **이어가기** — 닻에서 앞뒤로, 직전에 고른 박스와 IoU가 가장 큰 후보를
+         고른다. 겹치는 후보가 하나도 없으면 **연속성을 끊고** 그 프레임은
+         자동 선택을 쓴다(`eval_selectors.py`가 후보 0개에서 정한 것과 같은
+         처리다). 끊긴 횟수를 세어 남긴다.
+
+    ⚠️ **이 규칙은 오프라인 평가가 잰 규칙이 아니다.** B-1~B-6은 지정이 없는
+    39클립에서 `_largest_person_box`를 쟀다. 여기 이어가기 수식은
+    `eval_selectors.py`의 가중합을 **옮겨 온 것이 아니다** — 그 파일은 일부러
+    만든 복제본이고 그 가중치는 production 값이 아니다(미결 10번이 낸 사고의
+    형태). 지정 경로는 새 경로이며 평가가 그것을 잰 적이 없다.
+    """
+    if subject is None:
+        # auto 는 "이 사람을 따라갔다"고 주장한 적이 없으므로 source 를 낮추지
+        # 않는다. 그래도 넓이 점프는 센다 — 자동 선택이 얼마나 튀는지가
+        # 미결 8번이 정답 없이 물을 수 있는 것 중 하나다.
+        return auto_boxes, SubjectSelection(
+            source="auto", area_jumps=count_area_jumps(auto_boxes)
+        )
+
+    n = len(auto_boxes)
+    width, height = frame_size
+    x, y, w, h = subject.box
+    pixel_box = (x * width, y * height, w * width, h * height)
+
+    try:
+        anchor, offset, clamped = anchor_frame_for(subject.at_ms, sampled_fps, n)
+    except ValueError as exc:
+        return auto_boxes, SubjectSelection(
+            source="fallback", why=f"지정 시각을 프레임으로 옮길 수 없다 ({exc})"
+        )
+
+    here = candidates[anchor] if anchor < len(candidates) else []
+    best_iou, best_box = 0.0, None
+    for cand in here:
+        iou = _iou(pixel_box, cand)
+        if iou > best_iou:
+            best_iou, best_box = iou, cand
+
+    if best_box is None or best_iou < MIN_ANCHOR_IOU:
+        return auto_boxes, SubjectSelection(
+            source="fallback",
+            why=(f"찍은 자리({anchor}프레임)에서 그 사람을 못 찾았다 — "
+                 f"후보 {len(here)}개, 최대 IoU {best_iou:.2f} < {MIN_ANCHOR_IOU}"),
+            anchor_frame=anchor,
+            anchor_iou=round(best_iou, 3),
+            grid_offset_frames=offset,
+            clamped=clamped,
+        )
+
+    chosen: list[tuple[float, float, float, float] | None] = [None] * n
+    chosen[anchor] = best_box
+    breaks = 0
+
+    def walk(order, seed):
+        nonlocal breaks
+        previous = seed
+        for t in order:
+            pick, pick_iou = None, 0.0
+            for cand in candidates[t]:
+                iou = _iou(previous, cand)
+                if iou > pick_iou:
+                    pick, pick_iou = cand, iou
+            if pick is None:
+                # 겹치는 후보가 없다 — 이어갈 근거가 사라졌다.
+                # 직전 박스를 계속 들고 가면 그 오류를 굳히게 되므로 끊는다.
+                breaks += 1
+                chosen[t] = auto_boxes[t]
+                if auto_boxes[t] is not None:
+                    previous = auto_boxes[t]
+                continue
+            chosen[t] = pick
+            previous = pick
+
+    walk(range(anchor + 1, n), best_box)
+    walk(range(anchor - 1, -1, -1), best_box)
+
+    # 🔴 **주장을 사실에 맞춘다.** 넓이가 크게 뛴 자리가 있으면 도중에 대상이
+    # 바뀌었을 수 있고, 그러면 "지정한 사람을 분석했다"는 말이 틀린다.
+    # 추적을 고친 것이 아니라 **하지 않은 일을 했다고 말하지 않는 것**이다.
+    jumps = count_area_jumps(chosen)
+    return chosen, SubjectSelection(
+        source="specified_uncertain" if jumps else "specified",
+        why=(
+            f"닻({anchor}프레임)에서는 찾았으나 이후 선택 박스 넓이가 "
+            f"{SUBJECT_AREA_JUMP:g}배 이상 뛴 자리가 {jumps}곳 있다 — "
+            "도중에 다른 사람으로 바뀌었을 수 있다"
+        ) if jumps else "",
+        anchor_frame=anchor,
+        anchor_iou=round(best_iou, 3),
+        grid_offset_frames=offset,
+        clamped=clamped,
+        continuity_breaks=breaks,
+        area_jumps=jumps,
+    )
+
+
+def parse_subject_spec(box: str | None, at_ms: float | None) -> SubjectRequest | None:
+    """`"x,y,w,h"` 문자열과 시각을 SubjectRequest로. 잘못되면 ValueError.
+
+    **규칙을 여기 한 곳에 둔다.** HTTP는 422로, CLI는 종료 코드로 갈리지만
+    "무엇이 올바른 지정인가"는 하나여야 한다 — 두 곳에 복사하면 한쪽만
+    고쳐졌을 때 같은 입력이 경로에 따라 통과했다 막혔다 한다(미결 10번의 형태).
+
+    🔴 **범위를 벗어난 좌표는 거부한다.** 화면 픽셀을 그대로 보내면 값이
+    1을 넘는데, 그것을 조용히 받아 클램프하면 **엉뚱한 사람을 분석하고도
+    "지정대로 했다"고 답하게 된다.** 그것이 가장 나쁜 실패다.
+    """
+    if box is None:
+        return None
+    parts = [p.strip() for p in box.split(",")]
+    if len(parts) != 4:
+        raise ValueError("subject_box는 'x,y,w,h' 네 값이어야 한다 (정규화 0~1)")
+    try:
+        x, y, w, h = (float(p) for p in parts)
+    except ValueError as exc:
+        raise ValueError(f"subject_box를 숫자로 읽을 수 없다: {box!r}") from exc
+    if w <= 0 or h <= 0:
+        raise ValueError("subject_box의 너비·높이는 0보다 커야 한다")
+    if not all(0.0 <= v <= 1.0 for v in (x, y, x + w, y + h)):
+        raise ValueError(
+            "subject_box는 정규화 0~1이어야 한다 — 화면 픽셀 좌표를 보낸 것이 "
+            f"아닌지 확인할 것 (받은 값: {box!r})"
+        )
+    if at_ms is None:
+        raise ValueError("subject_box를 주면 subject_at_ms도 함께 주어야 한다")
+    if at_ms < 0:
+        raise ValueError("subject_at_ms는 0 이상이어야 한다")
+    return SubjectRequest(box=(x, y, w, h), at_ms=float(at_ms))
+
+
+def subject_envelope(result: "PoseResult | None", frame_count: int) -> dict:
+    """**누구를 분석했는가** — 선택 박스 시계열과 어떻게 골랐는지 (미결 18번).
+
+    🔴 이것이 없으면 "찍은 사람이 실제로 분석됐는가"를 확인할 방법이 없다.
+    `candidate_counts`는 선택 **이전** 관측이고, ViTPose는 top-down이라
+    **엉뚱한 박스를 줘도 자신 있게 관절을 낸다** — 신뢰도로는 드러나지 않는다.
+    박스가 남아 있으면 (1) 지정 박스와의 IoU를 기계적으로 재고
+    (2) `render_tracked_clip`으로 눈으로 본다.
+
+    🔴 **`features`를 바꾸지 않는다.** `timebase`와 같은 형제 블록이라 판정
+    입력이 그대로다 — 기존 평가(B-2~B-6)와 비교가 끊기지 않는다.
+
+    박스는 **정규화 0~1**로 낸다. 프론트가 보내는 좌표계와 같아야 화면 크기를
+    몰라도 바로 대조된다. 픽셀로 되짚을 수 있게 `frame_size`를 함께 싣는다.
+
+    HTTP 응답과 S3 리포트가 **같은 함수를 쓴다** — 두 벌로 두면 한쪽에만
+    필드가 늘어나 "어느 경로로 낸 결과냐"에 따라 봉투가 달라진다.
+    """
+    if result is None:
+        return {
+            "known": False,
+            "why": "합성 키포인트 경로 — 영상이 없어 사람 박스가 존재하지 않는다",
+            "source": "auto",
+        }
+
+    selection = result.subject_selection
+    return {
+        "known": True,
+        # "auto" | "specified" | "fallback"
+        # 🔴 fallback을 조용히 넘기지 않는다 — 사용자는 자기가 찍은 대로
+        # 분석된 줄 안다. why에 못 맞춘 이유가 들어 있다.
+        "source": selection.source,
+        "why": selection.why,
+        "anchor_frame": selection.anchor_frame,
+        "anchor_iou": selection.anchor_iou,
+        # 지정 시각과 샘플 격자의 어긋남(프레임). 최대 step/2다.
+        "grid_offset_frames": selection.grid_offset_frames,
+        # 찍은 시각이 분석 창 밖이라 끝으로 당겨졌는가.
+        "at_clamped": selection.clamped,
+        "continuity_breaks": selection.continuity_breaks,
+        # 🔴 **끊김 0이 "잘 따라갔다"는 뜻이 아니다.** 신원이 바뀔 때는 겹침이
+        # 넉넉해서 끊김으로 안 잡힌다. 넓이가 크게 뛴 횟수가 그 의심을 센다.
+        # **selection 이 이미 센 값을 쓴다** — 여기서 다시 세면 같은 규칙이
+        # 두 벌이 되고 한쪽만 고쳐졌을 때 source 와 숫자가 어긋난다.
+        "area_jumps": selection.area_jumps,
+        "frame_size": list(result.frame_size) if result.frame_size else None,
+        "frames_with_box": result.subject_box_frames(),
+        "frames": frame_count,
+        # (x, y, w, h) 정규화. 못 고른 프레임은 null이다.
+        "boxes": result.normalized_subject_boxes(),
+    }
+
+
 def _tracked_centers(detections, threshold: float = 0.3) -> dict[str, tuple[float, float, float]]:
     """프레임 하나에서 관심 도구의 중심좌표를 뽑는다.
 
@@ -317,6 +730,11 @@ def _record_input_observation(result: PoseResult, rubric_key: str | None) -> Non
             eligible_counts=result.eligible_candidate_counts(),
             raw_counts=result.raw_candidate_counts(),
             rubric_key=rubric_key,
+            # 대상을 **어떻게** 골랐는가. 이것이 있어야 "사람 지정이 얼마나
+            # 자주 실패하는가"를 정답 없이 잰다 (미결 18번 → 12번).
+            subject=result.subject_selection,
+            subject_box_frames=result.subject_box_frames(),
+            subject_area_jumps=result.subject_selection.area_jumps,
         )
     )
 
@@ -329,8 +747,14 @@ def extract_keypoints(
     rubric_key: str | None = None,
     max_frames: int = DEFAULT_MAX_FRAMES,
     max_seconds: float = DEFAULT_MAX_SECONDS,
+    subject: SubjectRequest | None = None,
 ) -> PoseResult:
     """영상에서 대상 선수의 키포인트 시계열을 추출한다.
+
+    subject — 사람이 찍은 분석 대상(정규화 박스 + 시각). **None이면 지금까지의
+      동작 그대로**이고 결과가 한 비트도 달라지지 않는다. `side`와 같은 규칙이다:
+      사람이 지정할 수 있게 열어 두고, 없으면 자동으로 고른다. 못 맞추면
+      자동으로 떨어지되 **그 사실이 결과에 남는다**(`subject_selection`).
 
     observe — 서비스 입력 관측 레코드를 남길지. **기본값이 True인 것이 핵심이다**:
       새 호출자는 아무것도 하지 않아도 관측에 포함되고, 빠지려면 명시해야 한다.
@@ -367,7 +791,21 @@ def extract_keypoints(
     # 있으므로 person 분기와 독립적으로 기록한다.
     obj_frames: list[dict[str, tuple[float, float, float]]] = []
 
+    # 프레임별 자동 선택 결과와, 지정이 있을 때만 쓰는 후보 목록.
+    auto_boxes: list[tuple[float, float, float, float] | None] = []
+    candidates: list[list[tuple[float, float, float, float]]] = []
+
     try:
+        # === 1차: 검출 ===
+        #
+        # 옛 구조는 프레임마다 검출과 포즈를 붙여서 했다. 대상 지정이 들어오면
+        # 선택이 **프레임을 가로질러** 이어져야 하므로(찍은 프레임에서 앞뒤로
+        # 전파한다) 검출을 먼저 다 끝내야 한다.
+        #
+        # 🔴 **RGB 프레임을 쌓아 두지 않는다.** 4K 300장이 약 7GB인데 사본을
+        # 하나 더 들면 그대로 두 배다(미결 9번). 2차에서 다시 변환한다 —
+        # cvtColor는 추론 앞에서 무시할 수 있는 비용이다.
+        # 검출 결과도 통째로 들지 않고 **박스만** 뽑아 둔다.
         for frame in frames:
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
@@ -381,8 +819,20 @@ def extract_keypoints(
             obj_frames.append(_tracked_centers(detections))
             # 관측은 선택보다 **먼저** 한다 — 아래에서 후보가 버려지기 때문이다.
             cand_counts.append(_count_person_candidates(detections))
+            auto_boxes.append(_largest_person_box(detections))
+            # 지정이 없으면 후보 목록을 만들지 않는다 — 쓰이지도 않는 것을
+            # 프레임마다 쌓을 이유가 없다.
+            candidates.append(
+                _eligible_person_boxes(detections) if subject is not None else []
+            )
 
-            box = _largest_person_box(detections)
+        height, width = frames[0].shape[:2]
+        subject_boxes, selection = select_subject_boxes(
+            auto_boxes, candidates, subject, sampled_fps, (width, height)
+        )
+
+        # === 2차: 포즈 ===
+        for frame, box in zip(frames, subject_boxes):
             if box is None:
                 # 사람이 검출되지 않은 프레임은 신뢰도 0으로 채운다.
                 # (프레임을 버리지 않는다 — 키포인트 인덱스 t가 곧 샘플링된
@@ -390,6 +840,7 @@ def extract_keypoints(
                 all_kps.append(np.zeros((17, 3)))
                 continue
 
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             pose_inputs = pose_processor(
                 rgb, boxes=[[list(box)]], return_tensors="pt"
             ).to(device)
@@ -426,6 +877,9 @@ def extract_keypoints(
         max_seconds=max_seconds,
         objects=stack_object_tracks(obj_frames),
         candidate_counts=cand_counts,
+        subject_boxes=subject_boxes,
+        frame_size=(width, height),
+        subject_selection=selection,
     )
     if observe:
         _record_input_observation(result, rubric_key)

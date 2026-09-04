@@ -14,6 +14,7 @@ import cv2
 import numpy as np
 import pytest
 
+from supersub_agent import pose
 from supersub_agent.pose import (
     PoseResult,
     crop_to_person,
@@ -357,3 +358,250 @@ def test_load_frames_is_none_without_a_video():
     result = PoseResult(keypoints=np.zeros((3, 17, 3)), source_fps=30.0, sampled_fps=15.0)
 
     assert result.load_frames() is None
+
+
+# --- 분석 대상 지정 (미결 18번) ---------------------------------------------
+
+
+def test_iou_is_zero_when_boxes_do_not_touch():
+    assert pose._iou((0, 0, 10, 10), (20, 20, 10, 10)) == 0.0
+
+
+def test_iou_of_identical_boxes_is_one():
+    assert pose._iou((3, 4, 10, 20), (3, 4, 10, 20)) == pytest.approx(1.0)
+
+
+def test_anchor_frame_snaps_to_the_grid_and_reports_the_gap():
+    """지정 시각이 격자에 없을 수 있다 — 붙이되 **어긋난 정도를 돌려준다.**"""
+    frame, offset, clamped = pose.anchor_frame_for(1040.0, 12.5, 100)
+
+    assert frame == 13                       # 1.04초 × 12.5fps = 13.0
+    assert offset == 0.0
+    assert clamped is False
+
+    frame, offset, clamped = pose.anchor_frame_for(1000.0, 12.5, 100)
+    assert frame == 13                       # 12.5 → 가장 가까운 13
+    assert offset == pytest.approx(0.5)
+    assert clamped is False
+
+
+def test_anchor_outside_the_analysis_window_is_clamped_and_says_so():
+    """업로드 상한 60초 대 분석 창 10초 — 35초 지점은 창에 아예 없다.
+
+    🔴 조용히 당기면 사용자는 자기가 찍은 순간이 분석된 줄 안다.
+    """
+    frame, _, clamped = pose.anchor_frame_for(35_000.0, 30.0, 300)
+
+    assert frame == 299
+    assert clamped is True
+
+
+def test_anchor_needs_a_known_grid():
+    """모르는 격자에서 프레임을 지어내지 않는다 (E-3와 같은 규약)."""
+    with pytest.raises(ValueError):
+        pose.anchor_frame_for(1000.0, 0.0, 100)
+
+
+def _auto(n, box=(0.0, 0.0, 30.0, 40.0)):
+    return [box] * n
+
+
+def test_no_specification_returns_the_very_same_list():
+    """🔴 지정이 없으면 **같은 객체를 그대로** 돌려준다.
+
+    목록을 새로 만들면 언젠가 값이 달라질 여지가 생긴다. 지정이 없을 때
+    ViTPose 입력이 한 비트도 달라지지 않아야 기존 평가(B-1~B-6)와 비교가
+    끊기지 않는다.
+    """
+    auto = _auto(5)
+    boxes, selection = pose.select_subject_boxes(auto, [[]] * 5, None, 30.0, (64, 48))
+
+    assert boxes is auto
+    assert selection.source == "auto"
+    assert selection.anchor_frame is None
+
+
+def test_specification_picks_the_overlapping_candidate_not_the_largest():
+    """찍은 사람이 가장 큰 사람이 아닐 수 있다 — 그게 이 기능의 존재 이유다."""
+    big = (0.0, 0.0, 60.0, 40.0)        # 자동 선택이 고르는 큰 사람
+    small = (60.0, 0.0, 20.0, 40.0)     # 사용자가 찍은 작은 사람
+    n = 4
+    boxes, selection = pose.select_subject_boxes(
+        _auto(n, big), [[big, small]] * n,
+        pose.SubjectRequest(box=(0.6, 0.0, 0.2, 1.0), at_ms=0.0),
+        30.0, (100, 40),
+    )
+
+    assert selection.source == "specified"
+    assert selection.anchor_frame == 0
+    assert boxes == [small] * n, "닻에서 앞뒤로 같은 사람을 이어가야 한다"
+
+
+def test_specification_propagates_backwards_from_a_late_anchor():
+    """드래그는 한 프레임인데 분석은 전 프레임이다 — 앞쪽도 채워야 한다."""
+    a = (0.0, 0.0, 20.0, 40.0)
+    b = (50.0, 0.0, 20.0, 40.0)
+    n = 6
+    boxes, selection = pose.select_subject_boxes(
+        _auto(n, a), [[a, b]] * n,
+        # 마지막 프레임에서 b를 찍었다 (30fps에서 5프레임 = 166.7ms)
+        pose.SubjectRequest(box=(0.5, 0.0, 0.2, 1.0), at_ms=166.7),
+        30.0, (100, 40),
+    )
+
+    assert selection.anchor_frame == 5
+    assert boxes == [b] * n
+
+
+def test_a_miss_falls_back_to_auto_and_says_why():
+    """🔴 조용히 떨어지지 않는다. 사용자는 자기가 찍은 대로 분석된 줄 안다."""
+    here = (0.0, 0.0, 20.0, 40.0)
+    n = 3
+    auto = _auto(n, here)
+    boxes, selection = pose.select_subject_boxes(
+        auto, [[here]] * n,
+        # 화면 반대편을 찍었다 — 겹치는 후보가 없다
+        pose.SubjectRequest(box=(0.8, 0.0, 0.2, 1.0), at_ms=0.0),
+        30.0, (100, 40),
+    )
+
+    assert boxes is auto
+    assert selection.source == "fallback"
+    assert "못 찾았다" in selection.why
+    assert selection.anchor_iou == 0.0
+
+
+def test_continuity_breaks_are_counted_not_hidden():
+    """후보가 사라진 프레임은 자동으로 떨어지고 **몇 번인지 남는다.**
+
+    직전 박스를 계속 들고 가면 첫 매칭 오류를 그대로 굳힌다.
+    """
+    a = (0.0, 0.0, 20.0, 40.0)
+    candidates = [[a], [], [a]]
+    boxes, selection = pose.select_subject_boxes(
+        [a, None, a], candidates,
+        pose.SubjectRequest(box=(0.0, 0.0, 0.2, 1.0), at_ms=0.0),
+        30.0, (100, 40),
+    )
+
+    assert selection.source == "specified"
+    assert selection.continuity_breaks == 1
+    assert boxes[1] is None, "끊긴 프레임은 자동 선택 결과를 그대로 쓴다"
+
+
+def test_pixel_coordinates_are_rejected_not_clamped():
+    """🔴 화면 픽셀을 그대로 보내면 **거부한다.**
+
+    조용히 클램프하면 엉뚱한 사람을 분석하고도 "지정대로 했다"고 답한다.
+    """
+    with pytest.raises(ValueError, match="정규화"):
+        pose.parse_subject_spec("745,380,225,410", 1000.0)
+
+
+def test_a_box_without_a_time_is_rejected():
+    with pytest.raises(ValueError, match="subject_at_ms"):
+        pose.parse_subject_spec("0.1,0.1,0.2,0.3", None)
+
+
+def test_no_box_means_auto():
+    assert pose.parse_subject_spec(None, None) is None
+
+
+def test_subject_envelope_normalizes_boxes_to_the_frontend_coordinate_system():
+    result = pose.PoseResult(
+        keypoints=np.zeros((2, 17, 3)), source_fps=30.0, sampled_fps=30.0,
+        subject_boxes=[(50.0, 20.0, 25.0, 40.0), None],
+        frame_size=(100, 80),
+    )
+
+    env = pose.subject_envelope(result, 2)
+
+    assert env["known"] is True
+    assert env["boxes"] == [[0.5, 0.25, 0.25, 0.5], None]
+    assert env["frames_with_box"] == 1
+    assert env["source"] == "auto"
+
+
+def test_subject_envelope_admits_it_knows_nothing_on_the_synthetic_path():
+    env = pose.subject_envelope(None, 12)
+
+    assert env["known"] is False
+    assert "합성" in env["why"]
+
+
+def test_area_jump_counts_a_likely_identity_switch():
+    """🔴 `continuity_breaks`가 못 잡는 실패를 이쪽이 센다.
+
+    신원이 바뀔 때는 겹침이 넉넉해서 "끊김"으로 안 잡힌다. 실측
+    (`3R1kvNrGJK0`)에서 타자 트랙이 심판으로 갈아탔을 때 끊김은 0이었고
+    넓이비는 5.5배였다.
+    """
+    small = (0.0, 0.0, 10.0, 10.0)
+    big = (0.0, 0.0, 20.0, 20.0)        # 넓이 4배
+    assert pose.count_area_jumps([small, small, big, big]) == 1
+
+
+def test_area_jump_ignores_gradual_growth():
+    """카메라로 다가오면 넓이는 실제로 커진다 — 그것까지 세면 신호가 죽는다."""
+    boxes = [(0.0, 0.0, 10.0 + i, 10.0 + i) for i in range(10)]
+    assert pose.count_area_jumps(boxes) == 0
+
+
+def test_area_jump_skips_frames_without_a_box():
+    """박스가 없는 프레임은 `continuity_breaks` 쪽 이야기다."""
+    box = (0.0, 0.0, 10.0, 10.0)
+    assert pose.count_area_jumps([box, None, box]) == 0
+
+
+def test_a_suspected_switch_downgrades_the_claim():
+    """🔴 봉투가 **하지 않은 일을 했다고 말하지 않는다.**
+
+    추적은 아직 못 고쳤다. 그렇다고 `specified` 하나로 내보내면 화면이
+    "지정하신 분으로 분석했습니다"라고 쓰게 된다 — 63%가 다른 사람이어도.
+    """
+    small = (0.0, 0.0, 10.0, 40.0)
+    big = (0.0, 0.0, 40.0, 40.0)        # 넓이 4배 — 갈아탄 것으로 의심
+    # 찍은 사람(small)이 3프레임째부터 후보에서 사라진다. 겹침은 남아 있어
+    # 끊김으로는 안 잡히고, 트랙이 조용히 big 으로 옮겨 간다 —
+    # 실클립에서 타자가 심판 앞을 지날 때 일어난 일과 같은 모양이다.
+    candidates = [[small, big], [small, big], [big], [big]]
+    boxes, selection = pose.select_subject_boxes(
+        [big] * 4, candidates,
+        pose.SubjectRequest(box=(0.0, 0.0, 0.1, 1.0), at_ms=0.0),
+        30.0, (100, 40),
+    )
+
+    assert boxes == [small, small, big, big]
+    assert selection.continuity_breaks == 0, "겹침이 있어 끊김으로는 안 잡힌다"
+
+    assert selection.source == "specified_uncertain"
+    assert selection.used_specification is True, "지정을 쓴 것은 맞다"
+    assert selection.is_uncertain is True
+    assert selection.area_jumps >= 1
+    assert "바뀌었을 수 있다" in selection.why
+
+
+def test_a_clean_track_keeps_the_plain_claim():
+    """의심이 없으면 낮추지 않는다 — 늘 의심이면 그 표시는 읽히지 않는다."""
+    box = (0.0, 0.0, 20.0, 40.0)
+    _, selection = pose.select_subject_boxes(
+        [box] * 4, [[box]] * 4,
+        pose.SubjectRequest(box=(0.0, 0.0, 0.2, 1.0), at_ms=0.0),
+        30.0, (100, 40),
+    )
+
+    assert selection.source == "specified"
+    assert selection.area_jumps == 0
+    assert selection.why == ""
+
+
+def test_auto_keeps_its_name_but_still_counts_jumps():
+    """auto 는 "이 사람을 따라갔다"고 주장한 적이 없다 — 낮출 주장이 없다."""
+    small = (0.0, 0.0, 10.0, 10.0)
+    big = (0.0, 0.0, 40.0, 40.0)
+    _, selection = pose.select_subject_boxes(
+        [small, big, big], [[]] * 3, None, 30.0, (100, 40)
+    )
+
+    assert selection.source == "auto"
+    assert selection.area_jumps == 1
