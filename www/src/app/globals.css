@@ -9289,7 +9289,10 @@ body:has(.ss-profile) {
    backdrop-filter는 컴포넌트에서 인라인으로 준다(위 규칙과 같은 이유). */
 .ss-matchbot {
   position: fixed;
-  right: 24px;
+  /* 🔴 오른쪽 아래는 로그아웃(.ss-home-footer, z-index 20)이 이미 쓰고
+     있다 — 같은 구석에 두면 더 높은 z-index(50)가 그 위를 완전히
+     덮는다(2026-09-04 실측). 왼쪽 아래로 둔다. */
+  left: 24px;
   bottom: 24px;
   z-index: 50;
   display: flex;
