@@ -11,6 +11,7 @@
   "grid_offset_frames": null,
   "at_clamped": false,
   "continuity_breaks": 0,
+  "area_jumps": 0,
   "frame_size": [
    1920,
    1080
@@ -1822,13 +1823,14 @@
  },
  "picked": {
   "known": true,
-  "source": "specified",
-  "why": "",
+  "source": "specified_uncertain",
+  "why": "닻(90프레임)에서는 찾았으나 이후 선택 박스 넓이가 2배 이상 뛴 자리가 1곳 있다 — 도중에 다른 사람으로 바뀌었을 수 있다",
   "anchor_frame": 90,
   "anchor_iou": 0.805,
   "grid_offset_frames": 0.0,
   "at_clamped": false,
   "continuity_breaks": 0,
+  "area_jumps": 1,
   "frame_size": [
    1920,
    1080
