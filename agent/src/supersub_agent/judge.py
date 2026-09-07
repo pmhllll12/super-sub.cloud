@@ -47,17 +47,18 @@ CRITERION_SCHEMA = {
     "additionalProperties": False,
 }
 
-SYSTEM_TEMPLATE = """당신은 {sport} 기술 평가관입니다. 항목의 등급은 이미 확정되어
-주어집니다. 당신의 일은 그 등급이 왜 나왔는지 선수에게 설명하는 문장을 쓰는 것입니다.
+SYSTEM_TEMPLATE = """당신은 {sport} 기술 평가관입니다. 판정은 이미 끝나 있고 결과가
+주어집니다. 당신의 일은 **선수의 자세를 서술하는 문장**을 쓰는 것입니다.
 
-- 주어진 등급을 전제로 씁니다. 등급을 다시 판정하거나 반박하지 않습니다.
-- **수치는 주어진 것만 씁니다.** 기준 구간은 이미 문장으로 제공되므로, 숫자를
-  새로 만들거나 범위를 넓혀 쓰지 않습니다.
-- 측정값이 그 기준의 어디에 위치하는지 짚고, 무엇을 고치면 되는지 한 마디 붙입니다.
+- 주어진 판정을 전제로 씁니다. 다시 판정하거나 반박하지 않습니다.
+- **등급 번호와 기준 구간은 쓰지 않습니다.** 그 표기는 화면에서 코드가 붙입니다.
+- **수치는 주어진 측정값만 씁니다.** 기준값·범위를 인용하거나 숫자를 새로
+  만들지 않습니다.
+- 측정값을 짚어 자세가 어땠는지 말하고, 무엇을 고치면 되는지 한 마디 붙입니다.
 
 출력 필드
-- evidence: 근거 문장 1~2개. 예: "임팩트 시 무릎각 141.7도로 2등급 기준
-  140~165도 범위의 하단에 있다. 조금 더 펴서 차면 발등 속도가 붙는다."
+- evidence: 근거 문장 1~2개. 예: "임팩트 시 무릎각 141.7도로 차는 다리가 거의
+  다 펴져 있다. 조금 더 펴서 차면 발등 속도가 붙는다."
 - metric_ref: 근거가 된 측정값의 이름."""
 
 # 종목 이름이 없으면 종목을 특정하지 않는 표현을 쓴다.
@@ -75,21 +76,12 @@ def system_prompt(sport: str = "") -> str:
 def band_text(criterion, grade: int) -> str:
     """확정된 등급의 수치 구간을 문장으로 만든다.
 
-    모델에게 구간을 **문장으로 확정해 주는** 자리다. 등급 정의만 주면 모델이
-    없는 상한을 지어낸다 — 실클립에서 "40도 이상"인 기준을 "40~165도"라고 써
-    선수 화면에 환각 수치가 나갔다.
+    🔴 **프롬프트는 이것을 쓰지 않는다.** 구간 문구는 화면 쪽 표기이고 정본은
+    `scoring.Criterion.band_text`다 — `aggregate`가 `band` 필드로 싣는다.
+    여기 남겨 둔 것은 조사 스크립트(`eval/.../evidence_audit.py`)가 부르기
+    때문이고, 판정 프롬프트에 이 값을 다시 넣지 않는다(미결 23번).
     """
-    parts = []
-    for lo, hi in criterion.bands.get(grade, ()):
-        if lo is None and hi is None:
-            continue
-        if lo is None:
-            parts.append(f"{hi:g} 이하")
-        elif hi is None:
-            parts.append(f"{lo:g} 이상")
-        else:
-            parts.append(f"{lo:g}~{hi:g}")
-    return " 또는 ".join(parts) if parts else ""
+    return criterion.band_text(grade)
 
 # transformers 5.15는 EXAONE 4.0/4.5를 네이티브 지원한다(원격 코드 불필요).
 # EXAONE 3.5는 trust_remote_code에 의존하는데, 그 원격 코드가
@@ -135,34 +127,43 @@ def build_prompt(criterion, metrics: dict[str, Any], grade: int) -> str:
 
     metrics는 이미 criterion.measured_by로 걸러진 것이어야 한다.
     grade는 scoring.Criterion.grade_for가 결정한 값이다 — 모델은 이를 전제로 쓴다.
+
+    🔴 **등급 번호도 기준 구간도 프롬프트에 넣지 않는다.** 예전에는 둘 다
+    넣었다. 구간을 안 주면 모델이 없는 상한을 지어냈고("40도 이상"이 화면에
+    "40~165도"로 나갔다), 주었더니 이번에는 그 구간을 문장에 옮겨 쓰면서 등급
+    번호까지 함께 틀렸다 — 감점 문장 11건 중 6건이 자기 등급과 반대로 말했다
+    (미결 23번). 그래서 모델에게는 **자세 서술만** 시키고 등급·칭호·구간은
+    `aggregate`가 붙인다. 프롬프트에 없는 숫자는 베껴 쓸 수 없다.
+
+    확정된 등급은 세 정의 중 **어느 것이 맞았는지**로만 전한다.
     """
     lines = [f"평가 항목: {criterion.id} ({criterion.name})"]
     if criterion.rationale:
         lines.append(f"\n항목 취지: {criterion.rationale.strip()}")
 
-    lines.append("\n채점 기준:")
+    # 좋은 것부터 나열하되 번호를 붙이지 않는다 — 번호가 있으면 문장에 샌다.
+    lines.append("\n이 항목의 수준 (좋은 것부터):")
     for g in (2, 1, 0):
-        mark = "  ← 확정된 등급" if g == grade else ""
-        lines.append(f"- {g}등급: {criterion.grades[g]}{mark}")
+        mark = "  ← 이번 판정" if g == grade else ""
+        lines.append(f"- {criterion.grades[g]}{mark}")
 
     if criterion.anchors:
-        lines.append("\n근거 문장 예시:")
+        lines.append("\n근거 문장 예시 (이 어투로 씁니다):")
         for a in criterion.anchors:
             measured = json.dumps(a["measured"], ensure_ascii=False)
-            lines.append(f"- 측정값 {measured} → {a['grade']}등급 ({a['evidence']})")
+            lines.append(f"- 측정값 {measured} → \"{a['evidence']}\"")
 
     lines.append("\n측정값 (이 숫자만 신뢰할 것):")
     lines.append(json.dumps(metrics, ensure_ascii=False, indent=2))
-    band = band_text(criterion, grade)
     lines.append(
-        f"\n확정된 등급은 {grade}등급입니다. "
-        f"{criterion.band_metric}={metrics.get(criterion.band_metric)}가 "
-        + (f"{grade}등급 구간({band})에 들어가기 때문입니다."
-           if band else f"{grade}등급 기준에 해당하기 때문입니다.")
+        f"\n이번 판정은 위 표시된 수준입니다. "
+        f"{criterion.band_metric}={metrics.get(criterion.band_metric)}가 그 근거입니다."
     )
-    if band:
-        lines.append(f"이 구간({band}) 외의 수치를 기준으로 인용하지 마세요.")
-    lines.append("이 등급에 대한 근거 문장을 JSON으로 출력하세요.")
+    lines.append(
+        "등급 번호나 기준 구간은 쓰지 마세요 — 측정값을 짚어 자세가 어땠는지만 "
+        "서술하고, 고칠 점을 한 마디 붙입니다."
+    )
+    lines.append("근거 문장을 JSON으로 출력하세요.")
     return "\n".join(lines)
 
 
