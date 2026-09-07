@@ -669,3 +669,29 @@ def test_the_old_three_tuple_still_unpacks(tmp_path):
     assert len(frames) == 30
     assert src_fps == pytest.approx(30.0)
     assert sampled_fps == pytest.approx(30.0)
+
+
+def test_the_guard_and_the_window_are_told_apart(tmp_path):
+    """무엇이 잘랐는지 구분한다 — 창과 가드는 뜻이 다르다.
+
+    창은 「여기까지 보기로 했다」이고 가드는 「더 들면 메모리가 터진다」다.
+    가드가 이기면 **의도한 창을 못 지킨 것**인데, 잘렸다는 사실만으로는
+    그 둘이 구분되지 않는다 (미결 ho 9번).
+    """
+    clip = write_clip(tmp_path / "c.avi", n_frames=90, fps=30.0)
+
+    by_window = pose.read_frames_ex(clip, target_fps=30, max_seconds=1.0)
+    by_guard = pose.read_frames_ex(clip, target_fps=30, max_frames=10, max_seconds=10.0)
+
+    assert by_window.limited_by == "window"
+    assert by_guard.limited_by == "memory_guard"
+
+
+def test_nothing_cut_means_nothing_to_blame(tmp_path):
+    """안 잘렸으면 범인도 없다 — 늘 값이 있으면 그 필드는 읽히지 않는다."""
+    clip = write_clip(tmp_path / "c.avi", n_frames=30, fps=30.0)
+
+    r = pose.read_frames_ex(clip, target_fps=30, max_seconds=10.0)
+
+    assert r.truncated is False
+    assert r.limited_by is None

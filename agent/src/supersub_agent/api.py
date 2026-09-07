@@ -189,6 +189,10 @@ def build_timebase(
         "truncated": bool(pose.truncated),
         # 원본 길이. 컨테이너가 모르면 None이다 — 지어내지 않는다.
         "source_seconds": pose.source_seconds,
+        # 무엇이 잘랐는가: "window"(보기로 한 만큼 봤다) · "memory_guard"
+        # (자원 때문에 **의도한 창을 못 지켰다**). 안 잘렸으면 None.
+        # 둘을 뭉뚱그리면 「10초 보기로 하고 6.7초만 봤다」가 안 보인다.
+        "limited_by": pose.limited_by,
         # 프레임 단위 지표를 초로. 어느 것이 인덱스이고 어느 것이 길이인지는
         # features.FRAME_INDEX_METRICS / FRAME_DURATION_METRICS 가 선언한다.
         "seconds": seconds,

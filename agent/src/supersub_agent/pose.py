@@ -252,6 +252,7 @@ class PoseResult:
     # 정한다. 기본값이 있어 이 필드를 모르는 기존 호출부는 그대로 동작한다.
     truncated: bool = False
     source_seconds: float | None = None
+    limited_by: str | None = None
     # 도구 궤적: 이름 → (T, 3) [중심 x, 중심 y, 신뢰도].
     # 미검출 프레임은 신뢰도 0으로 채운다 — 키포인트와 같은 규약이다.
     objects: dict[str, np.ndarray] = field(default_factory=dict)
@@ -349,6 +350,9 @@ class FrameRead(NamedTuple):
     truncated: bool
     # 원본 길이(초). 컨테이너가 총 프레임 수를 모르면 **None** — 지어내지 않는다.
     source_seconds: float | None
+    # 잘렸다면 **무엇이 잘랐는가**: "window"(분석 창) 또는 "memory_guard".
+    # 안 잘렸으면 None. 창과 가드는 뜻이 다르다 — 아래 `read_frames_ex` 참고.
+    limited_by: str | None
 
 
 def read_frames(
@@ -411,9 +415,18 @@ def read_frames_ex(
     # math.inf 는 "창 제한 없음"이다 — 메모리 가드만 남긴다. ceil(inf)가
     # OverflowError 를 내므로 먼저 걸러낸다.
     if math.isfinite(max_seconds):
-        limit = min(max_frames, max(1, math.ceil(max_seconds * sampled_fps)))
+        want = max(1, math.ceil(max_seconds * sampled_fps))
+        limit = min(max_frames, want)
     else:
+        want = math.inf
         limit = max_frames
+
+    # 🔴 **어느 상한이 이겼는지 기억해 둔다.** 둘은 뜻이 다르다 — 창은 "여기까지
+    # 보기로 했다"이고 가드는 "더 들면 메모리가 터진다"다. 가드가 이기면 **의도한
+    # 창이 지켜지지 않은 것**인데, 잘렸다는 사실만으로는 그 둘이 구분되지 않는다.
+    # 실효 fps가 30을 넘는 소스(원본 30.5~44.5fps는 step이 1이라 그대로 넘어온다)에서
+    # 10초 창이 최소 6.74초까지 줄어든다 — 측정은 `eval/pending9_window/`.
+    limited_by = "memory_guard" if limit < want else "window"
 
     if sampled_fps < target_fps * LOW_FPS_WARN_RATIO:
         _log.warning(
@@ -453,7 +466,10 @@ def read_frames_ex(
 
     if not frames:
         raise ValueError(f"프레임을 읽지 못했습니다: {video_path}")
-    return FrameRead(frames, src_fps, sampled_fps, truncated, source_seconds)
+    return FrameRead(
+        frames, src_fps, sampled_fps, truncated, source_seconds,
+        limited_by if truncated else None,
+    )
 
 
 def _largest_person_box(detections, threshold: float = 0.5):
@@ -929,6 +945,7 @@ def extract_keypoints(
         max_seconds=max_seconds,
         truncated=read.truncated,
         source_seconds=read.source_seconds,
+        limited_by=read.limited_by,
         objects=stack_object_tracks(obj_frames),
         candidate_counts=cand_counts,
         subject_boxes=subject_boxes,
