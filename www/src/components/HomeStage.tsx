@@ -115,6 +115,25 @@ export default function HomeStage({
    */
   const goOut = useCallback((next: boolean) => {
     if (next === outRef.current) return
+    /**
+     * 🔴 **여기서 바로 못박는다 — 렌더를 기다리면 안 된다.**
+     *
+     * 마우스 휠은 한 번 튕기면 `wheel` 이벤트가 여러 개 온다. `outRef` 를
+     * effect 에서만 갱신하면 그 전부가 **같은 옛 값**을 보고 각자 기록을
+     * 건드린다 — 내려갈 때 `pushState` 가 다섯 번 쌓이고, 올라올 때
+     * `history.back()` 이 다섯 번 나간다. 두 수가 다르면 남는 뒤로 가기가
+     * **화면 밖으로 걸어 나간다**(도메인에 올린 뒤 데스크톱 사용자들이 겪었다:
+     * 영상 모음에서 휠을 올렸더니 `/market` 으로 가거나 사이트를 떠났다.
+     * 2026-09-06 헤드리스로 재현 — 휠 1번 내리고 5번 올리면 `/market`).
+     *
+     * ⚠️ 맥북 트랙패드에서는 잘 안 드러난다. 손짓 하나가 이벤트 여럿이라는
+     * 것은 같지만, 그 사이에 `popstate` 가 끼어들면 다음 이벤트는 새 값을
+     * 보기 때문이다 — **안 나는 게 아니라 타이밍이 맞아야 난다.**
+     *
+     * 정본은 여전히 기록이다(`popstate` 가 마지막에 맞춘다). 이 값은 굴리는
+     * 도중에 같은 걸음을 두 번 걷지 않기 위한 **자물쇠**다.
+     */
+    outRef.current = next
     if (next) {
       stepped.current = true
       window.history.pushState({ ssHome: 'feed' }, '')
@@ -167,14 +186,30 @@ export default function HomeStage({
     }
     const dirOf = (d: number) => (d > DEAD ? 1 : d < -DEAD ? -1 : 0)
 
+    /**
+     * 🔴 **제 굴림을 가진 판 위에서는 이 신호를 안 받는다**(사용자 지적:
+     * 챗봇 대화를 훑으려다 화면이 통째로 내려갔다).
+     *
+     * 판이 `overscroll-behavior: contain` 을 써도 소용없다 — 그것은 굴림이
+     * **뒤 화면으로 새는 것**만 막고, `wheel` 이벤트가 창까지 올라오는 것은
+     * 못 막는다. 여기서 어디서 굴렸는지를 보고 갈라야 한다.
+     *
+     * `HeroGate` 가 목록 판이 열렸을 때 쓰는 것과 같은 판단이고, 방식만
+     * 다르다 — 거기는 표시 하나(`dataset.ssDetail`)로 충분한데 여기는 한
+     * 자리에 판이 셋(챗봇 · 지인 찾기 · AI 추천)이라 **굴린 자리**로 본다.
+     */
+    const onOwnPanel = (t: EventTarget | null) =>
+      t instanceof Element && t.closest('.ss-matchbot, .ss-suggest') !== null
+
     const onWheel = (e: WheelEvent) => {
-      if (e.ctrlKey) return
+      if (e.ctrlKey || onOwnPanel(e.target)) return
       move(dirOf(e.deltaY))
     }
     const onTouchStart = (e: TouchEvent) => {
       touchY = e.touches[0]?.clientY ?? 0
     }
     const onTouchMove = (e: TouchEvent) => {
+      if (onOwnPanel(e.target)) return
       // 손가락이 위로 = 내용은 아래로 = 내리는 것.
       move(dirOf(touchY - (e.touches[0]?.clientY ?? 0)))
     }
