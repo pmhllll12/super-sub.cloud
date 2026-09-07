@@ -81,6 +81,9 @@ uv run pytest tests/ -q     # 초록이 기본값이다
 | `test_keypoint_source.py::test_left_right_pairs_do_not_cross` | 좌우 관절이 뒤바뀐 채 지나가는 것 |
 | `test_observability.py::test_eligible_threshold_matches_the_selector` | 관측 기준과 selector 동작 기준이 갈라지는 것 |
 | `test_deploy_paths.py` | vLLM 백엔드가 **다른 모델을 서빙해도** 조용히 판정하는 것 |
+| `test_worker.py::test_a_single_video_propagates_its_exit_code` | 실패한 분석이 `succeeded` 로 보고되는 것 (리포트가 없는데 큐는 줄어든다) |
+| `test_worker.py::test_the_command_always_names_a_rubric` | 야구·농구를 **축구 루브릭으로** 채점하는 것 (`--rubric` 기본값이 축구다) |
+| `test_worker.py::test_the_analysis_child_is_seen_as_busy_by_autostop` | 분석 도중에 인스턴스가 꺼지는 것 (그 작업은 `running` 인 채 남는다) |
 
 ## 남의 영역
 

@@ -1,0 +1,48 @@
+# Super-Sub 분석 워커 — 백엔드 큐를 폴링해 analyze_s3.py 를 돌리고 결과를 보고한다.
+#
+# 설치:
+#   sudo mkdir -p /etc/supersub
+#   sudo cp agent/deploy/worker.env.example /etc/supersub/worker.env
+#   sudo vi /etc/supersub/worker.env          # SUPERSUB_WORKER_TOKEN 을 채운다
+#   sudo chmod 600 /etc/supersub/worker.env
+#   sudo cp agent/deploy/supersub-worker.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now supersub-worker
+#
+# 환경값은 /etc/supersub/worker.env 에 둔다 (유닛 파일은 저장소에 커밋되므로
+# 토큰 같은 배포별 값을 여기 적지 않는다).
+
+[Unit]
+Description=Super-Sub 분석 워커 (analysis-jobs 큐 폴링)
+# 판정 서버가 먼저 떠 있어야 한다. Wants 라 vLLM 이 죽어도 워커는 살아 있고,
+# 그때 작업은 failed 로 사유가 남는다 — 조용히 멈추는 것보다 낫다.
+After=network-online.target supersub-vllm.service
+Wants=network-online.target supersub-vllm.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/super-sub.cloud/agent
+EnvironmentFile=/etc/supersub/worker.env
+
+# uv sync 가 만든 venv 의 파이썬이다. 워커가 부르는 analyze_s3.py 도 같은
+# 인터프리터(sys.executable)로 도므로 의존성이 갈릴 일이 없다.
+ExecStart=/home/ubuntu/super-sub.cloud/agent/.venv/bin/python scripts/worker.py
+
+Restart=always
+RestartSec=15
+# 🔴 설정 오류(토큰 없음·401)로 끝나면 재시작하지 않는다. 재시작해도 그대로라
+# 저널이 401 로 차서 정작 고쳐야 할 줄이 묻힌다. 값을 고치고 다시 start 한다.
+RestartPreventExitStatus=78
+
+# 🔴 멈출 때 시간을 준다. 분석 중이면 워커가 자식을 끊고 그 작업을 failed 로
+# **보고한 뒤** 나간다. 여기서 SIGKILL 하면 그 작업이 running 인 채로 남고,
+# 회수 규칙이 아직 없어서(worker-interface.md 「아직 없는 것」) 사실상 영구다.
+KillSignal=SIGTERM
+TimeoutStopSec=90
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -151,9 +151,13 @@ cat agent/eval/pending6_side/labeling/EXCLUDED.md
 | 22. 골반 회전과 카메라 축 | 각도가 회전의 일부만 담는다(24%). 실클립 n=4로는 지표 문제인지 포즈 품질인지 못 가른다 |
 | 2 · min 4. 골든셋 라벨링 주체 | 사람 검수자 미확보. 위 셋의 공통 병목이다 |
 
+| jin 18. 분석 워커 폴링 루프 | ✅ **`scripts/worker.py` + `deploy/supersub-worker.service`** (2026.09.07). 백엔드 큐를 폴링해 `analyze_s3.py` 를 돌리고 결과를 보고한다. **EC2 설치·토큰 주입은 아직 안 했다** — 토큰 값을 정어진 님께 받아야 한다 |
+
 **남의 영역이라 기다리는 것**: 1·15(라이선스, 박민호) · 4(GPU 조달, 정어진) ·
-17(S3 큐 소비자, 정어진 — **에이전트 쪽 소비 형태는 만들어 뒀다**:
-`analyze_s3.py <접두사> --skip-analyzed`) · 18(계약, 정어진).
+17(S3 큐 소비자 — **양쪽 다 만들어졌다**: 백엔드 `claim`/`PATCH`(정어진) +
+워커 루프(위 jin 18). 접두사 스캔 형태도 남아 있다: `analyze_s3.py <접두사>
+--skip-analyzed`) · 18(계약, 정어진) · **jin 1(적재 규격 — 담당이 나다.
+`POST /analyses` 가 여기 막혀 있어 워커 산출물이 `reports/` JSON 까지다)**.
 
 ---
 
@@ -222,7 +226,7 @@ cat agent/eval/pending6_side/labeling/EXCLUDED.md
 | | |
 |---|---|
 | HEAD | `f7812b8` (브랜치 `ho`, `origin/ho`보다 앞서 있음). 로컬 `main`은 `edf9e0f`까지 당겨 뒀고 **아직 `ho`에 흡수하지 않았다** |
-| 테스트 | **210 통과** (`cd agent && uv run pytest -q`) |
+| 테스트 | **248 통과** (`cd agent && uv run pytest -q`) |
 | 루브릭 | active 3(축구 인스텝·야구 투구·농구 점프슛) · draft 3(축구 인사이드·농구 레이업·**야구 타격**) |
 | `DEFAULT_TARGET_FPS` | **30** (2026-09-02에 15에서 올림) |
 | `DEFAULT_MAX_FRAMES` | **300** — 메모리 가드이지 분석 의도가 아니다 |
