@@ -225,7 +225,7 @@ cat agent/eval/pending6_side/labeling/EXCLUDED.md
 
 | | |
 |---|---|
-| HEAD | `f7812b8` (브랜치 `ho`, `origin/ho`보다 앞서 있음). 로컬 `main`은 `edf9e0f`까지 당겨 뒀고 **아직 `ho`에 흡수하지 않았다** |
+| HEAD | `60e6e19` (브랜치 `ho`, `origin/ho`보다 앞서 있음). 로컬 `main`은 `edf9e0f`까지 당겨 뒀고 **아직 `ho`에 흡수하지 않았다** |
 | 테스트 | **248 통과** (`cd agent && uv run pytest -q`) |
 | 루브릭 | active 3(축구 인스텝·야구 투구·농구 점프슛) · draft 3(축구 인사이드·농구 레이업·**야구 타격**) |
 | `DEFAULT_TARGET_FPS` | **30** (2026-09-02에 15에서 올림) |
