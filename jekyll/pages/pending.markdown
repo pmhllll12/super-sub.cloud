@@ -3375,8 +3375,8 @@ https://<API 호스트>/api/v1/internal/analysis-jobs/claim
 이 저장소가 공개인데 `_posts/`·`pending.markdown`(+ `부록E-결정기록.markdown`)에
 **AWS 계정 ID(대시 표기 포함)·공인 IP·VPC/서브넷/보안그룹/인스턴스/EIP 할당 ID·
 IAM 역할명·API 호스트명**이 그대로 있었고, `pages.yml` 로 `dev.supersub-ai.com` 에
-배포되고 있었습니다. `_notes/ERRORS.md` 09-03 이 공인 IP 건을 한 번 지적했는데 그
-뒤로 더 늘어 있었습니다.
+배포되고 있었습니다. 공인 IP 건은 09-03 에 한 번 짚였는데 그 뒤로 더 늘어
+있었습니다.
 
 **두 커밋에 걸쳐 정리했습니다.** 규칙은 루트 `CLAUDE.md` 「공개 사이트에 인프라
 식별자를 쓰지 않습니다」에 명시했습니다.
