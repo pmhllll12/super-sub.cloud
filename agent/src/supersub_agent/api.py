@@ -182,6 +182,13 @@ def build_timebase(
         "step": max(1, round(float(pose.source_fps) / sampled_fps)) if sampled_fps else None,
         "frames": frame_count,
         "analyzed_seconds": round(frame_count / sampled_fps, 3),
+        # 🔴 **뒷부분을 안 봤으면 그렇게 말한다.** 업로드 상한(60초)이 분석
+        # 창(10초)보다 길어서 조용히 앞부분만 분석되고 있었다 — 사용자에게는
+        # 아무 표시도 안 났다(미결 jin 11번). 상한을 어느 쪽에 맞출지는 아직
+        # 결정 전이고, 결정과 무관하게 **잘렸다는 사실**은 봉투에 있어야 한다.
+        "truncated": bool(pose.truncated),
+        # 원본 길이. 컨테이너가 모르면 None이다 — 지어내지 않는다.
+        "source_seconds": pose.source_seconds,
         # 프레임 단위 지표를 초로. 어느 것이 인덱스이고 어느 것이 길이인지는
         # features.FRAME_INDEX_METRICS / FRAME_DURATION_METRICS 가 선언한다.
         "seconds": seconds,

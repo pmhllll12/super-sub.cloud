@@ -17,6 +17,7 @@ import logging
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import NamedTuple
 
 import cv2
 import numpy as np
@@ -247,6 +248,10 @@ class PoseResult:
     # 길어져 프레임과 인덱스가 어긋난다. 기본값을 쓰면 기존 호출부는 그대로다.
     max_frames: int = DEFAULT_MAX_FRAMES
     max_seconds: float = DEFAULT_MAX_SECONDS
+    # 상한에 걸려 뒷부분을 안 봤는가 · 원본 길이(모르면 None). `read_frames_ex`가
+    # 정한다. 기본값이 있어 이 필드를 모르는 기존 호출부는 그대로 동작한다.
+    truncated: bool = False
+    source_seconds: float | None = None
     # 도구 궤적: 이름 → (T, 3) [중심 x, 중심 y, 신뢰도].
     # 미검출 프레임은 신뢰도 0으로 채운다 — 키포인트와 같은 규약이다.
     objects: dict[str, np.ndarray] = field(default_factory=dict)
@@ -331,15 +336,46 @@ class PoseResult:
         return float((track[:, 2] > 0).mean())
 
 
+class FrameRead(NamedTuple):
+    """`read_frames_ex`의 결과. 앞 셋은 옛 `read_frames`의 3-튜플과 같다."""
+
+    frames: list[np.ndarray]
+    source_fps: float
+    sampled_fps: float
+    # 🔴 **상한에 걸려 뒷부분을 안 봤는가.** 영상이 거기서 끝난 것과 우리가
+    # 끊은 것은 다르다. 업로드 상한(60초)이 분석 창(10초)보다 길어서 **조용히
+    # 앞부분만 분석되고 있었다**(미결 jin 11번). 봉투가 말하지 않으면 화면도
+    # 사용자도 그 사실을 알 길이 없다.
+    truncated: bool
+    # 원본 길이(초). 컨테이너가 총 프레임 수를 모르면 **None** — 지어내지 않는다.
+    source_seconds: float | None
+
+
 def read_frames(
     video_path: str | Path,
     target_fps: int = DEFAULT_TARGET_FPS,
     max_frames: int = DEFAULT_MAX_FRAMES,
     max_seconds: float = DEFAULT_MAX_SECONDS,
 ) -> tuple[list[np.ndarray], float, float]:
+    """`read_frames_ex`의 앞 세 값만 돌려주는 껍데기.
+
+    **호출부 30곳이 3-튜플로 받고 있고 그중 다수가 보존 대상 평가 스크립트다.**
+    반환형을 넓히면 그것들이 전부 깨지므로, 본체는 `read_frames_ex`에 두고
+    이쪽은 그대로 남긴다. 새로 쓰는 곳은 `read_frames_ex`를 쓴다.
+    """
+    r = read_frames_ex(video_path, target_fps, max_frames, max_seconds)
+    return r.frames, r.source_fps, r.sampled_fps
+
+
+def read_frames_ex(
+    video_path: str | Path,
+    target_fps: int = DEFAULT_TARGET_FPS,
+    max_frames: int = DEFAULT_MAX_FRAMES,
+    max_seconds: float = DEFAULT_MAX_SECONDS,
+) -> FrameRead:
     """OpenCV로 디코딩하고 target_fps에 가장 가까운 정수 간격으로 다운샘플링한다.
 
-    반환값은 (프레임, 원본 fps, **실효** 샘플링 fps)다.
+    반환값은 (프레임, 원본 fps, **실효** 샘플링 fps, 잘렸는가, 원본 길이)다.
 
     간격이 정수라 target_fps를 그대로 달성하지 못한다 — 25fps 영상에 target 15를
     주면 step=round(1.67)=2, 즉 실효 12.5fps다. 목표값을 실효값인 양 기록하면
@@ -387,20 +423,37 @@ def read_frames(
             sampled_fps, target_fps, src_fps, step,
         )
 
+    # 원본 길이. 총 프레임 수를 모르는 컨테이너가 있어(0이나 음수를 낸다)
+    # 값이 성립할 때만 쓴다 — **모르면 None이고 지어내지 않는다.**
+    total = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+    source_seconds = (
+        round(total / src_fps, 3)
+        if total and total > 0 and src_fps > 0 and math.isfinite(total)
+        else None
+    )
+
     frames: list[np.ndarray] = []
     idx = 0
+    ended = False
     while len(frames) < limit:
         ok, frame = cap.read()
         if not ok:
+            ended = True
             break
         if idx % step == 0:
             frames.append(frame)
         idx += 1
+
+    # 상한에 걸려 멈춘 것인가, 영상이 끝난 것인가. **한 장 더 읽어 보고 정한다** —
+    # 총 프레임 수는 컨테이너가 틀리게 적어 두는 경우가 있어 근거로 삼지 않는다.
+    truncated = False
+    if not ended:
+        truncated = bool(cap.read()[0])
     cap.release()
 
     if not frames:
         raise ValueError(f"프레임을 읽지 못했습니다: {video_path}")
-    return frames, src_fps, sampled_fps
+    return FrameRead(frames, src_fps, sampled_fps, truncated, source_seconds)
 
 
 def _largest_person_box(detections, threshold: float = 0.5):
@@ -774,9 +827,8 @@ def extract_keypoints(
     )
 
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-    frames, src_fps, sampled_fps = read_frames(
-        video_path, target_fps, max_frames, max_seconds
-    )
+    read = read_frames_ex(video_path, target_fps, max_frames, max_seconds)
+    frames, src_fps, sampled_fps = read.frames, read.source_fps, read.sampled_fps
 
     det_processor = AutoProcessor.from_pretrained(PERSON_DETECTOR)
     detector = RTDetrForObjectDetection.from_pretrained(PERSON_DETECTOR).to(device).eval()
@@ -875,6 +927,8 @@ def extract_keypoints(
         target_fps=target_fps,
         max_frames=max_frames,
         max_seconds=max_seconds,
+        truncated=read.truncated,
+        source_seconds=read.source_seconds,
         objects=stack_object_tracks(obj_frames),
         candidate_counts=cand_counts,
         subject_boxes=subject_boxes,
