@@ -6,6 +6,7 @@ import PlayerCardView from '@/components/PlayerCardView'
 import BlankPlayerCard from '@/components/BlankPlayerCard'
 import SquadSuggest from '@/components/SquadSuggest'
 import SquadFriends from '@/components/SquadFriends'
+import MatchBot from '@/components/MatchBot'
 
 /**
  * 홈 첫 화면의 스쿼드 판 — 판 하나 위에 선수 카드를 **포지션 자리대로**
@@ -71,6 +72,8 @@ export default function SquadPanel({
   squad = null,
   friendSearch = false,
   onCloseFriendSearch,
+  bot = false,
+  onBotChange,
 }: {
   card?: PublicPlayerCard | null
   /**
@@ -83,6 +86,15 @@ export default function SquadPanel({
   /** 알약 '지인 찾기' 가 골라져 있는가 — 켜지면 판 옆에 지인 찾기가 열린다. */
   friendSearch?: boolean
   onCloseFriendSearch?: () => void
+  /**
+   * AI 챗봇이 열려 있는가 — 켜지면 **지인 찾기와 같은 자리**에서 나온다.
+   *
+   * 🔴 챗봇 자체는 `HomeStage` 것이지만 그릴 자리는 여기다. 판 오른쪽
+   * (`left: 100%`)은 `.ss-squad-wrap` 안에서만 잡히는 좌표라, 바깥에서
+   * 그리면 그 자리를 다시 재서 옮겨야 한다 — 자리를 정하는 곳이 둘이 된다.
+   */
+  bot?: boolean
+  onBotChange?: (next: boolean) => void
 }) {
   /* 🔴 서버가 준 것을 **첫 값으로만** 읽는다. 그 뒤로는 이 화면이 들고 있다 —
      넣기 · 빼기가 아직 서버로 안 가므로(위 주석), 매번 서버 값으로 되돌리면
@@ -291,6 +303,9 @@ export default function SquadPanel({
                     }
                     clearTimeout(timer.current)
                     setClosing(null)
+                    // 🔴 추천 판도 챗봇과 **같은 자리**에 선다 — 켜져 있으면
+                    // 먼저 물린다(그냥 열면 챗봇 뒤에 가려 나온다).
+                    onBotChange?.(false)
                     setPicking(slot)
                   }}
                 >
@@ -333,6 +348,27 @@ export default function SquadPanel({
           onClose={() => onCloseFriendSearch?.()}
         />
       )}
+
+      {/* 🔴 AI 단추는 **판의 오른쪽 변에 붙는다**(사용자 요청). 그래서
+          알약 줄이 아니라 **여기**서 그린다 — 판 폭은 `width: max-content`
+          라 CSS 상수가 없고(내용이 정한다), 판 바깥에서 맞추려면 그 폭을
+          다시 재서 두 곳에서 자리를 정하게 된다. 판 안에서는 `right: 0`
+          한 줄이면 무슨 폭이든 정확히 오른쪽 끝이다. */}
+      <button
+        type="button"
+        className="ss-home-ai ss-traveling-edge"
+        aria-label="AI 용병 찾기"
+        aria-expanded={bot}
+        onClick={() => onBotChange?.(!bot)}
+      >
+        AI
+      </button>
+
+      {/* AI 챗봇 — 지인 찾기 · 추천 판과 **같은 자리**다(사용자 요청).
+          ⚠️ 셋이 한 자리를 쓰므로 겹칠 수 있다. 지금은 여는 길이 서로 달라
+          (알약 · AI 단추 · 빈 자리 누르기) 실제로 겹치는 일은 없지만, 새로
+          여는 길을 붙일 때는 이 자리를 이미 누가 쓰고 있는지 봐야 한다. */}
+      {bot && <MatchBot open onClose={() => onBotChange?.(false)} />}
 
       {/* 추천 판 — 스쿼드 판 오른쪽에서 미끄러져 나온다. */}
       {shown && (

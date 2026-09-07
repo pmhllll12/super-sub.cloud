@@ -3,10 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PublicPlayerCard, Squad } from '@/server/backend'
 import SquadPanel from '@/components/SquadPanel'
-import MatchBot from '@/components/MatchBot'
 import SiteHeader from '@/components/SiteHeader'
 import HomeNav, { type Destination } from '@/components/HomeNav'
-import { FRIEND_SEARCH, MATCH_BOT } from '@/lib/destinations'
+import { FRIEND_SEARCH } from '@/lib/destinations'
 import { useIntroDone } from '@/lib/useIntroDone'
 import { useHideChrome, useLeaving } from '@/lib/pageTransition'
 import LogoutButton from '@/components/LogoutButton'
@@ -277,7 +276,42 @@ export default function HomeStage({
    */
   const [picked, setPicked] = useState<string | null>(defaultActive)
   const friendSearch = picked === FRIEND_SEARCH
-  const matchBot = picked === MATCH_BOT
+  /**
+   * 챗봇이 열려 있는가.
+   *
+   * 🔴 **알약(`picked`)과 떼어 놓는다**(사용자 요청). 한때 `picked === '용병
+   * 찾기'` 로 열었는데, 그 값이 `defaultActive` 로 시작하는 바람에 **홈에
+   * 들어오자마자 떠 있었고 닫기(×)를 눌러도 `defaultActive` 로 되돌아가
+   * 다시 열렸다**(실측). 여는 자리를 제 단추 하나로 옮기면서 그 얽힘이
+   * 통째로 없어졌다 — 알약 셋은 이제 챗봇과 아무 상관이 없다.
+   */
+  const [bot, setBot] = useState(false)
+
+  /**
+   * 🔴 **판 오른쪽 자리는 한 번에 하나만 쓴다**(사용자 지적: AI 를 켠 채
+   * 지인 찾기를 누르면 AI 가 사라지지 않고 **그 뒤에** 나왔다).
+   *
+   * 셋(챗봇 · 지인 찾기 · AI 추천)이 같은 좌표에 서므로 z 를 아무리 손봐야
+   * 뒤에 가려질 뿐이다 — 여는 쪽에서 **다른 것을 닫는 것**이 맞다.
+   *
+   * 알약 선택을 `defaultActive` 로 되돌리는 것은 지인 찾기 판의 × 가 하는
+   * 것과 같다 — 알약 하나는 늘 골라져 있어야 "고르는 자리"로 읽힌다.
+   */
+  const showBot = useCallback(
+    (next: boolean) => {
+      setBot(next)
+      if (!next) return
+      setPicked(defaultActive)
+      setActive(defaultActive)
+    },
+    [defaultActive],
+  )
+
+  /** 알약을 고르면 챗봇은 물러난다 — 위와 같은 이유로 자리가 하나다. */
+  const pick = useCallback((title: string | null) => {
+    setPicked(title)
+    setBot(false)
+  }, [])
 
   return (
     <>
@@ -323,13 +357,18 @@ export default function HomeStage({
                 variant="pill"
                 label="주요 목적지"
                 picked={picked}
-                onPick={setPicked}
+                onPick={pick}
               />
             </div>
             <SquadPanel
               card={card}
               squad={squad}
               friendSearch={friendSearch}
+              // 🔴 챗봇도 **판 오른쪽 그 자리**에서 나온다(사용자 요청) —
+              // 지인 찾기 · AI 추천과 같은 자리다. 그 자리는 `.ss-squad-wrap`
+              // 안에서만 잡히므로(`left: 100%`) 여기서 못 그리고 판에 넘긴다.
+              bot={bot}
+              onBotChange={showBot}
               // 판의 × 로 닫으면 알약 선택도 같이 풀려야 한다 — 안 그러면
               // 고른 채로 판만 없어져 다시 눌러도 안 열린다.
               onCloseFriendSearch={() => {
@@ -374,15 +413,6 @@ export default function HomeStage({
         </div>
       )}
 
-      {/* 스쿼드 판과 달리 자리(포지션 슬롯)와 무관해 그 판 안에 넣지 않고
-          독립된 떠 있는 판으로 연다 — SquadPanel 은 스쿼드 레이아웃 전용이다. */}
-      <MatchBot
-        open={matchBot}
-        onClose={() => {
-          setPicked(defaultActive)
-          setActive(defaultActive)
-        }}
-      />
     </>
   )
 }
