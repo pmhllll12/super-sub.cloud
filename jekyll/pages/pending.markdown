@@ -2716,7 +2716,21 @@ ssh supersub 'systemctl is-active postgresql supersub-api'   # active active
 - ~~IAM 역할~~ ✅ **해소 (2026.09.03)** — `supersub-video` 를 붙였고 업로드가 실물에서 돕니다
 - **남은 것은 A 레코드와 80·443 개방뿐입니다.** 둘 다 외부 공개를 정하는 날 함께 하면 됩니다
 
-### 9. `agent/`·`flutter/` 에 진입점 문서가 없습니다 (2026-09-02)
+### 9. `agent/`·`flutter/` 에 진입점 문서가 없습니다 (2026-09-02) — `agent/` 만 해소 (2026.09.07)
+
+> **`agent/CLAUDE.md` 를 만들었습니다** (정상호). `flutter/` 는 그대로입니다 —
+> 담당이 백성검이라 제가 쓰지 않았습니다.
+>
+> 확인: `ls agent/CLAUDE.md` → 있음 / `ls flutter/CLAUDE.md flutter/AGENTS.md`
+> → 아직 없음.
+>
+> 루트 `CLAUDE.md` 의 「코드 폴더는 담당자가 있습니다」 표에서 `agent/` 칸이
+> `—` 였던 것도 `agent/CLAUDE.md` 로 채웠습니다.
+>
+> **복사하지 말라는 것을 지켰습니다.** 루트 규칙과 `agent/README.md`(설계·환경)
+> 는 포인터만 두고, 이 폴더에서만 통하는 것을 적었습니다 — 사전 등록·조사와
+> 구현의 분리 같은 일하는 방식, `features` 를 바꾸면 B-6 재실행을 부른다는
+> 값비싼 실수 넷, **지워서는 안 되는 검사 넷**의 이름과 각각이 막고 있는 것.
 
 요청이 상대에게 닿으려면 **Claude 가 자동으로 읽는 자리**에 있어야 합니다. 지금은
 이렇습니다.

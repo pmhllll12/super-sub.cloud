@@ -75,7 +75,7 @@ Jekyll 소스 루트는 **저장소 루트 자체**입니다 (`_config.yml`이 �
 | `fastapi/` | **정어진** (백엔드·DB·API 계약) | `fastapi/CLAUDE.md` |
 | `www/` | 백성검 (Next.js 웹) | `www/AGENTS.md` |
 | `flutter/` | 백성검 (앱) | — |
-| `agent/` | 정상호 (분석·루브릭) | — |
+| `agent/` | 정상호 (분석·루브릭) | `agent/CLAUDE.md` |
 
 🔴 **남의 폴더를 고쳐야 하면 그 폴더의 진입점 문서를 먼저 읽습니다.** 거기에
 그 영역의 관례(테스트 구조·마이그레이션 규칙·지우면 안 되는 검사)가 있고,
