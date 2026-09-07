@@ -1220,7 +1220,7 @@ RT-DETR을 다시 돌려야 하는데, 그 클립은 Kinetics/YouTube 원본이�
 ### 16. AWS 계정에서 `ho`가 IAM·할당량을 못 쓴다 (2026.09.02) ✅ 해소 (2026.09.03)
 
 분석 에이전트를 올릴 AWS 자원을 콘솔에서 직접 만들고 있는데(계정
-`0706-0555-3723`, 서울), IAM 사용자 `ho`의 권한이 서비스별로 갈려 있다.
+`<AWS 계정 ID>`, 서울), IAM 사용자 `ho`의 권한이 서비스별로 갈려 있다.
 
 | 서비스 | 되나 | 확인된 것 |
 |---|---|---|
@@ -2570,13 +2570,13 @@ www/src/app/(app)/me/page.test.tsx:285     "부탁해야 생긴다" 테스트
 안 보이니 찾으실 때 참고하십시오(`fastapi/docs/deployment.md` 4절).
 
 ```bash
-curl -s -o /dev/null -w '%{http_code}\n' https://api.supersub-ai.com/health   # 200
+curl -s -o /dev/null -w '%{http_code}\n' https://<API 호스트>/health   # 200
 ssh supersub 'systemctl cat supersub-api | grep -c proxy-headers'             # 1
 ```
 
 ⚠️ **인스턴스를 끄면 `000`(연결 타임아웃)이 납니다 — 설정이 풀린 게 아닙니다.**
 2026-09-04에 실제로 그랬고, 그때도 DNS는 `<서버 IP>`로 정상 해석됐습니다.
-설정이 살아 있는지만 보려면 `getent hosts api.supersub-ai.com`으로 갈립니다.
+설정이 살아 있는지만 보려면 `getent hosts <API 호스트>`으로 갈립니다.
 
 🟡 **아직 없는 것 셋** — 지금 막는 것은 없지만 적어 둡니다. HSTS ·
 `client_max_body_size`(기본 1MB) · `proxy_read_timeout`(기본 60초).
@@ -2602,7 +2602,7 @@ DB 는 **같은 인스턴스**에 두기로 정해졌습니다(비용 없음, �
 
 #### 정해진 것 (2026-09-02)
 
-- 백엔드 주소는 **`api.supersub-ai.com`** 으로 합니다
+- 백엔드 주소는 **`<API 호스트>`** 으로 합니다
 - **80·443 개방은 아직 하지 않습니다.** 지금은 SSH 터널로 개발·시연이 됩니다
 - 인스턴스를 주기적으로 껐다 켜므로 **탄력적 IP** 를 붙입니다
 
@@ -2612,7 +2612,7 @@ DB 는 **같은 인스턴스**에 두기로 정해졌습니다(비용 없음, �
 고정이라 껐다 켜도 안 바뀝니다. SSH·서비스 셋(`postgresql`·`supersub-api`·백업
 타이머) 전부 확인했습니다.
 
-**그래서 `api.supersub-ai.com` A 레코드를 이제 만들 수 있습니다** — 아래 표의
+**그래서 `<API 호스트>` A 레코드를 이제 만들 수 있습니다** — 아래 표의
 "그 다음"이 열렸습니다. 다만 **80·443 개방과 인증서는 여전히 외부 공개를 정하는
 날 함께** 하므로, A 레코드도 그때 만드셔도 됩니다(먼저 만들어도 무방합니다).
 
@@ -2649,7 +2649,7 @@ IPv4** 에 시간당 $0.005 를 매깁니다 — **켜져 있는 동안에도 �
 | | |
 |---|---|
 | ~~부탁드릴 것~~ | ✅ **끝났습니다** — 2026-09-03 에 붙였습니다. **정정**: 새로 할당하지 않고 계정에 이미 떠 있던 미사용 탄력적 IP(`<탄력적 IP 할당 ID>`, `<서버 IP>` — `pmh12-instance`의 것과는 다릅니다)를 재활용했습니다(박민호) |
-| **그 다음** | ~~`api.supersub-ai.com` A 레코드~~ **✅ 이것도 같은 날 끝났습니다** — 가비아 A 레코드·80·443 개방·nginx+Let's Encrypt HTTPS까지 다 됐습니다(박민호). 절차는 paik 구역 1번 참고 |
+| **그 다음** | ~~`<API 호스트>` A 레코드~~ **✅ 이것도 같은 날 끝났습니다** — 가비아 A 레코드·80·443 개방·nginx+Let's Encrypt HTTPS까지 다 됐습니다(박민호). 절차는 paik 구역 1번 참고 |
 | 확인 | 껐다 켠 뒤에도 같은 IP 로 붙으면 된 것입니다 |
 
 #### ✅ IAM 인스턴스 역할 — 붙였습니다, **업로드가 실물에서 돕니다** (2026-09-03 해소)
@@ -2841,7 +2841,7 @@ ssh supersub 'systemctl is-active postgresql supersub-api'   # active active
 - 확인: `grep -c 'return mockBackend' www/src/server/backend/index.ts` → 1
   (mock 분기 하나만 남음)
 - 검증: `tsc --noEmit`·`eslint`·`next build`·시험 250개 전부 통과. 실제
-  EC2까지는 오늘 nginx+HTTPS를 새로 올려서 `https://api.supersub-ai.com`으로
+  EC2까지는 오늘 nginx+HTTPS를 새로 올려서 `https://<API 호스트>`으로
   직접 확인했습니다(미결 jin 8번 참고)
 - 🔴 **백성검 님께**: 원래 담당 항목이라 알려드립니다. 로그인·회원가입·프로필·
   관리자 화면이 오늘부터 **실제 DB를 봅니다** — mock의 데모 계정
@@ -3274,7 +3274,7 @@ POST /videos ──> analysis_job(queued)              ← 이미 있음
 **배포했고 `WORKER_TOKEN` 도 넣었습니다.** 붙이시면 바로 됩니다.
 
 ```
-https://api.supersub-ai.com/api/v1/internal/analysis-jobs/claim
+https://<API 호스트>/api/v1/internal/analysis-jobs/claim
   헤더 없이   -> 401
   틀린 값     -> 401
   맞는 값     -> 200 (작업 하나를 집습니다)
@@ -3372,25 +3372,27 @@ https://api.supersub-ai.com/api/v1/internal/analysis-jobs/claim
 
 ### 21. 공개 사이트에서 인프라 식별자를 걷어냈습니다 (2026-09-07)
 
-이 저장소가 공개인데 `_posts/`·`pending.markdown` 에 **AWS 계정 ID·공인 IP·
-VPC/서브넷/보안그룹/인스턴스/EIP 할당 ID·IAM 역할명**이 그대로 있었고,
-`pages.yml` 로 `dev.supersub-ai.com` 에 배포되고 있었습니다. `_notes/ERRORS.md`
-09-03 이 공인 IP 건을 한 번 지적했는데 그 뒤로 더 늘어 있었습니다.
+이 저장소가 공개인데 `_posts/`·`pending.markdown`(+ `부록E-결정기록.markdown`)에
+**AWS 계정 ID(대시 표기 포함)·공인 IP·VPC/서브넷/보안그룹/인스턴스/EIP 할당 ID·
+IAM 역할명·API 호스트명**이 그대로 있었고, `pages.yml` 로 `dev.supersub-ai.com` 에
+배포되고 있었습니다. `_notes/ERRORS.md` 09-03 이 공인 IP 건을 한 번 지적했는데 그
+뒤로 더 늘어 있었습니다.
 
-**이번 커밋에서 값을 자리표시자로 바꿨습니다.** 규칙은 루트 `CLAUDE.md`
-「공개 사이트에 인프라 식별자를 쓰지 않습니다」에 명시했습니다.
+**두 커밋에 걸쳐 정리했습니다.** 규칙은 루트 `CLAUDE.md` 「공개 사이트에 인프라
+식별자를 쓰지 않습니다」에 명시했습니다.
 
 | | |
 |---|---|
-| 바꾼 파일 | `_posts/2026-09-03-ec2-gpu-검증-한-바퀴-돌았습니다.markdown` · `_posts/2026-09-03-gpu-할당량이-0이라-ec2가-멈췄습니다.markdown` · 이 파일 |
-| 🔴 `## ho` 구역(16·18번)도 건드렸습니다 | ARN·인스턴스·VPC·역할명·이전 IP 줄입니다. **값만** 자리표시자로 바꿨고 서술은 한 글자도 안 건드렸습니다. 병합 시 이 줄에서 충돌하면 **자리표시자 쪽을 남겨** 주세요 |
-| 확인 | 루트 `CLAUDE.md` 「공개 사이트에 인프라 식별자를 쓰지 않습니다」의 grep 을 `jekyll/`·`_posts/` 전체에 돌려 결과가 없어야 합니다 (자리표시자 문법 `<...>` 만 남습니다) |
+| 바꾼 파일 | `_posts/2026-09-03-ec2-gpu-검증*` · `_posts/2026-09-03-gpu-할당량*` · `_posts/2026-09-02-박민호-님께-탄력적-ip*` · `_posts/2026-09-03-백엔드-오늘*` · 이 파일 · `부록E-결정기록.markdown`(기술 수준으로 다시 씀) |
+| 🔴 `## ho` 구역(16·18번)도 건드렸습니다 | ARN·인스턴스·VPC·역할명·이전 IP·계정 ID 줄입니다. **값만** 자리표시자로 바꿨고 서술은 한 글자도 안 건드렸습니다. 병합 시 이 줄에서 충돌하면 **자리표시자 쪽을 남겨** 주세요 |
+| 확인 | 루트 `CLAUDE.md` 의 grep 을 `jekyll/`·`_posts/` 전체에 돌려 결과가 없어야 합니다 (자리표시자 문법 `<...>` 만 남습니다) |
 
 #### 아직 남은 것 — 결정·조치가 필요합니다 (담당 정어진)
 
-- **S3 버킷 이름은 안 지웠습니다.** 서비스 도메인(`supersub-ai.com`)에서 바로
-  추측되고 `fastapi/`·`agent/` 코드에도 있어, 문서만 지우면 어긋나기만 합니다.
-  실효 방어는 **버킷 Block Public Access 4개 전부 켜짐 + 익명 허용 정책 없음 +
+- **S3 버킷 이름과 API 호스트명은 클라이언트·서버 코드에도 있습니다.** 버킷명은
+  제품 도메인에서 바로 추측되고, API 호스트는 `www/`·`flutter/` 설정과
+  `fastapi/`·`agent/` 에 있어 문서만 지우면 어긋나기만 합니다. 문서에서는 걷어냈고,
+  실효 방어는 **S3 버킷 Block Public Access 4개 전부 켜짐 + 익명 허용 정책 없음 +
   목록 비공개** 확인입니다.
 - **git 히스토리·검색 캐시에는 옛 값이 남습니다.** 계정 ID 는 회수가 안 되니
   노출을 줄이는 것이 전부입니다. 원본 IP 은닉이 필요하면 API 를 Cloudflare 프록시
@@ -3925,10 +3927,10 @@ S3 사전 서명 URL)가 그것입니다. 그래서 **새 저장 형식을 정�
    Settings → **Environments** → Production → Branch Tracking 이었습니다,
    Git 페이지가 아니었습니다)
 2. **nginx + Let's Encrypt HTTPS**를 EC2에 새로 올렸습니다
-   (`https://api.supersub-ai.com`), uvicorn에 `--proxy-headers` 를 빠뜨려서
+   (`https://<API 호스트>`), uvicorn에 `--proxy-headers` 를 빠뜨려서
    요청 제한(SEC-009)이 전부 한 IP로 뭉치던 것도 같이 고쳤습니다. 인증서
    자동 갱신 타이머(`certbot-renew.timer`, 매일 03:27 UTC)도 걸었습니다
-3. Vercel에 `BACKEND_BASE_URL=https://api.supersub-ai.com/api/v1` 추가
+3. Vercel에 `BACKEND_BASE_URL=https://<API 호스트>/api/v1` 추가
 4. **jin 10번(로그인이 mock)도 오늘 같이 끝냈습니다** — 저장 버튼이
    "토큰이 유효하지 않습니다"로 막혀서 보니, `USE_MOCK=1`이 Vercel
    Production/Preview 환경변수에 **8월 28일부터 이미 걸려 있었습니다.**

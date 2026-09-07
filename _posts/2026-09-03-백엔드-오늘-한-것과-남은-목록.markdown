@@ -12,12 +12,12 @@ nav_exclude: true
 
 ## ✅ 배포가 끝에서 끝까지 섭니다
 
-**`https://api.supersub-ai.com` 이 밖에서 열려 있습니다.** 오늘 확인했습니다.
+**`https://<API 호스트>` 이 밖에서 열려 있습니다.** 오늘 확인했습니다.
 
 | | |
 |---|---|
 | 탄력적 IP | 붙였습니다. 껐다 켜도 주소가 안 바뀝니다 |
-| A 레코드 · nginx · TLS | `api.supersub-ai.com` → `443` → 백엔드. `http` 는 301 로 넘어갑니다 |
+| A 레코드 · nginx · TLS | `<API 호스트>` → `443` → 백엔드. `http` 는 301 로 넘어갑니다 |
 | IAM 역할 | `supersub-video` — S3 `videos/` 접두사만 |
 | S3 업로드 | **실물에서 돕니다.** 사전 서명 URL → PUT → 등록 → 반려 → 목록 |
 | 웹 | `super-sub-cloud.vercel.app` 에서 가입·로그인이 실제 백엔드로 갑니다 |
