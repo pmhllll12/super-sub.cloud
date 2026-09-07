@@ -54,7 +54,8 @@ SYSTEM_TEMPLATE = """당신은 {sport} 기술 평가관입니다. 판정은 이�
 - **등급 번호와 기준 구간은 쓰지 않습니다.** 그 표기는 화면에서 코드가 붙입니다.
 - **수치는 주어진 측정값만 씁니다.** 기준값·범위를 인용하거나 숫자를 새로
   만들지 않습니다.
-- 측정값을 짚어 자세가 어땠는지 말하고, 무엇을 고치면 되는지 한 마디 붙입니다.
+- 측정값을 짚어 자세가 어땠는지 말합니다. **잘한 항목이면 무엇이 좋았는지**,
+  아쉬운 항목이면 무엇을 고치면 되는지 한 마디 붙입니다.
 
 출력 필드
 - evidence: 근거 문장 1~2개. 예: "임팩트 시 무릎각 141.7도로 차는 다리가 거의
@@ -63,6 +64,14 @@ SYSTEM_TEMPLATE = """당신은 {sport} 기술 평가관입니다. 판정은 이�
 
 # 종목 이름이 없으면 종목을 특정하지 않는 표현을 쓴다.
 SPORT_NAMES = {"football": "축구", "baseball": "야구", "basketball": "농구"}
+
+# 등급을 **번호 없이** 부르는 낱말. 프롬프트에서 어투와 수준을 짝지어 주는 자리다.
+#
+# 왜 번호가 아니라 낱말인가 — 번호를 주면 문장이 그것을 베껴 쓰고, 베껴 쓰면서
+# 틀렸다(미결 23번 1회차, 감점 문장 11건 중 6건). 번호를 빼자 이번에는 어느
+# 어투가 어느 수준인지 모르게 되어 **잘한 항목을 감점처럼** 쓰기 시작했다
+# (2등급 8건 중 4건). 낱말은 어투를 정해 주면서 문장에 새어도 숫자가 아니다.
+LEVEL_WORDS = {2: "잘함", 1: "보통", 0: "아쉬움"}
 
 
 def system_prompt(sport: str = "") -> str:
@@ -135,8 +144,11 @@ def build_prompt(criterion, metrics: dict[str, Any], grade: int) -> str:
     (미결 23번). 그래서 모델에게는 **자세 서술만** 시키고 등급·칭호·구간은
     `aggregate`가 붙인다. 프롬프트에 없는 숫자는 베껴 쓸 수 없다.
 
-    확정된 등급은 세 정의 중 **어느 것이 맞았는지**로만 전한다.
+    확정된 등급은 세 정의 중 **어느 것이 맞았는지**를 `LEVEL_WORDS`의 낱말로만
+    전한다. 앵커에도 같은 낱말을 붙여 **어투와 수준을 짝지어** 준다 — 그 짝이
+    없으면 모델이 잘한 항목을 감점처럼 쓴다(미결 23번 1회차).
     """
+    word = LEVEL_WORDS[grade]
     lines = [f"평가 항목: {criterion.id} ({criterion.name})"]
     if criterion.rationale:
         lines.append(f"\n항목 취지: {criterion.rationale.strip()}")
@@ -145,23 +157,31 @@ def build_prompt(criterion, metrics: dict[str, Any], grade: int) -> str:
     lines.append("\n이 항목의 수준 (좋은 것부터):")
     for g in (2, 1, 0):
         mark = "  ← 이번 판정" if g == grade else ""
-        lines.append(f"- {criterion.grades[g]}{mark}")
+        lines.append(f"- [{LEVEL_WORDS[g]}] {criterion.grades[g]}{mark}")
 
     if criterion.anchors:
-        lines.append("\n근거 문장 예시 (이 어투로 씁니다):")
+        lines.append("\n근거 문장 예시 (수준에 맞는 어투를 그대로 따릅니다):")
         for a in criterion.anchors:
             measured = json.dumps(a["measured"], ensure_ascii=False)
-            lines.append(f"- 측정값 {measured} → \"{a['evidence']}\"")
+            lines.append(
+                f"- [{LEVEL_WORDS[a['grade']]}] 측정값 {measured}"
+                f" → \"{a['evidence']}\""
+            )
 
     lines.append("\n측정값 (이 숫자만 신뢰할 것):")
     lines.append(json.dumps(metrics, ensure_ascii=False, indent=2))
     lines.append(
-        f"\n이번 판정은 위 표시된 수준입니다. "
+        f"\n이번 판정은 [{word}]입니다. "
         f"{criterion.band_metric}={metrics.get(criterion.band_metric)}가 그 근거입니다."
     )
+    # 끝맺음도 수준에 맞춘다. **"고칠 점을 붙여라"를 잘한 항목에까지 요구하면
+    # 모델이 칭찬할 자리에서 흠을 찾는다** — 1회차에서 2등급 문장이 무너진 데엔
+    # 이 요구도 몫이 있다. 앵커에 수준을 붙이는 것과 같은 취지의 손질이다.
+    closing = ("무엇이 좋았는지 한 마디 붙입니다." if grade == 2
+               else "무엇을 고치면 되는지 한 마디 붙입니다.")
     lines.append(
-        "등급 번호나 기준 구간은 쓰지 마세요 — 측정값을 짚어 자세가 어땠는지만 "
-        "서술하고, 고칠 점을 한 마디 붙입니다."
+        f"위 [{word}] 예시와 같은 어투로 씁니다. 등급 번호나 기준 구간은 쓰지 "
+        f"마세요 — 측정값을 짚어 자세가 어땠는지 서술하고, {closing}"
     )
     lines.append("근거 문장을 JSON으로 출력하세요.")
     return "\n".join(lines)

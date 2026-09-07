@@ -34,7 +34,10 @@ RUBRIC = ROOT / "rubrics/baseball_batting.yaml"
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--tag", required=True, choices=("before", "after"),
+    # after2 = 앵커에 수준 낱말을 되살린 2회차 (사전 등록 부기 A).
+    # **검사기(check_evidence.py)는 손대지 않는다** — 같은 R1·R2로 판정한다.
+    ap.add_argument("--tag", required=True,
+                    choices=("before", "after", "after2"),
                     help="코드를 고치기 전/후 어느 회차인가")
     args = ap.parse_args()
 
