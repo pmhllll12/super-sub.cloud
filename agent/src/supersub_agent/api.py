@@ -236,7 +236,9 @@ def run_pipeline(
     by_id = {c.id: c for c in rubric.criteria}
     for item in result["breakdown"]:
         criterion = by_id[item["criterion_id"]]
-        item["title"] = criterion.title_for(item["grade"])
+        # title·band는 여기서 붙이지 않는다 — `aggregate`가 이미 실었다.
+        # 근거 문장에서 등급 표기를 뺀 뒤로 **그 두 필드가 등급 맥락의 유일한
+        # 출처**라서, 붙이는 자리를 둘로 두면 한쪽만 고쳐진다(미결 23번).
         # 등급 구간 안쪽 여유 — 화면이 장단점을 고르는 기준이다.
         # 경계에 걸친 값은 다음 클립에서 등급이 뒤집히므로 장단점으로 올리지 않는다.
         margin = criterion.band_margin(features)
@@ -629,11 +631,14 @@ function render(d){
       측정 ${d.timing.measure_s}초 · 판정 ${d.timing.judge_s}초</div>
   </div>`;
 
+  // 구간(band)을 등급 옆에 찍는다. 근거 문장에서 등급·구간 표기를 뺐으므로
+  // (미결 23번) 「이 값이 왜 이 등급인가」를 눈으로 확인할 곳이 여기뿐이다.
   dev+='<div class="card"><table><tr><th>항목</th><th>등급</th><th>기여</th>'
     +'<th>근거</th></tr>';
   for(const b of r.breakdown){
     dev+=`<tr><td>${b.name}<div class="cmp">${b.title||''}</div></td>
-        <td><span class="g g${b.grade}">${b.grade}</span></td>
+        <td><span class="g g${b.grade}">${b.grade}</span>
+            <div class="mut">${b.band||''}</div></td>
         <td>${b.contribution}점<div class="mut">×${b.weight}</div></td>
         <td><code>${b.metric_ref}</code><div class="cmp">${b.evidence}</div></td></tr>`;
   }
