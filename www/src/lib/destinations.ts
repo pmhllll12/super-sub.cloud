@@ -16,8 +16,13 @@ import { type Destination } from '@/components/HomeNav'
 export const FRIEND_SEARCH = '지인 찾기'
 
 /**
- * 마찬가지로 제목이 곧 판단이다 — 누르면 `MatchBot`(흐름 B 챗봇)이 열린다
- * (미결 `min` 7번). 아래 FEATURED 의 제목과 **글자까지 같아야** 한다.
+ * 알약 '용병 찾기' 의 제목.
+ *
+ * ⚠️ 한때 **이 알약이 `MatchBot`(흐름 B 챗봇)을 열었다**(미결 `min` 7번).
+ * 지금은 아니다 — 챗봇은 알약 줄 오른쪽 끝의 **AI 단추**가 연다(사용자
+ * 요청, `HomeStage` 의 `ss-home-ai`). 알약으로 열던 시절에는 이 제목이
+ * `DEFAULT_FEATURED` 이기도 해서 **홈에 들어오자마자 챗봇이 떠 있었고
+ * 닫기가 안 먹었다.**
  */
 export const MATCH_BOT = '용병 찾기'
 
@@ -41,7 +46,6 @@ export const MATCH_BOT = '용병 찾기'
 // 둘 두지 않는다(우상단 '내 프로필'을 글자 줄에서 뺀 것과 같은 규칙).
 export const FEATURED: Destination[] = [
   {
-    // 🔴 제목이 위 MATCH_BOT과 **글자까지 같아야** 한다 — 누르면 `MatchBot`이 연다.
     title: MATCH_BOT,
     icon: 'sports_soccer',
     summary: '사람이 모자란 경기에\n뛸 사람을 찾습니다',

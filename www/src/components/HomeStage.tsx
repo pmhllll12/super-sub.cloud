@@ -3,10 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PublicPlayerCard, Squad } from '@/server/backend'
 import SquadPanel from '@/components/SquadPanel'
-import MatchBot from '@/components/MatchBot'
 import SiteHeader from '@/components/SiteHeader'
 import HomeNav, { type Destination } from '@/components/HomeNav'
-import { FRIEND_SEARCH, MATCH_BOT } from '@/lib/destinations'
+import { FRIEND_SEARCH } from '@/lib/destinations'
 import { useIntroDone } from '@/lib/useIntroDone'
 import { useHideChrome, useLeaving } from '@/lib/pageTransition'
 import LogoutButton from '@/components/LogoutButton'
@@ -115,6 +114,25 @@ export default function HomeStage({
    */
   const goOut = useCallback((next: boolean) => {
     if (next === outRef.current) return
+    /**
+     * 🔴 **여기서 바로 못박는다 — 렌더를 기다리면 안 된다.**
+     *
+     * 마우스 휠은 한 번 튕기면 `wheel` 이벤트가 여러 개 온다. `outRef` 를
+     * effect 에서만 갱신하면 그 전부가 **같은 옛 값**을 보고 각자 기록을
+     * 건드린다 — 내려갈 때 `pushState` 가 다섯 번 쌓이고, 올라올 때
+     * `history.back()` 이 다섯 번 나간다. 두 수가 다르면 남는 뒤로 가기가
+     * **화면 밖으로 걸어 나간다**(도메인에 올린 뒤 데스크톱 사용자들이 겪었다:
+     * 영상 모음에서 휠을 올렸더니 `/market` 으로 가거나 사이트를 떠났다.
+     * 2026-09-06 헤드리스로 재현 — 휠 1번 내리고 5번 올리면 `/market`).
+     *
+     * ⚠️ 맥북 트랙패드에서는 잘 안 드러난다. 손짓 하나가 이벤트 여럿이라는
+     * 것은 같지만, 그 사이에 `popstate` 가 끼어들면 다음 이벤트는 새 값을
+     * 보기 때문이다 — **안 나는 게 아니라 타이밍이 맞아야 난다.**
+     *
+     * 정본은 여전히 기록이다(`popstate` 가 마지막에 맞춘다). 이 값은 굴리는
+     * 도중에 같은 걸음을 두 번 걷지 않기 위한 **자물쇠**다.
+     */
+    outRef.current = next
     if (next) {
       stepped.current = true
       window.history.pushState({ ssHome: 'feed' }, '')
@@ -167,14 +185,30 @@ export default function HomeStage({
     }
     const dirOf = (d: number) => (d > DEAD ? 1 : d < -DEAD ? -1 : 0)
 
+    /**
+     * 🔴 **제 굴림을 가진 판 위에서는 이 신호를 안 받는다**(사용자 지적:
+     * 챗봇 대화를 훑으려다 화면이 통째로 내려갔다).
+     *
+     * 판이 `overscroll-behavior: contain` 을 써도 소용없다 — 그것은 굴림이
+     * **뒤 화면으로 새는 것**만 막고, `wheel` 이벤트가 창까지 올라오는 것은
+     * 못 막는다. 여기서 어디서 굴렸는지를 보고 갈라야 한다.
+     *
+     * `HeroGate` 가 목록 판이 열렸을 때 쓰는 것과 같은 판단이고, 방식만
+     * 다르다 — 거기는 표시 하나(`dataset.ssDetail`)로 충분한데 여기는 한
+     * 자리에 판이 셋(챗봇 · 지인 찾기 · AI 추천)이라 **굴린 자리**로 본다.
+     */
+    const onOwnPanel = (t: EventTarget | null) =>
+      t instanceof Element && t.closest('.ss-matchbot, .ss-suggest') !== null
+
     const onWheel = (e: WheelEvent) => {
-      if (e.ctrlKey) return
+      if (e.ctrlKey || onOwnPanel(e.target)) return
       move(dirOf(e.deltaY))
     }
     const onTouchStart = (e: TouchEvent) => {
       touchY = e.touches[0]?.clientY ?? 0
     }
     const onTouchMove = (e: TouchEvent) => {
+      if (onOwnPanel(e.target)) return
       // 손가락이 위로 = 내용은 아래로 = 내리는 것.
       move(dirOf(touchY - (e.touches[0]?.clientY ?? 0)))
     }
@@ -242,7 +276,42 @@ export default function HomeStage({
    */
   const [picked, setPicked] = useState<string | null>(defaultActive)
   const friendSearch = picked === FRIEND_SEARCH
-  const matchBot = picked === MATCH_BOT
+  /**
+   * 챗봇이 열려 있는가.
+   *
+   * 🔴 **알약(`picked`)과 떼어 놓는다**(사용자 요청). 한때 `picked === '용병
+   * 찾기'` 로 열었는데, 그 값이 `defaultActive` 로 시작하는 바람에 **홈에
+   * 들어오자마자 떠 있었고 닫기(×)를 눌러도 `defaultActive` 로 되돌아가
+   * 다시 열렸다**(실측). 여는 자리를 제 단추 하나로 옮기면서 그 얽힘이
+   * 통째로 없어졌다 — 알약 셋은 이제 챗봇과 아무 상관이 없다.
+   */
+  const [bot, setBot] = useState(false)
+
+  /**
+   * 🔴 **판 오른쪽 자리는 한 번에 하나만 쓴다**(사용자 지적: AI 를 켠 채
+   * 지인 찾기를 누르면 AI 가 사라지지 않고 **그 뒤에** 나왔다).
+   *
+   * 셋(챗봇 · 지인 찾기 · AI 추천)이 같은 좌표에 서므로 z 를 아무리 손봐야
+   * 뒤에 가려질 뿐이다 — 여는 쪽에서 **다른 것을 닫는 것**이 맞다.
+   *
+   * 알약 선택을 `defaultActive` 로 되돌리는 것은 지인 찾기 판의 × 가 하는
+   * 것과 같다 — 알약 하나는 늘 골라져 있어야 "고르는 자리"로 읽힌다.
+   */
+  const showBot = useCallback(
+    (next: boolean) => {
+      setBot(next)
+      if (!next) return
+      setPicked(defaultActive)
+      setActive(defaultActive)
+    },
+    [defaultActive],
+  )
+
+  /** 알약을 고르면 챗봇은 물러난다 — 위와 같은 이유로 자리가 하나다. */
+  const pick = useCallback((title: string | null) => {
+    setPicked(title)
+    setBot(false)
+  }, [])
 
   return (
     <>
@@ -288,13 +357,18 @@ export default function HomeStage({
                 variant="pill"
                 label="주요 목적지"
                 picked={picked}
-                onPick={setPicked}
+                onPick={pick}
               />
             </div>
             <SquadPanel
               card={card}
               squad={squad}
               friendSearch={friendSearch}
+              // 🔴 챗봇도 **판 오른쪽 그 자리**에서 나온다(사용자 요청) —
+              // 지인 찾기 · AI 추천과 같은 자리다. 그 자리는 `.ss-squad-wrap`
+              // 안에서만 잡히므로(`left: 100%`) 여기서 못 그리고 판에 넘긴다.
+              bot={bot}
+              onBotChange={showBot}
               // 판의 × 로 닫으면 알약 선택도 같이 풀려야 한다 — 안 그러면
               // 고른 채로 판만 없어져 다시 눌러도 안 열린다.
               onCloseFriendSearch={() => {
@@ -339,15 +413,6 @@ export default function HomeStage({
         </div>
       )}
 
-      {/* 스쿼드 판과 달리 자리(포지션 슬롯)와 무관해 그 판 안에 넣지 않고
-          독립된 떠 있는 판으로 연다 — SquadPanel 은 스쿼드 레이아웃 전용이다. */}
-      <MatchBot
-        open={matchBot}
-        onClose={() => {
-          setPicked(defaultActive)
-          setActive(defaultActive)
-        }}
-      />
     </>
   )
 }

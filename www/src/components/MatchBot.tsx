@@ -145,7 +145,16 @@ export default function MatchBot({ open, onClose }: { open: boolean; onClose: ()
       aria-label={'용병 찾기'}
       // 🔴 흐림은 인라인으로만 준다 — globals.css에 두면 Lightning CSS를
       // 지나며 통째로 사라진다(SquadFriends·ProfileStage와 같은 이유).
-      style={{ backdropFilter: 'blur(20px) saturate(1.4)', WebkitBackdropFilter: 'blur(20px) saturate(1.4)' }}
+      //
+      // 🔴 80px 은 사용자가 지정한 값이다(사이트 기본 `--ss-glass-blur`가
+      // 아니다). 뒤가 배경 사진(연기 · 인물 실루엣)이라 옅게 흐려서는 판이
+      // 아니라 구멍처럼 보인다 — `/me` 판이 70px 인 것과 같은 판단이다.
+      //
+      // ⚠️ 이 값만으로는 안 됐다. **조상에 transform 이 남아 있으면 아무리
+      // 올려도 안 흐려진다** — 변형된 조상이 backdrop root 를 만들어 배경
+      // 사진이 훑는 범위 밖으로 나간다. `.ss-squad-wrap` 의 등장 연출이
+      // 끝 프레임을 붙들고 있던 것이 그 원인이었다(globals.css 의 그 주석).
+      style={{ backdropFilter: 'blur(80px) saturate(1.4)', WebkitBackdropFilter: 'blur(80px) saturate(1.4)' }}
     >
       <header className="ss-matchbot-head">
         <h3>용병 찾기</h3>
