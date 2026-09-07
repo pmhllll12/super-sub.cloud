@@ -69,3 +69,32 @@ def test_timebase_is_a_sibling_of_features_not_a_part_of_it():
     build_timebase(feats, 250, pose_at(25.0, 25.0))
 
     assert feats == before
+
+
+def test_timebase_says_when_the_tail_was_not_looked_at():
+    """잘렸으면 봉투가 말한다 (미결 jin 11번).
+
+    업로드 상한 60초가 분석 창보다 길어 **조용히 앞부분만 분석되고 있었다.**
+    상한을 어느 쪽에 맞출지는 아직 결정 전이고, 그 결정과 무관하게 안 본
+    구간이 있다는 사실은 결과에 남아야 한다 — 없으면 화면도 말할 수 없다.
+    """
+    p = pose_at(30.0, 30.0)
+    p.truncated = True
+    p.source_seconds = 60.0
+
+    tb = build_timebase({}, frame_count=300, pose=p)
+
+    assert tb["truncated"] is True
+    assert tb["analyzed_seconds"] == 10.0
+    assert tb["source_seconds"] == 60.0
+
+
+def test_timebase_does_not_invent_a_source_length():
+    """원본 길이를 모르는 컨테이너가 있다. 모르면 None이다.
+
+    그럴듯한 기본값을 채워 넣는 것이 예전 `fps=12.0` 결함이 생긴 방식이다.
+    """
+    tb = build_timebase({}, frame_count=300, pose=pose_at(30.0, 30.0))
+
+    assert tb["truncated"] is False
+    assert tb["source_seconds"] is None

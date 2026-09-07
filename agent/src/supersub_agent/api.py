@@ -182,6 +182,17 @@ def build_timebase(
         "step": max(1, round(float(pose.source_fps) / sampled_fps)) if sampled_fps else None,
         "frames": frame_count,
         "analyzed_seconds": round(frame_count / sampled_fps, 3),
+        # 🔴 **뒷부분을 안 봤으면 그렇게 말한다.** 업로드 상한(60초)이 분석
+        # 창(10초)보다 길어서 조용히 앞부분만 분석되고 있었다 — 사용자에게는
+        # 아무 표시도 안 났다(미결 jin 11번). 상한을 어느 쪽에 맞출지는 아직
+        # 결정 전이고, 결정과 무관하게 **잘렸다는 사실**은 봉투에 있어야 한다.
+        "truncated": bool(pose.truncated),
+        # 원본 길이. 컨테이너가 모르면 None이다 — 지어내지 않는다.
+        "source_seconds": pose.source_seconds,
+        # 무엇이 잘랐는가: "window"(보기로 한 만큼 봤다) · "memory_guard"
+        # (자원 때문에 **의도한 창을 못 지켰다**). 안 잘렸으면 None.
+        # 둘을 뭉뚱그리면 「10초 보기로 하고 6.7초만 봤다」가 안 보인다.
+        "limited_by": pose.limited_by,
         # 프레임 단위 지표를 초로. 어느 것이 인덱스이고 어느 것이 길이인지는
         # features.FRAME_INDEX_METRICS / FRAME_DURATION_METRICS 가 선언한다.
         "seconds": seconds,
@@ -236,7 +247,9 @@ def run_pipeline(
     by_id = {c.id: c for c in rubric.criteria}
     for item in result["breakdown"]:
         criterion = by_id[item["criterion_id"]]
-        item["title"] = criterion.title_for(item["grade"])
+        # title·band는 여기서 붙이지 않는다 — `aggregate`가 이미 실었다.
+        # 근거 문장에서 등급 표기를 뺀 뒤로 **그 두 필드가 등급 맥락의 유일한
+        # 출처**라서, 붙이는 자리를 둘로 두면 한쪽만 고쳐진다(미결 23번).
         # 등급 구간 안쪽 여유 — 화면이 장단점을 고르는 기준이다.
         # 경계에 걸친 값은 다음 클립에서 등급이 뒤집히므로 장단점으로 올리지 않는다.
         margin = criterion.band_margin(features)
@@ -629,11 +642,14 @@ function render(d){
       측정 ${d.timing.measure_s}초 · 판정 ${d.timing.judge_s}초</div>
   </div>`;
 
+  // 구간(band)을 등급 옆에 찍는다. 근거 문장에서 등급·구간 표기를 뺐으므로
+  // (미결 23번) 「이 값이 왜 이 등급인가」를 눈으로 확인할 곳이 여기뿐이다.
   dev+='<div class="card"><table><tr><th>항목</th><th>등급</th><th>기여</th>'
     +'<th>근거</th></tr>';
   for(const b of r.breakdown){
     dev+=`<tr><td>${b.name}<div class="cmp">${b.title||''}</div></td>
-        <td><span class="g g${b.grade}">${b.grade}</span></td>
+        <td><span class="g g${b.grade}">${b.grade}</span>
+            <div class="mut">${b.band||''}</div></td>
         <td>${b.contribution}점<div class="mut">×${b.weight}</div></td>
         <td><code>${b.metric_ref}</code><div class="cmp">${b.evidence}</div></td></tr>`;
   }

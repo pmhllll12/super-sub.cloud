@@ -735,6 +735,58 @@ vLLM은 OpenAI 호환이라 `tools`/`tool_choice`를 받을 수 있으므로 나
 있다. 다만 **지금 정확도 근거로는 1.2B에 판단을 되돌릴 이유가 없다.** 열려면
 그 전에 "무엇을 모델이 정하게 할 것인가"를 정하고 근거를 남겨야 한다.
 
+### 6-4. 사람이 안 쳐도 돌게 하기 — 분석 워커
+
+6-2는 **사람이 명령을 치는** 경로다. 사용자가 앱에서 올린 클립까지 돌게 하려면
+큐를 집어 가는 것이 있어야 한다(미결 `ho` 17번 · `jin` 18번).
+
+```
+POST /videos ──> analysis_job(queued)          ← 백엔드
+    워커가 45초마다 ─> claim ─> analyze_s3.py ─> PATCH(succeeded|failed)
+                     └────────── scripts/worker.py ──────────┘
+```
+
+`videos/`와 `reports/`를 비교하는 방식이 아니라 **백엔드 큐를 폴링(pull)**한다.
+인스턴스가 꺼져 있어도 큐가 안전하게 쌓이고, 재시작마다 바뀌는 퍼블릭 IP에
+아무것도 걸려 있지 않다. 규격은 [`fastapi/docs/worker-interface.md`](../../fastapi/docs/worker-interface.md).
+
+```bash
+sudo mkdir -p /etc/supersub
+sudo cp agent/deploy/worker.env.example /etc/supersub/worker.env
+sudo vi /etc/supersub/worker.env     # SUPERSUB_WORKER_TOKEN 을 채운다
+sudo chmod 600 /etc/supersub/worker.env
+
+sudo cp agent/deploy/supersub-worker.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now supersub-worker
+```
+
+**확인 — 🔴 `claim`을 직접 부르지 않는다.** 그 호출은 조회가 아니라 소비라서,
+워커가 도는 중에 부르면 작업을 가로챈다.
+
+```bash
+# 설정이 맞는가 (집지 않고 루브릭 선택만 점검한다)
+cd ~/super-sub.cloud/agent
+uv run python scripts/worker.py --dry-run
+#   baseball → baseball_pitching.yaml
+#   basketball → basketball_jump_shot.yaml
+#   football → football_instep_shot.yaml
+
+systemctl status supersub-worker
+journalctl -u supersub-worker -f          # 작업을 집으면 여기 흐른다
+aws s3 ls s3://$BUCKET/reports/ --recursive | tail   # 리포트가 느는가
+```
+
+| | |
+|---|---|
+| **토큰** | 서버의 `WORKER_TOKEN`과 **같은 값**이다. 한쪽만 넣으면 계속 401이고, 그때 워커는 종료 코드 78로 멈춘 뒤 **재시작하지 않는다**(`RestartPreventExitStatus=78`) — 저널이 401로 차는 것보다 낫다 |
+| **루브릭** | claim 응답에 동작(motion)이 없어 **종목의 `active` 루브릭 하나**를 쓴다. 0개거나 2개 이상이면 실행하지 않고 `failed`로 보고한다. draft를 승격시키면 그 종목이 그때 멈춘다 |
+| **자동 종료와의 관계** | 🔴 **워커 이름을 `BUSY_PATTERN`에 넣지 않았다.** 큐가 비어도 이 프로세스는 계속 떠 있어서, 넣으면 인스턴스가 **영영 안 꺼진다**. 분석이 도는 동안에는 자식이 `analyze_s3.py`라 기존 패턴에 그대로 걸린다 — `tests/test_worker.py`가 그 매칭을 양쪽으로 검사한다 |
+| **멈출 때** | 분석 중에 `stop`하면 자식을 끊고 그 작업을 `failed`로 **보고한 뒤** 나간다. 그냥 죽으면 `running`인 채로 남고 회수 규칙이 아직 없다 |
+
+**적재(`POST /analyses`)는 아직 없다** — 미결 `jin` 1번(`metric_definition`이 0행)이
+먼저다. 그때까지 산출물은 `reports/`의 JSON이고, `analysis_job` 상태는 옮겨진다.
+
 ---
 
 ## 7. 수동 배포 운영 (`git pull origin ho`)
@@ -811,8 +863,13 @@ nvidia-smi -l 2                                   # GPU 사용량 추적
 
 이 런북이 **덮지 않는** 것들이다. 지금 필요 없어서 뺐지 실수가 아니다.
 
-- **자동 트리거** — S3 이벤트나 폴링 워커가 없다. 수동 CLI 1건 실행이다.
-  중복 처리·재시도·상태 저장이 필요해지면 그때 만든다.
+- ~~**자동 트리거**~~ — **생겼다** (2026-09-07, 6-4절). 백엔드 큐를 폴링하는
+  `scripts/worker.py` + `supersub-worker.service`다. 중복 처리는 백엔드가
+  `FOR UPDATE SKIP LOCKED`로 막는다. **다만 아래 둘은 아직 없다.**
+- **`running` 회수와 재시도** — 워커가 전원째로 죽으면 그 작업이 `running`인 채
+  남는다(정상 종료·시그널 경로는 `failed`로 보고하고 나간다). 몇 분 지나면
+  `queued`로 되돌리는 규칙, `failed`를 다시 큐에 넣는 정책 둘 다 백엔드 몫이다.
+- **적재(`POST /analyses`)** — 미결 `jin` 1번이 먼저다. 지금 산출물은 `reports/`의 JSON이다.
 - **`api.py`를 EC2에서 서비스로 띄우기** — 8080 유닛을 만들지 않았다.
   인증·타임아웃·동시성 설계가 먼저다.
 - **다중 인스턴스 / 오토스케일링** — 한 대다.

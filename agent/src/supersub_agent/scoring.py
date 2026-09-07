@@ -88,6 +88,28 @@ class Criterion:
         """해당 등급의 칭호. 정의되지 않았으면 항목명으로 대체한다."""
         return self.titles.get(grade) or self.name
 
+    def band_text(self, grade: int) -> str:
+        """해당 등급의 수치 구간을 사람이 읽을 문장으로 만든다.
+
+        **이 문구는 화면 쪽이 쓴다 — 판정 모델에게는 주지 않는다.** 예전에는
+        프롬프트에 넣었다. 등급 정의만 주면 모델이 없는 상한을 지어냈기 때문인데
+        ("40도 이상"인 기준이 화면에 "40~165도"로 나갔다), 구간을 주자 이번에는
+        그 구간을 문장에 옮겨 쓰면서 등급 번호까지 함께 틀렸다 — 감점 문장 11건 중
+        6건이 자기 등급과 반대로 말했다(미결 23번). 그래서 **문장에서 표기를 빼고
+        등급·칭호·구간은 코드가 붙이는** 쪽으로 옮겼고, 이 메서드가 그 자리다.
+        """
+        parts = []
+        for lo, hi in self.bands.get(grade, ()):
+            if lo is None and hi is None:
+                continue
+            if lo is None:
+                parts.append(f"{hi:g} 이하")
+            elif hi is None:
+                parts.append(f"{lo:g} 이상")
+            else:
+                parts.append(f"{lo:g}~{hi:g}")
+        return " 또는 ".join(parts)
+
     def is_applicable(self, features: dict[str, Any]) -> bool:
         """이 항목을 판정할 근거 지표가 모두 측정됐는지.
 
@@ -373,6 +395,11 @@ def aggregate(
                 "grade": grade,
                 "weight": round(weight, 4),
                 "contribution": round(contribution * 100, 1),
+                # 등급 표기는 **여기서** 붙는다. 모델 문장(evidence)에는 등급
+                # 번호도 구간도 없다 — 미결 23번의 처방이다. 화면이 칭호·구간을
+                # 보여주려면 루브릭을 다시 열지 않고 이 두 필드를 쓰면 된다.
+                "title": c.title_for(grade),
+                "band": c.band_text(grade),
                 "evidence": j.get("evidence", ""),
                 "metric_ref": j.get("metric_ref", ""),
             }

@@ -605,3 +605,93 @@ def test_auto_keeps_its_name_but_still_counts_jumps():
 
     assert selection.source == "auto"
     assert selection.area_jumps == 1
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 잘렸는가 — 상한에 걸린 것과 영상이 끝난 것을 가른다 (미결 jin 11번)
+
+
+def test_hitting_the_window_reports_truncation(tmp_path):
+    """창에 걸려 뒷부분을 안 봤으면 그렇게 말한다.
+
+    업로드 상한(60초)이 분석 창보다 길어서 **조용히 앞부분만 분석되고 있었다.**
+    사용자에게도 화면에도 아무 표시가 없었다. 상한을 어느 쪽에 맞출지는 아직
+    결정 전이고, 결정과 무관하게 잘렸다는 사실은 결과에 있어야 한다.
+    """
+    clip = write_clip(tmp_path / "long.avi", n_frames=90, fps=30.0)
+
+    r = pose.read_frames_ex(clip, target_fps=30, max_seconds=1.0)
+
+    assert len(r.frames) == 30, "1초 창이면 30fps에서 30장"
+    assert r.truncated is True
+    assert r.source_seconds == pytest.approx(3.0, abs=0.05)
+
+
+def test_a_clip_that_simply_ends_is_not_truncated(tmp_path):
+    """영상이 거기서 끝난 것은 자른 것이 아니다.
+
+    이 둘을 구분하지 못하면 모든 짧은 클립이 「잘렸다」고 나가고, 그 표시는
+    곧 읽히지 않는다.
+    """
+    clip = write_clip(tmp_path / "short.avi", n_frames=30, fps=30.0)
+
+    r = pose.read_frames_ex(clip, target_fps=30, max_seconds=10.0)
+
+    assert len(r.frames) == 30
+    assert r.truncated is False
+
+
+def test_the_memory_guard_also_counts_as_truncation(tmp_path):
+    """창이 아니라 메모리 가드에 걸려도 뒷부분을 못 본 것은 같다.
+
+    `max_frames`는 분석 의도가 아니라 자원 보호지만, 사용자 입장에서는
+    **안 본 구간이 있다**는 사실이 같다.
+    """
+    clip = write_clip(tmp_path / "many.avi", n_frames=60, fps=30.0)
+
+    r = pose.read_frames_ex(clip, target_fps=30, max_frames=10, max_seconds=10.0)
+
+    assert len(r.frames) == 10
+    assert r.truncated is True
+
+
+def test_the_old_three_tuple_still_unpacks(tmp_path):
+    """`read_frames`의 반환형을 넓히지 않았다.
+
+    호출부가 30곳이고 다수가 **보존 대상 평가 스크립트**다. 반환형을 바꾸면
+    그것들이 조용히 깨진다 — 그래서 본체를 `read_frames_ex`로 옮기고 이쪽은
+    3-튜플 그대로 두었다.
+    """
+    clip = write_clip(tmp_path / "c.avi", n_frames=30, fps=30.0)
+
+    frames, src_fps, sampled_fps = read_frames(clip, target_fps=30)
+
+    assert len(frames) == 30
+    assert src_fps == pytest.approx(30.0)
+    assert sampled_fps == pytest.approx(30.0)
+
+
+def test_the_guard_and_the_window_are_told_apart(tmp_path):
+    """무엇이 잘랐는지 구분한다 — 창과 가드는 뜻이 다르다.
+
+    창은 「여기까지 보기로 했다」이고 가드는 「더 들면 메모리가 터진다」다.
+    가드가 이기면 **의도한 창을 못 지킨 것**인데, 잘렸다는 사실만으로는
+    그 둘이 구분되지 않는다 (미결 ho 9번).
+    """
+    clip = write_clip(tmp_path / "c.avi", n_frames=90, fps=30.0)
+
+    by_window = pose.read_frames_ex(clip, target_fps=30, max_seconds=1.0)
+    by_guard = pose.read_frames_ex(clip, target_fps=30, max_frames=10, max_seconds=10.0)
+
+    assert by_window.limited_by == "window"
+    assert by_guard.limited_by == "memory_guard"
+
+
+def test_nothing_cut_means_nothing_to_blame(tmp_path):
+    """안 잘렸으면 범인도 없다 — 늘 값이 있으면 그 필드는 읽히지 않는다."""
+    clip = write_clip(tmp_path / "c.avi", n_frames=30, fps=30.0)
+
+    r = pose.read_frames_ex(clip, target_fps=30, max_seconds=10.0)
+
+    assert r.truncated is False
+    assert r.limited_by is None

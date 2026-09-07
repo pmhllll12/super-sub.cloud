@@ -1,0 +1,240 @@
+{
+  "tag": "after",
+  "backend": "transformers",
+  "model": "LGAI-EXAONE/EXAONE-4.0-1.2B",
+  "clips": {
+    "0Fet8TyoNR4": {
+      "score": 40,
+      "grade": "D",
+      "items": [
+        {
+          "criterion_id": "hip_shoulder_separation",
+          "name": "골반-어깨 분리",
+          "grade": 0,
+          "stored_grade": 0,
+          "evidence": "골반-어깨 분리각이 10.4도로 측정되어 준비~임팩트 구간 최소 기준(12도 미만)에 미달합니다.",
+          "metric_ref": "hip_shoulder_separation_deg",
+          "given_metrics": {
+            "hip_shoulder_separation_deg": 10.4
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 회전",
+          "grade": 0,
+          "stored_grade": 0,
+          "evidence": "골반 회전 범위 6.9도로 하체 회전이 현저히 부족하여 상체에만 의존한 스윙이 확인됩니다.",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 6.9
+          }
+        },
+        {
+          "criterion_id": "trunk_posture",
+          "name": "상체 유지",
+          "grade": 2,
+          "stored_grade": 2,
+          "evidence": "상체 기울기 3.1도로 임팩트 시 안정적인 자세를 유지했다.",
+          "metric_ref": "trunk_forward_lean_deg_at_impact",
+          "given_metrics": {
+            "trunk_forward_lean_deg_at_impact": 3.1
+          }
+        },
+        {
+          "criterion_id": "follow_through",
+          "name": "팔로스루",
+          "grade": 2,
+          "stored_grade": 2,
+          "evidence": "임팩트 후 어깨 굴곡 50.5도로 추가 진행되었으나, 마무리 구간이 다소 짧게 느껴지며 실클립에서 가짜 굴곡 가능성도 배제할 수 없음",
+          "metric_ref": "swing_shoulder_flexion_after_impact_deg",
+          "given_metrics": {
+            "swing_shoulder_flexion_after_impact_deg": 50.5
+          }
+        }
+      ]
+    },
+    "C7icGyrdROM": {
+      "score": 48,
+      "grade": "D",
+      "items": [
+        {
+          "criterion_id": "lead_arm_extension",
+          "name": "리드 팔(보텀핸드) 신전",
+          "grade": 0,
+          "stored_grade": 0,
+          "evidence": "임팩트 시 리드 팔 팔꿈치각 5.4도로 팔꿈치가 몸에 붙어 접혀 있다. 궤도가 짧아지고 배트가 안쪽으로 감기는 현상이 관찰된다.",
+          "metric_ref": "support_elbow_angle_at_impact",
+          "given_metrics": {
+            "support_elbow_angle_at_impact": 5.4
+          }
+        },
+        {
+          "criterion_id": "hip_shoulder_separation",
+          "name": "골반-어깨 분리",
+          "grade": 2,
+          "stored_grade": 2,
+          "evidence": "최대 분리각 30.2도로 골반이 상체보다 약 3.2도 앞서 열었다. 순서가 맞지만 회전량이 부족해 힘 전달 효율이 최적화되지 않았다.",
+          "metric_ref": "hip_shoulder_separation_deg",
+          "given_metrics": {
+            "hip_shoulder_separation_deg": 30.2
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 회전",
+          "grade": 0,
+          "stored_grade": 0,
+          "evidence": "골반 회전 범위 10.6도로 하체 회전이 현저히 부족해 상체에만 의존한 스윙이 확인됩니다.",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 10.6
+          }
+        },
+        {
+          "criterion_id": "trunk_posture",
+          "name": "상체 유지",
+          "grade": 1,
+          "stored_grade": 1,
+          "evidence": "상체 기울기 크기 28.4도로 임팩트 시 균형을 유지했으나, 약간의 forward lean가 관찰됩니다.",
+          "metric_ref": "trunk_forward_lean_deg_at_impact",
+          "given_metrics": {
+            "trunk_forward_lean_deg_at_impact": 28.4
+          }
+        },
+        {
+          "criterion_id": "follow_through",
+          "name": "팔로스루",
+          "grade": 2,
+          "stored_grade": 2,
+          "evidence": "임팩트 후 어깨 굴곡 73도 추가 진행, 팔이 몸을 완전히 감아 돌았다.",
+          "metric_ref": "swing_shoulder_flexion_after_impact_deg",
+          "given_metrics": {
+            "swing_shoulder_flexion_after_impact_deg": 73.0
+          }
+        }
+      ]
+    },
+    "YNMHMKb5Md4": {
+      "score": 48,
+      "grade": "D",
+      "items": [
+        {
+          "criterion_id": "lead_arm_extension",
+          "name": "리드 팔(보텀핸드) 신전",
+          "grade": 0,
+          "stored_grade": 0,
+          "evidence": "임팩트 시 리드 팔 팔꿈치각 99.5도로 팔꿈치가 몸에 붙어 접혀 있다. 궤도가 짧아지고 배트가 안쪽으로 감기는 현상이 관찰된다.",
+          "metric_ref": "support_elbow_angle_at_impact",
+          "given_metrics": {
+            "support_elbow_angle_at_impact": 99.5
+          }
+        },
+        {
+          "criterion_id": "hip_shoulder_separation",
+          "name": "골반-어깨 분리",
+          "grade": 2,
+          "stored_grade": 2,
+          "evidence": "최대 분리각 28.5도로 골반이 상체보다 약 7도 먼저 열렸다. 순서가 맞지만 회전량이 부족해 힘 전달 효율이 떨어질 수 있다.",
+          "metric_ref": "hip_shoulder_separation_deg",
+          "given_metrics": {
+            "hip_shoulder_separation_deg": 28.5
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 회전",
+          "grade": 0,
+          "stored_grade": 0,
+          "evidence": "골반 회전 범위 0도로 하체 회전이 전혀 없었다. 상체만으로 스윙이 진행되어 힘 전달 효율이 크게 떨어졌다.",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 0.0
+          }
+        },
+        {
+          "criterion_id": "trunk_posture",
+          "name": "상체 유지",
+          "grade": 2,
+          "stored_grade": 2,
+          "evidence": "상체 기울기 4.8도로 임팩트 시 안정적인 자세를 유지했다.",
+          "metric_ref": "trunk_forward_lean_deg_at_impact",
+          "given_metrics": {
+            "trunk_forward_lean_deg_at_impact": 4.8
+          }
+        },
+        {
+          "criterion_id": "follow_through",
+          "name": "팔로스루",
+          "grade": 1,
+          "stored_grade": 1,
+          "evidence": "임팩트 후 어깨 굴곡이 17.7도로 추가 진행되었으나, 짧은 마무리 구간으로 인해 공 제어 효율이 다소 떨어질 수 있다.",
+          "metric_ref": "swing_shoulder_flexion_after_impact_deg",
+          "given_metrics": {
+            "swing_shoulder_flexion_after_impact_deg": 17.7
+          }
+        }
+      ]
+    },
+    "ZMy0t-CSZiU": {
+      "score": 55,
+      "grade": "C",
+      "items": [
+        {
+          "criterion_id": "lead_arm_extension",
+          "name": "리드 팔(보텀핸드) 신전",
+          "grade": 1,
+          "stored_grade": 1,
+          "evidence": "임팩트 시 리드 팔 팔꿈치각 136도로 스윙 궤도가 중간 지점에서 공을 만났다.",
+          "metric_ref": "support_elbow_angle_at_impact",
+          "given_metrics": {
+            "support_elbow_angle_at_impact": 136.0
+          }
+        },
+        {
+          "criterion_id": "hip_shoulder_separation",
+          "name": "골반-어깨 분리",
+          "grade": 1,
+          "stored_grade": 1,
+          "evidence": "골반-어깨 분리각이 22.9도로 측정되었다. 이는 준비~임팩트 구간에서 골반이 상체보다 먼저 열리고 회전량이 부족함을 의미한다. 힘의 순서가 제대로 전달되지 않아 스윙 효율이 떨어질 수 있다.",
+          "metric_ref": "hip_shoulder_separation_deg",
+          "given_metrics": {
+            "hip_shoulder_separation_deg": 22.9
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 회전",
+          "grade": 0,
+          "stored_grade": 0,
+          "evidence": "골반 회전 범위 3.5도로 하체 회전이 현저히 부족하여 상체에만 의존하는 스윙이 나타났다.",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 3.5
+          }
+        },
+        {
+          "criterion_id": "trunk_posture",
+          "name": "상체 유지",
+          "grade": 2,
+          "stored_grade": 2,
+          "evidence": "상체 기울기 크기 12.4도로 임팩트 시 안정적인 자세를 유지했다.",
+          "metric_ref": "trunk_forward_lean_deg_at_impact",
+          "given_metrics": {
+            "trunk_forward_lean_deg_at_impact": -12.4
+          }
+        },
+        {
+          "criterion_id": "follow_through",
+          "name": "팔로스루",
+          "grade": 2,
+          "stored_grade": 2,
+          "evidence": "임팩트 후 어깨 굴곡 34.4도로 추가 진행되었으나, 마무리 구간이 다소 짧게 느껴지며 임팩트 직후 스윙이 완전히 멈추지 않았다. 더 부드럽게 감아 돌아가도록 연습이 필요하다.",
+          "metric_ref": "swing_shoulder_flexion_after_impact_deg",
+          "given_metrics": {
+            "swing_shoulder_flexion_after_impact_deg": 34.4
+          }
+        }
+      ]
+    }
+  }
+}
