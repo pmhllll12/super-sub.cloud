@@ -10,7 +10,7 @@ nav_exclude: true
 아침에 올린 [「GPU 할당량이 0이라 EC2 검증이 멈췄습니다」]({{ "/devlog/" | relative_url }})의
 후속입니다. **할당량이 승인됐고, 인스턴스가 떴고, 분석이 끝까지 돌았습니다.**
 
-- 인스턴스 `i-0ea81b71b57c047ff` (`supersub-ai`, g4dn.xlarge, ap-northeast-2a)
+- 인스턴스 `<인스턴스 ID>` (`supersub-ai`, g4dn.xlarge, ap-northeast-2a)
 - Ubuntu 26.04 DLAMI · Tesla T4 15360MiB · gp3 150GB
 - 어제 만들어 둔 VPC·서브넷·보안그룹·키 페어를 **그대로** 썼습니다
 
