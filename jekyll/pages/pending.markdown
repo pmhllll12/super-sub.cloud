@@ -1258,7 +1258,7 @@ EC2 검증 전체가 멈춘다.
 
 ### ✅ 할당량은 해소 (2026.09.03) — GPU 검증이 끝까지 돌았다
 
-**승인됐고 `g4dn.xlarge` 가 떴다.** `i-0ea81b71b57c047ff` (`supersub-ai`,
+**승인됐고 `g4dn.xlarge` 가 떴다.** `<인스턴스 ID>` (`supersub-ai`,
 ap-northeast-2a, Ubuntu 26.04 DLAMI, 150GB gp3). 위 「확인」대로
 `VcpuLimitExceeded` 없이 시작됐다. 만들어 둔 VPC·서브넷·보안그룹·키 페어를
 그대로 썼다.
@@ -1286,10 +1286,10 @@ ap-northeast-2a, Ubuntu 26.04 DLAMI, 150GB gp3). 위 「확인」대로
 
 ### ✅ IAM 역할도 해소 (2026.09.03) — **이 항목은 닫는다**
 
-역할 `supersub-ai-ec2` 가 만들어졌고 인스턴스에 붙었다. EC2 안에서 확인:
+역할 `<EC2 역할>` 가 만들어졌고 인스턴스에 붙었다. EC2 안에서 확인:
 
 ```
-Arn: arn:aws:sts::070605553723:assumed-role/supersub-ai-ec2/i-0ea81b71b57c047ff
+Arn: arn:aws:sts::<AWS 계정 ID>:assumed-role/<EC2 역할>/<인스턴스 ID>
 ```
 
 **권한이 의도한 만큼만 열렸다는 것까지 확인했다.**
@@ -1316,13 +1316,13 @@ Arn: arn:aws:sts::070605553723:assumed-role/supersub-ai-ec2/i-0ea81b71b57c047ff
 
 `작업 → 보안 → IAM 역할 수정` 을 열어 보니 **드롭다운이 비어 있고** 이렇게 뜬다:
 
-> User: `arn:aws:iam::070605553723:user/ho` is not authorized to perform:
+> User: `arn:aws:iam::<AWS 계정 ID>:user/ho` is not authorized to perform:
 > **`iam:ListInstanceProfiles`** … because no identity-based policy allows the action
 
 **아래 (b)만으로는 부족하다는 뜻이다.** 관리자가 역할을 만들어 줘도 `ho` 는
 그 목록을 못 읽어 **인스턴스에 붙일 수 없다.** 그래서 둘 중 하나가 더 필요하다:
 
-- 관리자가 **붙이는 것까지** 해 준다 (인스턴스 `i-0ea81b71b57c047ff`), 또는
+- 관리자가 **붙이는 것까지** 해 준다 (인스턴스 `<인스턴스 ID>`), 또는
 - `ho` 에게 `iam:ListInstanceProfiles` · `iam:PassRole` ·
   `ec2:AssociateIamInstanceProfile` 을 준다
 
@@ -1356,7 +1356,7 @@ $0.2219로 온디맨드($0.647)의 **34%**이고, 검증 작업은 회수를 감
 
 - (a) `ho`에게 `iam:CreateRole`·`CreatePolicy`·`AttachRolePolicy`·`PassRole`과
   `servicequotas:ListAWSDefaultServiceQuotas`·`RequestServiceQuotaIncrease` 부여
-- (b) 관리자가 대신 만들어 주기: EC2용 역할 `supersub-ai-ec2` — 신뢰 주체 EC2,
+- (b) 관리자가 대신 만들어 주기: EC2용 역할 `<EC2 역할>` — 신뢰 주체 EC2,
   권한은 `supersub-ai` 버킷의 `videos/`·`models/` 읽기와 `reports/` 쓰기만.
   정책 JSON은
   [`agent/deploy/README-console.md`](https://github.com/pmhllll12/super-sub.cloud/blob/ho/agent/deploy/README-console.md)
@@ -1376,7 +1376,7 @@ $0.2219로 온디맨드($0.647)의 **34%**이고, 검증 작업은 회수를 감
 | | |
 |---|---|
 | 확인 | 승인 뒤 `g4dn.xlarge` 시작이 `VcpuLimitExceeded` 없이 뜨면 된 것입니다 |
-| 하지 말 것 | 이미 만들어 둔 VPC·서브넷·보안그룹(`vpc-05572ffad8380565d` 등)을 새로 만들지 않기 — 그대로 씁니다 |
+| 하지 말 것 | 이미 만들어 둔 VPC·서브넷·보안그룹(`<VPC ID>` 등)을 새로 만들지 않기 — 그대로 씁니다 |
 
 - **담당**: 정어진(배포·AWS 계정) · **제기**: 정상호 · **기한**: **✅ 전부
   해소 (2026.09.03)** — 할당량 승인 → `g4dn.xlarge` 기동 → IAM 역할 부착까지
@@ -1640,7 +1640,7 @@ pull 방식이면 **꺼져 있어도 큐가 안전하게 쌓입니다.** 그래�
 > #### 🔴 정어진 님께 — 박스를 **S3로도** 보내 주셔야 합니다
 >
 > 분석은 `supersub-ai` EC2에서 도는데, 재시작마다 퍼블릭 IP가 바뀌므로
-> (이번에 실제로 겪었습니다: `13.124.60.135` → `13.125.239.98`) **"백엔드가
+> (이번에 실제로 겪었습니다: `<이전 IP>` → `<이전 IP 2>`) **"백엔드가
 > EC2에 요청" 방식은 매번 깨집니다.** EC2가 S3를 폴링하는 pull 쪽이
 > 자연스러운데, 그러면 **EC2는 백엔드 DB를 보지 않습니다**(IAM도 S3만
 > 열려 있습니다).
@@ -2575,7 +2575,7 @@ ssh supersub 'systemctl cat supersub-api | grep -c proxy-headers'             # 
 ```
 
 ⚠️ **인스턴스를 끄면 `000`(연결 타임아웃)이 납니다 — 설정이 풀린 게 아닙니다.**
-2026-09-04에 실제로 그랬고, 그때도 DNS는 `15.165.13.124`로 정상 해석됐습니다.
+2026-09-04에 실제로 그랬고, 그때도 DNS는 `<서버 IP>`로 정상 해석됐습니다.
 설정이 살아 있는지만 보려면 `getent hosts api.supersub-ai.com`으로 갈립니다.
 
 🟡 **아직 없는 것 셋** — 지금 막는 것은 없지만 적어 둡니다. HSTS ·
@@ -2648,7 +2648,7 @@ IPv4** 에 시간당 $0.005 를 매깁니다 — **켜져 있는 동안에도 �
 
 | | |
 |---|---|
-| ~~부탁드릴 것~~ | ✅ **끝났습니다** — 2026-09-03 에 붙였습니다. **정정**: 새로 할당하지 않고 계정에 이미 떠 있던 미사용 탄력적 IP(`eipalloc-0ddb7304bbcab4754`, `15.165.13.124` — `pmh12-instance`의 것과는 다릅니다)를 재활용했습니다(박민호) |
+| ~~부탁드릴 것~~ | ✅ **끝났습니다** — 2026-09-03 에 붙였습니다. **정정**: 새로 할당하지 않고 계정에 이미 떠 있던 미사용 탄력적 IP(`<탄력적 IP 할당 ID>`, `<서버 IP>` — `pmh12-instance`의 것과는 다릅니다)를 재활용했습니다(박민호) |
 | **그 다음** | ~~`api.supersub-ai.com` A 레코드~~ **✅ 이것도 같은 날 끝났습니다** — 가비아 A 레코드·80·443 개방·nginx+Let's Encrypt HTTPS까지 다 됐습니다(박민호). 절차는 paik 구역 1번 참고 |
 | 확인 | 껐다 켠 뒤에도 같은 IP 로 붙으면 된 것입니다 |
 
@@ -3369,6 +3369,36 @@ https://api.supersub-ai.com/api/v1/internal/analysis-jobs/claim
 
 - 상세(본체): 같은 구역 1번 · 18번 · 루트 미결 `ho` 17번
 - **담당**: 정상호 · **제기**: 정어진 · **기한**: 스프린트 3 (17번 시연 목표에 걸림)
+
+### 21. 공개 사이트에서 인프라 식별자를 걷어냈습니다 (2026-09-07)
+
+이 저장소가 공개인데 `_posts/`·`pending.markdown` 에 **AWS 계정 ID·공인 IP·
+VPC/서브넷/보안그룹/인스턴스/EIP 할당 ID·IAM 역할명**이 그대로 있었고,
+`pages.yml` 로 `dev.supersub-ai.com` 에 배포되고 있었습니다. `_notes/ERRORS.md`
+09-03 이 공인 IP 건을 한 번 지적했는데 그 뒤로 더 늘어 있었습니다.
+
+**이번 커밋에서 값을 자리표시자로 바꿨습니다.** 규칙은 루트 `CLAUDE.md`
+「공개 사이트에 인프라 식별자를 쓰지 않습니다」에 명시했습니다.
+
+| | |
+|---|---|
+| 바꾼 파일 | `_posts/2026-09-03-ec2-gpu-검증-한-바퀴-돌았습니다.markdown` · `_posts/2026-09-03-gpu-할당량이-0이라-ec2가-멈췄습니다.markdown` · 이 파일 |
+| 🔴 `## ho` 구역(16·18번)도 건드렸습니다 | ARN·인스턴스·VPC·역할명·이전 IP 줄입니다. **값만** 자리표시자로 바꿨고 서술은 한 글자도 안 건드렸습니다. 병합 시 이 줄에서 충돌하면 **자리표시자 쪽을 남겨** 주세요 |
+| 확인 | 루트 `CLAUDE.md` 「공개 사이트에 인프라 식별자를 쓰지 않습니다」의 grep 을 `jekyll/`·`_posts/` 전체에 돌려 결과가 없어야 합니다 (자리표시자 문법 `<...>` 만 남습니다) |
+
+#### 아직 남은 것 — 결정·조치가 필요합니다 (담당 정어진)
+
+- **S3 버킷 이름은 안 지웠습니다.** 서비스 도메인(`supersub-ai.com`)에서 바로
+  추측되고 `fastapi/`·`agent/` 코드에도 있어, 문서만 지우면 어긋나기만 합니다.
+  실효 방어는 **버킷 Block Public Access 4개 전부 켜짐 + 익명 허용 정책 없음 +
+  목록 비공개** 확인입니다.
+- **git 히스토리·검색 캐시에는 옛 값이 남습니다.** 계정 ID 는 회수가 안 되니
+  노출을 줄이는 것이 전부입니다. 원본 IP 은닉이 필요하면 API 를 Cloudflare 프록시
+  뒤에 두는 것을 검토합니다(지금은 DNS 가 EC2 IP 를 그대로 가리킵니다).
+- **콘텐츠 반영은 `main` 병합 뒤에 라이브가 됩니다** — 그 전까지 `dev.supersub-ai.com`
+  에는 옛 값이 그대로입니다.
+
+- **담당**: 정어진 · **제기**: 정어진 · **기한**: 버킷 확인은 이번 주 · 나머지는 스프린트 3
 
 ## min (박민호)
 
