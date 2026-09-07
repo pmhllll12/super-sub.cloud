@@ -48,23 +48,26 @@ has_children: true
   <div class="kanban-column">
     <h4>Backlog</h4>
     <div class="kanban-card"><span class="role-tag role-pm">박민호·PM</span>골든셋 라벨링 지도자 섭외(ho 2번)</div>
-    <div class="kanban-card"><span class="role-tag role-front">백성검·프론트/웹</span>클라이언트 계약 반영 — 429 재요청 억제·Flutter 에러 code 보존(jin 2번)</div>
-    <div class="kanban-card"><span class="role-tag role-front">백성검·프론트/웹</span>카드를 만드는 자리를 화면에(jin 7번)</div>
+    <div class="kanban-card"><span class="role-tag role-pm">박민호·PM</span>클립의 동작(motion) 자리 — 부록 D 수정 여부 판단(jin 17번)</div>
     <div class="kanban-card"><span class="role-tag role-front">백성검·프론트/웹</span>flutter/ 진입점 문서 작성(jin 9번)</div>
-    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>agent/ 진입점 문서 작성(jin 9번)</div>
     <div class="kanban-card"><span class="role-tag role-backend">정어진·백엔드/파이프라인</span>분석 결과 적재 — 지표 코드 종목 충돌 합의 대기 중이라 구현 보류(jin 1번)</div>
+    <div class="kanban-card"><span class="role-tag role-backend">정어진·백엔드/파이프라인</span>팀 구성원의 카드 식별자 — 스쿼드 등재가 막혀 있음(paik 2번)</div>
+    <div class="kanban-card"><span class="role-tag role-backend">정어진·백엔드/파이프라인</span>카드 꾸미기 규격 — 별명·사진 필드가 계약에 없음(paik 3번)</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>agent/ 진입점 문서 작성(jin 9번)</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>클립의 동작(motion) — 동작 코드 목록 확인(jin 17번)</div>
   </div>
   <div class="kanban-column">
     <h4>To Do</h4>
-    <div class="kanban-card"><span class="role-tag role-front">백성검·프론트/웹</span>웹을 mock에서 실제 백엔드로 전환(jin 10번)</div>
-    <div class="kanban-card"><span class="role-tag role-front">백성검·프론트/웹</span>패킷 A(과금) 도메인 구현 착수(jin 13번)</div>
     <div class="kanban-card"><span class="role-tag role-pm">박민호·PM</span>패킷 B(평가·신뢰) 애플리케이션·어댑터·라우터·테스트(jin 14번)</div>
+    <div class="kanban-card"><span class="role-tag role-front">백성검·프론트/웹</span>클라이언트 계약 반영 — 429 재요청 억제·프록시의 Retry-After 전달·Flutter 에러 code 보존(jin 2번)</div>
+    <div class="kanban-card"><span class="role-tag role-front">백성검·프론트/웹</span>패킷 A(과금) 도메인 구현 착수(jin 13번)</div>
+    <div class="kanban-card"><span class="role-tag role-front">백성검·프론트/웹</span>경기 탐색 /matches 화면(jin 15번)</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>분석 워커 폴링 루프 — 서버 쪽은 열렸음(jin 18번)</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>업로드 60초 상한 vs max_frames 300 판단(jin 11번)</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>스윙 측 자동판별 개선(ho 6번)</div>
   </div>
   <div class="kanban-column">
     <h4>In Progress</h4>
-    <div class="kanban-card"><span class="role-tag role-backend">정어진·백엔드/파이프라인</span>클립 업로드 붙일 자리 — 버킷·IAM 역할 확인 완료, 실연결 진행 중(jin 12번)</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>fps 등급 불일치 — 원인 규명 후 인접 결함 수리(ho 7번)</div>
   </div>
   <div class="kanban-column">
@@ -72,14 +75,27 @@ has_children: true
     <div class="kanban-card"><span class="role-tag role-backend">정어진·백엔드/파이프라인</span>백엔드를 EC2에 배포 — PostgreSQL 18·Python 3.14.7</div>
     <div class="kanban-card"><span class="role-tag role-backend">정어진·백엔드/파이프라인</span>클립 업로드 개통 — S3 사전 서명 URL(SFR-001)</div>
     <div class="kanban-card"><span class="role-tag role-backend">정어진·백엔드/파이프라인</span>백엔드 미구현 도메인을 패킷 A·B로 분담(지시서 작성)</div>
+    <div class="kanban-card"><span class="role-tag role-backend">정어진·백엔드/파이프라인</span>경기 탐색·수정·취소 개통 — GET/PATCH/DELETE /matches</div>
+    <div class="kanban-card"><span class="role-tag role-backend">정어진·백엔드/파이프라인</span>지원 무르기·거절 경로 — 지원 붙은 경기 취소가 막히던 409 해소(jin 16번)</div>
+    <div class="kanban-card"><span class="role-tag role-backend">정어진·백엔드/파이프라인</span>분석 작업 큐·워커 경로 개통 + worker-interface.md(정상호에게 인계)</div>
+    <div class="kanban-card"><span class="role-tag role-backend">정어진·백엔드/파이프라인</span>멈춘 분석 작업 회수 — 워커가 죽어도 큐가 안 막힌다</div>
+    <div class="kanban-card"><span class="role-tag role-backend">정어진·백엔드/파이프라인</span>패킷 B 마이그레이션 리뷰·DB 검증(min 2번 해소)</div>
     <div class="kanban-card"><span class="role-tag role-pm">박민호·PM</span>탄력적 IP·IAM 인스턴스 프로파일 부착 확인</div>
     <div class="kanban-card"><span class="role-tag role-pm">박민호·PM</span>패킷 B 초기 review_option 목록 확정, 5테이블 마이그레이션 작성</div>
-    <div class="kanban-card"><span class="role-tag role-pm">박민호·PM</span>홈 헤더에 AI SCOUTING 소개 문구 추가</div>
+    <div class="kanban-card"><span class="role-tag role-pm">박민호·PM</span>웹에 클립 업로드 붙임 — 분석 화면의 저장 버튼(jin 12번 해소)</div>
+    <div class="kanban-card"><span class="role-tag role-pm">박민호·PM</span>웹을 mock에서 실제 백엔드로 전환 — getBackend()가 FastAPI를 부른다(jin 10번 해소)</div>
     <div class="kanban-card"><span class="role-tag role-pm">박민호·PM</span>부록 D 종목 서술 오타 수정(jin 4번 해소)</div>
+    <div class="kanban-card"><span class="role-tag role-pm">박민호·PM</span>경기 취소를 A안(지원 취소·거절 경로 먼저)으로 결정(jin 16번)</div>
     <div class="kanban-card"><span class="role-tag role-front">백성검·프론트/웹</span>사람 추적을 탐지 기반(MoveNet MultiPose)으로 재구현</div>
     <div class="kanban-card"><span class="role-tag role-front">백성검·프론트/웹</span>레슨·상점 화면(mock) 신설, 판 안에서 도는 구조로 통합</div>
+    <div class="kanban-card"><span class="role-tag role-front">백성검·프론트/웹</span>상점 상품 목록 복구 · 영상 모음 댓글창 · 레슨/상점 판 2색 체계</div>
+    <div class="kanban-card"><span class="role-tag role-front">백성검·프론트/웹</span>카드를 만드는 자리를 화면에 — /me?edit=1 의 선수 카드 만들기(jin 7번 해소)</div>
+    <div class="kanban-card"><span class="role-tag role-front">백성검·프론트/웹</span>내 프로필(/me) 전면 개편 — 소속·정보·내 경기·계정·내 영상 한 판 + 카드 꾸미기</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>4K 입력 host RAM 문제 해결(D-1 — 재디코딩 방식)</div>
     <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>fps 불변성안(E-1·E-2) 사전 판정 — 구현 전 기각, 근본 처방은 탐색범위 제한임을 확정</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>GPU 인스턴스(g4dn.xlarge) 확보·검증 — 할당량·IAM 역할 해소(ho 16번)</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>관측 sink 우회가 흔적을 남기도록 수정(ho 12번 해소)</div>
+    <div class="kanban-card"><span class="role-tag role-agent">정상호·에이전트</span>골든셋 사전 등록 명세를 라벨 보기 전에 코드로 고정, 라벨 12건 확정·제외 27건 사유 기록</div>
   </div>
 </div>
 

@@ -53,6 +53,7 @@ class MyCardResult:
     og_image_key: str
     user: CardOwnerResult
     titles: list[TitleResult] = field(default_factory=list)
+    tagline: str | None = None
 
 
 @dataclass(frozen=True)
@@ -85,3 +86,4 @@ class PublicCardResult:
     og_image_key: str
     user: CardOwnerResult
     titles: list[TitleResult] = field(default_factory=list)
+    tagline: str | None = None

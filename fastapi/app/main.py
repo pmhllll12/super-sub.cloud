@@ -7,6 +7,7 @@
 
 from fastapi import FastAPI
 
+from app.analysis.adapter.inbound.api.v1.job_router import job_router
 from app.analysis.adapter.inbound.api.v1.video_router import video_router
 from app.card.adapter.inbound.api.v1.card_router import card_router
 from app.card.adapter.inbound.api.v1.squad_router import squad_router
@@ -15,6 +16,7 @@ from app.core.config import settings
 from app.core.errors import install_error_handlers
 from app.core.logging import configure_logging
 from app.match.adapter.inbound.api.v1.match_router import match_router
+from app.review.adapter.inbound.api.v1.review_router import review_router
 from app.user.adapter.inbound.api.v1.admin_router import admin_router
 from app.user.adapter.inbound.api.v1.auth_router import auth_router
 from app.user.adapter.inbound.api.v1.me_router import me_router
@@ -85,6 +87,8 @@ for _router in (
     card_router,
     squad_router,
     video_router,
+    job_router,
+    review_router,
     admin_router,
 ):
     app.include_router(_router, prefix=API_PREFIX)

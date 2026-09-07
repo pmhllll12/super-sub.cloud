@@ -101,4 +101,75 @@ describe('mockBackend', () => {
       expect(t).not.toHaveProperty('earned')
     }
   })
+
+  describe('createTeamMatch — 흐름 B(모집 등록 돕기) 챗봇이 부르는 자리', () => {
+    const DEMO_TOKEN = 'mock-access-token-demo'
+    const DEMO_TEAM_ID = '9a2e0000-0000-4000-8000-000000000002'
+    const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    const past = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+
+    it('주장이면 등록되고, 포지션 라벨이 붙어 돌아온다', async () => {
+      const m = await mockBackend.createTeamMatch(DEMO_TOKEN, DEMO_TEAM_ID, {
+        played_at: future,
+        place: '테스트 구장',
+        needs: [{ position_code: 'GK', head_count: 1 }],
+      })
+      expect(m.team_id).toBe(DEMO_TEAM_ID)
+      expect(m.needs).toEqual([{ position_code: 'GK', position_label: '골키퍼', head_count: 1 }])
+    })
+
+    it('모르는 팀이면 TEAM_NOT_FOUND 다', async () => {
+      await expect(
+        mockBackend.createTeamMatch(DEMO_TOKEN, '없는팀', {
+          played_at: future,
+          place: '어딘가',
+          needs: [{ position_code: 'GK', head_count: 1 }],
+        }),
+      ).rejects.toMatchObject({ status: 404, code: 'TEAM_NOT_FOUND' })
+    })
+
+    it('지난 시각이면 PAST_MATCH 다', async () => {
+      await expect(
+        mockBackend.createTeamMatch(DEMO_TOKEN, DEMO_TEAM_ID, {
+          played_at: past,
+          place: '어딘가',
+          needs: [{ position_code: 'GK', head_count: 1 }],
+        }),
+      ).rejects.toMatchObject({ status: 422, code: 'PAST_MATCH' })
+    })
+
+    it('needs 가 비어 있으면 VALIDATION_ERROR 다', async () => {
+      await expect(
+        mockBackend.createTeamMatch(DEMO_TOKEN, DEMO_TEAM_ID, {
+          played_at: future,
+          place: '어딘가',
+          needs: [],
+        }),
+      ).rejects.toMatchObject({ status: 422, code: 'VALIDATION_ERROR' })
+    })
+
+    it('이 팀 종목에 없는 포지션이면 UNKNOWN_POSITION 이다', async () => {
+      await expect(
+        mockBackend.createTeamMatch(DEMO_TOKEN, DEMO_TEAM_ID, {
+          played_at: future,
+          place: '어딘가',
+          // 야구 포지션을 축구 팀에 적었다.
+          needs: [{ position_code: 'P', head_count: 1 }],
+        }),
+      ).rejects.toMatchObject({ status: 422, code: 'UNKNOWN_POSITION' })
+    })
+
+    it('같은 포지션을 두 번 적으면 DUPLICATE_POSITION 이다', async () => {
+      await expect(
+        mockBackend.createTeamMatch(DEMO_TOKEN, DEMO_TEAM_ID, {
+          played_at: future,
+          place: '어딘가',
+          needs: [
+            { position_code: 'GK', head_count: 1 },
+            { position_code: 'GK', head_count: 1 },
+          ],
+        }),
+      ).rejects.toMatchObject({ status: 422, code: 'DUPLICATE_POSITION' })
+    })
+  })
 })

@@ -42,6 +42,9 @@ class TeamMemberResult:
     nickname: str
     role: str
     joined_at: datetime
+    # 카드가 없는 구성원은 둘 다 None 이다. 자세한 이유는 `TeamMemberEntity`.
+    player_card_id: UUID | None = None
+    card_public_slug: str | None = None
 
 
 @dataclass(frozen=True)

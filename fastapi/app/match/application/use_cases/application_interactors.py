@@ -11,11 +11,13 @@ from app.match.application.dtos.match_dto import (
     ApplicationResult,
     ApplicationsQuery,
     ApplyCommand,
+    RemoveApplicationCommand,
 )
 from app.match.application.ports.input.match_use_cases import (
     AcceptApplicationUseCase,
     ApplyToMatchUseCase,
     ListApplicationsUseCase,
+    RemoveApplicationUseCase,
 )
 from app.match.application.ports.output.match_port import MatchPort
 from app.match.application.use_cases.match_assembler import to_application_result
@@ -26,6 +28,7 @@ from app.match.domain.rules.application_rules import (
     acceptable_side,
     can_apply,
     can_offer,
+    can_remove,
     has_stake,
 )
 from app.match.domain.rules.match_rules import OWNER_ROLE, is_registrable
@@ -101,6 +104,28 @@ class AcceptApplicationInteractor(_ApplicationBase, AcceptApplicationUseCase):
         return to_application_result(
             self._repository.accept_application(application.id, side)
         )
+
+
+class RemoveApplicationInteractor(_ApplicationBase, RemoveApplicationUseCase):
+    def __call__(self, command: RemoveApplicationCommand) -> None:
+        match = self._match_or_404(command.match_id)
+        application = self._repository.find_application_by_id(command.application_id)
+        if application is None or application.match_id != match.id:
+            raise ApiError(404, "APPLICATION_NOT_FOUND", "지원 건을 찾을 수 없습니다.")
+
+        # 🔴 지난 경기의 지원은 지우지 않는다. 확정된 행(두 시각이 다 찬 것)이
+        #    "누가 그 경기에 뛰었나"의 유일한 근거라, 지우면 평가(SFR-008)가
+        #    대상을 잃는다. 취소도 같은 이유로 지난 경기를 막는다.
+        if not is_registrable(match.played_at, datetime.now(timezone.utc)):
+            raise ApiError(
+                422, "PAST_MATCH", "지난 경기의 지원은 무를 수 없습니다."
+            )
+
+        is_owner = self._role(match.team_id, command.actor_id) == OWNER_ROLE
+        if not can_remove(application, command.actor_id, is_owner):
+            raise ApiError(403, "FORBIDDEN", "이 지원 건을 없앨 수 없습니다.")
+
+        self._repository.delete_application(application.id)
 
 
 class ListApplicationsInteractor(_ApplicationBase, ListApplicationsUseCase):

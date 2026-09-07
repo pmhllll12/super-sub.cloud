@@ -1,7 +1,10 @@
 """`TeamPort` 의 PostgreSQL 구현.
 
 `team`·`team_member`·`user`·`sport` 는 **전부 `user` 컨텍스트의 테이블**이라
-카드 쪽과 달리 원시 SQL 로 우회할 일이 없다. ORM 을 그대로 쓴다.
+ORM 을 그대로 쓴다.
+
+🔴 **`player_card` 만 예외다.** 저쪽은 `card` 컨텍스트라 임포트하지 않고
+`table()`/`column()` 으로 읽는다(2026-09-04 추가 — 미결 `paik` 2번).
 """
 
 from __future__ import annotations
@@ -9,7 +12,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from sqlalchemy import select, update
+from sqlalchemy import column, select, table, update
 from sqlalchemy.orm import Session
 
 from app.core.errors import ApiError
@@ -20,6 +23,10 @@ from app.user.adapter.outbound.orm.user_orm import UserOrm
 from app.user.application.ports.output.team_port import TeamPort
 from app.user.domain.entities.team_entity import TeamEntity, TeamMemberEntity
 from app.user.domain.value_objects.team_role_vo import TeamRole
+
+
+# 소유하지 않는 테이블에서 **읽기만** 한다. 위 docstring 참조.
+_card = table("player_card", column("id"), column("user_id"), column("public_slug"))
 
 
 class TeamPgRepository(TeamPort):
@@ -43,10 +50,21 @@ class TeamPgRepository(TeamPort):
         )
 
     def active_members(self, team_id: UUID) -> list[TeamMemberEntity]:
-        """`left_at IS NULL` 만. 오래 소속된 사람이 앞에 온다."""
+        """`left_at IS NULL` 만. 오래 소속된 사람이 앞에 온다.
+
+        🔴 **카드는 `outerjoin` 이다.** 안쪽 조인으로 걸면 카드를 안 만든 구성원이
+        목록에서 통째로 사라진다 — 팀에는 여전히 있는 사람이다
+        (미결 `paik` 2번의 「하지 말 것」).
+
+        `player_card` 는 `card` 컨텍스트의 테이블이라 ORM 을 임포트하지 않고
+        `table()`/`column()` 으로 읽는다(`user_pg_repository.has_card` 와 같은 방식).
+        ⚠️ 대가: 저쪽 컬럼 이름이 바뀌면 파이썬이 안 잡아 준다 —
+        `tests/user/adapter/test_team_db.py` 가 방어선이다.
+        """
         stmt = (
-            select(TeamMemberOrm, UserOrm.nickname)
+            select(TeamMemberOrm, UserOrm.nickname, _card.c.id, _card.c.public_slug)
             .join(UserOrm, UserOrm.id == TeamMemberOrm.user_id)
+            .outerjoin(_card, _card.c.user_id == TeamMemberOrm.user_id)
             .where(
                 TeamMemberOrm.team_id == team_id,
                 TeamMemberOrm.left_at.is_(None),
@@ -59,8 +77,10 @@ class TeamPgRepository(TeamPort):
                 nickname=nickname,
                 role=TeamRole(member.role),
                 joined_at=member.joined_at,
+                player_card_id=card_id,
+                card_public_slug=slug,
             )
-            for member, nickname in self._session.execute(stmt).all()
+            for member, nickname, card_id, slug in self._session.execute(stmt).all()
         ]
 
     def create_team(self, team: TeamEntity, owner_id: UUID) -> None:

@@ -14,6 +14,7 @@ DB 의 현재 버전과 다르면 거부한다. 그래서 이 모듈은 `user` �
 
 from __future__ import annotations
 
+from hmac import compare_digest
 from typing import Annotated, Protocol
 from uuid import UUID
 
@@ -108,3 +109,28 @@ def require_admin(
 
 
 CurrentAdminUserId = Annotated[UUID, Depends(require_admin)]
+
+
+def require_worker(
+    x_worker_token: Annotated[str | None, Header()] = None,
+) -> None:
+    """분석 워커 전용 게이트. **사람 토큰이 아니다.**
+
+    워커는 GPU 인스턴스에서 도는 기계라 사용자 계정에 묶지 않는다 — 묶으면 그
+    계정이 탈퇴하거나 토큰이 폐기될 때 파이프라인이 조용히 멈춘다.
+
+    🔴 `settings.worker_token` 이 비어 있으면 **아무도** 통과하지 못한다.
+    `require_admin` 과 같은 이유다 — 조용한 기본값을 두면 값을 안 넣은 배포에서
+    누구나 큐를 집어 갈 수 있다.
+
+    🔴 `compare_digest` 로 비교한다. `==` 는 앞에서부터 다른 자리를 만나면 바로
+    끝나서, 걸린 시간이 "몇 글자가 맞았는지"를 알려 준다.
+    """
+    expected = settings.worker_token
+    if not expected or not x_worker_token:
+        raise ApiError(401, "INVALID_TOKEN", "워커 자격이 필요합니다.")
+    if not compare_digest(x_worker_token, expected):
+        raise ApiError(401, "INVALID_TOKEN", "워커 자격이 유효하지 않습니다.")
+
+
+WorkerAuth = Depends(require_worker)

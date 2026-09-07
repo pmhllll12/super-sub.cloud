@@ -17,6 +17,7 @@ from app.match.application.ports.input.match_use_cases import (
     ListApplicationsUseCase,
     ListTeamMatchesUseCase,
     ReadMatchUseCase,
+    RemoveApplicationUseCase,
     SearchMatchesUseCase,
     UpdateMatchUseCase,
 )
@@ -25,6 +26,7 @@ from app.match.application.use_cases.application_interactors import (
     AcceptApplicationInteractor,
     ApplyToMatchInteractor,
     ListApplicationsInteractor,
+    RemoveApplicationInteractor,
 )
 from app.match.application.use_cases.match_interactors import (
     CancelMatchInteractor,
@@ -94,6 +96,12 @@ def get_accept_use_case(repository: MatchRepositoryDep) -> AcceptApplicationUseC
     return AcceptApplicationInteractor(repository)
 
 
+def get_remove_application_use_case(
+    repository: MatchRepositoryDep,
+) -> RemoveApplicationUseCase:
+    return RemoveApplicationInteractor(repository)
+
+
 def get_list_applications_use_case(
     repository: MatchRepositoryDep,
 ) -> ListApplicationsUseCase:
@@ -115,5 +123,8 @@ AcceptApplicationUseCaseDep = Annotated[
 ]
 ListApplicationsUseCaseDep = Annotated[
     ListApplicationsUseCase, Depends(get_list_applications_use_case)
+]
+RemoveApplicationUseCaseDep = Annotated[
+    RemoveApplicationUseCase, Depends(get_remove_application_use_case)
 ]
 

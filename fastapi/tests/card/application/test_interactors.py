@@ -58,6 +58,7 @@ class FakeCardRepository(CardPort):
         # 저장소가 실제로 불렸는지 보려고 남긴다. "이미 있으면 만들지 않는다"는
         # 결과만으로 확인되지 않는다 — 카드는 어느 쪽이든 돌아오기 때문이다.
         self.created_for: list[UUID] = []
+        self.tagline_calls: list[tuple[UUID, str | None]] = []
 
     def find_by_owner(self, user_id: UUID) -> CardEntity | None:
         return _card() if user_id == _OWNER_ID else None
@@ -72,6 +73,14 @@ class FakeCardRepository(CardPort):
             owner=CardOwner(id=user_id, nickname="새 사람"),
             titles=[],
         )
+
+    def update_tagline(self, user_id: UUID, tagline: str | None) -> CardEntity | None:
+        # 넘어온 값을 그대로 남긴다 — 인터랙터가 **정규화한 뒤** 저장소를 부르는지
+        # 확인하려면 저장소가 받은 값이 보여야 한다.
+        self.tagline_calls.append((user_id, tagline))
+        if user_id != _OWNER_ID:
+            return None
+        return replace(_card(), tagline=tagline)
 
 
 class TestMyCardInteractor:

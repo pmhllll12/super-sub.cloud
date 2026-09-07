@@ -27,6 +27,7 @@ from app.match.application.dtos.match_dto import (
     MatchResult,
     MatchSearchQuery,
     MatchSearchResult,
+    RemoveApplicationCommand,
     TeamMatchesQuery,
     PositionNeedInput,
 )
@@ -38,6 +39,7 @@ from app.match.dependencies.match_providers import (
     ListTeamMatchesUseCaseDep,
     CancelMatchUseCaseDep,
     ReadMatchUseCaseDep,
+    RemoveApplicationUseCaseDep,
     SearchMatchesUseCaseDep,
     UpdateMatchUseCaseDep,
 )
@@ -199,6 +201,35 @@ def accept_application(
     """반대쪽이 수락한다. 둘 다 차면 `confirmed` 가 참이 된다."""
     return use_case(
         AcceptApplicationCommand(
+            actor_id=user_id, match_id=match_id, application_id=application_id
+        )
+    )
+
+
+@match_router.delete(
+    "/matches/{match_id}/applications/{application_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def remove_application(
+    match_id: UUID,
+    application_id: UUID,
+    user_id: CurrentUserId,
+    use_case: RemoveApplicationUseCaseDep,
+) -> None:
+    """지원을 없앤다 — **당사자면 무르기, 주장이면 거절이다.**
+
+    둘을 한 경로로 두는 이유는 **하는 일이 같기 때문**이다. 거절을 시각 컬럼으로
+    담으면 행이 남고, 그러면 `DELETE /matches/{match_id}` 가 계속 409 다
+    (미결 `jin` 16번에서 A-1 로 정했다).
+
+    ⚠️ **거절 이력은 남지 않는다.** 그리고 **상대에게 알림이 가지 않는다** —
+    알림 인프라가 아직 없다.
+
+    🔴 **지난 경기에서는 422 다.** 확정된 행이 "누가 그 경기에 뛰었나"의 유일한
+    근거라 지우면 평가(SFR-008)가 대상을 잃는다.
+    """
+    use_case(
+        RemoveApplicationCommand(
             actor_id=user_id, match_id=match_id, application_id=application_id
         )
     )

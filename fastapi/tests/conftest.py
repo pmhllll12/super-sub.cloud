@@ -8,6 +8,11 @@ from app.analysis.adapter.outbound.stub.video_stub_repository import (
     StubVideoRepository,
     reset_videos,
 )
+from app.analysis.adapter.outbound.stub.job_stub_repository import (
+    StubJobRepository,
+    reset_jobs,
+)
+from app.analysis.dependencies.job_providers import get_job_repository
 from app.analysis.dependencies.video_providers import (
     get_storage,
     get_video_repository,
@@ -17,6 +22,11 @@ from app.match.adapter.outbound.stub.match_stub_repository import (
     StubMatchRepository,
 )
 from app.match.dependencies.match_providers import get_match_repository
+from app.review.adapter.outbound.stub.review_stub_repository import (
+    StubReviewRepository,
+    reset_reviews,
+)
+from app.review.dependencies.review_providers import get_review_repository
 from app.core.deps import get_token_version_reader, get_user_email_reader
 from app.main import app
 from app.card.adapter.outbound.stub.card_stub_repository import StubCardRepository
@@ -86,12 +96,16 @@ def client() -> TestClient:
     app.dependency_overrides[get_match_repository] = StubMatchRepository
     app.dependency_overrides[get_squad_repository] = StubSquadRepository
     app.dependency_overrides[get_video_repository] = StubVideoRepository
+    app.dependency_overrides[get_job_repository] = StubJobRepository
+    app.dependency_overrides[get_review_repository] = StubReviewRepository
     # 🔴 저장소도 갈아끼운다. 안 끼우면 `S3_BUCKET` 이 없어 503 이 나는데,
     #    그건 계약이 아니라 **환경 문제**라 계약 테스트가 그걸 검사하면 안 된다.
     app.dependency_overrides[get_storage] = FakeStorage
     app.dependency_overrides[get_token_version_reader] = _stub_token_version_reader
     app.dependency_overrides[get_user_email_reader] = _stub_user_email_reader
     reset_videos()
+    reset_jobs()
+    reset_reviews()
     reset_squads()
     try:
         yield TestClient(app)
@@ -102,6 +116,8 @@ def client() -> TestClient:
         app.dependency_overrides.pop(get_match_repository, None)
         app.dependency_overrides.pop(get_squad_repository, None)
         app.dependency_overrides.pop(get_video_repository, None)
+        app.dependency_overrides.pop(get_job_repository, None)
+        app.dependency_overrides.pop(get_review_repository, None)
         app.dependency_overrides.pop(get_storage, None)
         app.dependency_overrides.pop(get_token_version_reader, None)
         app.dependency_overrides.pop(get_user_email_reader, None)

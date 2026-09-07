@@ -281,3 +281,72 @@ class TestCreateMyCardInDb:
         ).json()["public_slug"]
         assert "새사람" not in slug
         assert len(slug) >= 16
+
+
+class TestTaglineInDb:
+    """카드의 한 줄이 **실제로 저장되고 공개 카드에도 나가는가** (미결 `paik` 3번).
+
+    스텁은 딕셔너리라 저장·조회가 같은 객체다. 여기가 컬럼이 실재하는지,
+    그리고 **공유 링크로 보는 카드에도 실리는지**를 본다.
+    """
+
+    def test_저장되고_다시_읽힌다(self, db_client, db_session, fresh_account):
+        headers = fresh_account["headers"]
+        db_client.post(f"{V1}/me/card", headers=headers)
+
+        res = db_client.patch(
+            f"{V1}/me/card", json={"tagline": "THREE LUNGS"}, headers=headers
+        )
+        assert res.status_code == 200, res.text
+
+        row = db_session.execute(
+            text("select tagline from player_card where user_id = :u"),
+            {"u": str(fresh_account["user_id"])},
+        ).scalar_one()
+        assert row == "THREE LUNGS", "컬럼에 안 들어갔다"
+
+        assert db_client.get(f"{V1}/me/card", headers=headers).json()[
+            "tagline"
+        ] == "THREE LUNGS"
+
+    def test_공개_카드에도_나간다(self, db_client, fresh_account):
+        """🔴 안 실으면 **남이 보는 카드만** 밋밋해진다."""
+        headers = fresh_account["headers"]
+        slug = db_client.post(f"{V1}/me/card", headers=headers).json()["public_slug"]
+        db_client.patch(f"{V1}/me/card", json={"tagline": "숨은 왼발"}, headers=headers)
+
+        public = db_client.get(f"{V1}/cards/{slug}")
+        assert public.status_code == 200
+        assert public.json()["tagline"] == "숨은 왼발"
+        assert "id" not in public.json()   # 내부 id 는 여전히 안 나간다
+
+    def test_지우면_NULL_이_된다(self, db_client, db_session, fresh_account):
+        headers = fresh_account["headers"]
+        db_client.post(f"{V1}/me/card", headers=headers)
+        db_client.patch(f"{V1}/me/card", json={"tagline": "지울 것"}, headers=headers)
+
+        db_client.patch(f"{V1}/me/card", json={"tagline": None}, headers=headers)
+
+        row = db_session.execute(
+            text("select tagline from player_card where user_id = :u"),
+            {"u": str(fresh_account["user_id"])},
+        ).scalar_one()
+        assert row is None, "빈 문자열이 아니라 NULL 이어야 한다"
+
+    def test_안_정한_카드는_null_로_나간다(self, db_client, fresh_account):
+        created = db_client.post(f"{V1}/me/card", headers=fresh_account["headers"])
+        assert created.json()["tagline"] is None
+
+    def test_슬러그는_수정으로_안_바뀐다(self, db_client, fresh_account):
+        """🔴 이미 공유된 주소가 죽으면 안 된다."""
+        headers = fresh_account["headers"]
+        before = db_client.post(f"{V1}/me/card", headers=headers).json()["public_slug"]
+
+        db_client.patch(
+            f"{V1}/me/card",
+            json={"tagline": "x", "public_slug": "내가-정한-주소"},
+            headers=headers,
+        )
+        after = db_client.get(f"{V1}/me/card", headers=headers).json()["public_slug"]
+        assert after == before
+        assert db_client.get(f"{V1}/cards/{before}").status_code == 200

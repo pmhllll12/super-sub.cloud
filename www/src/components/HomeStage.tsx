@@ -1,11 +1,12 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { PublicPlayerCard } from '@/server/backend'
+import type { PublicPlayerCard, Squad } from '@/server/backend'
 import SquadPanel from '@/components/SquadPanel'
+import MatchBot from '@/components/MatchBot'
 import SiteHeader from '@/components/SiteHeader'
 import HomeNav, { type Destination } from '@/components/HomeNav'
-import { FRIEND_SEARCH } from '@/lib/destinations'
+import { FRIEND_SEARCH, MATCH_BOT } from '@/lib/destinations'
 import { useIntroDone } from '@/lib/useIntroDone'
 import { useHideChrome, useLeaving } from '@/lib/pageTransition'
 import LogoutButton from '@/components/LogoutButton'
@@ -37,6 +38,7 @@ export type { Destination }
 export default function HomeStage({
   user,
   card,
+  squad = null,
   destinations,
   featured = [],
   defaultActive = null,
@@ -44,6 +46,8 @@ export default function HomeStage({
   user: { nickname: string } | null
   /** 로그인한 사람의 선수 카드. 아직 카드가 없으면 null 이다. */
   card?: PublicPlayerCard | null
+  /** 팀의 스쿼드. 팀이 없거나 아직 안 만들었으면 null 이다. */
+  squad?: Squad | null
   destinations: Destination[]
   /**
    * 헤드라인 자리에 **유리 알약 버튼**으로 크게 내놓는 목적지들.
@@ -238,6 +242,7 @@ export default function HomeStage({
    */
   const [picked, setPicked] = useState<string | null>(defaultActive)
   const friendSearch = picked === FRIEND_SEARCH
+  const matchBot = picked === MATCH_BOT
 
   return (
     <>
@@ -245,7 +250,7 @@ export default function HomeStage({
           위, 무대(z-index 10) 아래에 깔려 사진만 덮는다. 덩어리들이 다 빠져나간
           뒤에 움직이도록 늦춘다(globals.css). */}
       <div className="ss-home-outro" data-up={out} aria-hidden={!out}>
-        <HomeFeed active={out} />
+        <HomeFeed active={out} by={user?.nickname ?? '나'} />
       </div>
 
       {/* 헤더는 모든 화면이 같이 쓴다(SiteHeader). 홈에서만 화면에
@@ -288,6 +293,7 @@ export default function HomeStage({
             </div>
             <SquadPanel
               card={card}
+              squad={squad}
               friendSearch={friendSearch}
               // 판의 × 로 닫으면 알약 선택도 같이 풀려야 한다 — 안 그러면
               // 고른 채로 판만 없어져 다시 눌러도 안 열린다.
@@ -332,6 +338,16 @@ export default function HomeStage({
           <LogoutButton />
         </div>
       )}
+
+      {/* 스쿼드 판과 달리 자리(포지션 슬롯)와 무관해 그 판 안에 넣지 않고
+          독립된 떠 있는 판으로 연다 — SquadPanel 은 스쿼드 레이아웃 전용이다. */}
+      <MatchBot
+        open={matchBot}
+        onClose={() => {
+          setPicked(defaultActive)
+          setActive(defaultActive)
+        }}
+      />
     </>
   )
 }

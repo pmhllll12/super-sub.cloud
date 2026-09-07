@@ -35,3 +35,12 @@ class TeamMemberEntity:
     nickname: str
     role: TeamRole
     joined_at: datetime
+    # 그 사람의 선수 카드. **없을 수 있다** — 카드를 안 만든 구성원도 팀에는
+    # 있는 사람이라 목록에서 빼지 않는다(미결 `paik` 2번의 「하지 말 것」).
+    #
+    # 🔴 둘을 함께 싣는 이유: 스쿼드 등재(`POST /teams/{id}/squad/members`)는
+    # 내부 id 를 받고, 카드로 가는 링크는 `public_slug` 를 쓴다. 하나만 주면
+    # 화면이 나머지를 얻을 경로가 없다 — 남의 카드를 슬러그로 찾을 수도,
+    # 내부 id 로 열 수도 없기 때문이다.
+    player_card_id: UUID | None = None
+    card_public_slug: str | None = None

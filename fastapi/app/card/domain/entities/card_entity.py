@@ -24,6 +24,10 @@ class CardEntity:
     og_image_key: str
     owner: CardOwner
     titles: list[TitleEntity]
+    # 사람이 정하는 한 줄. 안 정했으면 None (미결 paik 3번).
+    # `owner.nickname`(이름)·`titles`(분석이 주는 호칭)와 다른 값이다 —
+    # 셋 중 **이것만 사람이 고른다.**
+    tagline: str | None = None
 
 
 @dataclass(frozen=True)
@@ -34,3 +38,4 @@ class PublicCardEntity:
     og_image_key: str
     owner: CardOwner
     titles: list[TitleEntity]
+    tagline: str | None = None

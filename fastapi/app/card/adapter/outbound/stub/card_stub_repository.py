@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
@@ -69,14 +70,29 @@ def reset_created_cards() -> None:
 
 class StubCardRepository(CardPort):
     def find_by_owner(self, user_id: UUID) -> CardEntity | None:
-        if user_id == DEMO_USER_ID:
-            return _CARD
-        return _CREATED.get(user_id)
+        # 🔴 `_CREATED` 를 **먼저** 본다. 데모 카드를 먼저 돌려주면 수정이 반영되지
+        #    않는다(`update_tagline` 이 여기에 복사해 둔다) — 고쳤는데 다시 읽으면
+        #    옛 값이 나오는 상태가 된다.
+        found = _CREATED.get(user_id)
+        if found is not None:
+            return found
+        return _CARD if user_id == DEMO_USER_ID else None
 
     def find_by_slug(self, slug: PublicSlug) -> CardEntity | None:
         if slug == PublicSlug(DEMO_SLUG):
             return _CARD
         return next((c for c in _CREATED.values() if c.public_slug == slug), None)
+
+    def update_tagline(self, user_id: UUID, tagline: str | None) -> CardEntity | None:
+        """⚠️ **데모 카드(`_CARD`)는 모듈 상수라 안 바꾼다.** 바꾸면 다른 검사가
+        보는 값이 실행 순서에 따라 달라진다 — 대신 `_CREATED` 로 복사해 둔다.
+        """
+        card = self.find_by_owner(user_id)
+        if card is None:
+            return None
+        updated = replace(card, tagline=tagline)
+        _CREATED[user_id] = updated
+        return updated
 
     def create_for_owner(self, user_id: UUID) -> CardEntity:
         """멱등하게 만든다.

@@ -47,7 +47,10 @@ async function send<T>(
 
 export const apiPost = <T>(path: string, body: unknown) => send<T>('POST', path, body)
 export const apiPatch = <T>(path: string, body: unknown) => send<T>('PATCH', path, body)
-export const apiDelete = <T = void>(path: string) => send<T>('DELETE', path)
+/** 🔴 DELETE 도 본문을 받는다 — 탈퇴가 비밀번호를 함께 보낸다(계약 2장).
+ *  `body` 를 안 주면 예전처럼 본문 없이 나간다. */
+export const apiDelete = <T = void>(path: string, body?: unknown) =>
+  send<T>('DELETE', path, body)
 
 /** 화면이 보여줄 에러 문구. 서버가 준 message 를 그대로 쓰고, 그 외에는 일반 문구로 떨어진다. */
 export function apiErrorMessage(err: unknown): string {

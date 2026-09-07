@@ -86,5 +86,21 @@ class Settings(BaseSettings):
     def admin_email_set(self) -> frozenset[str]:
         return frozenset(e.strip().lower() for e in self.admin_emails.split(",") if e.strip())
 
+    # --- 분석 워커 -------------------------------------------------------------
+    # GPU 워커가 큐를 집을 때 쓰는 공유 시크릿. 사람 토큰이 아니라 기계용이라
+    # 사용자 계정에 묶지 않는다(계정이 탈퇴하면 파이프라인이 멈춘다).
+    # 🔴 비어 있으면 워커 경로가 **전부 401** 이다 — `admin_emails` 와 같은
+    #    이유로 fail-closed 다. 조용한 기본값을 두면 값을 안 넣은 배포에서
+    #    **누구나 큐를 집어 갈 수 있다.**
+    worker_token: str = ""
+
+    # 워커가 보고 없이 죽은 작업을 회수하기까지 기다리는 시간(분).
+    # 🔴 **가장 긴 분석보다 넉넉히 길어야 한다** — 짧으면 아직 돌고 있는 작업을
+    #    빼앗아 같은 클립을 두 번 분석한다. 실측이 아직 없어서(PER-001 이
+    #    "목표 소요 시간은 실측으로 확정한다"고 열어 두었다) 보수적으로 잡았다.
+    #    포즈 추출만 1080p 46프레임에 7초였고(`agent/deploy/README.md`), 판정·
+    #    미리보기가 더 붙는다. 실측이 나오면 줄인다.
+    analysis_job_timeout_minutes: int = 30
+
 
 settings = Settings()

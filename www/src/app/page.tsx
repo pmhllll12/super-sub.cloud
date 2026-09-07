@@ -1,5 +1,7 @@
-import { type PlayerCard, type User } from '@/server/backend'
+import { BackendError, getBackend, type PlayerCard, type Squad, type User } from '@/server/backend'
 import { getMyCardOrNull, requireUser } from '@/server/currentUser'
+import { cookies } from 'next/headers'
+import { SESSION_COOKIE } from '@/server/session'
 import HomeStage from '@/components/HomeStage'
 import { DEFAULT_FEATURED, DESTINATIONS, FEATURED } from '@/lib/destinations'
 
@@ -15,14 +17,18 @@ import { DEFAULT_FEATURED, DESTINATIONS, FEATURED } from '@/lib/destinations'
 export function HomeBody({
   user,
   card = null,
+  squad = null,
 }: {
   user: Pick<User, 'nickname'> | null
   card?: PlayerCard | null
+  /** 팀의 스쿼드. 팀이 없거나 아직 안 만들었으면 null 이다. */
+  squad?: Squad | null
 }) {
   return (
     <HomeStage
       user={user}
       card={card}
+      squad={squad}
       destinations={DESTINATIONS}
       featured={FEATURED}
       defaultActive={DEFAULT_FEATURED}
@@ -47,5 +53,23 @@ export default async function Home() {
   // 카드가 아직 없는 것은 정상이라 화면 안에서 닉네임 글자로 대신한다.
   const card = await getMyCardOrNull()
 
-  return <HomeBody user={user} card={card} />
+  /* 🔴 스쿼드는 **첫 소속 팀** 것을 읽는다. 계약에 "내 스쿼드" 하나짜리
+     경로가 없고 `GET /teams/{id}/squad` 뿐이라, 팀을 먼저 골라야 한다 —
+     팀이 여럿인 사람에게 어느 팀을 보일지는 아직 화면에 고를 자리가 없다.
+
+     🔴 404(`SQUAD_NOT_FOUND`)는 **정상이다.** 아직 안 만든 팀이라는 뜻이라
+     빈 판을 그린다 — 계약이 "만들지 않은 것"과 "비어 있는 것"을 일부러
+     갈라 두었다(3-7절). 그 밖의 실패도 판을 죽이지 않는다. */
+  const token = (await cookies()).get(SESSION_COOKIE)?.value
+  const teamId = user.teams[0]?.team_id
+  let squad: Squad | null = null
+  if (token && teamId) {
+    try {
+      squad = await getBackend().getSquad(token, teamId)
+    } catch (e) {
+      if (!(e instanceof BackendError)) throw e
+    }
+  }
+
+  return <HomeBody user={user} card={card} squad={squad} />
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import type { PublicPlayerCard } from '@/server/backend'
+import type { PublicPlayerCard, Squad } from '@/server/backend'
 import PlayerCardView from '@/components/PlayerCardView'
 import BlankPlayerCard from '@/components/BlankPlayerCard'
 import SquadSuggest from '@/components/SquadSuggest'
@@ -17,13 +17,18 @@ import SquadFriends from '@/components/SquadFriends'
  * 나머지 넷은 빈 카드 — 같은 틀 · 같은 머리글(SUPERSUB · PLAYER CARD)에
  * 가운데 + 만 있다. 눌러 보기 전에 무슨 자리인지 알 수 있어야 해서다.
  *
- * ⚠️ **아직 서버에 저장하지 않는다.** 계약(api-contract.md)에 스쿼드를
- * 만들거나 사람을 넣는 엔드포인트가 없다 — `GET /me` 의 `teams` 는 이미
- * 소속된 팀을 읽기만 하는 값이다. 지금은 이 컴포넌트의 상태로만 들고
- * 있고 새로고침하면 사라진다. 백엔드가 생기면 setMates 를 부르는 자리
- * 둘(넣기 · 빼기)을 API 호출로 바꾸면 된다. 브라우저 저장도 일부러 안
- * 넣었다 — 서버가 붙는 순간 상태가 두 곳에 생겨 어느 쪽이 진짜인지
- * 헷갈린다.
+ * 🔴 **읽기는 서버에서 온다**(2026-09-04). `GET /teams/{id}/squad` 가
+ * 09-03 에 생겨서, 홈이 그것을 받아 `squad` 로 넘겨준다 — 새로고침해도
+ * 등재된 사람이 그대로 앉아 있다.
+ *
+ * ⚠️ **넣기 · 빼기는 아직 이 컴포넌트 안에서만 일어난다.** 등재
+ * (`POST …/squad/members`)가 `player_card_id` 를 요구하는데, **팀 구성원의
+ * 카드 id 를 얻을 경로가 계약에 없다** — `GET /teams/{id}` 는 `user_id` ·
+ * `nickname` · `role` 까지만 준다. 그 경로가 생기면 setMates 를 부르는 자리
+ * 둘을 API 호출로 바꾸면 된다.
+ *
+ * 브라우저 저장은 일부러 안 넣었다 — 서버가 진짜가 되는 순간 상태가 두 곳에
+ * 생겨 어느 쪽이 맞는지 헷갈린다.
  */
 
 /** 판 위의 자리. `area` 는 globals.css 의 grid-template-areas 이름이다. */
@@ -41,17 +46,50 @@ const SLOTS: Slot[] = [
   { area: 'gk', label: 'GK' },
 ]
 
+/**
+ * 서버가 준 스쿼드를 **판의 자리 이름표**로 바꾼다.
+ *
+ * 🔴 내 자리(FW)는 건너뛴다 — 거기는 `card` 가 그리므로, 서버 목록에 내가
+ * 들어 있어도 같은 사람이 두 번 나오지 않는다.
+ * 🔴 같은 포지션이 둘인 자리(MF)는 **먼저 온 사람부터** 채운다. 서버는 어느
+ * 쪽 MF 인지까지는 모른다 — 좌 · 우는 화면만의 배치다.
+ */
+function seatsFromSquad(squad: Squad | null): Record<string, string | null> {
+  if (!squad) return {}
+  const left = [...squad.members]
+  const seats: Record<string, string | null> = {}
+  for (const slot of SLOTS) {
+    if (slot.mine) continue
+    const at = left.findIndex((m) => m.position_code === slot.label)
+    if (at >= 0) seats[slot.area] = left.splice(at, 1)[0].nickname
+  }
+  return seats
+}
+
 export default function SquadPanel({
   card,
+  squad = null,
   friendSearch = false,
   onCloseFriendSearch,
 }: {
   card?: PublicPlayerCard | null
+  /**
+   * 서버가 준 스쿼드. **없을 수 있다** — 팀이 없거나(개인 계정) 팀은 있어도
+   * 스쿼드를 아직 안 만든 경우다. 계약이 그 둘을 갈라 두었으므로(404
+   * `SQUAD_NOT_FOUND`) 여기서도 null 하나로 뭉뚱그리지 않고, 판은 빈 자리로
+   * 그린다.
+   */
+  squad?: Squad | null
   /** 알약 '지인 찾기' 가 골라져 있는가 — 켜지면 판 옆에 지인 찾기가 열린다. */
   friendSearch?: boolean
   onCloseFriendSearch?: () => void
 }) {
-  const [mates, setMates] = useState<Record<string, string | null>>({})
+  /* 🔴 서버가 준 것을 **첫 값으로만** 읽는다. 그 뒤로는 이 화면이 들고 있다 —
+     넣기 · 빼기가 아직 서버로 안 가므로(위 주석), 매번 서버 값으로 되돌리면
+     방금 넣은 사람이 사라진다. */
+  const [mates, setMates] = useState<Record<string, string | null>>(() =>
+    seatsFromSquad(squad),
+  )
   /**
    * 지인 찾기에서 골라 둔 사람. 정해져 있으면 **빈 자리 버튼의 뜻이 바뀐다**
    * — 원래는 "AI 추천 열기"지만 이때는 "여기 넣기"다. 자리를 여기서 안 고르고

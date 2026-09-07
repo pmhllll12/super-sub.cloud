@@ -34,6 +34,14 @@ class TeamMemberResponse(BaseModel):
     nickname: str
     role: str
     joined_at: Rfc3339
+    # 그 사람의 선수 카드. **카드를 안 만든 구성원은 둘 다 `null`** 이고, 그래도
+    # 목록에는 남는다 — 팀에는 있는 사람이다.
+    #
+    # 스쿼드 등재(`POST /teams/{id}/squad/members`)는 `player_card_id` 를 받고,
+    # 카드로 가는 링크는 `card_public_slug` 를 쓴다. 화면이 둘 다 필요해서
+    # 함께 싣는다(미결 `paik` 2번).
+    player_card_id: UUID | None = None
+    card_public_slug: str | None = None
 
 
 class TeamResponse(BaseModel):

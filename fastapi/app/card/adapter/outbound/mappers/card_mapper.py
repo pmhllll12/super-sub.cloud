@@ -39,4 +39,5 @@ def to_card_entity(
         og_image_key=row.og_image_key,
         owner=CardOwner(id=row.user_id, nickname=owner_nickname),
         titles=titles,
+        tagline=row.tagline,
     )

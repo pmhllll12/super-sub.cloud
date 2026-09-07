@@ -20,6 +20,9 @@ SPORT_CODES = ("football", "baseball", "basketball")
 _TEAMS: dict[UUID, TeamEntity] = {}
 _MEMBERS: dict[UUID, list[TeamMemberEntity]] = {}
 _KNOWN_USERS: set[UUID] = set()
+# user_id -> (player_card_id, public_slug). 실물은 `player_card` 를 outerjoin 해서
+# 얻는다 — **없는 사람이 있다**는 것이 요점이라 딕셔너리로 흉내 낸다.
+_CARDS: dict[UUID, tuple[UUID, str]] = {}
 
 
 def reset_teams() -> None:
@@ -27,6 +30,17 @@ def reset_teams() -> None:
     _TEAMS.clear()
     _MEMBERS.clear()
     _KNOWN_USERS.clear()
+    _CARDS.clear()
+
+
+def register_card(user_id: UUID, card_id: UUID, public_slug: str) -> None:
+    """"이 사람은 카드가 있다"를 검사가 알려 준다.
+
+    🔴 **`add_member` 보다 먼저 부른다.** 구성원을 만들 때 카드 값을 읽어 담기
+    때문이다 — 실물은 조회 시점에 조인하므로 순서가 상관없지만, 스텁은 만들 때
+    한 번 담는다. 이 차이가 드러나는 검사는 `test_team_db.py` 쪽이다.
+    """
+    _CARDS[user_id] = (card_id, public_slug)
 
 
 def register_user(user_id: UUID) -> None:
@@ -65,10 +79,13 @@ class StubTeamRepository(TeamPort):
 
     def _member(self, user_id: UUID, role: TeamRole, order: int) -> TeamMemberEntity:
         # 가입 순서가 보이도록 시각을 벌린다. 같은 값이면 정렬 검사가 무의미해진다.
+        card = _CARDS.get(user_id)
         return TeamMemberEntity(
             user_id=user_id,
             nickname="홍길동" if order == 0 else f"멤버{order}",
             role=role,
             joined_at=datetime(2026, 9, 1, tzinfo=timezone.utc)
             + timedelta(minutes=order),
+            player_card_id=card[0] if card else None,
+            card_public_slug=card[1] if card else None,
         )

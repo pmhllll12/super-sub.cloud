@@ -45,6 +45,26 @@ def acceptable_side(
     return None
 
 
+def can_remove(
+    application: ApplicationEntity, actor_id: UUID, actor_is_owner: bool
+) -> bool:
+    """이 사람이 이 지원 건을 없앨 수 있는가.
+
+    **무르기와 거절은 같은 동작이다** — 지원 당사자가 하면 무르기, 주최 팀 주장이
+    하면 거절이고, 둘 다 **행을 지운다.**
+
+    🔴 **거절을 컬럼으로 담지 않는 이유** (미결 `jin` 16번, A-1 채택):
+    `match_application.match_id` 의 삭제 규칙이 RESTRICT 라 **행이 남아 있는 한
+    경기를 취소할 수 없다.** 거절 시각 컬럼을 늘리면 부록 D 를 고치고도 그
+    막다른 곳이 그대로다. 지금 스키마가 이미 "행이 없으면 취소된다"고 말하고
+    있으므로 거기에 맞춘다.
+
+    ⚠️ **그래서 거절 이력이 남지 않는다.** 나중에 필요해지면 컬럼이 아니라
+    별도 테이블이어야 한다(행이 남으면 같은 문제가 돌아온다).
+    """
+    return actor_is_owner or actor_id == application.user_id
+
+
 def has_stake(
     application: ApplicationEntity, actor_id: UUID, actor_is_owner: bool
 ) -> bool:

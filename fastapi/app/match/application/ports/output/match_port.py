@@ -148,3 +148,12 @@ class MatchPort(ABC):
     @abstractmethod
     def accept_application(self, application_id: UUID, side: str) -> ApplicationEntity:
         """비어 있던 쪽 시각을 채운다."""
+
+    @abstractmethod
+    def delete_application(self, application_id: UUID) -> None:
+        """지원 건을 지운다 — 무르기와 거절이 같은 동작이다.
+
+        🔴 **이것이 `delete_match` 의 409 를 푸는 유일한 길이다**(미결 `jin` 16번).
+        `match_application.match_id` 가 RESTRICT 라 행이 남아 있으면 경기를
+        못 지운다. 거절을 컬럼으로 담으면 행이 남아 그대로 막힌다.
+        """
