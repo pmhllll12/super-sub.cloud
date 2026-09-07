@@ -3655,6 +3655,37 @@ https://api.supersub-ai.com/api/v1/internal/analysis-jobs/claim
 - 상세: `fastapi/docs/api-contract.md` **3-9절** 「정한 것」
 - **담당**: 박민호 · **제기**: 정어진 · **기한**: 문서 정리 시
 
+### 20. 미결 1번(적재 규격)·18번(워커 폴링 루프) 회신을 부탁드립니다 (정상호 님, 2026-09-07)
+
+같은 구역 **1번**(분석 결과 적재 규격)과 **18번**(분석 워커 폴링 루프)이 담당
+정상호 님으로 올라간 뒤 회신이 없습니다. `edf9e0f`(마지막 `main` 흡수) 이후
+`origin/ho`·`origin/main` 에 새 커밋이 없어 09-01 / 09-04 상태 그대로입니다.
+두 건이 서로 물려 있어 한 항목으로 묶어 리마인드합니다.
+
+| 건 | 만족해야 할 성질 | 먼저 확인 |
+|---|---|---|
+| **1번 적재 규격** | `api-contract.md` 3-1절의 A·B·C 중 하나로 결론이 서서 `metric_definition` 을 채울 수 있을 것. A(`sport_code` 제거)를 제안했지만 **안 이름은 예시지 규격이 아닙니다** — 다른 결론도 근거만 있으면 됩니다 | `grep -n "sport_code" fastapi/docs/api-contract.md` 의 3-1절에 결정이 적혔는지 · 적재 DB 의 `metric_definition` 행 수 |
+| **18번 폴링 루프** | `queued` 작업이 실제로 실행되고 끝나면 `succeeded`/`failed` 로 옮겨질 것. 규격은 `fastapi/docs/worker-interface.md` | `git grep -n "analysis-jobs/claim" -- agent/` → 결과가 있으면 착수됨 |
+
+🔴 **18번은 워커 방식을 하나로 수렴시켜 주십시오.** 지금 두 갈래가 공존합니다.
+
+| 방식 | 어디 | 판단 근거 |
+|---|---|---|
+| `analyze_s3.py --skip-analyzed` (`b899e65`) | `agent/` | S3 의 `reports/` 유무로 판단 — `analysis_job` 을 안 봅니다 |
+| `POST /internal/analysis-jobs/claim` + `PATCH` (`f7ea780`) | `fastapi/` (배포됨, `WORKER_TOKEN` 넣음) | `analysis_job` 이 정본 |
+
+**둘 다 남기지 않습니다** (더 나은 쪽 하나로). `analysis_job` 이 계약의 정본이라
+`/internal/*` 쪽을 권하지만, 종목·동작을 사람이 `--rubric` 으로 줘야 하는 문제는
+그쪽도 같습니다.
+
+| | |
+|---|---|
+| 하지 말 것 | 🔴 두 워커 방식을 둘 다 남기지 않기 · 🔴 이 항목을 지우지 않기 — 정하면 **1번·18번 각각에** 결과를 남깁니다(닫힌 경로가 남아야 반복이 안 됩니다) · `agent/deploy/` 의 `BUSY_PATTERN` 에 새 워커 프로세스 이름을 더하는 것을 잊지 않기(별도 프로세스면 분석 도중 인스턴스가 꺼집니다) |
+| 물려 있는 것 | 1번이 안 풀리면 18번 워커는 `reports/` JSON + `analysis_job` 상태까지만 갑니다(`POST /analyses` 적재는 1번 다음). 그래도 "올리면 결과가 나온다"는 시연됩니다 |
+
+- 상세(본체): 같은 구역 1번 · 18번 · 루트 미결 `ho` 17번
+- **담당**: 정상호 · **제기**: 정어진 · **기한**: 스프린트 3 (17번 시연 목표에 걸림)
+
 ## min (박민호)
 
 ### 1. 패킷 A(과금) 진행 상황을 알려주세요
