@@ -50,6 +50,11 @@ class VideoOrm(Base):
         Boolean, nullable=False, server_default="false"
     )
 
+    # 홈 영상 모음이 큰 글자로 얹는 값(미결 `paik` 5번). 안 정한 클립은 NULL —
+    # "안 정했다"와 "지웠다"를 구별할 필요가 없다.
+    title: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    description: Mapped[str | None] = mapped_column(String(280), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )

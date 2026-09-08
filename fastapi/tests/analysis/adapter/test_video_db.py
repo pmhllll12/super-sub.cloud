@@ -232,6 +232,70 @@ class TestVisibility:
         assert res.status_code == 404
         assert res.json()["error"]["code"] == "VIDEO_NOT_FOUND"
 
+    def test_제목_설명을_저장하고_부분_수정한다(self, db_client, db_session, uploader):
+        key = _upload(db_client, uploader)
+        video_id = _register(db_client, uploader, key).json()["id"]
+
+        db_client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"title": "첫 골", "description": "왼발"},
+            headers=uploader["headers"],
+        )
+        title, desc = db_session.execute(
+            text("SELECT title, description FROM video WHERE id = :id"),
+            {"id": uuid.UUID(video_id)},
+        ).one()
+        assert (title, desc) == ("첫 골", "왼발")
+
+        # description 만 바꾼다 — title 은 그대로
+        db_client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"description": "오른발"},
+            headers=uploader["headers"],
+        )
+        title, desc = db_session.execute(
+            text("SELECT title, description FROM video WHERE id = :id"),
+            {"id": uuid.UUID(video_id)},
+        ).one()
+        assert (title, desc) == ("첫 골", "오른발")
+
+
+class TestPlayback:
+    """`GET /videos/{id}/playback-url` — 사전 서명(가짜)까지가 실제 DB 경유."""
+
+    def test_공개_클립은_재생_URL_을_준다(self, db_client, uploader):
+        key = _upload(db_client, uploader)
+        video_id = _register(db_client, uploader, key).json()["id"]
+        db_client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"is_public": True},
+            headers=uploader["headers"],
+        )
+
+        res = db_client.get(
+            f"{V1}/videos/{video_id}/playback-url", headers=uploader["headers"]
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["url"].startswith("https://")
+
+    def test_비공개_남의_클립은_404_다(self, db_client, uploader):
+        key = _upload(db_client, uploader)
+        video_id = _register(db_client, uploader, key).json()["id"]
+
+        other = f"peek-{uuid.uuid4().hex[:12]}@super-sub.example"
+        db_client.post(
+            f"{V1}/auth/signup",
+            json={"email": other, "password": PASSWORD, "nickname": "엿보기"},
+        )
+        login = db_client.post(
+            f"{V1}/auth/login", json={"email": other, "password": PASSWORD}
+        )
+        h = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+        res = db_client.get(f"{V1}/videos/{video_id}/playback-url", headers=h)
+        assert res.status_code == 404
+        assert res.json()["error"]["code"] == "VIDEO_NOT_FOUND"
+
 
 class TestConstraints:
     def test_영상당_판정은_하나뿐이다(self, db_client, db_session, uploader):

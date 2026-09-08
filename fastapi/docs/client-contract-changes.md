@@ -766,16 +766,17 @@ curl -s -X POST -H "Authorization: Bearer $T" -H 'Content-Type: application/json
 
 ---
 
-## 20. 🟡 클립을 공개로 돌릴 수 있습니다 — 공개 목록도 생겼습니다 (2026-09-08 추가)
+## 20. 🟢 클립을 공개로 돌리고 제목을 달 수 있습니다 — 재생 주소도 생겼습니다 (2026-09-08 추가)
 
-미결 `paik` 5번의 **1+2 조각**입니다. 네 가지 중 앞의 둘이 됩니다.
+미결 `paik` 5번의 **네 조각 전부**. (1+2 를 먼저 내고 3+4 를 같은 날 이어 붙였습니다 —
+아래 「3·4 조각」.)
 
 | 무엇 | 상태 |
 |---|---|
 | 클립의 **공개 여부** | ✅ `PATCH /videos/{id}` `{"is_public": true}` |
 | **공개 클립 목록** | ✅ `GET /videos/public` |
-| **재생용 주소** | ✋ 아직입니다 (사전 서명 GET URL — 3조각) |
-| **제목·한 줄 설명** | ✋ 아직입니다 (4조각) |
+| **재생용 주소** | ✅ `GET /videos/{id}/playback-url` (사전 서명 GET URL) |
+| **제목·한 줄 설명** | ✅ `PATCH /videos/{id}` `{"title": …, "description": …}` |
 
 ### 만족해야 할 성질
 
@@ -791,10 +792,9 @@ curl -s -X POST -H "Authorization: Bearer $T" -H 'Content-Type: application/json
    "없다"를 구별해 주지 않습니다
 3. **`GET /videos/public` 은 로그인이 필요합니다.** 익명(비로그인) 홈에서
    부르셔야 하면 알려 주세요 — 지금은 인증을 그대로 뒀습니다
-4. **목록 한 줄은 `{id, sport_code, duration_ms, created_at}` 뿐입니다.**
-   저장 키·업로더·재생 주소는 안 옵니다(저장 키에 업로더 `user_id` 가 들어 있어서).
-   `lib/published.ts` 는 이 네 값으로 시작하시고, 재생 주소가 생기면(`3조각`)
-   `previewSrc` 만 바꾸시면 됩니다
+4. **목록 한 줄은 `{id, sport_code, duration_ms, created_at, title, description}` 입니다.**
+   저장 키·업로더는 안 옵니다(저장 키에 업로더 `user_id` 가 들어 있어서). 재생은
+   아래 3조각으로 따로 받습니다
 
 ### 먼저 확인
 
@@ -805,6 +805,35 @@ curl -s -X PATCH -H "Authorization: Bearer $T" -H 'Content-Type: application/jso
 
 # 다른 계정 토큰으로 목록에 뜨는가
 curl -s -H "Authorization: Bearer $OTHER_T" $API/videos/public | jq '.[].id'
+```
+
+### 3·4 조각 — 재생 주소와 제목·설명 (같은 날 이어서)
+
+**제목·한 줄 설명**은 공개 여부와 같은 `PATCH /videos/{id}` 로 정합니다.
+
+```json
+{ "title": "우리 팀 첫 골", "description": "왼발 감아차기" }
+```
+
+- **셋(`is_public`·`title`·`description`) 중 보낸 것만 바뀝니다.** 공개 여부만
+  토글할 때 제목이 지워지지 않습니다
+- `title` 100자 · `description` 280자, 넘으면 `422`. **`null`·공백이면 지웁니다**
+  (`tagline` 과 같은 규칙). 화면에서 미리 막아 주시는 편이 좋습니다
+- `GET /videos`·`GET /videos/public` 응답에 `title`·`description` 이 실립니다
+
+**재생 주소**는 클립마다 따로 받습니다 — `GET /videos/{id}/playback-url`.
+
+```json
+{ "url": "https://…s3….amazonaws.com/…?X-Amz-…", "expires_in": 900 }
+```
+
+- **공개 클립이면 남도**, 자기 클립이면 비공개여도 받습니다. 아니면 `404`
+- `expires_in` 초 뒤 만료됩니다 — **캐시하지 말고 재생 직전에** 받으세요
+- `MyVideos.tsx` 의 `previewSrc` 가 이 `url` 을 반환하도록 바꾸시면 됩니다.
+  `lib/published.ts` 도 목록 id 로 이 엔드포인트를 부르면 재생이 붙습니다
+
+```bash
+curl -s -H "Authorization: Bearer $OTHER_T" $API/videos/$PUB_ID/playback-url | jq .url
 ```
 
 ---

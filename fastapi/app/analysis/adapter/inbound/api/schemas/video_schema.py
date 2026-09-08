@@ -76,17 +76,32 @@ class VideoResponse(BaseModel):
     analysis_job_id: UUID | None
     analysis_status: str | None
     is_public: bool
+    title: str | None
+    description: str | None
 
 
-class SetVisibilitySchema(BaseModel):
-    """클립의 공개 여부를 바꾼다. `PATCH /videos/{id}` 본문."""
+class UpdateVideoSchema(BaseModel):
+    """클립을 부분 수정한다. `PATCH /videos/{id}` 본문.
 
-    is_public: bool
+    셋 다 생략 가능하다 — **보낸 것만** 바뀐다(`model_fields_set` 로 가른다).
+    `title`·`description` 은 `null` 이나 공백만 보내면 지운다.
+    """
+
+    is_public: bool | None = None
+    title: str | None = Field(default=None, max_length=100)
+    description: str | None = Field(default=None, max_length=280)
+
+
+class PlaybackUrlResponse(BaseModel):
+    """재생용 사전 서명 GET URL. `url` 에 바로 GET 하면 원본이 온다."""
+
+    url: str
+    expires_in: int
 
 
 class PublicVideoResponse(BaseModel):
-    """홈 영상 모음 한 줄. **저장 키·업로더는 안 실린다** — 재생 주소(사전
-    서명)와 제목·설명은 미결 `paik` 5번의 3·4 조각이다.
+    """홈 영상 모음 한 줄. **저장 키·업로더는 안 실린다** — 저장 키에 업로더
+    `user_id` 가 들어 있고, 재생은 `GET /videos/{id}/playback-url` 로 따로 받는다.
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -95,3 +110,5 @@ class PublicVideoResponse(BaseModel):
     sport_code: str
     duration_ms: int | None
     created_at: Rfc3339
+    title: str | None
+    description: str | None

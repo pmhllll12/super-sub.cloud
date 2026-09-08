@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import column, select, table
@@ -18,6 +19,7 @@ from sqlalchemy.orm import Session
 from app.analysis.adapter.outbound.orm.analysis_job_orm import AnalysisJobOrm
 from app.analysis.adapter.outbound.orm.video_orm import VideoOrm
 from app.analysis.adapter.outbound.orm.video_validation_orm import VideoValidationOrm
+from app.analysis.application.dtos.video_dto import UNSET
 from app.analysis.application.ports.output.video_port import VideoPort
 from app.analysis.domain.entities.video_entity import ValidationEntity, VideoEntity
 
@@ -99,13 +101,36 @@ class VideoPgRepository(VideoPort):
             for video, validation in rows
         ]
 
-    def set_visibility(
-        self, video_id: UUID, user_id: UUID, is_public: bool
+    def get(self, video_id: UUID) -> VideoEntity | None:
+        video = self._session.get(VideoOrm, video_id)
+        if video is None:
+            return None
+        validation = self._session.execute(
+            select(VideoValidationOrm).where(
+                VideoValidationOrm.video_id == video_id
+            )
+        ).scalar_one_or_none()
+        latest = self._latest_jobs([video_id]).get(video_id)
+        return _to_entity(video, validation, latest)
+
+    def update_video(
+        self,
+        video_id: UUID,
+        user_id: UUID,
+        *,
+        is_public: bool | Any = UNSET,
+        title: str | None | Any = UNSET,
+        description: str | None | Any = UNSET,
     ) -> VideoEntity | None:
         video = self._session.get(VideoOrm, video_id)
         if video is None or video.user_id != user_id:
             return None
-        video.is_public = is_public
+        if is_public is not UNSET:
+            video.is_public = is_public
+        if title is not UNSET:
+            video.title = title
+        if description is not UNSET:
+            video.description = description
         self._session.commit()
 
         validation = self._session.execute(
@@ -164,6 +189,8 @@ def _to_entity(
         duration_ms=video.duration_ms,
         side=video.side,
         is_public=video.is_public,
+        title=video.title,
+        description=video.description,
         created_at=video.created_at,
         validation=(
             None

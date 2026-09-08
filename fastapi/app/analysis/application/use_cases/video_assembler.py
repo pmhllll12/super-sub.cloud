@@ -13,6 +13,8 @@ def to_public_video_result(video: VideoEntity) -> PublicVideoResult:
         sport_code=video.sport_code,
         duration_ms=video.duration_ms,
         created_at=video.created_at,
+        title=video.title,
+        description=video.description,
     )
 
 
@@ -36,4 +38,6 @@ def to_video_result(video: VideoEntity) -> VideoResult:
         analysis_job_id=video.analysis_job_id,
         analysis_status=video.analysis_status,
         is_public=video.is_public,
+        title=video.title,
+        description=video.description,
     )

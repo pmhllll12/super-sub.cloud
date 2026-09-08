@@ -7,10 +7,12 @@
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 from abc import ABC, abstractmethod
 
+from app.analysis.application.dtos.video_dto import UNSET
 from app.analysis.domain.entities.video_entity import VideoEntity
 
 
@@ -39,12 +41,23 @@ class VideoPort(ABC):
         """
 
     @abstractmethod
-    def set_visibility(
-        self, video_id: UUID, user_id: UUID, is_public: bool
-    ) -> VideoEntity | None:
-        """클립의 공개 여부를 바꾸고 갱신된 영상을 돌려준다.
+    def get(self, video_id: UUID) -> VideoEntity | None:
+        """영상 1건. 업로더 구분 없이 — 소유 판단은 부르는 쪽이 한다."""
 
-        **`user_id` 로 소유를 확인한다** — 남의 클립이거나 없는 클립이면 `None`.
+    @abstractmethod
+    def update_video(
+        self,
+        video_id: UUID,
+        user_id: UUID,
+        *,
+        is_public: bool | Any = UNSET,
+        title: str | None | Any = UNSET,
+        description: str | None | Any = UNSET,
+    ) -> VideoEntity | None:
+        """클립을 부분 수정하고 갱신된 영상을 돌려준다.
+
+        `UNSET` 인 필드는 건드리지 않는다. **`user_id` 로 소유를 확인한다** —
+        남의 클립이거나 없는 클립이면 `None`.
         """
 
     @abstractmethod

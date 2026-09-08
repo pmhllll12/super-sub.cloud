@@ -1298,7 +1298,9 @@ SFR-001. 사용자가 자기 클립을 올리고, 서버가 규격을 검사해 
   "reject_reason": null,
   "analysis_job_id": "9a2e...",
   "analysis_status": "queued",
-  "is_public": false
+  "is_public": false,
+  "title": null,
+  "description": null
 }
 ```
 
@@ -1306,8 +1308,8 @@ SFR-001. 사용자가 자기 클립을 올리고, 서버가 규격을 검사해 
 (상한 1920x1080)"` · `analysis_job_id: null` 이다. **반려된 클립은 분석하지 않는다** —
 규격 검사를 두는 이유가 그것이다.
 
-`is_public` 은 **등록 시 항상 `false`** 다(미결 `paik` 5번). 공개로 돌리는 것은
-아래 `PATCH /videos/{id}` 다 — 요청 본문으로는 못 정한다.
+`is_public`·`title`·`description` 은 **등록 시 정할 수 없다** — 각각 `false`·`null`
+로 저장된다(미결 `paik` 5번). 바꾸는 것은 아래 `PATCH /videos/{id}` 다.
 
 `duration_ms`·`width`·`height` 는 **클라이언트가 잰 값**이다. 서버가 다시 재려면
 원본을 내려받아야 하고 그러면 PER-002 가 무너진다. 용량만은 저장소에 물어 실측한다.
@@ -1343,19 +1345,24 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
 플러터 `/videos` 화면(영상 상세 펼침 + 규격 반려 사유 바텀시트)이 이 응답 하나로
 그려진다.
 
-### `PATCH /api/v1/videos/{video_id}` — 공개 여부 (2026-09-08 추가)
+### `PATCH /api/v1/videos/{video_id}` — 부분 수정 (2026-09-08 추가)
 
-미결 `paik` 5번. **자기 클립의 공개 여부만** 바꾼다.
+미결 `paik` 5번. **자기 클립**의 공개 여부·제목·한 줄 설명을 바꾼다.
 
 ```json
-{ "is_public": true }
+{ "is_public": true, "title": "우리 팀 첫 골", "description": "왼발 감아차기" }
 ```
 
-`200 OK` — 응답은 `GET /videos` 한 줄과 같은 모양(바뀐 `is_public` 이 실려 온다).
+- **셋 다 생략 가능하다 — 보낸 것만 바뀐다.** 안 보낸 필드는 그대로다
+- `title` 100자 · `description` 280자. **`null` 이나 공백만 보내면 지운다**
+  (`PATCH /me/card` 의 `tagline` 과 같은 규칙). `is_public` 은 불리언이라
+  `null` 은 무시한다
+- `200 OK` — 응답은 `GET /videos` 한 줄과 같은 모양(바뀐 값이 실려 온다)
 
 | 에러 | code | 언제 |
 |---|---|---|
 | 404 | `VIDEO_NOT_FOUND` | 없는 클립이거나 **남의 클립**이다 — 존재 여부를 구별해 주지 않는다 |
+| 422 | `VALIDATION_ERROR` | `title`·`description` 이 길이 상한을 넘는다 |
 
 ### `GET /api/v1/videos/public` — 공개 클립 목록 (2026-09-08 추가)
 
@@ -1365,21 +1372,37 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
 ```json
 [
   { "id": "7c05...", "sport_code": "football", "duration_ms": 10200,
-    "created_at": "2026-09-08T09:00:00Z" }
+    "created_at": "2026-09-08T09:00:00Z", "title": "우리 팀 첫 골",
+    "description": "왼발 감아차기" }
 ]
 ```
 
 🔴 **로그인이 필요하다.** 확인 방법이 "다른 계정으로 로그인해도 보인다"라 인증을
 그대로 뒀다 — 익명 피드가 필요하면 연다.
 
-🔴 **저장 키·업로더·재생 주소는 안 실린다.** 저장 키에는 업로더 `user_id` 가 들어
-있고(`videos/<user_id>/…`), 재생은 사전 서명 URL 이 맞다 — 둘 다 미결 `paik` 5번의
-3·4 조각(재생 주소 · 제목·설명)에서 온다.
+🔴 **저장 키·업로더는 안 실린다.** 저장 키에는 업로더 `user_id` 가 들어 있다
+(`videos/<user_id>/…`). 재생은 아래 `GET /videos/{id}/playback-url` 로 따로 받는다.
+
+### `GET /api/v1/videos/{video_id}/playback-url` — 재생용 주소 (2026-09-08 추가)
+
+원본을 재생·다운로드할 **사전 서명 GET URL**. 재생도 앱 서버를 지나지 않는다
+(PER-002).
+
+```json
+{ "url": "https://<bucket>.s3.<region>.amazonaws.com/videos/…?X-Amz-…", "expires_in": 900 }
+```
+
+- **공개 클립이거나 자기 클립일 때만.** 아니면 `404 VIDEO_NOT_FOUND` — 비공개
+  남의 클립은 "없음"과 같게 답한다
+- URL 은 `expires_in` 초 뒤 만료된다. 매번 새로 받는다(캐시하지 않는다)
+
+| 에러 | code | 언제 |
+|---|---|---|
+| 404 | `VIDEO_NOT_FOUND` | 없는 클립이거나 비공개 남의 클립이다 |
+| 503 | `STORAGE_NOT_CONFIGURED` | 서버에 `S3_BUCKET` 이 없다 |
 
 ### 아직 없는 것
 
-- **재생용 주소** — 공개 목록·상세에서 실제로 재생하려면 사전 서명 GET URL 이 필요하다(`paik` 5번 3조각)
-- **제목·한 줄 설명** — 영상 모음이 큰 글자로 얹는 값(`paik` 5번 4조각)
 - **삭제** — 올린 클립을 지우는 경로. S3 객체까지 함께 지워야 해서 순서를 정해야 한다
 - **재분석** — `analysis_job` 은 여러 건을 허용하지만 만드는 경로가 업로드뿐이다
 - **분석 결과 적재**(`POST /analyses`) — 3-1 절. `metric_definition` 합의가 선행이다

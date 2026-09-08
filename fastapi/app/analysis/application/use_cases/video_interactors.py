@@ -17,21 +17,25 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from app.analysis.application.dtos.video_dto import (
+    UNSET,
+    GetPlaybackUrlCommand,
     MyVideosQuery,
+    PlaybackUrlResult,
     PublicVideoResult,
     PublicVideosQuery,
     RegisterVideoCommand,
-    SetVisibilityCommand,
+    UpdateVideoCommand,
     UploadUrlCommand,
     UploadUrlResult,
     VideoResult,
 )
 from app.analysis.application.ports.input.video_use_cases import (
     CreateUploadUrlUseCase,
+    GetPlaybackUrlUseCase,
     ListMyVideosUseCase,
     ListPublicVideosUseCase,
     RegisterVideoUseCase,
-    SetVideoVisibilityUseCase,
+    UpdateVideoUseCase,
 )
 from app.analysis.application.ports.output.storage_port import StoragePort
 from app.analysis.application.ports.output.video_port import VideoPort
@@ -144,13 +148,33 @@ class ListMyVideosInteractor(ListMyVideosUseCase):
         ]
 
 
-class SetVideoVisibilityInteractor(SetVideoVisibilityUseCase):
+def _clean_text(value: object) -> str | None:
+    """빈 문자열·공백만 있는 값은 지운 것으로 본다 — `PATCH /me/card` 의
+    `tagline` 과 같은 판단이다. `None` 은 그대로 `None`.
+    """
+    if value is None:
+        return None
+    trimmed = str(value).strip()
+    return trimmed or None
+
+
+class UpdateVideoInteractor(UpdateVideoUseCase):
     def __init__(self, repository: VideoPort) -> None:
         self._repository = repository
 
-    def __call__(self, command: SetVisibilityCommand) -> VideoResult:
-        video = self._repository.set_visibility(
-            command.video_id, command.user_id, command.is_public
+    def __call__(self, command: UpdateVideoCommand) -> VideoResult:
+        video = self._repository.update_video(
+            command.video_id,
+            command.user_id,
+            is_public=command.is_public,
+            title=(
+                UNSET if command.title is UNSET else _clean_text(command.title)
+            ),
+            description=(
+                UNSET
+                if command.description is UNSET
+                else _clean_text(command.description)
+            ),
         )
         if video is None:
             # 남의 클립인지 없는 클립인지 구별해 주지 않는다 — 남의 클립 존재
@@ -168,3 +192,19 @@ class ListPublicVideosInteractor(ListPublicVideosUseCase):
             to_public_video_result(v)
             for v in self._repository.list_public(query.limit)
         ]
+
+
+class GetPlaybackUrlInteractor(GetPlaybackUrlUseCase):
+    def __init__(self, repository: VideoPort, storage: StoragePort) -> None:
+        self._repository = repository
+        self._storage = storage
+
+    def __call__(self, command: GetPlaybackUrlCommand) -> PlaybackUrlResult:
+        video = self._repository.get(command.video_id)
+        if video is None or not (
+            video.is_public or video.user_id == command.user_id
+        ):
+            # 비공개 남의 클립은 "없음"과 같게 답한다.
+            raise ApiError(404, "VIDEO_NOT_FOUND", "클립을 찾을 수 없습니다.")
+        url, expires_in = self._storage.create_download_url(video.storage_key)
+        return PlaybackUrlResult(url=url, expires_in=expires_in)
