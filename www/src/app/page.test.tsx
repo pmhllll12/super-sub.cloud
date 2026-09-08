@@ -21,10 +21,12 @@ const CARD: PlayerCard = {
 }
 
 // 상단 글자 줄 셋 + 헤드라인 자리의 알약 둘. 알약으로 옮기면서 이름도
-// '용병 매칭'→'용병 찾기', '내 팀'→'팀 찾기' 로 바꿨다.
-// 🔴 '지인 찾기' 알약은 없앴다(2026-09-08) — '용병 찾기' 하나가 추천 판과
+// '용병 매칭'→'용병 찾기', '내 팀'→'팀 찾기' 로 바꿨고, 2026-09-08 에
+// 다시 '팀장' · '팀원' 이 됐다(사용자 요청) — 두 알약이 *무엇을 찾는가*가
+// 아니라 **내가 어느 쪽인가**를 고르는 자리가 됐다.
+// 🔴 '지인 찾기' 알약은 없앴다(2026-09-08) — '팀장' 하나가 추천 판과
 // 지인 판을 같이 연다. 되살리지 말 것(destinations.ts 주석).
-const TITLES = ['영상 분석', '레슨 · 상점', '경기장 예약', '용병 찾기', '팀 찾기']
+const TITLES = ['영상 분석', '레슨 · 상점', '경기장 예약', '팀장', '팀원']
 
 describe('홈 화면 — /', () => {
   it('워드마크와 목적지 글자를 적는다', () => {
@@ -137,7 +139,7 @@ describe('홈 화면 — /', () => {
 
   /* ── 용병 찾기 알약 — 판 둘을 짝으로 연다 (2026-09-08) ───────────── */
 
-  // 🔴 홈에 들어오자마자 떠 있으면 안 된다. '용병 찾기'는 DEFAULT_FEATURED
+  // 🔴 홈에 들어오자마자 떠 있으면 안 된다. '팀장'은 DEFAULT_FEATURED
   //    이기도 해서, 여는 조건을 `picked` 로 잡으면 처음부터 켜져 있고 ×도
   //    안 먹는다 — 챗봇을 이 알약으로 열던 시절에 실제로 그랬다.
   it('들어오자마자는 판이 하나도 안 떠 있다', () => {
@@ -146,10 +148,10 @@ describe('홈 화면 — /', () => {
     expect(screen.queryByRole('complementary', { name: '지인 찾기' })).toBeNull()
   })
 
-  it('용병 찾기를 누르면 추천 판과 지인 판이 같이 열린다', async () => {
+  it('팀장을 누르면 추천 판과 지인 판이 같이 열린다', async () => {
     const user = userEvent.setup()
     render(<HomeBody user={{ nickname: '홍길동' }} />)
-    await user.click(screen.getByRole('button', { name: '용병 찾기' }))
+    await user.click(screen.getByRole('button', { name: '팀장' }))
     expect(screen.getByRole('complementary', { name: /추천 선수/ })).toBeInTheDocument()
     expect(screen.getByRole('complementary', { name: '지인 찾기' })).toBeInTheDocument()
   })
@@ -158,7 +160,7 @@ describe('홈 화면 — /', () => {
   it('한 번 더 누르면 닫힌다', async () => {
     const user = userEvent.setup()
     render(<HomeBody user={{ nickname: '홍길동' }} />)
-    const pill = screen.getByRole('button', { name: '용병 찾기' })
+    const pill = screen.getByRole('button', { name: '팀장' })
     await user.click(pill)
     await user.click(pill)
     // ⚠️ 판은 **물러나는 동안 DOM 에 남는다**(그래야 연출이 보인다). 사라진
@@ -179,7 +181,7 @@ describe('홈 화면 — /', () => {
     const { container } = render(<HomeBody user={{ nickname: '홍길동' }} />)
     const head = container.querySelector('.ss-home-subhead')!
     expect(head).not.toHaveAttribute('data-aside')
-    await user.click(screen.getByRole('button', { name: '용병 찾기' }))
+    await user.click(screen.getByRole('button', { name: '팀장' }))
     expect(head).toHaveAttribute('data-aside', 'true')
   })
 
@@ -191,5 +193,48 @@ describe('홈 화면 — /', () => {
     const home = screen.getAllByRole('link', { name: '홈' })
     expect(home).toHaveLength(1)
     expect(home[0].textContent).toContain('SUPERSUB')
+  })
+
+  /* 🔴 **「팀원」은 스쿼드 판을 대신 선다**(사용자 요청, 2026-09-08). 나란히
+     세우면 *내 팀을 짜는 것*과 *남의 팀에 들어가는 것*이 한 화면에 겹쳐
+     무엇을 하고 있는지가 흐려진다. */
+  it('팀원을 누르면 스쿼드 판이 물러나고 팀 명단이 선다', async () => {
+    const user = userEvent.setup()
+    render(<HomeBody user={{ nickname: '홍길동' }} card={CARD} />)
+
+    const squad = screen.getByLabelText('내 스쿼드')
+    expect(squad).not.toHaveAttribute('data-seeking')
+    expect(screen.queryByLabelText('사람을 찾는 팀')).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: '팀원' }))
+
+    expect(screen.getByLabelText('사람을 찾는 팀')).toBeInTheDocument()
+    // 🔴 자리는 남기고 표시만 끈다 — 통째로 빼면 새 판이 설 크기를 잃는다.
+    expect(screen.getByLabelText('내 스쿼드')).toHaveAttribute('data-seeking', 'true')
+  })
+
+  // 이 판은 스쿼드 판을 대신 서므로, 닫을 길이 판의 × 뿐이면 알약을 눌러
+  // 놓고 되돌릴 방법이 없다 — '팀장' 과 같은 규칙이다.
+  it('팀원을 한 번 더 누르면 스쿼드 판이 도로 선다', async () => {
+    const user = userEvent.setup()
+    render(<HomeBody user={{ nickname: '홍길동' }} card={CARD} />)
+
+    const pill = screen.getByRole('button', { name: '팀원' })
+    await user.click(pill)
+    await user.click(pill)
+
+    expect(screen.queryByLabelText('사람을 찾는 팀')).toBeNull()
+    expect(screen.getByLabelText('내 스쿼드')).not.toHaveAttribute('data-seeking')
+  })
+
+  // 판 오른쪽 자리와 스쿼드 자리는 서로를 밀어낸다 — 한 번에 하나다.
+  it('팀장을 누르면 팀원 판이 물러난다', async () => {
+    const user = userEvent.setup()
+    render(<HomeBody user={{ nickname: '홍길동' }} card={CARD} />)
+
+    await user.click(screen.getByRole('button', { name: '팀원' }))
+    await user.click(screen.getByRole('button', { name: '팀장' }))
+
+    expect(screen.queryByLabelText('사람을 찾는 팀')).toBeNull()
   })
 })

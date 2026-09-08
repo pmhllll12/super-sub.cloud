@@ -6,6 +6,7 @@ import type {
   AuthToken,
   Match,
   MyVideo,
+  OpenMatch,
   Squad,
   PlayerCard,
   PublicPlayerCard,
@@ -178,6 +179,65 @@ const DEMO_MATCHES: Match[] = [
     played_at: '2026-09-17T19:30:00Z',
     place: '잠실 실내구장 A',
     needs: [{ position_code: 'MF', position_label: '미드필더', head_count: 1 }],
+  },
+]
+
+/**
+ * 모집 중인 경기 — 「팀원」 판이 훑는 목록(`GET /matches`).
+ *
+ * 🔴 **내 팀 것(`DEMO_MATCHES`)과 갈라 둔다.** 그쪽은 "내 팀의 다가오는 경기"
+ * 이고 이쪽은 "남의 팀이 사람을 못 채워 올린 모집 글"이다. 한 배열로 뭉치면
+ * 내 팀이 내 팀에 지원하는 목록이 된다.
+ *
+ * 종목 · 지역이 갈리는 줄을 일부러 섞어 두었다 — 거르기가 실제로 도는지
+ * 화면에서 보려면 걸러질 것이 있어야 한다.
+ */
+const OPEN_MATCHES: OpenMatch[] = [
+  {
+    id: 'om1',
+    team_id: '9a2e0000-0000-4000-8000-000000000101',
+    team_name: '번개FC',
+    region: '서울 강남구',
+    sport_code: 'football',
+    played_at: '2026-09-12T10:00:00Z',
+    place: '강남 풋살장 1구장',
+    needs: [
+      { position_code: 'GK', position_label: '골키퍼', head_count: 1 },
+      { position_code: 'DF', position_label: '수비수', head_count: 2 },
+    ],
+  },
+  {
+    id: 'om2',
+    team_id: '9a2e0000-0000-4000-8000-000000000102',
+    team_name: '망원 유나이티드',
+    region: '서울 마포구',
+    sport_code: 'football',
+    played_at: '2026-09-13T02:00:00Z',
+    place: '망원 축구장',
+    needs: [{ position_code: 'MF', position_label: '미드필더', head_count: 3 }],
+  },
+  {
+    id: 'om3',
+    team_id: '9a2e0000-0000-4000-8000-000000000103',
+    team_name: '수원 슈터스',
+    region: '경기 수원시',
+    sport_code: 'football',
+    played_at: '2026-09-14T09:00:00Z',
+    place: '수원 월드컵보조구장',
+    needs: [
+      { position_code: 'FW', position_label: '공격수', head_count: 1 },
+      { position_code: 'GK', position_label: '골키퍼', head_count: 1 },
+    ],
+  },
+  {
+    id: 'om4',
+    team_id: '9a2e0000-0000-4000-8000-000000000104',
+    team_name: '잠실 베어스',
+    region: '서울 송파구',
+    sport_code: 'baseball',
+    played_at: '2026-09-15T01:00:00Z',
+    place: '잠실 야구장 보조구장',
+    needs: [{ position_code: 'P', position_label: '투수', head_count: 1 }],
   },
 ]
 
@@ -359,6 +419,25 @@ export const mockBackend: Backend = {
     if (DEMO_VIDEOS.length === before) {
       throw new BackendError(404, 'VIDEO_NOT_FOUND', '그 영상을 찾을 수 없습니다.')
     }
+  },
+
+  async searchMatches(token, params) {
+    requireUser(token)
+    // 🔴 오타를 조용히 넘기지 않는다 — 계약이 정한 그대로다. 빈 목록으로
+    // 답하면 "그런 종목이 없다"와 "그 종목 경기가 없다"가 같아 보인다.
+    const sport = params?.sport_code
+    if (sport && !['football', 'baseball', 'basketball'].includes(sport)) {
+      throw new BackendError(422, 'UNKNOWN_SPORT', '지원하지 않는 종목입니다.')
+    }
+    const region = params?.region?.trim().toLowerCase()
+    const items = OPEN_MATCHES.filter(
+      (m) =>
+        (!sport || m.sport_code === sport) &&
+        (!region || m.region.toLowerCase().includes(region)),
+    )
+    const size = params?.size ?? 20
+    const page = params?.page ?? 1
+    return { items: items.slice((page - 1) * size, page * size), total: items.length, page, size }
   },
 
   async listTeamMatches(token, teamId) {

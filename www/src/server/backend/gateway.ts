@@ -6,6 +6,7 @@ import type {
   PlayerCard,
   PublicPlayerCard,
   Match,
+  MatchSearch,
   MyVideo,
   Squad,
   SignupResult,
@@ -53,6 +54,18 @@ export interface Backend {
   deleteMyVideo(token: string, videoId: string): Promise<void>
   /** 그 팀의 **다가오는** 경기. 이른 것이 앞에 온다. */
   listTeamMatches(token: string, teamId: string): Promise<Match[]>
+  /**
+   * 모집 중인 경기를 훑는다 — **팀 id 를 몰라도 되는 유일한 경로다.**
+   * 「팀원」 판이 쓴다: 아직 사람을 못 채운 팀들의 명단이다.
+   *
+   * 🔴 **다가오는 것만** 오고 이른 것이 앞이다. 종목 코드가 틀리면 빈 배열이
+   * 아니라 422 `UNKNOWN_SPORT` 다 — 오타와 "그런 경기가 없다"가 같아 보이면
+   * 사용자가 없는 것을 계속 기다린다.
+   */
+  searchMatches(
+    token: string,
+    params?: { sport_code?: string; region?: string; page?: number; size?: number },
+  ): Promise<MatchSearch>
   /** 경기를 새로 연다. 주장만 — 아니면 403 `FORBIDDEN`. */
   createTeamMatch(token: string, teamId: string, input: CreateMatchInput): Promise<Match>
   /** 팀의 스쿼드. 소속이면 본다. **아직 없으면 404 SQUAD_NOT_FOUND** 다. */

@@ -1,6 +1,7 @@
 import { callFastApi } from './fastapiCall'
 import type { Backend } from './gateway'
 import type {
+  MatchSearch,
   AdminUserDetail,
   AdminUserListResult,
   AuthToken,
@@ -81,6 +82,17 @@ export const fastapiBackend: Backend = {
       method: 'DELETE',
       token,
     })
+  },
+
+  searchMatches(token, params) {
+    const q = new URLSearchParams()
+    // 🔴 빈 값을 실어 보내지 않는다 — `sport_code=` 는 "전체"가 아니라
+    // 없는 종목이라 422 로 튕긴다.
+    for (const [k, v] of Object.entries(params ?? {})) {
+      if (v !== undefined && v !== null && v !== '') q.set(k, String(v))
+    }
+    const qs = q.toString()
+    return callFastApi<MatchSearch>(`/matches${qs ? `?${qs}` : ''}`, { method: 'GET', token })
   },
 
   listTeamMatches(token, teamId) {

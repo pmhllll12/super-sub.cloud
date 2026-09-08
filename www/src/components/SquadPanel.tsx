@@ -6,6 +6,7 @@ import PlayerCardView from '@/components/PlayerCardView'
 import BlankPlayerCard from '@/components/BlankPlayerCard'
 import SquadSuggest from '@/components/SquadSuggest'
 import SquadFriends from '@/components/SquadFriends'
+import TeamSeek from '@/components/TeamSeek'
 import MatchBot from '@/components/MatchBot'
 import { loadBoard, saveBoard } from '@/lib/squadBoard'
 import { loadFeatured } from '@/lib/featuredClip'
@@ -149,6 +150,8 @@ export default function SquadPanel({
   squad = null,
   scouting = false,
   onCloseScouting,
+  seeking = false,
+  onCloseSeeking,
   bot = false,
   onBotChange,
 }: {
@@ -170,6 +173,16 @@ export default function SquadPanel({
    */
   scouting?: boolean
   onCloseScouting?: () => void
+  /**
+   * 알약 '팀원' 을 눌렀는가 — 켜지면 **스쿼드 판이 물러나고 그 자리에**
+   * 사람을 찾는 팀들의 명단이 선다(사용자 요청, 2026-09-08).
+   *
+   * 🔴 나란히 세우지 않는다. 스쿼드 판은 *내 팀을 짜는* 자리이고 그 판은
+   * *남의 팀에 들어가는* 자리라, 둘이 같이 보이면 무엇을 하고 있는지가
+   * 흐려진다 — 판 오른쪽이 "한 번에 하나" 인 것과 같은 판단이다.
+   */
+  seeking?: boolean
+  onCloseSeeking?: () => void
   /**
    * AI 챗봇이 열려 있는가 — 켜지면 **지인 찾기와 같은 자리**에서 나온다.
    *
@@ -513,9 +526,20 @@ export default function SquadPanel({
         </filter>
       </svg>
 
+      {/* 🔴 **팀원 판은 스쿼드 판을 대신 선다**(사용자 요청, 2026-09-08).
+          같은 자리를 쓰므로 `.ss-squad-wrap` 안에서 좌표를 다시 잴 것이 없고,
+          오른쪽에 붙는 판들(추천 · 지인 · 챗봇)의 기준점도 그대로다. */}
+      {seeking && <TeamSeek closing={false} onClose={() => onCloseSeeking?.()} />}
+
       <section
         className="ss-squad"
         aria-label="내 스쿼드"
+        /* 🔴 **`hidden` 이 아니라 표시만 남긴다.** 통째로 빼면 자리가 접혀서
+           팀원 판이 설 크기를 잃는다 — 스쿼드 판의 크기는 카드 폭 · 칸 간격
+           에서 계산되는 값이라(globals.css) 그 숫자를 여기 베껴 오면 카드
+           크기를 바꾸는 순간 둘이 어긋난다. CSS 가 `visibility` 로 감추므로
+           **자리는 그대로 남고 접근성 트리에서는 빠진다.** */
+        data-seeking={seeking ? 'true' : undefined}
         // 🔴 backdrop-filter 는 **인라인으로** 준다. globals.css 에 두면
         // 같은 규칙의 color-mix() 때문에 Lightning CSS 가 @supports 로
         // 쪼개는 과정에서 통째로 떨어뜨린다(추천 판에서 실제로 그렇게
