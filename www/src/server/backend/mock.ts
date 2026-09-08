@@ -410,6 +410,15 @@ export const mockBackend: Backend = {
     return DEMO_VIDEOS
   },
 
+  async getPlaybackUrl(token, videoId) {
+    requireUser(token)
+    const v = DEMO_VIDEOS.find((x) => x.id === videoId)
+    if (!v) throw new BackendError(404, 'VIDEO_NOT_FOUND', '그 영상을 찾을 수 없습니다.')
+    // mock 의 저장 키는 `public/` 안의 진짜 파일이라 그대로가 곧 재생 주소다.
+    // 만료도 없지만 **화면이 그걸 알면 안 된다** — 실물과 같은 모양으로 답한다.
+    return { url: v.storage_key, expires_in: 900 }
+  },
+
   async deleteMyVideo(token, videoId) {
     requireUser(token)
     const before = DEMO_VIDEOS.length

@@ -75,6 +75,13 @@ export const fastapiBackend: Backend = {
     return callFastApi<MyVideo[]>('/videos', { method: 'GET', token })
   },
 
+  getPlaybackUrl(token, videoId) {
+    return callFastApi<{ url: string; expires_in: number }>(
+      `/videos/${encodeURIComponent(videoId)}/playback-url`,
+      { method: 'GET', token },
+    )
+  },
+
   async deleteMyVideo(token, videoId) {
     // 저장소에서 영상과 리포트를 함께 거두는 것은 **서버 몫**이다 — 화면은
     // 무엇이 어디 있는지 모른다(저장 키도 리포트 자리도 서버가 안다).

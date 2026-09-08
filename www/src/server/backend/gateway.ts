@@ -42,6 +42,14 @@ export interface Backend {
   /** 내가 올린 클립 목록. **최근 것이 앞에 온다.** */
   listMyVideos(token: string): Promise<MyVideo[]>
   /**
+   * 그 클립을 **재생할 수 있는 주소**(사전 서명 GET URL) — 계약 3-6절.
+   *
+   * 🔴 **캐시하지 않는다.** `expires_in`(기본 900초) 뒤 만료되므로 재생 직전에
+   * 받는다. 저장 키를 그대로 `<video src>` 에 넣으면 403 이다.
+   * 🔴 공개 클립이면 남의 것도, 내 것이면 비공개여도 받는다. 아니면 404.
+   */
+  getPlaybackUrl(token: string, videoId: string): Promise<{ url: string; expires_in: number }>
+  /**
    * 내가 올린 클립을 **지운다** — 저장소의 영상 파일과 그 분석 리포트까지.
    *
    * 🔴 되돌릴 수 없다. 화면이 먼저 한 번 더 묻는다(`MyVideos`).

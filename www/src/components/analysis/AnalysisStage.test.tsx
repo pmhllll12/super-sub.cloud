@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import AnalysisStage from './AnalysisStage'
 
@@ -766,4 +766,125 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
 
     vi.unstubAllGlobals()
   }, 10000)
+
+/**
+ * 🔴 **저장 없이 떠나면 그 영상을 지운다**(미결 `jin` 24번, 사용자 결정
+ * 2026-09-08). 「예」에서 이미 S3 에 올라가 있어서, 안 지우면 분석만 해 보고
+ * 마음에 안 든 영상이 영구히 쌓인다.
+ *
+ * 🔴 되돌릴 수 없는 일이라 **반대쪽이 더 중요하다** — 저장한 영상은 지우면 안
+ * 된다. 두 방향을 다 붙든다.
+ */
+describe('영상 분석 — 저장 안 한 영상은 떠날 때 지운다', () => {
+  /** 「예」까지 몰아서 서버에 영상이 올라간 상태(`videoId`)를 만든다. */
+  async function uploadedFetch() {
+    const fn = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url === '/api/videos/upload-url') {
+        return new Response(
+          JSON.stringify({
+            storage_key: 'videos/u1/abc.mp4',
+            upload_url: 'https://bucket.s3.example.com/abc.mp4?sig=1',
+            expires_in: 900,
+          }),
+          { status: 200 },
+        )
+      }
+      if (url.startsWith('https://bucket.s3.example.com/')) return new Response(null, { status: 200 })
+      if (url === '/api/videos') {
+        return new Response(
+          JSON.stringify({
+            id: 'v1',
+            sport_code: 'football',
+            storage_key: 'videos/u1/abc.mp4',
+            duration_ms: 0,
+            side: null,
+            created_at: '2026-09-03T00:00:00Z',
+            passed: true,
+            reject_reason: null,
+            analysis_job_id: 'job1',
+            analysis_status: 'queued',
+          }),
+          { status: 201 },
+        )
+      }
+      return new Response(null, { status: 204 })
+    })
+    vi.stubGlobal('fetch', fn)
+    return fn
+  }
+
+  const deletes = (fn: ReturnType<typeof vi.fn>) =>
+    fn.mock.calls.filter((c) => (c[1] as { method?: string } | undefined)?.method === 'DELETE')
+
+  async function upload() {
+    const fn = await uploadedFetch()
+    const user = userEvent.setup()
+    // 🔴 `pick()` 이 이미 그린다 — 따로 또 그리면 화면이 둘이 되어 조회가
+    //    "여러 개를 찾았다"로 죽는다.
+    const { view, input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await user.click(
+      await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }),
+    )
+    await sayYes(user)
+    await waitFor(() => expect(fn.mock.calls.some((c) => String(c[0]) === '/api/videos')).toBe(true), {
+      timeout: 3000,
+    })
+    return { fn, user, view }
+  }
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('올린 것이 없으면 떠나도 아무것도 안 지운다', () => {
+    const fn = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', fn)
+    pick().view.unmount()
+    expect(deletes(fn)).toHaveLength(0)
+  })
+
+  it('저장 안 하고 떠나면 그 영상을 지운다', async () => {
+    const { fn, view } = await upload()
+    view.unmount()
+    const calls = deletes(fn)
+    expect(calls).toHaveLength(1)
+    expect(String(calls[0]![0])).toBe('/api/videos/v1')
+    // 🔴 문서가 사라져도 요청이 끝까지 가야 한다 — beacon 은 DELETE 를 못 보낸다.
+    expect((calls[0]![1] as RequestInit).keepalive).toBe(true)
+  })
+
+  it('창을 닫을 때(pagehide)도 지운다', async () => {
+    const { fn } = await upload()
+    await act(async () => {
+      window.dispatchEvent(new Event('pagehide'))
+    })
+    expect(deletes(fn)).toHaveLength(1)
+  })
+
+  // 🔴 반대쪽 — 저장한 영상을 지우면 그 사람의 리포트가 통째로 사라진다.
+  it('저장했으면 떠나도 안 지운다', async () => {
+    const { fn, user, view } = await upload()
+    // 리포트가 다 나와야 풀린다 — 위 업로드 시험과 같은 여유를 준다.
+    await waitFor(
+      () => expect(screen.getByRole('button', { name: '내 프로필에 리포트 저장' })).toBeEnabled(),
+      { timeout: 8000 },
+    )
+    await user.click(screen.getByRole('button', { name: '내 프로필에 리포트 저장' }))
+    view.unmount()
+    expect(deletes(fn)).toHaveLength(0)
+    // 리포트가 다 나올 때까지 기다리는 시험이라 기본 5초로는 모자란다
+    // (위 업로드 시험과 같은 값).
+  }, 15000)
+
+  // 한 번 지운 것을 또 지우려 들면 안 된다 — 두 길(닫기 · 떠나기)이 겹친다.
+  it('두 번 지우지 않는다', async () => {
+    const { fn, view } = await upload()
+    await act(async () => {
+      window.dispatchEvent(new Event('pagehide'))
+    })
+    view.unmount()
+    expect(deletes(fn)).toHaveLength(1)
+  })
+})
 })

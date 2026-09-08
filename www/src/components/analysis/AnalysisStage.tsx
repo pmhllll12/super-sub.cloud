@@ -349,6 +349,14 @@ export default function AnalysisStage() {
   const [videoId, setVideoId] = useState<string | null>(null)
   /** 리포트를 내 프로필에 남겼는가 — `저장` 단추의 상태다. */
   const [reportSaved, setReportSaved] = useState(false)
+  /**
+   * 지금 **저장 안 된 채 서버에 올라가 있는** 영상 id.
+   *
+   * 🔴 **렌더에서 못박는다**(effect 안에서만 갱신하지 않는다). 떠나는 순간의
+   * 처리기가 옛 값을 보면 이미 저장한 영상을 지우거나, 방금 올린 것을 못
+   * 지운다 — 홈의 휠 처리기에서 똑같이 데인 자리다(`HomeStage` 의 `goOut`).
+   */
+  const leftoverRef = useRef<string | null>(null)
   /** 저장(서버 업로드) 진행 상태 — 미결 「분석한 영상을 우리 서버에 저장하는 경로」(paik-1). */
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'rejected' | 'error'>(
     'idle',
@@ -997,6 +1005,11 @@ export default function AnalysisStage() {
   }
 
   function reset() {
+    /* 🔴 **무른 영상도 지운다.** 「닫기」는 이 영상을 안 쓰겠다는 뜻인데, 이미
+       S3 에 올라가 있어서(「예」에서 올라간다) 안 지우면 그대로 남는다 —
+       떠날 때와 같은 일이라 같은 함수를 쓴다. 저장했으면 ref 가 이미 비어
+       있어서 아무 일도 안 한다. */
+    dropLeftover()
     // 1단계 — 판이 줄고, 비켜서 있던 배경 사진이 제자리로 돌아온다.
     // 영상은 그동안 미리 흐려진다(아래 closing 주석).
     setSideIn(false)
@@ -1099,7 +1112,52 @@ export default function AnalysisStage() {
     if (!videoId) return
     saveReport(videoId, REPORT)
     setReportSaved(true)
+    // 저장했으니 더 이상 「미저장분」이 아니다 — 떠날 때 지우면 안 된다.
+    leftoverRef.current = null
   }
+
+  /**
+   * 🔴 **저장 없이 떠나면 그 영상을 지운다**(미결 `jin` 24번, 사용자 결정
+   * 2026-09-08). 「예」에서 이미 S3 에 올라가 있어서, 안 지우면 분석만 해 보고
+   * 마음에 안 든 영상이 영구히 쌓인다.
+   *
+   * 🔴 **`sendBeacon` 이 아니라 `fetch(keepalive)`** 다. beacon 은 POST 만
+   * 보낼 수 있어 `DELETE` 를 실을 수가 없다. `keepalive` 는 문서가 사라져도
+   * 요청을 끝까지 보낸다.
+   *
+   * ⚠️ **놓쳐도 된다.** 서버가 백스톱 스윕을 돌린다(`kept=false` · TTL 24시간,
+   * 계약 3-8절의 `claim` 에 얹혀 있다). 이건 흔한 경우를 초 단위로 처리하는
+   * 빠른 길일 뿐이라 실패를 사용자에게 알리지 않는다.
+   */
+  function dropLeftover() {
+    const id = leftoverRef.current
+    if (!id) return
+    leftoverRef.current = null
+    void fetch(`/api/videos/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      keepalive: true,
+    }).catch(() => {})
+  }
+
+  // 🔴 매 렌더에서 지금 값으로 맞춘다 — 위 `leftoverRef` 주석 참고.
+  leftoverRef.current = reportSaved ? null : videoId
+
+  /**
+   * 떠날 때 한 번. 라우팅으로 이 화면을 벗어나는 것(정리 함수)과 창을 닫는
+   * 것(`pagehide`)을 **같은 일**로 다룬다.
+   *
+   * 🔴 `beforeunload` 가 아니라 `pagehide` 다 — 뒤로 가기 캐시(bfcache)로
+   * 들어갈 때도 불리고, 모바일에서 탭이 버려질 때 `beforeunload` 는 자주
+   * 건너뛴다.
+   */
+  useEffect(() => {
+    window.addEventListener('pagehide', dropLeftover)
+    return () => {
+      window.removeEventListener('pagehide', dropLeftover)
+      dropLeftover()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 한 번만 건다. 지울 대상은 ref 가 늘 최신이다.
+  }, [])
 
   /**
    * 관문을 물어도 되는가 — 관절이 안정적으로 붙었거나, **검출 자체가 꺼진**
