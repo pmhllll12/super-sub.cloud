@@ -117,6 +117,9 @@ LIMB_DEPENDENT_METRICS = frozenset({
     "swing_shoulder_flexion_after_impact_deg",
     # 어깨·골반 네 점이 모두 잡힌 프레임에서만 나온다.
     "hip_shoulder_separation_deg",
+    # 준비 구간에 다리 유효 프레임이 2개 미만이면 안 나온다 (미결 21번).
+    # 예전에는 0.0 을 지어냈고 그것이 "잠긴 골반" 0등급으로 갔다.
+    "hip_rotation_range_deg",
 })
 
 # --- 프레임 단위 지표 (미결 7번 E-3) ---------------------------------------
@@ -556,11 +559,22 @@ def extract_features(
     shoulder_axis = _axis_deg(xy[:, L_SHOULDER] - xy[:, R_SHOULDER])
     tb_start, tb_end = phases.takeback
     span_idx = [f for f in range(tb_start, tb_end + 1) if leg_usable[f]]
+    # 🔴 **못 쟀으면 값을 내지 않는다** (미결 21번, 2026-09-08).
+    #
+    # 예전에는 `else` 가지에서 0.0 을 넣었다. 그 값이
+    # PLAUSIBLE_RANGE(0~180)를 그대로 통과해 루브릭의 **0등급("잠긴 골반")** 으로
+    # 갔고, 실클립 `YNMHMKb5Md4` 에서 「골반 회전 각도 0.0도로 … 하체 회전 부재」
+    # 라는 문장까지 나갔다. 그 클립은 다리 게이트가 `leg0.0` — **다리를 못 본
+    # 클립이다.** 선수는 "하체를 안 썼다"는 지적을 받지만 일어난 일은 다르다.
+    #
+    # 키를 안 넣으면 도구 미검출과 같은 규약으로 그 항목만 판정에서 빠지고
+    # 가중치가 재정규화된다. 바로 아래 `hip_shoulder_separation_deg` 가 이미
+    # 그렇게 한다. 🔴 **다른 기본값으로 바꾸지 말 것** — 값을 안 내는 것이
+    # 답이지 더 그럴듯한 값을 지어내는 것이 아니다(E-3의 `fps=12.0`이 그랬다).
+    hip_rotation_range: float | None = None
     if len(span_idx) >= 2:
         unwrapped = np.unwrap(hip_axis[span_idx], period=180.0)
         hip_rotation_range = float(np.ptp(unwrapped))
-    else:
-        hip_rotation_range = 0.0
 
     # 골반-어깨 분리 — 골반이 얼마나 **먼저** 열렸는가.
     #
@@ -608,11 +622,15 @@ def extract_features(
         # 모델이 0을 "가속 구간 확보 실패"로 읽는다.
         # 루브릭 deferred: swing_acceleration_timing 참고.
         "trunk_forward_lean_deg_at_impact": round(trunk_lean, 1),
-        "hip_rotation_range_deg": round(hip_rotation_range, 1),
         "swing_hip_flexion_after_impact_deg": round(max_additional, 1),
         "follow_through_duration_frames": int(decel),
         "impact_frame": int(t),
     }
+
+    # 준비 구간에 다리를 못 봤으면 회전량을 내지 않는다 (미결 21번). 위 산출
+    # 지점의 주석 참고 — 0.0 을 넣으면 그것이 "잠긴 골반" 0등급으로 나간다.
+    if hip_rotation_range is not None:
+        features["hip_rotation_range_deg"] = round(hip_rotation_range, 1)
 
     # 몸통 키포인트가 부실하면 분리각을 내지 않는다 — 도구 미검출과 같은 규약으로
     # 그 지표를 쓰는 항목만 판정에서 빠지고, 남은 항목으로 가중치가 재정규화된다.
