@@ -295,11 +295,12 @@ def main() -> None:
         "--subject-at-ms", type=float, default=None,
         help="--subject-box 를 그린 영상 시각(밀리초). 박스를 주면 함께 주어야 한다",
     )
-    ap.add_argument(
-        "--skip-analyzed", action="store_true",
-        help="리포트가 이미 있는 영상은 건너뛴다. 🔴 이것이 큐 소비의 최소 형태다 "
-             "— videos/ 와 reports/ 를 비교해 안 돈 것만 처리한다(미결 17번 「나」)",
-    )
+    # 🔴 `--skip-analyzed` 를 **일부러 뺐다** (2026-09-08, 미결 jin 20번).
+    #    `reports/` 유무로 "안 돈 것"을 가리는 것은 두 번째 큐였다. 큐의 정본은
+    #    `analysis_job` 하나이고 그것을 소비하는 것은 `scripts/worker.py` 다.
+    #    둘을 같이 두면 워커가 집어 `running` 으로 돌리는 사이 스캔이 같은 영상을
+    #    또 돌린다 — `reports/` 는 분석이 **끝나야** 생기기 때문이다.
+    #    되살리지 못하게 `tests/test_worker.py` 가 검사한다.
     args = ap.parse_args()
 
     if not storage.is_s3_uri(args.video) or not storage.is_s3_uri(args.out):
@@ -327,12 +328,6 @@ def main() -> None:
     failed = 0
     for i, video in enumerate(videos, 1):
         print(f"\n[{i}/{len(videos)}] {video}")
-        if args.skip_analyzed and storage.object_exists(
-            storage.join_uri(args.out, report_slug(storage.parse_s3_uri(video)[1])) + "/",
-            region=args.region,
-        ):
-            print("  이미 리포트가 있다 — 건너뛴다")
-            continue
         try:
             analyze_one(video, args, rubric, subject)
         except SystemExit as exc:
