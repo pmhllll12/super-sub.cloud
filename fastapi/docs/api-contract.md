@@ -1856,6 +1856,83 @@ DB(연쇄)와 S3(`storage_key` + `reports/<user_id>/<video_id>/`, best-effort)�
 
 ---
 
+## 3-10. 과금 (2026-09-08 추가)
+
+부록 D 도메인 ⑥. 패킷 A(`docs/backend-work-split.md`). `paik` 브랜치에 있고,
+공유 파일 배선(`app/main.py` 등)은 아직입니다 — 정어진이 병합하며 잇습니다.
+
+### 🔴 잔량은 컬럼이 아니라 `SUM(delta)` 다
+
+부록 D.4 가 `analysis_credit.balance`를 파생값이라 제거한 자리다. 지급은 양수,
+차감은 음수 한 행이고, **크레딧 차감은 분석 경로(`POST /videos`)와 이어지지
+않는다** — 컨텍스트 경계를 넘는 연결이라 그쪽은 정어진이 붙인다.
+
+### 정하지 않은 것 (패킷 A 문서 「정해야 할 것」)
+
+무료 크레딧 지급 시점·액수, 분석 1건당 차감액, `reason` 값 목록은 아직 미정이다.
+그 전에도 조회·수동 지급은 가능하다 — 정책은 값이지 구조가 아니다.
+
+### `GET /api/v1/credits`
+
+인증 필요. 내 크레딧 잔량과 이력.
+
+```json
+{"balance": 70, "history": [
+  {"id": "…", "delta": 100, "reason": "signup_bonus", "created_at": "…"},
+  {"id": "…", "delta": -30, "reason": "analysis", "created_at": "…"}
+]}
+```
+
+### `POST /api/v1/admin/credits/adjustments` — 관리자 전용
+
+```json
+{"user_id": "…", "delta": 100, "reason": "signup_bonus"}
+```
+
+`201` — 조정 뒤 대상 사용자의 `GET /credits`와 같은 형태.
+
+| 에러 | code |
+|---|---|
+| 403 | 관리자가 아니다(`require_admin`, 계약 3-2절과 같은 게이트) |
+| 404 | `USER_NOT_FOUND` |
+| 422 | `INVALID_DELTA` — 증감액이 0이다 |
+
+### `GET /api/v1/coaches` · `GET /api/v1/coaches/{coach_id}`
+
+인증 필요. 페이지 형식은 `GET /admin/users`와 같다(`items`·`total`·`page`·`size`).
+
+```json
+{"id": "…", "name": "김도현", "contact": "…"}
+```
+
+⚠️ **종목·가격·소개 문장·대표 영상이 없다.** `www/src/lib/market.ts`의 `Coach`
+타입(mock)은 이보다 훨씬 풍부하지만, 부록 D의 `coach`는 `id`·`name`·`contact`
+셋뿐이다 — 화면과 스키마를 맞추는 것은 별도 결정이 필요해 미결 항목에 올렸다.
+상세 없는 코치는 404 `COACH_NOT_FOUND`.
+
+### `POST /api/v1/coaches/{coach_id}/referrals`
+
+```json
+{"fee": "50000.00"}
+```
+
+`201` — `{id, coach_id, fee, created_at}`. **중복을 막지 않는다** — 같은 코치에
+여러 번 연결을 요청할 수 있다(상담을 여러 번 받는 흐름이 자연스럽다).
+
+| 에러 | code |
+|---|---|
+| 404 | `COACH_NOT_FOUND` |
+| 422 | `INVALID_FEE` — 수수료가 음수다 |
+
+### 아직 없는 것
+
+- **`market.ts`의 나머지 필드** — 가격·후기·레슨 장소 등은 부록 D에 대응
+  컬럼이 없다. 필요해지면 부록 D 변경으로 이어진다
+- **크레딧 자동 지급·차감** — 가입 보너스나 분석당 차감을 트리거하는 경로.
+  지금은 관리자의 수동 조정뿐이다
+
+---
+
 ## 4. 스키마가 강제하는 규칙 — API에서도 지켜야 한다
 
 부록 D.5가 "코드에만 두면 지켜지지 않으므로 테이블 설계 단계에서 막는다"고 한 것들이다.

@@ -278,6 +278,13 @@ def analyze_command(cfg: Config, job: dict, rubric: Path) -> list[str]:
         "--out",
         cfg.reports_uri,
     ]
+    # 🔴 `video_id` 를 넘겨야 리포트가 **계약 자리**에 간다
+    # (`reports/<user_id>/<video_id>/report.json`, 미결 `jin` 24번). 안 넘기면
+    # 옛 자리(업로드 폴더 + 타임스탬프)로 가고, 「저장」이 원본을 옮겨 놓을
+    # 폴더와 리포트가 **따로 놀게 된다.**
+    # 없을 수도 있다고 보고 확인한다 — 옛 백엔드는 이 필드를 안 준다.
+    if job.get("video_id"):
+        cmd += ["--video-id", str(job["video_id"])]
     # side 는 없을 수 있다(null). 그러면 주지 않는다 — analyze_s3.py 의 기본값
     # "auto" 가 스스로 판별한다. None 을 문자열로 넘기면 argparse 가 거부한다.
     if job.get("side") in ("left", "right"):

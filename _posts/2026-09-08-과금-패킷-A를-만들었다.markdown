@@ -1,0 +1,34 @@
+---
+layout: default
+title: "과금(패킷 A)을 만들었다 — 크레딧·코치 연결"
+date: 2026-09-08
+nav_exclude: true
+---
+
+세션을 다시 시작하면서 `min` 구역 1·3번(박민호 PM의 진행 상황 질의)이 미결로
+남아 있는 것을 발견했다. `git grep -n "analysis_credit" -- fastapi/app`가 0건 —
+2026-09-03에 맡은 패킷 A(과금: `analysis_credit`·`coach`·`coach_referral`)가
+`www/` 화면 작업에 밀려 착수조차 안 되어 있었다.
+
+오늘 `app/billing/` 컨텍스트(domain·application·adapter·dependencies)와 라우터,
+마이그레이션(`20260908_billing_tables`), 테스트를 전부 만들었다. `review` 컨텍스트
+(패킷 B)를 그대로 본보기로 삼았다 — 잔량은 컬럼 없이 `SUM(delta)`로, `coach`엔
+`user_id` 없이, 크레딧 차감은 분석 경로에 잇지 않았다(패킷 A 「하지 말 것」).
+
+**공유 파일 5곳(`main.py`·`alembic/env.py`·`tests/conftest.py`)은 건드리지
+않았다** — 배선은 정어진 몫이다. 그래서 계약 테스트는 `tests/billing/conftest.py`
+에 라우터 하나만 올린 별도 앱으로 돌렸다(15 passed). DB 통합 테스트는 써 뒀지만
+이 환경의 Postgres 인증이 막혀 있어(`password authentication failed`) 못 돌렸다 —
+기존 `test_review_db.py` 등도 같은 이유로 이 환경에서 전부 실패해서 환경 문제로
+보고 그대로 남겨 뒀다.
+
+작업 중 새로 발견한 것: 부록 D의 `coach` 테이블에 종목 컬럼이 없어서
+`market/coaches` 화면의 종목 필터를 실제 데이터로 못 채운다. 패킷 A 문서가
+경고한 `football`/`soccer` 불일치보다 근본적인 문제라 혼자 정하지 않고
+[미결 `paik` 14번]({{ "/pending/" | relative_url }})으로 올렸다.
+
+다음에 할 일: 정어진이 공유 파일을 배선하면 계약 테스트를 전역 `client`로
+옮기고, DB 통합 테스트를 실제로 돌려 확인한다. `coach` 종목 컬럼 여부는
+박민호 결정 대기.
+
+[← 목차로](/toc/)

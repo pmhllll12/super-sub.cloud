@@ -212,8 +212,27 @@ export default function HomeStage({
       // 손가락이 위로 = 내용은 아래로 = 내리는 것.
       move(dirOf(touchY - (e.touches[0]?.clientY ?? 0)))
     }
+    /**
+     * 🔴 **글자를 치는 중인가.** 여기서 「내려가기」로 받는 글쇠 셋이 하필
+     * 글을 쓰는 사람에게도 오는 것들이다 — 스페이스는 **띄어쓰기**이고
+     * 화살표는 **글자 사이를 오가는 것**이다.
+     *
+     * 안 보면 챗봇에 「안녕하세요. 」까지 치는 순간 영상 모음으로 넘어간다
+     * (사용자 지적, 2026-09-08). 굴림 쪽이 `onOwnPanel` 로 갈라 놓은 것과
+     * 같은 판단인데, 자판은 **판 밖의 입력칸**(어디에 생기든)에서도 막아야
+     * 해서 조건이 하나 더 있다.
+     */
+    const isTyping = (t: EventTarget | null) =>
+      t instanceof HTMLElement &&
+      (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))
+
     /** 자판으로도 오갈 수 있어야 한다 — 굴림이 없으니 이게 유일한 다른 길이다. */
     const onKey = (e: KeyboardEvent) => {
+      /* 🔴 **한글 조합 중에는 아무것도 안 한다.** IME 가 글자를 맞추는 동안
+         브라우저는 `keydown` 을 그대로 흘려보내는데, 그때의 스페이스는 조합을
+         끝내는 신호지 「내려가기」가 아니다. `isComposing` 이 그것을 말한다 —
+         입력칸 밖(조합 중인 IME 창)에서 올 수도 있어 아래 두 검사로는 안 걸린다. */
+      if (e.isComposing || isTyping(e.target) || onOwnPanel(e.target)) return
       if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') move(1)
       else if (e.key === 'ArrowUp' || e.key === 'PageUp') move(-1)
     }
