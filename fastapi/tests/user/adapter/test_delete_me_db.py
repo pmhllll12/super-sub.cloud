@@ -66,9 +66,7 @@ def account(db_client, db_session):
         )
     )
     db_session.add(
-        MetricDefinitionOrm(
-            code=metric_code, label="무릎 각도", unit="deg", sport_code="football"
-        )
+        MetricDefinitionOrm(code=metric_code, label="무릎 각도", unit="deg")
     )
     db_session.add(
         PlayerCardOrm(

@@ -9,6 +9,7 @@ from fastapi import FastAPI
 
 from app.analysis.adapter.inbound.api.v1.job_router import job_router
 from app.analysis.adapter.inbound.api.v1.video_router import video_router
+from app.billing.adapter.inbound.api.v1.billing_router import billing_router
 from app.card.adapter.inbound.api.v1.card_router import card_router
 from app.card.adapter.inbound.api.v1.squad_router import squad_router
 from app.card.adapter.outbound.stub.card_stub_repository import DEMO_SLUG
@@ -90,6 +91,7 @@ for _router in (
     job_router,
     review_router,
     admin_router,
+    billing_router,
 ):
     app.include_router(_router, prefix=API_PREFIX)
 

@@ -40,6 +40,10 @@ class RegisterVideoSchema(BaseModel):
 
     `side` 는 던지는 팔·차는 발이다. 자동 판별이 팔 종목에서 신뢰할 수 없어
     (5장 CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 자동 판별을 쓴다.
+
+    `analyze` 가 거짓이면 규격은 검사하되 분석 작업을 만들지 않는다. 기록으로
+    남기려고 올리는 클립("업로드 영상")과 실력을 재려고 올리는 클립을 가르는
+    자리다. 생략하면 참 — 안 보내던 클라이언트의 동작이 그대로다.
     """
 
     sport_code: str = Field(min_length=1, max_length=20)
@@ -48,6 +52,7 @@ class RegisterVideoSchema(BaseModel):
     width: int = Field(ge=1)
     height: int = Field(ge=1)
     side: str | None = Field(default=None, max_length=5)
+    analyze: bool = True
 
 
 class VideoResponse(BaseModel):
@@ -70,3 +75,41 @@ class VideoResponse(BaseModel):
     reject_reason: str | None
     analysis_job_id: UUID | None
     analysis_status: str | None
+    is_public: bool
+    title: str | None
+    description: str | None
+    kept: bool
+
+
+class UpdateVideoSchema(BaseModel):
+    """클립을 부분 수정한다. `PATCH /videos/{id}` 본문.
+
+    셋 다 생략 가능하다 — **보낸 것만** 바뀐다(`model_fields_set` 로 가른다).
+    `title`·`description` 은 `null` 이나 공백만 보내면 지운다.
+    """
+
+    is_public: bool | None = None
+    title: str | None = Field(default=None, max_length=100)
+    description: str | None = Field(default=None, max_length=280)
+
+
+class PlaybackUrlResponse(BaseModel):
+    """재생용 사전 서명 GET URL. `url` 에 바로 GET 하면 원본이 온다."""
+
+    url: str
+    expires_in: int
+
+
+class PublicVideoResponse(BaseModel):
+    """홈 영상 모음 한 줄. **저장 키·업로더는 안 실린다** — 저장 키에 업로더
+    `user_id` 가 들어 있고, 재생은 `GET /videos/{id}/playback-url` 로 따로 받는다.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    sport_code: str
+    duration_ms: int | None
+    created_at: Rfc3339
+    title: str | None
+    description: str | None

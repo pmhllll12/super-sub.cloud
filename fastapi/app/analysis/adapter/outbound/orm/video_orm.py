@@ -16,7 +16,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, String, Uuid
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -24,6 +24,15 @@ from app.core.database import Base
 
 class VideoOrm(Base):
     __tablename__ = "video"
+    __table_args__ = (
+        # 백스톱 스윕은 `kept=false` 인 것만 훑는다(미결 `jin` 24번). 대부분이
+        # `true` 라 부분 인덱스가 작고, 45초마다 도는 질의를 가볍게 유지한다.
+        Index(
+            "ix_video_provisional",
+            "created_at",
+            postgresql_where=text("kept = false"),
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     # 업로더(부록 D.3). SEC-006 의 삭제 연쇄가 여기서 시작한다.
@@ -43,6 +52,24 @@ class VideoOrm(Base):
     # 던지는 팔·차는 발. **자동 판별이 팔 종목에서 신뢰할 수 없어**(5장 CON-007)
     # 업로드할 때 사람이 지정할 수 있게 열어 둔다. 비어 있으면 자동 판별을 쓴다.
     side: Mapped[str | None] = mapped_column(String(5), nullable=True)
+
+    # 공개 여부(미결 `paik` 5번). 🔴 기본은 비공개 — 이미 올라간 클립이 남에게
+    # 보이면 안 된다. 홈의 영상 모음은 `is_public` 인 클립만 훑는다.
+    is_public: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
+
+    # 홈 영상 모음이 큰 글자로 얹는 값(미결 `paik` 5번). 안 정한 클립은 NULL —
+    # "안 정했다"와 "지웠다"를 구별할 필요가 없다.
+    title: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    description: Mapped[str | None] = mapped_column(String(280), nullable=True)
+
+    # 프로필에 저장됐나(미결 `jin` 24번). `/analysis` 분석은 `false` 로 올라가고
+    # "내 프로필에 리포트 저장"이 `true` 로 만든다. `false` 인 것은 백스톱
+    # 스윕이 24시간 뒤 정리한다. `GET /videos` 는 `true` 만 준다.
+    kept: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="true"
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False

@@ -10574,15 +10574,6 @@ body:has(.ss-profile) {
   line-height: 1.5;
 }
 
-.ss-venue-card-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: auto;
-  padding-top: 8px;
-}
-
 .ss-venue-sports {
   display: flex;
   flex-wrap: wrap;
@@ -10602,8 +10593,52 @@ body:has(.ss-profile) {
   white-space: nowrap;
 }
 
-.ss-venue-price {
-  font-size: 0.875rem;
+/* 시간대별 접수 현황 — 실제 예약은 서울시 사이트로 나가는 링크뿐이라
+   여기엔 상태 배지 · 시간 · 외부 링크만 있고 우리 쪽 폼은 없다. */
+.ss-venue-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 10px;
+}
+
+.ss-venue-slot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+}
+
+.ss-venue-slot-status {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  border-radius: 999px;
+  padding: 0 8px;
+  font-size: 0.6875rem;
   font-weight: 600;
+  white-space: nowrap;
+}
+
+.ss-venue-slot-status.is-open {
+  background-color: color-mix(in srgb, var(--ss-accent, #33483c) 18%, transparent);
+  color: var(--ss-accent, #33483c);
+}
+
+.ss-venue-slot-status.is-closed {
+  background-color: color-mix(in srgb, var(--ss-fg, #000) 10%, transparent);
+  color: color-mix(in srgb, var(--ss-fg, #000) 55%, transparent);
+}
+
+.ss-venue-slot-time {
+  color: color-mix(in srgb, var(--ss-fg, #000) 70%, transparent);
+}
+
+.ss-venue-slot-link {
+  margin-left: auto;
+  font-weight: 600;
+  text-decoration: underline;
   white-space: nowrap;
 }
