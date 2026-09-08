@@ -308,6 +308,36 @@ describe('스쿼드 — 판 위에서 자유롭게 옮긴다', () => {
     expect(label()).not.toHaveAttribute('data-set')
     expect(label().textContent).toBe('GK')
   })
+  /* 🔴 **골키퍼 줄은 가운데 한 칸뿐이다**(사용자 요청, 2026-09-08). 축구에서
+     골키퍼는 하나이고 골대 앞 가운데에 선다 — 양옆 칸을 두면 판이 "골키퍼가
+     셋일 수도 있다"고 말하는 셈이 된다. */
+  it('골키퍼 줄에는 칸이 가운데 하나뿐이다', () => {
+    render(<SquadPanel card={CARD} squad={SQUAD} />)
+    const gkCells = [...document.querySelectorAll<HTMLElement>('.ss-squad-cell')].filter(
+      (c) => c.dataset.row === '3',
+    )
+    expect(gkCells).toHaveLength(1)
+    expect(gkCells[0].dataset.col).toBe('1')
+  })
+
+  it('골키퍼는 옆으로 못 간다', async () => {
+    render(<SquadPanel card={CARD} squad={SQUAD} />)
+    expect(posOf('이영희')).toBe('GK')
+    // 골키퍼 줄의 왼쪽 끝으로 끌어 본다 — 그 칸이 없으므로 제자리다.
+    await drag(seatOf('이영희'), 0, 3)
+    expect(posOf('이영희')).toBe('GK')
+    expect(seatOf('이영희').style.gridColumn).toBe('2')
+  })
+
+  /* ⚠️ **위아래는 막지 않는다**(사용자 결정). 자리를 통째로 잠그면 3:3 에서
+     셋 다 윗줄로 올리는 「전원 FW」가 불가능해진다 — 같은 날 아침에 요청받아
+     만든 동작이라 그쪽을 살렸다. 위 「셋을 다 윗줄로…」 시험이 그것을 잡는다. */
+  it('골키퍼도 위로는 올라간다', async () => {
+    render(<SquadPanel card={CARD} squad={SQUAD} />)
+    expect(posOf('이영희')).toBe('GK')
+    await drag(seatOf('이영희'), 1, 0)
+    expect(posOf('이영희')).toBe('FW')
+  })
 })
 
 describe('스쿼드 — 나갔다 와도 그대로다', () => {
@@ -527,4 +557,5 @@ describe('스쿼드 — 용병 찾기(추천 + 지인)', () => {
     await user.click(screen.getByRole('button', { name: '추천 닫기' }))
     expect(onClose).toHaveBeenCalled()
   })
+
 })

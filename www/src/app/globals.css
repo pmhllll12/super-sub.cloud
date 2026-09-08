@@ -326,7 +326,10 @@ body::-webkit-scrollbar {
    밝은 연기 위에서 읽히지 않는다). 지금 가리킨 칸만 강조색으로 바뀐다. */
 .ss-home-nav-item {
   padding: 12px 2px;
-  font-size: 0.8125rem;
+  /* 0.8125 → 0.875rem. 아이콘과 함께 **한 단 키웠다**(사용자 요청,
+     2026-09-08) — 알약 줄과 달리 이 줄은 화면 맨 위라 조금 더 커도
+     배경 사진을 안 가린다. */
+  font-size: 0.875rem;
   font-weight: 500;
   letter-spacing: 0.08em;
   white-space: nowrap;
@@ -339,6 +342,34 @@ body::-webkit-scrollbar {
 .ss-home-nav-item:focus-visible,
 .ss-home-nav-item[data-active='true'] {
   color: var(--ss-accent);
+}
+
+/* 🔴 **아이콘이 글자 위에 선다**(사용자 요청, 2026-09-08). 원래는 글자 아래
+   떠오르던 유리 카드 안에 있었는데, 그 판을 없애면서 갈 데가 없어졌다.
+
+   🔴 **아이콘 자리를 늘 차지한다.** 항목마다 아이콘이 있으므로 줄이 들썩일
+   일은 없지만, `gap` 이 아니라 세로 쌓기로 두어야 글자가 줄 가운데에 서고
+   옆 항목과 밑줄이 맞는다. */
+.ss-home-nav-item--stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  /* 글자만 있던 때의 좌우 여백(2px)은 아이콘에 너무 좁다. */
+  padding: 10px 8px;
+}
+
+/* 색은 물려받는다 — 가리키면 글자와 아이콘이 **함께** 강조색이 된다.
+   따로 칠하면 하나만 켜져 두 개가 다른 것처럼 보인다.
+   크기는 **한 단 키웠다**(20 → 24px, 사용자 요청 2026-09-08). */
+.ss-home-nav-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+/* 글자는 원래 자간을 그대로 쓴다 — 아이콘이 위에 붙었을 뿐이다. */
+.ss-home-nav-label {
+  letter-spacing: inherit;
 }
 
 /* ── 알약 변형 (variant="pill") ────────────────────────────────────────
@@ -362,6 +393,15 @@ body::-webkit-scrollbar {
   letter-spacing: 0;
   color: var(--ss-fg);
   text-shadow: 0 1px 6px var(--ss-bg);
+}
+
+/* 「로그인이 필요합니다」 — 판이 없어져도 남는 한 줄(DestinationCard 주석).
+   설명보다 한 단 흐리게 두어 **설명과 안내가 한 문장으로 안 읽히게** 한다. */
+.ss-nav-bare-note {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--ss-fg) 55%, transparent);
 }
 
 /* 🔴 **알약의 판은 위로 뜬다.** 글자 줄은 화면 맨 위에 있어 아래로 떨어져야
@@ -1478,6 +1518,138 @@ body::-webkit-scrollbar {
   padding: 14px 16px 16px;
 }
 
+/* ── 「팀원」 판 — 사람을 찾는 팀들의 명단 (2026-09-08) ──────────────
+   🔴 **스쿼드 판을 대신 선다**(사용자 요청). 같은 자리를 덮으므로 좌표를
+   다시 잴 것이 없고, 오른쪽에 붙는 판들(추천 · 지인 · 챗봇)의 기준점도
+   그대로다.
+
+   🔴 스쿼드 판은 `visibility` 로만 감춘다 — 통째로 빼면 자리가 접혀서 이
+   판이 설 크기를 잃는다. 그 크기는 카드 폭 · 칸 간격에서 계산되는 값이라
+   (아래 `.ss-squad-board`) 숫자를 베껴 오면 카드 크기를 바꿀 때 어긋난다. */
+.ss-squad[data-seeking='true'] {
+  visibility: hidden;
+}
+
+.ss-teams {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 20px 20px;
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 18%, transparent);
+  background: color-mix(in srgb, var(--ss-fg) 6%, transparent);
+}
+
+.ss-teams-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ss-teams-head h2 {
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+  color: var(--ss-fg);
+}
+
+.ss-teams-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  color: color-mix(in srgb, var(--ss-fg) 70%, transparent);
+  transition: color 160ms ease;
+}
+
+.ss-teams-close:hover,
+.ss-teams-close:focus-visible {
+  color: var(--ss-fg);
+}
+
+.ss-teams-count {
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--ss-fg) 62%, transparent);
+}
+
+.ss-teams-note {
+  font-size: 0.8rem;
+  color: color-mix(in srgb, var(--ss-fg) 70%, transparent);
+}
+
+.ss-teams-note[data-error='true'] {
+  color: color-mix(in srgb, var(--ss-error) 85%, var(--ss-fg));
+}
+
+/* 목록만 구른다 — 판이 늘어나면 옆의 헤드라인 자리까지 밀린다. */
+.ss-teams-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+}
+
+.ss-teams-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 14%, transparent);
+}
+
+.ss-teams-name {
+  font-size: 0.85rem;
+  color: var(--ss-fg);
+}
+
+/* 🔴 몇 자리가 비었는지가 이 목록을 고르는 기준이라 강조색으로 오른쪽 끝에
+   세운다 — 이름 옆에 묻히면 훑을 때 안 보인다. */
+.ss-teams-seats {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  font-size: 0.78rem;
+  color: var(--ss-accent);
+  white-space: nowrap;
+}
+
+.ss-teams-where,
+.ss-teams-when {
+  grid-column: 1;
+  font-size: 0.72rem;
+  color: color-mix(in srgb, var(--ss-fg) 58%, transparent);
+}
+
+.ss-teams-needs {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.ss-teams-need {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 22%, transparent);
+  font-size: 0.7rem;
+  color: color-mix(in srgb, var(--ss-fg) 76%, transparent);
+}
+
+.ss-teams-foot {
+  font-size: 0.7rem;
+  color: color-mix(in srgb, var(--ss-fg) 45%, transparent);
+}
+
 /* 경기장 선 안쪽 위에 얹힌다. 선(테두리 rect)이 상자 가장자리에서
    1/100 쯤 들어와 있으므로 그보다 더 안쪽에 둔다. */
 .ss-squad-head {
@@ -1656,7 +1828,10 @@ body::-webkit-scrollbar {
   width: 100%;
   height: 100%;
   fill: none;
-  stroke: var(--ss-fg);
+  /* 🔴 **안쪽 선은 30% 로 물린다**(사용자 요청, 2026-09-08). 카드 · 이름표가
+     이 선들 위에 얹히는데 온전한 흰색이면 글자와 선이 같은 무게로 보여
+     서로를 갉아먹었다. 바깥 테두리만 그대로 흰색이다(아래 -edge). */
+  stroke: color-mix(in srgb, var(--ss-fg) 30%, transparent);
   /* non-scaling-stroke 라 이 값이 그대로 화면 픽셀이다 — viewBox 배율에
      안 눌린다. 흰색으로 바꾸고 나니 0.6 도 굵어 보여 0.4 로 내렸다. 그 아래로
      내려가면 화면에 따라 선이 끊겨 보인다. */
@@ -1665,9 +1840,16 @@ body::-webkit-scrollbar {
   pointer-events: none;
 }
 
-/* 가운데 점만 채운다 — 선으로 그리면 안 보인다. */
+/* 🔴 **판의 경계는 온전한 흰색이다.** 흐리면 판이 어디까지인지 안 보인다 —
+   안쪽 선들과 달리 이건 카드가 얹히는 자리가 아니라 판 자체의 테두리다. */
+.ss-squad-pitch-edge {
+  stroke: var(--ss-fg);
+}
+
+/* 가운데 점만 채운다 — 선으로 그리면 안 보인다.
+   안쪽 것이라 선들과 같은 30% 로 간다. */
 .ss-squad-pitch-dot {
-  fill: var(--ss-fg);
+  fill: color-mix(in srgb, var(--ss-fg) 30%, transparent);
   stroke: none;
 }
 
@@ -1686,6 +1868,10 @@ body::-webkit-scrollbar {
   font-size: 0.625rem;
   font-weight: 700;
   letter-spacing: 0.1em;
+  /* 🔴 **다시 흰색이다**(사용자 요청, 2026-09-08 — 잔디색으로 바꿨던 것을
+     같은 날 되돌렸다). 겹쳐 보이던 것은 글자 색 때문이 아니라 **경기장 선이
+     글자와 같은 무게로 흰색이었기 때문**이라, 선을 30% 로 물리는 쪽으로
+     고쳤다(위 `.ss-squad-pitch`). 글자는 읽혀야 하는 쪽이라 온전한 흰색이다. */
   color: var(--ss-fg);
   border-radius: 4px;
   /* 🔴 **세로 여백을 주지 않는다.** 이름표가 단추가 되면서 1px 씩 붙였더니
@@ -2524,8 +2710,12 @@ body::-webkit-scrollbar {
     transform var(--ss-shot-dur) var(--ss-shot-ease);
 }
 
-/* 🔴 영상이 들어오면 **틀이 영상 비율을 따라간다.** 16:10 으로 못박아 두면
-   16:9 영상에서 좌우에 검은 띠가 생겨 잘린 것처럼 보인다.
+/* ⚠️ **틀은 16:9 로 못박혀 있다**(`--ss-frame-r`). 한때 "영상 비율을 따라간다"
+   고 적어 두었는데 **그 값을 갱신하는 코드가 없다**(2026-09-08 확인:
+   `grep -rn 'ss-frame-r' src/` 가 globals.css 안에서만 걸린다). 세로 영상은
+   그 안에서 `object-fit: contain` 으로 레터박스가 되어 좌우가 검게 남는다 —
+   지금 화면이 실제로 그렇게 보인다. 고칠 것이라면 영상 메타가 올 때
+   `--ss-frame-r` 을 넣어 주면 되고, 지금은 그대로 둔다.
    키를 정하고 폭을 비율에서 얻는다(그 반대가 아니다) — 그래야 화면이 낮아도
    틀이 세로로 넘치지 않는다. 폭은 판을 넘지 않는 선에서 줄어든다. */
 /* 🔴 틀의 폭은 **안쪽 영상 상자와 같다.** `fit-content` 로 두었더니 머리줄의
@@ -2574,17 +2764,48 @@ body::-webkit-scrollbar {
   padding-right: calc(var(--ss-shot-side-w) + var(--ss-frame-gap) * 2);
 }
 
-/* 🔴 **가운데다.** 왼쪽에 붙여 두었더니 세로 영상에서 틀이 좁아지면서 머리줄의
-   제목 알약이 워드마크와 겹치고, 오른쪽은 텅 비었다. 가로 영상은 폭이 남는 자리를
-   다 채우므로 가운데든 왼쪽이든 결과가 같다 — 그래서 티가 안 났을 뿐이다.
-   가운데로 두면 두 경우가 같은 규칙으로 맞는다(오른쪽 판 자리는 판 여백이
-   이미 비워 두었으므로, 그 왼쪽 영역의 가운데다). */
+/* 🔴 **틀은 늘 남는 가로를 다 채운다**(사용자 결정, 2026-09-08).
+   진짜 브라우저 창처럼 — **창은 그대로 있고 안의 내용만 바뀐다.**
+
+   앞서 두 번 헛짚었다:
+     · 왼쪽에 붙임 — 세로 영상에서 틀이 좁아져 **머리줄의 제목 알약이
+       워드마크와 겹치고** 오른쪽이 텅 비었다.
+     · 가운데 정렬 — 이번 문제다. 워드마크는 헤더 여백(48px)에 **고정**인데
+       틀만 가운데로 밀려서, 화면이 가로로 길거나 영상이 세로면 **틀의 왼쪽
+       가장자리가 로고를 가로질렀다**(실측: 2560×1080 에서 틀이 264px 에서
+       시작해 로고 48~202 가 통째로 틀 밖).
+
+   폭을 못박으면 그 둘이 한꺼번에 없어진다 — 로고도 알약도 화면 비율과
+   무관하게 늘 같은 자리다. 남는 자리는 **틀 안**에서 영상 옆에 생긴다.
+
+   🔴 **영상 상자(`-body`)는 안 늘린다.** 상자를 틀만큼 늘리고 영상을
+   `object-fit: contain` 으로 맞추면 레터박스가 생기는데, 관절 · 대상 네모
+   (`.ss-shot-track`)가 **상자에 `inset: 0` 으로 붙어 있어** 그만큼 어긋난다.
+   상자는 영상 크기 그대로 두고 가운데에 세운다. */
 .ss-shot[data-grown='true'] .ss-shot-frame {
   align-self: center;
+  width: var(--ss-frame-avail-w);
+  max-width: 100%;
+}
+
+.ss-shot[data-grown='true'] .ss-shot-frame-body {
+  /* 🔴 `100%` 로 한 번 더 자른다. 틀의 폭에는 **테두리 1px 이 양쪽**으로
+     들어 있어(`box-sizing: border-box`), 영상 상자에 `--ss-frame-w`(= 남는
+     가로) 를 그대로 주면 안쪽 칸보다 2px 넓어져 좌우가 1px 씩 잘렸다(실측).
+     `min` 이라 좁을 때는 지금처럼 영상 크기 그대로다. */
+  width: min(var(--ss-frame-w), 100%);
+  margin-inline: auto;
 }
 
 .ss-shot[data-grown='true'] .ss-shot-frame-bar {
   transition: padding 640ms var(--ss-shot-grow-ease);
+}
+
+/* 🔴 분석 화면에서는 머리줄이 44 → 68px 로 두툼해진다 — 알약도 그에 맞춰
+   한 단 키운다(사용자 요청). 안 키우면 넓어진 줄 안에서 혼자 작아 보인다. */
+.ss-shot[data-grown='true'] .ss-shot-close {
+  padding: 7px 18px;
+  font-size: 0.8125rem;
 }
 
 .ss-shot[data-leaving='true'] {
@@ -2990,9 +3211,9 @@ body::-webkit-scrollbar {
      44 → 78 로 **한 프레임에** 변한다 — 판과 창 틀은 부드럽게 움직이는데 이
      줄만 툭 자라고 툭 줄어서, 안쪽 것들이 떨어지는 것처럼 보였다. */
   transition: padding var(--ss-shot-dur) var(--ss-shot-ease);
-  /* 점 하나의 크기와 사이 간격. 아래 빈 자리(::after)가 이 값으로 계산되므로
-     크기를 바꿔도 제목 알약의 가운데 정렬이 안 어긋난다. */
-  --ss-dot: 13px;
+  /* 머리줄 오른쪽 것들 사이 간격(`.ss-shot-bar-right`).
+     ⚠️ 짝이던 `--ss-dot`(점 크기)은 걷어냈다 — 빨간 점이 「닫기」 알약이
+     되면서 읽는 곳이 없어졌다(2026-09-08). */
   --ss-dot-gap: 8px;
 }
 
@@ -3082,23 +3303,43 @@ body::-webkit-scrollbar {
   opacity: 0.35;
 }
 
-.ss-shot-dot {
-  width: var(--ss-dot);
-  height: var(--ss-dot);
+/* 🔴 **「닫기」라고 적힌 알약**(사용자 요청, 2026-09-08). 빨간 점이던 때는
+   누를 수 있다는 것도, 누르면 무엇이 되는지도 모양만으로는 안 읽혔다
+   ("다른 사람들이 아예 모르더라"). 빨강은 남긴다 — 되돌린다는 뜻이다.
+
+   테두리로 그린다: 채우면 머리줄에서 제일 먼저 눈에 들어와, 정작 봐야 할
+   영상 자리보다 세진다(머리줄을 밝게 뒤집었다 되돌린 것과 같은 이유). */
+.ss-shot-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--ss-fg) 22%, transparent);
-}
-
-/* 누를 수 있는 첫 점만 색이 산다 — 장식과 버튼이 같아 보이면 안 된다. */
-.ss-shot-dot-close {
+  border: 1px solid color-mix(in srgb, var(--ss-error) 55%, transparent);
+  background: color-mix(in srgb, var(--ss-error) 14%, transparent);
+  color: color-mix(in srgb, var(--ss-error) 88%, var(--ss-fg));
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  white-space: nowrap;
   cursor: pointer;
-  background: color-mix(in srgb, var(--ss-error) 70%, transparent);
-  transition: background 160ms ease;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
 }
 
-.ss-shot-dot-close:hover,
-.ss-shot-dot-close:focus-visible {
-  background: var(--ss-error);
+.ss-shot-close:hover,
+.ss-shot-close:focus-visible {
+  border-color: var(--ss-error);
+  background: color-mix(in srgb, var(--ss-error) 26%, transparent);
+  color: var(--ss-fg);
+}
+
+/* 영상이 없을 때의 자리지기 — 보이지만 않고 폭은 그대로다. 없애면 영상을
+   고르는 순간 머리줄의 것들이 알약 하나만큼 옆으로 튄다. */
+.ss-shot-close[data-ghost='true'] {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* 주소 알약 자리 — 여기에 고른 영상의 이름이 뜬다. */

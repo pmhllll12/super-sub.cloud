@@ -3,9 +3,15 @@
 
     uv run python eval/pending9_window/coverage.py
 
-창은 `DEFAULT_MAX_SECONDS`(초)이고 가드는 `DEFAULT_MAX_FRAMES`(장)다. 둘 중
+🔴 **이 스크립트는 고쳐지기 전의 크기를 재는 자리다** (2026-09-08 이후).
+가드는 이제 장수가 아니라 **바이트 예산**이고(`DEFAULT_MAX_FRAME_BYTES`),
+아래 `DEFAULT_MAX_FRAMES`는 해상도를 모르는 컨테이너에서만 쓰는 폴백이다.
+**고친 뒤의 판정은 `eval/pending9_budget/verify_budget.py`가 한다** — 이쪽은
+「무엇이 문제였나」를 남기려고 그대로 둔다. 지우면 왜 고쳤는지가 사라진다.
+
+창은 `DEFAULT_MAX_SECONDS`(초)이고 옛 가드는 `DEFAULT_MAX_FRAMES`(장)였다. 둘 중
 먼저 걸리는 쪽이 이긴다 — 그래서 **실효 fps가 높은 소스에서는 가드가 이기고,
-보기로 한 10초를 못 본다.** 이 스크립트는 그 구간과 최악값을 낸다.
+보기로 한 10초를 못 봤다.** 이 스크립트는 그 구간과 최악값을 낸다.
 
 조사 스크립트라 `src/`를 고치지 않는다 — 상수와 규칙을 production에서 import한다.
 리터럴을 복제하면 값이 바뀔 때 이 측정이 조용히 낡는다(미결 10번의 형태).
@@ -21,9 +27,11 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
 from supersub_agent.pose import (  # noqa: E402
+    DEFAULT_MAX_FRAME_BYTES,
     DEFAULT_MAX_FRAMES,
     DEFAULT_MAX_SECONDS,
     DEFAULT_TARGET_FPS,
+    frames_within_budget,
 )
 
 SPECS = Path("/mnt/d/supersub-phaseA/clip_specs.csv")
@@ -79,29 +87,24 @@ def main() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 처방 후보: 가드를 **장수가 아니라 바이트**로 둔다면
+# ✅ **처방은 들어갔다 (2026-09-08).** 가드가 바이트 예산이 됐다.
 #
-# 지금 가드가 해상도를 안 본다. 300장은 4K에서 7.46GB지만 1080p에서는 1.87GB다
-# (미결 9번의 실측표). 같은 숫자가 한쪽에서는 딱 맞고 다른 쪽에서는 4배 헐겁다.
-# 예산을 바이트로 두면 **4K 동작을 그대로 두면서** 낮은 해상도에서 창을 지킨다.
-
-BUDGET_BYTES = 2160 * 3840 * 3 * DEFAULT_MAX_FRAMES  # 지금 4K 300장 = 7.46GB
-
-
-def frames_in_budget(w: int, h: int) -> int:
-    return max(1, int(BUDGET_BYTES // (w * h * 3)))
+# 아래는 그때 계산했던 처방 후보이고, production 상수를 import 하므로 지금은
+# **실제로 들어간 값**을 찍는다. 판정(기준 A~E)은 여기가 아니라
+# `eval/pending9_budget/verify_budget.py`가 한다.
 
 
 def report_budget() -> None:
-    print(f"\n[처방 후보] 예산을 지금 4K 300장(={BUDGET_BYTES / 2**30:.2f}GB)으로 두면")
+    print(f"\n[처방 — 들어갔다] 예산 {DEFAULT_MAX_FRAME_BYTES / 1e6:,.0f}MB "
+          f"(= 4K 세로 300장)")
     for label, (w, h) in (("4K 세로", (2160, 3840)), ("1080p", (1920, 1080)),
                           ("720p", (1280, 720))):
-        n = frames_in_budget(w, h)
+        n = frames_within_budget(w, h)
         need = math.ceil(DEFAULT_MAX_SECONDS * 44.5)  # 최악 fps에서 창을 지킬 장수
         ok = "창을 지킨다" if n >= need else "여전히 못 지킨다"
         print(f"  {label:8} {n:5d}장  (44.5fps 창에 필요한 {need}장 대비 → {ok})")
-    print("  🔴 4K는 300장 그대로다 — 지금 동작을 바꾸지 않으면서 나머지를 푼다.")
-    print("  측정하지 않은 것: 실제 RSS. 프레임 말고도 드는 것이 있다(모델·중간 텐서).")
+    print("  🔴 4K는 300장 그대로다 — 지금 동작을 바꾸지 않으면서 나머지를 풀었다.")
+    print("  RSS 실측은 끝났다: 4K 300장 9,061MB (eval/pending9_rss/RESULTS.md).")
 
 
 if __name__ == "__main__":

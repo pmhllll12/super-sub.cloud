@@ -8,6 +8,7 @@ from __future__ import annotations
 import pytest
 
 from supersub_agent.scoring import (
+    SCORE_BANDS,
     RubricError,
     aggregate,
     discover_rubrics,
@@ -405,11 +406,17 @@ def test_out_of_band_marks_zero_grades_that_came_from_above():
     assert c.out_of_band(below) == "", "아래쪽 0등급은 표시하지 않는다"
 
 
-def test_out_of_band_does_not_move_the_score():
+# features 를 줘야만 채워지는 **표시 전용** 필드들. 이 목록이 늘어날 때마다
+# 아래 검사가 「점수를 안 건드린다」를 다시 확인한다.
+DISPLAY_ONLY_FIELDS = ("out_of_band", "stat")
+
+
+def test_display_only_fields_do_not_move_the_score():
     """🔴 표시는 표시일 뿐이다 — **점수·등급이 바뀌면 B-6 재실행을 부른다.**
 
-    features 를 주든 안 주든 `out_of_band` 를 뺀 나머지가 한 비트도 같아야 한다.
-    이 성질 때문에 이 처방을 임계값 검수 전에 넣을 수 있었다.
+    features 를 주든 안 주든 표시 전용 필드를 뺀 나머지가 한 비트도 같아야 한다.
+    이 성질 때문에 이 처방들(구간 위 0등급 표시·항목 점수)을 임계값 검수 전에
+    넣을 수 있었다.
     """
     rubric = load_rubric(RUBRIC_PATH)
     feats = {m: 0.0 for cr in rubric.criteria for m in cr.measured_by}
@@ -419,10 +426,80 @@ def test_out_of_band_does_not_move_the_score():
     with_feats = aggregate(judgments, rubric, features=feats)
 
     strip = lambda r: {  # noqa: E731
-        **r, "breakdown": [{k: v for k, v in b.items() if k != "out_of_band"}
+        **r, "breakdown": [{k: v for k, v in b.items()
+                            if k not in DISPLAY_ONLY_FIELDS}
                            for b in r["breakdown"]]
     }
     assert strip(without) == strip(with_feats)
     assert all(b["out_of_band"] == "" for b in without["breakdown"]), (
         "features 를 안 주면 표시가 없어야 한다"
     )
+    assert all(b["stat"] is None for b in without["breakdown"]), (
+        "features 를 안 주면 항목 점수를 **지어내지 않는다**"
+    )
+
+
+def test_item_score_never_contradicts_the_grade():
+    """🔴 레이더 차트가 리포트와 반대로 말하면 안 된다.
+
+    항목 점수(`score_for`)는 등급별로 겹치지 않는 자리에 놓인다 —
+    2등급 85~100 · 1등급 50~85 · 0등급 0~50. 이 성질이 깨지면 **2등급 항목이
+    1등급 항목보다 안쪽에 찍히는** 오각형이 나오고, 선수는 잘한 항목을
+    못한 것으로 읽는다.
+
+    루브릭 전체·값 범위 전체를 훑는다. 새 루브릭의 bands 에 빈틈이 생겨도
+    여기서 걸린다.
+    """
+    for key, rubric in discover_rubrics("rubrics").items():
+        for c in rubric.criteria:
+            ends = [e for iv in sum(c.bands.values(), ()) for e in iv if e is not None]
+            lo, hi = min(ends), max(ends)
+            span = (hi - lo) or 1.0
+            for step in range(-30, 131):
+                value = lo + span * step / 100.0
+                features = {c.band_metric: value}
+                try:
+                    grade = c.grade_for(features)
+                except RubricError:
+                    continue  # bands 가 덮지 않는 값 — 실제로는 도달하지 않는다
+                score = c.score_for(features)
+                floor, ceiling = SCORE_BANDS[grade]
+                assert floor <= score <= ceiling, (
+                    f"{key}/{c.id}: {c.band_metric}={value:g} 는 {grade}등급인데 "
+                    f"점수 {score} 가 {floor}~{ceiling} 밖이다"
+                )
+
+
+def test_an_open_top_band_is_not_penalised_for_being_far_from_the_middle():
+    """🔴 **위가 열린 이상 구간의 끝은 위험한 끝이 아니다.**
+
+    `hip_rotation` 의 2등급은 25~180도이고 180도 위에는 아무 등급도 없다.
+    「구간 한가운데가 최고점」으로 재면 골반을 끝까지 돌린 175도가 한가운데
+    102도보다 낮게 찍힌다 — **잘한 값을 깎는다.** `_risk_edges` 가 아래쪽
+    끝(25도)만 세는 이유다.
+    """
+    rubric = load_rubric(RUBRIC_PATH)
+    c = rubric.get("hip_rotation")
+    assert c.bands[2] == ((25.0, 180.0),), "이 검사가 전제하는 구간이 바뀌었다"
+
+    far = c.score_for({c.band_metric: 175.0})
+    middle = c.score_for({c.band_metric: 102.0})
+    edge = c.score_for({c.band_metric: 27.0})
+
+    assert far > middle > edge, (
+        "위험한 끝(25도)에서 멀어질수록 높아야 한다 — 한가운데를 최고점으로 잡으면 "
+        f"175도({far})가 102도({middle})보다 낮아진다"
+    )
+    assert far >= 99.0, "반대쪽 끝은 만점 언저리다"
+    assert edge <= 86.0, "위험한 끝에 붙은 값은 2등급 바닥이다"
+
+
+def test_item_score_is_absent_when_the_metric_was_not_measured():
+    """도구 미검출로 빠진 항목은 축이 0이 아니라 **없는** 것이다.
+
+    0으로 채우면 레이더에서 「그 항목을 못했다」로 보인다. 촬영 조건 때문에
+    선수가 깎이지 않게 하는 것은 `aggregate` 의 재정규화와 같은 취지다.
+    """
+    rubric = load_rubric(RUBRIC_PATH)
+    c = rubric.criteria[0]
+    assert c.score_for({}) is None
