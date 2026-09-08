@@ -25,7 +25,17 @@ from app.analysis.adapter.outbound.stub.job_stub_repository import (
     failure_reason_of,
     status_of,
 )
+from app.analysis.adapter.outbound.stub.video_stub_repository import (
+    _OBJECTS,
+    _VIDEOS,
+    FakeStorage,
+    put_object,
+    reset_videos,
+)
+from app.analysis.dependencies.video_providers import get_storage_optional
+from app.analysis.domain.entities.video_entity import VideoEntity
 from app.core.config import settings
+from app.main import app
 from tests.conftest import V1, error_code
 
 CLAIM = f"{V1}/internal/analysis-jobs/claim"
@@ -258,3 +268,49 @@ class TestReclaim:
         ).status_code == 204
         assert status_of(job_id) == "succeeded"
         assert failure_reason_of(job_id) is None
+
+
+class TestProvisionalSweep:
+    """claim 이 저장 안 한 오래된 임시 영상도 정리한다(미결 jin 24번 백스톱)."""
+
+    @pytest.fixture(autouse=True)
+    def _clean(self):
+        reset_videos()
+        app.dependency_overrides[get_storage_optional] = FakeStorage
+        yield
+        app.dependency_overrides.pop(get_storage_optional, None)
+        reset_videos()
+
+    def test_claim_이_오래된_미저장분을_치운다(self, client):
+        user_id = uuid4()
+        old = VideoEntity(
+            id=uuid4(),
+            user_id=user_id,
+            sport_code="football",
+            storage_key=f"videos/{user_id}/old.mp4",
+            duration_ms=5_000,
+            side=None,
+            kept=False,
+            created_at=datetime.now(timezone.utc) - timedelta(hours=48),
+        )
+        fresh = VideoEntity(
+            id=uuid4(),
+            user_id=user_id,
+            sport_code="football",
+            storage_key=f"videos/{user_id}/fresh.mp4",
+            duration_ms=5_000,
+            side=None,
+            kept=False,
+            created_at=datetime.now(timezone.utc),
+        )
+        _VIDEOS[old.id] = old
+        _VIDEOS[fresh.id] = fresh
+        put_object(old.storage_key, 1)
+        put_object(f"reports/{user_id}/{old.id}/report.json", 1)
+
+        assert client.post(CLAIM, headers=_hdr()).status_code == 204  # 큐는 비었다
+
+        assert old.id not in _VIDEOS
+        assert fresh.id in _VIDEOS
+        assert old.storage_key not in _OBJECTS
+        assert f"reports/{user_id}/{old.id}/report.json" not in _OBJECTS

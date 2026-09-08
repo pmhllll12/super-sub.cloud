@@ -534,9 +534,13 @@ ssh supersub 'systemctl is-active postgresql supersub-api supersub-backup.timer'
 실제 경로는 `~/supersub/app/fastapi/.env` 다(6-3 절에 처음부터 적혀 있었다).
 **짐작한 경로는 "0 건"이 아니라 "파일 없음"을 내고, 그것을 미착수로 오독한다.**
 
-⚠️ **연기 검사가 S3 에 1KB 객체 둘을 남겼다.** 역할에 `s3:DeleteObject` 가 없어
-서버에서 지울 수 없다 — 콘솔에서 `videos/` 아래를 한 번 비우면 된다. **클립 삭제
-기능을 만들 때 정책에 `s3:DeleteObject` 를 더해야 한다**(지금은 일부러 뺐다).
+⚠️ **연기 검사가 S3 에 1KB 객체 둘을 남겼다.** 09-03 당시 역할에 `s3:DeleteObject`
+가 없어 서버에서 지울 수 없었다 — 콘솔에서 `videos/` 아래를 한 번 비우면 된다.
+✅ **2026-09-08: 정책을 3문짜리(`s3:DeleteObject` + `reports/*`)로 교체했고
+서버에서 스모크 통과.** 클립 삭제·`keep` 이동(`CopyObject` videos→reports)·백스톱
+스윕이 쓰는 권한이 다 열렸고 `models/*` 은 여전히 거부된다. 미결 `jin` 24번 IAM
+조각. (단, **그 조각들 코드는 아직 서버에 배포되지 않았다** — 서버 head
+`5db18b239336`. 배포하면 IAM 은 이미 준비돼 있다.)
 
 | | |
 |---|---|
@@ -571,17 +575,27 @@ aws s3 ls s3://supersub-ai/      # 접두사 구조도 함께 본다
 | | 접두사 단위로 되나 |
 |---|---|
 | **수명 주기 규칙** | ✅ 된다. `videos/` 에만 보관 기간을 걸 수 있다 |
-| **IAM 권한** | ✅ 된다. EC2 역할에 `arn:aws:s3:::supersub-ai/videos/*` 만 주면 `models/`·`reports/` 에는 손을 못 댄다 |
+| **IAM 권한** | ✅ 된다. 접두사별로 `Resource` 를 쪼갤 수 있다. 백엔드는 `videos/*` 와 `reports/*` **둘 다** 필요하고(아래) `models/` 에는 손을 못 댄다 |
 | **CORS 규칙** | 🔴 **안 된다.** 버킷 전체에 걸린다 — 웹 업로드를 열면 다른 접두사에도 같은 규칙이 적용된다 |
 | 콘솔의 **"비어 있음"** | 🔴 **안 된다.** 버킷 전체를 지운다. 셋이 함께 날아간다 |
 
 > 09-03 에 위 표의 앞 둘을 "버킷 단위라 나눌 수 없다"고 잘못 적었다가 고쳤다.
 > **버킷 단위로 남는 것은 CORS 와 일괄 삭제 둘뿐이다.**
 
-### 서버에 줄 권한 — 인스턴스 역할 (2026-09-03)
+### 서버에 줄 권한 — 인스턴스 역할 (2026-09-03 · 2026-09-08 확장)
 
 클립은 앱 서버를 지나지 않고 사용자가 사전 서명 URL 로 S3 에 직접 올린다(PER-002).
-서버가 하는 일은 **URL 발급과 HEAD** 뿐이라 필요한 권한이 좁다.
+서버가 직접 S3 를 부르는 자리는 이렇다.
+
+| 코드 | S3 호출 | 필요 권한 |
+|---|---|---|
+| 사전 서명 URL 발급(PUT·GET) | 서명만 — S3 호출 없음 | 없음 (자격증명만) |
+| `size_of` (등록 시 실측) | `HeadObject` | `s3:GetObject` + `s3:ListBucket`\* |
+| `DELETE /videos/{id}` · 백스톱 스윕 | `DeleteObject` · `list_objects_v2` + `DeleteObjects` | `s3:DeleteObject`(`videos/*`·`reports/*`) · `s3:ListBucket` |
+| `POST /videos/{id}/keep` (프로필에 저장) | `CopyObject`(`videos/*`→`reports/*`) + `DeleteObject`(원본) | `s3:GetObject`+`s3:PutObject`+`s3:DeleteObject` 양쪽 접두사 |
+| 리포트 읽기(`paik` 7, 예정) | `GetObject`(`reports/*`) | `s3:GetObject`(`reports/*`) |
+
+\* `s3:ListBucket` 이 왜 `HeadObject` 에 필요한지는 아래 절.
 
 🔴 **장기 액세스 키를 서버 `.env` 에 두지 않는다** — boto3 가 인스턴스 역할을
 먼저 찾는다(`.env.example` 의 AWS 절).
@@ -590,7 +604,9 @@ aws s3 ls s3://supersub-ai/      # 접두사 구조도 함께 본다
 HEAD 요청은 **`s3:GetObject`** 로 인가된다. 없는 액션을 정책에 적으면 조용히
 아무 효과가 없고, **문법 오류도 안 난다.**
 
-붙일 인라인 정책은 이것이다.
+붙일 인라인 정책은 이것이다. **🔴 2026-09-08 에 `s3:DeleteObject` 와 `reports/*`
+문(statement)을 더했다** — `keep` 이동·삭제·스윕(미결 `jin` 24번) 때문이다.
+`models/` 는 여전히 못 건드린다.
 
 ```json
 {
@@ -599,8 +615,14 @@ HEAD 요청은 **`s3:GetObject`** 로 인가된다. 없는 액션을 정책에 �
     {
       "Sid": "SupersubVideoObjects",
       "Effect": "Allow",
-      "Action": ["s3:PutObject", "s3:GetObject"],
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
       "Resource": "arn:aws:s3:::supersub-ai/videos/*"
+    },
+    {
+      "Sid": "SupersubReportObjects",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::supersub-ai/reports/*"
     },
     {
       "Sid": "SupersubBucketList",
@@ -611,6 +633,12 @@ HEAD 요청은 **`s3:GetObject`** 로 인가된다. 없는 액션을 정책에 �
   ]
 }
 ```
+
+🔴 **`reports/*` 는 원래 정상호 접두사다.** 백엔드가 여기에 쓰기·삭제를 갖는 이유는
+⑴ `keep` 이 원본을 `reports/<user_id>/<video_id>/source.<ext>` 로 옮기고 ⑵ 클립을
+지우면 그 `reports/<user_id>/<video_id>/` 폴더(리포트·미리보기 포함)도 함께 지우기
+때문이다. 백엔드는 `reports/` 아래 **자기가 아는 `<user_id>/<video_id>/` 접두사만**
+건드린다. 워커가 리포트를 쓰는 것은 별개 주체(GPU 인스턴스)라 이 정책과 무관하다.
 
 #### 🔴 `s3:ListBucket` 이 왜 필요한가 — 404 와 403 을 가르기 위해서다
 
@@ -624,24 +652,57 @@ HEAD 요청은 **`s3:GetObject`** 로 인가된다. 없는 액션을 정책에 �
 
 ⚠️ `s3:prefix` 조건으로 좁히고 싶겠지만 **HeadObject 는 `s3:prefix` 를 넘기지
 않아서** 조건이 안 맞아 다시 403 이 된다. 버킷 전체에 주되, 이것으로 열리는 것은
-**키 이름 목록뿐**이고 `models/`·`reports/` 의 **내용은 못 읽는다**(위 `Resource`
-가 `videos/*` 로 좁혀져 있다).
+**키 이름 목록뿐**이고 `models/` 의 **내용은 못 읽는다**(위 오브젝트 문 둘이
+`videos/*`·`reports/*` 로 좁혀져 있다).
 
-#### 🔴 `jin` 계정으로는 붙일 수 없다 (2026-09-03 확인)
+#### 역할은 이미 붙어 있었다 — **정책만 교체했다** (2026-09-08 ✅)
 
-콘솔에서 막힌다.
+09-03 스모크가 통과했다는 것은 인스턴스 역할이 **이미 붙어 있고** 2문짜리 정책
+(`videos/*` Put+Get · `ListBucket`)이 들어 있었다는 뜻이다. 인스턴스 메타데이터로
+확인된다(`curl .../iam/info` → `InstanceProfileArn` 이 찍힌다).
 
+그래서 09-08 변경은 **새 역할을 만드는 게 아니라** 그 역할의 **인라인 정책 하나를
+위 3문짜리 JSON 으로 통째 교체**하는 것이었다.
+
+- 자리: **IAM 콘솔 → 역할(Roles) → (인스턴스에 붙은 그 역할) → 권한 → 인라인
+  정책 편집 → JSON 탭 → 교체 → 저장.** EC2 의 「작업 → 보안 → IAM 역할 수정」은
+  *붙일 역할을 바꾸는* 자리라 **건드리지 않는다** — 잘못하면 붙어 있는 역할이
+  떨어진다(미결 8번의 "IAM 역할 없음" 함정).
+- 🔴 **`jin` IAM 사용자는 09-03 에 `iam:ListInstanceProfiles` 에서 막혔다.**
+  역할 목록·편집이 권한 오류(`is not authorized to perform: iam:…`)를 내면
+  **계정 소유자(박민호)** 가 해야 한다.
+
+#### ✅ 반영·검증됨 (2026-09-08)
+
+정책을 저장한 **첫 시도는 세 번째 문(`SupersubBucketList`)만 들어가** `videos/*`
+`PutObject` 까지 막혔었다(업로드도 깨졌다). 전체 JSON 을 다시 붙여 저장하니
+스모크가 다 통과했다.
+
+역할이 실제로 무엇을 할 수 있는지는 **인스턴스 역할 자격증명으로 직접 태워** 본다
+— API 를 거치지 않으므로 코드 배포 상태와 무관하다.
+
+```bash
+# 서버에서, .venv 의 boto3 로 (인스턴스 역할 자동 사용)
+ssh supersub 'cd ~/supersub/app/fastapi && .venv/bin/python - <<PY
+import boto3, time
+c = boto3.client("s3", region_name="ap-northeast-2")
+B = "supersub-ai"; ts = time.strftime("%Y%m%d-%H%M%S")
+v, r = f"videos/_smoke/{ts}.txt", f"reports/_smoke/{ts}.txt"
+c.put_object(Bucket=B, Key=v, Body=b"x")                                  # Put videos/*
+c.copy_object(Bucket=B, CopySource={"Bucket": B, "Key": v}, Key=r)        # keep 이동
+c.get_object(Bucket=B, Key=r); c.delete_object(Bucket=B, Key=v)           # Get/Delete
+c.delete_object(Bucket=B, Key=r)
+try:
+    c.put_object(Bucket=B, Key=f"models/_smoke/{ts}.txt", Body=b"x"); print("BAD: models 써짐")
+except Exception: print("OK: models 거부, 나머지 통과")
+PY'
 ```
-User: arn:aws:iam::…:user/jin is not authorized to perform:
-iam:ListInstanceProfiles … because no identity-based policy allows it
-```
 
-**계정 소유자(박민호)가 해야 한다.** 그쪽 콘솔에서는 오류 없이 역할 목록이 뜬다.
-미결 8번에 정책 JSON 과 함께 올려 두었다.
+기대: `OK: models 거부, 나머지 통과`. `AccessDenied` 가 하나라도 나오면 저장된
+정책에 그 문이 빠진 것 — 전체 JSON 을 다시 붙인다.
 
-⚠️ **이미 있는 `pmh12-role` 을 그냥 붙이지 않는다.** 다른 인스턴스용으로 만든
-역할이라 무엇이 들어 있는지 모른다 — 넓으면 필요 이상으로 열리고, 좁으면 S3 가
-안 된다. **새 역할에 위 정책 하나만** 붙이는 편이 낫다.
+🔴 **코드는 아직 배포 전이라** `POST /videos/{id}/keep`·`DELETE /videos/{id}`·
+스윕은 서버에 없다(head `5db18b239336`). 배포하면 IAM 은 이미 준비돼 있다.
 
 ### CORS — 브라우저에서 올릴 때만 필요하다
 

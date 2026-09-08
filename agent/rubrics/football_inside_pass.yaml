@@ -64,7 +64,7 @@ criteria:
         evidence: "간격 0.95배(약 38cm)로 디딤발이 공에서 떨어져 방향이 흔들린다"
 
   - id: swing_knee_extension
-    name: 차는 다리 무릎 신전
+    name: 차는 다리 뻗기
     weight: 0.20
     rationale: >-
       패스는 짧은 스윙으로 민다. 슈팅처럼 무릎을 끝까지 펴면 공이 뜨고
@@ -126,7 +126,7 @@ criteria:
         evidence: "기울기 -3도로 상체가 젖혀져 패스가 뜬다"
 
   - id: hip_rotation
-    name: 골반 회전
+    name: 골반 돌리기
     weight: 0.15
     rationale: >-
       인사이드 면을 공에 대려면 골반이 열려야 한다. 다만 슈팅만큼 크게 돌면
@@ -157,7 +157,7 @@ criteria:
         evidence: "회전 5도로 골반이 닫혀 발끝으로 밀게 된다"
 
   - id: follow_through
-    name: 팔로스루
+    name: 차고 난 뒤 마무리
     weight: 0.20
     rationale: >-
       패스의 팔로스루는 짧고 방향을 향한다. 슈팅처럼 크게 뻗으면 세기가

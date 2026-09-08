@@ -5,7 +5,7 @@ import type { PublicPlayerCard, Squad } from '@/server/backend'
 import SquadPanel from '@/components/SquadPanel'
 import SiteHeader from '@/components/SiteHeader'
 import HomeNav, { type Destination } from '@/components/HomeNav'
-import { MATCH_BOT } from '@/lib/destinations'
+import { MATCH_BOT, TEAM_SEEK } from '@/lib/destinations'
 import { useIntroDone } from '@/lib/useIntroDone'
 import { useHideChrome, useLeaving } from '@/lib/pageTransition'
 import LogoutButton from '@/components/LogoutButton'
@@ -315,6 +315,16 @@ export default function HomeStage({
    * 통째로 없어졌다 — 알약 셋은 이제 챗봇과 아무 상관이 없다.
    */
   const [bot, setBot] = useState(false)
+  /**
+   * 알약 '팀원' 을 눌렀는가 — 켜지면 **스쿼드 판 자리에** 사람을 찾는 팀들의
+   * 명단이 선다(사용자 요청, 2026-09-08).
+   *
+   * 🔴 `picked === TEAM_SEEK` 로 판단해도 지금은 안전하다(그 제목은
+   * `defaultActive` 가 아니다). 그래도 제 상태로 드는 것은 **기본 알약이
+   * 나중에 바뀌어도 여기가 안 흔들리게** 하기 위해서다 — '용병 찾기' 를
+   * `picked` 로 열었다가 갇힌 적이 있다(destinations.ts 주석).
+   */
+  const [seeking, setSeeking] = useState(false)
 
   /**
    * 🔴 **판 오른쪽 자리는 한 번에 하나만 쓴다**(사용자 지적: AI 를 켠 채
@@ -333,6 +343,7 @@ export default function HomeStage({
       // 챗봇이 서는 곳은 **첫째 칸**이다 — 추천 판을 밀어낸다. 둘째 칸의
       // 지인 판까지 닫을 이유는 없지만, 짝으로 여닫는 것이라 같이 접는다.
       setScouting(false)
+      setSeeking(false)
       setPicked(defaultActive)
       setActive(defaultActive)
     },
@@ -349,10 +360,16 @@ export default function HomeStage({
     setPicked(title)
     setBot(false)
     setScouting((on) => (title === MATCH_BOT ? !on : false))
+    /* 🔴 '팀원' 도 **한 번 더 누르면 닫힌다**(토글). 이 판은 스쿼드 판을
+       대신 서므로, 닫을 길이 판의 × 뿐이면 알약을 눌러 놓고 되돌리는 길이
+       없다 — '팀장' 과 같은 규칙이다. */
+    setSeeking((on) => (title === TEAM_SEEK ? !on : false))
   }, [])
 
   /** 판의 × — 둘 중 어느 쪽을 닫아도 짝으로 접힌다(한 단추가 연 한 벌이다). */
   const closeScout = useCallback(() => setScouting(false), [])
+  /** 팀원 판의 × — 스쿼드 판이 도로 선다. */
+  const closeSeek = useCallback(() => setSeeking(false), [])
 
   return (
     <>
@@ -411,6 +428,8 @@ export default function HomeStage({
               bot={bot}
               onBotChange={showBot}
               onCloseScouting={closeScout}
+              seeking={seeking}
+              onCloseSeeking={closeSeek}
             />
           </div>
 

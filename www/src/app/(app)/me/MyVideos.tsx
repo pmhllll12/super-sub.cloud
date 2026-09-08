@@ -7,6 +7,7 @@ import { checkClip, uploadClip, type ClipMeta } from '@/lib/uploadClip'
 import { listPublished, publish, unpublish } from '@/lib/published'
 import { forgetReport, reportFor, type SavedReport } from '@/lib/savedReports'
 import { loadFeatured, setFeatured } from '@/lib/featuredClip'
+import { isDirectKey, usePlaybackUrls } from '@/lib/playbackUrl'
 import ReportView from '@/components/analysis/ReportView'
 
 /**
@@ -45,15 +46,18 @@ function videoState(v: MyVideo): { key: string; label: string } {
 /**
  * 이 클립을 화면에서 **틀어 볼 수 있는가.**
  *
- * 🔴 계약이 주는 것은 저장 키뿐이고 **조회용 주소가 아직 없다**(3-6절
- * "아직 없는 것"). 그래서 `/` 로 시작하는 키 — 지금은 mock 이 넣어 준
- * `public/` 의 목업 영상 — 만 그대로 재생하고, 진짜 백엔드가 주는
- * `videos/<user_id>/<uuid>.mp4` 는 null 을 돌려 그림 없이 메타만 그린다.
+ * 🔴 **사전 서명 주소가 생겨서 채웠다**(2026-09-08, 계약 3-6절
+ * `GET /videos/{id}/playback-url` — 미결 paik 12번 해소). 그전에는 저장 키밖에
+ * 없어서 진짜 백엔드에서는 null 을 돌려 **플레이어를 아예 안 그렸다**(키를
+ * 그대로 `<video src>` 에 넣으면 403 과 깨진 플레이어가 뜬다).
  *
- * 조회용 사전 서명 URL 이 생기면 **이 함수 하나만** 고치면 된다.
+ * 🔴 주소는 **`usePlaybackUrls` 가 받아 온다** — 만료되는 값이라 컴포넌트가
+ * 들고 있어야 다시 받을 수 있다. 여기서는 받아 둔 것을 꺼내기만 한다.
+ * `/` 로 시작하는 키는 mock 이 주는 `public/` 경로라 그대로가 주소다.
  */
-function previewSrc(v: MyVideo): string | null {
-  return v.storage_key.startsWith('/') ? v.storage_key : null
+function previewSrc(v: MyVideo, urls: Record<string, string>): string | null {
+  if (isDirectKey(v.storage_key)) return v.storage_key
+  return urls[v.id] ?? null
 }
 
 type TabKey = 'analyzed' | 'uploaded'
@@ -140,6 +144,11 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
   }, [picked])
 
   const all = [...added, ...videos].filter((x) => !removed.includes(x.id))
+  /**
+   * 재생 주소 — 계약이 저장 키만 주므로 클립마다 사전 서명 주소를 따로 받는다
+   * (`lib/playbackUrl.ts`). 목록이 바뀔 때만 다시 받는다.
+   */
+  const playbackUrls = usePlaybackUrls(all)
   const analyzed = all.filter((v) => v.analysis_job_id !== null)
   const uploaded = all.filter((v) => v.analysis_job_id === null)
 
@@ -178,7 +187,7 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
   /** 세우거나 푼다. 같은 영상을 다시 누르면 풀린다 — 대표는 하나뿐이다. */
   function toggleFeatured(target: MyVideo) {
     const on = featured === target.id
-    setFeatured(on ? null : { videoId: target.id, src: previewSrc(target) })
+    setFeatured(on ? null : { videoId: target.id, src: previewSrc(target, playbackUrls) })
     setFeaturedId(on ? null : target.id)
   }
 
@@ -313,7 +322,7 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
       what: form.what.trim(),
       /* 조회용 주소가 없어(계약 3-6절 "아직 없는 것") 실제 백엔드가 준 키는
          영상 모음에서도 안 틀린다 — `previewSrc` 와 같은 한계다. */
-      src: previewSrc(target) ?? target.storage_key,
+      src: previewSrc(target, playbackUrls) ?? target.storage_key,
       aspect: ratio ? `${ratio} / 1` : '16 / 9',
       at: target.created_at.slice(0, 10),
     })
@@ -440,7 +449,7 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
                 자리는 그대로 둔다. 비면 판이 접혀서 무엇이 잘못됐는지보다
                 화면이 깨진 것처럼 보인다. */}
             <div className="ss-profile-video-slot">
-            {previewSrc(v) && (
+            {previewSrc(v, playbackUrls) && (
               /* 🔴 `key` 를 영상 id 로 준다. 없으면 다음 영상으로 넘길 때 리액트가
                  같은 <video> 를 재사용해서 **src 만 갈리고 재생 위치 · 재생 중
                  여부가 그대로 남는다.** `preload="metadata"` 인 것도 그대로다 —
@@ -448,7 +457,7 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
               <video
                 key={v.id}
                 className="ss-profile-video-player"
-                src={previewSrc(v) ?? undefined}
+                src={previewSrc(v, playbackUrls) ?? undefined}
                 controls={showControls}
                 muted
                 playsInline
@@ -666,7 +675,7 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
           {
             <ul className="ss-profile-strip">
               {shown.map((sv, idx) => {
-                const src = previewSrc(sv)
+                const src = previewSrc(sv, playbackUrls)
                 return (
                   <li key={sv.id}>
                     <button

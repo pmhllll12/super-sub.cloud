@@ -9,7 +9,13 @@ import { type Destination } from '@/components/HomeNav'
  */
 
 /**
- * 알약 '용병 찾기' 의 제목 — **이 줄에서 유일하게 실제 동작이 붙어 있다.**
+ * 알약 '팀장' 의 제목.
+ *
+ * 🔴 **이름이 「용병 찾기」에서 「팀장」으로 바뀌었다**(사용자 요청, 2026-09-08).
+ * 짝인 「팀 찾기」도 「팀원」이 됐다 — 두 알약이 *무엇을 찾는가*가 아니라
+ * **내가 어느 쪽인가**를 고르는 자리가 됐기 때문이다. 상수 이름(`MATCH_BOT`)은
+ * 그대로 둔다: 값만 바뀌었고, 이름까지 갈면 이 값을 읽는 곳이 전부 흔들린다.
+ *
  * 누르면 스쿼드 판 오른쪽에 **AI 추천 판과 지인 찾기 판이 나란히** 열린다
  * (`HomeStage` → `SquadPanel`). 그 판단을 제목으로 하므로 아래 FEATURED 의
  * 제목과 **글자까지 같아야** 한다.
@@ -23,7 +29,7 @@ import { type Destination } from '@/components/HomeNav'
  * ⚠️ 챗봇(`MatchBot`)은 이 알약이 아니라 판 오른쪽 변의 **AI 단추**가 연다
  * (`SquadPanel` 의 `ss-home-ai`).
  */
-export const MATCH_BOT = '용병 찾기'
+export const MATCH_BOT = '팀장'
 
 // 홈 상단 글자 내비에 적히는 목적지. 앱(flutter/.../home_screen.dart)의
 // _kDestinations 에서 출발했지만 2026-08-30 에 웹에서 다시 골랐다:
@@ -42,16 +48,28 @@ export const MATCH_BOT = '용병 찾기'
 // 헤드라인 자리(옛 `FIND YOUR SQUAD`)에 유리 알약 버튼으로 크게 내놓는 둘.
 // **아래 DESTINATIONS 와 겹치지 않는다** — 같은 곳으로 가는 항목을 한 화면에
 // 둘 두지 않는다(우상단 '내 프로필'을 글자 줄에서 뺀 것과 같은 규칙).
+/**
+ * 알약 '팀원' 의 제목. 누르면 **스쿼드 판이 물러나고 그 자리에** 아직 사람을
+ * 못 채운 팀들의 명단이 선다(`TeamSeek`, 사용자 요청 2026-09-08).
+ *
+ * 🔴 `MATCH_BOT` 과 달리 이 값은 `DEFAULT_FEATURED` 가 **아니라서** 눌림
+ * (`picked`)으로 판단해도 안전하다. 그래도 `HomeStage` 는 제 상태로 든다 —
+ * 기본 알약이 무엇인지가 나중에 바뀌어도 여기가 안 흔들리게.
+ */
+export const TEAM_SEEK = '팀원'
+
 export const FEATURED: Destination[] = [
   {
     title: MATCH_BOT,
     icon: 'sports_soccer',
-    summary: '사람이 모자란 경기에\n뛸 사람을 찾습니다',
+    summary: '내 팀에 사람이 모자랍니다\n뛸 사람을 찾습니다',
   },
   {
-    title: '팀 찾기',
+    // 🔴 이 제목으로 판을 가른다(`HomeStage` 의 `seeking`) — **글자까지
+    // 같아야 한다.** 상수로 뺀 이유는 두 곳에 같은 글자를 두지 않기 위해서다.
+    title: TEAM_SEEK,
     icon: 'groups',
-    summary: '함께 뛸 팀을 찾고\n지원합니다',
+    summary: '아직 사람을 못 채운\n팀들을 훑습니다',
   },
   // 🔴 '지인 찾기' 알약은 **없앴다**(사용자 요청, 2026-09-08). 용병을 찾는
   // 일과 아는 사람을 찾는 일이 결국 **같은 자리를 채우는 한 가지 일**이라,
