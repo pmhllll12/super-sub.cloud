@@ -923,9 +923,11 @@ git -C fastapi log --oneline main -- app/billing   # main에 배선됐는지
 
 ## 23. 🟡 관리자 영상 목록·삭제가 생겼습니다 (2026-09-08 추가)
 
-미결 `jin` 24번 6조각. **관리자 웹**(`www/src/app/admin/…`)용입니다 — Flutter 는
-해당 없음. 사람이 "문제 영상"을 찾아 지우고 에이전트가 제대로 돌았는지 확인하는
-자리입니다.
+미결 `jin` 24번 6조각. **관리자 웹**(`www/src/app/admin/`)용입니다 — Flutter 는
+해당 없음. 🔴 **"문제 영상"을 일일히 사람이 관리하는 최종 설계는 아닙니다**
+(2026-09-08 사용자 확인) — 지금은 사람이 확인·삭제할 수 있게 열어 둔 임시 경로이고,
+자동/에이전트 정리는 나중 과제입니다. 읽을 수 있는 S3 키(21번 `filename`)와
+자동 스윕이 원래 방향입니다.
 
 | 엔드포인트 | 뜻 |
 |---|---|
@@ -953,6 +955,42 @@ git -C fastapi grep -n "admin/videos" -- app/main.py app/analysis   # 라우트�
 ```
 
 상세: `fastapi/docs/api-contract.md` **3-2절**
+
+---
+
+## 24. 🟡 "내 프로필에 리포트 저장" 이 서버에 붙었습니다 (2026-09-08 추가)
+
+미결 `jin` 24번 2조각. `POST /videos/{id}/keep` — `/analysis` 의 분석 결과를
+"내 프로필에 리포트 저장" 할 때 부릅니다.
+
+- `200 OK`, 응답은 `GET /videos` 한 줄과 같은 모양. `kept: true` 가 실려 옵니다.
+- 서버가 **임시 원본을 `videos/…` 에서 `reports/<user_id>/<video_id>/source.<ext>`
+  로 옮깁니다.** 옮긴 뒤 `storage_key` 가 바뀌므로, 저장 직후 재생·목록은
+  응답의 새 `storage_key` 를 쓰세요(옛 키로 `playback-url` 을 부르면 404 는
+  아니지만 없는 객체를 가리킵니다).
+- **멱등** — 이미 저장된 클립에 다시 불러도 `200`.
+- 남의/없는 클립은 `404 VIDEO_NOT_FOUND`.
+
+### 아직 안 켜진 것 — 임시-저장 전환 (5조각)
+
+지금은 `POST /videos` 로 등록되는 **모든** 클립이 `kept: true` 로 시작합니다
+(동작 보존). `/analysis` 업로드를 임시(`kept: false`)로 두고 `keep` 을 눌러야
+프로필에 남는 전환은, **프론트가 아래 둘을 다 갖추면** 함께 켭니다.
+
+1. `/analysis` "저장" 버튼이 `POST /videos/{id}/keep` 호출
+2. `/analysis` 를 저장 없이 벗어날 때 `DELETE /videos/{id}` 호출
+   (`beforeunload` / `sendBeacon`)
+
+그 전에 서버에서 켜면 저장 안 한 `/analysis` 업로드가 프로필에서 사라지므로,
+**프론트 준비가 됐다고 알려 주시면** 서버 쪽을 켜겠습니다.
+
+### 먼저 확인
+
+```bash
+git -C fastapi grep -n "videos/{video_id}/keep" -- app/analysis   # 라우트가 배선됐는지
+```
+
+상세: `fastapi/docs/api-contract.md` **3-6절**
 
 ---
 

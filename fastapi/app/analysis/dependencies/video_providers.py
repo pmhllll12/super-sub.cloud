@@ -14,6 +14,7 @@ from app.analysis.application.ports.input.video_use_cases import (
     CreateUploadUrlUseCase,
     DeleteVideoUseCase,
     GetPlaybackUrlUseCase,
+    KeepVideoUseCase,
     ListAdminVideosUseCase,
     ListMyVideosUseCase,
     ListPublicVideosUseCase,
@@ -27,6 +28,7 @@ from app.analysis.application.use_cases.video_interactors import (
     CreateUploadUrlInteractor,
     DeleteVideoInteractor,
     GetPlaybackUrlInteractor,
+    KeepVideoInteractor,
     ListAdminVideosInteractor,
     ListMyVideosInteractor,
     ListPublicVideosInteractor,
@@ -128,6 +130,12 @@ def get_delete_video_use_case(
     return DeleteVideoInteractor(repository, storage)
 
 
+def get_keep_video_use_case(
+    repository: VideoRepositoryDep, storage: StorageDep
+) -> KeepVideoUseCase:
+    return KeepVideoInteractor(repository, storage)
+
+
 def get_list_admin_videos_use_case(
     repository: VideoRepositoryDep,
 ) -> ListAdminVideosUseCase:
@@ -160,6 +168,9 @@ GetPlaybackUrlUseCaseDep = Annotated[
 ]
 DeleteVideoUseCaseDep = Annotated[
     DeleteVideoUseCase, Depends(get_delete_video_use_case)
+]
+KeepVideoUseCaseDep = Annotated[
+    KeepVideoUseCase, Depends(get_keep_video_use_case)
 ]
 ListAdminVideosUseCaseDep = Annotated[
     ListAdminVideosUseCase, Depends(get_list_admin_videos_use_case)

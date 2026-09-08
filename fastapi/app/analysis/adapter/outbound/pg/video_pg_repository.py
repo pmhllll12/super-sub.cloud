@@ -145,6 +145,24 @@ class VideoPgRepository(VideoPort):
         latest = self._latest_jobs([video_id]).get(video_id)
         return _to_entity(video, validation, latest)
 
+    def mark_kept(
+        self, video_id: UUID, user_id: UUID, *, storage_key: str
+    ) -> VideoEntity | None:
+        video = self._session.get(VideoOrm, video_id)
+        if video is None or video.user_id != user_id:
+            return None
+        video.kept = True
+        video.storage_key = storage_key
+        self._session.commit()
+
+        validation = self._session.execute(
+            select(VideoValidationOrm).where(
+                VideoValidationOrm.video_id == video_id
+            )
+        ).scalar_one_or_none()
+        latest = self._latest_jobs([video_id]).get(video_id)
+        return _to_entity(video, validation, latest)
+
     def delete(self, video_id: UUID, user_id: UUID) -> VideoEntity | None:
         video = self._session.get(VideoOrm, video_id)
         if video is None or video.user_id != user_id:

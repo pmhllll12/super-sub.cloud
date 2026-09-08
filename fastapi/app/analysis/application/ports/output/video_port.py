@@ -68,6 +68,16 @@ class VideoPort(ABC):
         """
 
     @abstractmethod
+    def mark_kept(
+        self, video_id: UUID, user_id: UUID, *, storage_key: str
+    ) -> VideoEntity | None:
+        """`kept=True` 로 놓고 `storage_key` 를 갱신한다("프로필에 저장", 미결
+        `jin` 24번). S3 이동은 부르는 쪽이 이미 했다 — 여기는 DB 만 맞춘다.
+        **`user_id` 로 소유를 확인한다** — 남의/없는 클립이면 `None`.
+        갱신된 영상을 판정·최근 작업과 함께 돌려준다.
+        """
+
+    @abstractmethod
     def delete(self, video_id: UUID, user_id: UUID) -> VideoEntity | None:
         """영상 행을 지우고 지운 영상을 돌려준다(S3 정리에 `storage_key` 가 필요).
 

@@ -25,6 +25,7 @@ from app.analysis.adapter.outbound.orm.video_orm import VideoOrm
 from app.analysis.adapter.outbound.orm.video_validation_orm import VideoValidationOrm
 from app.analysis.adapter.outbound.pg.video_pg_repository import VideoPgRepository
 from app.analysis.adapter.outbound.stub.video_stub_repository import (
+    _OBJECTS,
     FakeStorage,
     put_object,
     reset_videos,
@@ -349,6 +350,44 @@ class TestDelete:
 
         res = db_client.delete(f"{V1}/videos/{video_id}", headers=h)
         assert res.status_code == 404
+
+
+class TestKeep:
+    """미결 jin 24번 2조각 — `POST /videos/{id}/keep` 가 실제 DB 에서 도는지."""
+
+    def test_저장하면_storage_key_가_리포트_자리로_바뀐다(
+        self, db_client, db_session, uploader
+    ):
+        key = _upload(db_client, uploader)
+        video_id = _register(db_client, uploader, key).json()["id"]
+        assert key.startswith("videos/")
+
+        res = db_client.post(
+            f"{V1}/videos/{video_id}/keep", headers=uploader["headers"]
+        )
+        assert res.status_code == 200, res.text
+
+        stored_key, kept = db_session.execute(
+            text("SELECT storage_key, kept FROM video WHERE id = :id"),
+            {"id": uuid.UUID(video_id)},
+        ).one()
+        assert stored_key == f"reports/{uploader['id']}/{video_id}/source.mp4"
+        assert kept is True
+
+        # S3(가짜) 객체도 옮겨졌다
+        assert key not in _OBJECTS
+        assert stored_key in _OBJECTS
+
+        # 재생 주소는 새 키로 나온다
+        db_client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"is_public": True},
+            headers=uploader["headers"],
+        )
+        url = db_client.get(
+            f"{V1}/videos/{video_id}/playback-url", headers=uploader["headers"]
+        ).json()["url"]
+        assert f"source.mp4" in url
 
 
 class TestReadableKey:

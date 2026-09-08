@@ -1537,6 +1537,28 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
 | 404 | `VIDEO_NOT_FOUND` | 없는 클립이거나 비공개 남의 클립이다 |
 | 503 | `STORAGE_NOT_CONFIGURED` | 서버에 `S3_BUCKET` 이 없다 |
 
+### `POST /api/v1/videos/{video_id}/keep` — 프로필에 저장 (2026-09-08 추가)
+
+미결 `jin` 24번 2조각. **"내 프로필에 리포트 저장"** — `/analysis` 의 임시 분석을
+영구로 만든다. **자기 클립만.** `200 OK`, 응답은 `GET /videos` 한 줄과 같은 모양.
+
+- `kept` 를 `true` 로 만든다. `GET /videos`(본인 목록)에는 지금도 뜨지만, 임시-저장
+  전환(5조각, 프론트 대기)이 켜지면 이 호출 전에는 안 뜨게 된다.
+- **임시 원본(`videos/…`)이면 리포트 자리로 옮긴다** —
+  `reports/<user_id>/<video_id>/source.<ext>`. S3 `CopyObject`(서버 쪽) 후 원본
+  삭제라 바이트가 앱 서버를 지나지 않는다(PER-002). 옮긴 뒤 `storage_key` 가
+  새 값으로 바뀌어 응답에 실린다. 재생(`playback-url`)도 새 키를 쓴다.
+- **분석 작업이 없는 클립**(`/me` 업로드, `analyze:false`)은 옮기지 않는다 —
+  리포트 폴더가 없다. `kept` 만 켜고 `videos/` 에 그대로 둔다.
+- **멱등이다.** 이미 저장된 클립에 다시 불러도 `200` 이고 이동은 건너뛴다.
+- 🔴 리포트 JSON 안의 `source_video` 는 아직 옛 `videos/…` 키를 가리킨다 —
+  리포트를 DB 로 옮길 때(`paik` 7) 정리한다. 미리보기(`reports/…`)는 영향 없다.
+
+| 에러 | code | 언제 |
+|---|---|---|
+| 404 | `VIDEO_NOT_FOUND` | 없는 클립이거나 **남의 클립**이다 |
+| 503 | `STORAGE_NOT_CONFIGURED` | 서버에 `S3_BUCKET` 이 없다 |
+
 ### `DELETE /api/v1/videos/{video_id}` — 클립 삭제 (2026-09-08 추가)
 
 미결 `jin` 24번. **자기 클립만.** `204 No Content`.

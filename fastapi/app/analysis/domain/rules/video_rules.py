@@ -94,6 +94,28 @@ def owns_key(user_id: UUID, storage_key: str) -> bool:
     return storage_key.startswith(f"{_KEY_PREFIX}/{user_id}/")
 
 
+_REPORT_PREFIX = "reports"
+
+
+def is_provisional_key(storage_key: str) -> bool:
+    """아직 `videos/` 에 있는 임시 원본인가. 프로필에 저장되면 `reports/` 로
+    옮겨지므로(미결 `jin` 24번), 이미 옮겨진 것에 `keep` 을 다시 불러도 안전하게
+    아무것도 안 하도록 가른다.
+    """
+    return storage_key.startswith(f"{_KEY_PREFIX}/")
+
+
+def report_source_key(user_id: UUID, video_id: UUID, current_key: str) -> str:
+    """"프로필에 저장"된 원본이 갈 자리 — 리포트 산출물과 같은 폴더.
+
+    `reports/<user_id>/<video_id>/source.<ext>`. 정상호의 리포트 키 레이아웃
+    (`reports/<user_id>/<video_id>/report.json` 옆)과 한 자리다. 파일명이
+    `source` 로 고정이라 폴더만 알면 되짚을 수 있다 — 확장자는 원본에서 딴다.
+    """
+    ext = current_key.rsplit(".", 1)[-1] if "." in current_key else "mp4"
+    return f"{_REPORT_PREFIX}/{user_id}/{video_id}/source.{ext}"
+
+
 def reject_reason(
     *, duration_ms: int, width: int, height: int, size_bytes: int, analyze: bool = True
 ) -> str | None:

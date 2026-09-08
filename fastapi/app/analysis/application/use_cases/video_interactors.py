@@ -25,6 +25,7 @@ from app.analysis.application.dtos.video_dto import (
     AdminVideosQuery,
     DeleteVideoCommand,
     GetPlaybackUrlCommand,
+    KeepVideoCommand,
     MyVideosQuery,
     PlaybackUrlResult,
     PublicVideoResult,
@@ -40,6 +41,7 @@ from app.analysis.application.ports.input.video_use_cases import (
     CreateUploadUrlUseCase,
     DeleteVideoUseCase,
     GetPlaybackUrlUseCase,
+    KeepVideoUseCase,
     ListAdminVideosUseCase,
     ListMyVideosUseCase,
     ListPublicVideosUseCase,
@@ -57,8 +59,10 @@ from app.analysis.domain.rules.video_rules import (
     MAX_BYTES,
     build_storage_key,
     extension_for,
+    is_provisional_key,
     owns_key,
     reject_reason,
+    report_source_key,
 )
 from app.core.errors import ApiError
 
@@ -248,6 +252,44 @@ class DeleteVideoInteractor(DeleteVideoUseCase):
         #    조각), 남은 객체는 백스톱 스윕이 잡는다. 여기서 500 을 내면 이미 지운
         #    행을 두고 재시도를 부른다.
         _cleanup_storage(self._storage, video)
+
+
+class KeepVideoInteractor(KeepVideoUseCase):
+    """"내 프로필에 리포트 저장" — `kept` 를 켜고 임시 원본을 리포트 자리로 옮긴다.
+
+    순서가 중요하다: **S3 이동을 먼저** 하고 그다음 DB 를 맞춘다. 반대로 하면
+    DB 는 새 키를 가리키는데 객체가 아직 옛 자리에 있는 창이 생긴다. 이동이
+    실패하면 DB 는 그대로라 그냥 다시 부르면 되고, 이동 뒤 DB 가 실패하면 객체는
+    `reports/<video_id>/` 아래라 삭제·스윕이 접두사로 잡는다.
+    """
+
+    def __init__(self, repository: VideoPort, storage: StoragePort) -> None:
+        self._repository = repository
+        self._storage = storage
+
+    def __call__(self, command: KeepVideoCommand) -> VideoResult:
+        video = self._repository.get(command.video_id)
+        if video is None or video.user_id != command.user_id:
+            # 남의 클립인지 없는 클립인지 구별해 주지 않는다.
+            raise ApiError(404, "VIDEO_NOT_FOUND", "클립을 찾을 수 없습니다.")
+
+        new_key = video.storage_key
+        # 리포트가 딸린 분석 클립의 임시 원본만 옮긴다. `/me` 업로드(기록용,
+        # 분석 작업 없음)는 `videos/` 에 그대로 둔다 — 옮길 리포트 폴더가 없다.
+        if video.analysis_job_id is not None and is_provisional_key(
+            video.storage_key
+        ):
+            new_key = report_source_key(video.user_id, video.id, video.storage_key)
+            self._storage.move_object(video.storage_key, new_key)
+
+        updated = self._repository.mark_kept(
+            command.video_id, command.user_id, storage_key=new_key
+        )
+        if updated is None:
+            # 그 사이 지워졌다(경합). 이동을 되돌리지 않는다 — reports 접두사라
+            # 스윕이 잡고, 여기서 롤백을 시도하면 더 꼬인다.
+            raise ApiError(404, "VIDEO_NOT_FOUND", "클립을 찾을 수 없습니다.")
+        return to_video_result(updated)
 
 
 def _cleanup_storage(storage: StoragePort, video: VideoEntity) -> None:

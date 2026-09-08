@@ -95,6 +95,17 @@ class DeleteVideoCommand:
 
 
 @dataclass(frozen=True)
+class KeepVideoCommand:
+    """"내 프로필에 리포트 저장". `kept` 를 켜고, 임시 원본(`videos/…`)이면
+    리포트 자리(`reports/<user_id>/<video_id>/source.<ext>`)로 옮긴다(미결 `jin`
+    24번). **자기 클립만.**
+    """
+
+    video_id: UUID
+    user_id: UUID
+
+
+@dataclass(frozen=True)
 class PublicVideosQuery:
     """홈의 영상 모음. 공개 클립만, 최근 것부터."""
 

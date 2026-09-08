@@ -98,6 +98,16 @@ class StubVideoRepository(VideoPort):
         public.sort(key=lambda v: v.created_at, reverse=True)
         return public[:limit]
 
+    def mark_kept(
+        self, video_id: UUID, user_id: UUID, *, storage_key: str
+    ) -> VideoEntity | None:
+        video = _VIDEOS.get(video_id)
+        if video is None or video.user_id != user_id:
+            return None
+        updated = replace(video, kept=True, storage_key=storage_key)
+        _VIDEOS[video_id] = updated
+        return updated
+
     def delete(self, video_id: UUID, user_id: UUID) -> VideoEntity | None:
         video = _VIDEOS.get(video_id)
         if video is None or video.user_id != user_id:
@@ -139,6 +149,13 @@ class FakeStorage(StoragePort):
 
     def size_of(self, storage_key: str) -> int | None:
         return _OBJECTS.get(storage_key)
+
+    def move_object(self, src_key: str, dst_key: str) -> None:
+        if src_key == dst_key:
+            return
+        size = _OBJECTS.pop(src_key, None)
+        if size is not None:
+            _OBJECTS[dst_key] = size
 
     def delete_object(self, storage_key: str) -> None:
         _OBJECTS.pop(storage_key, None)

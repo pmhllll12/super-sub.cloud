@@ -137,6 +137,7 @@ class TestOpenApi:
             f"{V1}/videos/upload-url",
             f"{V1}/videos/public",
             V1 + "/videos/{video_id}",
+            V1 + "/videos/{video_id}/keep",
             V1 + "/videos/{video_id}/playback-url",
             V1 + "/teams/{team_id}/squad",
             V1 + "/teams/{team_id}/squad/members",
