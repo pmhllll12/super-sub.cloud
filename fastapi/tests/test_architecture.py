@@ -14,7 +14,7 @@ import ast
 from pathlib import Path
 
 APP = Path(__file__).resolve().parent.parent / "app"
-CONTEXTS = ("user", "card", "analysis", "match")
+CONTEXTS = ("user", "card", "analysis", "match", "review")
 
 # 컨텍스트에 속하지 않는 공용 모듈은 전부 `app/core/` 아래에 둔다.
 #
@@ -131,6 +131,25 @@ class TestContextBoundary:
                 if other:
                     offenders.append(f"{rel} → {mod}")
         assert not offenders, "컨텍스트끼리 직접 얽혔다:\n  " + "\n  ".join(offenders)
+
+    def test_CONTEXTS가_실제_디렉터리와_일치한다(self):
+        """`CONTEXTS` 를 손으로 관리하면 새 컨텍스트가 검사에서 조용히 빠진다.
+
+        `app/<X>/` 중 `core`(공용)를 뺀 것이 컨텍스트다. 그 목록과 `CONTEXTS`
+        가 어긋나면 위 경계 검사가 새 컨텍스트를 아예 안 본다 — 통과와
+        구별이 안 된다. 미결 `min` 8번(2026-09-08)이 그렇게 생겼다:
+        `match`·`review` 가 `CONTEXTS` 에 없었다.
+        """
+        dirs = {
+            p.name
+            for p in APP.iterdir()
+            if p.is_dir() and p.name not in ("core", "__pycache__")
+        }
+        assert dirs == set(CONTEXTS), (
+            f"app/ 디렉터리와 CONTEXTS 가 다르다 — "
+            f"디렉터리에만: {sorted(dirs - set(CONTEXTS))} · "
+            f"CONTEXTS 에만: {sorted(set(CONTEXTS) - dirs)}"
+        )
 
     def test_허용된_예외는_스텁_하나뿐이다(self):
         """예외가 늘어나면 여기서 알아차린다."""

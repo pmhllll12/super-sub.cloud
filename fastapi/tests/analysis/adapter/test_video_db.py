@@ -141,6 +141,27 @@ class TestRegister:
         ).scalar_one()
         assert jobs == 0
 
+    def test_analyze_false_면_작업_행이_안_생긴다(
+        self, db_client, db_session, uploader
+    ):
+        """미결 `paik` 4번 — 규격 통과해도 `analysis_job` 을 만들지 않는다."""
+        key = _upload(db_client, uploader)
+        res = _register(db_client, uploader, key, analyze=False)
+        assert res.status_code == 201, res.text
+        video_id = uuid.UUID(res.json()["id"])
+
+        passed = db_session.execute(
+            text("SELECT passed FROM video_validation WHERE video_id = :id"),
+            {"id": video_id},
+        ).scalar_one()
+        assert passed is True
+
+        jobs = db_session.execute(
+            text("SELECT count(*) FROM analysis_job WHERE video_id = :id"),
+            {"id": video_id},
+        ).scalar_one()
+        assert jobs == 0
+
     def test_없는_종목은_거부된다(self, db_client, uploader):
         """`sport` 를 원시 쿼리로 읽는 자리. 컬럼 이름이 바뀌면 여기서 깨진다."""
         key = _upload(db_client, uploader)
@@ -152,6 +173,128 @@ class TestRegister:
         """위 검사의 양성 대조. 둘이 같이 있어야 "종목을 실제로 읽는다"가 된다."""
         key = _upload(db_client, uploader)
         assert _register(db_client, uploader, key, sport_code="baseball").status_code == 201
+
+
+class TestVisibility:
+    """미결 `paik` 5번(1+2 조각) — 실제 PostgreSQL 에서 공개 여부가 도는지."""
+
+    def test_기본은_비공개로_저장된다(self, db_client, db_session, uploader):
+        key = _upload(db_client, uploader)
+        video_id = uuid.UUID(_register(db_client, uploader, key).json()["id"])
+
+        is_public = db_session.execute(
+            text("SELECT is_public FROM video WHERE id = :id"), {"id": video_id}
+        ).scalar_one()
+        assert is_public is False
+
+    def test_공개로_바꾸면_남의_공개_목록에_뜬다(self, db_client, uploader):
+        key = _upload(db_client, uploader)
+        video_id = _register(db_client, uploader, key).json()["id"]
+
+        res = db_client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"is_public": True},
+            headers=uploader["headers"],
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["is_public"] is True
+
+        # 다른 사람으로 로그인해도 보인다
+        other = f"viewer-{uuid.uuid4().hex[:12]}@super-sub.example"
+        db_client.post(
+            f"{V1}/auth/signup",
+            json={"email": other, "password": PASSWORD, "nickname": "구경꾼"},
+        )
+        login = db_client.post(
+            f"{V1}/auth/login", json={"email": other, "password": PASSWORD}
+        )
+        viewer_h = {"Authorization": f"Bearer {login.json()['access_token']}"}
+        rows = db_client.get(f"{V1}/videos/public", headers=viewer_h).json()
+        assert video_id in [r["id"] for r in rows]
+
+    def test_남의_클립은_못_바꾼다(self, db_client, uploader):
+        key = _upload(db_client, uploader)
+        video_id = _register(db_client, uploader, key).json()["id"]
+
+        other = f"intruder-{uuid.uuid4().hex[:12]}@super-sub.example"
+        db_client.post(
+            f"{V1}/auth/signup",
+            json={"email": other, "password": PASSWORD, "nickname": "침입자"},
+        )
+        login = db_client.post(
+            f"{V1}/auth/login", json={"email": other, "password": PASSWORD}
+        )
+        h = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+        res = db_client.patch(
+            f"{V1}/videos/{video_id}", json={"is_public": True}, headers=h
+        )
+        assert res.status_code == 404
+        assert res.json()["error"]["code"] == "VIDEO_NOT_FOUND"
+
+    def test_제목_설명을_저장하고_부분_수정한다(self, db_client, db_session, uploader):
+        key = _upload(db_client, uploader)
+        video_id = _register(db_client, uploader, key).json()["id"]
+
+        db_client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"title": "첫 골", "description": "왼발"},
+            headers=uploader["headers"],
+        )
+        title, desc = db_session.execute(
+            text("SELECT title, description FROM video WHERE id = :id"),
+            {"id": uuid.UUID(video_id)},
+        ).one()
+        assert (title, desc) == ("첫 골", "왼발")
+
+        # description 만 바꾼다 — title 은 그대로
+        db_client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"description": "오른발"},
+            headers=uploader["headers"],
+        )
+        title, desc = db_session.execute(
+            text("SELECT title, description FROM video WHERE id = :id"),
+            {"id": uuid.UUID(video_id)},
+        ).one()
+        assert (title, desc) == ("첫 골", "오른발")
+
+
+class TestPlayback:
+    """`GET /videos/{id}/playback-url` — 사전 서명(가짜)까지가 실제 DB 경유."""
+
+    def test_공개_클립은_재생_URL_을_준다(self, db_client, uploader):
+        key = _upload(db_client, uploader)
+        video_id = _register(db_client, uploader, key).json()["id"]
+        db_client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"is_public": True},
+            headers=uploader["headers"],
+        )
+
+        res = db_client.get(
+            f"{V1}/videos/{video_id}/playback-url", headers=uploader["headers"]
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["url"].startswith("https://")
+
+    def test_비공개_남의_클립은_404_다(self, db_client, uploader):
+        key = _upload(db_client, uploader)
+        video_id = _register(db_client, uploader, key).json()["id"]
+
+        other = f"peek-{uuid.uuid4().hex[:12]}@super-sub.example"
+        db_client.post(
+            f"{V1}/auth/signup",
+            json={"email": other, "password": PASSWORD, "nickname": "엿보기"},
+        )
+        login = db_client.post(
+            f"{V1}/auth/login", json={"email": other, "password": PASSWORD}
+        )
+        h = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+        res = db_client.get(f"{V1}/videos/{video_id}/playback-url", headers=h)
+        assert res.status_code == 404
+        assert res.json()["error"]["code"] == "VIDEO_NOT_FOUND"
 
 
 class TestConstraints:

@@ -40,6 +40,15 @@ class S3Storage(StoragePort):
         )
         return url, self._ttl
 
+    def create_download_url(self, storage_key: str) -> tuple[str, int]:
+        """GET 용 사전 서명 URL. 재생·다운로드가 앱 서버를 지나지 않게 한다."""
+        url = self._client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": self._bucket, "Key": storage_key},
+            ExpiresIn=self._ttl,
+        )
+        return url, self._ttl
+
     def size_of(self, storage_key: str) -> int | None:
         try:
             head = self._client.head_object(Bucket=self._bucket, Key=storage_key)

@@ -54,9 +54,7 @@ def chain(db_client, db_session):
     code = f"knee-angle-{uuid.uuid4().hex[:6]}"
 
     db_session.add(
-        MetricDefinitionOrm(
-            code=code, label="임팩트 시 무릎 각도", unit="deg", sport_code="football"
-        )
+        MetricDefinitionOrm(code=code, label="임팩트 시 무릎 각도", unit="deg")
     )
     db_session.add(
         VideoOrm(

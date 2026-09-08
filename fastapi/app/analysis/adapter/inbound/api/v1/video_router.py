@@ -2,25 +2,39 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from fastapi import APIRouter, status
 
 from app.analysis.adapter.inbound.api.schemas.video_schema import (
+    PlaybackUrlResponse,
+    PublicVideoResponse,
     RegisterVideoSchema,
+    UpdateVideoSchema,
     UploadUrlResponse,
     UploadUrlSchema,
     VideoResponse,
 )
 from app.analysis.application.dtos.video_dto import (
+    UNSET,
+    GetPlaybackUrlCommand,
     MyVideosQuery,
+    PlaybackUrlResult,
+    PublicVideoResult,
+    PublicVideosQuery,
     RegisterVideoCommand,
+    UpdateVideoCommand,
     UploadUrlCommand,
     UploadUrlResult,
     VideoResult,
 )
 from app.analysis.dependencies.video_providers import (
     CreateUploadUrlUseCaseDep,
+    GetPlaybackUrlUseCaseDep,
     ListMyVideosUseCaseDep,
+    ListPublicVideosUseCaseDep,
     RegisterVideoUseCaseDep,
+    UpdateVideoUseCaseDep,
 )
 from app.core.deps import CurrentUserId
 
@@ -69,6 +83,7 @@ def register_video(
             width=body.width,
             height=body.height,
             side=body.side,
+            analyze=body.analyze,
         )
     )
 
@@ -82,3 +97,64 @@ def list_my_videos(
     **남의 영상은 담기지 않는다** — 목록은 언제나 자기 것이다.
     """
     return use_case(MyVideosQuery(user_id=user_id))
+
+
+@video_router.get("/videos/public", response_model=list[PublicVideoResponse])
+def list_public_videos(
+    _user_id: CurrentUserId, use_case: ListPublicVideosUseCaseDep
+) -> list[PublicVideoResult]:
+    """공개된 클립. 최근 것이 앞에 온다. 홈의 영상 모음이 쓴다.
+
+    🔴 **로그인이 필요하다.** 익명 피드가 필요하면 열겠다 — 지금은 확인 방법이
+    "다른 계정으로 로그인해도 보인다"라 인증을 그대로 둔다.
+
+    저장 키·업로더는 안 실린다. 재생은 `GET /videos/{id}/playback-url` 로 받는다.
+    """
+    return use_case(PublicVideosQuery())
+
+
+@video_router.get(
+    "/videos/{video_id}/playback-url", response_model=PlaybackUrlResponse
+)
+def get_playback_url(
+    video_id: UUID,
+    user_id: CurrentUserId,
+    use_case: GetPlaybackUrlUseCaseDep,
+) -> PlaybackUrlResult:
+    """재생용 사전 서명 GET URL.
+
+    **공개 클립이거나 자기 클립일 때만.** 아니면 `404 VIDEO_NOT_FOUND` —
+    비공개 남의 클립은 "없음"과 같게 답한다.
+    """
+    return use_case(
+        GetPlaybackUrlCommand(video_id=video_id, user_id=user_id)
+    )
+
+
+@video_router.patch("/videos/{video_id}", response_model=VideoResponse)
+def update_video(
+    video_id: UUID,
+    body: UpdateVideoSchema,
+    user_id: CurrentUserId,
+    use_case: UpdateVideoUseCaseDep,
+) -> VideoResult:
+    """클립을 부분 수정한다 — 공개 여부·제목·한 줄 설명.
+
+    **보낸 필드만** 바뀐다. **자기 클립만.** 남의 클립이거나 없는 클립이면
+    `404 VIDEO_NOT_FOUND` — 존재 여부를 구별해 주지 않는다.
+    """
+    sent = body.model_fields_set
+    return use_case(
+        UpdateVideoCommand(
+            video_id=video_id,
+            user_id=user_id,
+            # `is_public` 은 불리언이라 `null` 은 뜻이 없다 — 보냈어도 무시한다.
+            is_public=(
+                body.is_public
+                if "is_public" in sent and body.is_public is not None
+                else UNSET
+            ),
+            title=body.title if "title" in sent else UNSET,
+            description=body.description if "description" in sent else UNSET,
+        )
+    )

@@ -17,20 +17,32 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from app.analysis.application.dtos.video_dto import (
+    UNSET,
+    GetPlaybackUrlCommand,
     MyVideosQuery,
+    PlaybackUrlResult,
+    PublicVideoResult,
+    PublicVideosQuery,
     RegisterVideoCommand,
+    UpdateVideoCommand,
     UploadUrlCommand,
     UploadUrlResult,
     VideoResult,
 )
 from app.analysis.application.ports.input.video_use_cases import (
     CreateUploadUrlUseCase,
+    GetPlaybackUrlUseCase,
     ListMyVideosUseCase,
+    ListPublicVideosUseCase,
     RegisterVideoUseCase,
+    UpdateVideoUseCase,
 )
 from app.analysis.application.ports.output.storage_port import StoragePort
 from app.analysis.application.ports.output.video_port import VideoPort
-from app.analysis.application.use_cases.video_assembler import to_video_result
+from app.analysis.application.use_cases.video_assembler import (
+    to_public_video_result,
+    to_video_result,
+)
 from app.analysis.domain.entities.video_entity import ValidationEntity, VideoEntity
 from app.analysis.domain.rules.video_rules import (
     MAX_BYTES,
@@ -105,6 +117,9 @@ class RegisterVideoInteractor(RegisterVideoUseCase):
             size_bytes=size_bytes,
         )
         now = datetime.now(timezone.utc)
+        # 반려된 클립은 분석하지 않는다(규격 검사를 두는 이유). `analyze=False` 면
+        # 규격은 통과해도 작업을 만들지 않는다 — 기록용 업로드(미결 `paik` 4번).
+        make_job = reason is None and command.analyze
         video = VideoEntity(
             id=uuid4(),
             user_id=command.user_id,
@@ -116,9 +131,8 @@ class RegisterVideoInteractor(RegisterVideoUseCase):
             validation=ValidationEntity(
                 passed=reason is None, reject_reason=reason, checked_at=now
             ),
-            # 반려된 클립은 분석하지 않는다 — 규격 검사를 두는 이유가 그것이다.
-            analysis_job_id=None if reason else uuid4(),
-            analysis_status=None if reason else _QUEUED,
+            analysis_job_id=uuid4() if make_job else None,
+            analysis_status=_QUEUED if make_job else None,
         )
         self._repository.register(video)
         return to_video_result(video)
@@ -132,3 +146,65 @@ class ListMyVideosInteractor(ListMyVideosUseCase):
         return [
             to_video_result(v) for v in self._repository.list_by_user(query.user_id)
         ]
+
+
+def _clean_text(value: object) -> str | None:
+    """빈 문자열·공백만 있는 값은 지운 것으로 본다 — `PATCH /me/card` 의
+    `tagline` 과 같은 판단이다. `None` 은 그대로 `None`.
+    """
+    if value is None:
+        return None
+    trimmed = str(value).strip()
+    return trimmed or None
+
+
+class UpdateVideoInteractor(UpdateVideoUseCase):
+    def __init__(self, repository: VideoPort) -> None:
+        self._repository = repository
+
+    def __call__(self, command: UpdateVideoCommand) -> VideoResult:
+        video = self._repository.update_video(
+            command.video_id,
+            command.user_id,
+            is_public=command.is_public,
+            title=(
+                UNSET if command.title is UNSET else _clean_text(command.title)
+            ),
+            description=(
+                UNSET
+                if command.description is UNSET
+                else _clean_text(command.description)
+            ),
+        )
+        if video is None:
+            # 남의 클립인지 없는 클립인지 구별해 주지 않는다 — 남의 클립 존재
+            # 여부가 새어 나가지 않게.
+            raise ApiError(404, "VIDEO_NOT_FOUND", "클립을 찾을 수 없습니다.")
+        return to_video_result(video)
+
+
+class ListPublicVideosInteractor(ListPublicVideosUseCase):
+    def __init__(self, repository: VideoPort) -> None:
+        self._repository = repository
+
+    def __call__(self, query: PublicVideosQuery) -> list[PublicVideoResult]:
+        return [
+            to_public_video_result(v)
+            for v in self._repository.list_public(query.limit)
+        ]
+
+
+class GetPlaybackUrlInteractor(GetPlaybackUrlUseCase):
+    def __init__(self, repository: VideoPort, storage: StoragePort) -> None:
+        self._repository = repository
+        self._storage = storage
+
+    def __call__(self, command: GetPlaybackUrlCommand) -> PlaybackUrlResult:
+        video = self._repository.get(command.video_id)
+        if video is None or not (
+            video.is_public or video.user_id == command.user_id
+        ):
+            # 비공개 남의 클립은 "없음"과 같게 답한다.
+            raise ApiError(404, "VIDEO_NOT_FOUND", "클립을 찾을 수 없습니다.")
+        url, expires_in = self._storage.create_download_url(video.storage_key)
+        return PlaybackUrlResult(url=url, expires_in=expires_in)

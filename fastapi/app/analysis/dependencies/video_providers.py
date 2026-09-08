@@ -11,15 +11,21 @@ from app.analysis.adapter.outbound.pg.video_pg_repository import VideoPgReposito
 from app.analysis.adapter.outbound.s3.s3_storage import S3Storage
 from app.analysis.application.ports.input.video_use_cases import (
     CreateUploadUrlUseCase,
+    GetPlaybackUrlUseCase,
     ListMyVideosUseCase,
+    ListPublicVideosUseCase,
     RegisterVideoUseCase,
+    UpdateVideoUseCase,
 )
 from app.analysis.application.ports.output.storage_port import StoragePort
 from app.analysis.application.ports.output.video_port import VideoPort
 from app.analysis.application.use_cases.video_interactors import (
     CreateUploadUrlInteractor,
+    GetPlaybackUrlInteractor,
     ListMyVideosInteractor,
+    ListPublicVideosInteractor,
     RegisterVideoInteractor,
+    UpdateVideoInteractor,
 )
 from app.core.config import settings
 from app.core.database import get_session
@@ -72,6 +78,24 @@ def get_list_my_videos_use_case(
     return ListMyVideosInteractor(repository)
 
 
+def get_update_video_use_case(
+    repository: VideoRepositoryDep,
+) -> UpdateVideoUseCase:
+    return UpdateVideoInteractor(repository)
+
+
+def get_list_public_videos_use_case(
+    repository: VideoRepositoryDep,
+) -> ListPublicVideosUseCase:
+    return ListPublicVideosInteractor(repository)
+
+
+def get_playback_url_use_case(
+    repository: VideoRepositoryDep, storage: StorageDep
+) -> GetPlaybackUrlUseCase:
+    return GetPlaybackUrlInteractor(repository, storage)
+
+
 CreateUploadUrlUseCaseDep = Annotated[
     CreateUploadUrlUseCase, Depends(get_create_upload_url_use_case)
 ]
@@ -80,4 +104,13 @@ RegisterVideoUseCaseDep = Annotated[
 ]
 ListMyVideosUseCaseDep = Annotated[
     ListMyVideosUseCase, Depends(get_list_my_videos_use_case)
+]
+UpdateVideoUseCaseDep = Annotated[
+    UpdateVideoUseCase, Depends(get_update_video_use_case)
+]
+ListPublicVideosUseCaseDep = Annotated[
+    ListPublicVideosUseCase, Depends(get_list_public_videos_use_case)
+]
+GetPlaybackUrlUseCaseDep = Annotated[
+    GetPlaybackUrlUseCase, Depends(get_playback_url_use_case)
 ]
