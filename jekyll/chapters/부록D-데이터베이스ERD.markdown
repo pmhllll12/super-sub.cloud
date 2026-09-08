@@ -59,10 +59,17 @@ D.3에 별도로 모았다.
 업로드부터 지표 산출까지 한 줄로 이어지는 체인이다. 이 순서가 곧 SEC-006의 삭제 연쇄 경로가
 된다(D.6).
 
-지표는 종목마다 항목이 다르므로 컬럼으로 고정하지 않는다. metric_definition에 항목을 정의하고
-analysis_metric_value에 항목당 한 행씩 적재한다.
+지표 항목은 루브릭이 정의하고 계속 늘어나므로 컬럼으로 고정하지 않는다. metric_definition에
+항목을 정의하고 analysis_metric_value에 항목당 한 행씩 적재한다. **지표는 물리량이라 종목에
+속하지 않는다** — 같은 물리량(예: `trunk_forward_lean_deg_at_impact`)이 축구·야구·농구
+루브릭에 함께 쓰인다. 어느 종목에서 쓰는지는 metric_definition이 아니라 그 지표를 참조하는
+루브릭·항목 쪽이 안다.
 
 ![도메인 ② 영상·분석 ERD]({{ "/assets/erd/domain2-video-analysis.svg" | relative_url }}){: class="erd-diagram" }
+
+> 위 그림에는 metric_definition에 `sport_code` 컬럼이 아직 표시되어 있으나, 지표를 종목
+> 무관 물리량으로 두기로 하면서(2026.09.08) 그 컬럼을 없앴다. **표가 최신이다.** 그림은
+> 좌표가 직접 박힌 수작업 SVG라 갱신 비용이 커서 미뤄 둔다(위 ①과 같은 사정이다).
 
 | 테이블 | 용도 | 1행이 뜻하는 것 |
 |---|---|---|
@@ -70,7 +77,7 @@ analysis_metric_value에 항목당 한 행씩 적재한다.
 | video_validation | 규격 검사 결과와 반려 사유. 사유를 값으로 남겨야 검수 기준을 확인할 수 있다 | 클립 1개의 검사 결과 |
 | analysis_job | 비동기 분석 작업의 상태와 소요 시간 (PER-001) | 분석 실행 1회 |
 | analysis_metric | 분석 1회가 산출한 지표 집합. 산출 버전을 기록한다 (QUA-002) | 분석 실행 1회가 낸 지표 묶음 |
-| metric_definition | 종목별 지표 항목의 정의와 단위 | 지표 항목 1개 (예: 임팩트 시 무릎 각도) |
+| metric_definition | 지표 항목의 정의와 단위. 물리량이라 종목에 속하지 않는다 — 어느 종목에서 쓰는지는 루브릭이 안다 | 지표 항목 1개 (예: 임팩트 시 무릎 각도) |
 | analysis_metric_value | 지표 항목별 값 (SFR-002) | 지표 묶음 1개 안의 항목 1개 값 |
 | analysis_report | 지표를 근거로 생성한 요약 문장 (SFR-003) | 지표 묶음 1개의 요약문 |
 | player_vector | 성향 비교용 특징 벡터. pgvector로 색인한다 (SFR-005) | 지표 묶음 1개의 임베딩 |
@@ -151,7 +158,6 @@ report·no_show는 review와 직접 이어지지 않는다. 제재를 평가 점
 |---|---|---|---|
 | video | user_id | user | 업로더 |
 | video | sport_code | sport | 종목 |
-| metric_definition | sport_code | sport | 종목별 지표 항목 |
 | title_definition | sport_code | sport | 종목별 호칭 기준 |
 | title_criteria | metric_code | metric_definition | 판정에 쓰는 지표 항목 |
 | user_title | user_id | user | 호칭 대상자 |
@@ -180,7 +186,7 @@ user_title.source_metric_id만 성격이 다르다. 나머지가 소유·참조 
 
 | 대상 | 처리 |
 |---|---|
-| 지표값 | jsonb 대신 metric_definition + analysis_metric_value로 전개했다. 지표 항목이 종목마다 달라 컬럼 고정이 불가능하므로 항목을 데이터로 둔다 |
+| 지표값 | jsonb 대신 metric_definition + analysis_metric_value로 전개했다. 지표 항목은 루브릭이 정의하고 계속 늘어나므로 컬럼 고정이 불가능해 항목을 데이터로 둔다 |
 | 호칭 기준 | jsonb 대신 title_criteria에 조건 한 줄씩 담는다 |
 | 필요 포지션 | 문자열 한 컬럼 대신 match_position_need로 분리했다. 포지션이 둘 이상일 수 있다 |
 | 평가 선택 결과 | review_selection으로 분리했다 |
@@ -279,7 +285,7 @@ user_title은 호칭 부여의 근거가 되는 지표를 참조한다. 근거�
 
 | 항목 | 내용 |
 |---|---|
-| 지표 항목 | metric_definition에 들어갈 종목별 항목 목록. 스프린트 1에서 확정한다 |
+| 지표 항목 | metric_definition에 들어갈 항목 목록(종목 무관 물리량 11개). 에이전트의 루브릭이 정의를 갖고 있으므로 그쪽에서 시드로 뽑는다. 스프린트 1에서 확정한다 |
 | 평가 선택지 | review_option의 항목 구성. 3.4의 피해 상한 설계와 함께 정한다 |
 | 과금 상세 | 4.3 수익 모델이 확정되지 않아 analysis_credit·coach_referral은 최소 형태다. 구인 측 과금이 채택되면 테이블이 추가된다 |
 | 평가·지표 대응 | review_option과 metric_definition의 대응 관계. 누적 보정(3.4) 도입 시 정의한다. 설정 데이터라 소급 적용이 가능하므로 지금 두지 않는다 |
