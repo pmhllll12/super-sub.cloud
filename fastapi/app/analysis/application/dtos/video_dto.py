@@ -85,6 +85,14 @@ class PlaybackUrlResult:
 
 
 @dataclass(frozen=True)
+class DeleteVideoCommand:
+    """영상을 지운다. **자기 클립만** — `user_id` 로 소유를 확인한다."""
+
+    video_id: UUID
+    user_id: UUID
+
+
+@dataclass(frozen=True)
 class PublicVideosQuery:
     """홈의 영상 모음. 공개 클립만, 최근 것부터."""
 

@@ -10,6 +10,7 @@ from uuid import uuid4
 import pytest
 
 from app.analysis.adapter.outbound.stub.video_stub_repository import (
+    _OBJECTS,
     put_object,
     reset_videos,
 )
@@ -466,6 +467,50 @@ class TestPlaybackUrl:
     def test_없는_클립은_404_다(self, client):
         res = client.get(
             f"{V1}/videos/{uuid4()}/playback-url", headers=_headers(uuid4())
+        )
+        assert res.status_code == 404
+        assert error_code(res) == "VIDEO_NOT_FOUND"
+
+
+class TestDeleteVideo:
+    def test_인증이_필요하다(self, client):
+        assert client.delete(f"{V1}/videos/{uuid4()}").status_code == 401
+
+    def test_자기_클립을_지우면_204_이고_목록에서_빠진다(self, client):
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+        video_id = _register(client, user_id, key).json()["id"]
+
+        res = client.delete(f"{V1}/videos/{video_id}", headers=_headers(user_id))
+        assert res.status_code == 204, res.text
+        assert client.get(f"{V1}/videos", headers=_headers(user_id)).json() == []
+
+    def test_S3_객체와_리포트_접두사도_지운다(self, client):
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+        video_id = _register(client, user_id, key).json()["id"]
+        report_key = f"reports/{user_id}/{video_id}/report.json"
+        put_object(report_key, 10)
+
+        client.delete(f"{V1}/videos/{video_id}", headers=_headers(user_id))
+        assert key not in _OBJECTS
+        assert report_key not in _OBJECTS
+
+    def test_남의_클립은_404_다(self, client):
+        owner = uuid4()
+        key = _issue(client, owner)
+        put_object(key, SIZE_OK)
+        video_id = _register(client, owner, key).json()["id"]
+
+        res = client.delete(f"{V1}/videos/{video_id}", headers=_headers(uuid4()))
+        assert res.status_code == 404
+        assert error_code(res) == "VIDEO_NOT_FOUND"
+
+    def test_없는_클립은_404_다(self, client):
+        res = client.delete(
+            f"{V1}/videos/{uuid4()}", headers=_headers(uuid4())
         )
         assert res.status_code == 404
         assert error_code(res) == "VIDEO_NOT_FOUND"

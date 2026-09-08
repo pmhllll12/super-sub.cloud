@@ -80,6 +80,12 @@ class StubVideoRepository(VideoPort):
         public.sort(key=lambda v: v.created_at, reverse=True)
         return public[:limit]
 
+    def delete(self, video_id: UUID, user_id: UUID) -> VideoEntity | None:
+        video = _VIDEOS.get(video_id)
+        if video is None or video.user_id != user_id:
+            return None
+        return _VIDEOS.pop(video_id)
+
 
 class FakeStorage(StoragePort):
     """URL 을 만들어 주지만 아무 데도 안 올라간다.
@@ -99,3 +105,10 @@ class FakeStorage(StoragePort):
 
     def size_of(self, storage_key: str) -> int | None:
         return _OBJECTS.get(storage_key)
+
+    def delete_object(self, storage_key: str) -> None:
+        _OBJECTS.pop(storage_key, None)
+
+    def delete_prefix(self, prefix: str) -> None:
+        for key in [k for k in _OBJECTS if k.startswith(prefix)]:
+            del _OBJECTS[key]

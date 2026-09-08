@@ -114,6 +114,15 @@ class VideoPgRepository(VideoPort):
         latest = self._latest_jobs([video_id]).get(video_id)
         return _to_entity(video, validation, latest)
 
+    def delete(self, video_id: UUID, user_id: UUID) -> VideoEntity | None:
+        video = self._session.get(VideoOrm, video_id)
+        if video is None or video.user_id != user_id:
+            return None
+        entity = _to_entity(video, None, None)  # S3 정리에 storage_key 만 필요
+        self._session.delete(video)  # FK ON DELETE CASCADE 가 자식을 정리한다
+        self._session.commit()
+        return entity
+
     def update_video(
         self,
         video_id: UUID,

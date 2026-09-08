@@ -13,11 +13,13 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from uuid import uuid4
 
 from app.analysis.application.dtos.video_dto import (
     UNSET,
+    DeleteVideoCommand,
     GetPlaybackUrlCommand,
     MyVideosQuery,
     PlaybackUrlResult,
@@ -31,6 +33,7 @@ from app.analysis.application.dtos.video_dto import (
 )
 from app.analysis.application.ports.input.video_use_cases import (
     CreateUploadUrlUseCase,
+    DeleteVideoUseCase,
     GetPlaybackUrlUseCase,
     ListMyVideosUseCase,
     ListPublicVideosUseCase,
@@ -52,6 +55,8 @@ from app.analysis.domain.rules.video_rules import (
     reject_reason,
 )
 from app.core.errors import ApiError
+
+_log = logging.getLogger("supersub.analysis")
 
 # 새 작업의 첫 상태. 값 목록은 `analysis_job` ORM 의 주석에 있다.
 _QUEUED = "queued"
@@ -214,3 +219,30 @@ class GetPlaybackUrlInteractor(GetPlaybackUrlUseCase):
             raise ApiError(404, "VIDEO_NOT_FOUND", "클립을 찾을 수 없습니다.")
         url, expires_in = self._storage.create_download_url(video.storage_key)
         return PlaybackUrlResult(url=url, expires_in=expires_in)
+
+
+class DeleteVideoInteractor(DeleteVideoUseCase):
+    def __init__(self, repository: VideoPort, storage: StoragePort) -> None:
+        self._repository = repository
+        self._storage = storage
+
+    def __call__(self, command: DeleteVideoCommand) -> None:
+        video = self._repository.delete(command.video_id, command.user_id)
+        if video is None:
+            raise ApiError(404, "VIDEO_NOT_FOUND", "클립을 찾을 수 없습니다.")
+        # 🔴 DB 에서 사라진 것이 "사용자에게 없어진 것"이다. S3 정리는 best-effort —
+        #    IAM 에 `s3:DeleteObject` 가 붙기 전에는 실패하지만(미결 `jin` 24번 IAM
+        #    조각), 남은 객체는 백스톱 스윕이 잡는다. 여기서 500 을 내면 이미 지운
+        #    행을 두고 재시도를 부른다.
+        try:
+            self._storage.delete_object(video.storage_key)
+            self._storage.delete_prefix(
+                f"reports/{video.user_id}/{video.id}/"
+            )
+        except Exception as exc:  # noqa: BLE001
+            _log.warning(
+                "video %s: DB 는 지웠으나 S3 정리 실패 (%s: %s)",
+                video.id,
+                type(exc).__name__,
+                exc,
+            )

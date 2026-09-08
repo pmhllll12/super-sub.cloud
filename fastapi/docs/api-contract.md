@@ -1469,9 +1469,23 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
 | 404 | `VIDEO_NOT_FOUND` | 없는 클립이거나 비공개 남의 클립이다 |
 | 503 | `STORAGE_NOT_CONFIGURED` | 서버에 `S3_BUCKET` 이 없다 |
 
+### `DELETE /api/v1/videos/{video_id}` — 클립 삭제 (2026-09-08 추가)
+
+미결 `jin` 24번. **자기 클립만.** `204 No Content`.
+
+- **DB 행**과 그 연쇄(`video_validation`·`analysis_job`·그 하위)를 지운다 —
+  외래키 `ON DELETE CASCADE`(SEC-006).
+- **S3 객체**도 지운다: `storage_key` + `reports/<user_id>/<video_id>/` 접두사 전부.
+  🔴 **best-effort** — 실패해도 `204` 다. DB 에서 사라진 것이 "사용자에게 없어진
+  것"이고, 남은 S3 객체는 백스톱 스윕이 잡는다. (지금 EC2 역할에 `s3:DeleteObject`
+  가 없어 실서버에서는 객체가 남는다 — 미결 `jin` 24번 IAM 조각)
+
+| 에러 | code | 언제 |
+|---|---|---|
+| 404 | `VIDEO_NOT_FOUND` | 없는 클립이거나 남의 클립이다 |
+
 ### 아직 없는 것
 
-- **삭제** — 올린 클립을 지우는 경로. S3 객체까지 함께 지워야 해서 순서를 정해야 한다
 - **재분석** — `analysis_job` 은 여러 건을 허용하지만 만드는 경로가 업로드뿐이다
 - **분석 결과 적재**(`POST /analyses`) — 3-1 절. `metric_definition` 합의가 선행이다
 

@@ -297,6 +297,52 @@ class TestPlayback:
         assert res.json()["error"]["code"] == "VIDEO_NOT_FOUND"
 
 
+class TestDelete:
+    def test_지우면_판정도_작업도_함께_사라진다(
+        self, db_client, db_session, uploader
+    ):
+        """미결 jin 24번 — `DELETE /videos/{id}` 가 SEC-006 연쇄를 탄다."""
+        key = _upload(db_client, uploader)
+        video_id = uuid.UUID(_register(db_client, uploader, key).json()["id"])
+        assert (
+            db_session.execute(
+                text("SELECT count(*) FROM analysis_job WHERE video_id = :id"),
+                {"id": video_id},
+            ).scalar_one()
+            == 1
+        )
+
+        res = db_client.delete(
+            f"{V1}/videos/{video_id}", headers=uploader["headers"]
+        )
+        assert res.status_code == 204, res.text
+
+        for tbl in ("video", "video_validation", "analysis_job"):
+            left = db_session.execute(
+                text(f"SELECT count(*) FROM {tbl} WHERE "
+                     f"{'id' if tbl == 'video' else 'video_id'} = :id"),
+                {"id": video_id},
+            ).scalar_one()
+            assert left == 0, tbl
+
+    def test_남의_클립은_404_다(self, db_client, uploader):
+        key = _upload(db_client, uploader)
+        video_id = _register(db_client, uploader, key).json()["id"]
+
+        other = f"del-{uuid.uuid4().hex[:12]}@super-sub.example"
+        db_client.post(
+            f"{V1}/auth/signup",
+            json={"email": other, "password": PASSWORD, "nickname": "남"},
+        )
+        login = db_client.post(
+            f"{V1}/auth/login", json={"email": other, "password": PASSWORD}
+        )
+        h = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+        res = db_client.delete(f"{V1}/videos/{video_id}", headers=h)
+        assert res.status_code == 404
+
+
 class TestConstraints:
     def test_영상당_판정은_하나뿐이다(self, db_client, db_session, uploader):
         """부록 D.7 의 유일 제약. **막히지 않으면 그 제약은 없는 것이다.**"""

@@ -17,6 +17,7 @@ from app.analysis.adapter.inbound.api.schemas.video_schema import (
 )
 from app.analysis.application.dtos.video_dto import (
     UNSET,
+    DeleteVideoCommand,
     GetPlaybackUrlCommand,
     MyVideosQuery,
     PlaybackUrlResult,
@@ -30,6 +31,7 @@ from app.analysis.application.dtos.video_dto import (
 )
 from app.analysis.dependencies.video_providers import (
     CreateUploadUrlUseCaseDep,
+    DeleteVideoUseCaseDep,
     GetPlaybackUrlUseCaseDep,
     ListMyVideosUseCaseDep,
     ListPublicVideosUseCaseDep,
@@ -158,3 +160,19 @@ def update_video(
             description=body.description if "description" in sent else UNSET,
         )
     )
+
+
+@video_router.delete(
+    "/videos/{video_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+def delete_video(
+    video_id: UUID,
+    user_id: CurrentUserId,
+    use_case: DeleteVideoUseCaseDep,
+) -> None:
+    """클립을 지운다 — DB 행(판정·작업 연쇄 포함)과 S3 객체.
+
+    **자기 클립만.** 남의 클립이거나 없는 클립이면 `404 VIDEO_NOT_FOUND`.
+    S3 정리는 best-effort다 — 실패해도 `204` 이고 남은 객체는 백스톱 스윕이 잡는다.
+    """
+    use_case(DeleteVideoCommand(video_id=video_id, user_id=user_id))
