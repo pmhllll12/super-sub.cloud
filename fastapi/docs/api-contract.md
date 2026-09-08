@@ -16,6 +16,7 @@
 | `POST`·`GET /teams/{id}/matches` · `GET /matches/{id}` | **실제 DB** (2026-09-02 추가, 3-4절) |
 | `POST`·`GET /matches/{id}/applications` · `POST .../accept` · `DELETE .../{application_id}` | **실제 DB** (2026-09-02 추가 · 무르기·거절은 2026-09-04, 3-5절) |
 | `GET /admin/users` · `GET /admin/users/{id}` · `DELETE /admin/users/{id}` | **실제 DB** (2026-08-31 추가, 3-2절) |
+| `GET /admin/videos` · `DELETE /admin/videos/{id}` | **실제 DB** (2026-09-08 추가 — 미결 `jin` 24번, 3-2절) |
 | `POST /internal/analysis-jobs/claim` · `PATCH /internal/analysis-jobs/{id}` | **실제 DB** (2026-09-04 추가 — **워커 전용**, 3-8절) |
 | `GET /review-options` · `POST /matches/{id}/reviews` · `POST /matches/{id}/no-shows` · `POST /reports` | **실제 DB** (2026-09-04 추가, 3-9절) |
 
@@ -830,6 +831,58 @@ trunk_alignment       2개 루브릭  basketball_jump_shot · basketball_layup  
 |---|---|
 | 404 | `USER_NOT_FOUND` |
 | 409 | `CANNOT_DELETE_SELF` — 자기 자신을 대상으로 호출했다 |
+
+### `GET /api/v1/admin/videos` — 한 사람의 영상 전부 (2026-09-08 추가)
+
+미결 `jin` 24번. **문제 영상을 사람이 찾아 지우고, 에이전트가 제대로 돌았는지
+확인**하는 자리다. 위 세 admin 경로와 같은 화이트리스트 게이트를 쓴다.
+
+`?user=<uid|email>` **필수**. `user.id`(UUID)나 이메일(대소문자 무시) 중 하나로
+사람을 짚는다. 없는 사람이면 `404 USER_NOT_FOUND`.
+
+`GET /videos`(본인 목록)와 달리 **아직 저장 안 한(`kept:false`) 임시분까지** 담고,
+최근 것이 앞에 온다.
+
+`200 OK`
+
+```json
+{
+  "user_id": "3f1c...", "nickname": "홍길동", "email": "demo@super-sub.example",
+  "items": [
+    { "id": "7c05...", "sport_code": "football",
+      "original_filename": "My Kick.mp4",
+      "storage_key": "videos/3f1c.../홍길동-My-Kick-20260908-1419-3f1c8a2b.mp4",
+      "created_at": "2026-09-08T09:00:00Z",
+      "kept": true, "is_public": false, "passed": true, "reject_reason": null,
+      "analysis_status": "queued",
+      "report_prefix": "reports/3f1c.../7c05.../" }
+  ]
+}
+```
+
+- `nickname`·`email` 은 **현재 값**이다(DB 조인). 저장 키 안의 닉네임 글자는
+  업로드 시점에 얼어붙지만, 목록은 `user.id` 로 조인해 rename 을 따라간다.
+- **재생·리포트 링크는 안 싣는다** — 목록 한 번에 객체마다 사전 서명을 하지
+  않으려는 것이다. 재생은 `storage_key` 로, 리포트는 `report_prefix` 아래
+  (`report.json`·`impact.jpg`·`tracked.webm`)를 콘솔이나 별도 사전 서명으로 짚는다.
+
+### `DELETE /api/v1/admin/videos/{video_id}` — 관리자 영상 삭제 (2026-09-08 추가)
+
+미결 `jin` 24번. **아무** 영상이나 지운다 — `DELETE /videos/{id}` 와 달리 소유를
+확인하지 않는다(관리자 인증이 그 자리를 대신한다).
+
+- **DB 행**과 연쇄(`video_validation`·`analysis_job`·그 하위, `ON DELETE CASCADE`).
+- **S3 객체**(`storage_key` + `reports/<user_id>/<video_id>/`)도 best-effort 로
+  지운다 — 실패해도 `204`. `DELETE /videos/{id}` 와 같다(EC2 역할에
+  `s3:DeleteObject` 가 붙기 전에는 객체가 남는다 — 미결 `jin` 24번 IAM 조각).
+- 비밀번호를 안 받는 대신 누가 눌렀는지 로그에 남긴다
+  (`event=admin_delete_video admin_id=… video_id=…`).
+
+`204 No Content`
+
+| 에러 | code |
+|---|---|
+| 404 | `VIDEO_NOT_FOUND` |
 
 ---
 

@@ -30,6 +30,7 @@ from app.analysis.adapter.outbound.stub.video_stub_repository import (
     reset_videos,
 )
 from app.analysis.dependencies.video_providers import get_storage
+from app.core.config import settings
 from app.main import app
 from tests.conftest import V1
 
@@ -531,3 +532,137 @@ class TestListMyVideos:
         assert rows[ok]["reject_reason"] is None
         assert rows[rejected]["analysis_status"] is None
         assert "길이" in rows[rejected]["reject_reason"]
+
+
+def _email_of(db_client, uploader):
+    """`uploader` 픽스처가 만든 이메일을 되찾는다 — 픽스처가 값을 안 돌려줘서."""
+    return db_client.get(f"{V1}/me", headers=uploader["headers"]).json()["email"]
+
+
+class TestAdminVideos:
+    """미결 jin 24번 6조각 — `GET/DELETE /admin/videos`.
+
+    `?user=<uid|email>` 를 사람으로 되짚는 것과 소유 검사 없는 삭제 연쇄를
+    **진짜 PostgreSQL** 에서 본다(스텁은 `user` 를 모른다).
+    """
+
+    @pytest.fixture
+    def admin(self, db_client):
+        email = f"admin-{uuid.uuid4().hex[:12]}@super-sub.example"
+        db_client.post(
+            f"{V1}/auth/signup",
+            json={"email": email, "password": PASSWORD, "nickname": "관리자"},
+        )
+        original = settings.admin_emails
+        settings.admin_emails = email
+        login = db_client.post(
+            f"{V1}/auth/login", json={"email": email, "password": PASSWORD}
+        )
+        try:
+            yield {
+                "email": email,
+                "headers": {
+                    "Authorization": f"Bearer {login.json()['access_token']}"
+                },
+            }
+        finally:
+            settings.admin_emails = original
+
+    def test_이메일로도_UUID로도_그_사람의_영상을_찾는다(
+        self, db_client, uploader, admin
+    ):
+        key = _upload(db_client, uploader)
+        video_id = _register(db_client, uploader, key).json()["id"]
+
+        # 대소문자를 섞어 보내 이메일 조회가 대소문자를 무시하는지 함께 본다
+        email = _email_of(db_client, uploader)
+        by_email = db_client.get(
+            f"{V1}/admin/videos", params={"user": email.upper()}, headers=admin["headers"]
+        )
+        assert by_email.status_code == 200, by_email.text
+        assert [r["id"] for r in by_email.json()["items"]] == [video_id]
+        assert by_email.json()["email"] == email
+        assert by_email.json()["nickname"] == "업로더"
+
+        by_uuid = db_client.get(
+            f"{V1}/admin/videos",
+            params={"user": str(uploader["id"])},
+            headers=admin["headers"],
+        )
+        assert [r["id"] for r in by_uuid.json()["items"]] == [video_id]
+
+    def test_닉네임을_바꾸면_현재_값으로_보인다(self, db_client, uploader, admin):
+        key = _upload(db_client, uploader)
+        _register(db_client, uploader, key)
+
+        db_client.patch(
+            f"{V1}/me", json={"nickname": "새이름"}, headers=uploader["headers"]
+        )
+        body = db_client.get(
+            f"{V1}/admin/videos",
+            params={"user": str(uploader["id"])},
+            headers=admin["headers"],
+        ).json()
+        # 옛 저장 키에는 "업로더" 가 얼어붙어 있지만 목록은 DB 조인이라 현재 값이다
+        assert body["nickname"] == "새이름"
+        assert "업로더-" in body["items"][0]["storage_key"]
+
+    def test_아직_저장_안_한_임시분도_관리자에게는_보인다(
+        self, db_client, db_session, uploader, admin
+    ):
+        prov_key = _upload(db_client, uploader)
+        prov_id = uuid.UUID(_register(db_client, uploader, prov_key).json()["id"])
+        db_session.execute(
+            text("UPDATE video SET kept = false WHERE id = :id"), {"id": prov_id}
+        )
+        db_session.commit()
+
+        # 본인 목록엔 안 나온다
+        assert prov_key not in [
+            r["storage_key"]
+            for r in db_client.get(
+                f"{V1}/videos", headers=uploader["headers"]
+            ).json()
+        ]
+        # 관리자 목록엔 나온다
+        rows = db_client.get(
+            f"{V1}/admin/videos",
+            params={"user": str(uploader["id"])},
+            headers=admin["headers"],
+        ).json()["items"]
+        row = next(r for r in rows if r["id"] == str(prov_id))
+        assert row["kept"] is False
+
+    def test_없는_사람이면_404(self, db_client, admin):
+        res = db_client.get(
+            f"{V1}/admin/videos",
+            params={"user": "ghost@super-sub.example"},
+            headers=admin["headers"],
+        )
+        assert res.status_code == 404
+        assert res.json()["error"]["code"] == "USER_NOT_FOUND"
+
+    def test_관리자는_남의_영상을_지운다_연쇄까지(
+        self, db_client, db_session, uploader, admin
+    ):
+        key = _upload(db_client, uploader)
+        video_id = uuid.UUID(_register(db_client, uploader, key).json()["id"])
+
+        res = db_client.delete(
+            f"{V1}/admin/videos/{video_id}", headers=admin["headers"]
+        )
+        assert res.status_code == 204, res.text
+        for tbl in ("video", "video_validation", "analysis_job"):
+            col = "id" if tbl == "video" else "video_id"
+            left = db_session.execute(
+                text(f"SELECT count(*) FROM {tbl} WHERE {col} = :id"),
+                {"id": video_id},
+            ).scalar_one()
+            assert left == 0, tbl
+
+    def test_없는_클립_삭제는_404(self, db_client, admin):
+        res = db_client.delete(
+            f"{V1}/admin/videos/{uuid.uuid4()}", headers=admin["headers"]
+        )
+        assert res.status_code == 404
+        assert res.json()["error"]["code"] == "VIDEO_NOT_FOUND"

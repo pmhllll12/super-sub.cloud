@@ -12,7 +12,7 @@ from uuid import UUID
 
 from abc import ABC, abstractmethod
 
-from app.analysis.application.dtos.video_dto import UNSET
+from app.analysis.application.dtos.video_dto import UNSET, UserRef
 from app.analysis.domain.entities.video_entity import VideoEntity
 
 
@@ -93,4 +93,25 @@ class VideoPort(ABC):
 
         홈의 영상 모음이 쓴다. 반려 사유·분석 상태는 채우지 않는다 — 목록이
         보여주지 않는다.
+        """
+
+    @abstractmethod
+    def resolve_user(self, identifier: str) -> UserRef | None:
+        """`user.id`(UUID 문자열) 또는 이메일로 사람을 찾는다(미결 `jin` 24번
+        관리자 영상 목록). `sport_exists` 처럼 `user` 컨텍스트를 임포트하지 않고
+        `table()`/`column()` 로 `user` 의 `id`·`nickname`·`email` 만 읽는다.
+        못 찾으면 `None`.
+        """
+
+    @abstractmethod
+    def list_all_by_user(self, user_id: UUID) -> list[VideoEntity]:
+        """그 사람의 영상 **전부**. `list_by_user` 와 달리 `kept=false` 임시분도
+        담는다 — 관리자는 아직 저장 안 한 클립까지 봐야 문제 영상을 찾는다.
+        최근 것이 앞에 오고, 판정·최근 작업 상태를 함께 채운다.
+        """
+
+    @abstractmethod
+    def admin_delete(self, video_id: UUID) -> VideoEntity | None:
+        """소유 검사 없이 영상 행을 지운다(관리자 전용). 연쇄·반환값은 `delete`
+        와 같다. 없는 클립이면 `None`.
         """

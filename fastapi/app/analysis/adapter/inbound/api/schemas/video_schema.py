@@ -118,3 +118,37 @@ class PublicVideoResponse(BaseModel):
     created_at: Rfc3339
     title: str | None
     description: str | None
+
+
+class AdminVideoRowResponse(BaseModel):
+    """관리자 영상 목록 한 줄. **사람이 읽을 수 있게** 원본 이름·업로드일·상태를
+    싣고, S3 로 되짚을 `storage_key` 와 리포트 폴더 접두사를 함께 준다 — 목록에서
+    N개 객체마다 사전 서명을 하지 않으려는 것이다(재생·리포트는 이 값으로 짚는다).
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    sport_code: str
+    original_filename: str | None
+    storage_key: str
+    created_at: Rfc3339
+    kept: bool
+    is_public: bool
+    passed: bool
+    reject_reason: str | None
+    analysis_status: str | None
+    report_prefix: str
+
+
+class AdminVideoListResponse(BaseModel):
+    """한 사람(`?user=<uid|email>`)의 영상 전부. 닉네임·이메일은 **현재 값**이다
+    (DB 조인이라 rename 이 반영된다 — 옛 저장 키에 얼어붙은 닉네임과 다르다).
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    user_id: UUID
+    nickname: str
+    email: str
+    items: list[AdminVideoRowResponse]

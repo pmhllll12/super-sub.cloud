@@ -19,6 +19,10 @@ from uuid import uuid4
 
 from app.analysis.application.dtos.video_dto import (
     UNSET,
+    AdminDeleteVideoCommand,
+    AdminVideoListResult,
+    AdminVideoRow,
+    AdminVideosQuery,
     DeleteVideoCommand,
     GetPlaybackUrlCommand,
     MyVideosQuery,
@@ -32,9 +36,11 @@ from app.analysis.application.dtos.video_dto import (
     VideoResult,
 )
 from app.analysis.application.ports.input.video_use_cases import (
+    AdminDeleteVideoUseCase,
     CreateUploadUrlUseCase,
     DeleteVideoUseCase,
     GetPlaybackUrlUseCase,
+    ListAdminVideosUseCase,
     ListMyVideosUseCase,
     ListPublicVideosUseCase,
     RegisterVideoUseCase,
@@ -241,15 +247,74 @@ class DeleteVideoInteractor(DeleteVideoUseCase):
         #    IAM 에 `s3:DeleteObject` 가 붙기 전에는 실패하지만(미결 `jin` 24번 IAM
         #    조각), 남은 객체는 백스톱 스윕이 잡는다. 여기서 500 을 내면 이미 지운
         #    행을 두고 재시도를 부른다.
-        try:
-            self._storage.delete_object(video.storage_key)
-            self._storage.delete_prefix(
-                f"reports/{video.user_id}/{video.id}/"
+        _cleanup_storage(self._storage, video)
+
+
+def _cleanup_storage(storage: StoragePort, video: VideoEntity) -> None:
+    """지운 영상의 S3 객체·리포트 폴더를 정리한다. **best-effort** — 실패해도
+    DB 에서 사라진 것이 "없어진 것"이고, 남은 객체는 백스톱 스윕이 잡는다.
+    """
+    try:
+        storage.delete_object(video.storage_key)
+        storage.delete_prefix(f"reports/{video.user_id}/{video.id}/")
+    except Exception as exc:  # noqa: BLE001
+        _log.warning(
+            "video %s: DB 는 지웠으나 S3 정리 실패 (%s: %s)",
+            video.id,
+            type(exc).__name__,
+            exc,
+        )
+
+
+def _to_admin_row(video: VideoEntity) -> AdminVideoRow:
+    validation = video.validation
+    return AdminVideoRow(
+        id=video.id,
+        sport_code=video.sport_code,
+        original_filename=video.original_filename,
+        storage_key=video.storage_key,
+        created_at=video.created_at,
+        kept=video.kept,
+        is_public=video.is_public,
+        passed=bool(validation and validation.passed),
+        reject_reason=validation.reject_reason if validation else None,
+        analysis_status=video.analysis_status,
+        report_prefix=f"reports/{video.user_id}/{video.id}/",
+    )
+
+
+class ListAdminVideosInteractor(ListAdminVideosUseCase):
+    def __init__(self, repository: VideoPort) -> None:
+        self._repository = repository
+
+    def __call__(self, query: AdminVideosQuery) -> AdminVideoListResult:
+        ref = self._repository.resolve_user(query.identifier.strip())
+        if ref is None:
+            raise ApiError(
+                404, "USER_NOT_FOUND", "해당 사용자를 찾을 수 없습니다."
             )
-        except Exception as exc:  # noqa: BLE001
-            _log.warning(
-                "video %s: DB 는 지웠으나 S3 정리 실패 (%s: %s)",
-                video.id,
-                type(exc).__name__,
-                exc,
-            )
+        rows = self._repository.list_all_by_user(ref.id)
+        return AdminVideoListResult(
+            user_id=ref.id,
+            nickname=ref.nickname,
+            email=ref.email,
+            items=[_to_admin_row(v) for v in rows],
+        )
+
+
+class AdminDeleteVideoInteractor(AdminDeleteVideoUseCase):
+    def __init__(self, repository: VideoPort, storage: StoragePort) -> None:
+        self._repository = repository
+        self._storage = storage
+
+    def __call__(self, command: AdminDeleteVideoCommand) -> None:
+        video = self._repository.admin_delete(command.video_id)
+        if video is None:
+            raise ApiError(404, "VIDEO_NOT_FOUND", "클립을 찾을 수 없습니다.")
+        # 비밀번호를 안 받는 대신 누가 눌렀는지 남긴다(`DELETE /admin/users` 와 같은 결).
+        _log.info(
+            "event=admin_delete_video admin_id=%s video_id=%s",
+            command.admin_id,
+            video.id,
+        )
+        _cleanup_storage(self._storage, video)

@@ -921,6 +921,41 @@ git -C fastapi log --oneline main -- app/billing   # main에 배선됐는지
 
 ---
 
+## 23. 🟡 관리자 영상 목록·삭제가 생겼습니다 (2026-09-08 추가)
+
+미결 `jin` 24번 6조각. **관리자 웹**(`www/src/app/admin/…`)용입니다 — Flutter 는
+해당 없음. 사람이 "문제 영상"을 찾아 지우고 에이전트가 제대로 돌았는지 확인하는
+자리입니다.
+
+| 엔드포인트 | 뜻 |
+|---|---|
+| `GET /admin/videos?user=<uid\|email>` | 그 사람의 영상 **전부**(임시 `kept:false` 포함), 최근순 |
+| `DELETE /admin/videos/{id}` | 아무 영상이나 삭제(소유 검사 없음) — DB 연쇄 + S3 best-effort |
+
+- `?user=` 는 **필수**입니다. `user.id`(UUID) 또는 이메일(대소문자 무시) 중 하나.
+  없는 사람이면 `404 USER_NOT_FOUND`.
+- 목록 한 줄: `id`·`sport_code`·`original_filename`·`storage_key`·`created_at`·
+  `kept`·`is_public`·`passed`·`reject_reason`·`analysis_status`·`report_prefix`.
+  응답 최상위에 그 사람의 **현재** `nickname`·`email` 이 옵니다(닉네임을 바꿔도
+  DB 조인이라 따라갑니다 — 저장 키에 얼어붙은 글자와 다릅니다).
+- **재생·리포트 링크는 목록에 안 실립니다.** 객체마다 사전 서명하지 않으려는
+  것이라, `storage_key`(재생)와 `report_prefix` 아래
+  `report.json`·`impact.jpg`·`tracked.webm`(리포트)를 콘솔이나 별도 사전 서명으로
+  짚으시면 됩니다.
+- 같은 관리자 게이트(`ADMIN_EMAILS` 화이트리스트, `403 FORBIDDEN`)입니다.
+- ⚠️ 21번과 같은 이유로 **S3 삭제는 아직 실서버에서 안 됩니다**(EC2 역할에
+  `s3:DeleteObject` 미부착). DB 에서는 즉시 사라집니다.
+
+### 먼저 확인
+
+```bash
+git -C fastapi grep -n "admin/videos" -- app/main.py app/analysis   # 라우트가 배선됐는지
+```
+
+상세: `fastapi/docs/api-contract.md` **3-2절**
+
+---
+
 ## 계약 문서
 
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린

@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
-from app.analysis.application.dtos.video_dto import UNSET
+from app.analysis.application.dtos.video_dto import UNSET, UserRef
 from app.analysis.application.ports.output.storage_port import StoragePort
 from app.analysis.application.ports.output.video_port import VideoPort
 from app.analysis.domain.entities.video_entity import VideoEntity
@@ -55,6 +55,18 @@ class StubVideoRepository(VideoPort):
         ]
         return sorted(mine, key=lambda v: v.created_at, reverse=True)
 
+    def list_all_by_user(self, user_id: UUID) -> list[VideoEntity]:
+        mine = [v for v in _VIDEOS.values() if v.user_id == user_id]
+        return sorted(mine, key=lambda v: v.created_at, reverse=True)
+
+    def resolve_user(self, identifier: str) -> UserRef | None:
+        # 스텁은 `user` 를 모른다 — UUID 꼴이면 그 사람이 있다고 보고(닉네임·
+        # 이메일은 빈 값), 이메일 꼴은 못 찾는다. 실제 조회는 `test_video_db.py`.
+        try:
+            return UserRef(id=UUID(identifier), nickname="", email="")
+        except ValueError:
+            return None
+
     def get(self, video_id: UUID) -> VideoEntity | None:
         return _VIDEOS.get(video_id)
 
@@ -91,6 +103,9 @@ class StubVideoRepository(VideoPort):
         if video is None or video.user_id != user_id:
             return None
         return _VIDEOS.pop(video_id)
+
+    def admin_delete(self, video_id: UUID) -> VideoEntity | None:
+        return _VIDEOS.pop(video_id, None)
 
     def sweep_provisional(self, ttl_hours: int) -> list[VideoEntity]:
         cutoff = datetime.now(timezone.utc) - timedelta(hours=ttl_hours)

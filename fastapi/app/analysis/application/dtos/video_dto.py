@@ -102,6 +102,68 @@ class PublicVideosQuery:
 
 
 @dataclass(frozen=True)
+class UserRef:
+    """`user` 컨텍스트에서 원시 SQL 로 읽어 온 사람 1명. 관리자 영상 목록이
+    `?user=<uid|email>` 를 사람으로 되짚는 데 쓴다(미결 `jin` 24번).
+    """
+
+    id: UUID
+    nickname: str
+    email: str
+
+
+@dataclass(frozen=True)
+class AdminVideosQuery:
+    """관리자가 한 사람의 영상을 전부 본다. `identifier` 는 `user.id`(UUID 문자열)
+    또는 이메일이다.
+    """
+
+    identifier: str
+
+
+@dataclass(frozen=True)
+class AdminVideoRow:
+    """관리자 목록 한 줄. **사람이 읽을 수 있게** 원본 이름·업로드일·상태를 싣고,
+    S3 로 되짚을 `storage_key` 와 리포트 폴더 접두사를 함께 준다.
+    """
+
+    id: UUID
+    sport_code: str
+    original_filename: str | None
+    storage_key: str
+    created_at: datetime
+    kept: bool
+    is_public: bool
+    passed: bool
+    reject_reason: str | None
+    analysis_status: str | None
+    report_prefix: str
+
+
+@dataclass(frozen=True)
+class AdminVideoListResult:
+    """한 사람의 영상 전부. 닉네임·이메일은 **현재 값**이다 — 옛 저장 키에 얼어
+    붙은 닉네임과 달리 DB 조인이라 rename 이 반영된다(미결 `jin` 24번).
+    """
+
+    user_id: UUID
+    nickname: str
+    email: str
+    items: list[AdminVideoRow]
+
+
+@dataclass(frozen=True)
+class AdminDeleteVideoCommand:
+    """관리자가 **아무** 영상이나 지운다. 소유 검사가 없다 — 관리자 인증이 그
+    자리를 대신한다(`DELETE /admin/users/{id}` 와 같은 결). 누가 눌렀는지는
+    로그에 남긴다.
+    """
+
+    video_id: UUID
+    admin_id: UUID
+
+
+@dataclass(frozen=True)
 class VideoResult:
     """`/videos` 화면 한 줄. 분석 상태와 반려 사유가 같이 온다.
 
