@@ -2812,7 +2812,14 @@ if len(sep_idx) >= 2:
 >
 > | 확인 | `grep -n "sport_code" fastapi/docs/api-contract.md` → 3-1절에 「✅ 결정 — A안」 있음 |
 > |---|---|
-> | 남은 것 | 스키마 반영 · `metric_definition` 시드(코드 11개는 `agent/rubrics/`에서 뽑아 드립니다) · 부록 D.3 |
+> | 남은 것 | ~~스키마 반영~~ ✅ · `metric_definition` 시드(코드 11개는 `agent/rubrics/`에서 뽑아 드립니다) · 부록 D.3 |
+
+**스키마 반영 (2026-09-08, 정어진, `5db18b239336`)**: `metric_definition_orm.py` 에서
+`sport_code` 제거 + `op.drop_column`. 그 컬럼엔 외래키가 없었다(`20260901_sport_and_position`
+이 A안 대비로 일부러 안 걸었음). 테이블 0 행이라 컬럼 삭제로 끝. `alembic check` +
+downgrade 왕복 클린, 572 통과. `test_analysis_schema_db.py`·`test_delete_me_db.py`
+픽스처의 `MetricDefinitionOrm(... sport_code=...)` 도 함께 정리. 남은 건 시드(정상호가
+`agent/rubrics/` 에서 뽑아 줌 · 넣는 주체 미정) · 부록 D.3(박민호).
 
 에이전트가 분석 결과를 백엔드에 넘기는 경로(`POST /videos` · `POST /analyses`)의
 규격은 나왔는데, **`metric_definition` 을 채울 수 없어 적재가 통째로 막힌다.**
