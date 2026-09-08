@@ -44,7 +44,9 @@ class StubVideoRepository(VideoPort):
         _VIDEOS[video.id] = video
 
     def list_by_user(self, user_id: UUID) -> list[VideoEntity]:
-        mine = [v for v in _VIDEOS.values() if v.user_id == user_id]
+        mine = [
+            v for v in _VIDEOS.values() if v.user_id == user_id and v.kept
+        ]
         return sorted(mine, key=lambda v: v.created_at, reverse=True)
 
     def get(self, video_id: UUID) -> VideoEntity | None:
@@ -74,9 +76,15 @@ class StubVideoRepository(VideoPort):
         return updated
 
     def list_public(self, limit: int) -> list[VideoEntity]:
-        public = [v for v in _VIDEOS.values() if v.is_public]
+        public = [v for v in _VIDEOS.values() if v.is_public and v.kept]
         public.sort(key=lambda v: v.created_at, reverse=True)
         return public[:limit]
+
+    def delete(self, video_id: UUID, user_id: UUID) -> VideoEntity | None:
+        video = _VIDEOS.get(video_id)
+        if video is None or video.user_id != user_id:
+            return None
+        return _VIDEOS.pop(video_id)
 
 
 class FakeStorage(StoragePort):
@@ -97,3 +105,10 @@ class FakeStorage(StoragePort):
 
     def size_of(self, storage_key: str) -> int | None:
         return _OBJECTS.get(storage_key)
+
+    def delete_object(self, storage_key: str) -> None:
+        _OBJECTS.pop(storage_key, None)
+
+    def delete_prefix(self, prefix: str) -> None:
+        for key in [k for k in _OBJECTS if k.startswith(prefix)]:
+            del _OBJECTS[key]

@@ -150,4 +150,9 @@ class TestOpenApi:
             V1 + "/matches/{match_id}/reviews",
             V1 + "/matches/{match_id}/no-shows",
             f"{V1}/reports",
+            f"{V1}/credits",
+            f"{V1}/admin/credits/adjustments",
+            f"{V1}/coaches",
+            V1 + "/coaches/{coach_id}",
+            V1 + "/coaches/{coach_id}/referrals",
         }

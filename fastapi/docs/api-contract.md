@@ -1362,13 +1362,19 @@ SFR-001. 사용자가 자기 클립을 올리고, 서버가 규격을 검사해 
   "analysis_status": "queued",
   "is_public": false,
   "title": null,
-  "description": null
+  "description": null,
+  "kept": true
 }
 ```
 
 반려면 `passed: false` · `reject_reason: "해상도가 상한을 넘습니다: 3840x2160
 (상한 1920x1080)"` · `analysis_job_id: null` 이다. **반려된 클립은 분석하지 않는다** —
 규격 검사를 두는 이유가 그것이다.
+
+`kept` 는 **프로필에 저장됐는가**다(미결 `jin` 24번). `GET /videos` 는 `kept: true`
+만 준다. **지금은 등록되는 모든 영상이 `kept: true`** 로 시작한다 — `/analysis`
+분석을 임시(`kept: false`)로 두고 "저장"에서 켜는 전환은 프론트가 준비되면
+따로 켠다.
 
 `is_public`·`title`·`description` 은 **등록 시 정할 수 없다** — 각각 `false`·`null`
 로 저장된다(미결 `paik` 5번). 바꾸는 것은 아래 `PATCH /videos/{id}` 다.
@@ -1463,9 +1469,23 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
 | 404 | `VIDEO_NOT_FOUND` | 없는 클립이거나 비공개 남의 클립이다 |
 | 503 | `STORAGE_NOT_CONFIGURED` | 서버에 `S3_BUCKET` 이 없다 |
 
+### `DELETE /api/v1/videos/{video_id}` — 클립 삭제 (2026-09-08 추가)
+
+미결 `jin` 24번. **자기 클립만.** `204 No Content`.
+
+- **DB 행**과 그 연쇄(`video_validation`·`analysis_job`·그 하위)를 지운다 —
+  외래키 `ON DELETE CASCADE`(SEC-006).
+- **S3 객체**도 지운다: `storage_key` + `reports/<user_id>/<video_id>/` 접두사 전부.
+  🔴 **best-effort** — 실패해도 `204` 다. DB 에서 사라진 것이 "사용자에게 없어진
+  것"이고, 남은 S3 객체는 백스톱 스윕이 잡는다. (지금 EC2 역할에 `s3:DeleteObject`
+  가 없어 실서버에서는 객체가 남는다 — 미결 `jin` 24번 IAM 조각)
+
+| 에러 | code | 언제 |
+|---|---|---|
+| 404 | `VIDEO_NOT_FOUND` | 없는 클립이거나 남의 클립이다 |
+
 ### 아직 없는 것
 
-- **삭제** — 올린 클립을 지우는 경로. S3 객체까지 함께 지워야 해서 순서를 정해야 한다
 - **재분석** — `analysis_job` 은 여러 건을 허용하지만 만드는 경로가 업로드뿐이다
 - **분석 결과 적재**(`POST /analyses`) — 3-1 절. `metric_definition` 합의가 선행이다
 
@@ -1807,6 +1827,83 @@ RAM 이 터지는 것 — 미결 `ho` 9번)이 큐를 영원히 돌게 된다. �
 - **신고 처리** — 접수만 한다. 관리자 화면이 생기면 붙인다
 - **평가 조회** — 내가 받은 평가를 보는 경로. 신뢰도 표시 화면이 정해지면 낸다
 - **불참 취소** — 잘못 기록한 것을 무르는 경로
+
+---
+
+## 3-10. 과금 (2026-09-08 추가)
+
+부록 D 도메인 ⑥. 패킷 A(`docs/backend-work-split.md`). `paik` 브랜치에 있고,
+공유 파일 배선(`app/main.py` 등)은 아직입니다 — 정어진이 병합하며 잇습니다.
+
+### 🔴 잔량은 컬럼이 아니라 `SUM(delta)` 다
+
+부록 D.4 가 `analysis_credit.balance`를 파생값이라 제거한 자리다. 지급은 양수,
+차감은 음수 한 행이고, **크레딧 차감은 분석 경로(`POST /videos`)와 이어지지
+않는다** — 컨텍스트 경계를 넘는 연결이라 그쪽은 정어진이 붙인다.
+
+### 정하지 않은 것 (패킷 A 문서 「정해야 할 것」)
+
+무료 크레딧 지급 시점·액수, 분석 1건당 차감액, `reason` 값 목록은 아직 미정이다.
+그 전에도 조회·수동 지급은 가능하다 — 정책은 값이지 구조가 아니다.
+
+### `GET /api/v1/credits`
+
+인증 필요. 내 크레딧 잔량과 이력.
+
+```json
+{"balance": 70, "history": [
+  {"id": "…", "delta": 100, "reason": "signup_bonus", "created_at": "…"},
+  {"id": "…", "delta": -30, "reason": "analysis", "created_at": "…"}
+]}
+```
+
+### `POST /api/v1/admin/credits/adjustments` — 관리자 전용
+
+```json
+{"user_id": "…", "delta": 100, "reason": "signup_bonus"}
+```
+
+`201` — 조정 뒤 대상 사용자의 `GET /credits`와 같은 형태.
+
+| 에러 | code |
+|---|---|
+| 403 | 관리자가 아니다(`require_admin`, 계약 3-2절과 같은 게이트) |
+| 404 | `USER_NOT_FOUND` |
+| 422 | `INVALID_DELTA` — 증감액이 0이다 |
+
+### `GET /api/v1/coaches` · `GET /api/v1/coaches/{coach_id}`
+
+인증 필요. 페이지 형식은 `GET /admin/users`와 같다(`items`·`total`·`page`·`size`).
+
+```json
+{"id": "…", "name": "김도현", "contact": "…"}
+```
+
+⚠️ **종목·가격·소개 문장·대표 영상이 없다.** `www/src/lib/market.ts`의 `Coach`
+타입(mock)은 이보다 훨씬 풍부하지만, 부록 D의 `coach`는 `id`·`name`·`contact`
+셋뿐이다 — 화면과 스키마를 맞추는 것은 별도 결정이 필요해 미결 항목에 올렸다.
+상세 없는 코치는 404 `COACH_NOT_FOUND`.
+
+### `POST /api/v1/coaches/{coach_id}/referrals`
+
+```json
+{"fee": "50000.00"}
+```
+
+`201` — `{id, coach_id, fee, created_at}`. **중복을 막지 않는다** — 같은 코치에
+여러 번 연결을 요청할 수 있다(상담을 여러 번 받는 흐름이 자연스럽다).
+
+| 에러 | code |
+|---|---|
+| 404 | `COACH_NOT_FOUND` |
+| 422 | `INVALID_FEE` — 수수료가 음수다 |
+
+### 아직 없는 것
+
+- **`market.ts`의 나머지 필드** — 가격·후기·레슨 장소 등은 부록 D에 대응
+  컬럼이 없다. 필요해지면 부록 D 변경으로 이어진다
+- **크레딧 자동 지급·차감** — 가입 보너스나 분석당 차감을 트리거하는 경로.
+  지금은 관리자의 수동 조정뿐이다
 
 ---
 

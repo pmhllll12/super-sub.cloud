@@ -8817,6 +8817,60 @@ body:has(.ss-shot) .ss-app-figure {
   position: relative;
 }
 
+/* 🔴 **지우기는 줄의 왼쪽 끝**(2026-09-08, 사용자 요청). 대표 영상 단추와
+   마주 보게 두 단추 다 흐름 밖으로 뺀다 — 흐름에 두면 가운데 넘기는 단추가
+   밀린다. 상자 폭이 영상 비와 무관하므로(위 `.ss-profile-video-frame`) 이
+   자리도 영상마다 안 갈린다.
+
+   ⚠️ 되돌릴 수 없는 단추라 **화살표에서 가장 먼 쪽**에 둔다. */
+.ss-profile-del {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ss-profile-del-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 32%, transparent);
+  padding: 5px 12px;
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--ss-fg) 76%, transparent);
+  white-space: nowrap;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.ss-profile-del-btn .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.ss-profile-del-btn:hover,
+.ss-profile-del-btn:focus-visible {
+  border-color: color-mix(in srgb, var(--ss-error) 70%, transparent);
+  color: color-mix(in srgb, var(--ss-error) 85%, var(--ss-fg));
+}
+
+/* 한 번 더 물은 뒤의 그 단추. 🔴 색만으로 말하지 않는다 — 글자가
+   「정말 지웁니다」로 바뀌고 옆에 「취소」가 선다. */
+.ss-profile-del-btn[data-armed='true'] {
+  border-color: var(--ss-error);
+  background-color: color-mix(in srgb, var(--ss-error) 16%, transparent);
+  color: color-mix(in srgb, var(--ss-error) 85%, var(--ss-fg));
+}
+
+.ss-profile-del-btn:disabled {
+  opacity: 0.6;
+}
+
 .ss-profile-featured-btn {
   position: absolute;
   top: 50%;
@@ -9668,39 +9722,59 @@ body:has(.ss-profile) {
   display: flex;
   flex-direction: column;
   align-items: center;
+  /* 상자 폭의 기준 — **가로 16:9** 한 편. 영상마다 갈리지 않는 값이라야
+     아래 넘기는 줄의 단추들이 제자리에 머문다. */
+  --ss-video-wide: 1.778;
 }
 
-/* 🔴 **상자가 영상 크기와 같다.** `--ss-video-r`(가로세로 비)은 영상의
-   메타데이터가 도착할 때 `MyVideos` 가 넣어 준다 — 그래야 아래 흰 선을
-   `100%` 로만 두어도 영상 폭에 딱 맞는다.
+/* 🔴 **상자 폭에 영상 비가 안 들어간다**(2026-09-08, 사용자 요청: "세로
+   영상이든 가로영상이든 단추 위치가 안 바뀌게"). 가로 16:9 한 편이 차지할
+   폭으로 못박는다 — 그 아래 넘기는 줄 · 흰 선이 이 폭을 그대로 쓰므로,
+   무슨 영상을 골라도 `‹ 1 / 2 ›` 와 「나를 보여주는 대표 영상」이 제자리다.
 
-   폭은 두 제약 중 작은 쪽이다: 칸 폭(100%)과, 키 상한에서 역산한 폭
-   (44vh × 비). 그래서 가로 영상은 폭이 꽉 차고 세로 영상은 좁아진다.
+   🔴 **앞서 "선이 영상 폭을 따라간다"고 해 둔 것을 여기서 뒤집는다.** 그때는
+   상자가 곧 영상이었는데, 그러면 세로 영상(비 0.5625)에서 줄이 247px 까지
+   좁아져 **오른쪽 끝에 건 단추가 가운데 화살표를 덮었다**(실측). 둘을 한
+   줄에 두기로 한 이상(아래 `.ss-profile-featured-btn` 주석) 줄 폭이 영상마다
+   갈리면 안 된다.
 
-   🔴 `width` 에 전이를 건다 — 영상을 넘기면 비가 바뀌는데, 없으면 선과
-   상자가 툭 끊기며 갈린다(사용자 요청: "부드럽게 늘어나게"). */
+   영상 자체는 여전히 **안 자른다** — 자기 비로 이 안에서 가운데 선다. */
 .ss-profile-video-frame {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  width: min(100%, calc(44vh * var(--ss-video-r, 1.778)));
-  transition: width 380ms cubic-bezier(0.25, 0.6, 0.3, 1);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ss-profile-video-frame {
-    transition: none;
-  }
+  width: min(100%, calc(44vh * var(--ss-video-wide, 1.778)));
 }
 
 /* 🔴 **자르지 않는다**(`contain`). `cover` 로 두었더니 세로 영상(1080×1920)이
    16:9 틀에 맞춰 **가운데만 잘려** 나왔다 — 이 사이트는 영상을 자르지 않는
    쪽을 지켜 왔다(작업 현황 0.8절). 상자가 이미 영상 비율이라 여백은 안 남는다. */
+/* 🔴 **영상이 서는 자리 — 키가 고정이다**(2026-09-08). 상자 폭을 비에서
+   떼어 놓아도 **키가 남아 있었다**: 가로 영상은 368px, 세로 영상은 432px 라
+   아래 넘기는 줄 · 흰 선 · 섬네일이 통째로 64px 오르내렸다(실측).
+
+   자리를 키 상한(44vh)으로 못박고 영상을 그 안에 세운다. 영상은 자기 비
+   그대로라 **늘어나지도 잘리지도 않고**, 남는 자리는 비워 둔다 — 검은 여백이
+   아니라 판 바탕이다(`background` 는 영상 자신에만 있다). */
+.ss-profile-video-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44vh;
+}
+
 .ss-profile-video-player {
   display: block;
-  width: 100%;
+  /* 영상 폭은 두 제약 중 작은 쪽이다: 상자 폭(100%)과, 키 상한에서 역산한
+     폭(44vh × 비). `aspect-ratio` 가 함께 걸려 있어 키는 44vh 를 못 넘고
+     여백(레터박스)도 안 생긴다 — 그래서 `max-height` 를 따로 두지 않는다.
+
+     🔴 상자가 아니라 **여기에** 전이를 건다(전에는 상자에 있었다). 상자는
+     이제 안 변하고, 영상을 넘길 때 비가 바뀌는 것은 이쪽이다
+     (사용자 요청: "부드럽게 늘어나게"). */
+  width: min(100%, calc(44vh * var(--ss-video-r, 1.778)));
   aspect-ratio: var(--ss-video-r, 1.778);
-  max-height: 44vh;
+  transition: width 380ms cubic-bezier(0.25, 0.6, 0.3, 1);
   background: #000;
   object-fit: contain;
   /* 🔴 선수 카드와 **같은 값**이다(`.ss-pcard-inner` 의 24px, 사용자 요청) —
@@ -9709,8 +9783,9 @@ body:has(.ss-profile) {
   border-radius: 24px;
 }
 
-/* 넘기는 줄 아래 얇은 흰 선. 영상 폭을 그대로 따른다.
-   비를 아직 모를 때는 폭이 틀리므로 나타나지 않는다(MyVideos 주석). */
+/* 넘기는 줄 아래 얇은 흰 선. **상자 폭**을 그대로 따른다 — 상자가 이제
+   영상 비와 무관하므로 이 선도 영상마다 갈리지 않는다(위 상자 주석).
+   비를 아직 모를 때 감추는 것은 그대로다(MyVideos 주석). */
 .ss-profile-video-rule {
   display: block;
   width: 100%;
@@ -9726,6 +9801,12 @@ body:has(.ss-profile) {
 
 .ss-profile-video-rule[data-ready='true'] {
   opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-profile-video-player {
+    transition: none;
+  }
 }
 
 /* 🔴 선 아래의 목록 — **가로로 구른다**(사용자 요청). 칸 폭을 넘으면 여기서만
@@ -10174,4 +10255,149 @@ body:has(.ss-profile) {
   display: flex;
   align-self: flex-start;
   gap: 8px;
+}
+
+/* ── 경기장 예약 ────────────────────────────────────────────────────
+   레슨 · 상점(`.ss-market`)과 같은 성격의 문서형 화면이라 껍데기 치수는
+   그대로 가져오되, `/venues`가 `/market` 아래가 아니라서 클래스는 새로
+   둔다 — 이름이 market이면 읽는 사람이 실제로는 아닌 소속 관계를 짐작한다. */
+.ss-venues {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 48px 0 24px;
+}
+
+.ss-venues-head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ss-venues-head h1 {
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ss-fg);
+}
+
+.ss-venues-head p {
+  max-width: 46rem;
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: color-mix(in srgb, var(--ss-fg) 68%, transparent);
+}
+
+.ss-venue-list {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
+}
+
+/* 코치 카드(`.ss-coach-card`)와 같은 색·테두리 규칙 — 밝은 크림 바탕에
+   판과 같은 초록 테두리. 여기는 영상이 없어 카드를 둘로 가르지 않는다. */
+.ss-venue-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--ss-accent, #33483c);
+  border-radius: 0;
+  padding: 18px;
+  background-color: var(--ss-surface, #e3dece);
+  color: var(--ss-fg, #000);
+}
+
+.ss-venue-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ss-venue-card-head b {
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+.ss-venue-card-head span {
+  font-size: 0.8125rem;
+  color: color-mix(in srgb, var(--ss-fg, #000) 60%, transparent);
+}
+
+.ss-venue-card-address {
+  font-size: 0.8125rem;
+  color: color-mix(in srgb, var(--ss-fg, #000) 60%, transparent);
+}
+
+.ss-venue-card-tagline {
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.ss-venue-sports {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* 정적 표시용 알약이라 `.ss-shot-sport`(누르는 거름망 단추)를 그대로 쓰지
+   않는다 — 저건 aria-pressed 를 갖는 단추 의미라 여기 <span> 에는 안 맞다. */
+.ss-venue-sport-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg, #000) 35%, transparent);
+  border-radius: 999px;
+  padding: 0 8px;
+  font-size: 0.6875rem;
+  white-space: nowrap;
+}
+
+/* 시간대별 접수 현황 — 실제 예약은 서울시 사이트로 나가는 링크뿐이라
+   여기엔 상태 배지 · 시간 · 외부 링크만 있고 우리 쪽 폼은 없다. */
+.ss-venue-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 10px;
+}
+
+.ss-venue-slot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+}
+
+.ss-venue-slot-status {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  border-radius: 999px;
+  padding: 0 8px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ss-venue-slot-status.is-open {
+  background-color: color-mix(in srgb, var(--ss-accent, #33483c) 18%, transparent);
+  color: var(--ss-accent, #33483c);
+}
+
+.ss-venue-slot-status.is-closed {
+  background-color: color-mix(in srgb, var(--ss-fg, #000) 10%, transparent);
+  color: color-mix(in srgb, var(--ss-fg, #000) 55%, transparent);
+}
+
+.ss-venue-slot-time {
+  color: color-mix(in srgb, var(--ss-fg, #000) 70%, transparent);
+}
+
+.ss-venue-slot-link {
+  margin-left: auto;
+  font-weight: 600;
+  text-decoration: underline;
+  white-space: nowrap;
 }
