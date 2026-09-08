@@ -51,11 +51,45 @@ DEFAULT_TARGET_FPS = 30
 # 기존 동작을 그대로 보존한다. 평가셋 39클립이 전부 10초 이하라 무변화다.
 DEFAULT_MAX_SECONDS = 10.0
 
-# **메모리 가드(장).** 분석 의도가 아니라 미결 9번(4K에서 host RAM이 먼저
-# 터진다)이 정한 상한이다. 4K 300장이 약 7GB이고 g4dn.xlarge의 host RAM은
-# 16GB다. 창을 넓히고 싶으면 DEFAULT_MAX_SECONDS를 올릴 것 — 이 값을 올리면
-# 메모리 한계를 올리는 것이지 창을 넓히는 것이 아니다.
+# **메모리 가드(바이트).** 분석 의도가 아니라 미결 9번(4K에서 host RAM이 먼저
+# 터진다)이 정한 상한이다. 창을 넓히고 싶으면 DEFAULT_MAX_SECONDS를 올릴 것 —
+# 이 값을 올리면 메모리 한계를 올리는 것이지 창을 넓히는 것이 아니다.
+#
+# 🔴 **장수가 아니라 바이트인 이유**: 장수로 막으면 해상도를 못 본다. 같은
+# 300장이 4K 세로에서 7,465MB이고 1080p에서 1,866MB다 — 한쪽에는 딱 맞고
+# 다른 쪽에는 4배 헐겁다. 헐거운 쪽이 치르는 대가가 **분석 창**이었다:
+# 실효 fps가 30을 넘는 소스에서 가드가 창을 이겨 보기로 한 10초 중 최악
+# **6.74초**만 봤다(`eval/pending9_window/`).
+#
+# 값이 이것인 이유: **지금의 4K 세로 300장과 같은 바이트다.** 실측 여유는
+# 11,214MB로 더 크지만(인스턴스 16,162 − 동거 vLLM 3,200 − base 1,748)
+# 올리지 않는다 — 올리면 4K 클립의 장수가 늘어 **결과가 달라지고**, 그건
+# 창을 지키는 일이 아니라 동작점 이동이다. 이 값에 고정하면 4K는 한 비트도
+# 안 바뀌고 낮은 해상도만 풀린다.
+#
+# 🔴 **런타임에 남은 메모리를 조회해 정하지 않는다.** 그러면 같은 클립이
+# 기계 상태에 따라 다른 장수로 분석되어 점수가 흔들리고, 그 차이가 아무
+# 데도 안 남는다. 예산은 상수이고 동거 프로세스 몫은 **이 값을 정할 때**
+# 뺐다 (`eval/pending9_budget/PREREGISTRATION.md` 2절).
+DEFAULT_MAX_FRAME_BYTES = 2160 * 3840 * 3 * 300      # 7,465MB
+
+# 예산을 장수로 환산할 수 없을 때 쓰는 값. 컨테이너가 해상도를 안 알려주는
+# 경우가 있어서 남긴다 — **모르면 지금까지의 동작을 그대로 한다.**
 DEFAULT_MAX_FRAMES = 300
+
+
+def frames_within_budget(width: int, height: int,
+                         budget_bytes: int = DEFAULT_MAX_FRAME_BYTES) -> int:
+    """이 해상도로 예산 안에 들 수 있는 장수. BGR uint8 한 벌 기준이다.
+
+    한 벌인 것은 재디코딩(D-1, 2026.09.01) 덕이고 실측이 그것을 확인했다 —
+    `RSS ≈ base + k × frame_bytes` 에서 `k ≈ 0.98`, 즉 프레임을 정확히 한 벌만
+    든다(`eval/pending9_rss/RESULTS.md`).
+
+    해상도를 모르면 부를 수 없다 — 그때는 `DEFAULT_MAX_FRAMES` 로 떨어진다.
+    """
+    per_frame = max(1, int(width) * int(height) * 3)
+    return max(1, budget_bytes // per_frame)
 
 # 실효 fps가 목표의 이 비율보다 낮으면 경고한다. **절벽만 막는다** —
 # 미결 7번이 확인했듯 30↔60에서도 등급이 37% 바뀌므로, 이 경고가 fps 불변성을
@@ -353,12 +387,17 @@ class FrameRead(NamedTuple):
     # 잘렸다면 **무엇이 잘랐는가**: "window"(분석 창) 또는 "memory_guard".
     # 안 잘렸으면 None. 창과 가드는 뜻이 다르다 — 아래 `read_frames_ex` 참고.
     limited_by: str | None
+    # 이 회차에 **실제로 쓴** 가드(장). 기본값은 해상도에서 계산되므로
+    # 부르는 쪽이 넘긴 값과 다를 수 있다. 재디코딩이 같은 장수를 잘라야 해서
+    # `PoseResult`가 이 값을 들고 다닌다 — 넘긴 값(None)을 들고 다니면
+    # 「무엇으로 잘랐나」가 결과에 안 남는다.
+    max_frames: int = DEFAULT_MAX_FRAMES
 
 
 def read_frames(
     video_path: str | Path,
     target_fps: int = DEFAULT_TARGET_FPS,
-    max_frames: int = DEFAULT_MAX_FRAMES,
+    max_frames: int | None = None,
     max_seconds: float = DEFAULT_MAX_SECONDS,
 ) -> tuple[list[np.ndarray], float, float]:
     """`read_frames_ex`의 앞 세 값만 돌려주는 껍데기.
@@ -374,7 +413,7 @@ def read_frames(
 def read_frames_ex(
     video_path: str | Path,
     target_fps: int = DEFAULT_TARGET_FPS,
-    max_frames: int = DEFAULT_MAX_FRAMES,
+    max_frames: int | None = None,
     max_seconds: float = DEFAULT_MAX_SECONDS,
 ) -> FrameRead:
     """OpenCV로 디코딩하고 target_fps에 가장 가까운 정수 간격으로 다운샘플링한다.
@@ -390,6 +429,11 @@ def read_frames_ex(
       max_seconds — **분석 창.** 몇 초까지 볼 것인가. 소스 fps와 무관하다.
       max_frames  — **메모리 가드.** 몇 장까지 들 것인가. 미결 9번(4K에서 host
                     RAM이 먼저 터진다)이 정한 값이며 분석 의도가 아니다.
+                    **기본값은 해상도에서 계산한다**(`DEFAULT_MAX_FRAME_BYTES`)
+                    — 장수로 고정하면 해상도를 못 봐서 낮은 해상도에서
+                    쓸데없이 창을 먹는다. 명시적으로 넘기면 그 값이 이긴다:
+                    평가 스크립트가 장수를 고정해 돌리는 자리가 있고, 그
+                    뜻이 바뀌면 그 회차들이 조용히 다른 것을 잰다.
 
     프레임 수만으로 막으면 **덮는 실시간 길이가 fps에 따라 달라진다** — 300장은
     30fps에서 10.0초지만 24fps에서는 12.5초다. 같은 동작을 담은 두 인코딩이 서로
@@ -407,6 +451,19 @@ def read_frames_ex(
     src_fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     step = max(1, round(src_fps / target_fps))
     sampled_fps = src_fps / step
+
+    # 가드를 **해상도에서** 정한다. 부르는 쪽이 장수를 명시했으면 그것이 이긴다.
+    # 🔴 컨테이너가 해상도를 안 알려주면(0이나 음수) **지어내지 않고**
+    # 지금까지의 장수 가드로 떨어진다 — 4K를 1080p로 착각해 예산을 네 배로
+    # 여는 것보다 낫다.
+    if max_frames is None:
+        w = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+        h = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        max_frames = (
+            frames_within_budget(int(w), int(h))
+            if w and h and w > 0 and h > 0
+            else DEFAULT_MAX_FRAMES
+        )
 
     # t < max_seconds 인 프레임의 개수. k 번째 표본의 시각이 k / sampled_fps 이므로
     # k < max_seconds * sampled_fps 이고, 개수는 그 값의 올림이다.
@@ -468,7 +525,7 @@ def read_frames_ex(
         raise ValueError(f"프레임을 읽지 못했습니다: {video_path}")
     return FrameRead(
         frames, src_fps, sampled_fps, truncated, source_seconds,
-        limited_by if truncated else None,
+        limited_by if truncated else None, max_frames,
     )
 
 
@@ -814,7 +871,7 @@ def extract_keypoints(
     device: str | None = None,
     observe: bool = True,
     rubric_key: str | None = None,
-    max_frames: int = DEFAULT_MAX_FRAMES,
+    max_frames: int | None = None,
     max_seconds: float = DEFAULT_MAX_SECONDS,
     subject: SubjectRequest | None = None,
 ) -> PoseResult:
@@ -941,7 +998,10 @@ def extract_keypoints(
         # 판정 모델이 올라갈 때 원본 프레임이 메모리에 남지 않는다.
         video_path=str(video_path),
         target_fps=target_fps,
-        max_frames=max_frames,
+        # 🔴 **넘긴 값이 아니라 실제로 쓴 값**을 싣는다. 기본값은 해상도에서
+        # 계산되므로 넘긴 것은 None 일 수 있고, 그걸 그대로 들고 다니면
+        # 재디코딩이 「무엇으로 잘랐는지」를 결과에서 읽을 수 없다.
+        max_frames=read.max_frames,
         max_seconds=max_seconds,
         truncated=read.truncated,
         source_seconds=read.source_seconds,
