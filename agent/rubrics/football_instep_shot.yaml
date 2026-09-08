@@ -37,7 +37,7 @@ kinematics:
 
 criteria:
   - id: plant_knee_flexion
-    name: 디딤발 무릎 굴곡
+    name: 디딤발 무릎 굽히기
     weight: 0.15
     rationale: >-
       디딤발이 충분히 굽어야 상체가 안정되고 체중이 실린다.
@@ -68,7 +68,7 @@ criteria:
         evidence: "무릎각 128.2도로 하한 135도 미달, 과도한 굴곡"
 
   - id: swing_knee_extension
-    name: 차는 다리 무릎 신전
+    name: 차는 다리 뻗기
     weight: 0.25
     rationale: >-
       임팩트 직전 무릎이 접혔다가 펴지며 발등 속도를 만든다.
@@ -129,7 +129,7 @@ criteria:
         evidence: "기울기 -8.7도로 상체가 뒤로 젖혀짐"
 
   - id: hip_rotation
-    name: 골반 회전
+    name: 골반 돌리기
     weight: 0.15
     rationale: >-
       백스윙에서 임팩트까지 골반이 회전하며 상체 힘이 다리로 전달된다.
@@ -160,7 +160,7 @@ criteria:
         evidence: "회전 범위 9.1도로 골반 회전이 거의 없음"
 
   - id: follow_through
-    name: 팔로스루
+    name: 차고 난 뒤 마무리
     weight: 0.15
     rationale: >-
       임팩트 후 차는 다리가 계속 뻗어 나가야 감속 없이 힘이 전달된다.

@@ -111,7 +111,7 @@ kinematics:
 
 criteria:
   - id: lead_arm_extension
-    name: 리드 팔(보텀핸드) 신전
+    name: 앞쪽 팔 뻗기
     weight: 0.25
     rationale: >-
       배트 아래쪽을 잡은 팔이 접촉 구간에서 펴져 나가야 스윙 궤도가 길어지고
@@ -146,7 +146,7 @@ criteria:
         evidence: "팔꿈치각 98도로 리드 팔이 접혀 궤도가 짧아졌다"
 
   - id: hip_shoulder_separation
-    name: 골반-어깨 분리
+    name: 골반이 어깨보다 먼저 열리기
     weight: 0.25
     rationale: >-
       앞발이 닿은 뒤 골반이 먼저 열리고 상체가 뒤따라야 힘이 순서대로 전달된다.
@@ -179,7 +179,7 @@ criteria:
         evidence: "분리각 7도로 골반과 상체가 거의 함께 돌았다"
 
   - id: hip_rotation
-    name: 골반 회전
+    name: 골반 돌리기
     weight: 0.20
     rationale: >-
       타격의 힘은 하체 회전에서 온다. 준비 자세에서 임팩트까지 골반이 돌지
@@ -213,7 +213,7 @@ criteria:
         evidence: "회전 범위 11도로 하체 회전이 거의 없는 상체 스윙이다"
 
   - id: trunk_posture
-    name: 상체 유지
+    name: 상체 자세 유지
     weight: 0.15
     rationale: >-
       임팩트에서 상체가 무너지면 눈높이가 흔들리고 배트 궤도가 따라 흔들린다.
@@ -249,7 +249,7 @@ criteria:
         evidence: "기울기 크기 53도로 상체가 앞으로 무너졌다"
 
   - id: follow_through
-    name: 팔로스루
+    name: 휘두른 뒤 마무리
     weight: 0.15
     rationale: >-
       접촉 뒤에도 팔이 몸을 감아 돌아야 감속 없이 배트 속도가 유지된다.

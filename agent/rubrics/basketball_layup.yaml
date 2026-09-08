@@ -32,7 +32,7 @@ kinematics:
 
 criteria:
   - id: release_arm_extension
-    name: 슛하는 팔 신전
+    name: 슛하는 팔 뻗기
     weight: 0.35
     rationale: >-
       릴리스 순간 팔이 완전히 뻗어야 공을 가장 높은 지점에서 놓을 수 있다.
@@ -63,7 +63,7 @@ criteria:
         evidence: "팔꿈치각 121도로 팔이 접힌 채 릴리스, 릴리스 지점이 낮다"
 
   - id: takeoff_leg_extension
-    name: 도약 신전
+    name: 딛고 뛰어오르기
     weight: 0.25
     rationale: >-
       도약한 다리가 공중에서 곧게 펴져야 높이가 나온다. 무릎이 접힌 채
@@ -94,7 +94,7 @@ criteria:
         evidence: "무릎각 132도로 다리가 접힌 채 최고점, 도약을 다 쓰지 못했다"
 
   - id: trunk_alignment
-    name: 상체 정렬
+    name: 상체 곧게 세우기
     weight: 0.25
     rationale: >-
       드라이브 속도를 안고 뛰어오르므로 상체가 앞으로 쏠리기 쉽다. 상체가 크게
@@ -125,7 +125,7 @@ criteria:
         evidence: "기울기 41도로 상체가 림 아래로 흘러 들어갔다"
 
   - id: guide_arm
-    name: 반대 팔 처리
+    name: 반대 팔로 공 지키기
     weight: 0.15
     rationale: >-
       반대 팔은 수비와 공 사이를 막고 균형을 잡는 자리다. 완전히 펴서 함께
