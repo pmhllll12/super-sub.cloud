@@ -18,6 +18,9 @@ class UploadUrlSchema(BaseModel):
 
     content_type: str = Field(min_length=1, max_length=100)
     size_bytes: int = Field(ge=1)
+    # 원본 파일 이름. 저장 키를 사람이 알아볼 수 있게 짓는 데 쓴다(미결 `jin`
+    # 24번). 슬러그화되므로 이상한 문자여도 안전하다.
+    filename: str = Field(min_length=1, max_length=255)
 
 
 class UploadUrlResponse(BaseModel):
@@ -53,6 +56,8 @@ class RegisterVideoSchema(BaseModel):
     height: int = Field(ge=1)
     side: str | None = Field(default=None, max_length=5)
     analyze: bool = True
+    # 원본 파일 이름. DB 에 온전히 남긴다 — 저장 키는 슬러그라 손실적이다(jin 24).
+    filename: str | None = Field(default=None, max_length=255)
 
 
 class VideoResponse(BaseModel):

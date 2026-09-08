@@ -63,7 +63,8 @@ _QUEUED = "queued"
 
 
 class CreateUploadUrlInteractor(CreateUploadUrlUseCase):
-    def __init__(self, storage: StoragePort) -> None:
+    def __init__(self, repository: VideoPort, storage: StoragePort) -> None:
+        self._repository = repository
         self._storage = storage
 
     def __call__(self, command: UploadUrlCommand) -> UploadUrlResult:
@@ -84,7 +85,12 @@ class CreateUploadUrlInteractor(CreateUploadUrlUseCase):
                 f"용량 상한은 {MAX_BYTES // (1024 * 1024)}MB 입니다.",
             )
 
-        storage_key = build_storage_key(command.user_id, extension)
+        storage_key = build_storage_key(
+            command.user_id,
+            extension,
+            nickname=self._repository.uploader_nickname(command.user_id) or "",
+            original_filename=command.filename,
+        )
         url, expires_in = self._storage.create_upload_url(
             storage_key, command.content_type
         )
@@ -144,6 +150,7 @@ class RegisterVideoInteractor(RegisterVideoUseCase):
             # 켠다(jin 24 5조각). 그전에 켜면 `/analysis` 업로드가 프로필에서
             # 사라지고 되살릴 길이 없다.
             kept=True,
+            original_filename=command.original_filename,
         )
         self._repository.register(video)
         return to_video_result(video)

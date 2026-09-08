@@ -26,6 +26,7 @@ from app.analysis.domain.entities.video_entity import ValidationEntity, VideoEnt
 
 # 소유하지 않는 테이블에서 **읽기만** 한다. 위 docstring 참조.
 _sport = table("sport", column("code"))
+_user = table("user", column("id"), column("nickname"))
 
 
 class VideoPgRepository(VideoPort):
@@ -35,6 +36,11 @@ class VideoPgRepository(VideoPort):
     def sport_exists(self, sport_code: str) -> bool:
         stmt = select(_sport.c.code).where(_sport.c.code == sport_code)
         return self._session.execute(stmt).first() is not None
+
+    def uploader_nickname(self, user_id: UUID) -> str | None:
+        return self._session.execute(
+            select(_user.c.nickname).where(_user.c.id == user_id)
+        ).scalar_one_or_none()
 
     def register(self, video: VideoEntity) -> None:
         """영상·판정·(통과 시) 작업을 한 트랜잭션에서 만든다."""
@@ -51,6 +57,7 @@ class VideoPgRepository(VideoPort):
                 side=video.side,
                 is_public=video.is_public,
                 kept=video.kept,
+                original_filename=video.original_filename,
                 created_at=video.created_at,
             )
         )
@@ -233,6 +240,7 @@ def _to_entity(
         title=video.title,
         description=video.description,
         kept=video.kept,
+        original_filename=video.original_filename,
         created_at=video.created_at,
         validation=(
             None

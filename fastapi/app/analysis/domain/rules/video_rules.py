@@ -21,6 +21,8 @@ SFR-001 이 요구하는 것은 "규격에 맞지 않으면 반려하고 **사�
 
 from __future__ import annotations
 
+import re
+from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 # 사전 서명 URL 을 내주기 전에 거르는 값. 실제 크기는 올라온 뒤 다시 잰다.
@@ -45,14 +47,46 @@ def extension_for(content_type: str) -> str | None:
     return CONTENT_TYPES.get(content_type)
 
 
-def build_storage_key(user_id: UUID, extension: str) -> str:
-    """객체 저장소의 키. `videos/<업로더>/<uuid>.<확장자>`.
+#: 슬러그에 남기는 문자 — 유니코드 글자·숫자·`_`(한글 음절·자모·한자 포함)와
+#: `-`. 나머지(공백·문장부호·이모지 등)는 `-` 로 접는다.
+_SLUG_STRIP = re.compile(r"[^\w-]+", re.UNICODE)
 
-    **업로더를 키에 넣는 것이 검사 수단이다.** 등록할 때 이 접두사를 대조하면
-    남이 올린 객체의 키를 자기 영상으로 등록하는 것을 막을 수 있다
-    (`owns_key`). 날짜로 나누면 그 대조를 할 수 없다.
+
+def _slug(text: str, max_len: int) -> str:
+    """콘솔에서 알아볼 수 있는 조각으로 줄인다. 비면 빈 문자열."""
+    s = _SLUG_STRIP.sub("-", (text or "").strip()).strip("-")
+    return s[:max_len].strip("-")
+
+
+def build_storage_key(
+    user_id: UUID,
+    extension: str,
+    *,
+    nickname: str = "",
+    original_filename: str = "",
+    now: datetime | None = None,
+) -> str:
+    """객체 저장소의 키. 미결 `jin` 24번 — 사람이 알아볼 수 있게 짓는다.
+
+    `videos/<user_id>/<닉네임>-<원본이름>-<YYYYMMDD-HHMM>-<8자>.<확장자>`
+
+    🔴 **`<user_id>/` 접두사는 그대로 둔다.** 등록할 때 이 접두사를 대조해
+    남이 올린 객체의 키를 자기 영상으로 등록하는 것을 막고(`owns_key`), 닉네임이
+    바뀌어도 이 UUID 로 주인을 되짚는다. 닉네임 조각은 **업로드 시점 라벨**이라
+    rename 해도 옛 키는 안 바뀐다.
+
+    `<8자>` 는 무작위다 — 같은 사람이 같은 이름·같은 분에 두 번 올려도 안 겹치게
+    하는 것이라 `video_id` 일 필요는 없다(그 시점엔 아직 없다).
     """
-    return f"{_KEY_PREFIX}/{user_id}/{uuid4()}.{extension}"
+    stamp = (now or datetime.now(timezone.utc)).strftime("%Y%m%d-%H%M")
+    stem = original_filename.rsplit(".", 1)[0] if original_filename else ""
+    parts = [
+        _slug(nickname, 20) or "user",
+        _slug(stem, 40) or "clip",
+        stamp,
+        uuid4().hex[:8],
+    ]
+    return f"{_KEY_PREFIX}/{user_id}/{'-'.join(parts)}.{extension}"
 
 
 def owns_key(user_id: UUID, storage_key: str) -> bool:

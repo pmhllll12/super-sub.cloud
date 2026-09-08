@@ -32,10 +32,16 @@ def _clean():
     reset_videos()
 
 
-def _issue(client, user_id, content_type="video/mp4", size_bytes=SIZE_OK):
+def _issue(
+    client, user_id, content_type="video/mp4", size_bytes=SIZE_OK, filename="clip.mp4"
+):
     res = client.post(
         f"{V1}/videos/upload-url",
-        json={"content_type": content_type, "size_bytes": size_bytes},
+        json={
+            "content_type": content_type,
+            "size_bytes": size_bytes,
+            "filename": filename,
+        },
         headers=_headers(user_id),
     )
     assert res.status_code == 200, res.text
@@ -58,7 +64,7 @@ class TestUploadUrl:
     def test_인증이_필요하다(self, client):
         res = client.post(
             f"{V1}/videos/upload-url",
-            json={"content_type": "video/mp4", "size_bytes": SIZE_OK},
+            json={"content_type": "video/mp4", "size_bytes": SIZE_OK, "filename": "c.mp4"},
         )
         assert res.status_code == 401
 
@@ -66,7 +72,7 @@ class TestUploadUrl:
         user_id = uuid4()
         res = client.post(
             f"{V1}/videos/upload-url",
-            json={"content_type": "video/mp4", "size_bytes": SIZE_OK},
+            json={"content_type": "video/mp4", "size_bytes": SIZE_OK, "filename": "c.mp4"},
             headers=_headers(user_id),
         )
         assert res.status_code == 200, res.text
@@ -78,7 +84,7 @@ class TestUploadUrl:
     def test_모르는_형식은_거부한다(self, client):
         res = client.post(
             f"{V1}/videos/upload-url",
-            json={"content_type": "video/x-msvideo", "size_bytes": SIZE_OK},
+            json={"content_type": "video/x-msvideo", "size_bytes": SIZE_OK, "filename": "c.avi"},
             headers=_headers(uuid4()),
         )
         assert res.status_code == 422
@@ -88,7 +94,7 @@ class TestUploadUrl:
         """헛걸음을 줄이는 자리다. 진짜 상한은 등록할 때 실측으로 건다."""
         res = client.post(
             f"{V1}/videos/upload-url",
-            json={"content_type": "video/mp4", "size_bytes": MAX_BYTES + 1},
+            json={"content_type": "video/mp4", "size_bytes": MAX_BYTES + 1, "filename": "c.mp4"},
             headers=_headers(uuid4()),
         )
         assert res.status_code == 422

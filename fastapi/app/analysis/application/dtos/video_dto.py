@@ -19,6 +19,7 @@ class UploadUrlCommand:
     user_id: UUID
     content_type: str
     size_bytes: int
+    filename: str = ""  # 원본 이름 — 저장 키를 사람이 알아보게 짓는다(jin 24)
 
 
 @dataclass(frozen=True)
@@ -48,6 +49,7 @@ class RegisterVideoCommand:
     height: int
     side: str | None = None
     analyze: bool = True
+    original_filename: str | None = None  # 원본 이름 — DB 에 온전히 남긴다(jin 24)
 
 
 @dataclass(frozen=True)

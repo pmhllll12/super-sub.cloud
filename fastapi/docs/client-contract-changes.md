@@ -860,6 +860,23 @@ curl -s -H "Authorization: Bearer $OTHER_T" $API/videos/$PUB_ID/playback-url | j
 `true`** — `/analysis` 분석을 임시(`kept:false`)로 두고 "저장"에서 켜는 전환은
 프론트가 `keep` 을 부를 준비가 되면 함께 켭니다. 그때까지는 무시하셔도 됩니다.
 
+### 🔴 `POST /videos/upload-url` 에 `filename` 을 실어 주세요 (2026-09-08 추가, 필수)
+
+미결 `jin` 24번. 저장 키를 사람이 알아볼 수 있게 지으려고 **원본 파일 이름**을
+받습니다.
+
+```json
+{ "content_type": "video/mp4", "size_bytes": 52428800, "filename": file.name }
+```
+
+- `file.name` 을 그대로 실으시면 됩니다. 공백·한글·이모지·문장부호가 있어도
+  서버가 슬러그화하니 안전합니다. **필수 필드** — 안 보내면 `422` 입니다.
+- 응답 `storage_key` 는 이제 `videos/<uuid>/<닉네임>-<이름>-<시각>-<8자>.mp4`
+  모양입니다. **뜯어보지 말고 `POST /videos` 에 그대로 넘기세요** — 앞부분
+  `<uuid>` 로 소유를 대조합니다.
+- `POST /videos` 에도 `filename` 을 실어 주시면(선택) `original_filename` 으로
+  온전히 저장됩니다. `upload-url` 에서 이미 받으므로 급하지 않습니다.
+
 ---
 
 ## 계약 문서

@@ -58,6 +58,7 @@ def create_upload_url(
             user_id=user_id,
             content_type=body.content_type,
             size_bytes=body.size_bytes,
+            filename=body.filename,
         )
     )
 
@@ -86,6 +87,7 @@ def register_video(
             height=body.height,
             side=body.side,
             analyze=body.analyze,
+            original_filename=body.filename,
         )
     )
 

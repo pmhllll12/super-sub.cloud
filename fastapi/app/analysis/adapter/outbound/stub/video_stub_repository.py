@@ -41,6 +41,11 @@ class StubVideoRepository(VideoPort):
     def sport_exists(self, sport_code: str) -> bool:
         return sport_code in _SPORTS
 
+    def uploader_nickname(self, user_id: UUID) -> str | None:
+        # 스텁은 `user` 를 모른다 — 키 슬러그는 "user" 로 떨어진다. 닉네임이
+        # 실제로 키에 들어가는지는 `test_video_db.py`(진짜 `user` 행)가 본다.
+        return None
+
     def register(self, video: VideoEntity) -> None:
         _VIDEOS[video.id] = video
 

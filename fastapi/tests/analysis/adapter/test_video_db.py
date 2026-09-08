@@ -75,10 +75,14 @@ def uploader(db_client):
     }
 
 
-def _upload(db_client, uploader, size_bytes=SIZE_OK):
+def _upload(db_client, uploader, size_bytes=SIZE_OK, filename="clip.mp4"):
     res = db_client.post(
         f"{V1}/videos/upload-url",
-        json={"content_type": "video/mp4", "size_bytes": SIZE_OK},
+        json={
+            "content_type": "video/mp4",
+            "size_bytes": SIZE_OK,
+            "filename": filename,
+        },
         headers=uploader["headers"],
     )
     assert res.status_code == 200, res.text
@@ -344,6 +348,36 @@ class TestDelete:
 
         res = db_client.delete(f"{V1}/videos/{video_id}", headers=h)
         assert res.status_code == 404
+
+
+class TestReadableKey:
+    """미결 jin 24번 — 저장 키에 닉네임·원본이름, `original_filename` 컬럼."""
+
+    def test_키에_실제_닉네임이_들어가고_원본이름이_저장된다(
+        self, db_client, db_session, uploader
+    ):
+        res = db_client.post(
+            f"{V1}/videos/upload-url",
+            json={
+                "content_type": "video/mp4",
+                "size_bytes": SIZE_OK,
+                "filename": "My Kick.mp4",
+            },
+            headers=uploader["headers"],
+        )
+        key = res.json()["storage_key"]
+        # `uploader` 픽스처가 닉네임 "업로더" 로 가입한다
+        assert key.startswith(f"videos/{uploader['id']}/업로더-My-Kick-")
+
+        put_object(key, SIZE_OK)
+        video_id = uuid.UUID(
+            _register(db_client, uploader, key, filename="My Kick.mp4").json()["id"]
+        )
+        stored = db_session.execute(
+            text("SELECT original_filename FROM video WHERE id = :id"),
+            {"id": video_id},
+        ).scalar_one()
+        assert stored == "My Kick.mp4"
 
 
 class TestProvisionalSweep:

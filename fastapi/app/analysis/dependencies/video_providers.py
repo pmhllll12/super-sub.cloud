@@ -82,8 +82,10 @@ StorageOptionalDep = Annotated[
 ]
 
 
-def get_create_upload_url_use_case(storage: StorageDep) -> CreateUploadUrlUseCase:
-    return CreateUploadUrlInteractor(storage)
+def get_create_upload_url_use_case(
+    repository: VideoRepositoryDep, storage: StorageDep
+) -> CreateUploadUrlUseCase:
+    return CreateUploadUrlInteractor(repository, storage)
 
 
 def get_register_video_use_case(

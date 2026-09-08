@@ -1306,18 +1306,28 @@ SFR-001. 사용자가 자기 클립을 올리고, 서버가 규격을 검사해 
 ### `POST /api/v1/videos/upload-url`
 
 ```json
-{ "content_type": "video/mp4", "size_bytes": 52428800 }
+{ "content_type": "video/mp4", "size_bytes": 52428800, "filename": "우리팀 첫 골.mp4" }
 ```
+
+`filename` 은 **원본 파일 이름**이다(2026-09-08 추가, 미결 `jin` 24번). 저장 키를
+사람이 알아볼 수 있게 짓는 데 쓴다 — 슬러그화되므로 공백·문장부호·이모지가
+들어와도 안전하다.
 
 `200 OK`
 
 ```json
 {
-  "storage_key": "videos/3f1c.../9a2e....mp4",
+  "storage_key": "videos/3f1c8a2b-…/업로더-우리팀-첫-골-20260908-1419-9a2e0c11.mp4",
   "upload_url": "https://<bucket>.s3.<region>.amazonaws.com/...",
   "expires_in": 900
 }
 ```
+
+`storage_key` 는 `videos/<user_id>/<닉네임 슬러그>-<원본이름 슬러그>-<YYYYMMDD-HHMM>-<8자>.<ext>`
+다. 🔴 **`<user_id>/` 접두사(UUID)는 그대로다** — 등록할 때 소유를 대조하고,
+닉네임이 바뀌어도 이 UUID 로 주인을 되짚는다. 닉네임 조각은 **업로드 시점 라벨**
+이라 rename 해도 옛 키는 안 바뀐다. 클라이언트는 이 값을 **그대로** `POST /videos`
+에 넘긴다 — 뜯어보지 않는다.
 
 🔴 **`upload_url` 에 PUT 할 때 `Content-Type` 을 요청한 값 그대로 보내야 한다.**
 서명에 들어 있어서 다르면 S3 가 거절한다.
@@ -1342,9 +1352,14 @@ SFR-001. 사용자가 자기 클립을 올리고, 서버가 규격을 검사해 
   "width": 1920,
   "height": 1080,
   "side": "right",
-  "analyze": true
+  "analyze": true,
+  "filename": "우리팀 첫 골.mp4"
 }
 ```
+
+`filename` 은 **원본 이름**이다 — DB `video.original_filename` 에 온전히 남긴다
+(저장 키 슬러그는 손실적이다). 관리자 목록이 이 값으로 "문제 영상"을 되짚는다.
+생략 가능(`null`).
 
 `201 Created`
 
