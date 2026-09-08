@@ -536,11 +536,11 @@ ssh supersub 'systemctl is-active postgresql supersub-api supersub-backup.timer'
 
 ⚠️ **연기 검사가 S3 에 1KB 객체 둘을 남겼다.** 09-03 당시 역할에 `s3:DeleteObject`
 가 없어 서버에서 지울 수 없었다 — 콘솔에서 `videos/` 아래를 한 번 비우면 된다.
-🔴 **2026-09-08: 이제 클립 삭제·`keep` 이동·백스톱 스윕이 붙어서 정책에
-`s3:DeleteObject` 와 `reports/*` 접근이 필요하다.** 아래 「서버에 줄 권한」의
-정책 JSON 을 그렇게 고쳤다 — **아직 콘솔에 반영되지 않았다**(박민호 작업).
-반영 전까지 실서버에서는 삭제·이동이 조용히 실패하고(코드가 best-effort 라 200/204
-는 정상) 객체만 남는다. 미결 `jin` 24번 IAM 조각.
+✅ **2026-09-08: 정책을 3문짜리(`s3:DeleteObject` + `reports/*`)로 교체했고
+서버에서 스모크 통과.** 클립 삭제·`keep` 이동(`CopyObject` videos→reports)·백스톱
+스윕이 쓰는 권한이 다 열렸고 `models/*` 은 여전히 거부된다. 미결 `jin` 24번 IAM
+조각. (단, **그 조각들 코드는 아직 서버에 배포되지 않았다** — 서버 head
+`5db18b239336`. 배포하면 IAM 은 이미 준비돼 있다.)
 
 | | |
 |---|---|
@@ -655,14 +655,14 @@ HEAD 요청은 **`s3:GetObject`** 로 인가된다. 없는 액션을 정책에 �
 **키 이름 목록뿐**이고 `models/` 의 **내용은 못 읽는다**(위 오브젝트 문 둘이
 `videos/*`·`reports/*` 로 좁혀져 있다).
 
-#### 🔴 역할은 이미 붙어 있다 — **정책만 교체한다** (2026-09-08 확인)
+#### 역할은 이미 붙어 있었다 — **정책만 교체했다** (2026-09-08 ✅)
 
 09-03 스모크가 통과했다는 것은 인스턴스 역할이 **이미 붙어 있고** 2문짜리 정책
-(`videos/*` Put+Get · `ListBucket`)이 들어 있다는 뜻이다. 인스턴스 메타데이터로
+(`videos/*` Put+Get · `ListBucket`)이 들어 있었다는 뜻이다. 인스턴스 메타데이터로
 확인된다(`curl .../iam/info` → `InstanceProfileArn` 이 찍힌다).
 
 그래서 09-08 변경은 **새 역할을 만드는 게 아니라** 그 역할의 **인라인 정책 하나를
-위 3문짜리 JSON 으로 통째 교체**하는 것이다.
+위 3문짜리 JSON 으로 통째 교체**하는 것이었다.
 
 - 자리: **IAM 콘솔 → 역할(Roles) → (인스턴스에 붙은 그 역할) → 권한 → 인라인
   정책 편집 → JSON 탭 → 교체 → 저장.** EC2 의 「작업 → 보안 → IAM 역할 수정」은
@@ -672,22 +672,37 @@ HEAD 요청은 **`s3:GetObject`** 로 인가된다. 없는 액션을 정책에 �
   역할 목록·편집이 권한 오류(`is not authorized to perform: iam:…`)를 내면
   **계정 소유자(박민호)** 가 해야 한다.
 
-#### 반영됐는지 확인 (정책을 저장한 뒤)
+#### ✅ 반영·검증됨 (2026-09-08)
+
+정책을 저장한 **첫 시도는 세 번째 문(`SupersubBucketList`)만 들어가** `videos/*`
+`PutObject` 까지 막혔었다(업로드도 깨졌다). 전체 JSON 을 다시 붙여 저장하니
+스모크가 다 통과했다.
+
+역할이 실제로 무엇을 할 수 있는지는 **인스턴스 역할 자격증명으로 직접 태워** 본다
+— API 를 거치지 않으므로 코드 배포 상태와 무관하다.
 
 ```bash
-# 서버에서 — 어떤 역할이 붙어 있나 (IMDSv2 라 토큰을 먼저 받는다)
-ssh supersub 'T=$(curl -s -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 60"); curl -s -H "X-aws-ec2-metadata-token: $T" http://169.254.169.254/latest/meta-data/iam/info'
-# → InstanceProfileArn 이 찍힌다. 정책 편집은 그 프로파일이 가리키는 역할에서.
-
-# keep 이동이 실서버에서 실제로 도는지 (스모크)
-#  1) /analysis 로 클립 하나 올려 분석 → video_id 확보
-#  2) POST /api/v1/videos/{id}/keep  → 200, 응답 storage_key 가 reports/…/source.<ext>
-#  3) playback-url 이 그 새 키를 주는지 본다 (옛 videos/ 키가 아니라)
+# 서버에서, .venv 의 boto3 로 (인스턴스 역할 자동 사용)
+ssh supersub 'cd ~/supersub/app/fastapi && .venv/bin/python - <<PY
+import boto3, time
+c = boto3.client("s3", region_name="ap-northeast-2")
+B = "supersub-ai"; ts = time.strftime("%Y%m%d-%H%M%S")
+v, r = f"videos/_smoke/{ts}.txt", f"reports/_smoke/{ts}.txt"
+c.put_object(Bucket=B, Key=v, Body=b"x")                                  # Put videos/*
+c.copy_object(Bucket=B, CopySource={"Bucket": B, "Key": v}, Key=r)        # keep 이동
+c.get_object(Bucket=B, Key=r); c.delete_object(Bucket=B, Key=v)           # Get/Delete
+c.delete_object(Bucket=B, Key=r)
+try:
+    c.put_object(Bucket=B, Key=f"models/_smoke/{ts}.txt", Body=b"x"); print("BAD: models 써짐")
+except Exception: print("OK: models 거부, 나머지 통과")
+PY'
 ```
 
-반영 전에는 `keep` 이 `move_object` 에서 `AccessDenied` 를 던지는데, 순서상
-**S3 이동을 먼저** 하므로 DB 는 안 바뀌고 `500` 이 난다 — `kept` 도 안 켜진다.
-(삭제·스윕은 best-effort 라 `204`/조용히 넘어가고 객체만 남는다.)
+기대: `OK: models 거부, 나머지 통과`. `AccessDenied` 가 하나라도 나오면 저장된
+정책에 그 문이 빠진 것 — 전체 JSON 을 다시 붙인다.
+
+🔴 **코드는 아직 배포 전이라** `POST /videos/{id}/keep`·`DELETE /videos/{id}`·
+스윕은 서버에 없다(head `5db18b239336`). 배포하면 IAM 은 이미 준비돼 있다.
 
 ### CORS — 브라우저에서 올릴 때만 필요하다
 
