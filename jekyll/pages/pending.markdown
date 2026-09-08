@@ -4670,10 +4670,13 @@ jin 21(공개 사이트 인프라 식별자 스크럽)에서 `jekyll/`·`_posts/
   🔴 **동작 보존** — 지금은 등록되는 모든 영상이 `kept=true`(`75dfe07`).
 - ✅ **3조각** — `DELETE /videos/{id}`(`389de29`) — DB 연쇄(SEC-006) + S3
   (`storage_key` + `reports/<uid>/<vid>/`, best-effort). 계약 3-6 · CCC 21번.
-- ⬜ **2조각** — `POST /videos/{id}/keep` + `videos/`→`reports/` 이동.
-  🔴 **차단 해제됨** — 정상호가 리포트 키를 `reports/<user_id>/<video_id>/` 로
-  정렬했다(`9a32e28`, 아래 정상호 조각). 이제 「저장」이 원본을 그 폴더에
-  `source.mp4` 로 놓으면 된다.
+- ✅ **2조각** — `POST /videos/{id}/keep`. `kept=true` + 임시 원본(`videos/…`)을
+  `reports/<user_id>/<video_id>/source.<ext>` 로 옮긴다(S3 `CopyObject`+원본 삭제,
+  `StoragePort.move_object`). **분석 작업이 없는 클립(`/me` 업로드)은 안 옮긴다** —
+  리포트 폴더가 없다. 멱등(이미 `reports/` 면 이동 건너뜀). S3 이동을 먼저 하고
+  DB(`mark_kept`)를 맞춘다 — 순서가 반대면 DB 가 없는 객체를 가리키는 창이 생김.
+  🔴 리포트 JSON `source_video` 는 아직 옛 키 — `paik` 7(리포트 DB 이관) 때 정리
+  (정상호 조각 (1)). 계약 3-6 · CCC 24번.
 - ✅ **4조각** `88c43d6` — 미저장분 백스톱 스윕. `POST /internal/analysis-jobs/claim`
   이 `reclaim_stale` 뒤에 `sweep_provisional(ttl)` 을 돈다(워커가 주기 호출 —
   별도 스케줄러 없음). 대상: `kept=false` · `ttl` 보다 오래 · 진행 중
