@@ -3206,7 +3206,14 @@ S3에 영구히 있습니다.** 사용자가 보는 것("저장해야 남는다"
 >
 > | 확인 | `grep -n "sport_code" fastapi/docs/api-contract.md` → 3-1절에 「✅ 결정 — A안」 있음 |
 > |---|---|
-> | 남은 것 | 스키마 반영 · `metric_definition` 시드(코드 11개는 `agent/rubrics/`에서 뽑아 드립니다) · 부록 D.3 |
+> | 남은 것 | ~~스키마 반영~~ ✅ · `metric_definition` 시드(코드 11개는 `agent/rubrics/`에서 뽑아 드립니다) · 부록 D.3 |
+
+**스키마 반영 (2026-09-08, 정어진, `5db18b239336`)**: `metric_definition_orm.py` 에서
+`sport_code` 제거 + `op.drop_column`. 그 컬럼엔 외래키가 없었다(`20260901_sport_and_position`
+이 A안 대비로 일부러 안 걸었음). 테이블 0 행이라 컬럼 삭제로 끝. `alembic check` +
+downgrade 왕복 클린, 572 통과. `test_analysis_schema_db.py`·`test_delete_me_db.py`
+픽스처의 `MetricDefinitionOrm(... sport_code=...)` 도 함께 정리. 남은 건 시드(정상호가
+`agent/rubrics/` 에서 뽑아 줌 · 넣는 주체 미정) · 부록 D.3(박민호).
 
 에이전트가 분석 결과를 백엔드에 넘기는 경로(`POST /videos` · `POST /analyses`)의
 규격은 나왔는데, **`metric_definition` 을 채울 수 없어 적재가 통째로 막힌다.**
@@ -4441,8 +4448,183 @@ IAM 역할명·API 호스트명**이 그대로 있었고, `pages.yml` 로 `dev.s
   뒤에 두는 것을 검토합니다(지금은 DNS 가 EC2 IP 를 그대로 가리킵니다).
 - **콘텐츠 반영은 `main` 병합 뒤에 라이브가 됩니다** — 그 전까지 `dev.supersub-ai.com`
   에는 옛 값이 그대로입니다.
+- **(2026-09-08)** `fastapi/docs/`(worker-interface.md·deployment.md)의 API 호스트명은
+  자리표시자로 바꿨습니다(`9c69747`). `agent/deploy/` 에 계정 ID·리소스 ID·호스트가
+  값으로 남은 것은 정상호 님 영역이라 **아래 22번**으로 올렸습니다. 버킷명은 제품
+  도메인에서 추측되고 `agent/` 코드 기본값에도 걸려 있어 이번엔 두었습니다.
 
 - **담당**: 정어진 · **제기**: 정어진 · **기한**: 버킷 확인은 이번 주 · 나머지는 스프린트 3
+
+### 22. `agent/deploy/` 에 AWS 계정 ID·리소스 ID·API 호스트가 값으로 남아 있습니다 (2026-09-08)
+
+jin 21(공개 사이트 인프라 식별자 스크럽)에서 `jekyll/`·`_posts/`·`fastapi/docs/` 는
+정리했는데, `agent/` 는 정상호 님 영역이라 손대지 않았습니다. **이 저장소는 공개라
+`agent/` 도 GitHub 에 그대로 노출됩니다.** 확인된 것:
+
+| 파일 | 무엇 |
+|---|---|
+| `agent/deploy/README-console.md` | AWS 계정 ID(대시 표기, 19·253행) · VPC/서브넷/보안그룹/인스턴스 ID(261-274행) · 과거 공인 IP(271·274행 부근) |
+| `agent/deploy/README.md` | AWS 계정 ID(대시 표기, 15·261행) |
+| `agent/deploy/worker.env.example` · `agent/scripts/worker.py:112` | `api.<도메인>` 백엔드 호스트. `worker.py` 는 **하드코딩 기본값**이라 자리표시자로만 바꾸면 배포에서 잘못된 URL 로 붙습니다 |
+
+| 대상 | 만족해야 할 성질 |
+|---|---|
+| 문서(`README*.md`, `*.env.example`) | 계정 ID·리소스 ID·공인 IP·API 호스트가 **값이 아니라 자리표시자**로 있을 것. 서술은 그대로 둬도 됩니다 (루트 `CLAUDE.md` 「공개 사이트에 인프라 식별자를 쓰지 않습니다」의 표) |
+| `worker.py` 기본값 | `SUPERSUB_API_BASE` 를 **필수 환경변수로** 두고 하드코딩 fallback 을 없앨 것 |
+
+| | |
+|---|---|
+| 먼저 확인 | `grep -rnE '[0-9]{4}-[0-9]{4}-[0-9]{4}\|(vpc\|subnet\|sg\|i)-[0-9a-f]{8,}\|api\.[a-z0-9-]+\.[a-z]+' agent/` — 결과가 자리표시자 문법(`<...>`)뿐이면 된 것입니다 |
+| 하지 말 것 | 🔴 `worker.py` 기본값을 자리표시자 문자열로만 바꾸지 않기(위 이유) · 🔴 이미 노출된 계정 ID 는 git 히스토리·검색 캐시에 남아 문서만 고쳐도 회수되지 않음 — 줄이는 것이 전부입니다 · 루트 `CLAUDE.md` 의 커밋 전 grep 범위에 `agent/` 를 더할지도 함께 판단해 주세요 |
+| 관련 | 같은 구역 21번 · 루트 `CLAUDE.md` 「공개 사이트에 인프라 식별자를 쓰지 않습니다」 |
+
+- **담당**: 정상호(`agent/` 문서·`worker.py` 설정) · **제기**: 정어진 · **기한**: 계정 ID·공인 IP 는 이번 주 · 리소스 ID·호스트는 스프린트 3
+
+### 23. `metric_definition` 을 누가·어떻게 채웁니까 — `POST /analyses` 착수 전에 필요합니다 (2026-09-08)
+
+미결 1번 A안이 정해졌고 **스키마 반영도 끝났습니다**(`metric_definition` 에서
+`sport_code` 제거, `5db18b239336`). 이제 `POST /analyses` 적재(계약 3-1)를 붙일
+차례인데, 그 엔드포인트가 제출된 지표 코드를 `metric_definition` 에 대조합니다
+(`UNKNOWN_METRIC_CODE` — 외래키). **테이블이 비어 있으면 모든 적재가 거부됩니다.**
+지금 0 행이고 시드 경로가 없습니다.
+
+1번 답변에 "11개 코드·단위·설명은 `agent/rubrics/` 에서 뽑아 시드용으로 냅니다"
+라고 적어 주셨는데, **뽑는 것까지는 정상호 님, 넣는 형태는 함께 정할 부분**입니다.
+
+| | 만족해야 할 성질 |
+|---|---|
+| **코드 목록** | `active` 루브릭이 쓰는 **모든** 지표 코드가 `metric_definition` 에 `(code, label, unit)` 로 들어가 있을 것. 목록의 정본이 어디인지(파일 경로·형식)만 알려 주시면 됩니다 |
+| **넣는 방식** | 셋 중 하나로 정해질 것 — 저장소 관례는 **시드-인-마이그레이션**입니다(`sport`·`position`·`review_option` 이 `op.bulk_insert` 로 들어갔습니다). 그 방식이면 목록만 주시면 **제가 마이그레이션을 씁니다.** 스크립트(`scripts/seed_demo.py` 옆)나 워커 전용 API(`PUT /internal/metric-definitions`)를 원하시면 그것도 됩니다 |
+| **루브릭이 코드를 늘릴 때** | 새 종목·동작이 새 코드를 들고 오면 그게 `metric_definition` 에 반영되는 경로가 정해져 있을 것 — 안 그러면 새 루브릭이 배포된 순간 그 종목 적재가 조용히 `UNKNOWN_METRIC_CODE` 로 전부 실패합니다 |
+
+| | |
+|---|---|
+| 먼저 확인 | `grep -rniE 'bulk_insert.*metric\|insert into metric_definition' fastapi/` → 걸리면 시드가 이미 들어온 것입니다 (2026-09-08 기준 0 건 — 돌려서 확인함) |
+| 하지 말 것 | 🔴 종목별로 코드를 쪼개지 않기 — A안의 취지입니다(`support_elbow_angle_at_impact` 는 야구·농구 공용, 한 행) · 🔴 `label`·`unit` 을 백엔드가 지어내지 않기 — 루브릭이 정본이라 그대로 받아야 합니다 |
+| 물려 있는 것 | 이게 정해지기 전에는 `POST /analyses` 를 붙여도 **실서버에서 전부 거부**됩니다. 스텁 테스트는 통과하므로 초록색에 속기 쉽습니다 |
+
+- 상세: `fastapi/docs/api-contract.md` 3-1 · 같은 구역 1번 「남은 것」
+- **담당**: 정상호(코드 목록·형식) · **제기**: 정어진 · **기한**: 스프린트 3 초 (`POST /analyses` 착수에 걸림)
+
+### 24. 영상 수명 주기 — 분석은 임시, "저장"을 눌러야 남는다 · `videos/` 는 원본, `reports/` 는 저장된 것 (2026-09-08 신설)
+
+라이브에서 확인한 것 둘: ⑴ S3 에서 파일을 지워도 `video` DB 행이 남아 프로필에
+유령 클립이 뜬다 (삭제 경로가 없다), ⑵ `/analysis` 에서 "이 사람으로 분석"을
+누르는 순간 영상이 올라가고 분석이 걸려 **바로·영구히** 「분석 영상」에 남는다.
+사용자가 원하는 흐름은 다르다.
+
+#### 원하는 흐름 (사용자 설명, 2026-09-08)
+
+```
+/analysis 에서 영상 로드 → 대상 지정("이 사람으로 분석" / "자동으로 고르기")
+   → 에이전트가 분석 → 결과(리포트)가 화면에 나온다   ← 아직 프로필에 없다
+   → 사용자가 "내 프로필에 리포트 저장"을 누르면       ← 그제서야 남는다
+        → 「분석 영상」에 뜨고, 골라 보면 결과+영상을 다시 본다
+   → 안 누르고 나가면 → DB·S3 어디에도 안 남는다
+```
+
+`/me` 「업로드」 탭(`analyze:false`, 기록용)은 사용자가 **명시적으로 올린 것**이라
+항상 남는다 — 이 임시-저장 관문은 `/analysis` 경로에만 건다.
+
+#### 만족해야 할 성질
+
+| 대상 | 성질 |
+|---|---|
+| **임시 상태** | `/analysis` 분석은 영상·`analysis_job` 이 생기되 **프로필에 안 보인다**. `GET /videos` 는 "저장된 것"만 준다 |
+| **저장** | "내 프로필에 리포트 저장" → 그 영상이 「분석 영상」에 뜨고, 리포트(요약·본 장면·지표)를 **골라서 다시 볼 수 있다**. 지금은 리포트가 브라우저 목업이다(`lib/savedReports.ts`) — 실제 리포트를 읽는 경로가 필요(같은 구역 관련: `paik` 7) |
+| **안 저장** | 저장 안 하고 떠나면 그 영상·job·리포트가 **DB·S3 에서 사라진다.** 브라우저가 닫혀도(명시 삭제 못 하는 경우) 정리된다 |
+| **`videos/` ↔ `reports/`** | `videos/<user_id>/<video_id>.mp4` = 올라온 원본(임시·기록용 공통). **저장되면 `reports/<user_id>/<video_id>/source.mp4` 로 옮기고** `videos/` 에서 지운다. `reports/<user_id>/<video_id>/` 아래에 `report.json`·오버레이 미리보기도 함께 |
+| **삭제** | `DELETE /videos/{id}` — DB 행 + S3 객체(`videos/` 든 `reports/` 든 그 video_id 접두사 전부). 계정 탈퇴 연쇄(SEC-006)에도 S3 까지 |
+| **탭 구분** | 「분석 영상」/「업로드 영상」은 S3 폴더가 아니라 DB `analysis_job_id` 유무로 계속 가른다 |
+
+#### 조각과 담당 (합의 뒤 나눔)
+
+| 조각 | 담당 |
+|---|---|
+| `video` 에 "저장됨" 표시(예: `kept` 불리언) + 마이그레이션 · `GET /videos` 필터 · `POST /videos` 가 경로별로 초기값 정함(`/analysis`=미저장, `/me` 업로드=저장) | 정어진 |
+| `POST /videos/{id}/keep`(또는 `PATCH`) — 저장 플립 + `videos/`→`reports/` S3 이동(`CopyObject`+`DeleteObject`) + `storage_key` 갱신 | 정어진 |
+| `DELETE /videos/{id}` — DB + S3. 미저장분 정리 스윕(job 회수처럼 트리거) | 정어진 |
+| EC2 인스턴스 역할 IAM: **`s3:DeleteObject`**(`videos/*`·`reports/*`) · `reports/*` 에 `s3:GetObject`·`s3:PutObject` — 지금 `DeleteObject` 는 일부러 빠져 있다(`deployment.md` 5절) | 박민호(콘솔) 또는 정어진(배포) |
+| 리포트 산출물 키를 `reports/<user_id>/<video_id>/` 로 정렬(지금은 `report_slug` = 상위폴더+stem) | 정상호 |
+| 실제 리포트를 DB 에 남겨 브라우저가 읽게(`paik` 7 · `POST /analyses`) — 지표 부분은 같은 구역 23번(시딩)에 물려 있다 | 정어진 + 정상호 |
+| `/analysis`: "저장"이 `keep` 호출, 화면을 벗어날 때 미저장분 `DELETE`, 「분석 영상」이 저장된 것만 | 백성검 |
+
+#### 정한 것 (2026-09-08, 사용자 답변)
+
+- **미저장분 정리 = 두 겹.** ⑴ `/analysis` 를 저장 없이 벗어나면 프론트가
+  `DELETE /videos/{id}` 를 부른다(빠른 길, `beforeunload`/`sendBeacon` 로 최대한).
+  ⑵ 서버 스윕이 백스톱 — `kept=false` **이고 `analysis_job` 이 종결 상태
+  (`succeeded`/`failed`)이거나 job 이 없고** `created_at < now - PROVISIONAL_TTL`
+  인 `video` 를 DB+S3 에서 지운다. 트리거는 새 타이머 없이
+  `POST /internal/analysis-jobs/claim`(워커가 45초마다) 에 얹는다 — 멈춘 job
+  회수(계약 3-8)와 같은 자리. `WHERE kept=false` 부분 인덱스.
+  - **TTL = 24시간** (설정 `PROVISIONAL_VIDEO_TTL_HOURS`, 기본 24). 사용자는
+    1\~2시간을 원했지만 **짧으면 두 가지가 깨진다**: ⓐ GPU 인스턴스 자동 종료로
+    job 이 `queued` 로 몇 시간 대기하는 정상 경우를 지워 버린다(→ 위 "job 종결
+    상태" 조건으로 막긴 하지만) ⓑ 사용자가 결과를 보고 자리를 비웠다 1\~2시간
+    뒤 저장하러 오면 이미 사라진다. **백스톱의 목적은 "브라우저가 죽었을 때
+    결국 회수"이지 공격적 청소가 아니다** — 영상 하나(~30MB)가 하루 사는 비용은
+    무의미하고, 빠른 길(⑴)이 흔한 경우를 초 단위로 처리한다. 짧게 가고 싶으면
+    설정값만 낮추면 된다
+- **`videos/`→`reports/` 이동은 fastapi 가 한다** — `keep` 처리 중에.
+  `CopyObject`(server-side) + `DeleteObject`(source). S3 수명주기 주인이 앱이라
+  워커가 아니라 여기가 맞다.
+
+#### 파일명·사람이 알아볼 수 있게 (2026-09-08, 사용자 요청)
+
+사용자: **키에 유저명·업로드한 영상 이름이 보여야** 나중에 문제 영상을 찾아
+지우고 "에이전트가 제대로 돌았는지" 사람이 확인할 수 있다.
+
+정한 방향 (2026-09-08, 사용자가 닉네임도 키에 넣기로):
+
+🔴 **소유 신원은 닉네임이 아니라 `user.id`(UUID)다.** `user.id`·`user.email` 은
+안 바뀌고, `video.user_id`(외래키)가 `user.id` 를 가리킨다. 닉네임(`user.nickname`,
+`PATCH /me` 로 변경)은 **표시용 라벨**일 뿐이다. 닉네임을 바꿔도 ⑴ `video.user_id`
+그대로 ⑵ S3 키의 `<user_id>/` 조각 그대로 ⑶ 파일명 끝의 `<video_id 앞 8자>` 그대로
+— 얼어붙는 건 옛 키 파일명에 적힌 닉네임 **글자**뿐이고, `GET /admin/videos?user=`
+는 `user.id` 로 조인해 옛·새 영상을 전부 찾고 **현재** 닉네임으로 보여준다.
+
+- **S3 키 =**
+  `videos/<user_id>/<닉네임 슬러그>-<원본이름 슬러그>-<YYYYMMDD-HHMM>-<video_id 앞 8자>.<ext>`
+  - `<user_id>/` 접두사는 **그대로 둔다** — `owns_key()` 보안 검사가 이 접두사로
+    소유를 확인하고, 닉네임이 바뀌어도 이 UUID 로 주인을 되짚는다. 콘솔에서
+    조금 거슬려도 파일명 부분이 읽히면 목적은 된다.
+  - `<닉네임>` 은 **업로드 시점 값**이다. 🔴 **rename 하면 옛 키는 안 고친다**
+    (S3 객체는 이름이 안 바뀐다) — 키는 그 시점 라벨. 소유는 위 `user.id` 로
+    유지되고 `GET /admin/videos` 목록은 DB 조인이라 **현재** 닉네임을 보여준다.
+  - `<시각>` UTC. 읽기용으로 KST 가 낫다면 바꾼다(사소).
+  - `<video_id 앞 8자>` 는 같은 사람이 같은 이름·같은 분에 두 번 올릴 때 충돌 방지.
+  - 슬러그: 한글·영숫자·`-`·`_` 만 남기고 공백→`-`, 나머지 제거, 길이 캡
+    (닉네임 20·이름 40), 비면 `clip`.
+- **`POST /videos/upload-url` 요청에 `filename` 을 더한다** — 지금은
+  `{content_type, size_bytes}` 뿐이라 원본 이름을 서버가 모른다. 키는
+  `upload-url` 단계에서 만들어지므로(파일 PUT 전) 여기서 받아야 한다. 서버가
+  `user.nickname` 을 조회(`card` 가 하듯 원시 SQL)해 슬러그를 붙인다.
+- **`video` 에 `original_filename` 컬럼** — 슬러그가 손실적이라도 원래 이름이
+  DB 에 온전히.
+- 저장(`keep`) 뒤: `reports/<user_id>/<video_id>/<닉네임>-<원본이름>-<시각>.<ext>`
+  — 폴더는 `video_id`(리포트와 한 자리), 파일명은 읽힌다.
+- **관리자 도구**는 그대로: `GET /admin/videos?user=<uid|email>`(현재 닉네임·
+  원본이름·업로드일·종목·분석 상태·리포트/재생 링크) · `DELETE /admin/videos/{id}`
+  (`DELETE /admin/users/{id}` 와 같은 결).
+
+예: 닉네임 `ㅇㄹㅇㄹ`, 파일 `1340880-sd_848_480_16fps.mp4`, 2026-09-08 14:19 →
+`videos/<user_id>/ㅇㄹㅇㄹ-1340880-sd_848_480_16fps-20260908-1419-3f1c8a2b.mp4`
+
+#### 조각 추가 (위 표에 더해)
+
+| 조각 | 담당 |
+|---|---|
+| 키에 원본이름 슬러그(`build_storage_key`) · `video.original_filename` 컬럼 | 정어진 |
+| `GET /admin/videos` (uid/email 로 필터, 사람이 읽는 목록) · `DELETE /admin/videos/{id}` | 정어진 |
+
+#### 지금 당장(테스트 단계 정리)
+
+- 서버 DB 유령 `video` 행 20개(S3 파일 없음, 1개만 실물 있음) — 사용자 승인받아 삭제한다(`classifier` 가 막아 사용자가 `!` 로 실행). 실물 있는 1개(`videos/2f3b04d9-…/37fe3852-…mp4`)는 남긴다
+- 해상도 상한(`analyze:false` 는 안 봄, `4ef9ea7`)은 서버 재시작 뒤 적용된다
+
+- 관련: `www/src/components/analysis/AnalysisStage.tsx`(`confirmSubject`·`saveToServer`·`saveReportToProfile`) · `lib/uploadClip.ts` · `lib/savedReports.ts` · 계약 3-6 · 같은 구역 6·7번(대상 박스·리포트 조회) · `ho` 9번(4K)
+- **담당**: 정어진(백엔드 수명 주기) · **제기**: 정어진(사용자 요청) · **기한**: 스프린트 3 (조각별로 나눔)
 
 ## min (박민호)
 
@@ -4986,7 +5168,7 @@ test` (299 passed, 신규 20건 — mock 6·라우트 4·컴포넌트 5·챗봇 
 
 - **담당**: 박민호(직접 구현) · **자문**: 정상호(AI 자원·라이선스) · **연동**: 정어진(기존 API, 필요시 계약 문의) · **제기**: 박민호 · **기한**: 이번 스프린트(흐름 B) · 나머지는 다음 스프린트 계획 시
 
-### 8. `fastapi/CLAUDE.md`의 컨텍스트 목록이 코드보다 뒤처져 있습니다
+### 8. `fastapi/CLAUDE.md`의 컨텍스트 목록이 코드보다 뒤처져 있습니다 ✅ 해소 (2026-09-08)
 
 `fastapi/CLAUDE.md` 「구조」 절은 "컨텍스트는 `user`·`card`·`analysis` 셋"이라고
 적어 두었는데, 실제로는 `match` 컨텍스트가 이미 있습니다.
@@ -4997,6 +5179,14 @@ test` (299 passed, 신규 20건 — mock 6·라우트 4·컴포넌트 5·챗봇 
   `CLAUDE.md` 「남의 영역 문서와 어긋날 때」)대로 처리했습니다
 - `review`(패킷 B)도 아직 컨텍스트로 추가되지 않았다면 그것도 같이 반영하시는
   편이 나을 것 같습니다 — 위 8번 항목의 `review_option` 등 5테이블 진행 상황 참고
+
+**처리 (2026-09-08, 정어진, `a1d3069`)**: `fastapi/CLAUDE.md` 「구조」 절과
+`test_architecture.py` 의 `CONTEXTS` 를 `user·card·analysis·match·review` 다섯으로
+맞췄습니다. `review` 를 `CONTEXTS` 에 넣어도 경계 검사 12건 전부 통과 — `review`
+컨텍스트는 이미 경계가 깨끗합니다. 손 관리 목록이 다시 뒤처지지 않게
+`test_CONTEXTS가_실제_디렉터리와_일치한다`(app/ 디렉터리 ↔ `CONTEXTS` 정합)를
+추가했습니다. 전체 545 통과.
+
 - **담당**: 정어진 · **제기**: 박민호 · **기한**: 확인되는 대로
 
 ## paik (백성검)
@@ -5178,7 +5368,7 @@ S3 사전 서명 URL)가 그것입니다. 그래서 **새 저장 형식을 정�
   `www/src/app/(app)/me/CardEditor.tsx`
 - **담당**: 정어진 · **제기**: 백성검 · **기한**: 스프린트 3 (조정 가능)
 
-### 4. 분석을 걸지 않고 **올리기만** 할 방법이 없습니다 (2026-09-04 신설)
+### 4. 분석을 걸지 않고 **올리기만** 할 방법이 없습니다 (2026-09-04 신설) ✅ 해소 (2026-09-08)
 
 `/me` 에 업로드 단추를 달았습니다. 그런데 계약 3-6절의 `POST /videos` 는 규격을
 통과한 클립에 **늘 분석 작업을 겁니다**(`analysis_job_id` 가 채워져 옵니다).
@@ -5200,10 +5390,18 @@ GPU 를 쓰는 일이라, 안 볼 리포트를 만드는 것은 서버 쪽에도
 모르고 분석을 걸어 버리면 화면도 그대로 「분석 영상」에 넣습니다 — 거짓말하지
 않으려고 그렇게 짰습니다. 그래서 **이게 없어도 화면은 안 깨집니다.**
 
+**처리 (2026-09-08, 정어진, `45a8564`)**: `RegisterVideoSchema`/`Command` 에
+`analyze: bool = True` 를 넣고, 인터랙터에서 `make_job = reason is None and
+command.analyze` 로 작업 생성을 걸었습니다. 화면이 실어 보내던 그 값 그대로입니다.
+
+- **확인 결과**: `analyze: false` 로 `POST /videos` → `passed: true` · `analysis_job_id: null`. 규격 반려는 `analyze` 와 무관하게 그대로(`passed: false` + 사유). 기본값(값 미전송)은 작업이 생김. 테스트 5건, 549 통과.
+- **하지 말 것 확인**: 기본값 안 바꿈(`= True`). 반려 클립 분석 안 거는 규칙 그대로.
+- 계약: `api-contract.md` 3-6 · `client-contract-changes.md` **19번**.
+
 - 관련: `www/src/lib/uploadClip.ts` · `www/src/app/(app)/me/MyVideos.tsx`
 - **담당**: 정어진 · **제기**: 백성검 · **기한**: 스프린트 3 (조정 가능)
 
-### 5. 클립에 **공개 여부**가 없어 영상 모음을 서버로 못 옮깁니다 (2026-09-04 신설)
+### 5. 클립에 **공개 여부**가 없어 영상 모음을 서버로 못 옮깁니다 (2026-09-04 신설) ✅ 해소 (2026-09-08)
 
 홈에서 내리면 나오는 **영상 모음**은 아직 화면 안의 붙박이 목록입니다
 (`www/src/lib/feed.ts` 의 `FEED`). 이번에 `/me` 에서 올린 클립을 **공개**로 돌리면
@@ -5229,6 +5427,20 @@ GPU 를 쓰는 일이라, 안 볼 리포트를 만드는 것은 서버 쪽에도
 🔴 **재생용 주소가 생기면 화면 쪽은 함수 하나만 고치면 됩니다**
 (`MyVideos.tsx` 의 `previewSrc`). 공개 목록도 `lib/published.ts` 한 파일만
 갈아 끼우면 되도록 부르는 쪽과 갈라 두었습니다.
+
+**처리 (2026-09-08, 정어진) — 네 조각 전부**. 1+2 를 `2c8590d`, 3+4 를 `d95617e` 로:
+
+| 무엇 | 상태 |
+|---|---|
+| 클립 **공개 여부** | ✅ `PATCH /videos/{id}` `{"is_public": true}`. 등록으로는 못 정하고 `false` 로 저장. 남의/없는 클립은 `404 VIDEO_NOT_FOUND` |
+| **공개 클립 목록** | ✅ `GET /videos/public` — 공개 클립만, 최근순, 최대 100. 🔴 로그인 필요(익명 홈에서 부르셔야 하면 알려 주세요). 저장 키·업로더는 안 실림 |
+| **재생용 주소** | ✅ `GET /videos/{id}/playback-url` — 사전 서명 GET URL. 공개 클립이거나 자기 클립일 때만(아니면 404). `expires_in` 초 만료, 캐시 말고 재생 직전에 받기 |
+| **제목 · 한 줄 설명** | ✅ 같은 `PATCH /videos/{id}` `{"title", "description"}`. 보낸 필드만 바뀜. 100/280자, `null`·공백이면 지움. `GET /videos`·`/videos/public` 응답에 실림 |
+
+- **확인 결과**: `is_public` 기본 `false`(기존 행도). `PATCH` 로 공개 → 다른 계정으로 `GET /videos/public` 에 뜸. 공개 클립 `playback-url` 을 남도 받고, 비공개 남의 클립은 404. 부분 수정 — `is_public` 만 토글해도 제목 안 지워짐. 테스트 **23건**, **572 통과**, `alembic check` + `downgrade -2` 왕복 클린.
+- **하지 말 것 확인**: 기본값 공개 아님(`server_default false`). 저장 키를 주소로 안 씀 — 목록에서 뺐고 재생은 사전 서명. 이미 공유한 주소가 죽는 값(`public_slug`)은 안 건드림.
+- 계약: `api-contract.md` 3-6(`PATCH` · `GET /videos/public` · `GET /videos/{id}/playback-url`) · `client-contract-changes.md` **20번**.
+- 화면: `MyVideos.tsx` 의 `previewSrc` 가 `playback-url` 의 `url` 을 반환하게, `lib/published.ts` 도 목록 id 로 그 엔드포인트를 부르면 재생이 붙습니다.
 
 - 관련: `www/src/lib/published.ts` · `www/src/lib/feed.ts` · 계약 3-6절
 - **담당**: 정어진 · **제기**: 백성검 · **기한**: 스프린트 3 (조정 가능)

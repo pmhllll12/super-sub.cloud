@@ -24,3 +24,11 @@ class StoragePort(ABC):
     @abstractmethod
     def size_of(self, storage_key: str) -> int | None:
         """올라온 객체의 크기(바이트). **없으면 None** — 아직 안 올렸다는 뜻이다."""
+
+    @abstractmethod
+    def create_download_url(self, storage_key: str) -> tuple[str, int]:
+        """그 키를 **내려받을 수 있는** URL 과 유효 시간(초)을 만든다.
+
+        재생도 앱 서버를 지나지 않는다(PER-002). 키 존재 여부는 확인하지 않는다 —
+        서명만 만든다.
+        """

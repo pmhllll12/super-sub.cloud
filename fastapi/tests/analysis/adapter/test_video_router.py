@@ -136,6 +136,67 @@ class TestRegisterVideo:
         assert body["analysis_job_id"] is None
         assert body["analysis_status"] is None
 
+    def test_analyze_false_면_통과해도_작업이_안_생긴다(self, client):
+        """기록용 업로드 — 미결 `paik` 4번. 규격은 검사하되 분석은 안 건다."""
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        res = _register(client, user_id, key, analyze=False)
+        assert res.status_code == 201, res.text
+        body = res.json()
+        assert body["passed"] is True
+        assert body["reject_reason"] is None
+        assert body["analysis_job_id"] is None
+        assert body["analysis_status"] is None
+
+    def test_analyze_기본값은_작업을_만든다(self, client):
+        """🔴 값을 안 보내면 지금처럼 분석이 걸려야 한다 — 화면 저장이 그 동작에 기댄다."""
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        # analyze 를 아예 안 실어 보낸다
+        res = _register(client, user_id, key)
+        assert res.json()["analysis_job_id"] is not None
+
+    def test_analyze_false_라도_용량_길이_반려는_그대로다(self, client):
+        """용량·길이는 `analyze` 와 무관하게 검사한다 — 사유는 값으로 남는다."""
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        res = _register(client, user_id, key, analyze=False, duration_ms=MAX_DURATION_MS + 1)
+        assert res.status_code == 201, res.text
+        body = res.json()
+        assert body["passed"] is False
+        assert "길이" in body["reject_reason"]
+        assert body["analysis_job_id"] is None
+
+    def test_analyze_false_면_4K_도_통과한다(self, client):
+        """해상도 상한은 분석 워커를 지키는 값이라 기록용 업로드엔 안 건다(미결 `ho` 9번)."""
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        res = _register(client, user_id, key, analyze=False, width=3840, height=2160)
+        assert res.status_code == 201, res.text
+        body = res.json()
+        assert body["passed"] is True
+        assert body["reject_reason"] is None
+        assert body["analysis_job_id"] is None
+
+    def test_analyze_true_면_4K_는_그대로_반려된다(self, client):
+        """분석을 걸면 해상도 상한이 살아 있다 — 4K 는 host RAM 이 터진다."""
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        res = _register(client, user_id, key, width=3840, height=2160)  # analyze 기본 True
+        assert res.status_code == 201, res.text
+        assert res.json()["passed"] is False
+        assert "해상도" in res.json()["reject_reason"]
+
     def test_올리지_않은_키는_반려가_아니라_에러다(self, client):
         """검사할 파일이 없다. 반려로 기록하면 "안 올린 것"과 구별되지 않는다."""
         user_id = uuid4()
@@ -205,3 +266,204 @@ class TestListMyVideos:
         row = client.get(f"{V1}/videos", headers=_headers(user_id)).json()[0]
         assert row["passed"] is False
         assert "해상도" in row["reject_reason"]
+
+
+def _register_clip(client, user_id):
+    key = _issue(client, user_id)
+    put_object(key, SIZE_OK)
+    res = _register(client, user_id, key)
+    assert res.status_code == 201, res.text
+    return res.json()["id"]
+
+
+class TestUpdateVideo:
+    def test_인증이_필요하다(self, client):
+        assert client.patch(f"{V1}/videos/{uuid4()}", json={"is_public": True}).status_code == 401
+
+    def test_제목과_설명을_정할_수_있다(self, client):
+        user_id = uuid4()
+        video_id = _register_clip(client, user_id)
+
+        res = client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"title": "우리 팀 첫 골", "description": "왼발 감아차기"},
+            headers=_headers(user_id),
+        )
+        assert res.status_code == 200, res.text
+        body = res.json()
+        assert body["title"] == "우리 팀 첫 골"
+        assert body["description"] == "왼발 감아차기"
+
+        row = client.get(f"{V1}/videos", headers=_headers(user_id)).json()[0]
+        assert row["title"] == "우리 팀 첫 골"
+
+    def test_보낸_필드만_바뀐다(self, client):
+        user_id = uuid4()
+        video_id = _register_clip(client, user_id)
+        client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"title": "제목"},
+            headers=_headers(user_id),
+        )
+
+        # is_public 만 바꾼다 — title 은 그대로여야 한다
+        res = client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"is_public": True},
+            headers=_headers(user_id),
+        )
+        assert res.json()["title"] == "제목"
+        assert res.json()["is_public"] is True
+
+    def test_공백_제목은_지운_것으로_본다(self, client):
+        user_id = uuid4()
+        video_id = _register_clip(client, user_id)
+        client.patch(
+            f"{V1}/videos/{video_id}", json={"title": "제목"}, headers=_headers(user_id)
+        )
+
+        res = client.patch(
+            f"{V1}/videos/{video_id}", json={"title": "   "}, headers=_headers(user_id)
+        )
+        assert res.json()["title"] is None
+
+    def test_제목_상한을_넘으면_422_다(self, client):
+        user_id = uuid4()
+        video_id = _register_clip(client, user_id)
+        res = client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"title": "가" * 101},
+            headers=_headers(user_id),
+        )
+        assert res.status_code == 422
+        assert error_code(res) == "VALIDATION_ERROR"
+
+    def test_기본은_비공개이고_공개로_바꿀_수_있다(self, client):
+        user_id = uuid4()
+        video_id = _register_clip(client, user_id)
+
+        rows = client.get(f"{V1}/videos", headers=_headers(user_id)).json()
+        assert rows[0]["is_public"] is False
+
+        res = client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"is_public": True},
+            headers=_headers(user_id),
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["is_public"] is True
+
+    def test_남의_클립은_404_다(self, client):
+        owner = uuid4()
+        video_id = _register_clip(client, owner)
+
+        res = client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"is_public": True},
+            headers=_headers(uuid4()),
+        )
+        assert res.status_code == 404
+        assert error_code(res) == "VIDEO_NOT_FOUND"
+
+    def test_없는_클립도_404_다(self, client):
+        res = client.patch(
+            f"{V1}/videos/{uuid4()}",
+            json={"is_public": True},
+            headers=_headers(uuid4()),
+        )
+        assert res.status_code == 404
+        assert error_code(res) == "VIDEO_NOT_FOUND"
+
+
+class TestListPublicVideos:
+    def test_인증이_필요하다(self, client):
+        assert client.get(f"{V1}/videos/public").status_code == 401
+
+    def test_공개한_것만_남의_눈에도_보인다(self, client):
+        owner, viewer = uuid4(), uuid4()
+        pub = _register_clip(client, owner)
+        _register_clip(client, owner)  # 비공개로 남겨 둔다
+
+        assert client.get(f"{V1}/videos/public", headers=_headers(viewer)).json() == []
+
+        client.patch(
+            f"{V1}/videos/{pub}", json={"is_public": True}, headers=_headers(owner)
+        )
+        rows = client.get(f"{V1}/videos/public", headers=_headers(viewer)).json()
+        assert [r["id"] for r in rows] == [pub]
+
+    def test_저장_키와_업로더는_안_실린다(self, client):
+        owner = uuid4()
+        video_id = _register_clip(client, owner)
+        client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"is_public": True},
+            headers=_headers(owner),
+        )
+        row = client.get(f"{V1}/videos/public", headers=_headers(uuid4())).json()[0]
+        assert set(row) == {
+            "id",
+            "sport_code",
+            "duration_ms",
+            "created_at",
+            "title",
+            "description",
+        }
+
+    def test_제목과_설명이_실린다(self, client):
+        owner = uuid4()
+        video_id = _register_clip(client, owner)
+        client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"is_public": True, "title": "제목", "description": "설명"},
+            headers=_headers(owner),
+        )
+        row = client.get(f"{V1}/videos/public", headers=_headers(uuid4())).json()[0]
+        assert row["title"] == "제목"
+        assert row["description"] == "설명"
+
+
+class TestPlaybackUrl:
+    def test_인증이_필요하다(self, client):
+        assert client.get(f"{V1}/videos/{uuid4()}/playback-url").status_code == 401
+
+    def test_공개_클립은_남도_URL_을_받는다(self, client):
+        owner, viewer = uuid4(), uuid4()
+        video_id = _register_clip(client, owner)
+        client.patch(
+            f"{V1}/videos/{video_id}", json={"is_public": True}, headers=_headers(owner)
+        )
+
+        res = client.get(
+            f"{V1}/videos/{video_id}/playback-url", headers=_headers(viewer)
+        )
+        assert res.status_code == 200, res.text
+        body = res.json()
+        assert body["url"].startswith("https://")
+        assert body["expires_in"] > 0
+
+    def test_자기_비공개_클립은_URL_을_받는다(self, client):
+        owner = uuid4()
+        video_id = _register_clip(client, owner)  # 비공개
+
+        res = client.get(
+            f"{V1}/videos/{video_id}/playback-url", headers=_headers(owner)
+        )
+        assert res.status_code == 200, res.text
+
+    def test_비공개_남의_클립은_404_다(self, client):
+        owner, viewer = uuid4(), uuid4()
+        video_id = _register_clip(client, owner)  # 비공개
+
+        res = client.get(
+            f"{V1}/videos/{video_id}/playback-url", headers=_headers(viewer)
+        )
+        assert res.status_code == 404
+        assert error_code(res) == "VIDEO_NOT_FOUND"
+
+    def test_없는_클립은_404_다(self, client):
+        res = client.get(
+            f"{V1}/videos/{uuid4()}/playback-url", headers=_headers(uuid4())
+        )
+        assert res.status_code == 404
+        assert error_code(res) == "VIDEO_NOT_FOUND"

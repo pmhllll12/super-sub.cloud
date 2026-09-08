@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import column, select, table
@@ -18,6 +19,7 @@ from sqlalchemy.orm import Session
 from app.analysis.adapter.outbound.orm.analysis_job_orm import AnalysisJobOrm
 from app.analysis.adapter.outbound.orm.video_orm import VideoOrm
 from app.analysis.adapter.outbound.orm.video_validation_orm import VideoValidationOrm
+from app.analysis.application.dtos.video_dto import UNSET
 from app.analysis.application.ports.output.video_port import VideoPort
 from app.analysis.domain.entities.video_entity import ValidationEntity, VideoEntity
 
@@ -46,6 +48,7 @@ class VideoPgRepository(VideoPort):
                 storage_key=video.storage_key,
                 duration_ms=video.duration_ms,
                 side=video.side,
+                is_public=video.is_public,
                 created_at=video.created_at,
             )
         )
@@ -98,6 +101,60 @@ class VideoPgRepository(VideoPort):
             for video, validation in rows
         ]
 
+    def get(self, video_id: UUID) -> VideoEntity | None:
+        video = self._session.get(VideoOrm, video_id)
+        if video is None:
+            return None
+        validation = self._session.execute(
+            select(VideoValidationOrm).where(
+                VideoValidationOrm.video_id == video_id
+            )
+        ).scalar_one_or_none()
+        latest = self._latest_jobs([video_id]).get(video_id)
+        return _to_entity(video, validation, latest)
+
+    def update_video(
+        self,
+        video_id: UUID,
+        user_id: UUID,
+        *,
+        is_public: bool | Any = UNSET,
+        title: str | None | Any = UNSET,
+        description: str | None | Any = UNSET,
+    ) -> VideoEntity | None:
+        video = self._session.get(VideoOrm, video_id)
+        if video is None or video.user_id != user_id:
+            return None
+        if is_public is not UNSET:
+            video.is_public = is_public
+        if title is not UNSET:
+            video.title = title
+        if description is not UNSET:
+            video.description = description
+        self._session.commit()
+
+        validation = self._session.execute(
+            select(VideoValidationOrm).where(
+                VideoValidationOrm.video_id == video_id
+            )
+        ).scalar_one_or_none()
+        latest = self._latest_jobs([video_id]).get(video_id)
+        return _to_entity(video, validation, latest)
+
+    def list_public(self, limit: int) -> list[VideoEntity]:
+        videos = (
+            self._session.execute(
+                select(VideoOrm)
+                .where(VideoOrm.is_public.is_(True))
+                .order_by(VideoOrm.created_at.desc())
+                .limit(limit)
+            )
+            .scalars()
+            .all()
+        )
+        # 목록은 반려 사유·분석 상태를 보여주지 않는다 — 판정·작업을 안 읽는다.
+        return [_to_entity(v, None, None) for v in videos]
+
     def _latest_jobs(
         self, video_ids: list[UUID]
     ) -> dict[UUID, AnalysisJobOrm]:
@@ -131,6 +188,9 @@ def _to_entity(
         storage_key=video.storage_key,
         duration_ms=video.duration_ms,
         side=video.side,
+        is_public=video.is_public,
+        title=video.title,
+        description=video.description,
         created_at=video.created_at,
         validation=(
             None

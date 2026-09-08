@@ -2,8 +2,20 @@
 
 from __future__ import annotations
 
-from app.analysis.application.dtos.video_dto import VideoResult
+from app.analysis.application.dtos.video_dto import PublicVideoResult, VideoResult
 from app.analysis.domain.entities.video_entity import VideoEntity
+
+
+def to_public_video_result(video: VideoEntity) -> PublicVideoResult:
+    """공개 목록 한 줄. 저장 키·업로더·분석 상태는 싣지 않는다."""
+    return PublicVideoResult(
+        id=video.id,
+        sport_code=video.sport_code,
+        duration_ms=video.duration_ms,
+        created_at=video.created_at,
+        title=video.title,
+        description=video.description,
+    )
 
 
 def to_video_result(video: VideoEntity) -> VideoResult:
@@ -25,4 +37,7 @@ def to_video_result(video: VideoEntity) -> VideoResult:
         reject_reason=validation.reject_reason if validation else None,
         analysis_job_id=video.analysis_job_id,
         analysis_status=video.analysis_status,
+        is_public=video.is_public,
+        title=video.title,
+        description=video.description,
     )
