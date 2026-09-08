@@ -5617,6 +5617,28 @@ mock입니다.
 - 관련: paik 7번(읽는 경로) · paik 11번(리포트 위치) · `www/src/lib/savedReports.ts` 주석
 - **담당**: 정상호→정어진→백성검(위 표 순서대로) · **제기**: 박민호 · **기한**: 스프린트 3
 
+### 10. Vercel 빌드가 24시간 rate limit에 걸렸습니다 — 기다리기로 결정
+
+`main`에 push할 때마다 Vercel(두 프로젝트 `super-sub-cloud`·`super-sub-cloud-dev`
+전부)이 빌드를 거부합니다.
+
+```
+Vercel – super-sub-cloud      | failure | Deployment rate limited — retry in 24 hours.
+Vercel – super-sub-cloud-dev  | failure | Deployment rate limited — retry in 24 hours.
+```
+
+GitHub 커밋 상태로 확인 — 첫 실패 **2026-09-08 08:33 UTC**(커밋 `c304c5f`), 이후
+push마다(`fe58bfb` 등, 08:56 UTC) 자동 재시도됐지만 매번 같은 이유로 실패했습니다.
+push 방식·코드 문제가 아니라 **Vercel 계정(무료 플랜)의 빌드 횟수 제한**입니다.
+
+| | |
+|---|---|
+| 확인 | `curl -s https://api.github.com/repos/pmhllll12/super-sub.cloud/commits/main/status` — `Vercel –` 두 컨텍스트가 `success`면 풀린 것입니다 |
+| 결정 | **Pro 업그레이드 대신 24시간 대기하기로 함**(2026-09-08, 박민호) |
+| 다시 시도하는 법 | 별도 조치 필요 없음 — 그 뒤 `main`에 아무 push나 있으면 자동으로 다시 빌드됩니다. 급하면 Vercel 콘솔에서 수동 재배포 |
+
+- **담당**: 박민호 · **제기**: 박민호 · **기한**: 2026-09-09 08:33 UTC 이후 재확인
+
 ## paik (백성검)
 
 ### 1. 분석한 영상을 우리 서버에 저장하는 경로 ✅ 해소 (2026.09.03)
