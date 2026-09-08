@@ -6,7 +6,10 @@ from abc import ABC, abstractmethod
 
 from app.analysis.application.dtos.video_dto import (
     MyVideosQuery,
+    PublicVideoResult,
+    PublicVideosQuery,
     RegisterVideoCommand,
+    SetVisibilityCommand,
     UploadUrlCommand,
     UploadUrlResult,
     VideoResult,
@@ -29,3 +32,15 @@ class ListMyVideosUseCase(ABC):
     @abstractmethod
     def __call__(self, query: MyVideosQuery) -> list[VideoResult]:
         """내 영상 목록. 분석 상태와 반려 사유가 함께 온다."""
+
+
+class SetVideoVisibilityUseCase(ABC):
+    @abstractmethod
+    def __call__(self, command: SetVisibilityCommand) -> VideoResult:
+        """클립의 공개 여부를 바꾼다. 남의 클립·없는 클립이면 404."""
+
+
+class ListPublicVideosUseCase(ABC):
+    @abstractmethod
+    def __call__(self, query: PublicVideosQuery) -> list[PublicVideoResult]:
+        """공개된 클립 목록. 홈의 영상 모음이 쓴다."""

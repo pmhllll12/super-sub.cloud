@@ -75,3 +75,23 @@ class VideoResponse(BaseModel):
     reject_reason: str | None
     analysis_job_id: UUID | None
     analysis_status: str | None
+    is_public: bool
+
+
+class SetVisibilitySchema(BaseModel):
+    """클립의 공개 여부를 바꾼다. `PATCH /videos/{id}` 본문."""
+
+    is_public: bool
+
+
+class PublicVideoResponse(BaseModel):
+    """홈 영상 모음 한 줄. **저장 키·업로더는 안 실린다** — 재생 주소(사전
+    서명)와 제목·설명은 미결 `paik` 5번의 3·4 조각이다.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    sport_code: str
+    duration_ms: int | None
+    created_at: Rfc3339

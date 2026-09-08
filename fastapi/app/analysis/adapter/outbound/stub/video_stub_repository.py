@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from uuid import UUID
 
 from app.analysis.application.ports.output.storage_port import StoragePort
@@ -43,6 +44,21 @@ class StubVideoRepository(VideoPort):
     def list_by_user(self, user_id: UUID) -> list[VideoEntity]:
         mine = [v for v in _VIDEOS.values() if v.user_id == user_id]
         return sorted(mine, key=lambda v: v.created_at, reverse=True)
+
+    def set_visibility(
+        self, video_id: UUID, user_id: UUID, is_public: bool
+    ) -> VideoEntity | None:
+        video = _VIDEOS.get(video_id)
+        if video is None or video.user_id != user_id:
+            return None
+        updated = replace(video, is_public=is_public)
+        _VIDEOS[video_id] = updated
+        return updated
+
+    def list_public(self, limit: int) -> list[VideoEntity]:
+        public = [v for v in _VIDEOS.values() if v.is_public]
+        public.sort(key=lambda v: v.created_at, reverse=True)
+        return public[:limit]
 
 
 class FakeStorage(StoragePort):

@@ -37,3 +37,20 @@ class VideoPort(ABC):
         검사 결과와 **가장 최근** 분석 작업의 상태를 함께 채운다 — `/videos`
         화면 한 줄이 그 셋을 같이 보여주기 때문이다.
         """
+
+    @abstractmethod
+    def set_visibility(
+        self, video_id: UUID, user_id: UUID, is_public: bool
+    ) -> VideoEntity | None:
+        """클립의 공개 여부를 바꾸고 갱신된 영상을 돌려준다.
+
+        **`user_id` 로 소유를 확인한다** — 남의 클립이거나 없는 클립이면 `None`.
+        """
+
+    @abstractmethod
+    def list_public(self, limit: int) -> list[VideoEntity]:
+        """공개된 클립. **최근 것이 앞에 온다.** 업로더 구분 없이 훑는다.
+
+        홈의 영상 모음이 쓴다. 반려 사유·분석 상태는 채우지 않는다 — 목록이
+        보여주지 않는다.
+        """

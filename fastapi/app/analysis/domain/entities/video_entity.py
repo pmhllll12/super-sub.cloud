@@ -43,3 +43,5 @@ class VideoEntity:
     validation: ValidationEntity | None = None
     analysis_job_id: UUID | None = None
     analysis_status: str | None = None
+    # 공개 여부(미결 `paik` 5번). 기본은 비공개.
+    is_public: bool = False

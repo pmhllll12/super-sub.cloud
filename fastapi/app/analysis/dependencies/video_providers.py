@@ -12,14 +12,18 @@ from app.analysis.adapter.outbound.s3.s3_storage import S3Storage
 from app.analysis.application.ports.input.video_use_cases import (
     CreateUploadUrlUseCase,
     ListMyVideosUseCase,
+    ListPublicVideosUseCase,
     RegisterVideoUseCase,
+    SetVideoVisibilityUseCase,
 )
 from app.analysis.application.ports.output.storage_port import StoragePort
 from app.analysis.application.ports.output.video_port import VideoPort
 from app.analysis.application.use_cases.video_interactors import (
     CreateUploadUrlInteractor,
     ListMyVideosInteractor,
+    ListPublicVideosInteractor,
     RegisterVideoInteractor,
+    SetVideoVisibilityInteractor,
 )
 from app.core.config import settings
 from app.core.database import get_session
@@ -72,6 +76,18 @@ def get_list_my_videos_use_case(
     return ListMyVideosInteractor(repository)
 
 
+def get_set_visibility_use_case(
+    repository: VideoRepositoryDep,
+) -> SetVideoVisibilityUseCase:
+    return SetVideoVisibilityInteractor(repository)
+
+
+def get_list_public_videos_use_case(
+    repository: VideoRepositoryDep,
+) -> ListPublicVideosUseCase:
+    return ListPublicVideosInteractor(repository)
+
+
 CreateUploadUrlUseCaseDep = Annotated[
     CreateUploadUrlUseCase, Depends(get_create_upload_url_use_case)
 ]
@@ -80,4 +96,10 @@ RegisterVideoUseCaseDep = Annotated[
 ]
 ListMyVideosUseCaseDep = Annotated[
     ListMyVideosUseCase, Depends(get_list_my_videos_use_case)
+]
+SetVideoVisibilityUseCaseDep = Annotated[
+    SetVideoVisibilityUseCase, Depends(get_set_visibility_use_case)
+]
+ListPublicVideosUseCaseDep = Annotated[
+    ListPublicVideosUseCase, Depends(get_list_public_videos_use_case)
 ]

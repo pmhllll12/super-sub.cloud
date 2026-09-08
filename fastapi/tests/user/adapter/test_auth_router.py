@@ -135,6 +135,8 @@ class TestOpenApi:
             V1 + "/matches/{match_id}/applications/{application_id}/accept",
             f"{V1}/videos",
             f"{V1}/videos/upload-url",
+            f"{V1}/videos/public",
+            V1 + "/videos/{video_id}",
             V1 + "/teams/{team_id}/squad",
             V1 + "/teams/{team_id}/squad/members",
             V1 + "/teams/{team_id}/squad/members/{member_id}",

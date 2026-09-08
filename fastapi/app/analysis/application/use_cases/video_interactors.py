@@ -18,7 +18,10 @@ from uuid import uuid4
 
 from app.analysis.application.dtos.video_dto import (
     MyVideosQuery,
+    PublicVideoResult,
+    PublicVideosQuery,
     RegisterVideoCommand,
+    SetVisibilityCommand,
     UploadUrlCommand,
     UploadUrlResult,
     VideoResult,
@@ -26,11 +29,16 @@ from app.analysis.application.dtos.video_dto import (
 from app.analysis.application.ports.input.video_use_cases import (
     CreateUploadUrlUseCase,
     ListMyVideosUseCase,
+    ListPublicVideosUseCase,
     RegisterVideoUseCase,
+    SetVideoVisibilityUseCase,
 )
 from app.analysis.application.ports.output.storage_port import StoragePort
 from app.analysis.application.ports.output.video_port import VideoPort
-from app.analysis.application.use_cases.video_assembler import to_video_result
+from app.analysis.application.use_cases.video_assembler import (
+    to_public_video_result,
+    to_video_result,
+)
 from app.analysis.domain.entities.video_entity import ValidationEntity, VideoEntity
 from app.analysis.domain.rules.video_rules import (
     MAX_BYTES,
@@ -133,4 +141,30 @@ class ListMyVideosInteractor(ListMyVideosUseCase):
     def __call__(self, query: MyVideosQuery) -> list[VideoResult]:
         return [
             to_video_result(v) for v in self._repository.list_by_user(query.user_id)
+        ]
+
+
+class SetVideoVisibilityInteractor(SetVideoVisibilityUseCase):
+    def __init__(self, repository: VideoPort) -> None:
+        self._repository = repository
+
+    def __call__(self, command: SetVisibilityCommand) -> VideoResult:
+        video = self._repository.set_visibility(
+            command.video_id, command.user_id, command.is_public
+        )
+        if video is None:
+            # 남의 클립인지 없는 클립인지 구별해 주지 않는다 — 남의 클립 존재
+            # 여부가 새어 나가지 않게.
+            raise ApiError(404, "VIDEO_NOT_FOUND", "클립을 찾을 수 없습니다.")
+        return to_video_result(video)
+
+
+class ListPublicVideosInteractor(ListPublicVideosUseCase):
+    def __init__(self, repository: VideoPort) -> None:
+        self._repository = repository
+
+    def __call__(self, query: PublicVideosQuery) -> list[PublicVideoResult]:
+        return [
+            to_public_video_result(v)
+            for v in self._repository.list_public(query.limit)
         ]

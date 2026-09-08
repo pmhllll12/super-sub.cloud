@@ -175,6 +175,64 @@ class TestRegister:
         assert _register(db_client, uploader, key, sport_code="baseball").status_code == 201
 
 
+class TestVisibility:
+    """미결 `paik` 5번(1+2 조각) — 실제 PostgreSQL 에서 공개 여부가 도는지."""
+
+    def test_기본은_비공개로_저장된다(self, db_client, db_session, uploader):
+        key = _upload(db_client, uploader)
+        video_id = uuid.UUID(_register(db_client, uploader, key).json()["id"])
+
+        is_public = db_session.execute(
+            text("SELECT is_public FROM video WHERE id = :id"), {"id": video_id}
+        ).scalar_one()
+        assert is_public is False
+
+    def test_공개로_바꾸면_남의_공개_목록에_뜬다(self, db_client, uploader):
+        key = _upload(db_client, uploader)
+        video_id = _register(db_client, uploader, key).json()["id"]
+
+        res = db_client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"is_public": True},
+            headers=uploader["headers"],
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["is_public"] is True
+
+        # 다른 사람으로 로그인해도 보인다
+        other = f"viewer-{uuid.uuid4().hex[:12]}@super-sub.example"
+        db_client.post(
+            f"{V1}/auth/signup",
+            json={"email": other, "password": PASSWORD, "nickname": "구경꾼"},
+        )
+        login = db_client.post(
+            f"{V1}/auth/login", json={"email": other, "password": PASSWORD}
+        )
+        viewer_h = {"Authorization": f"Bearer {login.json()['access_token']}"}
+        rows = db_client.get(f"{V1}/videos/public", headers=viewer_h).json()
+        assert video_id in [r["id"] for r in rows]
+
+    def test_남의_클립은_못_바꾼다(self, db_client, uploader):
+        key = _upload(db_client, uploader)
+        video_id = _register(db_client, uploader, key).json()["id"]
+
+        other = f"intruder-{uuid.uuid4().hex[:12]}@super-sub.example"
+        db_client.post(
+            f"{V1}/auth/signup",
+            json={"email": other, "password": PASSWORD, "nickname": "침입자"},
+        )
+        login = db_client.post(
+            f"{V1}/auth/login", json={"email": other, "password": PASSWORD}
+        )
+        h = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+        res = db_client.patch(
+            f"{V1}/videos/{video_id}", json={"is_public": True}, headers=h
+        )
+        assert res.status_code == 404
+        assert res.json()["error"]["code"] == "VIDEO_NOT_FOUND"
+
+
 class TestConstraints:
     def test_영상당_판정은_하나뿐이다(self, db_client, db_session, uploader):
         """부록 D.7 의 유일 제약. **막히지 않으면 그 제약은 없는 것이다.**"""

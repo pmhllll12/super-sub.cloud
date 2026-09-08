@@ -242,3 +242,81 @@ class TestListMyVideos:
         row = client.get(f"{V1}/videos", headers=_headers(user_id)).json()[0]
         assert row["passed"] is False
         assert "해상도" in row["reject_reason"]
+
+
+def _register_clip(client, user_id):
+    key = _issue(client, user_id)
+    put_object(key, SIZE_OK)
+    res = _register(client, user_id, key)
+    assert res.status_code == 201, res.text
+    return res.json()["id"]
+
+
+class TestSetVisibility:
+    def test_인증이_필요하다(self, client):
+        assert client.patch(f"{V1}/videos/{uuid4()}", json={"is_public": True}).status_code == 401
+
+    def test_기본은_비공개이고_공개로_바꿀_수_있다(self, client):
+        user_id = uuid4()
+        video_id = _register_clip(client, user_id)
+
+        rows = client.get(f"{V1}/videos", headers=_headers(user_id)).json()
+        assert rows[0]["is_public"] is False
+
+        res = client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"is_public": True},
+            headers=_headers(user_id),
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["is_public"] is True
+
+    def test_남의_클립은_404_다(self, client):
+        owner = uuid4()
+        video_id = _register_clip(client, owner)
+
+        res = client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"is_public": True},
+            headers=_headers(uuid4()),
+        )
+        assert res.status_code == 404
+        assert error_code(res) == "VIDEO_NOT_FOUND"
+
+    def test_없는_클립도_404_다(self, client):
+        res = client.patch(
+            f"{V1}/videos/{uuid4()}",
+            json={"is_public": True},
+            headers=_headers(uuid4()),
+        )
+        assert res.status_code == 404
+        assert error_code(res) == "VIDEO_NOT_FOUND"
+
+
+class TestListPublicVideos:
+    def test_인증이_필요하다(self, client):
+        assert client.get(f"{V1}/videos/public").status_code == 401
+
+    def test_공개한_것만_남의_눈에도_보인다(self, client):
+        owner, viewer = uuid4(), uuid4()
+        pub = _register_clip(client, owner)
+        _register_clip(client, owner)  # 비공개로 남겨 둔다
+
+        assert client.get(f"{V1}/videos/public", headers=_headers(viewer)).json() == []
+
+        client.patch(
+            f"{V1}/videos/{pub}", json={"is_public": True}, headers=_headers(owner)
+        )
+        rows = client.get(f"{V1}/videos/public", headers=_headers(viewer)).json()
+        assert [r["id"] for r in rows] == [pub]
+
+    def test_저장_키와_업로더는_안_실린다(self, client):
+        owner = uuid4()
+        video_id = _register_clip(client, owner)
+        client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"is_public": True},
+            headers=_headers(owner),
+        )
+        row = client.get(f"{V1}/videos/public", headers=_headers(uuid4())).json()[0]
+        assert set(row) == {"id", "sport_code", "duration_ms", "created_at"}

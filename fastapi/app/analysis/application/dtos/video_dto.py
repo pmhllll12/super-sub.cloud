@@ -51,6 +51,22 @@ class MyVideosQuery:
 
 
 @dataclass(frozen=True)
+class SetVisibilityCommand:
+    """클립의 공개 여부를 바꾼다. **자기 클립만** — `user_id` 로 소유를 확인한다."""
+
+    video_id: UUID
+    user_id: UUID
+    is_public: bool
+
+
+@dataclass(frozen=True)
+class PublicVideosQuery:
+    """홈의 영상 모음. 공개 클립만, 최근 것부터."""
+
+    limit: int = 100
+
+
+@dataclass(frozen=True)
 class VideoResult:
     """`/videos` 화면 한 줄. 분석 상태와 반려 사유가 같이 온다.
 
@@ -68,3 +84,16 @@ class VideoResult:
     reject_reason: str | None
     analysis_job_id: UUID | None
     analysis_status: str | None
+    is_public: bool
+
+
+@dataclass(frozen=True)
+class PublicVideoResult:
+    """공개 목록 한 줄. **저장 키·업로더를 싣지 않는다** — 재생 주소(사전
+    서명)와 제목은 아직 없다(미결 `paik` 5번의 3·4 조각).
+    """
+
+    id: UUID
+    sport_code: str
+    duration_ms: int | None
+    created_at: datetime

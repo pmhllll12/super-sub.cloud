@@ -766,6 +766,49 @@ curl -s -X POST -H "Authorization: Bearer $T" -H 'Content-Type: application/json
 
 ---
 
+## 20. 🟡 클립을 공개로 돌릴 수 있습니다 — 공개 목록도 생겼습니다 (2026-09-08 추가)
+
+미결 `paik` 5번의 **1+2 조각**입니다. 네 가지 중 앞의 둘이 됩니다.
+
+| 무엇 | 상태 |
+|---|---|
+| 클립의 **공개 여부** | ✅ `PATCH /videos/{id}` `{"is_public": true}` |
+| **공개 클립 목록** | ✅ `GET /videos/public` |
+| **재생용 주소** | ✋ 아직입니다 (사전 서명 GET URL — 3조각) |
+| **제목·한 줄 설명** | ✋ 아직입니다 (4조각) |
+
+### 만족해야 할 성질
+
+`PATCH /videos/{id}` 로 공개로 돌린 클립이 **다른 계정으로 로그인해도**
+`GET /videos/public` 목록에 뜹니다. `GET /videos`(내 목록)의 각 줄에도 이제
+`is_public` 이 실립니다.
+
+### 알아 두실 것 넷
+
+1. **기본은 비공개입니다.** 등록(`POST /videos`)으로는 공개 여부를 못 정합니다 —
+   보내도 무시되고 항상 `false` 로 저장됩니다. 이미 올라간 클립도 전부 비공개입니다
+2. **남의 클립·없는 클립은 `404 VIDEO_NOT_FOUND`** 입니다. "남의 것이라 안 된다"와
+   "없다"를 구별해 주지 않습니다
+3. **`GET /videos/public` 은 로그인이 필요합니다.** 익명(비로그인) 홈에서
+   부르셔야 하면 알려 주세요 — 지금은 인증을 그대로 뒀습니다
+4. **목록 한 줄은 `{id, sport_code, duration_ms, created_at}` 뿐입니다.**
+   저장 키·업로더·재생 주소는 안 옵니다(저장 키에 업로더 `user_id` 가 들어 있어서).
+   `lib/published.ts` 는 이 네 값으로 시작하시고, 재생 주소가 생기면(`3조각`)
+   `previewSrc` 만 바꾸시면 됩니다
+
+### 먼저 확인
+
+```bash
+# 공개로 돌린다
+curl -s -X PATCH -H "Authorization: Bearer $T" -H 'Content-Type: application/json' \
+  -d '{"is_public":true}' $API/videos/$VIDEO_ID | jq .is_public   # true
+
+# 다른 계정 토큰으로 목록에 뜨는가
+curl -s -H "Authorization: Bearer $OTHER_T" $API/videos/public | jq '.[].id'
+```
+
+---
+
 ## 계약 문서
 
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린
