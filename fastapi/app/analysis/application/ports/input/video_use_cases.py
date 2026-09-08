@@ -5,8 +5,14 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from app.analysis.application.dtos.video_dto import (
+    DeleteVideoCommand,
+    GetPlaybackUrlCommand,
     MyVideosQuery,
+    PlaybackUrlResult,
+    PublicVideoResult,
+    PublicVideosQuery,
     RegisterVideoCommand,
+    UpdateVideoCommand,
     UploadUrlCommand,
     UploadUrlResult,
     VideoResult,
@@ -29,3 +35,27 @@ class ListMyVideosUseCase(ABC):
     @abstractmethod
     def __call__(self, query: MyVideosQuery) -> list[VideoResult]:
         """내 영상 목록. 분석 상태와 반려 사유가 함께 온다."""
+
+
+class UpdateVideoUseCase(ABC):
+    @abstractmethod
+    def __call__(self, command: UpdateVideoCommand) -> VideoResult:
+        """클립을 부분 수정한다(공개 여부·제목·설명). 남의/없는 클립이면 404."""
+
+
+class ListPublicVideosUseCase(ABC):
+    @abstractmethod
+    def __call__(self, query: PublicVideosQuery) -> list[PublicVideoResult]:
+        """공개된 클립 목록. 홈의 영상 모음이 쓴다."""
+
+
+class GetPlaybackUrlUseCase(ABC):
+    @abstractmethod
+    def __call__(self, command: GetPlaybackUrlCommand) -> PlaybackUrlResult:
+        """재생용 사전 서명 URL. 공개 클립이거나 자기 클립일 때만, 아니면 404."""
+
+
+class DeleteVideoUseCase(ABC):
+    @abstractmethod
+    def __call__(self, command: DeleteVideoCommand) -> None:
+        """영상을 DB·S3 에서 지운다. 남의/없는 클립이면 404."""

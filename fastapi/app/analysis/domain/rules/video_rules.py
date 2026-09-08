@@ -10,7 +10,7 @@ SFR-001 이 요구하는 것은 "규격에 맞지 않으면 반려하고 **사�
 |---|---|---|
 | 용량 | 200MB | 사전 서명 URL 은 크기를 강제하지 못한다. 올라온 뒤 실측으로 건다 |
 | 길이 | 60초 | 한 동작을 담기에 충분하다 |
-| 해상도 | 1920x1080 | 4K 는 host RAM 이 먼저 터진다(미결 `ho` 9번, 실측) |
+| 해상도 | 1920x1080 **(분석 시에만)** | 4K 는 host RAM 이 먼저 터진다(미결 `ho` 9번, 실측). 분석 파이프라인을 지키는 값이라, **`analyze=False` 기록용 업로드에는 적용하지 않는다** — 그 클립은 워커를 지나지 않는다 (2026-09-08) |
 
 🔴 **길이 상한과 에이전트의 프레임 상한이 아직 안 맞는다.**
 `agent/src/supersub_agent/pose.py` 의
@@ -61,18 +61,22 @@ def owns_key(user_id: UUID, storage_key: str) -> bool:
 
 
 def reject_reason(
-    *, duration_ms: int, width: int, height: int, size_bytes: int
+    *, duration_ms: int, width: int, height: int, size_bytes: int, analyze: bool = True
 ) -> str | None:
     """규격 위반 사유. 맞으면 None.
 
     **첫 위반 하나만 돌려준다.** 사유를 모아 붙이면 문장이 길어져 화면
     (`/videos` 의 반려 사유 바텀시트)에서 읽히지 않고, 사람이 고칠 때는
     어차피 하나씩 고친다.
+
+    `analyze` 가 거짓이면 **해상도 상한을 보지 않는다** — 그 값은 분석 워커의
+    host RAM 을 지키는 것이라(미결 `ho` 9번), 분석을 걸지 않는 기록용 업로드에는
+    걸 이유가 없다. 용량·길이는 저장소·비용에 걸린 것이라 그대로 본다.
     """
     if size_bytes > MAX_BYTES:
         return f"용량이 상한을 넘습니다: {size_bytes // (1024 * 1024)}MB (상한 {MAX_BYTES // (1024 * 1024)}MB)"
     if duration_ms > MAX_DURATION_MS:
         return f"길이가 상한을 넘습니다: {duration_ms / 1000:.1f}초 (상한 {MAX_DURATION_MS // 1000}초)"
-    if width > MAX_WIDTH or height > MAX_HEIGHT:
+    if analyze and (width > MAX_WIDTH or height > MAX_HEIGHT):
         return f"해상도가 상한을 넘습니다: {width}x{height} (상한 {MAX_WIDTH}x{MAX_HEIGHT})"
     return None

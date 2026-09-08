@@ -731,11 +731,140 @@ curl -s -X PATCH -H "Authorization: Bearer $T" -H 'Content-Type: application/jso
 
 ---
 
-## 19. 🟡 과금이 생겼습니다 — 크레딧·코치 연결이 API로 됩니다 (2026-09-08 추가)
+## 19. 🟡 분석을 걸지 않고 클립만 올릴 수 있습니다 (2026-09-08 추가)
 
-미결 `paik` 13번(패킷 A)입니다. `paik` 브랜치에 만들어 뒀고, **아직 `main`에
-배선되지 않았습니다** — 정어진이 병합하며 잇습니다. 그 전까지는 참고만 하시면
-됩니다.
+미결 `paik` 4번. `POST /videos` 요청 본문에 **`analyze: false`** 를 실으면 규격은
+검사하되 분석 작업을 만들지 않습니다. 이미 그렇게 보내고 계신 그대로입니다.
+
+```json
+{ "sport_code": "football", "storage_key": "...", "duration_ms": 10200,
+  "width": 1920, "height": 1080, "analyze": false }
+```
+
+### 만족해야 할 성질
+
+`analyze: false` 로 등록한 클립은 응답의 **`analysis_job_id` 가 `null`** 입니다.
+그러면 「업로드 영상」 갈래(가르는 기준이 `analysis_job_id`)에 들어갑니다.
+
+### 알아 두실 것 셋
+
+1. **생략하면 참입니다.** `analyze` 를 안 보내면 지금처럼 분석이 걸립니다 —
+   분석 화면(`/analysis`)의 저장은 그 동작 그대로입니다. 기본값은 안 바뀌었습니다
+2. **규격 검사는 그대로 돕니다.** `analyze: false` 라도 반려 사유가 있으면
+   `passed: false` 와 `reject_reason` 이 옵니다. 반려된 클립은 원래 작업이 없습니다
+3. **`analyze` 는 되돌릴 수 있는 값이 아닙니다** — 나중에 분석을 걸려면 재분석
+   경로가 필요한데 아직 없습니다(계약 3-6 「아직 없는 것」)
+4. 🟢 **`analyze: false` 면 해상도 상한(1920x1080)을 안 봅니다** (2026-09-08 추가).
+   4K 로 찍은 클립도 기록용으로는 올라갑니다. 그 상한은 분석 워커를 지키는
+   값이라(4K 는 host RAM 이 터집니다) 분석을 걸 때만 삽니다. 용량 200MB·길이 60초
+   상한은 `analyze` 와 무관하게 그대로입니다
+
+### 먼저 확인
+
+```bash
+curl -s -X POST -H "Authorization: Bearer $T" -H 'Content-Type: application/json' \
+  -d '{"sport_code":"football","storage_key":"'"$KEY"'","duration_ms":10200,"width":1920,"height":1080,"analyze":false}' \
+  $API/videos | jq '.passed, .analysis_job_id'
+# true, null 이면 된 것입니다
+```
+
+---
+
+## 20. 🟢 클립을 공개로 돌리고 제목을 달 수 있습니다 — 재생 주소도 생겼습니다 (2026-09-08 추가)
+
+미결 `paik` 5번의 **네 조각 전부**. (1+2 를 먼저 내고 3+4 를 같은 날 이어 붙였습니다 —
+아래 「3·4 조각」.)
+
+| 무엇 | 상태 |
+|---|---|
+| 클립의 **공개 여부** | ✅ `PATCH /videos/{id}` `{"is_public": true}` |
+| **공개 클립 목록** | ✅ `GET /videos/public` |
+| **재생용 주소** | ✅ `GET /videos/{id}/playback-url` (사전 서명 GET URL) |
+| **제목·한 줄 설명** | ✅ `PATCH /videos/{id}` `{"title": …, "description": …}` |
+
+### 만족해야 할 성질
+
+`PATCH /videos/{id}` 로 공개로 돌린 클립이 **다른 계정으로 로그인해도**
+`GET /videos/public` 목록에 뜹니다. `GET /videos`(내 목록)의 각 줄에도 이제
+`is_public` 이 실립니다.
+
+### 알아 두실 것 넷
+
+1. **기본은 비공개입니다.** 등록(`POST /videos`)으로는 공개 여부를 못 정합니다 —
+   보내도 무시되고 항상 `false` 로 저장됩니다. 이미 올라간 클립도 전부 비공개입니다
+2. **남의 클립·없는 클립은 `404 VIDEO_NOT_FOUND`** 입니다. "남의 것이라 안 된다"와
+   "없다"를 구별해 주지 않습니다
+3. **`GET /videos/public` 은 로그인이 필요합니다.** 익명(비로그인) 홈에서
+   부르셔야 하면 알려 주세요 — 지금은 인증을 그대로 뒀습니다
+4. **목록 한 줄은 `{id, sport_code, duration_ms, created_at, title, description}` 입니다.**
+   저장 키·업로더는 안 옵니다(저장 키에 업로더 `user_id` 가 들어 있어서). 재생은
+   아래 3조각으로 따로 받습니다
+
+### 먼저 확인
+
+```bash
+# 공개로 돌린다
+curl -s -X PATCH -H "Authorization: Bearer $T" -H 'Content-Type: application/json' \
+  -d '{"is_public":true}' $API/videos/$VIDEO_ID | jq .is_public   # true
+
+# 다른 계정 토큰으로 목록에 뜨는가
+curl -s -H "Authorization: Bearer $OTHER_T" $API/videos/public | jq '.[].id'
+```
+
+### 3·4 조각 — 재생 주소와 제목·설명 (같은 날 이어서)
+
+**제목·한 줄 설명**은 공개 여부와 같은 `PATCH /videos/{id}` 로 정합니다.
+
+```json
+{ "title": "우리 팀 첫 골", "description": "왼발 감아차기" }
+```
+
+- **셋(`is_public`·`title`·`description`) 중 보낸 것만 바뀝니다.** 공개 여부만
+  토글할 때 제목이 지워지지 않습니다
+- `title` 100자 · `description` 280자, 넘으면 `422`. **`null`·공백이면 지웁니다**
+  (`tagline` 과 같은 규칙). 화면에서 미리 막아 주시는 편이 좋습니다
+- `GET /videos`·`GET /videos/public` 응답에 `title`·`description` 이 실립니다
+
+**재생 주소**는 클립마다 따로 받습니다 — `GET /videos/{id}/playback-url`.
+
+```json
+{ "url": "https://…s3….amazonaws.com/…?X-Amz-…", "expires_in": 900 }
+```
+
+- **공개 클립이면 남도**, 자기 클립이면 비공개여도 받습니다. 아니면 `404`
+- `expires_in` 초 뒤 만료됩니다 — **캐시하지 말고 재생 직전에** 받으세요
+- `MyVideos.tsx` 의 `previewSrc` 가 이 `url` 을 반환하도록 바꾸시면 됩니다.
+  `lib/published.ts` 도 목록 id 로 이 엔드포인트를 부르면 재생이 붙습니다
+
+```bash
+curl -s -H "Authorization: Bearer $OTHER_T" $API/videos/$PUB_ID/playback-url | jq .url
+```
+
+---
+
+## 21. 🟡 클립을 지울 수 있습니다 (2026-09-08 추가)
+
+미결 `jin` 24번 1조각. `DELETE /videos/{id}` — 자기 클립만, `204`.
+
+- DB 행 + 판정·분석 작업 연쇄 + S3 객체까지 지웁니다.
+- 남의/없는 클립은 `404 VIDEO_NOT_FOUND`.
+- ⚠️ **S3 삭제는 아직 실서버에서 안 됩니다** — EC2 역할에 `s3:DeleteObject` 를
+  붙이는 중입니다(미결 `jin` 24번). DB 에서는 지금도 사라지므로 목록에서는
+  즉시 빠집니다.
+- `/analysis` 를 저장 없이 벗어날 때 이걸 부르시면 됩니다(`beforeunload` /
+  `navigator.sendBeacon`). 놓쳐도 서버 백스톱 스윕이 24시간 뒤 정리합니다.
+
+### `video.kept` (같은 조각)
+
+`GET /videos`·`POST /videos` 응답에 `kept: boolean` 이 실립니다. **지금은 항상
+`true`** — `/analysis` 분석을 임시(`kept:false`)로 두고 "저장"에서 켜는 전환은
+프론트가 `keep` 을 부를 준비가 되면 함께 켭니다. 그때까지는 무시하셔도 됩니다.
+
+---
+
+## 22. 🟡 과금이 생겼습니다 — 크레딧·코치 연결이 API로 됩니다 (2026-09-08 추가)
+
+미결 `paik` 13번(패킷 A)입니다.
 
 | 엔드포인트 | 뜻 |
 |---|---|
@@ -768,10 +897,8 @@ curl -s -X PATCH -H "Authorization: Bearer $T" -H 'Content-Type: application/jso
 ### 먼저 확인
 
 ```bash
-git -C fastapi log --oneline paik -- app/billing   # 브랜치에 있는지
+git -C fastapi log --oneline main -- app/billing   # main에 배선됐는지
 ```
-
-`main`에 배선되면 이 항목에 이어서 남기겠습니다.
 
 상세: `fastapi/docs/api-contract.md` **3-10절** · `fastapi/docs/backend-work-split.md` 「패킷 A」
 

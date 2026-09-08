@@ -1,7 +1,7 @@
 """billing tables
 
 Revision ID: 98f9cbdc74f4
-Revises: None — 정어진이 병합할 때 채운다 (docs/backend-work-split.md 패킷 A)
+Revises: 10f68718757d
 Create Date: 2026-09-08
 
 부록 D 도메인 ⑥ 전부(`analysis_credit` · `coach` · `coach_referral`)다.
@@ -44,7 +44,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = '98f9cbdc74f4'
-down_revision: Union[str, Sequence[str], None] = None  # 🔴 정어진이 채운다
+down_revision: Union[str, Sequence[str], None] = "10f68718757d"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

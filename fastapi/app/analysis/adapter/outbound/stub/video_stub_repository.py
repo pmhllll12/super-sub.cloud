@@ -6,8 +6,11 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+from typing import Any
 from uuid import UUID
 
+from app.analysis.application.dtos.video_dto import UNSET
 from app.analysis.application.ports.output.storage_port import StoragePort
 from app.analysis.application.ports.output.video_port import VideoPort
 from app.analysis.domain.entities.video_entity import VideoEntity
@@ -41,8 +44,47 @@ class StubVideoRepository(VideoPort):
         _VIDEOS[video.id] = video
 
     def list_by_user(self, user_id: UUID) -> list[VideoEntity]:
-        mine = [v for v in _VIDEOS.values() if v.user_id == user_id]
+        mine = [
+            v for v in _VIDEOS.values() if v.user_id == user_id and v.kept
+        ]
         return sorted(mine, key=lambda v: v.created_at, reverse=True)
+
+    def get(self, video_id: UUID) -> VideoEntity | None:
+        return _VIDEOS.get(video_id)
+
+    def update_video(
+        self,
+        video_id: UUID,
+        user_id: UUID,
+        *,
+        is_public: bool | Any = UNSET,
+        title: str | None | Any = UNSET,
+        description: str | None | Any = UNSET,
+    ) -> VideoEntity | None:
+        video = _VIDEOS.get(video_id)
+        if video is None or video.user_id != user_id:
+            return None
+        changes: dict[str, Any] = {}
+        if is_public is not UNSET:
+            changes["is_public"] = is_public
+        if title is not UNSET:
+            changes["title"] = title
+        if description is not UNSET:
+            changes["description"] = description
+        updated = replace(video, **changes)
+        _VIDEOS[video_id] = updated
+        return updated
+
+    def list_public(self, limit: int) -> list[VideoEntity]:
+        public = [v for v in _VIDEOS.values() if v.is_public and v.kept]
+        public.sort(key=lambda v: v.created_at, reverse=True)
+        return public[:limit]
+
+    def delete(self, video_id: UUID, user_id: UUID) -> VideoEntity | None:
+        video = _VIDEOS.get(video_id)
+        if video is None or video.user_id != user_id:
+            return None
+        return _VIDEOS.pop(video_id)
 
 
 class FakeStorage(StoragePort):
@@ -58,5 +100,15 @@ class FakeStorage(StoragePort):
     def create_upload_url(self, storage_key: str, content_type: str) -> tuple[str, int]:
         return f"https://storage.invalid/{storage_key}", self.TTL_SECONDS
 
+    def create_download_url(self, storage_key: str) -> tuple[str, int]:
+        return f"https://storage.invalid/get/{storage_key}", self.TTL_SECONDS
+
     def size_of(self, storage_key: str) -> int | None:
         return _OBJECTS.get(storage_key)
+
+    def delete_object(self, storage_key: str) -> None:
+        _OBJECTS.pop(storage_key, None)
+
+    def delete_prefix(self, prefix: str) -> None:
+        for key in [k for k in _OBJECTS if k.startswith(prefix)]:
+            del _OBJECTS[key]

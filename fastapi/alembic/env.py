@@ -61,6 +61,9 @@ from app.review.adapter.outbound.orm import review_selection_orm  # noqa: E402,F
 from app.match.adapter.outbound.orm import (  # noqa: E402,F401
     match_position_need_orm,
 )
+from app.billing.adapter.outbound.orm import analysis_credit_orm  # noqa: E402,F401
+from app.billing.adapter.outbound.orm import coach_orm  # noqa: E402,F401
+from app.billing.adapter.outbound.orm import coach_referral_orm  # noqa: E402,F401
 # ---------------------------------------------------------------------------
 
 config = context.config

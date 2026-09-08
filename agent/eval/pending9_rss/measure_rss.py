@@ -46,21 +46,30 @@ DATA = ROOT / "data"
 #: 92프레임. 이 항목의 핵심 조합인 **4K 300장을 원본으로는 못 잰다.** 그대로
 #: 돌리면 92장을 재고 "300장"이라 적는다 — 조용히 틀리는 종류다(2026-09-08에
 #: 실제로 그렇게 나왔다). 그래서 `--prepare` 로 이어 붙인 긴 클립을 만든다.
-CLIPS = {
-    "1080p": DATA / "bball_shot.mp4",
-    "4k": DATA / "baseball_pitch_trim.mp4",
-    "1080p_long": DATA / "tmp" / "rss_long_1080p.mp4",
-    "4k_long": DATA / "tmp" / "rss_long_4k.mp4",
-}
+#: 🔴 **파일 이름을 박지 않는다 — 기계마다 다르다.** 로컬에는 `bball_shot.mp4`
+#: 가 있고 EC2 에는 없다(2026-09-08에 그래서 `--prepare` 가 죽었다). `data/*.mp4`
+#: 를 훑어 **해상도로 고른다.** 같은 해상도가 여럿이면 **가장 긴 것**을 쓴다 —
+#: 이 측정은 장수를 늘려야 하므로 긴 쪽이 낫다.
+CLIPS: dict[str, Path] = {}
+#: 원본 클립의 프레임 수 — 몇 번 이어 붙일지 정하는 데 쓴다.
+SRC_FRAMES: dict[str, int] = {}
 
-#: 원본을 몇 번 이어 붙일 것인가. 4K 92프레임 × 4 = 368 ≥ 300.
-REPEAT = 4
+#: 긴 클립이 최소 몇 프레임이어야 하는가. 계획 최대치(300)에 여유를 얹는다.
+#: 🔴 **반복 횟수를 고정하지 않는다** — 원본 길이가 기계마다 다르다(로컬 1080p
+#: 146프레임 · EC2 46프레임). ×4 로 박아 두면 EC2 에서 184장뿐이라 300장 조합이
+#: 조용히 미달한다.
+TARGET_LONG_FRAMES = 320
 
 #: 로컬(RAM 9GB, 가용 5GB)에서 안전한 범위. 4K 300장은 약 7.46GB라 넣지 않는다.
-PLAN_SAFE = [("1080p", 60), ("1080p_long", 150), ("1080p_long", 300),
-             ("4k", 30), ("4k", 60)]
+PLAN_SAFE = [("1080p_long", 60), ("1080p_long", 150), ("1080p_long", 300),
+             ("4k_long", 30), ("4k_long", 60)]
 #: EC2(RAM 15GB). 🔴 4K 300장이 여기 들어 있다 — 이 조합이 이 항목의 핵심이다.
-PLAN_FULL = PLAN_SAFE + [("4k_long", 150), ("4k_long", 300)]
+#:
+#: 🔴 **4K 300장이 두 번 있다.** 사전 등록 기준 D 가 「같은 조합을 2회 돌렸을 때
+#: `RSS_peak` 이 10% 안」인데 계획 표에 반복이 빠져 있었다. 재는 계획이 기준을
+#: 만족시키지 못하면 그 기준은 영원히 판정이 안 된다. 반복 점은 **적합에서
+#: 빼고**(`repeat_of`) D 판정에만 쓴다 — 같은 점을 두 번 세면 적합이 그쪽으로 쏠린다.
+PLAN_FULL = PLAN_SAFE + [("4k_long", 150), ("4k_long", 300), ("4k_long", 300)]
 
 
 def rss_kb() -> int:
@@ -108,6 +117,46 @@ class Sampler:
         return max(self.samples) if self.samples else 0
 
 
+def discover_clips() -> None:
+    """`data/*.mp4` 를 훑어 해상도별 대표 클립을 정한다.
+
+    1080p 는 **긴 변 1920**, 4K 는 **긴 변 3840** 으로 가른다(세로 영상이 있어
+    width/height 로 고정하면 못 잡는다 — `baseball_pitch_trim.mp4` 가 2160×3840 이다).
+    """
+    import subprocess
+
+    best: dict[str, tuple[int, Path]] = {}
+    for p in sorted(DATA.glob("*.mp4")):
+        try:
+            out = subprocess.run(
+                ["ffprobe", "-v", "error", "-select_streams", "v:0",
+                 "-show_entries", "stream=width,height,nb_frames",
+                 "-of", "csv=p=0", str(p)],
+                capture_output=True, text=True, timeout=20, check=True,
+            ).stdout.strip().split(",")
+            w, h = int(out[0]), int(out[1])
+            n = int(out[2]) if len(out) > 2 and out[2].isdigit() else 0
+        except (subprocess.SubprocessError, ValueError, IndexError):
+            continue
+        long_side = max(w, h)
+        key = {1920: "1080p", 3840: "4k"}.get(long_side)
+        if key and n > best.get(key, (0, None))[0]:
+            best[key] = (n, p)
+
+    for key, (n, p) in best.items():
+        CLIPS[key] = p
+        SRC_FRAMES[key] = n
+        print(f"  {key:6s} ← {p.name} ({n}프레임)")
+    CLIPS["1080p_long"] = DATA / "tmp" / "rss_long_1080p.mp4"
+    CLIPS["4k_long"] = DATA / "tmp" / "rss_long_4k.mp4"
+    missing = {"1080p", "4k"} - CLIPS.keys()
+    if missing:
+        raise SystemExit(
+            f"해상도 {sorted(missing)} 클립을 {DATA} 에서 찾지 못했다.\n"
+            "  이 측정은 해상도 두 종류가 있어야 base 와 k 를 가를 수 있다."
+        )
+
+
 def prepare_long_clips() -> None:
     """원본을 이어 붙여 긴 클립을 만든다 (`data/tmp/`, gitignore 안이다).
 
@@ -124,15 +173,17 @@ def prepare_long_clips() -> None:
         if dst.exists():
             print(f"  이미 있음: {dst.name}")
             continue
+        n_src = SRC_FRAMES.get(src_key, 0)
+        repeat = max(2, -(-TARGET_LONG_FRAMES // n_src)) if n_src else 4
         listing = out_dir / f"{dst.stem}.txt"
-        listing.write_text("".join(f"file '{src.resolve()}'\n" for _ in range(REPEAT)))
+        listing.write_text("".join(f"file '{src.resolve()}'\n" for _ in range(repeat)))
         subprocess.run(
             ["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0",
              "-i", str(listing), "-c", "copy", str(dst)],
             check=True,
         )
         listing.unlink(missing_ok=True)
-        print(f"  만듦: {dst.name} ({src.name} × {REPEAT})")
+        print(f"  만듦: {dst.name} ({src.name} {n_src}프레임 × {repeat})")
 
 
 def probe_video(path: Path) -> tuple[int, int]:
@@ -200,8 +251,9 @@ def fit(rows: list[dict]) -> None:
     #    RSS 를 정하는 것은 화소 수지 파일 이름이 아니다.
     fits = {}
     for res in sorted({f"{r['w']}x{r['h']}" for r in rows}):
+        # 🔴 재현 회차는 뺀다 — 같은 점을 두 번 세면 최소제곱이 그쪽으로 쏠린다.
         pts = [(r["frame_bytes_mb"], r["rss_peak_mb"]) for r in rows
-               if f"{r['w']}x{r['h']}" == res]
+               if f"{r['w']}x{r['h']}" == res and not r.get("repeat_of")]
         if len(pts) < 2:
             print(f"  {res:12s} 점이 {len(pts)}개뿐 — 적합 불가")
             continue
@@ -228,17 +280,65 @@ def fit(rows: list[dict]) -> None:
               f"{'✅' if all(1.0 <= k <= 3.0 for k in ks) else '🔴'}")
 
 
+def mem_total_mb() -> float:
+    """이 기계의 물리 RAM(MB). 기준 C 는 「인스턴스 RAM 안」이라 실측이 필요하다."""
+    for line in Path("/proc/meminfo").read_text().splitlines():
+        if line.startswith("MemTotal:"):
+            return int(line.split()[1]) / 1e3
+    return 0.0
+
+
+def judge_c_d(rows: list[dict]) -> None:
+    """사전 등록 기준 C(4K 300장이 RAM 안)·D(재현 10% 안)를 판정한다.
+
+    **판정 문구를 여기서 만든다** — 표를 눈으로 읽고 사람이 옮겨 적으면 그때
+    기준이 흔들린다. 기준은 `PREREGISTRATION.md` 에 측정 전에 고정됐다.
+    """
+    ram = mem_total_mb()
+    print(f"\n{'='*70}\n사전 등록 기준 C·D\n{'='*70}")
+
+    core = [r for r in rows if r["label"] == "4k_long" and r["requested_frames"] == 300]
+    if not core:
+        print("  기준 C — 4K 300장 회차가 없다. 판정 불가")
+    else:
+        peak = max(r["rss_peak_mb"] for r in core)
+        print(f"  기준 C — 4K 300장 RSS 피크 {peak:.0f}MB / RAM {ram:.0f}MB "
+              f"({peak / ram * 100:.0f}%): {'✅' if peak <= ram else '🔴'}")
+
+    if len(core) < 2:
+        print(f"  기준 D — 4K 300장이 {len(core)}회뿐 — 재현 판정 불가")
+    else:
+        peaks = [r["rss_peak_mb"] for r in core]
+        spread = (max(peaks) - min(peaks)) / max(peaks) * 100
+        print(f"  기준 D — 회차 {['%.0f' % p for p in peaks]}MB, 편차 {spread:.1f}% "
+              f"(합격선 10% 이내): {'✅' if spread <= 10 else '🔴'}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--plan", choices=("safe", "full"), default="safe",
                     help="safe=로컬(4K 300장 제외) · full=EC2")
-    ap.add_argument("--clip", choices=tuple(CLIPS), help="한 조합만 돌린다")
+    # 🔴 `choices=tuple(CLIPS)` 를 쓰지 않는다. `CLIPS` 는 모듈 수준에서 **비어
+    #    있고** `discover_clips()` 가 채우는데, 그 호출은 `parse_args()` **뒤**다.
+    #    선택지가 빈 채로 굳어 어떤 `--clip` 값도 "invalid choice" 가 되고,
+    #    argparse 는 **종료 코드 2** 로 죽는다 — 자식 프로세스가 전부 그렇게
+    #    죽었다(2026-09-08 EC2). 검사는 클립을 찾은 **뒤에** 한다.
+    ap.add_argument("--clip", help="한 조합만 돌린다 (자식 프로세스용)")
     ap.add_argument("--frames", type=int, help="--clip 과 함께 쓴다")
     ap.add_argument("--fps", type=int, default=30)
     ap.add_argument("--prepare", action="store_true",
                     help="긴 클립을 만들고 끝낸다 (data/tmp/, ffmpeg 필요)")
     ap.add_argument("--out", type=Path, default=Path(__file__).resolve().parent / "rss.json")
     args = ap.parse_args()
+
+    discover_clips()
+
+    if args.clip and args.clip not in CLIPS:
+        raise SystemExit(
+            f"--clip 값을 모른다: {args.clip}\n"
+            f"  가능한 값: {sorted(CLIPS)}\n"
+            "  `_long` 이 없으면 `--prepare` 를 먼저 돌린다."
+        )
 
     if args.prepare:
         prepare_long_clips()
@@ -261,6 +361,7 @@ def main() -> None:
     print("-" * 78)
     rows = []
     short = []
+    seen: set[tuple[str, int]] = set()
     for label, frames in plan:
         # 🔴 **조합마다 새 프로세스로 돈다.** `VmHWM` 은 프로세스 생애 최고라
         #    한 프로세스에서 이어 돌리면 **뒤 회차가 앞 회차의 봉우리를 물려받는다**
@@ -273,8 +374,10 @@ def main() -> None:
         r["reached"] = r["frames"] == r["requested_frames"]
         if not r["reached"]:
             short.append(r)
+        r["repeat_of"] = (label, frames) in seen
+        seen.add((label, frames))
         rows.append(r)
-        print(f"{label + ' ' + str(frames):16s}{r['frames']:6d}"
+        print(f"{label + ' ' + str(frames) + ('(재현)' if r['repeat_of'] else ''):16s}{r['frames']:6d}"
               f"{r['w']}x{r['h']:>7}{r['frame_bytes_mb']:11.0f}MB"
               f"{r['rss_peak_mb']:9.0f}MB{r['rss_delta_mb']:8.0f}MB"
               f"{r['ratio_peak_over_frames'] or 0:6.2f}{r['seconds']:6.0f}")
@@ -291,6 +394,7 @@ def main() -> None:
         raise SystemExit(2)
 
     fit(rows)
+    judge_c_d(rows)
     print("\n🔴 여기서 DEFAULT_MAX_FRAMES 를 바꾸지 않는다 — features 가 달라져")
     print("   B-6 재실행을 부른다(미결 11번). 이 회차는 예산을 정할 근거만 만든다.")
 

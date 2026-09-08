@@ -713,6 +713,20 @@ uv run python scripts/analyze_s3.py s3://$BUCKET/videos/pitch01.mp4 \
 `judge_backend`가 들어간다. 수동 배포라 EC2 코드 시점이 리포트마다 다를 수
 있어서다.
 
+#### 🔴 리포트 자리가 둘이다 — `--video-id` 를 주느냐로 갈린다
+
+| | 자리 | 언제 |
+|---|---|---|
+| **계약 자리** | `reports/<user_id>/<video_id>/report.json` + 같은 폴더의 `impact.jpg`·`tracked.webm` | **워커가 부를 때.** `claim` 이 준 `video_id` 를 넘긴다 |
+| 옛 자리 | `reports/<업로드 폴더>/<파일명>/<타임스탬프>.json` + `<타임스탬프>/` 아래 미리보기 | **손으로·배치로 부를 때.** 아래 6-2 예시가 이쪽이다 |
+
+계약 자리는 **영상 하나에 폴더 하나**다 — 「저장」을 누르면 fastapi 가 원본을
+같은 폴더에 `source.mp4` 로 옮기므로 한 영상에 대한 것이 한자리에 모인다
+(미결 `jin` 24번). 타임스탬프가 없어서 **재분석은 앞의 리포트를 덮는다**.
+
+배치·평가가 옛 자리를 쓰는 것은 의도다. 같은 영상을 조건을 바꿔 여러 번
+돌리는 것이 그쪽의 일상이라 회차별 타임스탬프가 있어야 비교가 남는다.
+
 **확인:**
 ```bash
 aws s3 ls --recursive s3://$BUCKET/reports/pitch01/

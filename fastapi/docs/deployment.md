@@ -200,12 +200,12 @@ alembic check        # "No new upgrade operations detected." 여야 한다
 
 ## 4. 리버스 프록시·로드밸런서 뒤에 둘 때
 
-> **✅ 2026-09-03 에 박민호가 다 세웠다.** `https://api.supersub-ai.com` 이 밖에서
+> **✅ 2026-09-03 에 박민호가 다 세웠다.** `https://<API 호스트>` 이 밖에서
 > 200 을 낸다 — A 레코드(가비아) · 80·443 개방 · nginx · Let's Encrypt 까지.
 > `http` 는 301 로 넘어간다. 이 절의 "그날 함께 한다"는 서술이 그날이 됐다.
 >
 > ```bash
-> curl -s -o /dev/null -w '%{http_code}\n' https://api.supersub-ai.com/health   # 200
+> curl -s -o /dev/null -w '%{http_code}\n' https://<API 호스트>/health   # 200
 > ```
 
 🔴 **`X-Forwarded-For` 를 신뢰하도록 설정하지 않으면** 인증 로그의 `client` 와
@@ -372,7 +372,7 @@ ssh supersub 'cd ~/supersub/app && git pull && cd fastapi \
 
 | 무엇 | 왜 |
 |---|---|
-| ~~80·443 개방 · nginx · TLS~~ | ✅ **2026-09-03 에 박민호가 세웠다** — 4절. `https://api.supersub-ai.com` 이 밖에서 200 을 낸다 |
+| ~~80·443 개방 · nginx · TLS~~ | ✅ **2026-09-03 에 박민호가 세웠다** — 4절. `https://<API 호스트>` 이 밖에서 200 을 낸다 |
 | **`pgvector`** | AL2023 저장소에 **패키지가 없다.** 지금 마이그레이션은 `vector` 를 안 써서 없이도 돌았다 — `player_vector` 가 들어올 때 소스 빌드(`gcc` 필요)를 해야 한다 |
 | ~~백업~~ | ✅ 2026-09-02 에 걸었다 — 7절. **다만 같은 디스크에 쌓인다**(밖으로 옮기는 것은 별도) |
 | **로그 회전·모니터링** | journald 기본값에 기대고 있다 |
