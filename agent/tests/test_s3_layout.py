@@ -16,7 +16,12 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from supersub_agent import storage  # noqa: E402
-from analyze_s3 import report_slug, resolve_videos  # noqa: E402
+from analyze_s3 import (  # noqa: E402
+    owner_from_key,
+    report_slug,
+    report_targets,
+    resolve_videos,
+)
 
 
 # --- 리포트를 어디에 놓는가 -------------------------------------------------
@@ -43,6 +48,68 @@ def test_report_slug_leaves_top_level_uploads_where_they_were():
 
 def test_report_slug_handles_a_bare_key():
     assert report_slug("clip.mp4") == "clip"
+
+
+# --- 계약 자리 (미결 jin 24번) ----------------------------------------------
+#
+# 「저장」을 누르면 fastapi 가 원본을 `reports/<user_id>/<video_id>/source.mp4`
+# 로 옮긴다. 리포트와 미리보기가 **같은 폴더**에 있어야 한 영상에 대한 것이
+# 한자리에 모인다.
+
+
+OUT = "s3://b/reports"
+STAMP = "20260908T051200Z"
+
+
+def test_the_video_id_puts_the_report_in_the_contract_spot():
+    report, previews = report_targets(
+        OUT, "videos/user-1/clip.mp4", "vid-9", STAMP
+    )
+
+    assert report == "s3://b/reports/user-1/vid-9/report.json"
+    assert previews == "s3://b/reports/user-1/vid-9"
+
+
+def test_the_owner_comes_from_the_prefix_not_the_filename():
+    """🔴 `jin` 24번이 파일명을 `<닉네임>-<원본이름>-<시각>-<video_id 앞 8자>`
+    로 바꾸기로 했다. `<user_id>/` 접두사는 그대로 두므로 여기가 안 깨져야 한다.
+
+    파일명 끝 8자는 `video_id` 의 **앞부분일 뿐**이라 자리를 정하는 데 쓰면 안 된다.
+    """
+    key = "videos/user-1/ㅇㄹㅇㄹ-clip-20260908-1419-3f1c8a2b.mp4"
+
+    assert owner_from_key(key) == "user-1"
+    report, _ = report_targets(OUT, key, "3f1c8a2b-full-uuid", STAMP)
+    assert report == "s3://b/reports/user-1/3f1c8a2b-full-uuid/report.json"
+
+
+def test_without_a_video_id_the_old_spot_is_kept():
+    """🔴 배치·평가 실행에는 `video_id` 가 없다.
+
+    그쪽은 같은 영상을 조건을 바꿔 여러 번 돌리는 것이 일상이라 **회차별
+    타임스탬프**가 맞다. 계약 자리로 끌고 오면 앞 회차를 덮어써서 비교가 사라진다.
+    """
+    report, previews = report_targets(OUT, "videos/user-1/clip.mp4", None, STAMP)
+
+    assert report == f"s3://b/reports/user-1/clip/{STAMP}.json"
+    assert previews == f"s3://b/reports/user-1/clip/{STAMP}"
+
+
+def test_a_key_without_an_owner_still_gets_a_spot():
+    """`videos/` 바로 아래 파일·평가용 키에는 소유자가 없다. 죽지 않고
+    `video_id` 만으로 자리를 잡는다."""
+    assert owner_from_key("videos/clip.mp4") is None
+    assert owner_from_key("clip.mp4") is None
+
+    report, _ = report_targets(OUT, "videos/clip.mp4", "vid-9", STAMP)
+    assert report == "s3://b/reports/vid-9/report.json"
+
+
+def test_the_report_and_its_previews_share_one_folder():
+    """저장이 `source.mp4` 를 놓을 자리와 같은 폴더여야 한다."""
+    report, previews = report_targets(OUT, "videos/u/c.mp4", "v", STAMP)
+
+    assert report.rsplit("/", 1)[0] == previews
 
 
 # --- 무엇을 분석 대상으로 보는가 --------------------------------------------

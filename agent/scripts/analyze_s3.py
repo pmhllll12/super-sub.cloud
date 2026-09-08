@@ -121,6 +121,53 @@ def report_slug(key: str) -> str:
     return f"{parent}/{stem}" if parent and parent != "videos" else stem
 
 
+def owner_from_key(key: str) -> str | None:
+    """`videos/<user_id>/…` 에서 소유자를 꺼낸다. 모양이 다르면 None.
+
+    🔴 **파일 이름이 아니라 접두사에서 읽는다.** 미결 `jin` 24번이 키를
+    `videos/<user_id>/<닉네임>-<원본이름>-<시각>-<video_id 앞 8자>.<ext>` 로
+    바꾸기로 했는데 **`<user_id>/` 접두사는 그대로 둔다** — 소유 검사가 그
+    접두사로 돌기 때문이다. 그래서 파일명 규칙이 바뀌어도 이 함수는 안 깨진다.
+    파일명 끝의 8자는 `video_id` 의 **앞부분일 뿐**이라 자리를 정하는 데
+    쓰면 안 된다.
+    """
+    parts = PurePosixPath(key).parts
+    if len(parts) >= 3 and parts[0] == "videos":
+        return parts[1]
+    return None
+
+
+def report_targets(
+    out: str, key: str, video_id: str | None, stamp: str
+) -> tuple[str, str]:
+    """(리포트 URI, 미리보기를 놓을 접두사).
+
+    계약(`jin` 24번)의 자리는 **영상 하나에 폴더 하나**다 —
+    `reports/<user_id>/<video_id>/report.json` 과 같은 폴더의 미리보기.
+    「저장」을 누르면 fastapi 가 원본을 `source.mp4` 로 **이 폴더에** 옮기므로,
+    한 영상에 대한 것이 한자리에 모인다.
+
+    🔴 **`video_id` 가 없으면 옛 자리를 그대로 쓴다.** 배치·평가 실행은
+    백엔드 작업이 아니라 `video_id` 가 없고, 그때는 회차별 타임스탬프가 맞다 —
+    같은 영상을 조건을 바꿔 여러 번 돌리는 것이 그쪽의 일상이다. 계약 자리로
+    끌고 오면 앞 회차를 덮어써서 비교가 사라진다.
+
+    🔴 **계약 자리에는 타임스탬프가 없다** — 재분석이 앞의 리포트를 덮는다.
+    같은 영상의 최신 결과가 하나 있는 것이 계약의 뜻이고, 언제 낸 것인지는
+    리포트 안의 `analyzed_at`·`code_version` 이 싣는다.
+    """
+    if video_id:
+        owner = owner_from_key(key)
+        base = f"{owner}/{video_id}" if owner else video_id
+        return storage.join_uri(out, base, "report.json"), storage.join_uri(out, base)
+
+    base = report_slug(key)
+    return (
+        storage.join_uri(out, base, f"{stamp}.json"),
+        storage.join_uri(out, base, stamp),
+    )
+
+
 def resolve_videos(uri: str, region: str | None) -> list[str]:
     """인자로 받은 것이 파일이든 **폴더든** 분석할 영상 목록으로 바꾼다.
 
@@ -208,22 +255,29 @@ def analyze_one(video: str, args, rubric, subject) -> None:
         # --- 미리보기 ------------------------------------------------------
         # 판정이 끝난 뒤다. 프레임을 다시 디코딩하므로 판정 모델과 겹치지 않는다.
         stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-        slug = report_slug(storage.parse_s3_uri(video)[1])
+        report_uri, preview_prefix = report_targets(
+            args.out, storage.parse_s3_uri(video)[1], args.video_id, stamp
+        )
         t0 = time.time()
         previews = build_previews(pose, int(features["impact_frame"]), Path(tmp))
         preview_s = time.time() - t0
 
         preview_uris: dict[str, str] = {}
         for kind, path in previews.items():
-            uri = storage.join_uri(args.out, slug, stamp, path.name)
+            uri = storage.join_uri(preview_prefix, path.name)
             storage.upload_file(path, uri, region=args.region)
             preview_uris[kind] = uri
             print(f"  미리보기 {kind}: {path.stat().st_size / 1e6:.2f}MB → {uri}")
 
     # --- 리포트 업로드 -----------------------------------------------------
-    target = storage.join_uri(args.out, slug, f"{stamp}.json")
+    target = report_uri
 
     report = {
+        # 🔴 **「저장」 뒤에는 이 키가 죽는다.** `jin` 24번의 `keep` 이 원본을
+        # `reports/<user_id>/<video_id>/source.mp4` 로 옮기고 `videos/` 쪽을
+        # 지우기 때문이다. 여기 값은 **분석 시점의 자리**이고, 옮긴 뒤의 자리를
+        # 아는 것은 fastapi 뿐이다 — 그쪽에서 갱신하거나 리포트를 DB로 옮길 때
+        # 정리한다(`jin` 24번에 적어 두었다).
         "source_video": video,
         "analyzed_at": stamp,
         "code_version": code_version(),
@@ -287,6 +341,12 @@ def main() -> None:
     ap.add_argument("--fps", type=int, default=DEFAULT_TARGET_FPS)
     ap.add_argument("--region", default=None, help="S3 리전 (미지정 시 기본 설정)")
     ap.add_argument(
+        "--video-id", default=None,
+        help="백엔드의 video.id. 주면 리포트를 계약 자리 "
+             "`<out>/<user_id>/<video_id>/report.json` 에 놓는다. "
+             "🔴 주지 않으면 옛 자리(회차별 타임스탬프)를 쓴다 — 배치·평가용이다",
+    )
+    ap.add_argument(
         "--subject-box", default=None, metavar="x,y,w,h",
         help="분석할 사람의 **정규화 0~1** 박스. 사람이 화면에서 찍은 값이다. "
              "🔴 표시 해상도 픽셀이 아니다 — 주지 않으면 지금까지처럼 자동으로 고른다",
@@ -318,6 +378,13 @@ def main() -> None:
           f"({len(rubric.criteria)}개 항목)")
 
     videos = resolve_videos(video_uri := args.video, args.region)
+    if len(videos) > 1 and args.video_id:
+        # 🔴 한 폴더의 여러 편이 같은 자리에 리포트를 쓰면 **서로 덮는다.**
+        #    계약 자리에는 타임스탬프가 없어서 마지막 것만 남는다.
+        raise SystemExit(
+            f"{video_uri} 아래에 영상이 {len(videos)}편인데 --video-id 가 하나다. "
+            "video_id 는 영상 한 편의 것이므로 영상을 직접 지정할 것."
+        )
     if len(videos) > 1 and subject is not None:
         raise SystemExit(
             f"{video_uri} 아래에 영상이 {len(videos)}편이다. 대상 지정"
