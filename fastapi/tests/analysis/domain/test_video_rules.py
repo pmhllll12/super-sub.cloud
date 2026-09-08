@@ -100,3 +100,26 @@ class TestStorageKey:
     def test_같은_사람이_두_번_받으면_다른_키다(self):
         user_id = uuid4()
         assert build_storage_key(user_id, "mp4") != build_storage_key(user_id, "mp4")
+
+    def test_닉네임과_원본이름이_키에_들어간다(self):
+        """미결 jin 24번 — 콘솔에서 알아볼 수 있게."""
+        user_id = uuid4()
+        key = build_storage_key(
+            user_id,
+            "mp4",
+            nickname="ㅇㄹㅇㄹ",
+            original_filename="My Kick (final).mp4",
+        )
+        assert key.startswith(f"videos/{user_id}/ㅇㄹㅇㄹ-")
+        assert "My-Kick-final" in key
+        assert key.endswith(".mp4")
+        assert owns_key(user_id, key)  # 접두사는 그대로라 소유 검사가 유지된다
+
+    def test_이상한_문자와_빈_값도_안전하다(self):
+        user_id = uuid4()
+        key = build_storage_key(
+            user_id, "mov", nickname="  ", original_filename="???.mov"
+        )
+        # 닉네임이 비면 user, 이름이 비면 clip 으로 떨어진다
+        assert key.startswith(f"videos/{user_id}/user-clip-")
+        assert key.endswith(".mov")

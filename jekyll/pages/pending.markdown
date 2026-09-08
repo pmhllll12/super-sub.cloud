@@ -4190,7 +4190,26 @@ www/src/components/analysis/AnalysisStage.test.tsx
 마이그레이션 파일은 쓰시되 `down_revision` 만 `None` 으로 두십시오. 다 되면
 자기 브랜치에 푸시하고 알려 주시면 제가 잇습니다.
 
-### 15. 경기 탐색이 열렸습니다 — `/matches` 화면이 그려집니다 (백성검 님, 2026-09-03)
+### 15. 경기 탐색이 열렸습니다 — `/matches` 화면이 그려집니다 (백성검 님, 2026-09-03) — 화면이 붙었습니다, 거르기만 남았습니다 (2026.09.08)
+
+> **홈의 「팀원」 알약이 이 경로를 씁니다.** 누르면 스쿼드 판이 물러나고 그 자리에
+> **아직 사람을 못 채운 팀들의 명단**이 섭니다(팀 이름 · 지역 · 장소 · 시각 ·
+> 필요 포지션 · 빈 자리 수). 말씀대로 **팀을 따로 조회하지 않습니다** — 응답
+> 하나로 한 줄이 다 그려집니다. 화면은 `www/src/components/TeamSeek.tsx` 입니다.
+>
+> 「확인」(`grep -rn "/matches?" www/src flutter/lib`) → `TeamSeek.tsx:63` 이 걸립니다.
+>
+> ⚠️ **아직 안 한 것 둘.** 항목을 닫지 않고 남겨 둡니다.
+>
+> - **종목 · 지역으로 거르는 자리**가 화면에 없습니다. 접점(`searchMatches`)과
+>   BFF 는 두 값을 이미 실어 보내고, 빈 값은 안 보냅니다(`sport_code=` 는
+>   "전체"가 아니라 없는 종목이라 422 라고 하셔서요). 단추만 붙이면 됩니다
+> - **지원(신청)** 은 안 붙였습니다 — 이번에 요청받은 것이 명단까지였습니다.
+>   없는 단추를 그려 두면 눌러 보고 아무 일도 안 일어납니다
+>
+> 🔴 **포지션은 서버에 안 물었습니다** — 말씀대로 `needs` 가 오므로 거를 때
+> 화면에서 합니다. 플러터(`flutter/lib`)는 아직입니다.
+
 
 지금까지 경기 목록은 **팀 id 를 알아야만** 볼 수 있었습니다. 그래서 플러터 설계의
 `/matches`(경기 탐색) 화면을 그릴 데이터가 없었고, **용병이 지원할 경기를 찾을
@@ -4796,7 +4815,7 @@ jin 21(공개 사이트 인프라 식별자 스크럽)에서 `jekyll/`·`_posts/
 | `video` 에 "저장됨" 표시(예: `kept` 불리언) + 마이그레이션 · `GET /videos` 필터 · `POST /videos` 가 경로별로 초기값 정함(`/analysis`=미저장, `/me` 업로드=저장) | 정어진 |
 | `POST /videos/{id}/keep`(또는 `PATCH`) — 저장 플립 + `videos/`→`reports/` S3 이동(`CopyObject`+`DeleteObject`) + `storage_key` 갱신 | 정어진 |
 | `DELETE /videos/{id}` — DB + S3. 미저장분 정리 스윕(job 회수처럼 트리거) | 정어진 |
-| EC2 인스턴스 역할 IAM: **`s3:DeleteObject`**(`videos/*`·`reports/*`) · `reports/*` 에 `s3:GetObject`·`s3:PutObject` — 지금 `DeleteObject` 는 일부러 빠져 있다(`deployment.md` 5절) | 박민호(콘솔) 또는 정어진(배포) |
+| EC2 인스턴스 역할 IAM: 인라인 정책에 `s3:DeleteObject` + `reports/*` 문 추가. **정책 JSON 은 `fastapi/docs/deployment.md` 「서버에 줄 권한」에 2026-09-08 판으로 준비됨** — 콘솔에 붙여넣기만. `jin` IAM 사용자는 `iam:*` 이 막혀 못 붙인다(같은 문서 확인). 반영·확인 절차도 그 절에 있음 | **박민호(콘솔)** |
 | 리포트 산출물 키를 `reports/<user_id>/<video_id>/` 로 정렬(지금은 `report_slug` = 상위폴더+stem) | 정상호 |
 | 실제 리포트를 DB 에 남겨 브라우저가 읽게(`paik` 7 · `POST /analyses`) — 지표 부분은 같은 구역 23번(시딩)에 물려 있다 | 정어진 + 정상호 |
 | `/analysis`: "저장"이 `keep` 호출, 화면을 벗어날 때 미저장분 `DELETE`, 「분석 영상」이 저장된 것만 | 백성검 |
@@ -4877,13 +4896,32 @@ jin 21(공개 사이트 인프라 식별자 스크럽)에서 `jekyll/`·`_posts/
   🔴 **동작 보존** — 지금은 등록되는 모든 영상이 `kept=true`(`75dfe07`).
 - ✅ **3조각** — `DELETE /videos/{id}`(`389de29`) — DB 연쇄(SEC-006) + S3
   (`storage_key` + `reports/<uid>/<vid>/`, best-effort). 계약 3-6 · CCC 21번.
-- ⬜ **2조각** — `POST /videos/{id}/keep` + `videos/`→`reports/` 이동. `reports/`
-  키 레이아웃을 정상호와 맞춘 뒤.
-- ⬜ **4조각** — 미저장분 스윕(`claim` 에 얹기).
+- ✅ **2조각** — `POST /videos/{id}/keep`. `kept=true` + 임시 원본(`videos/…`)을
+  `reports/<user_id>/<video_id>/source.<ext>` 로 옮긴다(S3 `CopyObject`+원본 삭제,
+  `StoragePort.move_object`). **분석 작업이 없는 클립(`/me` 업로드)은 안 옮긴다** —
+  리포트 폴더가 없다. 멱등(이미 `reports/` 면 이동 건너뜀). S3 이동을 먼저 하고
+  DB(`mark_kept`)를 맞춘다 — 순서가 반대면 DB 가 없는 객체를 가리키는 창이 생김.
+  🔴 리포트 JSON `source_video` 는 아직 옛 키 — `paik` 7(리포트 DB 이관) 때 정리
+  (정상호 조각 (1)). 계약 3-6 · CCC 24번.
+- ✅ **4조각** `88c43d6` — 미저장분 백스톱 스윕. `POST /internal/analysis-jobs/claim`
+  이 `reclaim_stale` 뒤에 `sweep_provisional(ttl)` 을 돈다(워커가 주기 호출 —
+  별도 스케줄러 없음). 대상: `kept=false` · `ttl` 보다 오래 · 진행 중
+  (`queued`/`running`) 작업 없음. DB 행 + S3(`storage_key` + `reports/<uid>/<vid>/`)
+  best-effort. `PROVISIONAL_VIDEO_TTL_HOURS=24`.
 - ⬜ **5조각** — 🔴 전환 `kept = not analyze`. **백성검 프론트가 `keep` 부를
   준비되면.** 그전에 켜면 `/analysis` 업로드가 프로필에서 사라진다.
-- ⬜ **6조각** — 파일명 슬러그 · `original_filename` · `upload-url` 에 `filename` ·
-  `GET/DELETE /admin/videos`.
+- ✅ **6조각** — `f6e3cc8`(6a): 저장 키 슬러그(`build_storage_key`, 닉네임·원본이름
+  한글·자모 보존) · `video.original_filename` 컬럼(`2598dc30f0cb`) ·
+  `POST /videos/upload-url` 에 `filename` 필수. `a8d72f9`: billing 과 head 충돌
+  재부모(체인 `…→98f9cbdc74f4→2598dc30f0cb`). 6b(`88c43d6` 다음 커밋): `GET
+  /admin/videos?user=<uid|email>`(현재 닉네임·이메일 + 임시분 포함 목록,
+  `report_prefix`) · `DELETE /admin/videos/{id}`(소유 검사 없음, DB 연쇄 + S3).
+  계약 3-2절 · CCC 23번.
+  - 🔴 **6b 는 "사람이 손으로" 하는 임시 경로다** (2026-09-08 사용자 확인).
+    사용자 원래 뜻은 "문제 영상을 일일히 사람이 관리"가 아니라 ⑴ **읽을 수 있는
+    S3 키**(6a)로 콘솔에서 가끔 확인 + ⑵ **자동 정리**(4조각 스윕)였다.
+    이미 구현됐으니 그대로 두되, **"문제 영상"의 자동/에이전트 처리**(잘못 돈
+    분석 감지·정리 등)는 나중 과제로 남긴다 — 6b 를 최종 설계로 보지 말 것.
 
 #### 지금 당장(테스트 단계 정리)
 
@@ -6054,7 +6092,20 @@ PATCH /internal/analysis-jobs/{job_id}
 - 관련: paik 7번 · `agent/scripts/worker.py` · `agent/scripts/analyze_s3.py` · 계약 3-8절
 - **담당**: 정상호(싣기) · 정어진(받는 칸) · **제기**: 백성검 · **기한**: 스프린트 3
 
-### 12. **올린 영상이 배포에서 안 보입니다** — 재생용 주소가 없어서입니다 (2026-09-08 신설)
+### 12. **올린 영상이 배포에서 안 보입니다** — 재생용 주소가 없어서입니다 (2026-09-08 신설) ✅ 해소 (2026.09.08)
+
+> **정어진 님이 `GET /videos/{id}/playback-url` 을 내주셨고**(CCC 20번 3조각) 화면에 붙였습니다.
+> 말씀대로 **`MyVideos.tsx` 의 `previewSrc` 하나**를 고쳤고, 주소를 받아 오는 일은
+> `www/src/lib/playbackUrl.ts` 로 뺐습니다 — 만료되는 값이라 컴포넌트가 들고
+> 있어야 다시 받을 수 있어서입니다.
+>
+> 「확인」: 배포 `/me` 에서 재생 — **로컬에서는 mock 이 `public/` 경로를 줘서 이
+> 갈래가 안 돕니다.** 그래서 ⑴ 라우트를 직접 찔러 `{url, expires_in}` · 404 · 401
+> 을 확인하고 ⑵ 서버 모양의 저장 키(`videos/u1/abc.mp4`)로 시험 셋을 세웠습니다.
+>
+> 🔴 **캐시 안 합니다** — 목록이 바뀔 때만 받습니다. 못 받으면 그 클립만 플레이어
+> 없이 그려지고 판은 안 무너집니다(예전에 통째로 무너지던 자리입니다).
+
 
 **paik 5번의 셋째 줄(「재생용 주소」)을 떼어 올립니다. 새 요청이 아니라 급한
 것을 드러내는 것입니다** — 5번은 제목이 「공개 여부」라 *영상 모음(남의 클립)*

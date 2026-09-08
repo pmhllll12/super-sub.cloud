@@ -109,6 +109,29 @@ export type Match = {
 }
 
 /**
+ * 경기 탐색 한 줄 — `GET /matches` (api-contract.md 3-4절 끝).
+ *
+ * 🔴 **팀 id 를 몰라도 되는 유일한 경로다.** 그래서 「팀원」 판이 이걸 쓴다 —
+ * 아직 사람을 못 채운 팀이 올린 모집 글이 곧 이 목록이다.
+ *
+ * `Match` 와 달리 **팀 이름 · 지역 · 종목이 함께 온다.** 고르는 기준이 그
+ * 셋이라, 없으면 화면이 팀을 한 건씩 다시 물어야 한다(계약이 그렇게 정했다).
+ */
+export type OpenMatch = Match & {
+  team_name: string
+  region: string
+  sport_code: string
+}
+
+/** `GET /matches` 의 페이지 봉투. `GET /admin/users` 와 같은 형식이다. */
+export type MatchSearch = {
+  items: OpenMatch[]
+  total: number
+  page: number
+  size: number
+}
+
+/**
  * `POST /teams/{id}/matches` 의 요청 본문 (api-contract.md 3-4절).
  * `MatchNeed`와 달리 `position_label`이 없다 — 서버가 채워서 돌려준다.
  */

@@ -6,6 +6,7 @@ import PlayerCardView from '@/components/PlayerCardView'
 import BlankPlayerCard from '@/components/BlankPlayerCard'
 import SquadSuggest from '@/components/SquadSuggest'
 import SquadFriends from '@/components/SquadFriends'
+import TeamSeek from '@/components/TeamSeek'
 import MatchBot from '@/components/MatchBot'
 import { loadBoard, saveBoard } from '@/lib/squadBoard'
 import { loadFeatured } from '@/lib/featuredClip'
@@ -51,6 +52,26 @@ const ROW_POS: PosCode[] = ['FW', 'MF', 'DF', 'GK']
 /** 판의 격자. 열 셋 · 행 넷 — 지금 포메이션 셋이 쓰던 칸 그대로다. */
 const COLS = 3
 const ROWS = ROW_POS.length
+
+/**
+ * 🔴 **골키퍼 줄은 가운데 한 칸뿐이다**(사용자 요청, 2026-09-08).
+ *
+ * 축구에서 골키퍼는 하나이고 골대 앞 가운데에 선다 — 양옆 칸을 두면 판이
+ * "골키퍼가 셋일 수도 있다"고 말하는 셈이 된다. 그래서 그 줄에서는 가운데만
+ * 그리고, 좌우로는 갈 데가 없다.
+ *
+ * ⚠️ **위아래는 막지 않는다**(사용자 결정, 2026-09-08). 자리를 통째로 잠그는
+ * 안도 있었지만, 그러면 3:3 에서 셋 다 윗줄로 올리는 **「전원 FW」**가
+ * 불가능해진다 — 같은 날 아침에 요청받아 만든 동작이라 그쪽을 살렸다.
+ * 골키퍼는 **옆으로만** 못 간다.
+ */
+const GK_ROW = ROW_POS.indexOf('GK')
+const GK_COL = 1
+
+/** 이 칸이 격자에 존재하는가 — 골키퍼 줄의 양옆은 아예 없다. */
+function cellExists(col: number, row: number): boolean {
+  return row !== GK_ROW || col === GK_COL
+}
 
 /**
  * 판 위의 자리.
@@ -149,6 +170,8 @@ export default function SquadPanel({
   squad = null,
   scouting = false,
   onCloseScouting,
+  seeking = false,
+  onCloseSeeking,
   bot = false,
   onBotChange,
 }: {
@@ -170,6 +193,16 @@ export default function SquadPanel({
    */
   scouting?: boolean
   onCloseScouting?: () => void
+  /**
+   * 알약 '팀원' 을 눌렀는가 — 켜지면 **스쿼드 판이 물러나고 그 자리에**
+   * 사람을 찾는 팀들의 명단이 선다(사용자 요청, 2026-09-08).
+   *
+   * 🔴 나란히 세우지 않는다. 스쿼드 판은 *내 팀을 짜는* 자리이고 그 판은
+   * *남의 팀에 들어가는* 자리라, 둘이 같이 보이면 무엇을 하고 있는지가
+   * 흐려진다 — 판 오른쪽이 "한 번에 하나" 인 것과 같은 판단이다.
+   */
+  seeking?: boolean
+  onCloseSeeking?: () => void
   /**
    * AI 챗봇이 열려 있는가 — 켜지면 **지인 찾기와 같은 자리**에서 나온다.
    *
@@ -328,6 +361,9 @@ export default function SquadPanel({
     setSlots((now) => {
       const me = now.find((sl) => sl.area === area)
       if (!me || (me.col === col && me.row === row)) return now
+      /* 🔴 **없는 칸으로는 못 간다** — 골키퍼 줄의 양옆이 그것이다. 한 곳에서
+         막아야 끌기 · 방향키 · 앞으로 생길 길이 다 같이 걸린다. */
+      if (!cellExists(col, row)) return now
       const other = now.find((sl) => sl.col === col && sl.row === row)
       return now.map((sl) => {
         if (sl.area === area) return { ...sl, col, row }
@@ -513,9 +549,20 @@ export default function SquadPanel({
         </filter>
       </svg>
 
+      {/* 🔴 **팀원 판은 스쿼드 판을 대신 선다**(사용자 요청, 2026-09-08).
+          같은 자리를 쓰므로 `.ss-squad-wrap` 안에서 좌표를 다시 잴 것이 없고,
+          오른쪽에 붙는 판들(추천 · 지인 · 챗봇)의 기준점도 그대로다. */}
+      {seeking && <TeamSeek closing={false} onClose={() => onCloseSeeking?.()} />}
+
       <section
         className="ss-squad"
         aria-label="내 스쿼드"
+        /* 🔴 **`hidden` 이 아니라 표시만 남긴다.** 통째로 빼면 자리가 접혀서
+           팀원 판이 설 크기를 잃는다 — 스쿼드 판의 크기는 카드 폭 · 칸 간격
+           에서 계산되는 값이라(globals.css) 그 숫자를 여기 베껴 오면 카드
+           크기를 바꾸는 순간 둘이 어긋난다. CSS 가 `visibility` 로 감추므로
+           **자리는 그대로 남고 접근성 트리에서는 빠진다.** */
+        data-seeking={seeking ? 'true' : undefined}
         // 🔴 backdrop-filter 는 **인라인으로** 준다. globals.css 에 두면
         // 같은 규칙의 color-mix() 때문에 Lightning CSS 가 @supports 로
         // 쪼개는 과정에서 통째로 떨어뜨린다(추천 판에서 실제로 그렇게
@@ -572,7 +619,11 @@ export default function SquadPanel({
           aria-hidden="true"
           focusable="false"
         >
-          <rect x="1" y="1" width="98" height="138" />
+          {/* 🔴 **바깥 테두리만 온전한 흰색이다**(사용자 요청, 2026-09-08).
+              판의 경계라 흐리면 판이 어디까지인지 안 보인다. 안쪽 선들
+              (하프라인 · 센터서클 · 페널티/골 에어리어)은 카드가 얹히는
+              바탕이라 30% 로 물린다 — 아래 `.ss-squad-pitch` 주석. */}
+          <rect className="ss-squad-pitch-edge" x="1" y="1" width="98" height="138" />
           <line x1="1" y1="70" x2="99" y2="70" />
           <circle cx="50" cy="70" r="14" />
           <circle className="ss-squad-pitch-dot" cx="50" cy="70" r="1.2" />
@@ -588,6 +639,9 @@ export default function SquadPanel({
         {Array.from({ length: ROWS * COLS }, (_, i) => {
           const col = i % COLS
           const row = Math.floor(i / COLS)
+          // 🔴 골키퍼 줄의 양옆은 **아예 안 그린다** — 그리면 `cellAt` 이
+          // 거기로 놓을 수 있는 자리로 센다.
+          if (!cellExists(col, row)) return null
           const taken = slots.some((sl) => sl.col === col && sl.row === row)
           return (
             <span

@@ -34,6 +34,16 @@ class StoragePort(ABC):
         """
 
     @abstractmethod
+    def move_object(self, src_key: str, dst_key: str) -> None:
+        """객체를 `src_key` 에서 `dst_key` 로 옮긴다 — 서버 쪽 복사 후 원본 삭제.
+
+        "프로필에 저장"이 임시 원본(`videos/…`)을 리포트 자리
+        (`reports/<user_id>/<video_id>/source.<ext>`)로 옮기는 자리다(미결 `jin`
+        24번). 앱 서버로 바이트가 흐르지 않는다(PER-002 — S3 `CopyObject`).
+        `src_key == dst_key` 면 아무것도 하지 않는다.
+        """
+
+    @abstractmethod
     def delete_object(self, storage_key: str) -> None:
         """그 키의 객체를 지운다. **없는 키여도 오류가 아니다**(멱등)."""
 

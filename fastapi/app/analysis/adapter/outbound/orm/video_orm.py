@@ -64,6 +64,12 @@ class VideoOrm(Base):
     title: Mapped[str | None] = mapped_column(String(100), nullable=True)
     description: Mapped[str | None] = mapped_column(String(280), nullable=True)
 
+    # 원본 파일 이름(미결 `jin` 24번). 저장 키는 슬러그라 손실적이라, 사람이
+    # 되짚을 수 있게 원래 이름을 온전히 남긴다.
+    original_filename: Mapped[str | None] = mapped_column(
+        String(255), nullable=True
+    )
+
     # 프로필에 저장됐나(미결 `jin` 24번). `/analysis` 분석은 `false` 로 올라가고
     # "내 프로필에 리포트 저장"이 `true` 로 만든다. `false` 인 것은 백스톱
     # 스윕이 24시간 뒤 정리한다. `GET /videos` 는 `true` 만 준다.

@@ -10,6 +10,8 @@ from app.analysis.application.ports.input.job_use_cases import (
     FinishJobUseCase,
 )
 from app.analysis.application.ports.output.job_port import JobPort
+from app.analysis.application.ports.output.storage_port import StoragePort
+from app.analysis.application.ports.output.video_port import VideoPort
 from app.analysis.domain.rules.job_rules import is_terminal
 from app.core.errors import ApiError
 
@@ -19,9 +21,20 @@ logger = logging.getLogger("supersub.analysis")
 
 
 class ClaimJobInteractor(ClaimJobUseCase):
-    def __init__(self, repository: JobPort, timeout_minutes: int) -> None:
+    def __init__(
+        self,
+        repository: JobPort,
+        timeout_minutes: int,
+        *,
+        video_repository: VideoPort,
+        storage: StoragePort | None,
+        provisional_ttl_hours: int,
+    ) -> None:
         self._repository = repository
         self._timeout_minutes = timeout_minutes
+        self._video_repository = video_repository
+        self._storage = storage
+        self._provisional_ttl_hours = provisional_ttl_hours
 
     def __call__(self) -> ClaimedJobResult | None:
         # 🔴 집기 **전에** 멈춘 것을 회수한다. 별도 스케줄러를 두지 않는 이유는
@@ -33,6 +46,33 @@ class ClaimJobInteractor(ClaimJobUseCase):
             logger.warning(
                 "멈춘 분석 작업을 회수했다: 큐로 %d 건, 실패로 %d 건", requeued, failed
             )
+
+        # 같은 이유로 저장 안 한 임시 영상 백스톱 정리도 여기 얹는다(미결
+        # `jin` 24번). 프론트가 화면을 벗어날 때 부르는 `DELETE` 가 빠른 길이고,
+        # 이건 그것이 놓친 것을 결국 회수한다. S3 정리는 best-effort.
+        swept = self._video_repository.sweep_provisional(
+            self._provisional_ttl_hours
+        )
+        for video in swept:
+            logger.warning(
+                "저장 안 한 임시 영상을 정리했다: %s (%s)",
+                video.id,
+                video.storage_key,
+            )
+            if self._storage is None:
+                continue
+            try:
+                self._storage.delete_object(video.storage_key)
+                self._storage.delete_prefix(
+                    f"reports/{video.user_id}/{video.id}/"
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "임시 영상 %s: DB 는 지웠으나 S3 정리 실패 (%s: %s)",
+                    video.id,
+                    type(exc).__name__,
+                    exc,
+                )
 
         job = self._repository.claim_next()
         if job is None:
