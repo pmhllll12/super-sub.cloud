@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { PlayerCard, Squad } from '@/server/backend'
 import SquadPanel from './SquadPanel'
@@ -138,9 +138,237 @@ describe('스쿼드', () => {
   })
 })
 
-describe('스쿼드 — 지인 찾기', () => {
+describe('스쿼드 — 판 크기 3:3 · 5:5 · 7:7', () => {
+  const seats = () => screen.getAllByText(/^(GK|DF|MF|FW)$/).length
+
+  // 처음 여는 크기는 풋살 5인이다(사용자 요청).
+  it('처음에는 5:5 다', () => {
+    render(<SquadPanel card={CARD} />)
+    expect(screen.getByRole('radio', { name: '5 : 5' })).toBeChecked()
+    expect(seats()).toBe(5)
+  })
+
+  it('3:3 을 누르면 자리가 셋으로 줄고 7:7 은 일곱이 된다', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<SquadPanel card={CARD} />)
+
+    await user.click(screen.getByRole('radio', { name: '3 : 3' }))
+    expect(seats()).toBe(3)
+    // 배치는 CSS 가 data-size 로 고른다 — 자리 이름이 두 곳에 살지 않게.
+    expect(container.querySelector('.ss-squad-board')).toHaveAttribute('data-size', '3')
+
+    await user.click(screen.getByRole('radio', { name: '7 : 7' }))
+    expect(seats()).toBe(7)
+    expect(container.querySelector('.ss-squad-board')).toHaveAttribute('data-size', '7')
+  })
+
+  /* 🔴 줄였다 되돌리면 **그대로 앉아 있어야 한다**(사용자 요청) — 실수로
+     눌렀을 때 잃는 것이 없어야 한다. 자리 이름이 역할+번호인 이유다. */
+  it('줄일 때 없어진 자리의 사람은 되돌리면 돌아온다', async () => {
+    const user = userEvent.setup()
+    render(<SquadPanel card={CARD} squad={SQUAD} />)
+    // 서버가 준 스쿼드에 MF 김철수가 있다.
+    expect(screen.getByRole('button', { name: '김철수 빼기' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('radio', { name: '3 : 3' }))
+    // 3인에는 MF 가 하나뿐이라 둘째 MF 는 판에서 빠진다.
+    expect(seats()).toBe(3)
+
+    await user.click(screen.getByRole('radio', { name: '5 : 5' }))
+    expect(screen.getByRole('button', { name: '김철수 빼기' })).toBeInTheDocument()
+  })
+
+  // 포지션 코드는 계약이 정한 축구 넷뿐이다 — 새 코드를 만들지 않는다.
+  it('어느 크기에서도 GK · DF · MF · FW 만 쓴다', async () => {
+    const user = userEvent.setup()
+    render(<SquadPanel card={CARD} />)
+    for (const s of ['3 : 3', '5 : 5', '7 : 7']) {
+      await user.click(screen.getByRole('radio', { name: s }))
+      // ⚠️ 판 오른쪽 변의 `AI` 단추도 두 글자라 여기 걸린다 — 자리 이름표
+      //    (.ss-squad-pos)만 본다.
+      for (const el of document.querySelectorAll('.ss-squad-pos')) {
+        expect(['GK', 'DF', 'MF', 'FW']).toContain(el.textContent)
+      }
+    }
+  })
+})
+
+describe('스쿼드 — 판 위에서 자유롭게 옮긴다', () => {
+  /** 그 자리의 지금 이름표. */
+  const posOf = (name: string) =>
+    screen
+      .getByRole('button', { name: new RegExp(name) })
+      .closest('.ss-squad-seat')!
+      .querySelector('.ss-squad-pos')!.textContent
+
+  /** 격자 칸을 실제 좌표로 세운다 — jsdom 은 크기를 안 재 준다. */
+  function layout() {
+    for (const el of document.querySelectorAll<HTMLElement>('.ss-squad-cell')) {
+      const col = Number(el.dataset.col)
+      const row = Number(el.dataset.row)
+      el.getBoundingClientRect = () =>
+        ({ left: col * 100, top: row * 150, width: 100, height: 150 }) as DOMRect
+    }
+  }
+
+  /** 카드를 끌어 그 칸에 놓는다. */
+  async function drag(seat: HTMLElement, col: number, row: number) {
+    layout()
+    const to = { clientX: col * 100 + 50, clientY: row * 150 + 75 }
+    fireEvent.pointerDown(seat, { button: 0, clientX: 0, clientY: 0, pointerId: 1 })
+    fireEvent.pointerMove(seat, { clientX: 40, clientY: 40, pointerId: 1 })
+    fireEvent.pointerUp(seat, { ...to, pointerId: 1 })
+  }
+
+  const seatOf = (name: string) =>
+    screen.getByRole('button', { name: new RegExp(name) }).closest('.ss-squad-seat') as HTMLElement
+
+  // 🔴 행이 포지션을 정한다 — 위가 공격이다.
+  it('위로 옮기면 이름표가 FW 로 바뀐다', async () => {
+    render(<SquadPanel card={CARD} squad={SQUAD} />)
+    // 서버가 준 김철수는 MF 자리(행 1)에 앉는다.
+    expect(posOf('김철수')).toBe('MF')
+
+    await drag(seatOf('김철수'), 0, 0)
+    expect(posOf('김철수')).toBe('FW')
+  })
+
+  /* 🔴 이게 이 기능의 요점이다(사용자 요청) — 3:3 이 골키퍼 1 · 수비 1 ·
+     공격 1 로 못박혀 있지 않고 「올 공격」이 될 수 있어야 한다. */
+  it('셋을 다 윗줄로 올리면 전원 FW 가 된다', async () => {
+    const user = userEvent.setup()
+    render(<SquadPanel card={CARD} />)
+    await user.click(screen.getByRole('radio', { name: '3 : 3' }))
+
+    for (const [i, seat] of [...document.querySelectorAll('.ss-squad-seat')].entries()) {
+      await drag(seat as HTMLElement, i, 0)
+    }
+    for (const el of document.querySelectorAll('.ss-squad-pos')) {
+      expect(el.textContent).toBe('FW')
+    }
+  })
+
+  // 사람이 있는 칸에 놓으면 밀어내지 않고 서로 바꾼다.
+  it('찬 칸에 놓으면 자리를 맞바꾼다', async () => {
+    render(<SquadPanel card={CARD} squad={SQUAD} />)
+    // 김철수는 MF(행 1), 이영희는 GK(행 3)다.
+    expect(posOf('김철수')).toBe('MF')
+    expect(posOf('이영희')).toBe('GK')
+
+    const gk = seatOf('이영희')
+    const gkCol = Number(
+      [...document.querySelectorAll<HTMLElement>('.ss-squad-cell')].find(
+        (c) => c.dataset.row === '3',
+      )!.dataset.col,
+    )
+    await drag(seatOf('김철수'), gkCol, 3)
+    expect(posOf('김철수')).toBe('GK')
+    expect(gk).toBeInTheDocument()
+  })
+
+  // 끌 수 없는 입력 장치의 길 — 방향키로도 옮긴다.
+  it('방향키로도 옮긴다', () => {
+    render(<SquadPanel card={CARD} squad={SQUAD} />)
+    expect(posOf('김철수')).toBe('MF')
+    fireEvent.keyDown(seatOf('김철수'), { key: 'ArrowUp' })
+    expect(posOf('김철수')).toBe('FW')
+    // 판 밖으로는 못 나간다 — 한 번 더 눌러도 그대로다.
+    fireEvent.keyDown(seatOf('김철수'), { key: 'ArrowUp' })
+    expect(posOf('김철수')).toBe('FW')
+  })
+
+  /* 🔴 끄는 것과 누르는 것을 갈라 둔다 — 놓자마자 그 사람이 빠지면 안 된다.
+     (앉은 카드를 누르는 것은 여전히 「빼기」다) */
+  it('끌어 놓은 뒤에 따라오는 누르기는 삼킨다', async () => {
+    render(<SquadPanel card={CARD} squad={SQUAD} />)
+    const seat = seatOf('김철수')
+    await drag(seat, 0, 0)
+    fireEvent.click(seat.querySelector('button')!)
+    expect(screen.getByRole('button', { name: /김철수/ })).toBeInTheDocument()
+  })
+
+  // 사용자가 정한 포지션은 옮겨도 안 바뀐다(사용자 요청).
+  it('이름표를 누르면 직접 정하고, 그 뒤로는 옮겨도 안 바뀐다', async () => {
+    const user = userEvent.setup()
+    render(<SquadPanel card={CARD} squad={SQUAD} />)
+    const label = () =>
+      seatOf('김철수').querySelector('.ss-squad-pos') as HTMLButtonElement
+
+    expect(label().textContent).toBe('MF')
+    await user.click(label()) // 자동(MF) → FW
+    expect(label().textContent).toBe('FW')
+    expect(label()).toHaveAttribute('data-set', 'true')
+
+    // 아래로 옮겨도 손으로 정한 값이 이긴다.
+    await drag(seatOf('김철수'), 0, 3)
+    expect(label().textContent).toBe('FW')
+
+    // 한 바퀴 돌면 「자동」으로 돌아오고, 그때는 자리를 따른다.
+    for (let i = 0; i < 4; i++) await user.click(label())
+    expect(label()).not.toHaveAttribute('data-set')
+    expect(label().textContent).toBe('GK')
+  })
+})
+
+describe('스쿼드 — 나갔다 와도 그대로다', () => {
+  /* 🔴 **다른 화면에 갔다 오거나 창을 닫았다 와도 판이 그대로여야 한다**
+     (사용자 요청, 2026-09-08). 판 크기 · 카드가 선 칸 · 앉은 사람 · 손으로
+     정한 포지션 — 넷 다 서버에 자리가 없어 브라우저에 남긴다.
+     ⚠️ `SquadPanel` 이 "브라우저 저장은 일부러 안 넣었다"고 적어 두었던 것을
+     이번에 뒤집었다(lib/squadBoard.ts 첫머리에 이유를 적었다). */
+  it('크기를 바꾸고 다시 그리면 그 크기로 열린다', async () => {
+    const user = userEvent.setup()
+    const { unmount } = render(<SquadPanel card={CARD} />)
+    await user.click(screen.getByRole('radio', { name: '7 : 7' }))
+    unmount()
+
+    render(<SquadPanel card={CARD} />)
+    expect(await screen.findByRole('radio', { name: '7 : 7' })).toBeChecked()
+    expect(document.querySelectorAll('.ss-squad-pos')).toHaveLength(7)
+  })
+
+  it('옮긴 자리와 뺀 사람이 그대로다', async () => {
+    const user = userEvent.setup()
+    const { unmount } = render(<SquadPanel card={CARD} squad={SQUAD} />)
+
+    // 김철수를 맨 윗줄로 올리고, 이영희는 뺀다.
+    const seat = screen
+      .getByRole('button', { name: /김철수/ })
+      .closest('.ss-squad-seat') as HTMLElement
+    for (const el of document.querySelectorAll<HTMLElement>('.ss-squad-cell')) {
+      const col = Number(el.dataset.col)
+      const row = Number(el.dataset.row)
+      el.getBoundingClientRect = () =>
+        ({ left: col * 100, top: row * 150, width: 100, height: 150 }) as DOMRect
+    }
+    fireEvent.pointerDown(seat, { button: 0, clientX: 0, clientY: 0, pointerId: 1 })
+    fireEvent.pointerMove(seat, { clientX: 40, clientY: 40, pointerId: 1 })
+    fireEvent.pointerUp(seat, { clientX: 50, clientY: 75, pointerId: 1 })
+    await user.click(screen.getByRole('button', { name: '이영희 빼기' }))
+    unmount()
+
+    render(<SquadPanel card={CARD} squad={SQUAD} />)
+    // 옮긴 자리(맨 윗줄 = FW)가 그대로다.
+    expect(
+      (await screen.findByRole('button', { name: /김철수/ }))
+        .closest('.ss-squad-seat')!
+        .querySelector('.ss-squad-pos')!.textContent,
+    ).toBe('FW')
+    // 🔴 뺀 사람이 되살아나면 안 된다 — 서버가 준 스쿼드에는 아직 들어 있다.
+    expect(screen.queryByRole('button', { name: /이영희/ })).toBeNull()
+  })
+
+  // 저장본이 깨져 있어도 판은 그려져야 한다.
+  it('저장본이 깨져 있으면 없는 것으로 치고 기본 판을 연다', async () => {
+    globalThis.localStorage.setItem('supersub.squad.v1', '{"size":')
+    render(<SquadPanel card={CARD} />)
+    expect(screen.getByRole('radio', { name: '5 : 5' })).toBeChecked()
+  })
+})
+
+describe('스쿼드 — 용병 찾기(추천 + 지인)', () => {
   function openFriends() {
-    return render(<SquadPanel card={CARD} friendSearch />)
+    return render(<SquadPanel card={CARD} scouting />)
   }
 
   it('켜면 판 옆에 검색창과 지인 목록이 나온다', () => {
@@ -148,6 +376,21 @@ describe('스쿼드 — 지인 찾기', () => {
     expect(screen.getByRole('complementary', { name: '지인 찾기' })).toBeInTheDocument()
     expect(screen.getByLabelText('지인 닉네임')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /홍길동/ })).toBeInTheDocument()
+  })
+
+  // 🔴 단추 하나가 **둘을 같이** 연다(2026-09-08). 전에는 '용병 찾기'와
+  //    '지인 찾기'가 알약 둘이었고 두 판이 한 자리를 다퉜다.
+  it('추천 판과 지인 판이 같이 열린다', () => {
+    openFriends()
+    expect(screen.getByRole('complementary', { name: /추천 선수/ })).toBeInTheDocument()
+    expect(screen.getByRole('complementary', { name: '지인 찾기' })).toBeInTheDocument()
+  })
+
+  // 판 위에서 위에서 아래로 읽히는 순서가 곧 "지금 가장 급한 자리"다.
+  // 내 자리(FW)는 건너뛰므로 빈 판에서는 MF 가 첫 자리다.
+  it('추천은 빈 자리 중 첫 번째(MF)의 것이다', () => {
+    openFriends()
+    expect(screen.getByRole('heading', { name: /AI 추천 MF/ })).toBeInTheDocument()
   })
 
   it('닉네임을 치면 그 사람만 남는다', async () => {
@@ -197,12 +440,14 @@ describe('스쿼드 — 지인 찾기', () => {
     expect(screen.getAllByRole('button', { name: /자리에 선수 넣기/ })).toHaveLength(4)
   })
 
-  // 두 판은 같은 자리에 뜬다 — 동시에 열면 겹친다.
-  it('지인 찾기가 열려 있으면 빈 자리를 눌러도 추천이 안 열린다', async () => {
+  /* 🔴 예전 규칙("지인이 열려 있으면 추천을 안 연다")을 **일부러 뒤집었다** —
+     두 판이 같은 좌표에 서 있어서 둘 중 하나만 그릴 수밖에 없었던 것이고,
+     이제는 칸이 갈렸다. 되돌리지 말 것. */
+  it('열려 있는 동안 다른 빈 자리를 누르면 그 자리의 추천으로 바뀐다', async () => {
     const user = userEvent.setup()
     openFriends()
     await user.click(screen.getByRole('button', { name: 'GK 자리에 선수 넣기' }))
-    expect(screen.queryByRole('complementary', { name: /추천 선수/ })).toBeNull()
+    expect(screen.getByRole('heading', { name: /AI 추천 GK/ })).toBeInTheDocument()
     expect(screen.getByRole('complementary', { name: '지인 찾기' })).toBeInTheDocument()
   })
 
@@ -244,11 +489,42 @@ describe('스쿼드 — 지인 찾기', () => {
     expect(badge?.closest('button')).toBe(screen.getByRole('button', { name: '김철수 빼기' }))
   })
 
+  /* 🔴 첫째 칸은 하나만 쓴다 — 빈 자리로 연 추천도 챗봇이 닫아야 한다.
+     ⚠️ 그 추천은 `scouting` 이 아니라 판이 제 상태로 들고 있어서, 알약으로
+     연 경우만 닫히고 **빈 자리로 연 경우에는 AI 판이 뒤에 나왔다**(실제로
+     겪었다). 되돌리지 말 것. */
+  it('빈 자리로 연 추천도 챗봇이 켜지면 닫힌다', async () => {
+    const user = userEvent.setup()
+    const { rerender } = render(<SquadPanel card={CARD} />)
+    await user.click(screen.getByRole('button', { name: 'GK 자리에 선수 넣기' }))
+    expect(screen.getByRole('complementary', { name: /추천 선수/ })).toHaveAttribute(
+      'data-state',
+      'open',
+    )
+
+    rerender(<SquadPanel card={CARD} bot />)
+    // 판은 물러나는 동안 DOM 에 남는다 — 사라진 것을 세지 말고 접혔는지 본다.
+    expect(screen.getByRole('complementary', { name: /추천 선수/ })).toHaveAttribute(
+      'data-state',
+      'closing',
+    )
+  })
+
   it('닫기를 누르면 부모에게 알린다', async () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
-    render(<SquadPanel card={CARD} friendSearch onCloseFriendSearch={onClose} />)
+    render(<SquadPanel card={CARD} scouting onCloseScouting={onClose} />)
     await user.click(screen.getByRole('button', { name: '지인 찾기 닫기' }))
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  // 🔴 한 단추가 연 한 벌이라 어느 쪽 ×를 눌러도 짝으로 접힌다. 추천만 닫고
+  //    지인을 남기면 알약은 켜진 채라 다시 눌러도 안 열린다.
+  it('추천 판의 닫기를 눌러도 같은 곳에 알린다', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    render(<SquadPanel card={CARD} scouting onCloseScouting={onClose} />)
+    await user.click(screen.getByRole('button', { name: '추천 닫기' }))
     expect(onClose).toHaveBeenCalled()
   })
 })

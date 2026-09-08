@@ -637,6 +637,39 @@ body::-webkit-scrollbar {
   flex-direction: column;
   align-items: flex-start;
   margin-top: calc(var(--ss-display-lh) * 1em);
+  /* 🔴 전환은 **h1 에 건다. 줄(span)이 아니다.** 줄에는 들어올 때의 연출이
+     `both` 로 붙어 있어 그 속성(transform · opacity)을 계속 쥐고 있다 —
+     전환은 애니메이션을 못 이긴다(이 저장소에서 여러 번 겪은 것). 바깥
+     상자에 걸면 그 다툼이 아예 안 생긴다. */
+  transition:
+    opacity 320ms ease,
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* 🔴 판이 열리면 **비켜선다**(사용자 요청, 2026-09-08). 추천 판과 지인 판이
+   나란히 서면 이 글자를 파고든다(1440 에서 298px · 1700 에서 161px, 실측).
+
+   ⚠️ **오른쪽으로 크게 못 민다** — 이 덩어리는 이미 화면 오른쪽 끝에 붙어
+   있다(1280 에서 왼끝 938). 밀면 화면 밖으로 나가 잘린다. 그래서 조금만
+   물러나며 흐려진다.
+   ⚠️ `visibility` 나 `display` 로 치우지 않는다 — 되돌아올 때 전환이 없어
+   툭 나타난다. 흐려도 자리는 그대로 있다. */
+.ss-home-subhead[data-aside='true'] {
+  opacity: 0.12;
+  transform: translateX(24px);
+  /* 흐려진 글자가 판 위의 누를 것을 가로채면 안 된다. */
+  pointer-events: none;
+}
+
+/* 움직임 줄이기 — 비키는 것 자체는 남긴다(안 비키면 글자와 판이 겹쳐
+   읽히지 않는다). 미끄러지는 것만 뺀다. */
+@media (prefers-reduced-motion: reduce) {
+  .ss-home-subhead {
+    transition: opacity 320ms ease;
+  }
+  .ss-home-subhead[data-aside='true'] {
+    transform: none;
+  }
 }
 
 /* 계단 폭은 눈대중 값이 아니라 **윗줄 첫 글자의 폭**이다. 그래야
@@ -1458,6 +1491,56 @@ body::-webkit-scrollbar {
   gap: 16px;
 }
 
+/* 🔴 「풋살 5인」이라고 적어 두기만 하던 자리다 — 이제 고르는 자리다
+   (사용자 요청, 2026-09-08). 머리글이 `align-items: baseline` 이라 단추 줄이
+   글자 밑선에 맞는다. */
+.ss-squad-size {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+/* 🔴 **안쪽을 흰색으로 채운다**(사용자 요청, 2026-09-08). 비워 두면 배경
+   사진(연기)이 그대로 비쳐, 사진이 밝은 자리에서는 글자가 묻힌다. 판 위의
+   선수 카드가 흰 바탕에 검은 글자라 그쪽과도 결이 맞는다.
+   ⚠️ 바탕을 채우면 글자는 **어두워져야** 한다 — 흰 위의 옅은 흰 글자는
+   안 읽힌다.
+   ⚠️ 값을 여기 적는다. 카드의 토큰(--ss-pcard-bg/-fg)은 `.ss-pcard` 에서만
+   선언되어 이 단추까지 안 내려온다 — `var()` 로 부르면 조용히 기본값으로
+   떨어진다. 빈 카드(.ss-pcard-blank)가 쓰는 것과 **같은 값**이다. */
+.ss-squad-size-btn {
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, #0b0b0b 24%, transparent);
+  padding: 3px 9px;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  background-color: #ffffff;
+  color: color-mix(in srgb, #0b0b0b 62%, transparent);
+  white-space: nowrap;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.ss-squad-size-btn:hover,
+.ss-squad-size-btn:focus-visible {
+  border-color: color-mix(in srgb, #0b0b0b 55%, transparent);
+  color: #0b0b0b;
+}
+
+/* 고른 것 — **민트 바탕에 검은 글자**다. 🔴 민트 글자를 흰 바탕에 두면
+   대비가 1.6:1 밖에 안 나와 안 읽힌다(계산값). 카드의 워드마크가 민트,
+   글자가 검정인 것과 같은 짝이다.
+   🔴 색만으로 말하지 않는다 — `role="radio"` 의 `aria-checked` 가 화면
+   낭독기에 같은 것을 알린다(마크업 쪽). */
+.ss-squad-size-btn[data-on='true'] {
+  border-color: var(--ss-accent);
+  background-color: var(--ss-accent);
+  color: #0b0b0b;
+  font-weight: 700;
+}
+
 .ss-squad-head h2 {
   font-size: 0.75rem;
   font-weight: 600;
@@ -1483,17 +1566,80 @@ body::-webkit-scrollbar {
      상자 안에 있어야 경기장 선 안쪽에 앉는다. */
   padding: 46px 22px 8px;
   display: grid;
-  /* 1-2-1 — 위가 공격이다: FW 하나, MF 둘, DF 하나, GK. */
-  grid-template-areas:
-    '.  fw .'
-    'ml .  mr'
-    '.  df .'
-    '.  gk .';
+  /* 기본은 5:5 — 1-2-1. 위가 공격이다: FW 하나, MF 둘, DF 하나, GK.
+     🔴 자리 이름은 **역할+번호**다(SquadPanel 의 FORMATIONS 주석) — 크기를
+     바꿔도 같은 이름이 같은 사람을 가리켜야 되돌렸을 때 제자리에 앉는다. */
+  /* 🔴 **자리 이름(grid-template-areas)을 안 쓴다**(2026-09-08). 카드를 판
+     위에서 자유롭게 옮기게 되면서, 자리를 이름으로 못박으면 옮길 수가 없다 —
+     이제 `SquadPanel` 이 칸 번호(`gridColumn`·`gridRow`)로 놓는다.
+     행이 곧 포지션이다: 0 FW · 1 MF · 2 DF · 3 GK. */
   /* 가로를 넉넉히 벌린다 — 세로로만 길면 판이 기둥처럼 보이고 포메이션
      으로 안 읽힌다. 세로 간격은 반대로 좁혀 키를 줄인다. */
   column-gap: 80px;
   row-gap: 6px;
   justify-items: center;
+
+  /* 🔴 **판 크기는 세 포메이션에서 똑같다**(사용자 요청, 2026-09-08).
+     칸을 안 못박으면 내용이 크기를 정해서, 3:3 은 홀쭉해지고 7:7 은 넓어진다
+     — 크기를 누를 때마다 판이 통째로 들썩이고 옆의 헤드라인 자리까지 밀린다
+     (실측: 3인 330×538 · 5인 518×692 · 7인 354×604).
+
+     🔴 **줄 키를 카드에서 계산한다.** 눈대중 px 로 박으면 카드 크기를 바꾸는
+     순간 어긋난다. 카드 비율이 3 : 4.1 이고(`.ss-pcard-mini`) 그 아래 자리
+     이름표가 한 줄 붙는다. */
+  --ss-squad-row: calc(var(--ss-pcard-mini-w, 92) * 1px * 4.1 / 3 + 1.35rem);
+  grid-template-columns: repeat(3, calc(var(--ss-pcard-mini-w, 92) * 1px));
+}
+
+/* 3:3 — 1-1-1. 셋이면 공격 · 중원 · 골키퍼 하나씩이다.
+   🔴 **네 줄을 그대로 쓴다.** 셋으로 줄이면 판 키가 한 줄만큼 줄어든다 —
+   가운데를 비워 두면 셋이 넉넉하게 벌어지기도 한다. */
+/* 🔴 **줄 넷을 늘 세워 둔다.** 자리를 다 위로 몰아 놓으면(「올 공격」) 아래
+   줄이 비는데, 비었다고 줄어들면 판 키가 배치에 따라 들썩인다. 카드가 든
+   줄은 내용이 정하고(그래야 카드 크기를 바꿔도 따라온다) 빈 줄만 최소치를
+   받는다 — 네 줄 전부에 최소치를 걸었더니 반올림이 쌓여 판이 10px 커졌다
+   (실측). */
+.ss-squad-board::before {
+  content: '';
+  /* 네 줄 · 세 칸을 통째로 덮는 보이지 않는 칸 하나. 줄 키는 그대로 내용이
+     정하고(그래야 카드 크기를 바꿔도 따라온다) 이것이 **바닥만** 받쳐 준다.
+     `grid-template-rows` 로 줄마다 최소치를 걸면 반올림이 쌓여 판이 10px
+     커진다(실측 692 → 702). */
+  grid-area: 1 / 1 / 5 / 4;
+  min-height: calc(var(--ss-squad-row) * 4 + 18px);
+  pointer-events: none;
+}
+
+/* 놓을 수 있는 칸 — **끄는 동안에만** 보인다. 평소엔 아무것도 아니다. */
+.ss-squad-cell {
+  z-index: 0;
+  border-radius: 10px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.ss-squad-board[data-moving='true'] .ss-squad-cell[data-free='true'] {
+  opacity: 1;
+  border: 1px dashed color-mix(in srgb, var(--ss-accent) 55%, transparent);
+  background-color: color-mix(in srgb, var(--ss-accent) 8%, transparent);
+}
+
+/* 끌고 있는 카드 — 손가락을 따라온다. 위로 띄우고 그림자를 준다.
+   🔴 전환을 걸지 않는다 — 매 프레임 좌표가 바뀌므로 전환이 걸리면 손가락을
+   한 박자 늦게 따라온다. */
+.ss-squad-seat[data-held='true'] {
+  z-index: 5;
+  cursor: grabbing;
+  filter: drop-shadow(0 12px 22px rgb(0 0 0 / 45%));
+}
+
+/* 🔴 카드를 끌 때 브라우저가 그림·글자를 대신 끌어가지 않게 한다. 터치에서는
+   `touch-action` 이 없으면 화면이 같이 굴러간다. */
+.ss-squad-seat {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* 아직 비어 있는 카드 — 바탕이 희다. 채워진 카드(연두)와 한눈에 갈려야
@@ -1534,11 +1680,32 @@ body::-webkit-scrollbar {
   gap: 4px;
 }
 
+/* 이름표 — 이제 **누르는 자리**다(포지션을 직접 정한다). 생김새는 그대로
+   두어 글자로만 읽히고, 손을 대면 그때 눌리는 것임이 드러난다. */
 .ss-squad-pos {
   font-size: 0.625rem;
   font-weight: 700;
   letter-spacing: 0.1em;
   color: var(--ss-fg);
+  border-radius: 4px;
+  /* 🔴 **세로 여백을 주지 않는다.** 이름표가 단추가 되면서 1px 씩 붙였더니
+     줄마다 쌓여 판이 10px 커졌다(실측 692 → 702). 손을 댔을 때 칠해지는
+     바탕은 가로 여백만으로도 충분히 읽힌다. */
+  padding: 0 5px;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.ss-squad-pos:hover,
+.ss-squad-pos:focus-visible {
+  background-color: color-mix(in srgb, var(--ss-fg) 16%, transparent);
+}
+
+/* ⚠️ 손으로 정해 둔 것 — 자리를 옮겨도 안 바뀐다. 표시가 없으면 왜 이름표가
+   안 따라오는지 알 수 없다. */
+.ss-squad-pos[data-set='true'] {
+  color: var(--ss-accent);
 }
 
 /* 빈 카드의 가운데 — 머리글 아래 남는 자리를 다 쓴다. */
@@ -1630,8 +1797,17 @@ body::-webkit-scrollbar {
   z-index: 3;
   display: flex;
   flex-direction: column;
-  margin-left: 12px;
-  width: 380px;
+  margin-left: var(--ss-side-panel-gap);
+  /* 🔴 두 판이 **같은 값**을 본다 — 지인 판의 자리(둘째 칸)가 이 폭에서
+     계산되므로, 따로 적으면 한쪽만 고쳐 칸이 어긋난다.
+
+     ⚠️ 좁은 화면에서는 줄어든다. 380 둘을 나란히 놓으면 오른끝이 1350 인데
+     1280 창에서는 **70px 이 화면 밖**이다(실측). 620 은 그 폭에서
+     스쿼드 판 오른끝(566) + 사이(12) + 오른쪽 여백이다 — 1380px 보다 넓으면
+     걸리지 않으므로 넓은 화면의 모양은 그대로다. */
+  --ss-side-panel-gap: 12px;
+  --ss-side-panel-w: min(380px, calc((100vw - 620px) / 2));
+  width: var(--ss-side-panel-w);
   /* 🔴 모서리 반지름을 변수로 둔다 — 펼쳐지는 애니메이션의 clip-path 가 같은
      값을 써야 해서다(따로 적으면 한쪽만 고쳐 모서리가 어긋난다).
 
@@ -1820,20 +1996,32 @@ body::-webkit-scrollbar {
    폭·비율은 .ss-pcard-mini 가 --ss-pcard-mini-w 로 잡는다 — 여기서는 그 값만
    준다(그 규칙 안에서 선언하면 다른 자리의 크기까지 덮는다).
    100: 62 였을 때는 머리글이 4px 도 안 되어 흰 얼룩으로만 보였다. */
+/* 🔴 여기는 이제 **그 사람의 대표 장면**이 앉는 자리다(빈 선수 카드였다).
+   크기는 **카드가 쓰던 그대로**(177 × 3/4.1 ≈ 242) 둔다 — 줄 높이가 바뀌면
+   판 전체의 짜임과 들어오는 연출의 지연이 같이 흔들린다.
+   ⚠️ 폭을 `--ss-pcard-mini-w` 로 주지 않는다. 그 손잡이는 `.ss-pcard-mini` 가
+   카드를 통째로 축소(transform)하려고 쓰는 것이고, 여기엔 축소할 카드가 없다. */
 .ss-suggest-card {
-  /* 🔴 카드 크기는 **화면 높이를 따라간다**(사용자 요청: 아래 여백을 위와
-     같게 하고 그만큼 카드를 키운다).
-
-     ⚠️ 고정 px 하나로 두었더니 큰 화면에서 카드 아래만 크게 비었다 —
-     남는 높이가 높이 증가분과 **1:1 로** 늘기 때문이다(실측: 960에서 121px,
-     1360에서 521px). 값이 단위 없는 숫자라 `clamp()` 를 못 써서
-     (`calc(var(--ss-pcard-mini-w) * 1px)` 로 쓰인다) 단계로 나눈다.
-
-     각 단계는 그 높이에서 **아래 여백이 위와 같아지는** 폭이다:
-     추가 폭 = (남는 높이 − 여백) × 3/4.1 (카드 비율의 역수).
-     🔴 좁은 화면에서는 폭이 먼저 걸리므로 `min-width` 도 함께 본다. */
-  --ss-pcard-mini-w: 177;
+  position: relative;
+  display: block;
+  width: 177px;
+  aspect-ratio: 3 / 4.1;
   flex: none;
+  overflow: hidden;
+  /* 🔴 **빈 곳은 검정**이다(사용자 요청). 토큰이 아니라 리터럴인 자리다 —
+     이건 판의 바탕색이 아니라 **영상의 레터박스**라, 판 색이 바뀌어도 같이
+     바뀌면 안 된다. */
+  background-color: #000;
+}
+
+/* 🔴 **틀에 맞춰 자르지 않는다**(사용자 요청) — `cover` 가 아니라 `contain`.
+   클립마다 비율이 달라서(세로 1080×1920 · 가로 1280×720 · 1920×1080) 세로
+   틀을 채우게 하면 어느 쪽이든 사람이 잘린다. 남는 곳은 위 검정이 받는다. */
+.ss-suggest-card video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 @media (min-height: 960px) and (min-width: 1200px) {
@@ -1934,6 +2122,12 @@ body::-webkit-scrollbar {
 .ss-friends {
   bottom: auto;
   max-height: 100%;
+  /* 🔴 **둘째 칸**이다(2026-09-08). 전에는 추천 판과 같은 좌표에 서서 한
+     번에 하나만 열렸는데, '용병 찾기' 하나가 둘을 같이 열게 되면서 자리를
+     갈랐다 — 첫째 칸의 폭과 사이만큼 더 오른쪽이다.
+     🔴 `--ss-side-panel-w` 를 여기서 다시 선언하지 않는다. 두 판이 한 값을
+     봐야 칸이 안 어긋난다(`.ss-suggest` 가 그 값을 정한다). */
+  left: calc(100% + var(--ss-side-panel-w) + var(--ss-side-panel-gap));
 }
 
 .ss-friends-search {
@@ -3142,6 +3336,127 @@ body::-webkit-scrollbar {
 }
 
 /* 오른쪽 판 쪽 안내와 버튼 두 개. */
+/* ── 무엇을 볼지 고르는 자리 (2026-09-08) ──────────────────────────── */
+
+/* 묶는 판 아래, 알약 줄과 대화창 사이의 빈 자리다(사용자 지목). 위에 선을
+   하나 그어 "사람을 고르는 일"과 "무엇을 볼지 고르는 일"을 가른다 — 한
+   덩어리로 붙으면 단추 넷이 같은 줄로 읽힌다. */
+.ss-shot-focus {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid color-mix(in srgb, var(--ss-fg) 18%, transparent);
+}
+
+.ss-shot-focus-head {
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: color-mix(in srgb, var(--ss-fg) 72%, transparent);
+}
+
+.ss-shot-focus-head b {
+  color: var(--ss-accent);
+  font-weight: 700;
+}
+
+/* 🔴 개수가 종목마다 다르다(축구 6 · 농구 5 · 야구 5, 거기에 「전체적으로」).
+   칸을 고정하지 않고 흐르게 둔다 — 고정하면 종목을 바꿀 때 줄 수가 달라져
+   아래 대화창이 들썩인다. */
+.ss-shot-focus-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ss-shot-focus-chip {
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 28%, transparent);
+  padding: 5px 11px;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--ss-fg) 78%, transparent);
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.ss-shot-focus-chip:hover,
+.ss-shot-focus-chip:focus-visible {
+  border-color: color-mix(in srgb, var(--ss-fg) 55%, transparent);
+  color: var(--ss-fg);
+}
+
+/* 고른 것 — 민트로 테두리와 글자를 같이 바꾼다. 🔴 색만으로 말하지 않는다:
+   `aria-pressed` 가 화면 낭독기에 같은 것을 알린다(마크업 쪽). */
+.ss-shot-focus-chip[data-on='true'] {
+  border-color: var(--ss-accent);
+  background-color: color-mix(in srgb, var(--ss-accent) 14%, transparent);
+  color: var(--ss-accent);
+}
+
+/* ⚠️ 아직 못 보낸다는 사실을 적는 줄 — 숨기면 고르고도 왜 안 달라지는지
+   알 수 없다(공개 여부 · 카드 꾸미기와 같은 규칙). */
+.ss-shot-focus-note {
+  margin-top: 10px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: color-mix(in srgb, var(--ss-fg) 48%, transparent);
+}
+
+/* 관문에서 다시 한 번 — 확인하는 자리에 확인할 것이 다 있어야 한다. */
+.ss-shot-confirm-focus {
+  font-size: 12px;
+  color: color-mix(in srgb, var(--ss-fg) 55%, transparent);
+}
+
+.ss-shot-confirm-focus b {
+  color: var(--ss-accent);
+  font-weight: 600;
+}
+
+/* ── 관문 — 「이 사람이 맞습니까?」 (2026-09-08) ───────────────────── */
+
+/* 🔴 묶는 판(.ss-shot-pickside)과 **같은 자리 · 같은 결**이다. 대상이 정해진
+   뒤 분석이 시작되기 전, 관절이 붙는 것을 보는 동안 여기 선다. 단추 줄은
+   그쪽 것(.ss-shot-pick-acts)을 그대로 쓴다 — 같은 뜻의 것에 다른 모양을
+   주지 않는다. */
+.ss-shot-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0 12px;
+}
+
+.ss-shot-confirm-q {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ss-fg);
+}
+
+.ss-shot-confirm-note,
+.ss-shot-confirm-wait {
+  font-size: 13px;
+  line-height: 1.6;
+  color: color-mix(in srgb, var(--ss-fg) 62%, transparent);
+}
+
+/* 아직 붙는 중 — 무엇을 기다리는지 말한다. 빈 판이면 멈춘 것처럼 보인다.
+   ⚠️ 깜빡임은 움직임 줄이기에서 끈다(글자는 그대로 남는다). */
+.ss-shot-confirm-wait {
+  animation: ss-shot-confirm-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes ss-shot-confirm-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-shot-confirm-wait {
+    animation: none;
+  }
+}
+
 .ss-shot-pickside {
   display: flex;
   flex-direction: column;
@@ -3640,6 +3955,12 @@ body::-webkit-scrollbar {
   font-size: 0.75rem;
   color: var(--ss-fg);
   transition: border-color 160ms ease;
+  /* 🔴 글자가 「내 프로필에 리포트 저장」으로 길어졌다(사용자 요청,
+     2026-09-08) — **줄바꿈하지 않는다.** 머리줄이 두 줄이 되면 옆의 제목과
+     높이가 어긋나고, 리포트로 바뀌는 순간 판 위쪽이 한 번 덜컥한다.
+     자리는 flex 가 준다(.ss-shot-side-head 의 justify-content: space-between). */
+  flex: none;
+  white-space: nowrap;
 }
 
 /* 🔴 잠겨 있는 동안은 **눌리지 않는다는 것이 보여야** 한다 — 리포트가 다 나오기
@@ -8484,6 +8805,91 @@ body:has(.ss-shot) .ss-app-figure {
 }
 
 .ss-profile-id-main,
+/* ── 나를 보여주는 대표 영상 (2026-09-08) ─────────────────────────── */
+
+/* 영상 **오른쪽 아래**에 붙인다(사용자 요청) — 그 영상에 대한 일이라 멀어지면
+   무엇을 세우는 것인지 흐려진다.
+
+   🔴 넘기는 줄(‹ 1 / 2 ›)과 **같은 줄**이다(사용자 지적: 두 줄로 갈려 있었다).
+   넘기는 단추는 가운데 그대로여야 하므로 이 단추만 **흐름 밖**으로 빼서
+   오른쪽 끝에 건다 — 흐름에 두면 가운데가 그만큼 왼쪽으로 밀린다. */
+.ss-profile-video-nav {
+  position: relative;
+}
+
+.ss-profile-featured-btn {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 32%, transparent);
+  padding: 5px 12px;
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--ss-fg) 76%, transparent);
+  white-space: nowrap;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.ss-profile-featured-btn .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.ss-profile-featured-btn:hover,
+.ss-profile-featured-btn:focus-visible {
+  border-color: color-mix(in srgb, var(--ss-fg) 58%, transparent);
+  color: var(--ss-fg);
+}
+
+/* 세워 둔 것. 🔴 색만으로 말하지 않는다 — 아이콘이 채워진 별로 바뀌고
+   `aria-pressed` 가 화면 낭독기에 같은 것을 알린다. */
+.ss-profile-featured-btn[data-on='true'] {
+  border-color: var(--ss-accent);
+  background-color: color-mix(in srgb, var(--ss-accent) 16%, transparent);
+  color: var(--ss-accent);
+}
+
+.ss-profile-featured-note {
+  margin-left: auto;
+  max-width: 320px;
+  text-align: right;
+  font-size: 0.6875rem;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--ss-fg) 52%, transparent);
+}
+
+/* ── 내 프로필의 분석 리포트 — **영상 목록 아래**다 (2026-09-08) ────── */
+
+/* 🔴 굴리는 목록 아래에 선을 긋고 그 아래에 둔다. 목록은 "무엇을 볼까"이고
+   리포트는 "그것이 무엇이었나"라, 한 덩어리로 붙으면 둘이 섞인다. */
+.ss-profile-report {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid color-mix(in srgb, var(--ss-fg) 22%, transparent);
+}
+
+.ss-profile-report-head {
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--ss-fg) 70%, transparent);
+}
+
+/* ⚠️ 어디에 남았는지 밝히는 줄 — 숨기면 다른 기기에서 안 보일 때 고장으로
+   읽힌다(공개 여부 · 카드 꾸미기와 같은 규칙). */
+.ss-profile-report-note {
+  margin-top: 10px;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--ss-fg) 52%, transparent);
+}
+
 .ss-profile-strip {
   animation: ss-p-from-bottom 460ms var(--ss-home-out-ease) 1080ms both;
 }

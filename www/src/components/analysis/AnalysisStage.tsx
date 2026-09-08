@@ -7,7 +7,10 @@ import { useHideChrome, useLeaving } from '@/lib/pageTransition'
 import type { Box } from '@/lib/box'
 import { smoothStep } from '@/lib/smoothBox'
 import { SPORTS, SPORT_CODE, type SportKey } from '@/lib/sports'
+import { FOCUS } from '@/lib/rubricFocus'
 import { uploadClip } from '@/lib/uploadClip'
+import { saveReport } from '@/lib/savedReports'
+import ReportView from '@/components/analysis/ReportView'
 import {
   EDGES,
   L_SHOULDER,
@@ -242,6 +245,15 @@ const STEPS = [
 const STEP_MS = 1100
 
 /**
+ * 관절이 **연속 이만큼** 잡혀야 「이 사람이 맞습니까?」를 묻는다.
+ *
+ * 🔴 한 번 잡히자마자 물으면 사람이 뼈대를 보기도 전에 질문이 뜬다. 검출은
+ * {@link TRACK_MS}(70ms) 간격이라 8이면 **0.6초쯤** 붙어 있는 것을 본 뒤다.
+ * 놓치면(`lost`) 0 으로 돌아가므로, 잠깐 스친 것은 통과하지 못한다.
+ */
+const STEADY_HITS = 8
+
+/**
  * 자리 표시 리포트.
  *
  * 🔴 **수치를 그리지 않는다.** 계약이 `report.summary` 에 총점 · 등급 숫자를
@@ -300,6 +312,43 @@ export default function AnalysisStage() {
    * 일으킬 값이 아니고, `pick()` 과 `저장` 클릭 사이에서만 읽힌다.
    */
   const pickedFileRef = useRef<File | null>(null)
+  /**
+   * 🔴 **관절이 그 사람에게 안정적으로 붙었는가**(사용자 요청, 2026-09-08).
+   *
+   * 관절은 매 프레임 다시 그려지므로 "다 그려졌다"는 끝점이 없다. 그래서
+   * **연속 {@link STEADY_HITS} 번** 잡히면 다 그려진 것으로 본다 — 한 번
+   * 잡히자마자 물으면 사람이 뼈대를 보기도 전에 질문이 뜬다.
+   *
+   * 이게 켜져야 「이 사람이 맞습니까?」가 나오고, 그 「예」가 곧 S3 업로드
+   * 트리거다. 즉 **관절이 안 붙으면 영상이 올라가지도 않는다** — 누구를 보고
+   * 리포트를 쓸지 모르는 영상이 올라가는 것을 이 관문이 막는다.
+   */
+  /**
+   * **무엇을 집중해서 볼지** — 에이전트가 채점하는 항목 중 고른 것들
+   * (사용자 요청, 2026-09-08). 목록은 `lib/rubricFocus.ts` 에 있고 정본은
+   * `agent/rubrics/*.yaml` 이다.
+   *
+   * 🔴 **비어 있는 것이 「전체적으로」다.** 따로 상태를 두지 않는다 — 두면
+   * "전체이면서 팔로스루도 고른" 앞뒤 안 맞는 상태가 생긴다.
+   *
+   * ⚠️ 고른 값을 **아직 아무 데도 못 보낸다**(계약에도 에이전트 CLI 에도
+   * 자리가 없다 — 미결 paik 8번). 화면에만 남는다.
+   */
+  const [focus, setFocus] = useState<string[]>([])
+  const [poseSteady, setPoseSteady] = useState(false)
+  /** 연속으로 몇 번 잡혔나. 놓치면 0 으로 돌아간다. */
+  const steadyRef = useRef(0)
+  /**
+   * 「예」를 눌렀는가 — **여기서부터** 진행 단계가 돌고 영상이 올라간다.
+   * 누르기 전에는 관절만 그린다.
+   */
+  const [confirmed, setConfirmed] = useState(false)
+  /**
+   * 올라간 영상의 id. 리포트를 매달 자리라(`저장`) 이게 없으면 매달 데가 없다.
+   */
+  const [videoId, setVideoId] = useState<string | null>(null)
+  /** 리포트를 내 프로필에 남겼는가 — `저장` 단추의 상태다. */
+  const [reportSaved, setReportSaved] = useState(false)
   /** 저장(서버 업로드) 진행 상태 — 미결 「분석한 영상을 우리 서버에 저장하는 경로」(paik-1). */
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'rejected' | 'error'>(
     'idle',
@@ -458,18 +507,28 @@ export default function AnalysisStage() {
     return () => URL.revokeObjectURL(file.url)
   }, [file])
 
-  // 오른쪽 판이 떠오르고 **분석 대상이 정해진 뒤부터** 단계가 하나씩 넘어간다.
-  // 🔴 누구를 보는지 모르는 채로 '자세 추적' 을 켤 수는 없다(사용자 요청).
+  /**
+   * 단계가 하나씩 넘어간다 — **「예」를 누른 뒤부터**(사용자 요청, 2026-09-08).
+   *
+   * 🔴 예전에는 대상이 정해지기만 하면 돌았다. 이제는 그 사이에 관문이 있다:
+   * 대상이 정해지면 **관절만 그리고**, 사람이 「이 사람이 맞습니다」라고
+   * 확인해야 분석이 시작된다.
+   *
+   * 🔴 **첫 칸('영상 등록')은 여기서 안 넘긴다.** 그 칸이 곧 진짜 S3 업로드라
+   * (`saveToServer`), 올라간 뒤에 스스로 넘어간다. 시간으로 넘기면 아직
+   * 올라가지도 않았는데 다음 칸이 켜진다.
+   */
   useEffect(() => {
-    if (!sideIn || !subject || done) return
+    if (!sideIn || !subject || !confirmed || done) return
     if (step >= STEPS.length) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setDone(true)
       return
     }
+    if (step === 0) return
     const t = window.setTimeout(() => setStep((s) => s + 1), STEP_MS)
     return () => clearTimeout(t)
-  }, [sideIn, subject, step, done])
+  }, [sideIn, subject, confirmed, step, done])
 
   /**
    * 🔴 **묶은 사람을 정말로 따라간다** — 매 프레임 사람을 검출하고, 그중에서
@@ -483,14 +542,23 @@ export default function AnalysisStage() {
    */
   useEffect(() => {
     const video = previewRef.current
-    const first = subject?.box
+    const first = subject?.box ?? null
     // 🔴 닫기 시작하면 **곧바로** 멎는다. 판이 줄어드는 0.8초 동안 계속 돌면
     // 그 사이 네모가 남의 위에서 움직이는 것이 보인다(사용자 요청).
-    if (!started || closing || !video || !first) return
+    // ⚠️ `first` 가 null 이어도 돈다 — '자동으로 고르기' 다(아래 주석).
+    if (!started || closing || !video || !subject) return
 
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d', { willReadFrequently: true })
-    if (!ctx) return
+    /* 🔴 2D 화판을 못 얻으면 **모델을 못 올린 것과 같은 상황**이다 — 생김새를
+       잴 그림을 못 떠서 따라갈 수가 없다. 조용히 돌아가면 관절이 영영 안
+       붙어 「이 사람이 맞습니까?」가 뜨지 않고, 그러면 그 사람은 분석을 아예
+       못 한다. 같은 자리로 보내 "따라가기만 꺼졌다" 로 다룬다.
+       ⚠️ jsdom 이 `getContext` 를 안 깔아 주므로 시험은 늘 이 길로 온다. */
+    if (!ctx) {
+      setTrackFailed(true)
+      return
+    }
 
     let stop = false
     let tracker: PersonTracker | null = null
@@ -544,12 +612,27 @@ export default function AnalysisStage() {
 
         // 첫 바퀴 — 손으로 그린 네모를 **검출된 사람에 맞춰 주고** 시작한다.
         if (!tracker) {
-          const snapped = snapToDetection(first, dets)
+          /* 🔴 **'자동으로 고르기' 도 여기서 따라간다**(사용자 요청,
+             2026-09-08). 그린 네모가 없으면(`first === null`) 화면이 스스로
+             고르는데, 기준은 **가장 큰 박스**다 — 에이전트가 쓰는 것과 같은
+             규칙이다(`_largest_person_box`). 두 규칙이 갈리면 화면에서 확인한
+             사람과 서버가 보는 사람이 달라진다.
+
+             이렇게 해야 두 단추가 **같은 관문**을 지난다. 안 그러면
+             '자동으로 고르기' 는 관절을 그릴 대상이 없어 물어볼 수가 없고,
+             확인 없이 영상이 올라가 버린다 — 이 관문이 막으려는 바로 그것이다. */
+          const auto = first
+            ? null
+            : (dets
+                .slice()
+                .sort((a, b) => b.box.w * b.box.h - a.box.w * a.box.h)[0]?.box ?? null)
+          const snapped = first ? snapToDetection(first, dets) : auto
           if (!snapped && waited < WAIT_MAX) {
             waited += 1
             continue
           }
           const from = snapped ?? first
+          if (!from) continue
           tracker = createPersonTracker(frame, from)
           targetRef.current = from
           shownRef.current = from
@@ -568,7 +651,17 @@ export default function AnalysisStage() {
         }
 
         // 멈춰 있으면 그림이 안 바뀐다 — 다시 잴 이유가 없다.
-        if (video.paused) continue
+        if (video.paused) {
+          /* 🔴 다만 **관문의 시계는 돈다.** 세우고 보는 것도 관절이 그 사람에게
+             붙어 있는지 확인하는 정당한 방법이다(영상을 돌려 보다 원하는
+             자리에서 세우고 묶는 것이 이 화면의 안내다). 여기서 안 세면
+             멈춘 채로는 「이 사람이 맞습니까?」가 영영 안 뜬다. */
+          if (poseRef.current) {
+            steadyRef.current += 1
+            if (steadyRef.current >= STEADY_HITS) setPoseSteady(true)
+          }
+          continue
+        }
 
         const r = tracker.step(dets, frame)
         setLost(r.lost)
@@ -590,12 +683,20 @@ export default function AnalysisStage() {
           shownRef.current = null
           poseRef.current = null
           shownPoseRef.current = null
+          // 🔴 놓치면 **0 으로 되돌린다.** 잠깐 스친 것을 "붙었다"로 세면
+          //    엉뚱한 사람 위에서 관문이 뜬다.
+          steadyRef.current = 0
           continue
         }
 
         // 그리는 것은 아래 rAF 가 한다 — 여기서는 목표만 갈아 끼운다.
         targetRef.current = r.box
-        if (r.det?.keypoints) poseRef.current = r.det.keypoints
+        if (r.det?.keypoints) {
+          poseRef.current = r.det.keypoints
+          // 관절이 실제로 잡힌 바퀴만 센다 — 상자만 따라간 바퀴는 안 센다.
+          steadyRef.current += 1
+          if (steadyRef.current >= STEADY_HITS) setPoseSteady(true)
+        }
 
         /**
          * 🔴 **2단계 — 그 사람만 잘라 확대해서 관절을 다시 잰다.**
@@ -858,7 +959,14 @@ export default function AnalysisStage() {
     video?.play()?.catch(() => {})
   }
 
-  /** 놓쳤을 때 — 영상을 세우고 묶는 판으로 돌아간다. 단계는 그대로 이어진다. */
+  /**
+   * 놓쳤을 때, 그리고 **「아니요」를 눌렀을 때** — 영상을 세우고 묶는 판으로
+   * 돌아간다(사용자 요청, 2026-09-08). 두 경우가 하는 일이 정확히 같아서
+   * 함수를 나누지 않았다.
+   *
+   * 🔴 관문 상태도 같이 되돌린다. 안 되돌리면 새로 묶은 사람 위에서 **묻지도
+   * 않고** 관문이 이미 통과된 채로 남는다.
+   */
   function repick() {
     wantPlayRef.current = false
     previewRef.current?.pause()
@@ -869,6 +977,21 @@ export default function AnalysisStage() {
     shownPoseRef.current = null
     setLost(false)
     setRect(null)
+    setPoseSteady(false)
+    steadyRef.current = 0
+  }
+
+  /**
+   * 「예」 — **여기가 S3 저장의 방아쇠다**(사용자 요청, 2026-09-08).
+   *
+   * 관절이 그 사람에게 붙은 것을 눈으로 확인한 뒤라, 이 순간 올라가는 영상은
+   * **누구를 봐야 하는지가 정해진 영상**이다. 진행 단계의 첫 칸이 원래
+   * '영상 등록' 이므로 그 칸을 진짜 업로드로 채운다 — 숨은 동작이 아니라
+   * 눈에 보이는 첫 칸이다.
+   */
+  function confirmSubject() {
+    setConfirmed(true)
+    void saveToServer()
   }
 
   function reset() {
@@ -893,6 +1016,13 @@ export default function AnalysisStage() {
       pickedFileRef.current = null
       setSaveState('idle')
       setSaveMessage(null)
+      // 관문도 처음으로 — 다음 영상에서 묻지도 않고 통과돼 있으면 안 된다.
+      setPoseSteady(false)
+      steadyRef.current = 0
+      setFocus([])
+      setConfirmed(false)
+      setVideoId(null)
+      setReportSaved(false)
       setSubject(null)
       targetRef.current = null
       shownRef.current = null
@@ -907,13 +1037,20 @@ export default function AnalysisStage() {
   }
 
   /**
-   * 영상을 우리 서버(EC2)에 올린다 — 미결 「분석한 영상을 우리 서버에 저장하는
-   * 경로」(paik-1). 계약 3-6절의 클립 업로드 경로(jin-12)를 그대로 쓴다:
-   * 화면의 가짜 리포트는 여기서 같이 저장하지 않는다 — 그 저장 형식은 아직
-   * 계약에 없다(담당 정어진). 영상을 올리면 **서버가 진짜로** 분석한다.
+   * 영상을 S3 에 올린다 — 계약 3-6절의 클립 업로드 경로(jin-12)를 그대로 쓴다.
+   *
+   * 🔴 **부르는 것은 「예」다**(2026-09-08). 예전에는 오른쪽 위 `저장` 이
+   * 불렀는데, 그러면 가짜 리포트가 다 나온 **뒤에야** 영상이 올라갔다 —
+   * 미결 「누구를 분석 대상으로 고를지」의 현황표가 *"`이 사람으로 분석` →
+   * S3 저장은 다른 버튼이다"* 로 지적한 자리다.
    *
    * 🔴 원본은 앱 서버를 지나지 않는다(PER-002) — 두 번째 단계는 브라우저가
    * S3 사전 서명 URL에 직접 PUT 한다.
+   *
+   * ⚠️ **대상 박스는 아직 못 보낸다.** 계약 본문에 자리가 없고, 워커가 읽는
+   * S3 쪽에도 올릴 자리가 없다(미결 paik 6번, 담당 정어진). `subject` 는
+   * 이미 정규화 0~1 좌표로 들고 있으므로(`toVideoBox`), 자리가 생기면
+   * `lib/uploadClip.ts` 에 실어 보내면 된다.
    */
   async function saveToServer() {
     const picked = pickedFileRef.current
@@ -935,6 +1072,10 @@ export default function AnalysisStage() {
 
       if (saved.passed) {
         setSaveState('saved')
+        setVideoId(saved.id)
+        // 🔴 첫 칸('영상 등록')이 여기서 끝난다 — 시간이 아니라 **실제로
+        //    올라간 것**이 다음 칸을 켠다.
+        setStep((now) => (now === 0 ? 1 : now))
       } else {
         setSaveState('rejected')
         setSaveMessage(saved.reject_reason ?? '규격에 맞지 않아 반려됐습니다.')
@@ -944,6 +1085,29 @@ export default function AnalysisStage() {
       setSaveMessage(e instanceof Error ? e.message : '저장하지 못했습니다.')
     }
   }
+
+  /**
+   * `저장` — **리포트를 내 프로필에 남긴다**(사용자 요청, 2026-09-08).
+   *
+   * 영상은 「예」가 이미 올렸으므로 여기서 다시 올리지 않는다. 남는 일은
+   * 리포트를 그 영상에 매다는 것이고, 계약에 읽는 경로가 없어 브라우저에
+   * 둔다(미결 paik 7번). `lib/savedReports.ts` 한 파일이 그 사실을 맡는다.
+   */
+  function saveReportToProfile() {
+    if (!videoId) return
+    saveReport(videoId, REPORT)
+    setReportSaved(true)
+  }
+
+  /**
+   * 관문을 물어도 되는가 — 관절이 안정적으로 붙었거나, **검출 자체가 꺼진**
+   * 경우다.
+   *
+   * 🔴 검출 모델을 못 올렸으면(`trackFailed`) 관절이 영영 안 잡힌다. 그때까지
+   * 막으면 그 사람은 분석을 아예 못 한다 — "따라가기만 꺼지고 분석은 그대로
+   * 진행한다"는 이 화면의 기존 규칙과 같은 결로, 바로 묻는다.
+   */
+  const askable = poseSteady || trackFailed
 
   return (
     <div
@@ -1351,14 +1515,15 @@ export default function AnalysisStage() {
       <aside className="ss-shot-side" aria-label="리포트와 대화">
         <header className="ss-shot-side-head">
           <h2>{done ? '리포트' : subject ? '보고 있습니다' : '분석할 사람'}</h2>
-          {/* 🔴 **리포트가 다 나온 뒤에만 눌린다**(사용자 요청) — 저장하는 것이
-              분석 결과까지 포함한 한 벌이라, 아직 도는 중에 누르면 무엇이 저장된
-              것인지 알 수 없다.
+          {/* 🔴 **이 단추는 리포트를 내 프로필에 남긴다**(사용자 요청,
+              2026-09-08). 영상을 올리는 일은 **「예」로 옮겼다** — 미결
+              「누구를 분석 대상으로 고를지」의 현황표가 *"`이 사람으로 분석`
+              → S3 저장은 다른 버튼이다"* 로 지적한 자리다. 지금은 관절이
+              그 사람에게 붙은 것을 확인한 순간 올라간다.
 
-              **미결 「분석한 영상을 우리 서버에 저장하는 경로」(paik-1) 해소** —
-              계약 3-6절 클립 업로드 경로(jin-12)로 영상을 올린다(`saveToServer`).
-              이 화면의 가짜 리포트는 같이 안 보낸다 — 그 저장 형식은 아직
-              계약에 없다. 올라간 영상은 **서버가 진짜로** 분석한다.
+              🔴 **리포트가 다 나온 뒤에만 눌린다** — 남기는 것이 그 결과다.
+              그리고 **올라간 영상이 있어야** 눌린다(`videoId`) — 매달 데가
+              없으면 남길 수가 없다.
 
               ⚠️ 이 자리에 있던 **'다른 영상'** 은 없앴다(사용자 요청). 고르기 전으로
               되돌리는 길은 창 틀의 **닫기 점**(`영상 닫기`)에 그대로 있다 —
@@ -1366,25 +1531,33 @@ export default function AnalysisStage() {
           <button
             type="button"
             className="ss-shot-again"
-            disabled={!done || saveState === 'saving'}
-            onClick={saveToServer}
+            disabled={!done || !videoId || reportSaved}
+            onClick={saveReportToProfile}
           >
-            {saveState === 'saving'
-              ? '올리는 중…'
-              : saveState === 'saved'
-                ? '저장됨'
-                : saveState === 'rejected'
-                  ? '반려됨'
-                  : saveState === 'error'
-                    ? '다시 시도'
-                    : '저장'}
+            {reportSaved ? '내 프로필에 저장됨' : '내 프로필에 리포트 저장'}
           </button>
         </header>
 
-        {/* 반려·오류 사유 — 성공(saved)은 버튼 글자로 충분해 따로 안 그린다. */}
+        {/* 반려·오류 사유 — 성공(saved)은 진행 단계가 넘어가는 것으로 보인다. */}
         {saveMessage && (saveState === 'rejected' || saveState === 'error') && (
           <p className="ss-shot-save-msg" data-tone={saveState}>
             {saveMessage}
+            {/* 🔴 올리다 실패한 것은 **다시 해 볼 수 있어야 한다.** 첫 칸에서
+                멈춘 채 길이 없으면 영상을 다시 고르는 수밖에 없다. */}
+            {saveState === 'error' && (
+              <button type="button" className="ss-shot-pick-auto" onClick={() => void saveToServer()}>
+                다시 시도
+              </button>
+            )}
+          </p>
+        )}
+
+        {/* ⚠️ 남긴 리포트가 어디에 있는지 밝힌다 — 숨기면 다른 기기에서 안 보일
+            때 고장으로 읽힌다(공개 여부 · 카드 꾸미기와 같은 규칙). */}
+        {reportSaved && (
+          <p className="ss-shot-save-msg" role="status">
+            내 프로필의 「분석 영상」 아래에 남겼습니다. 아직 이 브라우저에만
+            남습니다.
           </p>
         )}
 
@@ -1439,36 +1612,125 @@ export default function AnalysisStage() {
                 자동으로 고르기
               </button>
             </div>
+
+            {/* 🔴 **무엇을 볼지 고르는 자리**(사용자 요청, 2026-09-08).
+                올린 사람이 자기가 뭘 보고 싶은지 모를 수 있어서, **에이전트가
+                실제로 채점하는 항목**을 그대로 내놓는다 — 지어낸 목록이
+                아니라 `agent/rubrics/<종목>.yaml` 의 `criteria[].name` 이다
+                (`lib/rubricFocus.ts` 가 그 사본을 들고 있다).
+
+                🔴 **종목당 열린 루브릭(status: active) 하나만** 낸다. 루브릭
+                파일이 그 규칙을 스스로 적어 두었다 — draft 인 인사이드 패스 ·
+                타격 · 레이업은 목록에 없다.
+
+                🔴 **아무것도 안 고른 것이 「전체적으로」다.** 상태를 따로 두면
+                "전체인데 팔로스루도 고른" 앞뒤 안 맞는 경우가 생긴다. */}
+            {sport && (
+              <div className="ss-shot-focus">
+                <p className="ss-shot-focus-head">
+                  <b>{FOCUS[sport].motion}</b>에서 어디를 집중해서 볼까요?
+                </p>
+
+                <ul className="ss-shot-focus-list">
+                  <li>
+                    <button
+                      type="button"
+                      className="ss-shot-focus-chip"
+                      data-on={focus.length === 0 ? 'true' : undefined}
+                      aria-pressed={focus.length === 0}
+                      onClick={() => setFocus([])}
+                    >
+                      전체적으로
+                    </button>
+                  </li>
+                  {FOCUS[sport].items.map((it) => {
+                    const on = focus.includes(it.id)
+                    return (
+                      <li key={it.id}>
+                        <button
+                          type="button"
+                          className="ss-shot-focus-chip"
+                          data-on={on ? 'true' : undefined}
+                          aria-pressed={on}
+                          onClick={() =>
+                            setFocus((now) =>
+                              on ? now.filter((x) => x !== it.id) : [...now, it.id],
+                            )
+                          }
+                        >
+                          {it.label}
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+
+                {/* ⚠️ 고른 것을 아직 못 보낸다는 사실을 숨기지 않는다 —
+                    공개 여부 · 카드 꾸미기와 같은 규칙이다. */}
+                <p className="ss-shot-focus-note">
+                  {focus.length === 0
+                    ? '고르지 않으면 전체를 봅니다.'
+                    : '아직 이 선택은 화면에만 남습니다 — 서버로 보낼 자리가 준비 중입니다.'}
+                </p>
+              </div>
+            )}
+          </div>
+        ) : !confirmed ? (
+          /* 🔴 **관문**(사용자 요청, 2026-09-08). 대상이 정해져도 곧바로 분석이
+             돌지 않는다 — 먼저 관절만 그리고, 그것이 **그 사람에게** 붙은 것을
+             눈으로 확인받는다.
+
+             왜 이 자리에 관문을 두는가: 「예」가 곧 S3 업로드 방아쇠다. 관절이
+             안 붙은 영상이 올라가면 **서버도 누구를 보고 리포트를 써야 할지
+             모른다.** 여기서 막으면 그런 영상은 올라가지도 않는다. */
+          <div className="ss-shot-confirm" data-ready={askable ? 'true' : undefined}>
+            {askable ? (
+              <>
+                <p className="ss-shot-confirm-q">이 사람이 맞습니까?</p>
+                <p className="ss-shot-confirm-note">
+                  {trackFailed
+                    ? '검출 모델을 불러오지 못해 관절을 그리지 못했습니다. 그대로 진행할 수 있습니다.'
+                    : '묶은 사람에게 관절이 붙었습니다. 「예」를 누르면 이 영상이 올라가고 분석이 시작됩니다.'}
+                </p>
+                {/* 🔴 **무엇을 보기로 했는지 여기서 다시 말한다.** 확인하는
+                    자리에 확인할 것이 다 있어야 한다 — 앞 화면으로 돌아가
+                    기억해 낼 일을 만들지 않는다. */}
+                {sport && (
+                  <p className="ss-shot-confirm-focus">
+                    볼 것:{' '}
+                    <b>
+                      {focus.length === 0
+                        ? '전체적으로'
+                        : FOCUS[sport].items
+                            .filter((it) => focus.includes(it.id))
+                            .map((it) => it.label)
+                            .join(' · ')}
+                    </b>
+                  </p>
+                )}
+                <div className="ss-shot-pick-acts">
+                  <button type="button" className="ss-shot-pick-go" onClick={confirmSubject}>
+                    예
+                  </button>
+                  {/* 🔴 「아니요」가 하는 일은 `다시 묶기` 와 정확히 같다 —
+                      영상을 세우고 묶는 판으로 돌아간다. 함수를 나누지 않았다. */}
+                  <button type="button" className="ss-shot-pick-auto" onClick={repick}>
+                    아니요
+                  </button>
+                </div>
+              </>
+            ) : (
+              /* 아직 붙는 중 — 무엇을 기다리는지 말한다. 빈 판으로 두면
+                 멈춘 것처럼 보인다. */
+              <p className="ss-shot-confirm-wait" role="status">
+                관절을 찾고 있습니다…
+              </p>
+            )}
           </div>
         ) : done ? (
-          <div className="ss-report">
-            <p className="ss-report-summary">{REPORT.summary}</p>
-
-            <ul className="ss-report-traits">
-              {REPORT.traits.map((t) => (
-                <li key={t}>{t}</li>
-              ))}
-            </ul>
-
-            {/* 받은 호칭만 그린다. 못 받은 것을 미달 표식으로 남기지 않는다. */}
-            {REPORT.titles.length > 0 && (
-              <ul className="ss-report-titles" aria-label="받은 호칭">
-                {REPORT.titles.map((t) => (
-                  <li key={t}>{t}</li>
-                ))}
-              </ul>
-            )}
-
-            <h3>이렇게 본 장면</h3>
-            <ul className="ss-report-scenes">
-              {REPORT.scenes.map((s) => (
-                <li key={s.at}>
-                  <b>{s.at}</b>
-                  {s.what}
-                </li>
-              ))}
-            </ul>
-          </div>
+          /* 🔴 리포트 그림은 `/me` 와 **같은 것을 쓴다**(ReportView) — 두 벌로
+             두면 한쪽만 늙는다. */
+          <ReportView report={REPORT} />
         ) : (
           <ol className="ss-steps" aria-label="분석 진행">
             {STEPS.map((s, i) => {

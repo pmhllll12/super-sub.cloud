@@ -22,7 +22,9 @@ const CARD: PlayerCard = {
 
 // 상단 글자 줄 셋 + 헤드라인 자리의 알약 둘. 알약으로 옮기면서 이름도
 // '용병 매칭'→'용병 찾기', '내 팀'→'팀 찾기' 로 바꿨다.
-const TITLES = ['영상 분석', '레슨 · 상점', '경기장 예약', '용병 찾기', '팀 찾기', '지인 찾기']
+// 🔴 '지인 찾기' 알약은 없앴다(2026-09-08) — '용병 찾기' 하나가 추천 판과
+// 지인 판을 같이 연다. 되살리지 말 것(destinations.ts 주석).
+const TITLES = ['영상 분석', '레슨 · 상점', '경기장 예약', '용병 찾기', '팀 찾기']
 
 describe('홈 화면 — /', () => {
   it('워드마크와 목적지 글자를 적는다', () => {
@@ -128,6 +130,54 @@ describe('홈 화면 — /', () => {
   it('로그인 안 했으면 로그아웃 자리가 아예 없다', () => {
     render(<HomeBody user={null} />)
     expect(screen.queryByRole('button', { name: '로그아웃' })).toBeNull()
+  })
+
+  /* ── 용병 찾기 알약 — 판 둘을 짝으로 연다 (2026-09-08) ───────────── */
+
+  // 🔴 홈에 들어오자마자 떠 있으면 안 된다. '용병 찾기'는 DEFAULT_FEATURED
+  //    이기도 해서, 여는 조건을 `picked` 로 잡으면 처음부터 켜져 있고 ×도
+  //    안 먹는다 — 챗봇을 이 알약으로 열던 시절에 실제로 그랬다.
+  it('들어오자마자는 판이 하나도 안 떠 있다', () => {
+    render(<HomeBody user={{ nickname: '홍길동' }} />)
+    expect(screen.queryByRole('complementary', { name: /추천 선수/ })).toBeNull()
+    expect(screen.queryByRole('complementary', { name: '지인 찾기' })).toBeNull()
+  })
+
+  it('용병 찾기를 누르면 추천 판과 지인 판이 같이 열린다', async () => {
+    const user = userEvent.setup()
+    render(<HomeBody user={{ nickname: '홍길동' }} />)
+    await user.click(screen.getByRole('button', { name: '용병 찾기' }))
+    expect(screen.getByRole('complementary', { name: /추천 선수/ })).toBeInTheDocument()
+    expect(screen.getByRole('complementary', { name: '지인 찾기' })).toBeInTheDocument()
+  })
+
+  // 늘 골라져 있는 기본값이라, 누를 때마다 열기만 하면 닫을 길이 판의 ×뿐이다.
+  it('한 번 더 누르면 닫힌다', async () => {
+    const user = userEvent.setup()
+    render(<HomeBody user={{ nickname: '홍길동' }} />)
+    const pill = screen.getByRole('button', { name: '용병 찾기' })
+    await user.click(pill)
+    await user.click(pill)
+    // ⚠️ 판은 **물러나는 동안 DOM 에 남는다**(그래야 연출이 보인다). 사라진
+    //    것을 세지 말고 물러나는 중인지를 본다 — 둘 다 접혀야 한다.
+    expect(screen.getByRole('complementary', { name: /추천 선수/ })).toHaveAttribute(
+      'data-state',
+      'closing',
+    )
+    expect(screen.getByRole('complementary', { name: '지인 찾기' })).toHaveAttribute(
+      'data-state',
+      'closing',
+    )
+  })
+
+  // 🔴 두 판이 이 글자 자리를 파고든다(1440 에서 298px, 실측) — 비켜서야 한다.
+  it('판이 열리면 OWN THE PITCH 가 비켜선다', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<HomeBody user={{ nickname: '홍길동' }} />)
+    const head = container.querySelector('.ss-home-subhead')!
+    expect(head).not.toHaveAttribute('data-aside')
+    await user.click(screen.getByRole('button', { name: '용병 찾기' }))
+    expect(head).toHaveAttribute('data-aside', 'true')
   })
 
   // 하단 내비바는 없앴다 — 목적지가 상단 글자 줄에 이미 다 있다.
