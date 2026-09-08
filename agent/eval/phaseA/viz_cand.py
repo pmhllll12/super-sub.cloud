@@ -2,14 +2,17 @@
 import sys
 from pathlib import Path
 import numpy as np, cv2
-ROOT=Path("/mnt/d/supersub-phaseA")
+sys.path.insert(0,str(Path(__file__).resolve().parent))
+from paths import candidates_dir, default_target, external_root  # noqa: E402
+# 동작점을 이름으로 드러낸다 (미결 10·14번, 2026-09-08).
+ROOT=external_root(); CAND=candidates_dir(default_target())
 def unpack(f):
     d=np.load(f); n=d["n"]; b=d["boxes"]; out=[]; i=0
     for k in n: out.append(b[i:i+k]); i+=k
     return out, tuple(int(v) for v in d["frame_wh"])
 for cid, ts in [("3R1kvNrGJK0",[30,53,70]), ("O2GSaYqH8JY",[100,106,112]),
                 ("gg5xRWjw3f8",[66,92]), ("xMIUw5mi3Eo",[128,132])]:
-    per,(W,H)=unpack(ROOT/"candidates"/f"{cid}.npz")
+    per,(W,H)=unpack(CAND/f"{cid}.npz")
     tiles=[]
     for t in ts:
         img=cv2.imread(str(ROOT/"frames"/cid/f"{t:03d}.jpg"))

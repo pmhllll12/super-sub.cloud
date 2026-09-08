@@ -1329,8 +1329,46 @@ RT-DETR을 다시 돌려야 하는데, 그 클립은 Kinetics/YouTube 원본이�
 `eval/phaseA/paths.py`를 만들었다 — 환경변수(`SUPERSUB_PHASEA_ROOT`)로 빼되
 **저장소에 있는 것은 저장소를 먼저 본다.** 심볼릭 링크 방안은 위 이유로 뺐다.
 
-- `paths.py`로 옮긴 것은 `eval/pending13_edge/measure_edge.py` **하나뿐이다.**
-  `extract.py`·`analyze_phaseA.py`·`selector_downstream.py` 등 **14개는 그대로**다
+#### 진행 (2026.09.08) — 급소부터 옮겼다
+
+**`labeling/targets.py` 를 옮긴 것이 핵심이다.** 이 모듈 하나를 **18개 스크립트가
+import** 하고, `load_candidates()`·`clip_ids()` 가 전부 여기를 거친다. 이제
+저장소 사본(`candidates_target{15,30}/`)을 먼저 본다.
+
+| 옮긴 것 | 왜 |
+|---|---|
+| `labeling/targets.py` | 18개 스크립트의 후보 적재 공통 경로 |
+| `eval_b6/selector_downstream.py` | **B-6 재실행 경로**(미결 11번). 절대 홈경로 `AGENT` 도 뺐다 — 다른 기계·EC2에서 돈다 |
+| `cand_stats.py` · `sim_selectors.py` · `alt_events.py` · `viz_cand.py` | `ROOT/"candidates"`·`ROOT/"cache"` 를 **직접** 읽던 것들 |
+| `paths.default_target()` 신설 | 동작점 결정 규칙을 한 곳에. 파일마다 복사하면 그게 다시 미결 10번이다 |
+
+🔴 **`RERUN.md` 의 재실행 명령이 없는 파일을 가리키고 있었다.**
+`uv run python /mnt/d/supersub-phaseA/eval_b6/selector_downstream.py` — `/mnt/d` 의
+`.py` 38개는 2026-09-02에 전부 지웠다. 저장소 경로로 고쳤다.
+
+#### 🔴 옮기다가 드러난 것 — `/mnt/d/cand_stats.csv` 는 **target 15 산출물이다**
+
+동작 불변을 확인하려고 `cand_stats.py` 를 돌려 저장된 CSV와 대조했더니 **달랐다.**
+원인을 갈랐다 — `SUPERSUB_PHASEA_TARGET=15` 로 돌리니 **바이트 동일**이었다.
+
+| | |
+|---|---|
+| 리팩터는? | **정확하다.** 옛 동작점을 주면 옛 산출물을 그대로 재현한다 |
+| 그럼 무엇이 문제인가 | **저장된 CSV 가 낡았다.** target 15 때 만든 것인데 `/mnt/d/candidates` 는 2026-09-02 이후 target 30 이다. 읽는 사람은 그 사실을 알 수 없다 |
+| 대조 근거 | `/mnt/d/candidates` 전수가 `candidates_target30/` 과 **39/39 바이트 동일**(target 15 와는 1/39 — `8gmHKqDxXdg`, 원본 10fps라 두 동작점이 같은 클립) |
+
+**즉 이 변경은 오늘의 동작을 바꾸지 않는다** — 바꾸기 전에도 `/mnt/d/candidates`
+(=target 30)를 읽고 있었다. 달라진 것은 **무엇을 읽는지가 이름으로 보인다**는 것뿐이다.
+🔴 덮어썼던 `cand_stats.csv` 는 **원본으로 복원했다**(백업 대조 확인).
+
+**낡은 산출물을 지금 다시 만들지 않았다.** 산출물은 그때 무엇을 돌렸는지의 증거라
+말없이 갈아 끼우면 안 된다. 필요해지는 회차에 target 을 명시해 다시 낸다.
+
+- 남은 것: `/mnt/d` 하드코딩 **28개 파일** · 절대 홈경로(`/home/ho/...`) **14개**.
+  대부분 이미 돌린 일회성 분석이라 위험도는 낮다 — **다시 돌릴 일이 생길 때 옮긴다**
+- 🔴 **`candidates.py`(생성기)는 안 옮겼다.** 이건 읽는 게 아니라 **쓰는** 쪽이고,
+  쓰는 위치를 `candidates_target{N}/` 로 바꾸면 `PRESERVED_ASSETS.md` 의 자산 배치
+  계약이 바뀐다. 별도 결정이 필요하다
 - 캐시·검출후보는 저장소에서 읽히지만 `clips/`(130MB)·`labeling/`(31MB)은
   여전히 `/mnt/d`에만 있다. `paths.py`의 `require_external()`이 없을 때
   **왜 없는지 말하고 멈춘다** — 조용히 빈 결과를 내지 않게
