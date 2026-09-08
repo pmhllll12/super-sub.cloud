@@ -860,6 +860,23 @@ curl -s -H "Authorization: Bearer $OTHER_T" $API/videos/$PUB_ID/playback-url | j
 `true`** — `/analysis` 분석을 임시(`kept:false`)로 두고 "저장"에서 켜는 전환은
 프론트가 `keep` 을 부를 준비가 되면 함께 켭니다. 그때까지는 무시하셔도 됩니다.
 
+### 🔴 `POST /videos/upload-url` 에 `filename` 을 실어 주세요 (2026-09-08 추가, 필수)
+
+미결 `jin` 24번. 저장 키를 사람이 알아볼 수 있게 지으려고 **원본 파일 이름**을
+받습니다.
+
+```json
+{ "content_type": "video/mp4", "size_bytes": 52428800, "filename": file.name }
+```
+
+- `file.name` 을 그대로 실으시면 됩니다. 공백·한글·이모지·문장부호가 있어도
+  서버가 슬러그화하니 안전합니다. **필수 필드** — 안 보내면 `422` 입니다.
+- 응답 `storage_key` 는 이제 `videos/<uuid>/<닉네임>-<이름>-<시각>-<8자>.mp4`
+  모양입니다. **뜯어보지 말고 `POST /videos` 에 그대로 넘기세요** — 앞부분
+  `<uuid>` 로 소유를 대조합니다.
+- `POST /videos` 에도 `filename` 을 실어 주시면(선택) `original_filename` 으로
+  온전히 저장됩니다. `upload-url` 에서 이미 받으므로 급하지 않습니다.
+
 ---
 
 ## 22. 🟡 과금이 생겼습니다 — 크레딧·코치 연결이 API로 됩니다 (2026-09-08 추가)
@@ -901,6 +918,79 @@ git -C fastapi log --oneline main -- app/billing   # main에 배선됐는지
 ```
 
 상세: `fastapi/docs/api-contract.md` **3-10절** · `fastapi/docs/backend-work-split.md` 「패킷 A」
+
+---
+
+## 23. 🟡 관리자 영상 목록·삭제가 생겼습니다 (2026-09-08 추가)
+
+미결 `jin` 24번 6조각. **관리자 웹**(`www/src/app/admin/`)용입니다 — Flutter 는
+해당 없음. 🔴 **"문제 영상"을 일일히 사람이 관리하는 최종 설계는 아닙니다**
+(2026-09-08 사용자 확인) — 지금은 사람이 확인·삭제할 수 있게 열어 둔 임시 경로이고,
+자동/에이전트 정리는 나중 과제입니다. 읽을 수 있는 S3 키(21번 `filename`)와
+자동 스윕이 원래 방향입니다.
+
+| 엔드포인트 | 뜻 |
+|---|---|
+| `GET /admin/videos?user=<uid\|email>` | 그 사람의 영상 **전부**(임시 `kept:false` 포함), 최근순 |
+| `DELETE /admin/videos/{id}` | 아무 영상이나 삭제(소유 검사 없음) — DB 연쇄 + S3 best-effort |
+
+- `?user=` 는 **필수**입니다. `user.id`(UUID) 또는 이메일(대소문자 무시) 중 하나.
+  없는 사람이면 `404 USER_NOT_FOUND`.
+- 목록 한 줄: `id`·`sport_code`·`original_filename`·`storage_key`·`created_at`·
+  `kept`·`is_public`·`passed`·`reject_reason`·`analysis_status`·`report_prefix`.
+  응답 최상위에 그 사람의 **현재** `nickname`·`email` 이 옵니다(닉네임을 바꿔도
+  DB 조인이라 따라갑니다 — 저장 키에 얼어붙은 글자와 다릅니다).
+- **재생·리포트 링크는 목록에 안 실립니다.** 객체마다 사전 서명하지 않으려는
+  것이라, `storage_key`(재생)와 `report_prefix` 아래
+  `report.json`·`impact.jpg`·`tracked.webm`(리포트)를 콘솔이나 별도 사전 서명으로
+  짚으시면 됩니다.
+- 같은 관리자 게이트(`ADMIN_EMAILS` 화이트리스트, `403 FORBIDDEN`)입니다.
+- ⚠️ 21번과 같은 이유로 **S3 삭제는 아직 실서버에서 안 됩니다**(EC2 역할에
+  `s3:DeleteObject` 미부착). DB 에서는 즉시 사라집니다.
+
+### 먼저 확인
+
+```bash
+git -C fastapi grep -n "admin/videos" -- app/main.py app/analysis   # 라우트가 배선됐는지
+```
+
+상세: `fastapi/docs/api-contract.md` **3-2절**
+
+---
+
+## 24. 🟡 "내 프로필에 리포트 저장" 이 서버에 붙었습니다 (2026-09-08 추가)
+
+미결 `jin` 24번 2조각. `POST /videos/{id}/keep` — `/analysis` 의 분석 결과를
+"내 프로필에 리포트 저장" 할 때 부릅니다.
+
+- `200 OK`, 응답은 `GET /videos` 한 줄과 같은 모양. `kept: true` 가 실려 옵니다.
+- 서버가 **임시 원본을 `videos/…` 에서 `reports/<user_id>/<video_id>/source.<ext>`
+  로 옮깁니다.** 옮긴 뒤 `storage_key` 가 바뀌므로, 저장 직후 재생·목록은
+  응답의 새 `storage_key` 를 쓰세요(옛 키로 `playback-url` 을 부르면 404 는
+  아니지만 없는 객체를 가리킵니다).
+- **멱등** — 이미 저장된 클립에 다시 불러도 `200`.
+- 남의/없는 클립은 `404 VIDEO_NOT_FOUND`.
+
+### 아직 안 켜진 것 — 임시-저장 전환 (5조각)
+
+지금은 `POST /videos` 로 등록되는 **모든** 클립이 `kept: true` 로 시작합니다
+(동작 보존). `/analysis` 업로드를 임시(`kept: false`)로 두고 `keep` 을 눌러야
+프로필에 남는 전환은, **프론트가 아래 둘을 다 갖추면** 함께 켭니다.
+
+1. `/analysis` "저장" 버튼이 `POST /videos/{id}/keep` 호출
+2. `/analysis` 를 저장 없이 벗어날 때 `DELETE /videos/{id}` 호출
+   (`beforeunload` / `sendBeacon`)
+
+그 전에 서버에서 켜면 저장 안 한 `/analysis` 업로드가 프로필에서 사라지므로,
+**프론트 준비가 됐다고 알려 주시면** 서버 쪽을 켜겠습니다.
+
+### 먼저 확인
+
+```bash
+git -C fastapi grep -n "videos/{video_id}/keep" -- app/analysis   # 라우트가 배선됐는지
+```
+
+상세: `fastapi/docs/api-contract.md` **3-6절**
 
 ---
 

@@ -50,3 +50,5 @@ class VideoEntity:
     description: str | None = None
     # 프로필에 저장됐나(미결 `jin` 24번). 기본 True — `/analysis` 만 임시로 둔다.
     kept: bool = True
+    # 원본 파일 이름(미결 `jin` 24번). 저장 키 슬러그가 손실적이라 따로 남긴다.
+    original_filename: str | None = None

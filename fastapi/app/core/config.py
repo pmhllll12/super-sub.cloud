@@ -102,5 +102,13 @@ class Settings(BaseSettings):
     #    미리보기가 더 붙는다. 실측이 나오면 줄인다.
     analysis_job_timeout_minutes: int = 30
 
+    # 저장 안 한(`kept=false`) `/analysis` 업로드를 백스톱으로 정리하기까지
+    # 기다리는 시간(시간). 미결 `jin` 24번. 빠른 길은 프론트가 화면을 벗어날 때
+    # 부르는 `DELETE /videos/{id}` 이고, 이건 그것이 놓친 것(브라우저가 죽는 등)
+    # 을 결국 회수하는 자리다 — 짧게 잡으면 GPU 자동 종료로 `queued` 대기하는
+    # 정상 작업이나, 사용자가 결과를 보고 자리를 비웠다 저장하러 오는 경우를
+    # 지운다. 공격적 청소가 목적이 아니라 24로 넉넉히 둔다.
+    provisional_video_ttl_hours: int = 24
+
 
 settings = Settings()

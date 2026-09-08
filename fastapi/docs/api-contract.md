@@ -16,6 +16,7 @@
 | `POST`·`GET /teams/{id}/matches` · `GET /matches/{id}` | **실제 DB** (2026-09-02 추가, 3-4절) |
 | `POST`·`GET /matches/{id}/applications` · `POST .../accept` · `DELETE .../{application_id}` | **실제 DB** (2026-09-02 추가 · 무르기·거절은 2026-09-04, 3-5절) |
 | `GET /admin/users` · `GET /admin/users/{id}` · `DELETE /admin/users/{id}` | **실제 DB** (2026-08-31 추가, 3-2절) |
+| `GET /admin/videos` · `DELETE /admin/videos/{id}` | **실제 DB** (2026-09-08 추가 — 미결 `jin` 24번, 3-2절) |
 | `POST /internal/analysis-jobs/claim` · `PATCH /internal/analysis-jobs/{id}` | **실제 DB** (2026-09-04 추가 — **워커 전용**, 3-8절) |
 | `GET /review-options` · `POST /matches/{id}/reviews` · `POST /matches/{id}/no-shows` · `POST /reports` | **실제 DB** (2026-09-04 추가, 3-9절) |
 
@@ -831,6 +832,58 @@ trunk_alignment       2개 루브릭  basketball_jump_shot · basketball_layup  
 | 404 | `USER_NOT_FOUND` |
 | 409 | `CANNOT_DELETE_SELF` — 자기 자신을 대상으로 호출했다 |
 
+### `GET /api/v1/admin/videos` — 한 사람의 영상 전부 (2026-09-08 추가)
+
+미결 `jin` 24번. **문제 영상을 사람이 찾아 지우고, 에이전트가 제대로 돌았는지
+확인**하는 자리다. 위 세 admin 경로와 같은 화이트리스트 게이트를 쓴다.
+
+`?user=<uid|email>` **필수**. `user.id`(UUID)나 이메일(대소문자 무시) 중 하나로
+사람을 짚는다. 없는 사람이면 `404 USER_NOT_FOUND`.
+
+`GET /videos`(본인 목록)와 달리 **아직 저장 안 한(`kept:false`) 임시분까지** 담고,
+최근 것이 앞에 온다.
+
+`200 OK`
+
+```json
+{
+  "user_id": "3f1c...", "nickname": "홍길동", "email": "demo@super-sub.example",
+  "items": [
+    { "id": "7c05...", "sport_code": "football",
+      "original_filename": "My Kick.mp4",
+      "storage_key": "videos/3f1c.../홍길동-My-Kick-20260908-1419-3f1c8a2b.mp4",
+      "created_at": "2026-09-08T09:00:00Z",
+      "kept": true, "is_public": false, "passed": true, "reject_reason": null,
+      "analysis_status": "queued",
+      "report_prefix": "reports/3f1c.../7c05.../" }
+  ]
+}
+```
+
+- `nickname`·`email` 은 **현재 값**이다(DB 조인). 저장 키 안의 닉네임 글자는
+  업로드 시점에 얼어붙지만, 목록은 `user.id` 로 조인해 rename 을 따라간다.
+- **재생·리포트 링크는 안 싣는다** — 목록 한 번에 객체마다 사전 서명을 하지
+  않으려는 것이다. 재생은 `storage_key` 로, 리포트는 `report_prefix` 아래
+  (`report.json`·`impact.jpg`·`tracked.webm`)를 콘솔이나 별도 사전 서명으로 짚는다.
+
+### `DELETE /api/v1/admin/videos/{video_id}` — 관리자 영상 삭제 (2026-09-08 추가)
+
+미결 `jin` 24번. **아무** 영상이나 지운다 — `DELETE /videos/{id}` 와 달리 소유를
+확인하지 않는다(관리자 인증이 그 자리를 대신한다).
+
+- **DB 행**과 연쇄(`video_validation`·`analysis_job`·그 하위, `ON DELETE CASCADE`).
+- **S3 객체**(`storage_key` + `reports/<user_id>/<video_id>/`)도 best-effort 로
+  지운다 — 실패해도 `204`. `DELETE /videos/{id}` 와 같다(EC2 역할에
+  `s3:DeleteObject` 가 붙기 전에는 객체가 남는다 — 미결 `jin` 24번 IAM 조각).
+- 비밀번호를 안 받는 대신 누가 눌렀는지 로그에 남긴다
+  (`event=admin_delete_video admin_id=… video_id=…`).
+
+`204 No Content`
+
+| 에러 | code |
+|---|---|
+| 404 | `VIDEO_NOT_FOUND` |
+
 ---
 
 ## 3-3. 팀 (2026-09-02 추가)
@@ -1306,18 +1359,28 @@ SFR-001. 사용자가 자기 클립을 올리고, 서버가 규격을 검사해 
 ### `POST /api/v1/videos/upload-url`
 
 ```json
-{ "content_type": "video/mp4", "size_bytes": 52428800 }
+{ "content_type": "video/mp4", "size_bytes": 52428800, "filename": "우리팀 첫 골.mp4" }
 ```
+
+`filename` 은 **원본 파일 이름**이다(2026-09-08 추가, 미결 `jin` 24번). 저장 키를
+사람이 알아볼 수 있게 짓는 데 쓴다 — 슬러그화되므로 공백·문장부호·이모지가
+들어와도 안전하다.
 
 `200 OK`
 
 ```json
 {
-  "storage_key": "videos/3f1c.../9a2e....mp4",
+  "storage_key": "videos/3f1c8a2b-…/업로더-우리팀-첫-골-20260908-1419-9a2e0c11.mp4",
   "upload_url": "https://<bucket>.s3.<region>.amazonaws.com/...",
   "expires_in": 900
 }
 ```
+
+`storage_key` 는 `videos/<user_id>/<닉네임 슬러그>-<원본이름 슬러그>-<YYYYMMDD-HHMM>-<8자>.<ext>`
+다. 🔴 **`<user_id>/` 접두사(UUID)는 그대로다** — 등록할 때 소유를 대조하고,
+닉네임이 바뀌어도 이 UUID 로 주인을 되짚는다. 닉네임 조각은 **업로드 시점 라벨**
+이라 rename 해도 옛 키는 안 바뀐다. 클라이언트는 이 값을 **그대로** `POST /videos`
+에 넘긴다 — 뜯어보지 않는다.
 
 🔴 **`upload_url` 에 PUT 할 때 `Content-Type` 을 요청한 값 그대로 보내야 한다.**
 서명에 들어 있어서 다르면 S3 가 거절한다.
@@ -1342,9 +1405,14 @@ SFR-001. 사용자가 자기 클립을 올리고, 서버가 규격을 검사해 
   "width": 1920,
   "height": 1080,
   "side": "right",
-  "analyze": true
+  "analyze": true,
+  "filename": "우리팀 첫 골.mp4"
 }
 ```
+
+`filename` 은 **원본 이름**이다 — DB `video.original_filename` 에 온전히 남긴다
+(저장 키 슬러그는 손실적이다). 관리자 목록이 이 값으로 "문제 영상"을 되짚는다.
+생략 가능(`null`).
 
 `201 Created`
 
@@ -1467,6 +1535,28 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
 | 에러 | code | 언제 |
 |---|---|---|
 | 404 | `VIDEO_NOT_FOUND` | 없는 클립이거나 비공개 남의 클립이다 |
+| 503 | `STORAGE_NOT_CONFIGURED` | 서버에 `S3_BUCKET` 이 없다 |
+
+### `POST /api/v1/videos/{video_id}/keep` — 프로필에 저장 (2026-09-08 추가)
+
+미결 `jin` 24번 2조각. **"내 프로필에 리포트 저장"** — `/analysis` 의 임시 분석을
+영구로 만든다. **자기 클립만.** `200 OK`, 응답은 `GET /videos` 한 줄과 같은 모양.
+
+- `kept` 를 `true` 로 만든다. `GET /videos`(본인 목록)에는 지금도 뜨지만, 임시-저장
+  전환(5조각, 프론트 대기)이 켜지면 이 호출 전에는 안 뜨게 된다.
+- **임시 원본(`videos/…`)이면 리포트 자리로 옮긴다** —
+  `reports/<user_id>/<video_id>/source.<ext>`. S3 `CopyObject`(서버 쪽) 후 원본
+  삭제라 바이트가 앱 서버를 지나지 않는다(PER-002). 옮긴 뒤 `storage_key` 가
+  새 값으로 바뀌어 응답에 실린다. 재생(`playback-url`)도 새 키를 쓴다.
+- **분석 작업이 없는 클립**(`/me` 업로드, `analyze:false`)은 옮기지 않는다 —
+  리포트 폴더가 없다. `kept` 만 켜고 `videos/` 에 그대로 둔다.
+- **멱등이다.** 이미 저장된 클립에 다시 불러도 `200` 이고 이동은 건너뛴다.
+- 🔴 리포트 JSON 안의 `source_video` 는 아직 옛 `videos/…` 키를 가리킨다 —
+  리포트를 DB 로 옮길 때(`paik` 7) 정리한다. 미리보기(`reports/…`)는 영향 없다.
+
+| 에러 | code | 언제 |
+|---|---|---|
+| 404 | `VIDEO_NOT_FOUND` | 없는 클립이거나 **남의 클립**이다 |
 | 503 | `STORAGE_NOT_CONFIGURED` | 서버에 `S3_BUCKET` 이 없다 |
 
 ### `DELETE /api/v1/videos/{video_id}` — 클립 삭제 (2026-09-08 추가)
@@ -1733,6 +1823,17 @@ RAM 이 터지는 것 — 미결 `ho` 9번)이 큐를 영원히 돌게 된다. �
 
 ⚠️ 별도 스케줄러를 두지 않았다. 회수가 필요한 시점은 정확히 "누군가 일을 달라고
 할 때"이고, 타이머를 새로 만들면 **그 타이머가 살아 있는지를 또 확인해야 한다.**
+
+### 저장 안 한 임시 영상도 여기서 정리된다 (2026-09-08 추가)
+
+미결 `jin` 24번. `/analysis` 분석은 임시로 올라간다(`video.kept=false`).
+"내 프로필에 리포트 저장"을 안 누르고 떠나면 프론트가 `DELETE /videos/{id}` 를
+부르지만(빠른 길), 브라우저가 죽으면 놓친다. 그래서 **`claim` 이 멈춘 작업 회수와
+같은 자리에서** 백스톱을 돈다: `kept=false` 이고 `PROVISIONAL_VIDEO_TTL_HOURS`
+(기본 24)보다 오래됐고 **진행 중인 작업(`queued`/`running`)이 없는** `video` 를
+DB(연쇄)와 S3(`storage_key` + `reports/<user_id>/<video_id>/`, best-effort)에서
+지운다. `queued` 를 제외하는 이유는 GPU 인스턴스가 꺼져 있으면 몇 시간 대기가
+정상이기 때문이다.
 
 ---
 

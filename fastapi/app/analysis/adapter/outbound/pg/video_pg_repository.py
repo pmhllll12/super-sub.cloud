@@ -10,21 +10,23 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import column, select, table
+from sqlalchemy import column, func, select, table
 from sqlalchemy.orm import Session
 
 from app.analysis.adapter.outbound.orm.analysis_job_orm import AnalysisJobOrm
 from app.analysis.adapter.outbound.orm.video_orm import VideoOrm
 from app.analysis.adapter.outbound.orm.video_validation_orm import VideoValidationOrm
-from app.analysis.application.dtos.video_dto import UNSET
+from app.analysis.application.dtos.video_dto import UNSET, UserRef
 from app.analysis.application.ports.output.video_port import VideoPort
 from app.analysis.domain.entities.video_entity import ValidationEntity, VideoEntity
 
 # 소유하지 않는 테이블에서 **읽기만** 한다. 위 docstring 참조.
 _sport = table("sport", column("code"))
+_user = table("user", column("id"), column("nickname"), column("email"))
 
 
 class VideoPgRepository(VideoPort):
@@ -34,6 +36,24 @@ class VideoPgRepository(VideoPort):
     def sport_exists(self, sport_code: str) -> bool:
         stmt = select(_sport.c.code).where(_sport.c.code == sport_code)
         return self._session.execute(stmt).first() is not None
+
+    def uploader_nickname(self, user_id: UUID) -> str | None:
+        return self._session.execute(
+            select(_user.c.nickname).where(_user.c.id == user_id)
+        ).scalar_one_or_none()
+
+    def resolve_user(self, identifier: str) -> UserRef | None:
+        try:
+            where = _user.c.id == UUID(identifier)
+        except ValueError:
+            # UUID 가 아니면 이메일로 본다(대소문자 무시).
+            where = func.lower(_user.c.email) == identifier.lower()
+        row = self._session.execute(
+            select(_user.c.id, _user.c.nickname, _user.c.email).where(where)
+        ).first()
+        if row is None:
+            return None
+        return UserRef(id=row.id, nickname=row.nickname, email=row.email)
 
     def register(self, video: VideoEntity) -> None:
         """영상·판정·(통과 시) 작업을 한 트랜잭션에서 만든다."""
@@ -50,6 +70,7 @@ class VideoPgRepository(VideoPort):
                 side=video.side,
                 is_public=video.is_public,
                 kept=video.kept,
+                original_filename=video.original_filename,
                 created_at=video.created_at,
             )
         )
@@ -81,13 +102,23 @@ class VideoPgRepository(VideoPort):
         self._session.commit()
 
     def list_by_user(self, user_id: UUID) -> list[VideoEntity]:
+        return self._by_user(user_id, kept_only=True)
+
+    def list_all_by_user(self, user_id: UUID) -> list[VideoEntity]:
+        # 관리자는 아직 저장 안 한(`kept=false`) 임시분까지 본다.
+        return self._by_user(user_id, kept_only=False)
+
+    def _by_user(self, user_id: UUID, *, kept_only: bool) -> list[VideoEntity]:
+        conditions = [VideoOrm.user_id == user_id]
+        if kept_only:
+            conditions.append(VideoOrm.kept.is_(True))
         rows = (
             self._session.execute(
                 select(VideoOrm, VideoValidationOrm)
                 .outerjoin(
                     VideoValidationOrm, VideoValidationOrm.video_id == VideoOrm.id
                 )
-                .where(VideoOrm.user_id == user_id, VideoOrm.kept.is_(True))
+                .where(*conditions)
                 .order_by(VideoOrm.created_at.desc())
             )
             .tuples()
@@ -114,14 +145,72 @@ class VideoPgRepository(VideoPort):
         latest = self._latest_jobs([video_id]).get(video_id)
         return _to_entity(video, validation, latest)
 
+    def mark_kept(
+        self, video_id: UUID, user_id: UUID, *, storage_key: str
+    ) -> VideoEntity | None:
+        video = self._session.get(VideoOrm, video_id)
+        if video is None or video.user_id != user_id:
+            return None
+        video.kept = True
+        video.storage_key = storage_key
+        self._session.commit()
+
+        validation = self._session.execute(
+            select(VideoValidationOrm).where(
+                VideoValidationOrm.video_id == video_id
+            )
+        ).scalar_one_or_none()
+        latest = self._latest_jobs([video_id]).get(video_id)
+        return _to_entity(video, validation, latest)
+
     def delete(self, video_id: UUID, user_id: UUID) -> VideoEntity | None:
         video = self._session.get(VideoOrm, video_id)
         if video is None or video.user_id != user_id:
             return None
+        return self._delete(video)
+
+    def admin_delete(self, video_id: UUID) -> VideoEntity | None:
+        # 소유 검사가 없다 — 관리자 인증이 그 자리를 대신한다.
+        video = self._session.get(VideoOrm, video_id)
+        if video is None:
+            return None
+        return self._delete(video)
+
+    def _delete(self, video: VideoOrm) -> VideoEntity:
         entity = _to_entity(video, None, None)  # S3 정리에 storage_key 만 필요
         self._session.delete(video)  # FK ON DELETE CASCADE 가 자식을 정리한다
         self._session.commit()
         return entity
+
+    def sweep_provisional(self, ttl_hours: int) -> list[VideoEntity]:
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=ttl_hours)
+        # 이 영상에 아직 안 끝난 작업이 붙어 있나 — 있으면 지우지 않는다.
+        active_job = (
+            select(AnalysisJobOrm.id)
+            .where(
+                AnalysisJobOrm.video_id == VideoOrm.id,
+                AnalysisJobOrm.status.in_(("queued", "running")),
+            )
+            .exists()
+        )
+        stale = (
+            self._session.execute(
+                select(VideoOrm).where(
+                    VideoOrm.kept.is_(False),
+                    VideoOrm.created_at < cutoff,
+                    ~active_job,
+                )
+            )
+            .scalars()
+            .all()
+        )
+        if not stale:
+            return []
+        entities = [_to_entity(v, None, None) for v in stale]
+        for v in stale:
+            self._session.delete(v)  # 판정·작업 연쇄는 FK CASCADE
+        self._session.commit()
+        return entities
 
     def update_video(
         self,
@@ -202,6 +291,7 @@ def _to_entity(
         title=video.title,
         description=video.description,
         kept=video.kept,
+        original_filename=video.original_filename,
         created_at=video.created_at,
         validation=(
             None

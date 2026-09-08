@@ -12,13 +12,20 @@ from uuid import UUID
 
 from abc import ABC, abstractmethod
 
-from app.analysis.application.dtos.video_dto import UNSET
+from app.analysis.application.dtos.video_dto import UNSET, UserRef
 from app.analysis.domain.entities.video_entity import VideoEntity
 
 
 class VideoPort(ABC):
     @abstractmethod
     def sport_exists(self, sport_code: str) -> bool: ...
+
+    @abstractmethod
+    def uploader_nickname(self, user_id: UUID) -> str | None:
+        """그 사람의 현재 닉네임 — 저장 키를 사람이 알아보게 짓는 데 쓴다(미결
+        `jin` 24번). `sport_exists` 처럼 `user` 컨텍스트를 임포트하지 않고
+        `table()`/`column()` 로 `user.nickname` 만 읽는다.
+        """
 
     @abstractmethod
     def register(self, video: VideoEntity) -> None:
@@ -61,6 +68,16 @@ class VideoPort(ABC):
         """
 
     @abstractmethod
+    def mark_kept(
+        self, video_id: UUID, user_id: UUID, *, storage_key: str
+    ) -> VideoEntity | None:
+        """`kept=True` 로 놓고 `storage_key` 를 갱신한다("프로필에 저장", 미결
+        `jin` 24번). S3 이동은 부르는 쪽이 이미 했다 — 여기는 DB 만 맞춘다.
+        **`user_id` 로 소유를 확인한다** — 남의/없는 클립이면 `None`.
+        갱신된 영상을 판정·최근 작업과 함께 돌려준다.
+        """
+
+    @abstractmethod
     def delete(self, video_id: UUID, user_id: UUID) -> VideoEntity | None:
         """영상 행을 지우고 지운 영상을 돌려준다(S3 정리에 `storage_key` 가 필요).
 
@@ -70,9 +87,41 @@ class VideoPort(ABC):
         """
 
     @abstractmethod
+    def sweep_provisional(self, ttl_hours: int) -> list[VideoEntity]:
+        """저장 안 한 임시 영상 중 오래된 것을 지우고 목록으로 돌려준다(미결
+        `jin` 24번 백스톱).
+
+        조건: `kept=false` · `created_at` 이 `ttl_hours` 보다 오래됨 · **진행
+        중인 `analysis_job`(`queued`/`running`)이 없음** — 아직 분석을 기다리는
+        것을 지우면 안 된다(GPU 인스턴스가 꺼져 있으면 몇 시간 대기가 정상이다).
+        지운 영상의 `storage_key` 는 부르는 쪽이 S3 정리에 쓴다.
+        """
+
+    @abstractmethod
     def list_public(self, limit: int) -> list[VideoEntity]:
         """공개된 클립. **최근 것이 앞에 온다.** 업로더 구분 없이 훑는다.
 
         홈의 영상 모음이 쓴다. 반려 사유·분석 상태는 채우지 않는다 — 목록이
         보여주지 않는다.
+        """
+
+    @abstractmethod
+    def resolve_user(self, identifier: str) -> UserRef | None:
+        """`user.id`(UUID 문자열) 또는 이메일로 사람을 찾는다(미결 `jin` 24번
+        관리자 영상 목록). `sport_exists` 처럼 `user` 컨텍스트를 임포트하지 않고
+        `table()`/`column()` 로 `user` 의 `id`·`nickname`·`email` 만 읽는다.
+        못 찾으면 `None`.
+        """
+
+    @abstractmethod
+    def list_all_by_user(self, user_id: UUID) -> list[VideoEntity]:
+        """그 사람의 영상 **전부**. `list_by_user` 와 달리 `kept=false` 임시분도
+        담는다 — 관리자는 아직 저장 안 한 클립까지 봐야 문제 영상을 찾는다.
+        최근 것이 앞에 오고, 판정·최근 작업 상태를 함께 채운다.
+        """
+
+    @abstractmethod
+    def admin_delete(self, video_id: UUID) -> VideoEntity | None:
+        """소유 검사 없이 영상 행을 지운다(관리자 전용). 연쇄·반환값은 `delete`
+        와 같다. 없는 클립이면 `None`.
         """

@@ -5,8 +5,12 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from app.analysis.application.dtos.video_dto import (
+    AdminDeleteVideoCommand,
+    AdminVideoListResult,
+    AdminVideosQuery,
     DeleteVideoCommand,
     GetPlaybackUrlCommand,
+    KeepVideoCommand,
     MyVideosQuery,
     PlaybackUrlResult,
     PublicVideoResult,
@@ -59,3 +63,25 @@ class DeleteVideoUseCase(ABC):
     @abstractmethod
     def __call__(self, command: DeleteVideoCommand) -> None:
         """영상을 DB·S3 에서 지운다. 남의/없는 클립이면 404."""
+
+
+class KeepVideoUseCase(ABC):
+    @abstractmethod
+    def __call__(self, command: KeepVideoCommand) -> VideoResult:
+        """"프로필에 저장" — `kept` 를 켜고 임시 원본을 리포트 자리로 옮긴다.
+        남의/없는 클립이면 404. 응답은 `GET /videos` 한 줄과 같다.
+        """
+
+
+class ListAdminVideosUseCase(ABC):
+    @abstractmethod
+    def __call__(self, query: AdminVideosQuery) -> AdminVideoListResult:
+        """관리자가 한 사람(`?user=<uid|email>`)의 영상을 전부 본다. 없는
+        사람이면 `404 USER_NOT_FOUND`.
+        """
+
+
+class AdminDeleteVideoUseCase(ABC):
+    @abstractmethod
+    def __call__(self, command: AdminDeleteVideoCommand) -> None:
+        """관리자가 아무 영상이나 지운다(소유 검사 없음). 없는 클립이면 404."""
