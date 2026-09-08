@@ -1,0 +1,38 @@
+⚠ baseball/pitching: 측정 성공 표본 0편 (Track2 에 1행 있으나 전부 features_ok=0) — 재지 못했다
+
+=== baseball/batting (JHMDB 46) · status=draft ===
+  항목                                 0등급    상한초과    아래
+  lead_arm_extension                  26       1    25  🔴
+  hip_shoulder_separation             15       8     7  🔴
+  hip_rotation                        24       0    24
+  follow_through                      20      12     8  🔴
+
+=== football/instep_shot (B-6 Track2 18편) · status=active ===
+  항목                                 0등급    상한초과    아래
+  plant_knee_flexion                   6       0     6
+  swing_knee_extension                11       2     9  🔴
+  trunk_lean                           8       0     8
+  hip_rotation                         1       0     1
+  follow_through                       5       0     5
+
+=== basketball/jump_shot (B-6 Track2 1편) · status=active ===
+  항목                                 0등급    상한초과    아래
+  release_arm_extension                1       0     1
+
+=== basketball/layup (B-6 Track2 1편) · status=draft ===
+  0등급 없음
+
+==============================================================
+구조 점검 — 상한이 닫혀 있어 **샐 수 있는** 항목 (표본 무관)
+==============================================================
+  baseball_batting         status=draft  닫힘 5/5
+  baseball_pitching        status=active 닫힘 5/5
+  basketball_jump_shot     status=active 닫힘 5/5
+  basketball_layup         status=draft  닫힘 4/4
+  football_inside_pass     status=draft  닫힘 5/5
+  football_instep_shot     status=active 닫힘 6/6
+
+==============================================================
+전체 0등급 117건 중 **상한 초과 23건 (20%)**
+상한 초과는 「쟀는데 못했다」가 아니라 「구간 밖이다」인데 같은 0점이 된다.
+🔴 처방(가·나·다)은 여기서 고르지 않는다 — 임계값 검수(미결 2번)에 달려 있다.

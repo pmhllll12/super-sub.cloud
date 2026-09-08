@@ -4,9 +4,13 @@ pose quality(ViTPose)는 여기서 계산하지 않는다. 기하 신호만으�
 baseline 대비 연속성이 얼마나 개선되는지 상한을 본다.
 """
 import csv
+import sys
 from pathlib import Path
 import numpy as np
-ROOT=Path("/mnt/d/supersub-phaseA"); C=ROOT/"candidates"
+sys.path.insert(0,str(Path(__file__).resolve().parent))
+from paths import candidates_dir, default_target, external_root  # noqa: E402
+# 동작점을 이름으로 드러낸다 (미결 10·14번, 2026-09-08).
+ROOT=external_root(); C=candidates_dir(default_target())
 
 def unpack(f):
     d=np.load(f); n=d["n"]; b=d["boxes"]; out=[]; i=0

@@ -2,8 +2,13 @@
 import sys, json, csv
 from pathlib import Path
 import numpy as np
-sys.path.insert(0,"/home/ho/projects/super-sub.cloud/agent/src")
-ROOT=Path("/mnt/d/supersub-phaseA"); C=ROOT/"candidates"
+_HERE=Path(__file__).resolve().parent
+sys.path.insert(0,str(_HERE))
+sys.path.insert(0,str(_HERE.parent.parent/"src"))
+from paths import candidates_dir, default_target, external_root  # noqa: E402
+# 동작점을 이름으로 드러낸다 — `/mnt/d/candidates` 는 마지막 실행이 덮어써서
+# 무엇을 읽는지 알 수 없었다 (미결 10·14번, 2026-09-08).
+ROOT=external_root(); C=candidates_dir(default_target())
 
 def unpack(f):
     d=np.load(f); n=d["n"]; b=d["boxes"]; out=[]; i=0
