@@ -7,6 +7,8 @@ import BlankPlayerCard from '@/components/BlankPlayerCard'
 import SquadSuggest from '@/components/SquadSuggest'
 import SquadFriends from '@/components/SquadFriends'
 import MatchBot from '@/components/MatchBot'
+import { loadBoard, saveBoard } from '@/lib/squadBoard'
+import { loadFeatured } from '@/lib/featuredClip'
 
 /**
  * 홈 첫 화면의 스쿼드 판 — 판 하나 위에 선수 카드를 **포지션 자리대로**
@@ -28,24 +30,99 @@ import MatchBot from '@/components/MatchBot'
  * `nickname` · `role` 까지만 준다. 그 경로가 생기면 setMates 를 부르는 자리
  * 둘을 API 호출로 바꾸면 된다.
  *
- * 브라우저 저장은 일부러 안 넣었다 — 서버가 진짜가 되는 순간 상태가 두 곳에
- * 생겨 어느 쪽이 맞는지 헷갈린다.
+ * 🔴 **"브라우저 저장은 일부러 안 넣었다"를 2026-09-08 에 뒤집었다**(사용자
+ * 요청). 그때 이유는 "서버가 진짜가 되는 순간 상태가 두 곳에 생겨 어느 쪽이
+ * 맞는지 헷갈린다" 였는데, 그 사이 판이 **서버가 모르는 것들**을 갖게 됐다 —
+ * 판 크기 · 카드가 선 칸 · 손으로 정한 포지션. 게다가 넣기 · 빼기가 아직
+ * 서버로 안 가서, 저장이 없으면 다른 화면에 갔다 오기만 해도 판이 처음으로
+ * 돌아간다. 어디에 어떻게 남기는지는 `lib/squadBoard.ts` 한 곳에 있다.
  */
 
-/** 판 위의 자리. `area` 는 globals.css 의 grid-template-areas 이름이다. */
-type Slot = { area: string; label: string; mine?: boolean }
+/** 계약이 정한 축구 포지션 넷(3-4절). 새 코드를 만들지 않는다. */
+export type PosCode = 'FW' | 'MF' | 'DF' | 'GK'
+
+/**
+ * 🔴 **행이 포지션을 정한다**(사용자 요청, 2026-09-08) — 위가 공격이다.
+ * 카드를 옮기면 이름표가 따라 바뀐다. 그래서 3:3 을 셋 다 맨 윗줄로 올리면
+ * **전원 FW** 가 된다("올 공격").
+ */
+const ROW_POS: PosCode[] = ['FW', 'MF', 'DF', 'GK']
+
+/** 판의 격자. 열 셋 · 행 넷 — 지금 포메이션 셋이 쓰던 칸 그대로다. */
+const COLS = 3
+const ROWS = ROW_POS.length
+
+/**
+ * 판 위의 자리.
+ *
+ * 🔴 `col`·`row` 는 **격자 칸**이다. 전에는 `area`(grid-template-areas 이름)로
+ * 못박혀 있었는데, 그러면 자리가 포메이션에 갇혀 옮길 수가 없다.
+ * `pos` 가 있으면 **사람이 직접 정한 것**이고, 없으면 행이 정한다.
+ */
+type Slot = { area: string; col: number; row: number; pos?: PosCode | null; mine?: boolean }
+
+/** 이 자리의 지금 포지션 — 사람이 정한 것이 있으면 그것, 없으면 행이 정한다. */
+function posOf(slot: Slot): PosCode {
+  return slot.pos ?? ROW_POS[Math.min(slot.row, ROWS - 1)]
+}
+
+/** 판의 크기 — 3:3 · 5:5 · 7:7. 화면 글자와 같은 값이라 그대로 쓴다. */
+export type SquadSize = '3' | '5' | '7'
+
+/**
+ * 크기마다의 포메이션.
+ *
+ * 🔴 **자리 이름을 역할+번호로 둔다**(`fw1` · `mf2` · `df1` …). 크기를 바꿔도
+ * 같은 이름이 같은 자리를 가리켜야, 7인에서 넣은 사람이 5인으로 줄였다가
+ * 되돌아왔을 때 **제자리에 그대로 앉아 있다**(사용자 요청: 줄어들면 감췄다가
+ * 되돌리면 돌아온다). `ml`·`mr` 처럼 위치로 이름 지으면 3인의 MF 하나가
+ * 어느 쪽인지부터 정해야 하고, 크기가 바뀔 때마다 이름이 갈린다.
+ *
+ * 🔴 포지션 코드는 계약이 정한 축구 넷(`GK`·`DF`·`MF`·`FW`)만 쓴다 — 세 판
+ * 모두 그 안에서 된다(계약 3-4절). 새 코드를 만들지 않는다.
+ */
+export const FORMATIONS: Record<SquadSize, { label: string; slots: Slot[] }> = {
+  // 1-1-1 — 셋이면 공격 · 중원 · 골키퍼 하나씩이다.
+  '3': {
+    label: '3 : 3',
+    slots: [
+      { area: 'fw1', col: 1, row: 0, mine: true },
+      { area: 'mf1', col: 1, row: 1 },
+      { area: 'gk', col: 1, row: 3 },
+    ],
+  },
+  // 1-2-1 — 풋살 5인. 이 판이 원래 그리던 것이다.
+  '5': {
+    label: '5 : 5',
+    slots: [
+      { area: 'fw1', col: 1, row: 0, mine: true },
+      { area: 'mf1', col: 0, row: 1 },
+      { area: 'mf2', col: 2, row: 1 },
+      { area: 'df1', col: 1, row: 2 },
+      { area: 'gk', col: 1, row: 3 },
+    ],
+  },
+  // 2-3-1 — 7인제에서 가장 흔한 형태다.
+  '7': {
+    label: '7 : 7',
+    slots: [
+      { area: 'fw1', col: 1, row: 0, mine: true },
+      { area: 'mf1', col: 0, row: 1 },
+      { area: 'mf2', col: 1, row: 1 },
+      { area: 'mf3', col: 2, row: 1 },
+      { area: 'df1', col: 0, row: 2 },
+      { area: 'df2', col: 2, row: 2 },
+      { area: 'gk', col: 1, row: 3 },
+    ],
+  },
+}
+
+/** 처음 여는 크기 — 풋살 5인(사용자 요청). */
+const DEFAULT_SIZE: SquadSize = '5'
 
 // 추천 판이 닫히며 물러나는 시간 — globals.css 의 ss-suggest-out 과 같아야
 // 한다. 짧으면 애니메이션 도중에 잘리고, 길면 사라진 자리가 남는다.
 const SUGGEST_EXIT_MS = 200
-
-const SLOTS: Slot[] = [
-  { area: 'fw', label: 'FW', mine: true },
-  { area: 'ml', label: 'MF' },
-  { area: 'mr', label: 'MF' },
-  { area: 'df', label: 'DF' },
-  { area: 'gk', label: 'GK' },
-]
 
 /**
  * 서버가 준 스쿼드를 **판의 자리 이름표**로 바꾼다.
@@ -55,13 +132,13 @@ const SLOTS: Slot[] = [
  * 🔴 같은 포지션이 둘인 자리(MF)는 **먼저 온 사람부터** 채운다. 서버는 어느
  * 쪽 MF 인지까지는 모른다 — 좌 · 우는 화면만의 배치다.
  */
-function seatsFromSquad(squad: Squad | null): Record<string, string | null> {
+function seatsFromSquad(squad: Squad | null, slots: Slot[]): Record<string, string | null> {
   if (!squad) return {}
   const left = [...squad.members]
   const seats: Record<string, string | null> = {}
-  for (const slot of SLOTS) {
+  for (const slot of slots) {
     if (slot.mine) continue
-    const at = left.findIndex((m) => m.position_code === slot.label)
+    const at = left.findIndex((m) => m.position_code === posOf(slot))
     if (at >= 0) seats[slot.area] = left.splice(at, 1)[0].nickname
   }
   return seats
@@ -70,8 +147,8 @@ function seatsFromSquad(squad: Squad | null): Record<string, string | null> {
 export default function SquadPanel({
   card,
   squad = null,
-  friendSearch = false,
-  onCloseFriendSearch,
+  scouting = false,
+  onCloseScouting,
   bot = false,
   onBotChange,
 }: {
@@ -83,9 +160,16 @@ export default function SquadPanel({
    * 그린다.
    */
   squad?: Squad | null
-  /** 알약 '지인 찾기' 가 골라져 있는가 — 켜지면 판 옆에 지인 찾기가 열린다. */
-  friendSearch?: boolean
-  onCloseFriendSearch?: () => void
+  /**
+   * 알약 '용병 찾기' 를 눌렀는가 — 켜지면 판 오른쪽에 **AI 추천 판과 지인
+   * 찾기 판이 나란히** 열린다.
+   *
+   * 🔴 예전에는 '지인 찾기' 알약이 지인 판만 열었다. 두 일이 결국 **같은
+   * 빈 자리를 채우는 한 가지 일**이라 단추를 하나로 합쳤다(사용자 요청,
+   * 2026-09-08) — 그래서 판도 짝으로 여닫는다.
+   */
+  scouting?: boolean
+  onCloseScouting?: () => void
   /**
    * AI 챗봇이 열려 있는가 — 켜지면 **지인 찾기와 같은 자리**에서 나온다.
    *
@@ -96,12 +180,97 @@ export default function SquadPanel({
   bot?: boolean
   onBotChange?: (next: boolean) => void
 }) {
+  /**
+   * 🔴 **판 오른쪽은 이제 칸이 둘이다**(2026-09-08).
+   *
+   *   첫째 칸 — AI 추천 판 · 챗봇 (`.ss-suggest`)
+   *   둘째 칸 — 지인 찾기 판 (`.ss-friends`)
+   *
+   * 전에는 셋이 **한 좌표**에 서서 "한 번에 하나만" 이 규칙이었다(여는 쪽이
+   * 다른 것을 닫았다). 용병 찾기 하나가 추천과 지인을 **같이** 열어야 해서
+   * 칸을 갈랐다 — 첫째 칸은 여전히 한 번에 하나다(챗봇이 켜지면 추천이 닫힌다).
+   * 좌표는 globals.css 의 `--ss-side-panel-w` 가 정한다.
+   */
   /* 🔴 서버가 준 것을 **첫 값으로만** 읽는다. 그 뒤로는 이 화면이 들고 있다 —
      넣기 · 빼기가 아직 서버로 안 가므로(위 주석), 매번 서버 값으로 되돌리면
      방금 넣은 사람이 사라진다. */
+  /**
+   * 판의 크기(3:3 · 5:5 · 7:7) — 머리글의 단추가 바꾼다(사용자 요청,
+   * 2026-09-08). 전에는 「풋살 5인」이라고 적어 두기만 했다.
+   */
+  const [size, setSize] = useState<SquadSize>(DEFAULT_SIZE)
+  /**
+   * 🔴 자리는 **상태**다 — 옮길 수 있어야 해서다(사용자 요청, 2026-09-08).
+   * 포메이션(FORMATIONS)은 이제 「고정된 자리」가 아니라 **처음 놓이는 자리**다.
+   */
+  const [slots, setSlots] = useState<Slot[]>(() => FORMATIONS[DEFAULT_SIZE].slots)
+
+  /**
+   * 크기를 바꾸면 그 포메이션의 처음 자리로 놓는다.
+   *
+   * 🔴 **사람이 직접 정한 포지션(`pos`)은 들고 간다** — 같은 자리 이름이면
+   * 그대로 옮겨 준다. 크기를 잘못 눌렀다가 되돌렸을 때 손으로 고친 것이
+   * 사라지면 안 된다(앉은 사람을 안 지우는 것과 같은 이유).
+   */
+  function changeSize(next: SquadSize) {
+    setSize(next)
+    setSlots((now) => {
+      const kept = new Map(now.map((sl) => [sl.area, sl.pos ?? null]))
+      return FORMATIONS[next].slots.map((sl) => ({ ...sl, pos: kept.get(sl.area) ?? null }))
+    })
+    setMoving(null)
+  }
+
+  /* 🔴 앉은 사람은 **크기가 줄어도 안 지운다**(사용자 요청). 자리 이름이
+     역할+번호라(FORMATIONS 주석) 없어진 자리는 그리지 않을 뿐이고, 다시
+     키우면 그대로 앉아 있다 — 실수로 눌렀을 때 잃는 것이 없다. */
   const [mates, setMates] = useState<Record<string, string | null>>(() =>
-    seatsFromSquad(squad),
+    seatsFromSquad(squad, FORMATIONS[DEFAULT_SIZE].slots),
   )
+
+  /**
+   * 🔴 **그릴 때 저장소를 읽지 않는다.** 서버엔 없는 값이라 첫 그림이 서버와
+   * 달라져 하이드레이션이 깨진다(공개 목록 · 카드 꾸미기에서 이미 데인 자리).
+   * 그려진 다음에 한 번 읽어 얹는다.
+   */
+  /* 🔴 **ref 가 아니라 state 다.** ref 로 두면 되살리기와 저장이 **같은
+     렌더**에서 돌아, 저장이 아직 기본값인 판을 먼저 써 버리고 StrictMode 의
+     두 번째 실행이 그 덮어쓴 값을 읽는다 — 실제로 그래서 다른 화면에 갔다
+     오면 늘 5:5 로 돌아갔다(실측). state 면 되살린 값이 **화면에 반영된
+     다음 렌더**에서야 저장이 열린다. */
+  /**
+   * 내가 고른 대표 영상 — 추천 판이 목록에 나를 그릴 때 이 장면을 튼다.
+   * 🔴 그릴 때 읽지 않는다(하이드레이션).
+   */
+  const [myClip, setMyClip] = useState<string | null>(null)
+  useEffect(() => setMyClip(loadFeatured()?.src ?? null), [])
+
+  const [restored, setRestored] = useState(false)
+  useEffect(() => {
+    const saved = loadBoard()
+    setRestored(true)
+    if (!saved) return
+    if (saved.size in FORMATIONS) setSize(saved.size as SquadSize)
+    // 🔴 저장본이 이긴다 — 넣기 · 빼기가 아직 서버로 안 가므로 여기 있는
+    //    것이 더 최신이다. 서버로 가게 되면 이 줄부터 다시 봐야 한다.
+    setSlots(
+      saved.slots.map((sl) => ({
+        area: sl.area,
+        col: sl.col,
+        row: sl.row,
+        pos: (sl.pos as PosCode | null) ?? null,
+        mine: sl.mine,
+      })),
+    )
+    setMates(saved.mates)
+  }, [])
+
+  /* 바뀔 때마다 남긴다. 🔴 **되살리기 전에는 쓰지 않는다** — 처음 그린 값이
+     저장본을 덮어써서, 새로고침하면 늘 기본 판으로 돌아간다. */
+  useEffect(() => {
+    if (!restored) return
+    saveBoard({ size, slots: slots.map((sl) => ({ ...sl, pos: sl.pos ?? null })), mates })
+  }, [restored, size, slots, mates])
   /**
    * 지인 찾기에서 골라 둔 사람. 정해져 있으면 **빈 자리 버튼의 뜻이 바뀐다**
    * — 원래는 "AI 추천 열기"지만 이때는 "여기 넣기"다. 자리를 여기서 안 고르고
@@ -110,6 +279,76 @@ export default function SquadPanel({
   const [placing, setPlacing] = useState<string | null>(null)
   // 지인 찾기 판이 DOM 에 있는가 — 닫힐 때 물러나는 동안 남아 있어야 한다.
   const [friendVisible, setFriendVisible] = useState(false)
+  /**
+   * 지금 끌고 있는 자리와 손가락이 움직인 거리.
+   *
+   * 🔴 **끄는 것만 옮기는 손짓이다**(누르기가 아니다). 카드를 누르는 뜻은
+   * 그대로 둔다 — 빈 카드는 추천 열기, 앉은 카드는 빼기. 누르기를 옮기기로
+   * 바꾸면 그 둘이 갈 데가 없어지고, 카드가 이미 `<button>` 이라 그 안에
+   * 또 버튼을 둘 수도 없다.
+   */
+  const [moving, setMoving] = useState<{ area: string; dx: number; dy: number } | null>(null)
+  /** 끄는 동안 눌린 것으로 치지 않는다 — 놓는 순간 click 이 뒤따라 온다. */
+  const draggedRef = useRef(false)
+  const dragFromRef = useRef<{ x: number; y: number } | null>(null)
+  const boardRef = useRef<HTMLDivElement>(null)
+
+  /** 손가락이 이만큼 움직여야 "끈 것"으로 본다. 손떨림을 누르기로 살린다. */
+  const DRAG_MIN = 6
+
+  /**
+   * 화면 좌표에서 가장 가까운 격자 칸을 찾는다.
+   *
+   * 🔴 `elementFromPoint` 를 쓰지 않는다 — 끌고 있는 카드가 손가락 밑에 있어서
+   * 늘 자기 자신이 잡힌다. 칸의 중심과의 거리로 고른다.
+   */
+  function cellAt(x: number, y: number): { col: number; row: number } | null {
+    const board = boardRef.current
+    if (!board) return null
+    const cells = [...board.querySelectorAll('.ss-squad-cell')] as HTMLElement[]
+    if (!cells.length) return null
+    let best: { col: number; row: number } | null = null
+    let bestD = Infinity
+    for (const el of cells) {
+      const c = el.getBoundingClientRect()
+      const d = (c.left + c.width / 2 - x) ** 2 + (c.top + c.height / 2 - y) ** 2
+      if (d < bestD) {
+        bestD = d
+        best = { col: Number(el.dataset.col), row: Number(el.dataset.row) }
+      }
+    }
+    return best
+  }
+
+  /**
+   * 자리를 옮긴다. 그 칸에 다른 자리가 있으면 **서로 바꾼다** — 밀어내면
+   * 밀린 쪽이 어디로 갈지 정할 규칙이 또 필요하고, 바꾸는 편이 짐작대로다.
+   */
+  function moveTo(area: string, col: number, row: number) {
+    setSlots((now) => {
+      const me = now.find((sl) => sl.area === area)
+      if (!me || (me.col === col && me.row === row)) return now
+      const other = now.find((sl) => sl.col === col && sl.row === row)
+      return now.map((sl) => {
+        if (sl.area === area) return { ...sl, col, row }
+        if (other && sl.area === other.area) return { ...sl, col: me.col, row: me.row }
+        return sl
+      })
+    })
+  }
+
+  /** 이름표를 눌러 포지션을 직접 정한다 — 한 번에 한 칸씩 돈다(자동 포함). */
+  function cyclePos(area: string) {
+    setSlots((now) =>
+      now.map((sl) => {
+        if (sl.area !== area) return sl
+        const order: (PosCode | null)[] = [...ROW_POS, null]
+        const at = order.indexOf(sl.pos ?? null)
+        return { ...sl, pos: order[(at + 1) % order.length] }
+      }),
+    )
+  }
+
   // 지금 추천을 열어 둔 자리. null 이면 닫혀 있다.
   const [picking, setPicking] = useState<Slot | null>(null)
   // 닫히는 중인 자리 — 물러나는 동안 DOM 에 남겨 둬야 애니메이션이 보인다.
@@ -125,7 +364,7 @@ export default function SquadPanel({
   // 지인 찾기가 켜지면 바로 띄우고, 꺼지면 물러나는 시간만큼 남겨 둔다.
   // 고르던 사람도 같이 지운다 — 판이 없는데 자리만 깜빡이면 안 된다.
   useEffect(() => {
-    if (friendSearch) {
+    if (scouting) {
       clearTimeout(friendTimer.current)
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setFriendVisible(true)
@@ -135,13 +374,76 @@ export default function SquadPanel({
     setPlacing(null)
     friendTimer.current = window.setTimeout(() => setFriendVisible(false), SUGGEST_EXIT_MS)
     return () => clearTimeout(friendTimer.current)
-  }, [friendSearch])
+  }, [scouting])
+
+  /**
+   * 용병 찾기로 열 때 **어느 자리의 추천**을 낼 것인가 — 빈 자리 중 첫
+   * 번째다(FW → MF → MF → DF → GK). 이 순서는 판 위에서 위에서 아래로
+   * 읽히는 순서라, "지금 가장 급한 자리"로 그대로 읽힌다.
+   * 다 찼으면 마지막 자리를 낸다 — 판이 안 열리는 것보다 낫다(빼고 나서
+   * 다시 누를 필요가 없다).
+   */
+  const firstEmpty =
+    slots.find((slot) => !slot.mine && !mates[slot.area]) ?? slots[slots.length - 1]
+
+  /* 알약이 켜지면 추천 판도 같이 연다. 🔴 **자리를 여기서 다시 고르지
+     않는다** — 빈 자리를 직접 눌러 연 뒤(picking 이 이미 있다) 알약 상태가
+     바뀌었다고 그 자리를 첫 빈 자리로 되돌리면, 방금 고른 자리가 사라진다. */
+  useEffect(() => {
+    clearTimeout(timer.current)
+    if (scouting) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setClosing(null)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPicking((now) => now ?? firstEmpty)
+      return
+    }
+    // 꺼지면 추천 판도 같이 접는다 — 한 단추가 연 한 벌이다.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPicking((now) => {
+      if (now) {
+        setClosing(now)
+        timer.current = window.setTimeout(() => setClosing(null), SUGGEST_EXIT_MS)
+      }
+      return null
+    })
+    // firstEmpty 는 자리가 채워질 때마다 새 값이 된다 — 넣을 때마다 판이
+    // 다시 열리면 안 되므로 켜고 끄는 순간만 본다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scouting])
+
+  /**
+   * 🔴 **챗봇이 켜지면 추천 판을 닫는다** — 둘은 **첫째 칸**을 나눠 쓴다.
+   *
+   * ⚠️ 빈 자리를 눌러 연 추천은 `scouting` 이 아니라 이 판이 제 상태
+   * (`picking`)로 들고 있다. 그래서 알약으로 연 경우만 닫히고, **빈 자리로
+   * 연 경우에는 AI 판이 그 뒤에 나왔다**(사용자 지적) — 같은 좌표라 z 로는
+   * 가려질 뿐이다. 여는 쪽이 닫는다는 규칙을 이 길에도 건다.
+   *
+   * 빈 자리 누르기 쪽에도 `onBotChange?.(false)` 가 있어 **양쪽이 서로를
+   * 닫는다** — 어느 쪽을 먼저 눌러도 첫째 칸에는 하나만 선다.
+   */
+  useEffect(() => {
+    if (!bot) return
+    clearTimeout(timer.current)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPicking((now) => {
+      if (now) {
+        setClosing(now)
+        timer.current = window.setTimeout(() => setClosing(null), SUGGEST_EXIT_MS)
+      }
+      return null
+    })
+  }, [bot])
 
   function close() {
     setClosing(picking)
     setPicking(null)
     clearTimeout(timer.current)
     timer.current = window.setTimeout(() => setClosing(null), SUGGEST_EXIT_MS)
+    // 🔴 알약으로 연 한 벌이면 **둘 다** 접는다. 추천만 닫고 지인 판을
+    // 남기면, 알약은 아직 켜진 것으로 남아 다시 눌러도 안 열린다.
+    onCloseScouting?.()
   }
 
   // 열려 있는 동안 Esc 로 닫는다 — 바깥을 누르는 것과 같은 자리에 둔다.
@@ -160,15 +462,16 @@ export default function SquadPanel({
    * 넣을 수 있다.
    */
   const placed = Object.fromEntries(
-    SLOTS.flatMap((slot) => {
+    slots.flatMap((slot) => {
       const name = mates[slot.area]
-      return name ? [[name, slot.label] as const] : []
+      return name ? [[name, posOf(slot)] as const] : []
     }),
   )
 
-  // 🔴 두 판(추천 · 지인)은 **같은 자리**에 뜬다 — 동시에 열면 겹친다.
-  // 지인 찾기가 열려 있는 동안에는 추천을 그리지 않는다.
-  const shown = friendSearch ? null : (picking ?? closing)
+  /* 🔴 전에는 두 판이 **같은 자리**라 지인 찾기가 열려 있는 동안 추천을
+     아예 안 그렸다. 이제 칸이 둘이라(위 주석) 같이 뜬다 — 그 막음을 걷어냈다.
+     첫째 칸을 챗봇과 나눠 쓰는 것은 그대로다(챗봇을 켜면 추천이 닫힌다). */
+  const shown = picking ?? closing
 
   return (
     /* 🔴 추천 판은 스쿼드 판의 **형제**다. 스쿼드 판이 overflow: hidden
@@ -224,13 +527,38 @@ export default function SquadPanel({
       >
       {/* 반짝임의 **시계**가 여기 하나 있다 — 자리마다 걸면 위상이 어긋난다
           (globals.css 의 --ss-beckon-t 주석 참고). */}
-      <div className="ss-squad-board" data-placing={placing ? 'true' : undefined}>
+      {/* 🔴 배치는 CSS 가 `data-size` 로 고른다 — grid-template-areas 를 인라인
+          으로 주면 자리 이름이 두 곳(여기와 globals.css)에 살게 된다. */}
+      <div
+        ref={boardRef}
+        className="ss-squad-board"
+        data-size={size}
+        data-moving={moving ? 'true' : undefined}
+        data-placing={placing ? 'true' : undefined}
+      >
         {/* 머리글이 경기장 선 **안쪽**에 앉아야 한다 — 판 위쪽에 따로
             두면 선 밖으로 나간다. 선을 그리는 상자 안에 넣고 위 여백을
             그만큼 준다(globals.css). */}
         <header className="ss-squad-head">
           <h2>MY SQUAD</h2>
-          <p>풋살 5인</p>
+          {/* 🔴 「풋살 5인」이라고 **적어 두기만** 하던 자리다 — 이제 고를 수
+              있다(사용자 요청, 2026-09-08). 판의 배치가 같이 바뀐다.
+              라디오처럼 하나만 골라진다 — 판이 동시에 두 크기일 수는 없다. */}
+          <div className="ss-squad-size" role="radiogroup" aria-label="판 크기">
+            {(Object.keys(FORMATIONS) as SquadSize[]).map((key) => (
+              <button
+                key={key}
+                type="button"
+                role="radio"
+                aria-checked={size === key}
+                className="ss-squad-size-btn"
+                data-on={size === key ? 'true' : undefined}
+                onClick={() => changeSize(key)}
+              >
+                {FORMATIONS[key].label}
+              </button>
+            ))}
+          </div>
         </header>
 
         {/* 경기장 선 — 장식이라 스크린리더에서 숨긴다. preserveAspectRatio
@@ -254,10 +582,111 @@ export default function SquadPanel({
           <rect x="38" y="130" width="24" height="9" />
         </svg>
 
-        {SLOTS.map((slot) => {
-          const name = mates[slot.area] ?? null
+        {/* 🔴 **격자 칸**. 늘 열두 개를 그려 둔다 — 카드를 끌 때 어디에 놓을
+            수 있는지 보여 주는 자리이자, 놓을 때 가장 가까운 칸을 찾는 기준이다
+            (`cellAt`). 끌지 않는 동안에는 아무것도 안 그리고 손짓도 안 받는다. */}
+        {Array.from({ length: ROWS * COLS }, (_, i) => {
+          const col = i % COLS
+          const row = Math.floor(i / COLS)
+          const taken = slots.some((sl) => sl.col === col && sl.row === row)
           return (
-            <div key={slot.area} className="ss-squad-seat" style={{ gridArea: slot.area }}>
+            <span
+              key={`cell-${i}`}
+              className="ss-squad-cell"
+              data-col={col}
+              data-row={row}
+              data-free={!taken ? 'true' : undefined}
+              aria-hidden="true"
+              style={{ gridColumn: col + 1, gridRow: row + 1 }}
+            />
+          )
+        })}
+
+        {slots.map((slot) => {
+          const name = mates[slot.area] ?? null
+          const held = moving?.area === slot.area
+          return (
+            <div
+              key={slot.area}
+              className="ss-squad-seat"
+              data-held={held ? 'true' : undefined}
+              style={{
+                gridColumn: slot.col + 1,
+                gridRow: slot.row + 1,
+                ...(held
+                  ? ({
+                      transform: `translate(${moving.dx}px, ${moving.dy}px)`,
+                    } as React.CSSProperties)
+                  : null),
+              }}
+              /* 🔴 **끄는 것이 옮기는 손짓이다.** 누르는 뜻(빈 카드=추천 열기 ·
+                 앉은 카드=빼기)은 그대로 둔다. 손가락이 DRAG_MIN 만큼 움직여야
+                 끈 것으로 보고, 그 경우에만 뒤따라오는 click 을 삼킨다. */
+              onPointerDown={(e) => {
+                if (e.button !== 0) return
+                dragFromRef.current = { x: e.clientX, y: e.clientY }
+                draggedRef.current = false
+              }}
+              onPointerMove={(e) => {
+                const from = dragFromRef.current
+                if (!from) return
+                const dx = e.clientX - from.x
+                const dy = e.clientY - from.y
+                if (!draggedRef.current && Math.hypot(dx, dy) < DRAG_MIN) return
+                /* 🔴 포인터를 **여기서** 잡는다 — 누르는 순간이 아니다.
+                   누를 때 잡으면 `pointerup` 이 이 상자로 재지정되고, 그러면
+                   click 의 과녁이 안쪽 `<button>` 이 아니라 이 상자가 되어
+                   **빼기(⊗)도 추천 열기(+)도 통째로 안 눌린다**(사용자 지적).
+                   ⚠️ jsdom 은 잡기를 시늉만 하므로 이 결함을 못 잡는다 —
+                   시험이 통과했는데도 실물에서 안 눌렸다. */
+                if (!draggedRef.current) {
+                  draggedRef.current = true
+                  e.currentTarget.setPointerCapture(e.pointerId)
+                }
+                setMoving({ area: slot.area, dx, dy })
+              }}
+              onPointerUp={(e) => {
+                dragFromRef.current = null
+                if (!draggedRef.current) return
+                if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+                  e.currentTarget.releasePointerCapture(e.pointerId)
+                }
+                const cell = cellAt(e.clientX, e.clientY)
+                if (cell) moveTo(slot.area, cell.col, cell.row)
+                setMoving(null)
+              }}
+              onPointerCancel={() => {
+                dragFromRef.current = null
+                draggedRef.current = false
+                setMoving(null)
+              }}
+              /* 🔴 끌 수 없는 입력 장치의 길 — 카드에 초점을 두고 방향키로
+                 옮긴다. `preventDefault` 를 해야 화면이 같이 굴러가지 않는다. */
+              onKeyDown={(e) => {
+                const step: Record<string, [number, number]> = {
+                  ArrowLeft: [-1, 0],
+                  ArrowRight: [1, 0],
+                  ArrowUp: [0, -1],
+                  ArrowDown: [0, 1],
+                }
+                const d = step[e.key]
+                if (!d) return
+                e.preventDefault()
+                moveTo(
+                  slot.area,
+                  Math.min(COLS - 1, Math.max(0, slot.col + d[0])),
+                  Math.min(ROWS - 1, Math.max(0, slot.row + d[1])),
+                )
+              }}
+              /* 끈 뒤에 오는 click 하나를 삼킨다 — 놓자마자 추천이 열리거나
+                 그 사람이 빠지면 안 된다. */
+              onClickCapture={(e) => {
+                if (!draggedRef.current) return
+                e.stopPropagation()
+                e.preventDefault()
+                draggedRef.current = false
+              }}
+            >
               {slot.mine ? (
                 <div className="ss-pcard-mini">
                   {card ? (
@@ -284,8 +713,8 @@ export default function SquadPanel({
                     name
                       ? `${name} 빼기`
                       : placing
-                        ? `${slot.label} 자리에 ${placing} 넣기`
-                        : `${slot.label} 자리에 선수 넣기`
+                        ? `${posOf(slot)} 자리에 ${placing} 넣기`
+                        : `${posOf(slot)} 자리에 선수 넣기`
                   }
                   aria-expanded={
                     name || placing ? undefined : picking?.area === slot.area
@@ -330,7 +759,25 @@ export default function SquadPanel({
                   )}
                 </button>
               )}
-              <span className="ss-squad-pos">{slot.label}</span>
+              {/* 🔴 **이름표를 눌러 포지션을 직접 정한다**(사용자 요청).
+                  기본은 행이 정하고(위=FW · 가운데=MF · 아래=DF · 골문앞=GK),
+                  누르면 넷을 돌다가 「자동」으로 돌아온다. 「자동」이면 옮길
+                  때마다 다시 행이 정한다.
+                  ⚠️ 손으로 정해 둔 것은 `data-set` 으로 드러낸다 — 안 그러면
+                  왜 옮겼는데 이름표가 안 바뀌는지 알 수 없다. */}
+              <button
+                type="button"
+                className="ss-squad-pos"
+                data-set={slot.pos ? 'true' : undefined}
+                aria-label={
+                  slot.pos
+                    ? `포지션 ${slot.pos} — 직접 정한 값입니다. 눌러서 바꿉니다`
+                    : `포지션 ${posOf(slot)} — 자리를 따릅니다. 눌러서 바꿉니다`
+                }
+                onClick={() => cyclePos(slot.area)}
+              >
+                {posOf(slot)}
+              </button>
             </div>
           )
         })}
@@ -338,14 +785,15 @@ export default function SquadPanel({
 
       </section>
 
-      {/* 지인 찾기 판 — 추천 판과 **같은 자리**에 같은 방식으로 나온다. */}
+      {/* 지인 찾기 판 — 추천 판 **바로 오른쪽**(둘째 칸)에 같은 방식으로
+          나온다. 자리는 globals.css 의 `.ss-friends` 가 정한다. */}
       {friendVisible && (
         <SquadFriends
           placing={placing}
           placed={placed}
-          closing={!friendSearch}
+          closing={!scouting}
           onChoose={setPlacing}
-          onClose={() => onCloseFriendSearch?.()}
+          onClose={() => onCloseScouting?.()}
         />
       )}
 
@@ -364,16 +812,16 @@ export default function SquadPanel({
         AI
       </button>
 
-      {/* AI 챗봇 — 지인 찾기 · 추천 판과 **같은 자리**다(사용자 요청).
-          ⚠️ 셋이 한 자리를 쓰므로 겹칠 수 있다. 지금은 여는 길이 서로 달라
-          (알약 · AI 단추 · 빈 자리 누르기) 실제로 겹치는 일은 없지만, 새로
-          여는 길을 붙일 때는 이 자리를 이미 누가 쓰고 있는지 봐야 한다. */}
+      {/* AI 챗봇 — 추천 판과 **같은 첫째 칸**이다(사용자 요청). 여는 쪽이
+          상대를 닫는다(`onBotChange` · 빈 자리 누르기). 둘째 칸의 지인 판과는
+          자리가 갈렸으므로 겹치지 않는다. */}
       {bot && <MatchBot open onClose={() => onBotChange?.(false)} />}
 
       {/* 추천 판 — 스쿼드 판 오른쪽에서 미끄러져 나온다. */}
       {shown && (
         <SquadSuggest
-          position={shown.label}
+          position={posOf(shown)}
+          me={card ? { nickname: card.user.nickname, clip: myClip } : null}
           closing={picking === null}
           onClose={close}
           onPick={(name) => {
