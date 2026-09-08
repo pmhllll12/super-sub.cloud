@@ -241,7 +241,7 @@ def run_pipeline(
     expected = [c.id for c in rubric.applicable_criteria(features)]
     judgments = get_judge().judge_all(rubric, features)
     # 기대 목록을 넘겨, 도구 미검출로 빠진 것과 판정이 실패해 빠진 것을 구분한다.
-    result = aggregate(judgments, rubric, expected_ids=expected)
+    result = aggregate(judgments, rubric, expected_ids=expected, features=features)
     judge_s = time.time() - t0
 
     by_id = {c.id: c for c in rubric.criteria}

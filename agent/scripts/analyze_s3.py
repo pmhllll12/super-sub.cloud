@@ -195,7 +195,7 @@ def analyze_one(video: str, args, rubric, subject) -> None:
         t0 = time.time()
         try:
             judgments = judge.judge_all(rubric, features)
-            result = aggregate(judgments, rubric)
+            result = aggregate(judgments, rubric, features=features)
         finally:
             judge.unload()
         judge_s = time.time() - t0
