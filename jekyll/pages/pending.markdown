@@ -4915,6 +4915,10 @@ jin 21(공개 사이트 인프라 식별자 스크럽)에서 `jekyll/`·`_posts/
   best-effort. `PROVISIONAL_VIDEO_TTL_HOURS=24`.
 - ⬜ **5조각** — 🔴 전환 `kept = not analyze`. **백성검 프론트가 `keep` 부를
   준비되면.** 그전에 켜면 `/analysis` 업로드가 프로필에서 사라진다.
+  - 백성검 쪽 진행(`32cd644`): 재생 주소·`DELETE /videos/{id}`·**저장 없이 이탈 시
+    삭제**(`fetch(keepalive)`+`pagehide`)는 붙었다. 남은 건 「저장」 버튼을
+    `POST /videos/{id}/keep` 에 연결하는 것뿐 — 그게 **2조각(`bf7f03b`)으로
+    준비됐고 배포만 남았다.** 배포 → 백성검 연결 → 5조각 스위치 순서.
 - ✅ **6조각** — `f6e3cc8`(6a): 저장 키 슬러그(`build_storage_key`, 닉네임·원본이름
   한글·자모 보존) · `video.original_filename` 컬럼(`2598dc30f0cb`) ·
   `POST /videos/upload-url` 에 `filename` 필수. `a8d72f9`: billing 과 head 충돌
