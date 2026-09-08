@@ -6,6 +6,12 @@ vendor
 .env
 .env.local
 
+# 🔴 워커 자격 증명. 예시(worker.env.example)만 저장소에 두고 실값은 넣지 않는다.
+# 이 저장소는 공개다 — 한 번 올라가면 히스토리에서 회수가 안 된다.
+worker.env
+*/worker.env
+**/worker.env
+
 # agent/ — Python 구현체
 agent/.venv/
 agent/data/
