@@ -78,3 +78,38 @@ if (typeof HTMLCanvasElement !== 'undefined') {
     configurable: true,
   })
 }
+
+/**
+ * 🔴 jsdom 은 포인터 잡기(`setPointerCapture`)를 **안 만들어 준다.** 카드를
+ * 끌어 옮기는 손짓이 그것을 쓰는데(잡아 두지 않으면 카드 밖으로 손가락이
+ * 나가는 순간 `pointermove` 가 끊긴다), 없으면 시험에서만 TypeError 가 난다.
+ *
+ * 실제 브라우저에는 있으므로 시험만 다른 세상이 되지 않도록 세운다 —
+ * `localStorage` · `play()` · canvas 와 같은 이유 · 같은 방식이다.
+ * 잡는 시늉만 한다: 시험이 재는 것은 "끌면 옮겨지는가"이지 잡기 자체가 아니다.
+ */
+for (const name of ['setPointerCapture', 'releasePointerCapture', 'hasPointerCapture'] as const) {
+  if (typeof Element !== 'undefined' && !(name in Element.prototype)) {
+    Object.defineProperty(Element.prototype, name, {
+      value: () => (name === 'hasPointerCapture' ? false : undefined),
+      writable: true,
+      configurable: true,
+    })
+  }
+}
+
+/**
+ * 🔴 **시험 사이에 브라우저 저장소를 비운다.** 저장소는 파일 하나 안에서
+ * 시험을 넘어 살아남아서, 앞 시험이 남긴 값이 뒤 시험의 첫 화면을 바꾼다 —
+ * 스쿼드 판 저장을 붙이자마자 같은 파일의 시험 열두 개가 한꺼번에 깨졌다.
+ *
+ * 값을 미리 심어야 하는 시험은 **시험 본문에서** 심으면 된다(이 정리가 먼저
+ * 돈다). 지우는 것이 기본이어야 시험이 서로에게 기대지 않는다.
+ */
+beforeEach(() => {
+  try {
+    globalThis.localStorage?.clear()
+  } catch {
+    // 저장소가 없는 환경이면 비울 것도 없다.
+  }
+})

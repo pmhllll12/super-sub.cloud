@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { PlayerCard, Squad } from '@/server/backend'
 import SquadPanel from './SquadPanel'
@@ -190,6 +190,179 @@ describe('스쿼드 — 판 크기 3:3 · 5:5 · 7:7', () => {
         expect(['GK', 'DF', 'MF', 'FW']).toContain(el.textContent)
       }
     }
+  })
+})
+
+describe('스쿼드 — 판 위에서 자유롭게 옮긴다', () => {
+  /** 그 자리의 지금 이름표. */
+  const posOf = (name: string) =>
+    screen
+      .getByRole('button', { name: new RegExp(name) })
+      .closest('.ss-squad-seat')!
+      .querySelector('.ss-squad-pos')!.textContent
+
+  /** 격자 칸을 실제 좌표로 세운다 — jsdom 은 크기를 안 재 준다. */
+  function layout() {
+    for (const el of document.querySelectorAll<HTMLElement>('.ss-squad-cell')) {
+      const col = Number(el.dataset.col)
+      const row = Number(el.dataset.row)
+      el.getBoundingClientRect = () =>
+        ({ left: col * 100, top: row * 150, width: 100, height: 150 }) as DOMRect
+    }
+  }
+
+  /** 카드를 끌어 그 칸에 놓는다. */
+  async function drag(seat: HTMLElement, col: number, row: number) {
+    layout()
+    const to = { clientX: col * 100 + 50, clientY: row * 150 + 75 }
+    fireEvent.pointerDown(seat, { button: 0, clientX: 0, clientY: 0, pointerId: 1 })
+    fireEvent.pointerMove(seat, { clientX: 40, clientY: 40, pointerId: 1 })
+    fireEvent.pointerUp(seat, { ...to, pointerId: 1 })
+  }
+
+  const seatOf = (name: string) =>
+    screen.getByRole('button', { name: new RegExp(name) }).closest('.ss-squad-seat') as HTMLElement
+
+  // 🔴 행이 포지션을 정한다 — 위가 공격이다.
+  it('위로 옮기면 이름표가 FW 로 바뀐다', async () => {
+    render(<SquadPanel card={CARD} squad={SQUAD} />)
+    // 서버가 준 김철수는 MF 자리(행 1)에 앉는다.
+    expect(posOf('김철수')).toBe('MF')
+
+    await drag(seatOf('김철수'), 0, 0)
+    expect(posOf('김철수')).toBe('FW')
+  })
+
+  /* 🔴 이게 이 기능의 요점이다(사용자 요청) — 3:3 이 골키퍼 1 · 수비 1 ·
+     공격 1 로 못박혀 있지 않고 「올 공격」이 될 수 있어야 한다. */
+  it('셋을 다 윗줄로 올리면 전원 FW 가 된다', async () => {
+    const user = userEvent.setup()
+    render(<SquadPanel card={CARD} />)
+    await user.click(screen.getByRole('radio', { name: '3 : 3' }))
+
+    for (const [i, seat] of [...document.querySelectorAll('.ss-squad-seat')].entries()) {
+      await drag(seat as HTMLElement, i, 0)
+    }
+    for (const el of document.querySelectorAll('.ss-squad-pos')) {
+      expect(el.textContent).toBe('FW')
+    }
+  })
+
+  // 사람이 있는 칸에 놓으면 밀어내지 않고 서로 바꾼다.
+  it('찬 칸에 놓으면 자리를 맞바꾼다', async () => {
+    render(<SquadPanel card={CARD} squad={SQUAD} />)
+    // 김철수는 MF(행 1), 이영희는 GK(행 3)다.
+    expect(posOf('김철수')).toBe('MF')
+    expect(posOf('이영희')).toBe('GK')
+
+    const gk = seatOf('이영희')
+    const gkCol = Number(
+      [...document.querySelectorAll<HTMLElement>('.ss-squad-cell')].find(
+        (c) => c.dataset.row === '3',
+      )!.dataset.col,
+    )
+    await drag(seatOf('김철수'), gkCol, 3)
+    expect(posOf('김철수')).toBe('GK')
+    expect(gk).toBeInTheDocument()
+  })
+
+  // 끌 수 없는 입력 장치의 길 — 방향키로도 옮긴다.
+  it('방향키로도 옮긴다', () => {
+    render(<SquadPanel card={CARD} squad={SQUAD} />)
+    expect(posOf('김철수')).toBe('MF')
+    fireEvent.keyDown(seatOf('김철수'), { key: 'ArrowUp' })
+    expect(posOf('김철수')).toBe('FW')
+    // 판 밖으로는 못 나간다 — 한 번 더 눌러도 그대로다.
+    fireEvent.keyDown(seatOf('김철수'), { key: 'ArrowUp' })
+    expect(posOf('김철수')).toBe('FW')
+  })
+
+  /* 🔴 끄는 것과 누르는 것을 갈라 둔다 — 놓자마자 그 사람이 빠지면 안 된다.
+     (앉은 카드를 누르는 것은 여전히 「빼기」다) */
+  it('끌어 놓은 뒤에 따라오는 누르기는 삼킨다', async () => {
+    render(<SquadPanel card={CARD} squad={SQUAD} />)
+    const seat = seatOf('김철수')
+    await drag(seat, 0, 0)
+    fireEvent.click(seat.querySelector('button')!)
+    expect(screen.getByRole('button', { name: /김철수/ })).toBeInTheDocument()
+  })
+
+  // 사용자가 정한 포지션은 옮겨도 안 바뀐다(사용자 요청).
+  it('이름표를 누르면 직접 정하고, 그 뒤로는 옮겨도 안 바뀐다', async () => {
+    const user = userEvent.setup()
+    render(<SquadPanel card={CARD} squad={SQUAD} />)
+    const label = () =>
+      seatOf('김철수').querySelector('.ss-squad-pos') as HTMLButtonElement
+
+    expect(label().textContent).toBe('MF')
+    await user.click(label()) // 자동(MF) → FW
+    expect(label().textContent).toBe('FW')
+    expect(label()).toHaveAttribute('data-set', 'true')
+
+    // 아래로 옮겨도 손으로 정한 값이 이긴다.
+    await drag(seatOf('김철수'), 0, 3)
+    expect(label().textContent).toBe('FW')
+
+    // 한 바퀴 돌면 「자동」으로 돌아오고, 그때는 자리를 따른다.
+    for (let i = 0; i < 4; i++) await user.click(label())
+    expect(label()).not.toHaveAttribute('data-set')
+    expect(label().textContent).toBe('GK')
+  })
+})
+
+describe('스쿼드 — 나갔다 와도 그대로다', () => {
+  /* 🔴 **다른 화면에 갔다 오거나 창을 닫았다 와도 판이 그대로여야 한다**
+     (사용자 요청, 2026-09-08). 판 크기 · 카드가 선 칸 · 앉은 사람 · 손으로
+     정한 포지션 — 넷 다 서버에 자리가 없어 브라우저에 남긴다.
+     ⚠️ `SquadPanel` 이 "브라우저 저장은 일부러 안 넣었다"고 적어 두었던 것을
+     이번에 뒤집었다(lib/squadBoard.ts 첫머리에 이유를 적었다). */
+  it('크기를 바꾸고 다시 그리면 그 크기로 열린다', async () => {
+    const user = userEvent.setup()
+    const { unmount } = render(<SquadPanel card={CARD} />)
+    await user.click(screen.getByRole('radio', { name: '7 : 7' }))
+    unmount()
+
+    render(<SquadPanel card={CARD} />)
+    expect(await screen.findByRole('radio', { name: '7 : 7' })).toBeChecked()
+    expect(document.querySelectorAll('.ss-squad-pos')).toHaveLength(7)
+  })
+
+  it('옮긴 자리와 뺀 사람이 그대로다', async () => {
+    const user = userEvent.setup()
+    const { unmount } = render(<SquadPanel card={CARD} squad={SQUAD} />)
+
+    // 김철수를 맨 윗줄로 올리고, 이영희는 뺀다.
+    const seat = screen
+      .getByRole('button', { name: /김철수/ })
+      .closest('.ss-squad-seat') as HTMLElement
+    for (const el of document.querySelectorAll<HTMLElement>('.ss-squad-cell')) {
+      const col = Number(el.dataset.col)
+      const row = Number(el.dataset.row)
+      el.getBoundingClientRect = () =>
+        ({ left: col * 100, top: row * 150, width: 100, height: 150 }) as DOMRect
+    }
+    fireEvent.pointerDown(seat, { button: 0, clientX: 0, clientY: 0, pointerId: 1 })
+    fireEvent.pointerMove(seat, { clientX: 40, clientY: 40, pointerId: 1 })
+    fireEvent.pointerUp(seat, { clientX: 50, clientY: 75, pointerId: 1 })
+    await user.click(screen.getByRole('button', { name: '이영희 빼기' }))
+    unmount()
+
+    render(<SquadPanel card={CARD} squad={SQUAD} />)
+    // 옮긴 자리(맨 윗줄 = FW)가 그대로다.
+    expect(
+      (await screen.findByRole('button', { name: /김철수/ }))
+        .closest('.ss-squad-seat')!
+        .querySelector('.ss-squad-pos')!.textContent,
+    ).toBe('FW')
+    // 🔴 뺀 사람이 되살아나면 안 된다 — 서버가 준 스쿼드에는 아직 들어 있다.
+    expect(screen.queryByRole('button', { name: /이영희/ })).toBeNull()
+  })
+
+  // 저장본이 깨져 있어도 판은 그려져야 한다.
+  it('저장본이 깨져 있으면 없는 것으로 치고 기본 판을 연다', async () => {
+    globalThis.localStorage.setItem('supersub.squad.v1', '{"size":')
+    render(<SquadPanel card={CARD} />)
+    expect(screen.getByRole('radio', { name: '5 : 5' })).toBeChecked()
   })
 })
 
