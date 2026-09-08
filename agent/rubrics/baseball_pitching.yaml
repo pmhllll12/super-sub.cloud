@@ -30,7 +30,7 @@ kinematics:
 
 criteria:
   - id: release_arm_extension
-    name: 릴리스 팔 신전
+    name: 공 놓는 순간 팔 뻗기
     weight: 0.25
     rationale: >-
       팔꿈치가 펴지며 공을 놓아야 속도가 실린다. 릴리스 전에 이미 다 펴져
@@ -61,7 +61,7 @@ criteria:
         evidence: "팔꿈치각 177도로 릴리스 전에 이미 다 펴졌다"
 
   - id: hip_shoulder_separation
-    name: 골반-어깨 분리
+    name: 골반이 어깨보다 먼저 열리기
     weight: 0.25
     rationale: >-
       골반이 먼저 열리고 상체가 뒤따라야 힘이 순서대로 전달된다. 두 축이 벌어진
@@ -93,7 +93,7 @@ criteria:
         evidence: "분리각 9도로 골반과 상체가 거의 함께 돌았다"
 
   - id: stride_leg_block
-    name: 디딤발 버팀
+    name: 앞다리 버티기
     weight: 0.2
     rationale: >-
       앞다리가 버텨 줘야 회전이 상체로 넘어간다. 앞무릎이 계속 굽으면
@@ -155,7 +155,7 @@ criteria:
         evidence: "기울기 -6도로 상체가 젖혀져 공이 뜬다"
 
   - id: arm_deceleration
-    name: 팔 감속
+    name: 던진 뒤 팔 속도 줄이기
     weight: 0.15
     rationale: >-
       릴리스 후 팔이 몸을 가로질러 내려오며 감속해야 어깨·팔꿈치가 보호된다.

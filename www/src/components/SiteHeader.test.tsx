@@ -17,7 +17,10 @@ describe('화면 맨 위 줄', () => {
   it('모든 목적지를 적는다', () => {
     pathname.mockReturnValue('/')
     render(<SiteHeader user={{ nickname: '홍길동' }} destinations={DESTINATIONS} />)
-    expect(screen.getByRole('button', { name: '영상 분석' })).toBeInTheDocument()
+    // 글자 줄 항목은 2026-09-08 부터 **링크**다 — 아이콘이 글자 위로 올라가고
+    // 그 둘을 링크가 감싸면서 이동을 맡았다(HomeNav 주석).
+    expect(screen.getByRole('link', { name: '영상 분석' })).toBeInTheDocument()
+    // 이 고정값의 '레슨 · 상점' 은 href 가 없다 — 갈 곳이 없으면 버튼이다.
     expect(screen.getByRole('button', { name: '레슨 · 상점' })).toBeInTheDocument()
   })
 

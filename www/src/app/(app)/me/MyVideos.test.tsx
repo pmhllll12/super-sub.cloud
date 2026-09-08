@@ -398,3 +398,63 @@ describe('내 영상 — 지우기', () => {
     await waitFor(() => expect(reportFor('v1')).toBeNull())
   })
 })
+
+/**
+ * 🔴 **저장 키는 재생 주소가 아니다.** 계약이 주는 것은 `videos/<user_id>/…`
+ * 라 그대로 `<video src>` 에 넣으면 403 이고, 그래서 배포에서 플레이어가 아예
+ * 안 그려졌다(미결 paik 12번). 이제 `GET /videos/{id}/playback-url` 로 사전
+ * 서명 주소를 따로 받는다.
+ *
+ * ⚠️ **mock 은 이 경로를 안 탄다** — `public/` 안의 진짜 파일을 저장 키로 주기
+ * 때문에 `/` 로 시작하고, 그건 이미 주소다. 그래서 실물과 같은 모양의 클립을
+ * 여기서 만들어 그 갈래를 붙든다.
+ */
+describe('내 영상 — 재생 주소', () => {
+  const onServer: MyVideo = { ...analyzed, id: 'sv1', storage_key: 'videos/u1/abc.mp4' }
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('저장 키가 서버 것이면 재생 주소를 받아서 튼다', async () => {
+    const fn = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ url: 'https://s3.example.com/abc.mp4?sig=1', expires_in: 900 }),
+    })
+    vi.stubGlobal('fetch', fn)
+    render(<MyVideos videos={[onServer]} />)
+
+    await waitFor(() => expect(fn).toHaveBeenCalledWith('/api/videos/sv1/playback-url'))
+    await waitFor(() =>
+      expect(document.querySelector('.ss-profile-video-player')).toHaveAttribute(
+        'src',
+        'https://s3.example.com/abc.mp4?sig=1',
+      ),
+    )
+  })
+
+  /* 🔴 못 받아도 화면은 돌아야 한다 — 그 클립만 플레이어 없이 그려진다.
+     예전처럼 판이 통째로 무너지면 안 된다. */
+  it('주소를 못 받으면 플레이어만 없고 화면은 산다', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404, json: async () => null }))
+    render(<MyVideos videos={[onServer]} />)
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /삭제/ })).toBeInTheDocument())
+    expect(document.querySelector('.ss-profile-video-player')).toBeNull()
+  })
+
+  // `/` 로 시작하는 키(mock)는 이미 주소다 — 그물 밖으로 나가면 안 된다.
+  it('목업 키는 그대로 쓰고 서버를 안 부른다', async () => {
+    const fn = vi.fn()
+    vi.stubGlobal('fetch', fn)
+    render(<MyVideos videos={[analyzed]} />)
+
+    await waitFor(() =>
+      expect(document.querySelector('.ss-profile-video-player')).toHaveAttribute(
+        'src',
+        '/coach-c002.mp4',
+      ),
+    )
+    expect(fn).not.toHaveBeenCalled()
+  })
+})
+

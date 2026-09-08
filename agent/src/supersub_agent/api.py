@@ -437,8 +437,6 @@ button.ghost{background:transparent;color:var(--acc);border:1px solid var(--acc)
 select{background:var(--bg);color:var(--fg);border:1px solid var(--line);
        border-radius:7px;padding:.55rem .7rem;font:inherit;font-size:.9rem}
 .card{border:1px solid var(--line);border-radius:10px;padding:1.1rem;margin-bottom:1rem}
-.score{font-size:2.6rem;font-weight:700;line-height:1}
-.band{font-size:1.1rem;color:var(--mut);margin-left:.4rem}
 table{width:100%;border-collapse:collapse;font-size:.88rem}
 td,th{padding:.45rem .5rem;border-bottom:1px solid var(--line);text-align:left;
       vertical-align:top}
@@ -466,6 +464,30 @@ code{font:.85em ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--mut)}
 .pro .ttl{color:#16a34a}.part .ttl{color:#ca8a04}.con .ttl{color:#dc2626}
 .crit{color:var(--fg);opacity:.75;font-weight:600;margin-right:.4rem}
 .none{color:var(--mut);font-size:.86rem;font-style:italic}
+/* 오버롤 — 영상 하나의 총점과 등급. 항목 등급의 가중합이라 레이더 축 점수의
+   평균이 아니다. 그 구분을 화면에도 적어 둔다(ovr .note). */
+.ovr{display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.2rem;
+     align-items:center}
+@media(max-width:640px){.ovr{grid-template-columns:1fr}}
+.ovr .num{display:flex;align-items:baseline;gap:.5rem}
+.ovr .letter{font-size:3.4rem;font-weight:800;line-height:1;letter-spacing:-.04em}
+.ovr .pts{font-size:1.5rem;font-weight:700}
+.ovr .cap{color:var(--mut);font-size:.82rem;margin-top:.5rem}
+.ovr .note{color:var(--mut);font-size:.78rem;margin-top:.5rem;line-height:1.5}
+.prov{display:inline-block;background:var(--warnbg);color:var(--warn);
+      border-radius:999px;padding:.1rem .55rem;font-size:.72rem;font-weight:700;
+      vertical-align:middle}
+/* 레이더 — 단일 계열이라 색은 하나. 값은 축마다 글자로 직접 붙인다
+   (색만으로 읽게 두지 않는다). 표로도 볼 수 있게 상세의 표에 같은 열이 있다. */
+.radar{width:100%;height:auto;display:block;overflow:visible}
+.radar .grid{fill:none;stroke:var(--line);stroke-width:1}
+.radar .spoke{stroke:var(--line);stroke-width:1}
+.radar .area{fill:var(--acc);fill-opacity:.16;stroke:var(--acc);stroke-width:2;
+             stroke-linejoin:round}
+.radar .dot{fill:var(--acc);stroke:var(--bg);stroke-width:2}
+.radar .lbl{fill:var(--mut);font-size:11px}
+.radar .val{fill:var(--fg);font-size:12px;font-weight:700}
+.radar .ring{fill:var(--mut);font-size:9px;opacity:.7}
 /* 임팩트 순간 스켈레톤 — 추가 추론 없이 이미 가진 프레임으로 만든다. */
 .shot{text-align:center}
 .shot img,.shot video{max-width:100%;height:auto;border-radius:8px;
@@ -603,12 +625,91 @@ function prosCons(r){
   </div></div>`;
 }
 
+// 레이더 차트. 축은 **판정된 항목**이고 축 값은 항목 점수(breakdown[].stat)다.
+//
+// 🔴 등급(0/1/2)을 그대로 쓰면 꼭짓점이 중심·중간·끝 세 자리에만 찍혀 모양에서
+// 읽을 것이 없다. 그래서 서버가 연속 점수를 함께 낸다 — 뜻은 "이상 구간에서
+// 얼마나 떨어져 있는가"이고, 등급별 점수대가 겹치지 않아(2등급 85~100 ·
+// 1등급 50~85 · 0등급 0~50) 리포트의 등급과 반대로 그려지지 않는다.
+//
+// 축 개수는 루브릭이 정한다 — 지금 4~6개다(점프슛·투구 5, 인스텝 슈팅 6,
+// 레이업 4). 오각형으로 못 박지 않는 이유다.
+const RINGS=[25,50,75,100];
+function radar(items){
+  const N=items.length;
+  if(N<3) return '';                    // 삼각형이 안 되면 표로만 읽는다
+  const W=480,H=340,cx=240,cy=170,R=104;
+  const at=(i,rad)=>{const a=2*Math.PI*i/N-Math.PI/2;
+    return [cx+rad*Math.cos(a), cy+rad*Math.sin(a)];};
+  const poly=rad=>items.map((_,i)=>at(i,rad).map(n=>n.toFixed(1)).join(',')).join(' ');
+
+  let g=RINGS.map(p=>`<polygon class="grid" points="${poly(R*p/100)}"/>`).join('');
+  g+=items.map((_,i)=>{const [x,y]=at(i,R);
+    return `<line class="spoke" x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${
+      y.toFixed(1)}"/>`}).join('');
+  // 🔴 눈금 숫자는 그림에 안 넣는다 — 어디에 놓아도 데이터 선이 가로지른다
+  //     (위쪽 축에 넣었더니 「75」를 폴리곤 변이 관통했다). 눈금의 뜻은 캡션에
+  //     한 줄로 적고, 정확한 값은 축마다 붙은 숫자가 이미 싣고 있다.
+
+  const area=`<polygon class="area" points="${
+    items.map((b,i)=>at(i,R*b.stat/100).map(n=>n.toFixed(1)).join(',')).join(' ')}"/>`;
+  const dots=items.map((b,i)=>{const [x,y]=at(i,R*b.stat/100);
+    return `<circle class="dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4"/>`
+  }).join('');
+
+  // 이름은 길다(「골반이 어깨보다 먼저 열리기」). 띄어쓰기에서 두 줄까지 접는다.
+  const wrap=s=>{const w=s.split(' ');if(w.length<2||s.length<8)return [s];
+    let a='';const b=[];for(const t of w){
+      if(a && (a+' '+t).length>8){b.push(t)}else if(b.length){b.push(t)}
+      else{a=a?a+' '+t:t}}
+    return [a,b.join(' ')].filter(Boolean)};
+  const labels=items.map((b,i)=>{
+    const a=2*Math.PI*i/N-Math.PI/2, [x,y]=at(i,R+15);
+    const cos=Math.cos(a), sin=Math.sin(a);
+    const anchor=Math.abs(cos)<0.15?'middle':(cos>0?'start':'end');
+    const lines=[...wrap(b.name), String(Math.round(b.stat))];
+    const h=lines.length*13;
+    const top = sin<-0.5 ? y-h+11 : (sin>0.5 ? y+11 : y-h/2+11);
+    return `<text text-anchor="${anchor}" x="${x.toFixed(1)}" y="${top.toFixed(1)}">`
+      + lines.map((t,k)=>`<tspan class="${k===lines.length-1?'val':'lbl'}"
+           x="${x.toFixed(1)}" dy="${k?13:0}">${t}</tspan>`).join('')
+      + '</text>';
+  }).join('');
+
+  const alt=items.map(b=>`${b.name} ${Math.round(b.stat)}점`).join(', ');
+  return `<svg class="radar" viewBox="0 0 ${W} ${H}" role="img"
+     aria-label="항목별 점수 레이더 차트: ${alt}"><title>항목별 점수</title>
+     ${g}${area}${dots}${labels}</svg>`;
+}
+
+// 오버롤 — **영상 하나에 하나**다. 선수 한 명의 통합 등급이 아니다(여러 편을
+// 어떻게 합칠지는 정해진 바 없다). 값은 서버가 낸 result.score/grade 그대로이고
+// 화면이 다시 계산하지 않는다.
+function overall(d){
+  const r=d.result;
+  const axes=r.breakdown.filter(b=>typeof b.stat==='number');
+  return `<div class="card"><div class="ovr">
+    <div>
+      <div class="num"><span class="letter">${r.grade}</span>
+        <span class="pts">${r.score}<span class="mut" style="font-size:.9rem">점</span></span></div>
+      <div class="cap">${d.rubric.label} 오버롤
+        ${r.provisional?'<span class="prov">잠정</span>':''}</div>
+      <div class="note">항목 등급의 가중합입니다. 임계값이 지도자 검수 전이라
+        <b>등급도 잠정</b>입니다.${axes.length
+          ? ' 오른쪽 점수는 항목별로 이상 구간에서 얼마나 떨어졌는지를 잰 것이라, 그 평균이 총점은 아닙니다.'
+          : ''}</div>
+    </div>
+    <div>${radar(axes)}
+      ${axes.length>=3?'<div class="cap" style="text-align:center">항목별 점수 ·'
+        +' 바깥 테두리가 100점, 눈금 한 칸이 25점입니다</div>':''}</div>
+  </div></div>`;
+}
+
 function render(d){
   const r=d.result;
-  // 화면에 보이는 것은 칭호와 장단점뿐이다. 총점·배점·판정 근거는
-  // 선수에게 노출하지 않는다 — 루브릭이 지도자 검수 전이라 점수 자체가
-  // provisional이고, 칭호가 선수 카드에 쓸 산출물이기 때문이다.
-  // 개발 확인용으로 접어서 남겨 둔다.
+  // 오버롤(총점·등급)과 항목별 점수는 **보인다.** 예전에는 접어 두었는데,
+  // 임계값이 검수 전이라는 이유였다 — 그 사실은 없어지지 않았으므로 숨기는
+  // 대신 「잠정」을 붙여 함께 낸다. 배점·측정값·판정 근거는 그대로 접어 둔다.
   let h='';
   // 🔴 프레임 번호만 보여주지 않는다 (미결 7번 E-3). "62프레임"은 사람이 읽을
   // 수 있는 값이 아니고, 어느 격자인지 모르면 되짚을 수도 없다. 격자를 모르는
@@ -631,12 +732,10 @@ function render(d){
         에이전트가 이 자세를 근거로 채점했습니다.</div>
     </div>`;
   }
+  h+=overall(d);
   h+=prosCons(r);
 
-  let dev=`<div class="card">
-    <div><span class="score">${r.score}</span><span class="band">점 · ${r.grade}</span>
-    ${r.provisional?' <span class="mut">(provisional)</span>':''}</div>
-    <div class="mut" style="margin-top:.5rem">
+  let dev=`<div class="card"><div class="mut">
       기준: ${d.rubric.key} v${d.rubric.version} ·
       입력: ${d.source} · ${d.frames}프레임 ·
       측정 ${d.timing.measure_s}초 · 판정 ${d.timing.judge_s}초</div>
@@ -644,12 +743,14 @@ function render(d){
 
   // 구간(band)을 등급 옆에 찍는다. 근거 문장에서 등급·구간 표기를 뺐으므로
   // (미결 23번) 「이 값이 왜 이 등급인가」를 눈으로 확인할 곳이 여기뿐이다.
-  dev+='<div class="card"><table><tr><th>항목</th><th>등급</th><th>기여</th>'
-    +'<th>근거</th></tr>';
+  // 「점수」 열은 레이더 차트를 표로 읽는 자리이기도 하다.
+  dev+='<div class="card"><table><tr><th>항목</th><th>등급</th><th>점수</th>'
+    +'<th>기여</th><th>근거</th></tr>';
   for(const b of r.breakdown){
     dev+=`<tr><td>${b.name}<div class="cmp">${b.title||''}</div></td>
         <td><span class="g g${b.grade}">${b.grade}</span>
             <div class="mut">${b.band||''}</div></td>
+        <td>${b.stat==null?'<span class="mut">—</span>':b.stat}</td>
         <td>${b.contribution}점<div class="mut">×${b.weight}</div></td>
         <td><code>${b.metric_ref}</code><div class="cmp">${b.evidence}</div></td></tr>`;
   }
@@ -660,7 +761,7 @@ function render(d){
     dev+=`<tr><td><code>${k}</code></td><td>${v}</td></tr>`;
   dev+='</table></div>';
 
-  h+=`<details class="dev"><summary>개발 확인용 상세 (총점·배점·측정값)</summary>
+  h+=`<details class="dev"><summary>개발 확인용 상세 (배점·등급 구간·측정값)</summary>
       ${dev}</details>`;
 
   out.innerHTML=h;
