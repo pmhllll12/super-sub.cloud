@@ -4416,11 +4416,26 @@ jin 21(공개 사이트 인프라 식별자 스크럽)에서 `jekyll/`·`_posts/
 | 실제 리포트를 DB 에 남겨 브라우저가 읽게(`paik` 7 · `POST /analyses`) — 지표 부분은 같은 구역 23번(시딩)에 물려 있다 | 정어진 + 정상호 |
 | `/analysis`: "저장"이 `keep` 호출, 화면을 벗어날 때 미저장분 `DELETE`, 「분석 영상」이 저장된 것만 | 백성검 |
 
-#### 아직 안 정한 것 — 답이 오면 확정한다
+#### 정한 것 (2026-09-08, 사용자 답변)
 
-- **미저장분을 언제 지우나** — 화면 벗어날 때 프론트가 `DELETE` 호출(브라우저 닫히면 놓침) + TTL 스윕(예: 24시간) 백스톱 조합? TTL 값은?
-- **`videos/`→`reports/` 이동을 누가** — fastapi 가 `keep` 처리 중에(권장, S3 수명주기 주인) vs 워커가 분석 끝에?
-- **파일명 규칙**(무작위 UUID → 사람이 알아볼 수 있게) — 사용자가 "다시 논의" 로 미뤘다. 별건
+- **미저장분 정리 = 두 겹.** ⑴ `/analysis` 를 저장 없이 벗어나면 프론트가
+  `DELETE /videos/{id}` 를 부른다(빠른 길, `beforeunload`/`sendBeacon` 로 최대한).
+  ⑵ 서버 스윕이 백스톱 — `kept=false` 이고 `created_at < now - PROVISIONAL_TTL`
+  (**기본 24시간**, 설정으로 뺀다)인 `video` 를 DB+S3 에서 지운다. 트리거는
+  새 타이머를 만들지 않고 `POST /internal/analysis-jobs/claim`(워커가 45초마다
+  부름) 에 얹는다 — 멈춘 job 회수(계약 3-8)와 같은 자리. `WHERE kept=false`
+  부분 인덱스로 질의를 작게 유지한다.
+- **`videos/`→`reports/` 이동은 fastapi 가 한다** — `keep` 처리 중에.
+  `CopyObject`(server-side) + `DeleteObject`(source). S3 수명주기 주인이 앱이라
+  워커가 아니라 여기가 맞다.
+
+#### 아직 안 정한 것
+
+- **파일명 규칙**(무작위 UUID → 사람이 알아볼 수 있게) — 사용자가 미뤘다.
+  이 설계는 파일명에 안 기댄다(삭제는 `video_id` 기준, 카드 UI 는 제목·날짜·
+  섬네일을 보여주면 됨). 문제 영상을 관리자가 지우는 것은 별도 능력
+  (`DELETE /admin/videos/{id}` 류, `DELETE /admin/users/{id}` 와 같은 결) —
+  사용자도 "사람이 일일이"는 한계라고 봄. jin 24 핵심 아님, 후속으로 남긴다
 
 #### 지금 당장(테스트 단계 정리)
 
