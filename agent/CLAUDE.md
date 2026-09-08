@@ -12,6 +12,10 @@ grep -n '담당.*정상호' jekyll/pages/pending.markdown   # 나에게 온 요�
 cd agent && uv sync && uv run pytest tests/ -q         # 지금 초록인지
 ```
 
+🔴 **첫 작업: 미결 `jin` 23번**(`metric_definition` 시드용 지표 코드 목록) —
+사용자가 "세션 시작하면 착수" 로 지시했다. `POST /analyses`·`paik` 7번이 이것에
+막혀 있다. `## jin` 구역의 23번이다(`## ho` 23번은 근거 문장 표기로 별개).
+
 그리고 **[남은 작업 로드맵](../jekyll/pages/roadmap.markdown)** — 남은 작업의
 순서, 재조사하면 안 되는 **닫힌 경로**, 함정, 현재 상수값이 한 장에 있다.
 로드맵은 진입점일 뿐이고 **정본은 미결 항목**이다. 둘이 어긋나면 미결 항목이 이긴다.
