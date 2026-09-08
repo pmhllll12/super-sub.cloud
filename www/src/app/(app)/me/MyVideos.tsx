@@ -5,6 +5,8 @@ import type { MyVideo } from '@/server/backend'
 import { SPORTS, SPORT_CODE, type SportKey } from '@/lib/sports'
 import { checkClip, uploadClip, type ClipMeta } from '@/lib/uploadClip'
 import { listPublished, publish, unpublish } from '@/lib/published'
+import { reportFor, type SavedReport } from '@/lib/savedReports'
+import ReportView from '@/components/analysis/ReportView'
 
 /**
  * 내가 올린 클립 — **두 갈래로 갈라 한 번에 한 편만** 보여준다(사용자 요청).
@@ -140,6 +142,18 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
   // 줄어드는 경우(다시 받아 온 뒤)를 놓친다.
   const i = Math.min(at, Math.max(shown.length - 1, 0))
   const v = shown[i]
+
+  /**
+   * 이 영상에 매달린 분석 리포트.
+   *
+   * 🔴 **그릴 때 읽지 않는다** — 서버엔 없는 값이라 하이드레이션이 깨진다
+   * (공개 목록 · 카드 꾸미기에서 이미 데인 자리다). 영상이 바뀔 때마다
+   * effect 에서 다시 읽는다.
+   */
+  const [report, setReport] = useState<SavedReport | null>(null)
+  useEffect(() => {
+    setReport(v ? reportFor(v.id) : null)
+  }, [v])
 
   function pick(next: TabKey) {
     setTab(next)
@@ -513,6 +527,26 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
               })}
             </ul>
           }
+
+          {/* 🔴 **분석 리포트는 영상 목록 아래**다(사용자 요청, 2026-09-08).
+              영상 분석 화면에서 `저장` 을 누른 것이 여기로 온다.
+
+              🔴 **분석 갈래에서만** 낸다 — 그냥 올린 영상에는 리포트가 없다.
+              그림은 분석 화면과 **같은 것**을 쓴다(`ReportView`) — 두 벌로
+              두면 한쪽만 늙는다.
+
+              ⚠️ 계약에 리포트를 **읽는** 경로가 없어(미결 paik 7번) 이 값은
+              그 브라우저에만 있다. 그래서 아래에 그렇게 적어 둔다 — 숨기면
+              다른 기기에서 안 보일 때 고장으로 읽힌다. */}
+          {tab === 'analyzed' && report && (
+            <section className="ss-profile-report" aria-label="분석 리포트">
+              <h3 className="ss-profile-report-head">분석 리포트</h3>
+              <ReportView report={report} />
+              <p className="ss-profile-report-note">
+                {report.savedAt} 에 남겼습니다 — 아직 이 브라우저에만 남습니다.
+              </p>
+            </section>
+          )}
         </div>
       )}
     </>

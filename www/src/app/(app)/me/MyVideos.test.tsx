@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { MyVideo } from '@/server/backend'
 import { listPublished } from '@/lib/published'
+import { saveReport } from '@/lib/savedReports'
 import MyVideos from './MyVideos'
 
 /**
@@ -210,5 +211,54 @@ describe('내 영상 — 공개 여부', () => {
     await user.click(screen.getByRole('tab', { name: /업로드 영상/ }))
     await user.click(screen.getByRole('button', { name: /공개/ }))
     expect(screen.getByText(/이 브라우저에만/)).toBeInTheDocument()
+  })
+})
+
+describe('내 영상 — 분석 리포트', () => {
+  const REPORT = {
+    summary: '디딤발이 공보다 앞서 있습니다.',
+    traits: ['측면으로 벌리는 움직임이 많습니다'],
+    titles: ['첫 리포트'],
+    scenes: [{ at: '0:04', what: '디딤발 착지' }],
+  }
+
+  beforeEach(() => globalThis.localStorage?.clear())
+
+  it('저장해 둔 리포트가 있으면 영상 목록 아래에 그린다', async () => {
+    saveReport('v1', REPORT)
+    render(<MyVideos videos={[analyzed]} />)
+
+    expect(await screen.findByRole('region', { name: '분석 리포트' })).toBeInTheDocument()
+    expect(screen.getByText(/디딤발이 공보다 앞서/)).toBeInTheDocument()
+    expect(screen.getByText('디딤발 착지')).toBeInTheDocument()
+    // ⚠️ 어디에 남았는지 밝힌다 — 숨기면 다른 기기에서 안 보일 때 고장으로 읽힌다.
+    expect(screen.getByText(/이 브라우저에만/)).toBeInTheDocument()
+  })
+
+  it('저장해 둔 것이 없으면 아무것도 안 그린다', () => {
+    render(<MyVideos videos={[analyzed]} />)
+    expect(screen.queryByRole('region', { name: '분석 리포트' })).toBeNull()
+  })
+
+  // 🔴 그냥 올린 영상에는 리포트가 없다 — 갈래가 다르다.
+  it('업로드 갈래에서는 안 그린다', async () => {
+    saveReport('v3', REPORT)
+    const user = userEvent.setup()
+    render(<MyVideos videos={[analyzed, uploaded]} />)
+    await user.click(screen.getByRole('tab', { name: '업로드 영상' }))
+    expect(screen.queryByRole('region', { name: '분석 리포트' })).toBeNull()
+  })
+
+  // 🔴 수치를 그리지 않는 원칙은 이 자리에서도 같다(부록 D.5 · 계약 3장 4).
+  it('점수 · 등급 · 별점을 그리지 않는다', async () => {
+    saveReport('v1', REPORT)
+    const { container } = render(<MyVideos videos={[analyzed]} />)
+    await screen.findByRole('region', { name: '분석 리포트' })
+    const text = container.textContent ?? ''
+    expect(text).not.toMatch(/\d+\s*점/)
+    expect(text).not.toMatch(/등급/)
+    expect(text).not.toMatch(/★/)
+    expect(container.querySelector('progress')).toBeNull()
+    expect(container.querySelector('meter')).toBeNull()
   })
 })

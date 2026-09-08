@@ -3279,6 +3279,127 @@ body::-webkit-scrollbar {
 }
 
 /* 오른쪽 판 쪽 안내와 버튼 두 개. */
+/* ── 무엇을 볼지 고르는 자리 (2026-09-08) ──────────────────────────── */
+
+/* 묶는 판 아래, 알약 줄과 대화창 사이의 빈 자리다(사용자 지목). 위에 선을
+   하나 그어 "사람을 고르는 일"과 "무엇을 볼지 고르는 일"을 가른다 — 한
+   덩어리로 붙으면 단추 넷이 같은 줄로 읽힌다. */
+.ss-shot-focus {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid color-mix(in srgb, var(--ss-fg) 18%, transparent);
+}
+
+.ss-shot-focus-head {
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: color-mix(in srgb, var(--ss-fg) 72%, transparent);
+}
+
+.ss-shot-focus-head b {
+  color: var(--ss-accent);
+  font-weight: 700;
+}
+
+/* 🔴 개수가 종목마다 다르다(축구 6 · 농구 5 · 야구 5, 거기에 「전체적으로」).
+   칸을 고정하지 않고 흐르게 둔다 — 고정하면 종목을 바꿀 때 줄 수가 달라져
+   아래 대화창이 들썩인다. */
+.ss-shot-focus-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ss-shot-focus-chip {
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 28%, transparent);
+  padding: 5px 11px;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--ss-fg) 78%, transparent);
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.ss-shot-focus-chip:hover,
+.ss-shot-focus-chip:focus-visible {
+  border-color: color-mix(in srgb, var(--ss-fg) 55%, transparent);
+  color: var(--ss-fg);
+}
+
+/* 고른 것 — 민트로 테두리와 글자를 같이 바꾼다. 🔴 색만으로 말하지 않는다:
+   `aria-pressed` 가 화면 낭독기에 같은 것을 알린다(마크업 쪽). */
+.ss-shot-focus-chip[data-on='true'] {
+  border-color: var(--ss-accent);
+  background-color: color-mix(in srgb, var(--ss-accent) 14%, transparent);
+  color: var(--ss-accent);
+}
+
+/* ⚠️ 아직 못 보낸다는 사실을 적는 줄 — 숨기면 고르고도 왜 안 달라지는지
+   알 수 없다(공개 여부 · 카드 꾸미기와 같은 규칙). */
+.ss-shot-focus-note {
+  margin-top: 10px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: color-mix(in srgb, var(--ss-fg) 48%, transparent);
+}
+
+/* 관문에서 다시 한 번 — 확인하는 자리에 확인할 것이 다 있어야 한다. */
+.ss-shot-confirm-focus {
+  font-size: 12px;
+  color: color-mix(in srgb, var(--ss-fg) 55%, transparent);
+}
+
+.ss-shot-confirm-focus b {
+  color: var(--ss-accent);
+  font-weight: 600;
+}
+
+/* ── 관문 — 「이 사람이 맞습니까?」 (2026-09-08) ───────────────────── */
+
+/* 🔴 묶는 판(.ss-shot-pickside)과 **같은 자리 · 같은 결**이다. 대상이 정해진
+   뒤 분석이 시작되기 전, 관절이 붙는 것을 보는 동안 여기 선다. 단추 줄은
+   그쪽 것(.ss-shot-pick-acts)을 그대로 쓴다 — 같은 뜻의 것에 다른 모양을
+   주지 않는다. */
+.ss-shot-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0 12px;
+}
+
+.ss-shot-confirm-q {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ss-fg);
+}
+
+.ss-shot-confirm-note,
+.ss-shot-confirm-wait {
+  font-size: 13px;
+  line-height: 1.6;
+  color: color-mix(in srgb, var(--ss-fg) 62%, transparent);
+}
+
+/* 아직 붙는 중 — 무엇을 기다리는지 말한다. 빈 판이면 멈춘 것처럼 보인다.
+   ⚠️ 깜빡임은 움직임 줄이기에서 끈다(글자는 그대로 남는다). */
+.ss-shot-confirm-wait {
+  animation: ss-shot-confirm-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes ss-shot-confirm-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-shot-confirm-wait {
+    animation: none;
+  }
+}
+
 .ss-shot-pickside {
   display: flex;
   flex-direction: column;
@@ -3777,6 +3898,12 @@ body::-webkit-scrollbar {
   font-size: 0.75rem;
   color: var(--ss-fg);
   transition: border-color 160ms ease;
+  /* 🔴 글자가 「내 프로필에 리포트 저장」으로 길어졌다(사용자 요청,
+     2026-09-08) — **줄바꿈하지 않는다.** 머리줄이 두 줄이 되면 옆의 제목과
+     높이가 어긋나고, 리포트로 바뀌는 순간 판 위쪽이 한 번 덜컥한다.
+     자리는 flex 가 준다(.ss-shot-side-head 의 justify-content: space-between). */
+  flex: none;
+  white-space: nowrap;
 }
 
 /* 🔴 잠겨 있는 동안은 **눌리지 않는다는 것이 보여야** 한다 — 리포트가 다 나오기
@@ -8621,6 +8748,32 @@ body:has(.ss-shot) .ss-app-figure {
 }
 
 .ss-profile-id-main,
+/* ── 내 프로필의 분석 리포트 — **영상 목록 아래**다 (2026-09-08) ────── */
+
+/* 🔴 굴리는 목록 아래에 선을 긋고 그 아래에 둔다. 목록은 "무엇을 볼까"이고
+   리포트는 "그것이 무엇이었나"라, 한 덩어리로 붙으면 둘이 섞인다. */
+.ss-profile-report {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid color-mix(in srgb, var(--ss-fg) 22%, transparent);
+}
+
+.ss-profile-report-head {
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--ss-fg) 70%, transparent);
+}
+
+/* ⚠️ 어디에 남았는지 밝히는 줄 — 숨기면 다른 기기에서 안 보일 때 고장으로
+   읽힌다(공개 여부 · 카드 꾸미기와 같은 규칙). */
+.ss-profile-report-note {
+  margin-top: 10px;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--ss-fg) 52%, transparent);
+}
+
 .ss-profile-strip {
   animation: ss-p-from-bottom 460ms var(--ss-home-out-ease) 1080ms both;
 }
