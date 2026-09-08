@@ -4589,7 +4589,7 @@ jin 21(공개 사이트 인프라 식별자 스크럽)에서 `jekyll/`·`_posts/
 | `video` 에 "저장됨" 표시(예: `kept` 불리언) + 마이그레이션 · `GET /videos` 필터 · `POST /videos` 가 경로별로 초기값 정함(`/analysis`=미저장, `/me` 업로드=저장) | 정어진 |
 | `POST /videos/{id}/keep`(또는 `PATCH`) — 저장 플립 + `videos/`→`reports/` S3 이동(`CopyObject`+`DeleteObject`) + `storage_key` 갱신 | 정어진 |
 | `DELETE /videos/{id}` — DB + S3. 미저장분 정리 스윕(job 회수처럼 트리거) | 정어진 |
-| EC2 인스턴스 역할 IAM: **`s3:DeleteObject`**(`videos/*`·`reports/*`) · `reports/*` 에 `s3:GetObject`·`s3:PutObject` — 지금 `DeleteObject` 는 일부러 빠져 있다(`deployment.md` 5절) | 박민호(콘솔) 또는 정어진(배포) |
+| EC2 인스턴스 역할 IAM: 인라인 정책에 `s3:DeleteObject` + `reports/*` 문 추가. **정책 JSON 은 `fastapi/docs/deployment.md` 「서버에 줄 권한」에 2026-09-08 판으로 준비됨** — 콘솔에 붙여넣기만. `jin` IAM 사용자는 `iam:*` 이 막혀 못 붙인다(같은 문서 확인). 반영·확인 절차도 그 절에 있음 | **박민호(콘솔)** |
 | 리포트 산출물 키를 `reports/<user_id>/<video_id>/` 로 정렬(지금은 `report_slug` = 상위폴더+stem) | 정상호 |
 | 실제 리포트를 DB 에 남겨 브라우저가 읽게(`paik` 7 · `POST /analyses`) — 지표 부분은 같은 구역 23번(시딩)에 물려 있다 | 정어진 + 정상호 |
 | `/analysis`: "저장"이 `keep` 호출, 화면을 벗어날 때 미저장분 `DELETE`, 「분석 영상」이 저장된 것만 | 백성검 |
