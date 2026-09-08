@@ -8817,6 +8817,60 @@ body:has(.ss-shot) .ss-app-figure {
   position: relative;
 }
 
+/* 🔴 **지우기는 줄의 왼쪽 끝**(2026-09-08, 사용자 요청). 대표 영상 단추와
+   마주 보게 두 단추 다 흐름 밖으로 뺀다 — 흐름에 두면 가운데 넘기는 단추가
+   밀린다. 상자 폭이 영상 비와 무관하므로(위 `.ss-profile-video-frame`) 이
+   자리도 영상마다 안 갈린다.
+
+   ⚠️ 되돌릴 수 없는 단추라 **화살표에서 가장 먼 쪽**에 둔다. */
+.ss-profile-del {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ss-profile-del-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 32%, transparent);
+  padding: 5px 12px;
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--ss-fg) 76%, transparent);
+  white-space: nowrap;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.ss-profile-del-btn .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.ss-profile-del-btn:hover,
+.ss-profile-del-btn:focus-visible {
+  border-color: color-mix(in srgb, var(--ss-error) 70%, transparent);
+  color: color-mix(in srgb, var(--ss-error) 85%, var(--ss-fg));
+}
+
+/* 한 번 더 물은 뒤의 그 단추. 🔴 색만으로 말하지 않는다 — 글자가
+   「정말 지웁니다」로 바뀌고 옆에 「취소」가 선다. */
+.ss-profile-del-btn[data-armed='true'] {
+  border-color: var(--ss-error);
+  background-color: color-mix(in srgb, var(--ss-error) 16%, transparent);
+  color: color-mix(in srgb, var(--ss-error) 85%, var(--ss-fg));
+}
+
+.ss-profile-del-btn:disabled {
+  opacity: 0.6;
+}
+
 .ss-profile-featured-btn {
   position: absolute;
   top: 50%;

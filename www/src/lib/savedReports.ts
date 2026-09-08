@@ -67,3 +67,18 @@ export function saveReport(videoId: string, report: Omit<SavedReport, 'savedAt'>
   }
   return saved
 }
+
+/**
+ * 그 영상의 리포트를 **잊는다.** 영상을 지울 때 함께 부른다 — 안 그러면
+ * 지워진 영상의 리포트가 이 브라우저에 남는다.
+ */
+export function forgetReport(videoId: string): void {
+  const all = read()
+  if (!(videoId in all)) return
+  delete all[videoId]
+  try {
+    globalThis.localStorage?.setItem(KEY, JSON.stringify(all))
+  } catch {
+    // 못 지워도 화면은 계속 돈다 — 목록의 정본은 서버다.
+  }
+}

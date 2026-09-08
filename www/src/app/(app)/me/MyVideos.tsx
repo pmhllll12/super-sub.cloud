@@ -1,13 +1,13 @@
-"use client";
+'use client'
 
-import { useEffect, useState } from "react";
-import type { MyVideo } from "@/server/backend";
-import { SPORTS, SPORT_CODE, type SportKey } from "@/lib/sports";
-import { checkClip, uploadClip, type ClipMeta } from "@/lib/uploadClip";
-import { listPublished, publish, unpublish } from "@/lib/published";
-import { reportFor, type SavedReport } from "@/lib/savedReports";
-import { loadFeatured, setFeatured } from "@/lib/featuredClip";
-import ReportView from "@/components/analysis/ReportView";
+import { useEffect, useState } from 'react'
+import type { MyVideo } from '@/server/backend'
+import { SPORTS, SPORT_CODE, type SportKey } from '@/lib/sports'
+import { checkClip, uploadClip, type ClipMeta } from '@/lib/uploadClip'
+import { listPublished, publish, unpublish } from '@/lib/published'
+import { forgetReport, reportFor, type SavedReport } from '@/lib/savedReports'
+import { loadFeatured, setFeatured } from '@/lib/featuredClip'
+import ReportView from '@/components/analysis/ReportView'
 
 /**
  * 내가 올린 클립 — **두 갈래로 갈라 한 번에 한 편만** 보여준다(사용자 요청).
@@ -28,17 +28,17 @@ import ReportView from "@/components/analysis/ReportView";
 function videoState(v: MyVideo): { key: string; label: string } {
   // 🔴 반려를 먼저 본다. 반려된 클립은 분석 작업이 없어 `analysis_status` 가
   // null 인데, 분석을 안 건 클립도 null 이라 순서를 바꾸면 둘이 섞인다.
-  if (!v.passed) return { key: "rejected", label: "규격 반려" };
+  if (!v.passed) return { key: 'rejected', label: '규격 반려' }
   switch (v.analysis_status) {
-    case "succeeded":
-      return { key: "analyzed", label: "분석 완료" };
-    case "queued":
-    case "running":
-      return { key: "running", label: "분석 중" };
-    case "failed":
-      return { key: "failed", label: "분석 실패" };
+    case 'succeeded':
+      return { key: 'analyzed', label: '분석 완료' }
+    case 'queued':
+    case 'running':
+      return { key: 'running', label: '분석 중' }
+    case 'failed':
+      return { key: 'failed', label: '분석 실패' }
     default:
-      return { key: "raw", label: "분석 안 함" };
+      return { key: 'raw', label: '분석 안 함' }
   }
 }
 
@@ -53,10 +53,10 @@ function videoState(v: MyVideo): { key: string; label: string } {
  * 조회용 사전 서명 URL 이 생기면 **이 함수 하나만** 고치면 된다.
  */
 function previewSrc(v: MyVideo): string | null {
-  return v.storage_key.startsWith("/") ? v.storage_key : null;
+  return v.storage_key.startsWith('/') ? v.storage_key : null
 }
 
-type TabKey = "analyzed" | "uploaded";
+type TabKey = 'analyzed' | 'uploaded'
 
 export default function MyVideos({ videos }: { videos: MyVideo[] }) {
   /**
@@ -70,7 +70,7 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
    * 값으로 그리다가 옮겨 가므로 선이 부드럽게 늘어난다 — 0 으로 되돌리면
    * 한 번 접혔다 펴진다.
    */
-  const [ratio, setRatio] = useState<number | null>(null);
+  const [ratio, setRatio] = useState<number | null>(null)
 
   /**
    * 재생 막대를 보여줄 것인가 — **가져다 댔을 때만**(사용자 요청).
@@ -81,21 +81,30 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
    * 🔴 포커스에도 켠다. 막대가 없으면 키보드로는 재생에 닿을 길이 아예
    * 없어서, 마우스에만 매달면 그 사람은 영상을 못 튼다.
    */
-  const [showControls, setShowControls] = useState(false);
+  const [showControls, setShowControls] = useState(false)
 
   /**
    * 이 화면에서 방금 올린 것. ⚠️ **새로고침하면 사라진다** — 목록은 서버가 주는
    * 것이고(`listMyVideos`) 여기서 다시 받아 오지 않는다. 올린 직후에 목록에
    * 안 나타나면 올라간 건지 알 수가 없어서 앞에 얹어 둔다.
    */
-  const [added, setAdded] = useState<MyVideo[]>([]);
+  const [added, setAdded] = useState<MyVideo[]>([])
+  /**
+   * 방금 지운 것. 목록의 정본은 서버가 준 `videos` 이고 여기서 다시 받아
+   * 오지 않으므로, 지운 것을 이쪽에서 걸러 낸다 — 새로고침하면 서버 목록이
+   * 이미 그것을 빼고 온다.
+   */
+  const [removed, setRemoved] = useState<string[]>([])
+  /** 지울지 한 번 더 묻는 중인 영상 id. 되돌릴 수 없어서 곧바로 안 지운다. */
+  const [confirming, setConfirming] = useState<string | null>(null)
+  const [removing, setRemoving] = useState(false)
   /** 고른 파일. 크기를 재기 전에는 아직 못 올린다. */
-  const [picked, setPicked] = useState<File | null>(null);
-  const [pickedUrl, setPickedUrl] = useState<string | null>(null);
-  const [meta, setMeta] = useState<ClipMeta | null>(null);
+  const [picked, setPicked] = useState<File | null>(null)
+  const [pickedUrl, setPickedUrl] = useState<string | null>(null)
+  const [meta, setMeta] = useState<ClipMeta | null>(null)
   /** 거른 사유 · 반려 사유 · 실패 사유가 다 여기로 나온다. */
-  const [notice, setNotice] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
   /**
    * 공개로 돌린 영상들.
    *
@@ -103,52 +112,46 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
    * 서버가 그린 첫 화면과 브라우저가 그린 것이 갈려 하이드레이션이 깨진다.
    * 붙은 **뒤에** 한 번 읽는다.
    */
-  const [pubIds, setPubIds] = useState<string[]>([]);
+  const [pubIds, setPubIds] = useState<string[]>([])
   /** 공개 폼이 열린 영상 id 와 적고 있는 값. */
-  const [form, setForm] = useState<{
-    id: string;
-    title: string;
-    what: string;
-  } | null>(null);
+  const [form, setForm] = useState<{ id: string; title: string; what: string } | null>(null)
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- 위 주석 참고: 붙은 뒤에 읽어야 한다.
-  useEffect(() => setPubIds(listPublished().map((c) => c.id)), []);
+  useEffect(() => setPubIds(listPublished().map((c) => c.id)), [])
 
   useEffect(() => {
     if (!picked) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- 주소는 파일에서 만들어야 하고, 만든 것은 정리에서 거둬야 한다.
-      setPickedUrl(null);
-      return;
+      setPickedUrl(null)
+      return
     }
     // jsdom 에는 없다 — 없으면 미리보기만 없고 재는 일은 그대로 돈다.
-    let url: string | null = null;
+    let url: string | null = null
     try {
-      url = URL.createObjectURL(picked);
+      url = URL.createObjectURL(picked)
     } catch {
-      url = null;
+      url = null
     }
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 위와 같다.
-    setPickedUrl(url);
+    setPickedUrl(url)
     return () => {
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [picked]);
+      if (url) URL.revokeObjectURL(url)
+    }
+  }, [picked])
 
-  const all = [...added, ...videos];
-  const analyzed = all.filter((v) => v.analysis_job_id !== null);
-  const uploaded = all.filter((v) => v.analysis_job_id === null);
+  const all = [...added, ...videos].filter((x) => !removed.includes(x.id))
+  const analyzed = all.filter((v) => v.analysis_job_id !== null)
+  const uploaded = all.filter((v) => v.analysis_job_id === null)
 
-  const [tab, setTab] = useState<TabKey>(
-    analyzed.length > 0 ? "analyzed" : "uploaded",
-  );
-  const [at, setAt] = useState(0);
+  const [tab, setTab] = useState<TabKey>(analyzed.length > 0 ? 'analyzed' : 'uploaded')
+  const [at, setAt] = useState(0)
 
-  const shown = tab === "analyzed" ? analyzed : uploaded;
+  const shown = tab === 'analyzed' ? analyzed : uploaded
   // 🔴 자리를 상태로 들고 있으므로 목록이 짧은 갈래로 옮겨 가면 넘칠 수 있다.
   // 그릴 때 여기서 한 번 잡는다 — 탭을 누를 때만 0 으로 되돌리면, 목록 자체가
   // 줄어드는 경우(다시 받아 온 뒤)를 놓친다.
-  const i = Math.min(at, Math.max(shown.length - 1, 0));
-  const v = shown[i];
+  const i = Math.min(at, Math.max(shown.length - 1, 0))
+  const v = shown[i]
 
   /**
    * 이 영상에 매달린 분석 리포트.
@@ -157,40 +160,86 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
    * (공개 목록 · 카드 꾸미기에서 이미 데인 자리다). 영상이 바뀔 때마다
    * effect 에서 다시 읽는다.
    */
-  const [report, setReport] = useState<SavedReport | null>(null);
+  const [report, setReport] = useState<SavedReport | null>(null)
   useEffect(() => {
-    setReport(v ? reportFor(v.id) : null);
-  }, [v]);
+    setReport(v ? reportFor(v.id) : null)
+  }, [v])
 
   /**
    * 나를 보여주는 **대표 영상**으로 세워 둔 클립의 id.
    *
    * 🔴 그릴 때 읽지 않는다 — 서버엔 없는 값이라 하이드레이션이 깨진다.
    */
-  const [featured, setFeaturedId] = useState<string | null>(null);
+  const [featured, setFeaturedId] = useState<string | null>(null)
   useEffect(() => {
-    setFeaturedId(loadFeatured()?.videoId ?? null);
-  }, []);
+    setFeaturedId(loadFeatured()?.videoId ?? null)
+  }, [])
 
   /** 세우거나 푼다. 같은 영상을 다시 누르면 풀린다 — 대표는 하나뿐이다. */
   function toggleFeatured(target: MyVideo) {
-    const on = featured === target.id;
-    setFeatured(on ? null : { videoId: target.id, src: previewSrc(target) });
-    setFeaturedId(on ? null : target.id);
+    const on = featured === target.id
+    setFeatured(on ? null : { videoId: target.id, src: previewSrc(target) })
+    setFeaturedId(on ? null : target.id)
+  }
+
+  /**
+   * 이 클립을 지운다 — **저장소의 영상과 그 분석 리포트까지.**
+   *
+   * 🔴 되돌릴 수 없어서 한 번 더 묻는다(`confirming`). `window.confirm` 을
+   * 쓰지 않는다 — 이 사이트는 제 판을 그려 왔고, 그쪽은 시험에서도 못 누른다.
+   *
+   * 🔴 **서버가 지운 뒤에야 화면에서 뺀다.** 먼저 빼고 나중에 부르면, 실패한
+   * 경우 사라진 것처럼 보이는데 실제로는 남아 있다.
+   *
+   * 🔴 브라우저에만 있는 것들(대표 · 공개 · 리포트)도 함께 거둔다 — 계약에
+   * 자리가 없어 여기 남아 있는 값들이라(미결 paik 5·7·10번) 서버가 지워
+   * 주지 못한다.
+   */
+  async function removeVideo(target: MyVideo) {
+    if (removing) return
+    setRemoving(true)
+    setNotice(null)
+    try {
+      const res = await fetch(`/api/videos/${encodeURIComponent(target.id)}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        const body: unknown = await res.json().catch(() => null)
+        const msg =
+          typeof body === 'object' && body !== null && 'error' in body
+            ? ((body as { error?: { message?: string } }).error?.message ?? null)
+            : null
+        throw new Error(msg ?? '지우지 못했습니다.')
+      }
+      if (featured === target.id) {
+        setFeatured(null)
+        setFeaturedId(null)
+      }
+      unpublish(target.id)
+      setPubIds((prev) => prev.filter((id) => id !== target.id))
+      forgetReport(target.id)
+      setAdded((prev) => prev.filter((x) => x.id !== target.id))
+      setRemoved((prev) => [...prev, target.id])
+      setConfirming(null)
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : '지우지 못했습니다.')
+    } finally {
+      setRemoving(false)
+    }
   }
 
   function pick(next: TabKey) {
-    setTab(next);
-    setAt(0);
+    setTab(next)
+    setAt(0)
   }
 
   function step(delta: number) {
     setAt((prev) => {
-      const n = shown.length;
-      if (n === 0) return 0;
+      const n = shown.length
+      if (n === 0) return 0
       // 끝에서 반대쪽으로 돈다 — 목록이 짧아 끝이 금방 온다.
-      return (Math.min(prev, n - 1) + delta + n) % n;
-    });
+      return (Math.min(prev, n - 1) + delta + n) % n
+    })
   }
 
   /**
@@ -199,65 +248,65 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
    * 남겨야 하는 것이라(SFR-001) 여기서 가로채지 않는다.
    */
   function onPick(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0] ?? null;
+    const f = e.target.files?.[0] ?? null
     // 🔴 같은 파일을 다시 골라도 change 가 오게 비운다. 안 그러면 반려된 영상을
     // 고쳐서 다시 고를 때 아무 일도 안 일어난다.
-    e.target.value = "";
-    setNotice(null);
-    setMeta(null);
-    if (!f) return;
-    const bad = checkClip(f);
+    e.target.value = ''
+    setNotice(null)
+    setMeta(null)
+    if (!f) return
+    const bad = checkClip(f)
     if (bad) {
-      setPicked(null);
-      setNotice(bad);
-      return;
+      setPicked(null)
+      setNotice(bad)
+      return
     }
-    setPicked(f);
+    setPicked(f)
   }
 
   async function send(sport: SportKey) {
-    if (!picked || !meta || busy) return;
-    setBusy(true);
-    setNotice(null);
+    if (!picked || !meta || busy) return
+    setBusy(true)
+    setNotice(null)
     try {
       const saved = await uploadClip({
         file: picked,
         sportCode: SPORT_CODE[sport],
         meta,
         analyze: false,
-      });
-      setAdded((prev) => [saved, ...prev]);
-      setPicked(null);
-      setMeta(null);
+      })
+      setAdded((prev) => [saved, ...prev])
+      setPicked(null)
+      setMeta(null)
       if (!saved.passed) {
-        setNotice(saved.reject_reason ?? "규격에 맞지 않아 반려됐습니다.");
+        setNotice(saved.reject_reason ?? '규격에 맞지 않아 반려됐습니다.')
       } else {
         /* 🔴 **보낸 뜻이 아니라 돌아온 응답을 믿는다.** 계약이 아직 `analyze` 를
            모르므로 백엔드가 그것을 무시하고 분석을 걸 수 있다 — 그러면
            `analysis_job_id` 가 채워져 오고, 그때는 「분석 영상」이 사실이다. */
-        setTab(saved.analysis_job_id === null ? "uploaded" : "analyzed");
-        setAt(0);
+        setTab(saved.analysis_job_id === null ? 'uploaded' : 'analyzed')
+        setAt(0)
       }
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "올리지 못했습니다.");
+      setNotice(err instanceof Error ? err.message : '올리지 못했습니다.')
     } finally {
-      setBusy(false);
+      setBusy(false)
     }
   }
 
   function togglePublish(target: MyVideo) {
     if (pubIds.includes(target.id)) {
-      unpublish(target.id);
-      setPubIds((prev) => prev.filter((x) => x !== target.id));
-      setForm(null);
-      return;
+      unpublish(target.id)
+      setPubIds((prev) => prev.filter((x) => x !== target.id))
+      setForm(null)
+      return
     }
     // 켜는 것만으로는 안 올린다 — 제목이 있어야 영상 모음에서 이름이 생긴다.
-    setForm({ id: target.id, title: "", what: "" });
+    setForm({ id: target.id, title: '', what: '' })
   }
 
   function savePublish(target: MyVideo) {
-    if (!form || !form.title.trim()) return;
+    if (!form || !form.title.trim()) return
     publish({
       id: target.id,
       title: form.title.trim(),
@@ -265,57 +314,54 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
       /* 조회용 주소가 없어(계약 3-6절 "아직 없는 것") 실제 백엔드가 준 키는
          영상 모음에서도 안 틀린다 — `previewSrc` 와 같은 한계다. */
       src: previewSrc(target) ?? target.storage_key,
-      aspect: ratio ? `${ratio} / 1` : "16 / 9",
+      aspect: ratio ? `${ratio} / 1` : '16 / 9',
       at: target.created_at.slice(0, 10),
-    });
-    setPubIds((prev) => [...prev, target.id]);
-    setForm(null);
+    })
+    setPubIds((prev) => [...prev, target.id])
+    setForm(null)
   }
 
   return (
     <>
       <div className="ss-profile-tabrow">
-        <div className="ss-profile-tabs" role="tablist" aria-label="내 영상">
-          {/* 🔴 편수를 **안 적는다**(사용자 요청). 몇 편인지는 영상 아래 `1 / N`
+      <div className="ss-profile-tabs" role="tablist" aria-label="내 영상">
+        {/* 🔴 편수를 **안 적는다**(사용자 요청). 몇 편인지는 영상 아래 `1 / N`
             이 이미 말하고 있어서 같은 말이 두 곳에 있던 자리다. */}
-          {(
-            [
-              ["analyzed", "분석 영상"],
-              ["uploaded", "업로드 영상"],
-            ] as const
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              aria-selected={tab === key}
-              className="ss-profile-tab"
-              data-on={tab === key}
-              onClick={() => pick(key)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        {(
+          [
+            ['analyzed', '분석 영상'],
+            ['uploaded', '업로드 영상'],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
+            className="ss-profile-tab"
+            data-on={tab === key}
+            onClick={() => pick(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
-        {/* 🔴 `accept` 는 **힌트일 뿐**이다 — 파일 고르기 창에서 거름망을 "모든
+      {/* 🔴 `accept` 는 **힌트일 뿐**이다 — 파일 고르기 창에서 거름망을 "모든
           파일" 로 바꾸면 무엇이든 들어온다. 진짜 관문은 `checkClip` 이다. */}
-        <label
-          className="ss-profile-upload"
-          data-busy={busy ? "true" : undefined}
-        >
-          <input
-            type="file"
-            accept="video/*"
-            aria-label="올릴 영상"
-            disabled={busy}
-            onChange={onPick}
-          />
-          <span className="material-symbols-outlined" aria-hidden="true">
-            upload
-          </span>
-          업로드
-        </label>
+      <label className="ss-profile-upload" data-busy={busy ? 'true' : undefined}>
+        <input
+          type="file"
+          accept="video/*"
+          aria-label="올릴 영상"
+          disabled={busy}
+          onChange={onPick}
+        />
+        <span className="material-symbols-outlined" aria-hidden="true">
+          upload
+        </span>
+        업로드
+      </label>
       </div>
 
       {/* 올리는 중에 무슨 일이 있었는지 — 거른 사유 · 반려 사유 · 실패 사유. */}
@@ -337,12 +383,12 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
             playsInline
             preload="metadata"
             onLoadedMetadata={(e) => {
-              const el = e.currentTarget;
+              const el = e.currentTarget
               setMeta({
                 duration_ms: Math.round((el.duration || 0) * 1000),
                 width: el.videoWidth || 0,
                 height: el.videoHeight || 0,
-              });
+              })
             }}
           />
           <div className="ss-profile-picked-ask">
@@ -358,10 +404,7 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
                   disabled={!meta || busy}
                   onClick={() => send(sp.key)}
                 >
-                  <span
-                    className="material-symbols-outlined"
-                    aria-hidden="true"
-                  >
+                  <span className="material-symbols-outlined" aria-hidden="true">
                     {sp.icon}
                   </span>
                   {sp.label}
@@ -369,7 +412,7 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
               ))}
             </span>
             <p className="ss-profile-picked-hint">
-              {busy ? "올리는 중입니다…" : "종목을 고르면 올라갑니다."}
+              {busy ? '올리는 중입니다…' : '종목을 고르면 올라갑니다.'}
             </p>
           </div>
         </div>
@@ -377,15 +420,15 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
 
       {!v ? (
         <p className="ss-profile-muted">
-          {tab === "analyzed"
-            ? "아직 분석한 영상이 없습니다."
-            : "아직 업로드한 영상이 없습니다."}
+          {tab === 'analyzed'
+            ? '아직 분석한 영상이 없습니다.'
+            : '아직 업로드한 영상이 없습니다.'}
         </p>
       ) : (
         <div className="ss-profile-video" data-state={videoState(v).key}>
           <div
             className="ss-profile-video-frame"
-            style={{ "--ss-video-r": ratio ?? 16 / 9 } as React.CSSProperties}
+            style={{ '--ss-video-r': ratio ?? 16 / 9 } as React.CSSProperties}
           >
             {/* 🔴 **키가 고정된 자리다**(2026-09-08, 사용자 요청: "세로영상이든
                 가로영상이든 단추 위치가 안 바뀌게"). 영상은 자기 비 그대로
@@ -397,20 +440,20 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
                 자리는 그대로 둔다. 비면 판이 접혀서 무엇이 잘못됐는지보다
                 화면이 깨진 것처럼 보인다. */}
             <div className="ss-profile-video-slot">
-              {previewSrc(v) && (
-                /* 🔴 `key` 를 영상 id 로 준다. 없으면 다음 영상으로 넘길 때 리액트가
+            {previewSrc(v) && (
+              /* 🔴 `key` 를 영상 id 로 준다. 없으면 다음 영상으로 넘길 때 리액트가
                  같은 <video> 를 재사용해서 **src 만 갈리고 재생 위치 · 재생 중
                  여부가 그대로 남는다.** `preload="metadata"` 인 것도 그대로다 —
                  목록이 아니라 한 편만 그리지만, 넘길 때마다 본편을 받으면 낭비다. */
-                <video
-                  key={v.id}
-                  className="ss-profile-video-player"
-                  src={previewSrc(v) ?? undefined}
-                  controls={showControls}
-                  muted
-                  playsInline
-                  preload="metadata"
-                  /* 🔴 막대를 켜고 끄는 신호는 **영상 자신만** 듣는다.
+              <video
+                key={v.id}
+                className="ss-profile-video-player"
+                src={previewSrc(v) ?? undefined}
+                controls={showControls}
+                muted
+                playsInline
+                preload="metadata"
+                /* 🔴 막대를 켜고 끄는 신호는 **영상 자신만** 듣는다.
                    ⚠️ 상자(frame)에서 들었다가 두 번 데였다: 아래 넘기는 줄에
                    손만 얹어도 떴고, 그 줄의 단추를 누르면 **단추가 받은
                    포커스**가 상자까지 올라와 또 떴다(React 의 onFocus 는
@@ -418,31 +461,28 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
                    🔴 `tabIndex` 를 주는 이유 — 막대가 없는 `<video>` 는 포커스를
                    못 받아서, 없으면 키보드만 쓰는 사람은 재생에 닿을 길이
                    아예 없다. */
-                  tabIndex={0}
-                  onMouseEnter={() => setShowControls(true)}
-                  onMouseLeave={() => setShowControls(false)}
-                  onFocus={() => setShowControls(true)}
-                  onBlur={() => setShowControls(false)}
-                  onLoadedMetadata={(e) => {
-                    const el = e.currentTarget;
-                    if (el.videoWidth && el.videoHeight)
-                      setRatio(el.videoWidth / el.videoHeight);
-                  }}
-                />
-              )}
+                tabIndex={0}
+                onMouseEnter={() => setShowControls(true)}
+                onMouseLeave={() => setShowControls(false)}
+                onFocus={() => setShowControls(true)}
+                onBlur={() => setShowControls(false)}
+                onLoadedMetadata={(e) => {
+                  const el = e.currentTarget
+                  if (el.videoWidth && el.videoHeight) setRatio(el.videoWidth / el.videoHeight)
+                }}
+              />
+            )}
             </div>
 
-            {/* ⚠️ 영상 아래 붙던 상자(종목 · 날짜 · 길이 · 상태 배지)는 걷어냈다
+          {/* ⚠️ 영상 아래 붙던 상자(종목 · 날짜 · 길이 · 상태 배지)는 걷어냈다
               (사용자 요청). 어떤 갈래인지는 **위 알약이 이미 말하고 있어서**
               같은 말을 두 번 하던 자리였다.
 
               🔴 반려 사유만 남긴다 — 그건 알약이 대신해 줄 수 없고, 없으면
               왜 안 됐는지 알 데가 사라진다. */}
-            {v.reject_reason && (
-              <p className="ss-profile-video-reason">{v.reject_reason}</p>
-            )}
+          {v.reject_reason && <p className="ss-profile-video-reason">{v.reject_reason}</p>}
 
-            {/* 🔴 **나를 보여주는 대표 영상**(사용자 요청, 2026-09-08). 영상
+          {/* 🔴 **나를 보여주는 대표 영상**(사용자 요청, 2026-09-08). 영상
               오른쪽 아래 모서리에 붙는다 — 그 영상에 대한 일이라 영상에서
               멀어지면 무엇을 세우는 것인지 흐려진다.
 
@@ -452,64 +492,57 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
 
               ⚠️ 반려된 클립에는 안 낸다 — 서버가 안 보는 영상이다. */}
 
-            {/* 🔴 **업로드 갈래에서만** 낸다. 분석을 건 영상은 리포트를 보려고 올린
+          {/* 🔴 **업로드 갈래에서만** 낸다. 분석을 건 영상은 리포트를 보려고 올린
               것이고, 영상 모음은 올린 장면을 훑는 자리다 — 성격이 다르다. */}
-            {tab === "uploaded" && (
-              <div className="ss-profile-publish">
-                <button
-                  type="button"
-                  className="ss-profile-publish-toggle"
-                  data-on={pubIds.includes(v.id) ? "true" : undefined}
-                  aria-pressed={pubIds.includes(v.id)}
-                  onClick={() => togglePublish(v)}
-                >
-                  <span
-                    className="material-symbols-outlined"
-                    aria-hidden="true"
-                  >
-                    {pubIds.includes(v.id) ? "visibility" : "visibility_off"}
-                  </span>
-                  {pubIds.includes(v.id) ? "공개 중" : "공개"}
-                </button>
+          {tab === 'uploaded' && (
+            <div className="ss-profile-publish">
+              <button
+                type="button"
+                className="ss-profile-publish-toggle"
+                data-on={pubIds.includes(v.id) ? 'true' : undefined}
+                aria-pressed={pubIds.includes(v.id)}
+                onClick={() => togglePublish(v)}
+              >
+                <span className="material-symbols-outlined" aria-hidden="true">
+                  {pubIds.includes(v.id) ? 'visibility' : 'visibility_off'}
+                </span>
+                {pubIds.includes(v.id) ? '공개 중' : '공개'}
+              </button>
 
-                {form?.id === v.id && (
-                  <div className="ss-profile-publish-form">
-                    <label htmlFor="ss-pub-title">제목</label>
-                    <input
-                      id="ss-pub-title"
-                      value={form.title}
-                      maxLength={40}
-                      onChange={(e) =>
-                        setForm({ ...form, title: e.target.value })
-                      }
-                    />
-                    <label htmlFor="ss-pub-what">한 줄 설명</label>
-                    <input
-                      id="ss-pub-what"
-                      value={form.what}
-                      maxLength={60}
-                      onChange={(e) =>
-                        setForm({ ...form, what: e.target.value })
-                      }
-                    />
-                    {/* ⚠️ 서버에 공개 여부를 둘 자리가 아직 없다(미결). 그것을
+              {form?.id === v.id && (
+                <div className="ss-profile-publish-form">
+                  <label htmlFor="ss-pub-title">제목</label>
+                  <input
+                    id="ss-pub-title"
+                    value={form.title}
+                    maxLength={40}
+                    onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  />
+                  <label htmlFor="ss-pub-what">한 줄 설명</label>
+                  <input
+                    id="ss-pub-what"
+                    value={form.what}
+                    maxLength={60}
+                    onChange={(e) => setForm({ ...form, what: e.target.value })}
+                  />
+                  {/* ⚠️ 서버에 공개 여부를 둘 자리가 아직 없다(미결). 그것을
                       숨기면 다른 기기에서 안 보일 때 고장으로 읽힌다. */}
-                    <p className="ss-profile-publish-note">
-                      아직 이 브라우저에만 남습니다 — 다른 기기나 다른
-                      사람에게는 보이지 않습니다.
-                    </p>
-                    <button
-                      type="button"
-                      className="ss-profile-publish-save"
-                      disabled={!form.title.trim()}
-                      onClick={() => savePublish(v)}
-                    >
-                      공개하기
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+                  <p className="ss-profile-publish-note">
+                    아직 이 브라우저에만 남습니다 — 다른 기기나 다른 사람에게는 보이지
+                    않습니다.
+                  </p>
+                  <button
+                    type="button"
+                    className="ss-profile-publish-save"
+                    disabled={!form.title.trim()}
+                    onClick={() => savePublish(v)}
+                  >
+                    공개하기
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
             {/* 🔴 **한 편뿐이어도 그린다**(사용자 요청) — `1 / 1` 이 보여야 갈래
                 안에 몇 편이 있는지 알 수 있고, 갈래를 바꿔도 줄이 사라졌다
@@ -519,19 +552,56 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
                   줄이 둘로 갈려 판이 그만큼 길어진다. 넘기는 단추는 가운데
                   그대로여야 하므로 이 단추만 흐름 밖으로 빼서 오른쪽에 건다.
                   ⚠️ 반려된 클립에는 안 낸다 — 서버가 안 보는 영상이다. */}
+              {/* 🔴 **지우기는 줄의 왼쪽 끝**이다 — 대표 영상 단추와 마주 본다.
+                  그 단추와 같은 이유로 흐름 밖으로 뺀다: 흐름에 두면 가운데
+                  넘기는 단추가 그만큼 밀려 영상마다 자리가 갈린다.
+
+                  ⚠️ 되돌릴 수 없는 단추가 화살표 바로 옆에 있으면 안 된다 —
+                  그래서 반대쪽 끝이고, 누르면 한 번 더 묻는다. */}
+              <span className="ss-profile-del">
+                {confirming === v.id ? (
+                  <>
+                    <button
+                      type="button"
+                      className="ss-profile-del-btn"
+                      data-armed="true"
+                      disabled={removing}
+                      onClick={() => removeVideo(v)}
+                    >
+                      {removing ? '지우는 중…' : '정말 지웁니다'}
+                    </button>
+                    <button
+                      type="button"
+                      className="ss-profile-del-btn"
+                      disabled={removing}
+                      onClick={() => setConfirming(null)}
+                    >
+                      취소
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="ss-profile-del-btn"
+                    onClick={() => setConfirming(v.id)}
+                  >
+                    <span className="material-symbols-outlined" aria-hidden="true">
+                      delete
+                    </span>
+                    삭제
+                  </button>
+                )}
+              </span>
               {v.passed && (
                 <button
                   type="button"
                   className="ss-profile-featured-btn"
-                  data-on={featured === v.id ? "true" : undefined}
+                  data-on={featured === v.id ? 'true' : undefined}
                   aria-pressed={featured === v.id}
                   onClick={() => toggleFeatured(v)}
                 >
-                  <span
-                    className="material-symbols-outlined"
-                    aria-hidden="true"
-                  >
-                    {featured === v.id ? "stars" : "star"}
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    {featured === v.id ? 'stars' : 'star'}
                   </span>
                   나를 보여주는 대표 영상
                 </button>
@@ -577,8 +647,8 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
                 흐름 안에 둔다 — 겹쳐 놓으면 넘기는 단추를 덮는다. */}
             {v.passed && featured === v.id && (
               <p className="ss-profile-featured-note">
-                추천 판에서 나를 소개할 때 이 장면이 돕니다 — 아직 이
-                브라우저에만 남습니다.
+                추천 판에서 나를 소개할 때 이 장면이 돕니다 — 아직 이 브라우저에만
+                남습니다.
               </p>
             )}
 
@@ -596,14 +666,14 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
           {
             <ul className="ss-profile-strip">
               {shown.map((sv, idx) => {
-                const src = previewSrc(sv);
+                const src = previewSrc(sv)
                 return (
                   <li key={sv.id}>
                     <button
                       type="button"
                       className="ss-profile-strip-item"
                       data-on={idx === i}
-                      aria-current={idx === i ? "true" : undefined}
+                      aria-current={idx === i ? 'true' : undefined}
                       aria-label={`${idx + 1}번째 영상`}
                       onClick={() => setAt(idx)}
                     >
@@ -614,13 +684,11 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
                         <video src={src} muted playsInline preload="metadata" />
                       ) : (
                         /* 조회용 주소가 없는 클립(실물 백엔드) — 순서만 적는다. */
-                        <span className="ss-profile-strip-blank">
-                          {idx + 1}
-                        </span>
+                        <span className="ss-profile-strip-blank">{idx + 1}</span>
                       )}
                     </button>
                   </li>
-                );
+                )
               })}
             </ul>
           }
@@ -635,7 +703,7 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
               ⚠️ 계약에 리포트를 **읽는** 경로가 없어(미결 paik 7번) 이 값은
               그 브라우저에만 있다. 그래서 아래에 그렇게 적어 둔다 — 숨기면
               다른 기기에서 안 보일 때 고장으로 읽힌다. */}
-          {tab === "analyzed" && report && (
+          {tab === 'analyzed' && report && (
             <section className="ss-profile-report" aria-label="분석 리포트">
               <h3 className="ss-profile-report-head">분석 리포트</h3>
               <ReportView report={report} />
@@ -647,5 +715,5 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
         </div>
       )}
     </>
-  );
+  )
 }
