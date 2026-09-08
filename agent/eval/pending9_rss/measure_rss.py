@@ -64,7 +64,12 @@ TARGET_LONG_FRAMES = 320
 PLAN_SAFE = [("1080p_long", 60), ("1080p_long", 150), ("1080p_long", 300),
              ("4k_long", 30), ("4k_long", 60)]
 #: EC2(RAM 15GB). 🔴 4K 300장이 여기 들어 있다 — 이 조합이 이 항목의 핵심이다.
-PLAN_FULL = PLAN_SAFE + [("4k_long", 150), ("4k_long", 300)]
+#:
+#: 🔴 **4K 300장이 두 번 있다.** 사전 등록 기준 D 가 「같은 조합을 2회 돌렸을 때
+#: `RSS_peak` 이 10% 안」인데 계획 표에 반복이 빠져 있었다. 재는 계획이 기준을
+#: 만족시키지 못하면 그 기준은 영원히 판정이 안 된다. 반복 점은 **적합에서
+#: 빼고**(`repeat_of`) D 판정에만 쓴다 — 같은 점을 두 번 세면 적합이 그쪽으로 쏠린다.
+PLAN_FULL = PLAN_SAFE + [("4k_long", 150), ("4k_long", 300), ("4k_long", 300)]
 
 
 def rss_kb() -> int:
@@ -246,8 +251,9 @@ def fit(rows: list[dict]) -> None:
     #    RSS 를 정하는 것은 화소 수지 파일 이름이 아니다.
     fits = {}
     for res in sorted({f"{r['w']}x{r['h']}" for r in rows}):
+        # 🔴 재현 회차는 뺀다 — 같은 점을 두 번 세면 최소제곱이 그쪽으로 쏠린다.
         pts = [(r["frame_bytes_mb"], r["rss_peak_mb"]) for r in rows
-               if f"{r['w']}x{r['h']}" == res]
+               if f"{r['w']}x{r['h']}" == res and not r.get("repeat_of")]
         if len(pts) < 2:
             print(f"  {res:12s} 점이 {len(pts)}개뿐 — 적합 불가")
             continue
@@ -274,11 +280,50 @@ def fit(rows: list[dict]) -> None:
               f"{'✅' if all(1.0 <= k <= 3.0 for k in ks) else '🔴'}")
 
 
+def mem_total_mb() -> float:
+    """이 기계의 물리 RAM(MB). 기준 C 는 「인스턴스 RAM 안」이라 실측이 필요하다."""
+    for line in Path("/proc/meminfo").read_text().splitlines():
+        if line.startswith("MemTotal:"):
+            return int(line.split()[1]) / 1e3
+    return 0.0
+
+
+def judge_c_d(rows: list[dict]) -> None:
+    """사전 등록 기준 C(4K 300장이 RAM 안)·D(재현 10% 안)를 판정한다.
+
+    **판정 문구를 여기서 만든다** — 표를 눈으로 읽고 사람이 옮겨 적으면 그때
+    기준이 흔들린다. 기준은 `PREREGISTRATION.md` 에 측정 전에 고정됐다.
+    """
+    ram = mem_total_mb()
+    print(f"\n{'='*70}\n사전 등록 기준 C·D\n{'='*70}")
+
+    core = [r for r in rows if r["label"] == "4k_long" and r["requested_frames"] == 300]
+    if not core:
+        print("  기준 C — 4K 300장 회차가 없다. 판정 불가")
+    else:
+        peak = max(r["rss_peak_mb"] for r in core)
+        print(f"  기준 C — 4K 300장 RSS 피크 {peak:.0f}MB / RAM {ram:.0f}MB "
+              f"({peak / ram * 100:.0f}%): {'✅' if peak <= ram else '🔴'}")
+
+    if len(core) < 2:
+        print(f"  기준 D — 4K 300장이 {len(core)}회뿐 — 재현 판정 불가")
+    else:
+        peaks = [r["rss_peak_mb"] for r in core]
+        spread = (max(peaks) - min(peaks)) / max(peaks) * 100
+        print(f"  기준 D — 회차 {['%.0f' % p for p in peaks]}MB, 편차 {spread:.1f}% "
+              f"(합격선 10% 이내): {'✅' if spread <= 10 else '🔴'}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--plan", choices=("safe", "full"), default="safe",
                     help="safe=로컬(4K 300장 제외) · full=EC2")
-    ap.add_argument("--clip", choices=tuple(CLIPS), help="한 조합만 돌린다")
+    # 🔴 `choices=tuple(CLIPS)` 를 쓰지 않는다. `CLIPS` 는 모듈 수준에서 **비어
+    #    있고** `discover_clips()` 가 채우는데, 그 호출은 `parse_args()` **뒤**다.
+    #    선택지가 빈 채로 굳어 어떤 `--clip` 값도 "invalid choice" 가 되고,
+    #    argparse 는 **종료 코드 2** 로 죽는다 — 자식 프로세스가 전부 그렇게
+    #    죽었다(2026-09-08 EC2). 검사는 클립을 찾은 **뒤에** 한다.
+    ap.add_argument("--clip", help="한 조합만 돌린다 (자식 프로세스용)")
     ap.add_argument("--frames", type=int, help="--clip 과 함께 쓴다")
     ap.add_argument("--fps", type=int, default=30)
     ap.add_argument("--prepare", action="store_true",
@@ -287,6 +332,13 @@ def main() -> None:
     args = ap.parse_args()
 
     discover_clips()
+
+    if args.clip and args.clip not in CLIPS:
+        raise SystemExit(
+            f"--clip 값을 모른다: {args.clip}\n"
+            f"  가능한 값: {sorted(CLIPS)}\n"
+            "  `_long` 이 없으면 `--prepare` 를 먼저 돌린다."
+        )
 
     if args.prepare:
         prepare_long_clips()
@@ -309,6 +361,7 @@ def main() -> None:
     print("-" * 78)
     rows = []
     short = []
+    seen: set[tuple[str, int]] = set()
     for label, frames in plan:
         # 🔴 **조합마다 새 프로세스로 돈다.** `VmHWM` 은 프로세스 생애 최고라
         #    한 프로세스에서 이어 돌리면 **뒤 회차가 앞 회차의 봉우리를 물려받는다**
@@ -321,8 +374,10 @@ def main() -> None:
         r["reached"] = r["frames"] == r["requested_frames"]
         if not r["reached"]:
             short.append(r)
+        r["repeat_of"] = (label, frames) in seen
+        seen.add((label, frames))
         rows.append(r)
-        print(f"{label + ' ' + str(frames):16s}{r['frames']:6d}"
+        print(f"{label + ' ' + str(frames) + ('(재현)' if r['repeat_of'] else ''):16s}{r['frames']:6d}"
               f"{r['w']}x{r['h']:>7}{r['frame_bytes_mb']:11.0f}MB"
               f"{r['rss_peak_mb']:9.0f}MB{r['rss_delta_mb']:8.0f}MB"
               f"{r['ratio_peak_over_frames'] or 0:6.2f}{r['seconds']:6.0f}")
@@ -339,6 +394,7 @@ def main() -> None:
         raise SystemExit(2)
 
     fit(rows)
+    judge_c_d(rows)
     print("\n🔴 여기서 DEFAULT_MAX_FRAMES 를 바꾸지 않는다 — features 가 달라져")
     print("   B-6 재실행을 부른다(미결 11번). 이 회차는 예산을 정할 근거만 만든다.")
 
