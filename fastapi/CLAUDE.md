@@ -36,7 +36,9 @@ DB가 필요하다. WSL은 자동 기동이 아니다 — `pg_ctlcluster 18 main
 ## 구조 — 기술 계층이 아니라 **바운디드 컨텍스트**
 
 `app/<컨텍스트>/{domain,application,adapter,dependencies}`. 컨텍스트는
-`user` · `card` · `analysis` 셋이고 공용은 `app/core/`다.
+`user` · `card` · `analysis` · `match` · `review` 다섯이고 공용은 `app/core/`다.
+(목록의 정본은 `tests/test_architecture.py` 의 `CONTEXTS` — 실제 디렉터리와
+어긋나면 같은 파일의 `test_CONTEXTS가_실제_디렉터리와_일치한다` 가 잡는다.)
 
 🔴 **컨텍스트끼리 임포트하지 않는다.** 남의 테이블이 필요하면 **문자열 참조**로 건다.
 
