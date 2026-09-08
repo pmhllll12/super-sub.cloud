@@ -5,7 +5,7 @@ import type { MyVideo } from '@/server/backend'
 import { SPORTS, SPORT_CODE, type SportKey } from '@/lib/sports'
 import { checkClip, uploadClip, type ClipMeta } from '@/lib/uploadClip'
 import { listPublished, publish, unpublish } from '@/lib/published'
-import { reportFor, type SavedReport } from '@/lib/savedReports'
+import { forgetReport, reportFor, type SavedReport } from '@/lib/savedReports'
 import { loadFeatured, setFeatured } from '@/lib/featuredClip'
 import ReportView from '@/components/analysis/ReportView'
 
@@ -89,6 +89,15 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
    * 안 나타나면 올라간 건지 알 수가 없어서 앞에 얹어 둔다.
    */
   const [added, setAdded] = useState<MyVideo[]>([])
+  /**
+   * 방금 지운 것. 목록의 정본은 서버가 준 `videos` 이고 여기서 다시 받아
+   * 오지 않으므로, 지운 것을 이쪽에서 걸러 낸다 — 새로고침하면 서버 목록이
+   * 이미 그것을 빼고 온다.
+   */
+  const [removed, setRemoved] = useState<string[]>([])
+  /** 지울지 한 번 더 묻는 중인 영상 id. 되돌릴 수 없어서 곧바로 안 지운다. */
+  const [confirming, setConfirming] = useState<string | null>(null)
+  const [removing, setRemoving] = useState(false)
   /** 고른 파일. 크기를 재기 전에는 아직 못 올린다. */
   const [picked, setPicked] = useState<File | null>(null)
   const [pickedUrl, setPickedUrl] = useState<string | null>(null)
@@ -130,7 +139,7 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
     }
   }, [picked])
 
-  const all = [...added, ...videos]
+  const all = [...added, ...videos].filter((x) => !removed.includes(x.id))
   const analyzed = all.filter((v) => v.analysis_job_id !== null)
   const uploaded = all.filter((v) => v.analysis_job_id === null)
 
@@ -171,6 +180,52 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
     const on = featured === target.id
     setFeatured(on ? null : { videoId: target.id, src: previewSrc(target) })
     setFeaturedId(on ? null : target.id)
+  }
+
+  /**
+   * 이 클립을 지운다 — **저장소의 영상과 그 분석 리포트까지.**
+   *
+   * 🔴 되돌릴 수 없어서 한 번 더 묻는다(`confirming`). `window.confirm` 을
+   * 쓰지 않는다 — 이 사이트는 제 판을 그려 왔고, 그쪽은 시험에서도 못 누른다.
+   *
+   * 🔴 **서버가 지운 뒤에야 화면에서 뺀다.** 먼저 빼고 나중에 부르면, 실패한
+   * 경우 사라진 것처럼 보이는데 실제로는 남아 있다.
+   *
+   * 🔴 브라우저에만 있는 것들(대표 · 공개 · 리포트)도 함께 거둔다 — 계약에
+   * 자리가 없어 여기 남아 있는 값들이라(미결 paik 5·7·10번) 서버가 지워
+   * 주지 못한다.
+   */
+  async function removeVideo(target: MyVideo) {
+    if (removing) return
+    setRemoving(true)
+    setNotice(null)
+    try {
+      const res = await fetch(`/api/videos/${encodeURIComponent(target.id)}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        const body: unknown = await res.json().catch(() => null)
+        const msg =
+          typeof body === 'object' && body !== null && 'error' in body
+            ? ((body as { error?: { message?: string } }).error?.message ?? null)
+            : null
+        throw new Error(msg ?? '지우지 못했습니다.')
+      }
+      if (featured === target.id) {
+        setFeatured(null)
+        setFeaturedId(null)
+      }
+      unpublish(target.id)
+      setPubIds((prev) => prev.filter((id) => id !== target.id))
+      forgetReport(target.id)
+      setAdded((prev) => prev.filter((x) => x.id !== target.id))
+      setRemoved((prev) => [...prev, target.id])
+      setConfirming(null)
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : '지우지 못했습니다.')
+    } finally {
+      setRemoving(false)
+    }
   }
 
   function pick(next: TabKey) {
@@ -375,6 +430,16 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
             className="ss-profile-video-frame"
             style={{ '--ss-video-r': ratio ?? 16 / 9 } as React.CSSProperties}
           >
+            {/* 🔴 **키가 고정된 자리다**(2026-09-08, 사용자 요청: "세로영상이든
+                가로영상이든 단추 위치가 안 바뀌게"). 영상은 자기 비 그대로
+                이 안에서 가운데 서고, 남는 자리는 비워 둔다 — 자리를 영상
+                키에 맡기면 세로 영상에서 아래 것들이 통째로 64px 내려간다
+                (실측). **영상을 늘리거나 자르지 않는다.**
+
+                🔴 재생 주소가 없어도(배포에서 그렇다 — 미결 paik 12번) 이
+                자리는 그대로 둔다. 비면 판이 접혀서 무엇이 잘못됐는지보다
+                화면이 깨진 것처럼 보인다. */}
+            <div className="ss-profile-video-slot">
             {previewSrc(v) && (
               /* 🔴 `key` 를 영상 id 로 준다. 없으면 다음 영상으로 넘길 때 리액트가
                  같은 <video> 를 재사용해서 **src 만 갈리고 재생 위치 · 재생 중
@@ -407,6 +472,7 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
                 }}
               />
             )}
+            </div>
 
           {/* ⚠️ 영상 아래 붙던 상자(종목 · 날짜 · 길이 · 상태 배지)는 걷어냈다
               (사용자 요청). 어떤 갈래인지는 **위 알약이 이미 말하고 있어서**
@@ -486,6 +552,46 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
                   줄이 둘로 갈려 판이 그만큼 길어진다. 넘기는 단추는 가운데
                   그대로여야 하므로 이 단추만 흐름 밖으로 빼서 오른쪽에 건다.
                   ⚠️ 반려된 클립에는 안 낸다 — 서버가 안 보는 영상이다. */}
+              {/* 🔴 **지우기는 줄의 왼쪽 끝**이다 — 대표 영상 단추와 마주 본다.
+                  그 단추와 같은 이유로 흐름 밖으로 뺀다: 흐름에 두면 가운데
+                  넘기는 단추가 그만큼 밀려 영상마다 자리가 갈린다.
+
+                  ⚠️ 되돌릴 수 없는 단추가 화살표 바로 옆에 있으면 안 된다 —
+                  그래서 반대쪽 끝이고, 누르면 한 번 더 묻는다. */}
+              <span className="ss-profile-del">
+                {confirming === v.id ? (
+                  <>
+                    <button
+                      type="button"
+                      className="ss-profile-del-btn"
+                      data-armed="true"
+                      disabled={removing}
+                      onClick={() => removeVideo(v)}
+                    >
+                      {removing ? '지우는 중…' : '정말 지웁니다'}
+                    </button>
+                    <button
+                      type="button"
+                      className="ss-profile-del-btn"
+                      disabled={removing}
+                      onClick={() => setConfirming(null)}
+                    >
+                      취소
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="ss-profile-del-btn"
+                    onClick={() => setConfirming(v.id)}
+                  >
+                    <span className="material-symbols-outlined" aria-hidden="true">
+                      delete
+                    </span>
+                    삭제
+                  </button>
+                )}
+              </span>
               {v.passed && (
                 <button
                   type="button"
@@ -527,12 +633,15 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
               </button>
             </div>
 
-            {/* 영상 폭에 맞춰 늘었다 줄었다 하는 흰 선(사용자 요청). 상자가
-                이미 영상 크기라 `100%` 면 된다 — 폭을 다시 계산하지 않는다.
+            {/* 상자 폭을 그대로 쓰는 흰 선 — `100%` 면 된다.
 
-                🔴 **비를 알기 전에는 감춘다.** 그전에는 상자가 기본값(16:9)
-                이라, 세로 영상이면 선이 영상보다 넓게 그어진 채로 한 박자
-                보였다가 줄어든다(실측). 폭이 맞을 때만 나타나게 한다. */}
+                🔴 **상자는 이제 영상 비를 안 따른다**(2026-09-08, 사용자 요청).
+                세로 영상에서 줄이 좁아져 오른쪽 끝 단추가 가운데 화살표를
+                덮었기 때문이다 — `globals.css` 의 `.ss-profile-video-frame`
+                주석에 왜 뒤집었는지 적어 두었다.
+
+                🔴 **비를 알기 전에는 감춘다.** 폭은 이제 안 틀리지만, 영상이
+                아직 안 그려졌는데 선만 먼저 뜨면 허공에 그은 줄로 보인다. */}
             {/* ⚠️ 어디에 남는지 밝힌다 — 계약에 자리가 없어 이 브라우저에만
                 남는다(공개 여부 · 카드 꾸미기와 같은 규칙). 단추와 달리 이건
                 흐름 안에 둔다 — 겹쳐 놓으면 넘기는 단추를 덮는다. */}

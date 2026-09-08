@@ -40,6 +40,17 @@ export interface Backend {
   getPublicCard(slug: string): Promise<PublicPlayerCard>
   /** 내가 올린 클립 목록. **최근 것이 앞에 온다.** */
   listMyVideos(token: string): Promise<MyVideo[]>
+  /**
+   * 내가 올린 클립을 **지운다** — 저장소의 영상 파일과 그 분석 리포트까지.
+   *
+   * 🔴 되돌릴 수 없다. 화면이 먼저 한 번 더 묻는다(`MyVideos`).
+   * 🔴 남의 클립은 404 `VIDEO_NOT_FOUND` 다 — "있는데 남의 것"과 "없는 것"을
+   *    가르면 남의 클립 id 를 훑어 존재를 알아낼 수 있다.
+   *
+   * ⚠️ **아직 계약에 없다**(미결 paik 13번). 진짜 백엔드에서는 404 가 온다 —
+   * 지금 도는 것은 mock 뿐이다.
+   */
+  deleteMyVideo(token: string, videoId: string): Promise<void>
   /** 그 팀의 **다가오는** 경기. 이른 것이 앞에 온다. */
   listTeamMatches(token: string, teamId: string): Promise<Match[]>
   /** 경기를 새로 연다. 주장만 — 아니면 403 `FORBIDDEN`. */

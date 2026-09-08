@@ -103,7 +103,21 @@ function requireAdmin(token: string): User {
  * 🔴 세 상태를 일부러 갈라 두었다 — 화면이 구분해서 그려야 하는 것이
  * 그것이다: 분석까지 끝난 것 · 분석 중인 것 · 분석 없이 올리기만 한 것.
  */
-const DEMO_VIDEOS: MyVideo[] = [
+/**
+ * 🔴 **지울 수 있어야 해서 `let` 이다.** 삭제가 진짜로 목록에서 빠지는 것을
+ * 이 자리에서 보여 주지 않으면, 계약이 생기기 전까지 그 흐름을 아무도 못
+ * 밟아 본다(미결 paik 13번).
+ *
+ * ⚠️ **mock 으로 지운 것은 새로고침하면 되살아난다.** 버그가 아니라 개발
+ * 모드의 성질이다 — Next 는 서버 컴포넌트와 라우트 핸들러를 **다른 모듈
+ * 그래프**로 컴파일해서 이 파일이 두 벌 생긴다. 지우기는 라우트 쪽에서
+ * 도는데(`/api/videos/[id]`) `/me` 를 그리는 것은 다른 쪽이라, 라우트 쪽만
+ * 기억한다(실측 2026-09-08: 같은 영상을 다시 DELETE 하면 404 가 온다).
+ *
+ * 🔴 **진짜 백엔드에서는 안 그렇다** — 거기서는 상태가 DB 와 S3 에 있다.
+ * 이걸 고치겠다고 화면 쪽에 자리를 만들지 말 것.
+ */
+let DEMO_VIDEOS: MyVideo[] = [
   {
     id: 'v1',
     sport_code: 'football',
@@ -334,6 +348,17 @@ export const mockBackend: Backend = {
   async listMyVideos(token) {
     requireUser(token)
     return DEMO_VIDEOS
+  },
+
+  async deleteMyVideo(token, videoId) {
+    requireUser(token)
+    const before = DEMO_VIDEOS.length
+    DEMO_VIDEOS = DEMO_VIDEOS.filter((v) => v.id !== videoId)
+    // 🔴 없는 것을 지웠다고 하지 않는다 — 화면이 "지워졌다"로 읽고 목록에서
+    // 빼 버리면, 실제로는 남아 있는 영상이 사라진 것처럼 보인다.
+    if (DEMO_VIDEOS.length === before) {
+      throw new BackendError(404, 'VIDEO_NOT_FOUND', '그 영상을 찾을 수 없습니다.')
+    }
   },
 
   async listTeamMatches(token, teamId) {
