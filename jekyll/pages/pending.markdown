@@ -4796,7 +4796,7 @@ jin 21(공개 사이트 인프라 식별자 스크럽)에서 `jekyll/`·`_posts/
 | `video` 에 "저장됨" 표시(예: `kept` 불리언) + 마이그레이션 · `GET /videos` 필터 · `POST /videos` 가 경로별로 초기값 정함(`/analysis`=미저장, `/me` 업로드=저장) | 정어진 |
 | `POST /videos/{id}/keep`(또는 `PATCH`) — 저장 플립 + `videos/`→`reports/` S3 이동(`CopyObject`+`DeleteObject`) + `storage_key` 갱신 | 정어진 |
 | `DELETE /videos/{id}` — DB + S3. 미저장분 정리 스윕(job 회수처럼 트리거) | 정어진 |
-| EC2 인스턴스 역할 IAM: **`s3:DeleteObject`**(`videos/*`·`reports/*`) · `reports/*` 에 `s3:GetObject`·`s3:PutObject` — 지금 `DeleteObject` 는 일부러 빠져 있다(`deployment.md` 5절) | 박민호(콘솔) 또는 정어진(배포) |
+| EC2 인스턴스 역할 IAM: 인라인 정책에 `s3:DeleteObject` + `reports/*` 문 추가. **정책 JSON 은 `fastapi/docs/deployment.md` 「서버에 줄 권한」에 2026-09-08 판으로 준비됨** — 콘솔에 붙여넣기만. `jin` IAM 사용자는 `iam:*` 이 막혀 못 붙인다(같은 문서 확인). 반영·확인 절차도 그 절에 있음 | **박민호(콘솔)** |
 | 리포트 산출물 키를 `reports/<user_id>/<video_id>/` 로 정렬(지금은 `report_slug` = 상위폴더+stem) | 정상호 |
 | 실제 리포트를 DB 에 남겨 브라우저가 읽게(`paik` 7 · `POST /analyses`) — 지표 부분은 같은 구역 23번(시딩)에 물려 있다 | 정어진 + 정상호 |
 | `/analysis`: "저장"이 `keep` 호출, 화면을 벗어날 때 미저장분 `DELETE`, 「분석 영상」이 저장된 것만 | 백성검 |
@@ -4877,13 +4877,32 @@ jin 21(공개 사이트 인프라 식별자 스크럽)에서 `jekyll/`·`_posts/
   🔴 **동작 보존** — 지금은 등록되는 모든 영상이 `kept=true`(`75dfe07`).
 - ✅ **3조각** — `DELETE /videos/{id}`(`389de29`) — DB 연쇄(SEC-006) + S3
   (`storage_key` + `reports/<uid>/<vid>/`, best-effort). 계약 3-6 · CCC 21번.
-- ⬜ **2조각** — `POST /videos/{id}/keep` + `videos/`→`reports/` 이동. `reports/`
-  키 레이아웃을 정상호와 맞춘 뒤.
-- ⬜ **4조각** — 미저장분 스윕(`claim` 에 얹기).
+- ✅ **2조각** — `POST /videos/{id}/keep`. `kept=true` + 임시 원본(`videos/…`)을
+  `reports/<user_id>/<video_id>/source.<ext>` 로 옮긴다(S3 `CopyObject`+원본 삭제,
+  `StoragePort.move_object`). **분석 작업이 없는 클립(`/me` 업로드)은 안 옮긴다** —
+  리포트 폴더가 없다. 멱등(이미 `reports/` 면 이동 건너뜀). S3 이동을 먼저 하고
+  DB(`mark_kept`)를 맞춘다 — 순서가 반대면 DB 가 없는 객체를 가리키는 창이 생김.
+  🔴 리포트 JSON `source_video` 는 아직 옛 키 — `paik` 7(리포트 DB 이관) 때 정리
+  (정상호 조각 (1)). 계약 3-6 · CCC 24번.
+- ✅ **4조각** `88c43d6` — 미저장분 백스톱 스윕. `POST /internal/analysis-jobs/claim`
+  이 `reclaim_stale` 뒤에 `sweep_provisional(ttl)` 을 돈다(워커가 주기 호출 —
+  별도 스케줄러 없음). 대상: `kept=false` · `ttl` 보다 오래 · 진행 중
+  (`queued`/`running`) 작업 없음. DB 행 + S3(`storage_key` + `reports/<uid>/<vid>/`)
+  best-effort. `PROVISIONAL_VIDEO_TTL_HOURS=24`.
 - ⬜ **5조각** — 🔴 전환 `kept = not analyze`. **백성검 프론트가 `keep` 부를
   준비되면.** 그전에 켜면 `/analysis` 업로드가 프로필에서 사라진다.
-- ⬜ **6조각** — 파일명 슬러그 · `original_filename` · `upload-url` 에 `filename` ·
-  `GET/DELETE /admin/videos`.
+- ✅ **6조각** — `f6e3cc8`(6a): 저장 키 슬러그(`build_storage_key`, 닉네임·원본이름
+  한글·자모 보존) · `video.original_filename` 컬럼(`2598dc30f0cb`) ·
+  `POST /videos/upload-url` 에 `filename` 필수. `a8d72f9`: billing 과 head 충돌
+  재부모(체인 `…→98f9cbdc74f4→2598dc30f0cb`). 6b(`88c43d6` 다음 커밋): `GET
+  /admin/videos?user=<uid|email>`(현재 닉네임·이메일 + 임시분 포함 목록,
+  `report_prefix`) · `DELETE /admin/videos/{id}`(소유 검사 없음, DB 연쇄 + S3).
+  계약 3-2절 · CCC 23번.
+  - 🔴 **6b 는 "사람이 손으로" 하는 임시 경로다** (2026-09-08 사용자 확인).
+    사용자 원래 뜻은 "문제 영상을 일일히 사람이 관리"가 아니라 ⑴ **읽을 수 있는
+    S3 키**(6a)로 콘솔에서 가끔 확인 + ⑵ **자동 정리**(4조각 스윕)였다.
+    이미 구현됐으니 그대로 두되, **"문제 영상"의 자동/에이전트 처리**(잘못 돈
+    분석 감지·정리 등)는 나중 과제로 남긴다 — 6b 를 최종 설계로 보지 말 것.
 
 #### 지금 당장(테스트 단계 정리)
 

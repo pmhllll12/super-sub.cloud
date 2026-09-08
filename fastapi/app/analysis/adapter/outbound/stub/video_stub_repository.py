@@ -7,10 +7,11 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
-from app.analysis.application.dtos.video_dto import UNSET
+from app.analysis.application.dtos.video_dto import UNSET, UserRef
 from app.analysis.application.ports.output.storage_port import StoragePort
 from app.analysis.application.ports.output.video_port import VideoPort
 from app.analysis.domain.entities.video_entity import VideoEntity
@@ -40,6 +41,11 @@ class StubVideoRepository(VideoPort):
     def sport_exists(self, sport_code: str) -> bool:
         return sport_code in _SPORTS
 
+    def uploader_nickname(self, user_id: UUID) -> str | None:
+        # 스텁은 `user` 를 모른다 — 키 슬러그는 "user" 로 떨어진다. 닉네임이
+        # 실제로 키에 들어가는지는 `test_video_db.py`(진짜 `user` 행)가 본다.
+        return None
+
     def register(self, video: VideoEntity) -> None:
         _VIDEOS[video.id] = video
 
@@ -48,6 +54,18 @@ class StubVideoRepository(VideoPort):
             v for v in _VIDEOS.values() if v.user_id == user_id and v.kept
         ]
         return sorted(mine, key=lambda v: v.created_at, reverse=True)
+
+    def list_all_by_user(self, user_id: UUID) -> list[VideoEntity]:
+        mine = [v for v in _VIDEOS.values() if v.user_id == user_id]
+        return sorted(mine, key=lambda v: v.created_at, reverse=True)
+
+    def resolve_user(self, identifier: str) -> UserRef | None:
+        # 스텁은 `user` 를 모른다 — UUID 꼴이면 그 사람이 있다고 보고(닉네임·
+        # 이메일은 빈 값), 이메일 꼴은 못 찾는다. 실제 조회는 `test_video_db.py`.
+        try:
+            return UserRef(id=UUID(identifier), nickname="", email="")
+        except ValueError:
+            return None
 
     def get(self, video_id: UUID) -> VideoEntity | None:
         return _VIDEOS.get(video_id)
@@ -80,11 +98,37 @@ class StubVideoRepository(VideoPort):
         public.sort(key=lambda v: v.created_at, reverse=True)
         return public[:limit]
 
+    def mark_kept(
+        self, video_id: UUID, user_id: UUID, *, storage_key: str
+    ) -> VideoEntity | None:
+        video = _VIDEOS.get(video_id)
+        if video is None or video.user_id != user_id:
+            return None
+        updated = replace(video, kept=True, storage_key=storage_key)
+        _VIDEOS[video_id] = updated
+        return updated
+
     def delete(self, video_id: UUID, user_id: UUID) -> VideoEntity | None:
         video = _VIDEOS.get(video_id)
         if video is None or video.user_id != user_id:
             return None
         return _VIDEOS.pop(video_id)
+
+    def admin_delete(self, video_id: UUID) -> VideoEntity | None:
+        return _VIDEOS.pop(video_id, None)
+
+    def sweep_provisional(self, ttl_hours: int) -> list[VideoEntity]:
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=ttl_hours)
+        stale = [
+            v
+            for v in _VIDEOS.values()
+            if not v.kept
+            and v.created_at < cutoff
+            and v.analysis_status not in ("queued", "running")
+        ]
+        for v in stale:
+            del _VIDEOS[v.id]
+        return stale
 
 
 class FakeStorage(StoragePort):
@@ -105,6 +149,13 @@ class FakeStorage(StoragePort):
 
     def size_of(self, storage_key: str) -> int | None:
         return _OBJECTS.get(storage_key)
+
+    def move_object(self, src_key: str, dst_key: str) -> None:
+        if src_key == dst_key:
+            return
+        size = _OBJECTS.pop(src_key, None)
+        if size is not None:
+            _OBJECTS[dst_key] = size
 
     def delete_object(self, storage_key: str) -> None:
         _OBJECTS.pop(storage_key, None)

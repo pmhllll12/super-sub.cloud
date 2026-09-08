@@ -32,10 +32,16 @@ def _clean():
     reset_videos()
 
 
-def _issue(client, user_id, content_type="video/mp4", size_bytes=SIZE_OK):
+def _issue(
+    client, user_id, content_type="video/mp4", size_bytes=SIZE_OK, filename="clip.mp4"
+):
     res = client.post(
         f"{V1}/videos/upload-url",
-        json={"content_type": content_type, "size_bytes": size_bytes},
+        json={
+            "content_type": content_type,
+            "size_bytes": size_bytes,
+            "filename": filename,
+        },
         headers=_headers(user_id),
     )
     assert res.status_code == 200, res.text
@@ -58,7 +64,7 @@ class TestUploadUrl:
     def test_인증이_필요하다(self, client):
         res = client.post(
             f"{V1}/videos/upload-url",
-            json={"content_type": "video/mp4", "size_bytes": SIZE_OK},
+            json={"content_type": "video/mp4", "size_bytes": SIZE_OK, "filename": "c.mp4"},
         )
         assert res.status_code == 401
 
@@ -66,7 +72,7 @@ class TestUploadUrl:
         user_id = uuid4()
         res = client.post(
             f"{V1}/videos/upload-url",
-            json={"content_type": "video/mp4", "size_bytes": SIZE_OK},
+            json={"content_type": "video/mp4", "size_bytes": SIZE_OK, "filename": "c.mp4"},
             headers=_headers(user_id),
         )
         assert res.status_code == 200, res.text
@@ -78,7 +84,7 @@ class TestUploadUrl:
     def test_모르는_형식은_거부한다(self, client):
         res = client.post(
             f"{V1}/videos/upload-url",
-            json={"content_type": "video/x-msvideo", "size_bytes": SIZE_OK},
+            json={"content_type": "video/x-msvideo", "size_bytes": SIZE_OK, "filename": "c.avi"},
             headers=_headers(uuid4()),
         )
         assert res.status_code == 422
@@ -88,7 +94,7 @@ class TestUploadUrl:
         """헛걸음을 줄이는 자리다. 진짜 상한은 등록할 때 실측으로 건다."""
         res = client.post(
             f"{V1}/videos/upload-url",
-            json={"content_type": "video/mp4", "size_bytes": MAX_BYTES + 1},
+            json={"content_type": "video/mp4", "size_bytes": MAX_BYTES + 1, "filename": "c.mp4"},
             headers=_headers(uuid4()),
         )
         assert res.status_code == 422
@@ -511,6 +517,75 @@ class TestDeleteVideo:
     def test_없는_클립은_404_다(self, client):
         res = client.delete(
             f"{V1}/videos/{uuid4()}", headers=_headers(uuid4())
+        )
+        assert res.status_code == 404
+        assert error_code(res) == "VIDEO_NOT_FOUND"
+
+
+class TestKeepVideo:
+    """미결 jin 24번 2조각 — `POST /videos/{id}/keep`."""
+
+    def test_인증이_필요하다(self, client):
+        assert client.post(f"{V1}/videos/{uuid4()}/keep").status_code == 401
+
+    def test_저장하면_원본이_리포트_자리로_옮겨진다(self, client):
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+        video_id = _register(client, user_id, key).json()["id"]
+
+        res = client.post(f"{V1}/videos/{video_id}/keep", headers=_headers(user_id))
+        assert res.status_code == 200, res.text
+        body = res.json()
+        assert body["kept"] is True
+        assert body["storage_key"] == f"reports/{user_id}/{video_id}/source.mp4"
+
+        # S3 객체도 새 자리로 옮겨졌다 (옛 키는 사라진다)
+        assert key not in _OBJECTS
+        assert f"reports/{user_id}/{video_id}/source.mp4" in _OBJECTS
+
+    def test_두_번_불러도_200_이고_두_번째는_그대로다(self, client):
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+        video_id = _register(client, user_id, key).json()["id"]
+
+        first = client.post(
+            f"{V1}/videos/{video_id}/keep", headers=_headers(user_id)
+        ).json()["storage_key"]
+        second = client.post(
+            f"{V1}/videos/{video_id}/keep", headers=_headers(user_id)
+        )
+        assert second.status_code == 200
+        assert second.json()["storage_key"] == first
+
+    def test_분석_작업이_없는_클립은_옮기지_않는다(self, client):
+        """`/me` 업로드(`analyze:false`)는 리포트 폴더가 없어 `videos/` 에 둔다."""
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+        video_id = _register(client, user_id, key, analyze=False).json()["id"]
+
+        res = client.post(f"{V1}/videos/{video_id}/keep", headers=_headers(user_id))
+        assert res.status_code == 200, res.text
+        assert res.json()["storage_key"] == key
+        assert res.json()["kept"] is True
+
+    def test_남의_클립은_404_다(self, client):
+        owner = uuid4()
+        key = _issue(client, owner)
+        put_object(key, SIZE_OK)
+        video_id = _register(client, owner, key).json()["id"]
+
+        res = client.post(
+            f"{V1}/videos/{video_id}/keep", headers=_headers(uuid4())
+        )
+        assert res.status_code == 404
+        assert error_code(res) == "VIDEO_NOT_FOUND"
+
+    def test_없는_클립은_404_다(self, client):
+        res = client.post(
+            f"{V1}/videos/{uuid4()}/keep", headers=_headers(uuid4())
         )
         assert res.status_code == 404
         assert error_code(res) == "VIDEO_NOT_FOUND"

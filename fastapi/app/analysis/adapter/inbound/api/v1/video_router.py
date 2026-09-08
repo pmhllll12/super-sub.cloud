@@ -19,6 +19,7 @@ from app.analysis.application.dtos.video_dto import (
     UNSET,
     DeleteVideoCommand,
     GetPlaybackUrlCommand,
+    KeepVideoCommand,
     MyVideosQuery,
     PlaybackUrlResult,
     PublicVideoResult,
@@ -33,6 +34,7 @@ from app.analysis.dependencies.video_providers import (
     CreateUploadUrlUseCaseDep,
     DeleteVideoUseCaseDep,
     GetPlaybackUrlUseCaseDep,
+    KeepVideoUseCaseDep,
     ListMyVideosUseCaseDep,
     ListPublicVideosUseCaseDep,
     RegisterVideoUseCaseDep,
@@ -58,6 +60,7 @@ def create_upload_url(
             user_id=user_id,
             content_type=body.content_type,
             size_bytes=body.size_bytes,
+            filename=body.filename,
         )
     )
 
@@ -86,6 +89,7 @@ def register_video(
             height=body.height,
             side=body.side,
             analyze=body.analyze,
+            original_filename=body.filename,
         )
     )
 
@@ -160,6 +164,23 @@ def update_video(
             description=body.description if "description" in sent else UNSET,
         )
     )
+
+
+@video_router.post("/videos/{video_id}/keep", response_model=VideoResponse)
+def keep_video(
+    video_id: UUID,
+    user_id: CurrentUserId,
+    use_case: KeepVideoUseCaseDep,
+) -> VideoResult:
+    """"내 프로필에 리포트 저장" — `/analysis` 임시 분석을 영구로 만든다.
+
+    `kept` 를 켜고, 임시 원본(`videos/…`)이면 리포트 자리
+    (`reports/<user_id>/<video_id>/source.<ext>`)로 옮긴다(S3 `CopyObject`).
+    **자기 클립만.** 남의/없는 클립이면 `404 VIDEO_NOT_FOUND`.
+
+    **멱등이다** — 이미 저장된 클립에 다시 불러도 `200` 이고 이동은 건너뛴다.
+    """
+    return use_case(KeepVideoCommand(video_id=video_id, user_id=user_id))
 
 
 @video_router.delete(
