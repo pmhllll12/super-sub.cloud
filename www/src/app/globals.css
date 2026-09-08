@@ -1500,13 +1500,22 @@ body::-webkit-scrollbar {
   gap: 4px;
 }
 
+/* 🔴 **안쪽을 흰색으로 채운다**(사용자 요청, 2026-09-08). 비워 두면 배경
+   사진(연기)이 그대로 비쳐, 사진이 밝은 자리에서는 글자가 묻힌다. 판 위의
+   선수 카드가 흰 바탕에 검은 글자라 그쪽과도 결이 맞는다.
+   ⚠️ 바탕을 채우면 글자는 **어두워져야** 한다 — 흰 위의 옅은 흰 글자는
+   안 읽힌다.
+   ⚠️ 값을 여기 적는다. 카드의 토큰(--ss-pcard-bg/-fg)은 `.ss-pcard` 에서만
+   선언되어 이 단추까지 안 내려온다 — `var()` 로 부르면 조용히 기본값으로
+   떨어진다. 빈 카드(.ss-pcard-blank)가 쓰는 것과 **같은 값**이다. */
 .ss-squad-size-btn {
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--ss-fg) 26%, transparent);
+  border: 1px solid color-mix(in srgb, #0b0b0b 24%, transparent);
   padding: 3px 9px;
   font-size: 0.7rem;
   letter-spacing: 0.04em;
-  color: color-mix(in srgb, var(--ss-fg) 66%, transparent);
+  background-color: #ffffff;
+  color: color-mix(in srgb, #0b0b0b 62%, transparent);
   white-space: nowrap;
   transition:
     border-color 160ms ease,
@@ -1516,16 +1525,20 @@ body::-webkit-scrollbar {
 
 .ss-squad-size-btn:hover,
 .ss-squad-size-btn:focus-visible {
-  border-color: color-mix(in srgb, var(--ss-fg) 52%, transparent);
-  color: var(--ss-fg);
+  border-color: color-mix(in srgb, #0b0b0b 55%, transparent);
+  color: #0b0b0b;
 }
 
-/* 고른 것. 🔴 색만으로 말하지 않는다 — `role="radio"` 의 `aria-checked` 가
-   화면 낭독기에 같은 것을 알린다(마크업 쪽). */
+/* 고른 것 — **민트 바탕에 검은 글자**다. 🔴 민트 글자를 흰 바탕에 두면
+   대비가 1.6:1 밖에 안 나와 안 읽힌다(계산값). 카드의 워드마크가 민트,
+   글자가 검정인 것과 같은 짝이다.
+   🔴 색만으로 말하지 않는다 — `role="radio"` 의 `aria-checked` 가 화면
+   낭독기에 같은 것을 알린다(마크업 쪽). */
 .ss-squad-size-btn[data-on='true'] {
   border-color: var(--ss-accent);
-  background-color: color-mix(in srgb, var(--ss-accent) 16%, transparent);
-  color: var(--ss-accent);
+  background-color: var(--ss-accent);
+  color: #0b0b0b;
+  font-weight: 700;
 }
 
 .ss-squad-head h2 {
@@ -8792,6 +8805,65 @@ body:has(.ss-shot) .ss-app-figure {
 }
 
 .ss-profile-id-main,
+/* ── 나를 보여주는 대표 영상 (2026-09-08) ─────────────────────────── */
+
+/* 영상 **오른쪽 아래**에 붙인다(사용자 요청) — 그 영상에 대한 일이라 멀어지면
+   무엇을 세우는 것인지 흐려진다.
+
+   🔴 넘기는 줄(‹ 1 / 2 ›)과 **같은 줄**이다(사용자 지적: 두 줄로 갈려 있었다).
+   넘기는 단추는 가운데 그대로여야 하므로 이 단추만 **흐름 밖**으로 빼서
+   오른쪽 끝에 건다 — 흐름에 두면 가운데가 그만큼 왼쪽으로 밀린다. */
+.ss-profile-video-nav {
+  position: relative;
+}
+
+.ss-profile-featured-btn {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 32%, transparent);
+  padding: 5px 12px;
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--ss-fg) 76%, transparent);
+  white-space: nowrap;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.ss-profile-featured-btn .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.ss-profile-featured-btn:hover,
+.ss-profile-featured-btn:focus-visible {
+  border-color: color-mix(in srgb, var(--ss-fg) 58%, transparent);
+  color: var(--ss-fg);
+}
+
+/* 세워 둔 것. 🔴 색만으로 말하지 않는다 — 아이콘이 채워진 별로 바뀌고
+   `aria-pressed` 가 화면 낭독기에 같은 것을 알린다. */
+.ss-profile-featured-btn[data-on='true'] {
+  border-color: var(--ss-accent);
+  background-color: color-mix(in srgb, var(--ss-accent) 16%, transparent);
+  color: var(--ss-accent);
+}
+
+.ss-profile-featured-note {
+  margin-left: auto;
+  max-width: 320px;
+  text-align: right;
+  font-size: 0.6875rem;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--ss-fg) 52%, transparent);
+}
+
 /* ── 내 프로필의 분석 리포트 — **영상 목록 아래**다 (2026-09-08) ────── */
 
 /* 🔴 굴리는 목록 아래에 선을 긋고 그 아래에 둔다. 목록은 "무엇을 볼까"이고

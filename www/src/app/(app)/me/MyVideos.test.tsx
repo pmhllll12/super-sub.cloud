@@ -214,6 +214,51 @@ describe('내 영상 — 공개 여부', () => {
   })
 })
 
+describe('내 영상 — 나를 보여주는 대표 영상', () => {
+  const btn = () => screen.getByRole('button', { name: /나를 보여주는 대표 영상/ })
+
+  it('영상마다 세울 수 있고, 세우면 눌린 상태로 남는다', async () => {
+    const user = userEvent.setup()
+    render(<MyVideos videos={[analyzed]} />)
+    expect(btn()).toHaveAttribute('aria-pressed', 'false')
+
+    await user.click(btn())
+    expect(btn()).toHaveAttribute('aria-pressed', 'true')
+    expect(JSON.parse(globalThis.localStorage.getItem('supersub.featured.v1')!).videoId).toBe('v1')
+    // ⚠️ 어디에 남는지 밝힌다 — 계약에 자리가 없다.
+    expect(screen.getByText(/이 브라우저에만/)).toBeInTheDocument()
+  })
+
+  // 🔴 대표가 둘이면 어느 것이 나를 보여주는지 정해지지 않는다.
+  it('같은 영상을 다시 누르면 풀린다', async () => {
+    const user = userEvent.setup()
+    render(<MyVideos videos={[analyzed]} />)
+    await user.click(btn())
+    await user.click(btn())
+    expect(btn()).toHaveAttribute('aria-pressed', 'false')
+    expect(globalThis.localStorage.getItem('supersub.featured.v1')).toBeNull()
+  })
+
+  it('새로 그려도 세워 둔 것이 그대로다', async () => {
+    const user = userEvent.setup()
+    const { unmount } = render(<MyVideos videos={[analyzed]} />)
+    await user.click(btn())
+    unmount()
+
+    render(<MyVideos videos={[analyzed]} />)
+    expect(await screen.findByRole('button', { name: /나를 보여주는 대표 영상/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+  })
+
+  // ⚠️ 반려된 클립은 서버가 안 보는 영상이라 대표가 될 수 없다.
+  it('반려된 클립에는 안 낸다', () => {
+    render(<MyVideos videos={[{ ...analyzed, passed: false, reject_reason: '길이 초과' }]} />)
+    expect(screen.queryByRole('button', { name: /나를 보여주는 대표 영상/ })).toBeNull()
+  })
+})
+
 describe('내 영상 — 분석 리포트', () => {
   const REPORT = {
     summary: '디딤발이 공보다 앞서 있습니다.',

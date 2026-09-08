@@ -6,6 +6,7 @@ import { SPORTS, SPORT_CODE, type SportKey } from '@/lib/sports'
 import { checkClip, uploadClip, type ClipMeta } from '@/lib/uploadClip'
 import { listPublished, publish, unpublish } from '@/lib/published'
 import { reportFor, type SavedReport } from '@/lib/savedReports'
+import { loadFeatured, setFeatured } from '@/lib/featuredClip'
 import ReportView from '@/components/analysis/ReportView'
 
 /**
@@ -154,6 +155,23 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
   useEffect(() => {
     setReport(v ? reportFor(v.id) : null)
   }, [v])
+
+  /**
+   * 나를 보여주는 **대표 영상**으로 세워 둔 클립의 id.
+   *
+   * 🔴 그릴 때 읽지 않는다 — 서버엔 없는 값이라 하이드레이션이 깨진다.
+   */
+  const [featured, setFeaturedId] = useState<string | null>(null)
+  useEffect(() => {
+    setFeaturedId(loadFeatured()?.videoId ?? null)
+  }, [])
+
+  /** 세우거나 푼다. 같은 영상을 다시 누르면 풀린다 — 대표는 하나뿐이다. */
+  function toggleFeatured(target: MyVideo) {
+    const on = featured === target.id
+    setFeatured(on ? null : { videoId: target.id, src: previewSrc(target) })
+    setFeaturedId(on ? null : target.id)
+  }
 
   function pick(next: TabKey) {
     setTab(next)
@@ -398,6 +416,16 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
               왜 안 됐는지 알 데가 사라진다. */}
           {v.reject_reason && <p className="ss-profile-video-reason">{v.reject_reason}</p>}
 
+          {/* 🔴 **나를 보여주는 대표 영상**(사용자 요청, 2026-09-08). 영상
+              오른쪽 아래 모서리에 붙는다 — 그 영상에 대한 일이라 영상에서
+              멀어지면 무엇을 세우는 것인지 흐려진다.
+
+              한 편만 세울 수 있다. 다른 영상에서 누르면 그쪽으로 옮겨 가고,
+              같은 영상을 다시 누르면 풀린다 — 대표가 둘이면 어느 것이
+              나를 보여주는지 정해지지 않는다.
+
+              ⚠️ 반려된 클립에는 안 낸다 — 서버가 안 보는 영상이다. */}
+
           {/* 🔴 **업로드 갈래에서만** 낸다. 분석을 건 영상은 리포트를 보려고 올린
               것이고, 영상 모음은 올린 장면을 훑는 자리다 — 성격이 다르다. */}
           {tab === 'uploaded' && (
@@ -454,6 +482,24 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
                 안에 몇 편이 있는지 알 수 있고, 갈래를 바꿔도 줄이 사라졌다
                 나타나지 않는다. 다만 넘길 데가 없으므로 두 단추는 잠근다. */}
             <div className="ss-profile-video-nav">
+              {/* 🔴 넘기는 줄과 **같은 줄**에 선다(사용자 지적) — 따로 두면
+                  줄이 둘로 갈려 판이 그만큼 길어진다. 넘기는 단추는 가운데
+                  그대로여야 하므로 이 단추만 흐름 밖으로 빼서 오른쪽에 건다.
+                  ⚠️ 반려된 클립에는 안 낸다 — 서버가 안 보는 영상이다. */}
+              {v.passed && (
+                <button
+                  type="button"
+                  className="ss-profile-featured-btn"
+                  data-on={featured === v.id ? 'true' : undefined}
+                  aria-pressed={featured === v.id}
+                  onClick={() => toggleFeatured(v)}
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    {featured === v.id ? 'stars' : 'star'}
+                  </span>
+                  나를 보여주는 대표 영상
+                </button>
+              )}
               <button
                 type="button"
                 className="ss-profile-step"
@@ -487,6 +533,16 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
                 🔴 **비를 알기 전에는 감춘다.** 그전에는 상자가 기본값(16:9)
                 이라, 세로 영상이면 선이 영상보다 넓게 그어진 채로 한 박자
                 보였다가 줄어든다(실측). 폭이 맞을 때만 나타나게 한다. */}
+            {/* ⚠️ 어디에 남는지 밝힌다 — 계약에 자리가 없어 이 브라우저에만
+                남는다(공개 여부 · 카드 꾸미기와 같은 규칙). 단추와 달리 이건
+                흐름 안에 둔다 — 겹쳐 놓으면 넘기는 단추를 덮는다. */}
+            {v.passed && featured === v.id && (
+              <p className="ss-profile-featured-note">
+                추천 판에서 나를 소개할 때 이 장면이 돕니다 — 아직 이 브라우저에만
+                남습니다.
+              </p>
+            )}
+
             <span
               className="ss-profile-video-rule"
               data-ready={ratio !== null}

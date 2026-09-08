@@ -123,17 +123,32 @@ const SUGGESTIONS: Record<
 export default function SquadSuggest({
   position,
   closing,
+  me,
   onPick,
   onClose,
 }: {
   /** 지금 채우려는 자리(GK · DF · MF · FW). */
   position: string
+  /**
+   * 나 자신 — 후보 목록에 내가 있으면 **내가 고른 대표 영상**을 쓴다
+   * (사용자 요청, 2026-09-08). 사람마다 자기 `/me` 에서 한 편을 고르고,
+   * 이 판이 그 사람의 그 장면을 튼다는 뜻이다.
+   *
+   * ⚠️ **남의 것은 아직 못 읽는다** — 계약에 「대표」 표시도, 남의 영상을
+   * 읽을 경로도 없다(미결). 그래서 지금 실제로 갈리는 것은 내 것뿐이고,
+   * 나머지는 저장소의 자리 표시 클립 그대로다.
+   */
+  me?: { nickname: string; clip: string | null } | null
   /** 닫히는 중 — 사라지는 동안에도 DOM 에 남아 있어야 애니메이션이 보인다. */
   closing: boolean
   onPick: (name: string) => void
   onClose: () => void
 }) {
   const list = SUGGESTIONS[position] ?? []
+
+  /** 이 후보가 틀 장면 — 나라면 내가 고른 것, 아니면 자리 표시. */
+  const clipFor = (name: string, fallback: string) =>
+    me && me.clip && name === me.nickname ? me.clip : fallback
 
   return (
     <aside
@@ -211,7 +226,7 @@ export default function SquadSuggest({
                   //    안 그려서** 멈춰 있는 동안 칸이 검게만 남는다(코치 목록에서
                   //    같은 것을 겪었다). 0 이 아니라 0.1 인 것은 맨 첫 칸이 검은
                   //    영상이 흔해서다.
-                  src={`${s.clip}#t=0.1`}
+                  src={`${clipFor(s.name, s.clip)}#t=0.1`}
                   // 🔴 `autoPlay` 를 주지 않는다 — 판이 나올 때는 멈춰 있어야 한다.
                   //    🔴 `muted` 없이는 브라우저가 재생을 막고, `playsInline` 이
                   //    없으면 iOS 가 전체 화면으로 띄운다.

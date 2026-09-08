@@ -83,6 +83,40 @@ describe('추천 판 — 후보마다 대표 장면이 돈다', () => {
     }
   })
 
+  /* 🔴 사람마다 자기 `/me` 에서 고른 **대표 영상**이 이 판에서 돈다
+     (사용자 요청, 2026-09-08). ⚠️ 지금 실제로 갈리는 것은 **내 것뿐**이다 —
+     남의 대표 영상을 읽을 경로가 계약에 없다. */
+  it('목록에 내가 있으면 내가 고른 대표 영상을 튼다', () => {
+    stubMedia()
+    const { container } = render(
+      <SquadSuggest
+        position="MF"
+        closing={false}
+        me={{ nickname: '최유진', clip: '/my-featured.mp4' }}
+        onPick={() => {}}
+        onClose={() => {}}
+      />,
+    )
+    const srcs = [...container.querySelectorAll('video')].map((v) => v.getAttribute('src'))
+    expect(srcs[0]).toBe('/my-featured.mp4#t=0.1')
+    // 나머지는 자리 표시 그대로다.
+    expect(srcs[1]).not.toContain('my-featured')
+  })
+
+  it('내가 고른 것이 없으면 자리 표시를 그대로 쓴다', () => {
+    stubMedia()
+    const { container } = render(
+      <SquadSuggest
+        position="MF"
+        closing={false}
+        me={{ nickname: '최유진', clip: null }}
+        onPick={() => {}}
+        onClose={() => {}}
+      />,
+    )
+    expect(container.querySelector('video')!.getAttribute('src')).toMatch(/coach-c00\d\.mp4#t=0\.1/)
+  })
+
   it('고르는 것은 여전히 누르는 일이다 — 가져다 대는 것과 갈라져 있다', async () => {
     stubMedia()
     const picked: string[] = []

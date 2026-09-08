@@ -820,7 +820,8 @@ export default function SquadPanel({
       {/* 추천 판 — 스쿼드 판 오른쪽에서 미끄러져 나온다. */}
       {shown && (
         <SquadSuggest
-          position={shown.label}
+          position={posOf(shown)}
+          me={card ? { nickname: card.user.nickname, clip: myClip } : null}
           closing={picking === null}
           onClose={close}
           onPick={(name) => {
