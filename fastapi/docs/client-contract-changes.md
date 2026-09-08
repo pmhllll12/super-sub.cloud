@@ -842,6 +842,26 @@ curl -s -H "Authorization: Bearer $OTHER_T" $API/videos/$PUB_ID/playback-url | j
 
 ---
 
+## 21. 🟡 클립을 지울 수 있습니다 (2026-09-08 추가)
+
+미결 `jin` 24번 1조각. `DELETE /videos/{id}` — 자기 클립만, `204`.
+
+- DB 행 + 판정·분석 작업 연쇄 + S3 객체까지 지웁니다.
+- 남의/없는 클립은 `404 VIDEO_NOT_FOUND`.
+- ⚠️ **S3 삭제는 아직 실서버에서 안 됩니다** — EC2 역할에 `s3:DeleteObject` 를
+  붙이는 중입니다(미결 `jin` 24번). DB 에서는 지금도 사라지므로 목록에서는
+  즉시 빠집니다.
+- `/analysis` 를 저장 없이 벗어날 때 이걸 부르시면 됩니다(`beforeunload` /
+  `navigator.sendBeacon`). 놓쳐도 서버 백스톱 스윕이 24시간 뒤 정리합니다.
+
+### `video.kept` (같은 조각)
+
+`GET /videos`·`POST /videos` 응답에 `kept: boolean` 이 실립니다. **지금은 항상
+`true`** — `/analysis` 분석을 임시(`kept:false`)로 두고 "저장"에서 켜는 전환은
+프론트가 `keep` 을 부를 준비가 되면 함께 켭니다. 그때까지는 무시하셔도 됩니다.
+
+---
+
 ## 계약 문서
 
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린

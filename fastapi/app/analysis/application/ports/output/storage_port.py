@@ -32,3 +32,15 @@ class StoragePort(ABC):
         재생도 앱 서버를 지나지 않는다(PER-002). 키 존재 여부는 확인하지 않는다 —
         서명만 만든다.
         """
+
+    @abstractmethod
+    def delete_object(self, storage_key: str) -> None:
+        """그 키의 객체를 지운다. **없는 키여도 오류가 아니다**(멱등)."""
+
+    @abstractmethod
+    def delete_prefix(self, prefix: str) -> None:
+        """그 접두사 아래 객체를 전부 지운다. 아무것도 없어도 오류가 아니다.
+
+        영상을 지울 때 `reports/<user_id>/<video_id>/` 아래(리포트 JSON·미리보기)를
+        함께 치우는 자리다.
+        """

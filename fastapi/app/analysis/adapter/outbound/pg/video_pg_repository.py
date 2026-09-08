@@ -49,6 +49,7 @@ class VideoPgRepository(VideoPort):
                 duration_ms=video.duration_ms,
                 side=video.side,
                 is_public=video.is_public,
+                kept=video.kept,
                 created_at=video.created_at,
             )
         )
@@ -86,7 +87,7 @@ class VideoPgRepository(VideoPort):
                 .outerjoin(
                     VideoValidationOrm, VideoValidationOrm.video_id == VideoOrm.id
                 )
-                .where(VideoOrm.user_id == user_id)
+                .where(VideoOrm.user_id == user_id, VideoOrm.kept.is_(True))
                 .order_by(VideoOrm.created_at.desc())
             )
             .tuples()
@@ -112,6 +113,15 @@ class VideoPgRepository(VideoPort):
         ).scalar_one_or_none()
         latest = self._latest_jobs([video_id]).get(video_id)
         return _to_entity(video, validation, latest)
+
+    def delete(self, video_id: UUID, user_id: UUID) -> VideoEntity | None:
+        video = self._session.get(VideoOrm, video_id)
+        if video is None or video.user_id != user_id:
+            return None
+        entity = _to_entity(video, None, None)  # S3 정리에 storage_key 만 필요
+        self._session.delete(video)  # FK ON DELETE CASCADE 가 자식을 정리한다
+        self._session.commit()
+        return entity
 
     def update_video(
         self,
@@ -145,7 +155,7 @@ class VideoPgRepository(VideoPort):
         videos = (
             self._session.execute(
                 select(VideoOrm)
-                .where(VideoOrm.is_public.is_(True))
+                .where(VideoOrm.is_public.is_(True), VideoOrm.kept.is_(True))
                 .order_by(VideoOrm.created_at.desc())
                 .limit(limit)
             )
@@ -191,6 +201,7 @@ def _to_entity(
         is_public=video.is_public,
         title=video.title,
         description=video.description,
+        kept=video.kept,
         created_at=video.created_at,
         validation=(
             None

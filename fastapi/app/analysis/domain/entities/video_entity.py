@@ -48,3 +48,5 @@ class VideoEntity:
     # 홈 영상 모음이 얹는 값(미결 `paik` 5번). 안 정하면 None.
     title: str | None = None
     description: str | None = None
+    # 프로필에 저장됐나(미결 `jin` 24번). 기본 True — `/analysis` 만 임시로 둔다.
+    kept: bool = True

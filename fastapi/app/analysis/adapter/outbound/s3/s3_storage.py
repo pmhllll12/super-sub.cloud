@@ -49,6 +49,20 @@ class S3Storage(StoragePort):
         )
         return url, self._ttl
 
+    def delete_object(self, storage_key: str) -> None:
+        """객체 하나를 지운다. 없는 키에도 S3 는 오류를 안 낸다(멱등)."""
+        self._client.delete_object(Bucket=self._bucket, Key=storage_key)
+
+    def delete_prefix(self, prefix: str) -> None:
+        """접두사 아래 전부 지운다. `list_objects_v2` 로 훑어 최대 1000개씩 배치."""
+        paginator = self._client.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=self._bucket, Prefix=prefix):
+            keys = [{"Key": obj["Key"]} for obj in page.get("Contents", [])]
+            if keys:
+                self._client.delete_objects(
+                    Bucket=self._bucket, Delete={"Objects": keys}
+                )
+
     def size_of(self, storage_key: str) -> int | None:
         try:
             head = self._client.head_object(Bucket=self._bucket, Key=storage_key)

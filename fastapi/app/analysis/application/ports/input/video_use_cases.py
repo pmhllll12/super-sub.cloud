@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from app.analysis.application.dtos.video_dto import (
+    DeleteVideoCommand,
     GetPlaybackUrlCommand,
     MyVideosQuery,
     PlaybackUrlResult,
@@ -52,3 +53,9 @@ class GetPlaybackUrlUseCase(ABC):
     @abstractmethod
     def __call__(self, command: GetPlaybackUrlCommand) -> PlaybackUrlResult:
         """재생용 사전 서명 URL. 공개 클립이거나 자기 클립일 때만, 아니면 404."""
+
+
+class DeleteVideoUseCase(ABC):
+    @abstractmethod
+    def __call__(self, command: DeleteVideoCommand) -> None:
+        """영상을 DB·S3 에서 지운다. 남의/없는 클립이면 404."""
