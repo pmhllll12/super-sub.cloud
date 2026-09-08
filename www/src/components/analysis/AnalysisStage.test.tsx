@@ -220,6 +220,24 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     expect(screen.queryByLabelText('분석 진행')).toBeNull()
   })
 
+  /* 🔴 **올리자마자 돈다**(사용자 요청, 2026-09-08). 전에는 `loop` 만 있고
+     첫 프레임에서 멈춰 있었다.
+
+     ⚠️ jsdom 은 재생을 흉내만 낸다 — `paused` 가 실제로 갈리지 않는다. 그래서
+     여기서는 **틀에 무엇이 적혀 있는지**만 보고, 진짜로 도는지는 CDP 로 쟀다
+     (2026-09-08: 2.42s → 4.02s → 되감김 4.73s → 0.31s). `muted` 가 빠지면
+     브라우저 정책이 `play()` 를 거부해 **조용히 멈춰 있으므로** 함께 붙든다. */
+  it('영상을 고르면 소리 없이 자동으로, 무한히 돈다', async () => {
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+
+    const video = screen.getByLabelText(file.name) as HTMLVideoElement
+    expect(video).toHaveAttribute('autoplay')
+    expect(video).toHaveAttribute('loop')
+    expect(video.muted).toBe(true)
+  })
+
   /* 종목이 정해져 있으므로 **영상만 고르면 바로 시작할 수 있다.**
      ⚠️ 전에는 여기서 잠겨 있었고 「종목을 먼저 골라 주세요」가 떴다 — 고를
      자리가 없어진 지금 그 안내는 영영 안 나오므로 함께 걷어냈다. */
