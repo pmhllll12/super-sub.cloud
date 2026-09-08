@@ -1,7 +1,7 @@
 """video 에 원본 파일 이름을 담는다
 
 Revision ID: 2598dc30f0cb
-Revises: 10f68718757d
+Revises: 98f9cbdc74f4
 Create Date: 2026-09-08
 
 미결 `jin` 24번. 저장 키는 콘솔에서 알아볼 수 있게 슬러그로 짓지만(한글·영숫자만
@@ -17,7 +17,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "2598dc30f0cb"
-down_revision: Union[str, Sequence[str], None] = "10f68718757d"
+down_revision: Union[str, Sequence[str], None] = "98f9cbdc74f4"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
