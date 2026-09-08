@@ -326,7 +326,10 @@ body::-webkit-scrollbar {
    밝은 연기 위에서 읽히지 않는다). 지금 가리킨 칸만 강조색으로 바뀐다. */
 .ss-home-nav-item {
   padding: 12px 2px;
-  font-size: 0.8125rem;
+  /* 0.8125 → 0.875rem. 아이콘과 함께 **한 단 키웠다**(사용자 요청,
+     2026-09-08) — 알약 줄과 달리 이 줄은 화면 맨 위라 조금 더 커도
+     배경 사진을 안 가린다. */
+  font-size: 0.875rem;
   font-weight: 500;
   letter-spacing: 0.08em;
   white-space: nowrap;
@@ -339,6 +342,34 @@ body::-webkit-scrollbar {
 .ss-home-nav-item:focus-visible,
 .ss-home-nav-item[data-active='true'] {
   color: var(--ss-accent);
+}
+
+/* 🔴 **아이콘이 글자 위에 선다**(사용자 요청, 2026-09-08). 원래는 글자 아래
+   떠오르던 유리 카드 안에 있었는데, 그 판을 없애면서 갈 데가 없어졌다.
+
+   🔴 **아이콘 자리를 늘 차지한다.** 항목마다 아이콘이 있으므로 줄이 들썩일
+   일은 없지만, `gap` 이 아니라 세로 쌓기로 두어야 글자가 줄 가운데에 서고
+   옆 항목과 밑줄이 맞는다. */
+.ss-home-nav-item--stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  /* 글자만 있던 때의 좌우 여백(2px)은 아이콘에 너무 좁다. */
+  padding: 10px 8px;
+}
+
+/* 색은 물려받는다 — 가리키면 글자와 아이콘이 **함께** 강조색이 된다.
+   따로 칠하면 하나만 켜져 두 개가 다른 것처럼 보인다.
+   크기는 **한 단 키웠다**(20 → 24px, 사용자 요청 2026-09-08). */
+.ss-home-nav-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+/* 글자는 원래 자간을 그대로 쓴다 — 아이콘이 위에 붙었을 뿐이다. */
+.ss-home-nav-label {
+  letter-spacing: inherit;
 }
 
 /* ── 알약 변형 (variant="pill") ────────────────────────────────────────
@@ -362,6 +393,15 @@ body::-webkit-scrollbar {
   letter-spacing: 0;
   color: var(--ss-fg);
   text-shadow: 0 1px 6px var(--ss-bg);
+}
+
+/* 「로그인이 필요합니다」 — 판이 없어져도 남는 한 줄(DestinationCard 주석).
+   설명보다 한 단 흐리게 두어 **설명과 안내가 한 문장으로 안 읽히게** 한다. */
+.ss-nav-bare-note {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--ss-fg) 55%, transparent);
 }
 
 /* 🔴 **알약의 판은 위로 뜬다.** 글자 줄은 화면 맨 위에 있어 아래로 떨어져야

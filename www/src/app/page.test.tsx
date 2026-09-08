@@ -33,7 +33,14 @@ describe('홈 화면 — /', () => {
     render(<HomeBody user={null} />)
     // 워드마크는 헤더 · 헤더의 작은 카드 · 스쿼드 판의 빈 카드에 각각 있다.
     expect(screen.getAllByText('SUPERSUB').length).toBeGreaterThan(0)
-    for (const t of TITLES) {
+    /* 🔴 **글자 줄 셋은 이제 링크다**(2026-09-08). 아이콘이 글자 위로 올라가고
+       그 둘을 링크가 감싸면서 이동을 맡았다 — 전에는 글자가 버튼이고 떠오른
+       유리 카드가 링크였다. 알약 둘은 그대로 버튼이다(누르는 것이 이동이
+       아니라 *고르는 것*이라서). */
+    for (const t of ['영상 분석', '레슨 · 상점', '경기장 예약']) {
+      expect(screen.getByRole('link', { name: t })).toBeInTheDocument()
+    }
+    for (const t of ['팀장', '팀원']) {
       expect(screen.getByRole('button', { name: t })).toBeInTheDocument()
     }
   })
@@ -45,15 +52,15 @@ describe('홈 화면 — /', () => {
     expect(screen.queryByText('준비 중입니다')).toBeNull()
   })
 
-  it('글자를 가리키면 그 카드가 나오고 원래 페이지로 가는 링크가 된다', async () => {
+  it('글자를 가리키면 설명이 나오고, 이동은 그 글자가 한다', async () => {
     const user = userEvent.setup()
     render(<HomeBody user={{ nickname: '홍길동' }} />)
-    await user.hover(screen.getByRole('button', { name: '영상 분석' }))
+    const link = screen.getByRole('link', { name: '영상 분석' })
+    expect(link).toHaveAttribute('href', '/analysis')
+    await user.hover(link)
     expect(screen.getByText(/경기 영상을 올리면/)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /경기 영상을 올리면/ })).toHaveAttribute(
-      'href',
-      '/analysis',
-    )
+    // 🔴 한 항목에 링크는 하나다 — 떠오른 설명은 링크가 아니다.
+    expect(screen.queryByRole('link', { name: /경기 영상을 올리면/ })).toBeNull()
   })
 
   // '내 선수 카드'는 '내 프로필'에, '내 프로필'은 닉네임 자리에 합쳤다.
@@ -91,23 +98,19 @@ describe('홈 화면 — /', () => {
   it('경기장 예약은 목록 화면으로 가는 링크다', async () => {
     const user = userEvent.setup()
     render(<HomeBody user={{ nickname: '홍길동' }} />)
-    await user.hover(screen.getByRole('button', { name: '경기장 예약' }))
+    const link = screen.getByRole('link', { name: '경기장 예약' })
+    expect(link).toHaveAttribute('href', '/venues')
+    await user.hover(link)
     expect(screen.getByText(/가까운 구장을 찾고/)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /가까운 구장을 찾고/ })).toHaveAttribute(
-      'href',
-      '/venues',
-    )
   })
 
-  it('로그인 안 했으면 로그인 전용 목적지 카드에 안내를 붙이되 링크는 살아 있다', async () => {
+  it('로그인 안 했으면 안내를 붙이되 링크는 살아 있다', async () => {
     const user = userEvent.setup()
     render(<HomeBody user={null} />)
-    await user.hover(screen.getByRole('button', { name: '영상 분석' }))
+    const link = screen.getByRole('link', { name: '영상 분석' })
+    await user.hover(link)
     expect(screen.getByText('로그인이 필요합니다')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /경기 영상을 올리면/ })).toHaveAttribute(
-      'href',
-      '/analysis',
-    )
+    expect(link).toHaveAttribute('href', '/analysis')
   })
 
   // 스크롤되지 않는 화면이라 SCROLL DOWN 이 참말이 아니었고, 소셜은 실제
