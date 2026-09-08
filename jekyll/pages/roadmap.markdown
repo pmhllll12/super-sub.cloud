@@ -151,13 +151,16 @@ cat agent/eval/pending6_side/labeling/EXCLUDED.md
 | 22. 골반 회전과 카메라 축 | 각도가 회전의 일부만 담는다(24%). 실클립 n=4로는 지표 문제인지 포즈 품질인지 못 가른다 |
 | 2 · min 4. 골든셋 라벨링 주체 | 사람 검수자 미확보. 위 셋의 공통 병목이다 |
 
-| jin 18. 분석 워커 폴링 루프 | ✅ **`scripts/worker.py` + `deploy/supersub-worker.service`** (2026.09.07). 백엔드 큐를 폴링해 `analyze_s3.py` 를 돌리고 결과를 보고한다. **EC2 설치·토큰 주입은 아직 안 했다** — 토큰 값을 정어진 님께 받아야 한다 |
+| jin 18. 분석 워커 폴링 루프 | ✅ **`scripts/worker.py` + `deploy/supersub-worker.service`** (2026.09.07). 백엔드 큐를 폴링해 `analyze_s3.py` 를 돌리고 결과를 보고한다. **2026.09.08에 워커 방식을 이쪽 하나로 수렴**(jin 20) — `--skip-analyzed` 를 지웠다. **EC2 설치·토큰 주입은 아직 안 했다** — 토큰 값을 정어진 님께 받아야 한다 |
+| jin 1. 적재 규격 | ✅ **A안으로 결정했다** (2026.09.08) — `metric_definition.sport_code` 를 없앤다. 근거는 `api-contract.md` 3-1절. 🔴 **항목별 등급(`criteria.id`)은 A안으로도 안 풀린다** — 같은 종목의 두 루브릭이 같은 id 를 다른 임계값으로 쓴다(축구 4개). 축이 종목이 아니라 **루브릭**이다. 남은 것은 스키마 반영(정어진)·부록 D.3(박민호, `ho` 25번)·지표 11개 시드 |
 
 **남의 영역이라 기다리는 것**: 1·15(라이선스, 박민호) · 4(GPU 조달, 정어진) ·
 17(S3 큐 소비자 — **양쪽 다 만들어졌다**: 백엔드 `claim`/`PATCH`(정어진) +
-워커 루프(위 jin 18). 접두사 스캔 형태도 남아 있다: `analyze_s3.py <접두사>
---skip-analyzed`) · 18(계약, 정어진) · **jin 1(적재 규격 — 담당이 나다.
-`POST /analyses` 가 여기 막혀 있어 워커 산출물이 `reports/` JSON 까지다)**.
+워커 루프(위 jin 18). 🔴 **접두사 스캔 형태는 없앴다** — 큐가 둘이 되어서다.
+`--skip-analyzed` 는 2026.09.08에 지웠고 `test_there_is_only_one_queue` 가 되살아나는
+것을 막는다) · 18(계약, 정어진) · **jin 1(적재 규격 — A안으로 정했고,
+`POST /analyses` 적재는 정어진 님의 스키마 반영을 기다린다. 그때까지 워커 산출물은
+`reports/` JSON 까지다)**.
 
 ---
 
@@ -219,14 +222,14 @@ cat agent/eval/pending6_side/labeling/EXCLUDED.md
 
 ---
 
-## 6. 현재 상태 스냅샷 (2026.09.07)
+## 6. 현재 상태 스냅샷 (2026.09.08)
 
 ⚠️ **이 값들은 낡을 수 있다.** 착수할 때 다시 확인할 것.
 
 | | |
 |---|---|
-| HEAD | `60e6e19` (브랜치 `ho`, `origin/ho`보다 앞서 있음). 로컬 `main`은 `edf9e0f`까지 당겨 뒀고 **아직 `ho`에 흡수하지 않았다** |
-| 테스트 | **248 통과** (`cd agent && uv run pytest -q`) |
+| HEAD | `47c7c7d` + 로컬 커밋. **`main`을 `ho`에 흡수했다** (2026.09.08, fast-forward라 충돌 없음). `origin/ho`보다 앞서 있다 |
+| 테스트 | **249 통과** (`cd agent && uv run pytest -q`) |
 | 루브릭 | active 3(축구 인스텝·야구 투구·농구 점프슛) · draft 3(축구 인사이드·농구 레이업·**야구 타격**) |
 | `DEFAULT_TARGET_FPS` | **30** (2026-09-02에 15에서 올림) |
 | `DEFAULT_MAX_FRAMES` | **300** — 메모리 가드이지 분석 의도가 아니다 |
