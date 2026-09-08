@@ -589,3 +589,54 @@ def test_conversion_does_not_touch_the_features_dict():
     assert feats == before
     # 시간 값이 측정 이름공간으로 새어 들어가지 않았다.
     assert not any(k.endswith("_seconds") for k in feats)
+
+
+def test_unmeasurable_legs_yield_no_hip_rotation_key():
+    """🔴 준비 구간에서 다리를 못 보면 회전량을 **내지 않는다** (미결 21번).
+
+    예전에는 `0.0`을 넣었고 그 값이 PLAUSIBLE_RANGE(0~180)를 그대로 통과해
+    루브릭의 0등급("잠긴 골반")으로 갔다. 실클립 `YNMHMKb5Md4`에서
+    「골반 회전 각도 0.0도로 … 하체 회전 부재」라는 문장까지 나갔는데,
+    그 클립은 다리 유효 프레임이 1.3%였다 — **선수는 "하체를 안 썼다"는
+    지적을 받지만 일어난 일은 다리를 못 본 것이다.**
+
+    지우면 그 결함이 조용히 돌아온다. 0.0은 오류로 보이지 않기 때문이다.
+    """
+    # 🔴 실제로 결함이 난 조건은 **야구 타격(impact_limb="arm")** 이다.
+    # 그때는 다리 품질 게이트가 걸리지 않아, 다리를 거의 못 봐도 파이프라인이
+    # 끝까지 돈다 — `GS-PcxmaHmQ` 의 `usable_ratio_leg` 가 0.0133(1.3%)이었다.
+    seq = build_sequence(n=61, impact=30)
+
+    # build_sequence 는 다리만 움직인다. 팔로 임팩트를 잡으려면 팔이 움직여야
+    # 하므로 손목·팔꿈치에 스윙을 넣는다(각도 자체는 이 검사의 관심이 아니다).
+    for i in range(len(seq)):
+        p_ = i / 30
+        ang = np.radians(20.0 + 120.0 * min(1.0, p_))
+        sh = seq[i, F.L_SHOULDER, :2]
+        seq[i, F.L_ELBOW, :2] = sh + 30.0 * np.array([np.cos(ang), np.sin(ang)])
+        seq[i, F.L_WRIST, :2] = seq[i, F.L_ELBOW, :2] + 28.0 * np.array(
+            [np.cos(ang * 1.4), np.sin(ang * 1.4)]
+        )
+        seq[i, F.R_ELBOW, :2] = seq[i, F.L_ELBOW, :2] + np.array([-6.0, 2.0])
+        seq[i, F.R_WRIST, :2] = seq[i, F.L_WRIST, :2] + np.array([-6.0, 2.0])
+
+    assert "hip_rotation_range_deg" in extract_features(seq, impact_limb="arm")
+
+    # 다리를 통째로 못 보게 한다. 상체는 그대로라 팔 게이트는 통과한다.
+    blind = seq.copy()
+    for j in (F.L_HIP, F.R_HIP, F.L_KNEE, F.R_KNEE, F.L_ANKLE, F.R_ANKLE):
+        blind[:, j, 2] = 0.0
+
+    feats = extract_features(blind, impact_limb="arm")
+    assert "hip_rotation_range_deg" not in feats, (
+        "다리를 못 봤는데 회전량이 나왔다 — 0.0을 지어내던 결함이 돌아왔다"
+    )
+
+
+def test_hip_rotation_is_declared_limb_dependent():
+    """빠질 수 있다고 **선언**해야 `verify_rubric_coverage`가 면제한다.
+
+    선언을 빼면 다리를 못 본 클립에서 루브릭 검사가 "산출하지 않은 지표"로
+    죽는다 — 값을 안 내는 것과 못 내는 것을 가르는 자리다.
+    """
+    assert "hip_rotation_range_deg" in F.LIMB_DEPENDENT_METRICS

@@ -362,3 +362,67 @@ def test_band_text_states_the_actual_interval(rubric):
     assert "축구" in system_prompt("football")
     assert "야구" in system_prompt("baseball")
     assert "생활체육" in system_prompt(""), "모르는 종목은 특정하지 않는다"
+
+
+def test_out_of_band_marks_zero_grades_that_came_from_above():
+    """🔴 0등급이 **구간 위에서** 왔으면 표시한다 (미결 20번, 처방 「다」).
+
+    상위 등급의 위를 닫는 규칙은 오측정이 만점이 되는 것을 막는다(투구 골반
+    181.1도가 「40도 이상」에 걸려 장점으로 표시된 적이 있다). 그 규칙은 맞다.
+    문제는 **닫은 위쪽이 갈 곳이 0등급뿐**이라 「쟀는데 못했다」와 「구간
+    밖이다」가 같은 0점이 된다는 것이다 — 실측으로 0등급 117건 중 23건(20%)이
+    구간 위에서 왔다.
+
+    지우면 화면이 둘을 다시 구분하지 못한다.
+    """
+    rubric = load_rubric(RUBRIC_PATH)
+    base = {m: 0.0 for cr in rubric.criteria for m in cr.measured_by}
+
+    # 🔴 상한을 **막 넘긴** 값은 대개 1등급으로 간다 — 1등급 구간이 2등급
+    # 구간을 감싸기 때문이다. 0등급은 **더 멀리** 넘어야 걸린다. 그래서
+    # "상한 초과 = 0등급"으로 단정하지 말고 실제로 0이 되는 자리를 찾는다.
+    c = ceiling = above = None
+    for cand in rubric.criteria:
+        ceil = cand.top_ceiling()
+        if ceil is None:
+            continue
+        for step in (0.5, 5.0, 20.0, 60.0):
+            probe = {**base, cand.band_metric: ceil + step}
+            try:
+                hit = cand.grade_for(probe) == 0
+            except RubricError:
+                continue  # PLAUSIBLE 밖이라 실제로는 도달하지 않는 값이다
+            if hit:
+                c, ceiling, above = cand, ceil, probe
+                break
+        if c is not None:
+            break
+    assert c is not None, "상한 위가 0등급이 되는 항목이 하나는 있어야 한다"
+
+    below = {**base, c.band_metric: -999.0}
+    assert c.grade_for(above) == 0 and c.grade_for(below) == 0, "둘 다 0등급이어야 한다"
+    assert c.out_of_band(above) == "above"
+    assert c.out_of_band(below) == "", "아래쪽 0등급은 표시하지 않는다"
+
+
+def test_out_of_band_does_not_move_the_score():
+    """🔴 표시는 표시일 뿐이다 — **점수·등급이 바뀌면 B-6 재실행을 부른다.**
+
+    features 를 주든 안 주든 `out_of_band` 를 뺀 나머지가 한 비트도 같아야 한다.
+    이 성질 때문에 이 처방을 임계값 검수 전에 넣을 수 있었다.
+    """
+    rubric = load_rubric(RUBRIC_PATH)
+    feats = {m: 0.0 for cr in rubric.criteria for m in cr.measured_by}
+    judgments = _judgments(0, rubric)
+
+    without = aggregate(judgments, rubric)
+    with_feats = aggregate(judgments, rubric, features=feats)
+
+    strip = lambda r: {  # noqa: E731
+        **r, "breakdown": [{k: v for k, v in b.items() if k != "out_of_band"}
+                           for b in r["breakdown"]]
+    }
+    assert strip(without) == strip(with_feats)
+    assert all(b["out_of_band"] == "" for b in without["breakdown"]), (
+        "features 를 안 주면 표시가 없어야 한다"
+    )

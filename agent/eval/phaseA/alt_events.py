@@ -2,10 +2,14 @@
 import sys, csv, json
 from pathlib import Path
 import numpy as np
-sys.path.insert(0, "/home/ho/projects/super-sub.cloud/agent/src")
+_HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(_HERE))
+sys.path.insert(0, str(_HERE.parent.parent / "src"))
 from supersub_agent import features as F
+from paths import cache_dir, default_target, external_root  # noqa: E402
 
-ROOT = Path("/mnt/d/supersub-phaseA"); CACHE = ROOT/"cache"
+# 동작점을 이름으로 드러낸다 (미결 10·14번, 2026-09-08).
+ROOT = external_root(); CACHE = cache_dir(default_target())
 specs = {r["clip_id"]: r for r in csv.DictReader(open(ROOT/"clip_specs.csv"))}
 
 def peaks_of(vel, ok, frac=0.6, sep=3):

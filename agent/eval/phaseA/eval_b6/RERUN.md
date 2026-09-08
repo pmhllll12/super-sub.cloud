@@ -9,9 +9,16 @@
 ## 재실행 명령과 소요
 
 ```bash
-cd /home/ho/projects/super-sub.cloud/agent   # uv 프로젝트 루트
-uv run python /mnt/d/supersub-phaseA/eval_b6/selector_downstream.py
+cd <저장소>/agent                            # uv 프로젝트 루트
+uv run python eval/phaseA/eval_b6/selector_downstream.py
 ```
+
+> 🔴 **위 명령을 2026-09-08에 고쳤다.** 앞서 여기 적혀 있던
+> `uv run python /mnt/d/supersub-phaseA/eval_b6/selector_downstream.py` 는
+> **더 이상 존재하지 않는 파일을 가리킨다** — `/mnt/d` 의 `.py` 38개는
+> 2026-09-02에 전부 지웠다(`/mnt/d/supersub-phaseA/README_CODE_MOVED.md`).
+> 그대로 따라 했으면 "그런 파일 없음"으로 죽었을 것이고, **더 나빴던 것은
+> 지우기 전에 따라 했을 경우다** — 2026-08-27에 멈춘 사본이 조용히 돌았다.
 
 **소요 244초** (2026-08-28 실측, RTX 3050) — Track1 **169초** + Track2 **75초**.
 스크립트가 끝나면 `track1_seconds`·`track2_seconds`·`total_seconds`를 stdout에
@@ -43,12 +50,25 @@ JSON으로 찍는다. **파일로 남기지 않으므로 그 출력을 따로 �
 | 루브릭 | `agent/rubrics/` | Track 2 등급 산출 불가 |
 | 모델 가중치 | HF 캐시 (`usyd-community/vitpose-base-simple`, `PekingU/rtdetr_r50vd_coco_o365`) | 재다운로드 약 2.4GB |
 
-경로는 `selector_downstream.py`가 `/mnt/d/supersub-phaseA`로 **여전히
-하드코딩**하고 있다(미결 14번). 다만 2026-09-03에 저장소 사본이
-`../cache_target{15,30}/`·`../candidates_target{15,30}/`로 바뀌고
-[`../paths.py`](../paths.py)를 거쳐 **읽히게 됐다** — 앞서 "백업이며 읽히지
-않는다"고 적은 것을 정정한다. 이 스크립트를 그쪽으로 옮기는 것은 아직이다
-([`../PRESERVED_ASSETS.md`](../PRESERVED_ASSETS.md) 참고).
+#### ✅ 경로를 `paths.py`로 옮겼다 (2026-09-08, 미결 11·14번)
+
+앞서 "이 스크립트를 그쪽으로 옮기는 것은 아직이다"라고 적은 것을 **정정한다.**
+옮겼다.
+
+| 무엇 | 어디서 읽나 |
+|---|---|
+| 후보 npz | **저장소 `../candidates_target{15,30}/`** (`targets.load_candidates`) |
+| `clips/*.mp4` (130MB) | 외부 — `paths.external_root()`, 기본 `/mnt/d/supersub-phaseA` |
+| 절대경로 `AGENT` | **뺐다.** `__file__` 에서 유도한다 — 다른 기계·EC2에서도 돈다 |
+
+🔴 **이 변경으로 결과가 달라지지 않는다.** 2026-09-08에 `/mnt/d/candidates`
+전수를 저장소 사본과 대조했더니 **target 30 과 39/39 바이트 동일**이었다
+(target 15 와는 1/39 — 그 1개는 `8gmHKqDxXdg`, 원본 10fps라 두 동작점이 원소까지
+같은 클립이다). 즉 지금까지 읽고 있던 것이 곧 `candidates_target30/` 이다.
+
+동작점은 이제 **이름으로 보인다.** `/mnt/d/candidates` 는 이름에 동작점이 없어
+마지막으로 돌린 쪽이 덮어썼고, **무엇을 읽고 있는지 알 수 없었다**(미결 10·14번).
+`SUPERSUB_PHASEA_TARGET` 으로 바꾼다(기본값은 `pose.DEFAULT_TARGET_FPS`).
 
 ## 비결정성 요소
 

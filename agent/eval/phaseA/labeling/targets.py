@@ -1,7 +1,8 @@
 """Phase B-0 공용 모듈 — 라벨 대상 프레임 결정과 후보 적재.
 
 이 디렉터리의 도구는 전부 오프라인이다. production 저장소를 읽지도 쓰지도 않는다.
-입력은 Phase A가 남긴 /mnt/d/supersub-phaseA/candidates/*.npz 뿐이다.
+입력은 Phase A가 남긴 후보 npz 뿐이고, **어디서 읽는지는 `paths.py`가 정한다**
+(저장소 `candidates_target{15,30}/` 우선 · 없으면 `SUPERSUB_PHASEA_ROOT`).
 
 npz 구조 (Phase A candidates.py가 저장한 것):
     frame_wh     (2,)      [W, H]
@@ -20,12 +21,30 @@ from __future__ import annotations
 
 import csv
 import math
+import sys
 from pathlib import Path
 
 import numpy as np
 
-ROOT = Path("/mnt/d/supersub-phaseA")
-CAND = ROOT / "candidates"
+_PHASE_A = Path(__file__).resolve().parent.parent   # eval/phaseA
+_AGENT = _PHASE_A.parent.parent                     # agent/
+sys.path.insert(0, str(_PHASE_A))
+sys.path.insert(0, str(_AGENT / "src"))
+
+from paths import candidates_dir, default_target, external_root  # noqa: E402
+
+#: 어느 동작점의 후보를 읽을 것인가. 값의 출처는 `paths.default_target()`
+#: 하나다(미결 10번). `SUPERSUB_PHASEA_TARGET` 으로 덮을 수 있다.
+#:
+#: 🔴 **이 모듈은 이제 저장소 사본(`candidates_target{15,30}/`)을 먼저 본다.**
+#: 예전에는 `/mnt/d/supersub-phaseA/candidates/` 를 그대로 읽었는데, 그 폴더는
+#: **이름에 동작점이 없어서** 마지막으로 돌린 쪽이 덮어쓴다 — 무엇을 읽고 있는지
+#: 알 수 없었다(미결 10·14번). 2026-09-08 대조에서 `/mnt/d` 는 target 30 과
+#: 39/39 바이트 동일이었으므로 **이 변경으로 오늘의 동작은 바뀌지 않는다.**
+TARGET = default_target()
+
+ROOT = external_root()          # 저장소에 못 넣은 큰 자산(clips·frames·labeling)
+CAND = candidates_dir(TARGET)   # 저장소 사본 우선, 없으면 외부
 WORK = ROOT / "labeling"
 RENDERS = WORK / "renders"
 LABELS = WORK / "labels.json"

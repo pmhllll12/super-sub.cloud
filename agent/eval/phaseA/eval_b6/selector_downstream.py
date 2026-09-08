@@ -35,15 +35,24 @@ import cv2
 import numpy as np
 import torch
 
-PHASE_A = Path("/mnt/d/supersub-phaseA")
-AGENT = Path("/home/ho/projects/super-sub.cloud/agent")
 OUT = Path(__file__).resolve().parent
+_PHASE_A_DIR = OUT.parent                    # eval/phaseA
+AGENT = _PHASE_A_DIR.parent.parent           # agent/  (절대경로 하드코딩을 뺐다 —
+                                             # 다른 기계·EC2에서도 돈다)
 
-# 코드는 저장소, 데이터는 /mnt/d. /mnt/d 사본은 갱신되지 않아 조용히 옛
-# 동작을 한다 (2026-09-02에 실제로 겪었다).
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "eval_b2"))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "labeling"))
+# 코드는 저장소, 데이터는 외부(`SUPERSUB_PHASEA_ROOT`, 기본 /mnt/d).
+# /mnt/d 에 코드 사본을 두지 않는다 — 갱신되지 않아 조용히 옛 동작을 한다
+# (2026-09-02에 실제로 겪었다. `/mnt/d/.../README_CODE_MOVED.md`).
+sys.path.insert(0, str(_PHASE_A_DIR))
+sys.path.insert(0, str(_PHASE_A_DIR / "eval_b2"))
+sys.path.insert(0, str(_PHASE_A_DIR / "labeling"))
 sys.path.insert(0, str(AGENT / "src"))
+
+from paths import external_root  # noqa: E402
+
+#: clips/ 는 130MB라 저장소에 없다 — 외부에만 있다(PRESERVED_ASSETS.md).
+#: 후보 npz 는 `targets.load_candidates()` 가 저장소 사본에서 읽는다.
+PHASE_A = external_root()
 
 import eval_b2 as e2  # noqa: E402  (selector 구현 — 읽기 전용 import)
 from targets import clip_ids, load_candidates  # noqa: E402

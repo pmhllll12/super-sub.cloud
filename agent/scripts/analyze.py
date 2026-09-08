@@ -87,7 +87,7 @@ def main() -> None:
         for run in range(args.repeat):
             t0 = time.time()
             judgments = judge.judge_all(rubric, features)
-            result = aggregate(judgments, rubric)
+            result = aggregate(judgments, rubric, features=features)
             scores.append(result["score"])
             print(f"  {run + 1}회차: {result['score']}점 "
                   f"({result['grade']}) — {time.time() - t0:.1f}초")
