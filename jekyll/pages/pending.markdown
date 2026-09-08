@@ -4917,8 +4917,9 @@ jin 21(공개 사이트 인프라 식별자 스크럽)에서 `jekyll/`·`_posts/
   준비되면.** 그전에 켜면 `/analysis` 업로드가 프로필에서 사라진다.
   - 백성검 쪽 진행(`32cd644`): 재생 주소·`DELETE /videos/{id}`·**저장 없이 이탈 시
     삭제**(`fetch(keepalive)`+`pagehide`)는 붙었다. 남은 건 「저장」 버튼을
-    `POST /videos/{id}/keep` 에 연결하는 것뿐 — 그게 **2조각(`bf7f03b`)으로
-    준비됐고 배포만 남았다.** 배포 → 백성검 연결 → 5조각 스위치 순서.
+    `POST /videos/{id}/keep` 에 연결하는 것뿐 — 그게 **2조각(`bf7f03b`)이고
+    2026-09-08 에 배포됨(아래 「EC2 배포됨」).** 이제 백성검이 「저장」을
+    `POST /videos/{id}/keep` 에 연결하면 5조각 스위치를 켤 수 있다.
 - ✅ **6조각** — `f6e3cc8`(6a): 저장 키 슬러그(`build_storage_key`, 닉네임·원본이름
   한글·자모 보존) · `video.original_filename` 컬럼(`2598dc30f0cb`) ·
   `POST /videos/upload-url` 에 `filename` 필수. `a8d72f9`: billing 과 head 충돌
@@ -4932,10 +4933,16 @@ jin 21(공개 사이트 인프라 식별자 스크럽)에서 `jekyll/`·`_posts/
     이미 구현됐으니 그대로 두되, **"문제 영상"의 자동/에이전트 처리**(잘못 돈
     분석 감지·정리 등)는 나중 과제로 남긴다 — 6b 를 최종 설계로 보지 말 것.
 
-#### 지금 당장(테스트 단계 정리)
+#### ✅ EC2 배포됨 (2026-09-08)
 
-- 서버 DB 유령 `video` 행 20개(S3 파일 없음, 1개만 실물 있음) — 사용자 승인받아 삭제한다(`classifier` 가 막아 사용자가 `!` 로 실행). 실물 있는 1개(`videos/2f3b04d9-…/37fe3852-…mp4`)는 남긴다
-- 해상도 상한(`analyze:false` 는 안 봄, `4ef9ea7`)은 서버 재시작 뒤 적용된다
+`4ef9ea7` → `d15806c`. `alembic upgrade head`: `5db18b239336` → `2598dc30f0cb`
+(`video.kept`+부분 인덱스 · billing 3테이블 · `video.original_filename`).
+`systemctl restart` 후 `/health` ok. **end-to-end keep 스모크 통과** — 서버에서
+signup → upload-url(읽는 키) → 사전서명 PUT → `POST /videos`(작업 생김) →
+`POST /videos/{id}/keep` → **S3 원본이 `videos/` 에서
+`reports/<uid>/<vid>/source.mp4` 로 실제로 옮겨짐**(IAM OK) → 멱등 확인 →
+`DELETE /videos` 로 정리(S3 객체도 삭제됨). billing·admin/videos·playback-url·
+credits·coaches 라우트 다 401(존재)로 확인.
 
 #### ✅ 정상호 조각 — 리포트 키를 계약 자리로 옮겼습니다 (2026.09.08)
 
