@@ -33,7 +33,7 @@ kinematics:
 
 criteria:
   - id: release_arm_extension
-    name: 슛하는 팔 신전
+    name: 슛하는 팔 뻗기
     weight: 0.3
     rationale: >-
       릴리스 시 팔꿈치가 펴지며 공에 속도를 준다. 이미 다 펴진 뒤에 놓으면
@@ -64,7 +64,7 @@ criteria:
         evidence: "팔꿈치각 178도로 릴리스 전에 이미 다 펴졌다"
 
   - id: guide_hand
-    name: 가이드 핸드
+    name: 공 받치는 손
     weight: 0.2
     rationale: >-
       반대 손은 공을 받쳐 주기만 하고 밀지 않는다. 함께 펴지면 두 손이 공에
@@ -95,7 +95,7 @@ criteria:
         evidence: "팔꿈치각 171도로 두 손이 함께 공을 밀었다"
 
   - id: follow_through
-    name: 팔로스루
+    name: 던진 뒤 손목 마무리
     weight: 0.2
     rationale: >-
       릴리스 후 팔이 림 쪽으로 계속 뻗어 나가야 방향이 유지된다.
@@ -126,7 +126,7 @@ criteria:
         evidence: "추가 굴곡 3도로 릴리스 직후 팔을 거두었다"
 
   - id: trunk_alignment
-    name: 상체 정렬
+    name: 상체 곧게 세우기
     weight: 0.15
     rationale: >-
       점프슛은 수직으로 뛰어 수직으로 내려와야 한다. 상체가 뒤로 젖혀지거나
@@ -157,7 +157,7 @@ criteria:
         evidence: "기울기 -26도로 상체가 크게 젖혀졌다"
 
   - id: leg_drive
-    name: 하체 신전
+    name: 다리로 밀어 올리기
     weight: 0.15
     rationale: >-
       다리가 펴지며 만든 힘이 상체를 거쳐 공에 전달된다. 무릎이 접힌 채
