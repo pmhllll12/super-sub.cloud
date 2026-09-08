@@ -731,6 +731,52 @@ curl -s -X PATCH -H "Authorization: Bearer $T" -H 'Content-Type: application/jso
 
 ---
 
+## 19. 🟡 과금이 생겼습니다 — 크레딧·코치 연결이 API로 됩니다 (2026-09-08 추가)
+
+미결 `paik` 13번(패킷 A)입니다. `paik` 브랜치에 만들어 뒀고, **아직 `main`에
+배선되지 않았습니다** — 정어진이 병합하며 잇습니다. 그 전까지는 참고만 하시면
+됩니다.
+
+| 엔드포인트 | 뜻 |
+|---|---|
+| `GET /credits` | 내 크레딧 잔량(`balance`)·이력(`history`) |
+| `POST /admin/credits/adjustments` | 관리자 전용 수동 지급·조정 |
+| `GET /coaches` · `GET /coaches/{id}` | 코치 목록·상세 |
+| `POST /coaches/{id}/referrals` | 코치 연결 요청 기록 |
+
+### 🔴 `market/coaches` 화면의 mock을 그대로 걷어낼 수 없습니다
+
+`www/src/lib/market.ts`의 `Coach` 타입은 `tagline`·`pricePerSession`·`levels`·
+`titles`·`report`(영상·장면)·`verified`·`reviews`·`lesson`을 갖지만, 부록 D의
+`coach` 테이블은 **`id`·`name`·`contact` 셋뿐**입니다. API가 주는 값은 이 셋
+뿐이라, 화면의 나머지 필드는 **당분간 계속 mock으로 둬야 합니다** — 지우지
+마십시오.
+
+`sport`(종목)도 같은 이유로 없습니다. 패킷 A 문서의 「종목 코드가 다릅니다」
+경고(`football` vs `soccer`)를 보고 확인했는데, 지금 스키마엔 애초에 종목
+컬럼이 없어 **이번엔 해당하는 변환이 없습니다.** 종목별로 코치를 거르는 화면을
+실제 데이터로 채우려면 `coach`에 종목 컬럼을 추가하는 **부록 D 변경이 먼저**
+필요합니다 — 혼자 정하지 않고 미결 항목(`paik` 구역)으로 올려 뒀습니다.
+
+### 크레딧은 자동으로 쌓이지 않습니다
+
+가입 보너스·분석당 차감 같은 자동 지급/차감은 아직 없습니다(정책 미정).
+`POST /admin/credits/adjustments`로 **관리자가 수동으로만** 조정합니다 — `/credits`
+화면을 미리 만드셔도 됩니다만 지금은 값이 항상 `{"balance": 0, "history": []}`로
+비어 있을 것입니다.
+
+### 먼저 확인
+
+```bash
+git -C fastapi log --oneline paik -- app/billing   # 브랜치에 있는지
+```
+
+`main`에 배선되면 이 항목에 이어서 남기겠습니다.
+
+상세: `fastapi/docs/api-contract.md` **3-10절** · `fastapi/docs/backend-work-split.md` 「패킷 A」
+
+---
+
 ## 계약 문서
 
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린

@@ -4313,17 +4313,38 @@ IAM 역할명·API 호스트명**이 그대로 있었고, `pages.yml` 로 `dev.s
 
 ## min (박민호)
 
-### 1. 패킷 A(과금) 진행 상황을 알려주세요
+### 1. 패킷 A(과금) 진행 상황을 알려주세요 ✅ 회신 (2026.09.08)
 
-패킷 B(평가·신뢰)는 `review_option` 초기 목록을 확정하고 마이그레이션을
-`min`에 푸시했습니다(jin 구역 14번 진행 참고). 패킷 A(과금 — `analysis_credit` ·
-`coach` · `coach_referral`, `fastapi/docs/backend-work-split.md` 패킷 A)는 지금
-어디까지 되어 있는지 궁금합니다.
+> **늦어서 죄송합니다 — 착수 전이었던 것을 오늘 끝까지 만들었습니다.** 처음
+> 걸어 주신 `git grep -n "analysis_credit" -- fastapi/app`가 실제로 0건이었고,
+> 최근엔 `www/` 화면(경기 탐색·클립 업로드·경기장 예약 등) 쪽에 밀려 있었습니다.
+>
+> **오늘 `app/billing/`(domain·application·adapter·dependencies)·라우터·
+> 마이그레이션·테스트를 전부 만들어 `paik` 브랜치에 있습니다.** 공유 파일
+> 5곳(`main.py`·`alembic/env.py`·`tests/conftest.py`)은 배선이 정어진 몫이라
+> 건드리지 않았습니다.
+>
+> | | |
+> |---|---|
+> | 확인 | `git -C fastapi log --oneline paik -- app/billing` |
+> | 계약 테스트 | `.venv/bin/pytest -q tests/billing` → **15 passed**(스텁, 아직 `main.py`에 안 붙어 있어 라우터 하나만 올린 별도 앱으로 검사합니다 — `tests/billing/conftest.py`) |
+> | DB 통합 테스트 | 써 뒀지만 **이 환경에서 Postgres 인증이 막혀 못 돌렸습니다**(`password authentication failed for user "supersub"`) — `test_review_db.py` 등 기존 DB 테스트도 이 환경에서 전부 같은 이유로 실패해서 제 코드 문제는 아닌 것 같습니다. 로컬에서 `.venv/bin/pytest -q -m db tests/billing` 로 확인 부탁드립니다 |
+>
+> **말씀하신 두 걱정 다 확인했습니다.**
+>
+> - **종목 코드 불일치(`football` vs `soccer`)** — 이번엔 해당 없었습니다.
+>   `coach` 테이블(부록 D)에 애초에 종목 컬럼이 없어서 옮길 것 자체가
+>   없습니다. 대신 이게 새 문제입니다 — 아래 참고
+> - **미결 10번(웹이 mock 고정) 순서** — 이미 해소돼 있어서 걸리지 않았습니다
+>
+> 🔴 **다만 그 대신 부록 D 변경이 필요한 게 하나 나왔습니다** — `coach`에
+> 종목 컬럼이 없어 `market/coaches`의 종목 필터를 실제 데이터로 못 채웁니다.
+> 혼자 정하지 않고 **paik 구역 14번**으로 새로 올렸습니다 — 급하지 않으니
+> 편하실 때 봐 주십시오.
+>
+> 상세: `fastapi/docs/api-contract.md` **3-10절** · `fastapi/docs/backend-work-split.md`
+> 「패킷 A」 · 클라이언트 반영은 `fastapi/docs/client-contract-changes.md` **19번**
 
-- 확인: `git grep -n "analysis_credit" -- fastapi/app` (`paik` 브랜치 기준)
-- 막힌 게 있으면 여기 남겨 주세요 — 특히 패킷 A 문서에 적힌 종목 코드
-  불일치(`football` vs `soccer`)와 미결 10번(웹이 mock에 고정) 순서 문제가
-  먼저 걸릴 수 있다고 되어 있습니다
 - **담당**: 백성검 · **제기**: 박민호 · **기한**: 확인되는 대로
 
 ### 2. 패킷 B — review_option 초기 목록·마이그레이션 확인 부탁드립니다 ✅ 해소 (2026.09.04)
@@ -4429,20 +4450,19 @@ D.8이 "3.4의 피해 상한 설계와 함께 정한다"고 미뤄 둔 자리를
 두고 부정 신호는 선호 표현 둘로 제한하는 **선택지 구성 자체**로 푸신 것 —
 근거가 docstring에 남아 있어 나중에 왜 그런지 되짚을 수 있습니다. 좋았습니다.
 
-### 3. 패킷 A — 리뷰 부탁드립니다
+### 3. 패킷 A — 리뷰 부탁드립니다 ✅ 회신 (2026.09.08)
 
-1번에서 진행 상황을 여쭸는데, 되어 있는 만큼 리뷰도 함께 부탁드립니다.
-`fastapi/docs/backend-work-split.md` 패킷 A의 "하지 말 것"·"만족해야 할 성질"과
-맞춰서 스스로 한 번 확인해 주시면 좋겠습니다 — 특히:
-
-- 잔량을 별도 컬럼에 두지 않고 `analysis_credit.delta`의 합으로 구하는지
-- `coach`에 `user_id`를 넣지 않았는지 (ERD에 없는 컬럼입니다)
-- 크레딧 차감이 분석 경로(`POST /videos`)에 직접 연결되지 않았는지 —
-  그 연결은 정어진 님 쪽에서 붙입니다
-- 종목 코드(`football` vs `soccer`) 불일치를 그대로 두셨는지, 아니면 경계에서
-  변환하셨는지 — 어느 쪽이든 pending에 남겨 주시면 됩니다
-
-막히는 부분 있으면 여기 이어서 남겨 주세요.
+> **스스로 확인한 넷 다 지켰습니다.**
+>
+> | 확인할 것 | 결과 |
+> |---|---|
+> | 잔량이 `SUM(delta)`인가 | ✅ 컬럼을 두지 않았습니다 — `ViewCreditsInteractor`가 `credit_history()`를 합산합니다(`app/billing/application/use_cases/billing_interactors.py`) |
+> | `coach`에 `user_id`가 없는가 | ✅ `id`·`name`·`contact` 셋뿐입니다(`coach_orm.py`) |
+> | 크레딧 차감이 `POST /videos`에 직접 연결되지 않았는가 | ✅ `analysis` 컨텍스트를 임포트하지 않습니다 — 연결 지점은 없고, 수동 조정(`POST /admin/credits/adjustments`, 관리자 전용)만 있습니다 |
+> | 종목 코드(`football`/`soccer`) 처리 | ⚠️ **그대로 두지도, 변환하지도 않았습니다** — `coach`에 종목 컬럼 자체가 없어서 다룰 대상이 없었습니다. 새로 생긴 문제라 **paik 14번**으로 올렸습니다 |
+>
+> 1번 회신에 만든 것·테스트 현황을 전부 적어 뒀습니다 — 여기서 되풀이하지
+> 않습니다.
 
 - **담당**: 백성검 · **제기**: 박민호 · **기한**: 확인되는 대로
 
@@ -5426,5 +5446,30 @@ BFF · mock 까지는 다 되어 있습니다. **계약에 그 경로가 없습�
 
 - 관련: paik 11번(리포트 자리 — **먼저 풀려야 합니다**) · `www/src/app/api/videos/[id]/route.ts` · 계약 3-6절
 - **담당**: 정어진 · **제기**: 백성검 · **기한**: 스프린트 3
+
+### 14. `coach` 에 종목 컬럼이 없습니다 — `market/coaches` 를 실제 데이터로 못 채웁니다 (2026-09-08 신설)
+
+패킷 A(과금)를 만들면서 확인했습니다. 부록 D 의 `coach` 테이블은 `id`·`name`·
+`contact` 셋뿐이라 종목별로 코치를 거르는 지금 화면(`market/coaches`, 종목
+탭·필터)을 실제 API 로 채울 수 없습니다 — `www/src/lib/market.ts` 의 `Coach.sport`
+에 대응하는 컬럼이 아예 없습니다.
+
+패킷 A 문서의 「붙일 때 걸리는 것」이 경고한 종목 코드 불일치(`football` vs
+`soccer`)는 **이번엔 해당하지 않았습니다** — 애초에 옮길 컬럼이 없어서입니다.
+가격·소개 문장·후기·레슨 장소·대표 영상도 마찬가지로 부록 D 에 없어 화면
+쪽은 당분간 mock 을 유지합니다(`fastapi/docs/client-contract-changes.md` 19번에
+남겨 뒀습니다).
+
+| | |
+|---|---|
+| 만족해야 할 성질 | (결정 대기) 종목별로 코치를 거를 수 있을 것 — `coach` 에 컬럼을 늘리든, 코치-종목을 다대다로 두든 형태는 자유입니다 |
+| 하지 말 것 | 🔴 **혼자 컬럼을 늘리지 않기** — 부록 D 변경이라 PM 판단이 먼저입니다 |
+
+**급하지 않습니다.** 지금은 목록·상세·연결 기록까지만 되고, 종목 필터는 화면에서
+그냥 안 걸립니다(또는 mock 값을 계속 씁니다). 가격·후기 등 나머지 mock 필드를
+정말 실물로 바꾸는 일과 한 번에 정하는 편이 나을 것 같아 별도 항목으로 냈습니다.
+
+- 관련: `fastapi/docs/backend-work-split.md` 「패킷 A」 · 부록 D ⑥ 과금
+- **담당**: 박민호 · **제기**: 백성검 · **기한**: 확인되는 대로
 
 [← 표지]({{ "/" | relative_url }})
