@@ -79,4 +79,54 @@ describe('홈 — 굴림으로 영상 모음을 오간다', () => {
     wheelBurst(-100)
     expect(back).not.toHaveBeenCalled()
   })
+
+  /**
+   * 🔴 **글자를 치는 중에는 자판이 화면을 넘기지 않는다**(사용자 지적,
+   * 2026-09-08: 챗봇에 「안녕하세요. 」까지 쳤더니 영상 모음으로 넘어갔다).
+   *
+   * 자판으로도 오갈 수 있어야 해서 `ArrowDown`·`PageDown`·**스페이스**를
+   * 「내려가기」로 받는데, 그 셋은 글자를 치는 사람에게도 온다 — 스페이스는
+   * **띄어쓰기**이고 화살표는 **글자 사이를 오가는 것**이다. 어디서 눌렀는지를
+   * 보지 않으면 문장 한 줄을 못 쓴다.
+   */
+  function keyOn(target: Element | Window, key: string, init: KeyboardEventInit = {}) {
+    act(() => {
+      target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, ...init }))
+    })
+  }
+
+  it.each(['ArrowDown', 'PageDown', ' '])(
+    '글쇠 %s 를 입력칸에서 눌러도 영상 모음으로 안 넘어간다',
+    (key) => {
+      const { container } = setup()
+      const input = document.createElement('input')
+      container.appendChild(input)
+      keyOn(input, key)
+      expect(push).not.toHaveBeenCalled()
+    },
+  )
+
+  it('챗봇 판 안에서 누른 글쇠는 화면을 안 넘긴다', () => {
+    const { container } = setup()
+    const panel = document.createElement('div')
+    panel.className = 'ss-matchbot'
+    const btn = document.createElement('button')
+    panel.appendChild(btn)
+    container.appendChild(panel)
+    keyOn(btn, ' ')
+    expect(push).not.toHaveBeenCalled()
+  })
+
+  it('한글을 조합하는 중에 온 글쇠는 화면을 안 넘긴다', () => {
+    setup()
+    // IME 가 조합 중일 때 브라우저가 보내는 것 — 글쇠는 아직 글자의 일부다.
+    keyOn(window, ' ', { isComposing: true })
+    expect(push).not.toHaveBeenCalled()
+  })
+
+  it('그래도 빈 자리에서 누르면 자판으로 넘어간다 — 길을 막지 않는다', () => {
+    setup()
+    keyOn(document.body, 'ArrowDown')
+    expect(push).toHaveBeenCalledTimes(1)
+  })
 })

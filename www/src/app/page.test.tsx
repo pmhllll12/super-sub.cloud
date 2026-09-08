@@ -83,15 +83,18 @@ describe('홈 화면 — /', () => {
     expect(screen.getByText('내 프로필')).toBeInTheDocument()
   })
 
-  // 🔴 '준비 중입니다' 는 안 적는다(사용자 요청) — 개발 진행 상태는 화면이
-  // 할 말이 아니다. 갈 곳이 없으면 **링크가 아닌 것**으로 이미 드러난다.
-  it('아직 갈 곳이 없는 목적지는 카드가 링크가 아니다', async () => {
+  // 2026-09-08: 경기장 목록(mock)이 생겨 '경기장 예약'도 링크가 됐다
+  // (destinations.ts 주석) — 나머지 갈 곳 없는 목적지는 여전히 카드가
+  // 링크가 아닌 것으로 남는다(🔴 '준비 중입니다'는 안 적는다, 사용자 요청).
+  it('경기장 예약은 목록 화면으로 가는 링크다', async () => {
     const user = userEvent.setup()
     render(<HomeBody user={{ nickname: '홍길동' }} />)
     await user.hover(screen.getByRole('button', { name: '경기장 예약' }))
     expect(screen.getByText(/가까운 구장을 찾고/)).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /가까운 구장을 찾고/ })).toBeNull()
-    expect(screen.queryByText('준비 중입니다')).toBeNull()
+    expect(screen.getByRole('link', { name: /가까운 구장을 찾고/ })).toHaveAttribute(
+      'href',
+      '/venues',
+    )
   })
 
   it('로그인 안 했으면 로그인 전용 목적지 카드에 안내를 붙이되 링크는 살아 있다', async () => {

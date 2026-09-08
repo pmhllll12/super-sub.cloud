@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { MyVideo } from '@/server/backend'
 import { listPublished } from '@/lib/published'
-import { saveReport } from '@/lib/savedReports'
+import { reportFor, saveReport } from '@/lib/savedReports'
 import MyVideos from './MyVideos'
 
 /**
@@ -305,5 +305,96 @@ describe('내 영상 — 분석 리포트', () => {
     expect(text).not.toMatch(/★/)
     expect(container.querySelector('progress')).toBeNull()
     expect(container.querySelector('meter')).toBeNull()
+  })
+})
+
+/**
+ * 🔴 **지우기는 되돌릴 수 없다.** 그래서 이 넷이 다 지켜져야 한다:
+ * 한 번 더 묻는가 · 서버가 지운 **뒤에야** 화면에서 빠지는가 · 실패하면
+ * 남아 있는가 · 브라우저에만 있던 것(리포트 · 공개)까지 거두는가.
+ */
+describe('내 영상 — 지우기', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    globalThis.localStorage?.clear()
+  })
+
+  function stubFetch(res: { ok: boolean; body?: unknown; status?: number }) {
+    const fn = vi.fn().mockResolvedValue({
+      ok: res.ok,
+      status: res.status ?? (res.ok ? 204 : 404),
+      json: async () => res.body ?? null,
+    })
+    vi.stubGlobal('fetch', fn)
+    return fn
+  }
+
+  it('곧바로 안 지운다 — 한 번 더 묻는다', async () => {
+    const user = userEvent.setup()
+    const fn = stubFetch({ ok: true })
+    render(<MyVideos videos={[analyzed]} />)
+
+    await user.click(screen.getByRole('button', { name: /삭제/ }))
+    expect(fn).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: '정말 지웁니다' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '취소' })).toBeInTheDocument()
+  })
+
+  it('취소하면 아무 일도 없다', async () => {
+    const user = userEvent.setup()
+    const fn = stubFetch({ ok: true })
+    render(<MyVideos videos={[analyzed]} />)
+
+    await user.click(screen.getByRole('button', { name: /삭제/ }))
+    await user.click(screen.getByRole('button', { name: '취소' }))
+    expect(fn).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: /삭제/ })).toBeInTheDocument()
+  })
+
+  it('확인하면 그 영상만 지우도록 부르고 목록에서 뺀다', async () => {
+    const user = userEvent.setup()
+    const fn = stubFetch({ ok: true })
+    render(<MyVideos videos={[analyzed]} />)
+
+    await user.click(screen.getByRole('button', { name: /삭제/ }))
+    await user.click(screen.getByRole('button', { name: '정말 지웁니다' }))
+
+    await waitFor(() => expect(fn).toHaveBeenCalledTimes(1))
+    expect(fn.mock.calls[0][0]).toBe('/api/videos/v1')
+    expect(fn.mock.calls[0][1]).toMatchObject({ method: 'DELETE' })
+    await waitFor(() =>
+      expect(screen.getByText('아직 분석한 영상이 없습니다.')).toBeInTheDocument(),
+    )
+  })
+
+  it('서버가 못 지우면 사유를 띄우고 영상은 그대로 둔다', async () => {
+    const user = userEvent.setup()
+    stubFetch({
+      ok: false,
+      status: 404,
+      body: { error: { code: 'VIDEO_NOT_FOUND', message: '그 영상을 찾을 수 없습니다.' } },
+    })
+    render(<MyVideos videos={[analyzed]} />)
+
+    await user.click(screen.getByRole('button', { name: /삭제/ }))
+    await user.click(screen.getByRole('button', { name: '정말 지웁니다' }))
+
+    await waitFor(() =>
+      expect(screen.getByText('그 영상을 찾을 수 없습니다.')).toBeInTheDocument(),
+    )
+    // 🔴 사라진 것처럼 보이면 안 된다 — 서버에는 아직 있다.
+    expect(screen.queryByText('아직 분석한 영상이 없습니다.')).not.toBeInTheDocument()
+  })
+
+  it('브라우저에만 있던 리포트도 함께 거둔다', async () => {
+    const user = userEvent.setup()
+    stubFetch({ ok: true })
+    saveReport('v1', { summary: '요약', traits: [], titles: [], scenes: [] })
+    render(<MyVideos videos={[analyzed]} />)
+
+    await user.click(screen.getByRole('button', { name: /삭제/ }))
+    await user.click(screen.getByRole('button', { name: '정말 지웁니다' }))
+
+    await waitFor(() => expect(reportFor('v1')).toBeNull())
   })
 })

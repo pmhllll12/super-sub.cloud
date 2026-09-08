@@ -156,6 +156,25 @@ def test_the_command_writes_only_under_reports(worker, cfg):
     assert "s3://supersub-ai/videos/user-1/clip.mp4" in cmd
 
 
+def test_the_command_carries_the_video_id(worker, cfg):
+    """🔴 `video_id` 를 안 넘기면 리포트가 **계약 자리 밖**에 쌓인다.
+
+    「저장」(`jin` 24번)은 원본을 `reports/<user_id>/<video_id>/source.mp4` 로
+    옮긴다. 리포트가 옛 자리(업로드 폴더 + 타임스탬프)에 있으면 한 영상에 대한
+    것이 두 군데로 갈린다.
+    """
+    cmd = worker.analyze_command(cfg, _job(), ROOT / "rubrics/baseball_pitching.yaml")
+    assert cmd[cmd.index("--video-id") + 1] == "1b3c"
+
+
+def test_the_video_id_is_omitted_when_the_job_has_none(worker, cfg):
+    """옛 백엔드는 이 필드를 안 준다. 그때는 옛 자리로 가야지 죽으면 안 된다."""
+    cmd = worker.analyze_command(cfg, _job(video_id=None),
+                                 ROOT / "rubrics/baseball_pitching.yaml")
+    assert "--video-id" not in cmd
+    assert "None" not in cmd
+
+
 def test_side_is_omitted_when_the_job_has_none(worker, cfg):
     """`side` 는 null 일 수 있다. None을 문자열로 넘기면 argparse가 거부한다."""
     cmd = worker.analyze_command(cfg, _job(side=None),
