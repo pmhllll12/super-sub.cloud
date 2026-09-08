@@ -6,7 +6,7 @@ import FigureBackground from '@/components/FigureBackground'
 import { useHideChrome, useLeaving } from '@/lib/pageTransition'
 import type { Box } from '@/lib/box'
 import { smoothStep } from '@/lib/smoothBox'
-import { SPORTS, SPORT_CODE, type SportKey } from '@/lib/sports'
+import { DEFAULT_SPORT, SPORT_CODE, type SportKey } from '@/lib/sports'
 import { FOCUS } from '@/lib/rubricFocus'
 import { uploadClip } from '@/lib/uploadClip'
 import { saveReport } from '@/lib/savedReports'
@@ -355,12 +355,14 @@ export default function AnalysisStage() {
   )
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   /**
-   * 고른 종목. **기본값을 두지 않는다** — 위 SPORTS 주석 참고.
+   * 이 영상의 종목. **지금은 축구 고정**이라 고르는 자리가 없다 — 왜 그런지와
+   * 늘릴 때 무엇을 같이 되살려야 하는지는 `lib/sports.ts` 의 `DEFAULT_SPORT`
+   * 주석에 있다. 상태로 남겨 두는 것은 그때 그 자리를 도로 꽂기 위해서다.
    *
    * 영상을 물러도(reset) 지우지 않는다. 같은 사람이 연달아 올리는 클립은
    * 대개 같은 종목이라, 매번 다시 고르게 하면 손만 는다.
    */
-  const [sport, setSport] = useState<SportKey | null>(null)
+  const [sport] = useState<SportKey | null>(DEFAULT_SPORT)
   /**
    * 지금 끌고 있는(또는 다 그린) 네모 — 오버레이 기준이다.
    * 확정 전이라 다시 끌면 그대로 덮어쓴다.
@@ -1202,29 +1204,14 @@ export default function AnalysisStage() {
                 자리만 먹으면서 "눌리는 것처럼" 보였다. 종목 알약이 그 자리를
                 가져간다. */}
             <span className="ss-shot-bar-right">
-              {/* 🔴 종목을 골라야 시작할 수 있다 — 위 SPORTS 주석 참고.
-                  라디오가 아니라 `aria-pressed` 누름 버튼이다: 라디오는
-                  화살표 키 이동까지 손으로 만들어야 하는데, 알약 셋에는
-                  Tab 으로 하나씩 닿는 편이 오히려 예측 가능하다. */}
-              <span className="ss-shot-sports" role="group" aria-label="종목">
-                {SPORTS.map((s) => (
-                  <button
-                    key={s.key}
-                    type="button"
-                    className="ss-shot-sport"
-                    aria-pressed={sport === s.key}
-                    // 시작한 뒤에는 못 바꾼다 — 돌고 있는 분석의 루브릭을
-                    // 도중에 갈아끼우는 셈이 된다. 고른 것은 그대로 보인다.
-                    disabled={started}
-                    onClick={() => setSport(s.key)}
-                  >
-                    <span className="material-symbols-outlined" aria-hidden="true">
-                      {s.icon}
-                    </span>
-                    {s.label}
-                  </button>
-                ))}
-              </span>
+              {/* 🔴 **종목 알약 셋은 걷어냈다**(팀 결정, 2026-09-08: 일단 축구
+                  영상만 넣는다). 고를 것이 하나뿐인 자리를 남겨 두면 무엇을
+                  고르라는 것인지 알 수 없다.
+
+                  🔴 **늘릴 때 여기를 도로 꽂는다.** `lib/sports.ts` 의
+                  `DEFAULT_SPORT` 주석이 왜 그래야 하는지를 갖고 있다 —
+                  그 상수만 바꾸고 이 자리를 안 되살리면 다른 종목 영상이
+                  축구 루브릭으로 조용히 채점된다. */}
 
               {/* 🔴 닫기 점은 **진짜 버튼**이다. 창 틀의 닫기 자리이므로
                   시작한 뒤에도 그대로 있어야 한다 — 한때 시작하면 장식으로
@@ -1489,26 +1476,10 @@ export default function AnalysisStage() {
           </button>
         }
 
-        {/* 영상은 골랐는데 종목을 안 골랐을 때만 펴지는 한 줄.
-
-            🔴 **시작 버튼 아래다**(사용자 요청). 위에 뒀더니 창 틀과 버튼
-            사이에 끼어서 "지금 나온 줄도 몰랐다" — 눈은 누르려는 버튼에
-            가 있는데 안내는 그 위에 있었다. 잠긴 버튼 바로 아래, 강조색으로,
-            계속 깜빡인다.
-
-            🔴 **늘 DOM 에 있다.** 시작 버튼과 같은 이유다 — 붙였다 뗐다 하면
-            그 순간 판의 키가 확 바뀌어 안쪽 것들이 툭 떨어진다. 펴고 접는
-            것은 CSS 가 한다(`[data-picked]:not([data-sport])`).
-
-            🔴 접혀 있는 동안에는 **접근성 트리에서도 뺀다.** 키가 0 일 뿐
-            `display:none` 이 아니라서, 안 빼면 종목을 이미 골랐는데도 화면
-            낭독기가 "종목을 먼저 골라 주세요"를 계속 읽는다. */}
-        <p className="ss-shot-hint" aria-hidden={file && !sport ? undefined : 'true'}>
-          {/* 깜빡임은 **안쪽 글자**가 맡는다. 바깥 <p> 는 펴고 접는 일(키 ·
-              여백 · 불투명도 전이)을 하는데, 같은 요소에 무한 애니메이션을
-              걸면 그 전이를 애니메이션이 덮어써 펴질 때 툭 나타난다. */}
-          <span>종목을 먼저 골라 주세요</span>
-        </p>
+        {/* 🔴 **「종목을 먼저 골라 주세요」한 줄은 걷어냈다**(2026-09-08).
+            고를 자리가 없어졌으니 영영 안 펴지는 안내였다 — 남겨 두면 다음
+            사람이 "왜 안 뜨나"를 쫓는다. 종목을 다시 늘릴 때 이 안내도 같이
+            돌아온다(`lib/sports.ts` 의 `DEFAULT_SPORT` 주석). */}
       </aside>
 
       {/* ── 오른쪽 떠 있는 판 — 진행 · 리포트 · 대화 ────────────────── */}

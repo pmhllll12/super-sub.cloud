@@ -86,11 +86,15 @@ describe('영상 분석 화면', () => {
     expect(container.querySelector('meter')).toBeNull()
   })
 
-  // 🔴 기본값을 축구로 박아 두면 야구 영상이 축구 루브릭으로 조용히 채점된다.
-  it('종목은 처음에 아무것도 골라져 있지 않다', () => {
+  /* 🔴 **종목을 고르는 자리가 없다** — 축구 하나만 넣기로 했다(팀 결정,
+     2026-09-08). 이 시험이 그 결정을 붙들고 있다: 종목을 다시 늘리면서
+     `DEFAULT_SPORT` 만 바꾸고 고르는 자리를 안 되살리면 **여기가 먼저
+     빨개진다.** 그러지 않으면 다른 종목 영상이 축구 루브릭으로 조용히
+     채점되는 옛 위험이 그대로 돌아온다. */
+  it('종목을 고르는 자리가 없다 — 축구 하나뿐이다', () => {
     render(<AnalysisStage />)
     for (const name of ['축구', '야구', '농구']) {
-      expect(screen.getByRole('button', { name })).toHaveAttribute('aria-pressed', 'false')
+      expect(screen.queryByRole('button', { name })).toBeNull()
     }
   })
 
@@ -216,47 +220,16 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     expect(screen.queryByLabelText('분석 진행')).toBeNull()
   })
 
-  // 🔴 에이전트가 종목을 알아야 세세하게 본다 — 루브릭이 종목마다 다르다.
-  it('영상만 골라서는 시작할 수 없고, 종목까지 골라야 풀린다', async () => {
+  /* 종목이 정해져 있으므로 **영상만 고르면 바로 시작할 수 있다.**
+     ⚠️ 전에는 여기서 잠겨 있었고 「종목을 먼저 골라 주세요」가 떴다 — 고를
+     자리가 없어진 지금 그 안내는 영영 안 나오므로 함께 걷어냈다. */
+  it('영상만 고르면 바로 시작할 수 있다', async () => {
     const user = userEvent.setup()
     const { input, file } = pick()
     await user.upload(input, file)
 
-    const startBtn = screen.getByRole('button', { name: '분석 시작하기' })
-    expect(startBtn).toBeDisabled()
-    // 왜 잠겼는지 화면에 적어 둔다 — 잠긴 버튼만 있으면 이유를 알 길이 없다.
-    expect(screen.getByText('종목을 먼저 골라 주세요')).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: '야구' }))
-    expect(screen.getByRole('button', { name: '야구' })).toHaveAttribute('aria-pressed', 'true')
-    expect(startBtn).toBeEnabled()
-  })
-
-  // 돌고 있는 분석의 루브릭을 도중에 갈아끼우는 셈이 된다.
-  it('시작한 뒤에는 종목을 바꿀 수 없다', async () => {
-    const user = userEvent.setup()
-    const { input, file } = pick()
-    await user.upload(input, file)
-    await user.click(screen.getByRole('button', { name: '농구' }))
-    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
-
-    // 고른 것은 그대로 보인다 — 무엇으로 보고 있는지가 분석 내내 남아야 한다.
-    expect(screen.getByRole('button', { name: '농구' })).toHaveAttribute('aria-pressed', 'true')
-    for (const name of ['축구', '야구', '농구']) {
-      expect(screen.getByRole('button', { name })).toBeDisabled()
-    }
-  })
-
-  // 같은 사람이 연달아 올리는 클립은 대개 같은 종목이다.
-  it('영상을 물러도 고른 종목은 남는다', async () => {
-    const user = userEvent.setup()
-    const { input, file } = pick()
-    await user.upload(input, file)
-    await user.click(screen.getByRole('button', { name: '축구' }))
-    await user.click(screen.getByRole('button', { name: '영상 닫기' }))
-
-    await screen.findByLabelText('분석할 영상', {}, { timeout: 2000 })
-    expect(screen.getByRole('button', { name: '축구' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: '분석 시작하기' })).toBeEnabled()
+    expect(screen.queryByText('종목을 먼저 골라 주세요')).toBeNull()
   })
 
   // 🔴 시작 전에는 오른쪽 판이 아직 없다 — 여기서 못 무르면 잘못 고른 영상을
@@ -284,7 +257,6 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     const user = userEvent.setup()
     const { input, file } = pick()
     await user.upload(input, file)
-    await user.click(screen.getByRole('button', { name: '축구' }))
     await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
 
     pauseSpy.mockClear()
@@ -300,7 +272,6 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     const user = userEvent.setup()
     const { input, file } = pick()
     await user.upload(input, file)
-    await user.click(screen.getByRole('button', { name: '축구' }))
     await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
 
     await user.click(screen.getByRole('button', { name: '재생' }))
@@ -316,7 +287,6 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     const user = userEvent.setup()
     const { input, file } = pick()
     await user.upload(input, file)
-    await user.click(screen.getByRole('button', { name: '축구' }))
     await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
     await screen.findByRole('button', { name: '이 사람으로 분석' }, { timeout: 2500 })
     await drawSubject(user)
@@ -336,7 +306,6 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     const user = userEvent.setup()
     const { input, file } = pick()
     await user.upload(input, file)
-    await user.click(screen.getByRole('button', { name: '축구' }))
     await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
     await screen.findByRole('button', { name: '이 사람으로 분석' }, { timeout: 2500 })
     await drawSubject(user)
@@ -355,7 +324,6 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     const user = userEvent.setup()
     const { input, file } = pick()
     await user.upload(input, file)
-    await user.click(screen.getByRole('button', { name: '축구' }))
     await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
     await screen.findByRole('button', { name: '이 사람으로 분석' }, { timeout: 2500 })
     await drawSubject(user)
@@ -372,7 +340,6 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     const user = userEvent.setup()
     const { input, file } = pick()
     await user.upload(input, file)
-    await user.click(screen.getByRole('button', { name: '축구' }))
     await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
     await screen.findByRole('button', { name: '이 사람으로 분석' }, { timeout: 2500 })
     await drawSubject(user)
@@ -386,7 +353,6 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     const { input, file } = pick()
     await user.upload(input, file)
     // 종목을 골라야 시작이 풀린다.
-    await user.click(screen.getByRole('button', { name: '축구' }))
     await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
 
     await user.click(screen.getByRole('button', { name: '영상 닫기' }))
@@ -412,7 +378,6 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     const user = userEvent.setup()
     const { input, file } = pick()
     await user.upload(input, file)
-    await user.click(screen.getByRole('button', { name: '축구' }))
     await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
 
     const stage = document.querySelector('.ss-shot')
@@ -449,19 +414,25 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
   /* 🔴 목록은 **에이전트가 실제로 채점하는 항목**이다 — 지어낸 것이 아니라
      `agent/rubrics/basketball_jump_shot.yaml` 의 `criteria[].name` 이다.
      이 시험이 그 사본(`lib/rubricFocus.ts`)이 어긋나는 것을 잡는다. */
-  it('종목을 고르면 그 종목이 채점하는 항목이 선택지로 나온다', async () => {
+  it('그 종목이 채점하는 항목이 선택지로 나온다', async () => {
     const user = userEvent.setup()
     const { input, file } = pick()
     await user.upload(input, file)
-    await user.click(screen.getByRole('button', { name: '농구' }))
     await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
     await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 })
 
-    for (const label of ['슛하는 팔 신전', '가이드 핸드', '팔로스루', '상체 정렬', '하체 신전']) {
+    for (const label of [
+      '디딤발 무릎 굴곡',
+      '차는 다리 무릎 신전',
+      '상체 기울기',
+      '골반 회전',
+      '팔로스루',
+      '디딤발 위치',
+    ]) {
       expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
     }
     // 열린 동작 이름도 적는다 — 무엇에 대한 항목인지 알아야 고를 수 있다.
-    expect(screen.getByText('점프슛')).toBeInTheDocument()
+    expect(screen.getByText('인스텝 슈팅')).toBeInTheDocument()
   })
 
   /* 🔴 루브릭 파일이 정한 규칙이다 — *"status: 사용자 선택지에 올릴지 여부 —
@@ -471,13 +442,12 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     const user = userEvent.setup()
     const { input, file } = pick()
     await user.upload(input, file)
-    await user.click(screen.getByRole('button', { name: '농구' }))
     await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
     await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 })
 
-    // 농구의 draft 는 레이업이다. 그 항목(deferred)도 마찬가지로 없다.
-    expect(screen.queryByText(/레이업/)).toBeNull()
-    expect(screen.queryByRole('button', { name: '릴리스 높이' })).toBeNull()
+    // 축구의 draft 는 인사이드 패스다. 미룬 항목(deferred)도 마찬가지로 없다.
+    expect(screen.queryByText(/인사이드 패스/)).toBeNull()
+    expect(screen.queryByRole('button', { name: '임팩트 지점' })).toBeNull()
   })
 
   /* 🔴 **아무것도 안 고른 것이 「전체적으로」다.** 상태를 따로 두면 "전체인데
@@ -486,7 +456,6 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     const user = userEvent.setup()
     const { input, file } = pick()
     await user.upload(input, file)
-    await user.click(screen.getByRole('button', { name: '농구' }))
     await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
     await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 })
 
@@ -498,7 +467,7 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     expect(all).toHaveAttribute('aria-pressed', 'false')
 
     // 여러 개를 고를 수 있다 — 하나를 고르면 앞의 것이 풀리는 라디오가 아니다.
-    await user.click(screen.getByRole('button', { name: '가이드 핸드' }))
+    await user.click(screen.getByRole('button', { name: '골반 회전' }))
     expect(screen.getByRole('button', { name: '팔로스루' })).toHaveAttribute('aria-pressed', 'true')
 
     // 「전체적으로」를 누르면 고른 것이 다 풀린다.
@@ -513,7 +482,6 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     const user = userEvent.setup()
     const { input, file } = pick()
     await user.upload(input, file)
-    await user.click(screen.getByRole('button', { name: '농구' }))
     await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
     await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 })
     await user.click(screen.getByRole('button', { name: '팔로스루' }))
@@ -534,7 +502,6 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     const user = userEvent.setup()
     const { input, file } = pick()
     await user.upload(input, file)
-    await user.click(screen.getByRole('button', { name: '축구' }))
     await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
     await user.click(
       await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }),
@@ -551,7 +518,6 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     const user = userEvent.setup()
     const { input, file } = pick()
     await user.upload(input, file)
-    await user.click(screen.getByRole('button', { name: '축구' }))
     await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
     await user.click(
       await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }),
@@ -571,7 +537,6 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     const user = userEvent.setup()
     const { input, file } = pick()
     await user.upload(input, file)
-    await user.click(screen.getByRole('button', { name: '축구' }))
     await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
 
     // 영상 위에 묶는 판이 뜨고, 무엇을 하라는 것인지 거기에도 적혀 있다.
@@ -590,7 +555,6 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     const user = userEvent.setup()
     const { input, file } = pick()
     await user.upload(input, file)
-    await user.click(screen.getByRole('button', { name: '축구' }))
     await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
 
     expect(screen.getByRole('button', { name: '재생' })).toBeInTheDocument()
@@ -605,7 +569,6 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     const user = userEvent.setup()
     const { input, file } = pick()
     await user.upload(input, file)
-    await user.click(screen.getByRole('button', { name: '축구' }))
     await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
 
     await user.pointer({ target: screen.getByLabelText('영상 위치'), keys: '[MouseLeft]' })
@@ -619,7 +582,6 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     const user = userEvent.setup()
     const { input, file } = pick()
     await user.upload(input, file)
-    await user.click(screen.getByRole('button', { name: '축구' }))
     await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
 
     await user.click(
@@ -677,7 +639,6 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     const user = userEvent.setup()
     const { input, file } = pick()
     await user.upload(input, file)
-    await user.click(screen.getByRole('button', { name: '축구' }))
     await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
     await user.click(
       await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }),
@@ -759,7 +720,6 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     const user = userEvent.setup()
     const { input, file } = pick()
     await user.upload(input, file)
-    await user.click(screen.getByRole('button', { name: '축구' }))
     await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
     await user.click(
       await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }),
