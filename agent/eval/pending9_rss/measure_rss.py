@@ -46,19 +46,23 @@ DATA = ROOT / "data"
 #: 92프레임. 이 항목의 핵심 조합인 **4K 300장을 원본으로는 못 잰다.** 그대로
 #: 돌리면 92장을 재고 "300장"이라 적는다 — 조용히 틀리는 종류다(2026-09-08에
 #: 실제로 그렇게 나왔다). 그래서 `--prepare` 로 이어 붙인 긴 클립을 만든다.
-CLIPS = {
-    "1080p": DATA / "bball_shot.mp4",
-    "4k": DATA / "baseball_pitch_trim.mp4",
-    "1080p_long": DATA / "tmp" / "rss_long_1080p.mp4",
-    "4k_long": DATA / "tmp" / "rss_long_4k.mp4",
-}
+#: 🔴 **파일 이름을 박지 않는다 — 기계마다 다르다.** 로컬에는 `bball_shot.mp4`
+#: 가 있고 EC2 에는 없다(2026-09-08에 그래서 `--prepare` 가 죽었다). `data/*.mp4`
+#: 를 훑어 **해상도로 고른다.** 같은 해상도가 여럿이면 **가장 긴 것**을 쓴다 —
+#: 이 측정은 장수를 늘려야 하므로 긴 쪽이 낫다.
+CLIPS: dict[str, Path] = {}
+#: 원본 클립의 프레임 수 — 몇 번 이어 붙일지 정하는 데 쓴다.
+SRC_FRAMES: dict[str, int] = {}
 
-#: 원본을 몇 번 이어 붙일 것인가. 4K 92프레임 × 4 = 368 ≥ 300.
-REPEAT = 4
+#: 긴 클립이 최소 몇 프레임이어야 하는가. 계획 최대치(300)에 여유를 얹는다.
+#: 🔴 **반복 횟수를 고정하지 않는다** — 원본 길이가 기계마다 다르다(로컬 1080p
+#: 146프레임 · EC2 46프레임). ×4 로 박아 두면 EC2 에서 184장뿐이라 300장 조합이
+#: 조용히 미달한다.
+TARGET_LONG_FRAMES = 320
 
 #: 로컬(RAM 9GB, 가용 5GB)에서 안전한 범위. 4K 300장은 약 7.46GB라 넣지 않는다.
-PLAN_SAFE = [("1080p", 60), ("1080p_long", 150), ("1080p_long", 300),
-             ("4k", 30), ("4k", 60)]
+PLAN_SAFE = [("1080p_long", 60), ("1080p_long", 150), ("1080p_long", 300),
+             ("4k_long", 30), ("4k_long", 60)]
 #: EC2(RAM 15GB). 🔴 4K 300장이 여기 들어 있다 — 이 조합이 이 항목의 핵심이다.
 PLAN_FULL = PLAN_SAFE + [("4k_long", 150), ("4k_long", 300)]
 
@@ -108,6 +112,46 @@ class Sampler:
         return max(self.samples) if self.samples else 0
 
 
+def discover_clips() -> None:
+    """`data/*.mp4` 를 훑어 해상도별 대표 클립을 정한다.
+
+    1080p 는 **긴 변 1920**, 4K 는 **긴 변 3840** 으로 가른다(세로 영상이 있어
+    width/height 로 고정하면 못 잡는다 — `baseball_pitch_trim.mp4` 가 2160×3840 이다).
+    """
+    import subprocess
+
+    best: dict[str, tuple[int, Path]] = {}
+    for p in sorted(DATA.glob("*.mp4")):
+        try:
+            out = subprocess.run(
+                ["ffprobe", "-v", "error", "-select_streams", "v:0",
+                 "-show_entries", "stream=width,height,nb_frames",
+                 "-of", "csv=p=0", str(p)],
+                capture_output=True, text=True, timeout=20, check=True,
+            ).stdout.strip().split(",")
+            w, h = int(out[0]), int(out[1])
+            n = int(out[2]) if len(out) > 2 and out[2].isdigit() else 0
+        except (subprocess.SubprocessError, ValueError, IndexError):
+            continue
+        long_side = max(w, h)
+        key = {1920: "1080p", 3840: "4k"}.get(long_side)
+        if key and n > best.get(key, (0, None))[0]:
+            best[key] = (n, p)
+
+    for key, (n, p) in best.items():
+        CLIPS[key] = p
+        SRC_FRAMES[key] = n
+        print(f"  {key:6s} ← {p.name} ({n}프레임)")
+    CLIPS["1080p_long"] = DATA / "tmp" / "rss_long_1080p.mp4"
+    CLIPS["4k_long"] = DATA / "tmp" / "rss_long_4k.mp4"
+    missing = {"1080p", "4k"} - CLIPS.keys()
+    if missing:
+        raise SystemExit(
+            f"해상도 {sorted(missing)} 클립을 {DATA} 에서 찾지 못했다.\n"
+            "  이 측정은 해상도 두 종류가 있어야 base 와 k 를 가를 수 있다."
+        )
+
+
 def prepare_long_clips() -> None:
     """원본을 이어 붙여 긴 클립을 만든다 (`data/tmp/`, gitignore 안이다).
 
@@ -124,15 +168,17 @@ def prepare_long_clips() -> None:
         if dst.exists():
             print(f"  이미 있음: {dst.name}")
             continue
+        n_src = SRC_FRAMES.get(src_key, 0)
+        repeat = max(2, -(-TARGET_LONG_FRAMES // n_src)) if n_src else 4
         listing = out_dir / f"{dst.stem}.txt"
-        listing.write_text("".join(f"file '{src.resolve()}'\n" for _ in range(REPEAT)))
+        listing.write_text("".join(f"file '{src.resolve()}'\n" for _ in range(repeat)))
         subprocess.run(
             ["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0",
              "-i", str(listing), "-c", "copy", str(dst)],
             check=True,
         )
         listing.unlink(missing_ok=True)
-        print(f"  만듦: {dst.name} ({src.name} × {REPEAT})")
+        print(f"  만듦: {dst.name} ({src.name} {n_src}프레임 × {repeat})")
 
 
 def probe_video(path: Path) -> tuple[int, int]:
@@ -239,6 +285,8 @@ def main() -> None:
                     help="긴 클립을 만들고 끝낸다 (data/tmp/, ffmpeg 필요)")
     ap.add_argument("--out", type=Path, default=Path(__file__).resolve().parent / "rss.json")
     args = ap.parse_args()
+
+    discover_clips()
 
     if args.prepare:
         prepare_long_clips()
