@@ -652,37 +652,37 @@ HEAD 요청은 **`s3:GetObject`** 로 인가된다. 없는 액션을 정책에 �
 
 ⚠️ `s3:prefix` 조건으로 좁히고 싶겠지만 **HeadObject 는 `s3:prefix` 를 넘기지
 않아서** 조건이 안 맞아 다시 403 이 된다. 버킷 전체에 주되, 이것으로 열리는 것은
-**키 이름 목록뿐**이고 `models/`·`reports/` 의 **내용은 못 읽는다**(위 `Resource`
-가 `videos/*` 로 좁혀져 있다).
+**키 이름 목록뿐**이고 `models/` 의 **내용은 못 읽는다**(위 오브젝트 문 둘이
+`videos/*`·`reports/*` 로 좁혀져 있다).
 
-#### 🔴 `jin` 계정으로는 붙일 수 없다 (2026-09-03 확인)
+#### 🔴 역할은 이미 붙어 있다 — **정책만 교체한다** (2026-09-08 확인)
 
-콘솔에서 막힌다.
+09-03 스모크가 통과했다는 것은 인스턴스 역할이 **이미 붙어 있고** 2문짜리 정책
+(`videos/*` Put+Get · `ListBucket`)이 들어 있다는 뜻이다. 인스턴스 메타데이터로
+확인된다(`curl .../iam/info` → `InstanceProfileArn` 이 찍힌다).
 
-```
-User: arn:aws:iam::…:user/jin is not authorized to perform:
-iam:ListInstanceProfiles … because no identity-based policy allows it
-```
+그래서 09-08 변경은 **새 역할을 만드는 게 아니라** 그 역할의 **인라인 정책 하나를
+위 3문짜리 JSON 으로 통째 교체**하는 것이다.
 
-**계정 소유자(박민호)가 해야 한다.** 그쪽 콘솔에서는 오류 없이 역할 목록이 뜬다.
-정책 JSON 은 **바로 위**에 있고(2026-09-08 판), 미결 `jin` 24번 IAM 조각에도
-가리켜 두었다.
+- 자리: **IAM 콘솔 → 역할(Roles) → (인스턴스에 붙은 그 역할) → 권한 → 인라인
+  정책 편집 → JSON 탭 → 교체 → 저장.** EC2 의 「작업 → 보안 → IAM 역할 수정」은
+  *붙일 역할을 바꾸는* 자리라 **건드리지 않는다** — 잘못하면 붙어 있는 역할이
+  떨어진다(미결 8번의 "IAM 역할 없음" 함정).
+- 🔴 **`jin` IAM 사용자는 09-03 에 `iam:ListInstanceProfiles` 에서 막혔다.**
+  역할 목록·편집이 권한 오류(`is not authorized to perform: iam:…`)를 내면
+  **계정 소유자(박민호)** 가 해야 한다.
 
-⚠️ **이미 있는 `pmh12-role` 을 그냥 붙이지 않는다.** 다른 인스턴스용으로 만든
-역할이라 무엇이 들어 있는지 모른다 — 넓으면 필요 이상으로 열리고, 좁으면 S3 가
-안 된다. **새 역할에 위 정책 하나만** 붙이는 편이 낫다.
-
-#### 반영됐는지 확인 (박민호가 붙인 뒤)
+#### 반영됐는지 확인 (정책을 저장한 뒤)
 
 ```bash
-# 서버에서 — 역할이 붙어 있고 DeleteObject 가 되는지
-ssh supersub 'curl -s http://169.254.169.254/latest/meta-data/iam/security-credentials/'
-# → 역할 이름이 찍힌다 (404 HTML 이면 역할 자체가 아직)
+# 서버에서 — 어떤 역할이 붙어 있나 (IMDSv2 라 토큰을 먼저 받는다)
+ssh supersub 'T=$(curl -s -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 60"); curl -s -H "X-aws-ec2-metadata-token: $T" http://169.254.169.254/latest/meta-data/iam/info'
+# → InstanceProfileArn 이 찍힌다. 정책 편집은 그 프로파일이 가리키는 역할에서.
 
 # keep 이동이 실서버에서 실제로 도는지 (스모크)
 #  1) /analysis 로 클립 하나 올려 분석 → video_id 확보
-#  2) POST /api/v1/videos/{id}/keep  → 200, 응답 storage_key 가 reports/…/source.mp4
-#  3) ssh supersub 로 aws s3 ls 없이도, playback-url 이 그 새 키를 주는지 본다
+#  2) POST /api/v1/videos/{id}/keep  → 200, 응답 storage_key 가 reports/…/source.<ext>
+#  3) playback-url 이 그 새 키를 주는지 본다 (옛 videos/ 키가 아니라)
 ```
 
 반영 전에는 `keep` 이 `move_object` 에서 `AccessDenied` 를 던지는데, 순서상
