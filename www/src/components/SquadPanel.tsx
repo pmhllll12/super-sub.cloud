@@ -54,6 +54,26 @@ const COLS = 3
 const ROWS = ROW_POS.length
 
 /**
+ * 🔴 **골키퍼 줄은 가운데 한 칸뿐이다**(사용자 요청, 2026-09-08).
+ *
+ * 축구에서 골키퍼는 하나이고 골대 앞 가운데에 선다 — 양옆 칸을 두면 판이
+ * "골키퍼가 셋일 수도 있다"고 말하는 셈이 된다. 그래서 그 줄에서는 가운데만
+ * 그리고, 좌우로는 갈 데가 없다.
+ *
+ * ⚠️ **위아래는 막지 않는다**(사용자 결정, 2026-09-08). 자리를 통째로 잠그는
+ * 안도 있었지만, 그러면 3:3 에서 셋 다 윗줄로 올리는 **「전원 FW」**가
+ * 불가능해진다 — 같은 날 아침에 요청받아 만든 동작이라 그쪽을 살렸다.
+ * 골키퍼는 **옆으로만** 못 간다.
+ */
+const GK_ROW = ROW_POS.indexOf('GK')
+const GK_COL = 1
+
+/** 이 칸이 격자에 존재하는가 — 골키퍼 줄의 양옆은 아예 없다. */
+function cellExists(col: number, row: number): boolean {
+  return row !== GK_ROW || col === GK_COL
+}
+
+/**
  * 판 위의 자리.
  *
  * 🔴 `col`·`row` 는 **격자 칸**이다. 전에는 `area`(grid-template-areas 이름)로
@@ -341,6 +361,9 @@ export default function SquadPanel({
     setSlots((now) => {
       const me = now.find((sl) => sl.area === area)
       if (!me || (me.col === col && me.row === row)) return now
+      /* 🔴 **없는 칸으로는 못 간다** — 골키퍼 줄의 양옆이 그것이다. 한 곳에서
+         막아야 끌기 · 방향키 · 앞으로 생길 길이 다 같이 걸린다. */
+      if (!cellExists(col, row)) return now
       const other = now.find((sl) => sl.col === col && sl.row === row)
       return now.map((sl) => {
         if (sl.area === area) return { ...sl, col, row }
@@ -612,6 +635,9 @@ export default function SquadPanel({
         {Array.from({ length: ROWS * COLS }, (_, i) => {
           const col = i % COLS
           const row = Math.floor(i / COLS)
+          // 🔴 골키퍼 줄의 양옆은 **아예 안 그린다** — 그리면 `cellAt` 이
+          // 거기로 놓을 수 있는 자리로 센다.
+          if (!cellExists(col, row)) return null
           const taken = slots.some((sl) => sl.col === col && sl.row === row)
           return (
             <span
