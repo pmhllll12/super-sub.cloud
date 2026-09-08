@@ -35,17 +35,63 @@ import MatchBot from '@/components/MatchBot'
 /** 판 위의 자리. `area` 는 globals.css 의 grid-template-areas 이름이다. */
 type Slot = { area: string; label: string; mine?: boolean }
 
+/** 판의 크기 — 3:3 · 5:5 · 7:7. 화면 글자와 같은 값이라 그대로 쓴다. */
+export type SquadSize = '3' | '5' | '7'
+
+/**
+ * 크기마다의 포메이션.
+ *
+ * 🔴 **자리 이름을 역할+번호로 둔다**(`fw1` · `mf2` · `df1` …). 크기를 바꿔도
+ * 같은 이름이 같은 자리를 가리켜야, 7인에서 넣은 사람이 5인으로 줄였다가
+ * 되돌아왔을 때 **제자리에 그대로 앉아 있다**(사용자 요청: 줄어들면 감췄다가
+ * 되돌리면 돌아온다). `ml`·`mr` 처럼 위치로 이름 지으면 3인의 MF 하나가
+ * 어느 쪽인지부터 정해야 하고, 크기가 바뀔 때마다 이름이 갈린다.
+ *
+ * 🔴 포지션 코드는 계약이 정한 축구 넷(`GK`·`DF`·`MF`·`FW`)만 쓴다 — 세 판
+ * 모두 그 안에서 된다(계약 3-4절). 새 코드를 만들지 않는다.
+ */
+export const FORMATIONS: Record<SquadSize, { label: string; slots: Slot[] }> = {
+  // 1-1-1 — 셋이면 공격 · 중원 · 골키퍼 하나씩이다.
+  '3': {
+    label: '3 : 3',
+    slots: [
+      { area: 'fw1', label: 'FW', mine: true },
+      { area: 'mf1', label: 'MF' },
+      { area: 'gk', label: 'GK' },
+    ],
+  },
+  // 1-2-1 — 풋살 5인. 이 판이 원래 그리던 것이다.
+  '5': {
+    label: '5 : 5',
+    slots: [
+      { area: 'fw1', label: 'FW', mine: true },
+      { area: 'mf1', label: 'MF' },
+      { area: 'mf2', label: 'MF' },
+      { area: 'df1', label: 'DF' },
+      { area: 'gk', label: 'GK' },
+    ],
+  },
+  // 2-3-1 — 7인제에서 가장 흔한 형태다.
+  '7': {
+    label: '7 : 7',
+    slots: [
+      { area: 'fw1', label: 'FW', mine: true },
+      { area: 'mf1', label: 'MF' },
+      { area: 'mf2', label: 'MF' },
+      { area: 'mf3', label: 'MF' },
+      { area: 'df1', label: 'DF' },
+      { area: 'df2', label: 'DF' },
+      { area: 'gk', label: 'GK' },
+    ],
+  },
+}
+
+/** 처음 여는 크기 — 풋살 5인(사용자 요청). */
+const DEFAULT_SIZE: SquadSize = '5'
+
 // 추천 판이 닫히며 물러나는 시간 — globals.css 의 ss-suggest-out 과 같아야
 // 한다. 짧으면 애니메이션 도중에 잘리고, 길면 사라진 자리가 남는다.
 const SUGGEST_EXIT_MS = 200
-
-const SLOTS: Slot[] = [
-  { area: 'fw', label: 'FW', mine: true },
-  { area: 'ml', label: 'MF' },
-  { area: 'mr', label: 'MF' },
-  { area: 'df', label: 'DF' },
-  { area: 'gk', label: 'GK' },
-]
 
 /**
  * 서버가 준 스쿼드를 **판의 자리 이름표**로 바꾼다.
@@ -55,11 +101,11 @@ const SLOTS: Slot[] = [
  * 🔴 같은 포지션이 둘인 자리(MF)는 **먼저 온 사람부터** 채운다. 서버는 어느
  * 쪽 MF 인지까지는 모른다 — 좌 · 우는 화면만의 배치다.
  */
-function seatsFromSquad(squad: Squad | null): Record<string, string | null> {
+function seatsFromSquad(squad: Squad | null, slots: Slot[]): Record<string, string | null> {
   if (!squad) return {}
   const left = [...squad.members]
   const seats: Record<string, string | null> = {}
-  for (const slot of SLOTS) {
+  for (const slot of slots) {
     if (slot.mine) continue
     const at = left.findIndex((m) => m.position_code === slot.label)
     if (at >= 0) seats[slot.area] = left.splice(at, 1)[0].nickname
@@ -70,8 +116,8 @@ function seatsFromSquad(squad: Squad | null): Record<string, string | null> {
 export default function SquadPanel({
   card,
   squad = null,
-  friendSearch = false,
-  onCloseFriendSearch,
+  scouting = false,
+  onCloseScouting,
   bot = false,
   onBotChange,
 }: {
@@ -83,9 +129,16 @@ export default function SquadPanel({
    * 그린다.
    */
   squad?: Squad | null
-  /** 알약 '지인 찾기' 가 골라져 있는가 — 켜지면 판 옆에 지인 찾기가 열린다. */
-  friendSearch?: boolean
-  onCloseFriendSearch?: () => void
+  /**
+   * 알약 '용병 찾기' 를 눌렀는가 — 켜지면 판 오른쪽에 **AI 추천 판과 지인
+   * 찾기 판이 나란히** 열린다.
+   *
+   * 🔴 예전에는 '지인 찾기' 알약이 지인 판만 열었다. 두 일이 결국 **같은
+   * 빈 자리를 채우는 한 가지 일**이라 단추를 하나로 합쳤다(사용자 요청,
+   * 2026-09-08) — 그래서 판도 짝으로 여닫는다.
+   */
+  scouting?: boolean
+  onCloseScouting?: () => void
   /**
    * AI 챗봇이 열려 있는가 — 켜지면 **지인 찾기와 같은 자리**에서 나온다.
    *
@@ -96,11 +149,32 @@ export default function SquadPanel({
   bot?: boolean
   onBotChange?: (next: boolean) => void
 }) {
+  /**
+   * 🔴 **판 오른쪽은 이제 칸이 둘이다**(2026-09-08).
+   *
+   *   첫째 칸 — AI 추천 판 · 챗봇 (`.ss-suggest`)
+   *   둘째 칸 — 지인 찾기 판 (`.ss-friends`)
+   *
+   * 전에는 셋이 **한 좌표**에 서서 "한 번에 하나만" 이 규칙이었다(여는 쪽이
+   * 다른 것을 닫았다). 용병 찾기 하나가 추천과 지인을 **같이** 열어야 해서
+   * 칸을 갈랐다 — 첫째 칸은 여전히 한 번에 하나다(챗봇이 켜지면 추천이 닫힌다).
+   * 좌표는 globals.css 의 `--ss-side-panel-w` 가 정한다.
+   */
   /* 🔴 서버가 준 것을 **첫 값으로만** 읽는다. 그 뒤로는 이 화면이 들고 있다 —
      넣기 · 빼기가 아직 서버로 안 가므로(위 주석), 매번 서버 값으로 되돌리면
      방금 넣은 사람이 사라진다. */
+  /**
+   * 판의 크기(3:3 · 5:5 · 7:7) — 머리글의 단추가 바꾼다(사용자 요청,
+   * 2026-09-08). 전에는 「풋살 5인」이라고 적어 두기만 했다.
+   */
+  const [size, setSize] = useState<SquadSize>(DEFAULT_SIZE)
+  const slots = FORMATIONS[size].slots
+
+  /* 🔴 앉은 사람은 **크기가 줄어도 안 지운다**(사용자 요청). 자리 이름이
+     역할+번호라(FORMATIONS 주석) 없어진 자리는 그리지 않을 뿐이고, 다시
+     키우면 그대로 앉아 있다 — 실수로 눌렀을 때 잃는 것이 없다. */
   const [mates, setMates] = useState<Record<string, string | null>>(() =>
-    seatsFromSquad(squad),
+    seatsFromSquad(squad, FORMATIONS[DEFAULT_SIZE].slots),
   )
   /**
    * 지인 찾기에서 골라 둔 사람. 정해져 있으면 **빈 자리 버튼의 뜻이 바뀐다**
@@ -125,7 +199,7 @@ export default function SquadPanel({
   // 지인 찾기가 켜지면 바로 띄우고, 꺼지면 물러나는 시간만큼 남겨 둔다.
   // 고르던 사람도 같이 지운다 — 판이 없는데 자리만 깜빡이면 안 된다.
   useEffect(() => {
-    if (friendSearch) {
+    if (scouting) {
       clearTimeout(friendTimer.current)
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setFriendVisible(true)
@@ -135,13 +209,76 @@ export default function SquadPanel({
     setPlacing(null)
     friendTimer.current = window.setTimeout(() => setFriendVisible(false), SUGGEST_EXIT_MS)
     return () => clearTimeout(friendTimer.current)
-  }, [friendSearch])
+  }, [scouting])
+
+  /**
+   * 용병 찾기로 열 때 **어느 자리의 추천**을 낼 것인가 — 빈 자리 중 첫
+   * 번째다(FW → MF → MF → DF → GK). 이 순서는 판 위에서 위에서 아래로
+   * 읽히는 순서라, "지금 가장 급한 자리"로 그대로 읽힌다.
+   * 다 찼으면 마지막 자리를 낸다 — 판이 안 열리는 것보다 낫다(빼고 나서
+   * 다시 누를 필요가 없다).
+   */
+  const firstEmpty =
+    slots.find((slot) => !slot.mine && !mates[slot.area]) ?? slots[slots.length - 1]
+
+  /* 알약이 켜지면 추천 판도 같이 연다. 🔴 **자리를 여기서 다시 고르지
+     않는다** — 빈 자리를 직접 눌러 연 뒤(picking 이 이미 있다) 알약 상태가
+     바뀌었다고 그 자리를 첫 빈 자리로 되돌리면, 방금 고른 자리가 사라진다. */
+  useEffect(() => {
+    clearTimeout(timer.current)
+    if (scouting) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setClosing(null)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPicking((now) => now ?? firstEmpty)
+      return
+    }
+    // 꺼지면 추천 판도 같이 접는다 — 한 단추가 연 한 벌이다.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPicking((now) => {
+      if (now) {
+        setClosing(now)
+        timer.current = window.setTimeout(() => setClosing(null), SUGGEST_EXIT_MS)
+      }
+      return null
+    })
+    // firstEmpty 는 자리가 채워질 때마다 새 값이 된다 — 넣을 때마다 판이
+    // 다시 열리면 안 되므로 켜고 끄는 순간만 본다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scouting])
+
+  /**
+   * 🔴 **챗봇이 켜지면 추천 판을 닫는다** — 둘은 **첫째 칸**을 나눠 쓴다.
+   *
+   * ⚠️ 빈 자리를 눌러 연 추천은 `scouting` 이 아니라 이 판이 제 상태
+   * (`picking`)로 들고 있다. 그래서 알약으로 연 경우만 닫히고, **빈 자리로
+   * 연 경우에는 AI 판이 그 뒤에 나왔다**(사용자 지적) — 같은 좌표라 z 로는
+   * 가려질 뿐이다. 여는 쪽이 닫는다는 규칙을 이 길에도 건다.
+   *
+   * 빈 자리 누르기 쪽에도 `onBotChange?.(false)` 가 있어 **양쪽이 서로를
+   * 닫는다** — 어느 쪽을 먼저 눌러도 첫째 칸에는 하나만 선다.
+   */
+  useEffect(() => {
+    if (!bot) return
+    clearTimeout(timer.current)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPicking((now) => {
+      if (now) {
+        setClosing(now)
+        timer.current = window.setTimeout(() => setClosing(null), SUGGEST_EXIT_MS)
+      }
+      return null
+    })
+  }, [bot])
 
   function close() {
     setClosing(picking)
     setPicking(null)
     clearTimeout(timer.current)
     timer.current = window.setTimeout(() => setClosing(null), SUGGEST_EXIT_MS)
+    // 🔴 알약으로 연 한 벌이면 **둘 다** 접는다. 추천만 닫고 지인 판을
+    // 남기면, 알약은 아직 켜진 것으로 남아 다시 눌러도 안 열린다.
+    onCloseScouting?.()
   }
 
   // 열려 있는 동안 Esc 로 닫는다 — 바깥을 누르는 것과 같은 자리에 둔다.
@@ -160,15 +297,16 @@ export default function SquadPanel({
    * 넣을 수 있다.
    */
   const placed = Object.fromEntries(
-    SLOTS.flatMap((slot) => {
+    slots.flatMap((slot) => {
       const name = mates[slot.area]
       return name ? [[name, slot.label] as const] : []
     }),
   )
 
-  // 🔴 두 판(추천 · 지인)은 **같은 자리**에 뜬다 — 동시에 열면 겹친다.
-  // 지인 찾기가 열려 있는 동안에는 추천을 그리지 않는다.
-  const shown = friendSearch ? null : (picking ?? closing)
+  /* 🔴 전에는 두 판이 **같은 자리**라 지인 찾기가 열려 있는 동안 추천을
+     아예 안 그렸다. 이제 칸이 둘이라(위 주석) 같이 뜬다 — 그 막음을 걷어냈다.
+     첫째 칸을 챗봇과 나눠 쓰는 것은 그대로다(챗봇을 켜면 추천이 닫힌다). */
+  const shown = picking ?? closing
 
   return (
     /* 🔴 추천 판은 스쿼드 판의 **형제**다. 스쿼드 판이 overflow: hidden
@@ -224,13 +362,36 @@ export default function SquadPanel({
       >
       {/* 반짝임의 **시계**가 여기 하나 있다 — 자리마다 걸면 위상이 어긋난다
           (globals.css 의 --ss-beckon-t 주석 참고). */}
-      <div className="ss-squad-board" data-placing={placing ? 'true' : undefined}>
+      {/* 🔴 배치는 CSS 가 `data-size` 로 고른다 — grid-template-areas 를 인라인
+          으로 주면 자리 이름이 두 곳(여기와 globals.css)에 살게 된다. */}
+      <div
+        className="ss-squad-board"
+        data-size={size}
+        data-placing={placing ? 'true' : undefined}
+      >
         {/* 머리글이 경기장 선 **안쪽**에 앉아야 한다 — 판 위쪽에 따로
             두면 선 밖으로 나간다. 선을 그리는 상자 안에 넣고 위 여백을
             그만큼 준다(globals.css). */}
         <header className="ss-squad-head">
           <h2>MY SQUAD</h2>
-          <p>풋살 5인</p>
+          {/* 🔴 「풋살 5인」이라고 **적어 두기만** 하던 자리다 — 이제 고를 수
+              있다(사용자 요청, 2026-09-08). 판의 배치가 같이 바뀐다.
+              라디오처럼 하나만 골라진다 — 판이 동시에 두 크기일 수는 없다. */}
+          <div className="ss-squad-size" role="radiogroup" aria-label="판 크기">
+            {(Object.keys(FORMATIONS) as SquadSize[]).map((key) => (
+              <button
+                key={key}
+                type="button"
+                role="radio"
+                aria-checked={size === key}
+                className="ss-squad-size-btn"
+                data-on={size === key ? 'true' : undefined}
+                onClick={() => setSize(key)}
+              >
+                {FORMATIONS[key].label}
+              </button>
+            ))}
+          </div>
         </header>
 
         {/* 경기장 선 — 장식이라 스크린리더에서 숨긴다. preserveAspectRatio
@@ -254,7 +415,7 @@ export default function SquadPanel({
           <rect x="38" y="130" width="24" height="9" />
         </svg>
 
-        {SLOTS.map((slot) => {
+        {slots.map((slot) => {
           const name = mates[slot.area] ?? null
           return (
             <div key={slot.area} className="ss-squad-seat" style={{ gridArea: slot.area }}>
@@ -338,14 +499,15 @@ export default function SquadPanel({
 
       </section>
 
-      {/* 지인 찾기 판 — 추천 판과 **같은 자리**에 같은 방식으로 나온다. */}
+      {/* 지인 찾기 판 — 추천 판 **바로 오른쪽**(둘째 칸)에 같은 방식으로
+          나온다. 자리는 globals.css 의 `.ss-friends` 가 정한다. */}
       {friendVisible && (
         <SquadFriends
           placing={placing}
           placed={placed}
-          closing={!friendSearch}
+          closing={!scouting}
           onChoose={setPlacing}
-          onClose={() => onCloseFriendSearch?.()}
+          onClose={() => onCloseScouting?.()}
         />
       )}
 
@@ -364,10 +526,9 @@ export default function SquadPanel({
         AI
       </button>
 
-      {/* AI 챗봇 — 지인 찾기 · 추천 판과 **같은 자리**다(사용자 요청).
-          ⚠️ 셋이 한 자리를 쓰므로 겹칠 수 있다. 지금은 여는 길이 서로 달라
-          (알약 · AI 단추 · 빈 자리 누르기) 실제로 겹치는 일은 없지만, 새로
-          여는 길을 붙일 때는 이 자리를 이미 누가 쓰고 있는지 봐야 한다. */}
+      {/* AI 챗봇 — 추천 판과 **같은 첫째 칸**이다(사용자 요청). 여는 쪽이
+          상대를 닫는다(`onBotChange` · 빈 자리 누르기). 둘째 칸의 지인 판과는
+          자리가 갈렸으므로 겹치지 않는다. */}
       {bot && <MatchBot open onClose={() => onBotChange?.(false)} />}
 
       {/* 추천 판 — 스쿼드 판 오른쪽에서 미끄러져 나온다. */}

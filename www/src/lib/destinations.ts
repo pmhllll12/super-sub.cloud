@@ -9,20 +9,19 @@ import { type Destination } from '@/components/HomeNav'
  */
 
 /**
- * 알약만 실제 동작이 붙어 있다 — 누르면 스쿼드 판 옆에 지인 찾기가 열린다
- * (`SquadPanel`). 그 판단을 제목으로 하므로 아래 FEATURED 의 제목과
- * **글자까지 같아야** 한다.
- */
-export const FRIEND_SEARCH = '지인 찾기'
-
-/**
- * 알약 '용병 찾기' 의 제목.
+ * 알약 '용병 찾기' 의 제목 — **이 줄에서 유일하게 실제 동작이 붙어 있다.**
+ * 누르면 스쿼드 판 오른쪽에 **AI 추천 판과 지인 찾기 판이 나란히** 열린다
+ * (`HomeStage` → `SquadPanel`). 그 판단을 제목으로 하므로 아래 FEATURED 의
+ * 제목과 **글자까지 같아야** 한다.
  *
- * ⚠️ 한때 **이 알약이 `MatchBot`(흐름 B 챗봇)을 열었다**(미결 `min` 7번).
- * 지금은 아니다 — 챗봇은 알약 줄 오른쪽 끝의 **AI 단추**가 연다(사용자
- * 요청, `HomeStage` 의 `ss-home-ai`). 알약으로 열던 시절에는 이 제목이
- * `DEFAULT_FEATURED` 이기도 해서 **홈에 들어오자마자 챗봇이 떠 있었고
- * 닫기가 안 먹었다.**
+ * 🔴 **`picked`(고른 알약)로 그 판을 열지 않는다.** 이 제목이
+ * `DEFAULT_FEATURED` 이기도 해서, `picked === MATCH_BOT` 으로 열면 **홈에
+ * 들어오자마자 떠 있고 ×를 눌러도 `defaultActive` 로 되돌아가 다시 열린다**
+ * — 챗봇을 이 알약으로 열던 시절에 실제로 그랬다(미결 `min` 7번, 실측).
+ * `HomeStage` 가 "눌렀다"를 따로 든 상태로 잡는 것이 그 때문이다.
+ *
+ * ⚠️ 챗봇(`MatchBot`)은 이 알약이 아니라 판 오른쪽 변의 **AI 단추**가 연다
+ * (`SquadPanel` 의 `ss-home-ai`).
  */
 export const MATCH_BOT = '용병 찾기'
 
@@ -55,17 +54,15 @@ export const FEATURED: Destination[] = [
     icon: 'groups',
     summary: '함께 뛸 팀을 찾고\n지원합니다',
   },
-  {
-    // 🔴 제목이 `HomeStage` 의 FRIEND_SEARCH 와 **글자까지 같아야** 한다 —
-    // 이 알약만 실제 동작(스쿼드 판 옆에 지인 찾기 열기)이 붙어 있고, 그
-    // 판단을 제목으로 한다.
-    title: FRIEND_SEARCH,
-    icon: 'person_search',
-    summary: '아는 사람을 찾아\n스쿼드에 넣습니다',
-  },
+  // 🔴 '지인 찾기' 알약은 **없앴다**(사용자 요청, 2026-09-08). 용병을 찾는
+  // 일과 아는 사람을 찾는 일이 결국 **같은 자리를 채우는 한 가지 일**이라,
+  // 단추를 둘로 나누면 어느 쪽을 눌러야 하는지부터 고르게 된다. 지금은
+  // '용병 찾기' 하나가 **추천 판과 지인 판을 같이** 연다 — 고르는 것은
+  // 여전히 사람이지만, 그 선택지가 한 화면에 다 나와 있다.
 ]
 
-/** 아무것도 안 가리켰을 때 강조해 둘 항목 — 둘 중 '용병 찾기'가 기본이다. */
+/** 아무것도 안 가리켰을 때 강조해 둘 항목 — 둘 중 '용병 찾기'가 기본이다.
+ *  🔴 이 값이 곧 MATCH_BOT 이라 **판을 여는 조건으로 쓰면 안 된다**(위 주석). */
 export const DEFAULT_FEATURED = FEATURED[0].title
 
 export const DESTINATIONS: Destination[] = [
