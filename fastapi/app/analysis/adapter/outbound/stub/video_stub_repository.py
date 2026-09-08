@@ -44,7 +44,9 @@ class StubVideoRepository(VideoPort):
         _VIDEOS[video.id] = video
 
     def list_by_user(self, user_id: UUID) -> list[VideoEntity]:
-        mine = [v for v in _VIDEOS.values() if v.user_id == user_id]
+        mine = [
+            v for v in _VIDEOS.values() if v.user_id == user_id and v.kept
+        ]
         return sorted(mine, key=lambda v: v.created_at, reverse=True)
 
     def get(self, video_id: UUID) -> VideoEntity | None:
@@ -74,7 +76,7 @@ class StubVideoRepository(VideoPort):
         return updated
 
     def list_public(self, limit: int) -> list[VideoEntity]:
-        public = [v for v in _VIDEOS.values() if v.is_public]
+        public = [v for v in _VIDEOS.values() if v.is_public and v.kept]
         public.sort(key=lambda v: v.created_at, reverse=True)
         return public[:limit]
 

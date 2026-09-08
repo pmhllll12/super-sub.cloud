@@ -1362,13 +1362,19 @@ SFR-001. 사용자가 자기 클립을 올리고, 서버가 규격을 검사해 
   "analysis_status": "queued",
   "is_public": false,
   "title": null,
-  "description": null
+  "description": null,
+  "kept": true
 }
 ```
 
 반려면 `passed: false` · `reject_reason: "해상도가 상한을 넘습니다: 3840x2160
 (상한 1920x1080)"` · `analysis_job_id: null` 이다. **반려된 클립은 분석하지 않는다** —
 규격 검사를 두는 이유가 그것이다.
+
+`kept` 는 **프로필에 저장됐는가**다(미결 `jin` 24번). `GET /videos` 는 `kept: true`
+만 준다. **지금은 등록되는 모든 영상이 `kept: true`** 로 시작한다 — `/analysis`
+분석을 임시(`kept: false`)로 두고 "저장"에서 켜는 전환은 프론트가 준비되면
+따로 켠다.
 
 `is_public`·`title`·`description` 은 **등록 시 정할 수 없다** — 각각 `false`·`null`
 로 저장된다(미결 `paik` 5번). 바꾸는 것은 아래 `PATCH /videos/{id}` 다.

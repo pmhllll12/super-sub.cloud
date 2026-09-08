@@ -49,6 +49,7 @@ class VideoPgRepository(VideoPort):
                 duration_ms=video.duration_ms,
                 side=video.side,
                 is_public=video.is_public,
+                kept=video.kept,
                 created_at=video.created_at,
             )
         )
@@ -86,7 +87,7 @@ class VideoPgRepository(VideoPort):
                 .outerjoin(
                     VideoValidationOrm, VideoValidationOrm.video_id == VideoOrm.id
                 )
-                .where(VideoOrm.user_id == user_id)
+                .where(VideoOrm.user_id == user_id, VideoOrm.kept.is_(True))
                 .order_by(VideoOrm.created_at.desc())
             )
             .tuples()
@@ -145,7 +146,7 @@ class VideoPgRepository(VideoPort):
         videos = (
             self._session.execute(
                 select(VideoOrm)
-                .where(VideoOrm.is_public.is_(True))
+                .where(VideoOrm.is_public.is_(True), VideoOrm.kept.is_(True))
                 .order_by(VideoOrm.created_at.desc())
                 .limit(limit)
             )
@@ -191,6 +192,7 @@ def _to_entity(
         is_public=video.is_public,
         title=video.title,
         description=video.description,
+        kept=video.kept,
         created_at=video.created_at,
         validation=(
             None

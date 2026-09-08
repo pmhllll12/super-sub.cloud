@@ -112,6 +112,7 @@ class VideoResult:
     is_public: bool
     title: str | None
     description: str | None
+    kept: bool
 
 
 @dataclass(frozen=True)

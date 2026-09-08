@@ -341,6 +341,27 @@ class TestListMyVideos:
         rows = db_client.get(f"{V1}/videos", headers=uploader["headers"]).json()
         assert [r["storage_key"] for r in rows][:2] == [second, first]
 
+    def test_kept_false_인_것은_목록에서_빠진다(self, db_client, db_session, uploader):
+        """미결 jin 24번 — 임시(미저장) 영상은 `GET /videos` 에 안 나온다."""
+        kept_key = _upload(db_client, uploader)
+        _register(db_client, uploader, kept_key)
+        prov_key = _upload(db_client, uploader)
+        prov_id = uuid.UUID(_register(db_client, uploader, prov_key).json()["id"])
+
+        db_session.execute(
+            text("UPDATE video SET kept = false WHERE id = :id"), {"id": prov_id}
+        )
+        db_session.commit()
+
+        keys = [
+            r["storage_key"]
+            for r in db_client.get(
+                f"{V1}/videos", headers=uploader["headers"]
+            ).json()
+        ]
+        assert kept_key in keys
+        assert prov_key not in keys
+
     def test_분석_상태와_반려_사유가_같이_온다(self, db_client, uploader):
         ok = _upload(db_client, uploader)
         _register(db_client, uploader, ok)

@@ -78,6 +78,7 @@ class VideoResponse(BaseModel):
     is_public: bool
     title: str | None
     description: str | None
+    kept: bool
 
 
 class UpdateVideoSchema(BaseModel):

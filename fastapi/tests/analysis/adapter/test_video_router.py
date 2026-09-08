@@ -112,6 +112,8 @@ class TestRegisterVideo:
         assert body["analysis_job_id"] is not None
         assert body["analysis_status"] == "queued"
         assert body["side"] == "right"
+        # 미결 jin 24번 1조각 — 지금은 등록되는 모든 영상이 kept=true 로 시작한다.
+        assert body["kept"] is True
 
     def test_반려도_201_이고_사유가_본문에_온다(self, client):
         """🔴 422 로 돌려보내면 사유가 아무 데도 안 남는다 — SFR-001."""

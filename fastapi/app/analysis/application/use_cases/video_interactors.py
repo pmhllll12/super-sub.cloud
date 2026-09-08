@@ -134,6 +134,11 @@ class RegisterVideoInteractor(RegisterVideoUseCase):
             ),
             analysis_job_id=uuid4() if make_job else None,
             analysis_status=_QUEUED if make_job else None,
+            # 미결 `jin` 24번 — 지금은 전부 저장된 상태로 둔다(동작 보존).
+            # 프론트가 `keep` 을 부를 준비가 되면 `kept = not command.analyze` 로
+            # 켠다(jin 24 5조각). 그전에 켜면 `/analysis` 업로드가 프로필에서
+            # 사라지고 되살릴 길이 없다.
+            kept=True,
         )
         self._repository.register(video)
         return to_video_result(video)
