@@ -98,12 +98,20 @@ describe('영상 분석 화면', () => {
     }
   })
 
-  // 창 틀 흉내로 뒀던 장식 점 둘은 없앴다(사용자 요청) — 누를 수 있는 것은
-  // 하나뿐인데 셋이 나란히 있으면 나머지도 눌리는 것처럼 보인다.
-  it('창 틀 머리줄의 점은 하나뿐이다', () => {
+  /* 🔴 **빨간 점이 아니라 「닫기」라고 적힌 알약이다**(사용자 요청,
+     2026-09-08: "다른 사람들이 아예 모르더라"). 창 틀 흉내로 둔 신호등 점이라
+     누를 수 있다는 것도, 누르면 무엇이 되는지도 모양만으로는 안 읽혔다.
+
+     영상이 없을 때도 **자리는 남는다** — 없애면 영상을 고르는 순간 머리줄의
+     것들이 알약 하나만큼 옆으로 튄다. 그때는 접근성 트리에서 빠진다. */
+  it('영상이 없으면 닫기가 자리만 지키고 눌리지 않는다', () => {
     const { container } = render(<AnalysisStage />)
-    expect(container.querySelectorAll('.ss-shot-dot')).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: '닫기' })).toBeNull()
+    const ghost = container.querySelector('.ss-shot-close[data-ghost="true"]')
+    expect(ghost).not.toBeNull()
+    expect(ghost).toHaveTextContent('닫기')
   })
+
 
   // 🔴 올리기 전에 알아야 다시 안 찍는다. 셋 다 실제로 겪은 실패다 —
   // 카메라가 따라 움직이면 놓치고, 몸이 잘리면 볼 관절이 없고, 비슷한 옷을
@@ -249,6 +257,13 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     expect(screen.getByRole('button', { name: '분석 시작하기' })).toBeEnabled()
     expect(screen.queryByText('종목을 먼저 골라 주세요')).toBeNull()
   })
+  it('영상을 고르면 닫기가 진짜 버튼이 된다', async () => {
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    expect(screen.getByRole('button', { name: '닫기' })).toBeInTheDocument()
+    expect(document.querySelector('.ss-shot-close[data-ghost="true"]')).toBeNull()
+  })
 
   // 🔴 시작 전에는 오른쪽 판이 아직 없다 — 여기서 못 무르면 잘못 고른 영상을
   // 되돌릴 길이 아예 없다.
@@ -259,7 +274,7 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     expect(screen.getByText('clip.mp4')).toBeInTheDocument()
 
     // 닫기는 2단계다 — 판이 줄고 사진이 돌아온 **뒤에야** 고르는 자리로 돌아온다.
-    await user.click(screen.getByRole('button', { name: '영상 닫기' }))
+    await user.click(screen.getByRole('button', { name: '닫기' }))
     expect(await screen.findByLabelText('분석할 영상', {}, { timeout: 2000 })).toBeInTheDocument()
     // 버튼은 늘 DOM 에 있고 접혀 있을 뿐이다 — 고른 영상이 없으면 잠긴다.
     expect(screen.getByRole('button', { name: '분석 시작하기' })).toBeDisabled()
@@ -347,7 +362,7 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     await drawSubject(user)
     expect(document.querySelector('.ss-shot-track')).not.toBeNull()
 
-    await user.click(screen.getByRole('button', { name: '영상 닫기' }))
+    await user.click(screen.getByRole('button', { name: '닫기' }))
     // 판이 다 줄기를 기다리지 않는다 — 누른 즉시다.
     expect(document.querySelector('.ss-shot-track')).toBeNull()
   })
@@ -373,7 +388,7 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     // 종목을 골라야 시작이 풀린다.
     await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
 
-    await user.click(screen.getByRole('button', { name: '영상 닫기' }))
+    await user.click(screen.getByRole('button', { name: '닫기' }))
     // 1단계 — 자란 것부터 줄어든다. 아직 영상은 창 틀 안에 있다.
     expect(document.querySelector('.ss-shot')).not.toHaveAttribute('data-grown')
     // 2단계 — 다 줄면 고르는 자리로 돌아온다.

@@ -2801,6 +2801,13 @@ body::-webkit-scrollbar {
   transition: padding 640ms var(--ss-shot-grow-ease);
 }
 
+/* 🔴 분석 화면에서는 머리줄이 44 → 68px 로 두툼해진다 — 알약도 그에 맞춰
+   한 단 키운다(사용자 요청). 안 키우면 넓어진 줄 안에서 혼자 작아 보인다. */
+.ss-shot[data-grown='true'] .ss-shot-close {
+  padding: 7px 18px;
+  font-size: 0.8125rem;
+}
+
 .ss-shot[data-leaving='true'] {
   --ss-shot-dur: 820ms;
   --ss-shot-ease: var(--ss-leave-ease);
@@ -3204,9 +3211,9 @@ body::-webkit-scrollbar {
      44 → 78 로 **한 프레임에** 변한다 — 판과 창 틀은 부드럽게 움직이는데 이
      줄만 툭 자라고 툭 줄어서, 안쪽 것들이 떨어지는 것처럼 보였다. */
   transition: padding var(--ss-shot-dur) var(--ss-shot-ease);
-  /* 점 하나의 크기와 사이 간격. 아래 빈 자리(::after)가 이 값으로 계산되므로
-     크기를 바꿔도 제목 알약의 가운데 정렬이 안 어긋난다. */
-  --ss-dot: 13px;
+  /* 머리줄 오른쪽 것들 사이 간격(`.ss-shot-bar-right`).
+     ⚠️ 짝이던 `--ss-dot`(점 크기)은 걷어냈다 — 빨간 점이 「닫기」 알약이
+     되면서 읽는 곳이 없어졌다(2026-09-08). */
   --ss-dot-gap: 8px;
 }
 
@@ -3296,23 +3303,43 @@ body::-webkit-scrollbar {
   opacity: 0.35;
 }
 
-.ss-shot-dot {
-  width: var(--ss-dot);
-  height: var(--ss-dot);
+/* 🔴 **「닫기」라고 적힌 알약**(사용자 요청, 2026-09-08). 빨간 점이던 때는
+   누를 수 있다는 것도, 누르면 무엇이 되는지도 모양만으로는 안 읽혔다
+   ("다른 사람들이 아예 모르더라"). 빨강은 남긴다 — 되돌린다는 뜻이다.
+
+   테두리로 그린다: 채우면 머리줄에서 제일 먼저 눈에 들어와, 정작 봐야 할
+   영상 자리보다 세진다(머리줄을 밝게 뒤집었다 되돌린 것과 같은 이유). */
+.ss-shot-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--ss-fg) 22%, transparent);
-}
-
-/* 누를 수 있는 첫 점만 색이 산다 — 장식과 버튼이 같아 보이면 안 된다. */
-.ss-shot-dot-close {
+  border: 1px solid color-mix(in srgb, var(--ss-error) 55%, transparent);
+  background: color-mix(in srgb, var(--ss-error) 14%, transparent);
+  color: color-mix(in srgb, var(--ss-error) 88%, var(--ss-fg));
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  white-space: nowrap;
   cursor: pointer;
-  background: color-mix(in srgb, var(--ss-error) 70%, transparent);
-  transition: background 160ms ease;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
 }
 
-.ss-shot-dot-close:hover,
-.ss-shot-dot-close:focus-visible {
-  background: var(--ss-error);
+.ss-shot-close:hover,
+.ss-shot-close:focus-visible {
+  border-color: var(--ss-error);
+  background: color-mix(in srgb, var(--ss-error) 26%, transparent);
+  color: var(--ss-fg);
+}
+
+/* 영상이 없을 때의 자리지기 — 보이지만 않고 폭은 그대로다. 없애면 영상을
+   고르는 순간 머리줄의 것들이 알약 하나만큼 옆으로 튄다. */
+.ss-shot-close[data-ghost='true'] {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* 주소 알약 자리 — 여기에 고른 영상의 이름이 뜬다. */
