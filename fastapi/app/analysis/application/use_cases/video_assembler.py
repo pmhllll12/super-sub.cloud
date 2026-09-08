@@ -40,4 +40,5 @@ def to_video_result(video: VideoEntity) -> VideoResult:
         is_public=video.is_public,
         title=video.title,
         description=video.description,
+        kept=video.kept,
     )

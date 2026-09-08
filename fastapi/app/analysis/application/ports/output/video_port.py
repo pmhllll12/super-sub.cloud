@@ -61,6 +61,15 @@ class VideoPort(ABC):
         """
 
     @abstractmethod
+    def delete(self, video_id: UUID, user_id: UUID) -> VideoEntity | None:
+        """영상 행을 지우고 지운 영상을 돌려준다(S3 정리에 `storage_key` 가 필요).
+
+        `video_validation`·`analysis_job`(·그 하위)은 외래키 `ON DELETE CASCADE`
+        로 따라 지워진다(SEC-006). **`user_id` 로 소유를 확인한다** — 남의/없는
+        클립이면 `None`.
+        """
+
+    @abstractmethod
     def list_public(self, limit: int) -> list[VideoEntity]:
         """공개된 클립. **최근 것이 앞에 온다.** 업로더 구분 없이 훑는다.
 

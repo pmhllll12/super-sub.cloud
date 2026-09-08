@@ -36,10 +36,9 @@ export const MATCH_BOT = '용병 찾기'
 //     알약 버튼으로 옮기고 이름도 '용병 찾기' · '팀 찾기' 로 바꿨다
 //     (FEATURED). 같은 이유로 두 목록은 안 겹친다.
 //
-// href 가 있는 '영상 분석'은 requireUser() 에 걸리는 로그인 전용 화면이다 —
+// 셋 다 requireUser() 에 걸리는 로그인 전용 화면(app/(app)/ 그룹)이다 —
 // authRequired: true 로 표시해 두면 로그인 안 한 사람에게 카드가 "로그인이
-// 필요합니다"를 미리 보여준다(링크는 살려 둔다). 나머지는 아직 갈 곳이
-// 없어 카드가 링크가 아니다(눌러도 아무 일이 없다).
+// 필요합니다"를 미리 보여준다(링크는 살려 둔다).
 // 헤드라인 자리(옛 `FIND YOUR SQUAD`)에 유리 알약 버튼으로 크게 내놓는 둘.
 // **아래 DESTINATIONS 와 겹치지 않는다** — 같은 곳으로 가는 항목을 한 화면에
 // 둘 두지 않는다(우상단 '내 프로필'을 글자 줄에서 뺀 것과 같은 규칙).
@@ -84,5 +83,7 @@ export const DESTINATIONS: Destination[] = [
     title: '경기장 예약',
     icon: 'stadium',
     summary: '가까운 구장을 찾고\n시간을 잡습니다',
+    href: '/venues',
+    authRequired: true,
   },
 ]
