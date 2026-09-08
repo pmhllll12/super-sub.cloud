@@ -4446,7 +4446,7 @@ command.analyze` 로 작업 생성을 걸었습니다. 화면이 실어 보내�
 - 관련: `www/src/lib/uploadClip.ts` · `www/src/app/(app)/me/MyVideos.tsx`
 - **담당**: 정어진 · **제기**: 백성검 · **기한**: 스프린트 3 (조정 가능)
 
-### 5. 클립에 **공개 여부**가 없어 영상 모음을 서버로 못 옮깁니다 (2026-09-04 신설) — 🟡 절반 (2026-09-08)
+### 5. 클립에 **공개 여부**가 없어 영상 모음을 서버로 못 옮깁니다 (2026-09-04 신설) ✅ 해소 (2026-09-08)
 
 홈에서 내리면 나오는 **영상 모음**은 아직 화면 안의 붙박이 목록입니다
 (`www/src/lib/feed.ts` 의 `FEED`). 이번에 `/me` 에서 올린 클립을 **공개**로 돌리면
@@ -4473,19 +4473,19 @@ command.analyze` 로 작업 생성을 걸었습니다. 화면이 실어 보내�
 (`MyVideos.tsx` 의 `previewSrc`). 공개 목록도 `lib/published.ts` 한 파일만
 갈아 끼우면 되도록 부르는 쪽과 갈라 두었습니다.
 
-**처리 (2026-09-08, 정어진, `2c8590d`) — 네 가지 중 앞의 둘**:
+**처리 (2026-09-08, 정어진) — 네 조각 전부**. 1+2 를 `2c8590d`, 3+4 를 `d95617e` 로:
 
 | 무엇 | 상태 |
 |---|---|
-| 클립 **공개 여부** | ✅ `PATCH /videos/{id}` `{"is_public": true}`. 등록으로는 못 정하고 항상 `false` 로 저장(기본값 비공개). 남의/없는 클립은 `404 VIDEO_NOT_FOUND` |
-| **공개 클립 목록** | ✅ `GET /videos/public` — 공개 클립만, 최근순, 최대 100. 한 줄은 `{id, sport_code, duration_ms, created_at}`. 🔴 로그인 필요(익명 홈에서 부르셔야 하면 알려 주세요) |
-| **재생용 주소** | ✋ 아직 — 사전 서명 GET URL. `previewSrc` 가 기다리는 값 |
-| **제목 · 한 줄 설명** | ✋ 아직 |
+| 클립 **공개 여부** | ✅ `PATCH /videos/{id}` `{"is_public": true}`. 등록으로는 못 정하고 `false` 로 저장. 남의/없는 클립은 `404 VIDEO_NOT_FOUND` |
+| **공개 클립 목록** | ✅ `GET /videos/public` — 공개 클립만, 최근순, 최대 100. 🔴 로그인 필요(익명 홈에서 부르셔야 하면 알려 주세요). 저장 키·업로더는 안 실림 |
+| **재생용 주소** | ✅ `GET /videos/{id}/playback-url` — 사전 서명 GET URL. 공개 클립이거나 자기 클립일 때만(아니면 404). `expires_in` 초 만료, 캐시 말고 재생 직전에 받기 |
+| **제목 · 한 줄 설명** | ✅ 같은 `PATCH /videos/{id}` `{"title", "description"}`. 보낸 필드만 바뀜. 100/280자, `null`·공백이면 지움. `GET /videos`·`/videos/public` 응답에 실림 |
 
-- **확인 결과**: `analyze` 무관하게 `is_public` 기본 `false`. `PATCH` 로 공개 → 다른 계정 토큰으로 `GET /videos/public` 에 뜸. 저장 키·업로더는 목록에 안 실림(업로더 `user_id` 노출 방지). 테스트 10건, 559 통과, `alembic check`·downgrade 왕복 클린.
-- **하지 말 것 확인**: 기본값 공개 아님(`server_default false`, 기존 행도 비공개). 저장 키를 주소로 안 씀 — 목록에서 아예 뺌.
-- 계약: `api-contract.md` 3-6(`PATCH /videos/{id}` · `GET /videos/public`) · `client-contract-changes.md` **20번**.
-- **남은 것**: 재생 URL·제목/설명(3·4 조각). 항목은 그것들 때문에 **열어 둡니다.**
+- **확인 결과**: `is_public` 기본 `false`(기존 행도). `PATCH` 로 공개 → 다른 계정으로 `GET /videos/public` 에 뜸. 공개 클립 `playback-url` 을 남도 받고, 비공개 남의 클립은 404. 부분 수정 — `is_public` 만 토글해도 제목 안 지워짐. 테스트 **23건**, **572 통과**, `alembic check` + `downgrade -2` 왕복 클린.
+- **하지 말 것 확인**: 기본값 공개 아님(`server_default false`). 저장 키를 주소로 안 씀 — 목록에서 뺐고 재생은 사전 서명. 이미 공유한 주소가 죽는 값(`public_slug`)은 안 건드림.
+- 계약: `api-contract.md` 3-6(`PATCH` · `GET /videos/public` · `GET /videos/{id}/playback-url`) · `client-contract-changes.md` **20번**.
+- 화면: `MyVideos.tsx` 의 `previewSrc` 가 `playback-url` 의 `url` 을 반환하게, `lib/published.ts` 도 목록 id 로 그 엔드포인트를 부르면 재생이 붙습니다.
 
 - 관련: `www/src/lib/published.ts` · `www/src/lib/feed.ts` · 계약 3-6절
 - **담당**: 정어진 · **제기**: 백성검 · **기한**: 스프린트 3 (조정 가능)
