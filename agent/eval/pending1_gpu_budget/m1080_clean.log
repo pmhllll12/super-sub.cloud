@@ -1,0 +1,20 @@
+[포즈] 46프레임 · 원본 24.0fps · 실효 23.98fps
+  leg  유효 프레임 100% (스윙 측 auto)
+  arm  유효 프레임 91% (스윙 측 auto)
+  도구 sports_ball 검출률 85%
+
+[측정] impact_limb=arm impact_event=extension_peak swing_side=auto · 임팩트 39프레임 (1.63초)
+{
+  "plant_knee_angle_at_impact": 177.0,
+  "swing_knee_angle_at_impact": 130.2,
+  "trunk_forward_lean_deg_at_impact": 23.3,
+  "hip_rotation_range_deg": 164.3,
+  "swing_hip_flexion_after_impact_deg": 22.8,
+  "follow_through_duration_frames": 6,
+  "impact_frame": 39,
+  "hip_shoulder_separation_deg": 52.7,
+  "swing_elbow_angle_at_impact": 141.8,
+  "support_elbow_angle_at_impact": 171.2,
+  "swing_shoulder_flexion_after_impact_deg": 0.0,
+  "plant_foot_to_ball_offset": 0.61
+}
