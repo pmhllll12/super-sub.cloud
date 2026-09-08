@@ -695,3 +695,94 @@ def test_nothing_cut_means_nothing_to_blame(tmp_path):
 
     assert r.truncated is False
     assert r.limited_by is None
+
+
+# --- 메모리 가드는 장수가 아니라 바이트다 (미결 ho 9번) ----------------------
+#
+# 기준과 판정은 `eval/pending9_budget/`. 여기서 고정하는 것은 **동작**이다.
+
+
+def test_the_guard_reads_the_resolution_instead_of_a_fixed_frame_count(tmp_path):
+    """🔴 같은 장수가 해상도마다 다른 메모리를 먹는다.
+
+    300장이 4K 세로에서 7,465MB이고 1080p에서 1,866MB다 — 한쪽에는 딱 맞고
+    다른 쪽에는 4배 헐겁다. 장수로 막으면 **헐거운 쪽이 분석 창으로 대가를
+    치른다**: 실효 fps가 30을 넘는 소스에서 보기로 한 10초 중 최악 6.74초만
+    봤다. 예산을 바이트로 두면 낮은 해상도에서 장수가 늘어 창을 지킨다.
+    """
+    assert pose.frames_within_budget(2160, 3840) == 300, (
+        "4K 세로는 지금 동작 그대로여야 한다 — 예산이 그 값으로 정해져 있다"
+    )
+    assert pose.frames_within_budget(1920, 1080) > 445, (
+        "1080p는 최악 fps(44.5)의 10초 창 445장을 담을 수 있어야 한다"
+    )
+    assert pose.frames_within_budget(1280, 720) > pose.frames_within_budget(1920, 1080)
+
+
+def test_a_low_resolution_clip_keeps_the_whole_window(tmp_path):
+    """가드가 창을 먹지 않는다 — 이 항목이 사려던 것이 이것이다.
+
+    작은 클립이라 예산 안에 여유가 많다. 잘렸다면 그 범인은 **창**이어야지
+    가드여서는 안 된다.
+
+    🔴 **잘리는 클립으로 잰다.** 안 잘리는 클립에서는 `limited_by`가 None 이라
+    「가드가 안 이겼다」가 공허하다 — 옛 장수 가드(300)에서도 통과해 버린다.
+    여기서는 창이 이겨야 하고, 옛 동작이라면 300장에서 가드가 이겼다.
+    """
+    clip = write_clip(tmp_path / "small.avi", n_frames=500, fps=40.0)
+
+    r = pose.read_frames_ex(clip, target_fps=30, max_seconds=10.0)
+
+    assert r.truncated is True, "500장짜리를 10초 창으로 잘랐으니 잘린 것이 맞다"
+    assert r.limited_by == "window", (
+        "잘랐다면 범인은 창이어야 한다 — 옛 장수 가드(300)라면 memory_guard 였다"
+    )
+    assert len(r.frames) == 400, "40fps·10초 창은 400장이다 (옛 동작은 300장)"
+
+
+def test_an_explicit_frame_cap_still_wins(tmp_path):
+    """🔴 명시적으로 넘긴 장수를 예산이 덮지 않는다.
+
+    평가 스크립트가 장수를 고정해 돌리는 자리가 있다
+    (`eval/pending9_rss/measure_rss.py`). 기본값이 바뀌었다고 그 값을
+    무시하면 **그 회차들이 조용히 다른 것을 잰다.**
+    """
+    clip = write_clip(tmp_path / "c.avi", n_frames=60, fps=30.0)
+
+    r = pose.read_frames_ex(clip, target_fps=30, max_frames=10, max_seconds=10.0)
+
+    assert len(r.frames) == 10
+    assert r.max_frames == 10
+
+
+def test_the_result_carries_the_guard_it_actually_used(tmp_path):
+    """넘긴 값(None)이 아니라 **실제로 쓴 값**이 결과에 남는다.
+
+    재디코딩(`load_frames`)이 같은 장수를 잘라야 하고, 「무엇으로 잘랐나」를
+    사후에 읽을 수 있어야 한다.
+    """
+    clip = write_clip(tmp_path / "c.avi", n_frames=30, fps=30.0, size=(64, 48))
+
+    r = pose.read_frames_ex(clip, target_fps=30)
+
+    assert r.max_frames == pose.frames_within_budget(64, 48)
+    assert r.max_frames != pose.DEFAULT_MAX_FRAMES, "이 크기는 폴백 값과 달라야 한다"
+
+
+def test_the_budget_never_asks_the_machine_how_much_ram_is_left():
+    """🔴 **결정성.** 예산이 기계 상태에 의존하면 점수가 흔들린다.
+
+    남은 메모리를 조회해 예산을 정하면 같은 클립이 그때그때 다른 장수로
+    분석되고, 그 차이가 아무 데도 안 남는다. 편해 보이는 쪽이 조용히 틀리는
+    쪽이라 **상수로 두고 동거 프로세스 몫은 값을 정할 때 뺐다**
+    (`eval/pending9_budget/PREREGISTRATION.md` 2절).
+    """
+    import inspect
+    import re
+
+    src = inspect.getsource(pose.frames_within_budget)
+    probes = re.findall(
+        r"meminfo|MemAvailable|virtual_memory|psutil|os\.environ|getenv|sysconf", src
+    )
+    assert not probes, f"예산 계산이 런타임 상태를 본다: {probes}"
+    assert len({pose.frames_within_budget(1920, 1080) for _ in range(20)}) == 1

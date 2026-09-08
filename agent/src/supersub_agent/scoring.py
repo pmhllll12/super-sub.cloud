@@ -191,17 +191,137 @@ class Criterion:
                 f"{self.id}: 등급 판정 지표 {self.band_metric!r}가 측정값에 없음"
             )
         value = float(features[self.band_metric])
+        grade = self._grade_at(value)
+        if grade is None:
+            raise RubricError(
+                f"{self.id}: {self.band_metric}={value}가 어느 등급 구간에도 없음. "
+                "루브릭 bands가 값 범위를 모두 덮지 않는다."
+            )
+        return grade
+
+    def _grade_at(self, value: float) -> int | None:
+        """구간 판정의 알맹이. 어느 구간에도 없으면 None (grade_for가 오류로 옮긴다)."""
         for grade in (2, 1, 0):
-            for lo, hi in self.bands[grade]:
+            for lo, hi in self.bands.get(grade, ()):
                 if (lo is None or value >= lo) and (hi is None or value <= hi):
                     return grade
-        raise RubricError(
-            f"{self.id}: {self.band_metric}={value}가 어느 등급 구간에도 없음. "
-            "루브릭 bands가 값 범위를 모두 덮지 않는다."
-        )
+        return None
+
+    def _interval_at(self, value: float, grade: int) -> Interval | None:
+        for lo, hi in self.bands.get(grade, ()):
+            if (lo is None or value >= lo) and (hi is None or value <= hi):
+                return (lo, hi)
+        return None
+
+    def _nearest(self, grades: tuple[int, ...], value: float) -> tuple[float, float | None]:
+        """주어진 등급들의 구간 중 가장 가까운 것까지의 (거리, 그 구간의 폭).
+
+        구간 안이면 거리 0. 폭은 한쪽이 열려 있으면 None이다.
+        """
+        best: tuple[float, float | None] = (float("inf"), None)
+        for grade in grades:
+            for lo, hi in self.bands.get(grade, ()):
+                inside = (lo is None or value >= lo) and (hi is None or value <= hi)
+                ends = [e for e in (lo, hi) if e is not None]
+                if not inside and not ends:
+                    continue
+                distance = 0.0 if inside else min(abs(value - e) for e in ends)
+                width = hi - lo if lo is not None and hi is not None else None
+                if distance < best[0]:
+                    best = (distance, width)
+        return best
+
+    def _risk_edges(self, interval: Interval) -> tuple[float, ...]:
+        """이 구간의 끝 중 **넘어가면 등급이 떨어지는** 쪽만.
+
+        위가 열린 최상위 구간(`hip_rotation`의 25~180 같은 것)은 끝이 물리적
+        한계일 뿐 위험이 아니다. 그 끝까지 거리를 재서 감점하면 **잘한 값을
+        깎는다** — 180도로 완전히 돌린 골반이 한가운데 102도보다 낮은 점수를
+        받게 된다. 그래서 실제로 아래 등급이 붙어 있는 끝만 센다.
+        """
+        edges = []
+        for end, outward in ((interval[0], -1.0), (interval[1], +1.0)):
+            if end is None:
+                continue
+            beyond = self._grade_at(end + outward * 1e-6)
+            if beyond is not None and beyond < max(self.bands):
+                edges.append(end)
+        return tuple(edges)
+
+    def score_for(self, features: dict[str, Any]) -> float | None:
+        """항목별 **연속 점수** 0~100. 측정값이 없으면 None.
+
+        🔴 **총점은 이 값에서 나오지 않는다.** 총점·등급은 `aggregate`가
+        등급(0/1/2)의 가중합으로 내고 이 함수는 거기에 관여하지 않는다.
+        레이더 차트처럼 **항목 사이의 모양**을 보여줄 때 0·50·100 세 자리만
+        찍히면 읽을 것이 없어서 만든 표시용 값이다.
+
+        뜻은 **「이상 구간(최상위 등급)에서 얼마나 떨어져 있는가」**다.
+
+        | 등급 | 점수대 | 안에서의 위치 |
+        |---|---|---|
+        | 2 | 85~100 | 위험한 끝에서 멀수록 높다 (`_risk_edges`) |
+        | 1 | 50~85 | 이상 구간에 가까울수록 높다 |
+        | 0 | 0~50 | 바로 위 등급 구간에 가까울수록 높다 |
+
+        구간이 겹치지 않으므로 **등급 순서를 뒤집지 않는다** — 2등급 항목이
+        1등급 항목보다 낮게 찍히는 일이 없다. 루브릭에 빈틈이 생겨도 그렇도록
+        마지막에 등급별 점수대로 자른다.
+        """
+        if self.band_metric not in features:
+            return None
+        value = float(features[self.band_metric])
+        grade = self.grade_for(features)
+        top = max(self.bands)
+        floor, ceiling = SCORE_BANDS[grade]
+
+        if grade == top:
+            interval = self._interval_at(value, top)
+            edges = self._risk_edges(interval) if interval else ()
+            width = (
+                interval[1] - interval[0]
+                if interval and interval[0] is not None and interval[1] is not None
+                else None
+            )
+            if not edges or not width:
+                score = ceiling
+            else:
+                # 자(尺)는 **떨어질 수 있는 거리**다. 양끝이 다 위험하면
+                # 한가운데가 가장 먼 자리라 반폭이고, 한쪽만 위험하면
+                # (`hip_rotation` 25~180) 반대쪽 끝까지가 전부 여유라 전폭이다.
+                # 반폭으로 통일하면 위가 열린 구간에서 한가운데를 넘는 값이
+                # 전부 만점이 되어 **더 잘한 것과 덜 잘한 것이 같아진다.**
+                ruler = width / 2 if len(edges) == 2 else width
+                room = min(abs(value - e) for e in edges) / ruler
+                score = floor + (ceiling - floor) * min(1.0, room)
+        elif grade == 1:
+            interval = self._interval_at(value, 1)
+            # 1·2등급 구간은 양끝이 닫혀 있다(_parse_bands가 강제한다).
+            width = interval[1] - interval[0] if interval else None
+            distance, _ = self._nearest((top,), value)
+            score = (
+                ceiling - (ceiling - floor) * min(1.0, distance / width)
+                if width
+                else floor
+            )
+        else:
+            # 0등급은 열린 끝을 가질 수 있어 자기 구간 폭을 자로 쓸 수 없다.
+            # 바로 위 등급 구간까지의 거리를 그 구간의 폭으로 잰다.
+            distance, width = self._nearest(tuple(g for g in self.bands if g > 0), value)
+            score = ceiling * max(0.0, 1.0 - distance / width) if width else floor
+
+        return round(min(max(score, floor), ceiling), 1)
 
 
 CONFIDENT_MARGIN = 0.2
+
+# 등급별로 항목 점수(`Criterion.score_for`)가 놓일 자리. 겹치지 않게 둔다 —
+# 겹치면 화면의 레이더 차트가 리포트의 등급과 반대로 말한다.
+SCORE_BANDS: dict[int, tuple[float, float]] = {
+    2: (85.0, 100.0),
+    1: (50.0, 85.0),
+    0: (0.0, 50.0),
+}
 
 
 @dataclass(frozen=True)
@@ -443,6 +563,11 @@ def aggregate(
                 # 바뀐다 — 「쟀는데 못했다」와 「구간 밖이다」를 화면이 가를 수
                 # 있게 하는 표시일 뿐이다. features 를 안 주면 빈 문자열이다.
                 "out_of_band": c.out_of_band(features) if features else "",
+                # 항목별 연속 점수 0~100 (`Criterion.score_for`). 레이더 차트의
+                # 축 값이다. 🔴 **총점은 여기서 나오지 않는다** — 위 grade의
+                # 가중합이고, 이 값은 features를 안 주면 None일 뿐 나머지는
+                # 한 비트도 같다. out_of_band와 같은 성질이다.
+                "stat": c.score_for(features) if features else None,
                 "evidence": j.get("evidence", ""),
                 "metric_ref": j.get("metric_ref", ""),
             }

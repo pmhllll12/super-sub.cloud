@@ -49,6 +49,17 @@ class S3Storage(StoragePort):
         )
         return url, self._ttl
 
+    def move_object(self, src_key: str, dst_key: str) -> None:
+        """`CopyObject`(서버 쪽) 후 원본 삭제. 바이트가 앱 서버를 지나지 않는다."""
+        if src_key == dst_key:
+            return
+        self._client.copy_object(
+            Bucket=self._bucket,
+            CopySource={"Bucket": self._bucket, "Key": src_key},
+            Key=dst_key,
+        )
+        self._client.delete_object(Bucket=self._bucket, Key=src_key)
+
     def delete_object(self, storage_key: str) -> None:
         """객체 하나를 지운다. 없는 키에도 S3 는 오류를 안 낸다(멱등)."""
         self._client.delete_object(Bucket=self._bucket, Key=storage_key)
