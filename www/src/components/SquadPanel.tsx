@@ -619,7 +619,11 @@ export default function SquadPanel({
           aria-hidden="true"
           focusable="false"
         >
-          <rect x="1" y="1" width="98" height="138" />
+          {/* 🔴 **바깥 테두리만 온전한 흰색이다**(사용자 요청, 2026-09-08).
+              판의 경계라 흐리면 판이 어디까지인지 안 보인다. 안쪽 선들
+              (하프라인 · 센터서클 · 페널티/골 에어리어)은 카드가 얹히는
+              바탕이라 30% 로 물린다 — 아래 `.ss-squad-pitch` 주석. */}
+          <rect className="ss-squad-pitch-edge" x="1" y="1" width="98" height="138" />
           <line x1="1" y1="70" x2="99" y2="70" />
           <circle cx="50" cy="70" r="14" />
           <circle className="ss-squad-pitch-dot" cx="50" cy="70" r="1.2" />

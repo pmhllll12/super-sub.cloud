@@ -1828,7 +1828,10 @@ body::-webkit-scrollbar {
   width: 100%;
   height: 100%;
   fill: none;
-  stroke: var(--ss-fg);
+  /* 🔴 **안쪽 선은 30% 로 물린다**(사용자 요청, 2026-09-08). 카드 · 이름표가
+     이 선들 위에 얹히는데 온전한 흰색이면 글자와 선이 같은 무게로 보여
+     서로를 갉아먹었다. 바깥 테두리만 그대로 흰색이다(아래 -edge). */
+  stroke: color-mix(in srgb, var(--ss-fg) 30%, transparent);
   /* non-scaling-stroke 라 이 값이 그대로 화면 픽셀이다 — viewBox 배율에
      안 눌린다. 흰색으로 바꾸고 나니 0.6 도 굵어 보여 0.4 로 내렸다. 그 아래로
      내려가면 화면에 따라 선이 끊겨 보인다. */
@@ -1837,9 +1840,16 @@ body::-webkit-scrollbar {
   pointer-events: none;
 }
 
-/* 가운데 점만 채운다 — 선으로 그리면 안 보인다. */
+/* 🔴 **판의 경계는 온전한 흰색이다.** 흐리면 판이 어디까지인지 안 보인다 —
+   안쪽 선들과 달리 이건 카드가 얹히는 자리가 아니라 판 자체의 테두리다. */
+.ss-squad-pitch-edge {
+  stroke: var(--ss-fg);
+}
+
+/* 가운데 점만 채운다 — 선으로 그리면 안 보인다.
+   안쪽 것이라 선들과 같은 30% 로 간다. */
 .ss-squad-pitch-dot {
-  fill: var(--ss-fg);
+  fill: color-mix(in srgb, var(--ss-fg) 30%, transparent);
   stroke: none;
 }
 
@@ -1858,11 +1868,11 @@ body::-webkit-scrollbar {
   font-size: 0.625rem;
   font-weight: 700;
   letter-spacing: 0.1em;
-  /* 🔴 **흰색이 아니다**(사용자 요청, 2026-09-08). 경기장 선도 흰색이라
-     이름표가 하프라인 · 골 에어리어 선 위에 얹히면 글자와 선이 뒤엉켜
-     읽히지 않았다(MF 셋이 하프라인 위, GK 가 골 에어리어 위). 판이 이미
-     쓰고 있는 잔디색으로 바꿔 **선과 다른 색층**으로 뗀다. */
-  color: var(--ss-pitch-green);
+  /* 🔴 **다시 흰색이다**(사용자 요청, 2026-09-08 — 잔디색으로 바꿨던 것을
+     같은 날 되돌렸다). 겹쳐 보이던 것은 글자 색 때문이 아니라 **경기장 선이
+     글자와 같은 무게로 흰색이었기 때문**이라, 선을 30% 로 물리는 쪽으로
+     고쳤다(위 `.ss-squad-pitch`). 글자는 읽혀야 하는 쪽이라 온전한 흰색이다. */
+  color: var(--ss-fg);
   border-radius: 4px;
   /* 🔴 **세로 여백을 주지 않는다.** 이름표가 단추가 되면서 1px 씩 붙였더니
      줄마다 쌓여 판이 10px 커졌다(실측 692 → 702). 손을 댔을 때 칠해지는
