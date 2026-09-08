@@ -4485,6 +4485,21 @@ jin 21(공개 사이트 인프라 식별자 스크럽)에서 `jekyll/`·`_posts/
 | 키에 원본이름 슬러그(`build_storage_key`) · `video.original_filename` 컬럼 | 정어진 |
 | `GET /admin/videos` (uid/email 로 필터, 사람이 읽는 목록) · `DELETE /admin/videos/{id}` | 정어진 |
 
+#### 구현 진행 (정어진, 2026-09-08)
+
+- ✅ **1조각** — `video.kept` 컬럼(`10f68718757d`) + 전 계층 배선 · `GET /videos`·
+  `/videos/public` 이 `kept=true` 만 · 부분 인덱스 `ix_video_provisional`.
+  🔴 **동작 보존** — 지금은 등록되는 모든 영상이 `kept=true`(`75dfe07`).
+- ✅ **3조각** — `DELETE /videos/{id}`(`389de29`) — DB 연쇄(SEC-006) + S3
+  (`storage_key` + `reports/<uid>/<vid>/`, best-effort). 계약 3-6 · CCC 21번.
+- ⬜ **2조각** — `POST /videos/{id}/keep` + `videos/`→`reports/` 이동. `reports/`
+  키 레이아웃을 정상호와 맞춘 뒤.
+- ⬜ **4조각** — 미저장분 스윕(`claim` 에 얹기).
+- ⬜ **5조각** — 🔴 전환 `kept = not analyze`. **백성검 프론트가 `keep` 부를
+  준비되면.** 그전에 켜면 `/analysis` 업로드가 프로필에서 사라진다.
+- ⬜ **6조각** — 파일명 슬러그 · `original_filename` · `upload-url` 에 `filename` ·
+  `GET/DELETE /admin/videos`.
+
 #### 지금 당장(테스트 단계 정리)
 
 - 서버 DB 유령 `video` 행 20개(S3 파일 없음, 1개만 실물 있음) — 사용자 승인받아 삭제한다(`classifier` 가 막아 사용자가 `!` 로 실행). 실물 있는 1개(`videos/2f3b04d9-…/37fe3852-…mp4`)는 남긴다
