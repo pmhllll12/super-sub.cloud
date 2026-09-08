@@ -4420,22 +4420,52 @@ jin 21(공개 사이트 인프라 식별자 스크럽)에서 `jekyll/`·`_posts/
 
 - **미저장분 정리 = 두 겹.** ⑴ `/analysis` 를 저장 없이 벗어나면 프론트가
   `DELETE /videos/{id}` 를 부른다(빠른 길, `beforeunload`/`sendBeacon` 로 최대한).
-  ⑵ 서버 스윕이 백스톱 — `kept=false` 이고 `created_at < now - PROVISIONAL_TTL`
-  (**기본 24시간**, 설정으로 뺀다)인 `video` 를 DB+S3 에서 지운다. 트리거는
-  새 타이머를 만들지 않고 `POST /internal/analysis-jobs/claim`(워커가 45초마다
-  부름) 에 얹는다 — 멈춘 job 회수(계약 3-8)와 같은 자리. `WHERE kept=false`
-  부분 인덱스로 질의를 작게 유지한다.
+  ⑵ 서버 스윕이 백스톱 — `kept=false` **이고 `analysis_job` 이 종결 상태
+  (`succeeded`/`failed`)이거나 job 이 없고** `created_at < now - PROVISIONAL_TTL`
+  인 `video` 를 DB+S3 에서 지운다. 트리거는 새 타이머 없이
+  `POST /internal/analysis-jobs/claim`(워커가 45초마다) 에 얹는다 — 멈춘 job
+  회수(계약 3-8)와 같은 자리. `WHERE kept=false` 부분 인덱스.
+  - **TTL = 24시간** (설정 `PROVISIONAL_VIDEO_TTL_HOURS`, 기본 24). 사용자는
+    1\~2시간을 원했지만 **짧으면 두 가지가 깨진다**: ⓐ GPU 인스턴스 자동 종료로
+    job 이 `queued` 로 몇 시간 대기하는 정상 경우를 지워 버린다(→ 위 "job 종결
+    상태" 조건으로 막긴 하지만) ⓑ 사용자가 결과를 보고 자리를 비웠다 1\~2시간
+    뒤 저장하러 오면 이미 사라진다. **백스톱의 목적은 "브라우저가 죽었을 때
+    결국 회수"이지 공격적 청소가 아니다** — 영상 하나(~30MB)가 하루 사는 비용은
+    무의미하고, 빠른 길(⑴)이 흔한 경우를 초 단위로 처리한다. 짧게 가고 싶으면
+    설정값만 낮추면 된다
 - **`videos/`→`reports/` 이동은 fastapi 가 한다** — `keep` 처리 중에.
   `CopyObject`(server-side) + `DeleteObject`(source). S3 수명주기 주인이 앱이라
   워커가 아니라 여기가 맞다.
 
-#### 아직 안 정한 것
+#### 파일명·사람이 알아볼 수 있게 (2026-09-08, 사용자 요청)
 
-- **파일명 규칙**(무작위 UUID → 사람이 알아볼 수 있게) — 사용자가 미뤘다.
-  이 설계는 파일명에 안 기댄다(삭제는 `video_id` 기준, 카드 UI 는 제목·날짜·
-  섬네일을 보여주면 됨). 문제 영상을 관리자가 지우는 것은 별도 능력
-  (`DELETE /admin/videos/{id}` 류, `DELETE /admin/users/{id}` 와 같은 결) —
-  사용자도 "사람이 일일이"는 한계라고 봄. jin 24 핵심 아님, 후속으로 남긴다
+사용자: **키에 유저명·업로드한 영상 이름이 보여야** 나중에 문제 영상을 찾아
+지우고 "에이전트가 제대로 돌았는지" 사람이 확인할 수 있다.
+
+정한 방향:
+
+- **S3 키에 원본 파일명 슬러그를 넣는다.**
+  `videos/<user_id>/<yyyymmdd>-<원본이름 슬러그>-<video_id 앞 8자>.<ext>`
+  (저장되면 `reports/<user_id>/<video_id>/source.<ext>` — 리포트와 한 폴더).
+  콘솔 `aws s3 ls` 에서 날짜·이름이 보이고, `video_id` 조각이 있어 DB 로 되짚을
+  수 있다.
+- **`video` 에 `original_filename` 컬럼**을 둔다 — 슬러그가 손실적이라도
+  원래 이름이 DB 에 남는다. 프론트가 `picked.name` 을 이미 안다.
+- **유저명(닉네임)은 키에 안 넣는다** — 닉네임은 바뀌고(`PATCH /me`), 키에
+  박으면 rename 마다 옛 키가 어긋난다. 대신 **관리자 영상 목록**
+  (`GET /admin/videos?user=<uid|email>` 류)이 uid↔닉네임·원본이름·업로드일·
+  종목·분석 상태·리포트 링크·재생 링크를 한 줄로 준다 — "문제 영상 찾기 +
+  에이전트 실행 확인"의 실제 도구는 이것이다. 관리자 강제 삭제도 여기(`DELETE
+  /admin/videos/{id}`, `DELETE /admin/users/{id}` 와 같은 결).
+- 🔴 **닉네임을 키에도 넣고 싶다면** 답을 주세요 — 그러면 "rename 은 옛 키를
+  다시 안 쓴다(라벨일 뿐)"를 받아들이고 넣습니다.
+
+#### 조각 추가 (위 표에 더해)
+
+| 조각 | 담당 |
+|---|---|
+| 키에 원본이름 슬러그(`build_storage_key`) · `video.original_filename` 컬럼 | 정어진 |
+| `GET /admin/videos` (uid/email 로 필터, 사람이 읽는 목록) · `DELETE /admin/videos/{id}` | 정어진 |
 
 #### 지금 당장(테스트 단계 정리)
 
