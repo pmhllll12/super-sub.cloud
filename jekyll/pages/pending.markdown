@@ -4670,13 +4670,24 @@ jin 21(공개 사이트 인프라 식별자 스크럽)에서 `jekyll/`·`_posts/
   🔴 **동작 보존** — 지금은 등록되는 모든 영상이 `kept=true`(`75dfe07`).
 - ✅ **3조각** — `DELETE /videos/{id}`(`389de29`) — DB 연쇄(SEC-006) + S3
   (`storage_key` + `reports/<uid>/<vid>/`, best-effort). 계약 3-6 · CCC 21번.
-- ⬜ **2조각** — `POST /videos/{id}/keep` + `videos/`→`reports/` 이동. `reports/`
-  키 레이아웃을 정상호와 맞춘 뒤.
-- ⬜ **4조각** — 미저장분 스윕(`claim` 에 얹기).
+- ⬜ **2조각** — `POST /videos/{id}/keep` + `videos/`→`reports/` 이동.
+  🔴 **차단 해제됨** — 정상호가 리포트 키를 `reports/<user_id>/<video_id>/` 로
+  정렬했다(`9a32e28`, 아래 정상호 조각). 이제 「저장」이 원본을 그 폴더에
+  `source.mp4` 로 놓으면 된다.
+- ✅ **4조각** `88c43d6` — 미저장분 백스톱 스윕. `POST /internal/analysis-jobs/claim`
+  이 `reclaim_stale` 뒤에 `sweep_provisional(ttl)` 을 돈다(워커가 주기 호출 —
+  별도 스케줄러 없음). 대상: `kept=false` · `ttl` 보다 오래 · 진행 중
+  (`queued`/`running`) 작업 없음. DB 행 + S3(`storage_key` + `reports/<uid>/<vid>/`)
+  best-effort. `PROVISIONAL_VIDEO_TTL_HOURS=24`.
 - ⬜ **5조각** — 🔴 전환 `kept = not analyze`. **백성검 프론트가 `keep` 부를
   준비되면.** 그전에 켜면 `/analysis` 업로드가 프로필에서 사라진다.
-- ⬜ **6조각** — 파일명 슬러그 · `original_filename` · `upload-url` 에 `filename` ·
-  `GET/DELETE /admin/videos`.
+- ✅ **6조각** — `f6e3cc8`(6a): 저장 키 슬러그(`build_storage_key`, 닉네임·원본이름
+  한글·자모 보존) · `video.original_filename` 컬럼(`2598dc30f0cb`) ·
+  `POST /videos/upload-url` 에 `filename` 필수. `a8d72f9`: billing 과 head 충돌
+  재부모(체인 `…→98f9cbdc74f4→2598dc30f0cb`). 6b(`88c43d6` 다음 커밋): `GET
+  /admin/videos?user=<uid|email>`(현재 닉네임·이메일 + 임시분 포함 목록,
+  `report_prefix`) · `DELETE /admin/videos/{id}`(소유 검사 없음, DB 연쇄 + S3).
+  계약 3-2절 · CCC 23번.
 
 #### 지금 당장(테스트 단계 정리)
 
