@@ -88,12 +88,16 @@ D.3에 별도로 모았다.
 
 ![도메인 ③ 카드·호칭 ERD]({{ "/assets/erd/domain3-card-title.svg" | relative_url }}){: class="erd-diagram" }
 
+> 위 그림의 player_card에는 `tagline`이 아직 표시되어 있지 않다. 카드의 별명이
+> 화면에 고정 문구로 박혀 있어 모든 카드가 같은 문구였던 문제(`paik` 3번)를
+> 고치며 늘린 컬럼이다(2026.09.04). **표가 최신이다.**
+
 | 테이블 | 용도 | 1행이 뜻하는 것 |
 |---|---|---|
 | title_definition | 호칭의 종류와 분류(강점·활동·용병) (SFR-004) | 호칭 1종 |
 | title_criteria | 호칭별 절대 기준. 항목·비교연산자·임계값을 행으로 나눈다 | 호칭 1종의 판정 조건 1줄 |
 | user_title | 호칭 부여 이력 | 한 사람이 받은 호칭 1개 |
-| player_card | 공개 카드와 공유용 슬러그 (SFR-009) | 한 사람의 카드 1장 |
+| player_card | 공개 카드와 공유용 슬러그 (SFR-009). `tagline`(문자 20, 선택)에 카드 별명을 담는다 — `user.nickname`(이름)·`user_title`(분석이 주는 호칭)과는 다른 값이다 | 한 사람의 카드 1장 |
 | squad | 팀 단위 카드 묶음 | 한 팀의 스쿼드 1개 |
 | squad_member | 스쿼드에 등재된 카드와 포지션 | 스쿼드 1개에 등재된 카드 1장 |
 
@@ -116,10 +120,14 @@ D.3에 별도로 모았다.
 
 ![도메인 ⑤ 평가·신뢰 ERD]({{ "/assets/erd/domain5-review-trust.svg" | relative_url }}){: class="erd-diagram" }
 
+> 위 그림의 review_option에는 `sort_order`가 아직 표시되어 있지 않다. `ORDER BY`
+> 없이는 SQL이 행 순서를 보장하지 않아 화면 노출 순서가 깨졌던 것을 고치며
+> 늘린 컬럼이다(2026.09.04). **표가 최신이다.**
+
 | 테이블 | 용도 | 1행이 뜻하는 것 |
 |---|---|---|
 | review | 경기 후 상호 평가의 제출 사실과 시점 (SFR-008) | 경기 1건에서 A가 B를 평가한 1건 |
-| review_option | 평가 선택지 정의 | 선택지 1개 |
+| review_option | 평가 선택지 정의. `sort_order`(정수, 필수)로 화면 노출 순서를 고정한다 | 선택지 1개 |
 | review_selection | 평가에서 선택된 항목 | 평가 1건에서 고른 선택지 1개 |
 | report | 신고 접수 | 신고 1건 |
 | no_show | 불참·지각 기록 | 경기 1건의 불참자 1명 |
