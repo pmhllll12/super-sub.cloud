@@ -17,6 +17,10 @@ from app.analysis.application.use_cases.job_interactors import (
     ClaimJobInteractor,
     FinishJobInteractor,
 )
+from app.analysis.dependencies.video_providers import (
+    StorageOptionalDep,
+    VideoRepositoryDep,
+)
 from app.core.config import settings
 from app.core.database import get_session
 
@@ -30,8 +34,18 @@ def get_job_repository(
 JobRepositoryDep = Annotated[JobPort, Depends(get_job_repository)]
 
 
-def get_claim_job_use_case(repository: JobRepositoryDep) -> ClaimJobUseCase:
-    return ClaimJobInteractor(repository, settings.analysis_job_timeout_minutes)
+def get_claim_job_use_case(
+    repository: JobRepositoryDep,
+    video_repository: VideoRepositoryDep,
+    storage: StorageOptionalDep,
+) -> ClaimJobUseCase:
+    return ClaimJobInteractor(
+        repository,
+        settings.analysis_job_timeout_minutes,
+        video_repository=video_repository,
+        storage=storage,
+        provisional_ttl_hours=settings.provisional_video_ttl_hours,
+    )
 
 
 def get_finish_job_use_case(repository: JobRepositoryDep) -> FinishJobUseCase:

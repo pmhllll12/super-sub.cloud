@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
@@ -85,6 +86,19 @@ class StubVideoRepository(VideoPort):
         if video is None or video.user_id != user_id:
             return None
         return _VIDEOS.pop(video_id)
+
+    def sweep_provisional(self, ttl_hours: int) -> list[VideoEntity]:
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=ttl_hours)
+        stale = [
+            v
+            for v in _VIDEOS.values()
+            if not v.kept
+            and v.created_at < cutoff
+            and v.analysis_status not in ("queued", "running")
+        ]
+        for v in stale:
+            del _VIDEOS[v.id]
+        return stale
 
 
 class FakeStorage(StoragePort):

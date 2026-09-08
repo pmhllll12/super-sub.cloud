@@ -64,6 +64,24 @@ def get_storage() -> StoragePort:
 StorageDep = Annotated[StoragePort, Depends(get_storage)]
 
 
+def get_storage_optional() -> StoragePort | None:
+    """버킷이 없으면 `None`. **503 을 내지 않는다** — 워커 큐 소비처럼 S3 가
+    없어도 돌아야 하는 자리에서 쓴다(그 자리의 S3 정리는 best-effort).
+    """
+    if not settings.s3_bucket:
+        return None
+    return S3Storage(
+        bucket=settings.s3_bucket,
+        region=settings.aws_region,
+        url_ttl_seconds=settings.upload_url_ttl_seconds,
+    )
+
+
+StorageOptionalDep = Annotated[
+    StoragePort | None, Depends(get_storage_optional)
+]
+
+
 def get_create_upload_url_use_case(storage: StorageDep) -> CreateUploadUrlUseCase:
     return CreateUploadUrlInteractor(storage)
 

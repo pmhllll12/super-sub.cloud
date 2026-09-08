@@ -70,6 +70,17 @@ class VideoPort(ABC):
         """
 
     @abstractmethod
+    def sweep_provisional(self, ttl_hours: int) -> list[VideoEntity]:
+        """저장 안 한 임시 영상 중 오래된 것을 지우고 목록으로 돌려준다(미결
+        `jin` 24번 백스톱).
+
+        조건: `kept=false` · `created_at` 이 `ttl_hours` 보다 오래됨 · **진행
+        중인 `analysis_job`(`queued`/`running`)이 없음** — 아직 분석을 기다리는
+        것을 지우면 안 된다(GPU 인스턴스가 꺼져 있으면 몇 시간 대기가 정상이다).
+        지운 영상의 `storage_key` 는 부르는 쪽이 S3 정리에 쓴다.
+        """
+
+    @abstractmethod
     def list_public(self, limit: int) -> list[VideoEntity]:
         """공개된 클립. **최근 것이 앞에 온다.** 업로더 구분 없이 훑는다.
 

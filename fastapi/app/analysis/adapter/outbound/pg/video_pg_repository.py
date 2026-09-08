@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -122,6 +123,36 @@ class VideoPgRepository(VideoPort):
         self._session.delete(video)  # FK ON DELETE CASCADE 가 자식을 정리한다
         self._session.commit()
         return entity
+
+    def sweep_provisional(self, ttl_hours: int) -> list[VideoEntity]:
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=ttl_hours)
+        # 이 영상에 아직 안 끝난 작업이 붙어 있나 — 있으면 지우지 않는다.
+        active_job = (
+            select(AnalysisJobOrm.id)
+            .where(
+                AnalysisJobOrm.video_id == VideoOrm.id,
+                AnalysisJobOrm.status.in_(("queued", "running")),
+            )
+            .exists()
+        )
+        stale = (
+            self._session.execute(
+                select(VideoOrm).where(
+                    VideoOrm.kept.is_(False),
+                    VideoOrm.created_at < cutoff,
+                    ~active_job,
+                )
+            )
+            .scalars()
+            .all()
+        )
+        if not stale:
+            return []
+        entities = [_to_entity(v, None, None) for v in stale]
+        for v in stale:
+            self._session.delete(v)  # 판정·작업 연쇄는 FK CASCADE
+        self._session.commit()
+        return entities
 
     def update_video(
         self,

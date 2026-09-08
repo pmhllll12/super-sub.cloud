@@ -14,13 +14,16 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
+from app.analysis.adapter.outbound.orm.analysis_job_orm import AnalysisJobOrm
+from app.analysis.adapter.outbound.orm.video_orm import VideoOrm
 from app.analysis.adapter.outbound.orm.video_validation_orm import VideoValidationOrm
+from app.analysis.adapter.outbound.pg.video_pg_repository import VideoPgRepository
 from app.analysis.adapter.outbound.stub.video_stub_repository import (
     FakeStorage,
     put_object,
@@ -341,6 +344,76 @@ class TestDelete:
 
         res = db_client.delete(f"{V1}/videos/{video_id}", headers=h)
         assert res.status_code == 404
+
+
+class TestProvisionalSweep:
+    """미결 jin 24번 백스톱 — `VideoPgRepository.sweep_provisional`."""
+
+    def _make(self, db_session, uploader, *, kept, age_hours, job_status=None):
+        vid = uuid.uuid4()
+        created = datetime.now(timezone.utc) - timedelta(hours=age_hours)
+        db_session.add(
+            VideoOrm(
+                id=vid,
+                user_id=uploader["id"],
+                sport_code="football",
+                storage_key=f"videos/{uploader['id']}/{vid}.mp4",
+                duration_ms=5_000,
+                side=None,
+                kept=kept,
+                created_at=created,
+            )
+        )
+        db_session.flush()
+        if job_status is not None:
+            db_session.add(
+                AnalysisJobOrm(
+                    id=uuid.uuid4(),
+                    video_id=vid,
+                    status=job_status,
+                    created_at=created,
+                )
+            )
+        db_session.commit()
+        return vid
+
+    def test_오래된_미저장분만_지운다(self, db_session, uploader):
+        stale = self._make(db_session, uploader, kept=False, age_hours=48)
+        recent = self._make(db_session, uploader, kept=False, age_hours=1)
+        saved_old = self._make(db_session, uploader, kept=True, age_hours=48)
+
+        swept = VideoPgRepository(db_session).sweep_provisional(ttl_hours=24)
+        swept_ids = {v.id for v in swept}
+
+        assert stale in swept_ids
+        assert recent not in swept_ids
+        assert saved_old not in swept_ids
+
+        left = {
+            r[0]
+            for r in db_session.execute(
+                text("SELECT id FROM video WHERE id = ANY(:ids)"),
+                {"ids": [stale, recent, saved_old]},
+            )
+        }
+        assert stale not in left
+        assert {recent, saved_old} <= left
+
+    def test_아직_도는_작업이_붙은_것은_안_지운다(self, db_session, uploader):
+        """GPU 가 꺼져 있으면 `queued` 로 몇 시간 대기가 정상이다."""
+        queued = self._make(
+            db_session, uploader, kept=False, age_hours=48, job_status="queued"
+        )
+        done = self._make(
+            db_session, uploader, kept=False, age_hours=48, job_status="failed"
+        )
+
+        swept_ids = {
+            v.id
+            for v in VideoPgRepository(db_session).sweep_provisional(ttl_hours=24)
+        }
+        assert queued not in swept_ids
+        assert done in swept_ids
 
 
 class TestConstraints:
