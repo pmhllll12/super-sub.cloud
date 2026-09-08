@@ -5,7 +5,7 @@ import type { PublicPlayerCard, Squad } from '@/server/backend'
 import SquadPanel from '@/components/SquadPanel'
 import SiteHeader from '@/components/SiteHeader'
 import HomeNav, { type Destination } from '@/components/HomeNav'
-import { FRIEND_SEARCH } from '@/lib/destinations'
+import { MATCH_BOT } from '@/lib/destinations'
 import { useIntroDone } from '@/lib/useIntroDone'
 import { useHideChrome, useLeaving } from '@/lib/pageTransition'
 import LogoutButton from '@/components/LogoutButton'
@@ -212,8 +212,27 @@ export default function HomeStage({
       // 손가락이 위로 = 내용은 아래로 = 내리는 것.
       move(dirOf(touchY - (e.touches[0]?.clientY ?? 0)))
     }
+    /**
+     * 🔴 **글자를 치는 중인가.** 여기서 「내려가기」로 받는 글쇠 셋이 하필
+     * 글을 쓰는 사람에게도 오는 것들이다 — 스페이스는 **띄어쓰기**이고
+     * 화살표는 **글자 사이를 오가는 것**이다.
+     *
+     * 안 보면 챗봇에 「안녕하세요. 」까지 치는 순간 영상 모음으로 넘어간다
+     * (사용자 지적, 2026-09-08). 굴림 쪽이 `onOwnPanel` 로 갈라 놓은 것과
+     * 같은 판단인데, 자판은 **판 밖의 입력칸**(어디에 생기든)에서도 막아야
+     * 해서 조건이 하나 더 있다.
+     */
+    const isTyping = (t: EventTarget | null) =>
+      t instanceof HTMLElement &&
+      (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))
+
     /** 자판으로도 오갈 수 있어야 한다 — 굴림이 없으니 이게 유일한 다른 길이다. */
     const onKey = (e: KeyboardEvent) => {
+      /* 🔴 **한글 조합 중에는 아무것도 안 한다.** IME 가 글자를 맞추는 동안
+         브라우저는 `keydown` 을 그대로 흘려보내는데, 그때의 스페이스는 조합을
+         끝내는 신호지 「내려가기」가 아니다. `isComposing` 이 그것을 말한다 —
+         입력칸 밖(조합 중인 IME 창)에서 올 수도 있어 아래 두 검사로는 안 걸린다. */
+      if (e.isComposing || isTyping(e.target) || onOwnPanel(e.target)) return
       if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') move(1)
       else if (e.key === 'ArrowUp' || e.key === 'PageUp') move(-1)
     }
@@ -275,7 +294,17 @@ export default function HomeStage({
    * 이쪽이다 — '지인 찾기' 를 고르면 스쿼드 판 옆에 찾기 판이 열린다.
    */
   const [picked, setPicked] = useState<string | null>(defaultActive)
-  const friendSearch = picked === FRIEND_SEARCH
+  /**
+   * **용병 찾기를 눌렀는가** — 켜지면 스쿼드 판 오른쪽에 추천 판과 지인
+   * 찾기 판이 **나란히** 열린다.
+   *
+   * 🔴 `picked === MATCH_BOT` 으로 판단하지 않는다. 그 제목이
+   * `DEFAULT_FEATURED` 이기도 해서 **홈에 들어오자마자 켜져 있고, ×를 눌러
+   * 선택을 `defaultActive` 로 되돌리면 곧바로 다시 켜진다** — 챗봇을 이
+   * 알약으로 열던 시절에 실제로 그렇게 갇혔다(destinations.ts 주석).
+   * 알약 선택과 **떼어 놓은 제 상태**여야 그 얽힘이 안 생긴다.
+   */
+  const [scouting, setScouting] = useState(false)
   /**
    * 챗봇이 열려 있는가.
    *
@@ -301,17 +330,29 @@ export default function HomeStage({
     (next: boolean) => {
       setBot(next)
       if (!next) return
+      // 챗봇이 서는 곳은 **첫째 칸**이다 — 추천 판을 밀어낸다. 둘째 칸의
+      // 지인 판까지 닫을 이유는 없지만, 짝으로 여닫는 것이라 같이 접는다.
+      setScouting(false)
       setPicked(defaultActive)
       setActive(defaultActive)
     },
     [defaultActive],
   )
 
-  /** 알약을 고르면 챗봇은 물러난다 — 위와 같은 이유로 자리가 하나다. */
+  /**
+   * 알약을 고르면 챗봇은 물러난다 — 첫째 칸을 같이 쓴다.
+   *
+   * '용병 찾기'는 **한 번 더 누르면 닫힌다**(토글). 이 알약은 늘 골라져
+   * 있는 기본값이라, 누를 때마다 열기만 하면 닫을 길이 판의 ×밖에 없다.
+   */
   const pick = useCallback((title: string | null) => {
     setPicked(title)
     setBot(false)
+    setScouting((on) => (title === MATCH_BOT ? !on : false))
   }, [])
+
+  /** 판의 × — 둘 중 어느 쪽을 닫아도 짝으로 접힌다(한 단추가 연 한 벌이다). */
+  const closeScout = useCallback(() => setScouting(false), [])
 
   return (
     <>
@@ -363,18 +404,13 @@ export default function HomeStage({
             <SquadPanel
               card={card}
               squad={squad}
-              friendSearch={friendSearch}
+              scouting={scouting}
               // 🔴 챗봇도 **판 오른쪽 그 자리**에서 나온다(사용자 요청) —
               // 지인 찾기 · AI 추천과 같은 자리다. 그 자리는 `.ss-squad-wrap`
               // 안에서만 잡히므로(`left: 100%`) 여기서 못 그리고 판에 넘긴다.
               bot={bot}
               onBotChange={showBot}
-              // 판의 × 로 닫으면 알약 선택도 같이 풀려야 한다 — 안 그러면
-              // 고른 채로 판만 없어져 다시 눌러도 안 열린다.
-              onCloseFriendSearch={() => {
-                setPicked(defaultActive)
-                setActive(defaultActive)
-              }}
+              onCloseScouting={closeScout}
             />
           </div>
 
@@ -384,7 +420,17 @@ export default function HomeStage({
           {/* 왼쪽 헤드라인이 알약 버튼으로 바뀌면서 이 줄이 화면의 유일한
               큰 글자가 됐다 — 문서에 h1 이 하나는 있어야 해서 여기로 옮겼다.
               보이는 모양은 그대로다(크기 · 계단은 아래 CSS 가 정한다). */}
-          <h1 className="ss-home-display ss-home-subhead" aria-label="OWN THE PITCH">
+          {/* 🔴 판이 열리면 **비켜선다**(사용자 요청). 추천 판과 지인 판이
+              나란히 서면 이 글자 자리를 침범한다 — 1440 에서 298px, 1700
+              에서 161px 을 파고든다(실측). 글자는 읽고 마는 장식이고 판은
+              지금 하는 일이라, 비키는 쪽은 글자다.
+              🔴 **오른쪽으로 크게 못 민다** — 이미 화면 오른쪽 끝에 닿아
+              있다(1280 에서 왼끝 938). 그래서 조금 물러나며 흐려진다. */}
+          <h1
+            className="ss-home-display ss-home-subhead"
+            aria-label="OWN THE PITCH"
+            data-aside={scouting ? 'true' : undefined}
+          >
             <span>OWN</span>
             <span>THE</span>
             <span>PITCH</span>

@@ -50,7 +50,7 @@ ssh <gpu-instance> 'systemctl list-units --type=service | grep -i worker'
 ## 1. 작업 하나 집기
 
 ```
-POST https://api.supersub-ai.com/api/v1/internal/analysis-jobs/claim
+POST https://<API 호스트>/api/v1/internal/analysis-jobs/claim
 X-Worker-Token: <공유 시크릿>
 ```
 
@@ -127,7 +127,7 @@ uv run python scripts/analyze_s3.py \
 ## 4. 결과 보고
 
 ```
-PATCH https://api.supersub-ai.com/api/v1/internal/analysis-jobs/<job_id>
+PATCH https://<API 호스트>/api/v1/internal/analysis-jobs/<job_id>
 X-Worker-Token: <공유 시크릿>
 
 {"status": "succeeded"}
@@ -207,7 +207,7 @@ X-Worker-Token: <공유 시크릿>
 ```bash
 # 큐가 줄어드는가
 curl -s -H "X-Worker-Token: <값>" \
-  -X POST https://api.supersub-ai.com/api/v1/internal/analysis-jobs/claim -i | head -1
+  -X POST https://<API 호스트>/api/v1/internal/analysis-jobs/claim -i | head -1
 # 204 면 빈 것, 200 이면 하나 집은 것 (🔴 이 명령 자체가 작업을 하나 소비합니다)
 
 # 리포트가 생기는가

@@ -66,6 +66,29 @@ def require_external(what: str = "") -> Path:
     return root
 
 
+def default_target() -> int:
+    """동작점을 **명시하지 않는 호출자**가 쓸 값. 출처는 한 곳이다.
+
+    위 docstring 의 「기본값을 두지 않고 호출자가 고르게 한다」와 어긋나 보이지만
+    다르다 — 호출자가 `default_target()` 을 **직접 부르는** 것이라 어느 동작점을
+    쓰는지가 코드에 남는다. 숨은 기본값이 아니다.
+
+    이걸 함수로 둔 이유: 이 규칙을 파일마다 복사하면 한쪽만 고쳐진다. 그것이
+    미결 10번(서비스와 평가가 target_fps 를 서로 다르게 얻는다)의 형태다.
+    값의 출처는 `pose.DEFAULT_TARGET_FPS` 하나이고, 회차마다 바꿔야 하면
+    `SUPERSUB_PHASEA_TARGET` 으로 덮는다.
+    """
+    override = os.environ.get("SUPERSUB_PHASEA_TARGET")
+    if override:
+        return int(override)
+    import sys
+
+    sys.path.insert(0, str(HERE.parent.parent / "src"))
+    from supersub_agent.pose import DEFAULT_TARGET_FPS
+
+    return int(DEFAULT_TARGET_FPS)
+
+
 def _resolve(kind: str, target: int) -> Path:
     if target not in TARGETS:
         raise ValueError(f"target 은 {TARGETS} 중 하나여야 한다: {target!r}")

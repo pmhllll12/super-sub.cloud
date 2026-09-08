@@ -110,6 +110,40 @@ class Criterion:
                 parts.append(f"{lo:g}~{hi:g}")
         return " 또는 ".join(parts)
 
+    def top_ceiling(self) -> float | None:
+        """최상위 등급 구간의 **닫힌 위끝**. 위가 열려 있으면 None.
+
+        상위 등급의 위를 닫는 것은 오측정이 만점이 되는 것을 막으려고 생긴
+        규칙이다 — 투구 실클립의 골반 회전 181.1도가 「40도 이상」에 걸려
+        장점으로 표시된 적이 있다. 그 규칙은 맞다.
+        """
+        if not self.bands:
+            return None
+        highs = [hi for _lo, hi in self.bands.get(max(self.bands), ()) if hi is not None]
+        return max(highs) if highs else None
+
+    def out_of_band(self, features: dict[str, Any]) -> str:
+        """0등급이 **구간 위에서** 왔으면 `"above"`, 아니면 `""` (미결 20번).
+
+        🔴 **점수를 바꾸지 않는다. 표시만 한다.**
+
+        닫은 위쪽이 갈 곳이 0등급뿐이라 **「쟀는데 못했다」와 「구간 밖이다」가
+        같은 0점**이 된다. 선수는 둘 다 "못했다"로 읽는다. 실측으로는 0등급
+        117건 중 23건(20%)이 구간 위에서 왔고, active 루브릭에서도 난다
+        (`eval/pending20_band_ceiling/`).
+
+        🔴 **이것은 처방이 아니라 드러내기다.** 어느 처방(상한을
+        PLAUSIBLE_RANGE 로 · 밴드에 excluded 구간 · 표시만)이 옳은지는 임계값
+        검수(미결 2번)에 달려 있다. 미결 9번이 `timebase.limited_by` 로 한 것과
+        같은 형태다 — 결함을 보이게 두되 동작점은 안 옮긴다.
+        """
+        if not self.band_metric or self.band_metric not in features:
+            return ""
+        ceiling = self.top_ceiling()
+        if ceiling is None or self.grade_for(features) != 0:
+            return ""
+        return "above" if float(features[self.band_metric]) > ceiling else ""
+
     def is_applicable(self, features: dict[str, Any]) -> bool:
         """이 항목을 판정할 근거 지표가 모두 측정됐는지.
 
@@ -350,10 +384,15 @@ def aggregate(
     judgments: dict[str, dict[str, Any]],
     rubric: Rubric,
     expected_ids: Iterable[str] | None = None,
+    features: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """항목별 판정을 총점으로 합산한다.
 
     judgments: {criterion_id: {"grade": int, "evidence": str, "metric_ref": str}}
+
+    `features`를 주면 0등급이 **구간 위에서** 왔는지를 `out_of_band`로 표시한다
+    (미결 20번). 🔴 **점수는 그것과 무관하다** — 안 주면 그 필드가 빈 문자열일
+    뿐이고 나머지는 한 비트도 같다. B-6 재실행을 부르지 않는 이유다.
     """
     unknown = judgments.keys() - set(rubric.criterion_ids)
     if unknown:
@@ -400,6 +439,10 @@ def aggregate(
                 # 보여주려면 루브릭을 다시 열지 않고 이 두 필드를 쓰면 된다.
                 "title": c.title_for(grade),
                 "band": c.band_text(grade),
+                # 🔴 이 0등급이 **구간 위에서** 왔는가 (미결 20번). 점수는 안
+                # 바뀐다 — 「쟀는데 못했다」와 「구간 밖이다」를 화면이 가를 수
+                # 있게 하는 표시일 뿐이다. features 를 안 주면 빈 문자열이다.
+                "out_of_band": c.out_of_band(features) if features else "",
                 "evidence": j.get("evidence", ""),
                 "metric_ref": j.get("metric_ref", ""),
             }
