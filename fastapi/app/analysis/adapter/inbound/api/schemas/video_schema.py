@@ -40,6 +40,10 @@ class RegisterVideoSchema(BaseModel):
 
     `side` 는 던지는 팔·차는 발이다. 자동 판별이 팔 종목에서 신뢰할 수 없어
     (5장 CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 자동 판별을 쓴다.
+
+    `analyze` 가 거짓이면 규격은 검사하되 분석 작업을 만들지 않는다. 기록으로
+    남기려고 올리는 클립("업로드 영상")과 실력을 재려고 올리는 클립을 가르는
+    자리다. 생략하면 참 — 안 보내던 클라이언트의 동작이 그대로다.
     """
 
     sport_code: str = Field(min_length=1, max_length=20)
@@ -48,6 +52,7 @@ class RegisterVideoSchema(BaseModel):
     width: int = Field(ge=1)
     height: int = Field(ge=1)
     side: str | None = Field(default=None, max_length=5)
+    analyze: bool = True
 
 
 class VideoResponse(BaseModel):

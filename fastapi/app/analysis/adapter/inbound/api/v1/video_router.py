@@ -69,6 +69,7 @@ def register_video(
             width=body.width,
             height=body.height,
             side=body.side,
+            analyze=body.analyze,
         )
     )
 

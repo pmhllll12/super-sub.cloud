@@ -31,6 +31,8 @@ class RegisterVideoCommand:
     재려면 원본을 내려받아야 하고 그러면 PER-002(업로드·재생이 앱 서버를 지나지
     않는다)가 무너진다. 용량만은 저장소에 물어 실측한다 — 사전 서명 URL 이
     크기를 강제하지 못하기 때문이다.
+
+    `analyze` 가 거짓이면 규격 검사는 하되 분석 작업을 만들지 않는다.
     """
 
     user_id: UUID
@@ -40,6 +42,7 @@ class RegisterVideoCommand:
     width: int
     height: int
     side: str | None = None
+    analyze: bool = True
 
 
 @dataclass(frozen=True)

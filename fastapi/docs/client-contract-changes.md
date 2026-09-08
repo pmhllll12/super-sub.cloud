@@ -731,6 +731,41 @@ curl -s -X PATCH -H "Authorization: Bearer $T" -H 'Content-Type: application/jso
 
 ---
 
+## 19. 🟡 분석을 걸지 않고 클립만 올릴 수 있습니다 (2026-09-08 추가)
+
+미결 `paik` 4번. `POST /videos` 요청 본문에 **`analyze: false`** 를 실으면 규격은
+검사하되 분석 작업을 만들지 않습니다. 이미 그렇게 보내고 계신 그대로입니다.
+
+```json
+{ "sport_code": "football", "storage_key": "...", "duration_ms": 10200,
+  "width": 1920, "height": 1080, "analyze": false }
+```
+
+### 만족해야 할 성질
+
+`analyze: false` 로 등록한 클립은 응답의 **`analysis_job_id` 가 `null`** 입니다.
+그러면 「업로드 영상」 갈래(가르는 기준이 `analysis_job_id`)에 들어갑니다.
+
+### 알아 두실 것 셋
+
+1. **생략하면 참입니다.** `analyze` 를 안 보내면 지금처럼 분석이 걸립니다 —
+   분석 화면(`/analysis`)의 저장은 그 동작 그대로입니다. 기본값은 안 바뀌었습니다
+2. **규격 검사는 그대로 돕니다.** `analyze: false` 라도 반려 사유가 있으면
+   `passed: false` 와 `reject_reason` 이 옵니다. 반려된 클립은 원래 작업이 없습니다
+3. **`analyze` 는 되돌릴 수 있는 값이 아닙니다** — 나중에 분석을 걸려면 재분석
+   경로가 필요한데 아직 없습니다(계약 3-6 「아직 없는 것」)
+
+### 먼저 확인
+
+```bash
+curl -s -X POST -H "Authorization: Bearer $T" -H 'Content-Type: application/json' \
+  -d '{"sport_code":"football","storage_key":"'"$KEY"'","duration_ms":10200,"width":1920,"height":1080,"analyze":false}' \
+  $API/videos | jq '.passed, .analysis_job_id'
+# true, null 이면 된 것입니다
+```
+
+---
+
 ## 계약 문서
 
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린

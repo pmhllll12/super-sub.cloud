@@ -141,6 +141,27 @@ class TestRegister:
         ).scalar_one()
         assert jobs == 0
 
+    def test_analyze_false_면_작업_행이_안_생긴다(
+        self, db_client, db_session, uploader
+    ):
+        """미결 `paik` 4번 — 규격 통과해도 `analysis_job` 을 만들지 않는다."""
+        key = _upload(db_client, uploader)
+        res = _register(db_client, uploader, key, analyze=False)
+        assert res.status_code == 201, res.text
+        video_id = uuid.UUID(res.json()["id"])
+
+        passed = db_session.execute(
+            text("SELECT passed FROM video_validation WHERE video_id = :id"),
+            {"id": video_id},
+        ).scalar_one()
+        assert passed is True
+
+        jobs = db_session.execute(
+            text("SELECT count(*) FROM analysis_job WHERE video_id = :id"),
+            {"id": video_id},
+        ).scalar_one()
+        assert jobs == 0
+
     def test_없는_종목은_거부된다(self, db_client, uploader):
         """`sport` 를 원시 쿼리로 읽는 자리. 컬럼 이름이 바뀌면 여기서 깨진다."""
         key = _upload(db_client, uploader)

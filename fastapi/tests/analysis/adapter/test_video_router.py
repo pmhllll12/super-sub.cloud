@@ -136,6 +136,43 @@ class TestRegisterVideo:
         assert body["analysis_job_id"] is None
         assert body["analysis_status"] is None
 
+    def test_analyze_false_면_통과해도_작업이_안_생긴다(self, client):
+        """기록용 업로드 — 미결 `paik` 4번. 규격은 검사하되 분석은 안 건다."""
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        res = _register(client, user_id, key, analyze=False)
+        assert res.status_code == 201, res.text
+        body = res.json()
+        assert body["passed"] is True
+        assert body["reject_reason"] is None
+        assert body["analysis_job_id"] is None
+        assert body["analysis_status"] is None
+
+    def test_analyze_기본값은_작업을_만든다(self, client):
+        """🔴 값을 안 보내면 지금처럼 분석이 걸려야 한다 — 화면 저장이 그 동작에 기댄다."""
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        # analyze 를 아예 안 실어 보낸다
+        res = _register(client, user_id, key)
+        assert res.json()["analysis_job_id"] is not None
+
+    def test_analyze_false_라도_반려는_그대로_반려다(self, client):
+        """규격 검사는 `analyze` 와 무관하게 돈다 — 사유는 값으로 남아야 한다."""
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        res = _register(client, user_id, key, analyze=False, duration_ms=MAX_DURATION_MS + 1)
+        assert res.status_code == 201, res.text
+        body = res.json()
+        assert body["passed"] is False
+        assert "길이" in body["reject_reason"]
+        assert body["analysis_job_id"] is None
+
     def test_올리지_않은_키는_반려가_아니라_에러다(self, client):
         """검사할 파일이 없다. 반려로 기록하면 "안 올린 것"과 구별되지 않는다."""
         user_id = uuid4()

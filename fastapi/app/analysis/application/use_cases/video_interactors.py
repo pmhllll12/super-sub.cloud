@@ -105,6 +105,9 @@ class RegisterVideoInteractor(RegisterVideoUseCase):
             size_bytes=size_bytes,
         )
         now = datetime.now(timezone.utc)
+        # 반려된 클립은 분석하지 않는다(규격 검사를 두는 이유). `analyze=False` 면
+        # 규격은 통과해도 작업을 만들지 않는다 — 기록용 업로드(미결 `paik` 4번).
+        make_job = reason is None and command.analyze
         video = VideoEntity(
             id=uuid4(),
             user_id=command.user_id,
@@ -116,9 +119,8 @@ class RegisterVideoInteractor(RegisterVideoUseCase):
             validation=ValidationEntity(
                 passed=reason is None, reject_reason=reason, checked_at=now
             ),
-            # 반려된 클립은 분석하지 않는다 — 규격 검사를 두는 이유가 그것이다.
-            analysis_job_id=None if reason else uuid4(),
-            analysis_status=None if reason else _QUEUED,
+            analysis_job_id=uuid4() if make_job else None,
+            analysis_status=_QUEUED if make_job else None,
         )
         self._repository.register(video)
         return to_video_result(video)
