@@ -403,6 +403,30 @@ def test_a_folder_scan_still_ends_zero_when_some_clips_fail(monkeypatch):
     a3.main()  # 예외 없이 반환한다 = 종료 코드 0
 
 
+def test_there_is_only_one_queue(monkeypatch):
+    """🔴 큐를 소비하는 길은 **하나뿐**이어야 한다 (미결 jin 20번, 2026-09-08).
+
+    `analyze_s3.py --skip-analyzed` 는 `reports/` 유무로 "안 돈 것"을 가리는
+    두 번째 큐였다. 큐의 정본은 `analysis_job` 이고 그것을 집는 것은 worker.py 다.
+    둘을 같이 두면 워커가 집어 `running` 으로 돌리는 사이 스캔이 같은 영상을 또
+    돈다 — `reports/` 는 분석이 **끝나야** 생기기 때문이다. GPU 시간이 두 배로
+    나가고 리포트가 둘 생기는데, **어느 쪽도 오류로 보이지 않는다.**
+
+    되살리려면 이 검사를 지워야 한다. 지우기 전에 위 문단을 읽을 것.
+    """
+    a3 = _load_script("analyze_s3")
+    monkeypatch.setattr(
+        sys, "argv",
+        ["analyze_s3.py", "s3://b/v/", "--rubric", "r.yaml", "--out", "s3://b/r",
+         "--skip-analyzed"],
+    )
+    with pytest.raises(SystemExit) as exc:
+        a3.main()
+    assert exc.value.code == 2, (
+        "--skip-analyzed 가 다시 살아 있다 — 큐가 둘이 된다"
+    )
+
+
 class _StubRubric:
     sport = "baseball"
     motion = "pitching"
