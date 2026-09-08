@@ -6,6 +6,7 @@ import type {
   PlayerCard,
   PublicPlayerCard,
   Match,
+  MatchSearch,
   MyVideo,
   Squad,
   SignupResult,
@@ -41,6 +42,14 @@ export interface Backend {
   /** 내가 올린 클립 목록. **최근 것이 앞에 온다.** */
   listMyVideos(token: string): Promise<MyVideo[]>
   /**
+   * 그 클립을 **재생할 수 있는 주소**(사전 서명 GET URL) — 계약 3-6절.
+   *
+   * 🔴 **캐시하지 않는다.** `expires_in`(기본 900초) 뒤 만료되므로 재생 직전에
+   * 받는다. 저장 키를 그대로 `<video src>` 에 넣으면 403 이다.
+   * 🔴 공개 클립이면 남의 것도, 내 것이면 비공개여도 받는다. 아니면 404.
+   */
+  getPlaybackUrl(token: string, videoId: string): Promise<{ url: string; expires_in: number }>
+  /**
    * 내가 올린 클립을 **지운다** — 저장소의 영상 파일과 그 분석 리포트까지.
    *
    * 🔴 되돌릴 수 없다. 화면이 먼저 한 번 더 묻는다(`MyVideos`).
@@ -53,6 +62,18 @@ export interface Backend {
   deleteMyVideo(token: string, videoId: string): Promise<void>
   /** 그 팀의 **다가오는** 경기. 이른 것이 앞에 온다. */
   listTeamMatches(token: string, teamId: string): Promise<Match[]>
+  /**
+   * 모집 중인 경기를 훑는다 — **팀 id 를 몰라도 되는 유일한 경로다.**
+   * 「팀원」 판이 쓴다: 아직 사람을 못 채운 팀들의 명단이다.
+   *
+   * 🔴 **다가오는 것만** 오고 이른 것이 앞이다. 종목 코드가 틀리면 빈 배열이
+   * 아니라 422 `UNKNOWN_SPORT` 다 — 오타와 "그런 경기가 없다"가 같아 보이면
+   * 사용자가 없는 것을 계속 기다린다.
+   */
+  searchMatches(
+    token: string,
+    params?: { sport_code?: string; region?: string; page?: number; size?: number },
+  ): Promise<MatchSearch>
   /** 경기를 새로 연다. 주장만 — 아니면 403 `FORBIDDEN`. */
   createTeamMatch(token: string, teamId: string, input: CreateMatchInput): Promise<Match>
   /** 팀의 스쿼드. 소속이면 본다. **아직 없으면 404 SQUAD_NOT_FOUND** 다. */
