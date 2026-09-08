@@ -754,6 +754,10 @@ curl -s -X PATCH -H "Authorization: Bearer $T" -H 'Content-Type: application/jso
    `passed: false` 와 `reject_reason` 이 옵니다. 반려된 클립은 원래 작업이 없습니다
 3. **`analyze` 는 되돌릴 수 있는 값이 아닙니다** — 나중에 분석을 걸려면 재분석
    경로가 필요한데 아직 없습니다(계약 3-6 「아직 없는 것」)
+4. 🟢 **`analyze: false` 면 해상도 상한(1920x1080)을 안 봅니다** (2026-09-08 추가).
+   4K 로 찍은 클립도 기록용으로는 올라갑니다. 그 상한은 분석 워커를 지키는
+   값이라(4K 는 host RAM 이 터집니다) 분석을 걸 때만 삽니다. 용량 200MB·길이 60초
+   상한은 `analyze` 와 무관하게 그대로입니다
 
 ### 먼저 확인
 

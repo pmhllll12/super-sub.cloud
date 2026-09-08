@@ -160,8 +160,8 @@ class TestRegisterVideo:
         res = _register(client, user_id, key)
         assert res.json()["analysis_job_id"] is not None
 
-    def test_analyze_false_라도_반려는_그대로_반려다(self, client):
-        """규격 검사는 `analyze` 와 무관하게 돈다 — 사유는 값으로 남아야 한다."""
+    def test_analyze_false_라도_용량_길이_반려는_그대로다(self, client):
+        """용량·길이는 `analyze` 와 무관하게 검사한다 — 사유는 값으로 남는다."""
         user_id = uuid4()
         key = _issue(client, user_id)
         put_object(key, SIZE_OK)
@@ -172,6 +172,30 @@ class TestRegisterVideo:
         assert body["passed"] is False
         assert "길이" in body["reject_reason"]
         assert body["analysis_job_id"] is None
+
+    def test_analyze_false_면_4K_도_통과한다(self, client):
+        """해상도 상한은 분석 워커를 지키는 값이라 기록용 업로드엔 안 건다(미결 `ho` 9번)."""
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        res = _register(client, user_id, key, analyze=False, width=3840, height=2160)
+        assert res.status_code == 201, res.text
+        body = res.json()
+        assert body["passed"] is True
+        assert body["reject_reason"] is None
+        assert body["analysis_job_id"] is None
+
+    def test_analyze_true_면_4K_는_그대로_반려된다(self, client):
+        """분석을 걸면 해상도 상한이 살아 있다 — 4K 는 host RAM 이 터진다."""
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        res = _register(client, user_id, key, width=3840, height=2160)  # analyze 기본 True
+        assert res.status_code == 201, res.text
+        assert res.json()["passed"] is False
+        assert "해상도" in res.json()["reject_reason"]
 
     def test_올리지_않은_키는_반려가_아니라_에러다(self, client):
         """검사할 파일이 없다. 반려로 기록하면 "안 올린 것"과 구별되지 않는다."""

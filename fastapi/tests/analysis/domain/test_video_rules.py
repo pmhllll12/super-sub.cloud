@@ -56,6 +56,17 @@ class TestRejectReason:
         reason = reject_reason(**_ok(width=3840, height=2160))
         assert reason is not None and "3840x2160" in reason
 
+    def test_analyze_false_면_해상도_상한을_안_본다(self):
+        """해상도 상한은 분석 워커를 지키는 값이라 기록용 업로드엔 안 건다."""
+        assert reject_reason(**_ok(width=3840, height=2160, analyze=False)) is None
+
+    def test_analyze_false_라도_용량과_길이는_본다(self):
+        """용량·길이는 저장소·비용에 걸린 것이라 `analyze` 와 무관하다."""
+        assert "용량" in reject_reason(**_ok(size_bytes=MAX_BYTES + 1, analyze=False))
+        assert "길이" in reject_reason(
+            **_ok(duration_ms=MAX_DURATION_MS + 1, analyze=False)
+        )
+
     def test_사유는_하나만_돌려준다(self):
         """전부 위반해도 문장은 하나다. 모아 붙이면 화면에서 안 읽힌다."""
         reason = reject_reason(

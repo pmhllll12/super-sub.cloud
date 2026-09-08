@@ -115,6 +115,7 @@ class RegisterVideoInteractor(RegisterVideoUseCase):
             width=command.width,
             height=command.height,
             size_bytes=size_bytes,
+            analyze=command.analyze,
         )
         now = datetime.now(timezone.utc)
         # 반려된 클립은 분석하지 않는다(규격 검사를 두는 이유). `analyze=False` 면
