@@ -3751,7 +3751,7 @@ IPv4** 에 시간당 $0.005 를 매깁니다 — **켜져 있는 동안에도 �
 
 #### ✅ IAM 인스턴스 역할 — 붙였습니다, **업로드가 실물에서 돕니다** (2026-09-03 해소)
 
-`supersub-video` 역할이 인스턴스에 붙었고, 서버에서 끝에서 끝까지 태워 봤습니다.
+`<EC2 역할>` 이 인스턴스에 붙었고, 서버에서 끝에서 끝까지 태워 봤습니다.
 
 | 단계 | 결과 |
 |---|---|
@@ -3821,7 +3821,7 @@ HEAD 는 `s3:GetObject` 로 인가됩니다. 없는 액션은 오류도 안 나�
 #### ✅ 인스턴스 프로파일 붙어 있는 것 확인 (2026-09-03, 박민호)
 
 `describe-instances`로 보니 `supersub` 인스턴스에 인스턴스 프로파일
-(`supersub-video`)이 이미 붙어 있습니다. ⚠️ 다만 이 확인에 쓴 자격 증명은
+(`<EC2 역할>`)이 이미 붙어 있습니다. ⚠️ 다만 이 확인에 쓴 자격 증명은
 IAM 조회 권한(`iam:ListRoles` 등)이 없어서 **정책 내용(`videos/*`로 좁혀
 졌는지, `PutObject`·`GetObject`·`HeadObject`인지)까지는 여기서 확인 못
 했습니다** — 서버에서 실제로 S3를 불러 보시는 쪽이 정확한 확인입니다.
@@ -3858,7 +3858,7 @@ ssh supersub 'systemctl is-active postgresql supersub-api'   # active active
 - 배경과 그날 할 일의 순서: 개발 로그 [박민호 님께 — 탄력적 IP와 api 서브도메인]({{ "/devlog/" | relative_url }})
 - **담당**: 박민호(A 레코드 · 그 뒤 포트·인증서) · **제기**: 정어진 · **기한**: ~~외부 공개를 결정할 때~~ **✅ 2026-09-03 에 다 하셨습니다**
 - ~~탄력적 IP~~ ✅ **해소 (2026.09.03)** — 새로 할당해 `supersub` 에 붙였습니다
-- ~~IAM 역할~~ ✅ **해소 (2026.09.03)** — `supersub-video` 를 붙였고 업로드가 실물에서 돕니다
+- ~~IAM 역할~~ ✅ **해소 (2026.09.03)** — `<EC2 역할>` 을 붙였고 업로드가 실물에서 돕니다
 - ~~A 레코드 · 80·443 개방~~ ✅ **해소 (2026.09.03)** — nginx·Let's Encrypt 까지 박민호 님이
   세우셨습니다. **이 항목에서 남은 것은 없습니다** (2026-09-04 확인)
 
@@ -4723,6 +4723,11 @@ IAM 역할명·API 호스트명**이 그대로 있었고, `pages.yml` 로 `dev.s
   자리표시자로 바꿨습니다(`9c69747`). `agent/deploy/` 에 계정 ID·리소스 ID·호스트가
   값으로 남은 것은 정상호 님 영역이라 **아래 22번**으로 올렸습니다. 버킷명은 제품
   도메인에서 추측되고 `agent/` 코드 기본값에도 걸려 있어 이번엔 두었습니다.
+- **(2026-09-08)** 21번 스크럽이 **IAM 역할명(`<EC2 역할>` 자리)** 을 이 파일
+  `## ho` 구역 셋과 `_posts/2026-09-03-백엔드-오늘*` 표 한 칸에서 빠뜨렸던 것을
+  마저 자리표시자로 바꿨습니다. jin 24 IAM 조각 스모크를 서버에서 돌리다
+  발견했습니다. **값만** 바꿨고 서술은 안 건드렸습니다 — 병합 시 충돌하면
+  자리표시자 쪽을 남겨 주세요.
 
 - **담당**: 정어진 · **제기**: 정어진 · **기한**: 버킷 확인은 이번 주 · 나머지는 스프린트 3
 
@@ -4815,7 +4820,7 @@ jin 21(공개 사이트 인프라 식별자 스크럽)에서 `jekyll/`·`_posts/
 | `video` 에 "저장됨" 표시(예: `kept` 불리언) + 마이그레이션 · `GET /videos` 필터 · `POST /videos` 가 경로별로 초기값 정함(`/analysis`=미저장, `/me` 업로드=저장) | 정어진 |
 | `POST /videos/{id}/keep`(또는 `PATCH`) — 저장 플립 + `videos/`→`reports/` S3 이동(`CopyObject`+`DeleteObject`) + `storage_key` 갱신 | 정어진 |
 | `DELETE /videos/{id}` — DB + S3. 미저장분 정리 스윕(job 회수처럼 트리거) | 정어진 |
-| EC2 인스턴스 역할 IAM: 인라인 정책에 `s3:DeleteObject` + `reports/*` 문 추가. **정책 JSON 은 `fastapi/docs/deployment.md` 「서버에 줄 권한」에 2026-09-08 판으로 준비됨** — 콘솔에 붙여넣기만. `jin` IAM 사용자는 `iam:*` 이 막혀 못 붙인다(같은 문서 확인). 반영·확인 절차도 그 절에 있음 | **박민호(콘솔)** |
+| ✅ **해소 (2026-09-08)** — EC2 인스턴스 역할 인라인 정책을 3문짜리(`s3:DeleteObject` + `reports/*` Put/Get/Delete)로 교체. 서버에서 인스턴스 역할 자격증명으로 스모크 통과(`CopyObject` videos→reports · Delete 양쪽 · `models/*` 은 여전히 거부). 상세·재확인 스모크: `fastapi/docs/deployment.md` 「서버에 줄 권한」. **주의: 그 조각들 코드는 아직 서버에 배포 전** | 정어진(스모크) · 박민호(콘솔 저장) |
 | 리포트 산출물 키를 `reports/<user_id>/<video_id>/` 로 정렬(지금은 `report_slug` = 상위폴더+stem) | 정상호 |
 | 실제 리포트를 DB 에 남겨 브라우저가 읽게(`paik` 7 · `POST /analyses`) — 지표 부분은 같은 구역 23번(시딩)에 물려 있다 | 정어진 + 정상호 |
 | `/analysis`: "저장"이 `keep` 호출, 화면을 벗어날 때 미저장분 `DELETE`, 「분석 영상」이 저장된 것만 | 백성검 |
@@ -4910,6 +4915,11 @@ jin 21(공개 사이트 인프라 식별자 스크럽)에서 `jekyll/`·`_posts/
   best-effort. `PROVISIONAL_VIDEO_TTL_HOURS=24`.
 - ⬜ **5조각** — 🔴 전환 `kept = not analyze`. **백성검 프론트가 `keep` 부를
   준비되면.** 그전에 켜면 `/analysis` 업로드가 프로필에서 사라진다.
+  - 백성검 쪽 진행(`32cd644`): 재생 주소·`DELETE /videos/{id}`·**저장 없이 이탈 시
+    삭제**(`fetch(keepalive)`+`pagehide`)는 붙었다. 남은 건 「저장」 버튼을
+    `POST /videos/{id}/keep` 에 연결하는 것뿐 — 그게 **2조각(`bf7f03b`)이고
+    2026-09-08 에 배포됨(아래 「EC2 배포됨」).** 이제 백성검이 「저장」을
+    `POST /videos/{id}/keep` 에 연결하면 5조각 스위치를 켤 수 있다.
 - ✅ **6조각** — `f6e3cc8`(6a): 저장 키 슬러그(`build_storage_key`, 닉네임·원본이름
   한글·자모 보존) · `video.original_filename` 컬럼(`2598dc30f0cb`) ·
   `POST /videos/upload-url` 에 `filename` 필수. `a8d72f9`: billing 과 head 충돌
@@ -4923,10 +4933,16 @@ jin 21(공개 사이트 인프라 식별자 스크럽)에서 `jekyll/`·`_posts/
     이미 구현됐으니 그대로 두되, **"문제 영상"의 자동/에이전트 처리**(잘못 돈
     분석 감지·정리 등)는 나중 과제로 남긴다 — 6b 를 최종 설계로 보지 말 것.
 
-#### 지금 당장(테스트 단계 정리)
+#### ✅ EC2 배포됨 (2026-09-08)
 
-- 서버 DB 유령 `video` 행 20개(S3 파일 없음, 1개만 실물 있음) — 사용자 승인받아 삭제한다(`classifier` 가 막아 사용자가 `!` 로 실행). 실물 있는 1개(`videos/2f3b04d9-…/37fe3852-…mp4`)는 남긴다
-- 해상도 상한(`analyze:false` 는 안 봄, `4ef9ea7`)은 서버 재시작 뒤 적용된다
+`4ef9ea7` → `d15806c`. `alembic upgrade head`: `5db18b239336` → `2598dc30f0cb`
+(`video.kept`+부분 인덱스 · billing 3테이블 · `video.original_filename`).
+`systemctl restart` 후 `/health` ok. **end-to-end keep 스모크 통과** — 서버에서
+signup → upload-url(읽는 키) → 사전서명 PUT → `POST /videos`(작업 생김) →
+`POST /videos/{id}/keep` → **S3 원본이 `videos/` 에서
+`reports/<uid>/<vid>/source.mp4` 로 실제로 옮겨짐**(IAM OK) → 멱등 확인 →
+`DELETE /videos` 로 정리(S3 객체도 삭제됨). billing·admin/videos·playback-url·
+credits·coaches 라우트 다 401(존재)로 확인.
 
 #### ✅ 정상호 조각 — 리포트 키를 계약 자리로 옮겼습니다 (2026.09.08)
 
@@ -5570,6 +5586,59 @@ test` (299 passed, 신규 20건 — mock 6·라우트 4·컴포넌트 5·챗봇 
 
 - **담당**: 정어진 · **제기**: 박민호 · **기한**: 확인되는 대로
 
+### 9. 분석 리포트가 아직도 mock — 세 조각을 스프린트 3으로 한데 묶습니다
+
+`/analysis`에서 영상을 올려도 화면에 뜨는 리포트는 **항상 같은 고정 문구**입니다
+(`www/src/components/analysis/AnalysisStage.tsx`의 `REPORT` 상수, "자리 표시
+리포트"). 에이전트는 이미 진짜 리포트를 S3에 쓰고 있는데(`agent/scripts/analyze_s3.py`),
+그 결과와 화면 사이가 **세 군데 다 끊겨 있어** 하나도 이어지지 않습니다.
+
+| 순서 | 무엇 | 상세 | 담당 |
+|---|---|---|---|
+| 1 | 완료 보고에 그 리포트가 **어디 있는지** 값이 없다 | paik 11번 | 정상호(싣기) · 정어진(받는 칸) |
+| 2 | 그걸 **읽는 API**가 계약에 없다 | paik 7번 | 정어진 |
+| 3 | 화면이 그 API를 **부르지 않는다** — `AnalysisStage.tsx`가 서버에 아무것도 안 묻고 `REPORT` 상수를 그대로 그린다 | (새로 올림, 아래 참고) | 백성검 |
+
+1 → 2 → 3 순서로 이어져야 합니다 — 하나만 되면 나머지 둘이 없어 화면은 그대로
+mock입니다.
+
+**3번(화면 배선)은 지금까지 담당자가 명시된 항목이 없어 여기서 새로 답니다.**
+`www/src/lib/savedReports.ts` 주석에 이미 "경로가 생기면 이 파일만 갈아
+끼운다"고 적혀 있으니 그 계획대로 하시면 됩니다 — `AnalysisStage.tsx`·
+`MyVideos.tsx`는 `savedReports.ts`의 함수 시그니처만 알면 되고 저장 방식은
+몰라도 됩니다.
+
+| | |
+|---|---|
+| 확인(전체) | 영상 하나를 올려 분석을 `succeeded`까지 돌린 뒤 화면 리포트가 그 영상 내용에 따라 달라지면(고정 문구가 아니면) 된 것입니다 |
+| 확인(3번만) | `grep -n 'const REPORT' www/src/components/analysis/AnalysisStage.tsx`가 안 걸리면 하드코딩을 걷어낸 것입니다 |
+| 하지 말 것 | 🔴 수치(총점·등급)를 리포트에 넣지 않기 — paik 7번에 적힌 계약 3장 4 원칙 그대로입니다 |
+
+- 관련: paik 7번(읽는 경로) · paik 11번(리포트 위치) · `www/src/lib/savedReports.ts` 주석
+- **담당**: 정상호→정어진→백성검(위 표 순서대로) · **제기**: 박민호 · **기한**: 스프린트 3
+
+### 10. Vercel 빌드가 24시간 rate limit에 걸렸습니다 — 기다리기로 결정
+
+`main`에 push할 때마다 Vercel(두 프로젝트 `super-sub-cloud`·`super-sub-cloud-dev`
+전부)이 빌드를 거부합니다.
+
+```
+Vercel – super-sub-cloud      | failure | Deployment rate limited — retry in 24 hours.
+Vercel – super-sub-cloud-dev  | failure | Deployment rate limited — retry in 24 hours.
+```
+
+GitHub 커밋 상태로 확인 — 첫 실패 **2026-09-08 08:33 UTC**(커밋 `c304c5f`), 이후
+push마다(`fe58bfb` 등, 08:56 UTC) 자동 재시도됐지만 매번 같은 이유로 실패했습니다.
+push 방식·코드 문제가 아니라 **Vercel 계정(무료 플랜)의 빌드 횟수 제한**입니다.
+
+| | |
+|---|---|
+| 확인 | `curl -s https://api.github.com/repos/pmhllll12/super-sub.cloud/commits/main/status` — `Vercel –` 두 컨텍스트가 `success`면 풀린 것입니다 |
+| 결정 | **Pro 업그레이드 대신 24시간 대기하기로 함**(2026-09-08, 박민호) |
+| 다시 시도하는 법 | 별도 조치 필요 없음 — 그 뒤 `main`에 아무 push나 있으면 자동으로 다시 빌드됩니다. 급하면 Vercel 콘솔에서 수동 재배포 |
+
+- **담당**: 박민호 · **제기**: 박민호 · **기한**: 2026-09-09 08:33 UTC 이후 재확인
+
 ## paik (백성검)
 
 ### 1. 분석한 영상을 우리 서버에 저장하는 경로 ✅ 해소 (2026.09.03)
@@ -5912,7 +5981,7 @@ paik 1번에서 「저장」이 열리며 *"리포트 조회 규격과 같이 �
 > 리포트를 S3 에 쓰고 있는데 **그 자리를 아무도 알려 주지 않아서**, 읽는 경로만
 > 내주셔도 무엇을 읽을지가 정해지지 않습니다.
 
-- 관련: paik 1번(해소) · 계약 3-1 · 3-6절 「아직 없는 것」
+- 관련: paik 1번(해소) · 계약 3-1 · 3-6절 「아직 없는 것」 · min 9번(1~3번을 스프린트 3으로 묶은 자리 — 3번 화면 배선 담당이 여기서 정해짐)
 - **담당**: 정어진 · **제기**: 백성검 · **기한**: 스프린트 3 (조정 가능)
 
 ### 8. **어디를 집중해서 볼지**를 고를 수 있게 했는데, 보낼 데가 없습니다 (2026-09-08 신설)
@@ -6089,7 +6158,7 @@ PATCH /internal/analysis-jobs/{job_id}
 3-1 절의 `POST /analyses`(DB 적재)는 **이 화면에 필요 없습니다** — 그것은 지표
 검색 · 카드용이라 `metric_definition` 합의를 기다려도 됩니다.
 
-- 관련: paik 7번 · `agent/scripts/worker.py` · `agent/scripts/analyze_s3.py` · 계약 3-8절
+- 관련: paik 7번 · `agent/scripts/worker.py` · `agent/scripts/analyze_s3.py` · 계약 3-8절 · min 9번(1~3번을 스프린트 3으로 묶은 자리)
 - **담당**: 정상호(싣기) · 정어진(받는 칸) · **제기**: 백성검 · **기한**: 스프린트 3
 
 ### 12. **올린 영상이 배포에서 안 보입니다** — 재생용 주소가 없어서입니다 (2026-09-08 신설) ✅ 해소 (2026.09.08)
