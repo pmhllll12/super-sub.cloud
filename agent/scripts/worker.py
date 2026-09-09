@@ -106,11 +106,20 @@ class Config:
                 "HTTP 헤더에 실을 수 없는 값이다 — 따옴표나 주석이 섞이지 "
                 "않았는지 /etc/supersub/worker.env 를 확인할 것."
             )
+        # 🔴 기본값을 두지 않는다. 저장소가 공개라 호스트명을 코드에 박으면
+        #    그대로 공개된다. 자리표시자 문자열을 기본값으로 두는 것은 더
+        #    나쁘다 — 배포에서 잘못된 URL 로 조용히 붙는다. 없으면 시작하지
+        #    않게 해서 **설정 누락이 설정 누락으로 보이게** 한다.
+        api_base = (env.get("SUPERSUB_API_BASE") or "").strip()
+        if not api_base:
+            raise ConfigError(
+                "SUPERSUB_API_BASE 가 비어 있다. "
+                "deploy/worker.env.example 을 /etc/supersub/worker.env 로 복사해 "
+                "백엔드 주소를 채울 것 (값은 저장소에 없다 — 배포 담당자에게 받는다)."
+            )
         bucket = env.get("SUPERSUB_S3_BUCKET", "supersub-ai")
         return cls(
-            api_base=env.get(
-                "SUPERSUB_API_BASE", "https://api.supersub-ai.com/api/v1"
-            ).rstrip("/"),
+            api_base=api_base.rstrip("/"),
             token=token,
             bucket=bucket,
             reports_uri=env.get("SUPERSUB_REPORTS_URI", f"s3://{bucket}/reports"),

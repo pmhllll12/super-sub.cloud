@@ -83,9 +83,28 @@ def test_a_non_ascii_token_is_a_config_error_not_a_hiccup(worker):
         worker.Config.from_env({"SUPERSUB_WORKER_TOKEN": "비밀-값"})
 
 
+def test_an_empty_api_base_is_a_config_error(worker):
+    """🔴 백엔드 주소에 기본값을 두지 않는다 — 저장소가 공개다.
+
+    호스트명을 코드에 박으면 그대로 공개된다(미결 `jin` 22번). 그렇다고
+    자리표시자 문자열을 기본값으로 두면 **배포에서 잘못된 URL 로 조용히
+    붙는다** — 설정 누락이 설정 누락으로 보이지 않는다. 없으면 시작하지
+    않는 쪽이 맞다.
+
+    이 검사를 지우면 다음 사람이 "편의상" 기본값을 되살리고 호스트명이
+    다시 공개된다.
+    """
+    with pytest.raises(worker.ConfigError, match="SUPERSUB_API_BASE"):
+        worker.Config.from_env({"SUPERSUB_WORKER_TOKEN": "t"})
+
+
 def test_reports_prefix_defaults_under_the_bucket(worker):
     c = worker.Config.from_env(
-        {"SUPERSUB_WORKER_TOKEN": "t", "SUPERSUB_S3_BUCKET": "다른버킷"}
+        {
+            "SUPERSUB_WORKER_TOKEN": "t",
+            "SUPERSUB_API_BASE": "https://example.invalid/api/v1",
+            "SUPERSUB_S3_BUCKET": "다른버킷",
+        }
     )
     assert c.reports_uri == "s3://다른버킷/reports"
 
@@ -342,7 +361,11 @@ def test_an_unpickable_rubric_fails_the_job_without_running_it(
 
     monkeypatch.setattr(worker, "run_analysis", never)
     cfg_no_rubrics = worker.Config.from_env(
-        {"SUPERSUB_WORKER_TOKEN": "t", "SUPERSUB_RUBRIC_DIR": str(tmp_path)}
+        {
+            "SUPERSUB_WORKER_TOKEN": "t",
+            "SUPERSUB_API_BASE": "https://example.invalid/api/v1",
+            "SUPERSUB_RUBRIC_DIR": str(tmp_path),
+        }
     )
     worker.process(cfg_no_rubrics, _job(), worker.Stopper())
 
