@@ -5973,6 +5973,21 @@ env 는 앱과 동일)를 두거나, `supersub-cd.timer` 재배포 훅에
 
 - **담당**: 정상호(`supersub-ai` worker.env 갱신) · **제기**: 박민호 · **기한**: `supersub-ai` 다음 기동 전
 
+#### ✅ 추가 진행 (2026.09.09) — alembic 마이그레이션 훅 추가 (정어진 지적 반영)
+
+정어진이 물었던 "배포되는 파드가 `alembic upgrade head`를 실제로 도나요?"에
+대한 답 — **안 돌고 있었습니다.** initContainer로 추가했습니다.
+
+| | |
+|---|---|
+| 방식 | Deployment에 `initContainers`로 같은 이미지·같은 env(`supersub-api-env`)를 써서 `alembic upgrade head`만 실행. **성공해야만** 메인 컨테이너(`uvicorn`)가 뜹니다 — 마이그레이션이 실패하면 앱도 안 뜹니다(의도된 동작입니다, 스키마 안 맞는 채로 뜨는 것보다 낫습니다) |
+| 확인 | `kubectl logs -c migrate` → alembic이 정상 접속·실행(지금은 이미 head라 실제로 옮긴 리비전은 없음) · 메인 컨테이너 `Running` · `/health` → `200` |
+| CD와의 관계 | `supersub-cd.timer`가 새 digest를 감지해 `rollout restart`를 걸 때마다 이 initContainer도 같이 다시 돕니다 — **새 마이그레이션이 든 이미지가 배포되면 자동으로 반영됩니다** |
+
+절차는 `www/docs/2026-09-09-K3S-harness.md`에도 남겼습니다.
+
+- **담당**: 정어진(검토) · **제기**: 박민호 · **기한**: 확인되는 대로
+
 ### 12. 이 WSL의 로컬 Postgres — DB 통합 테스트 막던 원인, 고쳐졌습니다 ✅ 해소 (2026.09.09)
 
 **min 1번 회신**에서 "이 환경에서 `password authentication failed for user
