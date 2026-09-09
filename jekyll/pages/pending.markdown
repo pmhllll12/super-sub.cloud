@@ -7121,6 +7121,22 @@ push 방식·코드 문제가 아니라 **Vercel 계정(무료 플랜)의 빌드
 실제 서비스 영향이 있었던 시간대에 요청이 실패한 사용자가 있었는지, 로그로
 확인이 필요하시면 말씀해 주세요.
 
+#### ✅ 추가 진행 (2026.09.09) — 노출됐던 시크릿 3개 전부 교체 완료
+
+정어진이 권고한 순서(`WORKER_TOKEN` → DB 비밀번호 → `JWT_SECRET`) 그대로
+진행했습니다. 각 단계마다 `supersub` 서버의 systemd(`:8000`)·k3s
+파드(`:8080`) 둘 다 갱신하고 헬스체크했습니다.
+
+| | |
+|---|---|
+| `WORKER_TOKEN` | 교체 완료. **다만 `supersub-ai`가 지금 정지 상태라 그쪽 `/etc/supersub/worker.env`는 아직 옛 값입니다** — 접근 권한이 없어 저는 못 고칩니다. **정상호가 다음에 `supersub-ai`를 켤 때 새 값으로 갱신 필요**(fail-closed라 안 고쳐도 워커가 401로 멈추기만 하고 조용히 잘못되진 않습니다) |
+| DB 비밀번호 | `ALTER ROLE supersub WITH PASSWORD ...`로 교체, `.env`·k8s Secret 갱신. `db_configured: true`로 확인 |
+| `JWT_SECRET` | 교체 완료 — 로그인해 있던 사용자는 전부 로그아웃됩니다 |
+| 확인 | 매 단계 `curl localhost:8000/health`·`curl localhost:8080/health`·`curl https://<API 호스트>/health` 전부 `200` 유지 |
+| 예전 Docker Hub digest(`56b21535...`) 삭제 | **안 했습니다** — 레지스트리 삭제 API는 인증(토큰)이 필요한데 대화에 토큰을 넣지 않는 원칙이라 여기서는 못 합니다. 다만 **시크릿을 이미 교체해서 그 이미지 안 값은 이제 전부 무효**라 급하지 않습니다. 원하시면 Docker Hub UI에서 직접 지워 주세요 |
+
+- **담당**: 정상호(`supersub-ai` worker.env 갱신) · **제기**: 박민호 · **기한**: `supersub-ai` 다음 기동 전
+
 ### 12. 이 WSL의 로컬 Postgres — DB 통합 테스트 막던 원인, 고쳐졌습니다 ✅ 해소 (2026.09.09)
 
 **min 1번 회신**에서 "이 환경에서 `password authentication failed for user
