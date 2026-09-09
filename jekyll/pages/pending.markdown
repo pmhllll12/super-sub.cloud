@@ -6239,7 +6239,21 @@ squad_member : squad_id · player_card_id · position_id   ← 이게 전부입�
 - 관련: paik 5번(공개 여부 · 재생 주소) · `www/src/lib/featuredClip.ts` · 계약 3-6절
 - **담당**: 정어진 · **제기**: 백성검 · **기한**: 스프린트 3 (조정 가능)
 
-### 11. 분석은 끝나는데 **리포트가 어디 있는지 아무도 모릅니다** (2026-09-08 신설)
+### 11. 분석은 끝나는데 **리포트가 어디 있는지 아무도 모릅니다** (2026-09-08 신설) ✅ 해소 (2026.09.09)
+
+> **양쪽 다 붙었습니다** — meet 는 다음 `main` 통합입니다.
+> - **정어진(받는 칸)**: `FinishJobSchema.report_key`(선택, S3 키, 최대 1024) →
+>   `FinishJobCommand` → `analysis_job.report_key` 컬럼(마이그레이션
+>   `9d4e88f5b6c2`). 🔴 `succeeded` 가 아니면 인터랙터가 버립니다(실패한 작업이
+>   없는 리포트를 가리키지 않게). 계약 3-8·`worker-interface.md` 4절 갱신.
+>   커밋 `5cc83b2` (브랜치 `jin`).
+> - **정상호(싣기)**: 워커가 `--result-json` 자리 파일에서 `report_uri` 를 읽어
+>   `s3://<버킷>/` 를 떼고 `PATCH` 에 `report_key` 로 싣습니다. `origin/ho`
+>   `30ea51c` (jin 23 회신과 같은 커밋).
+> - 확인: `grep 'report_key' agent/scripts/worker.py
+>   fastapi/app/analysis/adapter/inbound/api/schemas/job_schema.py` — 병합 후
+>   양쪽에서 걸립니다. `report_slug` 규칙은 백엔드에 복사 안 함(워커가 값으로 전달).
+> - **paik 7(리포트 읽는 경로)이 이제 열렸습니다** — 읽을 대상이 정해졌습니다.
 
 **앞서 paik 7번에서 「읽는 경로만 내주시면 됩니다」라고 적은 것을 정정합니다.**
 오늘 코드를 따라가 보니 **그 앞에 한 칸이 더 비어 있었습니다.** 읽는 경로를
