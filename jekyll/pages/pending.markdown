@@ -5019,6 +5019,32 @@ DB로는 못 잡으므로 **여기만은 S3 수명주기 규칙이 맞다고 봅
 - 관련: `www/src/components/analysis/AnalysisStage.tsx`(`confirmSubject`·`saveToServer`·`saveReportToProfile`) · `lib/uploadClip.ts` · `lib/savedReports.ts` · 계약 3-6 · 같은 구역 6·7번(대상 박스·리포트 조회) · `ho` 9번(4K) · `ho` 27번(닫음)
 - **담당**: 정어진(백엔드 수명 주기) · 정상호(리포트 키 정렬·위 (1)) · **제기**: 정어진(사용자 요청) · **기한**: 스프린트 3 (조각별로 나눔)
 
+### 25. `metric_definition` 시드에 항목별 `stat` 코드를 추가해 주세요 — jin 23 후속 (2026-09-09)
+
+jin 23 회신에서 되물으신 둘("`stat` 도 적재하나" · "`impact_frame` 은 행인가
+필드인가")에 답합니다. 결정의 정본은 `fastapi/docs/api-contract.md` 3-1
+「✅ 결정 — 리포트 읽기 경로는 DB에서 조립한다 (2026-09-09)」입니다.
+
+- **`impact_frame`**: `metrics[]` **행**입니다(예시의 `frame_index` 필드 아님).
+  지금 yaml 에 넣어 두신 그대로면 됩니다 — 바꿀 것 없습니다.
+- **`stat`**: **적재합니다.** 읽기 경로를 (a) DB 조립으로 정해서, 레이더 축이 되는
+  항목별 연속값(0~100)도 `metric_definition` 에 코드가 있어야 `POST /analyses` 가
+  `UNKNOWN_METRIC_CODE` 로 거부하지 않습니다.
+
+| | 만족해야 할 성질 |
+|---|---|
+| stat 코드 산출 | 시드 행 산출물(지금은 `agent/scripts/export_metric_definitions.py`)이 **항목별 `stat` 코드도 낸다.** 형식은 등급과 같은 축 — `stat.{sport}.{motion}.{criterion_id}`, `unit` 은 `score`(0~100). 라벨은 등급 코드와 같은 규칙(`{루브릭 라벨} · {항목 이름}`). active 기준이고 `--include-draft` 동작도 등급과 동일하게 |
+| 코드 길이 보고 | 산출물에서 **가장 긴 `code` 의 글자 수**를 이 항목에 한 줄 적어 주세요. `metric_definition.code` 가 `String(50)` 이라, `grade.`·`stat.` 접두어가 붙은 코드가 50 을 넘으면 제가 **컬럼 확장 마이그레이션을 먼저** 넣어야 합니다(yaml 주석에 "접두어 붙으면 상한에 닿는다"고 적으셨습니다) |
+| 넘기는 법 | `ho` 에 push + 이 항목에 `✅ 회신` 로 한 줄(변경 요지 + 가장 긴 code 글자 수). 그러면 제가 `--json` 출력으로 `op.bulk_insert` 시드 마이그레이션을 만듭니다 |
+
+| | |
+|---|---|
+| 먼저 확인 | export 산출물에 `stat.` 접두 코드가 이미 나오면 하신 것이니 이 항목을 `✅ 회신` 으로 닫아 주세요 (`grep -n 'stat\.' agent/scripts/export_metric_definitions.py` 등으로) |
+| 하지 말 것 | 🔴 `stat` 라벨·단위를 백엔드가 지어내지 않도록 등급과 같은 규칙으로 루브릭에서 뽑아 주세요 · 🔴 `impact_frame` 을 목록에서 빼지 마세요(행으로 유지) |
+| 물려 있는 것 | jin 23(시드 마이그레이션) · min #9(리포트 화면) · `paik` 7. 이게 정해져야 시드가 ~45 행으로 완결되고 `POST /analyses` 가 실서버에서 안 거부됩니다 |
+| 상세 | `fastapi/docs/api-contract.md` 3-1 「✅ 결정 — 리포트 읽기 경로는 DB에서 조립한다」 |
+- **담당**: 정상호(stat 코드 산출) → 정어진(시드 마이그레이션) · **제기**: 정어진 · **기한**: jin 23 과 함께 (스프린트 3 초)
+
 ## min (박민호)
 
 ### 1. 패킷 A(과금) 진행 상황을 알려주세요 ✅ 회신 (2026.09.08)
