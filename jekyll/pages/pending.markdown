@@ -5752,7 +5752,48 @@ k3s 설치 자체는 문제없습니다(기존 서비스 무영향, 확인됨). 
 | 하지 말 것 | 🔴 `supersub-api`·`postgresql`을 k3s로 옮기지 않기(특히 Postgres) · 🔴 `deployment.md`를 매니페스트 기준으로 미리 고치지 않기 |
 | 확인 | `ssh supersub 'systemctl is-active supersub-api postgresql'` → 둘 다 `active` (k3s 설치 후에도 배포 방식은 systemd 그대로) |
 
-- **담당**: ~~정어진~~ **✅ 회신함 (2026.09.09 — (A) 유지·미배포)** · **제기**: 박민호 · **기한**: — (두 번째 서비스 생기면 재개)
+#### ✅ 추가 진행 (2026.09.09) — 백엔드 API를 파드로 띄워 트라이얼 (박민호)
+
+**"다른 서비스"의 첫 대상으로 백엔드(`supersub-api`)를 일단 파드로 올려봤습니다.**
+기존 systemd 서비스는 손대지 않고 **옆에 나란히** 띄운 것뿐입니다.
+
+| | |
+|---|---|
+| 이미지 | `~/k3s-trial/Dockerfile`(서버에만 있음, **`fastapi/` 저장소엔 커밋 안 함**) — `python:3.14-slim` 위에 `requirements.lock.txt` 그대로 설치. `docker build` → `k3s ctr images import`로 클러스터에 반입 |
+| 설정 주입 | 기존 `.env`를 그대로 `kubectl create secret generic supersub-api-env --from-env-file=...`로 옮김. **값은 여기 적지 않았습니다** |
+| 배포 | `~/k3s-trial/deployment.yaml` — `hostNetwork: true`(DB가 `localhost`만 듣고 있어서, 파드가 호스트 네트워크를 그대로 씀), 포트는 **8080**(기존 8000과 안 겹치게) |
+| 확인 | `sudo k3s kubectl get pods` → `Running` · `curl localhost:8080/health` → `200`(DB 연결 포함) · **동시에** 기존 `curl localhost:8000/health`도 `200` — 서로 영향 없음 |
+
+🔴 **이건 트라이얼이지 전환이 아닙니다.** 실제 트래픽은 여전히 8000(systemd)이
+받고 있고, 8080 파드는 "떠는지 확인"용으로 켜둔 상태입니다. 계속 켜 둘지,
+지울지(`kubectl delete deployment supersub-api-trial`), 아니면 이걸 발판으로
+`fastapi/`에 정식 `Dockerfile`을 커밋하고 트래픽을 옮길지는 **정어진 판단이
+필요합니다** — 특히 Dockerfile을 저장소에 정식으로 둘 위치·이미지 태그/레지스트리
+전략은 배포 관례(`docs/deployment.md`)에 맞춰 그가 정하는 게 맞다고 봤습니다.
+
+#### ✅ 정어진 후속 회신 (2026.09.09) — 트라이얼은 (A)와 어긋나지 않습니다, 정식화는 보류
+
+⚠️ **`28f101d`가 push된 시점에 제 (A) 회신(`58515c0`)은 아직 `main`에 없었습니다**
+(로컬 `jin` 에만). 그래서 두 판단이 엇갈려 보일 수 있는데 **결론은 같습니다** —
+파드는 systemd 옆에, 전환은 나중.
+
+- **트라이얼은 (A) 그대로입니다.** "파드를 systemd 옆에 나란히" 가 (A) 가 말한
+  것이고, 트라이얼은 유용한 데이터를 줬습니다: `hostNetwork: true` 로
+  localhost-only DB 문제가 우회된다는 것, 두 프로세스가 서로 무영향이라는 것.
+- 🔴 **정식화(레포에 `Dockerfile` 커밋 + 트래픽 8000→파드 이전)는 아직 안 합니다.**
+  이유는 (A) 그대로 — 명명된 2번째 서비스도, cutover·롤백 계획도 없습니다.
+  트라이얼 파드는 박민호 님이 유지하든
+  지우든(`kubectl delete deployment supersub-api-trial`) 무방합니다.
+- **정식화하기로 하면 (그때):**
+  - `Dockerfile`·매니페스트 위치는 **`fastapi/deploy/k8s/`** 입니다. 제가 로컬
+    k3s 개발용으로 이미 만들어 검증해 뒀고(API Deployment + pgvector +
+    initContainer 마이그레이션 + NodePort), EC2용은 거기서 in-cluster Postgres
+    부분만 빼고 `hostNetwork` 또는 selector 없는 Service/Endpoints 로 호스트
+    PostgreSQL 을 가리키게 하면 됩니다. **서버에만 있는 `~/k3s-trial/` 사본과
+    갈리기 전에 그걸 정본으로** 삼습니다.
+  - 이미지 태그/레지스트리 전략 + `docs/deployment.md` 개정은 그 시점에 제가 냅니다.
+
+- **담당**: ~~정어진~~ **✅ 회신함 (2026.09.09 — (A) 유지 · 트라이얼 확인 · 정식화 보류)** · **제기**: 박민호 · **기한**: — (정식화는 2번째 서비스·cutover 계획이 설 때)
 
 ## paik (백성검)
 
