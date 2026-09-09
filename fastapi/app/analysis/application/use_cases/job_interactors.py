@@ -12,7 +12,7 @@ from app.analysis.application.ports.input.job_use_cases import (
 from app.analysis.application.ports.output.job_port import JobPort
 from app.analysis.application.ports.output.storage_port import StoragePort
 from app.analysis.application.ports.output.video_port import VideoPort
-from app.analysis.domain.rules.job_rules import is_terminal
+from app.analysis.domain.rules.job_rules import SUCCEEDED, is_terminal
 from app.core.errors import ApiError
 
 # 회수는 **조용히 일어나면 안 된다.** 작업이 되돌려졌다는 것은 워커나 인스턴스에
@@ -100,8 +100,13 @@ class FinishJobInteractor(FinishJobUseCase):
                 422, "INVALID_JOB_STATUS", "끝난 상태만 보고할 수 있습니다."
             )
 
+        # 🔴 리포트 자리는 성공한 작업에만 남긴다 — 실패한 작업이 리포트를
+        #    가리키면 화면이 없는 것을 읽으러 간다. 워커도 그렇게 거르지만
+        #    받는 쪽에서 한 번 더 막는다(계약이 아니라 데이터 무결성이다).
+        report_key = command.report_key if command.status == SUCCEEDED else None
+
         blocked = self._repository.finish(
-            command.job_id, command.status, command.failure_reason
+            command.job_id, command.status, command.failure_reason, report_key
         )
         if blocked is None:
             return

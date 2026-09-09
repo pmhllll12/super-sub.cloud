@@ -118,7 +118,11 @@ class JobPgRepository(JobPort):
         return requeued, failed
 
     def finish(
-        self, job_id: UUID, status: str, failure_reason: str | None
+        self,
+        job_id: UUID,
+        status: str,
+        failure_reason: str | None,
+        report_key: str | None = None,
     ) -> str | None:
         # `running` 일 때만 바꾼다. 조건을 SQL 에 두는 이유는 읽고 나서 쓰면
         # 그 사이에 다른 보고가 끼어들 수 있어서다.
@@ -129,6 +133,7 @@ class JobPgRepository(JobPort):
                 status=status,
                 failure_reason=failure_reason,
                 finished_at=datetime.now(timezone.utc),
+                report_key=report_key,
             )
         ).rowcount
 

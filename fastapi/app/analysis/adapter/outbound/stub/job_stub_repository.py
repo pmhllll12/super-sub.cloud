@@ -35,6 +35,7 @@ class _Row:
     status: str = QUEUED
     failure_reason: str | None = None
     started_at: datetime | None = None
+    report_key: str | None = None
 
 
 _JOBS: dict[UUID, _Row] = {}
@@ -76,6 +77,11 @@ def failure_reason_of(job_id: UUID) -> str | None:
     return row.failure_reason if row else None
 
 
+def report_key_of(job_id: UUID) -> str | None:
+    row = _JOBS.get(job_id)
+    return row.report_key if row else None
+
+
 class StubJobRepository(JobPort):
     def claim_next(self) -> ClaimedJobEntity | None:
         waiting = [r for r in _JOBS.values() if r.status == QUEUED]
@@ -113,7 +119,11 @@ class StubJobRepository(JobPort):
         return requeued, failed
 
     def finish(
-        self, job_id: UUID, status: str, failure_reason: str | None
+        self,
+        job_id: UUID,
+        status: str,
+        failure_reason: str | None,
+        report_key: str | None = None,
     ) -> str | None:
         row = _JOBS.get(job_id)
         if row is None:
@@ -122,4 +132,5 @@ class StubJobRepository(JobPort):
             return row.status
         row.status = status
         row.failure_reason = failure_reason
+        row.report_key = report_key
         return None

@@ -182,6 +182,30 @@ def test_없는_작업은_missing_이다(db_session):
     assert JobPgRepository(_new_session()).finish(uuid.uuid4(), "failed", None) == "missing"
 
 
+def test_finish_가_리포트_자리를_컬럼에_남긴다(db_session, queued):
+    """미결 `paik` 11번 — `report_key` 가 실제 컬럼에 써지는지 (스텁이 아니라 DB)."""
+    job_id = queued["oldest"][0]
+    assert JobPgRepository(_new_session()).claim_next().job_id == job_id
+
+    key = "reports/u1/v1/report.json"
+    assert (
+        JobPgRepository(_new_session()).finish(job_id, "succeeded", None, key)
+        is None
+    )
+
+    db_session.expire_all()
+    assert db_session.get(AnalysisJobOrm, job_id).report_key == key
+
+
+def test_리포트_자리를_안_넘기면_컬럼이_비어_있다(db_session, queued):
+    job_id = queued["oldest"][0]
+    assert JobPgRepository(_new_session()).claim_next().job_id == job_id
+    assert JobPgRepository(_new_session()).finish(job_id, "succeeded", None) is None
+
+    db_session.expire_all()
+    assert db_session.get(AnalysisJobOrm, job_id).report_key is None
+
+
 def _stall(db_session, job_id, minutes):
     """그 작업이 `minutes` 분 전에 시작된 것처럼 만든다."""
     db_session.execute(

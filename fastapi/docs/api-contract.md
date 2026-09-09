@@ -1808,6 +1808,7 @@ POST /videos ──> analysis_job(queued)
 
 ```json
 { "status": "succeeded" }
+{ "status": "succeeded", "report_key": "reports/<user_id>/<video_id>/report.json" }
 { "status": "failed", "failure_reason": "품질 게이트 미달" }
 ```
 
@@ -1818,6 +1819,20 @@ POST /videos ──> analysis_job(queued)
 | 404 | `JOB_NOT_FOUND` | 없는 작업이다 |
 | 409 | `JOB_NOT_RUNNING` | 집지 않았거나 이미 끝났다. **재시도해도 소용없다** |
 | 422 | `INVALID_JOB_STATUS` | `queued`·`running` 으로는 보고할 수 없다 |
+
+#### `report_key` — 워커가 만든 리포트의 자리 (2026-09-09 추가, 미결 `paik` 11번)
+
+**선택 필드.** 워커가 분석 결과를 S3 에 쓴 뒤 그 **버킷 상대 키**를 함께 싣는다.
+백엔드는 이 값을 `analysis_job.report_key` 에 그대로 남긴다 — 자리 규칙
+(`analyze_s3` 의 `report_targets`)이 워커 안에만 있고, 파일 이름에 분석 시각이
+붙어 같은 영상을 두 번 돌리면 파일이 둘이 되므로 **백엔드가 계산으로 찾을 수 없다.**
+
+| | |
+|---|---|
+| 형태 | 버킷 상대 키. 예: `reports/<user_id>/<video_id>/report.json`. 상한 1024자(S3 객체 키 한계) — 넘으면 422 |
+| 🔴 `succeeded` 일 때만 | `failed` 와 함께 와도 **버린다**(실패한 작업이 가리킬 리포트는 없다). 계약이 아니라 데이터 무결성이라 받는 쪽에서 막는다 |
+| 없어도 된다 | 워커가 자리를 못 실어도(리포트가 다른 버킷 등) 분석은 성공한 것이다. 화면이 리포트를 못 찾을 뿐이다 |
+| 읽는 쪽 | 이 값으로 무엇을 읽을지는 미결 `paik` 7번(리포트 읽는 경로)에서 정한다 |
 
 **`finished_at` 을 받지 않는다.** 워커의 시계가 어긋나면 소요 시간이 음수가 된다 —
 서버가 찍는다. 같은 이유로 `started_at` 은 `claim` 이 찍는다. 🔴 이 두 시각의 차이가

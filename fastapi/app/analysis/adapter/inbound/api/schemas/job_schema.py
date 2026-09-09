@@ -32,3 +32,10 @@ class FinishJobSchema(BaseModel):
 
     status: str = Field(min_length=1, max_length=20)
     failure_reason: str | None = Field(default=None, max_length=255)
+    # 워커가 만든 리포트 하나를 가리키는 **버킷 상대 S3 키** (미결 `paik` 11번).
+    # 예: `reports/<user_id>/<video_id>/report.json`. 자리를 여기서 계산하지 않고
+    # 아는 쪽(워커)이 말해 주는 값을 그대로 받는다 — 규칙이 두 곳에 생기면 갈린다.
+    # 없어도 된다(분석은 성공한 것이고, 화면이 리포트를 못 찾을 뿐이다).
+    # 🔴 `succeeded` 가 아니면 무시된다(실패한 작업이 가리킬 리포트는 없다).
+    # 상한은 S3 객체 키 한계(1024바이트)다.
+    report_key: str | None = Field(default=None, max_length=1024)

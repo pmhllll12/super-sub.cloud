@@ -44,3 +44,10 @@ class AnalysisJobOrm(Base):
     finished_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+    # 워커가 만든 리포트를 가리키는 버킷 상대 S3 키 (미결 `paik` 11번).
+    # 예: `reports/<user_id>/<video_id>/report.json`. 완료 보고(`PATCH
+    # /internal/analysis-jobs/{id}`)가 `succeeded` 일 때만 채워진다 — 실패한
+    # 작업엔 가리킬 리포트가 없다. 자리 규칙은 워커(`analyze_s3`)가 정본이라
+    # 백엔드는 받은 값을 그대로 둔다. 상한은 S3 객체 키 한계다.
+    report_key: Mapped[str | None] = mapped_column(String(1024), nullable=True)

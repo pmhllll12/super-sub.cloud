@@ -23,6 +23,7 @@ import pytest
 from app.analysis.adapter.outbound.stub.job_stub_repository import (
     enqueue,
     failure_reason_of,
+    report_key_of,
     status_of,
 )
 from app.analysis.adapter.outbound.stub.video_stub_repository import (
@@ -162,6 +163,57 @@ class TestFinish:
         assert res.status_code == 204
         assert status_of(job_id) == "failed"
         assert failure_reason_of(job_id) == "품질 게이트 미달"
+
+    def test_성공_보고에_리포트_자리가_실린다(self, client):
+        """미결 `paik` 11번 — 워커가 만든 리포트 키를 작업에 남긴다."""
+        job_id = uuid4()
+        self._claim(client, job_id)
+        key = "reports/u1/v1/report.json"
+
+        res = client.patch(
+            _job(job_id),
+            json={"status": "succeeded", "report_key": key},
+            headers=_hdr(),
+        )
+        assert res.status_code == 204
+        assert report_key_of(job_id) == key
+
+    def test_리포트_자리는_안_실어도_된다(self, client):
+        """워커가 자리를 못 실어도 분석은 성공한 것이라 보고는 통과한다."""
+        job_id = uuid4()
+        self._claim(client, job_id)
+
+        res = client.patch(
+            _job(job_id), json={"status": "succeeded"}, headers=_hdr()
+        )
+        assert res.status_code == 204
+        assert report_key_of(job_id) is None
+
+    def test_실패_보고의_리포트_자리는_버린다(self, client):
+        """🔴 실패한 작업이 리포트를 가리키면 화면이 없는 것을 읽으러 간다."""
+        job_id = uuid4()
+        self._claim(client, job_id)
+
+        res = client.patch(
+            _job(job_id),
+            json={"status": "failed", "report_key": "reports/u1/v1/report.json"},
+            headers=_hdr(),
+        )
+        assert res.status_code == 204
+        assert report_key_of(job_id) is None
+
+    def test_리포트_자리가_너무_길면_422_다(self, client):
+        """상한은 S3 객체 키 한계(1024)다."""
+        job_id = uuid4()
+        self._claim(client, job_id)
+
+        res = client.patch(
+            _job(job_id),
+            json={"status": "succeeded", "report_key": "r/" + "x" * 1023},
+            headers=_hdr(),
+        )
+        assert res.status_code == 422
+        assert status_of(job_id) == "running"     # 안 바뀐다
 
     def test_집지_않은_작업은_409_다(self, client):
         """`queued` 를 바로 끝내면 `started_at` 이 빈 채 `finished_at` 만 찬다."""
