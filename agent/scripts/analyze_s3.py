@@ -121,6 +121,31 @@ def report_slug(key: str) -> str:
     return f"{parent}/{stem}" if parent and parent != "videos" else stem
 
 
+def focus_envelope(rubric, requested: str | None) -> dict:
+    """올린 사람이 고른 「집중해서 볼 항목」 (미결 `paik` 8번).
+
+    🔴 **채점에는 영향이 없다.** 고른 항목만 채점하고 가중치를 재정규화하는
+    길(그쪽 항목의 B안)은 택하지 않았다 — 같은 영상이 **고른 것에 따라 다른
+    점수**를 내면 선수끼리 비교가 안 되고, 스카우팅은 비교가 전부다.
+    측정 실패로 항목이 빠지는 것(`applicable_criteria`)과는 다르다. 그쪽은
+    촬영 조건이 강제한 것이고 이쪽은 사용자가 고른 것이다.
+
+    🔴 **모르는 id 를 조용히 버리지 않는다.** 화면이 낡은 id 를 보내거나
+    종목이 어긋나면 사용자가 고른 것이 아무 일도 안 일어난 채 사라진다.
+    그렇다고 분석을 실패시키지도 않는다 — 강조 힌트 하나 때문에 리포트가
+    통째로 없어지는 것이 더 나쁘다. **둘 다 적어서 드러낸다.**
+
+    빈 값은 「전체적으로」다. 그것이 기본이자 가장 흔한 경우다.
+    """
+    ids = [t.strip() for t in (requested or "").split(",") if t.strip()]
+    known = set(rubric.criterion_ids)
+    applied = [i for i in ids if i in known]
+    unknown = [i for i in ids if i not in known]
+    if unknown:
+        print(f"  ⚠️ 루브릭에 없는 집중 항목 {unknown} — 리포트에 남기고 계속한다")
+    return {"requested": ids, "applied": applied, "unknown": unknown}
+
+
 def owner_from_key(key: str) -> str | None:
     """`videos/<user_id>/…` 에서 소유자를 꺼낸다. 모양이 다르면 None.
 
@@ -295,6 +320,10 @@ def analyze_one(video: str, args, rubric, subject) -> str:
         # swing_side는 impact_limb에만 적용된다 — 반대쪽 사지 지표는 auto
         # 판별로 나온 값이다 (features.extract_features 참고).
         "swing_side": args.side,
+        # 올린 사람이 「집중해서 볼 항목」으로 고른 것 (미결 `paik` 8번).
+        # 🔴 **채점을 바꾸지 않는다** — 같은 영상이 고른 것에 따라 다른 점수를
+        # 내면 선수끼리 비교가 안 된다. 화면이 강조·정렬에 쓰라고 싣는다.
+        "focus": focus_envelope(rubric, args.focus),
         "target_fps": args.fps,
         "sampled_fps": round(float(pose.sampled_fps), 2),
         "frames": int(len(pose.keypoints)),
@@ -360,6 +389,13 @@ def main() -> None:
     ap.add_argument(
         "--subject-at-ms", type=float, default=None,
         help="--subject-box 를 그린 영상 시각(밀리초). 박스를 주면 함께 주어야 한다",
+    )
+    ap.add_argument(
+        "--focus", default=None, metavar="id,id",
+        help="올린 사람이 집중해서 보고 싶다고 고른 채점 항목 id (루브릭의 "
+             "`criteria[].id`, 쉼표로 구분). 🔴 **채점을 바꾸지 않는다** — "
+             "화면 강조용으로 리포트에 실릴 뿐이다(미결 `paik` 8번). "
+             "안 주면 「전체적으로」다",
     )
     ap.add_argument(
         "--result-json", default=None, metavar="경로",

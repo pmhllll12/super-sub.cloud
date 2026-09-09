@@ -475,6 +475,8 @@ class _StubRubric:
     motion = "pitching"
     version = "0.1"
     criteria = ()
+    # 집중 항목 검증이 대조하는 목록 (미결 `paik` 8번).
+    criterion_ids = ("follow_through", "guide_hand")
 
 
 # -- 리포트 자리를 완료 보고에 싣는다 (미결 `paik` 11번) ----------------------
@@ -655,3 +657,67 @@ def test_a_failed_single_analysis_writes_no_place_file(monkeypatch, tmp_path):
     with pytest.raises(SystemExit):
         a3.main()
     assert not out.exists()
+
+
+# -- 「집중해서 볼 항목」 (미결 `paik` 8번) ----------------------------------
+#
+# 🔴 **판단은 A안이다**: 채점은 그대로 두고 화면 강조용으로만 싣는다.
+#    B안(고른 것만 채점 + 가중치 재정규화)을 택하지 않은 이유는 같은 영상이
+#    고른 것에 따라 다른 점수를 내면 **선수끼리 비교가 안 되기** 때문이다.
+#    아래 검사들이 B안으로 슬며시 넘어가는 것을 막는다.
+
+
+def test_the_focus_choice_is_passed_through_when_the_job_has_one(worker, cfg):
+    cmd = worker.analyze_command(
+        cfg, _job(focus=["follow_through", "guide_hand"]), Path("r.yaml"))
+    assert cmd[cmd.index("--focus") + 1] == "follow_through,guide_hand"
+
+
+def test_no_focus_means_the_whole_thing_not_a_failure(worker, cfg):
+    """🔴 빈 목록은 「전체적으로」다 — 기본이자 가장 흔한 경우다.
+
+    백엔드에 아직 칸이 없어서 지금은 **항상** 이 갈래를 탄다. 여기서 죽으면
+    모든 분석이 죽는다.
+    """
+    for job in (_job(), _job(focus=None), _job(focus=[]), _job(focus=["", "  "])):
+        cmd = worker.analyze_command(cfg, job, Path("r.yaml"))
+        assert "--focus" not in cmd
+        assert "None" not in cmd
+
+
+def test_focus_does_not_change_the_score(worker):
+    """🔴 A안의 전부 — 고른 것이 점수를 바꾸면 안 된다.
+
+    `aggregate` 는 `focus` 를 아예 모른다. 이 검사가 빨개진다는 것은 누군가
+    채점 경로에 focus 를 끌어들였다는 뜻이고, 그 순간 같은 영상의 점수가
+    사용자 선택에 따라 달라진다.
+    """
+    import inspect
+
+    from supersub_agent import scoring
+
+    assert "focus" not in inspect.getsource(scoring.aggregate)
+    assert "focus" not in inspect.getsource(scoring.Rubric.applicable_criteria)
+
+
+def test_an_unknown_focus_id_is_recorded_not_swallowed(monkeypatch):
+    """🔴 화면이 낡은 id 를 보내면 **드러나야 한다.**
+
+    조용히 버리면 사용자가 고른 것이 아무 일도 안 일어난 채 사라지고, 왜
+    강조가 안 되는지 아무도 모른다. 그렇다고 분석을 죽이지도 않는다 —
+    강조 힌트 하나 때문에 리포트가 통째로 없어지는 것이 더 나쁘다.
+    """
+    a3 = _load_script("analyze_s3")
+    rubric = _StubRubric()
+    env = a3.focus_envelope(rubric, "follow_through,없는항목")
+    assert env["applied"] == ["follow_through"]
+    assert env["unknown"] == ["없는항목"]
+    assert env["requested"] == ["follow_through", "없는항목"]
+
+
+def test_an_empty_focus_envelope_is_all_three_empty(monkeypatch):
+    a3 = _load_script("analyze_s3")
+    for value in (None, "", "  ", ",,"):
+        assert a3.focus_envelope(_StubRubric(), value) == {
+            "requested": [], "applied": [], "unknown": []
+        }

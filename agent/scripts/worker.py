@@ -334,6 +334,15 @@ def analyze_command(cfg: Config, job: dict, rubric: Path,
     # "auto" 가 스스로 판별한다. None 을 문자열로 넘기면 argparse 가 거부한다.
     if job.get("side") in ("left", "right"):
         cmd += ["--side", job["side"]]
+    # 「집중해서 볼 항목」 (미결 `paik` 8번). 백엔드에 이 칸이 아직 없어서
+    # 지금은 항상 비어 있다 — 칸이 열리는 날 그대로 흘러가라고 미리 읽는다.
+    # 🔴 빈 목록은 실패가 아니라 「전체적으로」다. 없을 때 아무것도 안 붙인다.
+    focus = job.get("focus") or []
+    if isinstance(focus, str):
+        focus = [focus]
+    focus = [str(f).strip() for f in focus if str(f).strip()]
+    if focus:
+        cmd += ["--focus", ",".join(focus)]
     if cfg.region:
         cmd += ["--region", cfg.region]
     # 리포트가 어디 놓였는지를 파일로 받는다 (미결 `paik` 11번).
