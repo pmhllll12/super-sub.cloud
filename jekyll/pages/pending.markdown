@@ -7544,6 +7544,20 @@ grep -rniE '\bdocker\b|podman|containerd|k3s|kubectl|kubernetes' agent/ \
 - 관련: `ho` 1번(GPU 예산 실측) · `jin` 18번(워커 폴링 루프) · `ho` 26번(워커 정지)
 - **담당**: 박민호(적용 범위 판단) · **제기**: 정상호 · **기한**: 스프린트 3 계획 전
 
+### 15. 영상 업로드 「요청 값이 올바르지 않습니다: filename」 — 원인 찾아 고쳤습니다 ✅ 해소 (2026.09.09)
+
+사이트에서 직접 영상을 올려 분석을 시작해보다가 겪었습니다.
+
+| | |
+|---|---|
+| 원인 | `www/`가 `POST /videos/upload-url`에 `filename`을 안 보내고 있었습니다 — `fastapi/docs/client-contract-changes.md` 21절(2026-09-08, 정어진이 이미 요청해둔 것)이 필수라고 명시한 필드인데 아직 반영이 안 된 상태였습니다 |
+| 조치 | `www/src/lib/uploadClip.ts`(업로드/등록 두 요청 모두에 `filename: file.name` 추가) · `www/src/app/api/videos/upload-url/route.ts`(필수 검증에 `filename` 추가, register 쪽 `route.ts`는 원래 body를 그대로 넘기는 구조라 타입만 보강) |
+| 확인 | `npx tsc --noEmit` 통과 · 관련 vitest(`uploadClip`·`AnalysisStage`·`MyVideos`) 84개 중 83 통과, 나머지 1개는 제가 고친 부분과 무관한 리포트 폴링 타임아웃이고 **단독 실행하면 통과**(전체 스위트 동시 실행 시 리소스 경합) · `npx eslint` 새 경고 없음 |
+
+`www/` 소유가 백성검이라, 검토 부탁드립니다 — 급한 버그라 바로 고쳤습니다.
+
+- **담당**: 백성검(검토) · **제기**: 박민호 · **기한**: 확인되는 대로
+
 ## paik (백성검)
 
 ### 1. 분석한 영상을 우리 서버에 저장하는 경로 ✅ 해소 (2026.09.03)
