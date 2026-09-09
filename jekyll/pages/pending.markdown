@@ -6060,7 +6060,36 @@ paik 12번에 있습니다.)
 - 관련: `www/src/lib/published.ts` · `www/src/lib/feed.ts` · `www/src/app/(app)/me/MyVideos.tsx` · **paik 12번**(같은 프론트 반영이 필요) · 계약 3-6절
 - **담당**: 백성검(프론트 반영 — 백엔드 몫은 끝났습니다) · **제기**: 백성검 · **기한**: 스프린트 3 (조정 가능)
 
-### 6. **대상 지정 박스**를 올릴 자리가 없습니다 — 계약에도, S3 에도 (2026-09-08 신설)
+### 6. **대상 지정 박스**를 올릴 자리가 없습니다 — 계약에도, S3 에도 (2026-09-08 신설) ✅ 해소 (2026.09.09) — 백엔드
+
+> **`POST /videos` 본문에 `subject_box` · `subject_at_ms` 를 넣었습니다**
+> (정어진, 커밋 `ee401d6` · 마이그레이션 `411d1c83e4ca`).
+>
+> **🔴 사이드카가 아니라 claim 응답으로 갑니다.** 항목은 "DB 에만 저장되면 워커가
+> 못 봅니다 → S3 사이드카" 라고 적으셨는데, **워커는 이미 `side`·`focus` 를 claim
+> 응답(`POST /internal/analysis-jobs/claim`)으로 받고 있습니다**(`worker.py` 의
+> `job.get("focus")`). 워커가 DB 를 *직접* 안 볼 뿐, claim API 가 그 통로입니다.
+> 그래서 `subject_box` 도 같은 축으로 갑니다:
+> `POST /videos` (서버가 정규화·기하 검증) → `analysis_job` 행 → claim 응답 →
+> `--subject-box "x,y,w,h" --subject-at-ms`. 사이드카를 안 쓰니 백엔드 S3 쓰기도,
+> 브라우저 사이드카 PUT 도, 스캐너 걱정도 없습니다.
+>
+> | | |
+> |---|---|
+> | 검증(서버) | `x·y·w·h ∈ [0,1]` 아니면 **422**(픽셀 거부, 클램프 안 함) · `w·h>0` · `x+w≤1`·`y+h≤1` · `at_ms≤duration_ms` · 박스·시각 both-or-neither |
+> | 지정 없음 | 둘 다 생략 = 「자동으로 고르기」. **실패로 만들지 않습니다.** `analyze:false`·반려면 박스는 버려집니다(담을 작업 행이 없음, 이것도 실패 아님) |
+> | 브라우저 | 지금 그대로 — 영상만 S3 에 PUT, 박스는 `POST /videos` 본문. IAM 안 건드립니다 |
+> | 확인 | `grep -n "subject_box" www/src/lib/uploadClip.ts` (프론트) · `git -C fastapi grep -n "subject_box" -- app/analysis` (백엔드, 됨). `pytest -q` 669 passed |
+>
+> 🔴 **남은 것 — agent 쪽 배선 (정상호 님).** claim 응답에 값은 실었지만
+> `worker.py` 의 `analyze_command` 가 `--subject-box`/`--subject-at-ms` 를 아직
+> 안 붙입니다 — **`--focus` 와 똑같은 상태**입니다(백엔드가 내보내고 워커가 아직
+> 안 읽음). `job.get("subject_box")` / `job.get("subject_at_ms")` 를 읽어
+> `--focus` 옆에 세 줄 붙이면 됩니다. `worker-interface.md` 1절에 적어 뒀습니다.
+> (담당: 정상호 · agent/)
+>
+> ⚠️ 트랙이 도중에 다른 사람으로 갈아타는 문제(정상호 실측 63%)는 이 항목이
+> 고치지 못합니다 — 화면 몫은 닻을 좋게 주는 것까지, 그대로입니다.
 
 분석 화면이 「이 사람으로 분석」에서 받은 박스를 **어디로도 못 보냅니다.**
 계약 3-6절의 `POST /videos` 본문에 그 자리가 없습니다(`sport_code` ·
