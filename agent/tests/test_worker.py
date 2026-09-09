@@ -685,6 +685,64 @@ def test_no_focus_means_the_whole_thing_not_a_failure(worker, cfg):
         assert "None" not in cmd
 
 
+# -- 「이 사람으로 분석」 (미결 `paik` 6번) -----------------------------------
+#
+#    백엔드가 claim 응답에 `subject_box`(정규화 0~1 네 값)와 `subject_at_ms` 를
+#    싣는다. 워커는 그것을 자식에게 넘기기만 한다 — 규격은
+#    `fastapi/docs/worker-interface.md` 1절.
+
+
+def test_the_subject_box_is_passed_through_when_the_job_has_one(worker, cfg):
+    """찍은 사람이 실제로 분석되려면 지정이 자식까지 가야 한다."""
+    cmd = worker.analyze_command(
+        cfg, _job(subject_box=[0.39, 0.35, 0.12, 0.4], subject_at_ms=4200),
+        Path("r.yaml"))
+    assert cmd[cmd.index("--subject-box") + 1] == "0.39,0.35,0.12,0.4"
+    assert cmd[cmd.index("--subject-at-ms") + 1] == "4200"
+
+
+def test_no_subject_box_means_pick_automatically_not_a_failure(worker, cfg):
+    """🔴 지정이 없는 것은 **정식 경로**다 — 지금은 거의 모든 작업이 이쪽이다.
+
+    둘 다 생략 = 「자동으로 고르기」이고 실패가 아니다(계약). 여기서 플래그가
+    붙으면 자식이 `None` 을 좌표로 읽고 죽어 **모든 자동 분석이 죽는다.**
+    """
+    for job in (_job(),
+                _job(subject_box=None, subject_at_ms=None),
+                _job(subject_box=None, subject_at_ms=4200)):
+        cmd = worker.analyze_command(cfg, job, Path("r.yaml"))
+        assert "--subject-box" not in cmd
+        assert "None" not in cmd
+
+
+def test_a_half_given_subject_is_not_passed_as_half(worker, cfg):
+    """🔴 박스만 있고 시각이 없으면 **아무것도 붙이지 않는다.**
+
+    하나만 붙이면 자식이 「박스를 주면 시각도 함께」로 죽는데, 그것은 지정이
+    없는 것과 **다른 사건**이다 — 지정이 없으면 자동으로 골라 정상 분석돼야
+    한다. 계약이 both-or-neither 를 등록 시점에 막지만, 그것이 뚫렸을 때
+    **분석 전체가 죽는 쪽으로 무너지지 않게** 한다.
+    """
+    cmd = worker.analyze_command(
+        cfg, _job(subject_box=[0.39, 0.35, 0.12, 0.4]), Path("r.yaml"))
+    assert "--subject-box" not in cmd
+    assert "--subject-at-ms" not in cmd
+
+
+def test_the_worker_does_not_re_validate_the_subject_box(worker, cfg):
+    """🔴 범위 밖 좌표도 **그대로 넘긴다** — 판정은 한 곳에서만 한다.
+
+    무엇이 올바른 지정인가는 `pose.parse_subject_spec` 하나가 정한다. 워커가
+    같은 규칙을 복사해 미리 거르면, 두 곳이 갈렸을 때 **같은 입력이 경로에
+    따라 통과했다 막혔다 한다**(미결 10번의 형태). 잘못된 값은 자식이 0 아닌
+    코드로 죽고 그 사유가 `failure_reason` 에 남는 것이 옳은 실패다.
+    """
+    cmd = worker.analyze_command(
+        cfg, _job(subject_box=[640, 360, 200, 400], subject_at_ms=4200),
+        Path("r.yaml"))
+    assert cmd[cmd.index("--subject-box") + 1] == "640,360,200,400"
+
+
 def test_focus_does_not_change_the_score(worker):
     """🔴 A안의 전부 — 고른 것이 점수를 바꾸면 안 된다.
 

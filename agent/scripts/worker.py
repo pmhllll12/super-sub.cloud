@@ -343,6 +343,24 @@ def analyze_command(cfg: Config, job: dict, rubric: Path,
     focus = [str(f).strip() for f in focus if str(f).strip()]
     if focus:
         cmd += ["--focus", ",".join(focus)]
+    # 「이 사람으로 분석」 (미결 `paik` 6번). claim 응답이 정규화 0~1 네 값
+    # (`[x, y, w, h]`)과 그 박스를 그린 시각을 준다 — `worker-interface.md` 1절.
+    #
+    # 🔴 **여기서 다시 검증하지 않는다.** 무엇이 올바른 지정인가는
+    # `pose.parse_subject_spec` 한 곳에 있고, 규칙을 복사하면 한쪽만 고쳐졌을 때
+    # **같은 입력이 경로에 따라 통과했다 막혔다 한다**(미결 10번의 형태).
+    # 잘못된 값은 자식이 0 아닌 코드로 죽고 그 사유가 `failure_reason` 에 남는다.
+    #
+    # 🔴 **둘 다 있을 때만 붙인다.** 하나만 붙이면 자식이 「박스를 주면 시각도
+    # 함께」로 죽는데, 그것은 **지정이 없는 것과 다른 사건**이다 — 지정이 없으면
+    # 「자동으로 고르기」로 정상 분석돼야 한다(계약: 둘 다 생략 = 자동, 실패 아님).
+    box = job.get("subject_box")
+    at_ms = job.get("subject_at_ms")
+    if box is not None and at_ms is not None:
+        # 배열로 온다. 문자열로 오는 배포도 그대로 받아 준다 — 규격은 배열이지만
+        # 여기서 죽는 것보다 넘겨서 자식의 한 곳에서 판정받는 것이 낫다.
+        spec = box if isinstance(box, str) else ",".join(str(v) for v in box)
+        cmd += ["--subject-box", spec, "--subject-at-ms", str(at_ms)]
     if cfg.region:
         cmd += ["--region", cfg.region]
     # 리포트가 어디 놓였는지를 파일로 받는다 (미결 `paik` 11번).
