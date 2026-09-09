@@ -1,0 +1,12 @@
+# 절대 이미지에 들어가면 안 되는 것 — 2026-09-09에 .env가 이미지에
+# 그대로 들어가 Docker Hub까지 올라간 적이 있다 (min 11번). 다시 겪지 않는다.
+.env
+.env.*
+!.env.example
+
+.venv
+__pycache__
+*.pyc
+.git
+.pytest_cache
+tests
