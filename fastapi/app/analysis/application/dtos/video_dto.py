@@ -54,6 +54,9 @@ class RegisterVideoCommand:
     # 스키마가 정규화·기하 검증을 끝낸 값이다. 지정이 없으면 둘 다 None.
     subject_box: list[float] | None = None
     subject_at_ms: int | None = None
+    # 「집중해서 볼 항목」 (미결 `paik` 8번). 루브릭 criteria id 리스트.
+    # 스키마가 정리(공백 제거·중복 제거)한 값. 비면 None(「전체」).
+    focus: list[str] | None = None
 
 
 @dataclass(frozen=True)

@@ -147,6 +147,21 @@ class TestRegister:
         assert box == [0.39, 0.35, 0.12, 0.4]
         assert at == 4_200
 
+    def test_집중_항목이_작업_행에_저장된다(self, db_client, db_session, uploader):
+        """미결 `paik` 8번 — `analysis_job.focus`(JSON 컬럼) 에 남는다."""
+        key = _upload(db_client, uploader)
+        res = _register(
+            db_client, uploader, key, focus=["follow_through", "trunk_alignment"]
+        )
+        assert res.status_code == 201, res.text
+        video_id = uuid.UUID(res.json()["id"])
+
+        stored = db_session.execute(
+            text("SELECT focus FROM analysis_job WHERE video_id = :id"),
+            {"id": video_id},
+        ).scalar_one()
+        assert stored == ["follow_through", "trunk_alignment"]
+
     def test_analyze_false_면_지정_박스는_버려진다(
         self, db_client, db_session, uploader
     ):

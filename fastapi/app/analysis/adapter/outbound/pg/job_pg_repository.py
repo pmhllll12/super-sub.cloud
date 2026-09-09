@@ -52,6 +52,7 @@ class JobPgRepository(JobPort):
                 AnalysisJobOrm.video_id,
                 AnalysisJobOrm.subject_box,
                 AnalysisJobOrm.subject_at_ms,
+                AnalysisJobOrm.focus,
             )
         ).first()
 
@@ -60,7 +61,7 @@ class JobPgRepository(JobPort):
             self._session.rollback()
             return None
 
-        job_id, video_id, subject_box, subject_at_ms = claimed
+        job_id, video_id, subject_box, subject_at_ms, focus = claimed
         video = self._session.get(VideoOrm, video_id)
         if video is None:
             # 외래키가 CASCADE 라 정상 경로에서는 올 수 없다. 그래도 조용히
@@ -78,6 +79,7 @@ class JobPgRepository(JobPort):
             duration_ms=video.duration_ms,
             subject_box=subject_box,
             subject_at_ms=subject_at_ms,
+            focus=focus,
         )
 
     def reclaim_stale(self, timeout_minutes: int) -> tuple[int, int]:

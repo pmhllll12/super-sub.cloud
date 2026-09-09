@@ -38,6 +38,7 @@ class _Row:
     report_key: str | None = None
     subject_box: list[float] | None = None
     subject_at_ms: int | None = None
+    focus: list[str] | None = None
 
 
 _JOBS: dict[UUID, _Row] = {}
@@ -58,6 +59,7 @@ def enqueue(
     created_at: datetime | None = None,
     subject_box: list[float] | None = None,
     subject_at_ms: int | None = None,
+    focus: list[str] | None = None,
 ) -> None:
     """검사가 "이런 작업이 큐에 있다"고 알려 준다."""
     _JOBS[job_id] = _Row(
@@ -70,6 +72,7 @@ def enqueue(
         created_at=created_at or datetime.now(timezone.utc),
         subject_box=subject_box,
         subject_at_ms=subject_at_ms,
+        focus=focus,
     )
 
 
@@ -105,6 +108,7 @@ class StubJobRepository(JobPort):
             duration_ms=row.duration_ms,
             subject_box=row.subject_box,
             subject_at_ms=row.subject_at_ms,
+            focus=row.focus,
         )
 
     def reclaim_stale(self, timeout_minutes: int) -> tuple[int, int]:

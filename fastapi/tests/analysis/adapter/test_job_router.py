@@ -117,6 +117,8 @@ class TestClaim:
             # 지정이 없으면 둘 다 null — 「자동으로 고르기」 (미결 `paik` 6번).
             "subject_box": None,
             "subject_at_ms": None,
+            # 없으면 null — 「전체적으로」 (미결 `paik` 8번).
+            "focus": None,
         }
 
     def test_집으면_running_이_된다(self, client):
@@ -155,6 +157,14 @@ class TestClaim:
         enqueue(uuid4(), uuid4())
         body = client.post(CLAIM, headers=_hdr()).json()
         assert body["subject_box"] is None and body["subject_at_ms"] is None
+        assert body["focus"] is None
+
+    def test_집중_항목이_claim_응답에_실린다(self, client):
+        """미결 `paik` 8번 — 「집중해서 볼 항목」이 워커가 읽는 자리(claim)까지 온다."""
+        job_id = uuid4()
+        enqueue(job_id, uuid4(), focus=["follow_through", "guide_hand"])
+        body = client.post(CLAIM, headers=_hdr()).json()
+        assert body["focus"] == ["follow_through", "guide_hand"]
 
 
 class TestFinish:

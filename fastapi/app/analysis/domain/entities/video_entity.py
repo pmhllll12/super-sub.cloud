@@ -60,3 +60,5 @@ class VideoEntity:
     # 작업을 안 만들면(반려·`analyze=False`) 버려진다 — 담을 행이 없다.
     subject_box: list[float] | None = None
     subject_at_ms: int | None = None
+    # 「집중해서 볼 항목」 (미결 `paik` 8번). 위와 같은 취급.
+    focus: list[str] | None = None

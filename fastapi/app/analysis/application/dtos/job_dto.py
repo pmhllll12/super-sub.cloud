@@ -27,3 +27,5 @@ class ClaimedJobResult:
     # 「이 사람으로 분석」 (미결 `paik` 6번). 없으면 둘 다 None.
     subject_box: list[float] | None = None
     subject_at_ms: int | None = None
+    # 「집중해서 볼 항목」 (미결 `paik` 8번). 빈/None 이면 「전체」.
+    focus: list[str] | None = None

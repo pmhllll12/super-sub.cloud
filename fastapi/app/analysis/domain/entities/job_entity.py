@@ -30,3 +30,5 @@ class ClaimedJobEntity:
     # 그 박스를 그린 시각(ms). 지정이 없으면 둘 다 None — 「자동으로 고르기」다.
     subject_box: list[float] | None = None
     subject_at_ms: int | None = None
+    # 「집중해서 볼 항목」 (미결 `paik` 8번). 루브릭 criteria id 리스트. 빈/None 이면 「전체」.
+    focus: list[str] | None = None

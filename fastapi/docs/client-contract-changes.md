@@ -1141,6 +1141,37 @@ grep -rn "GK.*DF.*MF.*FW\|골키퍼.*수비수" www/src   # 하드코딩이 남�
 
 ---
 
+## 29. 🟢 「집중해서 볼 항목」(focus)을 `POST /videos` 에 실을 수 있습니다 (2026-09-09 추가, 미결 `paik` 8번)
+
+분석 화면의 `www/src/lib/rubricFocus.ts` 가 고른 항목을 보낼 자리가 없었습니다.
+`POST /api/v1/videos` 본문에 `focus` 를 더했습니다 (`subject_box` 와 같은 축 —
+`analysis_job` 에 저장 → claim 응답 → 워커 `--focus`).
+
+### 만족해야 할 성질
+
+- `www/src/lib/uploadClip.ts` 가 등록할 때 `focus` 를 함께 보낸다 — 루브릭의
+  `criteria[].id` 목록(예: `["follow_through", "guide_hand"]`).
+- 이 값은 저장돼 워커까지 흘러갑니다. 응답에는 안 실립니다.
+
+### 🔴 하지 말아야 할 것
+
+- **빈 목록·생략을 실패로 만들지 마세요** — 「전체적으로」가 기본이자 가장 흔한
+  경우입니다. `focus: []` 든 아예 생략이든 `201` 입니다.
+- **한글 항목 이름을 보내지 마세요** — `criteria[].id`(예: `follow_through`)입니다.
+  `팔로스루` 같은 표시 이름이 아닙니다. 서버는 실재 여부를 못 봅니다(루브릭은 `agent/`).
+- 항목 40자·목록 24개 상한. 서버가 공백·중복은 정리하지만 형식만입니다.
+
+### 먼저 확인
+
+```bash
+grep -n "focus" www/src/lib/uploadClip.ts        # 화면 쪽이 실었는지
+git -C fastapi grep -n "focus" -- app/analysis    # 백엔드 쪽(이미 됨)
+```
+
+상세: `fastapi/docs/api-contract.md` **3-6절** (`POST /videos`) · **3-8절** (claim 응답)
+
+---
+
 ## 계약 문서
 
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린

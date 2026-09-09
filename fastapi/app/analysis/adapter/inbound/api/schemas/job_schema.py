@@ -27,6 +27,10 @@ class ClaimedJobResponse(BaseModel):
     # --subject-at-ms` 로 넘긴다.
     subject_box: list[float] | None = None
     subject_at_ms: int | None = None
+    # 「집중해서 볼 항목」 (미결 `paik` 8번). 루브릭 criteria id 리스트.
+    # 🔴 **없거나 빈 리스트면 「전체적으로」**다 — 워커는 `--focus` 를 안 붙인다.
+    # 있으면 `--focus a,b,c` 로 넘긴다.
+    focus: list[str] | None = None
 
 
 class FinishJobSchema(BaseModel):

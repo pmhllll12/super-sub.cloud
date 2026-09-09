@@ -1467,7 +1467,8 @@ SFR-001. 사용자가 자기 클립을 올리고, 서버가 규격을 검사해 
   "analyze": true,
   "filename": "우리팀 첫 골.mp4",
   "subject_box": [0.39, 0.35, 0.12, 0.4],
-  "subject_at_ms": 4200
+  "subject_at_ms": 4200,
+  "focus": ["follow_through", "guide_hand"]
 }
 ```
 
@@ -1487,6 +1488,16 @@ SFR-001. 사용자가 자기 클립을 올리고, 서버가 규격을 검사해 
 | 기하 | `w·h > 0`, `x+w ≤ 1`, `y+h ≤ 1`. `subject_at_ms ≤ duration_ms` |
 | 🔴 없어도 된다 | 생략하면 「자동으로 고르기」다 — **실패로 만들지 않는다** |
 | 작업이 없으면 | `analyze: false` 거나 반려면 박스는 버려진다(담을 작업 행이 없다). 이것도 실패가 아니다 |
+
+`focus` 는 「어디를 집중해서 볼지」다(미결 `paik` 8번) — 루브릭 `criteria[].id`
+목록(예: `["follow_through", "guide_hand"]`). `subject_box` 와 같이 `claim` 응답으로
+워커에 흘러간다(`--focus`).
+
+| 규칙 | |
+|---|---|
+| 🔴 빈 목록·생략 = 「전체적으로」 | 기본이자 가장 흔한 경우 — **실패로 만들지 않는다** |
+| 형식 | 문자열 리스트. 서버가 공백·중복을 정리한다. 항목 40자·목록 24개 상한. 값의 실재(그 루브릭에 있는 id 인지)는 서버가 못 본다 — 루브릭은 `agent/` |
+| 작업이 없으면 | `subject_box` 와 같다 — 버려진다, 실패 아님 |
 
 `201 Created`
 
@@ -1916,7 +1927,8 @@ POST /videos ──> analysis_job(queued)
   "job_id": "…", "video_id": "…",
   "storage_key": "videos/<user_id>/<uuid>.mp4",
   "sport_code": "baseball", "side": "right", "duration_ms": 4200,
-  "subject_box": [0.39, 0.35, 0.12, 0.4], "subject_at_ms": 4200
+  "subject_box": [0.39, 0.35, 0.12, 0.4], "subject_at_ms": 4200,
+  "focus": ["follow_through", "guide_hand"]
 }
 ```
 
@@ -1924,6 +1936,10 @@ POST /videos ──> analysis_job(queued)
 등록 시 검증됨). 🔴 **없으면 둘 다 `null` 이고 그게 정상**이다 — 워커는
 「자동으로 고르기」로 돈다. 있으면 `analyze_s3.py --subject-box x,y,w,h
 --subject-at-ms` 로 넘긴다. `side`·`focus` 와 같은 축이다.
+
+`focus` 는 「집중해서 볼 항목」이다(미결 `paik` 8번) — 루브릭 `criteria[].id` 목록.
+🔴 **`null` 이나 빈 리스트면 「전체적으로」**다 — 워커는 `--focus` 를 안 붙인다.
+있으면 `--focus a,b,c` 로 넘긴다.
 
 **`204 No Content` — 큐가 비었다. 오류가 아니다.** 오류로 다루면 워커 로그가 빈
 폴링으로 가득 찬다.

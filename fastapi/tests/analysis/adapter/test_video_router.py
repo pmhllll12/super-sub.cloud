@@ -260,6 +260,39 @@ class TestRegisterVideo:
         )
         assert res.status_code == 422
 
+    def test_집중_항목을_받는다(self, client):
+        """미결 `paik` 8번 — 「어디를 집중해서 볼지」 루브릭 criteria id 목록."""
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        res = _register(
+            client, user_id, key, focus=["follow_through", "guide_hand"]
+        )
+        assert res.status_code == 201, res.text
+        assert res.json()["passed"] is True
+
+    def test_빈_집중_목록은_전체다_실패가_아니다(self, client):
+        """🔴 「전체적으로」가 기본이자 가장 흔한 경우 — 실패로 만들지 않는다."""
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        res = _register(client, user_id, key, focus=[])
+        assert res.status_code == 201, res.text
+
+    def test_집중_목록의_공백·중복은_정리된다(self, client):
+        """자유 문자열은 아니지만 형식은 서버가 정리한다(공백·중복 제거)."""
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        res = _register(
+            client, user_id, key,
+            focus=["  follow_through ", "follow_through", " "],
+        )
+        assert res.status_code == 201, res.text
+
     def test_올리지_않은_키는_반려가_아니라_에러다(self, client):
         """검사할 파일이 없다. 반려로 기록하면 "안 올린 것"과 구별되지 않는다."""
         user_id = uuid4()

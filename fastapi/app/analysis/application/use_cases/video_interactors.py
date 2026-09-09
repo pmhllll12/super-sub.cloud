@@ -169,6 +169,7 @@ class RegisterVideoInteractor(RegisterVideoUseCase):
             # 만들지 않는 것이 이 항목의 「하지 말 것」이다.
             subject_box=command.subject_box if make_job else None,
             subject_at_ms=command.subject_at_ms if make_job else None,
+            focus=command.focus if make_job else None,
         )
         self._repository.register(video)
         return to_video_result(video)

@@ -68,12 +68,17 @@ X-Worker-Token: <공유 시크릿>
   "side": "right",
   "duration_ms": 4200,
   "subject_box": [0.39, 0.35, 0.12, 0.4],
-  "subject_at_ms": 4200
+  "subject_at_ms": 4200,
+  "focus": ["follow_through", "guide_hand"]
 }
 ```
 
 - `storage_key` 앞에 `s3://supersub-ai/` 를 붙이면 `analyze_s3.py` 의 첫 인자입니다
 - `side` 는 없을 수 있습니다(`null`). 그러면 `--side` 를 주지 마십시오
+- ✅ **`focus` — 「집중해서 볼 항목」** (미결 `paik` 8번). 백엔드가 이제 claim 응답에
+  실어 보냅니다. `worker.py` 의 `analyze_command` 는 **이미 `job.get("focus")` 를
+  읽어 `--focus a,b,c` 로 넘기고 있어** 그대로 흘러갑니다. 🔴 **`null`·빈 리스트면
+  아무것도 안 붙입니다** — 「전체적으로」입니다
 - 🔴 **`subject_box`·`subject_at_ms` — 「이 사람으로 분석」** (미결 `paik` 6번).
   있으면 `--subject-box "x,y,w,h" --subject-at-ms <ms>` 로 넘겨 주십시오
   (`--focus` 와 같은 자리 — `worker.py` 의 `analyze_command`). **없으면(`null`)

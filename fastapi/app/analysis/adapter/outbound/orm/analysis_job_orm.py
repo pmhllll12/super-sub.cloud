@@ -59,3 +59,9 @@ class AnalysisJobOrm(Base):
     # 그게 정상 경로다** — 「자동으로 고르기」. 둘 중 하나만 찬 상태는 앱이 막는다.
     subject_box: Mapped[list | None] = mapped_column(JSON, nullable=True)
     subject_at_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # 「집중해서 볼 항목」 (미결 `paik` 8번). 루브릭 `criteria[].id` 리스트.
+    # `subject_box` 와 같은 축 — 등록이 받아 넣고 `claim` 응답 → 워커 `--focus`.
+    # 🔴 **NULL(빈 목록) = 「전체적으로」가 기본**이다. 채점을 바꿀지(가중치
+    # 재정규화)는 워커/루브릭 판단이고(미결 8번 안 B), 백엔드는 값만 나른다.
+    focus: Mapped[list | None] = mapped_column(JSON, nullable=True)

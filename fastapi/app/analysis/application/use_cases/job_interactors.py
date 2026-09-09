@@ -86,6 +86,7 @@ class ClaimJobInteractor(ClaimJobUseCase):
             duration_ms=job.duration_ms,
             subject_box=job.subject_box,
             subject_at_ms=job.subject_at_ms,
+            focus=job.focus,
         )
 
 

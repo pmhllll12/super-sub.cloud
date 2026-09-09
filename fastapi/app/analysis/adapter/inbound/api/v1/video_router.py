@@ -96,6 +96,7 @@ def register_video(
             original_filename=body.filename,
             subject_box=body.subject_box,
             subject_at_ms=body.subject_at_ms,
+            focus=body.focus,
         )
     )
 

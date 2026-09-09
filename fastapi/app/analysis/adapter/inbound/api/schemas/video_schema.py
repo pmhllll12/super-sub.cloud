@@ -66,6 +66,28 @@ class RegisterVideoSchema(BaseModel):
     subject_box: list[float] | None = Field(default=None, min_length=4, max_length=4)
     subject_at_ms: int | None = Field(default=None, ge=0)
 
+    # 「집중해서 볼 항목」 (미결 `paik` 8번). 루브릭 `criteria[].id` 리스트
+    # (예: `["follow_through", "guide_hand"]`). 🔴 **빈 목록·생략 = 「전체적으로」**
+    # 가 기본이자 가장 흔한 경우다 — 실패로 만들지 않는다. 각 항목의 실재
+    # 여부는 서버가 못 본다(루브릭은 `agent/`) — 형식만 본다(공백·중복 정리).
+    focus: list[str] | None = Field(default=None, max_length=24)
+
+    @model_validator(mode="after")
+    def _clean_focus(self) -> "RegisterVideoSchema":
+        if self.focus is None:
+            return self
+        seen: list[str] = []
+        for raw in self.focus:
+            item = raw.strip()
+            if not item:
+                continue
+            if len(item) > 40:
+                raise ValueError("focus 항목이 너무 깁니다(40자 상한).")
+            if item not in seen:
+                seen.append(item)
+        self.focus = seen or None
+        return self
+
     @model_validator(mode="after")
     def _check_subject(self) -> "RegisterVideoSchema":
         box, at = self.subject_box, self.subject_at_ms
