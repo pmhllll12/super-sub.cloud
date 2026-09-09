@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import ForeignKey, UniqueConstraint, Uuid
+from sqlalchemy import ForeignKey, SmallInteger, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -36,6 +36,14 @@ class SquadMemberOrm(Base):
     position_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("position.id"), nullable=False
     )
+
+    # 홈 스쿼드 판에서 이 카드가 선 격자 칸 (미결 `paik` 9번). **열·행 번호이고
+    # 픽셀이 아니다** — 카드 크기가 바뀌어도 배치가 안 어긋나게. 등재만 하고
+    # 판에 안 올린 카드는 둘 다 NULL 이다(둘 중 하나만 찬 상태는 앱이 막는다).
+    # 격자 뜻(지금 3열 × 4행, 행이 포지션 라인)의 정본은 계약 3-7 절이다 — 격자
+    # 크기가 바뀌면 여기 저장된 값의 뜻도 바뀌므로 그때 리매핑 마이그레이션이 필요.
+    grid_col: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    grid_row: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
 
     __table_args__ = (
         # 부록 D.7 — 스쿼드당 카드 1회 등재.

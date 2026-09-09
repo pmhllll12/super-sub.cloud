@@ -24,6 +24,7 @@ from app.review.adapter.inbound.api.v1.review_router import review_router
 from app.user.adapter.inbound.api.v1.admin_router import admin_router
 from app.user.adapter.inbound.api.v1.auth_router import auth_router
 from app.user.adapter.inbound.api.v1.me_router import me_router
+from app.user.adapter.inbound.api.v1.positions_router import positions_router
 from app.user.adapter.inbound.api.v1.team_router import team_router
 from app.user.adapter.outbound.stub.user_stub_repository import (
     DEMO_EMAIL,
@@ -87,6 +88,7 @@ for _router in (
     auth_router,
     me_router,
     team_router,
+    positions_router,
     match_router,
     card_router,
     squad_router,

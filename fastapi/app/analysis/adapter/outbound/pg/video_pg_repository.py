@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import column, func, select, table
+from sqlalchemy import column, func, select, table, update
 from sqlalchemy.orm import Session
 
 from app.analysis.adapter.outbound.orm.analysis_job_orm import AnalysisJobOrm
@@ -27,6 +27,8 @@ from app.analysis.domain.entities.video_entity import ValidationEntity, VideoEnt
 # 소유하지 않는 테이블에서 **읽기만** 한다. 위 docstring 참조.
 _sport = table("sport", column("code"))
 _user = table("user", column("id"), column("nickname"), column("email"))
+# `card` 컨텍스트 테이블. 슬러그→`user_id` 만 읽는다(경계 유지).
+_player_card = table("player_card", column("public_slug"), column("user_id"))
 
 
 class VideoPgRepository(VideoPort):
@@ -97,6 +99,9 @@ class VideoPgRepository(VideoPort):
                     video_id=video.id,
                     status=video.analysis_status,
                     created_at=video.created_at,
+                    subject_box=video.subject_box,
+                    subject_at_ms=video.subject_at_ms,
+                    focus=video.focus,
                 )
             )
         self._session.commit()
@@ -144,6 +149,36 @@ class VideoPgRepository(VideoPort):
         ).scalar_one_or_none()
         latest = self._latest_jobs([video_id]).get(video_id)
         return _to_entity(video, validation, latest)
+
+    def find_featured_by_card_slug(
+        self, card_public_slug: str
+    ) -> VideoEntity | None:
+        # 슬러그 → user_id 는 `player_card` 를 원시 쿼리로만 읽는다(경계 유지).
+        owner = self._session.execute(
+            select(_player_card.c.user_id).where(
+                _player_card.c.public_slug == card_public_slug
+            )
+        ).scalar_one_or_none()
+        if owner is None:
+            return None
+
+        video = self._session.execute(
+            select(VideoOrm)
+            .where(VideoOrm.user_id == owner, VideoOrm.is_featured.is_(True))
+        ).scalar_one_or_none()
+        if video is None:
+            return None
+
+        validation = self._session.execute(
+            select(VideoValidationOrm).where(
+                VideoValidationOrm.video_id == video.id
+            )
+        ).scalar_one_or_none()
+        # 🔴 반려된 클립은 대표에서 뺀다 — 인터랙터가 세울 때 막지만, 세운 뒤
+        #    재검사로 반려됐거나 옛 데이터가 있으면 여기서도 걸러야 한다.
+        if not (validation and validation.passed):
+            return None
+        return _to_entity(video, validation, None)
 
     def mark_kept(
         self, video_id: UUID, user_id: UUID, *, storage_key: str
@@ -220,6 +255,7 @@ class VideoPgRepository(VideoPort):
         is_public: bool | Any = UNSET,
         title: str | None | Any = UNSET,
         description: str | None | Any = UNSET,
+        is_featured: bool | Any = UNSET,
     ) -> VideoEntity | None:
         video = self._session.get(VideoOrm, video_id)
         if video is None or video.user_id != user_id:
@@ -230,6 +266,21 @@ class VideoPgRepository(VideoPort):
             video.title = title
         if description is not UNSET:
             video.description = description
+        if is_featured is not UNSET:
+            if is_featured:
+                # 🔴 **먼저 내린다** — 부분 유일 인덱스(`uq_video_featured_per_user`)
+                #    가 사람당 하나만 허용하므로, 남을 안 내리면 이 UPDATE 가
+                #    유일 위반으로 터진다. 같은 트랜잭션이라 창이 없다.
+                self._session.execute(
+                    update(VideoOrm)
+                    .where(
+                        VideoOrm.user_id == user_id,
+                        VideoOrm.is_featured.is_(True),
+                        VideoOrm.id != video_id,
+                    )
+                    .values(is_featured=False)
+                )
+            video.is_featured = is_featured
         self._session.commit()
 
         validation = self._session.execute(
@@ -288,6 +339,7 @@ def _to_entity(
         duration_ms=video.duration_ms,
         side=video.side,
         is_public=video.is_public,
+        is_featured=video.is_featured,
         title=video.title,
         description=video.description,
         kept=video.kept,

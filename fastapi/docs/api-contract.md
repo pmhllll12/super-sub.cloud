@@ -639,8 +639,43 @@ ERD 갱신은 미결 항목으로 올렸다.
 ### 분석이 실패했을 때
 
 `analysis_job`은 `queued · running · succeeded · failed`와 실패 사유를 갖는다.
-상태 갱신 엔드포인트는 **아직 정하지 않았다** — 결과 제출과 같은 자리에서 받을지
-따로 둘지가 미정이다(아래).
+✅ **워커가 `PATCH /internal/analysis-jobs/{job_id}` 로 `{"status": "failed",
+"failure_reason": …}` 를 보낸다** (3-8절). `succeeded`·`failed` 둘 다 이 한 자리로
+받는다 — `POST /analyses`(적재)와는 별개다. 워커 배선은 미결 `ho` 18번에서 끝났다.
+
+### ✅ 결정 — 리포트 읽기 경로는 DB에서 조립한다 (2026-09-09)
+
+`metrics`·`report` 를 `POST /analyses` 로 받아 DB(`analysis_metric_value` ·
+`analysis_report`)에 적재하고, **화면이 읽는 리포트는 그 DB에서 조립해 내보낸다.**
+S3 의 분석 산출물(`report.json`)을 서버가 받아 점수만 걷어내고 그대로 돌려주는
+방식(passthrough)은 **택하지 않는다.**
+
+보안이 먼저이고 속도는 그다음이라는 기준으로 골랐다:
+
+| | DB 조립 (택함) | S3 산출물 passthrough |
+|---|---|---|
+| 점수 노출 통제 | 응답을 명시적 DTO 로 조립 — 넣기로 한 필드만 나가는 **허용목록** | 상위에서 진화하는 JSON 에 **차단목록 필터** — 필드 하나 놓치면 조용히 유출 |
+| 객체 저장소 | 완전히 서버 내부 | 서버가 매 요청마다 상위 문서를 프록시 |
+| 3장 4)("리포트 본문에 수치 금지") | 구조적으로 보장 | 매 읽기 경로가 필터 버그 하나 거리 |
+| 서빙 비용 | DB 쿼리 1회 | 매 요청 객체 저장소 GET |
+
+**따라오는 것:**
+
+1. **항목별 `stat`(0~100 연속값)도 `metrics` 로 적재한다.** 위에서 "총점과 항목별
+   등급"만 명시했으나, 항목별 연속값이 화면에 필요하고(레이더 축 등) DB 조립이면
+   그 값도 DB 에 있어야 S3 를 안 거친다. 코드 형식은
+   `stat.{sport}.{motion}.{criterion_id}` — 등급 코드와 같은 축(루브릭 종속,
+   아래 「항목별 등급」 참고).
+2. **`impact_frame` 은 `metrics[]` 행이다**(예시의 `frame_index` 필드가 아니다).
+   파이프라인이 `features` 에 스칼라(초)로 방출하므로 `metric_definition` 에 코드가
+   있어야 하고, 없으면 적재가 통째로 `UNKNOWN_METRIC_CODE` 로 거부된다.
+3. `metric_definition` 시드 규모: 측정 12 + `total_score` 1 + 항목별 등급 16 +
+   항목별 `stat` 16 = **약 45개.** 코드·`label`·`unit` 의 정본과 산출 스크립트는
+   미결 `jin` 23번의 정상호 회신에 있다(`metric_definitions.yaml` ·
+   `export_metric_definitions.py`). 🔴 **부분 시드 금지** — 전부 없으면
+   `POST /analyses` 가 실서버에서 전부 거부된다.
+
+**읽기 엔드포인트(`GET` `.../report`)의 구체 규격은 시드가 들어온 뒤 이 절에 추가한다.**
 
 ### 🔴 지표 코드 실태 — 지금 스키마로는 루브릭을 담을 수 없다 (2026-09-01 조사)
 
@@ -749,9 +784,9 @@ trunk_alignment       2개 루브릭  basketball_jump_shot · basketball_layup  
 | 무엇 | 왜 지금 못 정하나 |
 |---|---|
 | ~~**지표 코드의 종목 처리 (A·B·C)**~~ | ✅ **A안** (2026-09-08). 스키마 반영 완료(`5db18b239336`). 남은 것은 부록 D.3 수정(박민호, 미결 `ho` 구역)뿐이다 |
-| **서비스 인증 방식** | 에이전트는 사용자가 아니다. 사용자 토큰을 쥐게 할 수 없으므로 별도 자격증명이 필요하다. 값은 배포 환경에서 주입한다(5장 SEC-011). 형태 미정 |
-| **지표 코드 목록의 주인** | 루브릭이 이미 이름을 갖고 있으므로 **에이전트가 정의하고 백엔드가 따라가는** 형태가 자연스럽다. 다만 새 종목을 열 때 누가 먼저 넣느냐(시드 스크립트 · 마이그레이션 · API)는 미정 |
-| **실패 보고 경로** | 상태 갱신을 별도 엔드포인트로 둘지, 결과 제출에 합칠지 |
+| ~~**서비스 인증 방식**~~ | ✅ `X-Worker-Token` 헤더 + `WORKER_TOKEN` 공유 시크릿(3-8절 · `core/deps.py` 의 `require_worker`). 비어 있으면 fail-closed(전부 401) |
+| **지표 코드 목록의 주인** | ✅ **에이전트가 정의하고 백엔드가 따라간다** — `agent/` 의 `metric_definitions.yaml` 이 정본(정상호, 미결 `jin` 23번). 새 코드가 `metric_definition` 시드에 반영되는 경로는 미결 `jin` 25번에서 마무리 |
+| ~~**실패 보고 경로**~~ | ✅ `PATCH /internal/analysis-jobs/{job_id}` 하나로 `succeeded`·`failed` 둘 다(3-8절, 미결 `ho` 18번) |
 | **신뢰도(키포인트 품질)를 어디에 담나** | 3장 4)의 산출물 넷 중 하나다. 지표 항목으로 넣을지 별도 필드로 둘지 |
 
 > ⚠️ 7장 칸반과 스프린트 1 로그에 **"측정값 MySQL 적재"** 라고 적혀 있는데,
@@ -1191,6 +1226,31 @@ GET /api/v1/matches?sport_code=football&region=서울&page=1&size=20
 
 **확정된 목록이 아니다.** 스쿼드(`squad_member`)가 들어올 때 세분화가 필요하면 늘린다.
 
+### `GET /api/v1/positions` — 포지션 목록 (2026-09-09 추가)
+
+위 표를 **API 로** 준다. 지금 스쿼드 등재·경기 `needs`·챗봇 화면이 이 목록을
+**하드코딩**하고 있어서, 마이그레이션이 바뀌면 조용히 낡는다. 그 자리를 이걸로
+갈아 끼운다. **로그인하면 누구나** — 참조 데이터라 사용자별 내용이 없다.
+
+```
+GET /api/v1/positions              → 전 종목
+GET /api/v1/positions?sport_code=football
+```
+
+```json
+[
+  { "sport_code": "football", "code": "DF", "label": "수비수" },
+  { "sport_code": "football", "code": "FW", "label": "공격수" }
+]
+```
+
+`sport_code` 순으로 정렬돼 온다. 🔴 **약칭(`code`)은 종목 안에서만 유일**하다 —
+야구 `C`(포수)와 농구 `C`(센터)는 다른 것이라 둘 다 실린다.
+
+| 에러 | code | 언제 |
+|---|---|---|
+| 422 | `UNKNOWN_SPORT` | `sport_code` 필터가 `sport` 에 없는 값이다 — 빈 배열이면 오타와 "그 종목 포지션이 아직 없다"가 같아 보인다(`GET /matches` 와 같은 판단) |
+
 ---
 
 ## 3-5. 지원과 제안 (2026-09-02 추가)
@@ -1406,13 +1466,39 @@ SFR-001. 사용자가 자기 클립을 올리고, 서버가 규격을 검사해 
   "height": 1080,
   "side": "right",
   "analyze": true,
-  "filename": "우리팀 첫 골.mp4"
+  "filename": "우리팀 첫 골.mp4",
+  "subject_box": [0.39, 0.35, 0.12, 0.4],
+  "subject_at_ms": 4200,
+  "focus": ["follow_through", "guide_hand"]
 }
 ```
 
 `filename` 은 **원본 이름**이다 — DB `video.original_filename` 에 온전히 남긴다
 (저장 키 슬러그는 손실적이다). 관리자 목록이 이 값으로 "문제 영상"을 되짚는다.
 생략 가능(`null`).
+
+`subject_box`·`subject_at_ms` 는 「이 사람으로 분석」 대상이다(미결 `paik` 6번).
+`subject_box` 는 정규화 `[x, y, w, h]` (0~1) — **화면 픽셀이 아니다.** `subject_at_ms`
+는 그 박스를 그린 영상 시각(ms). 응답에는 실리지 않는다(분석 작업의 값이라
+`claim` 응답으로 나간다 — 3-8절).
+
+| 규칙 | |
+|---|---|
+| 🔴 정규화만 | `x·y·w·h` 가 `[0, 1]` 밖이면 422. 조용히 클램프하면 엉뚱한 사람을 분석하고도 "지정대로"라 답한다 |
+| 🔴 함께 or 생략 | 박스만 주고 시각을 안 주면(또는 반대) 422 |
+| 기하 | `w·h > 0`, `x+w ≤ 1`, `y+h ≤ 1`. `subject_at_ms ≤ duration_ms` |
+| 🔴 없어도 된다 | 생략하면 「자동으로 고르기」다 — **실패로 만들지 않는다** |
+| 작업이 없으면 | `analyze: false` 거나 반려면 박스는 버려진다(담을 작업 행이 없다). 이것도 실패가 아니다 |
+
+`focus` 는 「어디를 집중해서 볼지」다(미결 `paik` 8번) — 루브릭 `criteria[].id`
+목록(예: `["follow_through", "guide_hand"]`). `subject_box` 와 같이 `claim` 응답으로
+워커에 흘러간다(`--focus`).
+
+| 규칙 | |
+|---|---|
+| 🔴 빈 목록·생략 = 「전체적으로」 | 기본이자 가장 흔한 경우 — **실패로 만들지 않는다** |
+| 형식 | 문자열 리스트. 서버가 공백·중복을 정리한다. 항목 40자·목록 24개 상한. 값의 실재(그 루브릭에 있는 id 인지)는 서버가 못 본다 — 루브릭은 `agent/` |
+| 작업이 없으면 | `subject_box` 와 같다 — 버려진다, 실패 아님 |
 
 `201 Created`
 
@@ -1429,6 +1515,7 @@ SFR-001. 사용자가 자기 클립을 올리고, 서버가 규격을 검사해 
   "analysis_job_id": "9a2e...",
   "analysis_status": "queued",
   "is_public": false,
+  "is_featured": false,
   "title": null,
   "description": null,
   "kept": true
@@ -1483,21 +1570,28 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
 
 ### `PATCH /api/v1/videos/{video_id}` — 부분 수정 (2026-09-08 추가)
 
-미결 `paik` 5번. **자기 클립**의 공개 여부·제목·한 줄 설명을 바꾼다.
+미결 `paik` 5번. **자기 클립**의 공개 여부·제목·한 줄 설명·대표 여부를 바꾼다.
 
 ```json
 { "is_public": true, "title": "우리 팀 첫 골", "description": "왼발 감아차기" }
+{ "is_featured": true }
 ```
 
-- **셋 다 생략 가능하다 — 보낸 것만 바뀐다.** 안 보낸 필드는 그대로다
+- **전부 생략 가능하다 — 보낸 것만 바뀐다.** 안 보낸 필드는 그대로다
 - `title` 100자 · `description` 280자. **`null` 이나 공백만 보내면 지운다**
-  (`PATCH /me/card` 의 `tagline` 과 같은 규칙). `is_public` 은 불리언이라
-  `null` 은 무시한다
-- `200 OK` — 응답은 `GET /videos` 한 줄과 같은 모양(바뀐 값이 실려 온다)
+  (`PATCH /me/card` 의 `tagline` 과 같은 규칙). `is_public`·`is_featured` 는
+  불리언이라 `null` 은 무시한다
+- `is_featured: true` — **「나를 보여주는 대표 영상」**(미결 `paik` 10번)으로 세운다.
+  🔴 **사람당 하나** — 세우면 그 사람의 다른 대표는 자동으로 내려간다(DB 부분
+  유일 인덱스). 🔴 **반려된 클립(`passed: false`)은 대표가 될 수 없다** →
+  `422 CANNOT_FEATURE`. 내리려면 `is_featured: false`
+- `200 OK` — 응답은 `GET /videos` 한 줄과 같은 모양(바뀐 값이 실려 온다).
+  `is_featured` 도 그 줄에 실린다
 
 | 에러 | code | 언제 |
 |---|---|---|
 | 404 | `VIDEO_NOT_FOUND` | 없는 클립이거나 **남의 클립**이다 — 존재 여부를 구별해 주지 않는다 |
+| 422 | `CANNOT_FEATURE` | 반려된 클립을 대표로 세우려 했다 |
 | 422 | `VALIDATION_ERROR` | `title`·`description` 이 길이 상한을 넘는다 |
 
 ### `GET /api/v1/videos/public` — 공개 클립 목록 (2026-09-08 추가)
@@ -1574,6 +1668,33 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
 |---|---|---|
 | 404 | `VIDEO_NOT_FOUND` | 없는 클립이거나 남의 클립이다 |
 
+### `GET /api/v1/cards/{card_public_slug}/featured-video` — 남의 대표 영상 (2026-09-09 추가, 미결 `paik` 10번)
+
+어떤 사람의 「나를 보여주는 대표 영상」을 **그 사람의 카드 슬러그**로 가져온다.
+추천 판에서 후보 옆에 도는 장면이 이것이다. 세우는 것은 위 `PATCH /videos/{id}`
+의 `is_featured` 다.
+
+```json
+{
+  "video_id": "7c05...",
+  "url": "https://<bucket>.s3.<region>.amazonaws.com/…?X-Amz-…",
+  "expires_in": 900,
+  "sport_code": "football",
+  "duration_ms": 10200
+}
+```
+
+- 🔴 **로그인하면 누구나.** 대표는 「보여 주려고」 고른 장면이지만, 사전 서명
+  URL 을 내주는 자리라 익명 긁기는 막는다.
+- 🔴 **저장 키가 아니라 사전 서명 GET URL** 을 준다 — 버킷은 닫혀 있다
+  (`playback-url` 과 같은 원칙). `expires_in` 초 뒤 만료, 매번 새로 받는다.
+- `is_public` 여부와 무관하다 — **대표로 세운 것 자체가 「보여 준다」는 뜻**이다.
+
+| 에러 | code | 언제 |
+|---|---|---|
+| 404 | `NO_FEATURED_VIDEO` | 슬러그가 없든·대표를 안 세웠든·그 대표가 반려됐든 — 밖에서는 다 "없음"이다 |
+| 503 | `STORAGE_NOT_CONFIGURED` | 서버에 `S3_BUCKET` 이 없다 |
+
 ### 아직 없는 것
 
 - **재분석** — `analysis_job` 은 여러 건을 허용하지만 만드는 경로가 업로드뿐이다
@@ -1619,12 +1740,16 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
   "id": "7c05...",
   "team_id": "3f1c...",
   "public_slug": "aB3xK9mQ2pL7vN4t",
+  "formation": null,
   "members": []
 }
 ```
 
 **멱등이다.** 두 번 불러도 스쿼드는 하나고 슬러그도 그대로다 — 클라이언트가
 재시도해도 공유 링크가 바뀌면 안 된다(`POST /me/card` 와 같은 판단이다).
+
+`formation` 은 홈 스쿼드 판의 판 크기다(`"3:3"`·`"5:5"`·`"7:7"`) — 아직 안
+정했으면 `null`. `PATCH /teams/{team_id}/squad` 로 저장한다(아래).
 
 | 에러 | code | 언제 |
 |---|---|---|
@@ -1640,7 +1765,11 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
 
 ```json
 { "player_card_id": "9a2e...", "position_code": "GK" }
+{ "player_card_id": "9a2e...", "position_code": "GK", "grid_col": 1, "grid_row": 3 }
 ```
+
+`grid_col`·`grid_row` 는 **선택**이다 — 등재하면서 홈 판 칸에 바로 올릴 때 준다.
+🔴 **함께 주거나 함께 비운다**(한쪽만 주면 422). 격자·픽셀 규칙은 아래 「홈 판 격자」.
 
 `201 Created` — **바뀐 스쿼드 전체**를 돌려준다(화면이 목록을 다시 그린다).
 
@@ -1649,6 +1778,7 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
   "id": "7c05...",
   "team_id": "3f1c...",
   "public_slug": "aB3xK9mQ2pL7vN4t",
+  "formation": "5:5",
   "members": [
     {
       "id": "1d4f...",
@@ -1656,11 +1786,15 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
       "card_public_slug": "hong-gildong-4f2a",
       "nickname": "홍길동",
       "position_code": "GK",
-      "position_label": "골키퍼"
+      "position_label": "골키퍼",
+      "grid_col": 1,
+      "grid_row": 3
     }
   ]
 }
 ```
+
+판에 안 올린 등재는 `grid_col`·`grid_row` 가 `null` 이다.
 
 `card_public_slug` 로 그 사람의 공개 카드(`/cards/{slug}`)로 갈 수 있다 —
 **내부 id 를 밖에 내보내지 않는 것**이 카드와 같은 원칙이다.
@@ -1690,6 +1824,53 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
 🔴 **그 등재가 이 팀 스쿼드의 것인지 확인한다.** 안 하면 주장이 id 만 알고 남의
 스쿼드에서 카드를 뺄 수 있다. 남의 것이면 `404 MEMBER_NOT_FOUND` 다.
 
+### `PATCH /api/v1/teams/{team_id}/squad` (2026-09-09 추가, 미결 `paik` 9번)
+
+홈 스쿼드 판의 **판 크기**를 저장한다. **주장만.** 바뀐 스쿼드 전체를 돌려준다.
+
+```json
+{ "formation": "5:5" }
+```
+
+값 집합(`"3:3"`·`"5:5"`·`"7:7"`)을 서버가 강제하지 않는다 — `analysis_job.status`
+와 같은 판단(값 규칙이 늘 때 마이그레이션 없이). 길이만 본다(1\~8).
+
+| 에러 | code | 언제 |
+|---|---|---|
+| 403 | `FORBIDDEN` | 주장이 아니다 |
+| 404 | `SQUAD_NOT_FOUND` | 스쿼드를 아직 안 만들었다 |
+
+### `PATCH /api/v1/teams/{team_id}/squad/members/{member_id}` (2026-09-09 추가, 미결 `paik` 9번)
+
+등재 하나의 **포지션·판 배치**를 바꾼다. **주장만.** 바뀐 스쿼드 전체를 돌려준다.
+계약의 「아직 없는 것 — 포지션 바꾸기」를 이걸로 해소한다.
+
+```json
+{ "position_code": "DF", "grid_col": 0, "grid_row": 2 }
+{ "position_code": "GK", "grid_col": null, "grid_row": null }
+```
+
+- `position_code` 는 **항상 준다** — 등재는 포지션 없이 존재하지 않는다. 포지션은
+  그대로 두고 칸만 옮기려면 지금 코드를 그대로 실으면 된다.
+- `grid_col`·`grid_row` 는 **함께 주거나 함께 비운다**. 둘 다 `null` 이면 등재는
+  남기고 **판에서만 뺀다**.
+
+| 에러 | code | 언제 |
+|---|---|---|
+| 403 | `FORBIDDEN` | 주장이 아니다 |
+| 404 | `MEMBER_NOT_FOUND` | 이 팀 스쿼드의 등재가 아니다 (남의 것도 이 코드다) |
+| 422 | `UNKNOWN_POSITION` | 이 종목에 없는 포지션이다 |
+
+### 홈 판 격자 — 지금 3열 × 4행 (2026-09-09 추가)
+
+`grid_col`·`grid_row` 는 **격자 칸 번호**다. 🔴 **화면 픽셀이 아니다** — 카드
+크기가 바뀌어도 배치가 안 어긋나게. 서버는 `0 ≤ 값 ≤ 15` 만 본다(픽셀 좌표
+방어). 지금 판은 **3열(0\~2) × 4행(0\~3)** 이고 **행이 포지션 라인**이다:
+`0` FW · `1` MF · `2` DF · `3` GK. `formation` 이 바뀌어도 격자는 이대로다.
+
+🔴 **격자 크기·행 의미가 바뀌면 저장된 값의 뜻도 바뀐다** — 그때는 리매핑
+마이그레이션이 필요하다. 이 절이 그 값의 정본이다.
+
 ### `GET /api/v1/squads/{public_slug}`
 
 **인증하지 않는다.** 공개 카드(`/cards/{slug}`)와 같은 결이다 — 슬러그가 96비트
@@ -1699,7 +1880,7 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
 
 - **스쿼드 삭제** — 팀 해체 시의 처리가 안 정해졌다(부록 D.6). `squad.team_id` 의
   삭제 규칙을 기본(RESTRICT)으로 둔 것도 같은 이유다
-- **포지션 바꾸기** — 지금은 빼고 다시 넣어야 한다. 화면이 요구하면 낸다
+- ~~**포지션 바꾸기**~~ ✅ 2026-09-09 — `PATCH .../squad/members/{member_id}` (미결 `paik` 9번)
 - **여러 스쿼드** — 이름 컬럼이 필요하다(위 「팀당 하나로 다룬다」)
 
 ---
@@ -1746,9 +1927,20 @@ POST /videos ──> analysis_job(queued)
 {
   "job_id": "…", "video_id": "…",
   "storage_key": "videos/<user_id>/<uuid>.mp4",
-  "sport_code": "baseball", "side": "right", "duration_ms": 4200
+  "sport_code": "baseball", "side": "right", "duration_ms": 4200,
+  "subject_box": [0.39, 0.35, 0.12, 0.4], "subject_at_ms": 4200,
+  "focus": ["follow_through", "guide_hand"]
 }
 ```
+
+`subject_box`·`subject_at_ms` 는 「이 사람으로 분석」 대상이다(미결 `paik` 6번,
+등록 시 검증됨). 🔴 **없으면 둘 다 `null` 이고 그게 정상**이다 — 워커는
+「자동으로 고르기」로 돈다. 있으면 `analyze_s3.py --subject-box x,y,w,h
+--subject-at-ms` 로 넘긴다. `side`·`focus` 와 같은 축이다.
+
+`focus` 는 「집중해서 볼 항목」이다(미결 `paik` 8번) — 루브릭 `criteria[].id` 목록.
+🔴 **`null` 이나 빈 리스트면 「전체적으로」**다 — 워커는 `--focus` 를 안 붙인다.
+있으면 `--focus a,b,c` 로 넘긴다.
 
 **`204 No Content` — 큐가 비었다. 오류가 아니다.** 오류로 다루면 워커 로그가 빈
 폴링으로 가득 찬다.
@@ -1774,6 +1966,7 @@ POST /videos ──> analysis_job(queued)
 
 ```json
 { "status": "succeeded" }
+{ "status": "succeeded", "report_key": "reports/<user_id>/<video_id>/report.json" }
 { "status": "failed", "failure_reason": "품질 게이트 미달" }
 ```
 
@@ -1784,6 +1977,20 @@ POST /videos ──> analysis_job(queued)
 | 404 | `JOB_NOT_FOUND` | 없는 작업이다 |
 | 409 | `JOB_NOT_RUNNING` | 집지 않았거나 이미 끝났다. **재시도해도 소용없다** |
 | 422 | `INVALID_JOB_STATUS` | `queued`·`running` 으로는 보고할 수 없다 |
+
+#### `report_key` — 워커가 만든 리포트의 자리 (2026-09-09 추가, 미결 `paik` 11번)
+
+**선택 필드.** 워커가 분석 결과를 S3 에 쓴 뒤 그 **버킷 상대 키**를 함께 싣는다.
+백엔드는 이 값을 `analysis_job.report_key` 에 그대로 남긴다 — 자리 규칙
+(`analyze_s3` 의 `report_targets`)이 워커 안에만 있고, 파일 이름에 분석 시각이
+붙어 같은 영상을 두 번 돌리면 파일이 둘이 되므로 **백엔드가 계산으로 찾을 수 없다.**
+
+| | |
+|---|---|
+| 형태 | 버킷 상대 키. 예: `reports/<user_id>/<video_id>/report.json`. 상한 1024자(S3 객체 키 한계) — 넘으면 422 |
+| 🔴 `succeeded` 일 때만 | `failed` 와 함께 와도 **버린다**(실패한 작업이 가리킬 리포트는 없다). 계약이 아니라 데이터 무결성이라 받는 쪽에서 막는다 |
+| 없어도 된다 | 워커가 자리를 못 실어도(리포트가 다른 버킷 등) 분석은 성공한 것이다. 화면이 리포트를 못 찾을 뿐이다 |
+| 읽는 쪽 | 이 값으로 무엇을 읽을지는 미결 `paik` 7번(리포트 읽는 경로)에서 정한다 |
 
 **`finished_at` 을 받지 않는다.** 워커의 시계가 어긋나면 소요 시간이 음수가 된다 —
 서버가 찍는다. 같은 이유로 `started_at` 은 `claim` 이 찍는다. 🔴 이 두 시각의 차이가
