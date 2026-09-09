@@ -21,11 +21,19 @@ _SPORTS = ("football", "baseball", "basketball")
 _VIDEOS: dict[UUID, VideoEntity] = {}
 # 가짜 저장소에 "올라와 있는" 객체. 키 -> 크기(바이트).
 _OBJECTS: dict[str, int] = {}
+# 스텁은 `player_card` 를 모른다 — 검사가 "이 슬러그는 이 사람 카드"라고 알려 준다.
+_CARD_SLUGS: dict[str, UUID] = {}
 
 
 def reset_videos() -> None:
     _VIDEOS.clear()
     _OBJECTS.clear()
+    _CARD_SLUGS.clear()
+
+
+def register_card_slug(public_slug: str, user_id: UUID) -> None:
+    """`find_featured_by_card_slug` 가 슬러그→user_id 를 풀 수 있게 한다(미결 `paik` 10번)."""
+    _CARD_SLUGS[public_slug] = user_id
 
 
 def put_object(storage_key: str, size_bytes: int) -> None:
@@ -78,6 +86,7 @@ class StubVideoRepository(VideoPort):
         is_public: bool | Any = UNSET,
         title: str | None | Any = UNSET,
         description: str | None | Any = UNSET,
+        is_featured: bool | Any = UNSET,
     ) -> VideoEntity | None:
         video = _VIDEOS.get(video_id)
         if video is None or video.user_id != user_id:
@@ -89,9 +98,30 @@ class StubVideoRepository(VideoPort):
             changes["title"] = title
         if description is not UNSET:
             changes["description"] = description
+        if is_featured is not UNSET:
+            if is_featured:
+                # 사람당 하나 — 먼저 남을 내린다(실물의 부분 유일 인덱스와 같은 효과).
+                for vid, v in list(_VIDEOS.items()):
+                    if v.user_id == user_id and v.is_featured and vid != video_id:
+                        _VIDEOS[vid] = replace(v, is_featured=False)
+            changes["is_featured"] = is_featured
         updated = replace(video, **changes)
         _VIDEOS[video_id] = updated
         return updated
+
+    def find_featured_by_card_slug(
+        self, card_public_slug: str
+    ) -> VideoEntity | None:
+        owner = _CARD_SLUGS.get(card_public_slug)
+        if owner is None:
+            return None
+        for v in _VIDEOS.values():
+            if v.user_id != owner or not v.is_featured:
+                continue
+            if not (v.validation and v.validation.passed):
+                return None
+            return v
+        return None
 
     def list_public(self, limit: int) -> list[VideoEntity]:
         public = [v for v in _VIDEOS.values() if v.is_public and v.kept]

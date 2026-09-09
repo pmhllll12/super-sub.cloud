@@ -290,8 +290,13 @@ grep -n '^## [0-9]' jekyll/pages/pending.markdown   # 결과가 있으면 구역
 
 🔴 **커밋 전에 돌립니다** (걸리면 자리표시자로 바꿉니다):
 
+범위에 **`agent/`·`fastapi/`도 넣습니다.** 사이트 빌드에서 제외된 폴더라도
+저장소가 공개면 GitHub에 그대로 보입니다 — 실제로 `agent/deploy/`에 계정 ID와
+리소스 ID가 남아 있었습니다(미결 `jin` 22번). "배포되지 않는다"와 "공개되지
+않는다"는 다릅니다.
+
 ```bash
-git diff --cached --name-only -- jekyll/ _posts/ guide/ \
+git diff --cached --name-only -- jekyll/ _posts/ guide/ agent/ fastapi/ \
   | xargs grep -nE 'arn:aws:[a-z]+::[0-9]{12}|[0-9]{4}-[0-9]{4}-[0-9]{4}|(vpc|subnet|sg|eipalloc)-[0-9a-f]{8,}|\bi-0[0-9a-f]{16}\b|\b(3|13|15|43|52|54)\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\b|api\.[a-z0-9-]+\.[a-z]+' 2>/dev/null
 ```
 

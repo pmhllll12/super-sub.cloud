@@ -121,6 +121,31 @@ def report_slug(key: str) -> str:
     return f"{parent}/{stem}" if parent and parent != "videos" else stem
 
 
+def focus_envelope(rubric, requested: str | None) -> dict:
+    """올린 사람이 고른 「집중해서 볼 항목」 (미결 `paik` 8번).
+
+    🔴 **채점에는 영향이 없다.** 고른 항목만 채점하고 가중치를 재정규화하는
+    길(그쪽 항목의 B안)은 택하지 않았다 — 같은 영상이 **고른 것에 따라 다른
+    점수**를 내면 선수끼리 비교가 안 되고, 스카우팅은 비교가 전부다.
+    측정 실패로 항목이 빠지는 것(`applicable_criteria`)과는 다르다. 그쪽은
+    촬영 조건이 강제한 것이고 이쪽은 사용자가 고른 것이다.
+
+    🔴 **모르는 id 를 조용히 버리지 않는다.** 화면이 낡은 id 를 보내거나
+    종목이 어긋나면 사용자가 고른 것이 아무 일도 안 일어난 채 사라진다.
+    그렇다고 분석을 실패시키지도 않는다 — 강조 힌트 하나 때문에 리포트가
+    통째로 없어지는 것이 더 나쁘다. **둘 다 적어서 드러낸다.**
+
+    빈 값은 「전체적으로」다. 그것이 기본이자 가장 흔한 경우다.
+    """
+    ids = [t.strip() for t in (requested or "").split(",") if t.strip()]
+    known = set(rubric.criterion_ids)
+    applied = [i for i in ids if i in known]
+    unknown = [i for i in ids if i not in known]
+    if unknown:
+        print(f"  ⚠️ 루브릭에 없는 집중 항목 {unknown} — 리포트에 남기고 계속한다")
+    return {"requested": ids, "applied": applied, "unknown": unknown}
+
+
 def owner_from_key(key: str) -> str | None:
     """`videos/<user_id>/…` 에서 소유자를 꺼낸다. 모양이 다르면 None.
 
@@ -193,8 +218,13 @@ def resolve_videos(uri: str, region: str | None) -> list[str]:
     return found
 
 
-def analyze_one(video: str, args, rubric, subject) -> None:
-    """영상 한 편을 분석해 리포트를 올린다."""
+def analyze_one(video: str, args, rubric, subject) -> str:
+    """영상 한 편을 분석해 리포트를 올리고, **올린 자리를 돌려준다.**
+
+    자리를 돌려주는 것은 워커가 완료 보고에 실어야 해서다(미결 `paik` 11번).
+    🔴 **부르는 쪽이 자리를 다시 계산하게 두지 않는다** — 규칙(`report_targets`)이
+    두 곳에 생기면 조용히 갈린다. 아는 쪽이 말해 주는 것이 맞다.
+    """
     # --- 내려받기 --------------------------------------------------------
     # 임시 디렉터리에 받고 **끝까지 살려 둔다.** 미리보기 렌더링이 원본을 다시
     # 디코딩하기 때문이다(PoseResult가 프레임을 들고 있지 않으므로). 붙들고
@@ -279,6 +309,16 @@ def analyze_one(video: str, args, rubric, subject) -> None:
         # 아는 것은 fastapi 뿐이다 — 그쪽에서 갱신하거나 리포트를 DB로 옮길 때
         # 정리한다(`jin` 24번에 적어 두었다).
         "source_video": video,
+        # 🔴 **어느 영상의 리포트인지를 봉투가 스스로 말한다** (미결 `jin` 24번 (1)).
+        # `source_video` 는 「저장」 뒤에 죽는다 — `keep` 이 원본을 옮기고
+        # `videos/` 쪽을 지우기 때문이다. 그러면 **리포트 안에서 어느 영상
+        # 것인지 가리키는 값이 하나도 안 남고**, 읽는 쪽이 S3 키를 파싱해
+        # 되짚어야 한다. 자리를 정하는 규칙이 두 곳에 생기는 것이라 `paik`
+        # 11번에서 배제한 형태와 같다 — **아는 쪽이 적어 준다.**
+        #
+        # 배치·평가 실행에는 `video_id` 가 없다(백엔드 작업이 아니다).
+        # 그때는 `null` 이다 — 모르면 지어내지 않는다.
+        "video_id": args.video_id,
         "analyzed_at": stamp,
         "code_version": code_version(),
         "rubric": {
@@ -290,6 +330,10 @@ def analyze_one(video: str, args, rubric, subject) -> None:
         # swing_side는 impact_limb에만 적용된다 — 반대쪽 사지 지표는 auto
         # 판별로 나온 값이다 (features.extract_features 참고).
         "swing_side": args.side,
+        # 올린 사람이 「집중해서 볼 항목」으로 고른 것 (미결 `paik` 8번).
+        # 🔴 **채점을 바꾸지 않는다** — 같은 영상이 고른 것에 따라 다른 점수를
+        # 내면 선수끼리 비교가 안 된다. 화면이 강조·정렬에 쓰라고 싣는다.
+        "focus": focus_envelope(rubric, args.focus),
         "target_fps": args.fps,
         "sampled_fps": round(float(pose.sampled_fps), 2),
         "frames": int(len(pose.keypoints)),
@@ -321,6 +365,7 @@ def analyze_one(video: str, args, rubric, subject) -> None:
     storage.upload_json(report, target, region=args.region)
     print(f"\n저장: {target}")
     print(json.dumps(report["timing"], ensure_ascii=False))
+    return target
 
 
 
@@ -354,6 +399,19 @@ def main() -> None:
     ap.add_argument(
         "--subject-at-ms", type=float, default=None,
         help="--subject-box 를 그린 영상 시각(밀리초). 박스를 주면 함께 주어야 한다",
+    )
+    ap.add_argument(
+        "--focus", default=None, metavar="id,id",
+        help="올린 사람이 집중해서 보고 싶다고 고른 채점 항목 id (루브릭의 "
+             "`criteria[].id`, 쉼표로 구분). 🔴 **채점을 바꾸지 않는다** — "
+             "화면 강조용으로 리포트에 실릴 뿐이다(미결 `paik` 8번). "
+             "안 주면 「전체적으로」다",
+    )
+    ap.add_argument(
+        "--result-json", default=None, metavar="경로",
+        help="올린 리포트의 자리를 이 파일에 JSON 으로 남긴다. 워커가 완료 "
+             "보고에 실으려고 읽는다(미결 `paik` 11번). 🔴 stdout 을 긁지 "
+             "않는 것은 로그 문구가 바뀌면 조용히 깨지기 때문이다",
     )
     # 🔴 `--skip-analyzed` 를 **일부러 뺐다** (2026-09-08, 미결 jin 20번).
     #    `reports/` 유무로 "안 돈 것"을 가리는 것은 두 번째 큐였다. 큐의 정본은
@@ -393,10 +451,12 @@ def main() -> None:
 
     print(f"대상 {len(videos)}편")
     failed = 0
+    produced: list[dict[str, str]] = []
     for i, video in enumerate(videos, 1):
         print(f"\n[{i}/{len(videos)}] {video}")
         try:
-            analyze_one(video, args, rubric, subject)
+            produced.append({"video": video,
+                             "report_uri": analyze_one(video, args, rubric, subject)})
         except SystemExit as exc:
             # 🔴 영상을 **한 편만** 준 경우는 종료 코드를 그대로 올린다.
             #    워커(scripts/worker.py)가 이 코드 하나로 succeeded/failed 를
@@ -416,6 +476,14 @@ def main() -> None:
     # 🔴 여러 편 중 일부 실패는 0으로 끝낸다 — 스캔은 "돌 수 있는 것을 돌리는"
     #    작업이고, 한 편의 품질 미달로 스캔 전체가 실패가 되면 재시도가 무한히
     #    돈다. 한 편짜리 호출(위 raise)과는 뜻이 다르다.
+
+    # 🔴 **성공한 것만 적는다.** 한 편짜리 호출이 실패하면 위에서 그대로
+    #    올라가 여기 못 온다 — 그래서 실패한 작업의 파일은 아예 안 생기고,
+    #    워커는 "없으면 안 싣는다"로 읽으면 된다.
+    if args.result_json:
+        Path(args.result_json).write_text(
+            json.dumps({"reports": produced}, ensure_ascii=False), encoding="utf-8"
+        )
 
 
 if __name__ == "__main__":

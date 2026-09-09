@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from uuid import UUID, uuid4
 
-from sqlalchemy import column, delete, select, table
+from sqlalchemy import column, delete, select, table, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -129,13 +129,20 @@ class SquadPgRepository(SquadPort):
         return self._session.execute(stmt).scalar_one_or_none()
 
     def enlist(
-        self, squad_id: UUID, player_card_id: UUID, position_id: UUID
+        self,
+        squad_id: UUID,
+        player_card_id: UUID,
+        position_id: UUID,
+        grid_col: int | None = None,
+        grid_row: int | None = None,
     ) -> SquadMemberEntity:
         member = SquadMemberOrm(
             id=uuid4(),
             squad_id=squad_id,
             player_card_id=player_card_id,
             position_id=position_id,
+            grid_col=grid_col,
+            grid_row=grid_row,
         )
         self._session.add(member)
         try:
@@ -147,7 +154,37 @@ class SquadPgRepository(SquadPort):
                 # HTTP 를 알게 된다.
                 raise ValueError("이미 등재된 카드다") from exc
             raise
-        return self._member_entity(member.id, player_card_id, position_id)
+        return self._member_entity(
+            member.id, player_card_id, position_id, grid_col, grid_row
+        )
+
+    def update_member(
+        self,
+        member_id: UUID,
+        position_id: UUID,
+        grid_col: int | None,
+        grid_row: int | None,
+    ) -> SquadMemberEntity:
+        row = self._session.execute(
+            update(SquadMemberOrm)
+            .where(SquadMemberOrm.id == member_id)
+            .values(
+                position_id=position_id, grid_col=grid_col, grid_row=grid_row
+            )
+            .returning(SquadMemberOrm.player_card_id)
+        ).one()
+        self._session.commit()
+        return self._member_entity(
+            member_id, row[0], position_id, grid_col, grid_row
+        )
+
+    def set_formation(self, squad_id: UUID, formation: str) -> None:
+        self._session.execute(
+            update(SquadOrm)
+            .where(SquadOrm.id == squad_id)
+            .values(formation=formation)
+        )
+        self._session.commit()
 
     def find_member(self, member_id: UUID) -> tuple[UUID, UUID] | None:
         stmt = select(SquadMemberOrm.squad_id, SquadMemberOrm.player_card_id).where(
@@ -181,6 +218,8 @@ class SquadPgRepository(SquadPort):
                     _position.c.id,
                     _position.c.code,
                     _position.c.label,
+                    SquadMemberOrm.grid_col,
+                    SquadMemberOrm.grid_row,
                 )
                 .select_from(SquadMemberOrm)
                 .join(PlayerCardOrm, PlayerCardOrm.id == SquadMemberOrm.player_card_id)
@@ -196,6 +235,7 @@ class SquadPgRepository(SquadPort):
             id=squad.id,
             team_id=squad.team_id,
             public_slug=PublicSlug(squad.public_slug),
+            formation=squad.formation,
             members=[
                 SquadMemberEntity(
                     id=r[0],
@@ -205,13 +245,20 @@ class SquadPgRepository(SquadPort):
                     position_id=r[4],
                     position_code=r[5],
                     position_label=r[6],
+                    grid_col=r[7],
+                    grid_row=r[8],
                 )
                 for r in rows
             ],
         )
 
     def _member_entity(
-        self, member_id: UUID, player_card_id: UUID, position_id: UUID
+        self,
+        member_id: UUID,
+        player_card_id: UUID,
+        position_id: UUID,
+        grid_col: int | None = None,
+        grid_row: int | None = None,
     ) -> SquadMemberEntity:
         row = self._session.execute(
             select(
@@ -233,4 +280,6 @@ class SquadPgRepository(SquadPort):
             position_id=position_id,
             position_code=row[2],
             position_label=row[3],
+            grid_col=grid_col,
+            grid_row=grid_row,
         )

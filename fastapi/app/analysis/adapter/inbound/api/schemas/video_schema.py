@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.shared import Rfc3339
 
@@ -59,6 +59,55 @@ class RegisterVideoSchema(BaseModel):
     # 원본 파일 이름. DB 에 온전히 남긴다 — 저장 키는 슬러그라 손실적이다(jin 24).
     filename: str | None = Field(default=None, max_length=255)
 
+    # 「이 사람으로 분석」 (미결 `paik` 6번). 정규화 `[x, y, w, h]` (0~1) 와 그
+    # 박스를 그린 영상 시각(ms). 🔴 **정규화 좌표만** — 화면 픽셀을 보내면 422 다
+    # (조용히 클램프하면 엉뚱한 사람을 분석하고도 "지정대로 했다"고 답한다).
+    # 지정이 없으면 둘 다 생략한다 — 「자동으로 고르기」가 정식 경로다.
+    subject_box: list[float] | None = Field(default=None, min_length=4, max_length=4)
+    subject_at_ms: int | None = Field(default=None, ge=0)
+
+    # 「집중해서 볼 항목」 (미결 `paik` 8번). 루브릭 `criteria[].id` 리스트
+    # (예: `["follow_through", "guide_hand"]`). 🔴 **빈 목록·생략 = 「전체적으로」**
+    # 가 기본이자 가장 흔한 경우다 — 실패로 만들지 않는다. 각 항목의 실재
+    # 여부는 서버가 못 본다(루브릭은 `agent/`) — 형식만 본다(공백·중복 정리).
+    focus: list[str] | None = Field(default=None, max_length=24)
+
+    @model_validator(mode="after")
+    def _clean_focus(self) -> "RegisterVideoSchema":
+        if self.focus is None:
+            return self
+        seen: list[str] = []
+        for raw in self.focus:
+            item = raw.strip()
+            if not item:
+                continue
+            if len(item) > 40:
+                raise ValueError("focus 항목이 너무 깁니다(40자 상한).")
+            if item not in seen:
+                seen.append(item)
+        self.focus = seen or None
+        return self
+
+    @model_validator(mode="after")
+    def _check_subject(self) -> "RegisterVideoSchema":
+        box, at = self.subject_box, self.subject_at_ms
+        if (box is None) != (at is None):
+            raise ValueError(
+                "subject_box 와 subject_at_ms 는 함께 주거나 함께 생략합니다."
+            )
+        if box is None:
+            return self
+        x, y, w, h = box
+        if not all(0.0 <= v <= 1.0 for v in box):
+            raise ValueError("subject_box 는 정규화 좌표입니다(0~1). 픽셀이 아닙니다.")
+        if w <= 0 or h <= 0:
+            raise ValueError("subject_box 의 너비·높이는 0보다 커야 합니다.")
+        if x + w > 1.0 or y + h > 1.0:
+            raise ValueError("subject_box 가 화면을 벗어납니다.")
+        if at is not None and at > self.duration_ms:
+            raise ValueError("subject_at_ms 가 클립 길이를 벗어납니다.")
+        return self
+
 
 class VideoResponse(BaseModel):
     """영상 1건.
@@ -84,6 +133,7 @@ class VideoResponse(BaseModel):
     title: str | None
     description: str | None
     kept: bool
+    is_featured: bool
 
 
 class UpdateVideoSchema(BaseModel):
@@ -96,6 +146,9 @@ class UpdateVideoSchema(BaseModel):
     is_public: bool | None = None
     title: str | None = Field(default=None, max_length=100)
     description: str | None = Field(default=None, max_length=280)
+    # 「대표 영상」 토글 (미결 `paik` 10번). `true` 로 세우면 그 사람의 다른 대표는
+    # 자동으로 내려간다(사람당 하나). 반려된 클립엔 못 세운다(422 `CANNOT_FEATURE`).
+    is_featured: bool | None = None
 
 
 class PlaybackUrlResponse(BaseModel):
@@ -103,6 +156,22 @@ class PlaybackUrlResponse(BaseModel):
 
     url: str
     expires_in: int
+
+
+class FeaturedVideoResponse(BaseModel):
+    """어떤 사람의 대표 영상 하나(미결 `paik` 10번). `GET /cards/{slug}/featured-video`.
+
+    저장 키가 아니라 **사전 서명 GET URL** 을 준다 — 버킷은 닫혀 있다(5번과 같은 원칙).
+    대표가 없으면 이 응답이 아니라 `404 NO_FEATURED_VIDEO` 다.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    video_id: UUID
+    url: str
+    expires_in: int
+    sport_code: str
+    duration_ms: int | None
 
 
 class PublicVideoResponse(BaseModel):

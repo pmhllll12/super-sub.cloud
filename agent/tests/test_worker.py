@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import re
 import subprocess
 import sys
@@ -83,9 +84,28 @@ def test_a_non_ascii_token_is_a_config_error_not_a_hiccup(worker):
         worker.Config.from_env({"SUPERSUB_WORKER_TOKEN": "비밀-값"})
 
 
+def test_an_empty_api_base_is_a_config_error(worker):
+    """🔴 백엔드 주소에 기본값을 두지 않는다 — 저장소가 공개다.
+
+    호스트명을 코드에 박으면 그대로 공개된다(미결 `jin` 22번). 그렇다고
+    자리표시자 문자열을 기본값으로 두면 **배포에서 잘못된 URL 로 조용히
+    붙는다** — 설정 누락이 설정 누락으로 보이지 않는다. 없으면 시작하지
+    않는 쪽이 맞다.
+
+    이 검사를 지우면 다음 사람이 "편의상" 기본값을 되살리고 호스트명이
+    다시 공개된다.
+    """
+    with pytest.raises(worker.ConfigError, match="SUPERSUB_API_BASE"):
+        worker.Config.from_env({"SUPERSUB_WORKER_TOKEN": "t"})
+
+
 def test_reports_prefix_defaults_under_the_bucket(worker):
     c = worker.Config.from_env(
-        {"SUPERSUB_WORKER_TOKEN": "t", "SUPERSUB_S3_BUCKET": "다른버킷"}
+        {
+            "SUPERSUB_WORKER_TOKEN": "t",
+            "SUPERSUB_API_BASE": "https://example.invalid/api/v1",
+            "SUPERSUB_S3_BUCKET": "다른버킷",
+        }
     )
     assert c.reports_uri == "s3://다른버킷/reports"
 
@@ -342,7 +362,11 @@ def test_an_unpickable_rubric_fails_the_job_without_running_it(
 
     monkeypatch.setattr(worker, "run_analysis", never)
     cfg_no_rubrics = worker.Config.from_env(
-        {"SUPERSUB_WORKER_TOKEN": "t", "SUPERSUB_RUBRIC_DIR": str(tmp_path)}
+        {
+            "SUPERSUB_WORKER_TOKEN": "t",
+            "SUPERSUB_API_BASE": "https://example.invalid/api/v1",
+            "SUPERSUB_RUBRIC_DIR": str(tmp_path),
+        }
     )
     worker.process(cfg_no_rubrics, _job(), worker.Stopper())
 
@@ -451,3 +475,336 @@ class _StubRubric:
     motion = "pitching"
     version = "0.1"
     criteria = ()
+    # 집중 항목 검증이 대조하는 목록 (미결 `paik` 8번).
+    criterion_ids = ("follow_through", "guide_hand")
+
+
+# -- 리포트 자리를 완료 보고에 싣는다 (미결 `paik` 11번) ----------------------
+#
+# 🔴 **여기 검사들이 막고 있는 것**: 분석은 끝나는데 백엔드가 리포트 파일을
+#    못 찾는 상태. 자리를 정하는 규칙은 `analyze_s3.report_targets` 안에만
+#    있어서 바깥에서는 계산할 수 없다. 워커가 안 실으면 화면은 영영 mock 이다.
+
+
+def _result_file(tmp_path, uri, name="result.json"):
+    p = tmp_path / name
+    p.write_text(json.dumps({"reports": [{"video": "s3://b/v.mp4",
+                                          "report_uri": uri}]}), encoding="utf-8")
+    return p
+
+
+def test_the_report_key_is_read_from_the_file_the_analysis_wrote(worker, tmp_path):
+    """버킷 상대 키로 꺼낸다 — 백엔드의 `storage_key` 와 같은 모양이다."""
+    f = _result_file(tmp_path, "s3://supersub-ai/reports/u1/v9/report.json")
+    assert worker.report_key_from(f, "supersub-ai") == "reports/u1/v9/report.json"
+
+
+def test_a_missing_or_broken_result_file_is_not_an_error(worker, tmp_path):
+    """🔴 자리를 못 실어도 **분석은 성공한 것이다.**
+
+    보고 자체를 막으면 작업이 `running` 으로 남는다 — 리포트를 못 찾는 것보다
+    나쁘다. 화면이 못 찾을 뿐이고 그 사실은 저널에 남는다.
+    """
+    assert worker.report_key_from(tmp_path / "없음.json", "supersub-ai") is None
+    broken = tmp_path / "broken.json"
+    broken.write_text("{ 이건 JSON 이 아니다", encoding="utf-8")
+    assert worker.report_key_from(broken, "supersub-ai") is None
+    empty = tmp_path / "empty.json"
+    empty.write_text(json.dumps({"reports": []}), encoding="utf-8")
+    assert worker.report_key_from(empty, "supersub-ai") is None
+
+
+def test_a_report_in_another_bucket_is_not_sent_as_a_key(worker, tmp_path):
+    """🔴 버킷 상대 키는 **그 버킷 안에서만** 뜻이 있다.
+
+    `SUPERSUB_REPORTS_URI` 가 다른 버킷을 가리키면 키만으로는 못 가리킨다.
+    틀린 자리를 싣느니 안 싣는다 — 백엔드가 없는 객체를 읽으려 든다.
+    """
+    f = _result_file(tmp_path, "s3://다른버킷/reports/u1/v9/report.json")
+    assert worker.report_key_from(f, "supersub-ai") is None
+
+
+def test_two_reports_are_ambiguous_so_nothing_is_sent(worker, tmp_path):
+    """작업 하나는 영상 하나다. 둘이면 어느 것이 이번 결과인지 안 정해진다."""
+    f = tmp_path / "two.json"
+    f.write_text(json.dumps({"reports": [
+        {"report_uri": "s3://supersub-ai/reports/u1/a/report.json"},
+        {"report_uri": "s3://supersub-ai/reports/u1/b/report.json"},
+    ]}), encoding="utf-8")
+    assert worker.report_key_from(f, "supersub-ai") is None
+
+
+def test_the_analysis_is_told_where_to_write_its_result(worker, cfg, tmp_path):
+    """워커가 자리 파일을 지정해야 자식이 적는다."""
+    cmd = worker.analyze_command(cfg, _job(), Path("r.yaml"), tmp_path / "r.json")
+    assert "--result-json" in cmd
+    assert str(tmp_path / "r.json") in cmd
+
+
+def test_a_succeeded_report_carries_the_key_and_a_failed_one_does_not(
+    worker, cfg, monkeypatch
+):
+    """🔴 실패한 작업에 자리를 실으면 **없는 파일을 가리킨다.**"""
+    sent = _intercept(worker, monkeypatch, [(204, b""), (204, b"")])
+    worker.report(cfg, "j1", "succeeded", report_key="reports/u1/v9/report.json")
+    worker.report(cfg, "j2", "failed", "품질 미달",
+                  report_key="reports/u1/v9/report.json")
+    assert sent[0][2] == {"status": "succeeded",
+                          "report_key": "reports/u1/v9/report.json"}
+    assert "report_key" not in sent[1][2]
+
+
+def test_a_finished_job_reports_the_place_the_analysis_actually_wrote(
+    worker, cfg, monkeypatch, tmp_path
+):
+    """끝에서 끝까지 — 자식이 적은 자리가 `PATCH` 본문에 실려 나가는가.
+
+    🔴 이것이 이 항목의 전부다. 앞의 조각들이 다 맞아도 여기서 안 실리면
+    백엔드는 여전히 리포트를 못 찾는다.
+    """
+    def analysis_that_writes_its_place(cmd, timeout, stopper):
+        path = Path(cmd[cmd.index("--result-json") + 1])
+        path.write_text(json.dumps({"reports": [
+            {"video": "s3://supersub-ai/videos/u1/clip.mp4",
+             "report_uri": "s3://supersub-ai/reports/u1/1b3c/report.json"},
+        ]}), encoding="utf-8")
+        return worker.Outcome(code=0, last_line="")
+
+    monkeypatch.setattr(worker, "run_analysis", analysis_that_writes_its_place)
+    monkeypatch.setattr(worker, "pick_rubric", lambda d, s: Path("r.yaml"))
+    sent = _intercept(worker, monkeypatch, [(204, b"")])
+
+    worker.process(cfg, _job(), worker.Stopper())
+
+    assert sent[-1][0] == "PATCH"
+    assert sent[-1][2] == {"status": "succeeded",
+                           "report_key": "reports/u1/1b3c/report.json"}
+
+
+def test_the_place_file_does_not_leak_between_jobs(worker, cfg, monkeypatch):
+    """🔴 앞 작업의 자리를 물려받으면 **실패한 작업이 남의 리포트를 가리킨다.**
+
+    작업마다 새 임시 폴더를 쓰는 것이 그것을 막는다. 두 번째 작업의 분석이
+    아무것도 안 적었는데 첫 번째의 값이 실리면 이 검사가 빨개진다.
+    """
+    seen: list[Path] = []
+
+    def analysis(cmd, timeout, stopper):
+        path = Path(cmd[cmd.index("--result-json") + 1])
+        seen.append(path)
+        if len(seen) == 1:
+            path.write_text(json.dumps({"reports": [
+                {"report_uri": "s3://supersub-ai/reports/u1/first/report.json"},
+            ]}), encoding="utf-8")
+        return worker.Outcome(code=0, last_line="")
+
+    monkeypatch.setattr(worker, "run_analysis", analysis)
+    monkeypatch.setattr(worker, "pick_rubric", lambda d, s: Path("r.yaml"))
+    sent = _intercept(worker, monkeypatch, [(204, b""), (204, b"")])
+
+    worker.process(cfg, _job(job_id="j1"), worker.Stopper())
+    worker.process(cfg, _job(job_id="j2"), worker.Stopper())
+
+    assert sent[0][2]["report_key"] == "reports/u1/first/report.json"
+    assert "report_key" not in sent[1][2]
+    assert seen[0] != seen[1], "두 작업이 같은 자리 파일을 썼다"
+
+
+def test_the_analysis_records_where_it_put_the_report(monkeypatch, tmp_path):
+    """자식 쪽 절반 — `--result-json` 에 자리를 적는가.
+
+    워커가 아무리 잘 읽어도 자식이 안 적으면 못 싣는다. 두 검사가 짝이다.
+    """
+    a3 = _load_script("analyze_s3")
+    monkeypatch.setattr(a3, "resolve_videos", lambda uri, region: ["s3://b/v/one.mp4"])
+    monkeypatch.setattr(a3, "load_rubric", lambda p: _StubRubric())
+    monkeypatch.setattr(
+        a3, "analyze_one",
+        lambda *a, **k: "s3://b/reports/u1/v9/report.json",
+    )
+    out = tmp_path / "result.json"
+    monkeypatch.setattr(sys, "argv", [
+        "analyze_s3.py", "s3://b/v/one.mp4", "--rubric", "r.yaml",
+        "--out", "s3://b/reports", "--result-json", str(out),
+    ])
+    a3.main()
+    written = json.loads(out.read_text(encoding="utf-8"))
+    assert written["reports"] == [
+        {"video": "s3://b/v/one.mp4",
+         "report_uri": "s3://b/reports/u1/v9/report.json"},
+    ]
+
+
+def test_a_failed_single_analysis_writes_no_place_file(monkeypatch, tmp_path):
+    """🔴 실패했는데 자리 파일이 남으면 **없는 리포트를 가리키게 된다.**
+
+    한 편짜리 호출은 SystemExit 가 그대로 올라가므로 파일 쓰는 자리에 못 온다.
+    그것이 워커의 「없으면 안 싣는다」와 짝을 이룬다.
+    """
+    a3 = _load_script("analyze_s3")
+    monkeypatch.setattr(a3, "resolve_videos", lambda uri, region: ["s3://b/v/one.mp4"])
+    monkeypatch.setattr(a3, "load_rubric", lambda p: _StubRubric())
+
+    def gate_failure(*a, **k):
+        raise SystemExit(2)
+
+    monkeypatch.setattr(a3, "analyze_one", gate_failure)
+    out = tmp_path / "result.json"
+    monkeypatch.setattr(sys, "argv", [
+        "analyze_s3.py", "s3://b/v/one.mp4", "--rubric", "r.yaml",
+        "--out", "s3://b/reports", "--result-json", str(out),
+    ])
+    with pytest.raises(SystemExit):
+        a3.main()
+    assert not out.exists()
+
+
+# -- 「집중해서 볼 항목」 (미결 `paik` 8번) ----------------------------------
+#
+# 🔴 **판단은 A안이다**: 채점은 그대로 두고 화면 강조용으로만 싣는다.
+#    B안(고른 것만 채점 + 가중치 재정규화)을 택하지 않은 이유는 같은 영상이
+#    고른 것에 따라 다른 점수를 내면 **선수끼리 비교가 안 되기** 때문이다.
+#    아래 검사들이 B안으로 슬며시 넘어가는 것을 막는다.
+
+
+def test_the_focus_choice_is_passed_through_when_the_job_has_one(worker, cfg):
+    cmd = worker.analyze_command(
+        cfg, _job(focus=["follow_through", "guide_hand"]), Path("r.yaml"))
+    assert cmd[cmd.index("--focus") + 1] == "follow_through,guide_hand"
+
+
+def test_no_focus_means_the_whole_thing_not_a_failure(worker, cfg):
+    """🔴 빈 목록은 「전체적으로」다 — 기본이자 가장 흔한 경우다.
+
+    백엔드에 아직 칸이 없어서 지금은 **항상** 이 갈래를 탄다. 여기서 죽으면
+    모든 분석이 죽는다.
+    """
+    for job in (_job(), _job(focus=None), _job(focus=[]), _job(focus=["", "  "])):
+        cmd = worker.analyze_command(cfg, job, Path("r.yaml"))
+        assert "--focus" not in cmd
+        assert "None" not in cmd
+
+
+# -- 「이 사람으로 분석」 (미결 `paik` 6번) -----------------------------------
+#
+#    백엔드가 claim 응답에 `subject_box`(정규화 0~1 네 값)와 `subject_at_ms` 를
+#    싣는다. 워커는 그것을 자식에게 넘기기만 한다 — 규격은
+#    `fastapi/docs/worker-interface.md` 1절.
+
+
+def test_the_subject_box_is_passed_through_when_the_job_has_one(worker, cfg):
+    """찍은 사람이 실제로 분석되려면 지정이 자식까지 가야 한다."""
+    cmd = worker.analyze_command(
+        cfg, _job(subject_box=[0.39, 0.35, 0.12, 0.4], subject_at_ms=4200),
+        Path("r.yaml"))
+    assert cmd[cmd.index("--subject-box") + 1] == "0.39,0.35,0.12,0.4"
+    assert cmd[cmd.index("--subject-at-ms") + 1] == "4200"
+
+
+def test_no_subject_box_means_pick_automatically_not_a_failure(worker, cfg):
+    """🔴 지정이 없는 것은 **정식 경로**다 — 지금은 거의 모든 작업이 이쪽이다.
+
+    둘 다 생략 = 「자동으로 고르기」이고 실패가 아니다(계약). 여기서 플래그가
+    붙으면 자식이 `None` 을 좌표로 읽고 죽어 **모든 자동 분석이 죽는다.**
+    """
+    for job in (_job(),
+                _job(subject_box=None, subject_at_ms=None),
+                _job(subject_box=None, subject_at_ms=4200)):
+        cmd = worker.analyze_command(cfg, job, Path("r.yaml"))
+        assert "--subject-box" not in cmd
+        assert "None" not in cmd
+
+
+def test_a_half_given_subject_is_not_passed_as_half(worker, cfg):
+    """🔴 박스만 있고 시각이 없으면 **아무것도 붙이지 않는다.**
+
+    하나만 붙이면 자식이 「박스를 주면 시각도 함께」로 죽는데, 그것은 지정이
+    없는 것과 **다른 사건**이다 — 지정이 없으면 자동으로 골라 정상 분석돼야
+    한다. 계약이 both-or-neither 를 등록 시점에 막지만, 그것이 뚫렸을 때
+    **분석 전체가 죽는 쪽으로 무너지지 않게** 한다.
+    """
+    cmd = worker.analyze_command(
+        cfg, _job(subject_box=[0.39, 0.35, 0.12, 0.4]), Path("r.yaml"))
+    assert "--subject-box" not in cmd
+    assert "--subject-at-ms" not in cmd
+
+
+def test_the_worker_does_not_re_validate_the_subject_box(worker, cfg):
+    """🔴 범위 밖 좌표도 **그대로 넘긴다** — 판정은 한 곳에서만 한다.
+
+    무엇이 올바른 지정인가는 `pose.parse_subject_spec` 하나가 정한다. 워커가
+    같은 규칙을 복사해 미리 거르면, 두 곳이 갈렸을 때 **같은 입력이 경로에
+    따라 통과했다 막혔다 한다**(미결 10번의 형태). 잘못된 값은 자식이 0 아닌
+    코드로 죽고 그 사유가 `failure_reason` 에 남는 것이 옳은 실패다.
+    """
+    cmd = worker.analyze_command(
+        cfg, _job(subject_box=[640, 360, 200, 400], subject_at_ms=4200),
+        Path("r.yaml"))
+    assert cmd[cmd.index("--subject-box") + 1] == "640,360,200,400"
+
+
+def test_focus_does_not_change_the_score(worker):
+    """🔴 A안의 전부 — 고른 것이 점수를 바꾸면 안 된다.
+
+    `aggregate` 는 `focus` 를 아예 모른다. 이 검사가 빨개진다는 것은 누군가
+    채점 경로에 focus 를 끌어들였다는 뜻이고, 그 순간 같은 영상의 점수가
+    사용자 선택에 따라 달라진다.
+    """
+    import inspect
+
+    from supersub_agent import scoring
+
+    assert "focus" not in inspect.getsource(scoring.aggregate)
+    assert "focus" not in inspect.getsource(scoring.Rubric.applicable_criteria)
+
+
+def test_an_unknown_focus_id_is_recorded_not_swallowed(monkeypatch):
+    """🔴 화면이 낡은 id 를 보내면 **드러나야 한다.**
+
+    조용히 버리면 사용자가 고른 것이 아무 일도 안 일어난 채 사라지고, 왜
+    강조가 안 되는지 아무도 모른다. 그렇다고 분석을 죽이지도 않는다 —
+    강조 힌트 하나 때문에 리포트가 통째로 없어지는 것이 더 나쁘다.
+    """
+    a3 = _load_script("analyze_s3")
+    rubric = _StubRubric()
+    env = a3.focus_envelope(rubric, "follow_through,없는항목")
+    assert env["applied"] == ["follow_through"]
+    assert env["unknown"] == ["없는항목"]
+    assert env["requested"] == ["follow_through", "없는항목"]
+
+
+def test_an_empty_focus_envelope_is_all_three_empty(monkeypatch):
+    a3 = _load_script("analyze_s3")
+    for value in (None, "", "  ", ",,"):
+        assert a3.focus_envelope(_StubRubric(), value) == {
+            "requested": [], "applied": [], "unknown": []
+        }
+
+
+def test_the_report_says_which_video_it_is_about(monkeypatch, tmp_path):
+    """🔴 봉투가 스스로 어느 영상인지 말해야 한다 (미결 `jin` 24번 (1)).
+
+    `source_video` 는 「저장」 뒤에 죽는다 — `keep` 이 원본을 `reports/` 로
+    옮기고 `videos/` 쪽을 지운다. `video_id` 가 없으면 그 순간 **리포트 안에서
+    어느 영상 것인지 가리키는 값이 하나도 안 남고**, 읽는 쪽이 S3 키를 파싱해
+    되짚어야 한다 — 자리 규칙이 두 곳에 생기는 형태다(`paik` 11번에서 배제했다).
+
+    배치·평가 실행에는 `video_id` 가 없으므로 그때는 `None` 이다. 🔴 모르면
+    지어내지 않는다 — 빈 문자열이나 파일명으로 채우면 없는 행을 가리킨다.
+    """
+    a3 = _load_script("analyze_s3")
+    import ast
+    import inspect
+
+    # `analyze_one` 은 모듈 최상위 함수라 getsource 가 0열부터 준다 —
+    # dedent·cleandoc 을 걸면 오히려 들여쓰기가 깨진다.
+    tree = ast.parse(inspect.getsource(a3.analyze_one))
+    keys = {
+        k.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Dict)
+        for k in node.keys
+        if isinstance(k, ast.Constant) and isinstance(k.value, str)
+    }
+    assert "video_id" in keys, "리포트 봉투에 video_id 가 없다"
+    assert "source_video" in keys

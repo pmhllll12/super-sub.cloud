@@ -60,11 +60,24 @@ class VideoPort(ABC):
         is_public: bool | Any = UNSET,
         title: str | None | Any = UNSET,
         description: str | None | Any = UNSET,
+        is_featured: bool | Any = UNSET,
     ) -> VideoEntity | None:
         """클립을 부분 수정하고 갱신된 영상을 돌려준다.
 
         `UNSET` 인 필드는 건드리지 않는다. **`user_id` 로 소유를 확인한다** —
         남의 클립이거나 없는 클립이면 `None`.
+
+        🔴 `is_featured=True` 면 **같은 사람의 다른 대표를 먼저 내리고** 이 클립을
+        세운다(사람당 하나 — 부분 유일 인덱스). 반려 클립 차단은 인터랙터가 한다.
+        """
+
+    @abstractmethod
+    def find_featured_by_card_slug(self, card_public_slug: str) -> VideoEntity | None:
+        """카드 슬러그 → 그 주인의 대표 영상 (미결 `paik` 10번).
+
+        `player_card` 는 `card` 컨텍스트 테이블이라 임포트하지 않고 슬러그→`user_id`
+        만 원시 쿼리로 읽는다(관리자 목록이 `user` 를 읽는 방식과 같다).
+        대표가 없거나·반려됐거나·슬러그가 없으면 `None`.
         """
 
     @abstractmethod

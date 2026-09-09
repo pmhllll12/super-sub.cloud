@@ -66,12 +66,26 @@ X-Worker-Token: <공유 시크릿>
   "storage_key": "videos/<user_id>/<uuid>.mp4",
   "sport_code": "baseball",
   "side": "right",
-  "duration_ms": 4200
+  "duration_ms": 4200,
+  "subject_box": [0.39, 0.35, 0.12, 0.4],
+  "subject_at_ms": 4200,
+  "focus": ["follow_through", "guide_hand"]
 }
 ```
 
 - `storage_key` 앞에 `s3://supersub-ai/` 를 붙이면 `analyze_s3.py` 의 첫 인자입니다
 - `side` 는 없을 수 있습니다(`null`). 그러면 `--side` 를 주지 마십시오
+- ✅ **`focus` — 「집중해서 볼 항목」** (미결 `paik` 8번). 백엔드가 이제 claim 응답에
+  실어 보냅니다. `worker.py` 의 `analyze_command` 는 **이미 `job.get("focus")` 를
+  읽어 `--focus a,b,c` 로 넘기고 있어** 그대로 흘러갑니다. 🔴 **`null`·빈 리스트면
+  아무것도 안 붙입니다** — 「전체적으로」입니다
+- 🔴 **`subject_box`·`subject_at_ms` — 「이 사람으로 분석」** (미결 `paik` 6번).
+  있으면 `--subject-box "x,y,w,h" --subject-at-ms <ms>` 로 넘겨 주십시오
+  (`--focus` 와 같은 자리 — `worker.py` 의 `analyze_command`). **없으면(`null`)
+  아무것도 붙이지 않습니다** — 「자동으로 고르기」가 정식 경로입니다. 등록 시
+  정규화·기하 검증을 마친 값이라 워커가 다시 검사할 필요는 없습니다.
+  ⚠️ 백엔드는 이 값을 claim 응답에 실었습니다. `analyze_command` 배선은 아직입니다
+  (미결 `paik` 6번 — `--focus` 와 같은 상태)
 - 🔴 **`POST` 입니다.** 조회처럼 보여도 이 호출은 작업을 하나 **소비**합니다 —
   실패해서 재시도하면 **다른 작업을 집습니다**(같은 것이 아닙니다)
 
@@ -131,6 +145,7 @@ PATCH https://<API 호스트>/api/v1/internal/analysis-jobs/<job_id>
 X-Worker-Token: <공유 시크릿>
 
 {"status": "succeeded"}
+{"status": "succeeded", "report_key": "reports/<user_id>/<video_id>/report.json"}
 {"status": "failed", "failure_reason": "품질 게이트 미달: …"}
 ```
 
@@ -141,6 +156,19 @@ X-Worker-Token: <공유 시크릿>
 | 404 | `JOB_NOT_FOUND` | 없는 작업입니다. **재시도 무의미** |
 | 409 | `JOB_NOT_RUNNING` | 집지 않았거나 이미 끝났습니다. **재시도 무의미** |
 | 422 | `INVALID_JOB_STATUS` | `succeeded`·`failed` 만 받습니다 |
+
+### `report_key` — 리포트 자리 (2026-09-09 추가, 미결 `paik` 11번)
+
+**선택 필드.** 분석이 남긴 리포트의 **버킷 상대 키**를 함께 실어 주십시오
+(`--result-json` 이 적어 준 자리 파일에서 읽어서). 백엔드는 이 값을 그대로
+`analysis_job` 에 남기고, 화면이 리포트를 찾을 때 씁니다.
+
+| | |
+|---|---|
+| 형태 | `s3://` 를 뗀 버킷 상대 키. 예: `reports/<user_id>/<video_id>/report.json`. 1024자 넘으면 422 |
+| `succeeded` 일 때만 | `failed` 와 함께 보내면 백엔드가 버립니다 — 굳이 안 실어도 됩니다 |
+| 없어도 됨 | 리포트가 다른 버킷이거나 자리 파일이 없으면 안 실어도 `204` 입니다. 화면이 리포트를 못 찾을 뿐입니다 — 보고 자체를 막지 마십시오 |
+| 자리 규칙 | 정본은 `analyze_s3` 입니다. 백엔드에 규칙을 복사하지 않습니다 — 아는 쪽이 값으로 말해 주는 구조입니다 |
 
 **`finished_at` 을 보내지 않습니다.** 서버가 찍습니다 — 워커의 시계가 어긋나면
 소요 시간이 음수가 됩니다. `started_at` 도 `claim` 이 찍었습니다.
