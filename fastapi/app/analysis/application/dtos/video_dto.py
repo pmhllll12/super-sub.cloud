@@ -50,6 +50,10 @@ class RegisterVideoCommand:
     side: str | None = None
     analyze: bool = True
     original_filename: str | None = None  # 원본 이름 — DB 에 온전히 남긴다(jin 24)
+    # 「이 사람으로 분석」 (미결 `paik` 6번). 정규화 `[x, y, w, h]`(0~1)와 그 시각(ms).
+    # 스키마가 정규화·기하 검증을 끝낸 값이다. 지정이 없으면 둘 다 None.
+    subject_box: list[float] | None = None
+    subject_at_ms: int | None = None
 
 
 @dataclass(frozen=True)

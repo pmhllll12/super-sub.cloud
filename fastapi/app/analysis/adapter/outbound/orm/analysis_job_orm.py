@@ -13,7 +13,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, String, Uuid
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -51,3 +51,11 @@ class AnalysisJobOrm(Base):
     # 작업엔 가리킬 리포트가 없다. 자리 규칙은 워커(`analyze_s3`)가 정본이라
     # 백엔드는 받은 값을 그대로 둔다. 상한은 S3 객체 키 한계다.
     report_key: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+
+    # 「이 사람으로 분석」 대상 박스 (미결 `paik` 6번). 정규화 `[x, y, w, h]`
+    # (0~1) 리스트 · 그 박스를 그린 영상 시각(ms). 등록(`POST /videos`)이
+    # 검증해서 넣고, `claim` 응답에 실려 워커의 `--subject-box`/`--subject-at-ms`
+    # 로 흘러간다(`side`·`focus` 와 같은 축). 🔴 **지정이 없으면 둘 다 NULL 이고
+    # 그게 정상 경로다** — 「자동으로 고르기」. 둘 중 하나만 찬 상태는 앱이 막는다.
+    subject_box: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    subject_at_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)

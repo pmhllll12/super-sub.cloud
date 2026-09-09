@@ -66,12 +66,21 @@ X-Worker-Token: <공유 시크릿>
   "storage_key": "videos/<user_id>/<uuid>.mp4",
   "sport_code": "baseball",
   "side": "right",
-  "duration_ms": 4200
+  "duration_ms": 4200,
+  "subject_box": [0.39, 0.35, 0.12, 0.4],
+  "subject_at_ms": 4200
 }
 ```
 
 - `storage_key` 앞에 `s3://supersub-ai/` 를 붙이면 `analyze_s3.py` 의 첫 인자입니다
 - `side` 는 없을 수 있습니다(`null`). 그러면 `--side` 를 주지 마십시오
+- 🔴 **`subject_box`·`subject_at_ms` — 「이 사람으로 분석」** (미결 `paik` 6번).
+  있으면 `--subject-box "x,y,w,h" --subject-at-ms <ms>` 로 넘겨 주십시오
+  (`--focus` 와 같은 자리 — `worker.py` 의 `analyze_command`). **없으면(`null`)
+  아무것도 붙이지 않습니다** — 「자동으로 고르기」가 정식 경로입니다. 등록 시
+  정규화·기하 검증을 마친 값이라 워커가 다시 검사할 필요는 없습니다.
+  ⚠️ 백엔드는 이 값을 claim 응답에 실었습니다. `analyze_command` 배선은 아직입니다
+  (미결 `paik` 6번 — `--focus` 와 같은 상태)
 - 🔴 **`POST` 입니다.** 조회처럼 보여도 이 호출은 작업을 하나 **소비**합니다 —
   실패해서 재시도하면 **다른 작업을 집습니다**(같은 것이 아닙니다)
 

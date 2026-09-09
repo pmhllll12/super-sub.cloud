@@ -90,6 +90,8 @@ def register_video(
             side=body.side,
             analyze=body.analyze,
             original_filename=body.filename,
+            subject_box=body.subject_box,
+            subject_at_ms=body.subject_at_ms,
         )
     )
 

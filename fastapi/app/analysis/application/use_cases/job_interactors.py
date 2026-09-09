@@ -84,6 +84,8 @@ class ClaimJobInteractor(ClaimJobUseCase):
             sport_code=job.sport_code,
             side=job.side,
             duration_ms=job.duration_ms,
+            subject_box=job.subject_box,
+            subject_at_ms=job.subject_at_ms,
         )
 
 

@@ -47,7 +47,12 @@ class JobPgRepository(JobPort):
             update(AnalysisJobOrm)
             .where(AnalysisJobOrm.id == oldest)
             .values(status=RUNNING, started_at=datetime.now(timezone.utc))
-            .returning(AnalysisJobOrm.id, AnalysisJobOrm.video_id)
+            .returning(
+                AnalysisJobOrm.id,
+                AnalysisJobOrm.video_id,
+                AnalysisJobOrm.subject_box,
+                AnalysisJobOrm.subject_at_ms,
+            )
         ).first()
 
         if claimed is None:
@@ -55,7 +60,7 @@ class JobPgRepository(JobPort):
             self._session.rollback()
             return None
 
-        job_id, video_id = claimed
+        job_id, video_id, subject_box, subject_at_ms = claimed
         video = self._session.get(VideoOrm, video_id)
         if video is None:
             # 외래키가 CASCADE 라 정상 경로에서는 올 수 없다. 그래도 조용히
@@ -71,6 +76,8 @@ class JobPgRepository(JobPort):
             sport_code=video.sport_code,
             side=video.side,
             duration_ms=video.duration_ms,
+            subject_box=subject_box,
+            subject_at_ms=subject_at_ms,
         )
 
     def reclaim_stale(self, timeout_minutes: int) -> tuple[int, int]:

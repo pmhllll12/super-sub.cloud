@@ -161,6 +161,11 @@ class RegisterVideoInteractor(RegisterVideoUseCase):
             # 사라지고 되살릴 길이 없다.
             kept=True,
             original_filename=command.original_filename,
+            # 미결 `paik` 6번. 작업을 안 만들면(반려·`analyze=False`) 저장소가
+            # 버린다 — 담을 `analysis_job` 행이 없다. 지정이 없을 때 실패로
+            # 만들지 않는 것이 이 항목의 「하지 말 것」이다.
+            subject_box=command.subject_box if make_job else None,
+            subject_at_ms=command.subject_at_ms if make_job else None,
         )
         self._repository.register(video)
         return to_video_result(video)

@@ -206,6 +206,59 @@ class TestRegisterVideo:
         assert res.json()["passed"] is False
         assert "해상도" in res.json()["reject_reason"]
 
+    def test_지정_박스를_받는다(self, client):
+        """미결 `paik` 6번 — 「이 사람으로 분석」 박스. 응답엔 안 실린다(작업 값)."""
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        res = _register(
+            client, user_id, key,
+            subject_box=[0.39, 0.35, 0.12, 0.4], subject_at_ms=4_200,
+        )
+        assert res.status_code == 201, res.text
+        assert res.json()["passed"] is True
+
+    def test_픽셀_좌표는_422_다(self, client):
+        """🔴 정규화 좌표만. 조용히 클램프하면 엉뚱한 사람을 분석하고도 지정대로라 답한다."""
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        res = _register(
+            client, user_id, key, subject_box=[340, 210, 120, 400], subject_at_ms=4_200
+        )
+        assert res.status_code == 422
+
+    def test_박스만_주고_시각을_안_주면_422_다(self, client):
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        res = _register(client, user_id, key, subject_box=[0.1, 0.1, 0.2, 0.2])
+        assert res.status_code == 422
+
+    def test_화면을_벗어나는_박스는_422_다(self, client):
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        res = _register(
+            client, user_id, key, subject_box=[0.8, 0.1, 0.5, 0.2], subject_at_ms=100
+        )
+        assert res.status_code == 422
+
+    def test_시각이_클립_길이를_넘으면_422_다(self, client):
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        res = _register(
+            client, user_id, key,
+            subject_box=[0.1, 0.1, 0.2, 0.2], subject_at_ms=10_001,  # duration 10_000
+        )
+        assert res.status_code == 422
+
     def test_올리지_않은_키는_반려가_아니라_에러다(self, client):
         """검사할 파일이 없다. 반려로 기록하면 "안 올린 것"과 구별되지 않는다."""
         user_id = uuid4()

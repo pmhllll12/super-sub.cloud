@@ -182,6 +182,39 @@ def test_없는_작업은_missing_이다(db_session):
     assert JobPgRepository(_new_session()).finish(uuid.uuid4(), "failed", None) == "missing"
 
 
+def test_claim_이_지정_박스를_실어_준다(db_session, queued):
+    """미결 `paik` 6번 — `analysis_job.subject_box`(JSON) 가 claim 응답까지 온다."""
+    job_id, _ = queued["oldest"]
+    db_session.execute(
+        text(
+            "UPDATE analysis_job SET subject_box = :b, subject_at_ms = :t "
+            "WHERE id = :i"
+        ),
+        {"b": '[0.39, 0.35, 0.12, 0.4]', "t": 4200, "i": job_id},
+    )
+    db_session.commit()
+
+    session = _new_session()
+    try:
+        claimed = JobPgRepository(session).claim_next()
+    finally:
+        session.close()
+    assert claimed is not None and claimed.job_id == job_id
+    assert claimed.subject_box == [0.39, 0.35, 0.12, 0.4]
+    assert claimed.subject_at_ms == 4200
+
+
+def test_지정이_없는_작업은_claim_에서_None_이다(db_session, queued):
+    job_id, _ = queued["oldest"]
+    session = _new_session()
+    try:
+        claimed = JobPgRepository(session).claim_next()
+    finally:
+        session.close()
+    assert claimed is not None and claimed.job_id == job_id
+    assert claimed.subject_box is None and claimed.subject_at_ms is None
+
+
 def test_finish_가_리포트_자리를_컬럼에_남긴다(db_session, queued):
     """미결 `paik` 11번 — `report_key` 가 실제 컬럼에 써지는지 (스텁이 아니라 DB)."""
     job_id = queued["oldest"][0]

@@ -24,3 +24,6 @@ class ClaimedJobResult:
     sport_code: str
     side: str | None
     duration_ms: int | None
+    # 「이 사람으로 분석」 (미결 `paik` 6번). 없으면 둘 다 None.
+    subject_box: list[float] | None = None
+    subject_at_ms: int | None = None

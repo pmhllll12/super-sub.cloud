@@ -114,6 +114,9 @@ class TestClaim:
             "sport_code": "baseball",
             "side": "right",
             "duration_ms": 4_200,
+            # 지정이 없으면 둘 다 null — 「자동으로 고르기」 (미결 `paik` 6번).
+            "subject_box": None,
+            "subject_at_ms": None,
         }
 
     def test_집으면_running_이_된다(self, client):
@@ -136,6 +139,22 @@ class TestClaim:
 
         res = client.post(CLAIM, headers=_hdr())
         assert res.json()["job_id"] == str(old)
+
+    def test_지정_박스가_claim_응답에_실린다(self, client):
+        """미결 `paik` 6번 — 「이 사람으로 분석」 이 워커가 읽는 자리(claim)까지 온다."""
+        job_id = uuid4()
+        enqueue(
+            job_id, uuid4(),
+            subject_box=[0.39, 0.35, 0.12, 0.4], subject_at_ms=4_200,
+        )
+        body = client.post(CLAIM, headers=_hdr()).json()
+        assert body["subject_box"] == [0.39, 0.35, 0.12, 0.4]
+        assert body["subject_at_ms"] == 4_200
+
+    def test_지정이_없으면_null_이_온다(self, client):
+        enqueue(uuid4(), uuid4())
+        body = client.post(CLAIM, headers=_hdr()).json()
+        assert body["subject_box"] is None and body["subject_at_ms"] is None
 
 
 class TestFinish:

@@ -52,3 +52,8 @@ class VideoEntity:
     kept: bool = True
     # 원본 파일 이름(미결 `jin` 24번). 저장 키 슬러그가 손실적이라 따로 남긴다.
     original_filename: str | None = None
+    # 「이 사람으로 분석」 (미결 `paik` 6번). `analysis_job` 에 실리는 값이지만
+    # `analysis_job_id`·`analysis_status` 처럼 등록 경로에서 함께 들고 온다.
+    # 작업을 안 만들면(반려·`analyze=False`) 버려진다 — 담을 행이 없다.
+    subject_box: list[float] | None = None
+    subject_at_ms: int | None = None

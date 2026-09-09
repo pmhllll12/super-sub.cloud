@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.shared import Rfc3339
 
@@ -58,6 +58,33 @@ class RegisterVideoSchema(BaseModel):
     analyze: bool = True
     # 원본 파일 이름. DB 에 온전히 남긴다 — 저장 키는 슬러그라 손실적이다(jin 24).
     filename: str | None = Field(default=None, max_length=255)
+
+    # 「이 사람으로 분석」 (미결 `paik` 6번). 정규화 `[x, y, w, h]` (0~1) 와 그
+    # 박스를 그린 영상 시각(ms). 🔴 **정규화 좌표만** — 화면 픽셀을 보내면 422 다
+    # (조용히 클램프하면 엉뚱한 사람을 분석하고도 "지정대로 했다"고 답한다).
+    # 지정이 없으면 둘 다 생략한다 — 「자동으로 고르기」가 정식 경로다.
+    subject_box: list[float] | None = Field(default=None, min_length=4, max_length=4)
+    subject_at_ms: int | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def _check_subject(self) -> "RegisterVideoSchema":
+        box, at = self.subject_box, self.subject_at_ms
+        if (box is None) != (at is None):
+            raise ValueError(
+                "subject_box 와 subject_at_ms 는 함께 주거나 함께 생략합니다."
+            )
+        if box is None:
+            return self
+        x, y, w, h = box
+        if not all(0.0 <= v <= 1.0 for v in box):
+            raise ValueError("subject_box 는 정규화 좌표입니다(0~1). 픽셀이 아닙니다.")
+        if w <= 0 or h <= 0:
+            raise ValueError("subject_box 의 너비·높이는 0보다 커야 합니다.")
+        if x + w > 1.0 or y + h > 1.0:
+            raise ValueError("subject_box 가 화면을 벗어납니다.")
+        if at is not None and at > self.duration_ms:
+            raise ValueError("subject_at_ms 가 클립 길이를 벗어납니다.")
+        return self
 
 
 class VideoResponse(BaseModel):

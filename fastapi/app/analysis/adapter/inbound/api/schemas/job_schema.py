@@ -21,6 +21,12 @@ class ClaimedJobResponse(BaseModel):
     sport_code: str
     side: str | None
     duration_ms: int | None
+    # 「이 사람으로 분석」 대상 (미결 `paik` 6번). 정규화 `[x, y, w, h]`(0~1)와
+    # 그 박스를 그린 시각(ms). 🔴 **없으면 둘 다 `null` 이고 그게 정상**이다 —
+    # 워커는 「자동으로 고르기」로 돈다. 있으면 `--subject-box x,y,w,h
+    # --subject-at-ms` 로 넘긴다.
+    subject_box: list[float] | None = None
+    subject_at_ms: int | None = None
 
 
 class FinishJobSchema(BaseModel):

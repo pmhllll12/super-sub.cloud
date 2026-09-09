@@ -1440,13 +1440,28 @@ SFR-001. 사용자가 자기 클립을 올리고, 서버가 규격을 검사해 
   "height": 1080,
   "side": "right",
   "analyze": true,
-  "filename": "우리팀 첫 골.mp4"
+  "filename": "우리팀 첫 골.mp4",
+  "subject_box": [0.39, 0.35, 0.12, 0.4],
+  "subject_at_ms": 4200
 }
 ```
 
 `filename` 은 **원본 이름**이다 — DB `video.original_filename` 에 온전히 남긴다
 (저장 키 슬러그는 손실적이다). 관리자 목록이 이 값으로 "문제 영상"을 되짚는다.
 생략 가능(`null`).
+
+`subject_box`·`subject_at_ms` 는 「이 사람으로 분석」 대상이다(미결 `paik` 6번).
+`subject_box` 는 정규화 `[x, y, w, h]` (0~1) — **화면 픽셀이 아니다.** `subject_at_ms`
+는 그 박스를 그린 영상 시각(ms). 응답에는 실리지 않는다(분석 작업의 값이라
+`claim` 응답으로 나간다 — 3-8절).
+
+| 규칙 | |
+|---|---|
+| 🔴 정규화만 | `x·y·w·h` 가 `[0, 1]` 밖이면 422. 조용히 클램프하면 엉뚱한 사람을 분석하고도 "지정대로"라 답한다 |
+| 🔴 함께 or 생략 | 박스만 주고 시각을 안 주면(또는 반대) 422 |
+| 기하 | `w·h > 0`, `x+w ≤ 1`, `y+h ≤ 1`. `subject_at_ms ≤ duration_ms` |
+| 🔴 없어도 된다 | 생략하면 「자동으로 고르기」다 — **실패로 만들지 않는다** |
+| 작업이 없으면 | `analyze: false` 거나 반려면 박스는 버려진다(담을 작업 행이 없다). 이것도 실패가 아니다 |
 
 `201 Created`
 
@@ -1840,9 +1855,15 @@ POST /videos ──> analysis_job(queued)
 {
   "job_id": "…", "video_id": "…",
   "storage_key": "videos/<user_id>/<uuid>.mp4",
-  "sport_code": "baseball", "side": "right", "duration_ms": 4200
+  "sport_code": "baseball", "side": "right", "duration_ms": 4200,
+  "subject_box": [0.39, 0.35, 0.12, 0.4], "subject_at_ms": 4200
 }
 ```
+
+`subject_box`·`subject_at_ms` 는 「이 사람으로 분석」 대상이다(미결 `paik` 6번,
+등록 시 검증됨). 🔴 **없으면 둘 다 `null` 이고 그게 정상**이다 — 워커는
+「자동으로 고르기」로 돈다. 있으면 `analyze_s3.py --subject-box x,y,w,h
+--subject-at-ms` 로 넘긴다. `side`·`focus` 와 같은 축이다.
 
 **`204 No Content` — 큐가 비었다. 오류가 아니다.** 오류로 다루면 워커 로그가 빈
 폴링으로 가득 찬다.

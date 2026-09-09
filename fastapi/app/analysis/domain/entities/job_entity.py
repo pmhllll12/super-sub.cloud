@@ -26,3 +26,7 @@ class ClaimedJobEntity:
     sport_code: str
     side: str | None
     duration_ms: int | None
+    # 「이 사람으로 분석」 대상 (미결 `paik` 6번). 정규화 `[x, y, w, h]`(0~1)와
+    # 그 박스를 그린 시각(ms). 지정이 없으면 둘 다 None — 「자동으로 고르기」다.
+    subject_box: list[float] | None = None
+    subject_at_ms: int | None = None

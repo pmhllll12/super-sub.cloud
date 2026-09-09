@@ -127,6 +127,44 @@ class TestRegister:
         assert row.reject_reason is None
         assert row.status == "queued"
 
+    def test_지정_박스가_작업_행에_저장된다(self, db_client, db_session, uploader):
+        """미결 `paik` 6번 — 「이 사람으로 분석」 이 `analysis_job` (JSON 컬럼)에 남는다."""
+        key = _upload(db_client, uploader)
+        res = _register(
+            db_client, uploader, key,
+            subject_box=[0.39, 0.35, 0.12, 0.4], subject_at_ms=4_200,
+        )
+        assert res.status_code == 201, res.text
+        video_id = uuid.UUID(res.json()["id"])
+
+        box, at = db_session.execute(
+            text(
+                "SELECT subject_box, subject_at_ms FROM analysis_job"
+                " WHERE video_id = :id"
+            ),
+            {"id": video_id},
+        ).one()
+        assert box == [0.39, 0.35, 0.12, 0.4]
+        assert at == 4_200
+
+    def test_analyze_false_면_지정_박스는_버려진다(
+        self, db_client, db_session, uploader
+    ):
+        """작업 행이 없으니 담을 데가 없다 — 실패로 만들지는 않는다(201)."""
+        key = _upload(db_client, uploader)
+        res = _register(
+            db_client, uploader, key, analyze=False,
+            subject_box=[0.1, 0.1, 0.2, 0.2], subject_at_ms=100,
+        )
+        assert res.status_code == 201, res.text
+        left = db_session.execute(
+            text(
+                "SELECT count(*) FROM analysis_job WHERE video_id = :id"
+            ),
+            {"id": uuid.UUID(res.json()["id"])},
+        ).scalar_one()
+        assert left == 0
+
     def test_반려는_판정만_남고_작업은_안_생긴다(
         self, db_client, db_session, uploader
     ):

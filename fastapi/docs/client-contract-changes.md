@@ -1034,6 +1034,42 @@ grep -n "localStorage" www/src/lib/squadBoard.ts   # 안 걸리면 갈아 끼운
 
 ---
 
+## 26. 🟢 「이 사람으로 분석」 박스를 `POST /videos` 에 실을 수 있습니다 (2026-09-09 추가, 미결 `paik` 6번)
+
+분석 화면이 「이 사람으로 분석」에서 받은 박스를 보낼 자리가 없었습니다.
+`POST /api/v1/videos` 본문에 두 필드를 더했습니다.
+
+### 만족해야 할 성질
+
+- `www/src/lib/uploadClip.ts` 가 등록할 때 `subject_box`·`subject_at_ms` 를 함께 보낸다.
+  - `subject_box`: `[x, y, w, h]` — **정규화 0~1**. 🔴 손으로 그린 네모가 아니라
+    「예」를 누른 순간 **추적기가 잡고 있는 박스**(항목에 적힌 대로).
+  - `subject_at_ms`: 그 박스를 그린 영상 시각(ms).
+- 이 값은 `analysis_job` 에 저장되고 워커의 claim 응답으로 흘러갑니다 —
+  화면이 더 할 일은 없습니다(응답에는 안 실립니다).
+
+### 🔴 하지 말아야 할 것
+
+- **화면 픽셀을 보내지 마세요** — `[0,1]` 밖이면 422. (조용히 클램프하지 않습니다.)
+- `subject_box` 와 `subject_at_ms` 는 **함께 보내거나 함께 생략**합니다(한쪽만 = 422).
+- **지정이 없을 때 억지로 채우지 마세요** — 생략하면 「자동으로 고르기」이고
+  그게 정식 경로입니다. 지정 없음을 실패로 만들지 않습니다.
+- 기하: `w·h > 0`, `x+w ≤ 1`, `y+h ≤ 1`, `subject_at_ms ≤ duration_ms`.
+
+### 먼저 확인
+
+```bash
+grep -n "subject_box" www/src/lib/uploadClip.ts        # 화면 쪽이 실었는지
+git -C fastapi grep -n "subject_box" -- app/analysis    # 백엔드 쪽(이미 됨)
+```
+
+⚠️ 트랙이 도중에 다른 사람으로 갈아타는 문제(정상호 님 실측: 63%)는 이 항목이
+고치지 못합니다 — 화면 몫은 **닻을 최대한 좋은 것으로 주는 것**까지입니다.
+
+상세: `fastapi/docs/api-contract.md` **3-6절** (`POST /videos`) · **3-8절** (claim 응답)
+
+---
+
 ## 계약 문서
 
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린

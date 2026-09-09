@@ -97,6 +97,8 @@ class VideoPgRepository(VideoPort):
                     video_id=video.id,
                     status=video.analysis_status,
                     created_at=video.created_at,
+                    subject_box=video.subject_box,
+                    subject_at_ms=video.subject_at_ms,
                 )
             )
         self._session.commit()
