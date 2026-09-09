@@ -6330,7 +6330,27 @@ squad_member : squad_id · player_card_id · position_id   ← 이게 전부입�
 - 관련: `www/src/lib/squadBoard.ts` · 부록 D 도메인 ③ · 계약 3-7절
 - **담당**: 정어진 · **제기**: 백성검 · **기한**: 스프린트 3 (조정 가능)
 
-### 10. **남의 대표 영상**을 읽을 경로가 없습니다 (2026-09-08 신설)
+### 10. **남의 대표 영상**을 읽을 경로가 없습니다 (2026-09-08 신설) ✅ 해소 (2026.09.09)
+
+> **둘 다 넣었습니다** (정어진, 커밋 `0c89797` · 마이그레이션 `2088e26b34ac`).
+> - **「대표」 표시**: `video.is_featured` bool. `PATCH /api/v1/videos/{id}` 에
+>   `{"is_featured": true}`. 🔴 **사람당 하나** — 세우면 옛 대표가 자동으로
+>   내려간다(부분 유일 인덱스 `uq_video_featured_per_user` 가 DB 에서 강제).
+>   🔴 반려된 클립(`passed:false`)은 `422 CANNOT_FEATURE`.
+> - **남의 대표 읽기**: `GET /api/v1/cards/{card_public_slug}/featured-video`
+>   (로그인 필요). `{video_id, url, expires_in, sport_code, duration_ms}` —
+>   `url` 은 **사전 서명 GET URL**(저장 키 아님, 5번과 같음). 대표가 없거나·
+>   반려됐거나·슬러그가 없으면 `404 NO_FEATURED_VIDEO`.
+> - **식별자는 카드 슬러그.** 내부 `user_id` 를 URL 에 안 쓴다(카드와 같은 원칙).
+>   `is_public` 여부와 무관하다 — 대표로 세운 것 자체가 「보여 준다」는 뜻.
+> - `VideoResponse` 에 `is_featured` 추가. 화면은 `www/src/lib/featuredClip.ts`
+>   한 파일만 갈아 끼우면 된다 — 반영 안내는 `client-contract-changes.md` 27번.
+> - 확인: `grep -n "localStorage" www/src/lib/featuredClip.ts` 안 걸리면 프론트
+>   갈아 끼운 것. `pytest -q` 681 passed.
+>
+> ⚠️ **`paik` 5번(공개 여부·공개 클립 목록·재생 주소)은 별개로 남아 있습니다** —
+> 이 항목이 5번에 얹으려던 「대표」 칸만 따로 처리했습니다. 5번의 나머지 셋은
+> 그 항목에서. 자리 표시 클립(`/coach-c00N.mp4`)은 그대로 두세요(영상 파일 추가 금지).
 
 `/me` 의 영상마다 「나를 보여주는 대표 영상」을 고를 수 있게 했습니다(사용자
 요청). 뜻은 **사람마다 자기를 한 편으로 보여 주는 장면을 갖는다**는 것이고,
