@@ -6547,6 +6547,56 @@ Windows가 쓰고 있는지부터 보는 게 빠릅니다. 이건 이 컴퓨터�
 
 - **담당**: 전체(박민호·백성검·정어진·정상호) · **제기**: 박민호 · **기한**: 확인되는 대로
 
+#### 확인 — `agent/` 는 **치울 것이 없고, 동시에 k3s 위에도 없습니다** (2026.09.09, 정상호)
+
+「지금 저장소엔 `docker-compose*` 가 없다」는 **`agent/` 에서도 맞습니다.** 다만
+확인해 보니 **없는 것이 compose 만이 아닙니다** — `agent/` 는 컨테이너를 아예
+안 씁니다.
+
+```bash
+git ls-files | grep -iE 'docker-compose|compose\.ya?ml|dockerfile'          # 0건 (저장소 전체)
+grep -rniE '\bdocker\b|podman|containerd|k3s|kubectl|kubernetes' agent/ \
+  --include='*.sh' --include='*.service' --include='*.md' --include='*.py'  # 0건
+```
+
+그래서 **정책을 어떻게 읽느냐에 따라 판정이 갈립니다.**
+
+| 정책을 이렇게 읽으면 | `agent/` 는 |
+|---|---|
+| 「`docker-compose` 를 쓰지 않는다」 | ✅ **이미 준수** — 치울 것 없음 |
+| 「빌드·구동은 **k3s로만** 한다」 | 🔴 **미준수** — 호스트 systemd 유닛 3개(`supersub-vllm` · `supersub-worker` · `supersub-autostop.timer`)로 돕니다 |
+
+🔴 **어느 쪽인지 정해 주셔야 합니다.** 제 쪽에서 정할 일이 아닙니다.
+
+#### 지금은 옮기지 **않기를** 권합니다 — 이유 셋 다 GPU에서 옵니다
+
+「하면 안 된다」가 아니라 **「이 셋을 먼저 풀어야 한다」**는 뜻입니다.
+
+| | |
+|---|---|
+| **1. GPU 입도가 안 맞습니다** | 지금은 vLLM 과 포즈 파이프라인(RT-DETR + ViTPose)이 **T4 한 장을 나눠 씁니다** — vLLM 이 `SUPERSUB_GPU_FRACTION=0.35` 만 잡고 나머지를 포즈가 씁니다(`deploy/serve_vllm.sh`). 그런데 k8s 표준 NVIDIA 디바이스 플러그인의 `nvidia.com/gpu: 1` 은 **장 단위**라 두 파드가 한 장을 나눠 요청할 수 없습니다. time-slicing 이나 MPS 를 따로 켜야 하고, 그건 새 설정 축입니다 |
+| **2. 모델 가중치가 호스트에 있습니다** | `ExecStartPre=sync_model.sh` 가 없으면 S3 에서 받아 놓습니다(`supersub-vllm.service`). 파드로 가면 PVC 나 initContainer 로 옮겨야 하고, **적재에 `TimeoutStartSec=900` 이 걸려 있는 기동**이라 프로브 설정이 같이 붙습니다 |
+| **3. autostop 이 호스트 프로세스를 봅니다** | `pgrep -f "$BUSY_PATTERN"` 으로 분석 중인지 판정합니다(`deploy/autostop.sh`). 여기가 틀리면 **분석 도중에 인스턴스가 꺼지고 그 작업은 `running` 인 채로 남습니다** — 회수 규칙이 아직 없어 사실상 영구입니다. `test_worker.py::test_the_analysis_child_is_seen_as_busy_by_autostop` 이 지키고 있는 성질입니다 |
+
+🔴 **3번은 「깨진다」고 단정하지 않습니다 — 확인하지 않았습니다.** 컨테이너
+프로세스도 호스트 `pgrep` 에는 대개 보이므로 그대로 살 가능성이 큽니다. 다만
+**살아 있는지를 확인하지 않은 채 옮기면 안 되는 자리**입니다. 틀렸을 때의 대가가
+「분석이 조용히 죽는다」라서입니다.
+
+비용은 GPU 노드를 k3s 에 붙이는 것(NVIDIA 컨테이너 툴킷 + 디바이스 플러그인)
+자체보다 **1번**이 큽니다. 한 장을 둘이 나눠 쓰는 지금 구조가 실측 위에 서
+있습니다 — 포즈 단독 피크 903MiB · 동시 6341MiB · 여유 9019MiB (`ho` 1번,
+`eval/pending1_gpu_budget/`).
+
+#### 판단해 주실 것
+
+1. **정책의 적용 범위** — 백엔드·웹(무상태 컨테이너)까지입니까, **GPU 워커까지**입니까
+2. GPU 워커까지라면 **언제** — 위 셋을 푸는 회차가 필요하고, 지금 스프린트 2
+   남은 일감(`ho` 6·7번)과 겹칩니다
+
+- 관련: `ho` 1번(GPU 예산 실측) · `jin` 18번(워커 폴링 루프) · `ho` 26번(워커 정지)
+- **담당**: 박민호(적용 범위 판단) · **제기**: 정상호 · **기한**: 스프린트 3 계획 전
+
 ## paik (백성검)
 
 ### 1. 분석한 영상을 우리 서버에 저장하는 경로 ✅ 해소 (2026.09.03)
