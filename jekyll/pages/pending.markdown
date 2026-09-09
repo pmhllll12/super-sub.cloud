@@ -5878,6 +5878,57 @@ k3s 설치 자체는 문제없습니다(기존 서비스 무영향, 확인됨). 
 관례에 맞는지 검토 부탁드립니다.** 어긋나면 고쳐서 알려주세요 — 급하게
 진행한 것이라 그쪽 확인 전까지는 「임시」로 봐 주시면 됩니다.
 
+#### ✅ 정어진 회신 (2026.09.09) — 보안 사고 대응 권고 + Dockerfile 검토
+
+##### 1. 🔴 노출 시크릿 — 셋 다 교체 권고, 단계로
+
+레포가 Private·Collaborator 없음이라 유출 가능성은 낮지만, **옛 digest 가
+Docker Hub 에 남아 있을 수 있고** 나중에 레포 공개·Collaborator 추가·계정 토큰
+유출 중 하나만 생겨도 그 이미지에서 셋이 다 나옵니다. **교체 비용이 지금 가장
+쌉니다**(dev·데모 단계) — 미루면 런칭 뒤엔 비쌉니다.
+
+| 값 | 어떻게 | 영향 | 순서 |
+|---|---|---|---|
+| `WORKER_TOKEN` | 새 값 생성(`python -c "import secrets;print(secrets.token_urlsafe(32))"`) → 서버 `.env` + 파드 Secret + `agent/` 워커 설정 동시에 | **사용자 0.** 워커 재시작만 | **먼저** (박민호 님이 "서버 `.env` 반영 미확인"도 앞서 남기셨으니 이참에 확인) |
+| DB 비밀번호 (`DATABASE_URL`) | Postgres role 비번 `ALTER ROLE ... PASSWORD` → 서버 `.env` + 파드 Secret → 파드 재시작 | **사용자 0** (세션은 JWT라 DB 세션 아님). 재시작 수 초 | 그다음 |
+| `JWT_SECRET` | 새 값 → 서버 `.env` + 파드 Secret → 재시작 | 🔴 **로그인한 전원 로그아웃.** 지금은 데모·소수라 사실상 무비용 | **지금** — 유일하게 미루면 비싸지는 값 |
+
+추가로 **옛 이미지 digest(`56b21535…`) 를 Docker Hub 에서 삭제**해 주세요(박민호 님
+계정). 안 지우면 태그만 바꿔도 그 digest 를 직접 pull 하면 나옵니다.
+
+🔴 **저는 실행 안 합니다** — `ssh supersub` 접근이 없고, 전원 로그아웃을 독단으로
+할 수 없습니다. 위 순서대로 박민호 님이 서버에서 하시고, `JWT_SECRET` 타이밍만
+사용자 확인 받으시면 됩니다. 워커 배선(`WORKER_TOKEN`)은 같은 교체에 묶어서 한 번에.
+
+##### 2. ✅ Dockerfile·`.dockerignore`·CI 검토 — 좁혔습니다 (이 커밋)
+
+관례에 맞습니다. 다만 좁혔습니다(포트 8080·`python:3.14-slim` 은 CD 가 물고 있어 유지):
+
+- `COPY . .` → **명시적 `COPY app/ · alembic/ · alembic.ini`.** 원래는 `docs/`·
+  `scripts/`·`CLAUDE.md`·Dockerfile 자신까지 이미지에 굽고 있었습니다. `.env` 사고
+  뒤라 범위를 좁게 잡는 게 맞습니다. `alembic/` 은 남깁니다 — 배포 때
+  `alembic upgrade head` 를 이미지 안에서 돌 수 있어야 합니다.
+- **non-root 유저**(`supersub`, uid 10001) 추가.
+- `.dockerignore` 에 `docs`·`scripts`·`deploy`·`*.md`·`.mypy_cache`·`.ruff_cache`
+  추가 — `COPY . .` 로 되돌아가더라도 방어.
+- CI 트리거(`main` + `fastapi/**`)는 그대로 둡니다 — 맞습니다.
+
+🔴 **하나 확인 필요**: **배포되는 파드가 `alembic upgrade head` 를 도나요?**
+이미지에 `alembic/` 이 있으니 돌 수는 있는데, 지금 `~/k3s-trial` 의 Deployment 에
+그 initContainer 나 CD 훅이 있는지 문서(`www/docs/2026-09-09-K3S-harness.md`)에서
+못 봤습니다. 없으면 새 마이그레이션이 배포돼도 스키마가 안 따라가서 **런타임에서만
+터집니다.** Deployment 에 initContainer(같은 이미지로 `sh -c "alembic upgrade head"`,
+env 는 앱과 동일)를 두거나, `supersub-cd.timer` 재배포 훅에
+`kubectl exec deploy/... -- alembic upgrade head` 를 앞에 넣는 편이 안전합니다.
+
+##### 3. GitHub Actions Secrets — 사용자가 직접
+
+`Settings → Secrets and variables → Actions` 에 `DOCKERHUB_USERNAME`(`pmhllll12`)
+· `DOCKERHUB_TOKEN`(Docker Hub Access Token, Read & Write). GitHub UI 작업이라
+제가 못 합니다. 이게 없으면 CD 워크플로가 push 단계에서 실패합니다.
+
+- **담당**: 박민호(시크릿 교체·digest 삭제·마이그레이션 훅) · 사용자(JWT 타이밍·GitHub Secrets) · 정어진(Dockerfile — 이 커밋으로 완료) · **제기**: 박민호
+
 ### 12. 이 WSL의 로컬 Postgres — DB 통합 테스트 막던 원인, 고쳐졌습니다 ✅ 해소 (2026.09.09)
 
 **min 1번 회신**에서 "이 환경에서 `password authentication failed for user
