@@ -6430,6 +6430,25 @@ push 방식·코드 문제가 아니라 **Vercel 계정(무료 플랜)의 빌드
 
 - **담당**: 정어진 · **제기**: 박민호 · **기한**: 확인되는 대로
 
+#### ✅ 추가 진행 (2026.09.09) — Docker Hub pull 방식으로 전환
+
+**로컬 import 대신 레지스트리 pull로 바꿨습니다.** 이유: 로컬 import 방식은
+그 서버에서 직접 빌드해야만 이미지가 생기는데, Docker Hub를 거치면 어디서
+빌드하든 같은 이미지를 여러 서버(로컬·EC2·다른 EC2)가 그대로 받아 쓸 수
+있습니다.
+
+| | |
+|---|---|
+| 레포 | `pmhllll12/supersub` (Private — 소스가 이미지에 그대로 들어가 있어 Public은 안 씀) |
+| 인증 | `supersub` 서버에서 `sudo docker login`(Access Token) 후 그 자격으로 k8s Secret(`dockerhub-cred`, `kubernetes.io/dockerconfigjson`) 생성 |
+| Deployment 변경 | `image: pmhllll12/supersub:latest` · `imagePullPolicy: Always` · `imagePullSecrets: [dockerhub-cred]` |
+| 확인 | `kubectl describe pod` 이벤트에 `Pulling image "pmhllll12/supersub:latest"` → `Successfully pulled` 찍힘 (진짜로 레지스트리에서 받은 것 확인) · `curl localhost:8080/health` → `200` |
+| 걸린 것 | 롤링 업데이트 중 새 파드가 `hostNetwork`라 기존 파드와 **포트 충돌**로 `Pending`(`didn't have free ports`) — 기존 파드를 수동으로 지워서 넘겼습니다. 단일 노드에서 `hostNetwork` 쓸 땐 롤링 업데이트가 이렇게 걸린다는 걸 알아두면 됩니다 |
+
+절차는 `www/docs/2026-09-09-K3S-harness.md`에도 반영했습니다. **여전히
+Dockerfile을 저장소에 정식으로 커밋할지, 이미지 태그 전략(버전 태그 vs
+`latest`)을 어떻게 할지는 정어진 판단이 필요합니다** — 위 본문 내용 그대로입니다.
+
 ### 12. 이 WSL의 로컬 Postgres — DB 통합 테스트 막던 원인, 고쳐졌습니다 ✅ 해소 (2026.09.09)
 
 **min 1번 회신**에서 "이 환경에서 `password authentication failed for user
