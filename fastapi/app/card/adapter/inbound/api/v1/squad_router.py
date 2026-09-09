@@ -12,13 +12,17 @@ from fastapi import APIRouter, Response, status
 
 from app.card.adapter.inbound.api.schemas.squad_schema import (
     EnlistCardSchema,
+    MoveMemberSchema,
+    SetFormationSchema,
     SquadResponse,
 )
 from app.card.application.dtos.squad_dto import (
     CreateSquadCommand,
     DischargeMemberCommand,
     EnlistCardCommand,
+    MoveMemberCommand,
     PublicSquadQuery,
+    SetFormationCommand,
     SquadResult,
     TeamSquadQuery,
 )
@@ -26,7 +30,9 @@ from app.card.dependencies.squad_providers import (
     CreateSquadUseCaseDep,
     DischargeMemberUseCaseDep,
     EnlistCardUseCaseDep,
+    MoveMemberUseCaseDep,
     PublicSquadUseCaseDep,
+    SetFormationUseCaseDep,
     TeamSquadUseCaseDep,
 )
 from app.core.deps import CurrentUserId
@@ -90,6 +96,54 @@ def enlist_card(
             team_id=team_id,
             player_card_id=body.player_card_id,
             position_code=body.position_code,
+            grid_col=body.grid_col,
+            grid_row=body.grid_row,
+        )
+    )
+
+
+@squad_router.patch(
+    "/teams/{team_id}/squad", response_model=SquadResponse
+)
+def set_squad_formation(
+    team_id: UUID,
+    body: SetFormationSchema,
+    user_id: CurrentUserId,
+    use_case: SetFormationUseCaseDep,
+) -> SquadResult:
+    """홈 판의 판 크기(`formation`)를 저장한다. **주장만.** (미결 `paik` 9번)
+
+    바뀐 스쿼드 전체를 돌려준다 — 화면이 판을 다시 그리기 때문이다.
+    """
+    return use_case(
+        SetFormationCommand(
+            actor_id=user_id, team_id=team_id, formation=body.formation
+        )
+    )
+
+
+@squad_router.patch(
+    "/teams/{team_id}/squad/members/{member_id}", response_model=SquadResponse
+)
+def move_member(
+    team_id: UUID,
+    member_id: UUID,
+    body: MoveMemberSchema,
+    user_id: CurrentUserId,
+    use_case: MoveMemberUseCaseDep,
+) -> SquadResult:
+    """등재 하나의 포지션·판 배치를 바꾼다. **주장만.** (미결 `paik` 9번)
+
+    `grid_col`·`grid_row` 는 함께 주거나 함께 비운다(둘 다 `null` 이면 판에서만 뺀다).
+    """
+    return use_case(
+        MoveMemberCommand(
+            actor_id=user_id,
+            team_id=team_id,
+            member_id=member_id,
+            position_code=body.position_code,
+            grid_col=body.grid_col,
+            grid_row=body.grid_row,
         )
     )
 

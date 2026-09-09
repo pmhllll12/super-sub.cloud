@@ -1,18 +1,83 @@
-# 백엔드 배포 준비
+# 백엔드 배포
 
-> **상태:** **구현됨 — SSH 터널로 도는 것까지 확인** · 2026-09-02
-> **확인:** `ssh supersub 'systemctl is-active supersub-api'` → `active`,
-> 터널을 열고 `curl -s localhost:8000/health` → `"status":"ok"`.
-> **밖에서는 아직 안 보인다** — 보안 그룹은 22 만 열려 있다(6-8 절).
-> **메모:** 여기 적힌 것은 **배포 환경이 생겼을 때 순서대로 밟는 절차**다. 로컬
-> 개발에 필요한 것은 `.env.example` 이 안내한다.
+> **상태:** **구현됨 — k3s + GitHub Actions CD** · 2026-09-09
+> **확인:** `curl -s https://<API 호스트>/health` → `{"status":"ok",...}` ·
+> `ssh supersub 'sudo k3s kubectl -n supersub get pods'` → `api-*` 가 `Running`.
+> **메모:** 배포는 이제 **손으로 밟는 절차가 아니라 자동**이다 — `main` 의
+> `fastapi/**` 가 바뀌면 이미지가 빌드돼 Docker Hub 로 가고, 서버가 그걸 폴링해
+> 재배포한다. 아래 「현재 배포」가 그 흐름이고, 사람이 하는 것은 **DB·시크릿·S3**
+> 준비뿐이다(1·2·9절). 로컬 개발은 `.env.example` 이 안내한다.
+>
+> 🔴 **옛 systemd 절차(0·3~6절, 8절 일부)는 「롤백·최초 세팅 기록」으로 남긴다** —
+> 지금 흐름이 아니다. k3s 가 못 돌 때 되돌리는 경로이자, 서버(`supersub`)가
+> 2026-09-02 에 처음 세팅됐을 때의 기록이다. min 14번 정책(빌드·구동은 k3s 로만).
 
-아래 순서에는 이유가 있다. **1번은 마이그레이션보다 먼저**여야 하고, 2번이 빠지면
-조용히 잘못 동작한다. **0번은 2026-09-02 에 서버가 생기면서 앞에 붙었다** — 거기 적힌 셋이 정해지기 전에는 1번을 시작할 수 없다.
+---
+
+## 현재 배포 — k3s + CD (2026-09-09)
+
+> 절차의 세부·함정은 `www/docs/2026-09-09-K3S-harness.md`(박민호) 가 정본이다.
+> 여기는 백엔드 관점에서 **무엇이 어떻게 도는지**와 **사람이 준비할 것**을 적는다.
+
+### 흐름
+
+```
+main 에 fastapi/** push
+  → GitHub Actions (.github/workflows/backend-docker-build.yml)
+      docker build (context: fastapi, file: fastapi/Dockerfile)
+      → push  pmhllll12/supersub:latest
+  → supersub 서버의 supersub-cd.timer (2분 폴링)
+      새 digest 감지 → kubectl rollout restart deploy/api  (ns: supersub)
+  → 파드 재생성 (strategy: Recreate)
+      initContainer: alembic upgrade head   ← 마이그레이션 (커밋 5f85c9d)
+      app 컨테이너: uvicorn app.main:app :8080  (hostNetwork)
+```
+
+- **포트 8080 · hostNetwork.** 파드가 호스트 네트워크를 그대로 써서 `localhost:5432`
+  의 호스트 PostgreSQL 에 붙는다(DB 는 파드로 안 옮긴다 — 아래 「DB 는 그대로」).
+  단일 노드에서 `hostNetwork` 라 롤링 업데이트가 포트 충돌하므로 `strategy: Recreate`.
+- **이미지에 `.env` 가 없다.** `fastapi/.dockerignore` 가 `.env`·`.env.*` 를 막는다 —
+  2026-09-09 에 `.env` 가 이미지에 구워져 Docker Hub 에 올라간 사고(미결 min 11번)
+  뒤로 git 으로 관리한다. 🔴 **`COPY . .` 로 되돌리지 말 것** — `Dockerfile` 은
+  `app/`·`alembic/`·`alembic.ini` 만 명시적으로 넣는다.
+- **설정 주입**: `kubectl -n supersub create secret generic supersub-api-env
+  --from-env-file=<서버의 .env>` → Deployment 가 `envFrom` 으로 읽는다. `.env`
+  파일 자체는 서버에만 있고 저장소·이미지에 없다.
+- **마이그레이션**은 initContainer 가 매 배포마다 `alembic upgrade head` 를 돈다.
+  head 면 no-op 라 안전하다. 🔴 **`CREATE EXTENSION vector` 는 여기 없다** — 그건
+  슈퍼유저 일회성이라 1절이 따로 다룬다.
+
+### 사람이 준비할 것 (한 번씩)
+
+| | 무엇 | 어디 |
+|---|---|---|
+| GitHub Actions Secrets | `DOCKERHUB_USERNAME` · `DOCKERHUB_TOKEN`(Read & Write) | 저장소 Settings → Secrets and variables → Actions. 없으면 CD 가 push 단계에서 실패한다 |
+| DB 확장 | `CREATE EXTENSION vector` (슈퍼유저, 호스트 DB 에 한 번) | **1절** |
+| 환경변수 | `supersub-api-env` Secret 에 들어갈 값 | **2절** (`.env.example` 이 목록) |
+| S3 버킷·IAM | 업로드 클립 저장소 | **9절** (변화 없음) |
+| 백업 | DB 덤프·복원 | **7절** (변화 없음 — DB 는 여전히 호스트 systemd Postgres) |
+
+### DB 는 그대로 — 파드로 안 옮긴다
+
+`postgresql` 은 `supersub` 서버에서 **systemd 로** 계속 돈다(18.6, 6-1절). k3s 로
+옮기는 것은 **앱뿐이다.** DB 를 StatefulSet + PV 로 옮기는 것은 백업·볼륨 계획이
+선행돼야 하는 별도 결정이고, min 14 정책("빌드·구동은 k3s 로만")도 앱이 대상이지
+DB 스토리지가 아니다. 그래서 7절(백업)·1절(확장)은 그대로 유효하다.
+
+### 롤백
+
+k3s 배포가 깨지면 옛 systemd 서비스로 되돌린다. `supersub-api.service` 는
+**지우지 않고 `disable` 만** 해 뒀다(있으면 `systemctl enable --now supersub-api`
+로 8000 을 다시 띄운다). 절차는 아래 6절이 그대로 롤백 런북이다.
 
 ---
 
 ## 0. 배포 대상 서버 — 무엇이 있고 무엇이 없나 (2026-09-02 확인)
+
+> 🔴 **이 절은 「최초 세팅 기록」이다.** 서버(`supersub`)에 파이썬·PostgreSQL·
+> systemd 서비스를 처음 올린 2026-09-02 의 상태다. 지금 배포는 위 「현재 배포」
+> (k3s + CD)다. 서버 사양(t3.large·7.8GB·디스크)과 「인스턴스 켠 순서」(8절)만
+> 계속 유효하고, 나머지는 그때 어떻게 세웠는지의 기록으로 읽는다.
 
 EC2 인스턴스 하나가 생겼다(`ssh supersub` · 서울 리전 · t3.large · vCPU 2 · 메모리
 7.8GB · **디스크 30GB** 중 28GB 여유). **접속 정보는 저장소에 두지 않는다** — 개인
@@ -94,6 +159,10 @@ sudo -u nobody /usr/local/bin/python3.14 -V      # 여기서 막히면 경로 �
 ---
 
 ## 1. DB 확장을 먼저 만든다 — 마이그레이션 전에
+
+> **k3s 배포에서도 그대로 유효하다.** initContainer 는 `alembic upgrade` 만 돌고
+> 확장은 안 만든다. 확장은 **호스트 PostgreSQL 에 슈퍼유저로 한 번** 만들어 두면
+> 되고, 그 뒤로는 손댈 일이 없다.
 
 🔴 **`CREATE EXTENSION vector` 는 슈퍼유저만 할 수 있다.** 앱 계정으로는 안 된다.
 
@@ -189,12 +258,20 @@ curl -s -o /dev/null -w '%{http_code}\n' https://<배포주소>/docs   # 404 여
 
 ## 3. 마이그레이션
 
+> **지금은 배포가 자동으로 돈다** — Deployment 의 initContainer 가 매 배포마다
+> `alembic upgrade head` 를 실행한다(커밋 `5f85c9d`). head 면 no-op 다. 아래는
+> 손으로 돌릴 때(롤백·로컬)의 명령이다.
+
 ```bash
 alembic upgrade head
 alembic check        # "No new upgrade operations detected." 여야 한다
 ```
 
 `create_all` 을 쓰지 않는다 — 마이그레이션이 스키마의 정본이다.
+
+🔴 **새 마이그레이션을 냈으면 `CREATE EXTENSION vector` 가 이미 돼 있는지 본다**(1절).
+initContainer 는 확장을 만들지 않는다 — 확장이 없으면 `vector` 타입을 쓰는
+마이그레이션이 initContainer 안에서 멈추고 파드가 안 뜬다.
 
 ---
 
@@ -255,7 +332,13 @@ DATABASE_URL=postgresql://<user>:<pw>@<host>:5432/<db>?sslmode=verify-full
 | 삭제 연쇄가 **DB 까지만** | 객체 저장소가 정해지지 않아 원본·썸네일·추출 프레임이 남는다 (5장 SEC-006 · ASM-003) |
 | `Retry-After` 헤더가 없다 | 429 응답에 재시도 시점을 싣지 않는다. 클라이언트가 즉시 재시도하지 않도록 별도 합의가 필요하다 |
 
-## 6. 실제로 밟은 순서 (2026-09-02, SSH 터널까지)
+## 6. 실제로 밟은 순서 (2026-09-02, SSH 터널까지) — **옛 방식 · 롤백 런북**
+
+> 🔴 **지금 배포가 아니다.** 서버를 2026-09-02 에 처음 세울 때 밟은 순서이고,
+> 지금은 **k3s 배포가 깨졌을 때 8000 systemd 로 되돌리는 런북**으로 쓴다.
+> 6-1(PostgreSQL)은 지금도 유효하다 — DB 는 여전히 이 systemd Postgres 다.
+> 6-5(systemd)의 `supersub-api.service` 는 `disable` 만 해 뒀으니
+> `systemctl enable --now supersub-api` 로 되살린다.
 
 같은 인스턴스에 PostgreSQL 을 두기로 했고(비용 없음), 보안 그룹은 열지 않았다.
 **밖에서는 아직 안 보인다** — 확인은 SSH 터널로 한다.
@@ -452,15 +535,17 @@ df -h /                     # 30G 로 보이면 끝
 
 ---
 
-## 8. 인스턴스를 껐다 켤 때 (2026-09-02)
+## 8. 인스턴스를 껐다 켤 때 (2026-09-02, k3s 반영 2026-09-09)
 
-비용 때문에 주기적으로 끈다. **서비스는 알아서 돌아온다** — `postgresql`·
-`supersub-api`·`supersub-backup.timer` 가 전부 `enabled` 라 부팅하면 스스로 뜬다.
+비용 때문에 주기적으로 끈다. **서비스는 알아서 돌아온다** — 부팅하면 스스로 뜬다.
 
 ```bash
-ssh supersub 'systemctl is-enabled postgresql supersub-api supersub-backup.timer'
-# 셋 다 enabled 여야 한다. disabled 가 보이면 그건 껐다 켠 뒤 안 뜬다는 뜻이다
-ssh supersub 'systemctl is-active postgresql supersub-api'   # 켠 뒤 확인
+# DB·백업·CD·k3s 가 전부 enabled 여야 한다
+ssh supersub 'systemctl is-enabled postgresql supersub-backup.timer supersub-cd.timer k3s'
+# 🔴 supersub-api(옛 8000 systemd)는 disabled 가 정상이다 — k3s 로 넘어갔다(롤백용으로만 남김)
+ssh supersub 'systemctl is-active postgresql k3s'
+ssh supersub 'sudo k3s kubectl -n supersub get pods'        # api-* 가 Running
+curl -s -o /dev/null -w '%{http_code}\n' https://<API 호스트>/health   # 200
 ```
 
 🔴 **09-02 의 "탄력적 IP 를 붙이지 않는다" 를 정정한다 (2026-09-03 사용자 결정).**

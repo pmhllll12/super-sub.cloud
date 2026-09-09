@@ -12,6 +12,7 @@ import pytest
 from app.analysis.adapter.outbound.stub.video_stub_repository import (
     _OBJECTS,
     put_object,
+    register_card_slug,
     reset_videos,
 )
 from app.analysis.domain.rules.video_rules import MAX_BYTES, MAX_DURATION_MS
@@ -205,6 +206,92 @@ class TestRegisterVideo:
         assert res.status_code == 201, res.text
         assert res.json()["passed"] is False
         assert "해상도" in res.json()["reject_reason"]
+
+    def test_지정_박스를_받는다(self, client):
+        """미결 `paik` 6번 — 「이 사람으로 분석」 박스. 응답엔 안 실린다(작업 값)."""
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        res = _register(
+            client, user_id, key,
+            subject_box=[0.39, 0.35, 0.12, 0.4], subject_at_ms=4_200,
+        )
+        assert res.status_code == 201, res.text
+        assert res.json()["passed"] is True
+
+    def test_픽셀_좌표는_422_다(self, client):
+        """🔴 정규화 좌표만. 조용히 클램프하면 엉뚱한 사람을 분석하고도 지정대로라 답한다."""
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        res = _register(
+            client, user_id, key, subject_box=[340, 210, 120, 400], subject_at_ms=4_200
+        )
+        assert res.status_code == 422
+
+    def test_박스만_주고_시각을_안_주면_422_다(self, client):
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        res = _register(client, user_id, key, subject_box=[0.1, 0.1, 0.2, 0.2])
+        assert res.status_code == 422
+
+    def test_화면을_벗어나는_박스는_422_다(self, client):
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        res = _register(
+            client, user_id, key, subject_box=[0.8, 0.1, 0.5, 0.2], subject_at_ms=100
+        )
+        assert res.status_code == 422
+
+    def test_시각이_클립_길이를_넘으면_422_다(self, client):
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        res = _register(
+            client, user_id, key,
+            subject_box=[0.1, 0.1, 0.2, 0.2], subject_at_ms=10_001,  # duration 10_000
+        )
+        assert res.status_code == 422
+
+    def test_집중_항목을_받는다(self, client):
+        """미결 `paik` 8번 — 「어디를 집중해서 볼지」 루브릭 criteria id 목록."""
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        res = _register(
+            client, user_id, key, focus=["follow_through", "guide_hand"]
+        )
+        assert res.status_code == 201, res.text
+        assert res.json()["passed"] is True
+
+    def test_빈_집중_목록은_전체다_실패가_아니다(self, client):
+        """🔴 「전체적으로」가 기본이자 가장 흔한 경우 — 실패로 만들지 않는다."""
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        res = _register(client, user_id, key, focus=[])
+        assert res.status_code == 201, res.text
+
+    def test_집중_목록의_공백·중복은_정리된다(self, client):
+        """자유 문자열은 아니지만 형식은 서버가 정리한다(공백·중복 제거)."""
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        res = _register(
+            client, user_id, key,
+            focus=["  follow_through ", "follow_through", " "],
+        )
+        assert res.status_code == 201, res.text
 
     def test_올리지_않은_키는_반려가_아니라_에러다(self, client):
         """검사할 파일이 없다. 반려로 기록하면 "안 올린 것"과 구별되지 않는다."""
@@ -430,6 +517,112 @@ class TestListPublicVideos:
         row = client.get(f"{V1}/videos/public", headers=_headers(uuid4())).json()[0]
         assert row["title"] == "제목"
         assert row["description"] == "설명"
+
+
+class TestFeatured:
+    """「나를 보여주는 대표 영상」 (미결 `paik` 10번)."""
+
+    def _feature(self, client, user_id, video_id):
+        return client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"is_featured": True},
+            headers=_headers(user_id),
+        )
+
+    def test_대표로_세운다(self, client):
+        user_id = uuid4()
+        vid = _register_clip(client, user_id)
+        res = self._feature(client, user_id, vid)
+        assert res.status_code == 200, res.text
+        assert res.json()["is_featured"] is True
+
+    def test_대표는_사람당_하나_새로_세우면_옛것이_내려간다(self, client):
+        user_id = uuid4()
+        first = _register_clip(client, user_id)
+        second = _register_clip(client, user_id)
+        self._feature(client, user_id, first)
+        self._feature(client, user_id, second)
+
+        rows = {r["id"]: r["is_featured"]
+                for r in client.get(f"{V1}/videos", headers=_headers(user_id)).json()}
+        assert rows[first] is False
+        assert rows[second] is True
+
+    def test_내릴_수도_있다(self, client):
+        user_id = uuid4()
+        vid = _register_clip(client, user_id)
+        self._feature(client, user_id, vid)
+        res = client.patch(
+            f"{V1}/videos/{vid}",
+            json={"is_featured": False},
+            headers=_headers(user_id),
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["is_featured"] is False
+
+    def test_반려된_클립은_대표로_못_세운다(self, client):
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+        rejected = _register(
+            client, user_id, key, duration_ms=MAX_DURATION_MS + 1
+        ).json()
+        assert rejected["passed"] is False
+
+        res = self._feature(client, user_id, rejected["id"])
+        assert res.status_code == 422
+        assert error_code(res) == "CANNOT_FEATURE"
+
+    def test_남의_클립은_대표로_못_세운다(self, client):
+        owner, other = uuid4(), uuid4()
+        vid = _register_clip(client, owner)
+        res = self._feature(client, other, vid)
+        assert res.status_code == 404
+
+
+class TestFeaturedRead:
+    """`GET /cards/{slug}/featured-video` — 남의 대표 영상 (미결 `paik` 10번)."""
+
+    def test_인증이_필요하다(self, client):
+        assert client.get(f"{V1}/cards/some-slug/featured-video").status_code == 401
+
+    def test_남의_대표를_카드_슬러그로_읽는다(self, client):
+        owner, viewer = uuid4(), uuid4()
+        vid = _register_clip(client, owner)
+        client.patch(
+            f"{V1}/videos/{vid}",
+            json={"is_featured": True},
+            headers=_headers(owner),
+        )
+        register_card_slug("hong-gildong-4f2a", owner)
+
+        res = client.get(
+            f"{V1}/cards/hong-gildong-4f2a/featured-video",
+            headers=_headers(viewer),
+        )
+        assert res.status_code == 200, res.text
+        body = res.json()
+        assert body["video_id"] == vid
+        assert body["url"].startswith("https://")
+        assert body["expires_in"] > 0
+
+    def test_대표가_없으면_404_다(self, client):
+        owner = uuid4()
+        _register_clip(client, owner)  # 대표로 안 세움
+        register_card_slug("no-featured-1a2b", owner)
+
+        res = client.get(
+            f"{V1}/cards/no-featured-1a2b/featured-video", headers=_headers(uuid4())
+        )
+        assert res.status_code == 404
+        assert error_code(res) == "NO_FEATURED_VIDEO"
+
+    def test_없는_슬러그는_404_다(self, client):
+        res = client.get(
+            f"{V1}/cards/누구도-아님/featured-video", headers=_headers(uuid4())
+        )
+        assert res.status_code == 404
+        assert error_code(res) == "NO_FEATURED_VIDEO"
 
 
 class TestPlaybackUrl:

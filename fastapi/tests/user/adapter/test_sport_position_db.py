@@ -19,6 +19,7 @@ from app.analysis.adapter.outbound.orm.video_orm import VideoOrm
 from app.card.adapter.outbound.orm.title_definition_orm import TitleDefinitionOrm
 from app.user.adapter.outbound.orm.position_orm import PositionOrm
 from app.user.adapter.outbound.orm.sport_orm import SportOrm
+from tests.conftest import V1
 
 pytestmark = pytest.mark.db
 
@@ -155,3 +156,39 @@ class TestPositionUniqueness:
         with pytest.raises(IntegrityError):
             db_session.flush()
         db_session.rollback()
+
+
+class TestPositionsEndpoint:
+    """`GET /positions` 가 **실제 DB 행**을 그대로 준다 (스텁 목록의 정답지)."""
+
+    def _token(self, db_client):
+        email = f"pos-{uuid.uuid4().hex[:12]}@super-sub.example"
+        db_client.post(
+            f"{V1}/auth/signup",
+            json={"email": email, "password": "supersub2026", "nickname": "포지션"},
+        )
+        login = db_client.post(
+            f"{V1}/auth/login",
+            json={"email": email, "password": "supersub2026"},
+        )
+        return {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+    def test_엔드포인트가_DB_행과_일치한다(self, db_client, db_session):
+        want = {
+            (p.sport_code, p.code, p.label)
+            for p in db_session.query(PositionOrm).all()
+        }
+        got = {
+            (r["sport_code"], r["code"], r["label"])
+            for r in db_client.get(
+                f"{V1}/positions", headers=self._token(db_client)
+            ).json()
+        }
+        assert got == want and len(want) >= 11
+
+    def test_종목_필터가_DB_에서_먹는다(self, db_client):
+        rows = db_client.get(
+            f"{V1}/positions?sport_code=basketball",
+            headers=self._token(db_client),
+        ).json()
+        assert {r["code"] for r in rows} == {"G", "F", "C"}

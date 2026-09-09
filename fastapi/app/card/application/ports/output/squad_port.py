@@ -54,16 +54,43 @@ class SquadPort(ABC):
 
     @abstractmethod
     def enlist(
-        self, squad_id: UUID, player_card_id: UUID, position_id: UUID
+        self,
+        squad_id: UUID,
+        player_card_id: UUID,
+        position_id: UUID,
+        grid_col: int | None = None,
+        grid_row: int | None = None,
     ) -> SquadMemberEntity:
-        """카드를 등재한다. 같은 카드를 두 번 넣으면 유일 제약이 막는다(부록 D.7)."""
+        """카드를 등재한다. 같은 카드를 두 번 넣으면 유일 제약이 막는다(부록 D.7).
+
+        `grid_col`·`grid_row` 는 등재하면서 판에 바로 올릴 때의 칸이다 — 인터랙터가
+        both-or-neither 를 보장해 넘긴다.
+        """
+
+    @abstractmethod
+    def update_member(
+        self,
+        member_id: UUID,
+        position_id: UUID,
+        grid_col: int | None,
+        grid_row: int | None,
+    ) -> SquadMemberEntity:
+        """등재 하나의 포지션·판 배치를 바꾼다 (미결 `paik` 9번).
+
+        `member_id` 가 이 팀 스쿼드의 것인지는 **인터랙터가 먼저 확인한다** — 여기는
+        받은 값을 그대로 쓴다. 표시용 값(닉네임·슬러그)까지 채운 엔티티를 돌려준다.
+        """
+
+    @abstractmethod
+    def set_formation(self, squad_id: UUID, formation: str) -> None:
+        """판 크기를 저장한다 (미결 `paik` 9번). 값 규칙은 검사하지 않는다."""
 
     @abstractmethod
     def find_member(self, member_id: UUID) -> tuple[UUID, UUID] | None:
         """`(squad_id, player_card_id)`. 없으면 None.
 
-        제외할 때 **그 등재가 이 팀의 스쿼드 것인지** 확인하는 데 쓴다 — 확인
-        없이 지우면 남의 스쿼드에서 카드를 뺄 수 있다.
+        제외·이동할 때 **그 등재가 이 팀의 스쿼드 것인지** 확인하는 데 쓴다 — 확인
+        없이 손대면 남의 스쿼드를 건드릴 수 있다.
         """
 
     @abstractmethod

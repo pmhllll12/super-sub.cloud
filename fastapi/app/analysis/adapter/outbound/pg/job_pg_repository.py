@@ -47,7 +47,13 @@ class JobPgRepository(JobPort):
             update(AnalysisJobOrm)
             .where(AnalysisJobOrm.id == oldest)
             .values(status=RUNNING, started_at=datetime.now(timezone.utc))
-            .returning(AnalysisJobOrm.id, AnalysisJobOrm.video_id)
+            .returning(
+                AnalysisJobOrm.id,
+                AnalysisJobOrm.video_id,
+                AnalysisJobOrm.subject_box,
+                AnalysisJobOrm.subject_at_ms,
+                AnalysisJobOrm.focus,
+            )
         ).first()
 
         if claimed is None:
@@ -55,7 +61,7 @@ class JobPgRepository(JobPort):
             self._session.rollback()
             return None
 
-        job_id, video_id = claimed
+        job_id, video_id, subject_box, subject_at_ms, focus = claimed
         video = self._session.get(VideoOrm, video_id)
         if video is None:
             # 외래키가 CASCADE 라 정상 경로에서는 올 수 없다. 그래도 조용히
@@ -71,6 +77,9 @@ class JobPgRepository(JobPort):
             sport_code=video.sport_code,
             side=video.side,
             duration_ms=video.duration_ms,
+            subject_box=subject_box,
+            subject_at_ms=subject_at_ms,
+            focus=focus,
         )
 
     def reclaim_stale(self, timeout_minutes: int) -> tuple[int, int]:
@@ -118,7 +127,11 @@ class JobPgRepository(JobPort):
         return requeued, failed
 
     def finish(
-        self, job_id: UUID, status: str, failure_reason: str | None
+        self,
+        job_id: UUID,
+        status: str,
+        failure_reason: str | None,
+        report_key: str | None = None,
     ) -> str | None:
         # `running` 일 때만 바꾼다. 조건을 SQL 에 두는 이유는 읽고 나서 쓰면
         # 그 사이에 다른 보고가 끼어들 수 있어서다.
@@ -129,6 +142,7 @@ class JobPgRepository(JobPort):
                 status=status,
                 failure_reason=failure_reason,
                 finished_at=datetime.now(timezone.utc),
+                report_key=report_key,
             )
         ).rowcount
 

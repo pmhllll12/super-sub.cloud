@@ -43,7 +43,11 @@ from app.user.adapter.outbound.stub.user_stub_repository import (
     StubUserRepository,
 )
 from app.user.adapter.outbound.stub.team_stub_repository import StubTeamRepository
+from app.user.adapter.outbound.stub.position_stub_repository import (
+    StubPositionRepository,
+)
 from app.user.dependencies.team_providers import get_team_repository
+from app.user.dependencies.position_providers import get_position_repository
 from app.user.dependencies.user_repository_provider import get_user_repository
 
 V1 = "/api/v1"
@@ -98,6 +102,7 @@ def client() -> TestClient:
     app.dependency_overrides[get_video_repository] = StubVideoRepository
     app.dependency_overrides[get_job_repository] = StubJobRepository
     app.dependency_overrides[get_review_repository] = StubReviewRepository
+    app.dependency_overrides[get_position_repository] = StubPositionRepository
     # 🔴 저장소도 갈아끼운다. 안 끼우면 `S3_BUCKET` 이 없어 503 이 나는데,
     #    그건 계약이 아니라 **환경 문제**라 계약 테스트가 그걸 검사하면 안 된다.
     app.dependency_overrides[get_storage] = FakeStorage
@@ -118,6 +123,7 @@ def client() -> TestClient:
         app.dependency_overrides.pop(get_video_repository, None)
         app.dependency_overrides.pop(get_job_repository, None)
         app.dependency_overrides.pop(get_review_repository, None)
+        app.dependency_overrides.pop(get_position_repository, None)
         app.dependency_overrides.pop(get_storage, None)
         app.dependency_overrides.pop(get_token_version_reader, None)
         app.dependency_overrides.pop(get_user_email_reader, None)
