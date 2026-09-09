@@ -5692,7 +5692,41 @@ push 방식·코드 문제가 아니라 **Vercel 계정(무료 플랜)의 빌드
 옮길지, 아니면 k3s는 새 워크로드 전용으로 옆에 둘지는 **정어진 판단이 필요합니다**
 — 배포 방식(`docs/deployment.md`)의 정본이 그쪽 소유라서입니다.
 
-- **담당**: 정어진 · **제기**: 박민호 · **기한**: 확인되는 대로
+#### ✅ 정어진 회신 (2026.09.09) — (A) 지금은 아무것도 옮기지 않습니다
+
+k3s 설치 자체는 문제없습니다(기존 서비스 무영향, 확인됨). **다만 `supersub-api`·
+`postgresql`은 systemd 그대로 두고 k3s에는 아직 아무 워크로드도 배포하지
+않습니다.** 실제로 오케스트레이션이 필요한 **두 번째 서비스가 특정될 때** API
+합류 여부를 그때 정합니다.
+
+근거:
+
+- 오케스트레이션 대상이 될 "다른 서비스"가 아직 이름이 없습니다. 두 번째
+  워크로드 0인 상태에서 도는 systemd 배포를 k8s로 옮기는 것은 순수 비용이고,
+  프로덕션을 서비스하는 유일한 박스에 클러스터 네트워킹·이미지 레지스트리·
+  인그레스 실패면을 더합니다.
+- 2 vCPU / 7.6GB 박스에 k8s idle 오버헤드(설치만으로 이미 +0.8GiB)에 더해
+  부하 시 kubelet·containerd·coredns·traefik이 얹힙니다.
+- systemd 배포는 마지막 배포(2026-09-08)에서 스모크까지 통과했고
+  `fastapi/docs/deployment.md`가 그 절차의 정본입니다. 이걸 매니페스트 기준으로
+  다시 쓰는 것은 실제 필요가 끌고 가야 하는 변경입니다.
+- 🔴 **Postgres는 옮기지 않습니다.** 디스크 여유 27GB 박스에서 StatefulSet +
+  local-path PV는 PV 오설정이나 `delete pvc` 한 번에 프로덕션 데이터가
+  사라집니다. 온박스 systemd Postgres + 알려진 백업 경로가 더 안전합니다.
+
+**해 둔 것:** 로컬(개인 개발) k3s용 매니페스트를 `fastapi/deploy/k8s/`에 만들어
+검증해 뒀습니다 — API Deployment + in-cluster pgvector + initContainer 마이그레이션
++ NodePort. 나중에 EC2로 API를 옮길 필요가 생기면 Postgres 부분만 빼고 이걸
+출발점으로 씁니다.
+
+| | |
+|---|---|
+| 결정 | (A) k3s는 설치된 채 유지, 워크로드 미배포. `supersub-api`·`postgresql` systemd 유지 |
+| 다시 볼 조건 | 오케스트레이션이 필요한 두 번째 서비스가 구체화될 때 — 그때 `fastapi/docs/deployment.md` 개정 + 이 항목 재개 |
+| 하지 말 것 | 🔴 `supersub-api`·`postgresql`을 k3s로 옮기지 않기(특히 Postgres) · 🔴 `deployment.md`를 매니페스트 기준으로 미리 고치지 않기 |
+| 확인 | `ssh supersub 'systemctl is-active supersub-api postgresql'` → 둘 다 `active` (k3s 설치 후에도 배포 방식은 systemd 그대로) |
+
+- **담당**: ~~정어진~~ **✅ 회신함 (2026.09.09 — (A) 유지·미배포)** · **제기**: 박민호 · **기한**: — (두 번째 서비스 생기면 재개)
 
 ## paik (백성검)
 
