@@ -500,6 +500,95 @@ def _parse_choice(raw: dict[str, Any], field_name: str, allowed: tuple[str, ...]
     return value
 
 
+def _has_final_consonant(word: str) -> bool | None:
+    """마지막 글자에 받침이 있는가. 한글이 아니면 None (모르면 안 고른다)."""
+    for ch in reversed(word.strip()):
+        if ch.isspace():
+            continue
+        code = ord(ch)
+        if 0xAC00 <= code <= 0xD7A3:
+            return (code - 0xAC00) % 28 != 0
+        return None
+    return None
+
+
+def _with_particle(word: str, after_consonant: str, after_vowel: str) -> str:
+    """조사를 붙인다. 🔴 판별이 안 되면 **둘 다 적는다**(`이(가)`).
+
+    선수에게 보이는 글이라 「차는 다리 뻗기이(가)」 같은 것이 그대로 나가면
+    안 된다. 다만 한글이 아닌 이름(영문·숫자)에서 아무 쪽이나 고르면 틀린
+    조사를 확신에 차서 쓰게 되므로, 그때는 모른다는 것을 드러낸다.
+    """
+    final = _has_final_consonant(word)
+    if final is None:
+        return f"{word}{after_consonant}({after_vowel})"
+    return f"{word}{after_consonant if final else after_vowel}"
+
+
+def _ro(word: str) -> str:
+    """`로`/`으로`. ㄹ 받침은 `로`를 쓴다 (「채찍이 된 다리」로 · 「잠긴 골반」으로)."""
+    for ch in reversed(word.strip()):
+        if ch.isspace():
+            continue
+        code = ord(ch)
+        if 0xAC00 <= code <= 0xD7A3:
+            final = (code - 0xAC00) % 28
+            return "로" if final in (0, 8) else "으로"
+        return "로(으로)"
+    return "로(으로)"
+
+
+def summarize(breakdown: list[dict[str, Any]]) -> str:
+    """선수에게 보여줄 두 문장 이내의 요약 (미결 `paik` 7번 · `min` 9번).
+
+    🔴 **모델을 부르지 않는다. 코드가 짓는다.**
+
+    근거 문장(`evidence`)은 모델이 쓰지만 요약은 아니다. 이유가 둘이다.
+
+    1. **계약 3장 4가 총점·등급 숫자를 금지한다.** 모델에게 맡기면 그것을
+       지키는지 매번 확인해야 한다 — 미결 23번에서 근거 문장이 자기 등급과
+       반대로 말하는 것을 잡는 데 2회차가 걸렸고 아직 1/19이 남아 있다.
+       **여기서는 숫자를 쓸 자리 자체를 안 만든다**(검사가 자릿수 0을 지킨다).
+    2. **정답이 없다.** 「더 나은 요약」은 좋아졌는지 판정할 방법이 없다.
+       코드가 지으면 같은 판정에서 **같은 문장**이 나와 재현된다.
+
+    재료는 이미 확정된 것뿐이다 — 등급이 가장 높은 항목의 칭호와 가장 낮은
+    항목의 칭호. 🔴 **없는 것은 지어내지 않는다**: 전부 잘했으면 아쉬운 점을
+    만들지 않고, 전부 못했으면 강점을 만들지 않는다.
+
+    나중에 모델이 쓰는 코칭 문장으로 바꾸려면 **별도 회차 + 사전 등록**이다.
+    """
+    if not breakdown:
+        return ""
+
+    # 같은 등급이면 **비중이 큰 쪽**을 고른다. 총점을 움직인 항목이 선수에게도
+    # 할 말이 많은 항목이다. 정렬을 안정시키려고 criterion_id 까지 넣는다 —
+    # 같은 판정이 같은 문장을 내야 재현이 성립한다.
+    def rank(item: dict[str, Any]) -> tuple:
+        return (int(item["grade"]), float(item.get("weight") or 0.0),
+                str(item["criterion_id"]))
+
+    ordered = sorted(breakdown, key=rank)
+    worst, best = ordered[0], ordered[-1]
+
+    parts: list[str] = []
+    # 🔴 **강점은 최고 등급일 때만 그렇게 부른다.** 1등급을 「강점」이라 하면
+    #    고칠 것이 있는 동작을 잘했다고 말하게 된다.
+    if int(best["grade"]) == MAX_GRADE:
+        parts.append(f"{_with_particle(best['name'], '이', '가')} "
+                     f"「{best['title']}」{_ro(best['title'])} 이번 동작의 강점입니다.")
+    if int(worst["grade"]) < MAX_GRADE and worst["criterion_id"] != best["criterion_id"]:
+        parts.append(f"{_with_particle(worst['name'], '은', '는')} "
+                     f"「{worst['title']}」{_ro(worst['title'])} 가장 아쉬웠습니다.")
+
+    if not parts:
+        # 전부 중간 등급이라 강점·약점이 안 갈렸거나 항목이 하나뿐인 경우.
+        # 🔴 갈리지 않았는데 갈린 척하지 않는다.
+        parts.append(f"{_with_particle(worst['name'], '은', '는')} "
+                     f"「{worst['title']}」{_ro(worst['title'])} 나왔습니다.")
+    return " ".join(parts)
+
+
 def aggregate(
     judgments: dict[str, dict[str, Any]],
     rubric: Rubric,
@@ -583,6 +672,11 @@ def aggregate(
     return {
         "score": score,
         "grade": _band(score, rubric.grade_bands),
+        # 선수에게 보여줄 두 문장 이내 요약 (계약 3장 4 · 미결 `paik` 7번).
+        # 🔴 `score`·`grade` 와 **무관하게** breakdown 에서만 짓는다 — 이 키를
+        # 빼도 점수는 한 비트도 안 바뀐다. `stat`·`out_of_band` 와 같은 성질이라
+        # B-6 재실행을 부르지 않는다.
+        "summary": summarize(breakdown),
         "breakdown": breakdown,
         # 측정하지 못해 판정에서 빠진 항목 — 0점이 아니라 제외다.
         "skipped": skipped,

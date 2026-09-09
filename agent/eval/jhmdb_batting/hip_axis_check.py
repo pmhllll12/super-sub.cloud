@@ -34,18 +34,26 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from supersub_agent import features as F  # noqa: E402
+from supersub_agent.scoring import load_rubric  # noqa: E402
 from analyze_keypoints import load_jhmdb  # noqa: E402
 
 
-def hip_axis_span(kps: np.ndarray) -> tuple[float, float] | None:
+def hip_axis_span(kps: np.ndarray, limb: str = "arm",
+                  event: str = "extension_peak") -> tuple[float, float] | None:
     """준비~임팩트 구간의 (골반 축 각도 변화폭, 축 단축률).
 
     각도는 `extract_features`가 쓰는 것과 **같은 산술**이다 — 축 기준(mod 180)
     으로 접고 언랩한 뒤 ptp. 단축률은 같은 구간에서 `1 - min/max`다.
+
+    🔴 **임팩트 사지를 루브릭에서 받는다** (2026-09-09). 전에는 `"arm"` 이
+    박혀 있었다. 야구 타격은 팔이 맞지만 **축구 슈팅은 다리**(`impact_limb: leg`)
+    라, 그대로 `--action kick_ball` 을 돌리면 **팔로 준비 구간을 잘라** 엉뚱한
+    창에서 골반을 재게 된다. 미결 22번이 「축구는 --action 만 바꾸면 그대로
+    된다」고 적어 둔 것은 **틀렸다.**
     """
     norm = F.normalize(kps)
-    swing, _ = F.identify_limb(norm, "arm", "auto")
-    phases = F.segment_phases(norm, swing, "arm", "extension_peak")
+    swing, _ = F.identify_limb(norm, limb, "auto")
+    phases = F.segment_phases(norm, swing, limb, event)
 
     xy = norm[:, :, :2]
     hip_axis = F._axis_deg(xy[:, F.L_HIP] - xy[:, F.R_HIP])
@@ -69,12 +77,21 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", type=Path, required=True)
     ap.add_argument("--action", default="swing_baseball")
+    # 🔴 임팩트 정의를 손으로 적지 않는다 — 루브릭이 정본이다. 리터럴을
+    #    복제하면 루브릭이 바뀔 때 이 측정이 조용히 낡는다(미결 10번의 형태).
+    ap.add_argument("--rubric", default="baseball_batting.yaml",
+                    help="임팩트 사지·사건을 읽어 올 루브릭. 축구는 "
+                         "football_instep_shot.yaml (impact_limb: leg)")
     args = ap.parse_args()
+
+    rubric = load_rubric(ROOT / "rubrics" / args.rubric)
+    print(f"임팩트 정의: {rubric.impact_limb} / {rubric.impact_event}"
+          f"  ({args.rubric})")
 
     angles, shortenings = [], []
     for name, kps in load_jhmdb(args.root, args.action):
         try:
-            out = hip_axis_span(kps)
+            out = hip_axis_span(kps, rubric.impact_limb, rubric.impact_event)
         except (F.InsufficientQuality, ValueError):
             continue
         if out is None:

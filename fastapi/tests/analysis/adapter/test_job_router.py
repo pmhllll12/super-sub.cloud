@@ -23,6 +23,7 @@ import pytest
 from app.analysis.adapter.outbound.stub.job_stub_repository import (
     enqueue,
     failure_reason_of,
+    report_key_of,
     status_of,
 )
 from app.analysis.adapter.outbound.stub.video_stub_repository import (
@@ -113,6 +114,11 @@ class TestClaim:
             "sport_code": "baseball",
             "side": "right",
             "duration_ms": 4_200,
+            # 지정이 없으면 둘 다 null — 「자동으로 고르기」 (미결 `paik` 6번).
+            "subject_box": None,
+            "subject_at_ms": None,
+            # 없으면 null — 「전체적으로」 (미결 `paik` 8번).
+            "focus": None,
         }
 
     def test_집으면_running_이_된다(self, client):
@@ -135,6 +141,30 @@ class TestClaim:
 
         res = client.post(CLAIM, headers=_hdr())
         assert res.json()["job_id"] == str(old)
+
+    def test_지정_박스가_claim_응답에_실린다(self, client):
+        """미결 `paik` 6번 — 「이 사람으로 분석」 이 워커가 읽는 자리(claim)까지 온다."""
+        job_id = uuid4()
+        enqueue(
+            job_id, uuid4(),
+            subject_box=[0.39, 0.35, 0.12, 0.4], subject_at_ms=4_200,
+        )
+        body = client.post(CLAIM, headers=_hdr()).json()
+        assert body["subject_box"] == [0.39, 0.35, 0.12, 0.4]
+        assert body["subject_at_ms"] == 4_200
+
+    def test_지정이_없으면_null_이_온다(self, client):
+        enqueue(uuid4(), uuid4())
+        body = client.post(CLAIM, headers=_hdr()).json()
+        assert body["subject_box"] is None and body["subject_at_ms"] is None
+        assert body["focus"] is None
+
+    def test_집중_항목이_claim_응답에_실린다(self, client):
+        """미결 `paik` 8번 — 「집중해서 볼 항목」이 워커가 읽는 자리(claim)까지 온다."""
+        job_id = uuid4()
+        enqueue(job_id, uuid4(), focus=["follow_through", "guide_hand"])
+        body = client.post(CLAIM, headers=_hdr()).json()
+        assert body["focus"] == ["follow_through", "guide_hand"]
 
 
 class TestFinish:
@@ -162,6 +192,57 @@ class TestFinish:
         assert res.status_code == 204
         assert status_of(job_id) == "failed"
         assert failure_reason_of(job_id) == "품질 게이트 미달"
+
+    def test_성공_보고에_리포트_자리가_실린다(self, client):
+        """미결 `paik` 11번 — 워커가 만든 리포트 키를 작업에 남긴다."""
+        job_id = uuid4()
+        self._claim(client, job_id)
+        key = "reports/u1/v1/report.json"
+
+        res = client.patch(
+            _job(job_id),
+            json={"status": "succeeded", "report_key": key},
+            headers=_hdr(),
+        )
+        assert res.status_code == 204
+        assert report_key_of(job_id) == key
+
+    def test_리포트_자리는_안_실어도_된다(self, client):
+        """워커가 자리를 못 실어도 분석은 성공한 것이라 보고는 통과한다."""
+        job_id = uuid4()
+        self._claim(client, job_id)
+
+        res = client.patch(
+            _job(job_id), json={"status": "succeeded"}, headers=_hdr()
+        )
+        assert res.status_code == 204
+        assert report_key_of(job_id) is None
+
+    def test_실패_보고의_리포트_자리는_버린다(self, client):
+        """🔴 실패한 작업이 리포트를 가리키면 화면이 없는 것을 읽으러 간다."""
+        job_id = uuid4()
+        self._claim(client, job_id)
+
+        res = client.patch(
+            _job(job_id),
+            json={"status": "failed", "report_key": "reports/u1/v1/report.json"},
+            headers=_hdr(),
+        )
+        assert res.status_code == 204
+        assert report_key_of(job_id) is None
+
+    def test_리포트_자리가_너무_길면_422_다(self, client):
+        """상한은 S3 객체 키 한계(1024)다."""
+        job_id = uuid4()
+        self._claim(client, job_id)
+
+        res = client.patch(
+            _job(job_id),
+            json={"status": "succeeded", "report_key": "r/" + "x" * 1023},
+            headers=_hdr(),
+        )
+        assert res.status_code == 422
+        assert status_of(job_id) == "running"     # 안 바뀐다
 
     def test_집지_않은_작업은_409_다(self, client):
         """`queued` 를 바로 끝내면 `started_at` 이 빈 채 `finished_at` 만 찬다."""

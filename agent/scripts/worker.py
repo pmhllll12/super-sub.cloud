@@ -38,6 +38,7 @@ import os
 import signal
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.error
@@ -106,11 +107,20 @@ class Config:
                 "HTTP 헤더에 실을 수 없는 값이다 — 따옴표나 주석이 섞이지 "
                 "않았는지 /etc/supersub/worker.env 를 확인할 것."
             )
+        # 🔴 기본값을 두지 않는다. 저장소가 공개라 호스트명을 코드에 박으면
+        #    그대로 공개된다. 자리표시자 문자열을 기본값으로 두는 것은 더
+        #    나쁘다 — 배포에서 잘못된 URL 로 조용히 붙는다. 없으면 시작하지
+        #    않게 해서 **설정 누락이 설정 누락으로 보이게** 한다.
+        api_base = (env.get("SUPERSUB_API_BASE") or "").strip()
+        if not api_base:
+            raise ConfigError(
+                "SUPERSUB_API_BASE 가 비어 있다. "
+                "deploy/worker.env.example 을 /etc/supersub/worker.env 로 복사해 "
+                "백엔드 주소를 채울 것 (값은 저장소에 없다 — 배포 담당자에게 받는다)."
+            )
         bucket = env.get("SUPERSUB_S3_BUCKET", "supersub-ai")
         return cls(
-            api_base=env.get(
-                "SUPERSUB_API_BASE", "https://api.supersub-ai.com/api/v1"
-            ).rstrip("/"),
+            api_base=api_base.rstrip("/"),
             token=token,
             bucket=bucket,
             reports_uri=env.get("SUPERSUB_REPORTS_URI", f"s3://{bucket}/reports"),
@@ -171,7 +181,37 @@ def claim(cfg: Config) -> dict | None:
     raise RuntimeError(f"claim 이 {status} 를 냈다: {body[:200]!r}")
 
 
-def report(cfg: Config, job_id: str, status: str, reason: str | None = None) -> bool:
+def report_key_from(result_path: Path, bucket: str) -> str | None:
+    """분석이 남긴 자리 파일에서 **버킷 상대 키**를 꺼낸다 (미결 `paik` 11번).
+
+    🔴 **자리를 여기서 계산하지 않는다.** 규칙(`analyze_s3.report_targets`)이
+    두 곳에 생기면 조용히 갈린다 — 아는 쪽이 파일로 말해 주고 여기는 읽기만
+    한다. stdout 을 긁지 않는 것도 같은 이유다(로그 문구가 바뀌면 깨진다).
+
+    없거나·비었거나·모양이 다르면 **None 이다.** 자리를 못 실어도 분석은
+    성공한 것이라 보고 자체를 막지 않는다 — 화면이 리포트를 못 찾을 뿐이다.
+    """
+    try:
+        raw = json.loads(result_path.read_text(encoding="utf-8"))
+        reports = raw["reports"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    if len(reports) != 1:
+        # 작업 하나는 영상 하나다. 둘 이상이면 어느 것이 이번 결과인지
+        # 정해지지 않으므로 **아무것도 안 싣는다** — 틀린 자리보다 낫다.
+        log(f"리포트 자리가 {len(reports)}건이라 싣지 않는다")
+        return None
+    uri = str(reports[0].get("report_uri", ""))
+    prefix = f"s3://{bucket}/"
+    if not uri.startswith(prefix):
+        # 리포트를 다른 버킷에 두면 버킷 상대 키로는 가리킬 수 없다.
+        log(f"리포트가 버킷 {bucket} 밖이라 키로 못 싣는다: {uri}")
+        return None
+    return uri[len(prefix):]
+
+
+def report(cfg: Config, job_id: str, status: str, reason: str | None = None,
+           report_key: str | None = None) -> bool:
     """결과를 보고한다. 보고가 안 되면 작업이 `running` 인 채로 남는다.
 
     claim 과 달리 **재시도한다.** 같은 것을 두 번 보고하면 409 로 돌아올 뿐
@@ -183,6 +223,10 @@ def report(cfg: Config, job_id: str, status: str, reason: str | None = None) -> 
     payload: dict[str, str] = {"status": status}
     if reason:
         payload["failure_reason"] = reason[:FAILURE_REASON_MAX]
+    # 🔴 성공한 작업에만 싣는다 — 실패했으면 가리킬 리포트가 없다.
+    #    받는 칸은 정어진 님의 `FinishJobSchema` 다 (미결 `paik` 11번).
+    if report_key and status == "succeeded":
+        payload["report_key"] = report_key
 
     for attempt in range(1, 4):
         try:
@@ -262,7 +306,8 @@ class Stopper:
             self.child.terminate()
 
 
-def analyze_command(cfg: Config, job: dict, rubric: Path) -> list[str]:
+def analyze_command(cfg: Config, job: dict, rubric: Path,
+                    result_json: Path | None = None) -> list[str]:
     """자식 프로세스의 명령줄.
 
     🔴 **`analyze_s3.py` 를 별도 프로세스로 부른다.** import 해서 안에서 돌리면
@@ -289,8 +334,38 @@ def analyze_command(cfg: Config, job: dict, rubric: Path) -> list[str]:
     # "auto" 가 스스로 판별한다. None 을 문자열로 넘기면 argparse 가 거부한다.
     if job.get("side") in ("left", "right"):
         cmd += ["--side", job["side"]]
+    # 「집중해서 볼 항목」 (미결 `paik` 8번). 백엔드에 이 칸이 아직 없어서
+    # 지금은 항상 비어 있다 — 칸이 열리는 날 그대로 흘러가라고 미리 읽는다.
+    # 🔴 빈 목록은 실패가 아니라 「전체적으로」다. 없을 때 아무것도 안 붙인다.
+    focus = job.get("focus") or []
+    if isinstance(focus, str):
+        focus = [focus]
+    focus = [str(f).strip() for f in focus if str(f).strip()]
+    if focus:
+        cmd += ["--focus", ",".join(focus)]
+    # 「이 사람으로 분석」 (미결 `paik` 6번). claim 응답이 정규화 0~1 네 값
+    # (`[x, y, w, h]`)과 그 박스를 그린 시각을 준다 — `worker-interface.md` 1절.
+    #
+    # 🔴 **여기서 다시 검증하지 않는다.** 무엇이 올바른 지정인가는
+    # `pose.parse_subject_spec` 한 곳에 있고, 규칙을 복사하면 한쪽만 고쳐졌을 때
+    # **같은 입력이 경로에 따라 통과했다 막혔다 한다**(미결 10번의 형태).
+    # 잘못된 값은 자식이 0 아닌 코드로 죽고 그 사유가 `failure_reason` 에 남는다.
+    #
+    # 🔴 **둘 다 있을 때만 붙인다.** 하나만 붙이면 자식이 「박스를 주면 시각도
+    # 함께」로 죽는데, 그것은 **지정이 없는 것과 다른 사건**이다 — 지정이 없으면
+    # 「자동으로 고르기」로 정상 분석돼야 한다(계약: 둘 다 생략 = 자동, 실패 아님).
+    box = job.get("subject_box")
+    at_ms = job.get("subject_at_ms")
+    if box is not None and at_ms is not None:
+        # 배열로 온다. 문자열로 오는 배포도 그대로 받아 준다 — 규격은 배열이지만
+        # 여기서 죽는 것보다 넘겨서 자식의 한 곳에서 판정받는 것이 낫다.
+        spec = box if isinstance(box, str) else ",".join(str(v) for v in box)
+        cmd += ["--subject-box", spec, "--subject-at-ms", str(at_ms)]
     if cfg.region:
         cmd += ["--region", cfg.region]
+    # 리포트가 어디 놓였는지를 파일로 받는다 (미결 `paik` 11번).
+    if result_json is not None:
+        cmd += ["--result-json", str(result_json)]
     return cmd
 
 
@@ -398,23 +473,35 @@ def process(cfg: Config, job: dict, stopper: Stopper) -> None:
 
     log(f"루브릭 {rubric.name}")
     started = time.time()
-    try:
-        outcome = run_analysis(
-            analyze_command(cfg, job, rubric), cfg.analyze_timeout, stopper
-        )
-    except Exception as exc:  # noqa: BLE001 — 실행 자체가 안 된 경우
-        log(f"분석을 실행하지 못했다: {type(exc).__name__}: {exc}")
-        report(cfg, job_id, "failed", f"분석 실행 실패: {type(exc).__name__}: {exc}")
-        return
+    # 자식이 리포트 자리를 여기 적는다. 작업마다 새로 만들어 **앞 작업의 값을
+    # 물려받지 않게** 한다 — 물려받으면 실패한 작업이 남의 리포트를 가리킨다.
+    with tempfile.TemporaryDirectory(prefix="supersub-job-") as tmp:
+        result_json = Path(tmp) / "result.json"
+        try:
+            outcome = run_analysis(
+                analyze_command(cfg, job, rubric, result_json),
+                cfg.analyze_timeout, stopper,
+            )
+        except Exception as exc:  # noqa: BLE001 — 실행 자체가 안 된 경우
+            log(f"분석을 실행하지 못했다: {type(exc).__name__}: {exc}")
+            report(cfg, job_id, "failed",
+                   f"분석 실행 실패: {type(exc).__name__}: {exc}")
+            return
 
-    elapsed = time.time() - started
-    if outcome.code == 0 and not outcome.note:
-        log(f"작업 {job_id} 성공 ({elapsed:.0f}초)")
-        report(cfg, job_id, "succeeded")
-    else:
-        reason = failure_reason(outcome)
-        log(f"작업 {job_id} 실패 ({elapsed:.0f}초) — {reason}")
-        report(cfg, job_id, "failed", reason)
+        elapsed = time.time() - started
+        if outcome.code == 0 and not outcome.note:
+            key = report_key_from(result_json, cfg.bucket)
+            if key is None:
+                # 🔴 성공했는데 자리를 못 실은 것은 **드러낸다.** 화면은
+                #    리포트를 못 찾고, 저널에 아무 말도 없으면 원인을 못 좁힌다.
+                log(f"작업 {job_id} 성공했지만 리포트 자리를 못 실었다")
+            log(f"작업 {job_id} 성공 ({elapsed:.0f}초)"
+                + (f" — 리포트 {key}" if key else ""))
+            report(cfg, job_id, "succeeded", report_key=key)
+        else:
+            reason = failure_reason(outcome)
+            log(f"작업 {job_id} 실패 ({elapsed:.0f}초) — {reason}")
+            report(cfg, job_id, "failed", reason)
 
 
 # --- 루프 -----------------------------------------------------------------

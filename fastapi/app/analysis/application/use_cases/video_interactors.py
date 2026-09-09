@@ -24,6 +24,8 @@ from app.analysis.application.dtos.video_dto import (
     AdminVideoRow,
     AdminVideosQuery,
     DeleteVideoCommand,
+    FeaturedVideoResult,
+    GetFeaturedVideoCommand,
     GetPlaybackUrlCommand,
     KeepVideoCommand,
     MyVideosQuery,
@@ -40,6 +42,7 @@ from app.analysis.application.ports.input.video_use_cases import (
     AdminDeleteVideoUseCase,
     CreateUploadUrlUseCase,
     DeleteVideoUseCase,
+    GetFeaturedVideoUseCase,
     GetPlaybackUrlUseCase,
     KeepVideoUseCase,
     ListAdminVideosUseCase,
@@ -161,6 +164,12 @@ class RegisterVideoInteractor(RegisterVideoUseCase):
             # 사라지고 되살릴 길이 없다.
             kept=True,
             original_filename=command.original_filename,
+            # 미결 `paik` 6번. 작업을 안 만들면(반려·`analyze=False`) 저장소가
+            # 버린다 — 담을 `analysis_job` 행이 없다. 지정이 없을 때 실패로
+            # 만들지 않는 것이 이 항목의 「하지 말 것」이다.
+            subject_box=command.subject_box if make_job else None,
+            subject_at_ms=command.subject_at_ms if make_job else None,
+            focus=command.focus if make_job else None,
         )
         self._repository.register(video)
         return to_video_result(video)
@@ -191,6 +200,18 @@ class UpdateVideoInteractor(UpdateVideoUseCase):
         self._repository = repository
 
     def __call__(self, command: UpdateVideoCommand) -> VideoResult:
+        # 🔴 대표로 **세우기 전에** 반려 여부를 본다 — 반려된 클립은 서버가 안
+        #    보는 영상이라(미결 `paik` 10번), 대표가 되면 추천 판이 없는 것을
+        #    읽으러 간다. 내리기(`False`)·안 건드림(`UNSET`)은 확인이 필요 없다.
+        if command.is_featured is True:
+            existing = self._repository.get(command.video_id)
+            if existing is None or existing.user_id != command.user_id:
+                raise ApiError(404, "VIDEO_NOT_FOUND", "클립을 찾을 수 없습니다.")
+            if not (existing.validation and existing.validation.passed):
+                raise ApiError(
+                    422, "CANNOT_FEATURE", "반려된 클립은 대표로 세울 수 없습니다."
+                )
+
         video = self._repository.update_video(
             command.video_id,
             command.user_id,
@@ -203,6 +224,7 @@ class UpdateVideoInteractor(UpdateVideoUseCase):
                 if command.description is UNSET
                 else _clean_text(command.description)
             ),
+            is_featured=command.is_featured,
         )
         if video is None:
             # 남의 클립인지 없는 클립인지 구별해 주지 않는다 — 남의 클립 존재
@@ -236,6 +258,30 @@ class GetPlaybackUrlInteractor(GetPlaybackUrlUseCase):
             raise ApiError(404, "VIDEO_NOT_FOUND", "클립을 찾을 수 없습니다.")
         url, expires_in = self._storage.create_download_url(video.storage_key)
         return PlaybackUrlResult(url=url, expires_in=expires_in)
+
+
+class GetFeaturedVideoInteractor(GetFeaturedVideoUseCase):
+    def __init__(self, repository: VideoPort, storage: StoragePort) -> None:
+        self._repository = repository
+        self._storage = storage
+
+    def __call__(self, command: GetFeaturedVideoCommand) -> FeaturedVideoResult:
+        video = self._repository.find_featured_by_card_slug(
+            command.card_public_slug
+        )
+        if video is None:
+            # 슬러그가 없든·대표가 없든·반려됐든 밖에서는 다 "없음"이다.
+            raise ApiError(
+                404, "NO_FEATURED_VIDEO", "대표 영상이 없습니다."
+            )
+        url, expires_in = self._storage.create_download_url(video.storage_key)
+        return FeaturedVideoResult(
+            video_id=video.id,
+            url=url,
+            expires_in=expires_in,
+            sport_code=video.sport_code,
+            duration_ms=video.duration_ms,
+        )
 
 
 class DeleteVideoInteractor(DeleteVideoUseCase):

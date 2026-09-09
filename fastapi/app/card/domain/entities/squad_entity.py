@@ -26,6 +26,11 @@ class SquadMemberEntity:
     position_id: UUID
     position_code: str
     position_label: str
+    # 홈 스쿼드 판에서 이 카드가 선 격자 칸 (미결 `paik` 9번). 열·행 번호이고
+    # **픽셀이 아니다**(카드 크기가 바뀌어도 배치가 안 어긋나게). 등재만 하고
+    # 판에 안 올린 카드는 둘 다 None 이다 — 둘 중 하나만 찬 상태는 없다.
+    grid_col: int | None = None
+    grid_row: int | None = None
 
 
 @dataclass(frozen=True)
@@ -46,4 +51,8 @@ class SquadEntity:
     id: UUID
     team_id: UUID
     public_slug: PublicSlug
+    # 판 크기 — 클라이언트가 `"3:3"`·`"5:5"`·`"7:7"` 로 쓴다 (미결 `paik` 9번).
+    # 아직 안 정한 스쿼드는 None. 서버는 값 집합을 검사하지 않는다(단계가 늘 때
+    # 마이그레이션 없이 넣으려는 것 — `analysis_job.status` 와 같은 판단).
+    formation: str | None = None
     members: list[SquadMemberEntity] = field(default_factory=list)

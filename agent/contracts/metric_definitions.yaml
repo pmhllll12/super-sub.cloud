@@ -1,0 +1,164 @@
+# 지표 코드의 정본 — `metric_definition` 시드의 출처 (미결 `jin` 23번)
+#
+# 🔴 **여기가 `label`·`unit` 의 정본이다.** 백엔드가 지어내지 않는다.
+#    `scripts/export_metric_definitions.py` 가 이 파일에서 시드 행을 만든다.
+#
+# ────────────────────────────────────────────────────────────────────────────
+# 왜 루브릭 파일에서 뽑지 않고 별도 파일인가
+#
+# 루브릭에 있는 이름은 **항목 이름**(`criteria[].name`)이지 지표 이름이 아니다.
+# 둘은 다른 것이다 — 항목은 *무엇을 채점하는가*, 지표는 *무엇을 쟀는가*.
+# 같은 지표가 종목마다 다른 항목 이름을 달고 있다:
+#
+#   swing_knee_angle_at_impact  → 농구 「다리로 밀어 올리기」 · 축구 「차는 다리 뻗기」
+#   support_elbow_angle_at_impact → 농구 「공 받치는 손」 · 야구 「앞쪽 팔 뻗기」
+#
+# A안(미결 `jin` 1번)이 지표를 종목에서 떼어 **코드당 한 행**으로 두기로 했으므로,
+# `label` 은 어느 한 종목의 항목 이름이 될 수 없다. **잰 것을 그대로 적는다.**
+#
+# ────────────────────────────────────────────────────────────────────────────
+# 🔴 unit 을 이름에서 유추하지 말 것
+#
+# `swing_elbow_angle_at_impact` 는 `_deg` 가 없는데 각도이고,
+# `plant_foot_to_ball_offset` 은 픽셀이 아니라 **어깨너비 배수**다(정규화 좌표).
+# 이름이 단위를 말해 준다고 믿으면 조용히 틀린 값이 쌓인다 — 그래서 여기 적는다.
+#
+# unit 값은 아래 넷만 쓴다:
+#   deg      도(°). signed 가 true 면 부호가 뜻을 갖는다
+#   ratio    무차원 비율. scale_ref 에 무엇으로 나눴는지 적는다
+#   s        초
+#   score    0~100 점수 · 0/1/2 등급 같은 판정값
+#
+# ────────────────────────────────────────────────────────────────────────────
+# 🔴 프레임을 프레임으로 보내지 않는다
+#
+# `impact_frame`·`follow_through_duration_frames` 는 파이프라인 안에서
+# **샘플링된 프레임** 단위지만, 그 수는 `sampled_fps` 없이는 뜻이 없다.
+# DB 행에는 fps 가 없으므로 **초로 환산해 보낸다**
+# (`features.frame_metrics_as_seconds`, 미결 7번 E-3 에서 만든 경로).
+# 그래서 아래 두 항목의 unit 은 `s` 다. 🔴 프레임 수를 그대로 넣으면 나중에
+# 읽는 쪽이 30fps 를 가정하고 곱한다 — 그 가정이 틀린 클립이 평가셋에 있다.
+
+version: 1
+
+# ── 측정 지표 ──────────────────────────────────────────────────────────────
+# 결정론적 코드가 키포인트에서 계산한다(`features.extract_features`).
+metrics:
+  - code: hip_rotation_range_deg
+    label: 골반 회전 범위
+    unit: deg
+    range: [0.0, 180.0]
+    description: 동작 구간에서 골반 축이 돈 각도의 최대-최소 폭.
+
+  - code: hip_shoulder_separation_deg
+    label: 골반-어깨 분리각
+    unit: deg
+    range: [0.0, 90.0]
+    description: 임팩트 시점에 골반 축과 어깨 축이 이루는 각.
+
+  - code: trunk_forward_lean_deg_at_impact
+    label: 임팩트 시 몸통 전후 기울기
+    unit: deg
+    signed: true
+    range: [-90.0, 90.0]
+    description: >-
+      임팩트 시점 몸통이 수직에서 기운 각. 🔴 부호가 앞뒤를 가른다 —
+      절댓값으로 저장하면 「앞으로 숙임」과 「뒤로 젖힘」이 같은 값이 된다.
+
+  - code: support_elbow_angle_at_impact
+    label: 임팩트 시 지지 팔 팔꿈치 각
+    unit: deg
+    range: [0.0, 180.0]
+    description: 임팩트 시점 지지 측(공을 받치는/앞쪽) 팔꿈치의 폄 각도. 180에 가까울수록 폈다.
+
+  - code: swing_elbow_angle_at_impact
+    label: 임팩트 시 주동 팔 팔꿈치 각
+    unit: deg
+    range: [0.0, 180.0]
+    description: 임팩트 시점 주동 측(던지는/슛하는) 팔꿈치의 폄 각도.
+
+  - code: swing_shoulder_flexion_after_impact_deg
+    label: 임팩트 후 주동 어깨 굴곡
+    unit: deg
+    range: [0.0, 180.0]
+    description: 임팩트 이후 주동 측 어깨가 더 돌아간 각. 팔로스루의 크기다.
+
+  - code: swing_hip_flexion_after_impact_deg
+    label: 임팩트 후 주동 고관절 굴곡
+    unit: deg
+    range: [0.0, 180.0]
+    description: 임팩트 이후 주동 측 고관절이 더 접힌 각.
+
+  - code: swing_knee_angle_at_impact
+    label: 임팩트 시 주동 무릎 각
+    unit: deg
+    range: [0.0, 180.0]
+    description: 임팩트 시점 주동 측(차는/뛰어오르는) 무릎의 폄 각도.
+
+  - code: plant_knee_angle_at_impact
+    label: 임팩트 시 디딤 무릎 각
+    unit: deg
+    range: [0.0, 180.0]
+    description: 임팩트 시점 디딤 측(버티는 쪽) 무릎의 폄 각도.
+
+  - code: plant_foot_to_ball_offset
+    label: 디딤발-공 수평 거리
+    unit: ratio
+    scale_ref: 어깨너비
+    description: >-
+      임팩트 시점 디딤 발목과 공 중심의 **수평** 거리를 어깨너비로 나눈 값.
+      🔴 픽셀이 아니다. 수직 성분은 뺐다(공 반지름과 부호가 안 맞아 근거가 못 된다).
+      🔴 공이 검출된 영상에서만 나온다 — 없으면 그 항목은 0점이 아니라 제외다.
+
+  - code: follow_through_duration_frames
+    label: 팔로스루 지속 시간
+    unit: s
+    emitted_from: frame_metrics_seconds
+    description: >-
+      임팩트 이후 마무리 동작이 이어진 시간. 🔴 코드 이름에 `frames` 가 남아
+      있지만 **보내는 값은 초다**(위 「프레임을 프레임으로 보내지 않는다」).
+      이름을 바꾸면 루브릭 `measured_by` 와 저장된 평가 산출물이 전부 어긋나므로
+      바꾸지 않았다.
+
+  - code: impact_frame
+    label: 임팩트 시각
+    unit: s
+    emitted_from: frame_metrics_seconds
+    description: >-
+      클립 시작부터 임팩트까지의 시간. 🔴 **어느 루브릭도 채점에 쓰지 않는다** —
+      근거를 되짚을 때 쓰는 값이라 `features` 에 실려 나간다. 시드에서 빼면
+      적재가 `UNKNOWN_METRIC_CODE` 로 거부된다.
+
+# ── 판정값 ────────────────────────────────────────────────────────────────
+# 측정이 아니라 루브릭이 내린 판단이다. 총점만 종목 무관이고,
+# 항목별 등급은 `export_metric_definitions.py` 가 active 루브릭에서 만든다
+# (아래 `grade_code_format` 참고).
+judgments:
+  - code: total_score
+    label: 종합 점수
+    unit: score
+    range: [0, 100]
+    description: 항목별 등급의 가중합. 🔴 항목별 `stat` 의 평균이 아니다.
+
+# 🔴 항목별 등급 코드에는 **종목·동작이 들어간다.** 항목 id 만으로는 안 된다 —
+# `follow_through` 가 농구에서는 「던진 뒤 손목 마무리」, 축구에서는 「차고 난 뒤
+# 마무리」이고 `release_arm_extension` 도 종목마다 이름이 다르다. 코드당 한 행인
+# A안에서 id 만 쓰면 **둘 중 한 종목의 이름이 지워진다.**
+#
+# A안이 종목을 뗀 근거는 「지표는 물리량이다」였는데 **등급은 물리량이 아니다** —
+# 어느 루브릭이 내렸는지가 값의 일부다. 그래서 여기서는 종목을 붙인다.
+grade_code_format: "grade.{sport}.{motion}.{criterion_id}"
+grade_unit: score
+grade_range: [0, 2]
+
+# 🔴 항목별 **연속 점수**(`breakdown[].stat`) — 레이더 차트의 축이다 (`jin` 25번).
+# 등급과 **같은 축으로** 만든다: 종목·동작이 코드에 들어가고, 라벨·`--include-draft`
+# 규칙도 같다. 읽기 경로를 DB 조립으로 정해서(계약 3-1) 이 코드가 없으면
+# `POST /analyses` 가 `UNKNOWN_METRIC_CODE` 로 거부한다.
+#
+# 🔴 **등급과 다른 값이다.** `stat` 은 0~100 연속값(「이상 구간에서 얼마나
+# 떨어졌나」)이고 등급은 0/1/2 다. **총점은 등급의 가중합이지 `stat` 의 평균이
+# 아니다** — 같은 항목에 행이 둘인 이유가 이것이다.
+stat_code_format: "stat.{sport}.{motion}.{criterion_id}"
+stat_unit: score
+stat_range: [0, 100]

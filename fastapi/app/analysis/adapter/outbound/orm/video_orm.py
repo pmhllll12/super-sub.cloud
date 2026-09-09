@@ -32,6 +32,15 @@ class VideoOrm(Base):
             "created_at",
             postgresql_where=text("kept = false"),
         ),
+        # 🔴 **대표 영상은 사람당 하나뿐이다**(미결 `paik` 10번). 부분 유일
+        # 인덱스로 DB 가 강제한다 — 앱이 「세우기 전에 남을 내린다」를 빠뜨려도
+        # 둘째가 못 들어간다.
+        Index(
+            "uq_video_featured_per_user",
+            "user_id",
+            unique=True,
+            postgresql_where=text("is_featured"),
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
@@ -75,6 +84,13 @@ class VideoOrm(Base):
     # 스윕이 24시간 뒤 정리한다. `GET /videos` 는 `true` 만 준다.
     kept: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="true"
+    )
+
+    # 「나를 보여주는 대표 영상」(미결 `paik` 10번). 추천 판에서 남의 후보 옆에
+    # 도는 장면이 그 사람의 이 값이다. 🔴 **사람당 하나** — 위 부분 유일 인덱스가
+    # 강제한다. 반려된 클립(`passed=false`)은 대표가 될 수 없다(앱이 막는다).
+    is_featured: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
     )
 
     created_at: Mapped[datetime] = mapped_column(

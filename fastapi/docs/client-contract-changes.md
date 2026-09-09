@@ -994,6 +994,184 @@ git -C fastapi grep -n "videos/{video_id}/keep" -- app/analysis   # 라우트가
 
 ---
 
+## 25. 🟢 홈 스쿼드 판의 배치를 서버에 저장할 수 있습니다 (2026-09-09 추가, 미결 `paik` 9번)
+
+판 크기·카드가 선 칸·손으로 정한 포지션이 지금은 그 브라우저의 `localStorage`
+에만 있어 **다른 기기에서는 처음 판으로 열립니다.** 세 값을 담을 자리를
+`squad`·`squad_member` 에 넣었습니다.
+
+### 만족해야 할 성질
+
+- 다른 기기(또는 다른 브라우저)로 로그인해도 **같은 판이 열린다.**
+  `www/src/lib/squadBoard.ts` 가 `localStorage` 대신 API 를 쓴다.
+- 판을 되살리는 데 필요한 세 값이 서버에 남는다:
+  - **판 크기** — `SquadResponse.formation` (`"3:3"`·`"5:5"`·`"7:7"`, 안 정했으면 `null`).
+    저장: `PATCH /api/v1/teams/{team_id}/squad` `{ "formation": "5:5" }`
+  - **칸** — `SquadMemberResponse.grid_col` · `grid_row` (판에 안 올렸으면 `null`).
+    저장: 등재할 때 `POST .../squad/members` 에 실어도 되고, 나중에
+    `PATCH /api/v1/teams/{team_id}/squad/members/{member_id}` 로 옮겨도 된다.
+  - **포지션** — 이미 있던 `position_code`. 같은 `PATCH .../members/{member_id}` 로 바꾼다
+    (전에는 빼고 다시 넣어야 했습니다 — 계약 3-7 「아직 없는 것」 해소).
+- 세 엔드포인트 모두 **바뀐 스쿼드 전체**를 돌려준다 — 화면이 판을 다시 그리면 된다.
+
+### 🔴 하지 말아야 할 것
+
+- **칸을 화면 픽셀로 보내지 마세요** — 격자 번호입니다(지금 **열 0\~2 · 행 0\~3**,
+  행이 포지션 라인: 0 FW · 1 MF · 2 DF · 3 GK). `0~15` 밖이면 422.
+- `grid_col`·`grid_row` 는 **함께 보내거나 함께 비웁니다**(한쪽만 = 422). 둘 다
+  `null` = 등재는 남기고 판에서만 뺌.
+- 포지션을 칸에서 역산하지 마세요 — 손으로 정한 값이라 자리와 다를 수 있습니다.
+- 관리(저장·이동)는 **주장만**. 아니면 403.
+
+### 먼저 확인
+
+```bash
+git -C fastapi grep -n "squad_member.grid_col\|def set_formation\|def update_member" -- app
+grep -n "localStorage" www/src/lib/squadBoard.ts   # 안 걸리면 갈아 끼운 것
+```
+
+상세: `fastapi/docs/api-contract.md` **3-7절** (「홈 판 격자」 · 새 PATCH 둘)
+
+---
+
+## 26. 🟢 「이 사람으로 분석」 박스를 `POST /videos` 에 실을 수 있습니다 (2026-09-09 추가, 미결 `paik` 6번)
+
+분석 화면이 「이 사람으로 분석」에서 받은 박스를 보낼 자리가 없었습니다.
+`POST /api/v1/videos` 본문에 두 필드를 더했습니다.
+
+### 만족해야 할 성질
+
+- `www/src/lib/uploadClip.ts` 가 등록할 때 `subject_box`·`subject_at_ms` 를 함께 보낸다.
+  - `subject_box`: `[x, y, w, h]` — **정규화 0~1**. 🔴 손으로 그린 네모가 아니라
+    「예」를 누른 순간 **추적기가 잡고 있는 박스**(항목에 적힌 대로).
+  - `subject_at_ms`: 그 박스를 그린 영상 시각(ms).
+- 이 값은 `analysis_job` 에 저장되고 워커의 claim 응답으로 흘러갑니다 —
+  화면이 더 할 일은 없습니다(응답에는 안 실립니다).
+
+### 🔴 하지 말아야 할 것
+
+- **화면 픽셀을 보내지 마세요** — `[0,1]` 밖이면 422. (조용히 클램프하지 않습니다.)
+- `subject_box` 와 `subject_at_ms` 는 **함께 보내거나 함께 생략**합니다(한쪽만 = 422).
+- **지정이 없을 때 억지로 채우지 마세요** — 생략하면 「자동으로 고르기」이고
+  그게 정식 경로입니다. 지정 없음을 실패로 만들지 않습니다.
+- 기하: `w·h > 0`, `x+w ≤ 1`, `y+h ≤ 1`, `subject_at_ms ≤ duration_ms`.
+
+### 먼저 확인
+
+```bash
+grep -n "subject_box" www/src/lib/uploadClip.ts        # 화면 쪽이 실었는지
+git -C fastapi grep -n "subject_box" -- app/analysis    # 백엔드 쪽(이미 됨)
+```
+
+⚠️ 트랙이 도중에 다른 사람으로 갈아타는 문제(정상호 님 실측: 63%)는 이 항목이
+고치지 못합니다 — 화면 몫은 **닻을 최대한 좋은 것으로 주는 것**까지입니다.
+
+상세: `fastapi/docs/api-contract.md` **3-6절** (`POST /videos`) · **3-8절** (claim 응답)
+
+---
+
+## 27. 🟢 「나를 보여주는 대표 영상」 — 세우기·남의 것 읽기 (2026-09-09 추가, 미결 `paik` 10번)
+
+대표 영상이 지금은 브라우저 `localStorage` 에만 있어 **남의 것은 자리 표시
+클립 그대로**입니다. 서버에 자리를 만들었습니다.
+
+### 만족해야 할 성질
+
+- **세우기** — `PATCH /api/v1/videos/{video_id}` 에 `{"is_featured": true}`.
+  응답(`GET /videos` 한 줄과 같은 모양)에 `is_featured` 가 실려 옵니다.
+  🔴 **사람당 하나** — 새로 세우면 옛 대표는 서버가 자동으로 내립니다. 내리려면
+  `{"is_featured": false}`.
+- **남의 것 읽기** — `GET /api/v1/cards/{card_public_slug}/featured-video`
+  (로그인 필요). `{ video_id, url, expires_in, sport_code, duration_ms }` 를 줍니다.
+  `url` 은 **사전 서명 GET URL**(만료됨 — `videoId` 로 다시 물어보세요, 5번과 같음).
+  대표가 없으면 `404 NO_FEATURED_VIDEO`.
+- `www/src/lib/featuredClip.ts` 가 `localStorage` 대신 이 둘을 씁니다 — 부르는
+  쪽(`MyVideos` · `SquadSuggest`)은 함수 시그니처만 알면 됩니다.
+
+### 🔴 하지 말아야 할 것
+
+- **대표를 여러 개 만들려 하지 마세요** — 서버가 하나만 남깁니다(부분 유일 인덱스).
+- **반려된 클립(`passed: false`)을 대표로 세우지 마세요** → `422 CANNOT_FEATURE`.
+- 읽기는 **카드 슬러그**로 합니다 — 내부 `user_id` 가 아닙니다(카드와 같은 원칙).
+- 저장 키를 그대로 `<video src>` 에 넣지 마세요 — `url`(사전 서명)을 씁니다.
+
+### 먼저 확인
+
+```bash
+grep -n "localStorage" www/src/lib/featuredClip.ts       # 안 걸리면 갈아 끼운 것
+git -C fastapi grep -n "is_featured\|featured-video" -- app/analysis   # 백엔드(됨)
+```
+
+⚠️ 추천 판 후보의 자리 표시 클립(`/coach-c00N.mp4`)은 그대로 두세요 — **영상
+파일을 더 넣지 마세요**(셋이 이미 16MB). 실제 후보에 카드 슬러그가 붙는 시점에
+이 경로로 갈아 끼우면 됩니다.
+
+상세: `fastapi/docs/api-contract.md` **3-6절** (`PATCH /videos` · `GET /cards/{slug}/featured-video`)
+
+---
+
+## 28. 🟢 포지션 목록 API — 하드코딩 걷어낼 수 있습니다 (2026-09-09 추가)
+
+`GET /api/v1/positions?sport_code=` (로그인 필요) 가 종목별 포지션
+(`[{sport_code, code, label}]`, `sport_code` 순) 을 줍니다. 지금 아래 셋이 각자
+`football: GK DF MF FW …` 를 하드코딩하고 있어 마이그레이션이 바뀌면 조용히
+낡습니다 — 이걸로 갈아 끼우면 됩니다.
+
+| 지금 하드코딩하는 곳 | 갈아 끼울 것 |
+|---|---|
+| `www/src/app/api/chat/route.ts` 시스템 프롬프트의 포지션 목록 (min 7 흐름 B) | 대화 시작 시 `GET /positions?sport_code={팀 종목}` 한 번 불러 넣기 |
+| 스쿼드 등재 UI (`SquadPanel` 류) 의 포지션 드롭다운 | 같은 호출 |
+| 모집 등록 UI 의 `needs[]` 포지션 선택 | 같은 호출 |
+
+### 🔴 하지 말아야 할 것
+
+- 없는 `sport_code` 로 부르면 빈 배열이 아니라 `422 UNKNOWN_SPORT` 입니다 —
+  `GET /matches` 와 같습니다.
+- `code` 는 **종목 안에서만** 유일합니다. 전 종목을 받으면 야구 `C`·농구 `C` 가
+  둘 다 옵니다 — `sport_code` 로 구분하세요.
+
+### 먼저 확인
+
+```bash
+git -C fastapi grep -n "positions_router\|/positions" -- app
+grep -rn "GK.*DF.*MF.*FW\|골키퍼.*수비수" www/src   # 하드코딩이 남았는지
+```
+
+상세: `fastapi/docs/api-contract.md` **3-3절** (`GET /positions`)
+
+---
+
+## 29. 🟢 「집중해서 볼 항목」(focus)을 `POST /videos` 에 실을 수 있습니다 (2026-09-09 추가, 미결 `paik` 8번)
+
+분석 화면의 `www/src/lib/rubricFocus.ts` 가 고른 항목을 보낼 자리가 없었습니다.
+`POST /api/v1/videos` 본문에 `focus` 를 더했습니다 (`subject_box` 와 같은 축 —
+`analysis_job` 에 저장 → claim 응답 → 워커 `--focus`).
+
+### 만족해야 할 성질
+
+- `www/src/lib/uploadClip.ts` 가 등록할 때 `focus` 를 함께 보낸다 — 루브릭의
+  `criteria[].id` 목록(예: `["follow_through", "guide_hand"]`).
+- 이 값은 저장돼 워커까지 흘러갑니다. 응답에는 안 실립니다.
+
+### 🔴 하지 말아야 할 것
+
+- **빈 목록·생략을 실패로 만들지 마세요** — 「전체적으로」가 기본이자 가장 흔한
+  경우입니다. `focus: []` 든 아예 생략이든 `201` 입니다.
+- **한글 항목 이름을 보내지 마세요** — `criteria[].id`(예: `follow_through`)입니다.
+  `팔로스루` 같은 표시 이름이 아닙니다. 서버는 실재 여부를 못 봅니다(루브릭은 `agent/`).
+- 항목 40자·목록 24개 상한. 서버가 공백·중복은 정리하지만 형식만입니다.
+
+### 먼저 확인
+
+```bash
+grep -n "focus" www/src/lib/uploadClip.ts        # 화면 쪽이 실었는지
+git -C fastapi grep -n "focus" -- app/analysis    # 백엔드 쪽(이미 됨)
+```
+
+상세: `fastapi/docs/api-contract.md` **3-6절** (`POST /videos`) · **3-8절** (claim 응답)
+
+---
+
 ## 계약 문서
 
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린
