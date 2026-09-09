@@ -1,7 +1,7 @@
 """영상 1건 분석 — 측정 → 판정 → 합산 전 구간 실행.
 
     uv run python scripts/analyze.py data/shot01.mp4
-    uv run python scripts/analyze.py data/shot01.mp4 --repeat 5   # 재현성 확인
+    uv run python scripts/analyze.py data/shot01.mp4 --repeat 5   # 판정만 반복
     uv run python scripts/analyze.py data/pitch.mp4 --side left    # 던지는 팔 지정
 
 8GB VRAM 제약 때문에 포즈 모델과 판정 모델을 동시에 올리지 않는다.
@@ -42,7 +42,9 @@ def main() -> None:
     ap.add_argument("--fps", type=int, default=DEFAULT_TARGET_FPS)
     ap.add_argument(
         "--repeat", type=int, default=1,
-        help="같은 측정값으로 판정을 N회 반복해 재현성을 확인한다.",
+        help="같은 측정값으로 **판정만** N회 반복한다. 🔴 3장 표의 재현성"
+             "(동일 영상 5회)이 아니다 — 그쪽은"
+             " eval/pending34_repro/measure_repro.py 가 잰다.",
     )
     args = ap.parse_args()
 
@@ -103,8 +105,14 @@ def main() -> None:
 
     if args.repeat > 1:
         sd = statistics.pstdev(scores)
-        print(f"\n재현성: {args.repeat}회 {scores}  표준편차 {sd:.2f}")
-        print(f"  기준 3점 이내 — {'충족' if sd <= 3 else '미달'}")
+        # 🔴 **판정 단계 재현성이다.** 영상→포즈→지표 구간은 한 번만 돌았고
+        #    `features` 가 회차 간에 공유된다. 3장 표의 「동일 영상 5회」와
+        #    다른 것을 재는데 예전에는 그냥 "재현성"이라고만 적어서 3장 목표를
+        #    충족한 것처럼 읽혔다 (미결 `ho` 34번).
+        print(f"\n판정 재현성(같은 측정값): {args.repeat}회 {scores}  "
+              f"표준편차 {sd:.2f}")
+        print("  🔴 3장의 「동일 영상 5회」가 아니다 — 그쪽은"
+              " eval/pending34_repro/measure_repro.py")
 
     # 마지막 단계라 여기서 죽으면 측정·판정을 다 하고 결과만 잃는다.
     # out/ 이 없는 새 체크아웃(EC2 등)에서 실제로 그랬다.

@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from supersub_agent.scoring import (
@@ -503,3 +505,44 @@ def test_item_score_is_absent_when_the_metric_was_not_measured():
     rubric = load_rubric(RUBRIC_PATH)
     c = rubric.criteria[0]
     assert c.score_for({}) is None
+
+
+# -- 동작(motion) 어휘 — 백엔드가 FK 로 쓸 값이다 (미결 `jin` 17번) -----------
+
+
+def test_the_motion_vocabulary_is_the_pair_not_the_bare_motion():
+    """🔴 동작 코드의 열쇠는 **(종목, 동작) 쌍**이지 `motion` 하나가 아니다.
+
+    지금은 `motion` 값 6개가 전역에서 겹치지 않지만 그것은 **우연이지 보장이
+    아니다.** `shot`·`serve` 처럼 여러 종목에 자연스럽게 들어갈 이름이 있고,
+    백엔드가 `motion` 만으로 참조 테이블을 만들면(미결 `jin` 17번 B안) 겹치는
+    순간 **한 행이 두 루브릭을 가리킨다** — 그러면 농구 영상이 축구 루브릭으로
+    채점되고 그 사실이 값에 안 남는다.
+
+    이 검사는 겹침을 금지하지 않는다. **겹치는 날 여기서 걸려서** 그때 쌍으로
+    갈지 이름을 바꿀지 정하게 하는 것이 목적이다.
+    """
+    found = discover_rubrics("rubrics")
+    motions = [r.motion for r in found.values()]
+    assert len(set(motions)) == len(motions), (
+        f"`motion` 이 종목을 넘어 겹친다: {sorted(motions)}. "
+        "백엔드 참조 테이블(jin 17번)이 이 값을 단독 키로 쓰고 있으면 함께 고칠 것."
+    )
+    for key, r in found.items():
+        assert key == f"{r.sport}/{r.motion}"
+
+
+def test_the_filename_matches_the_declared_sport_and_motion():
+    """파일명과 선언이 어긋나면 **목록을 파일명으로 세는 사람이 틀린다.**
+
+    미결 `jin` 17번이 "파일명(`baseball_pitching`)은 종목이 섞여 있어
+    `sport_code` 와 중복된다"고 적었는데, 그 판단이 서려면 파일명이 실제로
+    `<sport>_<motion>` 이어야 한다. 지금은 6개 전부 그렇고 **강제하는 것이
+    없었다.**
+    """
+    expected = {f"{r.sport}_{r.motion}"
+                for r in discover_rubrics("rubrics").values()}
+    actual = {p.stem for p in Path("rubrics").glob("*.yaml")}
+    assert actual == expected, (
+        f"파일명이 선언과 다르다: {sorted(actual - expected)}"
+    )

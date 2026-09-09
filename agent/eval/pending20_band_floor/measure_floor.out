@@ -1,0 +1,56 @@
+⚠ baseball/pitching: 측정 성공 표본 0편 (Track2 에 1행 있으나 전부 features_ok=0) — 이번에도 못 쟀다
+
+========================================================================
+0) 관절각 4개의 **실측 최솟값** (하한이 문제가 되는 자리)
+========================================================================
+  루브릭                                지표                                    n      최소
+  baseball/batting (JHMDB 46)        plant_knee_angle_at_impact           46    95.6
+  baseball/batting (JHMDB 46)        swing_knee_angle_at_impact           46   106.6
+  baseball/batting (JHMDB 46)        swing_elbow_angle_at_impact          46     6.8
+  baseball/batting (JHMDB 46)        support_elbow_angle_at_impact        46     2.2
+  baseball/batting 실클립 4건 (항목의 원 근거) plant_knee_angle_at_impact            4    24.3
+  baseball/batting 실클립 4건 (항목의 원 근거) swing_knee_angle_at_impact            4    29.0
+  baseball/batting 실클립 4건 (항목의 원 근거) swing_elbow_angle_at_impact           4    46.1
+  baseball/batting 실클립 4건 (항목의 원 근거) support_elbow_angle_at_impact         3     5.4
+  football/instep_shot (B-6 Track2 1 plant_knee_angle_at_impact           18    38.7
+  football/instep_shot (B-6 Track2 1 swing_knee_angle_at_impact           18    96.2
+  football/instep_shot (B-6 Track2 1 swing_elbow_angle_at_impact          15    72.2
+  football/instep_shot (B-6 Track2 1 support_elbow_angle_at_impact        10   109.2
+  basketball/jump_shot (B-6 Track2 1 plant_knee_angle_at_impact            1   111.3
+  basketball/jump_shot (B-6 Track2 1 swing_knee_angle_at_impact            1   174.0
+  basketball/jump_shot (B-6 Track2 1 swing_elbow_angle_at_impact           1   112.7
+  basketball/layup (B-6 Track2 1편)   plant_knee_angle_at_impact            1   176.0
+  basketball/layup (B-6 Track2 1편)   swing_knee_angle_at_impact            1   171.7
+  basketball/layup (B-6 Track2 1편)   swing_elbow_angle_at_impact           1   179.2
+  basketball/layup (B-6 Track2 1편)   support_elbow_angle_at_impact         1   161.7
+
+========================================================================
+(a)(b) 후보 하한 L 별 — 걸리는 값 / 그중 지금 0등급
+========================================================================
+    L(도)      걸리는 값      그중 0등급   지표별 내역
+       5          1           1   support_elbow=1
+      10          3           2   support_elbow=2 · swing_elbow=1
+      15          4           3   support_elbow=3 · swing_elbow=1
+      20          7           4   support_elbow=4 · swing_elbow=3
+      25         10           6   plant_knee=1 · support_elbow=6 · swing_elbow=3
+      30         12           7   plant_knee=1 · support_elbow=7 · swing_elbow=3 · swing_knee=1
+      35         12           7   plant_knee=1 · support_elbow=7 · swing_elbow=3 · swing_knee=1
+      40         16           8   plant_knee=2 · support_elbow=7 · swing_elbow=6 · swing_knee=1
+
+========================================================================
+(c) 반사실 — L 미만을 **빼고** 다시 채점하면
+========================================================================
+    L(도)     영향 클립      점수 변화       등급 문자 변화   등급 변화의 출처
+       5         1          1              0   —
+      10         3          2              1   baseball/batting 실클립 4건[draft]=1
+      15         4          3              2   baseball/batting 실클립 4건[draft]=1 · baseball/batting[draft]=1
+      20         7          4              2   baseball/batting 실클립 4건[draft]=1 · baseball/batting[draft]=1
+      25        10          6              4   baseball/batting 실클립 4건[draft]=1 · baseball/batting[draft]=3
+      30        11          7              4   baseball/batting 실클립 4건[draft]=1 · baseball/batting[draft]=3
+      35        11          7              4   baseball/batting 실클립 4건[draft]=1 · baseball/batting[draft]=3
+      40        15          8              4   baseball/batting 실클립 4건[draft]=1 · baseball/batting[draft]=3
+
+========================================================================
+🔴 어느 L 이 옳은지는 여기서 말하지 않는다 — 임계값 검수(미결 2번)다.
+🔴 표본에서 0건이라도 「결함이 없다」가 아니다 — 실클립 4건의 증거는 남는다.
+🔴 농구 둘은 표본이 각 1편이다. 0이 「안 샌다」는 뜻이 아니다.
