@@ -50,6 +50,9 @@ class VideoEntity:
     description: str | None = None
     # 프로필에 저장됐나(미결 `jin` 24번). 기본 True — `/analysis` 만 임시로 둔다.
     kept: bool = True
+    # 「나를 보여주는 대표 영상」(미결 `paik` 10번). 사람당 하나 — DB 부분 유일
+    # 인덱스가 강제한다. 반려된 클립은 될 수 없다(앱 규칙).
+    is_featured: bool = False
     # 원본 파일 이름(미결 `jin` 24번). 저장 키 슬러그가 손실적이라 따로 남긴다.
     original_filename: str | None = None
     # 「이 사람으로 분석」 (미결 `paik` 6번). `analysis_job` 에 실리는 값이지만

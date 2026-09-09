@@ -38,6 +38,7 @@ def to_video_result(video: VideoEntity) -> VideoResult:
         analysis_job_id=video.analysis_job_id,
         analysis_status=video.analysis_status,
         is_public=video.is_public,
+        is_featured=video.is_featured,
         title=video.title,
         description=video.description,
         kept=video.kept,

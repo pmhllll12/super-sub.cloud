@@ -528,6 +528,80 @@ class TestProvisionalSweep:
         assert done in swept_ids
 
 
+class TestFeatured:
+    """「대표 영상」이 실제 컬럼·부분 유일 인덱스·조인으로 도는지 (미결 `paik` 10번)."""
+
+    def _clip(self, db_client, uploader):
+        key = _upload(db_client, uploader)
+        res = _register(db_client, uploader, key)
+        assert res.status_code == 201, res.text
+        return res.json()["id"]
+
+    def test_사람당_하나_부분_유일_인덱스가_지킨다(
+        self, db_client, db_session, uploader
+    ):
+        first = self._clip(db_client, uploader)
+        second = self._clip(db_client, uploader)
+
+        for vid in (first, second):
+            r = db_client.patch(
+                f"{V1}/videos/{vid}",
+                json={"is_featured": True},
+                headers=uploader["headers"],
+            )
+            assert r.status_code == 200, r.text
+
+        rows = db_session.execute(
+            text(
+                "SELECT id::text, is_featured FROM video WHERE user_id = :u"
+            ),
+            {"u": uploader["id"]},
+        ).all()
+        featured = [r.id for r in rows if r.is_featured]
+        assert featured == [second]   # 하나뿐, 그리고 마지막 것
+
+    def test_남의_대표를_카드_슬러그로_읽는다(self, db_client, db_session, uploader):
+        vid = self._clip(db_client, uploader)
+        assert db_client.patch(
+            f"{V1}/videos/{vid}",
+            json={"is_featured": True},
+            headers=uploader["headers"],
+        ).status_code == 200
+
+        card = db_client.post(f"{V1}/me/card", headers=uploader["headers"])
+        assert card.status_code in (200, 201), card.text
+        slug = card.json()["public_slug"]
+
+        # 다른 사람으로 로그인해서 읽는다.
+        other_email = f"viewer-{uuid.uuid4().hex[:12]}@super-sub.example"
+        db_client.post(
+            f"{V1}/auth/signup",
+            json={"email": other_email, "password": PASSWORD, "nickname": "보는이"},
+        )
+        tok = db_client.post(
+            f"{V1}/auth/login", json={"email": other_email, "password": PASSWORD}
+        ).json()["access_token"]
+
+        res = db_client.get(
+            f"{V1}/cards/{slug}/featured-video",
+            headers={"Authorization": f"Bearer {tok}"},
+        )
+        assert res.status_code == 200, res.text
+        body = res.json()
+        assert body["video_id"] == vid
+        assert body["url"].startswith("https://")
+
+    def test_대표가_없으면_404_다(self, db_client, uploader):
+        self._clip(db_client, uploader)   # 대표로 안 세움
+        card = db_client.post(f"{V1}/me/card", headers=uploader["headers"])
+        slug = card.json()["public_slug"]
+
+        res = db_client.get(
+            f"{V1}/cards/{slug}/featured-video", headers=uploader["headers"]
+        )
+        assert res.status_code == 404
+
+
 class TestConstraints:
     def test_영상당_판정은_하나뿐이다(self, db_client, db_session, uploader):
         """부록 D.7 의 유일 제약. **막히지 않으면 그 제약은 없는 것이다.**"""

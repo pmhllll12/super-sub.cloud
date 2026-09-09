@@ -7,6 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, status
 
 from app.analysis.adapter.inbound.api.schemas.video_schema import (
+    FeaturedVideoResponse,
     PlaybackUrlResponse,
     PublicVideoResponse,
     RegisterVideoSchema,
@@ -18,6 +19,8 @@ from app.analysis.adapter.inbound.api.schemas.video_schema import (
 from app.analysis.application.dtos.video_dto import (
     UNSET,
     DeleteVideoCommand,
+    FeaturedVideoResult,
+    GetFeaturedVideoCommand,
     GetPlaybackUrlCommand,
     KeepVideoCommand,
     MyVideosQuery,
@@ -33,6 +36,7 @@ from app.analysis.application.dtos.video_dto import (
 from app.analysis.dependencies.video_providers import (
     CreateUploadUrlUseCaseDep,
     DeleteVideoUseCaseDep,
+    GetFeaturedVideoUseCaseDep,
     GetPlaybackUrlUseCaseDep,
     KeepVideoUseCaseDep,
     ListMyVideosUseCaseDep,
@@ -164,7 +168,31 @@ def update_video(
             ),
             title=body.title if "title" in sent else UNSET,
             description=body.description if "description" in sent else UNSET,
+            is_featured=(
+                body.is_featured
+                if "is_featured" in sent and body.is_featured is not None
+                else UNSET
+            ),
         )
+    )
+
+
+@video_router.get(
+    "/cards/{card_public_slug}/featured-video",
+    response_model=FeaturedVideoResponse,
+)
+def get_featured_video(
+    card_public_slug: str,
+    user_id: CurrentUserId,
+    use_case: GetFeaturedVideoUseCaseDep,
+) -> FeaturedVideoResult:
+    """어떤 사람의 「나를 보여주는 대표 영상」 (미결 `paik` 10번).
+
+    **로그인하면 누구나** — 추천 판에서 후보 옆에 도는 장면이다. 저장 키가 아니라
+    사전 서명 GET URL 을 준다(버킷은 닫혀 있다). 대표가 없으면 `404 NO_FEATURED_VIDEO`.
+    """
+    return use_case(
+        GetFeaturedVideoCommand(card_public_slug=card_public_slug)
     )
 
 

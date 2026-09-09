@@ -1070,6 +1070,46 @@ git -C fastapi grep -n "subject_box" -- app/analysis    # 백엔드 쪽(이미 �
 
 ---
 
+## 27. 🟢 「나를 보여주는 대표 영상」 — 세우기·남의 것 읽기 (2026-09-09 추가, 미결 `paik` 10번)
+
+대표 영상이 지금은 브라우저 `localStorage` 에만 있어 **남의 것은 자리 표시
+클립 그대로**입니다. 서버에 자리를 만들었습니다.
+
+### 만족해야 할 성질
+
+- **세우기** — `PATCH /api/v1/videos/{video_id}` 에 `{"is_featured": true}`.
+  응답(`GET /videos` 한 줄과 같은 모양)에 `is_featured` 가 실려 옵니다.
+  🔴 **사람당 하나** — 새로 세우면 옛 대표는 서버가 자동으로 내립니다. 내리려면
+  `{"is_featured": false}`.
+- **남의 것 읽기** — `GET /api/v1/cards/{card_public_slug}/featured-video`
+  (로그인 필요). `{ video_id, url, expires_in, sport_code, duration_ms }` 를 줍니다.
+  `url` 은 **사전 서명 GET URL**(만료됨 — `videoId` 로 다시 물어보세요, 5번과 같음).
+  대표가 없으면 `404 NO_FEATURED_VIDEO`.
+- `www/src/lib/featuredClip.ts` 가 `localStorage` 대신 이 둘을 씁니다 — 부르는
+  쪽(`MyVideos` · `SquadSuggest`)은 함수 시그니처만 알면 됩니다.
+
+### 🔴 하지 말아야 할 것
+
+- **대표를 여러 개 만들려 하지 마세요** — 서버가 하나만 남깁니다(부분 유일 인덱스).
+- **반려된 클립(`passed: false`)을 대표로 세우지 마세요** → `422 CANNOT_FEATURE`.
+- 읽기는 **카드 슬러그**로 합니다 — 내부 `user_id` 가 아닙니다(카드와 같은 원칙).
+- 저장 키를 그대로 `<video src>` 에 넣지 마세요 — `url`(사전 서명)을 씁니다.
+
+### 먼저 확인
+
+```bash
+grep -n "localStorage" www/src/lib/featuredClip.ts       # 안 걸리면 갈아 끼운 것
+git -C fastapi grep -n "is_featured\|featured-video" -- app/analysis   # 백엔드(됨)
+```
+
+⚠️ 추천 판 후보의 자리 표시 클립(`/coach-c00N.mp4`)은 그대로 두세요 — **영상
+파일을 더 넣지 마세요**(셋이 이미 16MB). 실제 후보에 카드 슬러그가 붙는 시점에
+이 경로로 갈아 끼우면 됩니다.
+
+상세: `fastapi/docs/api-contract.md` **3-6절** (`PATCH /videos` · `GET /cards/{slug}/featured-video`)
+
+---
+
 ## 계약 문서
 
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린

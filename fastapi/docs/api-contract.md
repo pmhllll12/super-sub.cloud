@@ -1478,6 +1478,7 @@ SFR-001. 사용자가 자기 클립을 올리고, 서버가 규격을 검사해 
   "analysis_job_id": "9a2e...",
   "analysis_status": "queued",
   "is_public": false,
+  "is_featured": false,
   "title": null,
   "description": null,
   "kept": true
@@ -1532,21 +1533,28 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
 
 ### `PATCH /api/v1/videos/{video_id}` — 부분 수정 (2026-09-08 추가)
 
-미결 `paik` 5번. **자기 클립**의 공개 여부·제목·한 줄 설명을 바꾼다.
+미결 `paik` 5번. **자기 클립**의 공개 여부·제목·한 줄 설명·대표 여부를 바꾼다.
 
 ```json
 { "is_public": true, "title": "우리 팀 첫 골", "description": "왼발 감아차기" }
+{ "is_featured": true }
 ```
 
-- **셋 다 생략 가능하다 — 보낸 것만 바뀐다.** 안 보낸 필드는 그대로다
+- **전부 생략 가능하다 — 보낸 것만 바뀐다.** 안 보낸 필드는 그대로다
 - `title` 100자 · `description` 280자. **`null` 이나 공백만 보내면 지운다**
-  (`PATCH /me/card` 의 `tagline` 과 같은 규칙). `is_public` 은 불리언이라
-  `null` 은 무시한다
-- `200 OK` — 응답은 `GET /videos` 한 줄과 같은 모양(바뀐 값이 실려 온다)
+  (`PATCH /me/card` 의 `tagline` 과 같은 규칙). `is_public`·`is_featured` 는
+  불리언이라 `null` 은 무시한다
+- `is_featured: true` — **「나를 보여주는 대표 영상」**(미결 `paik` 10번)으로 세운다.
+  🔴 **사람당 하나** — 세우면 그 사람의 다른 대표는 자동으로 내려간다(DB 부분
+  유일 인덱스). 🔴 **반려된 클립(`passed: false`)은 대표가 될 수 없다** →
+  `422 CANNOT_FEATURE`. 내리려면 `is_featured: false`
+- `200 OK` — 응답은 `GET /videos` 한 줄과 같은 모양(바뀐 값이 실려 온다).
+  `is_featured` 도 그 줄에 실린다
 
 | 에러 | code | 언제 |
 |---|---|---|
 | 404 | `VIDEO_NOT_FOUND` | 없는 클립이거나 **남의 클립**이다 — 존재 여부를 구별해 주지 않는다 |
+| 422 | `CANNOT_FEATURE` | 반려된 클립을 대표로 세우려 했다 |
 | 422 | `VALIDATION_ERROR` | `title`·`description` 이 길이 상한을 넘는다 |
 
 ### `GET /api/v1/videos/public` — 공개 클립 목록 (2026-09-08 추가)
@@ -1622,6 +1630,33 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
 | 에러 | code | 언제 |
 |---|---|---|
 | 404 | `VIDEO_NOT_FOUND` | 없는 클립이거나 남의 클립이다 |
+
+### `GET /api/v1/cards/{card_public_slug}/featured-video` — 남의 대표 영상 (2026-09-09 추가, 미결 `paik` 10번)
+
+어떤 사람의 「나를 보여주는 대표 영상」을 **그 사람의 카드 슬러그**로 가져온다.
+추천 판에서 후보 옆에 도는 장면이 이것이다. 세우는 것은 위 `PATCH /videos/{id}`
+의 `is_featured` 다.
+
+```json
+{
+  "video_id": "7c05...",
+  "url": "https://<bucket>.s3.<region>.amazonaws.com/…?X-Amz-…",
+  "expires_in": 900,
+  "sport_code": "football",
+  "duration_ms": 10200
+}
+```
+
+- 🔴 **로그인하면 누구나.** 대표는 「보여 주려고」 고른 장면이지만, 사전 서명
+  URL 을 내주는 자리라 익명 긁기는 막는다.
+- 🔴 **저장 키가 아니라 사전 서명 GET URL** 을 준다 — 버킷은 닫혀 있다
+  (`playback-url` 과 같은 원칙). `expires_in` 초 뒤 만료, 매번 새로 받는다.
+- `is_public` 여부와 무관하다 — **대표로 세운 것 자체가 「보여 준다」는 뜻**이다.
+
+| 에러 | code | 언제 |
+|---|---|---|
+| 404 | `NO_FEATURED_VIDEO` | 슬러그가 없든·대표를 안 세웠든·그 대표가 반려됐든 — 밖에서는 다 "없음"이다 |
+| 503 | `STORAGE_NOT_CONFIGURED` | 서버에 `S3_BUCKET` 이 없다 |
 
 ### 아직 없는 것
 

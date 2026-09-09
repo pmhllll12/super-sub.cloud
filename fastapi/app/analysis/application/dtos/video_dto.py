@@ -74,6 +74,9 @@ class UpdateVideoCommand:
     is_public: bool | Any = UNSET
     title: str | None | Any = UNSET
     description: str | None | Any = UNSET
+    # 「대표 영상」 토글 (미결 `paik` 10번). True 로 세우면 그 사람의 다른 대표는
+    # 내려간다. 반려된 클립엔 못 세운다(422).
+    is_featured: bool | Any = UNSET
 
 
 @dataclass(frozen=True)
@@ -88,6 +91,26 @@ class GetPlaybackUrlCommand:
 class PlaybackUrlResult:
     url: str
     expires_in: int
+
+
+@dataclass(frozen=True)
+class GetFeaturedVideoCommand:
+    """어떤 사람의 대표 영상을 그 사람의 **카드 슬러그**로 가져온다 (미결 `paik` 10번).
+
+    로그인한 사람이면 누구나 볼 수 있다 — 대표는 「보여 주려고」 고른 장면이지만,
+    사전 서명 URL 을 내주는 자리라 익명 긁기는 막는다.
+    """
+
+    card_public_slug: str
+
+
+@dataclass(frozen=True)
+class FeaturedVideoResult:
+    video_id: UUID
+    url: str
+    expires_in: int
+    sport_code: str
+    duration_ms: int | None
 
 
 @dataclass(frozen=True)
@@ -197,6 +220,7 @@ class VideoResult:
     analysis_job_id: UUID | None
     analysis_status: str | None
     is_public: bool
+    is_featured: bool
     title: str | None
     description: str | None
     kept: bool

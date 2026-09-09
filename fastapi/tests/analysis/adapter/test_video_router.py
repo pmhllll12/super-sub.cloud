@@ -12,6 +12,7 @@ import pytest
 from app.analysis.adapter.outbound.stub.video_stub_repository import (
     _OBJECTS,
     put_object,
+    register_card_slug,
     reset_videos,
 )
 from app.analysis.domain.rules.video_rules import MAX_BYTES, MAX_DURATION_MS
@@ -483,6 +484,112 @@ class TestListPublicVideos:
         row = client.get(f"{V1}/videos/public", headers=_headers(uuid4())).json()[0]
         assert row["title"] == "제목"
         assert row["description"] == "설명"
+
+
+class TestFeatured:
+    """「나를 보여주는 대표 영상」 (미결 `paik` 10번)."""
+
+    def _feature(self, client, user_id, video_id):
+        return client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"is_featured": True},
+            headers=_headers(user_id),
+        )
+
+    def test_대표로_세운다(self, client):
+        user_id = uuid4()
+        vid = _register_clip(client, user_id)
+        res = self._feature(client, user_id, vid)
+        assert res.status_code == 200, res.text
+        assert res.json()["is_featured"] is True
+
+    def test_대표는_사람당_하나_새로_세우면_옛것이_내려간다(self, client):
+        user_id = uuid4()
+        first = _register_clip(client, user_id)
+        second = _register_clip(client, user_id)
+        self._feature(client, user_id, first)
+        self._feature(client, user_id, second)
+
+        rows = {r["id"]: r["is_featured"]
+                for r in client.get(f"{V1}/videos", headers=_headers(user_id)).json()}
+        assert rows[first] is False
+        assert rows[second] is True
+
+    def test_내릴_수도_있다(self, client):
+        user_id = uuid4()
+        vid = _register_clip(client, user_id)
+        self._feature(client, user_id, vid)
+        res = client.patch(
+            f"{V1}/videos/{vid}",
+            json={"is_featured": False},
+            headers=_headers(user_id),
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["is_featured"] is False
+
+    def test_반려된_클립은_대표로_못_세운다(self, client):
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+        rejected = _register(
+            client, user_id, key, duration_ms=MAX_DURATION_MS + 1
+        ).json()
+        assert rejected["passed"] is False
+
+        res = self._feature(client, user_id, rejected["id"])
+        assert res.status_code == 422
+        assert error_code(res) == "CANNOT_FEATURE"
+
+    def test_남의_클립은_대표로_못_세운다(self, client):
+        owner, other = uuid4(), uuid4()
+        vid = _register_clip(client, owner)
+        res = self._feature(client, other, vid)
+        assert res.status_code == 404
+
+
+class TestFeaturedRead:
+    """`GET /cards/{slug}/featured-video` — 남의 대표 영상 (미결 `paik` 10번)."""
+
+    def test_인증이_필요하다(self, client):
+        assert client.get(f"{V1}/cards/some-slug/featured-video").status_code == 401
+
+    def test_남의_대표를_카드_슬러그로_읽는다(self, client):
+        owner, viewer = uuid4(), uuid4()
+        vid = _register_clip(client, owner)
+        client.patch(
+            f"{V1}/videos/{vid}",
+            json={"is_featured": True},
+            headers=_headers(owner),
+        )
+        register_card_slug("hong-gildong-4f2a", owner)
+
+        res = client.get(
+            f"{V1}/cards/hong-gildong-4f2a/featured-video",
+            headers=_headers(viewer),
+        )
+        assert res.status_code == 200, res.text
+        body = res.json()
+        assert body["video_id"] == vid
+        assert body["url"].startswith("https://")
+        assert body["expires_in"] > 0
+
+    def test_대표가_없으면_404_다(self, client):
+        owner = uuid4()
+        _register_clip(client, owner)  # 대표로 안 세움
+        register_card_slug("no-featured-1a2b", owner)
+
+        res = client.get(
+            f"{V1}/cards/no-featured-1a2b/featured-video", headers=_headers(uuid4())
+        )
+        assert res.status_code == 404
+        assert error_code(res) == "NO_FEATURED_VIDEO"
+
+    def test_없는_슬러그는_404_다(self, client):
+        res = client.get(
+            f"{V1}/cards/누구도-아님/featured-video", headers=_headers(uuid4())
+        )
+        assert res.status_code == 404
+        assert error_code(res) == "NO_FEATURED_VIDEO"
 
 
 class TestPlaybackUrl:

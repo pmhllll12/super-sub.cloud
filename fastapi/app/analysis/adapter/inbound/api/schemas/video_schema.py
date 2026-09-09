@@ -111,6 +111,7 @@ class VideoResponse(BaseModel):
     title: str | None
     description: str | None
     kept: bool
+    is_featured: bool
 
 
 class UpdateVideoSchema(BaseModel):
@@ -123,6 +124,9 @@ class UpdateVideoSchema(BaseModel):
     is_public: bool | None = None
     title: str | None = Field(default=None, max_length=100)
     description: str | None = Field(default=None, max_length=280)
+    # 「대표 영상」 토글 (미결 `paik` 10번). `true` 로 세우면 그 사람의 다른 대표는
+    # 자동으로 내려간다(사람당 하나). 반려된 클립엔 못 세운다(422 `CANNOT_FEATURE`).
+    is_featured: bool | None = None
 
 
 class PlaybackUrlResponse(BaseModel):
@@ -130,6 +134,22 @@ class PlaybackUrlResponse(BaseModel):
 
     url: str
     expires_in: int
+
+
+class FeaturedVideoResponse(BaseModel):
+    """어떤 사람의 대표 영상 하나(미결 `paik` 10번). `GET /cards/{slug}/featured-video`.
+
+    저장 키가 아니라 **사전 서명 GET URL** 을 준다 — 버킷은 닫혀 있다(5번과 같은 원칙).
+    대표가 없으면 이 응답이 아니라 `404 NO_FEATURED_VIDEO` 다.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    video_id: UUID
+    url: str
+    expires_in: int
+    sport_code: str
+    duration_ms: int | None
 
 
 class PublicVideoResponse(BaseModel):
