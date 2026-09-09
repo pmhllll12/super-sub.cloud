@@ -123,6 +123,7 @@ class TestOpenApi:
             f"{V1}/me/password",
             f"{V1}/me/card",
             V1 + "/cards/{public_slug}",
+            f"{V1}/positions",
             f"{V1}/teams",
             V1 + "/teams/{team_id}",
             V1 + "/teams/{team_id}/members",

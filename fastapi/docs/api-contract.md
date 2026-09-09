@@ -1225,6 +1225,31 @@ GET /api/v1/matches?sport_code=football&region=서울&page=1&size=20
 
 **확정된 목록이 아니다.** 스쿼드(`squad_member`)가 들어올 때 세분화가 필요하면 늘린다.
 
+### `GET /api/v1/positions` — 포지션 목록 (2026-09-09 추가)
+
+위 표를 **API 로** 준다. 지금 스쿼드 등재·경기 `needs`·챗봇 화면이 이 목록을
+**하드코딩**하고 있어서, 마이그레이션이 바뀌면 조용히 낡는다. 그 자리를 이걸로
+갈아 끼운다. **로그인하면 누구나** — 참조 데이터라 사용자별 내용이 없다.
+
+```
+GET /api/v1/positions              → 전 종목
+GET /api/v1/positions?sport_code=football
+```
+
+```json
+[
+  { "sport_code": "football", "code": "DF", "label": "수비수" },
+  { "sport_code": "football", "code": "FW", "label": "공격수" }
+]
+```
+
+`sport_code` 순으로 정렬돼 온다. 🔴 **약칭(`code`)은 종목 안에서만 유일**하다 —
+야구 `C`(포수)와 농구 `C`(센터)는 다른 것이라 둘 다 실린다.
+
+| 에러 | code | 언제 |
+|---|---|---|
+| 422 | `UNKNOWN_SPORT` | `sport_code` 필터가 `sport` 에 없는 값이다 — 빈 배열이면 오타와 "그 종목 포지션이 아직 없다"가 같아 보인다(`GET /matches` 와 같은 판단) |
+
 ---
 
 ## 3-5. 지원과 제안 (2026-09-02 추가)

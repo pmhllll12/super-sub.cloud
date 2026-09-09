@@ -1110,6 +1110,37 @@ git -C fastapi grep -n "is_featured\|featured-video" -- app/analysis   # 백엔�
 
 ---
 
+## 28. 🟢 포지션 목록 API — 하드코딩 걷어낼 수 있습니다 (2026-09-09 추가)
+
+`GET /api/v1/positions?sport_code=` (로그인 필요) 가 종목별 포지션
+(`[{sport_code, code, label}]`, `sport_code` 순) 을 줍니다. 지금 아래 셋이 각자
+`football: GK DF MF FW …` 를 하드코딩하고 있어 마이그레이션이 바뀌면 조용히
+낡습니다 — 이걸로 갈아 끼우면 됩니다.
+
+| 지금 하드코딩하는 곳 | 갈아 끼울 것 |
+|---|---|
+| `www/src/app/api/chat/route.ts` 시스템 프롬프트의 포지션 목록 (min 7 흐름 B) | 대화 시작 시 `GET /positions?sport_code={팀 종목}` 한 번 불러 넣기 |
+| 스쿼드 등재 UI (`SquadPanel` 류) 의 포지션 드롭다운 | 같은 호출 |
+| 모집 등록 UI 의 `needs[]` 포지션 선택 | 같은 호출 |
+
+### 🔴 하지 말아야 할 것
+
+- 없는 `sport_code` 로 부르면 빈 배열이 아니라 `422 UNKNOWN_SPORT` 입니다 —
+  `GET /matches` 와 같습니다.
+- `code` 는 **종목 안에서만** 유일합니다. 전 종목을 받으면 야구 `C`·농구 `C` 가
+  둘 다 옵니다 — `sport_code` 로 구분하세요.
+
+### 먼저 확인
+
+```bash
+git -C fastapi grep -n "positions_router\|/positions" -- app
+grep -rn "GK.*DF.*MF.*FW\|골키퍼.*수비수" www/src   # 하드코딩이 남았는지
+```
+
+상세: `fastapi/docs/api-contract.md` **3-3절** (`GET /positions`)
+
+---
+
 ## 계약 문서
 
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린
