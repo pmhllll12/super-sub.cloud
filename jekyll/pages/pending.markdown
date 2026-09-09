@@ -6057,7 +6057,7 @@ Windows가 쓰고 있는지부터 보는 게 빠릅니다. 이건 이 컴퓨터�
 | 1 | `fastapi/Dockerfile` 을 저장소에 커밋 (지금 로컬에만 있음. 박민호 님이 EC2 에서 쓴 것과 사실상 동일 — `python:3.14-slim` + `requirements.lock.txt`) | `git -C fastapi ls-files Dockerfile` |
 | 2 | `fastapi/deploy/k8s/` 를 EC2 형태로 정리 — in-cluster pgvector 를 빼고 호스트 PostgreSQL 을 `hostNetwork` 또는 selector 없는 Service/Endpoints 로. `~/k3s-trial/` 사본이 갈리기 전에 이걸 정본으로 | 매니페스트가 레포에, `~/k3s-trial/` 은 이걸 참조 |
 | 3 | 이미지 레지스트리 전략 확정 — 박민호 님이 `c7e8b75` 로 Docker Hub pull 로 전환하셨으니 그걸 따름. 태그 규칙(커밋 SHA?)만 정하면 됨 | `deployment.md` 에 태그 규칙 |
-| 4 | `docs/deployment.md` 재작성 — systemd 절차 → k3s 절차(`www/docs/2026-09-09-K3S-harness.md` 참조). **옛 systemd 절차는 「롤백」 절로 남긴다** | `grep -n k3s fastapi/docs/deployment.md` · `test_docs_paths` 통과 |
+| 4 ✅ | `docs/deployment.md` 재작성 완료 (정어진, 커밋 `a21af5f`) — 「현재 배포 — k3s + CD」 절 신설, 사람이 준비할 것 표(GitHub Secrets·확장·env·S3·백업), 옛 systemd 절차(0·3·6절)에 「롤백·최초 세팅」 배너, 6절 = 롤백 런북. 🔴 DB 는 파드로 안 옮김 명시. `test_docs_paths`·전체 pytest 통과 | — |
 | 5 | 🔴 **cutover** — 트래픽 8000(systemd) → 파드. 인그레스/포트 전환 + **systemd 유닛은 disable 만 하고 지우지 않는다**(롤백용). 스모크(`/health`·업로드→분석) 통과 후 `supersub-api.service` stop | 배포 `/health` 가 파드에서 응답 · systemd `is-enabled` = disabled |
 | 6 | CI — `fastapi/**` 변경 시 이미지 빌드+push (`.github/workflows/`). 지금은 테스트만 돎 | 워크플로에 build job |
 
