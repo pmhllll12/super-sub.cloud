@@ -5843,9 +5843,40 @@ k3s 설치 자체는 문제없습니다(기존 서비스 무영향, 확인됨). 
 | 확인 | `kubectl describe pod` 이벤트에 `Pulling image "pmhllll12/supersub:latest"` → `Successfully pulled` 찍힘 (진짜로 레지스트리에서 받은 것 확인) · `curl localhost:8080/health` → `200` |
 | 걸린 것 | 롤링 업데이트 중 새 파드가 `hostNetwork`라 기존 파드와 **포트 충돌**로 `Pending`(`didn't have free ports`) — 기존 파드를 수동으로 지워서 넘겼습니다. 단일 노드에서 `hostNetwork` 쓸 땐 롤링 업데이트가 이렇게 걸린다는 걸 알아두면 됩니다 |
 
-절차는 `www/docs/2026-09-09-K3S-harness.md`에도 반영했습니다. **여전히
-Dockerfile을 저장소에 정식으로 커밋할지, 이미지 태그 전략(버전 태그 vs
-`latest`)을 어떻게 할지는 정어진 판단이 필요합니다** — 위 본문 내용 그대로입니다.
+절차는 `www/docs/2026-09-09-K3S-harness.md`에도 반영했습니다.
+
+#### 🔴 추가 진행 (2026.09.09) — `.env`가 이미지에 그대로 들어가 push된 적이 있었습니다
+
+**직접 이미지를 열어봐서 발견했습니다.** `Dockerfile`에 `.dockerignore` 없이
+`COPY . .`만 있어서, `supersub` 서버의 `.env`·`.env.bak`이 그대로 이미지에
+들어갔고 그 상태로 Docker Hub(`pmhllll12/supersub`, digest `56b21535...`)에
+**한동안 올라가 있었습니다.** 노출된 값: `DATABASE_URL`(DB 비밀번호),
+`JWT_SECRET`, `WORKER_TOKEN`.
+
+| | |
+|---|---|
+| 즉시 조치 | `.dockerignore` 추가 후 재빌드·재push(새 digest `4ae283b3...`) — 확인: `docker run --rm pmhllll12/supersub:latest ls /app`에 `.env` 없음 |
+| 노출 범위 | 레포는 Private, Collaborator는 아직 안 추가한 상태라 **박민호 계정 밖으로 나갔을 가능성은 낮습니다.** 다만 예전 digest 자체가 Docker Hub에서 완전히 지워졌는지는 확인 안 했습니다 |
+| 🔴 **아직 안 한 것** | **`JWT_SECRET`·`DATABASE_URL` 비밀번호·`WORKER_TOKEN` 교체(rotation)** — 노출됐던 값이라 안전하게 하려면 바꾸는 게 맞다고 봅니다. 다만 `JWT_SECRET`을 바꾸면 로그인해 있는 모든 사용자가 로그아웃되고, `WORKER_TOKEN`을 바꾸면 워커 쪽 설정도 같이 바꿔야 해서 **운영에 영향이 갑니다.** 혼자 정하지 않고 여쭙습니다 — 언제 바꿀지, 바꾸는 김에 워커 쪽 배선도 같이 손볼지 판단 부탁드립니다 |
+
+#### ✅ 추가 진행 (2026.09.09) — Dockerfile·`.dockerignore`를 저장소에 정식으로 커밋, GitHub Actions로 CD 연결
+
+**"Dockerfile을 저장소에 커밋할지"를 이번엔 진행하는 쪽으로 정했습니다** —
+위 보안 사고 때문에 `.dockerignore`를 **git으로 관리해서 다음 사람이 또
+`.env`를 굽지 않게** 하는 게 더 급하다고 판단했습니다. 이미지 태그 전략은
+아직 `latest` 하나뿐입니다 — 손 안 댔습니다.
+
+| | |
+|---|---|
+| 커밋된 파일 | `fastapi/Dockerfile` · `fastapi/.dockerignore`(`.env`·`.env.*`·`.venv`·`tests`·`.git` 제외, `.env.example`만 예외) · `.github/workflows/backend-docker-build.yml` |
+| CD 흐름 | `main`에 `fastapi/**` 변경 push → GitHub Actions가 빌드해 `pmhllll12/supersub:latest`로 push → `supersub` 서버의 `supersub-cd.timer`(2분마다 폴링)가 새 digest를 감지해 `kubectl rollout restart` |
+| 포트 | **하나도 새로 안 열었습니다** — Docker Hub Webhook(인바운드, 서명 없음)이 아니라 EC2가 밖으로 나가서 확인하는 폴링 방식을 택했습니다 |
+| 롤아웃 충돌 방지 | Deployment `strategy: Recreate`로 바꿔서, hostNetwork 포트 충돌 없이 자동 재배포되게 했습니다 |
+| 🔴 **직접 해주셔야 하는 것** | GitHub 저장소 **Settings → Secrets and variables → Actions**에 `DOCKERHUB_USERNAME`(`pmhllll12`)·`DOCKERHUB_TOKEN`(Docker Hub Access Token, Read & Write)을 추가해주셔야 GitHub Actions가 push를 할 수 있습니다. 토큰은 대화·문서 어디에도 남기지 않았습니다 |
+
+`fastapi/` 소유가 정어진이라, **Dockerfile 내용·위치·CI 트리거 조건이
+관례에 맞는지 검토 부탁드립니다.** 어긋나면 고쳐서 알려주세요 — 급하게
+진행한 것이라 그쪽 확인 전까지는 「임시」로 봐 주시면 됩니다.
 
 ### 12. 이 WSL의 로컬 Postgres — DB 통합 테스트 막던 원인, 고쳐졌습니다 ✅ 해소 (2026.09.09)
 
