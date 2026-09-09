@@ -994,6 +994,46 @@ git -C fastapi grep -n "videos/{video_id}/keep" -- app/analysis   # 라우트가
 
 ---
 
+## 25. 🟢 홈 스쿼드 판의 배치를 서버에 저장할 수 있습니다 (2026-09-09 추가, 미결 `paik` 9번)
+
+판 크기·카드가 선 칸·손으로 정한 포지션이 지금은 그 브라우저의 `localStorage`
+에만 있어 **다른 기기에서는 처음 판으로 열립니다.** 세 값을 담을 자리를
+`squad`·`squad_member` 에 넣었습니다.
+
+### 만족해야 할 성질
+
+- 다른 기기(또는 다른 브라우저)로 로그인해도 **같은 판이 열린다.**
+  `www/src/lib/squadBoard.ts` 가 `localStorage` 대신 API 를 쓴다.
+- 판을 되살리는 데 필요한 세 값이 서버에 남는다:
+  - **판 크기** — `SquadResponse.formation` (`"3:3"`·`"5:5"`·`"7:7"`, 안 정했으면 `null`).
+    저장: `PATCH /api/v1/teams/{team_id}/squad` `{ "formation": "5:5" }`
+  - **칸** — `SquadMemberResponse.grid_col` · `grid_row` (판에 안 올렸으면 `null`).
+    저장: 등재할 때 `POST .../squad/members` 에 실어도 되고, 나중에
+    `PATCH /api/v1/teams/{team_id}/squad/members/{member_id}` 로 옮겨도 된다.
+  - **포지션** — 이미 있던 `position_code`. 같은 `PATCH .../members/{member_id}` 로 바꾼다
+    (전에는 빼고 다시 넣어야 했습니다 — 계약 3-7 「아직 없는 것」 해소).
+- 세 엔드포인트 모두 **바뀐 스쿼드 전체**를 돌려준다 — 화면이 판을 다시 그리면 된다.
+
+### 🔴 하지 말아야 할 것
+
+- **칸을 화면 픽셀로 보내지 마세요** — 격자 번호입니다(지금 **열 0\~2 · 행 0\~3**,
+  행이 포지션 라인: 0 FW · 1 MF · 2 DF · 3 GK). `0~15` 밖이면 422.
+- `grid_col`·`grid_row` 는 **함께 보내거나 함께 비웁니다**(한쪽만 = 422). 둘 다
+  `null` = 등재는 남기고 판에서만 뺌.
+- 포지션을 칸에서 역산하지 마세요 — 손으로 정한 값이라 자리와 다를 수 있습니다.
+- 관리(저장·이동)는 **주장만**. 아니면 403.
+
+### 먼저 확인
+
+```bash
+git -C fastapi grep -n "squad_member.grid_col\|def set_formation\|def update_member" -- app
+grep -n "localStorage" www/src/lib/squadBoard.ts   # 안 걸리면 갈아 끼운 것
+```
+
+상세: `fastapi/docs/api-contract.md` **3-7절** (「홈 판 격자」 · 새 PATCH 둘)
+
+---
+
 ## 계약 문서
 
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린
