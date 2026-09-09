@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import re
 import subprocess
 import sys
@@ -474,3 +475,183 @@ class _StubRubric:
     motion = "pitching"
     version = "0.1"
     criteria = ()
+
+
+# -- 리포트 자리를 완료 보고에 싣는다 (미결 `paik` 11번) ----------------------
+#
+# 🔴 **여기 검사들이 막고 있는 것**: 분석은 끝나는데 백엔드가 리포트 파일을
+#    못 찾는 상태. 자리를 정하는 규칙은 `analyze_s3.report_targets` 안에만
+#    있어서 바깥에서는 계산할 수 없다. 워커가 안 실으면 화면은 영영 mock 이다.
+
+
+def _result_file(tmp_path, uri, name="result.json"):
+    p = tmp_path / name
+    p.write_text(json.dumps({"reports": [{"video": "s3://b/v.mp4",
+                                          "report_uri": uri}]}), encoding="utf-8")
+    return p
+
+
+def test_the_report_key_is_read_from_the_file_the_analysis_wrote(worker, tmp_path):
+    """버킷 상대 키로 꺼낸다 — 백엔드의 `storage_key` 와 같은 모양이다."""
+    f = _result_file(tmp_path, "s3://supersub-ai/reports/u1/v9/report.json")
+    assert worker.report_key_from(f, "supersub-ai") == "reports/u1/v9/report.json"
+
+
+def test_a_missing_or_broken_result_file_is_not_an_error(worker, tmp_path):
+    """🔴 자리를 못 실어도 **분석은 성공한 것이다.**
+
+    보고 자체를 막으면 작업이 `running` 으로 남는다 — 리포트를 못 찾는 것보다
+    나쁘다. 화면이 못 찾을 뿐이고 그 사실은 저널에 남는다.
+    """
+    assert worker.report_key_from(tmp_path / "없음.json", "supersub-ai") is None
+    broken = tmp_path / "broken.json"
+    broken.write_text("{ 이건 JSON 이 아니다", encoding="utf-8")
+    assert worker.report_key_from(broken, "supersub-ai") is None
+    empty = tmp_path / "empty.json"
+    empty.write_text(json.dumps({"reports": []}), encoding="utf-8")
+    assert worker.report_key_from(empty, "supersub-ai") is None
+
+
+def test_a_report_in_another_bucket_is_not_sent_as_a_key(worker, tmp_path):
+    """🔴 버킷 상대 키는 **그 버킷 안에서만** 뜻이 있다.
+
+    `SUPERSUB_REPORTS_URI` 가 다른 버킷을 가리키면 키만으로는 못 가리킨다.
+    틀린 자리를 싣느니 안 싣는다 — 백엔드가 없는 객체를 읽으려 든다.
+    """
+    f = _result_file(tmp_path, "s3://다른버킷/reports/u1/v9/report.json")
+    assert worker.report_key_from(f, "supersub-ai") is None
+
+
+def test_two_reports_are_ambiguous_so_nothing_is_sent(worker, tmp_path):
+    """작업 하나는 영상 하나다. 둘이면 어느 것이 이번 결과인지 안 정해진다."""
+    f = tmp_path / "two.json"
+    f.write_text(json.dumps({"reports": [
+        {"report_uri": "s3://supersub-ai/reports/u1/a/report.json"},
+        {"report_uri": "s3://supersub-ai/reports/u1/b/report.json"},
+    ]}), encoding="utf-8")
+    assert worker.report_key_from(f, "supersub-ai") is None
+
+
+def test_the_analysis_is_told_where_to_write_its_result(worker, cfg, tmp_path):
+    """워커가 자리 파일을 지정해야 자식이 적는다."""
+    cmd = worker.analyze_command(cfg, _job(), Path("r.yaml"), tmp_path / "r.json")
+    assert "--result-json" in cmd
+    assert str(tmp_path / "r.json") in cmd
+
+
+def test_a_succeeded_report_carries_the_key_and_a_failed_one_does_not(
+    worker, cfg, monkeypatch
+):
+    """🔴 실패한 작업에 자리를 실으면 **없는 파일을 가리킨다.**"""
+    sent = _intercept(worker, monkeypatch, [(204, b""), (204, b"")])
+    worker.report(cfg, "j1", "succeeded", report_key="reports/u1/v9/report.json")
+    worker.report(cfg, "j2", "failed", "품질 미달",
+                  report_key="reports/u1/v9/report.json")
+    assert sent[0][2] == {"status": "succeeded",
+                          "report_key": "reports/u1/v9/report.json"}
+    assert "report_key" not in sent[1][2]
+
+
+def test_a_finished_job_reports_the_place_the_analysis_actually_wrote(
+    worker, cfg, monkeypatch, tmp_path
+):
+    """끝에서 끝까지 — 자식이 적은 자리가 `PATCH` 본문에 실려 나가는가.
+
+    🔴 이것이 이 항목의 전부다. 앞의 조각들이 다 맞아도 여기서 안 실리면
+    백엔드는 여전히 리포트를 못 찾는다.
+    """
+    def analysis_that_writes_its_place(cmd, timeout, stopper):
+        path = Path(cmd[cmd.index("--result-json") + 1])
+        path.write_text(json.dumps({"reports": [
+            {"video": "s3://supersub-ai/videos/u1/clip.mp4",
+             "report_uri": "s3://supersub-ai/reports/u1/1b3c/report.json"},
+        ]}), encoding="utf-8")
+        return worker.Outcome(code=0, last_line="")
+
+    monkeypatch.setattr(worker, "run_analysis", analysis_that_writes_its_place)
+    monkeypatch.setattr(worker, "pick_rubric", lambda d, s: Path("r.yaml"))
+    sent = _intercept(worker, monkeypatch, [(204, b"")])
+
+    worker.process(cfg, _job(), worker.Stopper())
+
+    assert sent[-1][0] == "PATCH"
+    assert sent[-1][2] == {"status": "succeeded",
+                           "report_key": "reports/u1/1b3c/report.json"}
+
+
+def test_the_place_file_does_not_leak_between_jobs(worker, cfg, monkeypatch):
+    """🔴 앞 작업의 자리를 물려받으면 **실패한 작업이 남의 리포트를 가리킨다.**
+
+    작업마다 새 임시 폴더를 쓰는 것이 그것을 막는다. 두 번째 작업의 분석이
+    아무것도 안 적었는데 첫 번째의 값이 실리면 이 검사가 빨개진다.
+    """
+    seen: list[Path] = []
+
+    def analysis(cmd, timeout, stopper):
+        path = Path(cmd[cmd.index("--result-json") + 1])
+        seen.append(path)
+        if len(seen) == 1:
+            path.write_text(json.dumps({"reports": [
+                {"report_uri": "s3://supersub-ai/reports/u1/first/report.json"},
+            ]}), encoding="utf-8")
+        return worker.Outcome(code=0, last_line="")
+
+    monkeypatch.setattr(worker, "run_analysis", analysis)
+    monkeypatch.setattr(worker, "pick_rubric", lambda d, s: Path("r.yaml"))
+    sent = _intercept(worker, monkeypatch, [(204, b""), (204, b"")])
+
+    worker.process(cfg, _job(job_id="j1"), worker.Stopper())
+    worker.process(cfg, _job(job_id="j2"), worker.Stopper())
+
+    assert sent[0][2]["report_key"] == "reports/u1/first/report.json"
+    assert "report_key" not in sent[1][2]
+    assert seen[0] != seen[1], "두 작업이 같은 자리 파일을 썼다"
+
+
+def test_the_analysis_records_where_it_put_the_report(monkeypatch, tmp_path):
+    """자식 쪽 절반 — `--result-json` 에 자리를 적는가.
+
+    워커가 아무리 잘 읽어도 자식이 안 적으면 못 싣는다. 두 검사가 짝이다.
+    """
+    a3 = _load_script("analyze_s3")
+    monkeypatch.setattr(a3, "resolve_videos", lambda uri, region: ["s3://b/v/one.mp4"])
+    monkeypatch.setattr(a3, "load_rubric", lambda p: _StubRubric())
+    monkeypatch.setattr(
+        a3, "analyze_one",
+        lambda *a, **k: "s3://b/reports/u1/v9/report.json",
+    )
+    out = tmp_path / "result.json"
+    monkeypatch.setattr(sys, "argv", [
+        "analyze_s3.py", "s3://b/v/one.mp4", "--rubric", "r.yaml",
+        "--out", "s3://b/reports", "--result-json", str(out),
+    ])
+    a3.main()
+    written = json.loads(out.read_text(encoding="utf-8"))
+    assert written["reports"] == [
+        {"video": "s3://b/v/one.mp4",
+         "report_uri": "s3://b/reports/u1/v9/report.json"},
+    ]
+
+
+def test_a_failed_single_analysis_writes_no_place_file(monkeypatch, tmp_path):
+    """🔴 실패했는데 자리 파일이 남으면 **없는 리포트를 가리키게 된다.**
+
+    한 편짜리 호출은 SystemExit 가 그대로 올라가므로 파일 쓰는 자리에 못 온다.
+    그것이 워커의 「없으면 안 싣는다」와 짝을 이룬다.
+    """
+    a3 = _load_script("analyze_s3")
+    monkeypatch.setattr(a3, "resolve_videos", lambda uri, region: ["s3://b/v/one.mp4"])
+    monkeypatch.setattr(a3, "load_rubric", lambda p: _StubRubric())
+
+    def gate_failure(*a, **k):
+        raise SystemExit(2)
+
+    monkeypatch.setattr(a3, "analyze_one", gate_failure)
+    out = tmp_path / "result.json"
+    monkeypatch.setattr(sys, "argv", [
+        "analyze_s3.py", "s3://b/v/one.mp4", "--rubric", "r.yaml",
+        "--out", "s3://b/reports", "--result-json", str(out),
+    ])
+    with pytest.raises(SystemExit):
+        a3.main()
+    assert not out.exists()

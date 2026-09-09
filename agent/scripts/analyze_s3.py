@@ -193,8 +193,13 @@ def resolve_videos(uri: str, region: str | None) -> list[str]:
     return found
 
 
-def analyze_one(video: str, args, rubric, subject) -> None:
-    """영상 한 편을 분석해 리포트를 올린다."""
+def analyze_one(video: str, args, rubric, subject) -> str:
+    """영상 한 편을 분석해 리포트를 올리고, **올린 자리를 돌려준다.**
+
+    자리를 돌려주는 것은 워커가 완료 보고에 실어야 해서다(미결 `paik` 11번).
+    🔴 **부르는 쪽이 자리를 다시 계산하게 두지 않는다** — 규칙(`report_targets`)이
+    두 곳에 생기면 조용히 갈린다. 아는 쪽이 말해 주는 것이 맞다.
+    """
     # --- 내려받기 --------------------------------------------------------
     # 임시 디렉터리에 받고 **끝까지 살려 둔다.** 미리보기 렌더링이 원본을 다시
     # 디코딩하기 때문이다(PoseResult가 프레임을 들고 있지 않으므로). 붙들고
@@ -321,6 +326,7 @@ def analyze_one(video: str, args, rubric, subject) -> None:
     storage.upload_json(report, target, region=args.region)
     print(f"\n저장: {target}")
     print(json.dumps(report["timing"], ensure_ascii=False))
+    return target
 
 
 
@@ -354,6 +360,12 @@ def main() -> None:
     ap.add_argument(
         "--subject-at-ms", type=float, default=None,
         help="--subject-box 를 그린 영상 시각(밀리초). 박스를 주면 함께 주어야 한다",
+    )
+    ap.add_argument(
+        "--result-json", default=None, metavar="경로",
+        help="올린 리포트의 자리를 이 파일에 JSON 으로 남긴다. 워커가 완료 "
+             "보고에 실으려고 읽는다(미결 `paik` 11번). 🔴 stdout 을 긁지 "
+             "않는 것은 로그 문구가 바뀌면 조용히 깨지기 때문이다",
     )
     # 🔴 `--skip-analyzed` 를 **일부러 뺐다** (2026-09-08, 미결 jin 20번).
     #    `reports/` 유무로 "안 돈 것"을 가리는 것은 두 번째 큐였다. 큐의 정본은
@@ -393,10 +405,12 @@ def main() -> None:
 
     print(f"대상 {len(videos)}편")
     failed = 0
+    produced: list[dict[str, str]] = []
     for i, video in enumerate(videos, 1):
         print(f"\n[{i}/{len(videos)}] {video}")
         try:
-            analyze_one(video, args, rubric, subject)
+            produced.append({"video": video,
+                             "report_uri": analyze_one(video, args, rubric, subject)})
         except SystemExit as exc:
             # 🔴 영상을 **한 편만** 준 경우는 종료 코드를 그대로 올린다.
             #    워커(scripts/worker.py)가 이 코드 하나로 succeeded/failed 를
@@ -416,6 +430,14 @@ def main() -> None:
     # 🔴 여러 편 중 일부 실패는 0으로 끝낸다 — 스캔은 "돌 수 있는 것을 돌리는"
     #    작업이고, 한 편의 품질 미달로 스캔 전체가 실패가 되면 재시도가 무한히
     #    돈다. 한 편짜리 호출(위 raise)과는 뜻이 다르다.
+
+    # 🔴 **성공한 것만 적는다.** 한 편짜리 호출이 실패하면 위에서 그대로
+    #    올라가 여기 못 온다 — 그래서 실패한 작업의 파일은 아예 안 생기고,
+    #    워커는 "없으면 안 싣는다"로 읽으면 된다.
+    if args.result_json:
+        Path(args.result_json).write_text(
+            json.dumps({"reports": produced}, ensure_ascii=False), encoding="utf-8"
+        )
 
 
 if __name__ == "__main__":

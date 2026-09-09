@@ -38,6 +38,7 @@ import os
 import signal
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.error
@@ -180,7 +181,37 @@ def claim(cfg: Config) -> dict | None:
     raise RuntimeError(f"claim 이 {status} 를 냈다: {body[:200]!r}")
 
 
-def report(cfg: Config, job_id: str, status: str, reason: str | None = None) -> bool:
+def report_key_from(result_path: Path, bucket: str) -> str | None:
+    """분석이 남긴 자리 파일에서 **버킷 상대 키**를 꺼낸다 (미결 `paik` 11번).
+
+    🔴 **자리를 여기서 계산하지 않는다.** 규칙(`analyze_s3.report_targets`)이
+    두 곳에 생기면 조용히 갈린다 — 아는 쪽이 파일로 말해 주고 여기는 읽기만
+    한다. stdout 을 긁지 않는 것도 같은 이유다(로그 문구가 바뀌면 깨진다).
+
+    없거나·비었거나·모양이 다르면 **None 이다.** 자리를 못 실어도 분석은
+    성공한 것이라 보고 자체를 막지 않는다 — 화면이 리포트를 못 찾을 뿐이다.
+    """
+    try:
+        raw = json.loads(result_path.read_text(encoding="utf-8"))
+        reports = raw["reports"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    if len(reports) != 1:
+        # 작업 하나는 영상 하나다. 둘 이상이면 어느 것이 이번 결과인지
+        # 정해지지 않으므로 **아무것도 안 싣는다** — 틀린 자리보다 낫다.
+        log(f"리포트 자리가 {len(reports)}건이라 싣지 않는다")
+        return None
+    uri = str(reports[0].get("report_uri", ""))
+    prefix = f"s3://{bucket}/"
+    if not uri.startswith(prefix):
+        # 리포트를 다른 버킷에 두면 버킷 상대 키로는 가리킬 수 없다.
+        log(f"리포트가 버킷 {bucket} 밖이라 키로 못 싣는다: {uri}")
+        return None
+    return uri[len(prefix):]
+
+
+def report(cfg: Config, job_id: str, status: str, reason: str | None = None,
+           report_key: str | None = None) -> bool:
     """결과를 보고한다. 보고가 안 되면 작업이 `running` 인 채로 남는다.
 
     claim 과 달리 **재시도한다.** 같은 것을 두 번 보고하면 409 로 돌아올 뿐
@@ -192,6 +223,10 @@ def report(cfg: Config, job_id: str, status: str, reason: str | None = None) -> 
     payload: dict[str, str] = {"status": status}
     if reason:
         payload["failure_reason"] = reason[:FAILURE_REASON_MAX]
+    # 🔴 성공한 작업에만 싣는다 — 실패했으면 가리킬 리포트가 없다.
+    #    받는 칸은 정어진 님의 `FinishJobSchema` 다 (미결 `paik` 11번).
+    if report_key and status == "succeeded":
+        payload["report_key"] = report_key
 
     for attempt in range(1, 4):
         try:
@@ -271,7 +306,8 @@ class Stopper:
             self.child.terminate()
 
 
-def analyze_command(cfg: Config, job: dict, rubric: Path) -> list[str]:
+def analyze_command(cfg: Config, job: dict, rubric: Path,
+                    result_json: Path | None = None) -> list[str]:
     """자식 프로세스의 명령줄.
 
     🔴 **`analyze_s3.py` 를 별도 프로세스로 부른다.** import 해서 안에서 돌리면
@@ -300,6 +336,9 @@ def analyze_command(cfg: Config, job: dict, rubric: Path) -> list[str]:
         cmd += ["--side", job["side"]]
     if cfg.region:
         cmd += ["--region", cfg.region]
+    # 리포트가 어디 놓였는지를 파일로 받는다 (미결 `paik` 11번).
+    if result_json is not None:
+        cmd += ["--result-json", str(result_json)]
     return cmd
 
 
@@ -407,23 +446,35 @@ def process(cfg: Config, job: dict, stopper: Stopper) -> None:
 
     log(f"루브릭 {rubric.name}")
     started = time.time()
-    try:
-        outcome = run_analysis(
-            analyze_command(cfg, job, rubric), cfg.analyze_timeout, stopper
-        )
-    except Exception as exc:  # noqa: BLE001 — 실행 자체가 안 된 경우
-        log(f"분석을 실행하지 못했다: {type(exc).__name__}: {exc}")
-        report(cfg, job_id, "failed", f"분석 실행 실패: {type(exc).__name__}: {exc}")
-        return
+    # 자식이 리포트 자리를 여기 적는다. 작업마다 새로 만들어 **앞 작업의 값을
+    # 물려받지 않게** 한다 — 물려받으면 실패한 작업이 남의 리포트를 가리킨다.
+    with tempfile.TemporaryDirectory(prefix="supersub-job-") as tmp:
+        result_json = Path(tmp) / "result.json"
+        try:
+            outcome = run_analysis(
+                analyze_command(cfg, job, rubric, result_json),
+                cfg.analyze_timeout, stopper,
+            )
+        except Exception as exc:  # noqa: BLE001 — 실행 자체가 안 된 경우
+            log(f"분석을 실행하지 못했다: {type(exc).__name__}: {exc}")
+            report(cfg, job_id, "failed",
+                   f"분석 실행 실패: {type(exc).__name__}: {exc}")
+            return
 
-    elapsed = time.time() - started
-    if outcome.code == 0 and not outcome.note:
-        log(f"작업 {job_id} 성공 ({elapsed:.0f}초)")
-        report(cfg, job_id, "succeeded")
-    else:
-        reason = failure_reason(outcome)
-        log(f"작업 {job_id} 실패 ({elapsed:.0f}초) — {reason}")
-        report(cfg, job_id, "failed", reason)
+        elapsed = time.time() - started
+        if outcome.code == 0 and not outcome.note:
+            key = report_key_from(result_json, cfg.bucket)
+            if key is None:
+                # 🔴 성공했는데 자리를 못 실은 것은 **드러낸다.** 화면은
+                #    리포트를 못 찾고, 저널에 아무 말도 없으면 원인을 못 좁힌다.
+                log(f"작업 {job_id} 성공했지만 리포트 자리를 못 실었다")
+            log(f"작업 {job_id} 성공 ({elapsed:.0f}초)"
+                + (f" — 리포트 {key}" if key else ""))
+            report(cfg, job_id, "succeeded", report_key=key)
+        else:
+            reason = failure_reason(outcome)
+            log(f"작업 {job_id} 실패 ({elapsed:.0f}초) — {reason}")
+            report(cfg, job_id, "failed", reason)
 
 
 # --- 루프 -----------------------------------------------------------------
