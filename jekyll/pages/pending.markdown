@@ -4576,8 +4576,61 @@ football/inside_pass · football/instep_shot
 종목이 섞여 있어 `sport_code` 와 중복됩니다. 정상호 님은 **이 목록이 정본이 맞는지만**
 확인해 주시면 됩니다.
 
-- 상세: 미결 `ho` 17번 「답변 (2026-09-04)」 의 라 항목 · `fastapi/docs/worker-interface.md`
-- **담당**: 박민호(부록 D 수정 여부) · 정상호(동작 코드 목록 확인) · **제기**: 정어진 · **기한**: 스프린트 3 (급하지 않음)
+#### ✅ 확인했습니다 — 정본 맞습니다. 다만 **목록이 하나 빠졌고, 단독 키는 위험합니다** (2026.09.09, 정상호)
+
+**⑴ 목록이 낡았습니다 — 5개가 아니라 6개입니다.** 적어 주신 뒤에 **야구 타격**
+(`baseball/batting`, draft)이 들어왔습니다. 지금 정본은 이렇습니다:
+
+| key | sport | motion | status |
+|---|---|---|---|
+| `baseball/pitching` | baseball | `pitching` | **active** |
+| `baseball/batting` | baseball | `batting` | draft ← **빠져 있던 것** |
+| `basketball/jump_shot` | basketball | `jump_shot` | **active** |
+| `basketball/layup` | basketball | `layup` | draft |
+| `football/instep_shot` | football | `instep_shot` | **active** |
+| `football/inside_pass` | football | `inside_pass` | draft |
+
+이 표를 옮겨 적지 마시고 **명령으로 뽑아 쓰세요** — 또 낡습니다.
+
+```
+cd agent && uv run python -c "import sys;sys.path.insert(0,'src');\
+from supersub_agent.scoring import discover_rubrics;\
+[print(f'{k}\t{v.status}') for k,v in sorted(discover_rubrics('rubrics').items())]"
+```
+
+**⑵ `motion` 을 코드로 쓰는 것은 맞습니다. 🔴 다만 단독 키로 두지 마세요.**
+
+지금 `motion` 6개가 전역에서 안 겹치는 것은 **우연이지 보장이 아닙니다.**
+`shot`·`serve` 처럼 여러 종목에 자연스럽게 들어갈 이름이 있습니다. B안
+참조 테이블의 키를 `motion` 하나로 두면 겹치는 순간 **한 행이 두 루브릭을
+가리키고**, 그러면 농구 영상이 축구 루브릭으로 채점되면서 **그 사실이 값에
+안 남습니다** — 이 항목이 막으려던 바로 그 사고입니다.
+
+**권고는 `(sport_code, motion_code)` 복합 키**입니다. B안 자체에는 동의합니다
+(자유 문자열이면 `football_instep_shot` 과 `instep_shot` 이 섞인다는 판단이 맞습니다).
+
+> 🔴 **`jin` 1번 A안과 헷갈리지 마세요.** 지표에서 종목을 뗀 근거는 「지표는
+> 물리량이다」였는데 **동작은 물리량이 아닙니다.** 같은 이유로 제가 `jin` 23번의
+> 항목별 등급 코드도 `grade.{sport}.{motion}.{criterion_id}` 로 냈습니다 — 축이
+> 종목이 아니라 **루브릭**이라는 그쪽 구역 1번의 지적과 같은 결론입니다.
+
+**⑶ 어휘를 지키는 검사가 없었습니다 — 넣었습니다.**
+
+| 검사 | 막는 것 |
+|---|---|
+| `test_the_motion_vocabulary_is_the_pair_not_the_bare_motion` | `motion` 이 종목을 넘어 겹치는 날 **거기서 걸립니다.** 겹침을 금지하는 것이 아니라, 그때 쌍으로 갈지 이름을 바꿀지 정하게 하는 자리입니다 |
+| `test_the_filename_matches_the_declared_sport_and_motion` | 파일명 ≠ `<sport>_<motion>`. 「파일명은 종목이 중복된다」는 판단이 서려면 파일명이 실제로 그 모양이어야 하는데 **강제하는 것이 없었습니다** |
+
+**둘 다 일부러 깨뜨려 확인했습니다** — 농구 `motion` 을 `instep_shot` 으로 바꾸니
+첫 검사가, 파일명을 바꾸니 둘째가 실패했습니다. 원복 후 350건 통과.
+
+| | |
+|---|---|
+| 확인 | `cd agent && uv run pytest tests/test_scoring.py -q` — 35건 |
+| 하지 말 것 | 🔴 `motion` 을 **단독 기본키**로 두지 마세요 · 위 표를 문서에 복사하지 마세요(명령으로 뽑으세요) |
+
+- 상세: 미결 `ho` 17번 「답변 (2026-09-04)」 의 라 항목 · `fastapi/docs/worker-interface.md` · `jin` 23번(등급 코드가 같은 쌍을 씁니다)
+- **담당**: 박민호(부록 D 수정 여부) · ~~정상호(동작 코드 목록 확인)~~ **✅ 확인·정정했습니다 (2026.09.09)** · **제기**: 정어진 · **기한**: 스프린트 3 (급하지 않음)
 
 ### 18. 분석 워커 — 백엔드 쪽은 냈습니다. 폴링 루프를 부탁드립니다 (정상호 님, 2026-09-04) ✅ 해소 (2026.09.07)
 
