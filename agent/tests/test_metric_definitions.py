@@ -94,6 +94,54 @@ def test_grade_codes_do_not_collide_across_sports():
     )
 
 
+def test_every_graded_criterion_also_has_a_stat_code():
+    """🔴 레이더 축(`breakdown[].stat`)도 적재된다 (`jin` 25번).
+
+    읽기 경로를 DB 조립으로 정해서(계약 3-1), 등급만 시드하고 `stat` 을
+    빠뜨리면 `POST /analyses` 가 그 코드에서 `UNKNOWN_METRIC_CODE` 로 거부한다.
+    **에이전트 테스트는 다 통과하고 실서버 적재에서만 터진다** — 그것이
+    `jin` 23번에서 한 번 났던 형태다.
+    """
+    rows = export.build_rows(include_draft=True)
+    grades = {r["code"].split(".", 1)[1] for r in rows if r["kind"].startswith("grade")}
+    stats = {r["code"].split(".", 1)[1] for r in rows if r["kind"].startswith("stat")}
+    assert grades, "등급 행이 하나도 안 나왔다"
+    assert grades == stats, (
+        "등급과 stat 의 항목 목록이 다르다 — 한쪽만 시드되면 적재가 거부된다\n"
+        f"  등급에만: {sorted(grades - stats)}\n  stat 에만: {sorted(stats - grades)}"
+    )
+
+
+def test_stat_rows_are_a_hundred_point_scale_not_a_grade():
+    """🔴 `stat` 은 0~100 연속값이고 등급은 0/1/2 다 — 단위가 같아도 다른 값이다.
+
+    총점은 **등급의 가중합**이지 `stat` 의 평균이 아니다. 이 둘을 같은 것으로
+    읽으면 화면의 레이더가 리포트의 등급과 다른 이야기를 한다.
+    """
+    stats = [r for r in export.build_rows(include_draft=True)
+             if r["kind"].startswith("stat")]
+    assert stats
+    for r in stats:
+        assert r["code"].startswith("stat."), r["code"]
+        assert r["unit"] == "score", r
+
+
+def test_no_code_outgrows_the_backend_column():
+    """🔴 `metric_definition.code` 는 `String(50)` 이다 (`jin` 25번).
+
+    지금 가장 긴 것이 48자라 **여유가 2자뿐**이다. 항목 id 나 동작 이름이
+    조금만 길어지면 넘고, 넘은 채 적재하면 잘려서 **다른 코드와 충돌한다.**
+    그때는 백엔드에 컬럼 확장이 **먼저** 들어가야 한다.
+    """
+    rows = export.build_rows(include_draft=True)
+    longest = max(rows, key=lambda r: len(r["code"]))
+    assert len(longest["code"]) <= export.CODE_LIMIT, (
+        f"code 가 {export.CODE_LIMIT}자를 넘는다: "
+        f"{longest['code']} ({len(longest['code'])}자)\n"
+        "  → 백엔드 컬럼 확장 마이그레이션이 먼저 필요하다 (`jin` 25번)"
+    )
+
+
 def test_rows_are_unique_and_complete():
     rows = export.build_rows(include_draft=False)
     codes = [r["code"] for r in rows]

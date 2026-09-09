@@ -43,6 +43,10 @@ from supersub_agent.scoring import load_rubric  # noqa: E402
 DEFS = ROOT / "contracts" / "metric_definitions.yaml"
 RUBRIC_DIR = ROOT / "rubrics"
 
+# 백엔드 `metric_definition.code` 의 폭 (`String(50)`, `jin` 25번). 여기서
+# 넘는지를 보고해야 정어진 님이 컬럼 확장을 **먼저** 넣을 수 있다.
+CODE_LIMIT = 50
+
 
 def load_definitions() -> dict:
     return yaml.safe_load(DEFS.read_text(encoding="utf-8"))
@@ -79,19 +83,35 @@ def build_rows(include_draft: bool = False) -> list[dict]:
             "kind": "judgment", "note": j.get("description", "").strip(),
         })
 
-    fmt = defs["grade_code_format"]
-    unit = defs["grade_unit"]
+    # 항목별 **등급**(0/1/2)과 **연속 점수**(0~100)를 같은 축으로 낸다.
+    # 🔴 둘은 다른 값이라 행도 둘이다 — 총점은 등급의 가중합이지 stat 의
+    #    평균이 아니다(`jin` 25번 · 계약 3-1).
+    grade_fmt = defs["grade_code_format"]
+    grade_unit = defs["grade_unit"]
+    stat_fmt = defs["stat_code_format"]
+    stat_unit = defs["stat_unit"]
     for r in rubrics(include_draft):
+        draft = "" if r.is_active else " (draft)"
         for c in r.criteria:
-            code = fmt.format(sport=r.sport, motion=r.motion, criterion_id=c.id)
             # 🔴 라벨에 종목을 함께 적는다. 코드당 한 행이라 「마무리」만으로는
             #    농구 것인지 축구 것인지 화면에서 못 가른다.
+            base_label = f"{r.label} · {c.name}"
             rows.append({
-                "code": code,
-                "label": f"{r.label} · {c.name}",
-                "unit": unit,
-                "kind": "grade" + ("" if r.is_active else " (draft)"),
+                "code": grade_fmt.format(sport=r.sport, motion=r.motion,
+                                         criterion_id=c.id),
+                "label": base_label,
+                "unit": grade_unit,
+                "kind": "grade" + draft,
                 "note": f"0~2 등급. 가중치 {c.weight}",
+            })
+            rows.append({
+                "code": stat_fmt.format(sport=r.sport, motion=r.motion,
+                                        criterion_id=c.id),
+                "label": base_label,
+                "unit": stat_unit,
+                "kind": "stat" + draft,
+                "note": "0~100 연속 점수 (레이더 축). 🔴 총점은 이 값의 "
+                        "평균이 아니라 등급의 가중합이다",
             })
 
     seen: dict[str, dict] = {}
@@ -154,6 +174,17 @@ def main() -> None:
     print(f"\n총 {len(rows)}행"
           + ("" if args.include_draft else " (active 루브릭만 — draft 까지는"
                                            " --include-draft)"))
+
+    # 🔴 `metric_definition.code` 가 `String(50)` 이다 (`jin` 25번). `grade.`·
+    #    `stat.` 접두어가 붙은 코드가 넘으면 백엔드가 **컬럼 확장 마이그레이션을
+    #    먼저** 넣어야 한다. 넘고 나서 적재에서 잘리면 다른 코드와 충돌한다.
+    longest = max(rows, key=lambda r: len(r["code"]))
+    n = len(longest["code"])
+    print(f"가장 긴 code: {n}자 — {longest['code']}")
+    if n > CODE_LIMIT:
+        print(f"🔴 {CODE_LIMIT}자를 넘는다 — 백엔드에 컬럼 확장이 먼저 필요하다.")
+    else:
+        print(f"   `String({CODE_LIMIT})` 안에 든다 (여유 {CODE_LIMIT - n}자).")
 
 
 if __name__ == "__main__":

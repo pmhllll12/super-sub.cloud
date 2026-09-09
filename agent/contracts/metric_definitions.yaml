@@ -150,3 +150,15 @@ judgments:
 grade_code_format: "grade.{sport}.{motion}.{criterion_id}"
 grade_unit: score
 grade_range: [0, 2]
+
+# 🔴 항목별 **연속 점수**(`breakdown[].stat`) — 레이더 차트의 축이다 (`jin` 25번).
+# 등급과 **같은 축으로** 만든다: 종목·동작이 코드에 들어가고, 라벨·`--include-draft`
+# 규칙도 같다. 읽기 경로를 DB 조립으로 정해서(계약 3-1) 이 코드가 없으면
+# `POST /analyses` 가 `UNKNOWN_METRIC_CODE` 로 거부한다.
+#
+# 🔴 **등급과 다른 값이다.** `stat` 은 0~100 연속값(「이상 구간에서 얼마나
+# 떨어졌나」)이고 등급은 0/1/2 다. **총점은 등급의 가중합이지 `stat` 의 평균이
+# 아니다** — 같은 항목에 행이 둘인 이유가 이것이다.
+stat_code_format: "stat.{sport}.{motion}.{criterion_id}"
+stat_unit: score
+stat_range: [0, 100]
