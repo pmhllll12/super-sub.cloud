@@ -5929,6 +5929,34 @@ env 는 앱과 동일)를 두거나, `supersub-cd.timer` 재배포 훅에
 
 - **담당**: 박민호(시크릿 교체·digest 삭제·마이그레이션 훅) · 사용자(JWT 타이밍·GitHub Secrets) · 정어진(Dockerfile — 이 커밋으로 완료) · **제기**: 박민호
 
+#### 🔴🔴 사고 보고 (2026.09.09) — 제 k3s 설치 때문에 `<API 호스트>`이 몇 시간 동안 안 됐습니다
+
+**정어진이 오늘 새벽(01:07 UTC, 이 인스턴스가 뜨자마자) 이미 nginx+Certbot으로
+`<API 호스트>`을 실제 서비스로 올려둔 상태였습니다** — 이걸 저는 몰랐고,
+`fastapi/docs/deployment.md`엔 "80·443 닫혀있음"이라고만 적혀 있어 이미 지난
+인스턴스 기준의 낡은 정보였습니다. 그 위에 제가 k3s를 설치하면서 사고가
+났습니다.
+
+| | |
+|---|---|
+| 1단계 원인 | k3s가 기본 설치하는 **Traefik(ingress)이 80·443을 같이 차지**했습니다. 사용자분이 브라우저로 `<서버 IP>/docs`에 접속했을 때 뜬 `404 page not found`가 사실 nginx가 아니라 **Traefik의 응답**이었습니다 — 그 순간부터 진짜 API 트래픽이 nginx 대신 Traefik으로 새고 있었을 가능성이 있습니다 |
+| 1단계 조치 | `/etc/rancher/k3s/config.yaml`에 `disable: [traefik, servicelb]` 추가 후 k3s 재시작 |
+| 🔴 2단계 원인(제가 만든 사고) | 재시작 뒤 **완전히 먹통**이 됐습니다(`curl`이 타임아웃). `tcpdump`로 원인을 추적한 결과, k3s의 `traefik` Service가 지워지다 만 채로(`finalizer` 걸림) 남아서, kube-router가 "이 IP(`172.31.27.61` — **하필 호스트 자체의 사설 IP와 같음**):80·443엔 이제 받아줄 게 없다"며 **명시적 `REJECT`(`ICMP port unreachable`)** 규칙을 걸어놨고, 이게 nginx가 쓰는 같은 IP·포트까지 막아버렸습니다 |
+| 2단계 조치 | 막힌 `finalizer`를 강제로 지우고(`kubectl patch svc traefik --type=merge -p '{"metadata":{"finalizers":[]}}'`) Service를 완전히 삭제 → `REJECT` 규칙 소멸 |
+| 최종 확인 | `curl https://<API 호스트>/health` → `200`, `{"status":"ok","env":"production","db_configured":true,"stub":false}` — 실제 프로덕션 응답 복구 확인 |
+| 영향 범위 | k3s 설치 시점부터 방금 고치기 전까지 **외부에서 `<API 호스트>`으로 오는 요청이 정상 처리 안 됐을 가능성이 있습니다.** 정확한 시작 시각은 특정 못 했습니다(k3s 설치 자체가 이 세션 진행 중 여러 단계에 걸쳐 있었습니다) |
+
+🔴 **교훈을 `www/docs/2026-09-09-K3S-harness.md`에도 남겼습니다** — 앞으로
+**이미 다른 서비스(nginx 등)가 host 네트워크를 쓰고 있는 서버에 k3s를 설치할
+땐 설치 직후 곧바로 `disable: [traefik, servicelb]`를 넣습니다.** k3s의
+기본 LoadBalancer(ServiceLB)가 **노드 자신의 IP를 "external IP"로 그대로
+쓰기 때문에**, 호스트가 이미 쓰는 포트와 충돌하는 게 예외가 아니라 기본
+동작입니다.
+
+**정어진께 죄송합니다.** 미리 여쭤보지 않고 진행한 것이 이 사고로 이어졌습니다.
+실제 서비스 영향이 있었던 시간대에 요청이 실패한 사용자가 있었는지, 로그로
+확인이 필요하시면 말씀해 주세요.
+
 ### 12. 이 WSL의 로컬 Postgres — DB 통합 테스트 막던 원인, 고쳐졌습니다 ✅ 해소 (2026.09.09)
 
 **min 1번 회신**에서 "이 환경에서 `password authentication failed for user
