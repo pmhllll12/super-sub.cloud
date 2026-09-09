@@ -309,6 +309,16 @@ def analyze_one(video: str, args, rubric, subject) -> str:
         # 아는 것은 fastapi 뿐이다 — 그쪽에서 갱신하거나 리포트를 DB로 옮길 때
         # 정리한다(`jin` 24번에 적어 두었다).
         "source_video": video,
+        # 🔴 **어느 영상의 리포트인지를 봉투가 스스로 말한다** (미결 `jin` 24번 (1)).
+        # `source_video` 는 「저장」 뒤에 죽는다 — `keep` 이 원본을 옮기고
+        # `videos/` 쪽을 지우기 때문이다. 그러면 **리포트 안에서 어느 영상
+        # 것인지 가리키는 값이 하나도 안 남고**, 읽는 쪽이 S3 키를 파싱해
+        # 되짚어야 한다. 자리를 정하는 규칙이 두 곳에 생기는 것이라 `paik`
+        # 11번에서 배제한 형태와 같다 — **아는 쪽이 적어 준다.**
+        #
+        # 배치·평가 실행에는 `video_id` 가 없다(백엔드 작업이 아니다).
+        # 그때는 `null` 이다 — 모르면 지어내지 않는다.
+        "video_id": args.video_id,
         "analyzed_at": stamp,
         "code_version": code_version(),
         "rubric": {

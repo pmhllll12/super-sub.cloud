@@ -5344,7 +5344,36 @@ DB로는 못 잡으므로 **여기만은 S3 수명주기 규칙이 맞다고 봅
 **태그 없는 객체 1일 만료** 같은 형태면 `keep` 흐름과 안 부딪힙니다(등록된 것은
 `POST /videos` 가 태그를 달아 규칙에서 빠집니다). 판단은 그쪽 몫입니다.
 
-- 관련: `www/src/components/analysis/AnalysisStage.tsx`(`confirmSubject`·`saveToServer`·`saveReportToProfile`) · `lib/uploadClip.ts` · `lib/savedReports.ts` · 계약 3-6 · 같은 구역 6·7번(대상 박스·리포트 조회) · `ho` 9번(4K) · `ho` 27번(닫음)
+#### ✅ (1) 조각 — **봉투가 스스로 말하게 했습니다** (2026.09.09, 정상호)
+
+`source_video` 가 「저장」 뒤에 죽는 것은 그대로입니다. 대신 **리포트 봉투에
+`video_id` 를 넣었습니다.**
+
+```json
+{ "source_video": "s3://…/videos/<user_id>/…",   // keep 뒤에는 죽는다
+  "video_id": "1b3c…",                            // ← 넣었다. 이걸로 되짚는다
+  "analyzed_at": "…" }
+```
+
+**왜 이 형태인가.** `source_video` 를 `keep` 뒤에 갱신하는 길도 있는데, **옮긴
+뒤의 자리를 아는 것은 fastapi 뿐**이라 그쪽 일이 됩니다. 반면 `video_id` 는
+분석 시점에 이미 알고 있는 값이고, 그것만 있으면 **읽는 쪽이 낡은 URI 를
+되살릴 필요 자체가 없습니다.**
+
+🔴 **없으면 S3 키를 파싱해야 했습니다.** 리포트가 `reports/<user_id>/<video_id>/`
+에 놓이니 경로에서 뽑을 수는 있지만, 그러면 **자리 규칙이 읽는 쪽에도 생깁니다** —
+`paik` 11번에서 배제한 바로 그 형태입니다. 아는 쪽이 적어 줍니다.
+
+- 배치·평가 실행에는 `video_id` 가 없어 **`null`** 입니다. 모르면 지어내지
+  않습니다 — 빈 문자열이나 파일명으로 채우면 없는 행을 가리킵니다
+- 검사: `test_the_report_says_which_video_it_is_about`. **일부러 필드를 빼서
+  실패하는 것을 확인했습니다**
+- 읽는 쪽 지도는 `agent/report-contract.md`
+
+**(2) 등록 안 된 고아 객체는 그대로 남아 있습니다** — S3 수명주기 규칙이
+맞다고 본 판단도 그대로이고, 그쪽 몫입니다.
+
+- 관련: `www/src/components/analysis/AnalysisStage.tsx`(`confirmSubject`·`saveToServer`·`saveReportToProfile`) · `lib/uploadClip.ts` · `lib/savedReports.ts` · 계약 3-6 · 같은 구역 6·7번(대상 박스·리포트 조회) · `ho` 9번(4K) · `ho` 27번(닫음) · **`agent/report-contract.md`**
 - **담당**: 정어진(백엔드 수명 주기) · 정상호(리포트 키 정렬·위 (1)) · **제기**: 정어진(사용자 요청) · **기한**: 스프린트 3 (조각별로 나눔)
 
 ## min (박민호)

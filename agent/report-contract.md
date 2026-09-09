@@ -28,7 +28,8 @@
 
 | 키 | 무엇 |
 |---|---|
-| `source_video` | 분석 시점의 원본 S3 URI. 🔴 **「저장」 뒤에는 낡습니다** — `keep` 이 원본을 옮기고 `videos/` 쪽을 지웁니다(`jin` 24번) |
+| `video_id` | **어느 영상의 리포트인가.** 되짚을 때 이것을 쓰세요 — 🔴 **S3 키를 파싱하지 마세요.** 배치·평가 실행에는 없어서 `null` 입니다(백엔드 작업이 아닙니다) |
+| `source_video` | 분석 시점의 원본 S3 URI. 🔴 **「저장」 뒤에는 낡습니다** — `keep` 이 원본을 옮기고 `videos/` 쪽을 지웁니다(`jin` 24번). 그래서 위 `video_id` 가 있습니다 |
 | `analyzed_at` · `code_version` | 언제·어느 코드로 냈나. 계약 자리에는 타임스탬프가 없어 **재분석이 앞의 것을 덮으므로**, 「언제 낸 것인가」는 이 값이 답합니다 |
 | `rubric` | `sport` · `motion` · `version` · `impact_limb` · `impact_event` |
 | `swing_side` | `auto`\|`left`\|`right` |

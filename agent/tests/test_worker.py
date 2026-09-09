@@ -721,3 +721,32 @@ def test_an_empty_focus_envelope_is_all_three_empty(monkeypatch):
         assert a3.focus_envelope(_StubRubric(), value) == {
             "requested": [], "applied": [], "unknown": []
         }
+
+
+def test_the_report_says_which_video_it_is_about(monkeypatch, tmp_path):
+    """🔴 봉투가 스스로 어느 영상인지 말해야 한다 (미결 `jin` 24번 (1)).
+
+    `source_video` 는 「저장」 뒤에 죽는다 — `keep` 이 원본을 `reports/` 로
+    옮기고 `videos/` 쪽을 지운다. `video_id` 가 없으면 그 순간 **리포트 안에서
+    어느 영상 것인지 가리키는 값이 하나도 안 남고**, 읽는 쪽이 S3 키를 파싱해
+    되짚어야 한다 — 자리 규칙이 두 곳에 생기는 형태다(`paik` 11번에서 배제했다).
+
+    배치·평가 실행에는 `video_id` 가 없으므로 그때는 `None` 이다. 🔴 모르면
+    지어내지 않는다 — 빈 문자열이나 파일명으로 채우면 없는 행을 가리킨다.
+    """
+    a3 = _load_script("analyze_s3")
+    import ast
+    import inspect
+
+    # `analyze_one` 은 모듈 최상위 함수라 getsource 가 0열부터 준다 —
+    # dedent·cleandoc 을 걸면 오히려 들여쓰기가 깨진다.
+    tree = ast.parse(inspect.getsource(a3.analyze_one))
+    keys = {
+        k.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Dict)
+        for k in node.keys
+        if isinstance(k, ast.Constant) and isinstance(k.value, str)
+    }
+    assert "video_id" in keys, "리포트 봉투에 video_id 가 없다"
+    assert "source_video" in keys
