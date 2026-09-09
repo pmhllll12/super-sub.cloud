@@ -5,7 +5,7 @@ import { withAuth } from '@/server/handler'
 /** api-contract.md 3-6절 — 클립 업로드 1단계. 올릴 자리(S3 사전 서명 URL)를 받는다. */
 export async function POST(req: NextRequest) {
   return withAuth(req, async (token) => {
-    let body: { content_type?: string; size_bytes?: number }
+    let body: { content_type?: string; size_bytes?: number; filename?: string }
     try {
       body = await req.json()
     } catch {
@@ -14,9 +14,13 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       )
     }
-    if (typeof body.content_type !== 'string' || typeof body.size_bytes !== 'number') {
+    if (
+      typeof body.content_type !== 'string' ||
+      typeof body.size_bytes !== 'number' ||
+      typeof body.filename !== 'string'
+    ) {
       return NextResponse.json(
-        { error: { code: 'BAD_REQUEST', message: 'content_type과 size_bytes가 필요합니다.' } },
+        { error: { code: 'BAD_REQUEST', message: 'content_type·size_bytes·filename이 필요합니다.' } },
         { status: 400 },
       )
     }
