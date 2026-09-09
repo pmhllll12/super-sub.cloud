@@ -6338,6 +6338,25 @@ push 방식·코드 문제가 아니라 **Vercel 계정(무료 플랜)의 빌드
 옮길지, 아니면 k3s는 새 워크로드 전용으로 옆에 둘지는 **정어진 판단이 필요합니다**
 — 배포 방식(`docs/deployment.md`)의 정본이 그쪽 소유라서입니다.
 
+#### ✅ 추가 진행 (2026.09.09) — 백엔드 API를 파드로 띄워 트라이얼
+
+**"다른 서비스"의 첫 대상으로 백엔드(`supersub-api`)를 일단 파드로 올려봤습니다.**
+기존 systemd 서비스는 손대지 않고 **옆에 나란히** 띄운 것뿐입니다.
+
+| | |
+|---|---|
+| 이미지 | `~/k3s-trial/Dockerfile`(서버에만 있음, **`fastapi/` 저장소엔 커밋 안 함**) — `python:3.14-slim` 위에 `requirements.lock.txt` 그대로 설치. `docker build` → `k3s ctr images import`로 클러스터에 반입 |
+| 설정 주입 | 기존 `.env`를 그대로 `kubectl create secret generic supersub-api-env --from-env-file=...`로 옮김. **값은 여기 적지 않았습니다** |
+| 배포 | `~/k3s-trial/deployment.yaml` — `hostNetwork: true`(DB가 `localhost`만 듣고 있어서, 파드가 호스트 네트워크를 그대로 씀), 포트는 **8080**(기존 8000과 안 겹치게) |
+| 확인 | `sudo k3s kubectl get pods` → `Running` · `curl localhost:8080/health` → `200`(DB 연결 포함) · **동시에** 기존 `curl localhost:8000/health`도 `200` — 서로 영향 없음 |
+
+🔴 **이건 트라이얼이지 전환이 아닙니다.** 실제 트래픽은 여전히 8000(systemd)이
+받고 있고, 8080 파드는 "떠는지 확인"용으로 켜둔 상태입니다. 계속 켜 둘지,
+지울지(`kubectl delete deployment supersub-api-trial`), 아니면 이걸 발판으로
+`fastapi/`에 정식 `Dockerfile`을 커밋하고 트래픽을 옮길지는 **정어진 판단이
+필요합니다** — 특히 Dockerfile을 저장소에 정식으로 둘 위치·이미지 태그/레지스트리
+전략은 배포 관례(`docs/deployment.md`)에 맞춰 그가 정하는 게 맞다고 봤습니다.
+
 - **담당**: 정어진 · **제기**: 박민호 · **기한**: 확인되는 대로
 
 ## paik (백성검)
