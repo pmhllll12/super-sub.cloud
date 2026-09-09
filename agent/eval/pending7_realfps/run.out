@@ -1,0 +1,36 @@
+=== 10_penalty1.avi · 원본 24.00fps (football_instep_shot.yaml) ===
+  원본 24.00fps             35점 (D) · 실효 24.0fps · 61프레임
+  1/2 → 12.00fps         🔴 실패 — InsufficientQuality: 임팩트 추정 프레임(30)이 분석 가능 구간(0~31) 경계에 있음. 동작 전후가 잘린 
+  1/3 → 8.00fps           18점 (D) · 실효 8.0fps · 22프레임  Δ-17점
+                         등급 바뀐 항목 2개: ['follow_through', 'hip_rotation']
+
+=== 11_freekick.avi · 원본 23.98fps (football_instep_shot.yaml) ===
+  원본 23.98fps             35점 (D) · 실효 23.98fps · 66프레임
+  1/2 → 11.99fps          48점 (D) · 실효 11.99fps · 35프레임  Δ+13점
+                         등급 바뀐 항목 3개: ['follow_through', 'swing_knee_extension', 'trunk_lean']
+  1/3 → 7.99fps           35점 (D) · 실효 7.99fps · 24프레임  Δ +0점
+
+=== 12_penalty.avi · 원본 29.97fps (football_instep_shot.yaml) ===
+  원본 29.97fps             30점 (D) · 실효 29.97fps · 116프레임
+  1/2 → 14.98fps          55점 (C) · 실효 14.98fps · 60프레임  Δ+25점 🔴
+                         등급 바뀐 항목 1개: ['swing_knee_extension']
+  1/3 → 9.99fps           48점 (D) · 실효 9.99fps · 40프레임  Δ+18점
+                         등급 바뀐 항목 2개: ['hip_rotation', 'swing_knee_extension']
+
+=== bball_shot.mp4 · 원본 23.98fps (basketball_jump_shot.yaml) ===
+  원본 23.98fps             62점 (C) · 실효 23.98fps · 146프레임
+  1/2 → 11.99fps         100점 (A) · 실효 11.99fps · 75프레임  Δ+38점 🔴
+                         등급 바뀐 항목 1개: ['release_arm_extension']
+  1/3 → 7.99fps           53점 (C) · 실효 7.99fps · 50프레임  Δ -9점
+                         등급 바뀐 항목 1개: ['leg_drive']
+
+==================================================================
+변형 8개 (클립 4 × 하향 2) — 그중 게이트 반려 1개
+  [성공 7개 기준] 총점 |Δ| 평균 17.1점 · 최악 38점
+                   부호 있는 평균 +9.7점  (올라간 것 4 · 내려간 것 2)
+  최종 등급 변경 2/7 (29%)
+  항목 등급 변경 6/7 (86%)
+
+🔴 합격선은 여기서 정하지 않는다 — 기준선이다(사전 등록 2절).
+🔴 pending7_fps 의 37% 를 대체하지 않는다 — 다른 것을 잰다.
+exit=0
