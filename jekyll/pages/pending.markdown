@@ -6197,7 +6197,26 @@ draft 가 승격되면 www 시험이 **먼저 빨개집니다.**
 - 관련: jin 17번(동작 코드) · paik 6번(대상 박스) · `agent/rubrics/*.yaml`
 - **담당**: 정상호(뜻 판단) · 정어진(실을 자리) · **제기**: 백성검 · **기한**: 스프린트 3
 
-### 9. 스쿼드 판의 **배치**를 서버에 둘 자리가 없습니다 (2026-09-08 신설)
+### 9. 스쿼드 판의 **배치**를 서버에 둘 자리가 없습니다 (2026-09-08 신설) ✅ 해소 (2026.09.09)
+
+> **안 A로 넣었습니다** (정어진, 커밋 `cbe7f16` · 마이그레이션 `6a0f3d23662c`).
+> - `squad.formation` `varchar(8)` NULL — 판 크기(`"3:3"`·`"5:5"`·`"7:7"`).
+>   `PATCH /api/v1/teams/{team_id}/squad` `{formation}` 로 저장(주장만).
+> - `squad_member.grid_col` · `grid_row` `smallint` NULL — 격자 칸. 🔴 픽셀 아님,
+>   `0~15` 밖이면 422. **both-or-neither**(한쪽만 = 422, 둘 다 null = 판에서만 뺌).
+> - `PATCH /api/v1/teams/{team_id}/squad/members/{member_id}`
+>   `{position_code, grid_col?, grid_row?}` — 이동 + **포지션 바꾸기**(계약 3-7
+>   「아직 없는 것」도 함께 해소). 남의 스쿼드 등재는 `404 MEMBER_NOT_FOUND`.
+> - `POST .../members` 에 `grid_col`/`grid_row` 선택 인자(등재하며 판에 올리기).
+> - 응답에 `formation` · 멤버별 `grid_col`/`grid_row`.
+> - 🔴 **격자 뜻의 정본은 계약 3-7 「홈 판 격자」** — 지금 3열(0\~2) × 4행(0\~3),
+>   행이 포지션 라인(0 FW · 1 MF · 2 DF · 3 GK). 격자 크기가 바뀌면 리매핑 필요.
+> - 확인: `grep -n "localStorage" www/src/lib/squadBoard.ts` 가 안 걸리면 프론트가
+>   갈아 끼운 것. `pytest -q` 658 passed. 클라이언트 반영 안내는 `client-contract-changes.md` 25번.
+>
+> ⚠️ **넣기·빼기 배선은 이미 계약에 있었습니다**(3-7 `POST/DELETE .../members`) —
+> 백성검 님이 배치 저장이 없어 프론트에서 미뤄 둔 것이라 하셨으니, 이제 다
+> 열렸습니다.
 
 홈의 스쿼드 판이 이제 **고를 수 있고 옮길 수 있습니다**(사용자 요청) —
 판 크기(3:3 · 5:5 · 7:7), 카드가 선 **칸**, 사람이 **손으로 정한 포지션**.
