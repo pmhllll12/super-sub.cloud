@@ -5,9 +5,12 @@ import type {
   AdminUserDetail,
   AdminUserListResult,
   AuthToken,
+  FeaturedVideo,
   Match,
   MercenaryCandidate,
   MyVideo,
+  Position,
+  PublicVideo,
   Squad,
   PlayerCard,
   PublicPlayerCard,
@@ -92,6 +95,34 @@ export const fastapiBackend: Backend = {
     })
   },
 
+  updateVideo(token, videoId, input) {
+    return callFastApi<MyVideo>(`/videos/${encodeURIComponent(videoId)}`, {
+      method: 'PATCH',
+      token,
+      body: input,
+    })
+  },
+
+  listPublicVideos(token) {
+    return callFastApi<PublicVideo[]>('/videos/public', { method: 'GET', token })
+  },
+
+  getFeaturedVideo(token, cardSlug) {
+    return callFastApi<FeaturedVideo>(
+      `/cards/${encodeURIComponent(cardSlug)}/featured-video`,
+      { method: 'GET', token },
+    )
+  },
+
+  listPositions(token, params) {
+    // 🔴 `searchMatches` 와 같은 이유로 **빈 값을 실어 보내지 않는다** —
+    // `sport_code=` 는 "전체"가 아니라 없는 종목이라 422 로 튕긴다.
+    const qs = params?.sport_code
+      ? `?${new URLSearchParams({ sport_code: params.sport_code })}`
+      : ''
+    return callFastApi<Position[]>(`/positions${qs}`, { method: 'GET', token })
+  },
+
   searchMatches(token, params) {
     const q = new URLSearchParams()
     // 🔴 빈 값을 실어 보내지 않는다 — `sport_code=` 는 "전체"가 아니라
@@ -152,6 +183,21 @@ export const fastapiBackend: Backend = {
     return callFastApi<Squad>(
       `/teams/${encodeURIComponent(teamId)}/squad/members/${encodeURIComponent(memberId)}`,
       { method: 'DELETE', token },
+    )
+  },
+
+  setSquadFormation(token, teamId, formation) {
+    return callFastApi<Squad>(`/teams/${encodeURIComponent(teamId)}/squad`, {
+      method: 'PATCH',
+      token,
+      body: { formation },
+    })
+  },
+
+  updateSquadMember(token, teamId, memberId, body) {
+    return callFastApi<Squad>(
+      `/teams/${encodeURIComponent(teamId)}/squad/members/${encodeURIComponent(memberId)}`,
+      { method: 'PATCH', token, body },
     )
   },
 

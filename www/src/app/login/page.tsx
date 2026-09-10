@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { apiErrorMessage, apiPost } from '@/lib/api/client'
+import { useRateLimitLock } from '@/lib/api/rateLimit'
 import Field from '@/components/ui/Field'
 import PillButton from '@/components/ui/PillButton'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
@@ -18,9 +19,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  /* 🔴 **429 뒤에는 다시 안 보낸다**(계약 1번). 기다릴 시간은 서버가 준
+     `Retry-After` 다 — 자체 타이머를 두지 않는다. */
+  const limit = useRateLimitLock()
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
+    // 잠긴 동안 눌러도 나가지 않는다 — 단추를 막아 두지만 Enter 로도 들어온다.
+    if (limit.locked) return
     setError(null)
     setBusy(true)
     try {
@@ -28,8 +34,8 @@ export default function LoginPage() {
       router.push('/home')
       router.refresh()
     } catch (err) {
-      // message 가 아니라 code 로 분기해야 할 곳이 생기면 여기서 나눈다.
-      setError(apiErrorMessage(err))
+      // 429 는 잠금이 제 문구(남은 초)를 내므로 에러 줄을 겹쳐 쓰지 않는다.
+      if (!limit.lockFrom(err)) setError(apiErrorMessage(err))
     } finally {
       setBusy(false)
     }
@@ -64,15 +70,17 @@ export default function LoginPage() {
           minLength={8}
           revealable
         />
-        {error && (
+        {(error || limit.note) && (
           <p role="alert" className="text-sm" style={{ color: 'var(--ss-error)' }}>
-            {error}
+            {limit.note ?? error}
           </p>
         )}
-        <PillButton type="submit" disabled={busy} className="mt-2 w-full">
+        <PillButton type="submit" disabled={busy || limit.locked} className="mt-2 w-full">
           로그인
         </PillButton>
-        <GoogleSignInButton onError={setError} />
+        {/* 🔴 구글 버튼은 **감추거나 덮지 않는다**(§6 — 가리면 구글이 클릭을
+            통째로 무시한다). 잠금은 버튼이 아니라 **보내는 쪽**에서 건다. */}
+        <GoogleSignInButton onError={setError} limit={limit} />
       </form>
     </AuthShell>
   )
