@@ -670,12 +670,13 @@ S3 의 분석 산출물(`report.json`)을 서버가 받아 점수만 걷어내�
    파이프라인이 `features` 에 스칼라(초)로 방출하므로 `metric_definition` 에 코드가
    있어야 하고, 없으면 적재가 통째로 `UNKNOWN_METRIC_CODE` 로 거부된다.
 3. `metric_definition` 시드 규모: 측정 12 + `total_score` 1 + 항목별 등급 16 +
-   항목별 `stat` 16 = **약 45개.** 코드·`label`·`unit` 의 정본과 산출 스크립트는
-   미결 `jin` 23번의 정상호 회신에 있다(`metric_definitions.yaml` ·
-   `export_metric_definitions.py`). 🔴 **부분 시드 금지** — 전부 없으면
-   `POST /analyses` 가 실서버에서 전부 거부된다.
+   항목별 `stat` 16 = **45개.** 코드·`label`·`unit` 의 정본과 산출 스크립트는
+   `agent/contracts/metric_definitions.yaml` · `agent/scripts/export_metric_definitions.py`
+   (미결 `jin` 23·25번). 🔴 **부분 시드 금지** — 전부 없으면 `POST /analyses` 가
+   실서버에서 전부 거부된다. **✅ 시드 완료** (2026-09-10, 마이그레이션
+   `ca31a2180b54`). draft 루브릭(73행)은 승격 시 그 루브릭의 행을 함께 넣는다.
 
-**읽기 엔드포인트(`GET` `.../report`)의 구체 규격은 시드가 들어온 뒤 이 절에 추가한다.**
+**읽기 엔드포인트(`GET` `.../report`)의 구체 규격은 적재 경로(흐름 B)와 함께 이 절에 추가한다.**
 
 ### 🔴 지표 코드 실태 — 지금 스키마로는 루브릭을 담을 수 없다 (2026-09-01 조사)
 
@@ -1999,9 +2000,10 @@ POST /videos ──> analysis_job(queued)
 
 ### 아직 없는 것
 
-- 🔴 **적재(`POST /analyses`)** — 미결 `jin` 1번(적재 규격)이 먼저다.
-  `metric_definition` 이 **0 행**이라 지금 만들면 외래키에서 전부 거부된다.
-  그때까지 워커의 산출물은 `reports/` 의 JSON 이다
+- 🔴 **적재(`POST /analyses`)** — 규격은 3-1 절에서 정해졌고(적재 규격 = 미결
+  `jin` 1번 A안, 2026-09-08), `metric_definition` 도 45행 시드됐다(마이그레이션
+  `ca31a2180b54`). 남은 것은 적재 경로(흐름 B) 구현이다. 그때까지 워커의 산출물은
+  `reports/` 의 JSON 이다
 - **재시도** — `failed` 를 사람이 다시 `queued` 로 되돌리는 경로. (워커가 죽어서
   생긴 실패는 아래 회수가 **한 번은 자동으로** 되살린다. 여기서 말하는 것은
   분석이 실제로 실패한 건이다)
