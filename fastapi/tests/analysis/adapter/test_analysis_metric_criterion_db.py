@@ -107,6 +107,7 @@ def test_breakdown_항목이_전부_적재된다(metric, db_session):
             out_of_band="",
             evidence="디딤발이 공 옆에 안정적으로 놓였습니다.",
             metric_ref="plant_knee_angle_at_impact",
+            view_dependent="grade",
             skipped=False,
         )
     )
@@ -122,6 +123,7 @@ def test_breakdown_항목이_전부_적재된다(metric, db_session):
     assert row.band == "150~170"
     assert row.evidence.startswith("디딤발")
     assert row.metric_ref == "plant_knee_angle_at_impact"
+    assert row.view_dependent == "grade"
     assert row.skipped is False
 
 

@@ -71,6 +71,10 @@ class AnalysisMetricCriterionOrm(Base):
     evidence: Mapped[str | None] = mapped_column(Text, nullable=True)
     # 그 항목이 근거로 삼은 지표 코드. 사람이 읽을 이름·단위는 `metric_definition`.
     metric_ref: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # 이 등급이 촬영 방향에 의존했나(미결 `ho` 37·38). `""`·`"metric"`·`"grade"`
+    # 셋뿐이고 `"grade"` 면 반대편에서 찍혔으면 등급이 달랐다는 뜻. 🔴 `band` 와
+    # 같은 등급 — 개발 확인용이고 선수 화면에 내지 않는다. `skipped` 행은 NULL.
+    view_dependent: Mapped[str | None] = mapped_column(String(10), nullable=True)
     skipped: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False
     )

@@ -73,6 +73,7 @@ _ENVELOPE = {
                 "stat": 88.5,
                 "evidence": "디딤발이 공 옆에 안정적으로 놓였습니다.",
                 "metric_ref": "plant_knee_angle_at_impact",
+                "view_dependent": "",
             },
             {
                 "criterion_id": "trunk_lean",
@@ -86,6 +87,7 @@ _ENVELOPE = {
                 "stat": None,  # stat 없으면 stat.* 행을 안 만든다
                 "evidence": "상체가 뒤로 젖혀졌습니다.",
                 "metric_ref": "trunk_forward_lean_deg_at_impact",
+                "view_dependent": "grade",  # 미결 37 — 촬영 방향에 갈린다
             },
         ],
         "skipped": [
@@ -137,10 +139,13 @@ def test_breakdown_과_skipped_가_criterion_행으로():
     assert by_id["plant_knee_flexion"].skipped is False
     assert by_id["plant_knee_flexion"].title == "흔들리지 않는 축"
     assert by_id["plant_knee_flexion"].grade == 2
+    assert by_id["plant_knee_flexion"].view_dependent is None  # "" → None
+    assert by_id["trunk_lean"].view_dependent == "grade"  # 미결 `ho` 38
 
     sk = by_id["plant_foot_position"]
     assert sk.skipped is True
     assert sk.grade is None and sk.title is None and sk.evidence is None
+    assert sk.view_dependent is None  # skipped 항목엔 없다
     assert sk.weight == Decimal("0.15")  # 루브릭 원값
 
 

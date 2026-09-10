@@ -65,6 +65,7 @@ def _envelope(*, sport="football", motion="instep_shot", score=71):
                     "stat": 88.5,
                     "evidence": "안정적으로 놓였습니다.",
                     "metric_ref": "plant_knee_angle_at_impact",
+                    "view_dependent": "grade",
                 },
             ],
             "skipped": [
@@ -159,6 +160,16 @@ def test_리포트가_네_테이블에_적재된다(job, db_session):
     assert report.provisional is True
     assert report.schema_version == "1.1"
     assert report.rubric_sport == "football" and report.rubric_motion == "instep_shot"
+
+    vd = db_session.execute(
+        text(
+            "select c.view_dependent from analysis_metric_criterion c "
+            "join analysis_metric am on c.analysis_metric_id = am.id "
+            "where am.analysis_job_id = :j and c.criterion_id = 'plant_knee_flexion'"
+        ),
+        {"j": str(job["job_id"])},
+    ).scalar()
+    assert vd == "grade"  # 미결 `ho` 38 — 촬영 방향 의존 표시
 
 
 def test_재분석은_앞의_것을_덮는다(job, db_session):

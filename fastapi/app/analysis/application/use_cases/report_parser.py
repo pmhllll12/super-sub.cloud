@@ -57,6 +57,8 @@ class CriterionRow:
     out_of_band: str = ""
     evidence: str | None = None
     metric_ref: str | None = None
+    # `""`·`"metric"`·`"grade"` (미결 `ho` 38). skipped 항목엔 없다 → None.
+    view_dependent: str | None = None
 
 
 @dataclass(frozen=True)
@@ -150,6 +152,7 @@ def parse_report(raw: bytes) -> ParsedReport:
                 out_of_band=str(item.get("out_of_band") or ""),
                 evidence=item.get("evidence") or None,
                 metric_ref=item.get("metric_ref") or None,
+                view_dependent=item.get("view_dependent") or None,
             )
         )
         # 항목별 등급·연속점수도 수치라 `analysis_metric_value` 로 간다(계약 3-1).
