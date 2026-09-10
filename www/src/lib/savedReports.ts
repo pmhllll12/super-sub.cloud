@@ -11,8 +11,8 @@ import type { VideoReport } from '@/server/backend'
  *   읽기  `GET /videos/{id}/report`
  *
  * 🔴 **모양을 바꾸는 일은 여기서만 한다.** 서버가 주는 것은 항목 배열
- * (`breakdown[]`)이고 화면이 그리는 것은 특징 · 호칭 목록이다. 부르는 쪽
- * (`AnalysisStage` · `MyVideos`)은 아래 셋만 알고 그 사이는 모른다 —
+ * (`breakdown[]`)이고 화면이 그리는 것은 칭호+문장 짝 목록이다. 부르는 쪽
+ * (`AnalysisStage` · `MyVideos`)은 아래 넷만 알고 그 사이는 모른다 —
  * `lib/published.ts` 가 걷힌 방식과 같다.
  *
  * 🔴 **저장을 따로 하지 않는다.** 리포트는 분석이 끝나면 서버에 적재되므로
@@ -29,9 +29,13 @@ import type { VideoReport } from '@/server/backend'
  */
 export type SavedReport = {
   summary: string
-  traits: string[]
-  /** 받은 것만. 못 받은 호칭을 미달 표식으로 남기지 않는다(4장). */
-  titles: string[]
+  /**
+   * 항목별 **칭호+문장 짝**(`ho` 24번). 🔴 **따로 떼지 않는다** — `title`
+   * 없이 `evidence`만 있으면 선수는 그것이 칭찬인지 지적인지 모른다.
+   * `title`이 없는 항목도 있다(호칭은 서버가 채운 것만이라 못 받을 수
+   * 있다) — 그때도 문장은 그대로 그린다.
+   */
+  points: { title: string | null; evidence: string }[]
   /** 판단의 근거가 된 장면. 시각은 수치가 아니라 찾아가는 자리다. */
   scenes: { at: string; what: string }[]
   /** 분석한 날(YYYY-MM-DD). 언제 본 리포트인지는 알아야 한다. */
@@ -65,14 +69,17 @@ function atText(seconds: number): string {
  *
  * 🔴 **호칭은 서버가 채운 것만 그린다.** 「어느 등급부터 받은 호칭인가」는
  * 계약에 없어서, 우리가 `grade === 2` 같은 선을 그으면 그게 곧 지어내는
- * 것이다 — `title` 이 있으면 받은 것으로 본다(미결로 올려 둔다).
+ * 것이다 — `title` 이 있으면 받은 것으로 본다(미결로 올려 둔다). 없어도
+ * 그 항목의 `evidence`는 버리지 않는다 — 칭호를 못 받았다고 문장까지
+ * 사라지면 안 된다.
  */
 export function toSavedReport(r: VideoReport): SavedReport {
   const live = r.breakdown.filter((b) => !b.skipped)
   return {
     summary: r.summary,
-    traits: live.map((b) => b.evidence).filter((t): t is string => !!t),
-    titles: live.map((b) => b.title).filter((t): t is string => !!t),
+    points: live
+      .filter((b) => !!b.evidence)
+      .map((b) => ({ title: b.title ?? null, evidence: b.evidence as string })),
     scenes: r.scenes.map((s) => ({ at: atText(s.at_seconds), what: s.label })),
     savedAt: r.analyzed_at.slice(0, 10),
   }
