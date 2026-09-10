@@ -7874,6 +7874,21 @@ BackOff 재시작 반복이고, 매 시도가 **프로덕션과 같은 호스트
 즉 Docker Hub `pmhllll12/supersub:latest` 가 **레포에 없는 실험 브랜치 빌드**입니다
 (k3s 이미지 스토어에 `pmhllll12/supersub` 다이제스트가 7개+ 쌓여 있습니다).
 
+##### 🔴 정정 (2026-09-10 오후) — 그 마이그레이션은 이제 있습니다
+
+위 grep 은 **min 매칭 기능이 `main` 에 병합되기 전**에 돌린 것이었습니다.
+`fastapi/alembic/versions/28148877afc0_add_mercenary_matching_fields.py` 가 그
+SQL(`ADD COLUMN skill_embedding VECTOR(768)` + HNSW 인덱스)이고, 지금 `main`·`jin`
+에 있습니다. 그러니 「레포에 없는 실험 빌드」가 아니라 **`main` 이미지도 이
+initContainer 에서 똑같이 죽습니다** — 붙는 DB 에 `vector` 확장이 없으면.
+
+같은 에러를 **CI(`backend-tests.yml`)도** 냈고 `jin` `3ba93c3` 으로 고쳤습니다 —
+이미지를 `pgvector/pgvector:pg18` 로 바꾸고 마이그레이션 전에
+`CREATE EXTENSION IF NOT EXISTS vector` 스텝을 넣었습니다. k3s 쪽 처방도 같은
+모양입니다: **initContainer 가 마이그레이션을 돌리기 전에** 그 파드가 붙는 DB 에
+확장이 있어야 합니다(`deployment.md` §1 — 슈퍼유저, 호스트 DB 에 한 번).
+아래 「만족해야 할 성질」의 둘째 줄이 그대로 유효합니다.
+
 #### 만족해야 할 성질
 
 | | |
