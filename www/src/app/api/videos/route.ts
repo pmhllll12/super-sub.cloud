@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
     let body: {
       sport_code?: string
       storage_key?: string
+      filename?: string
       duration_ms?: number
       width?: number
       height?: number

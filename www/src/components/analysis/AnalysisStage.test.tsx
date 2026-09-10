@@ -687,6 +687,7 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     expect(JSON.parse(uploadUrlCall![1]!.body as string)).toEqual({
       content_type: 'video/mp4',
       size_bytes: 1,
+      filename: 'clip.mp4',
     })
 
     expect(String(s3Call![0])).toBe('https://bucket.s3.example.com/abc.mp4?sig=1')

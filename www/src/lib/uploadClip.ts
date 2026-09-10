@@ -65,7 +65,7 @@ export async function uploadClip(opts: {
   const spot = await fetch('/api/videos/upload-url', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content_type: file.type, size_bytes: file.size }),
+    body: JSON.stringify({ content_type: file.type, size_bytes: file.size, filename: file.name }),
   })
   if (!spot.ok) throw new Error(await readError(spot, '업로드 자리를 못 받았습니다.'))
   const { storage_key, upload_url } = (await spot.json()) as {
@@ -87,6 +87,7 @@ export async function uploadClip(opts: {
     body: JSON.stringify({
       sport_code: sportCode,
       storage_key,
+      filename: file.name,
       ...meta,
       ...(analyze === false ? { analyze: false } : {}),
     }),

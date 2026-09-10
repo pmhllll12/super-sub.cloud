@@ -9,4 +9,12 @@ __pycache__
 *.pyc
 .git
 .pytest_cache
+.mypy_cache
+.ruff_cache
 tests
+# Dockerfile 이 명시적으로 COPY 하므로 아래는 없어도 되지만, `COPY . .` 로
+# 되돌아가더라도 이미지에 안 들어가게 방어로 둔다.
+docs
+scripts
+deploy
+*.md

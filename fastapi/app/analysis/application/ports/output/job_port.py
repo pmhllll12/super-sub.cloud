@@ -41,7 +41,11 @@ class JobPort(ABC):
 
     @abstractmethod
     def finish(
-        self, job_id: UUID, status: str, failure_reason: str | None
+        self,
+        job_id: UUID,
+        status: str,
+        failure_reason: str | None,
+        report_key: str | None = None,
     ) -> str | None:
         """`running` 인 작업을 끝낸다.
 
@@ -50,4 +54,8 @@ class JobPort(ABC):
 
         `finished_at` 은 여기서 찍는다. 워커가 보낸 시각을 믿으면 시계가 어긋난
         장비에서 소요 시간이 음수가 된다.
+
+        `report_key` 는 워커가 만든 리포트를 가리키는 버킷 상대 S3 키다
+        (미결 `paik` 11번). 인터랙터가 `succeeded` 가 아니면 `None` 으로 걸러
+        넘긴다 — 여기서는 받은 값을 그대로 쓴다.
         """

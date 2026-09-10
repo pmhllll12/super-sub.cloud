@@ -9,6 +9,8 @@ from app.analysis.application.dtos.video_dto import (
     AdminVideoListResult,
     AdminVideosQuery,
     DeleteVideoCommand,
+    FeaturedVideoResult,
+    GetFeaturedVideoCommand,
     GetPlaybackUrlCommand,
     KeepVideoCommand,
     MyVideosQuery,
@@ -57,6 +59,12 @@ class GetPlaybackUrlUseCase(ABC):
     @abstractmethod
     def __call__(self, command: GetPlaybackUrlCommand) -> PlaybackUrlResult:
         """재생용 사전 서명 URL. 공개 클립이거나 자기 클립일 때만, 아니면 404."""
+
+
+class GetFeaturedVideoUseCase(ABC):
+    @abstractmethod
+    def __call__(self, command: GetFeaturedVideoCommand) -> FeaturedVideoResult:
+        """어떤 사람의 대표 영상. 로그인하면 누구나. 대표가 없으면 404 `NO_FEATURED_VIDEO`."""
 
 
 class DeleteVideoUseCase(ABC):

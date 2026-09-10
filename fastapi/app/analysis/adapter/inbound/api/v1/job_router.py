@@ -67,6 +67,9 @@ def finish_job(
     """
     use_case(
         FinishJobCommand(
-            job_id=job_id, status=body.status, failure_reason=body.failure_reason
+            job_id=job_id,
+            status=body.status,
+            failure_reason=body.failure_reason,
+            report_key=body.report_key,
         )
     )

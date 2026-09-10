@@ -127,6 +127,59 @@ class TestRegister:
         assert row.reject_reason is None
         assert row.status == "queued"
 
+    def test_지정_박스가_작업_행에_저장된다(self, db_client, db_session, uploader):
+        """미결 `paik` 6번 — 「이 사람으로 분석」 이 `analysis_job` (JSON 컬럼)에 남는다."""
+        key = _upload(db_client, uploader)
+        res = _register(
+            db_client, uploader, key,
+            subject_box=[0.39, 0.35, 0.12, 0.4], subject_at_ms=4_200,
+        )
+        assert res.status_code == 201, res.text
+        video_id = uuid.UUID(res.json()["id"])
+
+        box, at = db_session.execute(
+            text(
+                "SELECT subject_box, subject_at_ms FROM analysis_job"
+                " WHERE video_id = :id"
+            ),
+            {"id": video_id},
+        ).one()
+        assert box == [0.39, 0.35, 0.12, 0.4]
+        assert at == 4_200
+
+    def test_집중_항목이_작업_행에_저장된다(self, db_client, db_session, uploader):
+        """미결 `paik` 8번 — `analysis_job.focus`(JSON 컬럼) 에 남는다."""
+        key = _upload(db_client, uploader)
+        res = _register(
+            db_client, uploader, key, focus=["follow_through", "trunk_alignment"]
+        )
+        assert res.status_code == 201, res.text
+        video_id = uuid.UUID(res.json()["id"])
+
+        stored = db_session.execute(
+            text("SELECT focus FROM analysis_job WHERE video_id = :id"),
+            {"id": video_id},
+        ).scalar_one()
+        assert stored == ["follow_through", "trunk_alignment"]
+
+    def test_analyze_false_면_지정_박스는_버려진다(
+        self, db_client, db_session, uploader
+    ):
+        """작업 행이 없으니 담을 데가 없다 — 실패로 만들지는 않는다(201)."""
+        key = _upload(db_client, uploader)
+        res = _register(
+            db_client, uploader, key, analyze=False,
+            subject_box=[0.1, 0.1, 0.2, 0.2], subject_at_ms=100,
+        )
+        assert res.status_code == 201, res.text
+        left = db_session.execute(
+            text(
+                "SELECT count(*) FROM analysis_job WHERE video_id = :id"
+            ),
+            {"id": uuid.UUID(res.json()["id"])},
+        ).scalar_one()
+        assert left == 0
+
     def test_반려는_판정만_남고_작업은_안_생긴다(
         self, db_client, db_session, uploader
     ):
@@ -488,6 +541,80 @@ class TestProvisionalSweep:
         }
         assert queued not in swept_ids
         assert done in swept_ids
+
+
+class TestFeatured:
+    """「대표 영상」이 실제 컬럼·부분 유일 인덱스·조인으로 도는지 (미결 `paik` 10번)."""
+
+    def _clip(self, db_client, uploader):
+        key = _upload(db_client, uploader)
+        res = _register(db_client, uploader, key)
+        assert res.status_code == 201, res.text
+        return res.json()["id"]
+
+    def test_사람당_하나_부분_유일_인덱스가_지킨다(
+        self, db_client, db_session, uploader
+    ):
+        first = self._clip(db_client, uploader)
+        second = self._clip(db_client, uploader)
+
+        for vid in (first, second):
+            r = db_client.patch(
+                f"{V1}/videos/{vid}",
+                json={"is_featured": True},
+                headers=uploader["headers"],
+            )
+            assert r.status_code == 200, r.text
+
+        rows = db_session.execute(
+            text(
+                "SELECT id::text, is_featured FROM video WHERE user_id = :u"
+            ),
+            {"u": uploader["id"]},
+        ).all()
+        featured = [r.id for r in rows if r.is_featured]
+        assert featured == [second]   # 하나뿐, 그리고 마지막 것
+
+    def test_남의_대표를_카드_슬러그로_읽는다(self, db_client, db_session, uploader):
+        vid = self._clip(db_client, uploader)
+        assert db_client.patch(
+            f"{V1}/videos/{vid}",
+            json={"is_featured": True},
+            headers=uploader["headers"],
+        ).status_code == 200
+
+        card = db_client.post(f"{V1}/me/card", headers=uploader["headers"])
+        assert card.status_code in (200, 201), card.text
+        slug = card.json()["public_slug"]
+
+        # 다른 사람으로 로그인해서 읽는다.
+        other_email = f"viewer-{uuid.uuid4().hex[:12]}@super-sub.example"
+        db_client.post(
+            f"{V1}/auth/signup",
+            json={"email": other_email, "password": PASSWORD, "nickname": "보는이"},
+        )
+        tok = db_client.post(
+            f"{V1}/auth/login", json={"email": other_email, "password": PASSWORD}
+        ).json()["access_token"]
+
+        res = db_client.get(
+            f"{V1}/cards/{slug}/featured-video",
+            headers={"Authorization": f"Bearer {tok}"},
+        )
+        assert res.status_code == 200, res.text
+        body = res.json()
+        assert body["video_id"] == vid
+        assert body["url"].startswith("https://")
+
+    def test_대표가_없으면_404_다(self, db_client, uploader):
+        self._clip(db_client, uploader)   # 대표로 안 세움
+        card = db_client.post(f"{V1}/me/card", headers=uploader["headers"])
+        slug = card.json()["public_slug"]
+
+        res = db_client.get(
+            f"{V1}/cards/{slug}/featured-video", headers=uploader["headers"]
+        )
+        assert res.status_code == 404
 
 
 class TestConstraints:

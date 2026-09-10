@@ -5992,6 +5992,22 @@ ID·리소스 ID·공인 IP·API 호스트라 그 범위만 했습니다. 다만
 
 ### 23. `metric_definition` 을 누가·어떻게 채웁니까 — `POST /analyses` 착수 전에 필요합니다 (2026-09-08)
 
+> 🔴 **이건 `## jin` 구역의 23번입니다.** `## ho` 구역에도 23번(근거 문장 등급
+> 표기)이 있는데 **다른 항목**입니다. `agent/eval/pending23_evidence/` 는 그쪽입니다.
+
+#### 🔴 정상호 님 — 세션 시작하면 이걸 해 주세요 (2026-09-08, 사용자 지시)
+
+**답을 기다리지 말고 코드 목록을 실제로 뽑아 주십시오.** 아래가 만족되면 제(정어진)가
+바로 시드 마이그레이션을 씁니다.
+
+| | |
+|---|---|
+| 산출물 | `active` 루브릭(`agent/rubrics/*.yaml` 중 배포되는 것) 전체가 쓰는 지표 코드를 **`(code, label, unit)`** 로 모은 **커밋된 파일 한 개.** 경로·형식은 정상호 님이 정하시고(예: `agent/rubrics/metric_definitions.json` — `[{"code","label","unit"}]`), 가능하면 그 파일을 다시 만드는 스크립트도 함께(루브릭이 코드를 늘릴 때의 경로가 됨) |
+| 넘기는 법 | 그 파일을 `ho` 브랜치에 push하고 **이 항목에 `✅ 회신 (날짜)` 로 파일 경로 한 줄** 답니다. 그러면 제가 `op.bulk_insert` 마이그레이션을 만들어 배포합니다 |
+| 정상호 님이 직접 시드까지 원하시면 | `PUT /internal/metric-definitions`(워커 토큰) 를 내 드릴 수 있습니다 — 그게 낫다고 판단되면 이 항목에 적어 주세요. 기본은 시드-인-마이그레이션(저장소 관례)입니다 |
+
+---
+
 미결 1번 A안이 정해졌고 **스키마 반영도 끝났습니다**(`metric_definition` 에서
 `sport_code` 제거, `5db18b239336`). 이제 `POST /analyses` 적재(계약 3-1)를 붙일
 차례인데, 그 엔드포인트가 제출된 지표 코드를 `metric_definition` 에 대조합니다
@@ -6353,6 +6369,52 @@ DB로는 못 잡으므로 **여기만은 S3 수명주기 규칙이 맞다고 봅
 
 - 관련: `www/src/components/analysis/AnalysisStage.tsx`(`confirmSubject`·`saveToServer`·`saveReportToProfile`) · `lib/uploadClip.ts` · `lib/savedReports.ts` · 계약 3-6 · 같은 구역 6·7번(대상 박스·리포트 조회) · `ho` 9번(4K) · `ho` 27번(닫음) · **`agent/report-contract.md`**
 - **담당**: 정어진(백엔드 수명 주기) · 정상호(리포트 키 정렬·위 (1)) · **제기**: 정어진(사용자 요청) · **기한**: 스프린트 3 (조각별로 나눔)
+
+### 25. `metric_definition` 시드에 항목별 `stat` 코드를 추가해 주세요 — jin 23 후속 (2026-09-09)
+
+jin 23 회신에서 되물으신 둘("`stat` 도 적재하나" · "`impact_frame` 은 행인가
+필드인가")에 답합니다. 결정의 정본은 `fastapi/docs/api-contract.md` 3-1
+「✅ 결정 — 리포트 읽기 경로는 DB에서 조립한다 (2026-09-09)」입니다.
+
+- **`impact_frame`**: `metrics[]` **행**입니다(예시의 `frame_index` 필드 아님).
+  지금 yaml 에 넣어 두신 그대로면 됩니다 — 바꿀 것 없습니다.
+- **`stat`**: **적재합니다.** 읽기 경로를 (a) DB 조립으로 정해서, 레이더 축이 되는
+  항목별 연속값(0~100)도 `metric_definition` 에 코드가 있어야 `POST /analyses` 가
+  `UNKNOWN_METRIC_CODE` 로 거부하지 않습니다.
+
+| | 만족해야 할 성질 |
+|---|---|
+| stat 코드 산출 | 시드 행 산출물(지금은 `agent/scripts/export_metric_definitions.py`)이 **항목별 `stat` 코드도 낸다.** 형식은 등급과 같은 축 — `stat.{sport}.{motion}.{criterion_id}`, `unit` 은 `score`(0~100). 라벨은 등급 코드와 같은 규칙(`{루브릭 라벨} · {항목 이름}`). active 기준이고 `--include-draft` 동작도 등급과 동일하게 |
+| 코드 길이 보고 | 산출물에서 **가장 긴 `code` 의 글자 수**를 이 항목에 한 줄 적어 주세요. `metric_definition.code` 가 `String(50)` 이라, `grade.`·`stat.` 접두어가 붙은 코드가 50 을 넘으면 제가 **컬럼 확장 마이그레이션을 먼저** 넣어야 합니다(yaml 주석에 "접두어 붙으면 상한에 닿는다"고 적으셨습니다) |
+| 넘기는 법 | `ho` 에 push + 이 항목에 `✅ 회신` 로 한 줄(변경 요지 + 가장 긴 code 글자 수). 그러면 제가 `--json` 출력으로 `op.bulk_insert` 시드 마이그레이션을 만듭니다 |
+
+| | |
+|---|---|
+| 먼저 확인 | export 산출물에 `stat.` 접두 코드가 이미 나오면 하신 것이니 이 항목을 `✅ 회신` 으로 닫아 주세요 (`grep -n 'stat\.' agent/scripts/export_metric_definitions.py` 등으로) |
+| 하지 말 것 | 🔴 `stat` 라벨·단위를 백엔드가 지어내지 않도록 등급과 같은 규칙으로 루브릭에서 뽑아 주세요 · 🔴 `impact_frame` 을 목록에서 빼지 마세요(행으로 유지) |
+| 물려 있는 것 | jin 23(시드 마이그레이션) · min #9(리포트 화면) · `paik` 7. 이게 정해져야 시드가 ~45 행으로 완결되고 `POST /analyses` 가 실서버에서 안 거부됩니다 |
+| 상세 | `fastapi/docs/api-contract.md` 3-1 「✅ 결정 — 리포트 읽기 경로는 DB에서 조립한다」 |
+- **담당**: 정상호(stat 코드 산출) → 정어진(시드 마이그레이션) · **제기**: 정어진 · **기한**: jin 23 과 함께 (스프린트 3 초)
+
+### 26. `GET /positions` 를 냈습니다 — 포지션 하드코딩을 걷어 주세요 (2026-09-09) ✅ 냈습니다
+
+`GET /api/v1/positions?sport_code=` 를 냈습니다(정어진, 커밋은 이 항목이 든 것).
+지금 **세 화면이 포지션 목록을 각자 하드코딩**하고 있어(마이그레이션이 바꾸면
+조용히 낡음) 그 자리를 이걸로 갈아 끼우면 됩니다 — min 7 챗봇(`www/src/app/api/
+chat/route.ts` 시스템 프롬프트) · 스쿼드 등재 UI · 모집 등록 `needs[]` 선택.
+
+- 응답: `[{sport_code, code, label}]`, `sport_code` 순. 로그인하면 누구나.
+- 🔴 없는 `sport_code` 로 부르면 `422 UNKNOWN_SPORT`(빈 배열 아님, `GET /matches`
+  와 같은 판단). `code` 는 종목 안에서만 유일(야구 `C`·농구 `C` 는 다른 것).
+- 반영 안내: `fastapi/docs/client-contract-changes.md` **28번**. 규격: 계약 3-3절.
+- 스키마 변경 없음 — `position` 테이블은 이미 있었고 읽는 엔드포인트만 추가.
+
+| | |
+|---|---|
+| 확인 | `curl -H "$AUTH" $API/api/v1/positions?sport_code=football` → `GK·DF·MF·FW` · `grep -rn "골키퍼.*수비수\|GK.*DF.*MF" www/src` 가 안 걸리면 프론트가 갈아 끼운 것 |
+| 하지 말 것 | 🔴 하드코딩 목록을 **양쪽에 공존**시키지 않기 — 한쪽만 고치면 어느 게 맞는지 모르게 됨 |
+
+- **담당**: 백성검(www 3곳 반영) · **제기**: 정어진 · **기한**: 스프린트 3 (급하지 않음 — 지금 하드코딩도 동작함)
 
 ## min (박민호)
 
@@ -7099,7 +7161,41 @@ push 방식·코드 문제가 아니라 **Vercel 계정(무료 플랜)의 빌드
 옮길지, 아니면 k3s는 새 워크로드 전용으로 옆에 둘지는 **정어진 판단이 필요합니다**
 — 배포 방식(`docs/deployment.md`)의 정본이 그쪽 소유라서입니다.
 
-#### ✅ 추가 진행 (2026.09.09) — 백엔드 API를 파드로 띄워 트라이얼
+#### ✅ 정어진 회신 (2026.09.09) — (A) 지금은 아무것도 옮기지 않습니다
+
+k3s 설치 자체는 문제없습니다(기존 서비스 무영향, 확인됨). **다만 `supersub-api`·
+`postgresql`은 systemd 그대로 두고 k3s에는 아직 아무 워크로드도 배포하지
+않습니다.** 실제로 오케스트레이션이 필요한 **두 번째 서비스가 특정될 때** API
+합류 여부를 그때 정합니다.
+
+근거:
+
+- 오케스트레이션 대상이 될 "다른 서비스"가 아직 이름이 없습니다. 두 번째
+  워크로드 0인 상태에서 도는 systemd 배포를 k8s로 옮기는 것은 순수 비용이고,
+  프로덕션을 서비스하는 유일한 박스에 클러스터 네트워킹·이미지 레지스트리·
+  인그레스 실패면을 더합니다.
+- 2 vCPU / 7.6GB 박스에 k8s idle 오버헤드(설치만으로 이미 +0.8GiB)에 더해
+  부하 시 kubelet·containerd·coredns·traefik이 얹힙니다.
+- systemd 배포는 마지막 배포(2026-09-08)에서 스모크까지 통과했고
+  `fastapi/docs/deployment.md`가 그 절차의 정본입니다. 이걸 매니페스트 기준으로
+  다시 쓰는 것은 실제 필요가 끌고 가야 하는 변경입니다.
+- 🔴 **Postgres는 옮기지 않습니다.** 디스크 여유 27GB 박스에서 StatefulSet +
+  local-path PV는 PV 오설정이나 `delete pvc` 한 번에 프로덕션 데이터가
+  사라집니다. 온박스 systemd Postgres + 알려진 백업 경로가 더 안전합니다.
+
+**해 둔 것:** 로컬(개인 개발) k3s용 매니페스트를 `fastapi/deploy/k8s/`에 만들어
+검증해 뒀습니다 — API Deployment + in-cluster pgvector + initContainer 마이그레이션
++ NodePort. 나중에 EC2로 API를 옮길 필요가 생기면 Postgres 부분만 빼고 이걸
+출발점으로 씁니다.
+
+| | |
+|---|---|
+| 결정 | (A) k3s는 설치된 채 유지, 워크로드 미배포. `supersub-api`·`postgresql` systemd 유지 |
+| 다시 볼 조건 | 오케스트레이션이 필요한 두 번째 서비스가 구체화될 때 — 그때 `fastapi/docs/deployment.md` 개정 + 이 항목 재개 |
+| 하지 말 것 | 🔴 `supersub-api`·`postgresql`을 k3s로 옮기지 않기(특히 Postgres) · 🔴 `deployment.md`를 매니페스트 기준으로 미리 고치지 않기 |
+| 확인 | `ssh supersub 'systemctl is-active supersub-api postgresql'` → 둘 다 `active` (k3s 설치 후에도 배포 방식은 systemd 그대로) |
+
+#### ✅ 추가 진행 (2026.09.09) — 백엔드 API를 파드로 띄워 트라이얼 (박민호)
 
 **"다른 서비스"의 첫 대상으로 백엔드(`supersub-api`)를 일단 파드로 올려봤습니다.**
 기존 systemd 서비스는 손대지 않고 **옆에 나란히** 띄운 것뿐입니다.
@@ -7118,7 +7214,42 @@ push 방식·코드 문제가 아니라 **Vercel 계정(무료 플랜)의 빌드
 필요합니다** — 특히 Dockerfile을 저장소에 정식으로 둘 위치·이미지 태그/레지스트리
 전략은 배포 관례(`docs/deployment.md`)에 맞춰 그가 정하는 게 맞다고 봤습니다.
 
-- **담당**: 정어진 · **제기**: 박민호 · **기한**: 확인되는 대로
+#### ✅ 정어진 후속 회신 (2026.09.09) — 트라이얼은 (A)와 어긋나지 않습니다, 정식화는 보류
+
+⚠️ **`28f101d`가 push된 시점에 제 (A) 회신(`58515c0`)은 아직 `main`에 없었습니다**
+(로컬 `jin` 에만). 그래서 두 판단이 엇갈려 보일 수 있는데 **결론은 같습니다** —
+파드는 systemd 옆에, 전환은 나중.
+
+- **트라이얼은 (A) 그대로입니다.** "파드를 systemd 옆에 나란히" 가 (A) 가 말한
+  것이고, 트라이얼은 유용한 데이터를 줬습니다: `hostNetwork: true` 로
+  localhost-only DB 문제가 우회된다는 것, 두 프로세스가 서로 무영향이라는 것.
+- 🔴 **정식화(레포에 `Dockerfile` 커밋 + 트래픽 8000→파드 이전)는 아직 안 합니다.**
+  이유는 (A) 그대로 — 명명된 2번째 서비스도, cutover·롤백 계획도 없습니다.
+  트라이얼 파드는 박민호 님이 유지하든
+  지우든(`kubectl delete deployment supersub-api-trial`) 무방합니다.
+- **정식화하기로 하면 (그때):**
+  - `Dockerfile`·매니페스트 위치는 **`fastapi/deploy/k8s/`** 입니다. 제가 로컬
+    k3s 개발용으로 이미 만들어 검증해 뒀고(API Deployment + pgvector +
+    initContainer 마이그레이션 + NodePort), EC2용은 거기서 in-cluster Postgres
+    부분만 빼고 `hostNetwork` 또는 selector 없는 Service/Endpoints 로 호스트
+    PostgreSQL 을 가리키게 하면 됩니다. **서버에만 있는 `~/k3s-trial/` 사본과
+    갈리기 전에 그걸 정본으로** 삼습니다.
+  - 이미지 태그/레지스트리 전략 + `docs/deployment.md` 개정은 그 시점에 제가 냅니다.
+
+#### 🔴 정정 (2026.09.09) — min 14 정책으로 「정식화 보류」를 거둡니다
+
+박민호 님이 **min 14 로 k3s-only 를 팀 정책**으로 정했습니다(로컬·EC2 둘 다).
+위 후속 회신의 「정식화는 아직 안 합니다 / 2번째 서비스가 나올 때까지」 조항을
+**거둡니다** — PM 결정이 났으니 전환은 진행합니다.
+
+- 위 회신의 **나머지는 그대로 유효**합니다: `fastapi/deploy/k8s/` 가 매니페스트
+  정본, EC2 는 in-cluster Postgres 빼고 호스트 PG, `~/k3s-trial/` 사본이 갈리기
+  전에 레포로 끌어올 것, cutover·롤백 계획이 필요할 것. 이제 이게 **전환의
+  체크리스트**입니다.
+- 배포 정본(`docs/deployment.md`) 담당으로서 할 일과 순서는 **min 14 회신**에
+  적었습니다.
+
+- **담당**: ~~정어진~~ **✅ 회신함 (2026.09.09 — (A) → min 14 정책으로 정식화 진행. 계획은 min 14)** · **제기**: 박민호 · **기한**: min 14 와 함께
 
 #### ✅ 추가 진행 (2026.09.09) — Docker Hub pull 방식으로 전환
 
@@ -7169,6 +7300,57 @@ push 방식·코드 문제가 아니라 **Vercel 계정(무료 플랜)의 빌드
 `fastapi/` 소유가 정어진이라, **Dockerfile 내용·위치·CI 트리거 조건이
 관례에 맞는지 검토 부탁드립니다.** 어긋나면 고쳐서 알려주세요 — 급하게
 진행한 것이라 그쪽 확인 전까지는 「임시」로 봐 주시면 됩니다.
+
+#### ✅ 정어진 회신 (2026.09.09) — 보안 사고 대응 권고 + Dockerfile 검토
+
+##### 1. 🔴 노출 시크릿 — 셋 다 교체 권고, 단계로
+
+레포가 Private·Collaborator 없음이라 유출 가능성은 낮지만, **옛 digest 가
+Docker Hub 에 남아 있을 수 있고** 나중에 레포 공개·Collaborator 추가·계정 토큰
+유출 중 하나만 생겨도 그 이미지에서 셋이 다 나옵니다. **교체 비용이 지금 가장
+쌉니다**(dev·데모 단계) — 미루면 런칭 뒤엔 비쌉니다.
+
+| 값 | 어떻게 | 영향 | 순서 |
+|---|---|---|---|
+| `WORKER_TOKEN` | 새 값 생성(`python -c "import secrets;print(secrets.token_urlsafe(32))"`) → 서버 `.env` + 파드 Secret + `agent/` 워커 설정 동시에 | **사용자 0.** 워커 재시작만 | **먼저** (박민호 님이 "서버 `.env` 반영 미확인"도 앞서 남기셨으니 이참에 확인) |
+| DB 비밀번호 (`DATABASE_URL`) | Postgres role 비번 `ALTER ROLE ... PASSWORD` → 서버 `.env` + 파드 Secret → 파드 재시작 | **사용자 0** (세션은 JWT라 DB 세션 아님). 재시작 수 초 | 그다음 |
+| `JWT_SECRET` | 새 값 → 서버 `.env` + 파드 Secret → 재시작 | 🔴 **로그인한 전원 로그아웃.** 지금은 데모·소수라 사실상 무비용 | **지금** — 유일하게 미루면 비싸지는 값 |
+
+추가로 **옛 이미지 digest(`56b21535…`) 를 Docker Hub 에서 삭제**해 주세요(박민호 님
+계정). 안 지우면 태그만 바꿔도 그 digest 를 직접 pull 하면 나옵니다.
+
+🔴 **저는 실행 안 합니다** — `ssh supersub` 접근이 없고, 전원 로그아웃을 독단으로
+할 수 없습니다. 위 순서대로 박민호 님이 서버에서 하시고, `JWT_SECRET` 타이밍만
+사용자 확인 받으시면 됩니다. 워커 배선(`WORKER_TOKEN`)은 같은 교체에 묶어서 한 번에.
+
+##### 2. ✅ Dockerfile·`.dockerignore`·CI 검토 — 좁혔습니다 (이 커밋)
+
+관례에 맞습니다. 다만 좁혔습니다(포트 8080·`python:3.14-slim` 은 CD 가 물고 있어 유지):
+
+- `COPY . .` → **명시적 `COPY app/ · alembic/ · alembic.ini`.** 원래는 `docs/`·
+  `scripts/`·`CLAUDE.md`·Dockerfile 자신까지 이미지에 굽고 있었습니다. `.env` 사고
+  뒤라 범위를 좁게 잡는 게 맞습니다. `alembic/` 은 남깁니다 — 배포 때
+  `alembic upgrade head` 를 이미지 안에서 돌 수 있어야 합니다.
+- **non-root 유저**(`supersub`, uid 10001) 추가.
+- `.dockerignore` 에 `docs`·`scripts`·`deploy`·`*.md`·`.mypy_cache`·`.ruff_cache`
+  추가 — `COPY . .` 로 되돌아가더라도 방어.
+- CI 트리거(`main` + `fastapi/**`)는 그대로 둡니다 — 맞습니다.
+
+🔴 **하나 확인 필요**: **배포되는 파드가 `alembic upgrade head` 를 도나요?**
+이미지에 `alembic/` 이 있으니 돌 수는 있는데, 지금 `~/k3s-trial` 의 Deployment 에
+그 initContainer 나 CD 훅이 있는지 문서(`www/docs/2026-09-09-K3S-harness.md`)에서
+못 봤습니다. 없으면 새 마이그레이션이 배포돼도 스키마가 안 따라가서 **런타임에서만
+터집니다.** Deployment 에 initContainer(같은 이미지로 `sh -c "alembic upgrade head"`,
+env 는 앱과 동일)를 두거나, `supersub-cd.timer` 재배포 훅에
+`kubectl exec deploy/... -- alembic upgrade head` 를 앞에 넣는 편이 안전합니다.
+
+##### 3. GitHub Actions Secrets — 사용자가 직접
+
+`Settings → Secrets and variables → Actions` 에 `DOCKERHUB_USERNAME`(`pmhllll12`)
+· `DOCKERHUB_TOKEN`(Docker Hub Access Token, Read & Write). GitHub UI 작업이라
+제가 못 합니다. 이게 없으면 CD 워크플로가 push 단계에서 실패합니다.
+
+- **담당**: 박민호(시크릿 교체·digest 삭제·마이그레이션 훅) · 사용자(JWT 타이밍·GitHub Secrets) · 정어진(Dockerfile — 이 커밋으로 완료) · **제기**: 박민호
 
 #### 🔴🔴 사고 보고 (2026.09.09) — 제 k3s 설치 때문에 `<API 호스트>`이 몇 시간 동안 안 됐습니다
 
@@ -7282,6 +7464,34 @@ Windows가 쓰고 있는지부터 보는 게 빠릅니다. 이건 이 컴퓨터�
 정책이라 여기 남깁니다. 지금 저장소엔 `docker-compose*` 파일이 없어서 당장
 치울 것은 없습니다.
 
+#### ✅ 정어진 회신 (2026.09.09) — 정책 수용. 백엔드 cutover 는 아래 순서로
+
+**정책 받습니다.** `docker-compose` 는 이 저장소에 없었고 제가 만든 로컬 k3s
+세팅도 매니페스트라 어긋나는 것은 없습니다. min 11 (A) 의 「정식화 보류」 조항은
+이 정책으로 거뒀습니다(min 11 에 정정 달았습니다).
+
+🔴 **다만 지금 EC2 는 아직 systemd 가 트래픽을 받습니다** — 8080 파드는 박민호 님
+표기대로 트라이얼이고, `docs/deployment.md` 도 systemd 절차입니다. 「EC2 를 k3s 로만
+구동」은 **방향**이지 현재 상태가 아니라, 배포 정본 담당으로서 아래를 **순서대로**
+합니다. 각 단계가 검증되면 다음으로 갑니다.
+
+| 순서 | 무엇 | 확인 |
+|---|---|---|
+| 1 | `fastapi/Dockerfile` 을 저장소에 커밋 (지금 로컬에만 있음. 박민호 님이 EC2 에서 쓴 것과 사실상 동일 — `python:3.14-slim` + `requirements.lock.txt`) | `git -C fastapi ls-files Dockerfile` |
+| 2 | `fastapi/deploy/k8s/` 를 EC2 형태로 정리 — in-cluster pgvector 를 빼고 호스트 PostgreSQL 을 `hostNetwork` 또는 selector 없는 Service/Endpoints 로. `~/k3s-trial/` 사본이 갈리기 전에 이걸 정본으로 | 매니페스트가 레포에, `~/k3s-trial/` 은 이걸 참조 |
+| 3 | 이미지 레지스트리 전략 확정 — 박민호 님이 `c7e8b75` 로 Docker Hub pull 로 전환하셨으니 그걸 따름. 태그 규칙(커밋 SHA?)만 정하면 됨 | `deployment.md` 에 태그 규칙 |
+| 4 ✅ | `docs/deployment.md` 재작성 완료 (정어진, 커밋 `a21af5f`) — 「현재 배포 — k3s + CD」 절 신설, 사람이 준비할 것 표(GitHub Secrets·확장·env·S3·백업), 옛 systemd 절차(0·3·6절)에 「롤백·최초 세팅」 배너, 6절 = 롤백 런북. 🔴 DB 는 파드로 안 옮김 명시. `test_docs_paths`·전체 pytest 통과 | — |
+| 5 | 🔴 **cutover** — 트래픽 8000(systemd) → 파드. 인그레스/포트 전환 + **systemd 유닛은 disable 만 하고 지우지 않는다**(롤백용). 스모크(`/health`·업로드→분석) 통과 후 `supersub-api.service` stop | 배포 `/health` 가 파드에서 응답 · systemd `is-enabled` = disabled |
+| 6 | CI — `fastapi/**` 변경 시 이미지 빌드+push (`.github/workflows/`). 지금은 테스트만 돎 | 워크플로에 build job |
+
+🔴 **Postgres 는 이 단계에서 안 옮깁니다** — 온박스 systemd Postgres 유지. DB 를
+파드/PV 로 옮기는 건 별도 결정이고 백업·볼륨 계획이 선행입니다(min 11 (A) 그대로).
+min 14 정책도 "빌드·구동"이라 앱이 대상이지 DB 스토리지는 아니라고 읽습니다 —
+아니면 알려 주세요.
+
+**1·2 는 지금 할 수 있습니다.** 3~6 은 EC2 가 켜져 있어야 하고 박민호 님과
+맞춰야 합니다(레지스트리·cutover 타이밍). 진행 신호 주시면 1·2 부터 하겠습니다.
+
 - **담당**: 전체(박민호·백성검·정어진·정상호) · **제기**: 박민호 · **기한**: 확인되는 대로
 
 #### 확인 — `agent/` 는 **치울 것이 없고, 동시에 k3s 위에도 없습니다** (2026.09.09, 정상호)
@@ -7333,6 +7543,20 @@ grep -rniE '\bdocker\b|podman|containerd|k3s|kubectl|kubernetes' agent/ \
 
 - 관련: `ho` 1번(GPU 예산 실측) · `jin` 18번(워커 폴링 루프) · `ho` 26번(워커 정지)
 - **담당**: 박민호(적용 범위 판단) · **제기**: 정상호 · **기한**: 스프린트 3 계획 전
+
+### 15. 영상 업로드 「요청 값이 올바르지 않습니다: filename」 — 원인 찾아 고쳤습니다 ✅ 해소 (2026.09.09)
+
+사이트에서 직접 영상을 올려 분석을 시작해보다가 겪었습니다.
+
+| | |
+|---|---|
+| 원인 | `www/`가 `POST /videos/upload-url`에 `filename`을 안 보내고 있었습니다 — `fastapi/docs/client-contract-changes.md` 21절(2026-09-08, 정어진이 이미 요청해둔 것)이 필수라고 명시한 필드인데 아직 반영이 안 된 상태였습니다 |
+| 조치 | `www/src/lib/uploadClip.ts`(업로드/등록 두 요청 모두에 `filename: file.name` 추가) · `www/src/app/api/videos/upload-url/route.ts`(필수 검증에 `filename` 추가, register 쪽 `route.ts`는 원래 body를 그대로 넘기는 구조라 타입만 보강) |
+| 확인 | `npx tsc --noEmit` 통과 · 관련 vitest(`uploadClip`·`AnalysisStage`·`MyVideos`) 84개 중 83 통과, 나머지 1개는 제가 고친 부분과 무관한 리포트 폴링 타임아웃이고 **단독 실행하면 통과**(전체 스위트 동시 실행 시 리소스 경합) · `npx eslint` 새 경고 없음 |
+
+`www/` 소유가 백성검이라, 검토 부탁드립니다 — 급한 버그라 바로 고쳤습니다.
+
+- **담당**: 백성검(검토) · **제기**: 박민호 · **기한**: 확인되는 대로
 
 ## paik (백성검)
 
@@ -7599,7 +7823,36 @@ paik 12번에 있습니다.)
 - 관련: `www/src/lib/published.ts` · `www/src/lib/feed.ts` · `www/src/app/(app)/me/MyVideos.tsx` · **paik 12번**(같은 프론트 반영이 필요) · 계약 3-6절
 - **담당**: 백성검(프론트 반영 — 백엔드 몫은 끝났습니다) · **제기**: 백성검 · **기한**: 스프린트 3 (조정 가능)
 
-### 6. **대상 지정 박스**를 올릴 자리가 없습니다 — 계약에도, S3 에도 (2026-09-08 신설)
+### 6. **대상 지정 박스**를 올릴 자리가 없습니다 — 계약에도, S3 에도 (2026-09-08 신설) ✅ 해소 (2026.09.09) — 백엔드
+
+> **`POST /videos` 본문에 `subject_box` · `subject_at_ms` 를 넣었습니다**
+> (정어진, 커밋 `ee401d6` · 마이그레이션 `411d1c83e4ca`).
+>
+> **🔴 사이드카가 아니라 claim 응답으로 갑니다.** 항목은 "DB 에만 저장되면 워커가
+> 못 봅니다 → S3 사이드카" 라고 적으셨는데, **워커는 이미 `side`·`focus` 를 claim
+> 응답(`POST /internal/analysis-jobs/claim`)으로 받고 있습니다**(`worker.py` 의
+> `job.get("focus")`). 워커가 DB 를 *직접* 안 볼 뿐, claim API 가 그 통로입니다.
+> 그래서 `subject_box` 도 같은 축으로 갑니다:
+> `POST /videos` (서버가 정규화·기하 검증) → `analysis_job` 행 → claim 응답 →
+> `--subject-box "x,y,w,h" --subject-at-ms`. 사이드카를 안 쓰니 백엔드 S3 쓰기도,
+> 브라우저 사이드카 PUT 도, 스캐너 걱정도 없습니다.
+>
+> | | |
+> |---|---|
+> | 검증(서버) | `x·y·w·h ∈ [0,1]` 아니면 **422**(픽셀 거부, 클램프 안 함) · `w·h>0` · `x+w≤1`·`y+h≤1` · `at_ms≤duration_ms` · 박스·시각 both-or-neither |
+> | 지정 없음 | 둘 다 생략 = 「자동으로 고르기」. **실패로 만들지 않습니다.** `analyze:false`·반려면 박스는 버려집니다(담을 작업 행이 없음, 이것도 실패 아님) |
+> | 브라우저 | 지금 그대로 — 영상만 S3 에 PUT, 박스는 `POST /videos` 본문. IAM 안 건드립니다 |
+> | 확인 | `grep -n "subject_box" www/src/lib/uploadClip.ts` (프론트) · `git -C fastapi grep -n "subject_box" -- app/analysis` (백엔드, 됨). `pytest -q` 669 passed |
+>
+> 🔴 **남은 것 — agent 쪽 배선 (정상호 님).** claim 응답에 값은 실었지만
+> `worker.py` 의 `analyze_command` 가 `--subject-box`/`--subject-at-ms` 를 아직
+> 안 붙입니다 — **`--focus` 와 똑같은 상태**입니다(백엔드가 내보내고 워커가 아직
+> 안 읽음). `job.get("subject_box")` / `job.get("subject_at_ms")` 를 읽어
+> `--focus` 옆에 세 줄 붙이면 됩니다. `worker-interface.md` 1절에 적어 뒀습니다.
+> (담당: 정상호 · agent/)
+>
+> ⚠️ 트랙이 도중에 다른 사람으로 갈아타는 문제(정상호 실측 63%)는 이 항목이
+> 고치지 못합니다 — 화면 몫은 닻을 좋게 주는 것까지, 그대로입니다.
 
 분석 화면이 「이 사람으로 분석」에서 받은 박스를 **어디로도 못 보냅니다.**
 계약 3-6절의 `POST /videos` 본문에 그 자리가 없습니다(`sport_code` ·
@@ -7702,7 +7955,24 @@ paik 1번에서 「저장」이 열리며 *"리포트 조회 규격과 같이 �
 - 관련: paik 1번(해소) · 계약 3-1 · 3-6절 「아직 없는 것」 · min 9번(1~3번을 스프린트 3으로 묶은 자리 — 3번 화면 배선 담당이 여기서 정해짐)
 - **담당**: 정어진 · **제기**: 백성검 · **기한**: 스프린트 3 (조정 가능)
 
-### 8. **어디를 집중해서 볼지**를 고를 수 있게 했는데, 보낼 데가 없습니다 (2026-09-08 신설)
+### 8. **어디를 집중해서 볼지**를 고를 수 있게 했는데, 보낼 데가 없습니다 (2026-09-08 신설) ✅ 해소 (2026.09.09) — 백엔드
+
+> **`POST /videos` 본문에 `focus` 를 넣었습니다** (정어진, 커밋 `a46d03e` ·
+> 마이그레이션 `9fc8835184c9`). `paik` 6번(대상 박스)과 **같은 축**:
+> `POST /videos` → `analysis_job.focus`(JSON) → `claim` 응답 → 워커 `--focus`.
+>
+> - `focus`: 루브릭 `criteria[].id` 리스트. 🔴 **빈 목록·생략 = 「전체적으로」**,
+>   실패 아님. 서버가 공백·중복 정리(항목 40자·목록 24개 상한). 값 실재 여부는
+>   서버가 못 봅니다(루브릭은 `agent/`).
+> - ✅ **정상호 조각도 이미 돼 있습니다** — `worker.py` 의 `analyze_command` 가
+>   전부터 `job.get("focus")` 를 읽어 `--focus a,b,c` 로 넘깁니다(미리 배선해
+>   두신 것). `subject_box` 와 달리 agent 쪽 follow-on 이 없습니다.
+> - **A/B/C 판단(focus 가 채점을 바꾸나)은 그대로 정상호 몫** — 백엔드는 값만
+>   나릅니다. A(근거 문장만)든 B(가중치 재정규화)든 흐르는 경로는 같습니다.
+> - 확인: `grep -n 'focus' www/src/lib/uploadClip.ts` 걸리면 프론트가 붙인 것.
+>   `pytest -q` 693 passed. 반영 안내 `client-contract-changes.md` 29번.
+>
+> ⚠️ `www` 쪽(`rubricFocus.ts` → `uploadClip.ts` 에 실어 보내기)은 백성검 몫으로 남습니다.
 
 분석 화면에서 올린 사람이 **채점 항목**을 고를 수 있게 했습니다(사용자 요청).
 목록은 지어낸 것이 아니라 `agent/rubrics/*.yaml` 의 `criteria[].name` 을 그대로
@@ -7814,7 +8084,26 @@ A 안을 더 밀면 **모델이 고른 항목에 더 자세히 쓰게** 할 수 
 - 관련: jin 17번(동작 코드) · paik 6번(대상 박스) · `ho` 29번(항목 이름을 쉬운 말로) · `agent/rubrics/*.yaml`
 - **담당**: ~~정상호(뜻 판단)~~ **✅ A 안 · 받는 자리까지 냈습니다 (2026.09.09)** → **정어진**(`POST /videos` 본문에 실을 자리 — `jin` 17번과 같은 자리) · **제기**: 백성검 · **기한**: 스프린트 3
 
-### 9. 스쿼드 판의 **배치**를 서버에 둘 자리가 없습니다 (2026-09-08 신설)
+### 9. 스쿼드 판의 **배치**를 서버에 둘 자리가 없습니다 (2026-09-08 신설) ✅ 해소 (2026.09.09)
+
+> **안 A로 넣었습니다** (정어진, 커밋 `cbe7f16` · 마이그레이션 `6a0f3d23662c`).
+> - `squad.formation` `varchar(8)` NULL — 판 크기(`"3:3"`·`"5:5"`·`"7:7"`).
+>   `PATCH /api/v1/teams/{team_id}/squad` `{formation}` 로 저장(주장만).
+> - `squad_member.grid_col` · `grid_row` `smallint` NULL — 격자 칸. 🔴 픽셀 아님,
+>   `0~15` 밖이면 422. **both-or-neither**(한쪽만 = 422, 둘 다 null = 판에서만 뺌).
+> - `PATCH /api/v1/teams/{team_id}/squad/members/{member_id}`
+>   `{position_code, grid_col?, grid_row?}` — 이동 + **포지션 바꾸기**(계약 3-7
+>   「아직 없는 것」도 함께 해소). 남의 스쿼드 등재는 `404 MEMBER_NOT_FOUND`.
+> - `POST .../members` 에 `grid_col`/`grid_row` 선택 인자(등재하며 판에 올리기).
+> - 응답에 `formation` · 멤버별 `grid_col`/`grid_row`.
+> - 🔴 **격자 뜻의 정본은 계약 3-7 「홈 판 격자」** — 지금 3열(0\~2) × 4행(0\~3),
+>   행이 포지션 라인(0 FW · 1 MF · 2 DF · 3 GK). 격자 크기가 바뀌면 리매핑 필요.
+> - 확인: `grep -n "localStorage" www/src/lib/squadBoard.ts` 가 안 걸리면 프론트가
+>   갈아 끼운 것. `pytest -q` 658 passed. 클라이언트 반영 안내는 `client-contract-changes.md` 25번.
+>
+> ⚠️ **넣기·빼기 배선은 이미 계약에 있었습니다**(3-7 `POST/DELETE .../members`) —
+> 백성검 님이 배치 저장이 없어 프론트에서 미뤄 둔 것이라 하셨으니, 이제 다
+> 열렸습니다.
 
 홈의 스쿼드 판이 이제 **고를 수 있고 옮길 수 있습니다**(사용자 요청) —
 판 크기(3:3 · 5:5 · 7:7), 카드가 선 **칸**, 사람이 **손으로 정한 포지션**.
@@ -7861,7 +8150,27 @@ squad_member : squad_id · player_card_id · position_id   ← 이게 전부입�
 - 관련: `www/src/lib/squadBoard.ts` · 부록 D 도메인 ③ · 계약 3-7절
 - **담당**: 정어진 · **제기**: 백성검 · **기한**: 스프린트 3 (조정 가능)
 
-### 10. **남의 대표 영상**을 읽을 경로가 없습니다 (2026-09-08 신설)
+### 10. **남의 대표 영상**을 읽을 경로가 없습니다 (2026-09-08 신설) ✅ 해소 (2026.09.09)
+
+> **둘 다 넣었습니다** (정어진, 커밋 `0c89797` · 마이그레이션 `2088e26b34ac`).
+> - **「대표」 표시**: `video.is_featured` bool. `PATCH /api/v1/videos/{id}` 에
+>   `{"is_featured": true}`. 🔴 **사람당 하나** — 세우면 옛 대표가 자동으로
+>   내려간다(부분 유일 인덱스 `uq_video_featured_per_user` 가 DB 에서 강제).
+>   🔴 반려된 클립(`passed:false`)은 `422 CANNOT_FEATURE`.
+> - **남의 대표 읽기**: `GET /api/v1/cards/{card_public_slug}/featured-video`
+>   (로그인 필요). `{video_id, url, expires_in, sport_code, duration_ms}` —
+>   `url` 은 **사전 서명 GET URL**(저장 키 아님, 5번과 같음). 대표가 없거나·
+>   반려됐거나·슬러그가 없으면 `404 NO_FEATURED_VIDEO`.
+> - **식별자는 카드 슬러그.** 내부 `user_id` 를 URL 에 안 쓴다(카드와 같은 원칙).
+>   `is_public` 여부와 무관하다 — 대표로 세운 것 자체가 「보여 준다」는 뜻.
+> - `VideoResponse` 에 `is_featured` 추가. 화면은 `www/src/lib/featuredClip.ts`
+>   한 파일만 갈아 끼우면 된다 — 반영 안내는 `client-contract-changes.md` 27번.
+> - 확인: `grep -n "localStorage" www/src/lib/featuredClip.ts` 안 걸리면 프론트
+>   갈아 끼운 것. `pytest -q` 681 passed.
+>
+> ⚠️ **`paik` 5번(공개 여부·공개 클립 목록·재생 주소)은 별개로 남아 있습니다** —
+> 이 항목이 5번에 얹으려던 「대표」 칸만 따로 처리했습니다. 5번의 나머지 셋은
+> 그 항목에서. 자리 표시 클립(`/coach-c00N.mp4`)은 그대로 두세요(영상 파일 추가 금지).
 
 `/me` 의 영상마다 「나를 보여주는 대표 영상」을 고를 수 있게 했습니다(사용자
 요청). 뜻은 **사람마다 자기를 한 편으로 보여 주는 장면을 갖는다**는 것이고,
@@ -7897,7 +8206,21 @@ squad_member : squad_id · player_card_id · position_id   ← 이게 전부입�
 - 관련: paik 5번(공개 여부 · 재생 주소) · `www/src/lib/featuredClip.ts` · 계약 3-6절
 - **담당**: 정어진 · **제기**: 백성검 · **기한**: 스프린트 3 (조정 가능)
 
-### 11. 분석은 끝나는데 **리포트가 어디 있는지 아무도 모릅니다** (2026-09-08 신설)
+### 11. 분석은 끝나는데 **리포트가 어디 있는지 아무도 모릅니다** (2026-09-08 신설) ✅ 해소 (2026.09.09)
+
+> **양쪽 다 붙었습니다** — meet 는 다음 `main` 통합입니다.
+> - **정어진(받는 칸)**: `FinishJobSchema.report_key`(선택, S3 키, 최대 1024) →
+>   `FinishJobCommand` → `analysis_job.report_key` 컬럼(마이그레이션
+>   `9d4e88f5b6c2`). 🔴 `succeeded` 가 아니면 인터랙터가 버립니다(실패한 작업이
+>   없는 리포트를 가리키지 않게). 계약 3-8·`worker-interface.md` 4절 갱신.
+>   커밋 `5cc83b2` (브랜치 `jin`).
+> - **정상호(싣기)**: 워커가 `--result-json` 자리 파일에서 `report_uri` 를 읽어
+>   `s3://<버킷>/` 를 떼고 `PATCH` 에 `report_key` 로 싣습니다. `origin/ho`
+>   `30ea51c` (jin 23 회신과 같은 커밋).
+> - 확인: `grep 'report_key' agent/scripts/worker.py
+>   fastapi/app/analysis/adapter/inbound/api/schemas/job_schema.py` — 병합 후
+>   양쪽에서 걸립니다. `report_slug` 규칙은 백엔드에 복사 안 함(워커가 값으로 전달).
+> - **paik 7(리포트 읽는 경로)이 이제 열렸습니다** — 읽을 대상이 정해졌습니다.
 
 **앞서 paik 7번에서 「읽는 경로만 내주시면 됩니다」라고 적은 것을 정정합니다.**
 오늘 코드를 따라가 보니 **그 앞에 한 칸이 더 비어 있었습니다.** 읽는 경로를
@@ -8034,7 +8357,24 @@ PATCH /internal/analysis-jobs/{job_id}
 - 관련: paik 5번(같은 요청의 나머지 셋, 같은 프론트 수정이 필요) · paik 10번 · 계약 3-6절 「아직 없는 것」
 - **담당**: 백성검 · **제기**: 백성검 · **기한**: 스프린트 3 — 다만 **이미 깨져 있어서** 5번의 나머지보다 먼저면 좋겠습니다
 
-### 13. 올린 영상을 **지울 경로가 없습니다** — S3 의 영상도 리포트도 안 지워집니다 (2026-09-08 신설)
+### 13. 올린 영상을 **지울 경로가 없습니다** — S3 의 영상도 리포트도 안 지워집니다 (2026-09-08 신설) ✅ 해소 (2026.09.09)
+
+> **`DELETE /api/v1/videos/{video_id}` 가 jin 24 작업으로 이미 붙어 있었습니다**
+> (`video_router.py` · `DeleteVideoInteractor`). 확인한 것:
+> - **DB**: 행 삭제 → 부록 D.6 연쇄로 `analysis_job`·지표까지 함께.
+> - **S3**: `_cleanup_storage` 가 `delete_object(storage_key)` +
+>   `delete_prefix("reports/<user_id>/<video_id>/")` — 영상 파일과 리포트 폴더
+>   (미리보기 포함)를 접두사로 지웁니다. best-effort 이고 남으면 백스톱 스윕이 잡습니다.
+> - **남의 클립·없는 클립**: `404 VIDEO_NOT_FOUND` (403 아님). 204 본문 없음.
+> - **분석 도는 중**: 연쇄 삭제로 작업도 사라집니다(= "취소"). 항목이 "어느 쪽이든
+>   사유를 띄운다"고 해서 이 동작으로 정합니다.
+> - 확인: `pytest tests/analysis -k delete` 10건 통과.
+>
+> 🔴 **리포트 접두사 정리는 리포트가 `reports/<user_id>/<video_id>/` 아래에
+> 놓인다는 전제입니다** — 그 규칙은 jin 24(`report_source_key`)가 정했고 워커가
+> 그 자리에 쓰도록 하는 것이 paik 11(`report_key`)입니다. paik 11 이 붙으면
+> 이 삭제가 정확히 그 폴더를 지웁니다. paik 11 전이라도 영상·DB·jin24 규칙
+> 폴더는 지워지므로 이 항목의 목적("지운 척하지 않는다")은 달성됐습니다.
 
 `/me` 에 **삭제** 단추를 달았습니다(사용자 요청). 넘기는 줄 왼쪽 끝에 서고,
 누르면 한 번 더 묻고, 확인하면 `DELETE /api/videos/{id}` 를 부릅니다 — 화면 ·
