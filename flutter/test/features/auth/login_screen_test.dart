@@ -3,9 +3,38 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:super_sub/core/mock/mock_db.dart';
 import 'package:super_sub/features/auth/data/auth_providers.dart';
+import 'package:super_sub/features/auth/data/auth_repository.dart';
 import 'package:super_sub/features/auth/data/auth_repository_mock.dart';
+import 'package:super_sub/features/auth/data/models/app_user.dart';
+import 'package:super_sub/features/auth/data/models/session.dart';
 import 'package:super_sub/features/auth/presentation/screens/login_screen.dart';
 import 'package:super_sub/features/auth/presentation/session_controller.dart';
+
+/// `POST /auth/login` 이 429 를 준 상황만 흉내낸다 — [MockAuthRepository]는
+/// 서버가 없어 요청 제한을 모르므로, 화면의 잠금 배선만 따로 검증한다.
+class _TooManyRequestsAuthRepository implements AuthRepository {
+  @override
+  Future<Session> login({required String email, required String password}) {
+    throw const AuthException(
+      '요청이 너무 잦습니다',
+      code: 'TOO_MANY_REQUESTS',
+      retryAfter: 2,
+    );
+  }
+
+  @override
+  Future<Session> loginAs(String userId) => throw UnimplementedError();
+
+  @override
+  Future<void> logout() async {}
+
+  @override
+  Future<Session?> restoreSession() async => null;
+
+  @override
+  Future<AppUser> updateProfile({required String nickname}) =>
+      throw UnimplementedError();
+}
 
 // 화면·세션 로직 테스트는 실제 API가 아니라 Mock을 상대한다 — 빠르고
 // 결정적이며, 백엔드 없이도 돈다. ApiAuthRepository 자체의 동작은
@@ -73,5 +102,46 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     expect(container.read(sessionControllerProvider), isA<SessionLoggedIn>());
+  });
+
+  testWidgets('429를 받으면 안내 문구가 뜨고 로그인 버튼이 잠긴다', (tester) async {
+    final override = authRepositoryProvider.overrideWith(
+      (ref) => _TooManyRequestsAuthRepository(),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [override],
+        child: const MaterialApp(home: LoginScreen()),
+      ),
+    );
+
+    await tester.enterText(find.byKey(const Key('login-email')), 'x@y.test');
+    await tester.enterText(find.byKey(const Key('login-password')), 'pw');
+    await tester.tap(find.byKey(const Key('login-submit')));
+    // 눌림 애니메이션(340ms) 뒤에 로그인이 실행되고 곧바로 실패한다.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('요청이 너무 잦습니다. 2초 뒤에 다시 시도해 주세요.'),
+        findsOneWidget);
+    // 서버 메시지 그대로가 아니라 잠금 안내로 대체된다.
+    expect(find.text('요청이 너무 잦습니다'), findsNothing);
+
+    // 잠긴 동안 다시 눌러도 세션이 생기지 않는다(버튼이 잠겨 눌림 자체가 막힌다).
+    await tester.tap(find.byKey(const Key('login-submit')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('요청이 너무 잦습니다. 2초 뒤에 다시 시도해 주세요.'),
+        findsOneWidget);
+
+    // 1초 뒤: 아직 잠겨 있다.
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('요청이 너무 잦습니다. 1초 뒤에 다시 시도해 주세요.'),
+        findsOneWidget);
+
+    // 2초 뒤: 잠금이 풀리고 안내 문구가 사라진다.
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.textContaining('다시 시도해 주세요'), findsNothing);
   });
 }
