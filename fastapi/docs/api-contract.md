@@ -547,10 +547,14 @@ ERD 갱신은 미결 항목으로 올렸다.
 
 ## 3-1. 분석 결과 적재 (규격 초안 — 정상호 회람용)
 
-> **상태:** 진행 전 · 2026-08-28 작성
-> **확인:** `grep -rn analyses fastapi/app/` → 결과가 없으면 미착수
-> **메모:** 스키마(`40a4991`)는 들어갔고 **엔드포인트가 없다.** 아래는 합의용 초안이며,
-> 3절까지와 달리 **아직 구현되지 않았다.**
+> **상태:** 적재 경로·읽기 엔드포인트는 **구현됨** (2026-09-10, 미결 `jin` 27번) —
+>   아래 「✅ 적재 경로(흐름 B)·읽기 엔드포인트」 절. 그 앞의 `POST /analyses`
+>   (`metrics[]` 통째 제출) 초안은 **폐기됐다.**
+> **확인:** `grep -rn 'videos/{video_id}/report' fastapi/app/` → 라우트가 있으면 읽기 착수됨 ·
+>   `grep -rn report_ingest fastapi/app/analysis/` → 적재 인터랙터
+> **메모:** 스키마(`40a4991`)와 적재 자리(`analysis_metric_criterion` 등)는 들어갔다.
+>   아래 초안 본문은 **폐기된 `POST /analyses` 규격**이라 그대로 두되(닫힌 경로),
+>   실물은 「✅ 적재 경로」 절을 본다.
 
 에이전트(`agent/`)가 분석 1회의 결과를 백엔드에 넘기는 경로다. 대상은 **정상호**다.
 
@@ -676,7 +680,62 @@ S3 의 분석 산출물(`report.json`)을 서버가 받아 점수만 걷어내�
    실서버에서 전부 거부된다. **✅ 시드 완료** (2026-09-10, 마이그레이션
    `ca31a2180b54`). draft 루브릭(73행)은 승격 시 그 루브릭의 행을 함께 넣는다.
 
-**읽기 엔드포인트(`GET` `.../report`)의 구체 규격은 적재 경로(흐름 B)와 함께 이 절에 추가한다.**
+### ✅ 적재 경로(흐름 B)·읽기 엔드포인트 — 구현됨 (2026-09-10, 미결 `jin` 27번)
+
+적재는 **S3 `report.json` 하나를 입력으로** 한다. `POST /analyses` 로 `metrics[]`
+배열을 통째로 받는 위 초안(2026-08-28)은 **폐기한다** — 워커가 같은 결과를 S3 와
+요청 본문에 두 번 만들어야 해서 갈라진다(미결 `jin` 27번 표).
+
+| | |
+|---|---|
+| 입력 | 완료 보고(`PATCH /internal/analysis-jobs/{id}`)의 `report_key`. 서버가 그 객체를 읽는다 — 워커는 DB 접속 정보를 모른다(위 「왜 DB에 직접 쓰지 않는가」 유지) |
+| 트리거 | 완료 보고가 `succeeded` 로 작업 상태를 넘긴 **직후, best-effort**. 적재가 실패해도 완료 보고 자체는 성공이다(리포트를 화면이 못 찾을 뿐) |
+| 스키마 | `report.json` 봉투 + `result` = `agent/report-contract.md`. `schema_version` 의 major 가 모르는 값이면 **적재 거부**(반쯤 적재 금지 — 어느 행이 낡은 스키마인지 사후 구분 불가) |
+| 적재 대상 | `analysis_metric`(작업당 1, 루브릭 `sport`/`motion`/`version` 을 여기 둔다) · `analysis_metric_value`(측정 + `total_score` + `grade.*` + `stat.*` 행) · `analysis_metric_criterion`(항목별 `grade`·`title`·`band`·`out_of_band`·`evidence`·`metric_ref`·`weight`·`contribution`·`skipped` — 항목당 1행) · `analysis_report`(`summary`·`model_name`·`provisional`·`previews`·`keypoint_quality`·`schema_version`) |
+| 재분석 | 같은 작업을 다시 적재하면 **앞의 것을 지우고 새로 넣는다**(`analysis_metric` CASCADE). 작업당 한 벌만 남는다 |
+| 지표 코드 검증 | 쓰기 전에 모든 `metric_code` 를 `metric_definition` 과 대조 — 하나라도 없으면 `UnknownMetricCode` 로 통째 거부(부분 적재 없음) |
+
+#### `GET /api/v1/videos/{video_id}/report`
+
+그 영상의 적재된 분석 리포트. 자기 영상만. **DB 에서 명시적 DTO 로 조립한다** —
+`report.json` passthrough 가 아니다(2026-09-09 결정).
+
+`200 OK`
+
+```json
+{
+  "video_id": "3f1c...",
+  "analyzed_at": "2026-09-10T12:00:00Z",
+  "summary": "디딤발 무릎 굽히기가 강점입니다.",
+  "provisional": true,
+  "breakdown": [
+    { "criterion_id": "plant_knee_flexion", "name": "디딤발 무릎 굽히기",
+      "grade": 2, "title": "흔들리지 않는 축",
+      "evidence": "안정적으로 놓였습니다.",
+      "metric_ref": "plant_knee_angle_at_impact", "skipped": false },
+    { "criterion_id": "plant_foot_position", "name": "디딤발 위치",
+      "grade": null, "title": null, "evidence": null,
+      "metric_ref": null, "skipped": true }
+  ],
+  "scenes": [
+    { "metric_code": "impact_frame", "label": "임팩트 프레임", "at_seconds": 2.07 }
+  ],
+  "previews": { "impact": "s3://.../impact.png" },
+  "keypoint_quality": { "known": true, "swing_side_valid_ratio": 0.9 }
+}
+```
+
+🔴 **허용목록이다.** DB 에 있어도 여기 없는 것: 총점·항목별 등급 숫자를 담은
+`summary`(3장 4 — 문장에 수치 금지) · 항목별 `stat`·`band`·`weight`·`contribution`
+(수치는 카드 경로가 따로 읽는다) · `out_of_band`(검수 전 임계값 — 미결 `jin` 24번).
+`grade` 가 `null` 이면 **제외(skipped)** 지 0점이 아니다. `scenes` 는 프레임
+지표(`impact_frame` 등)의 초 환산 — "이렇게 본 장면" 으로 이동하는 자리다.
+
+| 에러 | code | 언제 |
+|---|---|---|
+| 401 | `UNAUTHORIZED` | 토큰이 없거나 틀리다 |
+| 404 | `VIDEO_NOT_FOUND` | 없는 영상이거나 남의 영상이다 |
+| 404 | `REPORT_NOT_READY` | 영상은 있으나 아직 리포트가 적재되지 않았다 |
 
 ### 🔴 지표 코드 실태 — 지금 스키마로는 루브릭을 담을 수 없다 (2026-09-01 조사)
 
@@ -2376,8 +2435,8 @@ Gemini 임베딩으로 바꿔 코사인 유사도로 검색한다.
 스프린트 2 화면 두 개에 필요 없어서 뺐다. 필요해지면 그때 추가한다.
 
 - 카드 **수정** (`PATCH /me/card`) — 지금 카드에 사람이 고칠 값이 없다(닉네임은 `PATCH /me`). **생성(`POST /me/card`)은 2026-09-02에 3장으로 들어왔다**
-- **분석 리포트 조회** — 3-1은 **적재(쓰기)만** 다룬다. 선수가 자기 리포트를 보는
-  경로(`GET /me/analyses/...`)는 화면이 정해진 뒤에 낸다
+- ~~**분석 리포트 조회**~~ — ✅ 2026-09-10 에 `GET /videos/{video_id}/report` 로
+  들어왔다(3-1 「✅ 적재 경로(흐름 B)·읽기 엔드포인트」). 미결 `jin` 27번
 - 매칭·평가·과금 — 스프린트 3 이후
 - 비밀번호 **재설정**, 이메일 인증 — 메일 발송 인프라(SES 등)가 필요하다. 별건이다.
   로그인한 상태에서 바꾸는 **변경**(`PATCH /me/password`)은 2장에 있다

@@ -1,23 +1,34 @@
-"""`analysis_report` 테이블. 부록 D 도메인 ② — SFR-003.
+"""`analysis_report` 테이블. 부록 D 도메인 ② — SFR-003 · 미결 `jin` 27번.
 
-지표를 근거로 만든 요약 문장이다.
+분석 실행 1회의 **분석 단위 결과**다. 항목별 값(등급·`stat`·측정값)은
+`analysis_metric_value`, 항목별 맥락(칭호·구간·근거)은 `analysis_metric_criterion`
+이 담고, 여기는 그 위 — 요약 문장과 분석 전체에 걸리는 메타(검수 전 여부·미리보기·
+키포인트 품질)다.
 
-🔴 **지표와 테이블을 나눈 것이 요점이다.** 여기 들어가는 문장은 언어 모델 생성물이라
-비결정적이고, 지표는 결정론적이다(QUA-001). 한 테이블에 섞으면 "다시 돌리면 달라지는
-값"과 "언제나 같아야 하는 값"이 구별되지 않는다(부록 D.5).
+🔴 **지표와 문장을 나눈 것이 요점이다.** `summary` 는 등급이 정해지면 코드가
+짓는 결정론적 문장이지만(`scoring.summarize`), 항목별 `evidence` 는 언어 모델
+생성물이라 비결정적이라 `analysis_metric_criterion` 에 둔다. 재현성(QUA-001)이
+걸린 수치는 `analysis_metric_value` 에 있다.
 
-**항목별 등급과 총점은 여기에 없다** — 그것은 수치라서 `analysis_metric_value` 로
-간다(3장 4). 여기는 사람이 읽을 문장만 담는다.
-
-부록 D.7 — 지표 집합당 요약 1건.
+부록 D.7 — 지표 집합당 1건.
 """
 
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint, Uuid
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    String,
+    Text,
+    UniqueConstraint,
+    Uuid,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -35,6 +46,25 @@ class AnalysisReportOrm(Base):
     # 어느 모델이 썼는지. 모델을 바꾸면 문장 품질이 달라지므로 남긴다
     # (5장 CON-004 — 라이선스 문제로 교체될 수 있다).
     model_name: Mapped[str] = mapped_column(String(80), nullable=False)
+
+    # --- 미결 jin 27번: 적재가 봉투에서 실어 오는 분석 단위 메타 ---------------
+    # 봉투의 `schema_version`. 적재 시 모르는 major 는 거부하지만, 실린 값은
+    # "어느 계약으로 적재됐나"를 사후에 판별하게 남긴다. 옛 행은 NULL.
+    schema_version: Mapped[str | None] = mapped_column(
+        String(10), nullable=True
+    )
+    # 검수 전 루브릭으로 낸 값인가. 🔴 True 면 확정 점수로 보여주지 않는다.
+    provisional: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    # 스켈레톤 미리보기 S3 URI(`impact`·`tracked`). 비어 있으면 렌더링만 실패한
+    # 것이고 측정·판정은 유효하다.
+    previews: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    # 계약 3장 4)의 「신뢰도」 자리(`jin` 27번 곁가지). 스윙 측 게이트 관절의
+    # 유효 프레임 비율 등. 🔴 키포인트 신뢰도 평균이 아니다 — 「누구를 쟀는가」는
+    # `subject`(별건)가 답한다. 정규화가 안 되는 입력은 `known: false` 다.
+    keypoint_quality: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON, nullable=True
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )

@@ -32,6 +32,7 @@ from supersub_agent.features import (  # noqa: E402
     InsufficientQuality,
     extract_features,
     frame_metrics_as_seconds,
+    keypoint_quality_envelope,
     verify_rubric_coverage,
 )
 from supersub_agent.judge import Judge  # noqa: E402
@@ -302,7 +303,77 @@ def analyze_one(video: str, args, rubric, subject) -> str:
     # --- 리포트 업로드 -----------------------------------------------------
     target = report_uri
 
-    report = {
+    report = build_report(
+        video=video,
+        video_id=args.video_id,
+        stamp=stamp,
+        rubric=rubric,
+        rubric_path=args.rubric,
+        swing_side=args.side,
+        focus=args.focus,
+        target_fps=args.fps,
+        pose=pose,
+        features=features,
+        result=result,
+        previews=preview_uris,
+        judge_backend=judge.backend,
+        judge_model=judge.model_id,
+        timing={
+            "fetch_s": round(fetch_s, 2),
+            "measure_s": round(measure_s, 2),
+            "judge_s": round(judge_s, 2),
+            "preview_s": round(preview_s, 2),
+        },
+    )
+    storage.upload_json(report, target, region=args.region)
+    print(f"\n저장: {target}")
+    print(json.dumps(report["timing"], ensure_ascii=False))
+    return target
+
+
+# --- 리포트 봉투 ------------------------------------------------------------
+#
+# 🔴 **여기 키를 늘리거나 줄이는 것은 계약 변경이다** (미결 `jin` 27번).
+# 적재(`POST /analyses`)·읽기 경로·화면이 같은 JSON 을 읽으므로, 조용히 바꾸면
+# 백엔드는 배포 뒤 실서버에서만 알게 된다. 정본 목록은
+# `contracts/report_schema.yaml` 이고 `tests/test_report_contract.py` 가 이
+# 함수의 산출과 그 파일이 어긋나면 빨개진다.
+# 🔴 값은 `contracts/report_schema.yaml` 의 `version` 과 **같아야 한다**
+# (테스트가 본다). 필드를 늘렸으면 minor 를 올린다 — 1.1 은 `view_dependent`
+# 가 늘어난 봉투다 (미결 `ho` 37·38번).
+REPORT_SCHEMA_VERSION = "1.1"
+
+
+def build_report(
+    *,
+    video: str,
+    video_id: str | None,
+    stamp: str,
+    rubric,
+    rubric_path: str,
+    swing_side: str,
+    focus: str | None,
+    target_fps: int,
+    pose,
+    features: dict,
+    result: dict,
+    previews: dict[str, str],
+    judge_backend: str,
+    judge_model: str,
+    timing: dict,
+) -> dict:
+    """S3 에 올릴 리포트 **봉투**를 짓는다 — 업로드는 하지 않는다.
+
+    분석 절차에서 떼어 둔 이유는 하나다: **봉투를 검사할 수 있어야 해서다.**
+    안에 있으면 S3 와 영상과 판정 모델이 다 있어야 키 하나를 확인할 수 있고,
+    그러면 확인하지 않게 된다.
+    """
+    return {
+        # 🔴 **읽는 쪽이 봉투 모양을 가릴 수 있게 한다** (미결 `jin` 27번).
+        # 모르는 major 면 **적재를 거부하는 것이 맞다** — 필드가 빠진 리포트를
+        # 반쯤 적재하면 어느 행이 낡은 스키마에서 온 것인지 사후에 구분할 수
+        # 없다. 올릴 때는 계약으로 알린다(조용히 안 바꾼다).
+        "schema_version": REPORT_SCHEMA_VERSION,
         # 🔴 **「저장」 뒤에는 이 키가 죽는다.** `jin` 24번의 `keep` 이 원본을
         # `reports/<user_id>/<video_id>/source.mp4` 로 옮기고 `videos/` 쪽을
         # 지우기 때문이다. 여기 값은 **분석 시점의 자리**이고, 옮긴 뒤의 자리를
@@ -318,23 +389,23 @@ def analyze_one(video: str, args, rubric, subject) -> str:
         #
         # 배치·평가 실행에는 `video_id` 가 없다(백엔드 작업이 아니다).
         # 그때는 `null` 이다 — 모르면 지어내지 않는다.
-        "video_id": args.video_id,
+        "video_id": video_id,
         "analyzed_at": stamp,
         "code_version": code_version(),
         "rubric": {
             "sport": rubric.sport, "motion": rubric.motion,
-            "version": rubric.version, "path": args.rubric,
+            "version": rubric.version, "path": rubric_path,
             "impact_limb": rubric.impact_limb,
             "impact_event": rubric.impact_event,
         },
         # swing_side는 impact_limb에만 적용된다 — 반대쪽 사지 지표는 auto
         # 판별로 나온 값이다 (features.extract_features 참고).
-        "swing_side": args.side,
+        "swing_side": swing_side,
         # 올린 사람이 「집중해서 볼 항목」으로 고른 것 (미결 `paik` 8번).
         # 🔴 **채점을 바꾸지 않는다** — 같은 영상이 고른 것에 따라 다른 점수를
         # 내면 선수끼리 비교가 안 된다. 화면이 강조·정렬에 쓰라고 싣는다.
-        "focus": focus_envelope(rubric, args.focus),
-        "target_fps": args.fps,
+        "focus": focus_envelope(rubric, focus),
+        "target_fps": target_fps,
         "sampled_fps": round(float(pose.sampled_fps), 2),
         "frames": int(len(pose.keypoints)),
         # 프레임 단위 지표를 초로 (미결 7번 E-3). `sampled_fps`가 바로 위에
@@ -343,29 +414,28 @@ def analyze_one(video: str, args, rubric, subject) -> str:
         "frame_metrics_seconds": frame_metrics_as_seconds(
             features, float(pose.sampled_fps)
         ),
-        "judge_backend": judge.backend,
-        "judge_model": judge.model_id,
+        "judge_backend": judge_backend,
+        "judge_model": judge_model,
         # 스켈레톤은 ViTPose 키포인트로 그린 것이다 — 추가 추론이 없고
         # YOLO는 이 경로에 없다. 비어 있으면 렌더링에 실패한 것이고,
         # 그래도 위의 측정·판정은 그대로 유효하다.
-        "previews": preview_uris,
-        "timing": {
-            "fetch_s": round(fetch_s, 2),
-            "measure_s": round(measure_s, 2),
-            "judge_s": round(judge_s, 2),
-            "preview_s": round(preview_s, 2),
-        },
+        "previews": previews,
+        "timing": timing,
         # **누구를** 분석했는지 — 지정/자동/폴백과 선택 박스 시계열.
         # 🔴 폴백을 조용히 넘기지 않는다. 이것이 없으면 "찍은 사람이 실제로
         # 분석됐는가"를 사후에 확인할 방법이 없다 (미결 18번).
         "subject": subject_envelope(pose, int(len(pose.keypoints))),
+        # **얼마나 잘 잡힌 키포인트로 낸 값인가** (미결 `jin` 27번 곁가지).
+        # 계약 3장 4)의 「신뢰도」 자리다. 게이트가 이미 재던 값인데 통과 여부만
+        # 남기고 버리고 있었다 — 71%로 겨우 통과한 클립과 여유 있게 통과한
+        # 클립을 읽는 쪽이 구분할 수 없었다.
+        # 🔴 `features` 의 형제 블록이다 — 판정 입력이 그대로다.
+        "keypoint_quality": keypoint_quality_envelope(
+            pose.keypoints, rubric.impact_limb, swing_side
+        ),
         "features": features,
         "result": result,
     }
-    storage.upload_json(report, target, region=args.region)
-    print(f"\n저장: {target}")
-    print(json.dumps(report["timing"], ensure_ascii=False))
-    return target
 
 
 
