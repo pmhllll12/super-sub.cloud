@@ -7558,6 +7558,61 @@ grep -rniE '\bdocker\b|podman|containerd|k3s|kubectl|kubernetes' agent/ \
 
 - **담당**: 백성검(검토) · **제기**: 박민호 · **기한**: 확인되는 대로
 
+### 16. 용병 매칭 필드 마이그레이션 추가 — `user`에 DB·ORM만 올라간 상태입니다
+
+`fastapi/alembic/versions/28148877afc0_add_mercenary_matching_fields.py` — 초안
+파일(`xxxx_add_mercenary_matching_fields.py`)을 리비전 ID 생성해 옮기고 실행했습니다.
+
+| | |
+|---|---|
+| 추가된 컬럼 | `user` 테이블에 `preferred_positions`·`available_slots`·`location`·`skill_summary`·`is_searchable`·`skill_embedding`(pgvector 768차원) + HNSW 인덱스 |
+| 초안에서 고친 것 | 테이블명 가정(`users`)이 틀려서 실제 `user`(단수)로 정정 · `pgvector` 파이썬 패키지가 없어서 설치 후 `requirements.txt`·`requirements.lock.txt` 반영 · raw SQL의 `user` 예약어 인용 누락 수정 · 마이그레이션 주석의 `CREATE EXTENSION` 문구가 `TestMigrationPrivileges`(글자 그대로 스캔)에 걸려서 문구 재작성 |
+| ORM | `app/user/adapter/outbound/orm/user_orm.py`에 컬럼 6개 + `Index(..., postgresql_using="hnsw")` 매핑 추가 — 안 했으면 다음 `alembic --autogenerate`가 방금 추가한 컬럼을 지우려 들었을 것입니다 |
+| 확인 | `alembic heads` 단일(`28148877afc0`) · `alembic check` 클린 · 전체 `pytest` 693 passed, skipped 0 |
+| 🔴 하지 않은 것 | 이 필드를 쓰는 애플리케이션 코드(라우터·서비스·도메인 로직)는 전혀 없습니다 — **DB·ORM 스키마만** 올라간 상태입니다. "용병 매칭" 기능 자체의 설계(정말 필요한 필드가 무엇인지, 임베딩을 누가 언제 채우는지 등)도 아직 없습니다 |
+
+`user`는 정어진 소유 컨텍스트라 스키마 변경을 알립니다 — 검토 부탁드립니다.
+
+- **담당**: 정어진(검토) · **제기**: 박민호 · **기한**: 확인되는 대로
+
+### 17. 용병 후보 검색 API 구현 — `app/main.py` 배선과 SFR-006·007 구분 확인 부탁드립니다
+
+16번 위의 스키마를 실제로 쓰는 애플리케이션(라우터·유스케이스·저장소·Gemini
+임베딩 어댑터)을 `user` 컨텍스트 안에 전부 만들었습니다. 사용자가 요청한
+"AI 채팅창에 RAG 붙여서 용병 찾기·팀 매칭" 중 **검색(Retrieval) 부분**입니다 —
+생성(챗봇 응답 구성)은 `www/`의 몫이었는데, 이 항목을 올린 뒤 이어서 붙였습니다
+(아래 안 한 것 4 참고).
+
+| | |
+|---|---|
+| 새 파일 | `app/user/domain/entities/{mercenary_profile_entity,candidate_entity}.py` · `application/ports/{output/mercenary_port.py,output/embedding_port.py,input/{get,update}_mercenary_profile_use_case.py,input/search_candidates_use_case.py}` · `application/dtos/mercenary_dto.py` · `application/use_cases/{get,update}_mercenary_profile_interactor.py`·`search_candidates_interactor.py` · `adapter/outbound/{pg/mercenary_pg_repository.py, stub/{mercenary_stub_repository,stub_embedding_adapter}.py, google/gemini_embedding_adapter.py}` · `adapter/inbound/api/v1/mercenary_router.py`(+ schema) · `dependencies/{mercenary_repository,embedding,get_mercenary_profile,update_mercenary_profile,search_candidates}_provider.py` |
+| 엔드포인트 | `GET`·`PATCH /api/v1/me/mercenary-profile` · `POST /api/v1/matching/search-candidates`. 규격은 `docs/api-contract.md` **3-11절** |
+| 🔴 SFR-006·007과의 관계 | **대체 아님, 별개 기능입니다.** 3-11절에 표로 구분해 뒀습니다 — 이 검색은 지원 전 팀이 능동적으로 하는 것이고, SFR-006(`fitness_score`, 지원 후 3축 채점)·SFR-007(`recommendation`, 경기별 추천+사유 저장)은 도메인 ④에 예약만 된 별도 테이블입니다. 나중에 SFR-007 구현 때 이 검색을 retrieval 단계로 재사용할지는 정어진 판단입니다 |
+| 포지션 인코딩 | `preferred_positions`는 `"<sport_code>:<code>"` 문자열(도메인은 `PositionRef` 쌍으로만 다루고, 인코딩은 PG 어댑터 안에서만) — 포지션 약칭이 종목 간 겹쳐서입니다(`position` 테이블 주석과 같은 이유). DB 테스트로 야구 `C`·농구 `C`가 안 섞이는 것 확인했습니다 |
+| 임베딩 | Gemini `gemini-embedding-001`, 768차원(기존 컬럼과 일치) — 처음엔 `text-embedding-004`로 적었으나 아래에서 은퇴된 모델임이 드러나 정정했습니다. `skill_summary`가 실제로 바뀔 때만 재계산 — 포지션만 바꾸는 요청은 임베딩 API를 안 탑니다(`EmbeddingDep`을 즉시 resolve하지 않고 팩토리로 넘겨서 처리) |
+| 확인 | 인터랙터 단위 테스트(`tests/user/application/test_mercenary_interactors.py`, 스텁만) · DB 통합 테스트(`tests/user/adapter/test_mercenary_pg_db.py`, `@pytest.mark.db`, 실제 pgvector 유사도 순위·종목 간 포지션 미충돌 확인) · `alembic check` 클린 · 전체 `pytest` 704 passed, skipped 0 |
+| ~~🔴 안 한 것 1 — `app/main.py` 미배선~~ | ✅ **했습니다 (2026.09.10, 박민호 — 공유 파일이지만 이 항목의 정어진 몫을 대신 처리하기로 함).** `mercenary_router` import + 등록 추가, `tests/user/adapter/test_auth_router.py`의 openapi 경로 목록(공유 파일이지만 등록의 자연스러운 결과라 같이 고쳤습니다)에도 두 경로를 반영. 전체 `pytest` 507 passed(비-DB), 12 failed/28 errors는 전부 이 세션에 로컬 Postgres가 안 떠 있던 것뿐(기존 DB 테스트도 전부 같은 모양으로 실패해 새 코드 문제 아님) |
+| ~~🔴 안 한 것 2 — `GEMINI_API_KEY` 미배포~~ | ✅ **했습니다 (2026.09.10, 박민호).** 박민호가 `aistudio.google.com/apikey`에서 fastapi 전용 새 키를 발급해 서버 `~/supersub/app/fastapi/.env`에 넣고(0600 유지) `supersub-api` 재시작·`/health` 200 확인. **실제 키로 호출해보니 `text-embedding-004`가 이미 은퇴돼 404(NOT_FOUND)였습니다** — `client.models.list()`로 `embedContent` 지원 모델을 뽑아 `gemini-embedding-001`로 정정, 768차원 벡터 반환까지 확인(위 표 「임베딩」 정정 참고). 가짜 키로는 이 오류가 안 잡혔을 것입니다 |
+| ~~🔴 안 한 것 3 — 검색 권한 범위~~ | ✅ **박민호 결정 (2026.09.10): 현행 유지 — 로그인만 하면 누구나 검색 가능.** 스프린트 안엔 데모·시연이 우선이라 권한 세분화는 나중 스프린트로 미룹니다. 코드 변경 없음 |
+| ~~🔴 안 한 것 4 — `www/` 연동~~ | ✅ **했습니다 (2026.09.10)** — `MatchBot.tsx`가 흐름 D로 이 검색을 부르고, 결과를 다시 Gemini에 넣어 소개 문장으로 엮습니다. 상세: `docs/client-contract-changes.md` 30번 |
+
+`root/.env.example`에는 안 넣었습니다 — `fastapi/.env.example`이 "정본은 루트
+파일"이라 적어 두었지만 `JWT_SECRET`·`GOOGLE_CLIENT_IDS` 등 기존 키들도 실제로는
+루트에 없어서, 이미 있던 관례(fastapi 쪽에만 유지)를 따랐습니다. 이 문서 자체의
+드리프트는 별건이라 여기서 고치지 않았습니다.
+
+**이 항목은 담당(정어진) 대신 제기자(박민호)가 직접 처리했습니다** — SFR-006·007
+구분은 위 표에 이미 근거를 남겨 뒀고, 정어진이 보시고 다른 판단이면 이 항목
+아래에 남겨 주세요. `app/main.py` 배선처럼 원래 공유 파일 규칙(`fastapi/CLAUDE.md`)
+상 정어진 몫으로 남겨뒀던 것을 이번엔 예외적으로 직접 했다는 점만 유의해 주시면
+됩니다.
+
+✅ **해소 (2026.09.10)** — 안 한 것 네 가지 전부 닫혔습니다. `www/`가 챗봇에서
+이 검색을 실제로 부르면 end-to-end로 동작합니다(로컬 코드 기준 — 서버 배포는
+아직 이 브랜치가 병합되지 않아 별개입니다).
+
+- **담당**: ~~정어진~~ **박민호가 대신 처리 (2026.09.10)** · **제기**: 박민호 · **기한**: 확인되는 대로
+
 ## paik (백성검)
 
 ### 1. 분석한 영상을 우리 서버에 저장하는 경로 ✅ 해소 (2026.09.03)

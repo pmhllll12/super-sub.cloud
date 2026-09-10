@@ -6,6 +6,7 @@ import type {
   AdminUserListResult,
   AuthToken,
   Match,
+  MercenaryCandidate,
   MyVideo,
   Squad,
   PlayerCard,
@@ -111,6 +112,14 @@ export const fastapiBackend: Backend = {
 
   createTeamMatch(token, teamId, input) {
     return callFastApi<Match>(`/teams/${encodeURIComponent(teamId)}/matches`, {
+      method: 'POST',
+      token,
+      body: input,
+    })
+  },
+
+  searchMercenaryCandidates(token, input) {
+    return callFastApi<MercenaryCandidate[]>('/matching/search-candidates', {
       method: 'POST',
       token,
       body: input,

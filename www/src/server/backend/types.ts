@@ -142,6 +142,28 @@ export type CreateMatchInput = {
 }
 
 /**
+ * `POST /matching/search-candidates` — 용병 후보 검색 (api-contract.md 3-11절).
+ *
+ * `query_text`만 자연어로 보낸다 — **벡터는 여기서 만들지 않는다.** 서버가
+ * Gemini로 임베딩을 계산해 pgvector 코사인 유사도로 검색한다.
+ */
+export type SearchMercenaryCandidatesInput = {
+  sport_code: string
+  position_code: string
+  query_text: string
+  limit?: number
+}
+
+export type MercenaryCandidate = {
+  user_id: string
+  nickname: string
+  location: string | null
+  skill_summary: string | null
+  /** 코사인 유사도, 1에 가까울수록 조건에 가깝다. */
+  similarity: number
+}
+
+/**
  * 내가 올린 클립 한 줄 — `GET /videos` (api-contract.md 3-6절).
  * `POST /videos` 의 응답과 **같은 모양**이다.
  *
