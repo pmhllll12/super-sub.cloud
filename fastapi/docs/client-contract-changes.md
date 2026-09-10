@@ -1206,6 +1206,66 @@ curl -s -o /dev/null -w '%{http_code}\n' https://<API 호스트>/api/v1/me/merce
 
 ---
 
+## 31. 🟢 분석 리포트 조회 API — 하드코딩 `REPORT` 를 걷어낼 수 있습니다 (2026-09-10 추가, 미결 `jin` 27번 · `paik` 7번)
+
+분석이 끝나면 워커의 `report.json` 이 DB 에 적재되고, 화면은 그 리포트를 API 로
+읽습니다. 지금 `www/src/components/analysis/AnalysisStage.tsx` 안에 리포트 객체가
+하드코딩돼 있다면 이 API 호출로 바꿀 수 있습니다.
+
+### 만족해야 할 성질
+
+- 분석 리포트 화면이 **서버에서 받은 값**을 그린다. 특징 문장(`summary`)·항목별
+  근거(`breakdown[]` 의 `name`·`grade`·`title`·`evidence`)·본 장면(`scenes[]`)이
+  하드코딩이 아니다.
+- 아직 적재 전이면(`404 REPORT_NOT_READY`) "분석 중" 같은 대기 상태를 보인다 —
+  화면이 깨지지 않는다.
+
+### API
+
+`GET /api/v1/videos/{video_id}/report` (인증 필요, 자기 영상만)
+
+| 상태 | 뜻 |
+|---|---|
+| `200` | 아래 형태의 리포트 |
+| `404 VIDEO_NOT_FOUND` | 없는 영상이거나 남의 영상 |
+| `404 REPORT_NOT_READY` | 영상은 있으나 아직 리포트가 적재 전 |
+
+```json
+{
+  "video_id": "3f1c...", "analyzed_at": "2026-09-10T12:00:00Z",
+  "summary": "디딤발 무릎 굽히기가 강점입니다.", "provisional": true,
+  "breakdown": [
+    { "criterion_id": "plant_knee_flexion", "name": "디딤발 무릎 굽히기",
+      "grade": 2, "title": "흔들리지 않는 축", "evidence": "안정적으로 놓였습니다.",
+      "metric_ref": "plant_knee_angle_at_impact", "skipped": false }
+  ],
+  "scenes": [ { "metric_code": "impact_frame", "label": "임팩트 프레임", "at_seconds": 2.07 } ],
+  "previews": { "impact": "s3://.../impact.png" },
+  "keypoint_quality": { "known": true, "swing_side_valid_ratio": 0.9 }
+}
+```
+
+### 🔴 하지 말아야 할 것
+
+- **총점·별점·항목별 점수 숫자를 화면에서 지어내지 마세요** — 응답에 없습니다.
+  `summary` 는 문장뿐이고(3장 4 — 리포트 본문에 수치 금지) 수치는 카드 경로가
+  따로 줍니다. `grade` 는 0~2 등급이지 점수가 아닙니다.
+- **`grade: null` 을 0 으로 그리지 마세요** — `skipped: true` 와 짝이고 "이 항목은
+  평가 대상이 아니었다" 는 뜻입니다.
+- `band`·`stat`·`weight` 를 기대하지 마세요 — 허용목록에서 뺐습니다(검수 전
+  임계값 · 수치는 카드 경로).
+
+### 먼저 확인
+
+```bash
+grep -n "REPORT\s*=\|/report" www/src/components/analysis/AnalysisStage.tsx
+git -C fastapi grep -n "videos/{video_id}/report" -- app/analysis   # 백엔드 쪽(이미 됨)
+```
+
+상세: `fastapi/docs/api-contract.md` **3-1절** 「✅ 적재 경로(흐름 B)·읽기 엔드포인트」
+
+---
+
 ## 계약 문서
 
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린

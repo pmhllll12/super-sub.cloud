@@ -7660,6 +7660,89 @@ chat/route.ts` 시스템 프롬프트) · 스쿼드 등재 UI · 모집 등록 `
 기본은 (b)로 갈 생각입니다. `report.json` 스키마를 계약으로 고정하실 때
 `breakdown[]` 항목 필드 목록도 함께 못박아 주시면 (b) 컬럼을 거기 맞춥니다.
 
+#### ✅ (b) 로 확정했습니다 (2026.09.10) — 정상호 회신(`ho` `c5ad695`) 뒤
+
+`breakdown[]` 11필드가 계약(`agent/contracts/report_schema.yaml` · `schema_version`)
+으로 고정돼서 (b)로 갑니다. (c) JSON 블롭은 매 읽기가 재파싱·재필터라 3-1 이
+passthrough 를 뺀 그 이유("필터 버그 하나 거리")를 되살립니다. `ho` 24(title·band
+보존)·`ho` 28(오버롤 등급 읽기 경로)도 항목별 필드가 질의 가능해야 하고,
+`analysis_metric_value` 도 이미 행-per-item 입니다.
+
+**새 테이블 `analysis_metric_criterion`** — `analysis_metric_id`(fk CASCADE) ·
+`criterion_id` · `grade`(NULL=skipped) · `weight`(Numeric) · `contribution`(NULL 가능)
+· `title` · `band` · `out_of_band`(기본 `''`) · `evidence`(Text — 이 테이블에서
+유일한 LM 산출) · `metric_ref` · `skipped`(bool). `uq(analysis_metric_id, criterion_id)`.
+🔴 **`stat` 은 안 둡니다** — 이미 `analysis_metric_value` 행(`stat.{sport}.{motion}.{id}`).
+🔴 **`name` 도 안 둡니다** — `metric_definition.label`. `skipped[]` 은 같은 테이블에
+`skipped=true` 행(`grade`·`evidence` NULL — 없음이 곧 「제외」, 0점 아님).
+
+**`analysis_report` 추가 컬럼** — `provisional`(bool) · `previews`(JSON) ·
+`keypoint_quality`(JSON — 정상호 `keypoint_quality` 블록 통째) · `schema_version`(str).
+`summary`·`model_name` 은 그대로. 🔴 이 테이블 docstring 이 "LM 문장만" 이라는데
+`provisional` 등은 문장이 아니지만 **분석 단위 메타**라 여기가 맞습니다(정상호도
+같은 판단) — docstring 을 "분석 단위 결과" 로 넓힙니다.
+
+**적재 시**: `schema_version` 의 major 가 모르는 값이면 **적재 거부**(반쯤 적재하면
+어느 행이 낡은 스키마인지 사후 구분 불가 — 정상호 규칙).
+
+**아직 안 정한 것 하나**: 루브릭 식별(`sport`·`motion`·`version`)을
+`analysis_metric` 에 둘지 `analysis_report` 에 둘지 — 마이그레이션 짤 때 결정.
+읽기 DTO 가 `grade.{sport}.{motion}.{id}` 를 되짚는 데 필요합니다.
+
+🔴 **구현은 `report_schema.yaml` 이 `main` 에 병합된 뒤** 시작합니다 (지금 `ho` 에만).
+순서: 마이그레이션(위 둘) → 적재 인터랙터(`report_key`로 S3 읽어 `schema_version`
+검증 후 파싱) → 읽기 DTO(`GET .../report`, `paik` 7) → 백성검이 프론트
+`AnalysisStage.tsx` 의 하드코딩 `REPORT` 를 fetch 로 교체.
+
+#### ✅ 백엔드 3단계 구현 완료 (2026-09-10) — `jin` `a231395` · `f0ff8d5` · `3bacb5c`
+
+정상호 회신(`c5ad695`)의 필드 목록을 읽고 진행했습니다. `report_schema.yaml`
+파일 자체는 아직 `ho` 에만 있고 — **박민호의 다음 `ho`→`main` 병합에서 들어옵니다.**
+그때 봉투 필드가 회신과 어긋나면 파서(`report_parser.py`)만 고치면 됩니다.
+
+| 단계 | 무엇 | 검증 |
+|---|---|---|
+| 1 마이그레이션 | `analysis_metric_criterion`(11필드, `uq(metric_id, criterion_id)`, CASCADE) · `analysis_metric` 에 `rubric_sport/motion/version` · `analysis_report` 에 `provisional`·`previews`·`keypoint_quality`·`schema_version`. 리비전 `efcf961d0051` | `alembic check` 클린 · head 하나 |
+| 2 적재 | `report_parser`(순수 함수, `schema_version` major 미지원이면 거부) → `ReportIngestPgRepository`(코드 사전 대조 후 통째 거부 or 4테이블 replace) → `FinishJobInteractor` 가 완료 보고 뒤 best-effort 트리거 | `test_report_ingest_db.py` 4 · `test_report_parser.py` 8 · 인터랙터 4 |
+| 3 읽기 | `GET /videos/{video_id}/report` — DB 조립 허용목록 DTO. 404 는 영상 존재로 가름(`VIDEO_NOT_FOUND`/`REPORT_NOT_READY`) | `test_report_read_router.py` 5 · `test_report_read_db.py` 4 · 전체 745 통과 |
+
+**루브릭 식별 위치 결정**: `analysis_metric`(작업당 1행)에 뒀습니다 — `analysis_report`
+는 요약 단위라 재분석 시 루브릭 버전 이력이 metric 쪽에 붙는 게 맞습니다.
+
+##### 정상호 회신 `476b0df` 반영 확인 (2026-09-10) — 코드 변경 없음
+
+정상호가 계약을 `ho` 에서 정정했습니다(`schema_version` `1.0` → `1.1`, `breakdown[]`
+에 `view_dependent` 추가, 곁가지 하나). 제 구현과 대조한 결과 **깨지는 곳 없음**:
+
+| 정상호 정정 | 제 쪽 상태 |
+|---|---|
+| `schema_version` `1.1` (minor — `view_dependent` 추가) | 파서가 **major 만** 봅니다(`SUPPORTED_SCHEMA_MAJOR = 1`). `"1.1"` 통과, `analysis_report.schema_version` 에 `"1.1"` 이 그대로 들어감. `"1.0"` 봉투와 섞여도 둘 다 유효. 테스트 픽스처를 `"1.1"` 로 올렸습니다 |
+| `breakdown[].view_dependent` (`""`·`"metric"`·`"grade"`) | ✅ **저장하기로 결정**(`ho` 38번 판단 = 제 몫). 아래 소절 |
+| 곁가지: `metric_definition.label`(`"야구 · 투구 · 앞다리 버티기"`) ≠ `breakdown[].name` | 🔴 그래서 `analysis_metric_criterion` 에 **`name` 컬럼을 뒀습니다** — 위 (b) 확정의 "🔴 `name` 도 안 둡니다(= `label`)" 를 **정정합니다.** `label` 은 3단 합성이라 항목 이름과 글자가 다릅니다. `breakdown[].name` 을 그대로 저장하고, 둘을 같다고 보는 비교 검사는 넣지 않았습니다(정상호 경고 그대로) |
+
+##### ✅ `ho` 38번 (`view_dependent` 적재 컬럼 판단 = 제 몫) — **저장하기로** (2026-09-10)
+
+**넣습니다.** `analysis_metric_criterion.view_dependent` (`String(10)` nullable),
+마이그레이션 `a1c9f7b2e034`(← `efcf961d0051`. `efcf961d0051` 은 이미 push·참조돼
+있어 별도 리비전으로 더함). 파서·적재 저장소 각 1줄, `skipped` 행은 NULL.
+
+왜 넣는가:
+- `band`·`out_of_band` 와 **같은 등급의 개발 확인용 항목별 메타**다.
+  `analysis_metric_criterion` 이 이미 그 둘을 담고 있어 구조가 일관된다.
+- 실측으로 축구 슛 200클립 중 192건(96%)이 `"grade"` — 드문 값이 아니고,
+  "이 등급은 촬영 방향에 갈렸다"를 되짚는 데(37번·`ho` 28) 질의 가능해야 한다.
+- 안 넣으면 나중에 S3 의 `report.json` 을 전수 재파싱해야 채운다.
+
+🔴 **선수 화면 DTO(`ReportCriterionView`/`VideoReportResponse`)에는 안 넣습니다** —
+`band`·`out_of_band` 와 같습니다(정상호 지시). 점수 보정에도 안 씁니다(어느 부호가
+옳은지 모름).
+
+→ **`ho` 38번은 이걸로 만족됨.** 담당(정어진)이 판단·구현 완료했으니 정상호가
+그 항목에 `✅ 해소` 를 달면 됩니다.
+
+**남은 것**: 백성검이 `AnalysisStage.tsx` 하드코딩 `REPORT` → fetch 교체
+(`client-contract-changes.md` 31번). 이건 `paik` 7번에서 다룹니다.
+
 #### 곁가지 — 3-1 의 마지막 「미정」
 
 신뢰도(키포인트 품질)를 담을 자리가 3장 4) 산출물 넷 중 아직 안 정해졌습니다.

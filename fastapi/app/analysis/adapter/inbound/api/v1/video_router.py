@@ -14,8 +14,10 @@ from app.analysis.adapter.inbound.api.schemas.video_schema import (
     UpdateVideoSchema,
     UploadUrlResponse,
     UploadUrlSchema,
+    VideoReportResponse,
     VideoResponse,
 )
+from app.analysis.application.dtos.report_view_dto import ReadReportQuery
 from app.analysis.application.dtos.video_dto import (
     UNSET,
     DeleteVideoCommand,
@@ -41,6 +43,7 @@ from app.analysis.dependencies.video_providers import (
     KeepVideoUseCaseDep,
     ListMyVideosUseCaseDep,
     ListPublicVideosUseCaseDep,
+    ReadReportUseCaseDep,
     RegisterVideoUseCaseDep,
     UpdateVideoUseCaseDep,
 )
@@ -228,3 +231,25 @@ def delete_video(
     S3 정리는 best-effort다 — 실패해도 `204` 이고 남은 객체는 백스톱 스윕이 잡는다.
     """
     use_case(DeleteVideoCommand(video_id=video_id, user_id=user_id))
+
+
+@video_router.get(
+    "/videos/{video_id}/report", response_model=VideoReportResponse
+)
+def read_report(
+    video_id: UUID,
+    user_id: CurrentUserId,
+    use_case: ReadReportUseCaseDep,
+) -> VideoReportResponse:
+    """그 영상의 적재된 분석 리포트(미결 `jin` 27번 · `paik` 7번).
+
+    | 에러 | 뜻 |
+    |---|---|
+    | 404 `VIDEO_NOT_FOUND` | 없는 영상이거나 남의 영상이다 |
+    | 404 `REPORT_NOT_READY` | 영상은 있으나 아직 리포트가 적재되지 않았다 |
+
+    총점·등급 숫자는 `summary` 에 없고(3장 4) 항목별 등급·`stat` 도 여기 없다 —
+    수치는 카드 경로가 따로 읽는다.
+    """
+    view = use_case(ReadReportQuery(video_id=video_id, user_id=user_id))
+    return VideoReportResponse.model_validate(view)

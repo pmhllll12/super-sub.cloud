@@ -146,3 +146,23 @@ class StubJobRepository(JobPort):
         row.failure_reason = failure_reason
         row.report_key = report_key
         return None
+
+
+# 적재는 완료 보고 계약 테스트에는 무관하다 — DB 없이 돌아야 하므로 아무것도
+# 하지 않는다. 실제 적재는 `tests/analysis/adapter/test_report_ingest_db.py` 가
+# 진짜 PostgreSQL 로 본다.
+_INGESTED: dict[UUID, object] = {}
+
+
+def ingested_for(job_id: UUID) -> object | None:
+    return _INGESTED.get(job_id)
+
+
+def reset_ingested() -> None:
+    _INGESTED.clear()
+
+
+class StubReportIngestRepository:
+    def replace_for_job(self, job_id: UUID, parsed: object) -> bool:
+        _INGESTED[job_id] = parsed
+        return True
