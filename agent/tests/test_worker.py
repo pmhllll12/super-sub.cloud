@@ -376,13 +376,25 @@ def test_an_unpickable_rubric_fails_the_job_without_running_it(
 
 
 def test_a_finished_job_is_always_reported(worker, cfg, monkeypatch):
-    """성공하면 succeeded 로 옮겨진다 — 안 옮기면 큐가 안 줄어든다."""
+    """성공하면 succeeded 로 옮겨진다 — 안 옮기면 큐가 안 줄어든다.
+
+    성공 보고에는 **리포트 자리가 함께 실린다** (미결 `jin` 27번) — 그래서
+    이 스텁은 자식이 자리를 적은 것까지 흉내낸다. 자리가 없는 경우는
+    `test_a_success_is_never_reported_without_a_report_key` 가 따로 본다.
+    """
     sent = _intercept(worker, monkeypatch, [(204, b"")])
-    monkeypatch.setattr(
-        worker, "run_analysis", lambda cmd, timeout, stopper: worker.Outcome(0, "저장: …")
-    )
+
+    def analysis(cmd, timeout, stopper):
+        path = Path(cmd[cmd.index("--result-json") + 1])
+        path.write_text(json.dumps({"reports": [
+            {"report_uri": "s3://supersub-ai/reports/u1/v9/report.json"},
+        ]}), encoding="utf-8")
+        return worker.Outcome(0, "저장: …")
+
+    monkeypatch.setattr(worker, "run_analysis", analysis)
     worker.process(cfg, _job(), worker.Stopper())
-    assert sent[0][2] == {"status": "succeeded"}
+    assert sent[0][2] == {"status": "succeeded",
+                          "report_key": "reports/u1/v9/report.json"}
 
 
 def test_a_crash_inside_the_analysis_still_reports(worker, cfg, monkeypatch):
@@ -499,11 +511,13 @@ def test_the_report_key_is_read_from_the_file_the_analysis_wrote(worker, tmp_pat
     assert worker.report_key_from(f, "supersub-ai") == "reports/u1/v9/report.json"
 
 
-def test_a_missing_or_broken_result_file_is_not_an_error(worker, tmp_path):
-    """🔴 자리를 못 실어도 **분석은 성공한 것이다.**
+def test_a_missing_or_broken_result_file_yields_no_key(worker, tmp_path):
+    """자리 파일이 없거나 깨졌으면 **키를 지어내지 않는다.**
 
-    보고 자체를 막으면 작업이 `running` 으로 남는다 — 리포트를 못 찾는 것보다
-    나쁘다. 화면이 못 찾을 뿐이고 그 사실은 저널에 남는다.
+    이 함수는 키만 낸다. 키가 없을 때 무엇을 보고할지는 `process` 가 정하고,
+    그 답은 「실패」다 — 성공 보고에는 항상 `report_key` 가 실린다는 것이
+    계약이 되었다(미결 `jin` 27번). 아래
+    `test_a_success_is_never_reported_without_a_report_key` 가 그것을 지킨다.
     """
     assert worker.report_key_from(tmp_path / "없음.json", "supersub-ai") is None
     broken = tmp_path / "broken.json"
@@ -607,7 +621,49 @@ def test_the_place_file_does_not_leak_between_jobs(worker, cfg, monkeypatch):
 
     assert sent[0][2]["report_key"] == "reports/u1/first/report.json"
     assert "report_key" not in sent[1][2]
+    # 두 번째는 자리를 못 실었으므로 **실패**로 나간다 (미결 `jin` 27번).
+    assert sent[1][2]["status"] == "failed"
     assert seen[0] != seen[1], "두 작업이 같은 자리 파일을 썼다"
+
+
+@pytest.mark.parametrize(
+    "wrote, why",
+    [
+        (None, "자리 파일을 아예 안 적었다"),
+        ({"reports": []}, "빈 목록"),
+        ({"reports": [{"report_uri": "s3://다른버킷/reports/u1/v/report.json"}]},
+         "다른 버킷"),
+        ({"reports": [{"report_uri": "s3://supersub-ai/reports/u1/a/report.json"},
+                      {"report_uri": "s3://supersub-ai/reports/u1/b/report.json"}]},
+         "두 건이라 모호"),
+    ],
+)
+def test_a_success_is_never_reported_without_a_report_key(
+    worker, cfg, monkeypatch, wrote, why
+):
+    """🔴 **키 없는 `succeeded` 는 영원히 빈 리포트다** (미결 `jin` 27번).
+
+    적재가 `report_key` 로 S3 를 읽어 들이기로 정해졌으므로, 키가 없으면
+    적재할 것이 없다. 그런데 작업은 `succeeded` 로 닫혀 있어 **화면은 아무것도
+    못 찾고 사용자에게는 다시 시도할 방법도 안 보인다.** 실패로 드러내면
+    적어도 재시도가 된다 — 그 약속을 여기서 지킨다.
+    """
+    def analysis(cmd, timeout, stopper):
+        if wrote is not None:
+            path = Path(cmd[cmd.index("--result-json") + 1])
+            path.write_text(json.dumps(wrote), encoding="utf-8")
+        return worker.Outcome(code=0, last_line="")
+
+    monkeypatch.setattr(worker, "run_analysis", analysis)
+    monkeypatch.setattr(worker, "pick_rubric", lambda d, s: Path("r.yaml"))
+    sent = _intercept(worker, monkeypatch, [(204, b"")])
+
+    worker.process(cfg, _job(), worker.Stopper())
+
+    body = sent[-1][2]
+    assert body["status"] == "failed", f"{why}: 키 없이 성공으로 보고됐다"
+    assert "report_key" not in body
+    assert "report_key" in body["failure_reason"], "원인이 안 적혔다"
 
 
 def test_the_analysis_records_where_it_put_the_report(monkeypatch, tmp_path):
@@ -796,9 +852,10 @@ def test_the_report_says_which_video_it_is_about(monkeypatch, tmp_path):
     import ast
     import inspect
 
-    # `analyze_one` 은 모듈 최상위 함수라 getsource 가 0열부터 준다 —
-    # dedent·cleandoc 을 걸면 오히려 들여쓰기가 깨진다.
-    tree = ast.parse(inspect.getsource(a3.analyze_one))
+    # 봉투는 `build_report` 가 짓는다 (미결 `jin` 27번에서 `analyze_one` 에서
+    # 떼어냈다 — 검사할 수 있게 하려고). 모듈 최상위 함수라 getsource 가
+    # 0열부터 준다 — dedent·cleandoc 을 걸면 오히려 들여쓰기가 깨진다.
+    tree = ast.parse(inspect.getsource(a3.build_report))
     keys = {
         k.value
         for node in ast.walk(tree)

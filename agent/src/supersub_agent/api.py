@@ -29,6 +29,7 @@ from .features import (
     InsufficientQuality,
     extract_features,
     frame_metrics_as_seconds,
+    keypoint_quality_envelope,
     verify_rubric_coverage,
 )
 from .judge import Judge
@@ -268,6 +269,12 @@ def run_pipeline(
         "timebase": build_timebase(features, int(keypoints.shape[0]), pose),
         # **누구를** 분석했는지와 어떻게 골랐는지 (미결 18번).
         "subject": build_subject(pose, int(keypoints.shape[0])),
+        # **얼마나 잘 잡힌 키포인트로 낸 값인가** (미결 `jin` 27번 곁가지).
+        # S3 리포트와 **같은 함수**를 쓴다 — 두 벌로 두면 경로에 따라 신뢰도가
+        # 달라 보인다. 여기도 `features`의 형제 블록이다.
+        "keypoint_quality": keypoint_quality_envelope(
+            keypoints, rubric.impact_limb, swing_side
+        ),
         # 정지화면은 영상의 poster로 쓴다 — 로딩 전에도 자세가 보인다.
         "preview": impact_preview(frames, keypoints, int(features["impact_frame"])),
         "preview_video": tracked_preview(

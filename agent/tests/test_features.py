@@ -640,3 +640,44 @@ def test_hip_rotation_is_declared_limb_dependent():
     죽는다 — 값을 안 내는 것과 못 내는 것을 가르는 자리다.
     """
     assert "hip_rotation_range_deg" in F.LIMB_DEPENDENT_METRICS
+
+
+def test_the_mirror_declaration_matches_what_the_code_actually_does():
+    """🔴 「촬영 방향에 의존한다」는 **선언이 실제와 맞아야** 한다 (미결 37번).
+
+    좌우를 뒤집은 입력에서 부호가 뒤집히는 지표가 곧
+    `MIRROR_ANTISYMMETRIC_METRICS` 여야 한다. 이 검사가 막는 것은 두 방향이다.
+
+    - **빠뜨리기**: 새 지표가 방향에 의존하는데 선언이 없으면 `view_dependent`
+      가 조용히 `""` 를 내고, **결함이 다시 안 보이게 된다**
+    - **낡기**: 처방 (나)로 `trunk_lean` 을 방향 인식으로 고치면 이 지표는 더
+      이상 뒤집히지 않는다. 그때 선언을 안 지우면 **고쳐진 결함을 계속
+      경고하게** 된다 — 여기서 걸린다
+
+    🔴 **지우지 말 것.** 지우면 위 둘 다 조용히 지나간다.
+    """
+    seq = build_sequence(trunk_lean_at_impact=12.0)
+    mirrored = seq.copy()
+    mirrored[:, :, 0] *= -1.0  # 이미지 x 만 뒤집는다 — 좌우 라벨은 그대로다
+
+    upright = extract_features(seq)
+    flipped = extract_features(mirrored)
+    assert upright.keys() == flipped.keys(), "반전이 지표 목록을 바꾸면 안 된다"
+
+    actually_flips = {
+        k for k, v in upright.items()
+        if isinstance(v, float) and abs(v) > 1e-6
+        and flipped[k] == pytest.approx(-v, abs=0.05)
+    }
+    assert actually_flips == set(F.MIRROR_ANTISYMMETRIC_METRICS), (
+        f"선언과 실제가 다르다 — 실제로 뒤집히는 지표: {sorted(actually_flips)}, "
+        f"선언: {sorted(F.MIRROR_ANTISYMMETRIC_METRICS)}"
+    )
+
+    # 나머지는 반전에 **안 변해야** 한다. 여기가 깨지면 위 집합이 우연히 맞은 것이다.
+    for k, v in upright.items():
+        if k in actually_flips:
+            continue
+        assert flipped[k] == pytest.approx(v, abs=0.05), (
+            f"{k} 가 좌우 반전에 변한다 — 부호 반전도 아니다"
+        )
