@@ -8017,6 +8017,42 @@ grep -rniE '\bdocker\b|podman|containerd|k3s|kubectl|kubernetes' agent/ \
 - 관련: `min` 7번(원래 이 갭을 처음 적어 둔 자리) · `paik` 10번(데모 계정 우회 불가) · `api-contract.md` 937절
 - **담당**: 박민호(직접 진행) · **제기**: 박민호 · **기한**: 확인되는 대로
 
+### 19. **내 프로필을 "검색 가능"으로 켜는 화면이 없습니다** — 용병 검색이 항상 빈 결과입니다 (2026-09-10 신설)
+
+18번(팀 만들기)과 짝입니다 — 팀을 만들어도 **검색당할 사람이 DB에 없으면**
+`search_candidates`는 매번 빈 배열을 돌려줍니다(에러 아님, 정상 동작).
+
+`GET`·`PATCH /api/v1/me/mercenary-profile`(`api-contract.md` 2246절)가
+`preferred_positions`·`available_slots`·`skill_summary`·`is_searchable`을
+다루는데, **이걸 부르는 화면이 `www/`에 없습니다** —
+`grep -rln "mercenary-profile\|is_searchable\|skill_summary" www/src`로
+찾히는 건 `gateway.ts`·`types.ts`·`mock.ts`·`MatchBot.test.tsx`뿐이고,
+`MatchBot.tsx`는 검색 **결과**의 `skill_summary`를 보여주기만 합니다(213행)
+— 내 프로필을 채우는 자리가 아닙니다.
+
+🔴 **`is_searchable`을 켜려면 셋을 한꺼번에 채워야 합니다**
+(`preferred_positions`·`available_slots`·`skill_summary` 중 하나라도 비면
+422 `MERCENARY_PROFILE_INCOMPLETE`). `skill_summary`가 바뀌는 요청만
+Gemini 임베딩을 다시 계산합니다(포지션·시간만 바꾸면 임베딩 API를 안 탑니다).
+
+#### 만족해야 할 성질
+
+> 로그인한 사용자가 화면에서 자기 선호 포지션·가능 시간·소개 문장을 채우고
+> "용병으로 찾아지기"를 켤 수 있다.
+
+화면 위치·형태는 예시일 뿐 규격이 아닙니다. 자연스러운 자리는 `/me`
+(프로필 화면) 안 — 카드 꾸미기(`paik` 3번)와 같은 성격의 "내 정보" 섹션입니다.
+
+#### 확인
+
+| | |
+|---|---|
+| 확인 | 화면에서 포지션·가능 시간·소개·검색 가능 스위치를 채운 뒤, **다른 계정**의 팀장이 챗봇으로 같은 종목·포지션을 검색하면 그 사람이 후보로 뜨는지 |
+| 하지 말 것 | 🔴 `is_searchable`만 켜고 나머지를 비워두는 UI를 만들지 않기 — 서버가 422로 막아도, 화면에서 셋을 같이 입력받게 해야 사용자가 "왜 안 켜지지"에서 막히지 않는다 |
+
+- 관련: 18번(팀 만들기 — 같은 세션에서 발견) · `api-contract.md` 2246·2310절(`GET/PATCH /me/mercenary-profile`·`POST /matching/search-candidates`)
+- **담당**: 박민호(직접 진행) · **제기**: 박민호 · **기한**: 확인되는 대로
+
 ## paik (백성검)
 
 ### 1. 분석한 영상을 우리 서버에 저장하는 경로 ✅ 해소 (2026.09.03)
