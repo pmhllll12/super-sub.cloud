@@ -10,6 +10,7 @@ import type {
   Match,
   MatchSearch,
   MyVideo,
+  VideoReport,
   PublicVideo,
   Squad,
   SignupResult,
@@ -103,6 +104,16 @@ export interface Backend {
    * 🔴 대표가 없든 슬러그가 없든 그 대표가 반려됐든 **밖에서는 다 404
    * `NO_FEATURED_VIDEO`** 다 — 갈라 주면 남의 상태를 훑을 수 있다.
    */
+  /**
+   * 그 클립의 **분석 리포트** — `GET /videos/{id}/report` (CCC 31, 2026-09-10).
+   *
+   * 🔴 **아직 적재 전이면 404 `REPORT_NOT_READY`** 다. 「분석 중」과 「결과가
+   * 없다」가 같아 보이면 안 되므로 **빈 리포트를 지어 주지 않는다**(미결
+   * `paik` 7번의 「하지 말 것」).
+   * 🔴 남의 영상은 404 `VIDEO_NOT_FOUND` — 있고 없고를 알려 주지 않는다.
+   */
+  getVideoReport(token: string, videoId: string): Promise<VideoReport>
+
   getFeaturedVideo(token: string, cardSlug: string): Promise<FeaturedVideo>
   /**
    * 종목별 포지션 목록 — 로그인하면 누구나(계약 3-3절).

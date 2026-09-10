@@ -507,6 +507,80 @@ export const mockBackend: Backend = {
     return DEMO_VIDEOS
   },
 
+  /**
+   * 리포트 — 계약 3-1 `GET /videos/{id}/report` (CCC 31).
+   *
+   * 🔴 **분석이 끝난 클립에만 있다.** `running` · `null` 인 클립에 빈 리포트를
+   * 주면 「분석 중」과 「결과가 없다」가 같아 보인다(미결 `paik` 7번의 「하지
+   * 말 것」) — 실물과 같이 404 `REPORT_NOT_READY` 로 답해서, 화면의 대기
+   * 갈래를 mock 에서도 실제로 밟아 볼 수 있게 한다.
+   *
+   * ⚠️ 아래 값은 **꾸며 낸 예시**다. 실물은 워커가 만든 `report.json` 이
+   * DB 에 적재된 것이고, 모양(허용목록)만 같다.
+   */
+  async getVideoReport(token, videoId) {
+    requireUser(token)
+    const v = DEMO_VIDEOS.find((x) => x.id === videoId)
+    if (!v) throw new BackendError(404, 'VIDEO_NOT_FOUND', '그 영상을 찾을 수 없습니다.')
+    if (v.analysis_status !== 'succeeded') {
+      throw new BackendError(404, 'REPORT_NOT_READY', '아직 분석 결과가 없습니다.')
+    }
+    return {
+      video_id: v.id,
+      analyzed_at: v.created_at,
+      summary:
+        '디딤발이 공보다 앞서 있습니다. 임팩트에서 무릎을 조금 더 덮어 주시면 방향이 안정됩니다.',
+      provisional: true,
+      breakdown: [
+        {
+          criterion_id: 'plant_foot_position',
+          name: '디딤발 위치',
+          grade: 2,
+          title: '흔들리지 않는 축',
+          evidence: '측면으로 벌리는 움직임이 많습니다',
+          metric_ref: 'plant_foot_offset',
+          skipped: false,
+        },
+        {
+          criterion_id: 'shoulder_lead',
+          name: '어깨 선행',
+          grade: 1,
+          title: null,
+          evidence: '공을 받기 전에 어깨를 먼저 돌립니다',
+          metric_ref: 'shoulder_rotation_lead',
+          skipped: false,
+        },
+        {
+          criterion_id: 'follow_through',
+          name: '팔로스루',
+          grade: 2,
+          title: '첫 리포트',
+          evidence: '두 번째 동작으로 이어지는 속도가 빠릅니다',
+          metric_ref: 'follow_through_speed',
+          skipped: false,
+        },
+        /* 🔴 **평가 대상이 아니었던 항목** — `grade: null` 이고 `skipped: true` 다.
+           0 으로 그리면 못한 것으로 읽힌다. 화면이 이걸 빼는지 보려고 둔다. */
+        {
+          criterion_id: 'jump_height',
+          name: '점프 높이',
+          grade: null,
+          title: null,
+          evidence: null,
+          metric_ref: null,
+          skipped: true,
+        },
+      ],
+      scenes: [
+        { metric_code: 'plant_frame', label: '디딤발 착지', at_seconds: 4 },
+        { metric_code: 'impact_frame', label: '임팩트', at_seconds: 7.5 },
+        { metric_code: 'follow_frame', label: '팔로스루', at_seconds: 11.2 },
+      ],
+      previews: null,
+      keypoint_quality: null,
+    }
+  },
+
   async getPlaybackUrl(token, videoId) {
     requireUser(token)
     const v = DEMO_VIDEOS.find((x) => x.id === videoId)

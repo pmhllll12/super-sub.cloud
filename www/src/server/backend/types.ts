@@ -261,3 +261,46 @@ export type AdminUserDetail = {
   teams: AdminMembership[]
   has_card: boolean
 }
+
+/**
+ * 리포트 항목 하나 — 계약 3-1 `GET /videos/{id}/report` (CCC 31).
+ *
+ * 🔴 **`grade` 는 점수가 아니라 0~2 등급이고, `null` 은 0 이 아니다** —
+ * `skipped: true` 와 짝이라 「평가 대상이 아니었다」는 뜻이다. 0 으로 그리면
+ * 못한 것으로 읽힌다.
+ * 🔴 `band`·`stat`·가중치는 **응답에 없다**(허용목록) — 기대하지 않는다.
+ */
+export type ReportCriterion = {
+  criterion_id: string
+  name: string
+  grade: number | null
+  title: string | null
+  evidence: string | null
+  metric_ref: string | null
+  skipped: boolean
+}
+
+/** 판단의 근거가 된 장면. `at_seconds` 로 그 시각을 찾아간다. */
+export type ReportScene = {
+  metric_code: string
+  label: string
+  at_seconds: number
+}
+
+/**
+ * 적재된 분석 리포트 — 미결 `paik` 7번 · `jin` 27번, CCC 31.
+ *
+ * 🔴 **총점 · 별점 · 항목별 점수 숫자가 없다.** 계약 3장 4 가 `summary` 에
+ * 수치를 넣지 말라고 못박아 뒀고 수치는 카드 경로가 따로 준다 — 화면에서
+ * 지어내지 않는다.
+ */
+export type VideoReport = {
+  video_id: string
+  analyzed_at: string
+  summary: string
+  provisional: boolean | null
+  breakdown: ReportCriterion[]
+  scenes: ReportScene[]
+  previews: Record<string, string> | null
+  keypoint_quality: Record<string, unknown> | null
+}
