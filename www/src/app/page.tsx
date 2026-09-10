@@ -18,17 +18,24 @@ export function HomeBody({
   user,
   card = null,
   squad = null,
+  sportCode = null,
 }: {
   user: Pick<User, 'nickname'> | null
   card?: PlayerCard | null
   /** 팀의 스쿼드. 팀이 없거나 아직 안 만들었으면 null 이다. */
   squad?: Squad | null
+  /**
+   * 그 팀의 종목 — 스쿼드 판이 **포지션 목록을 받아 올 때** 쓴다(CCC 28).
+   * 🔴 코드만으로는 포지션을 못 찾는다(야구 `C`·농구 `C`가 다르다).
+   */
+  sportCode?: string | null
 }) {
   return (
     <HomeStage
       user={user}
       card={card}
       squad={squad}
+      sportCode={sportCode}
       destinations={DESTINATIONS}
       featured={FEATURED}
       defaultActive={DEFAULT_FEATURED}
@@ -71,5 +78,5 @@ export default async function Home() {
     }
   }
 
-  return <HomeBody user={user} card={card} squad={squad} />
+  return <HomeBody user={user} card={card} squad={squad} sportCode={user.teams[0]?.sport_code ?? null} />
 }

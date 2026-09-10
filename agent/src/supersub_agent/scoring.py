@@ -15,6 +15,8 @@ from typing import Any
 
 import yaml
 
+from .features import MIRROR_ANTISYMMETRIC_METRICS
+
 MAX_GRADE = 2
 
 # 등급 판정 구간 (최소, 최대). None은 한쪽이 열린 구간을 뜻한다.
@@ -143,6 +145,36 @@ class Criterion:
         if ceiling is None or self.grade_for(features) != 0:
             return ""
         return "above" if float(features[self.band_metric]) > ceiling else ""
+
+    def view_dependent(self, features: dict[str, Any]) -> str:
+        """이 항목의 등급이 **촬영 방향에 의존하는가** (미결 37번).
+
+        🔴 **점수를 바꾸지 않는다. 표시만 한다.** `out_of_band`(미결 20번)·
+        `timebase.limited_by`(미결 9번)와 같은 형태다 — 결함을 보이게 두되
+        동작점은 안 옮긴다.
+
+        | 값 | 뜻 |
+        |---|---|
+        | `""` | 이 항목의 판정 지표는 좌우 반전에 안 변한다 |
+        | `"metric"` | 지표는 방향에 의존하지만 **이 값에서는 등급이 같다** |
+        | `"grade"` | 🔴 **반대편에서 찍혔으면 등급이 달랐다** |
+
+        🔴 **「그래서 이 점수가 틀렸다」가 아니다.** 정답이 없어 어느 부호가
+        옳은지 모른다. 말할 수 있는 것은 **「같은 자세가 촬영 방향에 따라 다른
+        등급을 받는다」**까지이고, 이 필드가 그것을 숨기지 않게 한다.
+
+        처방 (가)밴드 0 대칭화·(나)방향 인식 지표는 각각 임계값 이동과
+        `features` 변경을 부른다. 이것은 **셋 중 대가가 없는 (다)**이다.
+        """
+        metric = self.band_metric
+        if metric not in MIRROR_ANTISYMMETRIC_METRICS or metric not in features:
+            return ""
+        mirrored = self._grade_at(-float(features[metric]))
+        # 반전값이 어느 구간에도 없으면(밴드가 한쪽만 덮는 경우) 등급을 지어내지
+        # 않는다 — 지표가 방향에 의존한다는 것까지만 말한다.
+        if mirrored is None or mirrored == self.grade_for(features):
+            return "metric"
+        return "grade"
 
     def is_applicable(self, features: dict[str, Any]) -> bool:
         """이 항목을 판정할 근거 지표가 모두 측정됐는지.
@@ -599,8 +631,9 @@ def aggregate(
 
     judgments: {criterion_id: {"grade": int, "evidence": str, "metric_ref": str}}
 
-    `features`를 주면 0등급이 **구간 위에서** 왔는지를 `out_of_band`로 표시한다
-    (미결 20번). 🔴 **점수는 그것과 무관하다** — 안 주면 그 필드가 빈 문자열일
+    `features`를 주면 0등급이 **구간 위에서** 왔는지를 `out_of_band`로(미결
+    20번), 등급이 **촬영 방향에 의존하는지**를 `view_dependent`로(미결 37번)
+    표시한다. 🔴 **점수는 그 둘과 무관하다** — 안 주면 두 필드가 빈 문자열일
     뿐이고 나머지는 한 비트도 같다. B-6 재실행을 부르지 않는 이유다.
     """
     unknown = judgments.keys() - set(rubric.criterion_ids)
@@ -652,6 +685,10 @@ def aggregate(
                 # 바뀐다 — 「쟀는데 못했다」와 「구간 밖이다」를 화면이 가를 수
                 # 있게 하는 표시일 뿐이다. features 를 안 주면 빈 문자열이다.
                 "out_of_band": c.out_of_band(features) if features else "",
+                # 🔴 이 등급이 **촬영 방향에 의존하는가** (미결 37번). 여기도
+                # 점수는 안 바뀐다 — `"grade"` 면 반대편에서 찍혔을 때 등급이
+                # 달랐다는 뜻이고, **지금 점수가 틀렸다는 뜻이 아니다.**
+                "view_dependent": c.view_dependent(features) if features else "",
                 # 항목별 연속 점수 0~100 (`Criterion.score_for`). 레이더 차트의
                 # 축 값이다. 🔴 **총점은 여기서 나오지 않는다** — 위 grade의
                 # 가중합이고, 이 값은 features를 안 주면 None일 뿐 나머지는

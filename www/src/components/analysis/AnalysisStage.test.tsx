@@ -455,11 +455,11 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 })
 
     for (const label of [
-      '디딤발 무릎 굴곡',
-      '차는 다리 무릎 신전',
+      '디딤발 무릎 굽히기',
+      '차는 다리 뻗기',
       '상체 기울기',
-      '골반 회전',
-      '팔로스루',
+      '골반 돌리기',
+      '차고 난 뒤 마무리',
       '디딤발 위치',
     ]) {
       expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
@@ -484,7 +484,7 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
   })
 
   /* 🔴 **아무것도 안 고른 것이 「전체적으로」다.** 상태를 따로 두면 "전체인데
-     팔로스루도 고른" 앞뒤 안 맞는 경우가 생긴다. */
+     「차고 난 뒤 마무리」도 고른" 앞뒤 안 맞는 경우가 생긴다. */
   it('처음에는 전체적으로가 골라져 있고, 항목을 고르면 풀린다', async () => {
     const user = userEvent.setup()
     const { input, file } = pick()
@@ -495,17 +495,17 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     const all = screen.getByRole('button', { name: '전체적으로' })
     expect(all).toHaveAttribute('aria-pressed', 'true')
 
-    await user.click(screen.getByRole('button', { name: '팔로스루' }))
-    expect(screen.getByRole('button', { name: '팔로스루' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(screen.getByRole('button', { name: '차고 난 뒤 마무리' }))
+    expect(screen.getByRole('button', { name: '차고 난 뒤 마무리' })).toHaveAttribute('aria-pressed', 'true')
     expect(all).toHaveAttribute('aria-pressed', 'false')
 
     // 여러 개를 고를 수 있다 — 하나를 고르면 앞의 것이 풀리는 라디오가 아니다.
-    await user.click(screen.getByRole('button', { name: '골반 회전' }))
-    expect(screen.getByRole('button', { name: '팔로스루' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(screen.getByRole('button', { name: '골반 돌리기' }))
+    expect(screen.getByRole('button', { name: '차고 난 뒤 마무리' })).toHaveAttribute('aria-pressed', 'true')
 
     // 「전체적으로」를 누르면 고른 것이 다 풀린다.
     await user.click(all)
-    expect(screen.getByRole('button', { name: '팔로스루' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: '차고 난 뒤 마무리' })).toHaveAttribute('aria-pressed', 'false')
     expect(all).toHaveAttribute('aria-pressed', 'true')
   })
 
@@ -517,12 +517,12 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     await user.upload(input, file)
     await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
     await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 })
-    await user.click(screen.getByRole('button', { name: '팔로스루' }))
+    await user.click(screen.getByRole('button', { name: '차고 난 뒤 마무리' }))
     await user.click(screen.getByRole('button', { name: '자동으로 고르기' }))
 
     loadVideo()
     await screen.findByText('이 사람이 맞습니까?', {}, { timeout: 4000 })
-    expect(document.querySelector('.ss-shot-confirm-focus')?.textContent).toContain('팔로스루')
+    expect(document.querySelector('.ss-shot-confirm-focus')?.textContent).toContain('차고 난 뒤 마무리')
   })
 
   /* 🔴 **관문이 곧 S3 방아쇠다**(사용자 요청, 2026-09-08). 관절이 안 붙은
@@ -710,9 +710,12 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     })
     await user.click(screen.getByRole('button', { name: '내 프로필에 리포트 저장' }))
     expect(await screen.findByRole('button', { name: '내 프로필에 저장됨' })).toBeInTheDocument()
-    expect(fetchMock).toHaveBeenCalledTimes(3)
-    // ⚠️ 어디에 남았는지 밝힌다 — 숨기면 다른 기기에서 안 보일 때 고장으로 읽힌다.
-    expect(screen.getByText(/이 브라우저에만/)).toBeInTheDocument()
+    /* 🔴 **리포트 읽기는 셈에서 뺀다.** 단계가 다 차면 화면이
+       `GET /videos/{id}/report` 를 부른다(2026-09-10, CCC 31) — 여기서 보려는
+       것은 「저장이 영상을 다시 올리지 않는다」이다. */
+    expect(fetchMock.mock.calls.filter((c) => !String(c[0]).endsWith('/report'))).toHaveLength(3)
+    // 어디에서 다시 볼 수 있는지 밝힌다. 이제 서버에 있으므로 「이 브라우저에만」이 아니다.
+    expect(screen.getByText(/내 프로필의 「분석 영상」 아래에서 다시 볼 수 있습니다/)).toBeInTheDocument()
 
     vi.unstubAllGlobals()
   }, 15000)

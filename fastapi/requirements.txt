@@ -26,3 +26,8 @@ pyjwt[crypto]        # crypto 는 구글 ID 토큰(RS256) 검증에 필요해진
 # 업로드 클립을 S3 에 둔다(SFR-001). 사전 서명 URL 발급과 HEAD 뿐이라 boto3 만
 # 있으면 되고, 자격증명은 기본 체인(EC2 역할 -> 환경변수)에서 찾는다.
 boto3
+
+# --- 관측 ----------------------------------------------------------------------
+# 요청 수·지연 히스토그램·에러율을 /metrics 로 노출한다. P95(PER-001·PER-003)는
+# Prometheus 에서 histogram_quantile 로 뽑는다 — 앱은 히스토그램만 낸다.
+prometheus-fastapi-instrumentator

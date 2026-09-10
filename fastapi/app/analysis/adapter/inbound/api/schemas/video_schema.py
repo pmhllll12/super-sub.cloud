@@ -221,3 +221,48 @@ class AdminVideoListResponse(BaseModel):
     nickname: str
     email: str
     items: list[AdminVideoRowResponse]
+
+
+class ReportCriterionResponse(BaseModel):
+    """리포트 항목 하나. 🔴 `band`·`stat`·가중치는 없다 — 임계값이 검수 전이고
+    (미결 24번) 수치는 카드 경로가 따로 읽는다.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    criterion_id: str
+    name: str
+    grade: int | None  # None = 제외. 0 점이 아니다.
+    title: str | None
+    evidence: str | None
+    metric_ref: str | None
+    skipped: bool
+
+
+class ReportSceneResponse(BaseModel):
+    """판단의 근거가 된 장면. `at_seconds` 로 그 시각으로 이동한다."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    metric_code: str
+    label: str
+    at_seconds: float
+
+
+class VideoReportResponse(BaseModel):
+    """적재된 분석 리포트(미결 `jin` 27번 · `paik` 7번). `GET /videos/{id}/report`.
+
+    🔴 **허용목록이다** — DB 조립(계약 3-1). 총점·등급 숫자는 `summary` 에 없고
+    (3장 4) 항목별 등급·`stat` 도 여기 없다(카드 경로가 읽는다).
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    video_id: UUID
+    analyzed_at: Rfc3339
+    summary: str
+    provisional: bool | None
+    breakdown: list[ReportCriterionResponse]
+    scenes: list[ReportSceneResponse]
+    previews: dict[str, str] | None
+    keypoint_quality: dict[str, object] | None

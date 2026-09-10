@@ -7,8 +7,14 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
+from app.analysis.adapter.outbound.pg.report_read_pg_repository import (
+    ReportReadPgRepository,
+)
 from app.analysis.adapter.outbound.pg.video_pg_repository import VideoPgRepository
 from app.analysis.adapter.outbound.s3.s3_storage import S3Storage
+from app.analysis.application.ports.input.report_read_use_case import (
+    ReadReportUseCase,
+)
 from app.analysis.application.ports.input.video_use_cases import (
     AdminDeleteVideoUseCase,
     CreateUploadUrlUseCase,
@@ -22,8 +28,12 @@ from app.analysis.application.ports.input.video_use_cases import (
     RegisterVideoUseCase,
     UpdateVideoUseCase,
 )
+from app.analysis.application.ports.output.report_read_port import ReportReadPort
 from app.analysis.application.ports.output.storage_port import StoragePort
 from app.analysis.application.ports.output.video_port import VideoPort
+from app.analysis.application.use_cases.report_read_interactor import (
+    ReadReportInteractor,
+)
 from app.analysis.application.use_cases.video_interactors import (
     AdminDeleteVideoInteractor,
     CreateUploadUrlInteractor,
@@ -188,4 +198,27 @@ ListAdminVideosUseCaseDep = Annotated[
 ]
 AdminDeleteVideoUseCaseDep = Annotated[
     AdminDeleteVideoUseCase, Depends(get_admin_delete_video_use_case)
+]
+
+
+def get_report_read_repository(
+    session: Annotated[Session, Depends(get_session)],
+) -> ReportReadPort:
+    return ReportReadPgRepository(session)
+
+
+ReportReadRepositoryDep = Annotated[
+    ReportReadPort, Depends(get_report_read_repository)
+]
+
+
+def get_read_report_use_case(
+    repository: ReportReadRepositoryDep,
+    video_repository: VideoRepositoryDep,
+) -> ReadReportUseCase:
+    return ReadReportInteractor(repository, video_repository)
+
+
+ReadReportUseCaseDep = Annotated[
+    ReadReportUseCase, Depends(get_read_report_use_case)
 ]

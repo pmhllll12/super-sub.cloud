@@ -1,8 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { MyVideo } from '@/server/backend'
-import { listPublished } from '@/lib/published'
-import { reportFor, saveReport } from '@/lib/savedReports'
 import MyVideos from './MyVideos'
 
 /**
@@ -26,6 +24,10 @@ const analyzed: MyVideo = {
   reject_reason: null,
   analysis_job_id: 'j1',
   analysis_status: 'succeeded',
+  is_featured: false,
+  is_public: false,
+  title: null,
+  description: null,
 }
 const uploaded: MyVideo = {
   ...analyzed,
@@ -155,18 +157,42 @@ describe('내 영상 — 공개 여부', () => {
     expect(screen.getByRole('button', { name: /공개/ })).toBeInTheDocument()
   })
 
+  /**
+   * 🔴 **공개는 2026-09-10 부터 서버가 쥔다**(CCC 20, 미결 `paik` 5번).
+   * 그전에는 브라우저 저장소라 다른 기기에서도 남에게도 안 보였다 — 그래서
+   * 여기서도 저장소가 아니라 **무엇이 PATCH 로 나갔는지**를 붙든다.
+   */
+  function server(over: Record<string, unknown> = {}) {
+    const fn = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
+      const body = init?.body ? JSON.parse(String(init.body)) : {}
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ ...uploaded, ...body, ...over }),
+      })
+    })
+    vi.stubGlobal('fetch', fn)
+    return fn
+  }
+  const patches = (fn: ReturnType<typeof vi.fn>) =>
+    fn.mock.calls.filter((c) => c[1]?.method === 'PATCH')
+
   it('공개로 켜면 제목과 한 줄 설명을 묻는다', async () => {
+    const fn = server()
     const user = userEvent.setup()
     render(<MyVideos videos={[analyzed, uploaded]} />)
     await user.click(screen.getByRole('tab', { name: /업로드 영상/ }))
     await user.click(screen.getByRole('button', { name: /공개/ }))
     expect(screen.getByLabelText('제목')).toBeInTheDocument()
     expect(screen.getByLabelText('한 줄 설명')).toBeInTheDocument()
-    // 아직 공개된 것은 아니다 — 적어야 올라간다.
-    expect(listPublished()).toEqual([])
+    // 아직 아무것도 안 나갔다 — 적어야 올라간다.
+    expect(patches(fn)).toEqual([])
   })
 
-  it('제목을 적고 저장하면 공개 목록에 들어간다', async () => {
+  /* 🔴 **한 번에 보낸다.** 「공개로 돌리고 → 제목을 단다」 두 번으로 나누면
+     그 사이에 끊겼을 때 이름 없는 영상이 남에게 보인다. */
+  it('제목을 적고 저장하면 공개와 제목이 한 번에 나간다', async () => {
+    const fn = server()
     const user = userEvent.setup()
     render(<MyVideos videos={[analyzed, uploaded]} />)
     await user.click(screen.getByRole('tab', { name: /업로드 영상/ }))
@@ -174,17 +200,20 @@ describe('내 영상 — 공개 여부', () => {
     await user.type(screen.getByLabelText('제목'), '농구 연습')
     await user.type(screen.getByLabelText('한 줄 설명'), '디딤발')
     await user.click(screen.getByRole('button', { name: '공개하기' }))
-    await waitFor(() => expect(listPublished()).toHaveLength(1))
-    expect(listPublished()[0]).toMatchObject({
-      id: 'v3',
+
+    await waitFor(() => expect(patches(fn)).toHaveLength(1))
+    const [url, init] = patches(fn)[0]
+    expect(url).toBe('/api/videos/v3')
+    expect(JSON.parse(init.body)).toEqual({
+      is_public: true,
       title: '농구 연습',
-      what: '디딤발',
-      src: '/coach-c003.mp4',
+      description: '디딤발',
     })
   })
 
   // 🔴 제목이 없으면 영상 모음에서 이름 없는 칸이 된다.
   it('제목이 비어 있으면 공개하지 못한다', async () => {
+    server()
     const user = userEvent.setup()
     render(<MyVideos videos={[analyzed, uploaded]} />)
     await user.click(screen.getByRole('tab', { name: /업로드 영상/ }))
@@ -192,64 +221,127 @@ describe('내 영상 — 공개 여부', () => {
     expect(screen.getByRole('button', { name: '공개하기' })).toBeDisabled()
   })
 
-  it('공개한 것을 다시 누르면 내린다', async () => {
+  /* 🔴 **제목을 같이 지우지 않는다** — 부분 수정이라 다시 공개할 때 적어 둔
+     이름이 살아 있다. */
+  it('다시 누르면 공개만 내린다', async () => {
+    const fn = server()
     const user = userEvent.setup()
-    render(<MyVideos videos={[analyzed, uploaded]} />)
+    render(<MyVideos videos={[analyzed, { ...uploaded, is_public: true }]} />)
     await user.click(screen.getByRole('tab', { name: /업로드 영상/ }))
-    await user.click(screen.getByRole('button', { name: /공개/ }))
-    await user.type(screen.getByLabelText('제목'), '농구 연습')
-    await user.click(screen.getByRole('button', { name: '공개하기' }))
-    await waitFor(() => expect(listPublished()).toHaveLength(1))
-    await user.click(screen.getByRole('button', { name: /공개/ }))
-    await waitFor(() => expect(listPublished()).toEqual([]))
+    expect(screen.getByRole('button', { name: /공개 중/ })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /공개 중/ }))
+    await waitFor(() => expect(patches(fn)).toHaveLength(1))
+    expect(JSON.parse(patches(fn)[0][1].body)).toEqual({ is_public: false })
   })
 
-  // ⚠️ 서버 저장이 아니라는 것을 화면이 말해야 한다 — 다른 기기에서 안 보인다.
-  it('이 브라우저에만 남는다는 것을 적어 둔다', async () => {
+  /* 🔴 **서버가 바꾼 뒤에야 화면을 바꾼다.** 먼저 내리고 나중에 부르면,
+     실패했을 때 비공개로 보이는데 실제로는 남에게 계속 보인다. */
+  it('서버가 거절하면 공개 중인 채로 남고 사유가 뜬다', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        json: async () => ({ error: { code: 'VIDEO_NOT_FOUND', message: '없는 영상입니다.' } }),
+      }),
+    )
+    const user = userEvent.setup()
+    render(<MyVideos videos={[analyzed, { ...uploaded, is_public: true }]} />)
+    await user.click(screen.getByRole('tab', { name: /업로드 영상/ }))
+    await user.click(screen.getByRole('button', { name: /공개 중/ }))
+
+    expect(await screen.findByText('없는 영상입니다.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /공개 중/ })).toBeInTheDocument()
+  })
+
+  /* 🔴 **정본은 서버의 `is_public` 이다** — 목록이 그렇다고 하면 열자마자
+     공개 중으로 그린다. */
+  it('서버가 공개라고 한 클립은 열자마자 공개 중이다', async () => {
+    const user = userEvent.setup()
+    render(<MyVideos videos={[analyzed, { ...uploaded, is_public: true }]} />)
+    await user.click(screen.getByRole('tab', { name: /업로드 영상/ }))
+    expect(screen.getByRole('button', { name: /공개 중/ })).toBeInTheDocument()
+  })
+
+  // 무엇이 일어나는지 누르기 전에 말한다 — 되돌릴 수 있지만 그 사이에 남이 본다.
+  it('남에게 보인다는 것을 적어 둔다', async () => {
+    server()
     const user = userEvent.setup()
     render(<MyVideos videos={[analyzed, uploaded]} />)
     await user.click(screen.getByRole('tab', { name: /업로드 영상/ }))
     await user.click(screen.getByRole('button', { name: /공개/ }))
-    expect(screen.getByText(/이 브라우저에만/)).toBeInTheDocument()
+    expect(screen.getByText(/다른 사람에게도 보입니다/)).toBeInTheDocument()
   })
 })
 
 describe('내 영상 — 나를 보여주는 대표 영상', () => {
   const btn = () => screen.getByRole('button', { name: /나를 보여주는 대표 영상/ })
+  /** PATCH 한 그대로 돌려주는 서버 대역 — 계약이 「바뀐 한 줄」을 준다. */
+  function server() {
+    const fn = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
+      const body = init?.body ? JSON.parse(String(init.body)) : {}
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ ...analyzed, is_featured: body.is_featured }),
+      })
+    })
+    vi.stubGlobal('fetch', fn)
+    return fn
+  }
 
-  it('영상마다 세울 수 있고, 세우면 눌린 상태로 남는다', async () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('세우면 계약대로 PATCH 하고 눌린 상태로 남는다', async () => {
+    const fn = server()
     const user = userEvent.setup()
     render(<MyVideos videos={[analyzed]} />)
     expect(btn()).toHaveAttribute('aria-pressed', 'false')
 
     await user.click(btn())
-    expect(btn()).toHaveAttribute('aria-pressed', 'true')
-    expect(JSON.parse(globalThis.localStorage.getItem('supersub.featured.v1')!).videoId).toBe('v1')
-    // ⚠️ 어디에 남는지 밝힌다 — 계약에 자리가 없다.
-    expect(screen.getByText(/이 브라우저에만/)).toBeInTheDocument()
+    await waitFor(() => expect(btn()).toHaveAttribute('aria-pressed', 'true'))
+    const [url, init] = fn.mock.calls.at(-1)!
+    expect(url).toBe('/api/videos/v1')
+    expect(init.method).toBe('PATCH')
+    expect(JSON.parse(init.body)).toEqual({ is_featured: true })
   })
 
   // 🔴 대표가 둘이면 어느 것이 나를 보여주는지 정해지지 않는다.
   it('같은 영상을 다시 누르면 풀린다', async () => {
+    const fn = server()
     const user = userEvent.setup()
     render(<MyVideos videos={[analyzed]} />)
     await user.click(btn())
+    await waitFor(() => expect(btn()).toHaveAttribute('aria-pressed', 'true'))
     await user.click(btn())
-    expect(btn()).toHaveAttribute('aria-pressed', 'false')
-    expect(globalThis.localStorage.getItem('supersub.featured.v1')).toBeNull()
+    await waitFor(() => expect(btn()).toHaveAttribute('aria-pressed', 'false'))
+    expect(JSON.parse(fn.mock.calls.at(-1)![1].body)).toEqual({ is_featured: false })
   })
 
-  it('새로 그려도 세워 둔 것이 그대로다', async () => {
-    const user = userEvent.setup()
-    const { unmount } = render(<MyVideos videos={[analyzed]} />)
-    await user.click(btn())
-    unmount()
+  /* 🔴 **정본은 서버의 `is_featured` 다.** 브라우저에 남은 것을 읽던 때와
+     갈리는 자리라, 목록이 그렇다고 하면 세워진 채로 열려야 한다. */
+  it('서버가 대표라고 한 클립은 열자마자 눌려 있다', async () => {
+    render(<MyVideos videos={[{ ...analyzed, is_featured: true }]} />)
+    expect(btn()).toHaveAttribute('aria-pressed', 'true')
+  })
 
-    render(<MyVideos videos={[analyzed]} />)
-    expect(await screen.findByRole('button', { name: /나를 보여주는 대표 영상/ })).toHaveAttribute(
-      'aria-pressed',
-      'true',
+  /* 🔴 **서버가 바꾼 뒤에야 화면이 바뀐다.** 반려된 클립을 세우려 하면
+     422 `CANNOT_FEATURE` 인데, 먼저 눌러 두면 세워진 것처럼 보인다. */
+  it('서버가 거절하면 안 눌리고 사유가 뜬다', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 422,
+        json: async () => ({ error: { code: 'CANNOT_FEATURE', message: '반려된 클립입니다.' } }),
+      }),
     )
+    const user = userEvent.setup()
+    render(<MyVideos videos={[analyzed]} />)
+    await user.click(btn())
+    expect(await screen.findByText('반려된 클립입니다.')).toBeInTheDocument()
+    expect(btn()).toHaveAttribute('aria-pressed', 'false')
   })
 
   // ⚠️ 반려된 클립은 서버가 안 보는 영상이라 대표가 될 수 없다.
@@ -260,34 +352,72 @@ describe('내 영상 — 나를 보여주는 대표 영상', () => {
 })
 
 describe('내 영상 — 분석 리포트', () => {
-  const REPORT = {
+  /**
+   * 🔴 **리포트는 2026-09-10 부터 서버가 쥔다**(CCC 31, 미결 `paik` 7번 ·
+   * `jin` 27번). 그전에는 화면이 만든 자리 표시를 `localStorage` 에 둔 것이라
+   * 다른 기기에서는 안 보였고 애초에 진짜 분석 결과가 아니었다 — 그래서 여기
+   * 시험도 저장소가 아니라 **서버 응답**을 세운다.
+   */
+  const SERVER_REPORT = {
+    video_id: 'v1',
+    analyzed_at: '2026-09-03T09:00:00Z',
     summary: '디딤발이 공보다 앞서 있습니다.',
-    traits: ['측면으로 벌리는 움직임이 많습니다'],
-    titles: ['첫 리포트'],
-    scenes: [{ at: '0:04', what: '디딤발 착지' }],
+    provisional: true,
+    breakdown: [
+      {
+        criterion_id: 'plant_foot_position',
+        name: '디딤발 위치',
+        grade: 2,
+        title: '첫 리포트',
+        evidence: '측면으로 벌리는 움직임이 많습니다',
+        metric_ref: 'plant_foot_offset',
+        skipped: false,
+      },
+    ],
+    scenes: [{ metric_code: 'plant_frame', label: '디딤발 착지', at_seconds: 4 }],
+    previews: null,
+    keypoint_quality: null,
   }
 
-  beforeEach(() => globalThis.localStorage?.clear())
+  afterEach(() => vi.unstubAllGlobals())
 
-  it('저장해 둔 리포트가 있으면 영상 목록 아래에 그린다', async () => {
-    saveReport('v1', REPORT)
+  /** `/report` 만 골라 답한다 — 다른 호출(재생 주소 등)은 그대로 통과시킨다. */
+  function stubReport(res: { ok: boolean; body?: unknown; status?: number }) {
+    const fn = vi.fn().mockImplementation((url: string) =>
+      Promise.resolve(
+        String(url).endsWith('/report')
+          ? { ok: res.ok, status: res.status ?? (res.ok ? 200 : 404), json: async () => res.body }
+          : { ok: true, status: 200, json: async () => ({}) },
+      ),
+    )
+    vi.stubGlobal('fetch', fn)
+    return fn
+  }
+
+  it('서버가 준 리포트를 영상 목록 아래에 그린다', async () => {
+    stubReport({ ok: true, body: SERVER_REPORT })
     render(<MyVideos videos={[analyzed]} />)
 
     expect(await screen.findByRole('region', { name: '분석 리포트' })).toBeInTheDocument()
     expect(screen.getByText(/디딤발이 공보다 앞서/)).toBeInTheDocument()
     expect(screen.getByText('디딤발 착지')).toBeInTheDocument()
-    // ⚠️ 어디에 남았는지 밝힌다 — 숨기면 다른 기기에서 안 보일 때 고장으로 읽힌다.
-    expect(screen.getByText(/이 브라우저에만/)).toBeInTheDocument()
+    // 분석한 날은 서버의 `analyzed_at` 이다 — 「남긴 날」이 아니다.
+    expect(screen.getByText(/2026-09-03 에 분석했습니다/)).toBeInTheDocument()
   })
 
-  it('저장해 둔 것이 없으면 아무것도 안 그린다', () => {
+  /* 🔴 **「아직」과 「없다」는 다르다**(미결 `paik` 7번의 「하지 말 것」) —
+     분석 중인 클립에 빈 자리를 보이면 결과가 없는 것으로 읽힌다. */
+  it('아직 적재 전이면 분석 중이라고 말한다', async () => {
+    stubReport({ ok: false, body: { error: { code: 'REPORT_NOT_READY', message: '아직입니다.' } } })
     render(<MyVideos videos={[analyzed]} />)
-    expect(screen.queryByRole('region', { name: '분석 리포트' })).toBeNull()
+
+    expect(await screen.findByText(/분석 중입니다/)).toBeInTheDocument()
+    expect(screen.queryByText(/디딤발이 공보다 앞서/)).toBeNull()
   })
 
   // 🔴 그냥 올린 영상에는 리포트가 없다 — 갈래가 다르다.
   it('업로드 갈래에서는 안 그린다', async () => {
-    saveReport('v3', REPORT)
+    stubReport({ ok: true, body: SERVER_REPORT })
     const user = userEvent.setup()
     render(<MyVideos videos={[analyzed, uploaded]} />)
     await user.click(screen.getByRole('tab', { name: '업로드 영상' }))
@@ -296,7 +426,7 @@ describe('내 영상 — 분석 리포트', () => {
 
   // 🔴 수치를 그리지 않는 원칙은 이 자리에서도 같다(부록 D.5 · 계약 3장 4).
   it('점수 · 등급 · 별점을 그리지 않는다', async () => {
-    saveReport('v1', REPORT)
+    stubReport({ ok: true, body: SERVER_REPORT })
     const { container } = render(<MyVideos videos={[analyzed]} />)
     await screen.findByRole('region', { name: '분석 리포트' })
     const text = container.textContent ?? ''
@@ -308,11 +438,6 @@ describe('내 영상 — 분석 리포트', () => {
   })
 })
 
-/**
- * 🔴 **지우기는 되돌릴 수 없다.** 그래서 이 넷이 다 지켜져야 한다:
- * 한 번 더 묻는가 · 서버가 지운 **뒤에야** 화면에서 빠지는가 · 실패하면
- * 남아 있는가 · 브라우저에만 있던 것(리포트 · 공개)까지 거두는가.
- */
 describe('내 영상 — 지우기', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
@@ -329,13 +454,21 @@ describe('내 영상 — 지우기', () => {
     return fn
   }
 
+  /**
+   * 🔴 **리포트 읽기는 셈에서 뺀다.** 화면은 영상을 고를 때마다
+   * `GET /videos/{id}/report` 를 부른다(2026-09-10, CCC 31) — 「지우기를
+   * 안 불렀다」를 보려는 시험이 그것까지 세면 늘 실패한다.
+   */
+  const notReport = (fn: ReturnType<typeof vi.fn>) =>
+    fn.mock.calls.filter((c) => !String(c[0]).endsWith('/report'))
+
   it('곧바로 안 지운다 — 한 번 더 묻는다', async () => {
     const user = userEvent.setup()
     const fn = stubFetch({ ok: true })
     render(<MyVideos videos={[analyzed]} />)
 
     await user.click(screen.getByRole('button', { name: /삭제/ }))
-    expect(fn).not.toHaveBeenCalled()
+    expect(notReport(fn)).toHaveLength(0)
     expect(screen.getByRole('button', { name: '정말 지웁니다' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '취소' })).toBeInTheDocument()
   })
@@ -347,7 +480,7 @@ describe('내 영상 — 지우기', () => {
 
     await user.click(screen.getByRole('button', { name: /삭제/ }))
     await user.click(screen.getByRole('button', { name: '취소' }))
-    expect(fn).not.toHaveBeenCalled()
+    expect(notReport(fn)).toHaveLength(0)
     expect(screen.getByRole('button', { name: /삭제/ })).toBeInTheDocument()
   })
 
@@ -359,9 +492,11 @@ describe('내 영상 — 지우기', () => {
     await user.click(screen.getByRole('button', { name: /삭제/ }))
     await user.click(screen.getByRole('button', { name: '정말 지웁니다' }))
 
-    await waitFor(() => expect(fn).toHaveBeenCalledTimes(1))
-    expect(fn.mock.calls[0][0]).toBe('/api/videos/v1')
-    expect(fn.mock.calls[0][1]).toMatchObject({ method: 'DELETE' })
+    await waitFor(() => expect(notReport(fn)).toHaveLength(1))
+    /* 🔴 **지운 영상에 PATCH 를 더 쏘지 않는다.** 대표·공개는 클립의 성질이라
+       클립이 사라지면서 같이 없어진다 — 따로 내리려 하면 404 다(CCC 20 · 27). */
+    expect(notReport(fn)[0][0]).toBe('/api/videos/v1')
+    expect(notReport(fn)[0][1]).toMatchObject({ method: 'DELETE' })
     await waitFor(() =>
       expect(screen.getByText('아직 분석한 영상이 없습니다.')).toBeInTheDocument(),
     )
@@ -386,17 +521,9 @@ describe('내 영상 — 지우기', () => {
     expect(screen.queryByText('아직 분석한 영상이 없습니다.')).not.toBeInTheDocument()
   })
 
-  it('브라우저에만 있던 리포트도 함께 거둔다', async () => {
-    const user = userEvent.setup()
-    stubFetch({ ok: true })
-    saveReport('v1', { summary: '요약', traits: [], titles: [], scenes: [] })
-    render(<MyVideos videos={[analyzed]} />)
-
-    await user.click(screen.getByRole('button', { name: /삭제/ }))
-    await user.click(screen.getByRole('button', { name: '정말 지웁니다' }))
-
-    await waitFor(() => expect(reportFor('v1')).toBeNull())
-  })
+  /* 🔴 **리포트를 따로 거두던 시험이 여기 있었다.** 2026-09-10 에 리포트가
+     서버로 옮겨 가면서(CCC 31) 화면이 지울 것이 없어졌다 — 영상이 사라지면
+     리포트도 함께 사라진다. 되살리지 않는다. */
 })
 
 /**
@@ -454,7 +581,8 @@ describe('내 영상 — 재생 주소', () => {
         '/coach-c002.mp4',
       ),
     )
-    expect(fn).not.toHaveBeenCalled()
+    // 리포트 읽기는 별개다 — 재생 주소를 안 불렀다는 것만 본다.
+    expect(fn.mock.calls.filter((c) => !String(c[0]).endsWith('/report'))).toHaveLength(0)
   })
 })
 

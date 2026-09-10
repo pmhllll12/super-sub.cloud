@@ -1,7 +1,6 @@
 import { ApiError, GoogleGenAI, type Content, type FunctionDeclaration } from '@google/genai'
 import { NextResponse, type NextRequest } from 'next/server'
-import { BackendError, getBackend } from '@/server/backend'
-import type { MercenaryCandidate } from '@/server/backend/types'
+import { BackendError, getBackend, type MercenaryCandidate, type Position } from '@/server/backend'
 import { withAuth } from '@/server/handler'
 
 /**
@@ -31,13 +30,32 @@ import { withAuth } from '@/server/handler'
 
 const MODEL = 'gemini-2.5-flash'
 
-/** 마이그레이션에 박힌 값이 정본이다 — 조회 API가 없어 하드코딩한다
- *  (api-contract.md "포지션 목록은 마이그레이션이 넣는다"). */
-const POSITIONS: Record<string, Record<string, string>> = {
-  football: { GK: '골키퍼', DF: '수비수', MF: '미드필더', FW: '공격수' },
-  futsal: { GK: '골키퍼', DF: '수비수', MF: '미드필더', FW: '공격수' },
-  baseball: { P: '투수', C: '포수', IF: '내야수', OF: '외야수' },
-  basketball: { G: '가드', F: '포워드', C: '센터' },
+/**
+ * 🔴 **포지션 목록을 더는 하드코딩하지 않는다**(CCC 28, 2026-09-10).
+ *
+ * 전에는 이 파일이 `{ football: { GK: '골키퍼', … } }` 를 들고 있었다 —
+ * 마이그레이션이 바뀌면 **조용히 낡아서**, 챗봇만 없는 코드를 계속 제안하고
+ * 등록에서야 422 가 났다. 이제 `GET /positions` 가 정본이다(계약 3-3절).
+ *
+ * 🔴 **주장인 팀의 종목만** 받아 온다. 전 종목을 받으면 야구 `C`(포수)와 농구
+ * `C`(센터)가 같이 실려, LLM 이 남의 종목 코드를 고를 여지가 생긴다.
+ */
+async function positionsFor(
+  token: string,
+  ownerTeams: { sport_code: string }[],
+): Promise<Position[]> {
+  const sports = [...new Set(ownerTeams.map((t) => t.sport_code))]
+  const lists = await Promise.all(
+    sports.map((sport) =>
+      // 한 종목이 422(없는 종목)여도 나머지는 살린다 — 목록이 조금 빈 채로
+      // 대화가 도는 편이, 챗봇이 통째로 안 열리는 것보다 낫다. 어차피 등록은
+      // 화면의 [등록] 버튼이 서버 검사를 다시 받는다.
+      getBackend()
+        .listPositions(token, { sport_code: sport })
+        .catch(() => [] as Position[]),
+    ),
+  )
+  return lists.flat()
 }
 
 const PROPOSE_TOOL_NAME = 'propose_match_registration'
@@ -104,13 +122,23 @@ type Proposal = {
   needs: { position_code: string; position_label: string; head_count: number }[]
 }
 
-function systemPrompt(ownerTeams: { team_id: string; name: string; sport_code: string }[]): string {
+function systemPrompt(
+  ownerTeams: { team_id: string; name: string; sport_code: string }[],
+  positions: Position[],
+): string {
   const now = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
   const teamLines = ownerTeams
     .map((t) => `- team_id="${t.team_id}" 이름="${t.name}" 종목=${t.sport_code}`)
     .join('\n')
-  const posLines = Object.entries(POSITIONS)
-    .map(([sport, codes]) => `- ${sport}: ` + Object.entries(codes).map(([c, l]) => `${c}(${l})`).join(' · '))
+  const posLines = [...new Set(positions.map((p) => p.sport_code))]
+    .map(
+      (sport) =>
+        `- ${sport}: ` +
+        positions
+          .filter((p) => p.sport_code === sport)
+          .map((p) => `${p.code}(${p.label})`)
+          .join(' · '),
+    )
     .join('\n')
 
   return [
@@ -187,9 +215,12 @@ export async function POST(req: NextRequest) {
 
     if (ownerTeams.length === 0) {
       // 대화형 슬롯을 채울 팀 자체가 없다 — LLM을 부르지 않고 바로 안내한다(비용 절약).
+      // 🔴 등록·검색 둘 다 주장인 팀을 전제로 하므로(SEARCH_TOOL도 team_id가
+      // 필요하다) 문구를 한쪽에 치우치지 않게 둔다 — "경기를 등록해 드릴 수
+      // 없어요"로 고정하면 용병을 검색하려던 사용자에게는 안내가 어긋난다.
       return NextResponse.json({
         history: priorHistory,
-        reply: '아직 주장으로 있는 팀이 없어서 경기를 등록해 드릴 수 없어요. 먼저 팀을 만들어 주세요.',
+        reply: '아직 주장으로 있는 팀이 없어서 도와드릴 수 없어요. 먼저 팀을 만들어 주세요.',
         proposal: null,
       })
     }
@@ -203,6 +234,9 @@ export async function POST(req: NextRequest) {
       { role: 'user', parts: [{ text: body.message }] },
     ]
 
+    // 🔴 프롬프트를 짓기 **전에** 받아 둔다 — 목록이 프롬프트의 일부다(CCC 28).
+    const positions = await positionsFor(token, ownerTeams)
+
     const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
     let response: Awaited<ReturnType<typeof client.models.generateContent>>
     try {
@@ -210,7 +244,7 @@ export async function POST(req: NextRequest) {
         model: MODEL,
         contents: messages,
         config: {
-          systemInstruction: systemPrompt(ownerTeams),
+          systemInstruction: systemPrompt(ownerTeams, positions),
           tools: [{ functionDeclarations: [PROPOSE_TOOL, SEARCH_TOOL] }],
         },
       })
@@ -242,7 +276,13 @@ export async function POST(req: NextRequest) {
         query_text: string
       }
       const team = ownerTeams.find((t) => t.team_id === input.team_id)
-      const labels = team ? POSITIONS[team.sport_code] : undefined
+      /* 🔴 **그 팀의 종목 안에서** 찾는다 — 코드만으로 찾으면 야구 `C`(포수)에
+         농구 `C`(센터) 검색이 섞인다(PROPOSE_TOOL 분기와 같은 이유, CCC 28). */
+      const labels = team
+        ? Object.fromEntries(
+            positions.filter((p) => p.sport_code === team.sport_code).map((p) => [p.code, p.label]),
+          )
+        : undefined
 
       if (!team || !labels || !labels[input.position_code]) {
         // team_id·position_code가 시스템 프롬프트에 준 값을 벗어났다 — 검색을
@@ -321,7 +361,7 @@ export async function POST(req: NextRequest) {
         const followUp = await client.models.generateContent({
           model: MODEL,
           contents: messages,
-          config: { systemInstruction: systemPrompt(ownerTeams) },
+          config: { systemInstruction: systemPrompt(ownerTeams, positions) },
         })
         searchReply = (followUp.text ?? '').trim() || searchReply
         messages.push(
@@ -351,7 +391,13 @@ export async function POST(req: NextRequest) {
       needs: { position_code: string; head_count: number }[]
     }
     const team = ownerTeams.find((t) => t.team_id === input.team_id)
-    const labels = team ? POSITIONS[team.sport_code] : undefined
+    /* 🔴 **그 팀의 종목 안에서** 이름을 찾는다 — 코드만으로 찾으면 야구 `C`
+       (포수)에 농구 `C`(센터) 이름이 붙는다(CCC 28). */
+    const labels = team
+      ? Object.fromEntries(
+          positions.filter((p) => p.sport_code === team.sport_code).map((p) => [p.code, p.label]),
+        )
+      : undefined
 
     // 다음 사용자 턴이 이 functionCall과 짝을 이루는 functionResponse 없이 오면
     // 대화 맥락이 어긋난다 — 실제로 등록을 실행하지 않았으므로 안내로 짝을 닫는다.

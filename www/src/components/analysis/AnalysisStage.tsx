@@ -8,8 +8,8 @@ import type { Box } from '@/lib/box'
 import { smoothStep } from '@/lib/smoothBox'
 import { DEFAULT_SPORT, SPORT_CODE, type SportKey } from '@/lib/sports'
 import { FOCUS } from '@/lib/rubricFocus'
-import { uploadClip } from '@/lib/uploadClip'
-import { saveReport } from '@/lib/savedReports'
+import { uploadClip, type ClipSubject } from '@/lib/uploadClip'
+import { fetchReport, type ReportResult } from '@/lib/savedReports'
 import ReportView from '@/components/analysis/ReportView'
 import {
   EDGES,
@@ -253,31 +253,6 @@ const STEP_MS = 1100
  */
 const STEADY_HITS = 8
 
-/**
- * 자리 표시 리포트.
- *
- * 🔴 **수치를 그리지 않는다.** 계약이 `report.summary` 에 총점 · 등급 숫자를
- * 넣지 말라고 못박아 뒀고(3장 4), 카드에 능력치 컬럼을 두지 않는 원칙과 짝이다.
- * 수치는 `analysis_metric_value` 한 곳에만 있고 여기로 나오지 않는다.
- */
-const REPORT = {
-  summary:
-    '디딤발이 공보다 앞서 있습니다. 임팩트에서 무릎을 조금 더 덮어 주시면 방향이 안정됩니다.',
-  traits: [
-    '측면으로 벌리는 움직임이 많습니다',
-    '공을 받기 전에 어깨를 먼저 돌립니다',
-    '두 번째 동작으로 이어지는 속도가 빠릅니다',
-  ],
-  /** 받은 것만 그린다 — 못 받은 호칭을 미달 표식으로 남기지 않는다(4장). */
-  titles: ['첫 리포트'],
-  /** 판단의 근거가 된 장면. 시각은 수치가 아니라 찾아가는 자리다. */
-  scenes: [
-    { at: '0:04', what: '디딤발 착지' },
-    { at: '0:07', what: '임팩트' },
-    { at: '0:11', what: '팔로스루' },
-  ],
-}
-
 export default function AnalysisStage() {
   /**
    * 이 화면을 떠나는 중인가 — 그러면 **들어온 것을 그대로 되감는다**
@@ -444,6 +419,15 @@ export default function AnalysisStage() {
   const [duration, setDuration] = useState(0)
   const [step, setStep] = useState(0)
   const [done, setDone] = useState(false)
+  /**
+   * 분석 리포트 — 🔴 **서버에서 읽는다**(CCC 31 · 미결 `paik` 7번 · `jin` 27번,
+   * 2026-09-10). 전에는 이 파일에 리포트 객체가 **하드코딩**돼 있었다.
+   *
+   * 🔴 **아직 적재 전이면 「분석 중」이다.** 화면의 단계 표시는 시간으로 넘어가는
+   * 것이라(위 `STEP_MS`) 다 찼다고 서버 쪽이 끝난 것은 아니다 — 빈 리포트를
+   * 그리면 「분석 중」과 「결과가 없다」가 같아 보인다.
+   */
+  const [report, setReport] = useState<ReportResult | null>(null)
   const [dragging, setDragging] = useState(false)
 
   // 판이 화면을 채우는 동안에는 헤더도 비킨다(사용자 요청) — 목적지 글자와
@@ -516,6 +500,22 @@ export default function AnalysisStage() {
     if (!file) return
     return () => URL.revokeObjectURL(file.url)
   }, [file])
+
+  /**
+   * 리포트를 받아 온다 — **단계가 다 차고, 올라간 영상이 있을 때** 한 번.
+   *
+   * 🔴 늦게 온 응답이 다른 영상의 리포트를 덮지 않게 `alive` 로 막는다.
+   */
+  useEffect(() => {
+    if (!done || !videoId) return
+    let alive = true
+    void fetchReport(videoId).then((r) => {
+      if (alive) setReport(r)
+    })
+    return () => {
+      alive = false
+    }
+  }, [done, videoId])
 
   /**
    * 단계가 하나씩 넘어간다 — **「예」를 누른 뒤부터**(사용자 요청, 2026-09-08).
@@ -1052,6 +1052,37 @@ export default function AnalysisStage() {
   }
 
   /**
+   * 서버에 실을 **대상 닻**을 만든다 (CCC 26, 계약 3-6절).
+   *
+   * 🔴 **「예」를 누른 순간 추적기가 잡고 있는 박스**를 쓴다 — 처음 손으로 그린
+   * 네모가 아니다. 사용자가 「맞습니다」라고 답한 것은 *그 순간 관절이 붙어
+   * 있던 사람*이고, 처음 네모는 그 사람을 찾기 위한 출발점일 뿐이다.
+   * 놓친 상태면 그 출발점으로 되돌아간다 — 지정이 있었다는 사실은 그대로다.
+   *
+   * 🔴 **영상 밖은 잘라 낸다.** 계약이 `x+w ≤ 1` 을 요구하고 서버는 범위 밖을
+   * 422 로 튕긴다. 이건 규칙을 피하려는 클램프가 아니라 **좌표계 정의**다 —
+   * 추적 상자는 화면 밖으로 걸칠 수 있지만 영상 그림 밖은 영상이 아니다.
+   *
+   * 🔴 **없으면 통째로 생략한다**(`undefined`) — 그것이 「자동으로 고르기」이고
+   * 정식 경로다. 억지로 채우면 없는 지정을 있는 것처럼 만든다.
+   */
+  function subjectAnchor(): ClipSubject | undefined {
+    const box = targetRef.current ?? subject?.box ?? null
+    if (!box) return undefined
+    const x = clamp01(box.x)
+    const y = clamp01(box.y)
+    const w = clamp01(box.x + box.w) - x
+    const h = clamp01(box.y + box.h) - y
+    // 넓이가 0 이면 가리키는 것이 없다 — 422 를 부르느니 자동으로 고르게 둔다.
+    if (w <= 0 || h <= 0) return undefined
+    /* `at` 은 **지금 보고 있는 프레임**이다. 🔴 `duration_ms` 를 넘으면 422 라
+       상한을 씌운다 — 둘 다 우리가 잰 값이고 반올림으로 한 틱 어긋날 수 있다. */
+    const durMs = Math.round((duration || 0) * 1000)
+    const nowMs = Math.round((previewRef.current?.currentTime ?? 0) * 1000)
+    return { box: [x, y, w, h], atMs: durMs > 0 ? Math.min(nowMs, durMs) : nowMs }
+  }
+
+  /**
    * 영상을 S3 에 올린다 — 계약 3-6절의 클립 업로드 경로(jin-12)를 그대로 쓴다.
    *
    * 🔴 **부르는 것은 「예」다**(2026-09-08). 예전에는 오른쪽 위 `저장` 이
@@ -1062,10 +1093,9 @@ export default function AnalysisStage() {
    * 🔴 원본은 앱 서버를 지나지 않는다(PER-002) — 두 번째 단계는 브라우저가
    * S3 사전 서명 URL에 직접 PUT 한다.
    *
-   * ⚠️ **대상 박스는 아직 못 보낸다.** 계약 본문에 자리가 없고, 워커가 읽는
-   * S3 쪽에도 올릴 자리가 없다(미결 paik 6번, 담당 정어진). `subject` 는
-   * 이미 정규화 0~1 좌표로 들고 있으므로(`toVideoBox`), 자리가 생기면
-   * `lib/uploadClip.ts` 에 실어 보내면 된다.
+   * 🔴 **대상 박스와 집중 항목을 함께 싣는다**(CCC 26 · 29, 미결 `paik` 6·8번).
+   * 둘 다 `analysis_job` 에 저장돼 워커의 claim 응답으로 흘러가고 **응답에는
+   * 안 실린다** — 화면이 더 할 일은 없다.
    */
   async function saveToServer() {
     const picked = pickedFileRef.current
@@ -1083,6 +1113,9 @@ export default function AnalysisStage() {
           width: video?.videoWidth ?? 0,
           height: video?.videoHeight ?? 0,
         },
+        subject: subjectAnchor(),
+        // 빈 목록은 「전체적으로」다 — 생략과 같은 뜻이라 실패가 아니다(CCC 29).
+        focus,
       })
 
       if (saved.passed) {
@@ -1102,15 +1135,15 @@ export default function AnalysisStage() {
   }
 
   /**
-   * `저장` — **리포트를 내 프로필에 남긴다**(사용자 요청, 2026-09-08).
+   * `저장` — **이 영상을 남긴다**(사용자 요청, 2026-09-08).
    *
-   * 영상은 「예」가 이미 올렸으므로 여기서 다시 올리지 않는다. 남는 일은
-   * 리포트를 그 영상에 매다는 것이고, 계약에 읽는 경로가 없어 브라우저에
-   * 둔다(미결 paik 7번). `lib/savedReports.ts` 한 파일이 그 사실을 맡는다.
+   * 🔴 **리포트를 따로 저장하지 않는다**(2026-09-10 에 바뀌었다). 리포트는
+   * 분석이 끝나면 서버에 적재되므로(CCC 31) 화면이 매달아 둘 것이 없다 —
+   * 남는 일은 **영상을 지우지 않는 것**뿐이다. 저장 없이 떠나면 아래
+   * `dropLeftover` 가 그 영상을 지우고, 그러면 리포트도 함께 사라진다.
    */
   function saveReportToProfile() {
     if (!videoId) return
-    saveReport(videoId, REPORT)
     setReportSaved(true)
     // 저장했으니 더 이상 「미저장분」이 아니다 — 떠날 때 지우면 안 된다.
     leftoverRef.current = null
@@ -1606,12 +1639,12 @@ export default function AnalysisStage() {
           </p>
         )}
 
-        {/* ⚠️ 남긴 리포트가 어디에 있는지 밝힌다 — 숨기면 다른 기기에서 안 보일
-            때 고장으로 읽힌다(공개 여부 · 카드 꾸미기와 같은 규칙). */}
+        {/* 어디에서 다시 볼 수 있는지 밝힌다. 🔴 **「이 브라우저에만」이 아니다**
+            — 2026-09-10 부터 리포트는 서버에 있다(CCC 31). 그전 문구를 그대로
+            두면 다른 기기에서 보이는데도 안 보인다고 말하게 된다. */}
         {reportSaved && (
           <p className="ss-shot-save-msg" role="status">
-            내 프로필의 「분석 영상」 아래에 남겼습니다. 아직 이 브라우저에만
-            남습니다.
+            내 프로필의 「분석 영상」 아래에서 다시 볼 수 있습니다.
           </p>
         )}
 
@@ -1784,7 +1817,33 @@ export default function AnalysisStage() {
         ) : done ? (
           /* 🔴 리포트 그림은 `/me` 와 **같은 것을 쓴다**(ReportView) — 두 벌로
              두면 한쪽만 늙는다. */
-          <ReportView report={REPORT} />
+          /* 🔴 **「아직」과 「없다」를 갈라 그린다** — 분석 중인 클립에 빈 판을
+             보이면 결과가 없는 것으로 읽힌다(미결 `paik` 7번의 「하지 말 것」). */
+          report?.state === 'ready' ? (
+            <ReportView report={report.report} />
+          ) : (
+            <div className="ss-report-wait" role="status">
+              <p>
+                {report === null
+                  ? '리포트를 불러오는 중입니다…'
+                  : report.state === 'not-ready'
+                    ? '아직 분석이 끝나지 않았습니다.'
+                    : report.state === 'missing'
+                      ? '그 영상을 찾을 수 없습니다.'
+                      : report.message}
+              </p>
+              {/* 기다리는 것 말고 할 일을 준다 — 끝났는지 다시 물어볼 수 있어야 한다. */}
+              {videoId && report?.state !== 'missing' && (
+                <button
+                  type="button"
+                  className="ss-shot-pick-auto"
+                  onClick={() => void fetchReport(videoId).then(setReport)}
+                >
+                  다시 확인
+                </button>
+              )}
+            </div>
+          )
         ) : (
           <ol className="ss-steps" aria-label="분석 진행">
             {STEPS.map((s, i) => {

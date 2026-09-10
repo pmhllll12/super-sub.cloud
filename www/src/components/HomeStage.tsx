@@ -38,6 +38,7 @@ export default function HomeStage({
   user,
   card,
   squad = null,
+  sportCode = null,
   destinations,
   featured = [],
   defaultActive = null,
@@ -47,6 +48,8 @@ export default function HomeStage({
   card?: PublicPlayerCard | null
   /** 팀의 스쿼드. 팀이 없거나 아직 안 만들었으면 null 이다. */
   squad?: Squad | null
+  /** 그 팀의 종목 — 스쿼드 판이 포지션 목록을 받아 올 때 쓴다(CCC 28). */
+  sportCode?: string | null
   destinations: Destination[]
   /**
    * 헤드라인 자리에 **유리 알약 버튼**으로 크게 내놓는 목적지들.
@@ -421,6 +424,7 @@ export default function HomeStage({
             <SquadPanel
               card={card}
               squad={squad}
+              sportCode={sportCode}
               scouting={scouting}
               // 🔴 챗봇도 **판 오른쪽 그 자리**에서 나온다(사용자 요청) —
               // 지인 찾기 · AI 추천과 같은 자리다. 그 자리는 `.ss-squad-wrap`

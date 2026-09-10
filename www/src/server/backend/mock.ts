@@ -4,10 +4,12 @@ import type {
   AdminUser,
   AdminUserDetail,
   AuthToken,
+  FeaturedVideo,
   Match,
   MercenaryCandidate,
   MyVideo,
   OpenMatch,
+  Position,
   Squad,
   PlayerCard,
   PublicPlayerCard,
@@ -94,6 +96,74 @@ function requireAdmin(token: string): User {
 }
 
 /**
+ * 종목별 포지션 — `GET /positions` 가 주는 것(계약 3-3절). 정본은 백엔드
+ * 마이그레이션이고 여기 것은 그 사본이다.
+ *
+ * 🔴 **이 표가 mock 안에서 유일한 포지션 목록이다.** 전에는 등재 검사와 경기
+ * 등록 검사가 `{ GK: '골키퍼', … }` 를 각자 들고 있었는데, 그러면 한쪽만
+ * 고쳐졌을 때 어느 쪽이 맞는지 알 수 없다 — 화면에서 하드코딩을 걷어낸 것과
+ * 같은 이유로 mock 안에서도 한 곳으로 모은다(CCC 28).
+ *
+ * 🔴 **`code` 는 종목 안에서만 유일하다** — 야구 `C`(포수)와 농구 `C`(센터)가
+ * 둘 다 있다. 코드만으로 이름을 찾으면 안 된다.
+ */
+const POSITIONS: Position[] = [
+  { sport_code: 'baseball', code: 'P', label: '투수' },
+  { sport_code: 'baseball', code: 'C', label: '포수' },
+  { sport_code: 'baseball', code: 'IF', label: '내야수' },
+  { sport_code: 'baseball', code: 'OF', label: '외야수' },
+  { sport_code: 'basketball', code: 'G', label: '가드' },
+  { sport_code: 'basketball', code: 'F', label: '포워드' },
+  { sport_code: 'basketball', code: 'C', label: '센터' },
+  { sport_code: 'football', code: 'GK', label: '골키퍼' },
+  { sport_code: 'football', code: 'DF', label: '수비수' },
+  { sport_code: 'football', code: 'MF', label: '미드필더' },
+  { sport_code: 'football', code: 'FW', label: '공격수' },
+  { sport_code: 'futsal', code: 'GK', label: '골키퍼' },
+  { sport_code: 'futsal', code: 'DF', label: '수비수' },
+  { sport_code: 'futsal', code: 'MF', label: '미드필더' },
+  { sport_code: 'futsal', code: 'FW', label: '공격수' },
+]
+
+/** 종목 안에서 포지션 이름을 찾는다. 없으면 `undefined` — 부르는 쪽이 422 를 낸다. */
+function positionLabel(sportCode: string, code: string): string | undefined {
+  return POSITIONS.find((p) => p.sport_code === sportCode && p.code === code)?.label
+}
+
+/**
+ * 그 팀의 종목 — 등재 포지션이 **어느 종목의 것인지** 가르는 값이다.
+ * 🔴 코드만으로 찾으면 안 되는 이유가 `POSITIONS` 주석에 있다.
+ */
+function teamSport(u: User, teamId: string): string | undefined {
+  return u.teams.find((t) => t.team_id === teamId)?.sport_code
+}
+
+/**
+ * 판 칸을 검사해 저장할 모양으로 만든다 (계약 3-7절 「홈 판 격자」).
+ *
+ * 🔴 **함께 주거나 함께 비운다** — 한쪽만 오면 422 다. 조용히 채우면 판에
+ * 없어야 할 카드가 0번 칸에 선다.
+ * 🔴 서버는 `0 ≤ 값 ≤ 15` 만 본다(화면 픽셀이 실려 오는 것을 막는 방어).
+ */
+function checkCell(
+  col: number | null | undefined,
+  row: number | null | undefined,
+): { grid_col: number | null; grid_row: number | null } {
+  const hasCol = col !== null && col !== undefined
+  const hasRow = row !== null && row !== undefined
+  if (hasCol !== hasRow) {
+    throw new BackendError(422, 'VALIDATION_ERROR', 'grid_col 과 grid_row 는 함께 보냅니다.')
+  }
+  if (!hasCol) return { grid_col: null, grid_row: null }
+  for (const v of [col, row] as number[]) {
+    if (!Number.isInteger(v) || v < 0 || v > 15) {
+      throw new BackendError(422, 'VALIDATION_ERROR', '판 칸은 0~15 의 격자 번호입니다.')
+    }
+  }
+  return { grid_col: col as number, grid_row: row as number }
+}
+
+/**
  * 데모 계정이 올린 클립들 — **최근 것이 앞에 온다**(계약 3-6절).
  *
  * 🔴 `storage_key` 에 **`public/` 의 목업 영상 경로**를 넣었다(사용자 요청:
@@ -131,6 +201,13 @@ let DEMO_VIDEOS: MyVideo[] = [
     reject_reason: null,
     analysis_job_id: 'j1',
     analysis_status: 'succeeded',
+    // 🔴 **사람당 하나다** — 셋 중 하나만 true 로 둔다(계약 3-6절).
+    is_featured: true,
+    /* 하나는 공개로 둔다 — 영상 모음이 서버 목록을 그리는 갈래를 실제로
+       밟아 볼 수 있어야 한다(CCC 20). */
+    is_public: true,
+    title: '왼발 감아차기',
+    description: '수비 둘 사이로 들어간 장면',
   },
   {
     id: 'v2',
@@ -143,6 +220,10 @@ let DEMO_VIDEOS: MyVideo[] = [
     reject_reason: null,
     analysis_job_id: 'j2',
     analysis_status: 'running',
+    is_featured: false,
+    is_public: false,
+    title: null,
+    description: null,
   },
   {
     id: 'v3',
@@ -156,6 +237,10 @@ let DEMO_VIDEOS: MyVideo[] = [
     // 분석을 걸지 않고 올리기만 한 클립.
     analysis_job_id: null,
     analysis_status: null,
+    is_featured: false,
+    is_public: false,
+    title: null,
+    description: null,
   },
 ]
 
@@ -281,6 +366,9 @@ let demoSquad: Squad | null = {
   id: 'sq1',
   team_id: DEMO_TEAM_ID,
   public_slug: 'aB3xK9mQ2pL7vN4t',
+  /* 아직 안 정한 상태로 둔다 — 화면이 「서버에 없으면 기본 판」 갈래를
+     실제로 밟아 봐야 한다(계약 3-7절, 처음엔 null 이다). */
+  formation: null,
   members: [
     {
       id: 'sm1',
@@ -289,6 +377,8 @@ let demoSquad: Squad | null = {
       nickname: '홍길동',
       position_code: 'FW',
       position_label: '공격수',
+      grid_col: 1,
+      grid_row: 0,
     },
     {
       id: 'sm2',
@@ -297,14 +387,21 @@ let demoSquad: Squad | null = {
       nickname: '김철수',
       position_code: 'MF',
       position_label: '미드필더',
+      grid_col: 0,
+      grid_row: 1,
     },
     {
+      /* 🔴 **판에 안 올린 등재**를 하나 남겨 둔다 — 둘 다 null 인 줄이
+         화면에서 어떻게 그려지는지(등재는 됐지만 판에는 없음) 확인할 수
+         있어야 한다. */
       id: 'sm3',
       player_card_id: '5e7a0000-0000-4000-8000-000000000003',
       card_public_slug: 'lee-younghee-9c8d',
       nickname: '이영희',
       position_code: 'GK',
       position_label: '골키퍼',
+      grid_col: null,
+      grid_row: null,
     },
   ],
 }
@@ -437,6 +534,80 @@ export const mockBackend: Backend = {
     return DEMO_VIDEOS
   },
 
+  /**
+   * 리포트 — 계약 3-1 `GET /videos/{id}/report` (CCC 31).
+   *
+   * 🔴 **분석이 끝난 클립에만 있다.** `running` · `null` 인 클립에 빈 리포트를
+   * 주면 「분석 중」과 「결과가 없다」가 같아 보인다(미결 `paik` 7번의 「하지
+   * 말 것」) — 실물과 같이 404 `REPORT_NOT_READY` 로 답해서, 화면의 대기
+   * 갈래를 mock 에서도 실제로 밟아 볼 수 있게 한다.
+   *
+   * ⚠️ 아래 값은 **꾸며 낸 예시**다. 실물은 워커가 만든 `report.json` 이
+   * DB 에 적재된 것이고, 모양(허용목록)만 같다.
+   */
+  async getVideoReport(token, videoId) {
+    requireUser(token)
+    const v = DEMO_VIDEOS.find((x) => x.id === videoId)
+    if (!v) throw new BackendError(404, 'VIDEO_NOT_FOUND', '그 영상을 찾을 수 없습니다.')
+    if (v.analysis_status !== 'succeeded') {
+      throw new BackendError(404, 'REPORT_NOT_READY', '아직 분석 결과가 없습니다.')
+    }
+    return {
+      video_id: v.id,
+      analyzed_at: v.created_at,
+      summary:
+        '디딤발이 공보다 앞서 있습니다. 임팩트에서 무릎을 조금 더 덮어 주시면 방향이 안정됩니다.',
+      provisional: true,
+      breakdown: [
+        {
+          criterion_id: 'plant_foot_position',
+          name: '디딤발 위치',
+          grade: 2,
+          title: '흔들리지 않는 축',
+          evidence: '측면으로 벌리는 움직임이 많습니다',
+          metric_ref: 'plant_foot_offset',
+          skipped: false,
+        },
+        {
+          criterion_id: 'shoulder_lead',
+          name: '어깨 선행',
+          grade: 1,
+          title: null,
+          evidence: '공을 받기 전에 어깨를 먼저 돌립니다',
+          metric_ref: 'shoulder_rotation_lead',
+          skipped: false,
+        },
+        {
+          criterion_id: 'follow_through',
+          name: '팔로스루',
+          grade: 2,
+          title: '첫 리포트',
+          evidence: '두 번째 동작으로 이어지는 속도가 빠릅니다',
+          metric_ref: 'follow_through_speed',
+          skipped: false,
+        },
+        /* 🔴 **평가 대상이 아니었던 항목** — `grade: null` 이고 `skipped: true` 다.
+           0 으로 그리면 못한 것으로 읽힌다. 화면이 이걸 빼는지 보려고 둔다. */
+        {
+          criterion_id: 'jump_height',
+          name: '점프 높이',
+          grade: null,
+          title: null,
+          evidence: null,
+          metric_ref: null,
+          skipped: true,
+        },
+      ],
+      scenes: [
+        { metric_code: 'plant_frame', label: '디딤발 착지', at_seconds: 4 },
+        { metric_code: 'impact_frame', label: '임팩트', at_seconds: 7.5 },
+        { metric_code: 'follow_frame', label: '팔로스루', at_seconds: 11.2 },
+      ],
+      previews: null,
+      keypoint_quality: null,
+    }
+  },
+
   async getPlaybackUrl(token, videoId) {
     requireUser(token)
     const v = DEMO_VIDEOS.find((x) => x.id === videoId)
@@ -455,6 +626,93 @@ export const mockBackend: Backend = {
     if (DEMO_VIDEOS.length === before) {
       throw new BackendError(404, 'VIDEO_NOT_FOUND', '그 영상을 찾을 수 없습니다.')
     }
+  },
+
+  async updateVideo(token, videoId, input) {
+    requireUser(token)
+    const at = DEMO_VIDEOS.findIndex((v) => v.id === videoId)
+    // 🔴 남의 클립도 "없음"이다 — 갈라 주면 id 를 훑어 존재를 알아낼 수 있다.
+    if (at < 0) throw new BackendError(404, 'VIDEO_NOT_FOUND', '그 영상을 찾을 수 없습니다.')
+    const target = DEMO_VIDEOS[at]
+
+    // `is_featured` 는 불리언이라 `null`·생략은 **무시한다**(계약 3-6절 —
+    // 보낸 것만 바뀐다). `undefined` 를 false 로 읽으면 제목만 고쳐도 대표가 풀린다.
+    if (typeof input.is_featured === 'boolean') {
+      if (input.is_featured && !target.passed) {
+        throw new BackendError(422, 'CANNOT_FEATURE', '반려된 클립은 대표로 세울 수 없습니다.')
+      }
+      /* 🔴 **사람당 하나** — 세우면 옛 대표가 여기서 내려간다(진짜 백엔드는
+         DB 부분 유일 인덱스가 한다). 화면이 두 번 부르지 않아도 되는 것이
+         이 성질 때문이라, mock 도 같은 성질을 지켜야 화면을 확인할 수 있다. */
+      DEMO_VIDEOS = DEMO_VIDEOS.map((v) =>
+        v.id === videoId
+          ? { ...v, is_featured: input.is_featured as boolean }
+          : input.is_featured
+            ? { ...v, is_featured: false }
+            : v,
+      )
+    }
+    /* 🔴 **보낸 것만 바꾼다.** `undefined` 를 값으로 읽으면 공개만 토글해도
+       제목이 지워진다 — 계약이 부분 수정으로 정한 이유가 그것이다. */
+    if (typeof input.is_public === 'boolean') {
+      DEMO_VIDEOS = DEMO_VIDEOS.map((v) =>
+        v.id === videoId ? { ...v, is_public: input.is_public as boolean } : v,
+      )
+    }
+    for (const key of ['title', 'description'] as const) {
+      if (!(key in input)) continue
+      const raw = input[key]
+      // `null`·공백은 **지운다**(`tagline` 과 같은 규칙).
+      const next = typeof raw === 'string' && raw.trim() ? raw.trim() : null
+      const cap = key === 'title' ? 100 : 280
+      if (next && next.length > cap) {
+        throw new BackendError(422, 'VALIDATION_ERROR', `${key} 가 상한을 넘습니다.`)
+      }
+      DEMO_VIDEOS = DEMO_VIDEOS.map((v) => (v.id === videoId ? { ...v, [key]: next } : v))
+    }
+    return DEMO_VIDEOS.find((v) => v.id === videoId) as MyVideo
+  },
+
+  async listPublicVideos(token) {
+    requireUser(token)
+    /* 🔴 **저장 키와 업로더를 안 싣는다** — 저장 키에 업로더의 `user_id` 가
+       들어 있어 계약이 일부러 뺐다. mock 이 더 주면 화면이 실물에 없는 값에
+       기대게 된다. 재생은 `playback-url` 로 따로 받는다. */
+    return DEMO_VIDEOS.filter((v) => v.is_public).map((v) => ({
+      id: v.id,
+      sport_code: v.sport_code,
+      duration_ms: v.duration_ms,
+      created_at: v.created_at,
+      title: v.title,
+      description: v.description,
+    }))
+  },
+
+  async getFeaturedVideo(token, cardSlug): Promise<FeaturedVideo> {
+    requireUser(token)
+    /* mock 은 카드가 한 벌뿐이라 데모 카드의 슬러그만 답한다. 🔴 슬러그가
+       다르든 대표가 없든 **밖에서는 다 같은 404** 다(계약 3-6절). */
+    const v = cardSlug === card.public_slug ? DEMO_VIDEOS.find((x) => x.is_featured) : undefined
+    if (!v) throw new BackendError(404, 'NO_FEATURED_VIDEO', '대표 영상이 없습니다.')
+    return {
+      video_id: v.id,
+      // mock 의 저장 키는 `public/` 안의 진짜 파일이라 그대로가 곧 재생 주소다.
+      url: v.storage_key,
+      expires_in: 900,
+      sport_code: v.sport_code,
+      duration_ms: v.duration_ms,
+    }
+  },
+
+  async listPositions(token, params) {
+    requireUser(token)
+    const sport = params?.sport_code
+    if (sport === undefined) return POSITIONS
+    // 🔴 없는 종목은 **빈 배열이 아니라 422** 다 — 오타와 "그 종목 포지션이
+    // 아직 없다"가 같아 보이면 사용자가 없는 것을 계속 기다린다.
+    const hit = POSITIONS.filter((p) => p.sport_code === sport)
+    if (!hit.length) throw new BackendError(422, 'UNKNOWN_SPORT', '그런 종목이 없습니다.')
+    return hit
   },
 
   async searchMatches(token, params) {
@@ -494,7 +752,6 @@ export const mockBackend: Backend = {
     if (needs.length === 0) {
       throw new BackendError(422, 'VALIDATION_ERROR', '필요 포지션이 비어 있습니다.')
     }
-    const labels: Record<string, string> = { GK: '골키퍼', DF: '수비수', MF: '미드필더', FW: '공격수' }
     const seen = new Set<string>()
     for (const n of needs) {
       if (n.head_count < 1) {
@@ -504,7 +761,9 @@ export const mockBackend: Backend = {
         throw new BackendError(422, 'DUPLICATE_POSITION', '같은 포지션을 두 번 적었습니다.')
       }
       seen.add(n.position_code)
-      if (!labels[n.position_code]) {
+      // 🔴 **그 팀 종목 안에서** 찾는다 — 야구 `C`(포수)와 농구 `C`(센터)가
+      // 다른 것이라 코드만으로 찾으면 남의 종목 포지션이 통과한다.
+      if (!positionLabel(team.sport_code, n.position_code)) {
         throw new BackendError(422, 'UNKNOWN_POSITION', '이 팀 종목에 없는 포지션입니다.')
       }
     }
@@ -513,7 +772,10 @@ export const mockBackend: Backend = {
       team_id: teamId,
       played_at,
       place,
-      needs: needs.map((n) => ({ ...n, position_label: labels[n.position_code] })),
+      needs: needs.map((n) => ({
+        ...n,
+        position_label: positionLabel(team.sport_code, n.position_code) ?? n.position_code,
+      })),
     }
     DEMO_MATCHES.push(match)
     return match
@@ -539,27 +801,29 @@ export const mockBackend: Backend = {
     requireUser(token)
     // 멱등이다 — 두 번 불러도 슬러그가 바뀌지 않는다.
     if (demoSquad && demoSquad.team_id === teamId) return demoSquad
-    demoSquad = { id: 'sq1', team_id: teamId, public_slug: 'aB3xK9mQ2pL7vN4t', members: [] }
+    demoSquad = {
+      id: 'sq1',
+      team_id: teamId,
+      public_slug: 'aB3xK9mQ2pL7vN4t',
+      formation: null,
+      members: [],
+    }
     return demoSquad
   },
 
-  async addSquadMember(token, teamId, { player_card_id, position_code }) {
-    requireUser(token)
+  async addSquadMember(token, teamId, { player_card_id, position_code, grid_col, grid_row }) {
+    const u = requireUser(token)
     if (!demoSquad || demoSquad.team_id !== teamId) {
       throw new BackendError(404, 'SQUAD_NOT_FOUND', '스쿼드를 아직 만들지 않았습니다.')
     }
     if (demoSquad.members.some((m) => m.player_card_id === player_card_id)) {
       throw new BackendError(409, 'ALREADY_ENLISTED', '이미 등재된 카드입니다.')
     }
-    const labels: Record<string, string> = {
-      GK: '골키퍼',
-      DF: '수비수',
-      MF: '미드필더',
-      FW: '공격수',
-    }
-    if (!labels[position_code]) {
+    const label = positionLabel(teamSport(u, teamId) ?? '', position_code)
+    if (!label) {
       throw new BackendError(422, 'UNKNOWN_POSITION', '이 종목에 없는 포지션입니다.')
     }
+    const cell = checkCell(grid_col, grid_row)
     demoSquad = {
       ...demoSquad,
       members: [
@@ -570,7 +834,8 @@ export const mockBackend: Backend = {
           card_public_slug: 'hong-gildong-4f2a',
           nickname: '홍길동',
           position_code,
-          position_label: labels[position_code],
+          position_label: label,
+          ...cell,
         },
       ],
     }
@@ -586,6 +851,43 @@ export const mockBackend: Backend = {
       throw new BackendError(404, 'MEMBER_NOT_FOUND', '그 등재를 찾을 수 없습니다.')
     }
     demoSquad = { ...demoSquad, members: demoSquad.members.filter((m) => m.id !== memberId) }
+    return demoSquad
+  },
+
+  async setSquadFormation(token, teamId, formation) {
+    requireUser(token)
+    if (!demoSquad || demoSquad.team_id !== teamId) {
+      throw new BackendError(404, 'SQUAD_NOT_FOUND', '스쿼드를 아직 만들지 않았습니다.')
+    }
+    /* 🔴 값 집합(`3:3`·`5:5`·`7:7`)을 **강제하지 않는다** — 계약이 길이만
+       본다(판 크기가 늘 때 마이그레이션이 없도록). mock 이 더 좁게 굴면
+       화면이 실물에서만 되는 값을 여기서 못 밟아 본다. */
+    if (!formation || formation.length > 8) {
+      throw new BackendError(422, 'VALIDATION_ERROR', 'formation 은 1~8자입니다.')
+    }
+    demoSquad = { ...demoSquad, formation }
+    return demoSquad
+  },
+
+  async updateSquadMember(token, teamId, memberId, { position_code, grid_col, grid_row }) {
+    const u = requireUser(token)
+    if (!demoSquad || demoSquad.team_id !== teamId) {
+      throw new BackendError(404, 'SQUAD_NOT_FOUND', '스쿼드를 아직 만들지 않았습니다.')
+    }
+    if (!demoSquad.members.some((m) => m.id === memberId)) {
+      throw new BackendError(404, 'MEMBER_NOT_FOUND', '그 등재를 찾을 수 없습니다.')
+    }
+    const label = positionLabel(teamSport(u, teamId) ?? '', position_code)
+    if (!label) {
+      throw new BackendError(422, 'UNKNOWN_POSITION', '이 종목에 없는 포지션입니다.')
+    }
+    const cell = checkCell(grid_col, grid_row)
+    demoSquad = {
+      ...demoSquad,
+      members: demoSquad.members.map((m) =>
+        m.id === memberId ? { ...m, position_code, position_label: label, ...cell } : m,
+      ),
+    }
     return demoSquad
   },
 
