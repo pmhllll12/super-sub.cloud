@@ -6656,6 +6656,24 @@ passthrough 를 뺀 그 이유("필터 버그 하나 거리")를 되살립니다
 검증 후 파싱) → 읽기 DTO(`GET .../report`, `paik` 7) → 백성검이 프론트
 `AnalysisStage.tsx` 의 하드코딩 `REPORT` 를 fetch 로 교체.
 
+#### ✅ 백엔드 3단계 구현 완료 (2026-09-10) — `jin` `a231395` · `f0ff8d5` · `3bacb5c`
+
+정상호 회신(`c5ad695`)의 필드 목록을 읽고 진행했습니다. `report_schema.yaml`
+파일 자체는 아직 `ho` 에만 있고 — **박민호의 다음 `ho`→`main` 병합에서 들어옵니다.**
+그때 봉투 필드가 회신과 어긋나면 파서(`report_parser.py`)만 고치면 됩니다.
+
+| 단계 | 무엇 | 검증 |
+|---|---|---|
+| 1 마이그레이션 | `analysis_metric_criterion`(11필드, `uq(metric_id, criterion_id)`, CASCADE) · `analysis_metric` 에 `rubric_sport/motion/version` · `analysis_report` 에 `provisional`·`previews`·`keypoint_quality`·`schema_version`. 리비전 `efcf961d0051` | `alembic check` 클린 · head 하나 |
+| 2 적재 | `report_parser`(순수 함수, `schema_version` major 미지원이면 거부) → `ReportIngestPgRepository`(코드 사전 대조 후 통째 거부 or 4테이블 replace) → `FinishJobInteractor` 가 완료 보고 뒤 best-effort 트리거 | `test_report_ingest_db.py` 4 · `test_report_parser.py` 8 · 인터랙터 4 |
+| 3 읽기 | `GET /videos/{video_id}/report` — DB 조립 허용목록 DTO. 404 는 영상 존재로 가름(`VIDEO_NOT_FOUND`/`REPORT_NOT_READY`) | `test_report_read_router.py` 5 · `test_report_read_db.py` 4 · 전체 745 통과 |
+
+**루브릭 식별 위치 결정**: `analysis_metric`(작업당 1행)에 뒀습니다 — `analysis_report`
+는 요약 단위라 재분석 시 루브릭 버전 이력이 metric 쪽에 붙는 게 맞습니다.
+
+**남은 것**: 백성검이 `AnalysisStage.tsx` 하드코딩 `REPORT` → fetch 교체
+(`client-contract-changes.md` 31번). 이건 `paik` 7번에서 다룹니다.
+
 #### 곁가지 — 3-1 의 마지막 「미정」
 
 신뢰도(키포인트 품질)를 담을 자리가 3장 4) 산출물 넷 중 아직 안 정해졌습니다.
