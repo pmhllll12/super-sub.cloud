@@ -1,0 +1,47 @@
+# 줄바꿈 정규화 + 바이너리 보호
+#
+# 왜 필요한가: Windows git 은 설치 기본값이 `core.autocrlf=true`(system 레벨)라
+# 체크아웃 시 워킹트리를 CRLF 로 쓴다. WSL git 은 미설정(=false)이라 그것을 전부
+# "수정됨"으로 본다. 이 저장소에서 실제로 겪은 것:
+#   - `demo/` 아이콘 7개가 손대지도 않았는데 수정됨으로 뜬다 (2026-08-25)
+#   - Windows 쪽에서 git 을 돌리면 130 파일이 mode 변경으로 잡힌다 (2026-09-07)
+#   - python `write_text()` 가 CRLF 로 써서 `git diff` 가 파일 전체를 변경으로 (2026-09-01)
+# 상세는 `_notes/ERRORS.md`(개인 노트).
+#
+# `eol=lf` 까지 붙이는 이유: `text=auto` 만으로는 저장(index)만 LF 로 맞추고
+# 체크아웃은 여전히 플랫폼 설정을 따른다. 두 OS 에서 워킹트리를 같게 만들려면
+# `eol=lf` 가 필요하다.
+#
+# 🔴 이 파일을 추가해도 **이미 추적 중인 파일은 자동으로 안 바뀐다.** index 의
+#    기존 blob 은 그대로다 — 앞으로의 `git add`/checkout 부터 LF 로 맞춰진다.
+#    과거분(현재 `agent/eval/phaseA/` 의 CSV·로그 61개가 CRLF)까지 한 번에
+#    맞추려면 `git add --renormalize .` 단독 커밋이 필요하고, 그건 남의 파일과
+#    네 브랜치를 건드리므로 **main 통합자(박민호)가 조율해서** 한다.
+* text=auto eol=lf
+
+# 내용이 한 바이트도 바뀌면 안 되는 파일. `text=auto` 자동 판별에 맡겨도 대개
+# 맞지만, 이미지·폰트·아카이브가 손상되면 원인 찾기가 어려우므로 못 박는다.
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.gif     binary
+*.ico     binary
+*.webp    binary
+*.mp4     binary
+*.mov     binary
+*.woff    binary
+*.woff2   binary
+*.ttf     binary
+*.otf     binary
+*.pdf     binary
+*.zip     binary
+*.jar     binary
+*.keystore binary
+*.jks     binary
+*.so      binary
+*.dll     binary
+*.pyc     binary
+*.npz     binary
+*.xlsx    binary
+
+# svg·plist 는 텍스트(XML)다 — binary 로 두면 diff 가 안 보인다. 기본 규칙을 따른다.
