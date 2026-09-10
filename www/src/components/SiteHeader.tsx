@@ -81,6 +81,19 @@ export default function SiteHeader({
   const bare = pathname === '/me'
 
   /**
+   * 🔴 **목적지 글자와 「내 프로필」을 접는 화면들.**
+   *
+   * `/me` 는 위 `bare` 가 워드마크를 가운데로 보내는 것까지 함께 하지만,
+   * **접는 것과 가운데로 보내는 것은 다른 일**이다 — 경기장 예약은 판이
+   * 화면을 꽉 채우는 자리라 머리줄이 비어야 하고(사용자 요청, 2026-09-10),
+   * 워드마크까지 움직이면 그 화면만 홈처럼 보인다.
+   *
+   * 🔴 접는 방식은 `bare` 와 같다 — **DOM 에서 빼지 않고 안 보이게만** 한다
+   * (아래 주석: 빼면 남은 것들이 자리를 다시 나눠 갖아 줄이 좌우로 튄다).
+   */
+  const quiet = bare || pathname === '/venues'
+
+  /**
    * 🔴 **되돌아오는 연출**을 위한 표시.
    *
    * 로고가 가운데로 가는 것은 프로필에서 애니메이션으로 보이는데, 거기서
@@ -142,7 +155,7 @@ export default function SiteHeader({
         <BrandMark size={26} />
       </TransitionLink>
 
-      <div className={`ss-home-nav-slot${bare ? ' ss-home-gone' : ''}`}>
+      <div className={`ss-home-nav-slot${quiet ? ' ss-home-gone' : ''}`}>
         <HomeNav
           destinations={shown}
           loggedIn={Boolean(user)}
@@ -159,7 +172,7 @@ export default function SiteHeader({
            눌러 보기 전엔 어디로 가는지 알 수 없다. */
         <TransitionLink
           href="/me"
-          className={`ss-home-profile shrink-0${bare ? ' ss-home-gone' : ''}`}
+          className={`ss-home-profile shrink-0${quiet ? ' ss-home-gone' : ''}`}
         >
           {card ? (
             <span className="ss-pcard-mini">
