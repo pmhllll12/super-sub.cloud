@@ -24,6 +24,7 @@ from app.review.adapter.inbound.api.v1.review_router import review_router
 from app.user.adapter.inbound.api.v1.admin_router import admin_router
 from app.user.adapter.inbound.api.v1.auth_router import auth_router
 from app.user.adapter.inbound.api.v1.me_router import me_router
+from app.user.adapter.inbound.api.v1.mercenary_router import mercenary_router
 from app.user.adapter.inbound.api.v1.positions_router import positions_router
 from app.user.adapter.inbound.api.v1.team_router import team_router
 from app.user.adapter.outbound.stub.user_stub_repository import (
@@ -98,6 +99,7 @@ for _router in (
     review_router,
     admin_router,
     billing_router,
+    mercenary_router,
 ):
     app.include_router(_router, prefix=API_PREFIX)
 

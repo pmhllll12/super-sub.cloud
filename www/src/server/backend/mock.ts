@@ -5,6 +5,7 @@ import type {
   AdminUserDetail,
   AuthToken,
   Match,
+  MercenaryCandidate,
   MyVideo,
   OpenMatch,
   Squad,
@@ -181,6 +182,32 @@ const DEMO_MATCHES: Match[] = [
     needs: [{ position_code: 'MF', position_label: '미드필더', head_count: 1 }],
   },
 ]
+
+/**
+ * 용병 후보 검색(`POST /matching/search-candidates`, api-contract.md 3-11절)의
+ * mock 데이터. 실제로는 서버가 `query_text`를 임베딩으로 바꿔 코사인 유사도로
+ * 정렬하지만, mock은 그럴 이유가 없다 — **포지션이 맞으면 고정 순서로** 준다.
+ */
+const DEMO_CANDIDATES: Record<string, MercenaryCandidate[]> = {
+  GK: [
+    {
+      user_id: 'c1',
+      nickname: '이골키',
+      location: '서울 강남',
+      skill_summary: '공중볼 처리에 강함, 주말 저녁 위주로 가능',
+      similarity: 0.86,
+    },
+  ],
+  FW: [
+    {
+      user_id: 'c2',
+      nickname: '박공격',
+      location: '서울 송파',
+      skill_summary: '스피드 좋은 윙 포워드, 평일 저녁 가능',
+      similarity: 0.79,
+    },
+  ],
+}
 
 /**
  * 모집 중인 경기 — 「팀원」 판이 훑는 목록(`GET /matches`).
@@ -490,6 +517,12 @@ export const mockBackend: Backend = {
     }
     DEMO_MATCHES.push(match)
     return match
+  },
+
+  async searchMercenaryCandidates(token, { position_code, limit }) {
+    requireUser(token)
+    const candidates = DEMO_CANDIDATES[position_code] ?? []
+    return candidates.slice(0, limit ?? 10)
   },
 
   async getSquad(token, teamId) {

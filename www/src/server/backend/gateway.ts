@@ -3,11 +3,13 @@ import type {
   AdminUserListResult,
   AuthToken,
   CreateMatchInput,
+  MercenaryCandidate,
   PlayerCard,
   PublicPlayerCard,
   Match,
   MatchSearch,
   MyVideo,
+  SearchMercenaryCandidatesInput,
   Squad,
   SignupResult,
   User,
@@ -76,6 +78,18 @@ export interface Backend {
   ): Promise<MatchSearch>
   /** 경기를 새로 연다. 주장만 — 아니면 403 `FORBIDDEN`. */
   createTeamMatch(token: string, teamId: string, input: CreateMatchInput): Promise<Match>
+  /**
+   * 용병 후보 검색(api-contract.md 3-11절, min 16·17번) — **SFR-006·007과
+   * 별개**다(그쪽은 지원 후 채점·추천, 이건 지원 전 검색). `is_searchable`인
+   * 사람만, 유사도 내림차순. 없으면 빈 배열(에러 아님).
+   *
+   * ⚠️ 아직 `fastapi/app/main.py`에 라우터가 배선되지 않아 지금은 404다
+   * (min 17번) — 정어진의 배선을 기다린다.
+   */
+  searchMercenaryCandidates(
+    token: string,
+    input: SearchMercenaryCandidatesInput,
+  ): Promise<MercenaryCandidate[]>
   /** 팀의 스쿼드. 소속이면 본다. **아직 없으면 404 SQUAD_NOT_FOUND** 다. */
   getSquad(token: string, teamId: string): Promise<Squad>
   /** 스쿼드를 연다. **멱등** — 이미 있으면 그것을 그대로 돌려준다. 주장만. */
