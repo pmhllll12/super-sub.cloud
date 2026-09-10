@@ -5509,7 +5509,7 @@ downgrade 왕복 클린, 572 통과. `test_analysis_schema_db.py`·`test_delete_
 - **합의 전에는 적재 엔드포인트를 구현하지 않는다** (스키마와 규격 초안까지만 올라가 있다)
 - **담당**: 정상호 · **제기**: 정어진 · **기한**: 스프린트 2
 
-### 2. 클라이언트의 백엔드 계약 반영 — www ✅ 해소 (2026.09.10) · flutter 대기
+### 2. 클라이언트의 백엔드 계약 반영 — www ✅ 해소 (2026.09.10) · flutter ✅ 해소 (2026.09.10)
 
 > **www 몫이 끝났습니다 (2026-09-10, 백성검).** 429 `TOO_MANY_REQUESTS` 뒤에
 > 같은 요청이 다시 안 나갑니다. **기다릴 시간은 서버가 준 `Retry-After`** 이고
@@ -5539,6 +5539,30 @@ downgrade 왕복 클린, 572 통과. `test_analysis_schema_db.py`·`test_delete_
 > 이 `code` 를 버리는 문제**(같은 구역 4번)가 아직 있어서, 429 를 다른 실패와
 > 가를 수단이 없습니다. 그 구멍은 새로 만든 `flutter/CLAUDE.md` 에 적어 두었고,
 > **www 가 이미 한 모양**(`ApiCallError`)을 따라가면 두 클라이언트가 안 갈립니다.
+
+> **flutter 몫도 끝났습니다 (2026-09-10, 백성검).** `AuthException` 이 `code` ·
+> `retryAfter` 를 갖게 되어(같은 구역 4번도 함께 닫힙니다) 429 를 다른 실패와
+> 가를 수 있습니다. www 가 이미 한 모양(`ApiCallError`)을 그대로 따라갔습니다 —
+> `Retry-After` 헤더도 **www 와 달리 프록시를 거치지 않고 바로 옵니다** (문서
+> 5·6절이 이미 짚어 둔 대로 Flutter 는 백엔드를 직접 부르므로 이 문제가 없습니다).
+>
+> | 자리 | 무엇 |
+> |---|---|
+> | `auth_repository.dart` | `AuthException` 에 `code`·`retryAfter` (선택 인자라 기존 호출부는 안 고쳤습니다) |
+> | `auth_repository_api.dart` | `_decode` 가 `error['code']` 와 `Retry-After` 헤더를 함께 싣습니다. 헤더가 없거나 0 이면 **최소 1초**(www와 같은 판단) |
+> | `data/rate_limit.dart` (신규) | `isRateLimited()` · `retryAfterSeconds()` — www의 같은 이름 함수와 같은 성질 |
+> | `presentation/rate_limit_controller.dart` (신규) | `rateLimitControllerProvider` — 매초 줄어드는 잠금 카운터. **지금은 로그인 화면만 잇습니다** — 가입·구글 로그인 화면이 Flutter 에 아직 없습니다(`grep -rln "signup\|google" flutter/lib/features/auth` 결과 없음). 생기면 같은 provider 를 이어 쓰면 됩니다 |
+> | `login_screen.dart` | 429 면 서버 메시지 대신 잠금 안내(`남은 초 뒤에 다시 시도`)를 띄우고 버튼을 잠급니다 |
+>
+> - 🔴 **구글 버튼 잠금 제외 규칙은 아직 해당 없음** — Flutter 에 구글 로그인
+>   화면이 없어 적용할 자리가 없습니다. 화면이 생기면 www 의 "구글 버튼에는
+>   잠금을 걸지 않는다"를 그대로 따라야 합니다.
+>
+> | 확인 | `flutter analyze` → 0건. `flutter test` → 91개 전부 통과(`rate_limit_test.dart` 7개, `login_screen_test.dart`의 429 시나리오 포함) |
+> |---|---|
+>
+> `flutter/CLAUDE.md` 의 "알려진 구멍" 절도 함께 갱신했습니다(더는 구멍이
+> 아닙니다).
 
 8/26 부터 백엔드 계약이 여러 번 늘었다. 정리 문서를 냈고 **조치가 필요한 것은
 둘**이다. 나머지는 이미 잘 돌아서 `조치 불필요` 와 그 이유를 적어 두었다.
@@ -7636,6 +7660,89 @@ chat/route.ts` 시스템 프롬프트) · 스쿼드 등재 UI · 모집 등록 `
 기본은 (b)로 갈 생각입니다. `report.json` 스키마를 계약으로 고정하실 때
 `breakdown[]` 항목 필드 목록도 함께 못박아 주시면 (b) 컬럼을 거기 맞춥니다.
 
+#### ✅ (b) 로 확정했습니다 (2026.09.10) — 정상호 회신(`ho` `c5ad695`) 뒤
+
+`breakdown[]` 11필드가 계약(`agent/contracts/report_schema.yaml` · `schema_version`)
+으로 고정돼서 (b)로 갑니다. (c) JSON 블롭은 매 읽기가 재파싱·재필터라 3-1 이
+passthrough 를 뺀 그 이유("필터 버그 하나 거리")를 되살립니다. `ho` 24(title·band
+보존)·`ho` 28(오버롤 등급 읽기 경로)도 항목별 필드가 질의 가능해야 하고,
+`analysis_metric_value` 도 이미 행-per-item 입니다.
+
+**새 테이블 `analysis_metric_criterion`** — `analysis_metric_id`(fk CASCADE) ·
+`criterion_id` · `grade`(NULL=skipped) · `weight`(Numeric) · `contribution`(NULL 가능)
+· `title` · `band` · `out_of_band`(기본 `''`) · `evidence`(Text — 이 테이블에서
+유일한 LM 산출) · `metric_ref` · `skipped`(bool). `uq(analysis_metric_id, criterion_id)`.
+🔴 **`stat` 은 안 둡니다** — 이미 `analysis_metric_value` 행(`stat.{sport}.{motion}.{id}`).
+🔴 **`name` 도 안 둡니다** — `metric_definition.label`. `skipped[]` 은 같은 테이블에
+`skipped=true` 행(`grade`·`evidence` NULL — 없음이 곧 「제외」, 0점 아님).
+
+**`analysis_report` 추가 컬럼** — `provisional`(bool) · `previews`(JSON) ·
+`keypoint_quality`(JSON — 정상호 `keypoint_quality` 블록 통째) · `schema_version`(str).
+`summary`·`model_name` 은 그대로. 🔴 이 테이블 docstring 이 "LM 문장만" 이라는데
+`provisional` 등은 문장이 아니지만 **분석 단위 메타**라 여기가 맞습니다(정상호도
+같은 판단) — docstring 을 "분석 단위 결과" 로 넓힙니다.
+
+**적재 시**: `schema_version` 의 major 가 모르는 값이면 **적재 거부**(반쯤 적재하면
+어느 행이 낡은 스키마인지 사후 구분 불가 — 정상호 규칙).
+
+**아직 안 정한 것 하나**: 루브릭 식별(`sport`·`motion`·`version`)을
+`analysis_metric` 에 둘지 `analysis_report` 에 둘지 — 마이그레이션 짤 때 결정.
+읽기 DTO 가 `grade.{sport}.{motion}.{id}` 를 되짚는 데 필요합니다.
+
+🔴 **구현은 `report_schema.yaml` 이 `main` 에 병합된 뒤** 시작합니다 (지금 `ho` 에만).
+순서: 마이그레이션(위 둘) → 적재 인터랙터(`report_key`로 S3 읽어 `schema_version`
+검증 후 파싱) → 읽기 DTO(`GET .../report`, `paik` 7) → 백성검이 프론트
+`AnalysisStage.tsx` 의 하드코딩 `REPORT` 를 fetch 로 교체.
+
+#### ✅ 백엔드 3단계 구현 완료 (2026-09-10) — `jin` `a231395` · `f0ff8d5` · `3bacb5c`
+
+정상호 회신(`c5ad695`)의 필드 목록을 읽고 진행했습니다. `report_schema.yaml`
+파일 자체는 아직 `ho` 에만 있고 — **박민호의 다음 `ho`→`main` 병합에서 들어옵니다.**
+그때 봉투 필드가 회신과 어긋나면 파서(`report_parser.py`)만 고치면 됩니다.
+
+| 단계 | 무엇 | 검증 |
+|---|---|---|
+| 1 마이그레이션 | `analysis_metric_criterion`(11필드, `uq(metric_id, criterion_id)`, CASCADE) · `analysis_metric` 에 `rubric_sport/motion/version` · `analysis_report` 에 `provisional`·`previews`·`keypoint_quality`·`schema_version`. 리비전 `efcf961d0051` | `alembic check` 클린 · head 하나 |
+| 2 적재 | `report_parser`(순수 함수, `schema_version` major 미지원이면 거부) → `ReportIngestPgRepository`(코드 사전 대조 후 통째 거부 or 4테이블 replace) → `FinishJobInteractor` 가 완료 보고 뒤 best-effort 트리거 | `test_report_ingest_db.py` 4 · `test_report_parser.py` 8 · 인터랙터 4 |
+| 3 읽기 | `GET /videos/{video_id}/report` — DB 조립 허용목록 DTO. 404 는 영상 존재로 가름(`VIDEO_NOT_FOUND`/`REPORT_NOT_READY`) | `test_report_read_router.py` 5 · `test_report_read_db.py` 4 · 전체 745 통과 |
+
+**루브릭 식별 위치 결정**: `analysis_metric`(작업당 1행)에 뒀습니다 — `analysis_report`
+는 요약 단위라 재분석 시 루브릭 버전 이력이 metric 쪽에 붙는 게 맞습니다.
+
+##### 정상호 회신 `476b0df` 반영 확인 (2026-09-10) — 코드 변경 없음
+
+정상호가 계약을 `ho` 에서 정정했습니다(`schema_version` `1.0` → `1.1`, `breakdown[]`
+에 `view_dependent` 추가, 곁가지 하나). 제 구현과 대조한 결과 **깨지는 곳 없음**:
+
+| 정상호 정정 | 제 쪽 상태 |
+|---|---|
+| `schema_version` `1.1` (minor — `view_dependent` 추가) | 파서가 **major 만** 봅니다(`SUPPORTED_SCHEMA_MAJOR = 1`). `"1.1"` 통과, `analysis_report.schema_version` 에 `"1.1"` 이 그대로 들어감. `"1.0"` 봉투와 섞여도 둘 다 유효. 테스트 픽스처를 `"1.1"` 로 올렸습니다 |
+| `breakdown[].view_dependent` (`""`·`"metric"`·`"grade"`) | ✅ **저장하기로 결정**(`ho` 38번 판단 = 제 몫). 아래 소절 |
+| 곁가지: `metric_definition.label`(`"야구 · 투구 · 앞다리 버티기"`) ≠ `breakdown[].name` | 🔴 그래서 `analysis_metric_criterion` 에 **`name` 컬럼을 뒀습니다** — 위 (b) 확정의 "🔴 `name` 도 안 둡니다(= `label`)" 를 **정정합니다.** `label` 은 3단 합성이라 항목 이름과 글자가 다릅니다. `breakdown[].name` 을 그대로 저장하고, 둘을 같다고 보는 비교 검사는 넣지 않았습니다(정상호 경고 그대로) |
+
+##### ✅ `ho` 38번 (`view_dependent` 적재 컬럼 판단 = 제 몫) — **저장하기로** (2026-09-10)
+
+**넣습니다.** `analysis_metric_criterion.view_dependent` (`String(10)` nullable),
+마이그레이션 `a1c9f7b2e034`(← `efcf961d0051`. `efcf961d0051` 은 이미 push·참조돼
+있어 별도 리비전으로 더함). 파서·적재 저장소 각 1줄, `skipped` 행은 NULL.
+
+왜 넣는가:
+- `band`·`out_of_band` 와 **같은 등급의 개발 확인용 항목별 메타**다.
+  `analysis_metric_criterion` 이 이미 그 둘을 담고 있어 구조가 일관된다.
+- 실측으로 축구 슛 200클립 중 192건(96%)이 `"grade"` — 드문 값이 아니고,
+  "이 등급은 촬영 방향에 갈렸다"를 되짚는 데(37번·`ho` 28) 질의 가능해야 한다.
+- 안 넣으면 나중에 S3 의 `report.json` 을 전수 재파싱해야 채운다.
+
+🔴 **선수 화면 DTO(`ReportCriterionView`/`VideoReportResponse`)에는 안 넣습니다** —
+`band`·`out_of_band` 와 같습니다(정상호 지시). 점수 보정에도 안 씁니다(어느 부호가
+옳은지 모름).
+
+→ **`ho` 38번은 이걸로 만족됨.** 담당(정어진)이 판단·구현 완료했으니 정상호가
+그 항목에 `✅ 해소` 를 달면 됩니다.
+
+**남은 것**: 백성검이 `AnalysisStage.tsx` 하드코딩 `REPORT` → fetch 교체
+(`client-contract-changes.md` 31번). 이건 `paik` 7번에서 다룹니다.
+
 #### 곁가지 — 3-1 의 마지막 「미정」
 
 신뢰도(키포인트 품질)를 담을 자리가 3장 4) 산출물 넷 중 아직 안 정해졌습니다.
@@ -8323,6 +8430,9 @@ EXAONE의 NC 라이선스 문제와는 완전히 분리됩니다. 정상호에�
 안내는 하지만 **실제로 만들 화면이 없어 막다른 곳**입니다. 다음 스프린트
 후보로 올려 둡니다 — 담당은 아직 안 정했습니다.
 
+> **정식 항목으로 올렸습니다 → 같은 구역 18번** (2026-09-10). 담당은 박민호가
+> 직접 진행합니다.
+
 **확인**: `git grep -n "createTeamMatch" -- www/src` · `cd www && npm run
 test` (299 passed, 신규 20건 — mock 6·라우트 4·컴포넌트 5·챗봇 라우트 3)
 · `npx tsc --noEmit` 통과. 데모 계정(`demo@super-sub.example`)의 팀 역할을
@@ -8986,6 +9096,137 @@ grep -rniE '\bdocker\b|podman|containerd|k3s|kubectl|kubernetes' agent/ \
 
 - **담당**: ~~정어진~~ **박민호가 대신 처리 (2026.09.10)** · **제기**: 박민호 · **기한**: 확인되는 대로
 
+### 18. **팀 만들기 화면이 없습니다** — 신규 계정이 주장 전용 기능을 하나도 못 씁니다 (2026-09-10 신설)
+
+`min` 7번에서 이미 한 번 짚었던 것("발견한 것 — 팀을 만드는 화면이 아직
+없습니다... 담당은 아직 안 정했습니다")을 정식 항목으로 올립니다. 오늘
+챗봇 검색을 실제 계정으로 테스트하다가 막혀서 원인을 다시 확인했습니다.
+
+`POST /teams`는 백엔드에 있는데(`fastapi/docs/api-contract.md` 937절,
+만든 사람이 자동으로 `owner`) **그걸 부르는 화면이 `www/`에 없습니다**
+(`git grep -n "POST /teams\|createTeam" www/src` — `app/api/chat/route.ts`의
+프롬프트 문구에서만 언급될 뿐, 실제 호출부는 0건). `app/api/teams/`
+아래도 `[teamId]/...` 하위 라우트만 있고 상위 `route.ts`가 없습니다.
+
+🔴 **테스트 편의 문제가 아닙니다.** 챗봇 등록·검색, 경기 만들기, 스쿼드
+관리가 전부 "주장인 팀"을 전제로 이미 만들어져 있는데, 그 팀을 처음
+만드는 길이 없어서 **신규 가입 계정은 이 기능들 중 아무것도 못 씁니다.**
+2026-09-03부터 배포가 실제 DB를 봐서 목업 데모 계정(`demo@super-sub.example`)
+우회도 이제 안 먹힙니다(`paik` 10번).
+
+#### 만족해야 할 성질
+
+> 로그인한 사용자가 화면에서 팀을 만들 수 있고, 그 팀의 주장(owner)이 된다.
+
+화면 위치·형태는 예시일 뿐 규격이 아닙니다. 아래는 기존 관례
+(`createSquad`·`createTeamMatch`)를 따라간 참고 구성입니다 — 제가
+직접 진행하며 바뀔 수 있습니다.
+
+| 계층 | 자리(예시) |
+|---|---|
+| 백엔드 연동 3종 | `gateway.ts`에 `createTeam` 추가 · `fastapiBackend.ts`(`POST /api/v1/teams`) · `mock.ts` |
+| BFF 라우트 | `app/api/teams/route.ts`(신규, `POST` 하나) |
+| 화면 | `app/(app)/teams/new/page.tsx`(이름·지역·종목 폼) |
+| 진입점 | `app/page.tsx`가 이미 `user.teams[0]?.team_id`로 "팀 없음"을 알고 있음(51행 근처) — `SquadPanel`이 `sportCode === null`일 때 빈 스쿼드 판 대신 "팀 만들기" 안내로 갈아 끼우면 됨 |
+
+#### 확인
+
+| | |
+|---|---|
+| 확인 | 팀이 없는 신규 계정으로 로그인 → 화면에서 팀 생성 → `GET /me`의 `teams`에 `role: owner`로 뜨는지. 그 뒤 챗봇에 검색 요청이 "주장인 팀이 없다" 안내 없이 실제로 진행되는지 |
+| 하지 말 것 | 🔴 팀 생성을 챗봇 대화로 대신 처리하지 않기 — 챗봇은 이미 있는 팀을 전제로 한 두 흐름(등록·검색)만 다룬다(`min` 7번 범위 정정과 같은 방향) |
+
+- 관련: `min` 7번(원래 이 갭을 처음 적어 둔 자리) · `paik` 10번(데모 계정 우회 불가) · `api-contract.md` 937절
+- **담당**: 박민호(직접 진행) · **제기**: 박민호 · **기한**: 확인되는 대로
+
+### 19. **내 프로필을 "검색 가능"으로 켜는 화면이 없습니다** — 용병 검색이 항상 빈 결과입니다 (2026-09-10 신설)
+
+18번(팀 만들기)과 짝입니다 — 팀을 만들어도 **검색당할 사람이 DB에 없으면**
+`search_candidates`는 매번 빈 배열을 돌려줍니다(에러 아님, 정상 동작).
+
+`GET`·`PATCH /api/v1/me/mercenary-profile`(`api-contract.md` 2246절)가
+`preferred_positions`·`available_slots`·`skill_summary`·`is_searchable`을
+다루는데, **이걸 부르는 화면이 `www/`에 없습니다** —
+`grep -rln "mercenary-profile\|is_searchable\|skill_summary" www/src`로
+찾히는 건 `gateway.ts`·`types.ts`·`mock.ts`·`MatchBot.test.tsx`뿐이고,
+`MatchBot.tsx`는 검색 **결과**의 `skill_summary`를 보여주기만 합니다(213행)
+— 내 프로필을 채우는 자리가 아닙니다.
+
+🔴 **`is_searchable`을 켜려면 셋을 한꺼번에 채워야 합니다**
+(`preferred_positions`·`available_slots`·`skill_summary` 중 하나라도 비면
+422 `MERCENARY_PROFILE_INCOMPLETE`). `skill_summary`가 바뀌는 요청만
+Gemini 임베딩을 다시 계산합니다(포지션·시간만 바꾸면 임베딩 API를 안 탑니다).
+
+#### 만족해야 할 성질
+
+> 로그인한 사용자가 화면에서 자기 선호 포지션·가능 시간·소개 문장을 채우고
+> "용병으로 찾아지기"를 켤 수 있다.
+
+화면 위치·형태는 예시일 뿐 규격이 아닙니다. 자연스러운 자리는 `/me`
+(프로필 화면) 안 — 카드 꾸미기(`paik` 3번)와 같은 성격의 "내 정보" 섹션입니다.
+
+#### 확인
+
+| | |
+|---|---|
+| 확인 | 화면에서 포지션·가능 시간·소개·검색 가능 스위치를 채운 뒤, **다른 계정**의 팀장이 챗봇으로 같은 종목·포지션을 검색하면 그 사람이 후보로 뜨는지 |
+| 하지 말 것 | 🔴 `is_searchable`만 켜고 나머지를 비워두는 UI를 만들지 않기 — 서버가 422로 막아도, 화면에서 셋을 같이 입력받게 해야 사용자가 "왜 안 켜지지"에서 막히지 않는다 |
+
+- 관련: 18번(팀 만들기 — 같은 세션에서 발견) · `api-contract.md` 2246·2310절(`GET/PATCH /me/mercenary-profile`·`POST /matching/search-candidates`)
+- **담당**: 박민호(직접 진행) · **제기**: 박민호 · **기한**: 확인되는 대로
+
+### 20. 용병 검색 결과에서 **후보를 고를 수가 없습니다** — 목록만 보여주고 끝입니다 (2026-09-10 신설)
+
+18·19번과 같은 세션에서 발견했습니다. `search_candidates`가 후보를 찾아
+주는 데까지는 되는데, **그다음이 없습니다.**
+
+`MatchBot.tsx`(180행 근처)를 보면 등록 흐름은 확인 카드에 **[등록] 버튼**이
+있어 실제로 처리되는데, 검색 결과(`candidates`)는 `<li>`로 닉네임·지역·
+소개 문장만 나열할 뿐 **클릭·선택·초대 동작이 전혀 없습니다.** "찾아주는"
+기능은 끝났고 "찾은 사람을 실제로 데려오는" 기능이 빠져 있습니다.
+
+#### ✅ 열린 질문 1번 — 결정됨 (2026.09.10, 박민호)
+
+**초대를 보내고, 상대방이 수락해야 확정되는 쪽으로 갑니다.** 주장이 동의
+없이 바로 팀원으로 꽂는 방식은 안 씁니다 — 검색 대상자 본인이 모르는 채로
+어딘가에 등록되는 것을 막습니다.
+
+#### 🔴 그런데 이 방식엔 **없는 것이 하나 더 있습니다** — 초대·수락 개념 자체가 계약에 없습니다
+
+`api-contract.md` 933절(3-3. 팀)에 이렇게 못박혀 있습니다:
+
+> 가입 | 본인이 가입하거나 주장이 넣는다. **초대·승인 테이블이 부록 D에
+> 없어 신청-승인 흐름은 넣지 않았다**
+
+즉 지금 있는 것은 **정반대 방향**뿐입니다 — 경기 지원(흐름 A,
+`GET /matches` → `POST .../applications` → 팀 쪽이 `.../applications/{id}/accept`)은
+**선수가 스스로 지원하고 팀이 수락**하는 구조입니다. 이번에 필요한 건
+**팀이 먼저 콕 집어 초대를 보내고 선수가 수락**하는, 방향이 반대인 흐름이라
+그대로 재사용할 수 없습니다 — 다만 "제안 → 수락으로 확정" 이라는 **상태
+전이 모양은 닮았으니 참고는 될 수 있습니다.**
+
+🔴 **그래서 이건 `www` 혼자 끝낼 수 있는 일이 아닙니다.** 새 테이블(초대·
+알림)과 새 엔드포인트가 필요해 보여서 **정어진과 스키마부터 맞춰야
+합니다** — 루트 `CLAUDE.md`의 "스키마·API 계약을 바꾸는 변경은 미리
+알려 주세요"가 그대로 적용됩니다.
+
+#### 만족해야 할 성질
+
+> 팀장이 검색 결과에서 후보를 고르면 그 사람에게 초대가 가고, 그 사람이
+> 수락해야 팀(또는 그 경기)에 실제로 반영된다.
+
+테이블·엔드포인트 이름은 예시일 뿐 규격이 아닙니다.
+
+#### 확인
+
+| | |
+|---|---|
+| 확인 | 검색 결과에서 "초대" 동작 → 상대방 계정에 초대 알림이 뜨는지 → 수락 시 `GET /teams/{id}`의 `members[]`(또는 그 경기의 `needs`)에 실제로 반영되는지. 거절·무시 시엔 아무것도 안 바뀌는지 |
+| 하지 말 것 | 🔴 동의 없이 `POST /teams/{id}/members`로 바로 추가하지 않기 — 오늘 결정과 반대 방향입니다 |
+
+- 관련: 18·19번(같은 세션에서 발견, 이 항목의 선행 조건) · `api-contract.md` 933절(3-3. 팀) · 흐름 A의 `applications`(방향은 반대지만 상태 전이 참고용) · `paik` 22번(팀 매칭 mock 표시 — 초대함 UI가 생기면 거기 mock도 같이 걷어야 함)
+- **담당**: 박민호(제품·화면) · 정어진(스키마·API, 착수 전 협의 필요) · **제기**: 박민호 · **기한**: 확인되는 대로
+
 ## paik (백성검)
 
 ### 1. 분석한 영상을 우리 서버에 저장하는 경로 ✅ 해소 (2026.09.03)
@@ -9373,7 +9614,7 @@ S3 를 폴링하는 pull 방식**입니다. 그래서 **EC2 는 백엔드 DB 를
 - 관련: 미결 ho 구역 「누구를 분석 대상으로 고를지」 · `www/src/lib/uploadClip.ts` · 계약 3-6절
 - **담당**: 정어진 · **제기**: 백성검 · **기한**: 스프린트 3 (조정 가능)
 
-### 7. 분석 리포트를 **읽는** 경로가 없습니다 (2026-09-08 신설)
+### 7. 분석 리포트를 **읽는** 경로가 없습니다 (2026-09-08 신설) ✅ 해소 (2026.09.10) — 백엔드 · ✅ 프론트도 반영 (2026.09.10)
 
 paik 1번에서 「저장」이 열리며 *"리포트 조회 규격과 같이 정하는 편이 낫습니다"*
 라고 적어 둔 것을, 실제로 막혀서 항목으로 올립니다.
@@ -9427,7 +9668,45 @@ paik 1번에서 「저장」이 열리며 *"리포트 조회 규격과 같이 �
 「아직 안 끝난 작업에 빈 리포트를 주지 말라」신 것도 그대로입니다 —
 리포트는 분석이 **끝나야** 생기고, `report_key` 도 `succeeded` 에만 실립니다.
 
-- 관련: paik 1번(해소) · 계약 3-1 · 3-6절 「아직 없는 것」 · min 9번(1~3번을 스프린트 3으로 묶은 자리 — 3번 화면 배선 담당이 여기서 정해짐)
+> 🔴 **아직 막혀 있습니다 (2026.09.10 오전, 백성검 확인 — 같은 날 오후에 풀렸습니다.
+> 아래를 보세요. 지우지 않고 남깁니다: 그때 무엇을 보고 막혔다고 판단했는지가
+> 남아야 다음 사람이 같은 조사를 반복하지 않습니다).** `fastapi/app/analysis`
+> 아래 리포트를 읽는 라우트(`GET .../report` 류)를 찾아봤는데 없습니다
+> (`grep -rn "APIRouter\|@router\.\(get\|post\)" fastapi/app/analysis` 로
+> 확인 — report 관련 GET 라우트 0건). `job_router.py` 에 `report_key` 를
+> **받는** 쪽만 있고 **내주는** 경로가 아직 없습니다. 그래서 이 항목에 막혀
+> 있는 `min` 9번(3단계 화면 배선) · `ho` 28번(오버롤 화면 표시) · `ho` 24번도
+> 같이 대기 중입니다 — 새로 조사할 필요 없이 이 항목이 열리면 셋 다 이어서
+> 하면 됩니다.
+
+#### ✅ 경로가 났고, 화면도 갈아 끼웠습니다 (2026.09.10, 백성검)
+
+**정어진 님이 `GET /videos/{id}/report` 를 내주셨습니다**(CCC 31번 · `jin` 27번,
+커밋 `3bacb5c`). 요청한 네 가지가 다 있습니다 — 요약(`summary`) · 특징
+(`breakdown[].evidence`) · 호칭(`breakdown[].title`) · 근거 장면(`scenes[]`).
+
+- **하드코딩을 걷어냈습니다.** `AnalysisStage.tsx` 안에 리포트 객체가 통째로
+  박혀 있던 것을 지우고 그 경로를 부릅니다
+- **브라우저 저장소도 걷어냈습니다.** `lib/savedReports.ts` 한 파일만 갈아
+  끼웠습니다 — 부르는 쪽(`AnalysisStage` · `MyVideos`)은 안 고쳤습니다
+- 「아직 안 끝난 것」을 갈라 그립니다 — `404 REPORT_NOT_READY` 는 **「분석
+  중입니다」**, `VIDEO_NOT_FOUND` 는 **「찾을 수 없습니다」**로 다릅니다
+- `skipped: true`(=`grade: null`) 항목은 **안 그립니다**. `band`·`stat` 도
+  응답에 없어 걸러 낼 것이 없었습니다
+- 「저장」 단추의 뜻이 바뀌었습니다 — 리포트가 서버에 있으므로 **영상을 남기는
+  것**만 합니다(저장 없이 떠나면 미저장분 정리가 그 영상을 지웁니다)
+
+| 확인 | 결과 |
+|---|---|
+| `grep -n 'localStorage' www/src/lib/savedReports.ts` | **0건** (전에는 6건) |
+| `grep -n 'REPORT\s*=' www/src/components/analysis/AnalysisStage.tsx` | **0건** |
+| 시험 | 566 통과 (리포트 옮김터 10건 신규) |
+
+⚠️ **배포되기 전까지는 화면에 「분석 중」이 뜹니다** — 그 경로가 아직 `main` 에
+없습니다(`jin` 이 앞서 있음). 배선은 끝났으므로 올라가는 즉시 값이 나옵니다.
+
+- 관련: paik 1번(해소) · paik 23번(호칭 규칙) · 계약 3-1 · 3-6절 「아직 없는 것」 · min 9번(1~3번을 스프린트 3으로 묶은 자리 — 3번 화면 배선 담당이 여기서 정해짐)
+- 🔴 **이 항목에 막혀 있던 `min` 9번 · `ho` 28번 · `ho` 24번이 이제 풀립니다** — 읽는 경로가 났고 웹은 붙였습니다(배포는 `jin` 이 `main` 에 올라간 뒤).
 - **담당**: 정어진 · **제기**: 백성검 · **기한**: 스프린트 3 (조정 가능)
 
 ### 8. **어디를 집중해서 볼지**를 고를 수 있게 했는데, 보낼 데가 없습니다 (2026-09-08 신설) ✅ 해소 (2026.09.09) — 백엔드 · ✅ 프론트도 반영 (2026.09.10)
@@ -10144,3 +10423,23 @@ description}` 입니다. **가로·세로가 없습니다.**
 **그 문구도 같이 걷어야** 합니다.
 
 - **담당**: 백성검(문구 걷기) · **제기**: 백성검 · **기한**: 17~21 이 닫힌 뒤
+
+### 23. 「받은 호칭」의 기준을 정해 주세요 — `grade` 와 `title` 의 관계 (2026-09-10 신설)
+
+리포트 화면은 **받은 호칭만** 그립니다 — 못 받은 것을 미달 표식으로 남기지
+않는다는 규칙입니다(계약 4장). 그런데 `GET /videos/{id}/report` 의 항목에는
+`grade`(0~2)와 `title` 이 **나란히** 있고, **어느 등급부터 받은 것인지**가
+계약에도 `agent/report-contract.md` 에도 없습니다.
+
+지금은 **`title` 이 채워진 항목만** 호칭으로 그립니다. 우리가 `grade === 2`
+같은 선을 그으면 그게 곧 화면이 지어내는 판단이라 안 그었습니다.
+
+| | |
+|---|---|
+| 만족해야 할 성질 | 「이 항목이 호칭을 받았는가」를 **응답만 보고** 판단할 수 있을 것. 지금 규칙(`title != null` 이면 받은 것)이 맞으면 그렇다고만 알려 주셔도 됩니다 |
+| 왜 묻는가 | 낮은 등급에도 `title` 이 붙는다면 화면이 **못한 항목에 호칭을 달게 됩니다** — 규칙이 정반대로 뒤집힙니다 |
+| 확인 | 실제 `report.json` 에서 `grade` 가 0·1 인 항목에 `title` 이 있는지 |
+| 하지 말 것 | 🔴 화면이 등급으로 선을 긋기 — 계약에 없는 기준을 클라이언트가 만드는 것입니다 |
+
+- 관련: paik 7번(해소) · CCC 31번 · `agent/report-contract.md`
+- **담당**: 정상호 · **제기**: 백성검 · **기한**: 스프린트 3

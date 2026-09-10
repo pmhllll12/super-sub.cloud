@@ -349,7 +349,8 @@ describe('내 프로필 — /me', () => {
       <MeBody user={USER} card={CARD} videos={[]} matches={[]} editing />,
     )
     fireEvent.click(screen.getByRole('tab', { name: '붓' }))
-    fireEvent.click(screen.getByRole('button', { name: '겹원' }))
+    // 그림 자국 하나를 고른다 — 이름은 `CardMark.MARKS` 가 정본이다.
+    fireEvent.click(screen.getByRole('button', { name: '수채 구름' }))
 
     const inCard = container.querySelector('.ss-card-stage .ss-pcard .ss-card-mark')
     expect(inCard).not.toBeNull()
@@ -391,7 +392,8 @@ describe('내 프로필 — /me', () => {
 
     // 다만 일부러 고른 자국은 그린다 — 말없이 지우지 않는다.
     fireEvent.click(screen.getByRole('tab', { name: '붓' }))
-    fireEvent.click(screen.getByRole('button', { name: '겹원' }))
+    // 그림 자국 하나를 고른다 — 이름은 `CardMark.MARKS` 가 정본이다.
+    fireEvent.click(screen.getByRole('button', { name: '수채 구름' }))
     expect(container.querySelector('.ss-card-stage .ss-pcard .ss-card-mark')).not.toBeNull()
   })
 

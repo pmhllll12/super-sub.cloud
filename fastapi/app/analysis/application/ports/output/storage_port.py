@@ -44,6 +44,15 @@ class StoragePort(ABC):
         """
 
     @abstractmethod
+    def read_object(self, storage_key: str) -> bytes | None:
+        """그 키의 객체 바이트를 읽는다. **없으면 None** — 아직 안 올렸다는 뜻이다.
+
+        워커가 올린 `report.json` 을 서버가 읽어 DB 로 적재하는 자리다(미결 `jin`
+        27번). 원본 클립처럼 큰 것이 아니라 리포트 JSON(수십 KB)이라 앱 서버를
+        지나도 된다 — 사전 서명 URL 이 아니라 직접 읽는다.
+        """
+
+    @abstractmethod
     def delete_object(self, storage_key: str) -> None:
         """그 키의 객체를 지운다. **없는 키여도 오류가 아니다**(멱등)."""
 

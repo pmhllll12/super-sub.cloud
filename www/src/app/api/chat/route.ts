@@ -215,9 +215,12 @@ export async function POST(req: NextRequest) {
 
     if (ownerTeams.length === 0) {
       // 대화형 슬롯을 채울 팀 자체가 없다 — LLM을 부르지 않고 바로 안내한다(비용 절약).
+      // 🔴 등록·검색 둘 다 주장인 팀을 전제로 하므로(SEARCH_TOOL도 team_id가
+      // 필요하다) 문구를 한쪽에 치우치지 않게 둔다 — "경기를 등록해 드릴 수
+      // 없어요"로 고정하면 용병을 검색하려던 사용자에게는 안내가 어긋난다.
       return NextResponse.json({
         history: priorHistory,
-        reply: '아직 주장으로 있는 팀이 없어서 경기를 등록해 드릴 수 없어요. 먼저 팀을 만들어 주세요.',
+        reply: '아직 주장으로 있는 팀이 없어서 도와드릴 수 없어요. 먼저 팀을 만들어 주세요.',
         proposal: null,
       })
     }
