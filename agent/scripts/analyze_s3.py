@@ -338,7 +338,10 @@ def analyze_one(video: str, args, rubric, subject) -> str:
 # 백엔드는 배포 뒤 실서버에서만 알게 된다. 정본 목록은
 # `contracts/report_schema.yaml` 이고 `tests/test_report_contract.py` 가 이
 # 함수의 산출과 그 파일이 어긋나면 빨개진다.
-REPORT_SCHEMA_VERSION = "1.0"
+# 🔴 값은 `contracts/report_schema.yaml` 의 `version` 과 **같아야 한다**
+# (테스트가 본다). 필드를 늘렸으면 minor 를 올린다 — 1.1 은 `view_dependent`
+# 가 늘어난 봉투다 (미결 `ho` 37·38번).
+REPORT_SCHEMA_VERSION = "1.1"
 
 
 def build_report(
