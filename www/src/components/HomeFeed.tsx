@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { feedWith } from '@/lib/feed'
-import { listPublished, type PublishedClip } from '@/lib/published'
+import { listPublished } from '@/lib/published'
+import type { PublicVideo } from '@/server/backend'
+import { usePlaybackUrls } from '@/lib/playbackUrl'
 
 /**
  * 홈을 내리면 나오는 **영상 모음** — 필름 한 줄이 화면 가운데를 지나간다.
@@ -83,18 +85,28 @@ export default function HomeFeed({ active, by }: { active: boolean; by: string }
 
   /** 앞뒤로 **끝없이** 돈다 — 마지막에서 오른쪽으로 가면 처음으로. */
   /**
-   * 내가 공개로 돌린 클립.
+   * 공개로 돌린 클립 — **남의 것까지**(CCC 20, 미결 `paik` 5번).
    *
-   * 🔴 그릴 때 저장소를 읽지 않는다 — 서버에는 그 값이 없어서 서버가 그린 첫
-   * 화면과 브라우저가 그린 것이 갈리면 하이드레이션이 깨진다. 붙은 뒤에 읽는다.
+   * 🔴 전에는 브라우저 저장소라 **내 것만** 붙었다. 이제
+   * `GET /videos/public` 이라 다른 사람이 공개한 것도 온다.
    *
-   * ⚠️ 아직 **내 것만** 붙는다. 남의 공개 영상은 계약에 목록도 재생 주소도
-   * 없어서(미결) 못 가져온다.
+   * 🔴 **그릴 때 부르지 않는다** — 서버가 그린 첫 화면과 갈리면 하이드레이션이
+   * 깨진다. 붙은 뒤에 받는다.
    */
-  const [published, setPublished] = useState<PublishedClip[]>([])
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- 저장소는 서버에 없다. 붙은 뒤에 읽어야 하이드레이션이 안 깨진다.
-  useEffect(() => setPublished(listPublished()), [])
-  const clips = feedWith(published, by)
+  const [published, setPublished] = useState<PublicVideo[]>([])
+  useEffect(() => {
+    let alive = true
+    void listPublished().then((list) => {
+      if (alive) setPublished(list)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
+  /* 🔴 **재생 주소는 목록에 안 실려 온다** — 클립마다 따로 받는다(만료되는
+     값이라 캐시하지 않는다). 저장 키가 없으므로 늘 받는 쪽으로 간다. */
+  const publicUrls = usePlaybackUrls(published)
+  const clips = feedWith(published, publicUrls, by)
 
   const go = (step: number) => setI((prev) => (prev + step + clips.length) % clips.length)
 
