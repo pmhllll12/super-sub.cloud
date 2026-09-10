@@ -6461,6 +6461,33 @@ chat/route.ts` 시스템 프롬프트) · 스쿼드 등재 UI · 모집 등록 `
 | 실물 확인 | `grep -rn 'report_key' agent/scripts/` — 워커가 성공 보고에 싣는가 · `agent/report-contract.md` 의 `result.breakdown[].criterion_id` 와 `metric_definition` 의 `grade.{sport}.{motion}.{id}` 가 대응하는가 |
 | 하지 말 것 | 🔴 에이전트가 `analysis_metric_value` 에 직접 INSERT — 검증·버전 기록·삭제 연쇄가 양쪽으로 갈라진다(3-1) · 🔴 읽기 경로에서 `report.json` passthrough — 적재 후 DB 조립이다 · 🔴 두 방식(`metrics[]` 제출 · S3+`report_key`)을 **둘 다** 열어 두기 · 🔴 `band`·`provisional`·`out_of_band` 를 선수 리포트 DTO 에 넣기(`agent/report-contract.md` 「화면에 낼 때」) |
 
+#### 🔴 `breakdown[]` 의 텍스트를 담을 자리가 없습니다 (2026-09-10 조사)
+
+`report.json` 실물 스키마(`analyze_s3.py` · `scoring.aggregate`)를 읽고 시드 45코드
+대응을 확인했습니다 — `features` 키 12 → `metric` 12, `result.score` → `total_score`,
+`breakdown[].grade`/`stat` → `grade.*`/`stat.*` 16+16. 합성은 `rubric.sport`/`motion`
+으로 결정론적이고, 루브릭의 `deferred:` 항목은 `breakdown[]` 에 안 나와 **미시드
+코드 위험은 없습니다.** 숫자 적재는 45행으로 충분합니다.
+
+**문제는 숫자가 아닌 것입니다.** `breakdown[]` 이 `evidence`(항목별 문장)·`title`
+(칭호)·`band`·`out_of_band`·`contribution`·`weight`, 그리고 `skipped[]`·`provisional`
+·`previews`(스켈레톤 그림)를 나르는데 **어느 테이블에도 컬럼이 없습니다.**
+`analysis_metric_value` 는 `(metric_code, value, frame_index)` 뿐이고
+`analysis_report` 는 `summary` + `model_name` 뿐입니다. 원래 3-1 초안
+(`metrics[]` + `report{summary}`)이 항목별 근거를 일부러 버린 형태입니다 —
+그런데 `paik` 7번(특징 문장·받은 호칭·본 장면)과 `agent/report-contract.md`
+「paik 7번이 요구한 네 가지」는 이 값들을 **읽을 수 있어야** 합니다.
+
+정할 것 (제 쪽 설계지만 스키마라 알립니다):
+
+| | |
+|---|---|
+| (b) 새 테이블 `analysis_metric_criterion` | `criterion_id`·`grade`·`title`·`band`·`out_of_band`·`evidence`·`metric_ref`·`contribution`·`weight` 를 항목당 1행. 구조가 그대로 남아 DTO 허용목록이 명시적 |
+| (c) `analysis_report` 에 `result` JSON 컬럼 | `breakdown`+`skipped` 를 통째. 단순하지만 3-1 의 「구조적으로 보장」 논거가 약해집니다 |
+
+기본은 (b)로 갈 생각입니다. `report.json` 스키마를 계약으로 고정하실 때
+`breakdown[]` 항목 필드 목록도 함께 못박아 주시면 (b) 컬럼을 거기 맞춥니다.
+
 #### 곁가지 — 3-1 의 마지막 「미정」
 
 신뢰도(키포인트 품질)를 담을 자리가 3장 4) 산출물 넷 중 아직 안 정해졌습니다.
@@ -6469,7 +6496,7 @@ chat/route.ts` 시스템 프롬프트) · 스쿼드 등재 UI · 모집 등록 `
 "지금은 안 낸다"를 알려 주시면 컬럼은 나중에 더합니다(17번처럼).
 
 - 상세: `fastapi/docs/api-contract.md` 3-1 · `agent/report-contract.md` · 같은 구역 23·24번 · `paik` 7번 · `min` 9번
-- **담당**: 정어진(적재·읽기 API 구현) · 정상호(`report.json` 스키마 계약 고정 + 성공 보고에 `report_key` 보장 + 위 곁가지) · **제기**: 정어진 · **기한**: 스프린트 3 (`paik` 7·`min` 9·`jin` 24 가 이것에 물려 있음)
+- **담당**: 정어진(적재·읽기 API 구현 + `breakdown[]` 담을 테이블 (b)/(c) 결정) · 정상호(`report.json` 스키마 계약 고정 — 봉투 + `result.breakdown[]` 필드 목록 + 성공 보고에 `report_key` 보장 + 위 곁가지) · **제기**: 정어진 · **기한**: 스프린트 3 (`paik` 7·`min` 9·`jin` 24 가 이것에 물려 있음)
 
 ## min (박민호)
 
