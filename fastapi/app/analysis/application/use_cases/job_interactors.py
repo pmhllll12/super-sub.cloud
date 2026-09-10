@@ -9,6 +9,9 @@ from app.analysis.application.ports.input.job_use_cases import (
     ClaimJobUseCase,
     FinishJobUseCase,
 )
+from app.analysis.application.ports.input.report_ingest_use_case import (
+    IngestReportUseCase,
+)
 from app.analysis.application.ports.output.job_port import JobPort
 from app.analysis.application.ports.output.storage_port import StoragePort
 from app.analysis.application.ports.output.video_port import VideoPort
@@ -91,8 +94,13 @@ class ClaimJobInteractor(ClaimJobUseCase):
 
 
 class FinishJobInteractor(FinishJobUseCase):
-    def __init__(self, repository: JobPort) -> None:
+    def __init__(
+        self,
+        repository: JobPort,
+        ingest: IngestReportUseCase | None = None,
+    ) -> None:
         self._repository = repository
+        self._ingest = ingest
 
     def __call__(self, command: FinishJobCommand) -> None:
         if not is_terminal(command.status):
@@ -111,12 +119,27 @@ class FinishJobInteractor(FinishJobUseCase):
         blocked = self._repository.finish(
             command.job_id, command.status, command.failure_reason, report_key
         )
-        if blocked is None:
-            return
         if blocked == "missing":
             raise ApiError(404, "JOB_NOT_FOUND", "작업을 찾을 수 없습니다.")
-        # 🔴 집지 않은 작업(`queued`)이나 이미 끝난 작업이다. 조용히 통과시키면
-        #    두 번째 보고가 `finished_at` 을 뒤로 밀어 소요 시간이 늘어난다.
-        raise ApiError(
-            409, "JOB_NOT_RUNNING", f"진행 중인 작업이 아닙니다(현재 {blocked})."
-        )
+        if blocked is not None:
+            # 🔴 집지 않은 작업(`queued`)이나 이미 끝난 작업이다. 조용히 통과시키면
+            #    두 번째 보고가 `finished_at` 을 뒤로 밀어 소요 시간이 늘어난다.
+            raise ApiError(
+                409, "JOB_NOT_RUNNING", f"진행 중인 작업이 아닙니다(현재 {blocked})."
+            )
+
+        # 완료가 커밋된 뒤에 적재한다(`repository.finish` 가 커밋한다).
+        # 🔴 **best-effort 다** — 적재가 실패해도 작업은 성공한 것이다. 리포트는
+        #    객체 저장소에 그대로 있으니 나중에 다시 적재하면 된다. 여기서
+        #    예외를 올리면 성공 보고 자체가 500 이 되어 워커가 재시도하고,
+        #    그러면 `409 JOB_NOT_RUNNING` 만 반복한다.
+        if self._ingest is not None and report_key:
+            try:
+                self._ingest(command.job_id, report_key)
+            except Exception as exc:  # noqa: BLE001
+                logger.error(
+                    "작업 %s 완료는 됐으나 리포트 적재 실패 (%s: %s) — 재적재 필요",
+                    command.job_id,
+                    type(exc).__name__,
+                    exc,
+                )

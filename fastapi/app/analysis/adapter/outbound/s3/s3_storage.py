@@ -60,6 +60,16 @@ class S3Storage(StoragePort):
         )
         self._client.delete_object(Bucket=self._bucket, Key=src_key)
 
+    def read_object(self, storage_key: str) -> bytes | None:
+        """객체 바이트를 읽는다. 없는 키는 None (`size_of` 와 같은 403 판단)."""
+        try:
+            obj = self._client.get_object(Bucket=self._bucket, Key=storage_key)
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") in ("404", "NoSuchKey"):
+                return None
+            raise
+        return obj["Body"].read()
+
     def delete_object(self, storage_key: str) -> None:
         """객체 하나를 지운다. 없는 키에도 S3 는 오류를 안 낸다(멱등)."""
         self._client.delete_object(Bucket=self._bucket, Key=storage_key)

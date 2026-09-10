@@ -21,6 +21,8 @@ _SPORTS = ("football", "baseball", "basketball")
 _VIDEOS: dict[UUID, VideoEntity] = {}
 # 가짜 저장소에 "올라와 있는" 객체. 키 -> 크기(바이트).
 _OBJECTS: dict[str, int] = {}
+# 바이트를 실제로 읽어야 하는 객체(리포트 JSON 등). 키 -> 바이트.
+_BLOBS: dict[str, bytes] = {}
 # 스텁은 `player_card` 를 모른다 — 검사가 "이 슬러그는 이 사람 카드"라고 알려 준다.
 _CARD_SLUGS: dict[str, UUID] = {}
 
@@ -28,7 +30,13 @@ _CARD_SLUGS: dict[str, UUID] = {}
 def reset_videos() -> None:
     _VIDEOS.clear()
     _OBJECTS.clear()
+    _BLOBS.clear()
     _CARD_SLUGS.clear()
+
+
+def put_blob(storage_key: str, data: bytes) -> None:
+    """검사가 "이 키에 이 바이트가 올라와 있다"고 알려 준다(`read_object` 용)."""
+    _BLOBS[storage_key] = data
 
 
 def register_card_slug(public_slug: str, user_id: UUID) -> None:
@@ -187,9 +195,15 @@ class FakeStorage(StoragePort):
         if size is not None:
             _OBJECTS[dst_key] = size
 
+    def read_object(self, storage_key: str) -> bytes | None:
+        return _BLOBS.get(storage_key)
+
     def delete_object(self, storage_key: str) -> None:
         _OBJECTS.pop(storage_key, None)
+        _BLOBS.pop(storage_key, None)
 
     def delete_prefix(self, prefix: str) -> None:
         for key in [k for k in _OBJECTS if k.startswith(prefix)]:
             del _OBJECTS[key]
+        for key in [k for k in _BLOBS if k.startswith(prefix)]:
+            del _BLOBS[key]

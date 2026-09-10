@@ -10,9 +10,14 @@ from app.analysis.adapter.outbound.stub.video_stub_repository import (
 )
 from app.analysis.adapter.outbound.stub.job_stub_repository import (
     StubJobRepository,
+    StubReportIngestRepository,
+    reset_ingested,
     reset_jobs,
 )
-from app.analysis.dependencies.job_providers import get_job_repository
+from app.analysis.dependencies.job_providers import (
+    get_job_repository,
+    get_report_ingest_repository,
+)
 from app.analysis.dependencies.video_providers import (
     get_storage,
     get_video_repository,
@@ -101,6 +106,9 @@ def client() -> TestClient:
     app.dependency_overrides[get_squad_repository] = StubSquadRepository
     app.dependency_overrides[get_video_repository] = StubVideoRepository
     app.dependency_overrides[get_job_repository] = StubJobRepository
+    app.dependency_overrides[get_report_ingest_repository] = (
+        StubReportIngestRepository
+    )
     app.dependency_overrides[get_review_repository] = StubReviewRepository
     app.dependency_overrides[get_position_repository] = StubPositionRepository
     # 🔴 저장소도 갈아끼운다. 안 끼우면 `S3_BUCKET` 이 없어 503 이 나는데,
@@ -110,6 +118,7 @@ def client() -> TestClient:
     app.dependency_overrides[get_user_email_reader] = _stub_user_email_reader
     reset_videos()
     reset_jobs()
+    reset_ingested()
     reset_reviews()
     reset_squads()
     try:
@@ -122,6 +131,7 @@ def client() -> TestClient:
         app.dependency_overrides.pop(get_squad_repository, None)
         app.dependency_overrides.pop(get_video_repository, None)
         app.dependency_overrides.pop(get_job_repository, None)
+        app.dependency_overrides.pop(get_report_ingest_repository, None)
         app.dependency_overrides.pop(get_review_repository, None)
         app.dependency_overrides.pop(get_position_repository, None)
         app.dependency_overrides.pop(get_storage, None)
