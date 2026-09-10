@@ -5917,7 +5917,12 @@ IAM 역할명·API 호스트명**이 그대로 있었고, `pages.yml` 로 `dev.s
   발견했습니다. **값만** 바꿨고 서술은 안 건드렸습니다 — 병합 시 충돌하면
   자리표시자 쪽을 남겨 주세요.
 
-- **담당**: 정어진 · **제기**: 정어진 · **기한**: 버킷 확인은 이번 주 · 나머지는 스프린트 3
+- **(2026-09-10)** 🔴 **「버킷 확인」을 서버에서 자동으로 못 합니다.** EC2 인스턴스
+  역할(`<EC2 역할>`)은 객체 수준 권한만 있어 `s3:GetBucketPublicAccessBlock`·
+  `s3:GetBucketPolicy`·`s3:GetBucketAcl` 가 전부 `AccessDenied` 입니다. **콘솔
+  또는 S3 admin 자격**으로 (1) Block Public Access 4개 (2) 버킷 정책에 익명(`Principal: "*"`)
+  허용 없음 (3) ACL 에 `AllUsers`/`AuthenticatedUsers` grant 없음 을 확인해야 합니다.
+- **담당**: 정어진(콘솔 확인) · **제기**: 정어진 · **기한**: 버킷 확인은 이번 주 · 나머지는 스프린트 3
 
 ### 22. `agent/deploy/` 에 AWS 계정 ID·리소스 ID·API 호스트가 값으로 남아 있습니다 (2026-09-08) ✅ 해소 (2026.09.09)
 
@@ -6549,6 +6554,41 @@ DB 만 압니다. 그래서 적재(`jin` 27번) 뒤 백엔드가 `analysis_metri
 
 - 상세: `ho` 32번 · 부록 D.2·D.7(`player_vector`) · `jin` 17번(축이 루브릭이다) · `jin` 27번(적재)
 - **담당**: 정어진(설계·적재 — `jin` 27·`ho` 33 뒤) · 정상호(`ho` 32번 표를 실물 6개로 정정) · **제기**: 정상호(`ho` 32번) · **기한**: 스프린트 3
+
+### 29. k3s 트라이얼 파드가 크래시 루프 중 — 이미지가 레포와 어긋나 있습니다 (2026-09-10 신설)
+
+라이브 서버(`ssh`)를 확인하다 발견했습니다. **프로덕션은 무영향**(트래픽은 여전히
+systemd venv `:8000` 이 받고, k3s 쪽엔 Service·Ingress 가 없습니다). 다만 두 가지:
+
+#### 1. 파드 initContainer 가 계속 실패
+
+`supersub-api-trial` 파드의 `migrate` initContainer 가 이 SQL 에서 죽습니다:
+
+```
+ALTER TABLE "user" ADD COLUMN skill_embedding VECTOR(768)
+  → psycopg.errors.UndefinedObject: type "vector" does not exist
+```
+
+BackOff 재시작 반복이고, 매 시도가 **프로덕션과 같은 호스트 Postgres** 에 붙어
+실패합니다(빠른 실패라 위험은 낮지만 깨끗하지 않습니다).
+
+#### 2. 🔴 그 마이그레이션이 **어느 브랜치에도 없습니다**
+
+`skill_embedding` / `VECTOR(768)` 를 `main`·`jin`·`ho`·`min` 전부에서 grep 했으나
+0건입니다. `origin/main` 의 마지막 마이그레이션은 `20260909_video_is_featured.py`.
+즉 Docker Hub `pmhllll12/supersub:latest` 가 **레포에 없는 실험 브랜치 빌드**입니다
+(k3s 이미지 스토어에 `pmhllll12/supersub` 다이제스트가 7개+ 쌓여 있습니다).
+
+#### 만족해야 할 성질
+
+| | |
+|---|---|
+| 이미지 = `main` | k3s 가 쓰는 `:latest` 가 `origin/main` 의 `fastapi/` 에서 빌드된 것과 일치. 실험 브랜치 산출물이 `:latest` 에 올라가지 않게 |
+| `CREATE EXTENSION vector` 선행 | initContainer 가 마이그레이션을 돌리기 전에, 그 파드가 붙는 DB 에 `vector` 확장이 있어야 함 (`deployment.md` §1 — 슈퍼유저, 호스트 DB 에 한 번). k3s 파드가 호스트 Postgres 를 본다면 이미 있을 수도 있으니 **어느 DB 를 보는지**부터 확인 |
+| 실패 시 멈춤 | 크래시 루프로 호스트 DB 를 계속 두드리지 않게. 고칠 때까지 트라이얼 롤아웃을 `scale 0` 하거나 이미지를 고정 |
+
+- 상세: `ssh supersub` 실측은 `_notes`(개인) — 요지는 이 항목에. `min` 11·14(k3s 도입·정책) · `deployment.md` §1
+- **담당**: 박민호(k3s 이관 소유 — min 11·14) · **제기**: 정어진 · **기한**: k3s cutover(min 14 step 5) 전
 
 ## min (박민호)
 
