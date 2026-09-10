@@ -5990,7 +5990,7 @@ ID·리소스 ID·공인 IP·API 호스트라 그 범위만 했습니다. 다만
 
 - **담당**: 정상호(`agent/` 문서·`worker.py` 설정) · **제기**: 정어진 · **기한**: ~~계정 ID·공인 IP 는 이번 주 · 리소스 ID·호스트는 스프린트 3~~ → **해소 (2026.09.09, 두 조각 함께)**
 
-### 23. `metric_definition` 을 누가·어떻게 채웁니까 — `POST /analyses` 착수 전에 필요합니다 (2026-09-08)
+### 23. `metric_definition` 을 누가·어떻게 채웁니까 — `POST /analyses` 착수 전에 필요합니다 (2026-09-08) ✅ 시드 해소 (2026.09.10)
 
 > 🔴 **이건 `## jin` 구역의 23번입니다.** `## ho` 구역에도 23번(근거 문장 등급
 > 표기)이 있는데 **다른 항목**입니다. `agent/eval/pending23_evidence/` 는 그쪽입니다.
@@ -6119,6 +6119,12 @@ fps 가 없습니다.** 프레임 수로 저장하면 나중에 읽는 쪽이 30
 
 - 상세: `fastapi/docs/api-contract.md` 3-1 · 같은 구역 1번 「남은 것」
 - **담당**: ~~정상호(코드 목록·형식)~~ **✅ 냈습니다 (2026.09.09)** → **정어진**(시드 마이그레이션 + 위 「답을 못 드린 것」 둘) · **제기**: 정어진 · **기한**: 스프린트 3 초 (`POST /analyses` 착수에 걸림)
+- **✅ 시드 마이그레이션 완료 (2026.09.10, `jin` `3a57936` · 마이그레이션 `ca31a2180b54`).**
+  `agent/contracts/metric_definitions.yaml` 을 `export_metric_definitions.py --json` 으로 뽑아
+  `op.bulk_insert` 45행(측정 12 + `total_score` + `grade` 16 + `stat` 16). 「답을 못 드린 것」
+  둘은 정상호가 정리 — `stat` 적재함(`jin` 25번), `impact_frame` 은 행으로 유지. draft 73행은
+  승격 시 추가. 확인: 다운→업 왕복 · `alembic check` 클린 · `alembic heads` 단일 · `pytest -q` 697.
+  **남은 것 — 적재 경로(흐름 B)·읽기 규격**: `jin` 24 「리포트를 DB에 남겨」 조각 + `api-contract.md` 3-1.
 
 ### 24. 영상 수명 주기 — 분석은 임시, "저장"을 눌러야 남는다 · `videos/` 는 원본, `reports/` 는 저장된 것 (2026-09-08 신설)
 
@@ -6370,7 +6376,7 @@ DB로는 못 잡으므로 **여기만은 S3 수명주기 규칙이 맞다고 봅
 - 관련: `www/src/components/analysis/AnalysisStage.tsx`(`confirmSubject`·`saveToServer`·`saveReportToProfile`) · `lib/uploadClip.ts` · `lib/savedReports.ts` · 계약 3-6 · 같은 구역 6·7번(대상 박스·리포트 조회) · `ho` 9번(4K) · `ho` 27번(닫음) · **`agent/report-contract.md`**
 - **담당**: 정어진(백엔드 수명 주기) · 정상호(리포트 키 정렬·위 (1)) · **제기**: 정어진(사용자 요청) · **기한**: 스프린트 3 (조각별로 나눔)
 
-### 25. `metric_definition` 시드에 항목별 `stat` 코드를 추가해 주세요 — jin 23 후속 (2026-09-09)
+### 25. `metric_definition` 시드에 항목별 `stat` 코드를 추가해 주세요 — jin 23 후속 (2026-09-09) ✅ 해소 (2026.09.10)
 
 jin 23 회신에서 되물으신 둘("`stat` 도 적재하나" · "`impact_frame` 은 행인가
 필드인가")에 답합니다. 결정의 정본은 `fastapi/docs/api-contract.md` 3-1
@@ -6395,6 +6401,8 @@ jin 23 회신에서 되물으신 둘("`stat` 도 적재하나" · "`impact_frame
 | 물려 있는 것 | jin 23(시드 마이그레이션) · min #9(리포트 화면) · `paik` 7. 이게 정해져야 시드가 ~45 행으로 완결되고 `POST /analyses` 가 실서버에서 안 거부됩니다 |
 | 상세 | `fastapi/docs/api-contract.md` 3-1 「✅ 결정 — 리포트 읽기 경로는 DB에서 조립한다」 |
 - **담당**: 정상호(stat 코드 산출) → 정어진(시드 마이그레이션) · **제기**: 정어진 · **기한**: jin 23 과 함께 (스프린트 3 초)
+- **✅ 해소 (2026.09.10)** — 정상호 `stat.{sport}.{motion}.{id}` 산출(`3b4b506`), 정어진 시드
+  마이그레이션(`ca31a2180b54`, `jin` 23번과 한 커밋 `3a57936`). 최장 code 48자 < `String(50)`.
 
 ### 26. `GET /positions` 를 냈습니다 — 포지션 하드코딩을 걷어 주세요 (2026-09-09) ✅ 냈습니다
 
