@@ -160,4 +160,6 @@ class TestOpenApi:
             f"{V1}/coaches",
             V1 + "/coaches/{coach_id}",
             V1 + "/coaches/{coach_id}/referrals",
+            f"{V1}/me/mercenary-profile",
+            f"{V1}/matching/search-candidates",
         }

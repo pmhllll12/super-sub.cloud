@@ -1,73 +1,97 @@
-/**
- * 스쿼드 판을 **그 브라우저에 남긴다** — 판 크기 · 카드가 선 자리 · 손으로 정한
- * 포지션 · 앉은 사람.
- *
- * 🔴 **`SquadPanel` 의 "브라우저 저장은 일부러 안 넣었다"를 이번에 뒤집는다**
- * (사용자 요청, 2026-09-08). 그때 적어 둔 이유는 *"서버가 진짜가 되는 순간
- * 상태가 두 곳에 생겨 어느 쪽이 맞는지 헷갈린다"* 였는데, 그 사이에 판이
- * **서버가 모르는 것들**을 갖게 됐다:
- *
- *   - 판 크기(3:3 · 5:5 · 7:7) — 계약에 없다
- *   - 카드가 선 **칸** — 계약에 없다(`squad_member` 는 `position_code` 뿐이다)
- *   - 손으로 정한 포지션 — 자리에서 역산되지 않는다
- *
- * 그리고 넣기 · 빼기가 아직 서버로 안 간다. 저장이 없으면 다른 화면에 갔다
- * 오기만 해도 판이 통째로 처음으로 돌아가, 기능이 성립하지 않는다.
- * (`me/cardStyleStore.ts` 가 같은 판단을 같은 이유로 했다.)
- *
- * ⚠️ **그 브라우저에만 남는다.** 다른 기기에서는 안 보인다 — 화면에도 그렇게
- * 적어 둔다(숨기면 고장으로 읽힌다).
- *
- * 🔴 서버에 자리가 생기면 **이 파일만 갈아 끼운다.** 부르는 쪽은 아래 두
- * 함수만 안다.
- */
-
-export type SavedSlot = {
-  /** 자리 이름(`fw1` · `mf2` …). 사람과 손으로 정한 포지션을 붙들고 있는 값이다. */
-  area: string
-  col: number
-  row: number
-  /** 손으로 정한 포지션. 없으면 자리(행)가 정한다. */
-  pos: string | null
-  mine?: boolean
-}
-
-export type SavedBoard = {
-  size: string
-  slots: SavedSlot[]
-  /** 자리 이름 → 앉은 사람의 닉네임. */
-  mates: Record<string, string | null>
-}
-
-const KEY = 'supersub.squad.v1'
+import type { Squad, SquadMember } from '@/server/backend'
 
 /**
- * 🔴 **읽기는 언제나 실패할 수 있다** — 사생활 보호 창 · 저장 공간 꽉 참 ·
- * 남이 넣어 둔 깨진 값. 어느 쪽이든 판이 안 그려지면 안 된다.
- * ⚠️ 이 jsdom 조합은 `localStorage` 를 안 깔아 준다(`vitest.setup.ts` 참고).
+ * 스쿼드 판의 **배치를 서버에 남긴다** — 판 크기 · 카드가 선 칸 · 손으로 정한
+ * 포지션 (계약 3-7절, CCC 25 / 미결 `paik` 9번).
+ *
+ * 🔴 **2026-09-10 에 브라우저 저장소를 걷어냈다.** 그전에는 그 브라우저에만
+ * 남아서 **다른 기기에서는 늘 처음 판**으로 열렸다. 이제 세 값이 계약이다:
+ *
+ *   판 크기   `Squad.formation`            ← `PATCH /teams/{id}/squad`
+ *   칸        `SquadMember.grid_col/_row`  ← `PATCH …/squad/members/{id}`
+ *   포지션    `SquadMember.position_code`  ← 같은 PATCH
+ *
+ * 🔴 **서버가 쥐는 것은 「등재된 사람」의 배치뿐이다.** 빈 자리는 서버에 자리가
+ * 없다 — `squad_member` 는 사람이 있어야 존재한다. 그래서 빈 자리의 칸·포지션은
+ * 여전히 포메이션 기본값이고, 이 파일은 **그것을 서버에 밀어 넣으려 하지
+ * 않는다.** 억지로 넣으려면 「사람 없는 등재」라는 없는 개념을 만들어야 한다.
+ *
+ * ⚠️ **넣기 · 빼기는 아직 이 파일이 다루지 않는다.** 지인 판에서 앉힌 사람은
+ * `player_card_id` 가 없어 등재가 안 되고(그 경로는 따로 있다), 그런 자리는
+ * 서버에 저장할 대상이 아니다 — `seatOf` 가 `memberId` 로 그 둘을 가른다.
  */
-export function loadBoard(): SavedBoard | null {
-  try {
-    const raw = globalThis.localStorage?.getItem(KEY)
-    if (!raw) return null
-    const v: unknown = JSON.parse(raw)
-    if (!v || typeof v !== 'object') return null
-    const b = v as Partial<SavedBoard>
-    // 모양이 어긋나면 없는 것으로 친다 — 반쪽짜리로 그리면 더 헷갈린다.
-    if (typeof b.size !== 'string' || !Array.isArray(b.slots) || !b.slots.length) return null
-    if (!b.slots.every((s) => s && typeof s.area === 'string' && Number.isFinite(s.col))) {
-      return null
+
+/** 판 크기의 계약 표기 — 화면의 `'3'`과 서버의 `"3:3"` 을 잇는다. */
+export function formationToSize(formation: string | null): string | null {
+  if (!formation) return null
+  const head = formation.split(':')[0]
+  return head || null
+}
+
+/** 화면 크기(`'5'`) → 계약 표기(`"5:5"`). */
+export function sizeToFormation(size: string): string {
+  return `${size}:${size}`
+}
+
+/**
+ * 그 등재가 판에 올라와 있는가 — **둘 다 채워졌을 때만** 그렇다.
+ * 🔴 한쪽만 채워지는 일은 없다(서버가 422 로 막는다). 그래도 `null` 검사를
+ * 한쪽만 하면 나중에 다른 한쪽이 없을 때 조용히 0번 칸에 선다.
+ */
+export function seatOf(m: SquadMember): { col: number; row: number } | null {
+  return m.grid_col !== null && m.grid_row !== null ? { col: m.grid_col, row: m.grid_row } : null
+}
+
+async function patch(path: string, body: unknown): Promise<Squad> {
+  const res = await fetch(path, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    let message = '판을 저장하지 못했습니다.'
+    try {
+      message = (await res.json())?.error?.message ?? message
+    } catch {
+      // 계약 형태가 아닌 응답 — 위 기본 문구를 쓴다.
     }
-    return { size: b.size, slots: b.slots, mates: b.mates ?? {} }
-  } catch {
-    return null
+    throw new Error(message)
   }
+  return (await res.json()) as Squad
 }
 
-export function saveBoard(board: SavedBoard): void {
-  try {
-    globalThis.localStorage?.setItem(KEY, JSON.stringify(board))
-  } catch {
-    // 못 써도 판은 계속 돈다 — 저장이 이 화면의 본업이 아니다.
-  }
+/**
+ * 판 크기를 저장한다. **바뀐 스쿼드 전체**가 돌아온다.
+ *
+ * ⚠️ **주장이 아니면 403 이다.** 판은 누구나 만져 볼 수 있지만 남는 것은
+ * 주장이 만진 것뿐이다 — 계약이 그렇게 정했고, 부르는 쪽이 그 실패를 판이
+ * 멈추는 일로 만들지 않는다.
+ */
+export function saveFormation(teamId: string, size: string): Promise<Squad> {
+  return patch(`/api/teams/${encodeURIComponent(teamId)}/squad`, {
+    formation: sizeToFormation(size),
+  })
+}
+
+/**
+ * 등재 하나의 **포지션 · 칸**을 저장한다.
+ *
+ * 🔴 `positionCode` 는 **항상 보낸다** — 등재는 포지션 없이 존재하지 않는다.
+ * 칸만 옮길 때도 지금 코드를 그대로 싣는다(계약 3-7절).
+ * 🔴 `cell` 이 `null` 이면 **판에서만 뺀다** — 등재는 남는다.
+ */
+export function saveSeat(
+  teamId: string,
+  memberId: string,
+  positionCode: string,
+  cell: { col: number; row: number } | null,
+): Promise<Squad> {
+  return patch(
+    `/api/teams/${encodeURIComponent(teamId)}/squad/members/${encodeURIComponent(memberId)}`,
+    {
+      position_code: positionCode,
+      grid_col: cell ? cell.col : null,
+      grid_row: cell ? cell.row : null,
+    },
+  )
 }

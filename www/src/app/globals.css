@@ -1573,6 +1573,67 @@ body::-webkit-scrollbar {
   color: var(--ss-fg);
 }
 
+/* 거르는 줄 — 종목 알약 · 지역 입력 · 찾기 (미결 jin 15번, 2026-09-10).
+   🔴 **흐름 안에 둔다**(목록만 구르므로). 흐름 밖으로 빼면 목록이 그 밑으로
+   들어가 첫 줄이 가려진다. */
+.ss-teams-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.ss-teams-sports {
+  display: flex;
+  gap: 4px;
+}
+
+.ss-teams-pill {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 24%, transparent);
+  font-size: 0.72rem;
+  color: color-mix(in srgb, var(--ss-fg) 72%, transparent);
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.ss-teams-pill:hover,
+.ss-teams-pill:focus-visible {
+  color: var(--ss-fg);
+  border-color: color-mix(in srgb, var(--ss-fg) 45%, transparent);
+}
+
+/* 🔴 고른 것은 **채워서** 말한다 — 테두리 색만 바꾸면 어느 것이 켜졌는지
+   알약 넷이 나란할 때 안 읽힌다. */
+.ss-teams-pill[data-on='true'] {
+  background: var(--ss-accent);
+  border-color: var(--ss-accent);
+  color: #000;
+}
+
+.ss-teams-region {
+  flex: 1;
+  min-width: 120px;
+}
+
+.ss-teams-region input {
+  width: 100%;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 24%, transparent);
+  font-size: 0.72rem;
+  color: var(--ss-fg);
+  background: transparent;
+}
+
+.ss-teams-region input::placeholder {
+  color: color-mix(in srgb, var(--ss-fg) 45%, transparent);
+}
+
 .ss-teams-count {
   font-size: 0.75rem;
   color: color-mix(in srgb, var(--ss-fg) 62%, transparent);
@@ -1972,8 +2033,14 @@ body::-webkit-scrollbar {
 /* ── 추천 판 (스쿼드 빈 자리를 누르면 오른쪽에서 나온다) ─────────────── */
 
 /* 스쿼드 판 **바깥** 오른쪽에 붙는다. 판 안에 두면 카드를 덮는다.
-   미끄러져 나오는 동안 판 밑으로 파고들지 않게 z 를 올린다. */
-.ss-suggest {
+   미끄러져 나오는 동안 판 밑으로 파고들지 않게 z 를 올린다.
+
+   🔴 **「비슷한 팀」 판(`.ss-tm`)이 이 껍데기를 그대로 쓴다**(사용자 결정:
+   추천 판과 같은 자리). 자리 · 폭 · 유리 · 펼쳐지는 연출을 베끼지 않고
+   선택자를 나눠 쓴다 — 베끼면 `--ss-side-panel-w` 가 두 곳에 생겨서
+   한쪽만 고쳐질 때 둘째 칸(지인 판)의 자리가 어긋난다. */
+.ss-suggest,
+.ss-tm {
   position: absolute;
   /* 왼쪽 스쿼드 판과 **같은 키**로 선다 — 나란히 놓이는 두 판이 아래끝이
      어긋나면 붙어 있는 한 벌로 안 읽힌다. */
@@ -2019,7 +2086,8 @@ body::-webkit-scrollbar {
 }
 
 /* 물러나는 중 — 아직 DOM 에 있지만 누를 수 있으면 안 된다. */
-.ss-suggest[data-state='closing'] {
+.ss-suggest[data-state='closing'],
+.ss-tm[data-closing='true'] {
   pointer-events: none;
   animation: ss-suggest-out 200ms ease-in both;
 }
@@ -10249,6 +10317,31 @@ body:has(.ss-profile) {
   color: var(--ss-error);
 }
 
+.ss-matchbot-candidates {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.ss-matchbot-candidate-card {
+  border: 1px solid var(--ss-glass-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+}
+
+.ss-matchbot-candidate-card p {
+  margin: 0;
+}
+
+.ss-matchbot-candidate-card p + p {
+  margin-top: 4px;
+  opacity: 0.85;
+}
+
 .ss-matchbot-input {
   display: flex;
   gap: 8px;
@@ -10641,4 +10734,817 @@ body:has(.ss-profile) {
   font-weight: 600;
   text-decoration: underline;
   white-space: nowrap;
+}
+
+/* ── 팀 매칭 (사용자 요청, 2026-09-10) ───────────────────────────────
+   판이 다 차면 머리줄의 단추가 깜빡이고, 누르면 오른쪽 첫째 칸에 비슷한
+   팀 명단이 선다. 신청해서 수락되면 화면을 덮는 대기 팝업이 뜬다. */
+
+/* 🔴 **판 밖 오른쪽**에 붙는다(사용자 요청, 2026-09-10). 머리줄 안에 두었더니
+   크기 단추(3:3 · 5:5 · 7:7)가 가운데로 밀렸다 — 그 줄은 `space-between` 이라
+   항목이 늘면 배치가 통째로 달라진다. 판 바깥 절대배치면 머리줄은 그대로다.
+
+   🔴 첫째 칸(`--ss-side-panel-gap`)과 **같은 사이 간격**을 쓴다. 명단이 바로
+   이 자리에 서므로, 다른 값을 쓰면 단추와 명단의 왼쪽 끝이 어긋난다. */
+.ss-squad-match {
+  position: absolute;
+  /* 🔴 **알약 줄(팀장 · 팀원 · AI)과 같은 높이**다(사용자 요청, 2026-09-10).
+     `bottom: 100%` + 같은 아래여백(22px)이라 AI 단추와 한 줄로 읽힌다 —
+     그쪽 값을 고치면 여기도 같이 고쳐야 한다.
+
+     🔴 가로는 그대로 **판 밖 오른쪽**이다. 판 안(머리줄)에 두었더니 크기
+     단추(3:3 · 5:5 · 7:7)가 가운데로 밀렸다 — 절대배치라 판의 어떤 것도
+     안 건드린다. */
+  left: 100%;
+  bottom: 100%;
+  margin-bottom: 22px;
+  margin-left: 12px;
+  z-index: 3;
+  /* 🔴 **세로는 AI 단추와 같다**(사용자 요청, 2026-09-10) — 같은 줄에 나란히
+     서므로 키가 다르면 한 줄로 안 읽힌다. 그래서 **세로 여백과 글자 크기를
+     그쪽에서 그대로 가져온다**(`.ss-home-ai` — 그 값을 고치면 여기도 같이).
+
+     🔴 **가로는 넉넉히 둔다.** 처음엔 알약 줄 크기(0.72rem)로 뒀다가
+     「나온지도 몰랐다」는 지적을 받았다 — 판이 다 찼다는 것을 알리는 단 하나의
+     신호라 눈에 띄어야 한다. 키를 못 키우는 대신 폭과 고리가 그 일을 한다. */
+  padding: 7px 26px;
+  border-radius: 999px;
+  /* 🔴 **민트로 채우지 않는다**(사용자 요청, 2026-09-10). 채웠더니 알약이
+     통째로 초록 덩어리가 되어 판·배경과 결이 갈렸다. 바탕은 AI 단추와 같은
+     유리로 두고, **민트는 테두리와 고리에만** 쓴다.
+     🔴 **글자는 흰색이다**(사용자 요청) — 민트 글자를 유리 위에 얹으면
+     대비가 얕아 읽기 힘들다. 눈에 띄는 일은 테두리와 고리가 맡고, 글자는
+     읽히는 일만 한다. */
+  border: 1px solid var(--ss-accent);
+  background: color-mix(in srgb, var(--ss-fg) 8%, transparent);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--ss-fg);
+  white-space: nowrap;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.ss-squad-match:hover,
+.ss-squad-match:focus-visible {
+  background: color-mix(in srgb, var(--ss-accent) 16%, transparent);
+}
+
+/* 다 찼을 때만 깜빡인다 — 판이 준비됐다는 신호라 그때만 눈길을 끈다.
+   🔴 **테두리만 깜빡이지 않는다.** 처음에 그렇게 했다가 어두운 배경에서
+   묻혀 「나온지도 몰랐다」는 말을 들었다 — 밖으로 퍼지는 고리와 살짝
+   커지는 것이 그 자리를 대신한다. */
+.ss-squad-match[data-blink='true'] {
+  animation: ss-match-blink 1.4s ease-in-out infinite;
+}
+
+@keyframes ss-match-blink {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ss-accent) 65%, transparent);
+    transform: scale(1);
+  }
+  50% {
+    /* 밖으로 퍼지며 옅어지는 **민트 고리** — 「여기를 보라」가 글자 밖으로 나간다.
+       🔴 바탕은 안 건드린다. 여기서 채우면 다시 초록 덩어리가 된다. */
+    box-shadow: 0 0 0 14px color-mix(in srgb, var(--ss-accent) 0%, transparent);
+    transform: scale(1.04);
+  }
+}
+
+/* 🔴 깜빡임은 **끌 수 있어야 한다.** 반복되는 명멸은 어지럼을 부른다.
+   끄더라도 **밝게는 남긴다** — 안 보이면 끈 뜻이 없다. */
+@media (prefers-reduced-motion: reduce) {
+  .ss-squad-match[data-blink='true'] {
+    animation: none;
+    /* 움직임 대신 민트 고리를 **켜 둔다** — 안 보이면 끈 뜻이 없다. */
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--ss-accent) 30%, transparent);
+  }
+}
+
+/* ── 비슷한 팀 명단 ─────────────────────────────────────────────── */
+
+.ss-tm-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex: none;
+}
+
+.ss-tm-head h2 {
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+  color: var(--ss-fg);
+}
+
+.ss-tm-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  color: color-mix(in srgb, var(--ss-fg) 70%, transparent);
+  transition: color 160ms ease;
+}
+
+.ss-tm-close:hover,
+.ss-tm-close:focus-visible {
+  color: var(--ss-fg);
+}
+
+.ss-tm-note {
+  font-size: 0.8rem;
+  color: color-mix(in srgb, var(--ss-fg) 70%, transparent);
+}
+
+/* 목록만 구른다 — 판이 늘어나면 아래 안내줄이 밀려 나간다. */
+.ss-tm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+}
+
+/* 🔴 **읽히게 하는 검은 막은 여기에 있다** — `.ss-suggest-item` 이 같은 문제를
+   같은 방식으로 이미 풀었다(그 주석 참고). 바깥 판은 유리로 두고, 글자가
+   얹히는 이 판때기만 어둡게 깐다 — 판 전체를 칠하면 유리감이 죽는다.
+
+   ⚠️ 흰 반투명(8%)만 쓰던 때는 뒤 배경을 **밝히기만** 해서, 인물 사진의
+   흰 연기 위에서 글씨가 통째로 묻혔다(사용자 지적, 2026-09-10).
+
+   🔴 **여기에 `backdrop-filter` 를 걸지 않는다.** 바깥 판(`.ss-tm`)이 펼쳐지는
+   연출 때문에 `transform` 을 계속 쥐고 있어(`ss-suggest-in`, `fill-mode: both`)
+   **변형된 조상이 backdrop root 를 만든다** — 자식의 흐림은 조용히 죽는다
+   (1.2 회차에 같은 것으로 데였다). 흐림은 판이, 읽히는 일은 이 막이 맡는다.
+
+   🔴 **`background` 단축에 층을 쌓지 않는다** — 색은 마지막 층에만 올 수 있고,
+   var() 가 낀 채로 중간 층이 되면 계산 시점에 무효가 되어 배경이 통째로
+   투명해진다(`.ss-suggest-item` 주석의 실측). 색과 층을 나눠 쓴다. */
+.ss-tm-row {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background-color: color-mix(in srgb, var(--ss-bg) 62%, transparent);
+  /* 유리 틴트 — 색이지만 이미지 층이라 단색 그라디언트로 편다. */
+  background-image: linear-gradient(var(--ss-glass-bg), var(--ss-glass-bg));
+}
+
+.ss-tm-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ss-fg);
+}
+
+.ss-tm-where {
+  font-size: 0.72rem;
+  color: color-mix(in srgb, var(--ss-fg) 62%, transparent);
+}
+
+/* 왜 이 팀이 나왔는지 — 근거를 알약으로 늘어놓는다. */
+.ss-tm-why {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.ss-tm-tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  color: color-mix(in srgb, var(--ss-fg) 78%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 22%, transparent);
+}
+
+.ss-tm-apply {
+  justify-self: start;
+  margin-top: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--ss-accent);
+  font-size: 0.72rem;
+  color: var(--ss-accent);
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.ss-tm-apply:hover:not(:disabled),
+.ss-tm-apply:focus-visible:not(:disabled) {
+  background: var(--ss-accent);
+  color: #000;
+}
+
+/* 기다리는 동안 · 다른 곳에 걸어 둔 동안 — 눌러도 될 것처럼 보이면 안 된다. */
+.ss-tm-apply:disabled {
+  border-color: color-mix(in srgb, var(--ss-fg) 24%, transparent);
+  color: color-mix(in srgb, var(--ss-fg) 52%, transparent);
+  cursor: default;
+}
+
+.ss-tm-foot {
+  flex: none;
+  margin-top: 8px;
+  font-size: 0.68rem;
+  color: color-mix(in srgb, var(--ss-fg) 52%, transparent);
+}
+
+/* ── 경기가 잡혔다 — 화면을 덮는 팝업 ──────────────────────────── */
+
+/* 🔴 `document.body` 로 내보내진 판이다(portal) — 쌓임 맥락 밖이라 이 z 가
+   비로소 헤더(`z-20`)·로그아웃 줄(20)보다 위에 선다. */
+.ss-mw {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  /* 🔴 **큰 움직임이 화면 밖으로 나간다** — 그동안 스크롤막대가 생기면
+     화면이 덜컥인다. 여기서 가둔다. */
+  overflow: hidden;
+  /* 🔴 **아래에서 위로 올라온다**(사용자 요청, 2026-09-10). 경기가 잡혔다는
+     것을 알리는 자리라, 그냥 나타나는 것보다 올라오는 편이 「새로 온 것」으로
+     읽힌다. 나갈 때는 **역순**으로 내려간다.
+
+     ⚠️ 420ms 로 뒀다가 **「너무 빠르다」**는 지적을 받았다(2026-09-10). 이 판은
+     훑고 지나가는 자리가 아니라 **한 번 뜨고 마는 알림**이라, 천천히 와도
+     성가시지 않다. */
+  animation: ss-mw-in 760ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* 내려가는 중 — 아직 DOM 에 있지만 누를 수 있으면 안 된다.
+   🔴 시간은 `MatchWaiting` 의 `EXIT_MS` 와 같아야 한다. */
+.ss-mw[data-leaving='true'] {
+  pointer-events: none;
+  animation: ss-mw-out 620ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+/* ── 판이 다 올라온 **뒤에** 안의 것들이 차례로 들어온다 ──────────
+   🔴 **순서가 뜻이다**(사용자 요청): 양옆 판이 바깥에서 들어오고, 그 **도중에**
+   가운데 글이 위에서 내려온다. 한꺼번에 들어오면 무엇을 먼저 볼지가 없다.
+
+   🔴 지연을 `.ss-mw` 의 시간(760ms)에 맞춰 둔다 — 그 값을 고치면 여기 셋도
+   같이 고쳐야 한다(먼저 들어오면 판이 올라오는 도중에 튀어나온다). */
+.ss-mini {
+  animation: ss-mw-side-left 720ms cubic-bezier(0.22, 1, 0.36, 1) 760ms both;
+}
+
+.ss-mini[data-side='them'] {
+  animation-name: ss-mw-side-right;
+}
+
+/* 양옆 판이 절반쯤 들어왔을 때 — 「무엇을 보는 화면인지」가 그때 도착한다. */
+.ss-mw-mid {
+  animation: ss-mw-drop 660ms cubic-bezier(0.22, 1, 0.36, 1) 1120ms both;
+}
+
+@keyframes ss-mw-side-left {
+  from {
+    /* 🔴 **화면 밖에서** 시작한다(사용자 요청: 확실히 보이면서). 제 폭만큼만
+       밀면 가운데 글에 가려 어디서 왔는지가 안 읽힌다. */
+    opacity: 0;
+    transform: translateX(-70vw);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes ss-mw-side-right {
+  from {
+    opacity: 0;
+    transform: translateX(70vw);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes ss-mw-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-60vh);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ss-mw-in {
+  from {
+    opacity: 0;
+    /* 화면 아래 밖에서 시작한다 — 판 전체(사진까지)가 한 장으로 올라온다. */
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ss-mw-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+}
+
+/* 움직임을 끈 사람에게 쓰는 짝 — 자리에서 흐려졌다 사라지기만 한다.
+   🔴 **이름을 따로 둔다.** 같은 `@keyframes` 를 미디어 쿼리 안에서 다시
+   정의하면 처리기가 keyframes 를 한데 모으면서 **나중 것이 전역으로 이긴다** —
+   그러면 모두에게 올라오는 연출이 사라진다. 이 저장소는 Lightning CSS 에
+   이미 한 번 데였다(`backdrop-filter`). */
+@keyframes ss-mw-in-flat {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ss-mw-out-flat {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* 🔴 큰 면적이 화면을 가로지르는 움직임이라 **끌 수 있어야 한다.**
+   끄더라도 뜨고 지는 것 자체는 남긴다 — 없으면 갑자기 나타났다 사라진다. */
+@media (prefers-reduced-motion: reduce) {
+  .ss-mw {
+    animation: ss-mw-in-flat 200ms ease-out both;
+  }
+
+  .ss-mw[data-leaving='true'] {
+    animation: ss-mw-out-flat 200ms ease-in both;
+  }
+
+  /* 🔴 안의 것들은 **움직이지 않고 그냥 있는다.** 화면을 가로지르는 셋을
+     흐리기만 남겨 두면 여전히 깜빡이는 것으로 보인다. */
+  .ss-mini,
+  .ss-mini[data-side='them'],
+  .ss-mw-mid {
+    animation: none;
+  }
+}
+
+/* 🔴 사진 위에 글자가 얹히므로 **어둡게 덮는 층이 함께** 있어야 한다.
+   경기장 사진은 해질녘이라 위쪽이 밝다 — 그대로 두면 날짜 글자가 묻힌다. */
+.ss-mw-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, #000 78%, transparent),
+      color-mix(in srgb, #000 62%, transparent)
+    ),
+    url('/stadium.jpg') center / cover no-repeat;
+}
+
+.ss-mw-close {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, #fff 40%, transparent);
+  color: #fff;
+  transition: background-color 160ms ease;
+}
+
+.ss-mw-close:hover,
+.ss-mw-close:focus-visible {
+  background: color-mix(in srgb, #fff 16%, transparent);
+}
+
+.ss-mw-body {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(24px, 5vw, 72px);
+  padding: 24px;
+  /* 좁은 화면에서는 판 둘이 아래로 접힌다 — 가로로 우겨넣으면 칸이 뭉개진다. */
+  flex-wrap: wrap;
+}
+
+.ss-mw-mid {
+  text-align: center;
+  color: #fff;
+  /* 🔴 가운데 글은 **줄바꿈으로 무너지지 않게** 최소 폭을 준다. 양옆 판이
+     먼저 자리를 가져가면 「9월 20일」이 세 줄로 접힌다. */
+  min-width: min(320px, 80vw);
+}
+
+.ss-mw-when {
+  font-size: clamp(1.1rem, 2.2vw, 1.6rem);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.ss-mw-where {
+  margin-top: 6px;
+  font-size: 0.9rem;
+  color: color-mix(in srgb, #fff 72%, transparent);
+}
+
+.ss-mw-vs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 20px;
+  font-size: clamp(1rem, 2vw, 1.35rem);
+  font-weight: 700;
+}
+
+.ss-mw-vs em {
+  font-style: normal;
+  font-size: 0.8em;
+  color: var(--ss-accent);
+}
+
+.ss-mw-note {
+  margin-top: 18px;
+  font-size: 0.7rem;
+  color: color-mix(in srgb, #fff 56%, transparent);
+}
+
+/* 팀 매칭으로 잡힌 줄 — 🔴 **서버 경기와 갈려 보여야 한다.** 한 목록에
+   나란히 서지만 하나는 진짜 경기이고 하나는 데모다(`lib/bookedMatches.ts`). */
+.ss-profile-match-tag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ss-accent) 55%, transparent);
+  font-size: 0.62rem;
+  color: var(--ss-accent);
+}
+
+.ss-profile-match-note {
+  margin-top: 8px;
+  font-size: 0.68rem;
+}
+
+/* 「경기 취소」 — 🔴 닫기(×)와 **다른 일**이라 자리를 가른다. 되돌릴 수 없어서
+   그 자리에서 한 번 더 묻고, 그때만 두 단추가 나란히 선다. */
+.ss-mw-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.ss-mw-cancel,
+.ss-mw-keep {
+  padding: 7px 18px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, #fff 34%, transparent);
+  font-size: 0.8rem;
+  color: color-mix(in srgb, #fff 82%, transparent);
+  white-space: nowrap;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.ss-mw-cancel:hover,
+.ss-mw-cancel:focus-visible,
+.ss-mw-keep:hover,
+.ss-mw-keep:focus-visible {
+  border-color: color-mix(in srgb, #fff 60%, transparent);
+  color: #fff;
+}
+
+/* 🔴 **되돌릴 수 없는 쪽만 붉다.** 처음부터 붉게 두면 눌러 보기도 전에
+   경고처럼 읽히고, 정작 확인 단추와 구별이 안 된다. */
+.ss-mw-cancel[data-danger='true'] {
+  border-color: color-mix(in srgb, var(--ss-error) 70%, transparent);
+  color: color-mix(in srgb, var(--ss-error) 92%, #fff);
+}
+
+.ss-mw-cancel[data-danger='true']:hover,
+.ss-mw-cancel[data-danger='true']:focus-visible {
+  background: color-mix(in srgb, var(--ss-error) 22%, transparent);
+  border-color: var(--ss-error);
+  color: #fff;
+}
+
+/* ── 읽기 전용 판 ────────────────────────────────────────────────
+   🔴 **홈의 판과 같은 클래스를 쓴다**(`.ss-squad` · `.ss-squad-board` …).
+   여기서는 **크기만** 줄인다 — 모양을 다시 그리면 두 판이 갈린다. */
+
+.ss-mini {
+  color: #fff;
+}
+
+.ss-mini-team {
+  margin-bottom: 6px;
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* 🔴 **카드 폭 하나로 판 전체가 커지고 줄어든다.** 줄 키도 칸도 이 값에서
+   계산되므로(`--ss-squad-row`), 다른 숫자를 손으로 박으면 어긋난다.
+
+   ⚠️ 62 로 뒀다가 **「너무 작아서 안 보인다」**는 지적을 받았다(2026-09-10).
+   홈의 판이 94 이고 여기는 그 판이 둘 나란히 서므로, 가운데 글 자리를
+   남기면서 홈에 가깝게 잡는다. */
+.ss-mini .ss-squad {
+  --ss-pcard-mini-w: 92;
+  padding: 0;
+}
+
+/* 홈에서는 위 여백이 머리글(MY SQUAD · 크기 단추)의 자리다 — 여기는 그 줄이
+   없으므로 걷어낸다. 안 걷으면 판 위가 통째로 빈다.
+   🔴 칸 사이는 홈(80px)보다 좁힌다 — 판이 둘이라 그대로 두면 가운데 글이
+   설 자리가 없다. */
+.ss-mini .ss-squad-board {
+  padding: 16px 18px 12px;
+  column-gap: 52px;
+}
+
+/* 읽기 전용이라 끄는 손짓이 없다 — 커서도 그렇게 말한다. */
+.ss-mini .ss-squad-seat {
+  cursor: default;
+}
+
+/* ── 경기 조건 판 (사용자 결정, 2026-09-10) ────────────────────────
+   「팀 매칭」·「팀원」을 처음 누르면 뜬다. 팀장·팀원이 같은 조각을 쓰고
+   갈리는 것은 「내 자리」 칸 하나뿐이다. */
+
+.ss-tm-head-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 🔴 **글자는 온전한 흰색이다**(사용자 요청, 2026-09-10) — 흐리게 두면 눌러도
+   되는 것인지 망설이게 된다. 무게는 테두리로만 낮춘다. */
+.ss-tm-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 26%, transparent);
+  font-size: 0.68rem;
+  color: var(--ss-fg);
+  white-space: nowrap;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+/* 아이콘(`rule_settings`) — 🔴 축을 글자에 맞춰 **가늘게** 준다. 기본
+   굵기(400)는 0.68rem 글자 옆에서 저 혼자 두꺼워 보인다. */
+.ss-tm-edit .material-symbols-outlined {
+  font-size: 15px;
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 100,
+    'GRAD' 200,
+    'opsz' 24;
+}
+
+.ss-tm-edit:hover,
+.ss-tm-edit:focus-visible {
+  border-color: color-mix(in srgb, var(--ss-fg) 52%, transparent);
+  background: color-mix(in srgb, var(--ss-fg) 12%, transparent);
+}
+
+/* 목록과 같은 자리를 쓰므로 남는 높이를 다 먹고 제 안에서 구른다. */
+.ss-prefs {
+  display: flex;
+  flex-direction: column;
+  /* 칸 사이를 넉넉히 — 붙어 있으면 판때기를 둬도 한 덩어리로 보인다. */
+  gap: 12px;
+  margin-top: 12px;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+}
+
+.ss-prefs-h {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ss-fg);
+}
+
+/* 🔴 **절마다 칸으로 나눈다**(사용자 지적, 2026-09-10 — 「구분도 안 된다」).
+   글자만 쌓아 두면 「어느 동네에서」와 그 아래 입력칸이 한 덩어리로 안 읽히고,
+   어디까지가 한 설정인지 알 수 없다. 판때기 · 여백 · 이름표 셋으로 가른다. */
+.ss-prefs-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px 14px;
+  border-radius: 10px;
+  /* 목록 줄(`.ss-tm-row`)과 같은 결 — 같은 판 안이라 결이 갈리면 안 된다. */
+  background-color: color-mix(in srgb, var(--ss-bg) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 14%, transparent);
+}
+
+/* 🔴 이름표가 **칸의 제목**으로 읽혀야 한다 — 본문과 같은 크기면 그냥 한 줄이
+   더 있는 것으로 보인다. 굵기와 자간으로 가른다.
+   🔴 **흰색이다**(사용자 요청, 2026-09-10). 민트로 뒀더니 알약·단추의 민트와
+   같은 무게가 되어 「누를 수 있는 것」처럼 읽혔다.
+   🔴 `<legend>` 가 아니라 `<p>` 다 — legend 는 브라우저가 테두리에 홈을 파고
+   얹어서 상자와 겹친다(그래서 `role="group"` 으로 바꿨다). */
+.ss-prefs-legend {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--ss-fg);
+}
+
+.ss-prefs-input {
+  width: 100%;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 24%, transparent);
+  font-size: 0.76rem;
+  color: var(--ss-fg);
+  background: transparent;
+}
+
+.ss-prefs-input::placeholder {
+  color: color-mix(in srgb, var(--ss-fg) 42%, transparent);
+}
+
+/* 적는 대로 나오는 후보 — 🔴 **흐름 안에 둔다.** 띄우면 그 아래 칸을 덮어
+   무엇이 가려졌는지 알 수 없다(판이 이미 좁다). */
+.ss-prefs-hits {
+  display: flex;
+  flex-direction: column;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: color-mix(in srgb, var(--ss-bg) 62%, transparent);
+}
+
+.ss-prefs-hit {
+  width: 100%;
+  padding: 6px 12px;
+  text-align: left;
+  font-size: 0.74rem;
+  color: var(--ss-fg);
+  transition: background-color 160ms ease;
+}
+
+.ss-prefs-hit:hover,
+.ss-prefs-hit:focus-visible {
+  background-color: color-mix(in srgb, var(--ss-accent) 18%, transparent);
+}
+
+.ss-prefs-none {
+  font-size: 0.7rem;
+  color: color-mix(in srgb, var(--ss-fg) 55%, transparent);
+}
+
+.ss-prefs-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.ss-prefs-chip {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 26%, transparent);
+  font-size: 0.7rem;
+  color: color-mix(in srgb, var(--ss-fg) 82%, transparent);
+  white-space: nowrap;
+}
+
+/* 고른 자리는 채워서 말한다 — 테두리만으로는 켜졌는지 안 읽힌다. */
+.ss-prefs-chip[data-on='true'] {
+  background: var(--ss-accent);
+  border-color: var(--ss-accent);
+  color: #000;
+}
+
+.ss-prefs-times {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ss-prefs-time {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: color-mix(in srgb, var(--ss-fg) 82%, transparent);
+}
+
+.ss-prefs-time select {
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 24%, transparent);
+  font-size: 0.72rem;
+  /* 🔴 목록(option)은 브라우저가 그리므로 **어두운 바탕**을 준다 — 투명하면
+     흰 배경에 흰 글씨가 되어 안 읽힌다. */
+  background: var(--ss-bg);
+  color: var(--ss-fg);
+}
+
+.ss-prefs-drop,
+.ss-prefs-add {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  color: color-mix(in srgb, var(--ss-fg) 62%, transparent);
+  transition: color 160ms ease;
+}
+
+.ss-prefs-drop:hover,
+.ss-prefs-add:hover,
+.ss-prefs-drop:focus-visible,
+.ss-prefs-add:focus-visible {
+  color: var(--ss-fg);
+}
+
+.ss-prefs-add {
+  align-self: flex-start;
+  border: 1px dashed color-mix(in srgb, var(--ss-fg) 26%, transparent);
+}
+
+/* 단추 줄은 칸 밖이다 — 설정이 아니라 **끝내는 자리**라 결이 달라야 한다. */
+.ss-prefs-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--ss-fg) 14%, transparent);
+}
+
+/* 🔴 **흰색이다**(사용자 요청, 2026-09-10). 민트로 뒀더니 조건 판 안에서
+   민트가 이름표 · 알약 · 이 단추까지 세 군데가 되어, 무엇이 눌러야 할 것인지가
+   오히려 흐려졌다. 이 판에서 민트는 **고른 것**(`.ss-prefs-chip[data-on]`)에만
+   남긴다. */
+.ss-prefs-go,
+.ss-prefs-cancel {
+  padding: 6px 16px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 42%, transparent);
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--ss-fg);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+/* 🔴 **글자는 「팀 찾기」와 같은 흰색이다**(사용자 요청). 흐리게 두면 눌러도
+   되는지 망설이게 된다 — 둘의 무게는 **굵기와 테두리**로만 가른다. */
+.ss-prefs-cancel {
+  border-color: color-mix(in srgb, var(--ss-fg) 26%, transparent);
+  font-weight: 400;
+  color: var(--ss-fg);
+}
+
+.ss-prefs-go:hover:not(:disabled),
+.ss-prefs-go:focus-visible:not(:disabled),
+.ss-prefs-cancel:hover,
+.ss-prefs-cancel:focus-visible {
+  background: color-mix(in srgb, var(--ss-fg) 16%, transparent);
+  border-color: color-mix(in srgb, var(--ss-fg) 65%, transparent);
+}
+
+/* 동네와 시간이 하나씩은 있어야 찾을 수 있다 — 없으면 못 누른다. */
+.ss-prefs-go:disabled {
+  border-color: color-mix(in srgb, var(--ss-fg) 24%, transparent);
+  color: color-mix(in srgb, var(--ss-fg) 45%, transparent);
+  cursor: default;
+}
+
+.ss-prefs-note {
+  font-size: 0.66rem;
+  color: color-mix(in srgb, var(--ss-fg) 48%, transparent);
 }

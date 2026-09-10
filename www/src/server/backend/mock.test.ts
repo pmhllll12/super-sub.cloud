@@ -172,4 +172,37 @@ describe('mockBackend', () => {
       ).rejects.toMatchObject({ status: 422, code: 'DUPLICATE_POSITION' })
     })
   })
+
+  describe('searchMercenaryCandidates — 흐름 D(용병 후보 검색) 챗봇이 부르는 자리', () => {
+    const DEMO_TOKEN = 'mock-access-token-demo'
+
+    it('포지션에 맞는 후보를 돌려준다', async () => {
+      const candidates = await mockBackend.searchMercenaryCandidates(DEMO_TOKEN, {
+        sport_code: 'football',
+        position_code: 'GK',
+        query_text: '주말 저녁 가능한 골키퍼',
+      })
+      expect(candidates.length).toBeGreaterThan(0)
+      expect(candidates[0].nickname).toBeTruthy()
+    })
+
+    it('맞는 후보가 없으면 빈 배열이다 — 에러가 아니다', async () => {
+      const candidates = await mockBackend.searchMercenaryCandidates(DEMO_TOKEN, {
+        sport_code: 'baseball',
+        position_code: 'C',
+        query_text: '아무나',
+      })
+      expect(candidates).toEqual([])
+    })
+
+    it('limit 만큼만 돌려준다', async () => {
+      const candidates = await mockBackend.searchMercenaryCandidates(DEMO_TOKEN, {
+        sport_code: 'football',
+        position_code: 'GK',
+        query_text: '아무나',
+        limit: 0,
+      })
+      expect(candidates).toEqual([])
+    })
+  })
 })

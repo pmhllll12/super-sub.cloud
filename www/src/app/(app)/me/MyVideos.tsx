@@ -4,9 +4,9 @@ import { useEffect, useState } from 'react'
 import type { MyVideo } from '@/server/backend'
 import { SPORTS, SPORT_CODE, type SportKey } from '@/lib/sports'
 import { checkClip, uploadClip, type ClipMeta } from '@/lib/uploadClip'
-import { listPublished, publish, unpublish } from '@/lib/published'
+import { publish, unpublish } from '@/lib/published'
 import { forgetReport, reportFor, type SavedReport } from '@/lib/savedReports'
-import { loadFeatured, setFeatured } from '@/lib/featuredClip'
+import { featuredOf, setFeatured } from '@/lib/featuredClip'
 import { isDirectKey, usePlaybackUrls } from '@/lib/playbackUrl'
 import ReportView from '@/components/analysis/ReportView'
 
@@ -112,16 +112,18 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
   /**
    * 공개로 돌린 영상들.
    *
-   * 🔴 `listPublished()` 를 그릴 때 부르지 않는다 — 저장소는 서버에 없으므로
-   * 서버가 그린 첫 화면과 브라우저가 그린 것이 갈려 하이드레이션이 깨진다.
-   * 붙은 **뒤에** 한 번 읽는다.
+   * 🔴 **정본은 서버의 `is_public` 이다**(CCC 20) — 전에는 브라우저 저장소라
+   * 다른 기기에서도 남에게도 안 보였다. 첫 값을 목록에서 뽑고 그 뒤로는 이
+   * 화면이 들고 있는다(목록은 서버 컴포넌트가 준 prop 이라 다시 안 온다).
+   *
+   * 🔴 **그릴 때 읽어도 된다** — 저장소가 아니라 prop 이라 서버와 브라우저의
+   * 첫 그림이 같다. effect 로 미뤄야 했던 이유가 사라졌다.
    */
-  const [pubIds, setPubIds] = useState<string[]>([])
+  const [pubIds, setPubIds] = useState<string[]>(() =>
+    videos.filter((v) => v.is_public).map((v) => v.id),
+  )
   /** 공개 폼이 열린 영상 id 와 적고 있는 값. */
   const [form, setForm] = useState<{ id: string; title: string; what: string } | null>(null)
-
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- 위 주석 참고: 붙은 뒤에 읽어야 한다.
-  useEffect(() => setPubIds(listPublished().map((c) => c.id)), [])
 
   useEffect(() => {
     if (!picked) {
@@ -177,18 +179,40 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
   /**
    * 나를 보여주는 **대표 영상**으로 세워 둔 클립의 id.
    *
-   * 🔴 그릴 때 읽지 않는다 — 서버엔 없는 값이라 하이드레이션이 깨진다.
+   * 🔴 **정본은 서버의 `is_featured` 다**(CCC 27) — 전에는 `localStorage` 라
+   * 다른 기기에서는 안 보였다. 첫 값을 목록에서 뽑고, 그 뒤로는 이 화면이
+   * 들고 있는다(목록은 서버 컴포넌트가 준 prop 이라 다시 안 온다).
+   *
+   * 🔴 **그릴 때 읽어도 된다** — 저장소가 아니라 prop 이라 서버와 브라우저의
+   * 첫 그림이 같다. 저장소를 읽던 때 effect 로 미뤄야 했던 이유가 사라졌다.
    */
-  const [featured, setFeaturedId] = useState<string | null>(null)
-  useEffect(() => {
-    setFeaturedId(loadFeatured()?.videoId ?? null)
-  }, [])
+  const [featured, setFeaturedId] = useState<string | null>(
+    () => featuredOf(videos)?.id ?? null,
+  )
+  /** 대표를 바꾸다 실패한 사유 — 반려된 클립은 422 `CANNOT_FEATURE` 다. */
+  const [featuredBusy, setFeaturedBusy] = useState(false)
 
-  /** 세우거나 푼다. 같은 영상을 다시 누르면 풀린다 — 대표는 하나뿐이다. */
-  function toggleFeatured(target: MyVideo) {
+  /**
+   * 세우거나 푼다. 같은 영상을 다시 누르면 풀린다 — 대표는 하나뿐이다.
+   *
+   * 🔴 **서버가 바꾼 뒤에야 화면을 바꾼다.** 먼저 바꾸고 나중에 부르면,
+   * 실패했을 때(반려된 클립 · 남의 클립) 세워진 것처럼 보이는데 실제로는
+   * 아니다 — 지우기가 같은 이유로 같은 순서를 쓴다.
+   * 🔴 **옛 대표를 따로 내리지 않는다.** 사람당 하나는 서버가 지킨다.
+   */
+  async function toggleFeatured(target: MyVideo) {
+    if (featuredBusy) return
+    setFeaturedBusy(true)
+    setNotice(null)
     const on = featured === target.id
-    setFeatured(on ? null : { videoId: target.id, src: previewSrc(target, playbackUrls) })
-    setFeaturedId(on ? null : target.id)
+    try {
+      await setFeatured(target.id, !on)
+      setFeaturedId(on ? null : target.id)
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : '대표 영상을 바꾸지 못했습니다.')
+    } finally {
+      setFeaturedBusy(false)
+    }
   }
 
   /**
@@ -200,9 +224,10 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
    * 🔴 **서버가 지운 뒤에야 화면에서 뺀다.** 먼저 빼고 나중에 부르면, 실패한
    * 경우 사라진 것처럼 보이는데 실제로는 남아 있다.
    *
-   * 🔴 브라우저에만 있는 것들(대표 · 공개 · 리포트)도 함께 거둔다 — 계약에
-   * 자리가 없어 여기 남아 있는 값들이라(미결 paik 5·7·10번) 서버가 지워
-   * 주지 못한다.
+   * 🔴 아직 브라우저에만 있는 것들(공개 · 리포트)도 함께 거둔다 — 계약에
+   * 자리가 없어 여기 남아 있는 값들이라(미결 paik 5·7번) 서버가 지워 주지
+   * 못한다. **대표는 이제 여기 없다**(CCC 27) — 클립의 성질이라 클립이
+   * 지워지면 서버에서 같이 없어진다.
    */
   async function removeVideo(target: MyVideo) {
     if (removing) return
@@ -220,11 +245,11 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
             : null
         throw new Error(msg ?? '지우지 못했습니다.')
       }
-      if (featured === target.id) {
-        setFeatured(null)
-        setFeaturedId(null)
-      }
-      unpublish(target.id)
+      /* 🔴 **대표도 공개도 서버에 따로 지울 것이 없다** — 둘 다 클립의
+         성질이라 클립이 사라지면서 같이 없어진다(CCC 20 · 27). 여기서
+         `unpublish` 를 부르면 **방금 지운 영상에 PATCH 를 쏘게 되고** 404 다.
+         화면에 남은 표시만 거둔다. */
+      if (featured === target.id) setFeaturedId(null)
       setPubIds((prev) => prev.filter((id) => id !== target.id))
       forgetReport(target.id)
       setAdded((prev) => prev.filter((x) => x.id !== target.id))
@@ -303,31 +328,40 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
     }
   }
 
-  function togglePublish(target: MyVideo) {
+  /**
+   * 🔴 **서버가 바꾼 뒤에야 화면을 바꾼다.** 먼저 끄고 나중에 부르면, 실패한
+   * 경우 비공개로 보이는데 실제로는 **남에게 계속 보인다** — 되돌릴 수 없는
+   * 쪽으로 틀리는 것이라 지우기와 같은 순서를 쓴다.
+   */
+  async function togglePublish(target: MyVideo) {
     if (pubIds.includes(target.id)) {
-      unpublish(target.id)
-      setPubIds((prev) => prev.filter((x) => x !== target.id))
-      setForm(null)
+      setNotice(null)
+      try {
+        await unpublish(target.id)
+        setPubIds((prev) => prev.filter((x) => x !== target.id))
+        setForm(null)
+      } catch (e) {
+        setNotice(e instanceof Error ? e.message : '공개를 풀지 못했습니다.')
+      }
       return
     }
     // 켜는 것만으로는 안 올린다 — 제목이 있어야 영상 모음에서 이름이 생긴다.
     setForm({ id: target.id, title: '', what: '' })
   }
 
-  function savePublish(target: MyVideo) {
+  async function savePublish(target: MyVideo) {
     if (!form || !form.title.trim()) return
-    publish({
-      id: target.id,
-      title: form.title.trim(),
-      what: form.what.trim(),
-      /* 조회용 주소가 없어(계약 3-6절 "아직 없는 것") 실제 백엔드가 준 키는
-         영상 모음에서도 안 틀린다 — `previewSrc` 와 같은 한계다. */
-      src: previewSrc(target, playbackUrls) ?? target.storage_key,
-      aspect: ratio ? `${ratio} / 1` : '16 / 9',
-      at: target.created_at.slice(0, 10),
-    })
-    setPubIds((prev) => [...prev, target.id])
-    setForm(null)
+    setNotice(null)
+    try {
+      /* 🔴 **공개와 제목을 한 번에 보낸다.** 나눠 보내면 그 사이에 끊겼을 때
+         이름 없는 영상이 남에게 보인다. 재생 주소도 비율도 안 보낸다 —
+         목록은 서버가 그리고, 재생은 `playback-url` 로 따로 받는다. */
+      await publish(target.id, { title: form.title.trim(), description: form.what.trim() })
+      setPubIds((prev) => [...prev, target.id])
+      setForm(null)
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : '공개하지 못했습니다.')
+    }
   }
 
   return (
@@ -534,11 +568,12 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
                     maxLength={60}
                     onChange={(e) => setForm({ ...form, what: e.target.value })}
                   />
-                  {/* ⚠️ 서버에 공개 여부를 둘 자리가 아직 없다(미결). 그것을
-                      숨기면 다른 기기에서 안 보일 때 고장으로 읽힌다. */}
+                  {/* 🔴 **공개는 되돌릴 수 있지만 그 사이에 남이 본다.**
+                      무엇이 일어나는지 누르기 전에 말한다(CCC 20 으로 서버에
+                      올라가면서 이 문구가 「이 브라우저에만」에서 바뀌었다). */}
                   <p className="ss-profile-publish-note">
-                    아직 이 브라우저에만 남습니다 — 다른 기기나 다른 사람에게는 보이지
-                    않습니다.
+                    영상 모음에서 다른 사람에게도 보입니다 — 언제든 다시 내릴 수
+                    있습니다.
                   </p>
                   <button
                     type="button"
@@ -651,13 +686,11 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
 
                 🔴 **비를 알기 전에는 감춘다.** 폭은 이제 안 틀리지만, 영상이
                 아직 안 그려졌는데 선만 먼저 뜨면 허공에 그은 줄로 보인다. */}
-            {/* ⚠️ 어디에 남는지 밝힌다 — 계약에 자리가 없어 이 브라우저에만
-                남는다(공개 여부 · 카드 꾸미기와 같은 규칙). 단추와 달리 이건
-                흐름 안에 둔다 — 겹쳐 놓으면 넘기는 단추를 덮는다. */}
+            {/* 무엇에 쓰이는 값인지 밝힌다. 단추와 달리 이건 흐름 안에 둔다 —
+                겹쳐 놓으면 넘기는 단추를 덮는다. */}
             {v.passed && featured === v.id && (
               <p className="ss-profile-featured-note">
-                추천 판에서 나를 소개할 때 이 장면이 돕니다 — 아직 이 브라우저에만
-                남습니다.
+                추천 판에서 나를 소개할 때 이 장면이 돕니다.
               </p>
             )}
 

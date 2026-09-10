@@ -1,9 +1,11 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import type { MercenaryCandidate } from '@/server/backend/types'
 
 /**
- * 흐름 B(모집 등록 돕기) 챗봇 — "용병 찾기" 알약을 누르면 열린다(미결 `min` 7번).
+ * 흐름 B(모집 등록 돕기) + 흐름 D(용병 후보 검색, 2026-09-10 추가) 챗봇 —
+ * "용병 찾기" 알약을 누르면 열린다(미결 `min` 7번·17번).
  *
  * 대화 이력은 서버에 저장하지 않는다 — 이 컴포넌트가 `history`(Gemini의
  * `Content[]` 그대로, 불투명한 값)를 들고 있다가 매 요청마다 돌려준다. 새로고침하면
@@ -12,6 +14,11 @@ import { useRef, useState } from 'react'
  * 🔴 **등록 API(`POST /api/teams/{id}/matches`)는 챗봇을 거치지 않고 이 컴포넌트가
  * 직접 부른다.** `/api/chat`이 돌려주는 `proposal`은 확인 카드일 뿐, LLM이 쓰기를
  * 실행하지 않는다 — 사용자가 [등록] 버튼을 눌러야 실제로 등록된다.
+ *
+ * `candidates`는 다르다 — **읽기라 확인 없이 곧바로 온 결과**다(`/api/chat`이
+ * `fastapi`의 `POST /matching/search-candidates`를 부르고, 그 결과를 다시
+ * Gemini에 넣어 만든 소개 문장이 `reply`에 실려 온다). 카드는 그 결과를 목록으로
+ * 보여주기만 하고 별도 액션은 없다 — 연락·초대 API가 아직 없다.
  */
 
 type DisplayMessage = { role: 'user' | 'assistant' | 'system'; text: string }
@@ -28,6 +35,7 @@ type ChatResponse = {
   history: unknown
   reply: string
   proposal: Proposal | null
+  candidates: MercenaryCandidate[] | null
 }
 
 type ApiErrorBody = { error?: { code?: string; message?: string } }
@@ -68,6 +76,7 @@ export default function MatchBot({ open, onClose }: { open: boolean; onClose: ()
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [proposal, setProposal] = useState<Proposal | null>(null)
+  const [candidates, setCandidates] = useState<MercenaryCandidate[] | null>(null)
   const [registering, setRegistering] = useState(false)
   const [registerError, setRegisterError] = useState<string | null>(null)
   const historyRef = useRef<unknown>([])
@@ -99,6 +108,7 @@ export default function MatchBot({ open, onClose }: { open: boolean; onClose: ()
       historyRef.current = ok.history
       if (ok.reply) setMessages((prev) => [...prev, { role: 'assistant', text: ok.reply }])
       setProposal(ok.proposal)
+      setCandidates(ok.candidates)
       setRegisterError(null)
     } catch {
       setMessages((prev) => [...prev, { role: 'system', text: '네트워크 오류로 보내지 못했어요.' }])
@@ -190,6 +200,20 @@ export default function MatchBot({ open, onClose }: { open: boolean; onClose: ()
             {registering ? '등록 중…' : '등록'}
           </button>
         </div>
+      )}
+
+      {candidates && candidates.length > 0 && (
+        <ul className="ss-matchbot-candidates" aria-label="용병 후보">
+          {candidates.map((c) => (
+            <li key={c.user_id} className="ss-matchbot-candidate-card">
+              <p>
+                <strong>{c.nickname}</strong>
+                {c.location && <> · {c.location}</>}
+              </p>
+              {c.skill_summary && <p>{c.skill_summary}</p>}
+            </li>
+          ))}
+        </ul>
       )}
 
       <form

@@ -127,7 +127,7 @@ export default function SquadSuggest({
   onPick,
   onClose,
 }: {
-  /** 지금 채우려는 자리(GK · DF · MF · FW). */
+  /** 지금 채우려는 자리의 포지션 코드 — 목록의 정본은 `GET /positions` 다. */
   position: string
   /**
    * 나 자신 — 후보 목록에 내가 있으면 **내가 고른 대표 영상**을 쓴다
