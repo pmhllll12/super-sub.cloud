@@ -6424,6 +6424,53 @@ chat/route.ts` 시스템 프롬프트) · 스쿼드 등재 UI · 모집 등록 `
 
 - **담당**: 백성검(www 3곳 반영) · **제기**: 정어진 · **기한**: 스프린트 3 (급하지 않음 — 지금 하드코딩도 동작함)
 
+### 27. 분석 리포트 적재 방식이 초안과 실물이 어긋납니다 — 통일해야 `POST /analyses` 를 짤 수 있습니다 (2026-09-10 신설)
+
+`metric_definition` 시드가 들어와(23번 ✅) 적재를 짤 수 있게 됐는데, **결과를
+어떻게 받느냐**가 두 문서에서 다릅니다.
+
+| | `api-contract.md` 3-1 초안 (2026-08-28) | 실물 (`agent/report-contract.md` · paik 11) |
+|---|---|---|
+| 에이전트가 보내는 것 | `POST /analyses` 로 `metrics[]` 배열 + `report` 를 통째로 | `report.json` 을 S3 에 올리고 완료 보고(`PATCH /internal/analysis-jobs/{id}`)에 **`report_key` 문자열만** |
+| 지표 정본 | 요청 본문의 `metrics[]` | S3 `report.json` 의 `features` · `result.breakdown[]` |
+
+초안대로 두면 워커가 **같은 결과를 두 번**(S3 에 한 번, `POST /analyses` 본문에
+한 번) 만들어 보내야 하고 둘이 갈라집니다.
+
+#### 만족해야 할 성질 (권고안 — 서버가 S3 를 읽는다)
+
+파일·엔드포인트 이름은 예시입니다.
+
+1. **적재 입력은 S3 `report.json` 하나다.** 서버가 `report_key` 로 그 객체를
+   읽어 `analysis_metric`(작업당 묶음 1) · `analysis_metric_value`(측정·항목별
+   등급·`stat`·`total_score` 행) · `analysis_report`(요약·근거)로 적재한다.
+   `report.json` 스키마는 `agent/report-contract.md` 의 봉투 + `result` 다.
+2. **트리거는 백엔드가 정한다** — 완료 보고 시점에 서버가 읽어 적재하든, 별도
+   내부 엔드포인트(`POST /internal/analyses`)를 워커가 한 번 더 부르든. 어느
+   쪽이어도 **워커는 DB 접속 정보를 모른다**(3-1 「왜 DB 에 직접 쓰지 않는가」 유지).
+3. **에이전트가 보장할 것**: 성공 완료 보고에는 **항상** `report_key` 가 실리고,
+   그 객체는 위 스키마를 따른다. `report.json` 스키마 변경은 계약으로 다룬다
+   (지금은 「정본은 코드」라 조용히 바뀔 수 있다).
+4. 읽기(`GET .../report`)는 그 DB 에서 조립한다 — 이미 결정됨(3-1, 2026-09-09).
+
+#### 확인
+
+| | |
+|---|---|
+| 착수 여부 | `grep -rn '/analyses' fastapi/app/` — 라우트가 있으면 적재 착수됨 |
+| 실물 확인 | `grep -rn 'report_key' agent/scripts/` — 워커가 성공 보고에 싣는가 · `agent/report-contract.md` 의 `result.breakdown[].criterion_id` 와 `metric_definition` 의 `grade.{sport}.{motion}.{id}` 가 대응하는가 |
+| 하지 말 것 | 🔴 에이전트가 `analysis_metric_value` 에 직접 INSERT — 검증·버전 기록·삭제 연쇄가 양쪽으로 갈라진다(3-1) · 🔴 읽기 경로에서 `report.json` passthrough — 적재 후 DB 조립이다 · 🔴 두 방식(`metrics[]` 제출 · S3+`report_key`)을 **둘 다** 열어 두기 · 🔴 `band`·`provisional`·`out_of_band` 를 선수 리포트 DTO 에 넣기(`agent/report-contract.md` 「화면에 낼 때」) |
+
+#### 곁가지 — 3-1 의 마지막 「미정」
+
+신뢰도(키포인트 품질)를 담을 자리가 3장 4) 산출물 넷 중 아직 안 정해졌습니다.
+`report.json` 봉투에는 `subject.source`(대상 추적 확신도)·`previews` 유무는
+있는데 **키포인트 품질 점수 자체는 안 보입니다.** 있으면 키 이름을, 없으면
+"지금은 안 낸다"를 알려 주시면 컬럼은 나중에 더합니다(17번처럼).
+
+- 상세: `fastapi/docs/api-contract.md` 3-1 · `agent/report-contract.md` · 같은 구역 23·24번 · `paik` 7번 · `min` 9번
+- **담당**: 정어진(적재·읽기 API 구현) · 정상호(`report.json` 스키마 계약 고정 + 성공 보고에 `report_key` 보장 + 위 곁가지) · **제기**: 정어진 · **기한**: 스프린트 3 (`paik` 7·`min` 9·`jin` 24 가 이것에 물려 있음)
+
 ## min (박민호)
 
 ### 1. 패킷 A(과금) 진행 상황을 알려주세요 ✅ 회신 (2026.09.08)
