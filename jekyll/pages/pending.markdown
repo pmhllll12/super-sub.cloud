@@ -4570,7 +4570,7 @@ downgrade 왕복 클린, 572 통과. `test_analysis_schema_db.py`·`test_delete_
 - **합의 전에는 적재 엔드포인트를 구현하지 않는다** (스키마와 규격 초안까지만 올라가 있다)
 - **담당**: 정상호 · **제기**: 정어진 · **기한**: 스프린트 2
 
-### 2. 클라이언트의 백엔드 계약 반영 — www ✅ 해소 (2026.09.10) · flutter 대기
+### 2. 클라이언트의 백엔드 계약 반영 — www ✅ 해소 (2026.09.10) · flutter ✅ 해소 (2026.09.10)
 
 > **www 몫이 끝났습니다 (2026-09-10, 백성검).** 429 `TOO_MANY_REQUESTS` 뒤에
 > 같은 요청이 다시 안 나갑니다. **기다릴 시간은 서버가 준 `Retry-After`** 이고
@@ -4600,6 +4600,30 @@ downgrade 왕복 클린, 572 통과. `test_analysis_schema_db.py`·`test_delete_
 > 이 `code` 를 버리는 문제**(같은 구역 4번)가 아직 있어서, 429 를 다른 실패와
 > 가를 수단이 없습니다. 그 구멍은 새로 만든 `flutter/CLAUDE.md` 에 적어 두었고,
 > **www 가 이미 한 모양**(`ApiCallError`)을 따라가면 두 클라이언트가 안 갈립니다.
+
+> **flutter 몫도 끝났습니다 (2026-09-10, 백성검).** `AuthException` 이 `code` ·
+> `retryAfter` 를 갖게 되어(같은 구역 4번도 함께 닫힙니다) 429 를 다른 실패와
+> 가를 수 있습니다. www 가 이미 한 모양(`ApiCallError`)을 그대로 따라갔습니다 —
+> `Retry-After` 헤더도 **www 와 달리 프록시를 거치지 않고 바로 옵니다** (문서
+> 5·6절이 이미 짚어 둔 대로 Flutter 는 백엔드를 직접 부르므로 이 문제가 없습니다).
+>
+> | 자리 | 무엇 |
+> |---|---|
+> | `auth_repository.dart` | `AuthException` 에 `code`·`retryAfter` (선택 인자라 기존 호출부는 안 고쳤습니다) |
+> | `auth_repository_api.dart` | `_decode` 가 `error['code']` 와 `Retry-After` 헤더를 함께 싣습니다. 헤더가 없거나 0 이면 **최소 1초**(www와 같은 판단) |
+> | `data/rate_limit.dart` (신규) | `isRateLimited()` · `retryAfterSeconds()` — www의 같은 이름 함수와 같은 성질 |
+> | `presentation/rate_limit_controller.dart` (신규) | `rateLimitControllerProvider` — 매초 줄어드는 잠금 카운터. **지금은 로그인 화면만 잇습니다** — 가입·구글 로그인 화면이 Flutter 에 아직 없습니다(`grep -rln "signup\|google" flutter/lib/features/auth` 결과 없음). 생기면 같은 provider 를 이어 쓰면 됩니다 |
+> | `login_screen.dart` | 429 면 서버 메시지 대신 잠금 안내(`남은 초 뒤에 다시 시도`)를 띄우고 버튼을 잠급니다 |
+>
+> - 🔴 **구글 버튼 잠금 제외 규칙은 아직 해당 없음** — Flutter 에 구글 로그인
+>   화면이 없어 적용할 자리가 없습니다. 화면이 생기면 www 의 "구글 버튼에는
+>   잠금을 걸지 않는다"를 그대로 따라야 합니다.
+>
+> | 확인 | `flutter analyze` → 0건. `flutter test` → 91개 전부 통과(`rate_limit_test.dart` 7개, `login_screen_test.dart`의 429 시나리오 포함) |
+> |---|---|
+>
+> `flutter/CLAUDE.md` 의 "알려진 구멍" 절도 함께 갱신했습니다(더는 구멍이
+> 아닙니다).
 
 8/26 부터 백엔드 계약이 여러 번 늘었다. 정리 문서를 냈고 **조치가 필요한 것은
 둘**이다. 나머지는 이미 잘 돌아서 `조치 불필요` 와 그 이유를 적어 두었다.

@@ -2,9 +2,18 @@ import 'models/app_user.dart';
 import 'models/session.dart';
 
 class AuthException implements Exception {
-  const AuthException(this.message);
+  const AuthException(this.message, {this.code, this.retryAfter});
 
   final String message;
+
+  /// 서버 에러 `code` (계약: `{"error": {"code", "message"}}`) — 분기는 이걸로
+  /// 한다. Mock 은 서버가 없어 늘 `null`이다.
+  final String? code;
+
+  /// 429 일 때 몇 초 기다려야 하는가(서버가 준 `Retry-After`, 정수 초).
+  /// 429 가 아니거나 헤더가 없으면 `null` — 웹(`www/`)의 `ApiCallError.retryAfter`와
+  /// 같은 성질이다.
+  final int? retryAfter;
 
   @override
   String toString() => message;
