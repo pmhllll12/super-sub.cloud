@@ -28,7 +28,7 @@ from app.analysis.application.use_cases.report_ingest_interactor import (
 from app.analysis.application.use_cases.report_parser import UnsupportedReportSchema
 
 _MINIMAL = {
-    "schema_version": "1.0",
+    "schema_version": "1.1",
     "rubric": {"sport": "football", "motion": "instep_shot", "version": "0.1"},
     "judge_model": "exaone-4.0-1.2b",
     "features": {},

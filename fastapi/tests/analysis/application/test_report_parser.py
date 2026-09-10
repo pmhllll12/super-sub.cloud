@@ -18,8 +18,9 @@ from app.analysis.application.use_cases.report_parser import (
 )
 
 # football.instep_shot — 시드된 코드만 쓴다(마이그레이션 ca31a2180b54).
+# schema_version 은 계약 현재값 "1.1" (ho 476b0df — view_dependent 추가로 minor 상승).
 _ENVELOPE = {
-    "schema_version": "1.0",
+    "schema_version": "1.1",
     "source_video": "s3://b/videos/u/v.mp4",
     "video_id": "11111111-1111-4111-8111-111111111111",
     "analyzed_at": "20260910T120000Z",
@@ -100,7 +101,7 @@ def _raw(env=None) -> bytes:
 
 def test_봉투를_행_모양으로_옮긴다():
     p = parse_report(_raw())
-    assert p.schema_version == "1.0"
+    assert p.schema_version == "1.1"
     assert (p.rubric_sport, p.rubric_motion, p.rubric_version) == (
         "football",
         "instep_shot",
@@ -150,8 +151,10 @@ def test_모르는_schema_major_는_거부한다():
 
 
 def test_minor_버전_차이는_통과한다():
-    ok = {**_ENVELOPE, "schema_version": "1.7"}
-    parse_report(_raw(ok))  # 예외 없음
+    # 낡은 봉투("1.0")와 앞선 minor("1.7") 둘 다 통과한다 — major 만 본다
+    # (정상호: "1.0 봉투와 1.1 봉투가 섞여도 둘 다 유효").
+    for v in ("1.0", "1.7"):
+        parse_report(_raw({**_ENVELOPE, "schema_version": v}))  # 예외 없음
 
 
 def test_JSON_이_아니면_MalformedReport():

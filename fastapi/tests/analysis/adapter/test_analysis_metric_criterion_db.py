@@ -221,7 +221,7 @@ def test_analysis_report_의_새_컬럼이_JSON_왕복한다(metric, db_session)
             analysis_metric_id=metric["metric_id"],
             summary="디딤발이 공보다 앞서 있습니다.",
             model_name="exaone-4.0-1.2b",
-            schema_version="1.0",
+            schema_version="1.1",
             provisional=True,
             previews=previews,
             keypoint_quality=kq,
@@ -236,7 +236,7 @@ def test_analysis_report_의_새_컬럼이_JSON_왕복한다(metric, db_session)
         .filter_by(analysis_metric_id=metric["metric_id"])
         .one()
     )
-    assert row.schema_version == "1.0"
+    assert row.schema_version == "1.1"
     assert row.provisional is True
     assert row.previews["impact"].endswith("impact.png")
     assert row.keypoint_quality["swing_side_valid_ratio"] == 0.94

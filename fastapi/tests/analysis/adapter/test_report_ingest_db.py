@@ -29,7 +29,7 @@ PASSWORD = "supersub2026"
 
 def _envelope(*, sport="football", motion="instep_shot", score=71):
     return {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "source_video": "s3://b/videos/u/v.mp4",
         "analyzed_at": "20260910T120000Z",
         "code_version": "abc1234",
@@ -157,7 +157,7 @@ def test_리포트가_네_테이블에_적재된다(job, db_session):
         {"j": str(job["job_id"])},
     ).one()
     assert report.provisional is True
-    assert report.schema_version == "1.0"
+    assert report.schema_version == "1.1"
     assert report.rubric_sport == "football" and report.rubric_motion == "instep_shot"
 
 
