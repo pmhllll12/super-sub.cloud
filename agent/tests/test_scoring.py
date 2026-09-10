@@ -410,7 +410,7 @@ def test_out_of_band_marks_zero_grades_that_came_from_above():
 
 # features 를 줘야만 채워지는 **표시 전용** 필드들. 이 목록이 늘어날 때마다
 # 아래 검사가 「점수를 안 건드린다」를 다시 확인한다.
-DISPLAY_ONLY_FIELDS = ("out_of_band", "stat")
+DISPLAY_ONLY_FIELDS = ("out_of_band", "stat", "view_dependent")
 
 
 def test_display_only_fields_do_not_move_the_score():
@@ -438,6 +438,9 @@ def test_display_only_fields_do_not_move_the_score():
     )
     assert all(b["stat"] is None for b in without["breakdown"]), (
         "features 를 안 주면 항목 점수를 **지어내지 않는다**"
+    )
+    assert all(b["view_dependent"] == "" for b in without["breakdown"]), (
+        "features 를 안 주면 촬영 방향 의존 표시가 없어야 한다"
     )
 
 
@@ -546,3 +549,61 @@ def test_the_filename_matches_the_declared_sport_and_motion():
     assert actual == expected, (
         f"파일명이 선언과 다르다: {sorted(actual - expected)}"
     )
+
+
+def _trunk_criterion(rubric):
+    return next(c for c in rubric.criteria
+                if c.band_metric == "trunk_forward_lean_deg_at_impact")
+
+
+@pytest.mark.parametrize(
+    "lean, expected",
+    [
+        # 인스텝의 2등급은 [5,20], 0등급은 ≤0 — 반전하면 2 → 0 이다.
+        (12.4, "grade"),
+        # 음수도 마찬가지다. -8.7 은 0등급이고 반전하면 8.7 로 2등급이 된다.
+        (-8.7, "grade"),
+        # 25도는 1등급([20,30])이고 반전한 -25 는 0등급이다.
+        (25.0, "grade"),
+        # 🔴 33도는 반전해도 0등급이라 **등급이 안 바뀐다** — 그래도 지표가
+        # 방향에 의존한다는 것은 그대로다.
+        (33.0, "metric"),
+    ],
+)
+def test_view_dependent_says_whether_the_grade_would_have_differed(rubric, lean, expected):
+    """🔴 촬영 방향 의존을 **드러낸다** (미결 37번 처방 (다)).
+
+    같은 자세라도 반대편에서 찍으면 `trunk_lean` 이 정확히 `-θ` 가 된다.
+    그 사실을 숨기지 않는 것이 이 필드의 전부다.
+    """
+    assert _trunk_criterion(rubric).view_dependent(
+        {"trunk_forward_lean_deg_at_impact": lean}
+    ) == expected
+
+
+def test_view_dependent_is_empty_for_metrics_that_do_not_flip(rubric):
+    """무릎각·골반 회전은 좌우 반전에 안 변한다 — 경고를 남발하지 않는다."""
+    feats = {m: 30.0 for cr in rubric.criteria for m in cr.measured_by}
+    for c in rubric.criteria:
+        if c.band_metric == "trunk_forward_lean_deg_at_impact":
+            continue
+        assert c.view_dependent(feats) == "", f"{c.id} 에 근거 없는 표시가 붙었다"
+
+
+def test_a_symmetric_band_is_what_actually_stops_the_flip():
+    """🔴 **같은 지표, 밴드 하나 차이로 갈린다** (미결 37번의 자기 검사).
+
+    야구 타격의 `trunk_lean` 밴드는 0 대칭이라 반전해도 등급이 안 바뀐다 —
+    실측에서도 46클립 0/46 이었다. 인스텝은 같은 지표로 18/18 이 바뀌었다.
+    **지표가 아니라 밴드가 결정한다**는 것을 여기에 고정한다.
+    """
+    batting = _trunk_criterion(load_rubric("rubrics/baseball_batting.yaml"))
+    instep = _trunk_criterion(load_rubric(RUBRIC_PATH))
+    for lean in (-30.0, -12.4, -3.0, 3.0, 12.4, 30.0):
+        feats = {"trunk_forward_lean_deg_at_impact": lean}
+        assert batting.view_dependent(feats) == "metric", (
+            f"대칭 밴드인데 {lean} 에서 등급이 뒤집혔다"
+        )
+    assert instep.view_dependent(
+        {"trunk_forward_lean_deg_at_impact": 12.4}
+    ) == "grade", "비대칭 밴드에서 뒤집힘이 안 잡혔다"

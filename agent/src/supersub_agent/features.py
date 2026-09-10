@@ -74,6 +74,12 @@ LIMB_MIN_CONFIDENCE = {"leg": 0.3, "arm": 0.6}
 #       0으로 만들자 17/17 전부 실패했다 — 팔과 달리 여기서는 뺄 수 없다.
 GATE_JOINTS = {"arm": 2, "leg": 3}
 
+# 품질 게이트의 합격선 — 스윙 측 게이트 관절의 유효 프레임 비율 하한.
+# `check_quality`의 기본값이자 `keypoint_quality_envelope`가 봉투에 적어 내는
+# 기준값이다. 🔴 **두 곳에 숫자를 적지 않는다** — 게이트가 0.7로 거른 입력에
+# 봉투가 0.6이라고 적으면 읽는 쪽이 "왜 통과했나"를 못 맞춘다.
+MIN_VALID_RATIO = 0.7
+
 # 골반·어깨 축을 각도로 쓸 수 있는 최소 투영 길이 (어깨너비 = 1.0 기준).
 #
 # 몸통이 카메라를 향하면 좌우 두 점이 겹쳐 보여 축이 짧아지고, 그 각도는 작은
@@ -120,6 +126,28 @@ LIMB_DEPENDENT_METRICS = frozenset({
     # 준비 구간에 다리 유효 프레임이 2개 미만이면 안 나온다 (미결 21번).
     # 예전에는 0.0 을 지어냈고 그것이 "잠긴 골반" 0등급으로 갔다.
     "hip_rotation_range_deg",
+})
+
+# 좌우가 반전되면 부호가 뒤집히는 지표 — **촬영 방향에 의존한다** (미결 37번).
+#
+# `normalize()`는 평행이동과 스케일만 한다. 방향은 정규화하지 않으므로, 같은
+# 자세라도 반대편에서 찍으면 각도가 정확히 `-θ`가 된다. 그래서 이 지표는
+# 「앞으로 기울었나」가 아니라 **「이미지 오른쪽으로 기울었나」**를 잰다.
+#
+# 🔴 **가정이 아니라 실측이다.** 축구 인스텝 18클립에서 18/18이 항목 등급이,
+# 8/18이 최종 등급이 바뀌었고(`eval/pending37_trunk_mirror/`), 3DSP 축구 슛
+# 200클립에서는 부호가 음수 100 / 양수 100으로 갈리고 **192/200(96%)**이
+# 반전 시 등급이 달라진다(`eval/dataset_3dsp/`). 야구 타격만 0/46인데,
+# 그 루브릭의 밴드가 0 대칭이라서다 — **같은 지표, 밴드 하나 차이다.**
+#
+# 🔴 **여기 담는 것은 「부호가 뒤집힌다」뿐이다.** 골반 회전이 카메라 축을 함께
+# 채점하는 것(미결 22번)은 **다른 결함**이라 넣지 않는다 — 축 기준(mod 180)이라
+# 반전에 부호가 안 바뀐다. 한 이름에 두 결함을 담으면 어느 쪽인지 못 읽는다.
+#
+# 이 목록은 **드러내기에만 쓰인다**(`scoring.Criterion.view_dependent`).
+# 점수·등급·`features` 어디에도 관여하지 않는다.
+MIRROR_ANTISYMMETRIC_METRICS = frozenset({
+    "trunk_forward_lean_deg_at_impact",
 })
 
 # --- 프레임 단위 지표 (미결 7번 E-3) ---------------------------------------
@@ -293,9 +321,65 @@ def _apex_frame(height: np.ndarray, usable: np.ndarray) -> int:
     return int(np.argmin(np.where(candidates, height, np.inf)))
 
 
+def gate_ratio(kps: np.ndarray, limb: str = "leg", side: str = "auto") -> float:
+    """스윙 측 게이트 관절의 유효 프레임 비율. **거르지 않고 값만 낸다.**
+
+    `check_quality`(게이트)와 `keypoint_quality_envelope`(보고)가 이것을 함께
+    쓴다. 🔴 **비율을 두 번 계산하지 않는다** — 한쪽 계산이 바뀌면 게이트가
+    0.72로 통과시킨 입력을 봉투가 0.61이라고 적는 일이 생긴다.
+    """
+    # 스윙 측 판별은 **정규화 후** 좌표로 한다. 원좌표에서는 몸 전체의 이동이
+    # 좌우 이동량에 함께 실려 반대쪽을 스윙으로 집는다.
+    swing, _ = identify_limb(normalize(kps), limb, side)
+    gate_chain = swing[:GATE_JOINTS[limb]]
+    return float(valid_frames(kps, limb, gate_chain).mean())
+
+
+def keypoint_quality_envelope(
+    kps: np.ndarray,
+    limb: str = "leg",
+    side: str = "auto",
+    threshold: float = MIN_VALID_RATIO,
+) -> dict:
+    """**키포인트 품질을 봉투가 스스로 말한다** (미결 `jin` 27번 곁가지).
+
+    계약 3장 4)의 산출물 넷 중 「신뢰도」를 담을 자리가 정해져 있지 않았다.
+    게이트(`check_quality`)가 이미 재던 값인데 **던져 버리고 있었다** — 통과
+    여부만 남고 "얼마나 여유 있게 통과했나"가 사라져, 65%로 반려된 클립과
+    71%로 겨우 통과한 클립을 읽는 쪽이 구분할 수 없었다.
+
+    🔴 **`features`에 넣지 않는다.** `timebase`·`subject`와 같은 **형제 블록**
+    이다 — 판정 입력이 그대로라 기존 평가(B-2~B-6)와 비교가 끊기지 않는다.
+
+    🔴 **키포인트 신뢰도 평균이 아니다.** ViTPose는 top-down이라 엉뚱한 박스를
+    줘도 자신 있게 관절을 낸다(`pose.subject_envelope`) — 신뢰도 평균이 높은
+    것은 "잘 잡았다"는 뜻이 아니다. 여기 값은 **사지별 기준을 넘긴 프레임의
+    비율**이고, "누구를 쟀는가"는 `subject`가 따로 답한다.
+    """
+    try:
+        ratio = gate_ratio(kps, limb, side)
+    except InsufficientQuality as exc:
+        # 정규화 자체가 안 되는 입력(어깨 너비 0)은 비율이 정의되지 않는다.
+        # 0.0으로 채우면 "쟀는데 나빴다"로 읽힌다 — 안 쟀다고 말한다.
+        return {"known": False, "why": str(exc), "limb": limb}
+    return {
+        "known": True,
+        "limb": limb,
+        "side": side,
+        # 게이트가 본 값 그대로. 0~1이다 (백분율이 아니다).
+        "swing_side_valid_ratio": round(ratio, 4),
+        # 몇 관절을 요구했는가 — 팔 2(어깨·팔꿈치) · 다리 3(발목까지).
+        "gate_joints": GATE_JOINTS[limb],
+        # 이 값 미만이면 애초에 리포트가 없다(`InsufficientQuality`).
+        "threshold": threshold,
+        # 관절 하나가 "보였다"고 인정되는 신뢰도 하한. 사지마다 다르다.
+        "min_keypoint_confidence": LIMB_MIN_CONFIDENCE.get(limb, MIN_CONFIDENCE),
+    }
+
+
 def check_quality(
     kps: np.ndarray,
-    min_valid_ratio: float = 0.7,
+    min_valid_ratio: float = MIN_VALID_RATIO,
     limb: str = "leg",
     side: str = "auto",
 ) -> float:
@@ -317,14 +401,10 @@ def check_quality(
     LIMB_DEPENDENT_METRICS 규약에 따라 해당 채점 항목이 판정에서 제외되며
     가중치가 재정규화된다. 지지 측 지표도 같은 경로로 처리된다.
     """
-    # 스윙 측 판별은 **정규화 후** 좌표로 한다. 원좌표에서는 몸 전체의 이동이
-    # 좌우 이동량에 함께 실려 반대쪽을 스윙으로 집는다.
-    swing, _ = identify_limb(normalize(kps), limb, side)
-    gate_chain = swing[:GATE_JOINTS[limb]]
-    ratio = float(valid_frames(kps, limb, gate_chain).mean())
+    ratio = gate_ratio(kps, limb, side)
     if ratio < min_valid_ratio:
         raise InsufficientQuality(
-            f"{LIMB_NAMES[limb]} 스윙 측 키포인트({len(gate_chain)}개 관절) "
+            f"{LIMB_NAMES[limb]} 스윙 측 키포인트({GATE_JOINTS[limb]}개 관절) "
             f"유효 프레임 비율 {ratio:.0%} < 기준 {min_valid_ratio:.0%}. "
             "재촬영이 필요하다."
         )
