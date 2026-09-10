@@ -207,3 +207,27 @@ class FakeStorage(StoragePort):
             del _OBJECTS[key]
         for key in [k for k in _BLOBS if k.startswith(prefix)]:
             del _BLOBS[key]
+
+
+# 리포트 조회는 적재된 DB 가 있어야 뜻이 있다 — 계약 테스트는 "없을 때 404" 만
+# 본다. 실제 조립은 `tests/analysis/adapter/test_report_read_db.py` 가 진짜
+# PostgreSQL 로 본다.
+_REPORT_VIEWS: dict[UUID, object] = {}
+
+
+def set_report_view(video_id: UUID, view: object) -> None:
+    _REPORT_VIEWS[video_id] = view
+
+
+def reset_report_views() -> None:
+    _REPORT_VIEWS.clear()
+
+
+class StubReportReadRepository:
+    def find_for_video(self, video_id: UUID, user_id: UUID) -> object | None:
+        # 실물은 `video.user_id == user_id` 를 조인 조건에 건다 — 남의 영상이면
+        # 뷰가 있어도 `None`. `_VIDEOS` 에 주인이 등록돼 있으면 그것을 본다.
+        owner = _VIDEOS.get(video_id)
+        if owner is not None and owner.user_id != user_id:
+            return None
+        return _REPORT_VIEWS.get(video_id)

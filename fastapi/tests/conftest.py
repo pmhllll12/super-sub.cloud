@@ -5,7 +5,9 @@ from fastapi.testclient import TestClient
 
 from app.analysis.adapter.outbound.stub.video_stub_repository import (
     FakeStorage,
+    StubReportReadRepository,
     StubVideoRepository,
+    reset_report_views,
     reset_videos,
 )
 from app.analysis.adapter.outbound.stub.job_stub_repository import (
@@ -19,6 +21,7 @@ from app.analysis.dependencies.job_providers import (
     get_report_ingest_repository,
 )
 from app.analysis.dependencies.video_providers import (
+    get_report_read_repository,
     get_storage,
     get_video_repository,
 )
@@ -109,6 +112,7 @@ def client() -> TestClient:
     app.dependency_overrides[get_report_ingest_repository] = (
         StubReportIngestRepository
     )
+    app.dependency_overrides[get_report_read_repository] = StubReportReadRepository
     app.dependency_overrides[get_review_repository] = StubReviewRepository
     app.dependency_overrides[get_position_repository] = StubPositionRepository
     # 🔴 저장소도 갈아끼운다. 안 끼우면 `S3_BUCKET` 이 없어 503 이 나는데,
@@ -119,6 +123,7 @@ def client() -> TestClient:
     reset_videos()
     reset_jobs()
     reset_ingested()
+    reset_report_views()
     reset_reviews()
     reset_squads()
     try:
@@ -132,6 +137,7 @@ def client() -> TestClient:
         app.dependency_overrides.pop(get_video_repository, None)
         app.dependency_overrides.pop(get_job_repository, None)
         app.dependency_overrides.pop(get_report_ingest_repository, None)
+        app.dependency_overrides.pop(get_report_read_repository, None)
         app.dependency_overrides.pop(get_review_repository, None)
         app.dependency_overrides.pop(get_position_repository, None)
         app.dependency_overrides.pop(get_storage, None)
