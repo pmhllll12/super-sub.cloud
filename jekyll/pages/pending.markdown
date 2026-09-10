@@ -6024,7 +6024,12 @@ IAM 역할명·API 호스트명**이 그대로 있었고, `pages.yml` 로 `dev.s
   발견했습니다. **값만** 바꿨고 서술은 안 건드렸습니다 — 병합 시 충돌하면
   자리표시자 쪽을 남겨 주세요.
 
-- **담당**: 정어진 · **제기**: 정어진 · **기한**: 버킷 확인은 이번 주 · 나머지는 스프린트 3
+- **(2026-09-10)** 🔴 **「버킷 확인」을 서버에서 자동으로 못 합니다.** EC2 인스턴스
+  역할(`<EC2 역할>`)은 객체 수준 권한만 있어 `s3:GetBucketPublicAccessBlock`·
+  `s3:GetBucketPolicy`·`s3:GetBucketAcl` 가 전부 `AccessDenied` 입니다. **콘솔
+  또는 S3 admin 자격**으로 (1) Block Public Access 4개 (2) 버킷 정책에 익명(`Principal: "*"`)
+  허용 없음 (3) ACL 에 `AllUsers`/`AuthenticatedUsers` grant 없음 을 확인해야 합니다.
+- **담당**: 정어진(콘솔 확인) · **제기**: 정어진 · **기한**: 버킷 확인은 이번 주 · 나머지는 스프린트 3
 
 ### 22. `agent/deploy/` 에 AWS 계정 ID·리소스 ID·API 호스트가 값으로 남아 있습니다 (2026-09-08) ✅ 해소 (2026.09.09)
 
@@ -6097,7 +6102,7 @@ ID·리소스 ID·공인 IP·API 호스트라 그 범위만 했습니다. 다만
 
 - **담당**: 정상호(`agent/` 문서·`worker.py` 설정) · **제기**: 정어진 · **기한**: ~~계정 ID·공인 IP 는 이번 주 · 리소스 ID·호스트는 스프린트 3~~ → **해소 (2026.09.09, 두 조각 함께)**
 
-### 23. `metric_definition` 을 누가·어떻게 채웁니까 — `POST /analyses` 착수 전에 필요합니다 (2026-09-08)
+### 23. `metric_definition` 을 누가·어떻게 채웁니까 — `POST /analyses` 착수 전에 필요합니다 (2026-09-08) ✅ 시드 해소 (2026.09.10)
 
 > 🔴 **이건 `## jin` 구역의 23번입니다.** `## ho` 구역에도 23번(근거 문장 등급
 > 표기)이 있는데 **다른 항목**입니다. `agent/eval/pending23_evidence/` 는 그쪽입니다.
@@ -6226,6 +6231,12 @@ fps 가 없습니다.** 프레임 수로 저장하면 나중에 읽는 쪽이 30
 
 - 상세: `fastapi/docs/api-contract.md` 3-1 · 같은 구역 1번 「남은 것」
 - **담당**: ~~정상호(코드 목록·형식)~~ **✅ 냈습니다 (2026.09.09)** → **정어진**(시드 마이그레이션 + 위 「답을 못 드린 것」 둘) · **제기**: 정어진 · **기한**: 스프린트 3 초 (`POST /analyses` 착수에 걸림)
+- **✅ 시드 마이그레이션 완료 (2026.09.10, `jin` `3a57936` · 마이그레이션 `ca31a2180b54`).**
+  `agent/contracts/metric_definitions.yaml` 을 `export_metric_definitions.py --json` 으로 뽑아
+  `op.bulk_insert` 45행(측정 12 + `total_score` + `grade` 16 + `stat` 16). 「답을 못 드린 것」
+  둘은 정상호가 정리 — `stat` 적재함(`jin` 25번), `impact_frame` 은 행으로 유지. draft 73행은
+  승격 시 추가. 확인: 다운→업 왕복 · `alembic check` 클린 · `alembic heads` 단일 · `pytest -q` 697.
+  **남은 것 — 적재 경로(흐름 B)·읽기 규격**: `jin` 24 「리포트를 DB에 남겨」 조각 + `api-contract.md` 3-1.
 
 ### 24. 영상 수명 주기 — 분석은 임시, "저장"을 눌러야 남는다 · `videos/` 는 원본, `reports/` 는 저장된 것 (2026-09-08 신설)
 
@@ -6477,7 +6488,7 @@ DB로는 못 잡으므로 **여기만은 S3 수명주기 규칙이 맞다고 봅
 - 관련: `www/src/components/analysis/AnalysisStage.tsx`(`confirmSubject`·`saveToServer`·`saveReportToProfile`) · `lib/uploadClip.ts` · `lib/savedReports.ts` · 계약 3-6 · 같은 구역 6·7번(대상 박스·리포트 조회) · `ho` 9번(4K) · `ho` 27번(닫음) · **`agent/report-contract.md`**
 - **담당**: 정어진(백엔드 수명 주기) · 정상호(리포트 키 정렬·위 (1)) · **제기**: 정어진(사용자 요청) · **기한**: 스프린트 3 (조각별로 나눔)
 
-### 25. `metric_definition` 시드에 항목별 `stat` 코드를 추가해 주세요 — jin 23 후속 (2026-09-09)
+### 25. `metric_definition` 시드에 항목별 `stat` 코드를 추가해 주세요 — jin 23 후속 (2026-09-09) ✅ 해소 (2026.09.10)
 
 jin 23 회신에서 되물으신 둘("`stat` 도 적재하나" · "`impact_frame` 은 행인가
 필드인가")에 답합니다. 결정의 정본은 `fastapi/docs/api-contract.md` 3-1
@@ -6502,6 +6513,8 @@ jin 23 회신에서 되물으신 둘("`stat` 도 적재하나" · "`impact_frame
 | 물려 있는 것 | jin 23(시드 마이그레이션) · min #9(리포트 화면) · `paik` 7. 이게 정해져야 시드가 ~45 행으로 완결되고 `POST /analyses` 가 실서버에서 안 거부됩니다 |
 | 상세 | `fastapi/docs/api-contract.md` 3-1 「✅ 결정 — 리포트 읽기 경로는 DB에서 조립한다」 |
 - **담당**: 정상호(stat 코드 산출) → 정어진(시드 마이그레이션) · **제기**: 정어진 · **기한**: jin 23 과 함께 (스프린트 3 초)
+- **✅ 해소 (2026.09.10)** — 정상호 `stat.{sport}.{motion}.{id}` 산출(`3b4b506`), 정어진 시드
+  마이그레이션(`ca31a2180b54`, `jin` 23번과 한 커밋 `3a57936`). 최장 code 48자 < `String(50)`.
 
 ### 26. `GET /positions` 를 냈습니다 — 포지션 하드코딩을 걷어 주세요 (2026-09-09) ✅ 해소 (2026.09.10)
 
@@ -6544,6 +6557,198 @@ chat/route.ts` 시스템 프롬프트) · 스쿼드 등재 UI · 모집 등록 `
 | 하지 말 것 | 🔴 하드코딩 목록을 **양쪽에 공존**시키지 않기 — 한쪽만 고치면 어느 게 맞는지 모르게 됨 |
 
 - **담당**: 백성검(www 3곳 반영) · **제기**: 정어진 · **기한**: 스프린트 3 (급하지 않음 — 지금 하드코딩도 동작함)
+
+### 27. 분석 리포트 적재 방식이 초안과 실물이 어긋납니다 — 통일해야 `POST /analyses` 를 짤 수 있습니다 (2026-09-10 신설)
+
+`metric_definition` 시드가 들어와(23번 ✅) 적재를 짤 수 있게 됐는데, **결과를
+어떻게 받느냐**가 두 문서에서 다릅니다.
+
+| | `api-contract.md` 3-1 초안 (2026-08-28) | 실물 (`agent/report-contract.md` · paik 11) |
+|---|---|---|
+| 에이전트가 보내는 것 | `POST /analyses` 로 `metrics[]` 배열 + `report` 를 통째로 | `report.json` 을 S3 에 올리고 완료 보고(`PATCH /internal/analysis-jobs/{id}`)에 **`report_key` 문자열만** |
+| 지표 정본 | 요청 본문의 `metrics[]` | S3 `report.json` 의 `features` · `result.breakdown[]` |
+
+초안대로 두면 워커가 **같은 결과를 두 번**(S3 에 한 번, `POST /analyses` 본문에
+한 번) 만들어 보내야 하고 둘이 갈라집니다.
+
+#### 만족해야 할 성질 (권고안 — 서버가 S3 를 읽는다)
+
+파일·엔드포인트 이름은 예시입니다.
+
+1. **적재 입력은 S3 `report.json` 하나다.** 서버가 `report_key` 로 그 객체를
+   읽어 `analysis_metric`(작업당 묶음 1) · `analysis_metric_value`(측정·항목별
+   등급·`stat`·`total_score` 행) · `analysis_report`(요약·근거)로 적재한다.
+   `report.json` 스키마는 `agent/report-contract.md` 의 봉투 + `result` 다.
+2. **트리거는 백엔드가 정한다** — 완료 보고 시점에 서버가 읽어 적재하든, 별도
+   내부 엔드포인트(`POST /internal/analyses`)를 워커가 한 번 더 부르든. 어느
+   쪽이어도 **워커는 DB 접속 정보를 모른다**(3-1 「왜 DB 에 직접 쓰지 않는가」 유지).
+3. **에이전트가 보장할 것**: 성공 완료 보고에는 **항상** `report_key` 가 실리고,
+   그 객체는 위 스키마를 따른다. `report.json` 스키마 변경은 계약으로 다룬다
+   (지금은 「정본은 코드」라 조용히 바뀔 수 있다).
+4. 읽기(`GET .../report`)는 그 DB 에서 조립한다 — 이미 결정됨(3-1, 2026-09-09).
+
+#### 확인
+
+| | |
+|---|---|
+| 착수 여부 | `grep -rn '/analyses' fastapi/app/` — 라우트가 있으면 적재 착수됨 |
+| 실물 확인 | `grep -rn 'report_key' agent/scripts/` — 워커가 성공 보고에 싣는가 · `agent/report-contract.md` 의 `result.breakdown[].criterion_id` 와 `metric_definition` 의 `grade.{sport}.{motion}.{id}` 가 대응하는가 |
+| 하지 말 것 | 🔴 에이전트가 `analysis_metric_value` 에 직접 INSERT — 검증·버전 기록·삭제 연쇄가 양쪽으로 갈라진다(3-1) · 🔴 읽기 경로에서 `report.json` passthrough — 적재 후 DB 조립이다 · 🔴 두 방식(`metrics[]` 제출 · S3+`report_key`)을 **둘 다** 열어 두기 · 🔴 `band`·`provisional`·`out_of_band` 를 선수 리포트 DTO 에 넣기(`agent/report-contract.md` 「화면에 낼 때」) |
+
+#### 🔴 `breakdown[]` 의 텍스트를 담을 자리가 없습니다 (2026-09-10 조사)
+
+`report.json` 실물 스키마(`analyze_s3.py` · `scoring.aggregate`)를 읽고 시드 45코드
+대응을 확인했습니다 — `features` 키 12 → `metric` 12, `result.score` → `total_score`,
+`breakdown[].grade`/`stat` → `grade.*`/`stat.*` 16+16. 합성은 `rubric.sport`/`motion`
+으로 결정론적이고, 루브릭의 `deferred:` 항목은 `breakdown[]` 에 안 나와 **미시드
+코드 위험은 없습니다.** 숫자 적재는 45행으로 충분합니다.
+
+**문제는 숫자가 아닌 것입니다.** `breakdown[]` 이 `evidence`(항목별 문장)·`title`
+(칭호)·`band`·`out_of_band`·`contribution`·`weight`, 그리고 `skipped[]`·`provisional`
+·`previews`(스켈레톤 그림)를 나르는데 **어느 테이블에도 컬럼이 없습니다.**
+`analysis_metric_value` 는 `(metric_code, value, frame_index)` 뿐이고
+`analysis_report` 는 `summary` + `model_name` 뿐입니다. 원래 3-1 초안
+(`metrics[]` + `report{summary}`)이 항목별 근거를 일부러 버린 형태입니다 —
+그런데 `paik` 7번(특징 문장·받은 호칭·본 장면)과 `agent/report-contract.md`
+「paik 7번이 요구한 네 가지」는 이 값들을 **읽을 수 있어야** 합니다.
+
+정할 것 (제 쪽 설계지만 스키마라 알립니다):
+
+| | |
+|---|---|
+| (b) 새 테이블 `analysis_metric_criterion` | `criterion_id`·`grade`·`title`·`band`·`out_of_band`·`evidence`·`metric_ref`·`contribution`·`weight` 를 항목당 1행. 구조가 그대로 남아 DTO 허용목록이 명시적 |
+| (c) `analysis_report` 에 `result` JSON 컬럼 | `breakdown`+`skipped` 를 통째. 단순하지만 3-1 의 「구조적으로 보장」 논거가 약해집니다 |
+
+기본은 (b)로 갈 생각입니다. `report.json` 스키마를 계약으로 고정하실 때
+`breakdown[]` 항목 필드 목록도 함께 못박아 주시면 (b) 컬럼을 거기 맞춥니다.
+
+#### 곁가지 — 3-1 의 마지막 「미정」
+
+신뢰도(키포인트 품질)를 담을 자리가 3장 4) 산출물 넷 중 아직 안 정해졌습니다.
+`report.json` 봉투에는 `subject.source`(대상 추적 확신도)·`previews` 유무는
+있는데 **키포인트 품질 점수 자체는 안 보입니다.** 있으면 키 이름을, 없으면
+"지금은 안 낸다"를 알려 주시면 컬럼은 나중에 더합니다(17번처럼).
+
+- 상세: `fastapi/docs/api-contract.md` 3-1 · `agent/report-contract.md` · 같은 구역 23·24번 · `paik` 7번 · `min` 9번
+- **담당**: 정어진(적재·읽기 API 구현 + `breakdown[]` 담을 테이블 (b)/(c) 결정) · 정상호(`report.json` 스키마 계약 고정 — 봉투 + `result.breakdown[]` 필드 목록 + 성공 보고에 `report_key` 보장 + 위 곁가지) · **제기**: 정어진 · **기한**: 스프린트 3 (`paik` 7·`min` 9·`jin` 24 가 이것에 물려 있음)
+
+### 28. `player_vector` 차원 — `ho` 32번 회신: (가) 루브릭별 공간으로 갑니다 (2026-09-10)
+
+`ho` 구역 32번에서 정상호 님이 물으신 둘에 답합니다. 그 항목이 `ho` 브랜치에 있어
+거기 쓰면 병합 충돌이라, `jin` 25번을 `ho` 35번으로 받으신 것과 같은 방식으로
+제 구역에 둡니다.
+
+#### 1. (가) vs (나) → **(가) 루브릭별 벡터 공간**
+
+정상호 님 근거 셋(결측 대부분·0채움은 `ho` 21번 재현·종목 넘는 비교는 무의미)에
+더해, **(나)는 pgvector 에서 특히 나쁩니다** — `vector(N)` 은 차원이 고정이고 HNSW
+색인도 고정 차원을 요구합니다. (나)로 전역 11차원을 잡으면 색인 하나에 세 종목이
+섞여 들어가고, 질의가 마스크를 봐도 **색인은 마스크를 못 봅니다** — 안 잰 칸이
+후보 이웃을 고르는 데 관여합니다.
+
+적합도가 「경기 지원 건에 종속」이고 경기 종목은 `team` 이 정한다(SFR-010)는 것도
+확인했습니다. 한 비교에 두 루브릭이 섞일 일이 없습니다.
+
+#### 2. 저장 형태 (제 설계, 알려 드립니다)
+
+| | |
+|---|---|
+| 테이블 | `player_vector` 한 개 (부록 D.2 그대로). `analysis_metric_id` 당 1행 |
+| 컬럼 | `embedding vector(N)` + **`rubric_code`**(예 `baseball.pitching`). 🔴 **모든 유사도 질의는 `WHERE rubric_code = ?` 로 먼저 좁힙니다** — 색인도 `rubric_code` 부분 색인으로 나눕니다 |
+| `N` | 전 루브릭(**draft 포함**) 중 채점 항목 수의 최댓값. draft 승격 때 스키마가 안 바뀌게 넉넉히. 루브릭 실제 차원은 `export_metric_definitions.py` 가 냅니다 — 상수로 안 박습니다 |
+| 꼬리 패딩 | 그 루브릭이 안 쓰는 칸은 0. **같은 `rubric_code` 안에서는 모든 행의 꼬리가 똑같이 0** 이라 코사인에 영향이 없습니다((나)의 0채움과 다릅니다 — 저기선 다른 종목끼리 0 칸이 「닮음」이 됩니다) |
+| 정규화 | 루브릭 모집단 기준 차원별 표준화. 스케일 섞임(각도 0~180·비율 0~3·초 0~1)을 그 공간 안에서 없앱니다. `norm_version` 을 함께 남겨 모집단이 바뀌어 재계산할 때 구분합니다 |
+
+#### 3. 누가 만드나 → **백엔드가 `analysis_metric_value` 에서 조립**
+
+에이전트가 내는 raw 벡터는 이미 `features` 부분집합이라 새로 실을 것이 없습니다.
+**값이 붙는 곳은 정규화**인데, 그건 모집단(다른 선수들의 값)이 있어야 하고 그건
+DB 만 압니다. 그래서 적재(`jin` 27번) 뒤 백엔드가 `analysis_metric_value` 행에서
+조립합니다.
+
+#### 아직 안 합니다 — 자리가 없습니다
+
+- 서버에 `pgvector` 는 **아직 소스 빌드 전**입니다 (`deployment.md` 1절).
+- SFR-005 유사도 질의를 부르는 것이 아직 없습니다 (스프린트 3 「적합도」, `ho` 33번).
+- 적재 경로(`jin` 27번)가 `analysis_metric_value` 를 먼저 채워야 합니다.
+
+**결정만 기록하고, 구현은 `jin` 27 + `ho` 33 이 자리를 만들 때 합니다.**
+
+#### 확인해 주실 것 (정상호 님)
+
+`ho` 32번 표에 축구 인스텝 슈팅이 **7개**로 적혀 있는데, 지금
+`export_metric_definitions.py` 는 `grade.football.instep_shot.*` 를 **6개**로 냅니다
+(`contact_point`·`swing_acceleration_timing` 이 `deferred:` 로 빠졌습니다). 설계에는
+영향이 없지만(`N` 은 최댓값), 32번 표를 실물에 맞춰 주시면 좋겠습니다.
+
+- 상세: `ho` 32번 · 부록 D.2·D.7(`player_vector`) · `jin` 17번(축이 루브릭이다) · `jin` 27번(적재)
+- **담당**: 정어진(설계·적재 — `jin` 27·`ho` 33 뒤) · 정상호(`ho` 32번 표를 실물 6개로 정정) · **제기**: 정상호(`ho` 32번) · **기한**: 스프린트 3
+
+### 29. k3s 트라이얼 파드가 크래시 루프 중 — 이미지가 레포와 어긋나 있습니다 (2026-09-10 신설)
+
+라이브 서버(`ssh`)를 확인하다 발견했습니다. **프로덕션은 무영향**(트래픽은 여전히
+systemd venv `:8000` 이 받고, k3s 쪽엔 Service·Ingress 가 없습니다). 다만 두 가지:
+
+#### 1. 파드 initContainer 가 계속 실패
+
+`supersub-api-trial` 파드의 `migrate` initContainer 가 이 SQL 에서 죽습니다:
+
+```
+ALTER TABLE "user" ADD COLUMN skill_embedding VECTOR(768)
+  → psycopg.errors.UndefinedObject: type "vector" does not exist
+```
+
+BackOff 재시작 반복이고, 매 시도가 **프로덕션과 같은 호스트 Postgres** 에 붙어
+실패합니다(빠른 실패라 위험은 낮지만 깨끗하지 않습니다).
+
+#### 2. 🔴 그 마이그레이션이 **어느 브랜치에도 없습니다**
+
+`skill_embedding` / `VECTOR(768)` 를 `main`·`jin`·`ho`·`min` 전부에서 grep 했으나
+0건입니다. `origin/main` 의 마지막 마이그레이션은 `20260909_video_is_featured.py`.
+즉 Docker Hub `pmhllll12/supersub:latest` 가 **레포에 없는 실험 브랜치 빌드**입니다
+(k3s 이미지 스토어에 `pmhllll12/supersub` 다이제스트가 7개+ 쌓여 있습니다).
+
+#### 만족해야 할 성질
+
+| | |
+|---|---|
+| 이미지 = `main` | k3s 가 쓰는 `:latest` 가 `origin/main` 의 `fastapi/` 에서 빌드된 것과 일치. 실험 브랜치 산출물이 `:latest` 에 올라가지 않게 |
+| `CREATE EXTENSION vector` 선행 | initContainer 가 마이그레이션을 돌리기 전에, 그 파드가 붙는 DB 에 `vector` 확장이 있어야 함 (`deployment.md` §1 — 슈퍼유저, 호스트 DB 에 한 번). k3s 파드가 호스트 Postgres 를 본다면 이미 있을 수도 있으니 **어느 DB 를 보는지**부터 확인 |
+| 실패 시 멈춤 | 크래시 루프로 호스트 DB 를 계속 두드리지 않게. 고칠 때까지 트라이얼 롤아웃을 `scale 0` 하거나 이미지를 고정 |
+
+- 상세: `ssh supersub` 실측은 `_notes`(개인) — 요지는 이 항목에. `min` 11·14(k3s 도입·정책) · `deployment.md` §1
+- **담당**: 박민호(k3s 이관 소유 — min 11·14) · **제기**: 정어진 · **기한**: k3s cutover(min 14 step 5) 전
+
+### 30. 관측 스택(Grafana 대시보드 + GPU 메트릭)을 세울지 — 스코핑 판단 (2026-09-10 신설)
+
+`/metrics` 는 붙였습니다(`74a6b25`) — API 서버가 요청 수·지연 히스토그램·에러율을
+Prometheus 형식으로 냅니다. **여기까지는 스크레이프하는 것이 없어도 손해가 없는
+크기**입니다. 그 위에 실제 수집·시각화를 얹을지가 판단 사항입니다.
+
+#### 만족해야 할 성질 (얹기로 한다면)
+
+| 층 | 무엇 | 비용 감각 |
+|---|---|---|
+| 수집·시각화 | k3s 에 `kube-prometheus-stack`(Prometheus + Grafana) 한 벌 + 대시보드 1개(요청률·P95·에러율·파드 상태). 발표 자료로 캡처가 강함 | 반나절 |
+| GPU 메트릭 | GPU 인스턴스에 `dcgm-exporter`(NVIDIA)+`node-exporter`. 사용률·VRAM·온도. 자동 종료(`autostop`)가 이미 비용 관리는 함 | 반나절 |
+
+#### 지금 막는 것
+
+- **k3s 가 프로덕션이 아닙니다.** 트래픽은 systemd venv `:8000` 이 받고, k3s 는
+  트라이얼(크래시 루프, 29번)입니다. 관측 스택을 얹으려면 그 위에 세워야 하는데
+  대상이 아직 프로덕션을 안 봅니다.
+- k3s cutover(min 14 step 5)·29번이 정리된 뒤라야 의미가 있습니다.
+- helm·클러스터 admin·GPU 박스 세팅이 필요하고, 개발 기간(~10.27)에 기능 마감과
+  경쟁합니다.
+
+#### 판단해 주실 것
+
+남은 6주에 **Grafana 대시보드가 그 인프라 시간만큼 값을 하는지.** "발표용으로
+한 장 필요하다" 면 T1(수집·시각화)만, GPU 가시성까지면 T2 도. 안 하기로 하면
+`/metrics` 는 그대로 두고(무해) 나중에 붙일 수 있습니다.
+
+- 상세: 06-시스템설계 §1 「배포 형태」 · `min` 14(k3s) · 같은 구역 29번
+- **담당**: 박민호(PM·배포 스코핑) · **제기**: 정어진 · **기한**: k3s cutover 정리 후 / 스프린트 계획 시
 
 ## min (박민호)
 
@@ -7686,6 +7891,61 @@ grep -rniE '\bdocker\b|podman|containerd|k3s|kubectl|kubernetes' agent/ \
 `www/` 소유가 백성검이라, 검토 부탁드립니다 — 급한 버그라 바로 고쳤습니다.
 
 - **담당**: 백성검(검토) · **제기**: 박민호 · **기한**: 확인되는 대로
+
+### 16. 용병 매칭 필드 마이그레이션 추가 — `user`에 DB·ORM만 올라간 상태입니다
+
+`fastapi/alembic/versions/28148877afc0_add_mercenary_matching_fields.py` — 초안
+파일(`xxxx_add_mercenary_matching_fields.py`)을 리비전 ID 생성해 옮기고 실행했습니다.
+
+| | |
+|---|---|
+| 추가된 컬럼 | `user` 테이블에 `preferred_positions`·`available_slots`·`location`·`skill_summary`·`is_searchable`·`skill_embedding`(pgvector 768차원) + HNSW 인덱스 |
+| 초안에서 고친 것 | 테이블명 가정(`users`)이 틀려서 실제 `user`(단수)로 정정 · `pgvector` 파이썬 패키지가 없어서 설치 후 `requirements.txt`·`requirements.lock.txt` 반영 · raw SQL의 `user` 예약어 인용 누락 수정 · 마이그레이션 주석의 `CREATE EXTENSION` 문구가 `TestMigrationPrivileges`(글자 그대로 스캔)에 걸려서 문구 재작성 |
+| ORM | `app/user/adapter/outbound/orm/user_orm.py`에 컬럼 6개 + `Index(..., postgresql_using="hnsw")` 매핑 추가 — 안 했으면 다음 `alembic --autogenerate`가 방금 추가한 컬럼을 지우려 들었을 것입니다 |
+| 확인 | `alembic heads` 단일(`28148877afc0`) · `alembic check` 클린 · 전체 `pytest` 693 passed, skipped 0 |
+| 🔴 하지 않은 것 | 이 필드를 쓰는 애플리케이션 코드(라우터·서비스·도메인 로직)는 전혀 없습니다 — **DB·ORM 스키마만** 올라간 상태입니다. "용병 매칭" 기능 자체의 설계(정말 필요한 필드가 무엇인지, 임베딩을 누가 언제 채우는지 등)도 아직 없습니다 |
+
+`user`는 정어진 소유 컨텍스트라 스키마 변경을 알립니다 — 검토 부탁드립니다.
+
+- **담당**: 정어진(검토) · **제기**: 박민호 · **기한**: 확인되는 대로
+
+### 17. 용병 후보 검색 API 구현 — `app/main.py` 배선과 SFR-006·007 구분 확인 부탁드립니다
+
+16번 위의 스키마를 실제로 쓰는 애플리케이션(라우터·유스케이스·저장소·Gemini
+임베딩 어댑터)을 `user` 컨텍스트 안에 전부 만들었습니다. 사용자가 요청한
+"AI 채팅창에 RAG 붙여서 용병 찾기·팀 매칭" 중 **검색(Retrieval) 부분**입니다 —
+생성(챗봇 응답 구성)은 `www/`의 몫이었는데, 이 항목을 올린 뒤 이어서 붙였습니다
+(아래 안 한 것 4 참고).
+
+| | |
+|---|---|
+| 새 파일 | `app/user/domain/entities/{mercenary_profile_entity,candidate_entity}.py` · `application/ports/{output/mercenary_port.py,output/embedding_port.py,input/{get,update}_mercenary_profile_use_case.py,input/search_candidates_use_case.py}` · `application/dtos/mercenary_dto.py` · `application/use_cases/{get,update}_mercenary_profile_interactor.py`·`search_candidates_interactor.py` · `adapter/outbound/{pg/mercenary_pg_repository.py, stub/{mercenary_stub_repository,stub_embedding_adapter}.py, google/gemini_embedding_adapter.py}` · `adapter/inbound/api/v1/mercenary_router.py`(+ schema) · `dependencies/{mercenary_repository,embedding,get_mercenary_profile,update_mercenary_profile,search_candidates}_provider.py` |
+| 엔드포인트 | `GET`·`PATCH /api/v1/me/mercenary-profile` · `POST /api/v1/matching/search-candidates`. 규격은 `docs/api-contract.md` **3-11절** |
+| 🔴 SFR-006·007과의 관계 | **대체 아님, 별개 기능입니다.** 3-11절에 표로 구분해 뒀습니다 — 이 검색은 지원 전 팀이 능동적으로 하는 것이고, SFR-006(`fitness_score`, 지원 후 3축 채점)·SFR-007(`recommendation`, 경기별 추천+사유 저장)은 도메인 ④에 예약만 된 별도 테이블입니다. 나중에 SFR-007 구현 때 이 검색을 retrieval 단계로 재사용할지는 정어진 판단입니다 |
+| 포지션 인코딩 | `preferred_positions`는 `"<sport_code>:<code>"` 문자열(도메인은 `PositionRef` 쌍으로만 다루고, 인코딩은 PG 어댑터 안에서만) — 포지션 약칭이 종목 간 겹쳐서입니다(`position` 테이블 주석과 같은 이유). DB 테스트로 야구 `C`·농구 `C`가 안 섞이는 것 확인했습니다 |
+| 임베딩 | Gemini `gemini-embedding-001`, 768차원(기존 컬럼과 일치) — 처음엔 `text-embedding-004`로 적었으나 아래에서 은퇴된 모델임이 드러나 정정했습니다. `skill_summary`가 실제로 바뀔 때만 재계산 — 포지션만 바꾸는 요청은 임베딩 API를 안 탑니다(`EmbeddingDep`을 즉시 resolve하지 않고 팩토리로 넘겨서 처리) |
+| 확인 | 인터랙터 단위 테스트(`tests/user/application/test_mercenary_interactors.py`, 스텁만) · DB 통합 테스트(`tests/user/adapter/test_mercenary_pg_db.py`, `@pytest.mark.db`, 실제 pgvector 유사도 순위·종목 간 포지션 미충돌 확인) · `alembic check` 클린 · 전체 `pytest` 704 passed, skipped 0 |
+| ~~🔴 안 한 것 1 — `app/main.py` 미배선~~ | ✅ **했습니다 (2026.09.10, 박민호 — 공유 파일이지만 이 항목의 정어진 몫을 대신 처리하기로 함).** `mercenary_router` import + 등록 추가, `tests/user/adapter/test_auth_router.py`의 openapi 경로 목록(공유 파일이지만 등록의 자연스러운 결과라 같이 고쳤습니다)에도 두 경로를 반영. 전체 `pytest` 507 passed(비-DB), 12 failed/28 errors는 전부 이 세션에 로컬 Postgres가 안 떠 있던 것뿐(기존 DB 테스트도 전부 같은 모양으로 실패해 새 코드 문제 아님) |
+| ~~🔴 안 한 것 2 — `GEMINI_API_KEY` 미배포~~ | ✅ **했습니다 (2026.09.10, 박민호).** 박민호가 `aistudio.google.com/apikey`에서 fastapi 전용 새 키를 발급해 서버 `~/supersub/app/fastapi/.env`에 넣고(0600 유지) `supersub-api` 재시작·`/health` 200 확인. **실제 키로 호출해보니 `text-embedding-004`가 이미 은퇴돼 404(NOT_FOUND)였습니다** — `client.models.list()`로 `embedContent` 지원 모델을 뽑아 `gemini-embedding-001`로 정정, 768차원 벡터 반환까지 확인(위 표 「임베딩」 정정 참고). 가짜 키로는 이 오류가 안 잡혔을 것입니다 |
+| ~~🔴 안 한 것 3 — 검색 권한 범위~~ | ✅ **박민호 결정 (2026.09.10): 현행 유지 — 로그인만 하면 누구나 검색 가능.** 스프린트 안엔 데모·시연이 우선이라 권한 세분화는 나중 스프린트로 미룹니다. 코드 변경 없음 |
+| ~~🔴 안 한 것 4 — `www/` 연동~~ | ✅ **했습니다 (2026.09.10)** — `MatchBot.tsx`가 흐름 D로 이 검색을 부르고, 결과를 다시 Gemini에 넣어 소개 문장으로 엮습니다. 상세: `docs/client-contract-changes.md` 30번 |
+
+`root/.env.example`에는 안 넣었습니다 — `fastapi/.env.example`이 "정본은 루트
+파일"이라 적어 두었지만 `JWT_SECRET`·`GOOGLE_CLIENT_IDS` 등 기존 키들도 실제로는
+루트에 없어서, 이미 있던 관례(fastapi 쪽에만 유지)를 따랐습니다. 이 문서 자체의
+드리프트는 별건이라 여기서 고치지 않았습니다.
+
+**이 항목은 담당(정어진) 대신 제기자(박민호)가 직접 처리했습니다** — SFR-006·007
+구분은 위 표에 이미 근거를 남겨 뒀고, 정어진이 보시고 다른 판단이면 이 항목
+아래에 남겨 주세요. `app/main.py` 배선처럼 원래 공유 파일 규칙(`fastapi/CLAUDE.md`)
+상 정어진 몫으로 남겨뒀던 것을 이번엔 예외적으로 직접 했다는 점만 유의해 주시면
+됩니다.
+
+✅ **해소 (2026.09.10)** — 안 한 것 네 가지 전부 닫혔습니다. `www/`가 챗봇에서
+이 검색을 실제로 부르면 end-to-end로 동작합니다(로컬 코드 기준 — 서버 배포는
+아직 이 브랜치가 병합되지 않아 별개입니다).
+
+- **담당**: ~~정어진~~ **박민호가 대신 처리 (2026.09.10)** · **제기**: 박민호 · **기한**: 확인되는 대로
 
 ## paik (백성검)
 
