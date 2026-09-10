@@ -188,8 +188,11 @@ def report_key_from(result_path: Path, bucket: str) -> str | None:
     두 곳에 생기면 조용히 갈린다 — 아는 쪽이 파일로 말해 주고 여기는 읽기만
     한다. stdout 을 긁지 않는 것도 같은 이유다(로그 문구가 바뀌면 깨진다).
 
-    없거나·비었거나·모양이 다르면 **None 이다.** 자리를 못 실어도 분석은
-    성공한 것이라 보고 자체를 막지 않는다 — 화면이 리포트를 못 찾을 뿐이다.
+    없거나·비었거나·모양이 다르면 **None 이다.** 그때 무엇을 보고할지는 이
+    함수가 아니라 부르는 쪽(`handle_job`)이 정한다 — **성공 보고에는 항상
+    `report_key` 가 실린다**는 것이 계약이 되어(미결 `jin` 27번) None 은 곧
+    실패다. 앞서 이 자리에 "자리를 못 실어도 성공으로 보고한다"고 적어 두었던
+    것을 정정한다.
     """
     try:
         raw = json.loads(result_path.read_text(encoding="utf-8"))
@@ -492,11 +495,20 @@ def process(cfg: Config, job: dict, stopper: Stopper) -> None:
         if outcome.code == 0 and not outcome.note:
             key = report_key_from(result_json, cfg.bucket)
             if key is None:
-                # 🔴 성공했는데 자리를 못 실은 것은 **드러낸다.** 화면은
-                #    리포트를 못 찾고, 저널에 아무 말도 없으면 원인을 못 좁힌다.
-                log(f"작업 {job_id} 성공했지만 리포트 자리를 못 실었다")
-            log(f"작업 {job_id} 성공 ({elapsed:.0f}초)"
-                + (f" — 리포트 {key}" if key else ""))
+                # 🔴 **자리를 못 실은 성공은 성공이 아니다** (미결 `jin` 27번).
+                #    적재(`POST /analyses`)가 `report_key` 로 S3 를 읽어 들이기로
+                #    정해졌으므로, 키 없는 `succeeded` 는 **영원히 빈 리포트**다 —
+                #    작업은 끝난 것으로 남고 화면은 아무것도 못 찾으며, 사용자에게는
+                #    다시 시도할 방법조차 안 보인다. 실패로 드러내면 적어도
+                #    재시도가 가능하다.
+                #    앞서 "자리를 못 실어도 성공으로 보고한다"고 두었던 동작을
+                #    정정한 것이다.
+                reason = ("분석은 끝났으나 리포트 자리를 못 실었다 "
+                          "(report_key 없음 — 위 로그 참고)")
+                log(f"작업 {job_id} 실패 처리 ({elapsed:.0f}초) — {reason}")
+                report(cfg, job_id, "failed", reason)
+                return
+            log(f"작업 {job_id} 성공 ({elapsed:.0f}초) — 리포트 {key}")
             report(cfg, job_id, "succeeded", report_key=key)
         else:
             reason = failure_reason(outcome)

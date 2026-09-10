@@ -1,0 +1,258 @@
+# `report.json` 의 정본 — 적재가 읽을 수 있는 봉투 (미결 `jin` 27번)
+#
+# 🔴 **여기가 필드 목록의 정본이다.** 앞서 `report-contract.md` 는 "정본은
+#    코드"라고 적어 두었는데, 그러면 스키마가 **조용히 바뀔 수 있다** — 적재
+#    (`POST /analyses`)·읽기 경로·화면 셋이 같은 JSON 을 읽으므로 그 조용한
+#    변경은 백엔드 배포 뒤 실서버에서만 드러난다. 그래서 목록을 파일로 고정하고
+#    `tests/test_report_contract.py` 가 코드의 산출과 이 파일을 맞춰 본다.
+#
+# 어긋나면 **테스트가 빨개진다** — 어느 쪽이 맞는지 사람이 정하고 둘을 함께
+# 고친다. 사본이 하나 더 생기는 것이 아니라, 사본이 갈라지는 것을 막는 장치다.
+#
+# ────────────────────────────────────────────────────────────────────────────
+# 바꾸는 절차 (미결 `jin` 27번의 「에이전트가 보장할 것」)
+#
+#   필드를 늘린다        → version 을 올리고(1.0 → 1.1) 미결 항목에 한 줄.
+#                          받는 쪽은 모르는 키를 무시하면 되므로 적재는 안 깨진다.
+#   필드를 빼거나 뜻을 바꾼다 → version 의 앞자리를 올린다(1.x → 2.0) + 미결
+#                          항목으로 **미리** 알린다. 적재가 그 키를 필수로
+#                          읽고 있으면 깨진다.
+#   version 은 봉투의 `schema_version` 으로 실려 나간다 (`analyze_s3.py`).
+#
+# 🔴 모르는 major 를 만나면 **적재를 거부하는 것이 맞다.** 반쯤 적재하면 어느
+#    행이 낡은 스키마에서 온 것인지 사후에 구분할 방법이 없다.
+#
+# ────────────────────────────────────────────────────────────────────────────
+# 변경 이력 — 🔴 **필드를 늘렸으면 여기 한 줄이 늘어야 한다**
+#
+#   1.0  (2026.09.10) 첫 고정 (미결 `jin` 27번). breakdown_item 11필드
+#   1.1  (2026.09.10) breakdown_item 에 `view_dependent` 추가 → 12필드
+#                     (미결 `ho` 37번 처방 (다) · 알림은 `ho` 38번).
+#                     🔴 앞서 필드만 늘리고 **version 을 안 올렸다** — 같은 파일에
+#                     적어 둔 절차를 스스로 어겼다. 받는 쪽은 `1.0` 봉투와
+#                     `1.1` 봉투를 구분할 방법이 없었다. minor 라 적재는 안 깨진다
+version: "1.1"
+
+# ────────────────────────────────────────────────────────────────────────────
+# 봉투 (최상위 키) — 이 목록이 전부다
+#
+# type 은 JSON 타입이다. `null: true` 는 **모를 때 그 값이 실제로 null 로
+# 온다**는 뜻이고, 그때 기본값을 채워 넣지 말라는 뜻이다.
+envelope:
+  schema_version:
+    type: string
+    why: 이 파일의 version. 모르는 major 면 적재를 거부한다
+  source_video:
+    type: string
+    why: 분석 시점의 원본 S3 URI. 🔴 「저장」 뒤에는 낡는다 (`jin` 24번의 keep)
+  video_id:
+    type: string
+    null: true
+    why: 어느 영상의 리포트인가. 배치·평가 실행에는 없어 null 이다 (지어내지 않는다)
+  analyzed_at:
+    type: string
+    why: "UTC 타임스탬프 `YYYYmmddTHHMMSSZ`. 재분석이 앞의 것을 덮으므로 「언제 낸 것인가」는 이 값이 답한다"
+  code_version:
+    type: string
+    why: 분석 코드의 짧은 커밋 해시. 못 읽으면 `"unknown"` 이다
+  rubric:
+    type: object
+    fields: [sport, motion, version, path, impact_limb, impact_event]
+    why: 어느 루브릭으로 낸 판정인가. `criterion_id` 의 뜻은 sport·motion 안에서만 유일하다
+  swing_side:
+    type: string
+    enum: [auto, left, right]
+    why: 🔴 `impact_limb` 에만 적용된다 — 반대쪽 사지는 언제나 auto 다
+  focus:
+    type: object
+    fields: [requested, applied, unknown]
+    why: 올린 사람이 고른 집중 항목 (`paik` 8번). 🔴 채점에 영향이 없다 (화면 강조·정렬용)
+  target_fps:
+    type: number
+    why: 목표 샘플링. 🔴 실효값이 아니다 — 초 환산에 쓰면 20% 어긋난다
+  sampled_fps:
+    type: number
+    why: 실효 샘플링. 프레임을 초로 옮기는 나눗수는 이것이다
+  frames:
+    type: number
+    why: 분석한 프레임 수 (샘플링 격자 기준)
+  frame_metrics_seconds:
+    type: object
+    open: true
+    why: >-
+      프레임 단위 지표의 초 환산. 키는 `features` 쪽 코드와 같다
+      (`impact_frame` · `follow_through_duration_frames`).
+      격자를 모르면 **빈 객체**다 — 0 으로 채우지 않는다
+  judge_backend:
+    type: string
+    why: 근거 문장을 낸 백엔드 (`vllm` · 로컬 적재)
+  judge_model:
+    type: string
+    why: 그 모델 id
+  previews:
+    type: object
+    open: true
+    why: >-
+      스켈레톤 미리보기 S3 URI. 키는 `impact`(정지화면) · `tracked`(영상).
+      **비어 있으면 렌더링만 실패한 것**이고 측정·판정은 유효하다
+  timing:
+    type: object
+    fields: [fetch_s, measure_s, judge_s, preview_s]
+    why: 단계별 소요 초. 관측용이다
+  subject:
+    type: object
+    fields:
+      - known
+      - source
+      - why
+      - anchor_frame
+      - anchor_iou
+      - grid_offset_frames
+      - at_clamped
+      - continuity_breaks
+      - area_jumps
+      - frame_size
+      - frames_with_box
+      - frames
+      - boxes
+    degraded_fields: [known, why, source]   # 합성 키포인트 경로 (known=false)
+    why: >-
+      **누구를** 분석했나 (미결 18번). 🔴 `source` 가 `specified_uncertain` 이면
+      찍은 사람을 끝까지 따라갔다고 보장 못 한다. 규칙은 `pose.subject_envelope`
+      한 곳이고 HTTP 경로도 같은 함수를 쓴다
+  keypoint_quality:
+    type: object
+    fields:
+      - known
+      - limb
+      - side
+      - swing_side_valid_ratio
+      - gate_joints
+      - threshold
+      - min_keypoint_confidence
+    degraded_fields: [known, why, limb]     # 정규화가 안 되는 입력
+    why: >-
+      계약 3장 4) 의 「신뢰도」 자리 (`jin` 27번 곁가지). 스윙 측 게이트 관절의
+      **유효 프레임 비율**(0~1)이다. 🔴 키포인트 신뢰도 평균이 아니고, 「누구를
+      쟀는가」도 아니다 — 그것은 `subject` 가 답한다.
+      `threshold` 미만이면 애초에 리포트가 없다
+  features:
+    type: object
+    open: true
+    why: >-
+      측정값 원본. 키는 **지표 코드**이고 그 정본은 `contracts/metric_definitions.yaml`
+      이다(적재 시드와 같은 목록). 🔴 여기 키를 늘리는 것은 판정 입력을 바꾸는
+      것이라 평가 재실행을 부른다 — 봉투에 값을 더할 때는 형제 블록으로 낸다
+  result:
+    type: object
+    why: 아래 `result` 절
+
+# ────────────────────────────────────────────────────────────────────────────
+# `result` — 판정 결과 (`scoring.aggregate` 가 만든다)
+result:
+  fields:
+    score:
+      type: number
+      why: 0~100 총점. **등급의 가중합**이다 (stat 의 평균이 아니다)
+    grade:
+      type: string
+      why: 총점의 등급 표기. 구간은 루브릭의 `grade_bands`
+    summary:
+      type: string
+      why: >-
+        선수에게 보여줄 두 문장 이내 요약. 🔴 **숫자가 없다** (계약 3장 4).
+        모델이 아니라 코드가 짓는다 (`scoring.summarize`) — 같은 판정이 같은 문장을 낸다
+    breakdown:
+      type: array
+      of: breakdown_item
+      why: 채점된 항목. 순서는 루브릭의 항목 순서다
+    skipped:
+      type: array
+      of: skipped_item
+      why: 🔴 **0점이 아니라 제외**다. 촬영 조건으로 못 잰 항목이고 가중치는 재정규화됐다
+    rubric_version:
+      type: string
+    pipeline_version:
+      type: string
+    provisional:
+      type: boolean
+      why: true 면 **지도자 검수 전** 루브릭으로 낸 값이다 — 확정 점수로 보여주지 않는다
+
+# 항목 하나 — `analysis_metric_criterion` (제안 (b)) 이 받을 자리
+breakdown_item:
+  fields:
+    criterion_id:
+      type: string
+      why: >-
+        항목 코드. 🔴 **종목·동작 안에서만 유일하다** — 적재 코드는
+        `grade.{sport}.{motion}.{criterion_id}` 로 합성한다 (`jin` 23번)
+    name:
+      type: string
+      why: 사람이 읽을 항목 이름 (한국어)
+    grade:
+      type: integer
+      enum: [0, 1, 2]
+      why: 판정 등급. 결정론적 코드가 정한다 (모델이 정하지 않는다)
+    weight:
+      type: number
+      why: 재정규화된 가중치 (판정된 항목 합이 1.0). 루브릭 원값이 아니다
+    contribution:
+      type: number
+      why: 이 항목이 총점에 실제로 보탠 점수 (0~100 축)
+    title:
+      type: string
+      why: 등급별 칭호 (「채찍이 된 다리」). **등급 맥락의 출처**다
+    band:
+      type: string
+      why: >-
+        그 등급의 수치 구간 텍스트. 둘로 갈릴 수 있다(`"135~150 또는 170~180"`) —
+        파싱하지 말 것. 🔴 **선수 화면에 내지 않는다** (임계값이 검수 전이다, 미결 24번)
+    out_of_band:
+      type: string
+      why: >-
+        0등급이 **구간 위**에서 왔는가 (미결 20번). 비어 있으면 아니다.
+        개발 확인용이고 선수 화면용이 아니다
+    view_dependent:
+      type: string
+      why: >-
+        이 등급이 **촬영 방향에 의존하는가** (미결 37번). `""` 안 함 ·
+        `"metric"` 지표는 의존하나 이 값에서는 등급이 같음 ·
+        🔴 `"grade"` 반대편에서 찍혔으면 등급이 달랐음.
+        🔴 **「점수가 틀렸다」가 아니다** — 정답이 없어 어느 부호가 옳은지 모른다.
+        점수는 이 필드와 무관하다. 개발 확인용이고 선수 화면용이 아니다
+    stat:
+      type: number
+      null: true
+      why: >-
+        항목별 연속 점수 0~100 (레이더 축). 🔴 총점은 이것의 평균이 아니다.
+        적재 코드는 `stat.{sport}.{motion}.{criterion_id}` (`jin` 25번)
+    evidence:
+      type: string
+      why: >-
+        항목별 근거 문장 (EXAONE 이 쓴다). 🔴 **등급 표기가 없다** (2026.09.07~) —
+        문장에서 등급을 정규식으로 뽑으려 하지 말 것 (미결 `ho` 23·24번)
+    metric_ref:
+      type: string
+      why: 그 항목이 근거로 삼은 지표 코드. 사람이 읽을 이름·단위는 `metric_definitions.yaml`
+
+skipped_item:
+  fields:
+    criterion_id: {type: string}
+    name: {type: string}
+    weight:
+      type: number
+      why: 루브릭 원값이다 (재정규화 전). 이 항목은 채점에서 빠졌다
+
+# ────────────────────────────────────────────────────────────────────────────
+# 🔴 S3 리포트에 **없는** 것 — HTTP 데모 경로에만 있다
+#
+# `api.run_pipeline` 은 화면이 장단점을 고르라고 항목마다 둘을 더 붙인다.
+# 적재가 이 둘을 기대하면 실서버에서 KeyError 다 — 필요하면 미결 항목으로
+# 요청하면 봉투에 싣는다(형제 필드라 값싸다).
+http_only_breakdown_fields:
+  margin:
+    type: number
+    why: 등급 구간 안쪽 여유. 경계에 걸친 값은 다음 클립에서 등급이 뒤집힌다
+  confident:
+    type: boolean
+    why: margin 이 기준 이상인가
