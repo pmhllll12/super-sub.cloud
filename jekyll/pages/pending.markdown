@@ -6679,8 +6679,28 @@ passthrough 를 뺀 그 이유("필터 버그 하나 거리")를 되살립니다
 | 정상호 정정 | 제 쪽 상태 |
 |---|---|
 | `schema_version` `1.1` (minor — `view_dependent` 추가) | 파서가 **major 만** 봅니다(`SUPPORTED_SCHEMA_MAJOR = 1`). `"1.1"` 통과, `analysis_report.schema_version` 에 `"1.1"` 이 그대로 들어감. `"1.0"` 봉투와 섞여도 둘 다 유효. 테스트 픽스처를 `"1.1"` 로 올렸습니다 |
-| `breakdown[].view_dependent` (`""`·`"metric"`·`"grade"`) | 파서가 **모르는 키라 무시**합니다. 저장 안 함 — 저장 여부는 `ho` 38번. 필요해지면 `analysis_metric_criterion` 에 컬럼 1개 + 파서 1줄 |
+| `breakdown[].view_dependent` (`""`·`"metric"`·`"grade"`) | ✅ **저장하기로 결정**(`ho` 38번 판단 = 제 몫). 아래 소절 |
 | 곁가지: `metric_definition.label`(`"야구 · 투구 · 앞다리 버티기"`) ≠ `breakdown[].name` | 🔴 그래서 `analysis_metric_criterion` 에 **`name` 컬럼을 뒀습니다** — 위 (b) 확정의 "🔴 `name` 도 안 둡니다(= `label`)" 를 **정정합니다.** `label` 은 3단 합성이라 항목 이름과 글자가 다릅니다. `breakdown[].name` 을 그대로 저장하고, 둘을 같다고 보는 비교 검사는 넣지 않았습니다(정상호 경고 그대로) |
+
+##### ✅ `ho` 38번 (`view_dependent` 적재 컬럼 판단 = 제 몫) — **저장하기로** (2026-09-10)
+
+**넣습니다.** `analysis_metric_criterion.view_dependent` (`String(10)` nullable),
+마이그레이션 `a1c9f7b2e034`(← `efcf961d0051`. `efcf961d0051` 은 이미 push·참조돼
+있어 별도 리비전으로 더함). 파서·적재 저장소 각 1줄, `skipped` 행은 NULL.
+
+왜 넣는가:
+- `band`·`out_of_band` 와 **같은 등급의 개발 확인용 항목별 메타**다.
+  `analysis_metric_criterion` 이 이미 그 둘을 담고 있어 구조가 일관된다.
+- 실측으로 축구 슛 200클립 중 192건(96%)이 `"grade"` — 드문 값이 아니고,
+  "이 등급은 촬영 방향에 갈렸다"를 되짚는 데(37번·`ho` 28) 질의 가능해야 한다.
+- 안 넣으면 나중에 S3 의 `report.json` 을 전수 재파싱해야 채운다.
+
+🔴 **선수 화면 DTO(`ReportCriterionView`/`VideoReportResponse`)에는 안 넣습니다** —
+`band`·`out_of_band` 와 같습니다(정상호 지시). 점수 보정에도 안 씁니다(어느 부호가
+옳은지 모름).
+
+→ **`ho` 38번은 이걸로 만족됨.** 담당(정어진)이 판단·구현 완료했으니 정상호가
+그 항목에 `✅ 해소` 를 달면 됩니다.
 
 **남은 것**: 백성검이 `AnalysisStage.tsx` 하드코딩 `REPORT` → fetch 교체
 (`client-contract-changes.md` 31번). 이건 `paik` 7번에서 다룹니다.
