@@ -41,6 +41,7 @@ from app.card.adapter.outbound.orm import title_definition_orm  # noqa: E402,F40
 from app.card.adapter.outbound.orm import user_title_orm  # noqa: E402,F401
 from app.user.adapter.outbound.orm import user_orm  # noqa: E402,F401
 from app.analysis.adapter.outbound.orm import analysis_job_orm  # noqa: E402,F401
+from app.analysis.adapter.outbound.orm import analysis_metric_criterion_orm  # noqa: E402,F401
 from app.analysis.adapter.outbound.orm import analysis_metric_orm  # noqa: E402,F401
 from app.analysis.adapter.outbound.orm import analysis_metric_value_orm  # noqa: E402,F401
 from app.analysis.adapter.outbound.orm import analysis_report_orm  # noqa: E402,F401
