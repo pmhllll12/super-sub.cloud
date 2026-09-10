@@ -7,6 +7,7 @@ import '../../../../core/widgets/refractive_glass.dart';
 import '../../../intro/presentation/brand_mark.dart';
 import '../../../intro/presentation/screens/glitch_intro_screen.dart'
     show kIntroInkColor;
+import '../rate_limit_controller.dart';
 import '../session_controller.dart';
 
 /// 시트 윗모서리 반지름. **클립과 셰이더가 같은 값을 봐야** 굴절이 모서리에서
@@ -91,7 +92,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       await action();
     } catch (e) {
-      if (mounted) setState(() => _error = '$e');
+      // 429 면 잠그고 안내 문구를 낸다 — 그 외에는 서버가 준 메시지 그대로.
+      final locked = ref.read(rateLimitControllerProvider.notifier).lockFrom(e);
+      if (mounted) {
+        setState(() => _error = locked ? null : '$e');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -171,6 +176,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Widget _form() {
     final notifier = sessionControllerProvider.notifier;
+    final secondsLeft = ref.watch(rateLimitControllerProvider);
+    final locked = secondsLeft > 0;
     // **위쪽에 붙인다.** 가운데 정렬로 두면 로고와 폼 사이가 벌어져 둘이
     // 따로 노는 덩어리로 읽힌다. 키보드가 올라와 자리가 모자라면 그때부터
     // 스크롤된다.
@@ -202,10 +209,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 label: '비밀번호',
                 obscure: true,
               ),
-              if (_error != null) ...[
+              if (_error != null || locked) ...[
                 const SizedBox(height: 14),
                 Text(
-                  _error!,
+                  locked ? rateLimitNote(secondsLeft)! : _error!,
                   textAlign: TextAlign.center,
                   style:
                       const TextStyle(color: Color(0xFFFF8A80), fontSize: 13),
@@ -215,7 +222,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               _GlassButton(
                 key: const Key('login-submit'),
                 label: '로그인',
-                enabled: !_busy,
+                enabled: !_busy && !locked,
                 busy: _busy,
                 onTap: () => _run(
                   () => ref.read(notifier).login(_email.text, _password.text),
