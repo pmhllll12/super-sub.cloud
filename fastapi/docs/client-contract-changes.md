@@ -1172,6 +1172,40 @@ git -C fastapi grep -n "focus" -- app/analysis    # 백엔드 쪽(이미 됨)
 
 ---
 
+## 30. ✅ 용병 후보 검색 신설 — 배선·배포 끝났습니다 (2026-09-10 추가·정정, 박민호, pending `min` 17번)
+
+처음 낼 때는 "아직 호출 불가(배선 전)"이라고 적었는데, **이후 같은 날 배선까지
+마쳤습니다 — 앞서 드린 안내를 정정합니다.** `app/main.py`에 `mercenary_router`가
+등록됐고, 배포 서버 `GEMINI_API_KEY`도 넣어 재시작·확인까지 끝났습니다(로컬
+코드 기준 — 이 브랜치가 `main`에 병합·배포되기 전까지 실제 배포 서버는 아직
+이 라우터를 서빙하지 않습니다).
+
+`GET`·`PATCH /api/v1/me/mercenary-profile`(내 용병 프로필) ·
+`POST /api/v1/matching/search-candidates`(후보 검색, 자연어 → 서버가 임베딩
+계산 → pgvector 코사인 유사도) 가 추가됩니다.
+
+🔴 **SFR-006·007(적합도·추천)과는 별개입니다** — 그걸 대신하지 않습니다. 자세한
+구분은 상세 링크의 표 참고.
+
+### www 쪽 연동도 이미 했습니다
+
+`www/src/components/MatchBot.tsx`(pending `min` 7번, 흐름 B)가 흐름 D로
+`search_candidates` 도구를 갖게 됐고, `www/src/app/api/chat/route.ts`가 이
+검색 API를 부른 뒤 결과를 다시 Gemini에 넣어 소개 문장으로 엮습니다(RAG의
+검색+생성). 코드·테스트는 이미 브랜치에 있고, 이 브랜치가 배포되면 바로
+동작합니다.
+
+### 먼저 확인
+
+```bash
+git -C fastapi grep -n "mercenary_router" -- app/main.py   # 있어야 정상
+curl -s -o /dev/null -w '%{http_code}\n' https://<API 호스트>/api/v1/me/mercenary-profile
+```
+
+상세: `fastapi/docs/api-contract.md` **3-11절**
+
+---
+
 ## 계약 문서
 
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PublicPlayerCard, Squad } from '@/server/backend'
 import PlayerCardView from '@/components/PlayerCardView'
 import BlankPlayerCard from '@/components/BlankPlayerCard'
@@ -8,16 +8,21 @@ import SquadSuggest from '@/components/SquadSuggest'
 import SquadFriends from '@/components/SquadFriends'
 import TeamSeek from '@/components/TeamSeek'
 import MatchBot from '@/components/MatchBot'
-import { loadBoard, saveBoard } from '@/lib/squadBoard'
-import { loadFeatured } from '@/lib/featuredClip'
+import TeamMatch from '@/components/TeamMatch'
+import MatchWaiting from '@/components/MatchWaiting'
+import type { MatchTeam } from '@/lib/teamMatch'
+import { book, unbook } from '@/lib/bookedMatches'
+import { formationToSize, saveFormation, saveSeat, seatOf } from '@/lib/squadBoard'
+import { COLS, ROWS, ROW_POS, cellExists, rowPos, type PosCode } from '@/lib/pitchGrid'
+import { fetchPositions } from '@/lib/positions'
+import { loadFeaturedOf } from '@/lib/featuredClip'
 
 /**
  * 홈 첫 화면의 스쿼드 판 — 판 하나 위에 선수 카드를 **포지션 자리대로**
  * 앉힌다(참고: 축구 게임의 스쿼드 화면). 한 줄로 늘어놓지 않는 이유가
  * 그것이다 — 누가 어느 자리인지가 배치로 읽혀야 한다.
  *
- * 풋살 5인, 1-2-1 포메이션: GK · DF 하나 · MF 둘 · FW 하나.
- * 내 카드는 맨 위(FW)에 놓는다 — 가운데 열의 맨 앞이라 눈이 먼저 간다.
+ * 풋살 5인, 1-2-1 포메이션 — 골키퍼 하나 · 수비 하나 · 중원 둘 · 공격 하나.
  * 나머지 넷은 빈 카드 — 같은 틀 · 같은 머리글(SUPERSUB · PLAYER CARD)에
  * 가운데 + 만 있다. 눌러 보기 전에 무슨 자리인지 알 수 있어야 해서다.
  *
@@ -25,53 +30,40 @@ import { loadFeatured } from '@/lib/featuredClip'
  * 09-03 에 생겨서, 홈이 그것을 받아 `squad` 로 넘겨준다 — 새로고침해도
  * 등재된 사람이 그대로 앉아 있다.
  *
- * ⚠️ **넣기 · 빼기는 아직 이 컴포넌트 안에서만 일어난다.** 등재
- * (`POST …/squad/members`)가 `player_card_id` 를 요구하는데, **팀 구성원의
- * 카드 id 를 얻을 경로가 계약에 없다** — `GET /teams/{id}` 는 `user_id` ·
- * `nickname` · `role` 까지만 준다. 그 경로가 생기면 setMates 를 부르는 자리
- * 둘을 API 호출로 바꾸면 된다.
+ * 🔴 **내 카드도 등재의 하나다**(2026-09-10). 맨 위(FW)는 **판이 내 카드를
+ * 그리는 처음 자리**일 뿐이고, 내 카드 슬러그로 내 등재를 찾아 이어 둔다 —
+ * 그래서 내 포지션 · 칸도 남들과 똑같이 서버에 남는다. **등재가 아니면
+ * 남길 데가 없어** 새로고침하면 처음 자리로 돌아간다(고장이 아니다).
+ * 🔴 `mates` 에는 내 이름을 **안** 넣는다 — 넣으면 판이 그 자리를 「남이 앉은
+ * 카드」로 그려서 내 카드 대신 이름표가 선다.
  *
- * 🔴 **"브라우저 저장은 일부러 안 넣었다"를 2026-09-08 에 뒤집었다**(사용자
- * 요청). 그때 이유는 "서버가 진짜가 되는 순간 상태가 두 곳에 생겨 어느 쪽이
- * 맞는지 헷갈린다" 였는데, 그 사이 판이 **서버가 모르는 것들**을 갖게 됐다 —
- * 판 크기 · 카드가 선 칸 · 손으로 정한 포지션. 게다가 넣기 · 빼기가 아직
- * 서버로 안 가서, 저장이 없으면 다른 화면에 갔다 오기만 해도 판이 처음으로
- * 돌아간다. 어디에 어떻게 남기는지는 `lib/squadBoard.ts` 한 곳에 있다.
+ * ⚠️ **넣기 · 빼기는 아직 이 컴포넌트 안에서만 일어난다.**
+ * 🔴 **막혀 있어서가 아니다 — 아직 안 붙였을 뿐이다**(2026-09-10 정정).
+ * 예전 주석은 *"팀 구성원의 카드 id 를 얻을 경로가 계약에 없다"* 고 적어
+ * 두었는데, **2026-09-04 에 열렸다**(미결 `paik` 2번 해소):
+ * `GET /teams/{team_id}` 의 `members[]` 가 `player_card_id` 와
+ * `card_public_slug` 를 함께 준다. 지금 없는 것은 **www 쪽 접점**이다 —
+ * `Backend.getTeam()` 과 그 BFF 라우트를 만들고, `setMates` 를 부르는 자리
+ * 둘을 `addSquadMember` · `removeSquadMember` 로 바꾸면 된다.
+ * 🔴 그때 **`player_card_id` 가 `null` 인 사람은 단추를 비활성**으로 둔다
+ * (카드가 없는 구성원 — 서버도 막지만 눌러 보고 알게 하지 않는다).
+ * 자리→등재 id 는 이미 아래 `members` 가 들고 있으니 그 짝을 채우면 된다.
+ *
+ * 🔴 **판 배치가 2026-09-10 에 서버로 갔다**(CCC 25, 미결 `paik` 9번). 판 크기 ·
+ * 카드가 선 칸 · 손으로 정한 포지션 셋이 계약에 자리를 얻어서, 09-08 에
+ * 임시로 넣었던 `localStorage` 를 걷어냈다 — 그때 적어 둔 "서버가 진짜가 되는
+ * 순간 상태가 두 곳에 생긴다"가 바로 지금이다. 어디에 어떻게 남기는지는
+ * `lib/squadBoard.ts` 한 곳에 있다.
+ *
+ * 🔴 **첫 판을 서버 값에서 만든다** — 저장소를 읽던 때와 달리 하이드레이션이
+ * 안 깨진다. `squad` 는 서버 컴포넌트가 준 prop 이라 서버와 브라우저의 첫
+ * 그림이 같다(저장소는 서버에 없어서 달랐다).
  */
 
-/** 계약이 정한 축구 포지션 넷(3-4절). 새 코드를 만들지 않는다. */
-export type PosCode = 'FW' | 'MF' | 'DF' | 'GK'
-
-/**
- * 🔴 **행이 포지션을 정한다**(사용자 요청, 2026-09-08) — 위가 공격이다.
- * 카드를 옮기면 이름표가 따라 바뀐다. 그래서 3:3 을 셋 다 맨 윗줄로 올리면
- * **전원 FW** 가 된다("올 공격").
- */
-const ROW_POS: PosCode[] = ['FW', 'MF', 'DF', 'GK']
-
-/** 판의 격자. 열 셋 · 행 넷 — 지금 포메이션 셋이 쓰던 칸 그대로다. */
-const COLS = 3
-const ROWS = ROW_POS.length
-
-/**
- * 🔴 **골키퍼 줄은 가운데 한 칸뿐이다**(사용자 요청, 2026-09-08).
- *
- * 축구에서 골키퍼는 하나이고 골대 앞 가운데에 선다 — 양옆 칸을 두면 판이
- * "골키퍼가 셋일 수도 있다"고 말하는 셈이 된다. 그래서 그 줄에서는 가운데만
- * 그리고, 좌우로는 갈 데가 없다.
- *
- * ⚠️ **위아래는 막지 않는다**(사용자 결정, 2026-09-08). 자리를 통째로 잠그는
- * 안도 있었지만, 그러면 3:3 에서 셋 다 윗줄로 올리는 **「전원 FW」**가
- * 불가능해진다 — 같은 날 아침에 요청받아 만든 동작이라 그쪽을 살렸다.
- * 골키퍼는 **옆으로만** 못 간다.
- */
-const GK_ROW = ROW_POS.indexOf('GK')
-const GK_COL = 1
-
-/** 이 칸이 격자에 존재하는가 — 골키퍼 줄의 양옆은 아예 없다. */
-function cellExists(col: number, row: number): boolean {
-  return row !== GK_ROW || col === GK_COL
-}
+/* 🔴 **격자 규칙은 `lib/pitchGrid.ts` 가 정본이다** — 대기 팝업의 읽기 전용
+   판(`MiniPitch`)이 같은 것을 쓰는데, 그쪽이 이 파일을 import 하면 순환이 된다.
+   두 벌로 베끼면 한쪽만 고쳐져 판마다 포지션이 갈린다. */
+export type { PosCode }
 
 /**
  * 판 위의 자리.
@@ -84,7 +76,23 @@ type Slot = { area: string; col: number; row: number; pos?: PosCode | null; mine
 
 /** 이 자리의 지금 포지션 — 사람이 정한 것이 있으면 그것, 없으면 행이 정한다. */
 function posOf(slot: Slot): PosCode {
-  return slot.pos ?? ROW_POS[Math.min(slot.row, ROWS - 1)]
+  return slot.pos ?? rowPos(slot.row)
+}
+
+/**
+ * 서버가 준 포지션을 자리에 얹는다.
+ *
+ * 🔴 **행이 정하는 것과 같으면 「자동」(`null`)으로 둔다.** 계약에는 「자동」이
+ * 없어서 `position_code` 가 늘 실려 오는데, 그것을 그대로 `pos` 에 박으면
+ * **한 번 저장된 카드는 옮겨도 이름표가 안 바뀐다** — 「행이 포지션을 정한다」가
+ * 조용히 죽는다(2026-09-10 에 실제로 그랬다).
+ *
+ * ⚠️ 손으로 정한 값이 마침 행과 같았던 경우는 「자동」이 된다. 그 자리에서는
+ * 보이는 것도 뜻도 같고, **다른 줄로 옮길 때만** 갈린다 — 둘을 가릴 방법이
+ * 계약에 없으므로 「옮기면 따라 바뀐다」 쪽을 지켰다.
+ */
+function applyPos(seat: Slot, code: string): void {
+  seat.pos = code === rowPos(seat.row) ? null : (code as PosCode)
 }
 
 /** 판의 크기 — 3:3 · 5:5 · 7:7. 화면 글자와 같은 값이라 그대로 쓴다. */
@@ -99,8 +107,9 @@ export type SquadSize = '3' | '5' | '7'
  * 되돌리면 돌아온다). `ml`·`mr` 처럼 위치로 이름 지으면 3인의 MF 하나가
  * 어느 쪽인지부터 정해야 하고, 크기가 바뀔 때마다 이름이 갈린다.
  *
- * 🔴 포지션 코드는 계약이 정한 축구 넷(`GK`·`DF`·`MF`·`FW`)만 쓴다 — 세 판
- * 모두 그 안에서 된다(계약 3-4절). 새 코드를 만들지 않는다.
+ * 🔴 여기 적힌 포지션은 **판의 생김새**다(행이 포지션 라인 — 계약 3-7절이
+ * 4행으로 못박았다). *고를 수 있는 목록*은 이제 `GET /positions` 가 정본이고
+ * (CCC 28) `posCodes` 가 그것을 받는다 — 둘은 다른 축이라 섞지 않는다.
  */
 export const FORMATIONS: Record<SquadSize, { label: string; slots: Slot[] }> = {
   // 1-1-1 — 셋이면 공격 · 중원 · 골키퍼 하나씩이다.
@@ -153,21 +162,93 @@ const SUGGEST_EXIT_MS = 200
  * 🔴 같은 포지션이 둘인 자리(MF)는 **먼저 온 사람부터** 채운다. 서버는 어느
  * 쪽 MF 인지까지는 모른다 — 좌 · 우는 화면만의 배치다.
  */
-function seatsFromSquad(squad: Squad | null, slots: Slot[]): Record<string, string | null> {
-  if (!squad) return {}
-  const left = [...squad.members]
-  const seats: Record<string, string | null> = {}
-  for (const slot of slots) {
-    if (slot.mine) continue
-    const at = left.findIndex((m) => m.position_code === posOf(slot))
-    if (at >= 0) seats[slot.area] = left.splice(at, 1)[0].nickname
+function seatsFromSquad(
+  squad: Squad | null,
+  size: SquadSize,
+  /** 내 카드 — **어느 등재가 나인지** 가리는 열쇠다(아래 0단계). */
+  mySlug?: string,
+): { slots: Slot[]; mates: Record<string, string | null>; members: Record<string, string> } {
+  // 자리는 **복사해서** 만진다 — FORMATIONS 는 모듈 상수라 고치면 다음 마운트가
+  // 남의 배치를 물려받는다.
+  const slots = FORMATIONS[size].slots.map((sl) => ({ ...sl }))
+  const mates: Record<string, string | null> = {}
+  const members: Record<string, string> = {}
+  if (!squad) return { slots, mates, members }
+
+  /* 0) **내 자리도 등재와 잇는다**(사용자 요청, 2026-09-10).
+        전에는 「내 자리는 `card` 가 그린다」는 이유로 등재와 안 이어 놓았는데,
+        그러면 **내 카드만 포지션과 칸이 안 남았다** — 옮길 수는 있는데 새로
+        고치면 제자리로 돌아갔다. 나도 팀의 한 명이라 남들과 같아야 한다.
+        🔴 `mates` 에는 **안** 넣는다. 거기 이름이 들어가면 판이 그 자리를
+        「남이 앉은 카드」로 그려서 내 카드 대신 이름표가 나온다. */
+  const me = mySlug ? squad.members.find((m) => m.card_public_slug === mySlug) : undefined
+  const mySeat = slots.find((sl) => sl.mine)
+  if (me && mySeat) {
+    members[mySeat.area] = me.id
+    const cell = seatOf(me)
+    if (cell) {
+      mySeat.col = cell.col
+      mySeat.row = cell.row
+    }
+    // 포지션도 저장된 값을 쓴다(행과 같으면 「자동」 — `applyPos` 주석).
+    applyPos(mySeat, me.position_code)
   }
-  return seats
+
+  /**
+   * 그 자리가 **이미 차 있는가.**
+   *
+   * 🔴 **내 자리(`mine`)도 찬 것으로 센다.** 거기는 `card` 가 그리므로
+   * `mates` 에는 안 들어가는데, 그것만 보고 판단하면 **내 카드 위로 남의
+   * 카드를 옮겨 놓는다** — 실제로 그래서 내 카드가 안 보였다(2026-09-10).
+   */
+  const taken = (sl: Slot) => Boolean(sl.mine || mates[sl.area])
+
+  /* 1) **칸이 저장된 등재 — 그 칸이 곧 자리다.**
+        포지션도 저장된 값을 쓴다: 손으로 정했을 수 있어 행에서 역산하면 안 된다. */
+  for (const m of squad.members) {
+    if (m === me) continue
+    const cell = seatOf(m)
+    if (!cell) continue
+    /* 🔴 그 칸이 이미 찼으면 **건너뛴다.** 내 자리와 겹치는 것이 이 갈래로
+       들어온다 — 서버 목록에 내가 들어 있어도 같은 사람이 두 번 나오지
+       않게 하는 것이 원래 규칙이고, 그 규칙을 여기서도 지킨다. */
+    if (slots.some((sl) => taken(sl) && sl.col === cell.col && sl.row === cell.row)) continue
+    /* 🔴 **그 칸에 있는 자리를 먼저 쓴다.** 아무 빈 자리나 끌어다 옮기면
+       자리들이 통째로 뒤엉켜, 원래 그 칸에 있던 자리가 밀려나며 카드가
+       겹쳐 사라진다. 그 칸에 자리가 없을 때만(골키퍼 줄 양옆처럼 아예 없는
+       칸, 또는 판이 작아진 경우) 남는 자리를 옮겨 온다. */
+    const seat =
+      slots.find((sl) => !taken(sl) && sl.col === cell.col && sl.row === cell.row) ??
+      slots.find((sl) => !taken(sl))
+    if (!seat) continue
+    seat.col = cell.col
+    seat.row = cell.row
+    applyPos(seat, m.position_code)
+    mates[seat.area] = m.nickname
+    members[seat.area] = m.id
+  }
+
+  /* 2) **칸이 아직 없는 등재**(`grid_col`·`grid_row` 가 null)는 포메이션의
+        기본 자리에 포지션으로 맞춰 앉힌다.
+        ⚠️ 계약대로면 "판에 안 올린 등재"라 안 그리는 것이 맞지만, 그러면
+        서버의 **기존 행이 전부 null 이라** 판이 통째로 비어 보인다 — 등재된
+        사람이 화면에서 사라지는 쪽이 더 나쁘다. 앉혀서 보여 주되 **여기서
+        저장하지는 않는다**(판을 여는 것만으로 서버가 바뀌면 안 된다). 그
+        사람을 한 번 옮기면 그때 칸이 서버에 생긴다. */
+  for (const m of squad.members) {
+    if (m === me || seatOf(m)) continue
+    const seat = slots.find((sl) => !taken(sl) && posOf(sl) === m.position_code)
+    if (!seat) continue
+    mates[seat.area] = m.nickname
+    members[seat.area] = m.id
+  }
+  return { slots, mates, members }
 }
 
 export default function SquadPanel({
   card,
   squad = null,
+  sportCode = null,
   scouting = false,
   onCloseScouting,
   seeking = false,
@@ -176,6 +257,13 @@ export default function SquadPanel({
   onBotChange,
 }: {
   card?: PublicPlayerCard | null
+  /**
+   * 그 팀의 종목 — **포지션 목록을 받아 오는 열쇠**다(CCC 28).
+   *
+   * 🔴 코드만으로는 못 찾는다 — 야구 `C`(포수)와 농구 `C`(센터)가 다르다.
+   * 없으면(팀이 없는 사람) 판이 아는 축구 넷으로 돈다.
+   */
+  sportCode?: string | null
   /**
    * 서버가 준 스쿼드. **없을 수 있다** — 팀이 없거나(개인 계정) 팀은 있어도
    * 스쿼드를 아직 안 만든 경우다. 계약이 그 둘을 갈라 두었으므로(404
@@ -228,15 +316,53 @@ export default function SquadPanel({
      넣기 · 빼기가 아직 서버로 안 가므로(위 주석), 매번 서버 값으로 되돌리면
      방금 넣은 사람이 사라진다. */
   /**
-   * 판의 크기(3:3 · 5:5 · 7:7) — 머리글의 단추가 바꾼다(사용자 요청,
-   * 2026-09-08). 전에는 「풋살 5인」이라고 적어 두기만 했다.
+   * 서버가 준 스쿼드로 만든 **첫 판** — 크기 · 자리 · 앉은 사람 · 그 사람의
+   * 등재 id 넷이 여기서 나온다(CCC 25).
+   *
+   * 🔴 **모르는 `formation` 은 기본 판으로 연다.** 계약이 값 집합을 강제하지
+   * 않아(길이만 본다) 화면이 아직 모르는 크기가 올 수 있다 — 그때 판이
+   * 안 그려지면 안 된다.
    */
-  const [size, setSize] = useState<SquadSize>(DEFAULT_SIZE)
+  const seeded = useMemo(() => {
+    const from = formationToSize(squad?.formation ?? null)
+    const startSize: SquadSize =
+      from && from in FORMATIONS ? (from as SquadSize) : DEFAULT_SIZE
+    return { size: startSize, ...seatsFromSquad(squad, startSize, card?.public_slug) }
+  }, [squad, card?.public_slug])
+
+  /**
+   * 판의 크기(3:3 · 5:5 · 7:7) — 머리글의 단추가 바꾼다(사용자 요청,
+   * 2026-09-08). 정본은 서버의 `Squad.formation` 이다(CCC 25).
+   */
+  const [size, setSize] = useState<SquadSize>(seeded.size)
   /**
    * 🔴 자리는 **상태**다 — 옮길 수 있어야 해서다(사용자 요청, 2026-09-08).
    * 포메이션(FORMATIONS)은 이제 「고정된 자리」가 아니라 **처음 놓이는 자리**다.
    */
-  const [slots, setSlots] = useState<Slot[]>(() => FORMATIONS[DEFAULT_SIZE].slots)
+  const [slots, setSlots] = useState<Slot[]>(() => seeded.slots)
+
+  /**
+   * 자리 이름 → 그 사람의 **등재 id**(`squad_member.id`).
+   *
+   * 🔴 **이것이 있는 자리만 서버에 저장된다.** 지인 판에서 앉힌 사람은
+   * `player_card_id` 가 없어 등재가 안 되고(그 경로는 아직 없다), 등재가
+   * 아니면 서버에 배치를 남길 대상이 없다 — 없는 등재에 PATCH 를 쏘면 404 다.
+   */
+  /* 🔴 **첫 값에서 고정된다** — 갱신 함수를 두지 않는다. 이 판이 사람을
+     새로 등재하지는 않으므로(그 경로는 아직 없다) 바뀔 일이 없고, 자리
+     (`mates`)와 따로 갱신되면 어느 자리가 누구의 등재인지가 어긋난다. */
+  const [members] = useState<Record<string, string>>(() => seeded.members)
+
+  /**
+   * 판 배치를 서버에 남긴다 — **판이 멈추지 않게 삼킨다.**
+   *
+   * 🔴 **주장이 아니면 403 이다**(계약 3-7절). 판은 누구나 만져 볼 수 있고
+   * 남는 것만 주장의 것이라, 실패를 화면의 고장으로 만들지 않는다. 되돌리지도
+   * 않는다 — 방금 옮긴 카드가 손 밑에서 제자리로 튀는 편이 더 나쁘다.
+   */
+  function persist(run: () => Promise<unknown>) {
+    void run().catch(() => {})
+  }
 
   /**
    * 크기를 바꾸면 그 포메이션의 처음 자리로 놓는다.
@@ -252,14 +378,13 @@ export default function SquadPanel({
       return FORMATIONS[next].slots.map((sl) => ({ ...sl, pos: kept.get(sl.area) ?? null }))
     })
     setMoving(null)
+    if (squad) persist(() => saveFormation(squad.team_id, next))
   }
 
   /* 🔴 앉은 사람은 **크기가 줄어도 안 지운다**(사용자 요청). 자리 이름이
      역할+번호라(FORMATIONS 주석) 없어진 자리는 그리지 않을 뿐이고, 다시
      키우면 그대로 앉아 있다 — 실수로 눌렀을 때 잃는 것이 없다. */
-  const [mates, setMates] = useState<Record<string, string | null>>(() =>
-    seatsFromSquad(squad, FORMATIONS[DEFAULT_SIZE].slots),
-  )
+  const [mates, setMates] = useState<Record<string, string | null>>(() => seeded.mates)
 
   /**
    * 🔴 **그릴 때 저장소를 읽지 않는다.** 서버엔 없는 값이라 첫 그림이 서버와
@@ -276,39 +401,66 @@ export default function SquadPanel({
    * 🔴 그릴 때 읽지 않는다(하이드레이션).
    */
   const [myClip, setMyClip] = useState<string | null>(null)
-  useEffect(() => setMyClip(loadFeatured()?.src ?? null), [])
-
-  const [restored, setRestored] = useState(false)
+  /**
+   * 🔴 **내 대표 영상도 계약으로 읽는다**(CCC 27). 전에는 `localStorage` 라
+   * 다른 기기에서는 안 나왔다. 내 카드 슬러그로 부르므로 남의 판을 볼 때도
+   * **같은 함수**가 그 사람 것을 준다 — 추천 판이 자리 표시 클립을 돌리던
+   * 자리가 이걸로 메워진다.
+   *
+   * 🔴 **그릴 때 부르지 않는다**(하이드레이션) — 그려진 다음에 한 번 얹는다.
+   * ⚠️ 주소는 만료되는 값이라 들고만 있고 캐시로 삼지 않는다.
+   */
+  const slug = card?.public_slug
   useEffect(() => {
-    const saved = loadBoard()
-    setRestored(true)
-    if (!saved) return
-    if (saved.size in FORMATIONS) setSize(saved.size as SquadSize)
-    // 🔴 저장본이 이긴다 — 넣기 · 빼기가 아직 서버로 안 가므로 여기 있는
-    //    것이 더 최신이다. 서버로 가게 되면 이 줄부터 다시 봐야 한다.
-    setSlots(
-      saved.slots.map((sl) => ({
-        area: sl.area,
-        col: sl.col,
-        row: sl.row,
-        pos: (sl.pos as PosCode | null) ?? null,
-        mine: sl.mine,
-      })),
-    )
-    setMates(saved.mates)
-  }, [])
+    if (!slug) return
+    let alive = true
+    void loadFeaturedOf(slug).then((f) => {
+      if (alive) setMyClip(f?.url ?? null)
+    })
+    return () => {
+      alive = false
+    }
+  }, [slug])
 
-  /* 바뀔 때마다 남긴다. 🔴 **되살리기 전에는 쓰지 않는다** — 처음 그린 값이
-     저장본을 덮어써서, 새로고침하면 늘 기본 판으로 돌아간다. */
+  /**
+   * 이름표를 눌러 고를 수 있는 **포지션 코드들** — `GET /positions` 가 정본이다
+   * (CCC 28). 전에는 이 파일의 `ROW_POS` 넷이 곧 고를 수 있는 전부라,
+   * 마이그레이션이 포지션을 늘려도 판은 몰랐다.
+   *
+   * 🔴 **`ROW_POS` 를 대신하지는 않는다.** 그쪽은 「행이 포지션 라인」이라는
+   * **판의 생김새**이고 계약 3-7절이 4행으로 못박은 값이다(0 FW · 1 MF ·
+   * 2 DF · 3 GK). 여기서 받는 것은 *고를 수 있는 목록*이라 서로 다른 축이다.
+   *
+   * 🔴 **못 받으면 판이 아는 넷으로 돈다** — 목록을 못 받았다고 이름표가
+   * 안 눌리면, 서버가 잠깐 흔들릴 때 판의 기능이 사라진다.
+   */
+  const [posCodes, setPosCodes] = useState<PosCode[]>(ROW_POS)
   useEffect(() => {
-    if (!restored) return
-    saveBoard({ size, slots: slots.map((sl) => ({ ...sl, pos: sl.pos ?? null })), mates })
-  }, [restored, size, slots, mates])
+    if (!sportCode) return
+    let alive = true
+    void fetchPositions(sportCode).then((list) => {
+      if (alive && list.length) setPosCodes(list.map((p) => p.code as PosCode))
+    })
+    return () => {
+      alive = false
+    }
+  }, [sportCode])
   /**
    * 지인 찾기에서 골라 둔 사람. 정해져 있으면 **빈 자리 버튼의 뜻이 바뀐다**
    * — 원래는 "AI 추천 열기"지만 이때는 "여기 넣기"다. 자리를 여기서 안 고르고
    * 진짜 판을 누르게 한 이유는 SquadFriends 주석에 있다.
    */
+  /**
+   * **팀 매칭** — 판이 다 찼을 때만 열리는 판(사용자 요청, 2026-09-10).
+   *
+   * 🔴 **추천 · 챗봇과 같은 첫째 칸**이라 「한 번에 하나」다 — 여는 쪽이
+   * 다른 것을 닫는다(같은 좌표라 z 로는 뒤에 가려질 뿐이다).
+   */
+  const [matching, setMatching] = useState(false)
+  /** 상대가 수락한 경기. 있으면 대기 팝업이 화면을 덮는다. */
+  const [matched, setMatched] = useState<MatchTeam | null>(null)
+
+
   const [placing, setPlacing] = useState<string | null>(null)
   // 지인 찾기 판이 DOM 에 있는가 — 닫힐 때 물러나는 동안 남아 있어야 한다.
   const [friendVisible, setFriendVisible] = useState(false)
@@ -358,31 +510,56 @@ export default function SquadPanel({
    * 밀린 쪽이 어디로 갈지 정할 규칙이 또 필요하고, 바꾸는 편이 짐작대로다.
    */
   function moveTo(area: string, col: number, row: number) {
-    setSlots((now) => {
-      const me = now.find((sl) => sl.area === area)
-      if (!me || (me.col === col && me.row === row)) return now
-      /* 🔴 **없는 칸으로는 못 간다** — 골키퍼 줄의 양옆이 그것이다. 한 곳에서
-         막아야 끌기 · 방향키 · 앞으로 생길 길이 다 같이 걸린다. */
-      if (!cellExists(col, row)) return now
-      const other = now.find((sl) => sl.col === col && sl.row === row)
-      return now.map((sl) => {
-        if (sl.area === area) return { ...sl, col, row }
-        if (other && sl.area === other.area) return { ...sl, col: me.col, row: me.row }
-        return sl
-      })
+    const me = slots.find((sl) => sl.area === area)
+    if (!me || (me.col === col && me.row === row)) return
+    /* 🔴 **없는 칸으로는 못 간다** — 골키퍼 줄의 양옆이 그것이다. 한 곳에서
+       막아야 끌기 · 방향키 · 앞으로 생길 길이 다 같이 걸린다. */
+    if (!cellExists(col, row)) return
+    const other = slots.find((sl) => sl.col === col && sl.row === row)
+    const next = slots.map((sl) => {
+      if (sl.area === area) return { ...sl, col, row }
+      if (other && sl.area === other.area) return { ...sl, col: me.col, row: me.row }
+      return sl
     })
+    setSlots(next)
+    /* 🔴 **자리를 맞바꾸면 둘 다 저장한다.** 옮긴 쪽만 보내면 밀려난 사람의
+       칸이 서버에서 옛 자리에 남아, 다음에 열 때 두 카드가 한 칸에 겹친다. */
+    saveCells(next, other ? [area, other.area] : [area])
+  }
+
+  /**
+   * 자리들의 **칸과 포지션**을 서버에 남긴다 — 등재된 사람이 앉은 자리만.
+   *
+   * 🔴 **다음 값을 받아서** 쓴다. 지금 상태를 다시 읽으면 **한 걸음 뒤처진
+   * 칸**을 보낸다 — 홈의 휠 처리기와 대표 영상 지우기에서 두 번 데인 자리다.
+   * 🔴 **상태 갱신 함수 안에서 부르지 않는다.** 그쪽은 순수해야 하고,
+   * StrictMode 는 그 함수를 한 번 더 돌린다 — 같은 PATCH 가 두 번 나간다.
+   */
+  function saveCells(next: Slot[], areas: string[]) {
+    if (!squad) return
+    for (const area of areas) {
+      const memberId = members[area]
+      // 등재가 아닌 자리(지인 판에서 앉힌 사람 · 내 자리)는 서버에 남길 것이 없다.
+      if (!memberId) continue
+      const sl = next.find((x) => x.area === area)
+      if (!sl) continue
+      persist(() => saveSeat(squad.team_id, memberId, posOf(sl), { col: sl.col, row: sl.row }))
+    }
   }
 
   /** 이름표를 눌러 포지션을 직접 정한다 — 한 번에 한 칸씩 돈다(자동 포함). */
   function cyclePos(area: string) {
-    setSlots((now) =>
-      now.map((sl) => {
-        if (sl.area !== area) return sl
-        const order: (PosCode | null)[] = [...ROW_POS, null]
-        const at = order.indexOf(sl.pos ?? null)
-        return { ...sl, pos: order[(at + 1) % order.length] }
-      }),
-    )
+    const next = slots.map((sl) => {
+      if (sl.area !== area) return sl
+      const order: (PosCode | null)[] = [...posCodes, null]
+      const at = order.indexOf(sl.pos ?? null)
+      return { ...sl, pos: order[(at + 1) % order.length] }
+    })
+    setSlots(next)
+    /* 자동(`null`)으로 돌아와도 저장한다 — 그때 서버로 가는 값은 **행이 정한
+       포지션**(`posOf`)이다. 계약은 `position_code` 를 늘 요구하고, 등재가
+       포지션 없이 존재하지 않기 때문이다. */
+    saveCells(next, [area])
   }
 
   // 지금 추천을 열어 둔 자리. null 이면 닫혀 있다.
@@ -411,6 +588,21 @@ export default function SquadPanel({
     friendTimer.current = window.setTimeout(() => setFriendVisible(false), SUGGEST_EXIT_MS)
     return () => clearTimeout(friendTimer.current)
   }, [scouting])
+
+  /**
+   * **판이 다 찼는가** — 「팀 매칭」이 켜지는 조건이다(사용자 요청).
+   *
+   * 🔴 **내 자리도 한 자리로 센다.** 거기는 `card` 가 그려서 `mates` 에 안
+   * 들어가지만, 판 위에 선 사람인 것은 같다 — 안 세면 5:5 를 다 채워도
+   * 넷으로 세어 단추가 영영 안 켜진다.
+   * 🔴 **크기와 무관하다**(사용자 결정) — 3:3 으로 할지 7:7 로 할지는 팀장이
+   * 정하는 것이라, 고른 크기가 다 차면 켜진다.
+   *
+   * 🔴 **「팀원」일 때는 아니다**(사용자 지적, 2026-09-10). 그쪽은 *남의 팀에
+   * 들어가는* 자리라 우리 팀이 상대를 찾을 일이 없다 — 판도 물러나 있어서
+   * 「다 찼다」가 화면에 보이지도 않는다.
+   */
+  const full = !seeking && slots.every((slot) => slot.mine || Boolean(mates[slot.area]))
 
   /**
    * 용병 찾기로 열 때 **어느 자리의 추천**을 낼 것인가 — 빈 자리 중 첫
@@ -552,7 +744,9 @@ export default function SquadPanel({
       {/* 🔴 **팀원 판은 스쿼드 판을 대신 선다**(사용자 요청, 2026-09-08).
           같은 자리를 쓰므로 `.ss-squad-wrap` 안에서 좌표를 다시 잴 것이 없고,
           오른쪽에 붙는 판들(추천 · 지인 · 챗봇)의 기준점도 그대로다. */}
-      {seeking && <TeamSeek closing={false} onClose={() => onCloseSeeking?.()} />}
+      {seeking && (
+        <TeamSeek closing={false} onClose={() => onCloseSeeking?.()} sportCode={sportCode} />
+      )}
 
       <section
         className="ss-squad"
@@ -663,6 +857,7 @@ export default function SquadPanel({
             <div
               key={slot.area}
               className="ss-squad-seat"
+              data-mine={slot.mine ? 'true' : undefined}
               data-held={held ? 'true' : undefined}
               style={{
                 gridColumn: slot.col + 1,
@@ -870,6 +1065,81 @@ export default function SquadPanel({
           상대를 닫는다(`onBotChange` · 빈 자리 누르기). 둘째 칸의 지인 판과는
           자리가 갈렸으므로 겹치지 않는다. */}
       {bot && <MatchBot open onClose={() => onBotChange?.(false)} />}
+
+      {/* 🔴 **알약 줄(팀장 · 팀원 · AI)과 같은 높이, 판 밖 오른쪽**에 선다
+          (사용자 요청, 2026-09-10). 머리줄 안에 두었더니 크기 단추가 가운데로
+          밀렸다 — 판 바깥 절대배치라 판의 어떤 것도 안 건드린다.
+
+          🔴 **자리를 늘 잡아 둔다**(`visibility`) — 마지막 자리를 채우는 순간
+          옆의 것들이 튀지 않게. 접근성 트리에서는 빠진다.
+
+          알약 줄로 올라오면서 명단(판 오른쪽)과 **더는 안 겹치므로**, 열려
+          있는 동안에도 그대로 두고 한 번 더 누르면 닫는다. */}
+      <button
+        type="button"
+        className="ss-squad-match"
+        data-blink={full && !matching ? 'true' : undefined}
+        aria-hidden={!full}
+        tabIndex={full ? undefined : -1}
+        style={full ? undefined : { visibility: 'hidden' }}
+        aria-expanded={matching}
+        onClick={() => {
+          // 첫째 칸은 한 번에 하나 — 여는 쪽이 다른 것을 닫는다.
+          onBotChange?.(false)
+          close()
+          setMatching((now) => !now)
+        }}
+      >
+        팀 매칭
+      </button>
+
+      {/* 비슷한 팀 명단 — 추천 · 챗봇과 **같은 첫째 칸**이다.
+          🔴 「팀원」이 켜져 있으면 **안 그린다.** 단추가 사라지는데 판만 남으면
+          닫을 길이 그 판의 × 뿐이고, 무엇을 보고 있는지도 흐려진다. 상태를
+          effect 로 끄지 않고 **그릴 때 가른다** — 되돌아오면 그대로 다시 뜬다. */}
+      {matching && !seeking && (
+        <TeamMatch
+          size={size}
+          closing={false}
+          onClose={() => setMatching(false)}
+          onMatched={(team) => {
+            setMatched(team)
+            /* 🔴 **잡힌 그 순간 적는다.** 팝업을 닫을 때 적으면, 닫지 않고
+               떠난 사람의 경기가 「내 경기」에 안 남는다. */
+            book(team)
+            // 팝업이 화면을 덮으므로 뒤의 명단은 접는다 — 닫았을 때 판만 남는다.
+            setMatching(false)
+          }}
+        />
+      )}
+
+      {/* 경기가 잡혔다 — 화면을 덮는 팝업. 닫으면 홈이 그대로 남는다. */}
+      {matched && (
+        <MatchWaiting
+          us={{
+            name: '우리 팀',
+            /* 🔴 **판에 선 사람만** 넘긴다. 내 자리는 `card` 가 그려서
+               `mates` 에 없으므로 여기서 이름을 따로 얹는다. */
+            squad: slots
+              .filter((sl) => sl.mine || mates[sl.area])
+              .map((sl) => ({
+                nickname: sl.mine ? (card?.user.nickname ?? '나') : (mates[sl.area] as string),
+                col: sl.col,
+                row: sl.row,
+                pos: posOf(sl),
+                mine: sl.mine,
+              })),
+          }}
+          them={matched}
+          myCard={card ?? null}
+          onClose={() => setMatched(null)}
+          onCancel={() => {
+            // 무른 경기는 「내 경기」에서도 빠진다 — 남으면 잡힌 줄 안다.
+            unbook(matched.id)
+            setMatched(null)
+          }}
+        />
+      )}
 
       {/* 추천 판 — 스쿼드 판 오른쪽에서 미끄러져 나온다. */}
       {shown && (

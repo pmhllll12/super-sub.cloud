@@ -9,7 +9,7 @@
  * (저장소에 있는 영상이 그것뿐이라서다) — 계약에 영상 조회가 생기면
  * (5장 ASM-003, 객체 저장소 미정) 이 상수를 지우고 응답을 흘려 넣으면 된다.
  */
-import type { PublishedClip } from './published'
+import type { PublicVideo } from '@/server/backend'
 
 export type FeedClip = {
   id: string
@@ -100,18 +100,30 @@ export const FEED: FeedClip[] = [
  * ⚠️ 남의 공개 영상은 아직 못 붙인다 — 계약에 공개 클립 목록도, 재생용 주소도
  * 없다(미결로 올렸다). 그때까지 이 자리에 늘어나는 것은 **내 것뿐**이다.
  */
-export function feedWith(published: PublishedClip[], by: string): FeedClip[] {
+export function feedWith(
+  published: PublicVideo[],
+  urls: Record<string, string>,
+  by: string,
+): FeedClip[] {
   return [
     ...published.map((c) => ({
       // 🔴 원래 목록과 겹치지 않게 접두사를 붙인다. id 는 리액트 key 이자
       // 좋아요의 기준이라, 겹치면 남의 영상에 불이 켜진다.
       id: `pub-${c.id}`,
-      title: c.title,
+      // 제목은 없을 수 있다(계약이 `null` 을 허용한다) — 빈 자리로 두지 않는다.
+      title: c.title ?? '제목 없는 장면',
       by,
-      at: c.at,
-      what: c.what,
-      src: c.src,
-      aspect: c.aspect,
+      at: c.created_at.slice(0, 10),
+      what: c.description ?? '',
+      /* 🔴 **저장 키가 아니라 사전 서명 주소다**(계약 3-6절). 목록에는 아예
+         안 실려 오므로 클립마다 `playback-url` 로 따로 받는다 — 아직 못 받은
+         것은 빈 문자열이고, 그 칸은 플레이어 없이 그려진다. */
+      src: urls[c.id] ?? '',
+      /* ⚠️ **비율을 서버가 안 준다.** 미리 알아야 칸이 안 덜컥이는 값인데
+         계약에 자리가 없어 가로(16:9)로 가정한다 — 세로 영상은 좌우가 남는다.
+         미결 `paik` 15번으로 올렸다. 영상을 읽어서 알아내지 않는다(그때 칸
+         크기가 바뀌어 화면이 한 번 덜컥한다). */
+      aspect: '16 / 9',
       // ⚠️ 계약 5장에 댓글이 없다 — 없는 것을 지어내지 않는다.
       comments: [],
     })),

@@ -11,14 +11,24 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import DateTime, Integer, String, Uuid
+from sqlalchemy import JSON, Boolean, DateTime, Index, Integer, String, Text, Uuid
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
+from pgvector.sqlalchemy import Vector
 
 from app.core.database import Base
 
 
 class UserOrm(Base):
     __tablename__ = "user"
+    __table_args__ = (
+        Index(
+            "ix_user_skill_embedding_hnsw",
+            "skill_embedding",
+            postgresql_using="hnsw",
+            postgresql_ops={"skill_embedding": "vector_cosine_ops"},
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     # 부록 D.7 — 계정 식별. 값 객체 Email 이 생성 시점에 소문자로 정규화하므로
@@ -36,4 +46,25 @@ class UserOrm(Base):
     # 우리에게 필요한 것은 갱신이 아니라 **폐기 능력** 하나뿐이었다.
     token_version: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default="0"
+    )
+
+    # 용병 매칭용 (2026-09-10 마이그레이션 28148877afc0). `MercenaryPort`가 이
+    # 테이블 위의 별도 개념(`MercenaryProfileEntity`)으로 다룬다 — `UserPort`에
+    # 얹지 않은 이유는 그 포트의 주석 참고.
+    #
+    # 🔴 `postgresql.ARRAY`를 쓴다(일반 `sqlalchemy.ARRAY`가 아니다) —
+    # `.contains()` 같은 PG 전용 연산자가 일반 ARRAY엔 없다(`mercenary_pg_
+    # repository.py`의 종목별 포지션 필터가 이걸 쓴다). DDL은 둘 다 같은
+    # `character varying[]`라 이 차이만으로는 새 마이그레이션이 필요 없다.
+    preferred_positions: Mapped[list[str] | None] = mapped_column(
+        ARRAY(String), nullable=True
+    )
+    available_slots: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    location: Mapped[str | None] = mapped_column(String, nullable=True)
+    skill_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_searchable: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
+    skill_embedding: Mapped[list[float] | None] = mapped_column(
+        Vector(768), nullable=True
     )

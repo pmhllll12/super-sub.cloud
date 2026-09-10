@@ -43,10 +43,15 @@ export async function fetchPlaybackUrl(videoId: string): Promise<string | null> 
  * 서명 주소를 새로 받아 온다.
  */
 export function usePlaybackUrls(
-  clips: { id: string; storage_key: string }[],
+  /**
+   * ⚠️ **`storage_key` 는 없을 수 있다.** 공개 클립 목록(`GET /videos/public`)은
+   * 저장 키를 아예 안 준다 — 키에 업로더의 `user_id` 가 들어 있어 계약이
+   * 일부러 뺐다(CCC 20). 없으면 **늘 받아야 하는 것**으로 본다.
+   */
+  clips: { id: string; storage_key?: string }[],
 ): Record<string, string> {
   const [urls, setUrls] = useState<Record<string, string>>({})
-  const needs = clips.filter((c) => !isDirectKey(c.storage_key)).map((c) => c.id)
+  const needs = clips.filter((c) => !c.storage_key || !isDirectKey(c.storage_key)).map((c) => c.id)
   const key = [...needs].sort().join(',')
 
   useEffect(() => {

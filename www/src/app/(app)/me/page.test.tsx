@@ -44,6 +44,10 @@ const VIDEOS: MyVideo[] = [
     reject_reason: null,
     analysis_job_id: 'j1',
     analysis_status: 'succeeded',
+    is_featured: false,
+    is_public: false,
+    title: null,
+    description: null,
   },
   {
     id: 'v2',
@@ -56,6 +60,10 @@ const VIDEOS: MyVideo[] = [
     reject_reason: null,
     analysis_job_id: null,
     analysis_status: null,
+    is_featured: false,
+    is_public: false,
+    title: null,
+    description: null,
   },
   {
     id: 'v3',
@@ -68,6 +76,10 @@ const VIDEOS: MyVideo[] = [
     reject_reason: '해상도가 상한을 넘습니다: 3840x2160 (상한 1920x1080)',
     analysis_job_id: null,
     analysis_status: null,
+    is_featured: false,
+    is_public: false,
+    title: null,
+    description: null,
   },
 ]
 

@@ -16,10 +16,11 @@ import AccountActions from './AccountActions'
 import CardEditor from './CardEditor'
 import StyledCard from './StyledCard'
 import { CardStyleProvider } from './cardStyle'
+import MyMatches from './MyMatches'
 import MyVideos from './MyVideos'
 import ProfileStage from './ProfileStage'
 import NicknameForm from './NicknameForm'
-import { when, ymd } from './format'
+import { ymd } from './format'
 import { SECTION_GLASS, SHEET_GLASS } from './glass'
 
 /** 정보 절의 한 줄 — 흐린 이름표와 진한 값. */
@@ -151,26 +152,10 @@ export function MeBody({
 
             <section className="ss-profile-matches" style={SECTION_GLASS}>
               <h2 className="ss-profile-h">내 경기</h2>
-              {matches.length === 0 ? (
-                /* ⚠️ "경기가 없다" 가 아니라 "**다가오는** 것이 없다" 다 —
-                   계약이 지난 경기를 이 목록에서 빼기 때문이다(3-4절).
-                   지난 경기가 있어도 여기는 비어 있을 수 있다. */
-                <p className="ss-profile-muted">다가오는 경기가 없습니다.</p>
-              ) : (
-                <ul className="ss-profile-match-list">
-                  {matches.map((m) => (
-                    <li key={m.id}>
-                      <p className="ss-profile-match-when">{when(m.played_at)}</p>
-                      <p className="ss-profile-match-place">{m.place}</p>
-                      {m.needs.length > 0 && (
-                        <p className="ss-profile-muted">
-                          {m.needs.map((n) => `${n.position_label} ${n.head_count}`).join(' · ')}
-                        </p>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
+              {/* 🔴 목록은 **브라우저에서** 그린다 — 팀 매칭으로 잡힌 경기가
+                  저장소에 있어서, 서버가 그린 첫 화면에 그것을 얹으면
+                  하이드레이션이 깨진다. 붙은 뒤에 읽는 일을 그쪽이 맡는다. */}
+              <MyMatches matches={matches} />
             </section>
 
             <AccountActions />

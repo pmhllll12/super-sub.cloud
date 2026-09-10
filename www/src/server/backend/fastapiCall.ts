@@ -1,4 +1,4 @@
-import { BackendError, parseErrorBody } from './errors'
+import { BackendError, parseErrorBody, readRetryAfter } from './errors'
 
 /**
  * FastAPI 를 직접 부르는 낮은 층 — `Backend` 인터페이스의 두 구현
@@ -48,6 +48,8 @@ export async function callFastApi<T>(
     // 계약 형태가 아닌 응답(프록시가 HTML 을 주는 경우 등) — parseErrorBody 가 떨어뜨린다.
   }
 
-  if (!res.ok) throw parseErrorBody(res.status, json)
+  // 🔴 **여기서 헤더를 안 읽으면 그 뒤로는 못 읽는다** — 본문만 들고 위로
+  // 올라가면 `Retry-After` 가 이 자리에서 사라진다(계약 1번의 「프록시가 버린다」).
+  if (!res.ok) throw parseErrorBody(res.status, json, readRetryAfter(res.headers))
   return json as T
 }

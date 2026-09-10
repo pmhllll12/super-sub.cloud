@@ -2217,6 +2217,144 @@ DB(연쇄)와 S3(`storage_key` + `reports/<user_id>/<video_id>/`, best-effort)�
 
 ---
 
+## 3-11. 용병 후보 검색 (2026-09-10 추가 — 박민호, 아직 미배선)
+
+🔴 **SFR-006(적합도)·SFR-007(추천)과는 별개 기능이다 — 그걸 대신하지 않는다.**
+도메인 ④(매칭) ERD에 예약된 `fitness_score`·`recommendation` 테이블은 아직
+안 만들었고, 이 기능은 그 테이블을 쓰지 않는다. 이름이 겹쳐 보여서 명시적으로
+가른다:
+
+| | 이 기능 (3-11절) | SFR-006 | SFR-007 |
+|---|---|---|---|
+| 언제 계산하나 | **지원 전** — 팀이 능동적으로 검색 | **지원(`match_application`) 후** | 팀에 후보 제시 시점 |
+| 무엇을 내나 | 코사인 유사도 스칼라 1개 | **수준·역할·성향 3축** `fitness_score` | 후보 + **추천 사유** |
+| 저장하나 | 안 함 — 매 요청 즉석 검색 | `fitness_score` 행 | `recommendation` 행 |
+| 특정 경기(`match_id`)에 묶이나 | 아니다 — 포지션·종목 조건뿐 | 그렇다(지원 건 단위) | 그렇다 |
+
+정어진이 나중에 SFR-006·007을 구현할 때, 여기 검색(`skill_embedding` 코사인
+유사도)을 **`recommendation`의 검색(retrieval) 단계**로 재사용할지는 그쪽
+판단이다 — 이 절은 그 결정을 선점하지 않는다. 관련: pending `min` 16번.
+
+### 스키마 — `user` 테이블에 얹었다 (새 테이블 아님)
+
+`fastapi/alembic/versions/28148877afc0_add_mercenary_matching_fields.py`
+(pending `min` 16번)가 만든 6개 컬럼을 그대로 쓴다. `preferred_positions`는
+`"<sport_code>:<code>"` 문자열로 인코딩한다 — 포지션 약칭이 종목 간 겹치기
+때문이다(`position` 테이블과 같은 이유, 3장 「포지션 목록은 마이그레이션이
+넣는다」 참고).
+
+### `GET /api/v1/me/mercenary-profile`
+
+인증 필요. 아직 한 번도 안 채웠으면 전부 기본값(빈 리스트·`is_searchable:
+false`)인 프로필을 돌려준다 — 404가 아니다.
+
+```json
+{
+  "user_id": "…",
+  "preferred_positions": [{"sport_code": "football", "code": "GK"}],
+  "available_slots": [{"day": "SAT", "start": "18:00", "end": "21:00"}],
+  "location": "서울 강남",
+  "skill_summary": "공중볼 처리에 강함",
+  "is_searchable": true
+}
+```
+
+### `PATCH /api/v1/me/mercenary-profile`
+
+인증 필요. **보낸 필드만 바뀐다.** `null`은 "안 건드림", `location`·
+`skill_summary`는 빈 문자열 `""`로 지운다. `preferred_positions`·
+`available_slots`는 빈 배열이면 그대로 빈 배열로 저장된다(이 둘은 `null`과
+`[]`을 코드가 구분할 수 있어 문자열과 같은 우회가 필요 없다).
+
+```json
+{
+  "preferred_positions": [{"sport_code": "football", "code": "GK"}],
+  "available_slots": [{"day": "SAT", "start": "18:00", "end": "21:00"}],
+  "skill_summary": "공중볼 처리에 강함",
+  "is_searchable": true
+}
+```
+
+`200 OK` — 응답은 `GET`과 같다.
+
+| 에러 | code | 언제 |
+|---|---|---|
+| 422 | `MERCENARY_PROFILE_INCOMPLETE` | `is_searchable`이 참이 되는데(요청에서 켜거나 이미 켜져 있는데) `preferred_positions`·`available_slots`·`skill_summary` 중 하나라도 비어 있다 |
+| 503 | `EMBEDDING_NOT_CONFIGURED` | `GEMINI_API_KEY`가 없다. **`skill_summary`가 실제로 바뀌는 요청에서만** 뜬다 — 포지션·가능 시간만 바꾸는 요청은 임베딩이 필요 없어 이 에러가 나지 않는다 |
+| 502 | `EMBEDDING_UPSTREAM_ERROR` | Gemini 임베딩 API 호출 실패 |
+
+🔴 **`skill_embedding`은 응답에 안 실린다.** 768개 float을 클라이언트가 받을
+이유가 없고, 저장·재계산에만 쓴다.
+
+### `POST /api/v1/matching/search-candidates`
+
+인증 필요(로그인만 하면 누구나 — 팀 주장 한정 여부는 박민호가 2026-09-10에
+현행 유지로 결정했다, pending `min` 17번). `query_text`(자연어)를 서버가
+Gemini 임베딩으로 바꿔 코사인 유사도로 검색한다.
+
+```json
+{
+  "sport_code": "football",
+  "position_code": "GK",
+  "query_text": "주말 저녁 가능한 골키퍼, 공중볼 강한 사람",
+  "limit": 10
+}
+```
+
+`200 OK`:
+
+```json
+[
+  {
+    "user_id": "…",
+    "nickname": "…",
+    "location": "서울 강남",
+    "skill_summary": "공중볼 처리에 강함",
+    "similarity": 0.83
+  }
+]
+```
+
+`is_searchable = true`이고 `preferred_positions`에 `{sport_code, position_code}`가
+있는 사람만, 유사도 내림차순으로 최대 `limit`명(1~50, 기본 10). 결과가
+없으면 빈 배열(에러 아님).
+
+🔴 **클라이언트가 벡터를 직접 만들어 보내지 않는다.** `query_text`만 받고
+서버가 임베딩을 계산한다 — 임의 벡터를 받으면 검색 랭킹을 조작할 수 있어서다.
+
+| 에러 | code | 언제 |
+|---|---|---|
+| 422 | `VALIDATION_ERROR` | `query_text`가 빈 문자열이다 |
+| 503 | `EMBEDDING_NOT_CONFIGURED` | `GEMINI_API_KEY`가 없다 — 검색은 매번 임베딩이 필요해 이 경로엔 예외가 없다 |
+| 502 | `EMBEDDING_UPSTREAM_ERROR` | Gemini 임베딩 API 호출 실패 |
+
+### ✅ 배선·배포 끝났다 (2026-09-10, 박민호 — 정어진 몫을 대신 처리)
+
+- `app/main.py`에 `mercenary_router`가 등록됐다. `openapi.json` 경로 목록을
+  검사하는 `tests/user/adapter/test_auth_router.py`도 함께 맞췄다
+- 배포 서버(`~/supersub/app/fastapi/.env`)에 fastapi 전용 `GEMINI_API_KEY`를
+  넣고 `supersub-api`를 재시작해 `/health` 200을 확인했다. `www/`가 쓰는
+  같은 이름의 키와는 여전히 별도 시크릿이다
+- **실제 키로 호출해 보니 임베딩 모델 id가 틀려 있었다** —
+  `text-embedding-004`는 이미 은퇴돼 `embedContent`에서 404(NOT_FOUND)가
+  났다. `client.models.list()`로 `embedContent`를 지원하는 모델을 뽑아
+  `gemini-embedding-001`로 정정하고 768차원 벡터 반환까지 확인했다
+  (`gemini_embedding_adapter.py`). 가짜 키로는 이 오류가 잡히지 않았을
+  것이다
+- 팀 주장 한정 여부는 위 절 첫 문단대로 **현행 유지(로그인만 하면 누구나)**
+  로 결정했다 — 코드 변경 없음
+
+이 브랜치가 `main`에 병합·배포되기 전까지는 배포 서버가 아직 이 라우터를
+서빙하지 않는다 — 위 배선은 로컬 코드 기준이고, 서버 쪽은 환경변수(2번째
+항목)만 미리 준비해 둔 상태다.
+
+### 아직 없는 것
+
+- **SFR-006·007 자체(위 표 참고)** — 이 절이 대신하지 않는다
+- **팀 관점 필터(가능 시간 겹침 등)** — 지금은 포지션·종목만 거른다
+
+---
+
 ## 4. 스키마가 강제하는 규칙 — API에서도 지켜야 한다
 
 부록 D.5가 "코드에만 두면 지켜지지 않으므로 테이블 설계 단계에서 막는다"고 한 것들이다.
