@@ -6622,6 +6622,40 @@ chat/route.ts` 시스템 프롬프트) · 스쿼드 등재 UI · 모집 등록 `
 기본은 (b)로 갈 생각입니다. `report.json` 스키마를 계약으로 고정하실 때
 `breakdown[]` 항목 필드 목록도 함께 못박아 주시면 (b) 컬럼을 거기 맞춥니다.
 
+#### ✅ (b) 로 확정했습니다 (2026.09.10) — 정상호 회신(`ho` `c5ad695`) 뒤
+
+`breakdown[]` 11필드가 계약(`agent/contracts/report_schema.yaml` · `schema_version`)
+으로 고정돼서 (b)로 갑니다. (c) JSON 블롭은 매 읽기가 재파싱·재필터라 3-1 이
+passthrough 를 뺀 그 이유("필터 버그 하나 거리")를 되살립니다. `ho` 24(title·band
+보존)·`ho` 28(오버롤 등급 읽기 경로)도 항목별 필드가 질의 가능해야 하고,
+`analysis_metric_value` 도 이미 행-per-item 입니다.
+
+**새 테이블 `analysis_metric_criterion`** — `analysis_metric_id`(fk CASCADE) ·
+`criterion_id` · `grade`(NULL=skipped) · `weight`(Numeric) · `contribution`(NULL 가능)
+· `title` · `band` · `out_of_band`(기본 `''`) · `evidence`(Text — 이 테이블에서
+유일한 LM 산출) · `metric_ref` · `skipped`(bool). `uq(analysis_metric_id, criterion_id)`.
+🔴 **`stat` 은 안 둡니다** — 이미 `analysis_metric_value` 행(`stat.{sport}.{motion}.{id}`).
+🔴 **`name` 도 안 둡니다** — `metric_definition.label`. `skipped[]` 은 같은 테이블에
+`skipped=true` 행(`grade`·`evidence` NULL — 없음이 곧 「제외」, 0점 아님).
+
+**`analysis_report` 추가 컬럼** — `provisional`(bool) · `previews`(JSON) ·
+`keypoint_quality`(JSON — 정상호 `keypoint_quality` 블록 통째) · `schema_version`(str).
+`summary`·`model_name` 은 그대로. 🔴 이 테이블 docstring 이 "LM 문장만" 이라는데
+`provisional` 등은 문장이 아니지만 **분석 단위 메타**라 여기가 맞습니다(정상호도
+같은 판단) — docstring 을 "분석 단위 결과" 로 넓힙니다.
+
+**적재 시**: `schema_version` 의 major 가 모르는 값이면 **적재 거부**(반쯤 적재하면
+어느 행이 낡은 스키마인지 사후 구분 불가 — 정상호 규칙).
+
+**아직 안 정한 것 하나**: 루브릭 식별(`sport`·`motion`·`version`)을
+`analysis_metric` 에 둘지 `analysis_report` 에 둘지 — 마이그레이션 짤 때 결정.
+읽기 DTO 가 `grade.{sport}.{motion}.{id}` 를 되짚는 데 필요합니다.
+
+🔴 **구현은 `report_schema.yaml` 이 `main` 에 병합된 뒤** 시작합니다 (지금 `ho` 에만).
+순서: 마이그레이션(위 둘) → 적재 인터랙터(`report_key`로 S3 읽어 `schema_version`
+검증 후 파싱) → 읽기 DTO(`GET .../report`, `paik` 7) → 백성검이 프론트
+`AnalysisStage.tsx` 의 하드코딩 `REPORT` 를 fetch 로 교체.
+
 #### 곁가지 — 3-1 의 마지막 「미정」
 
 신뢰도(키포인트 품질)를 담을 자리가 3장 4) 산출물 넷 중 아직 안 정해졌습니다.
