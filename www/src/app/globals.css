@@ -8936,7 +8936,23 @@ body:has(.ss-shot) .ss-app-figure {
   pointer-events: none;
 }
 
-/* 고르는 칸 — 열 가지를 한눈에. */
+/* 그림 자국 — 🔴 **칠하는 것은 `currentColor` 이고 그림은 마스크다.**
+   그래야 「자국 색」이 그대로 먹는다. 색이 구워진 그림이면 고른 색이 죽는다.
+
+   🔴 `contain` 이라 **안 자르고 안 늘인다** — 카드 비가 3:4.1 인데 그림들은
+   저마다 비가 달라서, `cover` 로 두면 수채 구름 같은 넓은 것이 좌우로 잘린다.
+   크기를 키우는 일은 「크기」 슬라이더(`--ss-card-mark-scale`)가 맡는다. */
+.ss-card-mark-img {
+  background-color: currentColor;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
+}
+
+/* 고르는 칸 — 열둘을 한눈에. */
 /* 기본 자국(원래 붓칠)도 같은 자리 · 같은 변형을 받는다. */
 .ss-card-mark-default {
   display: block;
