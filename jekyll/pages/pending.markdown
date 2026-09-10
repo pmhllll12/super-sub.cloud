@@ -6671,6 +6671,17 @@ passthrough 를 뺀 그 이유("필터 버그 하나 거리")를 되살립니다
 **루브릭 식별 위치 결정**: `analysis_metric`(작업당 1행)에 뒀습니다 — `analysis_report`
 는 요약 단위라 재분석 시 루브릭 버전 이력이 metric 쪽에 붙는 게 맞습니다.
 
+##### 정상호 회신 `476b0df` 반영 확인 (2026-09-10) — 코드 변경 없음
+
+정상호가 계약을 `ho` 에서 정정했습니다(`schema_version` `1.0` → `1.1`, `breakdown[]`
+에 `view_dependent` 추가, 곁가지 하나). 제 구현과 대조한 결과 **깨지는 곳 없음**:
+
+| 정상호 정정 | 제 쪽 상태 |
+|---|---|
+| `schema_version` `1.1` (minor — `view_dependent` 추가) | 파서가 **major 만** 봅니다(`SUPPORTED_SCHEMA_MAJOR = 1`). `"1.1"` 통과, `analysis_report.schema_version` 에 `"1.1"` 이 그대로 들어감. `"1.0"` 봉투와 섞여도 둘 다 유효. 테스트 픽스처를 `"1.1"` 로 올렸습니다 |
+| `breakdown[].view_dependent` (`""`·`"metric"`·`"grade"`) | 파서가 **모르는 키라 무시**합니다. 저장 안 함 — 저장 여부는 `ho` 38번. 필요해지면 `analysis_metric_criterion` 에 컬럼 1개 + 파서 1줄 |
+| 곁가지: `metric_definition.label`(`"야구 · 투구 · 앞다리 버티기"`) ≠ `breakdown[].name` | 🔴 그래서 `analysis_metric_criterion` 에 **`name` 컬럼을 뒀습니다** — 위 (b) 확정의 "🔴 `name` 도 안 둡니다(= `label`)" 를 **정정합니다.** `label` 은 3단 합성이라 항목 이름과 글자가 다릅니다. `breakdown[].name` 을 그대로 저장하고, 둘을 같다고 보는 비교 검사는 넣지 않았습니다(정상호 경고 그대로) |
+
 **남은 것**: 백성검이 `AnalysisStage.tsx` 하드코딩 `REPORT` → fetch 교체
 (`client-contract-changes.md` 31번). 이건 `paik` 7번에서 다룹니다.
 
