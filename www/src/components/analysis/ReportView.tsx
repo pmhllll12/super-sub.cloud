@@ -17,20 +17,17 @@ export default function ReportView({ report }: { report: ReportBody }) {
     <div className="ss-report">
       <p className="ss-report-summary">{report.summary}</p>
 
-      <ul className="ss-report-traits">
-        {report.traits.map((t) => (
-          <li key={t}>{t}</li>
+      {/* 🔴 칭호와 문장을 항목마다 짝으로 그린다(`ho` 24번) — 따로 떼면
+          선수가 그 문장을 칭찬인지 지적인지 모른다. 칭호가 없는 항목도
+          있다(호칭은 서버가 채운 것만이다) — 그때는 문장만 그린다. */}
+      <ul className="ss-report-points">
+        {report.points.map((p, i) => (
+          <li key={i} className="ss-report-point">
+            {p.title && <span className="ss-report-point-title">{p.title}</span>}
+            <p className="ss-report-point-evidence">{p.evidence}</p>
+          </li>
         ))}
       </ul>
-
-      {/* 받은 호칭만 그린다. 못 받은 것을 미달 표식으로 남기지 않는다. */}
-      {report.titles.length > 0 && (
-        <ul className="ss-report-titles" aria-label="받은 호칭">
-          {report.titles.map((t) => (
-            <li key={t}>{t}</li>
-          ))}
-        </ul>
-      )}
 
       <h3>이렇게 본 장면</h3>
       <ul className="ss-report-scenes">
