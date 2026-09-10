@@ -6,6 +6,7 @@
 """
 
 from fastapi import FastAPI
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.analysis.adapter.inbound.api.v1.admin_video_router import (
     admin_video_router,
@@ -78,6 +79,15 @@ app = FastAPI(
 )
 
 install_error_handlers(app)
+
+# 요청 수·지연 히스토그램·에러율을 `/metrics`(Prometheus 형식)로 낸다.
+# PER-001(목표 소요 시간)·PER-003(P95 500ms)의 검증 근거다 — 앱은 히스토그램만
+# 내고 P95 는 Prometheus 의 `histogram_quantile` 로 뽑는다.
+#
+# 🔴 `/metrics` 는 인증이 없다(`/health` 와 같은 취급). 내부 타이밍·트래픽량이
+#    드러나므로 **엣지(nginx)에서 외부 접근을 막고** 스크레이프만 통과시킨다.
+# OpenAPI 문서에는 넣지 않는다 — 운영용 엔드포인트다.
+Instrumentator().instrument(app).expose(app, include_in_schema=False)
 
 # 컨텍스트가 늘면 여기에 한 줄씩 추가한다 (review · billing).
 #
