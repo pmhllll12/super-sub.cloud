@@ -10,6 +10,7 @@ import type {
   MercenaryCandidate,
   MyVideo,
   Position,
+  VideoReport,
   PublicVideo,
   Squad,
   PlayerCard,
@@ -91,6 +92,13 @@ export const fastapiBackend: Backend = {
     // 무엇이 어디 있는지 모른다(저장 키도 리포트 자리도 서버가 안다).
     await callFastApi<null>(`/videos/${encodeURIComponent(videoId)}`, {
       method: 'DELETE',
+      token,
+    })
+  },
+
+  getVideoReport(token, videoId) {
+    return callFastApi<VideoReport>(`/videos/${encodeURIComponent(videoId)}/report`, {
+      method: 'GET',
       token,
     })
   },

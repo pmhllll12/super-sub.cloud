@@ -4477,6 +4477,18 @@ body::-webkit-scrollbar {
   color: color-mix(in srgb, var(--ss-fg) 70%, transparent);
 }
 
+/* 리포트가 아직 없을 때 그 자리 — 🔴 **빈 판으로 두지 않는다.** 무엇을
+   기다리는지 말하고, 다시 물어볼 길을 같이 준다(CCC 31 · 미결 `paik` 7번). */
+.ss-report-wait {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 18px 0;
+  font-size: 0.85rem;
+  color: color-mix(in srgb, var(--ss-fg) 72%, transparent);
+}
+
 .ss-report-summary {
   font-size: 0.8125rem;
   line-height: 1.6;
@@ -10611,146 +10623,481 @@ body:has(.ss-profile) {
    레슨 · 상점(`.ss-market`)과 같은 성격의 문서형 화면이라 껍데기 치수는
    그대로 가져오되, `/venues`가 `/market` 아래가 아니라서 클래스는 새로
    둔다 — 이름이 market이면 읽는 사람이 실제로는 아닌 소속 관계를 짐작한다. */
+/* ── 경기장 예약 (2026-09-10 개편, 참고 디자인은 호텔 예약 화면) ──────
+   🔴 **레슨 · 상점 판과 같은 두 색이다** — 짙은 초록 바탕에 종이색이 얹힌다.
+   0.8 회차가 정한 규칙 그대로: 자리마다 `--ss-fg`·`--ss-accent`·`--ss-surface`
+   **세 값만** 갈아 끼우면 글 · 테두리 · 알약 · 단추가 한꺼번에 따라온다.
+   🔴 **앱 민트는 이 판에서 안 쓴다** — 검은 화면용이라 짙은 초록 위에서 저
+   혼자 형광으로 튄다(전에 「접수중」 배지가 그랬다). 판 **바깥**의 헤더
+   워드마크는 이 규칙 밖이라 앱 색 그대로 둔다(사용자 요청, 2026-09-10). */
+/* 🔴 **본문 칸(가운데 1120px)을 빠져나와 화면을 꽉 채운다**(사용자 요청,
+   2026-09-10 — 「가운데에만 있는 게 말이 안 된다」). 이 판은 문서가 아니라
+   **한 화면을 통째로 쓰는 판**이라, 좁은 칸 안에 갇히면 목록이 세로로만
+   길어져 넷씩 놓은 뜻이 사라진다.
+   방식은 `.ss-market-intro` 가 쓰던 것과 같다 — 칸의 좌우 여백만큼 되민다.
+
+   ⚠️ `100vw` 는 스크롤막대를 포함한다. 막대가 자리를 차지하는 환경(윈도우)
+   에서는 그만큼 넘칠 수 있어 `max-width` 로 가둔다 — macOS 는 겹쳐 그려서
+   차이가 없다. */
+/* 🔴 **두 색의 손잡이는 이 둘뿐이다.** 아래 것들은 전부 이 값을 섞어 쓴다
+   (`color-mix`) — 하나만 바꿔도 이 화면 전체가 따라온다.
+
+   판(`.ss-vb`)이 아니라 **`body`** 에 두는 이유는, 이 색을 쓰는 것이 판만이
+   아니기 때문이다 — 바탕(`.ss-venues::before`)과 **판 바깥에 있는 헤더의
+   워드마크**도 같은 값을 쓴다. 여러 곳에 적으면 한쪽만 바뀐다. */
+body:has(.ss-venues) {
+  --ss-vb-green: #33483c;
+  --ss-vb-paper: #ebe7db;
+  /* 🔴 **위 띠의 머리 여백**(사용자 요청, 2026-09-10 — 「위쪽 공간이 너무
+     남잖아」). 워드마크가 쓰던 눈금(`--ss-home-content-pad` = 48px)은 한 화면을
+     통째로 쓰는 홈의 값이라, 글자 두 줄짜리 띠에서는 위가 텅 빈다.
+     ⚠️ **워드마크는 이 값을 안 쓴다** — 제자리(48px)에 그대로 둔다(사용자
+     요청 — 「로고 위치는 바꾸지 마」). 간판만 올라간다. */
+  --ss-vb-top-gap: 20px;
+  /* 🔴 **역할 이름이 따로 있는 이유**: 위 띠는 이 둘을 **맞바꿔** 쓴다(사용자
+     요청, 2026-09-10 — 「색상 2개 서로 바꾸라고」). 「초록 · 종이」라는 이름만
+     있으면 뒤집힌 자리에서 규칙이 거짓말을 한다 — 바탕이 종이색인데 규칙에는
+     `--ss-vb-green` 이라고 적혀 있게 된다. 아래 것들은 **바탕 · 글자**로만
+     말하고, 어느 색인지는 `.ss-vb-top` 이 정한다. */
+  --ss-vb-ground: var(--ss-vb-green);
+  --ss-vb-ink: var(--ss-vb-paper);
+}
+
 .ss-venues {
+  margin-inline: calc((100vw - 100%) / -2);
+  max-width: 100vw;
+  padding: 0;
+}
+
+/* 🔴 **위쪽 띠까지 초록이다**(사용자 요청, 2026-09-10 — 「위까지 다 채우라고」).
+   판 위에는 흐름에 놓인 헤더가 있어서, 좌우만 넓히면 그 자리가 어두운 채로
+   남는다.
+
+   ⚠️ **헤더 높이만큼 끌어올리지 않는다.** 그 높이는 카드 유무에 따라 달라져
+   («(app)/layout.tsx» 가 헤더를 고정하지 않는 바로 그 이유다) 상수로 빼면
+   어긋난다. 대신 화면 전체에 초록 바탕을 한 장 깔면 헤더는 그 위에 그대로
+   앉는다 — 높이를 몰라도 된다. 아래로도 같이 덮여서 목록이 짧을 때 밑이
+   어두워지는 것도 없어진다.
+
+   🔴 `z-index: -1` 이라 헤더(`relative z-20`)와 본문 **아래**에 깔린다.
+   헤더에는 제 배경이 없어서 이 초록이 그대로 비친다. */
+.ss-venues::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-color: var(--ss-vb-green);
+  pointer-events: none;
+}
+
+/* 🔴 **이 화면에서만 헤더를 흐름에서 뺀다**(사용자 요청 — 「같이 높여야지」).
+   헤더가 흐름에 있으면 그 높이(여백 48 + 워드마크 + 여백 48 ≈ 126px)만큼
+   판이 아래에서 시작해, 초록만 채운 빈 띠가 남는다. 빼면 판이 맨 위에서
+   시작하고 워드마크는 그 위에 그대로 앉는다.
+
+   ⚠️ 그래서 **간판이 워드마크와 같은 띠에 선다.** 겹치지 않는 것은 간판을
+   가운데로 보냈기 때문이다(`.ss-vb-top` 참고) — 둘 중 하나만 되돌리면 글자가
+   겹친다.
+
+   ⚠️ `fixed` 가 아니라 `absolute` 다. 「(app)/layout.tsx」가 헤더를 고정하지
+   않는 이유(카드 유무로 높이가 달라져 본문 위 여백이 어긋난다)는 그대로다 —
+   여기서는 **본문에 여백을 줄 일이 없어서** 흐름에서만 빼면 된다. */
+body:has(.ss-venues) .ss-home-header {
+  position: absolute;
+  inset-inline: 0;
+  /* ⚠️ **워드마크 자리는 건드리지 않는다**(사용자 요청, 2026-09-10 — 「로고
+     위치는 바꾸지 마」). 위 띠를 올릴 때 헤더도 같이 끌어올려 봤지만 되돌렸다 —
+     워드마크는 다른 화면과 같은 눈금(`--ss-home-content-pad` = 48px)에 선다. */
+  top: 0;
+}
+
+.ss-vb {
+  /* 두 색은 화면(`.ss-venues`)에서 물려받는다. 그 화면 밖에서 이 판만 따로
+     쓸 일이 생기면 여기 기본값을 되살린다. */
+  --ss-fg: var(--ss-vb-paper);
   display: flex;
   flex-direction: column;
-  gap: 28px;
-  padding: 48px 0 24px;
+  gap: 18px;
+  /* 🔴 화면 끝까지 닿으므로 **모서리를 둥글리지 않는다** — 둥근 모서리는
+     「가운데 놓인 판」의 표시다. 여백은 가장자리에서 직접 준다. */
+  /* 위 여백은 **워드마크와 같은 눈금**(`--ss-home-content-pad`)이다 — 헤더가
+     흐름 밖에 있어 둘이 같은 띠에 서므로, 다른 값을 쓰면 어긋나 보인다.
+     좌우 여백은 손잡이로 뽑아 둔다 — 위 띠가 **그만큼 되밀어야** 화면 양 끝에
+     닿는다(`.ss-vb-top`). 두 곳에 같은 값을 적으면 한쪽만 바뀐다. */
+  --ss-vb-pad-x: clamp(20px, 4vw, 72px);
+  /* 위 여백은 **0 이다** — 그 자리는 위 띠(`.ss-vb-top`)가 제 안쪽 여백으로
+     가진다. 판에도 주면 띠 위에 초록 줄이 한 겹 남는다. */
+  padding: 0 var(--ss-vb-pad-x) clamp(48px, 6vw, 96px);
+  background-color: var(--ss-vb-green);
+  color: var(--ss-vb-paper);
 }
 
-.ss-venues-head {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
+/* ── 머리: 간판 + 거르기 ─────────────────────────────────────── */
 
-.ss-venues-head h1 {
-  font-size: clamp(1.75rem, 3vw, 2.5rem);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--ss-fg);
-}
+/* 🔴 **간판은 가운데다**(사용자 요청 — 「가운데로 위치 옮기면 되잖아」).
+   헤더를 흐름에서 빼면서 워드마크와 간판이 같은 띠에 서게 됐는데, 간판이
+   왼쪽 끝에 있으면 그 위에 겹친다. 왼쪽 한 칸을 비워 두면 워드마크 자리가
+   되고 간판은 **판의 가운데**에 선다.
 
-.ss-venues-head p {
-  max-width: 46rem;
-  font-size: 0.9375rem;
-  line-height: 1.7;
-  color: color-mix(in srgb, var(--ss-fg) 68%, transparent);
-}
+   ⚠️ flex 의 `space-between` 으로는 가운데가 안 나온다 — 양 끝으로만 밀 뿐
+   가운데 것을 판 한가운데에 두지는 못한다(간판과 거르기의 폭이 달라서
+   그렇다). 세 칸 격자라야 가운데가 판의 가운데다. */
+.ss-vb-top {
+  /* 🔴 **여기서 두 색이 맞바뀐다**(사용자 요청, 2026-09-10). 바탕이 종이색,
+     글자가 짙은 초록이다. 아래 간판 · 알약 · 지역 목록 규칙은 하나도 안
+     고쳤다 — 그것들이 「바탕 · 글자」로만 말하기 때문에 이 두 줄로 띠 전체가
+     함께 뒤집힌다.
+     ⚠️ 헤더 워드마크는 이 띠 위에 있지만 **제 색 그대로**다(사용자 요청 —
+     「로고만 빼고」). */
+  --ss-vb-ground: var(--ss-vb-paper);
+  --ss-vb-ink: var(--ss-vb-green);
 
-.ss-venue-list {
   display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
+  grid-template-columns: 1fr auto 1fr;
+  align-items: flex-end;
+  gap: 16px;
+
+  /* 🔴 **판의 좌우 여백을 되밀어 화면 양 끝에 닿게 한다**(사용자 요청 —
+     「이 얇은 선 양쪽 끝까지 이어지게 해」). 되민 만큼을 제 안쪽 여백으로
+     돌려주므로 글자 자리는 그대로다. 위쪽은 판이 여백을 0 으로 두어
+     (`.ss-vb`) 띠가 화면 맨 위에 붙는다 — 그래야 워드마크가 띠 안에 앉는다. */
+  margin-inline: calc(var(--ss-vb-pad-x) * -1);
+  padding: var(--ss-vb-top-gap) var(--ss-vb-pad-x) 16px;
+  background-color: var(--ss-vb-ground);
+  color: var(--ss-vb-ink);
+  border-bottom: 1px solid color-mix(in srgb, var(--ss-vb-ink) 28%, transparent);
 }
 
-/* 코치 카드(`.ss-coach-card`)와 같은 색·테두리 규칙 — 밝은 크림 바탕에
-   판과 같은 초록 테두리. 여기는 영상이 없어 카드를 둘로 가르지 않는다. */
-.ss-venue-card {
+.ss-vb-sign {
+  grid-column: 2;
+  text-align: center;
+}
+
+.ss-vb-filters {
+  grid-column: 3;
+  justify-self: end;
+}
+
+/* 좁아지면 세 칸이 안 들어간다 — 워드마크와 겹칠 만큼 넓지도 않으므로
+   원래대로 왼쪽에서 위아래로 쌓는다. */
+@media (max-width: 900px) {
+  .ss-vb-top {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ss-vb-sign,
+  .ss-vb-filters {
+    grid-column: 1;
+  }
+
+  .ss-vb-sign {
+    /* 워드마크가 왼쪽 위에 있으므로 간판은 그 아래로 내려 준다. */
+    margin-top: 44px;
+    text-align: left;
+  }
+
+  .ss-vb-filters {
+    justify-self: start;
+  }
+}
+
+.ss-vb-sign h1 {
+  /* 상점의 간판과 **같은 글꼴**이다(Anton) — 두 판이 한 벌로 읽혀야 한다.
+     🔴 굵기를 주지 않는다. Anton 은 400 하나뿐이라 올리면 가짜 굵게만 걸린다. */
+  font-family: var(--font-sign), var(--font-rubik), system-ui, sans-serif;
+  font-size: clamp(1.8rem, 4vw, 3.2rem);
+  line-height: 1.05;
+  letter-spacing: 0.01em;
+  color: var(--ss-vb-ink);
+}
+
+/* 🔴 **글꼴을 주지 않는다** — 한글이라 Anton(라틴 전용)을 물리면 OS 기본으로
+   떨어져 위 줄과 따로 논다(상점 간판에서 같은 것을 겪었다). */
+.ss-vb-sign p {
+  margin-top: 4px;
+  font-size: 0.85rem;
+  color: color-mix(in srgb, var(--ss-vb-ink) 70%, transparent);
+}
+
+.ss-vb-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.ss-vb-sports {
+  display: flex;
+  gap: 4px;
+}
+
+.ss-vb-pill {
+  padding: 5px 14px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ss-vb-ink) 34%, transparent);
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--ss-vb-ink) 82%, transparent);
+  white-space: nowrap;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.ss-vb-pill:hover,
+.ss-vb-pill:focus-visible {
+  border-color: var(--ss-vb-ink);
+  color: var(--ss-vb-ink);
+}
+
+/* 고른 것은 **채워서** 말한다 — 테두리 색만 바꾸면 알약 넷이 나란할 때 안 읽힌다. */
+.ss-vb-pill[data-on='true'] {
+  background: var(--ss-vb-ink);
+  border-color: var(--ss-vb-ink);
+  color: var(--ss-vb-ground);
+}
+
+.ss-vb-at {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ss-vb-ink) 34%, transparent);
+  font-size: 0.75rem;
+  /* 🔴 목록(option)은 브라우저가 그린다 — **바탕을 준다.** 투명하면 흰 배경에
+     같은 색 글씨가 되어 안 읽힌다. */
+  background: var(--ss-vb-ground);
+  color: var(--ss-vb-ink);
+}
+
+/* 이름으로 바로 찾는 자리 — 42곳이면 아는 이름을 치는 편이 빠르다. */
+.ss-vb-search input {
+  width: 8.5rem;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ss-vb-ink) 34%, transparent);
+  background: transparent;
+  font-size: 0.75rem;
+  color: var(--ss-vb-ink);
+}
+
+.ss-vb-search input::placeholder {
+  color: color-mix(in srgb, var(--ss-vb-ink) 55%, transparent);
+}
+
+/* ── 자세한 조건 ───────────────────────────────────────────────
+   🔴 **위 띠 안이 아니라 그 아래(초록)에 둔다.** 띠에 넣으면 줄이 세 겹으로
+   늘어나 간판이 화면 밖으로 밀린다. 여기 것들은 판의 기본 두 색을 그대로 쓴다
+   — 뒤집힌 것은 띠 하나뿐이다. */
+.ss-vb-more {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px 22px;
+  padding: 4px 0 2px;
+}
+
+.ss-vb-field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  border: 1px solid var(--ss-accent, #33483c);
-  border-radius: 0;
-  padding: 18px;
-  background-color: var(--ss-surface, #e3dece);
-  color: var(--ss-fg, #000);
+  gap: 6px;
 }
 
-.ss-venue-card-head {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.ss-vb-legend {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--ss-vb-ink) 70%, transparent);
 }
 
-.ss-venue-card-head b {
-  font-size: 1.0625rem;
-  font-weight: 600;
-}
-
-.ss-venue-card-head span {
-  font-size: 0.8125rem;
-  color: color-mix(in srgb, var(--ss-fg, #000) 60%, transparent);
-}
-
-.ss-venue-card-address {
-  font-size: 0.8125rem;
-  color: color-mix(in srgb, var(--ss-fg, #000) 60%, transparent);
-}
-
-.ss-venue-card-tagline {
-  font-size: 0.875rem;
-  line-height: 1.5;
-}
-
-.ss-venue-sports {
+.ss-vb-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-/* 정적 표시용 알약이라 `.ss-shot-sport`(누르는 거름망 단추)를 그대로 쓰지
-   않는다 — 저건 aria-pressed 를 갖는 단추 의미라 여기 <span> 에는 안 맞다. */
-.ss-venue-sport-tag {
-  display: inline-flex;
-  align-items: center;
-  height: 22px;
-  border: 1px solid color-mix(in srgb, var(--ss-fg, #000) 35%, transparent);
-  border-radius: 999px;
-  padding: 0 8px;
-  font-size: 0.6875rem;
-  white-space: nowrap;
+/* ⚠️ 데이터의 한계를 적는 자리다 — 작게 두되 지우지 않는다. */
+.ss-vb-hint {
+  font-size: 0.68rem;
+  color: color-mix(in srgb, var(--ss-vb-ink) 55%, transparent);
 }
 
-/* 시간대별 접수 현황 — 실제 예약은 서울시 사이트로 나가는 링크뿐이라
-   여기엔 상태 배지 · 시간 · 외부 링크만 있고 우리 쪽 폼은 없다. */
-.ss-venue-slots {
+/* 조건을 다 켠 뒤 되돌아올 길 — 하나씩 끄게 두면 아무도 안 되돌린다. */
+.ss-vb-clear {
+  align-self: flex-end;
+  padding: 5px 14px;
+  border-radius: 999px;
+  border: 1px dashed color-mix(in srgb, var(--ss-vb-ink) 45%, transparent);
+  font-size: 0.72rem;
+  color: color-mix(in srgb, var(--ss-vb-ink) 80%, transparent);
+}
+
+.ss-vb-clear:hover,
+.ss-vb-clear:focus-visible {
+  border-color: var(--ss-vb-ink);
+  color: var(--ss-vb-ink);
+}
+
+.ss-vb-note {
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--ss-vb-paper) 66%, transparent);
+}
+
+.ss-vb-note b {
+  color: var(--ss-vb-paper);
+}
+
+.ss-vb-empty {
+  padding: 40px 0;
+  text-align: center;
+  font-size: 0.85rem;
+  color: color-mix(in srgb, var(--ss-vb-paper) 66%, transparent);
+}
+
+/* ── 카드 ─────────────────────────────────────────────────────
+   🔴 **한 줄에 넷**(사용자 결정) — 43곳이라 넓게 셋보다 훑기 좋다.
+
+   🔴 **`auto-fill` 이 아니라 넷으로 못박는다.** 판이 화면을 꽉 채우게 되면서
+   (`.ss-venues` 의 full-bleed) `auto-fill` 은 넓은 화면에서 여덟 · 열 줄까지
+   늘어난다 — 「넷」이라는 결정이 화면 폭에 따라 조용히 깨진다.
+   좁아지는 것은 아래 두 단계가 맡는다. */
+.ss-vb-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(12px, 1.2vw, 22px);
+}
+
+@media (max-width: 1180px) {
+  .ss-vb-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .ss-vb-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.ss-vb-card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: auto;
-  padding-top: 10px;
+  overflow: hidden;
+  border-radius: 12px;
+  /* 🔴 카드 바탕은 띠보다 **한 단 어둡게** 한다 — 레슨 판이 같은 값을 쓴다.
+     같은 밝기면 카드가 판 위에 얹힌 것으로 안 읽힌다. */
+  background: #e3dece;
+  color: #1b2620;
 }
 
-.ss-venue-slot {
+/* 🔴 **사진이 들어올 자리다.** 원본 데이터에 사진 컬럼이 없어(lib/venues.ts
+   주석) 지금은 종목을 얹은 판이다 — 사진이 오면 이 상자에 `<Image>` 만
+   넣으면 참고 디자인 모양이 된다(상점이 같은 방식이다).
+   🔴 `aspect-ratio` 와 flex 늘어나기를 같이 쓰지 않는다(0.9 회차에 데인 자리) —
+   키는 여기서 못박고 아래 본문이 남는 자리를 먹는다. */
+.ss-vb-thumb {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  font-size: 0.8125rem;
+  justify-content: center;
+  height: 92px;
+  flex: none;
+  background: var(--ss-vb-green);
+  color: color-mix(in srgb, var(--ss-vb-paper) 80%, transparent);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
 }
 
-.ss-venue-slot-status {
-  display: inline-flex;
+.ss-vb-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  /* 카드 키를 맞춘다 — 시간대 수가 달라도 아래 단추가 같은 줄에 선다. */
+  flex: 1;
+}
+
+.ss-vb-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.ss-vb-region-text {
+  font-size: 0.72rem;
+  color: color-mix(in srgb, #1b2620 62%, transparent);
+}
+
+.ss-vb-tagline {
+  margin-top: 2px;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: color-mix(in srgb, #1b2620 72%, transparent);
+}
+
+.ss-vb-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid color-mix(in srgb, #1b2620 14%, transparent);
+}
+
+.ss-vb-slot {
+  display: flex;
   align-items: center;
-  height: 20px;
+  gap: 6px;
+  font-size: 0.7rem;
+}
+
+/* 🔴 **민트가 아니다.** 이 판은 초록 · 종이 두 색이라 형광 민트가 튄다 —
+   열린 것은 짙은 초록으로 채우고 닫힌 것은 흐린 테두리로 둔다. */
+.ss-vb-badge {
+  padding: 1px 7px;
   border-radius: 999px;
-  padding: 0 8px;
-  font-size: 0.6875rem;
-  font-weight: 600;
+  border: 1px solid color-mix(in srgb, #1b2620 24%, transparent);
+  font-size: 0.64rem;
   white-space: nowrap;
+  color: color-mix(in srgb, #1b2620 55%, transparent);
 }
 
-.ss-venue-slot-status.is-open {
-  background-color: color-mix(in srgb, var(--ss-accent, #33483c) 18%, transparent);
-  color: var(--ss-accent, #33483c);
+.ss-vb-badge[data-open='true'] {
+  background: var(--ss-vb-green);
+  border-color: var(--ss-vb-green);
+  color: var(--ss-vb-paper);
 }
 
-.ss-venue-slot-status.is-closed {
-  background-color: color-mix(in srgb, var(--ss-fg, #000) 10%, transparent);
-  color: color-mix(in srgb, var(--ss-fg, #000) 55%, transparent);
+.ss-vb-slot-time {
+  color: color-mix(in srgb, #1b2620 72%, transparent);
 }
 
-.ss-venue-slot-time {
-  color: color-mix(in srgb, var(--ss-fg, #000) 70%, transparent);
+/* 🔴 **바깥으로 나가는 링크다.** 참고 디자인의 「Book Your Stay」 자리라
+   가로를 꽉 채우되, 우리가 결제하지 않는다는 것은 위 안내줄이 말한다. */
+.ss-vb-book {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  background: var(--ss-vb-green);
+  color: var(--ss-vb-paper);
+  transition: background-color 160ms ease;
 }
 
-.ss-venue-slot-link {
-  margin-left: auto;
-  font-weight: 600;
-  text-decoration: underline;
-  white-space: nowrap;
+.ss-vb-book:hover,
+.ss-vb-book:focus-visible {
+  background: color-mix(in srgb, var(--ss-vb-green) 82%, #000);
 }
+
+/* 열린 시간대가 없으면 단추 대신 그렇게 적는다 — 눌러도 아무 일이 없으면 안 된다. */
+.ss-vb-closed {
+  padding: 10px 14px;
+  font-size: 0.72rem;
+  text-align: center;
+  color: color-mix(in srgb, #1b2620 55%, transparent);
+  background: color-mix(in srgb, #1b2620 6%, transparent);
+}
+
 
 /* ── 팀 매칭 (사용자 요청, 2026-09-10) ───────────────────────────────
    판이 다 차면 머리줄의 단추가 깜빡이고, 누르면 오른쪽 첫째 칸에 비슷한

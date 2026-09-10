@@ -710,9 +710,12 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     })
     await user.click(screen.getByRole('button', { name: '내 프로필에 리포트 저장' }))
     expect(await screen.findByRole('button', { name: '내 프로필에 저장됨' })).toBeInTheDocument()
-    expect(fetchMock).toHaveBeenCalledTimes(3)
-    // ⚠️ 어디에 남았는지 밝힌다 — 숨기면 다른 기기에서 안 보일 때 고장으로 읽힌다.
-    expect(screen.getByText(/이 브라우저에만/)).toBeInTheDocument()
+    /* 🔴 **리포트 읽기는 셈에서 뺀다.** 단계가 다 차면 화면이
+       `GET /videos/{id}/report` 를 부른다(2026-09-10, CCC 31) — 여기서 보려는
+       것은 「저장이 영상을 다시 올리지 않는다」이다. */
+    expect(fetchMock.mock.calls.filter((c) => !String(c[0]).endsWith('/report'))).toHaveLength(3)
+    // 어디에서 다시 볼 수 있는지 밝힌다. 이제 서버에 있으므로 「이 브라우저에만」이 아니다.
+    expect(screen.getByText(/내 프로필의 「분석 영상」 아래에서 다시 볼 수 있습니다/)).toBeInTheDocument()
 
     vi.unstubAllGlobals()
   }, 15000)

@@ -5,7 +5,7 @@ import type { MyVideo } from '@/server/backend'
 import { SPORTS, SPORT_CODE, type SportKey } from '@/lib/sports'
 import { checkClip, uploadClip, type ClipMeta } from '@/lib/uploadClip'
 import { publish, unpublish } from '@/lib/published'
-import { forgetReport, reportFor, type SavedReport } from '@/lib/savedReports'
+import { fetchReport, type ReportResult } from '@/lib/savedReports'
 import { featuredOf, setFeatured } from '@/lib/featuredClip'
 import { isDirectKey, usePlaybackUrls } from '@/lib/playbackUrl'
 import ReportView from '@/components/analysis/ReportView'
@@ -165,16 +165,31 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
   const v = shown[i]
 
   /**
-   * 이 영상에 매달린 분석 리포트.
+   * 이 영상의 분석 리포트 — 🔴 **서버에서 읽는다**(CCC 31, 미결 `paik` 7번).
+   * 전에는 화면이 만든 자리 표시를 `localStorage` 에 둔 것이라 다른 기기에서는
+   * 안 보였고, 애초에 진짜 분석 결과가 아니었다.
    *
-   * 🔴 **그릴 때 읽지 않는다** — 서버엔 없는 값이라 하이드레이션이 깨진다
-   * (공개 목록 · 카드 꾸미기에서 이미 데인 자리다). 영상이 바뀔 때마다
-   * effect 에서 다시 읽는다.
+   * 🔴 **영상이 바뀌면 다시 읽는다.** 늦게 온 응답이 새 영상의 리포트를
+   * 덮지 않도록 `alive` 로 막는다 — 빠르게 넘기면 실제로 그렇게 엇갈린다.
    */
-  const [report, setReport] = useState<SavedReport | null>(null)
+  /**
+   * 🔴 **어느 영상의 리포트인지 함께 들고 있는다.** 그래야 영상을 넘길 때
+   * 상태를 비우지 않아도 된다 — 비우는 일(effect 안의 즉시 setState)은
+   * 렌더를 연쇄시킨다. id 가 다르면 그릴 때 없는 것으로 친다.
+   */
+  const [got, setGot] = useState<{ id: string; result: ReportResult } | null>(null)
   useEffect(() => {
-    setReport(v ? reportFor(v.id) : null)
+    if (!v) return
+    let alive = true
+    void fetchReport(v.id).then((r) => {
+      // 늦게 온 응답이 다른 영상의 자리에 앉지 않는다 — 빠르게 넘기면 실제로 엇갈린다.
+      if (alive) setGot({ id: v.id, result: r })
+    })
+    return () => {
+      alive = false
+    }
   }, [v])
+  const report = v && got?.id === v.id ? got.result : null
 
   /**
    * 나를 보여주는 **대표 영상**으로 세워 둔 클립의 id.
@@ -251,7 +266,8 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
          화면에 남은 표시만 거둔다. */
       if (featured === target.id) setFeaturedId(null)
       setPubIds((prev) => prev.filter((id) => id !== target.id))
-      forgetReport(target.id)
+      /* 🔴 리포트도 따로 지울 것이 없다 — 서버에 있고 영상과 함께 사라진다
+         (전에는 `localStorage` 라 여기서 손으로 지웠다). */
       setAdded((prev) => prev.filter((x) => x.id !== target.id))
       setRemoved((prev) => [...prev, target.id])
       setConfirming(null)
@@ -742,16 +758,30 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
               그림은 분석 화면과 **같은 것**을 쓴다(`ReportView`) — 두 벌로
               두면 한쪽만 늙는다.
 
-              ⚠️ 계약에 리포트를 **읽는** 경로가 없어(미결 paik 7번) 이 값은
-              그 브라우저에만 있다. 그래서 아래에 그렇게 적어 둔다 — 숨기면
-              다른 기기에서 안 보일 때 고장으로 읽힌다. */}
+              🔴 **「아직」과 「없다」를 갈라 그린다**(미결 paik 7번의 「하지 말
+              것」) — 분석 중인 클립에 빈 자리를 보이면 결과가 없는 것처럼
+              읽힌다. */}
           {tab === 'analyzed' && report && (
             <section className="ss-profile-report" aria-label="분석 리포트">
               <h3 className="ss-profile-report-head">분석 리포트</h3>
-              <ReportView report={report} />
-              <p className="ss-profile-report-note">
-                {report.savedAt} 에 남겼습니다 — 아직 이 브라우저에만 남습니다.
-              </p>
+              {report.state === 'ready' ? (
+                <>
+                  <ReportView report={report.report} />
+                  <p className="ss-profile-report-note">{report.report.savedAt} 에 분석했습니다.</p>
+                </>
+              ) : (
+                <p className="ss-profile-report-note" role="status">
+                  {/* 🔴 **사유 문구를 서버에서 그대로 받아 쓰지 않는다.** 위
+                      알림줄이 이미 같은 문장을 낼 수 있어(대표 세우기 실패 ·
+                      지우기 실패) 같은 글이 화면에 둘이 뜬다 — 실제로 그렇게
+                      겹쳤다. 여기는 리포트 자리라는 것이 드러나야 한다. */}
+                  {report.state === 'not-ready'
+                    ? '분석 중입니다 — 끝나면 여기에 나옵니다.'
+                    : report.state === 'missing'
+                      ? '리포트를 찾을 수 없습니다.'
+                      : '리포트를 읽지 못했습니다.'}
+                </p>
+              )}
             </section>
           )}
         </div>
