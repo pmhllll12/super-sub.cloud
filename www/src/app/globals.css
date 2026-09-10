@@ -10345,6 +10345,31 @@ body:has(.ss-profile) {
   color: var(--ss-error);
 }
 
+.ss-matchbot-candidates {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.ss-matchbot-candidate-card {
+  border: 1px solid var(--ss-glass-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+}
+
+.ss-matchbot-candidate-card p {
+  margin: 0;
+}
+
+.ss-matchbot-candidate-card p + p {
+  margin-top: 4px;
+  opacity: 0.85;
+}
+
 .ss-matchbot-input {
   display: flex;
   gap: 8px;

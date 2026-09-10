@@ -102,15 +102,31 @@ flutter run --dart-define=API_BASE_URL=http://<PC 주소>:8000/api/v1
 
 ---
 
-## 🔴 알려진 구멍 — `AuthException` 이 `code` 를 버린다
+## 429 잠금 — `AuthException` 이 `code`·`retryAfter` 를 갖는다 ✅ 해소 (2026-09-10)
 
-`AuthException` 이 `message` 만 갖고 있어서 **에러 `code` 로 분기할 수단이
-없다.** 그래서 429 `TOO_MANY_REQUESTS` 를 다른 실패와 가를 수가 없다 — 미결
-항목 `jin` 2·4번이 이것을 **선행 조건**으로 걸어 두었다.
+전에는 `AuthException` 이 `message` 만 갖고 있어서 에러 `code` 로 분기할 수단이
+없었다(429 `TOO_MANY_REQUESTS` 를 다른 실패와 못 갈랐다). 미결 `jin` 2번을
+따라 `code` 와 `retryAfter`(정수 초, 서버가 헤더를 안 주면 최소 1초)를
+선택 인자로 더했다 — 기존에 `const AuthException('문구')` 로 부르던 자리는
+안 고쳤다.
 
-고칠 때는 `code` 와 `retryAfter` 를 함께 싣는다. **웹(`www/`)이 같은 일을 이미
-했다**(`src/lib/api/client.ts` 의 `ApiCallError` · `retryAfterSeconds`) — 그쪽
-모양을 따라가면 두 클라이언트의 동작이 갈리지 않는다.
+429 판별·잠금은 세 자리로 나뉜다 — 새 화면이 로그인 흐름을 더 만들면 이 셋을
+그대로 잇는다.
+
+- `data/auth_repository_api.dart` — `_decode` 가 `error['code']` 와
+  `Retry-After` 헤더를 함께 싣는다
+- `data/rate_limit.dart` — `isRateLimited()` · `retryAfterSeconds()`
+- `presentation/rate_limit_controller.dart` — `rateLimitControllerProvider`.
+  매초 줄어드는 잠금 카운터. **로그인·가입·구글 로그인이 이 하나를 나눠 쓴다**
+  (같은 출처 창을 나눠 쓰므로) — 지금은 로그인 화면만 있어 그것만 잇는다.
+  가입·구글 로그인 화면이 생기면 같은 provider 를 이어 쓴다. 🔴 구글 로그인
+  버튼에는 www 처럼 잠금을 걸지 않는다 — 감추거나 덮으면 구글이 클릭을
+  통째로 무시한다(www 가 먼저 겪었다)
+
+**웹(`www/`)이 같은 일을 먼저 했다**(`src/lib/api/client.ts` 의 `ApiCallError`
+· `retryAfterSeconds`) — 모양을 그대로 따라가 두 클라이언트의 동작이 갈리지
+않는다. `Retry-After` 헤더는 **www 와 달리 프록시를 거치지 않고 그대로 온다**
+(Flutter 는 백엔드를 직접 부른다).
 
 ---
 

@@ -46,6 +46,16 @@ _TOP = frozenset(
     }
 )
 
+# 일부러 적었으나 아직 없는 경로 — 반드시 이유를 함께 둔다. 이유 없이 늘리면
+# 검사가 무의미해진다. 아래 `test_면제한_경로가_아직도_없다` 가 낡은 항목을 잡는다.
+#
+# 쓰는 경우: 아직 `main`(또는 이 브랜치)에 병합 안 된 남의 파일을 백틱 풀경로로
+# 인용해야 할 때. 병합되면 이 목록에서 지운다. (그 전까지는 `agent/` 나
+# "미결 `jin` N번" 처럼 경로 아닌 표기로 쓰는 것이 1순위다.)
+_KNOWN_ABSENT: dict[str, str] = {
+    # "agent/contracts/foo.yaml": "정상호 ho 브랜치. main 병합 뒤 생김 (미결 jin 27)",
+}
+
 # 백틱 안, 공백 없이 슬래시를 포함한 것. `/` 로 시작하는 API 경로는 제외한다.
 _CANDIDATE = re.compile(r"`([^`\s/][^`\s]*/[^`\s]*)`")
 
@@ -88,12 +98,23 @@ class TestDocPaths:
         missing = [
             f"{doc}:{lineno}  {rel}"
             for doc, lineno, rel in _collect()
-            if not _exists(rel)
+            if not _exists(rel) and rel.rstrip("/") not in _KNOWN_ABSENT
         ]
         assert not missing, (
             "문서가 없는 파일을 가리킨다 — 받는 쪽이 그대로 실행하면 엉뚱한 곳을 만든다.\n"
-            "경로를 고치거나, 파일이 옮겨졌으면 문서를 따라 옮길 것:\n  "
+            "경로를 고치거나, 파일이 옮겨졌으면 문서를 따라 옮길 것. 병합 전 남의\n"
+            "파일이라 일부러 인용했다면 `_KNOWN_ABSENT` 에 이유와 함께 넣을 것:\n  "
             + "\n  ".join(missing)
+        )
+
+    def test_면제한_경로가_아직도_없다(self):
+        """🔴 `_KNOWN_ABSENT` 항목이 실제로 생겼는데도 면제로 남아 있으면, 그 파일이
+        다시 사라져도 위 검사가 못 잡는다. 면제는 "아직 없다"가 참일 때만 유효하다.
+        """
+        resurfaced = sorted(rel for rel in _KNOWN_ABSENT if _exists(rel))
+        assert not resurfaced, (
+            "이 경로가 이제 실재한다 — `_KNOWN_ABSENT` 에서 지울 것: "
+            + ", ".join(resurfaced)
         )
 
     def test_검사할_경로를_실제로_찾고_있다(self):

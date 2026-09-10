@@ -10,8 +10,9 @@ import 'models/session.dart';
 /// `fastapi/` 백엔드에 붙는 실제 구현.
 ///
 /// 계약은 `fastapi/docs/api-contract.md` — 실패 응답은 전부
-/// `{"error": {"code", "message"}}` 형태이고, 여기서는 `message`를 그대로
-/// [AuthException]에 담는다(코드는 화면 쪽에서 필요해지면 그때 노출한다).
+/// `{"error": {"code", "message"}}` 형태이고, `code`와 `Retry-After` 헤더를
+/// 함께 [AuthException]에 담는다 — 429 `TOO_MANY_REQUESTS` 를 다른 실패와
+/// 가르는 유일한 수단이다(미결 `jin` 2번, 웹의 `ApiCallError`와 같은 모양).
 ///
 /// 세션은 [MockAuthRepository]와 마찬가지로 **메모리에만** 둔다 — 앱을
 /// 새로 켜면 다시 로그인해야 한다. 기기 재시작 후에도 로그인 상태를
@@ -107,8 +108,18 @@ class ApiAuthRepository implements AuthRepository {
       return decoded;
     }
     final error = decoded['error'] as Map<String, dynamic>?;
+    // 🔴 서버가 값을 안 주면 0 이 아니라 최소 1초 — 0 이면 잠금이 곧바로
+    // 풀려 "429 직후 재요청이 안 나간다"가 깨진다(웹과 같은 판단).
+    final rawRetryAfter = response.headers['retry-after'];
+    final parsedRetryAfter = rawRetryAfter == null
+        ? null
+        : int.tryParse(rawRetryAfter);
     throw AuthException(
       (error?['message'] as String?) ?? '알 수 없는 오류 (${response.statusCode})',
+      code: error?['code'] as String?,
+      retryAfter: parsedRetryAfter == null
+          ? null
+          : (parsedRetryAfter > 0 ? parsedRetryAfter : 1),
     );
   }
 }
