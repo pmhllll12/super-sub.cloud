@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { apiErrorMessage, apiPost } from '@/lib/api/client'
+import { useRateLimitLock } from '@/lib/api/rateLimit'
 import Field from '@/components/ui/Field'
 import PillButton from '@/components/ui/PillButton'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
@@ -20,8 +21,12 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
+  /* 🔴 로그인과 **같은 제한**을 받는다(계약 1번) — 같은 훅을 쓴다. */
+  const limit = useRateLimitLock()
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (limit.locked) return
     setError(null)
     setBusy(true)
     try {
@@ -29,7 +34,7 @@ export default function SignupPage() {
       // 가입은 로그인이 아니다. 세션이 없으니 로그인 화면으로 보낸다.
       router.push('/login')
     } catch (err) {
-      setError(apiErrorMessage(err))
+      if (!limit.lockFrom(err)) setError(apiErrorMessage(err))
     } finally {
       setBusy(false)
     }
@@ -74,15 +79,15 @@ export default function SignupPage() {
           maxLength={20}
           hint="1~20자"
         />
-        {error && (
+        {(error || limit.note) && (
           <p role="alert" className="text-sm" style={{ color: 'var(--ss-error)' }}>
-            {error}
+            {limit.note ?? error}
           </p>
         )}
-        <PillButton type="submit" disabled={busy} className="mt-2 w-full">
+        <PillButton type="submit" disabled={busy || limit.locked} className="mt-2 w-full">
           가입하기
         </PillButton>
-        <GoogleSignInButton onError={setError} text="signup_with" />
+        <GoogleSignInButton onError={setError} text="signup_with" limit={limit} />
       </form>
     </AuthShell>
   )

@@ -8,7 +8,7 @@ import type { Box } from '@/lib/box'
 import { smoothStep } from '@/lib/smoothBox'
 import { DEFAULT_SPORT, SPORT_CODE, type SportKey } from '@/lib/sports'
 import { FOCUS } from '@/lib/rubricFocus'
-import { uploadClip } from '@/lib/uploadClip'
+import { uploadClip, type ClipSubject } from '@/lib/uploadClip'
 import { saveReport } from '@/lib/savedReports'
 import ReportView from '@/components/analysis/ReportView'
 import {
@@ -1052,6 +1052,37 @@ export default function AnalysisStage() {
   }
 
   /**
+   * 서버에 실을 **대상 닻**을 만든다 (CCC 26, 계약 3-6절).
+   *
+   * 🔴 **「예」를 누른 순간 추적기가 잡고 있는 박스**를 쓴다 — 처음 손으로 그린
+   * 네모가 아니다. 사용자가 「맞습니다」라고 답한 것은 *그 순간 관절이 붙어
+   * 있던 사람*이고, 처음 네모는 그 사람을 찾기 위한 출발점일 뿐이다.
+   * 놓친 상태면 그 출발점으로 되돌아간다 — 지정이 있었다는 사실은 그대로다.
+   *
+   * 🔴 **영상 밖은 잘라 낸다.** 계약이 `x+w ≤ 1` 을 요구하고 서버는 범위 밖을
+   * 422 로 튕긴다. 이건 규칙을 피하려는 클램프가 아니라 **좌표계 정의**다 —
+   * 추적 상자는 화면 밖으로 걸칠 수 있지만 영상 그림 밖은 영상이 아니다.
+   *
+   * 🔴 **없으면 통째로 생략한다**(`undefined`) — 그것이 「자동으로 고르기」이고
+   * 정식 경로다. 억지로 채우면 없는 지정을 있는 것처럼 만든다.
+   */
+  function subjectAnchor(): ClipSubject | undefined {
+    const box = targetRef.current ?? subject?.box ?? null
+    if (!box) return undefined
+    const x = clamp01(box.x)
+    const y = clamp01(box.y)
+    const w = clamp01(box.x + box.w) - x
+    const h = clamp01(box.y + box.h) - y
+    // 넓이가 0 이면 가리키는 것이 없다 — 422 를 부르느니 자동으로 고르게 둔다.
+    if (w <= 0 || h <= 0) return undefined
+    /* `at` 은 **지금 보고 있는 프레임**이다. 🔴 `duration_ms` 를 넘으면 422 라
+       상한을 씌운다 — 둘 다 우리가 잰 값이고 반올림으로 한 틱 어긋날 수 있다. */
+    const durMs = Math.round((duration || 0) * 1000)
+    const nowMs = Math.round((previewRef.current?.currentTime ?? 0) * 1000)
+    return { box: [x, y, w, h], atMs: durMs > 0 ? Math.min(nowMs, durMs) : nowMs }
+  }
+
+  /**
    * 영상을 S3 에 올린다 — 계약 3-6절의 클립 업로드 경로(jin-12)를 그대로 쓴다.
    *
    * 🔴 **부르는 것은 「예」다**(2026-09-08). 예전에는 오른쪽 위 `저장` 이
@@ -1062,10 +1093,9 @@ export default function AnalysisStage() {
    * 🔴 원본은 앱 서버를 지나지 않는다(PER-002) — 두 번째 단계는 브라우저가
    * S3 사전 서명 URL에 직접 PUT 한다.
    *
-   * ⚠️ **대상 박스는 아직 못 보낸다.** 계약 본문에 자리가 없고, 워커가 읽는
-   * S3 쪽에도 올릴 자리가 없다(미결 paik 6번, 담당 정어진). `subject` 는
-   * 이미 정규화 0~1 좌표로 들고 있으므로(`toVideoBox`), 자리가 생기면
-   * `lib/uploadClip.ts` 에 실어 보내면 된다.
+   * 🔴 **대상 박스와 집중 항목을 함께 싣는다**(CCC 26 · 29, 미결 `paik` 6·8번).
+   * 둘 다 `analysis_job` 에 저장돼 워커의 claim 응답으로 흘러가고 **응답에는
+   * 안 실린다** — 화면이 더 할 일은 없다.
    */
   async function saveToServer() {
     const picked = pickedFileRef.current
@@ -1083,6 +1113,9 @@ export default function AnalysisStage() {
           width: video?.videoWidth ?? 0,
           height: video?.videoHeight ?? 0,
         },
+        subject: subjectAnchor(),
+        // 빈 목록은 「전체적으로」다 — 생략과 같은 뜻이라 실패가 아니다(CCC 29).
+        focus,
       })
 
       if (saved.passed) {

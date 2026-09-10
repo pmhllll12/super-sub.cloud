@@ -114,4 +114,38 @@ describe('MatchBot — 흐름 B(모집 등록 돕기) 챗봇', () => {
     await screen.findByText('그 시간은 이미 지났어요, 다른 시간을 알려주세요.')
     expect(screen.getByRole('button', { name: '등록' })).toBeInTheDocument()
   })
+
+  it('후보 검색 결과가 오면 카드 목록으로 그린다', async () => {
+    const candidates = [
+      {
+        user_id: 'c1',
+        nickname: '이골키',
+        location: '서울 강남',
+        skill_summary: '공중볼 처리에 강함',
+        similarity: 0.86,
+      },
+    ]
+    const fetchMock = vi.fn(async () => {
+      return new Response(
+        JSON.stringify({
+          history: [],
+          reply: '이골키님이 조건에 잘 맞아요.',
+          proposal: null,
+          candidates,
+        }),
+        { status: 200 },
+      )
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const user = userEvent.setup()
+    render(<MatchBot open onClose={() => {}} />)
+    await user.type(screen.getByLabelText('메시지'), '골키퍼 구해줘')
+    await user.click(screen.getByRole('button', { name: '보내기' }))
+
+    await screen.findByText('이골키님이 조건에 잘 맞아요.')
+    expect(screen.getByRole('list', { name: '용병 후보' })).toBeInTheDocument()
+    expect(screen.getByText('이골키')).toBeInTheDocument()
+    expect(screen.getByText('공중볼 처리에 강함')).toBeInTheDocument()
+  })
 })

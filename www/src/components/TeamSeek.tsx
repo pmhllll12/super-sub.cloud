@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import type { OpenMatch } from '@/server/backend'
+import { SPORTS, SPORT_CODE } from '@/lib/sports'
+import MatchPrefsForm from '@/components/MatchPrefs'
+import { loadPrefs, savePrefs, type MatchPrefs } from '@/lib/matchPrefs'
 
 /**
  * 「팀원」 판 — **아직 사람을 못 채운 팀들의 명단**(사용자 요청, 2026-09-08).
@@ -16,6 +19,13 @@ import type { OpenMatch } from '@/server/backend'
  * 그대로 부른다 — 팀 id 를 몰라도 되는 유일한 경로라, 아직 팀이 없는 사람이
  * 갈 수 있는 곳이 여기뿐이다. 지인 판 · AI 추천 판이 아직 붙박이인 것과
  * 갈리는 점이다(그쪽은 계약에 자리가 없다).
+ *
+ * 🔴 **거르기는 서버가 한다**(2026-09-10, 미결 `jin` 15번). 종목 · 지역
+ * 둘 다 `GET /matches` 가 받는 값이라 화면에서 걸러 내지 않는다 — 화면에서
+ * 걸러 봐야 **첫 페이지 안에서만** 걸러져서, 20건 뒤에 있는 것은 영영 안 나온다.
+ *
+ * ⚠️ **포지션은 예외로 화면에서 거른다** — 서버가 아직 안 받는다(계약이 그렇게
+ * 정했다: `needs` 가 오니 화면에서 하라고). 그래서 아직 안 붙였다.
  *
  * 🔴 **모집 글 한 건이 곧 팀 한 줄이다.** 계약이 주는 것은 경기이고 "인원이
  * 덜 찬 팀" 이라는 목록은 따로 없다 — 사람을 못 채웠으니 모집 글을 올린
@@ -45,22 +55,81 @@ type State =
 export default function TeamSeek({
   closing,
   onClose,
+  sportCode = null,
 }: {
   /** 닫히는 중 — 사라지는 동안에도 DOM 에 남아야 애니메이션이 보인다. */
   closing: boolean
   onClose: () => void
+  /** 「내 자리」 후보를 받아 올 종목 — 조건 판이 쓴다. */
+  sportCode?: string | null
 }) {
   const [state, setState] = useState<State>({ kind: 'loading' })
+  /**
+   * 고른 종목. `null` 이 **전체**다.
+   *
+   * 🔴 **「전체」를 빈 문자열로 두지 않는다.** `sport_code=` 는 "전체"가 아니라
+   * **없는 종목**이라 422 `UNKNOWN_SPORT` 로 튕긴다(계약 3-4절) — 오타와
+   * "그 종목 경기가 없다"가 같아 보이면 안 된다는 판단이다. 전체는 **파라미터
+   * 자체를 빼서** 부른다.
+   */
+  const [sport, setSport] = useState<string | null>(null)
+  /**
+   * 적어 넣은 지역. 🔴 **종목과 처리가 다르다** — 지역은 자유 문자열이라
+   * 안 걸리면 그냥 빈 목록이고 422 가 아니다.
+   */
+  const [region, setRegion] = useState('')
+  /** 실제로 보낸 지역 — 글자마다 부르지 않으려고 제출한 값만 따로 둔다. */
+  const [asked, setAsked] = useState('')
 
   /**
-   * 🔴 **판이 열릴 때 한 번만 받는다.** 그릴 때 부르면 서버가 그린 첫 화면과
-   * 갈려 하이드레이션이 깨진다(공개 목록 · 카드 꾸미기에서 데인 자리와 같다).
+   * 정해 둔 **내 조건**(팀장 쪽과 따로 둔다 — 같은 사람이 둘 다일 수 있다).
+   *
+   * 🔴 **거르기 줄을 대신하지 않는다.** 조건은 「늘 이런 경기를 찾는다」이고
+   * 거르기는 「지금 이 목록에서 더 좁힌다」라 층이 다르다 — 조건이 거르기의
+   * **첫 값을 채우고**, 그 뒤로는 거르기가 제 일을 한다(사용자와 확인).
+   *
+   * 🔴 그릴 때 저장소를 읽지 않는다(하이드레이션) — 붙은 뒤에 읽는다.
+   */
+  const [prefs, setPrefs] = useState<MatchPrefs | null>(null)
+  const [asking, setAsking] = useState(false)
+  /**
+   * 🔴 **조건을 읽기 전에는 목록을 받지 않는다.** `asking` 은 처음에 `false`
+   * 라, 이 표시가 없으면 조건을 읽는 effect 보다 목록 effect 가 먼저 돌아
+   * **묻기도 전에** 한 번 받아 온다(시험이 잡았다).
+   */
+  const [ready, setReady] = useState(false)
+  useEffect(() => {
+    const saved = loadPrefs('me')
+    setPrefs(saved)
+    setAsking(saved === null)
+    // 조건의 첫 지역을 거르기의 첫 값으로 — 없으면 그냥 전체다.
+    if (saved?.regions[0]) {
+      setRegion(saved.regions[0])
+      setAsked(saved.regions[0])
+    }
+    setReady(true)
+  }, [])
+
+  /**
+   * 🔴 **판이 열릴 때, 그리고 거르는 값이 바뀔 때만 받는다.** 그릴 때 부르면
+   * 서버가 그린 첫 화면과 갈려 하이드레이션이 깨진다(공개 목록 · 카드
+   * 꾸미기에서 데인 자리와 같다).
    */
   useEffect(() => {
+    // 조건을 아직 안 읽었거나 묻는 중이면 안 받는다 — 정하고 나서 받는다.
+    if (!ready || asking) return
     let alive = true
+    /* 🔴 **여기서 「불러오는 중」으로 되돌리지 않는다.** effect 안의 동기
+       setState 는 렌더를 한 번 더 부른다 — 되돌리는 일은 **값을 바꾼 손짓**
+       (알약 · 찾기)이 하고, 이 effect 는 받아 온 뒤에만 상태를 만진다. */
     void (async () => {
       try {
-        const res = await fetch('/api/matches?size=20')
+        /* 🔴 **빈 값을 실어 보내지 않는다.** `URLSearchParams` 에 넣는 순간
+           `sport_code=` 가 되어 422 다 — 있는 것만 넣는다. */
+        const q = new URLSearchParams({ size: '20' })
+        if (sport) q.set('sport_code', sport)
+        if (asked) q.set('region', asked)
+        const res = await fetch(`/api/matches?${q}`)
         const body: unknown = await res.json().catch(() => null)
         if (!alive) return
         if (!res.ok) {
@@ -80,7 +149,7 @@ export default function TeamSeek({
     return () => {
       alive = false
     }
-  }, [])
+  }, [sport, asked, asking, ready])
 
   return (
     <section
@@ -96,28 +165,121 @@ export default function TeamSeek({
     >
       <header className="ss-teams-head">
         <h2>사람을 찾는 팀</h2>
-        <button type="button" className="ss-teams-close" onClick={onClose} aria-label="닫기">
-          <span className="material-symbols-outlined" aria-hidden="true">
-            close
-          </span>
-        </button>
+        <div className="ss-tm-head-right">
+          {prefs && !asking && (
+            <button type="button" className="ss-tm-edit" onClick={() => setAsking(true)}>
+              {/* 🔴 아이콘은 **장식**이라 낭독기에서 숨긴다 — 옆의 글자가
+                  이미 무엇인지 말하고 있다(두 번 읽히면 성가시다). */}
+              <span className="material-symbols-outlined" aria-hidden="true">
+                rule_settings
+              </span>
+              설정 수정
+            </button>
+          )}
+          <button type="button" className="ss-teams-close" onClick={onClose} aria-label="닫기">
+            <span className="material-symbols-outlined" aria-hidden="true">
+              close
+            </span>
+          </button>
+        </div>
       </header>
 
-      {state.kind === 'loading' && <p className="ss-teams-note">불러오는 중입니다…</p>}
+      {/* 🔴 조건이 먼저다 — 없으면 거르기 줄도 목록도 안 그린다. */}
+      {asking && (
+        <MatchPrefsForm
+          kind="me"
+          sportCode={sportCode}
+          value={prefs}
+          onDone={(next) => {
+            savePrefs('me', next)
+            setPrefs(next)
+            setAsking(false)
+            if (next.regions[0]) {
+              setRegion(next.regions[0])
+              setAsked(next.regions[0])
+            }
+          }}
+          onCancel={prefs ? () => setAsking(false) : undefined}
+        />
+      )}
+
+      {/* 🔴 **거르는 줄은 늘 그린다** — 결과 안쪽에 두면 「없습니다」가 떴을 때
+          거르기가 같이 사라져서, 잘못 고른 것을 되돌릴 방법이 없어진다. */}
+      <form
+        className="ss-teams-filter"
+        hidden={asking}
+        onSubmit={(e) => {
+          e.preventDefault()
+          setAsked(region.trim())
+          setState({ kind: 'loading' })
+        }}
+      >
+        <div className="ss-teams-sports" role="group" aria-label="종목">
+          <button
+            type="button"
+            className="ss-teams-pill"
+            data-on={sport === null ? 'true' : undefined}
+            aria-pressed={sport === null}
+            onClick={() => {
+              setSport(null)
+              setState({ kind: 'loading' })
+            }}
+          >
+            전체
+          </button>
+          {SPORTS.map((s) => (
+            <button
+              key={s.key}
+              type="button"
+              className="ss-teams-pill"
+              data-on={sport === SPORT_CODE[s.key] ? 'true' : undefined}
+              aria-pressed={sport === SPORT_CODE[s.key]}
+              onClick={() => {
+                setSport(SPORT_CODE[s.key])
+                setState({ kind: 'loading' })
+              }}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+        <label className="ss-teams-region">
+          <span className="sr-only">지역</span>
+          <input
+            type="search"
+            value={region}
+            placeholder="지역 (예: 서울 강남구)"
+            onChange={(e) => setRegion(e.target.value)}
+          />
+        </label>
+        <button type="submit" className="ss-teams-pill">
+          찾기
+        </button>
+      </form>
+
+      {!asking && state.kind === 'loading' && (
+        <p className="ss-teams-note">불러오는 중입니다…</p>
+      )}
 
       {/* 🔴 실패를 빈 목록으로 그리지 않는다 — "못 가져왔다"와 "그런 팀이
           없다"가 같아 보이면 없는 것을 계속 기다리게 된다. */}
-      {state.kind === 'error' && (
+      {!asking && state.kind === 'error' && (
         <p className="ss-teams-note" data-error="true" role="alert">
           {state.message}
         </p>
       )}
 
-      {state.kind === 'ok' && state.items.length === 0 && (
-        <p className="ss-teams-note">지금은 사람을 찾는 팀이 없습니다.</p>
+      {!asking && state.kind === 'ok' && state.items.length === 0 && (
+        /* 거르고 있으면 그렇게 말한다 — 「없습니다」만 뜨면 사이트가 빈 것으로
+           읽히고, 거르기를 풀면 나온다는 것을 알 수 없다. */
+        <p className="ss-teams-note">
+          {sport || asked
+            ? '그 조건에 맞는 팀이 없습니다.'
+            : '지금은 사람을 찾는 팀이 없습니다.'}
+        </p>
       )}
 
-      {state.kind === 'ok' && state.items.length > 0 && (
+      {!asking && state.kind === 'ok' && state.items.length > 0 && (
         <>
           <p className="ss-teams-count">{state.total}팀이 자리를 채우고 있습니다</p>
           <ul className="ss-teams-list">

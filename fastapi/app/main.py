@@ -6,6 +6,7 @@
 """
 
 from fastapi import FastAPI
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.analysis.adapter.inbound.api.v1.admin_video_router import (
     admin_video_router,
@@ -24,6 +25,7 @@ from app.review.adapter.inbound.api.v1.review_router import review_router
 from app.user.adapter.inbound.api.v1.admin_router import admin_router
 from app.user.adapter.inbound.api.v1.auth_router import auth_router
 from app.user.adapter.inbound.api.v1.me_router import me_router
+from app.user.adapter.inbound.api.v1.mercenary_router import mercenary_router
 from app.user.adapter.inbound.api.v1.positions_router import positions_router
 from app.user.adapter.inbound.api.v1.team_router import team_router
 from app.user.adapter.outbound.stub.user_stub_repository import (
@@ -79,6 +81,15 @@ app = FastAPI(
 
 install_error_handlers(app)
 
+# 요청 수·지연 히스토그램·에러율을 `/metrics`(Prometheus 형식)로 낸다.
+# PER-001(목표 소요 시간)·PER-003(P95 500ms)의 검증 근거다 — 앱은 히스토그램만
+# 내고 P95 는 Prometheus 의 `histogram_quantile` 로 뽑는다.
+#
+# 🔴 `/metrics` 는 인증이 없다(`/health` 와 같은 취급). 내부 타이밍·트래픽량이
+#    드러나므로 **엣지(nginx)에서 외부 접근을 막고** 스크레이프만 통과시킨다.
+# OpenAPI 문서에는 넣지 않는다 — 운영용 엔드포인트다.
+Instrumentator().instrument(app).expose(app, include_in_schema=False)
+
 # 컨텍스트가 늘면 여기에 한 줄씩 추가한다 (review · billing).
 #
 # 영상은 별도 컨텍스트가 아니라 `analysis` 안에 있다 — 부록 D 가 도메인 ② 를
@@ -98,6 +109,7 @@ for _router in (
     review_router,
     admin_router,
     billing_router,
+    mercenary_router,
 ):
     app.include_router(_router, prefix=API_PREFIX)
 
