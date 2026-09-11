@@ -1,0 +1,80 @@
+축구 세트피스 19편 · CONTACT_MAX=0.8 MIN_GAP=8
+
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  44%|████▍     | 338/764 [00:00<00:00, 3360.20it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3927.90it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 4224.73it/s]
+  [1/19] 10_penalty1_91169c09.avi           터치  1 · 공커버 74% · 최근접 0.151 · 임팩트 55 vs 터치 40  (19.0초)
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  52%|█████▏    | 401/764 [00:00<00:00, 3918.91it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 4806.30it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3524.79it/s]
+  [2/19] 11_freekick_930ede06.avi           터치  0 · 공커버 77% · 최근접 1.765 · 임팩트 44 vs 터치 None  (12.9초)
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  45%|████▌     | 344/764 [00:00<00:00, 3421.15it/s]Loading weights:  94%|█████████▎| 715/764 [00:00<00:00, 3590.50it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3776.00it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3356.28it/s]
+  [3/19] 12_penalty_a821a39e.avi            터치  0 · 공커버 52% · 최근접 1.115 · 임팩트 52 vs 터치 None  (16.9초)
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  44%|████▎     | 334/764 [00:00<00:00, 3332.81it/s]Loading weights:  87%|████████▋ | 668/764 [00:00<00:00, 3282.88it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3707.40it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3454.59it/s]
+  [4/19] 13_freekick_616f8db5.avi           터치  0 · 공커버 56% · 최근접 1.368 · 임팩트 64 vs 터치 None  (15.6초)
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  42%|████▏     | 322/764 [00:00<00:00, 3213.96it/s]Loading weights:  84%|████████▍ | 644/764 [00:00<00:00, 3079.93it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3612.86it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3261.79it/s]
+  [5/19] 14_penalty1_980ede07.avi           터치  0 · 공커버 100% · 최근접 2.076 · 임팩트 52 vs 터치 None  (13.3초)
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  43%|████▎     | 325/764 [00:00<00:00, 3243.91it/s]Loading weights:  85%|████████▌ | 650/764 [00:00<00:00, 3090.53it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3596.61it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3286.06it/s]
+  [6/19] 14_penalty_db7e99af.avi            터치  0 · 공커버 61% · 최근접 0.862 · 임팩트 43 vs 터치 None  (14.4초)
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  44%|████▍     | 335/764 [00:00<00:00, 3339.13it/s]Loading weights:  88%|████████▊ | 669/764 [00:00<00:00, 3286.58it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3708.11it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3385.60it/s]
+  [7/19] 16_penalty1_44038699.avi           터치  0 · 공커버 25% · 최근접 1.803 · 임팩트 47 vs 터치 None  (12.6초)
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  45%|████▌     | 347/764 [00:00<00:00, 3464.87it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3984.99it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3336.76it/s]
+  [8/19] 18_freekick1_f4ff1a25.avi          터치  0 · 공커버 100% · 최근접 1.287 · 임팩트 23 vs 터치 None  (10.8초)
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  43%|████▎     | 325/764 [00:00<00:00, 3238.98it/s]Loading weights:  85%|████████▍ | 649/764 [00:00<00:00, 2940.06it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3453.32it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3727.52it/s]
+  [9/19] 18_freekick3_681418eb.avi          터치  0 · 공커버 100% · 최근접 1.746 · 임팩트 44 vs 터치 None  (12.3초)
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  43%|████▎     | 328/764 [00:00<00:00, 3279.22it/s]Loading weights:  86%|████████▌ | 656/764 [00:00<00:00, 3125.96it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3606.03it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3470.82it/s]
+  [10/19] 18_freekick_5033c49b.avi           터치  0 · 공커버 65% · 최근접 0.904 · 임팩트 34 vs 터치 None  (12.1초)
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  44%|████▍     | 337/764 [00:00<00:00, 3364.00it/s]Loading weights:  88%|████████▊ | 674/764 [00:00<00:00, 3219.37it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3622.00it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3535.75it/s]
+  [11/19] 19_freekick1_da3f1406.avi          터치  0 · 공커버 100% · 최근접 2.613 · 임팩트 None vs 터치 None  (13.0초)
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  43%|████▎     | 330/764 [00:00<00:00, 3299.40it/s]Loading weights:  86%|████████▋ | 660/764 [00:00<00:00, 3007.05it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3475.42it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3596.46it/s]
+  [12/19] 19_freekick2_86f6c708.avi          터치  1 · 공커버 52% · 최근접 0.375 · 임팩트 83 vs 터치 68  (19.1초)
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  43%|████▎     | 327/764 [00:00<00:00, 3221.18it/s]Loading weights:  85%|████████▌ | 650/764 [00:00<00:00, 3024.57it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3524.48it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3510.41it/s]
+  [13/19] 19_freekick_940922f8.avi           터치  1 · 공커버 58% · 최근접 0.175 · 임팩트 30 vs 터치 28  (12.2초)
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  48%|████▊     | 366/764 [00:00<00:00, 3656.21it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3817.56it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3689.28it/s]
+  [14/19] 21_freekick_3ee04674.avi           터치  0 · 공커버 89% · 최근접 1.404 · 임팩트 38 vs 터치 None  (13.1초)
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  43%|████▎     | 326/764 [00:00<00:00, 3255.73it/s]Loading weights:  85%|████████▌ | 652/764 [00:00<00:00, 3015.42it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3515.52it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3497.96it/s]
+  [15/19] 23_freekick_a972f2ea.avi           터치  0 · 공커버 100% · 최근접 1.199 · 임팩트 38 vs 터치 None  (12.1초)
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  43%|████▎     | 326/764 [00:00<00:00, 3257.02it/s]Loading weights:  85%|████████▌ | 652/764 [00:00<00:00, 3007.77it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3506.53it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3289.92it/s]
+  [16/19] 25_freekick1_86d715b9.avi          터치  0 · 공커버 37% · 최근접 1.148 · 임팩트 11 vs 터치 None  (10.7초)
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  43%|████▎     | 328/764 [00:00<00:00, 3265.00it/s]Loading weights:  86%|████████▌ | 655/764 [00:00<00:00, 3100.46it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3586.13it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3273.15it/s]
+  [17/19] 25_freekick_c76aa778.avi           터치  0 · 공커버 59% · 최근접 0.956 · 임팩트 24 vs 터치 None  (10.9초)
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  43%|████▎     | 332/764 [00:00<00:00, 3308.45it/s]Loading weights:  87%|████████▋ | 663/764 [00:00<00:00, 3241.56it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3689.61it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3732.50it/s]
+  [18/19] OpenPose_5T_df2d1ce9.avi           터치  0 · 공커버 67% · 최근접 4.819 · 임팩트 38 vs 터치 None  (12.8초)
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  42%|████▏     | 320/764 [00:00<00:00, 3193.58it/s]Loading weights:  84%|████████▍ | 640/764 [00:00<00:00, 2987.61it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3537.38it/s]
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3223.46it/s]
+  [19/19] Y1_2ff12fb9.avi                    터치  1 · 공커버 94% · 최근접 0.662 · 임팩트 26 vs 터치 20  (10.0초)
+
+==================================================================
+분모 18/19 편 (공 커버리지 <30% 등으로 뺀 것 1편)
+터치 수: 중앙값 0.0 · 분포 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1]
+기존 임팩트와 ±5프레임 일치: 1/4 (25%)
+
+── 사전 등록 판정
+  A 터치 수 중앙값 1~3        : 0.0 🔴
+  B 기존 임팩트와 일치 ≥50%   : 25% 🔴
+  C production 무수정         : ✅ (이 스크립트는 import 만 한다)
+  D 뺀 클립                   : 1편 ['16_penalty1_44038699.avi']
+
+🔴 B 의 일치는 **「맞다」가 아니다** — 둘 다 검증 안 된 계기다.
+🔴 이 표본은 **단일 동작**이라 「여럿 찾는다」는 증명되지 않는다.
+
+── 사후 관찰 (판정에 안 쓴다)
+  클립별 최근접 거리: 중앙값 1.17 어깨너비 · 범위 0.15~4.82
+  문턱(0.8) 바로 위(~1.2000000000000002) 인 클립: 6/18
+  🔴 문턱 근처가 적고 전반적으로 멀면 **문턱 문제가 아니라**
+     추적 대상이 공 가진 사람이 아닐 가능성이 크다 (미결 18번).

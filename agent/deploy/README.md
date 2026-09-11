@@ -687,14 +687,14 @@ WSL 개발은 변수가 없으니 그대로다.
 
 ```bash
 # 영상 올리기 (로컬에서)
-aws s3 cp ./pitch01.mp4 s3://$BUCKET/videos/pitch01.mp4
+aws s3 cp ./shot01.mp4 s3://$BUCKET/videos/shot01.mp4
 
 # 분석 (EC2에서)
 cd ~/super-sub.cloud/agent
-uv run python scripts/analyze_s3.py s3://$BUCKET/videos/pitch01.mp4 \
-  --rubric rubrics/baseball_pitching.yaml \
+uv run python scripts/analyze_s3.py s3://$BUCKET/videos/shot01.mp4 \
+  --rubric rubrics/football_instep_shot.yaml \
   --out s3://$BUCKET/reports \
-  --side left
+  --side right
 ```
 
 무슨 일이 일어나는가:
@@ -707,7 +707,7 @@ uv run python scripts/analyze_s3.py s3://$BUCKET/videos/pitch01.mp4 \
 | 4 | `scoring.Criterion.grade_for` — **등급을 코드가 정한다.** 모델이 아니다 |
 | 5 | `Judge` → vLLM `/v1/chat/completions` — 확정된 등급의 **근거 문장만** 생성. 항목 하나씩, `temperature=0`, `guided_json`으로 스키마 강제 |
 | 6 | **미리보기 렌더링** — 원본을 다시 디코딩해 임팩트 스켈레톤 `impact.jpg`와 대상 추적 영상 `tracked.webm`을 만든다. 추가 추론이 없다(ViTPose 키포인트로 그리기만 한다) |
-| 7 | `storage.upload_json` — `s3://버킷/reports/pitch01/<타임스탬프>.json` |
+| 7 | `storage.upload_json` — `s3://버킷/reports/shot01/<타임스탬프>.json` |
 
 리포트에는 측정값·판정·타이밍과 함께 `code_version`(git 커밋)과
 `judge_backend`가 들어간다. 수동 배포라 EC2 코드 시점이 리포트마다 다를 수
@@ -729,13 +729,13 @@ uv run python scripts/analyze_s3.py s3://$BUCKET/videos/pitch01.mp4 \
 
 **확인:**
 ```bash
-aws s3 ls --recursive s3://$BUCKET/reports/pitch01/
+aws s3 ls --recursive s3://$BUCKET/reports/shot01/
 # <타임스탬프>.json  · <타임스탬프>/impact.jpg  · <타임스탬프>/tracked.webm
 
-aws s3 cp s3://$BUCKET/reports/pitch01/<타임스탬프>.json - | python3 -m json.tool | head -40
+aws s3 cp s3://$BUCKET/reports/shot01/<타임스탬프>.json - | python3 -m json.tool | head -40
 
 # 그림을 눈으로 보려면 받아서 연다 (버킷은 퍼블릭이 아니다)
-aws s3 cp s3://$BUCKET/reports/pitch01/<타임스탬프>/impact.jpg .
+aws s3 cp s3://$BUCKET/reports/shot01/<타임스탬프>/impact.jpg .
 ```
 
 ### 6-3. 툴 콜링에 대해
@@ -782,9 +782,9 @@ sudo systemctl enable --now supersub-worker
 # 설정이 맞는가 (집지 않고 루브릭 선택만 점검한다)
 cd ~/super-sub.cloud/agent
 uv run python scripts/worker.py --dry-run
-#   baseball → baseball_pitching.yaml
-#   basketball → basketball_jump_shot.yaml
 #   football → football_instep_shot.yaml
+# 🔴 목록은 rubrics/ 가 정한다. 축구만 뜨는 것이 정상이다
+#    (2026.09.11 축구 단일 종목 전환).
 
 systemctl status supersub-worker
 journalctl -u supersub-worker -f          # 작업을 집으면 여기 흐른다

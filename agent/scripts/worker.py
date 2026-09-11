@@ -18,8 +18,8 @@
 │ (1) `claim` 은 한 바퀴에 **한 번만** 부른다. POST 이고 부를 때마다 작업을 │
 │     하나 소비하므로, 실패했다고 다시 부르면 **다른 작업**을 집는다.       │
 │ (2) 204 는 오류가 아니다 — 큐가 빈 것이 정상이다. 로그를 남기지 않는다.   │
-│ (3) `--rubric` 을 항상 명시한다. 기본값이 축구라 안 주면 야구를 축구로     │
-│     채점하고, 그 결과가 틀렸다는 것이 값에 나타나지 않는다.               │
+│ (3) `--rubric` 을 항상 명시한다. 기본값이 인스텝 슈팅이라 안 주면 인사이드 │
+│     패스를 인스텝으로 채점하고, 틀렸다는 것이 값에 나타나지 않는다.        │
 │ (4) `videos/` 에 쓰지 않는다. 읽기 전용 IAM 정책이 의도다.                │
 └─────────────────────────────────────────────────────────────────────────┘
 
@@ -431,13 +431,22 @@ def failure_reason(outcome: Outcome) -> str:
     """종료 코드를 사람이 읽을 사유로. 길이는 호출부(report)에서 자른다.
 
     | 0 | 정상                                          |
-    | 2 | 품질 게이트 미달 — 사람이 다시 찍어야 풀린다  |
+    | 2 | 품질 게이트 미달 — 사람이 다시 **찍어야** 풀린다 |
+    | 3 | 종목 불일치 — 사람이 **다른 영상을** 올려야 풀린다 |
     | 그 외 | 인자 오류·다운로드 실패·모델 적재 실패 등  |
+
+    🔴 **2와 3을 뭉뚱그리지 않는다.** 둘 다 실패지만 사용자가 할 일이 정반대다.
+    3에 「재촬영이 필요하다」가 나가면 **같은 파일을 다시 올린다** — 미결 41번이
+    실서버에서 아홉 번 그랬다(같은 클립, 같은 사유, 아홉 번).
     """
     if outcome.note:
         # 우리가 죽인 경우다. 종료 코드(-9 따위)는 뜻이 없고 note 가 이유다.
         tail = f" (마지막 출력: {outcome.last_line})" if outcome.last_line else ""
         return f"{outcome.note}{tail}"
+    if outcome.code == 3:
+        # analyze_s3.py 가 "종목 불일치: …" 을 **이미 라벨까지 붙여** 찍는다.
+        # 🔴 여기서 또 붙이면 「종목 불일치: 종목 불일치: …」가 된다 — 그대로 쓴다.
+        return outcome.last_line or "종목 불일치 — 다른 종목 영상으로 보입니다"
     if outcome.code == 2:
         # analyze_s3.py 가 "분석 중단: …" 을 마지막에 찍는다. 이미 사람이 읽을
         # 문장이라 그대로 쓴다.
@@ -537,7 +546,16 @@ def main() -> int:
     log(f"API {cfg.api_base} · 버킷 {cfg.bucket} · 리포트 {cfg.reports_uri}")
     log(f"루브릭 {cfg.rubric_dir} · 폴링 {cfg.poll_seconds:.0f}초")
     if args.dry_run:
-        for sport in ("baseball", "basketball", "football"):
+        # 🔴 종목 목록을 코드에 박지 않는다 — 루브릭 폴더가 정한다. 박아 두면
+        #    루브릭을 지운 뒤에도 점검이 그 종목을 찍고, 반대로 새 루브릭을
+        #    넣으면 점검에서 **안 보인 채** 배포된다 (2026.09.11 축구 단일
+        #    종목 전환에서 실제로 갈렸다).
+        sports = sorted(
+            {load_rubric(p).sport for p in sorted(Path(cfg.rubric_dir).glob("*.yaml"))}
+        )
+        if not sports:
+            log(f"  🔴 루브릭이 하나도 없다 ({cfg.rubric_dir})")
+        for sport in sports:
             try:
                 log(f"  {sport} → {pick_rubric(cfg.rubric_dir, sport).name}")
             except RubricUnavailable as exc:

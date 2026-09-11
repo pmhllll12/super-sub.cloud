@@ -19,23 +19,27 @@ uv run python -m scripts.dataset_pipeline.run \
 | 종목 | 명세 | 실제 | 지금 되는가 |
 |---|---|---|---|
 | ⚽ | SoccerNet **Clips-720p-10s** HF 선택 다운로드 | 그런 저장소가 **없다.** 720p 원본(`SoccerNet_raw_HQ`)은 `gated=manual`에 파일이 안 올라와 있다(NDA). 대안 `SushantGautam/SoccerNet-10s-5Class` — 10초 클립 34,050개가 파일 하나씩이라 **선택 다운로드가 된다.** 🔴 **224p** | **로그인하면 된다** |
-| ⚾ | 메타데이터 필터 후 **선택 다운로드** | `hbfreed/Picklebot-130K` 는 있다. 영상이 **단일 28.4GB `tar.xz`** 라 파일 단위 선택 다운로드가 **원리적으로 불가능**하다 | CSV 필터는 **된다**. 영상은 28.4GB를 받아야 한다 |
-| 🏀 | PL-NBA pre-trimmed 100개 | HF에 없다. 논문·GitHub은 실재하나 프리트림 클립이 **바이두넷디스크**로만 배포된다 | **자동 불가.** 사람이 받아 둔 폴더를 읽는다 |
+
+🔴 **야구(Picklebot-130K)·농구(PL-NBA) 어댑터는 2026-09-11 에 지웠다** — 팀
+방향이 **축구 단일 종목**으로 정해졌다. 조사 결과만 남긴다: 야구는 영상이 단일
+28.4GB `tar.xz` 라 선택 다운로드가 원리적으로 불가능했고(224×224 · **15fps**),
+농구는 프리트림 클립이 바이두넷디스크로만 배포돼 자동 수집이 안 되며 **상업적
+이용 금지**였다. 코드는 git 이력에 있다.
 
 카탈로그는 실제로 확인했다 — 축구 27,240건(Shots 5,456 · Goal · Foul · Throw-in ·
-Ball out of play), 야구 12,965건(Called Strike 8,240 · Ball 4,725).
+Ball out of play).
 
 ## 🔴 그 다음 — 받아도 지표를 믿을 근거가 없다
 
-**세 데이터셋 모두 이 파이프라인이 재려는 것을 재기에 맞지 않는다.** 받는 것과
+**공개 데이터셋은 이 파이프라인이 재려는 것을 재기에 맞지 않는다.** 받는 것과
 쓸 만한 것은 다른 문제다.
 
-- **해상도.** 축구 224p · 야구 **224×224**. 우리 경로는 RT-DETR + ViTPose
+- **해상도.** 축구 224p. 우리 경로는 RT-DETR + ViTPose
   top-down 이라 화면 안에서 선수가 작으면 손목·발목을 못 믿는다
-- **프레임레이트.** 야구가 **15fps** 다. 우리 동작점은 `DEFAULT_TARGET_FPS=30`
+- **프레임레이트.** 저fps 출처가 섞인다. 우리 동작점은 `DEFAULT_TARGET_FPS=30`
   이고, 미결 7번이 "15fps 에서는 임팩트가 격자에 아예 없는 경우가 많아 측정
   자체가 성립하지 않았다"고 적어 두었다. 클립마다 저fps 경고가 뜬다
-- **단위가 다르다.** 셋 다 **이벤트 클립**이다 — 방송 화면, 여러 선수, 카메라
+- **단위가 다르다.** **이벤트 클립**이다 — 방송 화면, 여러 선수, 카메라
   전환. 우리 루브릭은 **(종목, 동작)** 으로 한 선수의 한 동작을 본다(미결 3번)
 - **정답이 없다.** 이벤트·판정 라벨뿐이고 **자세 정답이 아니다.** `/labels/`
   가 정리한 네 층 중 어느 층도 이 데이터로는 안 열린다 →
@@ -61,11 +65,8 @@ uv run python -m scripts.dataset_pipeline.run --sport soccer \
 | 가진 것 | 해상도 · fps |
 |---|---|
 | `data/goldenset/soccerkicks_video` 19건 | 522×358 ~ **1280×720**, 24~30fps |
-| `data/bball_shot.mp4` · `bball_layup_trim.mp4` | **1920×1080**, 24fps |
-| `data/baseball_pitch_trim.mp4` | **2160×3840**, 25fps |
 
-전부 **단독 선수 · 단일 동작**이고 게이트도 대용량 다운로드도 필요 없다.
-`--local-dir` 은 어느 종목에서나 쓸 수 있다.
+**단독 선수 · 단일 동작**이고 게이트도 대용량 다운로드도 필요 없다.
 
 ## 저장 위치
 
@@ -80,8 +81,6 @@ uv run python -m scripts.dataset_pipeline.run --sport soccer \
     clips/batch_0000/       현재 배치 원본
     results/batch_0000.json 지표
     _state.json             진행 커서
-  baseball/ …
-  basketball/_incoming/     🔴 PL-NBA 를 여기에 직접 넣는다
 ```
 
 `SPORTS_DATASET_ROOT` 로 바꿀 수 있다. 여유 공간은 확인했다 — **212GB**.
@@ -121,16 +120,14 @@ EC2에서 돌린다면 키를 넣지 말고 **인스턴스 역할**을 쓴다. �
 ```bash
 # ⚽ 축구 — huggingface-cli login 필요 (gated=auto, 약관 동의)
 --sport soccer --rubric rubrics/football_instep_shot.yaml --event Shots
-
-# ⚾ 야구 — 투구다. baseball_pitching 과 맞는다(타격 루브릭은 없다, 미결 3번)
---sport baseball --rubric rubrics/baseball_pitching.yaml --split val --event "Called Strike"
-
-# 🏀 농구 — 먼저 클립을 <root>/basketball/_incoming/ 에 넣을 것
---sport basketball --rubric rubrics/basketball_jump_shot.yaml
 ```
 
-🔴 `--rubric` 은 **필수 인자**다. 기본값을 두면 야구 영상이 축구 루브릭으로
-조용히 채점된다 — 미결 17번 「하지 말 것」이 지목한 함정이다.
+🔴 `--sport` 는 `soccer` 하나다 (2026.09.11 축구 단일 종목 전환). 다른 값을
+주면 `sources.get_source` 가 멈춘다 — 받아 놓고 채점할 루브릭이 없는 상태를
+만들지 않기 위해서다.
+
+🔴 `--rubric` 은 **필수 인자**다. 기본값을 두면 인사이드 패스 영상이 인스텝
+루브릭으로 조용히 채점된다 — 미결 17번 「하지 말 것」이 지목한 함정이다.
 
 `--stage pose`(기본)는 포즈+지표까지, `--stage full` 은 판정(LLM)까지 간다.
 100건에 LLM을 태우면 오래 걸리므로 처음에는 `pose` 로 본다.
@@ -145,5 +142,5 @@ EC2에서 돌린다면 키를 넣지 말고 **인스턴스 역할**을 쓴다. �
   결과 JSON 이 그대로 들고 있는다
 - **`observe=False` 로 포즈를 뽑는다.** 기본값이면 데이터셋 수천 건이 서비스
   입력 관측에 섞여 그 통계가 못 쓰게 된다(미결 12번과 같은 축)
-- 야구는 **`prefetch` 로 배치를 한 번에 꺼낸다.** `.tar.xz` 는 랜덤 접근이
-  없어서 하나씩 꺼내면 28GB 를 건수만큼 다시 푼다
+- 출처가 `prefetch` 를 내놓으면 배치를 한 번에 꺼낸다 — 아카이브형 출처를
+  하나씩 꺼내면 압축을 건수만큼 다시 푼다 (야구 어댑터가 그랬다)

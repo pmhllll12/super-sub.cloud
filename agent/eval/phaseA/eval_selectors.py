@@ -26,7 +26,13 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent / "labeling"))
 from targets import enumerate_targets, load_candidates, target_key  # noqa: E402
 
-ROOT = Path("/mnt/d/supersub-phaseA")
+
+# 🔴 경로를 박지 않는다 — `eval/phaseA/paths.py` 가 정한다 (미결 14번).
+#    박아 두면 다른 기계에서 안 돌고, 저장소 사본을 떠도 읽히지 않는다.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from paths import external_root  # noqa: E402
+
+ROOT = external_root()
 OUT = ROOT / "eval_b1"
 OUT.mkdir(exist_ok=True)
 

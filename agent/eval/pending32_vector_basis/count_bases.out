@@ -1,0 +1,18 @@
+축구 인스텝 클립 18편 · 루브릭 항목 6개 · 그 항목들이 쓰는 지표 7개
+
+지표별 실측 보유율 — 🔴 루브릭이 「쓴다」와 「실제로 재진다」는 다르다
+  follow_through_duration_frames                18/18
+  hip_rotation_range_deg                        15/18
+  plant_foot_to_ball_offset                      0/18
+  plant_knee_angle_at_impact                    18/18
+  swing_hip_flexion_after_impact_deg            18/18
+  swing_knee_angle_at_impact                    18/18
+  trunk_forward_lean_deg_at_impact              18/18
+
+🔴 한 번도 안 잡힌 지표 1개 — 축에서 뺀다: ['plant_foot_to_ball_offset']
+
+전 축이 채워진 클립 15/18편 (항목 5개 · 지표 6개)
+고유 벡터 수 — 같으면 두 선수가 벡터로 구분되지 않는다
+  (A 지표값   ) 15/15
+  (B 등급    ) 12/15  🔴 겹친 클립 3편
+  (C stat  ) 15/15

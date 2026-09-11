@@ -60,11 +60,14 @@ transformers 버전 창에만 맞는다 — 4.x에서는 `RopeParameters` import
 
 ## 지원 범위
 
+🔴 **축구 단일 종목이다** (2026.09.11, 팀 방향 결정). 야구·농구 루브릭 4개와
+그 수집 어댑터를 지웠다. 코드는 git 이력에 있고, 되살리려면 루브릭이 먼저다 —
+`판정`·`측정` 경로 자체는 종목에 매여 있지 않다.
+
 채점 기준은 **(종목, 동작) 단위**로만 쓸 수 있다. 같은 지표가 동작에 따라
 반대로 채점되기 때문이다 — 임팩트 시 무릎각 176도는 인스텝 슈팅에서 1등급,
-인사이드 패스에서는 0등급("패스가 아니라 슈팅 궤적")이다. 농구는 더 분명해서
-점프슛은 `extension_peak`, 레이업은 `distal_apex`로 임팩트로 삼는 프레임
-자체가 다르다. "축구용 루브릭 하나"는 성립하지 않는다.
+인사이드 패스에서는 0등급("패스가 아니라 슈팅 궤적")이다. "축구용 루브릭 하나"는
+성립하지 않는다.
 
 지금 여는 범위는 **종목당 한 동작**이다. 동작을 하나 여는 실제 비용은 YAML
 작성이 아니라 임계값 실측·지도자 검수·검증 클립 확보이며, 열린 동작이 늘면
@@ -73,16 +76,7 @@ transformers 버전 창에만 맞는다 — 4.x에서는 `RopeParameters` import
 | 루브릭 | status | 검수 | 실클립 |
 |---|---|---|---|
 | 축구 인스텝 슈팅 | active | 전 | 통과 |
-| 야구 투구 | active | 전 | 통과 — 스윙 측 지정 필요, 임팩트 정의 재검토 |
-| 농구 점프슛 | active | 전 | 통과 — 임팩트 정의 재검토 |
 | 축구 인사이드 패스 | draft | 전 | 미확인 |
-| 농구 레이업 | draft | 전 | 통과 |
-
-**임팩트 정의 재검토**란: 팔로 던지는 동작에서 `extension_peak`이 릴리스가
-아니라 신전 **중간**을 잡는다. 야구 투구 실클립에서 임팩트 시 팔꿈치각 61도
-(25fps 샘플링 102도)인데 루브릭은 릴리스 각도 150~172도를 전제한다. 발이 공에
-닿는 순간이 곧 피크인 축구와 달리, 팔은 피크 이후로도 신전이 이어진다. 임팩트
-사건을 하나 더 만들지, bands를 다시 잡을지는 지도자 검수와 함께 정한다.
 
 `status`는 **범위**(지금 여는 동작인가), `review_required`는 **검수**(임계값이
 확정됐는가)로 축이 다르다. 위 표처럼 열려 있으면서 검수 전일 수 있다(결과에
@@ -93,19 +87,18 @@ draft도 포함해 돌기 때문에, 닫혀 있는 동안 파이프라인이 바
 
 ## 스윙 측 지정
 
-던지는 팔·차는 발은 기본적으로 말단 관절의 이동량으로 판별하는데, **팔 종목에서
-이 판별이 약하다.** 현재 동작점(실효 25fps)의 야구 투구 실클립에서 던지는 왼팔
-23.5 대 글러브 오른팔 33.1로 뒤집히고, 농구 레이업은 18.7 대 17.1로 8.7% 차이다.
-관측 비율로 할인하거나 손 최고점으로 바꿔 봐도 한 클립을 맞히면 다른 클립이
-뒤집힌다. `target_fps`를 15에서 30으로 올려도 뒤집힘은 남았다(마진 34% → 29%).
-재계산은 `eval/pending6_side/`가 GPU 없이 한다.
+차는 발은 기본적으로 말단 관절의 이동량으로 판별한다. **팔 종목에서는 이
+판별이 약했다** — 종목 정리 전 실측에서 던지는 팔 23.5 대 반대쪽 33.1로
+뒤집혔고, 손 최고점으로 바꾸거나 `target_fps`를 올려도(마진 34% → 29%) 한
+클립을 맞히면 다른 클립이 뒤집혔다. 축구만 남은 지금도 **자동 판별을 정답으로
+두지 않는다** — 재계산은 `eval/pending6_side/`가 GPU 없이 한다.
 
 그래서 사람이 지정할 수 있게 열어 두었다. 지정이 없으면 기존 자동 판별을 쓴다.
 
 ```
-uv run python scripts/measure.py data/pitch.mp4 --limb arm --side left
-uv run python scripts/analyze.py data/pitch.mp4 --rubric rubrics/baseball_pitching.yaml --side left
-POST /api/analyze/video?rubric=baseball/pitching&side=left
+uv run python scripts/measure.py data/shot.mp4 --limb leg --side right
+uv run python scripts/analyze.py data/shot.mp4 --rubric rubrics/football_instep_shot.yaml --side right
+POST /api/analyze/video?rubric=football/instep_shot&side=right
 ```
 
 **지정한 값은 루브릭의 `impact_limb`에만 적용되고, 반대쪽 사지는 언제나 auto다.**
@@ -125,10 +118,7 @@ target 15의 값이라 정정한다). 그래서 팔 루브릭에 `side=left`를 
 agent/
 ├── rubrics/                        # 채점 기준 + bands(등급 구간) + titles(칭호)
 │   ├── football_instep_shot.yaml   # active — 종목당 한 동작만 연다
-│   ├── baseball_pitching.yaml      # active
-│   ├── basketball_jump_shot.yaml   # active
-│   ├── football_inside_pass.yaml   # draft — 검수 대기, 선택지에 안 뜬다
-│   └── basketball_layup.yaml       # draft
+│   └── football_inside_pass.yaml   # draft — 검수 대기, 선택지에 안 뜬다
 ├── src/supersub_agent/
 │   ├── pose.py       # OpenCV 디코딩 + RT-DETR 검출 + ViTPose 추정
 │   ├── features.py   # 정규화 → 구간 분할 → 채점 지표 산출

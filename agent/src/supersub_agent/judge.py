@@ -24,7 +24,11 @@ import os
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
+
+import yaml
 
 # 스키마에 grade가 없는 것은 의도된 것이다 — 등급은 코드가 정한다.
 #
@@ -63,7 +67,12 @@ SYSTEM_TEMPLATE = """당신은 {sport} 기술 평가관입니다. 판정은 이�
 - metric_ref: 근거가 된 측정값의 이름."""
 
 # 종목 이름이 없으면 종목을 특정하지 않는 표현을 쓴다.
-SPORT_NAMES = {"football": "축구", "baseball": "야구", "basketball": "농구"}
+#
+# 🔴 **여기에 루브릭 없는 종목을 더하지 않는다** (2026.09.11 축구 단일 종목
+# 전환). 이름표만 있고 루브릭이 없으면 그 종목 작업은 어차피 `pick_rubric`
+# 에서 멈추는데, 이름표가 있으면 **멈춘 이유가 「지원하지 않는 종목」이
+# 아니라 설정 실수처럼 읽힌다.**
+SPORT_NAMES = {"football": "축구"}
 
 # 등급을 **번호 없이** 부르는 낱말. 프롬프트에서 어투와 수준을 짝지어 주는 자리다.
 #
@@ -73,11 +82,56 @@ SPORT_NAMES = {"football": "축구", "baseball": "야구", "basketball": "농구
 # (2등급 8건 중 4건). 낱말은 어투를 정해 주면서 문장에 새어도 숫자가 아니다.
 LEVEL_WORDS = {2: "잘함", 1: "보통", 0: "아쉬움"}
 
+#: 지표 라벨의 정본. `contracts/metric_definitions.yaml` 이고 적재 시드와 같은
+#: 파일이다 — 화면·백엔드·프롬프트가 **같은 이름**을 쓰게 하려는 것이다.
+_METRIC_DEFS = Path(__file__).resolve().parents[2] / "contracts" / "metric_definitions.yaml"
+
+
+@lru_cache(maxsize=1)
+def metric_labels() -> dict[str, str]:
+    """지표 코드 → 사람이 읽을 라벨 (`swing_knee_angle_at_impact` → 「임팩트 시 주동 무릎 각」).
+
+    🔴 **왜 필요한가.** 프롬프트에 코드 이름을 넣으면 모델이 그대로 베껴
+    쓴다 — 실서버에 「측정값 `swing_knee_angle_at_impact`=151.6로 …」가 그대로
+    나갔다(미결 `ho` 43번 ㉱). `build_prompt` 가 이미 쓰는 논리와 같다:
+    **프롬프트에 없는 것은 베껴 쓸 수 없다.**
+
+    🔴 **`unit` 은 일부러 안 쓴다.** `follow_through_duration_frames` 의 선언
+    단위가 `s` 인데 `features` 의 실제 값은 **프레임**이다(초 환산은 봉투의
+    `frame_metrics_seconds` 가 따로 싣는다 — E-3). 단위를 붙이면 12프레임을
+    **「12초」라고 지어내게 된다.**
+
+    누락은 걱정하지 않아도 된다 —
+    `test_metric_definitions.py::test_every_rubric_metric_is_declared` 가
+    모든 루브릭 지표가 이 파일에 선언돼 있음을 이미 강제한다. 그래도 못 찾으면
+    **코드를 그대로 돌려주지 않고** 부르는 쪽이 항목명으로 떨어지게 한다.
+    """
+    if not _METRIC_DEFS.exists():  # 배포에 파일이 없으면 라벨 없이 간다
+        return {}
+    doc = yaml.safe_load(_METRIC_DEFS.read_text(encoding="utf-8")) or {}
+    return {
+        m["code"]: m["label"]
+        for m in (doc.get("metrics") or [])
+        if m.get("code") and m.get("label")
+    }
+
+
+def label_for(code: str, fallback: str = "") -> str:
+    """지표 코드의 라벨. 🔴 **없으면 코드를 되돌려주지 않는다** — 그러면 유출이 살아난다."""
+    return metric_labels().get(code) or fallback or "측정값"
+
+
+def _labelled(measured: dict[str, Any]) -> str:
+    """`{코드: 값}` 을 사람이 읽는 한 줄로. JSON 을 그대로 넣지 않기 위한 자리."""
+    return " · ".join(f"{label_for(k)} {v}" for k, v in measured.items())
+
 
 def system_prompt(sport: str = "") -> str:
     """종목에 맞는 평가관 프롬프트.
 
-    고정 문구로 두면 야구 결과를 축구 평가관이 쓴다 — 실제로 그랬다.
+    지금 루브릭이 있는 종목은 축구뿐이지만 **기본값을 축구로 두지 않는다** —
+    종목 코드가 비거나 모르는 값이면 「생활체육」으로 쓴다. 고정 문구로 두면
+    다른 종목 결과를 축구 평가관이 쓰고, 실제로 그랬다.
     """
     return SYSTEM_TEMPLATE.format(sport=SPORT_NAMES.get(sport, "생활체육"))
 
@@ -103,6 +157,17 @@ MODELS = {
     "7.8B": "LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct",  # 원격 코드 — 버전 고정 필요
 }
 NATIVE = {"1.2B"}
+
+# 🔴 **가중치를 커밋으로 고정한다** — `pose.py` 와 같은 이유다(미결 11번).
+# 저장소 이름만 주면 업스트림이 갈아 끼워도 조용히 바뀌고, 로컬 캐시가 살아
+# 있는 동안은 드러나지 않는다. 아래 해시는 지금까지 판정을 낸 스냅숏 그대로다.
+#
+# 🔴 **3.5 계열(2.4B·7.8B)은 비워 둔다** — 이 기계에 캐시가 없어서 확인할 수 없고,
+# **확인 못 한 해시를 적는 것은 안 적는 것보다 나쁘다**(있는 근거처럼 보인다).
+# 그 둘은 원격 코드에 의존해 `transformers` 버전까지 함께 고정해야 한다.
+MODEL_REVISIONS = {
+    "LGAI-EXAONE/EXAONE-4.0-1.2B": "3abf2810673c7c0778df64a73c2d52eab32d91c4",
+}
 
 # vLLM(OpenAI 호환) 서버 주소를 담는 환경변수.
 #
@@ -149,7 +214,9 @@ def build_prompt(criterion, metrics: dict[str, Any], grade: int) -> str:
     없으면 모델이 잘한 항목을 감점처럼 쓴다(미결 23번 1회차).
     """
     word = LEVEL_WORDS[grade]
-    lines = [f"평가 항목: {criterion.id} ({criterion.name})"]
+    # 🔴 `criterion.id` 를 넣지 않는다 — `swing_knee_extension` 같은 코드가
+    #    문장에 샌다(미결 `ho` 43번 ㉱). 항목 이름만으로 충분하다.
+    lines = [f"평가 항목: {criterion.name}"]
     if criterion.rationale:
         lines.append(f"\n항목 취지: {criterion.rationale.strip()}")
 
@@ -162,17 +229,19 @@ def build_prompt(criterion, metrics: dict[str, Any], grade: int) -> str:
     if criterion.anchors:
         lines.append("\n근거 문장 예시 (수준에 맞는 어투를 그대로 따릅니다):")
         for a in criterion.anchors:
-            measured = json.dumps(a["measured"], ensure_ascii=False)
+            # 🔴 JSON 을 그대로 넣지 않는다 — 키가 지표 코드라 문장에 샌다.
             lines.append(
-                f"- [{LEVEL_WORDS[a['grade']]}] 측정값 {measured}"
+                f"- [{LEVEL_WORDS[a['grade']]}] {_labelled(a['measured'])}"
                 f" → \"{a['evidence']}\""
             )
 
     lines.append("\n측정값 (이 숫자만 신뢰할 것):")
-    lines.append(json.dumps(metrics, ensure_ascii=False, indent=2))
+    for code, value in metrics.items():
+        lines.append(f"- {label_for(code, criterion.name)}: {value}")
     lines.append(
         f"\n이번 판정은 [{word}]입니다. "
-        f"{criterion.band_metric}={metrics.get(criterion.band_metric)}가 그 근거입니다."
+        f"{label_for(criterion.band_metric, criterion.name)}"
+        f" {metrics.get(criterion.band_metric)}가 그 근거입니다."
     )
     # 끝맺음도 수준에 맞춘다. **"고칠 점을 붙여라"를 잘한 항목에까지 요구하면
     # 모델이 칭찬할 자리에서 흠을 찾는다** — 1회차에서 2등급 문장이 무너진 데엔
@@ -268,11 +337,16 @@ class Judge:
             load_kwargs["dtype"] = torch.bfloat16
 
         remote = self.model_size not in NATIVE
+        # 🔴 고정된 커밋이 있으면 그것으로 받는다 (미결 11번). 로컬 경로를
+        # 모델로 줄 때는 표에 없으므로 아무것도 안 붙는다 — 경로에 `revision`
+        # 을 붙이면 그쪽이 무시되거나 경고를 내기 때문이다.
+        pin = ({"revision": MODEL_REVISIONS[self.model_id]}
+               if self.model_id in MODEL_REVISIONS else {})
         self._tokenizer = AutoTokenizer.from_pretrained(
-            self.model_id, trust_remote_code=remote
+            self.model_id, trust_remote_code=remote, **pin
         )
         self._model = AutoModelForCausalLM.from_pretrained(
-            self.model_id, trust_remote_code=remote, **load_kwargs
+            self.model_id, trust_remote_code=remote, **pin, **load_kwargs
         )
         self._model.eval()
 

@@ -1,0 +1,746 @@
+[
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "0Fet8TyoNR4.mp4",
+  "frames": 230,
+  "tools": [
+   "baseball_bat",
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": true,
+  "why": [
+   "baseball_bat"
+  ],
+  "seconds": 28.9
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "3R1kvNrGJK0.mp4",
+  "frames": 300,
+  "tools": [
+   "baseball_bat"
+  ],
+  "ball": false,
+  "rejected": true,
+  "why": [
+   "baseball_bat"
+  ],
+  "seconds": 23.4
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "3USSmzO001k.mp4",
+  "frames": 300,
+  "tools": [
+   "baseball_bat",
+   "tennis_racket"
+  ],
+  "ball": false,
+  "rejected": true,
+  "why": [
+   "baseball_bat",
+   "tennis_racket"
+  ],
+  "seconds": 22.7
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "5-jBTNp5IQA.mp4",
+  "frames": 300,
+  "tools": [],
+  "ball": false,
+  "rejected": false,
+  "why": [],
+  "seconds": 22.6
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "6hrcRyIYTrA.mp4",
+  "frames": 300,
+  "tools": [
+   "baseball_bat"
+  ],
+  "ball": false,
+  "rejected": true,
+  "why": [
+   "baseball_bat"
+  ],
+  "seconds": 22.6
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "8gmHKqDxXdg.mp4",
+  "frames": 100,
+  "tools": [
+   "baseball_bat",
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": true,
+  "why": [
+   "baseball_bat"
+  ],
+  "seconds": 6.3
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "Atzrde5uGcM.mp4",
+  "frames": 300,
+  "tools": [
+   "baseball_bat"
+  ],
+  "ball": false,
+  "rejected": true,
+  "why": [
+   "baseball_bat"
+  ],
+  "seconds": 19.7
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "C7icGyrdROM.mp4",
+  "frames": 300,
+  "tools": [
+   "baseball_bat"
+  ],
+  "ball": false,
+  "rejected": true,
+  "why": [
+   "baseball_bat"
+  ],
+  "seconds": 21.2
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "CFjNxCZhn_8.mp4",
+  "frames": 300,
+  "tools": [],
+  "ball": false,
+  "rejected": false,
+  "why": [],
+  "seconds": 23.3
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "Fz16t9SrF3U.mp4",
+  "frames": 300,
+  "tools": [
+   "baseball_bat"
+  ],
+  "ball": false,
+  "rejected": true,
+  "why": [
+   "baseball_bat"
+  ],
+  "seconds": 22.6
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "GS-PcxmaHmQ.mp4",
+  "frames": 300,
+  "tools": [
+   "baseball_bat",
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": true,
+  "why": [
+   "baseball_bat"
+  ],
+  "seconds": 20.6
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "IYFifBJ9lH8.mp4",
+  "frames": 300,
+  "tools": [],
+  "ball": false,
+  "rejected": false,
+  "why": [],
+  "seconds": 21.0
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "IeDin6oB-IY.mp4",
+  "frames": 300,
+  "tools": [],
+  "ball": false,
+  "rejected": false,
+  "why": [],
+  "seconds": 21.2
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "LXjM7nBZcak.mp4",
+  "frames": 192,
+  "tools": [],
+  "ball": false,
+  "rejected": false,
+  "why": [],
+  "seconds": 13.7
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "LhD_fnHt_xg.mp4",
+  "frames": 243,
+  "tools": [],
+  "ball": false,
+  "rejected": false,
+  "why": [],
+  "seconds": 18.4
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "N5zWQkoLM3M.mp4",
+  "frames": 300,
+  "tools": [
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": false,
+  "why": [],
+  "seconds": 21.2
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "O2GSaYqH8JY.mp4",
+  "frames": 300,
+  "tools": [
+   "sports_ball",
+   "tennis_racket"
+  ],
+  "ball": true,
+  "rejected": true,
+  "why": [
+   "tennis_racket"
+  ],
+  "seconds": 24.0
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "V_whuvMjg_8.mp4",
+  "frames": 240,
+  "tools": [
+   "baseball_bat",
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": true,
+  "why": [
+   "baseball_bat"
+  ],
+  "seconds": 17.2
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "X6dC9pu5H3k.mp4",
+  "frames": 270,
+  "tools": [
+   "baseball_bat"
+  ],
+  "ball": false,
+  "rejected": true,
+  "why": [
+   "baseball_bat"
+  ],
+  "seconds": 17.8
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "YNMHMKb5Md4.mp4",
+  "frames": 174,
+  "tools": [
+   "baseball_bat"
+  ],
+  "ball": false,
+  "rejected": true,
+  "why": [
+   "baseball_bat"
+  ],
+  "seconds": 13.5
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "ZMy0t-CSZiU.mp4",
+  "frames": 300,
+  "tools": [
+   "baseball_bat"
+  ],
+  "ball": false,
+  "rejected": true,
+  "why": [
+   "baseball_bat"
+  ],
+  "seconds": 21.7
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "ZS-wgeg2qkI.mp4",
+  "frames": 300,
+  "tools": [
+   "baseball_bat"
+  ],
+  "ball": false,
+  "rejected": true,
+  "why": [
+   "baseball_bat"
+  ],
+  "seconds": 21.7
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "Zp9aDp2YTBw.mp4",
+  "frames": 240,
+  "tools": [
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": false,
+  "why": [],
+  "seconds": 15.8
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "bh6Cvz2orzQ.mp4",
+  "frames": 300,
+  "tools": [
+   "baseball_bat",
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": true,
+  "why": [
+   "baseball_bat"
+  ],
+  "seconds": 20.1
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "cDRi9AzrapA.mp4",
+  "frames": 250,
+  "tools": [
+   "baseball_bat"
+  ],
+  "ball": false,
+  "rejected": true,
+  "why": [
+   "baseball_bat"
+  ],
+  "seconds": 17.0
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "e8uB0GZsVOQ.mp4",
+  "frames": 240,
+  "tools": [
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": false,
+  "why": [],
+  "seconds": 18.3
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "g_wHimPF9o8.mp4",
+  "frames": 300,
+  "tools": [
+   "baseball_bat"
+  ],
+  "ball": false,
+  "rejected": true,
+  "why": [
+   "baseball_bat"
+  ],
+  "seconds": 21.2
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "gg5xRWjw3f8.mp4",
+  "frames": 300,
+  "tools": [
+   "baseball_bat"
+  ],
+  "ball": false,
+  "rejected": true,
+  "why": [
+   "baseball_bat"
+  ],
+  "seconds": 19.3
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "goeDWOVL95g.mp4",
+  "frames": 146,
+  "tools": [
+   "baseball_bat",
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": true,
+  "why": [
+   "baseball_bat"
+  ],
+  "seconds": 9.6
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "h_3LqD2Pl-E.mp4",
+  "frames": 300,
+  "tools": [
+   "baseball_bat",
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": true,
+  "why": [
+   "baseball_bat"
+  ],
+  "seconds": 19.1
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "hz-SpF35_BE.mp4",
+  "frames": 300,
+  "tools": [
+   "baseball_bat"
+  ],
+  "ball": false,
+  "rejected": true,
+  "why": [
+   "baseball_bat"
+  ],
+  "seconds": 20.5
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "idueIYDAbZc.mp4",
+  "frames": 296,
+  "tools": [],
+  "ball": false,
+  "rejected": false,
+  "why": [],
+  "seconds": 19.2
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "ihWykL5mYRI.mp4",
+  "frames": 300,
+  "tools": [
+   "baseball_bat"
+  ],
+  "ball": false,
+  "rejected": true,
+  "why": [
+   "baseball_bat"
+  ],
+  "seconds": 19.2
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "mTP2kap9cIw.mp4",
+  "frames": 300,
+  "tools": [
+   "baseball_bat"
+  ],
+  "ball": false,
+  "rejected": true,
+  "why": [
+   "baseball_bat"
+  ],
+  "seconds": 20.4
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "sGKeqfxwq5E.mp4",
+  "frames": 300,
+  "tools": [
+   "baseball_bat"
+  ],
+  "ball": false,
+  "rejected": true,
+  "why": [
+   "baseball_bat"
+  ],
+  "seconds": 19.3
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "sYl2jCqsSKo.mp4",
+  "frames": 300,
+  "tools": [
+   "baseball_bat"
+  ],
+  "ball": false,
+  "rejected": true,
+  "why": [
+   "baseball_bat"
+  ],
+  "seconds": 20.8
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "w-AQcjcoDyA.mp4",
+  "frames": 293,
+  "tools": [],
+  "ball": false,
+  "rejected": false,
+  "why": [],
+  "seconds": 21.4
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "wjJDs0qmwqE.mp4",
+  "frames": 300,
+  "tools": [
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": false,
+  "why": [],
+  "seconds": 20.9
+ },
+ {
+  "layer": "baseball(음성·거절 기대)",
+  "clip": "xMIUw5mi3Eo.mp4",
+  "frames": 291,
+  "tools": [
+   "baseball_bat"
+  ],
+  "ball": false,
+  "rejected": true,
+  "why": [
+   "baseball_bat"
+  ],
+  "seconds": 20.6
+ },
+ {
+  "layer": "soccer(양성·통과 기대)",
+  "clip": "10_penalty1_91169c09.avi",
+  "frames": 61,
+  "tools": [
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": false,
+  "why": [],
+  "seconds": 4.0
+ },
+ {
+  "layer": "soccer(양성·통과 기대)",
+  "clip": "11_freekick_930ede06.avi",
+  "frames": 66,
+  "tools": [
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": false,
+  "why": [],
+  "seconds": 4.6
+ },
+ {
+  "layer": "soccer(양성·통과 기대)",
+  "clip": "12_penalty_a821a39e.avi",
+  "frames": 116,
+  "tools": [
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": false,
+  "why": [],
+  "seconds": 7.3
+ },
+ {
+  "layer": "soccer(양성·통과 기대)",
+  "clip": "13_freekick_616f8db5.avi",
+  "frames": 102,
+  "tools": [
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": false,
+  "why": [],
+  "seconds": 6.5
+ },
+ {
+  "layer": "soccer(양성·통과 기대)",
+  "clip": "14_penalty1_980ede07.avi",
+  "frames": 75,
+  "tools": [
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": false,
+  "why": [],
+  "seconds": 5.1
+ },
+ {
+  "layer": "soccer(양성·통과 기대)",
+  "clip": "14_penalty_db7e99af.avi",
+  "frames": 82,
+  "tools": [
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": false,
+  "why": [],
+  "seconds": 5.6
+ },
+ {
+  "layer": "soccer(양성·통과 기대)",
+  "clip": "16_penalty1_44038699.avi",
+  "frames": 64,
+  "tools": [
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": false,
+  "why": [],
+  "seconds": 4.4
+ },
+ {
+  "layer": "soccer(양성·통과 기대)",
+  "clip": "18_freekick1_f4ff1a25.avi",
+  "frames": 44,
+  "tools": [
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": false,
+  "why": [],
+  "seconds": 2.8
+ },
+ {
+  "layer": "soccer(양성·통과 기대)",
+  "clip": "18_freekick3_681418eb.avi",
+  "frames": 62,
+  "tools": [
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": false,
+  "why": [],
+  "seconds": 4.0
+ },
+ {
+  "layer": "soccer(양성·통과 기대)",
+  "clip": "18_freekick_5033c49b.avi",
+  "frames": 57,
+  "tools": [
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": false,
+  "why": [],
+  "seconds": 3.7
+ },
+ {
+  "layer": "soccer(양성·통과 기대)",
+  "clip": "19_freekick1_da3f1406.avi",
+  "frames": 63,
+  "tools": [
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": false,
+  "why": [],
+  "seconds": 4.5
+ },
+ {
+  "layer": "soccer(양성·통과 기대)",
+  "clip": "19_freekick2_86f6c708.avi",
+  "frames": 138,
+  "tools": [
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": false,
+  "why": [],
+  "seconds": 9.8
+ },
+ {
+  "layer": "soccer(양성·통과 기대)",
+  "clip": "19_freekick_940922f8.avi",
+  "frames": 57,
+  "tools": [
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": false,
+  "why": [],
+  "seconds": 3.7
+ },
+ {
+  "layer": "soccer(양성·통과 기대)",
+  "clip": "21_freekick_3ee04674.avi",
+  "frames": 70,
+  "tools": [
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": false,
+  "why": [],
+  "seconds": 4.5
+ },
+ {
+  "layer": "soccer(양성·통과 기대)",
+  "clip": "23_freekick_a972f2ea.avi",
+  "frames": 57,
+  "tools": [
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": false,
+  "why": [],
+  "seconds": 4.0
+ },
+ {
+  "layer": "soccer(양성·통과 기대)",
+  "clip": "25_freekick1_86d715b9.avi",
+  "frames": 43,
+  "tools": [
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": false,
+  "why": [],
+  "seconds": 2.7
+ },
+ {
+  "layer": "soccer(양성·통과 기대)",
+  "clip": "25_freekick_c76aa778.avi",
+  "frames": 46,
+  "tools": [
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": false,
+  "why": [],
+  "seconds": 2.9
+ },
+ {
+  "layer": "soccer(양성·통과 기대)",
+  "clip": "OpenPose_5T_df2d1ce9.avi",
+  "frames": 63,
+  "tools": [
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": false,
+  "why": [],
+  "seconds": 4.6
+ },
+ {
+  "layer": "soccer(양성·통과 기대)",
+  "clip": "Y1_2ff12fb9.avi",
+  "frames": 31,
+  "tools": [
+   "sports_ball"
+  ],
+  "ball": true,
+  "rejected": false,
+  "why": [],
+  "seconds": 2.2
+ }
+]
