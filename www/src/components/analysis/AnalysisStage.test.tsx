@@ -29,6 +29,25 @@ vi.mock('@/lib/personDetector', () => ({
 }))
 
 /**
+ * `GET /videos/{id}/report` 의 대역 몸통 — **최소한만 채운다.** 2026-09-11 에
+ * 진행 체크리스트가 이 응답만으로 「끝났다」를 정하게 바뀌었으므로, 「예」를
+ * 누르고 리포트가 필요한 시험은 이 값을 꼭 답해야 폴링이 끝난다(안 답하면
+ * `not-ready`·`error` 로 읽혀 영영 되묻는다).
+ */
+const REPORT_MOCK = {
+  video_id: 'v1',
+  analyzed_at: '2026-09-03T00:00:00Z',
+  summary: '요약',
+  provisional: false,
+  total_score: null,
+  overall_grade: null,
+  breakdown: [],
+  scenes: [],
+  previews: null,
+  keypoint_quality: null,
+}
+
+/**
  * 🔴 **영상이 실린 것으로 세운다.** jsdom 의 `<video>` 는 `readyState` 도
  * `videoWidth` 도 0 이라, 사람 따라가기 루프가 `readyState < 2` 에서 영영
  * 되돌아간다 — 그러면 관절이 안 붙어 「이 사람이 맞습니까?」 관문을 시험할 수
@@ -665,6 +684,11 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
           { status: 201 },
         )
       }
+      // 🔴 「끝났다」가 이제 이 응답만으로 정해진다(2026-09-11, REPORT_MOCK
+      // 주석 참고) — 여기서 안 답하면 폴링이 영영 안 끝난다.
+      if (url.endsWith('/report')) {
+        return new Response(JSON.stringify(REPORT_MOCK), { status: 200 })
+      }
       throw new Error(`예상하지 못한 요청: ${url}`)
     })
     vi.stubGlobal('fetch', fetchMock)
@@ -811,6 +835,12 @@ describe('영상 분석 — 저장 안 한 영상은 떠날 때 지운다', () =
           }),
           { status: 201 },
         )
+      }
+      // 🔴 이 시험들은 리포트 저장·삭제를 보는 것이지 리포트 내용을 보는 것이
+      // 아니지만, 「끝났다」가 이제 이 응답으로만 정해지므로(2026-09-11) 여기서
+      // 204 로 답하면(과거 그랬듯) `res.json()` 이 깨져 폴링이 영영 안 끝난다.
+      if (url.endsWith('/report')) {
+        return new Response(JSON.stringify(REPORT_MOCK), { status: 200 })
       }
       return new Response(null, { status: 204 })
     })
