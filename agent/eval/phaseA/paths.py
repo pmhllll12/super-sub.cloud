@@ -71,6 +71,27 @@ def require_external(what: str = "") -> Path:
     return root
 
 
+_DEFAULT_SOCCER = Path("/mnt/d/sports_dataset/soccer/clips")
+
+
+def soccer_clips_root() -> Path:
+    """축구 클립(`*.avi`) — **Phase A 자산이 아니다.**
+
+    Phase A 골든셋 39편은 전부 야구(Kinetics `hitting baseball` 전수)라,
+    「축구인가」를 묻는 회차(미결 `ho` 43번 ㉮)에는 **양성 층이 없다.**
+    그 층을 여기서 온다.
+
+    🔴 **다른 데이터셋인데 왜 이 파일에 두는가.** `tests/test_eval_paths.py`
+    가 `eval/` 어디에도 기계별 경로를 못 박게 막고, 그 검사 문구가
+    **「예외 목록에 추가하는 것은 답이 아니다」**라고 적어 두었기 때문이다.
+    경로를 적어도 되는 자리는 이 모듈 하나다 — 두 번째 자리를 만들면
+    미결 14번이 되살아난다.
+
+    `SUPERSUB_SOCCER_ROOT` 로 바꾼다. **존재를 보장하지 않는다.**
+    """
+    return Path(os.environ.get("SUPERSUB_SOCCER_ROOT", _DEFAULT_SOCCER))
+
+
 def default_target() -> int:
     """동작점을 **명시하지 않는 호출자**가 쓸 값. 출처는 한 곳이다.
 

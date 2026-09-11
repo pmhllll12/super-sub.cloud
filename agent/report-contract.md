@@ -143,7 +143,7 @@
 | `out_of_band` | string | 비어 있지 않으면 0등급이 **구간 위**에서 왔다는 표시(미결 20번). 개발 확인용 |
 | `view_dependent` | string | 등급이 **촬영 방향에 의존하는가**(미결 37번). `""` · `"metric"` · 🔴 `"grade"`. 개발 확인용 — 아래 「화면에 낼 때」 참고 |
 | `stat` | number\|null | 레이더 축 값 0~100. 코드는 `stat.{sport}.{motion}.{criterion_id}` (`jin` 25번) |
-| `evidence` | string | 항목별 근거 문장 — `paik` 7번의 「특징 문장」. 🔴 **등급 표기가 없습니다**(정규식으로 뽑지 마세요) |
+| `evidence` | string | 항목별 근거 문장 — `paik` 7번의 「특징 문장」. 🔴 **등급 표기가 없습니다**(정규식으로 뽑지 마세요). 🔴 **지표 코드도 없습니다** (2026.09.11~) — 앞서 「측정값 `swing_knee_angle_at_impact`=151.6로…」가 그대로 나가던 것을 고쳤습니다. 🔴 **아직 남은 것**: 루브릭 문구에서 온 **구간 숫자**(「140~165도」)는 문장에 나올 수 있습니다 — 미결 23번이고 지도자 검수에 묶여 있습니다 |
 | `metric_ref` | string | 근거로 삼은 지표 코드. 이름·단위는 `metric_definitions.yaml` |
 
 `skipped[]` 항목은 셋입니다 — `criterion_id` · `name` · `weight`(루브릭 원값).
