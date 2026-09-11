@@ -37,6 +37,10 @@ from supersub_agent.pose import (  # noqa: E402
     select_subject_boxes,
 )
 
+# 🔴 경로를 박지 않는다 — `eval/phaseA/paths.py` 가 정한다 (미결 14번).
+from paths import external_root  # noqa: E402
+
+
 # --- 사전 등록 상수 — 결과를 보고 바꾸지 않는다 ---------------------------
 H_BINS, S_BINS = 32, 32
 APP_FLOOR = 0.3
@@ -168,7 +172,7 @@ def differing(chosen, auto) -> int:
 
 
 def main() -> None:
-    clips_dir = Path("/mnt/d/supersub-phaseA/clips")
+    clips_dir = external_root() / "clips"
     if not clips_dir.exists():
         raise SystemExit(f"🔴 클립을 찾을 수 없다: {clips_dir}")
 

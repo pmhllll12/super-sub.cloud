@@ -49,8 +49,9 @@ cd agent && uv sync && uv run pytest tests/ -q         # 지금 초록인지
 
 **(4) 코드는 저장소, 데이터는 `/mnt/d`.** 스크립트가 `/mnt/d`의 낡은 모듈을
 import해 재매핑이 빠진 채 평가가 돈 적이 있다 — **예외도 경고도 없이 숫자만
-달랐다.** 경로는 `eval/phaseA/paths.py`로 모으는 중이다(아직 14곳이 하드코딩이다,
-미결 14번).
+달랐다.** 경로는 `eval/phaseA/paths.py` 한 곳에서 정한다 (2026.09.11에 모았다,
+미결 14번). `tests/test_eval_paths.py` 가 새 하드코딩을 막는다 — **예외 목록에
+더해서 통과시키지 않는다.**
 
 ## 무엇이 무엇을 정하는가
 
@@ -91,6 +92,7 @@ uv run pytest tests/ -q     # 초록이 기본값이다
 | `test_worker.py::test_the_analysis_child_is_seen_as_busy_by_autostop` | 분석 도중에 인스턴스가 꺼지는 것 (그 작업은 `running` 인 채 남는다) |
 | `test_worker.py::test_an_empty_api_base_is_a_config_error` | 백엔드 호스트명이 기본값으로 되살아나 **공개 저장소에 다시 실리는 것** (미결 `jin` 22번) |
 | `test_worker.py::test_focus_does_not_change_the_score` | 「집중해서 볼 항목」이 채점 경로에 새어드는 것 — 그러면 **같은 영상의 점수가 사용자 선택에 따라 달라져** 선수끼리 비교가 안 된다 (미결 `paik` 8번) |
+| `test_eval_paths.py` | 평가·서비스 코드에 **기계별 경로**가 박히는 것. 박히면 다른 기계에서 안 돌고, 저장소 사본을 떠도 읽히지 않는다 (미결 14번) |
 | `test_model_pins.py` | 모델 가중치가 **이름만으로** 적재되는 것 — 업스트림이 갈아 끼우면 조용히 바뀌고 로컬 캐시가 사는 동안 안 드러난다. 표류를 캐시에 맞춰 「고정」을 올리는 것도 막는다 (미결 11번 N-1) |
 | `test_metric_definitions.py::test_every_rubric_metric_is_declared` | 새 루브릭 코드가 시드 정본에 빠진 채 배포되는 것. 에이전트 테스트는 다 통과하고 **실서버 적재에서만** `UNKNOWN_METRIC_CODE` 로 터진다 (미결 `jin` 23번) |
 

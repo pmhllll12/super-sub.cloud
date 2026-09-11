@@ -21,7 +21,7 @@ import cv2
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, "/home/ho/projects/super-sub.cloud/agent/src")
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))  # 🔴 기계별 절대경로를 박지 않는다 (미결 14번)
 
 from targets import (  # noqa: E402
     RATIOS,

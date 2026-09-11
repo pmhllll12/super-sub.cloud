@@ -18,7 +18,7 @@ import cv2
 import numpy as np
 import torch
 
-sys.path.insert(0, "/home/ho/projects/super-sub.cloud/agent/src")
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))  # 🔴 기계별 절대경로를 박지 않는다 (미결 14번)
 from supersub_agent.pose import (  # noqa: E402  (읽기 전용)
     COCO_PERSON_LABEL,
     DEFAULT_TARGET_FPS,
@@ -29,7 +29,13 @@ from supersub_agent.pose import (  # noqa: E402  (읽기 전용)
     read_frames,
 )
 
-OUT = Path("/mnt/d/supersub-phaseA/eval_b2")
+
+# 🔴 경로를 박지 않는다 — `eval/phaseA/paths.py` 가 정한다 (미결 14번).
+#    박아 두면 다른 기계에서 안 돌고, 저장소 사본을 떠도 읽히지 않는다.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from paths import external_root  # noqa: E402
+
+OUT = external_root() / "eval_b2"
 DET_THRESHOLD = 0.5
 WEIGHTS = {
     "A": {"centrality": 0.45 / 0.65, "size": 0.20 / 0.65},
@@ -59,7 +65,7 @@ def main() -> None:
     pproc = AutoProcessor.from_pretrained(POSE_MODEL, revision=POSE_MODEL_REVISION)
     pose = VitPoseForPoseEstimation.from_pretrained(POSE_MODEL, revision=POSE_MODEL_REVISION).to(dev).eval()
 
-    root = Path("/home/ho/projects/super-sub.cloud/agent/data")
+    root = (Path(__file__).resolve().parents[3] / "data")
     vids = sorted(root.glob("*.mp4")) + sorted((root / "goldenset" / "soccerkicks_video").glob("*.avi"))
     rows, diffs = [], []
 

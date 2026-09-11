@@ -3,12 +3,12 @@ import sys
 from pathlib import Path
 import numpy as np, cv2, torch
 from transformers import AutoProcessor, RTDetrForObjectDetection
-sys.path.insert(0,"/home/ho/projects/super-sub.cloud/agent/src")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))  # 🔴 기계별 절대경로를 박지 않는다 (미결 14번)
 from supersub_agent import pose as P
 dev="cuda" if torch.cuda.is_available() else "cpu"
 proc=AutoProcessor.from_pretrained(P.PERSON_DETECTOR, revision=P.PERSON_DETECTOR_REVISION)
 det=RTDetrForObjectDetection.from_pretrained(P.PERSON_DETECTOR, revision=P.PERSON_DETECTOR_REVISION).to(dev).eval()
-for p in sorted(Path("/home/ho/projects/super-sub.cloud/agent/data").glob("*.mp4")):
+for p in sorted((Path(__file__).resolve().parents[2] / "data").glob("*.mp4")):
     frames,src,sf=P.read_frames(str(p),target_fps=P.DEFAULT_TARGET_FPS)
     cnt=[];agree=[];ious=[];prev=None
     for fr in frames:

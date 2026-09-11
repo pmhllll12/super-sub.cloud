@@ -19,7 +19,14 @@ import json
 from collections import Counter
 from pathlib import Path
 
-ROOT = Path("/mnt/d/supersub-phaseA")
+import sys
+
+# 🔴 경로를 박지 않는다 — `eval/phaseA/paths.py` 가 정한다 (미결 14번).
+#    박아 두면 다른 기계에서 안 돌고, 저장소 사본을 떠도 읽히지 않는다.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from paths import external_root  # noqa: E402
+
+ROOT = external_root()
 B4 = ROOT / "eval_b4"
 
 # 합의 프레임(불일치 아님)에서 두 selector가 똑같이 얻은 점수
