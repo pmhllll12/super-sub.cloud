@@ -550,6 +550,15 @@ export const mockBackend: Backend = {
     requireUser(token)
     const v = DEMO_VIDEOS.find((x) => x.id === videoId)
     if (!v) throw new BackendError(404, 'VIDEO_NOT_FOUND', '그 영상을 찾을 수 없습니다.')
+    // 🔴 `failed` 는 `REPORT_NOT_READY` 와 다른 코드다 — 다시 물어봐도 안
+    // 바뀐다는 걸 화면이 구분해야 한다(2026-09-11, 실물에서 겪은 버그).
+    if (v.analysis_status === 'failed') {
+      throw new BackendError(
+        404,
+        'ANALYSIS_FAILED',
+        '품질 게이트 미달: 유효 프레임 비율이 기준보다 낮습니다. 재촬영이 필요합니다.',
+      )
+    }
     if (v.analysis_status !== 'succeeded') {
       throw new BackendError(404, 'REPORT_NOT_READY', '아직 분석 결과가 없습니다.')
     }

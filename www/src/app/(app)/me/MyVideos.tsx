@@ -777,9 +777,11 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
                       겹쳤다. 여기는 리포트 자리라는 것이 드러나야 한다. */}
                   {report.state === 'not-ready'
                     ? '분석 중입니다 — 끝나면 여기에 나옵니다.'
-                    : report.state === 'missing'
-                      ? '리포트를 찾을 수 없습니다.'
-                      : '리포트를 읽지 못했습니다.'}
+                    : report.state === 'failed'
+                      ? `분석에 실패했습니다 — ${report.reason}`
+                      : report.state === 'missing'
+                        ? '리포트를 찾을 수 없습니다.'
+                        : '리포트를 읽지 못했습니다.'}
                 </p>
               )}
             </section>
