@@ -2327,6 +2327,79 @@ body::-webkit-scrollbar {
   gap: 1px;
 }
 
+/* 🔴 이름과 등급을 한 줄에 — 등급을 따로 떼면 누구 것인지 한 번 더 짚어야
+   한다(사용자 요청). 등급은 이름 **오른쪽**이고, 사이를 벌려 이름이 길어져도
+   등급이 밀리지 않게 `auto` 로 민다. */
+.ss-suggest-nameline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ss-suggest-name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ss-fg);
+}
+
+/* 등급 표식 — 🔴 **색으로 서열을 말하지 않는다.** 여섯 칸에 색을 매기면
+   빨강/초록이 「나쁨/좋음」으로 읽히는데, D 가 곧 못하는 사람이라는 뜻은
+   아니다(아직 리뷰가 없어 F 인 사람도 있다 — `lib/playerGrade.ts`). 생김새는
+   하나로 두고 **글자가 값을 말한다.** */
+.ss-suggest-grade {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border: 1px solid color-mix(in srgb, var(--ss-accent) 55%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, #000 45%, transparent);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ss-accent);
+  flex: none;
+}
+
+/* 등급으로 좁히는 줄 — 판 머리 바로 아래. */
+.ss-suggest-grades {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.ss-suggest-grade-pill {
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 28%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--ss-fg) 70%, transparent);
+  cursor: pointer;
+}
+
+/* 🔴 고른 것만 또렷하고 나머지는 물러난다 — 목적지 글자 · `/me` 알약과 같은
+   규칙이다. 지금 무엇으로 좁혀 보고 있는지가 먼저 읽혀야 한다. */
+.ss-suggest-grade-pill[data-on='true'] {
+  border-color: var(--ss-accent);
+  background: var(--ss-accent);
+  /* 민트 위에서는 글자가 검어야 읽힌다(대비 1.6:1 로 데인 자리). */
+  color: #111;
+}
+
+.ss-suggest-empty {
+  padding: 8px 4px 2px;
+  text-align: center;
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--ss-fg) 62%, transparent);
+}
+
 .ss-suggest-title {
   font-size: 0.75rem;
   color: var(--ss-accent);
