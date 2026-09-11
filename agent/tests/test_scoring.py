@@ -621,3 +621,39 @@ def test_a_symmetric_band_is_what_actually_stops_the_flip(tmp_path):
     assert instep.view_dependent(
         {"trunk_forward_lean_deg_at_impact": 12.4}
     ) == "grade", "비대칭 밴드에서 뒤집힘이 안 잡혔다"
+
+
+def test_a_title_alone_does_not_mean_the_player_earned_it(rubric):
+    """🔴 `title` 은 **모든 등급에 있다** — 「받았는가」는 따로다 (`paik` 23번).
+
+    `title_for` 에 항목명 폴백이 있어 이 값은 **절대 비지 않는다.** 그런데
+    `report-contract.md` 가 그 자리를 그냥 「받은 호칭」이라고 적어 두었고,
+    화면(`www`)은 그대로 **`title` 이 채워진 항목만 호칭으로 그린다**고 구현했다
+    — 전부 채워져 있으므로 결과는 **0등급 항목에 「무너지는 축」을 다는 것**이다.
+    계약 4장이 「못 받은 것을 미달 표식으로 남기지 않는다」고 정한 것의 정반대다.
+
+    지우면 그 결함이 조용히 돌아온다. 🔴 `title_earned` 를 `title is not None`
+    으로 바꿔 쓰는 것도 여기서 걸린다.
+    """
+    for grade in (0, 1, 2):
+        result = aggregate(_judgments(grade, rubric), rubric)
+        for item in result["breakdown"]:
+            assert item["title"], f"{item['criterion_id']}: {grade}등급인데 칭호가 비었다"
+            assert item["title_earned"] is (grade == 2), (
+                f"{item['criterion_id']}: {grade}등급의 title_earned 가 "
+                f"{item['title_earned']} 다 — 「{item['title']}」"
+            )
+
+
+def test_a_grade_the_rubric_never_named_is_not_an_earned_title(rubric):
+    """🔴 루브릭이 안 적은 칭호를 **항목명으로 지어내 수여하지 않는다.**
+
+    폴백은 개발 화면이 빈칸을 안 보이게 하려는 것이지 지도자가 지어 준 칭호가
+    아니다. 최고 등급이라는 이유만으로 참을 내면, 칭호를 안 쓴 새 루브릭이
+    선수 화면에 **항목 이름을 호칭으로** 띄운다.
+    """
+    c = rubric.criteria[0]
+    assert c.title_is_earned(2) is True, "지금 루브릭은 2등급 칭호를 갖고 있다"
+    c.titles.pop(2)
+    assert c.title_for(2) == c.name, "폴백이 항목명이라는 전제가 깨졌다"
+    assert c.title_is_earned(2) is False

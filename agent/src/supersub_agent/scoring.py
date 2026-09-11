@@ -90,6 +90,19 @@ class Criterion:
         """해당 등급의 칭호. 정의되지 않았으면 항목명으로 대체한다."""
         return self.titles.get(grade) or self.name
 
+    def title_is_earned(self, grade: int) -> bool:
+        """이 칭호가 **받은 것**인가 (`paik` 23번).
+
+        🔴 `title_for` 는 폴백이 있어 **언제나 비지 않는다** — 0등급도
+        「무너지는 축」 같은 문구를 받는다. 그래서 「`title` 이 있으면 받은
+        것」으로 읽으면 화면이 **못한 항목에 호칭을 단다.** 받은 것은 최고
+        등급뿐이고, 그 선은 이미 `summarize` 가 「강점」을 부르는 선과 같다.
+
+        루브릭이 그 등급의 문구를 **안 적었으면 받지 않은 것으로 본다** —
+        폴백은 항목명이지 지도자가 지어 준 칭호가 아니다.
+        """
+        return grade == MAX_GRADE and bool(self.titles.get(grade))
+
     def band_text(self, grade: int) -> str:
         """해당 등급의 수치 구간을 사람이 읽을 문장으로 만든다.
 
@@ -682,6 +695,10 @@ def aggregate(
                 # 번호도 구간도 없다 — 미결 23번의 처방이다. 화면이 칭호·구간을
                 # 보여주려면 루브릭을 다시 열지 않고 이 두 필드를 쓰면 된다.
                 "title": c.title_for(grade),
+                # 🔴 위 `title` 은 **모든 등급에 있다** — 「받았는가」는 이쪽이
+                # 답한다 (`paik` 23번). 화면이 `title != null` 로 선을 그으면
+                # 0등급의 「무너지는 축」까지 호칭으로 그린다. 점수는 안 바뀐다.
+                "title_earned": c.title_is_earned(grade),
                 "band": c.band_text(grade),
                 # 🔴 이 0등급이 **구간 위에서** 왔는가 (미결 20번). 점수는 안
                 # 바뀐다 — 「쟀는데 못했다」와 「구간 밖이다」를 화면이 가를 수

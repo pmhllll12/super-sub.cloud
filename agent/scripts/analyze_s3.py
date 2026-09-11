@@ -340,8 +340,8 @@ def analyze_one(video: str, args, rubric, subject) -> str:
 # 함수의 산출과 그 파일이 어긋나면 빨개진다.
 # 🔴 값은 `contracts/report_schema.yaml` 의 `version` 과 **같아야 한다**
 # (테스트가 본다). 필드를 늘렸으면 minor 를 올린다 — 1.1 은 `view_dependent`
-# 가 늘어난 봉투다 (미결 `ho` 37·38번).
-REPORT_SCHEMA_VERSION = "1.1"
+# 가 늘어난 봉투다 (미결 `ho` 37·38번). 1.2 는 `title_earned` (미결 `paik` 23번).
+REPORT_SCHEMA_VERSION = "1.2"
 
 
 def build_report(
