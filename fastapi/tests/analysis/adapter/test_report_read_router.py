@@ -41,7 +41,7 @@ def _clean():
     reset_report_views()
 
 
-def _video(user_id):
+def _video(user_id, **overrides):
     v = VideoEntity(
         id=uuid4(),
         user_id=user_id,
@@ -50,6 +50,7 @@ def _video(user_id):
         duration_ms=10_000,
         side="right",
         created_at=datetime.now(timezone.utc),
+        **overrides,
     )
     _VIDEOS[v.id] = v
     return v
@@ -161,6 +162,22 @@ def test_영상은_있지만_적재_전이면_404_REPORT_NOT_READY(client):
     )
     assert res.status_code == 404
     assert error_code(res) == "REPORT_NOT_READY"
+
+
+def test_작업이_failed_면_404_ANALYSIS_FAILED_고_사유를_싣는다(client):
+    user_id = uuid4()
+    video = _video(
+        user_id,
+        analysis_status="failed",
+        analysis_failure_reason="품질 게이트 미달: 유효 프레임 비율 53% < 기준 70%.",
+    )  # 뷰는 안 넣는다 — 실패라 애초에 적재가 안 된다
+
+    res = client.get(
+        f"{V1}/videos/{video.id}/report", headers=_headers(user_id)
+    )
+    assert res.status_code == 404
+    assert error_code(res) == "ANALYSIS_FAILED"
+    assert "품질 게이트" in res.json()["error"]["message"]
 
 
 def test_인증이_없으면_401(client):

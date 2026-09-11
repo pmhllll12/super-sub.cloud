@@ -24,11 +24,19 @@ class ReadReportInteractor(ReadReportUseCase):
             return view
 
         # 없는 이유를 가른다 — 영상 자체가 없거나 남의 것이면 404 VIDEO_NOT_FOUND
-        # (존재 여부를 구별해 주지 않는 다른 경로와 같은 판단), 영상은 있는데
-        # 적재가 안 됐으면 REPORT_NOT_READY(분석은 됐는데 화면이 못 찾는 상태).
+        # (존재 여부를 구별해 주지 않는 다른 경로와 같은 판단), 작업이 `failed`
+        # 로 끝났으면 ANALYSIS_FAILED(다시 기다려도 절대 안 생긴다 — `queued`·
+        # `running` 과 구별해야 화면이 "다시 확인"을 무한 반복시키지 않는다),
+        # 그 외(아직 큐 대기 중·분석 중)면 REPORT_NOT_READY.
         video = self._video_repository.get(query.video_id)
         if video is None or video.user_id != query.user_id:
             raise ApiError(404, "VIDEO_NOT_FOUND", "영상을 찾을 수 없습니다.")
+        if video.analysis_status == "failed":
+            raise ApiError(
+                404,
+                "ANALYSIS_FAILED",
+                video.analysis_failure_reason or "분석에 실패했습니다.",
+            )
         raise ApiError(
             404, "REPORT_NOT_READY", "아직 리포트가 준비되지 않았습니다."
         )
