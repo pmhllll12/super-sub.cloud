@@ -7949,7 +7949,7 @@ Prometheus 형식으로 냅니다. **여기까지는 스크레이프하는 것�
 - 상세: 06-시스템설계 §1 「배포 형태」 · `min` 14(k3s) · 같은 구역 29번
 - **담당**: 박민호(PM·배포 스코핑) · **제기**: 정어진 · **기한**: k3s cutover 정리 후 / 스프린트 계획 시
 
-### 31. 운영 백엔드가 09-08(`d15806c`)에 멈춰 있다 — k3s cutover 로 최신화 (2026-09-11 신설, 1~3 완료 → 박민호 4 대기)
+### 31. 운영 백엔드가 09-08(`d15806c`)에 멈춰 있다 — k3s cutover 로 최신화 ✅ 해소 (2026.09.11, 4단계까지 전부 완료)
 
 09-11 라이브 재점검(`ssh`)에서 확인했습니다. **사이트는 살아 있습니다** — 외부·로컬
 `/health` 200, 트래픽은 systemd venv `:8000` 이 받습니다. 다만 그 systemd 체크아웃이
@@ -7981,14 +7981,28 @@ Prometheus 형식으로 냅니다. **여기까지는 스크레이프하는 것�
    `alembic_version` 이 `9fc8835184c9` → 단일 head `a1c9f7b2e034` 로 전진 확인.
 3. ✅ **k3s 파드 Ready 확인** (09-11 완료) — `1/1 Running`(재시작 0), `:8080
    /health` 200. `supersub-cd.service` 도 더 이상 실패 안 함(`29번`도 해소 표기).
-4. **min 14 step 5** — 트래픽 `:8000` → 파드 전환 + `supersub-api.service`
-   **disable**(지우지 않음, 롤백 경로) + 스모크. **박민호, 지금 진행 가능합니다.**
-   운영 트래픽(`:8000`)은 09-11 조치 내내 200 이었고 변경하지 않았습니다 — 확인은
-   그대로 `curl -s https://<API 호스트>/health` · `ssh supersub 'sudo k3s kubectl
-   get pods'`.
+4. ✅ **min 14 step 5** (박민호, 09-11 완료) — nginx(`/etc/nginx/conf.d/api.<도메인>.conf`)의
+   `proxy_pass` 를 `127.0.0.1:8000` → `127.0.0.1:8080` 으로 바꾸고(기존 파일은
+   타임스탬프 붙여 백업) `nginx -t` 통과 후 `reload`. 스모크: `/health` 200
+   (`db_configured: true`) · `/api/v1/positions`·`/api/v1/videos/public` 이
+   계약대로 401(로그인 필요, 문서에 명시된 의도된 동작 — 버그 아님). 이어서
+   `supersub-api.service` **disable + stop**(유닛 파일은 그대로 — 롤백 경로).
+   마지막에 `/health` 재확인 200. **지금부터 실제 트래픽이 k3s 파드로 나갑니다.**
 
 09-11에 백업을 먼저 복구해 둬서(같은 구역 백업 항목·`_notes`) 이번 자동 마이그레이션
 전에 복원 지점이 있었습니다.
+
+#### 🔴 진행 중 발견 — 이 항목과 별개로 새로 올립니다
+
+`kubectl get deploy -A`로 보니 실제 배포는 `supersub` 네임스페이스의 `deploy/api`가
+아니라 **`default` 네임스페이스의 `supersub-api-trial`**입니다(위 흐름도·이름과
+다름). 기능은 문서와 동일(hostNetwork·8080·initContainer가 `alembic upgrade head`)
+하지만 **이 매니페스트가 저장소 어디에도 커밋돼 있지 않습니다** — `git ls-files`에
+`k8s`·`deploy` 관련 yaml이 0건이고, 서버의 `~/k3s-trial/`에만 있습니다. min 14의
+원래 6단계 중 2번("`fastapi/deploy/k8s/`를 EC2 형태로 정리, `~/k3s-trial/` 사본이
+정본 되기 전에")이 아직 안 된 상태로 보입니다. 지금 컷오버 자체는 막지 않아 진행은
+했지만, 서버가 사라지면 이 매니페스트도 같이 사라집니다 — 별도 항목(같은 구역
+32번)으로 남겼습니다.
 
 #### 하지 말아야 할 것
 
@@ -8000,8 +8014,30 @@ Prometheus 형식으로 냅니다. **여기까지는 스크레이프하는 것�
 - pgvector 를 **마이그레이션 파일**에 `CREATE EXTENSION` 으로 넣지 않습니다
   (`TestMigrationPrivileges` 가 막습니다 — `deployment.md` §1).
 
-- 상세: `ssh` 실측은 `_notes`(개인) — 요지는 이 항목에. 같은 구역 `29번`·`27번` · `min` 11·14 · `deployment.md` §1
-- **담당**: ~~정어진(1~3: pgvector·확장·마이그레이션 적용·파드 확인)~~ **✅ 완료 (2026.09.11)** · **남은 것**: 박민호(4: min 14 step 5 트래픽 전환) · **제기**: 정어진 · **기한**: 스프린트 3 / k3s cutover(min 14 step 5)
+- 상세: `ssh` 실측은 `_notes`(개인) — 요지는 이 항목에. 같은 구역 `29번`·`27번`·`32번` · `min` 11·14 · `deployment.md` §1
+- **담당**: ~~정어진(1~3: pgvector·확장·마이그레이션 적용·파드 확인)~~ **✅ 완료 (2026.09.11)** · ~~박민호(4: min 14 step 5 트래픽 전환)~~ **✅ 완료 (2026.09.11)** · **제기**: 정어진 · **기한**: ~~스프린트 3 / k3s cutover(min 14 step 5)~~ **해소**
+
+### 32. `supersub-api-trial` 배포 매니페스트가 저장소에 없습니다 — `~/k3s-trial/`에만 있습니다 (2026-09-11 신설)
+
+`31번`(k3s cutover) 진행 중 발견했습니다. 실제 운영 트래픽을 받는 k3s Deployment가
+저장소 어디에도 커밋돼 있지 않고 서버의 `~/k3s-trial/`에만 있습니다 — 이름도
+`supersub-api-trial`(네임스페이스 `default`)로 "트라이얼" 그대로입니다. 기능은
+`deployment.md`가 설명하는 것과 같습니다(hostNetwork·`:8080`·initContainer가
+`alembic upgrade head`·이미지 `pmhllll12/supersub:latest`).
+
+min 14 원래 6단계 중 **2번**("`fastapi/deploy/k8s/`를 EC2 형태로 정리 — `~/k3s-trial/`
+사본이 갈리기 전에 이걸 정본으로")이 아직 안 된 상태로 보입니다. 지금 당장 서비스에
+영향은 없지만(파드는 정상 동작 중), **서버가 사라지거나 재구성되면 이 매니페스트도
+같이 사라집니다** — git으로 추적되는 게 하나도 없어서 재현 불가능합니다.
+
+| | |
+|---|---|
+| 만족해야 할 성질 | 지금 서버에서 도는 Deployment/Secret 구성이 저장소에 파일로 존재하고, 그걸로 재현 가능할 것. 이름·네임스페이스를 `supersub-api-trial`/`default`로 유지할지 `api`/`supersub`로 정리할지는 자유 |
+| 확인 | `ssh supersub 'sudo k3s kubectl get deploy -o yaml'`과 저장소 파일을 대조 |
+| 하지 말 것 | 지금 도는 파드를 건드리면서 정리하지 않기 — 먼저 있는 그대로 저장소에 옮겨 담고, 이름 등 정리는 그다음 별도로 |
+
+- 상세: `min` 14(원래 2번) · `31번`(이번 cutover) · `www/docs/2026-09-09-K3S-harness.md`
+- **담당**: 정어진 · **제기**: 박민호(31번 진행 중 발견) · **기한**: 급하지 않음 — 다음 배포 관련 작업 때 같이
 
 ## min (박민호)
 
@@ -9087,8 +9123,13 @@ Windows가 쓰고 있는지부터 보는 게 빠릅니다. 이건 이 컴퓨터�
 | 2 | `fastapi/deploy/k8s/` 를 EC2 형태로 정리 — in-cluster pgvector 를 빼고 호스트 PostgreSQL 을 `hostNetwork` 또는 selector 없는 Service/Endpoints 로. `~/k3s-trial/` 사본이 갈리기 전에 이걸 정본으로 | 매니페스트가 레포에, `~/k3s-trial/` 은 이걸 참조 |
 | 3 | 이미지 레지스트리 전략 확정 — 박민호 님이 `c7e8b75` 로 Docker Hub pull 로 전환하셨으니 그걸 따름. 태그 규칙(커밋 SHA?)만 정하면 됨 | `deployment.md` 에 태그 규칙 |
 | 4 ✅ | `docs/deployment.md` 재작성 완료 (정어진, 커밋 `a21af5f`) — 「현재 배포 — k3s + CD」 절 신설, 사람이 준비할 것 표(GitHub Secrets·확장·env·S3·백업), 옛 systemd 절차(0·3·6절)에 「롤백·최초 세팅」 배너, 6절 = 롤백 런북. 🔴 DB 는 파드로 안 옮김 명시. `test_docs_paths`·전체 pytest 통과 | — |
-| 5 | 🔴 **cutover** — 트래픽 8000(systemd) → 파드. 인그레스/포트 전환 + **systemd 유닛은 disable 만 하고 지우지 않는다**(롤백용). 스모크(`/health`·업로드→분석) 통과 후 `supersub-api.service` stop | 배포 `/health` 가 파드에서 응답 · systemd `is-enabled` = disabled |
+| 5 ✅ | **cutover 완료** (박민호, 2026.09.11) — nginx `proxy_pass` 를 `:8000` → `:8080` 으로 전환(설정 백업 후 `nginx -t`·`reload`), 스모크(`/health` 200·`db_configured: true`, `/api/v1/positions`·`/api/v1/videos/public` 계약대로 401) 통과 후 `supersub-api.service` **disable + stop**(유닛 파일은 남김 — 롤백 경로). 상세는 `jin` 31번 | `curl https://<API 호스트>/health` → 200 · `systemctl is-enabled supersub-api` → disabled |
 | 6 | CI — `fastapi/**` 변경 시 이미지 빌드+push (`.github/workflows/`). 지금은 테스트만 돎 | 워크플로에 build job |
+
+🔴 **2번(매니페스트를 저장소에 정본화)이 아직 안 된 채로 cutover가 먼저 됐습니다** —
+지금 도는 배포(`supersub-api-trial`, `default` 네임스페이스)가 서버의
+`~/k3s-trial/`에만 있고 git에 없습니다. 서비스에 영향은 없지만 재현 불가능한
+상태라 별도 항목(`jin` 32번)으로 남겼습니다.
 
 🔴 **Postgres 는 이 단계에서 안 옮깁니다** — 온박스 systemd Postgres 유지. DB 를
 파드/PV 로 옮기는 건 별도 결정이고 백업·볼륨 계획이 선행입니다(min 11 (A) 그대로).
