@@ -183,8 +183,9 @@ class TestRegister:
     def test_반려는_판정만_남고_작업은_안_생긴다(
         self, db_client, db_session, uploader
     ):
+        # 8K — 2026-09-11 정정으로 4K(3840x2160)까지는 통과하니 그 위 값을 쓴다.
         key = _upload(db_client, uploader)
-        res = _register(db_client, uploader, key, width=3840, height=2160)
+        res = _register(db_client, uploader, key, width=7680, height=4320)
         assert res.status_code == 201, res.text
         video_id = uuid.UUID(res.json()["id"])
 
@@ -195,7 +196,7 @@ class TestRegister:
             {"id": video_id},
         ).one()
         assert passed is False
-        assert "3840x2160" in reason
+        assert "7680x4320" in reason
 
         jobs = db_session.execute(
             text("SELECT count(*) FROM analysis_job WHERE video_id = :id"),
@@ -798,6 +799,30 @@ class TestAdminVideos:
         ).json()["items"]
         row = next(r for r in rows if r["id"] == str(prov_id))
         assert row["kept"] is False
+
+    def test_실패_사유가_관리자_목록에는_보이고_상태만_있던_자리를_채운다(
+        self, db_client, db_session, uploader, admin
+    ):
+        key = _upload(db_client, uploader)
+        video_id = uuid.UUID(_register(db_client, uploader, key).json()["id"])
+        reason = "품질 게이트 미달: 유효 프레임 비율 53% < 기준 70%."
+        db_session.execute(
+            text(
+                "UPDATE analysis_job SET status = 'failed', failure_reason = :r "
+                "WHERE video_id = :id"
+            ),
+            {"r": reason, "id": video_id},
+        )
+        db_session.commit()
+
+        rows = db_client.get(
+            f"{V1}/admin/videos",
+            params={"user": str(uploader["id"])},
+            headers=admin["headers"],
+        ).json()["items"]
+        row = next(r for r in rows if r["id"] == str(video_id))
+        assert row["analysis_status"] == "failed"
+        assert row["analysis_failure_reason"] == reason
 
     def test_없는_사람이면_404(self, db_client, admin):
         res = db_client.get(

@@ -708,13 +708,15 @@ S3 의 분석 산출물(`report.json`)을 서버가 받아 점수만 걷어내�
   "analyzed_at": "2026-09-10T12:00:00Z",
   "summary": "디딤발 무릎 굽히기가 강점입니다.",
   "provisional": true,
+  "total_score": 71,
+  "overall_grade": "B",
   "breakdown": [
     { "criterion_id": "plant_knee_flexion", "name": "디딤발 무릎 굽히기",
       "grade": 2, "title": "흔들리지 않는 축",
-      "evidence": "안정적으로 놓였습니다.",
+      "evidence": "안정적으로 놓였습니다.", "stat": 88.5,
       "metric_ref": "plant_knee_angle_at_impact", "skipped": false },
     { "criterion_id": "plant_foot_position", "name": "디딤발 위치",
-      "grade": null, "title": null, "evidence": null,
+      "grade": null, "title": null, "evidence": null, "stat": null,
       "metric_ref": null, "skipped": true }
   ],
   "scenes": [
@@ -725,17 +727,29 @@ S3 의 분석 산출물(`report.json`)을 서버가 받아 점수만 걷어내�
 }
 ```
 
-🔴 **허용목록이다.** DB 에 있어도 여기 없는 것: 총점·항목별 등급 숫자를 담은
-`summary`(3장 4 — 문장에 수치 금지) · 항목별 `stat`·`band`·`weight`·`contribution`
-(수치는 카드 경로가 따로 읽는다) · `out_of_band`(검수 전 임계값 — 미결 `jin` 24번).
-`grade` 가 `null` 이면 **제외(skipped)** 지 0점이 아니다. `scenes` 는 프레임
-지표(`impact_frame` 등)의 초 환산 — "이렇게 본 장면" 으로 이동하는 자리다.
+🔴 **허용목록이다.** DB 에 있어도 여기 없는 것: `band`·`weight`·`contribution`·
+`out_of_band`(검수 전 임계값 — 미결 `jin` 24번)·`view_dependent` — 전부 개발
+확인용이다. **`total_score`·`overall_grade`·`breakdown[].stat` 는 나간다**
+(2026-09-11 정정, 미결 `ho` 28번 — 이 문서가 앞서 "카드 경로가 따로 읽는다"고
+적었던 것은 틀렸다. 계약 3장 4가 막은 것은 `summary` 문장 **안에** 숫자를 넣는
+것이지 이 필드들 자체가 아니다). `grade` 가 `null` 이면 **제외(skipped)** 지
+0점이 아니고, 그 항목의 `stat` 도 `null` 이다. `overall_grade` 는 `total_score`
+와 마찬가지로 영상 하나(=분석 1회)의 값 — 선수 단위로 합친 오버롤은 없다.
+옛 행(이 필드가 생기기 전 적재분)은 `total_score`/`overall_grade` 가 `null`.
+`scenes` 는 프레임 지표(`impact_frame` 등)의 초 환산 — "이렇게 본 장면"으로
+이동하는 자리다.
 
 | 에러 | code | 언제 |
 |---|---|---|
 | 401 | `UNAUTHORIZED` | 토큰이 없거나 틀리다 |
 | 404 | `VIDEO_NOT_FOUND` | 없는 영상이거나 남의 영상이다 |
-| 404 | `REPORT_NOT_READY` | 영상은 있으나 아직 리포트가 적재되지 않았다 |
+| 404 | `ANALYSIS_FAILED` | 작업이 `failed`로 끝났다 — **다시 물어봐도 절대 안 생긴다.** `message`에 실패 사유(2026-09-11 추가, 사용자가 화면에서 실제로 겪음). 재촬영·재분석을 안내할 자리 |
+| 404 | `REPORT_NOT_READY` | 영상은 있고 작업이 `queued`·`running`이라 아직 적재 전이다 — 다시 물어보면 될 수도 있다 |
+
+🔴 **`ANALYSIS_FAILED`와 `REPORT_NOT_READY`를 같은 걸로 다루지 않는다** — 전자는
+끝난 상태(재시도해도 안 바뀜), 후자는 진행 중(재시도하면 바뀔 수 있음)이다. 이
+둘을 가르기 전에는 실패한 분석도 `REPORT_NOT_READY`로 나가서 화면이 "다시 확인"을
+무한 반복시켰다.
 
 ### 🔴 지표 코드 실태 — 지금 스키마로는 루브릭을 담을 수 없다 (2026-09-01 조사)
 
@@ -949,7 +963,7 @@ trunk_alignment       2개 루브릭  basketball_jump_shot · basketball_layup  
       "storage_key": "videos/3f1c.../홍길동-My-Kick-20260908-1419-3f1c8a2b.mp4",
       "created_at": "2026-09-08T09:00:00Z",
       "kept": true, "is_public": false, "passed": true, "reject_reason": null,
-      "analysis_status": "queued",
+      "analysis_status": "failed", "analysis_failure_reason": "품질 게이트 미달: …",
       "report_prefix": "reports/3f1c.../7c05.../" }
   ]
 }
@@ -960,6 +974,9 @@ trunk_alignment       2개 루브릭  basketball_jump_shot · basketball_layup  
 - **재생·리포트 링크는 안 싣는다** — 목록 한 번에 객체마다 사전 서명을 하지
   않으려는 것이다. 재생은 `storage_key` 로, 리포트는 `report_prefix` 아래
   (`report.json`·`impact.jpg`·`tracked.webm`)를 콘솔이나 별도 사전 서명으로 짚는다.
+- 🔴 **`analysis_failure_reason`** (2026-09-11 추가). `analysis_status`가
+  `failed`일 때만 값이 있고, 그 외엔 `null`이다 — "에이전트가 제대로 돌았는지"를
+  이 목록만으로 확인하려는 용도다(관리자 전용, `GET /videos`엔 없다).
 
 ### `DELETE /api/v1/admin/videos/{video_id}` — 관리자 영상 삭제 (2026-09-08 추가)
 
@@ -1463,13 +1480,19 @@ SFR-001. 사용자가 자기 클립을 올리고, 서버가 규격을 검사해 
 |---|---|
 | 용량 | 200MB |
 | 길이 | 60초 |
-| 해상도 | 1920x1080 — **`analyze: true` 일 때만** (2026-09-08) |
+| 해상도 | 긴 변 3840 · 짧은 변 2160(4K, 방향 무관) — **`analyze: true` 일 때만** (2026-09-11 정정) |
 | 형식 | `video/mp4` · `video/quicktime` |
 
-**해상도 상한은 분석 워커의 host RAM 을 지키는 값이다**(미결 `ho` 9번 — 4K 는
-터진다). 그래서 `analyze: false` 기록용 업로드에는 걸지 않는다 — 그 클립은 워커를
-지나지 않는다. `analyze: true` 4K 는 그대로 반려된다(`ho` 9번이 풀리면 상한을
-올리거나 없앤다). 용량·길이는 저장소·비용에 걸린 것이라 `analyze` 와 무관하다.
+**해상도 상한은 분석 워커의 메모리 예산을 지키는 값이다**(`ho` 9번). `analyze:
+false` 기록용 업로드에는 걸지 않는다 — 그 클립은 워커를 지나지 않는다.
+
+🔴 **정정 (2026-09-11)**: 여기 적혀 있던 "1920x1080, `ho` 9번이 풀리면 상한을
+올린다"는 예고 그대로 실행이 안 된 상태였다 — `ho` 9번은 2026-09-08에 이미
+4K(2160×3840, 300프레임)를 실측 기준으로 안전하다고 확정했는데, 이 상한만 안
+풀려 있었다(사용자가 화면에서 발견). 이제 그 기준까지 허용한다. **곁가지**:
+옛 상한이 `width`·`height`를 그대로 비교해서, 4K와 무관하게 **세로로 찍은
+보통 1080p 영상(1080×1920)도 방향 때문에 반려되고 있었다** — 같이 풀렸다.
+용량·길이는 저장소·비용에 걸린 것이라 `analyze` 와 무관하다.
 
 🔴 **길이 상한이 에이전트의 프레임 상한과 아직 안 맞는다.**
 `agent/src/supersub_agent/pose.py` 의
@@ -1582,8 +1605,9 @@ SFR-001. 사용자가 자기 클립을 올리고, 서버가 규격을 검사해 
 }
 ```
 
-반려면 `passed: false` · `reject_reason: "해상도가 상한을 넘습니다: 3840x2160
-(상한 1920x1080)"` · `analysis_job_id: null` 이다. **반려된 클립은 분석하지 않는다** —
+반려면 `passed: false` · `reject_reason: "해상도가 상한을 넘습니다: 7680x4320
+(상한 긴 변 3840 · 짧은 변 2160)"` · `analysis_job_id: null` 이다. **반려된
+클립은 분석하지 않는다** —
 규격 검사를 두는 이유가 그것이다.
 
 `kept` 는 **프로필에 저장됐는가**다(미결 `jin` 24번). `GET /videos` 는 `kept: true`

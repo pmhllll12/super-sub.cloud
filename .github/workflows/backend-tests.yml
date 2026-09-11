@@ -24,7 +24,12 @@ jobs:
     # 잡아낸 것이 이 통합 테스트였다.
     services:
       postgres:
-        image: postgres:18
+        # 🔴 순정 `postgres:18` 이 아니라 pgvector 가 들어간 이미지다. 용병 매칭
+        # 마이그레이션(`28148877afc0`)이 `vector` 타입을 쓰는데, 확장 파일이
+        # 이미지에 없으면 `alembic upgrade head` 가 `type "vector" does not exist`
+        # 로 멈춘다. 확장 자체는 아래 "DB 확장" 스텝이 만든다(운영은
+        # `docs/deployment.md` 1절 — 슈퍼유저가 마이그레이션 전에 한 번).
+        image: pgvector/pgvector:pg18
         env:
           POSTGRES_USER: supersub
           POSTGRES_PASSWORD: supersub_ci
@@ -56,6 +61,13 @@ jobs:
       # lock 을 쓴다 — requirements-dev.txt 는 버전을 안 박아서 CI 와 로컬이 갈린다.
       - name: 의존성 설치
         run: pip install -r requirements.lock.txt
+
+      # 🔴 확장은 마이그레이션이 아니라 환경 준비 단계의 일이다
+      # (`TestMigrationPrivileges` 가 마이그레이션 파일에서 `CREATE EXTENSION` 을
+      # 막는다 — 운영 앱 계정은 슈퍼유저가 아니라 거기서 멈추기 때문). CI 의
+      # `supersub` 유저는 이 이미지에서 슈퍼유저라 여기서 한 번 만든다.
+      - name: DB 확장 (pgvector)
+        run: PGPASSWORD=supersub_ci psql -h 127.0.0.1 -U supersub -d supersub -c 'CREATE EXTENSION IF NOT EXISTS vector'
 
       # 빈 DB 에 스키마를 만든다. create_all 이 아니라 마이그레이션이 정본이다.
       - name: 마이그레이션
