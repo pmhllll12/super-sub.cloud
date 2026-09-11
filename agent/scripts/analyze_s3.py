@@ -44,6 +44,9 @@ from supersub_agent.pose import (  # noqa: E402
     extract_keypoints,
     parse_subject_spec,
     render_tracked_clip,
+    SportMismatch,
+    TOOL_KO,
+    sport_conflict,
     subject_envelope,
 )
 from supersub_agent.scoring import aggregate, load_rubric  # noqa: E402
@@ -248,10 +251,26 @@ def analyze_one(video: str, args, rubric, subject) -> str:
             pose = extract_keypoints(
                 local, target_fps=args.fps, observe=False, subject=subject
             )
+            # 🔴 **종목 확인은 측정보다 먼저** (미결 `ho` 43번 ㉮). 다른 종목
+            #    영상을 축구 루브릭으로 재면 숫자는 나오는데 뜻이 없다 —
+            #    지금까지 그렇게 점수가 나가고 있었다.
+            conflict = sport_conflict(pose.objects, rubric.sport)
+            if conflict:
+                raise SportMismatch(
+                    f"{TOOL_KO.get(conflict, conflict)}가 보입니다 — "
+                    f"{rubric.sport_ko or rubric.sport} 영상이 아닌 것 같습니다."
+                )
             features = extract_features(
                 pose.keypoints, pose.objects, rubric.impact_limb,
                 rubric.impact_event, args.side,
             )
+        except SportMismatch as exc:
+            # 🔴 품질 게이트(2)와 **다른 코드**를 쓴다. 뭉뚱그리면 워커가
+            #    「품질 게이트 미달 — 재촬영이 필요하다」로 보고하고, 그러면
+            #    사용자는 **같은 파일을 다시 올린다**(미결 41번에서 아홉 번).
+            #    이쪽은 다시 찍어서 풀리는 것이 아니라 **다른 영상**이 필요하다.
+            print(f"\n종목 불일치: {exc}")
+            raise SystemExit(3) from exc
         except InsufficientQuality as exc:
             print(f"\n분석 중단: {exc}")
             raise SystemExit(2) from exc
