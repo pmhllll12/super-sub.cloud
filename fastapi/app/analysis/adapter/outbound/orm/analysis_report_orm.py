@@ -55,6 +55,10 @@ class AnalysisReportOrm(Base):
     )
     # 검수 전 루브릭으로 낸 값인가. 🔴 True 면 확정 점수로 보여주지 않는다.
     provisional: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    # 총점의 글자 등급(A/B/C/D) — `result.grade`. `scoring.aggregate` 가 낸 값을
+    # 그대로 적는다(미결 `ho` 28번) — 문턱값을 여기서 다시 계산하지 않는다.
+    # 옛 행은 NULL(이 컬럼이 생기기 전 적재분).
+    overall_grade: Mapped[str | None] = mapped_column(String(1), nullable=True)
     # 스켈레톤 미리보기 S3 URI(`impact`·`tracked`). 비어 있으면 렌더링만 실패한
     # 것이고 측정·판정은 유효하다.
     previews: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)

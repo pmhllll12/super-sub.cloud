@@ -23,9 +23,11 @@ import type { VideoReport } from '@/server/backend'
 /**
  * 리포트 한 벌 — **화면이 쓰는 모양**이다.
  *
- * 🔴 **수치가 없다.** 계약 3장 4 가 `report.summary` 에 총점 · 등급 숫자를
- * 넣지 말라고 못박아 뒀고, 카드에 능력치 컬럼을 두지 않는 원칙(부록 D.5)과
- * 짝이다. 서버 응답에도 점수 숫자는 없다(허용목록).
+ * 🔴 **정정 (CCC 32, 2026-09-11)**: 이 타입이 앞서 "수치가 없다"고 적었던 것은
+ * 틀렸다. 계약 3장 4 가 막은 것은 `summary` 문장 **안에** 숫자를 넣는 것이지,
+ * 오버롤(`totalScore`·`overallGrade`)이나 항목별 `radar` 축 값이 아니다. 카드에
+ * 능력치를 안 두는 원칙(부록 D.5)은 그대로다 — **이 값들을 `player_card`
+ * 화면으로 옮기지 않는다.** 이 리포트 화면 전용이다.
  */
 export type SavedReport = {
   summary: string
@@ -38,6 +40,20 @@ export type SavedReport = {
   points: { title: string | null; evidence: string }[]
   /** 판단의 근거가 된 장면. 시각은 수치가 아니라 찾아가는 자리다. */
   scenes: { at: string; what: string }[]
+  /**
+   * 오버롤 — **영상 하나(=분석 1회)의 값**이다(`ho` 28번). 여러 영상을 합친
+   * 것이 아니다 — "이 클립의 오버롤"이라고만 쓴다. 옛 리포트(이 필드가 생기기
+   * 전 적재분)는 `null` — 그때는 오버롤 표시를 건너뛴다.
+   */
+  totalScore: number | null
+  overallGrade: string | null
+  /**
+   * 레이더 축 — 항목마다 이름 + `stat`(0~100). `skipped`거나 `stat`이 `null`인
+   * 항목은 뺀다(0으로 그리면 "그 항목을 못했다"로 잘못 읽힌다). 🔴 **총점은
+   * 이 값들의 평균이 아니다** — 등급의 가중합이다. 화면에 나란히 둘 때 그렇게
+   * 안 읽히게 캡션을 단다.
+   */
+  radar: { name: string; stat: number }[]
   /** 분석한 날(YYYY-MM-DD). 언제 본 리포트인지는 알아야 한다. */
   savedAt: string
 }
@@ -81,6 +97,11 @@ export function toSavedReport(r: VideoReport): SavedReport {
       .filter((b) => !!b.evidence)
       .map((b) => ({ title: b.title ?? null, evidence: b.evidence as string })),
     scenes: r.scenes.map((s) => ({ at: atText(s.at_seconds), what: s.label })),
+    totalScore: r.total_score,
+    overallGrade: r.overall_grade,
+    radar: live
+      .filter((b) => b.stat !== null)
+      .map((b) => ({ name: b.name, stat: b.stat as number })),
     savedAt: r.analyzed_at.slice(0, 10),
   }
 }

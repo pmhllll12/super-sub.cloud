@@ -4362,7 +4362,7 @@ S3에 영구히 있습니다.** 사용자가 보는 것("저장해야 남는다"
 
 </details>
 
-### 28. 오버롤 등급이 **계산은 되는데 화면까지 안 갑니다** — 읽기 경로에 실어 주세요 (2026-09-08 신설)
+### 28. 오버롤 등급이 **계산은 되는데 화면까지 안 갑니다** — 읽기 경로에 실어 주세요 (2026-09-08 신설) ✅ 해소 (2026.09.11)
 
 사용자 요청: 「분석 리포트에 그레이드 시스템을 넣고 싶다. A·B·C·D를 유지하고
 **루브릭을 통합해 점수를 내고 그 점수를 근거로 등급을 나눠 달라**.」
@@ -7832,6 +7832,35 @@ passthrough 를 뺀 그 이유("필터 버그 하나 거리")를 되살립니다
 
 **남은 것**: 백성검이 `AnalysisStage.tsx` 하드코딩 `REPORT` → fetch 교체
 (`client-contract-changes.md` 31번). 이건 `paik` 7번에서 다룹니다.
+
+##### ✅ `ho` 28번 (오버롤 등급이 화면까지 안 감) — 읽기 경로에 실었습니다 (2026-09-11)
+
+`GET /videos/{id}/report` 가 이제 `total_score`·`overall_grade`·
+`breakdown[].stat` 을 함께 냅니다. `ho` 28번이 정한 그대로입니다 — **새로 계산한
+것은 없습니다.** `total_score`·`stat` 은 이미 `analysis_metric_value` 에 있던 값을
+읽기 경로에서 마저 조회하도록 늘렸고, `overall_grade`(`result.grade`)만 저장할
+자리가 없어 `analysis_report.overall_grade` 컬럼을 새로 뒀습니다(마이그레이션
+`8a765b42e48e`, `String(1)` nullable — 옛 행은 NULL).
+
+- **`report_view_dto.py`가 앞서 적었던 "수치는 카드 경로가 따로 읽는다"는 틀렸다고
+  판단해 정정했습니다** — `ho` 28번 자신의 "계약과 안 부딪힙니다" 절이 "총점·
+  등급은 리포트 경로로만 나간다"고 명시하고 있어, 그 결정 그대로 리포트 경로에
+  합쳤습니다. 별도 "카드 경로" 엔드포인트는 만들지 않았습니다 — 화면이 문장과
+  숫자를 같은 요청으로 받는 편이 간단하고, `paik` 7번이 이미 이 엔드포인트 하나만
+  부르고 있어 추가 요청이 필요 없습니다.
+- `band`·`weight`·`contribution`·`out_of_band`·`view_dependent` 는 여전히
+  허용목록 밖입니다 — 이번에 연 것은 `total_score`·`overall_grade`·`stat` 셋뿐.
+  `player_card` 능력치 금지(부록 D.5)는 `card_rules.FORBIDDEN_CARD_FIELDS` 가
+  그대로 막아 이번 변경과 무관합니다.
+- 확인: `pytest -q` 746 passed, `alembic upgrade/downgrade` 왕복 확인.
+- `client-contract-changes.md` **32번**에 31번의 "하지 말 것"(총점·`stat` 이
+  없다던 것) 정정을 남겼습니다.
+
+→ **`ho` 28번 전체 만족됨(2026-09-11, 백엔드+화면 둘 다).** 화면 표시(등급
+칩·총점·SVG 레이더)도 같은 날 넣었습니다(`88916f3`) — 차트 라이브러리는 새로
+안 넣고 다각형을 직접 그렸습니다. `www/src/lib/savedReports.ts`·
+`ReportView.tsx`. `npm test` 571 passed. `player_card` 화면에는 안 옮겼습니다
+(부록 D.5 그대로 — 애초에 그쪽 API가 이 값을 안 줍니다).
 
 #### 곁가지 — 3-1 의 마지막 「미정」
 

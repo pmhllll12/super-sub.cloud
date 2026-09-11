@@ -61,6 +61,8 @@ def _view(video_id):
         analyzed_at=datetime.now(timezone.utc),
         summary="디딤발 무릎 굽히기가 강점입니다.",
         provisional=True,
+        total_score=71.0,
+        overall_grade="B",
         breakdown=[
             ReportCriterionView(
                 criterion_id="plant_knee_flexion",
@@ -70,6 +72,7 @@ def _view(video_id):
                 evidence="안정적으로 놓였습니다.",
                 metric_ref="plant_knee_angle_at_impact",
                 skipped=False,
+                stat=88.5,
             ),
             ReportCriterionView(
                 criterion_id="plant_foot_position",
@@ -79,6 +82,7 @@ def _view(video_id):
                 evidence=None,
                 metric_ref=None,
                 skipped=True,
+                stat=None,
             ),
         ],
         scenes=[
@@ -105,6 +109,8 @@ def test_적재된_리포트를_돌려준다(client):
         "analyzed_at",
         "summary",
         "provisional",
+        "total_score",
+        "overall_grade",
         "breakdown",
         "scenes",
         "previews",
@@ -112,14 +118,19 @@ def test_적재된_리포트를_돌려준다(client):
     }
     assert body["summary"].startswith("디딤발")
     assert body["provisional"] is True
+    assert body["total_score"] == pytest.approx(71.0)
+    assert body["overall_grade"] == "B"
     assert len(body["breakdown"]) == 2
+    assert body["breakdown"][0]["stat"] == pytest.approx(88.5)
     assert body["breakdown"][1]["skipped"] is True
     assert body["breakdown"][1]["grade"] is None
+    assert body["breakdown"][1]["stat"] is None
     assert body["scenes"][0]["at_seconds"] == pytest.approx(2.07)
-    # 허용목록: band·stat·weight 는 새어 나가지 않는다.
+    # 허용목록(`ho` 28번으로 갱신): band·weight·contribution 은 여전히 안 나간다
+    # — `stat`·`total_score`·`overall_grade` 는 이제 나간다(위에서 확인).
     assert "band" not in body["breakdown"][0]
-    assert "stat" not in body["breakdown"][0]
     assert "weight" not in body["breakdown"][0]
+    assert "contribution" not in body["breakdown"][0]
 
 
 def test_없는_영상은_404_VIDEO_NOT_FOUND(client):

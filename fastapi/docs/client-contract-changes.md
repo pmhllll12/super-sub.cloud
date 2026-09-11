@@ -1266,6 +1266,79 @@ git -C fastapi grep -n "videos/{video_id}/report" -- app/analysis   # 백엔드 
 
 ---
 
+## 32. ✅ 정정 — 31번의 「하지 말 것」 두 줄이 틀렸습니다. `GET /videos/{id}/report` 가 이제 총점·오버롤 등급·항목별 `stat` 도 줍니다 (2026-09-11 추가·반영 완료, `ho` 28번)
+
+**앞서 31번에서 "총점·별점 숫자는 응답에 없다", "`band`·`stat`·`weight` 를
+기대하지 마세요" 라고 전달한 것을 정정합니다.** `stat` 은 이제 나갑니다 —
+`band`·`weight`·`contribution` 은 여전히 안 나갑니다.
+
+31번을 이미 반영하셨다면(응답 파싱을 이미 만드셨다면) **필드를 더 읽기만 하면
+됩니다** — 기존 필드는 그대로입니다.
+
+### 만족해야 할 성질
+
+- 오버롤(등급 A/B/C/D·총점 0~100)을 화면에 보여줄 수 있다. **영상 하나(=분석
+  1회)의 값**이다 — "이 선수의 오버롤"이 아니라 "이 클립의 오버롤"이라고 씁니다.
+- 레이더 차트를 그린다면 각 항목의 `stat`(0~100)을 축 값으로 쓴다. **`stat`이
+  `null`인 항목은 축에서 뺍니다** — 0으로 그리면 "그 항목을 못했다"로 잘못
+  읽힙니다(`skipped: true`인 항목이 그렇습니다).
+- `total_score`·`overall_grade`가 `null`이면(리포트가 이 필드가 생기기 전에
+  적재된 옛 것) 오버롤 표시를 건너뜁니다 — 문장·항목별 등급은 그대로 보여줄 수
+  있습니다.
+
+### 바뀐 응답 모양
+
+```json
+{
+  "video_id": "3f1c...", "analyzed_at": "2026-09-10T12:00:00Z",
+  "summary": "디딤발 무릎 굽히기가 강점입니다.", "provisional": true,
+  "total_score": 71, "overall_grade": "B",
+  "breakdown": [
+    { "criterion_id": "plant_knee_flexion", "name": "디딤발 무릎 굽히기",
+      "grade": 2, "title": "흔들리지 않는 축", "evidence": "안정적으로 놓였습니다.",
+      "stat": 88.5, "metric_ref": "plant_knee_angle_at_impact", "skipped": false }
+  ],
+  "scenes": [ { "metric_code": "impact_frame", "label": "임팩트 프레임", "at_seconds": 2.07 } ],
+  "previews": { "impact": "s3://.../impact.png" },
+  "keypoint_quality": { "known": true, "swing_side_valid_ratio": 0.9 }
+}
+```
+
+`total_score`·`overall_grade`·`breakdown[].stat` **셋만 추가**입니다. 나머지
+필드 이름·모양은 31번 그대로입니다.
+
+### 🔴 하지 말아야 할 것
+
+- **`total_score`를 `stat` 값들의 평균으로 다시 계산하지 마세요** — 총점은
+  등급의 가중합이고 `stat`과 무관합니다. 화면에 총점과 레이더를 나란히 둘 때
+  "축 점수 평균이 총점"으로 읽히지 않게 캡션을 답니다.
+- **`overall_grade`를 카드(`player_card`, 스쿼드 화면 등)에 올리지 마세요** —
+  부록 D.5가 막은 결정입니다. 이 등급은 **리포트 화면 전용**입니다.
+  `GET /cards/*` 계열 응답에는 이 필드가 없습니다.
+- 여전히 `band`·`weight`·`contribution`·`out_of_band`·`view_dependent` 는
+  기대하지 마세요 — 개발 확인용이고 허용목록 밖입니다.
+- 근거 문장(`evidence`)에서 등급·점수를 정규식으로 뽑지 마세요 — 문장에는
+  숫자가 없습니다(그대로 유효, 23·24번).
+
+### 먼저 확인
+
+```bash
+git -C fastapi diff a1c9f7b2e034 8a765b42e48e -- app/analysis/adapter/inbound/api/schemas/video_schema.py
+```
+
+위가 안 걸리면(즉 이미 병합돼 있으면) 서버가 이미 이 필드들을 내고 있는
+것입니다 — `curl` 로 실제 응답을 보고 파싱만 늘리면 됩니다.
+
+상세: `fastapi/docs/api-contract.md` **3-1절** · 같은 구역 31번(원래 계약) ·
+pending `ho` 28번
+
+**✅ 반영 완료 (2026-09-11)** — `www/src/server/backend/types.ts`(타입)·
+`src/lib/savedReports.ts`(옮김터)·`src/components/analysis/ReportView.tsx`
+(등급 칩·SVG 레이더)에 넣었다. 차트 라이브러리는 새로 안 넣었다. `npm test`
+571 passed.
+
+---
+
 ## 계약 문서
 
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린
