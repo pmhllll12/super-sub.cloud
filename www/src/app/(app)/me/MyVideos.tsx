@@ -602,58 +602,6 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
 
               ⚠️ 반려된 클립에는 안 낸다 — 서버가 안 보는 영상이다. */}
 
-          {/* 🔴 **업로드 갈래에서만** 낸다. 분석을 건 영상은 리포트를 보려고 올린
-              것이고, 영상 모음은 올린 장면을 훑는 자리다 — 성격이 다르다. */}
-          {tab === 'uploaded' && (
-            <div className="ss-profile-publish">
-              <button
-                type="button"
-                className="ss-profile-publish-toggle"
-                data-on={pubIds.includes(v.id) ? 'true' : undefined}
-                aria-pressed={pubIds.includes(v.id)}
-                onClick={() => togglePublish(v)}
-              >
-                <span className="material-symbols-outlined" aria-hidden="true">
-                  {pubIds.includes(v.id) ? 'visibility' : 'visibility_off'}
-                </span>
-                {pubIds.includes(v.id) ? '공개 중' : '공개'}
-              </button>
-
-              {form?.id === v.id && (
-                <div className="ss-profile-publish-form">
-                  <label htmlFor="ss-pub-title">제목</label>
-                  <input
-                    id="ss-pub-title"
-                    value={form.title}
-                    maxLength={40}
-                    onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  />
-                  <label htmlFor="ss-pub-what">한 줄 설명</label>
-                  <input
-                    id="ss-pub-what"
-                    value={form.what}
-                    maxLength={60}
-                    onChange={(e) => setForm({ ...form, what: e.target.value })}
-                  />
-                  {/* 🔴 **공개는 되돌릴 수 있지만 그 사이에 남이 본다.**
-                      무엇이 일어나는지 누르기 전에 말한다(CCC 20 으로 서버에
-                      올라가면서 이 문구가 「이 브라우저에만」에서 바뀌었다). */}
-                  <p className="ss-profile-publish-note">
-                    영상 모음에서 다른 사람에게도 보입니다 — 언제든 다시 내릴 수
-                    있습니다.
-                  </p>
-                  <button
-                    type="button"
-                    className="ss-profile-publish-save"
-                    disabled={!form.title.trim()}
-                    onClick={() => savePublish(v)}
-                  >
-                    공개하기
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
 
             {/* 🔴 **한 편뿐이어도 그린다**(사용자 요청) — `1 / 1` 이 보여야 갈래
                 안에 몇 편이 있는지 알 수 있고, 갈래를 바꿔도 줄이 사라졌다
@@ -703,20 +651,81 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
                   </button>
                 )}
               </span>
-              {v.passed && (
-                <button
-                  type="button"
-                  className="ss-profile-featured-btn"
-                  data-on={featured === v.id ? 'true' : undefined}
-                  aria-pressed={featured === v.id}
-                  onClick={() => toggleFeatured(v)}
-                >
-                  <span className="material-symbols-outlined" aria-hidden="true">
-                    {featured === v.id ? 'stars' : 'star'}
-                  </span>
-                  대표 영상 설정
-                </button>
-              )}
+              {/* 🔴 **줄의 오른쪽 끝에 둘이 나란히 선다**(사용자 요청,
+                  2026-09-11). 「전체 공개」가 「대표 영상 설정」의 왼쪽이다 —
+                  전에는 영상 바로 아래 왼쪽에 따로 떠 있어서, 같은 영상에
+                  대한 일인데 자리가 갈려 있었다.
+                  ⚠️ 둘을 **한 상자**로 묶어 흐름 밖에 건다. 각자 `right` 를
+                  주면 대표 단추의 폭(글자가 「대표 영상 설정」 ↔ 「대표 영상」
+                  으로 갈린다)을 왼쪽 단추가 알아야 한다. */}
+              <span className="ss-profile-nav-right">
+                {/* 🔴 **업로드 갈래에서만** 낸다. 분석을 건 영상은 리포트를 보려고 올린
+                          것이고, 영상 모음은 올린 장면을 훑는 자리다 — 성격이 다르다. */}
+                      {tab === 'uploaded' && (
+                        <div className="ss-profile-publish">
+                          <button
+                            type="button"
+                            className="ss-profile-publish-toggle"
+                            data-on={pubIds.includes(v.id) ? 'true' : undefined}
+                            aria-pressed={pubIds.includes(v.id)}
+                            onClick={() => togglePublish(v)}
+                          >
+                            <span className="material-symbols-outlined" aria-hidden="true">
+                              {pubIds.includes(v.id) ? 'visibility' : 'visibility_off'}
+                            </span>
+                            {pubIds.includes(v.id) ? '전체 공개 중' : '전체 공개'}
+                          </button>
+
+                          {form?.id === v.id && (
+                            <div className="ss-profile-publish-form">
+                              <label htmlFor="ss-pub-title">제목</label>
+                              <input
+                                id="ss-pub-title"
+                                value={form.title}
+                                maxLength={40}
+                                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                              />
+                              <label htmlFor="ss-pub-what">한 줄 설명</label>
+                              <input
+                                id="ss-pub-what"
+                                value={form.what}
+                                maxLength={60}
+                                onChange={(e) => setForm({ ...form, what: e.target.value })}
+                              />
+                              {/* 🔴 **공개는 되돌릴 수 있지만 그 사이에 남이 본다.**
+                                  무엇이 일어나는지 누르기 전에 말한다(CCC 20 으로 서버에
+                                  올라가면서 이 문구가 「이 브라우저에만」에서 바뀌었다). */}
+                              <p className="ss-profile-publish-note">
+                                영상 모음에서 다른 사람에게도 보입니다 — 언제든 다시 내릴 수
+                                있습니다.
+                              </p>
+                              <button
+                                type="button"
+                                className="ss-profile-publish-save"
+                                disabled={!form.title.trim()}
+                                onClick={() => savePublish(v)}
+                              >
+                                공개하기
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                {v.passed && (
+                  <button
+                    type="button"
+                    className="ss-profile-featured-btn"
+                    data-on={featured === v.id ? 'true' : undefined}
+                    aria-pressed={featured === v.id}
+                    onClick={() => toggleFeatured(v)}
+                  >
+                    <span className="material-symbols-outlined" aria-hidden="true">
+                      {featured === v.id ? 'stars' : 'star'}
+                    </span>
+                    대표 영상 설정
+                  </button>
+                )}
+              </span>
               <button
                 type="button"
                 className="ss-profile-step"
@@ -790,7 +799,13 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
                         /* 🔴 소리를 끄고 메타데이터만 받는다 — 목록에 여럿이
                            놓이므로 본편까지 받으면 이 줄 하나로 수십 MB 가
                            나간다. 첫 프레임만 표지로 쓴다. */
-                        <video src={src} muted playsInline preload="metadata" />
+                        /* 🔴 주소 뒤의 `#t=0.1` 이 있어야 **그림이 그려진다.**
+                           `preload="metadata"` 만으로는 브라우저가 길이·크기만
+                           받고 화면은 안 그려서, 갈래를 오갈 때 섬네일이
+                           **검은 칸으로 남는다**(사용자 지적). 0 이 아니라
+                           0.1 인 것은 맨 첫 칸이 검은 영상이 흔해서다 —
+                           추천 판과 코치 목록이 같은 이유로 그렇게 한다. */
+                        <video src={`${src}#t=0.1`} muted playsInline preload="metadata" />
                       ) : (
                         /* 조회용 주소가 없는 클립(실물 백엔드) — 순서만 적는다. */
                         <span className="ss-profile-strip-blank">{idx + 1}</span>
