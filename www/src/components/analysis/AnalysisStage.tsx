@@ -1699,8 +1699,22 @@ export default function AnalysisStage() {
             고르기만 한 단계에서는 아직 아무것도 안 하고 있다. */}
         {/* 놓쳤으면 말한다. 🔴 **분석을 멈추지는 않는다** — 에이전트도
             "검출 실패 프레임은 지표 계산에서 배제한다"(agent/README)로
-            같은 자리를 다룬다. 멈추는 게 아니라 그 구간을 빼는 것이 맞다. */}
-        {started && subject && (trackFailed || lost) && (
+            같은 자리를 다룬다. 멈추는 게 아니라 그 구간을 빼는 것이 맞다.
+
+            🔴 **`!confirmed` 를 넣었다**(2026-09-11, 사용자 지적) — 이 배너는
+            **관문**(「이 사람이 맞습니까?」 전) 용이다. 「예」를 누른 뒤에는
+            대상이 이미 `subjectAnchor()` 로 잘려 서버에 올라간 뒤라, 그 뒤에
+            도는 이 화면의 라이브 따라가기(재생 루프가 사람 없는 프레임을
+            지날 때도 도는 장식일 뿐이다)가 "놓쳤다"고 말해도 **실제 분석과
+            무관하다** — 사용자에게는 "분석 중인데 프레임을 놓쳤다"는, 진행
+            중인 진짜 작업이 잘못된 것처럼 읽힌다.
+
+            🔴 더 나쁘게는 `다시 묶기`(`repick`)가 `setSubject(null)` 을
+            불러 화면을 "사람을 골라 주세요" 단계로 되돌린다 — 이미 업로드·
+            분석이 시작된 뒤에 눌리면 `confirmed`는 `true`인 채 `subject`만
+            비어 뒤죽박죽인 화면이 되고, 다시 확인해 「예」를 또 누르면
+            `saveToServer()` 가 다시 불려 **같은 클립이 두 번 업로드**된다. */}
+        {started && subject && !confirmed && (trackFailed || lost) && (
           <div className="ss-shot-lost" role="status">
             <span>
               {trackFailed
