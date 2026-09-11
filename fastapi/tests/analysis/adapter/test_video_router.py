@@ -136,11 +136,12 @@ class TestRegisterVideo:
         assert "길이" in body["reject_reason"]
 
     def test_반려된_클립은_분석하지_않는다(self, client):
+        # 8K — 2026-09-11 정정으로 4K(3840x2160)까지는 통과하니 그 위 값을 쓴다.
         user_id = uuid4()
         key = _issue(client, user_id)
         put_object(key, SIZE_OK)
 
-        res = _register(client, user_id, key, width=3840, height=2160)
+        res = _register(client, user_id, key, width=7680, height=4320)
         body = res.json()
         assert body["passed"] is False
         assert body["analysis_job_id"] is None
@@ -196,13 +197,26 @@ class TestRegisterVideo:
         assert body["reject_reason"] is None
         assert body["analysis_job_id"] is None
 
-    def test_analyze_true_면_4K_는_그대로_반려된다(self, client):
-        """분석을 걸면 해상도 상한이 살아 있다 — 4K 는 host RAM 이 터진다."""
+    def test_analyze_true_여도_4K는_이제_통과한다(self, client):
+        """정정(2026-09-11) — `ho` 9번이 4K를 메모리로 이미 안전하다고 확정
+        했는데 이 상한이 안 풀려 있던 것을 사용자가 발견했다. 가로·세로 둘 다."""
+        user_id = uuid4()
+        for width, height in [(3840, 2160), (2160, 3840)]:
+            key = _issue(client, user_id)
+            put_object(key, SIZE_OK)
+            res = _register(client, user_id, key, width=width, height=height)
+            assert res.status_code == 201, res.text
+            assert res.json()["passed"] is True
+            assert res.json()["reject_reason"] is None
+            assert res.json()["analysis_job_id"] is not None
+
+    def test_analyze_true_면_해상도_상한은_여전히_살아있다(self, client):
+        """8K — 방향 무관 상한(긴 변 3840·짧은 변 2160)을 넘으면 그대로 반려."""
         user_id = uuid4()
         key = _issue(client, user_id)
         put_object(key, SIZE_OK)
 
-        res = _register(client, user_id, key, width=3840, height=2160)  # analyze 기본 True
+        res = _register(client, user_id, key, width=7680, height=4320)  # analyze 기본 True
         assert res.status_code == 201, res.text
         assert res.json()["passed"] is False
         assert "해상도" in res.json()["reject_reason"]
@@ -354,10 +368,11 @@ class TestListMyVideos:
 
     def test_반려_사유가_목록에도_온다(self, client):
         """`/videos` 화면이 반려 사유를 펼쳐 보여준다(플러터 설계 5.3)."""
+        # 8K — 2026-09-11 정정으로 4K(3840x2160)까지는 통과하니 그 위 값을 쓴다.
         user_id = uuid4()
         key = _issue(client, user_id)
         put_object(key, SIZE_OK)
-        _register(client, user_id, key, width=3840, height=2160)
+        _register(client, user_id, key, width=7680, height=4320)
 
         row = client.get(f"{V1}/videos", headers=_headers(user_id)).json()[0]
         assert row["passed"] is False

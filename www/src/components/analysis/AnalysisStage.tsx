@@ -241,8 +241,31 @@ const STEPS = [
   { key: 'verify', label: '근거 검증', note: '판단마다 그렇게 본 장면을 찾습니다' },
 ] as const
 
-/** 한 단계에 머무는 시간. 진짜 분석은 이보다 오래 걸린다 — 화면 확인용이다. */
+/**
+ * 칸을 하나씩 옮겨 다니는 시간 — **장식**이다. 실제로 끝났는지는 아래
+ * `POLL_MS` 로 서버에 물어서만 안다. 그래서 이 타이머는 마지막 칸(`verify`)
+ * 에서 멈추고 더 넘기지 않는다(2026-09-11, 사용자 지적) — 예전에는 다섯 칸을
+ * 다 채우면 그 자체로 「끝났다」고 선언해서, 진짜 분석이 5.5초보다 오래 걸리는
+ * 보통의 경우에 화면은 이미 리포트 판으로 넘어가 있고 서버는 아직 돌고
+ * 있었다 — 그 사이 뜨는 "아직 분석이 끝나지 않았습니다"가 사용자에게는
+ * "끝났다더니 안 끝났다"로 보였다.
+ */
 const STEP_MS = 1100
+
+/**
+ * 리포트가 됐는지 서버에 다시 물어보는 간격 — **진행 체크리스트가 실제로
+ * 진행되는 근거**다(2026-09-11, 사용자 요청). 올리자마자 100% 헛걸음일
+ * 것이 뻔하니 첫 확인도 이 간격만큼 늦춘다.
+ *
+ * 🔴 워커가 단계별(전처리 · 자세 추적 · 실력 판단 · 근거 검증)로 무엇을
+ * 하고 있는지 중간 보고하는 경로는 아직 없다(`agent/scripts/worker.py` 는
+ * 자식 프로세스의 종료 코드와 `result.json` 만 본다 — 정상호 담당,
+ * `agent/CLAUDE.md`). 그래서 이 화면은 그 네 칸 중 **어디**를 도는지는
+ * 모른다 — 아는 것은 "아직 안 끝났다" 뿐이라, 마지막 칸에 멈춰 "진행 중"
+ * 으로만 보이고 실제 끝(성공·실패)만 서버가 결정한다. 세분화된 단계별
+ * 보고가 필요해지면 `agent/` 쪽 변경이 먼저다 — 미결 항목으로 남긴다.
+ */
+const POLL_MS = 4000
 
 /**
  * 관절이 **연속 이만큼** 잡혀야 「이 사람이 맞습니까?」를 묻는다.
@@ -502,20 +525,44 @@ export default function AnalysisStage() {
   }, [file])
 
   /**
-   * 리포트를 받아 온다 — **단계가 다 차고, 올라간 영상이 있을 때** 한 번.
+   * 서버에 **진짜 끝났는지** 되풀이해 묻는다 — 「끝났다」는 이 응답만이
+   * 정한다(2026-09-11, 사용자 요청 「진행 체크리스트도 실제로 진행되게」).
    *
-   * 🔴 늦게 온 응답이 다른 영상의 리포트를 덮지 않게 `alive` 로 막는다.
+   * 🔴 `ready`·`failed`·`missing` 은 다시 물어도 안 바뀌는 결말이라 거기서
+   * 멈춘다. `not-ready`(아직 도는 중)·`error`(네트워크 등 일시적 문제)는
+   * 계속 되묻는다 — `error` 를 결말로 다루면 한 번의 요청 실패로 체크리스트가
+   * 영영 멈춘 것처럼 보인다.
+   *
+   * 🔴 늦게 온 응답이 다른 영상 것을 덮지 않게, 그리고 언마운트 뒤에도 다음
+   * 타이머가 잡히지 않게 `alive` 로 막는다.
+   *
+   * 🔴 **의존성에 `step` 을 넣지 않는다.** `videoId` 는 업로드가 성공한
+   * 순간 딱 한 번만 채워지지만, 장식용 단계 타이머(아래 효과)가 그 뒤에도
+   * 계속 `step` 을 바꾼다 — 넣으면 단계가 넘어갈 때마다 이 효과가 다시
+   * 돌아 4초짜리 대기가 매번 처음부터 다시 시작돼(2026-09-11에 실제로
+   * 시험이 이렇게 걸렸다), 실제로는 훨씬 늦게야 첫 확인이 나간다.
    */
   useEffect(() => {
-    if (!done || !videoId) return
+    if (!confirmed || done || !videoId) return
     let alive = true
-    void fetchReport(videoId).then((r) => {
-      if (alive) setReport(r)
-    })
+    let timer: number
+    const check = () => {
+      void fetchReport(videoId).then((r) => {
+        if (!alive) return
+        if (r.state === 'not-ready' || r.state === 'error') {
+          timer = window.setTimeout(check, POLL_MS)
+          return
+        }
+        setReport(r)
+        setDone(true)
+      })
+    }
+    timer = window.setTimeout(check, POLL_MS)
     return () => {
       alive = false
+      clearTimeout(timer)
     }
-  }, [done, videoId])
+  }, [confirmed, done, videoId])
 
   /**
    * 단계가 하나씩 넘어간다 — **「예」를 누른 뒤부터**(사용자 요청, 2026-09-08).
@@ -527,15 +574,14 @@ export default function AnalysisStage() {
    * 🔴 **첫 칸('영상 등록')은 여기서 안 넘긴다.** 그 칸이 곧 진짜 S3 업로드라
    * (`saveToServer`), 올라간 뒤에 스스로 넘어간다. 시간으로 넘기면 아직
    * 올라가지도 않았는데 다음 칸이 켜진다.
+   *
+   * 🔴 **마지막 칸에서 멈춘다** — 위 `STEP_MS` 주석대로, 다 채우는 것 자체가
+   * 「끝났다」는 뜻이던 것을 없앴다. 「끝났다」는 이제 위 폴링 효과가 서버
+   * 응답으로만 선언한다.
    */
   useEffect(() => {
     if (!sideIn || !subject || !confirmed || done) return
-    if (step >= STEPS.length) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setDone(true)
-      return
-    }
-    if (step === 0) return
+    if (step === 0 || step >= STEPS.length - 1) return
     const t = window.setTimeout(() => setStep((s) => s + 1), STEP_MS)
     return () => clearTimeout(t)
   }, [sideIn, subject, confirmed, step, done])
@@ -1653,8 +1699,22 @@ export default function AnalysisStage() {
             고르기만 한 단계에서는 아직 아무것도 안 하고 있다. */}
         {/* 놓쳤으면 말한다. 🔴 **분석을 멈추지는 않는다** — 에이전트도
             "검출 실패 프레임은 지표 계산에서 배제한다"(agent/README)로
-            같은 자리를 다룬다. 멈추는 게 아니라 그 구간을 빼는 것이 맞다. */}
-        {started && subject && (trackFailed || lost) && (
+            같은 자리를 다룬다. 멈추는 게 아니라 그 구간을 빼는 것이 맞다.
+
+            🔴 **`!confirmed` 를 넣었다**(2026-09-11, 사용자 지적) — 이 배너는
+            **관문**(「이 사람이 맞습니까?」 전) 용이다. 「예」를 누른 뒤에는
+            대상이 이미 `subjectAnchor()` 로 잘려 서버에 올라간 뒤라, 그 뒤에
+            도는 이 화면의 라이브 따라가기(재생 루프가 사람 없는 프레임을
+            지날 때도 도는 장식일 뿐이다)가 "놓쳤다"고 말해도 **실제 분석과
+            무관하다** — 사용자에게는 "분석 중인데 프레임을 놓쳤다"는, 진행
+            중인 진짜 작업이 잘못된 것처럼 읽힌다.
+
+            🔴 더 나쁘게는 `다시 묶기`(`repick`)가 `setSubject(null)` 을
+            불러 화면을 "사람을 골라 주세요" 단계로 되돌린다 — 이미 업로드·
+            분석이 시작된 뒤에 눌리면 `confirmed`는 `true`인 채 `subject`만
+            비어 뒤죽박죽인 화면이 되고, 다시 확인해 「예」를 또 누르면
+            `saveToServer()` 가 다시 불려 **같은 클립이 두 번 업로드**된다. */}
+        {started && subject && !confirmed && (trackFailed || lost) && (
           <div className="ss-shot-lost" role="status">
             <span>
               {trackFailed
@@ -1819,29 +1879,21 @@ export default function AnalysisStage() {
              두면 한쪽만 늙는다. */
           /* 🔴 **「아직」과 「없다」를 갈라 그린다** — 분석 중인 클립에 빈 판을
              보이면 결과가 없는 것으로 읽힌다(미결 `paik` 7번의 「하지 말 것」). */
+          /* 🔴 **`not-ready`·`error`는 여기 안 온다.** `done` 은 위 폴링
+             효과가 `report` 와 **같은 순간에만** 세운다(2026-09-11) — 도는
+             중이거나 네트워크가 잠깐 안 될 때는 `done` 이 그대로 거짓이라
+             이 자리에 못 온다. 그래서 여기 남는 결말은 `ready`·`failed`·
+             `missing` 셋뿐이고, 「다시 확인」 단추는 (폴링이 이미 하고
+             있어서) 쓸 일이 없어 없앴다. */
           report?.state === 'ready' ? (
             <ReportView report={report.report} />
           ) : (
             <div className="ss-report-wait" role="status">
               <p>
-                {report === null
-                  ? '리포트를 불러오는 중입니다…'
-                  : report.state === 'not-ready'
-                    ? '아직 분석이 끝나지 않았습니다.'
-                    : report.state === 'missing'
-                      ? '그 영상을 찾을 수 없습니다.'
-                      : report.message}
+                {report?.state === 'failed'
+                  ? `분석에 실패했습니다 — ${report.reason}`
+                  : '그 영상을 찾을 수 없습니다.'}
               </p>
-              {/* 기다리는 것 말고 할 일을 준다 — 끝났는지 다시 물어볼 수 있어야 한다. */}
-              {videoId && report?.state !== 'missing' && (
-                <button
-                  type="button"
-                  className="ss-shot-pick-auto"
-                  onClick={() => void fetchReport(videoId).then(setReport)}
-                >
-                  다시 확인
-                </button>
-              )}
             </div>
           )
         ) : (

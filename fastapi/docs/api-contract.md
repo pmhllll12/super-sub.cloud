@@ -449,9 +449,17 @@ Pydantic 검증에 걸리면 `code`는 항상 `VALIDATION_ERROR` 하나이고 `m
       "granted_at": "2026-08-20T12:00:00Z" },
     { "code": "weekend_regular", "label": "주말 개근", "category": "활동",
       "granted_at": "2026-08-01T09:00:00Z" }
-  ]
+  ],
+  "tagline": "THREE LUNGS",
+  "style": {
+    "bg": "#91ea92", "logo": "#0b0b0b", "text_color": "#0b0b0b",
+    "text_x": 50, "text_y": 34, "brush": 0, "brush_color": "#0b0b0b",
+    "brush_scale": 1, "brush_x": 0, "brush_y": 0
+  }
 }
 ```
+
+**둘 다 안 정했으면 `null`** — 만든 직후 카드가 그렇다(아래 참고).
 
 | 에러 | code |
 |---|---|
@@ -493,46 +501,81 @@ Pydantic 검증에 걸리면 `code`는 항상 `VALIDATION_ERROR` 하나이고 `m
 **기존 계정은 이 엔드포인트를 부르기 전까지 카드가 없다.** `GET /me/card` 는 그대로
 404 `CARD_NOT_FOUND` 를 낸다 — 클라이언트의 "아직 없습니다" 빈 상태는 계속 유효하다.
 
-### `PATCH /api/v1/me/card` — 한 줄 꾸미기 (2026-09-04 추가)
+### `PATCH /api/v1/me/card` — 한 줄과 꾸미기 (2026-09-04 신설, 2026-09-11 `style` 추가)
 
 인증 필요. 카드에서 **사람이 정하는 값**을 바꾼다. 미결 `paik` 3번 —
 지금까지 카드는 만들고 나면 손댈 것이 없어 **모든 카드가 글자까지 똑같았다**
-(별명이 화면의 붙박이 상수였다).
+(별명이 화면의 붙박이 상수였다). `tagline`(한 줄)으로 그 일부를 풀었고,
+`style`(바탕·로고·글자 색·글자 자리·붓자국)로 나머지를 마저 푼다.
 
 ```json
-{"tagline": "THREE LUNGS"}
+{
+  "tagline": "THREE LUNGS",
+  "style": {
+    "bg": "#91ea92", "logo": "#0b0b0b", "text_color": "#0b0b0b",
+    "text_x": 50, "text_y": 34, "brush": 0, "brush_color": "#0b0b0b",
+    "brush_scale": 1, "brush_x": 0, "brush_y": 0
+  }
+}
 ```
 
 `200 OK` — 응답 본문은 `GET /me/card` 와 같다.
 
+🔴 **둘은 따로 바뀐다** — `model_fields_set` 로 **보낸 필드만** 본다.
+`{"style": {...}}` 만 보내면 `tagline` 은 그대로다(반대도 마찬가지). 아예
+빈 본문 `{}` 을 보내면 아무것도 안 바뀌고 지금 카드가 그대로 온다.
+
 | 보내면 | 결과 |
 |---|---|
-| `{"tagline": "…"}` | 정한다 (**20자까지**) |
-| `{"tagline": null}` · `{"tagline": "   "}` | **지운다** — 안 정한 상태로 |
+| `{"tagline": "…"}` | 한 줄을 정한다 (**20자까지**) |
+| `{"tagline": null}` · `{"tagline": "   "}` | 한 줄을 **지운다** — 안 정한 상태로 |
 | 20자 초과 | `422 VALIDATION_ERROR`. 🔴 **조용히 자르지 않는다** — 쓴 것과 보이는 것이 달라지고 알아차리는 시점은 공유한 뒤다 |
+| `{"style": {...}}` (아래 형태 그대로) | 꾸미기를 **통째로** 바꾼다 |
+| `{"style": null}` | 꾸미기를 지운다 — 기본 모습으로 돌아간다 |
+| `style` 필드가 하나라도 모자라거나 색이 `#rrggbb` 형식이 아님 | `422 VALIDATION_ERROR`. 🔴 **부분 병합을 하지 않는다** — 일부만 보내면 나머지를 지우는 대신 거부한다. 화면이 늘 전체 값을 들고 있다가 저장하므로 병합할 이유가 없다 |
 | 카드가 없음 | `404 CARD_NOT_FOUND`. **여기서 만들지 않는다** — 만드는 자리는 `POST /me/card` 하나다 |
 
-#### 🔴 바꿀 수 있는 것은 이것뿐이다
+#### `style` 의 필드
 
-`public_slug` 와 `og_image_key` 는 **요청 본문에 자리가 없다.** 보내도 무시된다.
+| 필드 | 뜻 | 형식 |
+|---|---|---|
+| `bg` | 카드 바탕색 | `#rrggbb` |
+| `logo` | 워드마크 색 | `#rrggbb` |
+| `text_color` | 가운데 큰 글자(=`tagline`) 색 | `#rrggbb` |
+| `text_x`·`text_y` | 그 글자의 자리 (카드 폭·높이 대비 %) | `0`~`100` |
+| `brush` | 뒤에 까는 자국 — 몇 번째인지 (`www` 의 자산 목록 순서) | 정수 |
+| `brush_color` | 자국 색 | `#rrggbb` |
+| `brush_scale` | 자국 크기 배율 | `0.1`~`5` |
+| `brush_x`·`brush_y` | 자국 자리 (%) | `-100`~`100` |
 
-- `public_slug` — 이미 공유된 주소다. 바꾸면 **남이 가진 링크가 죽는다**
-- `og_image_key` — 슬러그에서 규칙으로 나오는 값이다
+🔴 **`brush` 의 정확한 상한을 값으로 안 막는다.** 고를 수 있는 자국 개수는
+`www` 쪽 자산이라 늘어날 수 있다 — `focus`(3-6절)가 루브릭 항목의 실재를
+안 보는 것과 같은 판단으로, 서버는 형식(정수·구간)만 본다.
+
+#### 🔴 여기 없는 것
+
+- `public_slug`·`og_image_key` — **요청 본문에 자리가 없다.** 보내도 무시된다.
+  `public_slug`는 이미 공유된 주소라 바꾸면 남이 가진 링크가 죽고, `og_image_key`는
+  슬러그에서 규칙으로 나오는 값이다
 - `titles` — **분석이 주는 것**이라 사람이 못 고른다(3.5)
-
-`tagline` 은 `user.nickname`(이름)과도 `titles`(호칭)와도 다른 값이다 — 카드에
-얹히는 셋 중 **이것만 사람이 고른다.**
+- **가운데 큰 글자의 내용** — `style` 이 아니라 **`tagline` 이 그 값이다.**
+  `www`가 04-09 이후 이걸 몰라 `style.text`를 새로 만들어 브라우저에만
+  담고 있었는데, 이 갱신에서 `tagline` 쪽으로 합친다(`client-contract-
+  changes.md` 35번)
+- **사진** — `og_image_key`가 "규칙은 있는데 파일이 없는" 상태라(위 `POST
+  /me/card` 참고) 저장 위치부터 정해야 한다. 사진에 딸린 자리·크기
+  (`photoScale`·`photoX`·`photoY`)와 통째로 까는 모드(`mode`)도 사진이
+  없으면 뜻이 없어 같이 뺐다 — `www`는 넷 다 그대로 브라우저에만 둔다.
+  `CardStyleSchema` 가 `extra=forbid` 라 이 필드들을 보내면 조용히
+  무시되지 않고 **422** 로 막힌다
 
 #### 공개 카드에도 나간다
 
-`GET /cards/{slug}` 응답에도 `tagline` 이 실린다. 안 실으면 **남이 보는 카드만**
-밋밋해진다.
+`GET /cards/{slug}` 응답에도 `tagline`·`style` 이 실린다. 안 실으면 **남이
+보는 카드만** 밋밋해진다.
 
-⚠️ **사진은 아직 없다.** `og_image_key` 가 "규칙은 있는데 파일이 없는" 상태라
-(위 `POST /me/card` 참고) 업로드를 여기 얹기 전에 **저장 위치부터** 정해야 한다.
-
-🔴 `tagline` 은 **부록 D 의 `player_card` 에 없는 컬럼**이다(2026-09-04 에 늘렸다).
-ERD 갱신은 미결 항목으로 올렸다.
+🔴 `tagline`·`style` 은 **부록 D 의 `player_card` 에 없는 컬럼**이다
+(각각 2026-09-04 · 2026-09-11 에 늘렸다). ERD 갱신은 미결 항목이다.
 
 ### `GET /api/v1/cards/{public_slug}`
 
@@ -708,13 +751,15 @@ S3 의 분석 산출물(`report.json`)을 서버가 받아 점수만 걷어내�
   "analyzed_at": "2026-09-10T12:00:00Z",
   "summary": "디딤발 무릎 굽히기가 강점입니다.",
   "provisional": true,
+  "total_score": 71,
+  "overall_grade": "B",
   "breakdown": [
     { "criterion_id": "plant_knee_flexion", "name": "디딤발 무릎 굽히기",
       "grade": 2, "title": "흔들리지 않는 축",
-      "evidence": "안정적으로 놓였습니다.",
+      "evidence": "안정적으로 놓였습니다.", "stat": 88.5,
       "metric_ref": "plant_knee_angle_at_impact", "skipped": false },
     { "criterion_id": "plant_foot_position", "name": "디딤발 위치",
-      "grade": null, "title": null, "evidence": null,
+      "grade": null, "title": null, "evidence": null, "stat": null,
       "metric_ref": null, "skipped": true }
   ],
   "scenes": [
@@ -725,17 +770,29 @@ S3 의 분석 산출물(`report.json`)을 서버가 받아 점수만 걷어내�
 }
 ```
 
-🔴 **허용목록이다.** DB 에 있어도 여기 없는 것: 총점·항목별 등급 숫자를 담은
-`summary`(3장 4 — 문장에 수치 금지) · 항목별 `stat`·`band`·`weight`·`contribution`
-(수치는 카드 경로가 따로 읽는다) · `out_of_band`(검수 전 임계값 — 미결 `jin` 24번).
-`grade` 가 `null` 이면 **제외(skipped)** 지 0점이 아니다. `scenes` 는 프레임
-지표(`impact_frame` 등)의 초 환산 — "이렇게 본 장면" 으로 이동하는 자리다.
+🔴 **허용목록이다.** DB 에 있어도 여기 없는 것: `band`·`weight`·`contribution`·
+`out_of_band`(검수 전 임계값 — 미결 `jin` 24번)·`view_dependent` — 전부 개발
+확인용이다. **`total_score`·`overall_grade`·`breakdown[].stat` 는 나간다**
+(2026-09-11 정정, 미결 `ho` 28번 — 이 문서가 앞서 "카드 경로가 따로 읽는다"고
+적었던 것은 틀렸다. 계약 3장 4가 막은 것은 `summary` 문장 **안에** 숫자를 넣는
+것이지 이 필드들 자체가 아니다). `grade` 가 `null` 이면 **제외(skipped)** 지
+0점이 아니고, 그 항목의 `stat` 도 `null` 이다. `overall_grade` 는 `total_score`
+와 마찬가지로 영상 하나(=분석 1회)의 값 — 선수 단위로 합친 오버롤은 없다.
+옛 행(이 필드가 생기기 전 적재분)은 `total_score`/`overall_grade` 가 `null`.
+`scenes` 는 프레임 지표(`impact_frame` 등)의 초 환산 — "이렇게 본 장면"으로
+이동하는 자리다.
 
 | 에러 | code | 언제 |
 |---|---|---|
 | 401 | `UNAUTHORIZED` | 토큰이 없거나 틀리다 |
 | 404 | `VIDEO_NOT_FOUND` | 없는 영상이거나 남의 영상이다 |
-| 404 | `REPORT_NOT_READY` | 영상은 있으나 아직 리포트가 적재되지 않았다 |
+| 404 | `ANALYSIS_FAILED` | 작업이 `failed`로 끝났다 — **다시 물어봐도 절대 안 생긴다.** `message`에 실패 사유(2026-09-11 추가, 사용자가 화면에서 실제로 겪음). 재촬영·재분석을 안내할 자리 |
+| 404 | `REPORT_NOT_READY` | 영상은 있고 작업이 `queued`·`running`이라 아직 적재 전이다 — 다시 물어보면 될 수도 있다 |
+
+🔴 **`ANALYSIS_FAILED`와 `REPORT_NOT_READY`를 같은 걸로 다루지 않는다** — 전자는
+끝난 상태(재시도해도 안 바뀜), 후자는 진행 중(재시도하면 바뀔 수 있음)이다. 이
+둘을 가르기 전에는 실패한 분석도 `REPORT_NOT_READY`로 나가서 화면이 "다시 확인"을
+무한 반복시켰다.
 
 ### 🔴 지표 코드 실태 — 지금 스키마로는 루브릭을 담을 수 없다 (2026-09-01 조사)
 
@@ -949,7 +1006,7 @@ trunk_alignment       2개 루브릭  basketball_jump_shot · basketball_layup  
       "storage_key": "videos/3f1c.../홍길동-My-Kick-20260908-1419-3f1c8a2b.mp4",
       "created_at": "2026-09-08T09:00:00Z",
       "kept": true, "is_public": false, "passed": true, "reject_reason": null,
-      "analysis_status": "queued",
+      "analysis_status": "failed", "analysis_failure_reason": "품질 게이트 미달: …",
       "report_prefix": "reports/3f1c.../7c05.../" }
   ]
 }
@@ -960,6 +1017,9 @@ trunk_alignment       2개 루브릭  basketball_jump_shot · basketball_layup  
 - **재생·리포트 링크는 안 싣는다** — 목록 한 번에 객체마다 사전 서명을 하지
   않으려는 것이다. 재생은 `storage_key` 로, 리포트는 `report_prefix` 아래
   (`report.json`·`impact.jpg`·`tracked.webm`)를 콘솔이나 별도 사전 서명으로 짚는다.
+- 🔴 **`analysis_failure_reason`** (2026-09-11 추가). `analysis_status`가
+  `failed`일 때만 값이 있고, 그 외엔 `null`이다 — "에이전트가 제대로 돌았는지"를
+  이 목록만으로 확인하려는 용도다(관리자 전용, `GET /videos`엔 없다).
 
 ### `DELETE /api/v1/admin/videos/{video_id}` — 관리자 영상 삭제 (2026-09-08 추가)
 
@@ -1463,13 +1523,19 @@ SFR-001. 사용자가 자기 클립을 올리고, 서버가 규격을 검사해 
 |---|---|
 | 용량 | 200MB |
 | 길이 | 60초 |
-| 해상도 | 1920x1080 — **`analyze: true` 일 때만** (2026-09-08) |
+| 해상도 | 긴 변 3840 · 짧은 변 2160(4K, 방향 무관) — **`analyze: true` 일 때만** (2026-09-11 정정) |
 | 형식 | `video/mp4` · `video/quicktime` |
 
-**해상도 상한은 분석 워커의 host RAM 을 지키는 값이다**(미결 `ho` 9번 — 4K 는
-터진다). 그래서 `analyze: false` 기록용 업로드에는 걸지 않는다 — 그 클립은 워커를
-지나지 않는다. `analyze: true` 4K 는 그대로 반려된다(`ho` 9번이 풀리면 상한을
-올리거나 없앤다). 용량·길이는 저장소·비용에 걸린 것이라 `analyze` 와 무관하다.
+**해상도 상한은 분석 워커의 메모리 예산을 지키는 값이다**(`ho` 9번). `analyze:
+false` 기록용 업로드에는 걸지 않는다 — 그 클립은 워커를 지나지 않는다.
+
+🔴 **정정 (2026-09-11)**: 여기 적혀 있던 "1920x1080, `ho` 9번이 풀리면 상한을
+올린다"는 예고 그대로 실행이 안 된 상태였다 — `ho` 9번은 2026-09-08에 이미
+4K(2160×3840, 300프레임)를 실측 기준으로 안전하다고 확정했는데, 이 상한만 안
+풀려 있었다(사용자가 화면에서 발견). 이제 그 기준까지 허용한다. **곁가지**:
+옛 상한이 `width`·`height`를 그대로 비교해서, 4K와 무관하게 **세로로 찍은
+보통 1080p 영상(1080×1920)도 방향 때문에 반려되고 있었다** — 같이 풀렸다.
+용량·길이는 저장소·비용에 걸린 것이라 `analyze` 와 무관하다.
 
 🔴 **길이 상한이 에이전트의 프레임 상한과 아직 안 맞는다.**
 `agent/src/supersub_agent/pose.py` 의
@@ -1582,8 +1648,9 @@ SFR-001. 사용자가 자기 클립을 올리고, 서버가 규격을 검사해 
 }
 ```
 
-반려면 `passed: false` · `reject_reason: "해상도가 상한을 넘습니다: 3840x2160
-(상한 1920x1080)"` · `analysis_job_id: null` 이다. **반려된 클립은 분석하지 않는다** —
+반려면 `passed: false` · `reject_reason: "해상도가 상한을 넘습니다: 7680x4320
+(상한 긴 변 3840 · 짧은 변 2160)"` · `analysis_job_id: null` 이다. **반려된
+클립은 분석하지 않는다** —
 규격 검사를 두는 이유가 그것이다.
 
 `kept` 는 **프로필에 저장됐는가**다(미결 `jin` 24번). `GET /videos` 는 `kept: true`

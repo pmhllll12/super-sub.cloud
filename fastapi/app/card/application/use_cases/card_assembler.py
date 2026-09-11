@@ -41,6 +41,7 @@ def to_my_card_result(card: CardEntity) -> MyCardResult:
         user=_owner(card.owner),
         titles=_titles(card.titles),
         tagline=card.tagline,
+        style=card.style,
     )
 
 
@@ -51,4 +52,5 @@ def to_public_card_result(card: PublicCardEntity) -> PublicCardResult:
         user=_owner(card.owner),
         titles=_titles(card.titles),
         tagline=card.tagline,
+        style=card.style,
     )

@@ -1,7 +1,9 @@
 import type {
   AdminUserDetail,
   AdminUserListResult,
+  AdminVideoListResult,
   AuthToken,
+  CardStyleWire,
   CreateMatchInput,
   FeaturedVideo,
   MercenaryCandidate,
@@ -44,6 +46,19 @@ export interface Backend {
    * 행위**여야 하기 때문이다 — 프리페치나 봇이 카드를 만들면 안 된다.
    */
   createMyCard(token: string): Promise<PlayerCard>
+  /**
+   * 카드의 한 줄(`tagline`)과 꾸미기(`style`)를 바꾼다 — 계약 3장, CCC 18·35.
+   *
+   * 🔴 **보낸 필드만 바뀐다** — `updateVideo` 와 같은 판단이다. `tagline`
+   * 만 보내면 `style` 은 그대로고, 반대도 마찬가지다. 그래서 입력 타입에
+   * `?`(생략 가능)를 뒀다 — `undefined` 로라도 보내면 "보냈다"로 읽힐 수
+   * 있으니 **키 자체를 빼고** 부른다. `null` 은 "지운다"는 뜻이 있는 값이다.
+   * 🔴 `style` 을 보낼 땐 **전체 값**을 보낸다 — 서버가 부분 병합을 안 한다.
+   */
+  updateMyCard(
+    token: string,
+    input: { tagline?: string | null; style?: CardStyleWire | null },
+  ): Promise<PlayerCard>
   getPublicCard(slug: string): Promise<PublicPlayerCard>
   /** 내가 올린 클립 목록. **최근 것이 앞에 온다.** */
   listMyVideos(token: string): Promise<MyVideo[]>
@@ -203,4 +218,6 @@ export interface Backend {
   ): Promise<AdminUserListResult>
   getUserDetail(token: string, userId: string): Promise<AdminUserDetail>
   forceDeleteUser(token: string, userId: string): Promise<void>
+  /** 관리자 전용. `user` 는 `user.id` 또는 이메일. 없는 사람이면 404 USER_NOT_FOUND. */
+  listAdminVideos(token: string, user: string): Promise<AdminVideoListResult>
 }

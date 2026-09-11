@@ -1266,6 +1266,211 @@ git -C fastapi grep -n "videos/{video_id}/report" -- app/analysis   # 백엔드 
 
 ---
 
+## 32. ✅ 정정 — 31번의 「하지 말 것」 두 줄이 틀렸습니다. `GET /videos/{id}/report` 가 이제 총점·오버롤 등급·항목별 `stat` 도 줍니다 (2026-09-11 추가·반영 완료, `ho` 28번)
+
+**앞서 31번에서 "총점·별점 숫자는 응답에 없다", "`band`·`stat`·`weight` 를
+기대하지 마세요" 라고 전달한 것을 정정합니다.** `stat` 은 이제 나갑니다 —
+`band`·`weight`·`contribution` 은 여전히 안 나갑니다.
+
+31번을 이미 반영하셨다면(응답 파싱을 이미 만드셨다면) **필드를 더 읽기만 하면
+됩니다** — 기존 필드는 그대로입니다.
+
+### 만족해야 할 성질
+
+- 오버롤(등급 A/B/C/D·총점 0~100)을 화면에 보여줄 수 있다. **영상 하나(=분석
+  1회)의 값**이다 — "이 선수의 오버롤"이 아니라 "이 클립의 오버롤"이라고 씁니다.
+- 레이더 차트를 그린다면 각 항목의 `stat`(0~100)을 축 값으로 쓴다. **`stat`이
+  `null`인 항목은 축에서 뺍니다** — 0으로 그리면 "그 항목을 못했다"로 잘못
+  읽힙니다(`skipped: true`인 항목이 그렇습니다).
+- `total_score`·`overall_grade`가 `null`이면(리포트가 이 필드가 생기기 전에
+  적재된 옛 것) 오버롤 표시를 건너뜁니다 — 문장·항목별 등급은 그대로 보여줄 수
+  있습니다.
+
+### 바뀐 응답 모양
+
+```json
+{
+  "video_id": "3f1c...", "analyzed_at": "2026-09-10T12:00:00Z",
+  "summary": "디딤발 무릎 굽히기가 강점입니다.", "provisional": true,
+  "total_score": 71, "overall_grade": "B",
+  "breakdown": [
+    { "criterion_id": "plant_knee_flexion", "name": "디딤발 무릎 굽히기",
+      "grade": 2, "title": "흔들리지 않는 축", "evidence": "안정적으로 놓였습니다.",
+      "stat": 88.5, "metric_ref": "plant_knee_angle_at_impact", "skipped": false }
+  ],
+  "scenes": [ { "metric_code": "impact_frame", "label": "임팩트 프레임", "at_seconds": 2.07 } ],
+  "previews": { "impact": "s3://.../impact.png" },
+  "keypoint_quality": { "known": true, "swing_side_valid_ratio": 0.9 }
+}
+```
+
+`total_score`·`overall_grade`·`breakdown[].stat` **셋만 추가**입니다. 나머지
+필드 이름·모양은 31번 그대로입니다.
+
+### 🔴 하지 말아야 할 것
+
+- **`total_score`를 `stat` 값들의 평균으로 다시 계산하지 마세요** — 총점은
+  등급의 가중합이고 `stat`과 무관합니다. 화면에 총점과 레이더를 나란히 둘 때
+  "축 점수 평균이 총점"으로 읽히지 않게 캡션을 답니다.
+- **`overall_grade`를 카드(`player_card`, 스쿼드 화면 등)에 올리지 마세요** —
+  부록 D.5가 막은 결정입니다. 이 등급은 **리포트 화면 전용**입니다.
+  `GET /cards/*` 계열 응답에는 이 필드가 없습니다.
+- 여전히 `band`·`weight`·`contribution`·`out_of_band`·`view_dependent` 는
+  기대하지 마세요 — 개발 확인용이고 허용목록 밖입니다.
+- 근거 문장(`evidence`)에서 등급·점수를 정규식으로 뽑지 마세요 — 문장에는
+  숫자가 없습니다(그대로 유효, 23·24번).
+
+### 먼저 확인
+
+```bash
+git -C fastapi diff a1c9f7b2e034 8a765b42e48e -- app/analysis/adapter/inbound/api/schemas/video_schema.py
+```
+
+위가 안 걸리면(즉 이미 병합돼 있으면) 서버가 이미 이 필드들을 내고 있는
+것입니다 — `curl` 로 실제 응답을 보고 파싱만 늘리면 됩니다.
+
+상세: `fastapi/docs/api-contract.md` **3-1절** · 같은 구역 31번(원래 계약) ·
+pending `ho` 28번
+
+**✅ 반영 완료 (2026-09-11)** — `www/src/server/backend/types.ts`(타입)·
+`src/lib/savedReports.ts`(옮김터)·`src/components/analysis/ReportView.tsx`
+(등급 칩·SVG 레이더)에 넣었다. 차트 라이브러리는 새로 안 넣었다. `npm test`
+571 passed.
+
+---
+
+## 33. 🔴 정정 — 업로드 해상도 상한이 1080p 가 아니라 4K 입니다 (2026-09-11 추가)
+
+**앞서(계약 문서·CCC 4번 등에서) "해상도 상한 1920x1080"이라고 전달했던 것을
+정정합니다.** `POST /videos`(`analyze: true`)의 해상도 반려 기준이 4K(긴 변
+3840 · 짧은 변 2160, 방향 무관)로 올라갔습니다 — `ho` 9번이 2026-09-08에 이미
+메모리로 안전하다고 확정했는데 이 상한만 안 풀려 있던 것을 사용자가 발견했습니다.
+
+### 만족해야 할 성질
+
+- 화면·안내 문구 어디선가 "1080p까지만 지원", "해상도가 너무 높습니다(1920x1080
+  이하로)" 같은 문구를 **하드코딩**했다면 4K 기준으로 고칩니다. `grep -rn "1920\|1080"
+  www/src`로 찾아본 결과 지금은 그런 문구가 없는 것 같습니다 — 서버 `reject_reason`
+  문장을 그대로 보여주는 구조라면 손댈 것이 없을 수 있습니다.
+- 업로드 전 클라이언트 쪽 사전 검증(있다면)도 같은 기준으로 맞춥니다.
+
+### 곁가지 — 4K 와 무관한 별개 버그도 같이 풀렸습니다
+
+옛 상한이 `width`·`height`를 그대로 비교해서, **세로로 찍은 보통 1080p 영상
+(1080×1920, 스마트폰 기본 방향)도 방향 때문에 반려되고 있었습니다.** 이제 방향
+무관하게 통과합니다 — 세로 영상 업로드가 갑자기 되기 시작했다면 이게 이유입니다.
+
+### 하지 말아야 할 것
+
+- 🔴 **60초 길이 상한은 그대로입니다** — 이건 별개 미해결 항목(에이전트 프레임
+  상한과 안 맞음, `agent/`)이라 이번 정정과 무관합니다.
+
+### 먼저 확인
+
+```bash
+git -C fastapi log --oneline -1 -- app/analysis/domain/rules/video_rules.py
+grep -rn "1920\|1080" www/src --include="*.ts" --include="*.tsx"
+```
+
+상세: `fastapi/docs/api-contract.md` 3-6절 · pending `## ho` 9번
+
+---
+
+## 34. ✅ `GET /videos/{id}/report` 에 새 에러 코드 `ANALYSIS_FAILED` — 이미 반영 완료 (2026-09-11 추가)
+
+**사용자가 화면에서 직접 겪은 버그.** 분석이 `failed`로 끝나도 이 엔드포인트가
+`REPORT_NOT_READY`만 내서, "다시 확인"을 눌러도 영원히 "아직 분석이 끝나지
+않았습니다"만 보였습니다 — 실패는 다시 물어봐도 절대 안 바뀌는데 곧 될 것처럼
+보인 것이 문제였습니다.
+
+### 바뀐 것
+
+| 코드 | 뜻 | 다시 물어보면 |
+|---|---|---|
+| `REPORT_NOT_READY` | 아직 `queued`·`running` | 바뀔 수 있다 |
+| `ANALYSIS_FAILED` (신설) | `failed`로 끝남, `message`에 실패 사유 | **절대 안 바뀐다** |
+
+### ✅ 반영 완료
+
+`www/src/lib/savedReports.ts`(`ReportResult`에 `{state:'failed', reason}` 추가)·
+`AnalysisStage.tsx`·`MyVideos.tsx`(실패 사유 표시, "다시 확인" 버튼 숨김)·
+`mock.ts`까지 이미 넣었습니다(`2206bb6`). `npm test` 576 passed.
+
+상세: `fastapi/docs/api-contract.md` 3-1절 · 같은 구역 31번(원래 계약)
+
+---
+
+## 35. ✅ 카드 꾸미기가 서버에 저장됩니다 — `style` 신설, `text`는 `tagline`과 합쳤습니다 — 이미 반영 완료 (2026-09-11 추가, 미결 `paik` 3번 나머지)
+
+**사용자가 화면에서 직접 겪은 문제.** 카드 편집기(`CardEditor.tsx`)에서 바탕 ·
+로고 · 글자 · 글자 색을 바꾸고 「저장」을 눌러도 **이 브라우저에만**
+(`localStorage`) 담겨서, 다른 기기에서 안 보이고 **공개 카드 링크(`/c/{slug}`)
+에도 안 실렸습니다. 이번엔 `www/`까지 같이 고쳤습니다(남의 영역이라
+`www/AGENTS.md` 먼저 읽었습니다).
+
+### 바뀐 것
+
+```json
+PATCH /me/card
+{
+  "tagline": "THREE LUNGS",
+  "style": {
+    "bg": "#91ea92", "logo": "#0b0b0b", "text_color": "#0b0b0b",
+    "text_x": 50, "text_y": 34, "brush": 0, "brush_color": "#0b0b0b",
+    "brush_scale": 1, "brush_x": 0, "brush_y": 0
+  }
+}
+```
+
+`GET /me/card`·`GET /cards/{slug}` 양쪽 응답에 `style`(안 꾸몄으면 `null`)이
+실립니다. `tagline`과 **따로** 바뀝니다(`model_fields_set`) — `style`만
+보내도 `tagline`은 그대로고 반대도 마찬가지입니다. 값이 하나라도 모자라거나
+색이 `#rrggbb` 형식이 아니면 `422`입니다 — 부분 병합을 하지 않으므로 화면은
+늘 들고 있는 **전체 값**을 보냅니다.
+
+### 🔴 `style.text`는 없습니다 — `tagline`과 합쳤습니다
+
+**이미 18번에서 낸 `tagline`이 같은 것이었습니다.** `cardStyle.tsx`의
+`DEFAULT_CARD_STYLE.text` 기본값(`"THREE LUNGS"`)이 18번 예시와 같은 문구인
+것이 그 증거입니다 — `www`가 04-09 이후 `tagline`을 모른 채 같은 개념을
+`style.text`로 새로 만들었던 것으로 보입니다. 합쳤습니다: 편집기의 "글자"
+입력란은 이제 `tagline`을 바꾸고(20자 상한, 서버와 같습니다), `PlayerCardView`
+의 가운데 큰 글자도 `card.tagline`을 읽습니다.
+
+### 여기 없는 것 — `style.photo`·`photoScale`·`photoX`·`photoY`·`mode`
+
+사진 자체와 그에 딸린 자리 · 크기 · 모드는 여전히 서버에 없습니다.
+`og_image_key`가 "규칙은 있는데 파일이 없는" 상태인 것과 같은 이유입니다
+(18번 「사진은 아직입니다」). 이 다섯은 지금처럼 브라우저에만, **이 세션
+동안만** 남습니다 — 서버로 보내면 `422`입니다(`CardStyleSchema`가
+`extra="forbid"`).
+
+### ✅ 반영 완료
+
+`www/src/app/(app)/me/cardStyle.tsx`(서버 값으로 초기화, `save()`가
+`PATCH /me/card`를 부름) · `CardEditor.tsx`("글자" 입력란이 `tagline`을
+바꿈, 20자 상한) · `StyledCard.tsx`(편집 중 미리보기) · `PlayerCardView.tsx`
+(`look`을 안 받아도 `card.style`·`card.tagline`을 스스로 읽어 그림 — 편집
+중이 아닐 때도, 공개 카드 화면도 손댈 것 없이 자동으로 꾸며진 대로 그려집니다)
+· `server/backend/{types,gateway,fastapiBackend,mock}.ts` · `api/me/card/route.ts`
+(PATCH 신설)까지 이미 넣었습니다. `cardStyleStore.ts`(옛 `localStorage` 저장소)
+는 지웠습니다 — 그 파일 자신의 주석이 예고했던 그대로입니다.
+
+`npx tsc --noEmit`·`npx eslint`(둘 다 무관한 기존 항목 외 없음) ·
+`npx vitest run` 574 passed(1 skipped, 무관) · `pytest -q` 776 passed.
+
+### 먼저 확인
+
+```bash
+curl -s -X PATCH -H "Authorization: Bearer $T" -H 'Content-Type: application/json' \
+  -d '{"style":{"bg":"#91ea92","logo":"#0b0b0b","text_color":"#0b0b0b","text_x":50,"text_y":34,"brush":0,"brush_color":"#0b0b0b","brush_scale":1,"brush_x":0,"brush_y":0}}' \
+  $API/me/card | jq .style
+```
+
+상세: `fastapi/docs/api-contract.md` 3절(선수 카드) · 같은 구역 18번(`tagline`,
+같은 계열) · `fastapi/alembic/versions/20260911_player_card_style.py`
+---
+
 ## 계약 문서
 
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린

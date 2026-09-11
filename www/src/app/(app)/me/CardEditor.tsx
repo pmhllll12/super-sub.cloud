@@ -11,10 +11,11 @@ import { useCardStyle } from './cardStyle'
 /**
  * 선 아래의 카드 편집기.
  *
- * ⚠️ **지금 바꿀 수 있는 것이 거의 없다.** 계약에 카드를 고치는 경로가 없고
- * (`POST /me/card` 는 **만들기**뿐이다), 카드에 보이는 별명 · 인물은 화면의
- * 붙박이다 — 서버가 주는 값이 아니다(`PlayerCardView` 주석). 호칭은 분석
- * 결과로 붙어서 사람이 고를 수 있는 것도 아니다.
+ * ✅ **바탕 · 로고 · 글자(`tagline`) · 글자 색 · 글자 자리 · 붓자국이 서버에
+ * 저장된다**(`PATCH /me/card`, CCC 35). 사진(누끼 인물)은 아직 붙박이다 —
+ * 올린 사진을 담을 저장 위치가 정해지지 않아서 이 세션 동안만 브라우저에
+ * 남는다(`cardStyle.tsx` 주석). 호칭은 분석 결과로 붙어서 여전히 사람이
+ * 고를 수 없다.
  *
  * 그래서 이 자리는 지금 **둘로 갈린다**:
  *   카드가 없으면 → 만들기 (미결 jin-7 이 요청한 자리)
@@ -143,9 +144,10 @@ function ColorRow({
 
 /** 1단계 — 바탕 · 로고 · 글자와 그 색. 사진 · 붓은 다음 단계다. */
 function CardLooks() {
-  const { style, set, reset, save } = useCardStyle()
+  const { style, tagline, set, setTagline, reset, save } = useCardStyle()
   /** 방금 저장했는가 — `null` 이면 아직 아무 말도 안 한다. */
   const [savedOk, setSavedOk] = useState<boolean | null>(null)
+  const [saving, setSaving] = useState(false)
   return (
     <div className="ss-card-looks">
       <dl>
@@ -158,11 +160,13 @@ function CardLooks() {
             <input
               type="text"
               className="ss-card-text-input"
-              value={style.text}
-              maxLength={24}
+              value={tagline}
+              // 🔴 서버 저장 한계(20자, `tagline`)와 같다 — 여기서 안 막으면
+              // 늘려 써도 되는 것처럼 보이다가 저장할 때 422 로 튕긴다.
+              maxLength={20}
               placeholder="비우면 글자 없이"
               aria-label="카드에 넣을 글자"
-              onChange={(e) => set({ text: e.target.value })}
+              onChange={(e) => setTagline(e.target.value)}
             />
           </dd>
         </div>
@@ -174,8 +178,9 @@ function CardLooks() {
         />
       </dl>
 
-      {/* 🔴 **초기화는 화면의 값만** 되돌린다. 담아 둔 것까지 지우면 되돌리기가
-          곧 삭제가 되어 무섭게 쓰인다 — 되돌린 뒤 저장을 눌러야 저장본도 바뀐다. */}
+      {/* 🔴 **초기화는 화면의 값만** **공장 기본값**으로 되돌린다. 저장된
+          것까지 지우면 되돌리기가 곧 삭제가 되어 무섭게 쓰인다 — 되돌린 뒤
+          저장을 눌러야 저장본도 바뀐다. */}
       <div className="ss-card-actions">
         <button type="button" className="ss-profile-tab" onClick={reset}>
           초기화
@@ -184,23 +189,27 @@ function CardLooks() {
           type="button"
           className="ss-profile-tab"
           data-on="true"
-          onClick={() => setSavedOk(save())}
+          disabled={saving}
+          onClick={async () => {
+            setSaving(true)
+            const ok = await save()
+            setSaving(false)
+            setSavedOk(ok)
+          }}
         >
           저장
         </button>
       </div>
 
-      {/* ⚠️ 서버가 아니라 이 브라우저에 담긴다는 것을 숨기지 않는다 — 다른
-          기기에서 안 보일 때 고장으로 읽힌다(계약에 필드가 없다, 미결 paik 3번). */}
+      {/* ✅ 서버에 담긴다(CCC 35) — 다른 기기 · 공개 카드 링크에도 반영된다. */}
       {savedOk === true && (
         <p className="ss-profile-publish-note" role="status">
-          저장했습니다 — 아직 이 브라우저에만 담깁니다. 공개 카드 링크에는 반영되지
-          않습니다.
+          저장했습니다 — 다른 기기와 공개 카드 링크에도 반영됩니다.
         </p>
       )}
       {savedOk === false && (
         <p className="ss-profile-video-reason" role="alert">
-          저장하지 못했습니다. 올린 사진이 너무 크면 담을 자리가 모자랍니다.
+          저장하지 못했습니다. 잠시 후 다시 시도해 주세요.
         </p>
       )}
     </div>

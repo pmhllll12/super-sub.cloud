@@ -4495,6 +4495,72 @@ body::-webkit-scrollbar {
   color: var(--ss-fg);
 }
 
+/* 오버롤 — 영상 하나의 등급·총점(CCC 32). 옛 리포트는 안 그린다(null). */
+.ss-report-overall {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ss-report-grade-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--ss-accent);
+  color: var(--ss-bg);
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.ss-report-total-score {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--ss-fg) 70%, transparent);
+}
+
+/* 레이더 — 항목별 stat(0~100). 라벨은 SVG 밖 범례에 둔다(한글 길이가 제각각). */
+.ss-report-radar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.ss-report-radar-axis {
+  stroke: color-mix(in srgb, var(--ss-fg) 20%, transparent);
+  stroke-width: 1;
+}
+
+.ss-report-radar-shape {
+  fill: color-mix(in srgb, var(--ss-accent) 25%, transparent);
+  stroke: var(--ss-accent);
+  stroke-width: 1.5;
+}
+
+.ss-report-radar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 12px;
+  font-size: 0.6875rem;
+  color: color-mix(in srgb, var(--ss-fg) 80%, transparent);
+}
+
+.ss-report-radar-legend li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ss-report-radar-legend b {
+  font-variant-numeric: tabular-nums;
+  color: var(--ss-accent);
+}
+
 /* 항목별 칭호+문장 짝(`ho` 24번) — 따로 떼지 않는다. */
 .ss-report-points {
   display: flex;

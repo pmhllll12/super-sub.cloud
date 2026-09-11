@@ -19,14 +19,50 @@ const KEYPOINTS = Array.from({ length: 17 }, (_, i) => ({
   score: 0.8,
 }))
 
+/**
+ * 🔴 **평소엔 사람이 늘 있다가, 한 시험만 "놓쳤다"를 재현하려고 끌 수 있게**
+ * 한다(`vi.hoisted` — 모듈이 끌어올려질 때도 살아 있어야 `vi.mock` 안에서
+ * 읽을 수 있다). 기본은 `true` — 다른 시험들은 이 값을 안 건드리므로 지금까지
+ * 그대로다.
+ */
+const { seesPerson } = vi.hoisted(() => ({ seesPerson: { current: true } }))
+
 vi.mock('@/lib/personDetector', () => ({
   warmUpDetector: () => Promise.resolve({}),
   warmUpRefine: () => Promise.resolve({}),
   detectPeople: () =>
-    Promise.resolve([{ box: { x: 0.3, y: 0.2, w: 0.25, h: 0.5 }, score: 0.9, keypoints: KEYPOINTS }]),
+    Promise.resolve(
+      seesPerson.current
+        ? [{ box: { x: 0.3, y: 0.2, w: 0.25, h: 0.5 }, score: 0.9, keypoints: KEYPOINTS }]
+        : [],
+    ),
   // 2단계는 없어도 되는 덤이다 — 못 하면 1단계 관절을 쓴다.
   refinePose: () => Promise.resolve(null),
 }))
+
+/**
+ * `GET /videos/{id}/report` 의 대역 몸통 — **최소한만 채운다.** 2026-09-11 에
+ * 진행 체크리스트가 이 응답만으로 「끝났다」를 정하게 바뀌었으므로, 「예」를
+ * 누르고 리포트가 필요한 시험은 이 값을 꼭 답해야 폴링이 끝난다(안 답하면
+ * `not-ready`·`error` 로 읽혀 영영 되묻는다).
+ */
+const REPORT_MOCK = {
+  video_id: 'v1',
+  analyzed_at: '2026-09-03T00:00:00Z',
+  summary: '요약',
+  provisional: false,
+  total_score: null,
+  overall_grade: null,
+  breakdown: [],
+  scenes: [],
+  previews: null,
+  keypoint_quality: null,
+}
+
+// 🔴 `seesPerson` 을 끈 시험이 있으면 다음 시험에 새지 않게 매번 되돌린다.
+afterEach(() => {
+  seesPerson.current = true
+})
 
 /**
  * 🔴 **영상이 실린 것으로 세운다.** jsdom 의 `<video>` 는 `readyState` 도
@@ -665,6 +701,11 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
           { status: 201 },
         )
       }
+      // 🔴 「끝났다」가 이제 이 응답만으로 정해진다(2026-09-11, REPORT_MOCK
+      // 주석 참고) — 여기서 안 답하면 폴링이 영영 안 끝난다.
+      if (url.endsWith('/report')) {
+        return new Response(JSON.stringify(REPORT_MOCK), { status: 200 })
+      }
       throw new Error(`예상하지 못한 요청: ${url}`)
     })
     vi.stubGlobal('fetch', fetchMock)
@@ -716,6 +757,68 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     expect(fetchMock.mock.calls.filter((c) => !String(c[0]).endsWith('/report'))).toHaveLength(3)
     // 어디에서 다시 볼 수 있는지 밝힌다. 이제 서버에 있으므로 「이 브라우저에만」이 아니다.
     expect(screen.getByText(/내 프로필의 「분석 영상」 아래에서 다시 볼 수 있습니다/)).toBeInTheDocument()
+
+    vi.unstubAllGlobals()
+  }, 15000)
+
+  /**
+   * 🔴 **"놓쳤습니다" 배너는 관문(「이 사람이 맞습니까?」) 전용이다**
+   * (2026-09-11, 사용자 지적 — "실제로는 분석 중인데 프레임을 놓쳤다고
+   * 나오는 게 말이 안 된다"). 「예」를 누른 뒤에는 이 화면의 라이브
+   * 따라가기가 사람을 놓쳐도(재생 루프가 사람 없는 프레임을 지날 때 흔하다)
+   * 실제 분석과 무관하므로 배너를 띄우지 않는다 — 띄우면 진행 중인 진짜
+   * 작업이 잘못된 것처럼 읽힌다. 게다가 그 배너의 「다시 묶기」는
+   * `setSubject(null)` 을 불러, 눌리면 이미 시작된 업로드·분석과 화면이
+   * 어긋난다.
+   */
+  it('예를 누른 뒤에는 놓쳐도 배너를 띄우지 않는다', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+      const url = String(input)
+      if (url === '/api/videos/upload-url') {
+        return new Response(
+          JSON.stringify({
+            storage_key: 'videos/u1/abc.mp4',
+            upload_url: 'https://bucket.s3.example.com/abc.mp4?sig=1',
+            expires_in: 900,
+          }),
+          { status: 200 },
+        )
+      }
+      if (url.startsWith('https://bucket.s3.example.com/')) return new Response(null, { status: 200 })
+      if (url === '/api/videos') {
+        return new Response(
+          JSON.stringify({
+            id: 'v1', sport_code: 'football', storage_key: 'videos/u1/abc.mp4',
+            duration_ms: 0, side: null, created_at: '2026-09-03T00:00:00Z',
+            passed: true, reject_reason: null, analysis_job_id: 'job1',
+            analysis_status: 'queued',
+          }),
+          { status: 201 },
+        )
+      }
+      if (url.endsWith('/report')) return new Response(JSON.stringify(REPORT_MOCK), { status: 200 })
+      throw new Error(`예상하지 못한 요청: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await user.click(
+      await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }),
+    )
+    await sayYes(user)
+    await screen.findByLabelText('분석 진행')
+
+    // 예를 누른 뒤에 사람을 놓친다 — 재생 루프가 사람 없는 프레임을 지날 때
+    // 흔한 일이다. `LOST_AFTER`(4회) × `TRACK_MS`(70ms) 는 280ms — 그 몇 배를
+    // 기다려도 배너가 없어야 한다.
+    seesPerson.current = false
+    await new Promise((r) => setTimeout(r, 500))
+
+    expect(screen.queryByText(/잠깐 놓쳤습니다/)).toBeNull()
+    expect(screen.queryByRole('button', { name: '다시 묶기' })).toBeNull()
 
     vi.unstubAllGlobals()
   }, 15000)
@@ -811,6 +914,12 @@ describe('영상 분석 — 저장 안 한 영상은 떠날 때 지운다', () =
           }),
           { status: 201 },
         )
+      }
+      // 🔴 이 시험들은 리포트 저장·삭제를 보는 것이지 리포트 내용을 보는 것이
+      // 아니지만, 「끝났다」가 이제 이 응답으로만 정해지므로(2026-09-11) 여기서
+      // 204 로 답하면(과거 그랬듯) `res.json()` 이 깨져 폴링이 영영 안 끝난다.
+      if (url.endsWith('/report')) {
+        return new Response(JSON.stringify(REPORT_MOCK), { status: 200 })
       }
       return new Response(null, { status: 204 })
     })

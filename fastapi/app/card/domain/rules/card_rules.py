@@ -65,6 +65,8 @@ def to_public(card: CardEntity) -> PublicCardEntity:
         # 공유 링크에도 나간다 — 카드에 크게 박히는 값이라 없으면 남이 보는
         # 카드만 밋밋해진다.
         tagline=card.tagline,
+        # 꾸미기도 같은 이유로 나간다 — 안 실으면 남이 보는 카드만 안 꾸며진다.
+        style=card.style,
     )
 
 

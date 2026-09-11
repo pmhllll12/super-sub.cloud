@@ -3,6 +3,7 @@ import type { Backend } from './gateway'
 import type {
   AdminUser,
   AdminUserDetail,
+  AdminVideoRow,
   AuthToken,
   FeaturedVideo,
   Match,
@@ -75,6 +76,8 @@ const card: PlayerCard = {
       granted_at: '2026-08-01T09:00:00Z',
     },
   ],
+  tagline: null,
+  style: null,
 }
 
 function requireUser(token: string): User {
@@ -494,20 +497,23 @@ export const mockBackend: Backend = {
 
   async getMyCard(token) {
     const u = requireUser(token)
-    if (u.email === DEMO_EMAIL) return card
+    // 🔴 **`made` 를 먼저 본다** — 데모 카드도 `updateMyCard` 로 고칠 수
+    // 있는데, 여길 뒤에 두면 고친 값이 안 보인다(`CardStubRepository` 의
+    // `_CREATED` 와 같은 판단).
     const mine = made.get(u.id)
+    if (mine) return mine
+    if (u.email === DEMO_EMAIL) return card
     // 가입만으로는 카드가 생기지 않는다 — **부탁해야** 생긴다(계약 3장).
-    if (!mine) throw new BackendError(404, 'CARD_NOT_FOUND', '아직 선수 카드가 없습니다.')
-    return mine
+    throw new BackendError(404, 'CARD_NOT_FOUND', '아직 선수 카드가 없습니다.')
   },
 
   async createMyCard(token) {
     const u = requireUser(token)
     // 🔴 **멱등이다.** 이미 있으면 그대로 돌려준다 — 슬러그가 바뀌면 이미
     // 공유한 주소가 죽는다(계약 3장).
-    if (u.email === DEMO_EMAIL) return card
     const has = made.get(u.id)
     if (has) return has
+    if (u.email === DEMO_EMAIL) return card
     const fresh: PlayerCard = {
       id: `card-${u.id}`,
       public_slug: `${u.nickname}-${u.id.slice(0, 4)}`,
@@ -515,17 +521,36 @@ export const mockBackend: Backend = {
       user: { id: u.id, nickname: u.nickname },
       // 🔴 호칭은 **빈 배열**이다 — 분석 결과로 붙으므로 만드는 시점에 있을 수 없다.
       titles: [],
+      tagline: null,
+      style: null,
     }
     made.set(u.id, fresh)
     return fresh
   },
 
-  async getPublicCard(slug) {
-    if (slug !== card.public_slug) {
-      throw new BackendError(404, 'CARD_NOT_FOUND', '카드를 찾을 수 없습니다.')
+  async updateMyCard(token, input) {
+    const u = requireUser(token)
+    const current = made.get(u.id) ?? (u.email === DEMO_EMAIL ? card : undefined)
+    if (!current) throw new BackendError(404, 'CARD_NOT_FOUND', '아직 선수 카드가 없습니다.')
+    const updated: PlayerCard = { ...current }
+    // 🔴 **키가 있는지로 "보냈는지"를 가른다** — `tagline: undefined` 도
+    // 유효한 JS 값이라 `input.tagline !== undefined` 로는 못 가른다
+    // (`PATCH /videos/{id}` route handler 와 같은 판단).
+    if ('tagline' in input) {
+      const cleaned = input.tagline?.trim()
+      updated.tagline = cleaned ? cleaned : null
     }
+    if ('style' in input) updated.style = input.style ?? null
+    made.set(u.id, updated)
+    return updated
+  },
+
+  async getPublicCard(slug) {
+    const owner = [...made.values()].find((c) => c.public_slug === slug)
+    const found = owner ?? (slug === card.public_slug ? card : undefined)
+    if (!found) throw new BackendError(404, 'CARD_NOT_FOUND', '카드를 찾을 수 없습니다.')
     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- 의도적으로 버리는 필드
-    const { id: _id, ...rest } = card
+    const { id: _id, ...rest } = found
     return rest as PublicPlayerCard
   },
 
@@ -549,6 +574,15 @@ export const mockBackend: Backend = {
     requireUser(token)
     const v = DEMO_VIDEOS.find((x) => x.id === videoId)
     if (!v) throw new BackendError(404, 'VIDEO_NOT_FOUND', '그 영상을 찾을 수 없습니다.')
+    // 🔴 `failed` 는 `REPORT_NOT_READY` 와 다른 코드다 — 다시 물어봐도 안
+    // 바뀐다는 걸 화면이 구분해야 한다(2026-09-11, 실물에서 겪은 버그).
+    if (v.analysis_status === 'failed') {
+      throw new BackendError(
+        404,
+        'ANALYSIS_FAILED',
+        '품질 게이트 미달: 유효 프레임 비율이 기준보다 낮습니다. 재촬영이 필요합니다.',
+      )
+    }
     if (v.analysis_status !== 'succeeded') {
       throw new BackendError(404, 'REPORT_NOT_READY', '아직 분석 결과가 없습니다.')
     }
@@ -558,6 +592,9 @@ export const mockBackend: Backend = {
       summary:
         '디딤발이 공보다 앞서 있습니다. 임팩트에서 무릎을 조금 더 덮어 주시면 방향이 안정됩니다.',
       provisional: true,
+      // 오버롤(CCC 32) — 영상 하나의 값. 등급의 가중합이라 stat 평균이 아니다.
+      total_score: 68,
+      overall_grade: 'C',
       breakdown: [
         {
           criterion_id: 'plant_foot_position',
@@ -567,6 +604,7 @@ export const mockBackend: Backend = {
           evidence: '측면으로 벌리는 움직임이 많습니다',
           metric_ref: 'plant_foot_offset',
           skipped: false,
+          stat: 91.2,
         },
         {
           criterion_id: 'shoulder_lead',
@@ -576,6 +614,7 @@ export const mockBackend: Backend = {
           evidence: '공을 받기 전에 어깨를 먼저 돌립니다',
           metric_ref: 'shoulder_rotation_lead',
           skipped: false,
+          stat: 62.0,
         },
         {
           criterion_id: 'follow_through',
@@ -585,9 +624,11 @@ export const mockBackend: Backend = {
           evidence: '두 번째 동작으로 이어지는 속도가 빠릅니다',
           metric_ref: 'follow_through_speed',
           skipped: false,
+          stat: 95.5,
         },
         /* 🔴 **평가 대상이 아니었던 항목** — `grade: null` 이고 `skipped: true` 다.
-           0 으로 그리면 못한 것으로 읽힌다. 화면이 이걸 빼는지 보려고 둔다. */
+           0 으로 그리면 못한 것으로 읽힌다. 화면이 이걸 빼는지 보려고 둔다.
+           `stat` 도 마찬가지로 `null` — 축에서 빼야 한다(CCC 32). */
         {
           criterion_id: 'jump_height',
           name: '점프 높이',
@@ -596,6 +637,7 @@ export const mockBackend: Backend = {
           evidence: null,
           metric_ref: null,
           skipped: true,
+          stat: null,
         },
       ],
       scenes: [
@@ -929,5 +971,34 @@ export const mockBackend: Backend = {
     const entry = [...users.entries()].find(([, u]) => u.id === userId)
     if (!entry) throw new BackendError(404, 'USER_NOT_FOUND', '회원을 찾을 수 없습니다.')
     users.delete(entry[0])
+  },
+
+  async listAdminVideos(token, user) {
+    requireAdmin(token)
+    const needle = user.trim().toLowerCase()
+    const found = [...users.values()].find(
+      (u) => u.id === user.trim() || u.email.toLowerCase() === needle,
+    )
+    if (!found) throw new BackendError(404, 'USER_NOT_FOUND', '해당 사용자를 찾을 수 없습니다.')
+    // mock 은 단일 세입자다 — DEMO_VIDEOS 가 곧 그 사람의 영상 전부다.
+    const items: AdminVideoRow[] = DEMO_VIDEOS.map((v) => ({
+      id: v.id,
+      sport_code: v.sport_code,
+      original_filename: null,
+      storage_key: v.storage_key,
+      created_at: v.created_at,
+      kept: true,
+      is_public: v.is_public,
+      passed: v.passed,
+      reject_reason: v.reject_reason,
+      analysis_status: v.analysis_status,
+      // mock 에는 실패 사유를 안 담아 뒀다 — 실물처럼 하나 꾸며서 화면 갈래를 밟아 본다.
+      analysis_failure_reason:
+        v.analysis_status === 'failed'
+          ? '품질 게이트 미달: 유효 프레임 비율이 기준보다 낮습니다.'
+          : null,
+      report_prefix: `reports/${found.id}/${v.id}/`,
+    }))
+    return { user_id: found.id, nickname: found.nickname, email: found.email, items }
   },
 }

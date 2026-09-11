@@ -31,12 +31,36 @@ export type Title = {
   granted_at: string
 }
 
+/**
+ * 카드 꾸미기 — 바탕 · 로고 · 글자 색 · 글자 자리 · 붓자국(미결 `paik` 3번
+ * 나머지, CCC 35). 가운데 큰 글자 **내용**은 여기 없다 — `PlayerCard.tagline`
+ * 이 그 값이다. 사진도 없다 — 저장 위치가 아직 없어서(`og_image_key` 와 같은
+ * 처지) `www` 쪽 `CardStyle`(`app/(app)/me/cardStyle.tsx`)의 photo 관련
+ * 필드 넷은 이 타입에 없고 브라우저에만 남는다.
+ */
+export type CardStyleWire = {
+  bg: string
+  logo: string
+  text_color: string
+  text_x: number
+  text_y: number
+  brush: number
+  brush_color: string
+  brush_scale: number
+  brush_x: number
+  brush_y: number
+}
+
 export type PlayerCard = {
   id: string
   public_slug: string
   og_image_key: string
   user: { id: string; nickname: string }
   titles: Title[]
+  // 사람이 정하는 한 줄. 안 정했으면 null (미결 `paik` 3번).
+  tagline: string | null
+  // 안 꾸몄으면 null — 화면이 기본 모습을 그린다.
+  style: CardStyleWire | null
 }
 
 /** GET /cards/{slug} — 공개용. id 가 없다. */
@@ -48,6 +72,33 @@ export type AdminUser = {
   email: string
   nickname: string
   created_at: string
+}
+
+/**
+ * `GET /admin/videos?user=` 목록 한 줄 — 한 사람의 영상 전부(저장 안 한 임시분
+ * 포함). "에이전트가 제대로 돌았는지" 확인하는 자리라 `analysis_failure_reason`
+ * 이 있다 — 일반 사용자 화면(`MyVideo`)엔 없는 필드다.
+ */
+export type AdminVideoRow = {
+  id: string
+  sport_code: string
+  original_filename: string | null
+  storage_key: string
+  created_at: string
+  kept: boolean
+  is_public: boolean
+  passed: boolean
+  reject_reason: string | null
+  analysis_status: 'queued' | 'running' | 'succeeded' | 'failed' | null
+  analysis_failure_reason: string | null
+  report_prefix: string
+}
+
+export type AdminVideoListResult = {
+  user_id: string
+  nickname: string
+  email: string
+  items: AdminVideoRow[]
 }
 
 export type AdminUserListResult = {
@@ -300,6 +351,8 @@ export type ReportCriterion = {
   evidence: string | null
   metric_ref: string | null
   skipped: boolean
+  /** 레이더 축 값 0~100(CCC 32). `skipped`거나 못 재면 `null` — 0이 아니다. */
+  stat: number | null
 }
 
 /** 판단의 근거가 된 장면. `at_seconds` 로 그 시각을 찾아간다. */
@@ -310,17 +363,22 @@ export type ReportScene = {
 }
 
 /**
- * 적재된 분석 리포트 — 미결 `paik` 7번 · `jin` 27번, CCC 31.
+ * 적재된 분석 리포트 — 미결 `paik` 7번 · `jin` 27번, CCC 31 · 32.
  *
- * 🔴 **총점 · 별점 · 항목별 점수 숫자가 없다.** 계약 3장 4 가 `summary` 에
- * 수치를 넣지 말라고 못박아 뒀고 수치는 카드 경로가 따로 준다 — 화면에서
- * 지어내지 않는다.
+ * 🔴 **정정 (CCC 32)**: 이 타입이 앞서 "총점·별점 숫자가 없다"고 적었던 것은
+ * 틀렸다. 계약 3장 4 가 막은 것은 `summary` 문장 **안에** 숫자를 넣는 것이지
+ * `total_score`·`overall_grade`·`breakdown[].stat` 자체가 아니다 — 이 셋은
+ * 리포트 경로로 나가는 것이 계약이다. `total_score`·`overall_grade` 는
+ * **영상 하나(=분석 1회)** 의 값 — 선수 단위로 합친 오버롤이 아니다. 옛
+ * 리포트(이 필드가 생기기 전 적재분)는 둘 다 `null`.
  */
 export type VideoReport = {
   video_id: string
   analyzed_at: string
   summary: string
   provisional: boolean | null
+  total_score: number | null
+  overall_grade: string | null
   breakdown: ReportCriterion[]
   scenes: ReportScene[]
   previews: Record<string, string> | null
