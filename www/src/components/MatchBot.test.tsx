@@ -23,6 +23,24 @@ describe('MatchBot — 흐름 B(모집 등록 돕기) 챗봇', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
+  it('입력이 비어 있을 때 Tab을 누르면 예시 문구가 채워진다', async () => {
+    const user = userEvent.setup()
+    render(<MatchBot open onClose={() => {}} />)
+    const input = screen.getByLabelText('메시지') as HTMLInputElement
+    input.focus()
+    await user.keyboard('{Tab}')
+    expect(input.value).toBe('이번 주 토요일 저녁에 골키퍼 1명 필요해요')
+  })
+
+  it('이미 입력한 것이 있으면 Tab이 예시 문구로 덮어쓰지 않는다', async () => {
+    const user = userEvent.setup()
+    render(<MatchBot open onClose={() => {}} />)
+    const input = screen.getByLabelText('메시지') as HTMLInputElement
+    await user.type(input, '축구')
+    await user.keyboard('{Tab}')
+    expect(input.value).toBe('축구')
+  })
+
   it('메시지를 보내면 /api/chat 을 부르고 답을 그린다', async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => {
       return new Response(
