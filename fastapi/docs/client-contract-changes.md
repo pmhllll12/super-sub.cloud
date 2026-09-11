@@ -1266,7 +1266,7 @@ git -C fastapi grep -n "videos/{video_id}/report" -- app/analysis   # 백엔드 
 
 ---
 
-## 32. 🔴 정정 — 31번의 「하지 말 것」 두 줄이 틀렸습니다. `GET /videos/{id}/report` 가 이제 총점·오버롤 등급·항목별 `stat` 도 줍니다 (2026-09-11 추가, 미결 `ho` 28번)
+## 32. ✅ 정정 — 31번의 「하지 말 것」 두 줄이 틀렸습니다. `GET /videos/{id}/report` 가 이제 총점·오버롤 등급·항목별 `stat` 도 줍니다 (2026-09-11 추가·반영 완료, `ho` 28번)
 
 **앞서 31번에서 "총점·별점 숫자는 응답에 없다", "`band`·`stat`·`weight` 를
 기대하지 마세요" 라고 전달한 것을 정정합니다.** `stat` 은 이제 나갑니다 —
@@ -1331,6 +1331,11 @@ git -C fastapi diff a1c9f7b2e034 8a765b42e48e -- app/analysis/adapter/inbound/ap
 
 상세: `fastapi/docs/api-contract.md` **3-1절** · 같은 구역 31번(원래 계약) ·
 pending `ho` 28번
+
+**✅ 반영 완료 (2026-09-11)** — `www/src/server/backend/types.ts`(타입)·
+`src/lib/savedReports.ts`(옮김터)·`src/components/analysis/ReportView.tsx`
+(등급 칩·SVG 레이더)에 넣었다. 차트 라이브러리는 새로 안 넣었다. `npm test`
+571 passed.
 
 ---
 
