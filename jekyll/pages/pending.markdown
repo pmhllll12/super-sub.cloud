@@ -7851,7 +7851,15 @@ DB 만 압니다. 그래서 적재(`jin` 27번) 뒤 백엔드가 `analysis_metri
 - 상세: `ho` 32번 · 부록 D.2·D.7(`player_vector`) · `jin` 17번(축이 루브릭이다) · `jin` 27번(적재)
 - **담당**: 정어진(설계·적재 — `jin` 27·`ho` 33 뒤) · 정상호(`ho` 32번 표를 실물 6개로 정정) · **제기**: 정상호(`ho` 32번) · **기한**: 스프린트 3
 
-### 29. k3s 트라이얼 파드가 크래시 루프 중 — 이미지가 레포와 어긋나 있습니다 (2026-09-10 신설)
+### 29. k3s 트라이얼 파드가 크래시 루프 중 — 이미지가 레포와 어긋나 있습니다 ✅ 해소 (2026.09.11)
+
+**조치**: 운영 호스트 Postgres 에 pgvector 설치 + `CREATE EXTENSION vector` (PGDG
+저장소, `deployment.md` §1 에 AL2023 절차·함정 둘 기록). **확인**: 다음 CD 폴링에서
+바로 성공 — `alembic_version` 이 `9fc8835184c9` → 단일 head `a1c9f7b2e034` 로 전진,
+`supersub-api-trial` 파드 `1/1 Running`(재시작 0), `:8080 /health` 200,
+`supersub-cd.service` 더 이상 실패 안 함(`systemctl is-failed` → `inactive`).
+운영 트래픽(`:8000`, systemd)은 그대로 200 — 변경 없음 확인. 상세는 같은 구역
+`31번`. 남은 것은 트래픽 전환(min 14 step 5, 박민호) 뿐이라 그쪽에서 이어집니다.
 
 라이브 서버(`ssh`)를 확인하다 발견했습니다. **프로덕션은 무영향**(트래픽은 여전히
 systemd venv `:8000` 이 받고, k3s 쪽엔 Service·Ingress 가 없습니다). 다만 두 가지:
@@ -7941,7 +7949,7 @@ Prometheus 형식으로 냅니다. **여기까지는 스크레이프하는 것�
 - 상세: 06-시스템설계 §1 「배포 형태」 · `min` 14(k3s) · 같은 구역 29번
 - **담당**: 박민호(PM·배포 스코핑) · **제기**: 정어진 · **기한**: k3s cutover 정리 후 / 스프린트 계획 시
 
-### 31. 운영 백엔드가 09-08(`d15806c`)에 멈춰 있다 — k3s cutover 로 최신화 (2026-09-11 신설)
+### 31. 운영 백엔드가 09-08(`d15806c`)에 멈춰 있다 — k3s cutover 로 최신화 (2026-09-11 신설, 1~3 완료 → 박민호 4 대기)
 
 09-11 라이브 재점검(`ssh`)에서 확인했습니다. **사이트는 살아 있습니다** — 외부·로컬
 `/health` 200, 트래픽은 systemd venv `:8000` 이 받습니다. 다만 그 systemd 체크아웃이
@@ -7964,23 +7972,23 @@ Prometheus 형식으로 냅니다. **여기까지는 스크레이프하는 것�
 
 #### 남은 절차와 순서
 
-🔴 **pgvector 를 켜는 순간 연쇄가 돕니다**: `CREATE EXTENSION vector` → 다음 CD
-폴링(2분)에서 initContainer 성공 → 밀린 마이그레이션 ~8개가 **운영 DB 에 자동
-적용** → k3s 파드 기동(`:8080` hostNetwork). 트래픽은 그래도 아직 `:8000`(systemd)
-이 받습니다 — 전환은 min 14 step 5 입니다.
+1. ✅ **pgvector 설치 + `CREATE EXTENSION vector`** (정어진, 09-11 완료) — PGDG
+   저장소로. 도중에 함정 둘을 만났고 `deployment.md` §1 에 절차·해결 다 적었습니다:
+   (a) 저장소 메타데이터 GPG 검증이 일시적으로 실패(CDN 전파 지연으로 보임) — 신뢰
+   사슬을 손으로 재현해 우회, `gpgcheck` 는 끄지 않았습니다. (b) 설치돼도 Amazon
+   빌드 PostgreSQL 이 다른 경로를 봐서 안 보임 — 심볼릭 링크로 연결(가역적).
+2. ✅ **마이그레이션 자동 적용 확인** (09-11 완료) — 다음 CD 폴링에서 바로 성공.
+   `alembic_version` 이 `9fc8835184c9` → 단일 head `a1c9f7b2e034` 로 전진 확인.
+3. ✅ **k3s 파드 Ready 확인** (09-11 완료) — `1/1 Running`(재시작 0), `:8080
+   /health` 200. `supersub-cd.service` 도 더 이상 실패 안 함(`29번`도 해소 표기).
+4. **min 14 step 5** — 트래픽 `:8000` → 파드 전환 + `supersub-api.service`
+   **disable**(지우지 않음, 롤백 경로) + 스모크. **박민호, 지금 진행 가능합니다.**
+   운영 트래픽(`:8000`)은 09-11 조치 내내 200 이었고 변경하지 않았습니다 — 확인은
+   그대로 `curl -s https://<API 호스트>/health` · `ssh supersub 'sudo k3s kubectl
+   get pods'`.
 
-1. **pgvector 설치 + `CREATE EXTENSION vector`** — 운영 호스트 Postgres 에 슈퍼유저로
-   한 번(`deployment.md` §1). Amazon Linux 2023 이라 패키지 또는 소스 빌드. **정어진,
-   지금.** 이걸로 `29번` initContainer·`supersub-cd.service` 루프가 풀립니다.
-2. **마이그레이션 자동 적용 확인** — initContainer 로그로 `9fc8835184c9` → head
-   까지 올라갔는지, `alembic_version` 이 단일 head 인지. CI(`3ba93c3`)가 빈 DB 에서
-   같은 체인을 이미 통과하므로 부분집합이라 위험은 낮지만 눈으로 확인.
-3. **k3s 파드 Ready 확인** — `:8080` 에서 `/health`.
-4. **min 14 step 5** — 트래픽 `:8000` → 파드 전환 + `supersub-api.service` **disable**
-   (지우지 않음, 롤백 경로) + 스모크. **박민호.** 정어진이 1~3 을 끝내고 넘깁니다.
-
-공통 사전: pgvector 확장은 어느 경로든 필요했고, 09-11 에 백업 복구가 됐으므로
-스키마 자동 적용 전 복원 지점이 있습니다.
+09-11에 백업을 먼저 복구해 둬서(같은 구역 백업 항목·`_notes`) 이번 자동 마이그레이션
+전에 복원 지점이 있었습니다.
 
 #### 하지 말아야 할 것
 
@@ -7993,7 +8001,7 @@ Prometheus 형식으로 냅니다. **여기까지는 스크레이프하는 것�
   (`TestMigrationPrivileges` 가 막습니다 — `deployment.md` §1).
 
 - 상세: `ssh` 실측은 `_notes`(개인) — 요지는 이 항목에. 같은 구역 `29번`·`27번` · `min` 11·14 · `deployment.md` §1
-- **담당**: 정어진(1~3: pgvector·확장·마이그레이션 적용·파드 확인) · 박민호(4: min 14 step 5 트래픽 전환·`29번` 소유) · **제기**: 정어진 · **기한**: 스프린트 3 / k3s cutover(min 14 step 5)
+- **담당**: ~~정어진(1~3: pgvector·확장·마이그레이션 적용·파드 확인)~~ **✅ 완료 (2026.09.11)** · **남은 것**: 박민호(4: min 14 step 5 트래픽 전환) · **제기**: 정어진 · **기한**: 스프린트 3 / k3s cutover(min 14 step 5)
 
 ## min (박민호)
 
