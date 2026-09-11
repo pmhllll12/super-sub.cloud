@@ -405,6 +405,22 @@ describe('내 영상 — 분석 리포트', () => {
     expect(screen.getByText(/2026-09-03 에 분석했습니다/)).toBeInTheDocument()
   })
 
+  /* 🔴 **리포트는 제 판 위에 선다.**
+     이 칸에는 배경 사진이 그대로 비치는데, 리포트는 길어서 사진의 **밝은
+     구간과 어두운 구간을 다 지나간다** — 판이 없으면 밝은 자리에서 민트
+     알약(칭호)이 씻겨 나간다(실제로 배포본에서 그랬다).
+
+     🔴 **흐림은 인라인으로만 잰다.** `globals.css` 에 적으면 Lightning CSS 가
+     통째로 떨어뜨려서, 규칙이 있어도 화면에는 없다 — 이 저장소가 네 번 겪은
+     자리라 시험이 **인라인이라는 사실**을 붙든다. */
+  it('리포트는 배경을 누르는 판 위에 그린다', async () => {
+    stubReport({ ok: true, body: SERVER_REPORT })
+    render(<MyVideos videos={[analyzed]} />)
+
+    const panel = await screen.findByRole('region', { name: '분석 리포트' })
+    expect(panel.style.backdropFilter).toMatch(/blur/)
+  })
+
   /* 🔴 **「아직」과 「없다」는 다르다**(미결 `paik` 7번의 「하지 말 것」) —
      분석 중인 클립에 빈 자리를 보이면 결과가 없는 것으로 읽힌다. */
   it('아직 적재 전이면 분석 중이라고 말한다', async () => {

@@ -9,6 +9,7 @@ import { fetchReport, type ReportResult } from '@/lib/savedReports'
 import { featuredOf, setFeatured } from '@/lib/featuredClip'
 import { isDirectKey, usePlaybackUrls } from '@/lib/playbackUrl'
 import ReportView from '@/components/analysis/ReportView'
+import { SECTION_GLASS } from './glass'
 
 /**
  * 내가 올린 클립 — **두 갈래로 갈라 한 번에 한 편만** 보여준다(사용자 요청).
@@ -762,7 +763,7 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
               것」) — 분석 중인 클립에 빈 자리를 보이면 결과가 없는 것처럼
               읽힌다. */}
           {tab === 'analyzed' && report && (
-            <section className="ss-profile-report" aria-label="분석 리포트">
+            <section className="ss-profile-report" aria-label="분석 리포트" style={SECTION_GLASS}>
               <h3 className="ss-profile-report-head">분석 리포트</h3>
               {report.state === 'ready' ? (
                 <>
