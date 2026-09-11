@@ -1,6 +1,7 @@
 import type {
   AdminUserDetail,
   AdminUserListResult,
+  AdminVideoListResult,
   AuthToken,
   CreateMatchInput,
   FeaturedVideo,
@@ -203,4 +204,6 @@ export interface Backend {
   ): Promise<AdminUserListResult>
   getUserDetail(token: string, userId: string): Promise<AdminUserDetail>
   forceDeleteUser(token: string, userId: string): Promise<void>
+  /** 관리자 전용. `user` 는 `user.id` 또는 이메일. 없는 사람이면 404 USER_NOT_FOUND. */
+  listAdminVideos(token: string, user: string): Promise<AdminVideoListResult>
 }
