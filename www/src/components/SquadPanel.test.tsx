@@ -39,6 +39,8 @@ const CARD: PlayerCard = {
   og_image_key: 'cards/7b4d.png',
   user: { id: 'u1', nickname: '홍길동' },
   titles: [],
+  tagline: null,
+  style: null,
 }
 
 describe('스쿼드 — 서버에서 읽기', () => {

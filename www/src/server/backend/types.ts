@@ -31,12 +31,36 @@ export type Title = {
   granted_at: string
 }
 
+/**
+ * 카드 꾸미기 — 바탕 · 로고 · 글자 색 · 글자 자리 · 붓자국(미결 `paik` 3번
+ * 나머지, CCC 35). 가운데 큰 글자 **내용**은 여기 없다 — `PlayerCard.tagline`
+ * 이 그 값이다. 사진도 없다 — 저장 위치가 아직 없어서(`og_image_key` 와 같은
+ * 처지) `www` 쪽 `CardStyle`(`app/(app)/me/cardStyle.tsx`)의 photo 관련
+ * 필드 넷은 이 타입에 없고 브라우저에만 남는다.
+ */
+export type CardStyleWire = {
+  bg: string
+  logo: string
+  text_color: string
+  text_x: number
+  text_y: number
+  brush: number
+  brush_color: string
+  brush_scale: number
+  brush_x: number
+  brush_y: number
+}
+
 export type PlayerCard = {
   id: string
   public_slug: string
   og_image_key: string
   user: { id: string; nickname: string }
   titles: Title[]
+  // 사람이 정하는 한 줄. 안 정했으면 null (미결 `paik` 3번).
+  tagline: string | null
+  // 안 꾸몄으면 null — 화면이 기본 모습을 그린다.
+  style: CardStyleWire | null
 }
 
 /** GET /cards/{slug} — 공개용. id 가 없다. */

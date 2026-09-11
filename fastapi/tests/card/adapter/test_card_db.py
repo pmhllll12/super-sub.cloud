@@ -350,3 +350,94 @@ class TestTaglineInDb:
         after = db_client.get(f"{V1}/me/card", headers=headers).json()["public_slug"]
         assert after == before
         assert db_client.get(f"{V1}/cards/{before}").status_code == 200
+
+
+_STYLE = {
+    "bg": "#91ea92",
+    "logo": "#0b0b0b",
+    "text_color": "#0b0b0b",
+    "text_x": 50,
+    "text_y": 34,
+    "brush": 0,
+    "brush_color": "#0b0b0b",
+    "brush_scale": 1,
+    "brush_x": 0,
+    "brush_y": 0,
+}
+
+
+class TestStyleInDb:
+    """카드 꾸미기가 **실제로 저장되고 공개 카드에도 나가는가**(미결 `paik` 3번
+    나머지, 2026-09-11). `TestTaglineInDb` 와 같은 자리 — JSON 컬럼이라
+    저장소가 그대로 돌려주는지만 봐도 스텁과 다르지 않을 것 같지만, **컬럼이
+    실재하는지**(`add_column` 이 실제로 적용됐는지)는 진짜 DB 로만 걸린다.
+    """
+
+    def test_저장되고_다시_읽힌다(self, db_client, db_session, fresh_account):
+        headers = fresh_account["headers"]
+        db_client.post(f"{V1}/me/card", headers=headers)
+
+        res = db_client.patch(f"{V1}/me/card", json={"style": _STYLE}, headers=headers)
+        assert res.status_code == 200, res.text
+        assert res.json()["style"] == _STYLE
+
+        row = db_session.execute(
+            text("select style from player_card where user_id = :u"),
+            {"u": str(fresh_account["user_id"])},
+        ).scalar_one()
+        assert row == _STYLE, "컬럼에 안 들어갔다"
+        assert db_client.get(f"{V1}/me/card", headers=headers).json()["style"] == _STYLE
+
+    def test_공개_카드에도_나간다(self, db_client, fresh_account):
+        """🔴 안 실으면 **남이 보는 카드만** 안 꾸며진다."""
+        headers = fresh_account["headers"]
+        slug = db_client.post(f"{V1}/me/card", headers=headers).json()["public_slug"]
+        db_client.patch(f"{V1}/me/card", json={"style": _STYLE}, headers=headers)
+
+        public = db_client.get(f"{V1}/cards/{slug}")
+        assert public.status_code == 200
+        assert public.json()["style"] == _STYLE
+
+    def test_지우면_NULL_이_된다(self, db_client, db_session, fresh_account):
+        headers = fresh_account["headers"]
+        db_client.post(f"{V1}/me/card", headers=headers)
+        db_client.patch(f"{V1}/me/card", json={"style": _STYLE}, headers=headers)
+
+        db_client.patch(f"{V1}/me/card", json={"style": None}, headers=headers)
+
+        row = db_session.execute(
+            text("select style from player_card where user_id = :u"),
+            {"u": str(fresh_account["user_id"])},
+        ).scalar_one()
+        assert row is None
+
+    def test_안_꾸민_카드는_null_로_나간다(self, db_client, fresh_account):
+        created = db_client.post(f"{V1}/me/card", headers=fresh_account["headers"])
+        assert created.json()["style"] is None
+
+    def test_tagline과_style은_따로_바뀐다(self, db_client, fresh_account):
+        """🔴 **여기가 이번에 새로 생긴 위험이다.** `style` 을 추가하기 전에는
+        PATCH 본문에 `tagline` 이 안 실려도 (Pydantic 기본값 `None` 때문에)
+        조용히 지워질 뻔했다 — `model_fields_set` 로 "보낸 필드만" 바꾸도록
+        고쳐 막았다."""
+        headers = fresh_account["headers"]
+        db_client.post(f"{V1}/me/card", headers=headers)
+        db_client.patch(f"{V1}/me/card", json={"tagline": "숨은 왼발"}, headers=headers)
+
+        res = db_client.patch(f"{V1}/me/card", json={"style": _STYLE}, headers=headers)
+        assert res.status_code == 200, res.text
+        assert res.json()["tagline"] == "숨은 왼발", "style 만 보냈는데 지워졌다"
+        assert res.json()["style"] == _STYLE
+
+    def test_사진_관련_필드는_거부한다(self, db_client, fresh_account):
+        """🔴 사진 저장 위치가 아직 없다 — `photo`·`mode` 등을 조용히
+        무시하지 않고 422 로 막는다(`CardStyleSchema` 가 `extra=forbid`)."""
+        headers = fresh_account["headers"]
+        db_client.post(f"{V1}/me/card", headers=headers)
+        res = db_client.patch(
+            f"{V1}/me/card",
+            json={"style": {**_STYLE, "mode": "full"}},
+            headers=headers,
+        )
+        assert res.status_code == 422
+        assert error_code(res) == "VALIDATION_ERROR"

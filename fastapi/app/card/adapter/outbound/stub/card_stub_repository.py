@@ -94,6 +94,16 @@ class StubCardRepository(CardPort):
         _CREATED[user_id] = updated
         return updated
 
+    def update_style(self, user_id: UUID, style: dict | None) -> CardEntity | None:
+        """⚠️ `update_tagline` 과 같은 이유로 데모 카드는 직접 안 바꾸고
+        `_CREATED` 로 복사해 둔다."""
+        card = self.find_by_owner(user_id)
+        if card is None:
+            return None
+        updated = replace(card, style=style)
+        _CREATED[user_id] = updated
+        return updated
+
     def create_for_owner(self, user_id: UUID) -> CardEntity:
         """멱등하게 만든다.
 
