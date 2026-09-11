@@ -10,6 +10,11 @@ import { featuredOf, setFeatured } from '@/lib/featuredClip'
 import { isDirectKey, usePlaybackUrls } from '@/lib/playbackUrl'
 import ReportView from '@/components/analysis/ReportView'
 import { SECTION_GLASS } from './glass'
+import { useReportPanel } from './reportPanel'
+
+/** 판이 왼쪽으로 물러나는 시간 — `globals.css` 의 `ss-p-report-out` 과 같아야
+ *  한다. 짧으면 연출 도중에 잘리고, 길면 사라진 자리가 남는다. */
+const REPORT_EXIT_MS = 320
 
 /**
  * 내가 올린 클립 — **두 갈래로 갈라 한 번에 한 편만** 보여준다(사용자 요청).
@@ -191,6 +196,34 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
     }
   }, [v])
   const report = v && got?.id === v.id ? got.result : null
+
+  /**
+   * 🔴 **리포트는 영상 아래가 아니라 왼쪽 칸을 덮는 판이다**(사용자 요청,
+   * 2026-09-11). 아래에 두면 영상을 보면서 읽을 수가 없어 굴려 내려가야
+   * 했다 — 이제 「해당 영상 리포트 보기」가 왼쪽 칸을 밀어내고 그 자리에 판이
+   * 들어온다. 켜짐은 `ProfileStage` 가 쥔다(`data-report`).
+   *
+   * 🔴 닫을 때도 **물러나는 것을 보여 준다** — 곧바로 떼면 판이 툭 사라진다.
+   * 그동안 DOM 에 남아 있어야 해서 `closing` 을 따로 둔다(추천 판과 같은 방식).
+   */
+  const { open: panelOpen, setOpen: setPanelOpen } = useReportPanel()
+  const [closing, setClosing] = useState(false)
+  const panelOn = panelOpen || closing
+
+  const closePanel = () => {
+    setPanelOpen(false)
+    setClosing(true)
+    setTimeout(() => setClosing(false), REPORT_EXIT_MS)
+  }
+
+  /* 🔴 **영상을 넘기면 닫는다.** 판은 「해당 영상」의 리포트라, 열어 둔 채로
+     다른 영상으로 넘어가면 무엇을 보고 있는지가 어긋난다. */
+  useEffect(() => {
+    setPanelOpen(false)
+    // `setPanelOpen` 은 무대가 준 setState 라 매 렌더 같은 것이 아니다 —
+    // 넣으면 영상이 안 바뀌어도 계속 닫힌다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [v?.id])
 
   /**
    * 나를 보여주는 **대표 영상**으로 세워 둔 클립의 id.
@@ -422,6 +455,23 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
         </span>
         업로드
       </label>
+
+      {/* 🔴 **영상 오른쪽 위**(사용자 요청). 이 줄은 `justify-content: center`
+          라 알약들이 가운데 서는데, 여기에 항목을 하나 더 넣으면 그 무리가
+          통째로 왼쪽으로 밀린다 — 그래서 **흐름 밖 절대배치**로 오른쪽 끝에
+          건다(스쿼드 판의 「팀 매칭」에서 같은 것을 겪었다).
+
+          ⚠️ 리포트 상태를 안 가린다 — 「분석 중」·「찾을 수 없음」도 판 안에서
+          말한다. 단추가 상태마다 사라지면 눌러 볼 데가 없어진다. */}
+      {tab === 'analyzed' && report && !panelOpen && (
+        <button
+          type="button"
+          className="ss-profile-report-open"
+          onClick={() => setPanelOpen(true)}
+        >
+          해당 영상 리포트 보기
+        </button>
+      )}
       </div>
 
       {/* 올리는 중에 무슨 일이 있었는지 — 거른 사유 · 반려 사유 · 실패 사유. */}
@@ -664,7 +714,7 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
                   <span className="material-symbols-outlined" aria-hidden="true">
                     {featured === v.id ? 'stars' : 'star'}
                   </span>
-                  나를 보여주는 대표 영상
+                  대표 영상 설정
                 </button>
               )}
               <button
@@ -762,9 +812,25 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
               🔴 **「아직」과 「없다」를 갈라 그린다**(미결 paik 7번의 「하지 말
               것」) — 분석 중인 클립에 빈 자리를 보이면 결과가 없는 것처럼
               읽힌다. */}
-          {tab === 'analyzed' && report && (
-            <section className="ss-profile-report" aria-label="분석 리포트" style={SECTION_GLASS}>
-              <h3 className="ss-profile-report-head">분석 리포트</h3>
+          {tab === 'analyzed' && report && panelOn && (
+            <section
+              className="ss-profile-report"
+              aria-label="분석 리포트"
+              data-state={closing ? 'closing' : 'open'}
+              style={SECTION_GLASS}
+            >
+              <div className="ss-profile-report-bar">
+                <h3 className="ss-profile-report-head">분석 리포트</h3>
+                {/* 🔴 닫는 길을 **판 안에도** 둔다. 여는 단추는 왼쪽 칸이
+                    밀려난 뒤 이 판에 가려서, 그것만으로는 되돌릴 수 없다. */}
+                <button
+                  type="button"
+                  className="ss-profile-report-close"
+                  onClick={closePanel}
+                >
+                  닫기
+                </button>
+              </div>
               {report.state === 'ready' ? (
                 <>
                   <ReportView report={report.report} />

@@ -1,7 +1,9 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { MyVideo } from '@/server/backend'
+import { useState } from 'react'
 import MyVideos from './MyVideos'
+import { ReportPanelContext } from './reportPanel'
 
 /**
  * 🔴 그물 밖으로 나가는 것(S3 · 우리 API)만 대역으로 세운다. 거르는 규칙
@@ -276,7 +278,7 @@ describe('내 영상 — 공개 여부', () => {
 })
 
 describe('내 영상 — 나를 보여주는 대표 영상', () => {
-  const btn = () => screen.getByRole('button', { name: /나를 보여주는 대표 영상/ })
+  const btn = () => screen.getByRole('button', { name: /대표 영상 설정/ })
   /** PATCH 한 그대로 돌려주는 서버 대역 — 계약이 「바뀐 한 줄」을 준다. */
   function server() {
     const fn = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
@@ -347,9 +349,28 @@ describe('내 영상 — 나를 보여주는 대표 영상', () => {
   // ⚠️ 반려된 클립은 서버가 안 보는 영상이라 대표가 될 수 없다.
   it('반려된 클립에는 안 낸다', () => {
     render(<MyVideos videos={[{ ...analyzed, passed: false, reject_reason: '길이 초과' }]} />)
-    expect(screen.queryByRole('button', { name: /나를 보여주는 대표 영상/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /대표 영상 설정/ })).toBeNull()
   })
 })
+
+/**
+ * 🔴 **리포트는 이제 단추를 눌러야 나온다**(2026-09-11, 사용자 요청) — 영상
+ * 아래가 아니라 **왼쪽 칸을 덮는 판**이다. 켜짐은 무대(`ProfileStage`)가
+ * 쥐므로, 시험에서는 그 자리에 상태를 채운 껍데기를 세운다.
+ */
+function WithPanel({ videos }: { videos: MyVideo[] }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <ReportPanelContext.Provider value={{ open, setOpen }}>
+      <MyVideos videos={videos} />
+    </ReportPanelContext.Provider>
+  )
+}
+
+/** 판을 연다 — 네 시험이 같은 걸음으로 시작한다. */
+async function openReport(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: '해당 영상 리포트 보기' }))
+}
 
 describe('내 영상 — 분석 리포트', () => {
   /**
@@ -394,9 +415,14 @@ describe('내 영상 — 분석 리포트', () => {
     return fn
   }
 
-  it('서버가 준 리포트를 영상 목록 아래에 그린다', async () => {
+  it('단추를 누르면 서버가 준 리포트를 판으로 연다', async () => {
     stubReport({ ok: true, body: SERVER_REPORT })
-    render(<MyVideos videos={[analyzed]} />)
+    const user = userEvent.setup()
+    render(<WithPanel videos={[analyzed]} />)
+
+    // 🔴 누르기 전에는 판이 없다 — 영상 아래에 늘 깔려 있으면 굴려 내려가야 한다.
+    expect(screen.queryByRole('region', { name: '분석 리포트' })).toBeNull()
+    await openReport(user)
 
     expect(await screen.findByRole('region', { name: '분석 리포트' })).toBeInTheDocument()
     expect(screen.getByText(/디딤발이 공보다 앞서/)).toBeInTheDocument()
@@ -415,7 +441,9 @@ describe('내 영상 — 분석 리포트', () => {
      자리라 시험이 **인라인이라는 사실**을 붙든다. */
   it('리포트는 배경을 누르는 판 위에 그린다', async () => {
     stubReport({ ok: true, body: SERVER_REPORT })
-    render(<MyVideos videos={[analyzed]} />)
+    const user = userEvent.setup()
+    render(<WithPanel videos={[analyzed]} />)
+    await openReport(user)
 
     const panel = await screen.findByRole('region', { name: '분석 리포트' })
     expect(panel.style.backdropFilter).toMatch(/blur/)
@@ -425,7 +453,10 @@ describe('내 영상 — 분석 리포트', () => {
      분석 중인 클립에 빈 자리를 보이면 결과가 없는 것으로 읽힌다. */
   it('아직 적재 전이면 분석 중이라고 말한다', async () => {
     stubReport({ ok: false, body: { error: { code: 'REPORT_NOT_READY', message: '아직입니다.' } } })
-    render(<MyVideos videos={[analyzed]} />)
+    const user = userEvent.setup()
+    render(<WithPanel videos={[analyzed]} />)
+    // ⚠️ 상태가 무엇이든 단추는 나온다 — 사라지면 눌러 볼 데가 없어진다.
+    await openReport(user)
 
     expect(await screen.findByText(/분석 중입니다/)).toBeInTheDocument()
     expect(screen.queryByText(/디딤발이 공보다 앞서/)).toBeNull()
@@ -443,7 +474,9 @@ describe('내 영상 — 분석 리포트', () => {
   // 🔴 수치를 그리지 않는 원칙은 이 자리에서도 같다(부록 D.5 · 계약 3장 4).
   it('점수 · 등급 · 별점을 그리지 않는다', async () => {
     stubReport({ ok: true, body: SERVER_REPORT })
-    const { container } = render(<MyVideos videos={[analyzed]} />)
+    const user = userEvent.setup()
+    const { container } = render(<WithPanel videos={[analyzed]} />)
+    await openReport(user)
     await screen.findByRole('region', { name: '분석 리포트' })
     const text = container.textContent ?? ''
     expect(text).not.toMatch(/\d+\s*점/)
