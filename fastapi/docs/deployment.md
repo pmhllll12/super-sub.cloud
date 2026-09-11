@@ -181,6 +181,49 @@ CREATE EXTENSION IF NOT EXISTS vector;
 wsl.exe -d Ubuntu-26.04 -u root -- su - postgres -c "psql -d supersub -c 'CREATE EXTENSION IF NOT EXISTS vector'"
 ```
 
+### 운영 서버(Amazon Linux 2023 + Amazon 빌드 PostgreSQL 18) 에서 (2026-09-11 실측)
+
+AL2023 저장소엔 pgvector 가 없다. PGDG 저장소를 더해 설치한다 — **버전을 반드시
+`postgresql18` 버전(여기선 18)에 맞춘다.**
+
+```bash
+sudo dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/AL-2023-x86_64/pgdg-amazonlinux-repo-latest.rpm
+sudo dnf install -y pgvector_18
+```
+
+🔴 **`pgdg-redhat-repo-latest.noarch.rpm` 이 아니라 `pgdg-amazonlinux-repo-latest.rpm`
+이다** — RHEL 용 이름을 그대로 쓰면 404 다. `AL-2023-x86_64/` 디렉터리 안의 실제
+파일명을 확인할 것.
+
+🔴 **함정 1 — PGDG 저장소 메타데이터 GPG 검증이 (일시적으로) 실패할 수 있다.**
+`dnf install pgvector_18` 이 `repomd.xml GPG signature verification error: Bad GPG
+signature` 로 막힐 수 있다(막 재배포된 메타데이터가 CDN 에지 간에 아직 다 퍼지지
+않았을 때 나타나는 것으로 보인다 — 재시도해도 몇 분간 계속될 수 있다). **이때
+`gpgcheck`/`repo_gpgcheck` 를 끄고 넘어가지 않는다.** 대신 신뢰 사슬을 손으로
+재현한다: `repomd.xml`(GPG 서명, `gpg --verify`) → `primary.xml.gz`(sha256 이
+`repomd.xml` 기재값과 일치하는지) → 대상 rpm(sha256 이 `primary.xml` 기재값과
+일치하는지) 을 각각 대조하고, `.rpm` 을 로컬 파일로 `dnf install ./pgvector_18-*.rpm`
+한다(임베디드 서명도 `rpm -K` 로 별도 확인 가능). `dnf repolist`가 정상화되면
+이후엔 그냥 `dnf install pgvector_18` 로 돌아가면 된다.
+
+🔴 **함정 2 — 설치돼도 안 보일 수 있다: 경로 프리픽스 불일치.** PGDG 의
+`pgvector_18` 은 자기 프리픽스(`/usr/pgsql-18/...`)에 설치되는데, **Amazon 이
+빌드한 `postgresql18-server` 는 다른 경로**(컨트롤 파일 `/usr/share/pgsql/
+extension/`, 모듈 `.so` `/usr/lib64/pgsql/`)를 본다. `rpm` 설치 자체는 성공해도
+`pg_available_extensions` 에 `vector` 행이 아예 안 뜬다(설치 안 됨이 아니라
+**서버가 못 찾는 것**). 대칭 심볼릭 링크로 잇는다(가역적):
+
+```bash
+sudo ln -sf /usr/pgsql-18/lib/vector.so /usr/lib64/pgsql/vector.so
+for f in /usr/pgsql-18/share/extension/vector*; do
+  sudo ln -sf "$f" "/usr/share/pgsql/extension/$(basename "$f")"
+done
+```
+
+이 링크 뒤 `pg_available_extensions` 에 `vector` 가 뜨면 아래 「확인」·본문의
+`CREATE EXTENSION` 이 그대로 통한다. **PGDG `postgresql18-devel` 을 추가로 설치하지
+않는다** — 같은 프리픽스 문제를 반복하고 Amazon 패키지와 충돌 위험만 늘린다.
+
 **확인** — 앱 계정으로 접속해 `installed_version` 이 나오면 된 것이다.
 
 ```sql
