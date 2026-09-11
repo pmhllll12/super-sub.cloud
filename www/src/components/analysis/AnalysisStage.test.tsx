@@ -416,6 +416,98 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     expect(screen.getByRole('button', { name: '내 프로필에 리포트 저장' })).toBeDisabled()
   })
 
+  /**
+   * 🔴 **선수와 비교하기** (2026-09-11, 사용자 요청).
+   *
+   * ⚠️ **로컬에서는 눈으로 확인할 수가 없다** — 이 화면의 리포트는 백엔드가
+   * 있어야 나오고, 개발 기기에서는 안 붙는다. 그래서 이 시험이 그 자리를
+   * 대신 붙든다: 단추가 **리포트 전에는 없고**, 누르면 이름 둘이 나오고,
+   * 고르면 **그 자리에서** 「찾는 중」으로 바뀌고, 다 찾으면 영상 칸이
+   * 반으로 갈린다.
+   */
+  it('리포트가 나오기 전에는 「선수와 비교하기」가 없다', async () => {
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await screen.findByRole('button', { name: '이 사람으로 분석' }, { timeout: 2500 })
+    await drawSubject(user)
+
+    expect(screen.queryByRole('button', { name: '선수와 비교하기' })).toBeNull()
+  })
+
+  it('리포트가 나온 뒤 누르면 이름 둘이 펴지고, 고르면 그 자리에서 찾기 시작한다', async () => {
+    /* 🔴 **리포트까지 가려면 영상이 올라가야 한다** — 진행 단계의 첫 칸이
+       진짜 업로드라, 그것이 안 끝나면 다음 칸으로 안 넘어간다. 그래서 위
+       「예를 누르면 …」 시험과 같은 세 응답을 세운다. */
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url === '/api/videos/upload-url') {
+        return new Response(
+          JSON.stringify({
+            storage_key: 'videos/u1/abc.mp4',
+            upload_url: 'https://bucket.s3.example.com/abc.mp4?sig=1',
+            expires_in: 900,
+          }),
+          { status: 200 },
+        )
+      }
+      if (url.startsWith('https://bucket.s3.example.com/')) return new Response(null, { status: 200 })
+      if (url === '/api/videos') {
+        return new Response(
+          JSON.stringify({
+            id: 'v1',
+            sport_code: 'football',
+            storage_key: 'videos/u1/abc.mp4',
+            duration_ms: 0,
+            side: null,
+            created_at: '2026-09-03T00:00:00Z',
+            passed: true,
+            reject_reason: null,
+            analysis_job_id: 'job1',
+            analysis_status: 'queued',
+          }),
+          { status: 201 },
+        )
+      }
+      // 리포트 읽기는 이 시험의 본론이 아니다 — 아직이라고만 답한다.
+      return new Response(
+        JSON.stringify({ error: { code: 'REPORT_NOT_READY', message: '아직입니다.' } }),
+        { status: 404 },
+      )
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await user.click(
+      await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }),
+    )
+    await sayYes(user)
+
+    const open = await screen.findByRole('button', { name: '선수와 비교하기' }, { timeout: 12000 })
+    // 접혀 있다 — 누르기 전에는 이름이 없다.
+    expect(screen.queryByRole('button', { name: '리오넬 메시' })).toBeNull()
+
+    await user.click(open)
+    expect(screen.getByRole('button', { name: '리오넬 메시' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '크리스티아누 호날두' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '리오넬 메시' }))
+    /* 🔴 **같은 자리를 쓴다** — 이름 둘이 사라지고 그 자리에 문장이 든다.
+       둘이 같이 있으면 판이 그만큼 들썩인다. */
+    expect(screen.queryByRole('button', { name: '리오넬 메시' })).toBeNull()
+    expect(screen.getByText(/리오넬 메시의 영상을 찾고 있는 중입니다/)).toBeInTheDocument()
+
+    // 다 찾으면 영상 칸이 반으로 갈리고 왼쪽에 자리가 선다.
+    expect(
+      await screen.findByLabelText('리오넬 메시 영상 자리', {}, { timeout: 4000 }),
+    ).toBeInTheDocument()
+    expect(document.querySelector('.ss-shot-frame-body')?.getAttribute('data-compare')).toBe('true')
+  }, 30000)
+
   // 창 틀의 닫기 자리이므로 시작한 뒤에도 그대로 있어야 한다.
   it('시작한 뒤에도 닫기 점이 남아 있고, 누르면 고르기 전으로 돌아간다', async () => {
     const user = userEvent.setup()

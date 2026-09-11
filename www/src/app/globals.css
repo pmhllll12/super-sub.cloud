@@ -29,6 +29,29 @@
      강조색(--ss-accent)보다 조금 더 노란 쪽이라 나란히 놓아도 안 겹친다. */
   --ss-pitch-green: #a6e89b;
   --ss-error: #ff8a80;
+
+  /* 레이더 축의 **범주형 색 여섯**(2026-09-11, 사용자 요청). 축마다 색이
+     다르고, 변은 양 끝 축의 색이 가운데서 섞인다.
+
+     🔴 **차례를 고정한다. 돌려 쓰지 않는다.** 축이 일곱이 되면 색을 새로
+     만드는 것이 아니라 그 판을 다시 설계해야 한다 — 생성한 색은 앞엣것과
+     구별된다는 보장이 없다.
+
+     🔴 **눈으로 고르지 않았다.** 여섯 검사(밝기 띠 · 채도 하한 · 색각
+     이상에서의 이웃 간 거리 · 정상 시야 하한 · 바탕 대비)를 돌려 다 통과한
+     값이다. 어두운 바탕(L 0.48~0.67 띠) 기준이고, 이웃한 두 색이 가장
+     가까운 자리가 ΔE 11.6(deutan)이다. **값을 손으로 고치면 그 보장이
+     깨진다** — 고쳐야 하면 같은 검사를 다시 돌릴 것.
+
+     ⚠️ 민트(`--ss-accent`)를 여기 넣지 않았다. 그 색은 이 사이트에서
+     「값 · 강조」라는 다른 뜻을 이미 갖고 있어서, 축 하나에 배정하면 그
+     축만 특별해 보인다. */
+  --ss-axis-1: #00ad64;
+  --ss-axis-2: #0b84ff;
+  --ss-axis-3: #d97300;
+  --ss-axis-4: #8b5cf6;
+  --ss-axis-5: #ff2d87;
+  --ss-axis-6: #ae8c00;
   --ss-scrim: rgba(0, 0, 0, 0.15);
 
   --ss-radius-sheet: 28px;
@@ -2327,10 +2350,81 @@ body::-webkit-scrollbar {
   gap: 1px;
 }
 
+/* 🔴 이름과 등급을 한 줄에 — 등급을 따로 떼면 누구 것인지 한 번 더 짚어야
+   한다(사용자 요청). 등급은 이름 **오른쪽**이고, 사이를 벌려 이름이 길어져도
+   등급이 밀리지 않게 `auto` 로 민다. */
+.ss-suggest-nameline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .ss-suggest-name {
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--ss-fg);
+}
+
+/* 등급 표식 — 🔴 **색으로 서열을 말하지 않는다.** 여섯 칸에 색을 매기면
+   빨강/초록이 「나쁨/좋음」으로 읽히는데, D 가 곧 못하는 사람이라는 뜻은
+   아니다(아직 리뷰가 없어 F 인 사람도 있다 — `lib/playerGrade.ts`). 생김새는
+   하나로 두고 **글자가 값을 말한다.** */
+.ss-suggest-grade {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border: 1px solid color-mix(in srgb, var(--ss-accent) 55%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, #000 45%, transparent);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ss-accent);
+  flex: none;
+}
+
+/* 등급으로 좁히는 줄 — 판 머리 바로 아래. */
+.ss-suggest-grades {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+/* 🔴 **안 고른 알약도 온전한 흰색**이다(사용자 요청, 2026-09-11). 옅게
+   두었더니 배경 연기가 그대로 비치는 이 판에서 회색으로 읽혔다.
+   ⚠️ 그래도 **고른 것과 안 고른 것은 갈린다** — 아래 `data-on` 이 민트로
+   채우고 글자를 검게 뒤집는다. 차이를 흐림이 아니라 **채움**이 말한다. */
+.ss-suggest-grade-pill {
+  padding: 4px 10px;
+  border: 1px solid var(--ss-fg);
+  border-radius: 999px;
+  background: transparent;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--ss-fg);
+  cursor: pointer;
+}
+
+/* 🔴 고른 것만 또렷하고 나머지는 물러난다 — 목적지 글자 · `/me` 알약과 같은
+   규칙이다. 지금 무엇으로 좁혀 보고 있는지가 먼저 읽혀야 한다. */
+.ss-suggest-grade-pill[data-on='true'] {
+  border-color: var(--ss-accent);
+  background: var(--ss-accent);
+  /* 민트 위에서는 글자가 검어야 읽힌다(대비 1.6:1 로 데인 자리). */
+  color: #111;
+}
+
+.ss-suggest-empty {
+  padding: 8px 4px 2px;
+  text-align: center;
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--ss-fg) 62%, transparent);
 }
 
 .ss-suggest-title {
@@ -2800,7 +2894,149 @@ body::-webkit-scrollbar {
    영상은 작아지고 오른쪽 판과는 멀어졌다.
    쓸 수 있는 폭과 "키 × 비율" 중 **작은 쪽**을 폭으로 잡고 키를 거기서 되계산하면,
    가로로 넉넉하면 키가, 세로로 넉넉하면 폭이 자연스럽게 자리를 다 쓴다. */
-.ss-shot[data-picked='true'] .ss-shot-frame-body {
+.ss-shot[data-picked='true'] /* ── 선수와 비교하기 (사용자 요청, 2026-09-11) ─────────────────────
+   ⚠️ **전부 자리 표시다.** 계약에도 에이전트에도 「비슷한 선수 영상」이
+   없다 — 찾는 시간은 붙박이고 왼쪽 칸은 회색이다. 진짜가 붙으면 이 절과
+   `AnalysisStage` 의 `startCompare` 를 같이 걷는다. */
+
+.ss-shot-compare-open {
+  padding: 5px 12px;
+  border: 1px solid var(--ss-fg);
+  border-radius: 999px;
+  background: none;
+  font-size: 0.75rem;
+  color: var(--ss-fg);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+
+.ss-shot-compare-open:hover,
+.ss-shot-compare-open:focus-visible {
+  background: color-mix(in srgb, var(--ss-fg) 14%, transparent);
+}
+
+/* 🔴 펴기는 `grid-template-rows`(0fr → 1fr). `max-height` 로 하면 상한과
+   실제 높이가 달라서 전환 시간의 일부가 **안 보이는 구간**에 쓰이고 속도가
+   튄다(이 저장소가 세 곳에서 같은 방식을 쓴다). */
+.ss-shot-compare {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 380ms var(--ss-home-out-ease);
+}
+
+.ss-shot-compare[data-open='true'] {
+  grid-template-rows: 1fr;
+}
+
+.ss-shot-compare > div {
+  overflow: hidden;
+}
+
+.ss-shot-compare-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 10px;
+}
+
+.ss-shot-compare-pick {
+  padding: 6px 14px;
+  border: 1px solid var(--ss-accent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ss-accent) 12%, transparent);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ss-accent);
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+
+.ss-shot-compare-pick:hover,
+.ss-shot-compare-pick:focus-visible {
+  background: color-mix(in srgb, var(--ss-accent) 26%, transparent);
+}
+
+.ss-shot-compare-msg {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  padding-top: 10px;
+  font-size: 0.78rem;
+  color: var(--ss-fg);
+}
+
+/* 점 셋 — 하나씩 켜졌다 함께 꺼진다. 🔴 글자로 찍지 않는 이유는
+   `AnalysisStage` 주석에 있다(문장이 좌우로 뜬다). */
+.ss-shot-dots {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 1px;
+}
+
+.ss-shot-dots > i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0;
+  animation: ss-shot-dot 1.2s steps(1, end) infinite;
+}
+
+.ss-shot-dots > i:nth-child(2) {
+  animation-delay: 0.3s;
+}
+
+.ss-shot-dots > i:nth-child(3) {
+  animation-delay: 0.6s;
+}
+
+@keyframes ss-shot-dot {
+  0%,
+  74% {
+    opacity: 1;
+  }
+  75%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-shot-dots > i {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* 🔴 영상 칸이 **반으로 갈린다.** 내 영상은 오른쪽 절반으로 밀리고 왼쪽에
+   선수 자리가 들어온다 — 상자를 가로 격자로 바꾸는 것 하나로 둘이 같이 된다. */
+.ss-shot-frame-body[data-compare='true'] {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* 회색 자리 — ⚠️ 진짜 영상이 붙으면 이 칸만 갈아 끼운다. */
+.ss-shot-compare-slot {
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ss-fg) 16%, transparent);
+  font-size: 0.8rem;
+  color: color-mix(in srgb, var(--ss-fg) 82%, transparent);
+  /* 왼쪽에서 밀려 들어온다 — 내 영상이 오른쪽으로 밀리는 것과 한 동작이다. */
+  animation: ss-shot-compare-in 420ms var(--ss-home-out-ease) both;
+}
+
+@keyframes ss-shot-compare-in {
+  from {
+    opacity: 0;
+    transform: translateX(-14%);
+  }
+}
+
+.ss-shot-frame-body {
   aspect-ratio: auto;
   /* 🔴 폭은 **틀을 그대로 따른다**(100%). 틀과 똑같이 `--ss-frame-w` 를 주고
      `max-width: none` 을 걸었더니, 틀은 `max-width: 100%` 에 걸려 줄어드는데
@@ -4523,11 +4759,33 @@ body::-webkit-scrollbar {
 }
 
 /* 레이더 — 항목별 stat(0~100). 라벨은 SVG 밖 범례에 둔다(한글 길이가 제각각). */
+/* 🔴 **그림 왼쪽, 이름은 그 오른쪽에 위에서 아래로**(2026-09-11, 사용자 요청).
+   가로 한 줄로 늘어놓으면 축이 늘었을 때 **줄바꿈이 생겨 1·2·3 순서가
+   흐트러진다** — 세로로 두면 번호 차례가 곧 읽는 차례다.
+
+   ⚠️ 이 컴포넌트는 분석 화면의 옆판(`min(420px, 34vw)`)에서도 쓴다. 거기선
+   나란히 설 폭이 안 나올 수 있어 **접히게** 둔다 — 범례에 `min-width` 가
+   있어야 접힘이 실제로 걸린다(한국어는 아무 데서나 줄바꿈돼서 min-content
+   가 거의 0 이라, 그냥 두면 안 접히고 글자만 잘게 쪼개진다). */
 .ss-report-radar {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 10px 18px;
+
+  /* 🔴 위·아래로 얇은 선을 둘러 **앞뒤 글과 갈라 놓는다**(사용자 요청).
+     위는 칭호·문장 목록이고 아래는 「이렇게 본 장면」이라, 선이 없으면 이
+     덩어리가 어디서 시작해 어디서 끝나는지가 안 읽힌다. */
+  margin: 4px 0;
+  padding: 14px 0;
+  border-top: 1px solid color-mix(in srgb, var(--ss-fg) 22%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--ss-fg) 22%, transparent);
+
+  /* 🔴 아래 세로선을 **접힘에 따라** 켜고 끄려고 둔다(`@container`).
+     판 폭은 자리마다 다르다 — `/me` 는 넓고 분석 화면 옆판은
+     `min(420px, 34vw)` 라, 화면 크기(`@media`)로는 못 가른다. */
+  container-type: inline-size;
 }
 
 .ss-report-radar-axis {
@@ -4535,19 +4793,108 @@ body::-webkit-scrollbar {
   stroke-width: 1;
 }
 
+/* 🔴 채움은 **중립**이다(2026-09-11). 변마다 축 색이 갈리는데 채움까지 색을
+   가지면 어느 색이 어느 축인지가 흐려진다 — 모양만 말하게 둔다. */
 .ss-report-radar-shape {
-  fill: color-mix(in srgb, var(--ss-accent) 25%, transparent);
-  stroke: var(--ss-accent);
-  stroke-width: 1.5;
+  fill: color-mix(in srgb, var(--ss-fg) 12%, transparent);
+  stroke: none;
+}
+
+/* 변 — 색은 `ReportView` 가 변마다 그러데이션으로 준다(양 끝 축의 색이
+   가운데서 섞인다). 여기서는 굵기만 정한다. */
+.ss-report-radar-edge {
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+/* 🔴 축 끝의 번호 — **범례와 짝을 이루는 유일한 표식**이다(2026-09-11).
+   이름은 한국어 길이가 제각각이라 축 끝에 못 놓는다(`ReportView` 주석). */
+/* 번호 원 — 🔴 **테두리와 속이 같은 축 색을 입는다**(`ReportView` 가 인라인
+   으로 준다, 2026-09-11 사용자 요청).
+
+   🔴 속은 **옅게만** 물린다(색 위에 검정을 겹친다). 꽉 채우면 그 위의 흰
+   숫자가 밝은 축 색(노랑 · 주황)에서 안 읽힌다 — 여섯 색의 밝기가 제각각이라
+   한 가지 글자색으로는 다 못 받친다. 어둡게 깔면 **어느 색이 와도** 흰
+   숫자가 읽히고 색은 여전히 보인다. */
+.ss-report-radar-numdot {
+  stroke-width: 2;
+}
+
+/* 🔴 **점수(`b`)와 생김새를 가른다.** 범례에 `디딤발 위치 91` 처럼 숫자가
+   이미 있어서, 번호를 맨숫자로 두면 둘이 같은 것으로 읽힌다 — 번호는 늘
+   테두리 안에 든다. SVG 와 범례가 **같은 클래스**를 쓰되 채움만 갈린다
+   (SVG 는 `fill`, HTML 은 `color` 라 서로 안 넘본다). */
+/* 🔴 **글자는 흰색이다.** 값·라벨에 계열 색을 입히면 작은 글자에서 대비가
+   무너진다 — 색은 그 옆의 표식(고리)이 들고 글자는 글자 색을 그대로 쓴다. */
+.ss-report-radar-num {
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  fill: var(--ss-fg);
+}
+
+.ss-report-radar-legend .ss-report-radar-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  /* 색은 `ReportView` 가 인라인으로 덮는다 — 그림의 고리와 같은 값이다. */
+  border: 2px solid transparent;
+  border-radius: 50%;
+  color: var(--ss-fg);
+  /* 글자 상자가 원을 밀어내지 않게. */
+  line-height: 1;
+  flex: none;
+}
+
+/* 🔴 그림 칸과 이름 칸을 **반씩** 나눈다(사용자 요청). 안 나누면
+   `justify-content: center` 가 둘을 한 덩어리로 가운데 두어서, 세로선을
+   기준으로 보면 그림이 오른쪽으로 치우친다. */
+.ss-report-radar-chart {
+  flex: 1;
+  display: flex;
+  justify-content: center;
 }
 
 .ss-report-radar-legend {
+  flex: 1;
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 4px 12px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  /* 위 주석 — 이 값이 있어야 좁은 판에서 접힌다.
+     ⚠️ `box-sizing: border-box`(tailwind preflight) 라 세로선의 안여백 18 +
+     선 1 이 이 안에 든다 — 긴 이름(「디딤발 무릎 굽히기 23」)이 한 줄에
+     들어오도록 그만큼 얹어 둔 값이다. */
+  min-width: 168px;
   font-size: 0.6875rem;
   color: color-mix(in srgb, var(--ss-fg) 80%, transparent);
+}
+
+/* 🔴 그림과 이름 사이의 세로선 — **나란히 설 때만** 긋는다(사용자 요청).
+   접혀서 이름이 그림 아래로 내려간 판에서는 왼쪽에 선이 그어져 있으면
+   무엇을 가르는 선인지 알 수 없다.
+
+   경계값은 접힘이 걸리는 지점에서 온다 — 두 칸이 `flex: 1 1 0` 이라 접힘은
+   **각자의 최소 폭**이 정한다: 그림 153~167(축 개수에 따라 다르다) + 사이 18
+   + 범례 168 ≈ 353. 넉넉히 **360** 으로 둔다.
+
+   🔴 어긋나야 한다면 **높은 쪽으로** 어긋내는 것이 맞다 — 그러면 나란히
+   섰는데 선만 없는 판이 되고, 반대로 낮추면 **접혔는데 선이 허공에 그어진**
+   판이 된다. 뒤엣것이 훨씬 나쁘다. */
+@container (min-width: 360px) {
+  .ss-report-radar-legend {
+    padding-left: 18px;
+    border-left: 1px solid color-mix(in srgb, var(--ss-fg) 22%, transparent);
+
+    /* 🔴 선 길이를 **그림 높이에** 맞춘다. 안 맞추면 글자 수가 길이를 정해서
+       (축 3개면 짧고 6개면 길다) 선이 허공에 뜬 토막으로 보인다 — 가로선
+       둘이 판 폭을 꽉 채우는 것과 짝이 안 맞는다.
+       늘어난 자리에서 이름들은 가운데에 모은다. */
+    align-self: stretch;
+    justify-content: center;
+  }
 }
 
 .ss-report-radar-legend li {
@@ -9201,15 +9548,16 @@ body:has(.ss-shot) .ss-app-figure {
   animation: ss-p-line 380ms ease 720ms both;
 }
 
-.ss-profile-body,
-.ss-profile-tabs,
-.ss-profile-upload,
-.ss-profile-video-player,
-.ss-profile-video-nav {
+/* 🔴 **들어오는 창 안에서만** 연출한다(`data-entered`).
+   ⚠️ `.ss-profile-video-player` 는 `key={v.id}` 라 **영상을 넘길 때마다 새로
+   붙는다** — 창이 없으면 그때마다 1080ms 를 기다렸다 나타나서 「영상이 너무
+   늦게 나온다」가 된다(사용자 지적). 알약으로 갈래를 바꿀 때도 같다.
+   나머지 넷은 늘 붙어 있어 창이 있으나 없으나 같지만, **한 무리는 한 규칙**
+   이어야 다음 사람이 왜 하나만 다른지 찾지 않는다. */
+.ss-profile:not([data-entered]) :is(.ss-profile-body, .ss-profile-tabs, .ss-profile-upload, .ss-profile-video-player, .ss-profile-video-nav) {
   animation: ss-p-from-top 460ms var(--ss-home-out-ease) 1080ms both;
 }
 
-.ss-profile-id-main,
 /* ── 나를 보여주는 대표 영상 (2026-09-08) ─────────────────────────── */
 
 /* 영상 **오른쪽 아래**에 붙인다(사용자 요청) — 그 영상에 대한 일이라 멀어지면
@@ -9238,15 +9586,21 @@ body:has(.ss-shot) .ss-app-figure {
   gap: 6px;
 }
 
+/* 🔴 **처음부터 빨강**이다(사용자 요청, 2026-09-11). 전에는 흰 테두리로 두고
+   가져다 댔을 때만 빨개졌는데, **되돌릴 수 없는 단추**를 눌러 보기 전까지
+   중립으로 두면 그 사실이 손을 올린 뒤에야 읽힌다. 이 저장소가 빨강을
+   「되돌린다 · 위험」으로 써 온 그대로다(분석 화면 닫기 · 판 닫기).
+   ⚠️ 그래도 **색만으로 말하지 않는다** — 한 번 더 묻고, 글자가 「정말
+   지웁니다」로 바뀌며, 옆에 「취소」가 선다(아래 `data-armed`). */
 .ss-profile-del-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--ss-fg) 32%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ss-error) 55%, transparent);
   padding: 5px 12px;
   font-size: 0.75rem;
-  color: color-mix(in srgb, var(--ss-fg) 76%, transparent);
+  color: color-mix(in srgb, var(--ss-error) 85%, var(--ss-fg));
   white-space: nowrap;
   transition:
     border-color 160ms ease,
@@ -9260,8 +9614,8 @@ body:has(.ss-shot) .ss-app-figure {
 
 .ss-profile-del-btn:hover,
 .ss-profile-del-btn:focus-visible {
-  border-color: color-mix(in srgb, var(--ss-error) 70%, transparent);
-  color: color-mix(in srgb, var(--ss-error) 85%, var(--ss-fg));
+  border-color: var(--ss-error);
+  background-color: color-mix(in srgb, var(--ss-error) 14%, transparent);
 }
 
 /* 한 번 더 물은 뒤의 그 단추. 🔴 색만으로 말하지 않는다 — 글자가
@@ -9276,19 +9630,31 @@ body:has(.ss-shot) .ss-app-figure {
   opacity: 0.6;
 }
 
-.ss-profile-featured-btn {
+/* 🔴 줄의 오른쪽 끝 — 「전체 공개」와 「대표 영상 설정」이 **한 상자**로
+   선다(2026-09-11, 사용자 요청). 각자 `right` 를 주면 왼쪽 단추가 오른쪽
+   단추의 폭을 알아야 하는데, 그 글자는 상태에 따라 갈린다. */
+.ss-profile-nav-right {
   position: absolute;
   top: 50%;
   right: 0;
   transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
+  gap: 8px;
+}
+
+.ss-profile-featured-btn {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--ss-fg) 32%, transparent);
+  /* 🔴 **온전한 흰색**(사용자 요청, 2026-09-11). 옅게 두었더니 배경 사진이
+     그대로 비치는 이 줄에서 회색으로 읽혔다 — 이 칸의 다른 글자들과 같은
+     판단이다. 「세워 둔 상태」는 아래 `data-on` 이 민트로 말한다. */
+  border: 1px solid var(--ss-fg);
   padding: 5px 12px;
   font-size: 0.75rem;
-  color: color-mix(in srgb, var(--ss-fg) 76%, transparent);
+  color: var(--ss-fg);
   white-space: nowrap;
   transition:
     border-color 160ms ease,
@@ -9320,17 +9686,306 @@ body:has(.ss-shot) .ss-app-figure {
   text-align: right;
   font-size: 0.6875rem;
   line-height: 1.5;
-  color: color-mix(in srgb, var(--ss-fg) 52%, transparent);
+  /* 🔴 **온전한 흰색**(2026-09-11, 사용자 요청) — 이 줄 뒤로 배경 사진이
+     그대로 지나가서 옅게 두면 회색으로 읽힌다. 이 칸의 다른 글자들과 같다. */
+  color: var(--ss-fg);
 }
 
 /* ── 내 프로필의 분석 리포트 — **영상 목록 아래**다 (2026-09-08) ────── */
 
 /* 🔴 굴리는 목록 아래에 선을 긋고 그 아래에 둔다. 목록은 "무엇을 볼까"이고
    리포트는 "그것이 무엇이었나"라, 한 덩어리로 붙으면 둘이 섞인다. */
+/* 🔴 **제 판 위에 선다** (2026-09-11). 앞서 여기 `border-top` 선 하나만 긋고
+   배경 사진 위에 글자를 그대로 얹었는데, 배포본에서 **칭호 알약이 씻겨
+   나갔다** — 리포트는 길어서 사진의 밝은 구간까지 내려가고, 민트는 어두운
+   바탕용으로 고른 색이다(이 파일의 「흰 바탕에 민트 글자는 안 읽힌다」와
+   같은 판단의 뒷면이다).
+
+   🔴 **바탕을 왼쪽 네 절(`#fff 6%`)과 반대로 어둡게 준다.** 흐림은 무늬만
+   뭉갤 뿐 **밝기를 안 바꾼다** — 왼쪽 절들이 읽히는 것은 그 뒤가 마침 어두운
+   초록이라서고, 같은 값을 밝은 자리에 놓으면 똑같이 씻긴다. 이 칸은 뒤가
+   무엇일지 정해져 있지 않으므로 판이 밝기를 **눌러** 줘야 한다.
+
+   🔴 흐림(backdrop-filter)은 여기 없다 — `MyVideos.tsx` 가 `SECTION_GLASS` 로
+   **인라인**으로 준다. globals.css 에 두면 Lightning CSS 를 지나며 떨어져
+   나간다(이 파일의 다른 유리 판들과 같은 이유). */
 .ss-profile-report {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid color-mix(in srgb, var(--ss-fg) 22%, transparent);
+  /* 🔴 **왼쪽 칸을 덮는 판이다**(2026-09-11, 사용자 요청). 영상 아래에 두면
+     영상을 보면서 읽을 수가 없어 굴려 내려가야 했다.
+
+     🔴 자리의 기준은 `.ss-profile-sheet`(`position: relative`)다. 이 요소는
+     오른쪽 칸(`.ss-profile-right`, `overflow-y: auto`) **안**에 있지만, 흐름
+     밖 요소는 **자리의 기준이 되는 조상**을 따르므로 그 굴림 칸에 안 갇힌다.
+     그래서 판을 넘어가는 일도 없다 — 판 쪽이 `overflow: hidden` 이라 왼쪽에서
+     들어오는 동안 깔끔하게 잘린다.
+
+     ⚠️ `top` 이 0 이 아닌 이유: 판은 머리글 뒤까지 **걷어 올려져 있고**
+     (`--ss-profile-rise`) 그만큼 안여백으로 되넣었다. 0 으로 두면 판이 워드마크
+     자리까지 올라간다. */
+  position: absolute;
+  left: 0;
+  top: var(--ss-profile-rise);
+  bottom: 0;
+  width: 50%;
+  z-index: 3;
+  overflow-y: auto;
+  padding: 16px 20px 20px;
+  border-radius: 14px;
+  background: color-mix(in srgb, #000 42%, transparent);
+  animation: ss-p-report-in 380ms var(--ss-home-out-ease) both;
+}
+
+.ss-profile-report[data-state='closing'] {
+  animation: ss-p-report-out 320ms ease both;
+}
+
+/* 왼쪽에서 들어오고 왼쪽으로 나간다 — 왼쪽 칸이 물러난 그 방향이다. */
+@keyframes ss-p-report-in {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+}
+
+@keyframes ss-p-report-out {
+  to {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+}
+
+/* 🔴 판이 켜지면 **왼쪽 칸이 통째로 밀려나간다**(사용자 요청). 감추는 것이
+   아니라 **밀어내는** 것이라, 자리는 그대로 두고 옮긴 뒤 손짓만 끊는다 —
+   `display: none` 으로 빼면 격자 칸이 접혀 오른쪽 칸이 넓어진다. */
+.ss-profile-left {
+  transition:
+    transform 380ms var(--ss-home-out-ease),
+    opacity 380ms var(--ss-home-out-ease);
+}
+
+.ss-profile[data-report='true'] .ss-profile-left {
+  transform: translateX(-104%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 🔴 **이 판에서만 글자를 한 단 키운다**(사용자 요청, 2026-09-11).
+   `ReportView` 는 분석 화면(`.ss-shot-side`, `min(420px, 34vw)`)도 쓰는데
+   거기는 좁아서 같이 키우면 줄이 넘친다 — 그래서 판을 앞에 붙여 가둔다.
+   ⚠️ 값은 원래 크기에서 한 단씩만 올렸다. 더 키우면 리포트가 판 밖으로
+   넘쳐 굴려야 하고, 그러면 아래에 두던 때와 같아진다. */
+.ss-profile-report .ss-report-summary {
+  font-size: 0.9375rem;
+}
+
+.ss-profile-report .ss-report-point-title {
+  font-size: 0.85rem;
+}
+
+.ss-profile-report .ss-report-point-evidence {
+  font-size: 0.875rem;
+}
+
+.ss-profile-report .ss-report h3 {
+  font-size: 0.875rem;
+}
+
+.ss-profile-report .ss-report-scenes {
+  font-size: 0.875rem;
+}
+
+.ss-profile-report .ss-report-radar-legend {
+  font-size: 0.8125rem;
+}
+
+.ss-profile-report .ss-report-total-score {
+  font-size: 0.875rem;
+}
+
+.ss-profile-report .ss-profile-report-head {
+  width: 100%;
+  text-align: center;
+  font-size: 1.0625rem;
+  letter-spacing: 0.06em;
+}
+
+.ss-profile-report .ss-profile-report-note {
+  font-size: 13px;
+}
+
+/* 🔴 **이 판에서는 흰색을 깎지 않는다**(사용자 요청, 2026-09-11).
+   `ReportView` 의 기본값은 흰색을 45~80% 로 옅게 써서 **덩어리 안에서 차례를
+   매기는** 방식인데(요약이 제일 진하고 근거 문장이 그다음), 이 판은 배경
+   사진 위에 떠 있어서 옅은 글자가 **회색으로 읽힌다** — 차례가 아니라
+   「흐린 글자」로 보인다.
+
+   ⚠️ 대신 **차례를 잃지 않게** 크기와 굵기는 그대로 둔다. 색을 다 흰색으로
+   올리는 대신 그 둘이 위아래를 말한다.
+   ⚠️ 민트(칭호 · 시각 · 점수)는 그대로다 — 그건 옅은 흰색이 아니라 **다른
+   뜻을 가진 색**이라, 흰색으로 바꾸면 무엇이 값인지가 사라진다. */
+.ss-profile-report .ss-report h3,
+.ss-profile-report .ss-report-scenes,
+.ss-profile-report .ss-report-point-evidence,
+.ss-profile-report .ss-report-total-score,
+.ss-profile-report .ss-report-radar-legend,
+.ss-profile-report .ss-profile-report-head,
+.ss-profile-report .ss-profile-report-note {
+  color: var(--ss-fg);
+}
+
+/* 글머리 점만 한 단 낮춘다 — 여기까지 온전한 흰색이면 점이 글자만큼 세져서
+   문장보다 먼저 눈에 들어온다. */
+.ss-profile-report .ss-report-point-evidence::before {
+  color: color-mix(in srgb, var(--ss-fg) 70%, transparent);
+}
+
+/* 판 머리 — 제목과 닫기가 마주 본다. */
+/* 🔴 제목은 **판 가운데**에 크게 선다(사용자 요청, 2026-09-11).
+   ⚠️ `space-between` 으로는 가운데에 못 놓는다 — 닫기 단추의 폭만큼 제목이
+   왼쪽으로 밀린다. 제목을 줄 전체로 펴 가운데 정렬하고, 닫기만 **흐름 밖**
+   으로 빼서 오른쪽 끝에 건다(이 화면이 세 번 쓴 방식이다). */
+.ss-profile-report-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  margin-bottom: 8px;
+}
+
+/* 🔴 **되돌리는 단추는 빨강**이다(사용자 요청) — 분석 화면의 「닫기」 알약이
+   이미 `--ss-error` 로 그렇게 되어 있다. 새 색을 만들지 않고 그것을 쓴다:
+   같은 뜻(되돌린다)에 색이 둘이면 어느 쪽이 무슨 뜻인지 안 읽힌다. */
+.ss-profile-report-close {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 6px 16px;
+  border: 1px solid color-mix(in srgb, var(--ss-error) 55%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ss-error) 14%, transparent);
+  /* ⚠️ 순수한 `--ss-error` 는 어두운 바탕에서 글자로 쓰기엔 대비가 모자란다 —
+     흰 쪽으로 섞어 올린다(분석 화면이 같은 식을 쓴다). */
+  color: color-mix(in srgb, var(--ss-error) 88%, var(--ss-fg));
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  flex: none;
+}
+
+.ss-profile-report-close:hover,
+.ss-profile-report-close:focus-visible {
+  border-color: var(--ss-error);
+  background: color-mix(in srgb, var(--ss-error) 26%, transparent);
+}
+
+/* 「해당 영상 리포트 보기」 — 🔴 알약 줄의 **흐름 밖**에 건다. 줄이
+   `justify-content: center` 라 항목을 하나 더 넣으면 알약 무리가 통째로
+   왼쪽으로 밀린다(스쿼드 판의 「팀 매칭」에서 같은 것을 겪었다). */
+.ss-profile-report-open {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 6px 15px;
+  /* 🔴 **흰 채움에 검은 글자**(2026-09-11, 사용자 요청 — 검정 · 버건디를
+     거쳐 여기로 돌아왔다). 이 칸에서 쓸 수 있는 색을 다 따져 본 끝이다 —
+     민트는 대표 영상 · 호칭 · 점수가 이미 쓰고 있고, 빨강(`--ss-error`)은
+     이 저장소에서 **되돌린다**는 뜻으로 굳어 있어(분석 화면의 「닫기」 ·
+     판 안의 「닫기」) 여는 단추에 쓰면 뜻이 뒤집힌다. 잔디색은 민트와 이웃한
+     값이라 나란히 두면 둘 다 흐려진다.
+
+     남는 것이 **명도 대비**다. 이 줄 뒤에는 배경 사진이 그대로 지나가므로
+     테두리만으로는 묻히는데, 흰색으로 채워 두면 어느 자리에서도 읽힌다 —
+     어두운 구간에서도 밝은 구간에서도 이 단추가 가장 밝다.
+     🔴 **밝은 바탕 위 글자는 검다** — 채움과 글자는 늘 반대쪽 끝이어야
+     한다(민트 글자를 흰 바탕에 올렸다 대비 1.6:1 로 데인 자리가 이 파일에
+     적혀 있다). */
+  border: 1px solid var(--ss-fg);
+  border-radius: 999px;
+  background: var(--ss-fg);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #111;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ss-profile-report-open:hover,
+.ss-profile-report-open:focus-visible {
+  background: color-mix(in srgb, var(--ss-fg) 86%, var(--ss-accent));
+  border-color: color-mix(in srgb, var(--ss-fg) 86%, var(--ss-accent));
+}
+
+/* 🔴 **깜빡인다**(사용자 요청). 스쿼드 판의 「팀 매칭」과 **같은 방식**이다 —
+   테두리만 깜빡이면 어두운 배경에서 묻혀 「나온지도 몰랐다」는 말을 들었고,
+   밖으로 퍼지는 고리 + 살짝 커지는 것이 그 자리를 대신했다.
+   ⚠️ 고리는 흰색이다 — 단추가 흰 채움이라 민트 고리를 두르면 두 색이 된다. */
+.ss-profile-report-open {
+  animation: ss-p-report-blink 1.6s ease-in-out infinite;
+}
+
+/* 🔴 **다른 것들과 같이 들고 난다**(사용자 요청) — 오른쪽 끝에 선 단추라
+   오른쪽으로 나가고 오른쪽에서 들어온다.
+
+   🔴 깜빡임을 **entry 뒤로 미룬다**(1540ms = 1080 지연 + 460 길이). 둘 다
+   `transform` 을 잡으므로 겹치면 **목록에서 뒤엣것이 이긴다** — 안 미루면
+   들어오는 움직임이 첫 프레임부터 깜빡임에 먹힌다.
+
+   ⚠️ 창(`:not([data-entered])`)으로 가둔다. 이 단추는 **리포트를 받아 온
+   뒤에 붙어서**, 안 가두면 늦게 붙을 때마다 1080ms 를 기다렸다 나타난다. */
+.ss-profile:not([data-entered]) .ss-profile-report-open {
+  animation:
+    ss-p-report-open-in 460ms var(--ss-home-out-ease) 1080ms both,
+    ss-p-report-blink 1.6s ease-in-out 1540ms infinite;
+}
+
+.ss-profile[data-leaving='true'] .ss-profile-report-open {
+  animation: ss-p-report-open-out 260ms ease both;
+}
+
+/* ⚠️ `translateY(-50%)` 는 **자리를 잡는 변형**이라 모든 칸에 다시 적는다 —
+   빼면 단추가 제 높이의 절반만큼 아래로 튄다. */
+@keyframes ss-p-report-open-in {
+  from {
+    transform: translateY(-50%) translateX(26px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(-50%) translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes ss-p-report-open-out {
+  to {
+    transform: translateY(-50%) translateX(26px);
+    opacity: 0;
+  }
+}
+
+@keyframes ss-p-report-blink {
+  0%,
+  100% {
+    /* 고리도 **흰색**이다 — 채움과 한 색이라 「번져 나가는 빛」으로 읽힌다. */
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ss-fg) 55%, transparent);
+    transform: translateY(-50%) scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 12px color-mix(in srgb, var(--ss-fg) 0%, transparent);
+    /* ⚠️ `translateY(-50%)` 를 **여기에도 적는다** — 자리를 잡는 변형이라
+       빼면 깜빡일 때마다 단추가 제 높이의 절반만큼 아래로 튄다. */
+    transform: translateY(-50%) scale(1.05);
+  }
+}
+
+/* 🔴 깜빡임은 **끌 수 있어야 한다.** 반복되는 명멸은 어지럼을 부른다.
+   끄더라도 고리는 켜 둔다 — 안 보이면 끈 뜻이 없다. */
+@media (prefers-reduced-motion: reduce) {
+  .ss-profile-report-open {
+    animation: none;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--ss-fg) 26%, transparent);
+  }
 }
 
 .ss-profile-report-head {
@@ -9349,8 +10004,32 @@ body:has(.ss-shot) .ss-app-figure {
   color: color-mix(in srgb, var(--ss-fg) 52%, transparent);
 }
 
-.ss-profile-strip {
+/* 🔴 **`.ss-profile-id-main` 이 여기서 떨어져 나가 있었다**(2026-09-11에 발견).
+   위 「대표 영상」 절이 이 선택자 목록 **한가운데** 끼어들면서, 떠 있던
+   `.ss-profile-id-main,` 이 그 절의 첫 규칙(`.ss-profile-video-nav`)과 붙어
+   버렸다 — 흘러든 것이 `position: relative` 하나라 **화면은 안 깨졌고
+   애니메이션만 조용히 사라졌다.** 신원 줄(카드 · 이름 · 「프로필 카드 수정」)이
+   들어올 때도 나갈 때도 혼자 툭 나타나던 이유다(사용자 지적).
+
+   ⚠️ **선택자 목록 사이에 절 주석을 넣지 말 것.** CSS 는 그것을 오류로
+   보지 않고 다음 `{` 까지 목록을 이어 붙인다 — 콘솔에도 안 남는다.
+
+   ⚠️ 리포트 판은 여기 있다가 빠졌다(2026-09-11) — 흐름에서 나와 왼쪽 칸을
+   덮는 판이 되면서 제 연출(`ss-p-report-in`)을 갖게 됐다. */
+.ss-profile:not([data-entered]) :is(.ss-profile-id-main, .ss-profile-strip) {
   animation: ss-p-from-bottom 460ms var(--ss-home-out-ease) 1080ms both;
+}
+
+/* 🔴 **나중에 붙는 것은 들어오는 창 안에서만** 연출한다.
+   「이 장면이 돕니다」 줄은 대표 영상을 세우는 순간 생기는데, 창을 안 두면
+   **그때마다 1080ms 를 기다렸다 나타나서** 눌러 놓고 1초 넘게 아무 일도 안
+   일어난 것처럼 보인다. 창은 `ProfileStage` 가 `data-entered` 로 닫는다 —
+   두 값은 같이 고친다.
+
+   ⚠️ 리포트 판은 여기서 빠졌다(2026-09-11) — 이제 흐름에 없고 왼쪽 칸을
+   덮는 판이라 제 연출(`ss-p-report-in`)을 갖는다. */
+.ss-profile:not([data-entered]) .ss-profile-featured-note {
+  animation: ss-p-from-top 460ms var(--ss-home-out-ease) 1080ms both;
 }
 
 @keyframes ss-p-open {
@@ -9397,11 +10076,19 @@ body:has(.ss-shot) .ss-app-figure {
   animation: ss-p-to-bottom 260ms ease both;
 }
 
+/* 🔴 **리포트 판이 열린 채로 나가면 그것도 왼쪽으로 뺀다**(사용자 요청).
+   안 빼면 다른 것이 다 빠진 뒤에도 판만 남아 있다가 판과 함께 툭 사라진다.
+   들어올 때 왼쪽에서 왔으므로 나갈 때도 그쪽이다 — 들어온 길로 되나간다. */
+.ss-profile[data-leaving='true'] .ss-profile-report {
+  animation: ss-p-report-out 260ms ease both;
+}
+
 .ss-profile[data-leaving='true'] .ss-profile-body,
 .ss-profile[data-leaving='true'] .ss-profile-tabs,
 .ss-profile[data-leaving='true'] .ss-profile-upload,
 .ss-profile[data-leaving='true'] .ss-profile-video-player,
-.ss-profile[data-leaving='true'] .ss-profile-video-nav {
+.ss-profile[data-leaving='true'] .ss-profile-video-nav,
+.ss-profile[data-leaving='true'] .ss-profile-featured-note {
   animation: ss-p-to-top 260ms ease both;
 }
 
@@ -9466,6 +10153,7 @@ body:has(.ss-shot) .ss-app-figure {
   .ss-profile-video-player,
   .ss-profile-video-nav,
   .ss-profile-id-main,
+  .ss-profile-featured-note,
   .ss-profile-strip,
   .ss-profile[data-leaving='true'] :is(
       .ss-profile-sheet,
@@ -9476,6 +10164,9 @@ body:has(.ss-shot) .ss-app-figure {
       .ss-profile-video-player,
       .ss-profile-video-nav,
       .ss-profile-id-main,
+      .ss-profile-featured-note,
+      .ss-profile-report,
+      .ss-profile-report-open,
       .ss-profile-strip
     ) {
     animation: none;
@@ -9976,6 +10667,54 @@ body:has(.ss-profile) {
   gap: 12px;
 }
 
+/* 🔴 **접기는 `grid-template-rows` 로 한다**(0fr → 1fr). `max-height` 로 하면
+   상한과 실제 높이가 달라서, 전환 시간의 일부가 **안 보이는 구간**에 쓰이고
+   속도가 튄다(이 화면 왼쪽 칸의 `.ss-profile-fold` 가 같은 이유로 그렇다).
+
+   ⚠️ 안쪽 상자에 `overflow: hidden` 이 있어야 한다 — 0fr 은 칸을 0 으로
+   만들 뿐이고, 넘치는 내용은 그냥 삐져나온다. */
+.ss-profile-match-fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 420ms var(--ss-home-out-ease);
+}
+
+.ss-profile-match-fold[data-open='true'] {
+  grid-template-rows: 1fr;
+}
+
+.ss-profile-match-fold > div {
+  overflow: hidden;
+  /* 🔴 위 목록과의 사이. **안쪽**에 둔다 — 바깥(margin)에 두면 접혔을 때도
+     그 틈이 남아, 접힌 판 아래에 까닭 없는 공백이 생긴다. */
+  padding-top: 0;
+  transition: padding-top 420ms var(--ss-home-out-ease);
+}
+
+.ss-profile-match-fold[data-open='true'] > div {
+  /* 목록 안의 줄 간격과 같은 값 — 펴졌을 때 한 목록으로 읽혀야 한다. */
+  padding-top: 12px;
+}
+
+/* 「더보기 N」 — 🔴 판 안의 다른 단추(회원 탈퇴)와 달리 **테두리를 안 준다.**
+   이건 화면을 떠나는 일이 아니라 이 자리에서 조금 더 보는 일이라, 알약으로
+   두면 옆 박스의 「회원 탈퇴」와 같은 무게로 읽힌다. */
+.ss-profile-match-more {
+  margin-top: 10px;
+  padding: 2px 0;
+  background: none;
+  border: none;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ss-accent);
+  cursor: pointer;
+}
+
+.ss-profile-match-more:hover,
+.ss-profile-match-more:focus-visible {
+  text-decoration: underline;
+}
+
 .ss-profile-match-when {
   font-size: 0.95rem;
   font-weight: 600;
@@ -10038,7 +10777,14 @@ body:has(.ss-profile) {
 
 /* ── 오른쪽. 올린 영상 ──────────────────────────────────────── */
 
+/* 🔴 상자 폭의 기준 — **가로 16:9** 한 편. 영상마다 갈리지 않는 값이라야
+   넘기는 줄의 단추들이 제자리에 머문다.
+
+   ⚠️ **`.ss-profile-video` 에서 여기로 올렸다**(2026-09-11) — 알약 줄도 이
+   폭을 알아야 「해당 영상 리포트 보기」의 오른쪽 끝이 「대표 영상 설정」과
+   맞는다(사용자 요청). 둘은 형제라 한쪽에만 있으면 물려받지 못한다. */
 .ss-profile-right {
+  --ss-video-wide: 1.778;
   gap: 18px;
   align-content: start;
   overflow-y: auto;
@@ -10127,9 +10873,6 @@ body:has(.ss-profile) {
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* 상자 폭의 기준 — **가로 16:9** 한 편. 영상마다 갈리지 않는 값이라야
-     아래 넘기는 줄의 단추들이 제자리에 머문다. */
-  --ss-video-wide: 1.778;
 }
 
 /* 🔴 **상자 폭에 영상 비가 안 들어간다**(2026-09-08, 사용자 요청: "세로
@@ -10166,6 +10909,26 @@ body:has(.ss-profile) {
   align-items: center;
   justify-content: center;
   height: 44vh;
+}
+
+/* 🔴 **갈래를 바꾸거나 영상을 넘길 때 부드럽게 갈린다**(사용자 요청,
+   2026-09-11). `key={v.id}` 라 영상은 새로 태어나는데, 연출이 없으면 그림이
+   **한 프레임에 통째로 뒤집혀** 눈이 아프다.
+
+   ⚠️ 길게 끌지 않는다(240ms · 지연 없음). 여기서 지연을 주면 「영상이 늦게
+   나온다」로 되돌아간다 — 방금 그 이유로 들어오는 연출을 창에 가뒀다.
+   🔴 들어올 때의 긴 연출과 **겹치지 않는다**: 그쪽(`:not([data-entered])`)이
+   선택자가 더 세서 창이 열려 있는 동안은 그 규칙이 이긴다. */
+.ss-profile-video-player {
+  animation: ss-p-clip-in 240ms var(--ss-home-out-ease) both;
+}
+
+@keyframes ss-p-clip-in {
+  from {
+    opacity: 0;
+    /* 살짝 뒤에서 온다 — 불투명도만 바꾸면 「깜빡」으로 읽힌다. */
+    transform: scale(1.015);
+  }
 }
 
 .ss-profile-video-player {
@@ -10232,6 +10995,10 @@ body:has(.ss-profile) {
   display: none;
 }
 
+/* ⚠️ 여기에 들어오는 연출을 걸었다가 **같은 날 되돌렸다.** 갈래를 바꿀 때
+   섬네일이 하나씩 사라졌다 나타나서 「정신 사납다」는 말을 들었다(사용자
+   지적) — 줄에 있는 것이 **여럿이라** 하나씩 깜빡이면 영상 한 장이 갈리는
+   것보다 훨씬 시끄럽다. 바뀌는 것은 조용히 바뀌게 둔다. */
 .ss-profile-strip > li {
   flex: none;
   scroll-snap-align: start;
@@ -10478,6 +11245,14 @@ body:has(.ss-profile) {
    그것을 먼저 집었다). 그래서 원래 선택자를 그대로 두고 `.ss-profile-upload`
    만 같은 목록에 넣는다. 부모까지 걸면 둘이 겹쳐 움직인다. */
 .ss-profile-tabrow {
+  /* 🔴 **자리의 기준**이자 칸 폭을 꽉 채운다 — 「해당 영상 리포트 보기」가
+     흐름 밖에서 오른쪽 끝에 서야 하는데, 폭이 내용만큼이면 「오른쪽 끝」이
+     알약 바로 옆이 된다(영상의 오른쪽 위가 아니다). */
+  position: relative;
+  /* 🔴 **영상 상자와 같은 폭**이라야 오른쪽 끝이 맞는다(사용자 요청) —
+     `.ss-profile-video-frame` 과 **같은 식**이다. 칸 폭(100%)으로 두면
+     알약 줄이 더 넓어서 단추가 영상보다 오른쪽으로 삐져나간다. */
+  width: min(100%, calc(44vh * var(--ss-video-wide, 1.778)));
   display: flex;
   align-items: center;
   /* 🔴 `space-between` 을 쓰지 않는다. 이 줄은 `.ss-profile-right`(그리드,
@@ -10583,11 +11358,11 @@ body:has(.ss-profile) {
 }
 
 /* 공개 여부 — 업로드 갈래에서만 나온다. */
+/* 🔴 줄 안에 서므로 **자리를 안 차지한 채** 폼을 아래로 띄운다. 흐름에
+   두면 폼이 열릴 때 줄이 통째로 길어져 아래 것들이 밀린다. */
 .ss-profile-publish {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  align-items: flex-start;
+  position: relative;
+  display: inline-flex;
 }
 
 .ss-profile-publish-toggle {
@@ -10597,7 +11372,11 @@ body:has(.ss-profile) {
   height: 28px;
   padding: 0 12px;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--ss-fg) 40%, transparent);
+  /* 🔴 **온전한 흰색**(2026-09-11, 사용자 요청) — 옆의 「대표 영상 설정」과
+     같은 무게로 선다. 옅게 두면 배경 사진 위에서 회색으로 읽힌다.
+     ⚠️ 켜진 상태(`data-on`)는 아래에서 갈린다 — 흐림이 아니라 **채움**이
+     차이를 말한다. */
+  border: 1px solid var(--ss-fg);
   font-size: 0.76rem;
   color: var(--ss-fg);
   cursor: pointer;
@@ -10627,12 +11406,21 @@ body:has(.ss-profile) {
     'opsz' 20;
 }
 
+/* 폼은 단추 **아래로 떠오른다** — 🔴 오른쪽 끝에 맞춰 연다(`right: 0`).
+   왼쪽에 맞추면 판 밖으로 나간다. */
 .ss-profile-publish-form {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 4;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  width: 100%;
-  max-width: 320px;
+  width: 300px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 22%, transparent);
+  background: color-mix(in srgb, #000 82%, transparent);
 }
 
 .ss-profile-publish-form label {

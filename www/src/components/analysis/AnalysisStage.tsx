@@ -346,6 +346,37 @@ export default function AnalysisStage() {
    */
   const [videoId, setVideoId] = useState<string | null>(null)
   /** 리포트를 내 프로필에 남겼는가 — `저장` 단추의 상태다. */
+  /**
+   * 「선수와 비교하기」 — 리포트가 다 나온 뒤, 프로 선수의 같은 동작과
+   * 나란히 놓고 보는 자리(사용자 요청, 2026-09-11).
+   *
+   *   idle      아직 안 눌렀다
+   *   picking   누구와 비교할지 고르는 중(이름 둘)
+   *   searching 고른 선수의 비슷한 장면을 찾는 중(연출)
+   *   shown     찾았다 — 영상 칸이 반으로 갈린다
+   *
+   * 🔴 **찾는 일은 진짜가 아니다.** 계약에도 에이전트에도 「비슷한 선수
+   * 영상」이 없다 — 시간도 붙박이(`COMPARE_MS`)고 왼쪽 칸은 회색 자리
+   * 표시다. 화면에 그렇게 적어 두었고 미결로도 올린다. 진짜가 붙으면
+   * `startCompare` 안과 그 문구를 같이 걷는다.
+   */
+  const COMPARE = [
+    { id: 'messi', name: '리오넬 메시' },
+    { id: 'ronaldo', name: '크리스티아누 호날두' },
+  ] as const
+  type CompareStage = 'idle' | 'picking' | 'searching' | 'shown'
+  const [compare, setCompare] = useState<CompareStage>('idle')
+  const [compareWho, setCompareWho] = useState<(typeof COMPARE)[number] | null>(null)
+
+  /** 찾는 척하는 시간. 🔴 진짜 검색이 붙으면 이 상수째 사라진다. */
+  const COMPARE_MS = 1600
+
+  const startCompare = (who: (typeof COMPARE)[number]) => {
+    setCompareWho(who)
+    setCompare('searching')
+    setTimeout(() => setCompare('shown'), COMPARE_MS)
+  }
+
   const [reportSaved, setReportSaved] = useState(false)
   /**
    * 지금 **저장 안 된 채 서버에 올라가 있는** 영상 id.
@@ -1377,7 +1408,17 @@ export default function AnalysisStage() {
             </span>
           </div>
 
-          <div className="ss-shot-frame-body">
+          {/* 🔴 비교가 뜨면 **이 상자가 반으로 갈린다** — 내 영상은 오른쪽으로
+              밀리고 왼쪽에 선수 영상이 들어온다(사용자 요청). 자리를 나누는
+              일만 여기서 하고, 안의 것들은 제 크기대로 따라간다. */}
+          <div className="ss-shot-frame-body" data-compare={compare === 'shown' ? 'true' : undefined}>
+            {/* ⚠️ **회색 자리 표시다** — 선수 영상을 읽을 경로가 계약에도
+                에이전트에도 없다. 진짜가 붙으면 이 칸만 갈아 끼운다. */}
+            {compare === 'shown' && (
+              <div className="ss-shot-compare-slot" aria-label={`${compareWho?.name} 영상 자리`}>
+                <span>{compareWho?.name.split(' ').slice(-1)[0]} 영상 자리입니다</span>
+              </div>
+            )}
             {file ? (
               <>
                 <video
@@ -1661,6 +1702,18 @@ export default function AnalysisStage() {
               ⚠️ 이 자리에 있던 **'다른 영상'** 은 없앴다(사용자 요청). 고르기 전으로
               되돌리는 길은 창 틀의 **「닫기」 알약**에 그대로 있다 —
               길이 하나 없어진 것이 아니라 자리를 옮긴 것이다. */}
+          {/* 🔴 **「저장」 왼쪽**이다(사용자 요청). 리포트가 다 나온 뒤에만
+              나온다 — 비교할 것이 아직 없으면 누를 데가 있으면 안 된다. */}
+          {done && (
+            <button
+              type="button"
+              className="ss-shot-compare-open"
+              aria-expanded={compare !== 'idle'}
+              onClick={() => setCompare((v) => (v === 'idle' ? 'picking' : 'idle'))}
+            >
+              선수와 비교하기
+            </button>
+          )}
           <button
             type="button"
             className="ss-shot-again"
@@ -1670,6 +1723,49 @@ export default function AnalysisStage() {
             {reportSaved ? '내 프로필에 저장됨' : '내 프로필에 리포트 저장'}
           </button>
         </header>
+
+        {/* 🔴 **머리줄 바로 아래에서 펴진다** — 리포트는 그만큼 아래로 밀린다
+            (사용자 요청). 접기는 `grid-template-rows`(0fr → 1fr) 다: 상한과
+            실제 높이가 다르면 전환이 안 보이는 구간에서 소모돼 속도가 튄다.
+
+            🔴 고르는 줄과 「찾는 중」이 **같은 자리**를 쓴다 — 이름 둘이
+            사라지고 그 자리에 문장이 들어오므로 판이 안 들썩인다. */}
+        <div className="ss-shot-compare" data-open={compare !== 'idle' ? 'true' : 'false'}>
+          <div>
+            {compare === 'picking' ? (
+              <div className="ss-shot-compare-picks">
+                {COMPARE.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className="ss-shot-compare-pick"
+                    onClick={() => startCompare(p)}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="ss-shot-compare-msg" role="status">
+                {compare === 'searching' ? (
+                  <>
+                    영상과 비슷한 {compareWho?.name}의 영상을 찾고 있는 중입니다
+                    {/* 🔴 점을 **글자로 찍지 않는다.** `...` 을 문자열로 돌리면
+                        글자 폭이 바뀌어 문장이 좌우로 뜬다 — 셋을 각각 요소로
+                        두고 불투명도만 차례로 켠다. */}
+                    <span className="ss-shot-dots" aria-hidden="true">
+                      <i />
+                      <i />
+                      <i />
+                    </span>
+                  </>
+                ) : compare === 'shown' ? (
+                  <>{compareWho?.name}의 장면을 왼쪽에 놓았습니다.</>
+                ) : null}
+              </p>
+            )}
+          </div>
+        </div>
 
         {/* 반려·오류 사유 — 성공(saved)은 진행 단계가 넘어가는 것으로 보인다. */}
         {saveMessage && (saveState === 'rejected' || saveState === 'error') && (
