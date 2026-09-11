@@ -9504,6 +9504,29 @@ Gemini 임베딩을 다시 계산합니다(포지션·시간만 바꾸면 임베
 - 관련: 18·19번(같은 세션에서 발견, 이 항목의 선행 조건) · `api-contract.md` 933절(3-3. 팀) · 흐름 A의 `applications`(방향은 반대지만 상태 전이 참고용) · `paik` 22번(팀 매칭 mock 표시 — 초대함 UI가 생기면 거기 mock도 같이 걷어야 함)
 - **담당**: 박민호(제품·화면) · 정어진(스키마·API, 착수 전 협의 필요) · **제기**: 박민호 · **기한**: 확인되는 대로
 
+### 21. `fastapi/CLAUDE.md`의 로컬 DB 안내가 실물과 다릅니다 — Docker인데 `pg_ctlcluster`로 적혀 있습니다 (2026-09-11 신설)
+
+`ho`·`jin`·`paik`을 `main`에 합친 뒤 로컬에서 백엔드 테스트를 돌리려다 걸렸습니다.
+`fastapi/CLAUDE.md`엔 "WSL은 자동 기동이 아니다 — `pg_ctlcluster 18 main start`(root)"
+라고 적혀 있는데, 실제로 이 문서 작업을 하던 WSL엔 **PostgreSQL 서버 패키지
+자체가 설치돼 있지 않았습니다**(`postgresql-client*`만 있고 서버·`postgresql-common`은
+없음, `/var/lib/postgresql/` 디렉터리도 없음).
+
+실제로 로컬 DB는 **Docker 컨테이너**로 떠 있었습니다 — `docker ps -a`에
+`supersub-postgres`(이미지 `pgvector/pgvector:pg18`, 포트 `5433:5432`)가 있었고,
+꺼져 있던 걸 `docker start supersub-postgres`로 켜니 `.env`의
+`DATABASE_URL`(`127.0.0.1:5433`)과 맞물려 바로 붙었습니다. 마이그레이션 최신화 후
+`pytest -q` → **746 passed, 0 skipped**.
+
+| | |
+|---|---|
+| 만족해야 할 성질 | `fastapi/CLAUDE.md`(또는 이 저장소 어딘가)를 그대로 따라가면 로컬 DB가 뜬다 — 지금은 안 됩니다 |
+| 확인 | `docker ps -a \| grep supersub-postgres` · `cat fastapi/.env \| grep DATABASE_URL` — 포트가 `pg_ctlcluster` 안내와 다릅니다(5433 vs 기본 5432) |
+| 하지 말 것 | 제가 직접 `fastapi/CLAUDE.md`를 고치지 않았습니다 — 정어진 님 영역이고, 이 환경 하나만 보고 일반화하면 다른 사람 로컬(진짜 네이티브 설치일 수도 있음)에 안 맞을 수 있습니다 |
+
+- 관련: `fastapi/CLAUDE.md` 상단 「DB가 필요하다」 절 · `fastapi/.env`
+- **담당**: 정어진(문서 확인·정정) · **제기**: 박민호 · **기한**: 확인되는 대로
+
 ## paik (백성검)
 
 ### 1. 분석한 영상을 우리 서버에 저장하는 경로 ✅ 해소 (2026.09.03)
