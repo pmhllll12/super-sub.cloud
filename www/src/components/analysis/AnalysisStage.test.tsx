@@ -470,11 +470,39 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
           { status: 201 },
         )
       }
-      // 리포트 읽기는 이 시험의 본론이 아니다 — 아직이라고만 답한다.
-      return new Response(
-        JSON.stringify({ error: { code: 'REPORT_NOT_READY', message: '아직입니다.' } }),
-        { status: 404 },
-      )
+      if (url === '/api/videos/v1/report') {
+        // 🔴 **정정 (병합, 2026-09-11)**: 체크리스트가 실제 리포트 준비
+        // 여부를 따라가게 바뀌어서(같은 파일 「예를 누르면」 시험 근처 주석
+        // 참고) 「아직」으로만 답하면 「선수와 비교하기」가 영원히 안 뜬다 —
+        // 이 시험의 본론(비교 흐름)까지 가려면 준비된 리포트가 필요하다.
+        return new Response(
+          JSON.stringify({
+            video_id: 'v1',
+            analyzed_at: '2026-09-11T00:00:00Z',
+            summary: '테스트 요약',
+            provisional: false,
+            total_score: 82,
+            overall_grade: 'B',
+            breakdown: [
+              {
+                criterion_id: 'c1',
+                name: '항목1',
+                grade: 2,
+                title: '좋음',
+                evidence: '증거 문장',
+                metric_ref: null,
+                skipped: false,
+                stat: 80,
+              },
+            ],
+            scenes: [],
+            previews: null,
+            keypoint_quality: null,
+          }),
+          { status: 200 },
+        )
+      }
+      throw new Error(`예상하지 못한 요청: ${url}`)
     })
     vi.stubGlobal('fetch', fetchMock)
 

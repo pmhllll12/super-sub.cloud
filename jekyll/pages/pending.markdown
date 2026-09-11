@@ -5806,6 +5806,20 @@ git show bf21391:agent/rubrics/baseball_batting.yaml > agent/rubrics/baseball_ba
 - 관련: 3번(덮었습니다) · 19번(데이터셋 조사 — 닫힌 경로로 남김) · `jin` 17번(종목 참조 테이블) · `jin` 23번(지표 시드)
 - **담당**: 백성검(화면 종목 선택지) · 정어진(참조 테이블·시드 판단) · 박민호(제안서 서술) · **제기**: 정상호 · **기한**: 스프린트 3 (급하지 않습니다 — 지금 깨지는 것은 없습니다)
 
+#### 확인 — `www` 쪽에서 실제로 깨진 테스트를 찾았습니다 (2026.09.11, 박민호)
+
+`ho`·`jin`·`paik`을 `main`에 합친 뒤 `www` 전체 vitest를 돌려 봤습니다
+(`agent`의 `pytest`만으로는 안 걸리는 자리라 위 서술과 안 겹칩니다).
+`src/lib/rubricFocus.test.ts`가 지워진 `agent/rubrics/baseball_pitching.yaml`·
+`basketball_jump_shot.yaml`을 직접 파일로 읽으려다 `ENOENT`로 3건 실패합니다
+(`baseball 의 항목이 루브릭 그대로다` · `basketball 의 항목이 루브릭 그대로다` ·
+`종목마다 열린 루브릭이 정확히 하나다`).
+
+🔴 **CI는 안 막습니다** — `www` vitest를 돌리는 워크플로가 없습니다
+(`backend-tests.yml`만 있음). 그래서 그대로 병합·push했습니다. 다만
+백성검 님이 이 항목을 집으실 때 `rubricFocus.ts`뿐 아니라 **이 테스트 파일도
+같이 고치셔야** `npx vitest run`이 다시 깨끗해집니다.
+
 ### 40. `breakdown[]` 에 **필드가 또 하나 늘었습니다** — `title_earned` (2026-09-11 신설)
 
 `paik` 23번(「받은 호칭」의 기준)에 답하면서 필드 하나가 늘었습니다. 38번과
