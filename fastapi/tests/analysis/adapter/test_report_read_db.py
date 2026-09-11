@@ -143,6 +143,10 @@ def test_적재된_네_테이블을_한_뷰로_조립한다(db_client, db_sessio
     assert body["previews"] == {"impact": "s3://b/reports/u/v/impact.png"}
     assert body["keypoint_quality"]["known"] is True
 
+    # 오버롤 — 영상 하나에 하나(`ho` 28번).
+    assert body["total_score"] == pytest.approx(71)
+    assert body["overall_grade"] == "B"
+
     # breakdown: 채점 1 + 제외 1, 제외가 뒤로.
     assert [c["criterion_id"] for c in body["breakdown"]] == [
         "plant_knee_flexion",
@@ -150,19 +154,21 @@ def test_적재된_네_테이블을_한_뷰로_조립한다(db_client, db_sessio
     ]
     assert body["breakdown"][0]["grade"] == 2
     assert body["breakdown"][0]["evidence"].startswith("안정적")
+    assert body["breakdown"][0]["stat"] == pytest.approx(88.5)
     assert body["breakdown"][1]["skipped"] is True
     assert body["breakdown"][1]["grade"] is None
+    assert body["breakdown"][1]["stat"] is None  # 제외 항목은 축도 없다.
 
     # scenes: 프레임 지표의 초 환산만.
     assert len(body["scenes"]) == 1
     assert body["scenes"][0]["metric_code"] == "impact_frame"
     assert body["scenes"][0]["at_seconds"] == pytest.approx(2.07)
 
-    # 허용목록 밖은 안 나온다.
+    # 허용목록 밖은 여전히 안 나온다 — `stat`·`total_score`·`overall_grade`
+    # 만 새로 열렸다(`ho` 28번), 나머지는 그대로 막혀 있다.
     assert "band" not in body["breakdown"][0]
-    assert "stat" not in body["breakdown"][0]
     assert "weight" not in body["breakdown"][0]
-    assert "total_score" not in json.dumps(body)
+    assert "contribution" not in body["breakdown"][0]
 
 
 def test_재분석이면_최신_리포트를_보여준다(db_client, db_session, owned):
@@ -173,8 +179,11 @@ def test_재분석이면_최신_리포트를_보여준다(db_client, db_session,
         f"{V1}/videos/{owned['video_id']}/report", headers=owned["headers"]
     )
     assert res.status_code == 200, res.text
+    body = res.json()
     # 한 벌만 남는다(적재가 덮으므로) — breakdown 이 두 배가 아니다.
-    assert len(res.json()["breakdown"]) == 2
+    assert len(body["breakdown"]) == 2
+    # total_score 도 최신 것 — 옛 값(40)이 아니라 덮은 값(90).
+    assert body["total_score"] == pytest.approx(90)
 
 
 def test_적재_전이면_404_REPORT_NOT_READY(db_client, owned):

@@ -241,15 +241,15 @@ def read_report(
     user_id: CurrentUserId,
     use_case: ReadReportUseCaseDep,
 ) -> VideoReportResponse:
-    """그 영상의 적재된 분석 리포트(미결 `jin` 27번 · `paik` 7번).
+    """그 영상의 적재된 분석 리포트(미결 `jin` 27번 · `paik` 7번 · `ho` 28번).
 
     | 에러 | 뜻 |
     |---|---|
     | 404 `VIDEO_NOT_FOUND` | 없는 영상이거나 남의 영상이다 |
     | 404 `REPORT_NOT_READY` | 영상은 있으나 아직 리포트가 적재되지 않았다 |
 
-    총점·등급 숫자는 `summary` 에 없고(3장 4) 항목별 등급·`stat` 도 여기 없다 —
-    수치는 카드 경로가 따로 읽는다.
+    `summary` 문장 안에는 숫자를 넣지 않는다(3장 4) — 총점·오버롤 등급·항목별
+    `stat` 은 문장이 아니라 이 응답의 필드로 나간다.
     """
     view = use_case(ReadReportQuery(video_id=video_id, user_id=user_id))
     return VideoReportResponse.model_validate(view)

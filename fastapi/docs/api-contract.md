@@ -708,13 +708,15 @@ S3 의 분석 산출물(`report.json`)을 서버가 받아 점수만 걷어내�
   "analyzed_at": "2026-09-10T12:00:00Z",
   "summary": "디딤발 무릎 굽히기가 강점입니다.",
   "provisional": true,
+  "total_score": 71,
+  "overall_grade": "B",
   "breakdown": [
     { "criterion_id": "plant_knee_flexion", "name": "디딤발 무릎 굽히기",
       "grade": 2, "title": "흔들리지 않는 축",
-      "evidence": "안정적으로 놓였습니다.",
+      "evidence": "안정적으로 놓였습니다.", "stat": 88.5,
       "metric_ref": "plant_knee_angle_at_impact", "skipped": false },
     { "criterion_id": "plant_foot_position", "name": "디딤발 위치",
-      "grade": null, "title": null, "evidence": null,
+      "grade": null, "title": null, "evidence": null, "stat": null,
       "metric_ref": null, "skipped": true }
   ],
   "scenes": [
@@ -725,11 +727,17 @@ S3 의 분석 산출물(`report.json`)을 서버가 받아 점수만 걷어내�
 }
 ```
 
-🔴 **허용목록이다.** DB 에 있어도 여기 없는 것: 총점·항목별 등급 숫자를 담은
-`summary`(3장 4 — 문장에 수치 금지) · 항목별 `stat`·`band`·`weight`·`contribution`
-(수치는 카드 경로가 따로 읽는다) · `out_of_band`(검수 전 임계값 — 미결 `jin` 24번).
-`grade` 가 `null` 이면 **제외(skipped)** 지 0점이 아니다. `scenes` 는 프레임
-지표(`impact_frame` 등)의 초 환산 — "이렇게 본 장면" 으로 이동하는 자리다.
+🔴 **허용목록이다.** DB 에 있어도 여기 없는 것: `band`·`weight`·`contribution`·
+`out_of_band`(검수 전 임계값 — 미결 `jin` 24번)·`view_dependent` — 전부 개발
+확인용이다. **`total_score`·`overall_grade`·`breakdown[].stat` 는 나간다**
+(2026-09-11 정정, 미결 `ho` 28번 — 이 문서가 앞서 "카드 경로가 따로 읽는다"고
+적었던 것은 틀렸다. 계약 3장 4가 막은 것은 `summary` 문장 **안에** 숫자를 넣는
+것이지 이 필드들 자체가 아니다). `grade` 가 `null` 이면 **제외(skipped)** 지
+0점이 아니고, 그 항목의 `stat` 도 `null` 이다. `overall_grade` 는 `total_score`
+와 마찬가지로 영상 하나(=분석 1회)의 값 — 선수 단위로 합친 오버롤은 없다.
+옛 행(이 필드가 생기기 전 적재분)은 `total_score`/`overall_grade` 가 `null`.
+`scenes` 는 프레임 지표(`impact_frame` 등)의 초 환산 — "이렇게 본 장면"으로
+이동하는 자리다.
 
 | 에러 | code | 언제 |
 |---|---|---|

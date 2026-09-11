@@ -224,8 +224,8 @@ class AdminVideoListResponse(BaseModel):
 
 
 class ReportCriterionResponse(BaseModel):
-    """리포트 항목 하나. 🔴 `band`·`stat`·가중치는 없다 — 임계값이 검수 전이고
-    (미결 24번) 수치는 카드 경로가 따로 읽는다.
+    """리포트 항목 하나. 🔴 `band`·가중치·`contribution`은 없다 — `band`는
+    임계값이 검수 전이고(미결 24번), 나머지는 개발 확인용이다.
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -237,6 +237,7 @@ class ReportCriterionResponse(BaseModel):
     evidence: str | None
     metric_ref: str | None
     skipped: bool
+    stat: float | None  # 레이더 축 값 0~100(`ho` 28번). None = 못 잼 — 0이 아니다.
 
 
 class ReportSceneResponse(BaseModel):
@@ -250,10 +251,13 @@ class ReportSceneResponse(BaseModel):
 
 
 class VideoReportResponse(BaseModel):
-    """적재된 분석 리포트(미결 `jin` 27번 · `paik` 7번). `GET /videos/{id}/report`.
+    """적재된 분석 리포트(미결 `jin` 27번 · `paik` 7번 · `ho` 28번).
+    `GET /videos/{id}/report`.
 
-    🔴 **허용목록이다** — DB 조립(계약 3-1). 총점·등급 숫자는 `summary` 에 없고
-    (3장 4) 항목별 등급·`stat` 도 여기 없다(카드 경로가 읽는다).
+    🔴 **허용목록이다** — DB 조립(계약 3-1). `summary` 문장 안에는 숫자를 넣지
+    않는다(3장 4) — 하지만 총점(`total_score`)·오버롤 등급(`overall_grade`)·
+    항목별 `stat`은 문장이 아니라 이 응답의 구조화된 필드로 나간다(`ho` 28번).
+    영상 하나(=분석 1회)의 값이다 — 선수 단위로 합친 오버롤은 아직 없다.
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -262,6 +266,8 @@ class VideoReportResponse(BaseModel):
     analyzed_at: Rfc3339
     summary: str
     provisional: bool | None
+    total_score: float | None  # 0~100, 항목 가중합. 옛 행은 None.
+    overall_grade: str | None  # A/B/C/D. 옛 행은 None.
     breakdown: list[ReportCriterionResponse]
     scenes: list[ReportSceneResponse]
     previews: dict[str, str] | None
