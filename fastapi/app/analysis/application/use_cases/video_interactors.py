@@ -158,11 +158,22 @@ class RegisterVideoInteractor(RegisterVideoUseCase):
             ),
             analysis_job_id=uuid4() if make_job else None,
             analysis_status=_QUEUED if make_job else None,
-            # 미결 `jin` 24번 — 지금은 전부 저장된 상태로 둔다(동작 보존).
-            # 프론트가 `keep` 을 부를 준비가 되면 `kept = not command.analyze` 로
-            # 켠다(jin 24 5조각). 그전에 켜면 `/analysis` 업로드가 프로필에서
-            # 사라지고 되살릴 길이 없다.
-            kept=True,
+            # 미결 `jin` 24번 5조각 해소(2026-09-11, 사용자 지적 — 분석에
+            # 실패한 영상이 지워지지 않고 남는다). **작업이 생긴 클립만**
+            # 임시다 — 그 클립만 나중에 "리포트가 나오나"가 갈리기 때문이다.
+            # `analyze=False`(기록용 업로드)와 **반려**(작업 자체가 안
+            # 생긴다 — `reject_reason`을 보여줄 뿐 이후 상태가 안 바뀐다)는
+            # 처음부터 영구다. `www`가 `POST /videos/{id}/keep`(「내 프로필에
+            # 리포트 저장」)을 부를 때만 임시 클립이 영구가 된다. 그전까지는
+            # 화면을 벗어나면 즉시 `DELETE /videos/{id}`가, 그것도 놓치면
+            # (브라우저가 죽는 등) `provisional_video_ttl_hours` 백스톱이
+            # 지운다 — 분석에 실패해 다시 볼 리포트가 없는 클립이 여기 걸린다.
+            #
+            # 🔴 `not command.analyze` 가 아니라 `not make_job` 이다 —
+            # `analyze=True` 인데 반려된 클립까지 임시로 두면 방금 반려된
+            # 사유를 보여준 그 클립이 목록에서 곧장 사라진다(`_by_user` 의
+            # `kept_only=True` 필터, `test_반려_사유가_목록에도_온다`).
+            kept=not make_job,
             original_filename=command.original_filename,
             # 미결 `paik` 6번. 작업을 안 만들면(반려·`analyze=False`) 저장소가
             # 버린다 — 담을 `analysis_job` 행이 없다. 지정이 없을 때 실패로

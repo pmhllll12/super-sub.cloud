@@ -7291,7 +7291,7 @@ fps 가 없습니다.** 프레임 수로 저장하면 나중에 읽는 쪽이 30
   승격 시 추가. 확인: 다운→업 왕복 · `alembic check` 클린 · `alembic heads` 단일 · `pytest -q` 697.
   **남은 것 — 적재 경로(흐름 B)·읽기 규격**: `jin` 24 「리포트를 DB에 남겨」 조각 + `api-contract.md` 3-1.
 
-### 24. 영상 수명 주기 — 분석은 임시, "저장"을 눌러야 남는다 · `videos/` 는 원본, `reports/` 는 저장된 것 (2026-09-08 신설)
+### 24. 영상 수명 주기 — 분석은 임시, "저장"을 눌러야 남는다 · `videos/` 는 원본, `reports/` 는 저장된 것 (2026-09-08 신설) ✅ 6조각 전부 해소 (2026.09.11, 5조각이 마지막이었다)
 
 라이브에서 확인한 것 둘: ⑴ S3 에서 파일을 지워도 `video` DB 행이 남아 프로필에
 유령 클립이 뜬다 (삭제 경로가 없다), ⑵ `/analysis` 에서 "이 사람으로 분석"을
@@ -7422,13 +7422,18 @@ fps 가 없습니다.** 프레임 수로 저장하면 나중에 읽는 쪽이 30
   별도 스케줄러 없음). 대상: `kept=false` · `ttl` 보다 오래 · 진행 중
   (`queued`/`running`) 작업 없음. DB 행 + S3(`storage_key` + `reports/<uid>/<vid>/`)
   best-effort. `PROVISIONAL_VIDEO_TTL_HOURS=24`.
-- ⬜ **5조각** — 🔴 전환 `kept = not analyze`. **백성검 프론트가 `keep` 부를
-  준비되면.** 그전에 켜면 `/analysis` 업로드가 프로필에서 사라진다.
-  - 백성검 쪽 진행(`32cd644`): 재생 주소·`DELETE /videos/{id}`·**저장 없이 이탈 시
-    삭제**(`fetch(keepalive)`+`pagehide`)는 붙었다. 남은 건 「저장」 버튼을
-    `POST /videos/{id}/keep` 에 연결하는 것뿐 — 그게 **2조각(`bf7f03b`)이고
-    2026-09-08 에 배포됨(아래 「EC2 배포됨」).** 이제 백성검이 「저장」을
-    `POST /videos/{id}/keep` 에 연결하면 5조각 스위치를 켤 수 있다.
+- ✅ **5조각 해소 (2026.09.11)** — 사용자가 화면에서 "분석에 실패한 영상이
+  DB·S3 에 안 지워진다"고 직접 지적해서 발견·해소. 전환은 `kept = not analyze`
+  가 아니라 **`kept = not make_job`** 으로 켰다 — `analyze=True` 인데 반려된
+  클립(작업 자체가 안 생김)까지 임시로 두면 방금 반려 사유를 보여준 그 클립이
+  목록에서 곧장 사라진다(`GET /videos` 의 `kept_only=True` 필터,
+  `test_반려_사유가_목록에도_온다`). `RegisterVideoInteractor` 정정 + 시험
+  14개 갱신(옛 가정 "등록만 하면 kept=true" 를 "작업이 생긴 클립은 keep 을
+  불러야 뜬다"로). **프론트(`www`)도 이 세션에서 같이 배선했다** — 「내
+  프로필에 리포트 저장」이 리포트가 `ready` 일 때만 `POST /videos/{id}/keep`
+  을 부르도록(`AnalysisStage.tsx`) — 미뤄 뒀던 "백성검이 연결하면"이 이번에
+  정어진이 직접 했다. `client-contract-changes.md` 36번, Flutter 는 아직
+  안 걸림(같은 문서에 확인 명령 적어 둠).
 - ✅ **6조각** — `f6e3cc8`(6a): 저장 키 슬러그(`build_storage_key`, 닉네임·원본이름
   한글·자모 보존) · `video.original_filename` 컬럼(`2598dc30f0cb`) ·
   `POST /videos/upload-url` 에 `filename` 필수. `a8d72f9`: billing 과 head 충돌

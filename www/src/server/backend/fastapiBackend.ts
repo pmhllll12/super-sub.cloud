@@ -101,6 +101,13 @@ export const fastapiBackend: Backend = {
     })
   },
 
+  keepVideo(token, videoId) {
+    return callFastApi<MyVideo>(`/videos/${encodeURIComponent(videoId)}/keep`, {
+      method: 'POST',
+      token,
+    })
+  },
+
   getVideoReport(token, videoId) {
     return callFastApi<VideoReport>(`/videos/${encodeURIComponent(videoId)}/report`, {
       method: 'GET',

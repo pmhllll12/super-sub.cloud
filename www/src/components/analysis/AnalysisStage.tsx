@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { apiErrorMessage, apiPost } from '@/lib/api/client'
 import AnalysisChat from '@/components/analysis/AnalysisChat'
 import FigureBackground from '@/components/FigureBackground'
 import { useHideChrome, useLeaving } from '@/lib/pageTransition'
@@ -347,6 +348,10 @@ export default function AnalysisStage() {
   const [videoId, setVideoId] = useState<string | null>(null)
   /** 리포트를 내 프로필에 남겼는가 — `저장` 단추의 상태다. */
   const [reportSaved, setReportSaved] = useState(false)
+  /** `keep` 호출이 오가는 중인가 — 두 번 누르는 것을 막는다. */
+  const [keeping, setKeeping] = useState(false)
+  /** `keep` 이 실패하면 이유를 담는다. `null` 이면 실패한 적이 없다. */
+  const [keepError, setKeepError] = useState<string | null>(null)
   /**
    * 지금 **저장 안 된 채 서버에 올라가 있는** 영상 id.
    *
@@ -1183,16 +1188,29 @@ export default function AnalysisStage() {
   /**
    * `저장` — **이 영상을 남긴다**(사용자 요청, 2026-09-08).
    *
+   * ✅ **서버에 붙었다**(2026-09-11, 미결 `jin` 24번 5조각 해소). 전에는
+   * 로컬 상태만 켜서 "떠날 때 안 지우기"로만 남겼는데, 실제로는 `POST
+   * /videos/{id}/keep` 을 불러야 서버가 영구로 본다 — 안 부르면 (이 화면을
+   * 정상적으로 떠나 `leftoverRef`가 지워도) 24시간 뒤 서버 백스톱이 결국
+   * 지운다(사용자가 "분석 실패한 영상이 안 지워진다"고 지적한 그 자리).
+   *
    * 🔴 **리포트를 따로 저장하지 않는다**(2026-09-10 에 바뀌었다). 리포트는
-   * 분석이 끝나면 서버에 적재되므로(CCC 31) 화면이 매달아 둘 것이 없다 —
-   * 남는 일은 **영상을 지우지 않는 것**뿐이다. 저장 없이 떠나면 아래
-   * `dropLeftover` 가 그 영상을 지우고, 그러면 리포트도 함께 사라진다.
+   * 분석이 끝나면 서버에 적재되므로(CCC 31) `keep` 호출만으로 충분하다.
    */
-  function saveReportToProfile() {
+  async function saveReportToProfile() {
     if (!videoId) return
-    setReportSaved(true)
-    // 저장했으니 더 이상 「미저장분」이 아니다 — 떠날 때 지우면 안 된다.
-    leftoverRef.current = null
+    setKeeping(true)
+    setKeepError(null)
+    try {
+      await apiPost(`/api/videos/${encodeURIComponent(videoId)}/keep`, {})
+      setReportSaved(true)
+      // 저장했으니 더 이상 「미저장분」이 아니다 — 떠날 때 지우면 안 된다.
+      leftoverRef.current = null
+    } catch (e) {
+      setKeepError(apiErrorMessage(e))
+    } finally {
+      setKeeping(false)
+    }
   }
 
   /**
@@ -1660,16 +1678,29 @@ export default function AnalysisStage() {
 
               ⚠️ 이 자리에 있던 **'다른 영상'** 은 없앴다(사용자 요청). 고르기 전으로
               되돌리는 길은 창 틀의 **「닫기」 알약**에 그대로 있다 —
-              길이 하나 없어진 것이 아니라 자리를 옮긴 것이다. */}
+              길이 하나 없어진 것이 아니라 자리를 옮긴 것이다.
+
+              🔴 **`report.state === 'ready'` 가 아니면 눌러도 안 된다**
+              (2026-09-11) — 분석이 실패·반려로 끝났으면 남길 리포트가 없다.
+              눌리게 두면 서버가 그대로 임시로 두고 결국 지워지는데, 사용자는
+              "저장했는데 왜 사라지나"로 오해한다. 단추 자체는 그대로
+              둔다 — 기다리는 동안 무엇이 나올지 미리 보여주는 자리였다
+              (`test_리포트가_끝나기_전에는_저장이_잠겨_있다`). */}
           <button
             type="button"
             className="ss-shot-again"
-            disabled={!done || !videoId || reportSaved}
-            onClick={saveReportToProfile}
+            disabled={!videoId || report?.state !== 'ready' || reportSaved || keeping}
+            onClick={() => void saveReportToProfile()}
           >
-            {reportSaved ? '내 프로필에 저장됨' : '내 프로필에 리포트 저장'}
+            {reportSaved ? '내 프로필에 저장됨' : keeping ? '저장하는 중…' : '내 프로필에 리포트 저장'}
           </button>
         </header>
+
+        {keepError && (
+          <p className="ss-shot-save-msg" data-tone="error">
+            {keepError}
+          </p>
+        )}
 
         {/* 반려·오류 사유 — 성공(saved)은 진행 단계가 넘어가는 것으로 보인다. */}
         {saveMessage && (saveState === 'rejected' || saveState === 'error') && (

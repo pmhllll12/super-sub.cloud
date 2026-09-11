@@ -706,6 +706,13 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
       if (url.endsWith('/report')) {
         return new Response(JSON.stringify(REPORT_MOCK), { status: 200 })
       }
+      // 🔴 「저장」이 이제 이 호출을 부른다(2026-09-11, 미결 `jin` 24번
+      // 5조각 해소) — 안 답하면 저장이 실패로 읽혀 "저장됨"으로 안 바뀐다.
+      if (url.endsWith('/keep')) {
+        return new Response(JSON.stringify({ id: 'v1', storage_key: 'reports/u1/v1/source.mp4' }), {
+          status: 200,
+        })
+      }
       throw new Error(`예상하지 못한 요청: ${url}`)
     })
     vi.stubGlobal('fetch', fetchMock)
@@ -751,10 +758,14 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     })
     await user.click(screen.getByRole('button', { name: '내 프로필에 리포트 저장' }))
     expect(await screen.findByRole('button', { name: '내 프로필에 저장됨' })).toBeInTheDocument()
-    /* 🔴 **리포트 읽기는 셈에서 뺀다.** 단계가 다 차면 화면이
-       `GET /videos/{id}/report` 를 부른다(2026-09-10, CCC 31) — 여기서 보려는
-       것은 「저장이 영상을 다시 올리지 않는다」이다. */
-    expect(fetchMock.mock.calls.filter((c) => !String(c[0]).endsWith('/report'))).toHaveLength(3)
+    /* 🔴 **리포트 읽기·`keep` 저장은 셈에서 뺀다.** 리포트는 폴링이(CCC 31),
+       저장은 방금 누른 단추가 부른다(2026-09-11, 미결 `jin` 24번 5조각) —
+       여기서 보려는 것은 「저장이 영상을 다시 올리지 않는다」이다. */
+    expect(
+      fetchMock.mock.calls.filter(
+        (c) => !String(c[0]).endsWith('/report') && !String(c[0]).endsWith('/keep'),
+      ),
+    ).toHaveLength(3)
     // 어디에서 다시 볼 수 있는지 밝힌다. 이제 서버에 있으므로 「이 브라우저에만」이 아니다.
     expect(screen.getByText(/내 프로필의 「분석 영상」 아래에서 다시 볼 수 있습니다/)).toBeInTheDocument()
 

@@ -82,6 +82,21 @@ export interface Backend {
    */
   deleteMyVideo(token: string, videoId: string): Promise<void>
   /**
+   * 「내 프로필에 리포트 저장」 — `POST /videos/{id}/keep`(계약 3-6절,
+   * 미결 `jin` 24번 5조각).
+   *
+   * 🔴 **작업이 생긴 클립은 등록만으로는 임시(`kept=false`)다**(2026-09-11
+   * 백엔드 정정 — 사용자가 "분석에 실패한 영상이 안 지워진다"고 지적해서
+   * 바뀌었다). 이 호출 전까지는 화면을 벗어나면 곧 지워지거나
+   * (`deleteMyVideo`/`pagehide`), 그것도 놓치면 24시간 뒤 서버 백스톱이
+   * 지운다 — **분석에 실패해 다시 볼 리포트가 없는 클립을 그대로 두는
+   * 길**이다. 이 호출을 부르면 영구가 되고, 임시 원본이던 것은 리포트
+   * 자리로 옮겨져 `storage_key` 가 바뀐다.
+   * 🔴 **멱등이다** — 이미 저장된 클립에 다시 불러도 그대로다.
+   * 🔴 남의/없는 클립은 404 `VIDEO_NOT_FOUND`.
+   */
+  keepVideo(token: string, videoId: string): Promise<MyVideo>
+  /**
    * 내 클립을 **부분 수정**한다 — 보낸 것만 바뀐다(계약 3-6절 `PATCH /videos`).
    *
    * 🔴 `is_featured: true` 는 「나를 보여주는 대표 영상」으로 세우는 것이고
