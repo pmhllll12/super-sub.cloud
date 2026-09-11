@@ -105,3 +105,50 @@ describe('분석 리포트 — 레이더', () => {
     expect(screen.getByText('63')).toBeInTheDocument()
   })
 })
+
+/**
+ * 🔴 **축 개수는 루브릭이 정한다(4~6).** 삼각형에서만 맞춰 두면 육각형이
+ * 오는 날 판이 깨진다 — 개수를 바꿔 가며 **성질**을 붙든다.
+ */
+describe('분석 리포트 — 레이더의 축 개수', () => {
+  const axesOf = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ name: `축${i + 1}`, stat: 40 + i * 9 }))
+
+  it.each([3, 4, 5, 6])('축이 %i 개면 변도 %i 개이고 저마다 그러데이션이 있다', (n) => {
+    const { container } = render(<ReportView report={{ ...base, radar: axesOf(n) }} />)
+
+    const edges = [...container.querySelectorAll('.ss-report-radar-edge')]
+    const grads = [...container.querySelectorAll('linearGradient')]
+    expect(edges).toHaveLength(n)
+    expect(grads).toHaveLength(n)
+
+    // 🔴 id 가 하나라도 겹치면 뒤엣것의 색이 앞엣것에도 먹는다.
+    const ids = grads.map((g) => g.id)
+    expect(new Set(ids).size).toBe(n)
+    // 변마다 제 그러데이션을 가리킨다.
+    expect(edges.map((e) => e.getAttribute('stroke'))).toEqual(ids.map((id) => `url(#${id})`))
+  })
+
+  /** 🔴 마지막 변은 **처음 축으로 돌아온다** — 안 닫히면 다각형이 아니다. */
+  it.each([4, 6])('축이 %i 개일 때 마지막 변이 첫 축 색으로 돌아온다', (n) => {
+    const { container } = render(<ReportView report={{ ...base, radar: axesOf(n) }} />)
+    const last = [...container.querySelectorAll('linearGradient')][n - 1]
+    const stops = [...last.querySelectorAll('stop')].map((s) => s.getAttribute('stop-color'))
+    expect(stops).toEqual([`var(--ss-axis-${n})`, 'var(--ss-axis-1)'])
+  })
+
+  /**
+   * 🔴 **여섯을 넘으면 색을 지어내지 않는다.** 돌려 쓰면 1번과 7번이 같은
+   * 색이 되어 **이웃한 자리에서 구별이 안 된다** — 마지막 색을 쓰되 번호가
+   * 그 둘을 가른다(색만으로 말하지 않는다는 원칙).
+   */
+  it('축이 일곱이어도 색을 새로 만들지 않는다', () => {
+    const { container } = render(<ReportView report={{ ...base, radar: axesOf(7) }} />)
+    const nums = [...container.querySelectorAll('svg .ss-report-radar-num')]
+    expect(nums.map((n) => n.textContent)).toEqual(['1', '2', '3', '4', '5', '6', '7'])
+    const rings = [...container.querySelectorAll('.ss-report-radar-numdot')]
+    expect(rings[6].getAttribute('stroke')).toBe('var(--ss-axis-6)')
+    // 1번과 7번이 같은 색으로 돌지 않는다 — 그게 「돌려 쓰지 않는다」의 뜻이다.
+    expect(rings[6].getAttribute('stroke')).not.toBe(rings[0].getAttribute('stroke'))
+  })
+})
