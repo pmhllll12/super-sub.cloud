@@ -957,7 +957,7 @@ trunk_alignment       2개 루브릭  basketball_jump_shot · basketball_layup  
       "storage_key": "videos/3f1c.../홍길동-My-Kick-20260908-1419-3f1c8a2b.mp4",
       "created_at": "2026-09-08T09:00:00Z",
       "kept": true, "is_public": false, "passed": true, "reject_reason": null,
-      "analysis_status": "queued",
+      "analysis_status": "failed", "analysis_failure_reason": "품질 게이트 미달: …",
       "report_prefix": "reports/3f1c.../7c05.../" }
   ]
 }
@@ -968,6 +968,9 @@ trunk_alignment       2개 루브릭  basketball_jump_shot · basketball_layup  
 - **재생·리포트 링크는 안 싣는다** — 목록 한 번에 객체마다 사전 서명을 하지
   않으려는 것이다. 재생은 `storage_key` 로, 리포트는 `report_prefix` 아래
   (`report.json`·`impact.jpg`·`tracked.webm`)를 콘솔이나 별도 사전 서명으로 짚는다.
+- 🔴 **`analysis_failure_reason`** (2026-09-11 추가). `analysis_status`가
+  `failed`일 때만 값이 있고, 그 외엔 `null`이다 — "에이전트가 제대로 돌았는지"를
+  이 목록만으로 확인하려는 용도다(관리자 전용, `GET /videos`엔 없다).
 
 ### `DELETE /api/v1/admin/videos/{video_id}` — 관리자 영상 삭제 (2026-09-08 추가)
 

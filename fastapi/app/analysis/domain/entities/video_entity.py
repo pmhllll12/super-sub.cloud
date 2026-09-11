@@ -43,6 +43,10 @@ class VideoEntity:
     validation: ValidationEntity | None = None
     analysis_job_id: UUID | None = None
     analysis_status: str | None = None
+    # 분석이 `failed` 일 때의 사유. `queued`·`running`·`succeeded` 면 None.
+    # 지금은 관리자 목록(`AdminVideoRow`)에만 실어 내보낸다 — 일반 사용자
+    # 화면(`/videos`)엔 아직 안 나간다(요청 범위 밖).
+    analysis_failure_reason: str | None = None
     # 공개 여부(미결 `paik` 5번). 기본은 비공개.
     is_public: bool = False
     # 홈 영상 모음이 얹는 값(미결 `paik` 5번). 안 정하면 None.

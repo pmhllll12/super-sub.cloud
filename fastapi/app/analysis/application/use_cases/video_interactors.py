@@ -367,6 +367,7 @@ def _to_admin_row(video: VideoEntity) -> AdminVideoRow:
         passed=bool(validation and validation.passed),
         reject_reason=validation.reject_reason if validation else None,
         analysis_status=video.analysis_status,
+        analysis_failure_reason=video.analysis_failure_reason,
         report_prefix=f"reports/{video.user_id}/{video.id}/",
     )
 
