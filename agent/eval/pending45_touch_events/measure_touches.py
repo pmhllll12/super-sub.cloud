@@ -127,9 +127,16 @@ def main() -> None:
             impact = None
 
         nearest = min(touches, key=lambda t: d[t]) if touches else None
+        # 🔴 **계기 검사용 관측이다 — 판정에 안 쓴다.** 터치가 0이 나왔을 때
+        #    「문턱에 아깝게 걸렸나」와 「공이 아예 딴 데 있나」를 갈라야
+        #    다음 회차의 방향이 정해진다. 사전 등록의 합격선은 그대로다.
+        finite = d[np.isfinite(d)]
         rows.append({
             "clip": clip.name, "frames": n,
             "ball_coverage": round(coverage, 3),
+            "distance_min": round(float(finite.min()), 3) if finite.size else None,
+            "distance_p10": round(float(np.percentile(finite, 10)), 3) if finite.size else None,
+            "distance_median": round(float(np.median(finite)), 3) if finite.size else None,
             "touches": touches,
             "n_touches": len(touches),
             "nearest_touch": nearest,
@@ -141,6 +148,7 @@ def main() -> None:
         })
         print(f"  [{i}/{len(clips)}] {clip.name[:34]:34s} "
               f"터치 {len(touches):2d} · 공커버 {coverage:.0%} · "
+              f"최근접 {rows[-1]['distance_min']} · "
               f"임팩트 {impact} vs 터치 {nearest}  ({rows[-1]['seconds']}초)")
 
     (HERE / "touches_raw.json").write_text(
@@ -176,6 +184,18 @@ def main() -> None:
           f"{[r['clip'] for r in dropped] or ''}")
     print("\n🔴 B 의 일치는 **「맞다」가 아니다** — 둘 다 검증 안 된 계기다.")
     print("🔴 이 표본은 **단일 동작**이라 「여럿 찾는다」는 증명되지 않는다.")
+
+    # ── 사후 관찰 (판정에 안 쓴다) ─────────────────────────────────────
+    mins = [r["distance_min"] for r in ok if r.get("distance_min") is not None]
+    if mins:
+        near_miss = [m for m in mins if CONTACT_MAX < m <= CONTACT_MAX * 1.5]
+        print(f"\n── 사후 관찰 (판정에 안 쓴다)")
+        print(f"  클립별 최근접 거리: 중앙값 {statistics.median(mins):.2f} "
+              f"어깨너비 · 범위 {min(mins):.2f}~{max(mins):.2f}")
+        print(f"  문턱({CONTACT_MAX}) 바로 위(~{CONTACT_MAX * 1.5}) 인 클립: "
+              f"{len(near_miss)}/{len(mins)}")
+        print("  🔴 문턱 근처가 적고 전반적으로 멀면 **문턱 문제가 아니라**")
+        print("     추적 대상이 공 가진 사람이 아닐 가능성이 크다 (미결 18번).")
 
 
 if __name__ == "__main__":
