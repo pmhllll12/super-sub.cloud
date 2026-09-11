@@ -50,6 +50,33 @@ export type AdminUser = {
   created_at: string
 }
 
+/**
+ * `GET /admin/videos?user=` 목록 한 줄 — 한 사람의 영상 전부(저장 안 한 임시분
+ * 포함). "에이전트가 제대로 돌았는지" 확인하는 자리라 `analysis_failure_reason`
+ * 이 있다 — 일반 사용자 화면(`MyVideo`)엔 없는 필드다.
+ */
+export type AdminVideoRow = {
+  id: string
+  sport_code: string
+  original_filename: string | null
+  storage_key: string
+  created_at: string
+  kept: boolean
+  is_public: boolean
+  passed: boolean
+  reject_reason: string | null
+  analysis_status: 'queued' | 'running' | 'succeeded' | 'failed' | null
+  analysis_failure_reason: string | null
+  report_prefix: string
+}
+
+export type AdminVideoListResult = {
+  user_id: string
+  nickname: string
+  email: string
+  items: AdminVideoRow[]
+}
+
 export type AdminUserListResult = {
   items: AdminUser[]
   total: number

@@ -141,6 +141,21 @@ describe('리포트 읽기', () => {
     expect(await fetchReport('v1')).toEqual({ state: 'missing' })
   })
 
+  // 🔴 정정(2026-09-11): 그전엔 이 코드가 not-ready 로 갔다 — 다시 확인해도
+  // 절대 안 바뀌는데 "아직입니다"로 보여 사용자가 실제로 헷갈렸다.
+  it('분석이 실패했으면 failed — 사유를 그대로 들고 온다', async () => {
+    stub({
+      ok: false,
+      body: {
+        error: { code: 'ANALYSIS_FAILED', message: '품질 게이트 미달: 재촬영이 필요합니다.' },
+      },
+    })
+    expect(await fetchReport('v1')).toEqual({
+      state: 'failed',
+      reason: '품질 게이트 미달: 재촬영이 필요합니다.',
+    })
+  })
+
   it('그 밖의 실패는 사유를 들고 온다', async () => {
     stub({ ok: false, status: 500, body: { error: { code: 'X', message: '서버가 아픕니다.' } } })
     expect(await fetchReport('v1')).toEqual({ state: 'error', message: '서버가 아픕니다.' })

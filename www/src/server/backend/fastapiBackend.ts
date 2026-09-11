@@ -4,6 +4,7 @@ import type {
   MatchSearch,
   AdminUserDetail,
   AdminUserListResult,
+  AdminVideoListResult,
   AuthToken,
   FeaturedVideo,
   Match,
@@ -217,6 +218,14 @@ export const fastapiBackend: Backend = {
 
   getUserDetail(token, userId) {
     return callFastApi<AdminUserDetail>(`/admin/users/${encodeURIComponent(userId)}`, {
+      method: 'GET',
+      token,
+    })
+  },
+
+  listAdminVideos(token, user) {
+    const params = new URLSearchParams({ user })
+    return callFastApi<AdminVideoListResult>(`/admin/videos?${params}`, {
       method: 'GET',
       token,
     })

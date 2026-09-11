@@ -246,7 +246,8 @@ def read_report(
     | 에러 | 뜻 |
     |---|---|
     | 404 `VIDEO_NOT_FOUND` | 없는 영상이거나 남의 영상이다 |
-    | 404 `REPORT_NOT_READY` | 영상은 있으나 아직 리포트가 적재되지 않았다 |
+    | 404 `ANALYSIS_FAILED` | 분석 작업이 실패로 끝났다 — 다시 물어봐도 안 생긴다. `message` 에 실패 사유(2026-09-11 추가) |
+    | 404 `REPORT_NOT_READY` | 영상은 있고 작업이 `queued`·`running` 이라 아직 적재 전이다 |
 
     `summary` 문장 안에는 숫자를 넣지 않는다(3장 4) — 총점·오버롤 등급·항목별
     `stat` 은 문장이 아니라 이 응답의 필드로 나간다.

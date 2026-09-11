@@ -194,6 +194,33 @@ def test_적재_전이면_404_REPORT_NOT_READY(db_client, owned):
     assert error_code(res) == "REPORT_NOT_READY"
 
 
+def test_작업이_failed_면_404_ANALYSIS_FAILED_고_다시_물어봐도_안_바뀐다(
+    db_client, db_session, owned
+):
+    reason = "품질 게이트 미달: 유효 프레임 비율 53% < 기준 70%."
+    db_session.execute(
+        text(
+            "UPDATE analysis_job SET status = 'failed', failure_reason = :r "
+            "WHERE id = :id"
+        ),
+        {"r": reason, "id": owned["job_id"]},
+    )
+    db_session.commit()
+
+    res = db_client.get(
+        f"{V1}/videos/{owned['video_id']}/report", headers=owned["headers"]
+    )
+    assert res.status_code == 404
+    assert error_code(res) == "ANALYSIS_FAILED"
+    assert res.json()["error"]["message"] == reason
+
+    # 다시 물어봐도 그대로 — REPORT_NOT_READY 로 되돌아가지 않는다.
+    res2 = db_client.get(
+        f"{V1}/videos/{owned['video_id']}/report", headers=owned["headers"]
+    )
+    assert error_code(res2) == "ANALYSIS_FAILED"
+
+
 def test_남의_영상이면_404_VIDEO_NOT_FOUND(db_client, db_session, owned):
     _ingest(db_session, owned["job_id"])
     other_email = f"other-{uuid.uuid4().hex[:12]}@super-sub.example"

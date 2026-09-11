@@ -207,6 +207,7 @@ class AdminVideoRowResponse(BaseModel):
     passed: bool
     reject_reason: str | None
     analysis_status: str | None
+    analysis_failure_reason: str | None
     report_prefix: str
 
 

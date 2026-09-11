@@ -1828,12 +1828,16 @@ export default function AnalysisStage() {
                   ? '리포트를 불러오는 중입니다…'
                   : report.state === 'not-ready'
                     ? '아직 분석이 끝나지 않았습니다.'
-                    : report.state === 'missing'
-                      ? '그 영상을 찾을 수 없습니다.'
-                      : report.message}
+                    : report.state === 'failed'
+                      ? `분석에 실패했습니다 — ${report.reason}`
+                      : report.state === 'missing'
+                        ? '그 영상을 찾을 수 없습니다.'
+                        : report.message}
               </p>
-              {/* 기다리는 것 말고 할 일을 준다 — 끝났는지 다시 물어볼 수 있어야 한다. */}
-              {videoId && report?.state !== 'missing' && (
+              {/* 기다리는 것 말고 할 일을 준다 — 끝났는지 다시 물어볼 수 있어야
+                  한다. 🔴 `failed`는 안 보인다 — 다시 물어봐도 절대 안 바뀌는데
+                  버튼을 보이면 사용자가 영원히 누르게 된다. */}
+              {videoId && report?.state !== 'missing' && report?.state !== 'failed' && (
                 <button
                   type="button"
                   className="ss-shot-pick-auto"
