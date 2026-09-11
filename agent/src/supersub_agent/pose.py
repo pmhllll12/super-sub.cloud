@@ -971,11 +971,7 @@ def extract_keypoints(
     read = read_frames_ex(video_path, target_fps, max_frames, max_seconds)
     frames, src_fps, sampled_fps = read.frames, read.source_fps, read.sampled_fps
 
-    # 🔴 `revision=` 을 빼지 않는다 — 위 상수 주석 참고 (미결 11번).
-    det_processor = AutoProcessor.from_pretrained(
-        PERSON_DETECTOR, revision=PERSON_DETECTOR_REVISION)
-    detector = RTDetrForObjectDetection.from_pretrained(
-        PERSON_DETECTOR, revision=PERSON_DETECTOR_REVISION).to(device).eval()
+    det_processor, detector = _load_detector(device)
     pose_processor = AutoProcessor.from_pretrained(
         POSE_MODEL, revision=POSE_MODEL_REVISION)
     pose_model = VitPoseForPoseEstimation.from_pretrained(
@@ -1088,6 +1084,136 @@ def extract_keypoints(
     if observe:
         _record_input_observation(result, rubric_key)
     return result
+
+
+def _load_detector(device: str):
+    """사람·도구 검출기 한 벌. 🔴 **적재를 한 곳에 둔다.**
+
+    `revision=` 을 빼면 업스트림이 가중치를 갈아 끼워도 **조용히 바뀐다**
+    (미결 11번). 부르는 곳이 둘(`extract_keypoints` · `detect_candidates`)인데
+    한쪽만 고정하면 그 한쪽이 다른 가중치로 돌고, 로컬 캐시가 사는 동안은
+    드러나지도 않는다. 그래서 두 곳이 **같은 함수**를 부른다.
+
+    🔴 import 가 함수 안에 있는 것은 의도다 — `transformers` 는 무거워서
+    모듈을 읽는 것만으로 끌어오면 CLI 도움말조차 느려진다.
+    """
+    from transformers import AutoProcessor, RTDetrForObjectDetection
+
+    processor = AutoProcessor.from_pretrained(
+        PERSON_DETECTOR, revision=PERSON_DETECTOR_REVISION)
+    detector = RTDetrForObjectDetection.from_pretrained(
+        PERSON_DETECTOR, revision=PERSON_DETECTOR_REVISION).to(device).eval()
+    return processor, detector
+
+
+def detect_candidates(
+    video_path: str | Path,
+    at_ms: float,
+    target_fps: int = DEFAULT_TARGET_FPS,
+    device: str | None = None,
+    max_seconds: float = DEFAULT_MAX_SECONDS,
+) -> dict:
+    """한 시각에서 **고를 수 있는 사람들**과 공 (미결 `ho` 44번).
+
+    화면이 「이 사람으로 분석」을 띄우려면 분석을 걸기 **전에** 후보를 알아야
+    한다. 지금은 사용자가 눈으로 보고 박스를 직접 그린다.
+
+    🔴 **좌표는 정규화 0~1 이다.** 여기서 나온 `box` 를 **그대로**
+    `--subject-box` 로 돌려보낼 수 있어야 한다 — 중간에 변환이 끼면 그 자리가
+    곧 버그다(표시 해상도는 기기마다 다르고, `parse_subject_spec` 은 범위 밖을
+    클램프가 아니라 **거부**한다). `tests/test_detect_candidates.py` 가 그
+    왕복을 검사한다.
+
+    🔴 **`anchor_frame_for` 를 쓴다** — `--subject-at-ms` 가 쓰는 것과 **같은
+    함수**다. 다른 산술로 프레임을 고르면 사용자가 고른 사람과 분석이 따라간
+    사람이 갈린다.
+
+    🔴 **후보를 고르지 않는다.** 순서는 **넓이 내림차순**이고 그뿐이다.
+    「공에 가장 가까운 사람」을 추천으로 끼워 넣지 않았다 — 임팩트 뒤에는 공이
+    **이미 떠나가고 있어서** 그 순간 공에 가까운 사람이 찬 사람이 아닌 경우가
+    흔하다. 재 보지 않은 신호를 추천으로 내면 사용자는 그게 근거 있는 줄 안다.
+    공 위치는 **주기만 한다.**
+    """
+    import torch  # 무거운 의존은 함수 안에서 — `extract_keypoints` 와 같은 규약
+
+    device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+    read = read_frames_ex(video_path, target_fps, None, max_seconds)
+    if not read.frames:
+        raise ValueError("프레임을 하나도 읽지 못했다")
+
+    frame_idx, grid_offset, clamped = anchor_frame_for(
+        at_ms, read.sampled_fps, len(read.frames)
+    )
+    frame = read.frames[frame_idx]
+    height, width = frame.shape[:2]
+
+    processor, detector = _load_detector(device)
+    try:
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        inputs = processor(images=rgb, return_tensors="pt").to(device)
+        with torch.inference_mode():
+            out = detector(**inputs)
+        detections = processor.post_process_object_detection(
+            out, target_sizes=[(height, width)], threshold=0.3
+        )[0]
+    finally:
+        del detector
+        gc.collect()
+        if device == "cuda":
+            torch.cuda.empty_cache()
+
+    # 🔴 selector 와 **같은 문턱**을 쓴다. 여기만 낮추면 화면에 보이는데
+    #    고르면 분석이 안 되는 사람이 생긴다.
+    people = []
+    for score, label, box in zip(
+        detections["scores"], detections["labels"], detections["boxes"]
+    ):
+        if int(label) != COCO_PERSON_LABEL or float(score) < PERSON_ELIGIBLE_THRESHOLD:
+            continue
+        x1, y1, x2, y2 = (float(v) for v in box)
+        w, h = (x2 - x1) / width, (y2 - y1) / height
+        if w <= 0 or h <= 0:
+            continue
+        people.append({
+            # 정규화 뒤 부동소수 오차로 1.0 을 넘으면 `parse_subject_spec` 이
+            # 거부한다 — 만들어 내는 쪽에서 창 안으로 맞춘다.
+            "box": _clip_unit_box(x1 / width, y1 / height, w, h),
+            "score": round(float(score), 3),
+        })
+    people.sort(key=lambda p: p["box"][2] * p["box"][3], reverse=True)
+
+    tools = _tracked_centers(detections)
+    ball = tools.get("sports_ball")
+    return {
+        "at_ms": float(at_ms),
+        "frame": frame_idx,
+        "grid_offset_frames": grid_offset,
+        "at_clamped": clamped,
+        "sampled_fps": read.sampled_fps,
+        "frame_size": [width, height],
+        "people": people,
+        "ball": (
+            {"x": round(ball[0] / width, 4), "y": round(ball[1] / height, 4),
+             "score": round(ball[2], 3)}
+            if ball else None
+        ),
+    }
+
+
+def _clip_unit_box(x: float, y: float, w: float, h: float
+                   ) -> list[float]:
+    """정규화 박스를 0~1 창 안으로 맞춘다 — **반올림 오차만** 흡수한다.
+
+    🔴 **큰 어긋남을 조용히 덮는 자리가 아니다.** `parse_subject_spec` 이
+    범위 밖을 거부하는 것은 화면 픽셀이 잘못 온 것을 잡으려는 것이고, 그
+    규칙은 그대로 둔다. 여기서 다루는 것은 픽셀→정규화 나눗셈에서 생기는
+    1e-9 수준의 초과뿐이다.
+    """
+    x = min(max(x, 0.0), 1.0)
+    y = min(max(y, 0.0), 1.0)
+    w = min(max(w, 0.0), 1.0 - x)
+    h = min(max(h, 0.0), 1.0 - y)
+    return [round(x, 6), round(y, 6), round(w, 6), round(h, 6)]
 
 
 def stack_object_tracks(
