@@ -183,8 +183,9 @@ class TestRegister:
     def test_반려는_판정만_남고_작업은_안_생긴다(
         self, db_client, db_session, uploader
     ):
+        # 8K — 2026-09-11 정정으로 4K(3840x2160)까지는 통과하니 그 위 값을 쓴다.
         key = _upload(db_client, uploader)
-        res = _register(db_client, uploader, key, width=3840, height=2160)
+        res = _register(db_client, uploader, key, width=7680, height=4320)
         assert res.status_code == 201, res.text
         video_id = uuid.UUID(res.json()["id"])
 
@@ -195,7 +196,7 @@ class TestRegister:
             {"id": video_id},
         ).one()
         assert passed is False
-        assert "3840x2160" in reason
+        assert "7680x4320" in reason
 
         jobs = db_session.execute(
             text("SELECT count(*) FROM analysis_job WHERE video_id = :id"),

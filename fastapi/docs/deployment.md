@@ -654,7 +654,7 @@ ssh supersub 'systemctl is-active postgresql supersub-api supersub-backup.timer'
 | 안 올린 키로 `POST /videos` | **422 `FILE_NOT_UPLOADED`** ← `s3:ListBucket` 이 붙었다는 증거다 |
 | 사전 서명 URL 로 S3 에 PUT | **200** |
 | `POST /videos` | `passed: true` · `analysis_status: "queued"` |
-| 4K 로 등록 | `passed: false` · 사유 `"해상도가 상한을 넘습니다: 3840x2160 (상한 1920x1080)"` |
+| 8K 로 등록 | `passed: false` · 사유 `"해상도가 상한을 넘습니다: 7680x4320 (상한 긴 변 3840 · 짧은 변 2160)"` — 2026-09-11 정정: 4K(3840x2160)까지는 이제 `passed: true`다 |
 | `GET /videos` | 둘 다, 최근 것이 앞에 |
 | 검사 계정 삭제 | `user` 하나를 지우니 `video`·`video_validation`·`analysis_job` 까지 함께 사라졌다 (**SEC-006 실물 확인**) |
 
