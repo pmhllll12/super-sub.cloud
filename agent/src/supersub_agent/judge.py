@@ -111,6 +111,17 @@ MODELS = {
 }
 NATIVE = {"1.2B"}
 
+# 🔴 **가중치를 커밋으로 고정한다** — `pose.py` 와 같은 이유다(미결 11번).
+# 저장소 이름만 주면 업스트림이 갈아 끼워도 조용히 바뀌고, 로컬 캐시가 살아
+# 있는 동안은 드러나지 않는다. 아래 해시는 지금까지 판정을 낸 스냅숏 그대로다.
+#
+# 🔴 **3.5 계열(2.4B·7.8B)은 비워 둔다** — 이 기계에 캐시가 없어서 확인할 수 없고,
+# **확인 못 한 해시를 적는 것은 안 적는 것보다 나쁘다**(있는 근거처럼 보인다).
+# 그 둘은 원격 코드에 의존해 `transformers` 버전까지 함께 고정해야 한다.
+MODEL_REVISIONS = {
+    "LGAI-EXAONE/EXAONE-4.0-1.2B": "3abf2810673c7c0778df64a73c2d52eab32d91c4",
+}
+
 # vLLM(OpenAI 호환) 서버 주소를 담는 환경변수.
 #
 # **비어 있으면 지금까지와 똑같이 로컬 transformers로 적재한다.** 이 값이 있을
@@ -275,11 +286,16 @@ class Judge:
             load_kwargs["dtype"] = torch.bfloat16
 
         remote = self.model_size not in NATIVE
+        # 🔴 고정된 커밋이 있으면 그것으로 받는다 (미결 11번). 로컬 경로를
+        # 모델로 줄 때는 표에 없으므로 아무것도 안 붙는다 — 경로에 `revision`
+        # 을 붙이면 그쪽이 무시되거나 경고를 내기 때문이다.
+        pin = ({"revision": MODEL_REVISIONS[self.model_id]}
+               if self.model_id in MODEL_REVISIONS else {})
         self._tokenizer = AutoTokenizer.from_pretrained(
-            self.model_id, trust_remote_code=remote
+            self.model_id, trust_remote_code=remote, **pin
         )
         self._model = AutoModelForCausalLM.from_pretrained(
-            self.model_id, trust_remote_code=remote, **load_kwargs
+            self.model_id, trust_remote_code=remote, **pin, **load_kwargs
         )
         self._model.eval()
 

@@ -36,7 +36,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "labeling"))
 sys.path.insert(0, "/home/ho/projects/super-sub.cloud/agent/src")
 from targets import clip_ids, load_candidates  # noqa: E402
 
-from supersub_agent.pose import DEFAULT_TARGET_FPS, POSE_MODEL, read_frames  # noqa: E402  (읽기 전용 import)
+from supersub_agent.pose import (DEFAULT_TARGET_FPS, POSE_MODEL,
+                                  POSE_MODEL_REVISION, read_frames)  # noqa: E402  (읽기 전용 import)
 
 ROOT = Path("/mnt/d/supersub-phaseA")
 OUT = ROOT / "eval_b2"
@@ -51,8 +52,8 @@ def main() -> None:
     from transformers import AutoProcessor, VitPoseForPoseEstimation
 
     dev = "cuda" if torch.cuda.is_available() else "cpu"
-    proc = AutoProcessor.from_pretrained(POSE_MODEL)
-    model = VitPoseForPoseEstimation.from_pretrained(POSE_MODEL).to(dev).eval()
+    proc = AutoProcessor.from_pretrained(POSE_MODEL, revision=POSE_MODEL_REVISION)
+    model = VitPoseForPoseEstimation.from_pretrained(POSE_MODEL, revision=POSE_MODEL_REVISION).to(dev).eval()
 
     rows: list[dict] = []
     timings: list[dict] = []

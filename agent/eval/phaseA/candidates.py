@@ -14,8 +14,8 @@ from supersub_agent import pose as P
 ROOT = Path("/mnt/d/supersub-phaseA")
 OUT = ROOT/"candidates"; OUT.mkdir(exist_ok=True)
 dev = "cuda" if torch.cuda.is_available() else "cpu"
-proc = AutoProcessor.from_pretrained(P.PERSON_DETECTOR)
-det = RTDetrForObjectDetection.from_pretrained(P.PERSON_DETECTOR).to(dev).eval()
+proc = AutoProcessor.from_pretrained(P.PERSON_DETECTOR, revision=P.PERSON_DETECTOR_REVISION)
+det = RTDetrForObjectDetection.from_pretrained(P.PERSON_DETECTOR, revision=P.PERSON_DETECTOR_REVISION).to(dev).eval()
 
 for i, p in enumerate(sorted((ROOT/"clips").glob("*.mp4")), 1):
     cid = p.stem

@@ -23,7 +23,9 @@ from supersub_agent.pose import (  # noqa: E402  (읽기 전용)
     COCO_PERSON_LABEL,
     DEFAULT_TARGET_FPS,
     PERSON_DETECTOR,
+    PERSON_DETECTOR_REVISION,
     POSE_MODEL,
+    POSE_MODEL_REVISION,
     read_frames,
 )
 
@@ -52,10 +54,10 @@ def main() -> None:
     from transformers import AutoProcessor, RTDetrForObjectDetection, VitPoseForPoseEstimation
 
     dev = "cuda" if torch.cuda.is_available() else "cpu"
-    dproc = AutoProcessor.from_pretrained(PERSON_DETECTOR)
-    det = RTDetrForObjectDetection.from_pretrained(PERSON_DETECTOR).to(dev).eval()
-    pproc = AutoProcessor.from_pretrained(POSE_MODEL)
-    pose = VitPoseForPoseEstimation.from_pretrained(POSE_MODEL).to(dev).eval()
+    dproc = AutoProcessor.from_pretrained(PERSON_DETECTOR, revision=PERSON_DETECTOR_REVISION)
+    det = RTDetrForObjectDetection.from_pretrained(PERSON_DETECTOR, revision=PERSON_DETECTOR_REVISION).to(dev).eval()
+    pproc = AutoProcessor.from_pretrained(POSE_MODEL, revision=POSE_MODEL_REVISION)
+    pose = VitPoseForPoseEstimation.from_pretrained(POSE_MODEL, revision=POSE_MODEL_REVISION).to(dev).eval()
 
     root = Path("/home/ho/projects/super-sub.cloud/agent/data")
     vids = sorted(root.glob("*.mp4")) + sorted((root / "goldenset" / "soccerkicks_video").glob("*.avi"))

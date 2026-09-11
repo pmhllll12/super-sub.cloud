@@ -3,15 +3,16 @@ import sys, csv
 from pathlib import Path
 import cv2, numpy as np, torch
 sys.path.insert(0,"/home/ho/projects/super-sub.cloud/agent/src")
-from supersub_agent.pose import PERSON_DETECTOR, COCO_PERSON_LABEL, DEFAULT_TARGET_FPS, read_frames
+from supersub_agent.pose import (PERSON_DETECTOR, PERSON_DETECTOR_REVISION, COCO_PERSON_LABEL,
+                                  DEFAULT_TARGET_FPS, read_frames)
 from transformers import AutoProcessor, RTDetrForObjectDetection
 OUT=Path("/mnt/d/supersub-phaseA/eval_b2/review_cases"); OUT.mkdir(exist_ok=True)
 rows=list(csv.DictReader(open("/mnt/d/supersub-phaseA/eval_b2/other_sports_diffs.csv")))
 want={}
 for r in rows: want.setdefault(r["video"],set()).add(int(r["frame"]))
 dev="cuda" if torch.cuda.is_available() else "cpu"
-p=AutoProcessor.from_pretrained(PERSON_DETECTOR)
-d=RTDetrForObjectDetection.from_pretrained(PERSON_DETECTOR).to(dev).eval()
+p=AutoProcessor.from_pretrained(PERSON_DETECTOR, revision=PERSON_DETECTOR_REVISION)
+d=RTDetrForObjectDetection.from_pretrained(PERSON_DETECTOR, revision=PERSON_DETECTOR_REVISION).to(dev).eval()
 root=Path("/home/ho/projects/super-sub.cloud/agent/data/goldenset/soccerkicks_video")
 for vid,fs in want.items():
     frames,_,_=read_frames(str(root/vid),target_fps=DEFAULT_TARGET_FPS)

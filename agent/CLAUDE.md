@@ -91,6 +91,7 @@ uv run pytest tests/ -q     # 초록이 기본값이다
 | `test_worker.py::test_the_analysis_child_is_seen_as_busy_by_autostop` | 분석 도중에 인스턴스가 꺼지는 것 (그 작업은 `running` 인 채 남는다) |
 | `test_worker.py::test_an_empty_api_base_is_a_config_error` | 백엔드 호스트명이 기본값으로 되살아나 **공개 저장소에 다시 실리는 것** (미결 `jin` 22번) |
 | `test_worker.py::test_focus_does_not_change_the_score` | 「집중해서 볼 항목」이 채점 경로에 새어드는 것 — 그러면 **같은 영상의 점수가 사용자 선택에 따라 달라져** 선수끼리 비교가 안 된다 (미결 `paik` 8번) |
+| `test_model_pins.py` | 모델 가중치가 **이름만으로** 적재되는 것 — 업스트림이 갈아 끼우면 조용히 바뀌고 로컬 캐시가 사는 동안 안 드러난다. 표류를 캐시에 맞춰 「고정」을 올리는 것도 막는다 (미결 11번 N-1) |
 | `test_metric_definitions.py::test_every_rubric_metric_is_declared` | 새 루브릭 코드가 시드 정본에 빠진 채 배포되는 것. 에이전트 테스트는 다 통과하고 **실서버 적재에서만** `UNKNOWN_METRIC_CODE` 로 터진다 (미결 `jin` 23번) |
 
 ## 남의 영역

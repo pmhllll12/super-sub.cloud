@@ -5,8 +5,8 @@ from transformers import AutoProcessor, RTDetrForObjectDetection
 sys.path.insert(0,"/home/ho/projects/super-sub.cloud/agent/src")
 from supersub_agent import pose as P
 dev="cuda" if torch.cuda.is_available() else "cpu"
-proc=AutoProcessor.from_pretrained(P.PERSON_DETECTOR)
-det=RTDetrForObjectDetection.from_pretrained(P.PERSON_DETECTOR).to(dev).eval()
+proc=AutoProcessor.from_pretrained(P.PERSON_DETECTOR, revision=P.PERSON_DETECTOR_REVISION)
+det=RTDetrForObjectDetection.from_pretrained(P.PERSON_DETECTOR, revision=P.PERSON_DETECTOR_REVISION).to(dev).eval()
 ps_=sorted(Path("/home/ho/projects/super-sub.cloud/agent/data/goldenset/soccerkicks_video").glob("*.avi"))[:8]
 tot=[]
 for p in ps_:

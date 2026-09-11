@@ -31,6 +31,22 @@ _log = logging.getLogger(__name__)
 
 PERSON_DETECTOR = "PekingU/rtdetr_r50vd_coco_o365"
 POSE_MODEL = "usyd-community/vitpose-base-simple"
+
+# 🔴 **가중치를 커밋으로 고정한다** (2026.09.11, 미결 11번의 남은 것).
+#
+# 저장소 이름만으로 적재하면 업스트림이 가중치를 갈아 끼워도 **조용히 바뀐다** —
+# 그리고 로컬 HF 캐시가 살아 있는 동안은 드러나지도 않는다. 그때 판단은 "이번
+# 결과를 채택할까"가 아니라 **"B-2~B-6의 어느 결론까지 다시 봐야 하는가"** 가
+# 된다(미결 11번이 적어 둔 형태).
+#
+# 아래 두 해시는 **지금까지의 모든 결과를 낸 스냅숏 그대로**다(2026.09.11 캐시의
+# `refs/main`). 그래서 이 고정은 값을 바꾸지 않는다 — **다음에 바뀌는 것을 막는다.**
+#
+# 🔴 올릴 때는 **재실행 회차와 함께** 올린다. 해시만 바꾸면 그 뒤 결과가 앞의
+# 결과와 같은 가중치에서 나왔다는 근거가 사라진다.
+PERSON_DETECTOR_REVISION = "457857cec8ac28ddede40ecee9eed2beca321af8"
+POSE_MODEL_REVISION = "a93ac0c67e0b7e2c55287d21d4c460c8f3c54d45"
+
 COCO_PERSON_LABEL = 0
 
 # 샘플링 목표 fps의 **단일 진실원**. 서비스도 평가도 이 값을 쓴다.
@@ -903,10 +919,15 @@ def extract_keypoints(
     read = read_frames_ex(video_path, target_fps, max_frames, max_seconds)
     frames, src_fps, sampled_fps = read.frames, read.source_fps, read.sampled_fps
 
-    det_processor = AutoProcessor.from_pretrained(PERSON_DETECTOR)
-    detector = RTDetrForObjectDetection.from_pretrained(PERSON_DETECTOR).to(device).eval()
-    pose_processor = AutoProcessor.from_pretrained(POSE_MODEL)
-    pose_model = VitPoseForPoseEstimation.from_pretrained(POSE_MODEL).to(device).eval()
+    # 🔴 `revision=` 을 빼지 않는다 — 위 상수 주석 참고 (미결 11번).
+    det_processor = AutoProcessor.from_pretrained(
+        PERSON_DETECTOR, revision=PERSON_DETECTOR_REVISION)
+    detector = RTDetrForObjectDetection.from_pretrained(
+        PERSON_DETECTOR, revision=PERSON_DETECTOR_REVISION).to(device).eval()
+    pose_processor = AutoProcessor.from_pretrained(
+        POSE_MODEL, revision=POSE_MODEL_REVISION)
+    pose_model = VitPoseForPoseEstimation.from_pretrained(
+        POSE_MODEL, revision=POSE_MODEL_REVISION).to(device).eval()
 
     all_kps: list[np.ndarray] = []
     # 프레임별 person 후보 수 — 사람이 없던 프레임도 (0, 0)으로 채운다.
