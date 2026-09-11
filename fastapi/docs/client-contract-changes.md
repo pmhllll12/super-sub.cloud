@@ -1376,6 +1376,30 @@ grep -rn "1920\|1080" www/src --include="*.ts" --include="*.tsx"
 
 ---
 
+## 34. ✅ `GET /videos/{id}/report` 에 새 에러 코드 `ANALYSIS_FAILED` — 이미 반영 완료 (2026-09-11 추가)
+
+**사용자가 화면에서 직접 겪은 버그.** 분석이 `failed`로 끝나도 이 엔드포인트가
+`REPORT_NOT_READY`만 내서, "다시 확인"을 눌러도 영원히 "아직 분석이 끝나지
+않았습니다"만 보였습니다 — 실패는 다시 물어봐도 절대 안 바뀌는데 곧 될 것처럼
+보인 것이 문제였습니다.
+
+### 바뀐 것
+
+| 코드 | 뜻 | 다시 물어보면 |
+|---|---|---|
+| `REPORT_NOT_READY` | 아직 `queued`·`running` | 바뀔 수 있다 |
+| `ANALYSIS_FAILED` (신설) | `failed`로 끝남, `message`에 실패 사유 | **절대 안 바뀐다** |
+
+### ✅ 반영 완료
+
+`www/src/lib/savedReports.ts`(`ReportResult`에 `{state:'failed', reason}` 추가)·
+`AnalysisStage.tsx`·`MyVideos.tsx`(실패 사유 표시, "다시 확인" 버튼 숨김)·
+`mock.ts`까지 이미 넣었습니다(`2206bb6`). `npm test` 576 passed.
+
+상세: `fastapi/docs/api-contract.md` 3-1절 · 같은 구역 31번(원래 계약)
+
+---
+
 ## 계약 문서
 
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린
