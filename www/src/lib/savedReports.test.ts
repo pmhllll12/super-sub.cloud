@@ -11,6 +11,8 @@ const report = (over: Partial<VideoReport> = {}): VideoReport => ({
   analyzed_at: '2026-09-03T09:00:00Z',
   summary: '디딤발이 공보다 앞서 있습니다.',
   provisional: true,
+  total_score: 71,
+  overall_grade: 'B',
   breakdown: [
     {
       criterion_id: 'plant_foot_position',
@@ -20,6 +22,7 @@ const report = (over: Partial<VideoReport> = {}): VideoReport => ({
       evidence: '측면으로 벌리는 움직임이 많습니다',
       metric_ref: 'plant_foot_offset',
       skipped: false,
+      stat: 88.5,
     },
   ],
   scenes: [{ metric_code: 'impact_frame', label: '임팩트', at_seconds: 7.5 }],
@@ -29,13 +32,24 @@ const report = (over: Partial<VideoReport> = {}): VideoReport => ({
 })
 
 describe('리포트 옮기기', () => {
-  it('요약 · 항목(칭호+문장 짝) · 장면을 화면 모양으로 옮긴다', () => {
+  it('요약 · 항목(칭호+문장 짝) · 장면 · 오버롤 · 레이더를 화면 모양으로 옮긴다', () => {
     expect(toSavedReport(report())).toEqual({
       summary: '디딤발이 공보다 앞서 있습니다.',
       points: [{ title: '흔들리지 않는 축', evidence: '측면으로 벌리는 움직임이 많습니다' }],
       scenes: [{ at: '0:07', what: '임팩트' }],
+      totalScore: 71,
+      overallGrade: 'B',
+      radar: [{ name: '디딤발 위치', stat: 88.5 }],
       savedAt: '2026-09-03',
     })
+  })
+
+  // 옛 리포트(이 필드가 생기기 전 적재분)는 오버롤이 null — 그대로 옮긴다.
+  it('오버롤이 없는 옛 리포트는 null 그대로 옮긴다', () => {
+    const r = report({ total_score: null, overall_grade: null })
+    const out = toSavedReport(r)
+    expect(out.totalScore).toBeNull()
+    expect(out.overallGrade).toBeNull()
   })
 
   /* 🔴 **`skipped` 는 「평가 대상이 아니었다」는 뜻이다**(`grade: null` 과 짝).
@@ -52,6 +66,7 @@ describe('리포트 옮기기', () => {
           evidence: '안 본 항목',
           metric_ref: null,
           skipped: true,
+          stat: null,
         },
       ],
     })
@@ -60,6 +75,8 @@ describe('리포트 옮기기', () => {
       { title: '흔들리지 않는 축', evidence: '측면으로 벌리는 움직임이 많습니다' },
     ])
     expect(JSON.stringify(out.points)).not.toContain('안 받은 호칭')
+    // 레이더도 마찬가지 — 0으로 그리면 "그 항목을 못했다"로 잘못 읽힌다.
+    expect(out.radar.map((a) => a.name)).not.toContain('점프 높이')
   })
 
   /* 🔴 **호칭은 서버가 채운 것만이다.** 「어느 등급부터 받은 호칭인가」가
@@ -82,9 +99,14 @@ describe('리포트 옮기기', () => {
     expect(toSavedReport(r).scenes[0].at).toBe('1:05')
   })
 
-  // 수치를 그리지 않는 원칙 — 옮김터에서 등급이 새어 나가면 안 된다.
-  it('등급 숫자를 화면 모양에 담지 않는다', () => {
-    expect(JSON.stringify(toSavedReport(report()))).not.toMatch(/grade|"2"/)
+  /* 🔴 **정정 (CCC 32)**: 이 시험이 앞서 "수치를 화면 모양에 담지 않는다"를
+     검사했던 것은 지금은 틀렸다 — 오버롤·`stat` 은 이제 담는다(위 시험들).
+     여전히 안 새는 것은 항목별 원시 등급(0/1/2 정수, `breakdown[].grade`)이다
+     — 화면은 `radar` 의 연속값(`stat`)만 쓰고 정수 등급은 안 옮긴다. */
+  it('항목별 원시 등급(0/1/2)은 화면 모양에 담지 않는다', () => {
+    const out = toSavedReport(report())
+    expect(JSON.stringify(out.points)).not.toMatch(/"grade"/)
+    expect(JSON.stringify(out.radar)).not.toMatch(/"grade"/)
   })
 })
 

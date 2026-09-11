@@ -558,6 +558,9 @@ export const mockBackend: Backend = {
       summary:
         '디딤발이 공보다 앞서 있습니다. 임팩트에서 무릎을 조금 더 덮어 주시면 방향이 안정됩니다.',
       provisional: true,
+      // 오버롤(CCC 32) — 영상 하나의 값. 등급의 가중합이라 stat 평균이 아니다.
+      total_score: 68,
+      overall_grade: 'C',
       breakdown: [
         {
           criterion_id: 'plant_foot_position',
@@ -567,6 +570,7 @@ export const mockBackend: Backend = {
           evidence: '측면으로 벌리는 움직임이 많습니다',
           metric_ref: 'plant_foot_offset',
           skipped: false,
+          stat: 91.2,
         },
         {
           criterion_id: 'shoulder_lead',
@@ -576,6 +580,7 @@ export const mockBackend: Backend = {
           evidence: '공을 받기 전에 어깨를 먼저 돌립니다',
           metric_ref: 'shoulder_rotation_lead',
           skipped: false,
+          stat: 62.0,
         },
         {
           criterion_id: 'follow_through',
@@ -585,9 +590,11 @@ export const mockBackend: Backend = {
           evidence: '두 번째 동작으로 이어지는 속도가 빠릅니다',
           metric_ref: 'follow_through_speed',
           skipped: false,
+          stat: 95.5,
         },
         /* 🔴 **평가 대상이 아니었던 항목** — `grade: null` 이고 `skipped: true` 다.
-           0 으로 그리면 못한 것으로 읽힌다. 화면이 이걸 빼는지 보려고 둔다. */
+           0 으로 그리면 못한 것으로 읽힌다. 화면이 이걸 빼는지 보려고 둔다.
+           `stat` 도 마찬가지로 `null` — 축에서 빼야 한다(CCC 32). */
         {
           criterion_id: 'jump_height',
           name: '점프 높이',
@@ -596,6 +603,7 @@ export const mockBackend: Backend = {
           evidence: null,
           metric_ref: null,
           skipped: true,
+          stat: null,
         },
       ],
       scenes: [
