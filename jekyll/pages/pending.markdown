@@ -7890,6 +7890,15 @@ initContainer 에서 똑같이 죽습니다** — 붙는 DB 에 `vector` 확장�
 확장이 있어야 합니다(`deployment.md` §1 — 슈퍼유저, 호스트 DB 에 한 번).
 아래 「만족해야 할 성질」의 둘째 줄이 그대로 유효합니다.
 
+##### 2026-09-11 재점검으로 확정
+
+`ssh` 로 운영 호스트 Postgres 를 직접 조회했습니다. `pg_available_extensions` 에
+`vector` 행이 **없습니다** — "확장 미생성" 이 아니라 **OS 레벨로 pgvector 패키지가
+안 깔려 있습니다**(설치만 됐으면 `vector | 0.x | NULL` 로 보입니다). initContainer
+가 붙는 DB = **systemd 앱과 같은 운영 호스트 Postgres** 확인(위 "어느 DB 를
+보는지" 에 대한 답). 그러니 확장은 그 호스트 DB 에 한 번 만들면 k3s·systemd 양쪽에
+적용됩니다. 이 항목을 포함하는 더 큰 작업(운영 백엔드 k3s cutover 최신화)은 같은 구역 **31번**.
+
 #### 만족해야 할 성질
 
 | | |
@@ -7931,6 +7940,60 @@ Prometheus 형식으로 냅니다. **여기까지는 스크레이프하는 것�
 
 - 상세: 06-시스템설계 §1 「배포 형태」 · `min` 14(k3s) · 같은 구역 29번
 - **담당**: 박민호(PM·배포 스코핑) · **제기**: 정어진 · **기한**: k3s cutover 정리 후 / 스프린트 계획 시
+
+### 31. 운영 백엔드가 09-08(`d15806c`)에 멈춰 있다 — k3s cutover 로 최신화 (2026-09-11 신설)
+
+09-11 라이브 재점검(`ssh`)에서 확인했습니다. **사이트는 살아 있습니다** — 외부·로컬
+`/health` 200, 트래픽은 systemd venv `:8000` 이 받습니다. 다만 그 systemd 체크아웃이
+`d15806c`(09-08)에 멈춰 있고, 어떤 배포 경로도 그것을 전진시키지 않고 있습니다.
+`29번`(k3s 크래시 루프)과 뿌리가 같지만, 그건 "트라이얼 파드가 시끄럽다" 이고
+이건 "운영이 3일 + 기능 12개 뒤처졌다" 라 항목을 나눕니다.
+
+**경로는 k3s cutover 로 확정입니다**(사용자 확인, 2026-09-11 — 이전에 결정돼 있던
+사항). 아래는 결정이 아니라 남은 절차와 순서·주의입니다.
+
+#### 확인된 사실 (2026-09-11)
+
+| | |
+|---|---|
+| systemd 실서비스 소스 | `d15806c`. `origin/main` 과 `fastapi/app` 기능 커밋 **12개** 차이 — RAG 매칭 검색, 리포트 적재·읽기(`jin` 27), `/metrics`, `/positions`, focus, 대표영상, 스쿼드 배치, `report_key`, `view_dependent`. 새 마이그레이션 약 8개 밀림 |
+| 운영 DB 리비전 | `alembic_version` = `9fc8835184c9`(= `20260909_analysis_job_focus`). systemd 코드엔 그 리비전 파일이 없어 `alembic current` 가 실패 — **DB 가 systemd 코드보다 앞서 있습니다**(k3s initContainer 가 09-09 에 거기까지 한 번 올린 흔적) |
+| pgvector | 운영 호스트 Postgres 에 **OS 레벨로 미설치**(`29번` 재점검 소절). `28148877afc0` 이후 마이그레이션이 여기서 막힙니다 |
+| CD | `:latest` 를 2분마다 pull → k3s 트라이얼에 `rollout restart`. 파드가 pgvector 로 `Init` 에서 죽어 `supersub-cd.service` 가 매번 실패 재시도 중(`29번`) |
+| 백업 | 09-09 비번 로테이션이 백업 자격(`db.env`)을 빠뜨려 09-10~11 실패 → **09-11 정어진이 복구**(`supersub-20260911-0058.dump`, `pg_restore -l` 정상). 이제 스키마 건드리기 전 복원 지점이 있습니다 |
+
+#### 남은 절차와 순서
+
+🔴 **pgvector 를 켜는 순간 연쇄가 돕니다**: `CREATE EXTENSION vector` → 다음 CD
+폴링(2분)에서 initContainer 성공 → 밀린 마이그레이션 ~8개가 **운영 DB 에 자동
+적용** → k3s 파드 기동(`:8080` hostNetwork). 트래픽은 그래도 아직 `:8000`(systemd)
+이 받습니다 — 전환은 min 14 step 5 입니다.
+
+1. **pgvector 설치 + `CREATE EXTENSION vector`** — 운영 호스트 Postgres 에 슈퍼유저로
+   한 번(`deployment.md` §1). Amazon Linux 2023 이라 패키지 또는 소스 빌드. **정어진,
+   지금.** 이걸로 `29번` initContainer·`supersub-cd.service` 루프가 풀립니다.
+2. **마이그레이션 자동 적용 확인** — initContainer 로그로 `9fc8835184c9` → head
+   까지 올라갔는지, `alembic_version` 이 단일 head 인지. CI(`3ba93c3`)가 빈 DB 에서
+   같은 체인을 이미 통과하므로 부분집합이라 위험은 낮지만 눈으로 확인.
+3. **k3s 파드 Ready 확인** — `:8080` 에서 `/health`.
+4. **min 14 step 5** — 트래픽 `:8000` → 파드 전환 + `supersub-api.service` **disable**
+   (지우지 않음, 롤백 경로) + 스모크. **박민호.** 정어진이 1~3 을 끝내고 넘깁니다.
+
+공통 사전: pgvector 확장은 어느 경로든 필요했고, 09-11 에 백업 복구가 됐으므로
+스키마 자동 적용 전 복원 지점이 있습니다.
+
+#### 하지 말아야 할 것
+
+- 1 을 하기 전에 **CD 타이머/트라이얼 디플로이먼트를 멈추지 않습니다** — k3s 로
+  가기로 했으니 CD 가 마이그레이션을 적용하는 것이 정상 경로입니다(`5f85c9d`
+  initContainer 배관).
+- `supersub-api.service` 를 지우지 않습니다 (step 5 에서도 disable 까지만 — min 14
+  정책). 롤백 경로입니다.
+- pgvector 를 **마이그레이션 파일**에 `CREATE EXTENSION` 으로 넣지 않습니다
+  (`TestMigrationPrivileges` 가 막습니다 — `deployment.md` §1).
+
+- 상세: `ssh` 실측은 `_notes`(개인) — 요지는 이 항목에. 같은 구역 `29번`·`27번` · `min` 11·14 · `deployment.md` §1
+- **담당**: 정어진(1~3: pgvector·확장·마이그레이션 적용·파드 확인) · 박민호(4: min 14 step 5 트래픽 전환·`29번` 소유) · **제기**: 정어진 · **기한**: 스프린트 3 / k3s cutover(min 14 step 5)
 
 ## min (박민호)
 
