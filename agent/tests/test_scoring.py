@@ -80,11 +80,7 @@ def test_open_scope_is_one_motion_per_sport():
     """
     active = {k for k, r in discover_rubrics("rubrics").items() if r.is_active}
 
-    assert active == {
-        "football/instep_shot",
-        "baseball/pitching",
-        "basketball/jump_shot",
-    }
+    assert active == {"football/instep_shot"}
     sports = [k.split("/")[0] for k in active]
     assert len(sports) == len(set(sports)), "한 종목에 두 동작이 열려 있다"
 
@@ -98,15 +94,11 @@ def test_closed_motions_stay_loadable():
     """
     closed = {k: r for k, r in discover_rubrics("rubrics").items() if not r.is_active}
 
-    assert set(closed) == {
-        "football/inside_pass",
-        "basketball/layup",
-        # 야구 타격 — 야구는 pitching이 이미 열려 있어 "종목당 한 동작" 범위에
-        # 안 들어간다. 그래도 파일을 둔 것은 JHMDB 관절 정답 54건(swing_baseball)이
-        # 루브릭을 기다리고 있어서다 — 스크립트는 status를 보지 않으므로
-        # 닫힌 채로 돌릴 수 있다. 미결 3번 · 19번.
-        "baseball/batting",
-    }
+    # 2026.09.11 축구 단일 종목 전환 — 야구·농구 루브릭 4개를 지웠다.
+    # 🔴 JHMDB 관절 정답(`eval/jhmdb_batting/`)은 남겨 뒀다. 그것은 종목
+    # 자산이 아니라 **포즈 좌우·관절 검증**의 근거이고, 지우면 지금 축구
+    # 판정이 서 있는 근거까지 끊긴다.
+    assert set(closed) == {"football/inside_pass"}
     for key, r in closed.items():
         assert r.criteria, key
         assert r.status == "draft", key
@@ -363,8 +355,10 @@ def test_band_text_states_the_actual_interval(rubric):
     assert band_text(c, 0) == "15 이하"
 
     assert "축구" in system_prompt("football")
-    assert "야구" in system_prompt("baseball")
     assert "생활체육" in system_prompt(""), "모르는 종목은 특정하지 않는다"
+    assert "생활체육" in system_prompt("baseball"), (
+        "루브릭 없는 종목 코드에 이름을 붙이고 있다 — 축구 단일 종목이다"
+    )
 
 
 def test_out_of_band_marks_zero_grades_that_came_from_above():
@@ -590,14 +584,33 @@ def test_view_dependent_is_empty_for_metrics_that_do_not_flip(rubric):
         assert c.view_dependent(feats) == "", f"{c.id} 에 근거 없는 표시가 붙었다"
 
 
-def test_a_symmetric_band_is_what_actually_stops_the_flip():
+def test_a_symmetric_band_is_what_actually_stops_the_flip(tmp_path):
     """🔴 **같은 지표, 밴드 하나 차이로 갈린다** (미결 37번의 자기 검사).
 
-    야구 타격의 `trunk_lean` 밴드는 0 대칭이라 반전해도 등급이 안 바뀐다 —
-    실측에서도 46클립 0/46 이었다. 인스텝은 같은 지표로 18/18 이 바뀌었다.
+    0 대칭 밴드는 좌우가 반전돼도 등급이 안 바뀌고, 비대칭 밴드는 바뀐다.
+    인스텝은 실측에서 18/18 이 뒤집혔고, 0 대칭 밴드를 쓰던 루브릭은 46클립
+    0/46 이었다 — 같은 지표, 더 큰 부호 분산, 밴드 하나 차이로 0% 대 44%.
     **지표가 아니라 밴드가 결정한다**는 것을 여기에 고정한다.
+
+    🔴 밴드를 **여기서 직접 만든다.** 2026.09.11 축구 단일 종목 전환으로 0
+    대칭 밴드를 쓰던 야구 타격 루브릭이 사라졌는데, 그때 이 검사를 함께
+    지우면 **대조군이 없어져** "인스텝이 뒤집힌다"만 남는다. 그러면 다음
+    사람이 지표를 갈아 치우려 든다 — 고칠 자리는 밴드다.
     """
-    batting = _trunk_criterion(load_rubric("rubrics/baseball_batting.yaml"))
+    text = Path(RUBRIC_PATH).read_text(encoding="utf-8")
+    symmetric = text.replace(
+        "      2: [[5, 20]]\n"
+        "      1: [[0, 5], [20, 30]]\n"
+        "      0: [[null, 0], [30, null]]\n",
+        "      2: [[-25, 25]]\n"
+        "      1: [[-42, -25], [25, 42]]\n"
+        "      0: [[null, -42], [42, null]]\n",
+    )
+    assert symmetric != text, "인스텝의 trunk_lean 밴드 표기가 바뀌었다"
+    path = tmp_path / "football_instep_shot.yaml"
+    path.write_text(symmetric, encoding="utf-8")
+
+    batting = _trunk_criterion(load_rubric(path))
     instep = _trunk_criterion(load_rubric(RUBRIC_PATH))
     for lean in (-30.0, -12.4, -3.0, 3.0, 12.4, 30.0):
         feats = {"trunk_forward_lean_deg_at_impact": lean}

@@ -86,7 +86,8 @@ uv run pytest tests/ -q     # 초록이 기본값이다
 | `test_observability.py::test_eligible_threshold_matches_the_selector` | 관측 기준과 selector 동작 기준이 갈라지는 것 |
 | `test_deploy_paths.py` | vLLM 백엔드가 **다른 모델을 서빙해도** 조용히 판정하는 것 |
 | `test_worker.py::test_a_single_video_propagates_its_exit_code` | 실패한 분석이 `succeeded` 로 보고되는 것 (리포트가 없는데 큐는 줄어든다) |
-| `test_worker.py::test_the_command_always_names_a_rubric` | 야구·농구를 **축구 루브릭으로** 채점하는 것 (`--rubric` 기본값이 축구다) |
+| `test_worker.py::test_the_command_always_names_a_rubric` | 인사이드 패스를 **인스텝 루브릭으로** 채점하는 것 (`--rubric` 기본값이 인스텝이다) |
+| `test_worker.py::test_a_sport_we_do_not_support_is_refused_not_guessed` | 축구 아닌 `sport_code` 가 **축구 루브릭으로** 채점되는 것. 백엔드 참조 테이블에는 다른 종목이 남아 있다 (2026.09.11 축구 단일 종목 전환) |
 | `test_worker.py::test_the_analysis_child_is_seen_as_busy_by_autostop` | 분석 도중에 인스턴스가 꺼지는 것 (그 작업은 `running` 인 채 남는다) |
 | `test_worker.py::test_an_empty_api_base_is_a_config_error` | 백엔드 호스트명이 기본값으로 되살아나 **공개 저장소에 다시 실리는 것** (미결 `jin` 22번) |
 | `test_worker.py::test_focus_does_not_change_the_score` | 「집중해서 볼 항목」이 채점 경로에 새어드는 것 — 그러면 **같은 영상의 점수가 사용자 선택에 따라 달라져** 선수끼리 비교가 안 된다 (미결 `paik` 8번) |

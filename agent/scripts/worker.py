@@ -18,8 +18,8 @@
 │ (1) `claim` 은 한 바퀴에 **한 번만** 부른다. POST 이고 부를 때마다 작업을 │
 │     하나 소비하므로, 실패했다고 다시 부르면 **다른 작업**을 집는다.       │
 │ (2) 204 는 오류가 아니다 — 큐가 빈 것이 정상이다. 로그를 남기지 않는다.   │
-│ (3) `--rubric` 을 항상 명시한다. 기본값이 축구라 안 주면 야구를 축구로     │
-│     채점하고, 그 결과가 틀렸다는 것이 값에 나타나지 않는다.               │
+│ (3) `--rubric` 을 항상 명시한다. 기본값이 인스텝 슈팅이라 안 주면 인사이드 │
+│     패스를 인스텝으로 채점하고, 틀렸다는 것이 값에 나타나지 않는다.        │
 │ (4) `videos/` 에 쓰지 않는다. 읽기 전용 IAM 정책이 의도다.                │
 └─────────────────────────────────────────────────────────────────────────┘
 
@@ -537,7 +537,16 @@ def main() -> int:
     log(f"API {cfg.api_base} · 버킷 {cfg.bucket} · 리포트 {cfg.reports_uri}")
     log(f"루브릭 {cfg.rubric_dir} · 폴링 {cfg.poll_seconds:.0f}초")
     if args.dry_run:
-        for sport in ("baseball", "basketball", "football"):
+        # 🔴 종목 목록을 코드에 박지 않는다 — 루브릭 폴더가 정한다. 박아 두면
+        #    루브릭을 지운 뒤에도 점검이 그 종목을 찍고, 반대로 새 루브릭을
+        #    넣으면 점검에서 **안 보인 채** 배포된다 (2026.09.11 축구 단일
+        #    종목 전환에서 실제로 갈렸다).
+        sports = sorted(
+            {load_rubric(p).sport for p in sorted(Path(cfg.rubric_dir).glob("*.yaml"))}
+        )
+        if not sports:
+            log(f"  🔴 루브릭이 하나도 없다 ({cfg.rubric_dir})")
+        for sport in sports:
             try:
                 log(f"  {sport} → {pick_rubric(cfg.rubric_dir, sport).name}")
             except RubricUnavailable as exc:

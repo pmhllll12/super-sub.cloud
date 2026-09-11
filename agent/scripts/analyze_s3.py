@@ -1,7 +1,7 @@
 """S3 영상 1건 분석 — 내려받기 → 측정 → 판정 → 리포트 업로드.
 
-    uv run python scripts/analyze_s3.py s3://버킷/videos/pitch01.mp4 \
-        --rubric rubrics/baseball_pitching.yaml \
+    uv run python scripts/analyze_s3.py s3://버킷/videos/shot01.mp4 \
+        --rubric rubrics/football_instep_shot.yaml \
         --out s3://버킷/reports \
         --side left
 

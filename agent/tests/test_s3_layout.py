@@ -43,7 +43,7 @@ def test_report_slug_keeps_the_upload_folder():
 def test_report_slug_leaves_top_level_uploads_where_they_were():
     """`videos/` 바로 아래 파일은 옛 경로를 지킨다 — 이미 올라간 리포트가
     떠내려가면 안 된다."""
-    assert report_slug("videos/baseball_pitch_trim.mp4") == "baseball_pitch_trim"
+    assert report_slug("videos/instep_shot_trim.mp4") == "instep_shot_trim"
 
 
 def test_report_slug_handles_a_bare_key():
