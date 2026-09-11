@@ -1,0 +1,316 @@
+[
+ {
+  "clip": "10_penalty1_91169c09.avi",
+  "frames": 61,
+  "ball_coverage": 0.738,
+  "events": [
+   43
+  ],
+  "n_events": 1,
+  "accel_at_events": [
+   1.289
+  ],
+  "speed_before_events": [
+   2.459
+  ],
+  "accel_max": 1.289,
+  "seconds": 16.5
+ },
+ {
+  "clip": "11_freekick_930ede06.avi",
+  "frames": 66,
+  "ball_coverage": 0.773,
+  "events": [],
+  "n_events": 0,
+  "accel_at_events": [],
+  "speed_before_events": [],
+  "accel_max": 0.561,
+  "seconds": 13.1
+ },
+ {
+  "clip": "12_penalty_a821a39e.avi",
+  "frames": 116,
+  "ball_coverage": 0.517,
+  "events": [
+   56
+  ],
+  "n_events": 1,
+  "accel_at_events": [
+   3.426
+  ],
+  "speed_before_events": [
+   3.426
+  ],
+  "accel_max": 3.426,
+  "seconds": 16.9
+ },
+ {
+  "clip": "13_freekick_616f8db5.avi",
+  "frames": 102,
+  "ball_coverage": 0.618,
+  "events": [],
+  "n_events": 0,
+  "accel_at_events": [],
+  "speed_before_events": [],
+  "accel_max": 0.899,
+  "seconds": 15.8
+ },
+ {
+  "clip": "14_penalty1_980ede07.avi",
+  "frames": 75,
+  "ball_coverage": 1.0,
+  "events": [
+   12,
+   26,
+   36,
+   45
+  ],
+  "n_events": 4,
+  "accel_at_events": [
+   4.984,
+   4.941,
+   4.954,
+   4.955
+  ],
+  "speed_before_events": [
+   2.533,
+   2.495,
+   2.477,
+   2.478
+  ],
+  "accel_max": 4.984,
+  "seconds": 13.5
+ },
+ {
+  "clip": "14_penalty_db7e99af.avi",
+  "frames": 82,
+  "ball_coverage": 0.61,
+  "events": [
+   46
+  ],
+  "n_events": 1,
+  "accel_at_events": [
+   2.049
+  ],
+  "speed_before_events": [
+   0.02
+  ],
+  "accel_max": 2.049,
+  "seconds": 14.6
+ },
+ {
+  "clip": "16_penalty1_44038699.avi",
+  "frames": 64,
+  "ball_coverage": 0.25,
+  "events": [],
+  "n_events": 0,
+  "accel_at_events": [],
+  "speed_before_events": [],
+  "accel_max": 0.178,
+  "seconds": 12.9
+ },
+ {
+  "clip": "18_freekick1_f4ff1a25.avi",
+  "frames": 44,
+  "ball_coverage": 1.0,
+  "events": [
+   24,
+   40
+  ],
+  "n_events": 2,
+  "accel_at_events": [
+   18.487,
+   16.449
+  ],
+  "speed_before_events": [
+   18.486,
+   16.273
+  ],
+  "accel_max": 18.487,
+  "seconds": 11.0
+ },
+ {
+  "clip": "18_freekick3_681418eb.avi",
+  "frames": 62,
+  "ball_coverage": 1.0,
+  "events": [
+   46
+  ],
+  "n_events": 1,
+  "accel_at_events": [
+   33.631
+  ],
+  "speed_before_events": [
+   4.031
+  ],
+  "accel_max": 33.631,
+  "seconds": 12.5
+ },
+ {
+  "clip": "18_freekick_5033c49b.avi",
+  "frames": 57,
+  "ball_coverage": 0.649,
+  "events": [
+   34
+  ],
+  "n_events": 1,
+  "accel_at_events": [
+   1.953
+  ],
+  "speed_before_events": [
+   0.004
+  ],
+  "accel_max": 1.953,
+  "seconds": 12.0
+ },
+ {
+  "clip": "19_freekick1_da3f1406.avi",
+  "frames": 63,
+  "ball_coverage": 1.0,
+  "events": [
+   31
+  ],
+  "n_events": 1,
+  "accel_at_events": [
+   21.719
+  ],
+  "speed_before_events": [
+   0.013
+  ],
+  "accel_max": 21.719,
+  "seconds": 12.9
+ },
+ {
+  "clip": "19_freekick2_86f6c708.avi",
+  "frames": 138,
+  "ball_coverage": 0.522,
+  "events": [
+   70
+  ],
+  "n_events": 1,
+  "accel_at_events": [
+   3.229
+  ],
+  "speed_before_events": [
+   0.214
+  ],
+  "accel_max": 3.229,
+  "seconds": 18.9
+ },
+ {
+  "clip": "19_freekick_940922f8.avi",
+  "frames": 57,
+  "ball_coverage": 0.579,
+  "events": [
+   31
+  ],
+  "n_events": 1,
+  "accel_at_events": [
+   3.308
+  ],
+  "speed_before_events": [
+   0.032
+  ],
+  "accel_max": 3.308,
+  "seconds": 12.0
+ },
+ {
+  "clip": "21_freekick_3ee04674.avi",
+  "frames": 70,
+  "ball_coverage": 0.886,
+  "events": [
+   36,
+   44,
+   65
+  ],
+  "n_events": 3,
+  "accel_at_events": [
+   6.065,
+   6.272,
+   1.008
+  ],
+  "speed_before_events": [
+   0.54,
+   6.609,
+   0.591
+  ],
+  "accel_max": 6.272,
+  "seconds": 13.1
+ },
+ {
+  "clip": "23_freekick_a972f2ea.avi",
+  "frames": 57,
+  "ball_coverage": 1.0,
+  "events": [
+   40,
+   49
+  ],
+  "n_events": 2,
+  "accel_at_events": [
+   4.859,
+   4.561
+  ],
+  "speed_before_events": [
+   0.285,
+   2.498
+  ],
+  "accel_max": 4.859,
+  "seconds": 12.4
+ },
+ {
+  "clip": "25_freekick1_86d715b9.avi",
+  "frames": 43,
+  "ball_coverage": 0.419,
+  "events": [],
+  "n_events": 0,
+  "accel_at_events": [],
+  "speed_before_events": [],
+  "accel_max": 0.151,
+  "seconds": 10.7
+ },
+ {
+  "clip": "25_freekick_c76aa778.avi",
+  "frames": 46,
+  "ball_coverage": 0.587,
+  "events": [
+   23
+  ],
+  "n_events": 1,
+  "accel_at_events": [
+   1.261
+  ],
+  "speed_before_events": [
+   2.487
+  ],
+  "accel_max": 1.261,
+  "seconds": 11.0
+ },
+ {
+  "clip": "OpenPose_5T_df2d1ce9.avi",
+  "frames": 63,
+  "ball_coverage": 0.683,
+  "events": [],
+  "n_events": 0,
+  "accel_at_events": [],
+  "speed_before_events": [],
+  "accel_max": 0.266,
+  "seconds": 13.0
+ },
+ {
+  "clip": "Y1_2ff12fb9.avi",
+  "frames": 31,
+  "ball_coverage": 0.935,
+  "events": [
+   28
+  ],
+  "n_events": 1,
+  "accel_at_events": [
+   3.374
+  ],
+  "speed_before_events": [
+   3.371
+  ],
+  "accel_max": 3.374,
+  "seconds": 10.2
+ }
+]
