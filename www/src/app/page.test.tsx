@@ -18,6 +18,8 @@ const CARD: PlayerCard = {
   og_image_key: 'cards/7b4d.png',
   user: { id: 'u1', nickname: '홍길동' },
   titles: [],
+  tagline: null,
+  style: null,
 }
 
 // 상단 글자 줄 셋 + 헤드라인 자리의 알약 둘. 알약으로 옮기면서 이름도
