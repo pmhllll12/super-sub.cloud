@@ -95,9 +95,10 @@ def test_closed_motions_stay_loadable():
     closed = {k: r for k, r in discover_rubrics("rubrics").items() if not r.is_active}
 
     # 2026.09.11 축구 단일 종목 전환 — 야구·농구 루브릭 4개를 지웠다.
-    # 🔴 JHMDB 관절 정답(`eval/jhmdb_batting/`)은 남겨 뒀다. 그것은 종목
-    # 자산이 아니라 **포즈 좌우·관절 검증**의 근거이고, 지우면 지금 축구
-    # 판정이 서 있는 근거까지 끊긴다.
+    # 🔴 `eval/` 은 남겨 뒀다. 사전등록 실험(7·20·34·37번)이 그 클립
+    # 측정치 위에 서 있고, 한 회차가 6종을 **같은 문서에서** 쟀기 때문에
+    # 종목으로 잘리지 않는다. 좌우·관절 매핑 검사 자체는 `eval/` 을 읽지
+    # 않는다 (`test_keypoint_source` → `scripts/analyze_keypoints.py`).
     assert set(closed) == {"football/inside_pass"}
     for key, r in closed.items():
         assert r.criteria, key
