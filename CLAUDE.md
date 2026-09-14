@@ -92,6 +92,13 @@ grep -n '담당.*<내 이름>' jekyll/pages/pending.markdown
   bundle exec jekyll build --source <저장소 루트> --destination <저장소 루트>/_site
   ```
   `cd`로 맞추는 것은 잘 잊습니다. `--source`를 주면 **어디서 돌려도 같은 결과**입니다.
+- 위 함정은 **Claude Code 세션에서 자동으로 고쳐집니다** —
+  `.claude/settings.json`의 훅이 `.claude/hooks/jekyll-source-guard.py`를 불러
+  `jekyll build|serve`에 `--source`·`--destination`을 박아 줍니다. 저장소 루트는
+  `git rev-parse --show-toplevel`로 그때그때 구하므로 **기계마다 경로가 달라도
+  됩니다.** `-s`/`--source`를 직접 준 명령은 건드리지 않으므로 `demo/`를 빌드하려면
+  `--source <경로>/demo`를 주면 됩니다. 왜 막는 방식이 아니라 고치는 방식인지는
+  그 스크립트 머리말에 적혀 있습니다 — **되살리면 안 되는 실패한 설계 둘**도 함께.
 - `.env`, `.env.local`도 `.gitignore`에 포함되어 있습니다 — 이 프로젝트 문서화 작업과 무관한 별도 파일이니 건드리지 않습니다.
 
 ## 저장소 구조
