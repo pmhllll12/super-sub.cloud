@@ -35,6 +35,21 @@ class ApiAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<Session> signup({
+    required String email,
+    required String password,
+    required String nickname,
+  }) async {
+    // 가입 응답은 사용자만 주고 토큰은 안 준다(계약) — 이어서 로그인한다.
+    await _post('/auth/signup', {
+      'email': email,
+      'password': password,
+      'nickname': nickname,
+    });
+    return login(email: email, password: password);
+  }
+
+  @override
   Future<Session> loginAs(String userId) {
     throw const AuthException('개발용 바로 진입은 API 모드에서 지원하지 않습니다');
   }

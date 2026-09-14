@@ -52,6 +52,13 @@ class SessionController extends Notifier<SessionState> {
     }
   }
 
+  Future<void> signup(String email, String password, String nickname) async {
+    final session = await ref
+        .read(authRepositoryProvider)
+        .signup(email: email, password: password, nickname: nickname);
+    state = SessionLoggedIn(session.user);
+  }
+
   Future<void> loginAs(String userId) async {
     final session = await ref.read(authRepositoryProvider).loginAs(userId);
     state = SessionLoggedIn(session.user);

@@ -58,7 +58,8 @@ describe.runIf(has)('무엇을 볼지 — 루브릭과 어긋나지 않는다', 
     for (const [sport, files] of open) {
       expect(files, `${sport} 의 열린 루브릭`).toHaveLength(1)
     }
-    // 화면이 아는 종목 셋이 다 열려 있어야 한다.
-    expect([...open.keys()].sort()).toEqual(['baseball', 'basketball', 'football'])
+    // 화면이 아는 종목이 다 열려 있어야 한다. 에이전트가 축구 하나로 정리했다
+    // (미결 ho 39번, 2026-09-11) — 종목을 되살리면 루브릭과 이 목록을 같이 늘린다.
+    expect([...open.keys()].sort()).toEqual(['football'])
   })
 })
