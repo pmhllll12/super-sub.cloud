@@ -83,6 +83,15 @@ grep -n '담당.*<내 이름>' jekyll/pages/pending.markdown
   (세션에 sudo 권한이 없으면 사용자에게 위 명령 실행을 요청할 것.)
 - 페이지 내용만 바꾼 경우 `listen`이 자동 재빌드하므로 별도 조치 불요.
 - `_site/`, `.jekyll-cache/`는 빌드 산출물이므로 커밋하지 않습니다 (`.gitignore`에 포함).
+- 🔴 **`jekyll build`를 하위 폴더에서 돌리지 마세요.** jekyll은 **현재 디렉터리를
+  소스로** 삼습니다. `agent/`에서 돌리면 `.venv`까지 `agent/_site/`로 복사해
+  **7.8GB**를 쓰고 멈춥니다(2026.09.14에 두 번 겪었습니다). `.gitignore`가 막아
+  주지 **않습니다** — `_site`는 이미 무시 대상이라 git에는 안 올라가지만
+  **디스크와 시간이 나갑니다.** 위치에 안 기대는 형태로 돌리는 것이 확실합니다:
+  ```
+  bundle exec jekyll build --source <저장소 루트> --destination <저장소 루트>/_site
+  ```
+  `cd`로 맞추는 것은 잘 잊습니다. `--source`를 주면 **어디서 돌려도 같은 결과**입니다.
 - `.env`, `.env.local`도 `.gitignore`에 포함되어 있습니다 — 이 프로젝트 문서화 작업과 무관한 별도 파일이니 건드리지 않습니다.
 
 ## 저장소 구조
