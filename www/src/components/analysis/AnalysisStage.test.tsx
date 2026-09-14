@@ -40,6 +40,10 @@ vi.mock('@/lib/personDetector', () => ({
   refinePose: () => Promise.resolve(null),
 }))
 
+// 선수 비교의 뽑기는 대역으로 — jsdom 에서는 영상을 넘기며 검출할 수 없다.
+const getMotion = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/motion/source', () => ({ getMotion }))
+
 /**
  * `GET /videos/{id}/report` 의 대역 몸통 — **최소한만 채운다.** 2026-09-11 에
  * 진행 체크리스트가 이 응답만으로 「끝났다」를 정하게 바뀌었으므로, 「예」를
@@ -60,8 +64,12 @@ const REPORT_MOCK = {
 }
 
 // 🔴 `seesPerson` 을 끈 시험이 있으면 다음 시험에 새지 않게 매번 되돌린다.
+// `getMotion` 의 호출 이력도 함께 비운다 — 안 비우면 `blob:test`(모든 시험이 같은
+// 값을 쓴다, `URL.createObjectURL` 대역) 로 건 호출 수를 세는 시험이 **앞선 시험이
+// 남긴 호출**까지 세어 버린다(리뷰 지적, 2026-09-15 — 실제로 이렇게 걸렸다).
 afterEach(() => {
   seesPerson.current = true
+  getMotion.mockClear()
 })
 
 /**
@@ -221,6 +229,58 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     URL.createObjectURL = vi.fn(() => 'blob:test')
     URL.revokeObjectURL = vi.fn()
   })
+
+  /* 🔴 **시험마다 자기 fetch 대역을 세운다**(리뷰 지적, 2026-09-15). 예전엔 뒤쪽
+     두 시험이 앞 시험의 `vi.stubGlobal('fetch', …)` 이 안 걷힌 채로 남는 것에
+     기대고 있었다 — 파일 순서가 바뀌거나 이 시험만 따로 돌리면 깨진다.
+     시험 끝마다 되돌려서 다음 시험이 남의 것을 물려받지 않게 한다. */
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  /**
+   * 리포트까지 가는 데 필요한 네 응답(업로드 URL · S3 · 등록 · 리포트)을 채운
+   * fetch 대역 — 「선수와 비교하기」에 이르는 시험들이 반복해 만들지 않도록 하나로 둔다.
+   */
+  function reportReadyFetch(report: Record<string, unknown> = REPORT_MOCK) {
+    const fn = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url === '/api/videos/upload-url') {
+        return new Response(
+          JSON.stringify({
+            storage_key: 'videos/u1/abc.mp4',
+            upload_url: 'https://bucket.s3.example.com/abc.mp4?sig=1',
+            expires_in: 900,
+          }),
+          { status: 200 },
+        )
+      }
+      if (url.startsWith('https://bucket.s3.example.com/')) return new Response(null, { status: 200 })
+      if (url === '/api/videos') {
+        return new Response(
+          JSON.stringify({
+            id: 'v1',
+            sport_code: 'football',
+            storage_key: 'videos/u1/abc.mp4',
+            duration_ms: 0,
+            side: null,
+            created_at: '2026-09-03T00:00:00Z',
+            passed: true,
+            reject_reason: null,
+            analysis_job_id: 'job1',
+            analysis_status: 'queued',
+          }),
+          { status: 201 },
+        )
+      }
+      if (url === '/api/videos/v1/report') {
+        return new Response(JSON.stringify(report), { status: 200 })
+      }
+      throw new Error(`예상하지 못한 요청: ${url}`)
+    })
+    vi.stubGlobal('fetch', fn)
+    return fn
+  }
 
   /**
    * 영상 위에 네모를 끌어 그리고 확정한다.
@@ -517,24 +577,237 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
 
     const open = await screen.findByRole('button', { name: '선수와 비교하기' }, { timeout: 12000 })
     // 접혀 있다 — 누르기 전에는 이름이 없다.
-    expect(screen.queryByRole('button', { name: '리오넬 메시' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '에스테반 로벨리' })).toBeNull()
 
     await user.click(open)
-    expect(screen.getByRole('button', { name: '리오넬 메시' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '크리스티아누 호날두' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '에스테반 로벨리' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '티아구 카스탄헤이라' })).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: '리오넬 메시' }))
+    await user.click(screen.getByRole('button', { name: '에스테반 로벨리' }))
     /* 🔴 **같은 자리를 쓴다** — 이름 둘이 사라지고 그 자리에 문장이 든다.
        둘이 같이 있으면 판이 그만큼 들썩인다. */
-    expect(screen.queryByRole('button', { name: '리오넬 메시' })).toBeNull()
-    expect(screen.getByText(/리오넬 메시의 영상을 찾고 있는 중입니다/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '에스테반 로벨리' })).toBeNull()
+    expect(screen.getByText(/에스테반 로벨리의 영상을 찾고 있는 중입니다/)).toBeInTheDocument()
 
-    // 다 찾으면 영상 칸이 반으로 갈리고 왼쪽에 자리가 선다.
+    // 다 찾으면 영상 칸이 반으로 갈리고 왼쪽에 그 선수의 영상이 선다.
+    /* 🔴 **선수마다 정해 둔 데모 클립이다**(2026-09-14, RAG 검색이 붙기 전까지) —
+       고른 사람과 다른 영상이 나오면 여기가 먼저 빨개진다. */
     expect(
-      await screen.findByLabelText('리오넬 메시 영상 자리', {}, { timeout: 4000 }),
-    ).toBeInTheDocument()
+      await screen.findByLabelText('에스테반 로벨리 영상', {}, { timeout: 4000 }),
+    ).toHaveAttribute('src', '/compare/pexels-15436954.mp4')
     expect(document.querySelector('.ss-shot-frame-body')?.getAttribute('data-compare')).toBe('true')
   }, 30000)
+
+  /* 🔴 **세 순간 비교(2026-09-14)** — 두 영상이 다 뽑히면 영상 칸이 위로 줄고 아래에
+     카드가 서며, 오른쪽 판 리포트 아래에 요약이 붙는다. 카드를 누르면 두 영상이
+     그 순간으로 간다. */
+  it('두 영상이 뽑히면 세 순간 카드와 비교 요약이 선다', async () => {
+    reportReadyFetch()
+    const { kickMotion } = await import('@/lib/motion/kickFixture')
+    getMotion.mockImplementation(async (_input, opts) => {
+      opts?.onProgress?.(1)
+      return kickMotion()
+    })
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await user.click(await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }))
+    await sayYes(user)
+    await user.click(await screen.findByRole('button', { name: '선수와 비교하기' }, { timeout: 12000 }))
+    await user.click(screen.getByRole('button', { name: '에스테반 로벨리' }))
+
+    const group = await screen.findByRole('group', { name: '세 순간 비교' }, { timeout: 5000 })
+    expect(group).toBeInTheDocument()
+    expect(document.querySelector('.ss-shot-frame-body')?.getAttribute('data-moments')).toBe('true')
+    // 선수 영상은 가장 큰 사람, 내 영상은 내가 올린 파일에서 뽑는다.
+    expect(getMotion.mock.calls.map((c) => c[0].src)).toContain('/compare/pexels-15436954.mp4')
+
+    // 두 영상이 같은 동작(대역)이라 규칙 문장은 「비슷합니다」다.
+    expect(await screen.findByText('세 순간 모두 선수와 비슷합니다.')).toBeInTheDocument()
+
+    // 🔴 비교 요약이 붙어도 **내 리포트(`ReportView`)는 그대로 남는다**
+    // (2026-09-15) — 비교는 리포트 아래에 얹는 것이지 갈아 치우는 것이 아니다.
+    expect(document.querySelector('.ss-report-summary')).toHaveTextContent(REPORT_MOCK.summary)
+
+    // 요약 절에도 「임팩트」 줄 단추가 있다 — 카드는 `data-moment` 로 집는다.
+    const impact = group.querySelector('[data-moment="impact"]') as HTMLElement
+    await user.click(impact)
+    expect(impact).toHaveAttribute('aria-pressed', 'true')
+    // 같은 카드를 다시 누르면 재생으로 돌아간다.
+    await user.click(impact)
+    expect(impact).toHaveAttribute('aria-pressed', 'false')
+  }, 40000)
+
+  it('순간을 못 찾으면 카드 없이 이유를 말한다', async () => {
+    reportReadyFetch()
+    const { kickMotion } = await import('@/lib/motion/kickFixture')
+    getMotion.mockResolvedValue(kickMotion({ impactShift: -14 }))
+
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await user.click(await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }))
+    await sayYes(user)
+    await user.click(await screen.findByRole('button', { name: '선수와 비교하기' }, { timeout: 12000 }))
+    await user.click(screen.getByRole('button', { name: '에스테반 로벨리' }))
+
+    expect(await screen.findByText(/슈팅 순간을 찾지 못했습니다/, {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: '세 순간 비교' })).toBeNull()
+    expect(screen.getByText(/슈팅 순간을 찾지 못해 비교하지 않았습니다/)).toBeInTheDocument()
+  }, 40000)
+
+  /* 🔴 **선수를 바꿔도 내 영상 뽑기는 안 끊긴다**(리뷰 지적, 2026-09-15). 예전엔
+     캐시된 내 영상 약속이 첫 시도의 컨트롤러에 묶여 있어서, 뽑는 중에 선수를
+     바꾸면(그 시도가 끊기며) 캐시까지 함께 끊겼다 — 다음 시도가 그 끊긴 약속을
+     물려받아 「뽑는 중」에 영원히 멈췄다. 이 시험은 그 경로(끊김 없이 카드가
+     선다)와 내 영상은 **한 번만** 뽑힌다는 것을 함께 지킨다.
+
+     🔴 **대역이 `opts.signal` 을 본다**(리뷰 지적, 2026-09-15) — 안 그러면 이
+     시험은 신호를 아예 무시하는 옛 버그 위에서도 그대로 통과한다(옛 코드가
+     `blob:test` 호출에 시도별 컨트롤러의 신호를 물려줬어도, 대역이 그 신호가
+     끊기는지 확인하지 않으면 「캐시가 끊겼다」를 재현할 수 없다). 신호가
+     끊기면(시도별 컨트롤러가 물려 있었다면 선수를 바꾸는 순간 끊긴다)
+     `AbortError` 로 거부해, 고쳐진 코드(캐시 전용 컨트롤러)에서만 이 약속이
+     안 끊긴 채 끝까지 감을 보인다. */
+  it('뽑는 중에 선수를 바꿔도 내 영상 뽑기는 이어가고, 끝나면 카드가 선다', async () => {
+    reportReadyFetch()
+    const { kickMotion } = await import('@/lib/motion/kickFixture')
+    let releaseUser: () => void = () => {}
+    const userGate = new Promise<void>((resolve) => {
+      releaseUser = resolve
+    })
+    getMotion.mockImplementation(async (input: { src: string }, opts) => {
+      opts?.onProgress?.(1)
+      if (input.src === 'blob:test') {
+        await new Promise<void>((resolve, reject) => {
+          const signal = opts?.signal
+          if (signal?.aborted) {
+            reject(new DOMException('aborted', 'AbortError'))
+            return
+          }
+          const onAbort = () => reject(new DOMException('aborted', 'AbortError'))
+          signal?.addEventListener('abort', onAbort)
+          void userGate.then(() => {
+            signal?.removeEventListener('abort', onAbort)
+            resolve()
+          })
+        })
+      }
+      return kickMotion()
+    })
+
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await user.click(await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }))
+    await sayYes(user)
+    await user.click(await screen.findByRole('button', { name: '선수와 비교하기' }, { timeout: 12000 }))
+    await user.click(screen.getByRole('button', { name: '에스테반 로벨리' }))
+
+    // 아직 내 영상 뽑기가 끝나지 않았다 — 여기서 닫고 다른 선수로 다시 고른다.
+    await screen.findByText(/자세를 뽑는 중/, {}, { timeout: 5000 })
+    await user.click(screen.getByRole('button', { name: '선수와 비교하기' })) // 닫는다
+    await user.click(screen.getByRole('button', { name: '선수와 비교하기' })) // 다시 연다
+    await user.click(await screen.findByRole('button', { name: '티아구 카스탄헤이라' }))
+
+    releaseUser()
+
+    const group = await screen.findByRole('group', { name: '세 순간 비교' }, { timeout: 8000 })
+    expect(group).toBeInTheDocument()
+    // 내 영상(blob:test)은 선수를 바꿔도 다시 뽑지 않는다 — 캐시가 이어졌다는 증거.
+    expect(getMotion.mock.calls.filter((c) => (c[0] as { src: string }).src === 'blob:test')).toHaveLength(1)
+  }, 40000)
+
+  /* 🔴 **비교한 뒤 「닫기」를 누르면 비교도 같이 걷힌다**(사용자 지적, 2026-09-15 배포에서 확인).
+     `reset()` 이 영상 · 대상 · 리포트는 되돌리면서 비교 상태는 안 되돌려서, 빈 판에 선수
+     칸(회색 「… 영상 자리입니다」)이 반쪽을 차지한 채 남았다. */
+  it('비교한 뒤 닫으면 선수 칸과 카드가 남지 않는다', async () => {
+    reportReadyFetch()
+    const { kickMotion } = await import('@/lib/motion/kickFixture')
+    getMotion.mockImplementation(async (_input, opts) => {
+      opts?.onProgress?.(1)
+      return kickMotion()
+    })
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await user.click(await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }))
+    await sayYes(user)
+    await user.click(await screen.findByRole('button', { name: '선수와 비교하기' }, { timeout: 12000 }))
+    await user.click(screen.getByRole('button', { name: '에스테반 로벨리' }))
+    await screen.findByRole('group', { name: '세 순간 비교' }, { timeout: 5000 })
+
+    await user.click(screen.getByRole('button', { name: '닫기' }))
+    expect(await screen.findByLabelText('분석할 영상', {}, { timeout: 2000 })).toBeInTheDocument()
+
+    const body = document.querySelector('.ss-shot-frame-body')
+    expect(body).not.toHaveAttribute('data-compare')
+    expect(body).not.toHaveAttribute('data-moments')
+    expect(document.querySelector('.ss-shot-compare-slot')).toBeNull()
+    expect(screen.queryByRole('group', { name: '세 순간 비교' })).toBeNull()
+  }, 40000)
+
+  /* 🔴 **찾는 척하는 1.6초 타이머가 취소되지 않는다**(리뷰 지적, 2026-09-15). 그
+     타이머가 `reset()` 뒤에도 살아 있다가 뒤늦게 `setCompare('shown')` 을 던지면,
+     이미 빈 판으로 돌아간 화면에 선수 칸이 다시 반쪽을 차지한다. */
+  it('선수를 고른 뒤 1.6초 안에 닫으면, 그 뒤 타이머가 지나도 비교 칸이 다시 갈리지 않는다', async () => {
+    reportReadyFetch()
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await user.click(await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }))
+    await sayYes(user)
+    await user.click(await screen.findByRole('button', { name: '선수와 비교하기' }, { timeout: 12000 }))
+    await user.click(screen.getByRole('button', { name: '에스테반 로벨리' }))
+
+    // 1.6초(COMPARE_MS)가 지나기 전에 닫는다.
+    await user.click(screen.getByRole('button', { name: '닫기' }))
+    expect(await screen.findByLabelText('분석할 영상', {}, { timeout: 2000 })).toBeInTheDocument()
+
+    // 검색 타이머가 지나도록 실제로 기다린다.
+    await new Promise((resolve) => setTimeout(resolve, 1800))
+
+    const body = document.querySelector('.ss-shot-frame-body')
+    expect(body).not.toHaveAttribute('data-compare')
+    expect(document.querySelector('.ss-shot-compare-slot')).toBeNull()
+  }, 15000)
+
+  /* 🔴 같은 타이머가 「선수와 비교하기」 토글을 검색 중에 닫아도 살아 있으면,
+     닫았던 토글이 저절로 다시 열리고 뽑기(`getMotion`)가 새로 시작된다. */
+  it('찾는 중에 토글을 닫으면, 타이머가 지나도 다시 안 열리고 뽑기도 시작되지 않는다', async () => {
+    reportReadyFetch()
+    const { kickMotion } = await import('@/lib/motion/kickFixture')
+    getMotion.mockImplementation(async (_input, opts) => {
+      opts?.onProgress?.(1)
+      return kickMotion()
+    })
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await user.click(await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }))
+    await sayYes(user)
+    await user.click(await screen.findByRole('button', { name: '선수와 비교하기' }, { timeout: 12000 }))
+    await user.click(screen.getByRole('button', { name: '에스테반 로벨리' }))
+
+    // 검색 중(1.6초가 지나기 전)에 토글을 닫는다.
+    await user.click(screen.getByRole('button', { name: '선수와 비교하기' }))
+    expect(getMotion).not.toHaveBeenCalled()
+
+    await new Promise((resolve) => setTimeout(resolve, 1800))
+
+    expect(screen.getByRole('button', { name: '선수와 비교하기' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
+    expect(document.querySelector('.ss-shot-frame-body')).not.toHaveAttribute('data-compare')
+    expect(getMotion).not.toHaveBeenCalled()
+  }, 15000)
 
   // 창 틀의 닫기 자리이므로 시작한 뒤에도 그대로 있어야 한다.
   it('시작한 뒤에도 닫기 점이 남아 있고, 누르면 고르기 전으로 돌아간다', async () => {
@@ -601,7 +874,7 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
   /* ── 무엇을 볼지 고르기 (2026-09-08) ─────────────────────────────── */
 
   /* 🔴 목록은 **에이전트가 실제로 채점하는 항목**이다 — 지어낸 것이 아니라
-     `agent/rubrics/basketball_jump_shot.yaml` 의 `criteria[].name` 이다.
+     `agent/rubrics/football_instep_shot.yaml` 의 `criteria[].name` 이다.
      이 시험이 그 사본(`lib/rubricFocus.ts`)이 어긋나는 것을 잡는다. */
   it('그 종목이 채점하는 항목이 선택지로 나온다', async () => {
     const user = userEvent.setup()
@@ -953,6 +1226,37 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
 
     vi.unstubAllGlobals()
   }, 15000)
+
+  /* 🔴 **멈춰 있어도 seek 하면 그 프레임을 잰다**(리뷰 지적, 2026-09-15 —
+     카드를 눌러 세 순간으로 옮긴 뒤 초록 뼈대가 seek 전 자리에 남는다는
+     사용자 스크린샷으로 확인). jsdom 은 `video.paused` 가 늘 `true`(대역
+     play/pause 가 내부 상태를 안 바꾼다) 라, 예전 코드는 `paused` 만 보고
+     seek 여부와 무관하게 늘 건너뛰었다 — 이 시험은 `currentTime` 이 바뀌면
+     한 번은 새로 반영됨을 「놓침」 배너로 확인한다(관문 전이라 배너가 뜬다). */
+  it('멈춘 채로 다른 시각으로 옮겨도(seek) 그 프레임의 검출을 반영한다', async () => {
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await user.click(await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }))
+    loadVideo()
+    await screen.findByText('이 사람이 맞습니까?', {}, { timeout: 4000 })
+    expect(screen.queryByText(/잠깐 놓쳤습니다/)).toBeNull()
+
+    /* 이제부터는 사람을 놓친다 — 그리고 멈춘 채로(예를 누르기 전) 여러 번 다른
+       시각으로 옮긴다(카드를 여러 번 눌러 보는 것과 같다). 「놓쳤습니다」는
+       연속 4번(`LOST_AFTER`) 이어야 뜨므로, seek 마다 실제로 새로 잰다는 것을
+       보이려면 **여러 번의 서로 다른 시각**이 필요하다 — 한 번의 seek 만으로는
+       고쳤어도 안 고쳤어도 배너가 안 뜬다(놓친 횟수가 1이라). */
+    seesPerson.current = false
+    const video = document.querySelector('video') as HTMLVideoElement
+    for (let i = 1; i <= 6; i += 1) {
+      video.currentTime = 5 + i * 0.01
+      await new Promise((r) => setTimeout(r, 100))
+    }
+
+    expect(await screen.findByText(/잠깐 놓쳤습니다/, {}, { timeout: 2000 })).toBeInTheDocument()
+  }, 10000)
 
   it('반려되면 사유를 보여준다', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {

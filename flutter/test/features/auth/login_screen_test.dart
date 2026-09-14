@@ -23,6 +23,19 @@ class _TooManyRequestsAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<Session> signup({
+    required String email,
+    required String password,
+    required String nickname,
+  }) {
+    throw const AuthException(
+      '요청이 너무 잦습니다',
+      code: 'TOO_MANY_REQUESTS',
+      retryAfter: 2,
+    );
+  }
+
+  @override
   Future<Session> loginAs(String userId) => throw UnimplementedError();
 
   @override
@@ -102,6 +115,101 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     expect(container.read(sessionControllerProvider), isA<SessionLoggedIn>());
+  });
+
+  group('회원가입', () {
+    /// 가입으로 바꾸고 세 칸을 채운 뒤 「가입하기」를 누른다.
+    Future<void> signUp(
+      WidgetTester tester, {
+      required String email,
+      required String password,
+      String nickname = '새식구',
+    }) async {
+      await tester.tap(find.byKey(const Key('auth-mode-toggle')));
+      await tester.pump();
+      await tester.enterText(find.byKey(const Key('login-email')), email);
+      await tester.enterText(find.byKey(const Key('login-password')), password);
+      await tester.enterText(find.byKey(const Key('signup-nickname')), nickname);
+      await tester.tap(find.byKey(const Key('signup-submit')));
+      // 눌림 애니메이션(340ms) → 가입(Mock 300ms) → _restore() 까지 흘려보낸다.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump(const Duration(milliseconds: 500));
+    }
+
+    testWidgets('회원가입으로 바꾸면 닉네임 칸과 가입 버튼이 생긴다', (tester) async {
+      await tester.pumpWidget(_wrap());
+      expect(find.byKey(const Key('signup-nickname')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('auth-mode-toggle')));
+      await tester.pump();
+
+      expect(find.byType(TextField), findsNWidgets(3));
+      expect(find.byKey(const Key('signup-submit')), findsOneWidget);
+      expect(find.byKey(const Key('login-submit')), findsNothing);
+      // 가입 중에는 개발용 바로 진입을 안 보인다 — 가입 폼과 한 덩어리로 읽힌다.
+      expect(find.text('팀 관리자'), findsNothing);
+    });
+
+    testWidgets('가입하면 곧바로 로그인된다', (tester) async {
+      final container = ProviderContainer(overrides: [_authOverride]);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: LoginScreen()),
+      ));
+
+      await signUp(tester, email: 'fresh@supersub.test', password: 'password123');
+
+      final state = container.read(sessionControllerProvider);
+      expect(state, isA<SessionLoggedIn>());
+      expect((state as SessionLoggedIn).user.nickname, '새식구');
+    });
+
+    // 🔴 서버도 막지만(422 WEAK_PASSWORD) 보내기 전에 말해 준다 — 규칙은 계약과 같다.
+    testWidgets('비밀번호가 8자보다 짧으면 보내지 않고 안내한다', (tester) async {
+      final container = ProviderContainer(overrides: [_authOverride]);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: LoginScreen()),
+      ));
+
+      // 요청이 안 나가므로 컨트롤러가 안 깨어난다 — 마지막 read 에서 처음 깨어나면
+      // Mock 복원(300ms) 타이머가 남아 시험이 실패한다. 먼저 깨워 흘려보낸다.
+      container.read(sessionControllerProvider);
+      await signUp(tester, email: 'fresh@supersub.test', password: 'short');
+
+      expect(find.text('비밀번호는 8자 이상이어야 합니다'), findsOneWidget);
+      expect(container.read(sessionControllerProvider), isNot(isA<SessionLoggedIn>()));
+    });
+
+    testWidgets('닉네임이 비어 있으면 보내지 않고 안내한다', (tester) async {
+      await tester.pumpWidget(_wrap());
+      await signUp(
+        tester,
+        email: 'fresh@supersub.test',
+        password: 'password123',
+        nickname: '   ',
+      );
+      expect(find.text('닉네임을 1~20자로 적어 주세요'), findsOneWidget);
+    });
+
+    testWidgets('이미 있는 이메일이면 오류 문구가 뜬다', (tester) async {
+      await tester.pumpWidget(_wrap());
+      await signUp(tester, email: 'player@supersub.test', password: 'password123');
+      expect(find.text('이미 가입된 이메일입니다'), findsOneWidget);
+    });
+
+    testWidgets('다시 로그인으로 바꾸면 닉네임 칸이 사라진다', (tester) async {
+      await tester.pumpWidget(_wrap());
+      await tester.tap(find.byKey(const Key('auth-mode-toggle')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('auth-mode-toggle')));
+      await tester.pump();
+      expect(find.byType(TextField), findsNWidgets(2));
+      expect(find.byKey(const Key('login-submit')), findsOneWidget);
+    });
   });
 
   testWidgets('429를 받으면 안내 문구가 뜨고 로그인 버튼이 잠긴다', (tester) async {
