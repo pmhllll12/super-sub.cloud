@@ -1471,6 +1471,64 @@ curl -s -X PATCH -H "Authorization: Bearer $T" -H 'Content-Type: application/jso
 같은 계열) · `fastapi/alembic/versions/20260911_player_card_style.py`
 ---
 
+## 36. 🔴 분석에 실패한 영상이 DB·S3 에 안 남습니다 — `kept` 기본값 정정, `POST /videos/{id}/keep` 필수로 바뀝니다 (2026-09-11 추가)
+
+**사용자가 화면에서 직접 겪은 문제** — 분석에 실패한 클립이 프로필의 「업로드
+영상」에 계속 남아 있었습니다. 원인은 미결 `jin` 24번 5조각이 안 켜져 있던
+것이었습니다: 문서(`api-contract.md`)는 "작업이 생긴 클립은 임시(`kept:false`)
+로 시작한다"고 이미 적혀 있었는데, **실제 등록 코드는 늘 `kept:true` 로
+등록해서** 어떤 클립도(성공·실패·저장 여부와 무관하게) `DELETE /videos/{id}`
+로 지워지지 않는 한 24시간 백스톱에도 안 걸리고 영영 안 지워졌습니다.
+
+### 바뀐 것
+
+`POST /videos` 응답의 `kept` 기본값이 바뀝니다.
+
+| 클립 | 이전 | 지금 |
+|---|---|---|
+| `analyze: false`(기록용 업로드) | `true` | `true`(안 바뀜) |
+| 반려(작업 자체가 안 생김) | `true` | `true`(안 바뀜) |
+| 정상 등록, 작업이 생김 | `true` | **`false`** |
+
+작업이 생긴 클립은 이제 **등록만으로는 `GET /videos`(본인 목록)·`GET
+/videos/public`·`GET /cards/{slug}/featured-video` 등 어디에도 안 뜹니다.**
+`POST /videos/{id}/keep` 을 불러야 뜹니다 — 이미 있던 엔드포인트라 새로 배울
+것은 없고, **이제부터 실제로 안 부르면 안 됩니다.**
+
+### 만족해야 할 성질
+
+**분석 결과를 볼 생각이 있는 클립만 프로필에 영구로 남고, 나머지(특히 분석에
+실패한 클립)는 사용자가 명시적으로 남기지 않는 한 결국 사라질 것.**
+
+### 먼저 확인
+
+```
+grep -rn "videos/.*keep\|keepVideo" <클라이언트 소스>
+```
+
+안 걸리면 아직 `keep` 을 안 부르고 있는 것이고, 지금 바로 고쳐야 합니다 —
+안 그러면 방금 분석을 마친 클립이 새로고침 한 번에 목록에서 사라집니다
+(정상 동작입니다 — `keep` 을 안 불렀을 뿐입니다).
+
+### ✅ `www` 는 이미 반영 완료
+
+`www/src/components/analysis/AnalysisStage.tsx` 의 「내 프로필에 리포트 저장」
+단추가 리포트 상태가 `ready` 일 때만 `POST /videos/{id}/keep` 을 부르도록
+배선했습니다(`server/backend/{gateway,fastapiBackend,mock}.ts` ·
+`api/videos/[id]/keep/route.ts` 신설). 분석이 실패·반려로 끝났으면 그 단추가
+잠긴 채로 남고, 화면을 벗어나면 곧(또는 늦어도 24시간 뒤 백스톱으로) 지워집니다.
+
+### 🔴 Flutter 는 아직입니다
+
+같은 명령(`grep -rn "keep" flutter/lib`)으로 확인해 주세요. 안 걸리면 지금은
+`/analysis` 화면에서 저장 없이 나가는 모든 클립이 결국 사라집니다 — 성공한
+분석까지 포함해서입니다. 별도 항목으로 올릴지는 담당자 판단에 맡깁니다.
+
+상세: `fastapi/docs/api-contract.md`(`POST /videos` · `POST /videos/{id}/keep`
+절, "저장 안 한 임시 영상도 여기서 정리된다" 절) · 같은 구역 20번(공개·재생,
+같은 `kept` 필터를 씀)
+---
+
 ## 계약 문서
 
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린

@@ -119,7 +119,11 @@ class TestListAdminVideos:
         assert row["original_filename"] == "clip.mp4"
         assert row["storage_key"] == key
         assert row["report_prefix"] == f"reports/{target}/{video_id}/"
-        assert row["kept"] is True
+        # 🔴 작업이 생긴 클립은 등록만으로는 임시(`kept=false`)다(미결 `jin`
+        # 24번 5조각 해소, 2026-09-11) — `POST /videos/{id}/keep` 을 불러야
+        # 영구가 된다. 관리자 목록은 임시분까지 다 보여줘야 하므로(위
+        # `kept_only=False`) 여기 뜨는 것 자체는 그대로다.
+        assert row["kept"] is False
         assert row["passed"] is True
 
     def test_영상이_없어도_사람이_있으면_빈_목록이다(self, client, admin_headers):
