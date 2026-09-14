@@ -74,20 +74,30 @@ describe('내 영상 — 올리기', () => {
     expect(uploadClip).not.toHaveBeenCalled()
   })
 
-  // 🔴 기본값을 축구로 박아 두면 야구 영상이 축구 루브릭으로 조용히 채점된다
-  // (분석 화면과 같은 판단이다).
-  it('종목을 고르기 전에는 올리지 않는다', async () => {
+  // 파일을 고른 것만으로는 안 올라간다 — 이름을 확인하고 누르는 자리가 있다.
+  it('올리기를 누르기 전에는 올리지 않는다', async () => {
     render(<MyVideos videos={[analyzed, uploaded]} />)
     await pick(mp4())
-    expect(screen.getByRole('group', { name: '종목' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '올리기' })).toBeInTheDocument()
     expect(uploadClip).not.toHaveBeenCalled()
   })
 
-  it('종목을 고르면 분석을 안 걸고 올린다', async () => {
+  /* 🔴 **종목을 고르는 자리가 없다** — 축구 하나다(미결 ho 39번). 종목을 되살리며
+     `DEFAULT_SPORT` 만 바꾸고 고르는 자리를 안 되살리면 여기가 먼저 빨개진다. */
+  it('종목을 묻지 않고 축구로 올린다', async () => {
+    render(<MyVideos videos={[analyzed, uploaded]} />)
+    await pick(mp4())
+    expect(screen.queryByRole('group', { name: '종목' })).toBeNull()
+    for (const name of ['축구', '야구', '농구']) {
+      expect(screen.queryByRole('button', { name })).toBeNull()
+    }
+  })
+
+  it('올리기를 누르면 분석을 안 걸고 올린다', async () => {
     uploadClip.mockResolvedValue({ ...uploaded, id: 'v9' })
     render(<MyVideos videos={[analyzed, uploaded]} />)
     const user = await pick(mp4())
-    await user.click(screen.getByRole('button', { name: '축구' }))
+    await user.click(screen.getByRole('button', { name: '올리기' }))
     await waitFor(() => expect(uploadClip).toHaveBeenCalled())
     expect(uploadClip.mock.calls[0][0]).toMatchObject({
       sportCode: 'football',
@@ -104,7 +114,7 @@ describe('내 영상 — 올리기', () => {
     uploadClip.mockResolvedValue({ ...uploaded, id: 'v9', analysis_job_id: 'j9', analysis_status: 'queued' })
     render(<MyVideos videos={[analyzed, uploaded]} />)
     const user = await pick(mp4())
-    await user.click(screen.getByRole('button', { name: '축구' }))
+    await user.click(screen.getByRole('button', { name: '올리기' }))
     // 알약에 편수를 안 적으므로(사용자 요청) 갈래가 갈렸는지는 **어느 알약이
     // 골라졌는지**와 영상 아래 `1 / N` 으로 본다.
     await waitFor(() =>
@@ -120,7 +130,7 @@ describe('내 영상 — 올리기', () => {
     uploadClip.mockResolvedValue({ ...uploaded, id: 'v9' })
     render(<MyVideos videos={[analyzed, uploaded]} />)
     const user = await pick(mp4())
-    await user.click(screen.getByRole('button', { name: '축구' }))
+    await user.click(screen.getByRole('button', { name: '올리기' }))
     await waitFor(() =>
       expect(screen.getByRole('tab', { name: '업로드 영상' })).toHaveAttribute(
         'aria-selected',
@@ -140,7 +150,7 @@ describe('내 영상 — 올리기', () => {
     })
     render(<MyVideos videos={[analyzed, uploaded]} />)
     const user = await pick(mp4())
-    await user.click(screen.getByRole('button', { name: '축구' }))
+    await user.click(screen.getByRole('button', { name: '올리기' }))
     expect(await screen.findByText('길이가 상한을 넘습니다')).toBeInTheDocument()
   })
 })
