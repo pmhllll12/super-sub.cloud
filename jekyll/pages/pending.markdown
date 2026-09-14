@@ -10720,6 +10720,40 @@ Gemini 임베딩을 다시 계산합니다(포지션·시간만 바꾸면 임베
 - 관련: `www/src/components/analysis/ReportView.tsx`(`ReportRadar`) · `www/src/app/(app)/me/MyVideos.tsx` · `ho` 28번(오버롤 등급 읽기 경로, CCC 32)
 - **담당**: 백성검 · **제기**: 박민호 · **기한**: 확인되는 대로
 
+### 23. 폰 실제 설치 → 가입 테스트(`retopia12@naver.com`) — DB 반영 확인함 ✅ 확인 (2026.09.14)
+
+폰에 앱 설치 후 `retopia12@naver.com`으로 가입. 서버(`supersub`) DB를 직접 조회해
+정상 반영을 확인했다.
+
+| | |
+|---|---|
+| 확인 | `ssh supersub` → `sudo -u postgres psql -d supersub` 로 `user`·`user_credential` 조회 |
+| 결과 | `user` 행 생성(닉네임 `pmh12`, 2026-09-14 04:08:05 UTC) + `user_credential` 행 동시 생성. 소셜 로그인이 아니라 이메일/비번 가입 경로(`user_identity` 없음) |
+
+🔴 **DB는 AWS RDS가 아니라 앱과 같은 EC2 인스턴스의 로컬 PostgreSQL이다**
+(`fastapi/docs/deployment.md` "DB 위치는 정해졌다" 절 — 2026-09-02 결정, 아직
+RDS로 안 옮김). RDS라고 알고 있었다면 정정.
+
+- **담당**: 박민호 · **제기**: 박민호 · **기한**: 해소됨
+
+### 24. `deployment.md`의 k3s 배포 위치가 문서와 실제가 다릅니다 — 정어진 확인 부탁드립니다
+
+23번 확인하며 같이 봤다. `deployment.md`는 `supersub` 네임스페이스의
+`deploy/api`라고 적혀 있는데(상단 요약 "확인" 줄 포함), **실제로는 `default`
+네임스페이스의 `supersub-api-trial`**로 떠 있다.
+
+```
+sudo k3s kubectl -n supersub get pods   → No resources found (네임스페이스 자체가 없음)
+sudo k3s kubectl get deploy -A          → default 에 supersub-api-trial (1/1 Running)
+```
+
+동작 자체는 정상이었다(`/health` → `{"status":"ok",...,"db_configured":true}`).
+**기능 문제는 아니고 문서-실제 불일치다.** `www/docs/2026-09-09-K3S-harness.md`도
+같은 값을 쓰고 있을 수 있어 함께 확인이 필요해 보인다. 남의 영역 문서라 직접
+고치지 않고 여기 올린다.
+
+- **담당**: 정어진 · **제기**: 박민호 · **기한**: 확인되는 대로
+
 ## paik (백성검)
 
 ### 1. 분석한 영상을 우리 서버에 저장하는 경로 ✅ 해소 (2026.09.03)
