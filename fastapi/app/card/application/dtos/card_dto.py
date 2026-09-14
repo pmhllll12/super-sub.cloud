@@ -9,7 +9,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any, Final
 from uuid import UUID
+
+# PATCH 에서 "안 보냈다"(그대로 둔다)와 "`null` 을 보냈다"(지운다)를 가르는
+# 자리표시자 — `app.analysis.application.dtos.video_dto.UNSET` 과 같은 판단
+# 이지만, 컨텍스트끼리 임포트하지 않으므로(`tests/test_architecture.py`)
+# 여기 따로 둔다.
+UNSET: Final[Any] = object()
 
 
 @dataclass(frozen=True)
@@ -54,6 +61,7 @@ class MyCardResult:
     user: CardOwnerResult
     titles: list[TitleResult] = field(default_factory=list)
     tagline: str | None = None
+    style: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -87,3 +95,4 @@ class PublicCardResult:
     user: CardOwnerResult
     titles: list[TitleResult] = field(default_factory=list)
     tagline: str | None = None
+    style: dict | None = None

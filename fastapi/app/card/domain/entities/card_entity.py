@@ -28,6 +28,10 @@ class CardEntity:
     # `owner.nickname`(이름)·`titles`(분석이 주는 호칭)와 다른 값이다 —
     # 셋 중 **이것만 사람이 고른다.**
     tagline: str | None = None
+    # 카드 꾸미기 — 바탕 · 로고 · 글자 색 · 글자 자리 · 붓자국(미결 paik 3번
+    # 나머지). 안 꾸몄으면 None — 화면이 기본 모습을 그린다. 사진은 안 담는다
+    # (ORM 주석 참고, 저장 위치 미정).
+    style: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -39,3 +43,4 @@ class PublicCardEntity:
     owner: CardOwner
     titles: list[TitleEntity]
     tagline: str | None = None
+    style: dict | None = None

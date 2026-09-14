@@ -2,17 +2,24 @@
 import sys, csv
 from pathlib import Path
 import cv2, numpy as np, torch
-sys.path.insert(0,"/home/ho/projects/super-sub.cloud/agent/src")
-from supersub_agent.pose import PERSON_DETECTOR, COCO_PERSON_LABEL, DEFAULT_TARGET_FPS, read_frames
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))  # 🔴 기계별 절대경로를 박지 않는다 (미결 14번)
+from supersub_agent.pose import (PERSON_DETECTOR, PERSON_DETECTOR_REVISION, COCO_PERSON_LABEL,
+                                  DEFAULT_TARGET_FPS, read_frames)
 from transformers import AutoProcessor, RTDetrForObjectDetection
-OUT=Path("/mnt/d/supersub-phaseA/eval_b2/review_cases"); OUT.mkdir(exist_ok=True)
-rows=list(csv.DictReader(open("/mnt/d/supersub-phaseA/eval_b2/other_sports_diffs.csv")))
+
+# 🔴 경로를 박지 않는다 — `eval/phaseA/paths.py` 가 정한다 (미결 14번).
+#    박아 두면 다른 기계에서 안 돌고, 저장소 사본을 떠도 읽히지 않는다.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from paths import external_root  # noqa: E402
+
+OUT=external_root() / "eval_b2/review_cases"; OUT.mkdir(exist_ok=True)
+rows=list(csv.DictReader(open(external_root() / "eval_b2/other_sports_diffs.csv")))
 want={}
 for r in rows: want.setdefault(r["video"],set()).add(int(r["frame"]))
 dev="cuda" if torch.cuda.is_available() else "cpu"
-p=AutoProcessor.from_pretrained(PERSON_DETECTOR)
-d=RTDetrForObjectDetection.from_pretrained(PERSON_DETECTOR).to(dev).eval()
-root=Path("/home/ho/projects/super-sub.cloud/agent/data/goldenset/soccerkicks_video")
+p=AutoProcessor.from_pretrained(PERSON_DETECTOR, revision=PERSON_DETECTOR_REVISION)
+d=RTDetrForObjectDetection.from_pretrained(PERSON_DETECTOR, revision=PERSON_DETECTOR_REVISION).to(dev).eval()
+root=(Path(__file__).resolve().parents[3] / "data" / "goldenset/soccerkicks_video")
 for vid,fs in want.items():
     frames,_,_=read_frames(str(root/vid),target_fps=DEFAULT_TARGET_FPS)
     for t in sorted(fs):

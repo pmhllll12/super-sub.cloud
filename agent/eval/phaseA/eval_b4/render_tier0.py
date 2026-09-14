@@ -14,14 +14,20 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-ROOT = Path("/mnt/d/supersub-phaseA")
+
+# 🔴 경로를 박지 않는다 — `eval/phaseA/paths.py` 가 정한다 (미결 14번).
+#    박아 두면 다른 기계에서 안 돌고, 저장소 사본을 떠도 읽히지 않는다.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from paths import external_root  # noqa: E402
+
+ROOT = external_root()
 B4 = ROOT / "eval_b4"
 OUT = B4 / "tier0_cases"
 
 # 코드는 저장소, 데이터는 /mnt/d. /mnt/d 사본은 갱신되지 않아 조용히 옛
 # 동작을 한다 (2026-09-02에 실제로 겪었다).
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "labeling"))
-sys.path.insert(0, "/home/ho/projects/super-sub.cloud/agent/src")
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))  # 🔴 기계별 절대경로를 박지 않는다 (미결 14번)
 from targets import load_candidates  # noqa: E402
 
 BOX_COLOR = (255, 200, 0)

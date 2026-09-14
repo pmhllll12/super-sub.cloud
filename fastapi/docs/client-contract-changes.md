@@ -1400,6 +1400,77 @@ grep -rn "1920\|1080" www/src --include="*.ts" --include="*.tsx"
 
 ---
 
+## 35. ✅ 카드 꾸미기가 서버에 저장됩니다 — `style` 신설, `text`는 `tagline`과 합쳤습니다 — 이미 반영 완료 (2026-09-11 추가, 미결 `paik` 3번 나머지)
+
+**사용자가 화면에서 직접 겪은 문제.** 카드 편집기(`CardEditor.tsx`)에서 바탕 ·
+로고 · 글자 · 글자 색을 바꾸고 「저장」을 눌러도 **이 브라우저에만**
+(`localStorage`) 담겨서, 다른 기기에서 안 보이고 **공개 카드 링크(`/c/{slug}`)
+에도 안 실렸습니다. 이번엔 `www/`까지 같이 고쳤습니다(남의 영역이라
+`www/AGENTS.md` 먼저 읽었습니다).
+
+### 바뀐 것
+
+```json
+PATCH /me/card
+{
+  "tagline": "THREE LUNGS",
+  "style": {
+    "bg": "#91ea92", "logo": "#0b0b0b", "text_color": "#0b0b0b",
+    "text_x": 50, "text_y": 34, "brush": 0, "brush_color": "#0b0b0b",
+    "brush_scale": 1, "brush_x": 0, "brush_y": 0
+  }
+}
+```
+
+`GET /me/card`·`GET /cards/{slug}` 양쪽 응답에 `style`(안 꾸몄으면 `null`)이
+실립니다. `tagline`과 **따로** 바뀝니다(`model_fields_set`) — `style`만
+보내도 `tagline`은 그대로고 반대도 마찬가지입니다. 값이 하나라도 모자라거나
+색이 `#rrggbb` 형식이 아니면 `422`입니다 — 부분 병합을 하지 않으므로 화면은
+늘 들고 있는 **전체 값**을 보냅니다.
+
+### 🔴 `style.text`는 없습니다 — `tagline`과 합쳤습니다
+
+**이미 18번에서 낸 `tagline`이 같은 것이었습니다.** `cardStyle.tsx`의
+`DEFAULT_CARD_STYLE.text` 기본값(`"THREE LUNGS"`)이 18번 예시와 같은 문구인
+것이 그 증거입니다 — `www`가 04-09 이후 `tagline`을 모른 채 같은 개념을
+`style.text`로 새로 만들었던 것으로 보입니다. 합쳤습니다: 편집기의 "글자"
+입력란은 이제 `tagline`을 바꾸고(20자 상한, 서버와 같습니다), `PlayerCardView`
+의 가운데 큰 글자도 `card.tagline`을 읽습니다.
+
+### 여기 없는 것 — `style.photo`·`photoScale`·`photoX`·`photoY`·`mode`
+
+사진 자체와 그에 딸린 자리 · 크기 · 모드는 여전히 서버에 없습니다.
+`og_image_key`가 "규칙은 있는데 파일이 없는" 상태인 것과 같은 이유입니다
+(18번 「사진은 아직입니다」). 이 다섯은 지금처럼 브라우저에만, **이 세션
+동안만** 남습니다 — 서버로 보내면 `422`입니다(`CardStyleSchema`가
+`extra="forbid"`).
+
+### ✅ 반영 완료
+
+`www/src/app/(app)/me/cardStyle.tsx`(서버 값으로 초기화, `save()`가
+`PATCH /me/card`를 부름) · `CardEditor.tsx`("글자" 입력란이 `tagline`을
+바꿈, 20자 상한) · `StyledCard.tsx`(편집 중 미리보기) · `PlayerCardView.tsx`
+(`look`을 안 받아도 `card.style`·`card.tagline`을 스스로 읽어 그림 — 편집
+중이 아닐 때도, 공개 카드 화면도 손댈 것 없이 자동으로 꾸며진 대로 그려집니다)
+· `server/backend/{types,gateway,fastapiBackend,mock}.ts` · `api/me/card/route.ts`
+(PATCH 신설)까지 이미 넣었습니다. `cardStyleStore.ts`(옛 `localStorage` 저장소)
+는 지웠습니다 — 그 파일 자신의 주석이 예고했던 그대로입니다.
+
+`npx tsc --noEmit`·`npx eslint`(둘 다 무관한 기존 항목 외 없음) ·
+`npx vitest run` 574 passed(1 skipped, 무관) · `pytest -q` 776 passed.
+
+### 먼저 확인
+
+```bash
+curl -s -X PATCH -H "Authorization: Bearer $T" -H 'Content-Type: application/json' \
+  -d '{"style":{"bg":"#91ea92","logo":"#0b0b0b","text_color":"#0b0b0b","text_x":50,"text_y":34,"brush":0,"brush_color":"#0b0b0b","brush_scale":1,"brush_x":0,"brush_y":0}}' \
+  $API/me/card | jq .style
+```
+
+상세: `fastapi/docs/api-contract.md` 3절(선수 카드) · 같은 구역 18번(`tagline`,
+같은 계열) · `fastapi/alembic/versions/20260911_player_card_style.py`
+---
+
 ## 계약 문서
 
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린

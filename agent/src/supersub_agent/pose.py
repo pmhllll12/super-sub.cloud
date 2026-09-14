@@ -31,6 +31,22 @@ _log = logging.getLogger(__name__)
 
 PERSON_DETECTOR = "PekingU/rtdetr_r50vd_coco_o365"
 POSE_MODEL = "usyd-community/vitpose-base-simple"
+
+# 🔴 **가중치를 커밋으로 고정한다** (2026.09.11, 미결 11번의 남은 것).
+#
+# 저장소 이름만으로 적재하면 업스트림이 가중치를 갈아 끼워도 **조용히 바뀐다** —
+# 그리고 로컬 HF 캐시가 살아 있는 동안은 드러나지도 않는다. 그때 판단은 "이번
+# 결과를 채택할까"가 아니라 **"B-2~B-6의 어느 결론까지 다시 봐야 하는가"** 가
+# 된다(미결 11번이 적어 둔 형태).
+#
+# 아래 두 해시는 **지금까지의 모든 결과를 낸 스냅숏 그대로**다(2026.09.11 캐시의
+# `refs/main`). 그래서 이 고정은 값을 바꾸지 않는다 — **다음에 바뀌는 것을 막는다.**
+#
+# 🔴 올릴 때는 **재실행 회차와 함께** 올린다. 해시만 바꾸면 그 뒤 결과가 앞의
+# 결과와 같은 가중치에서 나왔다는 근거가 사라진다.
+PERSON_DETECTOR_REVISION = "457857cec8ac28ddede40ecee9eed2beca321af8"
+POSE_MODEL_REVISION = "a93ac0c67e0b7e2c55287d21d4c460c8f3c54d45"
+
 COCO_PERSON_LABEL = 0
 
 # 샘플링 목표 fps의 **단일 진실원**. 서비스도 평가도 이 값을 쓴다.
@@ -109,6 +125,58 @@ TRACKED_LABELS = {
     34: "baseball_bat",
     38: "tennis_racket",
 }
+
+# 종목과 **어긋나는** 도구 — 이게 보이면 그 종목 영상이 아니다 (미결 `ho` 43번 ㉮).
+#
+# 🔴 **거절은 「없음」이 아니라 「있음」으로만 한다.** 「공이 안 보이니 축구가
+# 아니다」로 두면 정상 업로드를 대량으로 막는다 — 축구 클립에서도 공은 자주
+# 안 보인다(phaseA 골든셋 18편에서 `plant_foot_to_ball_offset` 0/18).
+#
+# 🔴 **`sports_ball` 은 여기 못 쓴다.** COCO 에서 축구공·농구공·야구공이 전부
+# 한 클래스(32)라 종목을 안 가른다. 실측으로도 야구 39편 중 12편이 공을 갖고
+# 있어, 「공이 있으면 축구」로 두면 그 12편이 그대로 통과한다.
+#
+# 🔴 **그래서 농구는 원리적으로 못 거른다** — 구별되는 도구가 COCO 에 없다.
+# 야구도 투구·수비는 배트가 화면에 없어 못 잡는다. 실패가 아니라 **범위**다.
+#
+# 실측 1회차 (`eval/pending43_sport_gate/`, 58편 전수, 사전 등록 `8969ce3`):
+#   축구 19편  오거절 **0** — 19편 전부 `sports_ball` 하나뿐, 배트·라켓 0건
+#   야구 39편  거절 **27 (69%)** — 통과한 12편은 배트 궤적이 안 남은 것들이다
+# 🔴 **31%는 그냥 통과한다. 벽이 아니라 걸름망이다.**
+COUNTER_EVIDENCE_TOOLS = {
+    "football": ("baseball_bat", "tennis_racket"),
+}
+
+#: 거절 사유를 사람 말로 적기 위한 이름. 🔴 사용자에게 `baseball_bat` 을
+#: 보여주지 않는다 — 근거 문장에서 코드 심벌을 걷어낸 것과 같은 취지다(㉱).
+TOOL_KO = {
+    "sports_ball": "공",
+    "baseball_bat": "야구 배트",
+    "tennis_racket": "라켓",
+}
+
+
+class SportMismatch(ValueError):
+    """올라온 영상이 그 종목이 아니다 (미결 `ho` 43번 ㉮).
+
+    🔴 **품질 문제와 다르다.** 품질 게이트는 「다시 찍으면 풀린다」이고 이쪽은
+    **「다른 영상을 올려야 풀린다」**다. 같은 사유로 뭉뚱그리면 사용자가 같은
+    파일을 다시 올린다 — 미결 41번이 실서버에서 아홉 번 그랬다.
+    """
+
+
+def sport_conflict(objects: dict[str, np.ndarray], sport: str) -> str | None:
+    """이 영상에 **그 종목과 어긋나는 도구**가 있으면 그 이름, 없으면 None.
+
+    `objects` 는 `stack_object_tracks` 를 이미 지난 것이라 **확실한 검출이 몇
+    프레임 있는 도구만** 들어 있다(문턱은 아래 두 상수). 여기서 문턱을 다시
+    정하지 않는 이유가 그것이다 — 손잡이가 둘이 되면 갈라진다.
+    """
+    for tool in COUNTER_EVIDENCE_TOOLS.get(sport, ()):
+        if tool in objects:
+            return tool
+    return None
+
 
 # 도구 궤적으로 인정할 기준: **확실한 검출이 몇 프레임 있는가**.
 #
@@ -903,10 +971,11 @@ def extract_keypoints(
     read = read_frames_ex(video_path, target_fps, max_frames, max_seconds)
     frames, src_fps, sampled_fps = read.frames, read.source_fps, read.sampled_fps
 
-    det_processor = AutoProcessor.from_pretrained(PERSON_DETECTOR)
-    detector = RTDetrForObjectDetection.from_pretrained(PERSON_DETECTOR).to(device).eval()
-    pose_processor = AutoProcessor.from_pretrained(POSE_MODEL)
-    pose_model = VitPoseForPoseEstimation.from_pretrained(POSE_MODEL).to(device).eval()
+    det_processor, detector = _load_detector(device)
+    pose_processor = AutoProcessor.from_pretrained(
+        POSE_MODEL, revision=POSE_MODEL_REVISION)
+    pose_model = VitPoseForPoseEstimation.from_pretrained(
+        POSE_MODEL, revision=POSE_MODEL_REVISION).to(device).eval()
 
     all_kps: list[np.ndarray] = []
     # 프레임별 person 후보 수 — 사람이 없던 프레임도 (0, 0)으로 채운다.
@@ -1015,6 +1084,136 @@ def extract_keypoints(
     if observe:
         _record_input_observation(result, rubric_key)
     return result
+
+
+def _load_detector(device: str):
+    """사람·도구 검출기 한 벌. 🔴 **적재를 한 곳에 둔다.**
+
+    `revision=` 을 빼면 업스트림이 가중치를 갈아 끼워도 **조용히 바뀐다**
+    (미결 11번). 부르는 곳이 둘(`extract_keypoints` · `detect_candidates`)인데
+    한쪽만 고정하면 그 한쪽이 다른 가중치로 돌고, 로컬 캐시가 사는 동안은
+    드러나지도 않는다. 그래서 두 곳이 **같은 함수**를 부른다.
+
+    🔴 import 가 함수 안에 있는 것은 의도다 — `transformers` 는 무거워서
+    모듈을 읽는 것만으로 끌어오면 CLI 도움말조차 느려진다.
+    """
+    from transformers import AutoProcessor, RTDetrForObjectDetection
+
+    processor = AutoProcessor.from_pretrained(
+        PERSON_DETECTOR, revision=PERSON_DETECTOR_REVISION)
+    detector = RTDetrForObjectDetection.from_pretrained(
+        PERSON_DETECTOR, revision=PERSON_DETECTOR_REVISION).to(device).eval()
+    return processor, detector
+
+
+def detect_candidates(
+    video_path: str | Path,
+    at_ms: float,
+    target_fps: int = DEFAULT_TARGET_FPS,
+    device: str | None = None,
+    max_seconds: float = DEFAULT_MAX_SECONDS,
+) -> dict:
+    """한 시각에서 **고를 수 있는 사람들**과 공 (미결 `ho` 44번).
+
+    화면이 「이 사람으로 분석」을 띄우려면 분석을 걸기 **전에** 후보를 알아야
+    한다. 지금은 사용자가 눈으로 보고 박스를 직접 그린다.
+
+    🔴 **좌표는 정규화 0~1 이다.** 여기서 나온 `box` 를 **그대로**
+    `--subject-box` 로 돌려보낼 수 있어야 한다 — 중간에 변환이 끼면 그 자리가
+    곧 버그다(표시 해상도는 기기마다 다르고, `parse_subject_spec` 은 범위 밖을
+    클램프가 아니라 **거부**한다). `tests/test_detect_candidates.py` 가 그
+    왕복을 검사한다.
+
+    🔴 **`anchor_frame_for` 를 쓴다** — `--subject-at-ms` 가 쓰는 것과 **같은
+    함수**다. 다른 산술로 프레임을 고르면 사용자가 고른 사람과 분석이 따라간
+    사람이 갈린다.
+
+    🔴 **후보를 고르지 않는다.** 순서는 **넓이 내림차순**이고 그뿐이다.
+    「공에 가장 가까운 사람」을 추천으로 끼워 넣지 않았다 — 임팩트 뒤에는 공이
+    **이미 떠나가고 있어서** 그 순간 공에 가까운 사람이 찬 사람이 아닌 경우가
+    흔하다. 재 보지 않은 신호를 추천으로 내면 사용자는 그게 근거 있는 줄 안다.
+    공 위치는 **주기만 한다.**
+    """
+    import torch  # 무거운 의존은 함수 안에서 — `extract_keypoints` 와 같은 규약
+
+    device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+    read = read_frames_ex(video_path, target_fps, None, max_seconds)
+    if not read.frames:
+        raise ValueError("프레임을 하나도 읽지 못했다")
+
+    frame_idx, grid_offset, clamped = anchor_frame_for(
+        at_ms, read.sampled_fps, len(read.frames)
+    )
+    frame = read.frames[frame_idx]
+    height, width = frame.shape[:2]
+
+    processor, detector = _load_detector(device)
+    try:
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        inputs = processor(images=rgb, return_tensors="pt").to(device)
+        with torch.inference_mode():
+            out = detector(**inputs)
+        detections = processor.post_process_object_detection(
+            out, target_sizes=[(height, width)], threshold=0.3
+        )[0]
+    finally:
+        del detector
+        gc.collect()
+        if device == "cuda":
+            torch.cuda.empty_cache()
+
+    # 🔴 selector 와 **같은 문턱**을 쓴다. 여기만 낮추면 화면에 보이는데
+    #    고르면 분석이 안 되는 사람이 생긴다.
+    people = []
+    for score, label, box in zip(
+        detections["scores"], detections["labels"], detections["boxes"]
+    ):
+        if int(label) != COCO_PERSON_LABEL or float(score) < PERSON_ELIGIBLE_THRESHOLD:
+            continue
+        x1, y1, x2, y2 = (float(v) for v in box)
+        w, h = (x2 - x1) / width, (y2 - y1) / height
+        if w <= 0 or h <= 0:
+            continue
+        people.append({
+            # 정규화 뒤 부동소수 오차로 1.0 을 넘으면 `parse_subject_spec` 이
+            # 거부한다 — 만들어 내는 쪽에서 창 안으로 맞춘다.
+            "box": _clip_unit_box(x1 / width, y1 / height, w, h),
+            "score": round(float(score), 3),
+        })
+    people.sort(key=lambda p: p["box"][2] * p["box"][3], reverse=True)
+
+    tools = _tracked_centers(detections)
+    ball = tools.get("sports_ball")
+    return {
+        "at_ms": float(at_ms),
+        "frame": frame_idx,
+        "grid_offset_frames": grid_offset,
+        "at_clamped": clamped,
+        "sampled_fps": read.sampled_fps,
+        "frame_size": [width, height],
+        "people": people,
+        "ball": (
+            {"x": round(ball[0] / width, 4), "y": round(ball[1] / height, 4),
+             "score": round(ball[2], 3)}
+            if ball else None
+        ),
+    }
+
+
+def _clip_unit_box(x: float, y: float, w: float, h: float
+                   ) -> list[float]:
+    """정규화 박스를 0~1 창 안으로 맞춘다 — **반올림 오차만** 흡수한다.
+
+    🔴 **큰 어긋남을 조용히 덮는 자리가 아니다.** `parse_subject_spec` 이
+    범위 밖을 거부하는 것은 화면 픽셀이 잘못 온 것을 잡으려는 것이고, 그
+    규칙은 그대로 둔다. 여기서 다루는 것은 픽셀→정규화 나눗셈에서 생기는
+    1e-9 수준의 초과뿐이다.
+    """
+    x = min(max(x, 0.0), 1.0)
+    y = min(max(y, 0.0), 1.0)
+    w = min(max(w, 0.0), 1.0 - x)
+    h = min(max(h, 0.0), 1.0 - y)
+    return [round(x, 6), round(y, 6), round(w, 6), round(h, 6)]
 
 
 def stack_object_tracks(

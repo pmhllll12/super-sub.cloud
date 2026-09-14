@@ -44,7 +44,11 @@ from supersub_agent.pose import (  # noqa: E402
     select_subject_boxes,
 )
 
-CLIPS = Path("/mnt/d/supersub-phaseA/clips")
+
+# 🔴 경로를 박지 않는다 — `eval/phaseA/paths.py` 가 정한다 (미결 14번).
+from paths import external_root  # noqa: E402
+
+CLIPS = external_root() / "clips"
 
 # --- 사전 등록 상수 ---------------------------------------------------------
 TAU = 0.6         # 외양 문턱 (1회차 보고에서 쓴 값 그대로)

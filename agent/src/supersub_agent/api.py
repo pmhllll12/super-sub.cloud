@@ -309,9 +309,10 @@ def run_pipeline(
 def api_rubrics() -> JSONResponse:
     """열려 있는 루브릭 목록. UI의 종목 선택이 이걸 읽는다.
 
-    status가 draft인 것은 빼고 내려준다 — 지금 여는 범위는 종목당 한 동작이다
-    (축구 인스텝 슈팅·야구 투구·농구 점프슛). 닫아 둔 동작도 키를 직접 주면
-    분석은 되므로, 검수·실측은 UI를 열지 않고도 계속 돌릴 수 있다.
+    status가 draft인 것은 빼고 내려준다 — 지금 여는 범위는 종목당 한 동작이고
+    종목은 축구 하나다(인스텝 슈팅. 2026.09.11 단일 종목 전환). 닫아 둔 동작
+    (인사이드 패스)도 키를 직접 주면 분석은 되므로, 검수·실측은 UI를 열지
+    않고도 계속 돌릴 수 있다.
     """
     rubrics = discover_rubrics(RUBRIC_DIR)
     return JSONResponse({
