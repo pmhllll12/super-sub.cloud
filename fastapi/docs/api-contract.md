@@ -1005,7 +1005,7 @@ trunk_alignment       2개 루브릭  basketball_jump_shot · basketball_layup  
       "original_filename": "My Kick.mp4",
       "storage_key": "videos/3f1c.../홍길동-My-Kick-20260908-1419-3f1c8a2b.mp4",
       "created_at": "2026-09-08T09:00:00Z",
-      "kept": true, "is_public": false, "passed": true, "reject_reason": null,
+      "kept": false, "is_public": false, "passed": true, "reject_reason": null,
       "analysis_status": "failed", "analysis_failure_reason": "품질 게이트 미달: …",
       "report_prefix": "reports/3f1c.../7c05.../" }
   ]
@@ -1644,7 +1644,7 @@ false` 기록용 업로드에는 걸지 않는다 — 그 클립은 워커를 �
   "is_featured": false,
   "title": null,
   "description": null,
-  "kept": true
+  "kept": false
 }
 ```
 
@@ -1653,10 +1653,14 @@ false` 기록용 업로드에는 걸지 않는다 — 그 클립은 워커를 �
 클립은 분석하지 않는다** —
 규격 검사를 두는 이유가 그것이다.
 
-`kept` 는 **프로필에 저장됐는가**다(미결 `jin` 24번). `GET /videos` 는 `kept: true`
-만 준다. **지금은 등록되는 모든 영상이 `kept: true`** 로 시작한다 — `/analysis`
-분석을 임시(`kept: false`)로 두고 "저장"에서 켜는 전환은 프론트가 준비되면
-따로 켠다.
+`kept` 는 **프로필에 저장됐는가**다(미결 `jin` 24번 5조각 해소, 2026-09-11).
+`GET /videos`(본인 목록) · 공개 목록 둘 다 `kept: true` 만 준다. **작업이 생긴
+클립만 등록 시 `kept: false` 로 시작한다** — `analyze: false`(기록용 업로드)와
+반려된 클립(작업이 안 생긴다)은 처음부터 `kept: true` 다. 임시 클립은 아래
+`POST /videos/{id}/keep` 을 불러야 영구가 된다 — 그전까지는 화면을 벗어나면
+곧 `DELETE /videos/{id}` 가, 그것도 놓치면 `PROVISIONAL_VIDEO_TTL_HOURS`
+백스톱이 지운다(2164줄 참고) — **분석에 실패해 다시 볼 리포트가 없는 클립을
+DB·S3 에 남기지 않으려는 것**이다(사용자가 화면에서 직접 지적).
 
 `is_public`·`title`·`description` 은 **등록 시 정할 수 없다** — 각각 `false`·`null`
 로 저장된다(미결 `paik` 5번). 바꾸는 것은 아래 `PATCH /videos/{id}` 다.
@@ -1758,13 +1762,17 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
 | 404 | `VIDEO_NOT_FOUND` | 없는 클립이거나 비공개 남의 클립이다 |
 | 503 | `STORAGE_NOT_CONFIGURED` | 서버에 `S3_BUCKET` 이 없다 |
 
-### `POST /api/v1/videos/{video_id}/keep` — 프로필에 저장 (2026-09-08 추가)
+### `POST /api/v1/videos/{video_id}/keep` — 프로필에 저장 (2026-09-08 추가, 2026-09-11 www 배선)
 
-미결 `jin` 24번 2조각. **"내 프로필에 리포트 저장"** — `/analysis` 의 임시 분석을
-영구로 만든다. **자기 클립만.** `200 OK`, 응답은 `GET /videos` 한 줄과 같은 모양.
+미결 `jin` 24번 2·5조각. **"내 프로필에 리포트 저장"** — 작업이 생긴 클립의
+임시 상태를 영구로 만든다. **자기 클립만.** `200 OK`, 응답은 `GET /videos` 한
+줄과 같은 모양.
 
-- `kept` 를 `true` 로 만든다. `GET /videos`(본인 목록)에는 지금도 뜨지만, 임시-저장
-  전환(5조각, 프론트 대기)이 켜지면 이 호출 전에는 안 뜨게 된다.
+- `kept` 를 `true` 로 만든다. **이 호출 전에는 `GET /videos`(본인 목록) · 공개
+  목록 어디에도 안 뜬다** — 등록 시점부터 `kept: false` 로 시작하기 때문이다
+  (위 `POST /videos` 절). `www` 의 분석 화면(`AnalysisStage.tsx`)이 리포트가
+  `ready` 일 때만 이 호출을 부른다 — 분석이 실패·반려로 끝났으면 부를 것이
+  없다(리포트가 없다).
 - **임시 원본(`videos/…`)이면 리포트 자리로 옮긴다** —
   `reports/<user_id>/<video_id>/source.<ext>`. S3 `CopyObject`(서버 쪽) 후 원본
   삭제라 바이트가 앱 서버를 지나지 않는다(PER-002). 옮긴 뒤 `storage_key` 가
@@ -2159,9 +2167,12 @@ RAM 이 터지는 것 — 미결 `ho` 9번)이 큐를 영원히 돌게 된다. �
 ⚠️ 별도 스케줄러를 두지 않았다. 회수가 필요한 시점은 정확히 "누군가 일을 달라고
 할 때"이고, 타이머를 새로 만들면 **그 타이머가 살아 있는지를 또 확인해야 한다.**
 
-### 저장 안 한 임시 영상도 여기서 정리된다 (2026-09-08 추가)
+### 저장 안 한 임시 영상도 여기서 정리된다 (2026-09-08 추가, 2026-09-11 실배선)
 
-미결 `jin` 24번. `/analysis` 분석은 임시로 올라간다(`video.kept=false`).
+미결 `jin` 24번(5조각까지 해소). 작업이 생긴 클립은 임시로 올라간다
+(`video.kept=false`) — 2026-09-11 전에는 이 문서만 그렇게 적혀 있었고 실제
+등록 코드는 늘 `kept=true` 였다(사용자가 "분석 실패한 영상이 안 지워진다"고
+지적해서 발견·수정했다).
 "내 프로필에 리포트 저장"을 안 누르고 떠나면 프론트가 `DELETE /videos/{id}` 를
 부르지만(빠른 길), 브라우저가 죽으면 놓친다. 그래서 **`claim` 이 멈춘 작업 회수와
 같은 자리에서** 백스톱을 돈다: `kept=false` 이고 `PROVISIONAL_VIDEO_TTL_HOURS`

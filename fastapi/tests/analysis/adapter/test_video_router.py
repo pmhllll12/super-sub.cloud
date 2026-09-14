@@ -120,8 +120,11 @@ class TestRegisterVideo:
         assert body["analysis_job_id"] is not None
         assert body["analysis_status"] == "queued"
         assert body["side"] == "right"
-        # 미결 jin 24번 1조각 — 지금은 등록되는 모든 영상이 kept=true 로 시작한다.
-        assert body["kept"] is True
+        # 미결 jin 24번 5조각 해소(2026-09-11) — 작업이 생긴 클립은 등록만으로는
+        # 임시(`kept=false`)다. `POST /videos/{id}/keep` 을 불러야 영구가 된다
+        # (`TestKeepVideo` 참고) — 안 그러면 분석에 실패해 다시 볼 리포트가
+        # 없는 클립이 DB·S3 에 영영 남는다(사용자가 화면에서 직접 지적).
+        assert body["kept"] is False
 
     def test_반려도_201_이고_사유가_본문에_온다(self, client):
         """🔴 422 로 돌려보내면 사유가 아무 데도 안 남는다 — SFR-001."""
@@ -358,9 +361,7 @@ class TestListMyVideos:
     def test_내_것만_담긴다(self, client):
         mine, other = uuid4(), uuid4()
         for user_id in (mine, other):
-            key = _issue(client, user_id)
-            put_object(key, SIZE_OK)
-            assert _register(client, user_id, key).status_code == 201
+            _register_clip(client, user_id)
 
         res = client.get(f"{V1}/videos", headers=_headers(mine))
         assert res.status_code == 200
@@ -380,11 +381,23 @@ class TestListMyVideos:
 
 
 def _register_clip(client, user_id):
+    """등록하고 **그 자리에서 저장까지** 한다 — 이 파일의 다른 시험 대부분이
+    바라는 것은 "쓸 수 있는 클립"이지 "아직 저장 안 한 임시분"이 아니다.
+
+    🔴 작업이 생긴 클립은 등록만으로는 `kept=false` 다(미결 `jin` 24번 5조각
+    해소, 2026-09-11) — `GET /videos`·공개 목록 어디에도 안 뜬다. 여기서
+    `keep` 을 안 부르면 이 헬퍼를 쓰는 시험 대부분이 "방금 등록한 클립이
+    목록에 없다"로 깨진다. 그 자체(등록만 하면 임시다)를 확인하는 시험은
+    `TestRegisterVideo`·`TestKeepVideo`가 이 헬퍼를 안 쓰고 직접 부른다.
+    """
     key = _issue(client, user_id)
     put_object(key, SIZE_OK)
     res = _register(client, user_id, key)
     assert res.status_code == 201, res.text
-    return res.json()["id"]
+    video_id = res.json()["id"]
+    kept = client.post(f"{V1}/videos/{video_id}/keep", headers=_headers(user_id))
+    assert kept.status_code == 200, kept.text
+    return video_id
 
 
 class TestUpdateVideo:
