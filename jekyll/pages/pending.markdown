@@ -11420,6 +11420,79 @@ Gemini 임베딩을 다시 계산합니다(포지션·시간만 바꾸면 임베
 - 관련: `www/src/components/analysis/ReportView.tsx`(`ReportRadar`) · `www/src/app/(app)/me/MyVideos.tsx` · `ho` 28번(오버롤 등급 읽기 경로, CCC 32)
 - **담당**: 백성검 · **제기**: 박민호 · **기한**: 확인되는 대로
 
+### 23. 폰 실제 설치 → 가입 테스트(`retopia12@naver.com`) — DB 반영 확인함 ✅ 확인 (2026.09.14)
+
+폰에 앱 설치 후 `retopia12@naver.com`으로 가입. 서버(`supersub`) DB를 직접 조회해
+정상 반영을 확인했다.
+
+| | |
+|---|---|
+| 확인 | `ssh supersub` → `sudo -u postgres psql -d supersub` 로 `user`·`user_credential` 조회 |
+| 결과 | `user` 행 생성(닉네임 `pmh12`, 2026-09-14 04:08:05 UTC) + `user_credential` 행 동시 생성. 소셜 로그인이 아니라 이메일/비번 가입 경로(`user_identity` 없음) |
+
+🔴 **DB는 AWS RDS가 아니라 앱과 같은 EC2 인스턴스의 로컬 PostgreSQL이다**
+(`fastapi/docs/deployment.md` "DB 위치는 정해졌다" 절 — 2026-09-02 결정, 아직
+RDS로 안 옮김). RDS라고 알고 있었다면 정정.
+
+- **담당**: 박민호 · **제기**: 박민호 · **기한**: 해소됨
+
+### 24. `deployment.md`의 k3s 배포 위치가 문서와 실제가 다릅니다 — 정어진 확인 부탁드립니다
+
+23번 확인하며 같이 봤다. `deployment.md`는 `supersub` 네임스페이스의
+`deploy/api`라고 적혀 있는데(상단 요약 "확인" 줄 포함), **실제로는 `default`
+네임스페이스의 `supersub-api-trial`**로 떠 있다.
+
+```
+sudo k3s kubectl -n supersub get pods   → No resources found (네임스페이스 자체가 없음)
+sudo k3s kubectl get deploy -A          → default 에 supersub-api-trial (1/1 Running)
+```
+
+동작 자체는 정상이었다(`/health` → `{"status":"ok",...,"db_configured":true}`).
+**기능 문제는 아니고 문서-실제 불일치다.** `www/docs/2026-09-09-K3S-harness.md`도
+같은 값을 쓰고 있을 수 있어 함께 확인이 필요해 보인다. 남의 영역 문서라 직접
+고치지 않고 여기 올린다.
+
+- **담당**: 정어진 · **제기**: 박민호 · **기한**: 확인되는 대로
+
+### 23. 부록 D ERD가 실제 DB 테이블과 다릅니다 — 정어진 확인 부탁드립니다
+
+21번 확인 김에 `\dt`로 `supersub` DB 전체 테이블 목록을 뽑아 부록 D(34개 테이블)와
+대조했다.
+
+| | |
+|---|---|
+| 실제 DB에만 없음(ERD엔 있음) | `title_criteria` · `player_vector` · `fitness_score` · `recommendation` — 4개, 아직 마이그레이션이 안 올라간 것으로 보인다 |
+| 실제 DB에만 있음(ERD엔 없음) | `analysis_metric_criterion` — 1개, 문서에 안 적힌 테이블 |
+
+실제 DB는 31개 도메인 테이블(+ `alembic_version`)이고 부록 D는 34개라고 적혀 있다.
+스키마 변경 자체가 문제는 아니고 — 어느 쪽이 최신인지, `analysis_metric_criterion`이
+뭘 대신하는 테이블인지(`analysis_metric_value`와 이름이 겹쳐 보인다) 확인이
+필요해서 올린다. 부록 D는 공개 문서라 직접 고치지 않았다.
+
+| | |
+|---|---|
+| 확인 | `ssh supersub` → `sudo -u postgres psql -d supersub -c '\dt'` |
+| 하지 말 것 | 마이그레이션이 진행 중일 수 있으니 4개가 "빠졌다"고 단정하고 부록 D에서 지우지 않기 — 정어진 확인 먼저 |
+
+- 관련: `jekyll/chapters/부록D-데이터베이스ERD.markdown` · 21·22번(같은 세션에서 발견)
+- **담당**: 정어진 · **제기**: 박민호 · **기한**: 확인되는 대로
+
+### 24. QA 체크리스트 페이지를 만들었습니다 ✅ 완료 (2026.09.14)
+
+8장(테스트 및 검증 계획) 하위에 **QA 체크리스트**(`/qa-체크리스트/`)를 추가했다.
+5장 요구사항(SFR·SEC·PER·QUA)을 근거로 기능 단위 인수 테스트 체크박스로 옮긴
+것이다 — 가입·로그인부터 매칭·평가·보안·성능까지.
+
+- 파일: `jekyll/qa/qa-체크리스트.markdown` (신규 폴더). `08-테스트및검증계획.markdown`에
+  `has_children: true`를 추가하고 QA 프로세스 절에 링크를 걸었다
+- **체크는 마크다운 직접 편집(`[ ]` → `[x]`)으로 한다** — 정적 사이트라 브라우저
+  클릭으로는 저장되지 않는다(2026.09.14 확인). 박민호가 기능을 검증할 때마다 알려주면
+  체크 반영
+- `min` → `main` 및 `ho`·`jin`·`paik` 전 브랜치에 sync 완료
+
+- 확인: http://localhost:4000/qa-체크리스트/ (로컬) · `git log --oneline main -- jekyll/qa`
+- **담당**: 박민호 · **제기**: 박민호 · **기한**: 완료됨
+
 ## paik (백성검)
 
 ### 1. 분석한 영상을 우리 서버에 저장하는 경로 ✅ 해소 (2026.09.03)
