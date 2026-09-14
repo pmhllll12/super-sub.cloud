@@ -153,16 +153,39 @@ def render(frames, t: int, boxes: list[tuple]) -> np.ndarray:
         cv2.putText(tile, str(i), (4, 16), cv2.FONT_HERSHEY_SIMPLEX, 0.6,
                     BOX_COLOR, 2)
         crops.append(tile)
-    crop_row = np.hstack(crops) if crops else np.zeros((CROP_H + 22, 10, 3), np.uint8)
-    if crop_row.shape[1] > main.shape[1]:
-        s = main.shape[1] / crop_row.shape[1]
-        crop_row = cv2.resize(crop_row, (main.shape[1], int(crop_row.shape[0] * s)))
-    else:
-        pad = np.zeros((crop_row.shape[0], main.shape[1] - crop_row.shape[1], 3),
-                       np.uint8)
-        crop_row = np.hstack([crop_row, pad])
+    # 🔴 **한 줄에 욱여넣지 않고 접는다.** 후보가 15명이면 한 줄로 붙였을 때
+    #    화면 폭에 맞추려고 통째로 줄여서 **사람이 안 보인다**(실제로 그랬다).
+    #    폭이 넘치면 줄을 내린다 — 크롭 크기는 후보 수와 무관하게 일정하다.
+    W = main.shape[1]
+    rows_of_crops: list[list[np.ndarray]] = [[]]
+    used = 0
+    for tile in crops:
+        if tile.shape[1] > W:                      # 한 장이 화면보다 넓다
+            s = W / tile.shape[1]
+            tile = cv2.resize(tile, (W, int(tile.shape[0] * s)))
+        if used + tile.shape[1] > W and rows_of_crops[-1]:
+            rows_of_crops.append([])
+            used = 0
+        rows_of_crops[-1].append(tile)
+        used += tile.shape[1]
 
-    return np.vstack([main, ctx_row, crop_row])
+    strips = []
+    for row in rows_of_crops:
+        if not row:
+            continue
+        h = max(t.shape[0] for t in row)
+        row = [t if t.shape[0] == h else
+               np.vstack([t, np.zeros((h - t.shape[0], t.shape[1], 3), np.uint8)])
+               for t in row]
+        strip = np.hstack(row)
+        if strip.shape[1] < W:
+            strip = np.hstack([strip,
+                               np.zeros((h, W - strip.shape[1], 3), np.uint8)])
+        strips.append(strip)
+    crop_block = (np.vstack(strips) if strips
+                  else np.zeros((CROP_H + 22, W, 3), np.uint8))
+
+    return np.vstack([main, ctx_row, crop_block])
 
 
 def main() -> None:
