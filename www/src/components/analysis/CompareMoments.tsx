@@ -88,7 +88,9 @@ export default function CompareMoments({
         <button type="button" className="ss-shot-moments-flip" aria-pressed={mirrored} onClick={onToggleMirror}>
           좌우 반전 ⇄
         </button>
-        <span>브라우저에서 잰 값 · 데모 영상(Pexels)</span>
+        {/* 「브라우저에서 잰 값」 표기는 뺐다(사용자 요청, 2026-09-15). 데모 영상 출처는 Pexels
+            라이선스(영상 속 사람이 보증하는 것처럼 보이지 않게)상 남긴다. */}
+        <span>데모 영상(Pexels)</span>
       </div>
     </div>
   )

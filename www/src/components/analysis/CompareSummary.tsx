@@ -49,10 +49,8 @@ export default function CompareSummary({
           </li>
         ))}
       </ul>
-      <p className="ss-compare-summary-note">
-        {request.measuredBy === 'browser' ? '브라우저에서 잰 값' : '에이전트 값'} · 차이 {SIMILAR_DEG}° 미만은
-        비슷함으로 봅니다
-      </p>
+      {/* 「브라우저에서 잰 값」 표기는 뺐다(사용자 요청, 2026-09-15). */}
+      <p className="ss-compare-summary-note">차이 {SIMILAR_DEG}° 미만은 비슷함으로 봅니다</p>
     </section>
   )
 }

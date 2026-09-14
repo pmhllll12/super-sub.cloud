@@ -63,13 +63,15 @@ describe('세 순간 카드', () => {
     expect(screen.getByRole('button', { name: /^임팩트/ })).toHaveTextContent('디딤발 무릎 굽히기 160° / 160°')
   })
 
-  it('반전 토글과 표기(브라우저에서 잰 값 · 데모 영상)가 있다', async () => {
+  // 「브라우저에서 잰 값」 표기는 뺐다(사용자 요청, 2026-09-15). 데모 영상 출처는 라이선스상 남긴다.
+  it('반전 토글과 데모 영상 표기가 있다', async () => {
     const props = renderIt({ mirrored: true })
     const flip = screen.getByRole('button', { name: /좌우 반전/ })
     expect(flip).toHaveAttribute('aria-pressed', 'true')
     await userEvent.click(flip)
     expect(props.onToggleMirror).toHaveBeenCalled()
-    expect(screen.getByText(/브라우저에서 잰 값 · 데모 영상\(Pexels\)/)).toBeInTheDocument()
+    expect(screen.getByText('데모 영상(Pexels)')).toBeInTheDocument()
+    expect(screen.queryByText(/브라우저에서 잰 값/)).toBeNull()
   })
 
   it('+1초가 영상 끝으로 대신됐으면 적는다', () => {
