@@ -117,15 +117,18 @@ def render(frames, t: int, boxes: list[tuple]) -> np.ndarray:
         cv2.rectangle(main, (x, y), (x + bw, y + bh), BOX_COLOR, 2)
         cv2.putText(main, str(i), (x, max(14, y - 5)),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, BOX_COLOR, 2)
-    cv2.putText(main, "<- 판정할 프레임 (박스 있는 것) ->", (8, main.shape[0] - 10),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1)
+    # 🔴 **이미지 안에 한글을 쓰지 않는다.** OpenCV 의 Hershey 폰트는 한글을
+    #    못 그려 전부 두부 상자가 된다(첫 판에서 실제로 그렇게 나왔다).
+    #    설명은 INSTRUCTIONS.md 가 하고, 그림에는 **숫자와 ASCII 만** 남긴다.
+    cv2.putText(main, "[ JUDGE THIS FRAME ]", (8, main.shape[0] - 10),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
     # 문맥 — 🔴 박스를 안 그린다
     ctx = []
     for dt in (-CONTEXT, CONTEXT):
         tt = min(max(t + dt, 0), len(frames) - 1)
         c = cv2.resize(frames[tt], (w * 2, h * 2), interpolation=cv2.INTER_CUBIC)
-        cv2.putText(c, f"{dt:+d} 프레임 (참고)", (6, 18),
+        cv2.putText(c, f"{dt:+d} (context, no boxes)", (6, 18),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
         ctx.append(c)
     ctx_row = np.hstack(ctx)
