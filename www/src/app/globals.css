@@ -3088,12 +3088,6 @@ body::-webkit-scrollbar {
   grid-template-rows: 55fr 45fr;
 }
 
-/* 재생 막대는 내 영상 칸 안에 둔다 — 그대로 두면 아래 카드 줄을 덮는다. */
-.ss-shot-frame-body[data-compare='true'] > .ss-shot-scrub {
-  grid-row: 1;
-  grid-column: 2;
-}
-
 .ss-shot-moments {
   grid-row: 2;
   grid-column: 1 / -1;
@@ -3221,6 +3215,10 @@ body::-webkit-scrollbar {
   .ss-shot-frame-body[data-compare='true'] {
     transition: none;
   }
+  /* 위 특이도 메모대로 — grown 상태에서는 이 더 구체적인 규칙도 같이 꺼야 한다. */
+  .ss-shot[data-grown='true'] .ss-shot-frame-body[data-compare='true'] {
+    transition: none;
+  }
 }
 
 /* 오른쪽 판 리포트 아래의 비교 요약. */
@@ -3286,6 +3284,19 @@ body::-webkit-scrollbar {
   transition:
     width 640ms var(--ss-shot-grow-ease),
     height 640ms var(--ss-shot-grow-ease);
+}
+
+/* 🔴 **위 규칙(0,3,0)이 `.ss-shot-frame-body[data-compare='true']`(0,2,0)의
+   `grid-template-rows` 전환을 덮어쓴다** — compare 는 grown 상태에서만 보이므로
+   둘 다 걸린 원소에서는 특이도가 더 높은 이 규칙이 항상 이긴다(순서와 무관하다).
+   그 결과 영상 칸이 위 55%·아래 45% 로 접히는 0.6초 전환이 한 번도 안 돈다(발견,
+   2026-09-15 리뷰). `transition` 은 shorthand 라 나눠 선언하면 먼저 값이 통째로
+   사라지므로, 두 규칙의 값을 한 선언에 모은 더 구체적인 규칙을 따로 둔다. */
+.ss-shot[data-grown='true'] .ss-shot-frame-body[data-compare='true'] {
+  transition:
+    width 640ms var(--ss-shot-grow-ease),
+    height 640ms var(--ss-shot-grow-ease),
+    grid-template-rows 600ms var(--ss-home-out-ease);
 }
 
 /* 오른쪽 판이 뜨면 영상 자리가 그만큼 물러나고 **왼쪽에 붙는다**. 가운데에

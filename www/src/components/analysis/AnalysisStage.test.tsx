@@ -626,6 +626,10 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     // 두 영상이 같은 동작(대역)이라 규칙 문장은 「비슷합니다」다.
     expect(await screen.findByText('세 순간 모두 선수와 비슷합니다.')).toBeInTheDocument()
 
+    // 🔴 비교 요약이 붙어도 **내 리포트(`ReportView`)는 그대로 남는다**
+    // (2026-09-15) — 비교는 리포트 아래에 얹는 것이지 갈아 치우는 것이 아니다.
+    expect(document.querySelector('.ss-report-summary')).toHaveTextContent(REPORT_MOCK.summary)
+
     // 요약 절에도 「임팩트」 줄 단추가 있다 — 카드는 `data-moment` 로 집는다.
     const impact = group.querySelector('[data-moment="impact"]') as HTMLElement
     await user.click(impact)
@@ -658,7 +662,15 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
      캐시된 내 영상 약속이 첫 시도의 컨트롤러에 묶여 있어서, 뽑는 중에 선수를
      바꾸면(그 시도가 끊기며) 캐시까지 함께 끊겼다 — 다음 시도가 그 끊긴 약속을
      물려받아 「뽑는 중」에 영원히 멈췄다. 이 시험은 그 경로(끊김 없이 카드가
-     선다)와 내 영상은 **한 번만** 뽑힌다는 것을 함께 지킨다. */
+     선다)와 내 영상은 **한 번만** 뽑힌다는 것을 함께 지킨다.
+
+     🔴 **대역이 `opts.signal` 을 본다**(리뷰 지적, 2026-09-15) — 안 그러면 이
+     시험은 신호를 아예 무시하는 옛 버그 위에서도 그대로 통과한다(옛 코드가
+     `blob:test` 호출에 시도별 컨트롤러의 신호를 물려줬어도, 대역이 그 신호가
+     끊기는지 확인하지 않으면 「캐시가 끊겼다」를 재현할 수 없다). 신호가
+     끊기면(시도별 컨트롤러가 물려 있었다면 선수를 바꾸는 순간 끊긴다)
+     `AbortError` 로 거부해, 고쳐진 코드(캐시 전용 컨트롤러)에서만 이 약속이
+     안 끊긴 채 끝까지 감을 보인다. */
   it('뽑는 중에 선수를 바꿔도 내 영상 뽑기는 이어가고, 끝나면 카드가 선다', async () => {
     reportReadyFetch()
     const { kickMotion } = await import('@/lib/motion/kickFixture')
@@ -668,7 +680,21 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     })
     getMotion.mockImplementation(async (input: { src: string }, opts) => {
       opts?.onProgress?.(1)
-      if (input.src === 'blob:test') await userGate
+      if (input.src === 'blob:test') {
+        await new Promise<void>((resolve, reject) => {
+          const signal = opts?.signal
+          if (signal?.aborted) {
+            reject(new DOMException('aborted', 'AbortError'))
+            return
+          }
+          const onAbort = () => reject(new DOMException('aborted', 'AbortError'))
+          signal?.addEventListener('abort', onAbort)
+          void userGate.then(() => {
+            signal?.removeEventListener('abort', onAbort)
+            resolve()
+          })
+        })
+      }
       return kickMotion()
     })
 
@@ -724,6 +750,64 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     expect(document.querySelector('.ss-shot-compare-slot')).toBeNull()
     expect(screen.queryByRole('group', { name: '세 순간 비교' })).toBeNull()
   }, 40000)
+
+  /* 🔴 **찾는 척하는 1.6초 타이머가 취소되지 않는다**(리뷰 지적, 2026-09-15). 그
+     타이머가 `reset()` 뒤에도 살아 있다가 뒤늦게 `setCompare('shown')` 을 던지면,
+     이미 빈 판으로 돌아간 화면에 선수 칸이 다시 반쪽을 차지한다. */
+  it('선수를 고른 뒤 1.6초 안에 닫으면, 그 뒤 타이머가 지나도 비교 칸이 다시 갈리지 않는다', async () => {
+    reportReadyFetch()
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await user.click(await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }))
+    await sayYes(user)
+    await user.click(await screen.findByRole('button', { name: '선수와 비교하기' }, { timeout: 12000 }))
+    await user.click(screen.getByRole('button', { name: '에스테반 로벨리' }))
+
+    // 1.6초(COMPARE_MS)가 지나기 전에 닫는다.
+    await user.click(screen.getByRole('button', { name: '닫기' }))
+    expect(await screen.findByLabelText('분석할 영상', {}, { timeout: 2000 })).toBeInTheDocument()
+
+    // 검색 타이머가 지나도록 실제로 기다린다.
+    await new Promise((resolve) => setTimeout(resolve, 1800))
+
+    const body = document.querySelector('.ss-shot-frame-body')
+    expect(body).not.toHaveAttribute('data-compare')
+    expect(document.querySelector('.ss-shot-compare-slot')).toBeNull()
+  }, 15000)
+
+  /* 🔴 같은 타이머가 「선수와 비교하기」 토글을 검색 중에 닫아도 살아 있으면,
+     닫았던 토글이 저절로 다시 열리고 뽑기(`getMotion`)가 새로 시작된다. */
+  it('찾는 중에 토글을 닫으면, 타이머가 지나도 다시 안 열리고 뽑기도 시작되지 않는다', async () => {
+    reportReadyFetch()
+    const { kickMotion } = await import('@/lib/motion/kickFixture')
+    getMotion.mockImplementation(async (_input, opts) => {
+      opts?.onProgress?.(1)
+      return kickMotion()
+    })
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await user.click(await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }))
+    await sayYes(user)
+    await user.click(await screen.findByRole('button', { name: '선수와 비교하기' }, { timeout: 12000 }))
+    await user.click(screen.getByRole('button', { name: '에스테반 로벨리' }))
+
+    // 검색 중(1.6초가 지나기 전)에 토글을 닫는다.
+    await user.click(screen.getByRole('button', { name: '선수와 비교하기' }))
+    expect(getMotion).not.toHaveBeenCalled()
+
+    await new Promise((resolve) => setTimeout(resolve, 1800))
+
+    expect(screen.getByRole('button', { name: '선수와 비교하기' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
+    expect(document.querySelector('.ss-shot-frame-body')).not.toHaveAttribute('data-compare')
+    expect(getMotion).not.toHaveBeenCalled()
+  }, 15000)
 
   // 창 틀의 닫기 자리이므로 시작한 뒤에도 그대로 있어야 한다.
   it('시작한 뒤에도 닫기 점이 남아 있고, 누르면 고르기 전으로 돌아간다', async () => {
@@ -1131,6 +1215,37 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
 
     vi.unstubAllGlobals()
   }, 15000)
+
+  /* 🔴 **멈춰 있어도 seek 하면 그 프레임을 잰다**(리뷰 지적, 2026-09-15 —
+     카드를 눌러 세 순간으로 옮긴 뒤 초록 뼈대가 seek 전 자리에 남는다는
+     사용자 스크린샷으로 확인). jsdom 은 `video.paused` 가 늘 `true`(대역
+     play/pause 가 내부 상태를 안 바꾼다) 라, 예전 코드는 `paused` 만 보고
+     seek 여부와 무관하게 늘 건너뛰었다 — 이 시험은 `currentTime` 이 바뀌면
+     한 번은 새로 반영됨을 「놓침」 배너로 확인한다(관문 전이라 배너가 뜬다). */
+  it('멈춘 채로 다른 시각으로 옮겨도(seek) 그 프레임의 검출을 반영한다', async () => {
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await user.click(await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }))
+    loadVideo()
+    await screen.findByText('이 사람이 맞습니까?', {}, { timeout: 4000 })
+    expect(screen.queryByText(/잠깐 놓쳤습니다/)).toBeNull()
+
+    /* 이제부터는 사람을 놓친다 — 그리고 멈춘 채로(예를 누르기 전) 여러 번 다른
+       시각으로 옮긴다(카드를 여러 번 눌러 보는 것과 같다). 「놓쳤습니다」는
+       연속 4번(`LOST_AFTER`) 이어야 뜨므로, seek 마다 실제로 새로 잰다는 것을
+       보이려면 **여러 번의 서로 다른 시각**이 필요하다 — 한 번의 seek 만으로는
+       고쳤어도 안 고쳤어도 배너가 안 뜬다(놓친 횟수가 1이라). */
+    seesPerson.current = false
+    const video = document.querySelector('video') as HTMLVideoElement
+    for (let i = 1; i <= 6; i += 1) {
+      video.currentTime = 5 + i * 0.01
+      await new Promise((r) => setTimeout(r, 100))
+    }
+
+    expect(await screen.findByText(/잠깐 놓쳤습니다/, {}, { timeout: 2000 })).toBeInTheDocument()
+  }, 10000)
 
   it('반려되면 사유를 보여준다', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {

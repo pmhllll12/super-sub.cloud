@@ -1,3 +1,4 @@
+import { kneeAngle } from './angles'
 import { kickMotion } from './kickFixture'
 import { detectMoments, velocity } from './moments'
 
@@ -14,10 +15,20 @@ describe('세 순간', () => {
     expect(r.moments.impact).toBe(15)
   })
 
-  it('직전은 임팩트 앞 0.5초 안에서 무릎이 가장 굽은 프레임이다', () => {
+  it('직전은 임팩트 0.3초 전이다', () => {
     const r = detectMoments(kickMotion())
     if (!r.ok) throw new Error(r.reason)
-    expect(r.moments.before).toBe(14)
+    // fps 15, impact 15 → 15 - round(0.3*15) = 15 - round(4.5) = 15 - 5 = 10.
+    expect(r.moments.before).toBe(10)
+  })
+
+  it('그 프레임에 관절이 없으면 가장 가까운 잡힌 프레임을 쓴다(동률이면 이른 쪽)', () => {
+    const m = kickMotion()
+    m.frames[10]![16] = { ...m.frames[10]![16], score: 0 } // 목표 프레임(10)의 오른 발목만 못 잡음
+    const r = detectMoments(m)
+    if (!r.ok) throw new Error(r.reason)
+    // 9(거리1)·11(거리1) 동률 — 이른 쪽인 9.
+    expect(r.moments.before).toBe(9)
   })
 
   it('+1초는 임팩트 + fps 프레임이다', () => {
@@ -52,5 +63,16 @@ describe('세 순간', () => {
     const m = kickMotion()
     m.frames = m.frames.map(() => null)
     expect(detectMoments(m).ok).toBe(false)
+  })
+
+  // 🔴 velocity[i]는 i-1·i+1만 보므로, 그 다리 무릎을 못 잰 프레임도 각속도 최대치가 될 수 있다.
+  it('진짜 임팩트 프레임에서 그 다리 무릎을 못 쟀으면 그 프레임은 후보에서 뺀다', () => {
+    const m = kickMotion()
+    m.frames[15]![14] = { ...m.frames[15]![14], score: 0 } // 15번 프레임의 오른 무릎만 못 잡음
+    const r = detectMoments(m)
+    if (!r.ok) throw new Error(r.reason)
+    expect(r.moments.impact).not.toBe(15)
+    const impactKnee = kneeAngle(m.frames[r.moments.impact]!, 'right', m.aspect)
+    expect(impactKnee).not.toBeNull()
   })
 })

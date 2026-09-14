@@ -69,13 +69,22 @@ export default function ComparePlayer({
   useEffect(() => {
     if (closing) return
     let stop = false
+    /**
+     * 마지막으로 잰 `currentTime`. 🔴 **멈춰 있어도 이 값과 다르면 다시 잰다**
+     * (리뷰 지적, 2026-09-15) — 세 순간 카드를 누르면 `seekTo` effect 가
+     * `pause()` + `currentTime` 이동을 하는데, `paused` 만 보고 건너뛰면 하늘색
+     * 뼈대가 seek 전 자리에 그대로 남는다(사용자 스크린샷으로 확인).
+     */
+    let lastDetectedAt: number | null = null
     const loop = async () => {
       while (!stop) {
         await new Promise((r) => setTimeout(r, DETECT_MS))
         const video = videoRef.current
         if (stop || !video) return
-        // 멈춰 있으면 그림이 안 바뀐다 — 다시 잴 이유가 없다.
-        if (video.paused || video.readyState < 2 || !video.videoWidth) continue
+        if (video.readyState < 2 || !video.videoWidth) continue
+        const t = video.currentTime
+        // 멈춰 있고 이미 이 시각을 쟀으면 그림이 안 바뀐다 — 다시 잴 이유가 없다.
+        if (video.paused && lastDetectedAt === t) continue
 
         let dets
         try {
@@ -84,6 +93,7 @@ export default function ComparePlayer({
           return
         }
         if (stop) return
+        lastDetectedAt = t
 
         const big = dets.slice().sort((a, b) => b.box.w * b.box.h - a.box.w * a.box.h)[0]
         targetRef.current = big?.box ?? null

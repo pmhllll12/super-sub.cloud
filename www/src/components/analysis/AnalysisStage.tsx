@@ -380,13 +380,34 @@ export default function AnalysisStage() {
 
   /** 찾는 척하는 시간. 🔴 진짜 검색이 붙으면 이 상수째 사라진다. */
   const COMPARE_MS = 1600
+  /**
+   * `startCompare` 가 예약한 「찾았다」 타이머 — 🔴 **자기 ref 로 취소할 수 있어야 한다**
+   * (리뷰 지적, 2026-09-15). `later()`(공용 타이머 함) 는 화면을 떠날 때만 한꺼번에 걷어서,
+   * 「닫기」 를 1.6초 안에 누르거나 「선수와 비교하기」 토글을 검색 중에 닫아도 이 타이머는
+   * 그대로 남아 있다가 나중에 `setCompare('shown')` 을 던져 — `idle` 로 돌아간 화면에
+   * 빈 비교 칸이 다시 갈리거나(닫기), 닫았던 토글이 저절로 다시 열려 뽑기가 새로 시작된다
+   * (토글). 닫는 모든 길(`reset`·토글 닫기)과 언마운트에서 이 ref 를 거둔다.
+   */
+  const compareTimerRef = useRef<number | null>(null)
+  const clearCompareTimer = useCallback(() => {
+    if (compareTimerRef.current != null) {
+      window.clearTimeout(compareTimerRef.current)
+      compareTimerRef.current = null
+    }
+  }, [])
+  useEffect(() => clearCompareTimer, [clearCompareTimer])
 
   const startCompare = (who: (typeof COMPARE)[number]) => {
+    clearCompareTimer()
     setCompareWho(who)
     setCompare('searching')
     resetCompareMotion()
     setCompareMotion({ status: 'extracting', progress: 0 })
-    setTimeout(() => setCompare('shown'), COMPARE_MS)
+    compareTimerRef.current = window.setTimeout(() => {
+      compareTimerRef.current = null
+      // 그사이 닫혔거나(idle) 다른 선수를 다시 골랐을 수 있다(picking) — searching 일 때만 연다.
+      setCompare((v) => (v === 'searching' ? 'shown' : v))
+    }, COMPARE_MS)
   }
 
   const [reportSaved, setReportSaved] = useState(false)
@@ -662,6 +683,14 @@ export default function AnalysisStage() {
     let stop = false
     let tracker: PersonTracker | null = null
     /**
+     * 마지막으로 **적용한**(따라가기 결과를 그린) `currentTime`. 🔴 **멈춰 있어도
+     * 이 값과 다르면 다시 적용한다**(리뷰 지적, 2026-09-15) — 카드를 눌러 그
+     * 순간으로 seek 하면 `paused` 는 그대로지만 그림은 바뀐 것이라, "멈춰 있으면
+     * 그림이 안 바뀐다" 는 가정이 깨진다. 그러지 않으면 seek 전 자리에 초록
+     * 뼈대가 그대로 남는다(사용자 스크린샷으로 확인).
+     */
+    let lastAppliedAt: number | null = null
+    /**
      * 아직 사람에 못 맞춘 채로 몇 바퀴 돌았나.
      *
      * 🔴 **처음 생김새는 반드시 검출된 상자에서 떠야 한다.** 사람을 크게
@@ -749,8 +778,10 @@ export default function AnalysisStage() {
           continue
         }
 
-        // 멈춰 있으면 그림이 안 바뀐다 — 다시 잴 이유가 없다.
-        if (video.paused) {
+        // 멈춰 있고 **아직 이 시각으로는 적용한 적이 없으면** 한 번은 적용한다
+        // (seek 직후) — 같은 시각을 두 번째로 도는 바퀴부터는 그림이 안 바뀌니 건너뛴다.
+        const currentT = video.currentTime
+        if (video.paused && lastAppliedAt === currentT) {
           /* 🔴 다만 **관문의 시계는 돈다.** 세우고 보는 것도 관절이 그 사람에게
              붙어 있는지 확인하는 정당한 방법이다(영상을 돌려 보다 원하는
              자리에서 세우고 묶는 것이 이 화면의 안내다). 여기서 안 세면
@@ -761,6 +792,7 @@ export default function AnalysisStage() {
           }
           continue
         }
+        lastAppliedAt = currentT
 
         const r = tracker.step(dets, frame)
         setLost(r.lost)
@@ -903,8 +935,11 @@ export default function AnalysisStage() {
     compareMotion.status === 'ready'
       ? (mirrorOverride ?? shouldMirror(compareMotion.player.moments, compareMotion.user.moments))
       : false
-  /* 🔴 **`useMemo` 로 고정한다.** 렌더마다 새 객체가 되면 `CompareSummary` 의 effect 가
-     매번 다시 돌아, 요약이 오는 동안 요청을 끊고 또 보낸다. */
+  /* 🔴 **`useMemo` 로 고정한다.** `CompareSummary` 는 순수하게 `request` 로만 그리는
+     상태 없는(stateless) 컴포넌트라 — 예전 주석처럼 「매번 다시 도는 effect」는 없다.
+     여기서 고정하는 이유는 그 대신 단순하다: `compareMotion` · `compareWho` ·
+     `mirrored` 가 안 바뀌었으면 매 렌더(예: 카드 클릭으로 인한 `moment` 갱신)마다
+     같은 각도표를 다시 계산·재할당할 이유가 없다. */
   const summaryRequest = useMemo(
     () =>
       compareMotion.status === 'ready' && compareWho
@@ -1181,6 +1216,7 @@ export default function AnalysisStage() {
        안 되돌려서, 영상을 비운 뒤에도 빈 판에 선수 칸이 반쪽을 차지한 채 남았다. 판이
        줄어드는 동안 두 칸이 남아 있을 이유도 없다. 버린 영상의 관절 캐시도 끊는다 —
        같은 파일을 다시 올리면 새 주소라 어차피 못 쓴다. */
+    clearCompareTimer()
     setCompare('idle')
     setCompareWho(null)
     resetCompareMotion()
@@ -1831,7 +1867,10 @@ export default function AnalysisStage() {
               className="ss-shot-compare-open"
               aria-expanded={compare !== 'idle'}
               onClick={() => {
-                if (compare !== 'idle') resetCompareMotion()
+                if (compare !== 'idle') {
+                  clearCompareTimer()
+                  resetCompareMotion()
+                }
                 setCompare((v) => (v === 'idle' ? 'picking' : 'idle'))
               }}
             >
@@ -2118,7 +2157,6 @@ export default function AnalysisStage() {
                 compareWho &&
                 (compareMotion.status === 'ready' || compareMotion.status === 'failed') && (
                   <CompareSummary
-                    key={summaryRequest ? JSON.stringify(summaryRequest) : `failed-${compareWho.id}`}
                     playerName={compareWho.name}
                     request={summaryRequest}
                     failedReason={compareMotion.status === 'failed' ? compareMotion.reason : null}
