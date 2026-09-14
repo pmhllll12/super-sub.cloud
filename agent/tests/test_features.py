@@ -533,6 +533,68 @@ def test_distal_apex_ignores_undetected_frames():
     assert phases.impact != 3
 
 
+# --- 한 영상에 동작이 여럿 (미결 45번 ㉲-a, 4회차) -------------------------
+
+
+def test_no_window_is_the_whole_clip():
+    """🔴 **지우지 말 것** — `window=None`이 지금까지의 경로 그대로인지.
+
+    이것이 깨지면 `features`가 바뀌고 **그때까지의 평가가 전부 무효**가 된다
+    (B-6 재실행). 45번 4회차가 39클립 × 설정 3에서 비트 동일을 확인했고,
+    이 검사는 그 성질을 코드 쪽에 붙들어 둔다.
+    """
+    seq = _with_arm_swing(build_sequence())
+    norm = F.normalize(seq)
+    swing, _ = F.identify_limb(norm, "arm")
+
+    whole = F.segment_phases(norm, swing, "arm", "extension_peak")
+    spanning = F.segment_phases(
+        norm, swing, "arm", "extension_peak", window=(0, len(seq))
+    )
+
+    assert whole == spanning
+
+
+def test_a_window_cannot_move_the_impact_outside_itself():
+    """구간을 주면 임팩트가 **그 안**에서만 잡히는지.
+
+    한 영상에 동작이 여럿일 때 구간마다 한 번씩 부르는 것이 ㉲-a의 형태다.
+    창이 안 걸리면 모든 구간이 같은 전역 최대값을 집어 리포트 N개가 전부
+    같은 프레임을 가리킨다 — 실패가 조용하다.
+
+    시퀀스를 길게 잡는 것은 **구간 분할이 성립할 여유**를 주기 위해서다.
+    짧으면 경계 검사(impact가 구간 끝에 붙음)에 먼저 걸려 창이 실제로
+    걸렸는지를 못 본다 — 그쪽은 아래 빈 구간 검사가 따로 본다.
+    """
+    seq = _with_arm_swing(build_sequence(n=81, impact=50))
+    norm = F.normalize(seq)
+    swing, _ = F.identify_limb(norm, "arm")
+
+    whole = F.segment_phases(norm, swing, "arm", "extension_peak").impact
+    half = len(seq) // 2
+    far = (half, len(seq)) if whole < half else (0, half)
+
+    phases = F.segment_phases(norm, swing, "arm", "extension_peak", window=far)
+
+    assert far[0] <= phases.impact < far[1]
+    assert phases.impact != whole
+
+
+def test_an_empty_window_is_refused_not_guessed():
+    """🔴 빈 구간에 **조용히 아무 프레임이나** 내지 않는지.
+
+    구간이 미검출 구간과 겹치면 고를 것이 없다. 그때 예외 대신 값을 내면
+    근거 없는 지표가 리포트에 실린다 — 미결 21번(못 잰 것을 0.0으로 지어냄)과
+    같은 형태다.
+    """
+    seq = _with_arm_swing(build_sequence())
+    norm = F.normalize(seq)
+    swing, _ = F.identify_limb(norm, "arm")
+
+    with pytest.raises(F.InsufficientQuality):
+        F.segment_phases(norm, swing, "arm", "extension_peak", window=(3, 3))
+
+
 # --- 프레임 단위 지표의 물리 시간 표기 (미결 7번 E-3) ----------------------
 
 
