@@ -40,4 +40,5 @@ def to_card_entity(
         owner=CardOwner(id=row.user_id, nickname=owner_nickname),
         titles=titles,
         tagline=row.tagline,
+        style=row.style,
     )

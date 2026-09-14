@@ -111,6 +111,7 @@ def test_봉투를_행_모양으로_옮긴다():
     )
     assert p.pipeline_version == "pose-v0.1"
     assert p.model_name == "exaone-4.0-1.2b"
+    assert p.overall_grade == "B"  # `ho` 28번 — 새로 계산하지 않고 그대로 옮긴다
     assert p.provisional is True
     assert p.previews == {"impact": "s3://b/reports/u/v/impact.png"}
     assert p.keypoint_quality["swing_side_valid_ratio"] == 0.94
@@ -171,3 +172,13 @@ def test_필수_키가_없으면_MalformedReport():
     no_result = {k: v for k, v in _ENVELOPE.items() if k != "result"}
     with pytest.raises(MalformedReport):
         parse_report(_raw(no_result))
+
+
+def test_grade_가_없으면_MalformedReport():
+    # `ho` 28번 — `result.grade` 도 `score`·`summary` 와 같은 필수 필드다.
+    no_grade = {
+        **_ENVELOPE,
+        "result": {k: v for k, v in _ENVELOPE["result"].items() if k != "grade"},
+    }
+    with pytest.raises(MalformedReport):
+        parse_report(_raw(no_grade))

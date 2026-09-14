@@ -77,6 +77,20 @@ class CardPgRepository(CardPort):
         self._session.commit()
         return self.find_by_owner(user_id)
 
+    def update_style(self, user_id: UUID, style: dict | None) -> CardEntity | None:
+        # 🔴 `update_tagline` 과 같은 모양이다 — `values()` 에 `style` 하나만
+        #    둔다. 위 포트 주석대로 통째로 갈아 끼운다.
+        changed = self._session.execute(
+            update(PlayerCardOrm)
+            .where(PlayerCardOrm.user_id == user_id)
+            .values(style=style)
+        ).rowcount
+        if not changed:
+            self._session.rollback()
+            return None
+        self._session.commit()
+        return self.find_by_owner(user_id)
+
     def create_for_owner(self, user_id: UUID) -> CardEntity:
         """카드를 만든다. 이미 있으면 있는 것을 돌려준다 (멱등).
 

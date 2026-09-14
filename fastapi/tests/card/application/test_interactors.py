@@ -11,6 +11,9 @@ from app.card.application.dtos.card_dto import (
     MyCardQuery,
     PublicCardQuery,
 )
+from app.card.application.ports.input.update_my_card_use_case import (
+    UpdateMyCardCommand,
+)
 from app.card.application.ports.output.card_port import CardPort
 from app.card.application.use_cases.create_my_card_interactor import (
     CreateMyCardInteractor,
@@ -18,6 +21,9 @@ from app.card.application.use_cases.create_my_card_interactor import (
 from app.card.application.use_cases.my_card_interactor import MyCardInteractor
 from app.card.application.use_cases.public_card_interactor import (
     PublicCardInteractor,
+)
+from app.card.application.use_cases.update_my_card_interactor import (
+    UpdateMyCardInteractor,
 )
 from app.card.domain.entities.card_entity import CardEntity
 from app.card.domain.entities.title_entity import TitleEntity
@@ -59,6 +65,7 @@ class FakeCardRepository(CardPort):
         # 결과만으로 확인되지 않는다 — 카드는 어느 쪽이든 돌아오기 때문이다.
         self.created_for: list[UUID] = []
         self.tagline_calls: list[tuple[UUID, str | None]] = []
+        self.style_calls: list[tuple[UUID, dict | None]] = []
 
     def find_by_owner(self, user_id: UUID) -> CardEntity | None:
         return _card() if user_id == _OWNER_ID else None
@@ -81,6 +88,12 @@ class FakeCardRepository(CardPort):
         if user_id != _OWNER_ID:
             return None
         return replace(_card(), tagline=tagline)
+
+    def update_style(self, user_id: UUID, style: dict | None) -> CardEntity | None:
+        self.style_calls.append((user_id, style))
+        if user_id != _OWNER_ID:
+            return None
+        return replace(_card(), style=style)
 
 
 class TestMyCardInteractor:
@@ -148,3 +161,60 @@ class TestCreateMyCardInteractor:
             CreateMyCardCommand(user_id=uuid4())
         )
         assert isinstance(result.card.public_slug, str)
+
+
+class TestUpdateMyCardInteractor:
+    """`tagline`·`style` 이 **따로** 바뀌는지 (2026-09-11, 미결 `paik` 3번 나머지).
+
+    🔴 하나가 `UNSET` 이면 그 저장소 메서드를 **아예 안 부른다** — DB 층
+    시험(`test_card_db.py`)은 늘 라우터를 거쳐 둘 다 채운 본문만 보내므로,
+    "한쪽만 보냈을 때 나머지가 안 바뀐다"는 여기서만 확인된다.
+    """
+
+    def test_tagline만_보내면_style_은_안_건드린다(self):
+        repo = FakeCardRepository()
+        UpdateMyCardInteractor(repo)(
+            UpdateMyCardCommand(user_id=_OWNER_ID, tagline="새 별명")
+        )
+        assert repo.tagline_calls == [(_OWNER_ID, "새 별명")]
+        assert repo.style_calls == []
+
+    def test_style만_보내면_tagline_은_안_건드린다(self):
+        repo = FakeCardRepository()
+        style = {"bg": "#91ea92"}
+        UpdateMyCardInteractor(repo)(
+            UpdateMyCardCommand(user_id=_OWNER_ID, style=style)
+        )
+        assert repo.style_calls == [(_OWNER_ID, style)]
+        assert repo.tagline_calls == []
+
+    def test_둘_다_보내면_둘_다_바뀐다(self):
+        repo = FakeCardRepository()
+        style = {"bg": "#91ea92"}
+        UpdateMyCardInteractor(repo)(
+            UpdateMyCardCommand(user_id=_OWNER_ID, tagline="새 별명", style=style)
+        )
+        assert repo.tagline_calls == [(_OWNER_ID, "새 별명")]
+        assert repo.style_calls == [(_OWNER_ID, style)]
+
+    def test_둘_다_안_보내면_저장소를_안_건드리고_지금_카드를_돌려준다(self):
+        repo = FakeCardRepository()
+        result = UpdateMyCardInteractor(repo)(UpdateMyCardCommand(user_id=_OWNER_ID))
+        assert repo.tagline_calls == []
+        assert repo.style_calls == []
+        assert result.public_slug == _SLUG
+
+    def test_style_에_null을_보내면_지운다(self):
+        repo = FakeCardRepository()
+        UpdateMyCardInteractor(repo)(
+            UpdateMyCardCommand(user_id=_OWNER_ID, style=None)
+        )
+        assert repo.style_calls == [(_OWNER_ID, None)]
+
+    def test_카드가_없으면_404(self):
+        with pytest.raises(ApiError) as exc:
+            UpdateMyCardInteractor(FakeCardRepository())(
+                UpdateMyCardCommand(user_id=uuid4(), tagline="아무거나")
+            )
+        assert exc.value.status_code == 404
+        assert exc.value.code == "CARD_NOT_FOUND"

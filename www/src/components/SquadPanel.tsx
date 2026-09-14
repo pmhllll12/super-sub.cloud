@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PublicPlayerCard, Squad } from '@/server/backend'
 import PlayerCardView from '@/components/PlayerCardView'
 import BlankPlayerCard from '@/components/BlankPlayerCard'
-import SquadSuggest from '@/components/SquadSuggest'
+import SquadSuggest, { gradeOfPlayer } from '@/components/SquadSuggest'
 import SquadFriends from '@/components/SquadFriends'
 import TeamSeek from '@/components/TeamSeek'
 import MatchBot from '@/components/MatchBot'
@@ -1146,6 +1146,13 @@ export default function SquadPanel({
         <SquadSuggest
           position={posOf(shown)}
           me={card ? { nickname: card.user.nickname, clip: myClip } : null}
+          /* 🔴 이미 앉은 사람들의 등급 — 추천 판이 그 **평균**으로 첫 거르개를
+             연다(사용자 요청: 넷이 찼고 하나를 더 구할 때). 모르는 사람은
+             `null` 이고 평균에서 빠진다 — 「모른다」를 「낮다」로 치면 팀 평균이
+             통째로 끌려 내려간다. */
+          seated={Object.values(mates)
+            .filter((n): n is string => Boolean(n))
+            .map(gradeOfPlayer)}
           closing={picking === null}
           onClose={close}
           onPick={(name) => {

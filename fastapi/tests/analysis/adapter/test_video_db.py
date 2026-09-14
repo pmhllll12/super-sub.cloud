@@ -183,8 +183,9 @@ class TestRegister:
     def test_반려는_판정만_남고_작업은_안_생긴다(
         self, db_client, db_session, uploader
     ):
+        # 8K — 2026-09-11 정정으로 4K(3840x2160)까지는 통과하니 그 위 값을 쓴다.
         key = _upload(db_client, uploader)
-        res = _register(db_client, uploader, key, width=3840, height=2160)
+        res = _register(db_client, uploader, key, width=7680, height=4320)
         assert res.status_code == 201, res.text
         video_id = uuid.UUID(res.json()["id"])
 
@@ -195,7 +196,7 @@ class TestRegister:
             {"id": video_id},
         ).one()
         assert passed is False
-        assert "3840x2160" in reason
+        assert "7680x4320" in reason
 
         jobs = db_session.execute(
             text("SELECT count(*) FROM analysis_job WHERE video_id = :id"),
@@ -252,6 +253,9 @@ class TestVisibility:
     def test_공개로_바꾸면_남의_공개_목록에_뜬다(self, db_client, uploader):
         key = _upload(db_client, uploader)
         video_id = _register(db_client, uploader, key).json()["id"]
+        # 🔴 공개 목록도 `kept=true` 만 본다 — 작업이 생긴 클립은 등록만으로는
+        # 임시라(미결 `jin` 24번 5조각 해소, 2026-09-11) `keep` 을 먼저 부른다.
+        db_client.post(f"{V1}/videos/{video_id}/keep", headers=uploader["headers"])
 
         res = db_client.patch(
             f"{V1}/videos/{video_id}",
@@ -653,25 +657,36 @@ class TestConstraints:
 
 class TestListMyVideos:
     def test_최근_것이_앞에_온다(self, db_client, uploader):
+        # 🔴 작업이 생긴 클립은 등록만으로는 목록에 안 뜬다(위 `kept=false`
+        # 시험 참고) — 여기서 순서를 보려면 둘 다 `keep` 을 부른다. 그러면
+        # `storage_key` 가 `reports/…` 로 옮겨지므로(`TestKeepVideo` 참고)
+        # 여기서는 안 바뀌는 `id` 로 순서를 잰다.
         first = _upload(db_client, uploader)
-        assert _register(db_client, uploader, first).status_code == 201
+        first_id = _register(db_client, uploader, first).json()["id"]
+        db_client.post(f"{V1}/videos/{first_id}/keep", headers=uploader["headers"])
         second = _upload(db_client, uploader)
-        assert _register(db_client, uploader, second).status_code == 201
+        second_id = _register(db_client, uploader, second).json()["id"]
+        db_client.post(f"{V1}/videos/{second_id}/keep", headers=uploader["headers"])
 
         rows = db_client.get(f"{V1}/videos", headers=uploader["headers"]).json()
-        assert [r["storage_key"] for r in rows][:2] == [second, first]
+        assert [r["id"] for r in rows][:2] == [second_id, first_id]
 
-    def test_kept_false_인_것은_목록에서_빠진다(self, db_client, db_session, uploader):
-        """미결 jin 24번 — 임시(미저장) 영상은 `GET /videos` 에 안 나온다."""
+    def test_kept_false_인_것은_목록에서_빠진다(self, db_client, uploader):
+        """미결 jin 24번 5조각 해소(2026-09-11) — 임시(미저장) 영상은
+        `GET /videos` 에 안 나온다. **작업이 생긴 클립은 등록만으로는
+        `kept=false` 다** — `POST /videos/{id}/keep` 을 불러야 보인다
+        (안 부르면 이 `prov_key` 처럼 목록에서 빠진 채로 남는다 — 실제로
+        분석에 실패한 클립이 그렇게 남지 않고 사라지는 것이 이 항목의 요점).
+        """
         kept_key = _upload(db_client, uploader)
-        _register(db_client, uploader, kept_key)
+        kept_id = _register(db_client, uploader, kept_key).json()["id"]
+        # 🔴 `keep` 이 임시 원본을 리포트 자리로 옮긴다 — 그래서 이 뒤로는
+        # `kept_key` 가 아니라 keep 응답이 돌려준 새 키로 찾는다.
+        kept_key_after = db_client.post(
+            f"{V1}/videos/{kept_id}/keep", headers=uploader["headers"]
+        ).json()["storage_key"]
         prov_key = _upload(db_client, uploader)
-        prov_id = uuid.UUID(_register(db_client, uploader, prov_key).json()["id"])
-
-        db_session.execute(
-            text("UPDATE video SET kept = false WHERE id = :id"), {"id": prov_id}
-        )
-        db_session.commit()
+        _register(db_client, uploader, prov_key)
 
         keys = [
             r["storage_key"]
@@ -679,12 +694,17 @@ class TestListMyVideos:
                 f"{V1}/videos", headers=uploader["headers"]
             ).json()
         ]
-        assert kept_key in keys
+        assert kept_key_after in keys
         assert prov_key not in keys
 
     def test_분석_상태와_반려_사유가_같이_온다(self, db_client, uploader):
         ok = _upload(db_client, uploader)
-        _register(db_client, uploader, ok)
+        ok_id = _register(db_client, uploader, ok).json()["id"]
+        # 🔴 작업이 생긴 클립은 등록만으로 목록에 안 뜬다(위 시험 참고) —
+        # `keep` 을 불러야 여기서 확인하려는 목록 자리에 나타난다.
+        ok = db_client.post(
+            f"{V1}/videos/{ok_id}/keep", headers=uploader["headers"]
+        ).json()["storage_key"]
         rejected = _upload(db_client, uploader)
         _register(db_client, uploader, rejected, duration_ms=90_000)
 
@@ -798,6 +818,30 @@ class TestAdminVideos:
         ).json()["items"]
         row = next(r for r in rows if r["id"] == str(prov_id))
         assert row["kept"] is False
+
+    def test_실패_사유가_관리자_목록에는_보이고_상태만_있던_자리를_채운다(
+        self, db_client, db_session, uploader, admin
+    ):
+        key = _upload(db_client, uploader)
+        video_id = uuid.UUID(_register(db_client, uploader, key).json()["id"])
+        reason = "품질 게이트 미달: 유효 프레임 비율 53% < 기준 70%."
+        db_session.execute(
+            text(
+                "UPDATE analysis_job SET status = 'failed', failure_reason = :r "
+                "WHERE video_id = :id"
+            ),
+            {"r": reason, "id": video_id},
+        )
+        db_session.commit()
+
+        rows = db_client.get(
+            f"{V1}/admin/videos",
+            params={"user": str(uploader["id"])},
+            headers=admin["headers"],
+        ).json()["items"]
+        row = next(r for r in rows if r["id"] == str(video_id))
+        assert row["analysis_status"] == "failed"
+        assert row["analysis_failure_reason"] == reason
 
     def test_없는_사람이면_404(self, db_client, admin):
         res = db_client.get(

@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { apiErrorMessage, apiPost } from '@/lib/api/client'
 import AnalysisChat from '@/components/analysis/AnalysisChat'
 import FigureBackground from '@/components/FigureBackground'
 import { useHideChrome, useLeaving } from '@/lib/pageTransition'
@@ -11,16 +12,16 @@ import { FOCUS } from '@/lib/rubricFocus'
 import { uploadClip, type ClipSubject } from '@/lib/uploadClip'
 import { fetchReport, type ReportResult } from '@/lib/savedReports'
 import ReportView from '@/components/analysis/ReportView'
-import {
-  EDGES,
-  L_SHOULDER,
-  MIN_KP,
-  NOSE,
-  R_SHOULDER,
-  isSamePerson,
-  smoothPose,
-  type Point,
-} from '@/lib/pose'
+import { isSamePerson, smoothPose, type Point } from '@/lib/pose'
+import { posePaths, toViewBox } from '@/lib/poseDraw'
+import ComparePlayer from '@/components/analysis/ComparePlayer'
+import CompareMoments from '@/components/analysis/CompareMoments'
+import CompareSummary from '@/components/analysis/CompareSummary'
+import { shouldMirror } from '@/lib/motion/align'
+import { detectMoments } from '@/lib/motion/moments'
+import { getMotion } from '@/lib/motion/source'
+import { buildSummaryRequest } from '@/lib/motion/summaryContract'
+import type { MomentKey, Moments, Motion } from '@/lib/motion/types'
 import {
   detectPeople,
   refinePose,
@@ -29,6 +30,7 @@ import {
 } from '@/lib/personDetector'
 import {
   createPersonTracker,
+  othersOf,
   snapToDetection,
   type PersonTracker,
 } from '@/lib/personTrack'
@@ -110,12 +112,13 @@ const SIDE_IN_MS = 1320
 const SHRINK_MS = 820
 
 /**
- * 고를 수 있는 종목.
+ * 종목.
  *
  * 🔴 **에이전트가 종목을 알아야 세세하게 본다**(정상호 · 사용자 전달). 루브릭이
  * 종목마다 다르므로 영상만 받아서는 "무엇에 비추어 볼지"가 정해지지 않는다.
- * 그래서 **고르지 않으면 시작할 수 없다** — 기본값을 축구로 박아 두면 야구
- * 영상이 축구 루브릭으로 조용히 채점된다.
+ * 지금은 **축구 하나라 묻지 않는다**(`DEFAULT_SPORT`, 미결 ho 39번) — 종목을
+ * 되살리면 고르는 자리도 같이 되살려야 다른 종목 영상이 축구 루브릭으로
+ * 조용히 채점되지 않는다.
  *
  * ⚠️ 계약(api-contract.md 3-1)의 영상 등록에 **종목 필드가 아직 없다.** 지금은
  * 화면 안에만 있고 서버로 나가지 않는다 — 리포트 조회 규격을 낼 때 같이 낸다.
@@ -166,22 +169,8 @@ function toVideoBox(box: Box, el: HTMLElement, video: HTMLVideoElement | null): 
   return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 }
 }
 
-/** `toVideoBox` 의 짝 — 영상 안 좌표를 다시 오버레이 좌표로. */
-function toViewBox(box: Box, el: HTMLElement, video: HTMLVideoElement | null): Box {
-  const r = el.getBoundingClientRect()
-  const vw = video?.videoWidth ?? 0
-  const vh = video?.videoHeight ?? 0
-  if (!vw || !vh || !r.width || !r.height) return box
-  const scale = Math.min(r.width / vw, r.height / vh)
-  const cw = (vw * scale) / r.width
-  const ch = (vh * scale) / r.height
-  return {
-    x: (1 - cw) / 2 + box.x * cw,
-    y: (1 - ch) / 2 + box.y * ch,
-    w: box.w * cw,
-    h: box.h * ch,
-  }
-}
+/* `toVideoBox` 의 짝(영상 안 → 오버레이 좌표)과 뼈대 그리기는 `lib/poseDraw.ts` 에
+   있다 — 비교 칸의 선수 영상(`ComparePlayer`)과 같은 셈을 나눠 쓴다. */
 
 /** 0:07 꼴로. 리포트의 '이렇게 본 장면' 과 같은 표기다. */
 function fmtTime(sec: number): string {
@@ -191,25 +180,6 @@ function fmtTime(sec: number): string {
   return `${m}:${String(r).padStart(2, '0')}`
 }
 
-/**
- * 관절 한 점을 영상 안 좌표 → 오버레이 좌표로. `toViewBox` 와 같은 셈이다.
- *
- * 🔴 상자와 **같은 보정**을 거쳐야 한다. 한쪽만 보정하면 막대기가 상자와
- * 어긋난 자리에 그려진다 — 세로 영상에서 특히 크게 벌어진다.
- */
-function toViewPoint(p: Point, el: HTMLElement, video: HTMLVideoElement | null) {
-  const r = el.getBoundingClientRect()
-  const vw = video?.videoWidth ?? 0
-  const vh = video?.videoHeight ?? 0
-  if (!vw || !vh || !r.width || !r.height) return p
-  const scale = Math.min(r.width / vw, r.height / vh)
-  const cw = (vw * scale) / r.width
-  const ch = (vh * scale) / r.height
-  return { x: (1 - cw) / 2 + p.x * cw, y: (1 - ch) / 2 + p.y * ch, score: p.score }
-}
-
-/** 뼈대를 그리는 좌표계 — 실제 크기와 무관한 고정 격자다(아래 SVG 참고). */
-const POSE_VB = 1000
 
 /** 이보다 작게 그은 것은 실수로 본다(오버레이 폭 · 키 대비). */
 const MIN_BOX = 0.04
@@ -241,8 +211,31 @@ const STEPS = [
   { key: 'verify', label: '근거 검증', note: '판단마다 그렇게 본 장면을 찾습니다' },
 ] as const
 
-/** 한 단계에 머무는 시간. 진짜 분석은 이보다 오래 걸린다 — 화면 확인용이다. */
+/**
+ * 칸을 하나씩 옮겨 다니는 시간 — **장식**이다. 실제로 끝났는지는 아래
+ * `POLL_MS` 로 서버에 물어서만 안다. 그래서 이 타이머는 마지막 칸(`verify`)
+ * 에서 멈추고 더 넘기지 않는다(2026-09-11, 사용자 지적) — 예전에는 다섯 칸을
+ * 다 채우면 그 자체로 「끝났다」고 선언해서, 진짜 분석이 5.5초보다 오래 걸리는
+ * 보통의 경우에 화면은 이미 리포트 판으로 넘어가 있고 서버는 아직 돌고
+ * 있었다 — 그 사이 뜨는 "아직 분석이 끝나지 않았습니다"가 사용자에게는
+ * "끝났다더니 안 끝났다"로 보였다.
+ */
 const STEP_MS = 1100
+
+/**
+ * 리포트가 됐는지 서버에 다시 물어보는 간격 — **진행 체크리스트가 실제로
+ * 진행되는 근거**다(2026-09-11, 사용자 요청). 올리자마자 100% 헛걸음일
+ * 것이 뻔하니 첫 확인도 이 간격만큼 늦춘다.
+ *
+ * 🔴 워커가 단계별(전처리 · 자세 추적 · 실력 판단 · 근거 검증)로 무엇을
+ * 하고 있는지 중간 보고하는 경로는 아직 없다(`agent/scripts/worker.py` 는
+ * 자식 프로세스의 종료 코드와 `result.json` 만 본다 — 정상호 담당,
+ * `agent/CLAUDE.md`). 그래서 이 화면은 그 네 칸 중 **어디**를 도는지는
+ * 모른다 — 아는 것은 "아직 안 끝났다" 뿐이라, 마지막 칸에 멈춰 "진행 중"
+ * 으로만 보이고 실제 끝(성공·실패)만 서버가 결정한다. 세분화된 단계별
+ * 보고가 필요해지면 `agent/` 쪽 변경이 먼저다 — 미결 항목으로 남긴다.
+ */
+const POLL_MS = 4000
 
 /**
  * 관절이 **연속 이만큼** 잡혀야 「이 사람이 맞습니까?」를 묻는다.
@@ -323,7 +316,106 @@ export default function AnalysisStage() {
    */
   const [videoId, setVideoId] = useState<string | null>(null)
   /** 리포트를 내 프로필에 남겼는가 — `저장` 단추의 상태다. */
+  /**
+   * 「선수와 비교하기」 — 리포트가 다 나온 뒤, 프로 선수의 같은 동작과
+   * 나란히 놓고 보는 자리(사용자 요청, 2026-09-11).
+   *
+   *   idle      아직 안 눌렀다
+   *   picking   누구와 비교할지 고르는 중(이름 둘)
+   *   searching 고른 선수의 비슷한 장면을 찾는 중(연출)
+   *   shown     찾았다 — 영상 칸이 반으로 갈린다
+   *
+   * 🔴 **찾는 일은 진짜가 아니다.** 계약에도 에이전트에도 「비슷한 선수
+   * 영상」이 없다 — 시간도 붙박이(`COMPARE_MS`)고, 왼쪽 영상은 **선수마다
+   * 붙박이로 정해 둔 데모 클립**이다(사용자 결정, 2026-09-14 — RAG · LangGraph
+   * 검색이 붙기 전까지). 진짜가 붙으면 `startCompare` 안에서 `src` 를 받아 오고
+   * 아래 `src` 칸과 `COMPARE_MS` 를 걷는다(미결 paik 28번).
+   *
+   * 데모 클립은 **Pexels 무료 영상**이다(15436954 · 15436958, 1280px 로 줄였다).
+   * 🔴 출처를 모르는 영상 · 실존 선수 경기 영상으로 바꾸지 않는다.
+   *
+   * 🔴 **이름은 지어낸 것이다**(사용자 결정, 2026-09-14). 처음엔 실제 선수
+   * 둘(메시 · 호날두)이었는데, 공개 사이트에 실존 인물의 이름을 허락 없이
+   * 걸면 퍼블리시티권에 걸리고 제휴한 것처럼 읽힌다(미결 paik 28번).
+   * 🔴 **실존 선수 이름으로 되돌리지 않는다** — 저작권 · 초상 판단(박민호)이
+   * 끝나기 전까지는 가상 이름이다.
+   */
+  const COMPARE = [
+    { id: 'rovelli', name: '에스테반 로벨리', src: '/compare/pexels-15436954.mp4' },
+    { id: 'castanheira', name: '티아구 카스탄헤이라', src: '/compare/pexels-15436958.mp4' },
+  ] as const
+  type CompareStage = 'idle' | 'picking' | 'searching' | 'shown'
+  const [compare, setCompare] = useState<CompareStage>('idle')
+  const [compareWho, setCompareWho] = useState<(typeof COMPARE)[number] | null>(null)
+
+  /**
+   * 세 순간 비교의 뽑기 상태(설계 §2 · §3). 🔴 `extracting` 으로 되돌리는 일은 **손짓**
+   * (`startCompare`)이 한다 — effect 첫 줄에서 되돌리면 렌더가 한 번 더 돈다.
+   */
+  type Analyzed = { motion: Motion; moments: Moments }
+  type CompareMotion =
+    | { status: 'idle' }
+    | { status: 'extracting'; progress: number }
+    | { status: 'ready'; player: Analyzed; user: Analyzed }
+    | { status: 'failed'; reason: string }
+  const [compareMotion, setCompareMotion] = useState<CompareMotion>({ status: 'idle' })
+  /** 좌우 반전 — `null` 이면 자동 판단(`shouldMirror`), 토글하면 값이 선다. */
+  const [mirrorOverride, setMirrorOverride] = useState<boolean | null>(null)
+  /** 누른 카드. 두 영상이 이 순간에 멈춘다. */
+  const [moment, setMoment] = useState<MomentKey | null>(null)
+  /**
+   * 내 영상 관절은 같은 파일 · 같은 대상이면 다시 쓴다 — 선수만 바꿀 때 다시 훑지 않는다.
+   *
+   * 🔴 **자기 컨트롤러를 갖는다**(리뷰 지적, 2026-09-15). 시도(아래 effect 의 `ctrl`)의
+   * 신호를 그대로 물려 쓰면, 뽑는 중에 선수를 바꿔 그 시도가 끊길 때 **이 캐시까지
+   * 함께 끊긴다** — 다음 시도가 끊긴 약속을 물려받아 「뽑는 중」에 영원히 멈춘다.
+   * 그래서 이 컨트롤러는 대상(키)이 바뀌거나 화면을 떠날 때만 끊는다.
+   */
+  const userMotionRef = useRef<{ key: string; ctrl: AbortController; motion: Promise<Motion> } | null>(null)
+
+  const resetCompareMotion = () => {
+    setCompareMotion({ status: 'idle' })
+    setMirrorOverride(null)
+    setMoment(null)
+  }
+
+  /** 찾는 척하는 시간. 🔴 진짜 검색이 붙으면 이 상수째 사라진다. */
+  const COMPARE_MS = 1600
+  /**
+   * `startCompare` 가 예약한 「찾았다」 타이머 — 🔴 **자기 ref 로 취소할 수 있어야 한다**
+   * (리뷰 지적, 2026-09-15). `later()`(공용 타이머 함) 는 화면을 떠날 때만 한꺼번에 걷어서,
+   * 「닫기」 를 1.6초 안에 누르거나 「선수와 비교하기」 토글을 검색 중에 닫아도 이 타이머는
+   * 그대로 남아 있다가 나중에 `setCompare('shown')` 을 던져 — `idle` 로 돌아간 화면에
+   * 빈 비교 칸이 다시 갈리거나(닫기), 닫았던 토글이 저절로 다시 열려 뽑기가 새로 시작된다
+   * (토글). 닫는 모든 길(`reset`·토글 닫기)과 언마운트에서 이 ref 를 거둔다.
+   */
+  const compareTimerRef = useRef<number | null>(null)
+  const clearCompareTimer = useCallback(() => {
+    if (compareTimerRef.current != null) {
+      window.clearTimeout(compareTimerRef.current)
+      compareTimerRef.current = null
+    }
+  }, [])
+  useEffect(() => clearCompareTimer, [clearCompareTimer])
+
+  const startCompare = (who: (typeof COMPARE)[number]) => {
+    clearCompareTimer()
+    setCompareWho(who)
+    setCompare('searching')
+    resetCompareMotion()
+    setCompareMotion({ status: 'extracting', progress: 0 })
+    compareTimerRef.current = window.setTimeout(() => {
+      compareTimerRef.current = null
+      // 그사이 닫혔거나(idle) 다른 선수를 다시 골랐을 수 있다(picking) — searching 일 때만 연다.
+      setCompare((v) => (v === 'searching' ? 'shown' : v))
+    }, COMPARE_MS)
+  }
+
   const [reportSaved, setReportSaved] = useState(false)
+  /** `keep` 호출이 오가는 중인가 — 두 번 누르는 것을 막는다. */
+  const [keeping, setKeeping] = useState(false)
+  /** `keep` 이 실패하면 이유를 담는다. `null` 이면 실패한 적이 없다. */
+  const [keepError, setKeepError] = useState<string | null>(null)
   /**
    * 지금 **저장 안 된 채 서버에 올라가 있는** 영상 id.
    *
@@ -502,20 +594,44 @@ export default function AnalysisStage() {
   }, [file])
 
   /**
-   * 리포트를 받아 온다 — **단계가 다 차고, 올라간 영상이 있을 때** 한 번.
+   * 서버에 **진짜 끝났는지** 되풀이해 묻는다 — 「끝났다」는 이 응답만이
+   * 정한다(2026-09-11, 사용자 요청 「진행 체크리스트도 실제로 진행되게」).
    *
-   * 🔴 늦게 온 응답이 다른 영상의 리포트를 덮지 않게 `alive` 로 막는다.
+   * 🔴 `ready`·`failed`·`missing` 은 다시 물어도 안 바뀌는 결말이라 거기서
+   * 멈춘다. `not-ready`(아직 도는 중)·`error`(네트워크 등 일시적 문제)는
+   * 계속 되묻는다 — `error` 를 결말로 다루면 한 번의 요청 실패로 체크리스트가
+   * 영영 멈춘 것처럼 보인다.
+   *
+   * 🔴 늦게 온 응답이 다른 영상 것을 덮지 않게, 그리고 언마운트 뒤에도 다음
+   * 타이머가 잡히지 않게 `alive` 로 막는다.
+   *
+   * 🔴 **의존성에 `step` 을 넣지 않는다.** `videoId` 는 업로드가 성공한
+   * 순간 딱 한 번만 채워지지만, 장식용 단계 타이머(아래 효과)가 그 뒤에도
+   * 계속 `step` 을 바꾼다 — 넣으면 단계가 넘어갈 때마다 이 효과가 다시
+   * 돌아 4초짜리 대기가 매번 처음부터 다시 시작돼(2026-09-11에 실제로
+   * 시험이 이렇게 걸렸다), 실제로는 훨씬 늦게야 첫 확인이 나간다.
    */
   useEffect(() => {
-    if (!done || !videoId) return
+    if (!confirmed || done || !videoId) return
     let alive = true
-    void fetchReport(videoId).then((r) => {
-      if (alive) setReport(r)
-    })
+    let timer: number
+    const check = () => {
+      void fetchReport(videoId).then((r) => {
+        if (!alive) return
+        if (r.state === 'not-ready' || r.state === 'error') {
+          timer = window.setTimeout(check, POLL_MS)
+          return
+        }
+        setReport(r)
+        setDone(true)
+      })
+    }
+    timer = window.setTimeout(check, POLL_MS)
     return () => {
       alive = false
+      clearTimeout(timer)
     }
-  }, [done, videoId])
+  }, [confirmed, done, videoId])
 
   /**
    * 단계가 하나씩 넘어간다 — **「예」를 누른 뒤부터**(사용자 요청, 2026-09-08).
@@ -527,15 +643,14 @@ export default function AnalysisStage() {
    * 🔴 **첫 칸('영상 등록')은 여기서 안 넘긴다.** 그 칸이 곧 진짜 S3 업로드라
    * (`saveToServer`), 올라간 뒤에 스스로 넘어간다. 시간으로 넘기면 아직
    * 올라가지도 않았는데 다음 칸이 켜진다.
+   *
+   * 🔴 **마지막 칸에서 멈춘다** — 위 `STEP_MS` 주석대로, 다 채우는 것 자체가
+   * 「끝났다」는 뜻이던 것을 없앴다. 「끝났다」는 이제 위 폴링 효과가 서버
+   * 응답으로만 선언한다.
    */
   useEffect(() => {
     if (!sideIn || !subject || !confirmed || done) return
-    if (step >= STEPS.length) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setDone(true)
-      return
-    }
-    if (step === 0) return
+    if (step === 0 || step >= STEPS.length - 1) return
     const t = window.setTimeout(() => setStep((s) => s + 1), STEP_MS)
     return () => clearTimeout(t)
   }, [sideIn, subject, confirmed, step, done])
@@ -572,6 +687,14 @@ export default function AnalysisStage() {
 
     let stop = false
     let tracker: PersonTracker | null = null
+    /**
+     * 마지막으로 **적용한**(따라가기 결과를 그린) `currentTime`. 🔴 **멈춰 있어도
+     * 이 값과 다르면 다시 적용한다**(리뷰 지적, 2026-09-15) — 카드를 눌러 그
+     * 순간으로 seek 하면 `paused` 는 그대로지만 그림은 바뀐 것이라, "멈춰 있으면
+     * 그림이 안 바뀐다" 는 가정이 깨진다. 그러지 않으면 seek 전 자리에 초록
+     * 뼈대가 그대로 남는다(사용자 스크린샷으로 확인).
+     */
+    let lastAppliedAt: number | null = null
     /**
      * 아직 사람에 못 맞춘 채로 몇 바퀴 돌았나.
      *
@@ -660,8 +783,10 @@ export default function AnalysisStage() {
           continue
         }
 
-        // 멈춰 있으면 그림이 안 바뀐다 — 다시 잴 이유가 없다.
-        if (video.paused) {
+        // 멈춰 있고 **아직 이 시각으로는 적용한 적이 없으면** 한 번은 적용한다
+        // (seek 직후) — 같은 시각을 두 번째로 도는 바퀴부터는 그림이 안 바뀌니 건너뛴다.
+        const currentT = video.currentTime
+        if (video.paused && lastAppliedAt === currentT) {
           /* 🔴 다만 **관문의 시계는 돈다.** 세우고 보는 것도 관절이 그 사람에게
              붙어 있는지 확인하는 정당한 방법이다(영상을 돌려 보다 원하는
              자리에서 세우고 묶는 것이 이 화면의 안내다). 여기서 안 세면
@@ -672,15 +797,15 @@ export default function AnalysisStage() {
           }
           continue
         }
+        lastAppliedAt = currentT
 
         const r = tracker.step(dets, frame)
         setLost(r.lost)
 
-        // 화면의 나머지 사람들 — 회색으로 그린다. 누구인지는 안 따진다.
-        othersRef.current = dets
-          .filter((d) => d !== r.det)
-          .map((d) => d.keypoints)
-          .filter((k): k is Point[] => Boolean(k))
+        // 화면의 나머지 사람들 — 회색으로 그린다. 🔴 짝지어진 검출만이 아니라
+        // 대상 박스와 크게 겹치는 검출도 뺀다(`othersOf` 주석 — 한 사람뿐인데
+        // 회색이 초록 위에 겹쳐 그려졌다).
+        othersRef.current = othersOf(dets, r)
 
         /**
          * 🔴 **놓치면 아예 없앤다**(사용자 요청). 예전에는 마지막 자리에
@@ -729,6 +854,105 @@ export default function AnalysisStage() {
       stop = true
     }
   }, [started, closing, subject])
+
+  // 선수를 고르면 두 영상의 관절을 뽑는다. 선수를 바꾸거나 닫으면 이 시도만 중단한다
+  // (내 영상 캐시는 안 끊는다 — 아래 `userMotionRef` 선언의 주석).
+  useEffect(() => {
+    if (compare !== 'shown' || !compareWho || !file) return
+    const ctrl = new AbortController()
+    const progress = [0, 0]
+    const report = (i: number) => (r: number) => {
+      progress[i] = r
+      if (!ctrl.signal.aborted) {
+        setCompareMotion({ status: 'extracting', progress: Math.round(((progress[0] + progress[1]) / 2) * 100) })
+      }
+    }
+
+    const box = subject?.box ?? null
+    const pickMe = box ? { box, atMs: subject?.at ?? 0 } : ('largest' as const)
+    const userKey = `${file.url}|${JSON.stringify(pickMe)}`
+    if (userMotionRef.current?.key !== userKey) {
+      // 대상이 바뀌었다 — 옛 캐시는 이제 쓸 데가 없으니 그때 가서 끊는다.
+      userMotionRef.current?.ctrl.abort()
+      const userCtrl = new AbortController()
+      userMotionRef.current = {
+        key: userKey,
+        ctrl: userCtrl,
+        motion: getMotion({ src: file.url, pick: pickMe }, { signal: userCtrl.signal, onProgress: report(1) }),
+      }
+    } else {
+      // 이미 도는(또는 끝난) 캐시를 그대로 쓴다 — 진행률은 여기서 다시 걸지 않고
+      // **끝나야 100 으로 뛴다**(선수만 바꾼 시도라 내 영상 몫을 따로 잴 수 없다).
+      void userMotionRef.current.motion.then(() => report(1)(1)).catch(() => {})
+    }
+    const userMotion = userMotionRef.current.motion
+
+    Promise.all([
+      getMotion({ src: compareWho.src, pick: 'largest' }, { signal: ctrl.signal, onProgress: report(0) }),
+      userMotion,
+    ])
+      .then(([pm, um]) => {
+        if (ctrl.signal.aborted) return
+        const p = detectMoments(pm)
+        const u = detectMoments(um)
+        if (!p.ok || !u.ok) {
+          setCompareMotion({ status: 'failed', reason: !p.ok ? p.reason : (u as { reason: string }).reason })
+          return
+        }
+        setCompareMotion({
+          status: 'ready',
+          player: { motion: pm, moments: p.moments },
+          user: { motion: um, moments: u.moments },
+        })
+      })
+      .catch(() => {
+        // 🔴 **이 시도 자체가 끊긴 것만 조용히 넘긴다**(`ctrl` — 새 선수의 뽑기가
+        // 이미 돌고 있다). 그 밖의 실패는 — 캐시가 다른 이유로 끊긴 것을 포함해 —
+        // 화면에 알린다. 안 그러면 "뽑는 중"에 멈춘 채 아무 말도 안 하게 된다
+        // (이 캐시가 낸 것이면 다음 시도가 다시 뽑도록 비운다).
+        if (ctrl.signal.aborted) return
+        if (userMotionRef.current?.key === userKey) userMotionRef.current = null
+        setCompareMotion({ status: 'failed', reason: '자세를 뽑지 못했습니다' })
+      })
+
+    return () => ctrl.abort()
+  }, [compare, compareWho, file, subject])
+
+  // 화면을 떠나면(언마운트) 캐시에 남은 뽑기도 끊는다 — 그 전까지는 살려 둔다.
+  useEffect(() => {
+    return () => userMotionRef.current?.ctrl.abort()
+  }, [])
+
+  // 누른 카드의 순간으로 내 영상을 옮긴다(선수 영상은 `ComparePlayer` 의 `seekTo`).
+  useEffect(() => {
+    const v = previewRef.current
+    if (!v || compareMotion.status !== 'ready') return
+    if (moment === null) {
+      void v.play()?.catch(() => {})
+      return
+    }
+    const { motion, moments } = compareMotion.user
+    v.pause()
+    v.currentTime = moments[moment] / motion.fps
+  }, [moment, compareMotion])
+
+  const mirrored =
+    compareMotion.status === 'ready'
+      ? (mirrorOverride ?? shouldMirror(compareMotion.player.moments, compareMotion.user.moments))
+      : false
+  /* 🔴 **`useMemo` 로 고정한다.** `CompareSummary` 는 순수하게 `request` 로만 그리는
+     상태 없는(stateless) 컴포넌트라 — 예전 주석처럼 「매번 다시 도는 effect」는 없다.
+     여기서 고정하는 이유는 그 대신 단순하다: `compareMotion` · `compareWho` ·
+     `mirrored` 가 안 바뀌었으면 매 렌더(예: 카드 클릭으로 인한 `moment` 갱신)마다
+     같은 각도표를 다시 계산·재할당할 이유가 없다. */
+  const summaryRequest = useMemo(
+    () =>
+      compareMotion.status === 'ready' && compareWho
+        ? buildSummaryRequest(compareWho.name, compareMotion.player, compareMotion.user, mirrored)
+        : null,
+    [compareMotion, compareWho, mirrored],
+  )
+  const toggleMoment = (key: MomentKey) => setMoment((cur) => (cur === key ? null : key))
 
   /**
    * 🔴 **그리기는 검출과 따로 돈다.**
@@ -779,34 +1003,6 @@ export default function AnalysisStage() {
       drawPose(dt, layer, video)
     }
 
-    /** 여러 사람의 자세를 뼈 · 관절 두 줄의 `d` 로 모은다. */
-    const pathsFor = (poses: Point[][], layer: HTMLElement, video: HTMLVideoElement | null) => {
-      let bones = ''
-      let joints = ''
-      for (const pose of poses) {
-        const pt = pose.map((p) => toViewPoint(p, layer, video))
-        const at = (i: number) =>
-          `${(pt[i].x * POSE_VB).toFixed(1)} ${(pt[i].y * POSE_VB).toFixed(1)}`
-        const seen = (i: number) => pt[i] && pt[i].score >= MIN_KP
-
-        for (const [a, b] of EDGES) {
-          if (!seen(a) || !seen(b)) continue
-          bones += `M${at(a)}L${at(b)}`
-        }
-        // 목 — 코와 두 어깨의 가운데를 잇는다. 고개 방향만 남긴다.
-        if (seen(NOSE) && seen(L_SHOULDER) && seen(R_SHOULDER)) {
-          const mx = ((pt[L_SHOULDER].x + pt[R_SHOULDER].x) / 2) * POSE_VB
-          const my = ((pt[L_SHOULDER].y + pt[R_SHOULDER].y) / 2) * POSE_VB
-          bones += `M${at(NOSE)}L${mx.toFixed(1)} ${my.toFixed(1)}`
-        }
-        // 길이 0 인 선은 둥근 끝 때문에 점으로 그려진다.
-        for (let i = 0; i < pt.length; i += 1) {
-          if (seen(i)) joints += `M${at(i)}L${at(i)}`
-        }
-      }
-      return { bones, joints }
-    }
-
     /**
      * 화면의 나머지 사람들 — 회색. 🔴 **누구인지 잇지 않는다.** 그래서 눅이기
      * 전에 "같은 사람의 연속된 두 장인가" 를 묻고, 아니면 그냥 새로 놓는다
@@ -824,7 +1020,7 @@ export default function AnalysisStage() {
       )
       shownOthersRef.current = smoothed
 
-      const { bones, joints } = pathsFor(smoothed, layer, video)
+      const { bones, joints } = posePaths(smoothed, layer, video)
       bone.setAttribute('d', bones)
       joint.setAttribute('d', joints)
     }
@@ -847,7 +1043,7 @@ export default function AnalysisStage() {
 
       const pose = smoothPose(shownPoseRef.current, raw, dt)
       shownPoseRef.current = pose
-      const { bones, joints } = pathsFor([pose], layer, video)
+      const { bones, joints } = posePaths([pose], layer, video)
       bone.setAttribute('d', bones)
       joint.setAttribute('d', joints)
     }
@@ -1021,6 +1217,16 @@ export default function AnalysisStage() {
     targetRef.current = null
     shownRef.current = null
     setLost(false)
+    /* 🔴 **비교도 바로 걷는다**(사용자 지적, 2026-09-15). 예전에는 여기서 비교 상태를
+       안 되돌려서, 영상을 비운 뒤에도 빈 판에 선수 칸이 반쪽을 차지한 채 남았다. 판이
+       줄어드는 동안 두 칸이 남아 있을 이유도 없다. 버린 영상의 관절 캐시도 끊는다 —
+       같은 파일을 다시 올리면 새 주소라 어차피 못 쓴다. */
+    clearCompareTimer()
+    setCompare('idle')
+    setCompareWho(null)
+    resetCompareMotion()
+    userMotionRef.current?.ctrl.abort()
+    userMotionRef.current = null
     // 2단계 — 다 줄어든 뒤에야 제목 · 설명 · 헤더가 다시 나타난다.
     // 🔴 `started` 를 여기서 끄는 것이 그 신호다. 같이 꺼 버리면 판이 줄기도
     // 전에 글자들이 되돌아와 두 동작이 겹친다.
@@ -1137,16 +1343,29 @@ export default function AnalysisStage() {
   /**
    * `저장` — **이 영상을 남긴다**(사용자 요청, 2026-09-08).
    *
+   * ✅ **서버에 붙었다**(2026-09-11, 미결 `jin` 24번 5조각 해소). 전에는
+   * 로컬 상태만 켜서 "떠날 때 안 지우기"로만 남겼는데, 실제로는 `POST
+   * /videos/{id}/keep` 을 불러야 서버가 영구로 본다 — 안 부르면 (이 화면을
+   * 정상적으로 떠나 `leftoverRef`가 지워도) 24시간 뒤 서버 백스톱이 결국
+   * 지운다(사용자가 "분석 실패한 영상이 안 지워진다"고 지적한 그 자리).
+   *
    * 🔴 **리포트를 따로 저장하지 않는다**(2026-09-10 에 바뀌었다). 리포트는
-   * 분석이 끝나면 서버에 적재되므로(CCC 31) 화면이 매달아 둘 것이 없다 —
-   * 남는 일은 **영상을 지우지 않는 것**뿐이다. 저장 없이 떠나면 아래
-   * `dropLeftover` 가 그 영상을 지우고, 그러면 리포트도 함께 사라진다.
+   * 분석이 끝나면 서버에 적재되므로(CCC 31) `keep` 호출만으로 충분하다.
    */
-  function saveReportToProfile() {
+  async function saveReportToProfile() {
     if (!videoId) return
-    setReportSaved(true)
-    // 저장했으니 더 이상 「미저장분」이 아니다 — 떠날 때 지우면 안 된다.
-    leftoverRef.current = null
+    setKeeping(true)
+    setKeepError(null)
+    try {
+      await apiPost(`/api/videos/${encodeURIComponent(videoId)}/keep`, {})
+      setReportSaved(true)
+      // 저장했으니 더 이상 「미저장분」이 아니다 — 떠날 때 지우면 안 된다.
+      leftoverRef.current = null
+    } catch (e) {
+      setKeepError(apiErrorMessage(e))
+    } finally {
+      setKeeping(false)
+    }
   }
 
   /**
@@ -1331,7 +1550,40 @@ export default function AnalysisStage() {
             </span>
           </div>
 
-          <div className="ss-shot-frame-body">
+          {/* 🔴 비교가 뜨면 **이 상자가 반으로 갈린다** — 내 영상은 오른쪽으로
+              밀리고 왼쪽에 선수 영상이 들어온다(사용자 요청). 자리를 나누는
+              일만 여기서 하고, 안의 것들은 제 크기대로 따라간다. */}
+          <div
+            className="ss-shot-frame-body"
+            data-compare={compare === 'shown' ? 'true' : undefined}
+            data-moments={compare === 'shown' && compareMotion.status === 'ready' ? 'true' : undefined}
+          >
+            {/* ⚠️ **데모 클립이다** — 선수 영상을 찾는 경로가 계약에도 에이전트에도
+                없다(위 `COMPARE` 주석). 진짜가 붙으면 `src` 만 갈아 끼운다. */}
+            {compare === 'shown' && compareWho && (
+              <ComparePlayer
+                key={compareWho.id}
+                src={compareWho.src}
+                label={`${compareWho.name} 영상`}
+                closing={closing}
+                seekTo={
+                  moment && compareMotion.status === 'ready'
+                    ? compareMotion.player.moments[moment] / compareMotion.player.motion.fps
+                    : null
+                }
+              />
+            )}
+            {compare === 'shown' && compareWho && compareMotion.status === 'ready' && (
+              <CompareMoments
+                playerName={compareWho.name}
+                player={compareMotion.player}
+                user={compareMotion.user}
+                mirrored={mirrored}
+                onToggleMirror={() => setMirrorOverride(!mirrored)}
+                selected={moment}
+                onSelect={toggleMoment}
+              />
+            )}
             {file ? (
               <>
                 <video
@@ -1428,8 +1680,18 @@ export default function AnalysisStage() {
                     {/* 자리는 위의 rAF 가 직접 쓴다 — 초당 60번 바뀌는 값을
                         React 상태에 두면 그만큼 다시 그린다. */}
                     <div ref={boxRef} className="ss-shot-track-box">
+                      {/* 방송 화면의 실시간 표시처럼 읽히게(사용자 요청, 2026-09-14).
+                          판 전체가 `aria-hidden` 이라 낭독기에는 안 간다 — 놓친
+                          사실은 오른쪽 판의 알림 한 줄(`.ss-shot-lost`)이 한글로 말한다. */}
                       <span className="ss-shot-track-tag">
-                        {lost ? '놓쳤습니다' : '따라가는 중'}
+                        {lost ? (
+                          'SIGNAL LOST'
+                        ) : (
+                          <>
+                            <i className="ss-shot-track-dot" />
+                            LIVE TRACKING
+                          </>
+                        )}
                       </span>
                     </div>
                   </div>
@@ -1614,16 +1876,96 @@ export default function AnalysisStage() {
 
               ⚠️ 이 자리에 있던 **'다른 영상'** 은 없앴다(사용자 요청). 고르기 전으로
               되돌리는 길은 창 틀의 **「닫기」 알약**에 그대로 있다 —
-              길이 하나 없어진 것이 아니라 자리를 옮긴 것이다. */}
+              길이 하나 없어진 것이 아니라 자리를 옮긴 것이다.
+
+              🔴 **`report.state === 'ready'` 가 아니면 눌러도 안 된다**
+              (2026-09-11) — 분석이 실패·반려로 끝났으면 남길 리포트가 없다.
+              눌리게 두면 서버가 그대로 임시로 두고 결국 지워지는데, 사용자는
+              "저장했는데 왜 사라지나"로 오해한다. 단추 자체는 그대로
+              둔다 — 기다리는 동안 무엇이 나올지 미리 보여주는 자리였다
+              (`test_리포트가_끝나기_전에는_저장이_잠겨_있다`). */}
+          {/* 🔴 **「저장」 왼쪽**이다(사용자 요청). 리포트가 다 나온 뒤에만
+              나온다 — 비교할 것이 아직 없으면 누를 데가 있으면 안 된다. */}
+          {done && (
+            <button
+              type="button"
+              className="ss-shot-compare-open"
+              aria-expanded={compare !== 'idle'}
+              onClick={() => {
+                if (compare !== 'idle') {
+                  clearCompareTimer()
+                  resetCompareMotion()
+                }
+                setCompare((v) => (v === 'idle' ? 'picking' : 'idle'))
+              }}
+            >
+              선수와 비교하기
+            </button>
+          )}
           <button
             type="button"
             className="ss-shot-again"
-            disabled={!done || !videoId || reportSaved}
-            onClick={saveReportToProfile}
+            disabled={!videoId || report?.state !== 'ready' || reportSaved || keeping}
+            onClick={() => void saveReportToProfile()}
           >
-            {reportSaved ? '내 프로필에 저장됨' : '내 프로필에 리포트 저장'}
+            {reportSaved ? '내 프로필에 저장됨' : keeping ? '저장하는 중…' : '내 프로필에 리포트 저장'}
           </button>
         </header>
+
+        {keepError && (
+          <p className="ss-shot-save-msg" data-tone="error">
+            {keepError}
+          </p>
+        )}
+
+        {/* 🔴 **머리줄 바로 아래에서 펴진다** — 리포트는 그만큼 아래로 밀린다
+            (사용자 요청). 접기는 `grid-template-rows`(0fr → 1fr) 다: 상한과
+            실제 높이가 다르면 전환이 안 보이는 구간에서 소모돼 속도가 튄다.
+
+            🔴 고르는 줄과 「찾는 중」이 **같은 자리**를 쓴다 — 이름 둘이
+            사라지고 그 자리에 문장이 들어오므로 판이 안 들썩인다. */}
+        <div className="ss-shot-compare" data-open={compare !== 'idle' ? 'true' : 'false'}>
+          <div>
+            {compare === 'picking' ? (
+              <div className="ss-shot-compare-picks">
+                {COMPARE.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className="ss-shot-compare-pick"
+                    onClick={() => startCompare(p)}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="ss-shot-compare-msg" role="status">
+                {compare === 'searching' ? (
+                  <>
+                    영상과 비슷한 {compareWho?.name}의 영상을 찾고 있는 중입니다
+                    {/* 🔴 점을 **글자로 찍지 않는다.** `...` 을 문자열로 돌리면
+                        글자 폭이 바뀌어 문장이 좌우로 뜬다 — 셋을 각각 요소로
+                        두고 불투명도만 차례로 켠다. */}
+                    <span className="ss-shot-dots" aria-hidden="true">
+                      <i />
+                      <i />
+                      <i />
+                    </span>
+                  </>
+                ) : compare === 'shown' ? (
+                  compareMotion.status === 'extracting' ? (
+                    <>두 영상에서 자세를 뽑는 중 · {compareMotion.progress}%</>
+                  ) : compareMotion.status === 'failed' ? (
+                    <>이 영상에서 슈팅 순간을 찾지 못했습니다 — {compareMotion.reason}</>
+                  ) : (
+                    <>{compareWho?.name}와 세 순간을 아래에 겹쳐 놓았습니다.</>
+                  )
+                ) : null}
+              </p>
+            )}
+          </div>
+        </div>
 
         {/* 반려·오류 사유 — 성공(saved)은 진행 단계가 넘어가는 것으로 보인다. */}
         {saveMessage && (saveState === 'rejected' || saveState === 'error') && (
@@ -1653,8 +1995,22 @@ export default function AnalysisStage() {
             고르기만 한 단계에서는 아직 아무것도 안 하고 있다. */}
         {/* 놓쳤으면 말한다. 🔴 **분석을 멈추지는 않는다** — 에이전트도
             "검출 실패 프레임은 지표 계산에서 배제한다"(agent/README)로
-            같은 자리를 다룬다. 멈추는 게 아니라 그 구간을 빼는 것이 맞다. */}
-        {started && subject && (trackFailed || lost) && (
+            같은 자리를 다룬다. 멈추는 게 아니라 그 구간을 빼는 것이 맞다.
+
+            🔴 **`!confirmed` 를 넣었다**(2026-09-11, 사용자 지적) — 이 배너는
+            **관문**(「이 사람이 맞습니까?」 전) 용이다. 「예」를 누른 뒤에는
+            대상이 이미 `subjectAnchor()` 로 잘려 서버에 올라간 뒤라, 그 뒤에
+            도는 이 화면의 라이브 따라가기(재생 루프가 사람 없는 프레임을
+            지날 때도 도는 장식일 뿐이다)가 "놓쳤다"고 말해도 **실제 분석과
+            무관하다** — 사용자에게는 "분석 중인데 프레임을 놓쳤다"는, 진행
+            중인 진짜 작업이 잘못된 것처럼 읽힌다.
+
+            🔴 더 나쁘게는 `다시 묶기`(`repick`)가 `setSubject(null)` 을
+            불러 화면을 "사람을 골라 주세요" 단계로 되돌린다 — 이미 업로드·
+            분석이 시작된 뒤에 눌리면 `confirmed`는 `true`인 채 `subject`만
+            비어 뒤죽박죽인 화면이 되고, 다시 확인해 「예」를 또 누르면
+            `saveToServer()` 가 다시 불려 **같은 클립이 두 번 업로드**된다. */}
+        {started && subject && !confirmed && (trackFailed || lost) && (
           <div className="ss-shot-lost" role="status">
             <span>
               {trackFailed
@@ -1819,29 +2175,33 @@ export default function AnalysisStage() {
              두면 한쪽만 늙는다. */
           /* 🔴 **「아직」과 「없다」를 갈라 그린다** — 분석 중인 클립에 빈 판을
              보이면 결과가 없는 것으로 읽힌다(미결 `paik` 7번의 「하지 말 것」). */
+          /* 🔴 **`not-ready`·`error`는 여기 안 온다.** `done` 은 위 폴링
+             효과가 `report` 와 **같은 순간에만** 세운다(2026-09-11) — 도는
+             중이거나 네트워크가 잠깐 안 될 때는 `done` 이 그대로 거짓이라
+             이 자리에 못 온다. 그래서 여기 남는 결말은 `ready`·`failed`·
+             `missing` 셋뿐이고, 「다시 확인」 단추는 (폴링이 이미 하고
+             있어서) 쓸 일이 없어 없앴다. */
           report?.state === 'ready' ? (
-            <ReportView report={report.report} />
+            <>
+              <ReportView report={report.report} />
+              {compare === 'shown' &&
+                compareWho &&
+                (compareMotion.status === 'ready' || compareMotion.status === 'failed') && (
+                  <CompareSummary
+                    playerName={compareWho.name}
+                    request={summaryRequest}
+                    failedReason={compareMotion.status === 'failed' ? compareMotion.reason : null}
+                    onSelect={toggleMoment}
+                  />
+                )}
+            </>
           ) : (
             <div className="ss-report-wait" role="status">
               <p>
-                {report === null
-                  ? '리포트를 불러오는 중입니다…'
-                  : report.state === 'not-ready'
-                    ? '아직 분석이 끝나지 않았습니다.'
-                    : report.state === 'missing'
-                      ? '그 영상을 찾을 수 없습니다.'
-                      : report.message}
+                {report?.state === 'failed'
+                  ? `분석에 실패했습니다 — ${report.reason}`
+                  : '그 영상을 찾을 수 없습니다.'}
               </p>
-              {/* 기다리는 것 말고 할 일을 준다 — 끝났는지 다시 물어볼 수 있어야 한다. */}
-              {videoId && report?.state !== 'missing' && (
-                <button
-                  type="button"
-                  className="ss-shot-pick-auto"
-                  onClick={() => void fetchReport(videoId).then(setReport)}
-                >
-                  다시 확인
-                </button>
-              )}
             </div>
           )
         ) : (

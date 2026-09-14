@@ -21,6 +21,8 @@ const CARD: PlayerCard = {
   og_image_key: 'og/hong-gildong.png',
   user: { id: 'u1', nickname: '홍길동' },
   titles: [],
+  tagline: null,
+  style: null,
 }
 
 /** 호칭이 실제로 달린 카드 — 알약을 보려면 필요하다. */

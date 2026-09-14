@@ -120,8 +120,11 @@ class TestRegisterVideo:
         assert body["analysis_job_id"] is not None
         assert body["analysis_status"] == "queued"
         assert body["side"] == "right"
-        # 미결 jin 24번 1조각 — 지금은 등록되는 모든 영상이 kept=true 로 시작한다.
-        assert body["kept"] is True
+        # 미결 jin 24번 5조각 해소(2026-09-11) — 작업이 생긴 클립은 등록만으로는
+        # 임시(`kept=false`)다. `POST /videos/{id}/keep` 을 불러야 영구가 된다
+        # (`TestKeepVideo` 참고) — 안 그러면 분석에 실패해 다시 볼 리포트가
+        # 없는 클립이 DB·S3 에 영영 남는다(사용자가 화면에서 직접 지적).
+        assert body["kept"] is False
 
     def test_반려도_201_이고_사유가_본문에_온다(self, client):
         """🔴 422 로 돌려보내면 사유가 아무 데도 안 남는다 — SFR-001."""
@@ -136,11 +139,12 @@ class TestRegisterVideo:
         assert "길이" in body["reject_reason"]
 
     def test_반려된_클립은_분석하지_않는다(self, client):
+        # 8K — 2026-09-11 정정으로 4K(3840x2160)까지는 통과하니 그 위 값을 쓴다.
         user_id = uuid4()
         key = _issue(client, user_id)
         put_object(key, SIZE_OK)
 
-        res = _register(client, user_id, key, width=3840, height=2160)
+        res = _register(client, user_id, key, width=7680, height=4320)
         body = res.json()
         assert body["passed"] is False
         assert body["analysis_job_id"] is None
@@ -196,13 +200,26 @@ class TestRegisterVideo:
         assert body["reject_reason"] is None
         assert body["analysis_job_id"] is None
 
-    def test_analyze_true_면_4K_는_그대로_반려된다(self, client):
-        """분석을 걸면 해상도 상한이 살아 있다 — 4K 는 host RAM 이 터진다."""
+    def test_analyze_true_여도_4K는_이제_통과한다(self, client):
+        """정정(2026-09-11) — `ho` 9번이 4K를 메모리로 이미 안전하다고 확정
+        했는데 이 상한이 안 풀려 있던 것을 사용자가 발견했다. 가로·세로 둘 다."""
+        user_id = uuid4()
+        for width, height in [(3840, 2160), (2160, 3840)]:
+            key = _issue(client, user_id)
+            put_object(key, SIZE_OK)
+            res = _register(client, user_id, key, width=width, height=height)
+            assert res.status_code == 201, res.text
+            assert res.json()["passed"] is True
+            assert res.json()["reject_reason"] is None
+            assert res.json()["analysis_job_id"] is not None
+
+    def test_analyze_true_면_해상도_상한은_여전히_살아있다(self, client):
+        """8K — 방향 무관 상한(긴 변 3840·짧은 변 2160)을 넘으면 그대로 반려."""
         user_id = uuid4()
         key = _issue(client, user_id)
         put_object(key, SIZE_OK)
 
-        res = _register(client, user_id, key, width=3840, height=2160)  # analyze 기본 True
+        res = _register(client, user_id, key, width=7680, height=4320)  # analyze 기본 True
         assert res.status_code == 201, res.text
         assert res.json()["passed"] is False
         assert "해상도" in res.json()["reject_reason"]
@@ -344,9 +361,7 @@ class TestListMyVideos:
     def test_내_것만_담긴다(self, client):
         mine, other = uuid4(), uuid4()
         for user_id in (mine, other):
-            key = _issue(client, user_id)
-            put_object(key, SIZE_OK)
-            assert _register(client, user_id, key).status_code == 201
+            _register_clip(client, user_id)
 
         res = client.get(f"{V1}/videos", headers=_headers(mine))
         assert res.status_code == 200
@@ -354,10 +369,11 @@ class TestListMyVideos:
 
     def test_반려_사유가_목록에도_온다(self, client):
         """`/videos` 화면이 반려 사유를 펼쳐 보여준다(플러터 설계 5.3)."""
+        # 8K — 2026-09-11 정정으로 4K(3840x2160)까지는 통과하니 그 위 값을 쓴다.
         user_id = uuid4()
         key = _issue(client, user_id)
         put_object(key, SIZE_OK)
-        _register(client, user_id, key, width=3840, height=2160)
+        _register(client, user_id, key, width=7680, height=4320)
 
         row = client.get(f"{V1}/videos", headers=_headers(user_id)).json()[0]
         assert row["passed"] is False
@@ -365,11 +381,23 @@ class TestListMyVideos:
 
 
 def _register_clip(client, user_id):
+    """등록하고 **그 자리에서 저장까지** 한다 — 이 파일의 다른 시험 대부분이
+    바라는 것은 "쓸 수 있는 클립"이지 "아직 저장 안 한 임시분"이 아니다.
+
+    🔴 작업이 생긴 클립은 등록만으로는 `kept=false` 다(미결 `jin` 24번 5조각
+    해소, 2026-09-11) — `GET /videos`·공개 목록 어디에도 안 뜬다. 여기서
+    `keep` 을 안 부르면 이 헬퍼를 쓰는 시험 대부분이 "방금 등록한 클립이
+    목록에 없다"로 깨진다. 그 자체(등록만 하면 임시다)를 확인하는 시험은
+    `TestRegisterVideo`·`TestKeepVideo`가 이 헬퍼를 안 쓰고 직접 부른다.
+    """
     key = _issue(client, user_id)
     put_object(key, SIZE_OK)
     res = _register(client, user_id, key)
     assert res.status_code == 201, res.text
-    return res.json()["id"]
+    video_id = res.json()["id"]
+    kept = client.post(f"{V1}/videos/{video_id}/keep", headers=_headers(user_id))
+    assert kept.status_code == 200, kept.text
+    return video_id
 
 
 class TestUpdateVideo:

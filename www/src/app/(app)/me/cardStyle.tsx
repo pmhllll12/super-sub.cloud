@@ -1,31 +1,35 @@
 'use client'
 
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { loadCardStyle, saveCardStyle } from './cardStyleStore'
+import { createContext, useContext, useMemo, useState } from 'react'
+import { apiPatch } from '@/lib/api/client'
+import { ALIAS } from '@/components/PlayerCardView'
+import type { CardStyleWire, PlayerCard } from '@/server/backend'
 
 /**
  * 카드 꾸미기 설정.
  *
- * ⚠️ **아직 서버에 저장되지 않는다.** 계약에 카드를 꾸미는 필드가 없다
- * (미결 paik 3번).
+ * ✅ **서버에 저장된다** (CCC 35, 2026-09-11). `PATCH /me/card`의 `style`이
+ * 그 자리다 — `bg`·`logo`·`text_color`·`text_x`·`text_y`·`brush`·
+ * `brush_color`·`brush_scale`·`brush_x`·`brush_y`(스네이크 표기는 서버
+ * 계약, 여기 `CardStyle`은 화면 관례대로 캐멀 표기다. `toWire`/`fromWire`가
+ * 그 경계다).
  *
- * 🔴 **앞서 "브라우저 저장도 일부러 안 넣었다"고 적었던 것을 정정한다**
- * (2026-09-04, 사용자 요청). 근거는 "서버가 붙으면 상태가 두 곳에 생긴다"
- * 였는데, 저장이 아예 없으면 **편집기를 닫는 순간 꾸민 것이 전부 사라져**
- * 기능이 성립하지 않았다. 지금은 `cardStyleStore.ts` 한 파일이 그 자리를
- * 맡고, 서버가 생기면 그 파일만 지우면 된다.
+ * 🔴 **`text`(가운데 큰 글자)는 여기 없다.** 이미 있던 `tagline`이 같은
+ * 자리였다 — 04-09에 그걸 몰라 `style.text`를 새로 만들었던 것을 이번에
+ * 합쳤다. 아래 `tagline`은 그 자리다(자리 이름을 그대로 쓴다 — 다른 개념이
+ * 아니라 같은 값의 편집 버퍼다).
  *
- * 🔴 **여기 담긴 이름들이 곧 계약에 요청할 필드 목록**이다. 화면에서 무엇이
- * 필요한지 먼저 굳혀 두면, 규격을 낼 때 짐작으로 정하지 않아도 된다.
+ * ⚠️ **사진 관련 넷(`photo`·`photoScale`·`photoX`·`photoY`)과 `mode`는
+ * 여전히 서버에 없다.** `og_image_key`가 "규칙은 있는데 파일이 없는" 것과
+ * 같은 이유다(저장 위치 미정) — `cardStyleStore.ts` 없이 **이 세션 동안만**
+ * 남는다. 새로고침하면 사라지는 것이 지금은 맞는 동작이다.
  */
 export type CardStyle = {
   /** 카드 바탕. */
   bg: string
   /** 워드마크(SUPERSUB) 색. */
   logo: string
-  /** 가운데 큰 글자. 비우면 카드에 글자가 없다. */
-  text: string
-  /** 그 글자의 색. */
+  /** 가운데 큰 글자(`tagline`)의 색. */
   textColor: string
   /**
    * 글자 자리 — 카드 폭 · 높이에 대한 백분율(가운데 기준).
@@ -35,9 +39,10 @@ export type CardStyle = {
   textX: number
   textY: number
   /**
-   * 올린 사진. **브라우저 안에만 있다**(파일을 읽은 data URL) — 카드 이미지를
-   * 올릴 자리가 계약에 정해져 있지 않아서 서버로 보내지 않는다.
-   * `og_image_key` 가 "그 위치에 파일이 아직 없다" 인 것과 같은 자리다.
+   * 올린 사진. **브라우저 안에만, 이 세션 동안만 있다**(파일을 읽은 data
+   * URL) — 카드 이미지를 올릴 자리가 계약에 정해져 있지 않아서 서버로
+   * 보내지 않는다. `og_image_key` 가 "그 위치에 파일이 아직 없다" 인 것과
+   * 같은 자리다.
    */
   photo: string | null
   /** 사진 크기(1 이 원래 크기). */
@@ -54,7 +59,7 @@ export type CardStyle = {
    *   수고 없이 카드를 만들 수 있는 길이다.
    */
   mode: 'cutout' | 'full'
-  /** 뒤에 깔리는 자국. `-1` 이면 아무것도 안 깐다. */
+  /** 뒤에 깔리는 자국. */
   brush: number
   brushColor: string
   brushScale: number
@@ -69,7 +74,6 @@ export const TEXT_MIN_Y = 24
 export const DEFAULT_CARD_STYLE: CardStyle = {
   bg: '#91ea92',
   logo: '#0b0b0b',
-  text: 'THREE LUNGS',
   textColor: '#0b0b0b',
   // 지금 카드에서 글자가 앉아 있는 자리 그대로.
   textX: 50,
@@ -86,13 +90,50 @@ export const DEFAULT_CARD_STYLE: CardStyle = {
   brushY: 0,
 }
 
+/** 서버 값(있으면) 위에 기본값을 채운다 — 필드가 늘어나도 옛 카드가 화면을 안 깬다. */
+function fromWire(wire: CardStyleWire | null | undefined): CardStyle {
+  if (!wire) return DEFAULT_CARD_STYLE
+  return {
+    ...DEFAULT_CARD_STYLE,
+    bg: wire.bg,
+    logo: wire.logo,
+    textColor: wire.text_color,
+    textX: wire.text_x,
+    textY: wire.text_y,
+    brush: wire.brush,
+    brushColor: wire.brush_color,
+    brushScale: wire.brush_scale,
+    brushX: wire.brush_x,
+    brushY: wire.brush_y,
+  }
+}
+
+/** 사진 관련 넷은 서버에 자리가 없다 — 여기서 빠지는 것이 그 경계다. */
+function toWire(style: CardStyle): CardStyleWire {
+  return {
+    bg: style.bg,
+    logo: style.logo,
+    text_color: style.textColor,
+    text_x: style.textX,
+    text_y: style.textY,
+    brush: style.brush,
+    brush_color: style.brushColor,
+    brush_scale: style.brushScale,
+    brush_x: style.brushX,
+    brush_y: style.brushY,
+  }
+}
+
 type Ctx = {
   style: CardStyle
+  /** 가운데 큰 글자의 편집 버퍼 — 저장하면 `tagline` 이 된다. */
+  tagline: string
   set: (patch: Partial<CardStyle>) => void
-  /** 화면의 값만 처음으로 되돌린다 — **저장해 둔 것은 건드리지 않는다.** */
+  setTagline: (v: string) => void
+  /** 화면의 값만 **공장 기본값**으로 되돌린다 — 저장된 것은 건드리지 않는다. */
   reset: () => void
-  /** 지금 값을 담아 둔다. 실패하면 `false`(사진이 크면 한도를 넘는다). */
-  save: () => boolean
+  /** 지금 값을 서버에 담는다. 실패하면 `false`. */
+  save: () => Promise<boolean>
 }
 
 const CardStyleContext = createContext<Ctx | null>(null)
@@ -100,26 +141,47 @@ const CardStyleContext = createContext<Ctx | null>(null)
 /**
  * 카드와 편집기가 **같은 값을 본다**. 둘이 화면에서 떨어져 있어서(카드는 선
  * 위, 편집기는 선 아래) 상태를 한쪽이 들고 있을 수가 없다.
+ *
+ * 🔴 **초기값을 서버가 준 `card` 에서 채운다.** 예전엔 `localStorage`를
+ * 마운트 뒤 `useEffect`로 읽었다(서버 렌더와 갈릴까 봐) — 이제 값의 정본이
+ * 서버이고 `card`는 서버 컴포넌트가 이미 들고 있는 값이라, 처음 렌더부터
+ * 같은 것을 그린다. 하이드레이션이 갈릴 자리가 없다.
  */
-export function CardStyleProvider({ children }: { children: React.ReactNode }) {
-  const [style, setStyle] = useState<CardStyle>(DEFAULT_CARD_STYLE)
-
-  /* 🔴 담아 둔 값을 **그릴 때 읽지 않는다.** 서버에는 없는 값이라 서버가 그린
-     첫 화면과 브라우저가 그린 것이 갈려 하이드레이션이 깨진다. */
-  useEffect(() => {
-    const saved = loadCardStyle(DEFAULT_CARD_STYLE)
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- 위 주석 참고.
-    if (saved) setStyle(saved)
-  }, [])
+export function CardStyleProvider({
+  card,
+  children,
+}: {
+  card: PlayerCard | null
+  children: React.ReactNode
+}) {
+  const [style, setStyle] = useState<CardStyle>(() => fromWire(card?.style))
+  // 🔴 안 정했으면 `ALIAS` 자리 표시로 시작한다 — 지금 카드(비편집 화면)에
+  // 보이는 것과 편집기를 여는 순간 보이는 것이 달라지면 안 된다.
+  const [tagline, setTagline] = useState(() => card?.tagline ?? ALIAS)
 
   const value = useMemo<Ctx>(
     () => ({
       style,
+      tagline,
       set: (patch) => setStyle((prev) => ({ ...prev, ...patch })),
-      reset: () => setStyle(DEFAULT_CARD_STYLE),
-      save: () => saveCardStyle(style),
+      setTagline,
+      reset: () => {
+        setStyle(DEFAULT_CARD_STYLE)
+        setTagline(ALIAS)
+      },
+      save: async () => {
+        try {
+          await apiPatch('/api/me/card', {
+            tagline: tagline.trim() || null,
+            style: toWire(style),
+          })
+          return true
+        } catch {
+          return false
+        }
+      },
     }),
-    [style],
+    [style, tagline],
   )
   return <CardStyleContext.Provider value={value}>{children}</CardStyleContext.Provider>
 }
@@ -132,9 +194,11 @@ export function useCardStyle(): Ctx {
   return (
     useContext(CardStyleContext) ?? {
       style: DEFAULT_CARD_STYLE,
+      tagline: '',
       set: () => {},
+      setTagline: () => {},
       reset: () => {},
-      save: () => false,
+      save: async () => false,
     }
   )
 }

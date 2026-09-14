@@ -70,6 +70,9 @@ class ParsedReport:
     rubric_version: str
     summary: str
     model_name: str
+    # 총점의 글자 등급(A/B/C/D) — `result.grade`. `scoring.aggregate` 가 낸 값을
+    # 그대로 옮긴다(미결 `ho` 28번) — 문턱값을 여기서 다시 계산하지 않는다.
+    overall_grade: str
     provisional: bool | None
     previews: dict[str, Any] | None
     keypoint_quality: dict[str, Any] | None
@@ -111,6 +114,7 @@ def parse_report(raw: bytes) -> ParsedReport:
 
     result = _require(env, "result", "봉투")
     summary = str(_require(result, "summary", "result"))
+    overall_grade = str(_require(result, "grade", "result"))
     # `model_name` 은 근거 문장(evidence)을 쓴 모델이다 — 봉투의 `judge_model`.
     model_name = str(env.get("judge_model") or "unknown")
 
@@ -192,6 +196,7 @@ def parse_report(raw: bytes) -> ParsedReport:
         rubric_version=rubric_version,
         summary=summary,
         model_name=model_name[:80],
+        overall_grade=overall_grade[:1],
         provisional=(
             bool(result["provisional"])
             if result.get("provisional") is not None

@@ -120,6 +120,7 @@ class ReportIngestPgRepository(ReportIngestPort):
                 analysis_metric_id=metric_id,
                 summary=parsed.summary,
                 model_name=parsed.model_name[:80],
+                overall_grade=parsed.overall_grade,
                 schema_version=parsed.schema_version[:10],
                 provisional=parsed.provisional,
                 previews=parsed.previews,

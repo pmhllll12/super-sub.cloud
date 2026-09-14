@@ -356,4 +356,5 @@ def _to_entity(
         ),
         analysis_job_id=None if job is None else job.id,
         analysis_status=None if job is None else job.status,
+        analysis_failure_reason=None if job is None else job.failure_reason,
     )

@@ -1,0 +1,76 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+장치 cuda · 검출기 PekingU/rtdetr_r50vd_coco_o365@457857ce
+🔴 거절 근거 도구: ('baseball_bat', 'tennis_racket')  (sports_ball 은 쓰지 않는다)
+
+Loading weights:   0%|          | 0/764 [00:00<?, ?it/s]Loading weights:  32%|███▏      | 242/764 [00:00<00:00, 2418.99it/s]Loading weights:  63%|██████▎   | 484/764 [00:00<00:00, 2298.06it/s]Loading weights: 100%|██████████| 764/764 [00:00<00:00, 3254.33it/s]
+실효 샘플링 fps가 목표보다 크게 낮습니다: 10.00 < 30 (소스 10.00fps, step 1). 프레임 간격이 넓어 임팩트 추정이 거칠어집니다. 이 경고는 절벽만 막으며 fps 불변성을 보장하지 않습니다 (미결 7번).
+── baseball(음성·거절 기대): 39편
+  [1/39] 0Fet8TyoNR4.mp4                          거절  도구=['baseball_bat', 'sports_ball']  (28.9초)
+  [2/39] 3R1kvNrGJK0.mp4                          거절  도구=['baseball_bat']  (23.4초)
+  [3/39] 3USSmzO001k.mp4                          거절  도구=['baseball_bat', 'tennis_racket']  (22.7초)
+  [4/39] 5-jBTNp5IQA.mp4                          통과  도구=없음  (22.6초)
+  [5/39] 6hrcRyIYTrA.mp4                          거절  도구=['baseball_bat']  (22.6초)
+  [6/39] 8gmHKqDxXdg.mp4                          거절  도구=['baseball_bat', 'sports_ball']  (6.3초)
+  [7/39] Atzrde5uGcM.mp4                          거절  도구=['baseball_bat']  (19.7초)
+  [8/39] C7icGyrdROM.mp4                          거절  도구=['baseball_bat']  (21.2초)
+  [9/39] CFjNxCZhn_8.mp4                          통과  도구=없음  (23.3초)
+  [10/39] Fz16t9SrF3U.mp4                          거절  도구=['baseball_bat']  (22.6초)
+  [11/39] GS-PcxmaHmQ.mp4                          거절  도구=['baseball_bat', 'sports_ball']  (20.6초)
+  [12/39] IYFifBJ9lH8.mp4                          통과  도구=없음  (21.0초)
+  [13/39] IeDin6oB-IY.mp4                          통과  도구=없음  (21.2초)
+  [14/39] LXjM7nBZcak.mp4                          통과  도구=없음  (13.7초)
+  [15/39] LhD_fnHt_xg.mp4                          통과  도구=없음  (18.4초)
+  [16/39] N5zWQkoLM3M.mp4                          통과  도구=['sports_ball']  (21.2초)
+  [17/39] O2GSaYqH8JY.mp4                          거절  도구=['sports_ball', 'tennis_racket']  (24.0초)
+  [18/39] V_whuvMjg_8.mp4                          거절  도구=['baseball_bat', 'sports_ball']  (17.2초)
+  [19/39] X6dC9pu5H3k.mp4                          거절  도구=['baseball_bat']  (17.8초)
+  [20/39] YNMHMKb5Md4.mp4                          거절  도구=['baseball_bat']  (13.5초)
+  [21/39] ZMy0t-CSZiU.mp4                          거절  도구=['baseball_bat']  (21.7초)
+  [22/39] ZS-wgeg2qkI.mp4                          거절  도구=['baseball_bat']  (21.7초)
+  [23/39] Zp9aDp2YTBw.mp4                          통과  도구=['sports_ball']  (15.8초)
+  [24/39] bh6Cvz2orzQ.mp4                          거절  도구=['baseball_bat', 'sports_ball']  (20.1초)
+  [25/39] cDRi9AzrapA.mp4                          거절  도구=['baseball_bat']  (17.0초)
+  [26/39] e8uB0GZsVOQ.mp4                          통과  도구=['sports_ball']  (18.3초)
+  [27/39] g_wHimPF9o8.mp4                          거절  도구=['baseball_bat']  (21.2초)
+  [28/39] gg5xRWjw3f8.mp4                          거절  도구=['baseball_bat']  (19.3초)
+  [29/39] goeDWOVL95g.mp4                          거절  도구=['baseball_bat', 'sports_ball']  (9.6초)
+  [30/39] h_3LqD2Pl-E.mp4                          거절  도구=['baseball_bat', 'sports_ball']  (19.1초)
+  [31/39] hz-SpF35_BE.mp4                          거절  도구=['baseball_bat']  (20.5초)
+  [32/39] idueIYDAbZc.mp4                          통과  도구=없음  (19.2초)
+  [33/39] ihWykL5mYRI.mp4                          거절  도구=['baseball_bat']  (19.2초)
+  [34/39] mTP2kap9cIw.mp4                          거절  도구=['baseball_bat']  (20.4초)
+  [35/39] sGKeqfxwq5E.mp4                          거절  도구=['baseball_bat']  (19.3초)
+  [36/39] sYl2jCqsSKo.mp4                          거절  도구=['baseball_bat']  (20.8초)
+  [37/39] w-AQcjcoDyA.mp4                          통과  도구=없음  (21.4초)
+  [38/39] wjJDs0qmwqE.mp4                          통과  도구=['sports_ball']  (20.9초)
+  [39/39] xMIUw5mi3Eo.mp4                          거절  도구=['baseball_bat']  (20.6초)
+── soccer(양성·통과 기대): 19편
+  [1/19] 10_penalty1_91169c09.avi                 통과  도구=['sports_ball']  (4.0초)
+  [2/19] 11_freekick_930ede06.avi                 통과  도구=['sports_ball']  (4.6초)
+  [3/19] 12_penalty_a821a39e.avi                  통과  도구=['sports_ball']  (7.3초)
+  [4/19] 13_freekick_616f8db5.avi                 통과  도구=['sports_ball']  (6.5초)
+  [5/19] 14_penalty1_980ede07.avi                 통과  도구=['sports_ball']  (5.1초)
+  [6/19] 14_penalty_db7e99af.avi                  통과  도구=['sports_ball']  (5.6초)
+  [7/19] 16_penalty1_44038699.avi                 통과  도구=['sports_ball']  (4.4초)
+  [8/19] 18_freekick1_f4ff1a25.avi                통과  도구=['sports_ball']  (2.8초)
+  [9/19] 18_freekick3_681418eb.avi                통과  도구=['sports_ball']  (4.0초)
+  [10/19] 18_freekick_5033c49b.avi                 통과  도구=['sports_ball']  (3.7초)
+  [11/19] 19_freekick1_da3f1406.avi                통과  도구=['sports_ball']  (4.5초)
+  [12/19] 19_freekick2_86f6c708.avi                통과  도구=['sports_ball']  (9.8초)
+  [13/19] 19_freekick_940922f8.avi                 통과  도구=['sports_ball']  (3.7초)
+  [14/19] 21_freekick_3ee04674.avi                 통과  도구=['sports_ball']  (4.5초)
+  [15/19] 23_freekick_a972f2ea.avi                 통과  도구=['sports_ball']  (4.0초)
+  [16/19] 25_freekick1_86d715b9.avi                통과  도구=['sports_ball']  (2.7초)
+  [17/19] 25_freekick_c76aa778.avi                 통과  도구=['sports_ball']  (2.9초)
+  [18/19] OpenPose_5T_df2d1ce9.avi                 통과  도구=['sports_ball']  (4.6초)
+  [19/19] Y1_2ff12fb9.avi                          통과  도구=['sports_ball']  (2.2초)
+
+==================================================================
+baseball(음성·거절 기대): 39편 · 거절 27 (69%) · 공 검출 12 (31%)
+soccer(양성·통과 기대): 19편 · 거절 0 (0%) · 공 검출 19 (100%)
+
+── 사전 등록 판정
+  A 축구 오거절 0건        : 0건 ✅
+  B 야구 거절 ≥50%        : 69% ✅
+  C 점수 비트 동일         : 별도 — 게이트는 features 를 안 건드린다
+  D 오거절 사유            : 해당 없음

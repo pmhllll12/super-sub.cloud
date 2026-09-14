@@ -1,7 +1,9 @@
 import type {
   AdminUserDetail,
   AdminUserListResult,
+  AdminVideoListResult,
   AuthToken,
+  CardStyleWire,
   CreateMatchInput,
   FeaturedVideo,
   MercenaryCandidate,
@@ -44,6 +46,19 @@ export interface Backend {
    * 행위**여야 하기 때문이다 — 프리페치나 봇이 카드를 만들면 안 된다.
    */
   createMyCard(token: string): Promise<PlayerCard>
+  /**
+   * 카드의 한 줄(`tagline`)과 꾸미기(`style`)를 바꾼다 — 계약 3장, CCC 18·35.
+   *
+   * 🔴 **보낸 필드만 바뀐다** — `updateVideo` 와 같은 판단이다. `tagline`
+   * 만 보내면 `style` 은 그대로고, 반대도 마찬가지다. 그래서 입력 타입에
+   * `?`(생략 가능)를 뒀다 — `undefined` 로라도 보내면 "보냈다"로 읽힐 수
+   * 있으니 **키 자체를 빼고** 부른다. `null` 은 "지운다"는 뜻이 있는 값이다.
+   * 🔴 `style` 을 보낼 땐 **전체 값**을 보낸다 — 서버가 부분 병합을 안 한다.
+   */
+  updateMyCard(
+    token: string,
+    input: { tagline?: string | null; style?: CardStyleWire | null },
+  ): Promise<PlayerCard>
   getPublicCard(slug: string): Promise<PublicPlayerCard>
   /** 내가 올린 클립 목록. **최근 것이 앞에 온다.** */
   listMyVideos(token: string): Promise<MyVideo[]>
@@ -66,6 +81,21 @@ export interface Backend {
    * 지금 도는 것은 mock 뿐이다.
    */
   deleteMyVideo(token: string, videoId: string): Promise<void>
+  /**
+   * 「내 프로필에 리포트 저장」 — `POST /videos/{id}/keep`(계약 3-6절,
+   * 미결 `jin` 24번 5조각).
+   *
+   * 🔴 **작업이 생긴 클립은 등록만으로는 임시(`kept=false`)다**(2026-09-11
+   * 백엔드 정정 — 사용자가 "분석에 실패한 영상이 안 지워진다"고 지적해서
+   * 바뀌었다). 이 호출 전까지는 화면을 벗어나면 곧 지워지거나
+   * (`deleteMyVideo`/`pagehide`), 그것도 놓치면 24시간 뒤 서버 백스톱이
+   * 지운다 — **분석에 실패해 다시 볼 리포트가 없는 클립을 그대로 두는
+   * 길**이다. 이 호출을 부르면 영구가 되고, 임시 원본이던 것은 리포트
+   * 자리로 옮겨져 `storage_key` 가 바뀐다.
+   * 🔴 **멱등이다** — 이미 저장된 클립에 다시 불러도 그대로다.
+   * 🔴 남의/없는 클립은 404 `VIDEO_NOT_FOUND`.
+   */
+  keepVideo(token: string, videoId: string): Promise<MyVideo>
   /**
    * 내 클립을 **부분 수정**한다 — 보낸 것만 바뀐다(계약 3-6절 `PATCH /videos`).
    *
@@ -203,4 +233,6 @@ export interface Backend {
   ): Promise<AdminUserListResult>
   getUserDetail(token: string, userId: string): Promise<AdminUserDetail>
   forceDeleteUser(token: string, userId: string): Promise<void>
+  /** 관리자 전용. `user` 는 `user.id` 또는 이메일. 없는 사람이면 404 USER_NOT_FOUND. */
+  listAdminVideos(token: string, user: string): Promise<AdminVideoListResult>
 }

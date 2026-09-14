@@ -32,7 +32,13 @@ _MINIMAL = {
     "rubric": {"sport": "football", "motion": "instep_shot", "version": "0.1"},
     "judge_model": "exaone-4.0-1.2b",
     "features": {},
-    "result": {"score": 50, "summary": "s", "breakdown": [], "skipped": []},
+    "result": {
+        "score": 50,
+        "grade": "C",
+        "summary": "s",
+        "breakdown": [],
+        "skipped": [],
+    },
 }
 
 

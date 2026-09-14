@@ -4,6 +4,7 @@ import type {
   MatchSearch,
   AdminUserDetail,
   AdminUserListResult,
+  AdminVideoListResult,
   AuthToken,
   FeaturedVideo,
   Match,
@@ -72,6 +73,10 @@ export const fastapiBackend: Backend = {
     return callFastApi<PlayerCard>('/me/card', { method: 'POST', token })
   },
 
+  updateMyCard(token, input) {
+    return callFastApi<PlayerCard>('/me/card', { method: 'PATCH', token, body: input })
+  },
+
   getPublicCard(slug) {
     return callFastApi<PublicPlayerCard>(`/cards/${encodeURIComponent(slug)}`, { method: 'GET' })
   },
@@ -92,6 +97,13 @@ export const fastapiBackend: Backend = {
     // 무엇이 어디 있는지 모른다(저장 키도 리포트 자리도 서버가 안다).
     await callFastApi<null>(`/videos/${encodeURIComponent(videoId)}`, {
       method: 'DELETE',
+      token,
+    })
+  },
+
+  keepVideo(token, videoId) {
+    return callFastApi<MyVideo>(`/videos/${encodeURIComponent(videoId)}/keep`, {
+      method: 'POST',
       token,
     })
   },
@@ -217,6 +229,14 @@ export const fastapiBackend: Backend = {
 
   getUserDetail(token, userId) {
     return callFastApi<AdminUserDetail>(`/admin/users/${encodeURIComponent(userId)}`, {
+      method: 'GET',
+      token,
+    })
+  },
+
+  listAdminVideos(token, user) {
+    const params = new URLSearchParams({ user })
+    return callFastApi<AdminVideoListResult>(`/admin/videos?${params}`, {
       method: 'GET',
       token,
     })

@@ -1,0 +1,340 @@
+[
+ {
+  "clip": "10_penalty1_91169c09.avi",
+  "scale_px": 49.44,
+  "coverage_before": 0.738,
+  "coverage_after": 0.738,
+  "dropped": 0,
+  "dropped_ratio": 0.0,
+  "events_before": [
+   43
+  ],
+  "events": [
+   43
+  ],
+  "n_events": 1,
+  "accel_at_events": [
+   1.289
+  ],
+  "accel_max": 1.289
+ },
+ {
+  "clip": "11_freekick_930ede06.avi",
+  "scale_px": 63.24,
+  "coverage_before": 0.773,
+  "coverage_after": 0.773,
+  "dropped": 0,
+  "dropped_ratio": 0.0,
+  "events_before": [],
+  "events": [],
+  "n_events": 0,
+  "accel_at_events": [],
+  "accel_max": 0.561
+ },
+ {
+  "clip": "12_penalty_a821a39e.avi",
+  "scale_px": 25.87,
+  "coverage_before": 0.517,
+  "coverage_after": 0.517,
+  "dropped": 0,
+  "dropped_ratio": 0.0,
+  "events_before": [
+   56
+  ],
+  "events": [
+   56
+  ],
+  "n_events": 1,
+  "accel_at_events": [
+   3.426
+  ],
+  "accel_max": 3.426
+ },
+ {
+  "clip": "13_freekick_616f8db5.avi",
+  "scale_px": 33.73,
+  "coverage_before": 0.618,
+  "coverage_after": 0.608,
+  "dropped": 1,
+  "dropped_ratio": 0.016,
+  "events_before": [],
+  "events": [],
+  "n_events": 0,
+  "accel_at_events": [],
+  "accel_max": 0.899
+ },
+ {
+  "clip": "14_penalty1_980ede07.avi",
+  "scale_px": 20.42,
+  "coverage_before": 1.0,
+  "coverage_after": 1.0,
+  "dropped": 0,
+  "dropped_ratio": 0.0,
+  "events_before": [
+   12,
+   26,
+   36,
+   45
+  ],
+  "events": [
+   12,
+   26,
+   36,
+   45
+  ],
+  "n_events": 4,
+  "accel_at_events": [
+   4.984,
+   4.941,
+   4.954,
+   4.955
+  ],
+  "accel_max": 4.984
+ },
+ {
+  "clip": "14_penalty_db7e99af.avi",
+  "scale_px": 18.58,
+  "coverage_before": 0.61,
+  "coverage_after": 0.61,
+  "dropped": 0,
+  "dropped_ratio": 0.0,
+  "events_before": [
+   46
+  ],
+  "events": [
+   46
+  ],
+  "n_events": 1,
+  "accel_at_events": [
+   2.049
+  ],
+  "accel_max": 2.049
+ },
+ {
+  "clip": "16_penalty1_44038699.avi",
+  "scale_px": 51.47,
+  "coverage_before": 0.25,
+  "coverage_after": 0.25,
+  "dropped": 0,
+  "dropped_ratio": 0.0,
+  "events_before": [],
+  "events": [],
+  "n_events": 0,
+  "accel_at_events": [],
+  "accel_max": 0.178
+ },
+ {
+  "clip": "18_freekick1_f4ff1a25.avi",
+  "scale_px": 37.84,
+  "coverage_before": 1.0,
+  "coverage_after": 0.841,
+  "dropped": 7,
+  "dropped_ratio": 0.159,
+  "events_before": [
+   24,
+   40
+  ],
+  "events": [],
+  "n_events": 0,
+  "accel_at_events": [],
+  "accel_max": 0.011
+ },
+ {
+  "clip": "18_freekick3_681418eb.avi",
+  "scale_px": 21.62,
+  "coverage_before": 1.0,
+  "coverage_after": 0.887,
+  "dropped": 7,
+  "dropped_ratio": 0.113,
+  "events_before": [
+   46
+  ],
+  "events": [
+   44
+  ],
+  "n_events": 1,
+  "accel_at_events": [
+   3.229
+  ],
+  "accel_max": 3.229
+ },
+ {
+  "clip": "18_freekick_5033c49b.avi",
+  "scale_px": 23.48,
+  "coverage_before": 0.649,
+  "coverage_after": 0.649,
+  "dropped": 0,
+  "dropped_ratio": 0.0,
+  "events_before": [
+   34
+  ],
+  "events": [
+   34
+  ],
+  "n_events": 1,
+  "accel_at_events": [
+   1.953
+  ],
+  "accel_max": 1.953
+ },
+ {
+  "clip": "19_freekick1_da3f1406.avi",
+  "scale_px": 22.77,
+  "coverage_before": 1.0,
+  "coverage_after": 0.921,
+  "dropped": 5,
+  "dropped_ratio": 0.079,
+  "events_before": [
+   31
+  ],
+  "events": [],
+  "n_events": 0,
+  "accel_at_events": [],
+  "accel_max": 0.047
+ },
+ {
+  "clip": "19_freekick2_86f6c708.avi",
+  "scale_px": 60.04,
+  "coverage_before": 0.522,
+  "coverage_after": 0.522,
+  "dropped": 0,
+  "dropped_ratio": 0.0,
+  "events_before": [
+   70
+  ],
+  "events": [
+   70
+  ],
+  "n_events": 1,
+  "accel_at_events": [
+   3.229
+  ],
+  "accel_max": 3.229
+ },
+ {
+  "clip": "19_freekick_940922f8.avi",
+  "scale_px": 74.89,
+  "coverage_before": 0.579,
+  "coverage_after": 0.579,
+  "dropped": 0,
+  "dropped_ratio": 0.0,
+  "events_before": [
+   31
+  ],
+  "events": [
+   31
+  ],
+  "n_events": 1,
+  "accel_at_events": [
+   3.308
+  ],
+  "accel_max": 3.308
+ },
+ {
+  "clip": "21_freekick_3ee04674.avi",
+  "scale_px": 42.25,
+  "coverage_before": 0.886,
+  "coverage_after": 0.857,
+  "dropped": 2,
+  "dropped_ratio": 0.032,
+  "events_before": [
+   36,
+   44,
+   65
+  ],
+  "events": [
+   65
+  ],
+  "n_events": 1,
+  "accel_at_events": [
+   1.008
+  ],
+  "accel_max": 1.008
+ },
+ {
+  "clip": "23_freekick_a972f2ea.avi",
+  "scale_px": 39.39,
+  "coverage_before": 1.0,
+  "coverage_after": 0.982,
+  "dropped": 1,
+  "dropped_ratio": 0.018,
+  "events_before": [
+   40,
+   49
+  ],
+  "events": [
+   39,
+   47
+  ],
+  "n_events": 2,
+  "accel_at_events": [
+   2.539,
+   4.579
+  ],
+  "accel_max": 4.579
+ },
+ {
+  "clip": "25_freekick1_86d715b9.avi",
+  "scale_px": 35.74,
+  "coverage_before": 0.419,
+  "coverage_after": 0.419,
+  "dropped": 0,
+  "dropped_ratio": 0.0,
+  "events_before": [],
+  "events": [],
+  "n_events": 0,
+  "accel_at_events": [],
+  "accel_max": 0.151
+ },
+ {
+  "clip": "25_freekick_c76aa778.avi",
+  "scale_px": 29.7,
+  "coverage_before": 0.587,
+  "coverage_after": 0.587,
+  "dropped": 0,
+  "dropped_ratio": 0.0,
+  "events_before": [
+   23
+  ],
+  "events": [
+   23
+  ],
+  "n_events": 1,
+  "accel_at_events": [
+   1.261
+  ],
+  "accel_max": 1.261
+ },
+ {
+  "clip": "OpenPose_5T_df2d1ce9.avi",
+  "scale_px": 11.23,
+  "coverage_before": 0.683,
+  "coverage_after": 0.683,
+  "dropped": 0,
+  "dropped_ratio": 0.0,
+  "events_before": [],
+  "events": [],
+  "n_events": 0,
+  "accel_at_events": [],
+  "accel_max": 0.266
+ },
+ {
+  "clip": "Y1_2ff12fb9.avi",
+  "scale_px": 53.82,
+  "coverage_before": 0.935,
+  "coverage_after": 0.935,
+  "dropped": 0,
+  "dropped_ratio": 0.0,
+  "events_before": [
+   28
+  ],
+  "events": [
+   28
+  ],
+  "n_events": 1,
+  "accel_at_events": [
+   3.374
+  ],
+  "accel_max": 3.374
+ }
+]
