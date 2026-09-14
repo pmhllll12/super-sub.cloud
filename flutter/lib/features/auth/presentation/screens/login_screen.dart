@@ -73,15 +73,42 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _nickname = TextEditingController();
 
   bool _busy = false;
   String? _error;
+
+  /// 가입 중인가. **경로를 따로 두지 않고 같은 시트에서 바꾼다** — 로그아웃
+  /// 상태에서 갈 수 있는 곳은 `/login` 하나라(`app_router.dart` 의 redirect),
+  /// 가입 경로를 새로 만들면 그 규칙부터 고쳐야 한다. 이메일 · 비밀번호 칸도
+  /// 그대로 이어 쓴다 — 로그인하려다 가입으로 바꾼 사람이 다시 치지 않게.
+  bool _signingUp = false;
 
   @override
   void dispose() {
     _email.dispose();
     _password.dispose();
+    _nickname.dispose();
     super.dispose();
+  }
+
+  /// 보내기 전에 막을 것 — 규칙은 계약(`POST /auth/signup` 입력 제약)과 같다.
+  /// 서버도 막지만(422) 눌러 보고 알게 하지 않는다. 형식이 애매한 이메일은
+  /// 서버 판단에 맡긴다 — 여기서 정규식을 세우면 두 규칙이 갈린다.
+  String? _signupProblem() {
+    if (!_email.text.contains('@')) return '이메일을 확인해 주세요';
+    if (_password.text.length < 8) return '비밀번호는 8자 이상이어야 합니다';
+    final nick = _nickname.text.trim();
+    if (nick.isEmpty || nick.length > 20) return '닉네임을 1~20자로 적어 주세요';
+    return null;
+  }
+
+  void _toggleMode() {
+    if (_busy) return;
+    setState(() {
+      _signingUp = !_signingUp;
+      _error = null;
+    });
   }
 
   Future<void> _run(Future<void> Function() action) async {
@@ -206,9 +233,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               _field(
                 key: const Key('login-password'),
                 controller: _password,
-                label: '비밀번호',
+                label: _signingUp ? '비밀번호 (8자 이상)' : '비밀번호',
                 obscure: true,
               ),
+              if (_signingUp) ...[
+                const SizedBox(height: 14),
+                _field(
+                  key: const Key('signup-nickname'),
+                  controller: _nickname,
+                  label: '닉네임',
+                ),
+              ],
               if (_error != null || locked) ...[
                 const SizedBox(height: 14),
                 Text(
@@ -219,16 +254,59 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ],
               const SizedBox(height: 22),
-              _GlassButton(
-                key: const Key('login-submit'),
-                label: '로그인',
-                enabled: !_busy && !locked,
-                busy: _busy,
-                onTap: () => _run(
-                  () => ref.read(notifier).login(_email.text, _password.text),
+              // 🔴 **키가 다르다** — 같은 키면 Flutter 가 버튼 상태(눌림 애니메이션)를
+              // 이어 써서, 바꾼 직후 누른 것이 앞 모드의 동작으로 나갈 수 있다.
+              if (_signingUp)
+                _GlassButton(
+                  key: const Key('signup-submit'),
+                  label: '가입하기',
+                  enabled: !_busy && !locked,
+                  busy: _busy,
+                  onTap: () {
+                    final problem = _signupProblem();
+                    if (problem != null) {
+                      setState(() => _error = problem);
+                      return;
+                    }
+                    _run(
+                      () => ref.read(notifier).signup(
+                            _email.text.trim(),
+                            _password.text,
+                            _nickname.text.trim(),
+                          ),
+                    );
+                  },
+                )
+              else
+                _GlassButton(
+                  key: const Key('login-submit'),
+                  label: '로그인',
+                  enabled: !_busy && !locked,
+                  busy: _busy,
+                  onTap: () => _run(
+                    () => ref.read(notifier).login(_email.text, _password.text),
+                  ),
+                ),
+              const SizedBox(height: 16),
+              // 모드 바꾸기 — 버튼보다 한 단계 낮은 글자 줄이다. 주 동작과 겨루면
+              // 어느 것을 누르라는 것인지 흐려진다.
+              Center(
+                child: TextButton(
+                  key: const Key('auth-mode-toggle'),
+                  onPressed: _busy ? null : _toggleMode,
+                  style: TextButton.styleFrom(foregroundColor: _kOnPhoto),
+                  child: Text(
+                    _signingUp ? '이미 계정이 있으신가요? 로그인' : '계정이 없으신가요? 회원가입',
+                    style: TextStyle(
+                      color: _kOnPhoto.withValues(alpha: 0.9),
+                      fontSize: 13,
+                      decoration: TextDecoration.underline,
+                      decorationColor: _kOnPhoto.withValues(alpha: 0.6),
+                    ),
+                  ),
                 ),
               ),
-              if (kDebugMode) ...[
+              if (kDebugMode && !_signingUp) ...[
                 // 개발용 구획은 실제 로그인과 성격이 다르다 — 사이를 벌려
                 // 한 덩어리로 안 읽히게 한다.
                 const SizedBox(height: 44),

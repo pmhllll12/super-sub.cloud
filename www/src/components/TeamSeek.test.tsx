@@ -81,8 +81,8 @@ describe('팀원 판 — 종목 · 지역으로 거른다', () => {
   it('전체로 되돌리면 종목을 다시 안 보낸다', async () => {
     const fn = stub()
     open()
-    await userEvent.click(screen.getByRole('button', { name: '야구' }))
-    await waitFor(() => expect(lastQuery(fn).get('sport_code')).toBe('baseball'))
+    await userEvent.click(screen.getByRole('button', { name: '축구' }))
+    await waitFor(() => expect(lastQuery(fn).get('sport_code')).toBe('football'))
 
     await userEvent.click(screen.getByRole('button', { name: '전체' }))
     await waitFor(() => expect(lastQuery(fn).has('sport_code')).toBe(false))
