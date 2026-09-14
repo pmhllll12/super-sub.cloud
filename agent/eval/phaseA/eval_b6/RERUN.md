@@ -48,7 +48,7 @@ JSON으로 찍는다. **파일로 남기지 않으므로 그 출력을 따로 �
 | `eval_b2/eval_b2.py`, `labeling/targets.py` | 저장소·`/mnt/d` 동일 (diff 확인) | import 실패 |
 | Track 2 영상 22개 | `agent/data/*.mp4` 3 + `agent/data/goldenset/soccerkicks_video/*.avi` 19 | Track 2 축소 |
 | 루브릭 | `agent/rubrics/` | Track 2 등급 산출 불가 |
-| 모델 가중치 | HF 캐시 (`usyd-community/vitpose-base-simple`, `PekingU/rtdetr_r50vd_coco_o365`) | 재다운로드 약 2.4GB |
+| 모델 가중치 | HF 캐시 (`usyd-community/vitpose-base-simple` @ `a93ac0c6`, `PekingU/rtdetr_r50vd_coco_o365` @ `457857ce`) | 재다운로드 약 2.4GB. **해시는 `pose.py` 가 정본**이고 2026.09.11에 고정했다 |
 
 #### ✅ 경로를 `paths.py`로 옮겼다 (2026-09-08, 미결 11·14번)
 
@@ -76,11 +76,28 @@ JSON으로 찍는다. **파일로 남기지 않으므로 그 출력을 따로 �
 
 ### 높음
 
-**N-1. 모델 가중치가 리비전 없이 이름으로만 고정돼 있다.**
-`pose.py`의 `POSE_MODEL`·`PERSON_DETECTOR`가 HF 저장소 **이름**만 담고 있고
-`revision=`이 없다. 업스트림이 파일을 갈아 끼우면 조용히 바뀐다. 로컬 HF 캐시가
-살아 있는 동안은 드러나지 않다가, 캐시를 지우거나 다른 기계에서 돌리는 순간
-어긋난다. **가장 흔하고 가장 늦게 발견되는 원인이다.**
+**N-1. ✅ 닫았다 (2026.09.11) — 가중치를 커밋으로 고정했다.**
+
+> 아래 진단은 그대로 옳았다. **고친 것은 원인이고, 기록은 남긴다.**
+>
+> `pose.py`에 `PERSON_DETECTOR_REVISION`·`POSE_MODEL_REVISION`을 두고
+> `from_pretrained(..., revision=...)`로 넘긴다. **이 재실행 경로도 같은 상수를
+> 쓴다** — `candidates.py`·`eval_b6/selector_downstream.py`·
+> `eval_b2/pose_quality.py`·`eval_b2/other_sports.py`·`other_sports.py`·
+> `soccer_check.py`·`eval_b2/render_soccer_diffs.py`.
+>
+> 🔴 **고정한 해시는 지금까지의 모든 결과를 낸 스냅숏 그대로다**(2026.09.11 HF
+> 캐시의 `refs/main`). 그래서 이 조치는 **과거 CSV를 무효화하지 않는다** — 값을
+> 바꾼 것이 아니라 **다음에 바뀌는 것을 막았다.**
+>
+> 표류는 `tests/test_model_pins.py::test_the_pin_still_matches_this_machines_cache`
+> 가 알려 준다. 🔴 **빨개지면 고정을 캐시에 맞추지 말 것** — 그것이 과거 결과와
+> 다른 가중치로 조용히 갈아타는 것이다. 올리려면 재실행 회차와 함께 올린다.
+>
+> **원래 진단**: `pose.py`의 `POSE_MODEL`·`PERSON_DETECTOR`가 HF 저장소 **이름**만
+> 담고 있고 `revision=`이 없었다. 업스트림이 파일을 갈아 끼우면 조용히 바뀌고,
+> 로컬 HF 캐시가 살아 있는 동안은 드러나지 않다가 캐시를 지우거나 다른 기계에서
+> 돌리는 순간 어긋난다. **가장 흔하고 가장 늦게 발견되는 원인이었다.**
 
 **N-2. `MAX_BATCH=24`의 OOM 폴백이 배치 크기를 바꾼다.**
 `selector_downstream.py:106`의 `except torch.cuda.OutOfMemoryError`가 배치를
@@ -147,8 +164,10 @@ Track 2의 selector도 같은 식이며 차이는 `pose_quality`를 그 실행�
 
 1. **행 수·키 집합이 다른가** → N-4. `agent/data/` 디렉터리 내용을 확인한다.
 2. **`detected_frames`·`usable_ratio_*`가 다른가** → 포즈나 검출이 달라졌다.
-   N-1(모델 리비전)을 가장 먼저 본다. HF 캐시의 커밋 해시를 확인하고,
-   기존 CSV가 만들어진 2026-08-28 시점과 같은 가중치인지 대조한다.
+   ~~N-1(모델 리비전)을 가장 먼저 본다.~~ → **N-1은 닫혔다 (2026.09.11)** —
+   가중치가 커밋으로 고정돼 있고 `tests/test_model_pins.py` 가 캐시와 대조한다.
+   그 검사가 초록이면 **가중치는 용의자가 아니다.** 빨갛다면 그 메시지가
+   무엇이 어긋났는지 말해 준다.
 3. **`selected_target_difference`가 다른가** → Track 1이면 `candidates/`나
    `pose_quality.csv`가 바뀐 것이다(둘 다 파일이므로 md5로 확인된다).
    Track 2면 포즈가 달라져 `pose_quality`가 달라진 것이다 → 2번으로 돌아간다.

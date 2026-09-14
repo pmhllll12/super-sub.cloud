@@ -73,6 +73,10 @@ export const fastapiBackend: Backend = {
     return callFastApi<PlayerCard>('/me/card', { method: 'POST', token })
   },
 
+  updateMyCard(token, input) {
+    return callFastApi<PlayerCard>('/me/card', { method: 'PATCH', token, body: input })
+  },
+
   getPublicCard(slug) {
     return callFastApi<PublicPlayerCard>(`/cards/${encodeURIComponent(slug)}`, { method: 'GET' })
   },

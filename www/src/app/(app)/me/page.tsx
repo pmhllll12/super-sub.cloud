@@ -84,7 +84,7 @@ export function MeBody({
     <ProfileStage editing={editing}>
       {/* 🔴 카드와 편집기가 화면에서 떨어져 있어(카드는 선 위, 편집기는 선
           아래) 한쪽이 상태를 들 수 없다 — 둘을 함께 감싼다. */}
-      <CardStyleProvider>
+      <CardStyleProvider card={card}>
       {/* 판 **바깥 위**에 얹는 한 마디. 워드마크가 가운데에 서므로 이쪽은
           왼쪽 끝에 둔다 — 둘이 같은 줄에서 좌우로 갈린다. */}
       <p className="ss-profile-title">MY PROFILE</p>
@@ -169,8 +169,10 @@ export function MeBody({
             <div className="ss-profile-id-main">
               <div className="ss-profile-face-col">
                 {card ? (
-                  /* 편집 중에만 꾸민 값을 입는다 — 평소에는 서버가 준 그대로다
-                     (설정은 아직 저장되지 않는다).
+                  /* 편집 중이 아니어도 꾸민 값이 보인다 — `PlayerCardView` 가
+                     `look` 을 안 받으면 `card.style` 을 스스로 읽는다(CCC 35).
+                     편집 중에는 **아직 저장 안 한 초안**을 보여줘야 하므로
+                     `StyledCard` 가 그 초안(`useCardStyle()`)을 직접 싣는다.
                      🔴 편집 중에는 `StyledCard` 가 **바깥 상자까지** 그린다.
                      `.ss-pcard-mini > .ss-pcard` 가 직계 자식을 찾으므로 사이에
                      상자를 끼울 수 없다. */

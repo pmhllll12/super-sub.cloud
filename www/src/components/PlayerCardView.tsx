@@ -12,10 +12,8 @@ import BrandMark from './ui/BrandMark'
  * 낸 것이다(만든 과정은 커밋 메시지 참고). **카드 세로 가운데 위로는
  * 올라오지 않는다** — 위쪽 절반은 워드마크와 머리글의 자리다.
  *
- * ⚠️ 가운데 큰 글자({@link ALIAS})는 **아직 붙박이 문구다.** 계약
- * (api-contract.md)에 별명 필드가 없어서 서버에서 받아올 데가 없다 —
- * 화면 모양을 먼저 잡아 두는 자리 표시다. 필드가 생기면 card 에서
- * 받아 쓰고 이 상수를 지운다.
+ * ✅ 가운데 큰 글자는 **`card.tagline`**(CCC 18·35)에서 온다 — 안 정했으면
+ * {@link ALIAS} 가 자리 표시로 남는다.
  *
  * 🔴 카드에 **닉네임도 호칭도 글자로 적지 않는다.** 인물과 별명이
  * 가운데를 차지해 자리가 없다. 다만 카드가 누구 것인지, 무슨 호칭을
@@ -33,12 +31,15 @@ import BrandMark from './ui/BrandMark'
  * 화면에서 되살아나면 그 설계가 통째로 무의미해진다.
  * titles 는 **받은 것만** 온다 — 미달 표식을 만들지 않는다.
  */
-// 계약에 별명 필드가 생기면 지운다 — 위 주석 참고.
-const ALIAS = 'THREE LUNGS'
+// `tagline`을 안 정한 카드가 보일 자리 표시. `cardStyle.tsx`의 편집 초안도
+// 같은 값으로 시작한다(export 하는 이유) — 편집기를 열었을 때 지금 카드에
+// 보이는 것과 다른 글자가 뜨면 안 된다.
+export const ALIAS = 'THREE LUNGS'
 
 /**
- * 카드를 꾸민 값. **넘기지 않으면 지금까지와 똑같이 그려진다** — 홈 헤더 ·
- * 스쿼드 판 · 공개 카드 화면은 이 prop 을 모른다.
+ * 카드를 꾸민 값. **안 넘기면 `card.style` 을 쓴다**(꾸민 적이 없으면 그것도
+ * 없어서 지금까지와 똑같이 그려진다) — 편집기(`StyledCard`)만 **아직 저장
+ * 안 한 초안**을 보여주려고 이 prop 을 직접 넘긴다.
  *
  * 🔴 색은 **CSS 변수로** 얹는다(`--ss-pcard-bg` 등). 그 변수를 카드 안의
  * 여러 규칙이 이미 읽고 있어서, 하나만 갈면 글 · 테두리 · 워드마크가 함께
@@ -63,6 +64,23 @@ type CardLook = {
   brushY?: number
 }
 
+/** `card.style` (서버, 스네이크) → `CardLook` (이 파일, 캐멀). 사진 관련은
+ * 서버에 없으므로 안 채운다 — 호출부가 `??` 로 기본값을 따로 잡는다. */
+function styleToLook(style: NonNullable<PublicPlayerCard['style']>): CardLook {
+  return {
+    bg: style.bg,
+    logo: style.logo,
+    textColor: style.text_color,
+    textX: style.text_x,
+    textY: style.text_y,
+    brush: style.brush,
+    brushColor: style.brush_color,
+    brushScale: style.brush_scale,
+    brushX: style.brush_x,
+    brushY: style.brush_y,
+  }
+}
+
 export default function PlayerCardView({
   card,
   look,
@@ -70,29 +88,33 @@ export default function PlayerCardView({
   card: PublicPlayerCard
   look?: CardLook
 }) {
-  const alias = look?.text ?? ALIAS
-  const photo = look?.photo ?? '/player_cutout.png'
-  const full = look?.mode === 'full'
+  // 🔴 **`look` 이 없어도 `card.style` 이 있으면 꾸며진 대로 그린다.** 이게
+  // 없으면 저장은 되는데 편집기 밖(내 프로필 평소 보기 · 공개 카드 링크)
+  // 에서는 안 보이는 반쪽짜리가 된다 — 저장한 보람이 없어진다.
+  const effective = look ?? (card.style ? styleToLook(card.style) : undefined)
+  const alias = look?.text ?? card.tagline ?? ALIAS
+  const photo = effective?.photo ?? '/player_cutout.png'
+  const full = effective?.mode === 'full'
   return (
     <article
       className="ss-pcard"
       aria-label={card.user.nickname}
       data-photo={full ? 'full' : undefined}
-      data-text-free={look ? 'true' : undefined}
+      data-text-free={effective ? 'true' : undefined}
       style={
-        look
+        effective
           ? ({
-              '--ss-pcard-bg': look.bg,
-              '--ss-pcard-fg': look.textColor,
-              '--ss-pcard-text-x': `${look.textX ?? 50}%`,
-              '--ss-pcard-text-y': `${look.textY ?? 34}%`,
-              '--ss-pcard-photo-scale': look.photoScale ?? 1,
-              '--ss-pcard-photo-x': `${look.photoX ?? 0}%`,
-              '--ss-pcard-photo-y': `${look.photoY ?? 0}%`,
-              '--ss-card-mark-color': look.brushColor,
-              '--ss-card-mark-scale': look.brushScale ?? 1,
-              '--ss-card-mark-x': `${look.brushX ?? 0}%`,
-              '--ss-card-mark-y': `${look.brushY ?? 0}%`,
+              '--ss-pcard-bg': effective.bg,
+              '--ss-pcard-fg': effective.textColor,
+              '--ss-pcard-text-x': `${effective.textX ?? 50}%`,
+              '--ss-pcard-text-y': `${effective.textY ?? 34}%`,
+              '--ss-pcard-photo-scale': effective.photoScale ?? 1,
+              '--ss-pcard-photo-x': `${effective.photoX ?? 0}%`,
+              '--ss-pcard-photo-y': `${effective.photoY ?? 0}%`,
+              '--ss-card-mark-color': effective.brushColor,
+              '--ss-card-mark-scale': effective.brushScale ?? 1,
+              '--ss-card-mark-x': `${effective.brushX ?? 0}%`,
+              '--ss-card-mark-y': `${effective.brushY ?? 0}%`,
             } as React.CSSProperties)
           : undefined
       }
@@ -102,15 +124,15 @@ export default function PlayerCardView({
             자세한 이유는 PlayerCardBrush 주석 참고.
             🔴 사진을 통째로 까는 모드에서는 그리지 않는다 — 사진 위에 검은
             자국이 얹히면 그림이 더러워 보인다. */}
-        {/* 🔴 꾸미개가 붙으면 **고른 자국**이, 아니면 지금까지의 붓자국이
-            깔린다. 둘을 같이 그리지 않는다 — 자국이 겹치면 어느 것을 고른
-            것인지 알 수 없다. */}
-        {look ? (
+        {/* 🔴 꾸민 값(저장했거나 편집 중)이 있으면 **고른 자국**이, 아니면
+            지금까지의 붓자국이 깔린다. 둘을 같이 그리지 않는다 — 자국이
+            겹치면 어느 것을 고른 것인지 알 수 없다. */}
+        {effective ? (
           /* 🔴 사진을 통째로 까는 모드에서는 **기본 붓칠만** 뺀다 — 사진 위에
              검은 자국이 얹히면 그림이 더러워 보인다. 다만 사용자가 **고른**
              자국은 그린다: 일부러 얹은 것을 말없이 지우면 안 된다. */
-          full && (look.brush ?? 0) === 0 ? null : (
-            <CardMark index={look.brush ?? 0} seed={card.public_slug} />
+          full && (effective.brush ?? 0) === 0 ? null : (
+            <CardMark index={effective.brush ?? 0} seed={card.public_slug} />
           )
         ) : (
           !full && <PlayerCardBrush seed={card.public_slug} />
@@ -127,7 +149,7 @@ export default function PlayerCardView({
 
         <header className="ss-pcard-top">
           {/* 바탕이 연두라 강조색(민트) 워드마크는 묻힌다 — 검게 찍는다. */}
-          <BrandMark size={22} color={look?.logo ?? 'var(--ss-pcard-fg)'} />
+          <BrandMark size={22} color={effective?.logo ?? 'var(--ss-pcard-fg)'} />
           <p className="ss-pcard-kicker">PLAYER CARD</p>
         </header>
 

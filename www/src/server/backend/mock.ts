@@ -76,6 +76,8 @@ const card: PlayerCard = {
       granted_at: '2026-08-01T09:00:00Z',
     },
   ],
+  tagline: null,
+  style: null,
 }
 
 function requireUser(token: string): User {
@@ -495,20 +497,23 @@ export const mockBackend: Backend = {
 
   async getMyCard(token) {
     const u = requireUser(token)
-    if (u.email === DEMO_EMAIL) return card
+    // 🔴 **`made` 를 먼저 본다** — 데모 카드도 `updateMyCard` 로 고칠 수
+    // 있는데, 여길 뒤에 두면 고친 값이 안 보인다(`CardStubRepository` 의
+    // `_CREATED` 와 같은 판단).
     const mine = made.get(u.id)
+    if (mine) return mine
+    if (u.email === DEMO_EMAIL) return card
     // 가입만으로는 카드가 생기지 않는다 — **부탁해야** 생긴다(계약 3장).
-    if (!mine) throw new BackendError(404, 'CARD_NOT_FOUND', '아직 선수 카드가 없습니다.')
-    return mine
+    throw new BackendError(404, 'CARD_NOT_FOUND', '아직 선수 카드가 없습니다.')
   },
 
   async createMyCard(token) {
     const u = requireUser(token)
     // 🔴 **멱등이다.** 이미 있으면 그대로 돌려준다 — 슬러그가 바뀌면 이미
     // 공유한 주소가 죽는다(계약 3장).
-    if (u.email === DEMO_EMAIL) return card
     const has = made.get(u.id)
     if (has) return has
+    if (u.email === DEMO_EMAIL) return card
     const fresh: PlayerCard = {
       id: `card-${u.id}`,
       public_slug: `${u.nickname}-${u.id.slice(0, 4)}`,
@@ -516,17 +521,36 @@ export const mockBackend: Backend = {
       user: { id: u.id, nickname: u.nickname },
       // 🔴 호칭은 **빈 배열**이다 — 분석 결과로 붙으므로 만드는 시점에 있을 수 없다.
       titles: [],
+      tagline: null,
+      style: null,
     }
     made.set(u.id, fresh)
     return fresh
   },
 
-  async getPublicCard(slug) {
-    if (slug !== card.public_slug) {
-      throw new BackendError(404, 'CARD_NOT_FOUND', '카드를 찾을 수 없습니다.')
+  async updateMyCard(token, input) {
+    const u = requireUser(token)
+    const current = made.get(u.id) ?? (u.email === DEMO_EMAIL ? card : undefined)
+    if (!current) throw new BackendError(404, 'CARD_NOT_FOUND', '아직 선수 카드가 없습니다.')
+    const updated: PlayerCard = { ...current }
+    // 🔴 **키가 있는지로 "보냈는지"를 가른다** — `tagline: undefined` 도
+    // 유효한 JS 값이라 `input.tagline !== undefined` 로는 못 가른다
+    // (`PATCH /videos/{id}` route handler 와 같은 판단).
+    if ('tagline' in input) {
+      const cleaned = input.tagline?.trim()
+      updated.tagline = cleaned ? cleaned : null
     }
+    if ('style' in input) updated.style = input.style ?? null
+    made.set(u.id, updated)
+    return updated
+  },
+
+  async getPublicCard(slug) {
+    const owner = [...made.values()].find((c) => c.public_slug === slug)
+    const found = owner ?? (slug === card.public_slug ? card : undefined)
+    if (!found) throw new BackendError(404, 'CARD_NOT_FOUND', '카드를 찾을 수 없습니다.')
     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- 의도적으로 버리는 필드
-    const { id: _id, ...rest } = card
+    const { id: _id, ...rest } = found
     return rest as PublicPlayerCard
   },
 

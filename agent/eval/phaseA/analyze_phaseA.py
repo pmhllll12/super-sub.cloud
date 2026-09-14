@@ -7,10 +7,16 @@ import sys, json, csv
 from pathlib import Path
 import numpy as np
 
-sys.path.insert(0, "/home/ho/projects/super-sub.cloud/agent/src")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))  # 🔴 기계별 절대경로를 박지 않는다 (미결 14번)
 from supersub_agent import features as F
 
-ROOT = Path("/mnt/d/supersub-phaseA")
+
+# 🔴 경로를 박지 않는다 — `eval/phaseA/paths.py` 가 정한다 (미결 14번).
+#    박아 두면 다른 기계에서 안 돌고, 저장소 사본을 떠도 읽히지 않는다.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from paths import external_root  # noqa: E402
+
+ROOT = external_root()
 CACHE = ROOT/"cache"
 
 JOINTS = {"shoulder": [F.L_SHOULDER, F.R_SHOULDER], "elbow": [F.L_ELBOW, F.R_ELBOW],
