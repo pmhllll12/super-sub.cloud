@@ -150,3 +150,50 @@ cd agent && uv run python eval/pending43_sport_gate2/measure_gate2.py
 
 GPU 를 쓴다(검출만). 축구 100편은 `eval/sample_gate/fetch_soccernet.py --n 100`
 으로 받는다(허깅페이스 로그인 필요 — 미결 46번).
+
+---
+
+## 🔴 진행 상태 (2026.09.14) — **아직 안 돌렸다**
+
+사전 등록과 측정 스크립트까지 있고 **측정은 안 했다.** 한 회차가 축구 100편 +
+야구 39편이라 **45분쯤** 걸리는데, 사용자가 그 자리에서 멈추라고 했다.
+**결과가 없으므로 이 회차에 대해 아무것도 주장하지 않는다.**
+
+돌리려면:
+```bash
+cd agent && uv run python eval/pending43_sport_gate2/measure_gate2.py
+```
+
+### ✅ 그런데 돌리기 전에 **함정 하나가 드러났다**
+
+스크립트에 종목 키를 `"soccer"` 라고 손으로 박았다가 `KeyError` 로 죽었다.
+production 이 쓰는 키는 **`"football"`** 이다(`rubrics/*.yaml` 의 `sport:`).
+
+🔴 **내 실수가 드러낸 것이 더 크다.**
+
+```python
+def sport_conflict(objects, sport):
+    for tool in COUNTER_EVIDENCE_TOOLS.get(sport, ()):   # ← 모르는 키면 ()
+        ...
+    return None                                          # ← 조용히 통과
+```
+
+**모르는 종목 키를 받으면 게이트가 통째로 무력화되고 경고도 예외도 없다.**
+내 스크립트는 딕셔너리를 **직접 찍다가** 죽어서 알았을 뿐이고, production
+경로(`analyze_s3.py:257` 의 `sport_conflict(pose.objects, rubric.sport)`)는
+**조용히 전부 통과시킨다.**
+
+오늘은 루브릭이 둘 다 `sport: football` 이라 **실제로 새는 것은 없다.**
+그런데 누군가 루브릭에 `sport: soccer`(같은 뜻의 다른 영어)를 적으면
+**그 순간 게이트가 꺼지고 아무도 모른다.**
+
+🔴 **이 회차에서 고치지 않는다** — 조사 회차이고 `src/` 를 안 건드린다.
+**3회차(처방)에 라켓 판정과 함께 올린다.** 처방 후보는 둘이다:
+
+| | |
+|---|---|
+| **(가)** | `sport_conflict` 이 **모르는 키에 예외**를 낸다 — 조용한 실패를 시끄러운 실패로 바꾼다 |
+| **(나)** | 루브릭 적재 때 `sport` 가 `COUNTER_EVIDENCE_TOOLS` 에 있는지 **검사로 막는다** — `test_metric_definitions.py::test_every_rubric_metric_is_declared` 와 같은 형태다 |
+
+🔴 **(나)가 더 이른 자리에서 막는다.** 다만 **종목이 늘어날 때마다 근거 도구를
+정해야 한다**는 뜻이라, 그것이 맞는 제약인지가 판단거리다.
