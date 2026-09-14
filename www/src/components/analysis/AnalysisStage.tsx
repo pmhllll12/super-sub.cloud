@@ -1177,6 +1177,15 @@ export default function AnalysisStage() {
     targetRef.current = null
     shownRef.current = null
     setLost(false)
+    /* 🔴 **비교도 바로 걷는다**(사용자 지적, 2026-09-15). 예전에는 여기서 비교 상태를
+       안 되돌려서, 영상을 비운 뒤에도 빈 판에 선수 칸이 반쪽을 차지한 채 남았다. 판이
+       줄어드는 동안 두 칸이 남아 있을 이유도 없다. 버린 영상의 관절 캐시도 끊는다 —
+       같은 파일을 다시 올리면 새 주소라 어차피 못 쓴다. */
+    setCompare('idle')
+    setCompareWho(null)
+    resetCompareMotion()
+    userMotionRef.current?.ctrl.abort()
+    userMotionRef.current = null
     // 2단계 — 다 줄어든 뒤에야 제목 · 설명 · 헤더가 다시 나타난다.
     // 🔴 `started` 를 여기서 끄는 것이 그 신호다. 같이 꺼 버리면 판이 줄기도
     // 전에 글자들이 되돌아와 두 동작이 겹친다.

@@ -695,6 +695,36 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     expect(getMotion.mock.calls.filter((c) => (c[0] as { src: string }).src === 'blob:test')).toHaveLength(1)
   }, 40000)
 
+  /* 🔴 **비교한 뒤 「닫기」를 누르면 비교도 같이 걷힌다**(사용자 지적, 2026-09-15 배포에서 확인).
+     `reset()` 이 영상 · 대상 · 리포트는 되돌리면서 비교 상태는 안 되돌려서, 빈 판에 선수
+     칸(회색 「… 영상 자리입니다」)이 반쪽을 차지한 채 남았다. */
+  it('비교한 뒤 닫으면 선수 칸과 카드가 남지 않는다', async () => {
+    reportReadyFetch()
+    const { kickMotion } = await import('@/lib/motion/kickFixture')
+    getMotion.mockImplementation(async (_input, opts) => {
+      opts?.onProgress?.(1)
+      return kickMotion()
+    })
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await user.click(await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }))
+    await sayYes(user)
+    await user.click(await screen.findByRole('button', { name: '선수와 비교하기' }, { timeout: 12000 }))
+    await user.click(screen.getByRole('button', { name: '에스테반 로벨리' }))
+    await screen.findByRole('group', { name: '세 순간 비교' }, { timeout: 5000 })
+
+    await user.click(screen.getByRole('button', { name: '닫기' }))
+    expect(await screen.findByLabelText('분석할 영상', {}, { timeout: 2000 })).toBeInTheDocument()
+
+    const body = document.querySelector('.ss-shot-frame-body')
+    expect(body).not.toHaveAttribute('data-compare')
+    expect(body).not.toHaveAttribute('data-moments')
+    expect(document.querySelector('.ss-shot-compare-slot')).toBeNull()
+    expect(screen.queryByRole('group', { name: '세 순간 비교' })).toBeNull()
+  }, 40000)
+
   // 창 틀의 닫기 자리이므로 시작한 뒤에도 그대로 있어야 한다.
   it('시작한 뒤에도 닫기 점이 남아 있고, 누르면 고르기 전으로 돌아간다', async () => {
     const user = userEvent.setup()
