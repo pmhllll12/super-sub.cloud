@@ -92,6 +92,29 @@ def soccer_clips_root() -> Path:
     return Path(os.environ.get("SUPERSUB_SOCCER_ROOT", _DEFAULT_SOCCER))
 
 
+_DEFAULT_SOCCERNET = Path("/mnt/d/sports_dataset_probe/soccernet")
+
+
+def soccernet_clips_root() -> Path:
+    """SoccerNet 방송 클립(`*.mp4`) — **다인 축구 표본의 후보다** (미결 `ho` 46번).
+
+    위 `soccer_clips_root()` 의 19편은 **전부 1인 훈련 영상**이라
+    「여러 명 중 누구를 고르는가」를 못 잰다(미결 18번 11회차). 방송 클립은
+    그 성질을 **가질 수 있는** 유일한 후보이고, 받는 길은
+    `scripts/dataset_pipeline/sources.py` 의 `SoccerNet10s` 에 이미 있다.
+
+    🔴 **「있다」가 아니라 「후보다」.** 224p 라 선수가 작고, 우리 검출기가
+    2명 이상을 실제로 집는지는 **받아서 재 봐야** 안다 — 그 관문이
+    `eval/sample_gate/`다.
+
+    🔴 **별도 뿌리에 둔다.** 기존 `clips/batch_0000` 과 `_state.json`(수집
+    커서)을 건드리면 앞선 회차의 재실행이 달라진다.
+
+    `SUPERSUB_SOCCERNET_ROOT` 로 바꾼다. **존재를 보장하지 않는다.**
+    """
+    return Path(os.environ.get("SUPERSUB_SOCCERNET_ROOT", _DEFAULT_SOCCERNET))
+
+
 def default_target() -> int:
     """동작점을 **명시하지 않는 호출자**가 쓸 값. 출처는 한 곳이다.
 
