@@ -26,6 +26,30 @@ class MockAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<Session> signup({
+    required String email,
+    required String password,
+    required String nickname,
+  }) async {
+    await Future<void>.delayed(_delay);
+    if (_db.findUserByEmail(email) != null) {
+      throw const AuthException(
+        '이미 가입된 이메일입니다',
+        code: 'EMAIL_ALREADY_EXISTS',
+      );
+    }
+    final user = AppUser(
+      id: 'u-${DateTime.now().microsecondsSinceEpoch}',
+      email: email,
+      nickname: nickname,
+      createdAt: DateTime.now(),
+    );
+    // 저장소에 실제로 써넣는다 — 로그아웃 뒤 같은 이메일로 다시 들어올 수 있어야 한다.
+    _db.users.add(user);
+    return _current = Session(user: user);
+  }
+
+  @override
   Future<Session> loginAs(String userId) async {
     await Future<void>.delayed(_delay);
     final user = _db.findUserById(userId);

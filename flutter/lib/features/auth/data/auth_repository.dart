@@ -27,6 +27,16 @@ class AuthException implements Exception {
 abstract class AuthRepository {
   Future<Session> login({required String email, required String password});
 
+  /// 가입하고 **그 계정으로 로그인된 세션**을 돌려준다(계약 `POST /auth/signup`).
+  ///
+  /// 가입만 하고 끝내면 방금 친 비밀번호를 로그인 화면에서 한 번 더 치게 된다.
+  /// 이미 있는 이메일이면 [AuthException](`EMAIL_ALREADY_EXISTS`)을 던진다.
+  Future<Session> signup({
+    required String email,
+    required String password,
+    required String nickname,
+  });
+
   /// 개발용 바로 진입. 릴리즈 빌드의 UI에서는 호출되지 않는다.
   Future<Session> loginAs(String userId);
 

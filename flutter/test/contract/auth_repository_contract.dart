@@ -74,5 +74,30 @@ void runAuthRepositoryContract(
       expect(await repo.restoreSession(), isNull);
     });
 
+    // 가입(계약 `POST /auth/signup`)은 **가입한 계정으로 로그인된 세션**을 돌려준다.
+    // 가입만 하고 로그인 화면으로 되돌리면 방금 친 비밀번호를 한 번 더 치게 된다.
+    test('가입하면 그 계정으로 로그인된 세션을 돌려준다', () async {
+      const email = 'new-member@supersub.test';
+      final session = await repo.signup(
+        email: email,
+        password: 'password123',
+        nickname: '새식구',
+      );
+      expect(session.user.email, equals(email));
+      expect(session.user.nickname, equals('새식구'));
+      expect((await repo.restoreSession())?.user.email, equals(email));
+    });
+
+    test('이미 있는 이메일로 가입하면 AuthException을 던진다', () async {
+      expect(
+        () => repo.signup(
+          email: knownEmail,
+          password: 'password123',
+          nickname: '중복',
+        ),
+        throwsA(isA<AuthException>()),
+      );
+    });
+
   });
 }
