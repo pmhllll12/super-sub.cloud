@@ -10759,6 +10759,29 @@ sudo k3s kubectl get deploy -A          → default 에 supersub-api-trial (1/1 
 
 - **담당**: 정어진 · **제기**: 박민호 · **기한**: 확인되는 대로
 
+### 23. 부록 D ERD가 실제 DB 테이블과 다릅니다 — 정어진 확인 부탁드립니다
+
+21번 확인 김에 `\dt`로 `supersub` DB 전체 테이블 목록을 뽑아 부록 D(34개 테이블)와
+대조했다.
+
+| | |
+|---|---|
+| 실제 DB에만 없음(ERD엔 있음) | `title_criteria` · `player_vector` · `fitness_score` · `recommendation` — 4개, 아직 마이그레이션이 안 올라간 것으로 보인다 |
+| 실제 DB에만 있음(ERD엔 없음) | `analysis_metric_criterion` — 1개, 문서에 안 적힌 테이블 |
+
+실제 DB는 31개 도메인 테이블(+ `alembic_version`)이고 부록 D는 34개라고 적혀 있다.
+스키마 변경 자체가 문제는 아니고 — 어느 쪽이 최신인지, `analysis_metric_criterion`이
+뭘 대신하는 테이블인지(`analysis_metric_value`와 이름이 겹쳐 보인다) 확인이
+필요해서 올린다. 부록 D는 공개 문서라 직접 고치지 않았다.
+
+| | |
+|---|---|
+| 확인 | `ssh supersub` → `sudo -u postgres psql -d supersub -c '\dt'` |
+| 하지 말 것 | 마이그레이션이 진행 중일 수 있으니 4개가 "빠졌다"고 단정하고 부록 D에서 지우지 않기 — 정어진 확인 먼저 |
+
+- 관련: `jekyll/chapters/부록D-데이터베이스ERD.markdown` · 21·22번(같은 세션에서 발견)
+- **담당**: 정어진 · **제기**: 박민호 · **기한**: 확인되는 대로
+
 ## paik (백성검)
 
 ### 1. 분석한 영상을 우리 서버에 저장하는 경로 ✅ 해소 (2026.09.03)
