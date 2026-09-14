@@ -517,22 +517,24 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
 
     const open = await screen.findByRole('button', { name: '선수와 비교하기' }, { timeout: 12000 })
     // 접혀 있다 — 누르기 전에는 이름이 없다.
-    expect(screen.queryByRole('button', { name: '리오넬 메시' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '에스테반 로벨리' })).toBeNull()
 
     await user.click(open)
-    expect(screen.getByRole('button', { name: '리오넬 메시' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '크리스티아누 호날두' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '에스테반 로벨리' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '티아구 카스탄헤이라' })).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: '리오넬 메시' }))
+    await user.click(screen.getByRole('button', { name: '에스테반 로벨리' }))
     /* 🔴 **같은 자리를 쓴다** — 이름 둘이 사라지고 그 자리에 문장이 든다.
        둘이 같이 있으면 판이 그만큼 들썩인다. */
-    expect(screen.queryByRole('button', { name: '리오넬 메시' })).toBeNull()
-    expect(screen.getByText(/리오넬 메시의 영상을 찾고 있는 중입니다/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '에스테반 로벨리' })).toBeNull()
+    expect(screen.getByText(/에스테반 로벨리의 영상을 찾고 있는 중입니다/)).toBeInTheDocument()
 
-    // 다 찾으면 영상 칸이 반으로 갈리고 왼쪽에 자리가 선다.
+    // 다 찾으면 영상 칸이 반으로 갈리고 왼쪽에 그 선수의 영상이 선다.
+    /* 🔴 **선수마다 정해 둔 데모 클립이다**(2026-09-14, RAG 검색이 붙기 전까지) —
+       고른 사람과 다른 영상이 나오면 여기가 먼저 빨개진다. */
     expect(
-      await screen.findByLabelText('리오넬 메시 영상 자리', {}, { timeout: 4000 }),
-    ).toBeInTheDocument()
+      await screen.findByLabelText('에스테반 로벨리 영상', {}, { timeout: 4000 }),
+    ).toHaveAttribute('src', '/compare/pexels-15436954.mp4')
     expect(document.querySelector('.ss-shot-frame-body')?.getAttribute('data-compare')).toBe('true')
   }, 30000)
 
@@ -601,7 +603,7 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
   /* ── 무엇을 볼지 고르기 (2026-09-08) ─────────────────────────────── */
 
   /* 🔴 목록은 **에이전트가 실제로 채점하는 항목**이다 — 지어낸 것이 아니라
-     `agent/rubrics/basketball_jump_shot.yaml` 의 `criteria[].name` 이다.
+     `agent/rubrics/football_instep_shot.yaml` 의 `criteria[].name` 이다.
      이 시험이 그 사본(`lib/rubricFocus.ts`)이 어긋나는 것을 잡는다. */
   it('그 종목이 채점하는 항목이 선택지로 나온다', async () => {
     const user = userEvent.setup()

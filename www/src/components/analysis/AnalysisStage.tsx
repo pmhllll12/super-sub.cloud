@@ -11,16 +11,9 @@ import { FOCUS } from '@/lib/rubricFocus'
 import { uploadClip, type ClipSubject } from '@/lib/uploadClip'
 import { fetchReport, type ReportResult } from '@/lib/savedReports'
 import ReportView from '@/components/analysis/ReportView'
-import {
-  EDGES,
-  L_SHOULDER,
-  MIN_KP,
-  NOSE,
-  R_SHOULDER,
-  isSamePerson,
-  smoothPose,
-  type Point,
-} from '@/lib/pose'
+import { isSamePerson, smoothPose, type Point } from '@/lib/pose'
+import { posePaths, toViewBox } from '@/lib/poseDraw'
+import ComparePlayer from '@/components/analysis/ComparePlayer'
 import {
   detectPeople,
   refinePose,
@@ -29,6 +22,7 @@ import {
 } from '@/lib/personDetector'
 import {
   createPersonTracker,
+  othersOf,
   snapToDetection,
   type PersonTracker,
 } from '@/lib/personTrack'
@@ -110,12 +104,13 @@ const SIDE_IN_MS = 1320
 const SHRINK_MS = 820
 
 /**
- * 고를 수 있는 종목.
+ * 종목.
  *
  * 🔴 **에이전트가 종목을 알아야 세세하게 본다**(정상호 · 사용자 전달). 루브릭이
  * 종목마다 다르므로 영상만 받아서는 "무엇에 비추어 볼지"가 정해지지 않는다.
- * 그래서 **고르지 않으면 시작할 수 없다** — 기본값을 축구로 박아 두면 야구
- * 영상이 축구 루브릭으로 조용히 채점된다.
+ * 지금은 **축구 하나라 묻지 않는다**(`DEFAULT_SPORT`, 미결 ho 39번) — 종목을
+ * 되살리면 고르는 자리도 같이 되살려야 다른 종목 영상이 축구 루브릭으로
+ * 조용히 채점되지 않는다.
  *
  * ⚠️ 계약(api-contract.md 3-1)의 영상 등록에 **종목 필드가 아직 없다.** 지금은
  * 화면 안에만 있고 서버로 나가지 않는다 — 리포트 조회 규격을 낼 때 같이 낸다.
@@ -166,22 +161,8 @@ function toVideoBox(box: Box, el: HTMLElement, video: HTMLVideoElement | null): 
   return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 }
 }
 
-/** `toVideoBox` 의 짝 — 영상 안 좌표를 다시 오버레이 좌표로. */
-function toViewBox(box: Box, el: HTMLElement, video: HTMLVideoElement | null): Box {
-  const r = el.getBoundingClientRect()
-  const vw = video?.videoWidth ?? 0
-  const vh = video?.videoHeight ?? 0
-  if (!vw || !vh || !r.width || !r.height) return box
-  const scale = Math.min(r.width / vw, r.height / vh)
-  const cw = (vw * scale) / r.width
-  const ch = (vh * scale) / r.height
-  return {
-    x: (1 - cw) / 2 + box.x * cw,
-    y: (1 - ch) / 2 + box.y * ch,
-    w: box.w * cw,
-    h: box.h * ch,
-  }
-}
+/* `toVideoBox` 의 짝(영상 안 → 오버레이 좌표)과 뼈대 그리기는 `lib/poseDraw.ts` 에
+   있다 — 비교 칸의 선수 영상(`ComparePlayer`)과 같은 셈을 나눠 쓴다. */
 
 /** 0:07 꼴로. 리포트의 '이렇게 본 장면' 과 같은 표기다. */
 function fmtTime(sec: number): string {
@@ -191,25 +172,6 @@ function fmtTime(sec: number): string {
   return `${m}:${String(r).padStart(2, '0')}`
 }
 
-/**
- * 관절 한 점을 영상 안 좌표 → 오버레이 좌표로. `toViewBox` 와 같은 셈이다.
- *
- * 🔴 상자와 **같은 보정**을 거쳐야 한다. 한쪽만 보정하면 막대기가 상자와
- * 어긋난 자리에 그려진다 — 세로 영상에서 특히 크게 벌어진다.
- */
-function toViewPoint(p: Point, el: HTMLElement, video: HTMLVideoElement | null) {
-  const r = el.getBoundingClientRect()
-  const vw = video?.videoWidth ?? 0
-  const vh = video?.videoHeight ?? 0
-  if (!vw || !vh || !r.width || !r.height) return p
-  const scale = Math.min(r.width / vw, r.height / vh)
-  const cw = (vw * scale) / r.width
-  const ch = (vh * scale) / r.height
-  return { x: (1 - cw) / 2 + p.x * cw, y: (1 - ch) / 2 + p.y * ch, score: p.score }
-}
-
-/** 뼈대를 그리는 좌표계 — 실제 크기와 무관한 고정 격자다(아래 SVG 참고). */
-const POSE_VB = 1000
 
 /** 이보다 작게 그은 것은 실수로 본다(오버레이 폭 · 키 대비). */
 const MIN_BOX = 0.04
@@ -356,13 +318,23 @@ export default function AnalysisStage() {
    *   shown     찾았다 — 영상 칸이 반으로 갈린다
    *
    * 🔴 **찾는 일은 진짜가 아니다.** 계약에도 에이전트에도 「비슷한 선수
-   * 영상」이 없다 — 시간도 붙박이(`COMPARE_MS`)고 왼쪽 칸은 회색 자리
-   * 표시다. 화면에 그렇게 적어 두었고 미결로도 올린다. 진짜가 붙으면
-   * `startCompare` 안과 그 문구를 같이 걷는다.
+   * 영상」이 없다 — 시간도 붙박이(`COMPARE_MS`)고, 왼쪽 영상은 **선수마다
+   * 붙박이로 정해 둔 데모 클립**이다(사용자 결정, 2026-09-14 — RAG · LangGraph
+   * 검색이 붙기 전까지). 진짜가 붙으면 `startCompare` 안에서 `src` 를 받아 오고
+   * 아래 `src` 칸과 `COMPARE_MS` 를 걷는다(미결 paik 28번).
+   *
+   * 데모 클립은 **Pexels 무료 영상**이다(15436954 · 15436958, 1280px 로 줄였다).
+   * 🔴 출처를 모르는 영상 · 실존 선수 경기 영상으로 바꾸지 않는다.
+   *
+   * 🔴 **이름은 지어낸 것이다**(사용자 결정, 2026-09-14). 처음엔 실제 선수
+   * 둘(메시 · 호날두)이었는데, 공개 사이트에 실존 인물의 이름을 허락 없이
+   * 걸면 퍼블리시티권에 걸리고 제휴한 것처럼 읽힌다(미결 paik 28번).
+   * 🔴 **실존 선수 이름으로 되돌리지 않는다** — 저작권 · 초상 판단(박민호)이
+   * 끝나기 전까지는 가상 이름이다.
    */
   const COMPARE = [
-    { id: 'messi', name: '리오넬 메시' },
-    { id: 'ronaldo', name: '크리스티아누 호날두' },
+    { id: 'rovelli', name: '에스테반 로벨리', src: '/compare/pexels-15436954.mp4' },
+    { id: 'castanheira', name: '티아구 카스탄헤이라', src: '/compare/pexels-15436958.mp4' },
   ] as const
   type CompareStage = 'idle' | 'picking' | 'searching' | 'shown'
   const [compare, setCompare] = useState<CompareStage>('idle')
@@ -753,11 +725,10 @@ export default function AnalysisStage() {
         const r = tracker.step(dets, frame)
         setLost(r.lost)
 
-        // 화면의 나머지 사람들 — 회색으로 그린다. 누구인지는 안 따진다.
-        othersRef.current = dets
-          .filter((d) => d !== r.det)
-          .map((d) => d.keypoints)
-          .filter((k): k is Point[] => Boolean(k))
+        // 화면의 나머지 사람들 — 회색으로 그린다. 🔴 짝지어진 검출만이 아니라
+        // 대상 박스와 크게 겹치는 검출도 뺀다(`othersOf` 주석 — 한 사람뿐인데
+        // 회색이 초록 위에 겹쳐 그려졌다).
+        othersRef.current = othersOf(dets, r)
 
         /**
          * 🔴 **놓치면 아예 없앤다**(사용자 요청). 예전에는 마지막 자리에
@@ -856,34 +827,6 @@ export default function AnalysisStage() {
       drawPose(dt, layer, video)
     }
 
-    /** 여러 사람의 자세를 뼈 · 관절 두 줄의 `d` 로 모은다. */
-    const pathsFor = (poses: Point[][], layer: HTMLElement, video: HTMLVideoElement | null) => {
-      let bones = ''
-      let joints = ''
-      for (const pose of poses) {
-        const pt = pose.map((p) => toViewPoint(p, layer, video))
-        const at = (i: number) =>
-          `${(pt[i].x * POSE_VB).toFixed(1)} ${(pt[i].y * POSE_VB).toFixed(1)}`
-        const seen = (i: number) => pt[i] && pt[i].score >= MIN_KP
-
-        for (const [a, b] of EDGES) {
-          if (!seen(a) || !seen(b)) continue
-          bones += `M${at(a)}L${at(b)}`
-        }
-        // 목 — 코와 두 어깨의 가운데를 잇는다. 고개 방향만 남긴다.
-        if (seen(NOSE) && seen(L_SHOULDER) && seen(R_SHOULDER)) {
-          const mx = ((pt[L_SHOULDER].x + pt[R_SHOULDER].x) / 2) * POSE_VB
-          const my = ((pt[L_SHOULDER].y + pt[R_SHOULDER].y) / 2) * POSE_VB
-          bones += `M${at(NOSE)}L${mx.toFixed(1)} ${my.toFixed(1)}`
-        }
-        // 길이 0 인 선은 둥근 끝 때문에 점으로 그려진다.
-        for (let i = 0; i < pt.length; i += 1) {
-          if (seen(i)) joints += `M${at(i)}L${at(i)}`
-        }
-      }
-      return { bones, joints }
-    }
-
     /**
      * 화면의 나머지 사람들 — 회색. 🔴 **누구인지 잇지 않는다.** 그래서 눅이기
      * 전에 "같은 사람의 연속된 두 장인가" 를 묻고, 아니면 그냥 새로 놓는다
@@ -901,7 +844,7 @@ export default function AnalysisStage() {
       )
       shownOthersRef.current = smoothed
 
-      const { bones, joints } = pathsFor(smoothed, layer, video)
+      const { bones, joints } = posePaths(smoothed, layer, video)
       bone.setAttribute('d', bones)
       joint.setAttribute('d', joints)
     }
@@ -924,7 +867,7 @@ export default function AnalysisStage() {
 
       const pose = smoothPose(shownPoseRef.current, raw, dt)
       shownPoseRef.current = pose
-      const { bones, joints } = pathsFor([pose], layer, video)
+      const { bones, joints } = posePaths([pose], layer, video)
       bone.setAttribute('d', bones)
       joint.setAttribute('d', joints)
     }
@@ -1412,12 +1355,15 @@ export default function AnalysisStage() {
               밀리고 왼쪽에 선수 영상이 들어온다(사용자 요청). 자리를 나누는
               일만 여기서 하고, 안의 것들은 제 크기대로 따라간다. */}
           <div className="ss-shot-frame-body" data-compare={compare === 'shown' ? 'true' : undefined}>
-            {/* ⚠️ **회색 자리 표시다** — 선수 영상을 읽을 경로가 계약에도
-                에이전트에도 없다. 진짜가 붙으면 이 칸만 갈아 끼운다. */}
-            {compare === 'shown' && (
-              <div className="ss-shot-compare-slot" aria-label={`${compareWho?.name} 영상 자리`}>
-                <span>{compareWho?.name.split(' ').slice(-1)[0]} 영상 자리입니다</span>
-              </div>
+            {/* ⚠️ **데모 클립이다** — 선수 영상을 찾는 경로가 계약에도 에이전트에도
+                없다(위 `COMPARE` 주석). 진짜가 붙으면 `src` 만 갈아 끼운다. */}
+            {compare === 'shown' && compareWho && (
+              <ComparePlayer
+                key={compareWho.id}
+                src={compareWho.src}
+                label={`${compareWho.name} 영상`}
+                closing={closing}
+              />
             )}
             {file ? (
               <>
@@ -1515,8 +1461,18 @@ export default function AnalysisStage() {
                     {/* 자리는 위의 rAF 가 직접 쓴다 — 초당 60번 바뀌는 값을
                         React 상태에 두면 그만큼 다시 그린다. */}
                     <div ref={boxRef} className="ss-shot-track-box">
+                      {/* 방송 화면의 실시간 표시처럼 읽히게(사용자 요청, 2026-09-14).
+                          판 전체가 `aria-hidden` 이라 낭독기에는 안 간다 — 놓친
+                          사실은 오른쪽 판의 알림 한 줄(`.ss-shot-lost`)이 한글로 말한다. */}
                       <span className="ss-shot-track-tag">
-                        {lost ? '놓쳤습니다' : '따라가는 중'}
+                        {lost ? (
+                          'SIGNAL LOST'
+                        ) : (
+                          <>
+                            <i className="ss-shot-track-dot" />
+                            LIVE TRACKING
+                          </>
+                        )}
                       </span>
                     </div>
                   </div>
