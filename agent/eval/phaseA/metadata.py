@@ -1,7 +1,14 @@
 """Phase A 클립 메타데이터 표 — 자동 산출 + 육안 검증(20건) 병합."""
 import csv, json
 from pathlib import Path
-ROOT = Path("/mnt/d/supersub-phaseA")
+import sys
+
+# 🔴 경로를 박지 않는다 — `eval/phaseA/paths.py` 가 정한다 (미결 14번).
+#    박아 두면 다른 기계에서 안 돌고, 저장소 사본을 떠도 읽히지 않는다.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from paths import external_root  # noqa: E402
+
+ROOT = external_root()
 
 # 육안 검증 20건 (컨택트시트 판독). peak_verdict:
 #   hit=컨택트 ±1프레임, near=1~2프레임 어긋남, late=2~4프레임 늦음,

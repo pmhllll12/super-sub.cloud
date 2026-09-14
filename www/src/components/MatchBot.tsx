@@ -54,6 +54,9 @@ function registerErrorText(code: string | undefined, fallback: string): string {
   }
 }
 
+/** 입력창 예시 문구 — placeholder와 Tab 자동완성이 같은 값을 쓴다. */
+const EXAMPLE_PROMPT = '이번 주 토요일 저녁에 골키퍼 1명 필요해요'
+
 function formatPlayedAt(iso: string): string {
   try {
     return new Date(iso).toLocaleString('ko-KR', {
@@ -228,8 +231,16 @@ export default function MatchBot({ open, onClose }: { open: boolean; onClose: ()
           aria-label="메시지"
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            // 🔴 입력이 비어 있을 때만 채운다 — 이미 뭔가 쳤으면 Tab은
+            // 원래 하던 대로(다음 요소로 포커스 이동) 둔다.
+            if (e.key === 'Tab' && !input) {
+              e.preventDefault()
+              setInput(EXAMPLE_PROMPT)
+            }
+          }}
           disabled={sending}
-          placeholder="이번 주 토요일 저녁에 골키퍼 1명 필요해요"
+          placeholder={EXAMPLE_PROMPT}
         />
         <button type="submit" disabled={sending || !input.trim()}>
           보내기

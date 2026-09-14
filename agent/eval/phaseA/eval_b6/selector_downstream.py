@@ -63,7 +63,9 @@ from supersub_agent.pose import (  # noqa: E402
     COCO_PERSON_LABEL,
     DEFAULT_TARGET_FPS,
     PERSON_DETECTOR,
+    PERSON_DETECTOR_REVISION,
     POSE_MODEL,
+    POSE_MODEL_REVISION,
     read_frames,
 )
 
@@ -338,15 +340,15 @@ def main() -> None:
 
     dev = "cuda" if torch.cuda.is_available() else "cpu"
     t0 = time.time()
-    pproc = AutoProcessor.from_pretrained(POSE_MODEL)
-    pmodel = VitPoseForPoseEstimation.from_pretrained(POSE_MODEL).to(dev).eval()
+    pproc = AutoProcessor.from_pretrained(POSE_MODEL, revision=POSE_MODEL_REVISION)
+    pmodel = VitPoseForPoseEstimation.from_pretrained(POSE_MODEL, revision=POSE_MODEL_REVISION).to(dev).eval()
 
     r1 = track1(pproc, pmodel, dev)
     t1 = time.time()
     _write(OUT / "selector_downstream_comparison.csv", r1)
 
-    dproc = AutoProcessor.from_pretrained(PERSON_DETECTOR)
-    dmodel = RTDetrForObjectDetection.from_pretrained(PERSON_DETECTOR).to(dev).eval()
+    dproc = AutoProcessor.from_pretrained(PERSON_DETECTOR, revision=PERSON_DETECTOR_REVISION)
+    dmodel = RTDetrForObjectDetection.from_pretrained(PERSON_DETECTOR, revision=PERSON_DETECTOR_REVISION).to(dev).eval()
     rubrics = S.discover_rubrics(AGENT / "rubrics")
     r2 = track2(dproc, dmodel, pproc, pmodel, dev, rubrics)
     t2 = time.time()

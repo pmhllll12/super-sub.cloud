@@ -194,7 +194,7 @@ def main() -> None:
     ap.add_argument("--stage", default="pose", choices=("pose", "full"),
                     help="pose=지표까지 · full=판정(LLM)까지")
     ap.add_argument("--side", default="auto", choices=("auto", "left", "right"))
-    ap.add_argument("--split", default=None, help="출처의 분할 (soccer/baseball)")
+    ap.add_argument("--split", default=None, help="출처의 분할 (예: soccer train/val)")
     ap.add_argument("--event", default=None, help="이벤트/라벨로 거른다")
     ap.add_argument("--local-dir", default=None,
                     help="이미 가진 폴더를 쓴다 (내려받지 않는다). 종목보다 우선한다")

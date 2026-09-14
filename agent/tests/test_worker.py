@@ -52,7 +52,7 @@ def _job(**over) -> dict:
         "job_id": "9a2e",
         "video_id": "1b3c",
         "storage_key": "videos/user-1/clip.mp4",
-        "sport_code": "baseball",
+        "sport_code": "football",
         "side": "right",
         "duration_ms": 4200,
     }
@@ -113,17 +113,25 @@ def test_reports_prefix_defaults_under_the_bucket(worker):
 # -- 루브릭 고르기 ----------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    ("sport", "expected"),
-    [
-        ("baseball", "baseball_pitching"),
-        ("basketball", "basketball_jump_shot"),
-        ("football", "football_instep_shot"),
-    ],
-)
-def test_picks_the_one_active_rubric_of_the_sport(worker, sport, expected):
+def test_picks_the_one_active_rubric_of_the_sport(worker):
     """worker-interface.md 2절의 표 그대로다. draft는 고르지 않는다."""
-    assert worker.pick_rubric(ROOT / "rubrics", sport).stem == expected
+    assert worker.pick_rubric(ROOT / "rubrics", "football").stem == "football_instep_shot"
+
+
+@pytest.mark.parametrize("sport", ["baseball", "basketball", "", "soccer"])
+def test_a_sport_we_do_not_support_is_refused_not_guessed(worker, sport):
+    """🔴 축구 단일 종목이다 (2026.09.11) — 그래도 **기본값으로 때우지 않는다.**
+
+    백엔드는 아직 다른 `sport_code` 를 실어 보낼 수 있다(참조 테이블에 남아
+    있다 — 미결 `jin` 17번). 그때 축구 루브릭으로 채점하면 **결과가 틀렸다는
+    것이 값에 나타나지 않는다.** 루브릭이 없으면 그 작업은 사유를 달고
+    failed 로 남아야 한다.
+
+    `soccer` 도 거부한다 — 데이터셋 출처 쪽 이름이고 루브릭의 종목 코드는
+    `football` 이다. 둘을 섞으면 조용히 안 걸린다.
+    """
+    with pytest.raises(worker.RubricUnavailable, match="0개"):
+        worker.pick_rubric(ROOT / "rubrics", sport)
 
 
 def _rubric_copy(src: Path, dest: Path, status: str) -> None:
@@ -149,10 +157,11 @@ def test_refuses_to_guess_when_two_are_active(worker, tmp_path):
 
 
 def test_refuses_a_sport_with_no_active_rubric(worker, tmp_path):
-    _rubric_copy(ROOT / "rubrics" / "baseball_pitching.yaml",
-                 tmp_path / "baseball_pitching.yaml", "draft")
+    """draft 밖에 없으면 고르지 않는다 — 승격은 사람이 한다."""
+    _rubric_copy(ROOT / "rubrics" / "football_instep_shot.yaml",
+                 tmp_path / "football_instep_shot.yaml", "draft")
     with pytest.raises(worker.RubricUnavailable, match="0개"):
-        worker.pick_rubric(tmp_path, "baseball")
+        worker.pick_rubric(tmp_path, "football")
 
 
 # -- 분석 명령줄 ------------------------------------------------------------
@@ -161,17 +170,18 @@ def test_refuses_a_sport_with_no_active_rubric(worker, tmp_path):
 def test_the_command_always_names_a_rubric(worker, cfg):
     """🔴 `--rubric` 을 생략하면 기본값이 축구 인스텝 슈팅이다.
 
-    야구 영상이 축구 루브릭으로 채점되고, **그 결과가 틀렸다는 것이 값에
-    나타나지 않는다.** 이 검사를 지우면 그 결함이 조용히 돌아온다.
+    인사이드 패스 영상이 인스텝 루브릭으로 채점되고, **그 결과가 틀렸다는
+    것이 값에 나타나지 않는다.** 이 검사를 지우면 그 결함이 조용히 돌아온다.
+    (축구 단일 종목이 된 뒤에도 같다 — 동작이 둘이다.)
     """
-    cmd = worker.analyze_command(cfg, _job(), ROOT / "rubrics/baseball_pitching.yaml")
+    cmd = worker.analyze_command(cfg, _job(), ROOT / "rubrics/football_inside_pass.yaml")
     assert "--rubric" in cmd
-    assert cmd[cmd.index("--rubric") + 1].endswith("baseball_pitching.yaml")
+    assert cmd[cmd.index("--rubric") + 1].endswith("football_inside_pass.yaml")
 
 
 def test_the_command_writes_only_under_reports(worker, cfg):
     """워커는 `videos/` 를 읽기만 한다 — IAM 정책이 읽기 전용인 것이 의도다."""
-    cmd = worker.analyze_command(cfg, _job(), ROOT / "rubrics/baseball_pitching.yaml")
+    cmd = worker.analyze_command(cfg, _job(), ROOT / "rubrics/football_inside_pass.yaml")
     assert cmd[cmd.index("--out") + 1] == "s3://supersub-ai/reports"
     assert "s3://supersub-ai/videos/user-1/clip.mp4" in cmd
 
@@ -183,14 +193,14 @@ def test_the_command_carries_the_video_id(worker, cfg):
     옮긴다. 리포트가 옛 자리(업로드 폴더 + 타임스탬프)에 있으면 한 영상에 대한
     것이 두 군데로 갈린다.
     """
-    cmd = worker.analyze_command(cfg, _job(), ROOT / "rubrics/baseball_pitching.yaml")
+    cmd = worker.analyze_command(cfg, _job(), ROOT / "rubrics/football_inside_pass.yaml")
     assert cmd[cmd.index("--video-id") + 1] == "1b3c"
 
 
 def test_the_video_id_is_omitted_when_the_job_has_none(worker, cfg):
     """옛 백엔드는 이 필드를 안 준다. 그때는 옛 자리로 가야지 죽으면 안 된다."""
     cmd = worker.analyze_command(cfg, _job(video_id=None),
-                                 ROOT / "rubrics/baseball_pitching.yaml")
+                                 ROOT / "rubrics/football_inside_pass.yaml")
     assert "--video-id" not in cmd
     assert "None" not in cmd
 
@@ -198,12 +208,12 @@ def test_the_video_id_is_omitted_when_the_job_has_none(worker, cfg):
 def test_side_is_omitted_when_the_job_has_none(worker, cfg):
     """`side` 는 null 일 수 있다. None을 문자열로 넘기면 argparse가 거부한다."""
     cmd = worker.analyze_command(cfg, _job(side=None),
-                                 ROOT / "rubrics/baseball_pitching.yaml")
+                                 ROOT / "rubrics/football_inside_pass.yaml")
     assert "--side" not in cmd
     assert "None" not in cmd
 
     cmd = worker.analyze_command(cfg, _job(side="left"),
-                                 ROOT / "rubrics/baseball_pitching.yaml")
+                                 ROOT / "rubrics/football_inside_pass.yaml")
     assert cmd[cmd.index("--side") + 1] == "left"
 
 
@@ -226,7 +236,7 @@ def test_the_analysis_child_is_seen_as_busy_by_autostop(worker, cfg):
     파이썬 `re` 는 POSIX 문자클래스(`[[:space:]]`)를 모르므로 실제 `grep -E`
     로 맞춰 본다 — 번역하면 그 번역이 틀릴 수 있다.
     """
-    cmd = worker.analyze_command(cfg, _job(), ROOT / "rubrics/baseball_pitching.yaml")
+    cmd = worker.analyze_command(cfg, _job(), ROOT / "rubrics/football_inside_pass.yaml")
     cmdline = " ".join(cmd)
     found = subprocess.run(
         ["grep", "-Eq", _busy_pattern()], input=cmdline, text=True, check=False
@@ -483,8 +493,8 @@ def test_there_is_only_one_queue(monkeypatch):
 
 
 class _StubRubric:
-    sport = "baseball"
-    motion = "pitching"
+    sport = "football"
+    motion = "instep_shot"
     version = "0.1"
     criteria = ()
     # 집중 항목 검증이 대조하는 목록 (미결 `paik` 8번).

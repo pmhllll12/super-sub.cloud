@@ -31,7 +31,13 @@ from supersub_agent.pose import (  # noqa: E402
     frames_within_budget,
 )
 
-SPECS = Path("/mnt/d/supersub-phaseA/clip_specs.csv")
+
+# 🔴 경로를 박지 않는다 — `eval/phaseA/paths.py` 가 정한다 (미결 14번).
+#    박아 두면 다른 기계에서 안 돌고, 저장소 사본을 떠도 읽히지 않는다.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "phaseA"))
+from paths import external_root  # noqa: E402
+
+SPECS = external_root() / "clip_specs.csv"
 
 # 🔴 **10진 MB 다 (1e6). MiB 가 아니다.** `pending9_rss` 의 실측표가 10진이라
 # (1920×1080×3×60 = 373,248,000B 를 「373MB」로 적었다) 여기서 MiB 로 재면
