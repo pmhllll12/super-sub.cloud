@@ -328,6 +328,35 @@ export function createPersonTracker(frame: Frame, box: Box): PersonTracker {
 }
 
 /**
+ * 이만큼 대상 박스와 겹치면 **같은 사람**으로 본다. 한 사람을 두 번 잡은
+ * 검출은 0.8 안팎이고, 바짝 붙어 선 옆 사람은 0.1~0.3 이다 — 그 사이다.
+ */
+const SAME_BODY_IOU = 0.5
+
+/**
+ * 회색으로 그릴 **나머지 사람들**의 관절.
+ *
+ * 🔴 **짝지어진 검출만 빼면 모자란다.** 한 사람뿐인 영상에서도 회색이 초록 위에
+ * 겹쳐 그려졌다(사용자 지적, 2026-09-14):
+ *   ⑴ 추적기가 한 바퀴 짝을 못 지으면(`det: null`) 그 사람의 이번 검출이 남는다
+ *   ⑵ 검출기가 한 사람을 두 번 잡으면 짝이 안 된 쪽이 남는다
+ * 그래서 **대상 박스와 크게 겹치는 검출**도 같이 뺀다.
+ *
+ * ⚠️ 놓친 동안(`lost`)에는 빼지 않는다 — 초록이 없는 때라, 그때 보이는 사람은
+ * 정말로 "찾긴 했지만 대상으로 못 붙인 사람" 이다.
+ */
+export function othersOf(
+  dets: Det[],
+  target: { box: Box; det: Det | null; lost: boolean },
+): Point[][] {
+  return dets
+    .filter((d) => d !== target.det)
+    .filter((d) => target.lost || iou(d.box, target.box) < SAME_BODY_IOU)
+    .map((d) => d.keypoints)
+    .filter((k): k is Point[] => Boolean(k))
+}
+
+/**
  * 사람이 그린 네모를 **검출된 사람에 맞춰 준다.** 맞출 것이 없으면 `null`.
  *
  * 🔴 **처음 생김새는 반드시 검출된 상자에서 떠야 한다.** 손으로 그린 네모는

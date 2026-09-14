@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import type { MyVideo } from '@/server/backend'
-import { SPORTS, SPORT_CODE, type SportKey } from '@/lib/sports'
+import { DEFAULT_SPORT, SPORT_CODE } from '@/lib/sports'
 import { checkClip, uploadClip, type ClipMeta } from '@/lib/uploadClip'
 import { publish, unpublish } from '@/lib/published'
 import { fetchReport, type ReportResult } from '@/lib/savedReports'
@@ -348,14 +348,14 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
     setPicked(f)
   }
 
-  async function send(sport: SportKey) {
+  async function send() {
     if (!picked || !meta || busy) return
     setBusy(true)
     setNotice(null)
     try {
       const saved = await uploadClip({
         file: picked,
-        sportCode: SPORT_CODE[sport],
+        sportCode: SPORT_CODE[DEFAULT_SPORT],
         meta,
         analyze: false,
       })
@@ -503,26 +503,25 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
           />
           <div className="ss-profile-picked-ask">
             <p className="ss-profile-picked-name">{picked.name}</p>
-            {/* 🔴 기본값을 축구로 박아 두면 야구 영상이 축구 루브릭으로 조용히
-                채점된다 — 고르는 순간 올라간다. */}
-            <span className="ss-shot-sports" role="group" aria-label="종목">
-              {SPORTS.map((sp) => (
-                <button
-                  key={sp.key}
-                  type="button"
-                  className="ss-shot-sport"
-                  disabled={!meta || busy}
-                  onClick={() => send(sp.key)}
-                >
-                  <span className="material-symbols-outlined" aria-hidden="true">
-                    {sp.icon}
-                  </span>
-                  {sp.label}
-                </button>
-              ))}
+            {/* 🔴 **종목을 묻지 않는다** — 축구 하나다(`lib/sports.ts`, 미결 ho 39번).
+                고를 것이 하나뿐인 단추는 무엇을 고르라는 것인지 안 읽힌다.
+                종목을 되살리면 여기에 고르는 자리를 같이 되살린다 — 안 그러면
+                다른 종목 영상이 축구 루브릭으로 조용히 채점된다. */}
+            <span className="ss-shot-sports">
+              <button
+                type="button"
+                className="ss-shot-sport"
+                disabled={!meta || busy}
+                onClick={send}
+              >
+                <span className="material-symbols-outlined" aria-hidden="true">
+                  upload
+                </span>
+                올리기
+              </button>
             </span>
             <p className="ss-profile-picked-hint">
-              {busy ? '올리는 중입니다…' : '종목을 고르면 올라갑니다.'}
+              {busy ? '올리는 중입니다…' : '축구 영상만 받습니다.'}
             </p>
           </div>
         </div>
