@@ -11614,6 +11614,29 @@ sudo k3s kubectl get deploy -A          → default 에 supersub-api-trial (1/1 
 - 확인: http://localhost:4000/qa-체크리스트/ (로컬) · `git log --oneline main -- jekyll/qa`
 - **담당**: 박민호 · **제기**: 박민호 · **기한**: 완료됨
 
+### 25. 앱 로그인 세션이 **재시작하면 사라집니다** — 영속 저장 필요
+
+QA 체크리스트(24번) 채우던 중 `flutter/lib/features/auth/data/auth_repository_api.dart`를
+읽다가 발견했다. 파일 자체 주석에 이미 적혀 있다.
+
+> 세션은... **메모리에만** 둔다 — 앱을 새로 켜면 다시 로그인해야 한다. 기기
+> 재시작 후에도 로그인 상태를 유지하려면 토큰을 영속 저장소(shared_preferences
+> 등)에 옮겨야 한다.
+
+토큰·세션을 로컬에 저장하는 패키지(`shared_preferences`·`flutter_secure_storage`
+등)가 `pubspec.yaml`에 아예 없다 — 껐다 켜면 무조건 로그아웃이다. 웹(`www/`)은
+같은 문제를 httpOnly 쿠키로 이미 풀어 뒀다(`www/src/server/session.ts`).
+
+| | |
+|---|---|
+| 만족해야 할 성질 | 앱을 완전히 종료했다가 다시 열어도 로그인 상태가 유지된다 |
+| 확인 | 로그인 → 앱 강제 종료 → 재실행 → 로그인 화면 대신 홈으로 바로 들어가는지 |
+| 참고 | 토큰을 그대로 평문 저장소(`shared_preferences`)에 두면 기기 탈취 시 노출된다 — `flutter_secure_storage`(iOS Keychain·Android Keystore) 쪽이 더 안전하다. 다만 최종 선택은 백성검님 판단 |
+| 하지 말 것 | 토큰을 로그에 남기거나(루트 CLAUDE.md 공통 원칙) 평문 그대로 커밋되는 설정 파일에 두지 않기 |
+
+- 관련: `jekyll/qa/qa-체크리스트.markdown` "앱 → 로그인" 절(현재 미구현으로 표시해 둠)
+- **담당**: 백성검 · **제기**: 박민호 · **기한**: 확인되는 대로
+
 ## paik (백성검)
 
 ### 1. 분석한 영상을 우리 서버에 저장하는 경로 ✅ 해소 (2026.09.03)
