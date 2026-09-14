@@ -362,8 +362,15 @@ export default function AnalysisStage() {
   const [mirrorOverride, setMirrorOverride] = useState<boolean | null>(null)
   /** 누른 카드. 두 영상이 이 순간에 멈춘다. */
   const [moment, setMoment] = useState<MomentKey | null>(null)
-  /** 내 영상 관절은 같은 파일 · 같은 대상이면 다시 쓴다 — 선수만 바꿀 때 다시 훑지 않는다. */
-  const userMotionRef = useRef<{ key: string; motion: Promise<Motion> } | null>(null)
+  /**
+   * 내 영상 관절은 같은 파일 · 같은 대상이면 다시 쓴다 — 선수만 바꿀 때 다시 훑지 않는다.
+   *
+   * 🔴 **자기 컨트롤러를 갖는다**(리뷰 지적, 2026-09-15). 시도(아래 effect 의 `ctrl`)의
+   * 신호를 그대로 물려 쓰면, 뽑는 중에 선수를 바꿔 그 시도가 끊길 때 **이 캐시까지
+   * 함께 끊긴다** — 다음 시도가 끊긴 약속을 물려받아 「뽑는 중」에 영원히 멈춘다.
+   * 그래서 이 컨트롤러는 대상(키)이 바뀌거나 화면을 떠날 때만 끊는다.
+   */
+  const userMotionRef = useRef<{ key: string; ctrl: AbortController; motion: Promise<Motion> } | null>(null)
 
   const resetCompareMotion = () => {
     setCompareMotion({ status: 'idle' })
@@ -811,7 +818,8 @@ export default function AnalysisStage() {
     }
   }, [started, closing, subject])
 
-  // 선수를 고르면 두 영상의 관절을 뽑는다. 선수를 바꾸거나 닫으면 중단한다.
+  // 선수를 고르면 두 영상의 관절을 뽑는다. 선수를 바꾸거나 닫으면 이 시도만 중단한다
+  // (내 영상 캐시는 안 끊는다 — 아래 `userMotionRef` 선언의 주석).
   useEffect(() => {
     if (compare !== 'shown' || !compareWho || !file) return
     const ctrl = new AbortController()
@@ -827,12 +835,18 @@ export default function AnalysisStage() {
     const pickMe = box ? { box, atMs: subject?.at ?? 0 } : ('largest' as const)
     const userKey = `${file.url}|${JSON.stringify(pickMe)}`
     if (userMotionRef.current?.key !== userKey) {
+      // 대상이 바뀌었다 — 옛 캐시는 이제 쓸 데가 없으니 그때 가서 끊는다.
+      userMotionRef.current?.ctrl.abort()
+      const userCtrl = new AbortController()
       userMotionRef.current = {
         key: userKey,
-        motion: getMotion({ src: file.url, pick: pickMe }, { signal: ctrl.signal, onProgress: report(1) }),
+        ctrl: userCtrl,
+        motion: getMotion({ src: file.url, pick: pickMe }, { signal: userCtrl.signal, onProgress: report(1) }),
       }
     } else {
-      progress[1] = 1
+      // 이미 도는(또는 끝난) 캐시를 그대로 쓴다 — 진행률은 여기서 다시 걸지 않고
+      // **끝나야 100 으로 뛴다**(선수만 바꾼 시도라 내 영상 몫을 따로 잴 수 없다).
+      void userMotionRef.current.motion.then(() => report(1)(1)).catch(() => {})
     }
     const userMotion = userMotionRef.current.motion
 
@@ -854,15 +868,23 @@ export default function AnalysisStage() {
           user: { motion: um, moments: u.moments },
         })
       })
-      .catch((e) => {
-        // 중단이면 조용히 — 새 선수의 뽑기가 이미 돌고 있다. 내 영상 약속도 버린다.
+      .catch(() => {
+        // 🔴 **이 시도 자체가 끊긴 것만 조용히 넘긴다**(`ctrl` — 새 선수의 뽑기가
+        // 이미 돌고 있다). 그 밖의 실패는 — 캐시가 다른 이유로 끊긴 것을 포함해 —
+        // 화면에 알린다. 안 그러면 "뽑는 중"에 멈춘 채 아무 말도 안 하게 된다
+        // (이 캐시가 낸 것이면 다음 시도가 다시 뽑도록 비운다).
+        if (ctrl.signal.aborted) return
         if (userMotionRef.current?.key === userKey) userMotionRef.current = null
-        if (ctrl.signal.aborted || (e instanceof DOMException && e.name === 'AbortError')) return
         setCompareMotion({ status: 'failed', reason: '자세를 뽑지 못했습니다' })
       })
 
     return () => ctrl.abort()
   }, [compare, compareWho, file, subject])
+
+  // 화면을 떠나면(언마운트) 캐시에 남은 뽑기도 끊는다 — 그 전까지는 살려 둔다.
+  useEffect(() => {
+    return () => userMotionRef.current?.ctrl.abort()
+  }, [])
 
   // 누른 카드의 순간으로 내 영상을 옮긴다(선수 영상은 `ComparePlayer` 의 `seekTo`).
   useEffect(() => {

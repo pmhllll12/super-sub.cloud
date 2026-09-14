@@ -64,8 +64,12 @@ const REPORT_MOCK = {
 }
 
 // 🔴 `seesPerson` 을 끈 시험이 있으면 다음 시험에 새지 않게 매번 되돌린다.
+// `getMotion` 의 호출 이력도 함께 비운다 — 안 비우면 `blob:test`(모든 시험이 같은
+// 값을 쓴다, `URL.createObjectURL` 대역) 로 건 호출 수를 세는 시험이 **앞선 시험이
+// 남긴 호출**까지 세어 버린다(리뷰 지적, 2026-09-15 — 실제로 이렇게 걸렸다).
 afterEach(() => {
   seesPerson.current = true
+  getMotion.mockClear()
 })
 
 /**
@@ -225,6 +229,58 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     URL.createObjectURL = vi.fn(() => 'blob:test')
     URL.revokeObjectURL = vi.fn()
   })
+
+  /* 🔴 **시험마다 자기 fetch 대역을 세운다**(리뷰 지적, 2026-09-15). 예전엔 뒤쪽
+     두 시험이 앞 시험의 `vi.stubGlobal('fetch', …)` 이 안 걷힌 채로 남는 것에
+     기대고 있었다 — 파일 순서가 바뀌거나 이 시험만 따로 돌리면 깨진다.
+     시험 끝마다 되돌려서 다음 시험이 남의 것을 물려받지 않게 한다. */
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  /**
+   * 리포트까지 가는 데 필요한 네 응답(업로드 URL · S3 · 등록 · 리포트)을 채운
+   * fetch 대역 — 「선수와 비교하기」에 이르는 시험들이 반복해 만들지 않도록 하나로 둔다.
+   */
+  function reportReadyFetch(report: Record<string, unknown> = REPORT_MOCK) {
+    const fn = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url === '/api/videos/upload-url') {
+        return new Response(
+          JSON.stringify({
+            storage_key: 'videos/u1/abc.mp4',
+            upload_url: 'https://bucket.s3.example.com/abc.mp4?sig=1',
+            expires_in: 900,
+          }),
+          { status: 200 },
+        )
+      }
+      if (url.startsWith('https://bucket.s3.example.com/')) return new Response(null, { status: 200 })
+      if (url === '/api/videos') {
+        return new Response(
+          JSON.stringify({
+            id: 'v1',
+            sport_code: 'football',
+            storage_key: 'videos/u1/abc.mp4',
+            duration_ms: 0,
+            side: null,
+            created_at: '2026-09-03T00:00:00Z',
+            passed: true,
+            reject_reason: null,
+            analysis_job_id: 'job1',
+            analysis_status: 'queued',
+          }),
+          { status: 201 },
+        )
+      }
+      if (url === '/api/videos/v1/report') {
+        return new Response(JSON.stringify(report), { status: 200 })
+      }
+      throw new Error(`예상하지 못한 요청: ${url}`)
+    })
+    vi.stubGlobal('fetch', fn)
+    return fn
+  }
 
   /**
    * 영상 위에 네모를 끌어 그리고 확정한다.
@@ -546,6 +602,7 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
      카드가 서며, 오른쪽 판 리포트 아래에 요약이 붙는다. 카드를 누르면 두 영상이
      그 순간으로 간다. */
   it('두 영상이 뽑히면 세 순간 카드와 비교 요약이 선다', async () => {
+    reportReadyFetch()
     const { kickMotion } = await import('@/lib/motion/kickFixture')
     getMotion.mockImplementation(async (_input, opts) => {
       opts?.onProgress?.(1)
@@ -579,6 +636,7 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
   }, 40000)
 
   it('순간을 못 찾으면 카드 없이 이유를 말한다', async () => {
+    reportReadyFetch()
     const { kickMotion } = await import('@/lib/motion/kickFixture')
     getMotion.mockResolvedValue(kickMotion({ impactShift: -14 }))
 
@@ -594,6 +652,47 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     expect(await screen.findByText(/슈팅 순간을 찾지 못했습니다/, {}, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.queryByRole('group', { name: '세 순간 비교' })).toBeNull()
     expect(screen.getByText(/슈팅 순간을 찾지 못해 비교하지 않았습니다/)).toBeInTheDocument()
+  }, 40000)
+
+  /* 🔴 **선수를 바꿔도 내 영상 뽑기는 안 끊긴다**(리뷰 지적, 2026-09-15). 예전엔
+     캐시된 내 영상 약속이 첫 시도의 컨트롤러에 묶여 있어서, 뽑는 중에 선수를
+     바꾸면(그 시도가 끊기며) 캐시까지 함께 끊겼다 — 다음 시도가 그 끊긴 약속을
+     물려받아 「뽑는 중」에 영원히 멈췄다. 이 시험은 그 경로(끊김 없이 카드가
+     선다)와 내 영상은 **한 번만** 뽑힌다는 것을 함께 지킨다. */
+  it('뽑는 중에 선수를 바꿔도 내 영상 뽑기는 이어가고, 끝나면 카드가 선다', async () => {
+    reportReadyFetch()
+    const { kickMotion } = await import('@/lib/motion/kickFixture')
+    let releaseUser: () => void = () => {}
+    const userGate = new Promise<void>((resolve) => {
+      releaseUser = resolve
+    })
+    getMotion.mockImplementation(async (input: { src: string }, opts) => {
+      opts?.onProgress?.(1)
+      if (input.src === 'blob:test') await userGate
+      return kickMotion()
+    })
+
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await user.click(await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }))
+    await sayYes(user)
+    await user.click(await screen.findByRole('button', { name: '선수와 비교하기' }, { timeout: 12000 }))
+    await user.click(screen.getByRole('button', { name: '에스테반 로벨리' }))
+
+    // 아직 내 영상 뽑기가 끝나지 않았다 — 여기서 닫고 다른 선수로 다시 고른다.
+    await screen.findByText(/자세를 뽑는 중/, {}, { timeout: 5000 })
+    await user.click(screen.getByRole('button', { name: '선수와 비교하기' })) // 닫는다
+    await user.click(screen.getByRole('button', { name: '선수와 비교하기' })) // 다시 연다
+    await user.click(await screen.findByRole('button', { name: '티아구 카스탄헤이라' }))
+
+    releaseUser()
+
+    const group = await screen.findByRole('group', { name: '세 순간 비교' }, { timeout: 8000 })
+    expect(group).toBeInTheDocument()
+    // 내 영상(blob:test)은 선수를 바꿔도 다시 뽑지 않는다 — 캐시가 이어졌다는 증거.
+    expect(getMotion.mock.calls.filter((c) => (c[0] as { src: string }).src === 'blob:test')).toHaveLength(1)
   }, 40000)
 
   // 창 틀의 닫기 자리이므로 시작한 뒤에도 그대로 있어야 한다.
