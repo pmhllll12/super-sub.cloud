@@ -32,10 +32,13 @@ export default function ComparePlayer({
   src,
   label,
   closing,
+  seekTo = null,
 }: {
   src: string
   label: string
   closing: boolean
+  /** 초. 숫자면 그 시각으로 가서 멈추고, `null` 이면 이어 재생한다(세 순간 카드). */
+  seekTo?: number | null
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const layerRef = useRef<HTMLDivElement>(null)
@@ -49,6 +52,18 @@ export default function ComparePlayer({
   const shownRef = useRef<Box | null>(null)
   const poseRef = useRef<Point[] | null>(null)
   const shownPoseRef = useRef<Point[] | null>(null)
+
+  // 세 순간 카드를 누르면 그 순간에 멈춘다. 다시 누르면(`null`) 이어 돈다.
+  useEffect(() => {
+    const v = videoRef.current
+    if (!v) return
+    if (seekTo === null) {
+      void v.play()?.catch(() => {})
+      return
+    }
+    v.pause()
+    v.currentTime = seekTo
+  }, [seekTo])
 
   // 검출 — 겹쳐 돌리지 않는다. 한 장이 오래 걸리면 그 시간이 곧 간격이다.
   useEffect(() => {

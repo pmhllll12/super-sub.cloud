@@ -40,6 +40,10 @@ vi.mock('@/lib/personDetector', () => ({
   refinePose: () => Promise.resolve(null),
 }))
 
+// 선수 비교의 뽑기는 대역으로 — jsdom 에서는 영상을 넘기며 검출할 수 없다.
+const getMotion = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/motion/source', () => ({ getMotion }))
+
 /**
  * `GET /videos/{id}/report` 의 대역 몸통 — **최소한만 채운다.** 2026-09-11 에
  * 진행 체크리스트가 이 응답만으로 「끝났다」를 정하게 바뀌었으므로, 「예」를
@@ -537,6 +541,60 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     ).toHaveAttribute('src', '/compare/pexels-15436954.mp4')
     expect(document.querySelector('.ss-shot-frame-body')?.getAttribute('data-compare')).toBe('true')
   }, 30000)
+
+  /* 🔴 **세 순간 비교(2026-09-14)** — 두 영상이 다 뽑히면 영상 칸이 위로 줄고 아래에
+     카드가 서며, 오른쪽 판 리포트 아래에 요약이 붙는다. 카드를 누르면 두 영상이
+     그 순간으로 간다. */
+  it('두 영상이 뽑히면 세 순간 카드와 비교 요약이 선다', async () => {
+    const { kickMotion } = await import('@/lib/motion/kickFixture')
+    getMotion.mockImplementation(async (_input, opts) => {
+      opts?.onProgress?.(1)
+      return kickMotion()
+    })
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await user.click(await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }))
+    await sayYes(user)
+    await user.click(await screen.findByRole('button', { name: '선수와 비교하기' }, { timeout: 12000 }))
+    await user.click(screen.getByRole('button', { name: '에스테반 로벨리' }))
+
+    const group = await screen.findByRole('group', { name: '세 순간 비교' }, { timeout: 5000 })
+    expect(group).toBeInTheDocument()
+    expect(document.querySelector('.ss-shot-frame-body')?.getAttribute('data-moments')).toBe('true')
+    // 선수 영상은 가장 큰 사람, 내 영상은 내가 올린 파일에서 뽑는다.
+    expect(getMotion.mock.calls.map((c) => c[0].src)).toContain('/compare/pexels-15436954.mp4')
+
+    // 두 영상이 같은 동작(대역)이라 규칙 문장은 「비슷합니다」다.
+    expect(await screen.findByText('세 순간 모두 선수와 비슷합니다.')).toBeInTheDocument()
+
+    // 요약 절에도 「임팩트」 줄 단추가 있다 — 카드는 `data-moment` 로 집는다.
+    const impact = group.querySelector('[data-moment="impact"]') as HTMLElement
+    await user.click(impact)
+    expect(impact).toHaveAttribute('aria-pressed', 'true')
+    // 같은 카드를 다시 누르면 재생으로 돌아간다.
+    await user.click(impact)
+    expect(impact).toHaveAttribute('aria-pressed', 'false')
+  }, 40000)
+
+  it('순간을 못 찾으면 카드 없이 이유를 말한다', async () => {
+    const { kickMotion } = await import('@/lib/motion/kickFixture')
+    getMotion.mockResolvedValue(kickMotion({ impactShift: -14 }))
+
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await user.click(await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }))
+    await sayYes(user)
+    await user.click(await screen.findByRole('button', { name: '선수와 비교하기' }, { timeout: 12000 }))
+    await user.click(screen.getByRole('button', { name: '에스테반 로벨리' }))
+
+    expect(await screen.findByText(/슈팅 순간을 찾지 못했습니다/, {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: '세 순간 비교' })).toBeNull()
+    expect(screen.getByText(/슈팅 순간을 찾지 못해 비교하지 않았습니다/)).toBeInTheDocument()
+  }, 40000)
 
   // 창 틀의 닫기 자리이므로 시작한 뒤에도 그대로 있어야 한다.
   it('시작한 뒤에도 닫기 점이 남아 있고, 누르면 고르기 전으로 돌아간다', async () => {

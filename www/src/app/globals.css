@@ -3053,9 +3053,6 @@ body::-webkit-scrollbar {
    `position: relative` 가 있어야 뼈대 판(`.ss-shot-track`, `inset: 0`)이 **이 칸**을
    덮는다 — 없으면 영상 상자 전체를 덮어 내 영상 쪽까지 넘어간다. */
 .ss-shot-compare-slot {
-  /* 🔴 선수 쪽 색 — 초록(내 사람)과 갈리는 하늘색(사용자 결정, 2026-09-14).
-     칸 안에서만 쓰므로 전역 토큰으로 올리지 않는다. */
-  --ss-pro: #5cb8ff;
   position: relative;
   overflow: hidden;
   border-radius: 10px;
@@ -3074,6 +3071,208 @@ body::-webkit-scrollbar {
 
 .ss-shot-compare-slot .ss-shot-track-tag {
   background-color: color-mix(in srgb, var(--ss-pro) 88%, transparent);
+}
+
+/* ── 세 순간 비교 (2026-09-14, www/docs/2026-09-14-선수-비교-분석-design.md) ──
+   다 뽑히면 영상 칸이 위 55% 로 줄고 아래 45% 에 카드가 선다. 틀 전체 키는 그대로라
+   오른쪽 판 · 머리줄이 안 흔들린다. 행 비율로 펴는 이유는 `.ss-shot-compare` 와 같다
+   (max-height 는 속도가 튄다). */
+.ss-shot-frame-body[data-compare='true'] {
+  --ss-pro: #5cb8ff;
+  grid-template-rows: 1fr 0fr;
+  row-gap: 0;
+  transition: grid-template-rows 600ms var(--ss-home-out-ease);
+}
+
+.ss-shot-frame-body[data-moments='true'] {
+  grid-template-rows: 55fr 45fr;
+}
+
+/* 재생 막대는 내 영상 칸 안에 둔다 — 그대로 두면 아래 카드 줄을 덮는다. */
+.ss-shot-frame-body[data-compare='true'] > .ss-shot-scrub {
+  grid-row: 1;
+  grid-column: 2;
+}
+
+.ss-shot-moments {
+  grid-row: 2;
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  padding-top: 10px;
+  overflow: hidden;
+}
+
+.ss-shot-moments-cards {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  min-height: 0;
+}
+
+.ss-shot-moment {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 0;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 22%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ss-fg) 5%, transparent);
+  color: var(--ss-fg);
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.ss-shot-moment[aria-pressed='true'] {
+  border-color: var(--ss-accent);
+  background: color-mix(in srgb, var(--ss-accent) 10%, transparent);
+}
+
+.ss-shot-moment svg {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+
+.ss-shot-moment-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.ss-shot-moment-metric {
+  font-size: 0.7rem;
+  color: color-mix(in srgb, var(--ss-fg) 80%, transparent);
+}
+
+.ss-shot-moment-pro,
+.ss-shot-moment-me {
+  fill: none;
+  stroke-width: 10;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ss-shot-moment-pro {
+  stroke: var(--ss-pro);
+}
+
+.ss-shot-moment-me {
+  stroke: var(--ss-accent);
+}
+
+.ss-shot-moment-pro-joint,
+.ss-shot-moment-me-joint {
+  fill: none;
+  stroke: var(--ss-fg);
+  stroke-width: 20;
+  stroke-linecap: round;
+}
+
+.ss-shot-moments-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.7rem;
+  color: color-mix(in srgb, var(--ss-fg) 70%, transparent);
+}
+
+.ss-shot-moments-legend i {
+  display: inline-block;
+  width: 14px;
+  height: 3px;
+  margin: 0 4px 2px 8px;
+  border-radius: 2px;
+  vertical-align: middle;
+}
+
+.ss-shot-moments-legend i[data-who='pro'] {
+  margin-left: 0;
+  background: var(--ss-pro);
+}
+
+.ss-shot-moments-legend i[data-who='me'] {
+  background: var(--ss-accent);
+}
+
+.ss-shot-moments-flip {
+  padding: 3px 10px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 40%, transparent);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.ss-shot-moments-flip[aria-pressed='true'] {
+  border-color: var(--ss-pro);
+  color: var(--ss-pro);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-shot-frame-body[data-compare='true'] {
+    transition: none;
+  }
+}
+
+/* 오른쪽 판 리포트 아래의 비교 요약. */
+.ss-compare-summary {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid color-mix(in srgb, var(--ss-fg) 14%, transparent);
+  font-size: 0.8125rem;
+  color: var(--ss-fg);
+}
+
+.ss-compare-summary h3 {
+  margin: 0 0 10px;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.ss-compare-summary-moments {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.ss-compare-summary-moments button {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ss-fg) 5%, transparent);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ss-compare-summary-moments b {
+  margin-right: 6px;
+  color: var(--ss-accent);
+}
+
+.ss-compare-summary-line {
+  display: block;
+  margin-top: 2px;
+}
+
+.ss-compare-summary-note {
+  margin-top: 10px;
+  font-size: 0.7rem;
+  color: color-mix(in srgb, var(--ss-fg) 60%, transparent);
 }
 
 @keyframes ss-shot-compare-in {

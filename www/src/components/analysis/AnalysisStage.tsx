@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import AnalysisChat from '@/components/analysis/AnalysisChat'
 import FigureBackground from '@/components/FigureBackground'
 import { useHideChrome, useLeaving } from '@/lib/pageTransition'
@@ -14,6 +14,13 @@ import ReportView from '@/components/analysis/ReportView'
 import { isSamePerson, smoothPose, type Point } from '@/lib/pose'
 import { posePaths, toViewBox } from '@/lib/poseDraw'
 import ComparePlayer from '@/components/analysis/ComparePlayer'
+import CompareMoments from '@/components/analysis/CompareMoments'
+import CompareSummary from '@/components/analysis/CompareSummary'
+import { shouldMirror } from '@/lib/motion/align'
+import { detectMoments } from '@/lib/motion/moments'
+import { getMotion } from '@/lib/motion/source'
+import { buildSummaryRequest } from '@/lib/motion/summaryContract'
+import type { MomentKey, Moments, Motion } from '@/lib/motion/types'
 import {
   detectPeople,
   refinePose,
@@ -340,12 +347,38 @@ export default function AnalysisStage() {
   const [compare, setCompare] = useState<CompareStage>('idle')
   const [compareWho, setCompareWho] = useState<(typeof COMPARE)[number] | null>(null)
 
+  /**
+   * 세 순간 비교의 뽑기 상태(설계 §2 · §3). 🔴 `extracting` 으로 되돌리는 일은 **손짓**
+   * (`startCompare`)이 한다 — effect 첫 줄에서 되돌리면 렌더가 한 번 더 돈다.
+   */
+  type Analyzed = { motion: Motion; moments: Moments }
+  type CompareMotion =
+    | { status: 'idle' }
+    | { status: 'extracting'; progress: number }
+    | { status: 'ready'; player: Analyzed; user: Analyzed }
+    | { status: 'failed'; reason: string }
+  const [compareMotion, setCompareMotion] = useState<CompareMotion>({ status: 'idle' })
+  /** 좌우 반전 — `null` 이면 자동 판단(`shouldMirror`), 토글하면 값이 선다. */
+  const [mirrorOverride, setMirrorOverride] = useState<boolean | null>(null)
+  /** 누른 카드. 두 영상이 이 순간에 멈춘다. */
+  const [moment, setMoment] = useState<MomentKey | null>(null)
+  /** 내 영상 관절은 같은 파일 · 같은 대상이면 다시 쓴다 — 선수만 바꿀 때 다시 훑지 않는다. */
+  const userMotionRef = useRef<{ key: string; motion: Promise<Motion> } | null>(null)
+
+  const resetCompareMotion = () => {
+    setCompareMotion({ status: 'idle' })
+    setMirrorOverride(null)
+    setMoment(null)
+  }
+
   /** 찾는 척하는 시간. 🔴 진짜 검색이 붙으면 이 상수째 사라진다. */
   const COMPARE_MS = 1600
 
   const startCompare = (who: (typeof COMPARE)[number]) => {
     setCompareWho(who)
     setCompare('searching')
+    resetCompareMotion()
+    setCompareMotion({ status: 'extracting', progress: 0 })
     setTimeout(() => setCompare('shown'), COMPARE_MS)
   }
 
@@ -777,6 +810,87 @@ export default function AnalysisStage() {
       stop = true
     }
   }, [started, closing, subject])
+
+  // 선수를 고르면 두 영상의 관절을 뽑는다. 선수를 바꾸거나 닫으면 중단한다.
+  useEffect(() => {
+    if (compare !== 'shown' || !compareWho || !file) return
+    const ctrl = new AbortController()
+    const progress = [0, 0]
+    const report = (i: number) => (r: number) => {
+      progress[i] = r
+      if (!ctrl.signal.aborted) {
+        setCompareMotion({ status: 'extracting', progress: Math.round(((progress[0] + progress[1]) / 2) * 100) })
+      }
+    }
+
+    const box = subject?.box ?? null
+    const pickMe = box ? { box, atMs: subject?.at ?? 0 } : ('largest' as const)
+    const userKey = `${file.url}|${JSON.stringify(pickMe)}`
+    if (userMotionRef.current?.key !== userKey) {
+      userMotionRef.current = {
+        key: userKey,
+        motion: getMotion({ src: file.url, pick: pickMe }, { signal: ctrl.signal, onProgress: report(1) }),
+      }
+    } else {
+      progress[1] = 1
+    }
+    const userMotion = userMotionRef.current.motion
+
+    Promise.all([
+      getMotion({ src: compareWho.src, pick: 'largest' }, { signal: ctrl.signal, onProgress: report(0) }),
+      userMotion,
+    ])
+      .then(([pm, um]) => {
+        if (ctrl.signal.aborted) return
+        const p = detectMoments(pm)
+        const u = detectMoments(um)
+        if (!p.ok || !u.ok) {
+          setCompareMotion({ status: 'failed', reason: !p.ok ? p.reason : (u as { reason: string }).reason })
+          return
+        }
+        setCompareMotion({
+          status: 'ready',
+          player: { motion: pm, moments: p.moments },
+          user: { motion: um, moments: u.moments },
+        })
+      })
+      .catch((e) => {
+        // 중단이면 조용히 — 새 선수의 뽑기가 이미 돌고 있다. 내 영상 약속도 버린다.
+        if (userMotionRef.current?.key === userKey) userMotionRef.current = null
+        if (ctrl.signal.aborted || (e instanceof DOMException && e.name === 'AbortError')) return
+        setCompareMotion({ status: 'failed', reason: '자세를 뽑지 못했습니다' })
+      })
+
+    return () => ctrl.abort()
+  }, [compare, compareWho, file, subject])
+
+  // 누른 카드의 순간으로 내 영상을 옮긴다(선수 영상은 `ComparePlayer` 의 `seekTo`).
+  useEffect(() => {
+    const v = previewRef.current
+    if (!v || compareMotion.status !== 'ready') return
+    if (moment === null) {
+      void v.play()?.catch(() => {})
+      return
+    }
+    const { motion, moments } = compareMotion.user
+    v.pause()
+    v.currentTime = moments[moment] / motion.fps
+  }, [moment, compareMotion])
+
+  const mirrored =
+    compareMotion.status === 'ready'
+      ? (mirrorOverride ?? shouldMirror(compareMotion.player.moments, compareMotion.user.moments))
+      : false
+  /* 🔴 **`useMemo` 로 고정한다.** 렌더마다 새 객체가 되면 `CompareSummary` 의 effect 가
+     매번 다시 돌아, 요약이 오는 동안 요청을 끊고 또 보낸다. */
+  const summaryRequest = useMemo(
+    () =>
+      compareMotion.status === 'ready' && compareWho
+        ? buildSummaryRequest(compareWho.name, compareMotion.player, compareMotion.user, mirrored)
+        : null,
+    [compareMotion, compareWho, mirrored],
+  )
+  const toggleMoment = (key: MomentKey) => setMoment((cur) => (cur === key ? null : key))
 
   /**
    * 🔴 **그리기는 검출과 따로 돈다.**
@@ -1354,7 +1468,11 @@ export default function AnalysisStage() {
           {/* 🔴 비교가 뜨면 **이 상자가 반으로 갈린다** — 내 영상은 오른쪽으로
               밀리고 왼쪽에 선수 영상이 들어온다(사용자 요청). 자리를 나누는
               일만 여기서 하고, 안의 것들은 제 크기대로 따라간다. */}
-          <div className="ss-shot-frame-body" data-compare={compare === 'shown' ? 'true' : undefined}>
+          <div
+            className="ss-shot-frame-body"
+            data-compare={compare === 'shown' ? 'true' : undefined}
+            data-moments={compare === 'shown' && compareMotion.status === 'ready' ? 'true' : undefined}
+          >
             {/* ⚠️ **데모 클립이다** — 선수 영상을 찾는 경로가 계약에도 에이전트에도
                 없다(위 `COMPARE` 주석). 진짜가 붙으면 `src` 만 갈아 끼운다. */}
             {compare === 'shown' && compareWho && (
@@ -1363,6 +1481,22 @@ export default function AnalysisStage() {
                 src={compareWho.src}
                 label={`${compareWho.name} 영상`}
                 closing={closing}
+                seekTo={
+                  moment && compareMotion.status === 'ready'
+                    ? compareMotion.player.moments[moment] / compareMotion.player.motion.fps
+                    : null
+                }
+              />
+            )}
+            {compare === 'shown' && compareWho && compareMotion.status === 'ready' && (
+              <CompareMoments
+                playerName={compareWho.name}
+                player={compareMotion.player}
+                user={compareMotion.user}
+                mirrored={mirrored}
+                onToggleMirror={() => setMirrorOverride(!mirrored)}
+                selected={moment}
+                onSelect={toggleMoment}
               />
             )}
             {file ? (
@@ -1665,7 +1799,10 @@ export default function AnalysisStage() {
               type="button"
               className="ss-shot-compare-open"
               aria-expanded={compare !== 'idle'}
-              onClick={() => setCompare((v) => (v === 'idle' ? 'picking' : 'idle'))}
+              onClick={() => {
+                if (compare !== 'idle') resetCompareMotion()
+                setCompare((v) => (v === 'idle' ? 'picking' : 'idle'))
+              }}
             >
               선수와 비교하기
             </button>
@@ -1716,7 +1853,13 @@ export default function AnalysisStage() {
                     </span>
                   </>
                 ) : compare === 'shown' ? (
-                  <>{compareWho?.name}의 장면을 왼쪽에 놓았습니다.</>
+                  compareMotion.status === 'extracting' ? (
+                    <>두 영상에서 자세를 뽑는 중 · {compareMotion.progress}%</>
+                  ) : compareMotion.status === 'failed' ? (
+                    <>이 영상에서 슈팅 순간을 찾지 못했습니다 — {compareMotion.reason}</>
+                  ) : (
+                    <>{compareWho?.name}와 세 순간을 아래에 겹쳐 놓았습니다.</>
+                  )
                 ) : null}
               </p>
             )}
@@ -1938,7 +2081,20 @@ export default function AnalysisStage() {
              `missing` 셋뿐이고, 「다시 확인」 단추는 (폴링이 이미 하고
              있어서) 쓸 일이 없어 없앴다. */
           report?.state === 'ready' ? (
-            <ReportView report={report.report} />
+            <>
+              <ReportView report={report.report} />
+              {compare === 'shown' &&
+                compareWho &&
+                (compareMotion.status === 'ready' || compareMotion.status === 'failed') && (
+                  <CompareSummary
+                    key={summaryRequest ? JSON.stringify(summaryRequest) : `failed-${compareWho.id}`}
+                    playerName={compareWho.name}
+                    request={summaryRequest}
+                    failedReason={compareMotion.status === 'failed' ? compareMotion.reason : null}
+                    onSelect={toggleMoment}
+                  />
+                )}
+            </>
           ) : (
             <div className="ss-report-wait" role="status">
               <p>
