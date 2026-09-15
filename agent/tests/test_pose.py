@@ -786,3 +786,67 @@ def test_the_budget_never_asks_the_machine_how_much_ram_is_left():
     )
     assert not probes, f"예산 계산이 런타임 상태를 본다: {probes}"
     assert len({pose.frames_within_budget(1920, 1080) for _ in range(20)}) == 1
+
+
+# --- 미리보기 인코딩 (2026-09-15) -----------------------------------------
+#
+# VP8 인코딩이 미리보기 시간의 거의 전부였다(300프레임에서 그리기 0.42초 ·
+# 인코딩 19.2초). ffmpeg에 realtime 설정으로 넘겨 2.4초로 줄였는데, 그 과정에서
+# **깨지면 안 되는 성질 셋**이 생겼다 — 아래가 그것을 잡는다.
+
+
+def _clip_inputs(n=6, size=(64, 48)):
+    frames = [np.full((size[1], size[0], 3), i * 20 % 256, dtype=np.uint8)
+              for i in range(n)]
+    kps = np.zeros((n, 17, 3), dtype=np.float64)
+    kps[:, :, 0] = np.linspace(8, size[0] - 8, 17)
+    kps[:, :, 1] = np.linspace(8, size[1] - 8, 17)
+    kps[:, :, 2] = 0.9
+    return frames, kps
+
+
+def test_the_preview_is_still_vp8_webm(tmp_path):
+    """코덱은 바뀌지 않았다 — 브라우저가 재생하는 것이 바뀌면 화면이 깨진다.
+
+    빠른 인코더로 옮긴 것이지 **형식을 바꾼 것이 아니다.** mp4가 더 빠르지만
+    그건 화면 쪽과 합의할 일이고(계약은 `previews`를 URI로만 규정한다) 여기서
+    조용히 갈아치우면 안 된다.
+    """
+    frames, kps = _clip_inputs()
+    out = tmp_path / "tracked.webm"
+    info = pose.render_tracked_clip(frames, kps, out, 10.0)
+
+    assert info["frames"] == len(frames)
+    assert info["bytes"] > 0
+    # WebM(Matroska) 컨테이너의 EBML 서명. 확장자가 아니라 실제 바이트를 본다.
+    assert out.read_bytes()[:4] == b"\x1a\x45\xdf\xa3"
+
+
+def test_the_preview_still_renders_without_ffmpeg(tmp_path, monkeypatch):
+    """ffmpeg이 없는 기계에서도 그림이 나온다 — 느릴 뿐이다.
+
+    빠른 경로를 외부 바이너리에 기댄 대가로 **그 바이너리가 없을 때**가
+    생겼다. 없으면 예전 OpenCV 경로로 떨어지고, 산출물은 그대로 나온다.
+    """
+    monkeypatch.setattr(pose.shutil, "which", lambda _name: None)
+    frames, kps = _clip_inputs()
+    out = tmp_path / "fallback.webm"
+
+    info = pose.render_tracked_clip(frames, kps, out, 10.0)
+
+    assert info["bytes"] > 0
+
+
+def test_a_broken_encoder_raises_instead_of_leaving_a_half_file(tmp_path,
+                                                               monkeypatch):
+    """인코딩 실패는 **예외로** 올라온다 — 조용히 빈 파일을 남기지 않는다.
+
+    `build_previews`가 이 예외를 받아 미리보기만 빼고 분석을 계속한다
+    (`test_deploy_paths.py::test_preview_failure_does_not_break_the_analysis`).
+    여기서 삼키면 리포트에 **재생되지 않는 URI**가 실린다.
+    """
+    monkeypatch.setattr(pose.shutil, "which", lambda _name: "/bin/false")
+    frames, kps = _clip_inputs()
+
+    with pytest.raises(RuntimeError):
+        pose.render_tracked_clip(frames, kps, tmp_path / "broken.webm", 10.0)

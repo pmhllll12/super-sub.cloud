@@ -125,8 +125,14 @@ class Config:
             bucket=bucket,
             reports_uri=env.get("SUPERSUB_REPORTS_URI", f"s3://{bucket}/reports"),
             rubric_dir=Path(env.get("SUPERSUB_RUBRIC_DIR", str(ROOT / "rubrics"))),
-            # 큐는 대부분 비어 있다. 촘촘히 돌아도 얻는 것이 없고 저널만 는다.
-            poll_seconds=float(env.get("SUPERSUB_POLL_SECONDS", "45")),
+            # 🔴 45에서 5로 내렸다 (2026-09-15). 빈 claim 은 아무것도 찍지
+            # 않으므로 저널이 늘지 않고(위 claim 참고), 이 값의 절반이 그대로
+            # **사용자가 보는 대기 시간**이다 — 45초면 평균 22.5초를 분석
+            # 시작 전에 쓴다. 분석 자체가 1분대라 거기에 그만큼을 더 얹을
+            # 이유가 없다. 백엔드에 가는 요청은 9배가 되지만 빈 claim 한 번은
+            # 질의 하나다. 자동 종료는 이 주기를 보지 않는다(autostop.sh 는
+            # 분석 자식 프로세스를 본다) — 내려도 꺼지는 시점이 안 바뀐다.
+            poll_seconds=float(env.get("SUPERSUB_POLL_SECONDS", "5")),
             http_timeout=float(env.get("SUPERSUB_HTTP_TIMEOUT", "30")),
             # 4K 한 편이 포즈 추출 + 판정까지 수 분이다. 넉넉히 두되 무한은
             # 아니게 — 모델 적재가 멈추면 워커가 영영 그 작업을 붙들고 있다.
