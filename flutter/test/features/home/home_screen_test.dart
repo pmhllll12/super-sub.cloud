@@ -1,16 +1,23 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:super_sub/core/mock/mock_db.dart';
-import 'package:super_sub/core/sport/current_sport.dart';
 import 'package:super_sub/features/auth/data/auth_providers.dart';
 import 'package:super_sub/features/auth/data/auth_repository_mock.dart';
 import 'package:super_sub/features/auth/presentation/session_controller.dart';
 import 'package:super_sub/features/home/presentation/screens/home_screen.dart';
+import 'package:super_sub/features/profile/presentation/widgets/player_card_view.dart';
 
 Future<ProviderContainer> _pumpLoggedIn(WidgetTester tester) async {
+  // **폰 크기로 돌린다.** 홈은 판 · 영상 분석 · 하단 바가 세로로 꽉 차는
+  // 화면이라 기본 800×600 에서는 판이 짜부라진다(app_router_test.dart 와 같다).
+  tester.view.physicalSize = const Size(1080, 2340);
+  tester.view.devicePixelRatio = 3;
+  addTearDown(tester.view.reset);
+
   final container = ProviderContainer(
     overrides: [
       authRepositoryProvider.overrideWith(
@@ -32,15 +39,47 @@ Future<ProviderContainer> _pumpLoggedIn(WidgetTester tester) async {
   unawaited(
     container.read(sessionControllerProvider.notifier).loginAs(MockDb.playerId),
   );
-  container.read(currentSportProvider.notifier).select('futsal');
   await tester.pump(const Duration(milliseconds: 500));
   // **pumpAndSettle을 쓰지 않는다.** 유리 조각의 테두리를 도는 빛이 무한
   // 반복이라 영영 안 멎는다.
   return container;
 }
 
+/// 판을 펼친다 — 손잡이를 누르고 스프링이 앉고 알약이 떠오를 때까지 흘려보낸다.
+Future<void> _openSheet(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('home-squad-handle')));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 1500));
+  await tester.pump(const Duration(milliseconds: 700));
+}
+
+double _opacityAbove(WidgetTester tester, Finder target) => tester
+    .widget<Opacity>(
+      find.ancestor(of: target, matching: find.byType(Opacity)).first,
+    )
+    .opacity;
+
+Finder _blankSeats() => find.byWidgetPredicate(
+      (w) => w.key is ValueKey<String> &&
+          (w.key! as ValueKey<String>).value.startsWith('squad-add-'),
+    );
+
 void main() {
-  testWidgets('종목을 불러오는 동안 로딩을 보여준다', (tester) async {
+  // 2026-09-15 — 홈 짜임을 갈았다: 판 · 영상 분석 · 오른쪽 위 내 프로필.
+  testWidgets('위쪽 로고 · 닉네임 · 종목 칩 · 옛 카드들이 없다', (tester) async {
+    await _pumpLoggedIn(tester);
+    expect(find.text('백성검'), findsNothing);
+    expect(find.text('풋살'), findsNothing);
+    expect(find.text('야구'), findsNothing);
+    for (final gone in const ['용병 매칭', '내 팀', '레슨 · 코치', '내 선수 카드']) {
+      expect(find.text(gone), findsNothing, reason: gone);
+    }
+  });
+
+  testWidgets('종목 목록을 기다리지 않고 바로 그린다', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
@@ -48,46 +87,245 @@ void main() {
       container: container,
       child: const MaterialApp(home: HomeScreen()),
     ));
-    // 종목 목록도 리포지토리에서 온다 — 첫 프레임은 아직 로딩이다.
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
-
-    await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byKey(const Key('home-video-analysis')), findsOneWidget);
+    // 컨트롤러 복원 타이머(Mock 300ms)를 흘려보내고 끝낸다.
+    await tester.pump(const Duration(milliseconds: 500));
   });
 
-  testWidgets('로고와 현재 종목을 보여준다', (tester) async {
+  testWidgets('맨 위에 팀장 · 팀원 · AI 와 내 프로필이 선다', (tester) async {
     await _pumpLoggedIn(tester);
-    // 로고는 화면 위쪽 가운데와 하단 바 알약 두 곳에 선다.
-    expect(find.text('SUPERSUB'), findsNWidgets(2));
-    expect(find.text('풋살'), findsOneWidget);
+    expect(find.byKey(const Key('home-role-captain')), findsOneWidget);
+    expect(find.byKey(const Key('home-role-member')), findsOneWidget);
+    expect(find.byKey(const Key('home-ai')), findsOneWidget);
+    expect(find.byKey(const Key('home-profile')), findsOneWidget);
+    expect(find.text('내 프로필'), findsOneWidget);
   });
 
-  testWidgets('종목 칩으로 전환할 수 있다', (tester) async {
-    final container = await _pumpLoggedIn(tester);
-    await tester.tap(find.byKey(const Key('home-sport-baseball')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(container.read(currentSportProvider), equals('baseball'));
-  });
+  // 2026-09-15 — 스쿼드 판은 위에서 내려오는 판 안에 있다. 들어오면 접혀 있다.
+  group('내려오는 판', () {
+    double boardWidth(WidgetTester tester) =>
+        tester.getSize(find.text('MY SQUAD')).width;
 
-  testWidgets('갈라져 나가는 곳들을 모두 보여 준다', (tester) async {
-    await _pumpLoggedIn(tester);
-    for (final title in const [
-      '영상 분석',
-      '용병 매칭',
-      '내 선수 카드',
-      '내 팀',
-      '레슨 · 코치',
-      '내 프로필',
-    ]) {
-      expect(find.text(title), findsOneWidget, reason: title);
+    Future<void> openSheet(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('home-squad-handle')));
+      // 스프링이 앉고(≈1초) 알약이 차례로 떠오를(0.56초) 때까지 흘려보낸다.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1500));
+      await tester.pump(const Duration(milliseconds: 700));
     }
+
+    testWidgets('접혀 있을 때는 알약이 안 눌리고, 펼치면 눌린다', (tester) async {
+      await _pumpLoggedIn(tester);
+      await tester.tap(find.byKey(const Key('home-role-member')), warnIfMissed: false);
+      await tester.pump();
+      expect(find.text('사람을 구하는 팀'), findsNothing);
+
+      await openSheet(tester);
+      await tester.tap(find.byKey(const Key('home-role-member')));
+      await tester.pump();
+      expect(find.text('사람을 구하는 팀'), findsOneWidget);
+    });
+
+    testWidgets('접혀 있을 때는 판이 안 눌린다', (tester) async {
+      await _pumpLoggedIn(tester);
+      await tester.tap(find.byKey(const Key('squad-add-gk')), warnIfMissed: false);
+      await tester.pump();
+      expect(find.textContaining('선수 넣기'), findsNothing);
+    });
+
+    testWidgets('접혔을 때 안내 글 · 내 프로필이 보이고, 펼치면 걷히고, 올리면 돌아온다',
+        (tester) async {
+      await _pumpLoggedIn(tester);
+      final hint = find.text('아래로 내려 내 팀 만들기');
+      final profile = find.byKey(const Key('home-profile'));
+      expect(_opacityAbove(tester, hint), 1);
+      expect(_opacityAbove(tester, profile), 1);
+      final profileLeft = tester.getTopLeft(profile).dx;
+
+      await _openSheet(tester);
+      expect(_opacityAbove(tester, hint), 0);
+      expect(_opacityAbove(tester, profile), 0);
+      // 오른쪽으로 빠져나갔다.
+      expect(tester.getTopLeft(profile).dx, greaterThan(profileLeft));
+
+      await _openSheet(tester); // 손잡이를 다시 누르면 접힌다.
+      expect(_opacityAbove(tester, hint), 1);
+      expect(_opacityAbove(tester, profile), 1);
+      expect(tester.getTopLeft(profile).dx, closeTo(profileLeft, 0.5));
+    });
+
+    testWidgets('펼치면 팀장 · 팀원은 가운데, AI 는 맨 오른쪽', (tester) async {
+      await _pumpLoggedIn(tester);
+      await _openSheet(tester);
+      final screenW = tester.view.physicalSize.width / tester.view.devicePixelRatio;
+      final captain = tester.getRect(find.byKey(const Key('home-role-captain')));
+      final member = tester.getRect(find.byKey(const Key('home-role-member')));
+      final ai = tester.getRect(find.byKey(const Key('home-ai')));
+      final pairCenter = (captain.left + member.right) / 2;
+      expect(pairCenter, closeTo(screenW / 2, 2));
+      expect(ai.right, closeTo(screenW - 16, 2));
+    });
+
+    // 영상 분석 — 접혔을 때는 판 아래부터 하단 바 위까지 채우는 큰 판(설명 있음),
+    // 펼치면 하단 바 바로 위의 납작한 띠(설명 없음)가 된다.
+    testWidgets('펼치면 영상 분석이 납작한 띠로 접혀 든다', (tester) async {
+      await _pumpLoggedIn(tester);
+      final panel = find.byKey(const Key('home-video-analysis'));
+      final big = tester.getRect(panel);
+      expect(big.height, greaterThan(150));
+      expect(_opacityAbove(tester, find.textContaining('자세를 재고')), 1);
+
+      await _openSheet(tester);
+      final flat = tester.getRect(panel);
+      expect(flat.height, closeTo(56, 1));
+      // 바닥은 그대로다 — 위가 내려와 납작해진다.
+      expect(flat.bottom, closeTo(big.bottom, 1));
+      expect(find.textContaining('자세를 재고'), findsNothing);
+
+      await _openSheet(tester); // 다시 접으면 큰 판으로 돌아온다.
+      expect(tester.getRect(panel).height, closeTo(big.height, 1));
+    });
+
+    // 판을 끌면 손끝 진동을 준다 — 절반을 넘을 때 딸깍, 놓아 붙으러 갈 때 톡.
+    testWidgets('판을 끌어내리면 진동이 온다', (tester) async {
+      await _pumpLoggedIn(tester);
+      final calls = <String?>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'HapticFeedback.vibrate') {
+            calls.add(call.arguments as String?);
+          }
+          return null;
+        },
+      );
+      addTearDown(() => tester.binding.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null));
+
+      await tester.fling(
+        find.byKey(const Key('home-squad-sheet')),
+        const Offset(0, 300),
+        1500,
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1500));
+
+      expect(calls, contains('HapticFeedbackType.selectionClick'));
+      expect(calls, contains('HapticFeedbackType.lightImpact'));
+    });
+
+    // 알약 셋은 판과 같이 자라지 않고 **판이 다 펼쳐진 뒤** 떠오른다.
+    testWidgets('알약은 판이 다 펼쳐진 뒤에 나타난다', (tester) async {
+      await _pumpLoggedIn(tester);
+      double captainOpacity() => tester
+          .widget<Opacity>(find
+              .ancestor(
+                of: find.byKey(const Key('home-role-captain')),
+                matching: find.byType(Opacity),
+              )
+              .first)
+          .opacity;
+
+      expect(captainOpacity(), 0);
+      await tester.tap(find.byKey(const Key('home-squad-handle')));
+      await tester.pump();
+      // 판이 반쯤 내려온 때 — 아직 알약은 없다.
+      await tester.pump(const Duration(milliseconds: 80));
+      expect(captainOpacity(), 0);
+
+      await tester.pump(const Duration(milliseconds: 1500));
+      await tester.pump(const Duration(milliseconds: 700));
+      expect(captainOpacity(), 1);
+    });
+
+    testWidgets('펼치면 판이 커지고, 끌어올리면 다시 작아진다', (tester) async {
+      await _pumpLoggedIn(tester);
+      final small = tester.getRect(find.byKey(const ValueKey('squad-seat-gk')));
+
+      await tester.fling(
+        find.byKey(const Key('home-squad-sheet')),
+        const Offset(0, 300),
+        1500,
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1500));
+      await tester.pump(const Duration(milliseconds: 700));
+      final big = tester.getRect(find.byKey(const ValueKey('squad-seat-gk')));
+      expect(big.height, greaterThan(small.height * 1.3));
+
+      await tester.fling(
+        find.byKey(const Key('home-squad-sheet')),
+        const Offset(0, -300),
+        1500,
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1500));
+      await tester.pump(const Duration(milliseconds: 700));
+      final again = tester.getRect(find.byKey(const ValueKey('squad-seat-gk')));
+      expect(again.height, closeTo(small.height, 1));
+      // 쓰지 않는 도우미 경고를 막는다.
+      expect(boardWidth(tester), greaterThan(0));
+    });
   });
 
-  testWidgets('아직 없는 화면은 준비 중으로 표시한다', (tester) async {
+  testWidgets('영상 분석은 판 아래(하단 바 바로 위)에 있다', (tester) async {
     await _pumpLoggedIn(tester);
-    // 영상 분석과 프로필만 실제 화면이 있다 — 나머지 넷은 준비 중이다.
-    expect(find.text('준비 중'), findsNWidgets(4));
+    final video = tester.getTopLeft(find.byKey(const Key('home-video-analysis')));
+    final squad = tester.getBottomLeft(find.text('GK'));
+    expect(video.dy, greaterThan(squad.dy));
+  });
+
+  group('스쿼드 판', () {
+    testWidgets('처음은 5:5 — 내 카드 하나와 빈 자리 넷', (tester) async {
+      await _pumpLoggedIn(tester);
+      expect(find.text('MY SQUAD'), findsOneWidget);
+      // 내 카드는 판의 FW 자리와 오른쪽 위 「내 프로필」 두 곳에 선다.
+      expect(find.byType(PlayerCardView), findsNWidgets(2));
+      expect(_blankSeats(), findsNWidgets(4));
+      for (final pos in const ['FW', 'DF', 'GK']) {
+        expect(find.text(pos), findsOneWidget, reason: pos);
+      }
+      expect(find.text('MF'), findsNWidgets(2));
+    });
+
+    testWidgets('크기를 바꾸면 자리 수가 따라 바뀐다', (tester) async {
+      await _pumpLoggedIn(tester);
+      await _openSheet(tester);
+      await tester.tap(find.byKey(const Key('squad-size-seven')));
+      await tester.pump();
+      expect(_blankSeats(), findsNWidgets(6));
+
+      await tester.tap(find.byKey(const Key('squad-size-three')));
+      await tester.pump();
+      expect(_blankSeats(), findsNWidgets(2));
+    });
+
+    testWidgets('빈 자리를 누르면 준비 중 안내가 뜬다', (tester) async {
+      await _pumpLoggedIn(tester);
+      await _openSheet(tester);
+      await tester.tap(find.byKey(const Key('squad-add-gk')));
+      await tester.pump();
+      expect(find.textContaining('선수 넣기'), findsOneWidget);
+    });
+
+    testWidgets('팀원을 고르면 판 자리에 팀 목록 자리가 선다', (tester) async {
+      await _pumpLoggedIn(tester);
+      // 알약은 판을 펼쳐야 눌린다.
+      await tester.tap(find.byKey(const Key('home-squad-handle')));
+      // 스프링이 앉고(≈1초) 알약이 차례로 떠오를(0.56초) 때까지 흘려보낸다.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1500));
+      await tester.pump(const Duration(milliseconds: 700));
+      await tester.tap(find.byKey(const Key('home-role-member')));
+      await tester.pump();
+      expect(find.text('MY SQUAD'), findsNothing);
+      expect(find.text('사람을 구하는 팀'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('home-role-captain')));
+      await tester.pump();
+      expect(find.text('MY SQUAD'), findsOneWidget);
+    });
   });
 
   testWidgets('바 메뉴를 열면 로그아웃 칸이 선다', (tester) async {
@@ -115,5 +353,4 @@ void main() {
 
     expect(container.read(sessionControllerProvider), isA<SessionLoggedOut>());
   });
-
 }

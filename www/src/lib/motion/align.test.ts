@@ -52,4 +52,33 @@ describe('겹치기', () => {
     expect(full.bones.length).toBeGreaterThan(cut.bones.length)
     expect(cut.bones).not.toContain('NaN')
   })
+
+  // 🔴 카드 SVG 는 viewBox 밖을 자른다. 머리를 원으로 바꾸자(2026-09-15) 원 윗부분이
+  // viewBox 위로 나가 **머리가 잘렸다**. 사람 비율(몸통 1 기준 귀 1.6 위 · 발목 1.85 아래)로 선 자세가
+  // 머리 끝부터 발목까지 격자 안에 들어와야 한다.
+  it('선 자세의 머리 원과 발목이 카드 격자 안에 들어온다', () => {
+    const P = (x: number, y: number) => ({ x, y, score: 0.9 })
+    const pose = Array.from({ length: 17 }, () => ({ x: 0, y: 0, score: 0 }))
+    pose[0] = P(0.1, -1.55)
+    pose[3] = P(-0.05, -1.6)
+    pose[4] = P(0.05, -1.6)
+    pose[5] = P(-0.02, -1)
+    pose[6] = P(0.02, -1)
+    pose[11] = P(-0.02, 0)
+    pose[12] = P(0.02, 0)
+    pose[13] = P(-0.02, 0.95)
+    pose[14] = P(0.02, 0.95)
+    pose[15] = P(-0.02, 1.85)
+    pose[16] = P(0.02, 1.85)
+    const size = 1000
+    const n = normalizePose(pose, 1, false)!
+    const { bones, joints } = skeletonPath(n, size)
+    const head = bones.match(/M(-?[\d.]+) (-?[\d.]+)a([\d.]+) ([\d.]+)/)!
+    const headTop = Number(head[2]) - Number(head[4])
+    // 선 굵기(절반 5)만큼 여유를 둔다.
+    expect(headTop).toBeGreaterThanOrEqual(5)
+    const ys = [...joints.matchAll(/[ML](-?[\d.]+) (-?[\d.]+)/g)].map((m) => Number(m[2]))
+    // 관절 고리(절반 12)만큼 여유를 둔다.
+    expect(Math.max(...ys)).toBeLessThanOrEqual(size - 12)
+  })
 })

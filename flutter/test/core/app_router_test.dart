@@ -74,8 +74,8 @@ void main() {
   testWidgets('로그인하면 종목을 안 골라도 홈에 착지한다', (tester) async {
     await _pumpHome(tester);
 
-    // 홈은 갈라져 나가는 곳들을 보여 준다.
-    expect(find.text('영상 분석'), findsOneWidget);
+    // 홈은 스쿼드 판과 「영상 분석」 판을 보여 준다.
+    expect(find.byKey(const Key('home-video-analysis')), findsOneWidget);
     expect(find.text('로그인'), findsNothing);
   });
 
@@ -90,15 +90,14 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.text('로그인'), findsWidgets);
-    expect(find.text('영상 분석'), findsNothing);
+    expect(find.byKey(const Key('home-video-analysis')), findsNothing);
   });
 
   testWidgets('영상 분석 카드가 자기 화면으로 데려간다', (tester) async {
     await _pumpHome(tester);
 
-    await tester.ensureVisible(find.text('영상 분석'));
-    await tester.pump();
-    await tester.tap(find.text('영상 분석'));
+    // 「영상 분석」 판 — 큰 판과 납작한 띠의 글이 겹쳐 있어 글자가 아니라 판을 누른다.
+    await tester.tap(find.byKey(const Key('home-video-analysis')));
     await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.text('분석할 영상을 골라주세요'), findsOneWidget);
@@ -115,10 +114,8 @@ void main() {
   testWidgets('로그인 상태에서 다른 라우트는 그대로 통과한다', (tester) async {
     await _pumpHome(tester);
 
-    // 홈이 스크롤되는 허브라 카드가 화면 밖에 있을 수 있다.
-    await tester.ensureVisible(find.text('내 프로필'));
-    await tester.pump();
-    await tester.tap(find.text('내 프로필'));
+    // 「내 프로필」은 홈 카드가 아니라 오른쪽 위 단추다(2026-09-15).
+    await tester.tap(find.byKey(const Key('home-profile')));
     await tester.pump(const Duration(milliseconds: 500));
 
     // redirect가 개입하지 않고 /profile에 머무른다.

@@ -28,18 +28,22 @@ export function shouldMirror(player: Moments, user: Moments): boolean {
 }
 
 /**
- * 정규화 좌표 → SVG 격자(0~size) 의 뼈 · 차는 다리 · 관절. 몸통 1 = size/3.6, 골반은 가운데보다
- * 조금 위. 모양(머리 원 · 척추 · 관절 고리)은 영상 위 뼈대와 같다(`lib/skeleton.ts`).
+ * 정규화 좌표 → SVG 격자(0~size) 의 뼈 · 차는 다리 · 관절. 몸통 1 = size/4.2, 골반은 가운데보다
+ * 조금 위(0.48). 모양(머리 원 · 척추 · 관절 고리)은 영상 위 뼈대와 같다(`lib/skeleton.ts`).
  * 카드는 정사각 격자를 늘리지 않으므로 가로 · 세로 px 비가 같다.
+ *
+ * 🔴 선 자세는 몸통 1 기준 **머리 끝 ≈ 1.8 위 · 발목 ≈ 1.85 아래**다. 예전 값(size/3.6, 0.42)은
+ * 얼굴 점까지만 들어가서, 머리를 원으로 바꾸자 원 윗부분이 viewBox 위로 나가 **잘렸다**
+ * (2026-09-15). 카드 글자 위치와는 무관하다 — SVG 가 제 판 밖을 자른다.
  */
 export function skeletonPath(
   points: (Point | null)[],
   size = 1000,
   kickingLeg: Leg | null = null,
 ): { bones: string; kick: string; joints: string } {
-  const unit = size / 3.6
+  const unit = size / 4.2
   const ox = size / 2
-  const oy = size * 0.42
+  const oy = size * 0.48
   const pts = points.map((p) => (p ? { x: ox + p.x * unit, y: oy + p.y * unit } : null))
   return skeletonShapes(pts, { kickingLeg })
 }
