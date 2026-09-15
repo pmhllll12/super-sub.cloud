@@ -3042,10 +3042,14 @@ body::-webkit-scrollbar {
    **왼쪽 선수 칸에** 그려졌다(사용자 지적, 배포에서 확인).
    절대배치 자식에 격자 칸을 주면 그 칸이 기준 상자가 된다 — 영상과 같은 칸을
    준다. 묶는 판(`.ss-shot-pick`)도 같은 셈(`toVideoBox`)을 쓰므로 함께 옮긴다. */
+/* 🔴 **끝 줄까지 적는다**(2026-09-15, 사용자 지적). `grid-row: 1` 은 `1 / auto` 이고
+   절대배치에서 `auto` 끝 줄은 **격자 상자의 가장자리**다 — 세 순간 카드 줄(45fr)이
+   생기자 판이 윗줄이 아니라 상자 전체 키를 덮어서, 초록 박스 · 뼈대가 영상과 같이
+   안 올라가고 아래로 늘어졌다(헤드리스 크롬 실측 200px → 110px). `globals.test.ts` 가 붙든다. */
 .ss-shot-frame-body[data-compare='true'] > .ss-shot-track,
 .ss-shot-frame-body[data-compare='true'] > .ss-shot-pick {
-  grid-row: 1;
-  grid-column: 2;
+  grid-row: 1 / 2;
+  grid-column: 2 / 3;
 }
 
 /* 선수 영상 칸(`ComparePlayer`) — ⚠️ 지금은 데모 클립이다. 진짜 검색이 붙어도
@@ -3061,8 +3065,8 @@ body::-webkit-scrollbar {
   animation: ss-shot-compare-in 420ms var(--ss-home-out-ease) both;
 }
 
-.ss-shot-compare-slot .ss-shot-bone {
-  stroke: var(--ss-pro);
+.ss-shot-compare-slot .ss-shot-track {
+  --ss-skel: var(--ss-pro);
 }
 
 .ss-shot-compare-slot .ss-shot-track-box {
@@ -3078,7 +3082,12 @@ body::-webkit-scrollbar {
    오른쪽 판 · 머리줄이 안 흔들린다. 행 비율로 펴는 이유는 `.ss-shot-compare` 와 같다
    (max-height 는 속도가 튄다). */
 .ss-shot-frame-body[data-compare='true'] {
-  --ss-pro: #5cb8ff;
+  /* 선수 색 — 박스 · 뼈대 · PRO 태그 · 세 순간 카드 선 · 범례 · 반전 단추가 다 이 값이다.
+     🔴 **마젠타다**(사용자 결정, 2026-09-15). 하늘색은 나(초록)와 같은 차가운 계열이라
+     헷갈렸고, 빨강은 적록 색각이상에서 초록과 가장 헷갈리는 짝인 데다 LIVE 점 · 닫기
+     알약과 겹쳤다. 마젠타는 초록의 보색이라 둘 다 피한다. 태그 글자가 어두운 색
+     (`--ss-bg`)이라 밝은 쪽으로 둔다. */
+  --ss-pro: #ff5ccf;
   grid-template-rows: 1fr 0fr;
   row-gap: 0;
   transition: grid-template-rows 600ms var(--ss-home-out-ease);
@@ -3161,11 +3170,24 @@ body::-webkit-scrollbar {
   stroke: var(--ss-accent);
 }
 
+/* 차는 다리 — 굵게(영상 위 뼈대와 같은 뜻). */
+.ss-shot-moment-kick {
+  stroke-width: 18;
+}
+
+/* 관절 고리 — 흰 점 위에 바탕색 점으로 가운데를 판다(영상 위 뼈대와 같은 모양). */
 .ss-shot-moment-pro-joint,
 .ss-shot-moment-me-joint {
   fill: none;
   stroke: var(--ss-fg);
-  stroke-width: 20;
+  stroke-width: 24;
+  stroke-linecap: round;
+}
+
+.ss-shot-moment-joint-core {
+  fill: none;
+  stroke: var(--ss-bg);
+  stroke-width: 10;
   stroke-linecap: round;
 }
 
@@ -3230,10 +3252,37 @@ body::-webkit-scrollbar {
   color: var(--ss-fg);
 }
 
+.ss-compare-summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
 .ss-compare-summary h3 {
-  margin: 0 0 10px;
+  margin: 0;
   font-size: 0.875rem;
   font-weight: 700;
+}
+
+/* 오른쪽 위 닫기 — 머리줄의 다른 알약(`.ss-shot-again`)과 같은 모양이다. */
+.ss-compare-summary-close {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 40%, transparent);
+  border-radius: 999px;
+  background: none;
+  font-size: 0.7rem;
+  color: var(--ss-fg);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 160ms ease;
+}
+
+.ss-compare-summary-close:hover,
+.ss-compare-summary-close:focus-visible {
+  border-color: var(--ss-fg);
 }
 
 .ss-compare-summary-moments {
@@ -4361,24 +4410,47 @@ body::-webkit-scrollbar {
   pointer-events: none;
 }
 
-/* 뼈는 가늘게, 관절은 굵게 — 굵기 차이만으로 마디가 읽힌다. */
+/* 뼈대 색 — 내 영상은 초록, 선수 칸(`.ss-shot-compare-slot`)은 마젠타. 번짐도 이 색이다. */
+.ss-shot-track {
+  --ss-skel: var(--ss-accent);
+}
+
+/* 뼈는 가늘게, 관절은 굵게 — 굵기 차이만으로 마디가 읽힌다.
+   모양(머리 원 · 척추 · 차는 다리 · 관절 고리)은 `lib/skeleton.ts` 가 정한다(2026-09-15). */
 .ss-shot-bone {
   fill: none;
-  stroke: var(--ss-accent);
+  stroke: var(--ss-skel);
   stroke-width: 2.5;
   stroke-linecap: round;
   stroke-linejoin: round;
-  /* 밝은 코트 위에서도 선이 살아 있게 — 바깥에 어두운 테를 두른다. */
-  filter: drop-shadow(0 0 1.5px color-mix(in srgb, var(--ss-bg) 85%, transparent));
+  /* 밝은 코트 위에서도 선이 살아 있게 — 바깥에 어두운 테를 두르고, 그 위에 같은 색으로
+     은은히 번지게 한다. ⚠️ 60fps 로 다시 그리는 선이라 느린 기기에서 무거우면 두 번째
+     그림자부터 뺀다. */
+  filter: drop-shadow(0 0 1.5px color-mix(in srgb, var(--ss-bg) 85%, transparent))
+    drop-shadow(0 0 4px color-mix(in srgb, var(--ss-skel) 55%, transparent));
 }
 
-/* 길이 0 인 선 + 둥근 끝 = 점. 원을 17개 만들 것 없다. */
+/* 차는 다리 — 굵게. 어느 다리인지는 비교로 동작을 뽑은 뒤에만 안다(그 전엔 비어 있다). */
+.ss-shot-bone-kick {
+  stroke-width: 4.5;
+}
+
+/* 길이 0 인 선 + 둥근 끝 = 점. 원을 17개 만들 것 없다.
+   🔴 **고리다** — 흰 점 위에 같은 자리를 바탕색 점으로 한 번 더 찍어 가운데를 판다
+   (`.ss-shot-joint-core`). 얼굴 점은 안 찍는다(머리 원이 대신한다). */
 .ss-shot-joint {
   fill: none;
   stroke: var(--ss-fg);
-  stroke-width: 5;
+  stroke-width: 7;
   stroke-linecap: round;
   filter: drop-shadow(0 0 1.5px color-mix(in srgb, var(--ss-bg) 85%, transparent));
+}
+
+.ss-shot-joint-core {
+  fill: none;
+  stroke: var(--ss-bg);
+  stroke-width: 3;
+  stroke-linecap: round;
 }
 
 /* ── 나머지 사람들 ────────────────────────────────────────────────────
@@ -4390,6 +4462,8 @@ body::-webkit-scrollbar {
 .ss-shot-bone-other {
   stroke: color-mix(in srgb, var(--ss-fg) 75%, transparent);
   stroke-width: 2;
+  /* 번짐은 내 사람만 — 회색이 초록으로 번지면 누가 나인지 흐려진다. */
+  filter: drop-shadow(0 0 1.5px color-mix(in srgb, var(--ss-bg) 85%, transparent));
 }
 
 .ss-shot-joint-other {
@@ -4761,6 +4835,14 @@ body::-webkit-scrollbar {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+/* 「선수와 비교하기」와 「내 프로필에 리포트 저장」을 한 묶음으로 — 머리줄이
+   `space-between` 이라 따로 두면 비교 단추가 가운데에 떴다(사용자 지적, 2026-09-15). */
+.ss-shot-side-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .ss-shot-side-head h2 {
