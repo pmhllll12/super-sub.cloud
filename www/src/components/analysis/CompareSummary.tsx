@@ -15,16 +15,31 @@ export default function CompareSummary({
   request,
   failedReason,
   onSelect,
+  onClose,
 }: {
   playerName: string
   request: SummaryRequest | null
   failedReason: string | null
   onSelect: (key: MomentKey) => void
+  /**
+   * 비교를 걷는다 — 🔴 **선수 비교는 저장하지 않는다**(사용자 결정, 2026-09-15).
+   * 닫으면 영상 칸 · 카드 · 이 절이 다 빠지고 내 리포트만 남는다.
+   */
+  onClose: () => void
 }) {
+  const head = (
+    <div className="ss-compare-summary-head">
+      <h3>비교 — {playerName}</h3>
+      <button type="button" className="ss-compare-summary-close" aria-label="비교 닫기" onClick={onClose}>
+        닫기
+      </button>
+    </div>
+  )
+
   if (!request) {
     return (
       <section className="ss-compare-summary" aria-label={`비교 — ${playerName}`}>
-        <h3>비교 — {playerName}</h3>
+        {head}
         <p>{failedReason ?? '비교할 수 없습니다'} — 슈팅 순간을 찾지 못해 비교하지 않았습니다.</p>
       </section>
     )
@@ -33,7 +48,7 @@ export default function CompareSummary({
   const text = describeComparison(request)
   return (
     <section className="ss-compare-summary" aria-label={`비교 — ${playerName}`}>
-      <h3>비교 — {playerName}</h3>
+      {head}
       <p>{text.summary}</p>
       <ul className="ss-compare-summary-moments">
         {text.moments.map((m) => (

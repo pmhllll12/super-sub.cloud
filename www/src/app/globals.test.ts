@@ -48,6 +48,21 @@ function commentsInsideSelectors(css: string): number[] {
 }
 
 describe('globals.css', () => {
+  /* 🔴 **절대배치 격자 자식은 끝 줄을 꼭 적는다**(2026-09-15, 사용자 지적 — 세 순간
+     카드가 서면 초록 박스 · 뼈대가 영상과 같이 안 올라가고 카드 위에 남았다).
+     `grid-row: 1` 은 `1 / auto` 인데, 절대배치에서 `auto` 끝 줄은 **격자 상자의
+     가장자리**다 — 그래서 판이 윗줄(55%)이 아니라 상자 전체 키를 덮었고,
+     `toViewBox` 가 그 키로 셈해 뼈대가 아래로 늘어졌다. 헤드리스 크롬 실측:
+     `grid-row: 1` → 키 200px, `1 / 2` → 110px(55fr 행). */
+  it('비교 칸의 뼈대 판은 윗줄 · 오른쪽 칸 하나만 덮는다', () => {
+    const rule = CSS.match(
+      /\.ss-shot-frame-body\[data-compare='true'\] > \.ss-shot-track,[^{]*\{([^}]*)\}/,
+    )?.[1]
+    expect(rule).toBeDefined()
+    expect(rule).toMatch(/grid-row:\s*1\s*\/\s*2\s*;/)
+    expect(rule).toMatch(/grid-column:\s*2\s*\/\s*3\s*;/)
+  })
+
   it('선택자와 { 사이에 주석이 끼어 있지 않다', () => {
     expect(commentsInsideSelectors(CSS)).toEqual([])
   })
