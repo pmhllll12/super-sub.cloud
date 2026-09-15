@@ -37,7 +37,11 @@ abstract class AuthRepository {
     required String nickname,
   });
 
-  /// 개발용 바로 진입. 릴리즈 빌드의 UI에서는 호출되지 않는다.
+  /// 구글이 준 **ID 토큰**으로 로그인한다(계약 `POST /auth/google`). 처음 보는
+  /// 구글 계정이면 서버가 그 자리에서 가입까지 한다 — 가입 경로가 따로 없다.
+  Future<Session> loginWithGoogle({required String idToken});
+
+  /// 시험이 로그인된 화면을 준비할 때 쓰는 바로 진입. 앱 화면에는 버튼이 없다.
   Future<Session> loginAs(String userId);
 
   Future<void> logout();
