@@ -7,8 +7,8 @@ import { MOMENT_KEYS, MOMENT_LABEL, type MomentKey, type Moments, type Motion } 
 type Analyzed = { motion: Motion; moments: Moments }
 
 /**
- * 영상 칸 아래 **세 순간 카드** — 순간마다 선수(하늘) · 나(초록) 뼈대를 골반 중점과
- * 몸통 길이로 맞춰 겹친다(설계 §3).
+ * 영상 칸 아래 **세 순간 카드** — 순간마다 선수(마젠타) · 나(초록) 뼈대를 골반 중점과
+ * 몸통 길이로 맞춰 겹친다(설계 §3). 차는 다리는 굵게, 관절은 고리로(2026-09-15).
  *
  * 🔴 **선수 쪽만 뒤집는다**(`mirrored`). 나는 늘 원래 모습 — 내 영상과 같은 방향이어야
  * 카드와 영상을 오가며 읽힌다.
@@ -38,8 +38,8 @@ export default function CompareMoments({
           const uSide = sideAt(user.motion, user.moments, key)
           const p = pSide && normalizePose(pSide.pose, pSide.aspect, mirrored)
           const u = uSide && normalizePose(uSide.pose, uSide.aspect, false)
-          const pro = p ? skeletonPath(p) : null
-          const me = u ? skeletonPath(u) : null
+          const pro = p && pSide ? skeletonPath(p, 1000, pSide.kickingLeg) : null
+          const me = u && uSide ? skeletonPath(u, 1000, uSide.kickingLeg) : null
           const first = pSide && uSide ? metricsAt(key, pSide, uSide)[0] : undefined
           const clipped = key === 'after' && (player.moments.afterClipped || user.moments.afterClipped)
           return (
@@ -60,13 +60,17 @@ export default function CompareMoments({
                 {pro && (
                   <>
                     <path className="ss-shot-moment-pro" d={pro.bones} />
+                    <path className="ss-shot-moment-pro ss-shot-moment-kick" d={pro.kick} />
                     <path className="ss-shot-moment-pro-joint" d={pro.joints} />
+                    <path className="ss-shot-moment-joint-core" d={pro.joints} />
                   </>
                 )}
                 {me && (
                   <>
                     <path className="ss-shot-moment-me" d={me.bones} />
+                    <path className="ss-shot-moment-me ss-shot-moment-kick" d={me.kick} />
                     <path className="ss-shot-moment-me-joint" d={me.joints} />
+                    <path className="ss-shot-moment-joint-core" d={me.joints} />
                   </>
                 )}
               </svg>
