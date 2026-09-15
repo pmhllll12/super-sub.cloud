@@ -875,3 +875,21 @@ def test_the_report_says_which_video_it_is_about(monkeypatch, tmp_path):
     }
     assert "video_id" in keys, "리포트 봉투에 video_id 가 없다"
     assert "source_video" in keys
+
+
+def test_the_default_poll_interval_is_not_the_users_waiting_room(worker):
+    """🔴 이 값의 **절반이 사용자가 보는 대기 시간**이다 (2026-09-15).
+
+    45초였을 때 분석은 1분대인데 그 앞에 평균 22.5초가 붙었다 — 아무 일도
+    일어나지 않는 시간이다. 빈 claim 은 로그를 남기지 않으므로(`claim()`)
+    촘촘하게 돌아도 저널이 늘지 않고, 자동 종료는 이 주기가 아니라 분석 자식
+    프로세스를 본다.
+
+    올리고 싶어지면 **그만큼이 대기 시간에 붙는다**는 것을 먼저 보라고 이
+    검사가 있다. 밀린 작업은 이 값과 무관하게 연달아 처리된다.
+    """
+    cfg = worker.Config.from_env(
+        {"SUPERSUB_WORKER_TOKEN": "wk_test_0000",
+         "SUPERSUB_API_BASE": "https://example.invalid/api/v1"}
+    )
+    assert cfg.poll_seconds <= 10, "기본 폴링이 대기 시간을 지배한다"

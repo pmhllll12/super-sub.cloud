@@ -1,0 +1,115 @@
+"""워크트리에 체크아웃된 커밋으로 **B-6 Track 2 만** 돌린다 (미결 `ho` 47번).
+
+판정 기준은 [`PREREGISTRATION.md`](PREREGISTRATION.md) 에 **돌리기 전에** 굳혔다.
+
+🔴 **이 스크립트는 아무것도 안 고친다.** 워크트리의 `selector_downstream.py` 를
+**그 커밋 그대로** 불러 `track2()` 만 부른다 — 전체 실행(약 430초)에서 Track 1
+(약 315초)을 뺀 것이고, 산출은 같아야 한다(기준 A 가 그것을 확인한다).
+
+    uv run python eval/pending47_baseline_audit/run_track2_at.py \
+        --worktree <워크트리> --out <csv>
+
+🔴 **워크트리의 `agent/data` 는 심링크다**(`.gitignore` 라 체크아웃에 없다).
+치울 때는 `git worktree remove` 로만 치운다 — 심링크를 지우다 원본을 날리지 않게.
+
+🔴 **이 경로는 `run_meta.json` 을 안 남긴다** — `main()` 을 건너뛰고 `track2()`
+만 부르기 때문이고, 그래야 **옛 커밋**(메타 기능이 없던 때)에서도 돈다.
+그래서 여기서 나온 CSV 는 **감사용 임시 산출**이지 기준선이 아니다. 기준선을
+새로 세우려면 전체 실행(`selector_downstream.py`)을 돌린다.
+"""
+from __future__ import annotations
+
+import argparse
+import importlib.util
+import inspect
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+
+def load_module(worktree: Path):
+    """워크트리의 스크립트를 **그 커밋 그대로** 불러온다.
+
+    그 스크립트가 top-level 에서 자기 위치 기준으로 `sys.path` 를 깔기 때문에
+    (`AGENT/src` 를 0번에 넣는다) `supersub_agent`·`eval_b2`·`targets`·`paths`
+    가 **전부 워크트리 쪽**으로 잡힌다. 🔴 그래서 이 파일은 그 전에
+    `supersub_agent` 를 import 하지 않는다 — 먼저 불러 두면 모듈 캐시가 이겨서
+    **본 저장소 코드로 재는 셈**이 된다.
+    """
+    path = worktree / "agent" / "eval" / "phaseA" / "eval_b6" / "selector_downstream.py"
+    if not path.exists():
+        raise SystemExit(f"없다: {path}")
+    spec = importlib.util.spec_from_file_location("b6_at_commit", path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["b6_at_commit"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _used_via_smi() -> str:
+    """기계 전체가 쓰는 VRAM (MiB). 🔴 **다른 프로세스까지 보인다.**"""
+    try:
+        out = subprocess.run(
+            ("nvidia-smi", "--query-gpu=memory.used,memory.total",
+             "--format=csv,noheader"), capture_output=True, text=True, check=True)
+        return out.stdout.strip()
+    except Exception as exc:  # noqa: BLE001
+        return f"못 읽음: {type(exc).__name__}"
+
+
+def _free_via_torch(dev: str):
+    import torch
+    return torch.cuda.mem_get_info(0) if dev == "cuda" else None
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--worktree", required=True)
+    ap.add_argument("--out", required=True)
+    args = ap.parse_args()
+
+    wt = Path(args.worktree).resolve()
+    assert "supersub_agent" not in sys.modules, "본 저장소 코드가 먼저 잡혔다"
+    mod = load_module(wt)
+
+    from transformers import AutoProcessor, RTDetrForObjectDetection, VitPoseForPoseEstimation
+    import torch
+
+    dev = "cuda" if torch.cuda.is_available() else "cpu"
+    # 🔴 리비전 상수는 `ef59faa`(2026-09-11) 에 생겼다. 그 앞 커밋에는 없으므로
+    #    **그 커밋이 하던 대로** 리비전 없이 부른다 — 여기서 채워 넣으면 그
+    #    커밋의 동작이 아니라 내가 만든 동작을 재게 된다.
+    pose_kw = {"revision": mod.POSE_MODEL_REVISION} if hasattr(mod, "POSE_MODEL_REVISION") else {}
+    det_kw = {"revision": mod.PERSON_DETECTOR_REVISION} if hasattr(mod, "PERSON_DETECTOR_REVISION") else {}
+
+    t0 = time.time()
+    pproc = AutoProcessor.from_pretrained(mod.POSE_MODEL, **pose_kw)
+    pmodel = VitPoseForPoseEstimation.from_pretrained(mod.POSE_MODEL, **pose_kw).to(dev).eval()
+    dproc = AutoProcessor.from_pretrained(mod.PERSON_DETECTOR, **det_kw)
+    dmodel = RTDetrForObjectDetection.from_pretrained(mod.PERSON_DETECTOR, **det_kw).to(dev).eval()
+
+    rubrics = mod.S.discover_rubrics(mod.AGENT / "rubrics")
+    sig = inspect.signature(mod.track2)
+    if len(sig.parameters) != 6:
+        raise SystemExit(f"track2 서명이 다르다({sig}) — 이 커밋은 손으로 볼 것")
+
+    # 🔴 **여유 VRAM 을 시작 시점에 적는다** (47번 3회차). 이 값이 회차의
+    #    계기 검사다 — 점유가 실제로 걸렸는지는 이것으로만 확인된다.
+    #
+    # 🔴 **`torch.cuda.mem_get_info` 를 믿으면 안 된다 (WSL2, 2026-09-15 실측)** —
+    #    다른 프로세스가 4 GiB 를 잡고 있는데도 「여유 6.5 GiB」라고 답했다.
+    #    `nvidia-smi` 는 같은 순간 5,067 MiB 사용 중이라고 했다. **기계 전체를
+    #    보는 쪽을 쓴다.** 둘 다 찍어 두는 것은 이 차이 자체가 기록이라서다.
+    print(f"시작 시 여유 VRAM(mem_get_info): {_free_via_torch(dev)}")
+    print(f"시작 시 사용 VRAM(nvidia-smi): {_used_via_smi()}")
+
+    rows = mod.track2(dproc, dmodel, pproc, pmodel, dev, rubrics)
+    mod._write(Path(args.out), rows)
+    # 배치 폴백이 일어났는지 — 옛 커밋에는 이 칸이 없다(그때는 셀 수 없었다).
+    print(f"batching: {getattr(mod, '_RUN', '기록 없음(옛 커밋)')}")
+    print(f"{len(rows)}행 · {round(time.time() - t0, 1)}초 → {args.out}")
+
+
+if __name__ == "__main__":
+    main()
