@@ -77,8 +77,15 @@ def main() -> None:
     if len(sig.parameters) != 6:
         raise SystemExit(f"track2 서명이 다르다({sig}) — 이 커밋은 손으로 볼 것")
 
+    # 🔴 **여유 VRAM 을 시작 시점에 적는다** (47번 3회차). 이 값이 회차의
+    #    계기 검사다 — 점유가 실제로 걸렸는지는 이것으로만 확인된다.
+    free, total = (torch.cuda.mem_get_info(0) if dev == "cuda" else (None, None))
+    print(f"시작 시 여유 VRAM: {free} / {total}")
+
     rows = mod.track2(dproc, dmodel, pproc, pmodel, dev, rubrics)
     mod._write(Path(args.out), rows)
+    # 배치 폴백이 일어났는지 — 옛 커밋에는 이 칸이 없다(그때는 셀 수 없었다).
+    print(f"batching: {getattr(mod, '_RUN', '기록 없음(옛 커밋)')}")
     print(f"{len(rows)}행 · {round(time.time() - t0, 1)}초 → {args.out}")
 
 
