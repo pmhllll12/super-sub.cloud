@@ -141,17 +141,110 @@ def test_the_before_moment_falls_back_when_the_swing_knee_is_not_there():
 def test_a_tie_in_the_fallback_takes_the_earlier_frame():
     """양옆이 똑같이 가까우면 **이른 쪽**. 안 정해 두면 경로마다 달라진다."""
     usable = np.array([True, True, False, True, True])
-    assert F._nearest_valid(usable, 2) == 1
+    assert F._nearest_valid(usable, 2, 0, 4) == 1
+
+
+def test_the_before_moment_never_lands_after_the_impact():
+    """🔴 **지우지 말 것** — 「직전」이 임팩트 뒤로 가면 카드 순서가 뒤집힌다.
+
+    범위(`[first, impact-1]`)를 안 걸면, 목표 프레임 앞쪽이 전부 안 잡힌
+    클립에서 **가장 가까운 유효 프레임이 임팩트 뒤**가 된다. 그래도 그림은
+    멀쩡히 그려져서 눈으로 안 잡힌다.
+    """
+    usable = np.array([False, False, False, False, True, True, True])
+    # 목표 1, 임팩트 5 → 뒤쪽(6)이 더 가깝지만 [4, 4] 안에서 골라야 한다.
+    assert F._nearest_valid(usable, 1, 4, 4) == 4
 
 
 def test_the_after_moment_falls_back_to_the_last_usable_frame_when_it_overflows():
-    """+1초가 클립을 넘치면 마지막 유효 프레임."""
+    """+1초가 넘치면 마지막 유효 프레임 — 그리고 **넘쳤다고 말한다**."""
     kps = pixelize(build_sequence(n=25, impact=16))
     block, features = envelope(kps)
     impact = int(features["impact_frame"])
     assert impact + round(FPS) >= len(kps), "이 클립은 +1초가 넘쳐야 한다"
+    assert block["after_clipped"] is True
     assert block["moments"]["after"] < len(kps)
     assert block["joints"][block["moments"]["after"]] is not None
+
+
+def test_a_clip_long_enough_does_not_claim_it_was_clipped():
+    """넉넉한 클립에서는 `after` 가 **진짜 +1초**여야 한다.
+
+    🔴 기본 픽스처(31장)로는 이 검사가 **공허하게 통과한다** — 그 클립은 늘
+    넘치기 때문이다. 그래서 여기서만 긴 시퀀스를 쓴다.
+    """
+    kps = pixelize(build_sequence(n=60, impact=20))
+    block, features = envelope(kps)
+    impact = int(features["impact_frame"])
+    assert impact + round(FPS) <= len(kps) - 1, "이 클립은 넘치면 안 된다"
+    assert block["after_clipped"] is False
+    assert block["moments"]["after"] == impact + round(FPS)
+
+
+def test_the_after_moment_stops_at_the_last_frame_we_actually_caught():
+    """🔴 **지우지 말 것** — 넘침 기준이 `frames` 가 아니라 **마지막 유효 프레임**.
+
+    `frames` 로 재면 뒤쪽이 미검출로 끝나는 클립에서 **빈 스켈레톤**이 「접촉 후」
+    카드로 나가고, `after_clipped` 도 안 서서 화면은 그것이 진짜 +1초인 줄 안다.
+    """
+    kps = pixelize(build_sequence(n=40, impact=16))
+    kps[30:, :, 2] = 0.0                  # 뒤 10장은 사람을 못 잡았다
+    block, features = envelope(kps)
+    impact = int(features["impact_frame"])
+    assert impact + round(FPS) < len(kps), "이 클립은 프레임 수로는 안 넘쳐야 한다"
+    assert block["after_clipped"] is True
+    assert block["moments"]["after"] <= 29
+    assert block["joints"][block["moments"]["after"]] is not None
+
+
+def test_direction_is_which_way_the_kicking_ankle_travels_into_the_impact(clip):
+    """차는 방향 — 화면 오른쪽이 1. `impact-1` → `impact` 의 발목 x로 잰다."""
+    block, features = envelope(clip)
+    impact = int(features["impact_frame"])
+    ankle = F.L_ANKLE if block["swing_leg"] == "left" else F.R_ANKLE
+    moved_left = clip[impact, ankle, 0] < clip[impact - 1, ankle, 0]
+    assert block["direction"] == (-1 if moved_left else 1)
+
+
+def test_direction_flips_when_the_clip_is_mirrored(clip):
+    """🔴 좌우를 뒤집은 영상이 **같은 방향**을 내면 그 값은 아무것도 안 잰다."""
+    base, _ = envelope(clip)
+    mirrored = clip.copy()
+    mirrored[:, :, 0] = FRAME_SIZE[0] - mirrored[:, :, 0]
+    flipped, _ = envelope(mirrored)
+    assert flipped["direction"] == -base["direction"]
+
+
+def test_direction_reads_the_step_into_the_impact_not_the_before_card():
+    """🔴 **지우지 말 것** — 「직전」으로 방향을 재면 부호가 뒤집힌다.
+
+    「직전」은 임팩트 0.3초 앞이라 **되접는 도중**일 수 있고, 되접기와 펴기가
+    섞이면 가로 이동 부호가 **실제 차는 방향과 반대**로 나온다. 화면이
+    2026-09-15에 `before` 재정의로 겪은 것이라 규격이 `impact - 1` 이다.
+
+    실클립에서 둘이 갈리기를 기다리면 **공허하게 통과한다**(기본 픽스처가
+    그랬다). 그래서 갈리는 배열을 손으로 만들어 규칙만 본다.
+    """
+    ankle = F.R_ANKLE
+    kps = np.zeros((10, 17, 3))
+    kps[:, :, 2] = 0.9
+    impact = 7
+    # 프레임:        0   1   2   3(직전)  4  5   6(impact-1)  7(impact)
+    kps[:, ankle, 0] = [50, 40, 30, 20, 10, 5, 60, 30, 35, 40]
+    # 「직전」(3)으로 재면 20 → 30 이라 **오른쪽(+1)**.
+    # `impact - 1`(6)로 재면 60 → 30 이라 **왼쪽(-1)**. 둘이 갈린다.
+    assert kps[impact, ankle, 0] > kps[3, ankle, 0], "직전 기준으로는 오른쪽(+1)"
+    assert kps[impact, ankle, 0] < kps[impact - 1, ankle, 0], "impact-1 기준은 왼쪽(-1)"
+
+    assert F._kick_direction(kps, impact, ankle) == -1
+
+
+def test_direction_defaults_to_one_when_the_ankle_was_not_caught():
+    kps = np.zeros((6, 17, 3))
+    kps[:, :, 2] = 0.9
+    kps[:, F.R_ANKLE, 0] = [0, 1, 2, 3, 4, 5]
+    kps[3, F.R_ANKLE, 2] = 0.0            # impact-1 을 못 잡았다
+    assert F._kick_direction(kps, 4, F.R_ANKLE) == 1
 
 
 def test_the_swing_leg_is_the_one_the_metrics_were_measured_on(clip):

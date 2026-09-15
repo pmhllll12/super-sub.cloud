@@ -409,20 +409,50 @@ BEFORE_IMPACT_SECONDS = 0.3
 AFTER_IMPACT_SECONDS = 1.0
 
 
-def _nearest_valid(usable: np.ndarray, t: int) -> int | None:
-    """t에서 가장 가까운 유효 프레임. **동률이면 이른 쪽**이다.
+def _nearest_valid(usable: np.ndarray, t: int, lo: int, hi: int) -> int | None:
+    """[lo, hi] 안에서 t에 가장 가까운 유효 프레임. **동률이면 이른 쪽**이다.
+
+    🔴 **범위를 받는 것이 핵심이다.** 「직전」은 `[first, impact - 1]` 안에서만
+    골라야 한다 — 범위 없이 가장 가까운 것을 찾으면 임팩트 **뒤** 프레임이
+    「직전」으로 나올 수 있고, 그러면 카드 순서가 뒤집힌 채 그려진다.
 
     동률 규칙을 한 곳에 둔다 — 두 곳에서 각자 고르면 같은 영상이 경로에 따라
     다른 프레임을 「직전」으로 내고, 그 차이는 눈으로만 보인다.
     """
-    if not usable.any():
+    lo, hi = max(0, lo), min(len(usable) - 1, hi)
+    if lo > hi:
         return None
-    offsets = range(len(usable))
-    for off in offsets:
-        for cand in ((t - off, t + off) if off else (t,)):
-            if 0 <= cand < len(usable) and usable[cand]:
-                return int(cand)
-    return None
+    if usable[t] and lo <= t <= hi:
+        return int(t)
+    best, best_dist = None, None
+    for i in range(lo, hi + 1):          # 오름차순 + 순부등호 = 동률이면 이른 쪽
+        if not usable[i]:
+            continue
+        dist = abs(i - t)
+        if best_dist is None or dist < best_dist:
+            best, best_dist = i, dist
+    return None if best is None else int(best)
+
+
+def _kick_direction(kps: np.ndarray, impact: int, ankle: int) -> int:
+    """차는 방향 — 화면 오른쪽이 `1`, 왼쪽이 `-1`.
+
+    🔴 **`impact - 1` 과 임팩트를 견준다. 「직전」 카드와 견주지 않는다.**
+    「직전」은 임팩트 0.3초 앞이라 **되접는 도중**일 수 있고, 되접기와 펴기가
+    섞인 구간에서는 가로 이동 부호가 **실제 차는 방향과 반대로** 나온다.
+    `impact - 1` 은 늘 잡혀 있고(임팩트 각속도를 재는 조건이다) 펴는 도중의
+    마지막 한 걸음이라 방향이 안정적이다.
+
+    화면(`www/src/lib/motion/moments.ts`)이 2026-09-15에 `before` 재정의로
+    이것을 겪었고, 여기는 **그 규칙을 옮긴 것**이다 — 한쪽만 고치지 않는다.
+
+    한쪽이라도 안 잡혔으면 `1`이다(화면의 기본값과 같다). 정규화는 축마다 같은
+    부호라 픽셀로 재도 결과가 같다.
+    """
+    prev, now = kps[impact - 1, ankle], kps[impact, ankle]
+    if prev[2] < MIN_CONFIDENCE or now[2] < MIN_CONFIDENCE:
+        return 1
+    return -1 if now[0] < prev[0] else 1
 
 
 def skeleton_envelope(
@@ -489,21 +519,33 @@ def skeleton_envelope(
 
     # 「직전」의 폴백이 보는 것은 **차는 다리 무릎각을 잴 수 있는가**다 —
     # 그 카드가 보여주는 것이 무릎 굽힘이라 다른 관절이 잡혀도 소용이 없다.
-    knee_usable = valid_frames(kps, "leg", LIMB_CHAINS["leg"][swing_leg])
+    # `segment_phases` 가 임팩트를 고를 때 쓰는 `usable` 과 **같은 식**이다.
+    swing_chain = LIMB_CHAINS["leg"][swing_leg]
+    knee_usable = valid_frames(kps, "leg", swing_chain) & np.isfinite(
+        chain_series(norm, swing_chain)
+    )
+    if not knee_usable.any():
+        return {"known": False, "why": "차는 다리 무릎각을 잰 프레임이 없다"}
+    first = int(np.argmax(knee_usable))
+    last = int(len(knee_usable) - 1 - np.argmax(knee_usable[::-1]))
 
-    before = impact - round(BEFORE_IMPACT_SECONDS * sampled_fps)
-    before = max(0, min(total - 1, before))
-    if not knee_usable[before]:
-        nearest = _nearest_valid(knee_usable, before)
-        if nearest is not None:
-            before = nearest
+    # 🔴 **`[first, impact - 1]` 안에서만 고른다** — 범위를 안 걸면 임팩트 뒤
+    # 프레임이 「직전」으로 나올 수 있다. 화면(`www/src/lib/motion/moments.ts`)
+    # 과 같은 규칙이다.
+    before_target = max(first, impact - round(BEFORE_IMPACT_SECONDS * sampled_fps))
+    before = _nearest_valid(knee_usable, before_target, first, impact - 1)
+    if before is None:                    # 임팩트가 경계면 segment_phases가 이미 막는다
+        return {"known": False, "why": "임팩트 앞에 차는 다리를 잰 프레임이 없다"}
 
+    # 🔴 **넘치는 기준이 `total` 이 아니라 `last`(마지막 유효 프레임)다.**
+    # `total` 로 재면 뒤쪽이 미검출로 끝나는 클립에서 **빈 스켈레톤**이 카드로
+    # 나간다 — 넘친 것이 아니라 못 잡은 것이라 `after_clipped` 도 안 선다.
     after = impact + round(AFTER_IMPACT_SECONDS * sampled_fps)
-    if after >= total:
-        # 「넘치면 마지막 유효 프레임」. 못 잡은 채로 끝나는 클립에서 마지막
-        # 프레임을 그냥 주면 빈 스켈레톤이 카드로 나간다.
-        last = _nearest_valid(knee_usable, total - 1)
-        after = last if last is not None else total - 1
+    after_clipped = after > last
+    if after_clipped:
+        after = last
+
+    direction = _kick_direction(kps, impact, L_ANKLE if swing_leg == "left" else R_ANKLE)
 
     xy = kps[:, :, :2].astype(np.float64)
     conf = kps[:, :, 2].astype(np.float64)
@@ -531,9 +573,15 @@ def skeleton_envelope(
         "frame_size": [int(frame_size[0]), int(frame_size[1])],
         # **차는 다리.** `swing_side`가 auto였으면 여기 값이 판별 결과다.
         "swing_leg": swing_leg,
+        # **차는 방향** — 화면 오른쪽이 1, 왼쪽이 -1. 상체 기울기를 「차는
+        # 방향으로」 읽으려면 이 부호가 있어야 한다.
+        "direction": direction,
         "keypoint_names": list(KEYPOINT_NAMES),
         # 프레임 번호. 화면의 카드 세 장이 이 순서로 선다.
         "moments": {"before": int(before), "impact": impact, "after": int(after)},
+        # +1초가 **클립을 넘쳐** 마지막 유효 프레임으로 물러섰는가.
+        # 🔴 이것이 없으면 화면은 「접촉 후」 카드가 **진짜 +1초인지** 알 수 없다.
+        "after_clipped": bool(after_clipped),
         # 초도 함께 낸다 — 읽는 쪽이 `target_fps`로 나누는 실수를 막는다.
         "moments_seconds": {
             "before": round(before / sampled_fps, 3),

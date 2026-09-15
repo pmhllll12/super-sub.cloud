@@ -362,7 +362,8 @@ def analyze_one(video: str, args, rubric, subject) -> str:
 # (테스트가 본다). 필드를 늘렸으면 minor 를 올린다 — 1.1 은 `view_dependent`
 # 가 늘어난 봉투다 (미결 `ho` 37·38번). 1.2 는 `title_earned` (미결 `paik` 23번).
 # 1.3 은 `skeleton` — 관절 시계열과 세 순간 (미결 `paik` 30번).
-REPORT_SCHEMA_VERSION = "1.3"
+# 1.4 는 그 안의 `direction`·`after_clipped` (같은 항목, 화면 타입과 대조해 찾음).
+REPORT_SCHEMA_VERSION = "1.4"
 
 
 def build_report(
