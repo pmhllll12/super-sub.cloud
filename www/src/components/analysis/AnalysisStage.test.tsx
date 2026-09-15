@@ -27,15 +27,25 @@ const KEYPOINTS = Array.from({ length: 17 }, (_, i) => ({
  */
 const { seesPerson } = vi.hoisted(() => ({ seesPerson: { current: true } }))
 
+/**
+ * 검출이 **도는 사이에** 무언가를 끼워 넣는 자리 — 카드를 눌러 seek 하는 것이
+ * 검출 도중에 오는 경우를 재현한다. 기본은 비어 있다.
+ */
+const { duringDetect } = vi.hoisted(() => ({
+  duringDetect: { current: null as null | (() => void) },
+}))
+
 vi.mock('@/lib/personDetector', () => ({
   warmUpDetector: () => Promise.resolve({}),
   warmUpRefine: () => Promise.resolve({}),
-  detectPeople: () =>
-    Promise.resolve(
+  detectPeople: () => {
+    duringDetect.current?.()
+    return Promise.resolve(
       seesPerson.current
         ? [{ box: { x: 0.3, y: 0.2, w: 0.25, h: 0.5 }, score: 0.9, keypoints: KEYPOINTS }]
         : [],
-    ),
+    )
+  },
   // 2단계는 없어도 되는 덤이다 — 못 하면 1단계 관절을 쓴다.
   refinePose: () => Promise.resolve(null),
 }))
@@ -69,6 +79,7 @@ const REPORT_MOCK = {
 // 남긴 호출**까지 세어 버린다(리뷰 지적, 2026-09-15 — 실제로 이렇게 걸렸다).
 afterEach(() => {
   seesPerson.current = true
+  duringDetect.current = null
   getMotion.mockClear()
 })
 
@@ -751,6 +762,59 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     expect(screen.queryByRole('group', { name: '세 순간 비교' })).toBeNull()
   }, 40000)
 
+  /* 🔴 **선수 비교는 저장하지 않는다**(사용자 결정, 2026-09-15). 요약 절 오른쪽 위
+     닫기로 걷으면 영상 칸 · 카드 · 요약이 다 빠지고 **내 리포트만 남는다** — 창 틀의
+     「닫기」(영상까지 무르는 것)와 다르다. */
+  it('비교 요약의 닫기를 누르면 비교만 걷히고 내 리포트는 남는다', async () => {
+    reportReadyFetch()
+    const { kickMotion } = await import('@/lib/motion/kickFixture')
+    getMotion.mockImplementation(async (_input, opts) => {
+      opts?.onProgress?.(1)
+      return kickMotion()
+    })
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await user.click(await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }))
+    await sayYes(user)
+    await user.click(await screen.findByRole('button', { name: '선수와 비교하기' }, { timeout: 12000 }))
+    await user.click(screen.getByRole('button', { name: '에스테반 로벨리' }))
+    await screen.findByRole('group', { name: '세 순간 비교' }, { timeout: 5000 })
+
+    await user.click(await screen.findByRole('button', { name: '비교 닫기' }))
+
+    const body = document.querySelector('.ss-shot-frame-body')
+    expect(body).not.toHaveAttribute('data-compare')
+    expect(body).not.toHaveAttribute('data-moments')
+    expect(document.querySelector('.ss-shot-compare-slot')).toBeNull()
+    expect(screen.queryByRole('group', { name: '세 순간 비교' })).toBeNull()
+    expect(screen.queryByRole('region', { name: /^비교 — / })).toBeNull()
+    // 영상은 그대로고 내 리포트도 그대로다.
+    expect(screen.queryByLabelText('분석할 영상')).toBeNull()
+    expect(document.querySelector('.ss-report-summary')).toHaveTextContent(REPORT_MOCK.summary)
+    // 다시 비교할 수 있다.
+    expect(screen.getByRole('button', { name: '선수와 비교하기' })).toHaveAttribute('aria-expanded', 'false')
+  }, 40000)
+
+  /* 「선수와 비교하기」는 「내 프로필에 리포트 저장」 **바로 왼쪽에 붙는다**(사용자 요청,
+     2026-09-15). 머리줄이 `space-between` 이라 셋이 흩어지면 가운데에 떠 있었다 —
+     두 단추를 한 묶음으로 둔다. */
+  it('리포트 머리줄에서 비교 단추는 저장 단추 바로 왼쪽에 한 묶음으로 선다', async () => {
+    reportReadyFetch()
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await user.click(await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }))
+    await sayYes(user)
+    const compareBtn = await screen.findByRole('button', { name: '선수와 비교하기' }, { timeout: 12000 })
+    const saveBtn = screen.getByRole('button', { name: '내 프로필에 리포트 저장' })
+    expect(compareBtn.parentElement).toBe(saveBtn.parentElement)
+    expect(compareBtn.parentElement).toHaveClass('ss-shot-side-actions')
+    expect(compareBtn.nextElementSibling).toBe(saveBtn)
+  }, 20000)
+
   /* 🔴 **찾는 척하는 1.6초 타이머가 취소되지 않는다**(리뷰 지적, 2026-09-15). 그
      타이머가 `reset()` 뒤에도 살아 있다가 뒤늦게 `setCompare('shown')` 을 던지면,
      이미 빈 판으로 돌아간 화면에 선수 칸이 다시 반쪽을 차지한다. */
@@ -1057,6 +1121,92 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     expect(await screen.findByLabelText('분석 진행')).toBeInTheDocument()
   })
 
+  /* ── 진행 단계 — 실제 순서 · 추정 시간 (2026-09-15) ─────────────────── */
+
+  /** 칸 이름 → 그 칸의 `data-state`. */
+  function stepState(label: string) {
+    const li = screen.getByText(label).closest('.ss-step')
+    return li?.getAttribute('data-state')
+  }
+
+  /* 🔴 전에는 1.1초씩 넘겨서 5초 만에 다 찼다. 이제는 칸마다 실제로 걸리는
+     시간으로 머문다 — 측정은 30초대라 몇 초 뒤에도 측정에 있어야 한다. */
+  it('칸은 1.1초씩이 아니라 단계마다 걸리는 시간으로 넘어간다', async () => {
+    const fn = reportReadyFetch()
+    const base = fn.getMockImplementation()!
+    fn.mockImplementation(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith('/report')) {
+        return new Response(
+          JSON.stringify({ error: { code: 'REPORT_NOT_READY', message: '아직' } }),
+          { status: 404 },
+        )
+      }
+      return base(input)
+    })
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await user.click(await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }))
+    await sayYes(user)
+
+    // 업로드가 끝나면 받기(1초) → 측정.
+    await waitFor(() => expect(stepState('자세 측정')).toBe('now'), { timeout: 4000 })
+    // 옛 1.1초 간격이면 이 사이에 판정 · 저장까지 넘어갔다.
+    await new Promise((r) => setTimeout(r, 2500))
+    expect(stepState('자세 측정')).toBe('now')
+    expect(stepState('판정 · 근거')).toBe('todo')
+    expect(screen.queryByText('전처리')).toBeNull()
+  }, 15000)
+
+  /* 🔴 서버가 추정보다 먼저 끝나면 **남은 칸을 채운 뒤** 리포트로 간다 —
+     측정 칸이 켜진 채 리포트가 뜨면 「측정하다 말았다」로 읽힌다. */
+  it('서버가 먼저 끝나면 마지막 칸까지 채운 뒤 리포트가 뜬다', async () => {
+    reportReadyFetch()
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await user.click(await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }))
+    await sayYes(user)
+
+    // 첫 확인(4초)에 리포트가 온다 — 그때 칸은 아직 측정 중이다.
+    await waitFor(() => expect(stepState('미리보기 · 저장')).toBe('now'), { timeout: 8000, interval: 20 })
+    expect(stepState('자세 측정')).toBe('done')
+    expect(document.querySelector('.ss-report-summary')).toBeNull()
+    await waitFor(
+      () => expect(document.querySelector('.ss-report-summary')).toHaveTextContent(REPORT_MOCK.summary),
+      { timeout: 2000 },
+    )
+  }, 20000)
+
+  /* 🔴 실패는 **채우지 않고 곧바로** 사유를 보인다 — 종목 불일치는 측정에서
+     멈춘 것이라 저장 칸까지 켜면 거짓이다. */
+  it('분석이 실패하면 칸을 채우지 않고 곧바로 사유를 보인다', async () => {
+    const fn = reportReadyFetch()
+    const base = fn.getMockImplementation()!
+    fn.mockImplementation(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith('/report')) {
+        return new Response(
+          JSON.stringify({ error: { code: 'ANALYSIS_FAILED', message: '종목 불일치: 농구공이 보입니다' } }),
+          { status: 404 },
+        )
+      }
+      return base(input)
+    })
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await user.click(await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }))
+    await sayYes(user)
+
+    expect(
+      await screen.findByText('분석에 실패했습니다 — 종목 불일치: 농구공이 보입니다', {}, { timeout: 8000 }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '내 프로필에 리포트 저장' })).toBeDisabled()
+  }, 20000)
+
   /* 🔴 **「예」가 올린다**(2026-09-08). 예전에는 오른쪽 위 `저장` 이 불러서
      가짜 리포트가 다 나온 뒤에야 영상이 올라갔다 — 미결 「누구를 분석 대상으로
      고를지」의 현황표가 *"`이 사람으로 분석` → S3 저장은 다른 버튼이다"* 로
@@ -1256,6 +1406,38 @@ describe('영상 분석 — 영상을 고른 뒤', () => {
     }
 
     expect(await screen.findByText(/잠깐 놓쳤습니다/, {}, { timeout: 2000 })).toBeInTheDocument()
+  }, 10000)
+
+  /* 🔴 **검출이 도는 사이에 seek 하면 그 결과는 옮기기 전 프레임이다**(2026-09-15,
+     사용자 지적 — 카드를 누르면 오른쪽 뼈대가 그 동작을 못 따라갈 때가 있다).
+     예전 루프는 검출이 **끝난 뒤** `currentTime` 을 읽어 「이 시각은 적용했다」로
+     적었다 — 그러면 옛 프레임의 관절이 새 시각의 것으로 남고, 멈춰 있는 동안은
+     같은 시각이라 다시 재지도 않는다. 여기서는 검출 도중마다 옮기면서 옛 프레임엔
+     사람이 있고 새 프레임엔 없게 만든다 — 고쳤으면 새 프레임을 재서 놓침이 쌓인다. */
+  it('검출 도중에 seek 하면 그 결과를 버리고 새 프레임을 다시 잰다', async () => {
+    const user = userEvent.setup()
+    const { input, file } = pick()
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기' }))
+    await user.click(await screen.findByRole('button', { name: '자동으로 고르기' }, { timeout: 2500 }))
+    loadVideo()
+    await screen.findByText('이 사람이 맞습니까?', {}, { timeout: 4000 })
+
+    const video = document.querySelector('video') as HTMLVideoElement
+    let call = 0
+    duringDetect.current = () => {
+      call += 1
+      if (call % 2 === 1) {
+        // 이 검출은 옮기기 **전** 프레임을 본다 — 사람이 있다. 도는 사이에 옮긴다.
+        seesPerson.current = true
+        video.currentTime = 5 + call * 0.01
+      } else {
+        // 옮긴 뒤의 프레임 — 사람이 없다.
+        seesPerson.current = false
+      }
+    }
+
+    expect(await screen.findByText(/잠깐 놓쳤습니다/, {}, { timeout: 3000 })).toBeInTheDocument()
   }, 10000)
 
   it('반려되면 사유를 보여준다', async () => {
