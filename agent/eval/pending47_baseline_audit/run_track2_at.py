@@ -11,6 +11,11 @@
 
 🔴 **워크트리의 `agent/data` 는 심링크다**(`.gitignore` 라 체크아웃에 없다).
 치울 때는 `git worktree remove` 로만 치운다 — 심링크를 지우다 원본을 날리지 않게.
+
+🔴 **이 경로는 `run_meta.json` 을 안 남긴다** — `main()` 을 건너뛰고 `track2()`
+만 부르기 때문이고, 그래야 **옛 커밋**(메타 기능이 없던 때)에서도 돈다.
+그래서 여기서 나온 CSV 는 **감사용 임시 산출**이지 기준선이 아니다. 기준선을
+새로 세우려면 전체 실행(`selector_downstream.py`)을 돌린다.
 """
 from __future__ import annotations
 
