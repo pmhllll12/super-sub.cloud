@@ -39,6 +39,8 @@ dependencies:
   uuid: ^4.6.0
   material_symbols_icons: ^4.2960.0
   http: ^1.6.0
+  google_sign_in: ^7.2.0
+  video_player: ^2.14.0
 
 dev_dependencies:
   flutter_test:
@@ -64,6 +66,10 @@ flutter:
 
   assets:
     - assets/images/
+    # 홈 「영상 분석」 판에서 되풀이되는 소개 영상. 원본 화면 기록(1964×1056 ·
+    # 60fps · 21MB)을 960×512(16의 배수) · 30fps · 소리 없음으로 줄였다(약 1MB). 🔴 영상을 더
+    # 늘리면 앱이 그만큼 무거워진다 — 웹 `www/public` 과 같은 주의.
+    - assets/videos/
 
   shaders:
     - shaders/ink_bleed.frag
@@ -79,6 +85,11 @@ flutter:
     - family: RubikGlitch
       fonts:
         - asset: assets/fonts/RubikGlitch-Regular.ttf
+    # 선수 카드의 영문(머리글 · 별명). 웹 `--font-card`(next/font 의 Young_Serif)와
+    # 같은 글꼴이다. 굵기는 400 하나뿐이다. 라이선스: YoungSerif-OFL.txt
+    - family: YoungSerif
+      fonts:
+        - asset: assets/fonts/YoungSerif-Regular.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:

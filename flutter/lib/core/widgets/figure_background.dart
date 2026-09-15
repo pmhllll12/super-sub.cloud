@@ -25,7 +25,19 @@ const LinearGradient _kFigureFade = LinearGradient(
 /// 몸이 접히는 것처럼 보였다. 제대로 하려면 머리와 몸을 따로 떼야 하는데
 /// 그만한 값어치가 없어 걷어냈다(git 이력에 남아 있다).
 class FigureBackground extends StatelessWidget {
-  const FigureBackground({super.key});
+  const FigureBackground({
+    super.key,
+    this.image = const AssetImage('assets/images/home_figure.jpg'),
+    this.alignment = Alignment.centerLeft,
+  });
+
+  /// 깔 사진. 기본은 영상 분석 화면이 쓰는 인물이다 — 홈은 2026-09-15 부터
+  /// 다른 사진을 넘긴다(`home_screen.dart`).
+  final ImageProvider image;
+
+  /// 화면에 안 들어가는 좌우를 어느 쪽 기준으로 자를지. 사진마다 인물 자리가
+  /// 달라서 사진과 함께 넘긴다.
+  final Alignment alignment;
 
   @override
   Widget build(BuildContext context) {
@@ -36,10 +48,10 @@ class FigureBackground extends StatelessWidget {
           alignment: Alignment.topCenter,
           child: FractionallySizedBox(
             heightFactor: _kFigureHeightFactor,
-            child: const Image(
-              image: AssetImage('assets/images/home_figure.jpg'),
+            child: Image(
+              image: image,
               fit: BoxFit.cover,
-              alignment: Alignment.centerLeft,
+              alignment: alignment,
             ),
           ),
         ),
