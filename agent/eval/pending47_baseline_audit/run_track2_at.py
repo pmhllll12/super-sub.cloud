@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import inspect
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -44,6 +45,22 @@ def load_module(worktree: Path):
     sys.modules["b6_at_commit"] = mod
     spec.loader.exec_module(mod)
     return mod
+
+
+def _used_via_smi() -> str:
+    """기계 전체가 쓰는 VRAM (MiB). 🔴 **다른 프로세스까지 보인다.**"""
+    try:
+        out = subprocess.run(
+            ("nvidia-smi", "--query-gpu=memory.used,memory.total",
+             "--format=csv,noheader"), capture_output=True, text=True, check=True)
+        return out.stdout.strip()
+    except Exception as exc:  # noqa: BLE001
+        return f"못 읽음: {type(exc).__name__}"
+
+
+def _free_via_torch(dev: str):
+    import torch
+    return torch.cuda.mem_get_info(0) if dev == "cuda" else None
 
 
 def main() -> None:
@@ -79,8 +96,13 @@ def main() -> None:
 
     # 🔴 **여유 VRAM 을 시작 시점에 적는다** (47번 3회차). 이 값이 회차의
     #    계기 검사다 — 점유가 실제로 걸렸는지는 이것으로만 확인된다.
-    free, total = (torch.cuda.mem_get_info(0) if dev == "cuda" else (None, None))
-    print(f"시작 시 여유 VRAM: {free} / {total}")
+    #
+    # 🔴 **`torch.cuda.mem_get_info` 를 믿으면 안 된다 (WSL2, 2026-09-15 실측)** —
+    #    다른 프로세스가 4 GiB 를 잡고 있는데도 「여유 6.5 GiB」라고 답했다.
+    #    `nvidia-smi` 는 같은 순간 5,067 MiB 사용 중이라고 했다. **기계 전체를
+    #    보는 쪽을 쓴다.** 둘 다 찍어 두는 것은 이 차이 자체가 기록이라서다.
+    print(f"시작 시 여유 VRAM(mem_get_info): {_free_via_torch(dev)}")
+    print(f"시작 시 사용 VRAM(nvidia-smi): {_used_via_smi()}")
 
     rows = mod.track2(dproc, dmodel, pproc, pmodel, dev, rubrics)
     mod._write(Path(args.out), rows)

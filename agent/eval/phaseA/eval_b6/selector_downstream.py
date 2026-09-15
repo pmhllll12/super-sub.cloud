@@ -408,12 +408,27 @@ def _env_state(dev: str) -> dict:
     #    N-2·N-3 이 「다른 프로세스가 GPU를 쓰고 있었는지에 따라 결과가 달라질
     #    수 있다」고 경고해 두었는데, **그걸 적어 두는 칸이 없었다.** 그래서
     #    09-08 에는 재현되던 것이 09-15 에 안 되는 이유를 **사후에 못 가린다.**
+    #
+    # 🔴 **`torch.cuda.mem_get_info` 를 믿으면 안 된다 (WSL2, 2026-09-15 실측)** —
+    #    다른 프로세스가 4 GiB 를 잡고 있는데도 「여유 6.5 GiB」라고 답했고,
+    #    같은 순간 `nvidia-smi` 는 5,067 MiB 사용 중이라고 했다. **이 칸을 넣은
+    #    목적(다른 프로세스가 같이 쓰고 있었나)에는 그쪽이 맞는 자다.**
+    #    둘 다 적는다 — 이 차이 자체가 기록이다(미결 47번 3회차).
     free_b = total_b = None
     if dev == "cuda":
         free_b, total_b = torch.cuda.mem_get_info(0)
+    smi = None
+    try:
+        smi = subprocess.run(
+            ("nvidia-smi", "--query-gpu=memory.used,memory.total",
+             "--format=csv,noheader"), capture_output=True, text=True,
+            check=True).stdout.strip()
+    except Exception as exc:  # noqa: BLE001
+        smi = f"error: {type(exc).__name__}"
     return {
-        "gpu_free_bytes_at_start": free_b,
-        "gpu_total_bytes": total_b,
+        "gpu_used_at_start_smi": smi,
+        "gpu_free_bytes_at_start_torch": free_b,
+        "gpu_total_bytes_torch": total_b,
         "python": sys.version.split()[0],
         "torch": torch.__version__,
         "cuda": torch.version.cuda,
