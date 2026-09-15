@@ -15,6 +15,9 @@ import base64
 import gc
 import logging
 import math
+import shutil
+import subprocess
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import NamedTuple
@@ -1346,6 +1349,70 @@ def _subject_windows(
     return tops, cw, ch
 
 
+@contextmanager
+def _clip_encoder(out_path: Path, fps: float, size: tuple[int, int]):
+    """BGR 프레임을 받아 VP8/WebM으로 쓰는 인코더 — ffmpeg이 있으면 그쪽으로.
+
+    **인코딩이 미리보기 시간의 거의 전부다.** 300프레임 1280×726 클립에서
+    그리기 0.42초 · 인코딩 19.2초였다(2026-09-15 실측, RTX 3050). OpenCV의
+    VideoWriter는 libvpx를 화질 우선 기본값으로 부르는데, 같은 VP8/WebM을
+    ffmpeg에 realtime 설정으로 넘기면 **2.4초**에 나오고 파일도 18.4MB에서
+    1.7MB로 준다. 코덱이 그대로라 브라우저 재생 호환은 바뀌지 않는다.
+
+    🔴 **화질이 조금 떨어지는 대신 시간을 산 것이다.** 미리보기는 검수용
+    그림이고 측정·판정은 이 함수를 지나지 않으므로 점수에는 닿지 않는다.
+
+    ffmpeg이 없으면 예전 경로(OpenCV)로 떨어진다 — 느릴 뿐 결과는 나온다.
+    EC2에는 깔려 있다(`deploy/README.md`의 apt 목록).
+    """
+    ow, oh = size
+    rate = max(1.0, fps)
+    ffmpeg = shutil.which("ffmpeg")
+
+    if ffmpeg is None:
+        _log.info("ffmpeg이 없어 OpenCV 인코더로 떨어진다 — 미리보기가 느려진다")
+        writer = cv2.VideoWriter(
+            str(out_path), cv2.VideoWriter_fourcc(*"VP80"), rate, (ow, oh)
+        )
+        if not writer.isOpened():
+            raise RuntimeError(f"인코더를 열 수 없습니다: {out_path}")
+        try:
+            yield writer.write
+        finally:
+            writer.release()
+        return
+
+    proc = subprocess.Popen(
+        [ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+         "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{ow}x{oh}",
+         "-r", f"{rate:.4f}", "-i", "-",
+         "-c:v", "libvpx", "-b:v", "1M",
+         # 이 둘이 19.2초를 2.4초로 만든다. cpu-used는 libvpx의 속도 단계다.
+         "-deadline", "realtime", "-cpu-used", "8",
+         "-an", str(out_path)],
+        stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+    )
+
+    def write(frame: np.ndarray) -> None:
+        # 연속 메모리여야 한다 — resize 결과는 그렇지만 크롭만 온 경우를 막는다.
+        proc.stdin.write(np.ascontiguousarray(frame).tobytes())
+
+    try:
+        yield write
+    except BrokenPipeError as exc:  # ffmpeg이 먼저 죽은 경우
+        proc.kill()
+        raise RuntimeError(f"인코더가 중단되었습니다: {out_path}") from exc
+    finally:
+        if proc.stdin and not proc.stdin.closed:
+            try:
+                proc.stdin.close()
+            except BrokenPipeError:
+                pass
+        err = proc.stderr.read().decode("utf-8", "replace").strip()
+        if proc.wait() != 0:
+            raise RuntimeError(f"인코딩 실패({proc.returncode}): {err or out_path}")
+
+
 def render_tracked_clip(
     frames: list[np.ndarray],
     keypoints: np.ndarray,
@@ -1363,6 +1430,7 @@ def render_tracked_clip(
 
     코덱은 VP8/WebM이다 — OpenCV의 pip 빌드에는 H.264 인코더가 없고(라이선스),
     mp4v는 브라우저가 재생하지 못한다. WebM은 브라우저가 기본 지원한다.
+    인코더를 어디로 보내는지는 `_clip_encoder`가 정한다.
     """
     if not frames:
         raise ValueError("프레임이 없습니다")
@@ -1372,13 +1440,8 @@ def render_tracked_clip(
 
     ow = out_width
     oh = int(round(ow * ch / cw / 2) * 2)      # 짝수 — 인코더가 요구한다
-    writer = cv2.VideoWriter(
-        str(out_path), cv2.VideoWriter_fourcc(*"VP80"), max(1.0, fps), (ow, oh)
-    )
-    if not writer.isOpened():
-        raise RuntimeError(f"인코더를 열 수 없습니다: {out_path}")
 
-    try:
+    with _clip_encoder(out_path, fps, (ow, oh)) as write:
         for t, frame in enumerate(frames):
             canvas = draw_overlay(frame, keypoints[t], min_conf)
             x, y = tops[t]
@@ -1393,9 +1456,7 @@ def render_tracked_clip(
                             0.9, (0, 0, 255), 2, cv2.LINE_AA)
             cv2.putText(crop, f"{t}", (14, oh - 14), cv2.FONT_HERSHEY_SIMPLEX,
                         0.6, (240, 240, 240), 2, cv2.LINE_AA)
-            writer.write(crop)
-    finally:
-        writer.release()
+            write(crop)
 
     return {"frames": len(frames), "size": (ow, oh), "fps": fps,
             "bytes": out_path.stat().st_size if out_path.exists() else 0}
