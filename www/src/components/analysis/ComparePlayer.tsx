@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import type { Box } from '@/lib/box'
 import { detectPeople, refinePose } from '@/lib/personDetector'
 import { smoothPose, type Point } from '@/lib/pose'
+import type { Leg } from '@/lib/motion/types'
 import { POSE_VB, posePaths, toViewBox } from '@/lib/poseDraw'
 import { smoothStep } from '@/lib/smoothBox'
 
@@ -15,16 +16,16 @@ import { smoothStep } from '@/lib/smoothBox'
 const DETECT_MS = 120
 
 /**
- * 「선수와 비교하기」의 왼쪽 칸 — **선수 영상과 그 위의 하늘색 뼈대.**
+ * 「선수와 비교하기」의 왼쪽 칸 — **선수 영상과 그 위의 마젠타 뼈대.**
  *
  * 🔴 **따라가지 않고 가장 큰 사람을 그린다.** 선수 영상은 사람이 누구를 볼지
  * 묶은 것이 아니라서 추적기를 걸 기준이 없다. 가장 큰 박스는 에이전트가 대상을
  * 고르는 규칙과 같다(`_largest_person_box`) — 두 규칙이 갈리면 화면이 보여 준
  * 사람과 서버가 본 사람이 달라진다.
  *
- * 🔴 **색은 하늘색이다**(사용자 결정, 2026-09-14). 초록은 「내 영상에서 따라가는
- * 사람」의 뜻으로 이미 쓰고 있어서, 같은 색이면 어느 쪽이 나인지 색으로 못 가른다.
- * 하늘색은 적록 색각 이상에서도 초록(누렇게 보인다)과 갈린다.
+ * 🔴 **색은 마젠타다**(사용자 결정, 2026-09-15 — 하늘색 → 마젠타). 초록은 「내 영상에서
+ * 따라가는 사람」의 뜻으로 이미 쓰고 있어서, 같은 색이면 어느 쪽이 나인지 색으로 못
+ * 가른다. 마젠타는 초록의 보색이라 적록 색각 이상에서도 갈린다. 값은 `--ss-pro`.
  *
  * ⚠️ 검출기를 못 올리면 **영상만 돈다** — 뼈대가 없어도 비교는 된다.
  */
@@ -33,10 +34,13 @@ export default function ComparePlayer({
   label,
   closing,
   seekTo = null,
+  kickingLeg = null,
 }: {
   src: string
   label: string
   closing: boolean
+  /** 선수의 차는 다리 — 동작을 뽑은 뒤에만 안다. 모르면 두 다리를 같게 그린다. */
+  kickingLeg?: Leg | null
   /** 초. 숫자면 그 시각으로 가서 멈추고, `null` 이면 이어 재생한다(세 순간 카드). */
   seekTo?: number | null
 }) {
@@ -44,7 +48,14 @@ export default function ComparePlayer({
   const layerRef = useRef<HTMLDivElement>(null)
   const boxRef = useRef<HTMLDivElement>(null)
   const boneRef = useRef<SVGPathElement>(null)
+  const kickRef = useRef<SVGPathElement>(null)
   const jointRef = useRef<SVGPathElement>(null)
+  const jointCoreRef = useRef<SVGPathElement>(null)
+  // 그리기 루프가 60fps 로 읽으므로 ref 에 옮겨 둔다.
+  const kickLegRef = useRef<Leg | null>(kickingLeg)
+  useEffect(() => {
+    kickLegRef.current = kickingLeg
+  }, [kickingLeg])
 
   /* 검출이 넣는 목표와 화면에 보이는 눅인 값 — 초당 60번 바뀌는 값이라 React
      상태에 두지 않는다(내 영상 쪽과 같은 이유). */
@@ -125,15 +136,19 @@ export default function ComparePlayer({
       const layer = layerRef.current
       const el = boxRef.current
       const bone = boneRef.current
+      const kick = kickRef.current
       const joint = jointRef.current
+      const core = jointCoreRef.current
       const video = videoRef.current
-      if (!layer || !el || !bone || !joint) return
+      if (!layer || !el || !bone || !kick || !joint || !core) return
+      const clear = () => {
+        for (const path of [bone, kick, joint, core]) path.setAttribute('d', '')
+      }
 
       const target = targetRef.current
       if (!target) {
         el.style.opacity = '0'
-        bone.setAttribute('d', '')
-        joint.setAttribute('d', '')
+        clear()
         shownRef.current = null
         shownPoseRef.current = null
         return
@@ -150,15 +165,18 @@ export default function ComparePlayer({
 
       const raw = poseRef.current
       if (!raw) {
-        bone.setAttribute('d', '')
-        joint.setAttribute('d', '')
+        clear()
         return
       }
       const pose = smoothPose(shownPoseRef.current, raw, dt)
       shownPoseRef.current = pose
-      const { bones, joints } = posePaths([pose], layer, video)
+      const { bones, kick: kickD, joints } = posePaths([pose], layer, video, {
+        kickingLeg: kickLegRef.current,
+      })
       bone.setAttribute('d', bones)
+      kick.setAttribute('d', kickD)
       joint.setAttribute('d', joints)
+      core.setAttribute('d', joints)
     }
     raf = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(raf)
@@ -190,7 +208,9 @@ export default function ComparePlayer({
           focusable="false"
         >
           <path ref={boneRef} className="ss-shot-bone" vectorEffect="non-scaling-stroke" />
+          <path ref={kickRef} className="ss-shot-bone ss-shot-bone-kick" vectorEffect="non-scaling-stroke" />
           <path ref={jointRef} className="ss-shot-joint" vectorEffect="non-scaling-stroke" />
+          <path ref={jointCoreRef} className="ss-shot-joint-core" vectorEffect="non-scaling-stroke" />
         </svg>
         <div ref={boxRef} className="ss-shot-track-box">
           <span className="ss-shot-track-tag">PRO</span>
