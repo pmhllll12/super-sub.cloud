@@ -65,3 +65,22 @@ class AnalysisJobOrm(Base):
     # 🔴 **NULL(빈 목록) = 「전체적으로」가 기본**이다. 채점을 바꿀지(가중치
     # 재정규화)는 워커/루브릭 판단이고(미결 8번 안 B), 백엔드는 값만 나른다.
     focus: Mapped[list | None] = mapped_column(JSON, nullable=True)
+
+    # `"analyze"` | `"detect"` (미결 `ho` 44번). 옛 행은 마이그레이션이 전부
+    # `"analyze"`로 채운다(그때는 이 구분이 없었으니 전부 분석 작업이었다).
+    # `job_type` 도 `status` 처럼 DB 제약을 안 건다 — 값 목록이 늘어날 수 있다.
+    # 🔴 **Python 쪽 기본값을 둔다**(`status`와 다른 점) — 이 필드가 생기기
+    # 전부터 `AnalysisJobOrm(...)`을 만드는 자리(테스트 픽스처 여러 곳 포함)가
+    # 많아서, 전부 찾아 고치는 대신 "안 주면 analyze"로 기존 호출을 그대로
+    # 살린다. 실제 생성 경로(등록·`detect` 큐잉)는 그래도 명시적으로 넣는다.
+    job_type: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="analyze"
+    )
+
+    # 🔴 `detect` 작업 전용 — `subject_at_ms` 를 **같은 컬럼, 다른 뜻**으로
+    # 재사용한다. 새 컬럼을 안 만든 이유: 둘 다 "이 작업이 보는 영상 시각(ms)"
+    # 이라는 같은 개념이고, 한 작업이 `analyze`와 `detect`를 동시에 겸하지
+    # 않아 값이 섞일 일이 없다(위 "둘 중 하나만 찬 상태는 앱이 막는다"는
+    # `analyze` 작업 등록 경로에서만 유효 — `detect` 작업은 `subject_box`
+    # 없이 `subject_at_ms`만 채우는 게 정상이다). `detect` 결과는 여기 담는다.
+    detection_result: Mapped[dict | None] = mapped_column(JSON, nullable=True)

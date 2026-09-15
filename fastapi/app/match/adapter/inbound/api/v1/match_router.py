@@ -11,8 +11,10 @@ from app.match.adapter.inbound.api.schemas.match_schema import (
     ApplicationResponse,
     ApplySchema,
     CreateMatchSchema,
+    CreateTeamMatchRequestSchema,
     MatchResponse,
     MatchSearchResponse,
+    TeamMatchRequestResponse,
     UpdateMatchSchema,
 )
 from app.match.application.dtos.match_dto import (
@@ -21,24 +23,34 @@ from app.match.application.dtos.match_dto import (
     ApplicationsQuery,
     ApplyCommand,
     CancelMatchCommand,
+    CancelTeamMatchRequestCommand,
     CreateMatchCommand,
+    CreateTeamMatchRequestCommand,
     UpdateMatchCommand,
     MatchQuery,
     MatchResult,
     MatchSearchQuery,
     MatchSearchResult,
     RemoveApplicationCommand,
+    RespondTeamMatchRequestCommand,
     TeamMatchesQuery,
+    TeamMatchRequestResult,
+    TeamMatchRequestsQuery,
     PositionNeedInput,
 )
 from app.match.dependencies.match_providers import (
     AcceptApplicationUseCaseDep,
+    AcceptTeamMatchRequestUseCaseDep,
     ApplyToMatchUseCaseDep,
     CreateMatchUseCaseDep,
+    CreateTeamMatchRequestUseCaseDep,
     ListApplicationsUseCaseDep,
     ListTeamMatchesUseCaseDep,
+    ListTeamMatchRequestsUseCaseDep,
     CancelMatchUseCaseDep,
+    CancelTeamMatchRequestUseCaseDep,
     ReadMatchUseCaseDep,
+    RejectTeamMatchRequestUseCaseDep,
     RemoveApplicationUseCaseDep,
     SearchMatchesUseCaseDep,
     UpdateMatchUseCaseDep,
@@ -244,3 +256,113 @@ def list_applications(
 ) -> list[ApplicationResult]:
     """주장은 전부, 그 외에는 **자기 건만** 본다 — 지원자 명단은 팀의 정보다."""
     return use_case(ApplicationsQuery(actor_id=user_id, match_id=match_id))
+
+
+# ---------------------------------------------------------------------------
+# 팀 대 팀 경기 신청 (`team_match_request`). `paik` 17번.
+#
+# 🔴 기존 `POST /matches/{id}/applications`(사람이 경기에 지원)와는 다르다 —
+# 이건 **팀이 팀에게** 거는 것이고, 받는 사람도 **상대 팀 주장**이다.
+# ---------------------------------------------------------------------------
+
+
+@match_router.post(
+    "/teams/{team_id}/match-requests",
+    response_model=TeamMatchRequestResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_team_match_request(
+    team_id: UUID,
+    body: CreateTeamMatchRequestSchema,
+    user_id: CurrentUserId,
+    use_case: CreateTeamMatchRequestUseCaseDep,
+) -> TeamMatchRequestResult:
+    """우리 팀(`team_id`)이 상대 팀에 경기를 건다. **신청 팀 주장만.**
+
+    대상 팀 주장(들)에게 알림(`team_match_requested`)이 간다.
+    """
+    return use_case(
+        CreateTeamMatchRequestCommand(
+            actor_id=user_id,
+            requester_team_id=team_id,
+            target_team_id=body.target_team_id,
+            proposed_played_at=body.played_at,
+            proposed_place=body.place,
+        )
+    )
+
+
+@match_router.get(
+    "/teams/{team_id}/match-requests",
+    response_model=list[TeamMatchRequestResponse],
+)
+def list_team_match_requests(
+    team_id: UUID,
+    user_id: CurrentUserId,
+    use_case: ListTeamMatchRequestsUseCaseDep,
+) -> list[TeamMatchRequestResult]:
+    """그 팀이 **보낸 것 + 받은 것**, 최신순. **주장만** 본다."""
+    return use_case(TeamMatchRequestsQuery(actor_id=user_id, team_id=team_id))
+
+
+@match_router.post(
+    "/teams/{team_id}/match-requests/{request_id}/accept",
+    response_model=TeamMatchRequestResponse,
+)
+def accept_team_match_request(
+    team_id: UUID,
+    request_id: UUID,
+    user_id: CurrentUserId,
+    use_case: AcceptTeamMatchRequestUseCaseDep,
+) -> TeamMatchRequestResult:
+    """대상 팀(`team_id`) 주장이 수락한다.
+
+    확정 경기가 생기고 양쪽 `GET /teams/{id}/matches`에 뜬다. 신청 팀에
+    알림(`team_match_accepted`)이 가고, **두 팀의 다른 `pending` 신청은 전부
+    `cancelled`로 정리된다**(동시 확정 방지 — 이중 예약을 막는다).
+    """
+    return use_case(
+        RespondTeamMatchRequestCommand(
+            actor_id=user_id, team_id=team_id, request_id=request_id
+        )
+    )
+
+
+@match_router.post(
+    "/teams/{team_id}/match-requests/{request_id}/reject",
+    response_model=TeamMatchRequestResponse,
+)
+def reject_team_match_request(
+    team_id: UUID,
+    request_id: UUID,
+    user_id: CurrentUserId,
+    use_case: RejectTeamMatchRequestUseCaseDep,
+) -> TeamMatchRequestResult:
+    """대상 팀(`team_id`) 주장이 거절한다. 신청 팀에 알림이 간다."""
+    return use_case(
+        RespondTeamMatchRequestCommand(
+            actor_id=user_id, team_id=team_id, request_id=request_id
+        )
+    )
+
+
+@match_router.delete(
+    "/teams/{team_id}/match-requests/{request_id}",
+    response_model=TeamMatchRequestResponse,
+)
+def cancel_team_match_request(
+    team_id: UUID,
+    request_id: UUID,
+    user_id: CurrentUserId,
+    use_case: CancelTeamMatchRequestUseCaseDep,
+) -> TeamMatchRequestResult:
+    """신청 팀(`team_id`) 주장이 스스로 무른다. **아직 `pending`일 때만.**
+
+    🔴 `204`가 아니라 취소된 신청을 그대로 돌려준다 — 다른 응답들과 같은
+    모양이라 클라이언트가 같은 파서를 쓸 수 있다(삭제라기보다 상태 전이라서).
+    """
+    return use_case(
+        CancelTeamMatchRequestCommand(
+            actor_id=user_id, team_id=team_id, request_id=request_id
+        )
+    )

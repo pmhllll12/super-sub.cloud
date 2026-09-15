@@ -12,6 +12,10 @@ from abc import ABC, abstractmethod
 from uuid import UUID
 
 from app.user.domain.entities.membership_entity import MembershipEntity
+from app.user.domain.entities.user_contact_entity import (
+    UserContactEntity,
+    UserContactSummary,
+)
 from app.user.domain.entities.user_entity import UserEntity
 from app.user.domain.value_objects.email_vo import Email
 from app.user.domain.value_objects.nickname_vo import Nickname
@@ -134,3 +138,62 @@ class UserPort(ABC):
         `user` 가 `card` 를 임포트하는 것은 아니다 — 구현(`UserPgRepository`)이
         `table()`/`column()` 원시 쿼리로 읽는다(`app/core/deps.py` 와 같은 이유).
         """
+
+    @abstractmethod
+    def update_searchable(self, user_id: UUID, is_nickname_searchable: bool) -> None:
+        """지인 검색(`GET /users/search`) 노출 여부를 바꾼다."""
+
+    @abstractmethod
+    def search_by_nickname(
+        self, *, q: str, exclude_user_id: UUID, limit: int
+    ) -> list[UserEntity]:
+        """닉네임 부분일치, `is_nickname_searchable=true`인 사람만.
+
+        `exclude_user_id`는 검색하는 본인 — 자기 자신은 지인으로 못 걸므로
+        결과에서 아예 뺀다. 페이지네이션은 없다 — 대신 `limit`으로 잘라
+        전수 스크래핑을 막는다(미결 `jin` 35번).
+        """
+
+    @abstractmethod
+    def find_contact(
+        self, user_a: UUID, user_b: UUID
+    ) -> UserContactEntity | None:
+        """두 사람 사이의 지인 신청 건. 방향과 무관하게(누가 신청했든) 찾는다.
+
+        방향 무관인 이유: A가 이미 B에게 신청했는데 B가 몰라서 B가 A에게 또
+        신청하면 같은 관계가 행 두 개가 된다 — 신청 전에 항상 이걸로 먼저 본다.
+        """
+
+    @abstractmethod
+    def find_contact_by_id(self, contact_id: UUID) -> UserContactEntity | None: ...
+
+    @abstractmethod
+    def create_contact_request(
+        self, requester_id: UUID, target_id: UUID, note: str | None
+    ) -> UserContactEntity:
+        """신청을 만들고, 대상에게 `notification`(type=`contact_request`)을 함께 남긴다.
+
+        `notification`은 다른 컨텍스트의 테이블이라 임포트하지 않고 `table()`/
+        `column()` 원시 쓰기로 넣는다 — `match`가 남의 테이블을 원시 쿼리로
+        **읽는** 것과 같은 경계 판단을 **쓰기**에도 그대로 적용한다. 알림
+        생성과 신청 생성이 **같은 트랜잭션**이어야 신청은 됐는데 알림만 빠지는
+        일이 없다.
+        """
+
+    @abstractmethod
+    def accept_contact_request(self, contact_id: UUID) -> UserContactEntity:
+        """대기중인 신청을 수락하고, 신청자에게 `notification`(type=`contact_accepted`)을 남긴다."""
+
+    @abstractmethod
+    def list_accepted_contacts(self, user_id: UUID) -> list[UserContactSummary]:
+        """내가 신청자든 대상이든, 수락된 관계의 **상대방**을 돌려준다.
+
+        `note`는 내가 신청자일 때만 함께 준다 — 상대가 쓴 적 없는 내 개인
+        메모라 상대 시점에서는 뜻이 없다(미결 `jin` 35번, 「하지 말 것」).
+        """
+
+    @abstractmethod
+    def list_incoming_contact_requests(
+        self, user_id: UUID
+    ) -> list[UserContactEntity]:
+        """내가 대상이고 아직 수락 안 한 신청 목록. 수락 화면이 이걸 본다."""

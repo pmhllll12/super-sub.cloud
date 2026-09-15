@@ -27,7 +27,7 @@ def account(db_client, db_session):
     email = f"revoke-{uuid.uuid4().hex[:12]}@super-sub.example"
     signup = db_client.post(
         f"{V1}/auth/signup",
-        json={"email": email, "password": PASSWORD, "nickname": "폐기시험"},
+        json={"email": email, "password": PASSWORD, "nickname": f"폐기시험{uuid.uuid4().hex[:6]}"},
     )
     assert signup.status_code == 201, signup.text
     user_id = uuid.UUID(signup.json()["id"])
@@ -80,7 +80,7 @@ class TestRevocation:
         other_email = f"other-{uuid.uuid4().hex[:12]}@super-sub.example"
         signup = db_client.post(
             f"{V1}/auth/signup",
-            json={"email": other_email, "password": PASSWORD, "nickname": "구경꾼"},
+            json={"email": other_email, "password": PASSWORD, "nickname": f"구경꾼{uuid.uuid4().hex[:6]}"},
         )
         assert signup.status_code == 201
         other_id = uuid.UUID(signup.json()["id"])

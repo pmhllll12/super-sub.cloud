@@ -80,7 +80,7 @@ def owned(db_client, db_session):
     email = f"report-read-{uuid.uuid4().hex[:12]}@super-sub.example"
     signup = db_client.post(
         f"{V1}/auth/signup",
-        json={"email": email, "password": PASSWORD, "nickname": "업로더"},
+        json={"email": email, "password": PASSWORD, "nickname": f"업로더{uuid.uuid4().hex[:6]}"},
     )
     assert signup.status_code == 201, signup.text
     user_id = uuid.UUID(signup.json()["id"])
@@ -226,7 +226,7 @@ def test_남의_영상이면_404_VIDEO_NOT_FOUND(db_client, db_session, owned):
     other_email = f"other-{uuid.uuid4().hex[:12]}@super-sub.example"
     db_client.post(
         f"{V1}/auth/signup",
-        json={"email": other_email, "password": PASSWORD, "nickname": "남"},
+        json={"email": other_email, "password": PASSWORD, "nickname": f"남{uuid.uuid4().hex[:6]}"},
     )
     login = db_client.post(
         f"{V1}/auth/login", json={"email": other_email, "password": PASSWORD}

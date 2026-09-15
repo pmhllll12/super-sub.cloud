@@ -25,6 +25,9 @@ _OBJECTS: dict[str, int] = {}
 _BLOBS: dict[str, bytes] = {}
 # 스텁은 `player_card` 를 모른다 — 검사가 "이 슬러그는 이 사람 카드"라고 알려 준다.
 _CARD_SLUGS: dict[str, UUID] = {}
+# 스텁은 `user` 도 모른다 — 검사가 "이 사람은 이 닉네임"이라고 알려 준다
+# (`paik` 16번, `uploader_info`).
+_NICKNAMES: dict[UUID, str] = {}
 
 
 def reset_videos() -> None:
@@ -32,6 +35,7 @@ def reset_videos() -> None:
     _OBJECTS.clear()
     _BLOBS.clear()
     _CARD_SLUGS.clear()
+    _NICKNAMES.clear()
 
 
 def put_blob(storage_key: str, data: bytes) -> None:
@@ -42,6 +46,11 @@ def put_blob(storage_key: str, data: bytes) -> None:
 def register_card_slug(public_slug: str, user_id: UUID) -> None:
     """`find_featured_by_card_slug` 가 슬러그→user_id 를 풀 수 있게 한다(미결 `paik` 10번)."""
     _CARD_SLUGS[public_slug] = user_id
+
+
+def register_nickname(user_id: UUID, nickname: str) -> None:
+    """`uploader_info` 가 user_id→닉네임을 풀 수 있게 한다(`paik` 16번)."""
+    _NICKNAMES[user_id] = nickname
 
 
 def put_object(storage_key: str, size_bytes: int) -> None:
@@ -135,6 +144,16 @@ class StubVideoRepository(VideoPort):
         public = [v for v in _VIDEOS.values() if v.is_public and v.kept]
         public.sort(key=lambda v: v.created_at, reverse=True)
         return public[:limit]
+
+    def uploader_info(
+        self, user_ids: list[UUID]
+    ) -> dict[UUID, tuple[str, str | None]]:
+        slug_by_user = {v: k for k, v in _CARD_SLUGS.items()}
+        return {
+            uid: (_NICKNAMES[uid], slug_by_user.get(uid))
+            for uid in user_ids
+            if uid in _NICKNAMES
+        }
 
     def mark_kept(
         self, video_id: UUID, user_id: UUID, *, storage_key: str

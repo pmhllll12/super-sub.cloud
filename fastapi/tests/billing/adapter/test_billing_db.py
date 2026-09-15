@@ -46,7 +46,7 @@ def user(db_session):
             'insert into "user" (id, email, nickname, created_at, token_version) '
             "values (:i, :e, :n, now(), 0)"
         ),
-        {"i": user_id, "e": f"bill-{user_id}@example.test", "n": "과금검사"},
+        {"i": user_id, "e": f"bill-{user_id}@example.test", "n": f"과금검사{uuid.uuid4().hex[:6]}"},
     )
     db_session.commit()
     yield user_id

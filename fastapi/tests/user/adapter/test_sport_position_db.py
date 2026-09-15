@@ -165,7 +165,7 @@ class TestPositionsEndpoint:
         email = f"pos-{uuid.uuid4().hex[:12]}@super-sub.example"
         db_client.post(
             f"{V1}/auth/signup",
-            json={"email": email, "password": "supersub2026", "nickname": "포지션"},
+            json={"email": email, "password": "supersub2026", "nickname": f"포지션{uuid.uuid4().hex[:6]}"},
         )
         login = db_client.post(
             f"{V1}/auth/login",

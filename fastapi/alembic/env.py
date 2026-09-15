@@ -32,6 +32,7 @@ from app.user.adapter.outbound.orm import position_orm  # noqa: E402,F401
 from app.user.adapter.outbound.orm import sport_orm  # noqa: E402,F401
 from app.user.adapter.outbound.orm import team_member_orm  # noqa: E402,F401
 from app.user.adapter.outbound.orm import team_orm  # noqa: E402,F401
+from app.user.adapter.outbound.orm import user_contact_orm  # noqa: E402,F401
 from app.user.adapter.outbound.orm import user_credential_orm  # noqa: E402,F401
 from app.user.adapter.outbound.orm import user_identity_orm  # noqa: E402,F401
 from app.card.adapter.outbound.orm import player_card_orm  # noqa: E402,F401
@@ -46,6 +47,7 @@ from app.analysis.adapter.outbound.orm import analysis_metric_orm  # noqa: E402,
 from app.analysis.adapter.outbound.orm import analysis_metric_value_orm  # noqa: E402,F401
 from app.analysis.adapter.outbound.orm import analysis_report_orm  # noqa: E402,F401
 from app.analysis.adapter.outbound.orm import metric_definition_orm  # noqa: E402,F401
+from app.analysis.adapter.outbound.orm import reference_player_orm  # noqa: E402,F401
 from app.analysis.adapter.outbound.orm import video_orm  # noqa: E402,F401
 from app.analysis.adapter.outbound.orm import (  # noqa: E402,F401
     video_validation_orm,
@@ -54,6 +56,9 @@ from app.match.adapter.outbound.orm import (  # noqa: E402,F401
     match_application_orm,
 )
 from app.match.adapter.outbound.orm import match_orm  # noqa: E402,F401
+from app.match.adapter.outbound.orm import (  # noqa: E402,F401
+    team_match_request_orm,
+)
 from app.review.adapter.outbound.orm import no_show_orm  # noqa: E402,F401
 from app.review.adapter.outbound.orm import report_orm  # noqa: E402,F401
 from app.review.adapter.outbound.orm import review_option_orm  # noqa: E402,F401
@@ -65,6 +70,13 @@ from app.match.adapter.outbound.orm import (  # noqa: E402,F401
 from app.billing.adapter.outbound.orm import analysis_credit_orm  # noqa: E402,F401
 from app.billing.adapter.outbound.orm import coach_orm  # noqa: E402,F401
 from app.billing.adapter.outbound.orm import coach_referral_orm  # noqa: E402,F401
+from app.notification.adapter.outbound.orm import notification_orm  # noqa: E402,F401
+from app.user.adapter.outbound.orm import region_orm  # noqa: E402,F401
+from app.match.adapter.outbound.orm import team_match_region_orm  # noqa: E402,F401
+from app.match.adapter.outbound.orm import team_match_slot_orm  # noqa: E402,F401
+from app.match.adapter.outbound.orm import member_match_region_orm  # noqa: E402,F401
+from app.match.adapter.outbound.orm import member_match_slot_orm  # noqa: E402,F401
+from app.match.adapter.outbound.orm import member_match_position_orm  # noqa: E402,F401
 # ---------------------------------------------------------------------------
 
 config = context.config

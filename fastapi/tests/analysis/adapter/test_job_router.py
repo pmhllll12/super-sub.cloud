@@ -21,6 +21,7 @@ from uuid import uuid4
 import pytest
 
 from app.analysis.adapter.outbound.stub.job_stub_repository import (
+    detection_result_of,
     enqueue,
     failure_reason_of,
     report_key_of,
@@ -119,6 +120,8 @@ class TestClaim:
             "subject_at_ms": None,
             # 없으면 null — 「전체적으로」 (미결 `paik` 8번).
             "focus": None,
+            # 미결 `ho` 44번 — `enqueue()` 기본값은 `analyze`다.
+            "job_type": "analyze",
         }
 
     def test_집으면_running_이_된다(self, client):
@@ -349,6 +352,34 @@ class TestReclaim:
         ).status_code == 204
         assert status_of(job_id) == "succeeded"
         assert failure_reason_of(job_id) is None
+
+
+class TestDetectJobType:
+    """미결 `ho` 44번 — `detect` 작업도 같은 클레임/완료 경로를 쓴다."""
+
+    def test_detect_작업의_job_type이_claim_응답에_실린다(self, client):
+        job_id = uuid4()
+        enqueue(job_id, uuid4(), job_type="detect")
+
+        body = client.post(CLAIM, headers=_hdr()).json()
+        assert body["job_type"] == "detect"
+
+    def test_detect_결과를_finish에_실을_수_있다(self, client):
+        job_id = uuid4()
+        enqueue(job_id, uuid4(), job_type="detect")
+        assert client.post(CLAIM, headers=_hdr()).status_code == 200
+
+        result = {
+            "people": [{"box": [0.1, 0.2, 0.1, 0.3], "score": 0.9}],
+            "ball": None,
+        }
+        res = client.patch(
+            _job(job_id),
+            json={"status": "succeeded", "detection_result": result},
+            headers=_hdr(),
+        )
+        assert res.status_code == 204
+        assert detection_result_of(job_id) == result
 
 
 class TestProvisionalSweep:

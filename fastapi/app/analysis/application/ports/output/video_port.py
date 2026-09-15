@@ -119,6 +119,19 @@ class VideoPort(ABC):
         """
 
     @abstractmethod
+    def uploader_info(
+        self, user_ids: list[UUID]
+    ) -> dict[UUID, tuple[str, str | None]]:
+        """영상 소유자들의 표시 정보 — `{user_id: (닉네임, 카드 공개 슬러그)}`.
+
+        `paik` 16번(공개 목록에 업로더가 없어 남의 영상이 내 이름으로 보이던
+        문제). 닉네임은 모든 사용자가 갖고(now 유일 제약도 걸림), 카드는 만든
+        사람만 있어 슬러그는 `None`일 수 있다 — 화면은 슬러그가 있을 때만
+        카드로 링크를 건다. `user`·`card` 컨텍스트를 원시 쿼리로만 읽는다
+        (경계 유지, 위 파일 docstring 참조).
+        """
+
+    @abstractmethod
     def resolve_user(self, identifier: str) -> UserRef | None:
         """`user.id`(UUID 문자열) 또는 이메일로 사람을 찾는다(미결 `jin` 24번
         관리자 영상 목록). `sport_exists` 처럼 `user` 컨텍스트를 임포트하지 않고

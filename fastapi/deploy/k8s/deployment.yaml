@@ -1,0 +1,46 @@
+# 정본은 서버에서 실제로 도는 Deployment다(`ssh supersub 'sudo k3s kubectl get deploy
+# supersub-api-trial -o yaml'`) — 이 파일은 2026.09.15에 그 실물을 그대로 옮겨 적은
+# 것이다(미결 `jin` 32번). 이름·네임스페이스가 "트라이얼" 그대로인 것도 실물 그대로다 —
+# 정리는 이번 범위 밖이라 하지 않았다(위 CLAUDE.md 「하지 말 것」).
+#
+# 적용 전에 supersub-api-env(설정)·dockerhub-cred(이미지 pull) Secret이 먼저
+# 있어야 한다 — `../../docs/deployment.md` 2절 참고.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supersub-api-trial
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: supersub-api-trial
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: supersub-api-trial
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      imagePullSecrets:
+        - name: dockerhub-cred
+      initContainers:
+        - name: migrate
+          image: pmhllll12/supersub:latest
+          imagePullPolicy: Always
+          command: ["alembic", "upgrade", "head"]
+          envFrom:
+            - secretRef:
+                name: supersub-api-env
+      containers:
+        - name: supersub-api-trial
+          image: pmhllll12/supersub:latest
+          imagePullPolicy: Always
+          command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: supersub-api-env

@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from sqlalchemy import column, func, or_, select, table, update
+from sqlalchemy import column, func, insert, or_, select, table, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -20,15 +20,21 @@ from app.core.errors import ApiError
 from app.core.password import PasswordTooLongError, hash_password, verify_password
 from app.user.adapter.outbound.mappers.user_mapper import (
     to_membership_entity,
+    to_user_contact_entity,
     to_user_entity,
 )
 from app.user.adapter.outbound.orm.team_member_orm import TeamMemberOrm
 from app.user.adapter.outbound.orm.team_orm import TeamOrm
+from app.user.adapter.outbound.orm.user_contact_orm import UserContactOrm
 from app.user.adapter.outbound.orm.user_credential_orm import UserCredentialOrm
 from app.user.adapter.outbound.orm.user_identity_orm import UserIdentityOrm
 from app.user.adapter.outbound.orm.user_orm import UserOrm
 from app.user.application.ports.output.user_port import UserPort
 from app.user.domain.entities.membership_entity import MembershipEntity
+from app.user.domain.entities.user_contact_entity import (
+    UserContactEntity,
+    UserContactSummary,
+)
 from app.user.domain.entities.user_entity import UserEntity
 from app.user.domain.value_objects.email_vo import Email
 from app.user.domain.value_objects.nickname_vo import Nickname
@@ -42,6 +48,14 @@ _UNIQUE_VIOLATION = "23505"
 
 def _is_unique_violation(exc: IntegrityError) -> bool:
     return getattr(getattr(exc, "orig", None), "sqlstate", None) == _UNIQUE_VIOLATION
+
+
+def _constraint_name(exc: IntegrityError) -> str | None:
+    """어느 유일 제약이 걸렸는지. `email`·`nickname` 둘 다 이 테이블에 있어서
+    (2026.09.15, `uq_user_nickname` 추가) `_is_unique_violation`만으로는 어느
+    쪽인지 못 가른다 — 이름을 봐야 한다."""
+    diag = getattr(getattr(exc, "orig", None), "diag", None)
+    return getattr(diag, "constraint_name", None)
 
 
 # LIKE 패턴에서 특별한 뜻을 갖는 문자. 검색어에 들어오면 리터럴로 바꿔야 한다.
@@ -59,6 +73,28 @@ def _escape_like(value: str) -> str:
         .replace("%", f"{_LIKE_ESCAPE}%")
         .replace("_", f"{_LIKE_ESCAPE}_")
     )
+
+# `notification` 은 `notification` 컨텍스트의 테이블이다. 임포트하지 않고
+# 원시 SQL 로 쓴다 — `notification_port.py` docstring 참고. 컬럼 이름이 바뀌면
+# 여기가 조용히 안 맞게 되므로 `tests/user/adapter/test_user_contact_db.py` 가
+# 실제 DB 로 대조한다.
+_notification = table(
+    "notification",
+    column("id"),
+    column("recipient_user_id"),
+    column("type"),
+    column("actor_user_id"),
+    column("subject_type"),
+    column("subject_id"),
+    column("read_at"),
+    column("created_at"),
+)
+
+# `app.notification.domain.rules.notification_rules` 의 값과 같다(컨텍스트끼리
+# 임포트하지 않으므로 값만 복제 — 위 `_UNIQUE_VIOLATION`과 같은 판단).
+_NOTIFY_CONTACT_REQUEST = "contact_request"
+_NOTIFY_CONTACT_ACCEPTED = "contact_accepted"
+_SUBJECT_USER_CONTACT = "user_contact"
 
 
 class UserPgRepository(UserPort):
@@ -103,6 +139,14 @@ class UserPgRepository(UserPort):
             # ⚠️ **IntegrityError 를 통째로 409 로 옮기지 않는다.** 그렇게 했더니
             # 위의 외래키 위반이 "이미 가입된 이메일"로 위장돼서, 신규 이메일까지
             # 409 를 받는 버그를 한참 못 찾았다. 유일 제약 위반만 계약의 409 다.
+            # 🔴 **어느 유일 제약인지도 가른다**(2026.09.15) — `uq_user_nickname`이
+            # 생기기 전에는 이 테이블에 유일 제약이 email 하나뿐이라 안 가려도
+            # 됐다. 안 가르면 닉네임이 겹쳤을 뿐인데 "이미 가입된 이메일"이라고
+            # 잘못 답한다.
+            if _constraint_name(exc) == "uq_user_nickname":
+                raise ApiError(
+                    409, "NICKNAME_ALREADY_EXISTS", "이미 사용 중인 닉네임입니다."
+                ) from exc
             if _is_unique_violation(exc):
                 # 유스케이스가 email_exists 로 먼저 걸러도 동시 요청 두 건은
                 # 통과한다. 유일 제약이 마지막 방어선이다.
@@ -195,6 +239,11 @@ class UserPgRepository(UserPort):
             self._session.commit()
         except IntegrityError as exc:
             self._session.rollback()
+            # 어느 유일 제약인지 가른다 — `create`와 같은 이유(2026.09.15).
+            if _constraint_name(exc) == "uq_user_nickname":
+                raise ApiError(
+                    409, "NICKNAME_ALREADY_EXISTS", "이미 사용 중인 닉네임입니다."
+                ) from exc
             if _is_unique_violation(exc):
                 raise ApiError(
                     409, "EMAIL_ALREADY_EXISTS", "이미 가입된 이메일입니다."
@@ -212,7 +261,17 @@ class UserPgRepository(UserPort):
             # 여기서 던지면 같은 판단이 두 곳에 생긴다.
             return
         row.nickname = str(nickname)
-        self._session.commit()
+        try:
+            self._session.commit()
+        except IntegrityError as exc:
+            self._session.rollback()
+            # `uq_user_nickname`(2026.09.15) 도입 후 — 남이 이미 쓰는 닉네임으로
+            # 바꾸려 하면 여기서 걸린다.
+            if _constraint_name(exc) == "uq_user_nickname":
+                raise ApiError(
+                    409, "NICKNAME_ALREADY_EXISTS", "이미 사용 중인 닉네임입니다."
+                ) from exc
+            raise
 
     def change_password(self, user_id: UUID, password: Password) -> None:
         try:
@@ -313,3 +372,158 @@ class UserPgRepository(UserPort):
         card_table = table("player_card", column("user_id"))
         stmt = select(card_table.c.user_id).where(card_table.c.user_id == user_id)
         return self._session.execute(stmt).first() is not None
+
+    def update_searchable(self, user_id: UUID, is_nickname_searchable: bool) -> None:
+        stmt = (
+            update(UserOrm)
+            .where(UserOrm.id == user_id)
+            .values(is_nickname_searchable=is_nickname_searchable)
+        )
+        self._session.execute(stmt)
+        self._session.commit()
+
+    def search_by_nickname(
+        self, *, q: str, exclude_user_id: UUID, limit: int
+    ) -> list[UserEntity]:
+        pattern = f"%{_escape_like(q)}%"
+        stmt = (
+            select(UserOrm)
+            .where(UserOrm.is_nickname_searchable.is_(True))
+            .where(UserOrm.id != exclude_user_id)
+            .where(UserOrm.nickname.ilike(pattern, escape=_LIKE_ESCAPE))
+            .order_by(UserOrm.nickname)
+            .limit(limit)
+        )
+        rows = self._session.execute(stmt).scalars().all()
+        return [to_user_entity(row) for row in rows]
+
+    def find_contact(
+        self, user_a: UUID, user_b: UUID
+    ) -> UserContactEntity | None:
+        stmt = select(UserContactOrm).where(
+            or_(
+                (UserContactOrm.requester_user_id == user_a)
+                & (UserContactOrm.target_user_id == user_b),
+                (UserContactOrm.requester_user_id == user_b)
+                & (UserContactOrm.target_user_id == user_a),
+            )
+        )
+        row = self._session.execute(stmt).scalars().first()
+        return to_user_contact_entity(row) if row is not None else None
+
+    def find_contact_by_id(self, contact_id: UUID) -> UserContactEntity | None:
+        row = self._session.get(UserContactOrm, contact_id)
+        return to_user_contact_entity(row) if row is not None else None
+
+    def create_contact_request(
+        self, requester_id: UUID, target_id: UUID, note: str | None
+    ) -> UserContactEntity:
+        """신청 생성과 알림 생성을 **같은 트랜잭션**에서 커밋한다.
+
+        `notification` 은 남의 테이블이라(위 `_notification` 참고) 원시 INSERT 로
+        쓴다 — `id`·`created_at` 은 여기서 채운다(그 컨텍스트의 리포지토리를
+        거치지 않으므로 기본값이 안 붙는다).
+        """
+        now = datetime.now(timezone.utc)
+        contact_row = UserContactOrm(
+            id=uuid4(),
+            requester_user_id=requester_id,
+            target_user_id=target_id,
+            note=note,
+            accepted_at=None,
+            created_at=now,
+        )
+        self._session.add(contact_row)
+        try:
+            self._session.flush()
+        except IntegrityError as exc:
+            self._session.rollback()
+            if _is_unique_violation(exc):
+                raise ApiError(
+                    409, "ALREADY_REQUESTED", "이미 신청했거나 지인인 사이입니다."
+                ) from exc
+            raise
+
+        self._session.execute(
+            insert(_notification).values(
+                id=uuid4(),
+                recipient_user_id=target_id,
+                type=_NOTIFY_CONTACT_REQUEST,
+                actor_user_id=requester_id,
+                subject_type=_SUBJECT_USER_CONTACT,
+                subject_id=contact_row.id,
+                read_at=None,
+                created_at=now,
+            )
+        )
+        self._session.commit()
+        return to_user_contact_entity(contact_row)
+
+    def accept_contact_request(self, contact_id: UUID) -> UserContactEntity:
+        row = self._session.get(UserContactOrm, contact_id)
+        now = datetime.now(timezone.utc)
+        row.accepted_at = now
+        self._session.execute(
+            insert(_notification).values(
+                id=uuid4(),
+                recipient_user_id=row.requester_user_id,
+                type=_NOTIFY_CONTACT_ACCEPTED,
+                actor_user_id=row.target_user_id,
+                subject_type=_SUBJECT_USER_CONTACT,
+                subject_id=row.id,
+                read_at=None,
+                created_at=now,
+            )
+        )
+        self._session.commit()
+        self._session.refresh(row)
+        return to_user_contact_entity(row)
+
+    def list_accepted_contacts(self, user_id: UUID) -> list[UserContactSummary]:
+        """상대방을 평평하게 조인해 온다. `note`는 내가 신청자일 때만 싣는다."""
+        as_requester = self._session.execute(
+            select(UserContactOrm, UserOrm.nickname)
+            .join(UserOrm, UserOrm.id == UserContactOrm.target_user_id)
+            .where(UserContactOrm.requester_user_id == user_id)
+            .where(UserContactOrm.accepted_at.isnot(None))
+        ).all()
+        as_target = self._session.execute(
+            select(UserContactOrm, UserOrm.nickname)
+            .join(UserOrm, UserOrm.id == UserContactOrm.requester_user_id)
+            .where(UserContactOrm.target_user_id == user_id)
+            .where(UserContactOrm.accepted_at.isnot(None))
+        ).all()
+
+        summaries = [
+            UserContactSummary(
+                contact_id=contact.id,
+                user_id=contact.target_user_id,
+                nickname=nickname,
+                note=contact.note,
+                accepted_at=contact.accepted_at,
+            )
+            for contact, nickname in as_requester
+        ] + [
+            UserContactSummary(
+                contact_id=contact.id,
+                user_id=contact.requester_user_id,
+                nickname=nickname,
+                note=None,
+                accepted_at=contact.accepted_at,
+            )
+            for contact, nickname in as_target
+        ]
+        summaries.sort(key=lambda s: s.accepted_at, reverse=True)
+        return summaries
+
+    def list_incoming_contact_requests(
+        self, user_id: UUID
+    ) -> list[UserContactEntity]:
+        stmt = (
+            select(UserContactOrm)
+            .where(UserContactOrm.target_user_id == user_id)
+            .where(UserContactOrm.accepted_at.is_(None))
+            .order_by(UserContactOrm.created_at.desc())
+        )
+        rows = self._session.execute(stmt).scalars().all()
+        return [to_user_contact_entity(row) for row in rows]

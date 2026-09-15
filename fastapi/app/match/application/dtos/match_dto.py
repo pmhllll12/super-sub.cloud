@@ -112,6 +112,9 @@ class MatchResult:
     played_at: datetime
     place: str
     needs: list[PositionNeedResult] = field(default_factory=list)
+    opponent_team_id: UUID | None = None
+
+
 @dataclass(frozen=True)
 class ApplyCommand:
     actor_id: UUID
@@ -151,3 +154,54 @@ class ApplicationResult:
     team_accepted_at: datetime | None
     user_accepted_at: datetime | None
     confirmed: bool
+
+
+# ---------------------------------------------------------------------------
+# 팀 대 팀 경기 신청 (`team_match_request`). `paik` 17번.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class CreateTeamMatchRequestCommand:
+    actor_id: UUID
+    requester_team_id: UUID
+    target_team_id: UUID
+    proposed_played_at: datetime
+    proposed_place: str
+
+
+@dataclass(frozen=True)
+class RespondTeamMatchRequestCommand:
+    """수락·거절이 같은 모양이다 — 둘 다 "그 팀 주장이 대기중 신청 하나에
+    답한다"는 같은 일이라서다. 실제 처리(만들 match·알림)만 갈린다.
+    """
+
+    actor_id: UUID
+    team_id: UUID
+    request_id: UUID
+
+
+@dataclass(frozen=True)
+class CancelTeamMatchRequestCommand:
+    actor_id: UUID
+    team_id: UUID
+    request_id: UUID
+
+
+@dataclass(frozen=True)
+class TeamMatchRequestsQuery:
+    actor_id: UUID
+    team_id: UUID
+
+
+@dataclass(frozen=True)
+class TeamMatchRequestResult:
+    id: UUID
+    requester_team_id: UUID
+    target_team_id: UUID
+    proposed_played_at: datetime
+    proposed_place: str
+    status: str
+    created_at: datetime
+    responded_at: datetime | None
+    match_id: UUID | None

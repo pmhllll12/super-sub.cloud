@@ -37,10 +37,11 @@ def card(db_client, db_session):
 
     시드된 데모 데이터에 기대지 않는다 — 기대면 테스트가 시드 실행 여부에 묶인다.
     """
+    nickname = f"카드주인{uuid.uuid4().hex[:6]}"
     email = f"card-{uuid.uuid4().hex[:12]}@super-sub.example"
     signup = db_client.post(
         f"{V1}/auth/signup",
-        json={"email": email, "password": PASSWORD, "nickname": "카드주인"},
+        json={"email": email, "password": PASSWORD, "nickname": nickname},
     )
     assert signup.status_code == 201, signup.text
     user_id = uuid.UUID(signup.json()["id"])
@@ -94,6 +95,7 @@ def card(db_client, db_session):
 
     yield {
         "email": email,
+        "nickname": nickname,
         "slug": slug,
         "card_id": str(card_id),
         "headers": {"Authorization": f"Bearer {login.json()['access_token']}"},
@@ -116,10 +118,11 @@ def card(db_client, db_session):
 @pytest.fixture
 def fresh_account(db_client, db_session):
     """카드가 **없는** 계정 하나. 끝나면 카드까지 지운다."""
+    nickname = f"새사람{uuid.uuid4().hex[:6]}"
     email = f"newcard-{uuid.uuid4().hex[:12]}@super-sub.example"
     signup = db_client.post(
         f"{V1}/auth/signup",
-        json={"email": email, "password": PASSWORD, "nickname": "새사람"},
+        json={"email": email, "password": PASSWORD, "nickname": nickname},
     )
     assert signup.status_code == 201, signup.text
     user_id = uuid.UUID(signup.json()["id"])
@@ -130,6 +133,7 @@ def fresh_account(db_client, db_session):
 
     yield {
         "user_id": user_id,
+        "nickname": nickname,
         "headers": {"Authorization": f"Bearer {login.json()['access_token']}"},
     }
 
@@ -153,15 +157,16 @@ class TestMyCardFromDb:
         컬럼 이름이 바뀌면 파이썬이 못 잡는다 — 여기가 유일한 방어선이다.
         """
         body = db_client.get(f"{V1}/me/card", headers=card["headers"]).json()
-        assert body["user"]["nickname"] == "카드주인"
+        assert body["user"]["nickname"] == card["nickname"]
 
     def test_닉네임을_바꾸면_카드에도_반영된다(self, db_client, card):
         """카드가 닉네임을 **복사해 두지 않고** 조인해서 읽는다는 증거다."""
+        new_nickname = f"바뀐주인{uuid.uuid4().hex[:6]}"
         db_client.patch(
-            f"{V1}/me", json={"nickname": "바뀐주인"}, headers=card["headers"]
+            f"{V1}/me", json={"nickname": new_nickname}, headers=card["headers"]
         )
         body = db_client.get(f"{V1}/me/card", headers=card["headers"]).json()
-        assert body["user"]["nickname"] == "바뀐주인"
+        assert body["user"]["nickname"] == new_nickname
 
     def test_호칭이_최신순으로_나온다(self, db_client, card):
         """저장소는 오래된 것부터 준다. 뒤집는 것은 도메인 규칙의 몫이다."""
@@ -176,7 +181,11 @@ class TestMyCardFromDb:
         email = f"nocard-{uuid.uuid4().hex[:10]}@super-sub.example"
         db_client.post(
             f"{V1}/auth/signup",
-            json={"email": email, "password": PASSWORD, "nickname": "카드없음"},
+            json={
+                "email": email,
+                "password": PASSWORD,
+                "nickname": f"카드없음{uuid.uuid4().hex[:6]}",
+            },
         )
         login = db_client.post(
             f"{V1}/auth/login", json={"email": email, "password": PASSWORD}
@@ -272,14 +281,14 @@ class TestCreateMyCardInDb:
         res = db_client.get(f"{V1}/cards/{slug}")
         assert res.status_code == 200, res.text
         # 닉네임이 `user` 테이블에서 읽힌다 — 카드는 복사해 두지 않는다.
-        assert res.json()["user"]["nickname"] == "새사람"
+        assert res.json()["user"]["nickname"] == fresh_account["nickname"]
 
     def test_슬러그가_이름에서_유도되지_않는다(self, db_client, fresh_account):
         """SEC-005 — 이름을 알아도 공개 주소를 맞힐 수 없어야 한다."""
         slug = db_client.post(
             f"{V1}/me/card", headers=fresh_account["headers"]
         ).json()["public_slug"]
-        assert "새사람" not in slug
+        assert fresh_account["nickname"] not in slug
         assert len(slug) >= 16
 
 
