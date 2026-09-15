@@ -7686,27 +7686,17 @@ Prometheus 형식으로 냅니다. **여기까지는 스크레이프하는 것�
 
 - **위치**: `pending-archive.markdown`의 `## jin` 구역으로 이동됨
 
-### 32. `supersub-api-trial` 배포 매니페스트가 저장소에 없습니다 — `~/k3s-trial/`에만 있습니다 (2026-09-11 신설)
+### 32. `supersub-api-trial` 배포 매니페스트가 저장소에 없습니다 — `~/k3s-trial/`에만 있습니다 (2026-09-11 신설) ✅ 해소 (2026.09.15)
 
-`31번`(k3s cutover) 진행 중 발견했습니다. 실제 운영 트래픽을 받는 k3s Deployment가
-저장소 어디에도 커밋돼 있지 않고 서버의 `~/k3s-trial/`에만 있습니다 — 이름도
-`supersub-api-trial`(네임스페이스 `default`)로 "트라이얼" 그대로입니다. 기능은
-`deployment.md`가 설명하는 것과 같습니다(hostNetwork·`:8080`·initContainer가
-`alembic upgrade head`·이미지 `pmhllll12/supersub:latest`).
+서버에서 실제로 돌던 Deployment를 그대로 옮겨 `fastapi/deploy/k8s/deployment.yaml`
+로 커밋(구조가 서버 실물과 동일한지 대조 완료). 이름·네임스페이스는
+`supersub-api-trial`/`default` 그대로 두고(정리는 별도), `deployment.md`의
+`ns: supersub`·`deploy/api` 오기재도 같이 정정. Secret(`supersub-api-env`) 키
+목록은 이미 `.env.example`에 8개 다 있어서(확인 완료) 별도 템플릿은 안 만듦 —
+값은 여전히 서버에만 있고 커밋 안 함.
 
-min 14 원래 6단계 중 **2번**("`fastapi/deploy/k8s/`를 EC2 형태로 정리 — `~/k3s-trial/`
-사본이 갈리기 전에 이걸 정본으로")이 아직 안 된 상태로 보입니다. 지금 당장 서비스에
-영향은 없지만(파드는 정상 동작 중), **서버가 사라지거나 재구성되면 이 매니페스트도
-같이 사라집니다** — git으로 추적되는 게 하나도 없어서 재현 불가능합니다.
-
-| | |
-|---|---|
-| 만족해야 할 성질 | 지금 서버에서 도는 Deployment/Secret 구성이 저장소에 파일로 존재하고, 그걸로 재현 가능할 것. 이름·네임스페이스를 `supersub-api-trial`/`default`로 유지할지 `api`/`supersub`로 정리할지는 자유 |
-| 확인 | `ssh supersub 'sudo k3s kubectl get deploy -o yaml'`과 저장소 파일을 대조 |
-| 하지 말 것 | 지금 도는 파드를 건드리면서 정리하지 않기 — 먼저 있는 그대로 저장소에 옮겨 담고, 이름 등 정리는 그다음 별도로 |
-
-- 상세: `min` 14(원래 2번) · `31번`(이번 cutover) · `www/docs/2026-09-09-K3S-harness.md`
-- **담당**: 정어진 · **제기**: 박민호(31번 진행 중 발견) · **기한**: 급하지 않음 — 다음 배포 관련 작업 때 같이
+- 상세: `fastapi/deploy/k8s/README.md` · `fastapi/docs/deployment.md` 2절
+- **담당**: 정어진 · **제기**: 박민호(31번 진행 중 발견) · **기한**: 해소됨
 
 ##### 관련 사례 하나 더 확인 (2026-09-11)
 
