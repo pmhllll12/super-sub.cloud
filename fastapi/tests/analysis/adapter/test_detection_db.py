@@ -26,15 +26,6 @@ pytestmark = pytest.mark.db
 _ANCIENT = datetime(2000, 1, 1, tzinfo=timezone.utc)
 
 
-def _new_session():
-    from app.core.database import engine_or_none
-
-    engine = engine_or_none()
-    if engine is None:
-        pytest.skip("DATABASE_URL 이 설정되지 않았다")
-    return Session(engine)
-
-
 @pytest.fixture
 def video(db_session):
     """영상 하나. 작업은 각 테스트가 필요한 만큼 직접 만든다."""
@@ -74,8 +65,8 @@ def video(db_session):
     db_session.commit()
 
 
-def test_create_detect_job이_실제로_적재된다(db_session, video):
-    job_id = JobPgRepository(_new_session()).create_detect_job(video, at_ms=2500)
+def test_create_detect_job이_실제로_적재된다(db_session, video, new_session_factory):
+    job_id = JobPgRepository(new_session_factory()).create_detect_job(video, at_ms=2500)
 
     db_session.expire_all()
     row = db_session.get(AnalysisJobOrm, job_id)
@@ -87,7 +78,7 @@ def test_create_detect_job이_실제로_적재된다(db_session, video):
     assert row.subject_box is None       # detect 는 박스가 없다
 
 
-def test_get_latest_detection이_가장_최근_것을_돌려준다(db_session, video):
+def test_get_latest_detection이_가장_최근_것을_돌려준다(db_session, video, new_session_factory):
     older = AnalysisJobOrm(
         id=uuid.uuid4(),
         video_id=video,
@@ -108,12 +99,12 @@ def test_get_latest_detection이_가장_최근_것을_돌려준다(db_session, v
     db_session.add(newer)
     db_session.commit()
 
-    found = JobPgRepository(_new_session()).get_latest_detection(video)
+    found = JobPgRepository(new_session_factory()).get_latest_detection(video)
     assert found is not None
     assert found.job_id == newer.id
 
 
-def test_analyze_작업은_get_latest_detection에_안_걸린다(db_session, video):
+def test_analyze_작업은_get_latest_detection에_안_걸린다(db_session, video, new_session_factory):
     analyze_job = AnalysisJobOrm(
         id=uuid.uuid4(),
         video_id=video,
@@ -124,10 +115,10 @@ def test_analyze_작업은_get_latest_detection에_안_걸린다(db_session, vid
     db_session.add(analyze_job)
     db_session.commit()
 
-    assert JobPgRepository(_new_session()).get_latest_detection(video) is None
+    assert JobPgRepository(new_session_factory()).get_latest_detection(video) is None
 
 
-def test_claim과_finish가_detect_결과를_왕복시킨다(db_session, video):
+def test_claim과_finish가_detect_결과를_왕복시킨다(db_session, video, new_session_factory):
     """전체 흐름 — 큐잉 → 집기(`job_type` 보존) → 완료 보고(`detection_result` 저장)."""
     job_id = uuid.uuid4()
     db_session.add(
@@ -142,7 +133,7 @@ def test_claim과_finish가_detect_결과를_왕복시킨다(db_session, video):
     )
     db_session.commit()
 
-    repo = JobPgRepository(_new_session())
+    repo = JobPgRepository(new_session_factory())
     claimed = repo.claim_next()
     assert claimed is not None
     assert claimed.job_id == job_id
