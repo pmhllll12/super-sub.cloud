@@ -1771,6 +1771,59 @@ compare/`의 Pexels 클립)로 재생해 주십시오** — 서버가 재생 주
 
 상세: `fastapi/docs/api-contract.md`(3-14절) · 부록 D 도메인 ②(`reference_player`)
 
+## 42. 팀↔팀 경기 신청·알림·수락이 생겼습니다 (2026-09-15 추가, 미결 `paik` 17번)
+
+`www/src/lib/teamMatch.ts`의 `applyToTeam()`이 1.4초 뒤 `{accepted: true}`를
+돌려주는 가짜였고, `lib/bookedMatches.ts`가 잡힌 경기를 브라우저에만 남기던
+것을 실제 API로 바꿀 수 있습니다. 🔴 **기존 `POST /matches/{id}/applications`
+(개인이 경기에 지원)와는 다른 새 엔드포인트입니다** — 이건 팀이 팀에게 겁니다.
+
+### 만족해야 할 성질
+
+1. **우리 팀이 상대 팀에 경기를 걸 수 있을 것.**
+2. **그 사실이 상대 팀장에게 닿을 것** — 알림(`GET /me/notifications`,
+   `jin` 35번)으로 옵니다.
+3. **수락하면 양쪽 모두에게 확정된 경기 하나가 생길 것** — 기존
+   `GET /teams/{id}/matches`에 그대로 뜹니다(새 목록 아님).
+
+### 새 엔드포인트 (계약 3-15절에 요청/응답 전체가 있습니다)
+
+| 엔드포인트 | 용도 |
+|---|---|
+| `POST /teams/{team_id}/match-requests` | 경기 걸기(대상 팀 id·시각·장소) |
+| `GET /teams/{team_id}/match-requests` | 보낸 것 + 받은 것 목록 |
+| `POST /teams/{team_id}/match-requests/{id}/accept` | 수락 → 확정 경기 생성 |
+| `POST /teams/{team_id}/match-requests/{id}/reject` | 거절 |
+| `DELETE /teams/{team_id}/match-requests/{id}` | 신청 팀이 스스로 무르기 |
+
+### 먼저 확인
+
+```
+grep -n "applyToTeam" www/src/lib/teamMatch.ts
+```
+
+걸리면 아직 가짜 그대로입니다.
+
+### 🔴 하지 말 것
+
+- **한 팀이 여러 신청을 동시에 걸어도 됩니다**(막지 않습니다) — 다만
+  **하나가 수락되면 그 팀의 다른 대기중 신청은 서버가 알아서
+  `cancelled`로 정리합니다**(이중 예약 방지). 화면에서 따로 막을 필요
+  없습니다 — 취소된 신청도 알림·목록 조회로 보입니다.
+- **`GET /matches/{id}` 응답에 `opponent_team_id`가 새로 생겼습니다** —
+  이 필드가 있으면 팀 대 팀 확정 경기라 **모집(`needs`)이 항상 빈
+  배열**입니다. 기존 모집 경기와 같은 화면으로 그리면 빈 모집란이
+  어색해 보일 수 있으니 구분해 주십시오.
+- **경기 취소는 기존 `DELETE /matches/{id}`를 그대로 씁니다** — 새
+  엔드포인트가 아닙니다. 다만 이제 **상대 팀 주장도** 취소할 수
+  있습니다(전엔 주최 쪽만).
+- 신청을 스스로 무르는 것(`DELETE .../match-requests/{id}`)은 알림이
+  안 갑니다 — 자기 행동을 자기에게 알릴 이유가 없어서입니다. 버그가
+  아닙니다.
+
+상세: `fastapi/docs/api-contract.md`(3-15절) · 부록 D 도메인 ④
+(`team_match_request`·`match.opponent_team_id`)
+
 ---
 
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린

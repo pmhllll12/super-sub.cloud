@@ -178,4 +178,8 @@ class TestOpenApi:
             f"{V1}/me/match-preferences",
             V1 + "/teams/{team_id}/members/match-preferences",
             V1 + "/teams/{team_id}/match-candidates",
+            V1 + "/teams/{team_id}/match-requests",
+            V1 + "/teams/{team_id}/match-requests/{request_id}/accept",
+            V1 + "/teams/{team_id}/match-requests/{request_id}/reject",
+            V1 + "/teams/{team_id}/match-requests/{request_id}",
         }

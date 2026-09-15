@@ -16,8 +16,10 @@ from app.match.domain.entities.match_entity import (
     MatchEntity,
     MatchListingEntity,
     PositionNeedEntity,
+    TeamMatchRequestEntity,
 )
 from app.match.domain.rules.application_rules import SIDE_TEAM, SIDE_USER
+from app.match.domain.rules.team_match_request_rules import ACCEPTED, CANCELLED, PENDING, REJECTED
 
 _POSITIONS = {
     "football": {"GK": "골키퍼", "DF": "수비수", "MF": "미드필더", "FW": "공격수"},
@@ -31,6 +33,7 @@ _TEAMS: dict[UUID, str] = {}
 _TEAM_META: dict[UUID, tuple[str, str]] = {}
 _ROLES: dict[tuple[UUID, UUID], str] = {}
 _MATCHES: dict[UUID, MatchEntity] = {}
+_TEAM_MATCH_REQUESTS: dict[UUID, TeamMatchRequestEntity] = {}
 
 
 def reset_matches() -> None:
@@ -40,6 +43,7 @@ def reset_matches() -> None:
     _MATCHES.clear()
     _APPLICATIONS.clear()
     _USERS.clear()
+    _TEAM_MATCH_REQUESTS.clear()
 
 
 def register_team(
@@ -142,6 +146,8 @@ class StubMatchRepository(StubApplicationsMixin, MatchPort):
         for match in _MATCHES.values():
             if match.played_at <= now:
                 continue
+            if match.opponent_team_id is not None:
+                continue  # 팀 대 팀 확정 경기는 모집이 없다 — 탐색에 안 낸다.
             name, team_region = _TEAM_META.get(match.team_id, ("스텁 팀", "서울"))
             if sport_code and _TEAMS.get(match.team_id) != sport_code:
                 continue
@@ -182,7 +188,7 @@ class StubMatchRepository(StubApplicationsMixin, MatchPort):
     def count_applications(self, match_id: UUID) -> int:
         return sum(1 for a in _APPLICATIONS.values() if a.match_id == match_id)
 
-    def delete_match(self, match_id: UUID) -> None:
+    def delete_match(self, match_id: UUID, actor_id: UUID) -> None:
         _MATCHES.pop(match_id, None)
 
     def find_positions(
@@ -209,6 +215,89 @@ class StubMatchRepository(StubApplicationsMixin, MatchPort):
         found = [
             m
             for m in _MATCHES.values()
-            if m.team_id == team_id and m.played_at > now
+            if (m.team_id == team_id or m.opponent_team_id == team_id)
+            and m.played_at > now
         ]
         return sorted(found, key=lambda m: m.played_at)
+
+    # ------------------------------------------------------------------
+    # 팀 대 팀 경기 신청 (`team_match_request`). `paik` 17번.
+    # ------------------------------------------------------------------
+
+    def owner_user_ids(self, team_id: UUID) -> list[UUID]:
+        return [
+            user_id
+            for (t, user_id), role in _ROLES.items()
+            if t == team_id and role == "owner"
+        ]
+
+    def create_team_match_request(self, request: TeamMatchRequestEntity) -> None:
+        """알림 생성은 흉내 내지 않는다 — `notification_stub_repository.py`와
+        같은 철학(알림은 DB 테스트만 본다)."""
+        _TEAM_MATCH_REQUESTS[request.id] = request
+
+    def find_team_match_request(
+        self, request_id: UUID
+    ) -> TeamMatchRequestEntity | None:
+        return _TEAM_MATCH_REQUESTS.get(request_id)
+
+    def list_team_match_requests(
+        self, team_id: UUID
+    ) -> list[TeamMatchRequestEntity]:
+        found = [
+            r
+            for r in _TEAM_MATCH_REQUESTS.values()
+            if r.requester_team_id == team_id or r.target_team_id == team_id
+        ]
+        return sorted(found, key=lambda r: r.created_at, reverse=True)
+
+    def accept_team_match_request(
+        self, request_id: UUID
+    ) -> TeamMatchRequestEntity:
+        row = _TEAM_MATCH_REQUESTS[request_id]
+        now = datetime.now(timezone.utc)
+        match = MatchEntity(
+            id=uuid4(),
+            team_id=row.requester_team_id,
+            opponent_team_id=row.target_team_id,
+            played_at=row.proposed_played_at,
+            place=row.proposed_place,
+        )
+        _MATCHES[match.id] = match
+        row = replace(row, status=ACCEPTED, responded_at=now, match_id=match.id)
+        _TEAM_MATCH_REQUESTS[request_id] = row
+
+        involved = {row.requester_team_id, row.target_team_id}
+        for other_id, other in list(_TEAM_MATCH_REQUESTS.items()):
+            if other_id == request_id or other.status != PENDING:
+                continue
+            if (
+                other.requester_team_id in involved
+                or other.target_team_id in involved
+            ):
+                _TEAM_MATCH_REQUESTS[other_id] = replace(
+                    other, status=CANCELLED, responded_at=now
+                )
+        return row
+
+    def reject_team_match_request(
+        self, request_id: UUID
+    ) -> TeamMatchRequestEntity:
+        row = replace(
+            _TEAM_MATCH_REQUESTS[request_id],
+            status=REJECTED,
+            responded_at=datetime.now(timezone.utc),
+        )
+        _TEAM_MATCH_REQUESTS[request_id] = row
+        return row
+
+    def cancel_team_match_request(
+        self, request_id: UUID
+    ) -> TeamMatchRequestEntity:
+        row = replace(
+            _TEAM_MATCH_REQUESTS[request_id],
+            status=CANCELLED,
+            responded_at=datetime.now(timezone.utc),
+        )
+        _TEAM_MATCH_REQUESTS[request_id] = row
+        return row

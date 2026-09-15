@@ -1250,9 +1250,13 @@ trunk_alignment       2개 루브릭  basketball_jump_shot · basketball_layup  
   "needs": [
     { "position_code": "FW", "position_label": "공격수", "head_count": 2 },
     { "position_code": "GK", "position_label": "골키퍼", "head_count": 1 }
-  ]
+  ],
+  "opponent_team_id": null
 }
 ```
+
+🔴 **`opponent_team_id`가 있으면 팀 대 팀으로 확정된 경기다**(3-15절,
+`paik` 17번) — 이런 경기는 `needs`가 항상 빈 배열이다.
 
 | 에러 | code |
 |---|---|
@@ -2798,6 +2802,82 @@ S3에 없다(EC2 역할이 `videos/` 접두사에 쓰기 권한이 없어 못 �
 
 상세: 부록 D 도메인 ②(`reference_player`) · 클라이언트 반영은
 `docs/client-contract-changes.md`
+
+## 3-15. 팀 대 팀 경기 신청 (2026-09-15 추가 — `paik` 17번)
+
+🔴 **기존 3-4·3-5절(경기 등록·지원)과는 주체가 다르다.** 그쪽은 **팀이 모집
+글을 열고 개인이 지원**하는 것이다. 여기는 **팀이 팀에게** 경기를 걸고
+**상대 팀 주장**이 받는다 — 스쿼드가 다 찬 두 팀이 맞붙는 흐름이다.
+
+수락되면 `match`가 하나 생기고, 그 경기엔 이제 `opponent_team_id`가
+찬다(3-4절 `GET /matches/{id}` 응답에 이 필드가 추가됐다). 이런 경기는
+모집이 필요 없어 `needs`가 항상 빈 배열이고, `GET /matches` 경기 탐색에도
+안 낸다.
+
+### `POST /api/v1/teams/{team_id}/match-requests`
+
+인증 필요. **신청 팀(`team_id`) 주장만.**
+
+```json
+{ "target_team_id": "b3f1...", "played_at": "2026-09-20T10:00:00+09:00", "place": "강남 풋살장" }
+```
+
+`201 Created`:
+
+```json
+{
+  "id": "c2a1...", "requester_team_id": "9a1e...", "target_team_id": "b3f1...",
+  "proposed_played_at": "2026-09-20T10:00:00+09:00", "proposed_place": "강남 풋살장",
+  "status": "pending", "created_at": "2026-09-15T09:00:00Z",
+  "responded_at": null, "match_id": null
+}
+```
+
+대상 팀 주장(들)에게 알림(`team_match_requested`)이 간다.
+
+| 에러 | code |
+|---|---|
+| 403 | `FORBIDDEN` — 신청 팀 주장이 아니다 |
+| 404 | `TEAM_NOT_FOUND` — 신청 팀·대상 팀 어느 쪽이든 |
+| 422 | `CANNOT_REQUEST_SELF` — 같은 팀에 걸었다 |
+| 422 | `PAST_MATCH` |
+
+### `GET /api/v1/teams/{team_id}/match-requests`
+
+인증 필요. **그 팀 주장만.** 그 팀이 **보낸 것 + 받은 것** 전부, 최신순 —
+`TeamMatchRequestResponse`(위) 배열.
+
+### `POST /api/v1/teams/{team_id}/match-requests/{request_id}/accept`
+
+인증 필요. **대상 팀(`team_id`) 주장만.** `status`가 `pending`이 아니면
+`409 TEAM_MATCH_REQUEST_ALREADY_RESPONDED`.
+
+확정 `match`가 생기고(응답의 `match_id`), 신청 팀에 알림
+(`team_match_accepted`)이 간다.
+
+🔴 **동시 확정 방지** — 수락되는 순간 **두 팀(신청·대상) 각각의 다른
+`pending` 신청을 전부 `cancelled`로 정리한다**(한 팀이 여러 곳에 동시에
+걸려 있다가 둘 다 수락되는 이중 예약을 막는다). 정리된 신청의 양쪽 주장
+에게 `team_match_request_cancelled` 알림이 간다.
+
+### `POST /api/v1/teams/{team_id}/match-requests/{request_id}/reject`
+
+인증 필요. **대상 팀 주장만.** 신청 팀에 `team_match_rejected` 알림.
+
+### `DELETE /api/v1/teams/{team_id}/match-requests/{request_id}`
+
+인증 필요. **신청 팀 주장만, `pending`일 때만**(아니면 409). 알림 없음 —
+자기 행동을 자기에게 알릴 이유가 없다. `204`가 아니라 취소된 신청을 그대로
+돌려준다(다른 응답과 같은 모양).
+
+### 확정 경기 취소 — 기존 `DELETE /matches/{match_id}`(3-4절)가 그대로 쓰인다
+
+🔴 **주장 판정이 넓어졌다.** 팀 대 팀 확정 경기는 **주최 팀·상대 팀 어느
+쪽 주장도** 취소할 수 있다(전엔 주최 쪽만). 취소하면 **취소 안 한 쪽** 팀
+주장(들)에게 `team_match_cancelled` 알림이 간다.
+
+상세: 부록 D 도메인 ④(`team_match_request`, `match.opponent_team_id`) ·
+클라이언트 반영은 `docs/client-contract-changes.md`
 
 ---
 

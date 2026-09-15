@@ -12,4 +12,21 @@ from __future__ import annotations
 CONTACT_REQUEST = "contact_request"
 CONTACT_ACCEPTED = "contact_accepted"
 
-KNOWN_TYPES = frozenset({CONTACT_REQUEST, CONTACT_ACCEPTED})
+# `team_match_request`(match 컨텍스트, `paik` 17번)가 만드는 알림 다섯 가지.
+TEAM_MATCH_REQUESTED = "team_match_requested"
+TEAM_MATCH_ACCEPTED = "team_match_accepted"
+TEAM_MATCH_REJECTED = "team_match_rejected"
+TEAM_MATCH_REQUEST_CANCELLED = "team_match_request_cancelled"
+TEAM_MATCH_CANCELLED = "team_match_cancelled"
+
+KNOWN_TYPES = frozenset(
+    {
+        CONTACT_REQUEST,
+        CONTACT_ACCEPTED,
+        TEAM_MATCH_REQUESTED,
+        TEAM_MATCH_ACCEPTED,
+        TEAM_MATCH_REJECTED,
+        TEAM_MATCH_REQUEST_CANCELLED,
+        TEAM_MATCH_CANCELLED,
+    }
+)

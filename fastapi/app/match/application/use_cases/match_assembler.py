@@ -7,9 +7,14 @@ from app.match.application.dtos.match_dto import (
     MatchListingResult,
     MatchResult,
     PositionNeedResult,
+    TeamMatchRequestResult,
 )
 from app.match.domain.entities.application_entity import ApplicationEntity
-from app.match.domain.entities.match_entity import MatchEntity, MatchListingEntity
+from app.match.domain.entities.match_entity import (
+    MatchEntity,
+    MatchListingEntity,
+    TeamMatchRequestEntity,
+)
 
 
 def to_match_result(match: MatchEntity) -> MatchResult:
@@ -26,6 +31,23 @@ def to_match_result(match: MatchEntity) -> MatchResult:
             )
             for n in match.needs
         ],
+        opponent_team_id=match.opponent_team_id,
+    )
+
+
+def to_team_match_request_result(
+    request: TeamMatchRequestEntity,
+) -> TeamMatchRequestResult:
+    return TeamMatchRequestResult(
+        id=request.id,
+        requester_team_id=request.requester_team_id,
+        target_team_id=request.target_team_id,
+        proposed_played_at=request.proposed_played_at,
+        proposed_place=request.proposed_place,
+        status=request.status,
+        created_at=request.created_at,
+        responded_at=request.responded_at,
+        match_id=request.match_id,
     )
 
 
