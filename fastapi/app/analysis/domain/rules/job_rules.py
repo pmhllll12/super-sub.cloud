@@ -22,6 +22,10 @@ RUNNING = "running"
 SUCCEEDED = "succeeded"
 FAILED = "failed"
 
+#: `analysis_job.job_type` (미결 `ho` 44번). `status` 처럼 DB 제약을 안 건다.
+ANALYZE = "analyze"
+DETECT = "detect"
+
 #: 워커가 끝났다고 보고할 수 있는 값. `queued`·`running` 은 여기 없다 —
 #: 그것은 보고가 아니라 진행 상태다.
 TERMINAL = frozenset({SUCCEEDED, FAILED})

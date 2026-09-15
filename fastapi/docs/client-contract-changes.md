@@ -1589,6 +1589,50 @@ grep -n "FRIENDS = \[" www/src/components/SquadFriends.tsx
 
 상세: `fastapi/docs/api-contract.md`(3-12절) · 부록 D 도메인 ①
 (`user_contact`·`notification`)
+
+## 38. "자동으로 고르기"를 실제로 부를 수 있습니다 — `POST`/`GET /videos/{id}/detect` (2026-09-15 추가, 미결 `ho` 44번)
+
+분석 걸기 전 화면(영상에서 분석할 사람을 드래그로 묶는 판)의 "자동으로
+고르기" 버튼이 지금 실제 API를 부를 수 있게 됐습니다.
+
+### 만족해야 할 성질
+
+1. **"자동으로 고르기"를 누르면 검출을 요청할 수 있을 것.**
+2. **결과가 바로 안 와도(폴링) 화면이 자연스러울 것** — GPU가 꺼져 있으면
+   몇 초~몇 분 걸릴 수 있습니다. 지금 분석 진행 체크리스트가 이미 같은 방식
+   (`GET /videos/{id}/report` 폴링)으로 도는 것과 같은 패턴입니다.
+3. **검출된 사람이 0명이어도 실패로 보이지 않을 것** — 그럴 땐 지금 하시던
+   대로 드래그로 넘어가면 됩니다.
+
+### 먼저 확인
+
+```
+grep -n "자동으로 고르기" www/src/components/analysis/AnalysisStage.tsx
+```
+걸리면 그 버튼이 아직 아무 API도 안 부르는 상태인지 확인해 주십시오.
+
+### 흐름
+
+1. `POST /videos/{video_id}/detect` — `202` + `{job_id, status:"queued", ...}`
+2. `GET /videos/{video_id}/detect`를 몇 초 간격으로 폴링 — `status`가
+   `succeeded`가 될 때까지
+3. `succeeded`면 `detection_result.people[].box`(정규화 `[x,y,w,h]`, 0~1)를
+   후보로 보여주고, 사용자가 고르면 **그 값을 그대로** 기존 분석 요청의
+   `subject_box`로 넘기면 됩니다 — 좌표 변환 없습니다
+
+상세(요청/응답 전체 예시): `fastapi/docs/api-contract.md`의
+`POST`/`GET /videos/{video_id}/detect` 절.
+
+### 🔴 하지 말 것
+
+- **검출 결과 0명을 오류로 다루지 마십시오.** `succeeded` + `people: []`가
+  정상입니다 — 드래그 경로로 넘기면 됩니다.
+- **`video_id`마다 검출 요청을 재사용하려 하지 마십시오.** 호출할 때마다
+  새 작업이 생깁니다(분석 작업과 같은 정책) — `GET`은 항상 **가장 최근**
+  것만 봅니다.
+- 워커(정상호 영역) 배선은 아직입니다 — 실제로 검출이 도는지는 그쪽 작업이
+  끝난 뒤에 확인 가능합니다. 지금은 API 형태만 붙이셔도 됩니다.
+
 ---
 
 ## 계약 문서

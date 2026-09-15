@@ -32,3 +32,24 @@ class ClaimedJobEntity:
     subject_at_ms: int | None = None
     # 「집중해서 볼 항목」 (미결 `paik` 8번). 루브릭 criteria id 리스트. 빈/None 이면 「전체」.
     focus: list[str] | None = None
+    # `"analyze"` | `"detect"` (미결 `ho` 44번). `detect`면 `sport_code`·
+    # `subject_box`·`focus`는 워커가 무시하면 된다 — `storage_key`와
+    # `subject_at_ms`(검출할 시각)만 본다.
+    job_type: str = "analyze"
+
+
+@dataclass(frozen=True)
+class DetectionStatusEntity:
+    """지금까지 나온 `detect` 작업 하나의 상태 (미결 `ho` 44번).
+
+    `ClaimedJobEntity`와 다른 자리다 — 이건 워커가 아니라 **화면이** 폴링해서
+    본다("이 작업을 하려면 알아야 할 것"이 아니라 "이 작업이 어떻게 됐는지").
+    """
+
+    job_id: UUID
+    status: str
+    failure_reason: str | None
+    # `{"people": [{"box":[x,y,w,h], "score":...}], "ball": {...}|None}` —
+    # `detect_subjects.py --result-json` 이 낸 것 그대로. `succeeded` 가 아니면
+    # None.
+    detection_result: dict | None

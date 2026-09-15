@@ -8,14 +8,20 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
+from uuid import uuid4
+
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.analysis.adapter.outbound.orm.analysis_job_orm import AnalysisJobOrm
 from app.analysis.adapter.outbound.orm.video_orm import VideoOrm
 from app.analysis.application.ports.output.job_port import JobPort
-from app.analysis.domain.entities.job_entity import ClaimedJobEntity
+from app.analysis.domain.entities.job_entity import (
+    ClaimedJobEntity,
+    DetectionStatusEntity,
+)
 from app.analysis.domain.rules.job_rules import (
+    DETECT,
     FAILED,
     QUEUED,
     RECLAIM_FINAL,
@@ -53,6 +59,7 @@ class JobPgRepository(JobPort):
                 AnalysisJobOrm.subject_box,
                 AnalysisJobOrm.subject_at_ms,
                 AnalysisJobOrm.focus,
+                AnalysisJobOrm.job_type,
             )
         ).first()
 
@@ -61,7 +68,7 @@ class JobPgRepository(JobPort):
             self._session.rollback()
             return None
 
-        job_id, video_id, subject_box, subject_at_ms, focus = claimed
+        job_id, video_id, subject_box, subject_at_ms, focus, job_type = claimed
         video = self._session.get(VideoOrm, video_id)
         if video is None:
             # 외래키가 CASCADE 라 정상 경로에서는 올 수 없다. 그래도 조용히
@@ -80,6 +87,7 @@ class JobPgRepository(JobPort):
             subject_box=subject_box,
             subject_at_ms=subject_at_ms,
             focus=focus,
+            job_type=job_type,
         )
 
     def reclaim_stale(self, timeout_minutes: int) -> tuple[int, int]:
@@ -132,6 +140,7 @@ class JobPgRepository(JobPort):
         status: str,
         failure_reason: str | None,
         report_key: str | None = None,
+        detection_result: dict | None = None,
     ) -> str | None:
         # `running` 일 때만 바꾼다. 조건을 SQL 에 두는 이유는 읽고 나서 쓰면
         # 그 사이에 다른 보고가 끼어들 수 있어서다.
@@ -143,6 +152,7 @@ class JobPgRepository(JobPort):
                 failure_reason=failure_reason,
                 finished_at=datetime.now(timezone.utc),
                 report_key=report_key,
+                detection_result=detection_result,
             )
         ).rowcount
 
@@ -157,3 +167,43 @@ class JobPgRepository(JobPort):
         ).scalar_one_or_none()
         self._session.rollback()
         return current if current is not None else "missing"
+
+    def create_detect_job(self, video_id: UUID, at_ms: int) -> UUID:
+        job_id = uuid4()
+        self._session.add(
+            AnalysisJobOrm(
+                id=job_id,
+                video_id=video_id,
+                job_type=DETECT,
+                status=QUEUED,
+                created_at=datetime.now(timezone.utc),
+                subject_at_ms=at_ms,
+            )
+        )
+        self._session.commit()
+        return job_id
+
+    def get_latest_detection(self, video_id: UUID) -> DetectionStatusEntity | None:
+        row = self._session.execute(
+            select(
+                AnalysisJobOrm.id,
+                AnalysisJobOrm.status,
+                AnalysisJobOrm.failure_reason,
+                AnalysisJobOrm.detection_result,
+            )
+            .where(
+                AnalysisJobOrm.video_id == video_id,
+                AnalysisJobOrm.job_type == DETECT,
+            )
+            .order_by(AnalysisJobOrm.created_at.desc())
+            .limit(1)
+        ).first()
+        if row is None:
+            return None
+        job_id, status, failure_reason, detection_result = row
+        return DetectionStatusEntity(
+            job_id=job_id,
+            status=status,
+            failure_reason=failure_reason,
+            detection_result=detection_result,
+        )

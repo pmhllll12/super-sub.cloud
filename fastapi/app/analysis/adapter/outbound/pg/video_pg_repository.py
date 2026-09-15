@@ -23,6 +23,7 @@ from app.analysis.adapter.outbound.orm.video_validation_orm import VideoValidati
 from app.analysis.application.dtos.video_dto import UNSET, UserRef
 from app.analysis.application.ports.output.video_port import VideoPort
 from app.analysis.domain.entities.video_entity import ValidationEntity, VideoEntity
+from app.analysis.domain.rules.job_rules import ANALYZE
 
 # 소유하지 않는 테이블에서 **읽기만** 한다. 위 docstring 참조.
 _sport = table("sport", column("code"))
@@ -97,6 +98,7 @@ class VideoPgRepository(VideoPort):
                 AnalysisJobOrm(
                     id=video.analysis_job_id,
                     video_id=video.id,
+                    job_type=ANALYZE,
                     status=video.analysis_status,
                     created_at=video.created_at,
                     subject_box=video.subject_box,

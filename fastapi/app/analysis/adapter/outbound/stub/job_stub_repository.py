@@ -10,11 +10,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from app.analysis.application.ports.output.job_port import JobPort
-from app.analysis.domain.entities.job_entity import ClaimedJobEntity
+from app.analysis.domain.entities.job_entity import (
+    ClaimedJobEntity,
+    DetectionStatusEntity,
+)
 from app.analysis.domain.rules.job_rules import (
+    ANALYZE,
+    DETECT,
     FAILED,
     QUEUED,
     RECLAIM_FINAL,
@@ -39,6 +44,8 @@ class _Row:
     subject_box: list[float] | None = None
     subject_at_ms: int | None = None
     focus: list[str] | None = None
+    job_type: str = ANALYZE
+    detection_result: dict | None = None
 
 
 _JOBS: dict[UUID, _Row] = {}
@@ -60,6 +67,7 @@ def enqueue(
     subject_box: list[float] | None = None,
     subject_at_ms: int | None = None,
     focus: list[str] | None = None,
+    job_type: str = ANALYZE,
 ) -> None:
     """검사가 "이런 작업이 큐에 있다"고 알려 준다."""
     _JOBS[job_id] = _Row(
@@ -69,6 +77,7 @@ def enqueue(
         sport_code=sport_code,
         side=side,
         duration_ms=duration_ms,
+        job_type=job_type,
         created_at=created_at or datetime.now(timezone.utc),
         subject_box=subject_box,
         subject_at_ms=subject_at_ms,
@@ -91,6 +100,11 @@ def report_key_of(job_id: UUID) -> str | None:
     return row.report_key if row else None
 
 
+def detection_result_of(job_id: UUID) -> dict | None:
+    row = _JOBS.get(job_id)
+    return row.detection_result if row else None
+
+
 class StubJobRepository(JobPort):
     def claim_next(self) -> ClaimedJobEntity | None:
         waiting = [r for r in _JOBS.values() if r.status == QUEUED]
@@ -109,6 +123,7 @@ class StubJobRepository(JobPort):
             subject_box=row.subject_box,
             subject_at_ms=row.subject_at_ms,
             focus=row.focus,
+            job_type=row.job_type,
         )
 
     def reclaim_stale(self, timeout_minutes: int) -> tuple[int, int]:
@@ -136,6 +151,7 @@ class StubJobRepository(JobPort):
         status: str,
         failure_reason: str | None,
         report_key: str | None = None,
+        detection_result: dict | None = None,
     ) -> str | None:
         row = _JOBS.get(job_id)
         if row is None:
@@ -145,7 +161,39 @@ class StubJobRepository(JobPort):
         row.status = status
         row.failure_reason = failure_reason
         row.report_key = report_key
+        row.detection_result = detection_result
         return None
+
+    def create_detect_job(self, video_id: UUID, at_ms: int) -> UUID:
+        job_id = uuid4()
+        # 대상 영상의 등록값(sport_code 등)이 스텁에 없을 수 있다 — detect
+        # 작업은 워커가 그런 필드를 안 보므로 자리표시자로 채운다.
+        _JOBS[job_id] = _Row(
+            job_id=job_id,
+            video_id=video_id,
+            storage_key="videos/stub/clip.mp4",
+            sport_code="",
+            side=None,
+            duration_ms=None,
+            created_at=datetime.now(timezone.utc),
+            subject_at_ms=at_ms,
+            job_type=DETECT,
+        )
+        return job_id
+
+    def get_latest_detection(self, video_id: UUID) -> DetectionStatusEntity | None:
+        candidates = [
+            r for r in _JOBS.values() if r.video_id == video_id and r.job_type == DETECT
+        ]
+        if not candidates:
+            return None
+        row = max(candidates, key=lambda r: r.created_at)
+        return DetectionStatusEntity(
+            job_id=row.job_id,
+            status=row.status,
+            failure_reason=row.failure_reason,
+            detection_result=row.detection_result,
+        )
 
 
 # 적재는 완료 보고 계약 테스트에는 무관하다 — DB 없이 돌아야 하므로 아무것도

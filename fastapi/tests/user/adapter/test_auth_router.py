@@ -141,6 +141,7 @@ class TestOpenApi:
             V1 + "/videos/{video_id}/keep",
             V1 + "/videos/{video_id}/playback-url",
             V1 + "/videos/{video_id}/report",
+            V1 + "/videos/{video_id}/detect",
             V1 + "/cards/{card_public_slug}/featured-video",
             V1 + "/teams/{team_id}/squad",
             V1 + "/teams/{team_id}/squad/members",
