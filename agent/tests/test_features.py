@@ -595,6 +595,59 @@ def test_an_empty_window_is_refused_not_guessed():
         F.segment_phases(norm, swing, "arm", "extension_peak", window=(3, 3))
 
 
+def test_the_deceleration_search_stays_inside_the_follow_through():
+    """🔴 **지우지 말 것** — 마무리 길이가 **구간 밖**을 읽지 않는지.
+
+    `follow_through_duration_frames` 의 감속 탐색이 `ankle_speed[t:]` 로 **클립
+    끝까지** 갔던 적이 있다(미결 43번 ㉳ 2·3회차, 2026-09-15). 그러면
+
+    - 구간을 주어도 **이 값만** 창 밖을 읽어, 반복 동작에서 **다음 터치의 발
+      속도**를 이번 마무리로 센다 (창 있는 짝의 35%가 그랬다), 그리고
+    - 창이 없어도 **유효 구간 밖**(미검출 프레임)의 발목 움직임을 감속 판정에
+      쓴다 — 평가셋 78산출 중 2개가 그랬다.
+
+    되살아나면 **조용하다**: 값이 커질 뿐 예외도 경고도 없고, 이 값은 밴드가
+    아니라 **근거 문장**으로 나가 점수에도 안 보인다.
+
+    아래 시퀀스는 스윙이 끝까지 감속하지 않으므로 탐색이 **경계까지 간다** —
+    그래서 「구간 길이와 정확히 같다」가 성립하고, 옛 규칙이면 **더 큰 값**이
+    나온다(마지막 단언이 그 여지를 확인한다).
+    """
+    seq = build_sequence()
+    seq[-5:] = 0.0                       # 꼬리 5프레임을 미검출로
+    norm = F.normalize(seq)
+    swing, _ = F.identify_limb(norm, "leg")
+    phases = F.segment_phases(norm, swing, "leg", "extension_peak")
+    ft_end = phases.follow_through[1]
+
+    feats = extract_features(seq)
+
+    assert feats["follow_through_duration_frames"] == ft_end - phases.impact
+    # 계기 검사 — 꼬리가 실제로 남아 있어야 이 검사가 뜻이 있다.
+    assert ft_end < len(seq) - 1
+
+
+def test_a_window_bounds_the_follow_through_length():
+    """구간을 주면 마무리 길이가 **그 구간 안**에서만 세어지는지.
+
+    위 검사의 창 버전이다. 한 영상에 동작이 여럿일 때(미결 45번 ㉲-a) 이것이
+    안 서면 **모든 구간의 마무리 길이가 사실상 같은 값**이 된다 — 창을 걸어도
+    값이 안 변하는 것이 2회차가 관찰한 그 모습이다.
+    """
+    seq = _with_arm_swing(build_sequence(n=81, impact=50))
+    norm = F.normalize(seq)
+    swing, _ = F.identify_limb(norm, "arm")
+    win = (30, 60)
+    phases = F.segment_phases(norm, swing, "arm", "extension_peak", window=win)
+
+    feats = extract_features(seq, impact_limb="arm", window=win)
+
+    assert feats["follow_through_duration_frames"] <= (
+        phases.follow_through[1] - phases.impact
+    )
+    assert phases.impact + feats["follow_through_duration_frames"] < win[1]
+
+
 # --- 프레임 단위 지표의 물리 시간 표기 (미결 7번 E-3) ----------------------
 
 

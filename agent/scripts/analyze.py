@@ -15,6 +15,7 @@ import json
 import statistics
 import sys
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
@@ -40,6 +41,13 @@ def main() -> None:
              "반대쪽 사지는 auto로 남는다 — extract_features 참고",
     )
     ap.add_argument("--fps", type=int, default=DEFAULT_TARGET_FPS)
+    ap.add_argument(
+        "--report", type=Path, default=None, metavar="경로",
+        help="계약 봉투(`report.json` 모양)를 이 자리에 쓴다. 🔴 **`analyze_s3` 와 "
+             "같은 `build_report` 를 쓴다** — 두 벌로 두면 로컬에서 본 봉투와 "
+             "서비스가 내는 봉투가 달라진다. S3 가 없는 자리(로컬 GPU)에서 "
+             "선수 영상처럼 **계약 모양이 필요한 것**을 낼 때 쓴다",
+    )
     ap.add_argument(
         "--repeat", type=int, default=1,
         help="같은 측정값으로 **판정만** N회 반복한다. 🔴 3장 표의 재현성"
@@ -123,6 +131,35 @@ def main() -> None:
         encoding="utf-8",
     )
     print(f"\n저장: {out}")
+
+    if args.report is not None:
+        # 🔴 **`analyze_s3` 의 `build_report` 를 그대로 쓴다.** 봉투를 여기서
+        # 손수 지으면 로컬에서 확인한 모양과 서비스가 내는 모양이 갈리는데,
+        # 그 차이는 **적재할 때에야** 드러난다 (미결 `jin` 27번이 막으려는 것).
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from analyze_s3 import build_report  # noqa: E402
+
+        report = build_report(
+            # 🔴 S3 가 아니라 **로컬 경로**다. 계약은 이 자리에 S3 URI 를 기대하므로
+            #    서비스 리포트와 헷갈리지 않게 `video_id` 를 `null` 로 둔다
+            #    (배치·평가 실행과 같은 규약이다).
+            video=str(args.video),
+            video_id=None,
+            stamp=datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ"),
+            rubric=rubric, rubric_path=args.rubric, swing_side=args.side,
+            focus=None, target_fps=args.fps, pose=pose, features=features,
+            result=result,
+            previews={},          # 로컬 경로에는 미리보기를 안 만든다
+            judge_backend=judge.backend, judge_model=judge.model_id,
+            timing={"measure_s": round(measure_s, 2)},
+        )
+        args.report.parent.mkdir(parents=True, exist_ok=True)
+        args.report.write_text(
+            json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        sk = report["skeleton"]
+        print(f"봉투: {args.report}  (schema {report['schema_version']}, "
+              f"skeleton {'있음' if sk.get('known') else '없음 — ' + sk.get('why', '')})")
 
 
 if __name__ == "__main__":

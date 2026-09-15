@@ -30,6 +30,7 @@ from .features import (
     extract_features,
     frame_metrics_as_seconds,
     keypoint_quality_envelope,
+    skeleton_envelope,
     verify_rubric_coverage,
 )
 from .judge import Judge
@@ -211,6 +212,38 @@ def build_subject(pose: "PoseResult | None", frame_count: int) -> dict:
     return subject_envelope(pose, frame_count)
 
 
+def build_skeleton(
+    keypoints: np.ndarray,
+    features: dict,
+    pose: "PoseResult | None",
+    impact_limb: str,
+    swing_side: str,
+) -> dict:
+    """결과 봉투의 `skeleton` 블록. 규칙은 `features.skeleton_envelope` 하나다.
+
+    S3 리포트(`scripts/analyze_s3.py`)도 **같은 함수**를 쓴다 — `subject` 와
+    같은 이유다. 두 벌로 두면 한쪽에만 필드가 늘어나 "어느 경로로 낸
+    결과냐"에 따라 화면이 겹쳐 그리는 자세가 달라진다.
+
+    🔴 합성 키포인트 경로(`pose is None`)에는 소스 영상이 없어 실효 fps 도
+    프레임 크기도 정의되지 않는다 — `build_timebase` 와 같은 규약으로
+    `known: false` 를 낸다. 그럴듯한 기본값을 채워 넣지 않는다.
+    """
+    if pose is None:
+        return {
+            "known": False,
+            "why": "합성 키포인트 경로 — 소스 영상이 없어 실효 fps·프레임 크기가 정의되지 않는다",
+        }
+    return skeleton_envelope(
+        keypoints,
+        float(pose.sampled_fps),
+        features,
+        impact_limb,
+        swing_side,
+        pose.frame_size,
+    )
+
+
 def run_pipeline(
     keypoints: np.ndarray,
     source: str,
@@ -274,6 +307,11 @@ def run_pipeline(
         # 달라 보인다. 여기도 `features`의 형제 블록이다.
         "keypoint_quality": keypoint_quality_envelope(
             keypoints, rubric.impact_limb, swing_side
+        ),
+        # **프레임별 관절과 세 순간** (미결 `paik` 30번). 비교 화면이 겹쳐
+        # 그리는 자리다. S3 리포트와 **같은 함수**를 쓴다.
+        "skeleton": build_skeleton(
+            keypoints, features, pose, rubric.impact_limb, swing_side
         ),
         # 정지화면은 영상의 poster로 쓴다 — 로딩 전에도 자세가 보인다.
         "preview": impact_preview(frames, keypoints, int(features["impact_frame"])),

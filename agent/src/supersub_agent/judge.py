@@ -23,6 +23,7 @@ import json
 import os
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
@@ -442,11 +443,36 @@ class Judge:
 
         도구가 검출되지 않으면 그 항목은 빠진다 — aggregate가 남은 항목으로
         가중치를 재정규화한다.
+
+        **원격(vLLM)일 때는 항목을 동시에 던진다.** 항목당 2~3초가 순차로 쌓여
+        EC2에서 판정만 17초였다(2026-09-03 측정). 서버는 이미 배치를 관리하고
+        있고 우리는 요청을 기다리기만 하므로, 묶어 던지면 가장 느린 항목 하나로
+        줄어든다.
+
+        🔴 **점수는 이것으로 움직일 수 없다.** 등급은 프롬프트를 만들기 전에
+        코드가 정하고(`judge_criterion`의 `grade_for`), 모델이 뭐라 답하든
+        `_validate`가 그 값으로 덮어쓴다. 동시 실행이 바꿀 수 있는 것은
+        `evidence` 문장뿐이고 그건 지금도 실행마다 흔들리는 값이다.
+
+        로컬(transformers)은 순차로 둔다 — 한 GPU에 모델이 하나라 동시에 불러야
+        얻을 것이 없고, outlines·transformers를 여러 스레드에서 부르는 것은
+        안전하다고 보장된 적이 없다.
         """
-        return {
-            c.id: self.judge_criterion(c, features, rubric.sport)
-            for c in rubric.applicable_criteria(features)
-        }
+        criteria = list(rubric.applicable_criteria(features))
+        if not self._remote_ready or len(criteria) < 2:
+            return {
+                c.id: self.judge_criterion(c, features, rubric.sport)
+                for c in criteria
+            }
+
+        with ThreadPoolExecutor(max_workers=len(criteria)) as pool:
+            pending = {
+                c.id: pool.submit(self.judge_criterion, c, features, rubric.sport)
+                for c in criteria
+            }
+            # 순서는 루브릭 순서 그대로다 — dict가 삽입 순서를 지키므로
+            # 리포트의 항목 순서가 동시 실행으로 흔들리지 않는다.
+            return {cid: fut.result() for cid, fut in pending.items()}
 
     # -- 내부 (vLLM) ----------------------------------------------------
     def _generate_remote(self, messages) -> dict[str, Any]:

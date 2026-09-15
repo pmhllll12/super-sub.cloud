@@ -1,0 +1,386 @@
+{
+ "written_at": "2026-09-15T02:11:57+00:00",
+ "device": "cuda",
+ "git": {
+  "commit": "17345c307b3db2c7acaf927508b9707b1ad034b6",
+  "branch": "ho",
+  "dirty": false,
+  "dirty_scope": [
+   "src",
+   "rubrics",
+   "eval/phaseA"
+  ]
+ },
+ "env": {
+  "python": "3.12.13",
+  "torch": "2.8.0+cu126",
+  "cuda": "12.6",
+  "cudnn": 91002,
+  "transformers": "5.15.1",
+  "opencv": "5.0.0",
+  "numpy": "2.5.2",
+  "gpu": "NVIDIA GeForce RTX 3050",
+  "cudnn_deterministic": false,
+  "cudnn_benchmark": false,
+  "cudnn_allow_tf32": true,
+  "matmul_allow_tf32": false
+ },
+ "models": {
+  "pose": {
+   "repo": "usyd-community/vitpose-base-simple",
+   "revision": "a93ac0c67e0b7e2c55287d21d4c460c8f3c54d45"
+  },
+  "detector": {
+   "repo": "PekingU/rtdetr_r50vd_coco_o365",
+   "revision": "457857cec8ac28ddede40ecee9eed2beca321af8"
+  }
+ },
+ "constants": {
+  "target_fps": 30,
+  "max_batch": 24,
+  "det_threshold": 0.5,
+  "modes": [
+   "baseline",
+   "A",
+   "B",
+   "A_pose",
+   "B_pose"
+  ],
+  "track1_kinematics": [
+   "arm",
+   "extension_peak"
+  ]
+ },
+ "batching": {
+  "oom_events": 0,
+  "min_batch": 24
+ },
+ "timing": {
+  "track1_seconds": 308.5,
+  "track2_seconds": 115.8,
+  "total_seconds": 424.3,
+  "track1_clips": 39,
+  "track2_clips": 19
+ },
+ "outputs": {
+  "selector_downstream_comparison.csv": {
+   "md5": "e2150ef89909dbf1cbce43973b21d5b4",
+   "bytes": 42520
+  },
+  "selector_downstream_rubric_clips.csv": {
+   "md5": "21051a6a37514713b5d3555a79bc4a22",
+   "bytes": 19672
+  }
+ },
+ "inputs": {
+  "track1": [
+   {
+    "name": "0Fet8TyoNR4.mp4",
+    "bytes": 6791968,
+    "md5": "dcedfd9826249efa1fc89ec956debc3f"
+   },
+   {
+    "name": "3R1kvNrGJK0.mp4",
+    "bytes": 8772364,
+    "md5": "e06f566ad385ad827d4b94beea601bdc"
+   },
+   {
+    "name": "3USSmzO001k.mp4",
+    "bytes": 7633217,
+    "md5": "683e249ec230d14413491cbf0769a3fa"
+   },
+   {
+    "name": "5-jBTNp5IQA.mp4",
+    "bytes": 5785272,
+    "md5": "4930f0c63f7a72a893ac3451ff675995"
+   },
+   {
+    "name": "6hrcRyIYTrA.mp4",
+    "bytes": 5842140,
+    "md5": "de3b438ad26092dc16c88250747d17eb"
+   },
+   {
+    "name": "8gmHKqDxXdg.mp4",
+    "bytes": 312535,
+    "md5": "4aca4f599378e7386e49557180a00598"
+   },
+   {
+    "name": "Atzrde5uGcM.mp4",
+    "bytes": 1199870,
+    "md5": "8038db7c1d0bad333d64a76211abbef4"
+   },
+   {
+    "name": "C7icGyrdROM.mp4",
+    "bytes": 294268,
+    "md5": "1db8037a066666a590fdd2e2e827a5f2"
+   },
+   {
+    "name": "CFjNxCZhn_8.mp4",
+    "bytes": 8062702,
+    "md5": "f34bcbe651afbe9335e2daa90d50de8d"
+   },
+   {
+    "name": "Fz16t9SrF3U.mp4",
+    "bytes": 5395065,
+    "md5": "248e92a40bef5a040c4c5f3f06d7e4ff"
+   },
+   {
+    "name": "GS-PcxmaHmQ.mp4",
+    "bytes": 1514825,
+    "md5": "79719af1895dbd8526af8c9f527eadb5"
+   },
+   {
+    "name": "IYFifBJ9lH8.mp4",
+    "bytes": 1999697,
+    "md5": "15e42089668f0127b10171ea4712a6b9"
+   },
+   {
+    "name": "IeDin6oB-IY.mp4",
+    "bytes": 3372794,
+    "md5": "05a4da538ef02eaf48c740447d52e1ce"
+   },
+   {
+    "name": "LXjM7nBZcak.mp4",
+    "bytes": 3899176,
+    "md5": "f2cb587cefb899d2e91295d11af5c339"
+   },
+   {
+    "name": "LhD_fnHt_xg.mp4",
+    "bytes": 10515419,
+    "md5": "3dc805a47c5ee4b0da2e2081fb1b7e37"
+   },
+   {
+    "name": "N5zWQkoLM3M.mp4",
+    "bytes": 3453406,
+    "md5": "31014fb257aa7860a1600e24b48d2910"
+   },
+   {
+    "name": "O2GSaYqH8JY.mp4",
+    "bytes": 13331579,
+    "md5": "9806a6411b2a5debb31c35ce7f66505b"
+   },
+   {
+    "name": "V_whuvMjg_8.mp4",
+    "bytes": 1811252,
+    "md5": "dd834d892836f68c7962b12b717e5da1"
+   },
+   {
+    "name": "X6dC9pu5H3k.mp4",
+    "bytes": 559188,
+    "md5": "51b7322a8aa778c5b3f0a333e837ad6a"
+   },
+   {
+    "name": "YNMHMKb5Md4.mp4",
+    "bytes": 4626860,
+    "md5": "d78012ceb559a7634f339621941129b2"
+   },
+   {
+    "name": "ZMy0t-CSZiU.mp4",
+    "bytes": 965948,
+    "md5": "a024bc0ddb3cfd4900ba0f7ea92bd61b"
+   },
+   {
+    "name": "ZS-wgeg2qkI.mp4",
+    "bytes": 2077227,
+    "md5": "b60bf162431775324a6cfc19cd796ec4"
+   },
+   {
+    "name": "Zp9aDp2YTBw.mp4",
+    "bytes": 593364,
+    "md5": "85fb9b1924e40c4dc9e64b08eea785ef"
+   },
+   {
+    "name": "bh6Cvz2orzQ.mp4",
+    "bytes": 1221295,
+    "md5": "a3f2505a91563c20e5d904625983b709"
+   },
+   {
+    "name": "cDRi9AzrapA.mp4",
+    "bytes": 719520,
+    "md5": "22b67c49ddd961815e31e5b868f64d96"
+   },
+   {
+    "name": "e8uB0GZsVOQ.mp4",
+    "bytes": 6855889,
+    "md5": "bdfb86b2f3554e52bda504fbb8dccabc"
+   },
+   {
+    "name": "g_wHimPF9o8.mp4",
+    "bytes": 1614367,
+    "md5": "cd3c13943ad3cfc1d657e8427818d4b6"
+   },
+   {
+    "name": "gg5xRWjw3f8.mp4",
+    "bytes": 1524991,
+    "md5": "2b583d6b2361b4a44c7d837d525fb64e"
+   },
+   {
+    "name": "goeDWOVL95g.mp4",
+    "bytes": 432039,
+    "md5": "cf765436e289c22442a4d2341db80a0b"
+   },
+   {
+    "name": "h_3LqD2Pl-E.mp4",
+    "bytes": 948489,
+    "md5": "6714f2f470cf6d28e7a7b5bfc1278e0f"
+   },
+   {
+    "name": "hz-SpF35_BE.mp4",
+    "bytes": 542969,
+    "md5": "7db3de8ac6725fbe071cdefad705d93f"
+   },
+   {
+    "name": "idueIYDAbZc.mp4",
+    "bytes": 1472602,
+    "md5": "ce39499f56a73590fba937a80cfe0298"
+   },
+   {
+    "name": "ihWykL5mYRI.mp4",
+    "bytes": 1318203,
+    "md5": "cc28900161487661ef36bbaa5d285bd9"
+   },
+   {
+    "name": "mTP2kap9cIw.mp4",
+    "bytes": 1439319,
+    "md5": "0b30f0875e9b4a3f765909581ef24f63"
+   },
+   {
+    "name": "sGKeqfxwq5E.mp4",
+    "bytes": 917531,
+    "md5": "9308f935beb15dc9caff69164fc49e6d"
+   },
+   {
+    "name": "sYl2jCqsSKo.mp4",
+    "bytes": 2619788,
+    "md5": "573129df98f9da2fc0ed6c3e99fcba20"
+   },
+   {
+    "name": "w-AQcjcoDyA.mp4",
+    "bytes": 10899665,
+    "md5": "b3cf19ef729ecc0340b14827d9576f0d"
+   },
+   {
+    "name": "wjJDs0qmwqE.mp4",
+    "bytes": 4025897,
+    "md5": "934c55a232e6c8cb45badf234c206ebf"
+   },
+   {
+    "name": "xMIUw5mi3Eo.mp4",
+    "bytes": 850170,
+    "md5": "1f9147fde88a23ca0a510e865907e311"
+   }
+  ],
+  "track2": [
+   {
+    "name": "baseball_pitch_trim.mp4",
+    "bytes": 9061991,
+    "md5": "ec9dc200b382c82f3db602a5acc44ca8"
+   },
+   {
+    "name": "bball_layup_trim.mp4",
+    "bytes": 1955619,
+    "md5": "fbb0c9f71325d4ad511fec9658ac1e86"
+   },
+   {
+    "name": "bball_shot.mp4",
+    "bytes": 22574007,
+    "md5": "8b8ba31bdd9ca785de820bdf51992f94"
+   },
+   {
+    "name": "10_penalty1.avi",
+    "bytes": 1387018,
+    "md5": "e886b7ef79d757bd7df4720a6527dfec"
+   },
+   {
+    "name": "11_freekick.avi",
+    "bytes": 2126626,
+    "md5": "5bc1187a1b5a8f3e286cf8c32f3d43a9"
+   },
+   {
+    "name": "12_penalty.avi",
+    "bytes": 11012656,
+    "md5": "c72e6b6ebea8a88d587a82cf299efa28"
+   },
+   {
+    "name": "13_freekick.avi",
+    "bytes": 5181668,
+    "md5": "b4e9fa710a809f33f33a029edf6edbbd"
+   },
+   {
+    "name": "14_penalty.avi",
+    "bytes": 1743702,
+    "md5": "d50589078118e3bbd9d236643d1e47a4"
+   },
+   {
+    "name": "14_penalty1.avi",
+    "bytes": 975158,
+    "md5": "258a2ac07b547c2f61814bb24cac5c76"
+   },
+   {
+    "name": "16_penalty1.avi",
+    "bytes": 3120342,
+    "md5": "dfc072c9caa0d6bb36cc932c21827921"
+   },
+   {
+    "name": "18_freekick.avi",
+    "bytes": 5054554,
+    "md5": "2b149ae044d75691c9b779157afc79bb"
+   },
+   {
+    "name": "18_freekick1.avi",
+    "bytes": 2503622,
+    "md5": "784d3744055e3f89add16b431ea6d810"
+   },
+   {
+    "name": "18_freekick3.avi",
+    "bytes": 4803834,
+    "md5": "e6916e8cdcfbb29e34f89ddb8cc7be2b"
+   },
+   {
+    "name": "19_freekick.avi",
+    "bytes": 4127926,
+    "md5": "6d7b58e525f8c7098e001d45fc8a4d0c"
+   },
+   {
+    "name": "19_freekick1.avi",
+    "bytes": 6036084,
+    "md5": "4a312ac2f6a80226ff22a663f5b08300"
+   },
+   {
+    "name": "19_freekick2.avi",
+    "bytes": 16572174,
+    "md5": "3592f10f52f733e9fd6e74f8a05aa99e"
+   },
+   {
+    "name": "21_freekick.avi",
+    "bytes": 5527522,
+    "md5": "8b53c2613f278c76a73f70c5aad8411a"
+   },
+   {
+    "name": "23_freekick.avi",
+    "bytes": 5094258,
+    "md5": "bb9934ab4f4dbdb31374e06ecaa2c7e3"
+   },
+   {
+    "name": "25_freekick.avi",
+    "bytes": 887136,
+    "md5": "7e57c9f2f00f532f3c2e46b7a4cf636e"
+   },
+   {
+    "name": "25_freekick1.avi",
+    "bytes": 804142,
+    "md5": "6af532f7972808e840269e2bebf7c702"
+   },
+   {
+    "name": "OpenPose_5T.avi",
+    "bytes": 8310158,
+    "md5": "403ee6177f4264350876a4c11a339ba1"
+   },
+   {
+    "name": "Y1.avi",
+    "bytes": 1334794,
+    "md5": "6d499c97048cc0d7ca271730495113fd"
+   }
+  ]
+ }
+}
