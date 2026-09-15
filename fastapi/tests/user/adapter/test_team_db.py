@@ -25,6 +25,7 @@ TEAM = {"name": "번개FC", "region": "서울 강남", "sport_code": "football"}
 
 
 def _account(db_client, nickname):
+    nickname = f"{nickname}{uuid.uuid4().hex[:6]}"
     email = f"team-{uuid.uuid4().hex[:12]}@super-sub.example"
     signup = db_client.post(
         f"{V1}/auth/signup",

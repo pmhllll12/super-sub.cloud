@@ -24,6 +24,7 @@ PASSWORD = "supersub2026"
 
 
 def _account(db_client, nickname):
+    nickname = f"{nickname}{uuid.uuid4().hex[:6]}"
     email = f"apply-{uuid.uuid4().hex[:12]}@super-sub.example"
     signup = db_client.post(
         f"{V1}/auth/signup",
@@ -122,7 +123,7 @@ class TestApplyInDb:
     def test_닉네임이_user_테이블에서_온다(self, db_client, world):
         """`match` 는 `user` 를 임포트하지 않고 컬럼만 읽는다 — 여기가 방어선이다."""
         res = _apply(db_client, world, world["outsider"])
-        assert res.json()["nickname"] == "용병지원자"
+        assert res.json()["nickname"] == world["outsider"]["nickname"]
 
     def test_유일_제약이_두_번째_지원을_막는다(self, db_client, db_session, world):
         _apply(db_client, world, world["outsider"])

@@ -11,12 +11,17 @@ from app.core.database import get_session
 from app.match.adapter.outbound.pg.match_pg_repository import MatchPgRepository
 from app.match.application.ports.input.match_use_cases import (
     AcceptApplicationUseCase,
+    AcceptTeamMatchRequestUseCase,
     ApplyToMatchUseCase,
     CancelMatchUseCase,
+    CancelTeamMatchRequestUseCase,
     CreateMatchUseCase,
+    CreateTeamMatchRequestUseCase,
     ListApplicationsUseCase,
     ListTeamMatchesUseCase,
+    ListTeamMatchRequestsUseCase,
     ReadMatchUseCase,
+    RejectTeamMatchRequestUseCase,
     RemoveApplicationUseCase,
     SearchMatchesUseCase,
     UpdateMatchUseCase,
@@ -35,6 +40,13 @@ from app.match.application.use_cases.match_interactors import (
     ReadMatchInteractor,
     SearchMatchesInteractor,
     UpdateMatchInteractor,
+)
+from app.match.application.use_cases.team_match_request_interactors import (
+    AcceptTeamMatchRequestInteractor,
+    CancelTeamMatchRequestInteractor,
+    CreateTeamMatchRequestInteractor,
+    ListTeamMatchRequestsInteractor,
+    RejectTeamMatchRequestInteractor,
 )
 
 
@@ -126,5 +138,52 @@ ListApplicationsUseCaseDep = Annotated[
 ]
 RemoveApplicationUseCaseDep = Annotated[
     RemoveApplicationUseCase, Depends(get_remove_application_use_case)
+]
+
+
+def get_create_team_match_request_use_case(
+    repository: MatchRepositoryDep,
+) -> CreateTeamMatchRequestUseCase:
+    return CreateTeamMatchRequestInteractor(repository)
+
+
+def get_list_team_match_requests_use_case(
+    repository: MatchRepositoryDep,
+) -> ListTeamMatchRequestsUseCase:
+    return ListTeamMatchRequestsInteractor(repository)
+
+
+def get_accept_team_match_request_use_case(
+    repository: MatchRepositoryDep,
+) -> AcceptTeamMatchRequestUseCase:
+    return AcceptTeamMatchRequestInteractor(repository)
+
+
+def get_reject_team_match_request_use_case(
+    repository: MatchRepositoryDep,
+) -> RejectTeamMatchRequestUseCase:
+    return RejectTeamMatchRequestInteractor(repository)
+
+
+def get_cancel_team_match_request_use_case(
+    repository: MatchRepositoryDep,
+) -> CancelTeamMatchRequestUseCase:
+    return CancelTeamMatchRequestInteractor(repository)
+
+
+CreateTeamMatchRequestUseCaseDep = Annotated[
+    CreateTeamMatchRequestUseCase, Depends(get_create_team_match_request_use_case)
+]
+ListTeamMatchRequestsUseCaseDep = Annotated[
+    ListTeamMatchRequestsUseCase, Depends(get_list_team_match_requests_use_case)
+]
+AcceptTeamMatchRequestUseCaseDep = Annotated[
+    AcceptTeamMatchRequestUseCase, Depends(get_accept_team_match_request_use_case)
+]
+RejectTeamMatchRequestUseCaseDep = Annotated[
+    RejectTeamMatchRequestUseCase, Depends(get_reject_team_match_request_use_case)
+]
+CancelTeamMatchRequestUseCaseDep = Annotated[
+    CancelTeamMatchRequestUseCase, Depends(get_cancel_team_match_request_use_case)
 ]
 

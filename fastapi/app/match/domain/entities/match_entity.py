@@ -27,6 +27,10 @@ class MatchEntity:
 
     🔴 **종목이 없다.** `match -> team -> sport_code` 로 결정된다(부록 D.4).
     여기에 종목을 들이면 팀 종목과 어긋날 수 있는 두 번째 진실이 생긴다.
+
+    `opponent_team_id`가 차 있으면 **팀 대 팀으로 확정된 경기**다(`paik` 17번,
+    `team_match_request` 수락으로만 생긴다). 이런 경기는 양쪽 스쿼드가 이미
+    차 있다는 전제라 `needs`(모집)가 비어 있다.
     """
 
     id: UUID
@@ -34,6 +38,28 @@ class MatchEntity:
     played_at: datetime
     place: str
     needs: list[PositionNeedEntity] = field(default_factory=list)
+    opponent_team_id: UUID | None = None
+
+
+@dataclass(frozen=True)
+class TeamMatchRequestEntity:
+    """팀 대 팀 경기 신청 1건. `paik` 17번.
+
+    개인이 경기에 지원하는 `ApplicationEntity`와는 다르다 — 신청 주체도 받는
+    사람도 팀(정확히는 그 팀 주장)이다. 상태를 `analysis_job.status`처럼
+    자유 문자열로 둔다(`TeamMatchRequestStatus` 참고) — DB 제약을 안 거는 것도
+    같은 이유(단계가 늘 때 마이그레이션 없이).
+    """
+
+    id: UUID
+    requester_team_id: UUID
+    target_team_id: UUID
+    proposed_played_at: datetime
+    proposed_place: str
+    status: str
+    created_at: datetime
+    responded_at: datetime | None = None
+    match_id: UUID | None = None
 
 
 @dataclass(frozen=True)

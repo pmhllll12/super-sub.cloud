@@ -71,5 +71,6 @@ def finish_job(
             status=body.status,
             failure_reason=body.failure_reason,
             report_key=body.report_key,
+            detection_result=body.detection_result,
         )
     )

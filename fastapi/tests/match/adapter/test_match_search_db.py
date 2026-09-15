@@ -37,7 +37,7 @@ def owner(db_client):
     email = f"search-{uuid.uuid4().hex[:12]}@super-sub.example"
     signup = db_client.post(
         f"{V1}/auth/signup",
-        json={"email": email, "password": PASSWORD, "nickname": "주장"},
+        json={"email": email, "password": PASSWORD, "nickname": f"주장{uuid.uuid4().hex[:6]}"},
     )
     assert signup.status_code == 201, signup.text
     login = db_client.post(

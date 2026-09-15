@@ -6,8 +6,12 @@ from app.analysis.application.dtos.video_dto import PublicVideoResult, VideoResu
 from app.analysis.domain.entities.video_entity import VideoEntity
 
 
-def to_public_video_result(video: VideoEntity) -> PublicVideoResult:
-    """공개 목록 한 줄. 저장 키·업로더·분석 상태는 싣지 않는다."""
+def to_public_video_result(
+    video: VideoEntity, uploader_nickname: str, uploader_card_slug: str | None
+) -> PublicVideoResult:
+    """공개 목록 한 줄. 저장 키(raw)·분석 상태는 싣지 않는다. 업로더는
+    닉네임+카드 슬러그로 싣는다(`paik` 16번) — 호출부가 배치로 구해서 넘긴다.
+    """
     return PublicVideoResult(
         id=video.id,
         sport_code=video.sport_code,
@@ -15,6 +19,8 @@ def to_public_video_result(video: VideoEntity) -> PublicVideoResult:
         created_at=video.created_at,
         title=video.title,
         description=video.description,
+        uploader_nickname=uploader_nickname,
+        uploader_card_slug=uploader_card_slug,
     )
 
 

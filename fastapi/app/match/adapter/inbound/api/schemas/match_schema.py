@@ -51,7 +51,11 @@ class PositionNeedResponse(BaseModel):
 
 
 class MatchResponse(BaseModel):
-    """**종목이 없다.** 주최 팀이 결정한다(부록 D.4) — `GET /teams/{team_id}` 를 본다."""
+    """**종목이 없다.** 주최 팀이 결정한다(부록 D.4) — `GET /teams/{team_id}` 를 본다.
+
+    `opponent_team_id`가 있으면 **팀 대 팀으로 확정된 경기**다(`paik` 17번,
+    `team_match_request` 수락으로만 생긴다) — `needs`는 항상 빈 배열이다.
+    """
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -60,6 +64,7 @@ class MatchResponse(BaseModel):
     played_at: Rfc3339
     place: str
     needs: list[PositionNeedResponse]
+    opponent_team_id: UUID | None = None
 class MatchListingResponse(BaseModel):
     """탐색 목록 한 줄.
 
@@ -113,3 +118,31 @@ class ApplySchema(BaseModel):
     """`user_id` 를 비우면 **본인이 지원**한다. 채우면 주장이 그 사람에게 제안한다."""
 
     user_id: UUID | None = None
+
+
+class CreateTeamMatchRequestSchema(BaseModel):
+    """팀 대 팀 경기 신청. `paik` 17번. `played_at` 은 타임존이 있는 시각이다."""
+
+    target_team_id: UUID
+    played_at: datetime
+    place: str = Field(min_length=1, max_length=120)
+
+
+class TeamMatchRequestResponse(BaseModel):
+    """신청 1건. `status`: `pending`·`accepted`·`rejected`·`cancelled`.
+
+    `match_id`는 `accepted`일 때만 찬다 — 그 값으로 `GET /matches/{id}`를
+    불러 확정 경기를 본다.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    requester_team_id: UUID
+    target_team_id: UUID
+    proposed_played_at: Rfc3339
+    proposed_place: str
+    status: str
+    created_at: Rfc3339
+    responded_at: Rfc3339 | None
+    match_id: UUID | None

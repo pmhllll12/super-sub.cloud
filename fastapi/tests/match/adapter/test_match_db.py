@@ -29,6 +29,7 @@ def _future(days=7):
 
 
 def _account(db_client, nickname):
+    nickname = f"{nickname}{uuid.uuid4().hex[:6]}"
     email = f"match-{uuid.uuid4().hex[:12]}@super-sub.example"
     signup = db_client.post(
         f"{V1}/auth/signup",
@@ -41,6 +42,7 @@ def _account(db_client, nickname):
     return {
         "email": email,
         "id": uuid.UUID(signup.json()["id"]),
+        "nickname": nickname,
         "headers": {"Authorization": f"Bearer {login.json()['access_token']}"},
     }
 

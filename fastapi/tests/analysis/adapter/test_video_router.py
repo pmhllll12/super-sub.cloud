@@ -13,6 +13,7 @@ from app.analysis.adapter.outbound.stub.video_stub_repository import (
     _OBJECTS,
     put_object,
     register_card_slug,
+    register_nickname,
     reset_videos,
 )
 from app.analysis.domain.rules.video_rules import MAX_BYTES, MAX_DURATION_MS
@@ -516,8 +517,9 @@ class TestListPublicVideos:
         rows = client.get(f"{V1}/videos/public", headers=_headers(viewer)).json()
         assert [r["id"] for r in rows] == [pub]
 
-    def test_저장_키와_업로더는_안_실린다(self, client):
+    def test_저장_키는_안_실리고_업로더는_닉네임으로_실린다(self, client):
         owner = uuid4()
+        register_nickname(owner, "업로더")
         video_id = _register_clip(client, owner)
         client.patch(
             f"{V1}/videos/{video_id}",
@@ -532,7 +534,24 @@ class TestListPublicVideos:
             "created_at",
             "title",
             "description",
+            "uploader_nickname",
+            "uploader_card_slug",
         }
+        assert row["uploader_nickname"] == "업로더"
+        assert row["uploader_card_slug"] is None
+
+    def test_카드가_있으면_슬러그도_실린다(self, client):
+        owner = uuid4()
+        register_nickname(owner, "업로더")
+        register_card_slug("owner-slug", owner)
+        video_id = _register_clip(client, owner)
+        client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"is_public": True},
+            headers=_headers(owner),
+        )
+        row = client.get(f"{V1}/videos/public", headers=_headers(uuid4())).json()[0]
+        assert row["uploader_card_slug"] == "owner-slug"
 
     def test_제목과_설명이_실린다(self, client):
         owner = uuid4()

@@ -175,8 +175,10 @@ class FeaturedVideoResponse(BaseModel):
 
 
 class PublicVideoResponse(BaseModel):
-    """홈 영상 모음 한 줄. **저장 키·업로더는 안 실린다** — 저장 키에 업로더
-    `user_id` 가 들어 있고, 재생은 `GET /videos/{id}/playback-url` 로 따로 받는다.
+    """홈 영상 모음 한 줄. **저장 키는 안 실린다** — 저장 키엔 업로더 `user_id`가
+    그대로 들어 있어서다. 업로더는 대신 `uploader_nickname`(항상 있음)과
+    `uploader_card_slug`(카드를 만들었으면, 없으면 `null`)로 싣는다(`paik`
+    16번). 재생은 `GET /videos/{id}/playback-url`로 따로 받는다.
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -187,6 +189,8 @@ class PublicVideoResponse(BaseModel):
     created_at: Rfc3339
     title: str | None
     description: str | None
+    uploader_nickname: str
+    uploader_card_slug: str | None
 
 
 class AdminVideoRowResponse(BaseModel):

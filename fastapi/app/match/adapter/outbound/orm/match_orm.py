@@ -28,3 +28,9 @@ class MatchOrm(Base):
         DateTime(timezone=True), nullable=False
     )
     place: Mapped[str] = mapped_column(String(120), nullable=False)
+    # 상대 팀(`paik` 17번, 2026.09.15) — 찼으면 팀 대 팀으로 확정된 경기다.
+    # `team_match_request` 수락으로만 채워진다. 비어 있으면(기본) 지금까지의
+    # "팀이 모집을 여는" 경기 그대로다.
+    opponent_team_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("team.id"), nullable=True
+    )

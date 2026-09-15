@@ -14,9 +14,15 @@ from app.analysis.adapter.outbound.pg.report_ingest_pg_repository import (
 from app.analysis.application.ports.input.job_use_cases import (
     ClaimJobUseCase,
     FinishJobUseCase,
+    GetDetectionStatusUseCase,
+    RequestDetectionUseCase,
 )
 from app.analysis.application.ports.output.job_port import JobPort
 from app.analysis.application.ports.output.report_ingest_port import ReportIngestPort
+from app.analysis.application.use_cases.detection_interactor import (
+    GetDetectionStatusInteractor,
+    RequestDetectionInteractor,
+)
 from app.analysis.application.use_cases.job_interactors import (
     ClaimJobInteractor,
     FinishJobInteractor,
@@ -81,3 +87,23 @@ def get_finish_job_use_case(
 
 ClaimJobUseCaseDep = Annotated[ClaimJobUseCase, Depends(get_claim_job_use_case)]
 FinishJobUseCaseDep = Annotated[FinishJobUseCase, Depends(get_finish_job_use_case)]
+
+
+def get_request_detection_use_case(
+    repository: JobRepositoryDep, video_repository: VideoRepositoryDep
+) -> RequestDetectionUseCase:
+    return RequestDetectionInteractor(repository, video_repository)
+
+
+def get_detection_status_use_case(
+    repository: JobRepositoryDep, video_repository: VideoRepositoryDep
+) -> GetDetectionStatusUseCase:
+    return GetDetectionStatusInteractor(repository, video_repository)
+
+
+RequestDetectionUseCaseDep = Annotated[
+    RequestDetectionUseCase, Depends(get_request_detection_use_case)
+]
+GetDetectionStatusUseCaseDep = Annotated[
+    GetDetectionStatusUseCase, Depends(get_detection_status_use_case)
+]

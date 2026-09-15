@@ -12,6 +12,7 @@ from app.user.adapter.inbound.api.schemas.me_schema import (
     UpdateMeSchema,
 )
 from app.user.application.dtos.me_dto import (
+    UNSET,
     ChangePasswordCommand,
     DeleteMeCommand,
     MeQuery,
@@ -38,8 +39,20 @@ def update_me(
     """닉네임을 바꾸고 **바뀐 뒤의 내 정보 전체**를 돌려준다.
 
     응답이 `GET /me` 와 같으므로 클라이언트는 파서를 하나만 들면 된다.
+    `is_nickname_searchable`은 **보낸 경우에만** 바뀐다.
     """
-    return use_case(UpdateMeCommand(user_id=user_id, nickname=body.nickname))
+    sent = body.model_fields_set
+    return use_case(
+        UpdateMeCommand(
+            user_id=user_id,
+            nickname=body.nickname,
+            is_nickname_searchable=(
+                body.is_nickname_searchable
+                if "is_nickname_searchable" in sent
+                else UNSET
+            ),
+        )
+    )
 
 
 @me_router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)

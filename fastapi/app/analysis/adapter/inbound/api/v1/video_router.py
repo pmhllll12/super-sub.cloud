@@ -6,6 +6,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, status
 
+from app.analysis.adapter.inbound.api.schemas.job_schema import (
+    DetectionResponse,
+    RequestDetectionSchema,
+)
 from app.analysis.adapter.inbound.api.schemas.video_schema import (
     FeaturedVideoResponse,
     PlaybackUrlResponse,
@@ -16,6 +20,11 @@ from app.analysis.adapter.inbound.api.schemas.video_schema import (
     UploadUrlSchema,
     VideoReportResponse,
     VideoResponse,
+)
+from app.analysis.application.dtos.job_dto import (
+    DetectionStatusQuery,
+    DetectionStatusResult,
+    RequestDetectionCommand,
 )
 from app.analysis.application.dtos.report_view_dto import ReadReportQuery
 from app.analysis.application.dtos.video_dto import (
@@ -34,6 +43,10 @@ from app.analysis.application.dtos.video_dto import (
     UploadUrlCommand,
     UploadUrlResult,
     VideoResult,
+)
+from app.analysis.dependencies.job_providers import (
+    GetDetectionStatusUseCaseDep,
+    RequestDetectionUseCaseDep,
 )
 from app.analysis.dependencies.video_providers import (
     CreateUploadUrlUseCaseDep,
@@ -124,7 +137,8 @@ def list_public_videos(
     🔴 **로그인이 필요하다.** 익명 피드가 필요하면 열겠다 — 지금은 확인 방법이
     "다른 계정으로 로그인해도 보인다"라 인증을 그대로 둔다.
 
-    저장 키·업로더는 안 실린다. 재생은 `GET /videos/{id}/playback-url` 로 받는다.
+    저장 키(raw `user_id` 포함)는 안 싣는다. 업로더는 닉네임+카드 슬러그(있으면)
+    로 싣는다(`paik` 16번). 재생은 `GET /videos/{id}/playback-url` 로 받는다.
     """
     return use_case(PublicVideosQuery())
 
@@ -254,3 +268,52 @@ def read_report(
     """
     view = use_case(ReadReportQuery(video_id=video_id, user_id=user_id))
     return VideoReportResponse.model_validate(view)
+
+
+@video_router.post(
+    "/videos/{video_id}/detect",
+    response_model=DetectionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def request_detection(
+    video_id: UUID,
+    user_id: CurrentUserId,
+    use_case: RequestDetectionUseCaseDep,
+    body: RequestDetectionSchema | None = None,
+) -> DetectionStatusResult:
+    """이 영상에 잡힌 사람들을 검출해 달라고 큐에 넣는다 (미결 `ho` 44번).
+
+    🔴 **`202`다 — 결과가 아니라 접수다.** GPU 인스턴스가 자동 종료돼 있을 수
+    있어(`agent-ai` autostop) 즉시 응답하지 못한다. `analyze` 작업과 같은 큐를
+    쓰고, `GET` 으로 폴링한다.
+
+    호출할 때마다 **새 작업**을 만든다 — 이전 요청을 재사용하지 않는다(지금
+    `analyze` 작업과 같은 정책). 검출된 사람이 0명이어도 **실패가 아니다** —
+    화면은 드래그로 넘어가면 된다.
+
+    | 에러 | 뜻 |
+    |---|---|
+    | 404 `VIDEO_NOT_FOUND` | 없는 영상이거나 남의 영상이다 |
+    """
+    at_ms = body.at_ms if body is not None else RequestDetectionSchema().at_ms
+    return use_case(
+        RequestDetectionCommand(user_id=user_id, video_id=video_id, at_ms=at_ms)
+    )
+
+
+@video_router.get(
+    "/videos/{video_id}/detect", response_model=DetectionResponse
+)
+def read_detection(
+    video_id: UUID,
+    user_id: CurrentUserId,
+    use_case: GetDetectionStatusUseCaseDep,
+) -> DetectionStatusResult:
+    """가장 최근 검출 요청의 상태를 본다 (미결 `ho` 44번). 화면이 폴링한다.
+
+    | 에러 | 뜻 |
+    |---|---|
+    | 404 `VIDEO_NOT_FOUND` | 없는 영상이거나 남의 영상이다 |
+    | 404 `DETECTION_NOT_FOUND` | 이 영상에 검출을 요청한 적이 없다 — 먼저 `POST` 한다 |
+    """
+    return use_case(DetectionStatusQuery(video_id=video_id, user_id=user_id))

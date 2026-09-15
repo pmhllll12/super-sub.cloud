@@ -16,7 +16,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from sqlalchemy import column, delete, func, select, table, update
+from sqlalchemy import column, delete, func, insert, or_, select, table, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -28,14 +28,19 @@ from app.match.adapter.outbound.orm.match_orm import MatchOrm
 from app.match.adapter.outbound.orm.match_position_need_orm import (
     MatchPositionNeedOrm,
 )
+from app.match.adapter.outbound.orm.team_match_request_orm import (
+    TeamMatchRequestOrm,
+)
 from app.match.application.ports.output.match_port import MatchPort
 from app.match.domain.entities.application_entity import ApplicationEntity
 from app.match.domain.entities.match_entity import (
     MatchEntity,
     MatchListingEntity,
     PositionNeedEntity,
+    TeamMatchRequestEntity,
 )
 from app.match.domain.rules.application_rules import SIDE_TEAM, SIDE_USER
+from app.match.domain.rules.team_match_request_rules import CANCELLED, ACCEPTED, REJECTED
 
 # 소유하지 않는 테이블에서 **읽기만** 한다. 위 docstring 참조.
 _team = table(
@@ -53,6 +58,30 @@ _position = table(
     "position", column("id"), column("sport_code"), column("code"), column("label")
 )
 _user = table("user", column("id"), column("nickname"))
+
+# `notification` 은 `notification` 컨텍스트의 테이블이다. 임포트하지 않고
+# 원시 SQL 로 쓴다(`user_pg_repository.py`의 `_notification`과 같은 방식·이유).
+_notification = table(
+    "notification",
+    column("id"),
+    column("recipient_user_id"),
+    column("type"),
+    column("actor_user_id"),
+    column("subject_type"),
+    column("subject_id"),
+    column("read_at"),
+    column("created_at"),
+)
+
+# `app.notification.domain.rules.notification_rules`의 값과 같다(컨텍스트끼리
+# 임포트하지 않으므로 값을 복제 — `user_pg_repository.py`와 같은 판단).
+_NOTIFY_TEAM_MATCH_REQUESTED = "team_match_requested"
+_NOTIFY_TEAM_MATCH_ACCEPTED = "team_match_accepted"
+_NOTIFY_TEAM_MATCH_REJECTED = "team_match_rejected"
+_NOTIFY_TEAM_MATCH_REQUEST_CANCELLED = "team_match_request_cancelled"
+_NOTIFY_TEAM_MATCH_CANCELLED = "team_match_cancelled"
+_SUBJECT_TEAM_MATCH_REQUEST = "team_match_request"
+_SUBJECT_MATCH = "match"
 
 # PostgreSQL 의 unique_violation. 컨텍스트끼리 임포트하지 않으므로 상수를 여기에도 둔다.
 _UNIQUE_VIOLATION = "23505"
@@ -102,7 +131,9 @@ class MatchPgRepository(MatchPort):
         offset: int,
         limit: int,
     ) -> tuple[list[MatchListingEntity], int]:
-        conditions = [MatchOrm.played_at > now]
+        # 팀 대 팀으로 이미 확정된 경기(`paik` 17번)는 모집이 없다 — 용병
+        # 탐색 목록에 안 낸다(낸다 해도 지원할 자리가 없어 죽은 결과다).
+        conditions = [MatchOrm.played_at > now, MatchOrm.opponent_team_id.is_(None)]
         if sport_code:
             conditions.append(_team.c.sport_code == sport_code)
         if region:
@@ -205,6 +236,7 @@ class MatchPgRepository(MatchPort):
                 team_id=match.team_id,
                 played_at=match.played_at,
                 place=match.place,
+                opponent_team_id=match.opponent_team_id,
             )
         )
         self._session.flush()
@@ -264,8 +296,34 @@ class MatchPgRepository(MatchPort):
             .where(MatchApplicationOrm.match_id == match_id)
         ).scalar_one()
 
-    def delete_match(self, match_id: UUID) -> None:
-        """필요 포지션을 먼저 지운다 — 외래키가 그 순서를 요구한다."""
+    def delete_match(self, match_id: UUID, actor_id: UUID) -> None:
+        """필요 포지션을 먼저 지운다 — 외래키가 그 순서를 요구한다.
+
+        팀 대 팀 확정 경기(`opponent_team_id` 있음)면 **취소한 쪽이 아닌
+        상대 팀** 주장(들)에게 알린다(`paik` 17번). `team_match_request.
+        match_id`는 FK가 `SET NULL`이라 따로 안 건드려도 된다.
+        """
+        match = self._session.get(MatchOrm, match_id)
+        if match is not None and match.opponent_team_id is not None:
+            # 취소한 사람이 속한 쪽이 아니라 **반대쪽** 팀에 알린다.
+            actor_side = (
+                match.team_id
+                if self.team_role_of(match.team_id, actor_id) is not None
+                else match.opponent_team_id
+            )
+            other_team = (
+                match.opponent_team_id
+                if actor_side == match.team_id
+                else match.team_id
+            )
+            self._notify(
+                recipient_user_ids=self.owner_user_ids(other_team),
+                notif_type=_NOTIFY_TEAM_MATCH_CANCELLED,
+                actor_user_id=actor_id,
+                subject_id=match_id,
+                now=datetime.now(timezone.utc),
+                subject_type=_SUBJECT_MATCH,
+            )
         self._session.execute(
             delete(MatchPositionNeedOrm).where(
                 MatchPositionNeedOrm.match_id == match_id
@@ -284,6 +342,7 @@ class MatchPgRepository(MatchPort):
             played_at=row.played_at,
             place=row.place,
             needs=self._needs(match_id),
+            opponent_team_id=row.opponent_team_id,
         )
 
     def list_upcoming_matches(
@@ -293,10 +352,20 @@ class MatchPgRepository(MatchPort):
 
         경기마다 따로 읽으면 목록 길이만큼 쿼리가 는다(N+1). 목록은 화면에서 자주
         열리는 자리라 여기서 미리 막아 둔다.
+
+        🔴 **주최했거나(`team_id`) 상대로 확정됐거나(`opponent_team_id`) 둘
+        다** 본다(`paik` 17번) — 안 그러면 수락한 상대 팀 화면엔 그 경기가
+        안 뜬다.
         """
         stmt = (
             select(MatchOrm)
-            .where(MatchOrm.team_id == team_id, MatchOrm.played_at > now)
+            .where(
+                or_(
+                    MatchOrm.team_id == team_id,
+                    MatchOrm.opponent_team_id == team_id,
+                ),
+                MatchOrm.played_at > now,
+            )
             .order_by(MatchOrm.played_at.asc())
         )
         rows = list(self._session.execute(stmt).scalars())
@@ -308,6 +377,7 @@ class MatchPgRepository(MatchPort):
                 played_at=row.played_at,
                 place=row.place,
                 needs=needs.get(row.id, []),
+                opponent_team_id=row.opponent_team_id,
             )
             for row in rows
         ]
@@ -489,4 +559,198 @@ class MatchPgRepository(MatchPort):
             nickname=nickname,
             team_accepted_at=row.team_accepted_at,
             user_accepted_at=row.user_accepted_at,
+        )
+
+    # ------------------------------------------------------------------
+    # 팀 대 팀 경기 신청 (`team_match_request`). `paik` 17번.
+    # ------------------------------------------------------------------
+
+    def owner_user_ids(self, team_id: UUID) -> list[UUID]:
+        stmt = select(_team_member.c.user_id).where(
+            _team_member.c.team_id == team_id,
+            _team_member.c.role == "owner",
+            _team_member.c.left_at.is_(None),
+        )
+        return [row[0] for row in self._session.execute(stmt).all()]
+
+    def _notify(
+        self,
+        *,
+        recipient_user_ids: list[UUID],
+        notif_type: str,
+        actor_user_id: UUID | None,
+        subject_id: UUID,
+        now: datetime,
+        subject_type: str = _SUBJECT_TEAM_MATCH_REQUEST,
+    ) -> None:
+        if not recipient_user_ids:
+            return
+        self._session.execute(
+            insert(_notification),
+            [
+                {
+                    "id": uuid4(),
+                    "recipient_user_id": uid,
+                    "type": notif_type,
+                    "actor_user_id": actor_user_id,
+                    "subject_type": subject_type,
+                    "subject_id": subject_id,
+                    "read_at": None,
+                    "created_at": now,
+                }
+                for uid in recipient_user_ids
+            ],
+        )
+
+    def create_team_match_request(self, request: TeamMatchRequestEntity) -> None:
+        self._session.add(
+            TeamMatchRequestOrm(
+                id=request.id,
+                requester_team_id=request.requester_team_id,
+                target_team_id=request.target_team_id,
+                proposed_played_at=request.proposed_played_at,
+                proposed_place=request.proposed_place,
+                status=request.status,
+                created_at=request.created_at,
+            )
+        )
+        self._notify(
+            recipient_user_ids=self.owner_user_ids(request.target_team_id),
+            notif_type=_NOTIFY_TEAM_MATCH_REQUESTED,
+            actor_user_id=None,
+            subject_id=request.id,
+            now=request.created_at,
+        )
+        self._session.commit()
+
+    def find_team_match_request(
+        self, request_id: UUID
+    ) -> TeamMatchRequestEntity | None:
+        row = self._session.get(TeamMatchRequestOrm, request_id)
+        return None if row is None else self._to_team_match_request(row)
+
+    def list_team_match_requests(
+        self, team_id: UUID
+    ) -> list[TeamMatchRequestEntity]:
+        stmt = (
+            select(TeamMatchRequestOrm)
+            .where(
+                or_(
+                    TeamMatchRequestOrm.requester_team_id == team_id,
+                    TeamMatchRequestOrm.target_team_id == team_id,
+                )
+            )
+            .order_by(TeamMatchRequestOrm.created_at.desc())
+        )
+        return [
+            self._to_team_match_request(row)
+            for row in self._session.execute(stmt).scalars()
+        ]
+
+    def accept_team_match_request(
+        self, request_id: UUID
+    ) -> TeamMatchRequestEntity:
+        """확정 경기 생성 + 신청 팀 알림 + **두 팀의 다른 `pending` 신청 정리**를
+        전부 한 트랜잭션에서 한다 — 동시 확정(이중 예약) 방지가 목적이다.
+        """
+        row = self._session.get(TeamMatchRequestOrm, request_id)
+        now = datetime.now(timezone.utc)
+
+        match = MatchOrm(
+            id=uuid4(),
+            team_id=row.requester_team_id,
+            opponent_team_id=row.target_team_id,
+            played_at=row.proposed_played_at,
+            place=row.proposed_place,
+        )
+        self._session.add(match)
+        self._session.flush()
+
+        row.status = ACCEPTED
+        row.responded_at = now
+        row.match_id = match.id
+
+        self._notify(
+            recipient_user_ids=self.owner_user_ids(row.requester_team_id),
+            notif_type=_NOTIFY_TEAM_MATCH_ACCEPTED,
+            actor_user_id=None,
+            subject_id=row.id,
+            now=now,
+        )
+        self._cancel_other_pending(row, now)
+
+        self._session.commit()
+        return self._to_team_match_request(row)
+
+    def _cancel_other_pending(
+        self, accepted: TeamMatchRequestOrm, now: datetime
+    ) -> None:
+        """`accepted`가 확정시킨 두 팀이 걸린 **다른** `pending` 신청을 전부
+        `cancelled`로 정리하고, 그 신청의 양쪽(신청·대상) 주장에게 알린다.
+        """
+        involved = {accepted.requester_team_id, accepted.target_team_id}
+        others = self._session.execute(
+            select(TeamMatchRequestOrm).where(
+                TeamMatchRequestOrm.id != accepted.id,
+                TeamMatchRequestOrm.status == "pending",
+                or_(
+                    TeamMatchRequestOrm.requester_team_id.in_(involved),
+                    TeamMatchRequestOrm.target_team_id.in_(involved),
+                ),
+            )
+        ).scalars().all()
+        for other in others:
+            other.status = CANCELLED
+            other.responded_at = now
+            recipients = self.owner_user_ids(
+                other.requester_team_id
+            ) + self.owner_user_ids(other.target_team_id)
+            self._notify(
+                recipient_user_ids=recipients,
+                notif_type=_NOTIFY_TEAM_MATCH_REQUEST_CANCELLED,
+                actor_user_id=None,
+                subject_id=other.id,
+                now=now,
+            )
+
+    def reject_team_match_request(
+        self, request_id: UUID
+    ) -> TeamMatchRequestEntity:
+        row = self._session.get(TeamMatchRequestOrm, request_id)
+        now = datetime.now(timezone.utc)
+        row.status = REJECTED
+        row.responded_at = now
+        self._notify(
+            recipient_user_ids=self.owner_user_ids(row.requester_team_id),
+            notif_type=_NOTIFY_TEAM_MATCH_REJECTED,
+            actor_user_id=None,
+            subject_id=row.id,
+            now=now,
+        )
+        self._session.commit()
+        return self._to_team_match_request(row)
+
+    def cancel_team_match_request(
+        self, request_id: UUID
+    ) -> TeamMatchRequestEntity:
+        """신청 팀이 스스로 무른다. 알림 없음(위 포트 docstring 참고)."""
+        row = self._session.get(TeamMatchRequestOrm, request_id)
+        row.status = CANCELLED
+        row.responded_at = datetime.now(timezone.utc)
+        self._session.commit()
+        return self._to_team_match_request(row)
+
+    def _to_team_match_request(
+        self, row: TeamMatchRequestOrm
+    ) -> TeamMatchRequestEntity:
+        return TeamMatchRequestEntity(
+            id=row.id,
+            requester_team_id=row.requester_team_id,
+            target_team_id=row.target_team_id,
+            proposed_played_at=row.proposed_played_at,
+            proposed_place=row.proposed_place,
+            status=row.status,
+            created_at=row.created_at,
+            responded_at=row.responded_at,
+            match_id=row.match_id,
         )

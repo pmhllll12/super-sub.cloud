@@ -9,10 +9,10 @@ nav_order: 4
 Super-Sub 플랫폼의 데이터 모델이다. 3장 서비스 기능과 5장 요구사항에서 도출했다.
 각자 담당 도메인부터 보면 된다.
 
-**34 테이블 · 6 도메인 · 1~3정규형 준수**
+**44 테이블 · 6 도메인 · 1~3정규형 준수**
 
 본 부록은 3장에서 정의한 서비스 기능과 5장 요구사항(SFR·SEC)에서 도출한 데이터 모델이다.
-34개 테이블을 6개 도메인으로 나누어 정리한다.
+44개 테이블을 6개 도메인으로 나누어 정리한다.
 
 제1정규형부터 제3정규형까지 준수한다. 비원자 값(jsonb), 이행 종속 컬럼, 파생·집계 컬럼을 두지
 않는다. 정규화 근거와 그에 따른 조회 비용은 D.4에서 다룬다.
@@ -43,16 +43,23 @@ D.3에 별도로 모았다.
 >   `updated_at timestamptz`
 > - `user_identity` — `id uuid PK` · `user_id uuid FK→user` · `provider text` ·
 >   `subject text` · `created_at timestamptz`
+>
+> `user_contact`·`notification`(미결 `jin` 35번, 2026.09.15)도 아직 그림에 없다.
+> `user.nickname`에 유일 제약이 붙었고 `is_nickname_searchable`(지인 검색 노출,
+> 용병 매칭의 `is_searchable`과는 다른 컬럼) 도 늘었다 — 전부 표가 최신이다.
 
 | 테이블 | 용도 | 1행이 뜻하는 것 |
 |---|---|---|
-| user | 계정과 신원 (SEC-003) | 가입한 사람 1명 |
+| user | 계정과 신원 (SEC-003). 닉네임은 유일하다 | 가입한 사람 1명 |
 | user_credential | 로그인 자격증명. 비밀번호 해시를 user에 두지 않고 분리한다. 소셜 로그인을 추가할 때 user를 건드리지 않아도 되고, 자격증명 조회 경로를 따로 제한할 수 있다 | 한 사람의 자격증명 1건 |
 | user_identity | 외부 제공자(구글 등) 계정과의 연결. provider가 준 고유 ID(subject)를 그대로 보관한다. **이메일로 사람을 식별하지 않는다** — 이메일은 바뀔 수 있고 재사용될 수도 있다 | 한 사람의 한 제공자 연결 1건 |
 | team | 동호회 | 등록된 팀 1개 |
 | team_member | 소속과 역할. 탈퇴 후에도 경기·평가 이력이 남아야 하므로 left_at으로 소프트 삭제한다. 재가입이 가능하므로 joined_at을 함께 둔다 | 한 사람의 한 팀 소속 구간 1건 |
 | sport | 축구·야구·농구 종목 코드 | 종목 1개 (현재 3행) |
 | position | 종목별 포지션. 포지션 약칭이 종목 간 겹칠 수 있어 대리키를 두고 (sport_code, code)에 유일 제약을 건다 | 한 종목의 포지션 1개 |
+| user_contact | 상호 지인 관계(미결 `jin` 35번). 한쪽이 신청하고(requester) 대상(target)이 수락하면 양쪽 다 서로를 지인으로 본다. 메모는 신청자만 본다 | 신청 1건(대기중) 또는 지인 관계 1건(수락됨) |
+| notification | 폴링 알림. 지인 신청·수락 등을 다른 컨텍스트가 원시 SQL로 적재한다 — 문구는 저장하지 않고 `type`+`actor`+`subject`로 클라이언트가 렌더링한다 | 알림 1건 |
+| region | 지역 참조 데이터(미결 `paik` 19번). `city`·`district`를 별도 컬럼으로 둬 계층 비교(같은 구/같은 시)를 문자열 파싱 없이 한다 — `team.region`(팀의 연고지, 자유 문자열)과는 다른 값이다 | 지역 1곳(예: 서울 강남구) |
 
 ### ② 영상·분석
 
@@ -68,17 +75,19 @@ D.3에 별도로 모았다.
 ![도메인 ② 영상·분석 ERD]({{ "/assets/erd/domain2-video-analysis.svg" | relative_url }}){: class="erd-diagram" }
 
 > 위 그림에는 metric_definition에 `sport_code` 컬럼이 아직 표시되어 있으나, 지표를 종목
-> 무관 물리량으로 두기로 하면서(2026.09.08) 그 컬럼을 없앴다. **표가 최신이다.** 그림은
-> 좌표가 직접 박힌 수작업 SVG라 갱신 비용이 커서 미뤄 둔다(위 ①과 같은 사정이다).
+> 무관 물리량으로 두기로 하면서(2026.09.08) 그 컬럼을 없앴다. 그림은 **analysis_metric_criterion도
+> 아직 반영하지 않았다**(2026.09.09~10 신설). **표가 최신이다.** 그림은 좌표가 직접 박힌
+> 수작업 SVG라 갱신 비용이 커서 미뤄 둔다(위 ①과 같은 사정이다).
 
 | 테이블 | 용도 | 1행이 뜻하는 것 |
 |---|---|---|
 | video | 업로드한 클립의 저장 위치와 메타 (SFR-001) | 업로드된 클립 1개 |
 | video_validation | 규격 검사 결과와 반려 사유. 사유를 값으로 남겨야 검수 기준을 확인할 수 있다 | 클립 1개의 검사 결과 |
-| analysis_job | 비동기 분석 작업의 상태와 소요 시간 (PER-001) | 분석 실행 1회 |
+| analysis_job | 비동기 분석 작업의 상태와 소요 시간 (PER-001). `job_type`(`analyze`\|`detect`)으로 분석과 사람 검출을 같은 큐로 돌린다 — 검출 결과는 `detection_result`에 담는다(2026.09.15, 미결 `ho` 44번) | 분석 또는 검출 실행 1회 |
 | analysis_metric | 분석 1회가 산출한 지표 집합. 산출 버전을 기록한다 (QUA-002) | 분석 실행 1회가 낸 지표 묶음 |
 | metric_definition | 지표 항목의 정의와 단위. 물리량이라 종목에 속하지 않는다 — 어느 종목에서 쓰는지는 루브릭이 안다 | 지표 항목 1개 (예: 임팩트 시 무릎 각도) |
 | analysis_metric_value | 지표 항목별 값 (SFR-002) | 지표 묶음 1개 안의 항목 1개 값 |
+| analysis_metric_criterion | 리포트 항목별 등급의 맥락 — 칭호·구간·근거 문장 (SFR-003). analysis_metric_value가 항목의 **수치**를 담는다면 여기는 그 항목의 **맥락**이다 | 지표 묶음 1개 안의 채점 항목 1개 |
 | analysis_report | 지표를 근거로 생성한 요약 문장 (SFR-003) | 지표 묶음 1개의 요약문 |
 | player_vector | 성향 비교용 특징 벡터. pgvector로 색인한다 (SFR-005) | 지표 묶음 1개의 임베딩 |
 
@@ -105,13 +114,22 @@ D.3에 별도로 모았다.
 
 ![도메인 ④ 매칭 ERD]({{ "/assets/erd/domain4-matching.svg" | relative_url }}){: class="erd-diagram" }
 
+> 위 그림에는 `match.opponent_team_id`와 `team_match_request`(미결 `paik`
+> 17번, 2026.09.15)가 아직 없다. **표가 최신이다.**
+
 | 테이블 | 용도 | 1행이 뜻하는 것 |
 |---|---|---|
-| match | 경기 등록 (SFR-010). 종목은 team이 결정하므로 컬럼을 두지 않는다 | 등록된 경기 1건 |
+| match | 경기 등록 (SFR-010). 종목은 team이 결정하므로 컬럼을 두지 않는다. `opponent_team_id`(선택)가 차 있으면 팀 대 팀으로 **확정된** 경기다 — `team_match_request` 수락으로만 채워지고, 이런 경기는 모집(`needs`)이 없다 | 등록된 경기 1건 |
 | match_position_need | 경기별 필요 포지션과 인원. 포지션이 둘 이상일 수 있어 행으로 나눈다 | 경기 1건의 포지션 1종 필요분 |
 | match_application | 지원과 제안. 양측 수락 시각을 각각 갖고, 둘 다 채워진 상태를 확정으로 본다 | 경기 1건에 대한 한 사람의 지원 1건 |
+| team_match_request | 팀 대 팀 경기 신청(미결 `paik` 17번). 신청 팀이 항상 먼저 걸고 대상 팀만 답하는 비대칭 흐름이라 `match_application`과 달리 단일 `status` 문자열을 쓴다 | 팀 1개가 팀 1개에 건 신청 1건 |
 | fitness_score | 수준·역할·성향 3축 적합도 (SFR-006) | 지원 1건의 적합도 산출 결과 |
 | recommendation | 후보 추천 이력과 추천 사유 (SFR-007) | 경기 1건에 제시된 후보 1명 |
+| team_match_region | 팀이 경기하고 싶은 지역(미결 `paik` 18번). 여러 개라 행으로 나눈다 | 팀 1개의 선호 지역 1곳 |
+| team_match_slot | 팀이 경기 가능한 요일·시각. `start_time < end_time`을 애플리케이션이 막는다 | 팀 1개의 가능 시간대 1개 |
+| member_match_region | 팀원 개인이 뛰고 싶은 지역. 팀 조건과 저장소가 분리돼 있다(같은 사람이 팀장이면서 팀원일 수 있어서) | 사용자 1명의 선호 지역 1곳 |
+| member_match_slot | 팀원 개인이 뛸 수 있는 요일·시각 | 사용자 1명의 가능 시간대 1개 |
+| member_match_position | 팀원 개인이 뛸 수 있는 포지션 | 사용자 1명의 희망 포지션 1개 |
 
 ### ⑤ 평가·신뢰
 
@@ -174,6 +192,8 @@ report·no_show는 review와 직접 이어지지 않는다. 제재를 평가 점
 | squad | team_id | team | 소속 팀 |
 | squad_member | position_id | position | 포지션 |
 | match | team_id | team | 주최 팀 |
+| match | opponent_team_id | team | 상대 팀(팀 대 팀 확정 경기, 없으면 용병 모집) |
+| team_match_request | requester_team_id · target_team_id | team | 신청 팀과 대상 팀 |
 | match_position_need | position_id | position | 필요 포지션 |
 | match_application | user_id | user | 지원자 |
 | recommendation | candidate_user_id | user | 추천 후보 |
@@ -269,6 +289,8 @@ user_title은 호칭 부여의 근거가 되는 지표를 참조한다. 근거�
 | 테이블 | 유일 제약 | 이유 |
 |---|---|---|
 | user | email | 계정 식별 |
+| user | nickname | 지인 검색이 닉네임으로 사람을 특정해야 한다(미결 `jin` 35번) |
+| user_contact | (requester_user_id, target_user_id) | 같은 방향으로 중복 신청 방지 |
 | user_credential | user_id | 사용자당 자격증명 1건 |
 | user_identity | (provider, subject) | 한 외부 계정이 두 사용자에 붙는 것을 막는다 |
 | user_identity | (user_id, provider) | 한 사용자가 같은 제공자를 두 번 연결하지 못하게 한다 |
@@ -276,6 +298,7 @@ user_title은 호칭 부여의 근거가 되는 지표를 참조한다. 근거�
 | video_validation | video_id | 영상당 검사 결과 1건 |
 | analysis_metric | analysis_job_id | 작업당 지표 집합 1건 |
 | analysis_metric_value | (analysis_metric_id, metric_code) | 항목당 값 1건 |
+| analysis_metric_criterion | (analysis_metric_id, criterion_id) | 한 분석에서 같은 채점 항목 중복 방지 |
 | analysis_report | analysis_metric_id | 지표 집합당 요약 1건 |
 | player_vector | analysis_metric_id | 지표 집합당 벡터 1건 |
 | player_card | user_id, public_slug | 사용자당 카드 1건, 슬러그 중복 방지 |
@@ -288,6 +311,10 @@ user_title은 호칭 부여의 근거가 되는 지표를 참조한다. 근거�
 | squad_member | (squad_id, player_card_id) | 스쿼드당 카드 1회 등재 |
 | match_position_need | (match_id, position_id) | 경기당 포지션 1행 |
 | no_show | (match_id, user_id) | 경기당 1인 1건 |
+| region | (city, district) | 지역 중복 등록 방지(`paik` 19번) |
+| team_match_region | (team_id, region_id) | 같은 지역 중복 선호 방지 |
+| member_match_region | (user_id, region_id) | 같은 지역 중복 선호 방지 |
+| member_match_position | (user_id, position_id) | 같은 포지션 중복 등록 방지 |
 
 ## D.8 미확정 사항
 
