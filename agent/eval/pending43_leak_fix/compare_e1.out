@@ -1,0 +1,56 @@
+## B-6 대조 E-1 (2026-08-28 판 → 오늘 코드, 고치기 전)
+
+- 행 수: 전 **305** · 후 **290** (305 예상)
+- 키 집합: 전에만 **15** · 후에만 **0**
+
+🔴 키가 안 맞는다 — RERUN.md N-4(입력 파일 집합)를 먼저 의심한다.
+  ('2', 'baseball_pitch_trim.mp4', 'A')
+  ('2', 'baseball_pitch_trim.mp4', 'A_pose')
+  ('2', 'baseball_pitch_trim.mp4', 'B')
+  ('2', 'baseball_pitch_trim.mp4', 'B_pose')
+  ('2', 'baseball_pitch_trim.mp4', 'baseline')
+  ('2', 'bball_layup_trim.mp4', 'A')
+  ('2', 'bball_layup_trim.mp4', 'A_pose')
+  ('2', 'bball_layup_trim.mp4', 'B')
+  ('2', 'bball_layup_trim.mp4', 'B_pose')
+  ('2', 'bball_layup_trim.mp4', 'baseline')
+  ('2', 'bball_shot.mp4', 'A')
+  ('2', 'bball_shot.mp4', 'A_pose')
+  ('2', 'bball_shot.mp4', 'B')
+  ('2', 'bball_shot.mp4', 'B_pose')
+  ('2', 'bball_shot.mp4', 'baseline')
+
+🔴 **아래는 겹치는 키만** 대조한 것이다 — 행 수 판정은 이미 깨졌다.
+
+### 열별 불일치 (17열)
+
+| 열 | 불일치 행 | 보기 |
+|---|---:|---|
+| `hip_rotation_range_deg` | 56 | 2|10_penalty1.avi|baseline: '45.7' → '45.8' |
+| `plant_knee_angle_at_impact` | 35 | 2|13_freekick.avi|A: '165.8' → '165.9' |
+| `swing_elbow_angle_at_impact` | 35 | 2|14_penalty.avi|A: '170.1' → '179.6' |
+| `swing_hip_flexion_after_impact_deg` | 34 | 2|10_penalty1.avi|A: '65.0' → '64.9' |
+| `swing_knee_angle_at_impact` | 30 | 2|14_penalty.avi|A: '151.0' → '47.1' |
+| `swing_shoulder_flexion_after_impact_deg` | 30 | 2|14_penalty1.avi|A: '0.0' → '0.4' |
+| `trunk_forward_lean_deg_at_impact` | 20 | 2|14_penalty.avi|A: '4.4' → '2.2' |
+| `hip_shoulder_separation_deg` | 20 | 2|18_freekick3.avi|A: '63.2' → '63.1' |
+| `support_elbow_angle_at_impact` | 15 | 2|14_penalty.avi|A: '' → '162.4' |
+| `usable_ratio_arm` | 10 | 2|14_penalty.avi|A: '0.8049' → '0.8171' |
+| `detected_frames` | 10 | 2|14_penalty.avi|A: '80' → '81' |
+| `impact_frame` | 10 | 2|14_penalty.avi|A: '46.0' → '43.0' |
+| `grade` | 10 | 2|14_penalty.avi|A: 'B' → 'D' |
+| `delta_support_elbow_angle_at_impact` | 10 | 2|14_penalty.avi|A: '' → '0.0' |
+| `usable_ratio_leg` | 5 | 2|19_freekick2.avi|A: '0.9783' → '0.9855' |
+| `delta_hip_rotation_range_deg` | 4 | 2|10_penalty1.avi|A: '-19.2' → '-19.3' |
+| `delta_swing_hip_flexion_after_impact_deg` | 4 | 2|10_penalty1.avi|A: '-2.6' → '-2.7' |
+
+### 판정에 쓰는 것
+
+| | 내용 | 결과 | |
+|---|---|---|---|
+| 행·키 | 305행 1:1 | 전 305 · 후 290 · 겹침 290 | 🔴 |
+| 임팩트 무관 6열 | 완전 일치 | 불일치 열 **3** | 🔴 |
+| D — 등급·점수 | 한 행도 안 바뀜 | 불일치 열 **1** | 🔴 |
+| E-2 — 마무리 길이 두 열 말고 | 전부 일치 | 그 밖 불일치 열 **17** | 🔴 |
+
+🔴 마무리 길이 밖에서 달라진 열: delta_hip_rotation_range_deg, delta_support_elbow_angle_at_impact, delta_swing_hip_flexion_after_impact_deg, detected_frames, grade, hip_rotation_range_deg, hip_shoulder_separation_deg, impact_frame, plant_knee_angle_at_impact, support_elbow_angle_at_impact, swing_elbow_angle_at_impact, swing_hip_flexion_after_impact_deg, swing_knee_angle_at_impact, swing_shoulder_flexion_after_impact_deg, trunk_forward_lean_deg_at_impact, usable_ratio_arm, usable_ratio_leg
