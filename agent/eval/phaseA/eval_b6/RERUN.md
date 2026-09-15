@@ -35,14 +35,38 @@ JSON으로 찍는다. **파일로 남기지 않으므로 그 출력을 따로 �
 > **합집합만** 포즈한다(`kp_cache[(t, g)]`). 포즈는 박스당 중앙 18.0ms다
 > (`eval_b2/pose_quality_timing.csv`).
 
-산출물 두 개를 **덮어쓴다.**
+산출물 **셋**을 덮어쓴다.
 
 | 파일 | 내용 |
 |---|---|
 | `selector_downstream_comparison.csv` | Track 1, 195행 × 38열 |
 | `selector_downstream_rubric_clips.csv` | Track 2, 110행 × 40열 |
+| **`run_meta.json`** | 🔴 **이 실행이 무엇으로 무엇을 만들었는지** (2026-09-15 신설) |
 
-**덮어쓰기 전에 기존 두 파일을 반드시 복사해 둘 것.** 대조(아래)의 기준선이다.
+**덮어쓰기 전에 기존 파일을 반드시 복사해 둘 것.** 대조(아래)의 기준선이다.
+
+### 🔴 `run_meta.json` — 2026-09-15 에 규칙을 바꿨다
+
+앞서 스크립트에 *「실행 메타는 파일로 남기지 않는다(승인된 산출물 목록에
+없음). 보고서에 적는다」*고 적혀 있었다. **그 규칙이 대가를 치렀다** — 산출이
+재현되지 않는데 **그때 무엇으로 돌렸는지가 아무 데도 없어서** 원인을 못 갈랐다
+(미결 `ho` 47번). 「보고서에 적는다」는 **사람이 적어야 남는다**는 뜻이고,
+그날 아무도 안 적었다.
+
+| 담는 것 | 그게 답해 주는 질문 |
+|---|---|
+| `inputs` — **읽은 영상 전부의 md5·크기**(Track 1 39 · Track 2 22) | 🔴 **「그때와 같은 파일로 돌렸나」** — `agent/data/` 는 `.gitignore` 라 이것 말고는 되짚을 길이 없다 |
+| `git` — 커밋·브랜치·**`dirty`** | 🔴 `dirty` 가 참이면 이 산출은 **어느 커밋의 것도 아니다** |
+| `env` — python·torch·cuda·cudnn·transformers·opencv·numpy·GPU·TF32 설정 | 「환경이 변했나」(N-3) |
+| `models` — 저장소와 **리비전** | 「같은 가중치인가」(N-1) |
+| `batching` — `oom_events`·`min_batch` | 🔴 **「폴백이 일어났나」**(N-2) — 예전에는 알 방법이 없었다 |
+| `constants` — target fps·`MAX_BATCH`·검출 문턱·selector 목록 | 「같은 동작점인가」(미결 10번) |
+| `outputs` — 두 CSV 의 md5·크기 | 「이 메타가 **이 산출의** 것인가」 |
+
+🔴 **CSV 를 다 쓴 뒤에 쓴다** — 메타 수집이 터져도 결과는 남는다. 수집 실패는
+조용히 넘기지 않고 해당 칸에 `error` 로 적힌다.
+🔴 **인프라 식별자를 안 담는다**(공개 저장소다) — 절대 경로·호스트명 대신
+**파일 지문**으로 적는다.
 
 ## 필요한 자산
 
@@ -144,8 +168,16 @@ JSON으로 찍는다. **파일로 남기지 않으므로 그 출력을 따로 �
 `selector_downstream.py:106`의 `except torch.cuda.OutOfMemoryError`가 배치를
 24 → 12 → 6으로 반씩 줄인다. 배치 크기가 달라지면 커널의 감산 순서가 달라져
 부동소수점 마지막 자리가 흔들릴 수 있다. **다른 프로세스가 GPU를 쓰고 있었는지에
-따라 결과가 달라질 수 있는 구조다.** 재실행 전에 GPU를 비우고, 폴백이 일어났는지
-확인할 방법이 현재 없다(로그를 남기지 않는다).
+따라 결과가 달라질 수 있는 구조다.** 재실행 전에 GPU를 비운다.
+
+> ✅ **정정 (2026-09-15) — 「폴백이 일어났는지 확인할 방법이 현재 없다」는 이제
+> 아니다.** `run_meta.json` 의 `batching` 이 `oom_events` 와 `min_batch` 를
+> 싣는다. **`min_batch` 가 24 보다 작으면 그 실행은 폴백이 일어난 실행**이고,
+> 그 산출을 다른 실행과 마지막 자리까지 대 보는 것은 의미가 없다.
+>
+> 🔴 **그리고 Track 2 에서는 이 위험이 구조적으로 없다** (미결 47번 1회차):
+> `_pose_batch` 에 들어가는 박스가 **한 프레임당 1~3개**라 `MAX_BATCH`=24 를
+> 넘을 일이 없어 **쪼개지지 않는다.** 남는 것은 Track 1 쪽이다.
 
 **N-3. cuDNN 비결정성과 TF32.**
 `torch.backends.cudnn.deterministic`이 설정돼 있지 않고(현재 `False`),
@@ -174,6 +206,30 @@ Track 2의 selector도 같은 식이며 차이는 `pose_quality`를 그 실행�
 전부 결정적이다.
 
 ## 재실행 후 대조 절차
+
+### 0. 🔴 **`run_meta.json` 부터 본다** (2026-09-15 신설)
+
+CSV 를 한 줄도 열기 전에, 기존 메타와 이번 메타를 대 본다. **다르면 그
+차이가 곧 원인 후보**이고, 아래 1~5단계를 건너뛸 수 있다.
+
+```bash
+# 예: 입력이 그때와 같은가
+python - <<'PY'
+import json
+a=json.load(open("run_meta.json")); b=json.load(open("<옛 메타>"))
+for k in ("git","env","models","constants","batching"):
+    if a[k]!=b[k]: print("다름:", k)
+fa={x["name"]:x["md5"] for x in a["inputs"]["track2"]}
+fb={x["name"]:x["md5"] for x in b["inputs"]["track2"]}
+print("입력이 다른 클립:", [n for n in fa if fa[n]!=fb.get(n)])
+PY
+```
+
+🔴 **옛 산출에는 이 파일이 없다** (규칙이 2026-09-15 에 바뀌었다). 그때 것과
+대 보려면 [`../../pending47_baseline_audit/input_fingerprints.csv`](../../pending47_baseline_audit/input_fingerprints.csv)
+가 **2026-09-15 시점의 입력 지문**을 들고 있다 — 그 이전은 **기록이 없다.**
+
+### 1. 그다음에 CSV
 
 기존 CSV 두 개가 **완전한 지문**이다 — 지표 11개 + `delta_*` 11개 + `grade` +
 `grade_changed` + 품질 비율 + 실패 사유가 (clip × mode) 305행에 전부 들어 있다.

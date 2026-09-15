@@ -26,9 +26,12 @@ feature 산출에는 impact_limb / impact_event가 필요한데 타격 rubric이
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
+import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import cv2
@@ -97,6 +100,13 @@ FEATURE_KEYS = [
 ]
 
 
+#: 이 실행에서 실제로 일어난 일. `run_meta.json` 이 이걸 싣는다.
+#: 🔴 `min_batch` 가 MAX_BATCH 보다 작으면 **OOM 폴백이 일어난 실행**이고,
+#: 배치 크기가 달라지면 커널의 감산 순서가 달라져 마지막 자리가 흔들린다
+#: (RERUN.md N-2). 예전에는 이걸 **알 방법이 아예 없었다.**
+_RUN = {"oom_events": 0, "min_batch": MAX_BATCH}
+
+
 def _pose_batch(proc, model, dev, rgb, xywh):
     """한 프레임의 박스 여러 개에 ViTPose를 돌려 (N,17,3)을 돌려준다."""
     batch = MAX_BATCH
@@ -120,6 +130,8 @@ def _pose_batch(proc, model, dev, rgb, xywh):
         except torch.cuda.OutOfMemoryError:  # pragma: no cover
             torch.cuda.empty_cache()
             batch = max(1, batch // 2)
+            _RUN["oom_events"] += 1
+            _RUN["min_batch"] = min(_RUN["min_batch"], batch)
             if batch == 1:
                 raise
 
@@ -335,6 +347,116 @@ def _write(path: Path, rows: list[dict]) -> None:
         w.writerows(rows)
 
 
+def _md5(path: Path) -> str:
+    return hashlib.md5(path.read_bytes()).hexdigest()
+
+
+def _safe(fn, *a, **kw):
+    """메타 수집이 실행을 죽이지 않게. 🔴 실패는 **조용히 넘기지 않고 적는다.**"""
+    try:
+        return fn(*a, **kw)
+    except Exception as exc:  # noqa: BLE001
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
+def _input_fingerprints() -> dict:
+    """이번 실행이 **실제로 읽은** 영상의 지문.
+
+    🔴 **이것이 없어서 2026-09-15 에 갈라내지 못한 것이 있다** (미결 47번):
+    Track 2 의 입력 `agent/data/` 는 `.gitignore` 라 **무엇을 넣고 돌렸는지
+    되짚을 방법이 아무것도 없었다.** 산출 CSV 가 재현되지 않는데 원인이
+    「코드」인지 「입력」인지 가를 수 없었고, 코드는 배제됐는데 입력은
+    **영구 미결**로 남았다.
+    """
+    t1 = sorted((PHASE_A / "clips" / f"{c}.mp4") for c in clip_ids())
+    root = AGENT / "data"
+    t2 = sorted(root.glob("*.mp4")) + sorted(
+        (root / "goldenset" / "soccerkicks_video").glob("*.avi"))
+    return {
+        "track1": [{"name": p.name, "bytes": p.stat().st_size, "md5": _md5(p)}
+                   for p in t1 if p.exists()],
+        "track2": [{"name": p.name, "bytes": p.stat().st_size, "md5": _md5(p)}
+                   for p in t2],
+    }
+
+
+def _git_state() -> dict:
+    """어느 커밋으로, **작업 트리가 깨끗한 채** 돌았는가.
+
+    🔴 `dirty` 가 참이면 이 산출은 **어느 커밋의 것도 아니다.** 그걸 모른 채
+    커밋에 실으면 다음 사람이 그 커밋으로 재현을 시도하다 시간을 버린다.
+    """
+    def run(*args: str) -> str:
+        return subprocess.run(("git", *args), cwd=AGENT, capture_output=True,
+                              text=True, check=True).stdout.strip()
+
+    watched = ("src", "rubrics", "eval/phaseA")
+    return {
+        "commit": run("rev-parse", "HEAD"),
+        "branch": run("rev-parse", "--abbrev-ref", "HEAD"),
+        "dirty": bool(run("status", "--porcelain", "--", *watched)),
+        "dirty_scope": list(watched),
+    }
+
+
+def _env_state(dev: str) -> dict:
+    import numpy
+    import transformers
+
+    gpu = torch.cuda.get_device_name(0) if dev == "cuda" else None
+    return {
+        "python": sys.version.split()[0],
+        "torch": torch.__version__,
+        "cuda": torch.version.cuda,
+        "cudnn": torch.backends.cudnn.version(),
+        "transformers": transformers.__version__,
+        "opencv": cv2.__version__,
+        "numpy": numpy.__version__,
+        "gpu": gpu,
+        "cudnn_deterministic": torch.backends.cudnn.deterministic,
+        "cudnn_benchmark": torch.backends.cudnn.benchmark,
+        "cudnn_allow_tf32": torch.backends.cudnn.allow_tf32,
+        "matmul_allow_tf32": torch.backends.cuda.matmul.allow_tf32,
+    }
+
+
+def _write_run_meta(dev: str, timing: dict) -> Path:
+    """이 실행이 **무엇으로 무엇을 만들었는지**를 파일로 남긴다.
+
+    🔴 **예전에는 stdout 에만 찍고 「승인된 산출물이 아니라」 파일로 안
+    남겼다.** 그 규칙이 2026-09-15 에 대가를 치렀다 — B-6 산출이 재현되지
+    않는데 **그때 무엇으로 돌렸는지 아무 데도 없어서** 원인을 못 갈랐다
+    (미결 `ho` 47번). 보고서에 적는다는 것은 **사람이 적어야** 남는다는
+    뜻이고, 그날 아무도 안 적었다.
+
+    🔴 **CSV 를 다 쓴 뒤에 쓴다** — 메타 수집이 터져도 결과는 남는다.
+    🔴 **인프라 식별자를 넣지 않는다** (공개 저장소다) — 절대 경로·호스트명을
+    담지 않고, **파일 지문**으로 대신한다.
+    """
+    meta = {
+        "written_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "device": dev,
+        "git": _safe(_git_state),
+        "env": _safe(_env_state, dev),
+        "models": {
+            "pose": {"repo": POSE_MODEL, "revision": POSE_MODEL_REVISION},
+            "detector": {"repo": PERSON_DETECTOR,
+                         "revision": PERSON_DETECTOR_REVISION},
+        },
+        "constants": {"target_fps": DEFAULT_TARGET_FPS, "max_batch": MAX_BATCH,
+                      "det_threshold": DET_THRESHOLD, "modes": list(MODES),
+                      "track1_kinematics": [T1_LIMB, T1_EVENT]},
+        "batching": dict(_RUN),
+        "timing": timing,
+        "outputs": {p.name: {"md5": _md5(p), "bytes": p.stat().st_size}
+                    for p in sorted(OUT.glob("selector_downstream_*.csv"))},
+        "inputs": _safe(_input_fingerprints),
+    }
+    path = OUT / "run_meta.json"
+    path.write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
+    return path
+
+
 def main() -> None:
     from transformers import AutoProcessor, RTDetrForObjectDetection, VitPoseForPoseEstimation
 
@@ -354,7 +476,19 @@ def main() -> None:
     t2 = time.time()
     _write(OUT / "selector_downstream_rubric_clips.csv", r2)
 
-    # 실행 메타는 파일로 남기지 않는다(승인된 산출물 목록에 없음). 보고서에 적는다.
+    # 🔴 **실행 메타를 파일로 남긴다** (2026-09-15, 미결 `ho` 47번).
+    #    앞서 여기 「파일로 남기지 않는다(승인된 산출물 목록에 없음). 보고서에
+    #    적는다」고 적혀 있었다. **그 규칙이 대가를 치렀다** — 산출이 재현되지
+    #    않는데 그때 무엇으로 돌렸는지가 아무 데도 없었다. 보고서에 적는다는
+    #    것은 사람이 적어야 남는다는 뜻이고, 그날 아무도 안 적었다.
+    timing = {"track1_seconds": round(t1 - t0, 1),
+              "track2_seconds": round(t2 - t1, 1),
+              "total_seconds": round(t2 - t0, 1),
+              "track1_clips": len({r["clip_id"] for r in r1}),
+              "track2_clips": len({r["clip_id"] for r in r2})}
+    meta_path = _write_run_meta(dev, timing)
+    print(f"실행 메타 → {meta_path.name}")
+
     print(json.dumps({
         "device": dev,
         "track1_seconds": round(t1 - t0, 1),
