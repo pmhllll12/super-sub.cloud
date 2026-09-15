@@ -78,3 +78,13 @@ class JobPort(ABC):
     @abstractmethod
     def get_latest_detection(self, video_id: UUID) -> DetectionStatusEntity | None:
         """그 영상의 가장 최근 `detect` 작업 하나. 없으면 None."""
+
+    @abstractmethod
+    def get_latest_report_key(self, video_id: UUID) -> str | None:
+        """그 영상의 가장 최근 **성공한 `analyze`** 작업이 가리키는 리포트 키.
+
+        `paik` 29번(관절 결과 읽기)이 쓴다 — 성공한 analyze 작업이 없으면(아직
+        큐 대기·분석 중·`detect` 뿐) `None`이다. 부르는 쪽이 `VideoEntity.
+        analysis_status`로 "왜 없는지"(대기 중인지 실패했는지)를 가른다 —
+        여기는 있는지 없는지만 답한다.
+        """

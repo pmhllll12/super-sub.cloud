@@ -21,12 +21,14 @@ from app.analysis.domain.entities.job_entity import (
     DetectionStatusEntity,
 )
 from app.analysis.domain.rules.job_rules import (
+    ANALYZE,
     DETECT,
     FAILED,
     QUEUED,
     RECLAIM_FINAL,
     RECLAIM_FIRST,
     RUNNING,
+    SUCCEEDED,
 )
 
 
@@ -207,3 +209,15 @@ class JobPgRepository(JobPort):
             failure_reason=failure_reason,
             detection_result=detection_result,
         )
+
+    def get_latest_report_key(self, video_id: UUID) -> str | None:
+        return self._session.execute(
+            select(AnalysisJobOrm.report_key)
+            .where(
+                AnalysisJobOrm.video_id == video_id,
+                AnalysisJobOrm.job_type == ANALYZE,
+                AnalysisJobOrm.status == SUCCEEDED,
+            )
+            .order_by(AnalysisJobOrm.created_at.desc())
+            .limit(1)
+        ).scalars().first()

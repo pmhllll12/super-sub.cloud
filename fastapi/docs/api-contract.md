@@ -2742,6 +2742,65 @@ INVALID_TIME_SLOT` — 뒤집힌 시간은 겹침 계산에서 늘 거짓이라 
 
 ---
 
+## 3-14. 선수·관절(skeleton) 읽기 (2026-09-15 추가 — `paik` 29번)
+
+「선수와 비교하기」가 자세를 겹쳐 그리는 자리의 서버 몫이다. 지금 화면은
+브라우저(MoveNet)가 직접 관절을 뽑는다 — 이 API는 **에이전트가 낸 값**을
+그대로 내준다(`ho` 30번). 🔴 **재생 주소는 안 준다** — 선수 원본 영상이
+S3에 없다(EC2 역할이 `videos/` 접두사에 쓰기 권한이 없어 못 올렸다). 화면은
+계속 정적 파일(`www/public/compare/`)로 재생한다.
+
+### `GET /api/v1/reference-players` — 선수 목록
+
+```json
+[{ "id": "castanheira", "name": "티아구 카스탄헤이라" },
+ { "id": "rovelli", "name": "에스테반 로벨리" }]
+```
+
+`id`는 `www/src/components/analysis/AnalysisStage.tsx`의 `COMPARE` id와
+그대로 맞춘다.
+
+### `GET /api/v1/reference-players/{player_id}/skeleton` — 선수 관절
+
+없는 `player_id`면 `404 PLAYER_NOT_FOUND`.
+
+### `GET /api/v1/videos/{video_id}/skeleton` — 내 영상 관절
+
+**자기 영상만.** `GET /videos/{id}/report`와 같은 에러 셋 — 없거나 남의
+것이면 `404 VIDEO_NOT_FOUND`, 분석 `failed`면 `404 ANALYSIS_FAILED`, 아직
+성공한 분석이 없으면 `404 REPORT_NOT_READY`.
+
+### 둘 다 같은 응답 모양
+
+```json
+{
+  "known": true, "fps": 15.0, "frames": 76, "frame_size": [1920, 1080],
+  "swing_leg": "right", "direction": 1,
+  "keypoint_names": ["nose", "...", "right_ankle"],
+  "moments": { "before": 41, "impact": 46, "after": 61 },
+  "moments_seconds": { "before": 2.733, "impact": 3.067, "after": 4.067 },
+  "after_clipped": false,
+  "joints": [[[0.4821, 0.3915, 0.94], "... 17점"], null, "..."]
+}
+```
+
+`joints`는 프레임당 COCO-17 × `[x, y, confidence]`. 🔴 **못 잡은 프레임은
+배열에서 안 빠지고 `null`로 자리를 지킨다** — 인덱스가 곧 프레임 번호다.
+좌표는 `frame_size`로 나눈 값이라 **0~1을 벗어날 수 있다**(화면 밖으로 나간
+관절) — 자르지 않는다.
+
+🔴 **리포트는 있는데 `skeleton`이 없으면**(옛 스키마, `schema_version` 1.4
+이전) 404가 아니라 `200`으로 `{"known": false, "why": "..."}`을 준다 —
+리포트 자체가 없는 것과는 다른 상태라서다.
+
+`skeleton`은 DB에 없다 — 리포트 전체가 이미 S3에 있어서 요청마다 그 키로
+읽는다(정어진 판단, `jin` 27번과 같은 결).
+
+상세: 부록 D 도메인 ②(`reference_player`) · 클라이언트 반영은
+`docs/client-contract-changes.md`
+
+---
+
 ## 6. 다음 단계
 
 > **2026-09-01 갱신.** 이 절의 1~4번이 전부 끝나서 다시 썼다. 옛 내용은 스텁 시절

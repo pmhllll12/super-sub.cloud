@@ -1725,6 +1725,54 @@ grep -n "TEAMS: Omit<MatchTeam" www/src/lib/teamMatch.ts
 
 ---
 
+## 41. 선수·내 영상의 관절(skeleton)을 읽을 수 있습니다 (2026-09-15 추가, 미결 `paik` 29번)
+
+「선수와 비교하기」가 지금 브라우저(MoveNet)로 직접 관절을 뽑고 있는 것을
+서버 값으로 바꿀 수 있습니다 — 받는 자리가 한 곳(`www/src/lib/motion/
+source.ts`)이라고 `paik` 29번에 적혀 있어서, 그 파일만 바꾸면 될 것입니다.
+
+### 만족해야 할 성질
+
+1. **선수 목록을 서버에서 받아올 수 있을 것** — 이름만입니다.
+2. **선수·내 영상 양쪽의 관절 시계열을 같은 모양으로 받을 수 있을 것.**
+
+### 🔴 이번 범위에서 안 한 것 — 재생 주소
+
+선수 원본 영상은 S3에 없습니다(EC2 역할이 `videos/` 접두사에 쓰기 권한이
+없어 못 올렸습니다). **화면은 계속 지금처럼 정적 파일(`www/public/
+compare/`의 Pexels 클립)로 재생해 주십시오** — 서버가 재생 주소를 안
+줍니다. 필요하면 별도로 요청해 주시면 됩니다.
+
+### 새 엔드포인트 (계약 3-14절)
+
+| 엔드포인트 | 용도 |
+|---|---|
+| `GET /reference-players` | 선수 목록(`id`·`name`만, `id`는 `AnalysisStage.tsx`의 `COMPARE` id와 같습니다) |
+| `GET /reference-players/{player_id}/skeleton` | 그 선수의 관절 시계열 |
+| `GET /videos/{video_id}/skeleton` | **내 영상만**의 관절 시계열 |
+
+관절 응답 모양은 `agent/report-contract.md`의 `skeleton` 절과 완전히
+같습니다(에이전트 값을 그대로 통과시킵니다) — `joints`(프레임당 COCO-17)·
+`fps`·`moments`(before/impact/after)·`swing_leg` 등.
+
+### 🔴 하지 말 것
+
+- **못 잡은 프레임(`joints[i] === null`)을 배열에서 건너뛰지 마십시오** —
+  인덱스가 곧 프레임 번호입니다. 건너뛰면 그다음 프레임이 다 한 칸씩
+  밀립니다.
+- **좌표를 0~1로 자르지 마십시오** — 화면 밖으로 나간 관절은 실제로 범위를
+  벗어난 값입니다. 자르면 발이 가장자리에 붙어 있는 것처럼 그려집니다.
+- `known: false` 응답(리포트는 있는데 관절 데이터가 없는 옛 리포트)을
+  에러로 다루지 마십시오 — `200`입니다. `why` 문구만 있고 나머지 필드는
+  없습니다.
+- `GET /videos/{id}/skeleton`은 `GET /videos/{id}/report`와 같은 에러
+  셋(`VIDEO_NOT_FOUND`·`ANALYSIS_FAILED`·`REPORT_NOT_READY`)을 씁니다 —
+  이미 처리하고 계신 분기를 그대로 재사용하시면 됩니다.
+
+상세: `fastapi/docs/api-contract.md`(3-14절) · 부록 D 도메인 ②(`reference_player`)
+
+---
+
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린
 것이다. 새로 붙이는 화면이 있으면 계약 문서 쪽을 본다.
 

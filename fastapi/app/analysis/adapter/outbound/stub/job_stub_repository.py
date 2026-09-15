@@ -25,6 +25,7 @@ from app.analysis.domain.rules.job_rules import (
     RECLAIM_FINAL,
     RECLAIM_FIRST,
     RUNNING,
+    SUCCEEDED,
 )
 
 
@@ -194,6 +195,18 @@ class StubJobRepository(JobPort):
             failure_reason=row.failure_reason,
             detection_result=row.detection_result,
         )
+
+    def get_latest_report_key(self, video_id: UUID) -> str | None:
+        candidates = [
+            r
+            for r in _JOBS.values()
+            if r.video_id == video_id
+            and r.job_type == ANALYZE
+            and r.status == SUCCEEDED
+        ]
+        if not candidates:
+            return None
+        return max(candidates, key=lambda r: r.created_at).report_key
 
 
 # 적재는 완료 보고 계약 테스트에는 무관하다 — DB 없이 돌아야 하므로 아무것도

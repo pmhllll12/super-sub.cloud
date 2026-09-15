@@ -12,6 +12,9 @@ from app.analysis.adapter.inbound.api.v1.admin_video_router import (
     admin_video_router,
 )
 from app.analysis.adapter.inbound.api.v1.job_router import job_router
+from app.analysis.adapter.inbound.api.v1.reference_player_router import (
+    reference_player_router,
+)
 from app.analysis.adapter.inbound.api.v1.video_router import video_router
 from app.billing.adapter.inbound.api.v1.billing_router import billing_router
 from app.card.adapter.inbound.api.v1.card_router import card_router
@@ -117,6 +120,7 @@ for _router in (
     video_router,
     admin_video_router,
     job_router,
+    reference_player_router,
     review_router,
     admin_router,
     billing_router,

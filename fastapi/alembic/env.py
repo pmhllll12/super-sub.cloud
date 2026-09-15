@@ -47,6 +47,7 @@ from app.analysis.adapter.outbound.orm import analysis_metric_orm  # noqa: E402,
 from app.analysis.adapter.outbound.orm import analysis_metric_value_orm  # noqa: E402,F401
 from app.analysis.adapter.outbound.orm import analysis_report_orm  # noqa: E402,F401
 from app.analysis.adapter.outbound.orm import metric_definition_orm  # noqa: E402,F401
+from app.analysis.adapter.outbound.orm import reference_player_orm  # noqa: E402,F401
 from app.analysis.adapter.outbound.orm import video_orm  # noqa: E402,F401
 from app.analysis.adapter.outbound.orm import (  # noqa: E402,F401
     video_validation_orm,

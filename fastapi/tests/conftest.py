@@ -16,9 +16,15 @@ from app.analysis.adapter.outbound.stub.job_stub_repository import (
     reset_ingested,
     reset_jobs,
 )
+from app.analysis.adapter.outbound.stub.reference_player_stub_repository import (
+    StubReferencePlayerRepository,
+)
 from app.analysis.dependencies.job_providers import (
     get_job_repository,
     get_report_ingest_repository,
+)
+from app.analysis.dependencies.reference_player_providers import (
+    get_reference_player_repository,
 )
 from app.analysis.dependencies.video_providers import (
     get_report_read_repository,
@@ -126,6 +132,9 @@ def client() -> TestClient:
     app.dependency_overrides[get_squad_repository] = StubSquadRepository
     app.dependency_overrides[get_video_repository] = StubVideoRepository
     app.dependency_overrides[get_job_repository] = StubJobRepository
+    app.dependency_overrides[get_reference_player_repository] = (
+        StubReferencePlayerRepository
+    )
     app.dependency_overrides[get_report_ingest_repository] = (
         StubReportIngestRepository
     )
@@ -161,6 +170,7 @@ def client() -> TestClient:
         app.dependency_overrides.pop(get_squad_repository, None)
         app.dependency_overrides.pop(get_video_repository, None)
         app.dependency_overrides.pop(get_job_repository, None)
+        app.dependency_overrides.pop(get_reference_player_repository, None)
         app.dependency_overrides.pop(get_report_ingest_repository, None)
         app.dependency_overrides.pop(get_report_read_repository, None)
         app.dependency_overrides.pop(get_review_repository, None)
