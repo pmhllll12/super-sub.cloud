@@ -404,7 +404,16 @@ def _env_state(dev: str) -> dict:
     import transformers
 
     gpu = torch.cuda.get_device_name(0) if dev == "cuda" else None
+    # 🔴 **돌릴 때 GPU 를 누가 같이 쓰고 있었는가** (2026-09-15, 47번 2회차).
+    #    N-2·N-3 이 「다른 프로세스가 GPU를 쓰고 있었는지에 따라 결과가 달라질
+    #    수 있다」고 경고해 두었는데, **그걸 적어 두는 칸이 없었다.** 그래서
+    #    09-08 에는 재현되던 것이 09-15 에 안 되는 이유를 **사후에 못 가린다.**
+    free_b = total_b = None
+    if dev == "cuda":
+        free_b, total_b = torch.cuda.mem_get_info(0)
     return {
+        "gpu_free_bytes_at_start": free_b,
+        "gpu_total_bytes": total_b,
         "python": sys.version.split()[0],
         "torch": torch.__version__,
         "cuda": torch.version.cuda,
