@@ -33,6 +33,7 @@ from supersub_agent.features import (  # noqa: E402
     extract_features,
     frame_metrics_as_seconds,
     keypoint_quality_envelope,
+    skeleton_envelope,
     verify_rubric_coverage,
 )
 from supersub_agent.judge import Judge  # noqa: E402
@@ -360,7 +361,8 @@ def analyze_one(video: str, args, rubric, subject) -> str:
 # 🔴 값은 `contracts/report_schema.yaml` 의 `version` 과 **같아야 한다**
 # (테스트가 본다). 필드를 늘렸으면 minor 를 올린다 — 1.1 은 `view_dependent`
 # 가 늘어난 봉투다 (미결 `ho` 37·38번). 1.2 는 `title_earned` (미결 `paik` 23번).
-REPORT_SCHEMA_VERSION = "1.2"
+# 1.3 은 `skeleton` — 관절 시계열과 세 순간 (미결 `paik` 30번).
+REPORT_SCHEMA_VERSION = "1.3"
 
 
 def build_report(
@@ -451,6 +453,18 @@ def build_report(
         # 🔴 `features` 의 형제 블록이다 — 판정 입력이 그대로다.
         "keypoint_quality": keypoint_quality_envelope(
             pose.keypoints, rubric.impact_limb, swing_side
+        ),
+        # **프레임별 관절과 세 순간** (미결 `paik` 30번). 비교 화면이 자세를
+        # 겹쳐 그리는 자리다 — 지금은 브라우저가 관절을 다시 뽑고 있어서
+        # 위쪽 리포트와 **다른 계기에서 온 값**으로 겹쳐 놓고 있다.
+        # 🔴 여기도 `features` 의 형제 블록이다 — 판정 입력이 그대로다.
+        "skeleton": skeleton_envelope(
+            pose.keypoints,
+            float(pose.sampled_fps),
+            features,
+            rubric.impact_limb,
+            swing_side,
+            pose.frame_size,
         ),
         "features": features,
         "result": result,

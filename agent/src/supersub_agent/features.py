@@ -24,6 +24,24 @@ L_HIP, R_HIP = 11, 12
 L_KNEE, R_KNEE = 13, 14
 L_ANKLE, R_ANKLE = 15, 16
 
+# COCO-17 관절 이름. **순서가 위 인덱스 상수와 같아야 한다** — ViTPose 출력의
+# 순서이고, 바꾸면 봉투가 엉뚱한 관절 이름을 붙인다.
+#
+# 🔴 이 목록을 봉투에 함께 싣는 이유는 **받는 쪽이 인덱스의 뜻을 추측하지
+# 않게** 하는 것이다(미결 `paik` 30번). 17점을 그냥 배열로 주면 화면 쪽이
+# 자기 상수표를 따로 들게 되고, 두 표가 갈리면 **왼쪽 무릎을 오른쪽으로**
+# 그려도 아무 데서도 안 터진다.
+KEYPOINT_NAMES = (
+    "nose",
+    "left_eye", "right_eye", "left_ear", "right_ear",
+    "left_shoulder", "right_shoulder",
+    "left_elbow", "right_elbow",
+    "left_wrist", "right_wrist",
+    "left_hip", "right_hip",
+    "left_knee", "right_knee",
+    "left_ankle", "right_ankle",
+)
+
 # 관절 체인 (몸통쪽, 각도를 잴 관절, 말단). 위상 분할은 가운데 관절의 신전
 # 각속도가 최대인 프레임을 임팩트로 삼는다 — 다리든 팔이든 구조가 같다.
 Chain = tuple[int, int, int]
@@ -374,6 +392,155 @@ def keypoint_quality_envelope(
         "threshold": threshold,
         # 관절 하나가 "보였다"고 인정되는 신뢰도 하한. 사지마다 다르다.
         "min_keypoint_confidence": LIMB_MIN_CONFIDENCE.get(limb, MIN_CONFIDENCE),
+    }
+
+
+# 「직전」·「+1초」를 임팩트에서 얼마나 떨어뜨릴 것인가 (미결 `paik` 30번).
+#
+# 🔴 **화면이 정한 값이고 에이전트가 고른 것이 아니다.** 비교 카드 세 장이
+# 서로 다른 자세로 보이게 하려고 실물에서 맞춘 값이라, 여기서 말없이 바꾸면
+# 화면과 어긋난다. 고칠 이유가 생기면 **고치지 말고 미결 항목에 적는다** —
+# 그 항목이 그렇게 요구한다.
+#
+# 0.3초인 이유: 앞서 「임팩트 앞 0.5초 안에서 차는 다리 무릎각 최소」였는데,
+# 그 정의는 구조상 최소각 프레임이 임팩트 **한 프레임 전**으로 쏠려 두 카드가
+# 거의 같은 자세로 보였다 (2026-09-15 정정).
+BEFORE_IMPACT_SECONDS = 0.3
+AFTER_IMPACT_SECONDS = 1.0
+
+
+def _nearest_valid(usable: np.ndarray, t: int) -> int | None:
+    """t에서 가장 가까운 유효 프레임. **동률이면 이른 쪽**이다.
+
+    동률 규칙을 한 곳에 둔다 — 두 곳에서 각자 고르면 같은 영상이 경로에 따라
+    다른 프레임을 「직전」으로 내고, 그 차이는 눈으로만 보인다.
+    """
+    if not usable.any():
+        return None
+    offsets = range(len(usable))
+    for off in offsets:
+        for cand in ((t - off, t + off) if off else (t,)):
+            if 0 <= cand < len(usable) and usable[cand]:
+                return int(cand)
+    return None
+
+
+def skeleton_envelope(
+    kps: np.ndarray,
+    sampled_fps: float,
+    features: dict,
+    impact_limb: str = "leg",
+    swing_side: str = "auto",
+    frame_size: tuple[int, int] | None = None,
+) -> dict:
+    """**프레임별 관절과 세 순간** — 비교 화면이 자세를 겹쳐 그리는 자리
+    (미결 `paik` 30번).
+
+    화면은 지금 브라우저에서 관절을 **다시 뽑고 있다**(데모). 그러면 위쪽
+    분석 리포트(에이전트 값)와 겹쳐 놓은 자세가 **다른 계기에서 온 값**이라
+    숫자가 안 맞고, 영상 두 편을 매번 훑느라 느리다. 여기 값이 그 둘을 함께
+    없앤다 — **에이전트가 이미 계산한 것을 실어 보낼 뿐이다.**
+
+    🔴 **`features`를 바꾸지 않는다.** `timebase`·`subject`·`keypoint_quality`
+    와 같은 **형제 블록**이다 — 판정 입력이 그대로라 기존 평가(B-2~B-6)와
+    비교가 끊기지 않고 B-6 재실행을 부르지 않는다.
+
+    🔴 **세 순간을 여기서 새로 정의하지 않는다.** 임팩트는 `segment_phases`가
+    이미 고른 값(`features["impact_frame"]`)을 그대로 쓴다. 다시 찾으면 같은
+    규칙이 두 벌이 되고, 리포트의 임팩트와 화면의 임팩트가 갈린다.
+
+    좌표는 **프레임 크기로 나눈 정규화 값**이다 — `subject`의 박스와 같은
+    규약이라 화면 크기를 몰라도 바로 겹쳐진다. 픽셀로 되짚을 수 있게
+    `frame_size`를 함께 싣는다. (자릿수는 4자리 — 1920px에서 0.2px이라
+    그리기에 손실이 없다.)
+
+    🔴 **0~1로 자르지 않는다.** 화면 밖으로 나간 관절은 ViTPose가 프레임
+    바깥 좌표를 내고, 그것이 실제로 일어난 일이다. 잘라 넣으면 발이 화면
+    가장자리에 **붙어 있는 것처럼** 그려진다.
+
+    사람이 안 잡힌 프레임은 **`null`로 자리를 지킨다.** 빼 버리면 배열 인덱스와
+    프레임 번호가 어긋나 세 순간이 엉뚱한 자세를 가리킨다.
+    """
+    if frame_size is None:
+        # 픽셀 크기를 모르면 정규화가 성립하지 않는다. 픽셀 좌표를 대신 내면
+        # 받는 쪽이 두 좌표계를 구분할 방법이 없다 — 안 냈다고 말한다.
+        return {"known": False, "why": "frame_size가 없다 — 합성 키포인트 경로"}
+    impact = features.get("impact_frame")
+    if impact is None:
+        return {"known": False, "why": "impact_frame이 없다 — 임팩트를 못 골랐다"}
+    if not (isinstance(sampled_fps, (int, float)) and sampled_fps > 0):
+        return {"known": False, "why": f"sampled_fps가 격자로 못 쓸 값이다: {sampled_fps!r}"}
+
+    try:
+        norm = normalize(kps)
+    except InsufficientQuality as exc:
+        return {"known": False, "why": str(exc)}
+
+    # 🔴 **`extract_features`와 같은 인자로 같은 함수를 부른다.** 반대쪽 사지를
+    # auto로 남기는 것까지 같아야 「차는 다리」가 채점과 어긋나지 않는다.
+    swing_knee, _plant_knee = identify_legs(
+        norm, swing_side if impact_limb == "leg" else "auto"
+    )
+    swing_leg = "left" if swing_knee == L_KNEE else "right"
+
+    impact = int(impact)
+    width, height = float(frame_size[0]), float(frame_size[1])
+    total = int(kps.shape[0])
+
+    # 「직전」의 폴백이 보는 것은 **차는 다리 무릎각을 잴 수 있는가**다 —
+    # 그 카드가 보여주는 것이 무릎 굽힘이라 다른 관절이 잡혀도 소용이 없다.
+    knee_usable = valid_frames(kps, "leg", LIMB_CHAINS["leg"][swing_leg])
+
+    before = impact - round(BEFORE_IMPACT_SECONDS * sampled_fps)
+    before = max(0, min(total - 1, before))
+    if not knee_usable[before]:
+        nearest = _nearest_valid(knee_usable, before)
+        if nearest is not None:
+            before = nearest
+
+    after = impact + round(AFTER_IMPACT_SECONDS * sampled_fps)
+    if after >= total:
+        # 「넘치면 마지막 유효 프레임」. 못 잡은 채로 끝나는 클립에서 마지막
+        # 프레임을 그냥 주면 빈 스켈레톤이 카드로 나간다.
+        last = _nearest_valid(knee_usable, total - 1)
+        after = last if last is not None else total - 1
+
+    xy = kps[:, :, :2].astype(np.float64)
+    conf = kps[:, :, 2].astype(np.float64)
+    joints: list[list[list[float]] | None] = []
+    for t in range(total):
+        if not (conf[t] > 0).any():
+            # 사람이 안 잡힌 프레임 — pose.py가 신뢰도 0으로 채운 자리다.
+            joints.append(None)
+            continue
+        joints.append([
+            [
+                round(float(xy[t, j, 0]) / width, 4),
+                round(float(xy[t, j, 1]) / height, 4),
+                round(float(conf[t, j]), 3),
+            ]
+            for j in range(kps.shape[1])
+        ])
+
+    return {
+        "known": True,
+        # 초 환산의 나눗수. 🔴 `target_fps`가 아니다 — 그것으로 나누면 20%
+        # 어긋난다(미결 7번 E-3).
+        "fps": round(float(sampled_fps), 4),
+        "frames": total,
+        "frame_size": [int(frame_size[0]), int(frame_size[1])],
+        # **차는 다리.** `swing_side`가 auto였으면 여기 값이 판별 결과다.
+        "swing_leg": swing_leg,
+        "keypoint_names": list(KEYPOINT_NAMES),
+        # 프레임 번호. 화면의 카드 세 장이 이 순서로 선다.
+        "moments": {"before": int(before), "impact": impact, "after": int(after)},
+        # 초도 함께 낸다 — 읽는 쪽이 `target_fps`로 나누는 실수를 막는다.
+        "moments_seconds": {
+            "before": round(before / sampled_fps, 3),
+            "impact": round(impact / sampled_fps, 3),
+            "after": round(after / sampled_fps, 3),
+        },
+        "joints": joints,
     }
 
 
