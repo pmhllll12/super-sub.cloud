@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:super_sub/core/dev/data_source.dart';
 import 'package:super_sub/core/mock/mock_db.dart';
 import 'package:super_sub/features/auth/data/auth_providers.dart';
 import 'package:super_sub/features/auth/data/auth_repository.dart';
+import 'package:super_sub/features/auth/data/auth_repository_api.dart';
 import 'package:super_sub/features/auth/data/auth_repository_mock.dart';
+import 'package:super_sub/features/auth/data/google_id_token.dart';
 import 'package:super_sub/features/auth/data/models/app_user.dart';
 import 'package:super_sub/features/auth/data/models/session.dart';
 import 'package:super_sub/features/auth/presentation/screens/login_screen.dart';
@@ -36,6 +39,15 @@ class _TooManyRequestsAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<Session> loginWithGoogle({required String idToken}) {
+    throw const AuthException(
+      '요청이 너무 잦습니다',
+      code: 'TOO_MANY_REQUESTS',
+      retryAfter: 2,
+    );
+  }
+
+  @override
   Future<Session> loginAs(String userId) => throw UnimplementedError();
 
   @override
@@ -47,6 +59,16 @@ class _TooManyRequestsAuthRepository implements AuthRepository {
   @override
   Future<AppUser> updateProfile({required String nickname}) =>
       throw UnimplementedError();
+}
+
+/// 구글 창 대신 정해 둔 토큰을 준다. `null` 이면 사용자가 창을 닫은 것이다.
+class _FixedToken implements GoogleIdTokenSource {
+  const _FixedToken(this.idToken);
+
+  final String? idToken;
+
+  @override
+  Future<String?> fetchIdToken() async => idToken;
 }
 
 // 화면·세션 로직 테스트는 실제 API가 아니라 Mock을 상대한다 — 빠르고
@@ -61,6 +83,18 @@ Widget _wrap() => ProviderScope(
       child: const MaterialApp(home: LoginScreen()),
     );
 
+/// 로그인 ↔ 가입 전환 글자를 누른다.
+///
+/// 폼 맨 아래라 800×600 시험 화면에서는 밖으로 밀린다 — 폰에서도 굴려서 닿는
+/// 자리라 **굴려 보이게 한 뒤** 누른다.
+Future<void> _tapModeToggle(WidgetTester tester) async {
+  final toggle = find.byKey(const Key('auth-mode-toggle'));
+  await tester.ensureVisible(toggle);
+  await tester.pump();
+  await tester.tap(toggle);
+  await tester.pump();
+}
+
 void main() {
   testWidgets('이메일과 비밀번호 입력란이 있다', (tester) async {
     await tester.pumpWidget(_wrap());
@@ -73,11 +107,56 @@ void main() {
     expect(find.textContaining('내려'), findsNothing);
   });
 
-  testWidgets('개발용 바로 진입 계정 3종이 있다', (tester) async {
+  // 웹처럼 이메일 로그인과 구글 로그인 둘뿐이다. 바로 진입 버튼은 API 모드에서
+  // 예외만 던졌다(2026-09-15 걷어냄).
+  testWidgets('로그인 수단은 이메일과 구글 둘뿐이다', (tester) async {
     await tester.pumpWidget(_wrap());
-    expect(find.text('개인 사용자 (데이터 있음)'), findsOneWidget);
-    expect(find.text('팀 관리자'), findsOneWidget);
-    expect(find.text('신규 가입자 (데이터 0건)'), findsOneWidget);
+    expect(find.byKey(const Key('login-submit')), findsOneWidget);
+    expect(find.byKey(const Key('google-submit')), findsOneWidget);
+    expect(find.textContaining('개발용'), findsNothing);
+    expect(find.text('팀 관리자'), findsNothing);
+  });
+
+  // 개발 빌드(시험도 개발 빌드다)에서만 서는 단추. 서버가 꺼진 곳에서 화면 작업을
+  // 잇는 용도다 — 데이터를 목업으로 바꾸고 목업 계정으로 들어간다.
+  testWidgets('「개발자 전용」은 목업으로 바꾼 뒤 들어간다', (tester) async {
+    // 인증을 덮어쓰지 않는다 — 실제 교체 지점이 스위치를 따라가는지 봐야 한다.
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(home: LoginScreen()),
+    ));
+    expect(container.read(useMockProvider), isFalse);
+    expect(container.read(authRepositoryProvider), isA<ApiAuthRepository>());
+
+    final button = find.byKey(const Key('dev-only-login'));
+    expect(find.text('개발자 전용'), findsOneWidget);
+    await tester.ensureVisible(button);
+    await tester.pump();
+    await tester.tap(button);
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(container.read(useMockProvider), isTrue);
+    expect(container.read(authRepositoryProvider), isA<MockAuthRepository>());
+    expect(container.read(sessionControllerProvider), isA<SessionLoggedIn>());
+  });
+
+  testWidgets('가입 모드에서는 「개발자 전용」을 안 보인다', (tester) async {
+    await tester.pumpWidget(_wrap());
+    await _tapModeToggle(tester);
+    expect(find.byKey(const Key('dev-only-login')), findsNothing);
+  });
+
+  testWidgets('눈 단추로 비밀번호를 보였다 숨긴다', (tester) async {
+    await tester.pumpWidget(_wrap());
+    TextField password() =>
+        tester.widget<TextField>(find.byKey(const Key('login-password')));
+
+    expect(password().obscureText, isTrue);
+    await tester.tap(find.byKey(const Key('password-reveal')));
+    await tester.pump();
+    expect(password().obscureText, isFalse);
   });
 
   testWidgets('없는 이메일로 로그인하면 오류 문구가 뜬다', (tester) async {
@@ -98,23 +177,56 @@ void main() {
     expect(find.text('등록되지 않은 이메일입니다'), findsOneWidget);
   });
 
-  testWidgets('바로 진입 버튼을 누르면 세션이 생긴다', (tester) async {
-    final container = ProviderContainer(overrides: [_authOverride]);
-    addTearDown(container.dispose);
+  group('구글 로그인', () {
+    Future<ProviderContainer> pumpWithToken(
+      WidgetTester tester,
+      String? idToken,
+    ) async {
+      final container = ProviderContainer(overrides: [
+        _authOverride,
+        googleIdTokenSourceProvider.overrideWithValue(_FixedToken(idToken)),
+      ]);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: LoginScreen()),
+      ));
+      return container;
+    }
 
-    await tester.pumpWidget(UncontrolledProviderScope(
-      container: container,
-      child: const MaterialApp(home: LoginScreen()),
-    ));
+    Future<void> tapGoogle(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('google-submit')));
+      // 눌림 애니메이션(340ms) → 로그인(Mock 300ms) → _restore() 까지.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump(const Duration(milliseconds: 500));
+    }
 
-    await tester.tap(find.text('팀 관리자'));
-    // 눌림 애니메이션(340ms)을 먼저 흘려보낸다.
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
-    // 위와 동일 — smoke_test.dart의 pump(500ms) 관용구 참고.
-    await tester.pump(const Duration(milliseconds: 500));
+    testWidgets('토큰을 받으면 로그인된다', (tester) async {
+      final container = await pumpWithToken(tester, 'google-id-token');
+      await tapGoogle(tester);
+      expect(container.read(sessionControllerProvider), isA<SessionLoggedIn>());
+    });
 
-    expect(container.read(sessionControllerProvider), isA<SessionLoggedIn>());
+    // 창을 닫은 것은 실패가 아니다 — 오류 문구를 띄우지 않는다.
+    testWidgets('구글 창을 닫으면 아무 일도 없다', (tester) async {
+      final container = await pumpWithToken(tester, null);
+      container.read(sessionControllerProvider);
+      await tapGoogle(tester);
+      expect(
+        container.read(sessionControllerProvider),
+        isNot(isA<SessionLoggedIn>()),
+      );
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.textContaining('실패'), findsNothing);
+    });
+
+    testWidgets('가입 모드에서는 글자만 가입으로 바뀐다', (tester) async {
+      await tester.pumpWidget(_wrap());
+      expect(find.text('구글 계정으로 로그인'), findsOneWidget);
+      await _tapModeToggle(tester);
+      expect(find.text('구글 계정으로 가입'), findsOneWidget);
+    });
   });
 
   group('회원가입', () {
@@ -125,11 +237,12 @@ void main() {
       required String password,
       String nickname = '새식구',
     }) async {
-      await tester.tap(find.byKey(const Key('auth-mode-toggle')));
-      await tester.pump();
+      await _tapModeToggle(tester);
       await tester.enterText(find.byKey(const Key('login-email')), email);
       await tester.enterText(find.byKey(const Key('login-password')), password);
       await tester.enterText(find.byKey(const Key('signup-nickname')), nickname);
+      await tester.ensureVisible(find.byKey(const Key('signup-submit')));
+      await tester.pump();
       await tester.tap(find.byKey(const Key('signup-submit')));
       // 눌림 애니메이션(340ms) → 가입(Mock 300ms) → _restore() 까지 흘려보낸다.
       await tester.pump();
@@ -141,14 +254,11 @@ void main() {
       await tester.pumpWidget(_wrap());
       expect(find.byKey(const Key('signup-nickname')), findsNothing);
 
-      await tester.tap(find.byKey(const Key('auth-mode-toggle')));
-      await tester.pump();
+      await _tapModeToggle(tester);
 
       expect(find.byType(TextField), findsNWidgets(3));
       expect(find.byKey(const Key('signup-submit')), findsOneWidget);
       expect(find.byKey(const Key('login-submit')), findsNothing);
-      // 가입 중에는 개발용 바로 진입을 안 보인다 — 가입 폼과 한 덩어리로 읽힌다.
-      expect(find.text('팀 관리자'), findsNothing);
     });
 
     testWidgets('가입하면 곧바로 로그인된다', (tester) async {
@@ -203,10 +313,8 @@ void main() {
 
     testWidgets('다시 로그인으로 바꾸면 닉네임 칸이 사라진다', (tester) async {
       await tester.pumpWidget(_wrap());
-      await tester.tap(find.byKey(const Key('auth-mode-toggle')));
-      await tester.pump();
-      await tester.tap(find.byKey(const Key('auth-mode-toggle')));
-      await tester.pump();
+      await _tapModeToggle(tester);
+      await _tapModeToggle(tester);
       expect(find.byType(TextField), findsNWidgets(2));
       expect(find.byKey(const Key('login-submit')), findsOneWidget);
     });
