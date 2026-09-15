@@ -39,10 +39,15 @@ export type MomentMetrics = { key: MomentKey; metrics: MetricRow[] }
 
 export const MOMENT_KEYS: readonly MomentKey[] = ['before', 'impact', 'after']
 
+/**
+ * 화면에 적는 순간 이름 — 🔴 **이름만 바꿨다**(사용자 요청, 2026-09-15: 직전 → 백스윙 ·
+ * 임팩트 → 접촉 · +1초 → 접촉 후). 키(`before`·`impact`·`after`)와 순간을 고르는
+ * 정의(`moments.ts`)는 그대로다 — 키는 계약(`SummaryRequest`)에 실린다.
+ */
 export const MOMENT_LABEL: Record<MomentKey, string> = {
-  before: '직전',
-  impact: '임팩트',
-  after: '+1초',
+  before: '백스윙',
+  impact: '접촉',
+  after: '접촉 후',
 }
 
 /** 🔴 루브릭(`agent/rubrics/football_instep_shot.yaml`)의 `criteria[].name` 그대로. */
