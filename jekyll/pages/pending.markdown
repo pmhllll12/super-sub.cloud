@@ -7734,6 +7734,45 @@ Secret 자체도 매니페스트처럼 저장소에 없어서, 지금 운영에 
 
 - **위치**: `pending-archive.markdown`의 `## jin` 구역으로 이동됨
 
+### 35. 지인 찾기 실제 검색·상호 지인 신청·폴링 알림을 만들었습니다 (2026-09-15 신설)
+
+사용자 요청 — 스쿼드 판 "지인 찾기"가 하드코딩 배열(`SquadFriends.tsx`의
+`FRIENDS` 상수)이었던 것을 실제 기능으로 바꿨습니다. 상호 관계(신청→수락)로,
+알림은 재사용 가능한 일반 인프라로 만들었습니다.
+
+**만든 것**
+
+| | |
+|---|---|
+| `user.nickname` 유일 제약 | 운영 DB 중복 0건 확인 후 추가. 가입·닉네임 변경 충돌은 `409 NICKNAME_ALREADY_EXISTS` |
+| `user.is_nickname_searchable` | 지인 검색 노출 스위치(기본 `true`), `PATCH /me`로 켬/끔. 용병 매칭의 `is_searchable`과는 다른 컬럼 |
+| `GET /users/search?q=` | 닉네임으로 찾기(최대 20명, 본인·비공개 제외) |
+| `user_contact`(새 테이블) + `POST/GET /me/contacts`, `POST /me/contacts/{id}/accept`, `GET /me/contacts/requests` | 상호 지인 신청·수락. 메모는 신청자만 봄 |
+| `notification`(새 바운디드 컨텍스트) + `GET /me/notifications`, `PATCH .../read` | 폴링 알림. 문구는 안 저장 — `type`+`actor`+`subject`로 클라이언트가 렌더링 |
+
+컨텍스트 간 알림 생성은 **포트를 안 만들고 원시 SQL로 직접 쓴다** —
+`notification` 테이블에 `user_contact` 쪽이 `table()`/`column()`으로 INSERT한다
+(`match`가 남의 테이블을 원시 쿼리로 **읽는** 경계 판단을 **쓰기**에도 그대로
+적용). 신청·알림 생성은 같은 트랜잭션.
+
+부록 D 도메인 ①에 반영(35→37 테이블), 계약은 `api-contract.md` 3-12절,
+클라이언트 반영 요청은 `client-contract-changes.md` 37번.
+
+- 확인: `.venv/bin/pytest -q` → 804 passed, skipped 0 · `alembic upgrade head && alembic check` 통과
+- **하나 짚어 둘 것**: 이 작업 중 로컬 개발 DB에 닉네임 중복 테스트 계정이
+  수천 건 쌓여 있던 걸 발견했습니다(기존 DB 테스트들이 계정을 만들고 정리하지
+  않는 경우가 있어서 — 이번과 무관하게 오래전부터 쌓인 것). 유일 제약을 걸기
+  전에 로컬 DB에서 한 번 정리했고, 앞으로 같은 문제가 안 생기게 관련 테스트
+  픽스처들의 닉네임에 임의 접미사를 붙여 뒀습니다. 운영 DB는 애초에 중복이
+  없어 이 정리가 필요 없었습니다.
+
+**후속 과제(급하지 않음, 담당 정어진)**: `match`(경기 지원 수락)·`team`(팀
+가입) 등 다른 컨텍스트에서 실제로 알림을 만들어 쓰는 배선은 이번에 안 했습니다
+— 인프라만 만들었습니다. 필요해지면 각 컨텍스트가 `user_contact`와 같은 방식
+(원시 SQL)으로 `notification`에 얹으면 됩니다.
+
+- **담당**: 백성검(`SquadFriends.tsx` 등 화면 배선 — `client-contract-changes.md` 37번 참고, `flutter/`도 필요하면) · 정어진(위 후속 과제) · **제기**: 정어진(사용자 요청) · **기한**: 급하지 않음(화면 쪽) · 후속 과제는 다음 배포 작업 때
+
 ## min (박민호)
 
 ### 1. 패킷 A(과금) 진행 상황을 알려주세요 ✅ 회신 (2026.09.08)

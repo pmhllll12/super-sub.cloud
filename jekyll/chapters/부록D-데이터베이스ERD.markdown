@@ -9,10 +9,10 @@ nav_order: 4
 Super-Sub 플랫폼의 데이터 모델이다. 3장 서비스 기능과 5장 요구사항에서 도출했다.
 각자 담당 도메인부터 보면 된다.
 
-**35 테이블 · 6 도메인 · 1~3정규형 준수**
+**37 테이블 · 6 도메인 · 1~3정규형 준수**
 
 본 부록은 3장에서 정의한 서비스 기능과 5장 요구사항(SFR·SEC)에서 도출한 데이터 모델이다.
-35개 테이블을 6개 도메인으로 나누어 정리한다.
+37개 테이블을 6개 도메인으로 나누어 정리한다.
 
 제1정규형부터 제3정규형까지 준수한다. 비원자 값(jsonb), 이행 종속 컬럼, 파생·집계 컬럼을 두지
 않는다. 정규화 근거와 그에 따른 조회 비용은 D.4에서 다룬다.
@@ -43,16 +43,22 @@ D.3에 별도로 모았다.
 >   `updated_at timestamptz`
 > - `user_identity` — `id uuid PK` · `user_id uuid FK→user` · `provider text` ·
 >   `subject text` · `created_at timestamptz`
+>
+> `user_contact`·`notification`(미결 `jin` 35번, 2026.09.15)도 아직 그림에 없다.
+> `user.nickname`에 유일 제약이 붙었고 `is_nickname_searchable`(지인 검색 노출,
+> 용병 매칭의 `is_searchable`과는 다른 컬럼) 도 늘었다 — 전부 표가 최신이다.
 
 | 테이블 | 용도 | 1행이 뜻하는 것 |
 |---|---|---|
-| user | 계정과 신원 (SEC-003) | 가입한 사람 1명 |
+| user | 계정과 신원 (SEC-003). 닉네임은 유일하다 | 가입한 사람 1명 |
 | user_credential | 로그인 자격증명. 비밀번호 해시를 user에 두지 않고 분리한다. 소셜 로그인을 추가할 때 user를 건드리지 않아도 되고, 자격증명 조회 경로를 따로 제한할 수 있다 | 한 사람의 자격증명 1건 |
 | user_identity | 외부 제공자(구글 등) 계정과의 연결. provider가 준 고유 ID(subject)를 그대로 보관한다. **이메일로 사람을 식별하지 않는다** — 이메일은 바뀔 수 있고 재사용될 수도 있다 | 한 사람의 한 제공자 연결 1건 |
 | team | 동호회 | 등록된 팀 1개 |
 | team_member | 소속과 역할. 탈퇴 후에도 경기·평가 이력이 남아야 하므로 left_at으로 소프트 삭제한다. 재가입이 가능하므로 joined_at을 함께 둔다 | 한 사람의 한 팀 소속 구간 1건 |
 | sport | 축구·야구·농구 종목 코드 | 종목 1개 (현재 3행) |
 | position | 종목별 포지션. 포지션 약칭이 종목 간 겹칠 수 있어 대리키를 두고 (sport_code, code)에 유일 제약을 건다 | 한 종목의 포지션 1개 |
+| user_contact | 상호 지인 관계(미결 `jin` 35번). 한쪽이 신청하고(requester) 대상(target)이 수락하면 양쪽 다 서로를 지인으로 본다. 메모는 신청자만 본다 | 신청 1건(대기중) 또는 지인 관계 1건(수락됨) |
+| notification | 폴링 알림. 지인 신청·수락 등을 다른 컨텍스트가 원시 SQL로 적재한다 — 문구는 저장하지 않고 `type`+`actor`+`subject`로 클라이언트가 렌더링한다 | 알림 1건 |
 
 ### ② 영상·분석
 
@@ -271,6 +277,8 @@ user_title은 호칭 부여의 근거가 되는 지표를 참조한다. 근거�
 | 테이블 | 유일 제약 | 이유 |
 |---|---|---|
 | user | email | 계정 식별 |
+| user | nickname | 지인 검색이 닉네임으로 사람을 특정해야 한다(미결 `jin` 35번) |
+| user_contact | (requester_user_id, target_user_id) | 같은 방향으로 중복 신청 방지 |
 | user_credential | user_id | 사용자당 자격증명 1건 |
 | user_identity | (provider, subject) | 한 외부 계정이 두 사용자에 붙는 것을 막는다 |
 | user_identity | (user_id, provider) | 한 사용자가 같은 제공자를 두 번 연결하지 못하게 한다 |
