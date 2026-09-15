@@ -1637,6 +1637,43 @@ grep -n "자동으로 고르기" www/src/components/analysis/AnalysisStage.tsx
 
 ## 계약 문서
 
+## 39. `GET /videos/public`에 업로더가 실립니다 (2026-09-15 추가, 미결 `paik` 16번)
+
+공개 클립 목록이 **누가 올렸는지 안 줘서, 남의 공개 영상도 보는 사람 자기
+닉네임으로 그려지던 버그**를 고쳤습니다(`HomeFeed.tsx`/`feed.ts`가 원인일
+것 같다고 `paik` 16번에 적혀 있던 그 문제입니다).
+
+### 만족해야 할 성질
+
+1. **공개 영상 목록 한 줄에 그 영상을 올린 사람이 누군지 표시될 것.**
+2. 카드를 만든 사람은 **눌러서 그 사람 카드로 갈 수 있을 것.**
+
+### 새로 실리는 필드 (`GET /videos/public` 응답 각 행)
+
+| 필드 | 값 |
+|---|---|
+| `uploader_nickname` | 항상 있습니다 — 그대로 표시하면 됩니다 |
+| `uploader_card_slug` | 카드를 만든 사람만, 없으면 `null`. 있으면 `GET /cards/{slug}`로 링크 걸 수 있습니다 |
+
+### 먼저 확인
+
+```
+grep -n "uploader_nickname" www/src/lib/feed.ts www/src/components/HomeFeed.tsx
+```
+
+걸리면 이미 반영된 것입니다.
+
+### 🔴 하지 말 것
+
+- **저장 키(`storage_key`)나 raw `user_id`는 여전히 안 옵니다** — 카드 링크는
+  `uploader_card_slug`로만 거십시오.
+- `uploader_card_slug`가 `null`일 때 링크를 안 그리는 것으로 충분합니다 —
+  "카드 없음"을 별도로 안내할 필요는 없습니다(`paik` 16번 본문 참고).
+
+상세: `fastapi/docs/api-contract.md`(공개 클립 목록 절)
+
+---
+
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린
 것이다. 새로 붙이는 화면이 있으면 계약 문서 쪽을 본다.
 

@@ -1768,24 +1768,27 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
 | 422 | `CANNOT_FEATURE` | 반려된 클립을 대표로 세우려 했다 |
 | 422 | `VALIDATION_ERROR` | `title`·`description` 이 길이 상한을 넘는다 |
 
-### `GET /api/v1/videos/public` — 공개 클립 목록 (2026-09-08 추가)
+### `GET /api/v1/videos/public` — 공개 클립 목록 (2026-09-08 추가, 2026-09-15 업로더 추가)
 
-홈의 영상 모음이 쓴다. **공개된 클립만**, 업로더 구분 없이, 최근 것이 앞에 온다
-(최대 100건).
+홈의 영상 모음이 쓴다. **공개된 클립만**, 최근 것이 앞에 온다(최대 100건).
 
 ```json
 [
   { "id": "7c05...", "sport_code": "football", "duration_ms": 10200,
     "created_at": "2026-09-08T09:00:00Z", "title": "우리 팀 첫 골",
-    "description": "왼발 감아차기" }
+    "description": "왼발 감아차기",
+    "uploader_nickname": "슛돌이", "uploader_card_slug": "shoot-dori-7f2a" }
 ]
 ```
 
 🔴 **로그인이 필요하다.** 확인 방법이 "다른 계정으로 로그인해도 보인다"라 인증을
 그대로 뒀다 — 익명 피드가 필요하면 연다.
 
-🔴 **저장 키·업로더는 안 실린다.** 저장 키에는 업로더 `user_id` 가 들어 있다
-(`videos/<user_id>/…`). 재생은 아래 `GET /videos/{id}/playback-url` 로 따로 받는다.
+🔴 **저장 키는 안 실린다** — 저장 키에는 업로더 `user_id` 가 그대로 들어 있다
+(`videos/<user_id>/…`). 업로더는 대신 `uploader_nickname`(모든 사용자가 있음)과
+`uploader_card_slug`(카드를 만든 사람만, 없으면 `null`)로 싣는다(`paik` 16번) —
+슬러그가 있으면 눌러서 그 사람 카드(`GET /cards/{slug}`)로 갈 수 있다. 재생은
+아래 `GET /videos/{id}/playback-url` 로 따로 받는다.
 
 ### `GET /api/v1/videos/{video_id}/playback-url` — 재생용 주소 (2026-09-08 추가)
 

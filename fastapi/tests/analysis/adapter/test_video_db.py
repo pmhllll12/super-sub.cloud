@@ -283,6 +283,39 @@ class TestVisibility:
         viewer_h = {"Authorization": f"Bearer {login.json()['access_token']}"}
         rows = db_client.get(f"{V1}/videos/public", headers=viewer_h).json()
         assert video_id in [r["id"] for r in rows]
+        # 목록이 보는 사람(viewer)이 아니라 올린 사람(uploader)의 닉네임을
+        # 실어야 한다 — `paik` 16번이 고치려던 바로 그 버그.
+        row = next(r for r in rows if r["id"] == video_id)
+        assert row["uploader_nickname"] == uploader["nickname"]
+
+    def test_카드를_만든_업로더는_슬러그도_실린다(self, db_client, uploader):
+        key = _upload(db_client, uploader)
+        video_id = _register(db_client, uploader, key).json()["id"]
+        db_client.post(f"{V1}/videos/{video_id}/keep", headers=uploader["headers"])
+        db_client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"is_public": True},
+            headers=uploader["headers"],
+        )
+        card = db_client.post(f"{V1}/me/card", headers=uploader["headers"]).json()
+
+        rows = db_client.get(f"{V1}/videos/public", headers=uploader["headers"]).json()
+        row = next(r for r in rows if r["id"] == video_id)
+        assert row["uploader_card_slug"] == card["public_slug"]
+
+    def test_카드가_없는_업로더는_슬러그가_null이다(self, db_client, uploader):
+        key = _upload(db_client, uploader)
+        video_id = _register(db_client, uploader, key).json()["id"]
+        db_client.post(f"{V1}/videos/{video_id}/keep", headers=uploader["headers"])
+        db_client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"is_public": True},
+            headers=uploader["headers"],
+        )
+
+        rows = db_client.get(f"{V1}/videos/public", headers=uploader["headers"]).json()
+        row = next(r for r in rows if r["id"] == video_id)
+        assert row["uploader_card_slug"] is None
 
     def test_남의_클립은_못_바꾼다(self, db_client, uploader):
         key = _upload(db_client, uploader)

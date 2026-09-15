@@ -137,7 +137,8 @@ def list_public_videos(
     🔴 **로그인이 필요하다.** 익명 피드가 필요하면 열겠다 — 지금은 확인 방법이
     "다른 계정으로 로그인해도 보인다"라 인증을 그대로 둔다.
 
-    저장 키·업로더는 안 실린다. 재생은 `GET /videos/{id}/playback-url` 로 받는다.
+    저장 키(raw `user_id` 포함)는 안 싣는다. 업로더는 닉네임+카드 슬러그(있으면)
+    로 싣는다(`paik` 16번). 재생은 `GET /videos/{id}/playback-url` 로 받는다.
     """
     return use_case(PublicVideosQuery())
 

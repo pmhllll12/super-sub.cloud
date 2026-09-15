@@ -307,6 +307,30 @@ class VideoPgRepository(VideoPort):
         # 목록은 반려 사유·분석 상태를 보여주지 않는다 — 판정·작업을 안 읽는다.
         return [_to_entity(v, None, None) for v in videos]
 
+    def uploader_info(
+        self, user_ids: list[UUID]
+    ) -> dict[UUID, tuple[str, str | None]]:
+        if not user_ids:
+            return {}
+        nicknames = dict(
+            self._session.execute(
+                select(_user.c.id, _user.c.nickname).where(
+                    _user.c.id.in_(user_ids)
+                )
+            ).all()
+        )
+        slugs = dict(
+            self._session.execute(
+                select(_player_card.c.user_id, _player_card.c.public_slug).where(
+                    _player_card.c.user_id.in_(user_ids)
+                )
+            ).all()
+        )
+        return {
+            uid: (nickname, slugs.get(uid))
+            for uid, nickname in nicknames.items()
+        }
+
     def _latest_jobs(
         self, video_ids: list[UUID]
     ) -> dict[UUID, AnalysisJobOrm]:
