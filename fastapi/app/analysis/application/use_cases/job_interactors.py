@@ -90,6 +90,7 @@ class ClaimJobInteractor(ClaimJobUseCase):
             subject_box=job.subject_box,
             subject_at_ms=job.subject_at_ms,
             focus=job.focus,
+            job_type=job.job_type,
         )
 
 
@@ -117,7 +118,11 @@ class FinishJobInteractor(FinishJobUseCase):
         report_key = command.report_key if command.status == SUCCEEDED else None
 
         blocked = self._repository.finish(
-            command.job_id, command.status, command.failure_reason, report_key
+            command.job_id,
+            command.status,
+            command.failure_reason,
+            report_key,
+            command.detection_result,
         )
         if blocked == "missing":
             raise ApiError(404, "JOB_NOT_FOUND", "작업을 찾을 수 없습니다.")

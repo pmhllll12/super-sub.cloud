@@ -23,6 +23,7 @@ from app.analysis.adapter.outbound.orm.video_validation_orm import VideoValidati
 from app.analysis.application.dtos.video_dto import UNSET, UserRef
 from app.analysis.application.ports.output.video_port import VideoPort
 from app.analysis.domain.entities.video_entity import ValidationEntity, VideoEntity
+from app.analysis.domain.rules.job_rules import ANALYZE
 
 # 소유하지 않는 테이블에서 **읽기만** 한다. 위 docstring 참조.
 _sport = table("sport", column("code"))
@@ -97,6 +98,7 @@ class VideoPgRepository(VideoPort):
                 AnalysisJobOrm(
                     id=video.analysis_job_id,
                     video_id=video.id,
+                    job_type=ANALYZE,
                     status=video.analysis_status,
                     created_at=video.created_at,
                     subject_box=video.subject_box,
@@ -304,6 +306,30 @@ class VideoPgRepository(VideoPort):
         )
         # 목록은 반려 사유·분석 상태를 보여주지 않는다 — 판정·작업을 안 읽는다.
         return [_to_entity(v, None, None) for v in videos]
+
+    def uploader_info(
+        self, user_ids: list[UUID]
+    ) -> dict[UUID, tuple[str, str | None]]:
+        if not user_ids:
+            return {}
+        nicknames = dict(
+            self._session.execute(
+                select(_user.c.id, _user.c.nickname).where(
+                    _user.c.id.in_(user_ids)
+                )
+            ).all()
+        )
+        slugs = dict(
+            self._session.execute(
+                select(_player_card.c.user_id, _player_card.c.public_slug).where(
+                    _player_card.c.user_id.in_(user_ids)
+                )
+            ).all()
+        )
+        return {
+            uid: (nickname, slugs.get(uid))
+            for uid, nickname in nicknames.items()
+        }
 
     def _latest_jobs(
         self, video_ids: list[UUID]

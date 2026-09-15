@@ -1527,9 +1527,304 @@ grep -rn "videos/.*keep\|keepVideo" <클라이언트 소스>
 상세: `fastapi/docs/api-contract.md`(`POST /videos` · `POST /videos/{id}/keep`
 절, "저장 안 한 임시 영상도 여기서 정리된다" 절) · 같은 구역 20번(공개·재생,
 같은 `kept` 필터를 씀)
+
+## 37. 지인 검색·상호 신청·폴링 알림이 새로 생겼습니다 (2026-09-15 추가, 미결 `jin` 35번)
+
+`www/src/components/SquadFriends.tsx`의 "지인 찾기" 판이 지금 하드코딩 배열을
+쓰고 있는 것을 확인했습니다("계약에 지인·친구 엔드포인트가 없다"는 그 파일
+주석 그대로입니다). 백엔드에 실제 엔드포인트를 만들었습니다 — 계약 3-12절.
+
+### 만족해야 할 성질
+
+1. **지인 찾기 판이 실제 사용자를 닉네임으로 검색할 수 있을 것.**
+2. **찾은 사람에게 "지인 신청"을 보낼 수 있고, 상대가 수락해야 지인이 될
+   것** — 일방적으로 등록되는 게 아니라 **상호** 관계입니다(신청→수락).
+3. **수락 대기 중인 신청·새 알림을 볼 수 있는 곳이 있을 것** — 알림은
+   지금은 폴링(`GET /me/notifications`)뿐입니다, 실시간 아닙니다.
+
+파일·컴포넌트 이름은 예시지 규격이 아닙니다 — 지켜야 하는 것은 위 성질뿐입니다.
+
+### 먼저 확인
+
+```
+grep -n "FRIENDS = \[" www/src/components/SquadFriends.tsx
+```
+
+걸리면 아직 하드코딩 배열 그대로입니다.
+
+### 새 엔드포인트 (계약 3-12절에 요청/응답 전체가 있습니다)
+
+| 엔드포인트 | 용도 |
+|---|---|
+| `GET /users/search?q=` | 닉네임으로 사람 찾기(최대 20명, 본인 제외) |
+| `POST /me/contacts` | 지인 신청(`target_user_id`, 선택적 `note`) |
+| `POST /me/contacts/{id}/accept` | 내가 대상인 신청 수락 |
+| `GET /me/contacts` | 수락된 지인 목록 |
+| `GET /me/contacts/requests` | 나에게 온 대기중 신청 |
+| `GET /me/notifications?unread_only=` | 알림 목록(폴링) |
+| `PATCH /me/notifications/{id}/read` | 알림 읽음 처리 |
+
+### 함께 바뀐 것 — `PATCH /me`
+
+`is_nickname_searchable`(boolean, 선택) 필드가 늘었습니다 — 안 보내면 안
+바뀝니다. 지인 검색에 내 닉네임이 노출될지를 사용자가 프로필에서 끌 수 있게
+하는 스위치입니다(기본값 `true`). `GET /me` 응답에도 이 필드가 옵니다.
+
+### 🔴 하지 말 것
+
+- **닉네임 중복 처리를 프론트에서 미리 막으려 하지 마십시오.** `user.nickname`
+  에 유일 제약이 새로 붙어서, 가입·닉네임 변경이 겹치면 서버가
+  `409 NICKNAME_ALREADY_EXISTS`를 냅니다 — 그 코드로만 분기하십시오.
+- **알림에 문구가 없습니다.** `type`(`contact_request`/`contact_accepted`)·
+  `actor_user_id`·`subject_type`만 옵니다 — 문장은 화면에서 조립해야 합니다.
+  서버가 문장을 보낼 거라고 가정하지 마십시오.
+- 지인 목록 응답의 `note`는 **내가 신청자일 때만** 옵니다 — 상대 시점에서는
+  항상 `null`입니다. 버그가 아닙니다.
+
+### 아직 없는 것 — 이번 범위 밖
+
+매칭 수락·팀 가입 성공 등 **다른 흐름에서 알림을 만드는 것**은 이번에 안
+했습니다(알림 인프라 자체만 만들었습니다). 필요해지면 별도로 요청해 주십시오.
+`flutter/`도 필요하면 같은 방식으로 반영해 주십시오.
+
+상세: `fastapi/docs/api-contract.md`(3-12절) · 부록 D 도메인 ①
+(`user_contact`·`notification`)
+
+## 38. "자동으로 고르기"를 실제로 부를 수 있습니다 — `POST`/`GET /videos/{id}/detect` (2026-09-15 추가, 미결 `ho` 44번)
+
+분석 걸기 전 화면(영상에서 분석할 사람을 드래그로 묶는 판)의 "자동으로
+고르기" 버튼이 지금 실제 API를 부를 수 있게 됐습니다.
+
+### 만족해야 할 성질
+
+1. **"자동으로 고르기"를 누르면 검출을 요청할 수 있을 것.**
+2. **결과가 바로 안 와도(폴링) 화면이 자연스러울 것** — GPU가 꺼져 있으면
+   몇 초~몇 분 걸릴 수 있습니다. 지금 분석 진행 체크리스트가 이미 같은 방식
+   (`GET /videos/{id}/report` 폴링)으로 도는 것과 같은 패턴입니다.
+3. **검출된 사람이 0명이어도 실패로 보이지 않을 것** — 그럴 땐 지금 하시던
+   대로 드래그로 넘어가면 됩니다.
+
+### 먼저 확인
+
+```
+grep -n "자동으로 고르기" www/src/components/analysis/AnalysisStage.tsx
+```
+걸리면 그 버튼이 아직 아무 API도 안 부르는 상태인지 확인해 주십시오.
+
+### 흐름
+
+1. `POST /videos/{video_id}/detect` — `202` + `{job_id, status:"queued", ...}`
+2. `GET /videos/{video_id}/detect`를 몇 초 간격으로 폴링 — `status`가
+   `succeeded`가 될 때까지
+3. `succeeded`면 `detection_result.people[].box`(정규화 `[x,y,w,h]`, 0~1)를
+   후보로 보여주고, 사용자가 고르면 **그 값을 그대로** 기존 분석 요청의
+   `subject_box`로 넘기면 됩니다 — 좌표 변환 없습니다
+
+상세(요청/응답 전체 예시): `fastapi/docs/api-contract.md`의
+`POST`/`GET /videos/{video_id}/detect` 절.
+
+### 🔴 하지 말 것
+
+- **검출 결과 0명을 오류로 다루지 마십시오.** `succeeded` + `people: []`가
+  정상입니다 — 드래그 경로로 넘기면 됩니다.
+- **`video_id`마다 검출 요청을 재사용하려 하지 마십시오.** 호출할 때마다
+  새 작업이 생깁니다(분석 작업과 같은 정책) — `GET`은 항상 **가장 최근**
+  것만 봅니다.
+- 워커(정상호 영역) 배선은 아직입니다 — 실제로 검출이 도는지는 그쪽 작업이
+  끝난 뒤에 확인 가능합니다. 지금은 API 형태만 붙이셔도 됩니다.
+
 ---
 
 ## 계약 문서
+
+## 39. `GET /videos/public`에 업로더가 실립니다 (2026-09-15 추가, 미결 `paik` 16번)
+
+공개 클립 목록이 **누가 올렸는지 안 줘서, 남의 공개 영상도 보는 사람 자기
+닉네임으로 그려지던 버그**를 고쳤습니다(`HomeFeed.tsx`/`feed.ts`가 원인일
+것 같다고 `paik` 16번에 적혀 있던 그 문제입니다).
+
+### 만족해야 할 성질
+
+1. **공개 영상 목록 한 줄에 그 영상을 올린 사람이 누군지 표시될 것.**
+2. 카드를 만든 사람은 **눌러서 그 사람 카드로 갈 수 있을 것.**
+
+### 새로 실리는 필드 (`GET /videos/public` 응답 각 행)
+
+| 필드 | 값 |
+|---|---|
+| `uploader_nickname` | 항상 있습니다 — 그대로 표시하면 됩니다 |
+| `uploader_card_slug` | 카드를 만든 사람만, 없으면 `null`. 있으면 `GET /cards/{slug}`로 링크 걸 수 있습니다 |
+
+### 먼저 확인
+
+```
+grep -n "uploader_nickname" www/src/lib/feed.ts www/src/components/HomeFeed.tsx
+```
+
+걸리면 이미 반영된 것입니다.
+
+### 🔴 하지 말 것
+
+- **저장 키(`storage_key`)나 raw `user_id`는 여전히 안 옵니다** — 카드 링크는
+  `uploader_card_slug`로만 거십시오.
+- `uploader_card_slug`가 `null`일 때 링크를 안 그리는 것으로 충분합니다 —
+  "카드 없음"을 별도로 안내할 필요는 없습니다(`paik` 16번 본문 참고).
+
+상세: `fastapi/docs/api-contract.md`(공개 클립 목록 절)
+
+---
+
+## 40. 경기 조건·지역·"맞는 상대" 후보가 생겼습니다 (2026-09-15 추가, 미결 `paik` 18·19·20·21번)
+
+`www/src/lib/matchPrefs.ts`(브라우저에만 저장)·`regions.ts`(60곳 하드코딩)·
+`teamMatch.ts`(mock 후보 7팀)를 실제 서버 경로로 바꿀 수 있게 됐습니다.
+`teamMatch.ts`의 `applyToTeam`(경기 신청)은 **이번 범위가 아닙니다** — `paik`
+17번(팀↔팀 경기 신청·수락·알림)에서 따로 냅니다.
+
+### 만족해야 할 성질
+
+1. **지역 선택지가 서버 목록(60곳)에서 올 것** — 자유 입력 대신.
+2. **팀 조건은 팀장만 정할 수 있고, 개인 조건과 안 섞일 것.**
+3. **"맞는 상대" 후보 목록에 유사도 점수 대신 사실값 근거가 올 것** — 화면이
+   `whyMatches()`로 직접 겹침을 계산할 필요가 없어집니다, 서버 응답의
+   `reasons[].detail`을 그대로 보여주면 됩니다("토요일 11:00~12:00 겹침"처럼
+   이미 문장입니다).
+
+### 먼저 확인
+
+```
+grep -n "REGIONS: string\[\]" www/src/lib/regions.ts
+grep -n "TEAMS: Omit<MatchTeam" www/src/lib/teamMatch.ts
+```
+
+걸리면 아직 하드코딩/mock 그대로입니다.
+
+### 새 엔드포인트 (계약 3-13절)
+
+| 엔드포인트 | 용도 |
+|---|---|
+| `GET /regions` | 지역 목록 |
+| `PUT/GET /teams/{team_id}/match-preferences` | 팀 조건(팀장만 `PUT`) |
+| `PUT/GET /me/match-preferences` | 내 조건(지역·시간·포지션) |
+| `GET /teams/{team_id}/members/match-preferences` | 팀원 조건 열람(팀장만) |
+| `GET /teams/{team_id}/match-candidates` | "맞는 상대" 후보(이미 정렬됨) |
+
+### 🔴 하지 말 것
+
+- **`whyMatches()`로 다시 계산하지 마십시오** — 서버가 이미 겹침·지역 계층을
+  계산해서 `reasons`로 줍니다. 화면에서 다시 계산하면 서버와 다른 답이 나올
+  수 있습니다.
+- **`match-candidates` 응답에 점수·유사도가 없다고 당황하지 마십시오** — 의도된
+  것입니다. 순서는 이미 서버가 정렬했습니다(`reasons`가 근거).
+- 시작 시각이 끝 시각보다 늦은 슬롯을 보내면 `422 INVALID_TIME_SLOT`입니다 —
+  화면에서 미리 막아 주십시오(사용자 경험상), 서버도 어차피 막습니다.
+- 팀 조건 `PUT`은 **통째로 교체**입니다 — 기존 지역·시간에 하나만 추가하고
+  싶어도 전체 목록을 다시 보내야 합니다.
+
+상세: `fastapi/docs/api-contract.md`(3-13절) · 부록 D 도메인 ①·④
+
+---
+
+## 41. 선수·내 영상의 관절(skeleton)을 읽을 수 있습니다 (2026-09-15 추가, 미결 `paik` 29번)
+
+「선수와 비교하기」가 지금 브라우저(MoveNet)로 직접 관절을 뽑고 있는 것을
+서버 값으로 바꿀 수 있습니다 — 받는 자리가 한 곳(`www/src/lib/motion/
+source.ts`)이라고 `paik` 29번에 적혀 있어서, 그 파일만 바꾸면 될 것입니다.
+
+### 만족해야 할 성질
+
+1. **선수 목록을 서버에서 받아올 수 있을 것** — 이름만입니다.
+2. **선수·내 영상 양쪽의 관절 시계열을 같은 모양으로 받을 수 있을 것.**
+
+### 🔴 이번 범위에서 안 한 것 — 재생 주소
+
+선수 원본 영상은 S3에 없습니다(EC2 역할이 `videos/` 접두사에 쓰기 권한이
+없어 못 올렸습니다). **화면은 계속 지금처럼 정적 파일(`www/public/
+compare/`의 Pexels 클립)로 재생해 주십시오** — 서버가 재생 주소를 안
+줍니다. 필요하면 별도로 요청해 주시면 됩니다.
+
+### 새 엔드포인트 (계약 3-14절)
+
+| 엔드포인트 | 용도 |
+|---|---|
+| `GET /reference-players` | 선수 목록(`id`·`name`만, `id`는 `AnalysisStage.tsx`의 `COMPARE` id와 같습니다) |
+| `GET /reference-players/{player_id}/skeleton` | 그 선수의 관절 시계열 |
+| `GET /videos/{video_id}/skeleton` | **내 영상만**의 관절 시계열 |
+
+관절 응답 모양은 `agent/report-contract.md`의 `skeleton` 절과 완전히
+같습니다(에이전트 값을 그대로 통과시킵니다) — `joints`(프레임당 COCO-17)·
+`fps`·`moments`(before/impact/after)·`swing_leg` 등.
+
+### 🔴 하지 말 것
+
+- **못 잡은 프레임(`joints[i] === null`)을 배열에서 건너뛰지 마십시오** —
+  인덱스가 곧 프레임 번호입니다. 건너뛰면 그다음 프레임이 다 한 칸씩
+  밀립니다.
+- **좌표를 0~1로 자르지 마십시오** — 화면 밖으로 나간 관절은 실제로 범위를
+  벗어난 값입니다. 자르면 발이 가장자리에 붙어 있는 것처럼 그려집니다.
+- `known: false` 응답(리포트는 있는데 관절 데이터가 없는 옛 리포트)을
+  에러로 다루지 마십시오 — `200`입니다. `why` 문구만 있고 나머지 필드는
+  없습니다.
+- `GET /videos/{id}/skeleton`은 `GET /videos/{id}/report`와 같은 에러
+  셋(`VIDEO_NOT_FOUND`·`ANALYSIS_FAILED`·`REPORT_NOT_READY`)을 씁니다 —
+  이미 처리하고 계신 분기를 그대로 재사용하시면 됩니다.
+
+상세: `fastapi/docs/api-contract.md`(3-14절) · 부록 D 도메인 ②(`reference_player`)
+
+## 42. 팀↔팀 경기 신청·알림·수락이 생겼습니다 (2026-09-15 추가, 미결 `paik` 17번)
+
+`www/src/lib/teamMatch.ts`의 `applyToTeam()`이 1.4초 뒤 `{accepted: true}`를
+돌려주는 가짜였고, `lib/bookedMatches.ts`가 잡힌 경기를 브라우저에만 남기던
+것을 실제 API로 바꿀 수 있습니다. 🔴 **기존 `POST /matches/{id}/applications`
+(개인이 경기에 지원)와는 다른 새 엔드포인트입니다** — 이건 팀이 팀에게 겁니다.
+
+### 만족해야 할 성질
+
+1. **우리 팀이 상대 팀에 경기를 걸 수 있을 것.**
+2. **그 사실이 상대 팀장에게 닿을 것** — 알림(`GET /me/notifications`,
+   `jin` 35번)으로 옵니다.
+3. **수락하면 양쪽 모두에게 확정된 경기 하나가 생길 것** — 기존
+   `GET /teams/{id}/matches`에 그대로 뜹니다(새 목록 아님).
+
+### 새 엔드포인트 (계약 3-15절에 요청/응답 전체가 있습니다)
+
+| 엔드포인트 | 용도 |
+|---|---|
+| `POST /teams/{team_id}/match-requests` | 경기 걸기(대상 팀 id·시각·장소) |
+| `GET /teams/{team_id}/match-requests` | 보낸 것 + 받은 것 목록 |
+| `POST /teams/{team_id}/match-requests/{id}/accept` | 수락 → 확정 경기 생성 |
+| `POST /teams/{team_id}/match-requests/{id}/reject` | 거절 |
+| `DELETE /teams/{team_id}/match-requests/{id}` | 신청 팀이 스스로 무르기 |
+
+### 먼저 확인
+
+```
+grep -n "applyToTeam" www/src/lib/teamMatch.ts
+```
+
+걸리면 아직 가짜 그대로입니다.
+
+### 🔴 하지 말 것
+
+- **한 팀이 여러 신청을 동시에 걸어도 됩니다**(막지 않습니다) — 다만
+  **하나가 수락되면 그 팀의 다른 대기중 신청은 서버가 알아서
+  `cancelled`로 정리합니다**(이중 예약 방지). 화면에서 따로 막을 필요
+  없습니다 — 취소된 신청도 알림·목록 조회로 보입니다.
+- **`GET /matches/{id}` 응답에 `opponent_team_id`가 새로 생겼습니다** —
+  이 필드가 있으면 팀 대 팀 확정 경기라 **모집(`needs`)이 항상 빈
+  배열**입니다. 기존 모집 경기와 같은 화면으로 그리면 빈 모집란이
+  어색해 보일 수 있으니 구분해 주십시오.
+- **경기 취소는 기존 `DELETE /matches/{id}`를 그대로 씁니다** — 새
+  엔드포인트가 아닙니다. 다만 이제 **상대 팀 주장도** 취소할 수
+  있습니다(전엔 주최 쪽만).
+- 신청을 스스로 무르는 것(`DELETE .../match-requests/{id}`)은 알림이
+  안 갑니다 — 자기 행동을 자기에게 알릴 이유가 없어서입니다. 버그가
+  아닙니다.
+
+상세: `fastapi/docs/api-contract.md`(3-15절) · 부록 D 도메인 ④
+(`team_match_request`·`match.opponent_team_id`)
+
+---
 
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린
 것이다. 새로 붙이는 화면이 있으면 계약 문서 쪽을 본다.

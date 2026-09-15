@@ -31,6 +31,7 @@ def _at(days):
 
 
 def _signup(db_client, nickname):
+    nickname = f"{nickname}{uuid.uuid4().hex[:6]}"
     email = f"edit-{uuid.uuid4().hex[:12]}@super-sub.example"
     res = db_client.post(
         f"{V1}/auth/signup",
@@ -43,6 +44,7 @@ def _signup(db_client, nickname):
     assert login.status_code == 200, login.text
     return {
         "id": uuid.UUID(res.json()["id"]),
+        "nickname": nickname,
         "headers": {"Authorization": f"Bearer {login.json()['access_token']}"},
     }
 

@@ -20,4 +20,5 @@
 """
 
 from app.user.adapter.outbound.orm import position_orm as position_orm  # noqa: F401
+from app.user.adapter.outbound.orm import region_orm as region_orm  # noqa: F401
 from app.user.adapter.outbound.orm import sport_orm as sport_orm  # noqa: F401

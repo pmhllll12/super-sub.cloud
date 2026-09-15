@@ -201,6 +201,69 @@ X-Worker-Token: <공유 시크릿>
 
 ---
 
+## 6. 검출(`detect`) 작업 — 미결 `ho` 44번 (2026-09-15 추가)
+
+「이 영상에 잡힌 사람들」을 화면이 미리 보는 기능입니다. **같은 큐, 같은
+`claim`/완료 경로**를 씁니다 — 새 엔드포인트가 아닙니다. `detect_subjects.py`는
+이미 만들어 두신 것 그대로 쓰시면 됩니다(`51d7c75`).
+
+### 만족해야 할 성질
+
+1. **`claim` 응답에 `job_type` 필드가 새로 옵니다** — `"analyze"` 또는
+   `"detect"`. `"detect"`면 `analyze_s3.py` 대신 `detect_subjects.py`를
+   부릅니다
+2. `detect` 작업의 `claim` 응답에서 쓸 것은 `storage_key`(영상 자리)와
+   `subject_at_ms`(검출할 시각, ms)뿐입니다 — `sport_code`·`subject_box`·
+   `focus`는 `analyze` 전용이니 무시하면 됩니다(값이 비어 있거나 의미가
+   없을 수 있습니다)
+3. **완료 보고에 `detection_result`를 실어 주십시오** —
+   `detect_subjects.py --result-json`이 낸 JSON(`people`·`ball`) **그대로**,
+   변환 없이
+
+```json
+// claim 응답 (detect)
+{
+  "job_id": "…", "video_id": "…",
+  "storage_key": "videos/<user_id>/<uuid>.mp4",
+  "job_type": "detect",
+  "subject_at_ms": 1000,
+  "sport_code": "football", "side": null, "duration_ms": null,
+  "subject_box": null, "focus": null
+}
+```
+
+```
+PATCH .../internal/analysis-jobs/<job_id>
+{
+  "status": "succeeded",
+  "detection_result": {
+    "people": [{"box": [0.287, 0.199, 0.168, 0.666], "score": 0.909}],
+    "ball": {"x": 0.661, "y": 0.706, "score": 0.918}
+  }
+}
+```
+
+### 확인
+
+```bash
+# 워커 코드 배선 여부
+git grep -n 'job_type' -- agent/
+```
+
+### 하지 말 것 (이 절 전용)
+
+- 🔴 **`job_type`을 안 보고 `analyze_s3.py`로 통째로 처리하지 않기.** `detect`
+  작업엔 `sport_code`가 비어 있을 수 있어 그대로 돌리면 엉뚱하게 죽거나
+  (최악의 경우) 조용히 틀린 걸 냅니다
+- 🔴 **`detect` 결과에 `report_key`를 실어 보내지 않기.** `detect` 작업은
+  리포트가 없습니다 — 백엔드가 그 필드를 가지고 리포트 적재를 시도하지
+  않는 것은 `report_key`가 없어야 성립합니다(있으면 있는 대로 적재를
+  시도하다 실패합니다)
+- **검출 0명을 실패로 보고하지 않기.** 화면은 0명이면 드래그로 넘어갑니다
+  — `succeeded` + `{"people": [], "ball": null}` 이 정상 경로입니다
+
+---
+
 ## 하지 말 것
 
 - 🔴 **`--rubric` 을 생략하지 않기.** 위 2번의 이유입니다

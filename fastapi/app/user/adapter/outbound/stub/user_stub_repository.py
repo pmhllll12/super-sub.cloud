@@ -17,6 +17,10 @@ from uuid import UUID
 
 from app.user.application.ports.output.user_port import UserPort
 from app.user.domain.entities.membership_entity import MembershipEntity
+from app.user.domain.entities.user_contact_entity import (
+    UserContactEntity,
+    UserContactSummary,
+)
 from app.user.domain.entities.user_entity import UserEntity
 from app.user.domain.value_objects.email_vo import Email
 from app.user.domain.value_objects.nickname_vo import Nickname
@@ -28,6 +32,10 @@ DEMO_USER_ID = UUID("3f1c9d2e-0a44-4b7c-9e11-2b5d8c6a1f30")
 
 _ACTIVE_TEAM_ID = UUID("9a2e5f31-6d70-4c18-b3a9-4e82d7c05a16")
 _LEFT_TEAM_ID = UUID("c4d17b02-8e35-4a91-b6f2-0d38e5a7c914")
+
+# 지인 신청 계약 테스트용 고정 데이터. 실제 저장 여부는 DB 테스트가 본다.
+_OTHER_USER_ID = UUID("9a2e5f31-6d70-4c18-b3a9-4e82d7c05a17")
+_PENDING_CONTACT_ID = UUID("6e1a2b3c-4d5e-4f60-8a71-2b3c4d5e6f71")
 
 
 def _at(y: int, mo: int, d: int, h: int = 0, mi: int = 0) -> datetime:
@@ -99,7 +107,18 @@ class StubUserRepository(UserPort):
         """스텁은 저장하지 않는다."""
 
     def get(self, user_id: UUID) -> UserEntity | None:
-        return _USER if user_id == DEMO_USER_ID else None
+        if user_id == DEMO_USER_ID:
+            return _USER
+        if user_id == _OTHER_USER_ID:
+            # 지인 신청 계약 테스트가 "존재하는 남"으로 쓸 대상 — DEMO_USER_ID
+            # 는 신청자 자신이라 자기 신청(422)이 되어 성공 경로를 못 본다.
+            return UserEntity(
+                id=_OTHER_USER_ID,
+                email=Email.of("other@super-sub.example"),
+                nickname=Nickname.of("김철수"),
+                created_at=_at(2026, 8, 1),
+            )
+        return None
 
     def update_nickname(self, user_id: UUID, nickname: Nickname) -> None:
         """스텁은 고정 데이터라 저장하지 않는다.
@@ -144,3 +163,79 @@ class StubUserRepository(UserPort):
     def has_card(self, user_id: UUID) -> bool:
         """데모 사용자에게는 `card_stub_repository.py` 의 데모 카드가 있다."""
         return user_id == DEMO_USER_ID
+
+    def update_searchable(self, user_id: UUID, is_nickname_searchable: bool) -> None:
+        """스텁은 고정 데이터라 저장하지 않는다. 실제 반영은 DB 테스트가 본다."""
+
+    def search_by_nickname(
+        self, *, q: str, exclude_user_id: UUID, limit: int
+    ) -> list[UserEntity]:
+        if exclude_user_id == DEMO_USER_ID:
+            return []
+        needle = q.lower()
+        if needle in str(_USER.nickname).lower():
+            return [_USER][:limit]
+        return []
+
+    def find_contact(
+        self, user_a: UUID, user_b: UUID
+    ) -> UserContactEntity | None:
+        """스텁은 아직 아무 관계도 없는 것으로 답한다 — 신청 성공 경로를 계약
+        테스트가 볼 수 있게. 이미 있는 경우(409)는 DB 테스트가 본다."""
+        return None
+
+    def find_contact_by_id(self, contact_id: UUID) -> UserContactEntity | None:
+        if contact_id != _PENDING_CONTACT_ID:
+            return None
+        return UserContactEntity(
+            id=_PENDING_CONTACT_ID,
+            requester_user_id=_OTHER_USER_ID,
+            target_user_id=DEMO_USER_ID,
+            note="같은 동네",
+            accepted_at=None,
+            created_at=_at(2026, 9, 14, 9, 0),
+        )
+
+    def create_contact_request(
+        self, requester_id: UUID, target_id: UUID, note: str | None
+    ) -> UserContactEntity:
+        """스텁은 고정 데이터라 저장하지 않는다. 실제 반영은 DB 테스트가 본다."""
+        return UserContactEntity(
+            id=_PENDING_CONTACT_ID,
+            requester_user_id=requester_id,
+            target_user_id=target_id,
+            note=note,
+            accepted_at=None,
+            created_at=_at(2026, 9, 15, 9, 0),
+        )
+
+    def accept_contact_request(self, contact_id: UUID) -> UserContactEntity:
+        """스텁은 고정 데이터라 저장하지 않는다. 실제 반영은 DB 테스트가 본다."""
+        return UserContactEntity(
+            id=contact_id,
+            requester_user_id=_OTHER_USER_ID,
+            target_user_id=DEMO_USER_ID,
+            note="같은 동네",
+            accepted_at=_at(2026, 9, 15, 9, 30),
+            created_at=_at(2026, 9, 14, 9, 0),
+        )
+
+    def list_accepted_contacts(self, user_id: UUID) -> list[UserContactSummary]:
+        if user_id != DEMO_USER_ID:
+            return []
+        return [
+            UserContactSummary(
+                contact_id=_PENDING_CONTACT_ID,
+                user_id=_OTHER_USER_ID,
+                nickname="김철수",
+                note=None,
+                accepted_at=_at(2026, 9, 15, 9, 30),
+            )
+        ]
+
+    def list_incoming_contact_requests(
+        self, user_id: UUID
+    ) -> list[UserContactEntity]:
+        if user_id != DEMO_USER_ID:
+            return []
+        return [self.find_contact_by_id(_PENDING_CONTACT_ID)]

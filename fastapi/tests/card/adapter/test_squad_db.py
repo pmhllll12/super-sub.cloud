@@ -30,6 +30,8 @@ PASSWORD = "supersub2026"
 
 
 def _signup(db_client, nickname):
+    # 임의 접미사 — `uq_user_nickname`(2026.09.15) 도입 후 재실행 간 충돌 방지.
+    nickname = f"{nickname}{uuid.uuid4().hex[:6]}"
     email = f"squad-{uuid.uuid4().hex[:12]}@super-sub.example"
     res = db_client.post(
         f"{V1}/auth/signup",
@@ -103,7 +105,7 @@ class TestEnlist:
         assert res.status_code == 201, res.text
 
         member = res.json()["members"][0]
-        assert member["nickname"] == "구성원"
+        assert member["nickname"] == team["member"]["nickname"]
         assert member["position_code"] == "GK"
         assert member["position_label"] == "골키퍼"
         assert member["card_public_slug"]
@@ -254,7 +256,7 @@ class TestReadPaths:
 
         res = db_client.get(f"{V1}/squads/{squad['public_slug']}")
         assert res.status_code == 200, res.text
-        assert res.json()["members"][0]["nickname"] == "구성원"
+        assert res.json()["members"][0]["nickname"] == team["member"]["nickname"]
 
     def test_생성은_멱등이다(self, db_client, team):
         first = _create_squad(db_client, team)

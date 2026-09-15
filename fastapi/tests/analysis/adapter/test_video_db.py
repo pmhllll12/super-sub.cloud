@@ -59,11 +59,16 @@ def _fake_storage():
 
 @pytest.fixture
 def uploader(db_client):
-    """가입한 사용자와 그 토큰. 시드 데이터에 기대지 않는다."""
+    """가입한 사용자와 그 토큰. 시드 데이터에 기대지 않는다.
+
+    닉네임에 임의 접미사를 붙인다 — `uq_user_nickname`(2026.09.15) 도입 후,
+    이 로컬 DB에 실행마다 쌓인 이전 "업로더" 계정과 겹치지 않아야 한다.
+    """
+    nickname = f"업로더{uuid.uuid4().hex[:6]}"
     email = f"video-{uuid.uuid4().hex[:12]}@super-sub.example"
     signup = db_client.post(
         f"{V1}/auth/signup",
-        json={"email": email, "password": PASSWORD, "nickname": "업로더"},
+        json={"email": email, "password": PASSWORD, "nickname": nickname},
     )
     assert signup.status_code == 201, signup.text
 
@@ -73,6 +78,7 @@ def uploader(db_client):
     assert login.status_code == 200, login.text
     return {
         "id": uuid.UUID(signup.json()["id"]),
+        "nickname": nickname,
         "headers": {"Authorization": f"Bearer {login.json()['access_token']}"},
     }
 
@@ -269,7 +275,7 @@ class TestVisibility:
         other = f"viewer-{uuid.uuid4().hex[:12]}@super-sub.example"
         db_client.post(
             f"{V1}/auth/signup",
-            json={"email": other, "password": PASSWORD, "nickname": "구경꾼"},
+            json={"email": other, "password": PASSWORD, "nickname": f"구경꾼{uuid.uuid4().hex[:6]}"},
         )
         login = db_client.post(
             f"{V1}/auth/login", json={"email": other, "password": PASSWORD}
@@ -277,6 +283,39 @@ class TestVisibility:
         viewer_h = {"Authorization": f"Bearer {login.json()['access_token']}"}
         rows = db_client.get(f"{V1}/videos/public", headers=viewer_h).json()
         assert video_id in [r["id"] for r in rows]
+        # 목록이 보는 사람(viewer)이 아니라 올린 사람(uploader)의 닉네임을
+        # 실어야 한다 — `paik` 16번이 고치려던 바로 그 버그.
+        row = next(r for r in rows if r["id"] == video_id)
+        assert row["uploader_nickname"] == uploader["nickname"]
+
+    def test_카드를_만든_업로더는_슬러그도_실린다(self, db_client, uploader):
+        key = _upload(db_client, uploader)
+        video_id = _register(db_client, uploader, key).json()["id"]
+        db_client.post(f"{V1}/videos/{video_id}/keep", headers=uploader["headers"])
+        db_client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"is_public": True},
+            headers=uploader["headers"],
+        )
+        card = db_client.post(f"{V1}/me/card", headers=uploader["headers"]).json()
+
+        rows = db_client.get(f"{V1}/videos/public", headers=uploader["headers"]).json()
+        row = next(r for r in rows if r["id"] == video_id)
+        assert row["uploader_card_slug"] == card["public_slug"]
+
+    def test_카드가_없는_업로더는_슬러그가_null이다(self, db_client, uploader):
+        key = _upload(db_client, uploader)
+        video_id = _register(db_client, uploader, key).json()["id"]
+        db_client.post(f"{V1}/videos/{video_id}/keep", headers=uploader["headers"])
+        db_client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"is_public": True},
+            headers=uploader["headers"],
+        )
+
+        rows = db_client.get(f"{V1}/videos/public", headers=uploader["headers"]).json()
+        row = next(r for r in rows if r["id"] == video_id)
+        assert row["uploader_card_slug"] is None
 
     def test_남의_클립은_못_바꾼다(self, db_client, uploader):
         key = _upload(db_client, uploader)
@@ -285,7 +324,7 @@ class TestVisibility:
         other = f"intruder-{uuid.uuid4().hex[:12]}@super-sub.example"
         db_client.post(
             f"{V1}/auth/signup",
-            json={"email": other, "password": PASSWORD, "nickname": "침입자"},
+            json={"email": other, "password": PASSWORD, "nickname": f"침입자{uuid.uuid4().hex[:6]}"},
         )
         login = db_client.post(
             f"{V1}/auth/login", json={"email": other, "password": PASSWORD}
@@ -351,7 +390,7 @@ class TestPlayback:
         other = f"peek-{uuid.uuid4().hex[:12]}@super-sub.example"
         db_client.post(
             f"{V1}/auth/signup",
-            json={"email": other, "password": PASSWORD, "nickname": "엿보기"},
+            json={"email": other, "password": PASSWORD, "nickname": f"엿보기{uuid.uuid4().hex[:6]}"},
         )
         login = db_client.post(
             f"{V1}/auth/login", json={"email": other, "password": PASSWORD}
@@ -398,7 +437,7 @@ class TestDelete:
         other = f"del-{uuid.uuid4().hex[:12]}@super-sub.example"
         db_client.post(
             f"{V1}/auth/signup",
-            json={"email": other, "password": PASSWORD, "nickname": "남"},
+            json={"email": other, "password": PASSWORD, "nickname": f"남{uuid.uuid4().hex[:6]}"},
         )
         login = db_client.post(
             f"{V1}/auth/login", json={"email": other, "password": PASSWORD}
@@ -463,8 +502,8 @@ class TestReadableKey:
             headers=uploader["headers"],
         )
         key = res.json()["storage_key"]
-        # `uploader` 픽스처가 닉네임 "업로더" 로 가입한다
-        assert key.startswith(f"videos/{uploader['id']}/업로더-My-Kick-")
+        # `uploader` 픽스처의 닉네임이 슬러그 앞부분이 된다(임의 접미사 포함).
+        assert key.startswith(f"videos/{uploader['id']}/{uploader['nickname']}-My-Kick-")
 
         put_object(key, SIZE_OK)
         video_id = uuid.UUID(
@@ -595,7 +634,7 @@ class TestFeatured:
         other_email = f"viewer-{uuid.uuid4().hex[:12]}@super-sub.example"
         db_client.post(
             f"{V1}/auth/signup",
-            json={"email": other_email, "password": PASSWORD, "nickname": "보는이"},
+            json={"email": other_email, "password": PASSWORD, "nickname": f"보는이{uuid.uuid4().hex[:6]}"},
         )
         tok = db_client.post(
             f"{V1}/auth/login", json={"email": other_email, "password": PASSWORD}
@@ -737,7 +776,7 @@ class TestAdminVideos:
         email = f"admin-{uuid.uuid4().hex[:12]}@super-sub.example"
         db_client.post(
             f"{V1}/auth/signup",
-            json={"email": email, "password": PASSWORD, "nickname": "관리자"},
+            json={"email": email, "password": PASSWORD, "nickname": f"관리자{uuid.uuid4().hex[:6]}"},
         )
         original = settings.admin_emails
         settings.admin_emails = email
@@ -768,7 +807,7 @@ class TestAdminVideos:
         assert by_email.status_code == 200, by_email.text
         assert [r["id"] for r in by_email.json()["items"]] == [video_id]
         assert by_email.json()["email"] == email
-        assert by_email.json()["nickname"] == "업로더"
+        assert by_email.json()["nickname"] == uploader["nickname"]
 
         by_uuid = db_client.get(
             f"{V1}/admin/videos",
@@ -781,17 +820,18 @@ class TestAdminVideos:
         key = _upload(db_client, uploader)
         _register(db_client, uploader, key)
 
+        new_nickname = f"새이름{uuid.uuid4().hex[:6]}"
         db_client.patch(
-            f"{V1}/me", json={"nickname": "새이름"}, headers=uploader["headers"]
+            f"{V1}/me", json={"nickname": new_nickname}, headers=uploader["headers"]
         )
         body = db_client.get(
             f"{V1}/admin/videos",
             params={"user": str(uploader["id"])},
             headers=admin["headers"],
         ).json()
-        # 옛 저장 키에는 "업로더" 가 얼어붙어 있지만 목록은 DB 조인이라 현재 값이다
-        assert body["nickname"] == "새이름"
-        assert "업로더-" in body["items"][0]["storage_key"]
+        # 옛 저장 키에는 옛 닉네임이 얼어붙어 있지만 목록은 DB 조인이라 현재 값이다
+        assert body["nickname"] == new_nickname
+        assert f"{uploader['nickname']}-" in body["items"][0]["storage_key"]
 
     def test_아직_저장_안_한_임시분도_관리자에게는_보인다(
         self, db_client, db_session, uploader, admin
