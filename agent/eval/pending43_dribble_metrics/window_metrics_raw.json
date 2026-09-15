@@ -1,0 +1,98 @@
+{
+ "n_base": 78,
+ "a_mismatch": [],
+ "g_changed": [
+  "3R1kvNrGJK0|arm|extension_peak: 109 → 104",
+  "goeDWOVL95g|arm|extension_peak: 56 → 47"
+ ],
+ "by_length": {
+  "10": {
+   "pairs": 23,
+   "leak_same": 23,
+   "leak_diff": [],
+   "outside": 8,
+   "changed": {
+    "hip_rotation_range_deg": 16,
+    "swing_hip_flexion_after_impact_deg": 20
+   },
+   "worse": {
+    "hip_rotation_range_deg": 0,
+    "swing_hip_flexion_after_impact_deg": 0
+   },
+   "rel_median": {
+    "hip_rotation_range_deg": -87.1875,
+    "swing_hip_flexion_after_impact_deg": -57.30118669776809
+   },
+   "grade_pairs": 41,
+   "grade_changed": 18,
+   "grade_down": 18,
+   "grade_up": []
+  },
+  "15": {
+   "pairs": 29,
+   "leak_same": 29,
+   "leak_diff": [],
+   "outside": 9,
+   "changed": {
+    "hip_rotation_range_deg": 18,
+    "swing_hip_flexion_after_impact_deg": 25
+   },
+   "worse": {
+    "hip_rotation_range_deg": 0,
+    "swing_hip_flexion_after_impact_deg": 0
+   },
+   "rel_median": {
+    "hip_rotation_range_deg": -83.52960025634863,
+    "swing_hip_flexion_after_impact_deg": -41.677660510114336
+   },
+   "grade_pairs": 49,
+   "grade_changed": 20,
+   "grade_down": 20,
+   "grade_up": []
+  },
+  "30": {
+   "pairs": 34,
+   "leak_same": 34,
+   "leak_diff": [],
+   "outside": 5,
+   "changed": {
+    "hip_rotation_range_deg": 21,
+    "swing_hip_flexion_after_impact_deg": 20
+   },
+   "worse": {
+    "hip_rotation_range_deg": 0,
+    "swing_hip_flexion_after_impact_deg": 0
+   },
+   "rel_median": {
+    "hip_rotation_range_deg": -71.30434782608695,
+    "swing_hip_flexion_after_impact_deg": -6.0606060606060534
+   },
+   "grade_pairs": 59,
+   "grade_changed": 17,
+   "grade_down": 17,
+   "grade_up": []
+  },
+  "60": {
+   "pairs": 39,
+   "leak_same": 39,
+   "leak_diff": [],
+   "outside": 6,
+   "changed": {
+    "hip_rotation_range_deg": 19,
+    "swing_hip_flexion_after_impact_deg": 22
+   },
+   "worse": {
+    "hip_rotation_range_deg": 0,
+    "swing_hip_flexion_after_impact_deg": 0
+   },
+   "rel_median": {
+    "hip_rotation_range_deg": -17.086155486164536,
+    "swing_hip_flexion_after_impact_deg": -2.6480836236933767
+   },
+   "grade_pairs": 69,
+   "grade_changed": 12,
+   "grade_down": 12,
+   "grade_up": []
+  }
+ }
+}
