@@ -11,7 +11,17 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import JSON, Boolean, DateTime, Index, Integer, String, Text, Uuid
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    Uuid,
+)
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 from pgvector.sqlalchemy import Vector
@@ -28,6 +38,9 @@ class UserOrm(Base):
             postgresql_using="hnsw",
             postgresql_ops={"skill_embedding": "vector_cosine_ops"},
         ),
+        # 운영 DB 중복 0건 확인(2026.09.15) 후 추가 — 지인 검색(`GET /users/search`)이
+        # 닉네임으로 사람을 특정해야 해서 유일해야 뜻이 선다(미결 `jin` 35번).
+        UniqueConstraint("nickname", name="uq_user_nickname"),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
@@ -67,4 +80,12 @@ class UserOrm(Base):
     )
     skill_embedding: Mapped[list[float] | None] = mapped_column(
         Vector(768), nullable=True
+    )
+
+    # 지인 검색(`GET /users/search`)에 내 닉네임이 걸리게 할지 — `is_searchable`
+    # (위, 용병 추천 대상 여부)과는 **다른 개념**이다. 그쪽은 AI 추천 후보로
+    # 노출될지, 이건 지인 신청을 받기 위해 남이 나를 찾을 수 있을지다. 기본값
+    # `true`(전체 검색 가능) — 프로필에서 끄면 검색에서 빠진다(미결 `jin` 35번).
+    is_nickname_searchable: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="true"
     )

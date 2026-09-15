@@ -1527,6 +1527,68 @@ grep -rn "videos/.*keep\|keepVideo" <클라이언트 소스>
 상세: `fastapi/docs/api-contract.md`(`POST /videos` · `POST /videos/{id}/keep`
 절, "저장 안 한 임시 영상도 여기서 정리된다" 절) · 같은 구역 20번(공개·재생,
 같은 `kept` 필터를 씀)
+
+## 37. 지인 검색·상호 신청·폴링 알림이 새로 생겼습니다 (2026-09-15 추가, 미결 `jin` 35번)
+
+`www/src/components/SquadFriends.tsx`의 "지인 찾기" 판이 지금 하드코딩 배열을
+쓰고 있는 것을 확인했습니다("계약에 지인·친구 엔드포인트가 없다"는 그 파일
+주석 그대로입니다). 백엔드에 실제 엔드포인트를 만들었습니다 — 계약 3-12절.
+
+### 만족해야 할 성질
+
+1. **지인 찾기 판이 실제 사용자를 닉네임으로 검색할 수 있을 것.**
+2. **찾은 사람에게 "지인 신청"을 보낼 수 있고, 상대가 수락해야 지인이 될
+   것** — 일방적으로 등록되는 게 아니라 **상호** 관계입니다(신청→수락).
+3. **수락 대기 중인 신청·새 알림을 볼 수 있는 곳이 있을 것** — 알림은
+   지금은 폴링(`GET /me/notifications`)뿐입니다, 실시간 아닙니다.
+
+파일·컴포넌트 이름은 예시지 규격이 아닙니다 — 지켜야 하는 것은 위 성질뿐입니다.
+
+### 먼저 확인
+
+```
+grep -n "FRIENDS = \[" www/src/components/SquadFriends.tsx
+```
+
+걸리면 아직 하드코딩 배열 그대로입니다.
+
+### 새 엔드포인트 (계약 3-12절에 요청/응답 전체가 있습니다)
+
+| 엔드포인트 | 용도 |
+|---|---|
+| `GET /users/search?q=` | 닉네임으로 사람 찾기(최대 20명, 본인 제외) |
+| `POST /me/contacts` | 지인 신청(`target_user_id`, 선택적 `note`) |
+| `POST /me/contacts/{id}/accept` | 내가 대상인 신청 수락 |
+| `GET /me/contacts` | 수락된 지인 목록 |
+| `GET /me/contacts/requests` | 나에게 온 대기중 신청 |
+| `GET /me/notifications?unread_only=` | 알림 목록(폴링) |
+| `PATCH /me/notifications/{id}/read` | 알림 읽음 처리 |
+
+### 함께 바뀐 것 — `PATCH /me`
+
+`is_nickname_searchable`(boolean, 선택) 필드가 늘었습니다 — 안 보내면 안
+바뀝니다. 지인 검색에 내 닉네임이 노출될지를 사용자가 프로필에서 끌 수 있게
+하는 스위치입니다(기본값 `true`). `GET /me` 응답에도 이 필드가 옵니다.
+
+### 🔴 하지 말 것
+
+- **닉네임 중복 처리를 프론트에서 미리 막으려 하지 마십시오.** `user.nickname`
+  에 유일 제약이 새로 붙어서, 가입·닉네임 변경이 겹치면 서버가
+  `409 NICKNAME_ALREADY_EXISTS`를 냅니다 — 그 코드로만 분기하십시오.
+- **알림에 문구가 없습니다.** `type`(`contact_request`/`contact_accepted`)·
+  `actor_user_id`·`subject_type`만 옵니다 — 문장은 화면에서 조립해야 합니다.
+  서버가 문장을 보낼 거라고 가정하지 마십시오.
+- 지인 목록 응답의 `note`는 **내가 신청자일 때만** 옵니다 — 상대 시점에서는
+  항상 `null`입니다. 버그가 아닙니다.
+
+### 아직 없는 것 — 이번 범위 밖
+
+매칭 수락·팀 가입 성공 등 **다른 흐름에서 알림을 만드는 것**은 이번에 안
+했습니다(알림 인프라 자체만 만들었습니다). 필요해지면 별도로 요청해 주십시오.
+`flutter/`도 필요하면 같은 방식으로 반영해 주십시오.
+
+상세: `fastapi/docs/api-contract.md`(3-12절) · 부록 D 도메인 ①
+(`user_contact`·`notification`)
 ---
 
 ## 계약 문서

@@ -163,4 +163,10 @@ class TestOpenApi:
             V1 + "/coaches/{coach_id}/referrals",
             f"{V1}/me/mercenary-profile",
             f"{V1}/matching/search-candidates",
+            f"{V1}/users/search",
+            f"{V1}/me/contacts",
+            V1 + "/me/contacts/{contact_id}/accept",
+            f"{V1}/me/contacts/requests",
+            f"{V1}/me/notifications",
+            V1 + "/me/notifications/{notification_id}/read",
         }

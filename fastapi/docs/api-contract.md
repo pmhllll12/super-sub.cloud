@@ -2492,6 +2492,103 @@ Gemini 임베딩으로 바꿔 코사인 유사도로 검색한다.
 
 ---
 
+## 3-12. 지인·알림 (2026-09-15 추가 — 미결 `jin` 35번)
+
+부록 D 도메인 ①. **상호 관계다** — 신청은 한쪽이 하지만, 대상이 수락하면
+양쪽 다 서로를 지인 목록에서 본다. 알림은 **폴링 방식**이다 — 웹소켓·푸시
+인프라가 없어서 분석 상태 확인과 같은 "몇 초마다 GET" 패턴을 쓴다. 실시간이
+필요해지면 이 위에 전달 채널만 얹으면 된다(저장 방식은 그대로).
+
+### `GET /api/v1/users/search?q=`
+
+인증 필요. 닉네임 부분일치(대소문자 무관), 최대 20명. `is_nickname_searchable
+=false`로 끈 사람과 **본인은 결과에서 빠진다.**
+
+```json
+[{"id": "…", "nickname": "김철수"}]
+```
+
+### `POST /api/v1/me/contacts` — 지인 신청
+
+```json
+{"target_user_id": "…", "note": "같은 동네"}
+```
+
+`201` — 신청 1건(`accepted_at: null`). 대상에게 `notification`(type=
+`contact_request`)이 함께 생긴다.
+
+| 에러 | code |
+|---|---|
+| 422 | `CANNOT_REQUEST_SELF` — 자기 자신에게 신청 |
+| 404 | `USER_NOT_FOUND` |
+| 409 | `ALREADY_REQUESTED` — 이미 신청했거나(방향 무관) 이미 지인이다 |
+
+### `POST /api/v1/me/contacts/{contact_id}/accept`
+
+내가 대상인 대기중 신청만 수락할 수 있다. 신청자에게 `notification`(type=
+`contact_accepted`)이 생긴다.
+
+| 에러 | code |
+|---|---|
+| 404 | `CONTACT_NOT_FOUND` |
+| 403 | `FORBIDDEN` — 내가 대상이 아니다 |
+| 409 | `ALREADY_ACCEPTED` |
+
+### `GET /api/v1/me/contacts` — 수락된 지인 목록
+
+내가 신청자든 대상이든 상대방이 평평하게 실린다. **`note`는 내가 신청자일
+때만** 온다 — 상대가 쓴 적 없는 내 개인 메모라서다.
+
+```json
+{"items": [
+  {"contact_id": "…", "user_id": "…", "nickname": "김철수",
+   "note": "같은 동네", "accepted_at": "…"}
+]}
+```
+
+### `GET /api/v1/me/contacts/requests` — 나에게 온 대기중 신청
+
+```json
+[{"id": "…", "requester_user_id": "…", "target_user_id": "…",
+  "note": null, "accepted_at": null, "created_at": "…"}]
+```
+
+### `GET /api/v1/me/notifications?unread_only=`
+
+최신순, 최대 50건. **문구를 안 준다** — `type`·`actor_user_id`·`subject_type`·
+`subject_id`로 클라이언트가 렌더링한다. 지금 나오는 `type`은 `contact_request`·
+`contact_accepted` 둘뿐이다.
+
+```json
+[{"id": "…", "type": "contact_request", "actor_user_id": "…",
+  "subject_type": "user_contact", "subject_id": "…",
+  "read_at": null, "created_at": "…"}]
+```
+
+### `PATCH /api/v1/me/notifications/{notification_id}/read`
+
+읽음 처리. 이미 읽었어도 200(멱등). 내 알림이 아니거나 없으면 404
+`NOTIFICATION_NOT_FOUND`.
+
+### 함께 바뀐 것
+
+- **`user.nickname`에 유일 제약**이 붙었다. 가입(`POST /auth/signup`)·구글
+  가입·닉네임 변경(`PATCH /me`)이 겹치는 닉네임을 받으면 이제
+  `409 NICKNAME_ALREADY_EXISTS`를 낸다(전에는 이 컬럼에 제약이 없었다).
+- `PATCH /api/v1/me`에 `is_nickname_searchable`(boolean, 선택)이 늘었다 —
+  안 보내면 안 바뀐다. 지인 검색 노출 여부고, 용병 매칭의 `is_searchable`과는
+  다른 컬럼이다. `GET /me` 응답에도 이 필드가 함께 온다.
+
+### 아직 없는 것
+
+- **실시간 전달**(웹소켓·푸시) — 지금은 폴링뿐이다
+- **다른 컨텍스트의 알림 생성** — 매칭 수락·팀 가입 성공 등에서 알림을 만드는
+  배선은 이번 범위 밖이다(각 컨텍스트가 필요할 때 같은 방식으로 얹는다)
+- **지인 검색을 위한 사전 안내**(닉네임 중복 시 가입 화면의 처리)는 이번
+  범위 밖 — 계약(409 코드)만 냈다
+
+---
+
 ## 4. 스키마가 강제하는 규칙 — API에서도 지켜야 한다
 
 부록 D.5가 "코드에만 두면 지켜지지 않으므로 테이블 설계 단계에서 막는다"고 한 것들이다.

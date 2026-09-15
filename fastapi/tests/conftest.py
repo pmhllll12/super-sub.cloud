@@ -30,6 +30,12 @@ from app.match.adapter.outbound.stub.match_stub_repository import (
     StubMatchRepository,
 )
 from app.match.dependencies.match_providers import get_match_repository
+from app.notification.adapter.outbound.stub.notification_stub_repository import (
+    StubNotificationRepository,
+)
+from app.notification.dependencies.notification_repository_provider import (
+    get_notification_repository,
+)
 from app.review.adapter.outbound.stub.review_stub_repository import (
     StubReviewRepository,
     reset_reviews,
@@ -115,6 +121,9 @@ def client() -> TestClient:
     app.dependency_overrides[get_report_read_repository] = StubReportReadRepository
     app.dependency_overrides[get_review_repository] = StubReviewRepository
     app.dependency_overrides[get_position_repository] = StubPositionRepository
+    app.dependency_overrides[get_notification_repository] = (
+        StubNotificationRepository
+    )
     # 🔴 저장소도 갈아끼운다. 안 끼우면 `S3_BUCKET` 이 없어 503 이 나는데,
     #    그건 계약이 아니라 **환경 문제**라 계약 테스트가 그걸 검사하면 안 된다.
     app.dependency_overrides[get_storage] = FakeStorage
@@ -140,6 +149,7 @@ def client() -> TestClient:
         app.dependency_overrides.pop(get_report_read_repository, None)
         app.dependency_overrides.pop(get_review_repository, None)
         app.dependency_overrides.pop(get_position_repository, None)
+        app.dependency_overrides.pop(get_notification_repository, None)
         app.dependency_overrides.pop(get_storage, None)
         app.dependency_overrides.pop(get_token_version_reader, None)
         app.dependency_overrides.pop(get_user_email_reader, None)
