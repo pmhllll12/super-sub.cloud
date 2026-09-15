@@ -9,10 +9,10 @@ nav_order: 4
 Super-Sub 플랫폼의 데이터 모델이다. 3장 서비스 기능과 5장 요구사항에서 도출했다.
 각자 담당 도메인부터 보면 된다.
 
-**43 테이블 · 6 도메인 · 1~3정규형 준수**
+**44 테이블 · 6 도메인 · 1~3정규형 준수**
 
 본 부록은 3장에서 정의한 서비스 기능과 5장 요구사항(SFR·SEC)에서 도출한 데이터 모델이다.
-43개 테이블을 6개 도메인으로 나누어 정리한다.
+44개 테이블을 6개 도메인으로 나누어 정리한다.
 
 제1정규형부터 제3정규형까지 준수한다. 비원자 값(jsonb), 이행 종속 컬럼, 파생·집계 컬럼을 두지
 않는다. 정규화 근거와 그에 따른 조회 비용은 D.4에서 다룬다.
@@ -114,11 +114,15 @@ D.3에 별도로 모았다.
 
 ![도메인 ④ 매칭 ERD]({{ "/assets/erd/domain4-matching.svg" | relative_url }}){: class="erd-diagram" }
 
+> 위 그림에는 `match.opponent_team_id`와 `team_match_request`(미결 `paik`
+> 17번, 2026.09.15)가 아직 없다. **표가 최신이다.**
+
 | 테이블 | 용도 | 1행이 뜻하는 것 |
 |---|---|---|
-| match | 경기 등록 (SFR-010). 종목은 team이 결정하므로 컬럼을 두지 않는다 | 등록된 경기 1건 |
+| match | 경기 등록 (SFR-010). 종목은 team이 결정하므로 컬럼을 두지 않는다. `opponent_team_id`(선택)가 차 있으면 팀 대 팀으로 **확정된** 경기다 — `team_match_request` 수락으로만 채워지고, 이런 경기는 모집(`needs`)이 없다 | 등록된 경기 1건 |
 | match_position_need | 경기별 필요 포지션과 인원. 포지션이 둘 이상일 수 있어 행으로 나눈다 | 경기 1건의 포지션 1종 필요분 |
 | match_application | 지원과 제안. 양측 수락 시각을 각각 갖고, 둘 다 채워진 상태를 확정으로 본다 | 경기 1건에 대한 한 사람의 지원 1건 |
+| team_match_request | 팀 대 팀 경기 신청(미결 `paik` 17번). 신청 팀이 항상 먼저 걸고 대상 팀만 답하는 비대칭 흐름이라 `match_application`과 달리 단일 `status` 문자열을 쓴다 | 팀 1개가 팀 1개에 건 신청 1건 |
 | fitness_score | 수준·역할·성향 3축 적합도 (SFR-006) | 지원 1건의 적합도 산출 결과 |
 | recommendation | 후보 추천 이력과 추천 사유 (SFR-007) | 경기 1건에 제시된 후보 1명 |
 | team_match_region | 팀이 경기하고 싶은 지역(미결 `paik` 18번). 여러 개라 행으로 나눈다 | 팀 1개의 선호 지역 1곳 |
@@ -188,6 +192,8 @@ report·no_show는 review와 직접 이어지지 않는다. 제재를 평가 점
 | squad | team_id | team | 소속 팀 |
 | squad_member | position_id | position | 포지션 |
 | match | team_id | team | 주최 팀 |
+| match | opponent_team_id | team | 상대 팀(팀 대 팀 확정 경기, 없으면 용병 모집) |
+| team_match_request | requester_team_id · target_team_id | team | 신청 팀과 대상 팀 |
 | match_position_need | position_id | position | 필요 포지션 |
 | match_application | user_id | user | 지원자 |
 | recommendation | candidate_user_id | user | 추천 후보 |
