@@ -9,10 +9,10 @@ nav_order: 4
 Super-Sub 플랫폼의 데이터 모델이다. 3장 서비스 기능과 5장 요구사항에서 도출했다.
 각자 담당 도메인부터 보면 된다.
 
-**34 테이블 · 6 도메인 · 1~3정규형 준수**
+**35 테이블 · 6 도메인 · 1~3정규형 준수**
 
 본 부록은 3장에서 정의한 서비스 기능과 5장 요구사항(SFR·SEC)에서 도출한 데이터 모델이다.
-34개 테이블을 6개 도메인으로 나누어 정리한다.
+35개 테이블을 6개 도메인으로 나누어 정리한다.
 
 제1정규형부터 제3정규형까지 준수한다. 비원자 값(jsonb), 이행 종속 컬럼, 파생·집계 컬럼을 두지
 않는다. 정규화 근거와 그에 따른 조회 비용은 D.4에서 다룬다.
@@ -68,8 +68,9 @@ D.3에 별도로 모았다.
 ![도메인 ② 영상·분석 ERD]({{ "/assets/erd/domain2-video-analysis.svg" | relative_url }}){: class="erd-diagram" }
 
 > 위 그림에는 metric_definition에 `sport_code` 컬럼이 아직 표시되어 있으나, 지표를 종목
-> 무관 물리량으로 두기로 하면서(2026.09.08) 그 컬럼을 없앴다. **표가 최신이다.** 그림은
-> 좌표가 직접 박힌 수작업 SVG라 갱신 비용이 커서 미뤄 둔다(위 ①과 같은 사정이다).
+> 무관 물리량으로 두기로 하면서(2026.09.08) 그 컬럼을 없앴다. 그림은 **analysis_metric_criterion도
+> 아직 반영하지 않았다**(2026.09.09~10 신설). **표가 최신이다.** 그림은 좌표가 직접 박힌
+> 수작업 SVG라 갱신 비용이 커서 미뤄 둔다(위 ①과 같은 사정이다).
 
 | 테이블 | 용도 | 1행이 뜻하는 것 |
 |---|---|---|
@@ -79,6 +80,7 @@ D.3에 별도로 모았다.
 | analysis_metric | 분석 1회가 산출한 지표 집합. 산출 버전을 기록한다 (QUA-002) | 분석 실행 1회가 낸 지표 묶음 |
 | metric_definition | 지표 항목의 정의와 단위. 물리량이라 종목에 속하지 않는다 — 어느 종목에서 쓰는지는 루브릭이 안다 | 지표 항목 1개 (예: 임팩트 시 무릎 각도) |
 | analysis_metric_value | 지표 항목별 값 (SFR-002) | 지표 묶음 1개 안의 항목 1개 값 |
+| analysis_metric_criterion | 리포트 항목별 등급의 맥락 — 칭호·구간·근거 문장 (SFR-003). analysis_metric_value가 항목의 **수치**를 담는다면 여기는 그 항목의 **맥락**이다 | 지표 묶음 1개 안의 채점 항목 1개 |
 | analysis_report | 지표를 근거로 생성한 요약 문장 (SFR-003) | 지표 묶음 1개의 요약문 |
 | player_vector | 성향 비교용 특징 벡터. pgvector로 색인한다 (SFR-005) | 지표 묶음 1개의 임베딩 |
 
@@ -276,6 +278,7 @@ user_title은 호칭 부여의 근거가 되는 지표를 참조한다. 근거�
 | video_validation | video_id | 영상당 검사 결과 1건 |
 | analysis_metric | analysis_job_id | 작업당 지표 집합 1건 |
 | analysis_metric_value | (analysis_metric_id, metric_code) | 항목당 값 1건 |
+| analysis_metric_criterion | (analysis_metric_id, criterion_id) | 한 분석에서 같은 채점 항목 중복 방지 |
 | analysis_report | analysis_metric_id | 지표 집합당 요약 1건 |
 | player_vector | analysis_metric_id | 지표 집합당 벡터 1건 |
 | player_card | user_id, public_slug | 사용자당 카드 1건, 슬러그 중복 방지 |

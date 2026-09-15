@@ -11576,7 +11576,7 @@ RDS로 안 옮김). RDS라고 알고 있었다면 정정.
 
 - **담당**: 박민호 · **제기**: 박민호 · **기한**: 해소됨
 
-### 24. `deployment.md`의 k3s 배포 위치가 문서와 실제가 다릅니다 — 정어진 확인 부탁드립니다
+### 24. `deployment.md`의 k3s 배포 위치가 문서와 실제가 다릅니다 — 정어진 확인 부탁드립니다 ✅ 해소 (2026.09.15)
 
 23번 확인하며 같이 봤다. `deployment.md`는 `supersub` 네임스페이스의
 `deploy/api`라고 적혀 있는데(상단 요약 "확인" 줄 포함), **실제로는 `default`
@@ -11594,7 +11594,17 @@ sudo k3s kubectl get deploy -A          → default 에 supersub-api-trial (1/1 
 
 - **담당**: 정어진 · **제기**: 박민호 · **기한**: 확인되는 대로
 
-### 23. 부록 D ERD가 실제 DB 테이블과 다릅니다 — 정어진 확인 부탁드립니다
+**확인 (2026.09.15)**: `ssh supersub`로 재확인 — 같은 결과(`default`/
+`supersub-api-trial`, 1/1 Running). **새로 발견된 게 아니라 `jin` 32번에서
+09-11에 이미 같은 사실(이름·네임스페이스 포함)을 남겨 둔 것**이다 — 실제로
+도는 k3s Deployment 매니페스트 자체가 저장소에 없고 서버의 `~/k3s-trial/`에만
+있어서, `deployment.md`도 그 실물을 못 따라간 상태다(min 14 원래 2번 미착수).
+`www/docs/2026-09-09-K3S-harness.md`는 네임스페이스를 `<네임스페이스>`
+자리표시자로만 써서 어긋남 없다. `deployment.md` 자체를 고치는 것은 매니페스트를
+저장소로 옮기는 `jin` 32번 작업과 함께 하는 게 맞아 보여 지금은 문서만 고치지
+않았다 — 상세·다음 조치는 `jin` 32번 참고.
+
+### 23. 부록 D ERD가 실제 DB 테이블과 다릅니다 — 정어진 확인 부탁드립니다 ✅ 해소 (2026.09.15)
 
 21번 확인 김에 `\dt`로 `supersub` DB 전체 테이블 목록을 뽑아 부록 D(34개 테이블)와
 대조했다.
@@ -11616,6 +11626,20 @@ sudo k3s kubectl get deploy -A          → default 에 supersub-api-trial (1/1 
 
 - 관련: `jekyll/chapters/부록D-데이터베이스ERD.markdown` · 21·22번(같은 세션에서 발견)
 - **담당**: 정어진 · **제기**: 박민호 · **기한**: 확인되는 대로
+
+**확인 (2026.09.15)**: `\dt` 재확인 결과 같음(31개 + `alembic_version`). 두
+갈래로 원인이 다르다.
+
+1. **없는 4개는 "빠진" 게 아니라 아직 착수 전이다.** `fastapi/app`·`alembic/versions`
+   어디에도 ORM·마이그레이션이 없다 — 부록 D 본문 그대로 SFR-005(`player_vector`
+   벡터 매칭)·SFR-006(`fitness_score` 적합도)·SFR-007(`recommendation` 추천)
+   기능을 위한 **설계 단계 스키마**다. 부록 D는 계획 문서로서 정확하므로 지우지
+   않는다.
+2. **`analysis_metric_criterion`은 반대로 문서 쪽이 밀렸다.** `ho` 38번(정상호
+   제기·내 판단, 2026-09-09~10)으로 실제 구현된 테이블이고, `analysis_metric_value`
+   (지표 항목별 값)와는 다른 테이블 — 등급의 `band`/`out_of_band`/`view_dependent`
+   같은 개발 확인용 메타를 담는다. 부록 D 본문에 이 절을 추가해 반영함
+   (`jekyll/chapters/부록D-데이터베이스ERD.markdown`).
 
 ### 24. QA 체크리스트 페이지를 만들었습니다 ✅ 완료 (2026.09.14)
 
