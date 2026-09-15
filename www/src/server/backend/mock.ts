@@ -670,6 +670,15 @@ export const mockBackend: Backend = {
     }
   },
 
+  async keepVideo(token, videoId) {
+    requireUser(token)
+    // 🔴 이 mock 은 임시(`kept=false`) 개념을 안 둔다 — `DEMO_VIDEOS` 는 늘
+    // "이미 저장된" 상태다. 그래도 계약대로 **남의/없는 클립은 404**로 답한다.
+    const v = DEMO_VIDEOS.find((x) => x.id === videoId)
+    if (!v) throw new BackendError(404, 'VIDEO_NOT_FOUND', '그 영상을 찾을 수 없습니다.')
+    return v
+  },
+
   async updateVideo(token, videoId, input) {
     requireUser(token)
     const at = DEMO_VIDEOS.findIndex((v) => v.id === videoId)

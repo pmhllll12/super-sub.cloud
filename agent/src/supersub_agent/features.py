@@ -492,6 +492,7 @@ def segment_phases(
     swing: int | Chain,
     limb: str = "leg",
     event: str = "extension_peak",
+    window: tuple[int, int] | None = None,
 ) -> Phases:
     """준비·임팩트·마무리 구간을 나눈다.
 
@@ -507,6 +508,18 @@ def segment_phases(
     어느 쪽이든 언어 모델을 쓰지 않는다 — 재현성이 필요한 구간이다.
 
     swing은 관절 체인이거나, 하위 호환을 위한 무릎 인덱스 하나다.
+
+    window는 임팩트를 찾을 구간 [a, b)다 (미결 45번 ㉲-a). 한 영상에 동작이
+    여러 번 나오면 **구간마다 이 함수를 한 번씩** 부른다 — 「임팩트 여럿」을
+    이 함수 안에서 풀지 않는 것은 의도다. 그러면 "몇 개인가"(검출)와
+    "어디인가"(구간 분할)가 한 자리에 섞이고, 개수·최소 간격 같은 상수가
+    여기 붙는다. 몇 개인지는 **바깥**이 정하고 여기는 하나씩 받는다.
+
+    🔴 **window=None이면 코드 경로가 지금까지와 한 줄도 다르지 않다.**
+    바뀌면 features가 바뀌고 그때까지의 평가가 전부 무효다(B-6 재실행).
+
+    🔴 **프레임 인덱스는 클립 기준 절대값 그대로다.** 구간 안에서 0부터 다시
+    세면 도구 궤적 조회(_ball_at)와 timebase 초 환산이 조용히 틀린다.
     """
     if event not in IMPACT_EVENTS:
         raise ValueError(f"impact_event는 {list(IMPACT_EVENTS)} 중 하나여야 한다: {event!r}")
@@ -517,6 +530,16 @@ def segment_phases(
     # 임팩트는 스윙 측 관절로 정의한다. 반대쪽이 가려진 프레임까지 후보에서
     # 빼면 임팩트가 실제 지점 밖으로 밀린다 (야구 투구 실클립).
     usable = valid_frames(kps, limb, swing) & np.isfinite(series)
+    if window is not None:
+        # 구간 밖을 "검출 실패"와 같게 다룬다. 그래야 아래 임팩트 탐색·경계
+        # 검사가 **지금과 같은 규칙 그대로** 구간 안에서만 성립한다.
+        outside = np.ones_like(usable)
+        outside[max(0, window[0]):max(0, window[1])] = False
+        usable = usable & ~outside
+        if not usable.any():
+            raise InsufficientQuality(
+                f"구간 {window}에 분석 가능한 프레임이 없다."
+            )
     if event == "extension_peak":
         impact = _peak_frame(np.gradient(series), usable)
     else:
@@ -560,6 +583,7 @@ def extract_features(
     impact_limb: str = "leg",
     impact_event: str = "extension_peak",
     swing_side: str = "auto",
+    window: tuple[int, int] | None = None,
 ) -> dict[str, float | int]:
     """루브릭이 요구하는 지표를 모두 산출한다.
 
@@ -575,6 +599,12 @@ def extract_features(
 
     impact_event는 임팩트로 삼을 사건이다 (루브릭의 kinematics.impact_event).
     채찍질하는 동작은 extension_peak, 들어올려 놓는 동작은 distal_apex다.
+
+    window는 분석할 구간 [a, b)다 (미결 45번 ㉲-a). 한 영상에 동작이 여러 번
+    나오면 **구간마다 이 함수를 한 번씩** 불러 지표를 따로 낸다 — 지금의
+    파이프라인을 N번 돌리는 것이지 새 경로가 아니다. 마무리 구간도 창 안에서
+    끊기므로 두 번째 동작의 팔로스루가 첫 동작까지 끌려가지 않는다.
+    🔴 **None이면 지금까지와 산출이 비트 동일하다** (미결 45번 4회차 기준 A).
 
     swing_side는 스윙 측을 직접 지정한다("left"/"right"). 기본값 "auto"는
     이동량으로 판별하는데, 팔 종목에서는 이 판별이 약하다(identify_limb 참고).
@@ -607,7 +637,7 @@ def extract_features(
         norm, swing_side if impact_limb == "leg" else "auto"
     )
     swing_chain, support_chain = identify_limb(norm, impact_limb, swing_side)
-    phases = segment_phases(norm, swing_chain, impact_limb, impact_event)
+    phases = segment_phases(norm, swing_chain, impact_limb, impact_event, window)
     t = phases.impact
 
     xy = norm[:, :, :2]
