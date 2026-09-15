@@ -31,6 +31,10 @@ class ClaimedJobResponse(BaseModel):
     # 🔴 **없거나 빈 리스트면 「전체적으로」**다 — 워커는 `--focus` 를 안 붙인다.
     # 있으면 `--focus a,b,c` 로 넘긴다.
     focus: list[str] | None = None
+    # `"analyze"` | `"detect"` (미결 `ho` 44번). `detect`면 워커가
+    # `analyze_s3.py` 대신 `detect_subjects.py`를 부른다 — `docs/
+    # worker-interface.md` 참고.
+    job_type: str
 
 
 class FinishJobSchema(BaseModel):
@@ -49,3 +53,21 @@ class FinishJobSchema(BaseModel):
     # 🔴 `succeeded` 가 아니면 무시된다(실패한 작업이 가리킬 리포트는 없다).
     # 상한은 S3 객체 키 한계(1024바이트)다.
     report_key: str | None = Field(default=None, max_length=1024)
+    # `detect` 작업의 결과 (미결 `ho` 44번) — `detect_subjects.py
+    # --result-json` 그대로(`people`·`ball`). `analyze` 워커는 안 보낸다.
+    detection_result: dict | None = None
+
+
+class RequestDetectionSchema(BaseModel):
+    """검출 요청 (미결 `ho` 44번). 안 주면 기본 시각(1000ms)으로 돈다."""
+
+    at_ms: int = Field(default=1000, ge=0)
+
+
+class DetectionResponse(BaseModel):
+    """검출 작업의 지금 상태 — `GET`/`POST` 둘 다 같은 모양으로 돌려준다."""
+
+    job_id: UUID
+    status: str
+    failure_reason: str | None
+    detection_result: dict | None

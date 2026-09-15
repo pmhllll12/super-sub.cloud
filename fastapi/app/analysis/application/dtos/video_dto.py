@@ -232,8 +232,10 @@ class VideoResult:
 
 @dataclass(frozen=True)
 class PublicVideoResult:
-    """공개 목록 한 줄. **저장 키·업로더를 싣지 않는다** — 저장 키에 업로더
-    `user_id` 가 들어 있고, 재생은 `GET /videos/{id}/playback-url` 로 따로 받는다.
+    """공개 목록 한 줄. **저장 키는 싣지 않는다** — 저장 키엔 업로더 `user_id`가
+    그대로 들어 있어서다. 업로더는 대신 **닉네임**(항상 있음)과 **카드 슬러그**
+    (있으면, 눌러서 카드로 갈 자리 — `paik` 16번)로 싣는다. 재생은
+    `GET /videos/{id}/playback-url`로 따로 받는다.
     """
 
     id: UUID
@@ -242,3 +244,5 @@ class PublicVideoResult:
     created_at: datetime
     title: str | None
     description: str | None
+    uploader_nickname: str
+    uploader_card_slug: str | None

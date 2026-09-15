@@ -24,3 +24,5 @@ class UserEntity:
     created_at: datetime
     # 발급한 토큰을 무효로 만들 때 올리는 값(SEC-004). 새 계정은 0 에서 시작한다.
     token_version: int = 0
+    # 지인 검색에 걸릴지(`user_orm.py` 참고, 용병 매칭의 `is_searchable`과 다른 개념).
+    is_nickname_searchable: bool = True

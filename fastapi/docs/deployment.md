@@ -2,7 +2,8 @@
 
 > **상태:** **구현됨 — k3s + GitHub Actions CD** · 2026-09-09
 > **확인:** `curl -s https://<API 호스트>/health` → `{"status":"ok",...}` ·
-> `ssh supersub 'sudo k3s kubectl -n supersub get pods'` → `api-*` 가 `Running`.
+> `ssh supersub 'sudo k3s kubectl get pods'` → `supersub-api-trial-*` 가 `Running`
+> (네임스페이스 `default` — `jin` 32번 이전엔 `supersub`로 잘못 적혀 있었다).
 > **메모:** 배포는 이제 **손으로 밟는 절차가 아니라 자동**이다 — `main` 의
 > `fastapi/**` 가 바뀌면 이미지가 빌드돼 Docker Hub 로 가고, 서버가 그걸 폴링해
 > 재배포한다. 아래 「현재 배포」가 그 흐름이고, 사람이 하는 것은 **DB·시크릿·S3**
@@ -27,7 +28,7 @@ main 에 fastapi/** push
       docker build (context: fastapi, file: fastapi/Dockerfile)
       → push  pmhllll12/supersub:latest
   → supersub 서버의 supersub-cd.timer (2분 폴링)
-      새 digest 감지 → kubectl rollout restart deploy/api  (ns: supersub)
+      새 digest 감지 → kubectl rollout restart deployment/supersub-api-trial  (ns: default)
   → 파드 재생성 (strategy: Recreate)
       initContainer: alembic upgrade head   ← 마이그레이션 (커밋 5f85c9d)
       app 컨테이너: uvicorn app.main:app :8080  (hostNetwork)
@@ -40,9 +41,17 @@ main 에 fastapi/** push
   2026-09-09 에 `.env` 가 이미지에 구워져 Docker Hub 에 올라간 사고(미결 min 11번)
   뒤로 git 으로 관리한다. 🔴 **`COPY . .` 로 되돌리지 말 것** — `Dockerfile` 은
   `app/`·`alembic/`·`alembic.ini` 만 명시적으로 넣는다.
-- **설정 주입**: `kubectl -n supersub create secret generic supersub-api-env
+- **설정 주입**: `kubectl create secret generic supersub-api-env
   --from-env-file=<서버의 .env>` → Deployment 가 `envFrom` 으로 읽는다. `.env`
-  파일 자체는 서버에만 있고 저장소·이미지에 없다.
+  파일 자체는 서버에만 있고 저장소·이미지에 없다. 키 목록(값 말고 이름만)의
+  정본은 `.env.example` — Secret에 실제로 들어있는 8개 키
+  (`APP_ENV`·`DATABASE_URL`·`JWT_SECRET`·`GOOGLE_CLIENT_IDS`·`ADMIN_EMAILS`·
+  `WORKER_TOKEN`·`AWS_REGION`·`S3_BUCKET`)가 전부 거기 있다(`jin` 32번 확인,
+  2026.09.15).
+- **매니페스트 자체**는 `fastapi/deploy/k8s/deployment.yaml` — 서버의
+  `~/k3s-trial/`에만 있던 것을 그대로 옮겨 담았다(`jin` 32번). 이름·네임스페이스를
+  `supersub-api-trial`/`default`로 유지할지는 아직 정리 전이고, 지금은 **실물을
+  그대로 커밋하는 것**까지만 했다.
 - **마이그레이션**은 initContainer 가 매 배포마다 `alembic upgrade head` 를 돈다.
   head 면 no-op 라 안전하다. 🔴 **`CREATE EXTENSION vector` 는 여기 없다** — 그건
   슈퍼유저 일회성이라 1절이 따로 다룬다.
@@ -587,7 +596,7 @@ df -h /                     # 30G 로 보이면 끝
 ssh supersub 'systemctl is-enabled postgresql supersub-backup.timer supersub-cd.timer k3s'
 # 🔴 supersub-api(옛 8000 systemd)는 disabled 가 정상이다 — k3s 로 넘어갔다(롤백용으로만 남김)
 ssh supersub 'systemctl is-active postgresql k3s'
-ssh supersub 'sudo k3s kubectl -n supersub get pods'        # api-* 가 Running
+ssh supersub 'sudo k3s kubectl get pods'        # supersub-api-trial-* 가 Running
 curl -s -o /dev/null -w '%{http_code}\n' https://<API 호스트>/health   # 200
 ```
 

@@ -794,6 +794,49 @@ S3 의 분석 산출물(`report.json`)을 서버가 받아 점수만 걷어내�
 둘을 가르기 전에는 실패한 분석도 `REPORT_NOT_READY`로 나가서 화면이 "다시 확인"을
 무한 반복시켰다.
 
+#### `POST`/`GET /api/v1/videos/{video_id}/detect` — 사람 검출, 2026-09-15 추가 (미결 `ho` 44번)
+
+분석을 걸기 **전에** 「이 영상에 잡힌 사람들」을 미리 보여주는 자리. **안 (가)**
+채택 — `analyze` 작업과 같은 큐(`analysis_job`)를 재사용, 화면은 **폴링**한다.
+GPU 인스턴스가 자동 종료돼 있을 수 있어(`agent-ai` autostop) 즉시 응답하는 동기
+API로는 못 둔다(같은 이유로 `analyze` 작업도 폴링이다).
+
+| | |
+|---|---|
+| `POST` | 새 `detect` 작업을 큐에 넣는다. `202 Accepted` + 아래와 같은 모양(아직 `queued`). 몸통은 선택 — `{"at_ms": 1000}`, 안 보내면 `1000`(기본값. 프레임 특정 시각이 아니라 "1초쯤 보라"는 대략값이라 이 정도로 충분하다고 판단) |
+| `GET` | 그 영상의 **가장 최근** `detect` 작업 상태. 호출마다 새 작업을 만드는 정책(재사용 안 함, `analyze`와 같음)이라 폴링은 항상 최신 것만 본다 |
+
+```json
+// 200 (또는 202) 예시 — succeeded
+{
+  "job_id": "9c2e...",
+  "status": "succeeded",
+  "failure_reason": null,
+  "detection_result": {
+    "people": [
+      { "box": [0.287, 0.199, 0.168, 0.666], "score": 0.909 },
+      { "box": [0.189, 0.0, 0.200, 0.441], "score": 0.888 }
+    ],
+    "ball": { "x": 0.661, "y": 0.706, "score": 0.918 }
+  }
+}
+```
+
+🔴 **검출 0명은 실패가 아니다.** `people`이 빈 배열이어도 `succeeded`다 — 검출이
+놓칠 수 있으니 화면은 그때 드래그로 직접 박스를 그리는 기존 경로로 넘어가면
+된다(`ho` 44번 본문). `box`는 정규화 `[x, y, w, h]`(0~1)로, 골라서 다음 분석
+요청의 `subject_box`에 **그대로** 넘기면 된다 — 좌표 변환은 없다.
+
+| 에러 | code | 언제 |
+|---|---|---|
+| 401 | `UNAUTHORIZED` | 토큰이 없거나 틀리다 |
+| 404 | `VIDEO_NOT_FOUND` | 없는 영상이거나 남의 영상이다 (둘 다 `POST`·`GET`) |
+| 404 | `DETECTION_NOT_FOUND` | (`GET`만) 이 영상에 검출을 요청한 적이 없다 — 먼저 `POST`한다 |
+
+워커 쪽 계약(`job_type`이 `claim` 응답에 실리는 것, 완료 보고의
+`detection_result`)은 `docs/worker-interface.md` 6절 — 정상호 몫, 아직 배선
+전이다.
+
 ### 🔴 지표 코드 실태 — 지금 스키마로는 루브릭을 담을 수 없다 (2026-09-01 조사)
 
 `metric_definition`이 비어 있어서 "코드 목록의 주인"만 미정이라고 적어 뒀는데,
@@ -1207,9 +1250,13 @@ trunk_alignment       2개 루브릭  basketball_jump_shot · basketball_layup  
   "needs": [
     { "position_code": "FW", "position_label": "공격수", "head_count": 2 },
     { "position_code": "GK", "position_label": "골키퍼", "head_count": 1 }
-  ]
+  ],
+  "opponent_team_id": null
 }
 ```
+
+🔴 **`opponent_team_id`가 있으면 팀 대 팀으로 확정된 경기다**(3-15절,
+`paik` 17번) — 이런 경기는 `needs`가 항상 빈 배열이다.
 
 | 에러 | code |
 |---|---|
@@ -1725,24 +1772,27 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
 | 422 | `CANNOT_FEATURE` | 반려된 클립을 대표로 세우려 했다 |
 | 422 | `VALIDATION_ERROR` | `title`·`description` 이 길이 상한을 넘는다 |
 
-### `GET /api/v1/videos/public` — 공개 클립 목록 (2026-09-08 추가)
+### `GET /api/v1/videos/public` — 공개 클립 목록 (2026-09-08 추가, 2026-09-15 업로더 추가)
 
-홈의 영상 모음이 쓴다. **공개된 클립만**, 업로더 구분 없이, 최근 것이 앞에 온다
-(최대 100건).
+홈의 영상 모음이 쓴다. **공개된 클립만**, 최근 것이 앞에 온다(최대 100건).
 
 ```json
 [
   { "id": "7c05...", "sport_code": "football", "duration_ms": 10200,
     "created_at": "2026-09-08T09:00:00Z", "title": "우리 팀 첫 골",
-    "description": "왼발 감아차기" }
+    "description": "왼발 감아차기",
+    "uploader_nickname": "슛돌이", "uploader_card_slug": "shoot-dori-7f2a" }
 ]
 ```
 
 🔴 **로그인이 필요하다.** 확인 방법이 "다른 계정으로 로그인해도 보인다"라 인증을
 그대로 뒀다 — 익명 피드가 필요하면 연다.
 
-🔴 **저장 키·업로더는 안 실린다.** 저장 키에는 업로더 `user_id` 가 들어 있다
-(`videos/<user_id>/…`). 재생은 아래 `GET /videos/{id}/playback-url` 로 따로 받는다.
+🔴 **저장 키는 안 실린다** — 저장 키에는 업로더 `user_id` 가 그대로 들어 있다
+(`videos/<user_id>/…`). 업로더는 대신 `uploader_nickname`(모든 사용자가 있음)과
+`uploader_card_slug`(카드를 만든 사람만, 없으면 `null`)로 싣는다(`paik` 16번) —
+슬러그가 있으면 눌러서 그 사람 카드(`GET /cards/{slug}`)로 갈 수 있다. 재생은
+아래 `GET /videos/{id}/playback-url` 로 따로 받는다.
 
 ### `GET /api/v1/videos/{video_id}/playback-url` — 재생용 주소 (2026-09-08 추가)
 
@@ -2492,6 +2542,103 @@ Gemini 임베딩으로 바꿔 코사인 유사도로 검색한다.
 
 ---
 
+## 3-12. 지인·알림 (2026-09-15 추가 — 미결 `jin` 35번)
+
+부록 D 도메인 ①. **상호 관계다** — 신청은 한쪽이 하지만, 대상이 수락하면
+양쪽 다 서로를 지인 목록에서 본다. 알림은 **폴링 방식**이다 — 웹소켓·푸시
+인프라가 없어서 분석 상태 확인과 같은 "몇 초마다 GET" 패턴을 쓴다. 실시간이
+필요해지면 이 위에 전달 채널만 얹으면 된다(저장 방식은 그대로).
+
+### `GET /api/v1/users/search?q=`
+
+인증 필요. 닉네임 부분일치(대소문자 무관), 최대 20명. `is_nickname_searchable
+=false`로 끈 사람과 **본인은 결과에서 빠진다.**
+
+```json
+[{"id": "…", "nickname": "김철수"}]
+```
+
+### `POST /api/v1/me/contacts` — 지인 신청
+
+```json
+{"target_user_id": "…", "note": "같은 동네"}
+```
+
+`201` — 신청 1건(`accepted_at: null`). 대상에게 `notification`(type=
+`contact_request`)이 함께 생긴다.
+
+| 에러 | code |
+|---|---|
+| 422 | `CANNOT_REQUEST_SELF` — 자기 자신에게 신청 |
+| 404 | `USER_NOT_FOUND` |
+| 409 | `ALREADY_REQUESTED` — 이미 신청했거나(방향 무관) 이미 지인이다 |
+
+### `POST /api/v1/me/contacts/{contact_id}/accept`
+
+내가 대상인 대기중 신청만 수락할 수 있다. 신청자에게 `notification`(type=
+`contact_accepted`)이 생긴다.
+
+| 에러 | code |
+|---|---|
+| 404 | `CONTACT_NOT_FOUND` |
+| 403 | `FORBIDDEN` — 내가 대상이 아니다 |
+| 409 | `ALREADY_ACCEPTED` |
+
+### `GET /api/v1/me/contacts` — 수락된 지인 목록
+
+내가 신청자든 대상이든 상대방이 평평하게 실린다. **`note`는 내가 신청자일
+때만** 온다 — 상대가 쓴 적 없는 내 개인 메모라서다.
+
+```json
+{"items": [
+  {"contact_id": "…", "user_id": "…", "nickname": "김철수",
+   "note": "같은 동네", "accepted_at": "…"}
+]}
+```
+
+### `GET /api/v1/me/contacts/requests` — 나에게 온 대기중 신청
+
+```json
+[{"id": "…", "requester_user_id": "…", "target_user_id": "…",
+  "note": null, "accepted_at": null, "created_at": "…"}]
+```
+
+### `GET /api/v1/me/notifications?unread_only=`
+
+최신순, 최대 50건. **문구를 안 준다** — `type`·`actor_user_id`·`subject_type`·
+`subject_id`로 클라이언트가 렌더링한다. 지금 나오는 `type`은 `contact_request`·
+`contact_accepted` 둘뿐이다.
+
+```json
+[{"id": "…", "type": "contact_request", "actor_user_id": "…",
+  "subject_type": "user_contact", "subject_id": "…",
+  "read_at": null, "created_at": "…"}]
+```
+
+### `PATCH /api/v1/me/notifications/{notification_id}/read`
+
+읽음 처리. 이미 읽었어도 200(멱등). 내 알림이 아니거나 없으면 404
+`NOTIFICATION_NOT_FOUND`.
+
+### 함께 바뀐 것
+
+- **`user.nickname`에 유일 제약**이 붙었다. 가입(`POST /auth/signup`)·구글
+  가입·닉네임 변경(`PATCH /me`)이 겹치는 닉네임을 받으면 이제
+  `409 NICKNAME_ALREADY_EXISTS`를 낸다(전에는 이 컬럼에 제약이 없었다).
+- `PATCH /api/v1/me`에 `is_nickname_searchable`(boolean, 선택)이 늘었다 —
+  안 보내면 안 바뀐다. 지인 검색 노출 여부고, 용병 매칭의 `is_searchable`과는
+  다른 컬럼이다. `GET /me` 응답에도 이 필드가 함께 온다.
+
+### 아직 없는 것
+
+- **실시간 전달**(웹소켓·푸시) — 지금은 폴링뿐이다
+- **다른 컨텍스트의 알림 생성** — 매칭 수락·팀 가입 성공 등에서 알림을 만드는
+  배선은 이번 범위 밖이다(각 컨텍스트가 필요할 때 같은 방식으로 얹는다)
+- **지인 검색을 위한 사전 안내**(닉네임 중복 시 가입 화면의 처리)는 이번
+  범위 밖 — 계약(409 코드)만 냈다
+
+---
+
 ## 4. 스키마가 강제하는 규칙 — API에서도 지켜야 한다
 
 부록 D.5가 "코드에만 두면 지켜지지 않으므로 테이블 설계 단계에서 막는다"고 한 것들이다.
@@ -2520,6 +2667,217 @@ Gemini 임베딩으로 바꿔 코사인 유사도로 검색한다.
   로그인한 상태에서 바꾸는 **변경**(`PATCH /me/password`)은 2장에 있다
 - 토큰 갱신 (`POST /auth/refresh`) — 액세스 토큰 하나로 시작하기로 했다
 - 카카오·애플 로그인 — `user_identity.provider` 에 값을 하나 더 쓰면 붙는다 (구글은 08-26에 들어왔다)
+
+---
+
+## 3-13. 경기 조건·지역·후보 (2026-09-15 추가 — `paik` 18·19·20·21번)
+
+"팀 매칭" 화면(홈 스쿼드 판이 다 차면 뜨는 것)이 서버 없이 mock으로 돌던 것 중
+**조건 저장 + 후보 목록** 부분을 냈다. 팀↔팀 경기 신청·수락·알림(`paik` 17번)
+은 이번 범위 밖 — 후보를 찾는 것까지다.
+
+### `GET /api/v1/regions` — 지역 목록
+
+`www/src/lib/regions.ts`의 60곳을 그대로 시드했다. `GET /positions`와 같은 결.
+
+```json
+[{ "id": "b1e2...", "city": "서울", "district": "강남구", "label": "서울 강남구" }]
+```
+
+### `PUT/GET /api/v1/teams/{team_id}/match-preferences` — 팀 조건
+
+**팀장만** `PUT` 할 수 있다(`403 FORBIDDEN`). **통째로 교체**한다 — 보낸
+`region_ids`·`slots`가 곧 새 조건 전체다(부분 수정이 아니다).
+
+```json
+{
+  "region_ids": ["b1e2..."],
+  "slots": [{ "weekday": 5, "start_time": "10:00:00", "end_time": "12:00:00" }]
+}
+```
+
+`weekday`는 0(월)~6(일). 🔴 `start_time >= end_time`이면 `422
+INVALID_TIME_SLOT` — 뒤집힌 시간은 겹침 계산에서 늘 거짓이라 조용히 아무것도
+안 걸리는 사고를 막으려는 것이다. 없는 지역 id는 `422 UNKNOWN_REGION`.
+
+### `PUT/GET /api/v1/me/match-preferences` — 개인 조건
+
+내 조건(지역·시간·**포지션**). `region_ids`·`slots` 검증은 팀 조건과 같다.
+없는 포지션 id는 `422 UNKNOWN_POSITION`. 🔴 **팀 조건과 저장소가 다르다** —
+같은 사람이 팀장이면서 팀원일 수 있어 절대 안 섞는다.
+
+### `GET /api/v1/teams/{team_id}/members/match-preferences` — 팀원 조건 열람
+
+**팀장만.** 그 팀 현재 소속(탈퇴자 제외) 전원의 조건을 `nickname`과 함께
+개인별로 그대로 준다 — 겹치는 시간대 같은 집계는 안 한다(원자료라야 화면이
+나중에 어떤 기준으로든 다시 계산할 수 있다).
+
+### `GET /api/v1/teams/{team_id}/match-candidates` — "맞는 상대" 후보
+
+🔴 **유사도 점수가 없다.** 판 크기(`squad.formation`)가 같고, 자기 팀이
+아니고, 상대 로스터가 그 인원만큼 찼고, 경기 조건을 하나라도 등록한 팀만 —
+전부 하드 필터로 걸러진 뒤 **이미 정렬된 순서**로 온다. 소프트 근거(겹치는
+분·지역 계층)는 `reasons`에 **사실값 문장**으로만 온다.
+
+```json
+[{
+  "team_id": "7c05...", "team_name": "번개FC", "region_label": "서울 강남구",
+  "formation": "5:5",
+  "reasons": [
+    { "kind": "time", "detail": "토요일 11:00~12:00 겹침" },
+    { "kind": "region", "detail": "같은 구(서울 강남구)" }
+  ]
+}]
+```
+
+`reasons`가 빈 배열이면 소프트 근거가 0개라는 뜻이다(화면이 구획을 나눌 수
+있다) — 그래도 하드 필터를 통과했으므로 목록에는 남는다.
+
+| 에러 | code | 언제 |
+|---|---|---|
+| 404 | `TEAM_NOT_FOUND` | 없는 팀 |
+| 403 | `FORBIDDEN` | (조건 설정) 팀장이 아니다 / (후보·팀원 조건) 그 팀 소속이 아니다 |
+| 422 | `INVALID_TIME_SLOT` | 요일 범위 밖이거나 시작이 끝보다 뒤 |
+| 422 | `UNKNOWN_REGION` / `UNKNOWN_POSITION` | 없는 id |
+
+상세: 부록 D 도메인 ①·④(`region`·`team_match_region`·`team_match_slot`·
+`member_match_region`·`member_match_slot`·`member_match_position`) ·
+클라이언트 반영은 `docs/client-contract-changes.md`
+
+---
+
+## 3-14. 선수·관절(skeleton) 읽기 (2026-09-15 추가 — `paik` 29번)
+
+「선수와 비교하기」가 자세를 겹쳐 그리는 자리의 서버 몫이다. 지금 화면은
+브라우저(MoveNet)가 직접 관절을 뽑는다 — 이 API는 **에이전트가 낸 값**을
+그대로 내준다(`ho` 30번). 🔴 **재생 주소는 안 준다** — 선수 원본 영상이
+S3에 없다(EC2 역할이 `videos/` 접두사에 쓰기 권한이 없어 못 올렸다). 화면은
+계속 정적 파일(`www/public/compare/`)로 재생한다.
+
+### `GET /api/v1/reference-players` — 선수 목록
+
+```json
+[{ "id": "castanheira", "name": "티아구 카스탄헤이라" },
+ { "id": "rovelli", "name": "에스테반 로벨리" }]
+```
+
+`id`는 `www/src/components/analysis/AnalysisStage.tsx`의 `COMPARE` id와
+그대로 맞춘다.
+
+### `GET /api/v1/reference-players/{player_id}/skeleton` — 선수 관절
+
+없는 `player_id`면 `404 PLAYER_NOT_FOUND`.
+
+### `GET /api/v1/videos/{video_id}/skeleton` — 내 영상 관절
+
+**자기 영상만.** `GET /videos/{id}/report`와 같은 에러 셋 — 없거나 남의
+것이면 `404 VIDEO_NOT_FOUND`, 분석 `failed`면 `404 ANALYSIS_FAILED`, 아직
+성공한 분석이 없으면 `404 REPORT_NOT_READY`.
+
+### 둘 다 같은 응답 모양
+
+```json
+{
+  "known": true, "fps": 15.0, "frames": 76, "frame_size": [1920, 1080],
+  "swing_leg": "right", "direction": 1,
+  "keypoint_names": ["nose", "...", "right_ankle"],
+  "moments": { "before": 41, "impact": 46, "after": 61 },
+  "moments_seconds": { "before": 2.733, "impact": 3.067, "after": 4.067 },
+  "after_clipped": false,
+  "joints": [[[0.4821, 0.3915, 0.94], "... 17점"], null, "..."]
+}
+```
+
+`joints`는 프레임당 COCO-17 × `[x, y, confidence]`. 🔴 **못 잡은 프레임은
+배열에서 안 빠지고 `null`로 자리를 지킨다** — 인덱스가 곧 프레임 번호다.
+좌표는 `frame_size`로 나눈 값이라 **0~1을 벗어날 수 있다**(화면 밖으로 나간
+관절) — 자르지 않는다.
+
+🔴 **리포트는 있는데 `skeleton`이 없으면**(옛 스키마, `schema_version` 1.4
+이전) 404가 아니라 `200`으로 `{"known": false, "why": "..."}`을 준다 —
+리포트 자체가 없는 것과는 다른 상태라서다.
+
+`skeleton`은 DB에 없다 — 리포트 전체가 이미 S3에 있어서 요청마다 그 키로
+읽는다(정어진 판단, `jin` 27번과 같은 결).
+
+상세: 부록 D 도메인 ②(`reference_player`) · 클라이언트 반영은
+`docs/client-contract-changes.md`
+
+## 3-15. 팀 대 팀 경기 신청 (2026-09-15 추가 — `paik` 17번)
+
+🔴 **기존 3-4·3-5절(경기 등록·지원)과는 주체가 다르다.** 그쪽은 **팀이 모집
+글을 열고 개인이 지원**하는 것이다. 여기는 **팀이 팀에게** 경기를 걸고
+**상대 팀 주장**이 받는다 — 스쿼드가 다 찬 두 팀이 맞붙는 흐름이다.
+
+수락되면 `match`가 하나 생기고, 그 경기엔 이제 `opponent_team_id`가
+찬다(3-4절 `GET /matches/{id}` 응답에 이 필드가 추가됐다). 이런 경기는
+모집이 필요 없어 `needs`가 항상 빈 배열이고, `GET /matches` 경기 탐색에도
+안 낸다.
+
+### `POST /api/v1/teams/{team_id}/match-requests`
+
+인증 필요. **신청 팀(`team_id`) 주장만.**
+
+```json
+{ "target_team_id": "b3f1...", "played_at": "2026-09-20T10:00:00+09:00", "place": "강남 풋살장" }
+```
+
+`201 Created`:
+
+```json
+{
+  "id": "c2a1...", "requester_team_id": "9a1e...", "target_team_id": "b3f1...",
+  "proposed_played_at": "2026-09-20T10:00:00+09:00", "proposed_place": "강남 풋살장",
+  "status": "pending", "created_at": "2026-09-15T09:00:00Z",
+  "responded_at": null, "match_id": null
+}
+```
+
+대상 팀 주장(들)에게 알림(`team_match_requested`)이 간다.
+
+| 에러 | code |
+|---|---|
+| 403 | `FORBIDDEN` — 신청 팀 주장이 아니다 |
+| 404 | `TEAM_NOT_FOUND` — 신청 팀·대상 팀 어느 쪽이든 |
+| 422 | `CANNOT_REQUEST_SELF` — 같은 팀에 걸었다 |
+| 422 | `PAST_MATCH` |
+
+### `GET /api/v1/teams/{team_id}/match-requests`
+
+인증 필요. **그 팀 주장만.** 그 팀이 **보낸 것 + 받은 것** 전부, 최신순 —
+`TeamMatchRequestResponse`(위) 배열.
+
+### `POST /api/v1/teams/{team_id}/match-requests/{request_id}/accept`
+
+인증 필요. **대상 팀(`team_id`) 주장만.** `status`가 `pending`이 아니면
+`409 TEAM_MATCH_REQUEST_ALREADY_RESPONDED`.
+
+확정 `match`가 생기고(응답의 `match_id`), 신청 팀에 알림
+(`team_match_accepted`)이 간다.
+
+🔴 **동시 확정 방지** — 수락되는 순간 **두 팀(신청·대상) 각각의 다른
+`pending` 신청을 전부 `cancelled`로 정리한다**(한 팀이 여러 곳에 동시에
+걸려 있다가 둘 다 수락되는 이중 예약을 막는다). 정리된 신청의 양쪽 주장
+에게 `team_match_request_cancelled` 알림이 간다.
+
+### `POST /api/v1/teams/{team_id}/match-requests/{request_id}/reject`
+
+인증 필요. **대상 팀 주장만.** 신청 팀에 `team_match_rejected` 알림.
+
+### `DELETE /api/v1/teams/{team_id}/match-requests/{request_id}`
+
+인증 필요. **신청 팀 주장만, `pending`일 때만**(아니면 409). 알림 없음 —
+자기 행동을 자기에게 알릴 이유가 없다. `204`가 아니라 취소된 신청을 그대로
+돌려준다(다른 응답과 같은 모양).
+
+### 확정 경기 취소 — 기존 `DELETE /matches/{match_id}`(3-4절)가 그대로 쓰인다
+
+🔴 **주장 판정이 넓어졌다.** 팀 대 팀 확정 경기는 **주최 팀·상대 팀 어느
+쪽 주장도** 취소할 수 있다(전엔 주최 쪽만). 취소하면 **취소 안 한 쪽** 팀
+주장(들)에게 `team_match_cancelled` 알림이 간다.
+
+상세: 부록 D 도메인 ④(`team_match_request`, `match.opponent_team_id`) ·
+클라이언트 반영은 `docs/client-contract-changes.md`
 
 ---
 

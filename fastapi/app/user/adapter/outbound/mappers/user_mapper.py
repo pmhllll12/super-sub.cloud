@@ -11,8 +11,10 @@ from __future__ import annotations
 
 from app.user.adapter.outbound.orm.team_member_orm import TeamMemberOrm
 from app.user.adapter.outbound.orm.team_orm import TeamOrm
+from app.user.adapter.outbound.orm.user_contact_orm import UserContactOrm
 from app.user.adapter.outbound.orm.user_orm import UserOrm
 from app.user.domain.entities.membership_entity import MembershipEntity
+from app.user.domain.entities.user_contact_entity import UserContactEntity
 from app.user.domain.entities.user_entity import UserEntity
 from app.user.domain.value_objects.email_vo import Email
 from app.user.domain.value_objects.nickname_vo import Nickname
@@ -27,6 +29,7 @@ def to_user_entity(row: UserOrm) -> UserEntity:
         nickname=Nickname.of(row.nickname),
         created_at=row.created_at,
         token_version=row.token_version,
+        is_nickname_searchable=row.is_nickname_searchable,
     )
 
 
@@ -44,4 +47,15 @@ def to_membership_entity(member: TeamMemberOrm, team: TeamOrm) -> MembershipEnti
         role=member.role,
         joined_at=member.joined_at,
         left_at=member.left_at,
+    )
+
+
+def to_user_contact_entity(row: UserContactOrm) -> UserContactEntity:
+    return UserContactEntity(
+        id=row.id,
+        requester_user_id=row.requester_user_id,
+        target_user_id=row.target_user_id,
+        note=row.note,
+        accepted_at=row.accepted_at,
+        created_at=row.created_at,
     )

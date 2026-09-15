@@ -34,7 +34,7 @@ def metric(db_client, db_session):
     email = f"criterion-{uuid.uuid4().hex[:12]}@super-sub.example"
     signup = db_client.post(
         "/api/v1/auth/signup",
-        json={"email": email, "password": PASSWORD, "nickname": "업로더"},
+        json={"email": email, "password": PASSWORD, "nickname": f"업로더{uuid.uuid4().hex[:6]}"},
     )
     assert signup.status_code == 201, signup.text
     user_id = uuid.UUID(signup.json()["id"])

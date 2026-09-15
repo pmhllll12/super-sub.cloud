@@ -249,9 +249,14 @@ class ListPublicVideosInteractor(ListPublicVideosUseCase):
         self._repository = repository
 
     def __call__(self, query: PublicVideosQuery) -> list[PublicVideoResult]:
+        videos = self._repository.list_public(query.limit)
+        # 업로더는 영상별로 한 번씩이 아니라 배치로 구한다(N+1 방지) — `paik` 16번.
+        uploaders = self._repository.uploader_info(
+            list({v.user_id for v in videos})
+        )
         return [
-            to_public_video_result(v)
-            for v in self._repository.list_public(query.limit)
+            to_public_video_result(v, *uploaders.get(v.user_id, ("", None)))
+            for v in videos
         ]
 
 
