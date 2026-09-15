@@ -20,6 +20,9 @@ from app.card.adapter.outbound.stub.card_stub_repository import DEMO_SLUG
 from app.core.config import settings
 from app.core.errors import install_error_handlers
 from app.core.logging import configure_logging
+from app.match.adapter.inbound.api.v1.match_preference_router import (
+    match_preference_router,
+)
 from app.match.adapter.inbound.api.v1.match_router import match_router
 from app.notification.adapter.inbound.api.v1.notification_router import (
     notification_router,
@@ -31,6 +34,7 @@ from app.user.adapter.inbound.api.v1.contacts_router import contacts_router
 from app.user.adapter.inbound.api.v1.me_router import me_router
 from app.user.adapter.inbound.api.v1.mercenary_router import mercenary_router
 from app.user.adapter.inbound.api.v1.positions_router import positions_router
+from app.user.adapter.inbound.api.v1.regions_router import regions_router
 from app.user.adapter.inbound.api.v1.team_router import team_router
 from app.user.adapter.inbound.api.v1.user_search_router import user_search_router
 from app.user.adapter.outbound.stub.user_stub_repository import (
@@ -105,7 +109,9 @@ for _router in (
     me_router,
     team_router,
     positions_router,
+    regions_router,
     match_router,
+    match_preference_router,
     card_router,
     squad_router,
     video_router,

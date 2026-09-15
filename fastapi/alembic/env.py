@@ -67,6 +67,12 @@ from app.billing.adapter.outbound.orm import analysis_credit_orm  # noqa: E402,F
 from app.billing.adapter.outbound.orm import coach_orm  # noqa: E402,F401
 from app.billing.adapter.outbound.orm import coach_referral_orm  # noqa: E402,F401
 from app.notification.adapter.outbound.orm import notification_orm  # noqa: E402,F401
+from app.user.adapter.outbound.orm import region_orm  # noqa: E402,F401
+from app.match.adapter.outbound.orm import team_match_region_orm  # noqa: E402,F401
+from app.match.adapter.outbound.orm import team_match_slot_orm  # noqa: E402,F401
+from app.match.adapter.outbound.orm import member_match_region_orm  # noqa: E402,F401
+from app.match.adapter.outbound.orm import member_match_slot_orm  # noqa: E402,F401
+from app.match.adapter.outbound.orm import member_match_position_orm  # noqa: E402,F401
 # ---------------------------------------------------------------------------
 
 config = context.config

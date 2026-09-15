@@ -1674,6 +1674,57 @@ grep -n "uploader_nickname" www/src/lib/feed.ts www/src/components/HomeFeed.tsx
 
 ---
 
+## 40. 경기 조건·지역·"맞는 상대" 후보가 생겼습니다 (2026-09-15 추가, 미결 `paik` 18·19·20·21번)
+
+`www/src/lib/matchPrefs.ts`(브라우저에만 저장)·`regions.ts`(60곳 하드코딩)·
+`teamMatch.ts`(mock 후보 7팀)를 실제 서버 경로로 바꿀 수 있게 됐습니다.
+`teamMatch.ts`의 `applyToTeam`(경기 신청)은 **이번 범위가 아닙니다** — `paik`
+17번(팀↔팀 경기 신청·수락·알림)에서 따로 냅니다.
+
+### 만족해야 할 성질
+
+1. **지역 선택지가 서버 목록(60곳)에서 올 것** — 자유 입력 대신.
+2. **팀 조건은 팀장만 정할 수 있고, 개인 조건과 안 섞일 것.**
+3. **"맞는 상대" 후보 목록에 유사도 점수 대신 사실값 근거가 올 것** — 화면이
+   `whyMatches()`로 직접 겹침을 계산할 필요가 없어집니다, 서버 응답의
+   `reasons[].detail`을 그대로 보여주면 됩니다("토요일 11:00~12:00 겹침"처럼
+   이미 문장입니다).
+
+### 먼저 확인
+
+```
+grep -n "REGIONS: string\[\]" www/src/lib/regions.ts
+grep -n "TEAMS: Omit<MatchTeam" www/src/lib/teamMatch.ts
+```
+
+걸리면 아직 하드코딩/mock 그대로입니다.
+
+### 새 엔드포인트 (계약 3-13절)
+
+| 엔드포인트 | 용도 |
+|---|---|
+| `GET /regions` | 지역 목록 |
+| `PUT/GET /teams/{team_id}/match-preferences` | 팀 조건(팀장만 `PUT`) |
+| `PUT/GET /me/match-preferences` | 내 조건(지역·시간·포지션) |
+| `GET /teams/{team_id}/members/match-preferences` | 팀원 조건 열람(팀장만) |
+| `GET /teams/{team_id}/match-candidates` | "맞는 상대" 후보(이미 정렬됨) |
+
+### 🔴 하지 말 것
+
+- **`whyMatches()`로 다시 계산하지 마십시오** — 서버가 이미 겹침·지역 계층을
+  계산해서 `reasons`로 줍니다. 화면에서 다시 계산하면 서버와 다른 답이 나올
+  수 있습니다.
+- **`match-candidates` 응답에 점수·유사도가 없다고 당황하지 마십시오** — 의도된
+  것입니다. 순서는 이미 서버가 정렬했습니다(`reasons`가 근거).
+- 시작 시각이 끝 시각보다 늦은 슬롯을 보내면 `422 INVALID_TIME_SLOT`입니다 —
+  화면에서 미리 막아 주십시오(사용자 경험상), 서버도 어차피 막습니다.
+- 팀 조건 `PUT`은 **통째로 교체**입니다 — 기존 지역·시간에 하나만 추가하고
+  싶어도 전체 목록을 다시 보내야 합니다.
+
+상세: `fastapi/docs/api-contract.md`(3-13절) · 부록 D 도메인 ①·④
+
+---
+
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린
 것이다. 새로 붙이는 화면이 있으면 계약 문서 쪽을 본다.
 

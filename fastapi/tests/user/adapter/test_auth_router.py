@@ -170,4 +170,9 @@ class TestOpenApi:
             f"{V1}/me/contacts/requests",
             f"{V1}/me/notifications",
             V1 + "/me/notifications/{notification_id}/read",
+            f"{V1}/regions",
+            V1 + "/teams/{team_id}/match-preferences",
+            f"{V1}/me/match-preferences",
+            V1 + "/teams/{team_id}/members/match-preferences",
+            V1 + "/teams/{team_id}/match-candidates",
         }

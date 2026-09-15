@@ -1,0 +1,75 @@
+"""경기 조건·후보 HTTP 모델. 계약 문서. `paik` 18·20·21번."""
+
+from __future__ import annotations
+
+from datetime import time
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class SlotSchema(BaseModel):
+    weekday: int = Field(ge=0, le=6)
+    start_time: time
+    end_time: time
+
+
+class SetTeamPreferenceSchema(BaseModel):
+    """통째로 교체한다(PUT) — 보낸 목록이 곧 새 조건 전체다."""
+
+    region_ids: list[UUID] = Field(default_factory=list)
+    slots: list[SlotSchema] = Field(default_factory=list)
+
+
+class TeamPreferenceResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    team_id: UUID
+    region_ids: list[UUID]
+    slots: list[SlotSchema]
+
+
+class SetMemberPreferenceSchema(BaseModel):
+    region_ids: list[UUID] = Field(default_factory=list)
+    slots: list[SlotSchema] = Field(default_factory=list)
+    position_ids: list[UUID] = Field(default_factory=list)
+
+
+class MemberPreferenceResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    user_id: UUID
+    region_ids: list[UUID]
+    slots: list[SlotSchema]
+    position_ids: list[UUID]
+
+
+class MemberPreferenceSummaryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    user_id: UUID
+    nickname: str
+    region_ids: list[UUID]
+    slots: list[SlotSchema]
+    position_ids: list[UUID]
+
+
+class MatchReasonResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    kind: str
+    detail: str
+
+
+class MatchCandidateResponse(BaseModel):
+    """`paik` 20번 — "맞는 상대" 한 팀. 🔴 유사도 점수는 없다, 순서는 이미
+    정렬돼 있고 `reasons`가 사실값 근거다.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    team_id: UUID
+    team_name: str
+    region_label: str
+    formation: str
+    reasons: list[MatchReasonResponse]

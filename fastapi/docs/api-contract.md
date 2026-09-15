@@ -2666,6 +2666,82 @@ Gemini 임베딩으로 바꿔 코사인 유사도로 검색한다.
 
 ---
 
+## 3-13. 경기 조건·지역·후보 (2026-09-15 추가 — `paik` 18·19·20·21번)
+
+"팀 매칭" 화면(홈 스쿼드 판이 다 차면 뜨는 것)이 서버 없이 mock으로 돌던 것 중
+**조건 저장 + 후보 목록** 부분을 냈다. 팀↔팀 경기 신청·수락·알림(`paik` 17번)
+은 이번 범위 밖 — 후보를 찾는 것까지다.
+
+### `GET /api/v1/regions` — 지역 목록
+
+`www/src/lib/regions.ts`의 60곳을 그대로 시드했다. `GET /positions`와 같은 결.
+
+```json
+[{ "id": "b1e2...", "city": "서울", "district": "강남구", "label": "서울 강남구" }]
+```
+
+### `PUT/GET /api/v1/teams/{team_id}/match-preferences` — 팀 조건
+
+**팀장만** `PUT` 할 수 있다(`403 FORBIDDEN`). **통째로 교체**한다 — 보낸
+`region_ids`·`slots`가 곧 새 조건 전체다(부분 수정이 아니다).
+
+```json
+{
+  "region_ids": ["b1e2..."],
+  "slots": [{ "weekday": 5, "start_time": "10:00:00", "end_time": "12:00:00" }]
+}
+```
+
+`weekday`는 0(월)~6(일). 🔴 `start_time >= end_time`이면 `422
+INVALID_TIME_SLOT` — 뒤집힌 시간은 겹침 계산에서 늘 거짓이라 조용히 아무것도
+안 걸리는 사고를 막으려는 것이다. 없는 지역 id는 `422 UNKNOWN_REGION`.
+
+### `PUT/GET /api/v1/me/match-preferences` — 개인 조건
+
+내 조건(지역·시간·**포지션**). `region_ids`·`slots` 검증은 팀 조건과 같다.
+없는 포지션 id는 `422 UNKNOWN_POSITION`. 🔴 **팀 조건과 저장소가 다르다** —
+같은 사람이 팀장이면서 팀원일 수 있어 절대 안 섞는다.
+
+### `GET /api/v1/teams/{team_id}/members/match-preferences` — 팀원 조건 열람
+
+**팀장만.** 그 팀 현재 소속(탈퇴자 제외) 전원의 조건을 `nickname`과 함께
+개인별로 그대로 준다 — 겹치는 시간대 같은 집계는 안 한다(원자료라야 화면이
+나중에 어떤 기준으로든 다시 계산할 수 있다).
+
+### `GET /api/v1/teams/{team_id}/match-candidates` — "맞는 상대" 후보
+
+🔴 **유사도 점수가 없다.** 판 크기(`squad.formation`)가 같고, 자기 팀이
+아니고, 상대 로스터가 그 인원만큼 찼고, 경기 조건을 하나라도 등록한 팀만 —
+전부 하드 필터로 걸러진 뒤 **이미 정렬된 순서**로 온다. 소프트 근거(겹치는
+분·지역 계층)는 `reasons`에 **사실값 문장**으로만 온다.
+
+```json
+[{
+  "team_id": "7c05...", "team_name": "번개FC", "region_label": "서울 강남구",
+  "formation": "5:5",
+  "reasons": [
+    { "kind": "time", "detail": "토요일 11:00~12:00 겹침" },
+    { "kind": "region", "detail": "같은 구(서울 강남구)" }
+  ]
+}]
+```
+
+`reasons`가 빈 배열이면 소프트 근거가 0개라는 뜻이다(화면이 구획을 나눌 수
+있다) — 그래도 하드 필터를 통과했으므로 목록에는 남는다.
+
+| 에러 | code | 언제 |
+|---|---|---|
+| 404 | `TEAM_NOT_FOUND` | 없는 팀 |
+| 403 | `FORBIDDEN` | (조건 설정) 팀장이 아니다 / (후보·팀원 조건) 그 팀 소속이 아니다 |
+| 422 | `INVALID_TIME_SLOT` | 요일 범위 밖이거나 시작이 끝보다 뒤 |
+| 422 | `UNKNOWN_REGION` / `UNKNOWN_POSITION` | 없는 id |
+
+상세: 부록 D 도메인 ①·④(`region`·`team_match_region`·`team_match_slot`·
+`member_match_region`·`member_match_slot`·`member_match_position`) ·
+클라이언트 반영은 `docs/client-contract-changes.md`
+
+---
+
 ## 6. 다음 단계
 
 > **2026-09-01 갱신.** 이 절의 1~4번이 전부 끝나서 다시 썼다. 옛 내용은 스텁 시절

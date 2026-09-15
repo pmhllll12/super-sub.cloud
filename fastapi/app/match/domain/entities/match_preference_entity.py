@@ -1,0 +1,80 @@
+"""경기 조건(`paik` 18번)·후보(`paik` 20번) 엔티티. 저장 형태가 아니라 앱이
+다루는 모양이다.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime, time
+from uuid import UUID
+
+
+@dataclass(frozen=True)
+class SlotEntity:
+    weekday: int
+    start_time: time
+    end_time: time
+
+
+@dataclass(frozen=True)
+class TeamPreferenceEntity:
+    team_id: UUID
+    region_ids: list[UUID] = field(default_factory=list)
+    slots: list[SlotEntity] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class MemberPreferenceEntity:
+    user_id: UUID
+    region_ids: list[UUID] = field(default_factory=list)
+    slots: list[SlotEntity] = field(default_factory=list)
+    position_ids: list[UUID] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class MemberPreferenceSummaryEntity:
+    """`paik` 21번 — 팀장이 보는 팀원 한 명의 조건."""
+
+    user_id: UUID
+    nickname: str
+    region_ids: list[UUID]
+    slots: list[SlotEntity]
+    position_ids: list[UUID]
+
+
+@dataclass(frozen=True)
+class RegionFactEntity:
+    """지역 id를 계층 비교 가능한 값으로 푼 것(`paik` 20번 — 같은 구/같은 시)."""
+
+    city: str
+    district: str
+
+
+@dataclass(frozen=True)
+class CandidateFactsEntity:
+    """후보 팀의 원자료. 소프트 점수는 인터랙터(도메인 규칙)가 계산한다 —
+    쿼리가 아니라 순수 함수라야 테스트하기 쉽다(`paik` 20번).
+    """
+
+    team_id: UUID
+    team_name: str
+    region_label: str  # team.region — 표시용 "연고지", 선호 지역과는 다르다
+    formation: str
+    regions: list[RegionFactEntity]  # 선호 지역(paik 18번), 계층 비교용으로 이미 해석됨
+    slots: list[SlotEntity]
+    last_active_at: datetime | None
+
+
+@dataclass(frozen=True)
+class MatchReason:
+    kind: str  # "time" | "region"
+    detail: str
+
+
+@dataclass(frozen=True)
+class MatchCandidateResultEntity:
+    team_id: UUID
+    team_name: str
+    region_label: str
+    formation: str
+    reasons: list[MatchReason]
