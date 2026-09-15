@@ -49,6 +49,20 @@ class MockAuthRepository implements AuthRepository {
     return _current = Session(user: user);
   }
 
+  /// 서버가 없어 토큰을 검증할 수 없다 — 빈 토큰만 거절하고, 나머지는
+  /// 데이터가 있는 개인 사용자로 들인다.
+  @override
+  Future<Session> loginWithGoogle({required String idToken}) async {
+    await Future<void>.delayed(_delay);
+    if (idToken.isEmpty) {
+      throw const AuthException(
+        '구글 토큰을 확인할 수 없습니다',
+        code: 'INVALID_GOOGLE_TOKEN',
+      );
+    }
+    return _current = Session(user: _db.findUserById(MockDb.playerId)!);
+  }
+
   @override
   Future<Session> loginAs(String userId) async {
     await Future<void>.delayed(_delay);

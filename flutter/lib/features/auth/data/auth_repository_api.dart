@@ -50,6 +50,15 @@ class ApiAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<Session> loginWithGoogle({required String idToken}) async {
+    // 🔴 access_token 이 아니라 id_token 이다 — 바꿔 보내면 서명 검증에서 401.
+    // 응답이 비밀번호 로그인과 같아 이후 흐름을 그대로 잇는다.
+    final tokenBody = await _post('/auth/google', {'id_token': idToken});
+    _token = tokenBody['access_token'] as String;
+    return _current = Session(user: await _fetchMe());
+  }
+
+  @override
   Future<Session> loginAs(String userId) {
     throw const AuthException('개발용 바로 진입은 API 모드에서 지원하지 않습니다');
   }
