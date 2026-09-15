@@ -719,8 +719,17 @@ def extract_features(
     max_additional = float(np.nanmax(flexion_after) - flexion_at_impact)
 
     # 스윙이 실제로 감속하기까지의 프레임 수.
+    #
+    # 🔴 **마무리 구간 안에서만 센다** (미결 43번 ㉳ 3회차, 2026-09-15). 예전에는
+    # `ankle_speed[t:]` 로 **클립 끝까지** 봤다. 그러면 ⑴ 구간을 주어도 이 값만
+    # 창 밖을 읽어 — 반복 동작에서 **다음 터치의 발 속도**를 이번 마무리로 세고,
+    # ⑵ 창이 없어도 **유효 구간 밖**(미검출)의 발목 움직임을 감속 판정에 썼다.
+    # 2회차가 창 있는 짝의 35%(L=10)가 창 끝을 넘긴다고 쟀고, 창 없는 산출에서도
+    # 78개 중 2개가 달라진다(그래서 이 변경은 B-6 재실행을 불렀다).
+    #
+    # `segment_phases` 가 `last - impact >= 2` 를 보장하므로 `post` 는 비지 않는다.
     ankle_speed = np.linalg.norm(np.diff(xy[:, swing_ankle], axis=0), axis=1)
-    post = ankle_speed[t:]
+    post = ankle_speed[t:ft_end]
     threshold = float(post[0]) * 0.3 if post.size else 0.0
     decel = np.argmax(post < threshold) if (post < threshold).any() else len(post)
 
