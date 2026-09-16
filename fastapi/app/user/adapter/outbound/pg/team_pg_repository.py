@@ -82,6 +82,31 @@ class TeamPgRepository(TeamPort):
             id=row.id, name=row.name, region=row.region, sport_code=row.sport_code
         )
 
+    def update_team(
+        self, team_id: UUID, name: str | None, region: str | None
+    ) -> TeamEntity | None:
+        """🔴 `values()` 에 이름·지역만 둔다 — `sport_code` 를 여기서 바꿀 수
+        있게 열어 두면 언젠가 누가 쓴다. 포지션·스쿼드·경기가 전부 그 값에
+        매달려 있어서, 바뀌면 이미 앉힌 포지션이 다른 종목 것이 된다.
+        """
+        values = {}
+        if name is not None:
+            values["name"] = name
+        if region is not None:
+            values["region"] = region
+        if not values:
+            # 바꿀 것이 없으면 갱신을 안 돈다 — 없는 팀 판정은 조회가 한다.
+            return self.find_team(team_id)
+
+        changed = self._session.execute(
+            update(TeamOrm).where(TeamOrm.id == team_id).values(**values)
+        ).rowcount
+        if not changed:
+            self._session.rollback()
+            return None
+        self._session.commit()
+        return self.find_team(team_id)
+
     def active_members(self, team_id: UUID) -> list[TeamMemberEntity]:
         """`left_at IS NULL` 만. 오래 소속된 사람이 앞에 온다.
 

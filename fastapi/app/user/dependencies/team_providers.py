@@ -24,6 +24,7 @@ from app.user.application.ports.input.team_use_cases import (
     ListTeamInvitationsUseCase,
     ReadTeamUseCase,
     RejectTeamInvitationUseCase,
+    UpdateTeamUseCase,
 )
 from app.user.application.ports.output.team_port import TeamPort
 from app.user.application.use_cases.team_interactors import (
@@ -37,6 +38,7 @@ from app.user.application.use_cases.team_interactors import (
     ListTeamInvitationsInteractor,
     ReadTeamInteractor,
     RejectTeamInvitationInteractor,
+    UpdateTeamInteractor,
 )
 
 
@@ -57,6 +59,10 @@ def get_read_team_use_case(repository: TeamRepositoryDep) -> ReadTeamUseCase:
     return ReadTeamInteractor(repository)
 
 
+def get_update_team_use_case(repository: TeamRepositoryDep) -> UpdateTeamUseCase:
+    return UpdateTeamInteractor(repository)
+
+
 def get_join_team_use_case(repository: TeamRepositoryDep) -> JoinTeamUseCase:
     return JoinTeamInteractor(repository)
 
@@ -67,6 +73,9 @@ def get_leave_team_use_case(repository: TeamRepositoryDep) -> LeaveTeamUseCase:
 
 CreateTeamUseCaseDep = Annotated[CreateTeamUseCase, Depends(get_create_team_use_case)]
 ReadTeamUseCaseDep = Annotated[ReadTeamUseCase, Depends(get_read_team_use_case)]
+UpdateTeamUseCaseDep = Annotated[
+    UpdateTeamUseCase, Depends(get_update_team_use_case)
+]
 JoinTeamUseCaseDep = Annotated[JoinTeamUseCase, Depends(get_join_team_use_case)]
 LeaveTeamUseCaseDep = Annotated[LeaveTeamUseCase, Depends(get_leave_team_use_case)]
 

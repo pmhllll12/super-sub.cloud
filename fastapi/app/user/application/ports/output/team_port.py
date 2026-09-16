@@ -39,6 +39,17 @@ class TeamPort(ABC):
     def find_team(self, team_id: UUID) -> TeamEntity | None: ...
 
     @abstractmethod
+    def update_team(
+        self, team_id: UUID, name: str | None, region: str | None
+    ) -> TeamEntity | None:
+        """팀 이름·지역을 고치고 갱신된 팀을 돌려준다. 없으면 `None`.
+
+        **`None` 인 인자는 안 건드린다.** 둘 다 `None` 이면 아무것도 안 바꾸고
+        지금 팀을 돌려준다. 🔴 `sport_code` 를 받는 자리를 두지 않는다 —
+        `UpdateTeamCommand` 주석 참고.
+        """
+
+    @abstractmethod
     def active_members(self, team_id: UUID) -> list[TeamMemberEntity]:
         """지금 소속된 구성원. **나간 사람(`left_at`)은 담지 않는다.**"""
 

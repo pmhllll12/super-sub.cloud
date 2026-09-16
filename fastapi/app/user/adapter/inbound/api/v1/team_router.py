@@ -17,6 +17,7 @@ from app.user.adapter.inbound.api.schemas.team_schema import (
     CreateTeamSchema,
     TeamInvitationResponse,
     TeamResponse,
+    UpdateTeamSchema,
 )
 from app.user.application.dtos.team_dto import (
     CancelTeamInvitationCommand,
@@ -30,6 +31,7 @@ from app.user.application.dtos.team_dto import (
     TeamInvitationsQuery,
     TeamQuery,
     TeamResult,
+    UpdateTeamCommand,
 )
 from app.user.dependencies.team_providers import (
     AcceptTeamInvitationUseCaseDep,
@@ -42,6 +44,7 @@ from app.user.dependencies.team_providers import (
     ListTeamInvitationsUseCaseDep,
     ReadTeamUseCaseDep,
     RejectTeamInvitationUseCaseDep,
+    UpdateTeamUseCaseDep,
 )
 
 team_router = APIRouter(tags=["teams"])
@@ -70,6 +73,36 @@ def read_team(
 ) -> TeamResult:
     """팀과 현재 구성원. 소속이 아니어도 볼 수 있다(가입하려면 먼저 봐야 한다)."""
     return use_case(TeamQuery(actor_id=user_id, team_id=team_id))
+
+
+@team_router.patch("/teams/{team_id}", response_model=TeamResponse)
+def update_team(
+    team_id: UUID,
+    body: UpdateTeamSchema,
+    user_id: CurrentUserId,
+    use_case: UpdateTeamUseCaseDep,
+) -> TeamResult:
+    """팀 이름·지역을 고친다. **주장만.**
+
+    지금까지 팀은 만들 때 적은 값이 영영 고정이었다 — 지역은 경기 탐색
+    (`GET /matches?region=`)이 거르는 값이라 틀리면 그 팀이 검색에서 안 걸린다.
+
+    | | |
+    |---|---|
+    | 403 `FORBIDDEN` | 주장이 아니다 |
+    | 404 `TEAM_NOT_FOUND` | 없는 팀이다 |
+    | 422 `VALIDATION_ERROR` | 빈 값·길이 초과·`null`(지우기는 안 된다) |
+
+    🔴 `sport_code` 는 못 바꾼다 — 본문에 자리가 없다(`UpdateTeamSchema` 참고).
+    """
+    return use_case(
+        UpdateTeamCommand(
+            actor_id=user_id,
+            team_id=team_id,
+            name=body.name,
+            region=body.region,
+        )
+    )
 
 
 @team_router.post(

@@ -259,3 +259,102 @@ class TestMemberCardReference:
         assert len(by_user) == 2
         assert by_user[str(owner["id"])]["card_public_slug"] is None
         assert by_user[str(other)]["card_public_slug"] == "quiet-heron-9876"
+
+
+class TestUpdateTeam:
+    """`PATCH /teams/{id}` — 팀 이름·지역 수정 (2026-09-16 신설).
+
+    지금까지 팀은 **만들 때 적은 값이 영영 고정**이었다. 지역은 경기 탐색
+    (`GET /matches?region=`)이 거르는 값이라, 틀리면 그 팀이 검색에서
+    통째로 안 걸린다.
+    """
+
+    def test_인증이_필요하다(self, client, team):
+        res = client.patch(f"{V1}/teams/{team['id']}", json={"region": "부산"})
+        assert res.status_code == 401
+
+    def test_주장이_지역을_고친다(self, client, owner, team):
+        res = client.patch(
+            f"{V1}/teams/{team['id']}",
+            json={"region": "부산 해운대구"},
+            headers=owner["headers"],
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["region"] == "부산 해운대구"
+
+        # 다시 읽어도 남아 있어야 한다.
+        again = client.get(f"{V1}/teams/{team['id']}", headers=owner["headers"])
+        assert again.json()["region"] == "부산 해운대구"
+
+    def test_이름도_고친다(self, client, owner, team):
+        res = client.patch(
+            f"{V1}/teams/{team['id']}", json={"name": "천둥FC"}, headers=owner["headers"]
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["name"] == "천둥FC"
+
+    def test_보낸_것만_바뀐다(self, client, owner, team):
+        """지역만 보내면 이름은 그대로다."""
+        res = client.patch(
+            f"{V1}/teams/{team['id']}", json={"region": "대전"}, headers=owner["headers"]
+        )
+        assert res.json()["name"] == TEAM["name"]
+        assert res.json()["region"] == "대전"
+
+    def test_빈_본문이면_아무것도_안_바뀐다(self, client, owner, team):
+        res = client.patch(f"{V1}/teams/{team['id']}", json={}, headers=owner["headers"])
+        assert res.status_code == 200, res.text
+        assert res.json()["name"] == TEAM["name"]
+        assert res.json()["region"] == TEAM["region"]
+
+    def test_주장이_아니면_403(self, client, owner, team):
+        """구성원도 못 고친다 — 팀 정보는 소속 전체에게 보이는 값이다."""
+        member_id = uuid4()
+        register_user(member_id)
+        client.post(
+            f"{V1}/teams/{team['id']}/members", json={}, headers=_headers(member_id)
+        )
+
+        res = client.patch(
+            f"{V1}/teams/{team['id']}",
+            json={"region": "대구"},
+            headers=_headers(member_id),
+        )
+        assert res.status_code == 403
+        assert error_code(res) == "FORBIDDEN"
+
+    def test_소속이_아니면_403(self, client, team):
+        res = client.patch(
+            f"{V1}/teams/{team['id']}", json={"region": "대구"}, headers=_headers()
+        )
+        assert res.status_code == 403
+
+    def test_없는_팀은_404(self, client, owner):
+        res = client.patch(
+            f"{V1}/teams/{uuid4()}", json={"region": "대구"}, headers=owner["headers"]
+        )
+        assert res.status_code == 404
+        assert error_code(res) == "TEAM_NOT_FOUND"
+
+    def test_빈_문자열은_422(self, client, owner, team):
+        res = client.patch(
+            f"{V1}/teams/{team['id']}", json={"name": ""}, headers=owner["headers"]
+        )
+        assert res.status_code == 422
+
+    def test_null_로는_못_지운다(self, client, owner, team):
+        """🔴 둘 다 NOT NULL 이라 "안 정한 상태"가 없다 — 카드의 `tagline` 과 다르다."""
+        res = client.patch(
+            f"{V1}/teams/{team['id']}", json={"region": None}, headers=owner["headers"]
+        )
+        assert res.status_code == 422
+
+    def test_종목은_못_바꾼다(self, client, owner, team):
+        """🔴 포지션·스쿼드·경기가 그 값에 매달려 있다 — 본문에 자리가 없어 무시된다."""
+        res = client.patch(
+            f"{V1}/teams/{team['id']}",
+            json={"sport_code": "baseball"},
+            headers=owner["headers"],
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["sport_code"] == TEAM["sport_code"]

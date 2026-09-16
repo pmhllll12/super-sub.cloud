@@ -21,6 +21,7 @@ from app.user.application.dtos.team_dto import (
     TeamInvitationsQuery,
     TeamQuery,
     TeamResult,
+    UpdateTeamCommand,
 )
 from app.user.application.ports.input.team_use_cases import (
     AcceptTeamInvitationUseCase,
@@ -33,6 +34,7 @@ from app.user.application.ports.input.team_use_cases import (
     ListTeamInvitationsUseCase,
     ReadTeamUseCase,
     RejectTeamInvitationUseCase,
+    UpdateTeamUseCase,
 )
 from app.user.application.ports.output.team_port import TeamPort
 from app.user.application.use_cases.team_assembler import (
@@ -52,6 +54,7 @@ from app.user.domain.rules.team_invitation_rules import (
 )
 from app.user.domain.rules.team_rules import (
     can_add_member,
+    can_edit_team,
     can_remove_member,
     is_last_owner,
 )
@@ -111,6 +114,30 @@ class ReadTeamInteractor(_TeamInteractorBase, ReadTeamUseCase):
         닉네임뿐이라 소속으로 막을 이유가 없다. 인증은 필요하다.
         """
         return self._result(self._team_or_404(query.team_id))
+
+
+class UpdateTeamInteractor(_TeamInteractorBase, UpdateTeamUseCase):
+    """팀 이름·지역을 고친다(주장만).
+
+    지금까지 팀은 **만들 때 적은 값이 영영 고정**이었다 — 고칠 경로가
+    없어서 이사하거나 오타를 내면 되돌릴 방법이 없었다. 그런데 지역은
+    경기 탐색(`GET /matches?region=`)이 거르는 값이라 틀리면 그 팀이
+    검색에서 안 걸린다.
+    """
+
+    def __call__(self, command: UpdateTeamCommand) -> TeamResult:
+        team = self._team_or_404(command.team_id)
+        members = self._repository.active_members(team.id)
+
+        if not can_edit_team(_role_of(members, command.actor_id)):
+            raise ApiError(403, "FORBIDDEN", "주장만 팀 정보를 고칠 수 있습니다.")
+
+        updated = self._repository.update_team(
+            team.id, command.name, command.region
+        )
+        if updated is None:
+            raise ApiError(404, "TEAM_NOT_FOUND", "팀을 찾을 수 없습니다.")
+        return self._result(updated)
 
 
 class JoinTeamInteractor(_TeamInteractorBase, JoinTeamUseCase):

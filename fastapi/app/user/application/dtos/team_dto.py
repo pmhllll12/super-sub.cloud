@@ -22,6 +22,23 @@ class TeamQuery:
 
 
 @dataclass(frozen=True)
+class UpdateTeamCommand:
+    """팀 이름·지역 수정.
+
+    `None` 이면 **안 건드린다**(HTTP 층에서 「안 보냄」이 여기로 온다).
+    🔴 `sport_code` 는 담지 않는다 — 포지션·스쿼드·경기가 전부 그 값에
+    매달려 있어서, 바꾸면 이미 앉힌 포지션이 다른 종목 것이 된다.
+    받을 자리를 아예 안 두는 것이 그 규칙을 코드로 지키는 방법이다
+    (카드가 `public_slug` 를 안 받는 것과 같은 판단).
+    """
+
+    actor_id: UUID
+    team_id: UUID
+    name: str | None = None
+    region: str | None = None
+
+
+@dataclass(frozen=True)
 class JoinTeamCommand:
     actor_id: UUID
     team_id: UUID

@@ -20,6 +20,7 @@ from app.user.application.dtos.team_dto import (
     TeamInvitationsQuery,
     TeamQuery,
     TeamResult,
+    UpdateTeamCommand,
 )
 
 
@@ -33,6 +34,12 @@ class ReadTeamUseCase(ABC):
     @abstractmethod
     def __call__(self, query: TeamQuery) -> TeamResult:
         """팀과 현재 구성원. 없으면 404."""
+
+
+class UpdateTeamUseCase(ABC):
+    @abstractmethod
+    def __call__(self, command: UpdateTeamCommand) -> TeamResult:
+        """팀 이름·지역을 고친다. **주장만.** 없으면 404."""
 
 
 class JoinTeamUseCase(ABC):

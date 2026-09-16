@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import text
@@ -54,6 +55,24 @@ def people(db_client, db_session):
     ids = [str(owner["id"]), str(member["id"])]
     db_session.execute(
         text("delete from team_member where user_id = any(:u)"), {"u": ids}
+    )
+    # 🔴 경기가 팀을 참조하므로 팀보다 **먼저** 지운다(외래키 방향의 역순).
+    # 팀 정보 수정 검사(`TestUpdateTeamInDb`)가 경기 탐색까지 보느라 경기를
+    # 만든다 — 안 지우면 아래 팀 삭제가 `match_team_id_fkey` 로 막힌다.
+    orphan_teams = (
+        "select id from team where id not in (select team_id from team_member) "
+        "and name = :n"
+    )
+    db_session.execute(
+        text(
+            "delete from match_position_need where match_id in "
+            f"(select id from match where team_id in ({orphan_teams}))"
+        ),
+        {"n": TEAM["name"]},
+    )
+    db_session.execute(
+        text(f"delete from match where team_id in ({orphan_teams})"),
+        {"n": TEAM["name"]},
     )
     db_session.execute(
         text(
@@ -263,3 +282,78 @@ class TestMemberCardReference:
         assert by_user[str(owner["id"])]["player_card_id"] is not None
         assert by_user[str(member["id"])]["player_card_id"] is None
 
+
+
+class TestUpdateTeamInDb:
+    """`PATCH /teams/{id}` 를 **실제 PostgreSQL** 에 대고 확인한다 (2026-09-16).
+
+    스텁이 답할 수 없는 것: 행이 실제로 바뀌는가, 그리고 🔴 **바뀐 지역이
+    경기 탐색(`GET /matches?region=`)에 곧바로 반영되는가** — 그 검색이
+    `team.region` 을 조인해 거르기 때문에 이 경로를 낸 이유가 거기 있다.
+    """
+
+    def test_지역이_실제로_바뀐다(self, db_client, db_session, people):
+        team = _create(db_client, people)
+        res = db_client.patch(
+            f"{V1}/teams/{team['id']}",
+            json={"region": "부산 해운대구"},
+            headers=people["owner"]["headers"],
+        )
+        assert res.status_code == 200, res.text
+
+        row = db_session.execute(
+            text("select name, region from team where id = :i"), {"i": team["id"]}
+        ).one()
+        assert row.region == "부산 해운대구"
+        assert row.name == TEAM["name"]
+
+    def test_바꾼_지역으로_경기_탐색에_걸린다(self, db_client, people):
+        """이 경로를 낸 이유 — 지역이 틀리면 그 팀 경기가 검색에서 통째로 빠진다."""
+        team = _create(db_client, people)
+        tag = uuid.uuid4().hex[:8]
+        db_client.patch(
+            f"{V1}/teams/{team['id']}",
+            json={"region": f"부산 해운대구 {tag}"},
+            headers=people["owner"]["headers"],
+        )
+
+        made = db_client.post(
+            f"{V1}/teams/{team['id']}/matches",
+            json={
+                "played_at": (
+                    datetime.now(timezone.utc) + timedelta(days=5)
+                ).isoformat(),
+                "place": "해운대 구장",
+                "needs": [{"position_code": "GK", "head_count": 1}],
+            },
+            headers=people["owner"]["headers"],
+        )
+        assert made.status_code == 201, made.text
+
+        found = db_client.get(
+            f"{V1}/matches",
+            params={"region": tag},
+            headers=people["owner"]["headers"],
+        )
+        assert found.status_code == 200, found.text
+        assert [i["team_name"] for i in found.json()["items"]] == [TEAM["name"]]
+
+    def test_주장이_아니면_행이_안_바뀐다(self, db_client, db_session, people):
+        team = _create(db_client, people)
+        db_client.post(
+            f"{V1}/teams/{team['id']}/members",
+            json={},
+            headers=people["member"]["headers"],
+        )
+
+        res = db_client.patch(
+            f"{V1}/teams/{team['id']}",
+            json={"region": "대구"},
+            headers=people["member"]["headers"],
+        )
+        assert res.status_code == 403
+
+        region = db_session.execute(
+            text("select region from team where id = :i"), {"i": team["id"]}
+        ).scalar_one()
+        assert region == TEAM["region"]

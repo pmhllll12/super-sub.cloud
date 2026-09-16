@@ -71,6 +71,20 @@ class StubTeamRepository(TeamPort):
     def find_team(self, team_id: UUID) -> TeamEntity | None:
         return _TEAMS.get(team_id)
 
+    def update_team(
+        self, team_id: UUID, name: str | None, region: str | None
+    ) -> TeamEntity | None:
+        team = _TEAMS.get(team_id)
+        if team is None:
+            return None
+        updated = replace(
+            team,
+            name=team.name if name is None else name,
+            region=team.region if region is None else region,
+        )
+        _TEAMS[team_id] = updated
+        return updated
+
     def active_members(self, team_id: UUID) -> list[TeamMemberEntity]:
         return list(_MEMBERS.get(team_id, []))
 
