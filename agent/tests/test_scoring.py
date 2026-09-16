@@ -444,6 +444,13 @@ def test_out_of_band_marks_zero_grades_that_came_from_above():
 # 아래 검사가 「점수를 안 건드린다」를 다시 확인한다.
 DISPLAY_ONLY_FIELDS = ("out_of_band", "stat", "view_dependent")
 
+# 봉투 맨 위의 표시 전용 블록. 🔴 `card` 는 2026.09.16 부터 features 에 **의존
+# 한다** — 한 등급에 반대 방향 구간이 둘 있는 항목에서 어느 쪽인지 고르려면
+# 측정값이 있어야 하고, 없으면 방향을 말하지 않는 틀로 떨어진다. 점수를 안
+# 건드리는 것은 `test_summary.py::test_the_card_does_not_move_the_score` 가
+# 따로 본다.
+DISPLAY_ONLY_BLOCKS = ("card",)
+
 
 def test_display_only_fields_do_not_move_the_score():
     """🔴 표시는 표시일 뿐이다 — **점수·등급이 바뀌면 B-6 재실행을 부른다.**
@@ -460,7 +467,8 @@ def test_display_only_fields_do_not_move_the_score():
     with_feats = aggregate(judgments, rubric, features=feats)
 
     strip = lambda r: {  # noqa: E731
-        **r, "breakdown": [{k: v for k, v in b.items()
+        **{k: v for k, v in r.items() if k not in DISPLAY_ONLY_BLOCKS},
+        "breakdown": [{k: v for k, v in b.items()
                             if k not in DISPLAY_ONLY_FIELDS}
                            for b in r["breakdown"]]
     }

@@ -138,10 +138,20 @@ def test_the_summary_is_at_most_two_sentences():
 #    기록이지 우리가 잰 것이 아니다.
 
 
-def _card(rubric, grades):
+def _card(rubric, grades, features=None):
     from supersub_agent.scoring import card
     result = aggregate(_judge(rubric, grades), rubric)
-    return card(result["breakdown"], rubric), result
+    return card(result["breakdown"], rubric, features), result
+
+
+def _inside(interval):
+    """그 구간 안의 값 하나. 방향이 갈리는 항목에 측정값을 만들어 주는 자리다."""
+    lo, hi = interval
+    if lo is None:
+        return hi - 1.0
+    if hi is None:
+        return lo + 1.0
+    return (lo + hi) / 2.0
 
 
 @pytest.mark.parametrize("key", sorted(RUBRICS))
@@ -274,10 +284,15 @@ def test_the_bullet_is_the_sentence_the_rubric_wrote(key, grade):
 
     적재기가 `card_lines` 를 안 읽거나 `card()` 가 루브릭을 못 받으면 예외 없이
     코드 틀로 돌아간다. 그 상태로도 다른 검사들은 전부 초록이다.
+
+    방향이 갈리는 항목은 **측정값이 있어야** 루브릭 문장이 나온다. 그래서 각
+    항목의 값을 그 등급의 첫 구간 안에 놓고 부른다 — 값을 안 주면 그 항목만
+    조용히 틀로 떨어져 이 검사가 무는 범위가 줄어든다.
     """
     rubric = RUBRICS[key]
-    got, result = _card(rubric, [grade] * len(rubric.criteria))
-    written = {c.card_line_for(grade).strip() for c in rubric.criteria}
+    features = {c.band_metric: _inside(c.bands[grade][0]) for c in rubric.criteria}
+    got, _ = _card(rubric, [grade] * len(rubric.criteria), features)
+    written = {s.strip() for c in rubric.criteria for s in c.card_lines.get(grade, ())}
     assert got["notes"], "불릿이 비었다"
     for note in got["notes"]:
         assert note in written, f"루브릭이 안 쓴 문장이 카드에 있다: {note}"
