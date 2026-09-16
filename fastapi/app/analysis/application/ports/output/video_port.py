@@ -25,6 +25,15 @@ class VideoPort(ABC):
     def sport_exists(self, sport_code: str) -> bool: ...
 
     @abstractmethod
+    def sport_is_active(self, sport_code: str) -> bool:
+        """**지금 새로 받을 수 있는 종목인가**(`sport.active`, `ho` 39번).
+
+        루브릭이 사라진 종목(야구·농구)은 행은 남아 있지만 `false` 다 —
+        그 종목으로 이미 올라간 영상이 참조하고 있어 지울 수 없어서다.
+        등록만 막고 **조회·목록은 그대로 둔다**(옛 영상이 계속 보여야 한다).
+        """
+
+    @abstractmethod
     def uploader_nickname(self, user_id: UUID) -> str | None:
         """그 사람의 현재 닉네임 — 저장 키를 사람이 알아보게 짓는 데 쓴다(미결
         `jin` 24번). `sport_exists` 처럼 `user` 컨텍스트를 임포트하지 않고

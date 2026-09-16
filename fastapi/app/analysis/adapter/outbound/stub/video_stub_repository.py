@@ -21,6 +21,8 @@ from app.analysis.domain.entities.video_entity import (
 )
 
 _SPORTS = ("football", "baseball", "basketball")
+# 지금 새로 받는 종목(`sport.active`, `ho` 39번). 나머지는 행만 남아 있다.
+_ACTIVE_SPORTS = ("football",)
 
 _VIDEOS: dict[UUID, VideoEntity] = {}
 # 가짜 저장소에 "올라와 있는" 객체. 키 -> 크기(바이트).
@@ -100,6 +102,9 @@ def put_object(
 class StubVideoRepository(VideoPort):
     def sport_exists(self, sport_code: str) -> bool:
         return sport_code in _SPORTS
+
+    def sport_is_active(self, sport_code: str) -> bool:
+        return sport_code in _ACTIVE_SPORTS
 
     def uploader_nickname(self, user_id: UUID) -> str | None:
         # 스텁은 `user` 를 모른다 — 키 슬러그는 "user" 로 떨어진다. 닉네임이

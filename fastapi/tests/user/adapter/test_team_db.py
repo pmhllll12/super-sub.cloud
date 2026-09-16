@@ -112,14 +112,37 @@ class TestCreateTeamInDb:
         assert res.status_code == 422
         assert error_code(res) == "UNKNOWN_SPORT"
 
-    def test_마이그레이션이_넣은_세_종목은_통과한다(self, db_client, people):
-        for code in ("football", "baseball", "basketball"):
+    def test_지금_받는_종목은_통과한다(self, db_client, people):
+        """`ho` 39번으로 축구만 `active` 다 — 세 종목 다 통과하던 검사를 바꿨다."""
+        res = db_client.post(
+            f"{V1}/teams",
+            json={**TEAM, "sport_code": "football"},
+            headers=people["owner"]["headers"],
+        )
+        assert res.status_code == 201, res.text
+
+    def test_내려간_종목은_행은_있지만_새로_못_만든다(
+        self, db_client, db_session, people
+    ):
+        """🔴 「없는 종목」과 다르다 — 행은 그대로 있어야 한다(`ho` 39번).
+
+        이미 그 종목으로 올라간 데이터(2026-09-16 실측 `video` 야구 165건)가
+        참조하고 있어 지울 수 없다. 그래서 `UNKNOWN_SPORT`(없다)가 아니라
+        `SPORT_NOT_AVAILABLE`(지금 안 받는다)로 가른다.
+        """
+        for code in ("baseball", "basketball"):
+            still_there = db_session.execute(
+                text("select active from sport where code = :c"), {"c": code}
+            ).scalar_one()
+            assert still_there is False, f"{code} 행이 사라졌다"
+
             res = db_client.post(
                 f"{V1}/teams",
                 json={**TEAM, "sport_code": code},
                 headers=people["owner"]["headers"],
             )
-            assert res.status_code == 201, f"{code}: {res.text}"
+            assert res.status_code == 422, f"{code}: {res.text}"
+            assert error_code(res) == "SPORT_NOT_AVAILABLE"
 
 
 class TestMembershipInDb:

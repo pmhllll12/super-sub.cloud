@@ -63,6 +63,16 @@ class TestCreateTeam:
         assert res.status_code == 422
         assert error_code(res) == "UNKNOWN_SPORT"
 
+    def test_내려간_종목은_없는_종목과_다른_code_다(self, client, owner):
+        """`ho` 39번 — 행은 있지만 루브릭이 없어 지금 안 받는 종목이다."""
+        res = client.post(
+            f"{V1}/teams",
+            json={**TEAM, "sport_code": "baseball"},
+            headers=owner["headers"],
+        )
+        assert res.status_code == 422
+        assert error_code(res) == "SPORT_NOT_AVAILABLE"
+
     def test_이름이_비면_422(self, client, owner):
         res = client.post(
             f"{V1}/teams", json={**TEAM, "name": ""}, headers=owner["headers"]

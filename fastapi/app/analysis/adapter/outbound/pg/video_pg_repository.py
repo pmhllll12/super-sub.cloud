@@ -33,7 +33,7 @@ from app.analysis.domain.entities.video_entity import (
 from app.analysis.domain.rules.job_rules import ANALYZE, FAILED, SUCCEEDED
 
 # 소유하지 않는 테이블에서 **읽기만** 한다. 위 docstring 참조.
-_sport = table("sport", column("code"))
+_sport = table("sport", column("code"), column("active"))
 _user = table("user", column("id"), column("nickname"), column("email"))
 # `card` 컨텍스트 테이블. 슬러그→`user_id` 만 읽는다(경계 유지).
 _player_card = table("player_card", column("public_slug"), column("user_id"))
@@ -55,6 +55,12 @@ class VideoPgRepository(VideoPort):
 
     def sport_exists(self, sport_code: str) -> bool:
         stmt = select(_sport.c.code).where(_sport.c.code == sport_code)
+        return self._session.execute(stmt).first() is not None
+
+    def sport_is_active(self, sport_code: str) -> bool:
+        stmt = select(_sport.c.code).where(
+            _sport.c.code == sport_code, _sport.c.active.is_(True)
+        )
         return self._session.execute(stmt).first() is not None
 
     def uploader_nickname(self, user_id: UUID) -> str | None:

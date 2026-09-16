@@ -124,6 +124,13 @@ class RegisterVideoInteractor(RegisterVideoUseCase):
     def __call__(self, command: RegisterVideoCommand) -> VideoResult:
         if not self._repository.sport_exists(command.sport_code):
             raise ApiError(422, "UNKNOWN_SPORT", "지원하지 않는 종목입니다.")
+        # 🔴 「없는 종목」과 **「지금 안 받는 종목」을 가른다**(`ho` 39번).
+        # 루브릭이 없는 종목은 등록은 통과하고 **워커에서 거부**돼서, 사용자
+        # 입장에서는 올라간 뒤에야 실패한다. 올리기 전에 막는 편이 맞다.
+        if not self._repository.sport_is_active(command.sport_code):
+            raise ApiError(
+                422, "SPORT_NOT_AVAILABLE", "지금은 받지 않는 종목입니다."
+            )
 
         # 🔴 키에 업로더가 들어 있으므로 대조할 수 있다. 안 하면 남이 올린
         #    객체의 키를 자기 영상으로 등록할 수 있다.

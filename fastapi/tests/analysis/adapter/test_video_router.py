@@ -354,6 +354,20 @@ class TestRegisterVideo:
         assert res.status_code == 422
         assert error_code(res) == "UNKNOWN_SPORT"
 
+    def test_내려간_종목은_없는_종목과_다른_code_다(self, client):
+        """`ho` 39번 — 행은 있지만 루브릭이 없어 지금 안 받는 종목이다.
+
+        🔴 `UNKNOWN_SPORT`(없다)와 가른다. 화면이 「오타」와 「지금은 축구만」을
+        다르게 안내할 수 있어야 하고, 되살릴 때 행을 다시 넣을 필요도 없다.
+        """
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        res = _register(client, user_id, key, sport_code="baseball")
+        assert res.status_code == 422
+        assert error_code(res) == "SPORT_NOT_AVAILABLE"
+
 
 class TestDuplicateDetection:
     """`ho` 41번 — 같은 내용을 다시 올리면 새 작업 없이 앞선 결과를 알려준다."""

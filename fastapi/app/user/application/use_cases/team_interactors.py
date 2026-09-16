@@ -83,6 +83,15 @@ class CreateTeamInteractor(_TeamInteractorBase, CreateTeamUseCase):
             raise ApiError(
                 422, "UNKNOWN_SPORT", "등록되지 않은 종목 코드입니다."
             )
+        # 🔴 「없는 종목」과 **「지금 안 받는 종목」을 가른다**(`ho` 39번).
+        # 행은 남아 있지만 루브릭이 없어 분석이 안 되는 종목이라, 여기서
+        # 막지 않으면 팀은 만들어지는데 그 팀 영상은 워커가 전부 거부한다.
+        if not self._repository.sport_is_active(command.sport_code):
+            raise ApiError(
+                422,
+                "SPORT_NOT_AVAILABLE",
+                "지금은 받지 않는 종목입니다.",
+            )
 
         team = TeamEntity(
             id=uuid4(),

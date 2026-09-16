@@ -249,9 +249,27 @@ class TestRegister:
         assert res.json()["error"]["code"] == "UNKNOWN_SPORT"
 
     def test_있는_종목은_통과한다(self, db_client, uploader):
-        """위 검사의 양성 대조. 둘이 같이 있어야 "종목을 실제로 읽는다"가 된다."""
+        """위 검사의 양성 대조. 둘이 같이 있어야 "종목을 실제로 읽는다"가 된다.
+
+        🔴 `ho` 39번으로 야구가 내려가서(`sport.active=false`) 축구로 바꿨다 —
+        내려간 종목은 아래 검사가 따로 본다.
+        """
         key = _upload(db_client, uploader)
-        assert _register(db_client, uploader, key, sport_code="baseball").status_code == 201
+        assert _register(db_client, uploader, key, sport_code="football").status_code == 201
+
+    def test_내려간_종목은_올리기_전에_막힌다(self, db_client, db_session, uploader):
+        """루브릭이 없는 종목은 등록은 통과하고 **워커에서** 거부돼서, 올린
+        뒤에야 실패했다(`ho` 39번). 올리기 전에 가른다 — 행은 그대로 둔다.
+        """
+        active = db_session.execute(
+            text("select active from sport where code = 'baseball'")
+        ).scalar_one()
+        assert active is False
+
+        key = _upload(db_client, uploader)
+        res = _register(db_client, uploader, key, sport_code="baseball")
+        assert res.status_code == 422
+        assert res.json()["error"]["code"] == "SPORT_NOT_AVAILABLE"
 
 
 class TestDuplicateDetection:

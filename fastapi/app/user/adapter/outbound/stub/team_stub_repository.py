@@ -22,6 +22,8 @@ from app.user.domain.value_objects.team_role_vo import TeamRole
 
 # 마이그레이션이 넣는 값과 같다(`20260901_sport_and_position`).
 SPORT_CODES = ("football", "baseball", "basketball")
+# 지금 새로 받는 종목(`sport.active`, `ho` 39번). 나머지는 행만 남아 있다.
+ACTIVE_SPORT_CODES = ("football",)
 
 _TEAMS: dict[UUID, TeamEntity] = {}
 _MEMBERS: dict[UUID, list[TeamMemberEntity]] = {}
@@ -59,6 +61,9 @@ def register_user(user_id: UUID) -> None:
 class StubTeamRepository(TeamPort):
     def sport_exists(self, sport_code: str) -> bool:
         return sport_code in SPORT_CODES
+
+    def sport_is_active(self, sport_code: str) -> bool:
+        return sport_code in ACTIVE_SPORT_CODES
 
     def user_exists(self, user_id: UUID) -> bool:
         return user_id in _KNOWN_USERS

@@ -64,6 +64,12 @@ class TeamPgRepository(TeamPort):
         stmt = select(SportOrm.code).where(SportOrm.code == sport_code)
         return self._session.execute(stmt).first() is not None
 
+    def sport_is_active(self, sport_code: str) -> bool:
+        stmt = select(SportOrm.code).where(
+            SportOrm.code == sport_code, SportOrm.active.is_(True)
+        )
+        return self._session.execute(stmt).first() is not None
+
     def user_exists(self, user_id: UUID) -> bool:
         stmt = select(UserOrm.id).where(UserOrm.id == user_id)
         return self._session.execute(stmt).first() is not None
