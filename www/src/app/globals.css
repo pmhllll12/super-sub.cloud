@@ -386,13 +386,168 @@ body::-webkit-scrollbar {
    따로 칠하면 하나만 켜져 두 개가 다른 것처럼 보인다.
    크기는 **한 단 키웠다**(20 → 24px, 사용자 요청 2026-09-08). */
 .ss-home-nav-icon {
-  font-size: 24px;
+  /* 24 → 31px. **1.3배**다(사용자 요청, 2026-09-16). 그 전에도 한 단
+     키운 적이 있다(20 → 24, 2026-09-08). */
+  font-size: 31px;
   line-height: 1;
 }
 
 /* 글자는 원래 자간을 그대로 쓴다 — 아이콘이 위에 붙었을 뿐이다. */
 .ss-home-nav-label {
   letter-spacing: inherit;
+}
+
+/* 아이콘과 그 위의 빨간 점을 함께 잡는 칸. 점을 아이콘 기준으로 매달아야
+   글자 길이가 달라도 같은 자리에 붙는다. */
+.ss-home-nav-iconwrap {
+  position: relative;
+  display: inline-flex;
+  line-height: 1;
+}
+
+/* 「알림」 아이콘만 광학 크기를 달리 쓴다 — 구글 폰트에서 고른 값 그대로
+   (wght 100 · GRAD 0 · opsz 40, 사용자 지정 2026-09-16). 굵기는 옆
+   아이콘들과 같고 opsz 만 다르다: 큰 광학 크기라 획이 조금 더 가늘게 선다. */
+.ss-home-nav-icon--notify {
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 100,
+    'GRAD' 0,
+    'opsz' 40;
+}
+
+/* 🔴 **완전히 꺼졌다 켜진다**(사용자 요청) — 부드럽게 숨 쉬는 것이 아니라
+   딱 끊긴다. `steps(1, end)` 라 중간값이 아예 안 그려진다: 페이드는 흐린
+   순간이 많아 "깜빡인다"로 안 읽힌다.
+
+   점은 배경색 테두리를 둘러 아이콘 획 위에 올라앉아도 경계가 남는다. */
+.ss-home-nav-dot {
+  position: absolute;
+  top: -1px;
+  right: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #ff3b30;
+  box-shadow: 0 0 0 2px var(--ss-bg);
+  animation: ss-blink 1s steps(1, end) infinite;
+}
+
+@keyframes ss-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* 🔴 **깜빡임을 끌 수 있어야 한다.** 번쩍이는 것은 편두통 · 광과민을 건드리고,
+   이 점은 "새 알림이 있다"는 뜻이라 안 깜빡여도 그 뜻이 그대로 전해진다. */
+@media (prefers-reduced-motion: reduce) {
+  .ss-home-nav-dot {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* ── 알림 판 — 「알림」 글자 아래로 떠오른다 ────────────────────────── */
+
+/* 🔴 **껍데기 판이 없다**(사용자 지적, 2026-09-16 — 「검정 판은 왜 또
+   만든겨」). 줄 자체가 이미 제 면을 가진 판인데 그 바깥을 한 번 더 감싸서
+   판이 판 안에 든 것처럼 보였다. 여기는 **자리만** 잡는다. */
+.ss-notify {
+  width: min(380px, 84vw);
+  text-align: left;
+}
+
+/* 빈 상태도 제 면을 갖는다 — 줄과 같은 이유다(껍데기가 없다). */
+.ss-notify-empty {
+  padding: 11px 14px;
+  border-radius: 14px;
+  background-color: color-mix(in srgb, var(--ss-bg) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 14%, transparent);
+  font-size: 0.8125rem;
+  color: color-mix(in srgb, var(--ss-fg) 70%, transparent);
+}
+
+.ss-notify-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* 🔴 **상대 팀 정보와 수락 단추가 한 줄에 있다**(사용자 요청) — 눌러서
+   들어가는 화면을 따로 만들지 않으려면 이 줄 하나로 끝나야 한다. */
+.ss-notify-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 14px;
+  border-radius: 14px;
+  /* 🔴 **줄이 곧 판이다.** 껍데기를 걷어냈으므로(위 `.ss-notify`) 배경 위에
+     바로 앉는다 — 옅게 두면 사진 위에서 글자가 안 읽힌다. */
+  background-color: color-mix(in srgb, var(--ss-bg) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 14%, transparent);
+}
+
+.ss-notify-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ss-notify-name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ss-fg);
+}
+
+.ss-notify-note {
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--ss-fg) 70%, transparent);
+}
+
+.ss-notify-acts {
+  display: flex;
+  flex: none;
+  gap: 6px;
+}
+
+.ss-notify-act {
+  border: 1px solid color-mix(in srgb, var(--ss-accent) 60%, transparent);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--ss-accent);
+  background: transparent;
+  transition:
+    background-color 160ms ease,
+    opacity 160ms ease;
+}
+
+.ss-notify-act:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--ss-accent) 18%, transparent);
+}
+
+/* 거절 — 같은 무게로 두면 무엇이 기본 동작인지 안 보인다. */
+.ss-notify-act--ghost {
+  border-color: color-mix(in srgb, var(--ss-fg) 26%, transparent);
+  color: color-mix(in srgb, var(--ss-fg) 72%, transparent);
+}
+
+.ss-notify-act--ghost:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--ss-fg) 10%, transparent);
+}
+
+.ss-notify-act:disabled {
+  cursor: default;
+  opacity: 0.45;
 }
 
 /* ── 알약 변형 (variant="pill") ────────────────────────────────────────
@@ -527,13 +682,59 @@ body::-webkit-scrollbar {
   z-index: 30;
   transform: translateX(-50%);
   padding-top: 8px;
-  animation: ss-card-in 180ms ease-out both;
+  /* 220ms — 180 에서 늘렸다(사용자 요청, 2026-09-16 「부드럽게」).
+     HomeNav 의 CARD_EXIT_MS 와 **같아야 한다**: 여기가 길면 다 사라지기
+     전에 DOM 에서 빠지고, 짧으면 사라진 자리가 남는다. */
+  animation: ss-card-in 220ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
 
 /* 물러나는 중 — 아직 DOM 에 있지만 누를 수 있으면 안 된다. */
 .ss-home-nav-card[data-state='closing'] {
   pointer-events: none;
-  animation: ss-card-out 180ms ease-in both;
+  animation: ss-card-out 220ms cubic-bezier(0.4, 0, 0.6, 1) both;
+}
+
+/* 🔴 **오른쪽 끝을 글자에 맞추고 왼쪽으로 펼친다**(사용자 요청, 2026-09-16).
+   「알림」이 줄의 **맨 오른쪽**으로 옮겨 가면서, 가운데 정렬로는 판이 오른쪽
+   으로 삐져나가 **「내 프로필」 카드와 겹쳤다.**
+
+   설명 카드(좁다)는 가운데가 맞고 이 판(380px)만 다르다 — 그래서 기본을
+   바꾸지 않고 변형을 따로 둔다.
+
+   ⚠️ 가운데 정렬을 `transform` 으로 하던 자리라, 그것을 끄면 **keyframes 의
+   `-50%` 도 같이 꺼야 한다**(안 그러면 뜨는 동안만 반쯤 왼쪽으로 밀린다) —
+   아래 `-r` 짝이 그것이다. */
+.ss-home-nav-card--right {
+  left: auto;
+  right: 0;
+  transform: none;
+  animation-name: ss-card-in-r;
+}
+
+.ss-home-nav-card--right[data-state='closing'] {
+  animation-name: ss-card-out-r;
+}
+
+@keyframes ss-card-in-r {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ss-card-out-r {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
 }
 
 @keyframes ss-card-in {
@@ -2576,6 +2777,39 @@ body::-webkit-scrollbar {
 .ss-friends-row[data-placed='true'] {
   cursor: default;
   opacity: 0.5;
+}
+
+/* 🔴 **아직 지인이 아닌 줄**(검색 결과)과 **받은 신청** 줄은 `<div>` 다 —
+   줄 전체가 버튼이면 "누르면 판에 앉는다"로 읽히는데, 이 둘은 신청·수락이라
+   뜻이 다르다. 그래서 누르는 곳을 오른쪽 단추 하나로 좁힌다. */
+.ss-friends-row[data-kind='found'],
+.ss-friends-row[data-kind='request'] {
+  cursor: default;
+}
+
+.ss-friends-act {
+  flex: none;
+  border: 1px solid color-mix(in srgb, var(--ss-accent) 60%, transparent);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--ss-accent);
+  background: transparent;
+  transition:
+    background-color 160ms ease,
+    opacity 160ms ease;
+}
+
+.ss-friends-act:not(:disabled):hover,
+.ss-friends-act:not(:disabled):focus-visible {
+  background-color: color-mix(in srgb, var(--ss-accent) 18%, transparent);
+}
+
+/* 보낸 뒤 — 누를 것이 없어졌다는 것이 색으로도 보여야 한다. */
+.ss-friends-act:disabled {
+  cursor: default;
+  opacity: 0.45;
 }
 
 .ss-friends-in {
