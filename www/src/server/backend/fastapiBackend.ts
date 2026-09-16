@@ -10,6 +10,8 @@ import type {
   Contact,
   ContactRequest,
   UserSearchResult,
+  CardGrade,
+  SquadCandidate,
   TeamMatchRequest,
   FeaturedVideo,
   Match,
@@ -322,6 +324,26 @@ export const fastapiBackend: Backend = {
     return callFastApi<TeamMatchRequest>(
       `/teams/${encodeURIComponent(teamId)}/match-requests/${encodeURIComponent(requestId)}/reject`,
       { method: 'POST', token },
+    )
+  },
+
+  /* ── 표시 등급 · 추천 후보 (계약 3-6·3-16절) ─────────────────────── */
+
+  getCardGrade(token, cardPublicSlug) {
+    return callFastApi<CardGrade>(
+      `/cards/${encodeURIComponent(cardPublicSlug)}/grade`,
+      { method: 'GET', token },
+    )
+  },
+
+  listSquadCandidates(token, teamId, { position_code, grade }) {
+    const q = new URLSearchParams({ position_code })
+    // 🔴 「상관없음」은 **안 실어 보낸다** — 계약이 생략과 `"any"` 를 같게 보지만,
+    //    빈 값(`grade=`)은 없는 등급이라 422 다(`searchMatches` 와 같은 함정).
+    if (grade) q.set('grade', grade)
+    return callFastApi<SquadCandidate[]>(
+      `/teams/${encodeURIComponent(teamId)}/squad/candidates?${q}`,
+      { method: 'GET', token },
     )
   },
 

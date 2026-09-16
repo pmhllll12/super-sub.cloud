@@ -7,6 +7,8 @@ import type {
   Contact,
   ContactRequest,
   UserSearchResult,
+  CardGrade,
+  SquadCandidate,
   TeamMatchRequest,
   CardStyleWire,
   CreateMatchInput,
@@ -285,4 +287,24 @@ export interface Backend {
   rejectTeamMatch(token: string, teamId: string, requestId: string): Promise<TeamMatchRequest>
   /** 신청 팀이 스스로 무르기 — `pending` 일 때만. 알림이 안 간다. */
   cancelTeamMatch(token: string, teamId: string, requestId: string): Promise<TeamMatchRequest>
+
+  /* ── 표시 등급 · 추천 후보 (계약 3-6·3-16절, CCC 43·44번) ──────────────
+   *
+   * 🔴 **경계는 서버가 긋는다.** 두 응답 모두 `grade`(`S`~`F`)와
+   * `provisional` 을 짝으로 준다 — 화면은 받아서 그리기만 한다.
+   */
+
+  /** 남의 표시 등급. 로그인하면 누구나(`featured-video` 와 같은 원칙). */
+  getCardGrade(token: string, cardPublicSlug: string): Promise<CardGrade>
+  /**
+   * 빈 자리에 넣을 후보들 — **이미 정렬돼서 온다.**
+   *
+   * `grade` 를 주면 그 칸으로만 하드 필터, 안 주면 거르지 않고 팀 평균과
+   * 가까운 순으로 정렬만 한다.
+   */
+  listSquadCandidates(
+    token: string,
+    teamId: string,
+    params: { position_code: string; grade?: string },
+  ): Promise<SquadCandidate[]>
 }

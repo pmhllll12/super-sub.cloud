@@ -9,6 +9,7 @@ import type {
   Contact,
   ContactRequest,
   UserSearchResult,
+  SquadCandidate,
   TeamMatchRequest,
   FeaturedVideo,
   Match,
@@ -437,6 +438,71 @@ const DEMO_DIRECTORY: UserSearchResult[] = [
   { id: '3f1c0000-0000-4000-8000-000000000007', nickname: '강도윤' },
   { id: '3f1c0000-0000-4000-8000-000000000008', nickname: '윤가온' },
 ]
+
+/**
+ * 추천 후보 명단 — `GET /teams/{id}/squad/candidates` 와 `GET /cards/{slug}/grade`
+ * 가 같이 읽는다 (계약 3-16·3-6절).
+ *
+ * 🔴 **전에는 이 사람들이 `SquadSuggest.tsx` 안에 있었다**(2026-09-16에 옮김).
+ * 화면이 명단과 **등급**을 들고 있으면 `USE_MOCK=0` 으로 바꿔도 지어낸 등급이
+ * 그대로 나온다 — 25·26번이 막으려던 것이 정확히 그것이다.
+ *
+ * 🔴 **`provisional: true` 를 섞어 둔다.** 지금 루브릭은 검수 전이라 진짜
+ * 서버도 대부분 `true` 를 낸다 — 그 갈래(「검수 전」 배지)를 개발 중에 한 번도
+ * 안 밟으면 진짜 서버에 붙는 날 그 표시가 없다는 것을 알게 된다.
+ *
+ * ⚠️ 말로 적은 특징(`title`·`notes`)과 대표 장면(`clip`)은 **여기 없다** —
+ * 계약 44번이 「지금은 mock 클립·문구를 그대로 쓰고 이름·등급만 이 응답으로」
+ * 라고 범위를 그었다. 그 셋은 아직 화면에 남아 있다.
+ */
+const DEMO_CANDIDATES_BY_POSITION: Record<string, SquadCandidate[]> = {
+  GK: [
+    candidate('김선우', 'A', true),
+    candidate('오재현', 'C', true),
+  ],
+  DF: [
+    candidate('박도현', 'S', false),
+    candidate('이건우', 'B', true),
+    candidate('정민석', 'C', true),
+    // 🔴 카드를 아직 안 만든 사람 — `card_public_slug` 가 `null` 이라 대표
+    //    영상도 못 읽는다. 링크를 안 그리는 것으로 충분하다(계약 44번).
+    { user_id: 'u-seo', nickname: '서준혁', card_public_slug: null, grade: 'D', provisional: true },
+  ],
+  MF: [
+    candidate('최유진', 'A', true),
+    candidate('강태원', 'B', true),
+    candidate('윤서준', 'C', true),
+  ],
+  FW: [
+    candidate('조현우', 'F', false),
+    candidate('임재민', 'A', true),
+    candidate('신동현', 'B', true),
+    candidate('문태호', 'C', true),
+    // 🔴 **등급을 모르는 사람**(대표 영상이 없거나 분석 전) — 뒤로 가되
+    //    사라지지 않는다. `F` 로 치지 않는 것이 26번의 「하지 말 것」이다.
+    { user_id: 'u-bae', nickname: '배준영', card_public_slug: 'bae-junyoung', grade: null, provisional: null },
+  ],
+}
+
+/** 한 줄 짓기 — 슬러그는 닉네임에서 만든다(mock 안에서만 통하는 규칙이다). */
+function candidate(
+  nickname: string,
+  grade: string,
+  provisional: boolean,
+): SquadCandidate {
+  return {
+    user_id: `u-${nickname}`,
+    nickname,
+    card_public_slug: `${nickname}-card`,
+    grade,
+    provisional,
+  }
+}
+
+/** 슬러그 → 등급을 찾을 때 쓰는 평평한 목록. */
+const DEMO_CANDIDATE_POOL: SquadCandidate[] = Object.values(
+  DEMO_CANDIDATES_BY_POSITION,
+).flat()
 
 /** 신청·수락된 지인. 프로세스가 사는 동안만 남는다. */
 const contacts = new Map<string, ContactRequest>()
@@ -1247,6 +1313,36 @@ export const mockBackend: Backend = {
   },
 
   /* ── 팀 대 팀 경기 신청 (계약 3-15절, CCC 42번) ─────────────────────── */
+
+  /* ── 표시 등급 · 추천 후보 (계약 3-6·3-16절, CCC 43·44번) ──────────────
+   *
+   * 🔴 **경계를 여기서 긋는다** — 진짜 서버가 Wilson 신뢰구간으로 계산하는
+   * 자리다. mock 은 그 결과만 흉내 내고, **화면은 어느 쪽이든 받아 쓰기만
+   * 한다**(그것이 25·26번의 「하지 말 것」이다).
+   *
+   * 🔴 `provisional: true` 를 **일부러 섞어 둔다** — 「검수 전」 배지가 개발
+   * 중에 한 번도 안 뜨면, 정상호가 조건으로 단 그 표시가 진짜 서버에 붙는 날
+   * 없다는 것을 알게 된다(팀 매칭 mock 이 5:5 만 채웠던 것과 같은 함정).
+   */
+
+  async getCardGrade(token, cardPublicSlug) {
+    requireUser(token)
+    const found = DEMO_CANDIDATE_POOL.find((c) => c.card_public_slug === cardPublicSlug)
+    // 모르는 슬러그는 **404 가 아니라 빈 등급**이다 — 계약이 「대표 영상이
+    // 없거나 분석 전」을 `null` 로 내기로 했고, 슬러그가 없는 것도 화면에서는
+    // 같은 뜻이다(보여 줄 등급이 없다).
+    return { grade: found?.grade ?? null, provisional: found?.provisional ?? null }
+  },
+
+  async listSquadCandidates(token, teamId, { position_code, grade }) {
+    const u = requireUser(token)
+    if (!u.teams.some((t) => t.team_id === teamId)) {
+      throw new BackendError(403, 'FORBIDDEN', '그 팀 소속이 아닙니다.')
+    }
+    const pool = DEMO_CANDIDATES_BY_POSITION[position_code] ?? []
+    if (!grade || grade === 'any') return pool
+    return pool.filter((c) => c.grade === grade)
+  },
 
   async requestTeamMatch(token, teamId, { target_team_id, played_at, place }) {
     const me = requireUser(token)

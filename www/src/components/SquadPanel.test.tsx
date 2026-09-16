@@ -44,6 +44,51 @@ const CARD: PlayerCard = {
   style: null,
 }
 
+/**
+ * 추천 후보 — **서버에서 온다**(2026-09-16, 계약 3-16절). 전에는
+ * `SquadSuggest.tsx` 안의 붙박이라 시험이 아무것도 안 세워도 됐다.
+ *
+ * 🔴 여기서 세우는 것은 **계약이 정한 응답 모양**이다. `provisional` 이
+ * 섞여 있어야 「검수 전」 배지 갈래를 밟는다(정상호 조건).
+ */
+const MY_TEAM_ID = 'team-mine'
+
+const CANDIDATES: Record<string, unknown[]> = {
+  GK: [
+    { user_id: 'u1', nickname: '김선우', card_public_slug: 'a', grade: 'A', provisional: true },
+    { user_id: 'u2', nickname: '오재현', card_public_slug: 'b', grade: 'C', provisional: true },
+  ],
+  MF: [
+    { user_id: 'u3', nickname: '최유진', card_public_slug: 'c', grade: 'A', provisional: true },
+    { user_id: 'u4', nickname: '강태원', card_public_slug: 'd', grade: 'B', provisional: false },
+    { user_id: 'u5', nickname: '윤서준', card_public_slug: 'e', grade: 'C', provisional: true },
+  ],
+  DF: [
+    { user_id: 'u6', nickname: '박도현', card_public_slug: 'f', grade: 'S', provisional: false },
+  ],
+  FW: [
+    { user_id: 'u7', nickname: '조현우', card_public_slug: 'g', grade: 'F', provisional: false },
+  ],
+}
+
+/** 후보 경로만 세운다 — 나머지 요청은 빈 것으로 답한다. */
+function stubCandidates() {
+  vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => {
+    const url = String(input)
+    const json = (b: unknown) => Promise.resolve(new Response(JSON.stringify(b), { status: 200 }))
+    if (url.includes('/squad/candidates')) {
+      const q = new URL(url, 'http://t').searchParams
+      const pos = q.get('position_code') ?? ''
+      const grade = q.get('grade')
+      const rows = (CANDIDATES[pos] ?? []) as { grade: string }[]
+      return json(grade ? rows.filter((r) => r.grade === grade) : rows)
+    }
+    if (url.startsWith('/api/me/contacts/requests')) return json([])
+    if (url.startsWith('/api/me/contacts')) return json({ items: [] })
+    return json([])
+  })
+}
+
 describe('스쿼드 — 서버에서 읽기', () => {
   // 🔴 09-03 에 `GET /teams/{id}/squad` 가 생겼다. 이게 없으면 화면은 다시
   // 새로고침마다 빈 판이 된다.
@@ -92,7 +137,8 @@ describe('스쿼드', () => {
   // 이름을 직접 적는 게 아니라 추천에서 고른다.
   it('빈 자리를 누르면 그 포지션의 추천 판이 나온다', async () => {
     const user = userEvent.setup()
-    render(<SquadPanel card={CARD} />)
+    stubCandidates()
+    render(<SquadPanel card={CARD} myTeamId={MY_TEAM_ID} />)
     await user.click(screen.getByRole('button', { name: 'GK 자리에 선수 넣기' }))
     expect(screen.getByRole('complementary', { name: 'GK 추천 선수' })).toBeInTheDocument()
     // 제목이 곧 몇 명이 왔는지다 — 자리마다 추천 수가 다르다.
@@ -103,7 +149,8 @@ describe('스쿼드', () => {
 
   it('자리마다 다른 추천이, 다른 수만큼 나온다', async () => {
     const user = userEvent.setup()
-    render(<SquadPanel card={CARD} />)
+    stubCandidates()
+    render(<SquadPanel card={CARD} myTeamId={MY_TEAM_ID} />)
     await user.click(screen.getAllByRole('button', { name: 'MF 자리에 선수 넣기' })[0])
     expect(screen.getByRole('heading', { name: 'AI 추천 MF 3명' })).toBeInTheDocument()
     expect(screen.getAllByRole('listitem')).toHaveLength(3)
@@ -111,7 +158,8 @@ describe('스쿼드', () => {
 
   it('추천에서 고르면 그 자리에 앉고 판이 닫힌다', async () => {
     const user = userEvent.setup()
-    render(<SquadPanel card={CARD} />)
+    stubCandidates()
+    render(<SquadPanel card={CARD} myTeamId={MY_TEAM_ID} />)
     await user.click(screen.getByRole('button', { name: 'DF 자리에 선수 넣기' }))
     await user.click(screen.getByRole('button', { name: /박도현/ }))
     expect(screen.getByRole('button', { name: '박도현 빼기' })).toBeInTheDocument()
@@ -132,7 +180,8 @@ describe('스쿼드', () => {
 
   it('넣은 선수를 눌러 뺀다', async () => {
     const user = userEvent.setup()
-    render(<SquadPanel card={CARD} />)
+    stubCandidates()
+    render(<SquadPanel card={CARD} myTeamId={MY_TEAM_ID} />)
     await user.click(screen.getByRole('button', { name: 'DF 자리에 선수 넣기' }))
     await user.click(screen.getByRole('button', { name: /박도현/ }))
     await user.click(screen.getByRole('button', { name: '박도현 빼기' }))
@@ -1113,5 +1162,101 @@ describe('스쿼드 — 지인 찾기는 서버를 부른다', () => {
         true,
       ),
     )
+  })
+})
+
+/**
+ * 🔴 **표시 등급은 서버가 낸다**(2026-09-16, 계약 3-6·3-16절 · 미결 paik 25·26번).
+ *
+ * 전에는 `SquadSuggest.tsx` 의 `SUGGESTIONS[].grade` 가 지어낸 값이었다. 이제
+ * 서버가 분석 등급(A~D) 위에 재매칭 의사의 Wilson 신뢰구간을 얹어 S~F 를
+ * 계산해서 준다 — **화면은 받아서 그리기만 한다.**
+ */
+describe('스쿼드 — 추천 판의 등급은 서버 값이다', () => {
+  let calls: string[]
+
+  beforeEach(() => {
+    calls = []
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input)
+      calls.push(url)
+      const json = (b: unknown) =>
+        Promise.resolve(new Response(JSON.stringify(b), { status: 200 }))
+      if (url.includes('/squad/candidates')) {
+        const grade = new URL(url, 'http://t').searchParams.get('grade')
+        const rows = [
+          { user_id: 'u1', nickname: '최유진', card_public_slug: 'c', grade: 'A', provisional: true },
+          { user_id: 'u2', nickname: '강태원', card_public_slug: 'd', grade: 'B', provisional: false },
+          // 🔴 등급을 모르는 사람 — 대표 영상이 없거나 아직 분석 전이다.
+          { user_id: 'u3', nickname: '이름없음', card_public_slug: null, grade: null, provisional: null },
+        ]
+        return json(grade ? rows.filter((r) => r.grade === grade) : rows)
+      }
+      return json([])
+    })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const openSuggest = async (user: ReturnType<typeof userEvent.setup>) => {
+    render(<SquadPanel card={CARD} myTeamId="team-mine" />)
+    await user.click(screen.getAllByRole('button', { name: 'MF 자리에 선수 넣기' })[0])
+  }
+
+  it('후보를 계약 경로로 받아 온다 — 붙박이가 아니다', async () => {
+    const user = userEvent.setup()
+    await openSuggest(user)
+    expect(await screen.findByText('최유진')).toBeInTheDocument()
+    expect(
+      calls.some((u) => u.includes('/api/teams/team-mine/squad/candidates?position_code=MF')),
+    ).toBe(true)
+  })
+
+  /**
+   * 🔴 **정상호가 조건으로 단 표시다**(2026-09-14). 지금 루브릭은
+   * `review_required: true` 라 남에게 보이는 등급이 잠정인데, 등급 문자만
+   * 보이면 받는 쪽은 확정으로 읽는다 — 남의 화면에 박힌 등급은 회수가 안 된다.
+   */
+  it('provisional 이면 등급 옆에 「검수 전」을 단다', async () => {
+    const user = userEvent.setup()
+    await openSuggest(user)
+    const row = (await screen.findByText('최유진')).closest('.ss-suggest-nameline')
+    expect(row).toHaveTextContent('A')
+    expect(row).toHaveTextContent('검수 전')
+
+    // 검수가 끝난 값에는 안 붙는다 — 늘 붙으면 표시가 뜻을 잃는다.
+    const done = screen.getByText('강태원').closest('.ss-suggest-nameline')
+    expect(done).toHaveTextContent('B')
+    expect(done).not.toHaveTextContent('검수 전')
+  })
+
+  /* 🔴 **모르는 등급을 `F` 로 치지 않는다**(26번의 「하지 말 것」) — 「없다」와
+     「낮다」는 다르다. 칸 자체를 안 그린다. */
+  it('등급을 모르는 후보는 등급 칸이 아예 없다', async () => {
+    const user = userEvent.setup()
+    await openSuggest(user)
+    const row = (await screen.findByText('이름없음')).closest('.ss-suggest-nameline')
+    expect(row?.querySelector('.ss-suggest-grade')).toBeNull()
+    expect(row).not.toHaveTextContent('F')
+  })
+
+  /* 🔴 **거르개는 서버로 간다.** 화면에서 거르면 「이 등급에 몇 명인가」가
+     받아 온 페이지 안에서만 맞는 값이 된다 — 계약이 하드 필터를 서버에 뒀다. */
+  it('등급을 고르면 그 값을 서버에 실어 보낸다', async () => {
+    const user = userEvent.setup()
+    await openSuggest(user)
+    await screen.findByText('최유진')
+    await user.click(screen.getByRole('button', { name: 'B' }))
+    await waitFor(() => expect(calls.some((u) => u.includes('grade=B'))).toBe(true))
+  })
+
+  /* 「상관없음」은 빈 값으로 나가면 안 된다 — `grade=` 는 없는 등급이라 422 다. */
+  it('「등급 상관없음」이면 grade 를 아예 안 싣는다', async () => {
+    const user = userEvent.setup()
+    await openSuggest(user)
+    await screen.findByText('최유진')
+    expect(calls.some((u) => u.includes('/squad/candidates') && u.includes('grade='))).toBe(false)
   })
 })

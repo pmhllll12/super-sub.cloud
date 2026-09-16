@@ -2570,6 +2570,28 @@ body::-webkit-scrollbar {
    빨강/초록이 「나쁨/좋음」으로 읽히는데, D 가 곧 못하는 사람이라는 뜻은
    아니다(아직 리뷰가 없어 F 인 사람도 있다 — `lib/playerGrade.ts`). 생김새는
    하나로 두고 **글자가 값을 말한다.** */
+/* 🔴 **검수 전 등급이라는 표시**(정상호 조건, 2026-09-14 · CCC 43번).
+   지금 루브릭은 `review_required: true` 라 남에게 보이는 등급이 잠정이다 —
+   등급 문자만 보이면 받는 쪽은 확정으로 읽고, **남의 화면에 박힌 등급은
+   회수가 안 된다.**
+
+   🔴 **강조색을 쓰지 않는다.** 등급 칩(민트)과 나란히 서는데 같은 색이면
+   둘이 한 덩어리로 읽혀 「검수 전 A」가 아니라 「A 등급의 한 종류」로 보인다.
+   회색으로 한 단 내려 **등급에 붙은 단서**로 읽히게 한다. */
+.ss-suggest-provisional {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 26%, transparent);
+  border-radius: 6px;
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1;
+  color: color-mix(in srgb, var(--ss-fg) 72%, transparent);
+  flex: none;
+}
+
 .ss-suggest-grade {
   display: inline-flex;
   align-items: center;

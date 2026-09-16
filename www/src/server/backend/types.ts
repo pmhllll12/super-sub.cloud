@@ -473,3 +473,39 @@ export type TeamMatchRequest = {
   /** 수락됐을 때만 찬다 — 확정된 경기 id. */
   match_id: string | null
 }
+
+/**
+ * 남의 **표시 등급** (계약 3-6절 `GET /cards/{slug}/grade`, CCC 43번).
+ *
+ * 🔴 **경계는 서버가 긋는다.** 분석 등급(`A`~`D`) 위에 재매칭 의사의 Wilson
+ * 95% 신뢰구간을 얹어 `S`~`F` 여섯을 서버가 계산한다 — 화면은 받기만 한다.
+ *
+ * 🔴 `provisional` 이 `true` 면 **검수 전 루브릭으로 낸 값**이다. 등급 문자만
+ * 떼어 쓰면 받는 쪽에서 잠정인지 알 방법이 없어진다 — 남의 화면에 박힌 등급은
+ * 회수가 안 된다(정상호 조건, 2026-09-14).
+ *
+ * `grade` 가 `null` 이면 대표 영상이 없거나 아직 분석 전이다. **`F` 로 치지
+ * 않는다** — 「없다」와 「낮다」는 다르다.
+ */
+export type CardGrade = {
+  grade: string | null
+  provisional: boolean | null
+}
+
+/**
+ * 빈 자리에 넣을 **추천 후보** 한 사람 (계약 3-16절, CCC 44번).
+ *
+ * 🔴 **순서가 곧 추천이다.** 서버가 이미 「이미 앉은 사람들의 등급 평균과
+ * 가까운 순」으로 정렬해서 준다 — 화면에서 다시 줄 세우지 않는다. 거리·유사도
+ * 점수는 응답에 없다(일부러 안 싣는다).
+ *
+ * ⚠️ `card_public_slug` 는 **아직 카드를 안 만든 사람이면 `null`** 이다.
+ * 대표 영상도 이 슬러그로만 읽으므로 그때는 영상이 없다.
+ */
+export type SquadCandidate = {
+  user_id: string
+  nickname: string
+  card_public_slug: string | null
+  grade: string | null
+  provisional: boolean | null
+}
