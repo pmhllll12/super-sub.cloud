@@ -7370,7 +7370,7 @@ EXAONE 의 NC 는 **모델 가중치**의 제약이었고, Gemini 무료 등급�
 
 - **위치**: `pending-archive.markdown`의 `## min` 구역으로 이동됨
 
-### 14. 정책 신설 — 빌드·구동은 k3s로만, docker-compose는 안 씁니다
+### 14. 정책 신설 — 빌드·구동은 k3s로만, docker-compose는 안 씁니다 ✅ 해소 (2026.09.16)
 
 11~13번 작업(AWS `supersub`·로컬 WSL에 k3s로 백엔드 올린 것)을 바탕으로
 정책과 재현 절차를 문서로 남겼습니다.
@@ -7398,25 +7398,26 @@ EXAONE 의 NC 는 **모델 가중치**의 제약이었고, Gemini 무료 등급�
 
 | 순서 | 무엇 | 확인 |
 |---|---|---|
-| 1 | `fastapi/Dockerfile` 을 저장소에 커밋 (지금 로컬에만 있음. 박민호 님이 EC2 에서 쓴 것과 사실상 동일 — `python:3.14-slim` + `requirements.lock.txt`) | `git -C fastapi ls-files Dockerfile` |
-| 2 | `fastapi/deploy/k8s/` 를 EC2 형태로 정리 — in-cluster pgvector 를 빼고 호스트 PostgreSQL 을 `hostNetwork` 또는 selector 없는 Service/Endpoints 로. `~/k3s-trial/` 사본이 갈리기 전에 이걸 정본으로 | 매니페스트가 레포에, `~/k3s-trial/` 은 이걸 참조 |
-| 3 | 이미지 레지스트리 전략 확정 — 박민호 님이 `c7e8b75` 로 Docker Hub pull 로 전환하셨으니 그걸 따름. 태그 규칙(커밋 SHA?)만 정하면 됨 | `deployment.md` 에 태그 규칙 |
+| 1 ✅ | `fastapi/Dockerfile` 을 저장소에 커밋 완료 (`d62803b`, 이후 `2781588` 로 좁힘) | `git -C fastapi ls-files Dockerfile` |
+| 2 ✅ | `fastapi/deploy/k8s/deployment.yaml` 을 EC2 형태(호스트 PostgreSQL을 `hostNetwork: true`로, in-cluster pgvector 없음)로 레포에 정본화 완료 (`baecb75`, `jin` 32번과 같은 커밋) | `git -C fastapi ls-files deploy/k8s/` |
+| 3 ✅ | 이미지 레지스트리 전략 확정 — Docker Hub `pmhllll12/supersub:latest` 고정 태그 + `supersub-cd.timer`가 2분마다 digest를 폴링해 감지하면 자체 재배포(커밋 SHA 태그가 아니라 digest 기반). `deployment.md`에 반영 | `deployment.md`에 태그 규칙 |
 | 4 ✅ | `docs/deployment.md` 재작성 완료 (정어진, 커밋 `a21af5f`) — 「현재 배포 — k3s + CD」 절 신설, 사람이 준비할 것 표(GitHub Secrets·확장·env·S3·백업), 옛 systemd 절차(0·3·6절)에 「롤백·최초 세팅」 배너, 6절 = 롤백 런북. 🔴 DB 는 파드로 안 옮김 명시. `test_docs_paths`·전체 pytest 통과 | — |
 | 5 ✅ | **cutover 완료** (박민호, 2026.09.11) — nginx `proxy_pass` 를 `:8000` → `:8080` 으로 전환(설정 백업 후 `nginx -t`·`reload`), 스모크(`/health` 200·`db_configured: true`, `/api/v1/positions`·`/api/v1/videos/public` 계약대로 401) 통과 후 `supersub-api.service` **disable + stop**(유닛 파일은 남김 — 롤백 경로). 상세는 `jin` 31번 | `curl https://<API 호스트>/health` → 200 · `systemctl is-enabled supersub-api` → disabled |
-| 6 | CI — `fastapi/**` 변경 시 이미지 빌드+push (`.github/workflows/`). 지금은 테스트만 돎 | 워크플로에 build job |
+| 6 ✅ | CI — `.github/workflows/backend-docker-build.yml` 신설(main에 `fastapi/**` push 시 빌드+Docker Hub push) | `.github/workflows/backend-docker-build.yml` 존재 |
 
-🔴 **2번(매니페스트를 저장소에 정본화)이 아직 안 된 채로 cutover가 먼저 됐습니다** —
+~~🔴 **2번(매니페스트를 저장소에 정본화)이 아직 안 된 채로 cutover가 먼저 됐습니다** —
 지금 도는 배포(`supersub-api-trial`, `default` 네임스페이스)가 서버의
-`~/k3s-trial/`에만 있고 git에 없습니다. 서비스에 영향은 없지만 재현 불가능한
-상태라 별도 항목(`jin` 32번)으로 남겼습니다.
+`~/k3s-trial/`에만 있고 git에 없습니다.~~ **✅ 해소 (2026.09.16)** — `jin` 32번
+회신대로 `baecb75`에서 정본화 완료.
 
 🔴 **Postgres 는 이 단계에서 안 옮깁니다** — 온박스 systemd Postgres 유지. DB 를
 파드/PV 로 옮기는 건 별도 결정이고 백업·볼륨 계획이 선행입니다(min 11 (A) 그대로).
 min 14 정책도 "빌드·구동"이라 앱이 대상이지 DB 스토리지는 아니라고 읽습니다 —
 아니면 알려 주세요.
 
-**1·2 는 지금 할 수 있습니다.** 3~6 은 EC2 가 켜져 있어야 하고 박민호 님과
-맞춰야 합니다(레지스트리·cutover 타이밍). 진행 신호 주시면 1·2 부터 하겠습니다.
+**처리**: 1~6번 전 단계 완료 확인 — Dockerfile(`d62803b`·`2781588`), 매니페스트
+정본화(`baecb75`), 레지스트리·태그 전략(Docker Hub `latest` + digest 폴링,
+`deployment.md`), CI 이미지 빌드(`backend-docker-build.yml`) 전부 실물 확인.
 
 - **담당**: 전체(박민호·백성검·정어진·정상호) · **제기**: 박민호 · **기한**: 확인되는 대로
 
@@ -7736,7 +7737,7 @@ Gemini 임베딩을 다시 계산합니다(포지션·시간만 바꾸면 임베
 - 관련: 18·19번(같은 세션에서 발견, 이 항목의 선행 조건) · `api-contract.md` 933절(3-3. 팀) · 흐름 A의 `applications`(방향은 반대지만 상태 전이 참고용) · `paik` 22번(팀 매칭 mock 표시 — 초대함 UI가 생기면 거기 mock도 같이 걷어야 함)
 - **담당**: 박민호(제품·화면) · 정어진(스키마·API, 착수 전 협의 필요) · **제기**: 박민호 · **기한**: 확인되는 대로
 
-### 21. `fastapi/CLAUDE.md`의 로컬 DB 안내가 실물과 다릅니다 — Docker인데 `pg_ctlcluster`로 적혀 있습니다 (2026-09-11 신설)
+### 21. `fastapi/CLAUDE.md`의 로컬 DB 안내가 실물과 다릅니다 — Docker인데 `pg_ctlcluster`로 적혀 있습니다 (2026-09-11 신설) ✅ 해소 (2026.09.16)
 
 `ho`·`jin`·`paik`을 `main`에 합친 뒤 로컬에서 백엔드 테스트를 돌리려다 걸렸습니다.
 `fastapi/CLAUDE.md`엔 "WSL은 자동 기동이 아니다 — `pg_ctlcluster 18 main start`(root)"
@@ -7758,6 +7759,9 @@ Gemini 임베딩을 다시 계산합니다(포지션·시간만 바꾸면 임베
 
 - 관련: `fastapi/CLAUDE.md` 상단 「DB가 필요하다」 절 · `fastapi/.env`
 - **담당**: 정어진(문서 확인·정정) · **제기**: 박민호 · **기한**: 확인되는 대로
+- **처리**: `fastapi/CLAUDE.md`의 DB 기동 안내를 환경별 확인 순서(DATABASE_URL 확인 →
+  Docker `supersub-postgres` 확인 → 네이티브 `pg_ctlcluster`)로 보강 — Docker인
+  환경도, 진짜 네이티브 설치인 환경도 모두 커버합니다. `e8fd06a`.
 
 ### 22. 분석한 영상 **두 편을 비교**해서 보고 싶습니다 (2026-09-11 신설)
 
