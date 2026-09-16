@@ -6,6 +6,7 @@ import { apiDelete, apiErrorMessage } from '@/lib/api/client'
 import Field from '@/components/ui/Field'
 import PillButton from '@/components/ui/PillButton'
 import { SECTION_GLASS } from './glass'
+import SearchablePref from './SearchablePref'
 
 /**
  * 계정 다루기 — 지금은 **탈퇴만** 있다.
@@ -17,7 +18,7 @@ import { SECTION_GLASS } from './glass'
  * 🔴 **평소에는 접혀 있다.** 프로필은 보여주는 화면인데 탈퇴는 되돌릴 수 없는
  * 동작이라, 단추가 늘 펴져 있으면 실수로 누를 자리가 늘 열려 있는 셈이다.
  */
-export default function AccountActions() {
+export default function AccountActions({ searchable }: { searchable: boolean }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -46,17 +47,26 @@ export default function AccountActions() {
     <section className="ss-profile-account" style={SECTION_GLASS}>
       <h2 className="ss-profile-h">계정</h2>
 
-      <button
-        type="button"
-        className="ss-profile-tab"
-        aria-expanded={open}
-        onClick={() => {
-          setOpen((v) => !v)
-          setError(null)
-        }}
-      >
-        회원 탈퇴
-      </button>
+      {/* 🔴 **공개 범위가 판의 왼쪽 위**다(사용자 요청, 2026-09-16). 평소에
+          보고 만지는 설정이라 위에 오고, 되돌릴 수 없는 탈퇴는 아래 구석으로
+          간다 — 자주 쓰는 것이 위, 위험한 것이 아래다. */}
+      <SearchablePref searchable={searchable} />
+
+      {/* 🔴 **오른쪽 아래**(사용자 요청). 판 안에서 제일 눈에 안 띄는 자리다 —
+          실수로 누를 자리가 늘 열려 있지 않게. */}
+      <div className="ss-profile-account-foot">
+        <button
+          type="button"
+          className="ss-profile-tab"
+          aria-expanded={open}
+          onClick={() => {
+            setOpen((v) => !v)
+            setError(null)
+          }}
+        >
+          회원 탈퇴
+        </button>
+      </div>
 
       {open && (
         <form onSubmit={onDelete} className="ss-profile-account-form">

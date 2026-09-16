@@ -54,8 +54,16 @@ export const fastapiBackend: Backend = {
     return callFastApi<User>('/me', { method: 'GET', token })
   },
 
-  updateMe(token, { nickname }) {
-    return callFastApi<User>('/me', { method: 'PATCH', token, body: { nickname } })
+  updateMe(token, input) {
+    // 🔴 **준 칸만 싣는다.** `undefined` 를 그대로 보내면 JSON 에서 사라지긴
+    //    하지만, 명시적으로 골라 담아야 "안 보낸 것은 안 바뀐다"가 코드에서도
+    //    읽힌다(계약이 그렇게 정했다).
+    const body: Record<string, unknown> = {}
+    if (input.nickname !== undefined) body.nickname = input.nickname
+    if (input.is_nickname_searchable !== undefined) {
+      body.is_nickname_searchable = input.is_nickname_searchable
+    }
+    return callFastApi<User>('/me', { method: 'PATCH', token, body })
   },
 
   async changePassword(token, body) {

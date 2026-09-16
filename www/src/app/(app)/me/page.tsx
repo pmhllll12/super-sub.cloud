@@ -158,7 +158,10 @@ export function MeBody({
               <MyMatches matches={matches} />
             </section>
 
-            <AccountActions />
+            {/* 🔴 **기본은 켜짐**이다. 옛 응답에 이 칸이 없을 수 있어
+                `?? true` 로 받는다 — 모른다고 꺼진 것으로 그리면 사실과
+                반대가 되고, 그 사람은 검색에 뜨는데 안 뜬다고 읽는다. */}
+            <AccountActions searchable={user.is_nickname_searchable ?? true} />
             </div>
           </div>
 

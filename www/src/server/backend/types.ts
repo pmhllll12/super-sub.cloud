@@ -19,6 +19,16 @@ export type User = {
   nickname: string
   created_at: string
   teams: Team[]
+  /**
+   * **지인 검색에 내 닉네임이 뜨는가** (계약 3-12절, CCC 37번). 기본은 `true`.
+   *
+   * 🔴 용병 매칭의 `is_searchable` 과 **다른 컬럼**이다 — 이쪽은 지인 찾기
+   * 노출이고 그쪽은 용병 후보 노출이다. 이름이 닮아 섞기 쉽다.
+   *
+   * ⚠️ 옛 응답에는 없을 수 있어 선택이다 — 없으면 **켜진 것으로 본다**(서버
+   * 기본값과 같게). 모른다고 꺼진 것으로 그리면 사실과 반대가 된다.
+   */
+  is_nickname_searchable?: boolean
 }
 
 /** POST /auth/signup 의 201 응답. teams 가 없다. */

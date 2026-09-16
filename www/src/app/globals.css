@@ -2594,6 +2594,109 @@ body::-webkit-scrollbar {
 
 /* 대표 영상을 아직 안 고른 사람 — 남의 영상을 대신 틀지 않는다. 칸은 그대로
    두고(줄 높이가 사람마다 튀지 않게) 없다는 말만 가운데 적는다. */
+/* ── 프로필의 공개 범위 스위치 ─────────────────────────────────────── */
+
+/* 🔴 **탈퇴는 판의 오른쪽 아래**(사용자 요청, 2026-09-16). 자주 쓰는 설정이
+   위, 되돌릴 수 없는 것이 아래 구석이다. */
+.ss-profile-account-foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
+.ss-pref-row {
+  display: flex;
+  /* 🔴 **가운데가 아니라 위로 붙인다.** 글이 두 줄이 되면 스위치가 가운데로
+     내려가 제목과 어긋난다 — 스위치는 제목 줄의 것이다. */
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ss-pref-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ss-pref-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ss-fg);
+}
+
+/* 🔴 **켜짐과 꺼짐의 뜻을 글로 적는다.** 스위치만 두면 「보이기」가 켜진 건지
+   꺼진 건지 눈으로만 알 수 있고, 무엇이 달라지는지는 아예 안 적힌다.
+
+   🔴 **한글 줄바꿈 둘을 함께 건다**(사용자 지적, 2026-09-16 — 마지막 줄에
+   「다.」만 남았다):
+
+     `word-break: keep-all`  어절 안에서 안 자른다. 기본값은 한글을 글자
+                             단위로 잘라서 「있습니 / 다.」 가 된다
+     `text-wrap: pretty`     마지막 줄에 한 조각만 남는 것(외톨이)을 피해
+                             앞 줄에서 미리 접는다
+
+   둘 다 필요하다 — `keep-all` 만으로는 어절이 안 쪼개질 뿐 외톨이는 남는다. */
+.ss-pref-note {
+  font-size: 0.75rem;
+  line-height: 1.6;
+  word-break: keep-all;
+  text-wrap: pretty;
+  color: color-mix(in srgb, var(--ss-fg) 68%, transparent);
+}
+
+.ss-pref-switch {
+  position: relative;
+  flex: none;
+  width: 46px;
+  height: 26px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 26%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ss-fg) 10%, transparent);
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease;
+}
+
+.ss-pref-switch[data-on='true'] {
+  border-color: color-mix(in srgb, var(--ss-accent) 60%, transparent);
+  background: color-mix(in srgb, var(--ss-accent) 30%, transparent);
+}
+
+.ss-pref-switch:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.ss-pref-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--ss-fg);
+  transition: transform 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.ss-pref-switch[data-on='true'] .ss-pref-knob {
+  transform: translateX(20px);
+  background: var(--ss-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-pref-knob {
+    transition: none;
+  }
+}
+
+.ss-pref-error {
+  margin-top: 10px;
+  font-size: 0.75rem;
+  color: #ff6b6b;
+}
+
 .ss-suggest-card-empty {
   display: flex;
   height: 100%;

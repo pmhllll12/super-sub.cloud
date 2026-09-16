@@ -37,7 +37,14 @@ export interface Backend {
   login(input: { email: string; password: string }): Promise<AuthToken>
   loginWithGoogle(input: { id_token: string }): Promise<AuthToken>
   getMe(token: string): Promise<User>
-  updateMe(token: string, input: { nickname: string }): Promise<User>
+  /**
+   * 내 정보를 고친다. **보낸 칸만 바뀐다** — 안 보낸 것은 그대로다(계약).
+   * 그래서 닉네임만 고칠 때 검색 노출을 실어 보내지 않는다.
+   */
+  updateMe(
+    token: string,
+    input: { nickname?: string; is_nickname_searchable?: boolean },
+  ): Promise<User>
   /** 🔴 성공하면 **기존 토큰이 전부 무효가 된다**(SEC-004) — 다시 로그인시켜야 한다. */
   changePassword(
     token: string,

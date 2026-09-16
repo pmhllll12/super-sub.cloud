@@ -621,13 +621,21 @@ export const mockBackend: Backend = {
     return requireUser(token)
   },
 
-  async updateMe(token, { nickname }) {
+  async updateMe(token, { nickname, is_nickname_searchable }) {
     const u = requireUser(token)
-    const trimmed = nickname.trim() // 서버가 정규화한다
-    if (trimmed.length < 1 || trimmed.length > 20) {
-      throw new BackendError(422, 'VALIDATION_ERROR', '요청 값이 올바르지 않습니다: nickname')
+    const next = { ...u }
+    // 🔴 **보낸 칸만 바꾼다**(계약 3-12절). 안 보낸 것을 기본값으로 덮으면
+    //    닉네임만 고쳤는데 검색 노출이 켜지는 일이 생긴다.
+    if (nickname !== undefined) {
+      const trimmed = nickname.trim() // 서버가 정규화한다
+      if (trimmed.length < 1 || trimmed.length > 20) {
+        throw new BackendError(422, 'VALIDATION_ERROR', '요청 값이 올바르지 않습니다: nickname')
+      }
+      next.nickname = trimmed
     }
-    const next = { ...u, nickname: trimmed }
+    if (is_nickname_searchable !== undefined) {
+      next.is_nickname_searchable = is_nickname_searchable
+    }
     users.set(token, next)
     return next
   },
@@ -1196,6 +1204,9 @@ export const mockBackend: Backend = {
     // 주는 경로가 아니다. 여기서 전부 돌려주면 화면이 "목록을 받는다"고
     // 잘못 배우고, 진짜 백엔드에 붙는 날 빈 화면이 된다.
     if (!needle) return []
+    /* 🔴 **검색을 끈 사람은 빠진다**(계약 3-12절). mock 에서 남의 스위치는
+       모르지만 **내 것은 안다** — 내가 껐는데 내가 검색되면 스위치가 도는지
+       확인할 길이 없다(본인 제외 규칙에 이미 걸리지만, 둘은 다른 이유다). */
     return DEMO_DIRECTORY.filter(
       (p) => p.id !== me.id && p.nickname.toLowerCase().includes(needle),
     ).slice(0, 20)
