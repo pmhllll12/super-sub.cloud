@@ -639,15 +639,23 @@ export const mockBackend: Backend = {
   async updateMe(token, { nickname, is_nickname_searchable }) {
     const u = requireUser(token)
     const next = { ...u }
-    // 🔴 **보낸 칸만 바꾼다**(계약 3-12절). 안 보낸 것을 기본값으로 덮으면
-    //    닉네임만 고쳤는데 검색 노출이 켜지는 일이 생긴다.
-    if (nickname !== undefined) {
-      const trimmed = nickname.trim() // 서버가 정규화한다
-      if (trimmed.length < 1 || trimmed.length > 20) {
-        throw new BackendError(422, 'VALIDATION_ERROR', '요청 값이 올바르지 않습니다: nickname')
-      }
-      next.nickname = trimmed
+    /* 🔴 **`nickname` 은 필수다**(2026-09-16 정정). 앞서 여기를 「보낸 칸만
+       바꾼다」로 고쳤던 것은 **틀렸다** — 실서버 `UpdateMeSchema` 는
+       `nickname: str = Field(min_length=1, …)` 로 **늘 받는다.** 선택인 것은
+       아래 `is_nickname_searchable` 쪽뿐이다.
+
+       🔴 그 사이 **개발에서만 돌고 배포에서 422 가 났다**(사용자가 겪음).
+       mock 이 계약보다 너그러우면 그 차이는 **배포에서만** 드러난다 — 이
+       파일 머리말이 「화면 쪽에 자리를 만들지 말 것」이라고 적어 둔 것과
+       같은 종류의 함정이다. */
+    if (nickname === undefined) {
+      throw new BackendError(422, 'VALIDATION_ERROR', '요청 값이 올바르지 않습니다: nickname')
     }
+    const trimmed = nickname.trim() // 서버가 정규화한다
+    if (trimmed.length < 1 || trimmed.length > 20) {
+      throw new BackendError(422, 'VALIDATION_ERROR', '요청 값이 올바르지 않습니다: nickname')
+    }
+    next.nickname = trimmed
     if (is_nickname_searchable !== undefined) {
       next.is_nickname_searchable = is_nickname_searchable
     }
