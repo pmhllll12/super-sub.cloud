@@ -12,6 +12,10 @@
        주기적으로 ──────┴─> claim ─> analyze_s3.py ─> PATCH(succeeded|failed)
                             └────────── 이 파일 ──────────┘
 
+같은 큐에 **검출(`detect`) 작업**도 온다 (미결 `ho` 44번). `claim` 응답의
+`job_type` 이 갈라 주고, 그때는 `detect_subjects.py` 를 불러 `detection_result`
+로 보고한다 — 새 큐도 새 폴링도 아니다.
+
 규격은 `fastapi/docs/worker-interface.md` 이고 정본은 `api-contract.md` 3-8절이다.
 
 ┌ 이 파일이 지키는 것 넷 ─────────────────────────────────────────────────┐
@@ -220,7 +224,8 @@ def report_key_from(result_path: Path, bucket: str) -> str | None:
 
 
 def report(cfg: Config, job_id: str, status: str, reason: str | None = None,
-           report_key: str | None = None) -> bool:
+           report_key: str | None = None,
+           detection_result: dict | None = None) -> bool:
     """결과를 보고한다. 보고가 안 되면 작업이 `running` 인 채로 남는다.
 
     claim 과 달리 **재시도한다.** 같은 것을 두 번 보고하면 409 로 돌아올 뿐
@@ -229,13 +234,19 @@ def report(cfg: Config, job_id: str, status: str, reason: str | None = None,
     `finished_at` 을 보내지 않는다. 서버가 찍는다 — 워커의 시계가 어긋나면
     소요 시간이 음수가 된다.
     """
-    payload: dict[str, str] = {"status": status}
+    payload: dict[str, object] = {"status": status}
     if reason:
         payload["failure_reason"] = reason[:FAILURE_REASON_MAX]
     # 🔴 성공한 작업에만 싣는다 — 실패했으면 가리킬 리포트가 없다.
     #    받는 칸은 정어진 님의 `FinishJobSchema` 다 (미결 `paik` 11번).
     if report_key and status == "succeeded":
         payload["report_key"] = report_key
+    # 🔴 `detect` 작업의 결과다 (미결 `ho` 44번). 같은 이유로 성공한 작업에만
+    #    싣는다. 🔴 **`report_key` 와 함께 실리는 일은 없다** — `detect` 는
+    #    리포트를 안 만들고, 받는 쪽이 `report_key` 를 보면 없는 S3 객체를
+    #    적재하려다 실패한다 (`worker-interface.md` 6절 「하지 말 것」).
+    if detection_result is not None and status == "succeeded":
+        payload["detection_result"] = detection_result
 
     for attempt in range(1, 4):
         try:
@@ -378,6 +389,55 @@ def analyze_command(cfg: Config, job: dict, rubric: Path,
     return cmd
 
 
+def detect_command(cfg: Config, job: dict, result_json: Path) -> list[str]:
+    """검출(`detect`) 작업의 명령줄 — `detect_subjects.py` 를 부른다.
+
+    🔴 **`analyze_s3.py` 와 인자가 겹치는 것이 없다.** 루브릭도 `--out` 도 안
+    준다 — 검출은 채점하지 않고 리포트도 안 만든다. `sport_code` 는 `detect`
+    작업에서 비어 있을 수 있어(`worker-interface.md` 6절 2번) **보지도 않는다.**
+
+    🔴 **`--at-ms` 는 `--subject-at-ms` 와 같은 값이어야 같은 프레임을 본다.**
+    화면이 이 목록에서 고른 박스를 그대로 분석에 넘기므로(왕복은
+    `tests/test_detect_candidates.py` 가 검사한다), 시각이 어긋나면 **다른
+    화면의 박스**를 분석에 주게 된다.
+    """
+    cmd = [
+        sys.executable,
+        str(ROOT / "scripts" / "detect_subjects.py"),
+        f"s3://{cfg.bucket}/{job['storage_key']}",
+        "--at-ms",
+        str(job["subject_at_ms"]),
+        # 자식이 후보를 여기 적는다. 🔴 **stdout 을 긁지 않는다** — 로그 문구가
+        # 바뀌면 깨진다(미결 `paik` 11번에서 배운 것이고 저쪽도 같은 형태다).
+        "--result-json",
+        str(result_json),
+    ]
+    if cfg.region:
+        cmd += ["--region", cfg.region]
+    return cmd
+
+
+def detection_result_from(result_path: Path) -> dict | None:
+    """자식이 적은 후보 JSON을 **그대로** 읽는다 (미결 `ho` 44번).
+
+    🔴 **변환하지 않는다.** 규격이 「`detect_subjects.py --result-json` 이 낸
+    JSON 그대로」다(`worker-interface.md` 6절 3번). 여기서 키를 고르거나 좌표를
+    손보면 **화면이 받는 박스와 분석이 받는 박스가 갈린다** — 그 왕복이 이
+    기능의 전부다.
+
+    못 읽거나 모양이 아니면 **None 이다.** 사람이 0명인 것은 정상이라 None 이
+    아니다 — 그 구분을 여기서 흐리면 검출이 놓친 영상이 실패로 보고된다.
+    """
+    try:
+        raw = json.loads(result_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(raw, dict) or "people" not in raw:
+        log(f"후보 파일의 모양이 다르다: {str(raw)[:120]}")
+        return None
+    return raw
+
+
 @dataclass(frozen=True)
 class Outcome:
     """분석 한 번의 결과. `note` 가 있으면 종료 코드보다 그쪽이 진짜 이유다 —
@@ -466,10 +526,112 @@ def failure_reason(outcome: Outcome) -> str:
     return f"종료 코드 {outcome.code}"
 
 
+def detect_failure_reason(outcome: Outcome) -> str:
+    """검출 실패의 사유. 🔴 **`failure_reason` 을 쓰지 않는다** — 코드 2의 뜻이
+    다르다. 분석의 2는 「품질 게이트 미달(다시 찍어야 한다)」이지만 검출의 2는
+    「그 시각의 프레임을 못 읽었다」다. 같은 문구를 내보내면 사용자가 멀쩡한
+    영상을 다시 찍는다 — 미결 41번이 그 형태의 실패다.
+
+    `detect_subjects.py` 가 「후보를 낼 수 없다: …」를 **이미 라벨까지 붙여**
+    찍으므로 여기서 또 붙이지 않는다.
+    """
+    if outcome.note:
+        tail = f" (마지막 출력: {outcome.last_line})" if outcome.last_line else ""
+        return f"{outcome.note}{tail}"
+    if outcome.last_line:
+        return f"검출 실패(종료 코드 {outcome.code}): {outcome.last_line}"
+    return f"검출 실패(종료 코드 {outcome.code})"
+
+
 # --- 한 건 처리 -----------------------------------------------------------
 
 
 def process(cfg: Config, job: dict, stopper: Stopper) -> None:
+    """작업 하나를 **종류에 맞는 쪽으로** 보낸다 (미결 `ho` 44번).
+
+    🔴 **`job_type` 을 안 보고 분석으로 통째로 처리하지 않는다.** `detect`
+    작업에는 `sport_code` 가 비어 있을 수 있어서, 그대로 분석에 넘기면 루브릭
+    단계에서 엉뚱한 사유로 죽거나 (최악의 경우) 조용히 틀린 것을 낸다
+    (`worker-interface.md` 6절 「하지 말 것」).
+
+    🔴 **모르는 종류는 추측하지 않는다.** 백엔드가 종류를 하나 더 늘렸는데
+    워커가 낡은 채로 돌면, 추측한 쪽은 **틀린 결과를 succeeded 로** 보고한다 —
+    그러면 큐는 줄고 사용자는 엉뚱한 것을 본다. failed 로 남기면 이유가 값에
+    남고 워커를 올린 뒤 다시 걸 수 있다.
+
+    필드가 아예 없으면 **분석이다** — 이 필드가 생기기 전의 백엔드가 그렇다
+    (`video_id` 와 같은 이유로 확인하고 읽는다).
+    """
+    job_type = str(job.get("job_type") or "analyze")
+    if job_type == "detect":
+        process_detect(cfg, job, stopper)
+        return
+    if job_type != "analyze":
+        reason = (f"모르는 작업 종류다: {job_type!r}. "
+                  "워커가 낡았을 수 있다 (analyze·detect 만 처리한다).")
+        log(f"작업 {job['job_id']} — {reason}")
+        report(cfg, job["job_id"], "failed", reason)
+        return
+    process_analysis(cfg, job, stopper)
+
+
+def process_detect(cfg: Config, job: dict, stopper: Stopper) -> None:
+    """검출 작업 하나 — 후보를 내고 `detection_result` 로 보고한다.
+
+    🔴 **`report_key` 를 싣지 않는다.** 검출은 리포트를 안 만든다.
+    🔴 **0명은 실패가 아니다.** 화면은 0명이면 드래그로 떨어지면 된다 —
+    실패로 만들면 화면이 「사람이 없습니다」로 막아 버린다.
+    """
+    job_id = job["job_id"]
+    at_ms = job.get("subject_at_ms")
+    log(f"작업 {job_id} — detect · {job.get('storage_key')} · {at_ms}ms")
+
+    if at_ms is None:
+        # 🔴 기본값으로 때우지 않는다. 시각을 지어내면 **화면이 본 것과 다른
+        #    프레임**의 후보를 내주고, 사용자는 자기가 보던 사람이 목록에 없는
+        #    이유를 알 수 없다. 백엔드는 이 값을 항상 준다(기본 1000ms).
+        reason = ("검출 시각(subject_at_ms)이 없다 — "
+                  "어느 화면에서 고르는지 정해지지 않는다")
+        log(f"작업 {job_id} 실패 — {reason}")
+        report(cfg, job_id, "failed", reason)
+        return
+
+    started = time.time()
+    with tempfile.TemporaryDirectory(prefix="supersub-detect-") as tmp:
+        result_json = Path(tmp) / "candidates.json"
+        try:
+            outcome = run_analysis(
+                detect_command(cfg, job, result_json), cfg.analyze_timeout, stopper
+            )
+        except Exception as exc:  # noqa: BLE001 — 실행 자체가 안 된 경우
+            log(f"검출을 실행하지 못했다: {type(exc).__name__}: {exc}")
+            report(cfg, job_id, "failed",
+                   f"검출 실행 실패: {type(exc).__name__}: {exc}")
+            return
+
+        elapsed = time.time() - started
+        if outcome.code != 0 or outcome.note:
+            reason = detect_failure_reason(outcome)
+            log(f"작업 {job_id} 실패 ({elapsed:.0f}초) — {reason}")
+            report(cfg, job_id, "failed", reason)
+            return
+
+        result = detection_result_from(result_json)
+        if result is None:
+            # 분석 쪽 `report_key` 와 같은 판단이다 — 실을 것이 없는 성공은
+            # 화면에서 영원히 빈 목록이고, 사용자에게는 다시 시도할 방법조차
+            # 안 보인다. 실패로 드러내면 적어도 다시 걸 수 있다.
+            reason = "검출은 끝났으나 후보를 못 읽었다 (위 로그 참고)"
+            log(f"작업 {job_id} 실패 처리 ({elapsed:.0f}초) — {reason}")
+            report(cfg, job_id, "failed", reason)
+            return
+
+        people = result.get("people") or []
+        log(f"작업 {job_id} 성공 ({elapsed:.0f}초) — 후보 {len(people)}명")
+        report(cfg, job_id, "succeeded", detection_result=result)
+
+
+def process_analysis(cfg: Config, job: dict, stopper: Stopper) -> None:
     """집은 작업 하나를 끝까지 처리한다 — **반드시 보고까지 간다.**
 
     여기서 예외가 새면 그 작업은 `running` 인 채로 영영 남는다(회수 규칙은 아직

@@ -7,8 +7,12 @@ import '../design_scale.dart';
 import '../theme/app_theme.dart';
 import '../../features/intro/presentation/brand_mark.dart';
 
-/// 하단 바와 로고 알약의 면 색 — 완전한 검정(2026-09-15, 유리였다).
-const Color kNavBarColor = Color(0xFF000000);
+/// 하단 바와 로고 알약의 면 색 — **진회색**(2026-09-16 사용자 지정.
+/// 유리 → 검정 → 진회색 순으로 왔다).
+///
+/// 🔴 홈 바탕이 완전한 검정이라 바까지 검정이면 바가 안 보인다. 홈의
+/// `_kSheetColor`(스쿼드 판 · 영상 분석 판)와 **같은 값**이다 — 넷이 한 켜다.
+const Color kNavBarColor = Color(0xFF1C1C1E);
 
 /// 바가 차지하는 높이(디자인 px). 시안 실측값이다.
 const double kBottomBarHeight = 155;

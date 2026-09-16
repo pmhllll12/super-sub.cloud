@@ -19,6 +19,16 @@ export type User = {
   nickname: string
   created_at: string
   teams: Team[]
+  /**
+   * **지인 검색에 내 닉네임이 뜨는가** (계약 3-12절, CCC 37번). 기본은 `true`.
+   *
+   * 🔴 용병 매칭의 `is_searchable` 과 **다른 컬럼**이다 — 이쪽은 지인 찾기
+   * 노출이고 그쪽은 용병 후보 노출이다. 이름이 닮아 섞기 쉽다.
+   *
+   * ⚠️ 옛 응답에는 없을 수 있어 선택이다 — 없으면 **켜진 것으로 본다**(서버
+   * 기본값과 같게). 모른다고 꺼진 것으로 그리면 사실과 반대가 된다.
+   */
+  is_nickname_searchable?: boolean
 }
 
 /** POST /auth/signup 의 201 응답. teams 가 없다. */
@@ -383,4 +393,150 @@ export type VideoReport = {
   scenes: ReportScene[]
   previews: Record<string, string> | null
   keypoint_quality: Record<string, unknown> | null
+}
+
+/**
+ * 지인 검색 결과 한 사람 (계약 3-12절, 2026-09-16).
+ *
+ * 🔴 **닉네임과 id 뿐이다.** 서버가 프로필·카드를 함께 주지 않는다 —
+ * 화면에서 더 보여 주고 싶으면 별도 경로로 따로 읽어야 한다.
+ */
+export type UserSearchResult = {
+  id: string
+  nickname: string
+}
+
+/**
+ * 수락된 지인 하나 (계약 3-12절).
+ *
+ * 🔴 `note` 는 **내가 신청자일 때만** 온다 — 상대 시점에서는 늘 `null` 이다.
+ * 버그가 아니다(계약이 그렇게 정했다). 화면이 `note` 없음을 오류로 다루면 안 된다.
+ */
+export type Contact = {
+  contact_id: string
+  user_id: string
+  nickname: string
+  note: string | null
+  accepted_at: string
+}
+
+/** 나에게 온 **대기중** 지인 신청 (계약 3-12절). 수락 전이라 `accepted_at` 은 늘 null 이다. */
+export type ContactRequest = {
+  id: string
+  requester_user_id: string
+  target_user_id: string
+  note: string | null
+  accepted_at: string | null
+  created_at: string
+}
+
+/**
+ * 알림 하나 (계약 3-12절).
+ *
+ * 🔴 **문구가 없다.** `type` · `actor_user_id` 만 오므로 문장은 화면이 조립한다 —
+ * 서버가 문장을 보낼 것이라고 가정하지 않는다.
+ */
+export type AppNotification = {
+  id: string
+  /**
+   * 🔴 **닫힌 목록으로 두지 않는다.** 계약이 "지금 나오는 것은 둘뿐"이라고
+   * 했지만 3-15절이 팀 경기 쪽 넷을 더 낸다 — 서버가 종류를 더 낼 때
+   * 화면이 파싱에서 죽으면 안 되므로 `string` 도 받는다(모르는 종류는
+   * 그리지 않고 넘긴다).
+   */
+  type:
+    | 'contact_request'
+    | 'contact_accepted'
+    | 'team_match_requested'
+    | 'team_match_accepted'
+    | 'team_match_rejected'
+    | 'team_match_cancelled'
+    | 'team_match_request_cancelled'
+    | (string & {})
+  actor_user_id: string
+  subject_type: string
+  subject_id: string
+  read_at: string | null
+  created_at: string
+}
+
+/**
+ * 팀이 팀에게 건 경기 신청 하나 (계약 3-15절, CCC 42번).
+ *
+ * 🔴 **개인이 모집 경기에 지원하는 것(3-5절)과 다른 개념이다.** 그쪽은 사람이
+ * 경기에 들어가는 것이고, 이쪽은 **스쿼드가 다 찬 두 팀이 맞붙는** 것이다 —
+ * 같은 화면에 섞으면 무엇을 수락하는 것인지가 흐려진다.
+ *
+ * `status` 가 `accepted` 가 되면 `match_id` 가 찬다. `cancelled` 는 **내가
+ * 무른 것이 아니라** 서버가 정리한 것일 수도 있다 — 한쪽이 다른 경기를
+ * 수락하면 그 팀의 남은 `pending` 이 전부 정리된다(이중 예약 방지).
+ */
+export type TeamMatchRequest = {
+  id: string
+  requester_team_id: string
+  target_team_id: string
+  proposed_played_at: string
+  proposed_place: string
+  status: 'pending' | 'accepted' | 'rejected' | 'cancelled'
+  created_at: string
+  responded_at: string | null
+  /** 수락됐을 때만 찬다 — 확정된 경기 id. */
+  match_id: string | null
+}
+
+/**
+ * 남의 **표시 등급** (계약 3-6절 `GET /cards/{slug}/grade`, CCC 43번).
+ *
+ * 🔴 **경계는 서버가 긋는다.** 분석 등급(`A`~`D`) 위에 재매칭 의사의 Wilson
+ * 95% 신뢰구간을 얹어 `S`~`F` 여섯을 서버가 계산한다 — 화면은 받기만 한다.
+ *
+ * 🔴 `provisional` 이 `true` 면 **검수 전 루브릭으로 낸 값**이다. 등급 문자만
+ * 떼어 쓰면 받는 쪽에서 잠정인지 알 방법이 없어진다 — 남의 화면에 박힌 등급은
+ * 회수가 안 된다(정상호 조건, 2026-09-14).
+ *
+ * `grade` 가 `null` 이면 대표 영상이 없거나 아직 분석 전이다. **`F` 로 치지
+ * 않는다** — 「없다」와 「낮다」는 다르다.
+ */
+export type CardGrade = {
+  grade: string | null
+  provisional: boolean | null
+}
+
+/**
+ * 빈 자리에 넣을 **추천 후보** 한 사람 (계약 3-16절, CCC 44번).
+ *
+ * 🔴 **순서가 곧 추천이다.** 서버가 이미 「이미 앉은 사람들의 등급 평균과
+ * 가까운 순」으로 정렬해서 준다 — 화면에서 다시 줄 세우지 않는다. 거리·유사도
+ * 점수는 응답에 없다(일부러 안 싣는다).
+ *
+ * ⚠️ `card_public_slug` 는 **아직 카드를 안 만든 사람이면 `null`** 이다.
+ * 대표 영상도 이 슬러그로만 읽으므로 그때는 영상이 없다.
+ */
+export type SquadCandidate = {
+  user_id: string
+  nickname: string
+  card_public_slug: string | null
+  grade: string | null
+  provisional: boolean | null
+}
+
+/**
+ * 팀 하나와 **현재 구성원** — `GET /teams/{id}` · `POST /teams` (계약 3-3절).
+ *
+ * ⚠️ `Team`(사용자의 소속 한 줄)과 다르다. 저쪽은 `GET /me` 가 주는 요약이고
+ * 이쪽은 팀 자신이다 — 나간 사람은 `members` 에 안 담긴다.
+ */
+export type TeamDetail = {
+  id: string
+  name: string
+  region: string
+  sport_code: string
+  members: {
+    user_id: string
+    nickname: string
+    role: string
+    joined_at: string
+    player_card_id: string | null
+    card_public_slug: string | null
+  }[]
 }

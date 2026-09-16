@@ -1,13 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import {
-  ANY_GRADE,
-  GRADES,
-  averageGrade,
-  type Grade,
-  type GradeFilter,
-} from '@/lib/playerGrade'
+import { useEffect, useState } from 'react'
+import { ANY_GRADE, GRADES, type GradeFilter } from '@/lib/playerGrade'
 
 /**
  * 스쿼드 판 오른쪽에서 나오는 추천 판 — 빈 자리를 누르면 그 포지션에
@@ -21,158 +15,114 @@ import {
  */
 
 /**
- * 🔴 `clip` 은 **그 사람의 대표 장면**이다(사용자 요청) — 빈 카드 대신 이것이
- * 보인다. 말로 적은 특징 옆에 우리가 분석한 장면이 같이 있어야 "AI 가
- * 골랐다"가 화면에서 성립한다(코치 목록이 같은 이유로 그렇게 되어 있다).
- * ⚠️ 지금은 저장소에 있는 클립 셋(`/coach-c00N.mp4`)을 **돌려 쓰는 자리
- * 표시**다 — 계약에 영상 조회가 없어서다(5장 ASM-003, 객체 저장소 미정).
- * `lib/feed.ts` 가 같은 파일을 같은 이유로 돌려 쓴다. 🔴 **영상 파일을 더
- * 넣지 말 것** — 저장소가 무거워진다(셋이 이미 16MB). 사람이 늘면 객체
- * 저장소 이야기를 먼저 꺼낸다.
- */
-/**
- * 🔴 `grade` 는 **mock 이다**(2026-09-11). 남의 등급을 읽을 경로가 계약에
- * 없다 — `GET /videos/{id}/report` 는 자기 영상만이고, 남의 것은 404 다.
- * 눈금과 「어떻게 정해지는가」는 `lib/playerGrade.ts` 에 적어 두었다.
+ * 사람마다 붙는 **말로 적은 특징과 대표 장면** — 아직 mock 이다.
  *
- * ⚠️ **S 와 F 를 일부러 섞어 두었다.** 서버는 지금 A~D 넷만 내므로, 그 둘이
- * 없으면 거르개의 두 칸이 개발 중에 한 번도 안 눌린다 — 팀 매칭 mock 이
- * 5:5 만 채워 뒀다가 7:7 로 바꾼 사람에게 빈 화면을 보인 것과 같은 함정이다.
+ * 🔴 **이름과 등급은 2026-09-16 에 진짜가 됐다**(계약 3-16절, CCC 44번).
+ * 걷어낸 것은 「누가 추천되는가」와 「그 사람 등급이 얼마인가」 둘이고, 계약
+ * 44번이 남은 범위를 그대로 그어 두었다:
+ *
+ * > `clip`·`title`·`notes` 는 이 응답에 없습니다 — 그건 별도 범위입니다.
+ * > 지금은 mock 클립·문구를 그대로 쓰고, **이름·등급만** 이 응답으로 바꿔
+ * > 주십시오.
+ *
+ * 그래서 이 표는 **닉네임으로 찾는 장식**이다. 서버가 준 후보의 닉네임이 여기
+ * 없으면 문구 없이 이름과 등급만 그린다 — 지어내지 않는다.
+ *
+ * ⚠️ 클립은 저장소의 셋(`/coach-c00N.mp4`)을 돌려 쓴다. 🔴 **영상 파일을 더
+ * 넣지 말 것** — 셋이 이미 16MB 다.
  */
-const SUGGESTIONS: Record<
-  string,
-  { name: string; title: string; notes: string[]; clip: string; grade: Grade }[]
-> = {
-  // 자리마다 추천 수가 다르다 — 분석에서 걸러진 만큼만 온다.
-  GK: [
-    {
-      name: '김선우',
-      grade: 'A',
-      clip: '/coach-c001.mp4',
-      title: '반응이 빠른',
-      notes: ['가까운 거리 슈팅 대응이 빠릅니다', '골문 앞을 넓게 씁니다'],
-    },
-    {
-      name: '오재현',
-      grade: 'C',
-      clip: '/coach-c002.mp4',
-      title: '공중볼에 강한',
-      notes: ['코너와 크로스에서 먼저 나옵니다', '수비와 말을 많이 맞춥니다'],
-    },
-  ],
-  DF: [
-    {
-      name: '박도현',
-      grade: 'S',
-      clip: '/coach-c003.mp4',
-      title: '몸싸움이 강한',
-      notes: ['1대1에서 잘 밀리지 않습니다', '세컨볼을 자주 따냅니다'],
-    },
-    {
-      name: '이건우',
-      grade: 'B',
-      clip: '/coach-c001.mp4',
-      title: '커버가 넓은',
-      notes: ['뒷공간을 미리 메웁니다', '옆 수비가 나갔을 때 자리를 채웁니다'],
-    },
-    {
-      name: '정민석',
-      grade: 'C',
-      clip: '/coach-c002.mp4',
-      title: '전진 패스가 좋은',
-      notes: ['수비에서 공격으로 한 번에 넘깁니다', '전환 순간에 앞을 먼저 봅니다'],
-    },
-    {
-      name: '서준혁',
-      grade: 'D',
-      clip: '/coach-c003.mp4',
-      title: '위치 선정이 좋은',
-      notes: ['라인을 잘 맞춥니다', '오프사이드를 유도합니다'],
-    },
-  ],
-  MF: [
-    {
-      name: '최유진',
-      grade: 'A',
-      clip: '/coach-c001.mp4',
-      title: '시야가 넓은',
-      notes: ['반대편 빈 공간을 자주 찾습니다', '한 박자 빠른 패스를 넣습니다'],
-    },
-    {
-      name: '강태원',
-      grade: 'B',
-      clip: '/coach-c002.mp4',
-      title: '10경기 연속',
-      notes: ['활동량이 많고 꾸준합니다', '수비 가담이 성실합니다'],
-    },
-    {
-      name: '윤서준',
-      grade: 'C',
-      clip: '/coach-c003.mp4',
-      title: '탈압박이 좋은',
-      notes: ['좁은 곳에서 공을 지킵니다', '몰리면 방향을 바꿔 빠져나옵니다'],
-    },
-  ],
-  FW: [
-    {
-      name: '조현우',
-      grade: 'F',
-      clip: '/coach-c001.mp4',
-      title: '슈팅이 매서운',
-      notes: ['박스 안에서 망설이지 않습니다', '왼발과 오른발을 모두 씁니다'],
-    },
-    {
-      name: '임재민',
-      grade: 'A',
-      clip: '/coach-c002.mp4',
-      title: '침투가 날카로운',
-      notes: ['뒷공간으로 먼저 달립니다', '수비 사이를 파고듭니다'],
-    },
-    {
-      name: '신동현',
-      grade: 'B',
-      clip: '/coach-c003.mp4',
-      title: '결정력이 좋은',
-      notes: ['적은 기회에서 마무리합니다', '몸을 등지고 받아 돌아섭니다'],
-    },
-    {
-      name: '문태호',
-      grade: 'C',
-      clip: '/coach-c001.mp4',
-      title: '연계가 좋은',
-      notes: ['등지고 받아 내주는 데 능합니다', '2대1을 잘 만듭니다'],
-    },
-    {
-      name: '배준영',
-      grade: 'A',
-      clip: '/coach-c002.mp4',
-      title: '스피드가 빠른',
-      notes: ['측면에서 한 번에 제칩니다', '역습 때 가장 먼저 달립니다'],
-    },
-  ],
+const FLAVOR: Record<string, { clip: string; title: string; notes: string[] }> = {
+  '김선우': {
+    clip: '/coach-c001.mp4',
+    title: '반응이 빠른',
+    notes: ['가까운 거리 슈팅 대응이 빠릅니다', '골문 앞을 넓게 씁니다'],
+  },
+  '오재현': {
+    clip: '/coach-c002.mp4',
+    title: '공중볼에 강한',
+    notes: ['코너와 크로스에서 먼저 나옵니다', '수비와 말을 많이 맞춥니다'],
+  },
+  '박도현': {
+    clip: '/coach-c003.mp4',
+    title: '몸싸움이 강한',
+    notes: ['1대1에서 잘 밀리지 않습니다', '세컨볼을 자주 따냅니다'],
+  },
+  '이건우': {
+    clip: '/coach-c001.mp4',
+    title: '커버가 넓은',
+    notes: ['뒷공간을 미리 메웁니다', '옆 수비가 나갔을 때 자리를 채웁니다'],
+  },
+  '정민석': {
+    clip: '/coach-c002.mp4',
+    title: '전진 패스가 좋은',
+    notes: ['수비에서 공격으로 한 번에 넘깁니다', '전환 순간에 앞을 먼저 봅니다'],
+  },
+  '서준혁': {
+    clip: '/coach-c003.mp4',
+    title: '위치 선정이 좋은',
+    notes: ['라인을 잘 맞춥니다', '오프사이드를 유도합니다'],
+  },
+  '최유진': {
+    clip: '/coach-c001.mp4',
+    title: '시야가 넓은',
+    notes: ['반대편 빈 공간을 자주 찾습니다', '한 박자 빠른 패스를 넣습니다'],
+  },
+  '강태원': {
+    clip: '/coach-c002.mp4',
+    title: '10경기 연속',
+    notes: ['활동량이 많고 꾸준합니다', '수비 가담이 성실합니다'],
+  },
+  '윤서준': {
+    clip: '/coach-c003.mp4',
+    title: '탈압박이 좋은',
+    notes: ['좁은 곳에서 공을 지킵니다', '몰리면 방향을 바꿔 빠져나옵니다'],
+  },
+  '조현우': {
+    clip: '/coach-c001.mp4',
+    title: '슈팅이 매서운',
+    notes: ['박스 안에서 망설이지 않습니다', '왼발과 오른발을 모두 씁니다'],
+  },
+  '임재민': {
+    clip: '/coach-c002.mp4',
+    title: '침투가 날카로운',
+    notes: ['뒷공간으로 먼저 달립니다', '수비 사이를 파고듭니다'],
+  },
+  '신동현': {
+    clip: '/coach-c003.mp4',
+    title: '결정력이 좋은',
+    notes: ['적은 기회에서 마무리합니다', '몸을 등지고 받아 돌아섭니다'],
+  },
+  '문태호': {
+    clip: '/coach-c001.mp4',
+    title: '연계가 좋은',
+    notes: ['등지고 받아 내주는 데 능합니다', '2대1을 잘 만듭니다'],
+  },
+  '배준영': {
+    clip: '/coach-c002.mp4',
+    title: '스피드가 빠른',
+    notes: ['측면에서 한 번에 제칩니다', '역습 때 가장 먼저 달립니다'],
+  },
 }
 
-/**
- * 이름으로 등급을 되짚는다 — 판에 앉은 사람의 등급을 알아내는 유일한 길이다.
- *
- * 🔴 **mock 을 뒤지는 함수다.** 서버가 남의 등급을 주기 시작하면 이 함수째
- * 지우고 그 값을 쓰면 된다 — 부르는 쪽(`SquadPanel`)은 안 고쳐도 된다.
- * ⚠️ 모르면 `null` 이다. 0(F)으로 치면 아직 분석을 안 한 사람이 팀 평균을
- * 끌어내린다(`averageGrade` 가 그래서 `null` 을 빼고 센다).
- */
-export function gradeOfPlayer(name: string): Grade | null {
-  for (const list of Object.values(SUGGESTIONS)) {
-    const hit = list.find((s) => s.name === name)
-    if (hit) return hit.grade
-  }
-  return null
+/** 후보 한 줄 — 서버가 주는 것(계약 3-16절)에 위 장식을 얹은 모양. */
+type Candidate = {
+  user_id: string
+  nickname: string
+  card_public_slug: string | null
+  grade: string | null
+  provisional: boolean | null
 }
+
+type State =
+  | { kind: 'loading' }
+  | { kind: 'ok'; list: Candidate[] }
+  | { kind: 'error'; message: string }
 
 export default function SquadSuggest({
   position,
   closing,
   me,
-  seated = [],
+  teamId,
   onPick,
   onClose,
 }: {
@@ -183,40 +133,157 @@ export default function SquadSuggest({
    * (사용자 요청, 2026-09-08). 사람마다 자기 `/me` 에서 한 편을 고르고,
    * 이 판이 그 사람의 그 장면을 튼다는 뜻이다.
    *
-   * ⚠️ **남의 것은 아직 못 읽는다** — 계약에 「대표」 표시도, 남의 영상을
-   * 읽을 경로도 없다(미결). 그래서 지금 실제로 갈리는 것은 내 것뿐이고,
-   * 나머지는 저장소의 자리 표시 클립 그대로다.
+   * ⚠️ **남의 것은 아직 이 판에 안 붙였다** — 후보 응답의 `card_public_slug`
+   * 로 `GET /cards/{slug}/featured-video` 를 부르면 되지만, 계약 44번이
+   * 「지금은 mock 클립을 그대로」로 범위를 그어서 그 줄은 남겨 두었다.
    */
   me?: { nickname: string; clip: string | null } | null
   /**
-   * 이미 판에 앉은 사람들의 등급 — **거르개의 첫 값을 정하는 데만** 쓴다
-   * (사용자 요청: 넷이 찼고 하나를 더 구할 때 그 넷의 평균과 비슷한 등급을
-   * 보여 준다). 등급을 모르는 사람은 `null` 로 넘긴다 — `averageGrade` 가
-   * 셈에서 뺀다.
-   *
-   * 🔴 **나중에 RAG 가 할 일의 자리다.** 지금은 등급 하나로만 좁히지만,
-   * 「비슷하다」의 기준은 서버가 정해야 한다(미결).
+   * 내 팀 id — 후보는 이 팀 밑에서 찾는다(계약 3-16절). `null` 이면 아직 못
+   * 읽었거나 팀이 없다 — 그때는 「후보가 없다」가 아니라 **못 물어본 것**이라
+   * 그렇게 적는다.
    */
-  seated?: (Grade | null)[]
+  teamId?: string | null
   /** 닫히는 중 — 사라지는 동안에도 DOM 에 남아 있어야 애니메이션이 보인다. */
   closing: boolean
   onPick: (name: string) => void
   onClose: () => void
 }) {
-  const all = SUGGESTIONS[position] ?? []
+  /* 🔴 **첫 값은 「상관없음」이다**(2026-09-16에 바뀜). 전에는 판에 앉은
+     사람들의 평균을 화면에서 계산해 첫 값으로 썼는데, 이제 **서버가 그 평균과
+     가까운 순으로 정렬해서** 준다 — 화면이 다시 계산하면 두 곳이 갈린다
+     (계약 44번의 「하지 말 것」). */
+  const [grade, setGrade] = useState<GradeFilter>(ANY_GRADE)
+  const [state, setState] = useState<State>({ kind: 'loading' })
+  /**
+   * 후보의 **대표 영상 주소** — `user_id` → 재생 URL (계약 3-6절).
+   *
+   * 🔴 **후보 응답에는 영상이 없다.** `card_public_slug` 로 한 사람씩 따로
+   * 물어야 한다 — 그래서 목록이 먼저 뜨고 영상이 나중에 채워진다(빈 칸이
+   * 잠깐 보이는 것이 정상이다).
+   *
+   * ⚠️ 이 주소는 **사전 서명 URL 이라 만료된다**(`expires_in`, 보통 15분).
+   * 판을 여는 동안만 쓰고 어디에도 오래 담아 두지 않는다.
+   */
+  const [clips, setClips] = useState<Record<string, string>>({})
+  /**
+   * 후보가 **직접 적은 호칭** — `user_id` → 첫 호칭 (미결 `paik` 36번).
+   *
+   * 🔴 후보 응답에 없어서 `card_public_slug` 로 따로 읽는다(대표 영상과 같다).
+   * 카드의 `titles[0].label` 이다 — 사람이 적은 글이라 **지어내지 않는다**.
+   */
+  const [titles, setTitles] = useState<Record<string, string>>({})
 
-  /* 🔴 **첫 값은 팀 평균이다**(사용자 요청). 아무도 등급이 없으면 「상관없음」
-     으로 연다 — 모르는 것을 기준으로 좁히면 빈 화면만 남는다. */
-  const [grade, setGrade] = useState<GradeFilter>(() => averageGrade(seated) ?? ANY_GRADE)
+  /* 🔴 **거르개를 서버에 넘긴다.** 화면에서 거르면 「이 등급에 몇 명인가」가
+     받아 온 페이지 안에서만 맞는 값이 된다 — 계약이 하드 필터를 서버에 두었다. */
+  useEffect(() => {
+    if (!teamId) {
+      // 물어볼 곳이 없다 — 「후보가 없다」와 갈라 적는다. 규칙은 effect 안의
+      // 동기 setState 를 싫어하지만, 여기는 부를 것이 아예 없는 갈래다.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setState({ kind: 'error', message: '팀을 먼저 만들어야 후보를 찾습니다.' })
+      return
+    }
+    let alive = true
+    setState({ kind: 'loading' })
+    void (async () => {
+      try {
+        const q = new URLSearchParams({ position_code: position })
+        if (grade !== ANY_GRADE) q.set('grade', grade)
+        const res = await fetch(
+          `/api/teams/${encodeURIComponent(teamId)}/squad/candidates?${q}`,
+        )
+        const body: unknown = await res.json().catch(() => null)
+        if (!alive) return
+        if (!res.ok) {
+          const msg =
+            typeof body === 'object' && body !== null && 'error' in body
+              ? ((body as { error?: { message?: string } }).error?.message ?? null)
+              : null
+          setState({ kind: 'error', message: msg ?? '후보를 가져오지 못했습니다.' })
+          return
+        }
+        setState({ kind: 'ok', list: Array.isArray(body) ? (body as Candidate[]) : [] })
+      } catch {
+        if (alive) setState({ kind: 'error', message: '후보를 가져오지 못했습니다.' })
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [teamId, position, grade])
 
-  /* ⚠️ **안 맞는 사람을 목록에서 뺀다.** 팀 매칭의 「비슷한 팀」과 반대
-     판단인데, 거기는 사람이 적어 놓은 조건이라 조금 틀렸을 수 있었고
-     여기는 **사람이 방금 누른 값**이라 뜻이 분명하다. */
-  const list = grade === ANY_GRADE ? all : all.filter((s) => s.grade === grade)
+  const list = state.kind === 'ok' ? state.list : []
 
-  /** 이 후보가 틀 장면 — 나라면 내가 고른 것, 아니면 자리 표시. */
-  const clipFor = (name: string, fallback: string) =>
-    me && me.clip && name === me.nickname ? me.clip : fallback
+  /* 🔴 **목록을 기다렸다가 영상을 받는다.** 후보마다 요청이 하나씩 더 나가지만
+     (계약이 목록에 영상을 안 실었다), 목록을 그것 때문에 늦추지는 않는다 —
+     이름과 등급이 먼저 서고 영상이 뒤따라 채워진다. */
+  useEffect(() => {
+    if (state.kind !== 'ok') return
+    const withCard = state.list.filter((c) => c.card_public_slug)
+    if (withCard.length === 0) return
+    let alive = true
+    void (async () => {
+      const found = await Promise.all(
+        withCard.map(async (c) => {
+          try {
+            const res = await fetch(
+              `/api/cards/${encodeURIComponent(c.card_public_slug as string)}/featured-video`,
+            )
+            // 🔴 **404 는 오류가 아니다** — 대표 영상을 아직 안 고른 사람이다
+            //    (계약 3-6절 `NO_FEATURED_VIDEO`). 조용히 넘긴다.
+            if (!res.ok) return null
+            const body = (await res.json().catch(() => null)) as { url?: string } | null
+            return body?.url ? ([c.user_id, body.url] as const) : null
+          } catch {
+            return null
+          }
+        }),
+      )
+      if (!alive) return
+      const next = Object.fromEntries(found.filter((x): x is readonly [string, string] => !!x))
+      setClips(next)
+
+      /* 🔴 **호칭도 같이 읽는다**(미결 `paik` 36번) — 후보 응답에 없어서
+         카드로 한 번 더 묻는다. 대표 영상과 **따로** 부르는 이유는 둘이
+         다른 경로이고(`/featured-video` · `/cards/{slug}`), 한쪽이 404 여도
+         다른 쪽은 있을 수 있어서다. */
+      const named = await Promise.all(
+        withCard.map(async (c) => {
+          try {
+            const r = await fetch(`/api/cards/${encodeURIComponent(c.card_public_slug as string)}`)
+            if (!r.ok) return null
+            const b = (await r.json().catch(() => null)) as { titles?: { label: string }[] } | null
+            const label = b?.titles?.[0]?.label?.trim()
+            return label ? ([c.user_id, label] as const) : null
+          } catch {
+            return null
+          }
+        }),
+      )
+      if (!alive) return
+      setTitles(Object.fromEntries(named.filter((x): x is readonly [string, string] => !!x)))
+    })()
+    return () => {
+      alive = false
+    }
+  }, [state])
+
+  /**
+   * 이 후보가 틀 장면 — 나라면 내가 고른 것, 아니면 **아는 자리 표시만**.
+   *
+   * 🔴 **모르는 사람에게 아무 클립이나 붙이지 않는다.** 전에는 자리 표시
+   * 하나로 떨어뜨렸는데(`?? '/coach-c001.mp4'`), 그러면 **진짜 사용자 전원**
+   * 에게 남의 농구 영상이 「그 사람 대표 장면」으로 붙는다 — 이름과 등급이
+   * 진짜가 된 지금은 그 옆의 가짜 영상이 진짜로 읽힌다. 없으면 없다고 한다.
+   */
+  const clipFor = (c: Candidate): string | null => {
+    // 내가 방금 고른 것이 가장 최신이다 — 서버 값보다 앞선다.
+    if (me && me.clip && c.nickname === me.nickname) return me.clip
+    // 🔴 그다음이 **진짜 대표 영상**이다. `FLAVOR` 는 맨 뒤 — 그것은 화면
+    //    mock 이라, 진짜가 있으면 진짜가 이겨야 한다.
+    return clips[c.user_id] ?? FLAVOR[c.nickname]?.clip ?? null
+  }
 
   return (
     <aside
@@ -271,12 +338,22 @@ export default function SquadSuggest({
         ))}
       </div>
 
-      {/* 🔴 **빈 목록을 말없이 두지 않는다.** 좁혀서 아무도 안 남은 것과
-          그 자리에 원래 후보가 없는 것은 다르다 — 뒤엣것이면 등급을 바꿔도
-          소용없다는 뜻이라, 사람이 알아야 할 정보가 갈린다. */}
-      {list.length === 0 && (
+      {/* 🔴 **넷을 갈라 적는다.** 받아 오는 중 · 못 받은 것 · 좁혀서 아무도
+          안 남은 것 · 그 자리에 원래 후보가 없는 것은 서로 다른 뜻이고, 사람이
+          다음에 할 일이 갈린다(등급을 넓힐지, 기다릴지, 포기할지). */}
+      {state.kind === 'loading' && (
         <p className="ss-suggest-empty" role="status">
-          {all.length === 0
+          후보를 찾고 있습니다…
+        </p>
+      )}
+      {state.kind === 'error' && (
+        <p className="ss-suggest-empty" role="alert">
+          {state.message}
+        </p>
+      )}
+      {state.kind === 'ok' && list.length === 0 && (
+        <p className="ss-suggest-empty" role="status">
+          {grade === ANY_GRADE
             ? '이 자리에 맞는 추천이 아직 없습니다.'
             : '이 등급에 맞는 사람이 없습니다 — 등급을 넓혀 보세요.'}
         </p>
@@ -287,7 +364,7 @@ export default function SquadSuggest({
           /* 차례로 들어온다 — 판만 통째로 나타나면 툭 튀어나온 느낌이다.
              순번은 CSS 가 지연으로 쓴다(--ss-i). */
           <li
-            key={s.name}
+            key={s.user_id}
             style={{ '--ss-i': i } as React.CSSProperties}
             // 🔴 **가져다 대면 돈다**(사용자 요청). 판이 나올 때는 멈춰 있다
             //    — `autoPlay` 를 안 주는 것이 그 뜻이다. 훑어보는 동안 장면이
@@ -309,7 +386,11 @@ export default function SquadSuggest({
               v.currentTime = 0
             }}
           >
-            <button type="button" className="ss-suggest-item" onClick={() => onPick(s.name)}>
+            <button
+              type="button"
+              className="ss-suggest-item"
+              onClick={() => onPick(s.nickname)}
+            >
               {/* 🔴 빈 선수 카드가 있던 자리다 — **그 사람의 대표 장면**으로
                   바꿨다(사용자 요청). 카드는 아직 없는 것을 그리는 표식이었고,
                   장면은 실제로 보여 줄 것이 있다.
@@ -318,14 +399,20 @@ export default function SquadSuggest({
                   전체를 넣고 남는 곳은 검게 둔다(`object-fit: contain`, 바탕은
                   globals.css). 클립마다 비율이 달라서(세로 1080×1920 · 가로
                   1280×720) 채우려면 어느 쪽이든 사람이 잘린다. */}
-              <span className="ss-suggest-card" aria-hidden="true">
+              <span className="ss-suggest-card" aria-hidden={clipFor(s) ? true : undefined}>
+                {clipFor(s) === null ? (
+                  /* 🔴 **없으면 없다고 적는다.** 대표 영상을 아직 안 고른
+                     사람이다 — 남의 영상을 대신 틀면 그것이 이 사람 장면으로
+                     읽힌다(이름·등급이 진짜라서 더 그렇다). */
+                  <span className="ss-suggest-card-empty">아직 대표 영상이 없습니다</span>
+                ) : (
                 <video
                   // 🔴 주소 뒤의 `#t=0.1` 은 "0.1초 자리를 보여 달라"는 뜻이다.
                   //    이게 없으면 브라우저가 `preload="metadata"` 만 보고 **그림은
                   //    안 그려서** 멈춰 있는 동안 칸이 검게만 남는다(코치 목록에서
                   //    같은 것을 겪었다). 0 이 아니라 0.1 인 것은 맨 첫 칸이 검은
                   //    영상이 흔해서다.
-                  src={`${clipFor(s.name, s.clip)}#t=0.1`}
+                  src={`${clipFor(s)}#t=0.1`}
                   // 🔴 `autoPlay` 를 주지 않는다 — 판이 나올 때는 멈춰 있어야 한다.
                   //    🔴 `muted` 없이는 브라우저가 재생을 막고, `playsInline` 이
                   //    없으면 iOS 가 전체 화면으로 띄운다.
@@ -334,24 +421,46 @@ export default function SquadSuggest({
                   playsInline
                   preload="metadata"
                 />
+                )}
               </span>
               <span className="ss-suggest-text">
                 {/* 🔴 이름과 등급을 **한 줄에** 둔다(사용자 요청) — 등급을
                     따로 떼면 누구의 등급인지 한 번 더 짚어야 한다. */}
                 <span className="ss-suggest-nameline">
-                  <span className="ss-suggest-name">{s.name}</span>
-                  <span className="ss-suggest-grade" data-grade={s.grade}>
-                    {s.grade}
+                  <span className="ss-suggest-name">{s.nickname}</span>
+                  {/* 🔴 **등급을 모르면 칸을 안 그린다** — 대표 영상이 없거나
+                      아직 분석 전이라는 뜻이고, `F` 로 치면 「없다」가 「낮다」가
+                      된다(26번의 「하지 말 것」). */}
+                  {s.grade && (
+                    <span className="ss-suggest-grade" data-grade={s.grade}>
+                      {s.grade}
+                    </span>
+                  )}
+                  {/* 🔴 **검수 전 값이면 반드시 그렇게 적는다**(정상호 조건,
+                      2026-09-14). 지금 루브릭은 `review_required: true` 라 남에게
+                      보이는 등급이 잠정이다 — 등급 문자만 떼어 보이면 받는 쪽은
+                      확정으로 읽고, 남의 화면에 박힌 등급은 회수가 안 된다. */}
+                  {s.provisional && <span className="ss-suggest-provisional">검수 전</span>}
+                </span>
+                {/* 🔴 **그 사람이 적은 호칭이 먼저다.** `FLAVOR` 는 화면 mock
+                    이라 진짜가 있으면 진짜가 이긴다(대표 영상과 같은 순서). */}
+                {(titles[s.user_id] || FLAVOR[s.nickname]?.title) && (
+                  <span className="ss-suggest-title">
+                    {titles[s.user_id] ?? FLAVOR[s.nickname].title}
                   </span>
-                </span>
-                <span className="ss-suggest-title">{s.title}</span>
-                {/* 영상 분석이 정리한 특징 — 수치가 아니라 말로 적는다
-                    (카드에 수치를 그리지 않는 규칙과 같은 이유). */}
-                <span className="ss-suggest-notes">
-                  {s.notes.map((n) => (
-                    <span key={n}>{n}</span>
-                  ))}
-                </span>
+                )}
+                {FLAVOR[s.nickname] && (
+                  <>
+                    {/* 영상 분석이 정리한 특징 — 수치가 아니라 말로 적는다
+                        (카드에 수치를 그리지 않는 규칙과 같은 이유).
+                        ⚠️ 아직 mock 이다 — 계약 44번이 그은 범위다. */}
+                    <span className="ss-suggest-notes">
+                      {FLAVOR[s.nickname].notes.map((n) => (
+                        <span key={n}>{n}</span>
+                      ))}
+                    </span>
+                  </>
+                )}
               </span>
             </button>
           </li>
