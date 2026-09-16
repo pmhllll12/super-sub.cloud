@@ -156,10 +156,14 @@ describe('프로필 — 팀 만들기가 나오는 때', () => {
     expect(line?.querySelector('button')).toHaveTextContent('팀 나가기')
   })
 
-  it('팀이 없으면 무엇이 막히는지 적는다', () => {
+  /* 🔴 **정정 (2026-09-16, 사용자 요청)**: 앞서 「팀을 만들어야 스쿼드와 경기
+     신청을 쓸 수 있습니다」까지 적게 붙들던 것을 걷었다 — 바로 아래에 「팀
+     만들기」 단추가 서 있어 **같은 말을 두 번** 하는 자리였다. */
+  it('팀이 없으면 한 줄로만 적고 만들 자리를 낸다', () => {
     render(<TeamActions teams={[]} userId="u1" />)
     expect(screen.getByRole('button', { name: '팀 만들기' })).toBeInTheDocument()
-    expect(screen.getByText(/팀을 만들어야/)).toBeInTheDocument()
+    expect(screen.getByText('아직 소속된 팀이 없습니다.')).toBeInTheDocument()
+    expect(screen.queryByText(/팀을 만들어야/)).toBeNull()
   })
 
   /* 🔴 **홈은 한 팀만 그린다.** 만들 수 있게 열었으니 고를 자리도 있어야

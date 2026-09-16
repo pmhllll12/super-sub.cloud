@@ -84,12 +84,11 @@ export default function TeamActions({
   return (
     <>
       {teams.length === 0 ? (
-        /* 🔴 **팀이 없으면 이 서비스가 거의 안 돈다** — 스쿼드 · 경기 신청 ·
-           알림이 전부 팀 밑이다. 「없습니다」로 끝내지 않고 무엇이 막히는지
-           적는다. */
-        <p className="ss-profile-muted">
-          아직 소속된 팀이 없습니다. 팀을 만들어야 스쿼드와 경기 신청을 쓸 수 있습니다.
-        </p>
+        /* 🔴 **한 줄로 끝낸다**(사용자 요청, 2026-09-16). 앞서 여기에
+           「팀을 만들어야 스쿼드와 경기 신청을 쓸 수 있습니다」를 덧붙여
+           무엇이 막히는지 적었는데, 바로 아래에 **「팀 만들기」 단추가 이미
+           서 있어서** 같은 말을 두 번 하는 자리였다. */
+        <p className="ss-profile-muted">아직 소속된 팀이 없습니다.</p>
       ) : (
         <ul className="ss-profile-teams">
           {teams.map((t) => (

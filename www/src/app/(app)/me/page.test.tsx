@@ -146,18 +146,20 @@ describe('내 프로필 — /me', () => {
 
   // 개수를 적던 '호칭 2' 배지는 걷어냈다(공유와 함께) — 남은 자리는
   // 정보 절 하나뿐이라, 비었을 때 알려 주는 것도 거기다.
-  /* 🔴 **「없음」을 부정적으로 적지 않는다**(계약 4장) — 빈 것은 정상이다.
-     「받은」에서 「정한」으로 바뀐 것은 사람이 직접 적게 되어서다(36번). */
-  it('호칭이 없으면 정보 절에서 그렇게 알려준다', () => {
+  /* 🔴 **정정 (2026-09-16, 사용자 요청)**: 빈 호칭을 말로 알리던 것을 걷었다 —
+     바로 옆 「호칭 정하기」 단추가 이미 그 말을 한다. 미달 표식을 대신 두지
+     않는 것(계약 4장)은 그대로다. */
+  it('호칭이 없으면 정하는 자리만 내고 빈 것을 말하지 않는다', () => {
     render(<MeBody user={USER} card={CARD} videos={[]} matches={[]} />)
-    expect(screen.getByText('아직 정한 호칭이 없습니다.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '호칭 정하기' })).toBeInTheDocument()
+    expect(screen.queryByText(/호칭이 없습니다/)).toBeNull()
   })
 
-  it('소속 팀이 없으면 그렇게 알려준다', () => {
+  it('소속 팀이 없으면 한 줄로만 알려준다', () => {
     render(<MeBody user={USER} card={CARD} videos={[]} matches={[]} />)
-    // 🔴 「없습니다」로 끝내지 않는다 — 팀이 없으면 스쿼드·경기 신청이 다 막힌다.
-    expect(screen.getByText(/아직 소속된 팀이 없습니다/)).toBeInTheDocument()
-    expect(screen.getByText(/팀을 만들어야/)).toBeInTheDocument()
+    // 🔴 여기서도 「팀 만들기」 단추가 바로 아래에 있어 같은 말을 두 번 안 한다.
+    expect(screen.getByText('아직 소속된 팀이 없습니다.')).toBeInTheDocument()
+    expect(screen.queryByText(/팀을 만들어야/)).toBeNull()
   })
 
   // 프로필은 '보여주는' 화면이다 — 입력칸이 늘 떠 있으면 설정 화면이 된다.

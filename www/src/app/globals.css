@@ -11720,7 +11720,10 @@ body:has(.ss-profile) {
 /* 팀 만들기 폼 접기 — 「내 경기」 더보기와 같은 방식이다(`grid-template-rows`
    0fr → 1fr). 🔴 `max-height` 로 하지 않는다: 상한과 실제 높이가 다르면
    아무 일도 안 일어나는 구간에서 시간이 새어 속도가 튄다. */
-/* 호칭 고치기 — 칩 줄 아래에 작게 붙는다. */
+/* 호칭 고치기 — 칩 줄 아래에 작게 붙는다.
+   🔴 **칩이 없으면 위 여백도 없다**(2026-09-16). 호칭을 아직 안 정한 사람은
+   이 단추가 그 칸의 첫 것이라, 8px 이 남아 있으면 왼쪽의 「호칭」 글자보다
+   한 단 내려가 줄이 어긋난다. */
 .ss-profile-titles-edit {
   margin-top: 8px;
   border: 1px solid color-mix(in srgb, var(--ss-fg) 24%, transparent);
@@ -11730,6 +11733,10 @@ body:has(.ss-profile) {
   color: color-mix(in srgb, var(--ss-fg) 72%, transparent);
   background: transparent;
   transition: background-color 160ms ease;
+}
+
+.ss-profile-titles-edit:first-child {
+  margin-top: 0;
 }
 
 .ss-profile-titles-edit:hover {

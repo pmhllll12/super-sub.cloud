@@ -78,11 +78,14 @@ export default function TitlesForm({ titles }: { titles: string[] }) {
 
   return (
     <>
-      {shown.length === 0 ? (
-        /* 🔴 **「아직 없음」을 부정적으로 적지 않는다**(계약 4장) — 빈 것은
-           정상이고, 미달 표식이 되면 안 된다. */
-        <span className="ss-profile-muted">아직 정한 호칭이 없습니다.</span>
-      ) : (
+      {/* 🔴 **비어 있을 때는 아무 말도 안 한다**(사용자 요청, 2026-09-16).
+          앞서 「아직 정한 호칭이 없습니다」를 두었는데, 바로 옆에 「호칭
+          정하기」 단추가 서 있어 **빈 것을 두 번 말하는** 자리였다. 단추만
+          남으면 그 자리가 비었다는 것과 무엇을 할 수 있는지가 한 번에 읽힌다.
+
+          🔴 여전히 **미달 표식은 아니다**(계약 4장) — 빈 것은 정상이라
+          「없음」·자물쇠 같은 표를 대신 넣지 않는다. */}
+      {shown.length > 0 && (
         <span className="ss-profile-pills">
           {shown.map((t) => (
             <span key={t} className="ss-profile-pill">
