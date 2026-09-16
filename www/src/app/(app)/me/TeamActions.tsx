@@ -25,7 +25,7 @@ export default function TeamActions({
   teams,
   userId,
 }: {
-  teams: { team_id: string; name: string; role: string }[]
+  teams: { team_id: string; name: string; region: string; sport_code: string; role: string }[]
   /** 나가기가 이 id 로 나간다 — 계약의 `member_id` 는 곧 `user_id` 다. */
   userId: string
 }) {
@@ -79,45 +79,70 @@ export default function TeamActions({
 
   return (
     <>
-      {teams.length > 0 && (
-        <ul className="ss-profile-team-acts">
+      {teams.length === 0 ? (
+        /* 🔴 **팀이 없으면 이 서비스가 거의 안 돈다** — 스쿼드 · 경기 신청 ·
+           알림이 전부 팀 밑이다. 「없습니다」로 끝내지 않고 무엇이 막히는지
+           적는다. */
+        <p className="ss-profile-muted">
+          아직 소속된 팀이 없습니다. 팀을 만들어야 스쿼드와 경기 신청을 쓸 수 있습니다.
+        </p>
+      ) : (
+        <ul className="ss-profile-teams">
           {teams.map((t) => (
             <li key={t.team_id}>
-              <button
-                type="button"
-                className="ss-profile-team-leave"
-                disabled={leaving === t.team_id}
-                onClick={() => void leave(t.team_id)}
-              >
-                {leaving === t.team_id ? '나가는 중…' : `${t.name} 나가기`}
-              </button>
+              {/* 🔴 **나가기는 팀 이름 오른쪽**이다(사용자 요청, 2026-09-16) —
+                  어느 팀을 나가는지가 이름 옆에 있어야 붙는다. 아래 따로 두면
+                  팀이 여럿일 때 어느 줄의 것인지 한 번 더 짚어야 한다. */}
+              <p className="ss-profile-team-name">
+                <span>{t.name}</span>
+                <button
+                  type="button"
+                  className="ss-profile-team-leave"
+                  disabled={leaving === t.team_id}
+                  onClick={() => void leave(t.team_id)}
+                >
+                  {leaving === t.team_id ? '나가는 중…' : '나가기'}
+                </button>
+              </p>
+              <p className="ss-profile-muted">
+                {t.region} · {t.sport_code}
+              </p>
             </li>
           ))}
         </ul>
       )}
 
-      {/* 🔴 **평소에는 접혀 있다** — 프로필은 보여주는 화면이고, 폼이 늘 펴져
-          있으면 설정 화면처럼 읽힌다(`AccountActions` 와 같은 판단). */}
-      <button
-        type="button"
-        className="ss-profile-tab"
-        aria-expanded={open}
-        onClick={() => {
-          setOpen((v) => !v)
-          setError(null)
-        }}
-      >
-        {open ? '접기' : '팀 만들기'}
-      </button>
+      {/* 🔴 **팀이 있으면 만들 자리를 안 낸다**(사용자 요청). 지금 짜임은 홈이
+          `teams[0]` 하나만 보므로, 둘째 팀을 만들 수 있게 두면 만들고도 안
+          보이는 팀이 생긴다. 나가고 나면(=0) 다시 나온다. */}
+      {teams.length === 0 && (
+        <>
+          <button
+            type="button"
+            className="ss-profile-tab ss-profile-tab--sm"
+            aria-expanded={open}
+            onClick={() => {
+              setOpen((v) => !v)
+              setError(null)
+            }}
+          >
+            {open ? '접기' : '팀 만들기'}
+          </button>
 
-      {open && (
-        <form onSubmit={create} className="ss-profile-account-form">
-          <Field label="팀 이름" value={name} onChange={setName} />
-          <Field label="지역" value={region} onChange={setRegion} hint="예: 서울 강남" />
-          <PillButton type="submit" disabled={busy || !name.trim() || !region.trim()}>
-            만들기
-          </PillButton>
-        </form>
+          {open && (
+            <form onSubmit={create} className="ss-profile-account-form ss-form-compact">
+              <Field label="팀 이름" value={name} onChange={setName} />
+              <Field label="지역" value={region} onChange={setRegion} hint="예: 서울 강남" />
+              <PillButton
+                type="submit"
+                disabled={busy || !name.trim() || !region.trim()}
+                className="self-start"
+              >
+                만들기
+              </PillButton>
+            </form>
+          )}
+        </>
       )}
 
       {error && (

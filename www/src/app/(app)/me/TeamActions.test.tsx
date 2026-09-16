@@ -79,8 +79,8 @@ describe('프로필 — 소속', () => {
   /* 🔴 `member_id` 는 곧 `user_id` 다 — 소속 행의 id 가 아니다. */
   it('나가기는 내 user_id 로 나간다', async () => {
     const user = userEvent.setup()
-    render(<TeamActions teams={[{ team_id: 't1', name: '번개FC', role: 'member' }]} userId="u1" />)
-    await user.click(screen.getByRole('button', { name: '번개FC 나가기' }))
+    render(<TeamActions teams={[{ team_id: 't1', name: '번개FC', region: '서울 강남', sport_code: 'futsal', role: 'member' }]} userId="u1" />)
+    await user.click(screen.getByRole('button', { name: '나가기' }))
 
     await waitFor(() => expect(refresh).toHaveBeenCalled())
     expect(sent.some((s) => s.url === '/api/teams/t1/members/u1' && s.method === 'DELETE')).toBe(
@@ -95,10 +95,47 @@ describe('프로필 — 소속', () => {
   it('마지막 주장이면 서버가 준 이유를 그대로 보여 준다', async () => {
     stub({ status: 409, code: 'LAST_OWNER', message: '마지막 주장은 팀을 나갈 수 없습니다.' })
     const user = userEvent.setup()
-    render(<TeamActions teams={[{ team_id: 't1', name: '번개FC', role: 'owner' }]} userId="u1" />)
+    render(<TeamActions teams={[{ team_id: 't1', name: '번개FC', region: '서울 강남', sport_code: 'futsal', role: 'owner' }]} userId="u1" />)
     // 🔴 단추가 **눌린다** — 막아 두지 않는다.
-    await user.click(screen.getByRole('button', { name: '번개FC 나가기' }))
+    await user.click(screen.getByRole('button', { name: '나가기' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('마지막 주장은 팀을 나갈 수 없습니다.')
+  })
+})
+
+/**
+ * 🔴 **팀이 있으면 만들 자리를 안 낸다**(사용자 요청, 2026-09-16).
+ *
+ * 지금 홈은 `teams[0]` 하나만 본다 — 둘째 팀을 만들 수 있게 두면 만들고도
+ * 화면 어디에도 안 보이는 팀이 생긴다. 나가고 나면 다시 나온다.
+ */
+describe('프로필 — 팀 만들기가 나오는 때', () => {
+  beforeEach(() => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({ id: 't9' }), { status: 201 })),
+    )
+  })
+  afterEach(() => vi.restoreAllMocks())
+
+  const TEAM = {
+    team_id: 't1',
+    name: '번개FC',
+    region: '서울 강남',
+    sport_code: 'futsal',
+    role: 'member',
+  }
+
+  it('팀이 있으면 만들기가 없다', () => {
+    render(<TeamActions teams={[TEAM]} userId="u1" />)
+    expect(screen.queryByRole('button', { name: '팀 만들기' })).toBeNull()
+    // 나가기는 팀 이름과 같은 줄에 있다.
+    const line = screen.getByText('번개FC').closest('.ss-profile-team-name')
+    expect(line?.querySelector('button')).toHaveTextContent('나가기')
+  })
+
+  it('팀이 없으면 만들기가 나온다', () => {
+    render(<TeamActions teams={[]} userId="u1" />)
+    expect(screen.getByRole('button', { name: '팀 만들기' })).toBeInTheDocument()
+    expect(screen.getByText(/팀을 만들어야/)).toBeInTheDocument()
   })
 })

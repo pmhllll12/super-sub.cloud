@@ -57,7 +57,7 @@ export default function AccountActions({ searchable }: { searchable: boolean }) 
       <div className="ss-profile-account-foot">
         <button
           type="button"
-          className="ss-profile-tab"
+          className="ss-profile-tab ss-profile-tab--sm ss-profile-tab--danger"
           aria-expanded={open}
           onClick={() => {
             setOpen((v) => !v)
@@ -69,7 +69,7 @@ export default function AccountActions({ searchable }: { searchable: boolean }) 
       </div>
 
       {open && (
-        <form onSubmit={onDelete} className="ss-profile-account-form">
+        <form onSubmit={onDelete} className="ss-profile-account-form ss-form-compact">
           <p className="ss-profile-muted">
             탈퇴하면 카드 · 호칭 · 소속과 올린 영상이 함께 지워집니다. 되돌릴 수 없습니다.
           </p>

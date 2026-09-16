@@ -25,6 +25,9 @@
   --ss-surface: #000000;
   --ss-fg: #ffffff;
   --ss-accent: #70ed88;
+  /* 되돌릴 수 없는 손짓의 색 — 팀 나가기 · 회원 탈퇴가 같이 쓴다
+     (사용자 요청, 2026-09-16). 알림의 빨간 점과 같은 값이다. */
+  --ss-danger: #ff3b30;
   /* 잔디 초록 — 스쿼드 빈 카드의 + 와 홈 헤드라인의 PITCH 가 같이 쓴다.
      강조색(--ss-accent)보다 조금 더 노란 쪽이라 나란히 놓아도 안 겹친다. */
   --ss-pitch-green: #a6e89b;
@@ -2604,33 +2607,66 @@ body::-webkit-scrollbar {
   margin-top: 18px;
 }
 
-/* 「소속」 절의 팀 나가기 줄 — 팀마다 하나. */
-.ss-profile-team-acts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 12px 0;
-}
-
-/* 🔴 **탈퇴는 강조하지 않는다.** 되돌리려면 다시 가입해야 하는데 팀을 찾을
-   경로가 아직 없어서(계약에 목록·검색이 없다) 사실상 되돌리기 어렵다. */
+/* 🔴 **완전한 빨강**이다(사용자 요청, 2026-09-16). 되돌리려면 다시 가입해야
+   하는데 팀을 찾을 경로가 아직 없어서(계약에 목록·검색이 없다) 사실상 되돌리기
+   어렵다 — 되돌릴 수 없는 손짓은 그렇게 보여야 한다. */
 .ss-profile-team-leave {
-  border: 1px solid color-mix(in srgb, var(--ss-fg) 26%, transparent);
+  flex: none;
+  border: 1px solid var(--ss-danger);
   border-radius: 999px;
-  padding: 5px 12px;
-  font-size: 0.75rem;
-  color: color-mix(in srgb, var(--ss-fg) 72%, transparent);
+  padding: 3px 11px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--ss-danger);
   background: transparent;
   transition: background-color 160ms ease;
 }
 
 .ss-profile-team-leave:not(:disabled):hover {
-  background-color: color-mix(in srgb, var(--ss-fg) 10%, transparent);
+  background-color: color-mix(in srgb, var(--ss-danger) 16%, transparent);
 }
 
 .ss-profile-team-leave:disabled {
   cursor: default;
   opacity: 0.5;
+}
+
+/* 🔴 **단추가 쓸데없이 크다**(사용자 지적, 2026-09-16). `PillButton` 은
+   `--ss-btn-*` 를 읽으므로 **그 변수만 좁혀** 이 폼 안에서 작게 만든다 —
+   컴포넌트를 고치면 로그인 · 가입의 큰 단추까지 같이 줄어든다. */
+.ss-form-compact {
+  --ss-btn-h: 34px;
+  --ss-btn-r: 999px;
+  --ss-btn-label: 0.8125rem;
+  gap: 10px;
+}
+
+.ss-form-compact .ss-field-input {
+  padding: 7px 12px;
+  font-size: 0.8125rem;
+}
+
+.ss-form-compact .ss-field-label {
+  font-size: 0.75rem;
+}
+
+/* 접었다 펴는 작은 탭 — 「팀 만들기」·「접기」. */
+/* 🔴 **회원 탈퇴는 완전한 빨강**(사용자 요청). `.ss-profile-tab` 자체를 물들이면
+   같은 클래스를 쓰는 「팀 만들기」까지 빨개진다 — 되돌릴 수 없는 것에만 건다. */
+.ss-profile-tab--danger {
+  border-color: var(--ss-danger);
+  color: var(--ss-danger);
+}
+
+.ss-profile-tab--danger:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--ss-danger) 16%, transparent);
+}
+
+.ss-profile-tab--sm {
+  height: 30px;
+  padding: 0 14px;
+  font-size: 0.8125rem;
 }
 
 .ss-pref-row {
@@ -11400,6 +11436,11 @@ body:has(.ss-profile) {
 
 .ss-profile-team-name {
   font-weight: 500;
+  /* 🔴 **이름과 나가기가 한 줄**이다(사용자 요청, 2026-09-16). 사이를 넉넉히
+     띄워 이름에 붙어 읽히지 않게 한다. */
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
 .ss-profile-info-row {

@@ -113,25 +113,6 @@ export function MeBody({
             <div className="ss-profile-body">
             <section className="ss-profile-bio" style={SECTION_GLASS}>
               <h2 className="ss-profile-h">소속</h2>
-              {user.teams.length === 0 ? (
-                /* 🔴 **팀이 없으면 이 서비스가 거의 안 돈다** — 스쿼드 · 경기
-                   신청 · 알림이 전부 팀 밑이다. 그래서 「없습니다」로 끝내지
-                   않고 무엇이 막히는지 적는다. */
-                <p className="ss-profile-muted">
-                  아직 소속된 팀이 없습니다. 팀을 만들어야 스쿼드와 경기 신청을 쓸 수 있습니다.
-                </p>
-              ) : (
-                <ul className="ss-profile-teams">
-                  {user.teams.map((t) => (
-                    <li key={t.team_id}>
-                      <p className="ss-profile-team-name">{t.name}</p>
-                      <p className="ss-profile-muted">
-                        {t.region} · {t.sport_code}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              )}
               <TeamActions teams={user.teams} userId={user.id} />
             </section>
 
