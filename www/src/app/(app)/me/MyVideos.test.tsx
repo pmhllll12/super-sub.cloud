@@ -185,6 +185,29 @@ describe('내 영상 — 공개 여부', () => {
   })
 
   /**
+   * 🔴 **대표 영상은 분석 갈래에만 있다**(2026-09-16, 사용자 요청).
+   *
+   * 두 갈래는 영상이 가는 곳이 다르다 — 그냥 올린 영상은 「전체 공개」에 따라
+   * **영상 모음에 나오나 안 나오나**뿐이고, 리포트가 없어 **추천 판에는 아예
+   * 안 들어간다.** 대표 영상은 그 추천 판에서 나를 소개하는 장면이라, 업로드
+   * 갈래에 단추를 두면 **아무 데도 안 쓰이는 값**을 고르게 된다.
+   *
+   * ⚠️ 서버가 막는 것은 아니다 — 계약이 거부하는 것은 반려된 클립뿐이다.
+   * 이건 화면의 판단이라 시험으로 붙들어 둔다.
+   */
+  it('업로드 영상에는 대표 영상 설정이 없다', async () => {
+    const user = userEvent.setup()
+    render(<MyVideos videos={[analyzed, uploaded]} />)
+    await toTab(user, /업로드 영상/)
+    expect(screen.queryByRole('button', { name: /대표 영상/ })).toBeNull()
+  })
+
+  it('분석 영상에는 대표 영상 설정이 있다', () => {
+    render(<MyVideos videos={[analyzed, uploaded]} />)
+    expect(screen.getByRole('button', { name: /대표 영상/ })).toBeInTheDocument()
+  })
+
+  /**
    * 🔴 **공개는 2026-09-10 부터 서버가 쥔다**(CCC 20, 미결 `paik` 5번).
    * 그전에는 브라우저 저장소라 다른 기기에서도 남에게도 안 보였다 — 그래서
    * 여기서도 저장소가 아니라 **무엇이 PATCH 로 나갔는지**를 붙든다.
