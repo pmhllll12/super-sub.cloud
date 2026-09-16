@@ -34,8 +34,10 @@ export type SavedReport = {
   /**
    * 항목별 **칭호+문장 짝**(`ho` 24번). 🔴 **따로 떼지 않는다** — `title`
    * 없이 `evidence`만 있으면 선수는 그것이 칭찬인지 지적인지 모른다.
-   * `title`이 없는 항목도 있다(호칭은 서버가 채운 것만이라 못 받을 수
-   * 있다) — 그때도 문장은 그대로 그린다.
+   * `title`이 `null`인 항목도 있다 — **받은 호칭이 아니라는 뜻**이고
+   * (아래 `toSavedReport`의 `title_earned` 설명), 그때도 문장은 그대로
+   * 그린다. 🔴 여기까지 오면 이미 걸러진 뒤다 — 그리는 쪽은 「미달」·
+   * 흐린 칭호 같은 표식을 **따로 붙이지 않는다.**
    */
   points: { title: string | null; evidence: string }[]
   /** 판단의 근거가 된 장면. 시각은 수치가 아니라 찾아가는 자리다. */
@@ -92,11 +94,17 @@ function atText(seconds: number): string {
  * 🔴 **`skipped` 항목은 뺀다.** `grade: null` 과 짝이라 「평가 대상이
  * 아니었다」는 뜻이고, 0 으로도 빈 문장으로도 그리면 못한 것으로 읽힌다.
  *
- * 🔴 **호칭은 서버가 채운 것만 그린다.** 「어느 등급부터 받은 호칭인가」는
- * 계약에 없어서, 우리가 `grade === 2` 같은 선을 그으면 그게 곧 지어내는
- * 것이다 — `title` 이 있으면 받은 것으로 본다(미결로 올려 둔다). 없어도
- * 그 항목의 `evidence`는 버리지 않는다 — 칭호를 못 받았다고 문장까지
- * 사라지면 안 된다.
+ * 🔴 **호칭은 `title_earned` 가 참인 것만 그린다**(CCC 47, 2026-09-16).
+ *
+ * 🔴 **정정**: 앞서 여기에 「`title` 이 있으면 받은 것으로 본다(미결로 올려
+ * 둔다)」고 적었던 것은 **틀렸다.** 그 미결(`ho` 40번 · `paik` 23번)의 답이
+ * 왔고, `title` 은 **모든 등급에 있다** — 0등급도 「무너지는 축」 같은 문구를
+ * 받는다. 유무로 선을 그으면 못한 항목에 호칭을 달게 된다.
+ *
+ * `title_earned` 가 `null` 이면 옛 리포트거나 제외된 항목이다 — **거짓으로
+ * 지어내지 않고 아무것도 안 그린다.** `grade === 2` 로 대신 긋지도 않는다.
+ * 호칭이 없어도 그 항목의 `evidence`는 버리지 않는다 — 칭호를 못 받았다고
+ * 문장까지 사라지면 안 된다.
  */
 export function toSavedReport(r: VideoReport): SavedReport {
   const live = r.breakdown.filter((b) => !b.skipped)
@@ -104,7 +112,10 @@ export function toSavedReport(r: VideoReport): SavedReport {
     summary: r.summary,
     points: live
       .filter((b) => !!b.evidence)
-      .map((b) => ({ title: b.title ?? null, evidence: b.evidence as string })),
+      .map((b) => ({
+        title: b.title_earned === true ? (b.title ?? null) : null,
+        evidence: b.evidence as string,
+      })),
     scenes: r.scenes.map((s) => ({ at: atText(s.at_seconds), what: s.label })),
     totalScore: r.total_score,
     overallGrade: r.overall_grade,

@@ -5208,7 +5208,21 @@ git show bf21391:agent/rubrics/baseball_batting.yaml > agent/rubrics/baseball_ba
 - 확인: `cd agent && uv run pytest tests/test_report_contract.py tests/test_scoring.py -q` · 실물 한 줄은 `agent/report-contract.md` 의 예시 JSON
 - 하지 말 것: 🔴 거짓을 **미달 표식으로 그리지 마세요**(계약 4장) — 흐린 칭호·자물쇠·「미달」 전부 해당합니다. **안 그리는 것이 맞습니다**
 - 관련: `paik` 23번(여기서 나왔습니다) · 같은 구역 38번(같은 형태·같은 판단) · `jin` 27번(봉투 계약)
-- **담당**: ~~정어진(적재 컬럼 판단)~~ **✅ 완료** · 백성검(화면 규칙을 `title_earned` 로) · **제기**: 정상호 · **기한**: 스프린트 3
+- **담당**: ~~정어진(적재 컬럼 판단)~~ **✅ 완료** · ~~백성검(화면 규칙을 `title_earned` 로)~~ **✅ 완료 (2026.09.16, 아래)** · **제기**: 정상호 · **기한**: 스프린트 3
+
+#### ✅ 화면도 완료 (2026.09.16, 백성검) — 「무너지는 축」을 수여하던 것이 멈췄습니다
+
+옮김터 한 곳(`www/src/lib/savedReports.ts`)에서만 갈랐습니다 — `title_earned`
+가 **참인 항목의 `title` 만** 넘기고, 거짓·`null` 은 `title: null` 로 내려
+그리는 쪽(`ReportView.tsx`)이 아무것도 안 그립니다. **미달 표식은 안 붙였습니다**
+(흐린 칭호·자물쇠·「미달」 — 위 「하지 말 것」). `grade === 2` 로 긋지 않았습니다.
+`evidence` 는 호칭을 못 받아도 그대로 남습니다(`ho` 24번).
+
+확인: `npx vitest run` **741 passed**(신규 2건 — 「못 받은 호칭은 문구가 있어도
+안 그린다」·「`title_earned` 가 null 인 옛 리포트는 호칭을 지어내지 않는다」) ·
+`npx tsc --noEmit` 통과. mock 도 계약대로 고쳐 **1등급 항목에 문구는 있고
+`title_earned: false`** 인 자리를 두었습니다 — 유무로 되돌아가면 시험이 아니라
+개발 화면에서 바로 보입니다.
 
 #### ✅ 완료 (2026.09.16, 정어진) — 38번과 달리 "넣는다"로 새로 넣었습니다
 

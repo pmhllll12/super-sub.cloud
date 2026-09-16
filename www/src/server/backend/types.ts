@@ -357,7 +357,22 @@ export type ReportCriterion = {
   criterion_id: string
   name: string
   grade: number | null
+  /**
+   * 🔴 **모든 등급에 있다** — 0등급도 「무너지는 축」 같은 문구를 받는다.
+   * 이 값의 유무로 「받은 호칭」을 가르면 못한 항목에 호칭을 달게 된다.
+   * 가르는 것은 아래 `title_earned` 다.
+   */
   title: string | null
+  /**
+   * 그 `title` 이 **실제로 받은 호칭인지**(CCC 47, 미결 `ho` 40번 · `paik` 23번).
+   *
+   * 🔴 `null` 이면 `skipped` 거나 이 필드가 생기기 전 적재분이다 — **거짓으로
+   * 지어내지 않는다.** 흐린 칭호·자물쇠·「미달」은 전부 미달 표식이라,
+   * 아무것도 안 그리는 것이 맞다. `grade === 2` 로 대신 긋지도 않는다
+   * (조건에 "루브릭이 그 등급의 문구를 실제로 적었을 것"이 함께 걸려 있어
+   * 칭호를 안 쓴 루브릭이 들어오면 갈린다).
+   */
+  title_earned: boolean | null
   evidence: string | null
   metric_ref: string | null
   skipped: boolean

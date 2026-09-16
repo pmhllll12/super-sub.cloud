@@ -795,16 +795,21 @@ export const mockBackend: Backend = {
           name: '디딤발 위치',
           grade: 2,
           title: '흔들리지 않는 축',
+          title_earned: true,
           evidence: '측면으로 벌리는 움직임이 많습니다',
           metric_ref: 'plant_foot_offset',
           skipped: false,
           stat: 91.2,
         },
+        /* 🔴 **문구는 있는데 못 받은 항목**(CCC 47) — 서버는 `title` 을 **모든
+           등급에** 싣는다. 화면이 `title_earned` 로 가르는지 보려고 둔다.
+           유무로 가르던 때는 이 자리가 「받은 호칭」으로 잘못 그려졌다. */
         {
           criterion_id: 'shoulder_lead',
           name: '어깨 선행',
           grade: 1,
-          title: null,
+          title: '앞서 도는 어깨',
+          title_earned: false,
           evidence: '공을 받기 전에 어깨를 먼저 돌립니다',
           metric_ref: 'shoulder_rotation_lead',
           skipped: false,
@@ -815,6 +820,7 @@ export const mockBackend: Backend = {
           name: '팔로스루',
           grade: 2,
           title: '첫 리포트',
+          title_earned: true,
           evidence: '두 번째 동작으로 이어지는 속도가 빠릅니다',
           metric_ref: 'follow_through_speed',
           skipped: false,
@@ -828,6 +834,7 @@ export const mockBackend: Backend = {
           name: '점프 높이',
           grade: null,
           title: null,
+          title_earned: null,
           evidence: null,
           metric_ref: null,
           skipped: true,
