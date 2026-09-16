@@ -131,7 +131,9 @@ describe('내 프로필 — /me', () => {
 
   // 🔴 카드는 호칭을 sr-only 로만 들고 있다(PlayerCardView). 눈에 보이는
   // 자리는 여기 하나뿐이라, 이게 없어지면 호칭은 화면에서 사라진다.
-  it('받은 호칭을 분류와 함께 알약으로 보여준다', () => {
+  /* 🔴 **분류(강점·활동)를 더는 안 적는다**(2026-09-16 결정, 미결 `paik` 36번).
+     호칭을 사람이 직접 적게 되면서 그 글에 분류를 매길 사람이 없어졌다. */
+  it('정한 호칭을 알약으로 보여준다 — 분류는 안 적는다', () => {
     const { container } = render(
       <MeBody user={USER} card={CARD_WITH_TITLES} videos={[]} matches={[]} />,
     )
@@ -139,19 +141,23 @@ describe('내 프로필 — /me', () => {
     // 화면 전체에서 세면 어느 쪽을 본 것인지 알 수 없다.
     const info = container.querySelector('.ss-profile-info')!
     expect(info.textContent).toContain('슈팅이 매서운')
-    expect(info.textContent).toContain('강점')
+    expect(info.textContent).not.toContain('강점')
   })
 
   // 개수를 적던 '호칭 2' 배지는 걷어냈다(공유와 함께) — 남은 자리는
   // 정보 절 하나뿐이라, 비었을 때 알려 주는 것도 거기다.
+  /* 🔴 **「없음」을 부정적으로 적지 않는다**(계약 4장) — 빈 것은 정상이다.
+     「받은」에서 「정한」으로 바뀐 것은 사람이 직접 적게 되어서다(36번). */
   it('호칭이 없으면 정보 절에서 그렇게 알려준다', () => {
     render(<MeBody user={USER} card={CARD} videos={[]} matches={[]} />)
-    expect(screen.getByText('아직 받은 호칭이 없습니다.')).toBeInTheDocument()
+    expect(screen.getByText('아직 정한 호칭이 없습니다.')).toBeInTheDocument()
   })
 
   it('소속 팀이 없으면 그렇게 알려준다', () => {
     render(<MeBody user={USER} card={CARD} videos={[]} matches={[]} />)
-    expect(screen.getByText('아직 소속된 팀이 없습니다.')).toBeInTheDocument()
+    // 🔴 「없습니다」로 끝내지 않는다 — 팀이 없으면 스쿼드·경기 신청이 다 막힌다.
+    expect(screen.getByText(/아직 소속된 팀이 없습니다/)).toBeInTheDocument()
+    expect(screen.getByText(/팀을 만들어야/)).toBeInTheDocument()
   })
 
   // 프로필은 '보여주는' 화면이다 — 입력칸이 늘 떠 있으면 설정 화면이 된다.

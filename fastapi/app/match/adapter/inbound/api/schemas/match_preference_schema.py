@@ -73,3 +73,20 @@ class MatchCandidateResponse(BaseModel):
     region_label: str
     formation: str
     reasons: list[MatchReasonResponse]
+
+
+class SquadCandidateResponse(BaseModel):
+    """`paik` 27번 — 빈 자리 추천 후보 한 명. `GET /teams/{id}/squad/candidates`.
+
+    🔴 유사도·거리 점수는 없다 — 순서는 이미 정렬돼 있다. `grade`가 `null`이면
+    아직 분석 전이다(0 이나 F 가 아니다). `provisional` 이 `true`인 동안은
+    화면이 등급 옆에 "검수 전"을 달아야 한다(26번과 같은 원칙).
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    user_id: UUID
+    nickname: str
+    card_public_slug: str | None
+    grade: str | None
+    provisional: bool | None

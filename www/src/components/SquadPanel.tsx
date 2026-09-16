@@ -4,14 +4,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PublicPlayerCard, Squad } from '@/server/backend'
 import PlayerCardView from '@/components/PlayerCardView'
 import BlankPlayerCard from '@/components/BlankPlayerCard'
-import SquadSuggest, { gradeOfPlayer } from '@/components/SquadSuggest'
+import SquadSuggest from '@/components/SquadSuggest'
 import SquadFriends from '@/components/SquadFriends'
 import TeamSeek from '@/components/TeamSeek'
 import MatchBot from '@/components/MatchBot'
 import TeamMatch from '@/components/TeamMatch'
 import MatchWaiting from '@/components/MatchWaiting'
-import type { MatchTeam } from '@/lib/teamMatch'
-import { book, unbook } from '@/lib/bookedMatches'
+import { teamById, type MatchTeam } from '@/lib/teamMatch'
 import { formationToSize, saveFormation, saveSeat, seatOf } from '@/lib/squadBoard'
 import { COLS, ROWS, ROW_POS, cellExists, rowPos, type PosCode } from '@/lib/pitchGrid'
 import { fetchPositions } from '@/lib/positions'
@@ -251,6 +250,11 @@ export default function SquadPanel({
   sportCode = null,
   scouting = false,
   onCloseScouting,
+  onOpenScouting,
+  myTeamId = null,
+  onRequested,
+  acceptedTeamId = null,
+  onAcceptedShown,
   seeking = false,
   onCloseSeeking,
   bot = false,
@@ -281,6 +285,35 @@ export default function SquadPanel({
    */
   scouting?: boolean
   onCloseScouting?: () => void
+  /**
+   * 빈 자리(`+`)를 눌렀을 때 **용병 찾기를 켜 달라**고 부모에게 알린다
+   * (사용자 요청, 2026-09-16). 알약으로 연 것과 **같은 한 벌**을 연다 —
+   * 추천 판 옆에 지인 찾기 판도 선다.
+   *
+   * 🔴 `scouting` 은 부모가 든다(`HomeStage`). 이 판이 제 상태로 흉내내지
+   * 않는 이유는, 켜진 동안 판 바깥의 큰 글자(`OWN THE PITCH`)가 비켜서야
+   * 하고 그 판단이 부모에 있기 때문이다 — 두 곳에서 들면 한쪽만 켜진 채로
+   * 어긋난다.
+   *
+   * ⚠️ 이때 자리는 **누른 자리**다. 아래 `scouting` 효과가
+   * `setPicking((now) => now ?? firstEmpty)` 로 **이미 고른 자리를 덮지
+   * 않게** 되어 있어서, 누르기 쪽에서 `setPicking(slot)` 을 먼저 하면 그
+   * 자리가 그대로 남는다(둘은 같은 이벤트에서 한 번에 반영된다).
+   */
+  onOpenScouting?: () => void
+  /** 내 팀 id — 경기 신청이 이 팀 밑으로 나간다(계약 3-15절). */
+  myTeamId?: string | null
+  /** 신청을 **걸었다**(「잡혔다」가 아니다) — 부모가 기억해 둔다. */
+  onRequested?: (requestId: string, team: MatchTeam) => void
+  /**
+   * **상대가 수락한 팀** — 값이 들어오는 순간 대기 팝업이 뜬다.
+   *
+   * 🔴 이 신호는 **알림에서 온다**(`useNotifyInbox`). 신청을 건 쪽이든 받아서
+   * 수락한 쪽이든, 확정되는 순간은 이 화면 바깥이라 부모가 알려 줘야 한다.
+   */
+  acceptedTeamId?: string | null
+  /** 팝업을 닫았다고 부모에게 알린다 — 안 지우면 닫자마자 다시 뜬다. */
+  onAcceptedShown?: () => void
   /**
    * 알약 '팀원' 을 눌렀는가 — 켜지면 **스쿼드 판이 물러나고 그 자리에**
    * 사람을 찾는 팀들의 명단이 선다(사용자 요청, 2026-09-08).
@@ -459,6 +492,31 @@ export default function SquadPanel({
   const [matching, setMatching] = useState(false)
   /** 상대가 수락한 경기. 있으면 대기 팝업이 화면을 덮는다. */
   const [matched, setMatched] = useState<MatchTeam | null>(null)
+
+  /**
+   * 🔴 **확정되는 순간은 이 화면 바깥이다**(사용자 요청, 2026-09-16) — 신청을
+   * 건 것만으로는 안 뜨고, 알림에서 수락이 확인돼야 뜬다.
+   *
+   * 이름 · 판을 그리려면 팀 한 벌이 필요한데 계약 응답에는 id 뿐이라
+   * (`teamById` 주석) 붙박이 목록에서 찾는다. **못 찾으면 안 띄운다** —
+   * 빈 판을 띄우느니 안 띄우는 편이 낫다.
+   */
+  useEffect(() => {
+    if (!acceptedTeamId) return
+    const them = teamById(acceptedTeamId)
+    if (!them) return
+    const team: MatchTeam = { ...them, why: [] }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMatched(team)
+    /* 🔴 **브라우저에 따로 적지 않는다**(2026-09-16). 전에는 `book(team)` 으로
+       localStorage 에 남겼다 — 계약에 확정 경기 자리가 없던 시절의 임시였다.
+       이제 수락하면 서버에 진짜 `match` 가 생기고(계약 3-15절) 「내 경기」가
+       `GET /teams/{id}/matches` 로 그것을 읽는다. 둘 다 두면 **같은 경기가
+       두 번** 보인다. */
+    // 팝업이 화면을 덮으므로 뒤의 명단은 접는다 — 닫았을 때 판만 남는다.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMatching(false)
+  }, [acceptedTeamId])
 
 
   const [placing, setPlacing] = useState<string | null>(null)
@@ -984,7 +1042,14 @@ export default function SquadPanel({
                     // 🔴 추천 판도 챗봇과 **같은 자리**에 선다 — 켜져 있으면
                     // 먼저 물린다(그냥 열면 챗봇 뒤에 가려 나온다).
                     onBotChange?.(false)
+                    // 🔴 **자리를 먼저 고른다.** 아래 onOpenScouting 이 켜는
+                    // `scouting` 효과는 `picking ?? firstEmpty` 라, 여기서
+                    // 먼저 넣어 두어야 **누른 자리**가 남는다. 순서를 뒤집으면
+                    // 첫 빈 자리로 밀린다.
                     setPicking(slot)
+                    // 지인 찾기도 같이 연다(사용자 요청, 2026-09-16) —
+                    // 알약으로 연 것과 같은 한 벌이다.
+                    onOpenScouting?.()
                   }}
                 >
                   <BlankPlayerCard>
@@ -1102,14 +1167,11 @@ export default function SquadPanel({
           size={size}
           closing={false}
           onClose={() => setMatching(false)}
-          onMatched={(team) => {
-            setMatched(team)
-            /* 🔴 **잡힌 그 순간 적는다.** 팝업을 닫을 때 적으면, 닫지 않고
-               떠난 사람의 경기가 「내 경기」에 안 남는다. */
-            book(team)
-            // 팝업이 화면을 덮으므로 뒤의 명단은 접는다 — 닫았을 때 판만 남는다.
-            setMatching(false)
-          }}
+          teamId={myTeamId}
+          /* 🔴 **여기서 대기 팝업을 띄우지 않는다**(사용자 요청, 2026-09-16).
+             신청은 걸린 것이고 확정은 상대가 수락할 때다 — 그 순간은 알림으로
+             오므로, 부모가 이 id 를 기억해 두었다가 그때 띄운다. */
+          onRequested={(requestId, team) => onRequested?.(requestId, team)}
         />
       )}
 
@@ -1132,11 +1194,17 @@ export default function SquadPanel({
           }}
           them={matched}
           myCard={card ?? null}
-          onClose={() => setMatched(null)}
-          onCancel={() => {
-            // 무른 경기는 「내 경기」에서도 빠진다 — 남으면 잡힌 줄 안다.
-            unbook(matched.id)
+          onClose={() => {
             setMatched(null)
+            onAcceptedShown?.()
+          }}
+          onCancel={() => {
+            /* ⚠️ **경기 취소는 아직 안 보낸다.** 계약에는 있다
+               (`DELETE /matches/{id}` — 팀 대 팀이면 양쪽 주장 누구나).
+               팝업만 닫히고 서버의 확정 경기는 남으므로, 「내 경기」에서
+               사라지지 않는다. 미결 `paik` 34번. */
+            setMatched(null)
+            onAcceptedShown?.()
           }}
         />
       )}
@@ -1146,13 +1214,11 @@ export default function SquadPanel({
         <SquadSuggest
           position={posOf(shown)}
           me={card ? { nickname: card.user.nickname, clip: myClip } : null}
-          /* 🔴 이미 앉은 사람들의 등급 — 추천 판이 그 **평균**으로 첫 거르개를
-             연다(사용자 요청: 넷이 찼고 하나를 더 구할 때). 모르는 사람은
-             `null` 이고 평균에서 빠진다 — 「모른다」를 「낮다」로 치면 팀 평균이
-             통째로 끌려 내려간다. */
-          seated={Object.values(mates)
-            .filter((n): n is string => Boolean(n))
-            .map(gradeOfPlayer)}
+          /* 🔴 **앉은 사람들의 평균을 화면에서 안 낸다**(2026-09-16). 서버가
+             그 평균과 가까운 순으로 정렬해서 주므로(계약 3-16절), 화면이 또
+             계산하면 두 곳이 갈린다 — 계약 44번의 「하지 말 것」이다. 대신
+             후보를 찾을 팀만 넘긴다. */
+          teamId={myTeamId}
           closing={picking === null}
           onClose={close}
           onPick={(name) => {

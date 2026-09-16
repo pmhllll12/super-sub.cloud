@@ -146,8 +146,92 @@ describe('홈 글자 내비 — 상단', () => {
     const icon = link.querySelector('.ss-home-nav-icon')
     expect(icon).not.toBeNull()
     expect(icon).toHaveTextContent('videocam')
-    // 글자보다 앞에 있어야 세로로 쌓았을 때 위에 온다.
-    expect(icon?.nextElementSibling).toHaveTextContent('영상 분석')
+    /* 글자보다 앞에 있어야 세로로 쌓았을 때 위에 온다.
+       🔴 아이콘은 이제 **칸 하나에 싸여 있다**(2026-09-16) — 빨간 점을 아이콘
+       기준으로 매달아야 글자 길이가 달라도 같은 자리에 붙기 때문이다. 그래서
+       글자의 앞 형제는 아이콘이 아니라 그 칸이다. */
+    const wrap = icon?.closest('.ss-home-nav-iconwrap')
+    expect(wrap).not.toBeNull()
+    expect(wrap?.nextElementSibling).toHaveTextContent('영상 분석')
     expect(container.querySelector('.ss-home-nav-item--stack')).toBe(link)
+  })
+})
+
+/**
+ * 🔴 **판이 든 항목은 「눌러서 여는」 것이다**(사용자 요청, 2026-09-16).
+ *
+ * 설명 카드는 읽고 마는 것이라 가리키기로 충분하지만, 알림 판에는 **누를
+ * 단추가 들어 있다** — 가리키기로 열면 글자를 벗어나 아래로 내려가는 순간
+ * 닫혀서 그 단추를 영영 못 누른다(사용자가 실제로 겪었다).
+ */
+describe('홈 글자 내비 — 판이 든 항목', () => {
+  const WITH_PANEL = [
+    { title: '알림', icon: 'circle_notifications', summary: '받은 신청' },
+    ...DESTINATIONS,
+  ]
+
+  const openable = (props: Partial<React.ComponentProps<typeof HomeNav>> = {}) =>
+    render(
+      <HomeNav
+        destinations={WITH_PANEL}
+        loggedIn
+        active={null}
+        onActivate={() => {}}
+        panels={{ 알림: <button type="button">수락하기</button> }}
+        {...props}
+      />,
+    )
+
+  it('가리키기만 해서는 안 열린다', async () => {
+    const user = userEvent.setup()
+    openable()
+    await user.hover(screen.getByRole('button', { name: '알림' }))
+    expect(screen.queryByRole('button', { name: '수락하기' })).toBeNull()
+  })
+
+  it('누르면 열리고, 마우스를 치워도 그대로 있다', async () => {
+    const user = userEvent.setup()
+    openable()
+    await user.click(screen.getByRole('button', { name: '알림' }))
+    expect(screen.getByRole('button', { name: '수락하기' })).toBeInTheDocument()
+
+    // 🔴 여기가 핵심이다 — 치워도 안 닫혀야 단추까지 마우스가 갈 수 있다.
+    await user.unhover(screen.getByRole('button', { name: '알림' }))
+    expect(screen.getByRole('button', { name: '수락하기' })).toBeInTheDocument()
+  })
+
+  it('다시 누르면 닫힌다', async () => {
+    const user = userEvent.setup()
+    openable()
+    const bell = screen.getByRole('button', { name: '알림' })
+    await user.click(bell)
+    await user.click(bell)
+    await waitFor(() => expect(screen.queryByRole('button', { name: '수락하기' })).toBeNull())
+  })
+
+  it('바깥을 누르면 닫힌다', async () => {
+    const user = userEvent.setup()
+    openable()
+    await user.click(screen.getByRole('button', { name: '알림' }))
+    await user.click(document.body)
+    await waitFor(() => expect(screen.queryByRole('button', { name: '수락하기' })).toBeNull())
+  })
+
+  /* 🔴 **판 안을 누르는 것은 바깥이 아니다** — 「수락하기」를 누르는 순간
+     닫히면 그 단추가 아무 일도 못 한다. */
+  it('판 안을 눌러도 안 닫힌다', async () => {
+    const user = userEvent.setup()
+    openable()
+    await user.click(screen.getByRole('button', { name: '알림' }))
+    await user.click(screen.getByRole('button', { name: '수락하기' }))
+    expect(screen.getByRole('button', { name: '수락하기' })).toBeInTheDocument()
+  })
+
+  it('Esc 로도 닫힌다', async () => {
+    const user = userEvent.setup()
+    openable()
+    await user.click(screen.getByRole('button', { name: '알림' }))
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('button', { name: '수락하기' })).toBeNull())
   })
 })

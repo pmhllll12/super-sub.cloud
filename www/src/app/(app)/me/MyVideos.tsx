@@ -646,7 +646,7 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
                     <span className="material-symbols-outlined" aria-hidden="true">
                       delete
                     </span>
-                    삭제
+                    해당 영상 삭제
                   </button>
                 )}
               </span>

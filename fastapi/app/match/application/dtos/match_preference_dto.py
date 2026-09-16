@@ -96,3 +96,28 @@ class MatchCandidateResult:
     # 순서는 이미 정렬돼 있다. reasons가 빈 리스트면 소프트 근거가 0개라는
     # 뜻이다 — 화면이 그걸로 구획을 나눌 수 있다.
     reasons: list[MatchReasonResult]
+
+
+@dataclass(frozen=True)
+class ListSquadCandidatesQuery:
+    """`paik` 27번 — 빈 자리 추천 후보. `grade`가 `None`이면(또는 `"any"`)
+    등급으로 좁히지 않고 실력 축 거리로 정렬만 한다 — `grade`를 직접
+    골랐을 때만 그 칸으로 하드 필터한다(정상호 회신)."""
+
+    actor_id: UUID
+    team_id: UUID
+    position_code: str
+    grade: str | None = None
+
+
+@dataclass(frozen=True)
+class SquadCandidateResult:
+    """🔴 사실값만 — 실력 축 거리는 정렬에만 쓰고 안 내려준다(20번과 같은
+    원칙). `provisional`은 `grade`와 항상 함께 온다(26번 — 등급 문자만
+    떼면 검수 전인지 알 방법이 없어진다)."""
+
+    user_id: UUID
+    nickname: str
+    card_public_slug: str | None
+    grade: str | None
+    provisional: bool | None
