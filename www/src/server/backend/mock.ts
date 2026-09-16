@@ -754,11 +754,22 @@ export const mockBackend: Backend = {
        사람이 없다. 읽는 쪽도 안 쓴다. */
     if ('titles' in input) {
       const now = new Date().toISOString()
-      updated.titles = (input.titles ?? [])
-        .map((t) => t.trim())
-        .filter(Boolean)
+      /* 🔴 **계약(51번)과 같은 모양이어야 한다.** 앞뒤 공백을 털고, 빈 글은
+         버리고, **같은 글은 하나만** 남긴다. `code` 는 `custom:` 으로 시작하고
+         `category` 는 **`null`** 이다 — 여기가 계약보다 너그러우면 그 차이는
+         배포에서만 드러난다(오늘 `nickname`·`futsal` 로 두 번 겪었다). */
+      updated.titles = [
+        ...new Set(
+          (input.titles ?? []).map((t) => t.trim()).filter(Boolean),
+        ),
+      ]
         .slice(0, 3)
-        .map((label, i) => ({ code: `self-${i + 1}`, label, category: '', granted_at: now }))
+        .map((label, i) => ({
+          code: `custom:${i + 1}`,
+          label,
+          category: null,
+          granted_at: now,
+        }))
     }
     made.set(u.id, updated)
     return updated

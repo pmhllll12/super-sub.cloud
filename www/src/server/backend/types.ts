@@ -35,9 +35,17 @@ export type User = {
 export type SignupResult = Omit<User, 'teams'>
 
 export type Title = {
+  /** 🔴 **사람이 직접 적은 호칭은 `custom:` 으로 시작한다**(계약 51). */
   code: string
   label: string
-  category: string
+  /**
+   * 분류 — `강점`·`활동`·`용병` 셋 중 하나.
+   *
+   * 🔴 **직접 적은 호칭은 `null` 이다**(계약 51, 2026-09-16). 분류는 부여되는
+   * 호칭의 것이고 자유 입력에는 매길 사람이 없다(`paik` 36번의 「분류를
+   * 요구하지 말 것」을 서버가 그렇게 지켰다).
+   */
+  category: string | null
   granted_at: string
 }
 
