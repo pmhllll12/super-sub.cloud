@@ -140,7 +140,13 @@ def list_squad_candidates(
     use_case: ListSquadCandidatesUseCaseDep,
     grade: str | None = None,
 ) -> list[SquadCandidateResult]:
-    """빈 자리 추천 후보 (미결 `paik` 27번). **그 팀 소속만.**
+    """빈 자리 추천 후보 (미결 `paik` 27번). **부르는 사람이 그 팀 소속이어야 한다.**
+
+    🔴 **「그 팀 소속만」은 부르는 사람 이야기지 후보 이야기가 아니다**
+    (2026-09-16에 내가 이 줄을 후보 범위로 잘못 읽고 미결 `min` 20번에
+    틀린 근거를 적었다). **후보는 오히려 팀 밖에서 찾는다** —
+    `member_match_position`(매칭 선호에 그 포지션을 등록한 사람)에서
+    가져오고 현재 팀원·이미 앉은 사람은 뺀다(`squad_recruitment_facts`).
 
     `grade`를 안 주거나 `"any"`를 주면 등급으로 거르지 않고 팀의 현재 등급
     평균과의 실력 축 거리로 정렬한다. `grade`를 직접 주면(`S`~`F`) **그
