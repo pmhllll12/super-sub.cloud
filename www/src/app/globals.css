@@ -3347,21 +3347,39 @@ body::-webkit-scrollbar {
   right: -7px;
   z-index: 3;
   border-radius: 999px;
-  /* 흰 카드와 어두운 배경 어느 쪽에 걸쳐도 아이콘이 살아 있게, 제 바탕을
-     깔고 앉는다. */
-  background: var(--ss-bg);
+  /* 🔴 **뒤에 아무것도 안 깐다**(사용자 지적, 2026-09-16: "뒤에 검정 넣지마").
+     전에는 어두운 바탕을 깔았는데 흰 카드 위에 검은 동그라미가 얹혀 보였다 —
+     빨강(`--ss-error`)은 흰 카드에서도 어두운 배경에서도 그 자체로 읽힌다. */
+  /* 🔴 **안쪽만 검정**(사용자 지정, 2026-09-16). 획은 빨강, 그 안은 검정이다.
+     동그라미가 획보다 커지지 않게 `background-clip: content-box` 로 안여백
+     안쪽에만 깐다 — 그냥 깔면 아이콘 글자상자만큼 퍼져 테두리 밖으로 나온다. */
+  background: #000 content-box;
+  padding: 2px;
   font-size: 20px;
   line-height: 1;
-  /* 구글 폰트에서 고른 값 그대로: 굵기 300 · 그레이드 200 · 광학 크기 20. */
+  /* 🔴 **채운 빨강**이다(사용자 지정, 2026-09-16: "완전 빨간색으로"). 앞서는
+     획만 있는 연한 살구색(`--ss-error` #ff8a80)이라 흰 카드 위에서 흐렸다. */
   font-variation-settings:
     'FILL' 0,
-    'wght' 300,
+    'wght' 400,
     'GRAD' 200,
     'opsz' 20;
-  color: var(--ss-error);
+  color: #ff1f1f;
+  /* 🔴 **이제 진짜 버튼이다**(2026-09-16). 전에는 장식이었고 카드 전체가
+     빼기였는데, 옮기려고 짚기만 해도 사람이 빠졌다(사용자 지적). 버튼 기본
+     모양을 지우고 과녁만 조금 넓힌다 — 20px 아이콘은 손가락에 작다. */
+  padding: 3px;
+  margin: -3px;
+  border: 0;
+  cursor: pointer;
 }
 
-
+.ss-squad-remove:hover,
+.ss-squad-remove:focus-visible {
+  outline: none;
+  color: var(--ss-fg);
+  background: var(--ss-error);
+}
 
 /* 빈 자리 카드 — 카드 전체가 버튼이다. 눌리는 곳이라는 게 손에 잡히게
    살짝 떠오른다. */

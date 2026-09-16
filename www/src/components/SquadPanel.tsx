@@ -678,6 +678,11 @@ export default function SquadPanel({
     const next = slots.map((sl) => (sl.area === area ? { ...sl, mine: true } : sl))
     setSlots(next)
     setPicking(null)
+    /* 🔴 **지인 찾기 판도 같이 닫는다**(사용자 지적, 2026-09-16). 추천 판은
+       `picking` 이 null 이 되며 닫히는데 지인 판은 `scouting` 이 쥐고 있어
+       혼자 남았다 — 자리를 정하고 나면 둘 다 볼 일이 없다. 한 단추가 연
+       한 벌이므로 닫는 것도 한 번이다. */
+    onCloseScouting?.()
     const sl = next.find((x) => x.area === area)
     if (squad && sl) {
       /* 🔴 **돌아온 등재 id 를 잇는다.** 안 이으면 방금 앉은 내 카드를 옮기거나
@@ -768,7 +773,14 @@ export default function SquadPanel({
    * 들어가는* 자리라 우리 팀이 상대를 찾을 일이 없다 — 판도 물러나 있어서
    * 「다 찼다」가 화면에 보이지도 않는다.
    */
-  const full = !seeking && slots.every((slot) => slot.mine || Boolean(mates[slot.area]))
+  /* 🔴 **다 찼고 + 모두 수락했을 때**만 켜진다(사용자 지정, 2026-09-16).
+     전에는 자리만 차면 켜졌는데, 그러면 아직 아무도 오기로 안 한 판으로
+     상대 팀에 경기를 신청하게 된다 — 「수락 대기중」이 남아 있는 판은
+     아직 팀이 아니다.
+     ⚠️ **내 자리는 수락을 안 본다** — 내가 나를 부른 것이라 기다릴 것이 없다. */
+  const full =
+    !seeking &&
+    slots.every((slot) => slot.mine || (Boolean(mates[slot.area]) && seeded.ready[slot.area]))
 
   /**
    * 용병 찾기로 열 때 **어느 자리의 추천**을 낼 것인가 — 빈 자리 중 첫
@@ -1115,30 +1127,53 @@ export default function SquadPanel({
               }}
             >
               {slot.mine ? (
-                /* 🔴 **내 카드도 눌러서 뺀다**(사용자 설계, 2026-09-16).
-                   전에는 여기가 `<div>` 라 ⊗ 도 없고 뺄 수도 없었다 —
-                   「나는 주장이지만 안 뛴다」를 표현할 길이 없었다.
-                   남의 카드와 **같은 규칙**이다(앉은 카드 = 빼기). */
-                <button
-                  type="button"
-                  className="ss-pcard-mini ss-squad-seat-btn"
-                  aria-label="나를 판에서 빼기"
-                  onClick={() => unseatMe(slot.area)}
-                >
-                  {card ? (
-                    <PlayerCardView card={card} />
-                  ) : (
-                    <BlankPlayerCard>
-                      <p className="ss-squad-note">아직 카드가 없습니다</p>
-                    </BlankPlayerCard>
-                  )}
-                  <span className="ss-squad-remove material-symbols-outlined" aria-hidden="true">
+                /* 🔴 **빼는 것은 ⊗ 뿐이다**(사용자 지적, 2026-09-16: "그냥
+                   카드 어디에 클릭해도 사라진다"). 카드 전체를 버튼으로 두면
+                   옮기려고 짚기만 해도 빠진다 — 되돌릴 수 없는 일에 넓은
+                   과녁을 주지 않는다.
+                   그래서 카드는 `<div>` 이고 ⊗ 가 **진짜 버튼**이다(버튼 안에
+                   버튼을 둘 수 없어 형제로 나란히 둔다). */
+                <>
+                  <div className="ss-pcard-mini">
+                    {card ? (
+                      <PlayerCardView card={card} />
+                    ) : (
+                      <BlankPlayerCard>
+                        <p className="ss-squad-note">아직 카드가 없습니다</p>
+                      </BlankPlayerCard>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    className="ss-squad-remove material-symbols-outlined"
+                    aria-label="나를 판에서 빼기"
+                    onClick={() => unseatMe(slot.area)}
+                  >
                     cancel
-                  </span>
-                </button>
+                  </button>
+                </>
+              ) : name ? (
+                /* 앉은 남의 카드도 같은 규칙 — 카드는 그림이고 ⊗ 만 뺀다. */
+                <>
+                  <div className="ss-pcard-mini">
+                    <BlankPlayerCard>
+                      <p className="ss-squad-name">{name}</p>
+                    </BlankPlayerCard>
+                  </div>
+                  <button
+                    type="button"
+                    className="ss-squad-remove material-symbols-outlined"
+                    aria-label={`${name} 빼기`}
+                    onClick={() => setMates((prev) => ({ ...prev, [slot.area]: null }))}
+                  >
+                    cancel
+                  </button>
+                </>
               ) : (
-                /* 🔴 카드 **전체**가 버튼이다. 가운데 + 만 눌리면 카드를
-                   눌렀는데 아무 일도 안 일어나는 순간이 생긴다.
+                /* 🔴 **빈 자리만 카드 전체가 버튼이다.** 여는 일(추천 열기 ·
+                   넣기)은 되돌릴 수 있어서 과녁이 넓어도 된다 — 가운데 + 만
+                   눌리면 카드를 눌렀는데 아무 일도 안 일어나는 순간이 생긴다.
+                   **빼는 일은 위에서 ⊗ 로만** 한다(되돌릴 수 없다).
                    버튼이 곧 .ss-pcard-mini 여야 한다 — 그 규칙이 카드를
                    직접 자식으로 찾기 때문에(> .ss-pcard) 사이에 다른
                    요소를 끼우면 축소가 통째로 풀린다. */
@@ -1147,22 +1182,14 @@ export default function SquadPanel({
                   className="ss-pcard-mini ss-squad-seat-btn"
                   // 고른 지인이 있으면 이 버튼은 "여기 넣기"다 — 깜빡이는
                   // 것만으로는 스크린리더에서 아무 차이가 없다.
-                  data-placing={!name && placing ? 'true' : undefined}
+                  data-placing={placing ? 'true' : undefined}
                   aria-label={
-                    name
-                      ? `${name} 빼기`
-                      : placing
-                        ? `${posOf(slot)} 자리에 ${placing} 넣기`
-                        : `${posOf(slot)} 자리에 선수 넣기`
+                    placing
+                      ? `${posOf(slot)} 자리에 ${placing} 넣기`
+                      : `${posOf(slot)} 자리에 선수 넣기`
                   }
-                  aria-expanded={
-                    name || placing ? undefined : picking?.area === slot.area
-                  }
+                  aria-expanded={placing ? undefined : picking?.area === slot.area}
                   onClick={() => {
-                    if (name) {
-                      setMates((prev) => ({ ...prev, [slot.area]: null }))
-                      return
-                    }
                     if (placing) {
                       setMates((prev) => ({ ...prev, [slot.area]: placing }))
                       // 판은 열어 둔다 — 여러 명을 이어서 넣는 게 보통이다.
@@ -1185,24 +1212,10 @@ export default function SquadPanel({
                   }}
                 >
                   <BlankPlayerCard>
-                    {name ? (
-                      <span className="ss-squad-name">{name}</span>
-                    ) : (
-                      <span className="ss-squad-plus material-symbols-outlined" aria-hidden="true">
-                        add
-                      </span>
-                    )}
-                  </BlankPlayerCard>
-                  {/* 빼는 표식 — 카드 오른쪽 위. 카드 **전체**가 이미 빼기
-                      버튼이라(aria-label) 이건 장식이고 누를 수 있는 요소가
-                      아니다. 버튼 안에 버튼을 두지 않는다.
-                      카드의 형제로 둔다 — .ss-pcard-mini 는 카드를 직접
-                      자식으로 찾으므로(> .ss-pcard) 감싸면 축소가 풀린다. */}
-                  {name && (
-                    <span className="ss-squad-remove material-symbols-outlined" aria-hidden="true">
-                      cancel
+                    <span className="ss-squad-plus material-symbols-outlined" aria-hidden="true">
+                      add
                     </span>
-                  )}
+                  </BlankPlayerCard>
                 </button>
               )}
 

@@ -1264,8 +1264,12 @@ describe('스쿼드 — 용병 찾기(추천 + 지인)', () => {
     expect(screen.getByRole('button', { name: /김철수/ })).toBeEnabled()
   })
 
-  // 카드 전체가 이미 '빼기' 버튼이다 — 표식은 장식이라 버튼이 아니어야 한다.
-  it('넣은 자리에는 빼기 표식이 붙는다', async () => {
+  /* 🔴 **정정 (2026-09-16, 사용자 지적: "그냥 카드 어디에 클릭해도 사라진다")**:
+     전에는 카드 전체가 「빼기」 버튼이고 ⊗ 는 장식(`aria-hidden`)이었다. 이제
+     **⊗ 가 진짜 버튼이고 카드는 눌러도 안 빠진다** — 옮기려고 짚기만 해도
+     사람이 빠지는 것이 문제였다. 되돌릴 수 없는 일에는 넓은 과녁을 주지 않는다.
+     (여는 일은 여전히 카드 전체가 과녁이다 — 되돌릴 수 있어서다.) */
+  it('넣은 자리는 ⊗ 로만 빠지고, 카드를 눌러서는 안 빠진다', async () => {
     const user = userEvent.setup()
     const { container } = await openFriends()
     expect(container.querySelector('.ss-squad-remove')).toBeNull()
@@ -1273,10 +1277,21 @@ describe('스쿼드 — 용병 찾기(추천 + 지인)', () => {
     await user.click(screen.getByRole('button', { name: /김철수/ }))
     await user.click(screen.getByRole('button', { name: 'GK 자리에 김철수 넣기' }))
 
+    // ⊗ 가 곧 빼기 버튼이다 — 장식이 아니다.
     const badge = container.querySelector('.ss-squad-remove')
     expect(badge).not.toBeNull()
-    expect(badge).toHaveAttribute('aria-hidden', 'true')
-    expect(badge?.closest('button')).toBe(screen.getByRole('button', { name: '김철수 빼기' }))
+    expect(badge).toBe(screen.getByRole('button', { name: '김철수 빼기' }))
+
+    /* 카드를 눌러도 그대로 앉아 있다. ⚠️ 지인 판에도 같은 이름이 있으므로
+       **판 위의 이름표**(`.ss-squad-name`)로 집는다. */
+    const seated = container.querySelector('.ss-squad-name') as HTMLElement
+    expect(seated).toHaveTextContent('김철수')
+    await user.click(seated)
+    expect(container.querySelector('.ss-squad-name')).toHaveTextContent('김철수')
+
+    // ⊗ 를 눌러야 빠진다.
+    await user.click(screen.getByRole('button', { name: '김철수 빼기' }))
+    expect(container.querySelector('.ss-squad-name')).toBeNull()
   })
 
   /* 🔴 첫째 칸은 하나만 쓴다 — 빈 자리로 연 추천도 챗봇이 닫아야 한다.
