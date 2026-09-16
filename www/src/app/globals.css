@@ -2677,6 +2677,102 @@ body::-webkit-scrollbar {
   font-size: 0.75rem;
 }
 
+/* ── 팀 만들기 폼 — 적은 만큼만 넓어지는 칸 (2026-09-16, 사용자 요청) ──────
+   전에는 공용 `ui/Field` 를 써서 칸이 판 너비를 **꽉 채웠다.** 팀 이름·지역은
+   짧은 말이라 빈 칸이 가로로 길게 남았다. */
+
+/* 🔴 **다 가운데**(사용자 요청). 라벨·칸·「만들기」가 한 축에 선다.
+
+   🔴 **빈 칸의 기본 폭**(사용자 요청, 2026-09-16). 처음엔 「만들기」 단추와
+   같게 맞췄다가 **단추보다 넓게**로 다시 정했다 — 적기 전의 칸이 단추만
+   하면 「누르는 것」처럼 보이고, 적을 자리라는 것이 안 읽힌다.
+
+   여기서부터 글자를 따라 늘어난다(아래 `.ss-team-grow`). 값 하나만 고치면
+   두 칸이 같이 움직인다. */
+.ss-profile-account-form {
+  --ss-team-base-w: 148px;
+  /* 🔴 「만들기」를 **위로 붙인다**(사용자 요청, 2026-09-16) — 칸 아래 예시를
+     걷어내고도 한 칸이 더 떠 보였다. */
+  gap: 8px;
+}
+
+.ss-team-field {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 🔴 **온전한 흰색**(사용자 요청) — 옅게 깔면 유리 판 위에서 회색으로 읽힌다.
+   이 판의 다른 글자들(「소속」·팀 이름)과 같은 무게로 선다. */
+.ss-team-field > label {
+  font-size: 0.75rem;
+  color: var(--ss-fg);
+}
+
+/* ⚠️ 예시는 **라벨 옆 괄호**다(사용자 요청, 2026-09-16). 칸 아래 따로 두었더니
+   한 줄을 더 먹어 「만들기」가 그만큼 밀려 내려갔다. 라벨보다 조금 작게 두어
+   이름이 아니라 곁들인 말이라는 것이 읽히게 한다 — 색은 라벨과 같은 흰색이다. */
+.ss-team-hint {
+  font-size: 0.68rem;
+}
+
+/**
+ * 🔴 **칸이 글자를 따라 넓어진다.** 감춘 쌍둥이(`::after`)를 같은 격자 칸에
+ * 겹쳐 두고 거기에 값을 적어 두면, **브라우저가 그 글자를 재서** 칸 너비를
+ * 정한다. 한글·영문·숫자 무엇이든 맞는다.
+ *
+ * 🔴 `size` 속성으로는 안 된다 — 「0」 글자 폭으로 세는 것이라 한글에서
+ * 절반쯤 좁게 나온다. JS 로 재는 방법도 있지만 글자마다 렌더가 한 번 더 돈다.
+ *
+ * ⚠️ **쌍둥이와 칸은 글꼴·안여백·테두리가 같아야 한다.** 하나라도 다르면
+ * 잰 너비와 실제 너비가 어긋나 글자가 끝에서 잘리거나 빈 자리가 남는다.
+ */
+.ss-team-grow {
+  display: inline-grid;
+  max-width: 100%;
+}
+
+.ss-team-grow::after,
+.ss-team-grow > input {
+  /* 같은 칸에 겹쳐 세운다 — 쌍둥이가 크기를 정하고 칸이 그 자리를 채운다. */
+  grid-area: 1 / 1;
+  /* 빈 칸이 「만들기」와 같은 폭이다 — 위 변수 하나가 둘을 맞춘다. */
+  min-width: var(--ss-team-base-w);
+  padding: 7px 14px;
+  border: 1px solid var(--ss-fg);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.8125rem;
+  letter-spacing: inherit;
+}
+
+.ss-team-grow::after {
+  content: attr(data-value);
+  /* 🔴 **자리는 차지하고 안 보인다.** `display:none` 이면 재지 못하고,
+     `opacity:0` 이면 가려 놓은 글자가 마우스에 잡힌다. */
+  visibility: hidden;
+  white-space: pre;
+  border-color: transparent;
+}
+
+/* ⚠️ **글자도 가운데**다 — 기본 폭이 짧은 값보다 넓어서, 왼쪽에 붙이면
+   칸 안에서 글자만 한쪽으로 쏠려 보인다. 값이 기본 폭을 넘으면 칸이 글자를
+   감싸므로 그때는 정렬이 눈에 띄지 않는다. */
+.ss-team-grow > input {
+  width: 100%;
+  text-align: center;
+  background-color: color-mix(in srgb, #000 24%, transparent);
+  /* 적는 글자도 **온전한 흰색**이다(사용자 요청). */
+  color: var(--ss-fg);
+  transition: background-color 160ms ease;
+}
+
+.ss-team-grow > input:focus-visible {
+  outline: none;
+  background-color: color-mix(in srgb, #000 38%, transparent);
+}
+
 .ss-pref-row {
   display: flex;
   /* 🔴 **가운데가 아니라 위로 붙인다.** 글이 두 줄이 되면 스위치가 가운데로

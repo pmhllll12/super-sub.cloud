@@ -1,11 +1,62 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { apiDelete, apiErrorMessage, apiPost } from '@/lib/api/client'
 import { rememberHomeTeam } from '@/lib/homeTeam'
-import Field from '@/components/ui/Field'
 import PillButton from '@/components/ui/PillButton'
+
+/**
+ * 팀 만들기 폼 전용 입력칸 — **적은 만큼만 넓어진다**(사용자 요청, 2026-09-16).
+ *
+ * 🔴 **공용 `ui/Field` 를 안 쓴다.** 그것은 로그인·가입도 쓰는데, 거기서는
+ * 칸이 판 너비를 꽉 채우는 것이 맞다(이메일·비밀번호는 길다). 공용 쪽에
+ * 늘어나는 성질을 넣으면 그 화면들이 같이 바뀐다.
+ *
+ * 🔴 **너비는 CSS 가 잰다.** `size` 속성은 「0」 글자 폭으로 세는 것이라 한글
+ * 에서 절반쯤 좁게 나오고, JS 로 재면 글자마다 렌더가 한 번 더 돈다. 감춘
+ * 쌍둥이(`::after` 의 `content: attr(data-value)`)를 같은 칸에 겹쳐 두면
+ * **어떤 글자든 브라우저가 알아서** 잰다(`globals.css` 의 `.ss-team-grow`).
+ */
+function GrowField({
+  label,
+  value,
+  onChange,
+  hint,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  hint?: string
+}) {
+  const id = useId()
+  return (
+    <div className="ss-team-field">
+      {/* ⚠️ **예시는 라벨 옆 괄호로**(사용자 요청, 2026-09-16). 칸 아래 따로
+          두었더니 한 줄을 더 먹으면서 「만들기」가 그만큼 밀려 내려갔고,
+          가운데 정렬 속에서 저 혼자 왼쪽이라 떠 보였다. */}
+      <label htmlFor={id}>
+        {label}
+        {hint && <span className="ss-team-hint"> ({hint})</span>}
+      </label>
+      {/* 🔴 `data-value` 가 **자(尺)** 노릇을 한다 — 값이 바뀌면 감춘 쌍둥이도
+          같이 바뀌고, 칸이 그만큼 넓어진다. 빈 값일 때는 `min-width` 가 받쳐
+          칸이 사라지지 않는다. */}
+      <span className="ss-team-grow" data-value={value}>
+        {/* 🔴 `size={1}` 이 있어야 한다. `<input>` 은 기본이 `size=20` 이라
+            **제 힘으로 스무 글자만큼 자리를 차지하고**, 격자가 그 값을 따라
+            가 버린다(실측: 빈 칸이 176px). 1 로 낮춰야 감춘 쌍둥이가 너비를
+            정한다. */}
+        <input
+          id={id}
+          size={1}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </span>
+    </div>
+  )
+}
 
 /**
  * 「소속」 절의 손짓 — **팀 만들기**와 **팀 나가기**.
@@ -168,8 +219,8 @@ export default function TeamActions({
           <div className="ss-profile-form-fold" data-open={open ? 'true' : 'false'}>
             <div inert={!open}>
               <form onSubmit={create} className="ss-profile-account-form ss-form-compact">
-                <Field label="팀 이름" value={name} onChange={setName} />
-                <Field label="지역" value={region} onChange={setRegion} hint="예: 서울 강남" />
+                <GrowField label="팀 이름" value={name} onChange={setName} />
+                <GrowField label="지역" value={region} onChange={setRegion} hint="예: 서울 강남" />
                 {/* 🔴 **가운데**(사용자 요청, 2026-09-16) — 폼이 좁아 왼쪽에
                     붙이면 아래 여백이 비어 보인다. */}
                 <PillButton
