@@ -21,6 +21,8 @@ def to_public_video_result(
         description=video.description,
         uploader_nickname=uploader_nickname,
         uploader_card_slug=uploader_card_slug,
+        width=video.width,
+        height=video.height,
     )
 
 

@@ -58,6 +58,13 @@ class VideoOrm(Base):
     storage_key: Mapped[str] = mapped_column(String(255), nullable=False)
     duration_ms: Mapped[int | None] = mapped_column(nullable=True)
 
+    # 화면 비율(`paik` 15번) — 등록할 때 클라이언트가 잰 값을 그대로 남긴다.
+    # 규격 검사에만 쓰고 버리던 것을 공개 목록이 미리 알아야 해서(`HomeFeed`가
+    # 칸을 그리기 전에 비율을 알아야 덜컥거리지 않는다) 저장하기 시작했다.
+    # 옛 행은 NULL — 이 컬럼이 생기기 전 등록분이다.
+    width: Mapped[int | None] = mapped_column(nullable=True)
+    height: Mapped[int | None] = mapped_column(nullable=True)
+
     # 던지는 팔·차는 발. **자동 판별이 팔 종목에서 신뢰할 수 없어**(5장 CON-007)
     # 업로드할 때 사람이 지정할 수 있게 열어 둔다. 비어 있으면 자동 판별을 쓴다.
     side: Mapped[str | None] = mapped_column(String(5), nullable=True)

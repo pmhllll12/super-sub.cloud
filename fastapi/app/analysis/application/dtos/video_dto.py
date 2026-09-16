@@ -271,3 +271,7 @@ class PublicVideoResult:
     description: str | None
     uploader_nickname: str
     uploader_card_slug: str | None
+    # 화면 비율(`paik` 15번). 이 컬럼이 생기기 전 등록분은 둘 다 None —
+    # 화면은 그럴 때 16:9로 가정해도 된다(기존 동작 그대로).
+    width: int | None
+    height: int | None

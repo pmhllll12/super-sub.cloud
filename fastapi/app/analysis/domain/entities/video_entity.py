@@ -40,6 +40,9 @@ class VideoEntity:
     duration_ms: int | None
     side: str | None
     created_at: datetime
+    # 화면 비율(`paik` 15번). 옛 행은 둘 다 None.
+    width: int | None = None
+    height: int | None = None
     validation: ValidationEntity | None = None
     analysis_job_id: UUID | None = None
     analysis_status: str | None = None

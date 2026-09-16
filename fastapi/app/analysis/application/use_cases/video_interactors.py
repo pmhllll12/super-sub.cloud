@@ -157,6 +157,8 @@ class RegisterVideoInteractor(RegisterVideoUseCase):
             duration_ms=command.duration_ms,
             side=command.side,
             created_at=now,
+            width=command.width,
+            height=command.height,
             validation=ValidationEntity(
                 passed=reason is None, reject_reason=reason, checked_at=now
             ),

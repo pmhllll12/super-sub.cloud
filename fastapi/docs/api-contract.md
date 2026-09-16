@@ -755,12 +755,12 @@ S3 의 분석 산출물(`report.json`)을 서버가 받아 점수만 걷어내�
   "overall_grade": "B",
   "breakdown": [
     { "criterion_id": "plant_knee_flexion", "name": "디딤발 무릎 굽히기",
-      "grade": 2, "title": "흔들리지 않는 축",
+      "grade": 2, "title": "흔들리지 않는 축", "title_earned": true,
       "evidence": "안정적으로 놓였습니다.", "stat": 88.5,
       "metric_ref": "plant_knee_angle_at_impact", "skipped": false },
     { "criterion_id": "plant_foot_position", "name": "디딤발 위치",
-      "grade": null, "title": null, "evidence": null, "stat": null,
-      "metric_ref": null, "skipped": true }
+      "grade": null, "title": null, "title_earned": null, "evidence": null,
+      "stat": null, "metric_ref": null, "skipped": true }
   ],
   "scenes": [
     { "metric_code": "impact_frame", "label": "임팩트 프레임", "at_seconds": 2.07 }
@@ -781,6 +781,12 @@ S3 의 분석 산출물(`report.json`)을 서버가 받아 점수만 걷어내�
 옛 행(이 필드가 생기기 전 적재분)은 `total_score`/`overall_grade` 가 `null`.
 `scenes` 는 프레임 지표(`impact_frame` 등)의 초 환산 — "이렇게 본 장면"으로
 이동하는 자리다.
+
+🔴 **`title_earned`(2026-09-16 추가, `paik` 23·`ho` 40번)로 「받은 호칭」을
+가른다.** `title`은 **모든 등급에 있다** — 0등급도 「무너지는 축」같은
+문구를 받는다. 그 값의 유무로 선을 그으면 못한 항목에 호칭을 달게 된다.
+`title_earned`가 참인 항목의 `title`만 "받은 호칭"으로 그린다. `null`이면
+`skipped`거나 이 필드가 생기기 전 적재분(둘 다 거짓으로 지어내지 않는다).
 
 | 에러 | code | 언제 |
 |---|---|---|
@@ -1772,7 +1778,7 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
 | 422 | `CANNOT_FEATURE` | 반려된 클립을 대표로 세우려 했다 |
 | 422 | `VALIDATION_ERROR` | `title`·`description` 이 길이 상한을 넘는다 |
 
-### `GET /api/v1/videos/public` — 공개 클립 목록 (2026-09-08 추가, 2026-09-15 업로더 추가)
+### `GET /api/v1/videos/public` — 공개 클립 목록 (2026-09-08 추가, 2026-09-15 업로더 추가, 2026-09-16 화면 비율 추가)
 
 홈의 영상 모음이 쓴다. **공개된 클립만**, 최근 것이 앞에 온다(최대 100건).
 
@@ -1781,7 +1787,8 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
   { "id": "7c05...", "sport_code": "football", "duration_ms": 10200,
     "created_at": "2026-09-08T09:00:00Z", "title": "우리 팀 첫 골",
     "description": "왼발 감아차기",
-    "uploader_nickname": "슛돌이", "uploader_card_slug": "shoot-dori-7f2a" }
+    "uploader_nickname": "슛돌이", "uploader_card_slug": "shoot-dori-7f2a",
+    "width": 1920, "height": 1080 }
 ]
 ```
 
@@ -1793,6 +1800,10 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
 `uploader_card_slug`(카드를 만든 사람만, 없으면 `null`)로 싣는다(`paik` 16번) —
 슬러그가 있으면 눌러서 그 사람 카드(`GET /cards/{slug}`)로 갈 수 있다. 재생은
 아래 `GET /videos/{id}/playback-url` 로 따로 받는다.
+
+`width`·`height`는 등록할 때 받은 값 그대로다(`paik` 15번, 화면이 미리 칸
+비율을 알아야 덜컥거리지 않는다). **이 컬럼이 생기기 전 등록분은 둘 다
+`null`**이다 — 화면은 그럴 때 16:9로 가정하면 된다(기존 동작).
 
 ### `GET /api/v1/videos/{video_id}/playback-url` — 재생용 주소 (2026-09-08 추가)
 
@@ -2400,15 +2411,18 @@ DB(연쇄)와 S3(`storage_key` + `reports/<user_id>/<video_id>/`, best-effort)�
 ### `GET /api/v1/coaches` · `GET /api/v1/coaches/{coach_id}`
 
 인증 필요. 페이지 형식은 `GET /admin/users`와 같다(`items`·`total`·`page`·`size`).
+목록은 **`sport_code` 쿼리로 거를 수 있다**(`paik` 14번, 2026-09-16 추가) — 안
+주면 전체 종목이 다 나온다.
 
 ```json
-{"id": "…", "name": "김도현", "contact": "…"}
+{"id": "…", "name": "김도현", "contact": "…", "sport_code": "football"}
 ```
 
-⚠️ **종목·가격·소개 문장·대표 영상이 없다.** `www/src/lib/market.ts`의 `Coach`
-타입(mock)은 이보다 훨씬 풍부하지만, 부록 D의 `coach`는 `id`·`name`·`contact`
-셋뿐이다 — 화면과 스키마를 맞추는 것은 별도 결정이 필요해 미결 항목에 올렸다.
-상세 없는 코치는 404 `COACH_NOT_FOUND`.
+⚠️ **가격·소개 문장·대표 영상이 아직 없다.** `www/src/lib/market.ts`의 `Coach`
+타입(mock)은 이보다 훨씬 풍부하지만, 부록 D의 `coach`는 `id`·`name`·`contact`·
+`sport_code` 넷뿐이다 — 나머지는 화면과 스키마를 맞추는 별도 결정이 필요해
+미결 항목에 남아 있다. 상세 없는 코치는 404 `COACH_NOT_FOUND`, 모르는
+`sport_code`는 422 `UNKNOWN_SPORT`.
 
 ### `POST /api/v1/coaches/{coach_id}/referrals`
 
@@ -2427,7 +2441,8 @@ DB(연쇄)와 S3(`storage_key` + `reports/<user_id>/<video_id>/`, best-effort)�
 ### 아직 없는 것
 
 - **`market.ts`의 나머지 필드** — 가격·후기·레슨 장소 등은 부록 D에 대응
-  컬럼이 없다. 필요해지면 부록 D 변경으로 이어진다
+  컬럼이 없다(종목은 `paik` 14번으로 이미 들어왔다). 필요해지면 부록 D
+  변경으로 이어진다
 - **크레딧 자동 지급·차감** — 가입 보너스나 분석당 차감을 트리거하는 경로.
   지금은 관리자의 수동 조정뿐이다
 
