@@ -11,6 +11,7 @@ from app.match.domain.entities.match_preference_entity import (
     MemberPreferenceSummaryEntity,
     RegionFactEntity,
     SlotEntity,
+    SquadRecruitmentFactsEntity,
     TeamPreferenceEntity,
 )
 
@@ -78,3 +79,24 @@ class MatchPreferencePort(ABC):
     @abstractmethod
     def resolve_regions(self, region_ids: list[UUID]) -> list[RegionFactEntity]:
         """id 목록을 (city, district)로 푼다 — 계층 비교(`paik` 20번)에 쓴다."""
+
+    @abstractmethod
+    def find_position(self, team_id: UUID, code: str) -> UUID | None:
+        """팀 **종목의** 포지션 id. 약칭은 종목 안에서만 유일하다(`card`
+        `SquadPort.find_position`과 같은 이유) — 없으면 `None`."""
+
+    @abstractmethod
+    def squad_recruitment_facts(
+        self, team_id: UUID, position_id: UUID
+    ) -> SquadRecruitmentFactsEntity:
+        """`paik` 27번 — 빈 자리 후보 원자료 + 이미 앉은 사람들의 등급.
+
+        하드 필터(정상호 회신)를 여기서 전부 건다: 그 포지션에 `member_
+        match_position`을 등록한 사람 중 ⑴ 이 팀 소속이 아니고(`team_member`,
+        `left_at IS NULL` 제외) ⑵ 이 스쿼드에 이미 앉지 않았고(`squad_member`)
+        ⑶ 팀이 경기 시간(`team_match_slot`)을 등록해 뒀다면 그 시간과 겹치는
+        `member_match_slot`이 있는 사람만(팀이 시간을 안 등록했으면 이 조건은
+        건너뛴다). 등급·`provisional`은 대표 영상의 리포트 + 리뷰 신뢰 축을
+        원시 교차 읽기로 계산한다(`analysis`·`review` 컨텍스트 테이블,
+        `card` 컨텍스트 테이블과 같은 이유로 임포트 없이 읽는다).
+        """

@@ -4,7 +4,14 @@ import type {
   AdminUser,
   AdminUserDetail,
   AdminVideoRow,
+  AppNotification,
   AuthToken,
+  Contact,
+  ContactRequest,
+  UserSearchResult,
+  TeamDetail,
+  SquadCandidate,
+  TeamMatchRequest,
   FeaturedVideo,
   Match,
   MercenaryCandidate,
@@ -45,7 +52,7 @@ const users = new Map<string, User>([
           team_id: '9a2e0000-0000-4000-8000-000000000002',
           name: '번개FC',
           region: '서울 강남',
-          sport_code: 'futsal',
+          sport_code: 'football',
           // 🔴 'owner'다 — 데모 계정으로 주장 전용 흐름(경기 등록 등)까지
           // 확인할 수 있어야 한다. 다른 곳은 이 값을 아직 안 쓴다(2026-09-04
           // 기준 실측 — 바꿔도 기존 동작에 영향 없음).
@@ -122,11 +129,14 @@ const POSITIONS: Position[] = [
   { sport_code: 'football', code: 'DF', label: '수비수' },
   { sport_code: 'football', code: 'MF', label: '미드필더' },
   { sport_code: 'football', code: 'FW', label: '공격수' },
-  { sport_code: 'futsal', code: 'GK', label: '골키퍼' },
-  { sport_code: 'futsal', code: 'DF', label: '수비수' },
-  { sport_code: 'futsal', code: 'MF', label: '미드필더' },
-  { sport_code: 'futsal', code: 'FW', label: '공격수' },
+  /* 🔴 **`futsal` 을 걷었다**(2026-09-16). 서버의 `sport` 참조 테이블에 그 행이
+     없다 — 마이그레이션 `20260901_sport_and_position.py` 가 **폐기**하고
+     `football` 로 옮겼다(`_RETIRED = "futsal"`). 여기 남겨 두면 없는 종목을
+     mock 이 아는 척해서, 이번처럼 배포에서만 터진다. */
 ]
+
+/** 서버의 `sport` 참조 테이블과 **같은 목록**이어야 한다(위 마이그레이션). */
+const SPORT_CODES = ['football', 'baseball', 'basketball']
 
 /** 종목 안에서 포지션 이름을 찾는다. 없으면 `undefined` — 부르는 쪽이 422 를 낸다. */
 function positionLabel(sportCode: string, code: string): string | undefined {
@@ -192,6 +202,20 @@ function checkCell(
  * 🔴 **진짜 백엔드에서는 안 그렇다** — 거기서는 상태가 DB 와 S3 에 있다.
  * 이걸 고치겠다고 화면 쪽에 자리를 만들지 말 것.
  */
+/**
+ * 데모 영상 파일의 **실제 화면 크기**(CCC 46). `public/` 의 파일을 `ffprobe` 로
+ * 읽은 값이다 — `MyVideo` 에는 이 칸이 없어서(공개 목록에만 실린다) 여기 둔다.
+ *
+ * 🔴 **새 파일을 넣으면 재서 적는다.** 눈대중으로 16:9 를 적으면 세로 영상이
+ * 가로 칸에 letterbox 되는데, 그게 바로 CCC 46 이 고친 그 증상이라 **mock 만
+ * 보고는 고쳐졌는지 알 수 없게 된다.**
+ */
+const DEMO_SIZES: Record<string, { width: number; height: number }> = {
+  '/coach-c001.mp4': { width: 1080, height: 1920 }, // 폰으로 세로
+  '/coach-c002.mp4': { width: 1280, height: 720 },
+  '/coach-c003.mp4': { width: 1920, height: 1080 },
+}
+
 let DEMO_VIDEOS: MyVideo[] = [
   {
     id: 'v1',
@@ -230,7 +254,7 @@ let DEMO_VIDEOS: MyVideo[] = [
   },
   {
     id: 'v3',
-    sport_code: 'futsal',
+    sport_code: 'football',
     storage_key: '/coach-c003.mp4',
     duration_ms: 15600,
     side: null,
@@ -412,6 +436,171 @@ let demoSquad: Squad | null = {
 /** `POST /me/card` 로 생긴 카드들. 데모 계정은 위 `card` 를 그대로 쓴다. */
 const made = new Map<string, PlayerCard>()
 
+/**
+ * 닉네임으로 찾을 수 있는 사람들 — `GET /users/search` 가 뒤지는 명단이다.
+ *
+ * 🔴 **전에는 이 사람들이 `SquadFriends.tsx` 안에 박혀 있었다**(2026-09-16에
+ * 옮김). 화면이 명단을 들고 있으면 `USE_MOCK=0` 으로 바꿔도 가짜가 그대로
+ * 나온다 — 여기로 내려야 스위치 하나로 진짜 사용자로 갈린다.
+ *
+ * 데모 계정(홍길동)도 넣어 둔다 — **본인이 결과에서 빠지는지**를 실제로
+ * 밟아 보려면 명단에 있어야 한다.
+ */
+const DEMO_DIRECTORY: UserSearchResult[] = [
+  { id: '3f1c0000-0000-4000-8000-000000000001', nickname: '홍길동' },
+  { id: '3f1c0000-0000-4000-8000-000000000002', nickname: '김철수' },
+  { id: '3f1c0000-0000-4000-8000-000000000003', nickname: '이영희' },
+  { id: '3f1c0000-0000-4000-8000-000000000004', nickname: '박준호' },
+  { id: '3f1c0000-0000-4000-8000-000000000005', nickname: '최민서' },
+  { id: '3f1c0000-0000-4000-8000-000000000006', nickname: '정하늘' },
+  { id: '3f1c0000-0000-4000-8000-000000000007', nickname: '강도윤' },
+  { id: '3f1c0000-0000-4000-8000-000000000008', nickname: '윤가온' },
+]
+
+/**
+ * 추천 후보 명단 — `GET /teams/{id}/squad/candidates` 와 `GET /cards/{slug}/grade`
+ * 가 같이 읽는다 (계약 3-16·3-6절).
+ *
+ * 🔴 **전에는 이 사람들이 `SquadSuggest.tsx` 안에 있었다**(2026-09-16에 옮김).
+ * 화면이 명단과 **등급**을 들고 있으면 `USE_MOCK=0` 으로 바꿔도 지어낸 등급이
+ * 그대로 나온다 — 25·26번이 막으려던 것이 정확히 그것이다.
+ *
+ * 🔴 **`provisional: true` 를 섞어 둔다.** 지금 루브릭은 검수 전이라 진짜
+ * 서버도 대부분 `true` 를 낸다 — 그 갈래(「검수 전」 배지)를 개발 중에 한 번도
+ * 안 밟으면 진짜 서버에 붙는 날 그 표시가 없다는 것을 알게 된다.
+ *
+ * ⚠️ 말로 적은 특징(`title`·`notes`)과 대표 장면(`clip`)은 **여기 없다** —
+ * 계약 44번이 「지금은 mock 클립·문구를 그대로 쓰고 이름·등급만 이 응답으로」
+ * 라고 범위를 그었다. 그 셋은 아직 화면에 남아 있다.
+ */
+const DEMO_CANDIDATES_BY_POSITION: Record<string, SquadCandidate[]> = {
+  GK: [
+    candidate('김선우', 'A', true),
+    candidate('오재현', 'C', true),
+  ],
+  DF: [
+    candidate('박도현', 'S', false),
+    candidate('이건우', 'B', true),
+    candidate('정민석', 'C', true),
+    // 🔴 카드를 아직 안 만든 사람 — `card_public_slug` 가 `null` 이라 대표
+    //    영상도 못 읽는다. 링크를 안 그리는 것으로 충분하다(계약 44번).
+    { user_id: 'u-seo', nickname: '서준혁', card_public_slug: null, grade: 'D', provisional: true },
+  ],
+  MF: [
+    candidate('최유진', 'A', true),
+    candidate('강태원', 'B', true),
+    candidate('윤서준', 'C', true),
+  ],
+  FW: [
+    candidate('조현우', 'F', false),
+    candidate('임재민', 'A', true),
+    candidate('신동현', 'B', true),
+    candidate('문태호', 'C', true),
+    // 🔴 **등급을 모르는 사람**(대표 영상이 없거나 분석 전) — 뒤로 가되
+    //    사라지지 않는다. `F` 로 치지 않는 것이 26번의 「하지 말 것」이다.
+    { user_id: 'u-bae', nickname: '배준영', card_public_slug: 'bae-junyoung', grade: null, provisional: null },
+  ],
+}
+
+/** 한 줄 짓기 — 슬러그는 닉네임에서 만든다(mock 안에서만 통하는 규칙이다). */
+function candidate(
+  nickname: string,
+  grade: string,
+  provisional: boolean,
+): SquadCandidate {
+  return {
+    user_id: `u-${nickname}`,
+    nickname,
+    card_public_slug: `${nickname}-card`,
+    grade,
+    provisional,
+  }
+}
+
+/** 슬러그 → 등급을 찾을 때 쓰는 평평한 목록. */
+const DEMO_CANDIDATE_POOL: SquadCandidate[] = Object.values(
+  DEMO_CANDIDATES_BY_POSITION,
+).flat()
+
+/** 신청·수락된 지인. 프로세스가 사는 동안만 남는다. */
+const contacts = new Map<string, ContactRequest>()
+
+/**
+ * 알림 통. `_to`(받는 사람)는 **mock 에만 있는 칸**이다 — 진짜 서버는 내
+ * 알림만 주므로 계약 응답에 그런 필드가 없다. 읽어 낼 때 떼고 준다.
+ */
+const notifications: (AppNotification & { _to: string })[] = []
+
+/**
+ * 팀 대 팀 경기 신청 (계약 3-15절).
+ *
+ * 🔴 **`tmr0` 을 하나 심어 둔다** — 받은 신청이 하나는 있어야 알림의 빨간
+ * 점 · 수락 흐름을 실제로 밟아 볼 수 있다. mock 에는 상대 팀 주장으로
+ * 로그인할 길이 없어서, 아무도 안 걸어 주면 그 화면을 영영 못 본다.
+ * 진짜 백엔드에서는 상대가 진짜로 걸어야 생긴다.
+ *
+ * id 는 `lib/teamMatch.ts` 의 `TEAMS` 와 맞춘다 — 그래야 화면이 상대 팀
+ * 이름을 찾을 수 있다(계약 응답에는 팀 id 만 오고 이름이 없다).
+ */
+const teamMatchRequests = new Map<string, TeamMatchRequest>([
+  [
+    'tmr0',
+    {
+      id: 'tmr0',
+      requester_team_id: 'mt-2', // 망원 유나이티드
+      target_team_id: DEMO_TEAM_ID,
+      proposed_played_at: '2026-09-19T09:00:00+09:00',
+      proposed_place: '망원 실내구장 A',
+      status: 'pending',
+      created_at: '2026-09-16T00:30:00Z',
+      responded_at: null,
+      match_id: null,
+    },
+  ],
+])
+
+/** 그 팀의 주장인가 — 계약이 주장만 허용하는 경로들이 쓴다. */
+function requireCaptain(u: User, teamId: string): void {
+  const team = u.teams.find((t) => t.team_id === teamId)
+  if (!team) throw new BackendError(404, 'TEAM_NOT_FOUND', '팀을 찾을 수 없습니다.')
+  if (team.role !== 'owner') {
+    throw new BackendError(403, 'FORBIDDEN', '팀 주장만 할 수 있습니다.')
+  }
+}
+
+/** 알림 한 통을 쌓는다. `_to` 는 mock 에만 있는 칸이다(`stripTo` 참고). */
+function pushNotification(to: string, type: AppNotification['type'], subjectId: string): void {
+  notifications.push({
+    id: `nt${notifications.length + 1}`,
+    type,
+    actor_user_id: to,
+    subject_type: type.startsWith('team_match') ? 'team_match_request' : 'user_contact',
+    subject_id: subjectId,
+    read_at: null,
+    created_at: new Date().toISOString(),
+    _to: to,
+  })
+}
+
+/**
+ * `_to` 를 떼고 계약 그대로의 알림만 남긴다.
+ *
+ * 🔴 **칸을 하나씩 적는다.** `const { _to, ...rest }` 로 벗기면 응답 모양이
+ * 「남은 것 전부」가 되어, mock 에 칸을 하나 더 두는 순간 계약에 없는 필드가
+ * 조용히 따라 나간다. 화면이 그걸 읽기 시작하면 진짜 서버에서 없어진다.
+ */
+function stripTo(n: AppNotification & { _to: string }): AppNotification {
+  return {
+    id: n.id,
+    type: n.type,
+    actor_user_id: n.actor_user_id,
+    subject_type: n.subject_type,
+    subject_id: n.subject_id,
+    read_at: n.read_at,
+    created_at: n.created_at,
+  }
+}
+
 export const mockBackend: Backend = {
   async signup({ email, password, nickname }) {
     if ([...users.values()].some((u) => u.email === email)) {
@@ -450,13 +639,29 @@ export const mockBackend: Backend = {
     return requireUser(token)
   },
 
-  async updateMe(token, { nickname }) {
+  async updateMe(token, { nickname, is_nickname_searchable }) {
     const u = requireUser(token)
+    const next = { ...u }
+    /* 🔴 **`nickname` 은 필수다**(2026-09-16 정정). 앞서 여기를 「보낸 칸만
+       바꾼다」로 고쳤던 것은 **틀렸다** — 실서버 `UpdateMeSchema` 는
+       `nickname: str = Field(min_length=1, …)` 로 **늘 받는다.** 선택인 것은
+       아래 `is_nickname_searchable` 쪽뿐이다.
+
+       🔴 그 사이 **개발에서만 돌고 배포에서 422 가 났다**(사용자가 겪음).
+       mock 이 계약보다 너그러우면 그 차이는 **배포에서만** 드러난다 — 이
+       파일 머리말이 「화면 쪽에 자리를 만들지 말 것」이라고 적어 둔 것과
+       같은 종류의 함정이다. */
+    if (nickname === undefined) {
+      throw new BackendError(422, 'VALIDATION_ERROR', '요청 값이 올바르지 않습니다: nickname')
+    }
     const trimmed = nickname.trim() // 서버가 정규화한다
     if (trimmed.length < 1 || trimmed.length > 20) {
       throw new BackendError(422, 'VALIDATION_ERROR', '요청 값이 올바르지 않습니다: nickname')
     }
-    const next = { ...u, nickname: trimmed }
+    next.nickname = trimmed
+    if (is_nickname_searchable !== undefined) {
+      next.is_nickname_searchable = is_nickname_searchable
+    }
     users.set(token, next)
     return next
   },
@@ -541,6 +746,31 @@ export const mockBackend: Backend = {
       updated.tagline = cleaned ? cleaned : null
     }
     if ('style' in input) updated.style = input.style ?? null
+    /* 🔴 **사람이 직접 적는 호칭**(2026-09-16, 미결 `paik` 36번). 읽는 모양은
+       그대로 `Title[]` 이라 카드 · 추천 판이 손댈 것이 없다 — 사람이 적은
+       글은 `label` 에 담고 `code` 는 서버가 짓는다(여기서는 차례로).
+
+       🔴 `category` 를 안 받는다(사용자 결정) — 자유 입력이라 분류를 매길
+       사람이 없다. 읽는 쪽도 안 쓴다. */
+    if ('titles' in input) {
+      const now = new Date().toISOString()
+      /* 🔴 **계약(51번)과 같은 모양이어야 한다.** 앞뒤 공백을 털고, 빈 글은
+         버리고, **같은 글은 하나만** 남긴다. `code` 는 `custom:` 으로 시작하고
+         `category` 는 **`null`** 이다 — 여기가 계약보다 너그러우면 그 차이는
+         배포에서만 드러난다(오늘 `nickname`·`futsal` 로 두 번 겪었다). */
+      updated.titles = [
+        ...new Set(
+          (input.titles ?? []).map((t) => t.trim()).filter(Boolean),
+        ),
+      ]
+        .slice(0, 3)
+        .map((label, i) => ({
+          code: `custom:${i + 1}`,
+          label,
+          category: null,
+          granted_at: now,
+        }))
+    }
     made.set(u.id, updated)
     return updated
   },
@@ -601,16 +831,21 @@ export const mockBackend: Backend = {
           name: '디딤발 위치',
           grade: 2,
           title: '흔들리지 않는 축',
+          title_earned: true,
           evidence: '측면으로 벌리는 움직임이 많습니다',
           metric_ref: 'plant_foot_offset',
           skipped: false,
           stat: 91.2,
         },
+        /* 🔴 **문구는 있는데 못 받은 항목**(CCC 47) — 서버는 `title` 을 **모든
+           등급에** 싣는다. 화면이 `title_earned` 로 가르는지 보려고 둔다.
+           유무로 가르던 때는 이 자리가 「받은 호칭」으로 잘못 그려졌다. */
         {
           criterion_id: 'shoulder_lead',
           name: '어깨 선행',
           grade: 1,
-          title: null,
+          title: '앞서 도는 어깨',
+          title_earned: false,
           evidence: '공을 받기 전에 어깨를 먼저 돌립니다',
           metric_ref: 'shoulder_rotation_lead',
           skipped: false,
@@ -621,6 +856,7 @@ export const mockBackend: Backend = {
           name: '팔로스루',
           grade: 2,
           title: '첫 리포트',
+          title_earned: true,
           evidence: '두 번째 동작으로 이어지는 속도가 빠릅니다',
           metric_ref: 'follow_through_speed',
           skipped: false,
@@ -634,6 +870,7 @@ export const mockBackend: Backend = {
           name: '점프 높이',
           grade: null,
           title: null,
+          title_earned: null,
           evidence: null,
           metric_ref: null,
           skipped: true,
@@ -736,6 +973,11 @@ export const mockBackend: Backend = {
       created_at: v.created_at,
       title: v.title,
       description: v.description,
+      /* 🔴 **재서 넣은 실제 값이다**(CCC 46) — `ffprobe` 로 `public/` 의 파일을
+         읽었다. 지어낸 값을 두면 세로 파일이 가로 칸에서 letterbox 되어, 화면이
+         고쳐졌는지 mock 으로는 알 수 없게 된다. 실서버의 옛 등록분은 둘 다
+         `null` 로 오고 그것은 **에러가 아니다**(화면이 16:9 로 가정한다). */
+      ...(DEMO_SIZES[v.storage_key] ?? { width: null, height: null }),
     }))
   },
 
@@ -1009,5 +1251,354 @@ export const mockBackend: Backend = {
       report_prefix: `reports/${found.id}/${v.id}/`,
     }))
     return { user_id: found.id, nickname: found.nickname, email: found.email, items }
+  },
+
+  /* ── 지인 · 알림 (계약 3-12절, CCC 37번) ──────────────────────────────
+   *
+   * 🔴 **이 명단은 mock 에만 있다.** 전에는 같은 사람들이 `SquadFriends.tsx`
+   * 안에 박혀 있었다 — 화면이 목록을 들고 있으면 `USE_MOCK=0` 으로 바꿔도
+   * 가짜가 그대로 나온다. 여기로 내리면 스위치 하나로 진짜 사용자가 나온다.
+   */
+
+  async searchUsers(token, q) {
+    const me = requireUser(token)
+    const needle = q.trim().toLowerCase()
+    // 🔴 빈 질의는 **빈 결과**다 — 계약의 `q` 는 필수고, 서버는 전체 명단을
+    // 주는 경로가 아니다. 여기서 전부 돌려주면 화면이 "목록을 받는다"고
+    // 잘못 배우고, 진짜 백엔드에 붙는 날 빈 화면이 된다.
+    if (!needle) return []
+    /* 🔴 **검색을 끈 사람은 빠진다**(계약 3-12절). mock 에서 남의 스위치는
+       모르지만 **내 것은 안다** — 내가 껐는데 내가 검색되면 스위치가 도는지
+       확인할 길이 없다(본인 제외 규칙에 이미 걸리지만, 둘은 다른 이유다). */
+    return DEMO_DIRECTORY.filter(
+      (p) => p.id !== me.id && p.nickname.toLowerCase().includes(needle),
+    ).slice(0, 20)
+  },
+
+  async listContacts(token) {
+    const me = requireUser(token)
+    const items: Contact[] = []
+    for (const c of contacts.values()) {
+      if (!c.accepted_at) continue
+      const iAmRequester = c.requester_user_id === me.id
+      if (!iAmRequester && c.target_user_id !== me.id) continue
+      const otherId = iAmRequester ? c.target_user_id : c.requester_user_id
+      items.push({
+        contact_id: c.id,
+        user_id: otherId,
+        nickname: DEMO_DIRECTORY.find((p) => p.id === otherId)?.nickname ?? '알 수 없음',
+        // 🔴 **내가 신청자일 때만** 준다(계약) — 상대 시점에서는 늘 null 이다.
+        note: iAmRequester ? c.note : null,
+        accepted_at: c.accepted_at,
+      })
+    }
+    return { items }
+  },
+
+  async listContactRequests(token) {
+    const me = requireUser(token)
+    return [...contacts.values()].filter((c) => !c.accepted_at && c.target_user_id === me.id)
+  },
+
+  async requestContact(token, { target_user_id, note }) {
+    const me = requireUser(token)
+    if (target_user_id === me.id) {
+      throw new BackendError(422, 'CANNOT_REQUEST_SELF', '자기 자신에게는 신청할 수 없습니다.')
+    }
+    if (!DEMO_DIRECTORY.some((p) => p.id === target_user_id)) {
+      throw new BackendError(404, 'USER_NOT_FOUND', '사용자를 찾을 수 없습니다.')
+    }
+    // 🔴 **방향을 안 본다** — 상대가 먼저 보낸 신청이 있어도 중복이다(계약).
+    const dup = [...contacts.values()].some(
+      (c) =>
+        (c.requester_user_id === me.id && c.target_user_id === target_user_id) ||
+        (c.requester_user_id === target_user_id && c.target_user_id === me.id),
+    )
+    if (dup) {
+      throw new BackendError(409, 'ALREADY_REQUESTED', '이미 신청했거나 이미 지인입니다.')
+    }
+    const made: ContactRequest = {
+      id: `ct${contacts.size + 1}`,
+      requester_user_id: me.id,
+      target_user_id,
+      note: note ?? null,
+      accepted_at: null,
+      created_at: new Date().toISOString(),
+    }
+    contacts.set(made.id, made)
+    notifications.push({
+      id: `nt${notifications.length + 1}`,
+      type: 'contact_request',
+      actor_user_id: me.id,
+      subject_type: 'user_contact',
+      subject_id: made.id,
+      read_at: null,
+      created_at: made.created_at,
+      // 받는 사람 — 계약 응답에는 없다(내 알림만 오므로). mock 은 한 통에
+      // 다 담아 두고 읽을 때 걸러야 해서 따로 든다.
+      _to: target_user_id,
+    })
+    return made
+  },
+
+  async acceptContact(token, contactId) {
+    const me = requireUser(token)
+    const found = contacts.get(contactId)
+    if (!found) throw new BackendError(404, 'CONTACT_NOT_FOUND', '신청을 찾을 수 없습니다.')
+    if (found.target_user_id !== me.id) {
+      throw new BackendError(403, 'FORBIDDEN', '내가 대상인 신청만 수락할 수 있습니다.')
+    }
+    if (found.accepted_at) {
+      throw new BackendError(409, 'ALREADY_ACCEPTED', '이미 수락한 신청입니다.')
+    }
+    const next = { ...found, accepted_at: new Date().toISOString() }
+    contacts.set(contactId, next)
+    notifications.push({
+      id: `nt${notifications.length + 1}`,
+      type: 'contact_accepted',
+      actor_user_id: me.id,
+      subject_type: 'user_contact',
+      subject_id: contactId,
+      read_at: null,
+      created_at: next.accepted_at!,
+      _to: found.requester_user_id,
+    })
+    return next
+  },
+
+  async listNotifications(token, unreadOnly) {
+    const me = requireUser(token)
+    return notifications
+      .filter((n) => n._to === me.id && (!unreadOnly || !n.read_at))
+      .map(stripTo)
+      .reverse() // 최신순
+      .slice(0, 50)
+  },
+
+  async readNotification(token, notificationId) {
+    const me = requireUser(token)
+    const found = notifications.find((n) => n.id === notificationId && n._to === me.id)
+    if (!found) {
+      throw new BackendError(404, 'NOTIFICATION_NOT_FOUND', '알림을 찾을 수 없습니다.')
+    }
+    // 멱등이다 — 이미 읽었어도 200 이고 시각을 덮지 않는다.
+    found.read_at ??= new Date().toISOString()
+    return stripTo(found)
+  },
+
+  /* ── 팀 대 팀 경기 신청 (계약 3-15절, CCC 42번) ─────────────────────── */
+
+  /* ── 표시 등급 · 추천 후보 (계약 3-6·3-16절, CCC 43·44번) ──────────────
+   *
+   * 🔴 **경계를 여기서 긋는다** — 진짜 서버가 Wilson 신뢰구간으로 계산하는
+   * 자리다. mock 은 그 결과만 흉내 내고, **화면은 어느 쪽이든 받아 쓰기만
+   * 한다**(그것이 25·26번의 「하지 말 것」이다).
+   *
+   * 🔴 `provisional: true` 를 **일부러 섞어 둔다** — 「검수 전」 배지가 개발
+   * 중에 한 번도 안 뜨면, 정상호가 조건으로 단 그 표시가 진짜 서버에 붙는 날
+   * 없다는 것을 알게 된다(팀 매칭 mock 이 5:5 만 채웠던 것과 같은 함정).
+   */
+
+  /* ── 팀 만들기 · 나가기 (계약 3-3절) ──────────────────────────────── */
+
+  async createTeam(token, { name, region, sport_code }) {
+    const u = requireUser(token)
+    if (!name.trim() || !region.trim()) {
+      throw new BackendError(422, 'VALIDATION_ERROR', '이름과 지역이 필요합니다.')
+    }
+    /* 🔴 **모르는 종목은 서버처럼 거절한다**(2026-09-16). 전에는 무엇이든
+       받아서, `futsal` 을 보내던 팀 만들기가 **개발에서만 돌고 배포에서
+       `422 UNKNOWN_SPORT` 로 죽었다**(사용자가 겪음). mock 이 계약보다
+       너그러우면 그 차이는 배포에서만 드러난다 — `PATCH /me` 의 `nickname`
+       과 같은 함정이라 같은 방식으로 막는다. */
+    if (!SPORT_CODES.includes(sport_code)) {
+      throw new BackendError(422, 'UNKNOWN_SPORT', '등록되지 않은 종목 코드입니다.')
+    }
+    const id = `team-${users.size}-${u.teams.length + 1}`
+    // 🔴 **만든 사람이 주장으로 함께 들어간다**(계약) — 그래야 `GET /me` 의
+    //    `teams` 에 바로 잡히고 홈 스쿼드 판이 그 팀을 읽는다.
+    const next: User = {
+      ...u,
+      teams: [
+        ...u.teams,
+        {
+          team_id: id,
+          name: name.trim(),
+          region: region.trim(),
+          sport_code,
+          role: 'owner',
+          joined_at: new Date().toISOString(),
+        },
+      ],
+    }
+    users.set(token, next)
+    return {
+      id,
+      name: name.trim(),
+      region: region.trim(),
+      sport_code,
+      members: [
+        {
+          user_id: u.id,
+          nickname: u.nickname,
+          role: 'owner',
+          joined_at: new Date().toISOString(),
+          player_card_id: null,
+          card_public_slug: null,
+        },
+      ],
+    } satisfies TeamDetail
+  },
+
+  async leaveTeam(token, teamId, memberId) {
+    const u = requireUser(token)
+    const mine = u.teams.find((t) => t.team_id === teamId)
+    if (!mine) throw new BackendError(404, 'NOT_A_MEMBER', '그 팀의 구성원이 아닙니다.')
+    /* 🔴 **마지막 주장은 못 나간다**(계약). mock 에는 나 혼자뿐이라 주장이면
+       늘 마지막이다 — 그 갈래를 실제로 밟아 볼 수 있어야 화면이 409 안내를
+       만들게 된다. */
+    if (mine.role === 'owner' && memberId === u.id) {
+      throw new BackendError(409, 'LAST_OWNER', '마지막 주장은 팀을 나갈 수 없습니다.')
+    }
+    users.set(token, { ...u, teams: u.teams.filter((t) => t.team_id !== teamId) })
+  },
+
+  async getCardGrade(token, cardPublicSlug) {
+    requireUser(token)
+    const found = DEMO_CANDIDATE_POOL.find((c) => c.card_public_slug === cardPublicSlug)
+    // 모르는 슬러그는 **404 가 아니라 빈 등급**이다 — 계약이 「대표 영상이
+    // 없거나 분석 전」을 `null` 로 내기로 했고, 슬러그가 없는 것도 화면에서는
+    // 같은 뜻이다(보여 줄 등급이 없다).
+    return { grade: found?.grade ?? null, provisional: found?.provisional ?? null }
+  },
+
+  async listSquadCandidates(token, teamId, { position_code, grade }) {
+    const u = requireUser(token)
+    if (!u.teams.some((t) => t.team_id === teamId)) {
+      throw new BackendError(403, 'FORBIDDEN', '그 팀 소속이 아닙니다.')
+    }
+    const pool = DEMO_CANDIDATES_BY_POSITION[position_code] ?? []
+    if (!grade || grade === 'any') return pool
+    return pool.filter((c) => c.grade === grade)
+  },
+
+  async requestTeamMatch(token, teamId, { target_team_id, played_at, place }) {
+    const me = requireUser(token)
+    requireCaptain(me, teamId)
+    if (target_team_id === teamId) {
+      throw new BackendError(422, 'CANNOT_REQUEST_SELF', '같은 팀에는 걸 수 없습니다.')
+    }
+    if (new Date(played_at).getTime() < Date.now()) {
+      throw new BackendError(422, 'PAST_MATCH', '지난 시각으로는 걸 수 없습니다.')
+    }
+    const made: TeamMatchRequest = {
+      id: `tmr${teamMatchRequests.size + 1}`,
+      requester_team_id: teamId,
+      target_team_id,
+      proposed_played_at: played_at,
+      proposed_place: place,
+      status: 'pending',
+      created_at: new Date().toISOString(),
+      responded_at: null,
+      match_id: null,
+    }
+    teamMatchRequests.set(made.id, made)
+    /* 🔴 **알림은 상대 팀 주장에게 간다** — mock 에는 그 사람이 없으므로 아무
+       데도 안 쌓인다. 내 화면의 빨간 점은 **받은 신청**(아래 seed)이 켠다.
+       여기서 나에게 알림을 만들면 내가 건 신청을 내가 받은 것처럼 보인다. */
+    return made
+  },
+
+  async listTeamMatchRequests(token, teamId) {
+    const me = requireUser(token)
+    requireCaptain(me, teamId)
+    return [...teamMatchRequests.values()]
+      .filter((r) => r.requester_team_id === teamId || r.target_team_id === teamId)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+  },
+
+  async acceptTeamMatch(token, teamId, requestId) {
+    const me = requireUser(token)
+    requireCaptain(me, teamId)
+    const found = teamMatchRequests.get(requestId)
+    if (!found || found.target_team_id !== teamId) {
+      throw new BackendError(404, 'TEAM_MATCH_REQUEST_NOT_FOUND', '신청을 찾을 수 없습니다.')
+    }
+    if (found.status !== 'pending') {
+      throw new BackendError(
+        409,
+        'TEAM_MATCH_REQUEST_ALREADY_RESPONDED',
+        '이미 응답한 신청입니다.',
+      )
+    }
+    const now = new Date().toISOString()
+    const next: TeamMatchRequest = {
+      ...found,
+      status: 'accepted',
+      responded_at: now,
+      match_id: `m-tmr-${requestId}`,
+    }
+    teamMatchRequests.set(requestId, next)
+    /* 🔴 **이중 예약을 막는다**(계약) — 수락되는 순간 두 팀 각각의 다른
+       `pending` 을 전부 `cancelled` 로 정리한다. 화면이 막을 일이 아니다. */
+    for (const [id, r] of teamMatchRequests) {
+      if (id === requestId || r.status !== 'pending') continue
+      const touches = [r.requester_team_id, r.target_team_id]
+      if (touches.includes(found.requester_team_id) || touches.includes(found.target_team_id)) {
+        teamMatchRequests.set(id, { ...r, status: 'cancelled', responded_at: now })
+      }
+    }
+    // 신청 팀 주장에게 알림 — mock 에서는 내가 양쪽을 다 볼 수 없으므로,
+    // **내가 건 신청이 수락된 경우에만** 내 알림 통에 쌓인다.
+    if (found.requester_team_id === teamId) {
+      pushNotification(me.id, 'team_match_accepted', requestId)
+    }
+    return next
+  },
+
+  async rejectTeamMatch(token, teamId, requestId) {
+    const me = requireUser(token)
+    requireCaptain(me, teamId)
+    const found = teamMatchRequests.get(requestId)
+    if (!found || found.target_team_id !== teamId) {
+      throw new BackendError(404, 'TEAM_MATCH_REQUEST_NOT_FOUND', '신청을 찾을 수 없습니다.')
+    }
+    if (found.status !== 'pending') {
+      throw new BackendError(
+        409,
+        'TEAM_MATCH_REQUEST_ALREADY_RESPONDED',
+        '이미 응답한 신청입니다.',
+      )
+    }
+    const next: TeamMatchRequest = {
+      ...found,
+      status: 'rejected',
+      responded_at: new Date().toISOString(),
+    }
+    teamMatchRequests.set(requestId, next)
+    return next
+  },
+
+  async cancelTeamMatch(token, teamId, requestId) {
+    const me = requireUser(token)
+    requireCaptain(me, teamId)
+    const found = teamMatchRequests.get(requestId)
+    if (!found || found.requester_team_id !== teamId) {
+      throw new BackendError(404, 'TEAM_MATCH_REQUEST_NOT_FOUND', '신청을 찾을 수 없습니다.')
+    }
+    if (found.status !== 'pending') {
+      throw new BackendError(
+        409,
+        'TEAM_MATCH_REQUEST_ALREADY_RESPONDED',
+        '이미 응답한 신청입니다.',
+      )
+    }
+    const next: TeamMatchRequest = {
+      ...found,
+      status: 'cancelled',
+      responded_at: new Date().toISOString(),
+    }
+    teamMatchRequests.set(requestId, next)
+    return next
   },
 }

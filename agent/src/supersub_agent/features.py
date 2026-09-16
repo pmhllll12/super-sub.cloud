@@ -92,6 +92,39 @@ LIMB_MIN_CONFIDENCE = {"leg": 0.3, "arm": 0.6}
 #       0으로 만들자 17/17 전부 실패했다 — 팔과 달리 여기서는 뺄 수 없다.
 GATE_JOINTS = {"arm": 2, "leg": 3}
 
+# 🔴 게이트 사유 문구가 쓰는 **사람 말** (2026-09-16, 미결 `ho` 41번).
+#
+# 실서버에서 사용자가 **같은 영상을 아홉 번** 올려 아홉 번 같은 이유로 떨어졌다.
+# 판정이 결정론적이라 같은 파일은 몇 번을 올려도 같은 값이 나오는데, 사유가
+# 「…유효 프레임 비율 53% < 기준 70%. 재촬영이 필요하다」였다 — **무엇을
+# 바꿔야 하는지가 없으니 「다시 올리기」가 자연스러운 다음 행동이었다.**
+#
+# 그래서 사유에 셋을 담는다: ⑴ **무엇이** 안 잡혔나(사람이 아는 부위 이름)
+# ⑵ **어떻게 찍어야** 하나 ⑶ 🔴 **같은 파일을 다시 올려도 같다**.
+# `GATE_JOINTS` 와 짝이다 — 세는 관절이 바뀌면 이 이름도 바뀌어야 하고,
+# `test_features.py` 가 둘이 어긋나면 잡는다.
+GATE_PART = {"arm": "팔", "leg": "다리"}
+GATE_JOINT_NAMES = {"arm": "어깨·팔꿈치", "leg": "골반·무릎·발목"}
+GATE_FRAMING = {"arm": "상체", "leg": "다리 전체"}
+
+
+def subject_particle(word: str) -> str:
+    """`word` 뒤에 붙일 주격 조사 — 받침이 있으면 「이」, 없으면 「가」.
+
+    🔴 **문구에 조사를 미리 박아 두지 않는다.** 그러면 부위 이름 하나를 고칠
+    때 조사까지 함께 고쳐야 하고, 실제로 「팔가」·「어깨·팔꿈치이」가 한 번
+    나갔다. 사용자에게 나가는 문장이라 이런 것이 바로 보인다.
+    """
+    last = word[-1] if word else ""
+    if "가" <= last <= "힣":  # 한글 음절이면 종성으로 판단한다
+        return "이" if (ord(last) - 0xAC00) % 28 else "가"
+    return "이"  # 숫자·영문으로 끝나면 안전한 쪽으로
+
+
+def with_particle(word: str) -> str:
+    """「다리」 → 「다리가」 · 「발목」 → 「발목이」."""
+    return f"{word}{subject_particle(word)}"
+
 # 품질 게이트의 합격선 — 스윙 측 게이트 관절의 유효 프레임 비율 하한.
 # `check_quality`의 기본값이자 `keypoint_quality_envelope`가 봉투에 적어 내는
 # 기준값이다. 🔴 **두 곳에 숫자를 적지 않는다** — 게이트가 0.7로 거른 입력에
@@ -619,9 +652,11 @@ def check_quality(
     ratio = gate_ratio(kps, limb, side)
     if ratio < min_valid_ratio:
         raise InsufficientQuality(
-            f"{LIMB_NAMES[limb]} 스윙 측 키포인트({GATE_JOINTS[limb]}개 관절) "
-            f"유효 프레임 비율 {ratio:.0%} < 기준 {min_valid_ratio:.0%}. "
-            "재촬영이 필요하다."
+            f"{with_particle(GATE_PART[limb])} 영상에 충분히 잡히지 않았습니다 — "
+            f"동작하는 쪽 {with_particle(GATE_JOINT_NAMES[limb])} 모두 보이는 "
+            f"프레임이 {ratio:.0%}뿐입니다(기준 {min_valid_ratio:.0%}). "
+            f"{with_particle(GATE_FRAMING[limb])} 화면 안에 들어오고 가려지지 "
+            "않게 다시 찍어 주세요. 같은 영상을 다시 올리면 결과가 같습니다."
         )
     return ratio
 

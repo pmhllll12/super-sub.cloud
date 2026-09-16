@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -23,6 +24,9 @@ from sqlalchemy.exc import IntegrityError
 from app.analysis.adapter.outbound.orm.analysis_job_orm import AnalysisJobOrm
 from app.analysis.adapter.outbound.orm.video_orm import VideoOrm
 from app.analysis.adapter.outbound.orm.video_validation_orm import VideoValidationOrm
+from app.analysis.adapter.outbound.pg.report_ingest_pg_repository import (
+    ReportIngestPgRepository,
+)
 from app.analysis.adapter.outbound.pg.video_pg_repository import VideoPgRepository
 from app.analysis.adapter.outbound.stub.video_stub_repository import (
     _OBJECTS,
@@ -30,9 +34,13 @@ from app.analysis.adapter.outbound.stub.video_stub_repository import (
     put_object,
     reset_videos,
 )
+from app.analysis.application.use_cases.report_parser import parse_report
 from app.analysis.dependencies.video_providers import get_storage
 from app.core.config import settings
+from app.core.security import issue_access_token
 from app.main import app
+from app.review.adapter.outbound.pg.review_pg_repository import ReviewPgRepository
+from app.review.domain.entities.review_entity import ReviewEntity
 from tests.conftest import V1
 
 pytestmark = pytest.mark.db
@@ -83,7 +91,9 @@ def uploader(db_client):
     }
 
 
-def _upload(db_client, uploader, size_bytes=SIZE_OK, filename="clip.mp4"):
+def _upload(
+    db_client, uploader, size_bytes=SIZE_OK, filename="clip.mp4", content_hash=None
+):
     res = db_client.post(
         f"{V1}/videos/upload-url",
         json={
@@ -95,7 +105,7 @@ def _upload(db_client, uploader, size_bytes=SIZE_OK, filename="clip.mp4"):
     )
     assert res.status_code == 200, res.text
     key = res.json()["storage_key"]
-    put_object(key, size_bytes)
+    put_object(key, size_bytes, content_hash=content_hash)
     return key
 
 
@@ -239,9 +249,109 @@ class TestRegister:
         assert res.json()["error"]["code"] == "UNKNOWN_SPORT"
 
     def test_있는_종목은_통과한다(self, db_client, uploader):
-        """위 검사의 양성 대조. 둘이 같이 있어야 "종목을 실제로 읽는다"가 된다."""
+        """위 검사의 양성 대조. 둘이 같이 있어야 "종목을 실제로 읽는다"가 된다.
+
+        🔴 `ho` 39번으로 야구가 내려가서(`sport.active=false`) 축구로 바꿨다 —
+        내려간 종목은 아래 검사가 따로 본다.
+        """
         key = _upload(db_client, uploader)
-        assert _register(db_client, uploader, key, sport_code="baseball").status_code == 201
+        assert _register(db_client, uploader, key, sport_code="football").status_code == 201
+
+    def test_내려간_종목은_올리기_전에_막힌다(self, db_client, db_session, uploader):
+        """루브릭이 없는 종목은 등록은 통과하고 **워커에서** 거부돼서, 올린
+        뒤에야 실패했다(`ho` 39번). 올리기 전에 가른다 — 행은 그대로 둔다.
+        """
+        active = db_session.execute(
+            text("select active from sport where code = 'baseball'")
+        ).scalar_one()
+        assert active is False
+
+        key = _upload(db_client, uploader)
+        res = _register(db_client, uploader, key, sport_code="baseball")
+        assert res.status_code == 422
+        assert res.json()["error"]["code"] == "SPORT_NOT_AVAILABLE"
+
+
+class TestDuplicateDetection:
+    """`ho` 41번 — 진짜 PostgreSQL로 "새 작업을 안 만든다"까지 확인한다.
+
+    계약 테스트(`test_video_router.py`)는 스텁이라 `analysis_job` 행이 실제로
+    생기는지/안 생기는지를 못 본다 — 여기서 그것을 본다.
+    """
+
+    HASH = "deadbeef" * 4
+
+    def _finish(self, db_session, video_id, *, status, failure_reason=None):
+        db_session.execute(
+            text(
+                "UPDATE analysis_job SET status = :s, failure_reason = :r "
+                "WHERE video_id = :id"
+            ),
+            {"s": status, "r": failure_reason, "id": video_id},
+        )
+        db_session.commit()
+
+    def test_같은_사람이_같은_내용을_다시_올리면_작업_행이_새로_안_생긴다(
+        self, db_client, db_session, uploader
+    ):
+        key1 = _upload(db_client, uploader, content_hash=self.HASH)
+        video1_id = uuid.UUID(_register(db_client, uploader, key1).json()["id"])
+        reason = "품질 게이트 미달: 유효 프레임 비율 53% < 기준 70%."
+        self._finish(db_session, video1_id, status="failed", failure_reason=reason)
+
+        key2 = _upload(db_client, uploader, filename="clip2.mp4", content_hash=self.HASH)
+        res = _register(db_client, uploader, key2)
+        assert res.status_code == 201, res.text
+        body = res.json()
+        video2_id = uuid.UUID(body["id"])
+        assert body["analysis_job_id"] is None
+        assert body["duplicate_of_video_id"] == str(video1_id)
+        assert body["duplicate_status"] == "failed"
+        assert body["duplicate_failure_reason"] == reason
+
+        jobs = db_session.execute(
+            text("SELECT count(*) FROM analysis_job WHERE video_id = :id"),
+            {"id": video2_id},
+        ).scalar_one()
+        assert jobs == 0
+
+    def test_다시_읽으면_이_영상_자신은_작업이_없다고_정직하게_나온다(
+        self, db_client, db_session, uploader
+    ):
+        """빌려온 결과는 등록 응답 한 번뿐이다 — `GET /videos`는 그 값을 안 들고 있다.
+
+        중복도 「작업이 있던 것」과 같은 취급이라(`kept=False`) 기본 목록에
+        보이려면 다른 분석-완료 클립처럼 「내 프로필에 저장」을 눌러야 한다.
+        """
+        key1 = _upload(db_client, uploader, content_hash=self.HASH)
+        video1_id = uuid.UUID(_register(db_client, uploader, key1).json()["id"])
+        self._finish(db_session, video1_id, status="succeeded")
+
+        key2 = _upload(db_client, uploader, filename="clip2.mp4", content_hash=self.HASH)
+        video2_id = uuid.UUID(_register(db_client, uploader, key2).json()["id"])
+        keep = db_client.post(
+            f"{V1}/videos/{video2_id}/keep", headers=uploader["headers"]
+        )
+        assert keep.status_code == 200, keep.text
+
+        rows = db_client.get(f"{V1}/videos", headers=uploader["headers"]).json()
+        row = next(r for r in rows if r["id"] == str(video2_id))
+        assert row["analysis_status"] is None
+        assert row["duplicate_of_video_id"] == str(video1_id)
+        assert row["duplicate_status"] is None
+
+    def test_끝나지_않은_동일_내용은_새_작업을_만든다(
+        self, db_client, db_session, uploader
+    ):
+        """`queued`인 것을 빌리면 안 끝난 결과를 답으로 주게 된다 — 대상에서 뺀다."""
+        key1 = _upload(db_client, uploader, content_hash=self.HASH)
+        _register(db_client, uploader, key1)  # 완료 처리 안 함 — queued 그대로
+
+        key2 = _upload(db_client, uploader, filename="clip2.mp4", content_hash=self.HASH)
+        res = _register(db_client, uploader, key2)
+        body = res.json()
+        assert body["analysis_job_id"] is not None
+        assert body["duplicate_of_video_id"] is None
 
 
 class TestVisibility:
@@ -287,6 +397,31 @@ class TestVisibility:
         # 실어야 한다 — `paik` 16번이 고치려던 바로 그 버그.
         row = next(r for r in rows if r["id"] == video_id)
         assert row["uploader_nickname"] == uploader["nickname"]
+
+    def test_화면_비율이_실제로_저장되고_공개_목록에_실린다(
+        self, db_client, db_session, uploader
+    ):
+        """`paik` 15번 — 세로 영상(9:16)도 실측 그대로 저장·노출되는가."""
+        key = _upload(db_client, uploader)
+        video_id = _register(db_client, uploader, key, width=1080, height=1920).json()[
+            "id"
+        ]
+        db_client.post(f"{V1}/videos/{video_id}/keep", headers=uploader["headers"])
+        db_client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"is_public": True},
+            headers=uploader["headers"],
+        )
+
+        stored = db_session.execute(
+            text("SELECT width, height FROM video WHERE id = :id"),
+            {"id": uuid.UUID(video_id)},
+        ).one()
+        assert (stored.width, stored.height) == (1080, 1920)
+
+        rows = db_client.get(f"{V1}/videos/public", headers=uploader["headers"]).json()
+        row = next(r for r in rows if r["id"] == video_id)
+        assert (row["width"], row["height"]) == (1080, 1920)
 
     def test_카드를_만든_업로더는_슬러그도_실린다(self, db_client, uploader):
         key = _upload(db_client, uploader)
@@ -916,3 +1051,226 @@ class TestAdminVideos:
         )
         assert res.status_code == 404
         assert res.json()["error"]["code"] == "VIDEO_NOT_FOUND"
+
+
+def _envelope(*, grade="A", provisional=False):
+    return {
+        "schema_version": "1.0",
+        "source_video": "s3://b/videos/u/v.mp4",
+        "analyzed_at": "20260910T120000Z",
+        "code_version": "abc1234",
+        "rubric": {"sport": "football", "motion": "instep_shot", "version": "0.1"},
+        "swing_side": "right",
+        "sampled_fps": 30.0,
+        "frames": 300,
+        "frame_metrics_seconds": {"impact_frame": 2.07},
+        "judge_model": "exaone-4.0-1.2b",
+        "features": {
+            "trunk_forward_lean_deg_at_impact": 12.4,
+            "plant_knee_angle_at_impact": 158.0,
+            "impact_frame": 62,
+        },
+        "result": {
+            "score": 90,
+            "grade": grade,
+            "summary": "등급 검사용 리포트입니다.",
+            "pipeline_version": "pose-v0.1",
+            "provisional": provisional,
+            "breakdown": [
+                {
+                    "criterion_id": "plant_knee_flexion",
+                    "name": "디딤발 무릎 굽히기",
+                    "grade": 2,
+                    "weight": 0.15,
+                    "contribution": 15.0,
+                    "title": "흔들리지 않는 축",
+                    "band": "150~170",
+                    "out_of_band": "",
+                    "stat": 88.5,
+                    "evidence": "안정적으로 놓였습니다.",
+                    "metric_ref": "plant_knee_angle_at_impact",
+                },
+            ],
+            "skipped": [],
+        },
+    }
+
+
+class TestCardGrade:
+    """`GET /cards/{slug}/grade` — 등급(미결 `paik` 25·26번)이 **실제 조인**으로
+    나오는지 확인한다. `card→video→analysis_job→analysis_metric→analysis_report`
+    와 `review→review_selection` 두 원시 쿼리 체인을 한 번에 검증한다 — 저쪽
+    컬럼 이름이 바뀌면 파이썬이 안 잡아 주므로 이 검사가 유일한 방어선이다
+    (`fastapi/CLAUDE.md`「원시 SQL로 남의 테이블을 읽는 자리」).
+    """
+
+    def _featured_with_report(self, db_session, user_id, *, grade, provisional):
+        """대표로 세운 영상 1개 + 그 리포트."""
+        now = datetime.now(timezone.utc)
+        video_id, job_id = uuid.uuid4(), uuid.uuid4()
+        db_session.add(
+            VideoOrm(
+                id=video_id,
+                user_id=user_id,
+                sport_code="football",
+                storage_key=f"videos/{video_id}.mp4",
+                duration_ms=10_000,
+                side="right",
+                is_featured=True,
+                created_at=now,
+            )
+        )
+        db_session.flush()
+        db_session.add(
+            AnalysisJobOrm(
+                id=job_id, video_id=video_id, status="succeeded", created_at=now
+            )
+        )
+        db_session.commit()
+        parsed = parse_report(
+            json.dumps(_envelope(grade=grade, provisional=provisional)).encode()
+        )
+        ReportIngestPgRepository(db_session).replace_for_job(job_id, parsed)
+        return video_id
+
+    def _reviews(self, db_session, *, team_id, match_id, reviewee, codes_by_reviewer):
+        """`reviewee` 앞으로 리뷰 여러 건. `codes_by_reviewer` 는 `{reviewer_id: [선택지...]}`."""
+        repo = ReviewPgRepository(db_session)
+        for reviewer_id, codes in codes_by_reviewer.items():
+            ok = repo.save_review(
+                ReviewEntity(
+                    id=uuid.uuid4(),
+                    match_id=match_id,
+                    reviewer_id=reviewer_id,
+                    reviewee_id=reviewee,
+                    submitted_at=datetime.now(timezone.utc),
+                    selected_codes=codes,
+                )
+            )
+            assert ok, "리뷰 저장 실패 — FK/유일 제약 확인"
+
+    def _team_and_match(self, db_session):
+        team_id, match_id = uuid.uuid4(), uuid.uuid4()
+        db_session.execute(
+            text(
+                "insert into team (id, name, sport_code, region) "
+                "values (:i, :n, 'football', '서울')"
+            ),
+            {"i": team_id, "n": f"등급검사팀-{team_id.hex[:6]}"},
+        )
+        db_session.execute(
+            text(
+                "insert into match (id, team_id, played_at, place) "
+                "values (:i, :t, now() - interval '1 day', '검사구장')"
+            ),
+            {"i": match_id, "t": team_id},
+        )
+        db_session.commit()
+        return team_id, match_id
+
+    def _teardown(self, db_session, *, user_ids, team_id=None, match_id=None):
+        db_session.rollback()
+        if match_id is not None:
+            db_session.execute(
+                text(
+                    "delete from review_selection where review_id in "
+                    "(select id from review where match_id = :m)"
+                ),
+                {"m": match_id},
+            )
+            db_session.execute(
+                text("delete from review where match_id = :m"), {"m": match_id}
+            )
+            db_session.execute(
+                text("delete from match where id = :m"), {"m": match_id}
+            )
+        if team_id is not None:
+            db_session.execute(text("delete from team where id = :t"), {"t": team_id})
+        for uid in user_ids:
+            db_session.execute(
+                text("delete from analysis_job where video_id in "
+                     "(select id from video where user_id = :u)"),
+                {"u": uid},
+            )
+            db_session.execute(text("delete from video where user_id = :u"), {"u": uid})
+            db_session.execute(
+                text("delete from player_card where user_id = :u"), {"u": uid}
+            )
+            db_session.execute(
+                text("delete from user_credential where user_id = :u"), {"u": uid}
+            )
+            db_session.execute(text('delete from "user" where id = :u'), {"u": uid})
+        db_session.commit()
+
+    def test_신뢰_우세인_A는_S로_조립된다(self, db_client, db_session, uploader):
+        owner_id = uploader["id"]
+        self._featured_with_report(
+            db_session, owner_id, grade="A", provisional=False
+        )
+        card = db_client.post(f"{V1}/me/card", headers=uploader["headers"])
+        assert card.status_code in (200, 201), card.text
+        slug = card.json()["public_slug"]
+
+        team_id, match_id = self._team_and_match(db_session)
+        reviewers = [uuid.uuid4() for _ in range(4)]
+        for rid in reviewers:
+            db_session.execute(
+                text(
+                    'insert into "user" (id, email, nickname, created_at, token_version) '
+                    "values (:i, :e, :n, now(), 0)"
+                ),
+                {"i": rid, "e": f"grade-rv-{rid}@example.test", "n": f"평가자{rid.hex[:6]}"},
+            )
+        db_session.commit()
+        self._reviews(
+            db_session,
+            team_id=team_id,
+            match_id=match_id,
+            reviewee=owner_id,
+            codes_by_reviewer={rid: ["repeat_yes"] for rid in reviewers},
+        )
+
+        viewer = uuid.uuid4()
+        db_session.execute(
+            text(
+                'insert into "user" (id, email, nickname, created_at, token_version) '
+                "values (:i, :e, :n, now(), 0)"
+            ),
+            {"i": viewer, "e": f"grade-viewer-{viewer}@example.test", "n": f"보는이{viewer.hex[:6]}"},
+        )
+        db_session.commit()
+
+        try:
+            # 남의 등급을 읽는 경로다(`paik` 25번) — `uploader` 가 아니라 `viewer`
+            # 로 부른다.
+            res = db_client.get(
+                f"{V1}/cards/{slug}/grade",
+                headers={"Authorization": f"Bearer {issue_access_token(viewer)}"},
+            )
+            assert res.status_code == 200, res.text
+            assert res.json() == {"grade": "S", "provisional": False}
+        finally:
+            self._teardown(
+                db_session,
+                user_ids=[owner_id, viewer, *reviewers],
+                team_id=team_id,
+                match_id=match_id,
+            )
+
+    def test_리뷰가_없으면_분석등급_그대로다(self, db_client, db_session, uploader):
+        owner_id = uploader["id"]
+        self._featured_with_report(
+            db_session, owner_id, grade="D", provisional=True
+        )
+        card = db_client.post(f"{V1}/me/card", headers=uploader["headers"])
+        slug = card.json()["public_slug"]
+
+        try:
+            res = db_client.get(
+                f"{V1}/cards/{slug}/grade", headers=uploader["headers"]
+            )
+            assert res.status_code == 200, res.text
+            # 리뷰 0건 → 신뢰 우세 아님 → D는 "구해 줄 근거 없음"으로 F.
+            assert res.json() == {"grade": "F", "provisional": True}
+        finally:
+            self._teardown(db_session, user_ids=[owner_id])

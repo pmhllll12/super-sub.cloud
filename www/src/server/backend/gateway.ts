@@ -2,7 +2,15 @@ import type {
   AdminUserDetail,
   AdminUserListResult,
   AdminVideoListResult,
+  AppNotification,
   AuthToken,
+  Contact,
+  ContactRequest,
+  UserSearchResult,
+  TeamDetail,
+  CardGrade,
+  SquadCandidate,
+  TeamMatchRequest,
   CardStyleWire,
   CreateMatchInput,
   FeaturedVideo,
@@ -30,7 +38,14 @@ export interface Backend {
   login(input: { email: string; password: string }): Promise<AuthToken>
   loginWithGoogle(input: { id_token: string }): Promise<AuthToken>
   getMe(token: string): Promise<User>
-  updateMe(token: string, input: { nickname: string }): Promise<User>
+  /**
+   * 내 정보를 고친다. **보낸 칸만 바뀐다** — 안 보낸 것은 그대로다(계약).
+   * 그래서 닉네임만 고칠 때 검색 노출을 실어 보내지 않는다.
+   */
+  updateMe(
+    token: string,
+    input: { nickname?: string; is_nickname_searchable?: boolean },
+  ): Promise<User>
   /** 🔴 성공하면 **기존 토큰이 전부 무효가 된다**(SEC-004) — 다시 로그인시켜야 한다. */
   changePassword(
     token: string,
@@ -55,9 +70,17 @@ export interface Backend {
    * 있으니 **키 자체를 빼고** 부른다. `null` 은 "지운다"는 뜻이 있는 값이다.
    * 🔴 `style` 을 보낼 땐 **전체 값**을 보낸다 — 서버가 부분 병합을 안 한다.
    */
+  /**
+   * 카드에서 **사람이 정하는 값**을 바꾼다. 보낸 칸만 바뀐다(계약 3-5절).
+   *
+   * ⚠️ `titles` 는 **아직 계약에 없다**(미결 `paik` 36번 — 요청해 두었다).
+   * 호칭을 사람이 직접 적기로 바뀌면서(2026-09-16) 필요해진 칸이고, 지금은
+   * mock 만 받는다. 🔴 **진짜 서버가 이 칸을 받기 전까지 실서버에서는
+   * 저장되지 않는다** — 화면이 그것을 숨기지 않고 말한다.
+   */
   updateMyCard(
     token: string,
-    input: { tagline?: string | null; style?: CardStyleWire | null },
+    input: { tagline?: string | null; style?: CardStyleWire | null; titles?: string[] },
   ): Promise<PlayerCard>
   getPublicCard(slug: string): Promise<PublicPlayerCard>
   /** 내가 올린 클립 목록. **최근 것이 앞에 온다.** */
@@ -235,4 +258,85 @@ export interface Backend {
   forceDeleteUser(token: string, userId: string): Promise<void>
   /** 관리자 전용. `user` 는 `user.id` 또는 이메일. 없는 사람이면 404 USER_NOT_FOUND. */
   listAdminVideos(token: string, user: string): Promise<AdminVideoListResult>
+
+  /* ── 지인 · 알림 (계약 3-12절, CCC 37번) ───────────────────────────────
+   *
+   * 🔴 **상호 관계다.** 신청(`requestContact`)은 한쪽이 하지만 상대가
+   * 수락(`acceptContact`)해야 양쪽 목록에 뜬다. 그래서 "검색해서 나온 사람"과
+   * "내 지인"은 **다른 목록**이다 — 화면에서 하나로 합치면 안 된다.
+   */
+
+  /** 닉네임 부분일치로 사람 찾기. 최대 20명, **본인과 검색을 끈 사람은 빠진다.** */
+  searchUsers(token: string, q: string): Promise<UserSearchResult[]>
+  /** 수락된 지인 목록. */
+  listContacts(token: string): Promise<{ items: Contact[] }>
+  /** 나에게 온 대기중 신청. 내가 보낸 신청은 여기 안 온다(계약에 그 경로가 없다). */
+  listContactRequests(token: string): Promise<ContactRequest[]>
+  /**
+   * 지인 신청. 422 `CANNOT_REQUEST_SELF` · 404 `USER_NOT_FOUND` ·
+   * 409 `ALREADY_REQUESTED`(방향 무관 · 이미 지인인 경우 포함).
+   */
+  requestContact(
+    token: string,
+    input: { target_user_id: string; note?: string },
+  ): Promise<ContactRequest>
+  /** 내가 대상인 대기중 신청만 수락된다. 403 `FORBIDDEN` · 409 `ALREADY_ACCEPTED`. */
+  acceptContact(token: string, contactId: string): Promise<ContactRequest>
+  /** 알림 목록(폴링). 최신순 최대 50건. */
+  listNotifications(token: string, unreadOnly?: boolean): Promise<AppNotification[]>
+  /** 읽음 처리. **멱등이다** — 이미 읽었어도 200. */
+  readNotification(token: string, notificationId: string): Promise<AppNotification>
+
+  /* ── 팀 대 팀 경기 신청 (계약 3-15절, CCC 42번) ─────────────────────── */
+
+  /** 경기 걸기. **신청 팀 주장만.** 422 `CANNOT_REQUEST_SELF`·`PAST_MATCH`. */
+  requestTeamMatch(
+    token: string,
+    teamId: string,
+    input: { target_team_id: string; played_at: string; place: string },
+  ): Promise<TeamMatchRequest>
+  /** 그 팀이 **보낸 것 + 받은 것** 전부, 최신순. 주장만. */
+  listTeamMatchRequests(token: string, teamId: string): Promise<TeamMatchRequest[]>
+  /** 수락 → 확정 경기 생성(`match_id`). **대상 팀 주장만.** */
+  acceptTeamMatch(token: string, teamId: string, requestId: string): Promise<TeamMatchRequest>
+  /** 거절. **대상 팀 주장만.** */
+  rejectTeamMatch(token: string, teamId: string, requestId: string): Promise<TeamMatchRequest>
+  /** 신청 팀이 스스로 무르기 — `pending` 일 때만. 알림이 안 간다. */
+  cancelTeamMatch(token: string, teamId: string, requestId: string): Promise<TeamMatchRequest>
+
+  /* ── 표시 등급 · 추천 후보 (계약 3-6·3-16절, CCC 43·44번) ──────────────
+   *
+   * 🔴 **경계는 서버가 긋는다.** 두 응답 모두 `grade`(`S`~`F`)와
+   * `provisional` 을 짝으로 준다 — 화면은 받아서 그리기만 한다.
+   */
+
+  /* ── 팀 만들기 · 나가기 (계약 3-3절) ──────────────────────────────── */
+
+  /** 팀을 만든다. 🔴 **만든 사람이 `owner` 로 함께 들어간다.** */
+  createTeam(
+    token: string,
+    input: { name: string; region: string; sport_code: string },
+  ): Promise<TeamDetail>
+  /**
+   * 팀에서 나간다(본인) 또는 뺀다(주장).
+   *
+   * 🔴 `memberId` 는 **그 사람의 `user_id`** 다 — 소속 행의 id 가 아니다.
+   * 🔴 **마지막 주장은 못 나간다**(`409 LAST_OWNER`) — 소유권 이양 경로가
+   * 아직 없다. 화면에서 미리 막지 말고 그 코드를 받아 안내한다.
+   */
+  leaveTeam(token: string, teamId: string, memberId: string): Promise<void>
+
+  /** 남의 표시 등급. 로그인하면 누구나(`featured-video` 와 같은 원칙). */
+  getCardGrade(token: string, cardPublicSlug: string): Promise<CardGrade>
+  /**
+   * 빈 자리에 넣을 후보들 — **이미 정렬돼서 온다.**
+   *
+   * `grade` 를 주면 그 칸으로만 하드 필터, 안 주면 거르지 않고 팀 평균과
+   * 가까운 순으로 정렬만 한다.
+   */
+  listSquadCandidates(
+    token: string,
+    teamId: string,
+    params: { position_code: string; grade?: string },
+  ): Promise<SquadCandidate[]>
 }

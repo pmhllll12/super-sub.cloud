@@ -19,5 +19,9 @@ class TitleEntity:
 
     code: str
     label: str
-    category: TitleCategory
+    #: 🔴 **사람이 직접 적은 호칭은 `None` 이다**(`paik` 36번, 2026-09-16).
+    #: 분류는 부록 D 가 정의한 셋뿐이고 그건 **부여되는 호칭**의 것이다 —
+    #: 사람이 적은 글에 분류를 매길 사람이 없어서(그 항목의 「하지 말 것」)
+    #: 새 분류를 만드는 대신 비워 둔다.
+    category: TitleCategory | None
     granted_at: datetime

@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
  */
 export async function PATCH(req: NextRequest) {
   return withAuth(req, async (token) => {
-    let body: { tagline?: unknown; style?: unknown }
+    let body: { tagline?: unknown; style?: unknown; titles?: unknown }
     try {
       body = await req.json()
     } catch {
@@ -40,7 +40,8 @@ export async function PATCH(req: NextRequest) {
       )
     }
 
-    const input: { tagline?: string | null; style?: CardStyleWire | null } = {}
+    const input: { tagline?: string | null; style?: CardStyleWire | null; titles?: string[] } =
+      {}
     // `tagline` 은 `null` 이 지운다는 뜻이 있는 값이다 — 그대로 넘긴다.
     if ('tagline' in body) {
       const v = body.tagline
@@ -50,10 +51,37 @@ export async function PATCH(req: NextRequest) {
       const v = body.style
       input.style = v === null ? null : (v as CardStyleWire)
     }
+    /* **사람이 직접 적는 호칭**(2026-09-16, 미결 `paik` 36번).
+       ⚠️ **아직 계약에 없다** — mock 만 받는다. 진짜 서버가 이 칸을 받기 전까지
+       실서버에서는 그냥 무시되거나 422 다. 화면이 그것을 숨기지 않고 말한다. */
+    if ('titles' in body) {
+      const v = body.titles
+      if (!Array.isArray(v) || v.some((t) => typeof t !== 'string')) {
+        return NextResponse.json(
+          { error: { code: 'VALIDATION_ERROR', message: '호칭은 글자 목록입니다.' } },
+          { status: 422 },
+        )
+      }
+      // 🔴 **길이는 여기서 막는다** — 20자는 `tagline` 과 같은 값이고, 추천
+      //    판의 한 줄에 들어가야 한다. 조용히 자르지 않는다(계약 3-5절과 같은
+      //    판단 — 쓴 것과 보이는 것이 달라지면 알아차리는 때가 공유한 뒤다).
+      if (v.some((t) => (t as string).trim().length > 20)) {
+        return NextResponse.json(
+          { error: { code: 'VALIDATION_ERROR', message: '호칭은 20자까지입니다.' } },
+          { status: 422 },
+        )
+      }
+      input.titles = v as string[]
+    }
 
     if (Object.keys(input).length === 0) {
       return NextResponse.json(
-        { error: { code: 'VALIDATION_ERROR', message: 'tagline·style 중 하나가 필요합니다.' } },
+        {
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'tagline·style·titles 중 하나가 필요합니다.',
+          },
+        },
         { status: 422 },
       )
     }

@@ -19,7 +19,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import String
+from sqlalchemy import Boolean, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -32,3 +32,14 @@ class SportOrm(Base):
     # 대리키를 두지 않는다 — 참조하는 쪽이 코드를 그대로 들고 있다.
     code: Mapped[str] = mapped_column(String(20), primary_key=True)
     label: Mapped[str] = mapped_column(String(40), nullable=False)
+    # 🔴 **지금 새로 받을 수 있는 종목인가** (`ho` 39번, 2026-09-16). 에이전트가
+    # 축구 단일 종목으로 정리되면서 야구·농구 루브릭이 사라졌는데, **행을 지울
+    # 수는 없다** — 이미 그 종목으로 올라간 영상이 참조하고 있다(2026-09-16
+    # 실측 165건). 그래서 지우는 대신 이 칸을 내린다.
+    #
+    # 읽기·거르기(`GET /positions`·경기 목록·코치 목록)는 **`false` 여도 그대로
+    # 돈다** — 과거 데이터를 계속 볼 수 있어야 해서다. 막는 것은 **새로 만드는
+    # 자리**(팀 만들기·영상 등록)뿐이다.
+    active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="true"
+    )

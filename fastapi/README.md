@@ -71,14 +71,19 @@ app/
     adapter/
       inbound/api/schemas/  auth_schema.py · me_schema.py
       inbound/api/v1/       auth_router.py · me_router.py
-      outbound/repositories/ user_stub_repository.py
+      outbound/orm/         *_orm.py (SQLAlchemy 모델)
+      outbound/pg/          *_pg_repository.py (실물)
+      outbound/stub/        *_stub_repository.py (계약 테스트용)
     dependencies/     user_repository_provider.py · *_provider.py
     _docs/README.md
 
   card/                                   부록 D ③ 카드·호칭 — 같은 모양
 ```
 
-앞으로 `video`(②) · `match`(④) · `review`(⑤) · `billing`(⑥)이 같은 모양으로 붙는다.
+**컨텍스트는 일곱이고 전부 붙어 있다**(2026-09-16 기준) — `user`(①) ·
+`analysis`(②, 부록 D 의 "영상·분석") · `card`(③) · `match`(④) · `review`(⑤) ·
+`billing`(⑥) · `notification`. 목록의 정본은 `tests/test_architecture.py` 의
+`CONTEXTS` 이고, 실제 디렉터리와 어긋나면 같은 파일의 검사가 잡는다.
 
 ### 파일 이름 접미사
 

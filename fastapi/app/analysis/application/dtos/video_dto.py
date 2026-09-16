@@ -117,6 +117,31 @@ class FeaturedVideoResult:
 
 
 @dataclass(frozen=True)
+class GetCardGradeCommand:
+    """카드 슬러그로 **표시 등급**을 읽는다(미결 `paik` 25·26번).
+
+    로그인하면 누구나 — 추천 판이 등급으로 후보를 좁히는 자리다. 대표 영상이
+    없거나 분석 전이면 `grade` 가 `None` 이다(카드 슬러그 자체가 없을 때만
+    404 — `CardGradeResult` 가 아니라 예외로 갈린다).
+    """
+
+    card_public_slug: str
+
+
+@dataclass(frozen=True)
+class CardGradeResult:
+    """`GET /cards/{slug}/grade` 응답 본문이 그대로 이 모양이다.
+
+    🔴 리포트 전체가 아니라 **등급 한 칸**만 준다(근거 문장·수치는 안 실린다).
+    `provisional` 을 등급과 함께 내준다 — 등급 문자만 떼면 받는 쪽이 잠정인지
+    알 방법이 없어진다(`paik` 26번).
+    """
+
+    grade: str | None
+    provisional: bool | None
+
+
+@dataclass(frozen=True)
 class DeleteVideoCommand:
     """영상을 지운다. **자기 클립만** — `user_id` 로 소유를 확인한다."""
 
@@ -228,6 +253,13 @@ class VideoResult:
     title: str | None
     description: str | None
     kept: bool
+    # 같은 내용의 다른(자기) 영상 결과를 재사용했으면 그 영상(`ho` 41번).
+    duplicate_of_video_id: UUID | None = None
+    # 🔴 등록 응답 한 번에만 실린다 — 위 `duplicate_of_video_id`가 있을 때만
+    # 채워진다. 나중에 이 영상을 다시 읽으면 이 둘은 `None`이다(`analysis_
+    # status`가 이 영상 자신의 진짜 작업 상태를 정직하게 보여준다).
+    duplicate_status: str | None = None
+    duplicate_failure_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -246,3 +278,7 @@ class PublicVideoResult:
     description: str | None
     uploader_nickname: str
     uploader_card_slug: str | None
+    # 화면 비율(`paik` 15번). 이 컬럼이 생기기 전 등록분은 둘 다 None —
+    # 화면은 그럴 때 16:9로 가정해도 된다(기존 동작 그대로).
+    width: int | None
+    height: int | None

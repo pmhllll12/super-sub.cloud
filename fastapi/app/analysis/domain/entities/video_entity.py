@@ -40,6 +40,9 @@ class VideoEntity:
     duration_ms: int | None
     side: str | None
     created_at: datetime
+    # 화면 비율(`paik` 15번). 옛 행은 둘 다 None.
+    width: int | None = None
+    height: int | None = None
     validation: ValidationEntity | None = None
     analysis_job_id: UUID | None = None
     analysis_status: str | None = None
@@ -66,3 +69,41 @@ class VideoEntity:
     subject_at_ms: int | None = None
     # 「집중해서 볼 항목」 (미결 `paik` 8번). 위와 같은 취급.
     focus: list[str] | None = None
+    # 같은 파일 재업로드 감지(`ho` 41번). S3 `ETag`. 옛 행은 None.
+    content_hash: str | None = None
+    # 내용이 같은 다른(자기) 영상의 결과를 재사용했으면 그 영상을 가리킨다
+    # (`ho` 41번). 실제 DB 컬럼이라 다시 읽으면 그대로 남아 있다.
+    duplicate_of_video_id: UUID | None = None
+    # 🔴 **DB 컬럼이 아니다.** 등록 응답 한 번에만 실리는 값 — 중복으로 판단해
+    # 새 작업을 안 만들었을 때 그 원본 영상의 결과를 등록 인터랙터가 직접
+    # 채운다(`ho` 41번). 나중에 이 영상을 다시 읽으면(`list_by_user` 등) 이
+    # 영상 자신은 작업이 없으므로 둘 다 `None`이다 — 그게 정직한 상태다.
+    duplicate_status: str | None = None
+    duplicate_failure_reason: str | None = None
+
+
+@dataclass(frozen=True)
+class PriorAnalysisOutcome:
+    """같은 사용자가 올린 같은 내용의 영상 중 분석까지 끝난 가장 최근 결과
+    (`ho` 41번, 중복 업로드 재사용). `find_prior_outcome`이 돌려준다."""
+
+    video_id: UUID
+    status: str
+    failure_reason: str | None
+
+
+@dataclass(frozen=True)
+class CardGradeRow:
+    """카드 슬러그가 가리키는 등급의 **원자료**(미결 `paik` 25·26번).
+
+    표시 등급(`S`~`F`) 계산은 여기서 하지 않는다 — 인터랙터가
+    `domain/rules/grade_rules.py`를 불러 한다. `overall_grade`·`provisional`
+    은 대표 영상이 없거나 분석 전이면 둘 다 `None`. `trust_total` 은 재매칭
+    의사(`repeat_yes`/`caution_would_not_repeat`)를 표한 평가 건수 — 매너·
+    실력 선택지는 세지 않는다(`paik` 26번 ⑴).
+    """
+
+    overall_grade: str | None
+    provisional: bool | None
+    trust_positive: int
+    trust_total: int

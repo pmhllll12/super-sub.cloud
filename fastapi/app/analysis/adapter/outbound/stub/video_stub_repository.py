@@ -14,13 +14,22 @@ from uuid import UUID
 from app.analysis.application.dtos.video_dto import UNSET, UserRef
 from app.analysis.application.ports.output.storage_port import StoragePort
 from app.analysis.application.ports.output.video_port import VideoPort
-from app.analysis.domain.entities.video_entity import VideoEntity
+from app.analysis.domain.entities.video_entity import (
+    CardGradeRow,
+    PriorAnalysisOutcome,
+    VideoEntity,
+)
 
 _SPORTS = ("football", "baseball", "basketball")
+# 지금 새로 받는 종목(`sport.active`, `ho` 39번). 나머지는 행만 남아 있다.
+_ACTIVE_SPORTS = ("football",)
 
 _VIDEOS: dict[UUID, VideoEntity] = {}
 # 가짜 저장소에 "올라와 있는" 객체. 키 -> 크기(바이트).
 _OBJECTS: dict[str, int] = {}
+# 가짜 저장소 객체의 내용 지문(`ho` 41번). 키 -> 해시. 안 부르면 없음(None) —
+# 대부분 테스트는 재업로드 감지와 무관하다.
+_HASHES: dict[str, str] = {}
 # 바이트를 실제로 읽어야 하는 객체(리포트 JSON 등). 키 -> 바이트.
 _BLOBS: dict[str, bytes] = {}
 # 스텁은 `player_card` 를 모른다 — 검사가 "이 슬러그는 이 사람 카드"라고 알려 준다.
@@ -28,14 +37,21 @@ _CARD_SLUGS: dict[str, UUID] = {}
 # 스텁은 `user` 도 모른다 — 검사가 "이 사람은 이 닉네임"이라고 알려 준다
 # (`paik` 16번, `uploader_info`).
 _NICKNAMES: dict[UUID, str] = {}
+# 스텁은 `analysis_report` 도 `review`/`review_selection` 도 모른다 — 검사가
+# 등급 원자료를 직접 채운다(미결 `paik` 25·26번, `find_card_grade`). user_id 로 건다.
+_REPORT_GRADES: dict[UUID, tuple[str | None, bool | None]] = {}
+_TRUST_COUNTS: dict[UUID, tuple[int, int]] = {}
 
 
 def reset_videos() -> None:
     _VIDEOS.clear()
     _OBJECTS.clear()
     _BLOBS.clear()
+    _HASHES.clear()
     _CARD_SLUGS.clear()
     _NICKNAMES.clear()
+    _REPORT_GRADES.clear()
+    _TRUST_COUNTS.clear()
 
 
 def put_blob(storage_key: str, data: bytes) -> None:
@@ -53,18 +69,42 @@ def register_nickname(user_id: UUID, nickname: str) -> None:
     _NICKNAMES[user_id] = nickname
 
 
-def put_object(storage_key: str, size_bytes: int) -> None:
+def register_report_grade(
+    user_id: UUID, overall_grade: str | None, provisional: bool | None
+) -> None:
+    """`find_card_grade` 가 쓸 분석 등급(미결 `paik` 25·26번). 안 부르면 그
+    사람은 분석 전(`overall_grade=None`)으로 본다."""
+    _REPORT_GRADES[user_id] = (overall_grade, provisional)
+
+
+def register_trust_counts(user_id: UUID, positive: int, total: int) -> None:
+    """`find_card_grade` 가 쓸 신뢰 축 — 재매칭 의사를 표한 평가 중 긍정
+    건수/전체 건수(`paik` 26번). 안 부르면 0/0(리뷰 없음과 같다)."""
+    _TRUST_COUNTS[user_id] = (positive, total)
+
+
+def put_object(
+    storage_key: str, size_bytes: int, *, content_hash: str | None = None
+) -> None:
     """검사가 "이 키에 이만한 파일이 올라와 있다"고 알려 준다.
 
     실제 업로드를 흉내 내는 자리다. 이것을 부르지 않으면 등록은
     `FILE_NOT_UPLOADED` 로 떨어진다 — 실물과 같은 동작이다.
+
+    `content_hash` 는 재업로드 감지(`ho` 41번) 테스트에서만 준다 — 안 주면
+    실물의 "지문을 못 구했다" 경우와 같다(`None`).
     """
     _OBJECTS[storage_key] = size_bytes
+    if content_hash is not None:
+        _HASHES[storage_key] = content_hash
 
 
 class StubVideoRepository(VideoPort):
     def sport_exists(self, sport_code: str) -> bool:
         return sport_code in _SPORTS
+
+    def sport_is_active(self, sport_code: str) -> bool:
+        return sport_code in _ACTIVE_SPORTS
 
     def uploader_nickname(self, user_id: UUID) -> str | None:
         # 스텁은 `user` 를 모른다 — 키 슬러그는 "user" 로 떨어진다. 닉네임이
@@ -140,6 +180,19 @@ class StubVideoRepository(VideoPort):
             return v
         return None
 
+    def find_card_grade(self, card_public_slug: str) -> CardGradeRow | None:
+        owner = _CARD_SLUGS.get(card_public_slug)
+        if owner is None:
+            return None
+        overall_grade, provisional = _REPORT_GRADES.get(owner, (None, None))
+        positive, total = _TRUST_COUNTS.get(owner, (0, 0))
+        return CardGradeRow(
+            overall_grade=overall_grade,
+            provisional=provisional,
+            trust_positive=positive,
+            trust_total=total,
+        )
+
     def list_public(self, limit: int) -> list[VideoEntity]:
         public = [v for v in _VIDEOS.values() if v.is_public and v.kept]
         public.sort(key=lambda v: v.created_at, reverse=True)
@@ -174,6 +227,27 @@ class StubVideoRepository(VideoPort):
     def admin_delete(self, video_id: UUID) -> VideoEntity | None:
         return _VIDEOS.pop(video_id, None)
 
+    def find_prior_outcome(
+        self, user_id: UUID, content_hash: str
+    ) -> PriorAnalysisOutcome | None:
+        candidates = [
+            v
+            for v in _VIDEOS.values()
+            if v.user_id == user_id
+            and v.content_hash == content_hash
+            and v.analysis_status in ("succeeded", "failed")
+            and v.subject_box is None
+            and not v.focus
+        ]
+        if not candidates:
+            return None
+        latest = max(candidates, key=lambda v: v.created_at)
+        return PriorAnalysisOutcome(
+            video_id=latest.id,
+            status=latest.analysis_status,
+            failure_reason=latest.analysis_failure_reason,
+        )
+
     def sweep_provisional(self, ttl_hours: int) -> list[VideoEntity]:
         cutoff = datetime.now(timezone.utc) - timedelta(hours=ttl_hours)
         stale = [
@@ -207,12 +281,18 @@ class FakeStorage(StoragePort):
     def size_of(self, storage_key: str) -> int | None:
         return _OBJECTS.get(storage_key)
 
+    def content_hash_of(self, storage_key: str) -> str | None:
+        return _HASHES.get(storage_key)
+
     def move_object(self, src_key: str, dst_key: str) -> None:
         if src_key == dst_key:
             return
         size = _OBJECTS.pop(src_key, None)
         if size is not None:
             _OBJECTS[dst_key] = size
+        content_hash = _HASHES.pop(src_key, None)
+        if content_hash is not None:
+            _HASHES[dst_key] = content_hash
 
     def read_object(self, storage_key: str) -> bytes | None:
         return _BLOBS.get(storage_key)
@@ -220,12 +300,15 @@ class FakeStorage(StoragePort):
     def delete_object(self, storage_key: str) -> None:
         _OBJECTS.pop(storage_key, None)
         _BLOBS.pop(storage_key, None)
+        _HASHES.pop(storage_key, None)
 
     def delete_prefix(self, prefix: str) -> None:
         for key in [k for k in _OBJECTS if k.startswith(prefix)]:
             del _OBJECTS[key]
         for key in [k for k in _BLOBS if k.startswith(prefix)]:
             del _BLOBS[key]
+        for key in [k for k in _HASHES if k.startswith(prefix)]:
+            del _HASHES[key]
 
 
 # 리포트 조회는 적재된 DB 가 있어야 뜻이 있다 — 계약 테스트는 "없을 때 404" 만

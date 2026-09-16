@@ -8,11 +8,13 @@ from app.match.application.dtos.match_preference_dto import (
     GetTeamPreferenceQuery,
     ListMatchCandidatesQuery,
     ListMemberPreferencesQuery,
+    ListSquadCandidatesQuery,
     MatchCandidateResult,
     MemberPreferenceResult,
     MemberPreferenceSummaryResult,
     SetMemberPreferenceCommand,
     SetTeamPreferenceCommand,
+    SquadCandidateResult,
     TeamPreferenceResult,
 )
 from app.match.application.ports.input.match_preference_use_cases import (
@@ -20,6 +22,7 @@ from app.match.application.ports.input.match_preference_use_cases import (
     GetTeamPreferenceUseCase,
     ListMatchCandidatesUseCase,
     ListMemberPreferencesUseCase,
+    ListSquadCandidatesUseCase,
     SetMemberPreferenceUseCase,
     SetTeamPreferenceUseCase,
 )
@@ -31,6 +34,7 @@ from app.match.application.use_cases.match_preference_assembler import (
     to_member_preference_result,
     to_member_preference_summary_result,
     to_slot_entities,
+    to_squad_candidate_results,
     to_team_preference_result,
 )
 from app.match.domain.rules.match_preference_rules import (
@@ -172,3 +176,38 @@ class ListMatchCandidatesInteractor(ListMatchCandidatesUseCase):
         our_regions = self._repository.resolve_regions(our_pref.region_ids)
         facts = self._repository.list_candidate_facts(query.team_id, formation)
         return to_candidate_result(our_pref.slots, our_regions, facts)
+
+
+class ListSquadCandidatesInteractor(ListSquadCandidatesUseCase):
+    """`paik` 27번 — 빈 자리 추천 후보. 하드 필터(포지션·제외·시간)와 등급
+    산출은 저장소가, 등급 하드 필터·거리 정렬은 여기(순수 로직, `assembler`)
+    가 한다 — `ListMatchCandidatesInteractor`와 같은 결이다.
+    """
+
+    def __init__(self, repository: MatchPreferencePort) -> None:
+        self._repository = repository
+
+    def __call__(
+        self, query: ListSquadCandidatesQuery
+    ) -> list[SquadCandidateResult]:
+        if not self._repository.team_exists(query.team_id):
+            raise ApiError(404, "TEAM_NOT_FOUND", "팀을 찾을 수 없습니다.")
+        role = self._repository.team_role(query.team_id, query.actor_id)
+        if role is None:
+            raise ApiError(
+                403, "FORBIDDEN", "그 팀 소속만 후보를 볼 수 있습니다."
+            )
+
+        position_id = self._repository.find_position(
+            query.team_id, query.position_code
+        )
+        if position_id is None:
+            raise ApiError(
+                422, "UNKNOWN_POSITION", "이 종목에 없는 포지션입니다."
+            )
+
+        facts = self._repository.squad_recruitment_facts(query.team_id, position_id)
+        wanted_grade = (
+            query.grade if query.grade and query.grade != "any" else None
+        )
+        return to_squad_candidate_results(facts, wanted_grade)

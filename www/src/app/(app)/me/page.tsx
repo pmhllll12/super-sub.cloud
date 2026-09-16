@@ -12,7 +12,10 @@ import {
 } from '@/server/backend'
 import { requireUser } from '@/server/currentUser'
 import { SESSION_COOKIE } from '@/server/session'
+import { HOME_TEAM_COOKIE, pickTeamId } from '@/lib/homeTeam'
 import AccountActions from './AccountActions'
+import TeamActions from './TeamActions'
+import TitlesForm from './TitlesForm'
 import CardEditor from './CardEditor'
 import StyledCard from './StyledCard'
 import { CardStyleProvider } from './cardStyle'
@@ -67,11 +70,14 @@ export function MeBody({
   videos,
   matches,
   editing = false,
+  homeTeamId,
 }: {
   user: User
   card: PlayerCard | null
   videos: MyVideo[]
   matches: Match[]
+  /** 홈이 지금 그리는 팀 — 소속이 여럿일 때 어느 것이 그것인지 표시한다. */
+  homeTeamId?: string
   /**
    * 카드 편집 모드인가. 🔴 **주소(`/me?edit=1`)가 들고 있다** — 컴포넌트
    * 상태로 두면 뒤로 가기로 닫을 수 없고, 새로고침하면 풀린다.
@@ -112,38 +118,17 @@ export function MeBody({
             <div className="ss-profile-body">
             <section className="ss-profile-bio" style={SECTION_GLASS}>
               <h2 className="ss-profile-h">소속</h2>
-              {user.teams.length === 0 ? (
-                <p className="ss-profile-muted">아직 소속된 팀이 없습니다.</p>
-              ) : (
-                <ul className="ss-profile-teams">
-                  {user.teams.map((t) => (
-                    <li key={t.team_id}>
-                      <p className="ss-profile-team-name">{t.name}</p>
-                      <p className="ss-profile-muted">
-                        {t.region} · {t.sport_code}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <TeamActions teams={user.teams} userId={user.id} homeTeamId={homeTeamId} />
             </section>
 
             <section className="ss-profile-info" style={SECTION_GLASS}>
               <h2 className="ss-profile-h">정보</h2>
               <dl>
                 <InfoRow label="호칭">
-                  {titles.length === 0 ? (
-                    <span className="ss-profile-muted">아직 받은 호칭이 없습니다.</span>
-                  ) : (
-                    <span className="ss-profile-pills">
-                      {titles.map((t) => (
-                        <span key={t.code} className="ss-profile-pill">
-                          <b>{t.category}</b>
-                          {t.label}
-                        </span>
-                      ))}
-                    </span>
-                  )}
+                  {/* 🔴 **사람이 직접 적는다**(2026-09-16 결정, 미결 `paik` 36번).
+                      원래는 분석이 붙이는 값이라 화면이 읽기만 했다 — 팀이 다시
+                      정하면서 여기서 고친다. 분류(강점·활동)는 안 받는다. */}
+                  <TitlesForm titles={titles.map((t) => t.label)} />
                 </InfoRow>
                 <InfoRow label="이메일">{user.email}</InfoRow>
                 <InfoRow label="함께한 날">{ymd(user.created_at)}부터</InfoRow>
@@ -158,7 +143,16 @@ export function MeBody({
               <MyMatches matches={matches} />
             </section>
 
-            <AccountActions />
+            {/* 🔴 **기본은 켜짐**이다. 옛 응답에 이 칸이 없을 수 있어
+                `?? true` 로 받는다 — 모른다고 꺼진 것으로 그리면 사실과
+                반대가 되고, 그 사람은 검색에 뜨는데 안 뜬다고 읽는다. */}
+            {/* 🔴 `nickname` 도 넘긴다 — `PATCH /me` 가 **늘 함께 받는다**
+                (계약 3-2절 · `UpdateMeSchema`). 아래 스위치가 그것을 실어야
+                한다. */}
+            <AccountActions
+              searchable={user.is_nickname_searchable ?? true}
+              nickname={user.nickname}
+            />
             </div>
           </div>
 
@@ -251,7 +245,8 @@ export default async function MePage({
   // 카드가 아직 없는 것은 정상이다 — CARD_NOT_FOUND 는 화면 안에서
   // "아직 없습니다"로 안내한다. 401 은 requireUser() 가 이미 걸러 냈지만
   // 그 사이 토큰이 죽을 수도 있어 여기서도 로그인으로 보낸다.
-  const token = (await cookies()).get(SESSION_COOKIE)?.value
+  const jar = await cookies()
+  const token = jar.get(SESSION_COOKIE)?.value
   let card: PlayerCard | null = null
   let videos: MyVideo[] = []
   let matches: Match[] = []
@@ -297,6 +292,7 @@ export default async function MePage({
       videos={videos}
       matches={matches}
       editing={edit === '1'}
+      homeTeamId={pickTeamId(user.teams, jar.get(HOME_TEAM_COOKIE)?.value)}
     />
   )
 }

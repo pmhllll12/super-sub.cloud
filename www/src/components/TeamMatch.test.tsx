@@ -6,8 +6,9 @@ import TeamMatch from './TeamMatch'
 /**
  * **비슷한 팀 명단** — 「팀 매칭」이 여는 판(사용자 요청, 2026-09-10).
  *
- * ⚠️ 목록도 신청도 **전부 mock 이다**(`lib/teamMatch.ts`). 그래서 이 시험은
- * 서버로 무엇이 나갔는지가 아니라 **화면이 무엇을 말하는지**를 붙든다.
+ * ⚠️ **명단은 아직 mock 이다**(`lib/teamMatch.ts` — 「비슷하다」를 고르는
+ * 경로가 계약에 없다). 🔴 **신청은 2026-09-16 에 진짜가 됐다**(계약 3-15절) —
+ * 그래서 이 파일은 `fetch` 를 세우고 **무엇이 나갔는지**까지 본다.
  */
 /** 이미 정해 둔 조건 — 이게 없으면 판이 명단 대신 **조건부터 묻는다**. */
 const PREFS: MatchPrefs = {
@@ -22,9 +23,41 @@ describe('비슷한 팀 명단', () => {
     localStorage.setItem(PREFS_KEY, JSON.stringify({ team: PREFS }))
   })
 
-  const open = (onMatched = vi.fn()) => {
-    render(<TeamMatch size="5" closing={false} onClose={() => {}} onMatched={onMatched} />)
-    return onMatched
+  /** 나간 요청들 — 신청이 진짜로 서버로 가는지 본다. */
+  let calls: { url: string; body: string | null }[]
+
+  beforeEach(() => {
+    calls = []
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      (input: RequestInfo | URL, init?: RequestInit) => {
+        calls.push({
+          url: String(input),
+          body: typeof init?.body === 'string' ? init.body : null,
+        })
+        return Promise.resolve(
+          new Response(JSON.stringify({ id: 'tmr9', status: 'pending' }), { status: 201 }),
+        )
+      },
+    )
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const MY_TEAM = 'team-mine'
+
+  const open = (onRequested = vi.fn()) => {
+    render(
+      <TeamMatch
+        size="5"
+        closing={false}
+        onClose={() => {}}
+        teamId={MY_TEAM}
+        onRequested={onRequested}
+      />,
+    )
+    return onRequested
   }
 
   /* mock 이 일부러 늦게 답한다 — 즉시 답하면 「찾는 중」 화면을 안 만들게 되고,
@@ -49,7 +82,15 @@ describe('비슷한 팀 명단', () => {
     ['5', '번개FC'],
     ['7', '강남 세븐스'],
   ])('%s:%s 판에도 팀이 나온다', async (size, first) => {
-    render(<TeamMatch size={size} closing={false} onClose={() => {}} onMatched={vi.fn()} />)
+    render(
+      <TeamMatch
+        size={size}
+        closing={false}
+        onClose={() => {}}
+        teamId={MY_TEAM}
+        onRequested={vi.fn()}
+      />,
+    )
     expect(await screen.findByText(first)).toBeInTheDocument()
   })
 
@@ -102,16 +143,26 @@ describe('비슷한 팀 명단', () => {
     expect(screen.getByRole('button', { name: '설정 수정' })).toBeInTheDocument()
   })
 
-  it('신청하면 수락을 기다린다고 말하고, 수락되면 알린다', async () => {
+  /**
+   * 🔴 **신청은 「잡혔다」가 아니다**(사용자 요청, 2026-09-16). 전에는 가짜
+   * `applyToTeam` 이 1.4초 뒤 수락된 것으로 쳐 줘서 대기 팝업이 바로 떴다 —
+   * 이제 이 판이 하는 일은 신청을 **거는 것까지**이고, 확정은 알림으로 온다.
+   */
+  it('신청하면 계약 경로로 보내고, 상대 수락을 기다린다고 적는다', async () => {
     const user = userEvent.setup()
-    const onMatched = open()
+    const onRequested = open()
     await screen.findByText('번개FC')
 
     await user.click(screen.getAllByRole('button', { name: '경기 신청' })[0])
-    expect(screen.getByRole('button', { name: '수락을 기다립니다…' })).toBeInTheDocument()
 
-    await waitFor(() => expect(onMatched).toHaveBeenCalled(), { timeout: 3000 })
-    expect(onMatched.mock.calls[0][0].name).toBe('번개FC')
+    await waitFor(() => expect(onRequested).toHaveBeenCalled())
+    const sent = calls.find((c) => c.url === `/api/teams/${MY_TEAM}/match-requests`)
+    expect(sent).toBeDefined()
+    expect(JSON.parse(sent!.body!).target_team_id).toBe('mt-1')
+
+    // 🔴 **대기 팝업을 띄우라고 하지 않는다** — 넘기는 것은 신청 id 다.
+    expect(onRequested.mock.calls[0][0]).toBe('tmr9')
+    expect(await screen.findByRole('button', { name: '상대 수락 대기 중' })).toBeInTheDocument()
   })
 
   /* 🔴 **한 번에 한 곳에만 신청한다.** 여러 곳에 걸어 두면 둘이 동시에
@@ -127,9 +178,11 @@ describe('비슷한 팀 명단', () => {
     }
   })
 
-  // ⚠️ 아무 데도 안 보낸다는 것을 숨기지 않는다 — 숨기면 진짜 신청된 줄 안다.
-  it('데모라는 것을 적어 둔다', () => {
+  /* 🔴 **어디까지가 진짜인지 적어 둔다.** 신청은 진짜로 나가지만 명단은
+     아직 붙박이다 — 안 적으면 다음 사람이 둘 다 진짜로 여긴다. */
+  it('명단이 아직 예시라는 것을 적어 둔다', async () => {
     open()
-    expect(screen.getByText(/데모입니다/)).toBeInTheDocument()
+    await screen.findByText('번개FC')
+    expect(screen.getByText(/명단은 아직 예시입니다/)).toBeInTheDocument()
   })
 })

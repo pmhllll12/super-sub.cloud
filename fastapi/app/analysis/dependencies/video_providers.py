@@ -19,6 +19,7 @@ from app.analysis.application.ports.input.video_use_cases import (
     AdminDeleteVideoUseCase,
     CreateUploadUrlUseCase,
     DeleteVideoUseCase,
+    GetCardGradeUseCase,
     GetFeaturedVideoUseCase,
     GetPlaybackUrlUseCase,
     KeepVideoUseCase,
@@ -38,6 +39,7 @@ from app.analysis.application.use_cases.video_interactors import (
     AdminDeleteVideoInteractor,
     CreateUploadUrlInteractor,
     DeleteVideoInteractor,
+    GetCardGradeInteractor,
     GetFeaturedVideoInteractor,
     GetPlaybackUrlInteractor,
     KeepVideoInteractor,
@@ -142,6 +144,12 @@ def get_featured_video_use_case(
     return GetFeaturedVideoInteractor(repository, storage)
 
 
+def get_card_grade_use_case(
+    repository: VideoRepositoryDep,
+) -> GetCardGradeUseCase:
+    return GetCardGradeInteractor(repository)
+
+
 def get_delete_video_use_case(
     repository: VideoRepositoryDep, storage: StorageDep
 ) -> DeleteVideoUseCase:
@@ -186,6 +194,9 @@ GetPlaybackUrlUseCaseDep = Annotated[
 ]
 GetFeaturedVideoUseCaseDep = Annotated[
     GetFeaturedVideoUseCase, Depends(get_featured_video_use_case)
+]
+GetCardGradeUseCaseDep = Annotated[
+    GetCardGradeUseCase, Depends(get_card_grade_use_case)
 ]
 DeleteVideoUseCaseDep = Annotated[
     DeleteVideoUseCase, Depends(get_delete_video_use_case)

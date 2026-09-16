@@ -12,15 +12,33 @@
 
 from __future__ import annotations
 
+import json
 import uuid
+from datetime import datetime, timezone
+from uuid import NAMESPACE_URL, uuid5
 
 import pytest
+from sqlalchemy import text
 
+from app.analysis.adapter.outbound.orm.analysis_job_orm import AnalysisJobOrm
+from app.analysis.adapter.outbound.orm.video_orm import VideoOrm
+from app.analysis.adapter.outbound.pg.report_ingest_pg_repository import (
+    ReportIngestPgRepository,
+)
+from app.analysis.application.use_cases.report_parser import parse_report
+from app.review.adapter.outbound.pg.review_pg_repository import ReviewPgRepository
+from app.review.domain.entities.review_entity import ReviewEntity
 from tests.conftest import V1, error_code
 
 pytestmark = pytest.mark.db
 
 PASSWORD = "supersub2026"
+
+
+def _position_id(code: str, sport_code: str = "football") -> uuid.UUID:
+    """`alembic/versions/20260902_match_tables.py`와 같은 계산 — 시드가
+    `uuid5`로 고정돼 있어 DB를 안 거치고도 같은 id를 얻는다."""
+    return uuid5(NAMESPACE_URL, f"supersub:position:{sport_code}:{code}")
 
 
 def _account(db_client, nickname):
@@ -356,3 +374,187 @@ class TestMatchCandidates:
             f"{V1}/teams/{team_a}/match-candidates", headers=owner["headers"]
         ).json()
         assert str(team_b) not in [r["team_id"] for r in rows]
+
+
+def _grade_envelope(grade: str, provisional: bool = False):
+    return {
+        "schema_version": "1.0",
+        "source_video": "s3://b/videos/u/v.mp4",
+        "analyzed_at": "20260910T120000Z",
+        "code_version": "abc1234",
+        "rubric": {"sport": "football", "motion": "instep_shot", "version": "0.1"},
+        "swing_side": "right",
+        "sampled_fps": 30.0,
+        "frames": 300,
+        "frame_metrics_seconds": {"impact_frame": 2.07},
+        "judge_model": "exaone-4.0-1.2b",
+        "features": {
+            "trunk_forward_lean_deg_at_impact": 12.4,
+            "plant_knee_angle_at_impact": 158.0,
+            "impact_frame": 62,
+        },
+        "result": {
+            "score": 90,
+            "grade": grade,
+            "summary": "빈 자리 후보 검사용 리포트입니다.",
+            "pipeline_version": "pose-v0.1",
+            "provisional": provisional,
+            "breakdown": [
+                {
+                    "criterion_id": "plant_knee_flexion",
+                    "name": "디딤발 무릎 굽히기",
+                    "grade": 2,
+                    "weight": 0.15,
+                    "contribution": 15.0,
+                    "title": "흔들리지 않는 축",
+                    "band": "150~170",
+                    "out_of_band": "",
+                    "stat": 88.5,
+                    "evidence": "안정적으로 놓였습니다.",
+                    "metric_ref": "plant_knee_angle_at_impact",
+                },
+            ],
+            "skipped": [],
+        },
+    }
+
+
+class TestSquadCandidates:
+    """`GET /teams/{id}/squad/candidates` (미결 `paik` 27번) — `member_match_
+    position`·`squad_member`·`team_member`·`analysis_report`·`review` 다섯을
+    실제 조인으로 확인한다. 컬럼 이름이 바뀌면 스텁은 못 잡는다.
+    """
+
+    def _give_featured_grade(self, db_session, user_id, *, grade, provisional=False):
+        now = datetime.now(timezone.utc)
+        video_id, job_id = uuid.uuid4(), uuid.uuid4()
+        db_session.add(
+            VideoOrm(
+                id=video_id, user_id=user_id, sport_code="football",
+                storage_key=f"videos/{video_id}.mp4", duration_ms=10_000,
+                side="right", is_featured=True, created_at=now,
+            )
+        )
+        db_session.flush()
+        db_session.add(
+            AnalysisJobOrm(id=job_id, video_id=video_id, status="succeeded", created_at=now)
+        )
+        db_session.commit()
+        parsed = parse_report(
+            json.dumps(_grade_envelope(grade, provisional)).encode()
+        )
+        ReportIngestPgRepository(db_session).replace_for_job(job_id, parsed)
+
+    def _minimal_match(self, db_session, team_id):
+        match_id = uuid.uuid4()
+        db_session.execute(
+            text(
+                "insert into match (id, team_id, played_at, place) "
+                "values (:i, :t, now() - interval '1 day', '검사구장')"
+            ),
+            {"i": match_id, "t": team_id},
+        )
+        db_session.commit()
+        return match_id
+
+    def _add_review(self, db_session, *, match_id, reviewer_id, reviewee_id, codes):
+        ok = ReviewPgRepository(db_session).save_review(
+            ReviewEntity(
+                id=uuid.uuid4(), match_id=match_id, reviewer_id=reviewer_id,
+                reviewee_id=reviewee_id, submitted_at=datetime.now(timezone.utc),
+                selected_codes=codes,
+            )
+        )
+        assert ok, "리뷰 저장 실패 — FK/유일 제약 확인"
+
+    def test_포지션_등급_제외를_실제_조인으로_확인한다(self, db_client, db_session):
+        owner = _account(db_client, "주장")
+        team_id = _team(db_client, owner, "빈자리")
+        gk = _position_id("GK")
+
+        # 지원자 1: GK 등록 + 등급 A + 리뷰 4건 전원 재매칭(신뢰 우세 → S).
+        cand_s = _account(db_client, "지원자S")
+        db_client.put(
+            f"{V1}/me/match-preferences",
+            json={"region_ids": [], "slots": [], "position_ids": [str(gk)]},
+            headers=cand_s["headers"],
+        )
+        self._give_featured_grade(db_session, cand_s["id"], grade="A")
+        for i in range(4):
+            reviewer = _account(db_client, f"평가자{i}")
+            self._add_review(
+                db_session, match_id=self._minimal_match(db_session, team_id),
+                reviewer_id=reviewer["id"], reviewee_id=cand_s["id"],
+                codes=["repeat_yes"],
+            )
+
+        # 지원자 2: GK 등록, 분석 전(등급 없음) — null로 와야 한다.
+        cand_none = _account(db_client, "지원자무등급")
+        db_client.put(
+            f"{V1}/me/match-preferences",
+            json={"region_ids": [], "slots": [], "position_ids": [str(gk)]},
+            headers=cand_none["headers"],
+        )
+
+        # 다른 포지션(FW)만 등록한 사람 — GK 후보에 안 나와야 한다.
+        cand_wrong_position = _account(db_client, "공격수")
+        fw = _position_id("FW")
+        db_client.put(
+            f"{V1}/me/match-preferences",
+            json={"region_ids": [], "slots": [], "position_ids": [str(fw)]},
+            headers=cand_wrong_position["headers"],
+        )
+
+        # 이미 이 팀 소속인 사람이 GK를 등록해도 후보에서 빠져야 한다.
+        teammate = _account(db_client, "이미팀원")
+        db_client.post(
+            f"{V1}/teams/{team_id}/members", json={}, headers=teammate["headers"]
+        )
+        db_client.put(
+            f"{V1}/me/match-preferences",
+            json={"region_ids": [], "slots": [], "position_ids": [str(gk)]},
+            headers=teammate["headers"],
+        )
+
+        res = db_client.get(
+            f"{V1}/teams/{team_id}/squad/candidates",
+            params={"position_code": "GK"},
+            headers=owner["headers"],
+        )
+        assert res.status_code == 200, res.text
+        rows = {r["user_id"]: r for r in res.json()}
+
+        assert str(teammate["id"]) not in rows
+        assert str(cand_wrong_position["id"]) not in rows
+
+        assert rows[str(cand_s["id"])]["grade"] == "S"
+        assert rows[str(cand_s["id"])]["provisional"] is False
+
+        assert rows[str(cand_none["id"])]["grade"] is None
+        assert rows[str(cand_none["id"])]["provisional"] is None
+
+    def test_이미_스쿼드에_앉은_사람은_제외된다(self, db_client, db_session):
+        owner = _account(db_client, "주장")
+        team_id = _team(db_client, owner, "빈자리앉음")
+
+        db_client.post(f"{V1}/teams/{team_id}/squad", headers=owner["headers"])
+        card = db_client.post(f"{V1}/me/card", headers=owner["headers"]).json()
+        enlisted = db_client.post(
+            f"{V1}/teams/{team_id}/squad/members",
+            json={"player_card_id": card["id"], "position_code": "GK"},
+            headers=owner["headers"],
+        )
+        assert enlisted.status_code == 201, enlisted.text
+
+        # 주장 본인은 team_member라 어차피 제외되므로, 이 시험은 "자기 팀
+        # 소속 제외"·"이미 앉은 사람 제외"가 함께 걸리는 가장 흔한 경로(주장
+        # 본인)로 확인한다 — 앱 규칙(NOT_TEAM_MEMBER)상 스쿼드 등재는 항상
+        # 팀 소속을 전제하므로 "팀 소속은 아니지만 이미 앉은" 조합은 만들
+        # 수 없다.
+        res = db_client.get(
+            f"{V1}/teams/{team_id}/squad/candidates",
+            params={"position_code": "GK"},
+            headers=owner["headers"],
+        )
+        assert res.status_code == 200, res.text
+        assert str(owner["id"]) not in {r["user_id"] for r in res.json()}

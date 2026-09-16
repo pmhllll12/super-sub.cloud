@@ -42,11 +42,11 @@ export function seatOf(m: SquadMember): { col: number; row: number } | null {
   return m.grid_col !== null && m.grid_row !== null ? { col: m.grid_col, row: m.grid_row } : null
 }
 
-async function patch(path: string, body: unknown): Promise<Squad> {
+async function send(method: string, path: string, body?: unknown): Promise<Squad> {
   const res = await fetch(path, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    method,
+    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
   })
   if (!res.ok) {
     let message = '판을 저장하지 못했습니다.'
@@ -59,6 +59,8 @@ async function patch(path: string, body: unknown): Promise<Squad> {
   }
   return (await res.json()) as Squad
 }
+
+const patch = (path: string, body: unknown) => send('PATCH', path, body)
 
 /**
  * 판 크기를 저장한다. **바뀐 스쿼드 전체**가 돌아온다.
@@ -93,5 +95,34 @@ export function saveSeat(
       grid_col: cell ? cell.col : null,
       grid_row: cell ? cell.row : null,
     },
+  )
+}
+
+/**
+ * 사람을 **판에 앉힌다** — 등재가 생기고 바뀐 스쿼드 전체가 돌아온다
+ * (계약 3-7절 `POST /teams/{id}/squad/members`).
+ *
+ * 🔴 **칸은 함께 주거나 함께 비운다** — 한쪽만 주면 서버가 422 다.
+ * 🔴 **팀 구성원의 카드만 앉는다**(앱 규칙). 추천·지인으로 찾은 **팀 밖**
+ * 사람은 이 경로로 못 앉는다 — 「합류 요청 → 수락」이 먼저 있어야 하고,
+ * 그 경로는 아직 계약에 없다(미결 `paik` 37번).
+ */
+export function addSeat(
+  teamId: string,
+  input: { playerCardId: string; positionCode: string; cell: { col: number; row: number } | null },
+): Promise<Squad> {
+  return send('POST', `/api/teams/${encodeURIComponent(teamId)}/squad/members`, {
+    player_card_id: input.playerCardId,
+    position_code: input.positionCode,
+    grid_col: input.cell ? input.cell.col : null,
+    grid_row: input.cell ? input.cell.row : null,
+  })
+}
+
+/** 등재를 **뺀다**(카드는 안 지워진다). 바뀐 스쿼드 전체가 돌아온다. */
+export function removeSeat(teamId: string, memberId: string): Promise<Squad> {
+  return send(
+    'DELETE',
+    `/api/teams/${encodeURIComponent(teamId)}/squad/members/${encodeURIComponent(memberId)}`,
   )
 }
