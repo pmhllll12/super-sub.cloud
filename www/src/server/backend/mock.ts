@@ -52,7 +52,7 @@ const users = new Map<string, User>([
           team_id: '9a2e0000-0000-4000-8000-000000000002',
           name: '번개FC',
           region: '서울 강남',
-          sport_code: 'futsal',
+          sport_code: 'football',
           // 🔴 'owner'다 — 데모 계정으로 주장 전용 흐름(경기 등록 등)까지
           // 확인할 수 있어야 한다. 다른 곳은 이 값을 아직 안 쓴다(2026-09-04
           // 기준 실측 — 바꿔도 기존 동작에 영향 없음).
@@ -129,11 +129,14 @@ const POSITIONS: Position[] = [
   { sport_code: 'football', code: 'DF', label: '수비수' },
   { sport_code: 'football', code: 'MF', label: '미드필더' },
   { sport_code: 'football', code: 'FW', label: '공격수' },
-  { sport_code: 'futsal', code: 'GK', label: '골키퍼' },
-  { sport_code: 'futsal', code: 'DF', label: '수비수' },
-  { sport_code: 'futsal', code: 'MF', label: '미드필더' },
-  { sport_code: 'futsal', code: 'FW', label: '공격수' },
+  /* 🔴 **`futsal` 을 걷었다**(2026-09-16). 서버의 `sport` 참조 테이블에 그 행이
+     없다 — 마이그레이션 `20260901_sport_and_position.py` 가 **폐기**하고
+     `football` 로 옮겼다(`_RETIRED = "futsal"`). 여기 남겨 두면 없는 종목을
+     mock 이 아는 척해서, 이번처럼 배포에서만 터진다. */
 ]
+
+/** 서버의 `sport` 참조 테이블과 **같은 목록**이어야 한다(위 마이그레이션). */
+const SPORT_CODES = ['football', 'baseball', 'basketball']
 
 /** 종목 안에서 포지션 이름을 찾는다. 없으면 `undefined` — 부르는 쪽이 422 를 낸다. */
 function positionLabel(sportCode: string, code: string): string | undefined {
@@ -251,7 +254,7 @@ let DEMO_VIDEOS: MyVideo[] = [
   },
   {
     id: 'v3',
-    sport_code: 'futsal',
+    sport_code: 'football',
     storage_key: '/coach-c003.mp4',
     duration_ms: 15600,
     side: null,
@@ -1391,6 +1394,14 @@ export const mockBackend: Backend = {
     const u = requireUser(token)
     if (!name.trim() || !region.trim()) {
       throw new BackendError(422, 'VALIDATION_ERROR', '이름과 지역이 필요합니다.')
+    }
+    /* 🔴 **모르는 종목은 서버처럼 거절한다**(2026-09-16). 전에는 무엇이든
+       받아서, `futsal` 을 보내던 팀 만들기가 **개발에서만 돌고 배포에서
+       `422 UNKNOWN_SPORT` 로 죽었다**(사용자가 겪음). mock 이 계약보다
+       너그러우면 그 차이는 배포에서만 드러난다 — `PATCH /me` 의 `nickname`
+       과 같은 함정이라 같은 방식으로 막는다. */
+    if (!SPORT_CODES.includes(sport_code)) {
+      throw new BackendError(422, 'UNKNOWN_SPORT', '등록되지 않은 종목 코드입니다.')
     }
     const id = `team-${users.size}-${u.teams.length + 1}`
     // 🔴 **만든 사람이 주장으로 함께 들어간다**(계약) — 그래야 `GET /me` 의

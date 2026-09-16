@@ -11,6 +11,45 @@ describe('mockBackend', () => {
     expect(t.expires_in).toBe(604800)
   })
 
+  /**
+   * 🔴 **모르는 종목은 서버처럼 거절한다**(2026-09-16).
+   *
+   * 서버의 `sport` 참조 테이블에는 `football`·`baseball`·`basketball` 셋뿐이다 —
+   * 마이그레이션 `20260901_sport_and_position.py` 가 `futsal` 을 **폐기**하고
+   * `football` 로 옮겼다. 그런데 팀 만들기 경로가 `futsal` 을 보내고 있었고,
+   * mock 이 무엇이든 받아 줘서 **개발에서만 돌고 배포에서 `422 UNKNOWN_SPORT`
+   * (「등록되지 않은 종목 코드입니다」)로 죽었다**(사용자가 겪음).
+   *
+   * 🔴 이 시험이 붙드는 것은 팀 만들기 화면이 아니라 **mock 이 계약보다
+   * 너그러워지지 않는 것**이다. 너그러우면 그 차이는 늘 배포에서만 드러난다.
+   */
+  it('모르는 종목으로 팀을 만들면 UNKNOWN_SPORT 다', async () => {
+    const t = await mockBackend.login({
+      email: 'demo@super-sub.example',
+      password: 'supersub2026',
+    })
+    await expect(
+      mockBackend.createTeam(t.access_token, {
+        name: '강남 FC',
+        region: '서울 강남',
+        sport_code: 'futsal',
+      }),
+    ).rejects.toMatchObject({ status: 422, code: 'UNKNOWN_SPORT' })
+  })
+
+  it('있는 종목으로는 팀이 만들어진다', async () => {
+    const t = await mockBackend.login({
+      email: 'demo@super-sub.example',
+      password: 'supersub2026',
+    })
+    const team = await mockBackend.createTeam(t.access_token, {
+      name: '강남 FC',
+      region: '서울 강남',
+      sport_code: 'football',
+    })
+    expect(team).toMatchObject({ name: '강남 FC', sport_code: 'football' })
+  })
+
   it('비밀번호가 틀리면 INVALID_CREDENTIALS 를 던진다', async () => {
     await expect(
       mockBackend.login({ email: 'demo@super-sub.example', password: '틀림' }),
