@@ -100,3 +100,77 @@ def test_the_leak_this_test_was_written_for_is_gone():
     # 🔴 등급 번호는 여전히 없어야 한다 (미결 23번의 처방을 되돌리지 않는다).
     assert "2등급" not in prompt and "등급 2" not in prompt
     assert not re.search(r"\[\s*[012]\s*\]", prompt), "등급 번호가 프롬프트에 있다"
+
+
+# -- 단위 (2회차, 2026.09.16) ------------------------------------------------
+#
+#    1회차는 단위를 **일부러 뺐다** — 계약의 `unit` 이 `s` 인데 `features` 의 값은
+#    프레임이라, 그대로 붙이면 9프레임이 「9초」가 되기 때문이다. 🔴 **그런데 빼는
+#    것으로는 안 막혔다.** 2회차 실측(EXAONE 1.2B, 120문장): 값을 언급한 21건 중
+#    **15건(71%)** 이 초·분을 붙였다 — 「지속 시간: 9」가 단위를 부르는 문장이라
+#    모델이 가장 그럴듯한 것을 지어냈다. 참인 단위를 주니 **0건**이 됐고 프레임
+#    표기가 0 → 23 이 됐다(`before_units.csv` · `after_units.csv`).
+
+
+def _frame_metrics():
+    from supersub_agent.judge import metric_units
+    return [c for c, u in metric_units().items() if u == "프레임"]
+
+
+def test_frame_valued_metrics_are_declared_as_frames_not_seconds():
+    """🔴 계약의 `unit: s` 를 그대로 믿으면 안 된다.
+
+    `emitted_from: frame_metrics_seconds` 는 **환산을 거쳐야 초가 된다**는
+    선언이다 — `features` 안에서는 프레임이다. 이 구분이 무너지면 프롬프트가
+    다시 「12초」를 부른다.
+    """
+    assert "follow_through_duration_frames" in _frame_metrics()
+    assert "impact_frame" in _frame_metrics()
+
+
+@pytest.mark.parametrize("key,criterion", list(_all_criteria()))
+def test_every_number_in_the_prompt_carries_its_unit(key, criterion):
+    """측정값 줄의 숫자에는 **참인 단위**가 붙어 있어야 한다.
+
+    붙어 있지 않으면 모델이 지어낸다 — 그것이 이 회차가 고친 결함이다.
+    """
+    from supersub_agent.judge import metric_units
+
+    metrics = {m: 12 for m in criterion.measured_by}
+    prompt = build_prompt(criterion, metrics, 1)
+    for code in criterion.measured_by:
+        unit = metric_units().get(code, "")
+        if not unit:  # ratio 는 무차원이라 일부러 안 붙인다
+            continue
+        assert f"12{unit}" in prompt, (
+            f"{key}/{criterion.id}: {code} 의 값에 단위 「{unit}」가 없다 — "
+            "맨 숫자를 주면 모델이 단위를 지어낸다"
+        )
+
+
+@pytest.mark.parametrize("key,criterion", list(_all_criteria()))
+def test_the_prompt_never_calls_a_frame_count_a_second(key, criterion):
+    """🔴 실물 결함 그대로 — 프레임 값에 「초」가 붙으면 안 된다."""
+    metrics = {m: 12 for m in criterion.measured_by}
+    prompt = build_prompt(criterion, metrics, 1)
+    assert not re.search(r"12\s*초", prompt), f"{key}/{criterion.id}: 프레임을 초로 적었다"
+
+
+@pytest.mark.parametrize("key,criterion", list(_all_criteria()))
+def test_the_anchors_use_the_same_ruler_as_the_measurement(key, criterion):
+    """🔴 앵커와 측정값이 **같은 자**여야 한다.
+
+    측정값만 단위를 붙이면 모델이 두 다른 자를 나란히 보게 된다. (같은 이유로
+    측정값을 초로 환산하는 것도 안 된다 — 앵커가 프레임이고, 그 앵커가 어느
+    fps 격자에서 매겨졌는지는 미결 7번이 아직 안 닫았다.)
+    """
+    from supersub_agent.judge import metric_units
+
+    prompt = build_prompt(criterion, {m: 12 for m in criterion.measured_by}, 1)
+    for anchor in criterion.anchors or []:
+        for code, value in anchor["measured"].items():
+            unit = metric_units().get(code, "")
+            if unit:
+                assert f"{value}{unit}" in prompt, (
+                    f"{key}/{criterion.id}: 앵커 {code}={value} 에 단위가 없다"
+                )

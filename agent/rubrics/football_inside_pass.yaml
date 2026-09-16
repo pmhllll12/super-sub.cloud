@@ -40,9 +40,9 @@ criteria:
       딛어야 발 안쪽 면이 공 중심을 정확히 민다.
     measured_by: [plant_foot_to_ball_offset]
     titles:
-      2: "조준된 디딤발"
-      1: "빗나간 조준"
-      0: "겨누지 않은 발"
+      2: "방향을 잡은 디딤발"
+      1: "빗나간 디딤발"
+      0: "멀리 놓인 디딤발"
     bands:
       metric: plant_foot_to_ball_offset
       2: [[0, 0.4]]
@@ -71,9 +71,9 @@ criteria:
       세기 조절이 안 된다.
     measured_by: [swing_knee_angle_at_impact]
     titles:
-      2: "절제된 스윙"
+      2: "짧고 정확한 스윙"
       1: "과한 스윙"
-      0: "휘둘러 버린 발"
+      0: "치우친 스윙"
     bands:
       metric: swing_knee_angle_at_impact
       2: [[120, 155]]
@@ -102,9 +102,9 @@ criteria:
       시야를 확보하되, 뒤로 젖혀지면 공이 뜬다.
     measured_by: [trunk_forward_lean_deg_at_impact]
     titles:
-      2: "세워진 시야"
-      1: "숙인 시야"
-      0: "젖혀진 상체"
+      2: "곧게 선 상체"
+      1: "숙인 상체"
+      0: "치우친 상체"
     bands:
       metric: trunk_forward_lean_deg_at_impact
       2: [[2, 15]]
@@ -133,8 +133,8 @@ criteria:
       방향 제어를 잃는다.
     measured_by: [hip_rotation_range_deg]
     titles:
-      2: "열어 놓은 골반"
-      1: "덜 열린 골반"
+      2: "알맞게 열린 골반"
+      1: "어긋난 골반 회전"
       0: "닫힌 골반"
     bands:
       metric: hip_rotation_range_deg

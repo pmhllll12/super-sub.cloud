@@ -296,6 +296,31 @@ class TestVisibility:
         row = next(r for r in rows if r["id"] == video_id)
         assert row["uploader_nickname"] == uploader["nickname"]
 
+    def test_화면_비율이_실제로_저장되고_공개_목록에_실린다(
+        self, db_client, db_session, uploader
+    ):
+        """`paik` 15번 — 세로 영상(9:16)도 실측 그대로 저장·노출되는가."""
+        key = _upload(db_client, uploader)
+        video_id = _register(db_client, uploader, key, width=1080, height=1920).json()[
+            "id"
+        ]
+        db_client.post(f"{V1}/videos/{video_id}/keep", headers=uploader["headers"])
+        db_client.patch(
+            f"{V1}/videos/{video_id}",
+            json={"is_public": True},
+            headers=uploader["headers"],
+        )
+
+        stored = db_session.execute(
+            text("SELECT width, height FROM video WHERE id = :id"),
+            {"id": uuid.UUID(video_id)},
+        ).one()
+        assert (stored.width, stored.height) == (1080, 1920)
+
+        rows = db_client.get(f"{V1}/videos/public", headers=uploader["headers"]).json()
+        row = next(r for r in rows if r["id"] == video_id)
+        assert (row["width"], row["height"]) == (1080, 1920)
+
     def test_카드를_만든_업로더는_슬러그도_실린다(self, db_client, uploader):
         key = _upload(db_client, uploader)
         video_id = _register(db_client, uploader, key).json()["id"]

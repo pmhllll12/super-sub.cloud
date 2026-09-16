@@ -133,7 +133,7 @@ def test_low_confidence_is_rejected():
     """품질이 낮은 입력으로는 점수를 내지 않는다."""
     seq = build_sequence()
     seq[:, [F.L_KNEE, F.R_KNEE], 2] = 0.05
-    with pytest.raises(InsufficientQuality, match="유효 프레임 비율"):
+    with pytest.raises(InsufficientQuality, match="보이는 프레임이"):
         extract_features(seq)
 
 
@@ -295,7 +295,7 @@ def test_arm_gate_still_fails_when_the_elbow_is_thin():
     """팔: 팔꿈치가 부족하면 여전히 막는다 — 게이트가 느슨해지면 안 된다."""
     seq = _thin_out(_with_arm_swing(build_sequence()), [F.L_ELBOW])
 
-    with pytest.raises(InsufficientQuality, match="유효 프레임 비율"):
+    with pytest.raises(InsufficientQuality, match="보이는 프레임이"):
         F.check_quality(seq, limb="arm", side="left")
 
 
@@ -352,7 +352,7 @@ def test_leg_gate_still_requires_the_ankle():
     hip_knee = F.LIMB_CHAINS["leg"]["left"][:2]
     assert F.valid_frames(seq, "leg", hip_knee).mean() >= 0.7, "엉덩이·무릎은 충분"
 
-    with pytest.raises(InsufficientQuality, match="유효 프레임 비율"):
+    with pytest.raises(InsufficientQuality, match="보이는 프레임이"):
         F.check_quality(seq, limb="leg")
 
 
@@ -796,3 +796,77 @@ def test_the_mirror_declaration_matches_what_the_code_actually_does():
         assert flipped[k] == pytest.approx(v, abs=0.05), (
             f"{k} 가 좌우 반전에 변한다 — 부호 반전도 아니다"
         )
+
+
+# -- 품질 게이트 사유 문구 (미결 `ho` 41번) ----------------------------------
+#
+#    실서버에서 사용자가 **같은 영상을 아홉 번** 올려 아홉 번 같은 이유로
+#    떨어졌다. 판정이 결정론적이라 같은 파일은 몇 번을 올려도 같은 값이
+#    나오는데, 사유가 「…유효 프레임 비율 53% < 기준 70%. 재촬영이 필요하다」라
+#    **무엇을 바꿔야 하는지가 없었다.** 아래 셋이 그 세 가지 결함을 각각 막는다.
+
+
+def _gate_message(limb: str = "leg") -> str:
+    """게이트가 실제로 내는 문장 한 개."""
+    joints = [F.L_KNEE, F.R_KNEE] if limb == "leg" else [F.L_ELBOW, F.R_ELBOW]
+    seq = _thin_out(build_sequence(), joints)
+    with pytest.raises(InsufficientQuality) as caught:
+        F.check_quality(seq, limb=limb, side="left")
+    return str(caught.value)
+
+
+@pytest.mark.parametrize("limb", ["leg", "arm"])
+def test_the_gate_reason_says_what_to_change(limb):
+    """🔴 「재촬영이 필요하다」로는 **같은 파일을 다시 올리는 것**을 못 막는다.
+
+    사유가 ⑴ 어느 부위가 ⑵ 어떻게 안 잡혔고 ⑶ 어떻게 찍어야 하는지를 말해야
+    사용자가 **다른 행동**을 한다.
+    """
+    msg = _gate_message(limb)
+    assert F.GATE_PART[limb] in msg, "어느 부위인지 없다"
+    assert F.GATE_JOINT_NAMES[limb] in msg, "어느 관절이 안 잡혔는지 없다"
+    assert "다시 찍어" in msg, "무엇을 해야 하는지 없다"
+    assert "%" in msg, "얼마나 안 잡혔는지 없다 — 지원 쪽이 판단할 근거가 사라진다"
+
+
+@pytest.mark.parametrize("limb", ["leg", "arm"])
+def test_the_gate_reason_says_the_same_file_will_not_pass(limb):
+    """🔴 이 한 줄이 아홉 번을 막는다.
+
+    판정은 결정론적이다. **같은 파일을 다시 올리면 같은 값이 나온다**는 것을
+    사유가 말하지 않으면, 사용자는 다시 올려 보는 것이 합리적이다.
+    """
+    assert "같은 영상을 다시 올리면" in _gate_message(limb)
+
+
+@pytest.mark.parametrize("limb", ["leg", "arm"])
+def test_the_gate_reason_uses_no_internal_vocabulary(limb):
+    """🔴 사용자에게 내부 용어를 보여주지 않는다 (`test_sport_gate` 와 같은 취지).
+
+    「스윙 측」·「키포인트」·「유효 프레임 비율」은 우리가 코드에서 쓰는 말이지
+    사용자가 아는 말이 아니다.
+    """
+    msg = _gate_message(limb)
+    for word in ("스윙 측", "키포인트", "유효 프레임 비율", "InsufficientQuality"):
+        assert word not in msg, f"내부 용어 「{word}」가 사용자에게 나간다"
+
+
+@pytest.mark.parametrize("limb", ["leg", "arm"])
+def test_the_gate_reason_survives_the_column_limit(limb):
+    """🔴 워커가 **앞을 남기고 뒤를 자른다**(`failure_reason` 255자).
+
+    고쳐야 할 것과 「같은 파일은 소용없다」가 **문장 끝에 있어서**, 길어지면
+    정작 필요한 말부터 잘린다. 프리픽스 둘(`분석 중단:` · `품질 게이트 미달:`)이
+    앞에 더 붙는 것까지 세어 둔다.
+    """
+    full = f"품질 게이트 미달: 분석 중단: {_gate_message(limb)}"
+    assert len(full) <= 255, f"{len(full)}자 — 사유가 잘려 나간다"
+
+
+@pytest.mark.parametrize(
+    "word,expected", [("다리", "다리가"), ("팔", "팔이"), ("발목", "발목이"),
+                      ("어깨·팔꿈치", "어깨·팔꿈치가"), ("상체", "상체가")]
+)
+def test_the_particle_follows_the_word(word, expected):
+    """🔴 「팔가」·「어깨·팔꿈치이」가 한 번 나갔다 — 사용자에게 바로 보인다."""
+    assert F.with_particle(word) == expected

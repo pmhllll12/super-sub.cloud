@@ -636,6 +636,58 @@ def summarize(breakdown: list[dict[str, Any]]) -> str:
     return " ".join(parts)
 
 
+def card(breakdown: list[dict[str, Any]]) -> dict[str, Any]:
+    """추천 카드에 쓸 **짧은 수식어 + 불릿 두 줄** (미결 `paik` 27번의 설명 칸).
+
+    화면(`SquadSuggest.tsx`)이 후보마다 이름 아래에 한 줄(`title`)과 불릿
+    둘(`notes`)을 그리는데 지금은 **붙박이 문자열**이다. 그 자리를 분석으로
+    채우기 위한 블록이다.
+
+    🔴 **모델을 부르지 않는다.** `summarize` 와 같은 이유다 — 정답이 없는 문장을
+    모델에게 맡기면 좋아졌는지 판정할 수 없고, 같은 판정이 매번 다른 말을 한다.
+
+    🔴 **이 카드가 말할 수 있는 것은 「이 영상에서 잰 자세」뿐이다.** 붙박이
+    문자열에는 「활동량이 많고 꾸준합니다」·「10경기 연속」 같은 것이 섞여
+    있는데, 그건 **경기 기록**이지 우리가 잰 것이 아니다. 여기서 만들지 않는다 —
+    화면이 그런 줄을 함께 쓰고 싶으면 **출처가 다른 줄**로 따로 받아야 한다.
+
+    | | |
+    |---|---|
+    | `title` | **가장 잘한 항목의 칭호.** 🔴 `title_earned` 가 참일 때만 — 안 그러면 0등급의 「무너지는 축」이 수식어로 걸린다(`paik` 23번) |
+    | `notes` | 강점 한 줄 · 아쉬운 점 한 줄. **없으면 안 만든다** — 둘을 채우려고 지어내지 않는다 |
+
+    점수와 무관하다(`summary`·`stat` 과 같은 성질) — 이 키를 빼도 총점은 한
+    비트도 안 바뀌고 **B-6 재실행을 부르지 않는다**.
+    """
+    if not breakdown:
+        return {"title": None, "notes": []}
+
+    def rank(item: dict[str, Any]) -> tuple:
+        return (int(item["grade"]), float(item.get("weight") or 0.0),
+                str(item["criterion_id"]))
+
+    ordered = sorted(breakdown, key=rank)
+    worst, best = ordered[0], ordered[-1]
+
+    # 🔴 받은 칭호만 수식어가 된다. 못 받았으면 **비운다** — 화면이 이름 아래에
+    #    아무것도 안 그리는 편이, 아쉬운 항목의 칭호를 자랑처럼 다는 것보다 낫다.
+    title = best["title"] if best.get("title_earned") else None
+
+    notes: list[str] = []
+    if int(best["grade"]) == MAX_GRADE:
+        # 🔴 수식어(칭호)를 불릿에서 **다시 말하지 않는다** — 화면이 둘을 나란히
+        #    그리므로 같은 말이 두 번 보인다. 여기는 **항목 이름**으로 적는다.
+        notes.append(f"{_with_particle(best['name'], '이', '가')} "
+                     "이번 동작의 강점입니다")
+    if int(worst["grade"]) < MAX_GRADE and worst["criterion_id"] != best["criterion_id"]:
+        notes.append(f"{_with_particle(worst['name'], '은', '는')} 아직 아쉽습니다")
+    if not notes:
+        # 갈리지 않았다 — 갈린 척하지 않는다(`summarize` 와 같은 규칙).
+        notes.append(f"{_with_particle(worst['name'], '은', '는')} "
+                     f"「{worst['title']}」{_ro(worst['title'])} 나왔습니다")
+    return {"title": title, "notes": notes}
+
+
 def aggregate(
     judgments: dict[str, dict[str, Any]],
     rubric: Rubric,
@@ -733,6 +785,9 @@ def aggregate(
         # 빼도 점수는 한 비트도 안 바뀐다. `stat`·`out_of_band` 와 같은 성질이라
         # B-6 재실행을 부르지 않는다.
         "summary": summarize(breakdown),
+        # 추천 카드의 설명 칸 (`paik` 27번). `summary` 와 같은 성질이다 —
+        # breakdown 에서만 짓고 점수를 안 건드린다.
+        "card": card(breakdown),
         "breakdown": breakdown,
         # 측정하지 못해 판정에서 빠진 항목 — 0점이 아니라 제외다.
         "skipped": skipped,

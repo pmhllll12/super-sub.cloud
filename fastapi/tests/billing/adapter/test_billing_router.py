@@ -8,7 +8,8 @@
 
 1. **크레딧 잔량은 `history`의 `delta` 합이다** — 별도 컬럼이 없다(부록 D.4)
 2. **크레딧 조정은 관리자만** 한다 — 분석 경로와 이어지지 않는다(패킷 A 「하지 말 것」)
-3. **코치에 종목·가격 같은 값이 없다** — `id`·`name`·`contact` 뿐이다(부록 D)
+3. **코치에 종목은 있고 가격은 아직 없다** — `id`·`name`·`contact`·`sport_code`
+   뿐이다(부록 D, `paik` 14번). 목록은 `sport_code`로 거를 수 있다
 4. **코치 연결 요청은 중복을 막지 않는다**
 """
 
@@ -31,6 +32,7 @@ from app.user.adapter.outbound.stub.user_stub_repository import (
     DEMO_USER_ID,
 )
 from tests.billing.conftest import V1
+from tests.conftest import error_code
 
 CREDITS = f"{V1}/credits"
 ADJUSTMENTS = f"{V1}/admin/credits/adjustments"
@@ -53,7 +55,9 @@ def as_admin():
 
 @pytest.fixture
 def coach():
-    c = CoachEntity(id=uuid4(), name="김도현", contact="kim@example.test")
+    c = CoachEntity(
+        id=uuid4(), name="김도현", contact="kim@example.test", sport_code="football"
+    )
     register_coach(c)
     return c
 
@@ -126,12 +130,34 @@ class TestCoaches:
             "id": str(coach.id),
             "name": coach.name,
             "contact": coach.contact,
+            "sport_code": coach.sport_code,
         }
 
-    def test_코치에_종목이나_가격이_없다(self, client, coach):
+    def test_코치에_아직_가격이_없다(self, client, coach):
+        """`paik` 14번 — 종목은 이제 있다. 가격·소개 문장은 이번 범위 밖."""
         res = client.get(COACHES, headers=_headers())
         for item in res.json()["items"]:
-            assert set(item) == {"id", "name", "contact"}
+            assert set(item) == {"id", "name", "contact", "sport_code"}
+
+    def test_종목으로_거를_수_있다(self, client, coach):
+        register_coach(
+            CoachEntity(
+                id=uuid4(),
+                name="농구코치",
+                contact="bball@example.test",
+                sport_code="basketball",
+            )
+        )
+        res = client.get(COACHES, params={"sport_code": "football"}, headers=_headers())
+        assert res.status_code == 200
+        body = res.json()
+        assert body["total"] == 1
+        assert body["items"][0]["id"] == str(coach.id)
+
+    def test_모르는_종목이면_422(self, client):
+        res = client.get(COACHES, params={"sport_code": "curling"}, headers=_headers())
+        assert res.status_code == 422
+        assert error_code(res) == "UNKNOWN_SPORT"
 
     def test_상세를_볼_수_있다(self, client, coach):
         res = client.get(f"{COACHES}/{coach.id}", headers=_headers())

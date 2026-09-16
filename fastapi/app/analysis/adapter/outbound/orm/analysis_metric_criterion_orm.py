@@ -58,6 +58,11 @@ class AnalysisMetricCriterionOrm(Base):
     )
     # 등급별 칭호(「채찍이 된 다리」). 등급 맥락의 출처다. `skipped` 는 NULL.
     title: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    # 「받은 호칭」인가(`paik` 23·`ho` 40번). `title`은 모든 등급에 있어서 유무로
+    # 못 가른다 — 참 조건은 최고 등급(2) + 루브릭이 그 문구를 실제로 적었을
+    # 것. `skipped` 행과, 이 필드가 생기기 전(schema_version 1.1) 적재분은
+    # NULL — 0등급을 거짓으로 지어내지 않는다.
+    title_earned: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     # 그 등급의 수치 구간 텍스트. 둘로 갈릴 수 있어("135~150 또는 170~180")
     # 파싱하지 않는다. 🔴 임계값이 검수 전이라 선수 화면에 내지 않는다(미결 24번).
     band: Mapped[str | None] = mapped_column(String(60), nullable=True)

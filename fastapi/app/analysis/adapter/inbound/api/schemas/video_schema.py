@@ -194,6 +194,9 @@ class PublicVideoResponse(BaseModel):
     그대로 들어 있어서다. 업로더는 대신 `uploader_nickname`(항상 있음)과
     `uploader_card_slug`(카드를 만들었으면, 없으면 `null`)로 싣는다(`paik`
     16번). 재생은 `GET /videos/{id}/playback-url`로 따로 받는다.
+
+    `width`·`height`는 화면 비율(`paik` 15번) — 이 컬럼이 생기기 전 등록분은
+    둘 다 `null`이다. 그럴 땐 화면이 16:9로 가정해도 된다(기존 동작).
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -206,6 +209,8 @@ class PublicVideoResponse(BaseModel):
     description: str | None
     uploader_nickname: str
     uploader_card_slug: str | None
+    width: int | None
+    height: int | None
 
 
 class AdminVideoRowResponse(BaseModel):
@@ -254,6 +259,10 @@ class ReportCriterionResponse(BaseModel):
     name: str
     grade: int | None  # None = 제외. 0 점이 아니다.
     title: str | None
+    # 「받은 호칭」인가(`paik` 23·`ho` 40번). `title`은 모든 등급에 있어서
+    # 유무로 「받은 호칭」을 못 가른다 — 참인 항목만 그렇게 그린다. `None`은
+    # `skipped`거나 이 필드가 생기기 전 적재분 — 거짓으로 지어내지 않는다.
+    title_earned: bool | None
     evidence: str | None
     metric_ref: str | None
     skipped: bool

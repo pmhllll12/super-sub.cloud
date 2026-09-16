@@ -43,9 +43,12 @@ RUBRIC = ROOT / "rubrics/baseball_batting.yaml"
 def main() -> None:
     ap = argparse.ArgumentParser()
     # after2 = 앵커에 수준 낱말을 되살린 2회차 (사전 등록 부기 A).
-    # **검사기(check_evidence.py)는 손대지 않는다** — 같은 R1·R2로 판정한다.
+    # after3 = 🔴 **43번 ㉱ 2회차(2026.09.16)가 프롬프트에 단위를 붙인 뒤**의
+    #          재측정이다. 처방이 아니라 **남이 건드린 뒤의 확인**이다 —
+    #          같은 프롬프트를 23번이 재고 있으므로 고친 사람이 다시 잰다.
+    # 🔴 **측정 로직도 검사기도 안 고쳤다** — 태그 하나만 늘렸다(after2 때와 같다).
     ap.add_argument("--tag", required=True,
-                    choices=("before", "after", "after2"),
+                    choices=("before", "after", "after2", "after3"),
                     help="코드를 고치기 전/후 어느 회차인가")
     args = ap.parse_args()
 

@@ -133,6 +133,7 @@ class ReportReadPgRepository(ReportReadPort):
                 name=c.name,
                 grade=c.grade,
                 title=c.title,
+                title_earned=c.title_earned,
                 evidence=c.evidence,
                 metric_ref=c.metric_ref,
                 skipped=c.skipped,
