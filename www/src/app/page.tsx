@@ -44,6 +44,7 @@ export function HomeBody({
       squad={squad}
       sportCode={sportCode}
       teamName={teamName}
+      myCardId={card?.id ?? null}
       destinations={DESTINATIONS}
       featured={FEATURED}
       defaultActive={DEFAULT_FEATURED}
