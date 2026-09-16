@@ -320,9 +320,8 @@ export type MyVideo = {
  * 🔴 **저장 키도 업로더도 안 온다.** 저장 키에 업로더의 `user_id` 가 들어
  * 있어서 계약이 일부러 뺐다 — 재생은 `playback-url` 로 따로 받는다.
  *
- * ⚠️ **화면 비율(가로/세로)이 없다.** 미리 알아야 칸이 안 덜컥이는 값인데
- * (`lib/feed.ts` 참고) 계약에 자리가 없어, 화면은 가로(16:9)로 가정하고 그린다 —
- * 세로 영상은 좌우가 남는다. 미결 `paik` 15번으로 올렸다.
+ * 🔴 **정정 (CCC 46, 2026-09-16)**: 앞서 "화면 비율이 없다"고 적었던 것은 이제
+ * 틀렸다 — 미결 `paik` 15번의 답으로 `width`·`height` 가 실려 온다.
  */
 export type PublicVideo = {
   id: string
@@ -331,6 +330,17 @@ export type PublicVideo = {
   created_at: string
   title: string | null
   description: string | null
+  /**
+   * 원본 화면 크기(px) — 등록할 때 받은 값 그대로다.
+   *
+   * 🔴 **둘 다 `null` 일 수 있다** — 이 컬럼이 생기기 전 등록분이다. **에러가
+   * 아니다**(계약 3-6절). 그때는 화면이 16:9 로 가정한다(그전까지의 동작).
+   *
+   * 🔴 미리 알아야 하는 값이다. 영상을 읽어서 알아내면 그때 칸 크기가 바뀌어
+   * 화면이 한 번 덜컥한다 — 목록 응답만으로 아는 것이 이 필드의 목적이다.
+   */
+  width: number | null
+  height: number | null
 }
 
 /** `Team` 과 달리 나간 소속도 포함하므로 `left_at` 을 갖는다. */

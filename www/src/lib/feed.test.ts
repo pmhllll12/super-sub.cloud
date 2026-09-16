@@ -12,6 +12,8 @@ const clip: PublicVideo = {
   created_at: '2026-09-04T11:05:00Z',
   title: '학교 끝나고 농구 연습',
   description: '디딤발이 공보다 앞서지 않는 순간',
+  width: 1920,
+  height: 1080,
 }
 const urls = { v3: 'https://s3.example.com/v3.mp4?sig=1' }
 
@@ -60,5 +62,32 @@ describe('영상 모음에 공개된 것을 얹는다', () => {
   it('id 가 원래 목록과 겹치지 않는다', () => {
     const ids = feedWith([{ ...clip, id: 'f-001' }], urls, '홍길동').map((c) => c.id)
     expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  /* 🔴 **칸은 영상 모양을 따라간다**(사용자 요청 — 세로로 찍은 것은 세로 그대로
+     세운다). 서버가 `width`·`height` 를 주기 전에는 전부 16:9 로 가정해서, 폰으로
+     세로로 찍어 올린 영상이 **가로 칸 안에 쪼그라들어** 좌우가 남았다. CCC 46
+     (미결 `paik` 15번의 답)으로 목록에 실려 온다. */
+  it('세로 영상은 세로 비율로 선다', () => {
+    const row = feedWith([{ ...clip, width: 1080, height: 1920 }], urls, '홍길동')[0]
+    expect(row.aspect).toBe('1080 / 1920')
+  })
+
+  it('가로 영상은 가로 비율로 선다', () => {
+    expect(feedWith([clip], urls, '홍길동')[0].aspect).toBe('1920 / 1080')
+  })
+
+  /* 🔴 **옛 등록분은 둘 다 `null` 이다**(이 컬럼이 생기기 전). 계약이 "에러로
+     다루지 말라"고 못 박았다 — 그때는 **지금까지의 동작(16:9 가정)** 그대로다. */
+  it('비율을 모르는 옛 영상은 16:9 로 가정한다', () => {
+    const row = feedWith([{ ...clip, width: null, height: null }], urls, '홍길동')[0]
+    expect(row.aspect).toBe('16 / 9')
+  })
+
+  /* 한쪽만 온 응답은 계약에 없지만, 비율은 **둘이 다 있어야** 나온다. 한 칸을
+     0 이나 1 로 메우면 칸이 화면을 넘거나 실처럼 눌린다 — 모르면 모른다고 둔다. */
+  it('한쪽만 오면 비율을 지어내지 않는다', () => {
+    expect(feedWith([{ ...clip, height: null }], urls, '홍길동')[0].aspect).toBe('16 / 9')
+    expect(feedWith([{ ...clip, width: 0 }], urls, '홍길동')[0].aspect).toBe('16 / 9')
   })
 })

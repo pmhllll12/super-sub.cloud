@@ -199,6 +199,20 @@ function checkCell(
  * 🔴 **진짜 백엔드에서는 안 그렇다** — 거기서는 상태가 DB 와 S3 에 있다.
  * 이걸 고치겠다고 화면 쪽에 자리를 만들지 말 것.
  */
+/**
+ * 데모 영상 파일의 **실제 화면 크기**(CCC 46). `public/` 의 파일을 `ffprobe` 로
+ * 읽은 값이다 — `MyVideo` 에는 이 칸이 없어서(공개 목록에만 실린다) 여기 둔다.
+ *
+ * 🔴 **새 파일을 넣으면 재서 적는다.** 눈대중으로 16:9 를 적으면 세로 영상이
+ * 가로 칸에 letterbox 되는데, 그게 바로 CCC 46 이 고친 그 증상이라 **mock 만
+ * 보고는 고쳐졌는지 알 수 없게 된다.**
+ */
+const DEMO_SIZES: Record<string, { width: number; height: number }> = {
+  '/coach-c001.mp4': { width: 1080, height: 1920 }, // 폰으로 세로
+  '/coach-c002.mp4': { width: 1280, height: 720 },
+  '/coach-c003.mp4': { width: 1920, height: 1080 },
+}
+
 let DEMO_VIDEOS: MyVideo[] = [
   {
     id: 'v1',
@@ -937,6 +951,11 @@ export const mockBackend: Backend = {
       created_at: v.created_at,
       title: v.title,
       description: v.description,
+      /* 🔴 **재서 넣은 실제 값이다**(CCC 46) — `ffprobe` 로 `public/` 의 파일을
+         읽었다. 지어낸 값을 두면 세로 파일이 가로 칸에서 letterbox 되어, 화면이
+         고쳐졌는지 mock 으로는 알 수 없게 된다. 실서버의 옛 등록분은 둘 다
+         `null` 로 오고 그것은 **에러가 아니다**(화면이 16:9 로 가정한다). */
+      ...(DEMO_SIZES[v.storage_key] ?? { width: null, height: null }),
     }))
   },
 
