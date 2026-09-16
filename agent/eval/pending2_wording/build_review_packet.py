@@ -95,13 +95,12 @@ def _interval(lo: float | None, hi: float | None) -> str:
     return f"{lo:g}~{hi:g}"
 
 
-def card_cell(criterion, grade: int) -> str:
-    """카드 문장 칸. 🔴 **구간마다 쓴 등급은 어느 구간의 말인지 함께 보인다.**
+def phrase_cell(criterion, written: tuple[str, ...], grade: int) -> str:
+    """칭호·카드 문장 칸. 🔴 **구간마다 쓴 등급은 어느 구간의 말인지 함께 보인다.**
 
     한 등급에 반대 방향이 둘 있는 자리(골반 회전 1등급: 덜 돌았다 / 너무 많이
-    돌았다)에서 문장만 나열하면 지도자가 **어느 쪽 말인지 모른 채** 고치게 된다.
+    돌았다)에서 문구만 나열하면 지도자가 **어느 쪽 말인지 모른 채** 고치게 된다.
     """
-    written = criterion.card_lines.get(grade, ())
     if not written:
         return "🔴 **비어 있습니다**"
     if len(written) == 1:
@@ -130,8 +129,8 @@ def render(rubric: Rubric) -> str:
         for g in (2, 1, 0):
             out.append(
                 f"| **{LEVEL_WORDS[g]}** | {c.grades.get(g) or '—'} "
-                f"| {c.titles.get(g) or '🔴 **비어 있습니다**'} "
-                f"| {card_cell(c, g)} |  |"
+                f"| {phrase_cell(c, c.titles.get(g, ()), g)} "
+                f"| {phrase_cell(c, c.card_lines.get(g, ()), g)} |  |"
             )
     out.append("\n---\n")
     out.append("## 마지막으로")

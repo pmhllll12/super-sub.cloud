@@ -70,10 +70,13 @@ def _parse_bands(entry: dict[str, Any]) -> tuple[str, dict[int, tuple[Interval, 
     return metric, bands
 
 
-def _parse_card_lines(
-    entry: dict[str, Any], bands: dict[int, tuple[Interval, ...]]
+def _parse_phrases(
+    entry: dict[str, Any], bands: dict[int, tuple[Interval, ...]], field_name: str
 ) -> dict[int, tuple[str, ...]]:
-    """추천 카드 문장을 읽는다 — 등급마다 **하나 또는 구간마다 하나**.
+    """선수에게 보이는 문구를 읽는다 — 등급마다 **하나 또는 구간마다 하나**.
+
+    `titles`(칭호)와 `card_lines`(추천 카드 문장)가 같은 규칙을 쓴다. 같은 함수로
+    읽는 이유는 **두 곳에 같은 규칙을 적어 두면 한쪽만 고쳐지기** 때문이다.
 
     🔴 **자리가 어긋나면 반대로 말한다.** 골반 회전 1등급처럼 「덜 돌았다」와
     「너무 많이 돌았다」가 한 등급에 같이 있는 자리에서, 문장 순서가 구간 순서와
@@ -81,17 +84,17 @@ def _parse_card_lines(
     없이 문장만 반대인 형태라 여기서 막는다.
     """
     parsed: dict[int, tuple[str, ...]] = {}
-    for key, written in (entry.get("card_lines") or {}).items():
+    for key, written in (entry.get(field_name) or {}).items():
         grade = int(key)
         per_interval = not isinstance(written, str)
         lines = tuple(written) if per_interval else (written,)
         if not lines or not all(isinstance(s, str) and s.strip() for s in lines):
-            raise RubricError(f"{entry['id']}: {grade}등급 카드 문장이 비었다")
+            raise RubricError(f"{entry['id']}: {grade}등급 {field_name} 이 비었다")
         # 🔴 목록으로 쓰면 **구간마다 쓰겠다는 뜻**이다. 그러면 개수가 맞아야
         #    한다 — 하나만 적어 두면 다른 방향의 선수는 조용히 틀로 떨어진다.
         if per_interval and len(lines) != len(bands.get(grade, ())):
             raise RubricError(
-                f"{entry['id']}: {grade}등급 카드 문장 {len(lines)}개가 구간 "
+                f"{entry['id']}: {grade}등급 {field_name} {len(lines)}개가 구간 "
                 f"{len(bands.get(grade, ()))}개와 안 맞는다. 구간마다 쓸 때는 "
                 "bands 순서와 자리가 맞아야 한다 — 어긋나면 반대 방향을 말한다."
             )
@@ -110,7 +113,10 @@ class Criterion:
     rationale: str = ""
     # 등급별 칭호 — 선수에게 보여줄 짧은 표현. 채점에는 관여하지 않는다.
     # 지도자가 검수하는 문구이므로 UI가 아니라 루브릭에 둔다.
-    titles: dict[int, str] = field(default_factory=dict)
+    #
+    # `card_lines` 와 **같은 규칙**이다 — 등급마다 하나, 또는 구간마다 하나
+    # (한 등급에 반대 방향이 있는 자리). 둘을 같은 함수로 읽는다(`_parse_phrases`).
+    titles: dict[int, tuple[str, ...]] = field(default_factory=dict)
     # 추천 카드의 불릿 문장 (미결 `paik` 27번). 🔴 **칭호와 같은 자리에 둔다** —
     # 지도자가 검수할 문구라서 UI 가 아니라 루브릭에 산다. 채점에 관여하지 않는다.
     #
@@ -123,9 +129,29 @@ class Criterion:
     band_metric: str = ""
     bands: dict[int, tuple[Interval, ...]] = field(default_factory=dict)
 
-    def title_for(self, grade: int) -> str:
-        """해당 등급의 칭호. 정의되지 않았으면 항목명으로 대체한다."""
-        return self.titles.get(grade) or self.name
+    def title_for(self, grade: int, value: float | None = None) -> str:
+        """해당 등급의 칭호. 정의되지 않았으면 항목명으로 대체한다.
+
+        🔴 **한 등급에 반대 방향이 둘이면 `value` 가 있어야 고른다** (2026.09.16).
+        「치우친 상체」처럼 한 말로 양쪽을 부르면 **어느 쪽으로 치우쳤는지**가
+        안 보인다. 값이 없으면 방향을 찍지 않고 **항목명**으로 떨어진다 —
+        `card_line_for` 가 빈 문자열로 떨어지는 것과 같은 판단이다.
+
+        값을 넘기는 곳은 `aggregate` 하나다(거기에 `features` 가 있다). 서비스
+        경로는 늘 넘긴다 — 안 넘기는 것은 합성 판정 데모(`scripts/demo.py`)뿐이고,
+        거기서는 항목명이 나온다.
+        """
+        written = self.titles.get(grade, ())
+        if not written:
+            return self.name
+        if len(written) == 1:
+            return written[0]
+        if value is None:
+            return self.name
+        for phrase, (lo, hi) in zip(written, self.bands.get(grade, ())):
+            if (lo is None or value >= lo) and (hi is None or value <= hi):
+                return phrase
+        return self.name
 
     def card_line_for(self, grade: int, value: float | None = None) -> str:
         """추천 카드에 쓸 한 줄. 루브릭이 안 적었으면 빈 문자열이다.
@@ -555,8 +581,8 @@ def load_rubric(path: str | Path) -> Rubric:
                 grades=grades,
                 anchors=tuple(entry.get("anchors", [])),
                 rationale=entry.get("rationale", ""),
-                titles={int(k): v for k, v in (entry.get("titles") or {}).items()},
-                card_lines=_parse_card_lines(entry, bands),
+                titles=_parse_phrases(entry, bands, "titles"),
+                card_lines=_parse_phrases(entry, bands, "card_lines"),
                 band_metric=band_metric,
                 bands=bands,
             )
@@ -865,6 +891,11 @@ def aggregate(
         weight = c.weight / total_weight
         contribution = weight * (grade / MAX_GRADE)
         ratio += contribution
+        # 한 등급에 **반대 방향 구간**이 둘 있는 항목은 이 값이 있어야 어느 쪽
+        # 칭호인지 고른다. 없으면 `title_for` 가 항목명으로 떨어진다 — 방향을
+        # 찍지 않는다. 🔴 **점수는 이 값과 무관하다**(등급은 이미 판정돼 왔다).
+        measured = (features or {}).get(c.band_metric)
+        value = measured if isinstance(measured, (int, float)) else None
         breakdown.append(
             {
                 "criterion_id": c.id,
@@ -875,7 +906,7 @@ def aggregate(
                 # 등급 표기는 **여기서** 붙는다. 모델 문장(evidence)에는 등급
                 # 번호도 구간도 없다 — 미결 23번의 처방이다. 화면이 칭호·구간을
                 # 보여주려면 루브릭을 다시 열지 않고 이 두 필드를 쓰면 된다.
-                "title": c.title_for(grade),
+                "title": c.title_for(grade, value),
                 # 🔴 위 `title` 은 **모든 등급에 있다** — 「받았는가」는 이쪽이
                 # 답한다 (`paik` 23번). 화면이 `title != null` 로 선을 그으면
                 # 0등급의 「무너지는 축」까지 호칭으로 그린다. 점수는 안 바뀐다.
