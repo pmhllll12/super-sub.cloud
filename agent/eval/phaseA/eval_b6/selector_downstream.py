@@ -32,6 +32,7 @@ import subprocess
 import sys
 import time
 from datetime import datetime, timezone
+from importlib.metadata import PackageNotFoundError, distributions, version
 from pathlib import Path
 
 import cv2
@@ -399,6 +400,18 @@ def _git_state() -> dict:
     }
 
 
+def _installed_packages() -> dict:
+    """이 실행이 **무엇으로 돌았는지**를 이름→버전으로 전부 적는다.
+
+    🔴 `uv.lock` 과 다른 것을 잰다. 잠금 파일은 **무엇을 깔 수 있나**이고 이쪽은
+    **무엇이 깔려 있었나**다 — 47번은 그 둘이 갈려서 났다(`uv sync` 가 extra 를
+    걷어내도 잠금 파일은 한 글자도 안 바뀐다).
+    """
+    return {d.metadata["Name"]: d.version
+            for d in sorted(distributions(), key=lambda d: d.metadata["Name"].lower())
+            if d.metadata["Name"]}
+
+
 def _env_state(dev: str) -> dict:
     import numpy
     import transformers
@@ -425,7 +438,21 @@ def _env_state(dev: str) -> dict:
             check=True).stdout.strip()
     except Exception as exc:  # noqa: BLE001
         smi = f"error: {type(exc).__name__}"
+    # 🔴 **전처리기가 무엇으로 잡혔는가** (2026-09-16, 47번 5회차). 이 칸이
+    #    없어서 09-08 과 09-15 가 왜 다른지 다섯 회차를 썼다. transformers 5.x 는
+    #    **`torchvision` 이 있느냐로 이미지 전처리기를 다르게 고르고**(있으면
+    #    텐서 경로, 없으면 `...ImageProcessorPil`), 리사이즈가 갈리면 픽셀이
+    #    달라져 **포즈가 흔들린다.** 🔴 `uv.lock` 은 이것을 안 알려 준다 —
+    #    `torchvision` 은 `tracking` extra 가 끌고 오던 것이라 **extra 없이
+    #    `uv sync` 한 번이면 조용히 빠진다.**
+    from transformers.utils.import_utils import is_torchvision_available
+    try:
+        torchvision_version = version("torchvision")
+    except PackageNotFoundError:
+        torchvision_version = None
     return {
+        "torchvision": torchvision_version,
+        "transformers_sees_torchvision": is_torchvision_available(),
         "gpu_used_at_start_smi": smi,
         "gpu_free_bytes_at_start_torch": free_b,
         "gpu_total_bytes_torch": total_b,
@@ -470,6 +497,11 @@ def _write_run_meta(dev: str, timing: dict) -> Path:
         "constants": {"target_fps": DEFAULT_TARGET_FPS, "max_batch": MAX_BATCH,
                       "det_threshold": DET_THRESHOLD, "modes": list(MODES),
                       "track1_kinematics": [T1_LIMB, T1_EVENT]},
+        # 🔴 **설치된 것 전부** (2026-09-16, 47번 5회차). 위 `env` 는 내가
+        #    「중요하다」고 미리 고른 몇 개만 적는데, **09-08 을 가른 것은 그
+        #    목록에 없던 `torchvision`** 이었다. 무엇이 중요한지는 사고가 난
+        #    뒤에 알게 되므로 **고르지 않고 전부 적는다** — 90개쯤이고 몇 KB다.
+        "packages": _safe(_installed_packages),
         "batching": dict(_RUN),
         "timing": timing,
         "outputs": {p.name: {"md5": _md5(p), "bytes": p.stat().st_size}

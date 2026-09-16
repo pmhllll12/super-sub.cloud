@@ -893,3 +893,241 @@ def test_the_default_poll_interval_is_not_the_users_waiting_room(worker):
          "SUPERSUB_API_BASE": "https://example.invalid/api/v1"}
     )
     assert cfg.poll_seconds <= 10, "기본 폴링이 대기 시간을 지배한다"
+
+
+# -- 검출(`detect`) 작업 ----------------------------------------------------
+#
+#    같은 큐에 종류가 둘이 됐다 (미결 `ho` 44번). `claim` 응답의 `job_type` 이
+#    갈라 주고, `detect` 면 `detect_subjects.py` 를 불러 `detection_result` 로
+#    보고한다. 규격은 `fastapi/docs/worker-interface.md` 6절.
+#
+#    🔴 여기 검사들이 지키는 성질은 **분석 경로가 안 바뀌는 것**과 **화면이
+#    받은 박스가 분석에 그대로 돌아가는 것** 둘이다.
+
+
+DETECT_RESULT = {
+    "people": [{"box": [0.287, 0.199, 0.168, 0.666], "score": 0.909}],
+    "ball": {"x": 0.661, "y": 0.706, "score": 0.918},
+    "frame": 30,
+    "at_clamped": False,
+    "source_video": "s3://supersub-ai/videos/user-1/clip.mp4",
+}
+
+
+def _detect_job(**over) -> dict:
+    """검출 작업의 claim 응답. 🔴 `sport_code` 가 **없다** — `detect` 작업에는
+    비어 있을 수 있다는 것이 규격이고(6절 2번), 그래도 돌아야 한다."""
+    job = {
+        "job_id": "7c1d",
+        "video_id": "1b3c",
+        "storage_key": "videos/user-1/clip.mp4",
+        "job_type": "detect",
+        "subject_at_ms": 1000,
+    }
+    job.update(over)
+    return job
+
+
+def _detect_run(worker, monkeypatch, result: dict | str | None, code: int = 0,
+                last_line: str = "") -> list[list[str]]:
+    """검출 자식을 흉내낸다 — 받은 명령줄을 모아 돌려준다."""
+    seen: list[list[str]] = []
+
+    def fake(cmd, timeout, stopper):
+        seen.append(cmd)
+        if result is not None:
+            path = Path(cmd[cmd.index("--result-json") + 1])
+            path.write_text(
+                result if isinstance(result, str)
+                else json.dumps(result, ensure_ascii=False),
+                encoding="utf-8",
+            )
+        return worker.Outcome(code, last_line)
+
+    monkeypatch.setattr(worker, "run_analysis", fake)
+    return seen
+
+
+def test_a_detect_job_calls_the_detector_not_the_analysis(worker, cfg, monkeypatch):
+    """🔴 `job_type` 을 안 보고 분석으로 넘기면 `sport_code` 가 비어 있어서
+    루브릭 단계에서 엉뚱한 사유로 죽는다 — 사용자에게는 「채점할 루브릭이
+    없다」가 나가는데 이 작업은 채점을 부탁한 적이 없다."""
+    _intercept(worker, monkeypatch, [(204, b"")])
+    seen = _detect_run(worker, monkeypatch, DETECT_RESULT)
+
+    worker.process(cfg, _detect_job(), worker.Stopper())
+
+    cmd = " ".join(seen[0])
+    assert "detect_subjects.py" in cmd
+    assert "analyze_s3.py" not in cmd
+    assert "--rubric" not in cmd, "검출은 채점하지 않는다"
+    assert "--out" not in cmd, "검출은 리포트를 안 만든다"
+
+
+def test_the_detector_looks_at_the_frame_the_screen_showed(worker, cfg, monkeypatch):
+    """🔴 `--at-ms` 가 `subject_at_ms` 와 같아야 **같은 화면**을 본다.
+
+    화면은 이 목록에서 고른 박스를 그대로 분석에 넘긴다(`--subject-box` ·
+    `--subject-at-ms`). 시각이 어긋나면 사용자가 본 적 없는 프레임의 후보를
+    내주고, 그 박스로 분석하면 **다른 사람이 분석된다.**
+    """
+    _intercept(worker, monkeypatch, [(204, b"")])
+    seen = _detect_run(worker, monkeypatch, DETECT_RESULT)
+
+    worker.process(cfg, _detect_job(subject_at_ms=4200), worker.Stopper())
+
+    assert seen[0][seen[0].index("--at-ms") + 1] == "4200"
+
+
+def test_the_candidates_are_reported_unchanged(worker, cfg, monkeypatch):
+    """🔴 자식이 낸 JSON을 **그대로** 싣는다 (6절 3번).
+
+    좌표는 정규화 0~1 이고 `people[].box` 가 그대로 `--subject-box` 로 돌아가는
+    것이 이 기능의 전부다. 워커가 키를 고르거나 좌표를 손보면 **화면이 받는
+    박스와 분석이 받는 박스가 갈린다.**
+    """
+    sent = _intercept(worker, monkeypatch, [(204, b"")])
+    _detect_run(worker, monkeypatch, DETECT_RESULT)
+
+    worker.process(cfg, _detect_job(), worker.Stopper())
+
+    method, path, payload = sent[0]
+    assert method == "PATCH" and path.endswith("/7c1d")
+    assert payload["status"] == "succeeded"
+    assert payload["detection_result"] == DETECT_RESULT
+
+
+def test_a_detect_report_never_carries_a_report_key(worker, cfg, monkeypatch):
+    """🔴 `detect` 작업은 리포트가 없다 (6절 「하지 말 것」).
+
+    실어 보내면 받는 쪽이 **없는 S3 객체**를 적재하려다 실패한다 — 그쪽 설계가
+    「`report_key` 가 없으면 적재를 안 한다」로 되어 있어서다.
+    """
+    sent = _intercept(worker, monkeypatch, [(204, b"")])
+    _detect_run(worker, monkeypatch, DETECT_RESULT)
+
+    worker.process(cfg, _detect_job(), worker.Stopper())
+
+    assert "report_key" not in sent[0][2]
+
+
+def test_nobody_in_the_frame_is_a_success_not_a_failure(worker, cfg, monkeypatch):
+    """🔴 0명은 정상 경로다. 화면은 0명이면 드래그로 떨어진다 — 실패로 만들면
+    화면이 「사람이 없습니다」로 막아 버리고 사용자는 찍을 방법이 없어진다."""
+    sent = _intercept(worker, monkeypatch, [(204, b"")])
+    _detect_run(worker, monkeypatch, {"people": [], "ball": None, "frame": 30})
+
+    worker.process(cfg, _detect_job(), worker.Stopper())
+
+    payload = sent[0][2]
+    assert payload["status"] == "succeeded"
+    assert payload["detection_result"]["people"] == []
+
+
+def test_a_broken_candidate_file_is_not_reported_as_success(worker, cfg, monkeypatch):
+    """🔴 실을 것이 없는 성공은 성공이 아니다 — `report_key` 와 같은 판단이다.
+
+    빈 목록으로 succeeded 를 내면 화면은 **영원히 빈 목록**이고 작업은 끝난
+    것으로 남아 다시 걸 방법조차 안 보인다.
+    """
+    for broken in ("{깨진", json.dumps({"ball": None}), None):
+        sent = _intercept(worker, monkeypatch, [(204, b"")])
+        _detect_run(worker, monkeypatch, broken)
+
+        worker.process(cfg, _detect_job(), worker.Stopper())
+
+        assert sent[0][2]["status"] == "failed"
+
+
+def test_a_detect_job_without_a_time_is_refused_rather_than_guessed(
+    worker, cfg, monkeypatch
+):
+    """🔴 시각을 지어내면 **화면이 본 것과 다른 프레임**의 후보가 나간다.
+
+    사용자는 자기가 보던 사람이 목록에 없는 이유를 알 수 없고, 그 상태가
+    「검출이 사람을 못 잡는다」로 보인다 — 실제로는 다른 화면을 본 것이다.
+    """
+    sent = _intercept(worker, monkeypatch, [(204, b"")])
+
+    def never(*a, **k):
+        raise AssertionError("검출이 실행됐다")
+
+    monkeypatch.setattr(worker, "run_analysis", never)
+    worker.process(cfg, _detect_job(subject_at_ms=None), worker.Stopper())
+
+    assert sent[0][2]["status"] == "failed"
+    assert "subject_at_ms" in sent[0][2]["failure_reason"]
+
+
+def test_a_detect_failure_does_not_tell_the_user_to_film_again(worker):
+    """🔴 종료 코드 2의 뜻이 분석과 다르다.
+
+    분석의 2는 「품질 게이트 미달(다시 찍어야 풀린다)」이고 검출의 2는 「그
+    시각의 프레임을 못 읽었다」다. 분석 쪽 문구를 그대로 쓰면 사용자가 멀쩡한
+    영상을 다시 찍는다 — 미결 41번이 실서버에서 아홉 번 그런 형태다.
+    """
+    reason = worker.detect_failure_reason(
+        worker.Outcome(2, "후보를 낼 수 없다: 읽을 프레임이 없다")
+    )
+    assert "품질 게이트" not in reason
+    assert "다시" not in reason
+    assert "후보를 낼 수 없다" in reason
+
+
+def test_an_unknown_job_type_is_refused_not_guessed(worker, cfg, monkeypatch):
+    """🔴 백엔드가 종류를 늘렸는데 워커가 낡았을 때, 추측한 쪽은 **틀린 결과를
+    succeeded 로** 보고한다 — 큐는 줄고 사용자는 엉뚱한 것을 본다."""
+    sent = _intercept(worker, monkeypatch, [(204, b"")])
+
+    def never(*a, **k):
+        raise AssertionError("모르는 종류를 실행했다")
+
+    monkeypatch.setattr(worker, "run_analysis", never)
+    worker.process(cfg, _detect_job(job_type="transcode"), worker.Stopper())
+
+    assert sent[0][2]["status"] == "failed"
+    assert "transcode" in sent[0][2]["failure_reason"]
+
+
+@pytest.mark.parametrize("job_type", ["analyze", None])
+def test_an_analyze_job_still_goes_to_the_analysis(worker, cfg, monkeypatch, job_type):
+    """🔴 분석 경로가 안 바뀌는 것이 이 변경의 조건이다.
+
+    `None` 쪽은 **이 필드가 생기기 전의 백엔드**다 — 필드가 없다고 실패하면
+    배포 순서에 따라 모든 분석이 멈춘다(`video_id` 와 같은 이유로 확인한다).
+    """
+    _intercept(worker, monkeypatch, [(204, b"")])
+    seen: list[list[str]] = []
+
+    def fake(cmd, timeout, stopper):
+        seen.append(cmd)
+        path = Path(cmd[cmd.index("--result-json") + 1])
+        path.write_text(json.dumps({"reports": [
+            {"report_uri": "s3://supersub-ai/reports/u1/v9/report.json"},
+        ]}), encoding="utf-8")
+        return worker.Outcome(0, "저장: …")
+
+    monkeypatch.setattr(worker, "run_analysis", fake)
+    job = _job() if job_type is None else _job(job_type=job_type)
+    worker.process(cfg, job, worker.Stopper())
+
+    assert "analyze_s3.py" in " ".join(seen[0])
+    assert "detect_subjects.py" not in " ".join(seen[0])
+
+
+def test_the_detect_child_is_seen_as_busy_by_autostop(worker, cfg, tmp_path):
+    """🔴 검출 도중에 인스턴스가 꺼지면 안 된다.
+
+    분석 자식(`analyze_s3.py`)은 원래 패턴에 걸렸지만 `detect_subjects.py` 는
+    2026-09-16 에 더하기 전까지 **안 걸렸다.** 검출은 몇 십 초짜리라 짧은데,
+    짧다는 것은 안 걸릴 이유가 아니라 **덜 걸릴 이유**다 — 그 사이에 타이머가
+    만료되면 사용자가 화면에서 기다리는 동안 전원이 내려간다.
+    """
+    cmd = worker.detect_command(cfg, _detect_job(), tmp_path / "c.json")
+    cmdline = " ".join(cmd)
+    found = subprocess.run(
+        ["grep", "-Eq", _busy_pattern()], input=cmdline, text=True, check=False
+    )
+    assert found.returncode == 0, (
+        f"autostop 이 이 명령줄을 '작업 중'으로 보지 못한다:\n  {cmdline}"
+    )

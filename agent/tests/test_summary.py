@@ -126,3 +126,106 @@ def test_the_summary_is_at_most_two_sentences():
                        [2, 1, 0] + [1] * (len(rubric.criteria) - 3)):
             s = aggregate(_judge(rubric, grades), rubric)["summary"]
             assert s.count("다.") <= 2, f"{key}: {s}"
+
+
+# -- 추천 카드의 설명 칸 (미결 `paik` 27번) ----------------------------------
+#
+#    화면(`SquadSuggest.tsx`)이 후보마다 이름 아래에 한 줄과 불릿 둘을 그리는데
+#    지금은 **붙박이 문자열**이다. 그 자리를 분석으로 채운다.
+#
+#    🔴 여기 검사들이 막는 것은 **없는 말을 하는 것**이다. 붙박이에는
+#    「활동량이 많고 꾸준합니다」·「10경기 연속」이 섞여 있는데 그건 경기
+#    기록이지 우리가 잰 것이 아니다.
+
+
+def _card(rubric, grades):
+    from supersub_agent.scoring import card
+    result = aggregate(_judge(rubric, grades), rubric)
+    return card(result["breakdown"]), result
+
+
+@pytest.mark.parametrize("key", sorted(RUBRICS))
+def test_the_card_titles_only_what_was_earned(key):
+    """🔴 못 받은 칭호를 수식어로 달지 않는다.
+
+    `title` 은 **모든 등급에 있다**(`paik` 23번). 그대로 쓰면 0등급의
+    「무너지는 축」이 이름 아래 자랑처럼 걸린다.
+    """
+    rubric = RUBRICS[key]
+    top, _ = _card(rubric, [2] * len(rubric.criteria))
+    bottom, _ = _card(rubric, [0] * len(rubric.criteria))
+    assert top["title"], "전부 잘했는데 수식어가 없다"
+    assert bottom["title"] is None, "못 받은 칭호가 수식어로 나갔다"
+
+
+@pytest.mark.parametrize("key", sorted(RUBRICS))
+def test_the_card_never_pads_to_two_notes(key):
+    """🔴 두 줄을 채우려고 지어내지 않는다.
+
+    전부 잘했으면 아쉬운 줄이 없고, 전부 못했으면 강점 줄이 없다. 화면이 두
+    줄을 원한다고 없는 말을 만들면 그 순간 이 카드는 근거가 아니다.
+    """
+    rubric = RUBRICS[key]
+    for grades in ([2] * len(rubric.criteria), [0] * len(rubric.criteria)):
+        got, _ = _card(rubric, grades)
+        assert 1 <= len(got["notes"]) <= 2
+        assert all(n.strip() for n in got["notes"])
+
+
+@pytest.mark.parametrize("key", sorted(RUBRICS))
+@pytest.mark.parametrize("grade", [0, 1, 2])
+def test_no_digits_reach_the_card(key, grade):
+    """🔴 계약 3장 4 — 숫자를 쓰지 않는다 (`summary` 와 같은 규칙)."""
+    got, _ = _card(RUBRICS[key], [grade] * len(RUBRICS[key].criteria))
+    text = (got["title"] or "") + " ".join(got["notes"])
+    assert not any(ch.isdigit() for ch in text), text
+
+
+@pytest.mark.parametrize("key", sorted(RUBRICS))
+def test_the_card_says_nothing_about_match_records(key):
+    """🔴 **경기 기록은 우리가 잰 것이 아니다.**
+
+    붙박이 문자열에 섞여 있던 「활동량」·「10경기 연속」·「출전」 같은 말은
+    분석이 아니라 기록에서 와야 한다. 여기서 만들면 **지어낸 스카우팅**이 된다.
+    """
+    rubric = RUBRICS[key]
+    for grade in (0, 1, 2):
+        got, _ = _card(rubric, [grade] * len(rubric.criteria))
+        text = (got["title"] or "") + " ".join(got["notes"])
+        for word in ("경기", "활동량", "출전", "연속", "꾸준"):
+            assert word not in text, f"경기 기록의 말이 카드에 섞였다: {word}"
+
+
+@pytest.mark.parametrize("key", sorted(RUBRICS))
+def test_the_card_does_not_move_the_score(key):
+    """🔴 `summary` 와 같은 성질 — 이 블록은 점수를 안 건드린다.
+
+    건드리면 B-6 재실행을 부른다. 카드를 빼고 계산한 것과 비트 동일해야 한다.
+    """
+    rubric = RUBRICS[key]
+    _, result = _card(rubric, [1] * len(rubric.criteria))
+    without = {k: v for k, v in result.items() if k != "card"}
+    again = aggregate(_judge(rubric, [1] * len(rubric.criteria)), rubric)
+    assert {k: v for k, v in again.items() if k != "card"} == without
+
+
+@pytest.mark.parametrize("key", sorted(RUBRICS))
+def test_the_card_is_deterministic(key):
+    """같은 판정이 같은 카드를 낸다 — 모델을 안 부르는 것이 그 이유다."""
+    rubric = RUBRICS[key]
+    a, _ = _card(rubric, [2, 1, 0] * len(rubric.criteria))
+    b, _ = _card(rubric, [2, 1, 0] * len(rubric.criteria))
+    assert a == b
+
+
+@pytest.mark.parametrize("key", sorted(RUBRICS))
+def test_the_card_does_not_repeat_its_own_title(key):
+    """🔴 화면은 수식어와 불릿을 **나란히** 그린다 — 같은 말이 두 번 보이면 안 된다.
+
+    수식어는 **칭호**, 불릿은 **항목 이름**으로 나눠 적는다.
+    """
+    rubric = RUBRICS[key]
+    got, _ = _card(rubric, [2] * len(rubric.criteria))
+    assert got["title"]
+    for note in got["notes"]:
+        assert got["title"] not in note, f"수식어가 불릿에서 반복된다: {note}"

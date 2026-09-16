@@ -1,0 +1,240 @@
+{
+  "tag": "after3",
+  "backend": "transformers",
+  "model": "LGAI-EXAONE/EXAONE-4.0-1.2B",
+  "clips": {
+    "0Fet8TyoNR4": {
+      "score": 40,
+      "grade": "D",
+      "items": [
+        {
+          "criterion_id": "hip_shoulder_separation",
+          "name": "골반이 어깨보다 먼저 열리기",
+          "grade": 0,
+          "stored_grade": 0,
+          "evidence": "골반-어깨 분리각 10.4도로 골반이 상체보다 먼저 열리는 정도가 부족하다. 준비~임팩트 구간에서 분리각이 작게 측정되어 스윙 효율이 떨어질 수 있다.",
+          "metric_ref": "hip_shoulder_separation_deg",
+          "given_metrics": {
+            "hip_shoulder_separation_deg": 10.4
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 0,
+          "stored_grade": 0,
+          "evidence": "골반 회전 범위 6.9도로 하체 회전이 거의 없었다",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 6.9
+          }
+        },
+        {
+          "criterion_id": "trunk_posture",
+          "name": "상체 자세 유지",
+          "grade": 2,
+          "stored_grade": 2,
+          "evidence": "임팩트 시 몸통 전후 기울기 3.1도로 상체가 안정적으로 유지되었다.",
+          "metric_ref": "trunk_forward_lean_deg_at_impact",
+          "given_metrics": {
+            "trunk_forward_lean_deg_at_impact": 3.1
+          }
+        },
+        {
+          "criterion_id": "follow_through",
+          "name": "휘두른 뒤 마무리",
+          "grade": 2,
+          "stored_grade": 2,
+          "evidence": "임팩트 후 주동 어깨 굴곡 50.5도로 추가 감속 효과가 잘 유지되었다.",
+          "metric_ref": "swing_shoulder_flexion_after_impact_deg",
+          "given_metrics": {
+            "swing_shoulder_flexion_after_impact_deg": 50.5
+          }
+        }
+      ]
+    },
+    "C7icGyrdROM": {
+      "score": 48,
+      "grade": "D",
+      "items": [
+        {
+          "criterion_id": "lead_arm_extension",
+          "name": "앞쪽 팔 뻗기",
+          "grade": 0,
+          "stored_grade": 0,
+          "evidence": "임팩트 시 리드 팔 팔꿈치각 5.4도로 접혀 있어 스윙 궤도가 짧아졌다.",
+          "metric_ref": "support_elbow_angle_at_impact",
+          "given_metrics": {
+            "support_elbow_angle_at_impact": 5.4
+          }
+        },
+        {
+          "criterion_id": "hip_shoulder_separation",
+          "name": "골반이 어깨보다 먼저 열리기",
+          "grade": 2,
+          "stored_grade": 2,
+          "evidence": "최대 분리각 30.2도로 골반이 상체보다 먼저 열리는 자세가 잘 유지되었다. 이로 인해 힘이 효율적으로 전달되는 데 기여했다.",
+          "metric_ref": "hip_shoulder_separation_deg",
+          "given_metrics": {
+            "hip_shoulder_separation_deg": 30.2
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 0,
+          "stored_grade": 0,
+          "evidence": "골반 회전 범위 10.6도로 하체 회전이 거의 없었다",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 10.6
+          }
+        },
+        {
+          "criterion_id": "trunk_posture",
+          "name": "상체 자세 유지",
+          "grade": 1,
+          "stored_grade": 1,
+          "evidence": "임팩트 시 몸통 전후 기울기 28.4도로 상체가 약간 한쪽으로 흔들렸다. 대칭 유지는 잘했으나, 더 안정적인 자세를 위해 충격 흡수 기술 연습이 필요할 것 같다.",
+          "metric_ref": "trunk_forward_lean_deg_at_impact",
+          "given_metrics": {
+            "trunk_forward_lean_deg_at_impact": 28.4
+          }
+        },
+        {
+          "criterion_id": "follow_through",
+          "name": "휘두른 뒤 마무리",
+          "grade": 2,
+          "stored_grade": 2,
+          "evidence": "임팩트 후 주동 어깨 굴곡 73.0도 추가 진행, 팔이 몸을 감아 돌았다.",
+          "metric_ref": "swing_shoulder_flexion_after_impact_deg",
+          "given_metrics": {
+            "swing_shoulder_flexion_after_impact_deg": 73.0
+          }
+        }
+      ]
+    },
+    "YNMHMKb5Md4": {
+      "score": 48,
+      "grade": "D",
+      "items": [
+        {
+          "criterion_id": "lead_arm_extension",
+          "name": "앞쪽 팔 뻗기",
+          "grade": 0,
+          "stored_grade": 0,
+          "evidence": "임팩트 시 리드 팔 팔꿈치각 99.5도로 접혀 있어 스윙 궤도가 짧아졌다.",
+          "metric_ref": "support_elbow_angle_at_impact",
+          "given_metrics": {
+            "support_elbow_angle_at_impact": 99.5
+          }
+        },
+        {
+          "criterion_id": "hip_shoulder_separation",
+          "name": "골반이 어깨보다 먼저 열리기",
+          "grade": 2,
+          "stored_grade": 2,
+          "evidence": "최대 분리각 28.5도로 골반이 상체보다 먼저 열리는 자세가 잘 유지되었다. 이로 인해 힘이 효율적으로 전달되어 스윙 속도가 자연스럽게 나타났다.",
+          "metric_ref": "hip_shoulder_separation_deg",
+          "given_metrics": {
+            "hip_shoulder_separation_deg": 28.5
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 0,
+          "stored_grade": 0,
+          "evidence": "골반 회전 범위 0.0도로 하체 회전이 전혀 없어 상체만 활용된 스윙이었다.",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 0.0
+          }
+        },
+        {
+          "criterion_id": "trunk_posture",
+          "name": "상체 자세 유지",
+          "grade": 2,
+          "stored_grade": 2,
+          "evidence": "임팩트 시 몸통 전후 기울기 4.8도로 상체가 안정적으로 유지되었다.",
+          "metric_ref": "trunk_forward_lean_deg_at_impact",
+          "given_metrics": {
+            "trunk_forward_lean_deg_at_impact": 4.8
+          }
+        },
+        {
+          "criterion_id": "follow_through",
+          "name": "휘두른 뒤 마무리",
+          "grade": 1,
+          "stored_grade": 1,
+          "evidence": "임팩트 후 주동 어깨 굴곡 17.7도로 마무리 구간이 다소 짧았다.",
+          "metric_ref": "swing_shoulder_flexion_after_impact_deg",
+          "given_metrics": {
+            "swing_shoulder_flexion_after_impact_deg": 17.7
+          }
+        }
+      ]
+    },
+    "ZMy0t-CSZiU": {
+      "score": 55,
+      "grade": "C",
+      "items": [
+        {
+          "criterion_id": "lead_arm_extension",
+          "name": "앞쪽 팔 뻗기",
+          "grade": 1,
+          "stored_grade": 1,
+          "evidence": "임팩트 시 리드 팔 팔꿈치각 136.0도로 스윙 궤도가 뻗어 나갔다.",
+          "metric_ref": "support_elbow_angle_at_impact",
+          "given_metrics": {
+            "support_elbow_angle_at_impact": 136.0
+          }
+        },
+        {
+          "criterion_id": "hip_shoulder_separation",
+          "name": "골반이 어깨보다 먼저 열리기",
+          "grade": 1,
+          "stored_grade": 1,
+          "evidence": "분리각 22.9도로 골반이 상체보다 먼저 열리는 정도가 중간 수준이지만, 준비~임팩트 구간 최대 분리각이 25도 미만으로 확인되어 회전량이 부족합니다.",
+          "metric_ref": "hip_shoulder_separation_deg",
+          "given_metrics": {
+            "hip_shoulder_separation_deg": 22.9
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 0,
+          "stored_grade": 0,
+          "evidence": "골반 회전 범위 3.5도로 하체 회전이 거의 없었다",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 3.5
+          }
+        },
+        {
+          "criterion_id": "trunk_posture",
+          "name": "상체 자세 유지",
+          "grade": 2,
+          "stored_grade": 2,
+          "evidence": "임팩트 시 몸통 전후 기울기 -12.4도로 상체가 안정적으로 유지되었다.",
+          "metric_ref": "trunk_forward_lean_deg_at_impact",
+          "given_metrics": {
+            "trunk_forward_lean_deg_at_impact": -12.4
+          }
+        },
+        {
+          "criterion_id": "follow_through",
+          "name": "휘두른 뒤 마무리",
+          "grade": 2,
+          "stored_grade": 2,
+          "evidence": "임팩트 후 주동 어깨 굴곡 34.4도로 팔이 몸을 감아 돌았다.",
+          "metric_ref": "swing_shoulder_flexion_after_impact_deg",
+          "given_metrics": {
+            "swing_shoulder_flexion_after_impact_deg": 34.4
+          }
+        }
+      ]
+    }
+  }
+}

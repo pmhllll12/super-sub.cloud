@@ -45,7 +45,7 @@ criteria:
     measured_by: [plant_knee_angle_at_impact]
     titles:
       2: "흔들리지 않는 축"
-      1: "설익은 축"
+      1: "흔들린 축"
       0: "무너지는 축"
     grades:
       2: "임팩트 시 디딤발 무릎각 150~170도"
@@ -75,9 +75,9 @@ criteria:
       임팩트 시점에 이미 다 펴져 있으면 가속 구간을 놓친 것이다.
     measured_by: [swing_knee_angle_at_impact]
     titles:
-      2: "채찍이 된 다리"
-      1: "덜 감긴 채찍"
-      0: "풀린 채찍"
+      2: "끝까지 뻗은 다리"
+      1: "지나치게 편 다리"
+      0: "치우친 다리"
     grades:
       2: "임팩트 시 무릎각 140~165도"
       1: "165~175도"
@@ -105,9 +105,9 @@ criteria:
       상체가 뒤로 젖혀지면 공이 뜬다. 공 위로 상체가 덮이는 자세가 기준이다.
     measured_by: [trunk_forward_lean_deg_at_impact]
     titles:
-      2: "공을 눌러 담는 상체"
-      1: "곧추선 상체"
-      0: "젖혀진 상체"
+      2: "공을 덮은 상체"
+      1: "치우친 상체"
+      0: "크게 치우친 상체"
     grades:
       2: "임팩트 시 상체 전방 기울기 5~20도"
       1: "0~5도(수직) 또는 20~30도(과도한 전방)"
@@ -136,7 +136,7 @@ criteria:
       회전 없이 다리만 휘두르면 힘이 실리지 않는다.
     measured_by: [hip_rotation_range_deg]
     titles:
-      2: "활처럼 열리는 골반"
+      2: "크게 열린 골반"
       1: "절반만 열린 골반"
       0: "잠긴 골반"
     grades:
@@ -167,9 +167,9 @@ criteria:
       임팩트 직후 멈추면 공 속도가 죽는다.
     measured_by: [swing_hip_flexion_after_impact_deg, follow_through_duration_frames]
     titles:
-      2: "공을 배웅하는 발"
-      1: "짧아진 배웅"
-      0: "멈춰 선 스윙"
+      2: "끝까지 따라간 마무리"
+      1: "짧아진 마무리"
+      0: "멈춘 마무리"
     grades:
       2: "임팩트 후 차는 다리 고관절 굴곡이 30도 이상 추가 진행"
       1: "15~30도"
@@ -198,9 +198,9 @@ criteria:
       넘어가 공이 눌리고, 너무 뒤에 딛으면 상체가 젖혀져 공이 뜬다.
     measured_by: [plant_foot_to_ball_offset]
     titles:
-      2: "자리를 아는 디딤발"
-      1: "어긋난 디딤 자리"
-      0: "헛짚은 디딤 자리"
+      2: "공 옆에 붙인 디딤발"
+      1: "조금 멀어진 디딤발"
+      0: "멀리 놓인 디딤발"
     bands:
       metric: plant_foot_to_ball_offset
       2: [[0, 0.5]]
