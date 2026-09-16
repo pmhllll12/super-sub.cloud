@@ -84,6 +84,34 @@ INTRO = """\
 """
 
 
+def _interval(lo: float | None, hi: float | None) -> str:
+    """구간 하나를 사람이 읽을 표기로. `Criterion.band_text` 와 같은 규칙이다."""
+    if lo is None and hi is None:
+        return "전 구간"
+    if lo is None:
+        return f"{hi:g} 이하"
+    if hi is None:
+        return f"{lo:g} 이상"
+    return f"{lo:g}~{hi:g}"
+
+
+def card_cell(criterion, grade: int) -> str:
+    """카드 문장 칸. 🔴 **구간마다 쓴 등급은 어느 구간의 말인지 함께 보인다.**
+
+    한 등급에 반대 방향이 둘 있는 자리(골반 회전 1등급: 덜 돌았다 / 너무 많이
+    돌았다)에서 문장만 나열하면 지도자가 **어느 쪽 말인지 모른 채** 고치게 된다.
+    """
+    written = criterion.card_lines.get(grade, ())
+    if not written:
+        return "🔴 **비어 있습니다**"
+    if len(written) == 1:
+        return written[0]
+    return "<br>".join(
+        f"**{_interval(lo, hi)}** — {line}"
+        for line, (lo, hi) in zip(written, criterion.bands.get(grade, ()))
+    )
+
+
 def render(rubric: Rubric) -> str:
     state = "열려 있는 동작" if rubric.is_active else "아직 안 연 동작"
     out = [f"# 문구 검수 서식 — {rubric.label}", ""]
@@ -103,7 +131,7 @@ def render(rubric: Rubric) -> str:
             out.append(
                 f"| **{LEVEL_WORDS[g]}** | {c.grades.get(g) or '—'} "
                 f"| {c.titles.get(g) or '🔴 **비어 있습니다**'} "
-                f"| {c.card_lines.get(g) or '🔴 **비어 있습니다**'} |  |"
+                f"| {card_cell(c, g)} |  |"
             )
     out.append("\n---\n")
     out.append("## 마지막으로")

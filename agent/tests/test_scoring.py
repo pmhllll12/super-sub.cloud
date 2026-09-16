@@ -122,6 +122,43 @@ def test_open_ended_top_bands_are_rejected(tmp_path):
         discover_rubrics(tmp_path)
 
 
+def test_card_lines_that_do_not_line_up_with_the_bands_are_rejected(tmp_path):
+    """🔴 구간마다 쓴 문장이 **자리가 어긋나면 반대로 말한다**.
+
+    한 등급에 반대 방향 구간이 둘 있는 자리(골반 회전 1등급: 덜 돌았다 / 너무
+    많이 돌았다)에서 문장 순서가 구간 순서와 다르면 **덜 돈 선수에게 「지나치게
+    많이 돌린다」**고 말한다. 예외도 경고도 없이 문장만 반대인 형태다.
+    """
+    head = ("sport: x\nmotion: y\ncriteria:\n"
+            "  - {id: a, name: A, weight: 1.0, measured_by: [m], "
+            "grades: {0: z, 1: z, 2: z}, "
+            "bands: {metric: m, 2: [[2, 3]], 1: [[1, 2], [3, 4]], 0: [[null, 1]]}, ")
+    (tmp_path / "one.yaml").write_text(
+        head + "card_lines: {2: ok, 1: [only-one], 0: ok}}\n", encoding="utf-8")
+
+    with pytest.raises(RubricError, match="구간"):
+        discover_rubrics(tmp_path)
+
+
+def test_a_grade_may_keep_one_sentence_for_both_directions(tmp_path):
+    """문장 하나로 양쪽 구간을 부르는 것은 **허용한다** — 갈라 쓰는 것은 선택이다.
+
+    갈라 쓰면 고칠 방향이 보이지만, 모든 항목에서 두 방향을 다르게 부를 말이
+    있는 것은 아니다. 하나만 있으면 방향과 무관한 문장으로 본다.
+    """
+    body = ("sport: x\nmotion: y\ncriteria:\n"
+            "  - {id: a, name: A, weight: 1.0, measured_by: [m], "
+            "grades: {0: z, 1: z, 2: z}, "
+            "bands: {metric: m, 2: [[2, 3]], 1: [[1, 2], [3, 4]], 0: [[null, 1]]}, "
+            "card_lines: {2: ok, 1: 한 문장, 0: ok}}\n")
+    (tmp_path / "one.yaml").write_text(body, encoding="utf-8")
+
+    c = discover_rubrics(tmp_path)["x/y"].criteria[0]
+    # 값을 안 줘도 쓸 수 있다 — 방향을 고를 필요가 없는 문장이라서다.
+    assert c.card_line_for(1) == "한 문장"
+    assert c.card_line_for(1, 1.5) == "한 문장"
+
+
 def test_unknown_status_is_rejected(tmp_path):
     """오타로 조용히 닫히면 안 된다 — 열려야 할 동작이 사라지는 쪽이 못 찾는다."""
     (tmp_path / "one.yaml").write_text(

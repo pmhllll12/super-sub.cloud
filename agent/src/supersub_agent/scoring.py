@@ -70,6 +70,35 @@ def _parse_bands(entry: dict[str, Any]) -> tuple[str, dict[int, tuple[Interval, 
     return metric, bands
 
 
+def _parse_card_lines(
+    entry: dict[str, Any], bands: dict[int, tuple[Interval, ...]]
+) -> dict[int, tuple[str, ...]]:
+    """추천 카드 문장을 읽는다 — 등급마다 **하나 또는 구간마다 하나**.
+
+    🔴 **자리가 어긋나면 반대로 말한다.** 골반 회전 1등급처럼 「덜 돌았다」와
+    「너무 많이 돌았다」가 한 등급에 같이 있는 자리에서, 문장 순서가 구간 순서와
+    다르면 **덜 돈 선수에게 「지나치게 많이 돌린다」**고 말한다. 예외도 경고도
+    없이 문장만 반대인 형태라 여기서 막는다.
+    """
+    parsed: dict[int, tuple[str, ...]] = {}
+    for key, written in (entry.get("card_lines") or {}).items():
+        grade = int(key)
+        per_interval = not isinstance(written, str)
+        lines = tuple(written) if per_interval else (written,)
+        if not lines or not all(isinstance(s, str) and s.strip() for s in lines):
+            raise RubricError(f"{entry['id']}: {grade}등급 카드 문장이 비었다")
+        # 🔴 목록으로 쓰면 **구간마다 쓰겠다는 뜻**이다. 그러면 개수가 맞아야
+        #    한다 — 하나만 적어 두면 다른 방향의 선수는 조용히 틀로 떨어진다.
+        if per_interval and len(lines) != len(bands.get(grade, ())):
+            raise RubricError(
+                f"{entry['id']}: {grade}등급 카드 문장 {len(lines)}개가 구간 "
+                f"{len(bands.get(grade, ()))}개와 안 맞는다. 구간마다 쓸 때는 "
+                "bands 순서와 자리가 맞아야 한다 — 어긋나면 반대 방향을 말한다."
+            )
+        parsed[grade] = lines
+    return parsed
+
+
 @dataclass(frozen=True)
 class Criterion:
     id: str
@@ -84,7 +113,12 @@ class Criterion:
     titles: dict[int, str] = field(default_factory=dict)
     # 추천 카드의 불릿 문장 (미결 `paik` 27번). 🔴 **칭호와 같은 자리에 둔다** —
     # 지도자가 검수할 문구라서 UI 가 아니라 루브릭에 산다. 채점에 관여하지 않는다.
-    card_lines: dict[int, str] = field(default_factory=dict)
+    #
+    # 등급마다 **문장 하나 또는 구간마다 하나**다. 뒤쪽은 한 등급에 **반대 방향
+    # 구간**이 둘 있을 때 쓴다 — 예: 골반 회전 1등급은 「덜 돌았다」와 「너무
+    # 많이 돌았다」가 같은 등급인데, 한 문장으로 부르면 **고칠 방향이 안 보인다.**
+    # 여러 개면 `bands[grade]` 의 구간 순서와 **자리가 맞아야 한다**(적재가 검사).
+    card_lines: dict[int, tuple[str, ...]] = field(default_factory=dict)
     # 등급 판정 구간. band_metric 하나의 값으로 등급이 결정된다.
     band_metric: str = ""
     bands: dict[int, tuple[Interval, ...]] = field(default_factory=dict)
@@ -93,19 +127,34 @@ class Criterion:
         """해당 등급의 칭호. 정의되지 않았으면 항목명으로 대체한다."""
         return self.titles.get(grade) or self.name
 
-    def card_line_for(self, grade: int) -> str:
+    def card_line_for(self, grade: int, value: float | None = None) -> str:
         """추천 카드에 쓸 한 줄. 루브릭이 안 적었으면 빈 문자열이다.
 
         🔴 **여기서 지어내지 않는다** — 없으면 `scoring.card` 가 코드가 짓는
         틀로 떨어진다. 그 폴백이 단조로운 것은 알지만, **없는 말을 만드는 것보다
         낫다.**
 
-        🔴 **문장에 숫자를 적지 않는다.** 이 줄은 등급마다 **고정**이라 측정값과
+        🔴 **문장에 숫자를 적지 않는다.** 이 줄은 구간마다 **고정**이라 측정값과
         함께 움직이지 않는다 — 「약 16cm」를 적어 두면 그 구간의 모든 영상이
         재지도 않은 수치를 달고 나간다. 수치가 필요한 자리는 `evidence` 다.
         `tests/test_summary.py` 가 루브릭에서 이걸 막는다.
+
+        🔴 **문장이 구간마다 있으면 `value` 가 있어야 고를 수 있다.** 없으면 빈
+        문자열이다 — **방향을 찍지 않는다.** 덜 돈 선수에게 「너무 많이 돌린다」고
+        말하는 것은 아무 말도 안 하는 것보다 나쁘다.
         """
-        return self.card_lines.get(grade, "")
+        written = self.card_lines.get(grade, ())
+        if not written:
+            return ""
+        if len(written) == 1:
+            # 방향과 무관한 한 문장 — 값이 없어도 쓸 수 있다.
+            return written[0]
+        if value is None:
+            return ""
+        for sentence, (lo, hi) in zip(written, self.bands.get(grade, ())):
+            if (lo is None or value >= lo) and (hi is None or value <= hi):
+                return sentence
+        return ""
 
     def title_is_earned(self, grade: int) -> bool:
         """이 칭호가 **받은 것**인가 (`paik` 23번).
@@ -507,8 +556,7 @@ def load_rubric(path: str | Path) -> Rubric:
                 anchors=tuple(entry.get("anchors", [])),
                 rationale=entry.get("rationale", ""),
                 titles={int(k): v for k, v in (entry.get("titles") or {}).items()},
-                card_lines={int(k): v
-                            for k, v in (entry.get("card_lines") or {}).items()},
+                card_lines=_parse_card_lines(entry, bands),
                 band_metric=band_metric,
                 bands=bands,
             )
@@ -656,7 +704,8 @@ def summarize(breakdown: list[dict[str, Any]]) -> str:
 
 
 def card(breakdown: list[dict[str, Any]],
-         rubric: "Rubric | None" = None) -> dict[str, Any]:
+         rubric: "Rubric | None" = None,
+         features: dict[str, Any] | None = None) -> dict[str, Any]:
     """추천 카드에 쓸 **짧은 수식어 + 불릿 두 줄** (미결 `paik` 27번의 설명 칸).
 
     화면(`SquadSuggest.tsx`)이 후보마다 이름 아래에 한 줄(`title`)과 불릿
@@ -722,7 +771,12 @@ def card(breakdown: list[dict[str, Any]],
     title = best["title"] if best.get("title_earned") else None
 
     def line(item: dict[str, Any], fallback: str) -> str:
-        """그 항목·그 등급에 대해 루브릭이 적어 둔 한 줄. 없으면 코드가 지은 틀."""
+        """그 항목·그 등급에 대해 루브릭이 적어 둔 한 줄. 없으면 코드가 지은 틀.
+
+        한 등급에 **반대 방향 구간**이 둘 있는 항목은 측정값이 있어야 어느 쪽인지
+        고를 수 있다 — `features` 를 안 주면 루브릭 문장 대신 **방향을 말하지
+        않는 틀**로 떨어진다(`card_line_for` 가 빈 문자열을 준다).
+        """
         if rubric is None:
             return fallback
         try:
@@ -731,7 +785,9 @@ def card(breakdown: list[dict[str, Any]],
             # 판정에만 있고 루브릭에 없는 항목 — aggregate가 먼저 막지만,
             # 이 함수는 breakdown만 들고 따로 불릴 수 있다.
             return fallback
-        return criterion.card_line_for(int(item["grade"])).strip() or fallback
+        measured = (features or {}).get(criterion.band_metric)
+        value = measured if isinstance(measured, (int, float)) else None
+        return criterion.card_line_for(int(item["grade"]), value).strip() or fallback
 
     # 🔴 **가장 잘한 등급에 있는 항목만** 고른다. 그 아래 등급은 이 카드에
     #    안 나온다 — 아쉬운 항목은 본인 리포트의 몫이다(위 표).
@@ -860,7 +916,7 @@ def aggregate(
         "summary": summarize(breakdown),
         # 추천 카드의 설명 칸 (`paik` 27번). `summary` 와 같은 성질이다 —
         # breakdown 에서만 짓고 점수를 안 건드린다.
-        "card": card(breakdown, rubric),
+        "card": card(breakdown, rubric, features),
         "breakdown": breakdown,
         # 측정하지 못해 판정에서 빠진 항목 — 0점이 아니라 제외다.
         "skipped": skipped,

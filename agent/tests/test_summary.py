@@ -234,9 +234,17 @@ def test_every_criterion_documents_a_card_line_for_every_grade(key, grade):
     빠져도 **터지지 않는다** — 코드가 지은 틀로 조용히 떨어질 뿐이라, 검수받지
     않은 문장이 섞인 채 나가도 아무도 모른다. 등급 셋을 다 요구하는 이유는
     0등급 줄이 가장 빠뜨리기 쉬워서다.
+
+    구간마다 쓴 등급(반대 방향이 한 등급에 있는 자리)은 **구간 수만큼** 있어야
+    한다 — 하나라도 비면 그 방향의 선수만 조용히 틀로 떨어진다.
     """
     for c in RUBRICS[key].criteria:
-        assert c.card_line_for(grade).strip(), f"{key}/{c.id}: {grade}등급 문장 없음"
+        written = c.card_lines.get(grade, ())
+        assert written, f"{key}/{c.id}: {grade}등급 문장 없음"
+        assert len(written) in (1, len(c.bands.get(grade, ()))), (
+            f"{key}/{c.id}: {grade}등급 문장 {len(written)}개가 구간 수와 안 맞는다"
+        )
+        assert all(s.strip() for s in written), f"{key}/{c.id}: {grade}등급 빈 문장"
 
 
 @pytest.mark.parametrize("key", sorted(RUBRICS))
@@ -249,10 +257,14 @@ def test_card_lines_say_only_what_a_fixed_sentence_may_say(key):
     최고·최저 항목만 지나가므로 나머지 문장은 검사되지 않는다.
     """
     for c in RUBRICS[key].criteria:
-        for grade, line in c.card_lines.items():
-            assert not any(ch.isdigit() for ch in line), f"{c.id}/{grade}: {line}"
-            for word in ("경기", "활동량", "출전", "연속", "꾸준"):
-                assert word not in line, f"{c.id}/{grade}: 경기 기록의 말 — {word}"
+        for grade, written in c.card_lines.items():
+            # 🔴 문자열을 그대로 순회하지 않는다 — 문장이 구간마다 여럿이라
+            #    튜플이고, 튜플을 문자로 아는 검사는 **조용히 다 통과한다.**
+            assert isinstance(written, tuple), f"{c.id}/{grade}: 튜플이 아니다"
+            for line in written:
+                assert not any(ch.isdigit() for ch in line), f"{c.id}/{grade}: {line}"
+                for word in ("경기", "활동량", "출전", "연속", "꾸준"):
+                    assert word not in line, f"{c.id}/{grade}: 경기 기록의 말 — {word}"
 
 
 @pytest.mark.parametrize("key", sorted(RUBRICS))
@@ -269,6 +281,46 @@ def test_the_bullet_is_the_sentence_the_rubric_wrote(key, grade):
     assert got["notes"], "불릿이 비었다"
     for note in got["notes"]:
         assert note in written, f"루브릭이 안 쓴 문장이 카드에 있다: {note}"
+
+
+def test_a_two_directioned_grade_tells_which_direction_it_was():
+    """🔴 한 등급 안에 **반대 방향**이 있으면 문장도 갈린다 (2026.09.16).
+
+    인사이드 패스의 골반 회전 1등급은 「덜 돌았다(8~15도)」와 「너무 많이
+    돌았다(35도 초과)」가 같은 등급이다. 한 문장으로 부르면 **고칠 방향이 안
+    보인다** — 지도자 검수 서식을 만들다 드러났다.
+    """
+    from supersub_agent.scoring import card
+    rubric = RUBRICS["football/inside_pass"]
+    hip = rubric.get("hip_rotation")
+    assert hip.card_line_for(1, 10.0) != hip.card_line_for(1, 40.0)
+    assert "덜" in hip.card_line_for(1, 10.0)
+
+    # 카드까지 실제로 갈리는지 — 골반만 1등급이고 나머지는 0등급으로 둔다.
+    grades = [1 if c.id == "hip_rotation" else 0 for c in rubric.criteria]
+    result = aggregate(_judge(rubric, grades), rubric)
+    for value, expected in ((10.0, hip.card_line_for(1, 10.0)),
+                            (40.0, hip.card_line_for(1, 40.0))):
+        got = card(result["breakdown"], rubric, {"hip_rotation_range_deg": value})
+        assert got["notes"] == [expected], (value, got)
+
+
+def test_without_a_measurement_the_card_does_not_guess_a_direction():
+    """🔴 **방향을 찍지 않는다.** 덜 돈 선수에게 「너무 많이 돌린다」고 말하는 것은
+    아무 말도 안 하는 것보다 나쁘다.
+
+    측정값이 없으면(평가·재현 경로가 `features` 없이 부른다) 루브릭 문장 대신
+    방향을 말하지 않는 틀로 떨어진다.
+    """
+    from supersub_agent.scoring import card
+    rubric = RUBRICS["football/inside_pass"]
+    hip = rubric.get("hip_rotation")
+    assert hip.card_line_for(1) == ""
+
+    grades = [1 if c.id == "hip_rotation" else 0 for c in rubric.criteria]
+    result = aggregate(_judge(rubric, grades), rubric)
+    got = card(result["breakdown"], rubric)          # features 없음
+    assert got["notes"] and got["notes"][0] not in hip.card_lines[1]
 
 
 # -- 아쉬운 항목은 추천 카드에 안 적는다 (2026.09.16 결정) -------------------

@@ -106,5 +106,5 @@ def test_the_wording_sheet_marks_an_empty_sentence_instead_of_leaving_a_blank():
     for rubric in RUBRICS.values():
         text = render_wording(rubric)
         holes = [(c.id, g) for c in rubric.criteria for g in (2, 1, 0)
-                 if not (c.card_lines.get(g) or "").strip()]
+                 if not any(s.strip() for s in c.card_lines.get(g, ()))]
         assert not holes or "비어 있습니다" in text, holes
