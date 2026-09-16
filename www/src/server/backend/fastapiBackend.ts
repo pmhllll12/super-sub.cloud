@@ -5,7 +5,12 @@ import type {
   AdminUserDetail,
   AdminUserListResult,
   AdminVideoListResult,
+  AppNotification,
   AuthToken,
+  Contact,
+  ContactRequest,
+  UserSearchResult,
+  TeamMatchRequest,
   FeaturedVideo,
   Match,
   MercenaryCandidate,
@@ -247,5 +252,85 @@ export const fastapiBackend: Backend = {
       method: 'DELETE',
       token,
     })
+  },
+
+  /* ── 지인 · 알림 (계약 3-12절) ─────────────────────────────────────── */
+
+  searchUsers(token, q) {
+    return callFastApi<UserSearchResult[]>(`/users/search?q=${encodeURIComponent(q)}`, {
+      method: 'GET',
+      token,
+    })
+  },
+
+  listContacts(token) {
+    return callFastApi<{ items: Contact[] }>('/me/contacts', { method: 'GET', token })
+  },
+
+  listContactRequests(token) {
+    return callFastApi<ContactRequest[]>('/me/contacts/requests', { method: 'GET', token })
+  },
+
+  requestContact(token, input) {
+    return callFastApi<ContactRequest>('/me/contacts', { method: 'POST', token, body: input })
+  },
+
+  acceptContact(token, contactId) {
+    return callFastApi<ContactRequest>(
+      `/me/contacts/${encodeURIComponent(contactId)}/accept`,
+      { method: 'POST', token },
+    )
+  },
+
+  listNotifications(token, unreadOnly) {
+    // 🔴 안 보낼 때와 `false` 는 서버에서 같은 뜻이다 — 참일 때만 싣는다.
+    const qs = unreadOnly ? '?unread_only=true' : ''
+    return callFastApi<AppNotification[]>(`/me/notifications${qs}`, { method: 'GET', token })
+  },
+
+  readNotification(token, notificationId) {
+    return callFastApi<AppNotification>(
+      `/me/notifications/${encodeURIComponent(notificationId)}/read`,
+      { method: 'PATCH', token },
+    )
+  },
+
+  /* ── 팀 대 팀 경기 신청 (계약 3-15절) ──────────────────────────────── */
+
+  requestTeamMatch(token, teamId, input) {
+    return callFastApi<TeamMatchRequest>(
+      `/teams/${encodeURIComponent(teamId)}/match-requests`,
+      { method: 'POST', token, body: input },
+    )
+  },
+
+  listTeamMatchRequests(token, teamId) {
+    return callFastApi<TeamMatchRequest[]>(
+      `/teams/${encodeURIComponent(teamId)}/match-requests`,
+      { method: 'GET', token },
+    )
+  },
+
+  acceptTeamMatch(token, teamId, requestId) {
+    return callFastApi<TeamMatchRequest>(
+      `/teams/${encodeURIComponent(teamId)}/match-requests/${encodeURIComponent(requestId)}/accept`,
+      { method: 'POST', token },
+    )
+  },
+
+  rejectTeamMatch(token, teamId, requestId) {
+    return callFastApi<TeamMatchRequest>(
+      `/teams/${encodeURIComponent(teamId)}/match-requests/${encodeURIComponent(requestId)}/reject`,
+      { method: 'POST', token },
+    )
+  },
+
+  cancelTeamMatch(token, teamId, requestId) {
+    // 🔴 204 가 아니라 **취소된 신청을 그대로** 돌려준다(계약) — 다른 응답과
+    // 같은 모양이라 부르는 쪽이 갈래를 안 만들어도 된다.
+    return callFastApi<TeamMatchRequest>(
+      `/teams/${encodeURIComponent(teamId)}/match-requests/${encodeURIComponent(requestId)}`,
+      { method: 'DELETE', token },
+    )
   },
 }

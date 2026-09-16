@@ -2,7 +2,12 @@ import type {
   AdminUserDetail,
   AdminUserListResult,
   AdminVideoListResult,
+  AppNotification,
   AuthToken,
+  Contact,
+  ContactRequest,
+  UserSearchResult,
+  TeamMatchRequest,
   CardStyleWire,
   CreateMatchInput,
   FeaturedVideo,
@@ -235,4 +240,49 @@ export interface Backend {
   forceDeleteUser(token: string, userId: string): Promise<void>
   /** 관리자 전용. `user` 는 `user.id` 또는 이메일. 없는 사람이면 404 USER_NOT_FOUND. */
   listAdminVideos(token: string, user: string): Promise<AdminVideoListResult>
+
+  /* ── 지인 · 알림 (계약 3-12절, CCC 37번) ───────────────────────────────
+   *
+   * 🔴 **상호 관계다.** 신청(`requestContact`)은 한쪽이 하지만 상대가
+   * 수락(`acceptContact`)해야 양쪽 목록에 뜬다. 그래서 "검색해서 나온 사람"과
+   * "내 지인"은 **다른 목록**이다 — 화면에서 하나로 합치면 안 된다.
+   */
+
+  /** 닉네임 부분일치로 사람 찾기. 최대 20명, **본인과 검색을 끈 사람은 빠진다.** */
+  searchUsers(token: string, q: string): Promise<UserSearchResult[]>
+  /** 수락된 지인 목록. */
+  listContacts(token: string): Promise<{ items: Contact[] }>
+  /** 나에게 온 대기중 신청. 내가 보낸 신청은 여기 안 온다(계약에 그 경로가 없다). */
+  listContactRequests(token: string): Promise<ContactRequest[]>
+  /**
+   * 지인 신청. 422 `CANNOT_REQUEST_SELF` · 404 `USER_NOT_FOUND` ·
+   * 409 `ALREADY_REQUESTED`(방향 무관 · 이미 지인인 경우 포함).
+   */
+  requestContact(
+    token: string,
+    input: { target_user_id: string; note?: string },
+  ): Promise<ContactRequest>
+  /** 내가 대상인 대기중 신청만 수락된다. 403 `FORBIDDEN` · 409 `ALREADY_ACCEPTED`. */
+  acceptContact(token: string, contactId: string): Promise<ContactRequest>
+  /** 알림 목록(폴링). 최신순 최대 50건. */
+  listNotifications(token: string, unreadOnly?: boolean): Promise<AppNotification[]>
+  /** 읽음 처리. **멱등이다** — 이미 읽었어도 200. */
+  readNotification(token: string, notificationId: string): Promise<AppNotification>
+
+  /* ── 팀 대 팀 경기 신청 (계약 3-15절, CCC 42번) ─────────────────────── */
+
+  /** 경기 걸기. **신청 팀 주장만.** 422 `CANNOT_REQUEST_SELF`·`PAST_MATCH`. */
+  requestTeamMatch(
+    token: string,
+    teamId: string,
+    input: { target_team_id: string; played_at: string; place: string },
+  ): Promise<TeamMatchRequest>
+  /** 그 팀이 **보낸 것 + 받은 것** 전부, 최신순. 주장만. */
+  listTeamMatchRequests(token: string, teamId: string): Promise<TeamMatchRequest[]>
+  /** 수락 → 확정 경기 생성(`match_id`). **대상 팀 주장만.** */
+  acceptTeamMatch(token: string, teamId: string, requestId: string): Promise<TeamMatchRequest>
+  /** 거절. **대상 팀 주장만.** */
+  rejectTeamMatch(token: string, teamId: string, requestId: string): Promise<TeamMatchRequest>
+  /** 신청 팀이 스스로 무르기 — `pending` 일 때만. 알림이 안 간다. */
+  cancelTeamMatch(token: string, teamId: string, requestId: string): Promise<TeamMatchRequest>
 }
