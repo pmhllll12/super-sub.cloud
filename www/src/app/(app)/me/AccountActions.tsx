@@ -18,7 +18,14 @@ import SearchablePref from './SearchablePref'
  * 🔴 **평소에는 접혀 있다.** 프로필은 보여주는 화면인데 탈퇴는 되돌릴 수 없는
  * 동작이라, 단추가 늘 펴져 있으면 실수로 누를 자리가 늘 열려 있는 셈이다.
  */
-export default function AccountActions({ searchable }: { searchable: boolean }) {
+export default function AccountActions({
+  searchable,
+  nickname,
+}: {
+  searchable: boolean
+  /** 아래 스위치가 `PATCH /me` 에 **함께 실어야** 하는 값 — 계약이 늘 받는다. */
+  nickname: string
+}) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -50,7 +57,7 @@ export default function AccountActions({ searchable }: { searchable: boolean }) 
       {/* 🔴 **공개 범위가 판의 왼쪽 위**다(사용자 요청, 2026-09-16). 평소에
           보고 만지는 설정이라 위에 오고, 되돌릴 수 없는 탈퇴는 아래 구석으로
           간다 — 자주 쓰는 것이 위, 위험한 것이 아래다. */}
-      <SearchablePref searchable={searchable} />
+      <SearchablePref searchable={searchable} nickname={nickname} />
 
       {/* 🔴 **오른쪽 아래**(사용자 요청). 판 안에서 제일 눈에 안 띄는 자리다 —
           실수로 누를 자리가 늘 열려 있지 않게. */}

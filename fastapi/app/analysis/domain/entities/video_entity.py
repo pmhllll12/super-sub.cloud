@@ -69,6 +69,27 @@ class VideoEntity:
     subject_at_ms: int | None = None
     # 「집중해서 볼 항목」 (미결 `paik` 8번). 위와 같은 취급.
     focus: list[str] | None = None
+    # 같은 파일 재업로드 감지(`ho` 41번). S3 `ETag`. 옛 행은 None.
+    content_hash: str | None = None
+    # 내용이 같은 다른(자기) 영상의 결과를 재사용했으면 그 영상을 가리킨다
+    # (`ho` 41번). 실제 DB 컬럼이라 다시 읽으면 그대로 남아 있다.
+    duplicate_of_video_id: UUID | None = None
+    # 🔴 **DB 컬럼이 아니다.** 등록 응답 한 번에만 실리는 값 — 중복으로 판단해
+    # 새 작업을 안 만들었을 때 그 원본 영상의 결과를 등록 인터랙터가 직접
+    # 채운다(`ho` 41번). 나중에 이 영상을 다시 읽으면(`list_by_user` 등) 이
+    # 영상 자신은 작업이 없으므로 둘 다 `None`이다 — 그게 정직한 상태다.
+    duplicate_status: str | None = None
+    duplicate_failure_reason: str | None = None
+
+
+@dataclass(frozen=True)
+class PriorAnalysisOutcome:
+    """같은 사용자가 올린 같은 내용의 영상 중 분석까지 끝난 가장 최근 결과
+    (`ho` 41번, 중복 업로드 재사용). `find_prior_outcome`이 돌려준다."""
+
+    video_id: UUID
+    status: str
+    failure_reason: str | None
 
 
 @dataclass(frozen=True)

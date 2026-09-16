@@ -95,3 +95,18 @@ class S3Storage(StoragePort):
                 return None
             raise
         return head["ContentLength"]
+
+    def content_hash_of(self, storage_key: str) -> str | None:
+        try:
+            head = self._client.head_object(Bucket=self._bucket, Key=storage_key)
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") in ("404", "NoSuchKey"):
+                return None
+            raise
+        etag = head.get("ETag", "").strip('"')
+        # 멀티파트 업로드의 ETag는 `<hex>-<파트수>` 형태라 MD5가 아니다 — 이
+        # 저장소는 사전 서명 단일 PUT만 쓰므로 정상 경로에선 안 일어나지만,
+        # 방어적으로 걸러 잘못된 지문으로 다른 영상과 같다고 오판하지 않는다.
+        if "-" in etag:
+            return None
+        return etag or None

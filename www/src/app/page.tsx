@@ -20,6 +20,7 @@ export function HomeBody({
   card = null,
   squad = null,
   sportCode = null,
+  teamName = null,
 }: {
   user: Pick<User, 'nickname'> | null
   card?: PlayerCard | null
@@ -30,6 +31,11 @@ export function HomeBody({
    * 🔴 코드만으로는 포지션을 못 찾는다(야구 `C`·농구 `C`가 다르다).
    */
   sportCode?: string | null
+  /**
+   * 홈에 그리는 그 팀의 이름 — 스쿼드 판의 머리글이 된다. 소속이 없으면
+   * `null` 이고 그때는 「MY SQUAD」로 둔다.
+   */
+  teamName?: string | null
 }) {
   return (
     <HomeStage
@@ -37,6 +43,8 @@ export function HomeBody({
       card={card}
       squad={squad}
       sportCode={sportCode}
+      teamName={teamName}
+      myCardId={card?.id ?? null}
       destinations={DESTINATIONS}
       featured={FEATURED}
       defaultActive={DEFAULT_FEATURED}
@@ -83,5 +91,13 @@ export default async function Home() {
   }
 
   const team = user.teams.find((t) => t.team_id === teamId) ?? null
-  return <HomeBody user={user} card={card} squad={squad} sportCode={team?.sport_code ?? null} />
+  return (
+    <HomeBody
+      user={user}
+      card={card}
+      squad={squad}
+      sportCode={team?.sport_code ?? null}
+      teamName={team?.name ?? null}
+    />
+  )
 }

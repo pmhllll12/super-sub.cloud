@@ -184,4 +184,9 @@ class TestOpenApi:
             V1 + "/teams/{team_id}/match-requests/{request_id}/reject",
             V1 + "/teams/{team_id}/match-requests/{request_id}",
             V1 + "/teams/{team_id}/squad/candidates",
+            V1 + "/teams/{team_id}/invitations",
+            V1 + "/teams/{team_id}/invitations/{invitation_id}",
+            f"{V1}/me/invitations",
+            V1 + "/me/invitations/{invitation_id}/accept",
+            V1 + "/me/invitations/{invitation_id}/reject",
         }

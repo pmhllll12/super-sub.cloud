@@ -55,6 +55,21 @@ async function pick(file: File, size = { w: 1920, h: 1080, dur: 10.2 }) {
 
 const mp4 = () => new File(['x'], 'clip.mp4', { type: 'video/mp4' })
 
+/**
+ * 갈래를 바꾸고 **다 바뀔 때까지 기다린다**.
+ *
+ * 🔴 누른 직후에는 아직 **옛 갈래가 그려져 있다**(2026-09-16). 판이 오른쪽으로
+ * 물러난 뒤에 내용이 갈리기 때문이다 — 알약만 먼저 켜진다. 그래서 누르자마자
+ * 새 갈래를 찾으면 못 찾는다. 물러남이 끝났다는 신호(`data-leaving` 이 지워짐)
+ * 를 기다린다.
+ */
+async function toTab(user: ReturnType<typeof userEvent.setup>, name: RegExp | string) {
+  await user.click(screen.getByRole('tab', { name }))
+  await waitFor(() =>
+    expect(document.querySelector('.ss-profile-swap')).not.toHaveAttribute('data-leaving'),
+  )
+}
+
 beforeEach(() => {
   localStorage.clear()
   uploadClip.mockReset()
@@ -165,8 +180,31 @@ describe('내 영상 — 공개 여부', () => {
   it('업로드 영상에는 공개 토글이 있다', async () => {
     const user = userEvent.setup()
     render(<MyVideos videos={[analyzed, uploaded]} />)
-    await user.click(screen.getByRole('tab', { name: /업로드 영상/ }))
+    await toTab(user, /업로드 영상/)
     expect(screen.getByRole('button', { name: /공개/ })).toBeInTheDocument()
+  })
+
+  /**
+   * 🔴 **대표 영상은 분석 갈래에만 있다**(2026-09-16, 사용자 요청).
+   *
+   * 두 갈래는 영상이 가는 곳이 다르다 — 그냥 올린 영상은 「전체 공개」에 따라
+   * **영상 모음에 나오나 안 나오나**뿐이고, 리포트가 없어 **추천 판에는 아예
+   * 안 들어간다.** 대표 영상은 그 추천 판에서 나를 소개하는 장면이라, 업로드
+   * 갈래에 단추를 두면 **아무 데도 안 쓰이는 값**을 고르게 된다.
+   *
+   * ⚠️ 서버가 막는 것은 아니다 — 계약이 거부하는 것은 반려된 클립뿐이다.
+   * 이건 화면의 판단이라 시험으로 붙들어 둔다.
+   */
+  it('업로드 영상에는 대표 영상 설정이 없다', async () => {
+    const user = userEvent.setup()
+    render(<MyVideos videos={[analyzed, uploaded]} />)
+    await toTab(user, /업로드 영상/)
+    expect(screen.queryByRole('button', { name: /대표 영상/ })).toBeNull()
+  })
+
+  it('분석 영상에는 대표 영상 설정이 있다', () => {
+    render(<MyVideos videos={[analyzed, uploaded]} />)
+    expect(screen.getByRole('button', { name: /대표 영상/ })).toBeInTheDocument()
   })
 
   /**
@@ -193,7 +231,7 @@ describe('내 영상 — 공개 여부', () => {
     const fn = server()
     const user = userEvent.setup()
     render(<MyVideos videos={[analyzed, uploaded]} />)
-    await user.click(screen.getByRole('tab', { name: /업로드 영상/ }))
+    await toTab(user, /업로드 영상/)
     await user.click(screen.getByRole('button', { name: /공개/ }))
     expect(screen.getByLabelText('제목')).toBeInTheDocument()
     expect(screen.getByLabelText('한 줄 설명')).toBeInTheDocument()
@@ -207,7 +245,7 @@ describe('내 영상 — 공개 여부', () => {
     const fn = server()
     const user = userEvent.setup()
     render(<MyVideos videos={[analyzed, uploaded]} />)
-    await user.click(screen.getByRole('tab', { name: /업로드 영상/ }))
+    await toTab(user, /업로드 영상/)
     await user.click(screen.getByRole('button', { name: /공개/ }))
     await user.type(screen.getByLabelText('제목'), '농구 연습')
     await user.type(screen.getByLabelText('한 줄 설명'), '디딤발')
@@ -228,7 +266,7 @@ describe('내 영상 — 공개 여부', () => {
     server()
     const user = userEvent.setup()
     render(<MyVideos videos={[analyzed, uploaded]} />)
-    await user.click(screen.getByRole('tab', { name: /업로드 영상/ }))
+    await toTab(user, /업로드 영상/)
     await user.click(screen.getByRole('button', { name: /공개/ }))
     expect(screen.getByRole('button', { name: '공개하기' })).toBeDisabled()
   })
@@ -239,7 +277,7 @@ describe('내 영상 — 공개 여부', () => {
     const fn = server()
     const user = userEvent.setup()
     render(<MyVideos videos={[analyzed, { ...uploaded, is_public: true }]} />)
-    await user.click(screen.getByRole('tab', { name: /업로드 영상/ }))
+    await toTab(user, /업로드 영상/)
     expect(screen.getByRole('button', { name: /공개 중/ })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /공개 중/ }))
@@ -260,7 +298,7 @@ describe('내 영상 — 공개 여부', () => {
     )
     const user = userEvent.setup()
     render(<MyVideos videos={[analyzed, { ...uploaded, is_public: true }]} />)
-    await user.click(screen.getByRole('tab', { name: /업로드 영상/ }))
+    await toTab(user, /업로드 영상/)
     await user.click(screen.getByRole('button', { name: /공개 중/ }))
 
     expect(await screen.findByText('없는 영상입니다.')).toBeInTheDocument()
@@ -272,7 +310,7 @@ describe('내 영상 — 공개 여부', () => {
   it('서버가 공개라고 한 클립은 열자마자 공개 중이다', async () => {
     const user = userEvent.setup()
     render(<MyVideos videos={[analyzed, { ...uploaded, is_public: true }]} />)
-    await user.click(screen.getByRole('tab', { name: /업로드 영상/ }))
+    await toTab(user, /업로드 영상/)
     expect(screen.getByRole('button', { name: /공개 중/ })).toBeInTheDocument()
   })
 
@@ -281,7 +319,7 @@ describe('내 영상 — 공개 여부', () => {
     server()
     const user = userEvent.setup()
     render(<MyVideos videos={[analyzed, uploaded]} />)
-    await user.click(screen.getByRole('tab', { name: /업로드 영상/ }))
+    await toTab(user, /업로드 영상/)
     await user.click(screen.getByRole('button', { name: /공개/ }))
     expect(screen.getByText(/다른 사람에게도 보입니다/)).toBeInTheDocument()
   })
@@ -477,7 +515,7 @@ describe('내 영상 — 분석 리포트', () => {
     stubReport({ ok: true, body: SERVER_REPORT })
     const user = userEvent.setup()
     render(<MyVideos videos={[analyzed, uploaded]} />)
-    await user.click(screen.getByRole('tab', { name: '업로드 영상' }))
+    await toTab(user, '업로드 영상')
     expect(screen.queryByRole('region', { name: '분석 리포트' })).toBeNull()
   })
 

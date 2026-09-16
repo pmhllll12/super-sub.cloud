@@ -218,6 +218,25 @@ describe('홈 화면 — /', () => {
     expect(screen.getByLabelText('내 스쿼드')).toHaveAttribute('data-seeking', 'true')
   })
 
+  /**
+   * 🔴 **머리글은 그 팀의 이름이다**(사용자 요청, 2026-09-16).
+   *
+   * 「내 팀이 생겼다」를 알리는 것보다 **어느 팀 판을 보고 있는지**가 이유다 —
+   * 소속이 여럿일 수 있고 홈은 그중 하나만 그리는데(`lib/homeTeam.ts`),
+   * 늘 「MY SQUAD」면 고른 팀을 바꿔도 화면 어디에도 안 적힌다.
+   */
+  it('팀이 있으면 스쿼드 머리글이 그 팀 이름이다', () => {
+    render(<HomeBody user={{ nickname: '홍길동' }} card={CARD} teamName="번개FC" />)
+    expect(screen.getByRole('heading', { name: '번개FC' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'MY SQUAD' })).toBeNull()
+  })
+
+  // 적을 이름이 없을 때의 기본값이다 — 팀을 만들면 이 글자가 바뀐다.
+  it('팀이 없으면 MY SQUAD 로 둔다', () => {
+    render(<HomeBody user={{ nickname: '홍길동' }} card={CARD} />)
+    expect(screen.getByRole('heading', { name: 'MY SQUAD' })).toBeInTheDocument()
+  })
+
   // 이 판은 스쿼드 판을 대신 서므로, 닫을 길이 판의 × 뿐이면 알약을 눌러
   // 놓고 되돌릴 방법이 없다 — '팀장' 과 같은 규칙이다.
   it('팀원을 한 번 더 누르면 스쿼드 판이 도로 선다', async () => {

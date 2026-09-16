@@ -253,6 +253,13 @@ class VideoResult:
     title: str | None
     description: str | None
     kept: bool
+    # 같은 내용의 다른(자기) 영상 결과를 재사용했으면 그 영상(`ho` 41번).
+    duplicate_of_video_id: UUID | None = None
+    # 🔴 등록 응답 한 번에만 실린다 — 위 `duplicate_of_video_id`가 있을 때만
+    # 채워진다. 나중에 이 영상을 다시 읽으면 이 둘은 `None`이다(`analysis_
+    # status`가 이 영상 자신의 진짜 작업 상태를 정직하게 보여준다).
+    duplicate_status: str | None = None
+    duplicate_failure_reason: str | None = None
 
 
 @dataclass(frozen=True)

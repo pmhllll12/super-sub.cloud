@@ -41,6 +41,8 @@ class VideoOrm(Base):
             unique=True,
             postgresql_where=text("is_featured"),
         ),
+        # 같은 사용자의 재업로드를 찾는 조회(`ho` 41번)가 쓴다.
+        Index("ix_video_user_content_hash", "user_id", "content_hash"),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
@@ -102,4 +104,14 @@ class VideoOrm(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
+    )
+
+    # 같은 파일 재업로드 감지(`ho` 41번). S3 `ETag`(단일 PUT이라 MD5)를 그대로
+    # 쓴다 — 다운로드 없이 이미 하던 `HeadObject`로 얻는다. 옛 행은 NULL.
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # 같은 사용자의 다른 영상과 내용이 같아 새 작업을 안 만들고 그 결과를
+    # 재사용했으면 그 영상을 가리킨다(`ho` 41번). 원본이 지워지면 NULL로
+    # 풀린다 — 이 영상 자체는 그대로 남아야 한다.
+    duplicate_of_video_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("video.id", ondelete="SET NULL"), nullable=True
     )

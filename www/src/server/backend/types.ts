@@ -35,9 +35,17 @@ export type User = {
 export type SignupResult = Omit<User, 'teams'>
 
 export type Title = {
+  /** 🔴 **사람이 직접 적은 호칭은 `custom:` 으로 시작한다**(계약 51). */
   code: string
   label: string
-  category: string
+  /**
+   * 분류 — `강점`·`활동`·`용병` 셋 중 하나.
+   *
+   * 🔴 **직접 적은 호칭은 `null` 이다**(계약 51, 2026-09-16). 분류는 부여되는
+   * 호칭의 것이고 자유 입력에는 매길 사람이 없다(`paik` 36번의 「분류를
+   * 요구하지 말 것」을 서버가 그렇게 지켰다).
+   */
+  category: string | null
   granted_at: string
 }
 
@@ -143,6 +151,17 @@ export type SquadMember = {
    */
   grid_col: number | null
   grid_row: number | null
+  /**
+   * **수락한 시각** — 비어 있으면 아직 **수락 대기중**이다(미결 `paik` 37번).
+   *
+   * 🔴 스쿼드가 팀 밖 사람도 받게 열리면서(사용자 결정, (나)안) 「앉혔다」와
+   * 「그 사람이 오기로 했다」가 갈렸다. 팀원은 앉는 즉시 채워지고, 추천·지인
+   * 으로 부른 사람은 **그 사람이 수락해야** 채워진다.
+   *
+   * ⚠️ **옵션이다** — 백엔드가 아직 안 낸다. 안 오면 화면은 「대기중」으로
+   * 본다(앉혔다는 것만 아는 상태라 그편이 맞다).
+   */
+  accepted_at?: string | null
 }
 
 /**
@@ -320,9 +339,8 @@ export type MyVideo = {
  * 🔴 **저장 키도 업로더도 안 온다.** 저장 키에 업로더의 `user_id` 가 들어
  * 있어서 계약이 일부러 뺐다 — 재생은 `playback-url` 로 따로 받는다.
  *
- * ⚠️ **화면 비율(가로/세로)이 없다.** 미리 알아야 칸이 안 덜컥이는 값인데
- * (`lib/feed.ts` 참고) 계약에 자리가 없어, 화면은 가로(16:9)로 가정하고 그린다 —
- * 세로 영상은 좌우가 남는다. 미결 `paik` 15번으로 올렸다.
+ * 🔴 **정정 (CCC 46, 2026-09-16)**: 앞서 "화면 비율이 없다"고 적었던 것은 이제
+ * 틀렸다 — 미결 `paik` 15번의 답으로 `width`·`height` 가 실려 온다.
  */
 export type PublicVideo = {
   id: string
@@ -331,6 +349,17 @@ export type PublicVideo = {
   created_at: string
   title: string | null
   description: string | null
+  /**
+   * 원본 화면 크기(px) — 등록할 때 받은 값 그대로다.
+   *
+   * 🔴 **둘 다 `null` 일 수 있다** — 이 컬럼이 생기기 전 등록분이다. **에러가
+   * 아니다**(계약 3-6절). 그때는 화면이 16:9 로 가정한다(그전까지의 동작).
+   *
+   * 🔴 미리 알아야 하는 값이다. 영상을 읽어서 알아내면 그때 칸 크기가 바뀌어
+   * 화면이 한 번 덜컥한다 — 목록 응답만으로 아는 것이 이 필드의 목적이다.
+   */
+  width: number | null
+  height: number | null
 }
 
 /** `Team` 과 달리 나간 소속도 포함하므로 `left_at` 을 갖는다. */
@@ -357,7 +386,22 @@ export type ReportCriterion = {
   criterion_id: string
   name: string
   grade: number | null
+  /**
+   * 🔴 **모든 등급에 있다** — 0등급도 「무너지는 축」 같은 문구를 받는다.
+   * 이 값의 유무로 「받은 호칭」을 가르면 못한 항목에 호칭을 달게 된다.
+   * 가르는 것은 아래 `title_earned` 다.
+   */
   title: string | null
+  /**
+   * 그 `title` 이 **실제로 받은 호칭인지**(CCC 47, 미결 `ho` 40번 · `paik` 23번).
+   *
+   * 🔴 `null` 이면 `skipped` 거나 이 필드가 생기기 전 적재분이다 — **거짓으로
+   * 지어내지 않는다.** 흐린 칭호·자물쇠·「미달」은 전부 미달 표식이라,
+   * 아무것도 안 그리는 것이 맞다. `grade === 2` 로 대신 긋지도 않는다
+   * (조건에 "루브릭이 그 등급의 문구를 실제로 적었을 것"이 함께 걸려 있어
+   * 칭호를 안 쓴 루브릭이 들어오면 갈린다).
+   */
+  title_earned: boolean | null
   evidence: string | null
   metric_ref: string | null
   skipped: boolean

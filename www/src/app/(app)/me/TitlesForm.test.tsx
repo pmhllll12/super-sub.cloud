@@ -30,11 +30,18 @@ describe('프로필 — 호칭 정하기', () => {
 
   afterEach(() => vi.restoreAllMocks())
 
-  /* 🔴 **「없음」을 부정적으로 적지 않는다**(계약 4장) — 빈 것은 정상이다. */
-  it('없으면 그렇게 적고, 정하는 자리를 낸다', () => {
+  /* 🔴 **정정 (2026-09-16, 사용자 요청)**: 앞서 「아직 정한 호칭이 없습니다」를
+     붙들던 것을 걷었다 — 바로 옆에 「호칭 정하기」 단추가 서 있어 **빈 것을 두
+     번** 말하는 자리였다. 단추만 남으면 비었다는 것과 무엇을 할 수 있는지가
+     한 번에 읽힌다.
+
+     🔴 그래도 **미달 표식은 안 넣는다**(계약 4장) — 「없음」·자물쇠 같은 표를
+     대신 두면 빈 것이 잘못인 것처럼 읽힌다. 아무것도 안 두는 것이 맞다. */
+  it('없으면 아무 말도 안 하고 정하는 자리만 낸다', () => {
     render(<TitlesForm titles={[]} />)
-    expect(screen.getByText('아직 정한 호칭이 없습니다.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '호칭 정하기' })).toBeInTheDocument()
+    expect(screen.queryByText(/호칭이 없습니다/)).toBeNull()
+    expect(screen.queryByText(/없음|미달/)).toBeNull()
   })
 
   it('있으면 알약으로 보이고 고칠 수 있다', () => {
@@ -146,13 +153,15 @@ describe('프로필 — 호칭이 저장 뒤 바로 바뀐다', () => {
     expect(screen.queryByText('옛 호칭')).toBeNull()
   })
 
-  it('다 비우면 「아직 정한 호칭이 없습니다」로 돌아간다', async () => {
+  it('다 비우면 알약이 사라지고 「호칭 정하기」로 돌아간다', async () => {
     const user = userEvent.setup()
     render(<TitlesForm titles={['하나']} />)
     await user.click(screen.getByRole('button', { name: '호칭 고치기' }))
     await user.clear(screen.getByLabelText('호칭 1'))
     await user.click(screen.getByRole('button', { name: '저장' }))
 
-    expect(await screen.findByText('아직 정한 호칭이 없습니다.')).toBeInTheDocument()
+    // 단추 글자가 「고치기」 → 「정하기」로 돌아가는 것이 곧 비었다는 표시다.
+    expect(await screen.findByRole('button', { name: '호칭 정하기' })).toBeInTheDocument()
+    expect(screen.queryByText('하나')).toBeNull()
   })
 })

@@ -146,7 +146,13 @@ export function MeBody({
             {/* 🔴 **기본은 켜짐**이다. 옛 응답에 이 칸이 없을 수 있어
                 `?? true` 로 받는다 — 모른다고 꺼진 것으로 그리면 사실과
                 반대가 되고, 그 사람은 검색에 뜨는데 안 뜬다고 읽는다. */}
-            <AccountActions searchable={user.is_nickname_searchable ?? true} />
+            {/* 🔴 `nickname` 도 넘긴다 — `PATCH /me` 가 **늘 함께 받는다**
+                (계약 3-2절 · `UpdateMeSchema`). 아래 스위치가 그것을 실어야
+                한다. */}
+            <AccountActions
+              searchable={user.is_nickname_searchable ?? true}
+              nickname={user.nickname}
+            />
             </div>
           </div>
 

@@ -54,7 +54,9 @@ class TitleResponse(BaseModel):
 
     code: str
     label: str
-    category: str
+    # 🔴 **사람이 직접 적은 호칭은 `null` 이다**(`paik` 36번, 2026-09-16).
+    # 그 경우 `code` 가 `custom:` 으로 시작한다.
+    category: str | None
     granted_at: Rfc3339
 
 
@@ -99,6 +101,11 @@ class UpdateMyCardSchema(BaseModel):
 
     tagline: str | None = Field(default=None, max_length=20)
     style: CardStyleSchema | None = Field(default=None)
+    # 사람이 직접 적는 호칭 **전체 목록**(`paik` 36번). 보낸 목록이 그대로
+    # 남는다 — 부분 병합이 아니다. `null` 이나 `[]` 면 전부 지운다.
+    # 🔴 `tagline` 을 재활용하지 않은 이유는 그 칸이 카드 가운데 큰 글자로
+    # 이미 쓰이고 있어서다(그 항목의 「하지 말 것」).
+    titles: list[str] | None = Field(default=None, max_length=3)
 
 
 class PublicCardResponse(BaseModel):

@@ -39,30 +39,39 @@ describe('프로필 — 지인 검색 노출', () => {
   afterEach(() => vi.restoreAllMocks())
 
   it('켜져 있으면 스위치가 켜진 것으로 읽힌다', () => {
-    render(<SearchablePref searchable />)
+    render(<SearchablePref searchable nickname="홍길동" />)
     expect(screen.getByRole('switch', { name: '지인 검색에 나를 보이기' })).toBeChecked()
   })
 
   /* 🔴 **켜짐/꺼짐의 뜻을 글로 적는다** — 스위치 모양만으로는 무엇이
      달라지는지 알 수 없다. */
   it('끄면 무엇이 달라지는지 글로 적는다', () => {
-    render(<SearchablePref searchable={false} />)
+    render(<SearchablePref searchable={false} nickname="홍길동" />)
     expect(screen.getByRole('switch')).not.toBeChecked()
     expect(screen.getByText(/아무도 나를 찾을 수 없습니다/)).toBeInTheDocument()
     // 이미 맺은 지인은 그대로라는 것도 말해 준다 — 안 적으면 끊길까 봐 못 끈다.
     expect(screen.getByText(/이미 맺은 지인은 그대로/)).toBeInTheDocument()
   })
 
-  /* 🔴 **이 칸만 보낸다.** 닉네임을 같이 실으면 계약상 그것도 고치는 요청이
-     된다 — 여기서 이름을 건드릴 이유가 없다. */
-  it('누르면 그 칸만 반대로 보낸다', async () => {
+  /* 🔴 **정정 (2026-09-16)**: 이 시험이 앞서 「이 칸만 보낸다」를 붙들던 것은
+     **틀렸다.** `PATCH /me` 의 `nickname` 은 **필수**다(`UpdateMeSchema`:
+     `nickname: str = Field(min_length=1, …)`) — 선택인 것은
+     `is_nickname_searchable` 쪽뿐이다.
+
+     🔴 **mock 만 너그러워서 여기서 안 걸렸다.** 개발에서는 잘 돌고 실서버에서만
+     `422 요청 값이 올바르지 않습니다: nickname` 이 났다(사용자가 배포에서 겪음).
+     mock 도 계약과 같게 되돌렸으니 이제 이 시험이 그 규칙을 지킨다. */
+  it('누르면 닉네임과 함께 그 칸을 반대로 보낸다', async () => {
     const user = userEvent.setup()
-    render(<SearchablePref searchable />)
+    render(<SearchablePref searchable nickname="홍길동" />)
     await user.click(screen.getByRole('switch'))
 
     await waitFor(() => expect(sent.length).toBe(1))
     expect(sent[0].url).toBe('/api/me')
-    expect(JSON.parse(sent[0].body!)).toEqual({ is_nickname_searchable: false })
+    expect(JSON.parse(sent[0].body!)).toEqual({
+      nickname: '홍길동',
+      is_nickname_searchable: false,
+    })
   })
 
   /**
@@ -74,7 +83,7 @@ describe('프로필 — 지인 검색 노출', () => {
    */
   it('서버가 답하면 스위치가 실제로 꺼진다', async () => {
     const user = userEvent.setup()
-    render(<SearchablePref searchable />)
+    render(<SearchablePref searchable nickname="홍길동" />)
     const sw = screen.getByRole('switch')
     expect(sw).toBeChecked()
 
@@ -99,7 +108,7 @@ describe('프로필 — 지인 검색 노출', () => {
       ),
     )
     const user = userEvent.setup()
-    render(<SearchablePref searchable />)
+    render(<SearchablePref searchable nickname="홍길동" />)
     await user.click(screen.getByRole('switch'))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('저장하지 못했습니다.')

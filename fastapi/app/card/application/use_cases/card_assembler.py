@@ -22,7 +22,9 @@ def _titles(titles: list[TitleEntity]) -> list[TitleResult]:
         TitleResult(
             code=t.code,
             label=t.label,
-            category=str(t.category),
+            # 🔴 `str(None)` 이 `"None"` 이 되지 않게 가른다 — 사람이 직접
+            # 적은 호칭은 분류가 없다(`paik` 36번).
+            category=str(t.category) if t.category is not None else None,
             granted_at=t.granted_at,
         )
         for t in titles

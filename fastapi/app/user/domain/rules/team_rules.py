@@ -23,6 +23,15 @@ def can_add_member(actor_role: TeamRole | None, adding_self: bool) -> bool:
     return actor_role is TeamRole.OWNER
 
 
+def can_edit_team(actor_role: TeamRole | None) -> bool:
+    """팀 자체(이름·지역)를 고칠 수 있는가. **`owner` 만.**
+
+    `can_add_member` 와 달리 「본인」 예외가 없다 — 팀 정보는 소속 전체에게
+    보이는 값이라 아무나 고치면 남의 팀 이름이 바뀐다.
+    """
+    return actor_role is TeamRole.OWNER
+
+
 def can_remove_member(
     actor_id: UUID, target_id: UUID, actor_role: TeamRole | None
 ) -> bool:

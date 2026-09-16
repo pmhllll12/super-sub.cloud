@@ -82,11 +82,19 @@ table("player_card", column("user_id"))       # 조회도 원시 SQL 로
 | 계약 테스트 | 상태 코드·에러 `code`·응답 형태 | 스텁 |
 | **DB 통합 테스트** (`@pytest.mark.db`) | 실제로 저장·조회·삭제되는가 | 진짜 PostgreSQL |
 
-🔴 **원시 SQL로 남의 테이블을 읽는 자리가 셋 있다**(`card`→`user.nickname`,
-`core/deps.py`→`user.token_version`·`email`, `user`→`player_card.user_id`).
-컨텍스트 경계를 지키려는 의도지만 **컬럼 이름을 바꾸면 파이썬이 잡아 주지 않는다.**
-`test_card_db.py`·`test_token_revocation_db.py`·`test_admin_db.py`가 유일한 방어선이다 —
+🔴 **원시 SQL로 남의 테이블을 읽는 자리는 DB 테스트가 유일한 방어선이다.**
+컨텍스트 경계를 지키려고 `table()`/`column()`으로 읽는 자리가 여러 곳이고
+(2026-09-16 기준 **저장소 11개 파일에 43군데**, 아래 명령으로 센다), 거기서는
+**저쪽 컬럼 이름이 바뀌어도 파이썬이 잡아 주지 않는다.** 그 컨텍스트의
+`@pytest.mark.db` 테스트가 실물 DB로 대조하는 것 말고는 걸리는 자리가 없다 —
 **지우거나 `@pytest.mark.db`를 떼지 말 것.**
+
+```bash
+grep -rn '^_[a-z_]* = table(' app/ --include='*.py' | wc -l
+```
+
+> 예전에 이 자리에 「셋 있다」며 목록을 적어 뒀는데 **금방 낡았다**(43군데가
+> 됐다). 자리를 세는 대신 규칙과 세는 명령을 둔다 — 목록은 어차피 늘어난다.
 
 DB가 없으면 통합 테스트는 **실패가 아니라 skip**이다. 초록색으로 끝나 놓치기 쉬우니
 **개수가 아니라 `skipped`가 0인지** 본다. CI는 skip이 있으면 exit 1을 낸다.
