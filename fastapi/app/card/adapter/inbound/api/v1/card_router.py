@@ -93,6 +93,7 @@ def update_my_card(
                 if "style" in sent
                 else UNSET
             ),
+            titles=body.titles if "titles" in sent else UNSET,
         )
     )
 

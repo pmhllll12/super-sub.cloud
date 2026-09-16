@@ -450,3 +450,101 @@ class TestStyleInDb:
         )
         assert res.status_code == 422
         assert error_code(res) == "VALIDATION_ERROR"
+
+
+class TestCustomTitlesInDb:
+    """사람이 직접 적는 호칭 (`paik` 36번).
+
+    스텁이 답할 수 없는 것들이다:
+
+    - `user_custom_title` 행이 **실제로** 생기고 갈아 끼울 때 옛 행이 지워지는가
+    - 🔴 **남이 보는 카드에도 실리는가** — 그 항목의 「만족해야 할 성질」 2번이다
+    - 부여된 호칭과 **한 목록으로 합쳐져** 최근순으로 나오는가
+    """
+
+    def _written(self, body):
+        return [t["label"] for t in body["titles"] if t["category"] is None]
+
+    def test_행이_실제로_생긴다(self, db_client, db_session, card):
+        res = db_client.patch(
+            f"{V1}/me/card",
+            json={"titles": ["시야가 넓은", "왼발잡이"]},
+            headers=card["headers"],
+        )
+        assert res.status_code == 200, res.text
+
+        labels = db_session.execute(
+            text(
+                "select label from user_custom_title uct "
+                "join player_card pc on pc.user_id = uct.user_id "
+                "where pc.public_slug = :s order by uct.created_at"
+            ),
+            {"s": card["slug"]},
+        ).scalars().all()
+        assert labels == ["시야가 넓은", "왼발잡이"]
+
+    def test_갈아_끼우면_옛_행이_사라진다(self, db_client, db_session, card):
+        """🔴 쌓이면 상한(3개)이 뜻을 잃는다."""
+        db_client.patch(
+            f"{V1}/me/card",
+            json={"titles": ["하나", "둘", "셋"]},
+            headers=card["headers"],
+        )
+        db_client.patch(
+            f"{V1}/me/card", json={"titles": ["넷"]}, headers=card["headers"]
+        )
+
+        count = db_session.execute(
+            text(
+                "select count(*) from user_custom_title uct "
+                "join player_card pc on pc.user_id = uct.user_id "
+                "where pc.public_slug = :s"
+            ),
+            {"s": card["slug"]},
+        ).scalar_one()
+        assert count == 1
+
+    def test_남이_보는_카드에도_실린다(self, db_client, card):
+        """만족해야 할 성질 2번 — 화면은 `GET /cards/{slug}` 하나만 본다."""
+        db_client.patch(
+            f"{V1}/me/card", json={"titles": ["왼발잡이"]}, headers=card["headers"]
+        )
+        public = db_client.get(f"{V1}/cards/{card['slug']}")
+        assert public.status_code == 200, public.text
+        assert self._written(public.json()) == ["왼발잡이"]
+
+    def test_부여된_호칭과_한_목록으로_최근순이다(self, db_client, card):
+        """직접 적은 것이 방금 쓴 것이라 앞에 온다 — 정렬 축이 하나다."""
+        body = db_client.patch(
+            f"{V1}/me/card", json={"titles": ["왼발잡이"]}, headers=card["headers"]
+        ).json()
+
+        labels = [t["label"] for t in body["titles"]]
+        # 픽스처가 넣은 부여 호칭 둘이 그대로 있고, 방금 쓴 것이 맨 앞이다.
+        assert labels[0] == "왼발잡이"
+        assert set(labels[1:]) == {"슈팅이 매서운", "주말 개근"}
+
+    def test_계정을_지우면_따라_지워진다(self, db_client, db_session, card):
+        """외래키 연쇄(`ondelete=CASCADE`)가 실제로 걸려 있는지 본다."""
+        db_client.patch(
+            f"{V1}/me/card", json={"titles": ["왼발잡이"]}, headers=card["headers"]
+        )
+        user_id = db_session.execute(
+            text("select user_id from player_card where public_slug = :s"),
+            {"s": card["slug"]},
+        ).scalar_one()
+
+        db_session.execute(
+            text("delete from user_title where user_id = :u"), {"u": user_id}
+        )
+        db_session.execute(
+            text("delete from player_card where user_id = :u"), {"u": user_id}
+        )
+        db_session.execute(text('delete from "user" where id = :u'), {"u": user_id})
+        db_session.commit()
+
+        left = db_session.execute(
+            text("select count(*) from user_custom_title where user_id = :u"),
+            {"u": user_id},
+        ).scalar_one()
+        assert left == 0
