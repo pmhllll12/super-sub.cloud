@@ -155,6 +155,17 @@ export default function SquadSuggest({
      (계약 44번의 「하지 말 것」). */
   const [grade, setGrade] = useState<GradeFilter>(ANY_GRADE)
   const [state, setState] = useState<State>({ kind: 'loading' })
+  /**
+   * 후보의 **대표 영상 주소** — `user_id` → 재생 URL (계약 3-6절).
+   *
+   * 🔴 **후보 응답에는 영상이 없다.** `card_public_slug` 로 한 사람씩 따로
+   * 물어야 한다 — 그래서 목록이 먼저 뜨고 영상이 나중에 채워진다(빈 칸이
+   * 잠깐 보이는 것이 정상이다).
+   *
+   * ⚠️ 이 주소는 **사전 서명 URL 이라 만료된다**(`expires_in`, 보통 15분).
+   * 판을 여는 동안만 쓰고 어디에도 오래 담아 두지 않는다.
+   */
+  const [clips, setClips] = useState<Record<string, string>>({})
 
   /* 🔴 **거르개를 서버에 넘긴다.** 화면에서 거르면 「이 등급에 몇 명인가」가
      받아 온 페이지 안에서만 맞는 값이 된다 — 계약이 하드 필터를 서버에 두었다. */
@@ -197,9 +208,55 @@ export default function SquadSuggest({
 
   const list = state.kind === 'ok' ? state.list : []
 
-  /** 이 후보가 틀 장면 — 나라면 내가 고른 것, 아니면 자리 표시. */
-  const clipFor = (name: string) =>
-    me && me.clip && name === me.nickname ? me.clip : (FLAVOR[name]?.clip ?? '/coach-c001.mp4')
+  /* 🔴 **목록을 기다렸다가 영상을 받는다.** 후보마다 요청이 하나씩 더 나가지만
+     (계약이 목록에 영상을 안 실었다), 목록을 그것 때문에 늦추지는 않는다 —
+     이름과 등급이 먼저 서고 영상이 뒤따라 채워진다. */
+  useEffect(() => {
+    if (state.kind !== 'ok') return
+    const withCard = state.list.filter((c) => c.card_public_slug)
+    if (withCard.length === 0) return
+    let alive = true
+    void (async () => {
+      const found = await Promise.all(
+        withCard.map(async (c) => {
+          try {
+            const res = await fetch(
+              `/api/cards/${encodeURIComponent(c.card_public_slug as string)}/featured-video`,
+            )
+            // 🔴 **404 는 오류가 아니다** — 대표 영상을 아직 안 고른 사람이다
+            //    (계약 3-6절 `NO_FEATURED_VIDEO`). 조용히 넘긴다.
+            if (!res.ok) return null
+            const body = (await res.json().catch(() => null)) as { url?: string } | null
+            return body?.url ? ([c.user_id, body.url] as const) : null
+          } catch {
+            return null
+          }
+        }),
+      )
+      if (!alive) return
+      const next = Object.fromEntries(found.filter((x): x is readonly [string, string] => !!x))
+      setClips(next)
+    })()
+    return () => {
+      alive = false
+    }
+  }, [state])
+
+  /**
+   * 이 후보가 틀 장면 — 나라면 내가 고른 것, 아니면 **아는 자리 표시만**.
+   *
+   * 🔴 **모르는 사람에게 아무 클립이나 붙이지 않는다.** 전에는 자리 표시
+   * 하나로 떨어뜨렸는데(`?? '/coach-c001.mp4'`), 그러면 **진짜 사용자 전원**
+   * 에게 남의 농구 영상이 「그 사람 대표 장면」으로 붙는다 — 이름과 등급이
+   * 진짜가 된 지금은 그 옆의 가짜 영상이 진짜로 읽힌다. 없으면 없다고 한다.
+   */
+  const clipFor = (c: Candidate): string | null => {
+    // 내가 방금 고른 것이 가장 최신이다 — 서버 값보다 앞선다.
+    if (me && me.clip && c.nickname === me.nickname) return me.clip
+    // 🔴 그다음이 **진짜 대표 영상**이다. `FLAVOR` 는 맨 뒤 — 그것은 화면
+    //    mock 이라, 진짜가 있으면 진짜가 이겨야 한다.
+    return clips[c.user_id] ?? FLAVOR[c.nickname]?.clip ?? null
+  }
 
   return (
     <aside
@@ -315,14 +372,20 @@ export default function SquadSuggest({
                   전체를 넣고 남는 곳은 검게 둔다(`object-fit: contain`, 바탕은
                   globals.css). 클립마다 비율이 달라서(세로 1080×1920 · 가로
                   1280×720) 채우려면 어느 쪽이든 사람이 잘린다. */}
-              <span className="ss-suggest-card" aria-hidden="true">
+              <span className="ss-suggest-card" aria-hidden={clipFor(s) ? true : undefined}>
+                {clipFor(s) === null ? (
+                  /* 🔴 **없으면 없다고 적는다.** 대표 영상을 아직 안 고른
+                     사람이다 — 남의 영상을 대신 틀면 그것이 이 사람 장면으로
+                     읽힌다(이름·등급이 진짜라서 더 그렇다). */
+                  <span className="ss-suggest-card-empty">아직 대표 영상이 없습니다</span>
+                ) : (
                 <video
                   // 🔴 주소 뒤의 `#t=0.1` 은 "0.1초 자리를 보여 달라"는 뜻이다.
                   //    이게 없으면 브라우저가 `preload="metadata"` 만 보고 **그림은
                   //    안 그려서** 멈춰 있는 동안 칸이 검게만 남는다(코치 목록에서
                   //    같은 것을 겪었다). 0 이 아니라 0.1 인 것은 맨 첫 칸이 검은
                   //    영상이 흔해서다.
-                  src={`${clipFor(s.nickname)}#t=0.1`}
+                  src={`${clipFor(s)}#t=0.1`}
                   // 🔴 `autoPlay` 를 주지 않는다 — 판이 나올 때는 멈춰 있어야 한다.
                   //    🔴 `muted` 없이는 브라우저가 재생을 막고, `playsInline` 이
                   //    없으면 iOS 가 전체 화면으로 띄운다.
@@ -331,6 +394,7 @@ export default function SquadSuggest({
                   playsInline
                   preload="metadata"
                 />
+                )}
               </span>
               <span className="ss-suggest-text">
                 {/* 🔴 이름과 등급을 **한 줄에** 둔다(사용자 요청) — 등급을

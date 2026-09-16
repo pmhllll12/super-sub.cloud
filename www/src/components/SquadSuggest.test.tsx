@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import SquadSuggest from './SquadSuggest'
 
@@ -141,5 +141,116 @@ describe('추천 판 — 후보마다 대표 장면이 돈다', () => {
 
     await user.click(screen.getByRole('button', { name: /최유진/ }))
     expect(picked).toEqual(['최유진'])
+  })
+})
+
+/**
+ * 🔴 **모르는 사람에게 아무 영상이나 붙이지 않는다**(2026-09-16).
+ *
+ * 후보가 진짜 사용자로 바뀌면서 `FLAVOR`(화면 mock)에 없는 이름이 대부분이
+ * 된다. 전에는 자리 표시 클립 하나로 떨어뜨렸는데, 그러면 **이름과 등급이
+ * 진짜인 옆에 남의 영상이 「그 사람 대표 장면」으로** 붙는다.
+ */
+describe('추천 판 — 대표 영상이 없는 사람', () => {
+  it('아는 클립이 없으면 영상 대신 없다고 적는다', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify([
+            {
+              user_id: 'u9',
+              nickname: '처음보는사람',
+              card_public_slug: null,
+              grade: 'B',
+              provisional: false,
+            },
+          ]),
+          { status: 200 },
+        ),
+      ),
+    )
+    const { container } = render(
+      <SquadSuggest
+        position="MF"
+        teamId="team-mine"
+        closing={false}
+        onPick={() => {}}
+        onClose={() => {}}
+      />,
+    )
+    expect(await screen.findByText('처음보는사람')).toBeInTheDocument()
+    // 🔴 남의 영상이 붙으면 안 된다.
+    expect(container.querySelector('video')).toBeNull()
+    expect(screen.getByText('아직 대표 영상이 없습니다')).toBeInTheDocument()
+    // 이름과 등급은 진짜라 그대로 나온다.
+    // ⚠️ 거르개 알약에도 「B」가 있어서 줄 안으로 좁혀서 본다.
+    const line = screen.getByText('처음보는사람').closest('.ss-suggest-nameline')
+    expect(line?.querySelector('.ss-suggest-grade')).toHaveTextContent('B')
+  })
+})
+
+/**
+ * 🔴 **대표 영상은 따로 물어서 채운다**(2026-09-16, 계약 3-6절).
+ *
+ * 후보 응답(3-16절)에는 영상이 없다 — `card_public_slug` 로 한 사람씩
+ * `GET /cards/{slug}/featured-video` 를 부른다. 그래서 목록이 먼저 서고
+ * 영상이 뒤따라 채워진다.
+ */
+describe('추천 판 — 대표 영상을 따라 받는다', () => {
+  const ROW = {
+    user_id: 'u1',
+    nickname: '처음보는사람',
+    card_public_slug: 'someone-card',
+    grade: 'B',
+    provisional: false,
+  }
+
+  function stub(featured: { ok: boolean; url?: string }) {
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('/featured-video')) {
+        return Promise.resolve(
+          featured.ok
+            ? new Response(JSON.stringify({ url: featured.url, expires_in: 900 }), { status: 200 })
+            : new Response(
+                JSON.stringify({ error: { code: 'NO_FEATURED_VIDEO', message: '없습니다.' } }),
+                { status: 404 },
+              ),
+        )
+      }
+      return Promise.resolve(new Response(JSON.stringify([ROW]), { status: 200 }))
+    })
+  }
+
+  const open = () =>
+    render(
+      <SquadSuggest
+        position="MF"
+        teamId="team-mine"
+        closing={false}
+        onPick={() => {}}
+        onClose={() => {}}
+      />,
+    )
+
+  it('대표 영상이 있으면 그 사람 영상을 튼다', async () => {
+    stub({ ok: true, url: '/their-featured.mp4' })
+    const { container } = open()
+    await screen.findByText('처음보는사람')
+    await waitFor(() =>
+      expect(container.querySelector('video')?.getAttribute('src')).toBe(
+        '/their-featured.mp4#t=0.1',
+      ),
+    )
+  })
+
+  /* 🔴 **404 는 오류가 아니다** — 아직 안 고른 사람이다. 남의 영상을 대신
+     틀지 않는다. */
+  it('대표 영상이 없으면(404) 영상 없이 그대로 둔다', async () => {
+    stub({ ok: false })
+    const { container } = open()
+    await screen.findByText('처음보는사람')
+    expect(container.querySelector('video')).toBeNull()
+    expect(screen.getByText('아직 대표 영상이 없습니다')).toBeInTheDocument()
   })
 })

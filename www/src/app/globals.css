@@ -2592,6 +2592,20 @@ body::-webkit-scrollbar {
   flex: none;
 }
 
+/* 대표 영상을 아직 안 고른 사람 — 남의 영상을 대신 틀지 않는다. 칸은 그대로
+   두고(줄 높이가 사람마다 튀지 않게) 없다는 말만 가운데 적는다. */
+.ss-suggest-card-empty {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  text-align: center;
+  font-size: 0.6875rem;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--ss-fg) 55%, transparent);
+}
+
 .ss-suggest-grade {
   display: inline-flex;
   align-items: center;
