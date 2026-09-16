@@ -1,4 +1,3 @@
-import type { SportCode } from '@/lib/market'
 import type { MatchPrefs } from '@/lib/matchPrefs'
 import type { Venue, VenueSlot } from '@/lib/venues'
 
@@ -25,8 +24,13 @@ export type DayKind = 'weekday' | 'weekend'
 /** 조기(이른 아침) · 낮 · 야간. 한 시간대가 셋 다일 수 있다(06:00~22:00). */
 export type TimeBand = 'early' | 'day' | 'night'
 
+/**
+ * 🔴 **종목 칸이 없다**(2026-09-16, 팀 결정: 풋살 하나만 한다). 고를 것이
+ * 하나뿐이면 거름망이 아니다 — 화면의 종목 탭과 함께 걷었고, 목록(`venues.ts`)
+ * 에서도 축구·풋살 아닌 시설을 덜어냈다. 종목을 다시 늘리면 여기와 `VenueBoard`
+ * 의 탭을 **같이** 되살린다(한쪽만 두면 고를 수는 있는데 안 걸러진다).
+ */
 export type VenueQuery = {
-  sport: SportCode | null
   /** 빈 배열이면 **전체**다 — 「아무 지역도 안 고름」과 「전체」는 같은 뜻으로 둔다. */
   regions: string[]
   days: DayKind[]
@@ -42,7 +46,6 @@ export type VenueQuery = {
 }
 
 export const EMPTY_QUERY: VenueQuery = {
-  sport: null,
   regions: [],
   days: [],
   bands: [],
@@ -55,7 +58,6 @@ export const EMPTY_QUERY: VenueQuery = {
 /** 조건이 하나라도 켜져 있는가 — 「비우기」를 보일지 정한다. */
 export function hasQuery(q: VenueQuery): boolean {
   return (
-    q.sport !== null ||
     q.regions.length > 0 ||
     q.days.length > 0 ||
     q.bands.length > 0 ||
@@ -180,7 +182,6 @@ export function countOpen(venue: Venue): number {
 }
 
 export function venueMatches(venue: Venue, q: VenueQuery): boolean {
-  if (q.sport && !venue.sports.includes(q.sport)) return false
   if (q.regions.length > 0 && !q.regions.includes(venue.region)) return false
   if (q.prefs && q.prefs.regions.length > 0 && !q.prefs.regions.includes(venue.region)) return false
 

@@ -19,6 +19,7 @@ const report = (over: Partial<VideoReport> = {}): VideoReport => ({
       name: '디딤발 위치',
       grade: 2,
       title: '흔들리지 않는 축',
+      title_earned: true,
       evidence: '측면으로 벌리는 움직임이 많습니다',
       metric_ref: 'plant_foot_offset',
       skipped: false,
@@ -63,6 +64,7 @@ describe('리포트 옮기기', () => {
           name: '점프 높이',
           grade: null,
           title: '안 받은 호칭',
+          title_earned: null,
           evidence: '안 본 항목',
           metric_ref: null,
           skipped: true,
@@ -79,14 +81,41 @@ describe('리포트 옮기기', () => {
     expect(out.radar.map((a) => a.name)).not.toContain('점프 높이')
   })
 
-  /* 🔴 **호칭은 서버가 채운 것만이다.** 「어느 등급부터 받은 호칭인가」가
-     계약에 없어서 우리가 `grade === 2` 같은 선을 그으면 그게 곧 지어내는
-     것이다(미결로 올려 둔다). 호칭이 없어도 **문장은 그대로 남는다** —
-     `ho` 24번이 막은 것은 title 없이 evidence만 있는 것이 아니라, 그 반대
-     (문장을 지워 통째로 사라지는 것)다. */
+  /* 🔴 **정정 (CCC 47, 2026-09-16)**: 앞서 이 시험이 「`title` 이 있으면 받은
+     것으로 본다」를 검사했던 것은 **틀렸다.** `title` 은 **모든 등급에 있다**
+     — 0등급도 「무너지는 축」 같은 문구를 받는다. 그래서 유무로 선을 그으면
+     못한 항목에 호칭을 달게 된다. 이제 `title_earned` 가 가른다(미결 `ho`
+     40번 · `paik` 23번의 답).
+
+     호칭이 없어도 **문장은 그대로 남는다** — `ho` 24번이 막은 것은 title 없이
+     evidence만 있는 것이 아니라, 그 반대(문장을 지워 통째로 사라지는 것)다. */
+  it('못 받은 호칭(title_earned 가 거짓)은 문구가 있어도 안 그린다', () => {
+    const r = report({
+      breakdown: [
+        { ...report().breakdown[0], grade: 0, title: '무너지는 축', title_earned: false },
+      ],
+    })
+    expect(toSavedReport(r).points).toEqual([
+      { title: null, evidence: '측면으로 벌리는 움직임이 많습니다' },
+    ])
+    expect(JSON.stringify(toSavedReport(r).points)).not.toContain('무너지는 축')
+  })
+
+  /* 🔴 `title_earned` 가 `null` 이면 **옛 리포트**(이 필드가 생기기 전 적재분)
+     거나 제외된 항목이다. 거짓으로 지어내지 않는다 — 흐린 칭호·자물쇠·「미달」
+     전부 미달 표식이라 **아무것도 안 그리는 것이 맞다**(계약 47의 「하지 말 것」). */
+  it('title_earned 가 null 인 옛 리포트는 호칭을 지어내지 않는다', () => {
+    const r = report({
+      breakdown: [{ ...report().breakdown[0], title: '흔들리지 않는 축', title_earned: null }],
+    })
+    expect(toSavedReport(r).points).toEqual([
+      { title: null, evidence: '측면으로 벌리는 움직임이 많습니다' },
+    ])
+  })
+
   it('호칭이 비어 있어도 문장은 그대로 남고 칭호만 없다', () => {
     const r = report({
-      breakdown: [{ ...report().breakdown[0], grade: 1, title: null }],
+      breakdown: [{ ...report().breakdown[0], grade: 1, title: null, title_earned: false }],
     })
     expect(toSavedReport(r).points).toEqual([
       { title: null, evidence: '측면으로 벌리는 움직임이 많습니다' },

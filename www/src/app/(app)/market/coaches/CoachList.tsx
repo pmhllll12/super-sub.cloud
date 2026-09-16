@@ -3,21 +3,16 @@
 import { useState } from 'react'
 import { TransitionLink } from '@/lib/pageTransition'
 import { FilterBar, SortSelect } from '../FilterBar'
-import {
-  LEVEL_LABEL,
-  SPORT_LABEL,
-  won,
-  type Coach,
-  type Level,
-  type SportCode,
-} from '@/lib/market'
+import { LEVEL_LABEL, won, type Coach, type Level } from '@/lib/market'
 
 /**
  * 코치 목록과 거름망.
  *
- * 🔴 종목 알약은 **영상 분석과 같은 모양**을 쓴다(`.ss-shot-sport`). 사용자가
- * 이미 한 번 배운 조작이라 여기서 새로 배울 것이 없어야 한다 — 같은 뜻의 것에
- * 다른 모양을 주지 않는다.
+ * 🔴 **종목 거름망이 없다**(2026-09-16, 팀 결정: 풋살 하나만 한다). 고를 것이
+ * 하나뿐이면 거름망이 아니라 같은 답을 내는 단추다 — 카드에 종목을 적지도
+ * 않는다(전부 같은 값이다). 종목을 다시 늘리면 **알약과 카드 표시를 같이**
+ * 되살린다. 그때 알약은 영상 분석과 같은 모양(`.ss-shot-sport`)을 쓴다 —
+ * 사용자가 이미 한 번 배운 조작이라 같은 뜻에 다른 모양을 주지 않는다.
  *
  * 거름망을 클라이언트에 둔 이유: 지금은 mock 이라 목록이 몇 개뿐이고, 서버로
  * 다시 물으면 화면이 한 번 비었다 돌아온다. API 가 붙으면 이 컴포넌트가 쿼리
@@ -75,7 +70,6 @@ export default function CoachList({
   coaches: Coach[]
   onPick?: (id: string) => void
 }) {
-  const [sport, setSport] = useState<SportCode | null>(null)
   const [level, setLevel] = useState<Level | null>(null)
   const [region, setRegion] = useState<string | null>(null)
   const [sort, setSort] = useState<CoachSort>('recommended')
@@ -99,12 +93,11 @@ export default function CoachList({
   const max = maxPrice === '' ? null : Number(maxPrice)
   const priced = min !== null || max !== null
 
-  const filtered = Boolean(sport || level || region) || priced
+  const filtered = Boolean(level || region) || priced
 
   const shown = coaches
     .filter(
       (c) =>
-        (!sport || c.sport === sport) &&
         (!level || c.levels.includes(level)) &&
         (!region || c.region.startsWith(region)) &&
         (min === null || c.pricePerSession >= min) &&
@@ -134,17 +127,6 @@ export default function CoachList({
     <>
       <FilterBar
         fields={[
-          {
-            key: 'sport',
-            label: '종목',
-            value: sport ? SPORT_LABEL[sport] : null,
-            picked: sport,
-            onPick: (v) => setSport(v as SportCode | null),
-            options: (Object.keys(SPORT_LABEL) as SportCode[]).map((code) => ({
-              value: code,
-              label: SPORT_LABEL[code],
-            })),
-          },
           {
             key: 'level',
             label: '수준',
@@ -276,9 +258,9 @@ export default function CoachList({
                 <span className="ss-coach-card-text">
                 <span className="ss-coach-card-head">
                   <b>{c.name}</b>
-                  <span>
-                    {SPORT_LABEL[c.sport]} · {c.region}
-                  </span>
+                  {/* 🔴 종목을 안 적는다(2026-09-16, 팀 결정: 풋살 하나만 한다) —
+                      전부 같은 값이라 읽는 사람에게 아무것도 안 알려 준다. */}
+                  <span>{c.region}</span>
                 </span>
 
                 <span className="ss-coach-card-tagline">{c.tagline}</span>

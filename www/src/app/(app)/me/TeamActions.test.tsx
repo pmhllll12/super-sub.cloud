@@ -73,7 +73,11 @@ describe('프로필 — 소속', () => {
     render(<TeamActions teams={[]} userId="u1" />)
     await user.click(screen.getByRole('button', { name: '팀 만들기' }))
     expect(screen.getByLabelText('팀 이름')).toBeInTheDocument()
-    expect(screen.getByLabelText('지역')).toBeInTheDocument()
+    /* ⚠️ 라벨이 「지역 (예: 서울 강남)」이다 — 예시를 칸 아래가 아니라 **라벨 옆
+       괄호**로 옮겼다(2026-09-16, 사용자 요청). 접근성 이름도 그 전체다:
+       보이는 글자가 이름에 들어 있어야 한다는 규칙(label in name)을 지키려면
+       `aria-label` 로 「지역」만 따로 주면 안 된다. */
+    expect(screen.getByLabelText(/지역/)).toBeInTheDocument()
     expect(screen.queryByLabelText(/종목/)).toBeNull()
   })
 
@@ -84,7 +88,7 @@ describe('프로필 — 소속', () => {
     render(<TeamActions teams={[]} userId="u1" />)
     await user.click(screen.getByRole('button', { name: '팀 만들기' }))
     await user.type(screen.getByLabelText('팀 이름'), '번개FC')
-    await user.type(screen.getByLabelText('지역'), '서울 강남')
+    await user.type(screen.getByLabelText(/지역/), '서울 강남')
     await user.click(screen.getByRole('button', { name: '만들기' }))
 
     await waitFor(() => expect(refresh).toHaveBeenCalled())
@@ -156,10 +160,14 @@ describe('프로필 — 팀 만들기가 나오는 때', () => {
     expect(line?.querySelector('button')).toHaveTextContent('팀 나가기')
   })
 
-  it('팀이 없으면 무엇이 막히는지 적는다', () => {
+  /* 🔴 **정정 (2026-09-16, 사용자 요청)**: 앞서 「팀을 만들어야 스쿼드와 경기
+     신청을 쓸 수 있습니다」까지 적게 붙들던 것을 걷었다 — 바로 아래에 「팀
+     만들기」 단추가 서 있어 **같은 말을 두 번** 하는 자리였다. */
+  it('팀이 없으면 한 줄로만 적고 만들 자리를 낸다', () => {
     render(<TeamActions teams={[]} userId="u1" />)
     expect(screen.getByRole('button', { name: '팀 만들기' })).toBeInTheDocument()
-    expect(screen.getByText(/팀을 만들어야/)).toBeInTheDocument()
+    expect(screen.getByText('아직 소속된 팀이 없습니다.')).toBeInTheDocument()
+    expect(screen.queryByText(/팀을 만들어야/)).toBeNull()
   })
 
   /* 🔴 **홈은 한 팀만 그린다.** 만들 수 있게 열었으니 고를 자리도 있어야

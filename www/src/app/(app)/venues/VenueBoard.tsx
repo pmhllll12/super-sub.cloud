@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { SPORT_LABEL, type SportCode } from '@/lib/market'
+import { SPORT_LABEL } from '@/lib/market'
 import { HOURS, loadPrefs, type MatchPrefs } from '@/lib/matchPrefs'
 import {
   EMPTY_QUERY,
@@ -115,30 +115,10 @@ export default function VenueBoard({ venues }: { venues: Venue[] }) {
             />
           </label>
 
-          <div className="ss-vb-sports" role="group" aria-label="종목">
-            <button
-              type="button"
-              className="ss-vb-pill"
-              data-on={q.sport === null ? 'true' : undefined}
-              aria-pressed={q.sport === null}
-              onClick={() => set({ sport: null })}
-            >
-              전체
-            </button>
-            {(Object.keys(SPORT_LABEL) as SportCode[]).map((code) => (
-              <button
-                key={code}
-                type="button"
-                className="ss-vb-pill"
-                data-on={q.sport === code ? 'true' : undefined}
-                aria-pressed={q.sport === code}
-                onClick={() => set({ sport: code })}
-              >
-                {SPORT_LABEL[code]}
-              </button>
-            ))}
-          </div>
-
+          {/* 🔴 **종목 탭을 걷었다**(2026-09-16, 팀 결정: 풋살 하나만 한다).
+              고를 것이 하나뿐이면 탭은 전부 같은 답을 내는 단추다 — 목록에서도
+              축구·풋살 아닌 시설(야구장·농구장 13곳)을 덜어냈다. 종목을 다시
+              늘리면 여기와 `venueFilter` 의 `sport` 를 같이 되살린다. */}
           <button
             type="button"
             className="ss-vb-pill"

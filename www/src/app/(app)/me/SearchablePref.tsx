@@ -22,7 +22,17 @@ import { apiErrorMessage, apiPatch } from '@/lib/api/client'
  * (사용자 요청, 2026-09-16) 판과 제목은 `AccountActions` 것 하나뿐이다 —
  * 판을 둘 두면 같은 성격의 설정이 두 덩어리로 갈려 보인다.
  */
-export default function SearchablePref({ searchable }: { searchable: boolean }) {
+export default function SearchablePref({
+  searchable,
+  nickname,
+}: {
+  searchable: boolean
+  /**
+   * 🔴 **함께 실어 보내는 값**이다 — 이 스위치가 이름을 바꾸려는 것이 아니라,
+   * `PATCH /me` 가 `nickname` 을 **늘 받기** 때문이다(아래 `toggle` 주석).
+   */
+  nickname: string
+}) {
   const router = useRouter()
   /**
    * 🔴 **서버가 돌려준 값을 여기 든다.** 서버 컴포넌트의 `searchable` 만 믿으면
@@ -48,9 +58,21 @@ export default function SearchablePref({ searchable }: { searchable: boolean }) 
     setBusy(true)
     setError(null)
     try {
-      /* 🔴 **이 칸만 보낸다.** 닉네임을 같이 실어 보내면 계약상 그것도 고치는
-         요청이 된다 — 여기서 이름을 건드릴 이유가 없다. */
+      /* 🔴 **닉네임을 함께 보낸다 — 계약이 늘 받는다**(2026-09-16 정정).
+         앞서 여기에 「이 칸만 보낸다」고 적고 그렇게 고쳤던 것은 **틀렸다.**
+         `PATCH /me` 의 `nickname` 은 **필수**다(`UpdateMeSchema`:
+         `nickname: str = Field(min_length=1, …)`, docstring 도 "닉네임은 항상
+         보낸다"). 선택인 것은 `is_nickname_searchable` 쪽뿐이다.
+
+         🔴 **mock 만 고쳐 놓아서 여기서 안 걸렸다.** 개발에서는 잘 돌고
+         실서버에서만 `422 요청 값이 올바르지 않습니다: nickname` 이 났다
+         (사용자가 배포에서 겪음). mock 도 계약과 같게 되돌렸다 — 갈라 두면
+         다음에도 배포에서만 터진다.
+
+         ⚠️ 같은 이름을 다시 보내는 것이라 **아무것도 안 바뀐다.** 유일 제약
+         (`uq_user_nickname`)도 자기 행을 같은 값으로 쓰는 것이라 안 걸린다. */
       const updated = await apiPatch<{ is_nickname_searchable?: boolean }>('/api/me', {
+        nickname,
         is_nickname_searchable: !on,
       })
       // 서버가 말한 값으로 맞춘다. 안 실어 주는 옛 응답이면 보낸 값으로 둔다.
@@ -70,9 +92,19 @@ export default function SearchablePref({ searchable }: { searchable: boolean }) 
         <span className="ss-pref-text">
           <span className="ss-pref-name">지인 검색에 나를 보이기</span>
           <span className="ss-pref-note">
-            {on
-              ? '닉네임으로 나를 찾아 지인 신청을 보낼 수 있습니다.'
-              : '아무도 나를 찾을 수 없습니다. 이미 맺은 지인은 그대로입니다.'}
+            {/* 🔴 **끈 쪽은 두 줄이다**(사용자 요청, 2026-09-16). 「아무도 나를
+                찾을 수 없습니다」가 겁나는 말이라, 그 뒤에 붙는 안심(「이미 맺은
+                지인은 그대로」)이 같은 줄에 묻히면 안 읽힌다. 줄바꿈은 글자 수에
+                기대지 않고 **요소로** 긋는다 — 판 폭이 바뀌어도 자리가 안 흔들린다. */}
+            {on ? (
+              '닉네임으로 나를 찾아 지인 신청을 보낼 수 있습니다.'
+            ) : (
+              <>
+                아무도 나를 찾을 수 없습니다.
+                <br />
+                이미 맺은 지인은 그대로입니다.
+              </>
+            )}
           </span>
         </span>
         {/* 🔴 `role="switch"` + `aria-checked` — 켜짐/꺼짐이 있는 단추라는 것이

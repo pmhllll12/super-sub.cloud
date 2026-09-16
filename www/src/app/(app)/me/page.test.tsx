@@ -146,18 +146,20 @@ describe('내 프로필 — /me', () => {
 
   // 개수를 적던 '호칭 2' 배지는 걷어냈다(공유와 함께) — 남은 자리는
   // 정보 절 하나뿐이라, 비었을 때 알려 주는 것도 거기다.
-  /* 🔴 **「없음」을 부정적으로 적지 않는다**(계약 4장) — 빈 것은 정상이다.
-     「받은」에서 「정한」으로 바뀐 것은 사람이 직접 적게 되어서다(36번). */
-  it('호칭이 없으면 정보 절에서 그렇게 알려준다', () => {
+  /* 🔴 **정정 (2026-09-16, 사용자 요청)**: 빈 호칭을 말로 알리던 것을 걷었다 —
+     바로 옆 「호칭 정하기」 단추가 이미 그 말을 한다. 미달 표식을 대신 두지
+     않는 것(계약 4장)은 그대로다. */
+  it('호칭이 없으면 정하는 자리만 내고 빈 것을 말하지 않는다', () => {
     render(<MeBody user={USER} card={CARD} videos={[]} matches={[]} />)
-    expect(screen.getByText('아직 정한 호칭이 없습니다.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '호칭 정하기' })).toBeInTheDocument()
+    expect(screen.queryByText(/호칭이 없습니다/)).toBeNull()
   })
 
-  it('소속 팀이 없으면 그렇게 알려준다', () => {
+  it('소속 팀이 없으면 한 줄로만 알려준다', () => {
     render(<MeBody user={USER} card={CARD} videos={[]} matches={[]} />)
-    // 🔴 「없습니다」로 끝내지 않는다 — 팀이 없으면 스쿼드·경기 신청이 다 막힌다.
-    expect(screen.getByText(/아직 소속된 팀이 없습니다/)).toBeInTheDocument()
-    expect(screen.getByText(/팀을 만들어야/)).toBeInTheDocument()
+    // 🔴 여기서도 「팀 만들기」 단추가 바로 아래에 있어 같은 말을 두 번 안 한다.
+    expect(screen.getByText('아직 소속된 팀이 없습니다.')).toBeInTheDocument()
+    expect(screen.queryByText(/팀을 만들어야/)).toBeNull()
   })
 
   // 프로필은 '보여주는' 화면이다 — 입력칸이 늘 떠 있으면 설정 화면이 된다.
@@ -199,20 +201,58 @@ describe('내 프로필 — /me', () => {
     return els[0].getAttribute('src')
   }
 
+  /**
+   * 갈래를 바꾸고 **다 바뀔 때까지 기다린다**.
+   *
+   * 🔴 누른 직후에는 아직 **옛 갈래가 그려져 있다**(2026-09-16, 사용자 요청으로
+   * 넣은 연출). 판이 오른쪽으로 물러난 뒤에 내용이 갈리기 때문이다 — 알약만
+   * 먼저 켜진다. 물러남이 끝났다는 신호(`data-leaving` 이 지워짐)를 기다린다.
+   */
+  async function toTab(name: RegExp | string) {
+    fireEvent.click(screen.getByRole('tab', { name }))
+    await waitFor(() =>
+      expect(document.querySelector('.ss-profile-swap')).not.toHaveAttribute('data-leaving'),
+    )
+  }
+
   // 🔴 한 번에 한 편만 그린다 — 목록이 아니다.
-  it('한 편만 보이고, 알약을 바꾸면 그 갈래의 영상이 나온다', () => {
+  it('한 편만 보이고, 알약을 바꾸면 그 갈래의 영상이 나온다', async () => {
     const { container } = render(<MeBody user={USER} card={CARD} videos={VIDEOS} matches={[]} />)
     // 분석 영상 갈래에는 v1 하나뿐이다.
     expect(shownVideo(container)).toBe('/a.mp4')
 
-    fireEvent.click(screen.getByRole('tab', { name: /업로드 영상/ }))
+    await toTab(/업로드 영상/)
 
     expect(shownVideo(container)).toBe('/b.mp4')
   })
 
-  it('다음 · 이전 단추로 같은 갈래의 영상을 넘긴다', () => {
+  /* 🔴 **먼저 물러나고 그 뒤에 갈린다**(2026-09-16, 사용자 요청: "두개 왔다
+     갔다 클릭할 때 너무 사라지고 나오는게 부자연스러워"). 누르자마자 갈아
+     끼우면 옛 내용이 그 자리에서 사라지고 새것이 툭 나타난다 — 그 툭을
+     없애려고 넣었다.
+
+     🔴 **알약은 바로 켜진다.** 내용까지 기다리면 눌러도 반응이 없는 것처럼
+     읽힌다 — 누른 자리가 먼저 답하고 내용이 따라온다. */
+  it('알약을 누르면 판이 먼저 물러나고, 그 사이 내용은 아직 옛 갈래다', async () => {
     const { container } = render(<MeBody user={USER} card={CARD} videos={VIDEOS} matches={[]} />)
+
     fireEvent.click(screen.getByRole('tab', { name: /업로드 영상/ }))
+
+    expect(container.querySelector('.ss-profile-swap')).toHaveAttribute('data-leaving', 'true')
+    expect(screen.getByRole('tab', { name: /업로드 영상/ })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    expect(shownVideo(container)).toBe('/a.mp4')
+
+    // 다 물러난 뒤에 갈리고, 물러남 표시도 지워진다(그래야 제자리로 돌아온다).
+    await waitFor(() => expect(shownVideo(container)).toBe('/b.mp4'))
+    expect(container.querySelector('.ss-profile-swap')).not.toHaveAttribute('data-leaving')
+  })
+
+  it('다음 · 이전 단추로 같은 갈래의 영상을 넘긴다', async () => {
+    const { container } = render(<MeBody user={USER} card={CARD} videos={VIDEOS} matches={[]} />)
+    await toTab(/업로드 영상/)
 
     expect(screen.getByText('1 / 2')).toBeInTheDocument()
     expect(shownVideo(container)).toBe('/b.mp4')
@@ -229,9 +269,9 @@ describe('내 프로필 — /me', () => {
   })
 
   // 🔴 넘기는 단추가 앞뒤로만 가는 데 비해, 목록은 바로 고르게 한다.
-  it('선 아래 목록에서 영상을 바로 고른다', () => {
+  it('선 아래 목록에서 영상을 바로 고른다', async () => {
     const { container } = render(<MeBody user={USER} card={CARD} videos={VIDEOS} matches={[]} />)
-    fireEvent.click(screen.getByRole('tab', { name: /업로드 영상/ }))
+    await toTab(/업로드 영상/)
     expect(shownVideo(container)).toBe('/b.mp4')
 
     fireEvent.click(screen.getByRole('button', { name: '2번째 영상' }))
@@ -265,11 +305,11 @@ describe('내 프로필 — /me', () => {
     expect(screen.getByText(/해상도가 상한을 넘습니다/)).toBeInTheDocument()
   })
 
-  it('갈래가 비어 있으면 그 갈래에 맞게 알려준다', () => {
+  it('갈래가 비어 있으면 그 갈래에 맞게 알려준다', async () => {
     render(<MeBody user={USER} card={CARD} videos={[]} matches={[]} />)
     expect(screen.getByText('아직 업로드한 영상이 없습니다.')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('tab', { name: /분석 영상/ }))
+    await toTab(/분석 영상/)
     expect(screen.getByText('아직 분석한 영상이 없습니다.')).toBeInTheDocument()
   })
 
