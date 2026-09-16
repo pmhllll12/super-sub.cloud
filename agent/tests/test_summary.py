@@ -271,6 +271,48 @@ def test_the_bullet_is_the_sentence_the_rubric_wrote(key, grade):
         assert note in written, f"루브릭이 안 쓴 문장이 카드에 있다: {note}"
 
 
+# -- 아쉬운 항목은 추천 카드에 안 적는다 (2026.09.16 결정) -------------------
+#
+#    이 카드는 **남이 보는 화면**이고 묻는 것은 「이 선수를 부를까」다. 사람 이름
+#    옆의 약점 한 줄은 그 판단에 보태기보다 **사람을 규정하는 쪽**으로 읽힌다.
+#    본인 리포트에는 그대로 있다 — 거기서는 코칭이지 낙인이 아니다.
+
+
+@pytest.mark.parametrize("key", sorted(RUBRICS))
+def test_the_card_names_only_the_best_grade_it_found(key):
+    """🔴 아쉬운 항목이 추천 카드에 섞이는 것을 막는다.
+
+    예전에는 **가장 낮은 항목**을 일부러 한 줄 적었다(「…은 아직 아쉽습니다」).
+    등급이 갈린 판정으로 재야 무는 검사다 — 전부 같은 등급이면 위아래가 같아서
+    무엇을 골랐든 통과한다.
+    """
+    rubric = RUBRICS[key]
+    n = len(rubric.criteria)
+    grades = [2, 1, 0] + [1] * (n - 3)
+    got, result = _card(rubric, grades)
+    top = max(int(b["grade"]) for b in result["breakdown"])
+    said = {c.card_line_for(top).strip() for c in rubric.criteria}
+    for note in got["notes"]:
+        assert note in said, f"가장 잘한 등급이 아닌 항목이 카드에 있다: {note}"
+
+
+@pytest.mark.parametrize("key", sorted(RUBRICS))
+def test_a_card_without_a_strength_still_speaks_but_calls_it_nothing(key):
+    """🔴 2등급이 없어도 **비우지 않는다** — 그 선수에게서 가장 나은 항목을 적는다.
+
+    실측으로는 드물다(축구 18편 중 1편). 그렇다고 빈 카드를 내보내면 화면은
+    **분석이 없는 것**과 구분하지 못한다.
+
+    🔴 다만 **1등급을 「강점」이라 부르지 않는다** — `summarize` 와 같은 규칙이고,
+    그 선을 넘으면 카드가 못한 것을 잘한 것으로 옮겨 적기 시작한다.
+    """
+    rubric = RUBRICS[key]
+    got, _ = _card(rubric, [1] * len(rubric.criteria))
+    assert got["notes"], "가장 나은 항목조차 안 적었다"
+    assert got["title"] is None, "2등급이 없는데 수식어가 걸렸다"
+    assert "강점" not in " ".join(got["notes"])
+
+
 @pytest.mark.parametrize("key", sorted(RUBRICS))
 def test_the_card_still_speaks_without_a_rubric(key):
     """루브릭 없이 `breakdown` 만 들고 불려도 돌아야 한다 (평가·재현 경로).

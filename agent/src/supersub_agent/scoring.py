@@ -674,7 +674,21 @@ def card(breakdown: list[dict[str, Any]],
     | | |
     |---|---|
     | `title` | **가장 잘한 항목의 칭호.** 🔴 `title_earned` 가 참일 때만 — 안 그러면 0등급의 「무너지는 축」이 수식어로 걸린다(`paik` 23번) |
-    | `notes` | 강점 한 줄 · 아쉬운 점 한 줄. **없으면 안 만든다** — 둘을 채우려고 지어내지 않는다 |
+    | `notes` | **가장 잘한 등급의 항목만** 최대 두 줄, 가중치 큰 것부터 |
+
+    🔴 **아쉬운 항목을 여기 적지 않는다** (2026.09.16 결정). 이 카드는 **남이
+    보는 화면**이고 묻는 것은 「이 선수를 부를까」다. 사람 이름 옆에 붙는 약점
+    한 줄은 그 판단에 보태는 것보다 **사람을 규정하는 쪽**으로 읽힌다 — 못 받은
+    칭호를 수식어로 달지 않기로 한 것(`paik` 23번)과 같은 자리다. **본인
+    리포트에는 그대로 있다** — 거기서는 아쉬운 항목이 코칭이지 낙인이 아니다.
+
+    🔴 **그래도 비우지는 않는다.** 2등급이 하나도 없으면 **그 선수에게서 가장
+    나은 등급의 항목**을 적는다. 실측으로는 드물다 — 축구 18편에서 2등급을
+    하나라도 가진 편이 **17편**(나머지 1편은 최고가 1등급, 0등급이 최고인 편은
+    없었다). 편당 2등급 개수는 중앙값 2라 **두 줄을 강점으로만 채울 수 있다.**
+
+    🔴 **1등급을 「강점」이라 부르지 않는다** (`summarize` 와 같은 규칙). 가장
+    나은 등급이 2등급이 아니면 문장은 **그 등급의 문장**이지 칭찬이 아니다.
 
     🔴 **불릿 문장은 루브릭이 등급마다 적어 둔 `card_lines` 다** (2026.09.16).
     코드가 짓던 틀(「…가 이번 동작의 강점입니다」)은 항목 이름만 갈아 끼우는
@@ -701,7 +715,7 @@ def card(breakdown: list[dict[str, Any]],
                 str(item["criterion_id"]))
 
     ordered = sorted(breakdown, key=rank)
-    worst, best = ordered[0], ordered[-1]
+    best = ordered[-1]
 
     # 🔴 받은 칭호만 수식어가 된다. 못 받았으면 **비운다** — 화면이 이름 아래에
     #    아무것도 안 그리는 편이, 아쉬운 항목의 칭호를 자랑처럼 다는 것보다 낫다.
@@ -719,19 +733,31 @@ def card(breakdown: list[dict[str, Any]],
             return fallback
         return criterion.card_line_for(int(item["grade"])).strip() or fallback
 
-    notes: list[str] = []
-    if int(best["grade"]) == MAX_GRADE:
-        # 🔴 수식어(칭호)를 불릿에서 **다시 말하지 않는다** — 화면이 둘을 나란히
-        #    그리므로 같은 말이 두 번 보인다. 여기는 **항목 이름**으로 적는다.
-        notes.append(line(best, f"{_with_particle(best['name'], '이', '가')} "
-                                "이번 동작의 강점입니다"))
-    if int(worst["grade"]) < MAX_GRADE and worst["criterion_id"] != best["criterion_id"]:
-        notes.append(line(worst,
-                          f"{_with_particle(worst['name'], '은', '는')} 아직 아쉽습니다"))
-    if not notes:
-        # 갈리지 않았다 — 갈린 척하지 않는다(`summarize` 와 같은 규칙).
-        notes.append(line(worst, f"{_with_particle(worst['name'], '은', '는')} "
-                                 f"「{worst['title']}」{_ro(worst['title'])} 나왔습니다"))
+    # 🔴 **가장 잘한 등급에 있는 항목만** 고른다. 그 아래 등급은 이 카드에
+    #    안 나온다 — 아쉬운 항목은 본인 리포트의 몫이다(위 표).
+    top_grade = int(best["grade"])
+    picked = sorted(
+        (it for it in breakdown if int(it["grade"]) == top_grade),
+        # 가중치가 큰 것부터 — 이 동작에서 더 중요한 항목이 먼저 보인다.
+        key=lambda it: (-float(it.get("weight") or 0.0), str(it["criterion_id"])),
+    )
+
+    def fallback(item: dict[str, Any]) -> str:
+        """루브릭이 문장을 안 줬을 때 코드가 짓는 틀.
+
+        🔴 **2등급이 아니면 「강점」이라 부르지 않는다** (`summarize` 와 같은
+        규칙). 그 자리는 그저 **이 선수에게서 가장 나은 항목**이지 잘한 것이
+        아니다.
+        """
+        if top_grade == MAX_GRADE:
+            # 🔴 수식어(칭호)를 불릿에서 **다시 말하지 않는다** — 화면이 둘을
+            #    나란히 그리므로 같은 말이 두 번 보인다. 여기는 **항목 이름**이다.
+            return f"{_with_particle(item['name'], '이', '가')} 이번 동작의 강점입니다"
+        return (f"{_with_particle(item['name'], '은', '는')} "
+                f"「{item['title']}」{_ro(item['title'])} 나왔습니다")
+
+    # 두 줄까지다. 하나뿐이면 하나만 — 채우려고 아래 등급을 끌어오지 않는다.
+    notes = [line(it, fallback(it)) for it in picked[:2]]
     return {"title": title, "notes": notes}
 
 
