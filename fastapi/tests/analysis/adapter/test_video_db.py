@@ -91,7 +91,9 @@ def uploader(db_client):
     }
 
 
-def _upload(db_client, uploader, size_bytes=SIZE_OK, filename="clip.mp4"):
+def _upload(
+    db_client, uploader, size_bytes=SIZE_OK, filename="clip.mp4", content_hash=None
+):
     res = db_client.post(
         f"{V1}/videos/upload-url",
         json={
@@ -103,7 +105,7 @@ def _upload(db_client, uploader, size_bytes=SIZE_OK, filename="clip.mp4"):
     )
     assert res.status_code == 200, res.text
     key = res.json()["storage_key"]
-    put_object(key, size_bytes)
+    put_object(key, size_bytes, content_hash=content_hash)
     return key
 
 
@@ -250,6 +252,88 @@ class TestRegister:
         """위 검사의 양성 대조. 둘이 같이 있어야 "종목을 실제로 읽는다"가 된다."""
         key = _upload(db_client, uploader)
         assert _register(db_client, uploader, key, sport_code="baseball").status_code == 201
+
+
+class TestDuplicateDetection:
+    """`ho` 41번 — 진짜 PostgreSQL로 "새 작업을 안 만든다"까지 확인한다.
+
+    계약 테스트(`test_video_router.py`)는 스텁이라 `analysis_job` 행이 실제로
+    생기는지/안 생기는지를 못 본다 — 여기서 그것을 본다.
+    """
+
+    HASH = "deadbeef" * 4
+
+    def _finish(self, db_session, video_id, *, status, failure_reason=None):
+        db_session.execute(
+            text(
+                "UPDATE analysis_job SET status = :s, failure_reason = :r "
+                "WHERE video_id = :id"
+            ),
+            {"s": status, "r": failure_reason, "id": video_id},
+        )
+        db_session.commit()
+
+    def test_같은_사람이_같은_내용을_다시_올리면_작업_행이_새로_안_생긴다(
+        self, db_client, db_session, uploader
+    ):
+        key1 = _upload(db_client, uploader, content_hash=self.HASH)
+        video1_id = uuid.UUID(_register(db_client, uploader, key1).json()["id"])
+        reason = "품질 게이트 미달: 유효 프레임 비율 53% < 기준 70%."
+        self._finish(db_session, video1_id, status="failed", failure_reason=reason)
+
+        key2 = _upload(db_client, uploader, filename="clip2.mp4", content_hash=self.HASH)
+        res = _register(db_client, uploader, key2)
+        assert res.status_code == 201, res.text
+        body = res.json()
+        video2_id = uuid.UUID(body["id"])
+        assert body["analysis_job_id"] is None
+        assert body["duplicate_of_video_id"] == str(video1_id)
+        assert body["duplicate_status"] == "failed"
+        assert body["duplicate_failure_reason"] == reason
+
+        jobs = db_session.execute(
+            text("SELECT count(*) FROM analysis_job WHERE video_id = :id"),
+            {"id": video2_id},
+        ).scalar_one()
+        assert jobs == 0
+
+    def test_다시_읽으면_이_영상_자신은_작업이_없다고_정직하게_나온다(
+        self, db_client, db_session, uploader
+    ):
+        """빌려온 결과는 등록 응답 한 번뿐이다 — `GET /videos`는 그 값을 안 들고 있다.
+
+        중복도 「작업이 있던 것」과 같은 취급이라(`kept=False`) 기본 목록에
+        보이려면 다른 분석-완료 클립처럼 「내 프로필에 저장」을 눌러야 한다.
+        """
+        key1 = _upload(db_client, uploader, content_hash=self.HASH)
+        video1_id = uuid.UUID(_register(db_client, uploader, key1).json()["id"])
+        self._finish(db_session, video1_id, status="succeeded")
+
+        key2 = _upload(db_client, uploader, filename="clip2.mp4", content_hash=self.HASH)
+        video2_id = uuid.UUID(_register(db_client, uploader, key2).json()["id"])
+        keep = db_client.post(
+            f"{V1}/videos/{video2_id}/keep", headers=uploader["headers"]
+        )
+        assert keep.status_code == 200, keep.text
+
+        rows = db_client.get(f"{V1}/videos", headers=uploader["headers"]).json()
+        row = next(r for r in rows if r["id"] == str(video2_id))
+        assert row["analysis_status"] is None
+        assert row["duplicate_of_video_id"] == str(video1_id)
+        assert row["duplicate_status"] is None
+
+    def test_끝나지_않은_동일_내용은_새_작업을_만든다(
+        self, db_client, db_session, uploader
+    ):
+        """`queued`인 것을 빌리면 안 끝난 결과를 답으로 주게 된다 — 대상에서 뺀다."""
+        key1 = _upload(db_client, uploader, content_hash=self.HASH)
+        _register(db_client, uploader, key1)  # 완료 처리 안 함 — queued 그대로
+
+        key2 = _upload(db_client, uploader, filename="clip2.mp4", content_hash=self.HASH)
+        res = _register(db_client, uploader, key2)
+        body = res.json()
+        assert body["analysis_job_id"] is not None
+        assert body["duplicate_of_video_id"] is None
 
 
 class TestVisibility:

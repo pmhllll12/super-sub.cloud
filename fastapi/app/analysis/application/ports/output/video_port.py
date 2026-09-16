@@ -13,7 +13,11 @@ from uuid import UUID
 from abc import ABC, abstractmethod
 
 from app.analysis.application.dtos.video_dto import UNSET, UserRef
-from app.analysis.domain.entities.video_entity import CardGradeRow, VideoEntity
+from app.analysis.domain.entities.video_entity import (
+    CardGradeRow,
+    PriorAnalysisOutcome,
+    VideoEntity,
+)
 
 
 class VideoPort(ABC):
@@ -160,4 +164,16 @@ class VideoPort(ABC):
     def admin_delete(self, video_id: UUID) -> VideoEntity | None:
         """소유 검사 없이 영상 행을 지운다(관리자 전용). 연쇄·반환값은 `delete`
         와 같다. 없는 클립이면 `None`.
+        """
+
+    @abstractmethod
+    def find_prior_outcome(
+        self, user_id: UUID, content_hash: str
+    ) -> PriorAnalysisOutcome | None:
+        """그 사용자가 올린 같은 내용(`content_hash`)의 영상 중, 「이 사람으로
+        분석」·「집중해서 볼 항목」 지정 없이(자동 선택 경로) 분석까지 끝난
+        것 중 가장 최근 결과(`ho` 41번, 중복 업로드 재사용).
+
+        🔴 지정이 있는 작업은 대상에서 뺀다 — 같은 영상이어도 어느 사람을
+        보라고 골랐는지가 다르면 측정 결과가 다를 수 있다. 없으면 `None`.
         """

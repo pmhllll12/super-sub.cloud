@@ -50,4 +50,7 @@ def to_video_result(video: VideoEntity) -> VideoResult:
         title=video.title,
         description=video.description,
         kept=video.kept,
+        duplicate_of_video_id=video.duplicate_of_video_id,
+        duplicate_status=video.duplicate_status,
+        duplicate_failure_reason=video.duplicate_failure_reason,
     )

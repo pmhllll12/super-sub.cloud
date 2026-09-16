@@ -1697,7 +1697,10 @@ false` 기록용 업로드에는 걸지 않는다 — 그 클립은 워커를 �
   "is_featured": false,
   "title": null,
   "description": null,
-  "kept": false
+  "kept": false,
+  "duplicate_of_video_id": null,
+  "duplicate_status": null,
+  "duplicate_failure_reason": null
 }
 ```
 
@@ -1739,6 +1742,30 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
 
 **저장 키에 업로더가 들어 있다**(`videos/<user_id>/<uuid>.<확장자>`). 등록할 때 그
 접두사를 대조하므로 남이 올린 객체를 자기 영상으로 등록할 수 없다.
+
+#### 같은 내용을 다시 올리면 — `duplicate_of_video_id` (`ho` 41번, 2026-09-16)
+
+실서버에서 같은 영상이 게이트 미달로 아홉 번 재업로드된 사례가 나왔다 —
+분석이 결정론적이라 다시 돌려도 같은 결과가 나오는데 안내가 없어 GPU·S3만
+낭비했다. 그래서 등록할 때 **같은 사용자**가 올린 **같은 내용**(서버가 S3
+객체로 판별)의 영상 중 분석까지 끝난 것(성공·실패 무관)이 있으면 **새
+작업을 만들지 않고** 그 결과를 이 응답에 실어 알려준다.
+
+- `duplicate_of_video_id`: 결과를 빌려온 원본 영상의 id. 중복이 아니면 `null`
+- `duplicate_status`: 그 원본의 마지막 분석 상태(`succeeded`·`failed`). 자세히
+  보려면 이 값과 `duplicate_of_video_id`로 `GET /videos/{id}/report`를 부른다
+- `duplicate_failure_reason`: 실패였을 때만 그 사유. 성공이면 `null`
+
+🔴 **이 셋은 등록 응답 한 번에만 실린다.** 이 영상 자신은 작업을 아예 안
+만들었으므로(`analysis_job_id: null`), 나중에 `GET /videos`로 다시 읽으면
+`analysis_status`는 정직하게 `null`이고 `duplicate_status`·`duplicate_
+failure_reason`도 `null`이다 — `duplicate_of_video_id`만 그대로 남는다.
+등록 직후 이 응답을 놓치지 말고 화면에 반영해야 한다.
+
+「이 사람으로 분석」(`subject_box`)·「집중해서 볼 항목」(`focus`)을 지정하면
+같은 영상이어도 측정 대상이 달라질 수 있어 **중복 판단 대상에서 뺀다**(항상
+새 작업을 만든다). 중복으로 처리된 클립도 「작업이 생긴 클립」과 같은
+`kept: false`로 시작한다 — `POST /videos/{id}/keep`을 불러야 프로필에 남는다.
 
 ### `GET /api/v1/videos`
 

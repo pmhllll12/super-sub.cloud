@@ -146,9 +146,31 @@ class RegisterVideoInteractor(RegisterVideoUseCase):
             analyze=command.analyze,
         )
         now = datetime.now(timezone.utc)
+
+        # 재업로드 감지(`ho` 41번) — 규격을 통과한, 실제로 분석할 클립만
+        # 본다. 「이 사람으로 분석」·「집중해서 볼 항목」을 지정하면 같은
+        # 영상이어도 측정 대상이 달라질 수 있어 대상에서 뺀다.
+        content_hash = self._storage.content_hash_of(command.storage_key)
+        prior = None
+        if (
+            reason is None
+            and command.analyze
+            and content_hash is not None
+            and command.subject_box is None
+            and not command.focus
+        ):
+            prior = self._repository.find_prior_outcome(
+                command.user_id, content_hash
+            )
+
         # 반려된 클립은 분석하지 않는다(규격 검사를 두는 이유). `analyze=False` 면
         # 규격은 통과해도 작업을 만들지 않는다 — 기록용 업로드(미결 `paik` 4번).
-        make_job = reason is None and command.analyze
+        # 같은 내용을 이미 분석해 본 적이 있으면(`prior`) 새 작업도 안 만든다 —
+        # 결정론적 파이프라인이라 같은 파일은 다시 돌려도 같은 결과다.
+        make_job = reason is None and command.analyze and prior is None
+        # 「이미 결과가 있다」도 「작업이 있다」와 같은 취급이다 — 임시 상태로
+        # 뒀다가 사용자가 「내 프로필에 저장」을 눌러야 영구가 된다.
+        has_outcome = make_job or prior is not None
         video = VideoEntity(
             id=uuid4(),
             user_id=command.user_id,
@@ -175,11 +197,12 @@ class RegisterVideoInteractor(RegisterVideoUseCase):
             # (브라우저가 죽는 등) `provisional_video_ttl_hours` 백스톱이
             # 지운다 — 분석에 실패해 다시 볼 리포트가 없는 클립이 여기 걸린다.
             #
-            # 🔴 `not command.analyze` 가 아니라 `not make_job` 이다 —
+            # 🔴 `not command.analyze` 가 아니라 `not has_outcome` 이다 —
             # `analyze=True` 인데 반려된 클립까지 임시로 두면 방금 반려된
             # 사유를 보여준 그 클립이 목록에서 곧장 사라진다(`_by_user` 의
-            # `kept_only=True` 필터, `test_반려_사유가_목록에도_온다`).
-            kept=not make_job,
+            # `kept_only=True` 필터, `test_반려_사유가_목록에도_온다`). 이미
+            # 결과를 재사용한 중복도 같은 이유로 임시다(`ho` 41번).
+            kept=not has_outcome,
             original_filename=command.original_filename,
             # 미결 `paik` 6번. 작업을 안 만들면(반려·`analyze=False`) 저장소가
             # 버린다 — 담을 `analysis_job` 행이 없다. 지정이 없을 때 실패로
@@ -187,6 +210,10 @@ class RegisterVideoInteractor(RegisterVideoUseCase):
             subject_box=command.subject_box if make_job else None,
             subject_at_ms=command.subject_at_ms if make_job else None,
             focus=command.focus if make_job else None,
+            content_hash=content_hash,
+            duplicate_of_video_id=prior.video_id if prior else None,
+            duplicate_status=prior.status if prior else None,
+            duplicate_failure_reason=prior.failure_reason if prior else None,
         )
         self._repository.register(video)
         return to_video_result(video)

@@ -2012,6 +2012,37 @@ grep -n "aspect.*16.*9\|aspect: '16" www/src/lib/feed.ts
 
 ---
 
+## 48. `POST /videos` 응답에 `duplicate_of_video_id`·`duplicate_status`·`duplicate_failure_reason`이 실립니다 (2026-09-16 추가, `ho` 41번)
+
+같은 사람이 같은 내용의 영상을 다시 올리면(예: 게이트 미달로 떨어진 영상을
+그대로 재업로드) 서버가 **새 분석 작업을 안 만들고** 이전 결과를 이 응답에
+바로 실어 줍니다 — `analysis_job_id`는 `null`입니다.
+
+### 만족해야 할 성질
+
+등록 직후 `duplicate_of_video_id`가 있으면 **"이 영상은 앞서 같은 이유로
+분석되지 않았습니다"** 류의 안내를 그 자리에서 보여줄 것. `duplicate_status`가
+`"failed"`면 `duplicate_failure_reason`(에이전트 사유 문구, 정상호 몫)을 같이
+보여주고, `"succeeded"`면 이미 성공했다는 사실만 알리거나 `duplicate_of_video_id`로
+`GET /videos/{id}/report`를 불러 그 결과를 보여줘도 됩니다.
+
+### 🔴 하지 말 것
+
+- 재업로드 자체를 막지 마십시오 — 촬영을 다시 해서 올린 것일 수 있습니다.
+  이건 **안내**지 차단이 아닙니다.
+- 이 셋은 **등록 응답에만** 실립니다. 나중에 `GET /videos`로 같은 영상을
+  다시 읽으면 셋 다 `duplicate_of_video_id`를 빼고 전부 `null`입니다(그
+  영상 자신은 애초에 작업이 없어서 `analysis_status`도 `null`) — 이 응답을
+  놓치면 다시 볼 방법이 `duplicate_of_video_id`를 따라가는 것뿐이니, 화면에
+  받는 즉시 반영해 주십시오.
+- 「이 사람으로 분석」·「집중해서 볼 항목」을 지정해서 올린 경우는 대상에서
+  빠집니다(항상 새로 분석합니다) — 그런 업로드에서 이 필드들이 안 와도
+  버그가 아닙니다.
+
+상세: `fastapi/docs/api-contract.md`(영상 등록 절)
+
+---
+
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린
 것이다. 새로 붙이는 화면이 있으면 계약 문서 쪽을 본다.
 

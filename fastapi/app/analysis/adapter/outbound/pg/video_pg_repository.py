@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import column, func, select, table, update
+from sqlalchemy import Text, cast, column, func, or_, select, table, update
 from sqlalchemy.orm import Session
 
 from app.analysis.adapter.outbound.orm.analysis_job_orm import AnalysisJobOrm
@@ -26,10 +26,11 @@ from app.analysis.application.dtos.video_dto import UNSET, UserRef
 from app.analysis.application.ports.output.video_port import VideoPort
 from app.analysis.domain.entities.video_entity import (
     CardGradeRow,
+    PriorAnalysisOutcome,
     ValidationEntity,
     VideoEntity,
 )
-from app.analysis.domain.rules.job_rules import ANALYZE
+from app.analysis.domain.rules.job_rules import ANALYZE, FAILED, SUCCEEDED
 
 # 소유하지 않는 테이블에서 **읽기만** 한다. 위 docstring 참조.
 _sport = table("sport", column("code"))
@@ -93,6 +94,8 @@ class VideoPgRepository(VideoPort):
                 kept=video.kept,
                 original_filename=video.original_filename,
                 created_at=video.created_at,
+                content_hash=video.content_hash,
+                duplicate_of_video_id=video.duplicate_of_video_id,
             )
         )
         # 🔴 `flush()` 로 순서를 고정한다. 판정과 작업이 `video.id` 를 참조하므로
@@ -292,6 +295,47 @@ class VideoPgRepository(VideoPort):
             return None
         return self._delete(video)
 
+    def find_prior_outcome(
+        self, user_id: UUID, content_hash: str
+    ) -> PriorAnalysisOutcome | None:
+        # 🔴 `.is_(None)` 만으로는 안 걸린다. `subject_box`·`focus`는 SQLAlchemy
+        # `JSON` 타입이라 지정 없이 등록한 값도 SQL `NULL`이 아니라 **JSON
+        # `null` 리터럴**로 저장된다(`none_as_null` 기본값). 그래서 텍스트로
+        # 캐스팅해 둘 다 잡는다 — 저장 방식이 앞으로 바뀌어도(`NULL`로만
+        # 저장되게 고치는 등) 이 조건은 그대로 맞는다.
+        no_subject_box = or_(
+            AnalysisJobOrm.subject_box.is_(None),
+            cast(AnalysisJobOrm.subject_box, Text) == "null",
+        )
+        no_focus = or_(
+            AnalysisJobOrm.focus.is_(None),
+            cast(AnalysisJobOrm.focus, Text) == "null",
+        )
+        row = self._session.execute(
+            select(
+                AnalysisJobOrm.video_id,
+                AnalysisJobOrm.status,
+                AnalysisJobOrm.failure_reason,
+            )
+            .join(VideoOrm, VideoOrm.id == AnalysisJobOrm.video_id)
+            .where(
+                VideoOrm.user_id == user_id,
+                VideoOrm.content_hash == content_hash,
+                AnalysisJobOrm.status.in_((SUCCEEDED, FAILED)),
+                no_subject_box,
+                no_focus,
+            )
+            .order_by(AnalysisJobOrm.created_at.desc())
+            .limit(1)
+        ).first()
+        if row is None:
+            return None
+        return PriorAnalysisOutcome(
+            video_id=row.video_id,
+            status=row.status,
+            failure_reason=row.failure_reason,
+        )
+
     def _delete(self, video: VideoOrm) -> VideoEntity:
         entity = _to_entity(video, None, None)  # S3 정리에 storage_key 만 필요
         self._session.delete(video)  # FK ON DELETE CASCADE 가 자식을 정리한다
@@ -464,4 +508,6 @@ def _to_entity(
         analysis_job_id=None if job is None else job.id,
         analysis_status=None if job is None else job.status,
         analysis_failure_reason=None if job is None else job.failure_reason,
+        content_hash=video.content_hash,
+        duplicate_of_video_id=video.duplicate_of_video_id,
     )

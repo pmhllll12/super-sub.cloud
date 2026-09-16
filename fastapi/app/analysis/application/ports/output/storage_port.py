@@ -26,6 +26,17 @@ class StoragePort(ABC):
         """올라온 객체의 크기(바이트). **없으면 None** — 아직 안 올렸다는 뜻이다."""
 
     @abstractmethod
+    def content_hash_of(self, storage_key: str) -> str | None:
+        """올라온 객체의 내용 지문(`ho` 41번, 재업로드 감지). **없으면 None.**
+
+        S3 구현은 `ETag`(단일 PUT 업로드라 MD5)를 그대로 쓴다 — 다운로드 없이
+        이미 `size_of`가 부르는 `HeadObject`로 얻을 수 있다. 멀티파트로 올라간
+        객체처럼 `ETag`가 MD5가 아닌 경우는 **구별할 수단이 없으니 `None`을
+        돌려 안전하게 "모른다"로 처리한다** — 잘못된 지문으로 다른 영상과
+        같다고 오판하는 것보다 낫다.
+        """
+
+    @abstractmethod
     def create_download_url(self, storage_key: str) -> tuple[str, int]:
         """그 키를 **내려받을 수 있는** URL 과 유효 시간(초)을 만든다.
 
