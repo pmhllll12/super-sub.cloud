@@ -36,6 +36,7 @@ class CoachResponse(BaseModel):
     id: UUID
     name: str
     contact: str
+    sport_code: str
 
 
 class CoachListResponse(BaseModel):

@@ -4854,7 +4854,7 @@ import 하지 않고 식만 옮겨 왔습니다(`features.py:544`). 처방을 �
 - **담당**: 정상호 · **제기**: 정상호 · **기한**: ~~표본 메우기 → 처방 선택~~ → **✅ (다) 드러내기는 넣었습니다 (2026.09.10).** 남은 것은 **(가)/(나) 중 무엇으로 고칠지**이고 둘 다 지금은 막혀 있습니다 — (가)는 임계값 이동이라 **지도자 검수(2번·34번)** 뒤, (나)는 **전제가 안 서서** 투구·킥 표본이 생긴 뒤입니다. 🔴 **항목을 닫지 않습니다** — 드러냈을 뿐 고친 것이 아닙니다
 - **후속**: 계약에 필드가 하나 늘어 `jin` 적재가 받아야 합니다 → 아래 **38번**
 
-### 38. `breakdown[]` 에 **필드가 하나 늘었습니다** — `view_dependent` (2026-09-10 신설)
+### 38. `breakdown[]` 에 **필드가 하나 늘었습니다** — `view_dependent` (2026-09-10 신설) ✅ 해소 (2026.09.16 확인 — 실제로는 2026.09.10에 이미 됨)
 
 미결 37번 처방 (다)를 넣으면서 리포트 계약에 필드 하나가 늘었습니다.
 **미리 알립니다** — 계약이 바뀌면 적재 쪽도 함께 봐야 해서요.
@@ -4907,7 +4907,20 @@ import 하지 않고 식만 옮겨 왔습니다(`features.py:544`). 처방을 �
 - 확인: `cd agent && uv run pytest tests/test_report_contract.py -q` (계약 필드 목록을 고정하는 검사가 있습니다) · 실물 한 줄은 `agent/report-contract.md` 의 예시 JSON
 - 하지 말 것: 🔴 **파싱해서 점수를 보정하지 마세요.** 어느 부호가 옳은지 모르는 상태라 보정할 방향이 없습니다
 - 관련: 37번(여기서 나왔습니다) · 20번(`out_of_band` — 같은 형태) · `jin` 27번(봉투 계약)
-- **담당**: 정어진(적재 컬럼 판단) · **제기**: 정상호 · **기한**: 스프린트 3 (급하지 않습니다 — 안 받아도 안 깨집니다)
+- **담당**: ~~정어진(적재 컬럼 판단)~~ **✅ 이미 됨** · **제기**: 정상호 · **기한**: 스프린트 3 (급하지 않습니다 — 안 받아도 안 깨집니다)
+
+#### ✅ 확인만 함 (2026.09.16) — "넣는다" 쪽으로 이미 결정·구현돼 있었습니다
+
+`title_earned`(40번) 작업을 하다가 이 항목을 다시 봤는데, **판단이고 코드고
+전부 이미 끝나 있었습니다**(커밋 `18e1335`, 2026.09.10 — 마이그레이션
+`20260910_criterion_view_dependent.py`). `analysis_metric_criterion.
+view_dependent`(String(10), nullable) 컬럼·파서(`report_parser.py`)·적재
+(`report_ingest_pg_repository.py`)까지 다 있고, **"하지 말 것"(선수 화면에
+안 내기)도 지켜져 있습니다** — `ReportCriterionView`/`ReportCriterionResponse`
+어느 쪽에도 `view_dependent`가 없습니다(개발 확인용으로만 남음).
+
+- 확인: `grep -rn view_dependent app/analysis` → ORM·파서·적재 3곳, 읽기
+  DTO·응답 스키마엔 없음 · `alembic heads` 단일
 
 ### 39. 에이전트를 **축구 단일 종목으로 정리했습니다** — 종목 코드가 남은 곳을 봐 주세요 (2026-09-11 신설)
 
@@ -5027,7 +5040,7 @@ git show bf21391:agent/rubrics/baseball_batting.yaml > agent/rubrics/baseball_ba
 - 확인: `cd www && npx vitest run` → **602 통과**(실패 0) · `npx tsc --noEmit` 깨끗 ·
   eslint 28건(오류 7) **변경 전과 같음**
 
-### 40. `breakdown[]` 에 **필드가 또 하나 늘었습니다** — `title_earned` (2026-09-11 신설)
+### 40. `breakdown[]` 에 **필드가 또 하나 늘었습니다** — `title_earned` (2026-09-11 신설) ✅ 해소 (2026.09.16)
 
 `paik` 23번(「받은 호칭」의 기준)에 답하면서 필드 하나가 늘었습니다. 38번과
 같은 형태라 **미리 알립니다.**
@@ -5062,7 +5075,24 @@ git show bf21391:agent/rubrics/baseball_batting.yaml > agent/rubrics/baseball_ba
 - 확인: `cd agent && uv run pytest tests/test_report_contract.py tests/test_scoring.py -q` · 실물 한 줄은 `agent/report-contract.md` 의 예시 JSON
 - 하지 말 것: 🔴 거짓을 **미달 표식으로 그리지 마세요**(계약 4장) — 흐린 칭호·자물쇠·「미달」 전부 해당합니다. **안 그리는 것이 맞습니다**
 - 관련: `paik` 23번(여기서 나왔습니다) · 같은 구역 38번(같은 형태·같은 판단) · `jin` 27번(봉투 계약)
-- **담당**: 정어진(적재 컬럼 판단) · 백성검(화면 규칙을 `title_earned` 로) · **제기**: 정상호 · **기한**: 스프린트 3
+- **담당**: ~~정어진(적재 컬럼 판단)~~ **✅ 완료** · 백성검(화면 규칙을 `title_earned` 로) · **제기**: 정상호 · **기한**: 스프린트 3
+
+#### ✅ 완료 (2026.09.16, 정어진) — 38번과 달리 "넣는다"로 새로 넣었습니다
+
+`analysis_metric_criterion.title_earned`(boolean, nullable — 마이그레이션
+`5e91b4a7c3d8`) 추가. 38번(`view_dependent`)과 달리 이건 **선수 화면이
+실제로 쓰는 값**이라 읽기 경로에도 열었습니다 — `GET /videos/{id}/report`의
+`breakdown[]`에 `title_earned`가 실립니다. `skipped` 항목과 이 필드가
+생기기 전 적재분은 `null`(`False`로 안 지어냄 — `or None` 대신
+`.get("title_earned")`를 그대로 써서 실제 `False` 값이 사라지지 않게
+했습니다).
+
+- 확인: `alembic heads`/`check` 클린 · `pytest -q` 전체 통과(파서·적재·
+  읽기 3층 테스트 추가, 실제 PostgreSQL로 `True`/`False`/`null` 세 값
+  전부 왕복 확인)
+- 반영: `docs/api-contract.md`(리포트 조회 절)·`docs/client-contract-
+  changes.md`(47번)
+- 남은 것: 백성검 화면 쪽(`title` 유무 대신 `title_earned`로 판단 바꾸기)
 
 ### 41. **같은 영상을 아홉 번 다시 올려 아홉 번 같은 이유로 떨어졌습니다** (2026-09-11 신설)
 
@@ -8080,7 +8110,7 @@ PATCH /internal/analysis-jobs/{job_id}
 
 - **위치**: `pending-archive.markdown`의 `## paik` 구역으로 이동됨
 
-### 14. `coach` 에 종목 컬럼이 없습니다 — `market/coaches` 를 실제 데이터로 못 채웁니다 (2026-09-08 신설)
+### 14. `coach` 에 종목 컬럼이 없습니다 — `market/coaches` 를 실제 데이터로 못 채웁니다 (2026-09-08 신설) ✅ 해소 (2026.09.16)
 
 패킷 A(과금)를 만들면서 확인했습니다. 부록 D 의 `coach` 테이블은 `id`·`name`·
 `contact` 셋뿐이라 종목별로 코치를 거르는 지금 화면(`market/coaches`, 종목
@@ -8114,12 +8144,27 @@ PATCH /internal/analysis-jobs/{job_id}
 급하지 않다고 하셨으니 그 작업과 묶어서 하셔도 되고, 필요하시면 이 컬럼만 먼저
 넣으셔도 됩니다(선택은 정어진 님께 맡깁니다).
 
-- 관련: `fastapi/docs/backend-work-split.md` 「패킷 A」 · 부록 D ⑥ 과금 · `fastapi/docs/client-contract-changes.md` 19번
-- **담당**: 정어진(부록 D `coach.sport_code` 마이그레이션 + `market/coaches` API 반영) · **제기**: 백성검 · **기한**: 확인되는 대로
+- 관련: `fastapi/docs/backend-work-split.md` 「패킷 A」 · 부록 D ⑥ 과금 · `fastapi/docs/client-contract-changes.md` 45번(19번은 지금 다른 내용이라 참조가 낡아 있었습니다 — 새 번호로 냈습니다)
+- **담당**: ~~정어진(부록 D `coach.sport_code` 마이그레이션 + `market/coaches` API 반영)~~ **✅ 완료** · **제기**: 백성검 · **기한**: 확인되는 대로
+
+#### ✅ 완료 (2026.09.16, 정어진)
+
+`coach.sport_code`(String(20), FK→`sport.code`, NOT NULL — 마이그레이션
+`704781aa7d4e`) 추가. 행이 0건이라 백필 없이 바로 걸었습니다. `GET
+/coaches`·`GET /coaches/{id}` 응답에 `sport_code`가 실리고, `GET
+/coaches?sport_code=football`로 거를 수 있습니다(모르는 종목은 422
+`UNKNOWN_SPORT`). 가격·소개 문장 등 나머지 mock 필드는 그대로 미결로
+남겨 뒀습니다(요청 범위 밖).
+
+- 확인: `alembic heads`/`check` 클린 · `pytest -q tests/billing/
+  tests/test_architecture.py` 37 passed · 실제 PostgreSQL로 FK 위반(모르는
+  종목) 거부, 종목 필터 동작까지 확인
+- 반영: `docs/api-contract.md`(코치 절)·`docs/client-contract-changes.md`
+  (45번, 새 번호로 냄)
 
 [← 표지]({{ "/" | relative_url }})
 
-### 15. 공개 클립 목록에 **화면 비율**이 없어 세로 영상이 잘못 그려집니다 (2026-09-10 신설)
+### 15. 공개 클립 목록에 **화면 비율**이 없어 세로 영상이 잘못 그려집니다 (2026-09-10 신설) ✅ 해소 (2026.09.16)
 
 `GET /videos/public` 한 줄은 `{id, sport_code, duration_ms, created_at, title,
 description}` 입니다. **가로·세로가 없습니다.**
@@ -8138,7 +8183,21 @@ description}` 입니다. **가로·세로가 없습니다.**
 | 하지 말 것 | 🔴 **저장 키를 실어 주지 마세요** — 지금 안 주는 이유(업로더 `user_id` 가 들어 있다)가 그대로 유효합니다. 비율만 있으면 됩니다 |
 
 - 관련: `www/src/lib/feed.ts` · 같은 구역 5번(이 목록을 붙인 회차)
-- **담당**: 정어진 · **제기**: 백성검 · **기한**: 급하지 않음(고장은 아닙니다)
+- **담당**: ~~정어진~~ **✅ 완료** · **제기**: 백성검 · **기한**: 급하지 않음(고장은 아닙니다)
+
+#### ✅ 완료 (2026.09.16, 정어진)
+
+`video.width`·`height`(둘 다 nullable — 마이그레이션 `3f8a1c6d2b90`) 추가.
+등록(`POST /videos`)이 이미 받던 값을 이제 저장하고, `GET /videos/public`
+응답에 그대로 싣습니다. 이 컬럼이 생기기 전 등록분은 둘 다 `null`(0으로
+안 채웠습니다 — `ho` 21번과 같은 판단) — 화면은 그럴 때 기존 16:9 가정을
+그대로 쓰면 됩니다.
+
+- 확인: `alembic heads`/`check` 클린 · `pytest -q tests/analysis/
+  tests/test_architecture.py` 289 passed · 세로 영상(1080×1920)으로 실제
+  PostgreSQL에 등록→공개 목록 조회까지 값이 그대로 오는 것 확인
+- 반영: `docs/api-contract.md`(공개 클립 목록 절)·`docs/client-contract-
+  changes.md`(46번)
 
 ### 16. 공개 클립에 **올린 사람**이 없어 영상 모음이 남의 것을 내 이름으로 그립니다 (2026-09-10 신설) ✅ 해소 (2026.09.15)
 

@@ -29,14 +29,23 @@ Python 3.14 · FastAPI · SQLAlchemy(동기) · PostgreSQL 18 + pgvector · Alem
 .venv/bin/alembic upgrade head && .venv/bin/alembic check
 ```
 
-DB가 필요하다. WSL은 자동 기동이 아니다 — `pg_ctlcluster 18 main start`(root).
+DB가 필요하다. WSL은 자동 기동이 아니다. 🔴 **기동 방식은 환경마다 다르다**
+(`min` 21번, 2026-09-16) — 아래 순서로 확인한다.
+
+```bash
+cat .env | grep DATABASE_URL      # 실제로 어느 포트를 보는지가 정본이다
+docker ps -a | grep supersub-postgres   # 있으면 Docker 컨테이너다 —
+  # `docker start supersub-postgres`(포트는 보통 5433, `pg_ctlcluster`가 아니다)
+pg_ctlcluster 18 main start       # 위 둘 다 없으면 네이티브 설치다(root)
+```
 
 ---
 
 ## 구조 — 기술 계층이 아니라 **바운디드 컨텍스트**
 
 `app/<컨텍스트>/{domain,application,adapter,dependencies}`. 컨텍스트는
-`user` · `card` · `analysis` · `match` · `review` 다섯이고 공용은 `app/core/`다.
+`user` · `card` · `analysis` · `match` · `review` · `billing` · `notification`
+일곱이고 공용은 `app/core/`다.
 (목록의 정본은 `tests/test_architecture.py` 의 `CONTEXTS` — 실제 디렉터리와
 어긋나면 같은 파일의 `test_CONTEXTS가_실제_디렉터리와_일치한다` 가 잡는다.)
 

@@ -33,6 +33,7 @@ class CoachEntity:
     id: UUID
     name: str
     contact: str
+    sport_code: str
 
 
 @dataclass(frozen=True)

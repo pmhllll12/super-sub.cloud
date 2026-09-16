@@ -1,12 +1,14 @@
 """과금이 **실제 PostgreSQL에서** 도는지 확인한다.
 
 계약 테스트(`test_billing_router.py`)는 스텁을 끼우므로 FK·정렬을 보지 못한다.
-여기서 보는 것은 셋이다.
+여기서 보는 것은 넷이다.
 
 1. `user`를 원시 쿼리로 읽는 자리(`user_exists`)가 맞다 — 🔴 저쪽 컬럼 이름이
    바뀌면 파이썬이 안 잡아 준다. 이 검사가 유일한 방어선이다 — **지우지 말 것**
 2. 크레딧 잔량이 실제로 `SUM(delta)`로 나온다 — 컬럼이 없다
 3. `coach_referral`에 유일 제약이 없다 — 같은 코치에 여러 번 연결해도 전부 남는다
+4. `coach.sport_code`가 실제로 `sport.code`를 FK로 참조하고, `sport` 원시
+   읽기(`sport_exists`)도 맞다(`paik` 14번)
 """
 
 from __future__ import annotations
@@ -63,10 +65,18 @@ def user(db_session):
 @pytest.fixture
 def coach(db_session):
     repo = BillingPgRepository(_new_session())
-    c = CoachEntity(id=uuid.uuid4(), name="검사코치", contact="test@example.test")
+    c = CoachEntity(
+        id=uuid.uuid4(),
+        name="검사코치",
+        contact="test@example.test",
+        sport_code="football",
+    )
     db_session.execute(
-        text("insert into coach (id, name, contact) values (:i, :n, :c)"),
-        {"i": c.id, "n": c.name, "c": c.contact},
+        text(
+            "insert into coach (id, name, contact, sport_code) "
+            "values (:i, :n, :c, :s)"
+        ),
+        {"i": c.id, "n": c.name, "c": c.contact, "s": c.sport_code},
     )
     db_session.commit()
     yield c
@@ -120,3 +130,47 @@ def test_코치_목록은_이름순으로_페이지네이션된다(db_session, c
 def test_없는_코치는_None이다(db_session):
     repo = BillingPgRepository(_new_session())
     assert repo.get_coach(uuid.uuid4()) is None
+
+
+def test_종목도_남의_테이블을_원시_쿼리로_읽는다(db_session):
+    """`paik` 14번. `sport`는 다른 컨텍스트 테이블이라 원시 쿼리로만 읽는다 —
+    저쪽 컬럼 이름이 바뀌면 파이썬이 안 잡아 준다. 이 검사가 유일한 방어선."""
+    repo = BillingPgRepository(_new_session())
+    assert repo.sport_exists("football")
+    assert not repo.sport_exists("curling")
+
+
+def test_모르는_종목_코드는_FK가_막는다(db_session):
+    """`paik` 14번 — `coach.sport_code`가 실제로 `sport.code`를 참조한다."""
+    from sqlalchemy.exc import IntegrityError
+
+    with pytest.raises(IntegrityError):
+        db_session.execute(
+            text(
+                "insert into coach (id, name, contact, sport_code) "
+                "values (:i, :n, :c, :s)"
+            ),
+            {"i": uuid.uuid4(), "n": "가짜코치", "c": "x@example.test", "s": "curling"},
+        )
+        db_session.flush()
+    db_session.rollback()
+
+
+def test_종목으로_실제로_거른다(db_session, coach):
+    other = uuid.uuid4()
+    db_session.execute(
+        text(
+            "insert into coach (id, name, contact, sport_code) "
+            "values (:i, :n, :c, :s)"
+        ),
+        {"i": other, "n": "농구코치", "c": "b@example.test", "s": "basketball"},
+    )
+    db_session.commit()
+
+    repo = BillingPgRepository(_new_session())
+    coaches, total = repo.list_coaches(offset=0, limit=100, sport_code="basketball")
+    assert total == 1
+    assert coaches[0].id == other
+
+    db_session.execute(text("delete from coach where id = :i"), {"i": other})
+    db_session.commit()

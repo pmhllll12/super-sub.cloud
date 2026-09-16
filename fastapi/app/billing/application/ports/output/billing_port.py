@@ -27,12 +27,20 @@ class BillingPort(ABC):
         """지급 또는 차감 한 행을 남긴다. 잔량 컬럼은 없다 — 조회 때 합산한다."""
 
     @abstractmethod
-    def list_coaches(self, offset: int, limit: int) -> tuple[list[CoachEntity], int]:
-        """(그 페이지의 코치, 전체 수)."""
+    def list_coaches(
+        self, offset: int, limit: int, sport_code: str | None = None
+    ) -> tuple[list[CoachEntity], int]:
+        """(그 페이지의 코치, 전체 수). `sport_code`를 주면 그 종목만 거른다
+        (`paik` 14번)."""
 
     @abstractmethod
     def get_coach(self, coach_id: UUID) -> CoachEntity | None:
         """없으면 `None`."""
+
+    @abstractmethod
+    def sport_exists(self, sport_code: str) -> bool:
+        """`sport` 는 다른 컨텍스트의 테이블이라 원시 쿼리로만 읽는다
+        (`analysis`의 같은 이름 메서드와 같은 이유, `paik` 14번)."""
 
     @abstractmethod
     def save_referral(self, referral: CoachReferralEntity) -> None:

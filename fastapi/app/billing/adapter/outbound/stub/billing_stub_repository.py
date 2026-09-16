@@ -11,6 +11,8 @@ from app.billing.domain.entities.billing_entity import (
     CreditEntryEntity,
 )
 
+_SPORTS = ("football", "baseball", "basketball")
+
 _CREDITS: dict[UUID, list[CreditEntryEntity]] = {}
 _COACHES: dict[UUID, CoachEntity] = {}
 _REFERRALS: list[CoachReferralEntity] = []
@@ -44,8 +46,12 @@ class StubBillingRepository(BillingPort):
         _CREDITS.setdefault(entry.user_id, []).append(entry)
         _USERS.add(entry.user_id)
 
-    def list_coaches(self, offset: int, limit: int) -> tuple[list[CoachEntity], int]:
+    def list_coaches(
+        self, offset: int, limit: int, sport_code: str | None = None
+    ) -> tuple[list[CoachEntity], int]:
         coaches = sorted(_COACHES.values(), key=lambda c: c.name)
+        if sport_code:
+            coaches = [c for c in coaches if c.sport_code == sport_code]
         return coaches[offset : offset + limit], len(coaches)
 
     def get_coach(self, coach_id: UUID) -> CoachEntity | None:
@@ -56,3 +62,6 @@ class StubBillingRepository(BillingPort):
 
     def user_exists(self, user_id: UUID) -> bool:
         return user_id in _USERS
+
+    def sport_exists(self, sport_code: str) -> bool:
+        return sport_code in _SPORTS

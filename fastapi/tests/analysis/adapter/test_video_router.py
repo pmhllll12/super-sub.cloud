@@ -538,7 +538,11 @@ class TestListPublicVideos:
             "description",
             "uploader_nickname",
             "uploader_card_slug",
+            "width",
+            "height",
         }
+        # `_register`가 보내는 기본값(`paik` 15번) — 화면 비율이 실제로 실린다.
+        assert (row["width"], row["height"]) == (1920, 1080)
         assert row["uploader_nickname"] == "업로더"
         assert row["uploader_card_slug"] is None
 
