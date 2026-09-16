@@ -124,17 +124,17 @@ export const COACHES: Coach[] = [
   {
     id: 'c-002',
     name: '정하늘',
-    sport: 'basketball',
+    sport: 'soccer',
     region: '서울 마포',
-    tagline: '슛 폼은 손보다 발에서 갈립니다',
+    tagline: '좁은 코트에서 마무리까지 가는 길',
     pricePerSession: 70000,
     levels: ['intermediate', 'advanced'],
     titles: ['첫 리포트'],
     report: {
-      summary: '릴리스 직전 어깨가 먼저 열리지 않습니다. 두 번째 동작으로 이어지는 속도가 빠릅니다.',
+      summary: '슈팅 직전 상체가 먼저 열리지 않습니다. 두 번째 동작으로 이어지는 속도가 빠릅니다.',
       scenes: [
-        { at: '0:03', what: '스텝 정지' },
-        { at: '0:06', what: '릴리스' },
+        { at: '0:03', what: '디딤발 착지' },
+        { at: '0:06', what: '임팩트' },
       ],
       videoSlug: 'coach-jung-01',
       clipUrl: '/coach-c002.mp4',
@@ -142,21 +142,21 @@ export const COACHES: Coach[] = [
     },
     verified: ['신원 확인', '대학 선수 이력 4년'],
     reviews: [{ by: '최OO', text: '영상으로 먼저 보고 만나서 설명이 짧았습니다.', at: '2026-08-25' }],
-    lesson: { places: ['마포 실내체육관'], hours: '주말 오후', note: '1회 60분 · 2인까지' },
+    lesson: { places: ['마포 실내풋살장'], hours: '주말 오후', note: '1회 60분 · 2인까지' },
   },
   {
     id: 'c-003',
     name: '오세진',
-    sport: 'baseball',
+    sport: 'soccer',
     region: '경기 성남',
-    tagline: '스윙 궤도를 눈이 아니라 데이터로',
+    tagline: '인사이드 패스를 눈이 아니라 데이터로',
     pricePerSession: 80000,
     levels: ['beginner', 'intermediate', 'advanced'],
     titles: ['임팩트 안정'],
     report: {
-      summary: '히팅 포인트가 몸 앞에서 일정하게 잡힙니다. 팔로스루에서 축이 흔들리지 않습니다.',
+      summary: '공을 대는 지점이 몸 앞에서 일정하게 잡힙니다. 팔로스루에서 축이 흔들리지 않습니다.',
       scenes: [
-        { at: '0:05', what: '로드' },
+        { at: '0:05', what: '디딤발 착지' },
         { at: '0:08', what: '임팩트' },
       ],
       videoSlug: 'coach-oh-01',
@@ -165,7 +165,7 @@ export const COACHES: Coach[] = [
     },
     verified: ['신원 확인', '생활체육지도사 2급', '실업팀 이력 3년'],
     reviews: [],
-    lesson: { places: ['성남 실내 배팅장'], hours: '평일 오전 · 저녁', note: '1회 60분' },
+    lesson: { places: ['성남 실내풋살장'], hours: '평일 오전 · 저녁', note: '1회 60분' },
   },
 ]
 
