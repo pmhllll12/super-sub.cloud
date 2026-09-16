@@ -110,6 +110,7 @@ class ReportIngestPgRepository(ReportIngestPort):
                 evidence=c.evidence,
                 metric_ref=c.metric_ref[:50] if c.metric_ref else None,
                 view_dependent=c.view_dependent[:10] if c.view_dependent else None,
+                title_earned=c.title_earned,
                 skipped=c.skipped,
             )
             for c in parsed.criteria

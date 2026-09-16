@@ -90,13 +90,15 @@ def list_coaches(
     use_case: ListCoachesUseCaseDep,
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
+    sport_code: str | None = Query(None),
 ) -> CoachListResult:
-    """`market/coaches` 목록 화면.
+    """`market/coaches` 목록 화면. `sport_code`를 주면 그 종목만 거른다
+    (`paik` 14번).
 
-    ⚠️ 종목·가격·소개 문장 같은 값은 없다 — 부록 D 의 `coach`는 `id`·`name`·
-    `contact` 셋뿐이다.
+    ⚠️ 가격·소개 문장 같은 값은 아직 없다 — 부록 D 의 `coach`는 `id`·`name`·
+    `contact`·`sport_code` 넷뿐이다.
     """
-    return use_case(ListCoachesQuery(page=page, size=size))
+    return use_case(ListCoachesQuery(page=page, size=size, sport_code=sport_code))
 
 
 @billing_router.get("/coaches/{coach_id}", response_model=CoachResponse)

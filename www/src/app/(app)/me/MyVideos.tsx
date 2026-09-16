@@ -17,6 +17,22 @@ import { useReportPanel } from './reportPanel'
 const REPORT_EXIT_MS = 320
 
 /**
+ * 갈래를 바꿀 때 **나가는 데** 걸리는 시간 — `globals.css` 의
+ * `.ss-profile-swap` 전환 길이와 같아야 한다(사용자 요청, 2026-09-16:
+ * "너무 사라지고 나오는게 부자연스러워").
+ *
+ * 🔴 **나간 뒤에 갈아 끼운다.** 누르자마자 `tab` 을 바꾸면 옛 내용이 그
+ * 자리에서 사라지고 새것이 툭 나타난다 — 그 툭이 사용자가 지적한 것이다.
+ * 그래서 나가는 동안은 `tab` 을 **그대로 두고**(옛 내용이 계속 그려진다)
+ * 이 시간 뒤에 바꾼다. 들어오는 쪽은 CSS 가 되돌아오면서 저절로 된다.
+ */
+const TAB_SWAP_MS = 240
+
+/** 공개 폼이 펼쳐지고 접히는 시간 — `globals.css` 의 `.ss-profile-publish-slot`
+ *  전환 길이와 같아야 한다. 짧으면 내용이 먼저 사라져 툭 접힌다. */
+const PUBLISH_SLIDE_MS = 260
+
+/**
  * 내가 올린 클립 — **두 갈래로 갈라 한 번에 한 편만** 보여준다(사용자 요청).
  *
  *   분석 영상  — 분석을 걸어 둔 것(영상 분석 화면에서 저장한 클립)
@@ -130,6 +146,20 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
   )
   /** 공개 폼이 열린 영상 id 와 적고 있는 값. */
   const [form, setForm] = useState<{ id: string; title: string; what: string } | null>(null)
+  /**
+   * 폼이 **펼쳐져 있는가** — `form`(내용)과 따로 둔다.
+   *
+   * 🔴 접는 연출이 도는 동안 내용이 남아 있어야 한다. 접자마자 `form` 을
+   * 비우면 칸이 **툭** 접힌다 — 미끄러질 것이 없어서다. 그래서 이 값을 먼저
+   * 내리고, 다 접힌 뒤에 아래 타이머가 `form` 을 비운다.
+   */
+  const [formOpen, setFormOpen] = useState(false)
+
+  useEffect(() => {
+    if (formOpen || !form) return
+    const id = setTimeout(() => setForm(null), PUBLISH_SLIDE_MS)
+    return () => clearTimeout(id)
+  }, [formOpen, form])
 
   useEffect(() => {
     if (!picked) {
@@ -162,6 +192,23 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
 
   const [tab, setTab] = useState<TabKey>(analyzed.length > 0 ? 'analyzed' : 'uploaded')
   const [at, setAt] = useState(0)
+  /**
+   * 나가는 중이면 **갈 곳**, 아니면 `null`. 이 값이 있는 동안 화면은 아직
+   * 옛 갈래(`tab`)를 그리고 있고, 판만 오른쪽으로 물러나는 중이다.
+   */
+  const [leaving, setLeaving] = useState<TabKey | null>(null)
+
+  /* 🔴 다 나간 뒤에 갈아 끼운다. 타이머가 도는 중에 컴포넌트가 사라지면
+     치운다 — 안 그러면 없는 것에 setState 한다. */
+  useEffect(() => {
+    if (!leaving) return
+    const id = setTimeout(() => {
+      setTab(leaving)
+      setAt(0)
+      setLeaving(null)
+    }, TAB_SWAP_MS)
+    return () => clearTimeout(id)
+  }, [leaving])
 
   const shown = tab === 'analyzed' ? analyzed : uploaded
   // 🔴 자리를 상태로 들고 있으므로 목록이 짧은 갈래로 옮겨 가면 넘칠 수 있다.
@@ -312,9 +359,25 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
     }
   }
 
+  /**
+   * 갈래 바꾸기 — **나가는 것을 먼저 보여주고** 갈아 끼운다.
+   *
+   * 🔴 `tab` 을 여기서 바로 안 바꾼다. 바꾸면 옛 내용이 그 프레임에 사라지고
+   * 새것이 나타나 「툭」 끊긴다(사용자 지적). `leaving` 만 세우면 옛 내용이
+   * 그려진 채로 오른쪽으로 물러나고, 아래 타이머가 다 나간 뒤에 바꾼다.
+   *
+   * ⚠️ **나가는 중에 또 누르면 무시한다.** 받아 주면 타이머가 겹쳐 중간에
+   * 갈아 끼워지고, 반쯤 물러난 자리에서 새 내용이 나온다.
+   */
   function pick(next: TabKey) {
-    setTab(next)
-    setAt(0)
+    if (next === tab || leaving) return
+    // 연출을 끈 사람에게는 기다릴 이유가 없다 — 그 자리에서 갈아 끼운다.
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      setTab(next)
+      setAt(0)
+      return
+    }
+    setLeaving(next)
   }
 
   function step(delta: number) {
@@ -383,6 +446,11 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
    * 경우 비공개로 보이는데 실제로는 **남에게 계속 보인다** — 되돌릴 수 없는
    * 쪽으로 틀리는 것이라 지우기와 같은 순서를 쓴다.
    */
+  /** 폼을 접는다 — 미끄러짐이 끝난 뒤에 내용을 비운다(빈 칸이 먼저 사라지면 툭 접힌다). */
+  function closeForm() {
+    setFormOpen(false)
+  }
+
   async function togglePublish(target: MyVideo) {
     if (pubIds.includes(target.id)) {
       setNotice(null)
@@ -390,13 +458,20 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
         await unpublish(target.id)
         setPubIds((prev) => prev.filter((x) => x !== target.id))
         setForm(null)
+        setFormOpen(false)
       } catch (e) {
         setNotice(e instanceof Error ? e.message : '공개를 풀지 못했습니다.')
       }
       return
     }
+    // 🔴 **열려 있으면 닫는다**(사용자 요청) — 같은 단추가 「전체 공개」이자 「닫기」다.
+    if (formOpen && form?.id === target.id) {
+      closeForm()
+      return
+    }
     // 켜는 것만으로는 안 올린다 — 제목이 있어야 영상 모음에서 이름이 생긴다.
     setForm({ id: target.id, title: '', what: '' })
+    setFormOpen(true)
   }
 
   async function savePublish(target: MyVideo) {
@@ -430,9 +505,12 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
             key={key}
             type="button"
             role="tab"
-            aria-selected={tab === key}
+            /* 🔴 **누른 쪽이 바로 켜진다.** 내용은 아직 물러나는 중이지만
+               알약까지 기다리면 눌러도 반응이 없는 것처럼 읽힌다 — 누른
+               자리가 먼저 답하고 내용이 따라온다. */
+            aria-selected={(leaving ?? tab) === key}
             className="ss-profile-tab"
-            data-on={tab === key}
+            data-on={(leaving ?? tab) === key}
             onClick={() => pick(key)}
           >
             {label}
@@ -467,6 +545,10 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
         <button
           type="button"
           className="ss-profile-report-open"
+          /* 🔴 **판과 같이 들고 난다**(사용자 요청) — 이 단추도 오른쪽으로
+             물러났다가 오른쪽에서 돌아온다. 흐름 밖 절대배치라 판 안에 못
+             넣어서, 같은 신호를 따로 받는다. */
+          data-leaving={leaving ? 'true' : undefined}
           onClick={() => setPanelOpen(true)}
         >
           해당 영상 리포트 보기
@@ -527,6 +609,17 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
         </div>
       )}
 
+      {/* 🔴 **갈래가 바뀔 때 오른쪽으로 물러났다가 오른쪽에서 돌아온다**
+          (사용자 요청, 2026-09-16). 감싸는 판 하나에 전환을 걸어 두면
+          나가기와 들어오기가 **같은 전환의 양방향**이라 따로 맞출 것이 없다
+          — `data-leaving` 이 서면 물러나고, 지워지면 제자리로 돌아온다.
+
+          🔴 **내용은 그 사이에 갈린다**(`tab` 이 바뀌는 시점이 물러난 뒤다).
+          보이지 않는 동안 갈리므로 갈리는 순간이 안 보인다.
+
+          ⚠️ 알림줄·고른 파일은 **이 밖에** 둔다 — 갈래와 무관하게 남아야
+          하는 것들이라 같이 물러나면 「올리는 중」이 사라진 것처럼 읽힌다. */}
+      <div className="ss-profile-swap" data-leaving={leaving ? 'true' : undefined}>
       {!v ? (
         <p className="ss-profile-muted">
           {tab === 'analyzed'
@@ -646,7 +739,7 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
                     <span className="material-symbols-outlined" aria-hidden="true">
                       delete
                     </span>
-                    삭제
+                    해당 영상 삭제
                   </button>
                 )}
               </span>
@@ -670,47 +763,41 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
                             onClick={() => togglePublish(v)}
                           >
                             <span className="material-symbols-outlined" aria-hidden="true">
-                              {pubIds.includes(v.id) ? 'visibility' : 'visibility_off'}
+                              {pubIds.includes(v.id)
+                                ? 'visibility'
+                                : formOpen && form?.id === v.id
+                                  ? 'close'
+                                  : 'visibility_off'}
                             </span>
-                            {pubIds.includes(v.id) ? '전체 공개 중' : '전체 공개'}
+                            {/* 🔴 **열려 있으면 「닫기」다**(사용자 요청,
+                                2026-09-16). 같은 단추가 여는 자리이자 닫는
+                                자리라, 열어 놓고 되돌릴 데를 따로 찾지 않는다. */}
+                            {pubIds.includes(v.id)
+                              ? '전체 공개 중'
+                              : formOpen && form?.id === v.id
+                                ? '닫기'
+                                : '전체 공개'}
                           </button>
-
-                          {form?.id === v.id && (
-                            <div className="ss-profile-publish-form">
-                              <label htmlFor="ss-pub-title">제목</label>
-                              <input
-                                id="ss-pub-title"
-                                value={form.title}
-                                maxLength={40}
-                                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                              />
-                              <label htmlFor="ss-pub-what">한 줄 설명</label>
-                              <input
-                                id="ss-pub-what"
-                                value={form.what}
-                                maxLength={60}
-                                onChange={(e) => setForm({ ...form, what: e.target.value })}
-                              />
-                              {/* 🔴 **공개는 되돌릴 수 있지만 그 사이에 남이 본다.**
-                                  무엇이 일어나는지 누르기 전에 말한다(CCC 20 으로 서버에
-                                  올라가면서 이 문구가 「이 브라우저에만」에서 바뀌었다). */}
-                              <p className="ss-profile-publish-note">
-                                영상 모음에서 다른 사람에게도 보입니다 — 언제든 다시 내릴 수
-                                있습니다.
-                              </p>
-                              <button
-                                type="button"
-                                className="ss-profile-publish-save"
-                                disabled={!form.title.trim()}
-                                onClick={() => savePublish(v)}
-                              >
-                                공개하기
-                              </button>
-                            </div>
-                          )}
                         </div>
                       )}
-                {v.passed && (
+                {/* 🔴 **분석 갈래에서만** 낸다(사용자 요청, 2026-09-16).
+
+                    두 갈래는 **영상이 가는 곳이 다르다.** 그냥 올린 영상은
+                    「전체 공개」에 따라 **영상 모음(`/home`)에 나오나 안 나오나**
+                    뿐이고, 분석을 안 해서 리포트가 없으니 **추천 판에는 아예 안
+                    들어간다.** 대표 영상은 그 추천 판에서 나를 소개하는 장면이라,
+                    여기에 단추를 두면 아무 데도 안 쓰이는 값을 고르게 된다.
+
+                    ⚠️ **서버가 막는 것은 아니다.** 계약(3-6절)이 거부하는 것은
+                    반려된 클립(`passed: false` → `422 CANNOT_FEATURE`)뿐이고,
+                    분석 안 한 영상도 세울 수는 있다 — 여기서 안 내주는 것은
+                    화면의 판단이다.
+
+                    ⚠️ 이 단추가 **내리는 자리이기도 하다.** 업로드 영상이 이미
+                    대표로 서 있는 사람은 여기서 못 내린다 — 분석 영상 하나를
+                    대표로 세우면 자동으로 내려간다(사람당 하나). 아래 알림도
+                    같이 막으므로 그 상태는 이 갈래에서 아예 안 보인다. */}
+                {v.passed && tab === 'analyzed' && (
                   <button
                     type="button"
                     className="ss-profile-featured-btn"
@@ -752,6 +839,72 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
               </button>
             </div>
 
+            {/* 공개 폼 — 🔴 **흐름 안에 둔다**(사용자 요청, 2026-09-16).
+                전에는 단추 아래로 **떠올랐고**(절대배치), 그래서 아래 선과
+                썸네일 줄을 덮어 잘려 보였다. 이제 자리를 차지하며 열리므로
+                아래 것들이 **부드럽게 밀려 내려간다.**
+
+                🔴 **높이를 모르고도 미끄러지게** `grid-template-rows: 0fr → 1fr`
+                을 쓴다. `height: auto` 는 전환이 안 되고, 고정 px 을 적으면
+                글자 크기나 문구가 바뀔 때마다 다시 재야 한다.
+
+                🔴 **자리는 늘 있고 내용만 든다.** 열 때 요소가 새로 붙으면
+                전환이 시작할 곳(0fr)이 없어 툭 나타난다 — 갈래 바꾸기에서
+                쓴 것과 같은 이유다. 닫을 때도 `form` 을 바로 안 비우고
+                미끄러짐이 끝난 뒤에 비운다. */}
+            {tab === 'uploaded' && !pubIds.includes(v.id) && (
+              <div
+                className="ss-profile-publish-slot"
+                data-open={formOpen && form?.id === v.id ? 'true' : undefined}
+              >
+                <div className="ss-profile-publish-slot-inner">
+                  {/* 🔴 흐림은 **인라인으로만** 준다 — `globals.css` 에 적으면
+                      Lightning CSS 를 지나며 떨어져 나간다(`me/glass.ts`).
+                      왼쪽 칸의 「정보」 판들과 같은 값을 쓴다. */}
+                  {form?.id === v.id && (
+                    <div className="ss-profile-publish-form" style={SECTION_GLASS}>
+                      <div className="ss-profile-publish-fields">
+                        <label className="ss-profile-publish-field">
+                          <span>제목</span>
+                          <input
+                            value={form.title}
+                            maxLength={40}
+                            placeholder="무엇을 보는 장면인가요"
+                            aria-label="제목"
+                            onChange={(e) => setForm({ ...form, title: e.target.value })}
+                          />
+                        </label>
+                        <label className="ss-profile-publish-field">
+                          <span>한 줄 설명</span>
+                          <input
+                            value={form.what}
+                            maxLength={60}
+                            placeholder="없어도 됩니다"
+                            aria-label="한 줄 설명"
+                            onChange={(e) => setForm({ ...form, what: e.target.value })}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          className="ss-profile-publish-save"
+                          disabled={!form.title.trim()}
+                          onClick={() => savePublish(v)}
+                        >
+                          공개하기
+                        </button>
+                      </div>
+                      {/* 🔴 **공개는 되돌릴 수 있지만 그 사이에 남이 본다.**
+                          무엇이 일어나는지 누르기 전에 말한다(CCC 20 으로 서버에
+                          올라가면서 이 문구가 「이 브라우저에만」에서 바뀌었다). */}
+                      <p className="ss-profile-publish-note">
+                        영상 모음에서 다른 사람에게도 보입니다 — 언제든 다시 내릴 수 있습니다.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* 상자 폭을 그대로 쓰는 흰 선 — `100%` 면 된다.
 
                 🔴 **상자는 이제 영상 비를 안 따른다**(2026-09-08, 사용자 요청).
@@ -762,8 +915,12 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
                 🔴 **비를 알기 전에는 감춘다.** 폭은 이제 안 틀리지만, 영상이
                 아직 안 그려졌는데 선만 먼저 뜨면 허공에 그은 줄로 보인다. */}
             {/* 무엇에 쓰이는 값인지 밝힌다. 단추와 달리 이건 흐름 안에 둔다 —
-                겹쳐 놓으면 넘기는 단추를 덮는다. */}
-            {v.passed && featured === v.id && (
+                겹쳐 놓으면 넘기는 단추를 덮는다.
+
+                🔴 **단추와 같은 갈래에서만** 낸다(사용자 요청, 2026-09-16).
+                그냥 올린 영상은 리포트가 없어 **추천 판에 아예 안 들어간다** —
+                거기 두면 「이 장면이 돕니다」가 **사실이 아닌 말**이 된다. */}
+            {v.passed && tab === 'analyzed' && featured === v.id && (
               <p className="ss-profile-featured-note">
                 추천 판에서 나를 소개할 때 이 장면이 돕니다.
               </p>
@@ -869,6 +1026,7 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
           )}
         </div>
       )}
+      </div>
     </>
   )
 }

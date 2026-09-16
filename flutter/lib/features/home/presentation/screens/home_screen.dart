@@ -16,9 +16,13 @@ import '../../../auth/presentation/session_controller.dart';
 import '../../../profile/presentation/widgets/player_card_view.dart';
 import '../../../team/presentation/widgets/squad_board.dart';
 
-/// 홈의 바탕 — **흰색**(2026-09-15 사용자 요청). 전에는 검정 바탕에 연기 속
-/// 실루엣 사진을 깔았다(`assets/images/home_silhouette.jpg` 는 지금 안 쓴다).
-const Color _kHomeBg = Color(0xFFFFFFFF);
+/// 홈의 바탕 — **완전한 검정**(2026-09-16 사용자 요청. 하루 동안 흰색이었다).
+/// 사진은 안 깐다(`assets/images/home_silhouette.jpg` 는 지금 안 쓴다).
+///
+/// 🔴 판(`_kSheetColor`)·하단 바(`kNavBarColor`)는 이 바탕보다 **한 단 밝은**
+/// 진회색이다 — 바탕과 판을 밝기로만 가른다. 둘을 같은 검정으로 되돌리면
+/// 판의 경계가 사라진다.
+const Color _kHomeBg = Color(0xFF000000);
 
 /// 검은 바탕 위의 글자.
 const Color _kOnDark = Color(0xFFFFFFFF);
@@ -39,8 +43,10 @@ const double _kCollapsedBoardShrink = 0.82;
 /// 판 아래 손잡이 줄의 높이. 판을 끌어내리는 자리라는 표식이다.
 const double _kSheetHandleH = 28;
 
-/// 스쿼드 판 · 영상 분석 판의 면 색 — 완전한 검정.
-const Color _kSheetColor = Color(0xFF000000);
+/// 스쿼드 판 · 영상 분석 판의 면 색 — **진회색**(2026-09-16 사용자 지정).
+/// 검은 바탕(`_kHomeBg`)보다 한 단 밝아서 판이 층으로 읽힌다.
+/// 하단 바 · 로고 알약(`kNavBarColor`)과 **같은 값이어야 한다** — 넷이 한 켜다.
+const Color _kSheetColor = Color(0xFF1C1C1E);
 
 /// 판 아래 모서리. 음악 앱의 앨범 판처럼 아래만 둥글다.
 const double _kSheetRadius = 28;
@@ -485,8 +491,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 Positioned.fill(
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      // 🔴 **완전한 검정이다**(2026-09-15 사용자 요청 — 반투명이었다).
-                      // 흰 바탕 위에서 비치면 판이 회색으로 뜬다.
+                      // 🔴 **반투명으로 되돌리지 않는다**(2026-09-15 사용자 요청).
+                      // 흰 바탕 위에서 비치면 판이 뿌옇게 뜬다. 색은 `_kSheetColor`.
                       color: _kSheetColor,
                       borderRadius: BorderRadius.vertical(
                         bottom: Radius.circular(radius),

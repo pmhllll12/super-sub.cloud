@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PublicPlayerCard, Squad } from '@/server/backend'
 import SquadPanel from '@/components/SquadPanel'
 import SiteHeader from '@/components/SiteHeader'
+import { useNotifyInbox } from '@/lib/useNotifyInbox'
 import HomeNav, { type Destination } from '@/components/HomeNav'
 import { MATCH_BOT, TEAM_SEEK } from '@/lib/destinations'
 import { useIntroDone } from '@/lib/useIntroDone'
@@ -39,6 +40,8 @@ export default function HomeStage({
   card,
   squad = null,
   sportCode = null,
+  teamName = null,
+  myCardId = null,
   destinations,
   featured = [],
   defaultActive = null,
@@ -50,6 +53,10 @@ export default function HomeStage({
   squad?: Squad | null
   /** 그 팀의 종목 — 스쿼드 판이 포지션 목록을 받아 올 때 쓴다(CCC 28). */
   sportCode?: string | null
+  /** 홈에 그리는 팀 이름 — 스쿼드 판의 머리글. 소속이 없으면 `null`. */
+  teamName?: string | null
+  /** 내 카드 id — 판에 나를 앉힐 때 쓴다(계약이 `player_card_id` 를 받는다). */
+  myCardId?: string | null
   destinations: Destination[]
   /**
    * 헤드라인 자리에 **유리 알약 버튼**으로 크게 내놓는 목적지들.
@@ -308,6 +315,12 @@ export default function HomeStage({
    * 알약 선택과 **떼어 놓은 제 상태**여야 그 얽힘이 안 생긴다.
    */
   const [scouting, setScouting] = useState(false)
+
+  /* 🔴 헤더(`SiteHeader`)도 제 통을 따로 돈다 — 빨간 점과 판은 그쪽 것이고,
+     여기 것은 **대기 팝업을 띄울 신호**를 받기 위한 것이다. 폴링 둘이 도는
+     셈이지만 GET 둘이라 가볍고, 하나로 합치려면 통을 앱 전체 컨텍스트로
+     올려야 해서 그 값이 더 비싸다. */
+  const inbox = useNotifyInbox()
   /**
    * 챗봇이 열려 있는가.
    *
@@ -422,9 +435,17 @@ export default function HomeStage({
               />
             </div>
             <SquadPanel
+              /* 경기 신청 · 확정은 헤더의 알림함과 한 벌이다 — 신청은 여기서
+                 걸고, **확정은 알림이 알려 준다**(사용자 요청, 2026-09-16). */
+              myTeamId={inbox.teamId}
+              onRequested={(requestId, team) => inbox.noteSent(requestId, team.id)}
+              acceptedTeamId={inbox.acceptedTeamId}
+              onAcceptedShown={inbox.clearAccepted}
               card={card}
               squad={squad}
               sportCode={sportCode}
+              teamName={teamName}
+              myCardId={myCardId}
               scouting={scouting}
               // 🔴 챗봇도 **판 오른쪽 그 자리**에서 나온다(사용자 요청) —
               // 지인 찾기 · AI 추천과 같은 자리다. 그 자리는 `.ss-squad-wrap`
@@ -432,6 +453,9 @@ export default function HomeStage({
               bot={bot}
               onBotChange={showBot}
               onCloseScouting={closeScout}
+              // 빈 자리(+)를 눌러도 알약과 **같은 한 벌**이 열린다
+              // (사용자 요청, 2026-09-16) — 추천 판 옆에 지인 찾기 판도 선다.
+              onOpenScouting={() => setScouting(true)}
               seeking={seeking}
               onCloseSeeking={closeSeek}
             />

@@ -5,7 +5,15 @@ import type {
   AdminUserDetail,
   AdminUserListResult,
   AdminVideoListResult,
+  AppNotification,
   AuthToken,
+  Contact,
+  ContactRequest,
+  UserSearchResult,
+  TeamDetail,
+  CardGrade,
+  SquadCandidate,
+  TeamMatchRequest,
   FeaturedVideo,
   Match,
   MercenaryCandidate,
@@ -47,8 +55,16 @@ export const fastapiBackend: Backend = {
     return callFastApi<User>('/me', { method: 'GET', token })
   },
 
-  updateMe(token, { nickname }) {
-    return callFastApi<User>('/me', { method: 'PATCH', token, body: { nickname } })
+  updateMe(token, input) {
+    // 🔴 **준 칸만 싣는다.** `undefined` 를 그대로 보내면 JSON 에서 사라지긴
+    //    하지만, 명시적으로 골라 담아야 "안 보낸 것은 안 바뀐다"가 코드에서도
+    //    읽힌다(계약이 그렇게 정했다).
+    const body: Record<string, unknown> = {}
+    if (input.nickname !== undefined) body.nickname = input.nickname
+    if (input.is_nickname_searchable !== undefined) {
+      body.is_nickname_searchable = input.is_nickname_searchable
+    }
+    return callFastApi<User>('/me', { method: 'PATCH', token, body })
   },
 
   async changePassword(token, body) {
@@ -247,5 +263,116 @@ export const fastapiBackend: Backend = {
       method: 'DELETE',
       token,
     })
+  },
+
+  /* ── 지인 · 알림 (계약 3-12절) ─────────────────────────────────────── */
+
+  searchUsers(token, q) {
+    return callFastApi<UserSearchResult[]>(`/users/search?q=${encodeURIComponent(q)}`, {
+      method: 'GET',
+      token,
+    })
+  },
+
+  listContacts(token) {
+    return callFastApi<{ items: Contact[] }>('/me/contacts', { method: 'GET', token })
+  },
+
+  listContactRequests(token) {
+    return callFastApi<ContactRequest[]>('/me/contacts/requests', { method: 'GET', token })
+  },
+
+  requestContact(token, input) {
+    return callFastApi<ContactRequest>('/me/contacts', { method: 'POST', token, body: input })
+  },
+
+  acceptContact(token, contactId) {
+    return callFastApi<ContactRequest>(
+      `/me/contacts/${encodeURIComponent(contactId)}/accept`,
+      { method: 'POST', token },
+    )
+  },
+
+  listNotifications(token, unreadOnly) {
+    // 🔴 안 보낼 때와 `false` 는 서버에서 같은 뜻이다 — 참일 때만 싣는다.
+    const qs = unreadOnly ? '?unread_only=true' : ''
+    return callFastApi<AppNotification[]>(`/me/notifications${qs}`, { method: 'GET', token })
+  },
+
+  readNotification(token, notificationId) {
+    return callFastApi<AppNotification>(
+      `/me/notifications/${encodeURIComponent(notificationId)}/read`,
+      { method: 'PATCH', token },
+    )
+  },
+
+  /* ── 팀 대 팀 경기 신청 (계약 3-15절) ──────────────────────────────── */
+
+  requestTeamMatch(token, teamId, input) {
+    return callFastApi<TeamMatchRequest>(
+      `/teams/${encodeURIComponent(teamId)}/match-requests`,
+      { method: 'POST', token, body: input },
+    )
+  },
+
+  listTeamMatchRequests(token, teamId) {
+    return callFastApi<TeamMatchRequest[]>(
+      `/teams/${encodeURIComponent(teamId)}/match-requests`,
+      { method: 'GET', token },
+    )
+  },
+
+  acceptTeamMatch(token, teamId, requestId) {
+    return callFastApi<TeamMatchRequest>(
+      `/teams/${encodeURIComponent(teamId)}/match-requests/${encodeURIComponent(requestId)}/accept`,
+      { method: 'POST', token },
+    )
+  },
+
+  rejectTeamMatch(token, teamId, requestId) {
+    return callFastApi<TeamMatchRequest>(
+      `/teams/${encodeURIComponent(teamId)}/match-requests/${encodeURIComponent(requestId)}/reject`,
+      { method: 'POST', token },
+    )
+  },
+
+  /* ── 표시 등급 · 추천 후보 (계약 3-6·3-16절) ─────────────────────── */
+
+  createTeam(token, input) {
+    return callFastApi<TeamDetail>('/teams', { method: 'POST', token, body: input })
+  },
+
+  async leaveTeam(token, teamId, memberId) {
+    await callFastApi<null>(
+      `/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(memberId)}`,
+      { method: 'DELETE', token },
+    )
+  },
+
+  getCardGrade(token, cardPublicSlug) {
+    return callFastApi<CardGrade>(
+      `/cards/${encodeURIComponent(cardPublicSlug)}/grade`,
+      { method: 'GET', token },
+    )
+  },
+
+  listSquadCandidates(token, teamId, { position_code, grade }) {
+    const q = new URLSearchParams({ position_code })
+    // 🔴 「상관없음」은 **안 실어 보낸다** — 계약이 생략과 `"any"` 를 같게 보지만,
+    //    빈 값(`grade=`)은 없는 등급이라 422 다(`searchMatches` 와 같은 함정).
+    if (grade) q.set('grade', grade)
+    return callFastApi<SquadCandidate[]>(
+      `/teams/${encodeURIComponent(teamId)}/squad/candidates?${q}`,
+      { method: 'GET', token },
+    )
+  },
+
+  cancelTeamMatch(token, teamId, requestId) {
+    // 🔴 204 가 아니라 **취소된 신청을 그대로** 돌려준다(계약) — 다른 응답과
+    // 같은 모양이라 부르는 쪽이 갈래를 안 만들어도 된다.
+    return callFastApi<TeamMatchRequest>(
+      `/teams/${encodeURIComponent(teamId)}/match-requests/${encodeURIComponent(requestId)}`,
+      { method: 'DELETE', token },
+    )
   },
 }

@@ -13,12 +13,25 @@ from uuid import UUID
 from abc import ABC, abstractmethod
 
 from app.analysis.application.dtos.video_dto import UNSET, UserRef
-from app.analysis.domain.entities.video_entity import VideoEntity
+from app.analysis.domain.entities.video_entity import (
+    CardGradeRow,
+    PriorAnalysisOutcome,
+    VideoEntity,
+)
 
 
 class VideoPort(ABC):
     @abstractmethod
     def sport_exists(self, sport_code: str) -> bool: ...
+
+    @abstractmethod
+    def sport_is_active(self, sport_code: str) -> bool:
+        """**지금 새로 받을 수 있는 종목인가**(`sport.active`, `ho` 39번).
+
+        루브릭이 사라진 종목(야구·농구)은 행은 남아 있지만 `false` 다 —
+        그 종목으로 이미 올라간 영상이 참조하고 있어 지울 수 없어서다.
+        등록만 막고 **조회·목록은 그대로 둔다**(옛 영상이 계속 보여야 한다).
+        """
 
     @abstractmethod
     def uploader_nickname(self, user_id: UUID) -> str | None:
@@ -78,6 +91,16 @@ class VideoPort(ABC):
         `player_card` 는 `card` 컨텍스트 테이블이라 임포트하지 않고 슬러그→`user_id`
         만 원시 쿼리로 읽는다(관리자 목록이 `user` 를 읽는 방식과 같다).
         대표가 없거나·반려됐거나·슬러그가 없으면 `None`.
+        """
+
+    @abstractmethod
+    def find_card_grade(self, card_public_slug: str) -> CardGradeRow | None:
+        """카드 슬러그 → 등급 원자료(미결 `paik` 25·26번).
+
+        슬러그가 없으면 `None`. 슬러그는 찾았지만 대표 영상이 없거나 분석
+        전이면 `overall_grade`/`provisional` 이 `None`인 행(슬러그를 찾았다는
+        사실은 남는다 — 인터랙터가 그걸로 404 를 가른다). 신뢰 축은 `review`·
+        `review_selection`(`review` 컨텍스트 테이블)을 원시 쿼리로 읽는다.
         """
 
     @abstractmethod
@@ -150,4 +173,16 @@ class VideoPort(ABC):
     def admin_delete(self, video_id: UUID) -> VideoEntity | None:
         """소유 검사 없이 영상 행을 지운다(관리자 전용). 연쇄·반환값은 `delete`
         와 같다. 없는 클립이면 `None`.
+        """
+
+    @abstractmethod
+    def find_prior_outcome(
+        self, user_id: UUID, content_hash: str
+    ) -> PriorAnalysisOutcome | None:
+        """그 사용자가 올린 같은 내용(`content_hash`)의 영상 중, 「이 사람으로
+        분석」·「집중해서 볼 항목」 지정 없이(자동 선택 경로) 분석까지 끝난
+        것 중 가장 최근 결과(`ho` 41번, 중복 업로드 재사용).
+
+        🔴 지정이 있는 작업은 대상에서 뺀다 — 같은 영상이어도 어느 사람을
+        보라고 골랐는지가 다르면 측정 결과가 다를 수 있다. 없으면 `None`.
         """

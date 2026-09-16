@@ -29,14 +29,23 @@ Python 3.14 · FastAPI · SQLAlchemy(동기) · PostgreSQL 18 + pgvector · Alem
 .venv/bin/alembic upgrade head && .venv/bin/alembic check
 ```
 
-DB가 필요하다. WSL은 자동 기동이 아니다 — `pg_ctlcluster 18 main start`(root).
+DB가 필요하다. WSL은 자동 기동이 아니다. 🔴 **기동 방식은 환경마다 다르다**
+(`min` 21번, 2026-09-16) — 아래 순서로 확인한다.
+
+```bash
+cat .env | grep DATABASE_URL      # 실제로 어느 포트를 보는지가 정본이다
+docker ps -a | grep supersub-postgres   # 있으면 Docker 컨테이너다 —
+  # `docker start supersub-postgres`(포트는 보통 5433, `pg_ctlcluster`가 아니다)
+pg_ctlcluster 18 main start       # 위 둘 다 없으면 네이티브 설치다(root)
+```
 
 ---
 
 ## 구조 — 기술 계층이 아니라 **바운디드 컨텍스트**
 
 `app/<컨텍스트>/{domain,application,adapter,dependencies}`. 컨텍스트는
-`user` · `card` · `analysis` · `match` · `review` 다섯이고 공용은 `app/core/`다.
+`user` · `card` · `analysis` · `match` · `review` · `billing` · `notification`
+일곱이고 공용은 `app/core/`다.
 (목록의 정본은 `tests/test_architecture.py` 의 `CONTEXTS` — 실제 디렉터리와
 어긋나면 같은 파일의 `test_CONTEXTS가_실제_디렉터리와_일치한다` 가 잡는다.)
 
@@ -73,11 +82,19 @@ table("player_card", column("user_id"))       # 조회도 원시 SQL 로
 | 계약 테스트 | 상태 코드·에러 `code`·응답 형태 | 스텁 |
 | **DB 통합 테스트** (`@pytest.mark.db`) | 실제로 저장·조회·삭제되는가 | 진짜 PostgreSQL |
 
-🔴 **원시 SQL로 남의 테이블을 읽는 자리가 셋 있다**(`card`→`user.nickname`,
-`core/deps.py`→`user.token_version`·`email`, `user`→`player_card.user_id`).
-컨텍스트 경계를 지키려는 의도지만 **컬럼 이름을 바꾸면 파이썬이 잡아 주지 않는다.**
-`test_card_db.py`·`test_token_revocation_db.py`·`test_admin_db.py`가 유일한 방어선이다 —
+🔴 **원시 SQL로 남의 테이블을 읽는 자리는 DB 테스트가 유일한 방어선이다.**
+컨텍스트 경계를 지키려고 `table()`/`column()`으로 읽는 자리가 여러 곳이고
+(2026-09-16 기준 **저장소 11개 파일에 43군데**, 아래 명령으로 센다), 거기서는
+**저쪽 컬럼 이름이 바뀌어도 파이썬이 잡아 주지 않는다.** 그 컨텍스트의
+`@pytest.mark.db` 테스트가 실물 DB로 대조하는 것 말고는 걸리는 자리가 없다 —
 **지우거나 `@pytest.mark.db`를 떼지 말 것.**
+
+```bash
+grep -rn '^_[a-z_]* = table(' app/ --include='*.py' | wc -l
+```
+
+> 예전에 이 자리에 「셋 있다」며 목록을 적어 뒀는데 **금방 낡았다**(43군데가
+> 됐다). 자리를 세는 대신 규칙과 세는 명령을 둔다 — 목록은 어차피 늘어난다.
 
 DB가 없으면 통합 테스트는 **실패가 아니라 skip**이다. 초록색으로 끝나 놓치기 쉬우니
 **개수가 아니라 `skipped`가 0인지** 본다. CI는 skip이 있으면 exit 1을 낸다.

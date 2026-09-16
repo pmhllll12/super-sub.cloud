@@ -158,6 +158,10 @@ def test_적재된_네_테이블을_한_뷰로_조립한다(db_client, db_sessio
     assert body["breakdown"][1]["skipped"] is True
     assert body["breakdown"][1]["grade"] is None
     assert body["breakdown"][1]["stat"] is None  # 제외 항목은 축도 없다.
+    # `_envelope`가 schema_version "1.0"이라 `title_earned` 키가 없다 —
+    # 옛 적재분과 같은 모양, `null`이어야 한다(`ho` 40번, `false`로 안 채움).
+    assert body["breakdown"][0]["title_earned"] is None
+    assert body["breakdown"][1]["title_earned"] is None
 
     # scenes: 프레임 지표의 초 환산만.
     assert len(body["scenes"]) == 1
@@ -169,6 +173,23 @@ def test_적재된_네_테이블을_한_뷰로_조립한다(db_client, db_sessio
     assert "band" not in body["breakdown"][0]
     assert "weight" not in body["breakdown"][0]
     assert "contribution" not in body["breakdown"][0]
+
+
+def test_title_earned_이_실제로_저장되고_노출된다(db_client, db_session, owned):
+    """`ho` 40번 — schema_version 1.2. `False`가 `null`로 뭉개지지 않는가."""
+    env = _envelope()
+    env["schema_version"] = "1.2"
+    env["result"]["breakdown"][0]["title_earned"] = True
+    parsed = parse_report(json.dumps(env).encode())
+    ReportIngestPgRepository(db_session).replace_for_job(owned["job_id"], parsed)
+
+    res = db_client.get(
+        f"{V1}/videos/{owned['video_id']}/report", headers=owned["headers"]
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["breakdown"][0]["title_earned"] is True
+    assert body["breakdown"][1]["title_earned"] is None  # skipped 항목
 
 
 def test_재분석이면_최신_리포트를_보여준다(db_client, db_session, owned):

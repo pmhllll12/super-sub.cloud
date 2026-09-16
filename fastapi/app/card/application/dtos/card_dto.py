@@ -43,7 +43,9 @@ class PublicCardQuery:
 class TitleResult:
     code: str
     label: str
-    category: str
+    #: 사람이 직접 적은 호칭은 `None` 이다(`paik` 36번) — 분류는 부여되는
+    #: 호칭의 것이다. 자세한 이유는 `TitleEntity.category`.
+    category: str | None
     granted_at: datetime
 
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { TransitionLink } from '@/lib/pageTransition'
-import { LEVEL_LABEL, SPORT_LABEL, won, type Coach } from '@/lib/market'
+import { LEVEL_LABEL, won, type Coach } from '@/lib/market'
 import LessonApply, { LessonApplyButton } from './[id]/LessonApply'
 
 /**
@@ -125,9 +125,10 @@ export default function CoachDetail({
                   줄어들며 이름이 옆으로 흔들린다. */}
               <LessonApplyButton hidden={applyOpen} onClick={() => setApplyOpen(true)} />
             </div>
+            {/* 🔴 종목을 안 적는다(2026-09-16, 팀 결정: 풋살 하나만 한다) —
+                전부 같은 값이라 읽는 사람에게 아무것도 안 알려 준다. */}
             <p>
-              {SPORT_LABEL[coach.sport]} · {coach.region} · 회당{' '}
-              {won(coach.pricePerSession)}
+              {coach.region} · 회당 {won(coach.pricePerSession)}
             </p>
           </div>
         </div>

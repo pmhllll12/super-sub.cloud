@@ -5,17 +5,22 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from uuid import uuid4
 
 import pytest
 
 from app.analysis.adapter.outbound.stub.video_stub_repository import (
     _OBJECTS,
+    StubVideoRepository,
     put_object,
     register_card_slug,
     register_nickname,
+    register_report_grade,
+    register_trust_counts,
     reset_videos,
 )
+from app.analysis.domain.entities.video_entity import VideoEntity
 from app.analysis.domain.rules.video_rules import MAX_BYTES, MAX_DURATION_MS
 from app.core.security import issue_access_token
 from tests.conftest import V1, error_code
@@ -349,6 +354,146 @@ class TestRegisterVideo:
         assert res.status_code == 422
         assert error_code(res) == "UNKNOWN_SPORT"
 
+    def test_내려간_종목은_없는_종목과_다른_code_다(self, client):
+        """`ho` 39번 — 행은 있지만 루브릭이 없어 지금 안 받는 종목이다.
+
+        🔴 `UNKNOWN_SPORT`(없다)와 가른다. 화면이 「오타」와 「지금은 축구만」을
+        다르게 안내할 수 있어야 하고, 되살릴 때 행을 다시 넣을 필요도 없다.
+        """
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+
+        res = _register(client, user_id, key, sport_code="baseball")
+        assert res.status_code == 422
+        assert error_code(res) == "SPORT_NOT_AVAILABLE"
+
+
+class TestDuplicateDetection:
+    """`ho` 41번 — 같은 내용을 다시 올리면 새 작업 없이 앞선 결과를 알려준다."""
+
+    HASH = "deadbeef" * 4  # 32자, MD5 hex 자리수
+
+    def _seed_prior(self, user_id, *, status, failure_reason=None, **kw):
+        """분석까지 끝난 영상이 이미 있다고 스텁에 직접 심는다.
+
+        실제로는 등록→워커가 집음→완료 보고로 이 상태가 만들어지지만, 완료
+        보고 경로(`job_router`)는 별도 스텁 저장소(`job_stub_repository`)를
+        쓰고 `_VIDEOS`(영상 스텁)를 갱신하지 않는다 — 계약 테스트 층에서는
+        이 상태를 직접 구성하는 것이 맞다. 진짜 DB로 끝까지 잇는 흐름은
+        `test_video_db.py` 가 본다.
+        """
+        prior_id = uuid4()
+        StubVideoRepository().register(
+            VideoEntity(
+                id=prior_id,
+                user_id=user_id,
+                sport_code="football",
+                storage_key=f"videos/{user_id}/prior.mp4",
+                duration_ms=10_000,
+                side=None,
+                created_at=datetime.now(timezone.utc),
+                analysis_job_id=uuid4(),
+                analysis_status=status,
+                analysis_failure_reason=failure_reason,
+                content_hash=self.HASH,
+                **kw,
+            )
+        )
+        return prior_id
+
+    def test_같은_내용이_실패했었으면_새_작업_없이_그_사유를_알려준다(self, client):
+        user_id = uuid4()
+        prior_id = self._seed_prior(
+            user_id,
+            status="failed",
+            failure_reason="품질 게이트 미달: 하반신 스윙 측 키포인트 유효 프레임 비율 53% < 기준 70%.",
+        )
+
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK, content_hash=self.HASH)
+
+        res = _register(client, user_id, key)
+        assert res.status_code == 201, res.text
+        body = res.json()
+        # 새 작업은 안 만든다 — GPU를 또 태우지 않는다.
+        assert body["analysis_job_id"] is None
+        assert body["analysis_status"] is None
+        assert body["duplicate_of_video_id"] == str(prior_id)
+        assert body["duplicate_status"] == "failed"
+        assert "53%" in body["duplicate_failure_reason"]
+
+    def test_같은_내용이_성공했었으면_새_작업_없이_그_사실을_알려준다(self, client):
+        user_id = uuid4()
+        prior_id = self._seed_prior(user_id, status="succeeded")
+
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK, content_hash=self.HASH)
+
+        res = _register(client, user_id, key)
+        assert res.status_code == 201, res.text
+        body = res.json()
+        assert body["analysis_job_id"] is None
+        assert body["duplicate_of_video_id"] == str(prior_id)
+        assert body["duplicate_status"] == "succeeded"
+        assert body["duplicate_failure_reason"] is None
+
+    def test_내용_지문을_모르면_중복_판단을_안_한다(self, client):
+        """S3 가 ETag 를 못 주면(멀티파트 등) 중복 여부를 모른다로 처리한다."""
+        user_id = uuid4()
+        self._seed_prior(user_id, status="failed", failure_reason="사유")
+
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)  # content_hash 안 줌
+
+        res = _register(client, user_id, key)
+        body = res.json()
+        assert body["analysis_job_id"] is not None
+        assert body["duplicate_of_video_id"] is None
+
+    def test_다른_사람이_올린_같은_내용은_중복이_아니다(self, client):
+        """`user_id`로 좁힌다 — 남의 과거 결과를 빌려오지 않는다."""
+        other_user = uuid4()
+        self._seed_prior(other_user, status="failed", failure_reason="사유")
+
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK, content_hash=self.HASH)
+
+        res = _register(client, user_id, key)
+        body = res.json()
+        assert body["analysis_job_id"] is not None
+        assert body["duplicate_of_video_id"] is None
+
+    def test_박스_지정이_있으면_중복_판단을_안_한다(self, client):
+        """같은 영상이어도 누구를 보라고 골랐는지가 다르면 결과가 다를 수 있다."""
+        user_id = uuid4()
+        self._seed_prior(user_id, status="succeeded")
+
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK, content_hash=self.HASH)
+
+        res = _register(
+            client, user_id, key,
+            subject_box=[0.1, 0.1, 0.2, 0.2], subject_at_ms=100,
+        )
+        body = res.json()
+        assert body["analysis_job_id"] is not None
+        assert body["duplicate_of_video_id"] is None
+
+    def test_아직_끝나지_않은_동일_내용은_중복이_아니다(self, client):
+        """`queued`·`running` 인 것을 빌리면 안 끝난 결과를 답으로 준다."""
+        user_id = uuid4()
+        self._seed_prior(user_id, status="queued")
+
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK, content_hash=self.HASH)
+
+        res = _register(client, user_id, key)
+        body = res.json()
+        assert body["analysis_job_id"] is not None
+        assert body["duplicate_of_video_id"] is None
+
 
 class TestListMyVideos:
     def test_인증이_필요하다(self, client):
@@ -536,7 +681,11 @@ class TestListPublicVideos:
             "description",
             "uploader_nickname",
             "uploader_card_slug",
+            "width",
+            "height",
         }
+        # `_register`가 보내는 기본값(`paik` 15번) — 화면 비율이 실제로 실린다.
+        assert (row["width"], row["height"]) == (1920, 1080)
         assert row["uploader_nickname"] == "업로더"
         assert row["uploader_card_slug"] is None
 
@@ -670,6 +819,88 @@ class TestFeaturedRead:
         )
         assert res.status_code == 404
         assert error_code(res) == "NO_FEATURED_VIDEO"
+
+
+class TestCardGrade:
+    """`GET /cards/{slug}/grade` — 남의 표시 등급 (미결 `paik` 25·26번)."""
+
+    def test_인증이_필요하다(self, client):
+        assert client.get(f"{V1}/cards/some-slug/grade").status_code == 401
+
+    def test_없는_슬러그는_404_다(self, client):
+        res = client.get(f"{V1}/cards/누구도-아님/grade", headers=_headers(uuid4()))
+        assert res.status_code == 404
+        assert error_code(res) == "CARD_NOT_FOUND"
+
+    def test_대표_영상이_없으면_등급이_null이다(self, client):
+        owner = uuid4()
+        register_card_slug("no-report-1a2b", owner)  # 슬러그는 있지만 분석 없음
+
+        res = client.get(
+            f"{V1}/cards/no-report-1a2b/grade", headers=_headers(uuid4())
+        )
+        assert res.status_code == 200, res.text
+        body = res.json()
+        assert body["grade"] is None
+        assert body["provisional"] is None
+
+    def test_리뷰가_없는_A는_S가_아니라_그대로_온다(self, client):
+        owner = uuid4()
+        register_card_slug("grade-a-plain", owner)
+        register_report_grade(owner, "A", provisional=False)
+
+        res = client.get(
+            f"{V1}/cards/grade-a-plain/grade", headers=_headers(uuid4())
+        )
+        assert res.status_code == 200, res.text
+        assert res.json() == {"grade": "A", "provisional": False}
+
+    def test_신뢰_우세인_A는_S로_오른다(self, client):
+        owner = uuid4()
+        register_card_slug("grade-a-trusted", owner)
+        register_report_grade(owner, "A", provisional=False)
+        register_trust_counts(owner, positive=4, total=4)  # 하한 0.510 > 0.5
+
+        res = client.get(
+            f"{V1}/cards/grade-a-trusted/grade", headers=_headers(uuid4())
+        )
+        assert res.status_code == 200, res.text
+        assert res.json() == {"grade": "S", "provisional": False}
+
+    def test_신뢰_우세_아닌_D는_F로_내려간다(self, client):
+        owner = uuid4()
+        register_card_slug("grade-d-plain", owner)
+        register_report_grade(owner, "D", provisional=True)
+
+        res = client.get(
+            f"{V1}/cards/grade-d-plain/grade", headers=_headers(uuid4())
+        )
+        assert res.status_code == 200, res.text
+        assert res.json() == {"grade": "F", "provisional": True}
+
+    def test_provisional을_등급과_함께_내려준다(self, client):
+        """26번 「하지 말 것」 — 등급 문자만 떼어 내보내지 않는다."""
+        owner = uuid4()
+        register_card_slug("grade-provisional", owner)
+        register_report_grade(owner, "B", provisional=True)
+
+        res = client.get(
+            f"{V1}/cards/grade-provisional/grade", headers=_headers(uuid4())
+        )
+        assert res.status_code == 200, res.text
+        assert res.json() == {"grade": "B", "provisional": True}
+
+    def test_리포트_전체가_아니라_등급_한_칸만_준다(self, client):
+        """25번 「하지 말 것」 — 근거 문장·수치가 새면 안 된다."""
+        owner = uuid4()
+        register_card_slug("grade-narrow", owner)
+        register_report_grade(owner, "C", provisional=False)
+
+        res = client.get(
+            f"{V1}/cards/grade-narrow/grade", headers=_headers(uuid4())
+        )
+        assert res.status_code == 200, res.text
+        assert set(res.json()) == {"grade", "provisional"}
 
 
 class TestPlaybackUrl:

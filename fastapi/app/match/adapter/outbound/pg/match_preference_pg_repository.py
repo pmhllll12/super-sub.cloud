@@ -33,11 +33,19 @@ from app.match.domain.entities.match_preference_entity import (
     MemberPreferenceSummaryEntity,
     RegionFactEntity,
     SlotEntity,
+    SquadCandidateFactsEntity,
+    SquadRecruitmentFactsEntity,
     TeamPreferenceEntity,
 )
+from app.match.domain.rules.candidate_grade_rules import (
+    display_grade,
+    is_trust_dominant,
+)
+from app.match.domain.rules.match_preference_rules import overlap_minutes
 
 # 소유하지 않는 테이블에서 **읽기만** 한다. 위 docstring 참조.
 _team = table("team", column("id"), column("name"), column("region"))
+_team_sport = table("team", column("id"), column("sport_code"))
 _team_member = table(
     "team_member",
     column("team_id"),
@@ -47,12 +55,42 @@ _team_member = table(
 )
 _user = table("user", column("id"), column("nickname"))
 _position = table("position", column("id"))
+_position_full = table(
+    "position", column("id"), column("sport_code"), column("code")
+)
 _region = table(
     "region", column("id"), column("city"), column("district")
 )
 _squad = table("squad", column("id"), column("team_id"), column("formation"))
 _squad_member = table("squad_member", column("squad_id"), column("player_card_id"))
 _match = table("match", column("team_id"), column("played_at"))
+# `card` 컨텍스트 — 스쿼드 등재는 카드 단위지 사람 단위가 아니라서 이걸 거쳐야
+# 사람(user_id)이 나온다(`paik` 27번).
+_player_card = table("player_card", column("id"), column("user_id"), column("public_slug"))
+# `analysis` 컨텍스트 — 후보의 표시 등급(`paik` 25·26·27번). `find_card_grade`
+# (`app/analysis/adapter/outbound/pg/video_pg_repository.py`)와 같은 조인이지만
+# 컨텍스트끼리 임포트하지 않아서 복제한다.
+_video = table(
+    "video", column("id"), column("user_id"), column("is_featured"), column("created_at")
+)
+_analysis_job = table("analysis_job", column("id"), column("video_id"))
+_analysis_metric = table(
+    "analysis_metric", column("id"), column("analysis_job_id"), column("created_at")
+)
+_analysis_report = table(
+    "analysis_report",
+    column("analysis_metric_id"),
+    column("overall_grade"),
+    column("provisional"),
+)
+# `review` 컨텍스트 — 신뢰 축(재매칭 의사). `analysis`가 이미 하는 것과 같은
+# 복제(위 파일의 grade_rules 절 참조).
+_review = table("review", column("id"), column("reviewee_id"))
+_review_selection = table(
+    "review_selection", column("review_id"), column("option_code")
+)
+_TRUST_POSITIVE_CODE = "repeat_yes"
+_TRUST_OPTION_CODES = (_TRUST_POSITIVE_CODE, "caution_would_not_repeat")
 
 
 class MatchPreferencePgRepository(MatchPreferencePort):
@@ -373,6 +411,223 @@ class MatchPreferencePgRepository(MatchPreferencePort):
                 )
             )
         return results
+
+    # ── 빈 자리 후보 (paik 27번) ────────────────────────────────────
+
+    def find_position(self, team_id: UUID, code: str) -> UUID | None:
+        stmt = (
+            select(_position_full.c.id)
+            .select_from(
+                _position_full.join(
+                    _team_sport, _position_full.c.sport_code == _team_sport.c.sport_code
+                )
+            )
+            .where(_team_sport.c.id == team_id, _position_full.c.code == code)
+        )
+        row = self._session.execute(stmt).first()
+        return row[0] if row else None
+
+    def squad_recruitment_facts(
+        self, team_id: UUID, position_id: UUID
+    ) -> SquadRecruitmentFactsEntity:
+        squad_id = self._session.execute(
+            select(_squad.c.id).where(_squad.c.team_id == team_id)
+        ).scalar_one_or_none()
+
+        # 하드 필터 1: 이미 이 스쿼드에 앉은 사람 (카드 → user_id).
+        seated_user_ids: set[UUID] = set()
+        if squad_id is not None:
+            seated_user_ids = set(
+                self._session.execute(
+                    select(_player_card.c.user_id)
+                    .select_from(
+                        _squad_member.join(
+                            _player_card,
+                            _player_card.c.id == _squad_member.c.player_card_id,
+                        )
+                    )
+                    .where(_squad_member.c.squad_id == squad_id)
+                ).scalars()
+            )
+
+        # 하드 필터 2: 이 팀의 현재 소속(나간 사람은 이미 빠졌다).
+        team_member_ids = set(
+            self._session.execute(
+                select(_team_member.c.user_id).where(
+                    _team_member.c.team_id == team_id,
+                    _team_member.c.left_at.is_(None),
+                )
+            ).scalars()
+        )
+        excluded = seated_user_ids | team_member_ids
+
+        # 후보 원자료: 그 포지션을 등록했고 제외 대상이 아닌 사람.
+        candidate_ids = set(
+            self._session.execute(
+                select(MemberMatchPositionOrm.user_id).where(
+                    MemberMatchPositionOrm.position_id == position_id
+                )
+            ).scalars()
+        ) - excluded
+
+        # 하드 필터 3: 팀이 경기 시간을 등록해 뒀으면 그 시간과 겹치는 후보만
+        # (팀이 안 등록했으면 이 필터는 건너뛴다 — `paik` 20번과 같은 완화).
+        team_slots = self._session.execute(
+            select(
+                TeamMatchSlotOrm.weekday,
+                TeamMatchSlotOrm.start_time,
+                TeamMatchSlotOrm.end_time,
+            ).where(TeamMatchSlotOrm.team_id == team_id)
+        ).all()
+        if team_slots and candidate_ids:
+            member_slots = self._session.execute(
+                select(
+                    MemberMatchSlotOrm.user_id,
+                    MemberMatchSlotOrm.weekday,
+                    MemberMatchSlotOrm.start_time,
+                    MemberMatchSlotOrm.end_time,
+                ).where(MemberMatchSlotOrm.user_id.in_(candidate_ids))
+            ).all()
+            available: set[UUID] = set()
+            for uid, weekday, start, end in member_slots:
+                if uid in available:
+                    continue
+                for tw, ts, te in team_slots:
+                    if overlap_minutes(weekday, start, end, tw, ts, te) > 0:
+                        available.add(uid)
+                        break
+            candidate_ids &= available
+
+        grades = self._grades_for(list(candidate_ids | seated_user_ids))
+        seated_grades = [
+            g for uid in seated_user_ids if (g := grades.get(uid, (None, None))[0])
+        ]
+        if not candidate_ids:
+            return SquadRecruitmentFactsEntity(
+                seated_grades=seated_grades, candidates=[]
+            )
+
+        nicknames = dict(
+            self._session.execute(
+                select(_user.c.id, _user.c.nickname).where(
+                    _user.c.id.in_(candidate_ids)
+                )
+            ).all()
+        )
+        slugs = dict(
+            self._session.execute(
+                select(_player_card.c.user_id, _player_card.c.public_slug).where(
+                    _player_card.c.user_id.in_(candidate_ids)
+                )
+            ).all()
+        )
+        last_active = dict(
+            self._session.execute(
+                select(_video.c.user_id, _video.c.created_at).where(
+                    _video.c.user_id.in_(candidate_ids),
+                    _video.c.is_featured.is_(True),
+                )
+            ).all()
+        )
+
+        candidates = [
+            SquadCandidateFactsEntity(
+                user_id=uid,
+                nickname=nicknames.get(uid, ""),
+                card_public_slug=slugs.get(uid),
+                grade=grades.get(uid, (None, None))[0],
+                provisional=grades.get(uid, (None, None))[1],
+                last_active_at=last_active.get(uid),
+            )
+            for uid in candidate_ids
+        ]
+        return SquadRecruitmentFactsEntity(
+            seated_grades=seated_grades, candidates=candidates
+        )
+
+    def _grades_for(
+        self, user_ids: list[UUID]
+    ) -> dict[UUID, tuple[str | None, bool | None]]:
+        """`user_id` → (표시 등급, `provisional`). 대표 영상이 없거나 분석
+        전이면 `(None, None)` — `analysis`의 `find_card_grade`와 같은 조인을
+        복제한다(컨텍스트 경계, 위 테이블 정의 참조).
+        """
+        if not user_ids:
+            return {}
+
+        featured_video: dict[UUID, UUID] = dict(
+            self._session.execute(
+                select(_video.c.user_id, _video.c.id).where(
+                    _video.c.user_id.in_(user_ids), _video.c.is_featured.is_(True)
+                )
+            ).all()
+        )
+
+        report_by_video: dict[UUID, tuple[str | None, bool | None]] = {}
+        if featured_video:
+            video_ids = list(featured_video.values())
+            rows = self._session.execute(
+                select(
+                    _analysis_job.c.video_id,
+                    _analysis_report.c.overall_grade,
+                    _analysis_report.c.provisional,
+                )
+                .select_from(
+                    _analysis_job.join(
+                        _analysis_metric,
+                        _analysis_metric.c.analysis_job_id == _analysis_job.c.id,
+                    ).join(
+                        _analysis_report,
+                        _analysis_report.c.analysis_metric_id
+                        == _analysis_metric.c.id,
+                    )
+                )
+                .where(_analysis_job.c.video_id.in_(video_ids))
+                .order_by(_analysis_metric.c.created_at.desc())
+            ).all()
+            for video_id, grade, provisional in rows:
+                # 재분석은 여러 리포트를 남긴다 — DESC 순서라 먼저 만난 것이
+                # 최신이다. `paik` 21번(임팩트 순간)과 같은 "먼저 만난 것이
+                # 최신" 관례.
+                report_by_video.setdefault(video_id, (grade, provisional))
+
+        joined = _review.join(
+            _review_selection, _review_selection.c.review_id == _review.c.id
+        )
+        totals = dict(
+            self._session.execute(
+                select(_review.c.reviewee_id, func.count(func.distinct(_review.c.id)))
+                .select_from(joined)
+                .where(
+                    _review.c.reviewee_id.in_(user_ids),
+                    _review_selection.c.option_code.in_(_TRUST_OPTION_CODES),
+                )
+                .group_by(_review.c.reviewee_id)
+            ).all()
+        )
+        positives = dict(
+            self._session.execute(
+                select(_review.c.reviewee_id, func.count(func.distinct(_review.c.id)))
+                .select_from(joined)
+                .where(
+                    _review.c.reviewee_id.in_(user_ids),
+                    _review_selection.c.option_code == _TRUST_POSITIVE_CODE,
+                )
+                .group_by(_review.c.reviewee_id)
+            ).all()
+        )
+
+        result: dict[UUID, tuple[str | None, bool | None]] = {}
+        for uid in user_ids:
+            video_id = featured_video.get(uid)
+            overall_grade, provisional = (
+                report_by_video.get(video_id, (None, None))
+                if video_id is not None
+                else (None, None)
+            )
+            trust_dominant = is_trust_dominant(positives.get(uid, 0), totals.get(uid, 0))
+            result[uid] = (display_grade(overall_grade, trust_dominant), provisional)
+        return result
 
 
 def _required_headcount(formation: str) -> int:

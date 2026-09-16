@@ -34,6 +34,10 @@ class ReportCriterionView:
     name: str
     grade: int | None       # None = 제외(skipped). 0 점이 아니다.
     title: str | None
+    # 「받은 호칭」인가(`paik` 23·`ho` 40번). `title`은 모든 등급에 있어서
+    # 유무로 못 가른다 — 참인 항목의 `title`만 「받은 호칭」으로 그린다.
+    # `skipped`나 이 필드가 생기기 전 적재분은 None(거짓으로 지어내지 않음).
+    title_earned: bool | None
     evidence: str | None
     metric_ref: str | None
     skipped: bool

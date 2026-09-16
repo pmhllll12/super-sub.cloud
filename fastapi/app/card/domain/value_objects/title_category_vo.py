@@ -15,3 +15,8 @@ class TitleCategory(StrEnum):
     STRENGTH = "강점"
     ACTIVITY = "활동"
     MERCENARY = "용병"
+
+    # 🔴 **여기에 값을 더하지 않는다.** `tests/card/domain/test_card_rules.py`
+    # 의 「부록 D 가 정의한 셋만 있다」가 이 목록을 부록 D 에 묶어 둔다.
+    # 사람이 직접 적는 호칭(`paik` 36번)은 분류가 **없다** — 새 분류를
+    # 만드는 대신 `TitleEntity.category` 를 `None` 으로 둔다(2026-09-16).

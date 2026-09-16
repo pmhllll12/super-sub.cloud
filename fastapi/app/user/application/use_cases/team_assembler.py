@@ -2,8 +2,16 @@
 
 from __future__ import annotations
 
-from app.user.application.dtos.team_dto import TeamMemberResult, TeamResult
-from app.user.domain.entities.team_entity import TeamEntity, TeamMemberEntity
+from app.user.application.dtos.team_dto import (
+    TeamInvitationResult,
+    TeamMemberResult,
+    TeamResult,
+)
+from app.user.domain.entities.team_entity import (
+    TeamEntity,
+    TeamInvitationEntity,
+    TeamMemberEntity,
+)
 
 
 def to_team_result(
@@ -25,4 +33,17 @@ def to_team_result(
             )
             for m in members
         ],
+    )
+
+
+def to_team_invitation_result(
+    invitation: TeamInvitationEntity,
+) -> TeamInvitationResult:
+    return TeamInvitationResult(
+        id=invitation.id,
+        team_id=invitation.team_id,
+        invited_user_id=invitation.invited_user_id,
+        status=invitation.status,
+        created_at=invitation.created_at,
+        responded_at=invitation.responded_at,
     )

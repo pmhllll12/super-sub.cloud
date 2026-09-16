@@ -19,6 +19,13 @@ TEAM_MATCH_REJECTED = "team_match_rejected"
 TEAM_MATCH_REQUEST_CANCELLED = "team_match_request_cancelled"
 TEAM_MATCH_CANCELLED = "team_match_cancelled"
 
+# `team_invitation`(user 컨텍스트, `min` 20번)가 만드는 알림 세 가지. 무르기
+# (cancel)는 보낸 쪽이 스스로 하는 것이라 알림이 없다(`team_match_request`의
+# `cancel`과 같은 판단).
+TEAM_INVITATION_SENT = "team_invitation_sent"
+TEAM_INVITATION_ACCEPTED = "team_invitation_accepted"
+TEAM_INVITATION_REJECTED = "team_invitation_rejected"
+
 KNOWN_TYPES = frozenset(
     {
         CONTACT_REQUEST,
@@ -28,5 +35,8 @@ KNOWN_TYPES = frozenset(
         TEAM_MATCH_REJECTED,
         TEAM_MATCH_REQUEST_CANCELLED,
         TEAM_MATCH_CANCELLED,
+        TEAM_INVITATION_SENT,
+        TEAM_INVITATION_ACCEPTED,
+        TEAM_INVITATION_REJECTED,
     }
 )

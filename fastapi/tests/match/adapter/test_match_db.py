@@ -55,13 +55,23 @@ def world(db_client, db_session):
 
     teams = {}
     for sport in ("football", "baseball", "basketball"):
+        # 🔴 **축구로 만들고 종목은 뒤에서 바꾼다**(`ho` 39번, 2026-09-16).
+        # 야구·농구는 `sport.active=false` 라 API 로 새로 못 만든다. 여기
+        # 필요한 것은 **이미 그 종목으로 있는 옛 팀**이고(실제로 DB 에 있다),
+        # 이 검사들이 보는 것도 "종목이 다르면 포지션이 안 맞는다" 쪽이다.
         res = db_client.post(
             f"{V1}/teams",
-            json={"name": f"{sport}팀", "region": "서울", "sport_code": sport},
+            json={"name": f"{sport}팀", "region": "서울", "sport_code": "football"},
             headers=owner["headers"],
         )
         assert res.status_code == 201, res.text
         teams[sport] = res.json()["id"]
+        if sport != "football":
+            db_session.execute(
+                text("update team set sport_code = :s where id = :i"),
+                {"s": sport, "i": teams[sport]},
+            )
+            db_session.commit()
 
     res = db_client.post(
         f"{V1}/teams/{teams['football']}/members",

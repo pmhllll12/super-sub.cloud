@@ -13,21 +13,38 @@ from fastapi import APIRouter, status
 from app.core.deps import CurrentUserId
 from app.user.adapter.inbound.api.schemas.team_schema import (
     AddMemberSchema,
+    CreateTeamInvitationSchema,
     CreateTeamSchema,
+    TeamInvitationResponse,
     TeamResponse,
+    UpdateTeamSchema,
 )
 from app.user.application.dtos.team_dto import (
+    CancelTeamInvitationCommand,
     CreateTeamCommand,
+    CreateTeamInvitationCommand,
     JoinTeamCommand,
     LeaveTeamCommand,
+    MyTeamInvitationsQuery,
+    RespondTeamInvitationCommand,
+    TeamInvitationResult,
+    TeamInvitationsQuery,
     TeamQuery,
     TeamResult,
+    UpdateTeamCommand,
 )
 from app.user.dependencies.team_providers import (
+    AcceptTeamInvitationUseCaseDep,
+    CancelTeamInvitationUseCaseDep,
+    CreateTeamInvitationUseCaseDep,
     CreateTeamUseCaseDep,
     JoinTeamUseCaseDep,
     LeaveTeamUseCaseDep,
+    ListMyTeamInvitationsUseCaseDep,
+    ListTeamInvitationsUseCaseDep,
     ReadTeamUseCaseDep,
+    RejectTeamInvitationUseCaseDep,
+    UpdateTeamUseCaseDep,
 )
 
 team_router = APIRouter(tags=["teams"])
@@ -56,6 +73,36 @@ def read_team(
 ) -> TeamResult:
     """팀과 현재 구성원. 소속이 아니어도 볼 수 있다(가입하려면 먼저 봐야 한다)."""
     return use_case(TeamQuery(actor_id=user_id, team_id=team_id))
+
+
+@team_router.patch("/teams/{team_id}", response_model=TeamResponse)
+def update_team(
+    team_id: UUID,
+    body: UpdateTeamSchema,
+    user_id: CurrentUserId,
+    use_case: UpdateTeamUseCaseDep,
+) -> TeamResult:
+    """팀 이름·지역을 고친다. **주장만.**
+
+    지금까지 팀은 만들 때 적은 값이 영영 고정이었다 — 지역은 경기 탐색
+    (`GET /matches?region=`)이 거르는 값이라 틀리면 그 팀이 검색에서 안 걸린다.
+
+    | | |
+    |---|---|
+    | 403 `FORBIDDEN` | 주장이 아니다 |
+    | 404 `TEAM_NOT_FOUND` | 없는 팀이다 |
+    | 422 `VALIDATION_ERROR` | 빈 값·길이 초과·`null`(지우기는 안 된다) |
+
+    🔴 `sport_code` 는 못 바꾼다 — 본문에 자리가 없다(`UpdateTeamSchema` 참고).
+    """
+    return use_case(
+        UpdateTeamCommand(
+            actor_id=user_id,
+            team_id=team_id,
+            name=body.name,
+            region=body.region,
+        )
+    )
 
 
 @team_router.post(
@@ -87,4 +134,122 @@ def remove_team_member(
     """탈퇴(본인)하거나 방출한다(주장). **행은 지우지 않고 `left_at` 을 채운다.**"""
     use_case(
         LeaveTeamCommand(actor_id=user_id, team_id=team_id, user_id=member_id)
+    )
+
+
+# ---------------------------------------------------------------------------
+# 팀 초대 (`team_invitation`). `min` 20번.
+#
+# 동의 없이 `POST /teams/{id}/members`로 바로 넣지 않는다(2026-09-10 박민호
+# 결정) — 초대를 보내고 **받은 사람 본인이 수락해야** 소속이 된다.
+# ---------------------------------------------------------------------------
+
+
+@team_router.post(
+    "/teams/{team_id}/invitations",
+    response_model=TeamInvitationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_team_invitation(
+    team_id: UUID,
+    body: CreateTeamInvitationSchema,
+    user_id: CurrentUserId,
+    use_case: CreateTeamInvitationUseCaseDep,
+) -> TeamInvitationResult:
+    """우리 팀(`team_id`)이 개인을 초대한다. **주장만.**
+
+    받은 사람에게 알림(`team_invitation_sent`)이 간다.
+
+    | | |
+    |---|---|
+    | 403 `FORBIDDEN` | 주장이 아니다 |
+    | 404 `USER_NOT_FOUND` | 그 사람이 없다 |
+    | 409 `ALREADY_MEMBER` | 이미 이 팀의 구성원이다 |
+    | 409 `ALREADY_INVITED` | 이미 그 사람에게 보낸 대기 중 초대가 있다 |
+    """
+    return use_case(
+        CreateTeamInvitationCommand(
+            actor_id=user_id, team_id=team_id, invited_user_id=body.invited_user_id
+        )
+    )
+
+
+@team_router.get(
+    "/teams/{team_id}/invitations",
+    response_model=list[TeamInvitationResponse],
+)
+def list_team_invitations(
+    team_id: UUID,
+    user_id: CurrentUserId,
+    use_case: ListTeamInvitationsUseCaseDep,
+) -> list[TeamInvitationResult]:
+    """그 팀이 보낸 초대 전부(상태 무관), 최신순. **주장만** 본다."""
+    return use_case(TeamInvitationsQuery(actor_id=user_id, team_id=team_id))
+
+
+@team_router.get("/me/invitations", response_model=list[TeamInvitationResponse])
+def list_my_invitations(
+    user_id: CurrentUserId, use_case: ListMyTeamInvitationsUseCaseDep
+) -> list[TeamInvitationResult]:
+    """내가 받은, 아직 답 안 한 초대 목록."""
+    return use_case(MyTeamInvitationsQuery(user_id=user_id))
+
+
+@team_router.post(
+    "/me/invitations/{invitation_id}/accept",
+    response_model=TeamInvitationResponse,
+)
+def accept_team_invitation(
+    invitation_id: UUID,
+    user_id: CurrentUserId,
+    use_case: AcceptTeamInvitationUseCaseDep,
+) -> TeamInvitationResult:
+    """받은 사람 본인이 수락한다. **그 팀의 구성원이 된다.**
+
+    | | |
+    |---|---|
+    | 404 `TEAM_INVITATION_NOT_FOUND` | 초대가 없다 |
+    | 403 `FORBIDDEN` | 내가 받은 사람이 아니다 |
+    | 409 `TEAM_INVITATION_ALREADY_RESPONDED` | 이미 답이 났다 |
+    """
+    return use_case(
+        RespondTeamInvitationCommand(actor_id=user_id, invitation_id=invitation_id)
+    )
+
+
+@team_router.post(
+    "/me/invitations/{invitation_id}/reject",
+    response_model=TeamInvitationResponse,
+)
+def reject_team_invitation(
+    invitation_id: UUID,
+    user_id: CurrentUserId,
+    use_case: RejectTeamInvitationUseCaseDep,
+) -> TeamInvitationResult:
+    """받은 사람 본인이 거절한다. 팀 주장(들)에게 알림이 간다."""
+    return use_case(
+        RespondTeamInvitationCommand(actor_id=user_id, invitation_id=invitation_id)
+    )
+
+
+@team_router.delete(
+    "/teams/{team_id}/invitations/{invitation_id}",
+    response_model=TeamInvitationResponse,
+)
+def cancel_team_invitation(
+    team_id: UUID,
+    invitation_id: UUID,
+    user_id: CurrentUserId,
+    use_case: CancelTeamInvitationUseCaseDep,
+) -> TeamInvitationResult:
+    """보낸 팀(`team_id`) 주장이 스스로 무른다. **아직 `pending`일 때만.**
+
+    🔴 `204`가 아니라 무른 초대를 그대로 돌려준다 — `team_match_request`의
+    취소와 같은 이유(삭제라기보다 상태 전이라서, 클라이언트가 같은 파서를
+    쓸 수 있다).
+    """
+    return use_case(
+        CancelTeamInvitationCommand(
+            actor_id=user_id, team_id=team_id, invitation_id=invitation_id
+        )
     )

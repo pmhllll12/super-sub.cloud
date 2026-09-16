@@ -134,6 +134,13 @@ class VideoResponse(BaseModel):
     description: str | None
     kept: bool
     is_featured: bool
+    # 같은 내용의 다른(자기) 영상 결과를 재사용했으면 그 영상(`ho` 41번,
+    # 중복 업로드). 등록 응답에서만 `duplicate_status`/`duplicate_failure_
+    # reason` 도 함께 채워진다 — 그 결과를 자세히 보려면 이 id로
+    # `GET /videos/{id}/report` 를 부른다.
+    duplicate_of_video_id: UUID | None
+    duplicate_status: str | None
+    duplicate_failure_reason: str | None
 
 
 class UpdateVideoSchema(BaseModel):
@@ -174,11 +181,29 @@ class FeaturedVideoResponse(BaseModel):
     duration_ms: int | None
 
 
+class CardGradeResponse(BaseModel):
+    """카드 슬러그의 **표시 등급**(미결 `paik` 25·26번). `GET /cards/{slug}/grade`.
+
+    `S`·`A`·`B`·`C`·`D`·`F` 여섯 중 하나 — 계산 규칙은 `grade_rules.py`(재매칭
+    의사의 Wilson 95% 신뢰구간). 대표 영상이 없거나 분석 전이면 `grade` 가
+    `null`이다. **`provisional`이 `true`인 동안은 화면에 "검수 전"을 달아야
+    한다** — 등급 문자만 떼어 쓰지 않는다(`paik` 26번).
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    grade: str | None
+    provisional: bool | None
+
+
 class PublicVideoResponse(BaseModel):
     """홈 영상 모음 한 줄. **저장 키는 안 실린다** — 저장 키엔 업로더 `user_id`가
     그대로 들어 있어서다. 업로더는 대신 `uploader_nickname`(항상 있음)과
     `uploader_card_slug`(카드를 만들었으면, 없으면 `null`)로 싣는다(`paik`
     16번). 재생은 `GET /videos/{id}/playback-url`로 따로 받는다.
+
+    `width`·`height`는 화면 비율(`paik` 15번) — 이 컬럼이 생기기 전 등록분은
+    둘 다 `null`이다. 그럴 땐 화면이 16:9로 가정해도 된다(기존 동작).
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -191,6 +216,8 @@ class PublicVideoResponse(BaseModel):
     description: str | None
     uploader_nickname: str
     uploader_card_slug: str | None
+    width: int | None
+    height: int | None
 
 
 class AdminVideoRowResponse(BaseModel):
@@ -239,6 +266,10 @@ class ReportCriterionResponse(BaseModel):
     name: str
     grade: int | None  # None = 제외. 0 점이 아니다.
     title: str | None
+    # 「받은 호칭」인가(`paik` 23·`ho` 40번). `title`은 모든 등급에 있어서
+    # 유무로 「받은 호칭」을 못 가른다 — 참인 항목만 그렇게 그린다. `None`은
+    # `skipped`거나 이 필드가 생기기 전 적재분 — 거짓으로 지어내지 않는다.
+    title_earned: bool | None
     evidence: str | None
     metric_ref: str | None
     skipped: bool

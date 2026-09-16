@@ -66,6 +66,7 @@ class FakeCardRepository(CardPort):
         self.created_for: list[UUID] = []
         self.tagline_calls: list[tuple[UUID, str | None]] = []
         self.style_calls: list[tuple[UUID, dict | None]] = []
+        self.custom_title_calls: list[tuple[UUID, list[str]]] = []
 
     def find_by_owner(self, user_id: UUID) -> CardEntity | None:
         return _card() if user_id == _OWNER_ID else None
@@ -94,6 +95,25 @@ class FakeCardRepository(CardPort):
         if user_id != _OWNER_ID:
             return None
         return replace(_card(), style=style)
+
+    def replace_custom_titles(
+        self, user_id: UUID, labels: list[str]
+    ) -> CardEntity | None:
+        # `update_tagline` 과 같은 이유로 받은 값을 그대로 남긴다 —
+        # 인터랙터가 **정규화한 뒤** 부르는지 확인하려면 보여야 한다.
+        self.custom_title_calls.append((user_id, labels))
+        if user_id != _OWNER_ID:
+            return None
+        written = [
+            TitleEntity(
+                code=f"custom:{i}",
+                label=label,
+                category=None,
+                granted_at=datetime(2026, 9, 16, tzinfo=timezone.utc),
+            )
+            for i, label in enumerate(labels)
+        ]
+        return replace(_card(), titles=[*_card().titles, *written])
 
 
 class TestMyCardInteractor:

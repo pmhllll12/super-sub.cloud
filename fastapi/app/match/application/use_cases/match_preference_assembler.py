@@ -13,6 +13,7 @@ from app.match.application.dtos.match_preference_dto import (
     MemberPreferenceResult,
     MemberPreferenceSummaryResult,
     SlotInput,
+    SquadCandidateResult,
     TeamPreferenceResult,
 )
 from app.match.domain.entities.match_preference_entity import (
@@ -21,8 +22,11 @@ from app.match.domain.entities.match_preference_entity import (
     MemberPreferenceSummaryEntity,
     RegionFactEntity,
     SlotEntity,
+    SquadCandidateFactsEntity,
+    SquadRecruitmentFactsEntity,
     TeamPreferenceEntity,
 )
+from app.match.domain.rules.candidate_grade_rules import skill_value
 from app.match.domain.rules.match_preference_rules import (
     overlap_minutes,
     region_tier,
@@ -166,3 +170,53 @@ def to_candidate_result(
     # (죽은 팀이 위로 안 오게 — `paik` 20번 정상호 회신).
     rows.sort(key=lambda row: (row[0] <= 0, -row[0], -row[1]))
     return [row[2] for row in rows]
+
+
+def _to_squad_candidate_result(c: SquadCandidateFactsEntity) -> SquadCandidateResult:
+    return SquadCandidateResult(
+        user_id=c.user_id,
+        nickname=c.nickname,
+        card_public_slug=c.card_public_slug,
+        grade=c.grade,
+        provisional=c.provisional,
+    )
+
+
+def _average_skill(seated_grades: list[str]) -> float | None:
+    """이미 앉은 사람들의 실력 축 평균. 등급 없는 사람은 셈에서 뺀다
+    (`ho` 21번과 같은 판단) — 아무도 등급이 없으면 `None`."""
+    values = [v for g in seated_grades if (v := skill_value(g)) is not None]
+    if not values:
+        return None
+    return sum(values) / len(values)
+
+
+def to_squad_candidate_results(
+    facts: SquadRecruitmentFactsEntity, wanted_grade: str | None
+) -> list[SquadCandidateResult]:
+    """`paik` 27번. `wanted_grade`가 있으면(사용자가 직접 고른 칸) 그 칸으로
+    **하드 필터**하고 최근 활동순만 매긴다. 없으면 **거르지 않고** 팀 평균과의
+    실력 축 거리로 정렬한다(정상호 회신 — 기본값은 거르지 말고 정렬하길
+    권함). 🔴 거리·점수는 정렬에만 쓰고 응답에는 안 싣는다(20번과 같은 원칙).
+    """
+
+    def _recency(c: SquadCandidateFactsEntity) -> float:
+        return c.last_active_at.timestamp() if c.last_active_at else 0.0
+
+    if wanted_grade is not None:
+        chosen = [c for c in facts.candidates if c.grade == wanted_grade]
+        chosen.sort(key=lambda c: -_recency(c))
+        return [_to_squad_candidate_result(c) for c in chosen]
+
+    team_avg = _average_skill(facts.seated_grades)
+    rows: list[tuple[bool, float, float, SquadCandidateFactsEntity]] = []
+    for c in facts.candidates:
+        value = skill_value(c.grade)
+        no_grade = value is None
+        # 🔴 「등급을 모르는 사람」은 거리 축에 안 올린다 — 모르는 값에 자리를
+        # 주면 안 잰 것이 근거가 된다(`ho` 21번). 뒤로 보내고, 그 안에서는
+        # 최근 활동순으로만 가른다.
+        distance = 0.0 if (no_grade or team_avg is None) else abs(value - team_avg)
+        rows.append((no_grade, distance, _recency(c), c))
+    rows.sort(key=lambda row: (row[0], row[1], -row[2]))
+    return [_to_squad_candidate_result(row[3]) for row in rows]

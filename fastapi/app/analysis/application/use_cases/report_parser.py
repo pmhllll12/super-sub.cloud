@@ -59,6 +59,9 @@ class CriterionRow:
     metric_ref: str | None = None
     # `""`·`"metric"`·`"grade"` (미결 `ho` 38). skipped 항목엔 없다 → None.
     view_dependent: str | None = None
+    # 「받은 호칭」인가(`paik` 23·`ho` 40). skipped 항목엔 없다 → None. 옛
+    # 봉투(schema_version 1.1)도 이 키가 없어 자연히 None이 된다.
+    title_earned: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -157,6 +160,9 @@ def parse_report(raw: bytes) -> ParsedReport:
                 evidence=item.get("evidence") or None,
                 metric_ref=item.get("metric_ref") or None,
                 view_dependent=item.get("view_dependent") or None,
+                # 🔴 `or None`을 안 쓴다 — `False`가 진짜 값이라 그걸 지우면
+                # 안 된다. 키가 없으면(옛 봉투) `.get()`이 자연히 `None`.
+                title_earned=item.get("title_earned"),
             )
         )
         # 항목별 등급·연속점수도 수치라 `analysis_metric_value` 로 간다(계약 3-1).

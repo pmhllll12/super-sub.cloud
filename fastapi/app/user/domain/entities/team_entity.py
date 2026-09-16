@@ -44,3 +44,22 @@ class TeamMemberEntity:
     # 내부 id 로 열 수도 없기 때문이다.
     player_card_id: UUID | None = None
     card_public_slug: str | None = None
+
+
+@dataclass(frozen=True)
+class TeamInvitationEntity:
+    """팀이 개인을 데려오는 초대 1건 (`min` 20번).
+
+    `team_match_request`(팀 대 팀)와 상태 전이 모양만 같다 — `status`가
+    `pending`/`accepted`/`rejected`/`cancelled` 문자열인 이유도 같다
+    (`analysis_job.status`처럼 단계가 늘 때 마이그레이션이 필요 없게).
+    수락되면 `team_member`가 새로 생긴다(`team_invitation`은 그 사실을
+    따로 담지 않는다 — `team_member.joined_at`로 이미 알 수 있다).
+    """
+
+    id: UUID
+    team_id: UUID
+    invited_user_id: UUID
+    status: str
+    created_at: datetime
+    responded_at: datetime | None = None
