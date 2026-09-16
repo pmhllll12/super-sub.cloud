@@ -146,6 +146,7 @@ class TestOpenApi:
             f"{V1}/reference-players",
             V1 + "/reference-players/{player_id}/skeleton",
             V1 + "/cards/{card_public_slug}/featured-video",
+            V1 + "/cards/{card_public_slug}/grade",
             V1 + "/teams/{team_id}/squad",
             V1 + "/teams/{team_id}/squad/members",
             V1 + "/teams/{team_id}/squad/members/{member_id}",
@@ -182,4 +183,5 @@ class TestOpenApi:
             V1 + "/teams/{team_id}/match-requests/{request_id}/accept",
             V1 + "/teams/{team_id}/match-requests/{request_id}/reject",
             V1 + "/teams/{team_id}/match-requests/{request_id}",
+            V1 + "/teams/{team_id}/squad/candidates",
         }

@@ -174,6 +174,21 @@ class FeaturedVideoResponse(BaseModel):
     duration_ms: int | None
 
 
+class CardGradeResponse(BaseModel):
+    """카드 슬러그의 **표시 등급**(미결 `paik` 25·26번). `GET /cards/{slug}/grade`.
+
+    `S`·`A`·`B`·`C`·`D`·`F` 여섯 중 하나 — 계산 규칙은 `grade_rules.py`(재매칭
+    의사의 Wilson 95% 신뢰구간). 대표 영상이 없거나 분석 전이면 `grade` 가
+    `null`이다. **`provisional`이 `true`인 동안은 화면에 "검수 전"을 달아야
+    한다** — 등급 문자만 떼어 쓰지 않는다(`paik` 26번).
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    grade: str | None
+    provisional: bool | None
+
+
 class PublicVideoResponse(BaseModel):
     """홈 영상 모음 한 줄. **저장 키는 안 실린다** — 저장 키엔 업로더 `user_id`가
     그대로 들어 있어서다. 업로더는 대신 `uploader_nickname`(항상 있음)과

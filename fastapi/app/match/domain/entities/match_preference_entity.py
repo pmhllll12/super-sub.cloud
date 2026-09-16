@@ -78,3 +78,29 @@ class MatchCandidateResultEntity:
     region_label: str
     formation: str
     reasons: list[MatchReason]
+
+
+@dataclass(frozen=True)
+class SquadCandidateFactsEntity:
+    """빈 자리 후보 1명의 원자료 (`paik` 27번). 포지션·자기 팀/이미 앉은 사람
+    제외·시간 하드 필터는 저장소가 이미 걸었다 — 여기 있다는 것 자체가
+    "이 셋을 통과했다"는 뜻이다. 등급 산출(`analysis`·`review` 원시 교차
+    읽기)도 저장소가 한다 — 순수 함수(`candidate_grade_rules.py`)로는 DB를
+    못 읽는다.
+    """
+
+    user_id: UUID
+    nickname: str
+    card_public_slug: str | None
+    grade: str | None
+    provisional: bool | None
+    last_active_at: datetime | None
+
+
+@dataclass(frozen=True)
+class SquadRecruitmentFactsEntity:
+    """추천 조립에 필요한 원자료 한 벌. `seated_grades`는 팀 평균을 내는
+    분모다(등급 있는 사람만 — `ho` 21번과 같은 판단, 모르는 사람은 셈에서 뺀다)."""
+
+    seated_grades: list[str]
+    candidates: list[SquadCandidateFactsEntity]

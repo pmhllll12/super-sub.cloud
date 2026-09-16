@@ -13,7 +13,7 @@ from uuid import UUID
 from abc import ABC, abstractmethod
 
 from app.analysis.application.dtos.video_dto import UNSET, UserRef
-from app.analysis.domain.entities.video_entity import VideoEntity
+from app.analysis.domain.entities.video_entity import CardGradeRow, VideoEntity
 
 
 class VideoPort(ABC):
@@ -78,6 +78,16 @@ class VideoPort(ABC):
         `player_card` 는 `card` 컨텍스트 테이블이라 임포트하지 않고 슬러그→`user_id`
         만 원시 쿼리로 읽는다(관리자 목록이 `user` 를 읽는 방식과 같다).
         대표가 없거나·반려됐거나·슬러그가 없으면 `None`.
+        """
+
+    @abstractmethod
+    def find_card_grade(self, card_public_slug: str) -> CardGradeRow | None:
+        """카드 슬러그 → 등급 원자료(미결 `paik` 25·26번).
+
+        슬러그가 없으면 `None`. 슬러그는 찾았지만 대표 영상이 없거나 분석
+        전이면 `overall_grade`/`provisional` 이 `None`인 행(슬러그를 찾았다는
+        사실은 남는다 — 인터랙터가 그걸로 404 를 가른다). 신뢰 축은 `review`·
+        `review_selection`(`review` 컨텍스트 테이블)을 원시 쿼리로 읽는다.
         """
 
     @abstractmethod

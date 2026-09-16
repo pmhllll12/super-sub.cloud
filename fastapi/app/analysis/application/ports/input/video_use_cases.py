@@ -8,8 +8,10 @@ from app.analysis.application.dtos.video_dto import (
     AdminDeleteVideoCommand,
     AdminVideoListResult,
     AdminVideosQuery,
+    CardGradeResult,
     DeleteVideoCommand,
     FeaturedVideoResult,
+    GetCardGradeCommand,
     GetFeaturedVideoCommand,
     GetPlaybackUrlCommand,
     KeepVideoCommand,
@@ -65,6 +67,14 @@ class GetFeaturedVideoUseCase(ABC):
     @abstractmethod
     def __call__(self, command: GetFeaturedVideoCommand) -> FeaturedVideoResult:
         """어떤 사람의 대표 영상. 로그인하면 누구나. 대표가 없으면 404 `NO_FEATURED_VIDEO`."""
+
+
+class GetCardGradeUseCase(ABC):
+    @abstractmethod
+    def __call__(self, command: GetCardGradeCommand) -> CardGradeResult:
+        """카드 슬러그의 표시 등급. 로그인하면 누구나. 카드가 없으면 404
+        `CARD_NOT_FOUND` — 대표 영상이 없거나 분석 전인 것은 404 가 아니라
+        `grade: None` 이다."""
 
 
 class DeleteVideoUseCase(ABC):

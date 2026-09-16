@@ -14,6 +14,8 @@ from app.analysis.adapter.outbound.stub.video_stub_repository import (
     put_object,
     register_card_slug,
     register_nickname,
+    register_report_grade,
+    register_trust_counts,
     reset_videos,
 )
 from app.analysis.domain.rules.video_rules import MAX_BYTES, MAX_DURATION_MS
@@ -670,6 +672,88 @@ class TestFeaturedRead:
         )
         assert res.status_code == 404
         assert error_code(res) == "NO_FEATURED_VIDEO"
+
+
+class TestCardGrade:
+    """`GET /cards/{slug}/grade` — 남의 표시 등급 (미결 `paik` 25·26번)."""
+
+    def test_인증이_필요하다(self, client):
+        assert client.get(f"{V1}/cards/some-slug/grade").status_code == 401
+
+    def test_없는_슬러그는_404_다(self, client):
+        res = client.get(f"{V1}/cards/누구도-아님/grade", headers=_headers(uuid4()))
+        assert res.status_code == 404
+        assert error_code(res) == "CARD_NOT_FOUND"
+
+    def test_대표_영상이_없으면_등급이_null이다(self, client):
+        owner = uuid4()
+        register_card_slug("no-report-1a2b", owner)  # 슬러그는 있지만 분석 없음
+
+        res = client.get(
+            f"{V1}/cards/no-report-1a2b/grade", headers=_headers(uuid4())
+        )
+        assert res.status_code == 200, res.text
+        body = res.json()
+        assert body["grade"] is None
+        assert body["provisional"] is None
+
+    def test_리뷰가_없는_A는_S가_아니라_그대로_온다(self, client):
+        owner = uuid4()
+        register_card_slug("grade-a-plain", owner)
+        register_report_grade(owner, "A", provisional=False)
+
+        res = client.get(
+            f"{V1}/cards/grade-a-plain/grade", headers=_headers(uuid4())
+        )
+        assert res.status_code == 200, res.text
+        assert res.json() == {"grade": "A", "provisional": False}
+
+    def test_신뢰_우세인_A는_S로_오른다(self, client):
+        owner = uuid4()
+        register_card_slug("grade-a-trusted", owner)
+        register_report_grade(owner, "A", provisional=False)
+        register_trust_counts(owner, positive=4, total=4)  # 하한 0.510 > 0.5
+
+        res = client.get(
+            f"{V1}/cards/grade-a-trusted/grade", headers=_headers(uuid4())
+        )
+        assert res.status_code == 200, res.text
+        assert res.json() == {"grade": "S", "provisional": False}
+
+    def test_신뢰_우세_아닌_D는_F로_내려간다(self, client):
+        owner = uuid4()
+        register_card_slug("grade-d-plain", owner)
+        register_report_grade(owner, "D", provisional=True)
+
+        res = client.get(
+            f"{V1}/cards/grade-d-plain/grade", headers=_headers(uuid4())
+        )
+        assert res.status_code == 200, res.text
+        assert res.json() == {"grade": "F", "provisional": True}
+
+    def test_provisional을_등급과_함께_내려준다(self, client):
+        """26번 「하지 말 것」 — 등급 문자만 떼어 내보내지 않는다."""
+        owner = uuid4()
+        register_card_slug("grade-provisional", owner)
+        register_report_grade(owner, "B", provisional=True)
+
+        res = client.get(
+            f"{V1}/cards/grade-provisional/grade", headers=_headers(uuid4())
+        )
+        assert res.status_code == 200, res.text
+        assert res.json() == {"grade": "B", "provisional": True}
+
+    def test_리포트_전체가_아니라_등급_한_칸만_준다(self, client):
+        """25번 「하지 말 것」 — 근거 문장·수치가 새면 안 된다."""
+        owner = uuid4()
+        register_card_slug("grade-narrow", owner)
+        register_report_grade(owner, "C", provisional=False)
+
+        res = client.get(
+            f"{V1}/cards/grade-narrow/grade", headers=_headers(uuid4())
+        )
+        assert res.status_code == 200, res.text
+        assert set(res.json()) == {"grade", "provisional"}
 
 
 class TestPlaybackUrl:

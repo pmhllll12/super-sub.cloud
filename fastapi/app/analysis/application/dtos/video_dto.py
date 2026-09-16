@@ -117,6 +117,31 @@ class FeaturedVideoResult:
 
 
 @dataclass(frozen=True)
+class GetCardGradeCommand:
+    """카드 슬러그로 **표시 등급**을 읽는다(미결 `paik` 25·26번).
+
+    로그인하면 누구나 — 추천 판이 등급으로 후보를 좁히는 자리다. 대표 영상이
+    없거나 분석 전이면 `grade` 가 `None` 이다(카드 슬러그 자체가 없을 때만
+    404 — `CardGradeResult` 가 아니라 예외로 갈린다).
+    """
+
+    card_public_slug: str
+
+
+@dataclass(frozen=True)
+class CardGradeResult:
+    """`GET /cards/{slug}/grade` 응답 본문이 그대로 이 모양이다.
+
+    🔴 리포트 전체가 아니라 **등급 한 칸**만 준다(근거 문장·수치는 안 실린다).
+    `provisional` 을 등급과 함께 내준다 — 등급 문자만 떼면 받는 쪽이 잠정인지
+    알 방법이 없어진다(`paik` 26번).
+    """
+
+    grade: str | None
+    provisional: bool | None
+
+
+@dataclass(frozen=True)
 class DeleteVideoCommand:
     """영상을 지운다. **자기 클립만** — `user_id` 로 소유를 확인한다."""
 

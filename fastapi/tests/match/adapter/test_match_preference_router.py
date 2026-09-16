@@ -6,7 +6,7 @@ regions_router도 여기서 함께 본다(같은 기능 묶음, `paik` 18·19·2
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import pytest
@@ -14,10 +14,16 @@ import pytest
 from app.core.security import issue_access_token
 from app.match.adapter.outbound.stub.match_preference_stub_repository import (
     REGIONS_BY_ID,
+    register_candidate_activity,
+    register_candidate_card,
+    register_candidate_grade,
     register_last_match,
+    register_position,
+    register_seated,
     register_squad,
     register_team,
     register_team_member,
+    register_team_position,
     reset_match_preferences,
 )
 from tests.conftest import V1, error_code
@@ -261,3 +267,158 @@ class TestMatchCandidates:
         kinds = {r["kind"] for r in row["reasons"]}
         assert kinds == {"time", "region"}
         assert "score" not in row
+
+
+def _set_member_position(client, user_id, position_id):
+    register_position(position_id)
+    res = client.put(
+        f"{V1}/me/match-preferences",
+        json={"region_ids": [], "slots": [], "position_ids": [str(position_id)]},
+        headers=_headers(user_id),
+    )
+    assert res.status_code == 200, res.text
+
+
+class TestSquadCandidates:
+    """`GET /teams/{id}/squad/candidates` — 빈 자리 추천 후보 (미결 `paik` 27번)."""
+
+    def test_소속이_아니면_403(self, client):
+        team_id, owner, outsider = uuid4(), uuid4(), uuid4()
+        register_team(team_id)
+        register_team_member(team_id, owner, "owner", "주장")
+
+        res = client.get(
+            f"{V1}/teams/{team_id}/squad/candidates",
+            params={"position_code": "GK"},
+            headers=_headers(outsider),
+        )
+        assert res.status_code == 403, res.text
+
+    def test_없는_포지션_코드는_422(self, client):
+        team_id, owner = uuid4(), uuid4()
+        register_team(team_id)
+        register_team_member(team_id, owner, "owner", "주장")
+
+        res = client.get(
+            f"{V1}/teams/{team_id}/squad/candidates",
+            params={"position_code": "없는자리"},
+            headers=_headers(owner),
+        )
+        assert res.status_code == 422, res.text
+        assert error_code(res) == "UNKNOWN_POSITION"
+
+    def test_등급이_없어도_후보로_온다(self, client):
+        team_id, owner, candidate = uuid4(), uuid4(), uuid4()
+        position_id = uuid4()
+        register_team(team_id)
+        register_team_member(team_id, owner, "owner", "주장")
+        register_team_position(team_id, "GK", position_id)
+        _set_member_position(client, candidate, position_id)
+        register_candidate_card(candidate, "candidate-slug")
+
+        res = client.get(
+            f"{V1}/teams/{team_id}/squad/candidates",
+            params={"position_code": "GK"},
+            headers=_headers(owner),
+        )
+        assert res.status_code == 200, res.text
+        rows = res.json()
+        assert len(rows) == 1
+        assert rows[0]["user_id"] == str(candidate)
+        assert rows[0]["grade"] is None
+        assert rows[0]["provisional"] is None
+
+    def test_자기_팀과_이미_앉은_사람은_제외된다(self, client):
+        team_id, owner, teammate, seated = uuid4(), uuid4(), uuid4(), uuid4()
+        position_id = uuid4()
+        register_team(team_id)
+        register_team_member(team_id, owner, "owner", "주장")
+        register_team_position(team_id, "GK", position_id)
+        _set_member_position(client, teammate, position_id)
+        register_team_member(team_id, teammate, "member", "이미팀원")
+        _set_member_position(client, seated, position_id)
+        register_seated(team_id, seated)
+
+        res = client.get(
+            f"{V1}/teams/{team_id}/squad/candidates",
+            params={"position_code": "GK"},
+            headers=_headers(owner),
+        )
+        assert res.status_code == 200, res.text
+        assert res.json() == []
+
+    def test_등급을_직접_고르면_그_칸만_하드필터한다(self, client):
+        team_id, owner = uuid4(), uuid4()
+        cand_b, cand_c = uuid4(), uuid4()
+        position_id = uuid4()
+        register_team(team_id)
+        register_team_member(team_id, owner, "owner", "주장")
+        register_team_position(team_id, "GK", position_id)
+        for uid, grade in ((cand_b, "B"), (cand_c, "C")):
+            _set_member_position(client, uid, position_id)
+            register_candidate_grade(uid, grade, provisional=False)
+
+        res = client.get(
+            f"{V1}/teams/{team_id}/squad/candidates",
+            params={"position_code": "GK", "grade": "B"},
+            headers=_headers(owner),
+        )
+        assert res.status_code == 200, res.text
+        rows = res.json()
+        assert [r["user_id"] for r in rows] == [str(cand_b)]
+        assert rows[0]["grade"] == "B"
+        assert rows[0]["provisional"] is False
+
+    def test_등급_상관없음이면_거르지_않고_실력축_거리로_정렬한다(self, client):
+        """팀 평균은 이미 앉은 사람(등급 B, 실력값 2)에서 낸다. 후보 A(거리 1,
+        최근)·C(거리 1, 오래전)·D(거리 2)·등급 없음 순으로 와야 한다."""
+        team_id, owner, seated = uuid4(), uuid4(), uuid4()
+        cand_a, cand_c, cand_d, cand_none = uuid4(), uuid4(), uuid4(), uuid4()
+        position_id = uuid4()
+        register_team(team_id)
+        register_team_member(team_id, owner, "owner", "주장")
+        register_team_position(team_id, "GK", position_id)
+
+        _set_member_position(client, seated, position_id)
+        register_candidate_grade(seated, "B")
+        register_seated(team_id, seated)
+
+        now = datetime.now(timezone.utc)
+        for uid, grade, active in (
+            (cand_a, "A", now),
+            (cand_c, "C", now - timedelta(days=30)),
+            (cand_d, "D", now),
+            (cand_none, None, now),
+        ):
+            _set_member_position(client, uid, position_id)
+            if grade is not None:
+                register_candidate_grade(uid, grade)
+            register_candidate_activity(uid, active)
+
+        res = client.get(
+            f"{V1}/teams/{team_id}/squad/candidates",
+            params={"position_code": "GK", "grade": "any"},
+            headers=_headers(owner),
+        )
+        assert res.status_code == 200, res.text
+        order = [r["user_id"] for r in res.json()]
+        assert order == [str(cand_a), str(cand_c), str(cand_d), str(cand_none)]
+
+    def test_거리_점수는_응답에_없다(self, client):
+        team_id, owner, cand = uuid4(), uuid4(), uuid4()
+        position_id = uuid4()
+        register_team(team_id)
+        register_team_member(team_id, owner, "owner", "주장")
+        register_team_position(team_id, "GK", position_id)
+        _set_member_position(client, cand, position_id)
+        register_candidate_grade(cand, "A", provisional=True)
+
+        res = client.get(
+            f"{V1}/teams/{team_id}/squad/candidates",
+            params={"position_code": "GK"},
+            headers=_headers(owner),
+        )
+        assert res.status_code == 200, res.text
+        assert set(res.json()[0]) == {
+            "user_id", "nickname", "card_public_slug", "grade", "provisional",
+        }

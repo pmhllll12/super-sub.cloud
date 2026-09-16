@@ -13,6 +13,7 @@ from app.match.adapter.inbound.api.schemas.match_preference_schema import (
     MemberPreferenceSummaryResponse,
     SetMemberPreferenceSchema,
     SetTeamPreferenceSchema,
+    SquadCandidateResponse,
     TeamPreferenceResponse,
 )
 from app.match.application.dtos.match_preference_dto import (
@@ -20,12 +21,14 @@ from app.match.application.dtos.match_preference_dto import (
     GetTeamPreferenceQuery,
     ListMatchCandidatesQuery,
     ListMemberPreferencesQuery,
+    ListSquadCandidatesQuery,
     MatchCandidateResult,
     MemberPreferenceResult,
     MemberPreferenceSummaryResult,
     SetMemberPreferenceCommand,
     SetTeamPreferenceCommand,
     SlotInput,
+    SquadCandidateResult,
     TeamPreferenceResult,
 )
 from app.match.dependencies.match_preference_providers import (
@@ -33,6 +36,7 @@ from app.match.dependencies.match_preference_providers import (
     GetTeamPreferenceUseCaseDep,
     ListMatchCandidatesUseCaseDep,
     ListMemberPreferencesUseCaseDep,
+    ListSquadCandidatesUseCaseDep,
     SetMemberPreferenceUseCaseDep,
     SetTeamPreferenceUseCaseDep,
 )
@@ -123,3 +127,31 @@ def list_match_candidates(
     이미 정렬했다. 🔴 유사도 점수는 없다 — `reasons`가 근거다.
     """
     return use_case(ListMatchCandidatesQuery(actor_id=user_id, team_id=team_id))
+
+
+@match_preference_router.get(
+    "/teams/{team_id}/squad/candidates",
+    response_model=list[SquadCandidateResponse],
+)
+def list_squad_candidates(
+    team_id: UUID,
+    position_code: str,
+    user_id: CurrentUserId,
+    use_case: ListSquadCandidatesUseCaseDep,
+    grade: str | None = None,
+) -> list[SquadCandidateResult]:
+    """빈 자리 추천 후보 (미결 `paik` 27번). **그 팀 소속만.**
+
+    `grade`를 안 주거나 `"any"`를 주면 등급으로 거르지 않고 팀의 현재 등급
+    평균과의 실력 축 거리로 정렬한다. `grade`를 직접 주면(`S`~`F`) **그
+    칸으로만 하드 필터**한다. 🔴 리포트 전체·거리 점수는 안 나간다 — 등급 한
+    칸(+ `provisional`)만 준다.
+    """
+    return use_case(
+        ListSquadCandidatesQuery(
+            actor_id=user_id,
+            team_id=team_id,
+            position_code=position_code,
+            grade=grade,
+        )
+    )
