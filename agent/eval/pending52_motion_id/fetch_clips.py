@@ -139,7 +139,12 @@ def download(vid: str, dest: Path) -> bool:
     # 720p 이하로 묶는다 — 4K 를 받아 봐야 포즈 단계에서 줄인다.
     r = subprocess.run(
         ["yt-dlp", "--quiet", "--no-warnings",
-         "-f", "bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720][ext=mp4]/b[height<=720]",
+         # 🔴 **AV1 을 뺀다** (`vcodec!*=av01`). 1회차에서 4편이 여기서 죽었다 —
+         #    「프레임을 읽지 못했습니다」로 나오지만 표본 탓이 아니라 이 기계의
+         #    디코더가 AV1 을 못 여는 것이다. 최근 업로드가 AV1 로 온다.
+         "-f", ("bv*[vcodec!*=av01][height<=720][ext=mp4]+ba[ext=m4a]/"
+                "b[vcodec!*=av01][height<=720][ext=mp4]/"
+                "b[vcodec!*=av01][height<=720]"),
          "--merge-output-format", "mp4", "-o", str(dest),
          f"https://www.youtube.com/watch?v={vid}"],
         capture_output=True, text=True, timeout=600,

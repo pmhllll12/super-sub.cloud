@@ -138,6 +138,23 @@ def motion_id_root() -> Path:
     return Path(os.environ.get("SUPERSUB_MOTION_ID_ROOT", _DEFAULT_MOTION_ID))
 
 
+def motion_id_cache() -> Path:
+    """`motion_id` 클립의 **키포인트·공 궤적 캐시** (미결 `ho` 52번 2회차).
+
+    🔴 **왜 캐시를 두는가.** 1회차는 확인할 것이 하나 생길 때마다 **GPU 로 30분**
+    을 다시 썼다. 포즈는 결정론적이라 같은 영상·같은 `target_fps` 면 같은 값이
+    나오는데도 매번 다시 뽑은 것이다. 한 번 떠 두면 이후 진단이 **초 단위**가
+    되고, 그래야 「임팩트가 진짜 킥인가」 같은 질문을 값싸게 물을 수 있다.
+
+    🔴 **동작점을 이름에 드러낸다** — `phaseA` 의 `cache_target15/`·
+    `cache_target30/` 와 같은 규칙이다. 어느 fps 로 뽑았는지 이름에 없으면
+    섞어 쓰게 되고, 그것이 미결 10번의 형태다.
+
+    저장소에 넣지 않는다 — 영상에서 파생된 것이고 크기도 있다.
+    """
+    return motion_id_root() / "cache_target30"
+
+
 def default_target() -> int:
     """동작점을 **명시하지 않는 호출자**가 쓸 값. 출처는 한 곳이다.
 
