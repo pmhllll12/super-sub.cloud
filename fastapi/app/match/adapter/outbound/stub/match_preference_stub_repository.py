@@ -23,8 +23,11 @@ from app.match.domain.entities.match_preference_entity import (
     MemberPreferenceSummaryEntity,
     RegionFactEntity,
     SlotEntity,
+    SquadCandidateFactsEntity,
+    SquadRecruitmentFactsEntity,
     TeamPreferenceEntity,
 )
+from app.match.domain.rules.match_preference_rules import overlap_minutes
 
 # 계약 테스트용 지역 픽스처 — 같은 시 안에 구가 둘(계층 검증용).
 REGIONS_BY_ID: dict[UUID, RegionFactEntity] = {
@@ -48,6 +51,13 @@ _MEMBER_REGIONS: dict[UUID, list[UUID]] = {}
 _MEMBER_SLOTS: dict[UUID, list[SlotEntity]] = {}
 _MEMBER_POSITIONS: dict[UUID, list[UUID]] = {}
 
+# `paik` 27번 — 빈 자리 후보.
+_TEAM_POSITIONS: dict[tuple[UUID, str], UUID] = {}  # (team_id, code) -> position_id
+_SEATED: dict[UUID, set[UUID]] = {}  # team_id -> 이미 스쿼드에 앉은 user_id
+_CANDIDATE_GRADES: dict[UUID, tuple[str | None, bool | None]] = {}
+_CANDIDATE_SLUGS: dict[UUID, str | None] = {}
+_CANDIDATE_ACTIVITY: dict[UUID, datetime | None] = {}
+
 
 def reset_match_preferences() -> None:
     for d in (
@@ -62,6 +72,11 @@ def reset_match_preferences() -> None:
         _MEMBER_REGIONS,
         _MEMBER_SLOTS,
         _MEMBER_POSITIONS,
+        _TEAM_POSITIONS,
+        _SEATED,
+        _CANDIDATE_GRADES,
+        _CANDIDATE_SLUGS,
+        _CANDIDATE_ACTIVITY,
     ):
         d.clear()
 
@@ -87,6 +102,34 @@ def register_position(position_id: UUID) -> None:
 
 def register_last_match(team_id: UUID, played_at: datetime) -> None:
     _LAST_MATCH[team_id] = played_at
+
+
+def register_team_position(team_id: UUID, code: str, position_id: UUID) -> None:
+    """`find_position` 이 풀 수 있게 (팀, 코드) → 포지션 id 를 알려 준다
+    (`paik` 27번). 실물은 팀의 종목으로 좁히지만 스텁은 종목을 모른다 —
+    검사가 이미 좁혀서 등록한다."""
+    _TEAM_POSITIONS[(team_id, code)] = position_id
+
+
+def register_seated(team_id: UUID, user_id: UUID) -> None:
+    """이 사람이 이 팀 스쿼드에 이미 앉아 있다(`paik` 27번 제외 대상)."""
+    _SEATED.setdefault(team_id, set()).add(user_id)
+
+
+def register_candidate_grade(
+    user_id: UUID, grade: str | None, provisional: bool | None = None
+) -> None:
+    """`squad_recruitment_facts` 가 쓸 등급(`paik` 25·26·27번). 안 부르면
+    분석 전(`None`)으로 본다."""
+    _CANDIDATE_GRADES[user_id] = (grade, provisional)
+
+
+def register_candidate_card(user_id: UUID, public_slug: str | None) -> None:
+    _CANDIDATE_SLUGS[user_id] = public_slug
+
+
+def register_candidate_activity(user_id: UUID, at: datetime | None) -> None:
+    _CANDIDATE_ACTIVITY[user_id] = at
 
 
 class StubMatchPreferenceRepository(MatchPreferencePort):
@@ -191,3 +234,57 @@ class StubMatchPreferenceRepository(MatchPreferencePort):
                 )
             )
         return out
+
+    def find_position(self, team_id: UUID, code: str) -> UUID | None:
+        return _TEAM_POSITIONS.get((team_id, code))
+
+    def squad_recruitment_facts(
+        self, team_id: UUID, position_id: UUID
+    ) -> SquadRecruitmentFactsEntity:
+        seated = _SEATED.get(team_id, set())
+        team_members = {
+            uid for (tid, uid) in _MEMBERSHIPS if tid == team_id
+        }
+        excluded = seated | team_members
+
+        candidate_ids = {
+            uid
+            for uid, positions in _MEMBER_POSITIONS.items()
+            if position_id in positions and uid not in excluded
+        }
+
+        team_slots = _TEAM_SLOTS.get(team_id, [])
+        if team_slots:
+            candidate_ids = {
+                uid
+                for uid in candidate_ids
+                if any(
+                    overlap_minutes(
+                        ms.weekday, ms.start_time, ms.end_time,
+                        ts.weekday, ts.start_time, ts.end_time,
+                    )
+                    > 0
+                    for ms in _MEMBER_SLOTS.get(uid, [])
+                    for ts in team_slots
+                )
+            }
+
+        seated_grades = [
+            g
+            for uid in seated
+            if (g := _CANDIDATE_GRADES.get(uid, (None, None))[0])
+        ]
+        candidates = [
+            SquadCandidateFactsEntity(
+                user_id=uid,
+                nickname=_NICKNAMES.get(uid, ""),
+                card_public_slug=_CANDIDATE_SLUGS.get(uid),
+                grade=_CANDIDATE_GRADES.get(uid, (None, None))[0],
+                provisional=_CANDIDATE_GRADES.get(uid, (None, None))[1],
+                last_active_at=_CANDIDATE_ACTIVITY.get(uid),
+            )
+            for uid in candidate_ids
+        ]
+        return SquadRecruitmentFactsEntity(
+            seated_grades=seated_grades, candidates=candidates
+        )

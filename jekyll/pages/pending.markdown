@@ -8329,7 +8329,33 @@ const list = grade === ANY_GRADE ? all : all.filter((s) => s.grade === grade)
 | 🔴 하지 말 것 | **서버가 유사도 점수를 매겨 내리지 마세요** — 20번에 같은 부탁을 적었습니다. **사실값만** 주시면 순서는 화면이 정합니다 |
 
 - 근거: 26번(등급 눈금) · 20번(비슷한 팀 — 하드/소프트 분리) · `ho` 32번(`player_vector` 축) · `ho` 34번(임계값 출처) · `ho` 21번(「없다」와 「낮다」) · `agent/rubrics/football_instep_shot.yaml`(`grade_bands`)
-- **남은 담당**: 정어진(내주는 경로) · 백성검(`gradeValue` 평균을 실력 축 네 칸으로 · 기본값을 `ANY_GRADE` 로 · 「아직 분석 전」 덩어리 분리)
+- **남은 담당**: ~~정어진(내주는 경로)~~ **✅ 완료 (2026.09.16, 아래)** ·
+  백성검(`gradeValue` 평균을 실력 축 네 칸으로 · 기본값을 `ANY_GRADE` 로 ·
+  「아직 분석 전」 덩어리 분리)
+
+#### ✅ 정어진 몫 완료 (2026.09.16) — `GET /teams/{id}/squad/candidates`
+
+표에 적힌 하드/소프트/함께 내려야 할 것을 그대로 구현했습니다. 🔴 **한
+가지 배치 판단**: 20번(팀 대 팀 후보)과 재료가 겹치지만 25·26번의 등급
+계산까지 필요해서 `match` 컨텍스트 하나에 몰아넣었습니다 — 컨텍스트끼리
+포트도 인터랙터도 못 넘겨서(경계 규칙), 등급 계산(`analysis`·`review`
+원시 교차 읽기 + Wilson 식)을 **복제**했습니다(`app/match/domain/rules/
+candidate_grade_rules.py` — `grade_rules.py`가 정본, 둘이 갈리면 그쪽을
+따릅니다).
+
+- `grade`를 직접 고르면 그 칸만 하드 필터, 안 고르면 **거르지 않고**
+  이미 앉은 사람들의 등급 평균과의 실력 축 거리로 정렬(등급 모르는 후보는
+  뒤로 가되 `null`로 남습니다 — 안 사라집니다)
+- 거리·유사도 점수는 응답에 없습니다(하지 말 것 지켜짐)
+- 확인: `.venv/bin/pytest -q tests/match/ tests/analysis/ tests/test_architecture.py`
+  전부 통과, 신규 `tests/match/adapter/test_match_preference_db.py::
+  TestSquadCandidates`(실제 PostgreSQL로 포지션·등급·제외 다섯 테이블
+  조인 검증) · `alembic check` "No new upgrade operations detected"
+- 계약 `docs/api-contract.md`(3-16절)·`docs/client-contract-changes.md`
+  (44번) 갱신
+
+남은 것은 **백성검 쪽 화면**(등급 평균의 실력 축 환산·기본값·분석 전
+덩어리 분리)뿐입니다 — 44번에 적어 두었습니다.
 
 ### 28. **「선수와 비교하기」는 데모 영상 + 브라우저 실측 세 순간 비교입니다** — 진짜 선수 영상 경로와 「비슷하다」 기준은 아직 없습니다 (2026-09-11 신설, 2026-09-15 제목 갱신)
 

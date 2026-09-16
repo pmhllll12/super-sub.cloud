@@ -1874,6 +1874,51 @@ grep -n "gradeOfPlayer\|SUGGESTIONS" www/src/components/SquadSuggest.tsx
 
 ---
 
+## 44. AI 추천 후보를 실제로 읽을 수 있습니다 (2026-09-16 추가, 미결 `paik` 27번)
+
+`www/src/components/SquadSuggest.tsx`의 `SUGGESTIONS`가 mock이던 자리입니다.
+43번(등급)과 짝입니다 — 여기는 "누구를 추천하나"이고 43번은 "그 사람 등급을
+어떻게 읽나"입니다.
+
+### 만족해야 할 성질
+
+1. **빈 자리를 누르면 그 포지션에 맞는 실제 후보 목록이 올 것.**
+2. **위쪽에 `S`~`F` + "등급 상관없음" 거르개를 두면, 상관없음일 때 서버가
+   이미 "팀 평균과 비슷한 순"으로 정렬해서 줄 것** — 화면이 다시 계산하지
+   않습니다.
+
+### 새 엔드포인트
+
+```
+GET /api/v1/teams/{team_id}/squad/candidates?position_code=GK&grade=B
+→ [{ "user_id", "nickname", "card_public_slug", "grade", "provisional" }, ...]
+```
+
+`grade`는 생략하거나 `"any"`를 주면 거르지 않고 정렬만 됩니다. 응답은 43번의
+등급 응답과 필드가 같습니다(`grade`·`provisional`).
+
+### 먼저 확인
+
+```
+grep -n "SUGGESTIONS\s*:" www/src/components/SquadSuggest.tsx
+```
+
+걸리면 아직 mock 그대로입니다.
+
+### 🔴 하지 말 것
+
+- **거리·유사도 점수를 서버에 요구하지 마십시오.** 순서는 이미 정렬돼서
+  옵니다 — `averageGrade()`로 다시 계산하지 않습니다.
+- **`card_public_slug`가 `null`인 후보가 있습니다** — 아직 카드를 안 만든
+  사람입니다. 링크를 안 그리는 것으로 충분합니다(39번과 같은 원칙).
+- `clip`(대표 장면 영상)·`title`·`notes`(말로 적은 특징)는 이 응답에 없습니다
+  — 그건 별도 범위입니다. 지금은 mock 클립·문구를 그대로 쓰고, 이름·등급만
+  이 응답으로 바꿔 주십시오.
+
+상세: `fastapi/docs/api-contract.md`(3-16절)
+
+---
+
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린
 것이다. 새로 붙이는 화면이 있으면 계약 문서 쪽을 본다.
 

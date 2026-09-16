@@ -2910,6 +2910,53 @@ S3에 없다(EC2 역할이 `videos/` 접두사에 쓰기 권한이 없어 못 �
 
 ---
 
+## 3-16. 빈 자리 추천 후보 (2026-09-16 추가 — 미결 `paik` 27번)
+
+스쿼드 빈 자리를 채울 사람을 추천한다. 3-13절(경기 조건·후보)과 같은
+`member_match_position`/`member_match_slot` 재료를 쓰지만, **팀 대 팀**이 아니라
+**팀 대 개인**이다 — AI 추천 판(`SquadSuggest.tsx`)이 그 대상이다.
+
+### `GET /api/v1/teams/{team_id}/squad/candidates`
+
+인증 필요. **그 팀 소속만.**
+
+| 쿼리 | 필수 | 뜻 |
+|---|---|---|
+| `position_code` | 예 | 채울 자리(`GK`·`DF`·... — 팀의 종목으로 좁혀 찾는다) |
+| `grade` | 아니오 | `S`~`F` 중 하나를 주면 **그 칸으로만 하드 필터**. 안 주거나 `"any"`면 안 거르고 정렬만 한다 |
+
+```json
+[
+  { "user_id": "7c05...", "nickname": "김선우", "card_public_slug": "kim-abc1",
+    "grade": "A", "provisional": false },
+  { "user_id": "3af2...", "nickname": "오재현", "card_public_slug": null,
+    "grade": null, "provisional": null }
+]
+```
+
+- 🔴 **하드 필터**(이미 여기 있다는 것 자체가 통과했다는 뜻): 그 포지션을
+  `member_match_position`에 등록했고, ⑴ 이 팀 소속이 아니고 ⑵ 이 스쿼드에
+  이미 앉지 않았고 ⑶ 팀이 경기 시간(`team_match_slot`)을 등록해 뒀다면
+  그 시간과 겹치는 `member_match_slot`이 있다(팀이 시간을 안 등록했으면
+  이 조건은 생략).
+- **`grade`를 안 주면**: 거르지 않고 **이미 앉은 사람들의 현재 등급 평균과의
+  실력 축 거리**로 정렬한다(`S`=`A`, `F`=`D`로 같은 자리 — 26번 규칙). 등급을
+  모르는 후보는 뒤로 가되 사라지지 않는다(`grade: null`).
+- 🔴 **거리·유사도 점수는 응답에 없다** — 순서는 이미 서버가 정렬했다.
+- `grade`·`provisional`은 25·26번과 같은 계산(신뢰 축은 저장하지 않고 매
+  요청 다시 집계).
+
+| 에러 | code | 언제 |
+|---|---|---|
+| 404 | `TEAM_NOT_FOUND` | |
+| 403 | `FORBIDDEN` | 그 팀 소속이 아니다 |
+| 422 | `UNKNOWN_POSITION` | 그 팀 종목에 없는 포지션 코드 |
+
+상세: 부록 D 도메인 ①·②·④·⑤(교차 읽기) · 클라이언트 반영은
+`docs/client-contract-changes.md`
+
+---
+
 ## 6. 다음 단계
 
 > **2026-09-01 갱신.** 이 절의 1~4번이 전부 끝나서 다시 썼다. 옛 내용은 스텁 시절
