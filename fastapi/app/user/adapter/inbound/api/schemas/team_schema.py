@@ -52,3 +52,20 @@ class TeamResponse(BaseModel):
     region: str
     sport_code: str
     members: list[TeamMemberResponse]
+
+
+class CreateTeamInvitationSchema(BaseModel):
+    """주장이 개인을 초대한다(`min` 20번). 용병 검색 결과의 `user_id`를 그대로 싣는다."""
+
+    invited_user_id: UUID
+
+
+class TeamInvitationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    team_id: UUID
+    invited_user_id: UUID
+    status: str
+    created_at: Rfc3339
+    responded_at: Rfc3339 | None

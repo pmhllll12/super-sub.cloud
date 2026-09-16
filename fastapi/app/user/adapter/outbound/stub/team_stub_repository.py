@@ -6,12 +6,18 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from app.core.errors import ApiError
 from app.user.application.ports.output.team_port import TeamPort
-from app.user.domain.entities.team_entity import TeamEntity, TeamMemberEntity
+from app.user.domain.entities.team_entity import (
+    TeamEntity,
+    TeamInvitationEntity,
+    TeamMemberEntity,
+)
+from app.user.domain.rules.team_invitation_rules import PENDING
 from app.user.domain.value_objects.team_role_vo import TeamRole
 
 # 마이그레이션이 넣는 값과 같다(`20260901_sport_and_position`).
@@ -23,6 +29,7 @@ _KNOWN_USERS: set[UUID] = set()
 # user_id -> (player_card_id, public_slug). 실물은 `player_card` 를 outerjoin 해서
 # 얻는다 — **없는 사람이 있다**는 것이 요점이라 딕셔너리로 흉내 낸다.
 _CARDS: dict[UUID, tuple[UUID, str]] = {}
+_INVITATIONS: dict[UUID, TeamInvitationEntity] = {}
 
 
 def reset_teams() -> None:
@@ -31,6 +38,7 @@ def reset_teams() -> None:
     _MEMBERS.clear()
     _KNOWN_USERS.clear()
     _CARDS.clear()
+    _INVITATIONS.clear()
 
 
 def register_card(user_id: UUID, card_id: UUID, public_slug: str) -> None:
@@ -76,6 +84,61 @@ class StubTeamRepository(TeamPort):
         _MEMBERS[team_id] = [
             m for m in _MEMBERS.get(team_id, []) if m.user_id != user_id
         ]
+
+    # --- 팀 초대 (`min` 20번). 알림 생성은 흉내 내지 않는다 — 실제 DB 검사가
+    #     본다(`test_team_match_request_db.py`와 같은 판단). --------------------
+
+    def create_team_invitation(self, invitation: TeamInvitationEntity) -> None:
+        _INVITATIONS[invitation.id] = invitation
+
+    def find_team_invitation(self, invitation_id: UUID) -> TeamInvitationEntity | None:
+        return _INVITATIONS.get(invitation_id)
+
+    def find_pending_invitation(
+        self, team_id: UUID, invited_user_id: UUID
+    ) -> TeamInvitationEntity | None:
+        return next(
+            (
+                i
+                for i in _INVITATIONS.values()
+                if i.team_id == team_id
+                and i.invited_user_id == invited_user_id
+                and i.status == PENDING
+            ),
+            None,
+        )
+
+    def list_team_invitations(self, team_id: UUID) -> list[TeamInvitationEntity]:
+        items = [i for i in _INVITATIONS.values() if i.team_id == team_id]
+        return sorted(items, key=lambda i: i.created_at, reverse=True)
+
+    def list_my_pending_invitations(
+        self, user_id: UUID
+    ) -> list[TeamInvitationEntity]:
+        items = [
+            i
+            for i in _INVITATIONS.values()
+            if i.invited_user_id == user_id and i.status == PENDING
+        ]
+        return sorted(items, key=lambda i: i.created_at, reverse=True)
+
+    def accept_team_invitation(self, invitation_id: UUID) -> TeamInvitationEntity:
+        return self._respond(invitation_id, "accepted")
+
+    def reject_team_invitation(self, invitation_id: UUID) -> TeamInvitationEntity:
+        return self._respond(invitation_id, "rejected")
+
+    def cancel_team_invitation(self, invitation_id: UUID) -> TeamInvitationEntity:
+        return self._respond(invitation_id, "cancelled")
+
+    def _respond(self, invitation_id: UUID, status: str) -> TeamInvitationEntity:
+        updated = replace(
+            _INVITATIONS[invitation_id],
+            status=status,
+            responded_at=datetime.now(timezone.utc),
+        )
+        _INVITATIONS[invitation_id] = updated
+        return updated
 
     def _member(self, user_id: UUID, role: TeamRole, order: int) -> TeamMemberEntity:
         # 가입 순서가 보이도록 시각을 벌린다. 같은 값이면 정렬 검사가 무의미해진다.

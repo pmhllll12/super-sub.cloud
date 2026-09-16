@@ -54,3 +54,48 @@ class TeamResult:
     region: str
     sport_code: str
     members: list[TeamMemberResult] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class CreateTeamInvitationCommand:
+    actor_id: UUID
+    team_id: UUID
+    invited_user_id: UUID
+
+
+@dataclass(frozen=True)
+class RespondTeamInvitationCommand:
+    actor_id: UUID
+    invitation_id: UUID
+
+
+@dataclass(frozen=True)
+class CancelTeamInvitationCommand:
+    actor_id: UUID
+    team_id: UUID
+    invitation_id: UUID
+
+
+@dataclass(frozen=True)
+class TeamInvitationsQuery:
+    """팀이 보낸 초대 목록(주장만) — `GET /teams/{id}/invitations`."""
+
+    actor_id: UUID
+    team_id: UUID
+
+
+@dataclass(frozen=True)
+class MyTeamInvitationsQuery:
+    """내가 받은, 아직 답 안 한 초대 목록 — `GET /me/invitations`."""
+
+    user_id: UUID
+
+
+@dataclass(frozen=True)
+class TeamInvitationResult:
+    id: UUID
+    team_id: UUID
+    invited_user_id: UUID
+    status: str
+    created_at: datetime
+    responded_at: datetime | None

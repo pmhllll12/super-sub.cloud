@@ -5,7 +5,11 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from uuid import UUID
 
-from app.user.domain.entities.team_entity import TeamEntity, TeamMemberEntity
+from app.user.domain.entities.team_entity import (
+    TeamEntity,
+    TeamInvitationEntity,
+    TeamMemberEntity,
+)
 
 
 class TeamPort(ABC):
@@ -42,3 +46,46 @@ class TeamPort(ABC):
 
     @abstractmethod
     def user_exists(self, user_id: UUID) -> bool: ...
+
+    # --- 팀 초대 (`min` 20번) ------------------------------------------------
+
+    @abstractmethod
+    def create_team_invitation(self, invitation: TeamInvitationEntity) -> None:
+        """초대와 그 사람에게 갈 알림을 **같은 트랜잭션에서** 만든다."""
+
+    @abstractmethod
+    def find_team_invitation(self, invitation_id: UUID) -> TeamInvitationEntity | None: ...
+
+    @abstractmethod
+    def find_pending_invitation(
+        self, team_id: UUID, invited_user_id: UUID
+    ) -> TeamInvitationEntity | None:
+        """그 팀이 그 사람에게 보낸, 아직 답 안 한 초대. 중복 초대를 막는 데 쓴다."""
+
+    @abstractmethod
+    def list_team_invitations(self, team_id: UUID) -> list[TeamInvitationEntity]:
+        """그 팀이 보낸 초대 전부(상태 무관), 최신순."""
+
+    @abstractmethod
+    def list_my_pending_invitations(
+        self, user_id: UUID
+    ) -> list[TeamInvitationEntity]:
+        """내가 받은, 아직 답 안 한 초대만, 최신순."""
+
+    @abstractmethod
+    def accept_team_invitation(self, invitation_id: UUID) -> TeamInvitationEntity:
+        """`accepted`로 놓고 그 팀 주장(들)에게 알린다.
+
+        🔴 **`team_member`를 여기서 만들지 않는다** — 그건 기존
+        `JoinTeamUseCase`(자기-가입)가 한다. 이 메서드는 초대 쪽 상태만
+        맡는다(인터랙터가 순서를 조율한다).
+        """
+
+    @abstractmethod
+    def reject_team_invitation(self, invitation_id: UUID) -> TeamInvitationEntity:
+        """`rejected`로 놓고 그 팀 주장(들)에게 알린다."""
+
+    @abstractmethod
+    def cancel_team_invitation(self, invitation_id: UUID) -> TeamInvitationEntity:
+        """`cancelled`로 놓는다. 보낸 쪽이 스스로 무르는 것이라 알림 없음
+        (`team_match_request.cancel`과 같은 판단)."""

@@ -1098,7 +1098,7 @@ trunk_alignment       2개 루브릭  basketball_jump_shot · basketball_layup  
 | | |
 |---|---|
 | 역할 | `owner`(만든 사람) · `member`. 부록 D 는 값을 열거하지 않아 **앱이 쓰는 집합**으로 정했다 |
-| 가입 | **본인이 가입**하거나 **주장이 넣는다.** 초대·승인 테이블이 부록 D 에 없어 신청-승인 흐름은 넣지 않았다 |
+| 가입 | **본인이 가입**하거나 **주장이 넣는다.** 🔴 **2026-09-16 정정** — 「초대·승인 테이블이 부록 D 에 없어 신청-승인 흐름은 넣지 않았다」고 적었던 것을 정정합니다. `min` 20번으로 `team_invitation` 을 새로 두었고, **주장이 초대 → 받은 사람이 수락**하는 흐름이 아래 「팀 초대」 절에 있습니다(부록 D 에 없는 테이블을 늘린 것입니다) |
 | 탈퇴 | 행을 **지우지 않고** `left_at` 을 채운다(부록 D.6). 재가입은 새 행이라 이력이 남는다 |
 | 종목 | `team` 이 정한다. 경기에 종목 컬럼을 두지 않고 `match → team → sport_code` 로 결정된다(부록 D.4) |
 
@@ -1186,6 +1186,52 @@ trunk_alignment       2개 루브릭  basketball_jump_shot · basketball_layup  
 🔴 **마지막 주장이 나가면 아무도 남을 넣을 수 없는 팀이 된다.** 소유권 이양 API 가
 아직 없어 되돌릴 방법이 없으므로 미리 막는다. 팀 해체도 같은 이유로 아직 없다 —
 필요해지면 이양과 함께 낸다.
+
+### 팀 초대 — `team_invitation` (2026-09-16 추가, `min` 20번)
+
+챗봇 용병 검색(`POST /matching/search-candidates`)이 찾아 준 사람을 **실제로
+데려오는** 자리다. 검색은 되는데 그다음이 없다는 것이 `min` 20번이었다.
+
+🔴 **동의 없이 `POST /teams/{id}/members` 로 바로 넣지 않는다**(2026-09-10
+박민호 결정) — 검색 대상자가 모르는 채로 어딘가에 등록되는 것을 막는다.
+**주장이 초대를 보내고, 받은 사람 본인이 수락해야** 소속이 된다.
+
+상태는 `pending` → `accepted` / `rejected` / `cancelled` 넷이고 `pending`
+일 때만 답할 수 있다. 응답은 넷 다 같은 모양이다:
+
+```json
+{
+  "id": "0d2f...",
+  "team_id": "7c05...",
+  "invited_user_id": "9a2e...",
+  "status": "pending",
+  "created_at": "2026-09-16T09:00:00Z",
+  "responded_at": null
+}
+```
+
+| 경로 | 누가 | 무엇 |
+|---|---|---|
+| `POST /api/v1/teams/{team_id}/invitations` | **그 팀 주장** | 초대를 보낸다. 본문은 `{"invited_user_id": "..."}`. `201` |
+| `GET /api/v1/teams/{team_id}/invitations` | **그 팀 주장** | 그 팀이 보낸 초대 전부(상태 무관), 최신순 |
+| `GET /api/v1/me/invitations` | 본인 | 내가 받은, **아직 답 안 한** 초대만, 최신순 |
+| `POST /api/v1/me/invitations/{invitation_id}/accept` | **받은 사람 본인** | 수락 — `team_member` 가 `member` 로 생긴다 |
+| `POST /api/v1/me/invitations/{invitation_id}/reject` | **받은 사람 본인** | 거절 — 아무것도 안 바뀐다 |
+| `DELETE /api/v1/teams/{team_id}/invitations/{invitation_id}` | **그 팀 주장** | 보낸 쪽이 무른다. 🔴 `204` 가 아니라 무른 초대를 그대로 돌려준다(`team_match_request` 의 취소와 같은 이유 — 삭제라기보다 상태 전이다) |
+
+| 에러 | code | 언제 |
+|---|---|---|
+| 403 | `FORBIDDEN` | 주장이 아닌데 보내려 했다 · 받은 사람이 아닌데 답하려 했다 |
+| 404 | `TEAM_NOT_FOUND` · `USER_NOT_FOUND` · `TEAM_INVITATION_NOT_FOUND` | |
+| 409 | `ALREADY_MEMBER` | 이미 그 팀 구성원이다 |
+| 409 | `ALREADY_INVITED` | 그 사람에게 보낸 대기 중 초대가 이미 있다 |
+| 409 | `TEAM_INVITATION_ALREADY_RESPONDED` | 이미 답이 난 초대다 |
+
+**알림**(`GET /me/notifications`)은 셋이다 — 보낼 때 받은 사람에게
+`team_invitation_sent`, 수락·거절할 때 그 팀 주장(들)에게
+`team_invitation_accepted` · `team_invitation_rejected`. `subject_type` 은
+전부 `team_invitation` 이고 `subject_id` 가 초대 id 다. **무르기(cancel)는
+알림이 없다** — 보낸 쪽이 스스로 하는 것이라 알릴 상대가 없다.
 
 ---
 
