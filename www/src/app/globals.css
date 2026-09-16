@@ -28,16 +28,7 @@
   /* 되돌릴 수 없는 손짓의 색 — 팀 나가기 · 회원 탈퇴 · 해당 영상 삭제가
      같이 쓴다(사용자 요청, 2026-09-16). 알림의 빨간 점과 같은 값이다. */
   --ss-danger: #ff3b30;
-  /**
-   * **채우는 빨강** — 그 단추들의 바탕이다. 🔴 `--ss-danger` 보다 **어둡다**:
-   * 흰 글자와의 대비가 `#ff3b30` 은 3.55 로 AA(4.5) 미달이고 이 값은 4.98 이다
-   * (실측, 2026-09-16).
-   *
-   * 🔴 **테두리형으로 되돌리지 말 것.** 초록 단추(`--ss-accent` #70ed88)가
-   * 테두리형으로 읽히는 것은 그 초록이 **밝아서**다. 빨강은 중간 밝기라 같은
-   * 짜임을 쓰면 프로필의 초록 유리 판 위에서 대비가 **1.82** 까지 떨어진다 —
-   * 어떤 빨강 글자를 써도 그 판 위에서는 3.93 이 한계였다.
-   */
+  /** 채우는 빨강 — 호버에 쓴다. 흰 글자와 4.98(AA 통과). */
   --ss-danger-fill: #d32f2f;
   /* 잔디 초록 — 스쿼드 빈 카드의 + 와 홈 헤드라인의 PITCH 가 같이 쓴다.
      강조색(--ss-accent)보다 조금 더 노란 쪽이라 나란히 놓아도 안 겹친다. */
@@ -2623,21 +2614,25 @@ body::-webkit-scrollbar {
    어렵다 — 되돌릴 수 없는 손짓은 그렇게 보여야 한다. */
 .ss-profile-team-leave {
   flex: none;
-  border: 1px solid var(--ss-danger-fill);
+  /* 🔴 **테두리형에 완전한 빨강**(사용자 결정, 2026-09-16) — 「대표 영상 설정」
+     (초록)과 같은 짜임이다. 선과 글자가 같은 색이고 안쪽은 비어 있다.
+
+     ⚠️ 이 판(초록 유리) 위에서 대비는 1.90 이다 — 사용자가 숫자를 알고 고른
+     값이다. 검은 판(영상 쪽)에서는 3.98 이다. 🔴 **읽기 어렵다고 혼자
+     밝히지 말 것** — 두 번 되돌아온 자리다. */
+  border: 1px solid var(--ss-danger);
   border-radius: 999px;
   padding: 3px 11px;
   font-size: 0.7rem;
   font-weight: 600;
   line-height: 1.5;
-  /* 🔴 **채운 빨강에 흰 글자**(사용자 결정, 2026-09-16 — 대비 실측 뒤). 셋이
-     같은 값이다. 왜 테두리형이 아닌지는 `--ss-danger-fill` 주석에 있다. */
-  color: #fff;
-  background-color: var(--ss-danger-fill);
+  color: var(--ss-danger);
+  background: transparent;
   transition: background-color 160ms ease;
 }
 
 .ss-profile-team-leave:not(:disabled):hover {
-  background-color: var(--ss-danger);
+  background-color: color-mix(in srgb, var(--ss-danger) 24%, transparent);
 }
 
 .ss-profile-team-leave:disabled {
@@ -10389,12 +10384,12 @@ body:has(.ss-shot) .ss-app-figure {
   align-items: center;
   gap: 6px;
   border-radius: 999px;
-  border: 1px solid var(--ss-danger-fill);
+  /* 🔴 **테두리형에 완전한 빨강** — 팀 나가기와 같은 값이다(사용자 결정). */
+  border: 1px solid var(--ss-danger);
   padding: 5px 12px;
   font-size: 0.75rem;
-  /* 🔴 채운 빨강에 흰 글자 — 위 둘과 같은 값이다(사용자 결정). */
-  color: #fff;
-  background-color: var(--ss-danger-fill);
+  color: var(--ss-danger);
+  background: transparent;
   white-space: nowrap;
   transition:
     border-color 160ms ease,
@@ -10409,7 +10404,7 @@ body:has(.ss-shot) .ss-app-figure {
 .ss-profile-del-btn:hover,
 .ss-profile-del-btn:focus-visible {
   border-color: var(--ss-danger);
-  background-color: var(--ss-danger);
+  background-color: color-mix(in srgb, var(--ss-danger) 24%, transparent);
 }
 
 /* 한 번 더 물은 뒤의 그 단추. 🔴 색만으로 말하지 않는다 — 글자가
@@ -11650,6 +11645,32 @@ body:has(.ss-profile) {
 /* 팀 만들기 폼 접기 — 「내 경기」 더보기와 같은 방식이다(`grid-template-rows`
    0fr → 1fr). 🔴 `max-height` 로 하지 않는다: 상한과 실제 높이가 다르면
    아무 일도 안 일어나는 구간에서 시간이 새어 속도가 튄다. */
+/* 호칭 고치기 — 칩 줄 아래에 작게 붙는다. */
+.ss-profile-titles-edit {
+  margin-top: 8px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 24%, transparent);
+  border-radius: 999px;
+  padding: 3px 11px;
+  font-size: 0.7rem;
+  color: color-mix(in srgb, var(--ss-fg) 72%, transparent);
+  background: transparent;
+  transition: background-color 160ms ease;
+}
+
+.ss-profile-titles-edit:hover {
+  background-color: color-mix(in srgb, var(--ss-fg) 10%, transparent);
+}
+
+.ss-profile-title-input {
+  width: 100%;
+  padding: 7px 12px;
+  font-size: 0.8125rem;
+}
+
+.ss-profile-titles-hint {
+  font-size: 0.7rem;
+}
+
 .ss-profile-form-fold {
   display: grid;
   grid-template-rows: 0fr;

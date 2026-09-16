@@ -166,6 +166,13 @@ export default function SquadSuggest({
    * 판을 여는 동안만 쓰고 어디에도 오래 담아 두지 않는다.
    */
   const [clips, setClips] = useState<Record<string, string>>({})
+  /**
+   * 후보가 **직접 적은 호칭** — `user_id` → 첫 호칭 (미결 `paik` 36번).
+   *
+   * 🔴 후보 응답에 없어서 `card_public_slug` 로 따로 읽는다(대표 영상과 같다).
+   * 카드의 `titles[0].label` 이다 — 사람이 적은 글이라 **지어내지 않는다**.
+   */
+  const [titles, setTitles] = useState<Record<string, string>>({})
 
   /* 🔴 **거르개를 서버에 넘긴다.** 화면에서 거르면 「이 등급에 몇 명인가」가
      받아 온 페이지 안에서만 맞는 값이 된다 — 계약이 하드 필터를 서버에 두었다. */
@@ -236,6 +243,26 @@ export default function SquadSuggest({
       if (!alive) return
       const next = Object.fromEntries(found.filter((x): x is readonly [string, string] => !!x))
       setClips(next)
+
+      /* 🔴 **호칭도 같이 읽는다**(미결 `paik` 36번) — 후보 응답에 없어서
+         카드로 한 번 더 묻는다. 대표 영상과 **따로** 부르는 이유는 둘이
+         다른 경로이고(`/featured-video` · `/cards/{slug}`), 한쪽이 404 여도
+         다른 쪽은 있을 수 있어서다. */
+      const named = await Promise.all(
+        withCard.map(async (c) => {
+          try {
+            const r = await fetch(`/api/cards/${encodeURIComponent(c.card_public_slug as string)}`)
+            if (!r.ok) return null
+            const b = (await r.json().catch(() => null)) as { titles?: { label: string }[] } | null
+            const label = b?.titles?.[0]?.label?.trim()
+            return label ? ([c.user_id, label] as const) : null
+          } catch {
+            return null
+          }
+        }),
+      )
+      if (!alive) return
+      setTitles(Object.fromEntries(named.filter((x): x is readonly [string, string] => !!x)))
     })()
     return () => {
       alive = false
@@ -415,9 +442,15 @@ export default function SquadSuggest({
                       확정으로 읽고, 남의 화면에 박힌 등급은 회수가 안 된다. */}
                   {s.provisional && <span className="ss-suggest-provisional">검수 전</span>}
                 </span>
+                {/* 🔴 **그 사람이 적은 호칭이 먼저다.** `FLAVOR` 는 화면 mock
+                    이라 진짜가 있으면 진짜가 이긴다(대표 영상과 같은 순서). */}
+                {(titles[s.user_id] || FLAVOR[s.nickname]?.title) && (
+                  <span className="ss-suggest-title">
+                    {titles[s.user_id] ?? FLAVOR[s.nickname].title}
+                  </span>
+                )}
                 {FLAVOR[s.nickname] && (
                   <>
-                    <span className="ss-suggest-title">{FLAVOR[s.nickname].title}</span>
                     {/* 영상 분석이 정리한 특징 — 수치가 아니라 말로 적는다
                         (카드에 수치를 그리지 않는 규칙과 같은 이유).
                         ⚠️ 아직 mock 이다 — 계약 44번이 그은 범위다. */}

@@ -70,9 +70,17 @@ export interface Backend {
    * 있으니 **키 자체를 빼고** 부른다. `null` 은 "지운다"는 뜻이 있는 값이다.
    * 🔴 `style` 을 보낼 땐 **전체 값**을 보낸다 — 서버가 부분 병합을 안 한다.
    */
+  /**
+   * 카드에서 **사람이 정하는 값**을 바꾼다. 보낸 칸만 바뀐다(계약 3-5절).
+   *
+   * ⚠️ `titles` 는 **아직 계약에 없다**(미결 `paik` 36번 — 요청해 두었다).
+   * 호칭을 사람이 직접 적기로 바뀌면서(2026-09-16) 필요해진 칸이고, 지금은
+   * mock 만 받는다. 🔴 **진짜 서버가 이 칸을 받기 전까지 실서버에서는
+   * 저장되지 않는다** — 화면이 그것을 숨기지 않고 말한다.
+   */
   updateMyCard(
     token: string,
-    input: { tagline?: string | null; style?: CardStyleWire | null },
+    input: { tagline?: string | null; style?: CardStyleWire | null; titles?: string[] },
   ): Promise<PlayerCard>
   getPublicCard(slug: string): Promise<PublicPlayerCard>
   /** 내가 올린 클립 목록. **최근 것이 앞에 온다.** */

@@ -721,6 +721,20 @@ export const mockBackend: Backend = {
       updated.tagline = cleaned ? cleaned : null
     }
     if ('style' in input) updated.style = input.style ?? null
+    /* 🔴 **사람이 직접 적는 호칭**(2026-09-16, 미결 `paik` 36번). 읽는 모양은
+       그대로 `Title[]` 이라 카드 · 추천 판이 손댈 것이 없다 — 사람이 적은
+       글은 `label` 에 담고 `code` 는 서버가 짓는다(여기서는 차례로).
+
+       🔴 `category` 를 안 받는다(사용자 결정) — 자유 입력이라 분류를 매길
+       사람이 없다. 읽는 쪽도 안 쓴다. */
+    if ('titles' in input) {
+      const now = new Date().toISOString()
+      updated.titles = (input.titles ?? [])
+        .map((t) => t.trim())
+        .filter(Boolean)
+        .slice(0, 3)
+        .map((label, i) => ({ code: `self-${i + 1}`, label, category: '', granted_at: now }))
+    }
     made.set(u.id, updated)
     return updated
   },

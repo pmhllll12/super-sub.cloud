@@ -15,6 +15,7 @@ import { SESSION_COOKIE } from '@/server/session'
 import { HOME_TEAM_COOKIE, pickTeamId } from '@/lib/homeTeam'
 import AccountActions from './AccountActions'
 import TeamActions from './TeamActions'
+import TitlesForm from './TitlesForm'
 import CardEditor from './CardEditor'
 import StyledCard from './StyledCard'
 import { CardStyleProvider } from './cardStyle'
@@ -124,18 +125,10 @@ export function MeBody({
               <h2 className="ss-profile-h">정보</h2>
               <dl>
                 <InfoRow label="호칭">
-                  {titles.length === 0 ? (
-                    <span className="ss-profile-muted">아직 받은 호칭이 없습니다.</span>
-                  ) : (
-                    <span className="ss-profile-pills">
-                      {titles.map((t) => (
-                        <span key={t.code} className="ss-profile-pill">
-                          <b>{t.category}</b>
-                          {t.label}
-                        </span>
-                      ))}
-                    </span>
-                  )}
+                  {/* 🔴 **사람이 직접 적는다**(2026-09-16 결정, 미결 `paik` 36번).
+                      원래는 분석이 붙이는 값이라 화면이 읽기만 했다 — 팀이 다시
+                      정하면서 여기서 고친다. 분류(강점·활동)는 안 받는다. */}
+                  <TitlesForm titles={titles.map((t) => t.label)} />
                 </InfoRow>
                 <InfoRow label="이메일">{user.email}</InfoRow>
                 <InfoRow label="함께한 날">{ymd(user.created_at)}부터</InfoRow>
