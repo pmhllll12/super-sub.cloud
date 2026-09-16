@@ -28,6 +28,10 @@ const REPORT_EXIT_MS = 320
  */
 const TAB_SWAP_MS = 240
 
+/** 공개 폼이 펼쳐지고 접히는 시간 — `globals.css` 의 `.ss-profile-publish-slot`
+ *  전환 길이와 같아야 한다. 짧으면 내용이 먼저 사라져 툭 접힌다. */
+const PUBLISH_SLIDE_MS = 260
+
 /**
  * 내가 올린 클립 — **두 갈래로 갈라 한 번에 한 편만** 보여준다(사용자 요청).
  *
@@ -142,6 +146,20 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
   )
   /** 공개 폼이 열린 영상 id 와 적고 있는 값. */
   const [form, setForm] = useState<{ id: string; title: string; what: string } | null>(null)
+  /**
+   * 폼이 **펼쳐져 있는가** — `form`(내용)과 따로 둔다.
+   *
+   * 🔴 접는 연출이 도는 동안 내용이 남아 있어야 한다. 접자마자 `form` 을
+   * 비우면 칸이 **툭** 접힌다 — 미끄러질 것이 없어서다. 그래서 이 값을 먼저
+   * 내리고, 다 접힌 뒤에 아래 타이머가 `form` 을 비운다.
+   */
+  const [formOpen, setFormOpen] = useState(false)
+
+  useEffect(() => {
+    if (formOpen || !form) return
+    const id = setTimeout(() => setForm(null), PUBLISH_SLIDE_MS)
+    return () => clearTimeout(id)
+  }, [formOpen, form])
 
   useEffect(() => {
     if (!picked) {
@@ -428,6 +446,11 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
    * 경우 비공개로 보이는데 실제로는 **남에게 계속 보인다** — 되돌릴 수 없는
    * 쪽으로 틀리는 것이라 지우기와 같은 순서를 쓴다.
    */
+  /** 폼을 접는다 — 미끄러짐이 끝난 뒤에 내용을 비운다(빈 칸이 먼저 사라지면 툭 접힌다). */
+  function closeForm() {
+    setFormOpen(false)
+  }
+
   async function togglePublish(target: MyVideo) {
     if (pubIds.includes(target.id)) {
       setNotice(null)
@@ -435,13 +458,20 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
         await unpublish(target.id)
         setPubIds((prev) => prev.filter((x) => x !== target.id))
         setForm(null)
+        setFormOpen(false)
       } catch (e) {
         setNotice(e instanceof Error ? e.message : '공개를 풀지 못했습니다.')
       }
       return
     }
+    // 🔴 **열려 있으면 닫는다**(사용자 요청) — 같은 단추가 「전체 공개」이자 「닫기」다.
+    if (formOpen && form?.id === target.id) {
+      closeForm()
+      return
+    }
     // 켜는 것만으로는 안 올린다 — 제목이 있어야 영상 모음에서 이름이 생긴다.
     setForm({ id: target.id, title: '', what: '' })
+    setFormOpen(true)
   }
 
   async function savePublish(target: MyVideo) {
@@ -733,44 +763,21 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
                             onClick={() => togglePublish(v)}
                           >
                             <span className="material-symbols-outlined" aria-hidden="true">
-                              {pubIds.includes(v.id) ? 'visibility' : 'visibility_off'}
+                              {pubIds.includes(v.id)
+                                ? 'visibility'
+                                : formOpen && form?.id === v.id
+                                  ? 'close'
+                                  : 'visibility_off'}
                             </span>
-                            {pubIds.includes(v.id) ? '전체 공개 중' : '전체 공개'}
+                            {/* 🔴 **열려 있으면 「닫기」다**(사용자 요청,
+                                2026-09-16). 같은 단추가 여는 자리이자 닫는
+                                자리라, 열어 놓고 되돌릴 데를 따로 찾지 않는다. */}
+                            {pubIds.includes(v.id)
+                              ? '전체 공개 중'
+                              : formOpen && form?.id === v.id
+                                ? '닫기'
+                                : '전체 공개'}
                           </button>
-
-                          {form?.id === v.id && (
-                            <div className="ss-profile-publish-form">
-                              <label htmlFor="ss-pub-title">제목</label>
-                              <input
-                                id="ss-pub-title"
-                                value={form.title}
-                                maxLength={40}
-                                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                              />
-                              <label htmlFor="ss-pub-what">한 줄 설명</label>
-                              <input
-                                id="ss-pub-what"
-                                value={form.what}
-                                maxLength={60}
-                                onChange={(e) => setForm({ ...form, what: e.target.value })}
-                              />
-                              {/* 🔴 **공개는 되돌릴 수 있지만 그 사이에 남이 본다.**
-                                  무엇이 일어나는지 누르기 전에 말한다(CCC 20 으로 서버에
-                                  올라가면서 이 문구가 「이 브라우저에만」에서 바뀌었다). */}
-                              <p className="ss-profile-publish-note">
-                                영상 모음에서 다른 사람에게도 보입니다 — 언제든 다시 내릴 수
-                                있습니다.
-                              </p>
-                              <button
-                                type="button"
-                                className="ss-profile-publish-save"
-                                disabled={!form.title.trim()}
-                                onClick={() => savePublish(v)}
-                              >
-                                공개하기
-                              </button>
-                            </div>
-                          )}
                         </div>
                       )}
                 {/* 🔴 **분석 갈래에서만** 낸다(사용자 요청, 2026-09-16).
@@ -831,6 +838,72 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
                 </span>
               </button>
             </div>
+
+            {/* 공개 폼 — 🔴 **흐름 안에 둔다**(사용자 요청, 2026-09-16).
+                전에는 단추 아래로 **떠올랐고**(절대배치), 그래서 아래 선과
+                썸네일 줄을 덮어 잘려 보였다. 이제 자리를 차지하며 열리므로
+                아래 것들이 **부드럽게 밀려 내려간다.**
+
+                🔴 **높이를 모르고도 미끄러지게** `grid-template-rows: 0fr → 1fr`
+                을 쓴다. `height: auto` 는 전환이 안 되고, 고정 px 을 적으면
+                글자 크기나 문구가 바뀔 때마다 다시 재야 한다.
+
+                🔴 **자리는 늘 있고 내용만 든다.** 열 때 요소가 새로 붙으면
+                전환이 시작할 곳(0fr)이 없어 툭 나타난다 — 갈래 바꾸기에서
+                쓴 것과 같은 이유다. 닫을 때도 `form` 을 바로 안 비우고
+                미끄러짐이 끝난 뒤에 비운다. */}
+            {tab === 'uploaded' && !pubIds.includes(v.id) && (
+              <div
+                className="ss-profile-publish-slot"
+                data-open={formOpen && form?.id === v.id ? 'true' : undefined}
+              >
+                <div className="ss-profile-publish-slot-inner">
+                  {/* 🔴 흐림은 **인라인으로만** 준다 — `globals.css` 에 적으면
+                      Lightning CSS 를 지나며 떨어져 나간다(`me/glass.ts`).
+                      왼쪽 칸의 「정보」 판들과 같은 값을 쓴다. */}
+                  {form?.id === v.id && (
+                    <div className="ss-profile-publish-form" style={SECTION_GLASS}>
+                      <div className="ss-profile-publish-fields">
+                        <label className="ss-profile-publish-field">
+                          <span>제목</span>
+                          <input
+                            value={form.title}
+                            maxLength={40}
+                            placeholder="무엇을 보는 장면인가요"
+                            aria-label="제목"
+                            onChange={(e) => setForm({ ...form, title: e.target.value })}
+                          />
+                        </label>
+                        <label className="ss-profile-publish-field">
+                          <span>한 줄 설명</span>
+                          <input
+                            value={form.what}
+                            maxLength={60}
+                            placeholder="없어도 됩니다"
+                            aria-label="한 줄 설명"
+                            onChange={(e) => setForm({ ...form, what: e.target.value })}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          className="ss-profile-publish-save"
+                          disabled={!form.title.trim()}
+                          onClick={() => savePublish(v)}
+                        >
+                          공개하기
+                        </button>
+                      </div>
+                      {/* 🔴 **공개는 되돌릴 수 있지만 그 사이에 남이 본다.**
+                          무엇이 일어나는지 누르기 전에 말한다(CCC 20 으로 서버에
+                          올라가면서 이 문구가 「이 브라우저에만」에서 바뀌었다). */}
+                      <p className="ss-profile-publish-note">
+                        영상 모음에서 다른 사람에게도 보입니다 — 언제든 다시 내릴 수 있습니다.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* 상자 폭을 그대로 쓰는 흰 선 — `100%` 면 된다.
 

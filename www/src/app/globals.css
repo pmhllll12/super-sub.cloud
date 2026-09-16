@@ -12379,66 +12379,164 @@ body:has(.ss-profile) {
     'opsz' 20;
 }
 
-/* 폼은 단추 **아래로 떠오른다** — 🔴 오른쪽 끝에 맞춰 연다(`right: 0`).
-   왼쪽에 맞추면 판 밖으로 나간다. */
+/* 🔴 **폼이 들어설 자리**(2026-09-16, 사용자 요청: "부드럽게 내려가고").
+   전에는 폼이 단추 아래로 **떠올라서**(절대배치) 선과 썸네일 줄을 덮어
+   잘려 보였다. 이제 흐름 안에서 자리를 벌리며 열리므로 아래 것들이 **밀려
+   내려간다.**
+
+   🔴 **높이를 모르고도 미끄러지게** `grid-template-rows: 0fr → 1fr` 을 쓴다.
+   `height: auto` 는 전환이 안 되고, 고정 px 은 글자 크기·문구가 바뀔 때마다
+   다시 재야 한다. 안쪽 상자가 `overflow: hidden` 을 맡는다 — 그게 없으면
+   칸이 0 이어도 내용이 비어져 나온다.
+
+   🔴 길이는 `MyVideos.tsx` 의 `PUBLISH_SLIDE_MS`(260)와 같아야 한다 — 다
+   접힌 뒤에 내용을 비우기 때문이다. */
+.ss-profile-publish-slot {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 260ms var(--ss-home-out-ease),
+    opacity 200ms ease;
+}
+
+.ss-profile-publish-slot[data-open='true'] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.ss-profile-publish-slot-inner {
+  overflow: hidden;
+}
+
+/* 🔴 **한 줄로 컴팩트하게**(사용자 요청). 전에는 라벨·칸·문구·단추가 세로로
+   쌓여 판이 길었다 — 적을 것이 둘뿐이라 한 줄에 선다.
+
+   🔴 **왼쪽 칸의 「정보」 판과 같은 재질이다**(사용자 요청, 2026-09-16) —
+   `.ss-profile-info` 와 값을 맞췄다(흰색 6% · 모서리 11 · 테두리 없음).
+   같은 화면에 재질이 둘이면 한쪽이 남의 판처럼 보인다.
+
+   ⚠️ **흐림은 여기 못 적는다.** `backdrop-filter` 를 `globals.css` 에 적으면
+   Lightning CSS 를 지나며 통째로 떨어져 나간다(`me/glass.ts` 머리말). 그래서
+   `SECTION_GLASS` 를 인라인으로 준다 — 저 판들과 같은 방식이다.
+
+   🔴 **채움은 「정보」 판과 다르다 — 뒤가 다르기 때문이다**(2026-09-16,
+   사용자 지적: "여기 잘 안 보이는데"). 저 판들은 `#fff 5~6%` 인데도 잘
+   읽힌다. 그 뒤가 **어두운 초록 쪽 배경**이라서지 값이 좋아서가 아니다.
+   이 판은 오른쪽 칸, **밝은 연보라 배경** 위에 선다.
+
+   🔴 **블러를 더 준다고 안 된다.** 흐림은 뒤를 뭉갤 뿐 **밝기를 안 바꾼다** —
+   밝은 것을 흐리면 고르게 밝아질 뿐이다. 그래서 채움을 어둡게 깐다.
+
+   실측(헤드리스 크롬, 판 안 여섯 점의 합성색에서 흰 글자 대비, 가장 나쁜 곳):
+
+   | 채움 | 가장 나쁜 곳 | |
+   |---|---|---|
+   | `#fff 6%`(「정보」 판과 같은 값) | **1.59** | AA(4.5) 미달 |
+   | `#000 62%`(지금) | **8.51** | 통과 |
+
+   가장 나쁜 자리는 판 **가운데~오른쪽**이다 — 뒤 사진이 거기서 연보라
+   (`rgb(216,199,230)`)로 가장 밝다. 색은 눈이 아니라 재서 고른다. */
 .ss-profile-publish-form {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 4;
+  margin-top: 10px;
+  padding: 11px 14px;
+  border-radius: 11px;
+  background: color-mix(in srgb, #000 62%, transparent);
+}
+
+/* 제목 · 설명 · 단추가 한 줄. 좁아지면 접힌다(`wrap`) — 칸이 실처럼 눌리는
+   것보다 줄이 하나 느는 편이 낫다. */
+.ss-profile-publish-fields {
   display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+/* 🔴 라벨을 칸 **위에 작게** 얹는다. 왼쪽에 두면 칸이 그만큼 좁아지고,
+   자리표시 글만 두면 적고 나서 그 칸이 무엇이었는지 사라진다. */
+.ss-profile-publish-field {
+  display: flex;
+  flex: 1 1 150px;
   flex-direction: column;
-  gap: 4px;
-  width: 300px;
-  padding: 12px;
-  border-radius: 12px;
-  border: 1px solid color-mix(in srgb, var(--ss-fg) 22%, transparent);
-  background: color-mix(in srgb, #000 82%, transparent);
+  gap: 3px;
+  min-width: 0;
 }
 
-.ss-profile-publish-form label {
-  font-size: 0.72rem;
-  color: color-mix(in srgb, var(--ss-fg) 60%, transparent);
+/* 🔴 **온전한 흰색**(사용자 요청, 2026-09-16). 옅게 깔면 유리 판 위에서
+   회색으로 읽혀 무슨 칸인지 흐려진다 — 「정보」 판의 글자들과 같은 무게다. */
+.ss-profile-publish-field > span {
+  padding-left: 2px;
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  color: var(--ss-fg);
 }
 
+/* 테두리는 **온전한 흰색**이다(사용자 요청) — 이 판의 알약들(「호칭 고치기」·
+   「팀 만들기」)과 같은 무게로 선다. 안은 살짝만 깔아 칸이라는 것만 말한다. */
 .ss-profile-publish-form input {
-  height: 32px;
-  padding: 0 10px;
-  border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--ss-fg) 30%, transparent);
-  background-color: transparent;
+  width: 100%;
+  height: 34px;
+  padding: 0 11px;
+  border-radius: 10px;
+  border: 1px solid var(--ss-fg);
+  background-color: color-mix(in srgb, #fff 6%, transparent);
   font-size: 0.82rem;
   color: var(--ss-fg);
+  transition: background-color 160ms ease;
+}
+
+/* ⚠️ 자리표시 글만 **덜 희다.** 적은 값과 같은 흰색이면 이미 적어 둔 것으로
+   읽혀서, 비어 있는데도 채워진 줄 안다. 그래도 읽히게 62% 다. */
+.ss-profile-publish-form input::placeholder {
+  color: color-mix(in srgb, var(--ss-fg) 62%, transparent);
 }
 
 .ss-profile-publish-form input:focus-visible {
   outline: none;
-  border-color: var(--ss-fg);
+  background-color: color-mix(in srgb, #fff 16%, transparent);
 }
 
 .ss-profile-publish-note {
-  margin-top: 2px;
-  font-size: 0.7rem;
+  margin: 9px 0 0;
+  padding-left: 2px;
+  font-size: 0.72rem;
   line-height: 1.5;
-  color: color-mix(in srgb, var(--ss-fg) 55%, transparent);
+  color: var(--ss-fg);
 }
 
+/* 🔴 **채운 단추**다 — 칸 둘 옆에서 테두리만 두르면 입력 칸의 하나로 읽힌다.
+   높이는 칸과 같은 34 라 밑변이 나란하다. */
 .ss-profile-publish-save {
-  align-self: flex-start;
-  margin-top: 4px;
-  height: 30px;
-  padding: 0 14px;
-  border-radius: 999px;
+  flex: 0 0 auto;
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 10px;
   border: 1px solid var(--ss-fg);
-  background: color-mix(in srgb, var(--ss-fg) 12%, transparent);
+  background: var(--ss-fg);
   font-size: 0.78rem;
-  color: var(--ss-fg);
+  font-weight: 600;
+  color: #111;
   cursor: pointer;
+  transition:
+    opacity 160ms ease,
+    background-color 160ms ease;
 }
 
 .ss-profile-publish-save:disabled {
-  opacity: 0.45;
+  /* 적기 전에는 **비어 있는 단추**다 — 채운 채로 흐리기만 하면 눌리는 줄 안다.
+     ⚠️ 테두리와 글자는 흰색 그대로 두고 **채움만** 뺀다(사용자 요청: 완전한
+     흰색). 글자를 흐리면 이 판에서 유일하게 회색인 것이 되어 눈에 걸린다. */
+  border-color: var(--ss-fg);
+  background: transparent;
+  color: var(--ss-fg);
   cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-profile-publish-slot {
+    transition: none;
+  }
 }
 
 /* 카드 꾸미기의 「초기화 · 저장」 줄. 알약 두 개가 나란히 선다. */
