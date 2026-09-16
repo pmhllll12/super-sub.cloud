@@ -248,6 +248,7 @@ export default function SquadPanel({
   card,
   squad = null,
   sportCode = null,
+  teamName = null,
   scouting = false,
   onCloseScouting,
   onOpenScouting,
@@ -268,6 +269,17 @@ export default function SquadPanel({
    * 없으면(팀이 없는 사람) 판이 아는 축구 넷으로 돈다.
    */
   sportCode?: string | null
+  /**
+   * 홈에 그리는 그 팀의 이름 — **머리글이 된다**(사용자 요청, 2026-09-16).
+   *
+   * 🔴 이름을 적는 까닭은 「내 팀이 생겼다」를 알리는 것보다 **어느 팀 판을
+   * 보고 있는지**다. 소속이 여럿일 수 있고 홈은 그중 하나만 그리는데
+   * (`lib/homeTeam.ts`), 머리글이 늘 「MY SQUAD」면 고른 팀을 바꿔도 화면
+   * 어디에도 안 적힌다.
+   *
+   * 소속이 없으면 `null` — 그때는 「MY SQUAD」로 둔다(적을 이름이 없다).
+   */
+  teamName?: string | null
   /**
    * 서버가 준 스쿼드. **없을 수 있다** — 팀이 없거나(개인 계정) 팀은 있어도
    * 스쿼드를 아직 안 만든 경우다. 계약이 그 둘을 갈라 두었으므로(404
@@ -839,7 +851,19 @@ export default function SquadPanel({
             두면 선 밖으로 나간다. 선을 그리는 상자 안에 넣고 위 여백을
             그만큼 준다(globals.css). */}
         <header className="ss-squad-head">
-          <h2>MY SQUAD</h2>
+          {/* 🔴 **팀이 있으면 그 이름이 머리글이다**(위 `teamName` 주석).
+              없을 때만 「MY SQUAD」다 — 팀을 만들면 이 글자가 바뀌는 것이
+              곧 「생겼다」는 신호이기도 하다.
+
+              ⚠️ 이름이 길 수 있다(계약에 상한이 없다). 한 줄로 자르고
+              말줄임한다 — 안 그러면 오른쪽 크기 단추(3:3·5:5·7:7)를 밀어낸다.
+              `title` 을 달아 잘린 이름도 가리키면 읽을 수 있게 둔다. */}
+          <h2
+            className={teamName ? 'ss-squad-title--team' : undefined}
+            title={teamName ?? undefined}
+          >
+            {teamName ?? 'MY SQUAD'}
+          </h2>
           {/* 🔴 「풋살 5인」이라고 **적어 두기만** 하던 자리다 — 이제 고를 수
               있다(사용자 요청, 2026-09-08). 판의 배치가 같이 바뀐다.
               라디오처럼 하나만 골라진다 — 판이 동시에 두 크기일 수는 없다. */}

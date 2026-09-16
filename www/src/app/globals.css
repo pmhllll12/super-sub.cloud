@@ -2008,6 +2008,24 @@ body::-webkit-scrollbar {
   font-weight: 600;
   letter-spacing: 0.14em;
   color: var(--ss-fg);
+  /* 🔴 **한 줄로 자른다**(2026-09-16). 팀 이름이 머리글이 되면서 길이가
+     사람 손에 달렸는데(계약에 상한이 없다), 두 줄이 되면 머리글 상자가
+     `align-items: baseline` 이라 오른쪽 크기 단추 줄이 따라 내려간다.
+     ⚠️ `min-width: 0` 이 함께 있어야 한다 — flex 자식은 기본이
+     `min-width: auto` 라 그것만으로는 안 줄어들어 말줄임이 안 걸린다. */
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 🔴 **팀 이름일 때는 자간을 줄인다.** 「MY SQUAD」는 영문 대문자라 넓은
+   자간(0.14em)이 라벨처럼 읽히는데, 한글 이름(「번개FC」)에 같은 값을 주면
+   글자가 흩어져 **이름이 아니라 표식처럼** 보인다. 이름은 이름으로 읽혀야
+   해서 조금 크고 촘촘하게 둔다. */
+.ss-squad-title--team {
+  font-size: 0.84rem;
+  letter-spacing: 0.02em;
 }
 
 /* 판 안 글자는 전부 완전한 흰색이다 — 배경 사진이 밝은 자리도 있어
