@@ -199,20 +199,58 @@ describe('내 프로필 — /me', () => {
     return els[0].getAttribute('src')
   }
 
+  /**
+   * 갈래를 바꾸고 **다 바뀔 때까지 기다린다**.
+   *
+   * 🔴 누른 직후에는 아직 **옛 갈래가 그려져 있다**(2026-09-16, 사용자 요청으로
+   * 넣은 연출). 판이 오른쪽으로 물러난 뒤에 내용이 갈리기 때문이다 — 알약만
+   * 먼저 켜진다. 물러남이 끝났다는 신호(`data-leaving` 이 지워짐)를 기다린다.
+   */
+  async function toTab(name: RegExp | string) {
+    fireEvent.click(screen.getByRole('tab', { name }))
+    await waitFor(() =>
+      expect(document.querySelector('.ss-profile-swap')).not.toHaveAttribute('data-leaving'),
+    )
+  }
+
   // 🔴 한 번에 한 편만 그린다 — 목록이 아니다.
-  it('한 편만 보이고, 알약을 바꾸면 그 갈래의 영상이 나온다', () => {
+  it('한 편만 보이고, 알약을 바꾸면 그 갈래의 영상이 나온다', async () => {
     const { container } = render(<MeBody user={USER} card={CARD} videos={VIDEOS} matches={[]} />)
     // 분석 영상 갈래에는 v1 하나뿐이다.
     expect(shownVideo(container)).toBe('/a.mp4')
 
-    fireEvent.click(screen.getByRole('tab', { name: /업로드 영상/ }))
+    await toTab(/업로드 영상/)
 
     expect(shownVideo(container)).toBe('/b.mp4')
   })
 
-  it('다음 · 이전 단추로 같은 갈래의 영상을 넘긴다', () => {
+  /* 🔴 **먼저 물러나고 그 뒤에 갈린다**(2026-09-16, 사용자 요청: "두개 왔다
+     갔다 클릭할 때 너무 사라지고 나오는게 부자연스러워"). 누르자마자 갈아
+     끼우면 옛 내용이 그 자리에서 사라지고 새것이 툭 나타난다 — 그 툭을
+     없애려고 넣었다.
+
+     🔴 **알약은 바로 켜진다.** 내용까지 기다리면 눌러도 반응이 없는 것처럼
+     읽힌다 — 누른 자리가 먼저 답하고 내용이 따라온다. */
+  it('알약을 누르면 판이 먼저 물러나고, 그 사이 내용은 아직 옛 갈래다', async () => {
     const { container } = render(<MeBody user={USER} card={CARD} videos={VIDEOS} matches={[]} />)
+
     fireEvent.click(screen.getByRole('tab', { name: /업로드 영상/ }))
+
+    expect(container.querySelector('.ss-profile-swap')).toHaveAttribute('data-leaving', 'true')
+    expect(screen.getByRole('tab', { name: /업로드 영상/ })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    expect(shownVideo(container)).toBe('/a.mp4')
+
+    // 다 물러난 뒤에 갈리고, 물러남 표시도 지워진다(그래야 제자리로 돌아온다).
+    await waitFor(() => expect(shownVideo(container)).toBe('/b.mp4'))
+    expect(container.querySelector('.ss-profile-swap')).not.toHaveAttribute('data-leaving')
+  })
+
+  it('다음 · 이전 단추로 같은 갈래의 영상을 넘긴다', async () => {
+    const { container } = render(<MeBody user={USER} card={CARD} videos={VIDEOS} matches={[]} />)
+    await toTab(/업로드 영상/)
 
     expect(screen.getByText('1 / 2')).toBeInTheDocument()
     expect(shownVideo(container)).toBe('/b.mp4')
@@ -229,9 +267,9 @@ describe('내 프로필 — /me', () => {
   })
 
   // 🔴 넘기는 단추가 앞뒤로만 가는 데 비해, 목록은 바로 고르게 한다.
-  it('선 아래 목록에서 영상을 바로 고른다', () => {
+  it('선 아래 목록에서 영상을 바로 고른다', async () => {
     const { container } = render(<MeBody user={USER} card={CARD} videos={VIDEOS} matches={[]} />)
-    fireEvent.click(screen.getByRole('tab', { name: /업로드 영상/ }))
+    await toTab(/업로드 영상/)
     expect(shownVideo(container)).toBe('/b.mp4')
 
     fireEvent.click(screen.getByRole('button', { name: '2번째 영상' }))
@@ -265,11 +303,11 @@ describe('내 프로필 — /me', () => {
     expect(screen.getByText(/해상도가 상한을 넘습니다/)).toBeInTheDocument()
   })
 
-  it('갈래가 비어 있으면 그 갈래에 맞게 알려준다', () => {
+  it('갈래가 비어 있으면 그 갈래에 맞게 알려준다', async () => {
     render(<MeBody user={USER} card={CARD} videos={[]} matches={[]} />)
     expect(screen.getByText('아직 업로드한 영상이 없습니다.')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('tab', { name: /분석 영상/ }))
+    await toTab(/분석 영상/)
     expect(screen.getByText('아직 분석한 영상이 없습니다.')).toBeInTheDocument()
   })
 

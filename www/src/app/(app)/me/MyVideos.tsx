@@ -17,6 +17,18 @@ import { useReportPanel } from './reportPanel'
 const REPORT_EXIT_MS = 320
 
 /**
+ * 갈래를 바꿀 때 **나가는 데** 걸리는 시간 — `globals.css` 의
+ * `.ss-profile-swap` 전환 길이와 같아야 한다(사용자 요청, 2026-09-16:
+ * "너무 사라지고 나오는게 부자연스러워").
+ *
+ * 🔴 **나간 뒤에 갈아 끼운다.** 누르자마자 `tab` 을 바꾸면 옛 내용이 그
+ * 자리에서 사라지고 새것이 툭 나타난다 — 그 툭이 사용자가 지적한 것이다.
+ * 그래서 나가는 동안은 `tab` 을 **그대로 두고**(옛 내용이 계속 그려진다)
+ * 이 시간 뒤에 바꾼다. 들어오는 쪽은 CSS 가 되돌아오면서 저절로 된다.
+ */
+const TAB_SWAP_MS = 240
+
+/**
  * 내가 올린 클립 — **두 갈래로 갈라 한 번에 한 편만** 보여준다(사용자 요청).
  *
  *   분석 영상  — 분석을 걸어 둔 것(영상 분석 화면에서 저장한 클립)
@@ -162,6 +174,23 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
 
   const [tab, setTab] = useState<TabKey>(analyzed.length > 0 ? 'analyzed' : 'uploaded')
   const [at, setAt] = useState(0)
+  /**
+   * 나가는 중이면 **갈 곳**, 아니면 `null`. 이 값이 있는 동안 화면은 아직
+   * 옛 갈래(`tab`)를 그리고 있고, 판만 오른쪽으로 물러나는 중이다.
+   */
+  const [leaving, setLeaving] = useState<TabKey | null>(null)
+
+  /* 🔴 다 나간 뒤에 갈아 끼운다. 타이머가 도는 중에 컴포넌트가 사라지면
+     치운다 — 안 그러면 없는 것에 setState 한다. */
+  useEffect(() => {
+    if (!leaving) return
+    const id = setTimeout(() => {
+      setTab(leaving)
+      setAt(0)
+      setLeaving(null)
+    }, TAB_SWAP_MS)
+    return () => clearTimeout(id)
+  }, [leaving])
 
   const shown = tab === 'analyzed' ? analyzed : uploaded
   // 🔴 자리를 상태로 들고 있으므로 목록이 짧은 갈래로 옮겨 가면 넘칠 수 있다.
@@ -312,9 +341,25 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
     }
   }
 
+  /**
+   * 갈래 바꾸기 — **나가는 것을 먼저 보여주고** 갈아 끼운다.
+   *
+   * 🔴 `tab` 을 여기서 바로 안 바꾼다. 바꾸면 옛 내용이 그 프레임에 사라지고
+   * 새것이 나타나 「툭」 끊긴다(사용자 지적). `leaving` 만 세우면 옛 내용이
+   * 그려진 채로 오른쪽으로 물러나고, 아래 타이머가 다 나간 뒤에 바꾼다.
+   *
+   * ⚠️ **나가는 중에 또 누르면 무시한다.** 받아 주면 타이머가 겹쳐 중간에
+   * 갈아 끼워지고, 반쯤 물러난 자리에서 새 내용이 나온다.
+   */
   function pick(next: TabKey) {
-    setTab(next)
-    setAt(0)
+    if (next === tab || leaving) return
+    // 연출을 끈 사람에게는 기다릴 이유가 없다 — 그 자리에서 갈아 끼운다.
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      setTab(next)
+      setAt(0)
+      return
+    }
+    setLeaving(next)
   }
 
   function step(delta: number) {
@@ -430,9 +475,12 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
             key={key}
             type="button"
             role="tab"
-            aria-selected={tab === key}
+            /* 🔴 **누른 쪽이 바로 켜진다.** 내용은 아직 물러나는 중이지만
+               알약까지 기다리면 눌러도 반응이 없는 것처럼 읽힌다 — 누른
+               자리가 먼저 답하고 내용이 따라온다. */
+            aria-selected={(leaving ?? tab) === key}
             className="ss-profile-tab"
-            data-on={tab === key}
+            data-on={(leaving ?? tab) === key}
             onClick={() => pick(key)}
           >
             {label}
@@ -467,6 +515,10 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
         <button
           type="button"
           className="ss-profile-report-open"
+          /* 🔴 **판과 같이 들고 난다**(사용자 요청) — 이 단추도 오른쪽으로
+             물러났다가 오른쪽에서 돌아온다. 흐름 밖 절대배치라 판 안에 못
+             넣어서, 같은 신호를 따로 받는다. */
+          data-leaving={leaving ? 'true' : undefined}
           onClick={() => setPanelOpen(true)}
         >
           해당 영상 리포트 보기
@@ -527,6 +579,17 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
         </div>
       )}
 
+      {/* 🔴 **갈래가 바뀔 때 오른쪽으로 물러났다가 오른쪽에서 돌아온다**
+          (사용자 요청, 2026-09-16). 감싸는 판 하나에 전환을 걸어 두면
+          나가기와 들어오기가 **같은 전환의 양방향**이라 따로 맞출 것이 없다
+          — `data-leaving` 이 서면 물러나고, 지워지면 제자리로 돌아온다.
+
+          🔴 **내용은 그 사이에 갈린다**(`tab` 이 바뀌는 시점이 물러난 뒤다).
+          보이지 않는 동안 갈리므로 갈리는 순간이 안 보인다.
+
+          ⚠️ 알림줄·고른 파일은 **이 밖에** 둔다 — 갈래와 무관하게 남아야
+          하는 것들이라 같이 물러나면 「올리는 중」이 사라진 것처럼 읽힌다. */}
+      <div className="ss-profile-swap" data-leaving={leaving ? 'true' : undefined}>
       {!v ? (
         <p className="ss-profile-muted">
           {tab === 'analyzed'
@@ -869,6 +932,7 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
           )}
         </div>
       )}
+      </div>
     </>
   )
 }

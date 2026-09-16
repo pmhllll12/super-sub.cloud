@@ -10335,6 +10335,31 @@ body:has(.ss-shot) .ss-app-figure {
   animation: ss-p-line 380ms ease 720ms both;
 }
 
+/* 갈래(분석 영상 ↔ 업로드 영상)를 바꿀 때 **오른쪽으로 물러났다가 오른쪽에서
+   돌아온다**(사용자 요청, 2026-09-16: "너무 사라지고 나오는게 부자연스러워").
+
+   🔴 **애니메이션이 아니라 전환이다.** 나가기와 들어오기가 **같은 전환의
+   양방향**이라 둘을 따로 맞출 것이 없다 — `data-leaving` 이 서면 물러나고,
+   지워지면 제자리로 돌아온다. 키프레임 둘로 하면 길이·가속을 두 곳에서
+   맞춰야 하고 한쪽만 고치면 오갈 때 모양이 달라진다.
+
+   🔴 길이는 `MyVideos.tsx` 의 `TAB_SWAP_MS`(240)와 **같아야 한다** — 그
+   타이머가 다 나간 뒤에 내용을 갈아 끼우기 때문이다. 여기가 더 길면 아직
+   물러나는 중에 내용이 갈리는 것이 보인다.
+
+   ⚠️ 거리는 26px 다 — 아래 `ss-p-report-open-in` 과 **같은 값**이다. 함께
+   움직이는 둘이 다른 거리로 가면 한 몸으로 안 읽힌다. */
+.ss-profile-swap {
+  transition:
+    transform 240ms var(--ss-home-out-ease),
+    opacity 240ms ease;
+}
+
+.ss-profile-swap[data-leaving='true'] {
+  transform: translateX(26px);
+  opacity: 0;
+}
+
 /* 🔴 **들어오는 창 안에서만** 연출한다(`data-entered`).
    ⚠️ `.ss-profile-video-player` 는 `key={v.id}` 라 **영상을 넘길 때마다 새로
    붙는다** — 창이 없으면 그때마다 1080ms 를 기다렸다 나타나서 「영상이 너무
@@ -10729,6 +10754,30 @@ body:has(.ss-shot) .ss-app-figure {
     ss-p-report-blink 1.6s ease-in-out 1540ms infinite;
 }
 
+/* 갈래(분석 영상 ↔ 업로드 영상)를 바꿀 때 — **판(`.ss-profile-swap`)과 같이
+   들고 난다**(사용자 요청, 2026-09-16). 흐름 밖 절대배치라 그 판 안에 못 넣어서
+   같은 신호(`data-leaving`)를 따로 받는다.
+
+   🔴 **돌아올 때는 새로 붙는다** — 이 단추는 분석 갈래에서만 그려지므로
+   갈래가 돌아오면 mount 다. 그래서 들어오는 쪽만 키프레임이고, 판처럼
+   전환의 양방향으로는 못 쓴다.
+
+   🔴 깜빡임을 **들어온 뒤로 미룬다**(240ms). 위 진입 규칙과 같은 이유로,
+   둘 다 `transform` 을 잡아 겹치면 뒤엣것이 이긴다.
+
+   ⚠️ 이 두 규칙은 아래 화면 퇴장 규칙(`.ss-profile[data-leaving]`)보다
+   **먼저** 와야 한다 — 같은 무게(0,3,0)라 나중 것이 이기는데, 화면을
+   떠나는 연출이 갈래 연출에 먹히면 안 된다. */
+.ss-profile[data-entered] .ss-profile-report-open {
+  animation:
+    ss-p-report-open-in 240ms var(--ss-home-out-ease) both,
+    ss-p-report-blink 1.6s ease-in-out 240ms infinite;
+}
+
+.ss-profile[data-entered] .ss-profile-report-open[data-leaving='true'] {
+  animation: ss-p-report-open-out 240ms var(--ss-home-out-ease) both;
+}
+
 .ss-profile[data-leaving='true'] .ss-profile-report-open {
   animation: ss-p-report-open-out 260ms ease both;
 }
@@ -10958,6 +11007,17 @@ body:has(.ss-shot) .ss-app-figure {
       .ss-profile-report-open,
       .ss-profile-strip
     ) {
+    animation: none;
+  }
+
+  /* 갈래 바꾸기 — 판은 전환이라 `animation: none` 이 안 듣는다. 화면 쪽도
+     `pick()` 에서 이 설정을 보고 기다리지 않고 바로 갈아 끼운다. */
+  .ss-profile-swap {
+    transition: none;
+  }
+
+  .ss-profile[data-entered] .ss-profile-report-open,
+  .ss-profile[data-entered] .ss-profile-report-open[data-leaving='true'] {
     animation: none;
   }
 }
