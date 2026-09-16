@@ -117,14 +117,61 @@ def metric_labels() -> dict[str, str]:
     }
 
 
+@lru_cache(maxsize=1)
+def metric_units() -> dict[str, str]:
+    """지표 코드 → **`features` 안에서의** 단위 꼬리표 (「도」·「프레임」).
+
+    🔴 **계약의 `unit` 을 그대로 쓰면 안 된다.** `unit` 은 **DB 로 나갈 때**의
+    단위이고, `emitted_from: frame_metrics_seconds` 가 붙은 항목은 그 값이
+    **환산을 거쳐야** 초가 된다 — `features` 안에서는 여전히 **프레임**이다.
+    그 구분이 이미 계약에 적혀 있으므로 **새 키를 더하지 않는다.**
+
+    🔴 **왜 붙이는가.** 1회차가 단위를 일부러 뺐다(9프레임이 「9초」가 되는 것을
+    막으려고). 그런데 **빼는 것으로는 안 막혔다** — 「지속 시간: 9」는 단위를
+    부르는 문장이라 모델이 가장 그럴듯한 「초」를 지어냈다. 2회차 실측:
+    값을 언급한 문장 21건 중 **15건(71%)** 이 초·분을 붙였다.
+    1회차의 논리를 뒤집어 쓴다 — **참인 단위를 주면 그것을 베낀다.**
+
+    🔴 **`ratio` 에는 아무것도 안 붙인다.** 무차원이고, 무엇으로 나눴는지는
+    `scale_ref` 라 한 낱말로 줄이면 오히려 틀린 말이 된다.
+    """
+    if not _METRIC_DEFS.exists():
+        return {}
+    doc = yaml.safe_load(_METRIC_DEFS.read_text(encoding="utf-8")) or {}
+    suffix = {"deg": "도", "score": "점"}
+    units: dict[str, str] = {}
+    for m in doc.get("metrics") or []:
+        code = m.get("code")
+        if not code:
+            continue
+        if m.get("emitted_from") == "frame_metrics_seconds":
+            units[code] = "프레임"  # 🔴 환산 전이다 — 초가 아니다
+        else:
+            units[code] = suffix.get(m.get("unit", ""), "")
+    return units
+
+
 def label_for(code: str, fallback: str = "") -> str:
     """지표 코드의 라벨. 🔴 **없으면 코드를 되돌려주지 않는다** — 그러면 유출이 살아난다."""
     return metric_labels().get(code) or fallback or "측정값"
 
 
+def valued(code: str, value: Any) -> str:
+    """값에 **참인 단위**를 붙인다 — 「12」가 아니라 「12프레임」.
+
+    선언이 없으면 맨 숫자로 둔다. 🔴 **모르는 단위를 지어내지 않는다** —
+    그것이 이 회차가 고치는 결함 자체다.
+    """
+    return f"{value}{metric_units().get(code, '')}"
+
+
 def _labelled(measured: dict[str, Any]) -> str:
-    """`{코드: 값}` 을 사람이 읽는 한 줄로. JSON 을 그대로 넣지 않기 위한 자리."""
-    return " · ".join(f"{label_for(k)} {v}" for k, v in measured.items())
+    """`{코드: 값}` 을 사람이 읽는 한 줄로. JSON 을 그대로 넣지 않기 위한 자리.
+
+    🔴 **앵커도 측정값과 같은 자로 적는다.** 한쪽만 단위를 붙이면 모델이 두 다른
+    자를 나란히 보게 된다.
+    """
+    return " · ".join(f"{label_for(k)} {valued(k, v)}" for k, v in measured.items())
 
 
 def system_prompt(sport: str = "") -> str:
@@ -236,13 +283,16 @@ def build_prompt(criterion, metrics: dict[str, Any], grade: int) -> str:
                 f" → \"{a['evidence']}\""
             )
 
-    lines.append("\n측정값 (이 숫자만 신뢰할 것):")
+    # 🔴 **단위를 함께 준다** (2회차). 맨 숫자를 주면 모델이 단위를 지어내고,
+    #    프레임 값에는 「초」가 가장 그럴듯해서 「12초」가 나갔다.
+    lines.append("\n측정값 (이 숫자와 단위만 신뢰할 것):")
     for code, value in metrics.items():
-        lines.append(f"- {label_for(code, criterion.name)}: {value}")
+        lines.append(f"- {label_for(code, criterion.name)}: {valued(code, value)}")
     lines.append(
         f"\n이번 판정은 [{word}]입니다. "
         f"{label_for(criterion.band_metric, criterion.name)}"
-        f" {metrics.get(criterion.band_metric)}가 그 근거입니다."
+        f" {valued(criterion.band_metric, metrics.get(criterion.band_metric))}"
+        "가 그 근거입니다."
     )
     # 끝맺음도 수준에 맞춘다. **"고칠 점을 붙여라"를 잘한 항목에까지 요구하면
     # 모델이 칭찬할 자리에서 흠을 찾는다** — 1회차에서 2등급 문장이 무너진 데엔
