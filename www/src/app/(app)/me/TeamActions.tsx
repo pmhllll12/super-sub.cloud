@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { apiDelete, apiErrorMessage, apiPost } from '@/lib/api/client'
+import { rememberHomeTeam } from '@/lib/homeTeam'
 import Field from '@/components/ui/Field'
 import PillButton from '@/components/ui/PillButton'
 
@@ -24,10 +25,13 @@ import PillButton from '@/components/ui/PillButton'
 export default function TeamActions({
   teams,
   userId,
+  homeTeamId,
 }: {
   teams: { team_id: string; name: string; region: string; sport_code: string; role: string }[]
   /** 나가기가 이 id 로 나간다 — 계약의 `member_id` 는 곧 `user_id` 다. */
   userId: string
+  /** 지금 홈에 보이는 팀. 소속이 여럿일 때만 고를 자리가 난다. */
+  homeTeamId?: string
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -107,27 +111,51 @@ export default function TeamActions({
               <p className="ss-profile-muted">
                 {t.region} · {t.sport_code}
               </p>
+              {/* 🔴 **소속이 여럿일 때만 낸다.** 하나뿐이면 고를 것이 없고,
+                  단추만 있으면 무엇을 고르는 자리인지가 안 읽힌다. */}
+              {teams.length > 1 && (
+                <button
+                  type="button"
+                  className="ss-profile-team-home"
+                  data-on={homeTeamId === t.team_id ? 'true' : undefined}
+                  aria-pressed={homeTeamId === t.team_id}
+                  onClick={() => {
+                    rememberHomeTeam(t.team_id)
+                    router.refresh()
+                  }}
+                >
+                  {homeTeamId === t.team_id ? '홈에 보이는 팀' : '홈에 이 팀 보기'}
+                </button>
+              )}
             </li>
           ))}
         </ul>
       )}
 
-      {/* 🔴 **팀이 있으면 만들 자리를 안 낸다**(사용자 요청). 지금 짜임은 홈이
-          `teams[0]` 하나만 보므로, 둘째 팀을 만들 수 있게 두면 만들고도 안
-          보이는 팀이 생긴다. 나가고 나면(=0) 다시 나온다. */}
-      {teams.length === 0 && (
-        <>
-          <button
-            type="button"
-            className="ss-profile-tab ss-profile-tab--sm"
-            aria-expanded={open}
-            onClick={() => {
-              setOpen((v) => !v)
-              setError(null)
-            }}
-          >
-            {open ? '접기' : '팀 만들기'}
-          </button>
+      {/* 🔴 **팀 만들기는 늘 낸다**(사용자 지적, 2026-09-16 — 「마지막 주장이어도
+          새로 만들고 싶을 수 있다」). 계약에 팀 해체도 소유권 이양도 없어서
+          마지막 주장은 나갈 수가 없는데, 만들 자리까지 막으면 그 사람은 새
+          팀을 시작할 방법이 아예 없다. 미결 `paik` 35번으로 올렸다.
+
+          🔴 그래서 **홈에 보일 팀을 고르는 자리**가 함께 필요하다 — 없으면
+          새로 만든 팀이 홈에 안 보인다(홈은 한 팀만 그린다). */}
+      <>
+          {/* 🔴 **오른쪽 아래 끝**(사용자 요청, 2026-09-16) — 「계정」 판의
+              회원 탈퇴와 같은 자리다. 판마다 「지금 할 일」은 위, 「덜 쓰는
+              것」은 아래 구석으로 모은다. */}
+          <div className="ss-profile-account-foot">
+            <button
+              type="button"
+              className="ss-profile-tab ss-profile-tab--sm"
+              aria-expanded={open}
+              onClick={() => {
+                setOpen((v) => !v)
+                setError(null)
+              }}
+            >
+              {open ? '접기' : '팀 만들기'}
+            </button>
+          </div>
 
           {open && (
             <form onSubmit={create} className="ss-profile-account-form ss-form-compact">
@@ -142,8 +170,7 @@ export default function TeamActions({
               </PillButton>
             </form>
           )}
-        </>
-      )}
+      </>
 
       {error && (
         <p role="alert" className="ss-profile-video-reason">

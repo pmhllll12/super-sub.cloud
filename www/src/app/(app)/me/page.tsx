@@ -12,6 +12,7 @@ import {
 } from '@/server/backend'
 import { requireUser } from '@/server/currentUser'
 import { SESSION_COOKIE } from '@/server/session'
+import { HOME_TEAM_COOKIE, pickTeamId } from '@/lib/homeTeam'
 import AccountActions from './AccountActions'
 import TeamActions from './TeamActions'
 import CardEditor from './CardEditor'
@@ -68,11 +69,14 @@ export function MeBody({
   videos,
   matches,
   editing = false,
+  homeTeamId,
 }: {
   user: User
   card: PlayerCard | null
   videos: MyVideo[]
   matches: Match[]
+  /** 홈이 지금 그리는 팀 — 소속이 여럿일 때 어느 것이 그것인지 표시한다. */
+  homeTeamId?: string
   /**
    * 카드 편집 모드인가. 🔴 **주소(`/me?edit=1`)가 들고 있다** — 컴포넌트
    * 상태로 두면 뒤로 가기로 닫을 수 없고, 새로고침하면 풀린다.
@@ -113,7 +117,7 @@ export function MeBody({
             <div className="ss-profile-body">
             <section className="ss-profile-bio" style={SECTION_GLASS}>
               <h2 className="ss-profile-h">소속</h2>
-              <TeamActions teams={user.teams} userId={user.id} />
+              <TeamActions teams={user.teams} userId={user.id} homeTeamId={homeTeamId} />
             </section>
 
             <section className="ss-profile-info" style={SECTION_GLASS}>
@@ -242,7 +246,8 @@ export default async function MePage({
   // 카드가 아직 없는 것은 정상이다 — CARD_NOT_FOUND 는 화면 안에서
   // "아직 없습니다"로 안내한다. 401 은 requireUser() 가 이미 걸러 냈지만
   // 그 사이 토큰이 죽을 수도 있어 여기서도 로그인으로 보낸다.
-  const token = (await cookies()).get(SESSION_COOKIE)?.value
+  const jar = await cookies()
+  const token = jar.get(SESSION_COOKIE)?.value
   let card: PlayerCard | null = null
   let videos: MyVideo[] = []
   let matches: Match[] = []
@@ -288,6 +293,7 @@ export default async function MePage({
       videos={videos}
       matches={matches}
       editing={edit === '1'}
+      homeTeamId={pickTeamId(user.teams, jar.get(HOME_TEAM_COOKIE)?.value)}
     />
   )
 }

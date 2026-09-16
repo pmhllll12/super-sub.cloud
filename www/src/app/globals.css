@@ -2651,24 +2651,6 @@ body::-webkit-scrollbar {
   font-size: 0.75rem;
 }
 
-/* 접었다 펴는 작은 탭 — 「팀 만들기」·「접기」. */
-/* 🔴 **회원 탈퇴는 완전한 빨강**(사용자 요청). `.ss-profile-tab` 자체를 물들이면
-   같은 클래스를 쓰는 「팀 만들기」까지 빨개진다 — 되돌릴 수 없는 것에만 건다. */
-.ss-profile-tab--danger {
-  border-color: var(--ss-danger);
-  color: var(--ss-danger);
-}
-
-.ss-profile-tab--danger:not(:disabled):hover {
-  background-color: color-mix(in srgb, var(--ss-danger) 16%, transparent);
-}
-
-.ss-profile-tab--sm {
-  height: 30px;
-  padding: 0 14px;
-  font-size: 0.8125rem;
-}
-
 .ss-pref-row {
   display: flex;
   /* 🔴 **가운데가 아니라 위로 붙인다.** 글이 두 줄이 되면 스위치가 가운데로
@@ -10394,10 +10376,12 @@ body:has(.ss-shot) .ss-app-figure {
   align-items: center;
   gap: 6px;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--ss-error) 55%, transparent);
+  /* 🔴 **완전한 빨강**(사용자 요청, 2026-09-16). 전에는 `--ss-error` 를 흐린
+     글자색과 섞어 연어빛이었다 — 지우는 손짓은 그렇게 보이면 안 된다. */
+  border: 1px solid var(--ss-danger);
   padding: 5px 12px;
   font-size: 0.75rem;
-  color: color-mix(in srgb, var(--ss-error) 85%, var(--ss-fg));
+  color: var(--ss-danger);
   white-space: nowrap;
   transition:
     border-color 160ms ease,
@@ -11624,6 +11608,48 @@ body:has(.ss-profile) {
   border-color: var(--ss-fg);
   background: color-mix(in srgb, var(--ss-fg) 12%, transparent);
 }
+
+/* 🔴 **여기 아래여야 한다.** 위 `.ss-profile-tab` 과 **같은 특이도**라, 앞에
+   두면 기본값이 나중에 와서 이긴다 — 실제로 빨강이 안 먹었다(2026-09-16). */
+
+/* 「홈에 이 팀 보기」 — 소속이 여럿일 때만 난다. 고른 것은 강조색으로 찬다. */
+.ss-profile-team-home {
+  margin-top: 6px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 24%, transparent);
+  border-radius: 999px;
+  padding: 3px 11px;
+  font-size: 0.7rem;
+  color: color-mix(in srgb, var(--ss-fg) 72%, transparent);
+  background: transparent;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.ss-profile-team-home[data-on='true'] {
+  border-color: color-mix(in srgb, var(--ss-accent) 60%, transparent);
+  color: var(--ss-accent);
+  background-color: color-mix(in srgb, var(--ss-accent) 14%, transparent);
+}
+
+/* 🔴 **회원 탈퇴는 완전한 빨강**(사용자 요청). `.ss-profile-tab` 자체를 물들이면
+   같은 클래스를 쓰는 「팀 만들기」까지 빨개진다 — 되돌릴 수 없는 것에만 건다. */
+.ss-profile-tab--danger {
+  border-color: var(--ss-danger);
+  color: var(--ss-danger);
+}
+
+.ss-profile-tab--danger:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--ss-danger) 16%, transparent);
+}
+
+/* 접었다 펴는 작은 탭 — 「팀 만들기」·「접기」. */
+.ss-profile-tab--sm {
+  height: 30px;
+  padding: 0 14px;
+  font-size: 0.8125rem;
+}
+
 
 /* 한 편만 그리므로 예전의 목록 규칙(.ss-profile-videos)은 걷어냈다. */
 

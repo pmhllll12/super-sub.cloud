@@ -125,17 +125,42 @@ describe('프로필 — 팀 만들기가 나오는 때', () => {
     role: 'member',
   }
 
-  it('팀이 있으면 만들기가 없다', () => {
+  /**
+   * 🔴 **팀이 있어도 만들 수 있다**(사용자 지적, 2026-09-16 — 「마지막 주장이어도
+   * 새로 만들고 싶을 수 있다」). 계약에 팀 해체도 소유권 이양도 없어서 마지막
+   * 주장은 나갈 수가 없는데, 만들 자리까지 막으면 새 팀을 시작할 길이 없다.
+   */
+  it('팀이 있어도 만들기가 나온다', () => {
     render(<TeamActions teams={[TEAM]} userId="u1" />)
-    expect(screen.queryByRole('button', { name: '팀 만들기' })).toBeNull()
+    expect(screen.getByRole('button', { name: '팀 만들기' })).toBeInTheDocument()
     // 나가기는 팀 이름과 같은 줄에 있다.
     const line = screen.getByText('번개FC').closest('.ss-profile-team-name')
     expect(line?.querySelector('button')).toHaveTextContent('나가기')
   })
 
-  it('팀이 없으면 만들기가 나온다', () => {
+  it('팀이 없으면 무엇이 막히는지 적는다', () => {
     render(<TeamActions teams={[]} userId="u1" />)
     expect(screen.getByRole('button', { name: '팀 만들기' })).toBeInTheDocument()
     expect(screen.getByText(/팀을 만들어야/)).toBeInTheDocument()
+  })
+
+  /* 🔴 **홈은 한 팀만 그린다.** 만들 수 있게 열었으니 고를 자리도 있어야
+     한다 — 없으면 새로 만든 팀이 홈에 안 보인다. */
+  it('소속이 하나뿐이면 고를 자리가 없다', () => {
+    render(<TeamActions teams={[TEAM]} userId="u1" homeTeamId="t1" />)
+    expect(screen.queryByRole('button', { name: /홈에/ })).toBeNull()
+  })
+
+  it('소속이 여럿이면 홈에 보일 팀을 고른다', () => {
+    const second = { ...TEAM, team_id: 't2', name: '새벽FC' }
+    render(<TeamActions teams={[TEAM, second]} userId="u1" homeTeamId="t1" />)
+    expect(screen.getByRole('button', { name: '홈에 보이는 팀' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(screen.getByRole('button', { name: '홈에 이 팀 보기' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
   })
 })
