@@ -14,7 +14,7 @@ from uuid import UUID
 from app.analysis.application.dtos.video_dto import UNSET, UserRef
 from app.analysis.application.ports.output.storage_port import StoragePort
 from app.analysis.application.ports.output.video_port import VideoPort
-from app.analysis.domain.entities.video_entity import VideoEntity
+from app.analysis.domain.entities.video_entity import CardGradeRow, VideoEntity
 
 _SPORTS = ("football", "baseball", "basketball")
 
@@ -28,6 +28,10 @@ _CARD_SLUGS: dict[str, UUID] = {}
 # 스텁은 `user` 도 모른다 — 검사가 "이 사람은 이 닉네임"이라고 알려 준다
 # (`paik` 16번, `uploader_info`).
 _NICKNAMES: dict[UUID, str] = {}
+# 스텁은 `analysis_report` 도 `review`/`review_selection` 도 모른다 — 검사가
+# 등급 원자료를 직접 채운다(미결 `paik` 25·26번, `find_card_grade`). user_id 로 건다.
+_REPORT_GRADES: dict[UUID, tuple[str | None, bool | None]] = {}
+_TRUST_COUNTS: dict[UUID, tuple[int, int]] = {}
 
 
 def reset_videos() -> None:
@@ -36,6 +40,8 @@ def reset_videos() -> None:
     _BLOBS.clear()
     _CARD_SLUGS.clear()
     _NICKNAMES.clear()
+    _REPORT_GRADES.clear()
+    _TRUST_COUNTS.clear()
 
 
 def put_blob(storage_key: str, data: bytes) -> None:
@@ -51,6 +57,20 @@ def register_card_slug(public_slug: str, user_id: UUID) -> None:
 def register_nickname(user_id: UUID, nickname: str) -> None:
     """`uploader_info` 가 user_id→닉네임을 풀 수 있게 한다(`paik` 16번)."""
     _NICKNAMES[user_id] = nickname
+
+
+def register_report_grade(
+    user_id: UUID, overall_grade: str | None, provisional: bool | None
+) -> None:
+    """`find_card_grade` 가 쓸 분석 등급(미결 `paik` 25·26번). 안 부르면 그
+    사람은 분석 전(`overall_grade=None`)으로 본다."""
+    _REPORT_GRADES[user_id] = (overall_grade, provisional)
+
+
+def register_trust_counts(user_id: UUID, positive: int, total: int) -> None:
+    """`find_card_grade` 가 쓸 신뢰 축 — 재매칭 의사를 표한 평가 중 긍정
+    건수/전체 건수(`paik` 26번). 안 부르면 0/0(리뷰 없음과 같다)."""
+    _TRUST_COUNTS[user_id] = (positive, total)
 
 
 def put_object(storage_key: str, size_bytes: int) -> None:
@@ -139,6 +159,19 @@ class StubVideoRepository(VideoPort):
                 return None
             return v
         return None
+
+    def find_card_grade(self, card_public_slug: str) -> CardGradeRow | None:
+        owner = _CARD_SLUGS.get(card_public_slug)
+        if owner is None:
+            return None
+        overall_grade, provisional = _REPORT_GRADES.get(owner, (None, None))
+        positive, total = _TRUST_COUNTS.get(owner, (0, 0))
+        return CardGradeRow(
+            overall_grade=overall_grade,
+            provisional=provisional,
+            trust_positive=positive,
+            trust_total=total,
+        )
 
     def list_public(self, limit: int) -> list[VideoEntity]:
         public = [v for v in _VIDEOS.values() if v.is_public and v.kept]

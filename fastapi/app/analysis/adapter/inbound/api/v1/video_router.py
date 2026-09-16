@@ -11,6 +11,7 @@ from app.analysis.adapter.inbound.api.schemas.job_schema import (
     RequestDetectionSchema,
 )
 from app.analysis.adapter.inbound.api.schemas.video_schema import (
+    CardGradeResponse,
     FeaturedVideoResponse,
     PlaybackUrlResponse,
     PublicVideoResponse,
@@ -29,8 +30,10 @@ from app.analysis.application.dtos.job_dto import (
 from app.analysis.application.dtos.report_view_dto import ReadReportQuery
 from app.analysis.application.dtos.video_dto import (
     UNSET,
+    CardGradeResult,
     DeleteVideoCommand,
     FeaturedVideoResult,
+    GetCardGradeCommand,
     GetFeaturedVideoCommand,
     GetPlaybackUrlCommand,
     KeepVideoCommand,
@@ -51,6 +54,7 @@ from app.analysis.dependencies.job_providers import (
 from app.analysis.dependencies.video_providers import (
     CreateUploadUrlUseCaseDep,
     DeleteVideoUseCaseDep,
+    GetCardGradeUseCaseDep,
     GetFeaturedVideoUseCaseDep,
     GetPlaybackUrlUseCaseDep,
     KeepVideoUseCaseDep,
@@ -212,6 +216,25 @@ def get_featured_video(
     return use_case(
         GetFeaturedVideoCommand(card_public_slug=card_public_slug)
     )
+
+
+@video_router.get(
+    "/cards/{card_public_slug}/grade",
+    response_model=CardGradeResponse,
+)
+def get_card_grade(
+    card_public_slug: str,
+    user_id: CurrentUserId,
+    use_case: GetCardGradeUseCaseDep,
+) -> CardGradeResult:
+    """카드 주인의 **표시 등급** (미결 `paik` 25·26번).
+
+    **로그인하면 누구나** — 추천 판이 등급으로 후보를 좁히는 자리다. 🔴
+    리포트 전체를 열지 않는다 — 등급 한 칸(+ 검수 전 여부)만 준다. 카드
+    슬러그 자체가 없으면 `404 CARD_NOT_FOUND`; 대표 영상이 없거나 분석
+    전이면 (404 가 아니라) `grade: null` 로 답한다.
+    """
+    return use_case(GetCardGradeCommand(card_public_slug=card_public_slug))
 
 
 @video_router.post("/videos/{video_id}/keep", response_model=VideoResponse)

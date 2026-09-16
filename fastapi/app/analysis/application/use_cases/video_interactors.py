@@ -23,8 +23,10 @@ from app.analysis.application.dtos.video_dto import (
     AdminVideoListResult,
     AdminVideoRow,
     AdminVideosQuery,
+    CardGradeResult,
     DeleteVideoCommand,
     FeaturedVideoResult,
+    GetCardGradeCommand,
     GetFeaturedVideoCommand,
     GetPlaybackUrlCommand,
     KeepVideoCommand,
@@ -42,6 +44,7 @@ from app.analysis.application.ports.input.video_use_cases import (
     AdminDeleteVideoUseCase,
     CreateUploadUrlUseCase,
     DeleteVideoUseCase,
+    GetCardGradeUseCase,
     GetFeaturedVideoUseCase,
     GetPlaybackUrlUseCase,
     KeepVideoUseCase,
@@ -58,6 +61,7 @@ from app.analysis.application.use_cases.video_assembler import (
     to_video_result,
 )
 from app.analysis.domain.entities.video_entity import ValidationEntity, VideoEntity
+from app.analysis.domain.rules.grade_rules import display_grade, is_trust_dominant
 from app.analysis.domain.rules.video_rules import (
     MAX_BYTES,
     build_storage_key,
@@ -297,6 +301,24 @@ class GetFeaturedVideoInteractor(GetFeaturedVideoUseCase):
             expires_in=expires_in,
             sport_code=video.sport_code,
             duration_ms=video.duration_ms,
+        )
+
+
+class GetCardGradeInteractor(GetCardGradeUseCase):
+    """미결 `paik` 25·26번. 경계 계산은 여기서 하고, 화면은 받은 값을 그대로
+    보여주기만 한다(`grade_rules.py`가 붙인 규칙 그대로)."""
+
+    def __init__(self, repository: VideoPort) -> None:
+        self._repository = repository
+
+    def __call__(self, command: GetCardGradeCommand) -> CardGradeResult:
+        row = self._repository.find_card_grade(command.card_public_slug)
+        if row is None:
+            raise ApiError(404, "CARD_NOT_FOUND", "카드를 찾을 수 없습니다.")
+        trust_dominant = is_trust_dominant(row.trust_positive, row.trust_total)
+        return CardGradeResult(
+            grade=display_grade(row.overall_grade, trust_dominant),
+            provisional=row.provisional,
         )
 
 

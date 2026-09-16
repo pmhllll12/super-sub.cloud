@@ -1826,6 +1826,54 @@ grep -n "applyToTeam" www/src/lib/teamMatch.ts
 
 ---
 
+## 43. 남의 표시 등급(`S`~`F`)을 실제로 읽을 수 있습니다 (2026-09-16 추가, 미결 `paik` 25·26번)
+
+`www/src/components/SquadSuggest.tsx`의 `SUGGESTIONS[].grade`와 `gradeOfPlayer()`가
+mock이던 자리입니다. `www/src/lib/playerGrade.ts`가 이미 이 규칙을 문서화해
+두었는데(2026-09-11, `GRADES = ['S','A','B','C','D','F']`), 지금까지는 부를 경로가
+없어 **화면에 보이는 등급이 전부 지어낸 값**이었습니다. 이제 실제로 계산해 줍니다.
+
+### 만족해야 할 성질
+
+**AI 추천 후보(카드 슬러그가 있는 사람)의 표시 등급을 읽을 수 있을 것.**
+`playerGrade.ts`의 눈금(`S`~`F` 여섯)과 그대로 맞습니다 — 경계 계산은 **서버가
+다 했으니 화면에서 다시 계산하지 않습니다.**
+
+### 새 엔드포인트
+
+```
+GET /api/v1/cards/{card_public_slug}/grade
+→ { "grade": "S" | "A" | "B" | "C" | "D" | "F" | null, "provisional": bool | null }
+```
+
+로그인하면 누구나(`featured-video`와 같은 원칙). `grade`가 `null`이면 대표
+영상이 없거나 아직 분석 전이라는 뜻입니다 — 이때는 `averageGrade()`가 이미
+하듯 그 사람을 등급 계산에서 빼면 됩니다(0이나 `F`로 치지 않습니다).
+
+### 먼저 확인
+
+```
+grep -n "gradeOfPlayer\|SUGGESTIONS" www/src/components/SquadSuggest.tsx
+```
+
+걸리면 아직 mock 그대로입니다 — 걸리는 함수째 지우고 위 엔드포인트로 바꾸면 됩니다.
+
+### 🔴 하지 말 것
+
+- **`provisional`이 `true`인 동안 등급 옆에 "검수 전"을 답니다.** 서버가 등급
+  문자와 `provisional`을 같이 내려주는 이유가 이것입니다 — 등급만 떼어 쓰면
+  검수 전 값인지 알 방법이 없어집니다(남의 화면에 박힌 등급은 나중에 회수가
+  안 됩니다).
+- **경계를 화면에서 다시 긋지 않습니다.** `S`·`F`가 어떻게 갈리는지는 서버
+  계산이고, `playerGrade.ts`의 `GRADES`·`gradeValue`·`averageGrade`는 그대로
+  쓰되 **등급을 직접 계산하는 코드는 없어야 합니다.**
+- 리포트 전체(근거 문장·항목별 점수)는 이 경로로 안 옵니다 — 필요해지면
+  별도로 올려 주십시오, 지금은 등급 한 칸만입니다.
+
+상세: `fastapi/docs/api-contract.md`(3-6절, `featured-video` 다음)
+
+---
+
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린
 것이다. 새로 붙이는 화면이 있으면 계약 문서 쪽을 본다.
 

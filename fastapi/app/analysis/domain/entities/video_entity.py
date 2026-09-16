@@ -66,3 +66,20 @@ class VideoEntity:
     subject_at_ms: int | None = None
     # 「집중해서 볼 항목」 (미결 `paik` 8번). 위와 같은 취급.
     focus: list[str] | None = None
+
+
+@dataclass(frozen=True)
+class CardGradeRow:
+    """카드 슬러그가 가리키는 등급의 **원자료**(미결 `paik` 25·26번).
+
+    표시 등급(`S`~`F`) 계산은 여기서 하지 않는다 — 인터랙터가
+    `domain/rules/grade_rules.py`를 불러 한다. `overall_grade`·`provisional`
+    은 대표 영상이 없거나 분석 전이면 둘 다 `None`. `trust_total` 은 재매칭
+    의사(`repeat_yes`/`caution_would_not_repeat`)를 표한 평가 건수 — 매너·
+    실력 선택지는 세지 않는다(`paik` 26번 ⑴).
+    """
+
+    overall_grade: str | None
+    provisional: bool | None
+    trust_positive: int
+    trust_total: int

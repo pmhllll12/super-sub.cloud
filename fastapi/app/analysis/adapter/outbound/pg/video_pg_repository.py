@@ -18,11 +18,17 @@ from sqlalchemy import column, func, select, table, update
 from sqlalchemy.orm import Session
 
 from app.analysis.adapter.outbound.orm.analysis_job_orm import AnalysisJobOrm
+from app.analysis.adapter.outbound.orm.analysis_metric_orm import AnalysisMetricOrm
+from app.analysis.adapter.outbound.orm.analysis_report_orm import AnalysisReportOrm
 from app.analysis.adapter.outbound.orm.video_orm import VideoOrm
 from app.analysis.adapter.outbound.orm.video_validation_orm import VideoValidationOrm
 from app.analysis.application.dtos.video_dto import UNSET, UserRef
 from app.analysis.application.ports.output.video_port import VideoPort
-from app.analysis.domain.entities.video_entity import ValidationEntity, VideoEntity
+from app.analysis.domain.entities.video_entity import (
+    CardGradeRow,
+    ValidationEntity,
+    VideoEntity,
+)
 from app.analysis.domain.rules.job_rules import ANALYZE
 
 # 소유하지 않는 테이블에서 **읽기만** 한다. 위 docstring 참조.
@@ -30,6 +36,16 @@ _sport = table("sport", column("code"))
 _user = table("user", column("id"), column("nickname"), column("email"))
 # `card` 컨텍스트 테이블. 슬러그→`user_id` 만 읽는다(경계 유지).
 _player_card = table("player_card", column("public_slug"), column("user_id"))
+# `review` 컨텍스트 테이블. 등급 화면의 신뢰 축(미결 `paik` 25·26번)만 읽는다 —
+# `id`·`reviewee_id`(review)와 `review_id`·`option_code`(review_selection).
+_review = table("review", column("id"), column("reviewee_id"))
+_review_selection = table(
+    "review_selection", column("review_id"), column("option_code")
+)
+# 신뢰 축에 쓰는 선택지 둘 — 재매칭 의사의 반대편(`paik` 26번 ⑴). 매너·실력
+# 선택지는 여기서 세지 않는다(전부 긍정형이라 눈금이 안 선다).
+_TRUST_POSITIVE_CODE = "repeat_yes"
+_TRUST_OPTION_CODES = (_TRUST_POSITIVE_CODE, "caution_would_not_repeat")
 
 
 class VideoPgRepository(VideoPort):
@@ -181,6 +197,67 @@ class VideoPgRepository(VideoPort):
         if not (validation and validation.passed):
             return None
         return _to_entity(video, validation, None)
+
+    def find_card_grade(self, card_public_slug: str) -> CardGradeRow | None:
+        # 슬러그 → user_id 는 `player_card` 를 원시 쿼리로만 읽는다(경계 유지) —
+        # `find_featured_by_card_slug` 와 같은 패턴.
+        owner = self._session.execute(
+            select(_player_card.c.user_id).where(
+                _player_card.c.public_slug == card_public_slug
+            )
+        ).scalar_one_or_none()
+        if owner is None:
+            return None
+
+        # 대표 영상의 최신 리포트. 반려된 클립은 `analysis_job` 이 없어서(등록
+        # 시 통과한 것만 작업이 생긴다) 이 조인이 자연히 걸러 낸다.
+        report = self._session.execute(
+            select(
+                AnalysisReportOrm.overall_grade, AnalysisReportOrm.provisional
+            )
+            .select_from(VideoOrm)
+            .join(AnalysisJobOrm, AnalysisJobOrm.video_id == VideoOrm.id)
+            .join(
+                AnalysisMetricOrm,
+                AnalysisMetricOrm.analysis_job_id == AnalysisJobOrm.id,
+            )
+            .join(
+                AnalysisReportOrm,
+                AnalysisReportOrm.analysis_metric_id == AnalysisMetricOrm.id,
+            )
+            .where(VideoOrm.user_id == owner, VideoOrm.is_featured.is_(True))
+            .order_by(AnalysisMetricOrm.created_at.desc())
+            .limit(1)
+        ).first()
+
+        # 신뢰 축. `review`·`review_selection` 은 `review` 컨텍스트 테이블이라
+        # 원시 쿼리로만 읽는다 — 위 테이블 정의 참조.
+        joined = _review.join(
+            _review_selection, _review_selection.c.review_id == _review.c.id
+        )
+        trust_total = self._session.execute(
+            select(func.count(func.distinct(_review.c.id)))
+            .select_from(joined)
+            .where(
+                _review.c.reviewee_id == owner,
+                _review_selection.c.option_code.in_(_TRUST_OPTION_CODES),
+            )
+        ).scalar_one()
+        trust_positive = self._session.execute(
+            select(func.count(func.distinct(_review.c.id)))
+            .select_from(joined)
+            .where(
+                _review.c.reviewee_id == owner,
+                _review_selection.c.option_code == _TRUST_POSITIVE_CODE,
+            )
+        ).scalar_one()
+
+        return CardGradeRow(
+            overall_grade=report.overall_grade if report else None,
+            provisional=report.provisional if report else None,
+            trust_positive=trust_positive,
+            trust_total=trust_total,
+        )
 
     def mark_kept(
         self, video_id: UUID, user_id: UUID, *, storage_key: str
