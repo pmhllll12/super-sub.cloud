@@ -23,7 +23,15 @@ describe('프로필 — 지인 검색 노출', () => {
           url: String(input),
           body: typeof init?.body === 'string' ? init.body : null,
         })
-        return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
+        // `PATCH /me` 는 **고쳐진 사용자를 그대로** 돌려준다(계약) — 화면이
+        // 그 값으로 맞추므로 시험도 그 모양을 세운다.
+        const body = typeof init?.body === 'string' ? JSON.parse(init.body) : {}
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ is_nickname_searchable: body.is_nickname_searchable }),
+            { status: 200 },
+          ),
+        )
       },
     )
   })
@@ -55,6 +63,26 @@ describe('프로필 — 지인 검색 노출', () => {
     await waitFor(() => expect(sent.length).toBe(1))
     expect(sent[0].url).toBe('/api/me')
     expect(JSON.parse(sent[0].body!)).toEqual({ is_nickname_searchable: false })
+  })
+
+  /**
+   * 🔴 **서버가 답한 값으로 스위치가 실제로 움직인다.**
+   *
+   * 서버 컴포넌트가 준 prop 만 믿으면 개발 모드에서 영영 안 움직인다 — Next 가
+   * mock 을 두 벌 컴파일해서 고친 쪽과 그리는 쪽이 갈린다(`mock.ts` 머리말).
+   * 사용자가 「버튼이 안 된다」고 한 것이 이것이다.
+   */
+  it('서버가 답하면 스위치가 실제로 꺼진다', async () => {
+    const user = userEvent.setup()
+    render(<SearchablePref searchable />)
+    const sw = screen.getByRole('switch')
+    expect(sw).toBeChecked()
+
+    await user.click(sw)
+
+    await waitFor(() => expect(sw).not.toBeChecked())
+    // 글도 따라 바뀐다 — 스위치만 움직이면 무엇이 달라졌는지 안 읽힌다.
+    expect(screen.getByText(/아무도 나를 찾을 수 없습니다/)).toBeInTheDocument()
   })
 
   /**

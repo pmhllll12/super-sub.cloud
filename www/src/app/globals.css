@@ -2604,6 +2604,35 @@ body::-webkit-scrollbar {
   margin-top: 18px;
 }
 
+/* 「소속」 절의 팀 나가기 줄 — 팀마다 하나. */
+.ss-profile-team-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+/* 🔴 **탈퇴는 강조하지 않는다.** 되돌리려면 다시 가입해야 하는데 팀을 찾을
+   경로가 아직 없어서(계약에 목록·검색이 없다) 사실상 되돌리기 어렵다. */
+.ss-profile-team-leave {
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 26%, transparent);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--ss-fg) 72%, transparent);
+  background: transparent;
+  transition: background-color 160ms ease;
+}
+
+.ss-profile-team-leave:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--ss-fg) 10%, transparent);
+}
+
+.ss-profile-team-leave:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
 .ss-pref-row {
   display: flex;
   /* 🔴 **가운데가 아니라 위로 붙인다.** 글이 두 줄이 되면 스위치가 가운데로
@@ -13141,23 +13170,6 @@ body:has(.ss-venues) .ss-home-header {
   margin-top: 18px;
   font-size: 0.7rem;
   color: color-mix(in srgb, #fff 56%, transparent);
-}
-
-/* 팀 매칭으로 잡힌 줄 — 🔴 **서버 경기와 갈려 보여야 한다.** 한 목록에
-   나란히 서지만 하나는 진짜 경기이고 하나는 데모다(`lib/bookedMatches.ts`). */
-.ss-profile-match-tag {
-  display: inline-block;
-  margin-right: 6px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--ss-accent) 55%, transparent);
-  font-size: 0.62rem;
-  color: var(--ss-accent);
-}
-
-.ss-profile-match-note {
-  margin-top: 8px;
-  font-size: 0.68rem;
 }
 
 /* 「경기 취소」 — 🔴 닫기(×)와 **다른 일**이라 자리를 가른다. 되돌릴 수 없어서

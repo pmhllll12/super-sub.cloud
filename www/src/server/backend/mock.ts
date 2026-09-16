@@ -9,6 +9,7 @@ import type {
   Contact,
   ContactRequest,
   UserSearchResult,
+  TeamDetail,
   SquadCandidate,
   TeamMatchRequest,
   FeaturedVideo,
@@ -1335,6 +1336,62 @@ export const mockBackend: Backend = {
    * 중에 한 번도 안 뜨면, 정상호가 조건으로 단 그 표시가 진짜 서버에 붙는 날
    * 없다는 것을 알게 된다(팀 매칭 mock 이 5:5 만 채웠던 것과 같은 함정).
    */
+
+  /* ── 팀 만들기 · 나가기 (계약 3-3절) ──────────────────────────────── */
+
+  async createTeam(token, { name, region, sport_code }) {
+    const u = requireUser(token)
+    if (!name.trim() || !region.trim()) {
+      throw new BackendError(422, 'VALIDATION_ERROR', '이름과 지역이 필요합니다.')
+    }
+    const id = `team-${users.size}-${u.teams.length + 1}`
+    // 🔴 **만든 사람이 주장으로 함께 들어간다**(계약) — 그래야 `GET /me` 의
+    //    `teams` 에 바로 잡히고 홈 스쿼드 판이 그 팀을 읽는다.
+    const next: User = {
+      ...u,
+      teams: [
+        ...u.teams,
+        {
+          team_id: id,
+          name: name.trim(),
+          region: region.trim(),
+          sport_code,
+          role: 'owner',
+          joined_at: new Date().toISOString(),
+        },
+      ],
+    }
+    users.set(token, next)
+    return {
+      id,
+      name: name.trim(),
+      region: region.trim(),
+      sport_code,
+      members: [
+        {
+          user_id: u.id,
+          nickname: u.nickname,
+          role: 'owner',
+          joined_at: new Date().toISOString(),
+          player_card_id: null,
+          card_public_slug: null,
+        },
+      ],
+    } satisfies TeamDetail
+  },
+
+  async leaveTeam(token, teamId, memberId) {
+    const u = requireUser(token)
+    const mine = u.teams.find((t) => t.team_id === teamId)
+    if (!mine) throw new BackendError(404, 'NOT_A_MEMBER', '그 팀의 구성원이 아닙니다.')
+    /* 🔴 **마지막 주장은 못 나간다**(계약). mock 에는 나 혼자뿐이라 주장이면
+       늘 마지막이다 — 그 갈래를 실제로 밟아 볼 수 있어야 화면이 409 안내를
+       만들게 된다. */
+    if (mine.role === 'owner' && memberId === u.id) {
+      throw new BackendError(409, 'LAST_OWNER', '마지막 주장은 팀을 나갈 수 없습니다.')
+    }
+    users.set(token, { ...u, teams: u.teams.filter((t) => t.team_id !== teamId) })
+  },
 
   async getCardGrade(token, cardPublicSlug) {
     requireUser(token)

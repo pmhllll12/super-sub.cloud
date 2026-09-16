@@ -519,3 +519,24 @@ export type SquadCandidate = {
   grade: string | null
   provisional: boolean | null
 }
+
+/**
+ * 팀 하나와 **현재 구성원** — `GET /teams/{id}` · `POST /teams` (계약 3-3절).
+ *
+ * ⚠️ `Team`(사용자의 소속 한 줄)과 다르다. 저쪽은 `GET /me` 가 주는 요약이고
+ * 이쪽은 팀 자신이다 — 나간 사람은 `members` 에 안 담긴다.
+ */
+export type TeamDetail = {
+  id: string
+  name: string
+  region: string
+  sport_code: string
+  members: {
+    user_id: string
+    nickname: string
+    role: string
+    joined_at: string
+    player_card_id: string | null
+    card_public_slug: string | null
+  }[]
+}

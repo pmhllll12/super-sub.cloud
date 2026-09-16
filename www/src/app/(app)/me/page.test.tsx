@@ -151,7 +151,9 @@ describe('내 프로필 — /me', () => {
 
   it('소속 팀이 없으면 그렇게 알려준다', () => {
     render(<MeBody user={USER} card={CARD} videos={[]} matches={[]} />)
-    expect(screen.getByText('아직 소속된 팀이 없습니다.')).toBeInTheDocument()
+    // 🔴 「없습니다」로 끝내지 않는다 — 팀이 없으면 스쿼드·경기 신청이 다 막힌다.
+    expect(screen.getByText(/아직 소속된 팀이 없습니다/)).toBeInTheDocument()
+    expect(screen.getByText(/팀을 만들어야/)).toBeInTheDocument()
   })
 
   // 프로필은 '보여주는' 화면이다 — 입력칸이 늘 떠 있으면 설정 화면이 된다.

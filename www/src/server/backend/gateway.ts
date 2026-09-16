@@ -7,6 +7,7 @@ import type {
   Contact,
   ContactRequest,
   UserSearchResult,
+  TeamDetail,
   CardGrade,
   SquadCandidate,
   TeamMatchRequest,
@@ -300,6 +301,22 @@ export interface Backend {
    * 🔴 **경계는 서버가 긋는다.** 두 응답 모두 `grade`(`S`~`F`)와
    * `provisional` 을 짝으로 준다 — 화면은 받아서 그리기만 한다.
    */
+
+  /* ── 팀 만들기 · 나가기 (계약 3-3절) ──────────────────────────────── */
+
+  /** 팀을 만든다. 🔴 **만든 사람이 `owner` 로 함께 들어간다.** */
+  createTeam(
+    token: string,
+    input: { name: string; region: string; sport_code: string },
+  ): Promise<TeamDetail>
+  /**
+   * 팀에서 나간다(본인) 또는 뺀다(주장).
+   *
+   * 🔴 `memberId` 는 **그 사람의 `user_id`** 다 — 소속 행의 id 가 아니다.
+   * 🔴 **마지막 주장은 못 나간다**(`409 LAST_OWNER`) — 소유권 이양 경로가
+   * 아직 없다. 화면에서 미리 막지 말고 그 코드를 받아 안내한다.
+   */
+  leaveTeam(token: string, teamId: string, memberId: string): Promise<void>
 
   /** 남의 표시 등급. 로그인하면 누구나(`featured-video` 와 같은 원칙). */
   getCardGrade(token: string, cardPublicSlug: string): Promise<CardGrade>

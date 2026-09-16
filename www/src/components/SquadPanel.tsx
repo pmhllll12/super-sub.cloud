@@ -11,7 +11,6 @@ import MatchBot from '@/components/MatchBot'
 import TeamMatch from '@/components/TeamMatch'
 import MatchWaiting from '@/components/MatchWaiting'
 import { teamById, type MatchTeam } from '@/lib/teamMatch'
-import { book, unbook } from '@/lib/bookedMatches'
 import { formationToSize, saveFormation, saveSeat, seatOf } from '@/lib/squadBoard'
 import { COLS, ROWS, ROW_POS, cellExists, rowPos, type PosCode } from '@/lib/pitchGrid'
 import { fetchPositions } from '@/lib/positions'
@@ -509,9 +508,11 @@ export default function SquadPanel({
     const team: MatchTeam = { ...them, why: [] }
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMatched(team)
-    /* 🔴 **잡힌 그 순간 적는다.** 팝업을 닫을 때 적으면, 닫지 않고 떠난
-       사람의 경기가 「내 경기」에 안 남는다. */
-    book(team)
+    /* 🔴 **브라우저에 따로 적지 않는다**(2026-09-16). 전에는 `book(team)` 으로
+       localStorage 에 남겼다 — 계약에 확정 경기 자리가 없던 시절의 임시였다.
+       이제 수락하면 서버에 진짜 `match` 가 생기고(계약 3-15절) 「내 경기」가
+       `GET /teams/{id}/matches` 로 그것을 읽는다. 둘 다 두면 **같은 경기가
+       두 번** 보인다. */
     // 팝업이 화면을 덮으므로 뒤의 명단은 접는다 — 닫았을 때 판만 남는다.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMatching(false)
@@ -1198,8 +1199,10 @@ export default function SquadPanel({
             onAcceptedShown?.()
           }}
           onCancel={() => {
-            // 무른 경기는 「내 경기」에서도 빠진다 — 남으면 잡힌 줄 안다.
-            unbook(matched.id)
+            /* ⚠️ **경기 취소는 아직 안 보낸다.** 계약에는 있다
+               (`DELETE /matches/{id}` — 팀 대 팀이면 양쪽 주장 누구나).
+               팝업만 닫히고 서버의 확정 경기는 남으므로, 「내 경기」에서
+               사라지지 않는다. 미결 `paik` 34번. */
             setMatched(null)
             onAcceptedShown?.()
           }}

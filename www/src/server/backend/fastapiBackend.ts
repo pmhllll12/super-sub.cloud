@@ -10,6 +10,7 @@ import type {
   Contact,
   ContactRequest,
   UserSearchResult,
+  TeamDetail,
   CardGrade,
   SquadCandidate,
   TeamMatchRequest,
@@ -336,6 +337,17 @@ export const fastapiBackend: Backend = {
   },
 
   /* ── 표시 등급 · 추천 후보 (계약 3-6·3-16절) ─────────────────────── */
+
+  createTeam(token, input) {
+    return callFastApi<TeamDetail>('/teams', { method: 'POST', token, body: input })
+  },
+
+  async leaveTeam(token, teamId, memberId) {
+    await callFastApi<null>(
+      `/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(memberId)}`,
+      { method: 'DELETE', token },
+    )
+  },
 
   getCardGrade(token, cardPublicSlug) {
     return callFastApi<CardGrade>(

@@ -24,6 +24,22 @@ import { apiErrorMessage, apiPatch } from '@/lib/api/client'
  */
 export default function SearchablePref({ searchable }: { searchable: boolean }) {
   const router = useRouter()
+  /**
+   * 🔴 **서버가 돌려준 값을 여기 든다.** 서버 컴포넌트의 `searchable` 만 믿으면
+   * 개발 모드(`USE_MOCK=1`)에서 스위치가 영영 안 움직인다 — Next 가 서버
+   * 컴포넌트와 라우트 핸들러를 **다른 모듈 그래프**로 컴파일해서 mock 이 두
+   * 벌 생기고, 고친 쪽과 그리는 쪽이 갈린다(`mock.ts` 머리말 · 2026-09-08 에
+   * 영상 삭제로 같은 것을 겪었다. 실측: 라우트는 `false`, 페이지는 `true`).
+   *
+   * ⚠️ **이것은 mock 을 위한 우회가 아니다**(그 파일이 「화면 쪽에 자리를
+   * 만들지 말 것」이라고 적어 둔 그것). `PATCH /me` 는 **고쳐진 사용자를 그대로
+   * 돌려준다** — 그 답을 버리고 화면을 다시 받아 오는 쪽이 오히려 한 번 더
+   * 도는 길이었다. 진짜 백엔드에서도 이 편이 빠르고 정확하다.
+   *
+   * 🔴 **낙관적 갱신이 아니다.** 누르는 순간이 아니라 **서버가 답한 뒤**에만
+   * 바뀐다 — 실패하면 스위치는 그대로다.
+   */
+  const [on, setOn] = useState(searchable)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -34,7 +50,12 @@ export default function SearchablePref({ searchable }: { searchable: boolean }) 
     try {
       /* 🔴 **이 칸만 보낸다.** 닉네임을 같이 실어 보내면 계약상 그것도 고치는
          요청이 된다 — 여기서 이름을 건드릴 이유가 없다. */
-      await apiPatch('/api/me', { is_nickname_searchable: !searchable })
+      const updated = await apiPatch<{ is_nickname_searchable?: boolean }>('/api/me', {
+        is_nickname_searchable: !on,
+      })
+      // 서버가 말한 값으로 맞춘다. 안 실어 주는 옛 응답이면 보낸 값으로 둔다.
+      setOn(updated?.is_nickname_searchable ?? !on)
+      // 이 화면의 다른 자리(닉네임 등)도 같은 사용자에서 오므로 함께 맞춘다.
       router.refresh()
     } catch (e) {
       setError(apiErrorMessage(e))
@@ -49,7 +70,7 @@ export default function SearchablePref({ searchable }: { searchable: boolean }) 
         <span className="ss-pref-text">
           <span className="ss-pref-name">지인 검색에 나를 보이기</span>
           <span className="ss-pref-note">
-            {searchable
+            {on
               ? '닉네임으로 나를 찾아 지인 신청을 보낼 수 있습니다.'
               : '아무도 나를 찾을 수 없습니다. 이미 맺은 지인은 그대로입니다.'}
           </span>
@@ -59,10 +80,10 @@ export default function SearchablePref({ searchable }: { searchable: boolean }) 
         <button
           type="button"
           role="switch"
-          aria-checked={searchable}
+          aria-checked={on}
           aria-label="지인 검색에 나를 보이기"
           className="ss-pref-switch"
-          data-on={searchable ? 'true' : undefined}
+          data-on={on ? 'true' : undefined}
           disabled={busy}
           onClick={() => void toggle()}
         >
