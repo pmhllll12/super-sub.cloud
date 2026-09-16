@@ -28,14 +28,77 @@ QUERIES: dict[str, list[str]] = {
         "how to pass a soccer ball inside of foot tutorial",
         "push pass technique football coaching",
         "inside foot passing drill individual",
+        "side foot pass soccer technique demonstration",
+        "inside of the foot pass coaching point youth soccer",
+        "short pass technique football slow motion",
+        "push pass soccer fundamentals demonstration",
+        "inside kick soccer technique slow motion",
+        "how to strike a pass inside of foot side view",
+        "soccer passing technique analysis single player",
+        "inside foot kick demonstration football coaching",
+        "ground pass technique soccer tutorial",
+        "basic passing technique football academy inside",
+        "inside foot pass coaching demonstration slow",
+        "passing technique soccer player demonstration inside foot",
+        "soccer inside pass practice wall",
+        "football passing technique breakdown inside of foot",
+        "learn to pass football inside foot beginner",
+        "passing with the inside of the foot youth coaching",
     ],
     "instep_shot": [
         "instep drive shooting technique slow motion",
         "how to shoot with laces football tutorial",
         "instep kick technique individual training",
         "power shot technique football drill",
+        "laces shot technique soccer demonstration",
+        "instep drive soccer coaching demonstration",
+        "shooting technique slow motion football striker",
+        "full volley instep strike technique",
     ],
 }
+
+# 🔴 **제목으로 거르는 규칙 — 측정 전에 정한다.** 라벨이 제목에서 오므로
+#    제목이 두 동작을 함께 말하거나 다른 동작을 말하면 그 클립은 라벨이 없다.
+#    이것은 결과를 보고 고르는 것이 아니라 **라벨 규칙 자체**다.
+EXCLUDE_WORDS: dict[str, tuple[str, ...]] = {
+    # 로프티드·칩·롱패스는 **발등**으로 찬다 — 인사이드가 아니다.
+    # 론도·경기 장면은 단독 드릴이 아니라 대상 선택이 흔들린다(미결 45번).
+    # 프리킥·슛은 검색이 물어 온 오답이다 — 패스가 아니다.
+    "inside_pass": ("lofted", "chip", "long pass", "driven pass", "rondo",
+                    "outside", "laces", "volley", "curve", "bend",
+                    "freekick", "free kick", "shoot", "shot", "finishing",
+                    "goal"),
+    # 인사이드를 함께 가르치는 영상, 헤딩은 인스텝 드라이브가 아니다.
+    "instep_shot": ("inside of", "inside foot", "side foot", "header", "outside"),
+}
+
+# 🔴 **축구가 아닌 종목**이 검색에 섞인다 — 호주식 풋볼 `goalkicking`, 럭비 등.
+#    루브릭은 축구 전용이고, 다른 종목 동작을 축구 라벨로 재면 그 자체가 오염이다.
+NOT_FOOTBALL = ("goalkicking", "afl", "rugby", "gaelic", "punt")
+
+# 🔴 **제목이 동작을 명시해야 라벨이 있다.** 금지어를 하나씩 늘리는 방식은 끝이
+#    없다 — 「Soccer Tricks: The Bicycle Kick」·「detail soccer player kicking
+#    ball」처럼 **패스라고 말한 적 없는** 영상이 패스 질의에 걸려 들어왔다.
+#    그래서 규칙을 뒤집는다: 있어야 할 말을 요구한다.
+REQUIRE_WORDS: dict[str, tuple[str, ...]] = {
+    "inside_pass": ("inside", "push pass", "passing", "pass"),
+    "instep_shot": ("instep", "laces", "shoot", "shot", "strike", "striking",
+                    "drive", "volley", "finishing"),
+}
+
+
+def excluded(label: str, title: str) -> str | None:
+    """제외 사유. 없으면 None."""
+    low = title.lower()
+    for w in NOT_FOOTBALL:
+        if w in low:
+            return f"{w}(축구 아님)"
+    for w in EXCLUDE_WORDS[label]:
+        if w in low:
+            return w
+    if not any(w in low for w in REQUIRE_WORDS[label]):
+        return "동작을 밝히지 않음"
+    return None
 
 PER_QUERY = 8          # 질의당 후보
 MIN_SEC, MAX_SEC = 4, 90
@@ -99,6 +162,11 @@ def main() -> int:
                 if got >= TARGET_PER_CLASS or c["id"] in seen:
                     continue
                 seen.add(c["id"])
+                why = excluded(label, c["title"])
+                if why:
+                    print(f"  ⊘ {c['id']} 제외(제목에 {why!r}): {c['title'][:55]}",
+                          flush=True)
+                    continue
                 path = outdir / f"{c['id']}.mp4"
                 ok = False
                 try:
@@ -112,6 +180,16 @@ def main() -> int:
                                      "path": str(path.relative_to(DEST))})
                     got += 1
         print(f"[{label}] 받은 것 {got}편", flush=True)
+
+    # 🔴 **두 층에 같은 영상이 들어오면 라벨이 모순이다** — 양쪽에서 뺀다.
+    #    (검색이 「laces and inside of the foot」 같은 겸용 강의를 물어 온다.)
+    by_id: dict[str, set[str]] = {}
+    for m in manifest:
+        by_id.setdefault(m["id"], set()).add(m["label"])
+    both = {i for i, labels in by_id.items() if len(labels) > 1}
+    for i in sorted(both):
+        print(f"⊘ {i} 제외 — 두 층에 모두 걸렸다(라벨 모순)", flush=True)
+    manifest = [m for m in manifest if m["id"] not in both]
 
     out = HERE / "clips_manifest.csv"
     with out.open("w", newline="", encoding="utf-8") as fh:
