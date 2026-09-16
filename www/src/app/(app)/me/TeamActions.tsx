@@ -105,7 +105,7 @@ export default function TeamActions({
                   disabled={leaving === t.team_id}
                   onClick={() => void leave(t.team_id)}
                 >
-                  {leaving === t.team_id ? '나가는 중…' : '나가기'}
+                  {leaving === t.team_id ? '나가는 중…' : '팀 나가기'}
                 </button>
               </p>
               <p className="ss-profile-muted">
@@ -157,19 +157,32 @@ export default function TeamActions({
             </button>
           </div>
 
-          {open && (
-            <form onSubmit={create} className="ss-profile-account-form ss-form-compact">
-              <Field label="팀 이름" value={name} onChange={setName} />
-              <Field label="지역" value={region} onChange={setRegion} hint="예: 서울 강남" />
-              <PillButton
-                type="submit"
-                disabled={busy || !name.trim() || !region.trim()}
-                className="self-start"
-              >
-                만들기
-              </PillButton>
-            </form>
-          )}
+          {/* 🔴 **늘 그리고 접기만 한다**(사용자 요청 — 부드럽게 펴졌다 닫히게).
+              `{open && …}` 로 붙였다 뗐다 하면 전환할 대상이 없어 툭 나타난다.
+              접는 방식은 「내 경기」의 더보기와 같다(`grid-template-rows`
+              0fr → 1fr) — `max-height` 로 하면 상한과 실제 높이가 달라 아무
+              일도 안 일어나는 구간에서 시간이 새고 속도가 튄다.
+
+              🔴 접힌 동안에는 **탭으로도 못 닿게** 한다(`inert`) — 안 그러면
+              눈에 안 보이는 입력칸에 커서가 들어간다. `aria-hidden` 만으로는
+              포커스를 막지 못한다. */}
+          <div className="ss-profile-form-fold" data-open={open ? 'true' : 'false'}>
+            <div inert={!open}>
+              <form onSubmit={create} className="ss-profile-account-form ss-form-compact">
+                <Field label="팀 이름" value={name} onChange={setName} />
+                <Field label="지역" value={region} onChange={setRegion} hint="예: 서울 강남" />
+                {/* 🔴 **가운데**(사용자 요청, 2026-09-16) — 폼이 좁아 왼쪽에
+                    붙이면 아래 여백이 비어 보인다. */}
+                <PillButton
+                  type="submit"
+                  disabled={busy || !name.trim() || !region.trim()}
+                  className="self-center"
+                >
+                  만들기
+                </PillButton>
+              </form>
+            </div>
+          </div>
       </>
 
       {error && (

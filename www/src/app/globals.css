@@ -25,9 +25,20 @@
   --ss-surface: #000000;
   --ss-fg: #ffffff;
   --ss-accent: #70ed88;
-  /* 되돌릴 수 없는 손짓의 색 — 팀 나가기 · 회원 탈퇴가 같이 쓴다
-     (사용자 요청, 2026-09-16). 알림의 빨간 점과 같은 값이다. */
+  /* 되돌릴 수 없는 손짓의 색 — 팀 나가기 · 회원 탈퇴 · 해당 영상 삭제가
+     같이 쓴다(사용자 요청, 2026-09-16). 알림의 빨간 점과 같은 값이다. */
   --ss-danger: #ff3b30;
+  /**
+   * **채우는 빨강** — 그 단추들의 바탕이다. 🔴 `--ss-danger` 보다 **어둡다**:
+   * 흰 글자와의 대비가 `#ff3b30` 은 3.55 로 AA(4.5) 미달이고 이 값은 4.98 이다
+   * (실측, 2026-09-16).
+   *
+   * 🔴 **테두리형으로 되돌리지 말 것.** 초록 단추(`--ss-accent` #70ed88)가
+   * 테두리형으로 읽히는 것은 그 초록이 **밝아서**다. 빨강은 중간 밝기라 같은
+   * 짜임을 쓰면 프로필의 초록 유리 판 위에서 대비가 **1.82** 까지 떨어진다 —
+   * 어떤 빨강 글자를 써도 그 판 위에서는 3.93 이 한계였다.
+   */
+  --ss-danger-fill: #d32f2f;
   /* 잔디 초록 — 스쿼드 빈 카드의 + 와 홈 헤드라인의 PITCH 가 같이 쓴다.
      강조색(--ss-accent)보다 조금 더 노란 쪽이라 나란히 놓아도 안 겹친다. */
   --ss-pitch-green: #a6e89b;
@@ -2612,19 +2623,21 @@ body::-webkit-scrollbar {
    어렵다 — 되돌릴 수 없는 손짓은 그렇게 보여야 한다. */
 .ss-profile-team-leave {
   flex: none;
-  border: 1px solid var(--ss-danger);
+  border: 1px solid var(--ss-danger-fill);
   border-radius: 999px;
   padding: 3px 11px;
   font-size: 0.7rem;
   font-weight: 600;
   line-height: 1.5;
-  color: var(--ss-danger);
-  background: transparent;
+  /* 🔴 **채운 빨강에 흰 글자**(사용자 결정, 2026-09-16 — 대비 실측 뒤). 셋이
+     같은 값이다. 왜 테두리형이 아닌지는 `--ss-danger-fill` 주석에 있다. */
+  color: #fff;
+  background-color: var(--ss-danger-fill);
   transition: background-color 160ms ease;
 }
 
 .ss-profile-team-leave:not(:disabled):hover {
-  background-color: color-mix(in srgb, var(--ss-danger) 16%, transparent);
+  background-color: var(--ss-danger);
 }
 
 .ss-profile-team-leave:disabled {
@@ -10376,12 +10389,12 @@ body:has(.ss-shot) .ss-app-figure {
   align-items: center;
   gap: 6px;
   border-radius: 999px;
-  /* 🔴 **완전한 빨강**(사용자 요청, 2026-09-16). 전에는 `--ss-error` 를 흐린
-     글자색과 섞어 연어빛이었다 — 지우는 손짓은 그렇게 보이면 안 된다. */
-  border: 1px solid var(--ss-danger);
+  border: 1px solid var(--ss-danger-fill);
   padding: 5px 12px;
   font-size: 0.75rem;
-  color: var(--ss-danger);
+  /* 🔴 채운 빨강에 흰 글자 — 위 둘과 같은 값이다(사용자 결정). */
+  color: #fff;
+  background-color: var(--ss-danger-fill);
   white-space: nowrap;
   transition:
     border-color 160ms ease,
@@ -10395,8 +10408,8 @@ body:has(.ss-shot) .ss-app-figure {
 
 .ss-profile-del-btn:hover,
 .ss-profile-del-btn:focus-visible {
-  border-color: var(--ss-error);
-  background-color: color-mix(in srgb, var(--ss-error) 14%, transparent);
+  border-color: var(--ss-danger);
+  background-color: var(--ss-danger);
 }
 
 /* 한 번 더 물은 뒤의 그 단추. 🔴 색만으로 말하지 않는다 — 글자가
@@ -11634,13 +11647,49 @@ body:has(.ss-profile) {
 
 /* 🔴 **회원 탈퇴는 완전한 빨강**(사용자 요청). `.ss-profile-tab` 자체를 물들이면
    같은 클래스를 쓰는 「팀 만들기」까지 빨개진다 — 되돌릴 수 없는 것에만 건다. */
+/* 팀 만들기 폼 접기 — 「내 경기」 더보기와 같은 방식이다(`grid-template-rows`
+   0fr → 1fr). 🔴 `max-height` 로 하지 않는다: 상한과 실제 높이가 다르면
+   아무 일도 안 일어나는 구간에서 시간이 새어 속도가 튄다. */
+.ss-profile-form-fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 320ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.ss-profile-form-fold[data-open='true'] {
+  grid-template-rows: 1fr;
+}
+
+.ss-profile-form-fold > div {
+  overflow: hidden;
+  /* 틈을 **안쪽**에 둔다 — 바깥(margin)에 두면 접혔을 때도 남아 까닭 없는
+     공백이 생긴다. */
+  padding-top: 0;
+  transition: padding-top 320ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.ss-profile-form-fold[data-open='true'] > div {
+  padding-top: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-profile-form-fold,
+  .ss-profile-form-fold > div {
+    transition: none;
+  }
+}
+
+/* 🔴 **채운 빨강에 흰 글자**(사용자 결정, 2026-09-16). 셋(팀 나가기 · 회원
+   탈퇴 · 해당 영상 삭제)이 같은 규칙을 쓴다. */
 .ss-profile-tab--danger {
-  border-color: var(--ss-danger);
-  color: var(--ss-danger);
+  border-color: var(--ss-danger-fill);
+  color: #fff;
+  background-color: var(--ss-danger-fill);
 }
 
 .ss-profile-tab--danger:not(:disabled):hover {
-  background-color: color-mix(in srgb, var(--ss-danger) 16%, transparent);
+  border-color: var(--ss-danger);
+  background-color: var(--ss-danger);
 }
 
 /* 접었다 펴는 작은 탭 — 「팀 만들기」·「접기」. */

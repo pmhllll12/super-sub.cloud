@@ -43,10 +43,28 @@ describe('프로필 — 소속', () => {
 
   afterEach(() => vi.restoreAllMocks())
 
-  it('평소에는 폼이 접혀 있다', () => {
-    render(<TeamActions teams={[]} userId="u1" />)
+  /**
+   * 🔴 **접혀 있을 뿐 DOM 에는 있다**(2026-09-16). 부드럽게 펴지려면 전환할
+   * 대상이 있어야 해서 `{open && …}` 로 붙였다 뗐다 하지 않는다.
+   *
+   * 그래서 **탭으로 못 닿게** 하는 것이 중요하다 — 안 그러면 눈에 안 보이는
+   * 입력칸에 커서가 들어간다. `aria-hidden` 은 포커스를 막지 못해 `inert` 다.
+   */
+  it('평소에는 폼이 접혀 있고 탭으로도 못 닿는다', () => {
+    const { container } = render(<TeamActions teams={[]} userId="u1" />)
     expect(screen.getByRole('button', { name: '팀 만들기' })).toBeInTheDocument()
-    expect(screen.queryByLabelText('팀 이름')).toBeNull()
+    const fold = container.querySelector('.ss-profile-form-fold')
+    expect(fold).toHaveAttribute('data-open', 'false')
+    expect(fold?.firstElementChild).toHaveAttribute('inert')
+  })
+
+  it('펴면 닿을 수 있게 된다', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<TeamActions teams={[]} userId="u1" />)
+    await user.click(screen.getByRole('button', { name: '팀 만들기' }))
+    const fold = container.querySelector('.ss-profile-form-fold')
+    expect(fold).toHaveAttribute('data-open', 'true')
+    expect(fold?.firstElementChild).not.toHaveAttribute('inert')
   })
 
   /* 🔴 **종목을 안 묻는다**(사용자 결정) — 풋살만 다룬다. BFF 가 채운다. */
@@ -80,7 +98,7 @@ describe('프로필 — 소속', () => {
   it('나가기는 내 user_id 로 나간다', async () => {
     const user = userEvent.setup()
     render(<TeamActions teams={[{ team_id: 't1', name: '번개FC', region: '서울 강남', sport_code: 'futsal', role: 'member' }]} userId="u1" />)
-    await user.click(screen.getByRole('button', { name: '나가기' }))
+    await user.click(screen.getByRole('button', { name: '팀 나가기' }))
 
     await waitFor(() => expect(refresh).toHaveBeenCalled())
     expect(sent.some((s) => s.url === '/api/teams/t1/members/u1' && s.method === 'DELETE')).toBe(
@@ -97,7 +115,7 @@ describe('프로필 — 소속', () => {
     const user = userEvent.setup()
     render(<TeamActions teams={[{ team_id: 't1', name: '번개FC', region: '서울 강남', sport_code: 'futsal', role: 'owner' }]} userId="u1" />)
     // 🔴 단추가 **눌린다** — 막아 두지 않는다.
-    await user.click(screen.getByRole('button', { name: '나가기' }))
+    await user.click(screen.getByRole('button', { name: '팀 나가기' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('마지막 주장은 팀을 나갈 수 없습니다.')
   })
@@ -135,7 +153,7 @@ describe('프로필 — 팀 만들기가 나오는 때', () => {
     expect(screen.getByRole('button', { name: '팀 만들기' })).toBeInTheDocument()
     // 나가기는 팀 이름과 같은 줄에 있다.
     const line = screen.getByText('번개FC').closest('.ss-profile-team-name')
-    expect(line?.querySelector('button')).toHaveTextContent('나가기')
+    expect(line?.querySelector('button')).toHaveTextContent('팀 나가기')
   })
 
   it('팀이 없으면 무엇이 막히는지 적는다', () => {
