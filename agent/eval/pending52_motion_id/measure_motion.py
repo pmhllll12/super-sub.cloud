@@ -20,6 +20,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "eval" / "phaseA"))
 
 from supersub_agent.features import (  # noqa: E402
     InsufficientQuality,
@@ -36,8 +37,11 @@ from supersub_agent.features import (  # noqa: E402
 )
 from supersub_agent.pose import extract_keypoints  # noqa: E402
 
+import paths  # noqa: E402
+
 HERE = Path(__file__).resolve().parent
-CLIPS = Path("/mnt/d/sports-pose/soccer/motion_id")
+# 🔴 경로는 `paths.py` 한 곳에서 정한다 (미결 14번).
+CLIPS = paths.motion_id_root()
 
 # 🔴 사전 등록에서 박은 값. **결과를 보고 돌리지 않는다.**
 SPEED_SHOT = 42.0      # 어깨너비/초

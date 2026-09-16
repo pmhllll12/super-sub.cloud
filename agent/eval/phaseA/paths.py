@@ -115,6 +115,29 @@ def soccernet_clips_root() -> Path:
     return Path(os.environ.get("SUPERSUB_SOCCERNET_ROOT", _DEFAULT_SOCCERNET))
 
 
+_DEFAULT_MOTION_ID = Path("/mnt/d/sports-pose/soccer/motion_id")
+
+
+def motion_id_root() -> Path:
+    """슛·패스 두 층의 드릴 클립 (미결 `ho` 52번) — **Phase A 자산이 아니다.**
+
+    「영상만 보고 슛인가 패스인가」를 재려면 두 클래스가 다 있어야 하는데,
+    우리가 가진 축구 클립은 **전부 슛 쪽**이다(골든셋 19 · 3DSP 200 ·
+    SoccerNet `Shots` 100). 패스 라벨이 붙은 클립이 **하나도 없어서** 새로
+    받았고, 그 뿌리가 여기다.
+
+    🔴 **두 층을 같은 성격(단독 선수 드릴)으로 맞춰 받는다.** 한쪽만 중계
+    영상이면 분류기가 동작이 아니라 **촬영 방식**을 배운다. 그래서 위
+    `soccer_clips_root()`(세트피스 중계)와 섞지 않고 별도 뿌리에 둔다.
+
+    🔴 **영상은 각 업로더의 저작물이라 저장소에 커밋하지 않는다** — 커밋하는
+    것은 출처 표(`clips_manifest.csv`)뿐이다.
+
+    `SUPERSUB_MOTION_ID_ROOT` 로 바꾼다. **존재를 보장하지 않는다.**
+    """
+    return Path(os.environ.get("SUPERSUB_MOTION_ID_ROOT", _DEFAULT_MOTION_ID))
+
+
 def default_target() -> int:
     """동작점을 **명시하지 않는 호출자**가 쓸 값. 출처는 한 곳이다.
 

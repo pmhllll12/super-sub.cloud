@@ -19,7 +19,14 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-DEST = Path("/mnt/d/sports-pose/soccer/motion_id")
+ROOT = HERE.parents[1]
+sys.path.insert(0, str(ROOT / "eval" / "phaseA"))
+
+import paths  # noqa: E402
+
+# 🔴 경로를 여기 박지 않는다 — `paths.py` 가 기계별 경로를 적어도 되는 유일한
+#    자리다(미결 14번, `tests/test_eval_paths.py` 가 막는다).
+DEST = paths.motion_id_root()
 
 # 층마다 여러 질의를 쓴다 — 한 채널의 촬영 습관만 배우지 않게.
 QUERIES: dict[str, list[str]] = {
