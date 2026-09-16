@@ -9717,3 +9717,45 @@ grep -n 'titles' fastapi/docs/api-contract.md | grep -i 'patch\|쓰기'
 판이 후보의 `card_public_slug` 로 읽어 **「시야가 넓은」 자리**에 그립니다(대표
 영상을 그렇게 붙였습니다). 그때 `SquadSuggest.tsx` 의 `FLAVOR` 에서 `title` 이
 빠집니다 — 33번(한 줄 특징)과는 **다른 칸**입니다.
+
+#### 🔴 덧붙임 (2026-09-16 저녁) — **배포에서 실제로 겪었습니다. 그리고 조용히 실패합니다**
+
+적는 화면은 이미 붙어 있습니다. 그래서 사용자가 배포(`supersub-ai.com/me`)에서
+호칭을 적고 「저장」을 눌렀는데 **아무 일도 안 일어났습니다.**
+
+화면은 `PATCH /me/card` 에 `titles` 를 실어 보냅니다. 그런데 받는 쪽이 이렇습니다:
+
+```python
+# fastapi/app/card/adapter/inbound/api/schemas/card_schema.py
+class UpdateMyCardSchema(BaseModel):
+    tagline: str | None = Field(default=None, max_length=20)
+    style: CardStyleSchema | None = Field(default=None)
+```
+
+`titles` 칸이 없고, Pydantic 기본값이 `extra='ignore'` 라 **그 칸을 조용히
+버리고 `200` 을 돌려줍니다.**
+
+🔴 **그래서 실패가 성공처럼 보입니다.** 화면은 응답이 200 이면 저장된 줄 압니다 —
+「안 받는다」와 「받았다」를 가를 방법이 응답에 없습니다. 에러였다면 화면이 그것을
+그대로 말했을 텐데(그렇게 짜 두었습니다), 지금은 **사용자가 적어 놓고 떠났다가
+나중에 비어 있는 것을 봅니다.**
+
+##### 만족해야 할 성질 (위 1·2에 하나 더)
+
+3. **안 받는 칸을 보냈으면 그렇다고 답할 것.** `titles` 를 받아 주시는 것이
+   제일 좋고, 당장 어려우면 **모르는 필드를 거절**해 주셔도 됩니다
+   (`model_config = ConfigDict(extra='forbid')` → `422`). 조용히 버리는 것만
+   아니면 화면이 사실대로 말할 수 있습니다.
+
+##### 확인
+
+```bash
+# 안 받는 칸을 보냈을 때 200 이 아니라 422 이거나, titles 가 실제로 담기는가
+grep -n 'titles\|extra' fastapi/app/card/adapter/inbound/api/schemas/card_schema.py
+```
+
+- **급합니다** — 다른 미결과 달리 **사용자에게 이미 보이는 자리**이고, 잘못된
+  성공을 보여주고 있습니다
+- 그때까지 화면 쪽에서 「응답에 바뀐 값이 없으면 실패로 본다」로 버틸 수는
+  있습니다(백성검). 다만 **그것은 추측으로 가르는 것**이라, 위 3번이 되면
+  걷어냅니다
