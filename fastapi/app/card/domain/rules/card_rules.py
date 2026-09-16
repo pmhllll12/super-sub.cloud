@@ -95,6 +95,45 @@ def normalize_tagline(raw: str | None) -> str | None:
     return cleaned
 
 
+# 사람이 직접 적는 호칭(`paik` 36번). 길이는 `tagline` 과 같은 20자다 —
+# 추천 판의 한 줄에 들어가야 해서 그 정도면 충분하다. 개수 상한은 지금
+# 화면이 칩 둘을 그린다는 데서 왔다(셋까지 여유를 뒀다).
+MAX_CUSTOM_TITLE = 20
+MAX_CUSTOM_TITLES = 3
+
+
+def normalize_custom_titles(raw: list[str] | None) -> list[str]:
+    """사람이 적은 호칭들을 저장할 모양으로 만든다(`paik` 36번).
+
+    - 앞뒤 공백을 턴다
+    - **빈 문자열은 버린다** — `normalize_tagline` 과 같은 판단(빈 줄을
+      그리게 하지 않는다)
+    - **같은 글은 하나만 남긴다**(먼저 쓴 순서를 지킨다) — 같은 칩이 둘
+      그려질 이유가 없다
+    - `None` 은 **전부 지운다**는 뜻이라 빈 목록이 된다
+
+    🔴 **길이도 개수도 자르지 않고 거부한다.** 조용히 자르면 사람이 쓴 것과
+    보이는 것이 달라지고, 그것을 알아차리는 시점은 카드를 공유한 뒤다
+    (`normalize_tagline` 과 같은 이유).
+    """
+    if raw is None:
+        return []
+
+    cleaned: list[str] = []
+    for item in raw:
+        text = item.strip()
+        if not text:
+            continue
+        if len(text) > MAX_CUSTOM_TITLE:
+            raise ValueError(f"{MAX_CUSTOM_TITLE}자를 넘을 수 없다")
+        if text not in cleaned:
+            cleaned.append(text)
+
+    if len(cleaned) > MAX_CUSTOM_TITLES:
+        raise ValueError(f"{MAX_CUSTOM_TITLES}개를 넘을 수 없다")
+    return cleaned
+
+
 def visible_titles(granted: list[TitleEntity]) -> list[TitleEntity]:
     """카드에 표시할 호칭.
 

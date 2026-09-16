@@ -27,6 +27,10 @@ class UpdateMyCardCommand:
     #: 카드 꾸미기 전체. `UNSET` 이면 안 건드리고, `None` 이면 꾸미기 전으로
     #: 되돌린다. 부분 병합은 하지 않는다(`CardPort.update_style` 참고).
     style: dict | None | Any = UNSET
+    #: 사람이 직접 적는 호칭 **전체 목록**(`paik` 36번). `UNSET` 이면 안
+    #: 건드리고, `None` 이나 빈 목록이면 **전부 지운다**. `style` 과 같이
+    #: 통째로 갈아 끼운다 — 부분 병합은 하지 않는다.
+    titles: list[str] | None | Any = UNSET
 
 
 class UpdateMyCardUseCase(ABC):

@@ -134,6 +134,13 @@ class VideoResponse(BaseModel):
     description: str | None
     kept: bool
     is_featured: bool
+    # 같은 내용의 다른(자기) 영상 결과를 재사용했으면 그 영상(`ho` 41번,
+    # 중복 업로드). 등록 응답에서만 `duplicate_status`/`duplicate_failure_
+    # reason` 도 함께 채워진다 — 그 결과를 자세히 보려면 이 id로
+    # `GET /videos/{id}/report` 를 부른다.
+    duplicate_of_video_id: UUID | None
+    duplicate_status: str | None
+    duplicate_failure_reason: str | None
 
 
 class UpdateVideoSchema(BaseModel):

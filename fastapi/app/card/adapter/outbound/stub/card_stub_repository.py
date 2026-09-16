@@ -104,6 +104,31 @@ class StubCardRepository(CardPort):
         _CREATED[user_id] = updated
         return updated
 
+    def replace_custom_titles(
+        self, user_id: UUID, labels: list[str]
+    ) -> CardEntity | None:
+        """`paik` 36번. 직접 적은 호칭(`category=직접`)만 갈아 끼운다 —
+        **부여된 호칭은 그대로 둔다.**"""
+        card = self.find_by_owner(user_id)
+        if card is None:
+            return None
+        # 직접 적은 것은 `category` 가 없다 — 부여된 것만 남긴다.
+        kept = [t for t in card.titles if t.category is not None]
+        now = datetime.now(timezone.utc)
+        written = [
+            TitleEntity(
+                # 실물은 `custom:<행 id>` 다. 스텁도 유일하기만 하면 된다.
+                code=f"custom:{uuid4()}",
+                label=label,
+                category=None,
+                granted_at=now,
+            )
+            for label in labels
+        ]
+        updated = replace(card, titles=kept + written)
+        _CREATED[user_id] = updated
+        return updated
+
     def create_for_owner(self, user_id: UUID) -> CardEntity:
         """멱등하게 만든다.
 
