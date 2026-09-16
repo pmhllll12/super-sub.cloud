@@ -122,6 +122,77 @@ def test_open_ended_top_bands_are_rejected(tmp_path):
         discover_rubrics(tmp_path)
 
 
+def test_a_title_tells_which_way_the_posture_went():
+    """🔴 한 등급 안의 **반대 방향**을 칭호도 가른다 (2026.09.16).
+
+    「치우친 상체」는 **젖혀진 것**과 **앞으로 무너진 것**을 같은 말로 불렀다.
+    선수가 읽는 자리(리포트 상세·적재 컬럼)라 방향이 안 보이면 고칠 수가 없다.
+
+    🔴 값이 없으면 **방향을 찍지 않고 항목명**으로 떨어진다 — `card_line_for` 가
+    빈 문자열로 떨어지는 것과 같은 판단이다. 서비스 경로는 늘 값을 넘긴다.
+    """
+    rubric = load_rubric(RUBRIC_PATH)
+    trunk = rubric.get("trunk_lean")
+    back, forward = trunk.title_for(0, -8.7), trunk.title_for(0, 35.0)
+    assert back != forward, "양쪽을 같은 말로 부른다"
+    assert trunk.title_for(0) == trunk.name, "값이 없는데 방향을 골랐다"
+
+    judgments = {c.id: {"grade": 0, "evidence": ""} for c in rubric.criteria}
+    # 항목마다 **자기 0등급 구간 안**의 값을 준다. 아무 값이나 주면 구간에 없어
+    # `grade_for` 가 막는다 — 그 검사는 그대로 두는 것이 맞다.
+    feats = {}
+    for cr in rubric.criteria:
+        lo, hi = cr.bands[0][0]
+        feats[cr.band_metric] = hi - 1.0 if lo is None else (
+            lo + 1.0 if hi is None else (lo + hi) / 2)
+    got = aggregate(judgments, rubric, features=feats)
+    said = {b["criterion_id"]: b["title"] for b in got["breakdown"]}
+    assert said["trunk_lean"] == back
+
+    # 값을 안 주면 그 항목만 항목명으로 떨어진다 — 나머지는 그대로다.
+    plain = aggregate(judgments, rubric)
+    said_plain = {b["criterion_id"]: b["title"] for b in plain["breakdown"]}
+    assert said_plain["trunk_lean"] == trunk.name
+    assert said_plain["hip_rotation"] == said["hip_rotation"], "안 갈린 항목까지 변했다"
+
+
+def test_card_lines_that_do_not_line_up_with_the_bands_are_rejected(tmp_path):
+    """🔴 구간마다 쓴 문장이 **자리가 어긋나면 반대로 말한다**.
+
+    한 등급에 반대 방향 구간이 둘 있는 자리(골반 회전 1등급: 덜 돌았다 / 너무
+    많이 돌았다)에서 문장 순서가 구간 순서와 다르면 **덜 돈 선수에게 「지나치게
+    많이 돌린다」**고 말한다. 예외도 경고도 없이 문장만 반대인 형태다.
+    """
+    head = ("sport: x\nmotion: y\ncriteria:\n"
+            "  - {id: a, name: A, weight: 1.0, measured_by: [m], "
+            "grades: {0: z, 1: z, 2: z}, "
+            "bands: {metric: m, 2: [[2, 3]], 1: [[1, 2], [3, 4]], 0: [[null, 1]]}, ")
+    (tmp_path / "one.yaml").write_text(
+        head + "card_lines: {2: ok, 1: [only-one], 0: ok}}\n", encoding="utf-8")
+
+    with pytest.raises(RubricError, match="구간"):
+        discover_rubrics(tmp_path)
+
+
+def test_a_grade_may_keep_one_sentence_for_both_directions(tmp_path):
+    """문장 하나로 양쪽 구간을 부르는 것은 **허용한다** — 갈라 쓰는 것은 선택이다.
+
+    갈라 쓰면 고칠 방향이 보이지만, 모든 항목에서 두 방향을 다르게 부를 말이
+    있는 것은 아니다. 하나만 있으면 방향과 무관한 문장으로 본다.
+    """
+    body = ("sport: x\nmotion: y\ncriteria:\n"
+            "  - {id: a, name: A, weight: 1.0, measured_by: [m], "
+            "grades: {0: z, 1: z, 2: z}, "
+            "bands: {metric: m, 2: [[2, 3]], 1: [[1, 2], [3, 4]], 0: [[null, 1]]}, "
+            "card_lines: {2: ok, 1: 한 문장, 0: ok}}\n")
+    (tmp_path / "one.yaml").write_text(body, encoding="utf-8")
+
+    c = discover_rubrics(tmp_path)["x/y"].criteria[0]
+    # 값을 안 줘도 쓸 수 있다 — 방향을 고를 필요가 없는 문장이라서다.
+    assert c.card_line_for(1) == "한 문장"
+    assert c.card_line_for(1, 1.5) == "한 문장"
+
+
 def test_unknown_status_is_rejected(tmp_path):
     """오타로 조용히 닫히면 안 된다 — 열려야 할 동작이 사라지는 쪽이 못 찾는다."""
     (tmp_path / "one.yaml").write_text(
@@ -403,9 +474,19 @@ def test_out_of_band_marks_zero_grades_that_came_from_above():
     assert c.out_of_band(below) == "", "아래쪽 0등급은 표시하지 않는다"
 
 
-# features 를 줘야만 채워지는 **표시 전용** 필드들. 이 목록이 늘어날 때마다
+# features 를 줘야만 채워지거나 **달라지는** 필드들. 이 목록이 늘어날 때마다
 # 아래 검사가 「점수를 안 건드린다」를 다시 확인한다.
-DISPLAY_ONLY_FIELDS = ("out_of_band", "stat", "view_dependent")
+#
+# 🔴 `title` 은 2026.09.16 부터 features 에 **의존한다** — 한 등급에 반대 방향
+# 구간이 둘 있는 항목(「젖혀진 상체」 / 「무너진 상체」)에서 어느 쪽인지 고르려면
+# 측정값이 있어야 하고, 없으면 방향을 찍지 않고 항목명으로 떨어진다. 그래서
+# 이 검사가 보는 것은 **점수·등급·가중치**이고 문구는 아니다.
+DISPLAY_ONLY_FIELDS = ("out_of_band", "stat", "view_dependent", "title")
+
+# 봉투 맨 위의 표시 전용 블록. `card` 와 `summary` 는 위 `title` 과 같은 이유로
+# features 에 의존한다(둘 다 칭호·구간 문구를 재료로 쓴다). 점수를 안 건드리는
+# 것은 `test_summary.py::test_the_card_does_not_move_the_score` 가 따로 본다.
+DISPLAY_ONLY_BLOCKS = ("card", "summary")
 
 
 def test_display_only_fields_do_not_move_the_score():
@@ -423,7 +504,8 @@ def test_display_only_fields_do_not_move_the_score():
     with_feats = aggregate(judgments, rubric, features=feats)
 
     strip = lambda r: {  # noqa: E731
-        **r, "breakdown": [{k: v for k, v in b.items()
+        **{k: v for k, v in r.items() if k not in DISPLAY_ONLY_BLOCKS},
+        "breakdown": [{k: v for k, v in b.items()
                             if k not in DISPLAY_ONLY_FIELDS}
                            for b in r["breakdown"]]
     }

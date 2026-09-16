@@ -116,7 +116,7 @@ target 15의 값이라 정정한다). 그래서 팔 루브릭에 `side=left`를 
 
 ```
 agent/
-├── rubrics/                        # 채점 기준 + bands(등급 구간) + titles(칭호)
+├── rubrics/                        # 채점 기준 + bands(등급 구간) + 선수에게 보일 문구
 │   ├── football_instep_shot.yaml   # active — 종목당 한 동작만 연다
 │   └── football_inside_pass.yaml   # draft — 검수 대기, 선택지에 안 뜬다
 ├── src/supersub_agent/
@@ -298,8 +298,9 @@ RT-DETR에 넣는 구조라 해상도를 낮추면 더 줄어들 여지가 있�
 
 `rubrics/football_instep_shot.yaml`의 각도 임계값은 **지도자 검수 전 임시값**이다.
 `review_required: true`인 동안 `aggregate()`는 결과에 `provisional: true`를 붙인다.
-검수 전 점수를 대외에 노출하지 않는다. `titles`(칭호)도 선수에게 보이는 문구이므로
-임계값과 함께 검수 대상이다.
+검수 전 점수를 대외에 노출하지 않는다. `titles`(칭호)와 `card_lines`(추천 카드
+불릿)도 선수에게 보이는 문구이므로 임계값과 함께 검수 대상이다 — 화면이 아니라
+루브릭에 두는 이유가 그것이다. 쓰는 규칙은 인스텝 슈팅 루브릭 머리말에 있다.
 
 EXAONE은 **EXAONE AI Model License 1.2 - NC**로 비상업 라이선스다.
 상업적 이용에는 LG AI Research와 별도 계약이 필요하다 (미결 항목 1번).
