@@ -141,7 +141,7 @@ def test_the_summary_is_at_most_two_sentences():
 def _card(rubric, grades):
     from supersub_agent.scoring import card
     result = aggregate(_judge(rubric, grades), rubric)
-    return card(result["breakdown"]), result
+    return card(result["breakdown"], rubric), result
 
 
 @pytest.mark.parametrize("key", sorted(RUBRICS))
@@ -216,6 +216,72 @@ def test_the_card_is_deterministic(key):
     a, _ = _card(rubric, [2, 1, 0] * len(rubric.criteria))
     b, _ = _card(rubric, [2, 1, 0] * len(rubric.criteria))
     assert a == b
+
+
+# -- 불릿 문장의 출처: 루브릭의 `card_lines` (2026.09.16) --------------------
+#
+#    코드가 짓던 틀(「…가 이번 동작의 강점입니다」)은 항목 이름만 갈아 끼우는
+#    문장이었다. 선수에게 보이는 문구는 **지도자가 검수**해야 하므로 칭호와
+#    같은 자리(루브릭)로 옮겼다. 아래 검사들이 그 배선과, 고정 문장이라서
+#    생기는 함정을 막는다.
+
+
+@pytest.mark.parametrize("key", sorted(RUBRICS))
+@pytest.mark.parametrize("grade", [0, 1, 2])
+def test_every_criterion_documents_a_card_line_for_every_grade(key, grade):
+    """🔴 새 항목이 문장 없이 배포되는 것을 막는다.
+
+    빠져도 **터지지 않는다** — 코드가 지은 틀로 조용히 떨어질 뿐이라, 검수받지
+    않은 문장이 섞인 채 나가도 아무도 모른다. 등급 셋을 다 요구하는 이유는
+    0등급 줄이 가장 빠뜨리기 쉬워서다.
+    """
+    for c in RUBRICS[key].criteria:
+        assert c.card_line_for(grade).strip(), f"{key}/{c.id}: {grade}등급 문장 없음"
+
+
+@pytest.mark.parametrize("key", sorted(RUBRICS))
+def test_card_lines_say_only_what_a_fixed_sentence_may_say(key):
+    """🔴 **등급마다 고정된 문장**이라 적어서는 안 되는 것이 있다.
+
+    수치는 측정값과 함께 움직이지 않는다 — 「약 16cm」를 구간 문장에 적으면 그
+    구간의 **모든 영상**이 재지도 않은 수치를 달고 나간다. 경기 기록은 애초에
+    우리가 잰 것이 아니다. 렌더된 카드만 보는 검사로는 모자라다 — 그쪽은
+    최고·최저 항목만 지나가므로 나머지 문장은 검사되지 않는다.
+    """
+    for c in RUBRICS[key].criteria:
+        for grade, line in c.card_lines.items():
+            assert not any(ch.isdigit() for ch in line), f"{c.id}/{grade}: {line}"
+            for word in ("경기", "활동량", "출전", "연속", "꾸준"):
+                assert word not in line, f"{c.id}/{grade}: 경기 기록의 말 — {word}"
+
+
+@pytest.mark.parametrize("key", sorted(RUBRICS))
+@pytest.mark.parametrize("grade", [0, 2])
+def test_the_bullet_is_the_sentence_the_rubric_wrote(key, grade):
+    """🔴 루브릭 문장이 실제로 카드에 실리는지 — 배선이 끊기면 조용히 폴백한다.
+
+    적재기가 `card_lines` 를 안 읽거나 `card()` 가 루브릭을 못 받으면 예외 없이
+    코드 틀로 돌아간다. 그 상태로도 다른 검사들은 전부 초록이다.
+    """
+    rubric = RUBRICS[key]
+    got, result = _card(rubric, [grade] * len(rubric.criteria))
+    written = {c.card_line_for(grade).strip() for c in rubric.criteria}
+    assert got["notes"], "불릿이 비었다"
+    for note in got["notes"]:
+        assert note in written, f"루브릭이 안 쓴 문장이 카드에 있다: {note}"
+
+
+@pytest.mark.parametrize("key", sorted(RUBRICS))
+def test_the_card_still_speaks_without_a_rubric(key):
+    """루브릭 없이 `breakdown` 만 들고 불려도 돌아야 한다 (평가·재현 경로).
+
+    빈 카드를 내보내는 것보다 코드가 지은 단조로운 문장이 낫다.
+    """
+    from supersub_agent.scoring import card
+    rubric = RUBRICS[key]
+    result = aggregate(_all(rubric, 2), rubric)
+    got = card(result["breakdown"])
+    assert got["notes"] and all(n.strip() for n in got["notes"])
 
 
 @pytest.mark.parametrize("key", sorted(RUBRICS))

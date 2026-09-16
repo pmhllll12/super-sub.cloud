@@ -82,6 +82,9 @@ class Criterion:
     # 등급별 칭호 — 선수에게 보여줄 짧은 표현. 채점에는 관여하지 않는다.
     # 지도자가 검수하는 문구이므로 UI가 아니라 루브릭에 둔다.
     titles: dict[int, str] = field(default_factory=dict)
+    # 추천 카드의 불릿 문장 (미결 `paik` 27번). 🔴 **칭호와 같은 자리에 둔다** —
+    # 지도자가 검수할 문구라서 UI 가 아니라 루브릭에 산다. 채점에 관여하지 않는다.
+    card_lines: dict[int, str] = field(default_factory=dict)
     # 등급 판정 구간. band_metric 하나의 값으로 등급이 결정된다.
     band_metric: str = ""
     bands: dict[int, tuple[Interval, ...]] = field(default_factory=dict)
@@ -89,6 +92,20 @@ class Criterion:
     def title_for(self, grade: int) -> str:
         """해당 등급의 칭호. 정의되지 않았으면 항목명으로 대체한다."""
         return self.titles.get(grade) or self.name
+
+    def card_line_for(self, grade: int) -> str:
+        """추천 카드에 쓸 한 줄. 루브릭이 안 적었으면 빈 문자열이다.
+
+        🔴 **여기서 지어내지 않는다** — 없으면 `scoring.card` 가 코드가 짓는
+        틀로 떨어진다. 그 폴백이 단조로운 것은 알지만, **없는 말을 만드는 것보다
+        낫다.**
+
+        🔴 **문장에 숫자를 적지 않는다.** 이 줄은 등급마다 **고정**이라 측정값과
+        함께 움직이지 않는다 — 「약 16cm」를 적어 두면 그 구간의 모든 영상이
+        재지도 않은 수치를 달고 나간다. 수치가 필요한 자리는 `evidence` 다.
+        `tests/test_summary.py` 가 루브릭에서 이걸 막는다.
+        """
+        return self.card_lines.get(grade, "")
 
     def title_is_earned(self, grade: int) -> bool:
         """이 칭호가 **받은 것**인가 (`paik` 23번).
@@ -490,6 +507,8 @@ def load_rubric(path: str | Path) -> Rubric:
                 anchors=tuple(entry.get("anchors", [])),
                 rationale=entry.get("rationale", ""),
                 titles={int(k): v for k, v in (entry.get("titles") or {}).items()},
+                card_lines={int(k): v
+                            for k, v in (entry.get("card_lines") or {}).items()},
                 band_metric=band_metric,
                 bands=bands,
             )
@@ -636,7 +655,8 @@ def summarize(breakdown: list[dict[str, Any]]) -> str:
     return " ".join(parts)
 
 
-def card(breakdown: list[dict[str, Any]]) -> dict[str, Any]:
+def card(breakdown: list[dict[str, Any]],
+         rubric: "Rubric | None" = None) -> dict[str, Any]:
     """추천 카드에 쓸 **짧은 수식어 + 불릿 두 줄** (미결 `paik` 27번의 설명 칸).
 
     화면(`SquadSuggest.tsx`)이 후보마다 이름 아래에 한 줄(`title`)과 불릿
@@ -656,6 +676,20 @@ def card(breakdown: list[dict[str, Any]]) -> dict[str, Any]:
     | `title` | **가장 잘한 항목의 칭호.** 🔴 `title_earned` 가 참일 때만 — 안 그러면 0등급의 「무너지는 축」이 수식어로 걸린다(`paik` 23번) |
     | `notes` | 강점 한 줄 · 아쉬운 점 한 줄. **없으면 안 만든다** — 둘을 채우려고 지어내지 않는다 |
 
+    🔴 **불릿 문장은 루브릭이 등급마다 적어 둔 `card_lines` 다** (2026.09.16).
+    코드가 짓던 틀(「…가 이번 동작의 강점입니다」)은 항목 이름만 갈아 끼우는
+    문장이라 **카드마다 같은 말**로 읽혔다. 칭호(`titles`)와 **같은 자리에 두는
+    이유도 같다** — 선수에게 보이는 문구는 지도자가 검수해야 하고, 검수 대상은
+    코드가 아니라 데이터여야 한다.
+
+    🔴 **여기서 다양성을 기대하지 않는다.** 같은 항목·같은 등급이면 문장도 같다.
+    이 블록이 사는 것은 **검수된 자연스러운 문구**이지 카드마다 다른 말이 아니다.
+    선수마다 달라지는 문장이 필요하면 그건 `evidence` 의 일이다.
+
+    🔴 **`rubric` 을 안 주면 코드가 지은 틀로 떨어진다.** 이 함수는 루브릭 없이도
+    (평가·재현 경로가 `breakdown` 만 들고 부른다) 돌아야 하고, 빈 카드를 내보내는
+    것보다 단조로운 문장이 낫다.
+
     점수와 무관하다(`summary`·`stat` 과 같은 성질) — 이 키를 빼도 총점은 한
     비트도 안 바뀌고 **B-6 재실행을 부르지 않는다**.
     """
@@ -673,18 +707,31 @@ def card(breakdown: list[dict[str, Any]]) -> dict[str, Any]:
     #    아무것도 안 그리는 편이, 아쉬운 항목의 칭호를 자랑처럼 다는 것보다 낫다.
     title = best["title"] if best.get("title_earned") else None
 
+    def line(item: dict[str, Any], fallback: str) -> str:
+        """그 항목·그 등급에 대해 루브릭이 적어 둔 한 줄. 없으면 코드가 지은 틀."""
+        if rubric is None:
+            return fallback
+        try:
+            criterion = rubric.get(str(item["criterion_id"]))
+        except KeyError:
+            # 판정에만 있고 루브릭에 없는 항목 — aggregate가 먼저 막지만,
+            # 이 함수는 breakdown만 들고 따로 불릴 수 있다.
+            return fallback
+        return criterion.card_line_for(int(item["grade"])).strip() or fallback
+
     notes: list[str] = []
     if int(best["grade"]) == MAX_GRADE:
         # 🔴 수식어(칭호)를 불릿에서 **다시 말하지 않는다** — 화면이 둘을 나란히
         #    그리므로 같은 말이 두 번 보인다. 여기는 **항목 이름**으로 적는다.
-        notes.append(f"{_with_particle(best['name'], '이', '가')} "
-                     "이번 동작의 강점입니다")
+        notes.append(line(best, f"{_with_particle(best['name'], '이', '가')} "
+                                "이번 동작의 강점입니다"))
     if int(worst["grade"]) < MAX_GRADE and worst["criterion_id"] != best["criterion_id"]:
-        notes.append(f"{_with_particle(worst['name'], '은', '는')} 아직 아쉽습니다")
+        notes.append(line(worst,
+                          f"{_with_particle(worst['name'], '은', '는')} 아직 아쉽습니다"))
     if not notes:
         # 갈리지 않았다 — 갈린 척하지 않는다(`summarize` 와 같은 규칙).
-        notes.append(f"{_with_particle(worst['name'], '은', '는')} "
-                     f"「{worst['title']}」{_ro(worst['title'])} 나왔습니다")
+        notes.append(line(worst, f"{_with_particle(worst['name'], '은', '는')} "
+                                 f"「{worst['title']}」{_ro(worst['title'])} 나왔습니다"))
     return {"title": title, "notes": notes}
 
 
@@ -787,7 +834,7 @@ def aggregate(
         "summary": summarize(breakdown),
         # 추천 카드의 설명 칸 (`paik` 27번). `summary` 와 같은 성질이다 —
         # breakdown 에서만 짓고 점수를 안 건드린다.
-        "card": card(breakdown),
+        "card": card(breakdown, rubric),
         "breakdown": breakdown,
         # 측정하지 못해 판정에서 빠진 항목 — 0점이 아니라 제외다.
         "skipped": skipped,
