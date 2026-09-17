@@ -953,7 +953,11 @@ def aggregate(
         "skipped": skipped,
         "rubric_version": rubric.version,
         "pipeline_version": rubric.pipeline_version,
-        # 검수 전 루브릭으로 낸 점수는 대외 노출하지 않는다.
+        # 🔴 **검수되지 않은 루브릭으로 낸 값**이라는 표시. 2026.09.17에
+        # 지도자 검수 없이 가기로 해서(미결 2번) **이 값이 영구히 true 다.**
+        # 앞서 여기 «대외 노출하지 않는다»고 적어 둔 것을 정정한다 — 노출하고
+        # 있고, 막는 대신 이 표시로 말한다. `review_required` 를 false 로
+        # 바꾸지 않는다: 화면의 「검수 전」 배지가 이 값을 그린다.
         "provisional": rubric.review_required,
     }
 
