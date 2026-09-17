@@ -188,6 +188,11 @@ def seed(session: Session, password: str, contacts_to: str | None) -> list[dict]
             id=video_id, user_id=uid, sport_code="football", storage_key=storage_key,
             duration_ms=dur, width=w, height=h, is_public=True, title=title,
             original_filename=clip, kept=True, is_featured=True, created_at=uploaded))
+        # 🔴 규격 검사 통과 기록이 있어야 대표 영상으로 나간다 — `find_featured_by_card_slug` 가
+        #    `video_validation.passed` 를 본다(없으면 404 NO_FEATURED_VIDEO). 처음 판에서 빠뜨려
+        #    추천 판에 「아직 대표 영상이 없습니다」가 떴다(2026-09-17 운영에서 발견).
+        session.execute(insert(T["video_validation"]).values(
+            id=uuid4(), video_id=video_id, passed=True, reject_reason=None, checked_at=uploaded))
         session.execute(insert(T["analysis_job"]).values(
             id=job_id, video_id=video_id, status="succeeded", job_type="analyze",
             created_at=uploaded, started_at=uploaded + timedelta(seconds=30),
