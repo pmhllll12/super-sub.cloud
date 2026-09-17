@@ -1635,13 +1635,20 @@ GET /api/v1/positions?sport_code=football
 
 ```json
 [
-  { "sport_code": "football", "code": "DF", "label": "수비수" },
-  { "sport_code": "football", "code": "FW", "label": "공격수" }
+  { "id": "1c7d...", "sport_code": "football", "code": "DF", "label": "수비수" },
+  { "id": "4f02...", "sport_code": "football", "code": "FW", "label": "공격수" }
 ]
 ```
 
 `sport_code` 순으로 정렬돼 온다. 🔴 **약칭(`code`)은 종목 안에서만 유일**하다 —
 야구 `C`(포수)와 농구 `C`(센터)는 다른 것이라 둘 다 실린다.
+
+🔴 **`id` 가 2026-09-17 에 실렸다**(백성검, 승인받고 직접). 3-13절의
+`PUT /me/match-preferences` 가 포지션을 **`position_ids`(UUID)** 로 받는데 그
+UUID 를 내주는 경로가 **어디에도 없어서**, 클라이언트가 자기 포지션을 등록할
+방법이 원천적으로 없었다 — 그래서 AI 추천 후보의 첫 하드 필터를 아무도 통과하지
+못했다. 약칭으로는 못 보낸다(종목 안에서만 유일하다). 지역이 `GET /regions` 로
+`id` 를 받는 것과 같은 결이다.
 
 | 에러 | code | 언제 |
 |---|---|---|
@@ -3024,6 +3031,23 @@ INVALID_TIME_SLOT` — 뒤집힌 시간은 겹침 계산에서 늘 거짓이라 
 내 조건(지역·시간·**포지션**). `region_ids`·`slots` 검증은 팀 조건과 같다.
 없는 포지션 id는 `422 UNKNOWN_POSITION`. 🔴 **팀 조건과 저장소가 다르다** —
 같은 사람이 팀장이면서 팀원일 수 있어 절대 안 섞는다.
+
+```json
+{
+  "region_ids": ["b1e2..."],
+  "slots": [{ "weekday": 5, "start_time": "10:00:00", "end_time": "12:00:00" }],
+  "position_ids": ["1c7d..."]
+}
+```
+
+🔴 **`position_ids` 는 약칭(`MF`)이 아니라 `GET /positions` 의 `id`** 다 —
+약칭은 종목 안에서만 유일해서 그것만으로는 한 줄을 못 가리킨다. (이 칸의 모양이
+문서에 없어서 2026-09-17 에 적었다. 같은 날 `GET /positions` 가 `id` 를 싣기
+시작했다 — 그 전에는 **클라이언트가 이 칸을 채울 방법이 아예 없었다.**)
+
+🔴 **여기 올린 포지션이 곧 `GET /teams/{id}/squad/candidates` 의 첫 하드
+필터**다. 안 올리면 남의 AI 추천 판에 안 뜬다 — 팀 조건을 안 올리면 우리 팀이
+「맞는 상대」에 안 뜨는 것과 짝을 이룬다.
 
 ### `GET /api/v1/teams/{team_id}/members/match-preferences` — 팀원 조건 열람
 

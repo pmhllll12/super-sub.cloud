@@ -196,6 +196,13 @@ export type Squad = {
  * 지어 다룬다.
  */
 export type Position = {
+  /**
+   * 🔴 **다른 도메인이 포지션을 지목할 때 쓰는 값**(2026-09-17에 실렸다).
+   * 내 경기 조건이 포지션을 `position_ids` 로 받는데(계약 3-13절), 약칭은
+   * **종목 안에서만** 유일해서 `code` 로는 한 줄을 못 가리킨다 — 지역이
+   * 이름 대신 `id` 로 오가는 것과 같은 이유다.
+   */
+  id: string
   sport_code: string
   code: string
   label: string
@@ -756,6 +763,23 @@ export type TeamMatchPreference = {
   team_id: string
   region_ids: string[]
   slots: MatchSlot[]
+}
+
+/**
+ * **내 경기 조건** (계약 3-13절). `PUT` 은 팀 조건과 마찬가지로 **통째로 교체**다.
+ *
+ * 🔴 **팀 조건과 저장소가 다르다** — 같은 사람이 팀장이면서 팀원일 수 있어
+ * 계약이 둘을 절대 안 섞는다. 「우리 팀이 찾는 경기」와 「내가 뛸 수 있는 때」는
+ * 다른 값이다.
+ * 🔴 **`position_ids` 가 팀 조건에는 없는 칸**이고, 이게 곧 **내가 남의 AI
+ * 추천 후보로 뜨는 조건**이다(서버의 첫 하드 필터). 약칭이 아니라 id 다 —
+ * `Position.id` 머리말 참조.
+ */
+export type MemberMatchPreference = {
+  user_id: string
+  region_ids: string[]
+  slots: MatchSlot[]
+  position_ids: string[]
 }
 
 /**

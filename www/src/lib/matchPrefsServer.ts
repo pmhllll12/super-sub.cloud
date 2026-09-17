@@ -1,4 +1,10 @@
-import type { MatchSlot, Region, TeamMatchPreference } from '@/server/backend'
+import type {
+  MatchSlot,
+  MemberMatchPreference,
+  Position,
+  Region,
+  TeamMatchPreference,
+} from '@/server/backend'
 import { EMPTY_PREFS, type MatchPrefs, type TimeSlot } from './matchPrefs'
 
 /**
@@ -85,4 +91,55 @@ export function toScreenPrefs(pref: TeamMatchPreference, regions: Region[]): Mat
     if (label) names.push(label)
   }
   return { ...EMPTY_PREFS, regions: names, times: pref.slots.map(toScreenSlot) }
+}
+
+/**
+ * **내 조건**을 보낼 모양으로 옮긴다 — 팀 조건에 **포지션이 더 붙는다.**
+ *
+ * 🔴 **화면은 약칭(`MF`)을, 계약은 id(UUID)를 쓴다.** 약칭은 **종목 안에서만**
+ * 유일해서(야구 `C`=포수 · 농구 `C`=센터) 그대로 보낼 수가 없다 — 그래서
+ * `GET /positions` 가 준 목록으로 옮긴다. 지역이 이름 대신 id 로 가는 것과
+ * 같은 이유다.
+ *
+ * 🔴 **모르는 약칭은 버린다** — 지역과 같은 판단이다. 그대로 실어 보내면 422
+ * `UNKNOWN_POSITION` 이고, `PUT` 이 **통째로 교체**라 그 한 줄 때문에 **조건
+ * 전체가** 저장되지 않는다. 다만 **조용히 비는 것이 더 나쁘므로**, 부르는 쪽
+ * (`myPrefsStore`)이 「고른 것이 있는데 하나도 안 옮겨졌다」를 실패로 본다.
+ */
+export function toServerMemberPrefs(
+  prefs: MatchPrefs,
+  regions: Region[],
+  positions: Position[],
+): { region_ids: string[]; slots: MatchSlot[]; position_ids: string[] } {
+  const idOf = new Map(positions.map((p) => [p.code, p.id]))
+  const position_ids: string[] = []
+  for (const code of prefs.positions) {
+    const id = idOf.get(code)
+    if (id) position_ids.push(id)
+  }
+  return { ...toServerPrefs(prefs, regions), position_ids }
+}
+
+/**
+ * 받은 **내 조건**을 화면 모양으로 되돌린다.
+ *
+ * 🔴 **모르는 id 는 약칭을 지어내지 않고 뺀다**(지역과 같다) — 목록에 없는
+ * 자리를 「알 수 없음」 같은 글자로 채우면 사용자가 그것을 고른 줄로 읽는다.
+ */
+export function toScreenMemberPrefs(
+  pref: MemberMatchPreference,
+  regions: Region[],
+  positions: Position[],
+): MatchPrefs {
+  const codeOf = new Map(positions.map((p) => [p.id, p.code]))
+  const codes: string[] = []
+  for (const id of pref.position_ids) {
+    const code = codeOf.get(id)
+    if (code) codes.push(code)
+  }
+  const base = toScreenPrefs(
+    { team_id: '', region_ids: pref.region_ids, slots: pref.slots },
+    regions,
+  )
+  return { ...base, positions: codes }
 }

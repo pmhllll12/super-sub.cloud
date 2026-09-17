@@ -6,21 +6,39 @@
 
 from __future__ import annotations
 
+from uuid import NAMESPACE_URL, UUID, uuid5
+
 from app.user.application.ports.output.position_port import PositionPort
 from app.user.domain.entities.position_entity import PositionEntity
 
+_NAMES: list[tuple[str, str, str]] = [
+    ("football", "GK", "골키퍼"),
+    ("football", "DF", "수비수"),
+    ("football", "MF", "미드필더"),
+    ("football", "FW", "공격수"),
+    ("baseball", "P", "투수"),
+    ("baseball", "C", "포수"),
+    ("baseball", "IF", "내야수"),
+    ("baseball", "OF", "외야수"),
+    ("basketball", "G", "가드"),
+    ("basketball", "F", "포워드"),
+    ("basketball", "C", "센터"),
+]
+
+
+def _fake_id(sport_code: str, code: str) -> UUID:
+    """스텁 전용 id — `(종목, 약칭)` 에서 **늘 같은 값**이 나온다.
+
+    🔴 **실물 DB 의 id 가 아니다.** 여기서 만든 값을 실서버에 보내면
+    `422 UNKNOWN_POSITION` 이다. 매번 `uuid4()` 로 흔들면 계약 테스트가
+    한 요청에서 받은 id 를 다음 요청에 쓸 수 없어 고정값으로 둔다.
+    """
+    return uuid5(NAMESPACE_URL, f"supersub:stub:position:{sport_code}:{code}")
+
+
 _POSITIONS: list[PositionEntity] = [
-    PositionEntity("football", "GK", "골키퍼"),
-    PositionEntity("football", "DF", "수비수"),
-    PositionEntity("football", "MF", "미드필더"),
-    PositionEntity("football", "FW", "공격수"),
-    PositionEntity("baseball", "P", "투수"),
-    PositionEntity("baseball", "C", "포수"),
-    PositionEntity("baseball", "IF", "내야수"),
-    PositionEntity("baseball", "OF", "외야수"),
-    PositionEntity("basketball", "G", "가드"),
-    PositionEntity("basketball", "F", "포워드"),
-    PositionEntity("basketball", "C", "센터"),
+    PositionEntity(_fake_id(sport, code), sport, code, label)
+    for sport, code, label in _NAMES
 ]
 
 _SPORTS = {"football", "baseball", "basketball"}

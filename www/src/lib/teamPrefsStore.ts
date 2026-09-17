@@ -1,6 +1,7 @@
-import type { Region, TeamMatchPreference } from '@/server/backend'
+import type { TeamMatchPreference } from '@/server/backend'
 import type { MatchPrefs } from './matchPrefs'
 import { toScreenPrefs, toServerPrefs } from './matchPrefsServer'
+import { __resetRefDataCache, regions } from './refData'
 
 /**
  * **팀 경기 조건을 서버에 읽고 쓴다** (계약 3-13절, CCC 40번).
@@ -11,18 +12,9 @@ import { toScreenPrefs, toServerPrefs } from './matchPrefsServer'
  * 것처럼 보이는데 **우리 팀이 남의 후보 목록에 아예 안 떴다.**
  *
  * 🔴 **지역 목록을 한 번만 읽는다.** 이름↔id 변환에 필요한데 60곳이 잘 안
- * 바뀌는 참조 데이터라, 화면을 여는 동안 여러 번 부를 이유가 없다.
+ * 바뀌는 참조 데이터라, 화면을 여는 동안 여러 번 부를 이유가 없다 — 캐시는
+ * `refData.ts` 한 곳에 있다(내 조건 쪽과 같은 목록을 두 번 받지 않으려고).
  */
-
-let regionsCache: Region[] | null = null
-
-async function regions(): Promise<Region[]> {
-  if (regionsCache) return regionsCache
-  const res = await fetch('/api/regions')
-  if (!res.ok) throw new Error('지역 목록을 불러오지 못했습니다.')
-  regionsCache = ((await res.json().catch(() => null)) ?? []) as Region[]
-  return regionsCache
-}
 
 /**
  * 정해 둔 팀 조건. **아직 안 정했으면 `null`** 이다 — 빈 조건(다 지운 것)과
@@ -69,7 +61,7 @@ export async function saveTeamPrefs(teamId: string | null, prefs: MatchPrefs): P
   if (!res.ok) throw new Error('조건을 저장하지 못했습니다.')
 }
 
-/** 시험에서만 쓴다 — 지역 캐시를 비운다. */
+/** 시험에서만 쓴다 — 지역 캐시를 비운다. 실체는 `refData.ts` 에 있다. */
 export function __resetRegionsCache(): void {
-  regionsCache = null
+  __resetRefDataCache()
 }
