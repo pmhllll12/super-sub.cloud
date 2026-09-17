@@ -144,6 +144,23 @@ class UserPort(ABC):
         """지인 검색(`GET /users/search`) 노출 여부를 바꾼다."""
 
     @abstractmethod
+    def card_slugs(self, user_ids: list[UUID]) -> dict[UUID, str]:
+        """그 사람들의 **공개 카드 슬러그**를 한 번에 읽는다 — 없는 사람은 빠진다.
+
+        🔴 **왜 여기 있나** (미결 `paik` 39번, 백성검 요청 — 정어진 승인).
+        홈 스쿼드 판이 앉은 사람의 **진짜 카드**를 그리는데, 지인 목록과 닉네임
+        검색만 찾아갈 값이 없어 그 줄만 이름표로 남았다. 같은 판 안에서 어디서
+        앉혔느냐에 따라 카드가 뜨기도 안 뜨기도 하면 안 된다.
+
+        🔴 **내부 `user_id` 로 카드를 찾게 하지 않는다** — 밖으로 나가는 것은
+        슬러그뿐이다(카드·스쿼드가 지켜 온 원칙). 그래서 서버가 여기서 바꿔 준다.
+
+        🔴 `player_card` 는 `card` 컨텍스트의 테이블이라 **원시 쿼리로 읽는다**
+        (`has_card` 와 같은 이유 — `user` 가 `card` 를 임포트하면 경계 검사가
+        막는다).
+        """
+
+    @abstractmethod
     def search_by_nickname(
         self, *, q: str, exclude_user_id: UUID, limit: int
     ) -> list[UserEntity]:

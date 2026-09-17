@@ -34,6 +34,11 @@ type Contact = {
   nickname: string
   note: string | null
   accepted_at: string
+  /**
+   * 그 사람의 공개 카드 슬러그 — 카드를 안 만들었으면 `null`(미결 `paik` 39번).
+   * 🔴 **이것이 있어야 판에 앉혔을 때 그 사람 카드가 뜬다.** 없으면 이름표다.
+   */
+  card_public_slug: string | null
 }
 
 type ContactRequest = {
@@ -69,7 +74,11 @@ export default function SquadFriends({
   placed: Record<string, string>
   /** 닫히는 중 — 사라지는 동안에도 DOM 에 남아 있어야 애니메이션이 보인다. */
   closing: boolean
-  onChoose: (nickname: string | null) => void
+  /**
+   * 앉힐 사람을 고른다 — **슬러그도 같이 넘긴다**(2026-09-17). 이름만
+   * 넘기면 판이 그 사람의 진짜 카드를 못 그린다(빈 카드에 이름만 찍힌다).
+   */
+  onChoose: (nickname: string | null, cardSlug: string | null) => void
   onClose: () => void
 }) {
   const [query, setQuery] = useState('')
@@ -274,7 +283,12 @@ export default function SquadFriends({
                 aria-pressed={placed[c.nickname] ? undefined : placing === c.nickname}
                 // 고른 사람을 한 번 더 누르면 고르기를 푼다 — 자리를 누르기
                 // 전에 마음이 바뀌면 되돌릴 길이 있어야 한다.
-                onClick={() => onChoose(placing === c.nickname ? null : c.nickname)}
+                onClick={() =>
+                  onChoose(
+                    placing === c.nickname ? null : c.nickname,
+                    placing === c.nickname ? null : c.card_public_slug,
+                  )
+                }
               >
                 <span className="ss-friends-text">
                   <span className="ss-friends-name">{c.nickname}</span>

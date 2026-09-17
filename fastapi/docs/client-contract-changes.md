@@ -2487,6 +2487,49 @@ grep -n '"notes"' fastapi/docs/api-contract.md
 상세: `fastapi/docs/api-contract.md`(3-6절 `GET /cards/{slug}/grade` ·
 3-14절 `GET /teams/{id}/squad/candidates`)
 
+## 57. 지인 목록·닉네임 검색에 **카드 슬러그**가 실립니다 (2026-09-17 추가, 미결 `paik` 39번)
+
+홈 스쿼드 판이 앉은 사람의 **진짜 카드**를 그리는데, **지인으로 앉힌 사람만**
+찾아갈 값이 없어 이름표로 남았습니다 — 같은 판 안에서 어디서 앉혔느냐에 따라
+카드가 뜨기도 안 뜨기도 했습니다.
+
+```jsonc
+GET /me/contacts
+{ "items": [ { "contact_id": "...", "user_id": "...", "nickname": "김철수",
+               "note": null, "accepted_at": "...",
+               "card_public_slug": "kim-chulsoo-1a2b" } ] }
+
+GET /users/search?q=김
+[ { "id": "...", "nickname": "김철수", "card_public_slug": "kim-chulsoo-1a2b" } ]
+```
+
+추천 후보(`/squad/candidates`)가 이미 주던 것과 **같은 모양**입니다.
+
+### 🔴 셋 다 정상값입니다
+
+| 받는 값 | 뜻 | 화면 |
+|---|---|---|
+| 슬러그 | 카드를 만든 사람 | `GET /cards/{slug}` 로 그 카드를 그림 |
+| `null` | **카드를 아직 안 만든 사람** — 정상입니다 | 이름표만 |
+
+🔴 **칸이 빠지는 것이 아니라 `null` 입니다** — 그래야 화면이 「아직 못 받았다」와
+「카드가 없다」를 가릅니다.
+
+### 🔴 하지 말 것
+
+- **내부 `user_id` 로 카드를 찾지 마십시오** — 밖으로 나가는 것은 슬러그뿐입니다
+  (카드·스쿼드가 지켜 온 원칙). 서버가 여기서 바꿔 줍니다.
+- **카드가 없는 사람을 목록에서 빼지 마십시오** — 지인은 지인입니다.
+
+### 누가 고쳤나
+
+🔴 **백성검이 고쳤습니다**(정어진 승인, 2026-09-17). 마이그레이션은 없습니다 —
+응답 필드만 늘었고 `player_card` 는 기존 관례대로 **원시 쿼리**로 읽습니다
+(`user` 가 `card` 를 임포트하지 않도록 — `has_card` 와 같은 방식). 사람마다 따로
+읽지 않고 **한 번에** 읽습니다.
+
+- 확인: `.venv/bin/pytest -q` → 766 passed (새 시험 3)
+
 ---
 
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린

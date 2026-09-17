@@ -597,6 +597,8 @@ export default function SquadPanel({
 
 
   const [placing, setPlacing] = useState<string | null>(null)
+  /** 고른 지인의 카드 슬러그 — 앉히는 순간 그 자리로 옮겨 간다(미결 `paik` 39번). */
+  const [placingSlug, setPlacingSlug] = useState<string | null>(null)
   // 지인 찾기 판이 DOM 에 있는가 — 닫힐 때 물러나는 동안 남아 있어야 한다.
   const [friendVisible, setFriendVisible] = useState(false)
   /**
@@ -850,6 +852,9 @@ export default function SquadPanel({
     }
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPlacing(null)
+    // 고른 사람의 슬러그도 같이 놓는다 — 판이 닫혔는데 남아 있으면 다음에
+    // 앉히는 사람에게 **앞 사람 카드**가 붙는다.
+    setPlacingSlug(null)
     friendTimer.current = window.setTimeout(() => setFriendVisible(false), SUGGEST_EXIT_MS)
     return () => clearTimeout(friendTimer.current)
   }, [scouting])
@@ -1289,23 +1294,20 @@ export default function SquadPanel({
                   onClick={() => {
                     if (placing) {
                       setMates((prev) => ({ ...prev, [slot.area]: placing }))
-                      /* 🔴 지인 판은 슬러그를 모른다 — **비운다.** 안 비우면
-                         **앞 사람 카드가 그대로 남아** 새 이름 위에 남의 카드가
-                         그려진다(대표 영상에서 한 번 데인 그 모양이다).
+                      /* 🔴 **고른 사람의 슬러그를 그 자리로 옮긴다**(미결
+                         `paik` 39번, 2026-09-17 — 사용자 요청 「저기서 선택하면
+                         스쿼드판에 그 사람 카드는 당연히 똑같이 떠야지」).
+                         지인 목록이 슬러그를 안 줘서 이름표만 뜨던 자리였고,
+                         같은 날 백엔드에 그 칸을 더했다(정어진 승인).
 
-                         🔴 **여기도 카드가 떠야 한다**(사용자 요청,
-                         2026-09-17 — 「저기서 선택하면 스쿼드판에 그 사람
-                         카드는 당연히 똑같이 떠야지」). 다만 지인 목록 응답
-                         (`GET /me/contacts`)에 `card_public_slug` 가 **없어서**
-                         지금은 찾아갈 값이 없다 — 미결 `paik` 39번으로 올렸다.
-
-                         🔴 **그 칸이 오면 여기 한 줄만 바꾸면 된다** — 그리는
-                         쪽(`mateCards`)은 이미 슬러그만 있으면 카드를 받아
-                         온다. 카드를 안 만든 사람은 `null` 이고 그때는 지금처럼
-                         이름표로 남는다(그 갈래도 이미 그린다). */
-                      setMateSlugs((prev) => ({ ...prev, [slot.area]: null }))
+                         🔴 **없으면 `null` 로 덮는다.** 안 덮으면 **앞 사람
+                         카드가 그대로 남아** 새 이름 위에 남의 카드가 그려진다
+                         (대표 영상에서 한 번 데인 그 모양이다). 카드를 안 만든
+                         사람은 그대로 이름표다 — 정상 갈래다. */
+                      setMateSlugs((prev) => ({ ...prev, [slot.area]: placingSlug }))
                       // 판은 열어 둔다 — 여러 명을 이어서 넣는 게 보통이다.
                       setPlacing(null)
+                      setPlacingSlug(null)
                       return
                     }
                     clearTimeout(timer.current)
@@ -1383,7 +1385,10 @@ export default function SquadPanel({
           placing={placing}
           placed={placed}
           closing={!scouting}
-          onChoose={setPlacing}
+          onChoose={(nickname, cardSlug) => {
+            setPlacing(nickname)
+            setPlacingSlug(cardSlug)
+          }}
           onClose={() => onCloseScouting?.()}
         />
       )}

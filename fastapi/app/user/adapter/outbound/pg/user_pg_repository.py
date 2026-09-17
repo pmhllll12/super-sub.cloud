@@ -373,6 +373,16 @@ class UserPgRepository(UserPort):
         stmt = select(card_table.c.user_id).where(card_table.c.user_id == user_id)
         return self._session.execute(stmt).first() is not None
 
+    def card_slugs(self, user_ids: list[UUID]) -> dict[UUID, str]:
+        """`has_card` 와 같은 이유로 원시 쿼리다 — 카드를 안 만든 사람은 빠진다."""
+        if not user_ids:
+            return {}
+        card_table = table("player_card", column("user_id"), column("public_slug"))
+        stmt = select(card_table.c.user_id, card_table.c.public_slug).where(
+            card_table.c.user_id.in_(user_ids)
+        )
+        return {row.user_id: row.public_slug for row in self._session.execute(stmt)}
+
     def update_searchable(self, user_id: UUID, is_nickname_searchable: bool) -> None:
         stmt = (
             update(UserOrm)
@@ -514,6 +524,12 @@ class UserPgRepository(UserPort):
             for contact, nickname in as_target
         ]
         summaries.sort(key=lambda s: s.accepted_at, reverse=True)
+        # 🔴 **카드 슬러그를 한 번에 채운다**(미결 `paik` 39번). 한 줄씩 따로
+        #    읽으면 지인 수만큼 쿼리가 나간다. 카드를 안 만든 사람은 `None` 이고
+        #    그때 화면은 이름표로 남는다 — 정상 갈래다.
+        slugs = self.card_slugs([s.user_id for s in summaries])
+        for s in summaries:
+            s.card_public_slug = slugs.get(s.user_id)
         return summaries
 
     def list_incoming_contact_requests(

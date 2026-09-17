@@ -387,6 +387,73 @@ describe('스쿼드 — 팀장은 FW 에 먼저 앉는다', () => {
     expect(document.querySelectorAll('.ss-pcard-alias').length).toBeGreaterThan(0)
   })
 
+  /**
+   * 🔴 **지인으로 앉혀도 카드가 뜬다** (미결 `paik` 39번, 2026-09-17 — 사용자
+   * 요청 「저기서 선택하면 스쿼드판에 그 사람 카드는 당연히 똑같이 떠야지」).
+   *
+   * 지인 목록이 슬러그를 안 줘서 그 줄만 이름표로 남았었다 — 같은 날 백엔드에
+   * `card_public_slug` 를 더했고(정어진 승인), 화면은 그 값을 자리로 옮긴다.
+   * **수락 전이어도 카드는 바로 보인다** — 수락 여부는 위의 「수락 대기중」이
+   * 말한다.
+   */
+  it('지인으로 앉힌 사람도 슬러그가 있으면 카드를 그린다', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        const u = String(url)
+        if (u.startsWith('/api/cards/')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              public_slug: 'friend-1',
+              og_image_key: 'k.png',
+              user: { id: 'u7', nickname: '이영희' },
+              titles: [],
+              tagline: '왼발잡이',
+              style: null,
+            }),
+          })
+        }
+        if (u.includes('/me/contacts')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              items: [
+                {
+                  contact_id: 'ct1',
+                  user_id: 'u7',
+                  nickname: '이영희',
+                  note: null,
+                  accepted_at: '2026-09-15T09:30:00Z',
+                  card_public_slug: 'friend-1',
+                },
+              ],
+            }),
+          })
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => SQUAD })
+      }),
+    )
+
+    render(
+      <SquadPanel
+        card={CARD}
+        myCardId={CARD.id}
+        scouting
+        onCloseScouting={() => {}}
+      />,
+    )
+
+    await user.click(await screen.findByRole('button', { name: /이영희/ }))
+    /* 빈 자리는 여럿이라 **하나를 집는다** — 어느 자리든 뜻은 같다. */
+    await user.click(screen.getAllByRole('button', { name: /자리에 이영희 넣기/ })[0])
+
+    expect(await screen.findByText('왼발잡이')).toBeInTheDocument()
+  })
+
   /* 🔴 **못 알아보는 응답이면 이름표로 남는다** — 엉뚱한 것을 카드 자리에
      넣으면 판이 통째로 안 그려진다. 못 그리는 것보다 이름이라도 남는 쪽이다. */
   it('카드를 못 읽으면 이름표로 남는다', async () => {
