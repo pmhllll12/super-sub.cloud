@@ -21,6 +21,16 @@ class TeamEntity:
     name: str
     region: str
     sport_code: str
+    # 해체 시각(`paik` 35번). `None` 이면 살아 있는 팀이다.
+    #
+    # 🔴 행을 지우지 않는다 — 지난 경기·평가가 이 팀 이름을 가리킨다
+    # (`team_member.left_at` 과 같은 판단, 부록 D.6). 해체된 팀은 **새로
+    # 만드는 자리만** 막고 읽기·이력은 그대로다(`sport.active` 와 같다).
+    disbanded_at: datetime | None = None
+
+    @property
+    def is_disbanded(self) -> bool:
+        return self.disbanded_at is not None
 
 
 @dataclass(frozen=True)

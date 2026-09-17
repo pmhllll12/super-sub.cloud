@@ -41,11 +41,31 @@ def can_remove_member(
     return actor_role is TeamRole.OWNER
 
 
+def can_disband_team(actor_role: TeamRole | None) -> bool:
+    """팀을 해체할 수 있는가. **`owner` 만** (`paik` 35번).
+
+    `can_edit_team` 과 같은 이유로 「본인」 예외가 없다 — 구성원 아무나
+    해체하면 남의 팀이 사라진다.
+    """
+    return actor_role is TeamRole.OWNER
+
+
+def can_set_member_role(actor_role: TeamRole | None) -> bool:
+    """남의 역할을 바꿀 수 있는가. **`owner` 만** (`paik` 35번).
+
+    이것이 `is_last_owner` 가 가리키던 「다른 주장을 먼저 세운다」의 실물이다.
+    그전에는 그 안내가 **가리키는 경로가 없어 실행 불가능**했다.
+    """
+    return actor_role is TeamRole.OWNER
+
+
 def is_last_owner(members: list[TeamMemberEntity], user_id: UUID) -> bool:
     """이 사람이 나가면 팀에 `owner` 가 없어지는가.
 
-    없어지면 **아무도 남을 추가할 수 없는 팀**이 된다. 소유권 이양 API 가 없는
-    지금은 되돌릴 방법이 없으므로 미리 막는다.
+    없어지면 **아무도 남을 추가할 수 없는 팀**이 된다. 되돌리는 길은 둘이다
+    (`paik` 35번, 2026-09-17): 다른 사람을 주장으로 세우거나
+    (`PATCH /teams/{id}/members/{user_id}`), 팀을 해체하거나
+    (`DELETE /teams/{id}`). 혼자인 팀은 세울 상대가 없으므로 후자다.
     """
     owners = [m for m in members if m.role is TeamRole.OWNER]
     return len(owners) == 1 and owners[0].user_id == user_id

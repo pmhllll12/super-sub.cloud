@@ -12,11 +12,13 @@ from app.user.application.dtos.team_dto import (
     CancelTeamInvitationCommand,
     CreateTeamCommand,
     CreateTeamInvitationCommand,
+    DisbandTeamCommand,
     JoinTeamCommand,
     LeaveTeamCommand,
     MyTeamInvitationResult,
     MyTeamInvitationsQuery,
     RespondTeamInvitationCommand,
+    SetMemberRoleCommand,
     TeamInvitationResult,
     TeamInvitationsQuery,
     TeamQuery,
@@ -53,6 +55,18 @@ class LeaveTeamUseCase(ABC):
     @abstractmethod
     def __call__(self, command: LeaveTeamCommand) -> None:
         """탈퇴하거나(본인) 남을 뺀다(`owner`). 행은 지우지 않는다."""
+
+
+class DisbandTeamUseCase(ABC):
+    @abstractmethod
+    def __call__(self, command: DisbandTeamCommand) -> None:
+        """팀을 해체한다 (`paik` 35번). **행은 지우지 않는다.**"""
+
+
+class SetMemberRoleUseCase(ABC):
+    @abstractmethod
+    def __call__(self, command: SetMemberRoleCommand) -> TeamResult:
+        """구성원의 역할을 바꾼다 (`paik` 35번, 주장 세우기)."""
 
 
 class CreateTeamInvitationUseCase(ABC):

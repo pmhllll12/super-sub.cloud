@@ -1268,9 +1268,59 @@ trunk_alignment       2개 루브릭  basketball_jump_shot · basketball_layup  
 | 404 | `TEAM_NOT_FOUND` · `NOT_A_MEMBER` |
 | 409 | `LAST_OWNER` — 마지막 주장은 나갈 수 없다 |
 
-🔴 **마지막 주장이 나가면 아무도 남을 넣을 수 없는 팀이 된다.** 소유권 이양 API 가
-아직 없어 되돌릴 방법이 없으므로 미리 막는다. 팀 해체도 같은 이유로 아직 없다 —
-필요해지면 이양과 함께 낸다.
+🔴 **마지막 주장이 나가면 아무도 남을 넣을 수 없는 팀이 된다.** 그래서 미리 막는데,
+**되돌리는 길이 2026-09-17 에 둘 생겼다**(`paik` 35번) — 다른 사람을 주장으로
+세우거나(`PATCH .../members/{id}`), 팀을 해체하거나(`DELETE /teams/{id}`).
+혼자인 팀은 세울 상대가 없으므로 후자다.
+
+> 🔴 **앞서 이 자리에 "소유권 이양 API 가 아직 없다 · 팀 해체도 아직 없다"고
+> 적어 두었던 것을 정정한다** — 둘 다 생겼다(아래 두 절).
+
+### `PATCH /api/v1/teams/{team_id}/members/{member_id}` (2026-09-17 추가, `paik` 35번)
+
+인증 필요. **주장만.** 구성원의 역할을 바꾼다 — 실질적으로 **주장 세우기**다.
+
+```json
+{ "role": "owner" }
+```
+
+`200 OK` — 갱신된 팀(`GET /teams/{id}` 와 같은 형태). `role` 은 `owner`·`member`
+둘뿐이고 그 밖의 값은 422 다.
+
+🔴 **기존 주장은 그대로 주장이다.** 주장은 여럿일 수 있다. 넘기고 나가려면
+세운 다음 `DELETE /teams/{team_id}/members/{내 id}` 로 나가면 된다 — 한 번에
+둘을 하면 「넘기기만」 하려는 경우를 표현할 수 없다.
+
+| 에러 | code |
+|---|---|
+| 403 | `FORBIDDEN` — 주장이 아니다 |
+| 404 | `TEAM_NOT_FOUND` · `NOT_A_MEMBER` |
+| 409 | `TEAM_DISBANDED` — 해체된 팀이다 |
+
+### `DELETE /api/v1/teams/{team_id}` — 팀 해체 (2026-09-17 추가, `paik` 35번)
+
+인증 필요. **주장만.** `204 No Content`.
+
+🔴 **행을 지우지 않는다.** `team.disbanded_at` 을 찍고 남은 구성원을 전부
+내보내고(그래서 `GET /me` 의 `teams` 에서 사라진다) 대기 중이던 초대·경기
+신청을 `cancelled` 로 닫는다. **지난 경기·평가·스쿼드는 그대로 남는다** —
+그것들이 이 팀 이름을 가리키기 때문이다(`team_member.left_at` 과 같은 판단,
+부록 D.6).
+
+해체된 팀은 **새로 만드는 자리만** 막힌다 — 가입·초대·팀 수정이 409
+`TEAM_DISBANDED` 다. **읽기는 그대로 된다**(`GET /teams/{id}` 가 200 이고
+`disbanded_at` 이 차 있으며 `members` 가 빈 배열이다). `sport.active` 와 같은
+판단이다(`ho` 39번).
+
+| 에러 | code |
+|---|---|
+| 403 | `FORBIDDEN` — 주장이 아니다 |
+| 404 | `TEAM_NOT_FOUND` |
+| 409 | `TEAM_DISBANDED` — 이미 해체됐다 |
+| 409 | `TEAM_HAS_UPCOMING_MATCH` — **앞으로 있을** 경기가 있다. 상대에게는 약속이라 먼저 정리해야 한다(지난 경기는 세지 않는다) |
+
+그래서 `GET /teams/{id}` 응답에 `disbanded_at` 이 생겼다 — 살아 있는 팀은
+`null` 이다.
 
 ### 팀 초대 — `team_invitation` (2026-09-16 추가, `min` 20번)
 

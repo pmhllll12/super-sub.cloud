@@ -39,6 +39,21 @@ _card = table("player_card", column("id"), column("user_id"), column("public_slu
 # `squad` 도 `card` 컨텍스트다 — 위와 같은 이유로 임포트하지 않는다(`paik` 37번).
 _squad = table("squad", column("team_id"), column("public_slug"))
 
+# `match` 컨텍스트의 둘. 해체가 이력을 건드리지 않는지 보려면 앞으로 있을
+# 경기를 세야 하고, 대기 중인 경기 신청은 닫아야 한다(`paik` 35번).
+_match = table(
+    "match", column("id"), column("team_id"), column("opponent_team_id"),
+    column("played_at"),
+)
+_team_match_request = table(
+    "team_match_request", column("id"), column("requester_team_id"),
+    column("target_team_id"), column("status"), column("responded_at"),
+)
+# `app.match.domain.rules.team_match_request_rules` 의 값과 같다 — 컨텍스트끼리
+# 임포트하지 않으므로 값만 복제한다(위 알림 타입들과 같은 판단).
+_MATCH_REQUEST_PENDING = "pending"
+_MATCH_REQUEST_CANCELLED = "cancelled"
+
 # `notification` 은 `notification` 컨텍스트의 테이블이다. 임포트하지 않고
 # 원시 SQL 로 쓴다 — `user_pg_repository.py`의 `_notification`과 같은 방식·이유.
 _notification = table(
@@ -84,7 +99,11 @@ class TeamPgRepository(TeamPort):
         if row is None:
             return None
         return TeamEntity(
-            id=row.id, name=row.name, region=row.region, sport_code=row.sport_code
+            id=row.id,
+            name=row.name,
+            region=row.region,
+            sport_code=row.sport_code,
+            disbanded_at=row.disbanded_at,
         )
 
     def update_team(
@@ -221,6 +240,68 @@ class TeamPgRepository(TeamPort):
                 TeamMemberOrm.left_at.is_(None),
             )
             .values(left_at=datetime.now(timezone.utc))
+        )
+        self._session.commit()
+
+    def set_member_role(self, team_id: UUID, user_id: UUID, role: str) -> None:
+        self._session.execute(
+            update(TeamMemberOrm)
+            .where(
+                TeamMemberOrm.team_id == team_id,
+                TeamMemberOrm.user_id == user_id,
+                TeamMemberOrm.left_at.is_(None),
+            )
+            .values(role=role)
+        )
+        self._session.commit()
+
+    # --- 팀 해체 (`paik` 35번) -----------------------------------------------
+
+    def has_upcoming_match(self, team_id: UUID) -> bool:
+        now = datetime.now(timezone.utc)
+        stmt = select(_match.c.id).where(
+            _match.c.played_at > now,
+            (_match.c.team_id == team_id)
+            | (_match.c.opponent_team_id == team_id),
+        )
+        return self._session.execute(stmt).first() is not None
+
+    def disband_team(self, team_id: UUID) -> None:
+        now = datetime.now(timezone.utc)
+        self._session.execute(
+            update(TeamOrm)
+            .where(TeamOrm.id == team_id, TeamOrm.disbanded_at.is_(None))
+            .values(disbanded_at=now)
+        )
+        # 남은 구성원을 전부 내보낸다 — `GET /me` 의 `teams` 가 `left_at` 으로
+        # 거르므로, 이걸 빼면 해체한 팀이 모두의 목록에 그대로 남는다.
+        self._session.execute(
+            update(TeamMemberOrm)
+            .where(
+                TeamMemberOrm.team_id == team_id,
+                TeamMemberOrm.left_at.is_(None),
+            )
+            .values(left_at=now)
+        )
+        # 대기 중이던 초대를 닫는다 — 안 닫으면 해체된 팀의 초대가 남의
+        # 초대함에 남고, 수락하면 죽은 팀에 들어가게 된다.
+        self._session.execute(
+            update(TeamInvitationOrm)
+            .where(
+                TeamInvitationOrm.team_id == team_id,
+                TeamInvitationOrm.status == PENDING,
+            )
+            .values(status=CANCELLED, responded_at=now)
+        )
+        # 경기 신청도 같다(보낸 것·받은 것 둘 다). `match` 컨텍스트라 원시 SQL.
+        self._session.execute(
+            _team_match_request.update()
+            .where(
+                _team_match_request.c.status == _MATCH_REQUEST_PENDING,
+                (_team_match_request.c.requester_team_id == team_id)
+                | (_team_match_request.c.target_team_id == team_id),
+            )
+            .values(status=_MATCH_REQUEST_CANCELLED, responded_at=now)
         )
         self._session.commit()
 

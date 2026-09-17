@@ -24,6 +24,7 @@ def to_team_result(
         name=team.name,
         region=team.region,
         sport_code=team.sport_code,
+        disbanded_at=team.disbanded_at,
         members=[
             TeamMemberResult(
                 user_id=m.user_id,

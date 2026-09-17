@@ -71,6 +71,27 @@ class TeamResult:
     region: str
     sport_code: str
     members: list[TeamMemberResult] = field(default_factory=list)
+    # 해체 시각(`paik` 35번). `None` 이면 살아 있는 팀이다. 지난 경기가
+    # 가리키는 팀도 읽히므로 **화면이 이 칸으로 가른다.**
+    disbanded_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class DisbandTeamCommand:
+    """팀 해체 (`paik` 35번). 주장만."""
+
+    actor_id: UUID
+    team_id: UUID
+
+
+@dataclass(frozen=True)
+class SetMemberRoleCommand:
+    """구성원의 역할을 바꾼다 (`paik` 35번, 주장 세우기). 주장만."""
+
+    actor_id: UUID
+    team_id: UUID
+    user_id: UUID
+    role: str
 
 
 @dataclass(frozen=True)

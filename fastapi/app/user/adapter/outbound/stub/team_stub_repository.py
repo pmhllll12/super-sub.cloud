@@ -36,6 +36,8 @@ _INVITATIONS: dict[UUID, TeamInvitationEntity] = {}
 # team_id -> 스쿼드 공개 슬러그. 스텁에는 `squad` 테이블이 없다 —
 # **없는 팀이 있다**는 것이 요점이라(`_CARDS` 와 같은 이유) 딕셔너리로 흉내 낸다.
 _SQUAD_SLUGS: dict[UUID, str] = {}
+# 앞으로 있을 경기가 있는 팀(`paik` 35번). 스텁에는 `match` 테이블이 없다.
+_UPCOMING_MATCHES: set[UUID] = set()
 # 포지션 목록은 마이그레이션(`20260902_match_tables`)이 넣는 값과 같다.
 _POSITIONS = {
     "football": {"GK": "골키퍼", "DF": "수비수", "MF": "미드필더", "FW": "공격수"},
@@ -55,6 +57,7 @@ def reset_teams() -> None:
     _INVITATIONS.clear()
     _SQUAD_SLUGS.clear()
     _POSITION_IDS.clear()
+    _UPCOMING_MATCHES.clear()
 
 
 def register_card(user_id: UUID, card_id: UUID, public_slug: str) -> None:
@@ -74,6 +77,11 @@ def register_squad(team_id: UUID, public_slug: str) -> None:
     스쿼드를 아직 안 만든 팀이 그렇다.
     """
     _SQUAD_SLUGS[team_id] = public_slug
+
+
+def register_upcoming_match(team_id: UUID) -> None:
+    """"이 팀은 앞으로 있을 경기가 있다"를 검사가 알려 준다(`paik` 35번)."""
+    _UPCOMING_MATCHES.add(team_id)
 
 
 def register_user(user_id: UUID) -> None:
@@ -126,6 +134,32 @@ class StubTeamRepository(TeamPort):
         _MEMBERS[team_id] = [
             m for m in _MEMBERS.get(team_id, []) if m.user_id != user_id
         ]
+
+    def set_member_role(self, team_id: UUID, user_id: UUID, role: str) -> None:
+        _MEMBERS[team_id] = [
+            replace(m, role=TeamRole(role)) if m.user_id == user_id else m
+            for m in _MEMBERS.get(team_id, [])
+        ]
+
+    # --- 팀 해체 (`paik` 35번). `match` 쪽 정리는 흉내 내지 않는다 —
+    #     실제 DB 검사가 본다(알림 생성과 같은 판단). ------------------------
+
+    def has_upcoming_match(self, team_id: UUID) -> bool:
+        """스텁에는 `match` 가 없다. 검사가 `register_upcoming_match` 로 알려 준다."""
+        return team_id in _UPCOMING_MATCHES
+
+    def disband_team(self, team_id: UUID) -> None:
+        team = _TEAMS.get(team_id)
+        if team is not None:
+            _TEAMS[team_id] = replace(team, disbanded_at=datetime.now(timezone.utc))
+        _MEMBERS[team_id] = []
+        for key, invitation in list(_INVITATIONS.items()):
+            if invitation.team_id == team_id and invitation.status == PENDING:
+                _INVITATIONS[key] = replace(
+                    invitation,
+                    status="cancelled",
+                    responded_at=datetime.now(timezone.utc),
+                )
 
     # --- 팀 초대 (`min` 20번). 알림 생성은 흉내 내지 않는다 — 실제 DB 검사가
     #     본다(`test_team_match_request_db.py`와 같은 판단). --------------------

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -79,6 +80,23 @@ class TeamResponse(BaseModel):
     region: str
     sport_code: str
     members: list[TeamMemberResponse]
+    # 해체된 팀이면 시각이 찬다(`paik` 35번). 🔴 **`null` 이 정상이다** —
+    # 해체는 드문 일이고, 값이 있으면 구성원이 비어 있는 것도 정상이다.
+    disbanded_at: Rfc3339 | None = None
+
+
+class SetMemberRoleSchema(BaseModel):
+    """구성원의 역할을 바꾼다 (`paik` 35번). 실질적으로 **주장 세우기**다.
+
+    `LAST_OWNER` 안내가 가리키는 「다른 주장을 먼저 세운다」의 실물이다 —
+    그전에는 세울 경로가 없어 안내가 실행 불가능했다.
+
+    🔴 **기존 주장은 그대로 주장이다.** 넘기고 나가려면 세운 다음
+    `DELETE /teams/{id}/members/{내 id}` 로 나가면 된다 — 한 번에 둘을 하면
+    「넘기기만」 하려는 경우를 표현할 수 없다.
+    """
+
+    role: Literal["owner", "member"]
 
 
 class CreateTeamInvitationSchema(BaseModel):
