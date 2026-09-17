@@ -41,7 +41,9 @@ from datetime import datetime
 from pathlib import Path
 from uuid import UUID
 
-ROOT = Path(__file__).resolve().parent.parent if "__file__" in globals() else Path.cwd()
+# 🔴 Python 3.14 는 표준입력 실행에도 `__file__ = "<stdin>"` 을 채운다 — 확장자·실재로 가른다.
+_here = Path(globals().get("__file__", ""))
+ROOT = _here.resolve().parent.parent if _here.suffix == ".py" and _here.is_file() else Path.cwd()
 sys.path.insert(0, str(ROOT))
 
 from sqlalchemy import and_, select  # noqa: E402
