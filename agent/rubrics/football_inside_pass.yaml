@@ -291,7 +291,8 @@ criteria:
       - measured: {swing_hip_flexion_after_impact_deg: 1.5, follow_through_duration_frames: 1}
         grade: 0
         evidence: "추가 굴곡 1.5도로 임팩트 직후 스윙이 끊겼다"
-      - measured: {swing_hip_flexion_after_impact_deg: 5.0}
+      - measured: {swing_hip_flexion_after_impact_deg: 5.0,
+                   follow_through_duration_frames: 2}
         grade: 1
         evidence: "굴곡 5도로 찬 뒤 다리가 조금밖에 안 나갔다"
 

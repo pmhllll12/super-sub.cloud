@@ -953,3 +953,22 @@ def test_the_other_grades_keep_all_their_anchors():
     # 1등급은 양방향인데 판정 등급이 아니므로 둘 다 남아야 한다.
     assert "거의 수직" in prompt
     assert "조금 깊이 숙였다" in prompt
+
+
+def test_an_anchor_lists_every_metric_the_criterion_measures():
+    """🔴 앵커가 `measured_by` 를 **다 적어야** 한다 (미결 23번 A).
+
+    평가는 밴드 지표가 아닌 값을 **그 등급 앵커에서** 가져와 채운다. 앵커가
+    빠뜨리면 채울 값의 출처가 없고, 예전에는 그 자리를 **상수 10.0** 이
+    메웠다 — 그 상수가 문장을 끌고 갔다(`RESULTS_second_metric.md`).
+
+    프롬프트 쪽 이유도 있다: 앵커는 「이 값들에 이렇게 쓴다」는 본보기인데
+    한 앵커만 지표를 덜 보여 주면 **본보기가 서로 다른 것을 보여 준다.**
+    """
+    for key, rubric in _football_rubrics().items():
+        for c in rubric.criteria:
+            for a in c.anchors:
+                missing = set(c.measured_by) - set(a["measured"])
+                assert not missing, (
+                    f"{key}/{c.id} {a['grade']}등급 앵커에 {sorted(missing)} 가 없다"
+                )

@@ -59,6 +59,42 @@ def value_in_band(criterion, grade: int, frac: float, seg: int = 0) -> float:
     return round(float(lo) + (float(hi) - float(lo)) * frac, 1)
 
 
+def filler(criterion, grade: int, band_value: float, given: dict) -> dict:
+    """밴드 지표가 **아닌** 값을 무엇으로 채울까 (미결 23번 A).
+
+    🔴 **상수 `10.0` 을 쓰던 자리다. 그것이 문장을 끌고 갔다.**
+    실측 중앙은 4프레임인데 10.0 은 프롬프트 앵커(잘함 4·아쉬움 1)를 넘어
+    **「길다」로 읽혔고**, 굴곡 4.8 의 오독이 지속 1·4 에서는 안 났다
+    (`RESULTS_second_metric.md`). 계기가 만든 결함이다.
+
+    대신 **그 등급 앵커의 값**을 쓴다. 루브릭이 이미 등급마다 적어 둔 값이라
+    실측에서 왔고, 등급과 어긋나지 않으며, **결정적이다**(무작위면 재현이
+    깨지고, 중앙값 하나면 또 상수라 같은 형태의 결함이다).
+
+    앵커가 여럿이면 **가-3 과 같은 규칙** — 밴드 값이 앉은 조각의 앵커를 쓴다.
+
+    🔴 **이 표본은 이제 「두 번째 지표가 등급과 어긋날 때」를 못 잰다.**
+    그건 일부러다 — 그 질문은 `second_metric.py` 가 따로 재고, 한 표본이
+    둘을 겸하게 두는 것이 바로 지금 고치는 문제다. **계기는 중립이어야 한다.**
+    """
+    rest = [c for c in criterion.measured_by if c != criterion.band_metric]
+    if not rest:
+        return {}
+    anchors = criterion.anchors_for(grade, band_value)
+    out = {}
+    for code in rest:
+        for anchor in anchors:
+            if code in anchor["measured"]:
+                out[code] = float(anchor["measured"][code])
+                break
+        else:
+            raise SystemExit(
+                f"{criterion.id} {grade}등급 앵커에 {code} 가 없다 — "
+                "채울 값의 출처가 없다. 앵커에 적을 것 (사전 등록 3절)."
+            )
+    return out
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="evidence_football.json",
@@ -80,12 +116,13 @@ def main() -> None:
                     #    방향 오독을 반쪽만 재게 된다 (사전 등록 3절).
                     for seg in range(len(criterion.bands[grade])):
                         for frac in FRACTIONS:
-                            features = {criterion.band_metric:
-                                        value_in_band(criterion, grade, frac, seg)}
+                            band_value = value_in_band(
+                                criterion, grade, frac, seg)
+                            features = {criterion.band_metric: band_value}
                             # 밴드 지표 말고 `measured_by` 에 있는 것도 채운다 —
                             # 프롬프트가 그것들도 보여주기 때문이다.
-                            for code in criterion.measured_by:
-                                features.setdefault(code, 10.0)
+                            features.update(
+                                filler(criterion, grade, band_value, features))
                             got = criterion.grade_for(features)
                             if got != grade:
                                 continue  # 고른 값이 그 등급이 아니면 버린다
