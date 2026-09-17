@@ -260,6 +260,7 @@ export default function SquadPanel({
   sportCode = null,
   teamName = null,
   myCardId = null,
+  isCaptain = false,
   scouting = false,
   onCloseScouting,
   onOpenScouting,
@@ -301,6 +302,19 @@ export default function SquadPanel({
    * (공개 카드에 내부 id 를 안 싣는 원칙). 그래서 따로 받는다.
    */
   myCardId?: string | null
+  /**
+   * 내가 이 팀의 **팀장인가** (사용자 요청, 2026-09-17).
+   *
+   * 🔴 **판을 고치는 것은 팀장 하나다.** 서버는 처음부터 주장만 쓰게 막고
+   * 있었다(계약 3-7절 — 등재·빼기·옮기기·판 크기가 전부 `403 FORBIDDEN`).
+   * 그런데 화면이 그걸 안 보여 줘서, 팀원에게도 ⊗ 와 빈 자리 `+` 가 그대로
+   * 보이고 **팀장을 뺄 수도 있는 것처럼** 굴었다. 눌러도 서버는 거부하므로
+   * 남의 팀이 망가지지는 않았지만, **아무것도 저장되지 않는데 화면만 바뀌는**
+   * 것이 사용자가 겪은 「저장이 잘 안 된다」였다.
+   *
+   * 🔴 **기본이 `false` 다** — 안 넘기면 못 만지는 쪽으로 떨어진다.
+   */
+  isCaptain?: boolean
   /**
    * 서버가 준 스쿼드. **없을 수 있다** — 팀이 없거나(개인 계정) 팀은 있어도
    * 스쿼드를 아직 안 만든 경우다. 계약이 그 둘을 갈라 두었으므로(404
@@ -651,6 +665,16 @@ export default function SquadPanel({
    * 때뿐**이다.
    */
   const [invites, setInvites] = useState<Record<string, string>>({})
+  /**
+   * **수락이 끝난 자리** — 「수락 대기중」 딱지를 떼는 데 쓴다.
+   *
+   * 🔴 `seeded.ready` 는 **등재된 사람**의 수락 시각에서 온다. 수락은 했지만
+   * 아직 등재 전인 사람(바로 아래에서 등재해 준다)은 거기 없어서, 이것이
+   * 없으면 이미 합류한 팀원 카드에 계속 「수락 대기중」이 붙어 있는다.
+   */
+  const [acceptedSeats, setAcceptedSeats] = useState<Record<string, boolean>>({})
+  /** 자리 → 수락한 사람의 `user_id`. 그 사람을 **등재**할 때 카드 id 를 찾는 열쇠다. */
+  const acceptedRef = useRef<Record<string, string>>({})
   // 지인 찾기 판이 DOM 에 있는가 — 닫힐 때 물러나는 동안 남아 있어야 한다.
   const [friendVisible, setFriendVisible] = useState(false)
   /**
@@ -699,6 +723,9 @@ export default function SquadPanel({
    * 밀린 쪽이 어디로 갈지 정할 규칙이 또 필요하고, 바꾸는 편이 짐작대로다.
    */
   function moveTo(area: string, col: number, row: number) {
+    /* 🔴 **여기서도 막는다.** 손짓 쪽에서 이미 걸렀지만, 옮기는 길이 여럿이라
+       (끌기 · 방향키 · 앞으로 생길 길) 한 곳에서 다시 막아 두는 편이 안전하다. */
+    if (!isCaptain) return
     const me = slots.find((sl) => sl.area === area)
     if (!me || (me.col === col && me.row === row)) return
     /* 🔴 **없는 칸으로는 못 간다** — 골키퍼 줄의 양옆이 그것이다. 한 곳에서
@@ -751,7 +778,11 @@ export default function SquadPanel({
    * 이 함수는 그대로 남는다 — 자동 착석이 이것을 부른다.
    */
   function seatMe(area: string) {
-    if (mySeat || !myCardId) return
+    /* 🔴 **팀장만 스스로 앉는다**(2026-09-17). 앉는 것은 곧 등재
+       (`POST /squad/members`)이고 등재는 주장 전용이라, 팀원이 앉으면
+       403 이 나고 **판에만 섰다가 새로고침에 사라진다.** 팀원의 카드는
+       팀장이 등재해 주었을 때 서버가 준 스쿼드로 선다. */
+    if (!isCaptain || mySeat || !myCardId) return
     const next = slots.map((sl) => (sl.area === area ? { ...sl, mine: true } : sl))
     setSlots(next)
     setPicking(null)
@@ -897,30 +928,56 @@ export default function SquadPanel({
           id: string
           status: string
           position_code: string | null
+          /** 수락한 사람을 **등재**할 때 그 사람의 카드를 찾는 열쇠다. */
+          invited_user_id: string
           invited_user_nickname: string | null
           invited_user_card_slug: string | null
         }[]
-        const pending = rows.filter((r) => r.status === 'pending')
-        if (pending.length === 0 || !alive) return
+        /* 🔴 **수락한 사람도 앉힌다**(사용자 지적, 2026-09-17: "저장도 잘
+           안되고"). 전에는 `pending` 만 되살렸다 — 그래서 **상대가 수락하는
+           순간 판에서 사라졌다.** 수락은 초대의 끝이 아니라 **팀원이 됐다**는
+           뜻이라, 거절·무르기(`rejected`·`cancelled`)와 같이 묶으면 안 된다. */
+        const shown = rows.filter((r) => r.status === 'pending' || r.status === 'accepted')
+        if (shown.length === 0 || !alive) return
         setSlots((now) => {
-          const nextMates: Record<string, string | null> = {}
-          const nextSlugs: Record<string, string | null> = {}
-          const nextInvites: Record<string, string> = {}
-          for (const r of pending) {
-            if (!r.invited_user_nickname) continue
-            /* 자리를 안 정한 초대는 빈 칸 아무 데나 앉힌다 — 「우리 팀에
-               오세요」도 정상 초대라 판에서 빠뜨리지 않는다. */
-            const seat =
-              now.find((sl) => posOf(sl) === r.position_code && !nextMates[sl.area]) ??
-              now.find((sl) => !sl.mine && !nextMates[sl.area])
-            if (!seat) continue
-            nextMates[seat.area] = r.invited_user_nickname
-            nextSlugs[seat.area] = r.invited_user_card_slug
-            nextInvites[seat.area] = r.id
-          }
-          setMates((prev) => ({ ...prev, ...nextMates }))
-          setMateSlugs((prev) => ({ ...prev, ...nextSlugs }))
-          setInvites((prev) => ({ ...prev, ...nextInvites }))
+          setMates((prevMates) => {
+            const nextMates = { ...prevMates }
+            const nextSlugs: Record<string, string | null> = {}
+            const nextInvites: Record<string, string> = {}
+            const nextReady: Record<string, boolean> = {}
+            /* 🔴 **이미 앉아 있는 사람을 두 번 앉히지 않는다.** 수락한 사람은
+               등재(`squad_member`)로도 돌아올 수 있어서(아래 자동 등재), 그때
+               같은 사람이 두 칸을 차지하는 일이 생긴다. */
+            const seated = new Set(
+              Object.values(prevMates).filter((v): v is string => !!v),
+            )
+            for (const r of shown) {
+              const who = r.invited_user_nickname
+              if (!who || seated.has(who)) continue
+              const free = (sl: Slot) => !sl.mine && !nextMates[sl.area]
+              /* 자리를 안 정한 초대는 빈 칸 아무 데나 앉힌다 — 「우리 팀에
+                 오세요」도 정상 초대라 판에서 빠뜨리지 않는다. */
+              const seat =
+                now.find((sl) => posOf(sl) === r.position_code && free(sl)) ?? now.find(free)
+              if (!seat) continue
+              nextMates[seat.area] = who
+              seated.add(who)
+              nextSlugs[seat.area] = r.invited_user_card_slug
+              if (r.status === 'pending') {
+                nextInvites[seat.area] = r.id
+              } else {
+                /* 🔴 수락한 자리에는 ⊗ 로 **무를 초대가 없다** — 무르기는
+                   대기 중인 것에만 있는 일이다. 대신 「수락 대기중」 딱지를
+                   떼야 한다(아래 `acceptedSeats`). */
+                nextReady[seat.area] = true
+                acceptedRef.current[seat.area] = r.invited_user_id
+              }
+            }
+            setMateSlugs((prev) => ({ ...prev, ...nextSlugs }))
+            setInvites((prev) => ({ ...prev, ...nextInvites }))
+            setAcceptedSeats((prev) => ({ ...prev, ...nextReady }))
+            return nextMates
+          })
           return now
         })
       } catch {
@@ -931,6 +988,61 @@ export default function SquadPanel({
       alive = false
     }
   }, [myTeamId])
+
+  /**
+   * **수락한 사람을 스쿼드에 등재한다** — 이것이 있어야 배치가 **남는다**
+   * (사용자 지적, 2026-09-17: "저장도 잘 안되고").
+   *
+   * 🔴 **초대 수락은 팀 가입까지만 한다.** 서버의 수락 처리는 `team_member`
+   * 를 만들 뿐 `squad_member` 를 만들지 않는다 — 그래서 수락한 사람은
+   * 판에 앉아 있어도 **등재 id 가 없고**, 등재가 없으면 옮겨도 빼도
+   * `PATCH`/`DELETE` 를 쏠 대상이 없어 **아무것도 저장되지 않았다.**
+   *
+   * 🔴 **팀장만 한다.** 등재는 주장 전용이라(계약 3-7절) 팀원이 부르면 403 이다.
+   * 🔴 이미 등재된 사람은 서버가 `409 ALREADY_ENLISTED` 로 막는다 — 삼킨다.
+   */
+  useEffect(() => {
+    if (!isCaptain || !squad || !myTeamId) return
+    const want = Object.entries(acceptedRef.current).filter(
+      ([area]) => !members[area] && mates[area],
+    )
+    if (want.length === 0) return
+    let alive = true
+    void (async () => {
+      try {
+        const res = await fetch(`/api/teams/${encodeURIComponent(myTeamId)}`)
+        if (!res.ok || !alive) return
+        const team = (await res.json().catch(() => null)) as {
+          members?: { user_id: string; player_card_id: string | null }[]
+        } | null
+        const cardOf = new Map(
+          (team?.members ?? []).map((m) => [m.user_id, m.player_card_id]),
+        )
+        for (const [area, userId] of want) {
+          const cardId = cardOf.get(userId)
+          const sl = slots.find((x) => x.area === area)
+          // 카드를 아직 안 만든 사람은 등재할 것이 없다 — 이름표로 남는다.
+          if (!cardId || !sl || !alive) continue
+          try {
+            const next = await addSeat(squad.team_id, {
+              playerCardId: cardId,
+              positionCode: posOf(sl),
+              cell: { col: sl.col, row: sl.row },
+            })
+            const row = next.members.find((m) => m.player_card_id === cardId)
+            if (row && alive) setMembers((prev) => ({ ...prev, [area]: row.id }))
+          } catch {
+            /* 이미 등재됐거나(409) 그 사이 팀을 나갔다 — 판은 그대로 둔다. */
+          }
+        }
+      } catch {
+        /* 팀을 못 읽어도 판은 돈다 — 등재만 다음 기회로 미룬다. */
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [isCaptain, squad, myTeamId, mates, members, slots])
 
   /** 이름표를 눌러 포지션을 직접 정한다 — 한 번에 한 칸씩 돈다(자동 포함). */
   function cyclePos(area: string) {
@@ -1241,6 +1353,10 @@ export default function SquadPanel({
                 aria-checked={size === key}
                 className="ss-squad-size-btn"
                 data-on={size === key ? 'true' : undefined}
+                /* 🔴 판 크기도 **주장만** 저장된다(계약 3-7절의 `PATCH
+                   /teams/{id}/squad`). 팀원이 눌러 봐야 403 이라, 판만
+                   바뀌었다가 새로고침에 되돌아온다. */
+                disabled={!isCaptain}
                 onClick={() => changeSize(key)}
               >
                 {FORMATIONS[key].label}
@@ -1320,6 +1436,9 @@ export default function SquadPanel({
                  끈 것으로 보고, 그 경우에만 뒤따라오는 click 을 삼킨다. */
               onPointerDown={(e) => {
                 if (e.button !== 0) return
+                // 🔴 **팀장만 옮긴다.** 서버가 어차피 403 이라, 못 막으면
+                //    카드가 손 따라 움직였다가 새로고침에 제자리로 돌아온다.
+                if (!isCaptain) return
                 dragFromRef.current = { x: e.clientX, y: e.clientY }
                 draggedRef.current = false
               }}
@@ -1359,6 +1478,7 @@ export default function SquadPanel({
               /* 🔴 끌 수 없는 입력 장치의 길 — 카드에 초점을 두고 방향키로
                  옮긴다. `preventDefault` 를 해야 화면이 같이 굴러가지 않는다. */
               onKeyDown={(e) => {
+                if (!isCaptain) return
                 const step: Record<string, [number, number]> = {
                   ArrowLeft: [-1, 0],
                   ArrowRight: [1, 0],
@@ -1417,6 +1537,11 @@ export default function SquadPanel({
                       )
                     })()}
                   </div>
+                  {/* 🔴 **팀장에게만 ⊗ 를 그린다**(사용자 요청, 2026-09-17).
+                      전에는 팀원에게도 보여서 **팀장을 뺄 수 있는 것처럼**
+                      굴었다 — 눌러도 서버가 403 이라 실제로는 안 빠졌고,
+                      화면만 바뀌었다가 새로고침에 되돌아왔다. */}
+                  {isCaptain && (
                   <button
                     type="button"
                     className="ss-squad-remove material-symbols-outlined"
@@ -1430,6 +1555,7 @@ export default function SquadPanel({
                   >
                     cancel
                   </button>
+                  )}
                 </>
               ) : (
                 /* 🔴 **빈 자리만 카드 전체가 버튼이다.** 여는 일(추천 열기 ·
@@ -1445,6 +1571,11 @@ export default function SquadPanel({
                   // 고른 지인이 있으면 이 버튼은 "여기 넣기"다 — 깜빡이는
                   // 것만으로는 스크린리더에서 아무 차이가 없다.
                   data-placing={placing ? 'true' : undefined}
+                  /* 🔴 **팀원은 빈 자리를 못 연다**(사용자 요청, 2026-09-17).
+                     넣는 것도 등재(`POST /squad/members`)라 주장만 되고,
+                     초대도 주장만 보낸다 — 눌러도 아무 일이 안 일어나는
+                     단추를 두면 고장으로 읽힌다. */
+                  disabled={!isCaptain}
                   aria-label={
                     placing
                       ? `${posOf(slot)} 자리에 ${placing} 넣기`
@@ -1510,7 +1641,7 @@ export default function SquadPanel({
                   ⚠️ **아직 서버로 안 나간다.** 합류 요청 경로와 알림 타입이
                   계약에 없다(미결 `paik` 37번) — 그때까지 이 표시는 화면
                   안에서만 산다. */}
-              {name && !seeded.ready[slot.area] && (
+              {name && !seeded.ready[slot.area] && !acceptedSeats[slot.area] && (
                 <span className="ss-squad-pending" aria-live="polite">
                   수락 대기중
                 </span>

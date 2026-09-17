@@ -42,6 +42,7 @@ export default function HomeStage({
   sportCode = null,
   teamName = null,
   myCardId = null,
+  isCaptain = false,
   destinations,
   featured = [],
   defaultActive = null,
@@ -57,6 +58,13 @@ export default function HomeStage({
   teamName?: string | null
   /** 내 카드 id — 판에 나를 앉힐 때 쓴다(계약이 `player_card_id` 를 받는다). */
   myCardId?: string | null
+  /**
+   * 내가 이 팀의 **팀장인가**(`role === 'owner'`).
+   *
+   * 🔴 **기본이 `false` 다.** 안 넘기면 못 만지는 쪽으로 떨어진다 — 권한은
+   * 빠뜨렸을 때 **막히는** 편이 맞다.
+   */
+  isCaptain?: boolean
   destinations: Destination[]
   /**
    * 헤드라인 자리에 **유리 알약 버튼**으로 크게 내놓는 목적지들.
@@ -450,6 +458,7 @@ export default function HomeStage({
               squad={squad}
               sportCode={sportCode}
               teamName={teamName}
+              isCaptain={isCaptain}
               myCardId={myCardId}
               scouting={scouting}
               // 🔴 챗봇도 **판 오른쪽 그 자리**에서 나온다(사용자 요청) —
