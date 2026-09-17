@@ -560,6 +560,21 @@ export type TeamMatchRequest = {
   responded_at: string | null
   /** 수락됐을 때만 찬다 — 확정된 경기 id. */
   match_id: string | null
+  /**
+   * 두 팀의 **이름·지역** (CCC 55, 미결 `paik` 31번).
+   *
+   * 🔴 **알림 줄이 이 값을 쓴다** — 전에는 화면의 붙박이 목록에서 찾고 못
+   * 찾으면 「상대 팀」이라 적었다. 이름을 지어내지 않으려고 걷었다.
+   *
+   * 🔴 **캐시하지 않는다.** 서버가 매번 `team` 에서 읽어서, 팀 이름이 바뀌면
+   * (`PATCH /teams/{id}`) 다음 조회에 바로 반영된다.
+   *
+   * 🔴 **id 칸은 그대로다** — 이름은 표시용이고 팀을 가리키는 것은 id 다.
+   */
+  requester_team_name: string | null
+  requester_team_region: string | null
+  target_team_name: string | null
+  target_team_region: string | null
 }
 
 /**

@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { teamById } from '@/lib/teamMatch'
 
 /**
  * 알림함 — **내가 응답해야 하는 것**만 모은다 (계약 3-12·3-15절).
@@ -22,7 +21,17 @@ export type InboxMatch = {
   teamId: string
   /** 건 쪽 팀 id — 수락한 뒤 대기 화면이 이 팀을 그린다. */
   opponentTeamId: string
-  /** 상대 팀 이름. 🔴 계약이 이름을 안 줘서 못 찾을 수 있다 — 그때는 `null`. */
+  /**
+   * 상대 팀 이름·지역 — **서버가 준다**(CCC 55, 2026-09-17).
+   *
+   * 🔴 **정정**: 전에는 계약이 이름을 안 줘서 화면의 붙박이 목록에서 찾고,
+   * 못 찾으면 「상대 팀」이라고 적었다(미결 `paik` 31번). 이제 신청 응답에
+   * 두 팀의 이름·지역이 실려 온다 — 그 붙박이 폴백은 걷었다.
+   *
+   * 🔴 **캐시하지 않는다.** 서버가 매번 `team` 에서 읽으므로 팀 이름이
+   * 바뀌면(`PATCH /teams/{id}`) 다음 조회에 바로 반영된다 — 들고 있으면
+   * 그 이점이 사라진다.
+   */
   name: string | null
   region: string | null
   playedAt: string
@@ -99,18 +108,27 @@ export function useNotifyInbox() {
             status: string
             /** 수락됐을 때만 찬다 — 「무르기」가 이걸로 부른다(계약). */
             match_id: string | null
+            /* 두 팀의 이름·지역(CCC 55) — 생성·목록·수락·거절·무르기 다섯
+               경로가 같은 모양이라 파서 하나로 읽힌다. */
+            requester_team_name: string | null
+            requester_team_region: string | null
+            target_team_name: string | null
+            target_team_region: string | null
           }[]
           for (const r of rows) {
             // 받은 것 중 **아직 대기중**인 것만 응답할 거리가 있다.
             if (r.status === 'pending' && r.target_team_id === teamId) {
-              const them = teamById(r.requester_team_id)
               next.push({
                 kind: 'team-match',
                 id: r.id,
                 teamId,
                 opponentTeamId: r.requester_team_id,
-                name: them?.name ?? null,
-                region: them?.region ?? null,
+                /* 🔴 **서버가 준 이름을 그대로 쓴다**(CCC 55). 붙박이 목록에서
+                   찾아 못 찾으면 「상대 팀」이라 적던 것을 걷었다 — 이름을
+                   지어내지 않는다. 옛 응답이면 `null` 이고, 그때도 화면이
+                   이름 없이 그린다. */
+                name: r.requester_team_name ?? null,
+                region: r.requester_team_region ?? null,
                 playedAt: r.proposed_played_at,
                 place: r.proposed_place,
               })

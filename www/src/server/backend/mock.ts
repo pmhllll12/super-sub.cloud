@@ -580,6 +580,12 @@ const teamMatchRequests = new Map<string, TeamMatchRequest>([
       created_at: '2026-09-16T00:30:00Z',
       responded_at: null,
       match_id: null,
+      /* 🔴 **이름·지역은 서버가 준다**(CCC 55) — 전에는 화면이 붙박이 목록에서
+         찾았다. mock 도 같이 실어야 화면이 그 갈래를 밟는다. */
+      requester_team_name: '망원 유나이티드',
+      requester_team_region: '서울 마포구',
+      target_team_name: '번개FC',
+      target_team_region: '서울 강남구',
     },
   ],
 ])
@@ -1646,6 +1652,12 @@ export const mockBackend: Backend = {
       created_at: new Date().toISOString(),
       responded_at: null,
       match_id: null,
+      /* 건 쪽은 나다 — 내 팀 이름을 싣는다. 받는 쪽은 mock 이 그 팀을 안
+         들고 있어 `null` 이고, 그것도 **정상값**이다(옛 응답과 같은 모양). */
+      requester_team_name: me.teams.find((t) => t.team_id === teamId)?.name ?? null,
+      requester_team_region: me.teams.find((t) => t.team_id === teamId)?.region ?? null,
+      target_team_name: null,
+      target_team_region: null,
     }
     teamMatchRequests.set(made.id, made)
     /* 🔴 **알림은 상대 팀 주장에게 간다** — mock 에는 그 사람이 없으므로 아무
