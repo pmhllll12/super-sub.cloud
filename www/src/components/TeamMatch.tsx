@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { applyToTeam, findTeams, type MatchTeam } from '@/lib/teamMatch'
 import MatchPrefsForm from '@/components/MatchPrefs'
 import { loadPrefs, savePrefs, type MatchPrefs } from '@/lib/matchPrefs'
+import { useFitToViewport } from '@/lib/useFitToViewport'
 
 /**
  * **비슷한 팀 명단** — 「팀 매칭」을 누르면 판 오른쪽에 선다(사용자 요청,
@@ -63,6 +64,9 @@ export default function TeamMatch({
   onRequested: (requestId: string, team: MatchTeam) => void
 }) {
   const [state, setState] = useState<State>({ kind: 'loading' })
+  /* 🔴 화면 아래로 넘치지 않게 — 「팀원」 판과 같은 상자에 매달려 있어 같은
+     문제를 겪는다(`useFitToViewport` 머리말). */
+  const fitRef = useFitToViewport<HTMLElement>()
   /** 지금 수락을 기다리는 팀. 하나뿐이다 — 두 곳에 동시에 신청하지 않는다. */
   const [waiting, setWaiting] = useState<string | null>(null)
   /** 신청이 실제로 나간 팀 — 줄에 「수락 대기 중」이라고 적는다. */
@@ -126,6 +130,7 @@ export default function TeamMatch({
 
   return (
     <section
+      ref={fitRef}
       className="ss-tm"
       data-closing={closing ? 'true' : undefined}
       aria-label="비슷한 팀"

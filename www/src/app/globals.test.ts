@@ -77,4 +77,44 @@ describe('globals.css', () => {
     expect(commentsInsideSelectors('.a,\n/* 왜 */\n.b {\n}')).toEqual([])
     expect(commentsInsideSelectors('/* ── 절 */\n\n.a {\n  /* 값 */\n  color: red;\n}')).toEqual([])
   })
+
+  /**
+   * 🔴 **홈의 두 판은 화면 아래를 안 넘는다** (2026-09-17, 사용자 제보 —
+   * 「맥북은 안 그런데 PC 에서는 저 판에서 스크롤하면 내려간다」).
+   *
+   * 판은 스쿼드 판 상자에 매달려 있고 그 상자는 **경기장 높이라 어느 창에서나
+   * 702px 고정**이다. 헤드리스 크롬 실측(고치기 전 → 뒤):
+   *   · 맥북 14" 1512×857  화면 밖 **9px** → −16
+   *   · PC 1366×768        화면 밖 **72px** → −16
+   *   · PC 1280×720        화면 밖 **108px** → −17
+   *   · 1024×768           화면 밖 **117px** → −17
+   * 맥북만 거의 0 이라 우리 눈에는 멀쩡해 보였다.
+   *
+   * 🔴 **그리고 잘린 부분은 스크롤로 못 되찾는다** — `body` 의
+   * `overflow-x: clip` 이 세로까지 `clip` 으로 만든다(한 축이 `clip` 이면
+   * 다른 축의 `visible` 도 `clip` 이 되는 규칙). `clip` 을 모르는 브라우저에서는
+   * 반대로 페이지가 통째로 내려간다 — 증상이 갈릴 뿐 뿌리는 하나다.
+   */
+  it('홈의 두 판에 화면 높이 상한이 걸려 있다', () => {
+    for (const sel of ['\\.ss-teams', '\\.ss-tm']) {
+      const rule = CSS.match(new RegExp(`^${sel} \\{([^}]*)\\}`, 'm'))?.[1]
+      expect(rule, sel).toBeDefined()
+      // 값은 `useFitToViewport` 가 잰다 — 판의 화면 위 자리를 CSS 는 못 읽는다.
+      expect(rule, sel).toMatch(/max-height:\s*var\(--ss-fit-h/)
+    }
+  })
+
+  /**
+   * 🔴 **판 위에서 굴린 휠이 페이지로 새지 않는다.** 안쪽 목록·폼에만 걸면
+   * 그것들이 꽉 안 찼을 때 그대로 문서로 넘어간다 — 그래서 **판 자신**
+   * (`.ss-teams`, `overflow: hidden` 이라 그 자체로 스크롤 상자다)에도 건다.
+   */
+  it('판과 판 안의 구르는 영역이 스크롤을 페이지로 넘기지 않는다', () => {
+    const areas = ['\\.ss-teams', '\\.ss-teams-list', '\\.ss-tm-list', '\\.ss-prefs']
+    for (const sel of areas) {
+      const rule = CSS.match(new RegExp(`^${sel} \\{([^}]*)\\}`, 'm'))?.[1]
+      expect(rule, sel).toBeDefined()
+      expect(rule, sel).toMatch(/overscroll-behavior:\s*contain\s*;/)
+    }
+  })
 })

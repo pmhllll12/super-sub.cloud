@@ -1759,15 +1759,28 @@ body::-webkit-scrollbar {
   visibility: hidden;
 }
 
+/* 🔴 **화면 아래로 안 넘친다**(2026-09-17). 이 판은 스쿼드 판 상자에 매달려
+   있는데 그 상자는 경기장 높이라 **어느 창에서나 702px 고정**이라, 창이 낮으면
+   아래가 화면 밖으로 나간다(실측: 맥북 857은 9px, PC 1366×768은 72px,
+   1280×720은 108px). 그리고 `body` 의 `overflow-x: clip` 이 세로까지 `clip` 으로
+   만들어 **스크롤로 되찾을 수도 없다.** 값은 `useFitToViewport` 가 잰다 —
+   창 위에서의 자리를 CSS 가 읽을 방법이 없다(그 머리말에 이유가 있다).
+   넉넉한 창에서는 `none` 이라 지금까지와 똑같이 선다. */
 .ss-teams {
   position: absolute;
   inset: 0;
+  max-height: var(--ss-fit-h, none);
   z-index: 2;
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 18px 20px 20px;
   overflow: hidden;
+  /* 🔴 **판 위에서 굴린 휠은 판이 삼킨다**(2026-09-17). `overflow: hidden` 은
+     그 자체로 스크롤 상자라, 여기 `contain` 을 주면 **굴릴 것이 없을 때도**
+     문서로 안 넘어간다 — 안쪽 목록·폼에만 걸면 그것들이 꽉 안 찼을 때 새어
+     나간다. PC 에서 「판에서 스크롤하면 화면이 내려간다」던 것이 이 자리다. */
+  overscroll-behavior: contain;
   border-radius: 18px;
   border: 1px solid color-mix(in srgb, var(--ss-fg) 18%, transparent);
   background: color-mix(in srgb, var(--ss-fg) 6%, transparent);
@@ -1883,6 +1896,10 @@ body::-webkit-scrollbar {
   flex-direction: column;
   gap: 8px;
   overflow-y: auto;
+  /* 🔴 **끝까지 굴려도 페이지로 안 넘긴다**(2026-09-17). 없으면 목록 끝에서
+     휠이 문서로 흘러가 화면이 통째로 내려간다 — PC 에서 그렇게 보인다는
+     말을 들었다(`useFitToViewport` 머리말). */
+  overscroll-behavior: contain;
   min-height: 0;
   flex: 1;
 }
@@ -2293,6 +2310,10 @@ body::-webkit-scrollbar {
      어긋나면 붙어 있는 한 벌로 안 읽힌다. */
   top: 0;
   bottom: 0;
+  /* 🔴 「팀원」 판과 같은 이유로 화면 아래를 안 넘는다(`.ss-teams` 머리말).
+     ⚠️ 여기서는 `top`·`bottom` 이 둘 다 잡혀 있어 과잉 제약인데, 그때는
+     `bottom` 이 무시되고 이 상한이 이긴다 — 그래서 판이 화면 끝에서 멈춘다. */
+  max-height: var(--ss-fit-h, none);
   left: 100%;
   z-index: 3;
   display: flex;
@@ -13448,6 +13469,8 @@ body:has(.ss-venues) .ss-home-header {
   gap: 8px;
   margin-top: 10px;
   overflow-y: auto;
+  /* 🔴 끝까지 굴려도 페이지로 안 넘긴다(`.ss-teams-list` 와 같은 이유). */
+  overscroll-behavior: contain;
   min-height: 0;
   flex: 1;
 }
@@ -13909,6 +13932,8 @@ body:has(.ss-venues) .ss-home-header {
   gap: 12px;
   margin-top: 12px;
   overflow-y: auto;
+  /* 🔴 `.ss-teams-list` 와 같은 이유 — 끝에서 휠이 페이지로 새지 않는다. */
+  overscroll-behavior: contain;
   min-height: 0;
   flex: 1;
 }
