@@ -1,3 +1,4 @@
+import { REGIONS } from '@/lib/regions'
 import { BackendError } from './errors'
 import type { Backend } from './gateway'
 import type {
@@ -23,6 +24,9 @@ import type {
   PublicPlayerCard,
   PublicVideo,
   ReceivedInvitation,
+  Region,
+  TeamMatchPreference,
+  MatchCandidate,
   SignupResult,
   TeamInvitation,
   User,
@@ -515,6 +519,58 @@ const inviterSquad: Squad = {
     },
   ],
 }
+
+/**
+ * **지역 목록** (계약 3-13절). 실서버는 `region` 참조 테이블을 `lib/regions.ts`
+ * 의 60곳으로 시드했다 — 여기서도 **같은 목록**을 쓴다(두 벌로 두면 화면에서
+ * 고른 지역이 mock 에 없어 422 가 난다).
+ *
+ * ⚠️ id 는 실서버에서 UUID 다. mock 은 이름에서 만든 고정 문자열을 쓴다 —
+ * 값의 모양이 아니라 **「이름이 아니라 id 로 보낸다」는 규칙**이 여기서
+ * 확인해야 할 것이다.
+ */
+const DEMO_REGIONS: Region[] = REGIONS.map((label, i) => {
+  const [city, ...rest] = label.split(' ')
+  return { id: `rg-${String(i + 1).padStart(3, '0')}`, city, district: rest.join(' '), label }
+})
+
+/** 팀별 경기 조건 — `PUT` 이 통째로 갈아 끼운다. */
+const teamPrefs = new Map<string, TeamMatchPreference>()
+
+/**
+ * 「맞는 상대」 후보 (계약 3-13절).
+ *
+ * 🔴 **점수가 없다.** 순서는 서버가 정렬한 것이고 `reasons` 는 **사실값
+ * 문장**이다 — 화면이 겹침을 다시 계산하지 않는다(계약의 「하지 말 것」).
+ * ⚠️ `reasons` 가 빈 배열인 줄을 하나 남겨 둔다 — 소프트 근거가 0개여도
+ * 하드 필터는 통과했다는 뜻이고, 화면이 그 갈래를 실제로 밟아 봐야 한다.
+ */
+const DEMO_MATCH_CANDIDATES: MatchCandidate[] = [
+  {
+    team_id: '9a2e0000-0000-4000-8000-000000000201',
+    team_name: '망원 유나이티드',
+    region_label: '서울 마포구',
+    formation: '5:5',
+    reasons: [
+      { kind: 'time', detail: '토요일 11:00~12:00 겹침' },
+      { kind: 'region', detail: '같은 시(서울)' },
+    ],
+  },
+  {
+    team_id: '9a2e0000-0000-4000-8000-000000000202',
+    team_name: '합정 프렌즈',
+    region_label: '서울 마포구',
+    formation: '5:5',
+    reasons: [{ kind: 'time', detail: '일요일 09:00~10:30 겹침' }],
+  },
+  {
+    team_id: '9a2e0000-0000-4000-8000-000000000203',
+    team_name: '성수 웨이브',
+    region_label: '서울 성동구',
+    formation: '5:5',
+    reasons: [],
+  },
+]
 
 /** `POST /me/card` 로 생긴 카드들. 데모 계정은 위 `card` 를 그대로 쓴다. */
 const made = new Map<string, PlayerCard>()
@@ -1442,6 +1498,48 @@ export const mockBackend: Backend = {
       throw new BackendError(404, 'SQUAD_NOT_FOUND', '스쿼드를 아직 만들지 않았습니다.')
     }
     return demoSquad
+  },
+
+  /* ── 경기 조건·지역·후보 (계약 3-13절, CCC 40번) ─────────────────── */
+
+  async listRegions(token) {
+    requireUser(token)
+    return DEMO_REGIONS
+  },
+
+  async getTeamMatchPrefs(token, teamId) {
+    requireUser(token)
+    return teamPrefs.get(teamId) ?? { team_id: teamId, region_ids: [], slots: [] }
+  },
+
+  async putTeamMatchPrefs(token, teamId, { region_ids, slots }) {
+    requireCaptain(requireUser(token), teamId)
+    /* 🔴 **실서버처럼 막는다.** mock 이 너그러우면 배포에서만 터진다 —
+       1.12 회차에 같은 원인으로 세 번 겪었다. */
+    for (const id of region_ids) {
+      if (!DEMO_REGIONS.some((r) => r.id === id)) {
+        throw new BackendError(422, 'UNKNOWN_REGION', '그런 지역이 없습니다.')
+      }
+    }
+    for (const s of slots) {
+      if (s.weekday < 0 || s.weekday > 6 || s.start_time >= s.end_time) {
+        throw new BackendError(422, 'INVALID_TIME_SLOT', '시간대가 올바르지 않습니다.')
+      }
+    }
+    // 🔴 **통째로 교체**다(계약) — 부분 병합을 하지 않는다.
+    const next = { team_id: teamId, region_ids: [...region_ids], slots: [...slots] }
+    teamPrefs.set(teamId, next)
+    return next
+  },
+
+  async listMatchCandidates(token, teamId) {
+    requireUser(token)
+    /* 🔴 **조건을 등록한 팀만** 후보가 된다(계약의 하드 필터) — 우리 팀이
+       조건을 안 올리면 남의 목록에도 안 뜬다는 것이 그 규칙의 짝이다.
+       여기서는 그 규칙을 흉내만 낸다: 우리가 등록하기 전엔 빈 목록이다. */
+    const mine = teamPrefs.get(teamId)
+    if (!mine || (mine.region_ids.length === 0 && mine.slots.length === 0)) return []
+    return DEMO_MATCH_CANDIDATES
   },
 
   async getSquadBySlug(publicSlug) {

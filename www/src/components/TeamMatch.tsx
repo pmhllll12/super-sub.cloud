@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { applyToTeam, findTeams, type MatchTeam } from '@/lib/teamMatch'
 import MatchPrefsForm from '@/components/MatchPrefs'
-import { loadPrefs, savePrefs, type MatchPrefs } from '@/lib/matchPrefs'
+import { type MatchPrefs } from '@/lib/matchPrefs'
+import { loadTeamPrefs, saveTeamPrefs } from '@/lib/teamPrefsStore'
 import { useFitToViewport } from '@/lib/useFitToViewport'
 
 /**
@@ -83,13 +84,38 @@ export default function TeamMatch({
   const [prefs, setPrefs] = useState<MatchPrefs | null>(null)
   const [asking, setAsking] = useState(false)
   const [ready, setReady] = useState(false)
+  /* 🔴 **서버에서 읽는다**(CCC 40번). 전에는 `localStorage` 였고, 그래서
+     조건이 이 브라우저를 벗어나지 못했다 — 화면은 설정이 끝난 것처럼 보이는데
+     **서버에는 아무것도 안 올라가서 우리 팀이 남의 후보 목록에 안 떴다.**
+     🔴 팀 id 를 모르면 물을 데가 없다 — 그때는 조건 판부터 띄운다. */
   useEffect(() => {
-    const saved = loadPrefs('team')
-    setPrefs(saved)
-    setAsking(saved === null)
-    setReady(true)
-  }, [])
+    if (!teamId) {
+      setReady(true)
+      setAsking(true)
+      return
+    }
+    let alive = true
+    void loadTeamPrefs(teamId).then((saved) => {
+      if (!alive) return
+      setPrefs(saved)
+      setAsking(saved === null)
+      setReady(true)
+    })
+    return () => {
+      alive = false
+    }
+  }, [teamId])
 
+  /**
+   * ⚠️ **명단은 아직 `teamMatch.ts` 의 붙박이 7팀이다.** 조건은 이제 서버에
+   * 올라가지만(위 `saveTeamPrefs`), 후보 목록 교체는 **막혀 있다** —
+   * `GET /teams/{id}/match-candidates` 는 팀 후보라 **경기 시각·구장이
+   * 없는데**(`team_id`·`team_name`·`region_label`·`formation`·`reasons` 뿐)
+   * 신청(`POST match-requests`)은 `played_at`·`place` 를 **필수로** 받는다.
+   *
+   * 🔴 **구장 이름을 지어낼 수 없다.** 누가 시각·구장을 정하는지(우리가
+   * 제안하나 · 상대 공고에서 오나)를 먼저 정해야 한다 — 미결에 올렸다.
+   */
   useEffect(() => {
     if (!prefs) return
     let alive = true
@@ -180,9 +206,14 @@ export default function TeamMatch({
           kind="team"
           value={prefs}
           onDone={(next) => {
-            savePrefs('team', next)
+            /* 🔴 **여기가 「우리 팀이 남에게 보이기 시작하는」 자리다** —
+               서버가 「조건을 하나라도 등록한 팀만」 후보로 고른다(계약
+               3-13절). 실패하면 화면이 그것을 숨기지 않고 말한다. */
             setPrefs(next)
             setAsking(false)
+            void saveTeamPrefs(teamId, next).catch(() =>
+              setError('조건을 저장하지 못했습니다 — 다시 시도해 주세요.'),
+            )
           }}
           /* 처음 묻는 자리에서는 그만둘 데가 없다 — 고칠 때만 준다. */
           onCancel={prefs ? () => setAsking(false) : undefined}

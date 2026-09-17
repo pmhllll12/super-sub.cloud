@@ -710,3 +710,56 @@ export type TeamDetail = {
     card_public_slug: string | null
   }[]
 }
+
+/**
+ * **지역 한 줄** (계약 3-13절, CCC 40번).
+ *
+ * 🔴 `label` 이 화면에 그대로 보이는 글자이고(`서울 강남구`), 저장·조회에
+ * 쓰는 것은 `id` 다 — 이름으로 보내면 「강남구」·「서울 강남」이 다 다른
+ * 값이 되어 대조가 안 된다(`lib/regions.ts` 머리말이 그래서 목록을 뒀다).
+ */
+export type Region = {
+  id: string
+  city: string
+  district: string
+  label: string
+}
+
+/**
+ * 경기 조건의 시간대 한 칸 (계약 3-13절).
+ *
+ * 🔴 **`weekday` 는 0(월)~6(일)** 이다 — 화면의 `TimeSlot.day` 는
+ * `Date.getDay()` 와 같은 **0(일)~6(토)** 라 **기준이 서로 다르다.**
+ * 그냥 넘기면 하루씩 밀린다(`lib/matchPrefs.ts` 의 변환을 거친다).
+ * 🔴 시각은 `HH:MM:SS` 다 — 화면은 `HH:MM` 를 쓴다.
+ */
+export type MatchSlot = {
+  weekday: number
+  start_time: string
+  end_time: string
+}
+
+/** 팀 경기 조건 (계약 3-13절). `PUT` 은 **통째로 교체**다. */
+export type TeamMatchPreference = {
+  team_id: string
+  region_ids: string[]
+  slots: MatchSlot[]
+}
+
+/**
+ * **「맞는 상대」 후보 한 팀** (계약 3-13절, CCC 40번).
+ *
+ * 🔴 **유사도 점수가 없다.** 순서는 **서버가 이미 정렬**했고 `reasons` 가
+ * 사실값 근거다(「토요일 11:00~12:00 겹침」처럼 이미 문장이다).
+ * 🔴 **화면이 겹침을 다시 계산하지 않는다**(계약의 「하지 말 것」) — 다시
+ * 계산하면 서버와 다른 답이 나온다.
+ * ⚠️ `reasons` 가 빈 배열인 것도 정상이다 — 소프트 근거가 0개라는 뜻이고,
+ * 하드 필터는 통과했으므로 목록에는 남는다.
+ */
+export type MatchCandidate = {
+  team_id: string
+  team_name: string
+  region_label: string
+  formation: string
+  reasons: { kind: string; detail: string }[]
+}

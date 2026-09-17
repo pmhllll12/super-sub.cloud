@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { PREFS_KEY, type MatchPrefs } from '@/lib/matchPrefs'
+import { __resetRegionsCache } from '@/lib/teamPrefsStore'
 import TeamMatch from './TeamMatch'
 
 /**
@@ -18,6 +19,9 @@ const PREFS: MatchPrefs = {
 }
 
 describe('비슷한 팀 명단', () => {
+  /* 🔴 대역이 이 값을 읽으므로 **쓰는 곳보다 위**에 둔다(모듈 상수 TDZ). */
+  const MY_TEAM = 'team-mine'
+
   beforeEach(() => {
     localStorage.clear()
     localStorage.setItem(PREFS_KEY, JSON.stringify({ team: PREFS }))
@@ -34,6 +38,33 @@ describe('비슷한 팀 명단', () => {
           url: String(input),
           body: typeof init?.body === 'string' ? init.body : null,
         })
+        const u = String(input)
+        /* 🔴 **조건은 이제 서버에서 온다**(CCC 40번) — 전에는 `localStorage`
+           였다. 그 둘을 대역하지 않으면 조건이 `null` 로 읽혀서 판이 명단
+           대신 **조건 판부터 띄운다**(실제로 12건이 그렇게 깨졌다). */
+        if (u.endsWith('/api/regions')) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify([
+                { id: 'rg-001', city: '서울', district: '강남구', label: '서울 강남구' },
+              ]),
+              { status: 200 },
+            ),
+          )
+        }
+        if (u.includes('/match-preferences')) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                team_id: MY_TEAM,
+                region_ids: ['rg-001'],
+                // 토요일 = 계약 5(0=월). 화면의 day 6 과 같은 날이다.
+                slots: [{ weekday: 5, start_time: '09:00:00', end_time: '11:00:00' }],
+              }),
+              { status: 200 },
+            ),
+          )
+        }
         return Promise.resolve(
           new Response(JSON.stringify({ id: 'tmr9', status: 'pending' }), { status: 201 }),
         )
@@ -43,9 +74,10 @@ describe('비슷한 팀 명단', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+    /* 🔴 지역 목록은 한 번만 읽고 캐시한다 — 시험 사이에 비워야 다음
+       시험의 대역이 실제로 불린다. */
+    __resetRegionsCache()
   })
-
-  const MY_TEAM = 'team-mine'
 
   const open = (onRequested = vi.fn()) => {
     render(
@@ -128,9 +160,22 @@ describe('비슷한 팀 명단', () => {
     expect(names).toHaveLength(3)
   })
 
-  /* 🔴 조건을 아직 안 정했으면 **명단 대신 묻는다**(사용자 결정). */
+  /**
+   * 🔴 조건을 아직 안 정했으면 **명단 대신 묻는다**(사용자 결정).
+   *
+   * 🔴 **서버는 조건이 없을 때도 빈 목록을 담은 200 을 준다**(404 가 아니다) —
+   * 그래서 「지역도 시간도 0개」를 곧 「안 정했다」로 읽는다. 전에는
+   * `localStorage.clear()` 로 만들던 상태다.
+   */
   it('조건이 없으면 먼저 묻는다', async () => {
-    localStorage.clear()
+    __resetRegionsCache()
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => {
+      const u = String(input)
+      const body = u.endsWith('/api/regions')
+        ? []
+        : { team_id: MY_TEAM, region_ids: [], slots: [] }
+      return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }))
+    })
     open()
     expect(await screen.findByText('어떤 경기를 찾으세요?')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '경기 신청' })).toBeNull()

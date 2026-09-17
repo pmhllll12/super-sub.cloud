@@ -27,6 +27,9 @@ import type {
   SignupResult,
   TeamInvitation,
   ReceivedInvitation,
+  Region,
+  TeamMatchPreference,
+  MatchCandidate,
   User,
 } from './types'
 
@@ -200,6 +203,31 @@ export const fastapiBackend: Backend = {
       method: 'GET',
       token,
     })
+  },
+
+  listRegions(token) {
+    return callFastApi<Region[]>('/regions', { method: 'GET', token })
+  },
+
+  getTeamMatchPrefs(token, teamId) {
+    return callFastApi<TeamMatchPreference>(
+      `/teams/${encodeURIComponent(teamId)}/match-preferences`,
+      { method: 'GET', token },
+    )
+  },
+
+  putTeamMatchPrefs(token, teamId, input) {
+    return callFastApi<TeamMatchPreference>(
+      `/teams/${encodeURIComponent(teamId)}/match-preferences`,
+      { method: 'PUT', token, body: input },
+    )
+  },
+
+  listMatchCandidates(token, teamId) {
+    return callFastApi<MatchCandidate[]>(
+      `/teams/${encodeURIComponent(teamId)}/match-candidates`,
+      { method: 'GET', token },
+    )
   },
 
   getSquadBySlug(publicSlug) {

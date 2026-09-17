@@ -28,6 +28,10 @@ import type {
   SignupResult,
   TeamInvitation,
   ReceivedInvitation,
+  Region,
+  MatchSlot,
+  TeamMatchPreference,
+  MatchCandidate,
   User,
 } from './types'
 
@@ -407,6 +411,36 @@ export interface Backend {
    * 결과다(계약의 「하지 말 것」).
    */
   rejectInvitation(token: string, invitationId: string): Promise<TeamInvitation>
+
+  /* ── 경기 조건·지역·후보 (계약 3-13절, CCC 40번) ──────────────────── */
+
+  /**
+   * 지역 목록 — 조건 판의 「어느 동네에서」 후보.
+   *
+   * 🔴 **화면이 목록을 들고 있지 않는다**(`lib/regions.ts` 의 붙박이 60곳을
+   * 걷어낸 자리다). 저장은 `id` 로 하므로 이름만으로는 아무것도 못 보낸다.
+   */
+  listRegions(token: string): Promise<Region[]>
+  /** 우리 팀 경기 조건. 소속이면 읽는다. */
+  getTeamMatchPrefs(token: string, teamId: string): Promise<TeamMatchPreference>
+  /**
+   * 우리 팀 경기 조건을 **통째로 교체**한다 — **팀장만**(아니면 403).
+   *
+   * 🔴 **이걸 안 보내면 우리 팀은 남의 후보 목록에 안 뜬다** — 서버가
+   * 「경기 조건을 하나라도 등록한 팀만」 후보로 고른다(계약 3-13절).
+   * 🔴 부분 수정이 아니다. 하나만 더하려도 전체를 다시 보낸다.
+   */
+  putTeamMatchPrefs(
+    token: string,
+    teamId: string,
+    input: { region_ids: string[]; slots: MatchSlot[] },
+  ): Promise<TeamMatchPreference>
+  /**
+   * 「맞는 상대」 후보 — **이미 정렬돼 있다.** 그 팀 소속만(아니면 403).
+   *
+   * 🔴 화면이 겹침을 다시 계산하지 않는다 — `reasons` 를 그대로 적는다.
+   */
+  listMatchCandidates(token: string, teamId: string): Promise<MatchCandidate[]>
 
   /** 남의 표시 등급. 로그인하면 누구나(`featured-video` 와 같은 원칙). */
   getCardGrade(token: string, cardPublicSlug: string): Promise<CardGrade>
