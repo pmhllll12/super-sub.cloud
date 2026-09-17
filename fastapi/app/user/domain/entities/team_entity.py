@@ -74,6 +74,18 @@ class TeamInvitationEntity:
     created_at: datetime
     responded_at: datetime | None = None
 
+    # 초대받은 **사람**(미결 `paik` 39번 후속, 2026-09-17 — 백성검, 정어진 승인).
+    #
+    # 🔴 **보낸 쪽 화면이 판을 되살리는 값이다.** 주장이 스쿼드 판에 앉힌 사람은
+    # 초대로 남는데, id 만으로는 새로고침 뒤에 **누구인지도 무슨 카드인지도**
+    # 그릴 수가 없었다. 받는 쪽(`MyTeamInvitationEntity`)에 팀 넉 칸을 실어 준
+    # 것과 **같은 이유·같은 방식**이다 — 줄마다 따로 부르지 않게.
+    #
+    # 🔴 카드를 안 만든 사람은 슬러그가 `None` 이다 — 정상이고, 그때 화면은
+    # 이름표로 남는다.
+    invited_user_nickname: str | None = None
+    invited_user_card_slug: str | None = None
+
     # 「부르는 자리」(`paik` 37번). 셋 다 `None` 이면 **자리를 안 정한 초대**다.
     #
     # 🔴 대리키와 약칭을 함께 싣는 이유는 `TeamMemberEntity` 의 카드 둘과 같다 —

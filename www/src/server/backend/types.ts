@@ -529,6 +529,11 @@ export type AppNotification = {
     | 'team_match_accepted'
     | 'team_match_rejected'
     | 'team_match_cancelled'
+    // 팀 초대(CCC 49·53) — 보낼 때 받는 사람에게, 답할 때 그 팀 주장에게.
+    // 🔴 **무르기는 알림이 없다** — 보낸 쪽이 스스로 하는 것이라 알릴 상대가 없다.
+    | 'team_invitation_sent'
+    | 'team_invitation_accepted'
+    | 'team_invitation_rejected'
     | 'team_match_request_cancelled'
     | (string & {})
   actor_user_id: string
@@ -575,6 +580,59 @@ export type TeamMatchRequest = {
   requester_team_region: string | null
   target_team_name: string | null
   target_team_region: string | null
+}
+
+/**
+ * **팀 초대 한 건** (계약 3-3절 「팀 초대」, CCC 49·53번).
+ *
+ * 🔴 **동의 없이 꽂지 않는다**(2026-09-10 박민호 결정). 주장이 초대를 보내고
+ * 받은 사람이 수락해야 팀원이 된다 — `POST /teams/{id}/members` 로 바로 넣는
+ * 길은 **본인이 스스로 가입할 때만** 쓴다.
+ *
+ * 🔴 **판에 앉힌 자리가 여기 남는다**(`position_code`). 그래서 새로고침해도
+ * 그 자리가 살아 있고, **사라지는 것은 상대가 거절하거나 주장이 무를 때뿐**
+ * 이다(사용자 설계, 2026-09-17).
+ */
+export type TeamInvitation = {
+  id: string
+  team_id: string
+  invited_user_id: string
+  status: 'pending' | 'accepted' | 'rejected' | 'cancelled'
+  created_at: string
+  responded_at: string | null
+  /**
+   * 부르는 자리 — 🔴 **둘 다 `null` 일 수 있다.** 자리를 안 정한 초대
+   * (「우리 팀에 오세요」)가 정상이다. 약칭과 이름을 함께 주는 이유는 구성원
+   * 카드와 같다 — 하나만 주면 화면이 나머지를 얻을 경로가 없다.
+   */
+  position_code: string | null
+  position_label: string | null
+  /**
+   * 초대받은 **사람** — 보낸 초대 목록에만 실린다(2026-09-17).
+   *
+   * 🔴 **판을 되살리는 값이다.** id 만으로는 새로고침 뒤에 누구인지도 무슨
+   * 카드인지도 그릴 수 없었다. 카드를 안 만든 사람은 슬러그가 `null` 이고,
+   * 그때는 이름표로 남는다.
+   */
+  invited_user_nickname: string | null
+  invited_user_card_slug: string | null
+}
+
+/**
+ * **내가 받은 초대** — 위에 넉 칸이 더 붙는다(CCC 53).
+ *
+ * 🔴 받는 사람은 **아직 그 팀 소속이 아니다.** 팀 id 하나로는 이름도 모르는
+ * 팀의 초대를 판단할 수가 없어서 서버가 실어 준다(감싸지 않고 덧붙였다).
+ *
+ * 🔴 **경기 시각·구장은 없다** — 초대는 경기에 묶이지 않는다. 「우리 팀에
+ * 오세요」이지 「이 경기에 와 달라」가 아니다.
+ */
+export type ReceivedInvitation = TeamInvitation & {
+  team_name: string
+  team_region: string
+  team_sport_code: string
+  /** 그 팀 판을 보여 줄 값. 스쿼드를 아직 안 만든 팀이면 `null` 이다. */
+  squad_public_slug: string | null
 }
 
 /**

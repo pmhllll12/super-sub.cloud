@@ -25,6 +25,8 @@ import type {
   PlayerCard,
   PublicPlayerCard,
   SignupResult,
+  TeamInvitation,
+  ReceivedInvitation,
   User,
 } from './types'
 
@@ -362,6 +364,51 @@ export const fastapiBackend: Backend = {
       method: 'DELETE',
       token,
     })
+  },
+
+  /* ── 팀 초대 (계약 3-3절, CCC 49·53번) ───────────────────────────── */
+
+  inviteToTeam(token, teamId, input) {
+    return callFastApi<TeamInvitation>(
+      `/teams/${encodeURIComponent(teamId)}/invitations`,
+      { method: 'POST', token, body: input },
+    )
+  },
+
+  listTeamInvitations(token, teamId) {
+    return callFastApi<TeamInvitation[]>(
+      `/teams/${encodeURIComponent(teamId)}/invitations`,
+      { method: 'GET', token },
+    )
+  },
+
+  cancelTeamInvitation(token, teamId, invitationId) {
+    // 🔴 `204` 가 아니라 무른 초대를 돌려준다 — 같은 파서를 쓴다.
+    return callFastApi<TeamInvitation>(
+      `/teams/${encodeURIComponent(teamId)}/invitations/${encodeURIComponent(invitationId)}`,
+      { method: 'DELETE', token },
+    )
+  },
+
+  listMyInvitations(token) {
+    return callFastApi<ReceivedInvitation[]>('/me/invitations', {
+      method: 'GET',
+      token,
+    })
+  },
+
+  acceptInvitation(token, invitationId) {
+    return callFastApi<TeamInvitation>(
+      `/me/invitations/${encodeURIComponent(invitationId)}/accept`,
+      { method: 'POST', token },
+    )
+  },
+
+  rejectInvitation(token, invitationId) {
+    return callFastApi<TeamInvitation>(
+      `/me/invitations/${encodeURIComponent(invitationId)}/reject`,
+      { method: 'POST', token },
+    )
   },
 
   getCardGrade(token, cardPublicSlug) {

@@ -154,7 +154,7 @@ export default function SquadSuggest({
    * 사람의 **진짜 카드를 못 그린다**(빈 카드에 이름만 찍힌다). 카드를 아직 안
    * 만든 사람은 `null` 이고, 그때는 이름표로 남는 것이 맞다.
    */
-  onPick: (name: string, cardSlug: string | null) => void
+  onPick: (name: string, cardSlug: string | null, userId: string) => void
   onClose: () => void
 }) {
   /* 🔴 **첫 값은 「상관없음」이다**(2026-09-16에 바뀜). 전에는 판에 앉은
@@ -397,7 +397,7 @@ export default function SquadSuggest({
             <button
               type="button"
               className="ss-suggest-item"
-              onClick={() => onPick(s.nickname, s.card_public_slug)}
+              onClick={() => onPick(s.nickname, s.card_public_slug, s.user_id)}
             >
               {/* 🔴 빈 선수 카드가 있던 자리다 — **그 사람의 대표 장면**으로
                   바꿨다(사용자 요청). 카드는 아직 없는 것을 그리는 표식이었고,

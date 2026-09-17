@@ -1614,3 +1614,128 @@ describe('스쿼드 — 추천 판의 등급은 서버 값이다', () => {
     expect(calls.some((u) => u.includes('/squad/candidates') && u.includes('grade='))).toBe(false)
   })
 })
+
+/**
+ * **앉힌 사람은 남는다** (계약 49·53, 사용자 설계 2026-09-17).
+ *
+ * 🔴 「일단 앉혀 두고, **그 사람이 거부하거나 팀장이 ⊗ 를 누를 때만** 사라져야
+ * 한다」가 요구였다. 그래서 앉히기를 **초대**로 잇는다 — 서버에 남으므로
+ * 새로고침해도 그 자리에 있고, 끝나는 길은 거절과 무르기 둘뿐이다.
+ */
+describe('스쿼드 — 앉히면 초대가 나간다', () => {
+  const TEAM = 'team-mine'
+
+  function server(invitations: unknown[] = []) {
+    const sent: { url: string; method: string; body: unknown }[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+        const u = String(url)
+        sent.push({
+          url: u,
+          method: init?.method ?? 'GET',
+          body: init?.body ? JSON.parse(String(init.body)) : null,
+        })
+        if (u.includes('/invitations')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => (init?.method === 'POST' ? { id: 'inv-1' } : invitations),
+          })
+        }
+        if (u.includes('/squad/candidates')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => MF_ROWS })
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => SQUAD })
+      }),
+    )
+    return sent
+  }
+
+  const MF_ROWS = [
+    {
+      user_id: 'u-jung',
+      nickname: '정상호',
+      card_public_slug: 'jung-1',
+      grade: 'A',
+      provisional: false,
+      notes: null,
+    },
+  ]
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  /* 🔴 **부르는 자리를 함께 보낸다** — 그래야 새로고침해도 어느 칸이었는지 산다. */
+  it('추천에서 고르면 그 자리로 초대가 나간다', async () => {
+    const sent = server()
+    const user = userEvent.setup()
+    render(<SquadPanel card={CARD} myCardId={CARD.id} myTeamId={TEAM} />)
+    // 5:5 판에는 MF 가 둘이다 — 어느 쪽이든 뜻은 같다.
+    await user.click((await screen.findAllByRole('button', { name: 'MF 자리에 선수 넣기' }))[0])
+    await user.click(await screen.findByRole('button', { name: /정상호/ }))
+
+    await waitFor(() => {
+      const post = sent.find((c) => c.method === 'POST' && c.url.includes('/invitations'))
+      expect(post).toBeDefined()
+      expect(post!.body).toEqual({ invited_user_id: 'u-jung', position_code: 'MF' })
+    })
+  })
+
+  /**
+   * 🔴 **새로고침해도 그 자리에 있다.** 대기 중인 초대를 판에 되살린다 —
+   * 이것이 「앉혀 두면 남는다」를 실제로 만드는 자리다.
+   */
+  it('대기 중인 초대는 판에 되살아난다', async () => {
+    server([
+      {
+        id: 'inv-1',
+        status: 'pending',
+        position_code: 'MF',
+        invited_user_nickname: '정상호',
+        invited_user_card_slug: null,
+      },
+    ])
+    render(<SquadPanel card={CARD} myCardId={CARD.id} myTeamId={TEAM} />)
+    expect(await screen.findByText('정상호')).toBeInTheDocument()
+  })
+
+  /* 🔴 끝난 초대(거절·무르기)는 안 되살린다 — 그래서 그 자리가 비워진다. */
+  it('거절·무른 초대는 판에 안 되살아난다', async () => {
+    server([
+      {
+        id: 'inv-1',
+        status: 'rejected',
+        position_code: 'MF',
+        invited_user_nickname: '정상호',
+        invited_user_card_slug: null,
+      },
+    ])
+    render(<SquadPanel card={CARD} myCardId={CARD.id} myTeamId={TEAM} />)
+    await waitFor(() => expect(screen.getByText('MY SQUAD')).toBeInTheDocument())
+    expect(screen.queryByText('정상호')).toBeNull()
+  })
+
+  /* 🔴 ⊗ 는 **서버에서도 무른다** — 안 그러면 새로고침에 되살아난다. */
+  it('⊗ 를 누르면 초대를 무른다', async () => {
+    const sent = server([
+      {
+        id: 'inv-1',
+        status: 'pending',
+        position_code: 'MF',
+        invited_user_nickname: '정상호',
+        invited_user_card_slug: null,
+      },
+    ])
+    const user = userEvent.setup()
+    render(<SquadPanel card={CARD} myCardId={CARD.id} myTeamId={TEAM} />)
+    await user.click(await screen.findByRole('button', { name: '정상호 빼기' }))
+
+    await waitFor(() =>
+      expect(
+        sent.some(
+          (c) => c.method === 'DELETE' && c.url.endsWith('/invitations/inv-1'),
+        ),
+      ).toBe(true),
+    )
+  })
+})

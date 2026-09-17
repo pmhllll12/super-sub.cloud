@@ -78,7 +78,11 @@ export default function SquadFriends({
    * 앉힐 사람을 고른다 — **슬러그도 같이 넘긴다**(2026-09-17). 이름만
    * 넘기면 판이 그 사람의 진짜 카드를 못 그린다(빈 카드에 이름만 찍힌다).
    */
-  onChoose: (nickname: string | null, cardSlug: string | null) => void
+  onChoose: (
+    nickname: string | null,
+    cardSlug: string | null,
+    userId: string | null,
+  ) => void
   onClose: () => void
 }) {
   const [query, setQuery] = useState('')
@@ -287,6 +291,7 @@ export default function SquadFriends({
                   onChoose(
                     placing === c.nickname ? null : c.nickname,
                     placing === c.nickname ? null : c.card_public_slug,
+                    placing === c.nickname ? null : c.user_id,
                   )
                 }
               >

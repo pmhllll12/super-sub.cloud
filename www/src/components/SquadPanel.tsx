@@ -21,7 +21,7 @@ import {
 import { COLS, ROWS, ROW_POS, cellExists, rowPos, type PosCode } from '@/lib/pitchGrid'
 import { fetchPositions } from '@/lib/positions'
 import { loadFeaturedOf } from '@/lib/featuredClip'
-import { apiDelete } from '@/lib/api/client'
+import { apiDelete, apiPost } from '@/lib/api/client'
 
 /**
  * 홈 첫 화면의 스쿼드 판 — 판 하나 위에 선수 카드를 **포지션 자리대로**
@@ -599,6 +599,17 @@ export default function SquadPanel({
   const [placing, setPlacing] = useState<string | null>(null)
   /** 고른 지인의 카드 슬러그 — 앉히는 순간 그 자리로 옮겨 간다(미결 `paik` 39번). */
   const [placingSlug, setPlacingSlug] = useState<string | null>(null)
+  /** 고른 지인의 `user_id` — **초대를 보내려면 이것이 있어야 한다**(계약 49). */
+  const [placingUserId, setPlacingUserId] = useState<string | null>(null)
+  /**
+   * 그 자리에 보낸 **초대 id**.
+   *
+   * 🔴 **앉힌 사람이 사라지지 않는 이유가 이것이다**(사용자 설계, 2026-09-17).
+   * 판에 앉히면 초대가 서버에 남고, 새로고침하면 `GET /teams/{id}/invitations`
+   * 로 되살아난다. **사라지는 것은 상대가 거절하거나 주장이 ⊗ 를 눌러 무를
+   * 때뿐**이다.
+   */
+  const [invites, setInvites] = useState<Record<string, string>>({})
   // 지인 찾기 판이 DOM 에 있는가 — 닫힐 때 물러나는 동안 남아 있어야 한다.
   const [friendVisible, setFriendVisible] = useState(false)
   /**
@@ -775,6 +786,111 @@ export default function SquadPanel({
     }
   }, [mateSlugs, mateCards])
 
+  /**
+   * **그 자리로 초대를 보낸다** (계약 49·53, 2026-09-17).
+   *
+   * 🔴 **동의 없이 꽂지 않는다**(2026-09-10 박민호 결정) — 그 사람이 수락해야
+   * 팀원이 된다. 그때까지 카드 위에 「수락 대기중」이 붙는다.
+   *
+   * 🔴 **부르는 자리를 함께 보낸다**(`position_code`) — 그래야 새로고침해도
+   * **어느 칸**에 앉혔는지가 살아난다.
+   *
+   * ⚠️ 팀이 아직 없으면 보낼 데가 없다 — 화면에만 앉는다(그 자리는 새로고침
+   * 하면 사라진다). 팀을 만들면 그때부터 남는다.
+   */
+  async function invite(slot: Slot, userId: string) {
+    if (!myTeamId) return
+    try {
+      const made = await apiPost<{ id: string }>(
+        `/api/teams/${encodeURIComponent(myTeamId)}/invitations`,
+        { invited_user_id: userId, position_code: posOf(slot) },
+      )
+      setInvites((prev) => ({ ...prev, [slot.area]: made.id }))
+    } catch {
+      /* 🔴 **화면에서 지우지 않는다.** 이미 앉은 것을 걷으면 사람이 방금 한
+         일이 사라진 것처럼 보인다 — 초대가 안 나갔을 뿐이라 ⊗ 로 빼면 된다.
+         (같은 사람에게 이미 보낸 초대가 있으면 `409` 다.) */
+    }
+  }
+
+  /**
+   * **보낸 초대를 무른다** — ⊗ 를 누를 때(계약 49).
+   *
+   * 🔴 사라지는 길은 **이것과 상대의 거절 둘뿐**이다(사용자 설계). 그래서
+   * 화면에서 지우기 전에 서버로 먼저 보낸다 — 실패하면 그대로 둔다.
+   */
+  async function cancelInvite(area: string) {
+    const id = invites[area]
+    if (!myTeamId || !id) return
+    try {
+      await apiDelete(
+        `/api/teams/${encodeURIComponent(myTeamId)}/invitations/${encodeURIComponent(id)}`,
+      )
+    } catch {
+      /* 이미 답이 났으면 409 다 — 그때는 아래 복원이 곧 맞춰 준다. */
+    }
+    setInvites((prev) => {
+      const next = { ...prev }
+      delete next[area]
+      return next
+    })
+  }
+
+  /**
+   * **판을 되살린다** — 보낸 초대 중 **아직 대기 중인 것**을 자리에 앉힌다.
+   *
+   * 🔴 이것이 「앉혀 두면 남는다」를 실제로 만드는 자리다(사용자 설계,
+   * 2026-09-17). 거절·무르기로 끝난 초대는 `status` 가 `pending` 이 아니라
+   * 여기서 빠지고, 그래서 **그 자리가 비워진다.**
+   */
+  useEffect(() => {
+    if (!myTeamId) return
+    let alive = true
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/teams/${encodeURIComponent(myTeamId)}/invitations`,
+        )
+        if (!res.ok || !alive) return
+        const rows = ((await res.json().catch(() => null)) ?? []) as {
+          id: string
+          status: string
+          position_code: string | null
+          invited_user_nickname: string | null
+          invited_user_card_slug: string | null
+        }[]
+        const pending = rows.filter((r) => r.status === 'pending')
+        if (pending.length === 0 || !alive) return
+        setSlots((now) => {
+          const nextMates: Record<string, string | null> = {}
+          const nextSlugs: Record<string, string | null> = {}
+          const nextInvites: Record<string, string> = {}
+          for (const r of pending) {
+            if (!r.invited_user_nickname) continue
+            /* 자리를 안 정한 초대는 빈 칸 아무 데나 앉힌다 — 「우리 팀에
+               오세요」도 정상 초대라 판에서 빠뜨리지 않는다. */
+            const seat =
+              now.find((sl) => posOf(sl) === r.position_code && !nextMates[sl.area]) ??
+              now.find((sl) => !sl.mine && !nextMates[sl.area])
+            if (!seat) continue
+            nextMates[seat.area] = r.invited_user_nickname
+            nextSlugs[seat.area] = r.invited_user_card_slug
+            nextInvites[seat.area] = r.id
+          }
+          setMates((prev) => ({ ...prev, ...nextMates }))
+          setMateSlugs((prev) => ({ ...prev, ...nextSlugs }))
+          setInvites((prev) => ({ ...prev, ...nextInvites }))
+          return now
+        })
+      } catch {
+        /* 못 읽어도 판은 그대로 돈다 — 되살리기만 못 한다. */
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [myTeamId])
+
   /** 이름표를 눌러 포지션을 직접 정한다 — 한 번에 한 칸씩 돈다(자동 포함). */
   function cyclePos(area: string) {
     const next = slots.map((sl) => {
@@ -852,6 +968,7 @@ export default function SquadPanel({
     }
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPlacing(null)
+    setPlacingUserId(null)
     // 고른 사람의 슬러그도 같이 놓는다 — 판이 닫혔는데 남아 있으면 다음에
     // 앉히는 사람에게 **앞 사람 카드**가 붙는다.
     setPlacingSlug(null)
@@ -1266,6 +1383,8 @@ export default function SquadPanel({
                     onClick={() => {
                       setMates((prev) => ({ ...prev, [slot.area]: null }))
                       setMateSlugs((prev) => ({ ...prev, [slot.area]: null }))
+                      // 🔴 **서버에서도 무른다** — 안 그러면 새로고침에 되살아난다.
+                      void cancelInvite(slot.area)
                     }}
                   >
                     cancel
@@ -1308,6 +1427,9 @@ export default function SquadPanel({
                       // 판은 열어 둔다 — 여러 명을 이어서 넣는 게 보통이다.
                       setPlacing(null)
                       setPlacingSlug(null)
+                      setPlacingUserId(null)
+                      // 🔴 **초대를 보낸다** — 이래야 새로고침해도 남는다.
+                      if (placingUserId) void invite(slot, placingUserId)
                       return
                     }
                     clearTimeout(timer.current)
@@ -1385,9 +1507,10 @@ export default function SquadPanel({
           placing={placing}
           placed={placed}
           closing={!scouting}
-          onChoose={(nickname, cardSlug) => {
+          onChoose={(nickname, cardSlug, userId) => {
             setPlacing(nickname)
             setPlacingSlug(cardSlug)
+            setPlacingUserId(userId)
           }}
           onClose={() => onCloseScouting?.()}
         />
@@ -1510,10 +1633,13 @@ export default function SquadPanel({
           teamId={myTeamId}
           closing={picking === null}
           onClose={close}
-          onPick={(name, cardSlug) => {
+          onPick={(name, cardSlug, userId) => {
             setMates((prev) => ({ ...prev, [shown.area]: name }))
             // 🔴 슬러그를 같이 남긴다 — 이것이 있어야 그 사람 카드가 그려진다.
             setMateSlugs((prev) => ({ ...prev, [shown.area]: cardSlug }))
+            // 🔴 **초대를 보낸다**(계약 49) — 동의 없이 꽂지 않는다. 그 사람이
+            //    수락해야 팀원이 되고, 그때까지 카드 위에 「수락 대기중」이 붙는다.
+            void invite(shown, userId)
             close()
           }}
         />

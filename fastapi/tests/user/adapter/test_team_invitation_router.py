@@ -349,3 +349,24 @@ class TestCancelInvitation:
             headers=owner["headers"],
         )
         assert res.status_code == 409
+
+
+class TestSentInvitationCarriesUser:
+    """보낸 초대에 **초대받은 사람**이 실린다 (2026-09-17, 백성검 · 정어진 승인).
+
+    🔴 **보낸 쪽 화면이 판을 되살리는 값이다.** 주장이 스쿼드 판에 앉힌 사람은
+    초대로 남는데, id 만으로는 새로고침 뒤에 **누구인지도 무슨 카드인지도**
+    그릴 수가 없었다 — 받는 쪽(`GET /me/invitations`)에 팀 넉 칸을 실어 준 것과
+    같은 이유다.
+    """
+
+    def test_칸_자체는_늘_있다(self, client, owner, candidate, team):
+        _invite(client, team["id"], owner["headers"], candidate["id"], "FW")
+        res = client.get(f"{V1}/teams/{team['id']}/invitations", headers=owner["headers"])
+        assert res.status_code == 200, res.text
+        rows = res.json()
+        assert rows, "방금 보낸 초대가 한 건은 있어야 이 시험이 뜻이 있다"
+        for row in rows:
+            # 카드를 안 만든 사람은 `null` 이다 — **빠지는 것이 아니라 null**.
+            assert "invited_user_nickname" in row
+            assert "invited_user_card_slug" in row

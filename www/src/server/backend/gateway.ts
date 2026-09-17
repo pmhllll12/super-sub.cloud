@@ -26,6 +26,8 @@ import type {
   SearchMercenaryCandidatesInput,
   Squad,
   SignupResult,
+  TeamInvitation,
+  ReceivedInvitation,
   User,
 } from './types'
 
@@ -357,6 +359,46 @@ export interface Backend {
    * 지원이 몇인지는 서버만 안다(마지막 주장 나가기와 같은 원칙).
    */
   cancelMatch(token: string, matchId: string): Promise<void>
+
+  /* ── 팀 초대 (계약 3-3절 「팀 초대」, CCC 49·53번) ──────────────────
+   *
+   * 🔴 **동의 없이 꽂지 않는다**(2026-09-10 박민호 결정) — 주장이 부르고
+   * 받은 사람이 수락해야 팀원이 된다.
+   */
+
+  /** 초대를 보낸다 — **주장만**. `positionCode` 는 선택(안 정한 초대도 정상). */
+  inviteToTeam(
+    token: string,
+    teamId: string,
+    input: { invited_user_id: string; position_code?: string },
+  ): Promise<TeamInvitation>
+  /**
+   * 그 팀이 보낸 초대 **전부**(상태 무관), 최신순 — 주장만.
+   *
+   * 🔴 **판을 되살리는 값이다.** 앉힌 사람이 새로고침 뒤에도 그 자리에 있는
+   * 것은 이 목록 덕이다(사용자 설계, 2026-09-17).
+   */
+  listTeamInvitations(token: string, teamId: string): Promise<TeamInvitation[]>
+  /**
+   * 보낸 초대를 **무른다** — 주장만. 🔴 `204` 가 아니라 무른 초대를 그대로
+   * 돌려준다(상태 전이라 다른 응답과 같은 파서를 쓴다).
+   *
+   * ⚠️ **알림이 없다** — 보낸 쪽이 스스로 하는 것이라 알릴 상대가 없다.
+   */
+  cancelTeamInvitation(
+    token: string,
+    teamId: string,
+    invitationId: string,
+  ): Promise<TeamInvitation>
+  /** 내가 받은, **아직 답 안 한** 초대만. 팀 넉 칸이 더 붙는다(CCC 53). */
+  listMyInvitations(token: string): Promise<ReceivedInvitation[]>
+  /** 수락 — 그때 `team_member` 가 `member` 로 생긴다. */
+  acceptInvitation(token: string, invitationId: string): Promise<TeamInvitation>
+  /**
+   * 거절 — 🔴 **실패가 아니다.** `200` 이고 아무것도 안 바뀐 것이 맞는
+   * 결과다(계약의 「하지 말 것」).
+   */
+  rejectInvitation(token: string, invitationId: string): Promise<TeamInvitation>
 
   /** 남의 표시 등급. 로그인하면 누구나(`featured-video` 와 같은 원칙). */
   getCardGrade(token: string, cardPublicSlug: string): Promise<CardGrade>

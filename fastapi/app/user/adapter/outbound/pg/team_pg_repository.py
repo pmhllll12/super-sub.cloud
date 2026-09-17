@@ -9,6 +9,7 @@ ORM 을 그대로 쓴다.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
@@ -380,12 +381,37 @@ class TeamPgRepository(TeamPort):
         return None if row is None else self._to_invitation(row)
 
     def list_team_invitations(self, team_id: UUID) -> list[TeamInvitationEntity]:
+        """보낸 초대 전부. **초대받은 사람의 닉네임·카드 슬러그를 함께 싣는다.**
+
+        🔴 **보낸 쪽 화면이 판을 되살리는 값이다**(2026-09-17). 주장이 스쿼드
+        판에 앉힌 사람은 초대로 남는데, id 만으로는 새로고침 뒤에 누구인지도
+        무슨 카드인지도 그릴 수가 없었다. 받는 쪽에 팀 넉 칸을 실어 준 것과
+        같은 이유다 — **줄마다 따로 부르지 않게.**
+
+        🔴 `player_card` 는 `card` 컨텍스트라 원시 쿼리로 **바깥 조인**한다.
+        카드를 안 만든 사람은 `None` 이고 그것도 정상이다.
+        """
+        card_slug = (
+            select(_card.c.public_slug)
+            .where(_card.c.user_id == TeamInvitationOrm.invited_user_id)
+            .limit(1)
+            .scalar_subquery()
+        )
         stmt = (
-            select(TeamInvitationOrm)
+            select(TeamInvitationOrm, UserOrm.nickname, card_slug)
+            .join(UserOrm, UserOrm.id == TeamInvitationOrm.invited_user_id)
             .where(TeamInvitationOrm.team_id == team_id)
             .order_by(TeamInvitationOrm.created_at.desc())
         )
-        return [self._to_invitation(r) for r in self._session.execute(stmt).scalars()]
+        # 🔴 엔티티가 `frozen` 이라 대입이 아니라 `replace` 다.
+        return [
+            replace(
+                self._to_invitation(row),
+                invited_user_nickname=nickname,
+                invited_user_card_slug=slug,
+            )
+            for row, nickname, slug in self._session.execute(stmt)
+        ]
 
     def list_my_pending_invitations(
         self, user_id: UUID

@@ -22,7 +22,9 @@ import type {
   PlayerCard,
   PublicPlayerCard,
   PublicVideo,
+  ReceivedInvitation,
   SignupResult,
+  TeamInvitation,
   User,
 } from './types'
 
@@ -599,6 +601,49 @@ function requireCaptain(u: User, teamId: string): void {
   }
 }
 
+/**
+ * 보낸 초대들 (계약 3-3절 「팀 초대」).
+ *
+ * 🔴 **판에 앉힌 사람이 여기 남는다.** 그래서 새로고침해도 자리가 살아 있고,
+ * 사라지는 것은 **상대가 거절하거나 주장이 무를 때뿐**이다(사용자 설계,
+ * 2026-09-17).
+ */
+const invitations = new Map<string, TeamInvitation>()
+
+/** 수락·거절은 **받은 본인만**, 그리고 **대기 중일 때만** 된다(계약). */
+function respondToInvitation(
+  token: string,
+  invitationId: string,
+  status: 'accepted' | 'rejected',
+): TeamInvitation {
+  const u = requireUser(token)
+  const iv = invitations.get(invitationId)
+  if (!iv || iv.invited_user_id !== u.id) {
+    throw new BackendError(404, 'INVITATION_NOT_FOUND', '초대를 찾을 수 없습니다.')
+  }
+  if (iv.status !== 'pending') {
+    throw new BackendError(
+      409,
+      'TEAM_INVITATION_ALREADY_RESPONDED',
+      '이미 답이 난 초대입니다.',
+    )
+  }
+  const next: TeamInvitation = {
+    ...iv,
+    status,
+    responded_at: new Date().toISOString(),
+  }
+  invitations.set(invitationId, next)
+  /* 🔴 **수락·거절 둘 다 그 팀 주장에게 알림이 간다**(계약) — 무르기만
+     알림이 없다(보낸 쪽이 스스로 하는 것이라 알릴 상대가 없다). */
+  pushNotification(
+    iv.team_id,
+    status === 'accepted' ? 'team_invitation_accepted' : 'team_invitation_rejected',
+    iv.id,
+  )
+  return next
+}
+
 /** 알림 한 통을 쌓는다. `_to` 는 mock 에만 있는 칸이다(`stripTo` 참고). */
 function pushNotification(to: string, type: AppNotification['type'], subjectId: string): void {
   notifications.push({
@@ -1099,6 +1144,115 @@ export const mockBackend: Backend = {
   async listTeamMatches(token, teamId) {
     requireUser(token)
     return DEMO_MATCHES.filter((m) => m.team_id === teamId)
+  },
+
+  /* ── 팀 초대 (계약 3-3절, CCC 49·53번) ───────────────────────────── */
+
+  async inviteToTeam(token, teamId, { invited_user_id, position_code }) {
+    const u = requireUser(token)
+    requireCaptain(u, teamId)
+    /* 🔴 **대기 중 초대가 이미 있으면 409** — 같은 사람에게 두 번 보내면
+       받는 쪽에 같은 줄이 둘 뜬다(계약 `ALREADY_INVITED`). */
+    const already = [...invitations.values()].some(
+      (iv) =>
+        iv.team_id === teamId &&
+        iv.invited_user_id === invited_user_id &&
+        iv.status === 'pending',
+    )
+    if (already) {
+      throw new BackendError(409, 'ALREADY_INVITED', '이미 보낸 초대가 있습니다.')
+    }
+    const team = u.teams.find((t) => t.team_id === teamId)!
+    /* 🔴 **이 팀 종목에 없는 자리는 422** — 약칭은 종목 안에서만 유일하다
+       (축구 `FW` ≠ 농구 `FW`). 자리를 안 정한 초대는 정상이라 안 본다. */
+    if (position_code && !positionLabel(team.sport_code, position_code)) {
+      throw new BackendError(422, 'UNKNOWN_POSITION', '이 팀 종목에 없는 자리입니다.')
+    }
+    const made: TeamInvitation = {
+      id: `inv${invitations.size + 1}`,
+      team_id: teamId,
+      invited_user_id,
+      status: 'pending',
+      created_at: new Date().toISOString(),
+      responded_at: null,
+      position_code: position_code ?? null,
+      position_label: position_code
+        ? (positionLabel(team.sport_code, position_code) ?? null)
+        : null,
+      /* 초대받은 사람 — mock 은 후보 표에서 닉네임·슬러그를 찾는다. 못 찾으면
+         `null` 이고 그것도 정상이다(카드를 안 만든 사람과 같은 모양). */
+      invited_user_nickname:
+        DEMO_CANDIDATE_POOL.find((c) => c.user_id === invited_user_id)?.nickname ?? null,
+      invited_user_card_slug:
+        DEMO_CANDIDATE_POOL.find((c) => c.user_id === invited_user_id)?.card_public_slug ??
+        null,
+    }
+    invitations.set(made.id, made)
+    return made
+  },
+
+  async listTeamInvitations(token, teamId) {
+    const u = requireUser(token)
+    requireCaptain(u, teamId)
+    // 🔴 **상태 무관 전부**, 최신순(계약) — 판을 되살리는 값이라 거른 것을
+    //    주면 화면이 무엇을 지웠는지 모른다.
+    return [...invitations.values()]
+      .filter((iv) => iv.team_id === teamId)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+  },
+
+  async cancelTeamInvitation(token, teamId, invitationId) {
+    const u = requireUser(token)
+    requireCaptain(u, teamId)
+    const iv = invitations.get(invitationId)
+    if (!iv || iv.team_id !== teamId) {
+      throw new BackendError(404, 'INVITATION_NOT_FOUND', '초대를 찾을 수 없습니다.')
+    }
+    if (iv.status !== 'pending') {
+      throw new BackendError(
+        409,
+        'TEAM_INVITATION_ALREADY_RESPONDED',
+        '이미 답이 난 초대입니다.',
+      )
+    }
+    /* 🔴 **204 가 아니라 무른 초대를 돌려준다**(계약) — 삭제라기보다 상태
+       전이라, 화면이 같은 파서로 읽는다. */
+    const next: TeamInvitation = {
+      ...iv,
+      status: 'cancelled',
+      responded_at: new Date().toISOString(),
+    }
+    invitations.set(invitationId, next)
+    return next
+  },
+
+  async listMyInvitations(token) {
+    const u = requireUser(token)
+    /* 🔴 **아직 답 안 한 것만**(계약). 받는 사람은 그 팀 소속이 아니라 팀
+       이름을 따로 읽을 길이 없어서 넉 칸이 함께 온다(CCC 53). */
+    return [...invitations.values()]
+      .filter((iv) => iv.invited_user_id === u.id && iv.status === 'pending')
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      .map(
+        (iv): ReceivedInvitation => ({
+          ...iv,
+          team_name: '번개FC',
+          team_region: '서울 강남구',
+          team_sport_code: 'football',
+          // 스쿼드를 아직 안 만든 팀이면 `null` 이다 — 정상값이다.
+          squad_public_slug: demoSquad?.public_slug ?? null,
+        }),
+      )
+  },
+
+  async acceptInvitation(token, invitationId) {
+    return respondToInvitation(token, invitationId, 'accepted')
+  },
+
+  async rejectInvitation(token, invitationId) {
+    /* 🔴 **거절은 실패가 아니다** — 200 이고 아무것도 안 바뀐 것이 맞는
+       결과다(계약의 「하지 말 것」). */
+    return respondToInvitation(token, invitationId, 'rejected')
   },
 
   async cancelMatch(token, matchId) {

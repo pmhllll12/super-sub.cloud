@@ -185,6 +185,10 @@ class StubTeamRepository(TeamPort):
         )
 
     def list_team_invitations(self, team_id: UUID) -> list[TeamInvitationEntity]:
+        """🔴 **초대받은 사람의 닉네임·카드 슬러그를 함께 싣는다** — 보낸 쪽
+        화면이 판을 되살리는 값이다(2026-09-17). 스텁은 사람 정보를 안 들고
+        있어 **빈 값**을 내는데, 그 자체가 정상 갈래다(카드를 안 만든 사람과
+        같은 모양) — 실제 값은 DB 시험이 본다."""
         items = [i for i in _INVITATIONS.values() if i.team_id == team_id]
         return sorted(items, key=lambda i: i.created_at, reverse=True)
 
