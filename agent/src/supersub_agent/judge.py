@@ -279,15 +279,19 @@ def build_prompt(criterion, metrics: dict[str, Any], grade: int) -> str:
     #    `grades` 는 두 방향을 한 문자열에 담아("170도 초과(굴곡 부족) 또는
     #    135~150도(과굴곡)") **모델이 방향을 고르게** 만들었고, 그게 틀렸다
     #    (2026.09.17 판독 5건). 고를 것을 안 주면 고르다 틀릴 수 없다.
+    # 🔴 **판정 등급의 수준 문구 하나만 넣는다** (미결 23번 B). 전에는 셋을 다
+    #    넣었는데, **모델이 옆 등급 문구를 끌어와** 문장이 스스로 모순됐다:
+    #    굴곡 79.2도(= 「슈팅처럼 크다」 조각)에 *"팔로스루가 **짧고** 방향을
+    #    유지하며 마무리됐다"* — 「짧게」는 **[잘함] 수준 문구**의 말이다.
+    #    남은 오독 다섯 중 셋의 출처가 그것이었다(2026.09.17 판독).
+    #
+    # 🔴 **앵커는 셋 다 남긴다.** 눈금을 주는 것은 앵커다 — 1회차에서 앵커의
+    #    수준 표시를 뺐다가 **2등급 문장 8건 중 4건**이 무너졌다. 여기서
+    #    줄이는 것은 **수준 문구**뿐이고, `[잘함]`·[아쉬움] 앵커가 남아
+    #    「무엇이 더 낫고 무엇이 더 아쉬운가」는 그대로 보인다.
     band_value = metrics.get(criterion.band_metric)
-    lines.append("\n이 항목의 수준 (좋은 것부터):")
-    for g in (2, 1, 0):
-        mark = "  ← 이번 판정" if g == grade else ""
-        if g == grade:
-            text = criterion.plain_for(g, band_value) or criterion.grades[g]
-        else:
-            text = criterion.plain_all(g) or criterion.grades[g]
-        lines.append(f"- [{LEVEL_WORDS[g]}] {text}{mark}")
+    text = criterion.plain_for(grade, band_value) or criterion.grades[grade]
+    lines.append(f"\n이번 판정 수준:\n- [{LEVEL_WORDS[grade]}] {text}")
 
     # 🔴 **이번 판정 등급의 앵커는 값이 앉은 조각의 것만 넣는다** (가-3).
     #    모델이 앵커의 방향을 따라가기 때문이다 — 앵커 조각이 값 조각과

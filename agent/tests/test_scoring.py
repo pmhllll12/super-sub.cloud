@@ -972,3 +972,53 @@ def test_an_anchor_lists_every_metric_the_criterion_measures():
                 assert not missing, (
                     f"{key}/{c.id} {a['grade']}등급 앵커에 {sorted(missing)} 가 없다"
                 )
+
+
+def test_the_prompt_carries_only_the_judged_levels_wording():
+    """🔴 **옆 등급 수준 문구를 프롬프트에 안 넣는다** (미결 23번 B).
+
+    셋을 다 넣던 시절, 모델이 옆 등급 문구를 끌어와 문장이 스스로 모순됐다 —
+    굴곡 79.2도(「슈팅처럼 크다」 조각)에 *"팔로스루가 **짧고** 방향을
+    유지하며 마무리됐다"*. 「짧게」는 **[잘함] 수준 문구**의 말이었고,
+    남은 오독 다섯 중 셋의 출처가 그것이었다.
+    """
+    from supersub_agent.judge import build_prompt
+
+    rubric = _football_rubrics()["football/inside_pass"]
+    crit = next(c for c in rubric.criteria if c.id == "follow_through")
+    prompt = build_prompt(
+        crit,
+        {"swing_hip_flexion_after_impact_deg": 79.2,
+         "follow_through_duration_frames": 8.0},
+        1,
+    )
+    head = prompt.split("근거 문장 예시")[0]
+
+    assert "패스인데 마무리가 슈팅처럼 크다" in head, "판정 등급 문구가 없다"
+    assert "짧게, 방향을 남기며" not in head, (
+        "[잘함] 수준 문구가 남았다 — 모델이 그걸 끌어온다"
+    )
+    assert "찬 직후에 다리가 그대로 멈춘다" not in head, "[아쉬움] 수준 문구가 남았다"
+
+
+def test_the_anchors_still_show_every_level():
+    """🔴 **앵커는 줄이지 않는다** — 눈금을 주는 것은 앵커다.
+
+    1회차에서 앵커의 수준 표시를 뺐다가 **2등급 문장 8건 중 4건**이
+    무너졌다. B 가 줄인 것은 수준 문구뿐이고, 어느 어투가 어느 수준인지는
+    여기가 떠받친다. 이 검사가 없으면 나중에 「프롬프트를 더 줄이자」가
+    그 자리를 다시 밟는다.
+    """
+    from supersub_agent.judge import build_prompt
+
+    rubric = _football_rubrics()["football/inside_pass"]
+    crit = next(c for c in rubric.criteria if c.id == "follow_through")
+    prompt = build_prompt(
+        crit,
+        {"swing_hip_flexion_after_impact_deg": 79.2,
+         "follow_through_duration_frames": 8.0},
+        1,
+    )
+    examples = prompt.split("근거 문장 예시")[1]
+    for word in ("[잘함]", "[보통]", "[아쉬움]"):
+        assert word in examples, f"앵커에서 {word} 가 사라졌다"
