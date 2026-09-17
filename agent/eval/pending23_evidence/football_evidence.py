@@ -26,6 +26,7 @@ R1(「등급」 낱말)·R2(구간 표기)는 **표기**를 세므로 라벨이 
 """
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -42,8 +43,15 @@ from supersub_agent.scoring import discover_rubrics  # noqa: E402
 FRACTIONS = (0.35, 0.65)
 
 
-def value_in_band(criterion, grade: int, frac: float) -> float:
-    lo, hi = criterion.bands[grade][0]
+def value_in_band(criterion, grade: int, frac: float, seg: int = 0) -> float:
+    """등급 `grade` 의 `seg` 번째 조각 안에서 값 하나를 고른다.
+
+    🔴 **`seg` 는 2026.09.17 에 더했다.** 그전에는 `bands[grade][0]` — **첫
+    조각만** 뽑았고, 그래서 양방향 구간 **8곳의 두 번째 조각을 한 번도 물어본
+    적이 없다.** 방향 오독을 재는 회차인데 **방향의 한쪽만 재고 있었다**
+    (사전 등록 `PREREGISTRATION_plain.md` 3절).
+    """
+    lo, hi = criterion.bands[grade][seg]
     if lo is None:
         return round(float(hi) * frac, 1)
     if hi is None:
@@ -52,6 +60,11 @@ def value_in_band(criterion, grade: int, frac: float) -> float:
 
 
 def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--out", default="evidence_football.json",
+                    help="낼 파일 이름 (before/after 를 따로 둘 때 쓴다)")
+    args = ap.parse_args()
+
     rubrics = discover_rubrics(str(ROOT / "rubrics"))
     judge = Judge()
     print(f"백엔드: {judge.backend} · 모델: {judge.model_id}")
@@ -63,33 +76,39 @@ def main() -> None:
             items = []
             for criterion in rubric.criteria:
                 for grade in (2, 1, 0):
-                    for frac in FRACTIONS:
-                        features = {criterion.band_metric:
-                                    value_in_band(criterion, grade, frac)}
-                        # 밴드 지표 말고 `measured_by` 에 있는 것도 채운다 —
-                        # 프롬프트가 그것들도 보여주기 때문이다.
-                        for code in criterion.measured_by:
-                            features.setdefault(code, 10.0)
-                        got = criterion.grade_for(features)
-                        if got != grade:
-                            continue  # 밴드가 갈라져 있으면 건너뛴다(정직하게)
-                        judged = judge.judge_criterion(
-                            criterion, features, rubric.sport)
-                        items.append({
-                            "criterion_id": criterion.id,
-                            "name": criterion.name,
-                            "grade": grade,
-                            "stored_grade": grade,
-                            "evidence": judged.get("evidence", ""),
-                            "metric_ref": judged.get("metric_ref", ""),
-                            "given_metrics": select_metrics(criterion, features),
-                        })
+                    # 🔴 **조각마다** 돈다 — 양방향 구간의 반대쪽을 안 뽑으면
+                    #    방향 오독을 반쪽만 재게 된다 (사전 등록 3절).
+                    for seg in range(len(criterion.bands[grade])):
+                        for frac in FRACTIONS:
+                            features = {criterion.band_metric:
+                                        value_in_band(criterion, grade, frac, seg)}
+                            # 밴드 지표 말고 `measured_by` 에 있는 것도 채운다 —
+                            # 프롬프트가 그것들도 보여주기 때문이다.
+                            for code in criterion.measured_by:
+                                features.setdefault(code, 10.0)
+                            got = criterion.grade_for(features)
+                            if got != grade:
+                                continue  # 고른 값이 그 등급이 아니면 버린다
+                            judged = judge.judge_criterion(
+                                criterion, features, rubric.sport)
+                            items.append({
+                                "criterion_id": criterion.id,
+                                "name": criterion.name,
+                                "grade": grade,
+                                "stored_grade": grade,
+                                # 어느 조각에서 뽑은 값인가 — 판독이 이걸로
+                                # 「반대 조각의 말을 썼는가」를 가른다.
+                                "segment": seg,
+                                "evidence": judged.get("evidence", ""),
+                                "metric_ref": judged.get("metric_ref", ""),
+                                "given_metrics": select_metrics(criterion, features),
+                            })
             clips[key] = {"score": None, "grade": None, "items": items}
             print(f"  {key}: {len(items)}문장")
     finally:
         judge.unload()
 
-    dest = HERE / "evidence_football.json"
+    dest = HERE / args.out
     dest.write_text(json.dumps(
         {"tag": "football", "backend": judge.backend, "model": judge.model_id,
          "clips": clips}, ensure_ascii=False, indent=2), encoding="utf-8")

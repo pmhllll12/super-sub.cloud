@@ -739,3 +739,127 @@ def test_a_grade_the_rubric_never_named_is_not_an_earned_title(rubric):
     c.titles.pop(2)
     assert c.title_for(2) == c.name, "폴백이 항목명이라는 전제가 깨졌다"
     assert c.title_is_earned(2) is False
+
+
+# --- 숫자 없는 수준 설명 (미결 23번 가-2) -----------------------------------
+
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def _football_rubrics():
+    return discover_rubrics("rubrics")
+
+
+def test_every_live_rubric_writes_a_plain_level_for_every_grade():
+    """🔴 **판정 모델이 읽는 자리에 숫자가 없어야 한다** (미결 23번 가-2).
+
+    `grades` 는 "150~170도" 처럼 경계를 품고 있고, 프롬프트에 있으면 모델이
+    언젠가 베낀다 — 1회차에서 구간 표기로, 2회차에서 수준 정의에 박힌
+    "25~60도" 로, **두 번** 확인했다.
+
+    이 검사가 없으면 새 루브릭·새 항목이 `grades_plain` 없이 들어오고,
+    `build_prompt` 는 조용히 `grades` 로 떨어진다 — **아무도 모른다.**
+    """
+    for key, rubric in _football_rubrics().items():
+        for c in rubric.criteria:
+            for grade in (2, 1, 0):
+                assert c.grades_plain.get(grade), (
+                    f"{key}/{c.id} 의 {grade}등급에 grades_plain 이 없다. "
+                    "없으면 프롬프트가 숫자 박힌 grades 로 떨어진다."
+                )
+
+
+def test_a_plain_level_never_carries_a_number():
+    """숫자를 적으면 이 칸을 만든 이유가 없어진다."""
+    import re
+    for key, rubric in _football_rubrics().items():
+        for c in rubric.criteria:
+            for grade, lines in c.grades_plain.items():
+                for text in lines:
+                    assert not re.search(r"\d", text), (
+                        f"{key}/{c.id} {grade}등급 grades_plain 에 숫자가 있다: "
+                        f"{text!r}"
+                    )
+
+
+def test_a_two_way_grade_gets_one_plain_line_per_segment():
+    """🔴 **양방향 등급은 조각마다 하나여야 한다.**
+
+    한 문장으로 양쪽을 부르면 모델이 방향을 고르고, 그게 지금 틀리고 있는
+    자리다 — 2026.09.17 판독에서 140.2도(과굴곡)에 「굴곡 부족」이 나왔다.
+    """
+    for key, rubric in _football_rubrics().items():
+        for c in rubric.criteria:
+            for grade in (2, 1, 0):
+                segments = len(c.bands.get(grade, ()))
+                if segments < 2:
+                    continue
+                assert len(c.grades_plain[grade]) == segments, (
+                    f"{key}/{c.id} {grade}등급: 구간 {segments}개인데 "
+                    f"grades_plain 이 {len(c.grades_plain[grade])}개다"
+                )
+
+
+def test_a_plain_line_that_does_not_match_its_segments_is_refused():
+    """조각 수와 문장 수가 다르면 **적재에서 막는다** (기준 F).
+
+    `titles`·`card_lines` 와 같은 규칙이다. 어긋난 채로 지나가면 모델이
+    **반대 방향의 수준 설명**을 받는다 — 고치려는 결함 그 자체다.
+    """
+    from supersub_agent.scoring import RubricError, load_rubric
+    import yaml
+
+    raw = yaml.safe_load(
+        (ROOT / "rubrics" / "football_instep_shot.yaml").read_text(encoding="utf-8")
+    )
+    for entry in raw["criteria"]:
+        if entry["id"] == "plant_knee_flexion":
+            entry["grades_plain"][1] = ["한 줄만 적는다"]  # 구간은 둘인데
+            break
+
+    broken = ROOT / "data" / "tmp" / "broken_plain.yaml"
+    broken.parent.mkdir(parents=True, exist_ok=True)
+    broken.write_text(yaml.safe_dump(raw, allow_unicode=True), encoding="utf-8")
+    try:
+        with pytest.raises(RubricError, match="grades_plain"):
+            load_rubric(broken)
+    finally:
+        broken.unlink()
+
+
+def test_the_judged_grade_gets_only_its_own_direction():
+    """🔴 이번 판정 등급은 **값이 앉은 조각 하나만** 프롬프트에 들어간다.
+
+    고를 것을 안 주면 고르다 틀릴 수 없다. 반대 방향의 말이 프롬프트에
+    남아 있으면 그 말이 문장에 나온다 — 2026.09.17 판독이 그 형태였다.
+    """
+    from supersub_agent.judge import build_prompt
+
+    rubric = _football_rubrics()["football/instep_shot"]
+    crit = next(c for c in rubric.criteria if c.id == "plant_knee_flexion")
+    metrics = {crit.band_metric: 140.2}  # [135,150] 조각 = 과굴곡
+
+    prompt = build_prompt(crit, metrics, 1)
+
+    assert "필요보다 깊이 굽힌다" in prompt
+    assert "뻣뻣하게 선다" not in prompt, (
+        "반대 조각의 말이 프롬프트에 남았다 — 모델이 그걸 고를 수 있다"
+    )
+
+
+def test_the_prompt_stops_carrying_band_numbers():
+    """프롬프트의 수준 설명에 경계 숫자가 없어야 한다.
+
+    🔴 `grades` 가 그대로 들어가던 자리라, 이 검사가 빠지면 되돌아가도
+    아무도 모른다.
+    """
+    from supersub_agent.judge import build_prompt
+
+    rubric = _football_rubrics()["football/instep_shot"]
+    crit = next(c for c in rubric.criteria if c.id == "plant_knee_flexion")
+    prompt = build_prompt(crit, {crit.band_metric: 140.2}, 1)
+
+    head = prompt.split("근거 문장 예시")[0]
+    for edge in ("135", "150", "170", "180"):
+        assert edge not in head, f"수준 설명에 경계 숫자 {edge} 가 남았다"

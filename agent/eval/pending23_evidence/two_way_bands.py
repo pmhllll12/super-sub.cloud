@@ -25,6 +25,7 @@
 """
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -56,9 +57,10 @@ def which_segment(value, segs) -> int | None:
 
 
 def main() -> None:
-    data = json.loads(
-        (HERE / "evidence_football.json").read_text(encoding="utf-8")
-    )
+    ap = argparse.ArgumentParser()
+    ap.add_argument("path", nargs="?", default="evidence_football.json")
+    args = ap.parse_args()
+    data = json.loads((HERE / args.path).read_text(encoding="utf-8"))
 
     flagged = 0
     total = 0

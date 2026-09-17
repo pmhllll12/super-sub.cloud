@@ -125,9 +125,58 @@ class Criterion:
     # 많이 돌았다」가 같은 등급인데, 한 문장으로 부르면 **고칠 방향이 안 보인다.**
     # 여러 개면 `bands[grade]` 의 구간 순서와 **자리가 맞아야 한다**(적재가 검사).
     card_lines: dict[int, tuple[str, ...]] = field(default_factory=dict)
+    # `grades` 를 **숫자 없이** 다시 쓴 것 — 판정 모델에게 주는 수준 설명이다
+    # (미결 23번 처방 가-2). `titles`·`card_lines` 와 **같은 규칙**을 쓴다:
+    # 등급마다 하나, 또는 **구간마다 하나**.
+    #
+    # 🔴 왜 `grades` 를 그대로 안 주는가 — 두 가지가 샌다.
+    #   ⑴ **숫자**: `grades` 는 "150~170도" 처럼 경계를 품고 있고, 프롬프트에
+    #      있으면 모델이 언젠가 베낀다(1·2회차에서 두 번 확인했다).
+    #   ⑵ **방향**: 양방향 구간의 `grades` 는 두 방향을 한 문자열에 담는다 —
+    #      "170도 초과(굴곡 부족) 또는 135~150도(과굴곡)". 측정값이 어느 쪽인지
+    #      안 주므로 **모델이 고르고, 틀린다**(2026.09.17 판독에서 5건).
+    #
+    # 🔴 **채점에 관여하지 않는다** — 등급은 `bands` 가 정한다. 이 칸이 비어도
+    # `grades` 로 떨어질 뿐이라 기존 루브릭은 그대로 돈다.
+    grades_plain: dict[int, tuple[str, ...]] = field(default_factory=dict)
     # 등급 판정 구간. band_metric 하나의 값으로 등급이 결정된다.
     band_metric: str = ""
     bands: dict[int, tuple[Interval, ...]] = field(default_factory=dict)
+
+    def plain_for(self, grade: int, value: float | None = None) -> str:
+        """판정 모델에게 줄 **숫자 없는 수준 설명** (미결 23번 가-2).
+
+        🔴 **값이 앉은 구간의 문장 하나만** 돌려준다. 양방향 구간에서 둘 다
+        주면 모델이 고르고, 그게 지금 틀리고 있는 자리다.
+
+        `grades_plain` 이 없으면 **빈 문자열**이다 — 부르는 쪽이 `grades` 로
+        떨어진다. 🔴 여기서 `grades` 를 대신 돌려주지 않는다: 그러면 숫자가
+        **조용히** 프롬프트로 돌아가고, 이 함수를 쓴다는 것만으로 안전하다고
+        믿게 된다. 떨어지는 자리를 부르는 쪽에 두어 **보이게** 한다.
+        """
+        written = self.grades_plain.get(grade, ())
+        if not written:
+            return ""
+        if len(written) == 1:
+            return written[0]
+        if value is None:
+            # 방향을 못 고른다. 🔴 찍지 않는다 — `card_line_for` 와 같은 판단이다.
+            return ""
+        for text, (lo, hi) in zip(written, self.bands.get(grade, ())):
+            if (lo is None or value >= lo) and (hi is None or value <= hi):
+                return text
+        return ""
+
+    def plain_all(self, grade: int) -> str:
+        """그 등급의 수준 설명 **전부** — 판정 등급이 **아닌** 등급에 쓴다.
+
+        이번 판정이 아닌 등급은 「무엇이 더 낫고 무엇이 더 아쉬운가」의 맥락으로
+        들어가므로 방향을 하나로 좁힐 이유가 없다. 🔴 **좁히면 안 되는 이유도
+        있다** — 2등급이 한 방향뿐인 것처럼 보이면 모델이 반대쪽으로 치우친
+        선수에게 엉뚱한 목표를 제시한다.
+        """
+        written = self.grades_plain.get(grade, ())
+        return " 또는 ".join(written)
 
     def title_for(self, grade: int, value: float | None = None) -> str:
         """해당 등급의 칭호. 정의되지 않았으면 항목명으로 대체한다.
@@ -583,6 +632,10 @@ def load_rubric(path: str | Path) -> Rubric:
                 rationale=entry.get("rationale", ""),
                 titles=_parse_phrases(entry, bands, "titles"),
                 card_lines=_parse_phrases(entry, bands, "card_lines"),
+                # 🔴 **같은 검사를 탄다** — 구간마다 쓸 때 개수가 어긋나면
+                #    적재에서 막힌다. 여기가 어긋나면 모델이 **반대 방향의
+                #    수준 설명**을 받고, 그건 지금 고치려는 결함 그 자체다.
+                grades_plain=_parse_phrases(entry, bands, "grades_plain"),
                 band_metric=band_metric,
                 bands=bands,
             )

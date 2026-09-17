@@ -269,10 +269,25 @@ def build_prompt(criterion, metrics: dict[str, Any], grade: int) -> str:
         lines.append(f"\n항목 취지: {criterion.rationale.strip()}")
 
     # 좋은 것부터 나열하되 번호를 붙이지 않는다 — 번호가 있으면 문장에 샌다.
+    #
+    # 🔴 **`grades_plain` 이 있으면 그것을 쓴다** (미결 23번 가-2).
+    #    `grades` 는 "150~170도" 처럼 **경계 숫자를 품고 있고**, 프롬프트에
+    #    있으면 모델이 언젠가 베낀다 — 1회차에서 구간 표기로, 2회차에서
+    #    수준 정의에 박힌 "25~60도" 로, 두 번 확인했다.
+    #
+    # 🔴 **이번 판정 등급은 측정값이 앉은 조각 하나만** 넣는다. 양방향 구간의
+    #    `grades` 는 두 방향을 한 문자열에 담아("170도 초과(굴곡 부족) 또는
+    #    135~150도(과굴곡)") **모델이 방향을 고르게** 만들었고, 그게 틀렸다
+    #    (2026.09.17 판독 5건). 고를 것을 안 주면 고르다 틀릴 수 없다.
+    band_value = metrics.get(criterion.band_metric)
     lines.append("\n이 항목의 수준 (좋은 것부터):")
     for g in (2, 1, 0):
         mark = "  ← 이번 판정" if g == grade else ""
-        lines.append(f"- [{LEVEL_WORDS[g]}] {criterion.grades[g]}{mark}")
+        if g == grade:
+            text = criterion.plain_for(g, band_value) or criterion.grades[g]
+        else:
+            text = criterion.plain_all(g) or criterion.grades[g]
+        lines.append(f"- [{LEVEL_WORDS[g]}] {text}{mark}")
 
     if criterion.anchors:
         lines.append("\n근거 문장 예시 (수준에 맞는 어투를 그대로 따릅니다):")
