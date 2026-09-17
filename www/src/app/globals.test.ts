@@ -117,4 +117,23 @@ describe('globals.css', () => {
       expect(rule, sel).toMatch(/overscroll-behavior:\s*contain\s*;/)
     }
   })
+
+  /**
+   * 🔴 **「수락 대기중」 알약의 규칙이 살아 있다** (2026-09-17).
+   *
+   * 이 블록을 **두 번 날렸다** — 09-16 에 「나」 핀 규칙을 다시 쓰면서 그 밑의
+   * 것을 슬라이스로 같이 지웠고, 09-17 에 그 핀 CSS 를 걷으면서 **또** 같이
+   * 지웠다. 요소는 그려지는데 스타일만 없어서 알약이 카드 아래 **큰 글자**로
+   * 떨어진다 — 콘솔에도 안 남고 시험도 안 잡았다. 이제 여기서 잡는다.
+   */
+  it('수락 대기중 알약이 카드 위에 걸치는 규칙을 갖는다', () => {
+    const rule = CSS.match(/^\.ss-squad-pending \{([^}]*)\}/m)?.[1]
+    expect(rule).toBeDefined()
+    // 카드 **위쪽에 걸친다** — 흐름에 두면 카드 아래로 떨어진다.
+    expect(rule).toMatch(/position:\s*absolute\s*;/)
+    expect(rule).toMatch(/top:\s*-11px\s*;/)
+    // 알약 모양 · 어두운 바탕 위 빨간 글자.
+    expect(rule).toMatch(/border-radius:\s*999px\s*;/)
+    expect(rule).toMatch(/color:\s*var\(--ss-error\)/)
+  })
 })

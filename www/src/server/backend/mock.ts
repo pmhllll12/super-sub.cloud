@@ -459,6 +459,27 @@ const DEMO_DIRECTORY: UserSearchResult[] = [
 ]
 
 /**
+ * 분석이 낸 불릿 — **루브릭이 말할 수 있는 것만** 적는다(CCC 56 · `ho` 50번).
+ *
+ * 🔴 「반대편 빈 공간을 자주 찾습니다」류의 **경기 행동은 없다** — 한 편의
+ * 자세 분석으로는 못 잰다(정상호 확인). 여기 문장은 전부 **인스텝 슛·인사이드
+ * 패스 루브릭의 항목**에서 나올 법한 것이다.
+ *
+ * 🔴 **셋을 다 낸다** — 두 줄 · 한 줄 · 없음(`null`). 화면이 「늘 두 줄」로
+ * 짜이면 한 줄짜리에서 빈 칸이 남는다.
+ */
+const NOTES_POOL: Record<string, string[]> = {
+  김선우: ['차는 다리를 끝까지 뻗습니다', '디딤발을 공 옆에 붙입니다'],
+  오재현: ['상체를 공 위로 덮습니다'],
+  박도현: ['디딤발 무릎을 깊게 굽힙니다', '차고 난 뒤 몸이 앞으로 따라갑니다'],
+  이건우: ['골반을 목표 쪽으로 돌립니다'],
+  최유진: ['발목을 고정해 공을 정확히 맞춥니다', '상체가 덜 젖혀집니다'],
+  강태원: ['디딤발을 공 옆에 붙입니다'],
+  조현우: ['차는 다리를 끝까지 뻗습니다'],
+  임재민: ['골반을 목표 쪽으로 돌립니다', '차고 난 뒤 몸이 앞으로 따라갑니다'],
+}
+
+/**
  * 추천 후보 명단 — `GET /teams/{id}/squad/candidates` 와 `GET /cards/{slug}/grade`
  * 가 같이 읽는다 (계약 3-16·3-6절).
  *
@@ -485,7 +506,7 @@ const DEMO_CANDIDATES_BY_POSITION: Record<string, SquadCandidate[]> = {
     candidate('정민석', 'C', true),
     // 🔴 카드를 아직 안 만든 사람 — `card_public_slug` 가 `null` 이라 대표
     //    영상도 못 읽는다. 링크를 안 그리는 것으로 충분하다(계약 44번).
-    { user_id: 'u-seo', nickname: '서준혁', card_public_slug: null, grade: 'D', provisional: true },
+    { user_id: 'u-seo', nickname: '서준혁', card_public_slug: null, grade: 'D', provisional: true, notes: null },
   ],
   MF: [
     candidate('최유진', 'A', true),
@@ -499,7 +520,7 @@ const DEMO_CANDIDATES_BY_POSITION: Record<string, SquadCandidate[]> = {
     candidate('문태호', 'C', true),
     // 🔴 **등급을 모르는 사람**(대표 영상이 없거나 분석 전) — 뒤로 가되
     //    사라지지 않는다. `F` 로 치지 않는 것이 26번의 「하지 말 것」이다.
-    { user_id: 'u-bae', nickname: '배준영', card_public_slug: 'bae-junyoung', grade: null, provisional: null },
+    { user_id: 'u-bae', nickname: '배준영', card_public_slug: 'bae-junyoung', grade: null, provisional: null, notes: null },
   ],
 }
 
@@ -512,6 +533,9 @@ function candidate(
   return {
     user_id: `u-${nickname}`,
     nickname,
+    /* 🔴 **분석이 낸 불릿**(CCC 56). 한 줄·두 줄·`null` 셋 다 정상값이라
+       mock 도 셋을 다 낸다 — 화면이 「두 줄이겠지」로 짜이지 않게 한다. */
+    notes: NOTES_POOL[nickname] ?? null,
     card_public_slug: `${nickname}-card`,
     grade,
     provisional,
@@ -1585,7 +1609,12 @@ export const mockBackend: Backend = {
     // 모르는 슬러그는 **404 가 아니라 빈 등급**이다 — 계약이 「대표 영상이
     // 없거나 분석 전」을 `null` 로 내기로 했고, 슬러그가 없는 것도 화면에서는
     // 같은 뜻이다(보여 줄 등급이 없다).
-    return { grade: found?.grade ?? null, provisional: found?.provisional ?? null }
+    // 불릿도 **후보 목록과 같은 값**이다(CCC 56) — 두 자리가 갈리면 안 된다.
+    return {
+      grade: found?.grade ?? null,
+      provisional: found?.provisional ?? null,
+      notes: found?.notes ?? null,
+    }
   },
 
   async listSquadCandidates(token, teamId, { position_code, grade }) {

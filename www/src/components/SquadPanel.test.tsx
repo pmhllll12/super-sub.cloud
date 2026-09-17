@@ -347,6 +347,18 @@ describe('스쿼드 — 팀장은 FW 에 먼저 앉는다', () => {
     // 내 카드는 기다릴 것이 없다 — 표식이 하나뿐이다.
     expect(container.querySelectorAll('.ss-squad-pending')).toHaveLength(1)
   })
+
+  /* 🔴 **「준비 완료」는 없앴다**(사용자 판단, 2026-09-17). 이 표시는 「아직
+     수락 안 했다」를 말하는 자리지 다 된 것을 자랑하는 자리가 아니다 —
+     기다리는 것만 말하고 된 것은 조용히 둔다. */
+  it('수락된 사람에게는 아무 표식도 안 붙는다', () => {
+    const { container } = render(
+      <SquadPanel card={CARD} squad={SQUAD} myCardId={CARD.id} />,
+    )
+    // SQUAD 의 사람들은 이미 등재된 팀원이라 기다릴 것이 없다.
+    expect(screen.queryByText('준비 완료')).toBeNull()
+    expect(container.querySelector('.ss-squad-pending')).toBeNull()
+  })
 })
 
 describe('스쿼드 — 판 크기 3:3 · 5:5 · 7:7', () => {

@@ -578,6 +578,11 @@ export type TeamMatchRequest = {
 export type CardGrade = {
   grade: string | null
   provisional: boolean | null
+  /**
+   * 분석이 낸 불릿 — **후보 목록의 것과 같은 값**이다(CCC 56). 슬러그만 아는
+   * 자리를 위해 여기에도 실린다. 🔴 한 줄·`null` 둘 다 정상이다.
+   */
+  notes: string[] | null
 }
 
 /**
@@ -596,6 +601,20 @@ export type SquadCandidate = {
   card_public_slug: string | null
   grade: string | null
   provisional: boolean | null
+  /**
+   * **분석이 낸 불릿 한두 줄** (CCC 56, 미결 `paik` 33·38번 · `ho` 50번).
+   *
+   * 🔴 **셋 다 정상값이다** — 두 줄 · **한 줄** · `null`. 두 줄을 채우려고
+   * 지어내지 않는 것이 에이전트 쪽 규칙이고, `null` 은 옛 봉투(1.4 이하)거나
+   * 분석 전이다. **실패로 보지 않는다.**
+   *
+   * 🔴 **후보마다 `/grade` 를 다시 부르지 않는다** — 목록 응답에 이미 있다.
+   *
+   * 🔴 **이름 아래 한 줄로 쓰지 않는다.** 그 자리는 **사람이 적는 호칭**이고
+   * (CCC 51 · `paik` 36번), 이건 그 아래 불릿이다 — 섞으면 팀장이 사람이
+   * 적은 글을 AI 판정으로 읽는다.
+   */
+  notes: string[] | null
 }
 
 /**

@@ -38,9 +38,10 @@ import { ANY_GRADE, GRADES, type GradeFilter } from '@/lib/playerGrade'
  * 등급 옆에** 걸린다. 2026-09-11 에 대표 영상을 `?? '/coach-c001.mp4'` 로
  * 떨어뜨리다 똑같이 데인 자리다.
  *
- * 진짜 불릿은 에이전트가 이미 만들고 있다(`result.card.notes`) — 다만 **남의
- * 것을 읽을 경로가 계약에 없다**(후보 응답에도 `GET /cards/{slug}` 에도 없다).
- * 미결 `paik` 38번으로 올렸고, 경로가 생기면 여기에 그 값을 넣는다.
+ * 🔴 **그리고 같은 날 진짜가 왔다**(CCC 56, 미결 `paik` 33·38번). 후보 목록
+ * 응답에 `notes` 가 실려 온다 — **후보마다 `/grade` 를 다시 부르지 않는다.**
+ * 그래서 이 표에 남은 것은 **대표 영상 폴백(`clip`)과 호칭 폴백(`title`)뿐**
+ * 이고, 불릿은 서버 값만 쓴다.
  *
  * ⚠️ 클립은 저장소의 셋(`/coach-c00N.mp4`)을 돌려 쓴다. 🔴 **영상 파일을 더
  * 넣지 말 것** — 셋이 이미 16MB 다.
@@ -111,6 +112,8 @@ type Candidate = {
   card_public_slug: string | null
   grade: string | null
   provisional: boolean | null
+  /** 분석이 낸 불릿 한두 줄 (CCC 56). 🔴 한 줄·`null` 둘 다 정상이다. */
+  notes?: string[] | null
 }
 
 type State =
@@ -456,6 +459,24 @@ export default function SquadSuggest({
                 {(titles[s.user_id] || FLAVOR[s.nickname]?.title) && (
                   <span className="ss-suggest-title">
                     {titles[s.user_id] ?? FLAVOR[s.nickname].title}
+                  </span>
+                )}
+                {/* 🔴 **분석이 낸 불릿**(CCC 56, 2026-09-17). 오늘 아침까지는
+                    여기 붙박이 문장이 있었는데 **재는 것이 없는 말**이라
+                    걷었고(`ho` 50번), 같은 날 정어진이 진짜 값을 냈다.
+
+                    🔴 **한 줄·`null` 둘 다 정상이다** — 두 줄을 채우려고
+                    지어내지 않는 것이 에이전트 쪽 규칙이라, 없으면 이 칸을
+                    아예 안 그린다. 화면에서 문장을 짓지 않는다.
+
+                    🔴 **이름 아래 한 줄과 다른 자리다** — 그쪽은 **사람이
+                    적은 호칭**(CCC 51)이고 이건 **분석이 낸 것**이다. 섞으면
+                    팀장이 사람이 적은 글까지 AI 판정으로 읽는다. */}
+                {s.notes && s.notes.length > 0 && (
+                  <span className="ss-suggest-notes">
+                    {s.notes.map((n) => (
+                      <span key={n}>{n}</span>
+                    ))}
                   </span>
                 )}
               </span>

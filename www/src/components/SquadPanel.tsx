@@ -1244,17 +1244,18 @@ export default function SquadPanel({
                   그 사람이 수락해야 선다. 카드 위에서 깜빡여 「아직 아니다」를
                   말한다.
 
+                  🔴 **「준비 완료」는 없앴다**(사용자 판단, 2026-09-17). 이
+                  표시의 목적은 「아직 수락 안 했다」를 말하는 것이지 다 된
+                  것을 자랑하는 것이 아니다 — **기다리는 것만 말하고, 된 것은
+                  조용히 둔다.** 판이 처음부터 차 있게 되면서(팀장 자동 착석)
+                  다 된 카드마다 초록 딱지가 붙는 것이 오히려 시끄러웠다.
+
                   ⚠️ **아직 서버로 안 나간다.** 합류 요청 경로와 알림 타입이
                   계약에 없다(미결 `paik` 37번) — 그때까지 이 표시는 화면
-                  안에서만 산다. 🔴 그래서 **「준비 완료」로 바뀌는 길이
-                  아직 없다**, 지어내지 않는다. */}
-              {name && (
-                <span
-                  className="ss-squad-pending"
-                  data-ready={seeded.ready[slot.area] ? 'true' : undefined}
-                  aria-live="polite"
-                >
-                  {seeded.ready[slot.area] ? '준비 완료' : '수락 대기중'}
+                  안에서만 산다. */}
+              {name && !seeded.ready[slot.area] && (
+                <span className="ss-squad-pending" aria-live="polite">
+                  수락 대기중
                 </span>
               )}
               {/* 🔴 **이름표를 눌러 포지션을 직접 정한다**(사용자 요청).

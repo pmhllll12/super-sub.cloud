@@ -270,6 +270,58 @@ describe('추천 판 — 카드에 적히는 말', () => {
     { user_id: 'u1', nickname: '김선우', card_public_slug: 'c', grade: 'A', provisional: false },
   ]
 
+  /**
+   * 🔴 **분석이 낸 불릿은 서버가 준 것만 그린다**(CCC 56, 2026-09-17).
+   * 같은 날 아침에 붙박이를 걷었고, 오후에 정어진이 진짜 값을 냈다 —
+   * 후보 목록 응답에 실려 온다(후보마다 `/grade` 를 다시 안 부른다).
+   */
+  it('서버가 준 불릿을 그대로 그린다', async () => {
+    stubMedia()
+    stubCandidates([
+      {
+        user_id: 'u1',
+        nickname: '최유진',
+        card_public_slug: 'c',
+        grade: 'A',
+        provisional: false,
+        notes: ['차는 다리를 끝까지 뻗습니다', '디딤발을 공 옆에 붙입니다'],
+      },
+    ])
+    render(
+      <SquadSuggest position="MF" me={null} teamId="t1" closing={false} onClose={() => {}} onPick={() => {}} />,
+    )
+    expect(await screen.findByText('차는 다리를 끝까지 뻗습니다')).toBeInTheDocument()
+    expect(screen.getByText('디딤발을 공 옆에 붙입니다')).toBeInTheDocument()
+  })
+
+  /* 🔴 **한 줄도 정상이다** — 두 줄을 채우려고 지어내지 않는 것이 규칙이라,
+     화면이 「늘 두 줄」로 짜여 있으면 안 된다. */
+  it('한 줄만 와도 그대로 그린다', async () => {
+    stubMedia()
+    stubCandidates([
+      { user_id: 'u1', nickname: '최유진', card_public_slug: 'c', grade: 'A', provisional: false, notes: ['상체를 공 위로 덮습니다'] },
+    ])
+    const { container } = render(
+      <SquadSuggest position="MF" me={null} teamId="t1" closing={false} onClose={() => {}} onPick={() => {}} />,
+    )
+    expect(await screen.findByText('상체를 공 위로 덮습니다')).toBeInTheDocument()
+    expect(container.querySelectorAll('.ss-suggest-notes > span')).toHaveLength(1)
+  })
+
+  /* 🔴 **`null` 도 정상이다**(옛 봉투거나 분석 전) — 그 칸을 아예 안 그린다.
+     화면에서 문장을 짓지 않는다. */
+  it('불릿이 없으면 그 칸을 안 그린다', async () => {
+    stubMedia()
+    stubCandidates([
+      { user_id: 'u1', nickname: '최유진', card_public_slug: 'c', grade: 'A', provisional: false, notes: null },
+    ])
+    const { container } = render(
+      <SquadSuggest position="MF" me={null} teamId="t1" closing={false} onClose={() => {}} onPick={() => {}} />,
+    )
+    expect(await screen.findByText('최유진')).toBeInTheDocument()
+    expect(container.querySelector('.ss-suggest-notes')).toBeNull()
+  })
+
   it('재는 것이 없는 불릿은 안 그린다', async () => {
     stubMedia()
     stubCandidates(FLAVOR_ROWS)

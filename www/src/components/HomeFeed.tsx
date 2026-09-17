@@ -240,6 +240,19 @@ export default function HomeFeed({ active }: { active: boolean }) {
     })
   }, [i, active])
 
+  /* 🔴 **없으면 없다고 말한다**(2026-09-17). 여기 붙박이 클립 셋이 있어서
+     목록이 빌 일이 없었는데, 그것들이 **실제 도메인에서 진짜 영상 뒤에 그대로
+     붙어** 있었다(게다가 셋 다 농구였다 — 종목은 축구 하나로 정리됐다).
+     지우고 나면 공개된 영상이 하나도 없는 순간이 생긴다 — 아래 `clips[i]` 가
+     그대로 터지므로 여기서 먼저 받는다. */
+  if (clips.length === 0) {
+    return (
+      <div className="ss-feed" ref={box} data-active={active} data-library={library}>
+        <p className="ss-feed-empty">아직 공개된 영상이 없습니다.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="ss-feed" ref={box} data-active={active} data-library={library}>
       <div

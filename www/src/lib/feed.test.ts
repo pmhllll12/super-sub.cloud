@@ -1,5 +1,5 @@
 import type { PublicVideo } from '@/server/backend'
-import { FEED, feedWith } from './feed'
+import { feedWith } from './feed'
 
 /**
  * 🔴 **남의 공개 영상까지 얹힌다**(CCC 20, 미결 `paik` 5번). 전에는 브라우저
@@ -20,14 +20,18 @@ const clip: PublicVideo = {
 const urls = { v3: 'https://s3.example.com/v3.mp4?sig=1' }
 
 describe('영상 모음에 공개된 것을 얹는다', () => {
-  it('공개한 것이 없으면 원래 목록 그대로다', () => {
-    expect(feedWith([], {})).toEqual(FEED)
+  /* 🔴 **정정 (2026-09-17, 사용자 지적)**: 전에는 붙박이 클립 셋이 뒤에 붙어
+     목록이 빌 일이 없었는데, 그것들이 **실제 도메인에서 진짜 영상 뒤에 그대로
+     보였다**(셋 다 농구였다 — 종목은 축구 하나로 정리됐다). 이제 공개된 것이
+     없으면 목록도 비고, 화면이 그렇게 말한다. */
+  it('공개한 것이 없으면 목록도 빈다', () => {
+    expect(feedWith([], {})).toEqual([])
   })
 
   // 방금 공개한 것이 뒤에 묻혀 있으면 공개가 됐는지 알 수가 없다.
   it('공개한 것이 맨 앞에 온다', () => {
     const list = feedWith([clip], urls)
-    expect(list).toHaveLength(FEED.length + 1)
+    expect(list).toHaveLength(1)
     expect(list[0]).toMatchObject({
       title: '학교 끝나고 농구 연습',
       what: '디딤발이 공보다 앞서지 않는 순간',

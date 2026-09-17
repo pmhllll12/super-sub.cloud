@@ -3289,6 +3289,41 @@ body::-webkit-scrollbar {
 
    ⚠️ 작아졌다 커졌다 한다 — 가만히 있으면 카드 장식으로 읽혀 **누르는
    것인 줄 모른다.** `prefers-reduced-motion` 이면 안 움직이고 그대로 선다. */
+/* 🔴 **수락 대기중** — 카드 **위쪽에 걸치는 알약**이다(사용자 지정).
+   추천·지인에서 고른 사람은 팀 밖 사람이라 바로 뛰는 것이 아니고, 그 사람이
+   수락해야 선다. 깜빡여서 「아직 아니다」를 말한다.
+
+   🔴 **되살린 규칙이다 (2026-09-17).** 오늘 「나」 핀 CSS 를 걷으면서 **이
+   블록까지 같이 지웠다** — 요소는 그려지는데 스타일이 없어서 카드 아래에
+   큰 글자로 떨어졌다. 09-16 에 똑같이 밟고 「CSS 블록을 통째로 갈아 끼울 때
+   아래 것까지 지우지 말 것」이라고 적어 둔 그 자리를 **다시 밟았다.**
+   지울 때는 슬라이스로 걷지 말고 **지울 규칙만** 지운다. */
+.ss-squad-pending {
+  position: absolute;
+  top: -11px;
+  left: 50%;
+  z-index: 3;
+  transform: translateX(-50%);
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #000 78%, transparent);
+  color: var(--ss-error);
+  font-size: 0.64rem;
+  font-weight: 600;
+  white-space: nowrap;
+  animation: ss-squad-pending-blink 1.4s ease-in-out infinite;
+}
+
+@keyframes ss-squad-pending-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ss-squad-pending {
     animation: none;
@@ -14067,4 +14102,15 @@ body:has(.ss-venues) .ss-home-header {
 .ss-prefs-note {
   font-size: 0.66rem;
   color: color-mix(in srgb, var(--ss-fg) 48%, transparent);
+}
+
+/* 공개된 영상이 하나도 없을 때 — 붙박이 클립을 걷고 나서 생긴 자리
+   (2026-09-17). 판 한가운데에 한 줄만 둔다: 없는 것을 그림으로 채우지 않는다. */
+.ss-feed-empty {
+  display: grid;
+  place-items: center;
+  min-height: 40vh;
+  margin: 0;
+  font-size: 0.85rem;
+  color: color-mix(in srgb, var(--ss-fg) 62%, transparent);
 }
