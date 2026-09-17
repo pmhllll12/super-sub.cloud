@@ -90,6 +90,125 @@
   }
 }
 
+// --- 본문 그림 · 수치 칸 (III 부 생성기 출력) ---------------------------------
+// 전에는 생성기가 색을 인라인 style 로 박았다. 인라인 색은 테마별로 못 바꾸므로 클래스로 옮겼다.
+.doc-figure {
+  margin: 1.4rem 0;
+}
+
+.doc-figure-caption {
+  font-size: 0.85rem;
+  color: #5c5962;
+  margin-top: 0.4rem;
+}
+
+.stat-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 1.2rem 0;
+}
+
+.stat-tile {
+  flex: 1 1 150px;
+  border: 1px solid #e3e1da;
+  border-radius: 8px;
+  padding: 0.8rem 1rem;
+  background: #fff;
+}
+
+.stat-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #27262b;
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  color: #27262b;
+  margin-top: 0.15rem;
+}
+
+.stat-note {
+  font-size: 0.78rem;
+  color: #5c5962;
+  margin-top: 0.2rem;
+}
+
+// 부록 D 의 ERD 그림 틀 — 그림이 커서 옆으로 밀어 본다
+.erd-frame {
+  overflow-x: auto;
+  margin: 1.2rem 0;
+  border: 1px solid #e3e1da;
+  border-radius: 6px;
+}
+
+// --- 다크 모드 (2026-09-17) --------------------------------------------------
+// 테마 전환은 _includes/head_custom.html · header_custom.html. 테마 기본 요소(본문·표·코드·
+// 사이드바)는 Just the Docs 의 dark 스킴이 맡고, 여기서는 우리가 직접 색을 준 것만 고친다.
+// 🔴 새로 색을 직접 주는 요소를 만들면 아래에 다크 값도 함께 둔다.
+.theme-toggle {
+  margin-left: auto;
+  padding: 0 1rem;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.75rem;
+  color: #7253ed;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+html[data-theme="dark"] {
+  .theme-toggle {
+    color: #6fa8fb;
+  }
+
+  // 그림은 밝은 바탕에 맞춰 그렸다 — 선·글자가 어두운 색이라, 다크 화면에서는 밝은 판 위에 둔다.
+  .doc-figure svg {
+    box-sizing: border-box;
+    padding: 0.75rem;
+    border-radius: 8px;
+    background: #f4f3ef;
+  }
+
+  .doc-figure-caption,
+  .stat-note {
+    color: #a9a6ad;
+  }
+
+  .stat-tile {
+    border-color: #44434d;
+    background: #302d36;
+  }
+
+  // ERD 는 흰 바탕으로 그렸다 — 틀 전체를 흰 판으로 둬서 그림 옆 빈칸만 어둡게 뜨지 않게 한다
+  .erd-frame {
+    border-color: #44434d;
+    background: #fff;
+  }
+
+  .stat-value,
+  .stat-label {
+    color: #f5f6fa;
+  }
+
+  .kanban-column {
+    background: #302d36;
+  }
+
+  .kanban-column h4 {
+    color: #a9a6ad;
+  }
+
+  .kanban-card {
+    border-color: #44434d;
+    background: #27262b;
+    box-shadow: none;
+  }
+}
+
 // 사이트 제목이 사이드바 폭(16.5rem)에서 세 줄로 접혀 고정 높이 머리칸(3.75rem) 위로
 // 잘렸다. 글자를 줄여 두 줄 안에 들인다. 테마가 크기를 !important 로 주므로 같이 쓴다.
 .site-title {

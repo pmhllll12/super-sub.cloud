@@ -1,1 +1,18 @@
 <link rel="stylesheet" href="{{ "/assets/main.css" | relative_url }}">
+
+{%- comment -%}
+  다크 모드 (2026-09-17). 첫 화면을 그리기 전에 테마를 정해야 밝은 화면이 번쩍이지 않는다 —
+  그래서 머리(head)에서 바로 돈다. 사용자가 고른 값(localStorage)이 먼저, 없으면 운영체제 설정.
+  테마 전환은 Just the Docs 의 jtd.setTheme(스타일시트 교체)을 쓰고, 우리 CSS(assets/main.scss)는
+  <html data-theme="dark"> 로 다크 값을 고른다. 바꾸는 단추는 _includes/header_custom.html.
+{%- endcomment %}
+<script>
+  (function () {
+    var saved = null;
+    try { saved = localStorage.getItem('supersub-theme'); } catch (e) {}
+    var theme = (saved === 'dark' || saved === 'light') ? saved
+      : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+    if (theme === 'dark') jtd.setTheme('dark');
+  })();
+</script>

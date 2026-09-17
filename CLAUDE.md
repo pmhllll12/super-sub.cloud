@@ -161,6 +161,17 @@ Jekyll 소스 루트는 **저장소 루트 자체**입니다 (`_config.yml`이 �
 본문을 80rem까지 넓혔으며, 사이드바에서 세 줄로 접혀 잘리던 사이트 제목을 줄였습니다 — 전부
 `assets/main.scss` 끝의 「넓은 화면 레이아웃」 절입니다. 그보다 좁은 화면은 테마 기본 그대로입니다.
 
+**다크 모드가 있습니다(2026-09-17).** 머리칸의 「다크 모드」 단추로 바꾸고, 고른 값은 그 브라우저에
+남습니다(고른 적이 없으면 운영체제 설정을 따릅니다). 전환은 `_includes/head_custom.html`(첫 화면 전에
+정함)·`_includes/header_custom.html`(단추)이고, 본문·표·코드·사이드바는 Just the Docs 의 dark 스킴이
+맡습니다. 🔴 **페이지 본문에 색을 인라인 `style="color:#…"` 로 박지 마십시오** — 테마별로 못 바꿔서
+다크 화면에서 글자가 안 보입니다. `assets/main.scss` 에 클래스로 두고 같은 파일의
+`html[data-theme="dark"]` 절에 다크 값도 함께 둡니다. 확인:
+
+```bash
+grep -rnE 'style="[^"]*(color|background|border)[^"]*#' jekyll/ _posts/   # 0건이어야 합니다
+```
+
 사이드바 트리는 프론트매터의 `nav_order`(형제 간 정렬)와 `parent`/`grand_parent`(최대
 3단계 중첩), `has_children: true`(하위 페이지를 거느리는 상위 페이지)로 자동 생성됩니다.
 사이드바에 안 보이게 하려면 `nav_exclude: true`를 씁니다 (`index.markdown`, 구 `toc.markdown`,

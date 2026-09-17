@@ -35,7 +35,7 @@ user가 대부분의 테이블과 연결되는 허브이므로 전체를 한 장
 코드를 가져다 쓰지 않는 구조라서다). 그 지도는
 [백엔드 · 파이프라인]({{ "/11-백엔드파이프라인/" | relative_url }}) 그림 1에 있다.
 
-<div style="overflow-x:auto;margin:1.2rem 0;border:1px solid #e3e1da;border-radius:6px"><a href="{{ '/assets/erd/d1-overview.svg' | relative_url }}?v=20260917" title="원본 크기로 열기"><img src="{{ '/assets/erd/d1-overview.svg' | relative_url }}?v=20260917" alt="D.1 도메인을 넘는 외래키" width="740" height="420" style="max-width:100%;height:auto;display:block"></a></div>
+<div class="erd-frame"><a href="{{ '/assets/erd/d1-overview.svg' | relative_url }}?v=20260917" title="원본 크기로 열기"><img src="{{ '/assets/erd/d1-overview.svg' | relative_url }}?v=20260917" alt="D.1 도메인을 넘는 외래키" width="740" height="420" style="max-width:100%;height:auto;display:block"></a></div>
 
 ## D.2 도메인별 상세
 
@@ -44,7 +44,7 @@ user가 대부분의 테이블과 연결되는 허브이므로 전체를 한 장
 
 ### ① 사용자·팀
 
-<div style="overflow-x:auto;margin:1.2rem 0;border:1px solid #e3e1da;border-radius:6px"><a href="{{ '/assets/erd/domain1-user-team.svg' | relative_url }}?v=20260917" title="원본 크기로 열기"><img src="{{ '/assets/erd/domain1-user-team.svg' | relative_url }}?v=20260917" alt="도메인 ① 사용자·팀 ERD" width="1145" height="904" style="max-width:none;height:auto;display:block"></a></div>
+<div class="erd-frame"><a href="{{ '/assets/erd/domain1-user-team.svg' | relative_url }}?v=20260917" title="원본 크기로 열기"><img src="{{ '/assets/erd/domain1-user-team.svg' | relative_url }}?v=20260917" alt="도메인 ① 사용자·팀 ERD" width="1145" height="904" style="max-width:none;height:auto;display:block"></a></div>
 
 
 | 테이블 | 용도 | 1행이 뜻하는 것 |
@@ -71,7 +71,7 @@ user가 대부분의 테이블과 연결되는 허브이므로 전체를 한 장
 같은 항목이다(지금 루브릭은 축구 두 동작뿐이다). 어느 종목에서 쓰는지는 metric_definition이 아니라 그 지표를 참조하는
 루브릭·항목 쪽이 안다.
 
-<div style="overflow-x:auto;margin:1.2rem 0;border:1px solid #e3e1da;border-radius:6px"><a href="{{ '/assets/erd/domain2-video-analysis.svg' | relative_url }}?v=20260917" title="원본 크기로 열기"><img src="{{ '/assets/erd/domain2-video-analysis.svg' | relative_url }}?v=20260917" alt="도메인 ② 영상·분석 ERD" width="1835" height="908" style="max-width:none;height:auto;display:block"></a></div>
+<div class="erd-frame"><a href="{{ '/assets/erd/domain2-video-analysis.svg' | relative_url }}?v=20260917" title="원본 크기로 열기"><img src="{{ '/assets/erd/domain2-video-analysis.svg' | relative_url }}?v=20260917" alt="도메인 ② 영상·분석 ERD" width="1835" height="908" style="max-width:none;height:auto;display:block"></a></div>
 
 
 | 테이블 | 용도 | 1행이 뜻하는 것 |
@@ -94,7 +94,7 @@ user가 대부분의 테이블과 연결되는 허브이므로 전체를 한 장
 경기 후 평가가 떠받친다」로 정하면서 뒤쪽이 생겼다. 분석이 기준을 넘으면 호칭을 주는 설계
 (title_criteria)는 구현하지 않았다.
 
-<div style="overflow-x:auto;margin:1.2rem 0;border:1px solid #e3e1da;border-radius:6px"><a href="{{ '/assets/erd/domain3-card-title.svg' | relative_url }}?v=20260917b" title="원본 크기로 열기"><img src="{{ '/assets/erd/domain3-card-title.svg' | relative_url }}?v=20260917b" alt="도메인 ③ 카드·호칭 ERD" width="932" height="706" style="max-width:none;height:auto;display:block"></a></div>
+<div class="erd-frame"><a href="{{ '/assets/erd/domain3-card-title.svg' | relative_url }}?v=20260917b" title="원본 크기로 열기"><img src="{{ '/assets/erd/domain3-card-title.svg' | relative_url }}?v=20260917b" alt="도메인 ③ 카드·호칭 ERD" width="932" height="706" style="max-width:none;height:auto;display:block"></a></div>
 
 
 | 테이블 | 용도 | 1행이 뜻하는 것 |
@@ -109,7 +109,7 @@ user가 대부분의 테이블과 연결되는 허브이므로 전체를 한 장
 
 ### ④ 매칭
 
-<div style="overflow-x:auto;margin:1.2rem 0;border:1px solid #e3e1da;border-radius:6px"><a href="{{ '/assets/erd/domain4-matching.svg' | relative_url }}?v=20260917b" title="원본 크기로 열기"><img src="{{ '/assets/erd/domain4-matching.svg' | relative_url }}?v=20260917b" alt="도메인 ④ 매칭 ERD" width="991" height="942" style="max-width:none;height:auto;display:block"></a></div>
+<div class="erd-frame"><a href="{{ '/assets/erd/domain4-matching.svg' | relative_url }}?v=20260917b" title="원본 크기로 열기"><img src="{{ '/assets/erd/domain4-matching.svg' | relative_url }}?v=20260917b" alt="도메인 ④ 매칭 ERD" width="991" height="942" style="max-width:none;height:auto;display:block"></a></div>
 
 
 | 테이블 | 용도 | 1행이 뜻하는 것 |
@@ -131,7 +131,7 @@ user가 대부분의 테이블과 연결되는 허브이므로 전체를 한 장
 평가는 선택형이므로(3.4) 선택지를 review_option에 정의하고 선택 결과를 review_selection에
 행으로 담는다.
 
-<div style="overflow-x:auto;margin:1.2rem 0;border:1px solid #e3e1da;border-radius:6px"><a href="{{ '/assets/erd/domain5-review-trust.svg' | relative_url }}?v=20260917b" title="원본 크기로 열기"><img src="{{ '/assets/erd/domain5-review-trust.svg' | relative_url }}?v=20260917b" alt="도메인 ⑤ 평가·신뢰 ERD" width="932" height="706" style="max-width:none;height:auto;display:block"></a></div>
+<div class="erd-frame"><a href="{{ '/assets/erd/domain5-review-trust.svg' | relative_url }}?v=20260917b" title="원본 크기로 열기"><img src="{{ '/assets/erd/domain5-review-trust.svg' | relative_url }}?v=20260917b" alt="도메인 ⑤ 평가·신뢰 ERD" width="932" height="706" style="max-width:none;height:auto;display:block"></a></div>
 
 
 | 테이블 | 용도 | 1행이 뜻하는 것 |
@@ -152,7 +152,7 @@ report·no_show는 review와 직접 이어지지 않는다. 제재를 평가 점
 
 ### ⑥ 과금
 
-<div style="overflow-x:auto;margin:1.2rem 0;border:1px solid #e3e1da;border-radius:6px"><a href="{{ '/assets/erd/domain6-billing.svg' | relative_url }}?v=20260917b" title="원본 크기로 열기"><img src="{{ '/assets/erd/domain6-billing.svg' | relative_url }}?v=20260917b" alt="도메인 ⑥ 과금 ERD" width="903" height="410" style="max-width:none;height:auto;display:block"></a></div>
+<div class="erd-frame"><a href="{{ '/assets/erd/domain6-billing.svg' | relative_url }}?v=20260917b" title="원본 크기로 열기"><img src="{{ '/assets/erd/domain6-billing.svg' | relative_url }}?v=20260917b" alt="도메인 ⑥ 과금 ERD" width="903" height="410" style="max-width:none;height:auto;display:block"></a></div>
 
 | 테이블 | 용도 | 1행이 뜻하는 것 |
 |---|---|---|
@@ -172,7 +172,7 @@ report·no_show는 review와 직접 이어지지 않는다. 제재를 평가 점
 처음 설계에는 없던 도메인이다. 지인 신청·팀 초대·팀 대 팀 경기 신청이 모두 「상대에게 알린다」를
 필요로 하면서 독립했다. 화면이 주기적으로 물어 가져간다(폴링).
 
-<div style="overflow-x:auto;margin:1.2rem 0;border:1px solid #e3e1da;border-radius:6px"><a href="{{ '/assets/erd/domain7-notification.svg' | relative_url }}?v=20260917" title="원본 크기로 열기"><img src="{{ '/assets/erd/domain7-notification.svg' | relative_url }}?v=20260917" alt="도메인 ⑦ 알림 ERD" width="684" height="332" style="max-width:none;height:auto;display:block"></a></div>
+<div class="erd-frame"><a href="{{ '/assets/erd/domain7-notification.svg' | relative_url }}?v=20260917" title="원본 크기로 열기"><img src="{{ '/assets/erd/domain7-notification.svg' | relative_url }}?v=20260917" alt="도메인 ⑦ 알림 ERD" width="684" height="332" style="max-width:none;height:auto;display:block"></a></div>
 
 | 테이블 | 용도 | 1행이 뜻하는 것 |
 |---|---|---|
@@ -311,7 +311,7 @@ SEC-006은 삭제 요청 시 원본과 파생물이 함께 삭제될 것을 요�
 (`ON DELETE`)에서 계산한 것이다 — **계정을 지우면** 왼쪽 나무가 함께 지워지고, 그 안의 점선 가지가
 **영상 한 편을 지울 때** 함께 지워지는 범위다.
 
-<div style="overflow-x:auto;margin:1.2rem 0;border:1px solid #e3e1da;border-radius:6px"><a href="{{ '/assets/erd/d6-cascade.svg' | relative_url }}?v=20260917b" title="원본 크기로 열기"><img src="{{ '/assets/erd/d6-cascade.svg' | relative_url }}?v=20260917b" alt="D.6 계정·영상 삭제 연쇄와 작성자만 비우는 기록" width="740" height="760" style="max-width:100%;height:auto;display:block"></a></div>
+<div class="erd-frame"><a href="{{ '/assets/erd/d6-cascade.svg' | relative_url }}?v=20260917b" title="원본 크기로 열기"><img src="{{ '/assets/erd/d6-cascade.svg' | relative_url }}?v=20260917b" alt="D.6 계정·영상 삭제 연쇄와 작성자만 비우는 기록" width="740" height="760" style="max-width:100%;height:auto;display:block"></a></div>
 
 계정 탈퇴는 사용자 행을 실제로 지우고, 딸린 것은 이 연쇄가 지운다 — 자격증명·외부 계정 연결·카드·
 호칭·소속·영상 체인·알림·지인·받은 초대·개인 매칭 조건, 그리고 경기 지원·불참·크레딧·코치 연결·
