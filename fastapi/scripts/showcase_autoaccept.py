@@ -43,7 +43,9 @@ from uuid import UUID
 
 # 🔴 Python 3.14 는 표준입력 실행에도 `__file__ = "<stdin>"` 을 채운다 — 확장자·실재로 가른다.
 _here = Path(globals().get("__file__", ""))
-ROOT = _here.resolve().parent.parent if _here.suffix == ".py" and _here.is_file() else Path.cwd()
+# `resolve()` 가 아니라 `absolute()` — k8s ConfigMap 으로 넣은 파일은 심볼릭 링크라 resolve 하면
+# `..data` 안쪽으로 따라 들어가 두 단계 위가 app 이 아니게 된다.
+ROOT = _here.absolute().parent.parent if _here.suffix == ".py" and _here.is_file() else Path.cwd()
 sys.path.insert(0, str(ROOT))
 
 from sqlalchemy import and_, select  # noqa: E402

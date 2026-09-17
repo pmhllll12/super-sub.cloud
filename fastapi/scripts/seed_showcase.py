@@ -44,7 +44,9 @@ from uuid import UUID, uuid4
 # 🔴 `"__file__" in globals()` 로 가르지 않는다 — Python 3.14 는 표준입력 실행에도
 #    `__file__ = "<stdin>"` 을 채워서 운영 파드에서 경로가 틀렸다(테이블을 못 불러 KeyError).
 _here = Path(globals().get("__file__", ""))
-ROOT = _here.resolve().parent.parent if _here.suffix == ".py" and _here.is_file() else Path.cwd()
+# `resolve()` 가 아니라 `absolute()` — k8s ConfigMap 으로 넣은 파일은 심볼릭 링크라 resolve 하면
+# `..data` 안쪽으로 따라 들어가 두 단계 위가 app 이 아니게 된다.
+ROOT = _here.absolute().parent.parent if _here.suffix == ".py" and _here.is_file() else Path.cwd()
 sys.path.insert(0, str(ROOT))
 
 from sqlalchemy import delete, insert, or_, select  # noqa: E402
