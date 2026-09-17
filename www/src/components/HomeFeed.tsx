@@ -21,7 +21,11 @@ import { usePlaybackUrls } from '@/lib/playbackUrl'
  * 🔴 **뜬 상태에서만 산다.** 홈이 아직 위에 있을 때는 이 판이 화면 밖에 있으므로
  * 영상을 틀지 않는다 — 안 보이는 영상을 트는 것은 데이터만 쓰는 일이다.
  */
-export default function HomeFeed({ active, by }: { active: boolean; by: string }) {
+/* 🔴 **보는 사람 닉네임을 더는 안 받는다**(2026-09-17, 미결 `paik` 16번).
+   전에는 `by` 를 받아 공개 클립 **전부**에 붙였고, 목록에 남의 영상이 섞이면
+   그것이 내 이름으로 그려졌다. 이제 줄마다 서버가 준 업로더를 쓴다 —
+   **손에 닿는 「나」가 아예 없어야** 같은 실수가 되살아나지 않는다. */
+export default function HomeFeed({ active }: { active: boolean }) {
   const [i, setI] = useState(0)
   /** 좋아요를 누른 영상. ⚠️ 이 화면 안에서만 산다(계약에 좋아요가 없다). */
   const [liked, setLiked] = useState<string[]>([])
@@ -106,7 +110,7 @@ export default function HomeFeed({ active, by }: { active: boolean; by: string }
   /* 🔴 **재생 주소는 목록에 안 실려 온다** — 클립마다 따로 받는다(만료되는
      값이라 캐시하지 않는다). 저장 키가 없으므로 늘 받는 쪽으로 간다. */
   const publicUrls = usePlaybackUrls(published)
-  const clips = feedWith(published, publicUrls, by)
+  const clips = feedWith(published, publicUrls)
 
   const go = (step: number) => setI((prev) => (prev + step + clips.length) % clips.length)
 
@@ -287,7 +291,16 @@ export default function HomeFeed({ active, by }: { active: boolean; by: string }
       <div className="ss-feed-bar">
         {/* 왼쪽 알약 — 지금 보는 영상이 누구의 무엇인지. */}
         <p className="ss-feed-pill ss-feed-who">
-          <b>{clips[i].by}</b>
+          {/* 🔴 **카드가 있는 사람은 눌러서 그 카드로 간다**(CCC 39 의 성질 2).
+              없으면 링크를 안 그리고 이름만 둔다 — 「카드 없음」을 따로 알리지
+              않는다(같은 계약의 「하지 말 것」). */}
+          {clips[i].bySlug ? (
+            <a className="ss-feed-who-link" href={`/c/${clips[i].bySlug}`}>
+              {clips[i].by}
+            </a>
+          ) : (
+            <b>{clips[i].by}</b>
+          )}
           {/* 가르는 선. 낭독기는 이걸 읽을 필요가 없다 — 이름과 제목은 이미
               따로 읽힌다. */}
           <i aria-hidden="true">|</i>

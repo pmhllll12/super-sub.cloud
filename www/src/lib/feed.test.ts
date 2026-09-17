@@ -14,17 +14,19 @@ const clip: PublicVideo = {
   description: '디딤발이 공보다 앞서지 않는 순간',
   width: 1920,
   height: 1080,
+  uploader_nickname: '홍길동',
+  uploader_card_slug: 'hong-gildong-4f2a',
 }
 const urls = { v3: 'https://s3.example.com/v3.mp4?sig=1' }
 
 describe('영상 모음에 공개된 것을 얹는다', () => {
   it('공개한 것이 없으면 원래 목록 그대로다', () => {
-    expect(feedWith([], {}, '홍길동')).toEqual(FEED)
+    expect(feedWith([], {})).toEqual(FEED)
   })
 
   // 방금 공개한 것이 뒤에 묻혀 있으면 공개가 됐는지 알 수가 없다.
   it('공개한 것이 맨 앞에 온다', () => {
-    const list = feedWith([clip], urls, '홍길동')
+    const list = feedWith([clip], urls)
     expect(list).toHaveLength(FEED.length + 1)
     expect(list[0]).toMatchObject({
       title: '학교 끝나고 농구 연습',
@@ -37,30 +39,30 @@ describe('영상 모음에 공개된 것을 얹는다', () => {
   /* 🔴 **저장 키가 아니라 사전 서명 주소다.** 목록에는 아예 안 실려 오므로
      클립마다 `playback-url` 로 따로 받는다(계약 3-6절). */
   it('재생 주소는 따로 받은 것을 쓴다', () => {
-    expect(feedWith([clip], urls, '홍길동')[0].src).toBe(urls.v3)
+    expect(feedWith([clip], urls)[0].src).toBe(urls.v3)
   })
 
   /* 아직 주소를 못 받은 칸은 빈 문자열이다 — 그 칸만 플레이어 없이 그려지고
      목록이 통째로 안 무너진다. */
   it('주소를 아직 못 받았으면 비워 둔다', () => {
-    expect(feedWith([clip], {}, '홍길동')[0].src).toBe('')
+    expect(feedWith([clip], {})[0].src).toBe('')
   })
 
   /* 계약이 제목에 `null` 을 허용한다 — 빈 자리로 두면 이름 없는 칸이 된다. */
   it('제목이 없으면 자리를 비우지 않는다', () => {
-    const row = feedWith([{ ...clip, title: null, description: null }], urls, '홍길동')[0]
+    const row = feedWith([{ ...clip, title: null, description: null }], urls)[0]
     expect(row.title).toBe('제목 없는 장면')
     expect(row.what).toBe('')
   })
 
   // ⚠️ 계약 5장에 댓글이 없다 — 없는 것을 지어내지 않는다.
   it('공개 영상에는 댓글이 붙어 있지 않다', () => {
-    expect(feedWith([clip], urls, '홍길동')[0].comments).toEqual([])
+    expect(feedWith([clip], urls)[0].comments).toEqual([])
   })
 
   // 🔴 id 는 리액트 key 이자 좋아요의 기준이다. 겹치면 남의 영상에 불이 켜진다.
   it('id 가 원래 목록과 겹치지 않는다', () => {
-    const ids = feedWith([{ ...clip, id: 'f-001' }], urls, '홍길동').map((c) => c.id)
+    const ids = feedWith([{ ...clip, id: 'f-001' }], urls).map((c) => c.id)
     expect(new Set(ids).size).toBe(ids.length)
   })
 
@@ -69,25 +71,62 @@ describe('영상 모음에 공개된 것을 얹는다', () => {
      세로로 찍어 올린 영상이 **가로 칸 안에 쪼그라들어** 좌우가 남았다. CCC 46
      (미결 `paik` 15번의 답)으로 목록에 실려 온다. */
   it('세로 영상은 세로 비율로 선다', () => {
-    const row = feedWith([{ ...clip, width: 1080, height: 1920 }], urls, '홍길동')[0]
+    const row = feedWith([{ ...clip, width: 1080, height: 1920 }], urls)[0]
     expect(row.aspect).toBe('1080 / 1920')
   })
 
   it('가로 영상은 가로 비율로 선다', () => {
-    expect(feedWith([clip], urls, '홍길동')[0].aspect).toBe('1920 / 1080')
+    expect(feedWith([clip], urls)[0].aspect).toBe('1920 / 1080')
   })
 
   /* 🔴 **옛 등록분은 둘 다 `null` 이다**(이 컬럼이 생기기 전). 계약이 "에러로
      다루지 말라"고 못 박았다 — 그때는 **지금까지의 동작(16:9 가정)** 그대로다. */
   it('비율을 모르는 옛 영상은 16:9 로 가정한다', () => {
-    const row = feedWith([{ ...clip, width: null, height: null }], urls, '홍길동')[0]
+    const row = feedWith([{ ...clip, width: null, height: null }], urls)[0]
     expect(row.aspect).toBe('16 / 9')
   })
 
   /* 한쪽만 온 응답은 계약에 없지만, 비율은 **둘이 다 있어야** 나온다. 한 칸을
      0 이나 1 로 메우면 칸이 화면을 넘거나 실처럼 눌린다 — 모르면 모른다고 둔다. */
   it('한쪽만 오면 비율을 지어내지 않는다', () => {
-    expect(feedWith([{ ...clip, height: null }], urls, '홍길동')[0].aspect).toBe('16 / 9')
-    expect(feedWith([{ ...clip, width: 0 }], urls, '홍길동')[0].aspect).toBe('16 / 9')
+    expect(feedWith([{ ...clip, height: null }], urls)[0].aspect).toBe('16 / 9')
+    expect(feedWith([{ ...clip, width: 0 }], urls)[0].aspect).toBe('16 / 9')
+  })
+})
+
+/**
+ * 🔴 **남의 공개 영상이 「내 이름」으로 그려지던 것**(미결 `paik` 16번,
+ * CCC 39 로 2026-09-17 해소).
+ *
+ * 전에는 `feedWith` 가 **보는 사람 닉네임 하나**를 받아 공개 클립 전부에
+ * 붙였다. 목록에는 남의 영상도 섞여 오므로 남의 장면이 내 이름을 달고 나왔다.
+ * 이제 줄마다 서버가 준 업로더를 쓴다.
+ */
+describe('올린 사람은 줄마다 다르다', () => {
+  const mine: PublicVideo = { ...clip, id: 'v-mine' }
+  const theirs: PublicVideo = {
+    ...clip,
+    id: 'v-theirs',
+    uploader_nickname: '김철수',
+    uploader_card_slug: 'kim-chulsoo-1a2b',
+  }
+
+  it('각 영상의 업로더를 그대로 쓴다', () => {
+    const list = feedWith([mine, theirs], {})
+    expect(list[0].by).toBe('홍길동')
+    expect(list[1].by).toBe('김철수')
+  })
+
+  it('카드 슬러그도 그 사람 것을 따라간다', () => {
+    const list = feedWith([mine, theirs], {})
+    expect(list[0].bySlug).toBe('hong-gildong-4f2a')
+    expect(list[1].bySlug).toBe('kim-chulsoo-1a2b')
+  })
+
+  /* 🔴 카드를 안 만든 사람은 `null` 이다 — 링크를 안 그리면 그만이고,
+     「카드 없음」을 따로 알리지 않는다(계약의 「하지 말 것」). */
+  it('카드가 없는 사람은 슬러그가 null 이다', () => {
+    const noCard: PublicVideo = { ...clip, uploader_card_slug: null }
+    expect(feedWith([noCard], {})[0].bySlug).toBeNull()
   })
 })

@@ -18,6 +18,13 @@ export type FeedClip = {
   /** 올린 사람. */
   by: string
   /**
+   * 그 사람 카드의 공개 슬러그 — 있으면 이름이 **카드로 가는 링크**가 된다.
+   *
+   * 🔴 없으면(`null`·`undefined`) **링크를 안 그리면 그만**이다. 「카드 없음」을
+   * 따로 알리지 않는다(CCC 39 의 「하지 말 것」).
+   */
+  bySlug?: string | null
+  /**
    * 올린 날(YYYY-MM-DD).
    *
    * ⚠️ **화면에는 안 내보낸다**(사용자 요청). 언제 올렸는지가 보이면 오래된 것이
@@ -107,15 +114,17 @@ function aspectOf(width: number | null, height: number | null): string {
 }
 
 /**
- * 원래 목록 앞에 **내가 공개한 클립**을 얹는다.
+ * 원래 목록 앞에 **공개된 클립**을 얹는다.
  *
- * ⚠️ 남의 공개 영상은 아직 못 붙인다 — 계약에 공개 클립 목록도, 재생용 주소도
- * 없다(미결로 올렸다). 그때까지 이 자리에 늘어나는 것은 **내 것뿐**이다.
+ * 🔴 **정정 (2026-09-17, CCC 39 · 미결 `paik` 16번 해소).** 앞서 이 자리에
+ * 「늘어나는 것은 내 것뿐」이라고 적혀 있었고, 그래서 **보는 사람 닉네임
+ * 하나를 모든 줄에 붙이고** 있었다. 목록에는 **남의 공개 영상도 섞여 오므로**
+ * 그러면 남의 장면이 내 이름으로 그려진다 — 그게 `paik` 16번이었다.
+ * 이제 **줄마다 그 영상의 업로더**를 쓴다(`uploader_nickname`, 늘 온다).
  */
 export function feedWith(
   published: PublicVideo[],
   urls: Record<string, string>,
-  by: string,
 ): FeedClip[] {
   return [
     ...published.map((c) => ({
@@ -124,7 +133,11 @@ export function feedWith(
       id: `pub-${c.id}`,
       // 제목은 없을 수 있다(계약이 `null` 을 허용한다) — 빈 자리로 두지 않는다.
       title: c.title ?? '제목 없는 장면',
-      by,
+      /* 🔴 **서버가 준 업로더를 그대로 쓴다.** 보는 사람 이름을 기본값으로
+         깔지 않는다 — 그렇게 두면 서버가 값을 빠뜨렸을 때 **남의 영상이 다시
+         내 이름으로** 그려지고, 그 잘못이 조용히 숨는다. */
+      by: c.uploader_nickname,
+      bySlug: c.uploader_card_slug,
       at: c.created_at.slice(0, 10),
       what: c.description ?? '',
       /* 🔴 **저장 키가 아니라 사전 서명 주소다**(계약 3-6절). 목록에는 아예

@@ -21,6 +21,7 @@ import type {
   Squad,
   PlayerCard,
   PublicPlayerCard,
+  PublicVideo,
   SignupResult,
   User,
 } from './types'
@@ -962,23 +963,61 @@ export const mockBackend: Backend = {
   },
 
   async listPublicVideos(token) {
-    requireUser(token)
-    /* 🔴 **저장 키와 업로더를 안 싣는다** — 저장 키에 업로더의 `user_id` 가
-       들어 있어 계약이 일부러 뺐다. mock 이 더 주면 화면이 실물에 없는 값에
-       기대게 된다. 재생은 `playback-url` 로 따로 받는다. */
-    return DEMO_VIDEOS.filter((v) => v.is_public).map((v) => ({
+    const u = requireUser(token)
+    /* 🔴 **저장 키는 안 싣는다** — 거기에 업로더의 `user_id` 가 들어 있어
+       계약이 일부러 뺐다. 재생은 `playback-url` 로 따로 받는다.
+
+       ⚠️ **업로더 닉네임·카드 슬러그는 이제 싣는다**(CCC 39, 2026-09-15) —
+       그게 없어서 남의 공개 영상이 보는 사람 이름으로 그려졌다(`paik` 16번). */
+    const mine = DEMO_VIDEOS.filter((v) => v.is_public).map((v) => ({
       id: v.id,
       sport_code: v.sport_code,
       duration_ms: v.duration_ms,
       created_at: v.created_at,
       title: v.title,
       description: v.description,
+      uploader_nickname: u.nickname,
+      uploader_card_slug: card.public_slug,
       /* 🔴 **재서 넣은 실제 값이다**(CCC 46) — `ffprobe` 로 `public/` 의 파일을
          읽었다. 지어낸 값을 두면 세로 파일이 가로 칸에서 letterbox 되어, 화면이
          고쳐졌는지 mock 으로는 알 수 없게 된다. 실서버의 옛 등록분은 둘 다
          `null` 로 오고 그것은 **에러가 아니다**(화면이 16:9 로 가정한다). */
       ...(DEMO_SIZES[v.storage_key] ?? { width: null, height: null }),
     }))
+
+    /* 🔴 **남의 공개 영상도 섞어 준다**(2026-09-17). 실서버의 이 목록은 온
+       사람들의 공개 클립이다 — mock 이 내 것만 주면 화면은 **「남의 것」이라는
+       경우를 영영 못 만나고**, 바로 그래서 `paik` 16번(남의 영상이 내 이름으로
+       그려짐)이 개발에서 안 보였다. 🔴 **카드가 없는 사람도 한 명 둔다** —
+       슬러그가 `null` 인 갈래(링크를 안 그린다)를 밟아 볼 수 있어야 한다. */
+    const others: PublicVideo[] = [
+      {
+        id: 'pubv-남-1',
+        sport_code: 'football',
+        duration_ms: 12_000,
+        created_at: '2026-09-12T09:00:00Z',
+        title: '골대 앞 마무리',
+        description: '디딤발이 공보다 앞서지 않게',
+        width: 1080,
+        height: 1920,
+        uploader_nickname: '김철수',
+        uploader_card_slug: 'kim-chulsoo-1a2b',
+      },
+      {
+        id: 'pubv-남-2',
+        sport_code: 'football',
+        duration_ms: 9_000,
+        created_at: '2026-09-13T10:30:00Z',
+        title: '인사이드 패스 연습',
+        description: null,
+        width: 1920,
+        height: 1080,
+        uploader_nickname: '최카드없음',
+        // 🔴 카드를 안 만든 사람 — 링크를 안 그리는 갈래다.
+        uploader_card_slug: null,
+      },
+    ]
+    return [...mine, ...others]
   },
 
   async getFeaturedVideo(token, cardSlug): Promise<FeaturedVideo> {

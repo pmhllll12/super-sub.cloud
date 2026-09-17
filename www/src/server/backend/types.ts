@@ -360,6 +360,21 @@ export type PublicVideo = {
    */
   width: number | null
   height: number | null
+  /**
+   * **올린 사람의 닉네임** — 늘 온다(CCC 39, 2026-09-15).
+   *
+   * 🔴 **이게 없어서 남의 공개 영상도 보는 사람 이름으로 그려졌다**(미결
+   * `paik` 16번). 목록에 남의 것이 섞이는데 화면이 「나」 하나만 알고 있었다.
+   */
+  uploader_nickname: string
+  /**
+   * 그 사람 카드의 공개 슬러그 — **카드를 만든 사람만** 있고 없으면 `null`.
+   *
+   * 🔴 `null` 이면 **링크를 안 걸면 그만**이다. 「카드 없음」이라고 따로 알릴
+   * 필요 없다(계약의 「하지 말 것」). raw `user_id` 나 저장 키는 **안 온다** —
+   * 링크는 이 값으로만 건다.
+   */
+  uploader_card_slug: string | null
 }
 
 /** `Team` 과 달리 나간 소속도 포함하므로 `left_at` 을 갖는다. */
