@@ -1,0 +1,210 @@
+---
+layout: default
+title: 백엔드 · 파이프라인
+permalink: /11-백엔드파이프라인/
+parent: III 부. 개발 진행
+nav_order: 2
+---
+
+# 백엔드 · 파이프라인
+
+> 2026-09-17 기준 · 담당 정어진. 전체 구성 속 위치는
+> [프로젝트 전체 그림]({{ "/10-프로젝트전체그림/" | relative_url }})의 그림 1·2에 있다. 이 장은
+> **무엇을 만들었고, 무엇에 막혔고, 어떻게 풀었나**를 다룬다.
+
+## 1) 맡은 것 한눈에
+
+API 서버와 데이터베이스, 그리고 분석 파이프라인의 **양 끝** — 들어오는 영상의 검사,
+분석 작업 대기열, 돌아온 결과의 적재 — 를 맡았다. 분석 자체(자세 추출·채점)는 정상호,
+배포 앞단과 k3s 전환은 박민호가 맡았다.
+
+<div style="display:flex;flex-wrap:wrap;gap:0.75rem;margin:1.2rem 0"><div style="flex:1 1 150px;border:1px solid #e3e1da;border-radius:8px;padding:0.8rem 1rem;background:#fff"><div style="font-size:1.6rem;font-weight:700;color:#27262b;line-height:1.2">1,068</div><div style="font-size:0.9rem;color:#27262b;margin-top:0.15rem">백엔드 테스트</div><div style="font-size:0.78rem;color:#5c5962;margin-top:0.2rem">08-25 70건에서</div></div><div style="flex:1 1 150px;border:1px solid #e3e1da;border-radius:8px;padding:0.8rem 1rem;background:#fff"><div style="font-size:1.6rem;font-weight:700;color:#27262b;line-height:1.2">98</div><div style="font-size:0.9rem;color:#27262b;margin-top:0.15rem">API 경로</div><div style="font-size:0.78rem;color:#5c5962;margin-top:0.2rem">도메인 7개에 나눠</div></div><div style="flex:1 1 150px;border:1px solid #e3e1da;border-radius:8px;padding:0.8rem 1rem;background:#fff"><div style="font-size:1.6rem;font-weight:700;color:#27262b;line-height:1.2">43</div><div style="font-size:0.9rem;color:#27262b;margin-top:0.15rem">테이블</div><div style="font-size:0.78rem;color:#5c5962;margin-top:0.2rem">처음 설계 32개</div></div><div style="flex:1 1 150px;border:1px solid #e3e1da;border-radius:8px;padding:0.8rem 1rem;background:#fff"><div style="font-size:1.6rem;font-weight:700;color:#27262b;line-height:1.2">51건</div><div style="font-size:0.9rem;color:#27262b;margin-top:0.15rem">계약 변경</div><div style="font-size:0.78rem;color:#5c5962;margin-top:0.2rem">화면 쪽에 넘긴 규격 변경</div></div></div>
+
+## 2) 구조
+
+### 도메인 지도
+
+<figure style="margin:1.4rem 0"><svg viewBox="0 0 740 452" role="img" aria-label="백엔드 도메인 일곱과, 서로의 테이블을 직접 읽는 관계 15쌍. 사용자·팀 도메인이 가장 많이 읽히고, 매칭 도메인이 가장 많이 읽어 간다." font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Apple SD Gothic Neo','Noto Sans KR',sans-serif" style="max-width:100%;height:auto;display:block"><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5c5962"/></marker></defs><g><title>매칭 — 테이블 9개</title><rect x="300" y="16" width="140" height="58" rx="6" fill="#f6f5f1" stroke="#5c5962" stroke-width="1.5"/><text x="370.0" y="41" text-anchor="middle" font-size="14" fill="#27262b" font-weight="600">매칭</text><text x="370.0" y="60" text-anchor="middle" font-size="11.5" fill="#5c5962">테이블 9개</text></g><g><title>영상 분석 — 테이블 9개</title><rect x="40" y="120" width="140" height="58" rx="6" fill="#f6f5f1" stroke="#5c5962" stroke-width="1.5"/><text x="110.0" y="145" text-anchor="middle" font-size="14" fill="#27262b" font-weight="600">영상 분석</text><text x="110.0" y="164" text-anchor="middle" font-size="11.5" fill="#5c5962">테이블 9개</text></g><g><title>평가·신뢰 — 테이블 5개</title><rect x="560" y="120" width="140" height="58" rx="6" fill="#f6f5f1" stroke="#5c5962" stroke-width="1.5"/><text x="630.0" y="145" text-anchor="middle" font-size="14" fill="#27262b" font-weight="600">평가·신뢰</text><text x="630.0" y="164" text-anchor="middle" font-size="11.5" fill="#5c5962">테이블 5개</text></g><g><title>사용자·팀 — 테이블 10개</title><rect x="300" y="196" width="140" height="58" rx="6" fill="#f6f5f1" stroke="#5c5962" stroke-width="1.5"/><text x="370.0" y="221" text-anchor="middle" font-size="14" fill="#27262b" font-weight="600">사용자·팀</text><text x="370.0" y="240" text-anchor="middle" font-size="11.5" fill="#5c5962">테이블 10개</text></g><g><title>카드·스쿼드 — 테이블 6개</title><rect x="40" y="276" width="140" height="58" rx="6" fill="#f6f5f1" stroke="#5c5962" stroke-width="1.5"/><text x="110.0" y="301" text-anchor="middle" font-size="14" fill="#27262b" font-weight="600">카드·스쿼드</text><text x="110.0" y="320" text-anchor="middle" font-size="11.5" fill="#5c5962">테이블 6개</text></g><g><title>알림 — 테이블 1개</title><rect x="560" y="276" width="140" height="58" rx="6" fill="#f6f5f1" stroke="#5c5962" stroke-width="1.5"/><text x="630.0" y="301" text-anchor="middle" font-size="14" fill="#27262b" font-weight="600">알림</text><text x="630.0" y="320" text-anchor="middle" font-size="11.5" fill="#5c5962">테이블 1개</text></g><g><title>과금 — 테이블 3개</title><rect x="300" y="360" width="140" height="58" rx="6" fill="#f6f5f1" stroke="#5c5962" stroke-width="1.5"/><text x="370.0" y="385" text-anchor="middle" font-size="14" fill="#27262b" font-weight="600">과금</text><text x="370.0" y="404" text-anchor="middle" font-size="11.5" fill="#5c5962">테이블 3개</text></g><g><title>매칭 → 영상 분석: 테이블 4개를 직접 읽음</title><path d="M300,55 L182,124" fill="none" stroke="transparent" stroke-width="12"/><path d="M300,55 L182,124" fill="none" stroke="#5c5962" stroke-width="1.5" marker-end="url(#a)"/></g><g><title>매칭 → 평가·신뢰: 테이블 2개를 직접 읽음 / 평가·신뢰 → 매칭: 테이블 2개를 직접 읽음</title><path d="M440,55 L558,124" fill="none" stroke="transparent" stroke-width="12"/><path d="M440,55 L558,124" fill="none" stroke="#5c5962" stroke-width="1.5" marker-end="url(#a)" marker-start="url(#a)"/></g><g><title>매칭 → 사용자·팀: 테이블 6개를 직접 읽음 / 사용자·팀 → 매칭: 테이블 2개를 직접 읽음</title><path d="M370,74 L370,194" fill="none" stroke="transparent" stroke-width="12"/><path d="M370,74 L370,194" fill="none" stroke="#5c5962" stroke-width="1.5" marker-end="url(#a)" marker-start="url(#a)"/></g><g><title>매칭 → 카드·스쿼드: 테이블 3개를 직접 읽음</title><path d="M300,30 L22,30 L22,305 L38,305" fill="none" stroke="transparent" stroke-width="12"/><path d="M300,30 L22,30 L22,305 L38,305" fill="none" stroke="#5c5962" stroke-width="1.5" marker-end="url(#a)"/></g><g><title>매칭 → 알림: 테이블 1개를 직접 읽음</title><path d="M440,30 L718,30 L718,305 L702,305" fill="none" stroke="transparent" stroke-width="12"/><path d="M440,30 L718,30 L718,305 L702,305" fill="none" stroke="#5c5962" stroke-width="1.5" marker-end="url(#a)"/></g><g><title>영상 분석 → 사용자·팀: 테이블 2개를 직접 읽음</title><path d="M180,165 L298,212" fill="none" stroke="transparent" stroke-width="12"/><path d="M180,165 L298,212" fill="none" stroke="#5c5962" stroke-width="1.5" marker-end="url(#a)"/></g><g><title>영상 분석 → 카드·스쿼드: 테이블 1개를 직접 읽음</title><path d="M110,178 L110,274" fill="none" stroke="transparent" stroke-width="12"/><path d="M110,178 L110,274" fill="none" stroke="#5c5962" stroke-width="1.5" marker-end="url(#a)"/></g><g><title>영상 분석 → 평가·신뢰: 테이블 2개를 직접 읽음</title><path d="M180,140 L558,140" fill="none" stroke="transparent" stroke-width="12"/><path d="M180,140 L558,140" fill="none" stroke="#5c5962" stroke-width="1.5" marker-end="url(#a)"/></g><g><title>평가·신뢰 → 사용자·팀: 테이블 2개를 직접 읽음</title><path d="M560,165 L442,212" fill="none" stroke="transparent" stroke-width="12"/><path d="M560,165 L442,212" fill="none" stroke="#5c5962" stroke-width="1.5" marker-end="url(#a)"/></g><g><title>카드·스쿼드 → 사용자·팀: 테이블 4개를 직접 읽음 / 사용자·팀 → 카드·스쿼드: 테이블 2개를 직접 읽음</title><path d="M180,290 L298,238" fill="none" stroke="transparent" stroke-width="12"/><path d="M180,290 L298,238" fill="none" stroke="#5c5962" stroke-width="1.5" marker-end="url(#a)" marker-start="url(#a)"/></g><g><title>사용자·팀 → 알림: 테이블 1개를 직접 읽음</title><path d="M440,238 L558,290" fill="none" stroke="transparent" stroke-width="12"/><path d="M440,238 L558,290" fill="none" stroke="#5c5962" stroke-width="1.5" marker-end="url(#a)"/></g><g><title>과금 → 사용자·팀: 테이블 2개를 직접 읽음</title><path d="M370,360 L370,256" fill="none" stroke="transparent" stroke-width="12"/><path d="M370,360 L370,256" fill="none" stroke="#5c5962" stroke-width="1.5" marker-end="url(#a)"/></g><text x="20" y="440" text-anchor="start" font-size="11.5" fill="#27262b">화살표 = 읽는 도메인 → 테이블 주인 · 양쪽 화살표 = 서로 읽음 · 선에 마우스를 올리면 테이블 수</text></svg><figcaption style="font-size:0.85rem;color:#5c5962;margin-top:0.4rem">그림 1. 도메인 지도(2026-09-17). 도메인끼리 <strong>코드는 서로 가져다 쓰지 않는다</strong> — 검사가 막는다. 대신 필요한 값은 다른 도메인의 테이블을 직접 읽는데, 그런 관계가 15쌍(45곳)이다. 사용자·팀은 다섯 도메인이 읽어 가고, 추천 판을 만드는 매칭은 다섯 도메인을 읽는다(4절 D).</figcaption></figure>
+
+### 분석 작업의 상태 흐름
+
+<figure style="margin:1.4rem 0"><svg viewBox="0 0 740 392" role="img" aria-label="분석 작업의 상태: 대기에서 워커가 가져가면 실행, 완료 보고로 성공 또는 실패. 보고 없이 30분 멈추면 첫 번째는 다시 대기로, 두 번째는 실패로 끝난다. 대기에서 바로 성공이나 실패로 가는 길은 금지다. 같은 영상을 다시 올리면 작업을 만들지 않고 앞 영상을 가리킨다." font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Apple SD Gothic Neo','Noto Sans KR',sans-serif" style="max-width:100%;height:auto;display:block"><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5c5962"/></marker><marker id="x" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#d03b3b"/></marker></defs><g><title>대기 — queued</title><rect x="30" y="130" width="120" height="52" rx="26" fill="#f6f5f1" stroke="#27262b" stroke-width="1.5"/><text x="90" y="153" text-anchor="middle" font-size="14" fill="#27262b" font-weight="600">대기</text><text x="90" y="170" text-anchor="middle" font-size="11" fill="#5c5962">queued</text></g><g><title>실행 — running</title><rect x="300" y="130" width="120" height="52" rx="26" fill="#f6f5f1" stroke="#27262b" stroke-width="1.5"/><text x="360" y="153" text-anchor="middle" font-size="14" fill="#27262b" font-weight="600">실행</text><text x="360" y="170" text-anchor="middle" font-size="11" fill="#5c5962">running</text></g><g><title>성공 — succeeded</title><rect x="590" y="50" width="120" height="52" rx="26" fill="#f6f5f1" stroke="#27262b" stroke-width="1.5"/><text x="650" y="73" text-anchor="middle" font-size="14" fill="#27262b" font-weight="600">성공</text><text x="650" y="90" text-anchor="middle" font-size="11" fill="#5c5962">succeeded</text></g><g><title>실패 — failed</title><rect x="590" y="210" width="120" height="52" rx="26" fill="#f6f5f1" stroke="#27262b" stroke-width="1.5"/><text x="650" y="233" text-anchor="middle" font-size="14" fill="#27262b" font-weight="600">실패</text><text x="650" y="250" text-anchor="middle" font-size="11" fill="#5c5962">failed</text></g><path d="M150,156 L298,156" fill="none" stroke="#5c5962" stroke-width="1.5" marker-end="url(#a)"/><text x="224" y="147" text-anchor="middle" font-size="11" fill="#5c5962">워커가 가져감</text><path d="M420,146 L588,84" fill="none" stroke="#5c5962" stroke-width="1.5" marker-end="url(#a)"/><text x="470" y="100" text-anchor="middle" font-size="11" fill="#5c5962">완료 보고</text><path d="M420,166 L588,228" fill="none" stroke="#5c5962" stroke-width="1.5" marker-end="url(#a)"/><text x="548" y="198" text-anchor="middle" font-size="11" fill="#5c5962">실패 보고</text><path d="M360,182 C360,268 90,268 90,184" fill="none" stroke="#5c5962" stroke-width="1.5" marker-end="url(#a)"/><text x="225" y="280" text-anchor="middle" font-size="11" fill="#5c5962">보고 없이 30분 멈춤 · 첫 번째 → 다시 대기열</text><path d="M400,182 C430,280 540,290 588,250" fill="none" stroke="#5c5962" stroke-width="1.5" marker-end="url(#a)"/><text x="510" y="300" text-anchor="middle" font-size="11" fill="#5c5962">두 번째 멈춤 → 실패로 끝냄</text><path d="M90,130 C90,30 400,20 588,66" fill="none" stroke="#d03b3b" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#x)"/><text x="330" y="20" text-anchor="middle" font-size="11.5" fill="#d03b3b" font-weight="600">✕ 대기에서 바로 끝내기 — 금지 (C의 1차안이 이 길이었다)</text><line x1="20" y1="318" x2="720" y2="318" stroke="#e3e1da" stroke-width="1"/><text x="20" y="338" text-anchor="start" font-size="11.5" fill="#27262b" font-weight="600">같은 영상을 다시 올리면(C)</text><rect x="20" y="348" width="160" height="34" rx="6" fill="none" stroke="#5c5962" stroke-width="1.2"/><text x="100.0" y="370" text-anchor="middle" font-size="11.5" fill="#27262b">같은 사람 · 같은 내용</text><path d="M182,365 L238,365" fill="none" stroke="#5c5962" stroke-width="1.5" marker-end="url(#a)"/><rect x="240" y="348" width="230" height="34" rx="6" fill="none" stroke="#5c5962" stroke-width="1.2"/><text x="355.0" y="370" text-anchor="middle" font-size="11.5" fill="#27262b">작업을 만들지 않고 앞 영상을 가리킴</text><path d="M472,365 L528,365" fill="none" stroke="#5c5962" stroke-width="1.5" marker-end="url(#a)"/><rect x="530" y="348" width="190" height="34" rx="6" fill="none" stroke="#5c5962" stroke-width="1.2"/><text x="625.0" y="370" text-anchor="middle" font-size="11.5" fill="#27262b">앞 결과를 등록 응답에 싣기</text></svg><figcaption style="font-size:0.85rem;color:#5c5962;margin-top:0.4rem">그림 2. 분석 작업 하나가 거치는 상태. 이 규칙은 <strong>코드 한 곳에만</strong> 있고 DB 제약으로 걸지 않았다 — 단계가 늘 때 마이그레이션 없이 넣으려는 것이다. 회수를 한 번으로 제한한 이유는, 무한히 되돌리면 워커를 죽이는 영상이 대기열을 영원히 돌기 때문이다.</figcaption></figure>
+
+## 3) 수치로 본 진행
+
+<figure style="margin:1.4rem 0"><svg viewBox="0 0 740 280" role="img" aria-label="백엔드 테스트 수 추이: 08-25에 70건에서 09-17에 1,068건. 한 번도 줄지 않았다." font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Apple SD Gothic Neo','Noto Sans KR',sans-serif" style="max-width:100%;height:auto;display:block"><line x1="60" y1="240.0" x2="690" y2="240.0" stroke="#e3e1da" stroke-width="1"/><text x="52" y="244.0" text-anchor="end" font-size="11" fill="#5c5962">0</text><line x1="60" y1="195.5" x2="690" y2="195.5" stroke="#e3e1da" stroke-width="1"/><text x="52" y="199.5" text-anchor="end" font-size="11" fill="#5c5962">250</text><line x1="60" y1="150.9" x2="690" y2="150.9" stroke="#e3e1da" stroke-width="1"/><text x="52" y="154.9" text-anchor="end" font-size="11" fill="#5c5962">500</text><line x1="60" y1="106.4" x2="690" y2="106.4" stroke="#e3e1da" stroke-width="1"/><text x="52" y="110.4" text-anchor="end" font-size="11" fill="#5c5962">750</text><line x1="60" y1="61.8" x2="690" y2="61.8" stroke="#e3e1da" stroke-width="1"/><text x="52" y="65.8" text-anchor="end" font-size="11" fill="#5c5962">1,000</text><text x="60.0" y="258" text-anchor="middle" font-size="11" fill="#5c5962">08-25</text><text x="251.7" y="258" text-anchor="middle" font-size="11" fill="#5c5962">09-01</text><text x="443.5" y="258" text-anchor="middle" font-size="11" fill="#5c5962">09-08</text><text x="635.2" y="258" text-anchor="middle" font-size="11" fill="#5c5962">09-15</text><polyline points="60.0,227.5 87.4,217.4 142.2,210.6 279.1,183.3 306.5,161.8 333.9,159.5 443.5,127.2 470.9,116.5 498.3,115.8 525.7,101.7 635.2,82.0 662.6,57.7 690.0,49.7" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round"/><g><title>08-25 · 테스트 70건</title><circle cx="60.0" cy="227.5" r="10" fill="transparent"/><circle cx="60.0" cy="227.5" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"/></g><g><title>08-26 · 테스트 127건</title><circle cx="87.4" cy="217.4" r="10" fill="transparent"/><circle cx="87.4" cy="217.4" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"/></g><g><title>08-28 · 테스트 165건</title><circle cx="142.2" cy="210.6" r="10" fill="transparent"/><circle cx="142.2" cy="210.6" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"/></g><g><title>09-02 · 테스트 318건</title><circle cx="279.1" cy="183.3" r="10" fill="transparent"/><circle cx="279.1" cy="183.3" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"/></g><g><title>09-03 · 테스트 439건</title><circle cx="306.5" cy="161.8" r="10" fill="transparent"/><circle cx="306.5" cy="161.8" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"/></g><g><title>09-04 · 테스트 452건</title><circle cx="333.9" cy="159.5" r="10" fill="transparent"/><circle cx="333.9" cy="159.5" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"/></g><g><title>09-08 · 테스트 633건</title><circle cx="443.5" cy="127.2" r="10" fill="transparent"/><circle cx="443.5" cy="127.2" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"/></g><g><title>09-09 · 테스트 693건</title><circle cx="470.9" cy="116.5" r="10" fill="transparent"/><circle cx="470.9" cy="116.5" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"/></g><g><title>09-10 · 테스트 697건</title><circle cx="498.3" cy="115.8" r="10" fill="transparent"/><circle cx="498.3" cy="115.8" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"/></g><g><title>09-11 · 테스트 776건</title><circle cx="525.7" cy="101.7" r="10" fill="transparent"/><circle cx="525.7" cy="101.7" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"/></g><g><title>09-15 · 테스트 887건</title><circle cx="635.2" cy="82.0" r="10" fill="transparent"/><circle cx="635.2" cy="82.0" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"/></g><g><title>09-16 · 테스트 1,023건</title><circle cx="662.6" cy="57.7" r="10" fill="transparent"/><circle cx="662.6" cy="57.7" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"/></g><g><title>09-17 · 테스트 1,068건</title><circle cx="690.0" cy="49.7" r="10" fill="transparent"/><circle cx="690.0" cy="49.7" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"/></g><text x="700.0" y="53.7" text-anchor="start" font-size="12" fill="#27262b" font-weight="600">1,068</text><text x="70" y="214" text-anchor="start" font-size="12" fill="#27262b" font-weight="600">70</text></svg><figcaption style="font-size:0.85rem;color:#5c5962;margin-top:0.4rem">그림 3. 백엔드 테스트 수(pytest). 08-25 70건 → 09-17 1,068건, <strong>한 번도 줄지 않았다.</strong> 값은 커밋 메시지에 남긴 전체 실행 결과이고, 적지 않은 날은 점이 없다. 기능마다 계약 검사와 실제 DB 검사를 함께 넣었다.</figcaption></figure>
+
+<figure style="margin:1.4rem 0"><svg viewBox="0 0 740 280" role="img" aria-label="스키마 증가: 테이블은 08-26에 8개에서 09-17에 43개, 마이그레이션은 3개에서 47개. 처음 설계는 32개 테이블이었다." font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Apple SD Gothic Neo','Noto Sans KR',sans-serif" style="max-width:100%;height:auto;display:block"><line x1="60" y1="240.0" x2="600" y2="240.0" stroke="#e3e1da" stroke-width="1"/><text x="52" y="244.0" text-anchor="end" font-size="11" fill="#5c5962">0</text><line x1="60" y1="200.8" x2="600" y2="200.8" stroke="#e3e1da" stroke-width="1"/><text x="52" y="204.8" text-anchor="end" font-size="11" fill="#5c5962">10</text><line x1="60" y1="161.6" x2="600" y2="161.6" stroke="#e3e1da" stroke-width="1"/><text x="52" y="165.6" text-anchor="end" font-size="11" fill="#5c5962">20</text><line x1="60" y1="122.4" x2="600" y2="122.4" stroke="#e3e1da" stroke-width="1"/><text x="52" y="126.4" text-anchor="end" font-size="11" fill="#5c5962">30</text><line x1="60" y1="83.2" x2="600" y2="83.2" stroke="#e3e1da" stroke-width="1"/><text x="52" y="87.2" text-anchor="end" font-size="11" fill="#5c5962">40</text><line x1="60" y1="44.0" x2="600" y2="44.0" stroke="#e3e1da" stroke-width="1"/><text x="52" y="48.0" text-anchor="end" font-size="11" fill="#5c5962">50</text><text x="60.0" y="258" text-anchor="middle" font-size="11" fill="#5c5962">08-24</text><text x="240.0" y="258" text-anchor="middle" font-size="11" fill="#5c5962">09-01</text><text x="397.5" y="258" text-anchor="middle" font-size="11" fill="#5c5962">09-08</text><text x="555.0" y="258" text-anchor="middle" font-size="11" fill="#5c5962">09-15</text><line x1="60" y1="114.6" x2="600" y2="114.6" stroke="#5c5962" stroke-width="1.2" stroke-dasharray="5 4"/><text x="66" y="108.6" text-anchor="start" font-size="11" fill="#27262b">처음 설계(ERD) 32개 · 08-24</text><polyline points="105.0,208.6 150.0,185.1 240.0,177.3 262.5,165.5 285.0,134.2 307.5,134.2 397.5,122.4 420.0,122.4 442.5,118.5 465.0,118.5 555.0,79.3 577.5,71.4 600.0,71.4" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round"/><g><title>08-26 · 테이블(누적) 8</title><circle cx="105.0" cy="208.6" r="10" fill="transparent"/><circle cx="105.0" cy="208.6" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"/></g><g><title>08-28 · 테이블(누적) 14</title><circle cx="150.0" cy="185.1" r="10" fill="transparent"/><circle cx="150.0" cy="185.1" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"/></g><g><title>09-01 · 테이블(누적) 16</title><circle cx="240.0" cy="177.3" r="10" fill="transparent"/><circle cx="240.0" cy="177.3" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"/></g><g><title>09-02 · 테이블(누적) 19</title><circle cx="262.5" cy="165.5" r="10" fill="transparent"/><circle cx="262.5" cy="165.5" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"/></g><g><title>09-03 · 테이블(누적) 27</title><circle cx="285.0" cy="134.2" r="10" fill="transparent"/><circle cx="285.0" cy="134.2" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"/></g><g><title>09-04 · 테이블(누적) 27</title><circle cx="307.5" cy="134.2" r="10" fill="transparent"/><circle cx="307.5" cy="134.2" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"/></g><g><title>09-08 · 테이블(누적) 30</title><circle cx="397.5" cy="122.4" r="10" fill="transparent"/><circle cx="397.5" cy="122.4" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"/></g><g><title>09-09 · 테이블(누적) 30</title><circle cx="420.0" cy="122.4" r="10" fill="transparent"/><circle cx="420.0" cy="122.4" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"/></g><g><title>09-10 · 테이블(누적) 31</title><circle cx="442.5" cy="118.5" r="10" fill="transparent"/><circle cx="442.5" cy="118.5" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"/></g><g><title>09-11 · 테이블(누적) 31</title><circle cx="465.0" cy="118.5" r="10" fill="transparent"/><circle cx="465.0" cy="118.5" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"/></g><g><title>09-15 · 테이블(누적) 41</title><circle cx="555.0" cy="79.3" r="10" fill="transparent"/><circle cx="555.0" cy="79.3" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"/></g><g><title>09-16 · 테이블(누적) 43</title><circle cx="577.5" cy="71.4" r="10" fill="transparent"/><circle cx="577.5" cy="71.4" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"/></g><g><title>09-17 · 테이블(누적) 43</title><circle cx="600.0" cy="71.4" r="10" fill="transparent"/><circle cx="600.0" cy="71.4" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2"/></g><text x="610.0" y="75.4" text-anchor="start" font-size="12" fill="#27262b" font-weight="600">테이블 43</text><rect x="60" y="12" width="12" height="12" rx="3" fill="#2a78d6"/><text x="78" y="22" text-anchor="start" font-size="12" fill="#27262b">테이블(누적)</text><polyline points="105.0,228.2 150.0,216.5 240.0,212.6 262.5,204.7 285.0,193.0 307.5,185.1 397.5,161.6 420.0,142.0 442.5,122.4 465.0,114.6 555.0,95.0 577.5,67.5 600.0,55.8" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round"/><g><title>08-26 · 마이그레이션(누적) 3</title><circle cx="105.0" cy="228.2" r="10" fill="transparent"/><circle cx="105.0" cy="228.2" r="4" fill="#eb6834" stroke="#fff" stroke-width="2"/></g><g><title>08-28 · 마이그레이션(누적) 6</title><circle cx="150.0" cy="216.5" r="10" fill="transparent"/><circle cx="150.0" cy="216.5" r="4" fill="#eb6834" stroke="#fff" stroke-width="2"/></g><g><title>09-01 · 마이그레이션(누적) 7</title><circle cx="240.0" cy="212.6" r="10" fill="transparent"/><circle cx="240.0" cy="212.6" r="4" fill="#eb6834" stroke="#fff" stroke-width="2"/></g><g><title>09-02 · 마이그레이션(누적) 9</title><circle cx="262.5" cy="204.7" r="10" fill="transparent"/><circle cx="262.5" cy="204.7" r="4" fill="#eb6834" stroke="#fff" stroke-width="2"/></g><g><title>09-03 · 마이그레이션(누적) 12</title><circle cx="285.0" cy="193.0" r="10" fill="transparent"/><circle cx="285.0" cy="193.0" r="4" fill="#eb6834" stroke="#fff" stroke-width="2"/></g><g><title>09-04 · 마이그레이션(누적) 14</title><circle cx="307.5" cy="185.1" r="10" fill="transparent"/><circle cx="307.5" cy="185.1" r="4" fill="#eb6834" stroke="#fff" stroke-width="2"/></g><g><title>09-08 · 마이그레이션(누적) 20</title><circle cx="397.5" cy="161.6" r="10" fill="transparent"/><circle cx="397.5" cy="161.6" r="4" fill="#eb6834" stroke="#fff" stroke-width="2"/></g><g><title>09-09 · 마이그레이션(누적) 25</title><circle cx="420.0" cy="142.0" r="10" fill="transparent"/><circle cx="420.0" cy="142.0" r="4" fill="#eb6834" stroke="#fff" stroke-width="2"/></g><g><title>09-10 · 마이그레이션(누적) 30</title><circle cx="442.5" cy="122.4" r="10" fill="transparent"/><circle cx="442.5" cy="122.4" r="4" fill="#eb6834" stroke="#fff" stroke-width="2"/></g><g><title>09-11 · 마이그레이션(누적) 32</title><circle cx="465.0" cy="114.6" r="10" fill="transparent"/><circle cx="465.0" cy="114.6" r="4" fill="#eb6834" stroke="#fff" stroke-width="2"/></g><g><title>09-15 · 마이그레이션(누적) 37</title><circle cx="555.0" cy="95.0" r="10" fill="transparent"/><circle cx="555.0" cy="95.0" r="4" fill="#eb6834" stroke="#fff" stroke-width="2"/></g><g><title>09-16 · 마이그레이션(누적) 44</title><circle cx="577.5" cy="67.5" r="10" fill="transparent"/><circle cx="577.5" cy="67.5" r="4" fill="#eb6834" stroke="#fff" stroke-width="2"/></g><g><title>09-17 · 마이그레이션(누적) 47</title><circle cx="600.0" cy="55.8" r="10" fill="transparent"/><circle cx="600.0" cy="55.8" r="4" fill="#eb6834" stroke="#fff" stroke-width="2"/></g><text x="610.0" y="59.8" text-anchor="start" font-size="12" fill="#27262b" font-weight="600">마이그레이션 47</text><rect x="210" y="12" width="12" height="12" rx="3" fill="#eb6834"/><text x="228" y="22" text-anchor="start" font-size="12" fill="#27262b">마이그레이션(누적)</text></svg><figcaption style="font-size:0.85rem;color:#5c5962;margin-top:0.4rem">그림 4. 테이블과 마이그레이션이 쌓인 흐름. 처음 설계(점선, 32개)를 09-15에 넘었다 — 설계에 없던 로그인 수단·알림·팀 초대·일정 매칭 같은 자리가 생기면서다. 마이그레이션이 테이블보다 빨리 는 것은 <strong>이미 있는 테이블에 칸을 더한 변경</strong>이 그만큼 많았다는 뜻이다(팀 해체 표시·부르는 자리·카드 불릿 등).</figcaption></figure>
+
+<details markdown="block">
+<summary>표로 보기</summary>
+
+| 날짜 | 테스트 |
+|---|---:|
+| 08-25 | 70 |
+| 08-26 | 127 |
+| 08-28 | 165 |
+| 09-02 | 318 |
+| 09-03 | 439 |
+| 09-04 | 452 |
+| 09-08 | 633 |
+| 09-09 | 693 |
+| 09-10 | 697 |
+| 09-11 | 776 |
+| 09-15 | 887 |
+| 09-16 | 1,023 |
+| 09-17 | 1,068 |
+
+| 날짜 | 테이블(누적) | 마이그레이션(누적) |
+|---|---:|---:|
+| 08-26 | 8 | 3 |
+| 08-28 | 14 | 6 |
+| 09-01 | 16 | 7 |
+| 09-02 | 19 | 9 |
+| 09-03 | 27 | 12 |
+| 09-04 | 27 | 14 |
+| 09-08 | 30 | 20 |
+| 09-09 | 30 | 25 |
+| 09-10 | 31 | 30 |
+| 09-11 | 31 | 32 |
+| 09-15 | 41 | 37 |
+| 09-16 | 43 | 44 |
+| 09-17 | 43 | 47 |
+
+</details>
+
+## 4) 어려운 문제와 해결
+
+### A. 소리 없는 장애 — 하루 넘게 분석이 멈췄는데, 백엔드는 몰랐다
+
+**상황.** 09-16 08:27부터 분석이 한 건도 돌지 않았다. 작업은 대기열에 쌓이는데 가져가는
+워커가 없었고, **백엔드 로그에는 워커의 요청이 아예 찍히지 않았다.**
+
+**막힌 점.** 백엔드에서 보이는 것은 "요청이 안 온다"뿐이라, 워커가 죽었는지·네트워크
+문제인지·서버 문제인지 가를 단서가 없었다.
+
+**어떻게 좁혔나.**
+
+1. (정상호) 워커 기록에서 실패 응답을 찾았고, 그 응답을 보낸 것이 우리 서버가 아니라
+   **앞단**이라는 흔적을 확인했다. 마지막 정상 처리는 08:11, 첫 실패는 08:27 — 워커는
+   코드·설정·재시작 없이 **같은 프로세스 안에서** 갈렸다. 원인은 워커 밖에 있었다.
+2. (정상호) 조건을 하나씩 바꿔 같은 경로를 불러 차단 기준을 특정했다. 이때 **작업을
+   소비하는 호출은 쓰지 않고** 조회 방식으로만 시험했다 — 시험이 운영 데이터를 바꾸지
+   않게.
+3. (정상호) 워커가 요청마다 자기 이름을 밝히도록 고쳐 분석을 되살렸다.
+4. (정어진) 서버에서 같은 시험을 재현하고, 앞단을 거치지 않은 직접 호출은 정상인 것을
+   확인했다. 그런데 **배포 문서 어디에도 그 앞단이 없었다** — 문서는 nginx를 맨 앞으로
+   적고 있었다.
+
+**고른 것.** 워커 쪽 수정은 규칙을 피한 것이지 규칙이 우리를 안 막게 된 것이 아니라서,
+문제를 닫지 않고 앞단 규칙을 맡은 박민호에게 근본 조치(워커 전용 경로를 차단 대상에서
+빼기)를 넘겼다. 배포 문서에 앞단을 적고 「백엔드는 멀쩡한데 밖에서만 막히면 앞단부터
+본다」를 남겼다.
+
+**배운 것.** 설정을 확인하는 명령 하나가 서버 이관 뒤로 **아무것도 못 잡는 상태**였는데,
+"안 걸린다"가 "문제가 없다"로 읽혀 왔다. 확인 명령은 **살아 있는지 판별되게** 고쳤다 —
+결과가 비면 그 자체가 이상 신호가 되는 형태로.
+
+### B. 지우지 않는 삭제 — 마지막 주장이 팀을 버릴 방법이 없었다
+
+**상황.** 팀의 마지막 주장은 나갈 수 없게 막혀 있었다 — 주장이 없는 팀에는 아무도 사람을
+넣을 수 없어서다. 그런데 팀을 없애는 길도, 다른 사람을 주장으로 세우는 길도 없었다.
+오류 안내는 "다른 주장을 먼저 세우라"고 했지만 **세울 방법이 없었다.** 혼자 만든 팀은
+영영 버릴 수 없었다.
+
+**막힌 점.** 요청은 "팀 삭제"였다. 그런데 팀을 가리키는 외래키가 9개였고 그중 5개가
+삭제를 막는다(경기·스쿼드·경기 신청·구성원). 설계 문서의 삭제 연쇄도 팀 삭제를 정해
+두지 않았다.
+
+| 선택지 | 얻는 것 | 잃는 것 |
+|---|---|---|
+| 진짜 삭제 + 삭제 연쇄를 새로 정의 | 요청 그대로 | 세 도메인에 걸친 규칙을 새로 만들어야 하고, 지난 경기·평가가 가리키던 팀이 사라진다 |
+| **해체 표시** (행은 남김) | 이력 보존 · 스키마 변경은 칸 하나 | 새로 만드는 자리마다 해체 여부를 봐야 한다 |
+| 그대로 둠 | 변경 없음 | 사용자가 계속 막힌다 |
+
+**고른 것과 이유.** 해체 표시. 구성원 탈퇴도 이미 같은 이유로 행을 지우지 않고 탈퇴
+시각만 남기고 있었다 — 팀에도 같은 원칙을 적용했다. 여럿인 팀의 주장이 나갈 수 있게
+**주장 세우기**도 함께 냈다.
+
+**구현하다 찾은 구멍.** 처음엔 "구성원을 전부 내보내면 되지 않나"였는데, **본인 가입은
+누구나 할 수 있어서** 표시가 없으면 해체한 팀에 아무나 들어와 팀이 되살아난다. 그래서
+표시 칸이 꼭 필요했고, 막는 범위는 가입·초대·수정(새로 만드는 자리)으로만 잡았다 —
+읽기와 이력은 그대로다. 앞으로 있을 경기가 있으면 해체를 막았다(상대 팀에게는
+약속이다). 경기 탐색이 다가오는 경기만 보여 주므로, 이 규칙 하나로 "없는 팀의 경기가
+탐색에 뜨는" 문제가 구조적으로 생기지 않는다.
+
+**결과.** 검사 21건(계약 15 · 실제 DB 6)을 더했고 전체 1,055건이 통과했다.
+
+### C. 첫 설계를 스스로 버리다 — 같은 영상을 다시 올렸을 때
+
+**상황.** 같은 사람이 같은 영상을 다시 올리면 GPU로 똑같은 분석을 또 돌렸다. 앞서 실패한
+영상이면 같은 이유로 또 실패했다.
+
+**1차안.** 새 분석 작업을 만들되 곧바로 "성공" 또는 "실패"로 끝내고 앞 결과를 복사한다.
+기존 흐름(작업 → 결과)을 그대로 쓸 수 있어 간단해 보였다.
+
+**버린 이유.** 코드로 옮기기 전에 상태 규칙을 다시 읽다가 발견했다 — **대기에서 바로 끝내기는
+금지**다(그림 2의 빨간 점선). 워커가 가져가지 않은 작업이 끝난 것처럼 보이면, 시작·끝 시각의
+차이로 재는 처리 시간 지표가 거짓이 된다. 게다가 결과를 복사하려면 리포트를 다시 적재하는
+일까지 따라왔다.
+
+**2차안(채택).** 새 작업을 **아예 만들지 않고**, 새 영상이 앞 영상을 가리키기만 한다. 등록
+응답에 앞 결과(성공·실패와 사유)를 바로 싣는다. 재적재가 통째로 사라졌다.
+
+**좁힌 조건 셋.** 내용이 같은지는 저장소가 이미 알려 주는 파일 지문으로 판단한다(다시 내려받지
+않는다) · 본인 영상끼리만 · 분석 대상을 따로 지정한 영상은 제외한다(같은 영상이라도 누구를
+봤는지가 다르면 결과가 다를 수 있다).
+
+**구현하며 밟은 함정.** 두 JSON 칸은 "비어 있음"이 SQL의 NULL이 아니라 JSON의 `null` 값으로
+저장돼서, 조건이 실제 데이터에 한 건도 걸리지 않았다. 실제 DB로 조회해 보는 통합 검사에서야
+드러났다 — 가짜 저장소로만 검사했다면 통과했을 자리다.
+
+### D. 경계를 말이 아니라 검사로 — 도메인 일곱이 섞이지 않게
+
+**상황.** 백엔드를 도메인 일곱으로 나눴다(그림 1). 다른 팀원도 백엔드에 도메인을 붙이는
+기간이 있었고(과금은 박민호가 만들었다), **규칙을 문서에만 적으면 반드시 무너진다.**
+
+**고른 것.** 규칙을 검사로 바꿨다. 검사 12개가 도메인끼리 코드를 가져다 쓰는지, 계층이 거꾸로
+의존하는지, 새 테이블이 마이그레이션 도구에 등록됐는지를 매번 확인하고, 어기면 CI가 막는다.
+
+**치른 대가 둘.**
+
+1. 다른 도메인의 값이 필요하면 그 도메인 코드를 부를 수 없어 **테이블을 직접 읽는다** — 15쌍,
+   45곳이다. 그런데 저쪽 칸 이름이 바뀌면 파이썬이 잡아 주지 못한다. 그래서 그런 자리마다
+   **실제 DB로 대조하는 통합 검사**를 두었고, DB가 없어 검사가 건너뛰어지면 CI가 실패하게 했다
+   — "초록불인데 사실은 안 돌았다"를 막으려는 것이다.
+2. 계산 규칙도 빌려 쓸 수 없다. 추천 판(매칭)이 등급(영상 분석)을 계산해야 해서 **등급 규칙을
+   매칭 쪽에 복제**했다. 둘이 갈라지지 않게 지키는 일이 따라온다.
+
+**또 하나의 판단.** 도메인들을 조율하는 별도 계층은 넣지 않았다. 지금 도메인 사이의 흐름은
+전부 **읽기**라서, 도메인을 넘나드는 쓰기 흐름이 실제로 생기면 그 사례로 뽑아내기로 했다 —
+상상한 흐름에 맞춰 미리 만들면 실제 코드가 왔을 때 다시 깎게 된다.
+
+---
+
+[← 프로젝트 전체 그림]({{ "/10-프로젝트전체그림/" | relative_url }})
+
+<details markdown="block">
+<summary>이 장의 수치를 다시 뽑는 명령</summary>
+
+```bash
+# 테스트 수 — 커밋 메시지의 전체 실행 결과(두 표기)를 날짜별로
+git log --reverse --author=roqkf --format='@@%ad%n%B' --date=short \
+  | awk '/^@@/{d=substr($0,3); next}
+         { l=$0; while (match(l, /(pytest|전체)[^0-9]{0,20}[0-9]+ passed/)) {
+             s=substr(l,RSTART,RLENGTH); gsub(/[^0-9]/," ",s); n=split(s,b," ");
+             if (b[n]+0>m[d]) m[d]=b[n]+0; l=substr(l,RSTART+RLENGTH) } }
+         END{for(k in m) print k, m[k]}' | sort
+
+# 테이블·마이그레이션 — 마이그레이션 파일이 들어온 날짜별로
+for f in fastapi/alembic/versions/*.py; do
+  echo "$(git log --diff-filter=A --format=%ad --date=short -- "$f" | tail -1) $(grep -c 'op.create_table(' "$f")"
+done | sort | awk '{m[$1]++; t[$1]+=$2} END{for(k in m) print k, m[k], t[k]}' | sort
+
+# 계약 변경 항목 수 (번호 5~9는 처음부터 없다)
+grep -cE '^## [0-9]+\.' fastapi/docs/client-contract-changes.md
+```
+
+</details>
+
+[← 목차로](/toc/)
