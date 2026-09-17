@@ -7825,6 +7825,87 @@ Secret 자체도 매니페스트처럼 저장소에 없어서, 지금 운영에 
   `client-contract-changes.md` 절에서 그대로 따릅니다
 - **담당**: 백성검 · **제기**: 정어진 · **기한**: 급하지 않음(순서는 백성검 판단)
 
+### 37. **앞단이 Cloudflare 입니다 — 문서에 없었고, 그 때문에 두 가지가 딸려 있습니다** (2026-09-17 신설)
+
+- **담당**: 박민호(Cloudflare 규칙 · k3s 파드 인자) · **제기**: 정어진 · **기한**: 🔴 봇 차단 규칙은 재발 방지라 급하지 않지만, **아래 (나)는 지금 실제로 일어나고 있습니다**
+
+`ho` 53번(정상호)을 확인하다가 **그 항목의 전제와 다른 것**을 찾았습니다.
+정상호 님은 「앞단 규칙 자체는 정어진 영역」이라고 적으셨는데, **제 영역이
+아닙니다** — 저는 EC2·nginx·배포까지이고 **Cloudflare 계정·대시보드에 접근
+수단이 없습니다**(이 PC에도 저장소에도 없습니다). 그래서 이쪽으로 올립니다.
+
+#### 먼저 — `ho` 53번의 막힘 자체는 **이미 풀렸습니다**
+
+정상호 님의 UA 수정분이 GPU 인스턴스에 반영돼 있습니다. 2026-09-17 11:45
+(KST) 기준으로 워커가 `POST /internal/analysis-jobs/claim` 을 **5초 간격으로
+`204`** 로 받고 있습니다. 🔴 **더 급한 일로 보고 손대실 필요는 없습니다.**
+
+#### (가) 봇 차단 규칙 — 재발 방지가 남았습니다
+
+정상호 님 진단이 **그대로 재현됩니다**(공개 경로에 `GET` 으로만 확인했습니다 —
+`claim` 은 `POST` 로 부르면 작업을 소비합니다).
+
+| 보낸 UA | 결과 |
+|---|---|
+| `Python-urllib/3.12` | **403** (`server: cloudflare`) |
+| `python-urllib/3.12` (소문자) | 405 — 통과 |
+| `supersub-worker/1.0` | 405 — 통과 |
+| 오리진 직접(파드) | 405 — **앱은 멀쩡합니다** |
+
+**제 판단은 「`/api/v1/internal/*` 를 봇 차단 대상에서 제외」쪽입니다.** 워커
+IP 허용은 GPU 박스에 탄력적 IP 가 없어서(설계입니다) 인스턴스를 켤 때마다
+손이 갑니다. 그 경로는 이미 `X-Worker-Token` 으로 인증하고, UA 를 바꾼 것은
+정상호 님 말씀대로 **규칙이 조금만 넓어지면 그대로 재발**합니다.
+
+#### 🔴 (나) `client` 가 **Cloudflare 엣지 주소**로 찍힙니다 — 지금 일어나는 일입니다
+
+`fastapi/docs/deployment.md` 4절이 🔴 로 경고해 둔 바로 그 상황입니다:
+「`X-Forwarded-For` 를 신뢰하지 않으면 **요청 제한(SEC-009)의 키가 전부 LB
+주소가 되어 모든 사용자가 한 덩어리로 묶인다**」.
+
+파드 로그의 `client=` 가 **Cloudflare 대역으로만** 찍힙니다(같은 엣지 주소에
+수십 건). 즉 요청 제한과 인증 로그가 **사람별이 아니라 엣지별**로 묶입니다.
+
+원인은 둘이고 **둘 다 그쪽 구역**입니다.
+
+1. **nginx 에 원주소 복원이 없습니다** — `set_real_ip_from`(Cloudflare 대역)·
+   `real_ip_header CF-Connecting-IP` 가 한 줄도 없습니다. 그래서 nginx 가
+   보는 `$remote_addr` 자체가 Cloudflare 입니다
+2. **k3s 파드 인자에 `--proxy-headers`·`--forwarded-allow-ips` 가 없습니다** —
+   systemd 시절에는 드롭인에 있었는데(그 문서 절에 그렇게 적혀 있습니다)
+   **k3s 이관 때 딸려오지 않았습니다.** 지금 파드는
+   `uvicorn app.main:app --host 0.0.0.0 --port 8080` 뿐입니다
+
+🔴 **문서의 확인 명령이 낡아서 이걸 못 잡고 있었습니다** —
+`systemctl cat supersub-api | grep proxy-headers` 인데 systemd 는 이제
+`inactive` 입니다(이관 완료라 정상입니다). **k3s 기준으로 고쳐 두었습니다**
+(아래 문서 정정).
+
+#### 확인
+
+```bash
+# (가) 403 이 아니라 405 면 앞단을 통과한 것입니다
+curl -s -o /dev/null -w "%{http_code}\n" -X GET \
+  -A "Python-urllib/3.12" "https://<API 호스트>/api/v1/internal/analysis-jobs/claim"
+
+# (나) client 가 Cloudflare 대역이 아니라 실제 사용자 주소로 찍히면 해결입니다
+sudo k3s kubectl logs deploy/supersub-api-trial --tail=200 \
+  | grep -o "client=[^ ]*" | sort | uniq -c
+```
+
+#### 🔴 하지 말 것
+
+- **위 `curl` 을 `-X POST` 로 바꾸지 마십시오** — `claim` 은 부를 때마다
+  작업 하나를 `running` 으로 넘기고 회수 규칙이 아직 없습니다(정상호 님이
+  `ho` 53번에 적어 두신 것과 같습니다)
+- **(나)를 고칠 때 `--forwarded-allow-ips` 를 `*` 로 열지 마십시오** —
+  클라이언트가 `X-Forwarded-For` 를 위조해 요청 제한을 우회합니다
+  (`deployment.md` 4절). 신뢰 범위는 nginx 쪽만입니다
+- **워커 UA 를 되돌리지 마십시오** — 자기 이름을 밝히는 것이 원래 맞습니다
+
+- 관련: `ho` 53번(원 제기) · 문서는 `fastapi/docs/deployment.md` 4절에
+  이번에 정정했습니다(Cloudflare 가 앞에 있다는 사실이 그 문서에 없었습니다)
+
 ## min (박민호)
 
 ### 1. 패킷 A(과금) 진행 상황을 알려주세요 ✅ 회신 (2026.09.08)
