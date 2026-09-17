@@ -13994,6 +13994,41 @@ body:has(.ss-venues) .ss-home-header {
   }
 }
 
+/* ── 신청할 때 고르는 시각·구장 (사용자 요청, 2026-09-17) ───────────
+   🔴 후보에는 경기 시각·구장이 **없다**(팀 후보이지 경기 공고가 아니다).
+   신청은 둘을 필수로 받으므로 **우리가 제안한다** — 지어내지 않고 우리
+   조건과 경기장 목록에서 고른다. */
+.ss-tm-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  background-color: color-mix(in srgb, var(--ss-bg) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 14%, transparent);
+}
+
+.ss-tm-pick-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--ss-fg) 78%, transparent);
+}
+
+/* 고르는 칸이 남는 폭을 다 쓴다 — 구장 이름이 길다. */
+.ss-tm-pick-row select {
+  flex: 1;
+  min-width: 0;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 22%, transparent);
+  background-color: color-mix(in srgb, var(--ss-bg) 88%, transparent);
+  color: var(--ss-fg);
+  padding: 4px 6px;
+  font-size: 0.75rem;
+}
+
 /* ── 겹친 판 물리기 (사용자 요청, 2026-09-17) ────────────────────────
    초대 판은 알림에서 **왼쪽으로** 나오는데, 그 자리에 「AI 추천」·「지인
    찾기」 판이 **겹쳐 있을 때가 있다.** 그때 뒤엣것을 물려 앞의 판이 읽히게

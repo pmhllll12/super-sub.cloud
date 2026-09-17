@@ -1,20 +1,20 @@
 import type { PosCode } from '@/lib/pitchGrid'
-import { slotsOverlap, type MatchPrefs, type TimeSlot } from '@/lib/matchPrefs'
 
 /**
- * **팀 매칭** — 우리 팀과 조건이 비슷하고 **자리를 다 채운** 팀들.
+ * **팀 매칭** — 우리 팀과 조건이 맞는 팀들.
  *
- * ⚠️ **전부 mock 이다.** 계약에 넷 다 없다:
+ * ✅ **거의 다 진짜가 됐다.** 신청·알림·수락은 2026-09-16(계약 3-15절),
+ * 후보 목록은 2026-09-17(계약 3-13절 · CCC 40번)에 붙었다 — 붙박이 7팀을
+ * 크기로 거르고 근거를 `whyMatches()` 로 다시 계산하던 코드는 **걷었다**
+ * (계약이 「다시 계산하지 말 것」으로 못 박았다).
  *
- *   - 「비슷한 팀」을 골라 주는 경로 (RAG — 무엇을 근거로 비슷하다고 할지가
- *     정해지지 않았다. 미결로 올렸다: 정상호)
- *   - 경기 신청 (`POST /matches/{id}/applications` 는 **사람이 경기에** 지원하는
- *     것이지 **팀이 팀에게** 거는 것이 아니다 — 다른 개념이다. 정어진)
- *   - 상대 팀장에게 가는 **알림**
- *   - 상대의 **수락**
- *
- * 🔴 경로가 생기면 **이 파일만 갈아 끼운다.** 부르는 쪽(`TeamMatch`)은 아래
- * 두 함수만 안다 — `published.ts`·`squadBoard.ts` 가 같은 방식이었다.
+ * ⚠️ **아직 남은 mock 하나 — 아래 `TEAMS` · `teamById`.** 대기 팝업
+ * (`MatchWaiting`)이 **상대 팀의 이름과 판**을 그리는 데 쓴다.
+ * 🔴 **`USE_MOCK` 으로 안 꺼진다**(화면에 박힌 mock 이다) — 그 목록에 없는
+ * 진짜 팀이 수락하면 이름이 「상대 팀」으로 나오고 판이 빈다.
+ * 🔴 걷으려면 **상대 팀 스쿼드의 공개 슬러그**가 필요하다 — 경기 신청
+ * 응답에는 팀 이름·지역만 오고 슬러그가 없다(초대에만 실린다, CCC 53번).
+ * 정어진에게 요청할 자리다.
  */
 
 /** 판 위의 한 명 — 읽기 전용 판이 그리는 최소값. */
@@ -165,50 +165,6 @@ const TEAMS: Omit<MatchTeam, 'why'>[] = [
   },
 ]
 
-/** 그 경기가 언제인가 — 조건의 시간대와 견주려고 요일·시각으로 편다. */
-function slotOf(playedAt: string): TimeSlot | null {
-  const d = new Date(playedAt)
-  if (Number.isNaN(d.getTime())) return null
-  const p = (n: number) => String(n).padStart(2, '0')
-  const from = `${p(d.getHours())}:${p(d.getMinutes())}`
-  // 한 경기를 두 시간짜리로 본다 — 끝나는 시각이 계약에 없다(미결로 올렸다).
-  const end = new Date(d.getTime() + 2 * 60 * 60 * 1000)
-  return { day: d.getDay(), from, to: `${p(end.getHours())}:${p(end.getMinutes())}` }
-}
-
-/**
- * **왜 이 팀이 나왔는가** — 조건과 실제로 겹치는 것만 적는다.
- *
- * 🔴 **겹치지 않으면 안 적는다.** 빈 배열이면 「크기만 같다」는 뜻이고, 그것도
- * 사실이다 — 없는 근거를 지어내는 것보다 낫다.
- */
-export function whyMatches(team: Omit<MatchTeam, 'why'>, prefs: MatchPrefs): string[] {
-  const out: string[] = []
-  if (prefs.regions.includes(team.region)) out.push('같은 지역')
-  const slot = slotOf(team.playedAt)
-  if (slot && prefs.times.some((t) => slotsOverlap(t, slot))) out.push('시간이 맞음')
-  out.push(`${team.size} : ${team.size}`)
-  return out
-}
-
-/**
- * **조건에 맞는 팀들** — 우리와 판 크기가 같고, 조건과 겹치는 쪽이 앞에 온다.
- *
- * 🔴 **안 겹친다고 빼지 않는다.** 조건은 「이런 걸 찾는다」이지 「이것만
- * 보겠다」가 아니다 — 다 빼 버리면 조건을 조금 잘못 적은 사람에게 빈 화면만
- * 남는다. 근거가 많은 쪽을 위로 올리고, 왜 나왔는지는 알약이 말한다.
- *
- * ⚠️ mock 이라 지연을 일부러 둔다 — 즉시 답하면 「찾는 중」 화면을 안 만들게
- * 되고, 진짜 경로가 붙는 날 그 화면이 없다는 것을 알게 된다(`AnalysisChat` 이
- * 같은 이유로 같은 일을 한다).
- */
-export function findTeams(size: string, prefs: MatchPrefs): Promise<MatchTeam[]> {
-  const found = TEAMS.filter((t) => t.size === size)
-    .map((t) => ({ ...t, why: whyMatches(t, prefs) }))
-    .sort((a, b) => b.why.length - a.why.length)
-  return new Promise((resolve) => setTimeout(() => resolve(found), 500))
-}
-
 /**
  * 팀 id 로 그 팀을 찾는다 — **이름을 그릴 때** 쓴다.
  *
@@ -257,4 +213,59 @@ export async function applyToTeam(
     throw new Error(msg ?? '경기를 신청하지 못했습니다.')
   }
   return { requestId: (body as { id: string }).id }
+}
+
+/**
+ * **「맞는 상대」 후보 한 팀** — 서버가 준 것 (계약 3-13절, CCC 40번).
+ *
+ * 🔴 **`MatchTeam` 과 다르다.** 후보는 **팀**이고 `MatchTeam` 은 붙박이
+ * mock 이 갖고 있던 **경기 공고**였다 — 후보에는 경기 시각·구장이 없다.
+ * 그 둘은 신청할 때 **우리가 고른다**(`lib/matchProposal.ts` · `lib/venues.ts`).
+ */
+export type CandidateTeam = {
+  id: string
+  name: string
+  region: string
+  /** 판 크기 — `'3'`·`'5'`·`'7'`. 서버가 `"5:5"` 로 주는 것을 앞자리만 쓴다. */
+  size: string
+  /**
+   * **왜 이 팀이 나왔는가** — 🔴 **서버가 준 사실값 문장 그대로**다
+   * (「토요일 11:00~12:00 겹침」). 화면이 겹침을 다시 계산하지 않는다
+   * (계약의 「하지 말 것」: 다시 계산하면 서버와 다른 답이 나온다).
+   *
+   * ⚠️ 빈 배열도 정상이다 — 소프트 근거가 0개라는 뜻이고, 하드 필터는
+   * 통과했으므로 목록에 남는다.
+   */
+  why: string[]
+}
+
+/**
+ * **조건에 맞는 팀들** — 서버가 **이미 정렬해서** 준다.
+ *
+ * ✅ **2026-09-17 — 진짜 경로에 붙었다**(CCC 40번). 위 `TEAMS` 붙박이 7팀과
+ * `whyMatches()` 가 하던 일이다. 🔴 판 크기·자기 팀 제외·로스터 충원·조건
+ * 등록 여부는 **서버가 하드 필터로 이미 걸렀다** — 화면이 다시 거르지 않는다.
+ *
+ * 🔴 **우리가 조건을 안 올렸으면 빈 목록이다** — 서버가 「조건을 하나라도
+ * 등록한 팀만」 후보로 고르기 때문이다. 그 규칙의 짝이 곧 「우리도 남의
+ * 목록에 안 뜬다」다.
+ */
+export async function findCandidates(myTeamId: string): Promise<CandidateTeam[]> {
+  const res = await fetch(`/api/teams/${encodeURIComponent(myTeamId)}/match-candidates`)
+  if (!res.ok) throw new Error('맞는 상대를 찾지 못했습니다.')
+  const rows = ((await res.json().catch(() => null)) ?? []) as {
+    team_id: string
+    team_name: string
+    region_label: string
+    formation: string
+    reasons: { kind: string; detail: string }[]
+  }[]
+  return rows.map((r) => ({
+    id: r.team_id,
+    name: r.team_name,
+    region: r.region_label,
+    // `"5:5"` → `"5"`. 판 크기 표기는 화면이 한 자리로 쓴다(`SquadSize`).
+    size: r.formation.split(':')[0],
+    why: r.reasons.map((x) => x.detail),
+  }))
 }

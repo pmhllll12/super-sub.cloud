@@ -1,7 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { applyToTeam, findTeams, type MatchTeam } from '@/lib/teamMatch'
+import { useEffect, useMemo, useState } from 'react'
+import { applyToTeam, findCandidates, type CandidateTeam } from '@/lib/teamMatch'
+import { proposalsFrom, toPlayedAt, type Proposal } from '@/lib/matchProposal'
+import { VENUES } from '@/lib/venues'
 import MatchPrefsForm from '@/components/MatchPrefs'
 import { type MatchPrefs } from '@/lib/matchPrefs'
 import { loadTeamPrefs, saveTeamPrefs } from '@/lib/teamPrefsStore'
@@ -39,7 +41,8 @@ function whenText(iso: string): string {
 
 type State =
   | { kind: 'loading' }
-  | { kind: 'ok'; teams: MatchTeam[] }
+  | { kind: 'error'; message: string }
+  | { kind: 'ok'; teams: CandidateTeam[] }
 
 export default function TeamMatch({
   size,
@@ -62,7 +65,7 @@ export default function TeamMatch({
    * 신청을 **걸었다**. 🔴 「잡혔다」가 아니다 — 부모가 이 id 를 기억해 두었다가
    * 상대가 수락하는 순간(알림)에 대기 팝업을 띄운다.
    */
-  onRequested: (requestId: string, team: MatchTeam) => void
+  onRequested: (requestId: string, team: CandidateTeam) => void
 }) {
   const [state, setState] = useState<State>({ kind: 'loading' })
   /* 🔴 화면 아래로 넘치지 않게 — 「팀원」 판과 같은 상자에 매달려 있어 같은
@@ -107,26 +110,52 @@ export default function TeamMatch({
   }, [teamId])
 
   /**
-   * ⚠️ **명단은 아직 `teamMatch.ts` 의 붙박이 7팀이다.** 조건은 이제 서버에
-   * 올라가지만(위 `saveTeamPrefs`), 후보 목록 교체는 **막혀 있다** —
-   * `GET /teams/{id}/match-candidates` 는 팀 후보라 **경기 시각·구장이
-   * 없는데**(`team_id`·`team_name`·`region_label`·`formation`·`reasons` 뿐)
-   * 신청(`POST match-requests`)은 `played_at`·`place` 를 **필수로** 받는다.
+   * ✅ **명단이 서버 것이 됐다**(CCC 40번, 2026-09-17) — 붙박이 7팀과
+   * `whyMatches()` 를 걷었다.
    *
-   * 🔴 **구장 이름을 지어낼 수 없다.** 누가 시각·구장을 정하는지(우리가
-   * 제안하나 · 상대 공고에서 오나)를 먼저 정해야 한다 — 미결에 올렸다.
+   * 🔴 **서버가 이미 정렬해서 준다.** 판 크기·자기 팀 제외·로스터 충원·조건
+   * 등록 여부는 하드 필터로 걸러져 오므로 **화면이 다시 거르지 않는다**.
+   * 근거(`why`)도 서버가 준 문장 그대로다 — 다시 계산하면 서버와 다른 답이
+   * 나온다(계약의 「하지 말 것」).
    */
   useEffect(() => {
-    if (!prefs) return
+    if (!prefs || !teamId) return
     let alive = true
     setState({ kind: 'loading' })
-    void findTeams(size, prefs).then((teams) => {
-      if (alive) setState({ kind: 'ok', teams })
-    })
+    void findCandidates(teamId)
+      .then((teams) => {
+        if (alive) setState({ kind: 'ok', teams })
+      })
+      .catch(() => {
+        if (alive) setState({ kind: 'error', message: '맞는 상대를 불러오지 못했습니다.' })
+      })
     return () => {
       alive = false
     }
-  }, [size, prefs])
+  }, [teamId, prefs])
+
+  /**
+   * **신청할 때 고르는 시각·구장** (사용자 요청, 2026-09-17).
+   *
+   * 🔴 후보에는 시각·구장이 **없다**(팀 후보이지 경기 공고가 아니다). 그런데
+   * 신청은 둘을 필수로 받는다 — 그래서 **우리가 제안한다.** 지어내지 않는다:
+   * 시각은 **우리가 서버에 올린 조건**에서, 구장은 **경기장 목록**(서울시
+   * 공공데이터)에서 온다.
+   */
+  const proposals = useMemo(() => (prefs ? proposalsFrom(prefs.times) : []), [prefs])
+  /** 지금 신청 칸을 열어 둔 팀. 한 번에 하나다. */
+  const [picking, setPicking] = useState<string | null>(null)
+  const [pickedAt, setPickedAt] = useState<Proposal | null>(null)
+  const [pickedPlace, setPickedPlace] = useState<string>('')
+
+  /**
+   * 고를 수 있는 구장 — **우리 조건 지역**의 것을 앞에 둔다.
+   * ⚠️ 목록이 비지 않게, 지역이 안 맞아도 전부 고를 수 있게 남겨 둔다.
+   */
+  const venues = useMemo(() => {
+    const mine = new Set(prefs?.regions ?? [])
+    return [...VENUES].sort((a, b) => Number(mine.has(b.region)) - Number(mine.has(a.region)))
+  }, [prefs])
 
   /**
    * 경기를 건다.
@@ -140,12 +169,23 @@ export default function TeamMatch({
    * (수락되면 나머지를 알아서 정리한다), 화면에서 여러 줄이 동시에 「대기 중」
    * 이면 어느 것을 기다리는지가 안 읽힌다.
    */
-  async function apply(team: MatchTeam) {
+  async function apply(team: CandidateTeam) {
     if (waiting || !teamId) return
+    /* 🔴 **고르지 않았으면 안 보낸다.** 시각·구장을 화면이 채우면 아무도 못
+       뛰는 경기가 잡힌다 — 조건이 없으면 고를 것도 없다(`proposals` 가 빈다). */
+    if (!pickedAt || !pickedPlace) {
+      setError('경기 시각과 구장을 고르세요.')
+      return
+    }
     setWaiting(team.id)
     setError(null)
     try {
-      const { requestId } = await applyToTeam(teamId, team)
+      const { requestId } = await applyToTeam(teamId, {
+        id: team.id,
+        playedAt: toPlayedAt(pickedAt.at),
+        place: pickedPlace,
+      })
+      setPicking(null)
       onRequested(requestId, team)
       setSentTo(team.id)
     } catch (e) {
@@ -224,6 +264,12 @@ export default function TeamMatch({
         <p className="ss-tm-note">비슷한 팀을 찾고 있습니다…</p>
       )}
 
+      {!asking && state.kind === 'error' && (
+        <p className="ss-tm-note" role="alert">
+          {state.message}
+        </p>
+      )}
+
       {!asking && state.kind === 'ok' && state.teams.length === 0 && (
         <p className="ss-tm-note">지금은 조건이 맞는 팀이 없습니다.</p>
       )}
@@ -233,8 +279,10 @@ export default function TeamMatch({
           {state.teams.map((t) => (
             <li key={t.id} className="ss-tm-row">
               <span className="ss-tm-name">{t.name}</span>
+              {/* 🔴 **시각을 적지 않는다** — 후보는 팀이고 경기 공고가
+                  아니라서 시각이 없다. 시각은 아래에서 **우리가 고른다.** */}
               <span className="ss-tm-where">
-                {t.region} · {whenText(t.playedAt)}
+                {t.region} · {t.size} : {t.size}
               </span>
               {/* 🔴 **왜 이 팀이 나왔는지 적는다**(사용자 결정). 근거 없이
                   「비슷합니다」만 말하면 목록을 믿을 근거가 없다. */}
@@ -251,14 +299,75 @@ export default function TeamMatch({
                 /* 다른 곳에 신청해 둔 동안에는 못 누른다 — 위 `apply` 주석.
                    주장인 팀을 아직 못 읽었으면 보낼 곳이 없어 못 누른다. */
                 disabled={waiting !== null || !teamId}
-                onClick={() => void apply(t)}
+                onClick={() => {
+                  /* 🔴 **바로 안 보낸다** — 시각·구장을 먼저 고른다(후보에는
+                     그 둘이 없다). 조건이 없으면 고를 것이 없으므로 그렇게 적는다. */
+                  setError(null)
+                  setPicking(picking === t.id ? null : t.id)
+                  setPickedAt(proposals[0] ?? null)
+                  setPickedPlace('')
+                }}
               >
                 {sentTo === t.id
                   ? '상대 수락 대기 중'
                   : waiting === t.id
                     ? '신청하는 중…'
-                    : '경기 신청'}
+                    : picking === t.id
+                      ? '접기'
+                      : '경기 신청'}
               </button>
+
+              {/* 🔴 **시각·구장은 우리가 제안한다.** 지어내지 않는다 — 시각은
+                  서버에 올린 우리 조건에서, 구장은 경기장 목록에서 온다. */}
+              {picking === t.id && (
+                <div className="ss-tm-pick">
+                  {proposals.length === 0 ? (
+                    <p className="ss-tm-note">
+                      경기 조건에 시간대가 없습니다 — 「설정 수정」에서 먼저 정하세요.
+                    </p>
+                  ) : (
+                    <>
+                      <label className="ss-tm-pick-row">
+                        <span>언제</span>
+                        <select
+                          value={pickedAt?.label ?? ''}
+                          onChange={(e) =>
+                            setPickedAt(proposals.find((x) => x.label === e.target.value) ?? null)
+                          }
+                        >
+                          {proposals.map((x) => (
+                            <option key={x.label} value={x.label}>
+                              {x.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="ss-tm-pick-row">
+                        <span>어디서</span>
+                        <select
+                          value={pickedPlace}
+                          onChange={(e) => setPickedPlace(e.target.value)}
+                        >
+                          <option value="">구장을 고르세요</option>
+                          {venues.map((v) => (
+                            <option key={v.id} value={v.name}>
+                              {v.name} · {v.region}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <button
+                        type="button"
+                        className="ss-tm-apply"
+                        disabled={waiting !== null || !pickedAt || !pickedPlace}
+                        onClick={() => void apply(t)}
+                      >
+                        이 시각으로 신청
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             </li>
           ))}
         </ul>
@@ -276,7 +385,7 @@ export default function TeamMatch({
           어디까지가 진짜인지 안 적으면 다음 사람이 둘 다 진짜로 여긴다. */}
       {!asking && !error && (
         <p className="ss-tm-foot">
-          신청은 상대 팀장에게 갑니다 — 수락해야 경기가 잡힙니다. (명단은 아직 예시입니다)
+          신청은 상대 팀장에게 갑니다 — 수락해야 경기가 잡힙니다.
         </p>
       )}
     </section>

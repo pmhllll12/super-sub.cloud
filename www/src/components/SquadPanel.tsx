@@ -336,7 +336,9 @@ export default function SquadPanel({
   /** 내 팀 id — 경기 신청이 이 팀 밑으로 나간다(계약 3-15절). */
   myTeamId?: string | null
   /** 신청을 **걸었다**(「잡혔다」가 아니다) — 부모가 기억해 둔다. */
-  onRequested?: (requestId: string, team: MatchTeam) => void
+  /* 🔴 **`id` 만 있으면 된다.** 쓰는 쪽(`HomeStage`)이 `team.id` 를
+     기억해 두는 것이 전부다 — 넓게 잡으면 후보(`CandidateTeam`)를 못 넘긴다. */
+  onRequested?: (requestId: string, team: { id: string }) => void
   /**
    * **상대가 수락한 팀** — 값이 들어오는 순간 대기 팝업이 뜬다.
    *
