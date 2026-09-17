@@ -22,10 +22,13 @@ const PANEL_CLASS =
 const COMPACT_PANEL_CLASS =
   'flex flex-col items-center justify-center gap-1.5 px-3 py-3 text-center w-[var(--ss-card-compact-w)] h-[var(--ss-card-compact-h)]'
 
-// 알약 버튼(`HomeNav` variant="pill") 위로 떠오르는 것 — **판이 없다.**
-// 유리판도 아이콘도 제목도 안내문도 없이 설명 글자만 뜬다(사용자 요청).
-// 제목은 바로 아래 알약에 이미 적혀 있고, 판을 두면 그 아래 스쿼드 판과
+// 버튼 위(알약)·아래(글자 줄)로 떠오르는 것 — **판이 없다.**
+// 유리판도 아이콘도 제목도 없이 설명 글자만 뜬다(사용자 요청).
+// 제목은 바로 옆 버튼에 이미 적혀 있고, 판을 두면 그 아래 스쿼드 판과
 // 유리가 두 겹으로 겹쳐 둘 다 탁해진다.
+//
+// 🔴 **2026-09-08 부터 글자 줄도 이 모양이다.** 아이콘이 글자 위로 올라가고
+// 유리판이 통째로 빠지면서, 떠오르는 것은 설명 한 덩이뿐이 됐다.
 const BARE_CLASS = 'ss-nav-bare block whitespace-pre-line text-center'
 
 export default function DestinationCard({
@@ -70,7 +73,13 @@ export default function DestinationCard({
   const notice = locked ? '로그인이 필요합니다' : null
 
   const inner = bare ? (
-    <span className={`${BARE_CLASS} ${className}`}>{summary}</span>
+    <span className={`${BARE_CLASS} ${className}`}>
+      {summary}
+      {/* 🔴 **안내문은 판이 없어져도 남는다.** 이건 개발 진행 상태가 아니라
+          **사용자가 할 일**이라, 못 들어가는 곳을 눌러 보고 나서야 알게 하면
+          안 된다(위 `notice` 주석과 같은 판단). */}
+      {notice && <span className="ss-nav-bare-note">{notice}</span>}
+    </span>
   ) : (
     <GlassPanel
       phase={phase}
@@ -119,7 +128,12 @@ export default function DestinationCard({
     </GlassPanel>
   )
 
-  if (href) {
+  /* 🔴 **`bare` 는 링크가 아니다.** 떠오른 설명을 눌러 이동하던 것을
+     2026-09-08 에 뒤집었다 — 이제 **아이콘과 글자**가 링크다(사용자 요청).
+     둘 다 링크로 두면 같은 곳으로 가는 링크가 한 항목에 둘이 되어 낭독기
+     에서도 시험에서도 어느 쪽인지 모호해진다(원래 글자를 버튼으로 둔 이유가
+     그것이었고, 지금은 반대쪽을 버튼으로 둔다). */
+  if (href && !bare) {
     return (
       <TransitionLink href={href} className="block">
         {inner}

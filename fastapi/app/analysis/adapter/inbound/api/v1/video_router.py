@@ -2,25 +2,67 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from fastapi import APIRouter, status
 
+from app.analysis.adapter.inbound.api.schemas.job_schema import (
+    DetectionResponse,
+    RequestDetectionSchema,
+)
 from app.analysis.adapter.inbound.api.schemas.video_schema import (
+    CardGradeResponse,
+    FeaturedVideoResponse,
+    PlaybackUrlResponse,
+    PublicVideoResponse,
     RegisterVideoSchema,
+    UpdateVideoSchema,
     UploadUrlResponse,
     UploadUrlSchema,
+    VideoReportResponse,
     VideoResponse,
 )
+from app.analysis.application.dtos.job_dto import (
+    DetectionStatusQuery,
+    DetectionStatusResult,
+    RequestDetectionCommand,
+)
+from app.analysis.application.dtos.report_view_dto import ReadReportQuery
 from app.analysis.application.dtos.video_dto import (
+    UNSET,
+    CardGradeResult,
+    DeleteVideoCommand,
+    FeaturedVideoResult,
+    GetCardGradeCommand,
+    GetFeaturedVideoCommand,
+    GetPlaybackUrlCommand,
+    KeepVideoCommand,
     MyVideosQuery,
+    PlaybackUrlResult,
+    PublicVideoResult,
+    PublicVideosQuery,
     RegisterVideoCommand,
+    UpdateVideoCommand,
     UploadUrlCommand,
     UploadUrlResult,
     VideoResult,
 )
+from app.analysis.dependencies.job_providers import (
+    GetDetectionStatusUseCaseDep,
+    RequestDetectionUseCaseDep,
+)
 from app.analysis.dependencies.video_providers import (
     CreateUploadUrlUseCaseDep,
+    DeleteVideoUseCaseDep,
+    GetCardGradeUseCaseDep,
+    GetFeaturedVideoUseCaseDep,
+    GetPlaybackUrlUseCaseDep,
+    KeepVideoUseCaseDep,
     ListMyVideosUseCaseDep,
+    ListPublicVideosUseCaseDep,
+    ReadReportUseCaseDep,
     RegisterVideoUseCaseDep,
+    UpdateVideoUseCaseDep,
 )
 from app.core.deps import CurrentUserId
 
@@ -42,6 +84,7 @@ def create_upload_url(
             user_id=user_id,
             content_type=body.content_type,
             size_bytes=body.size_bytes,
+            filename=body.filename,
         )
     )
 
@@ -69,6 +112,11 @@ def register_video(
             width=body.width,
             height=body.height,
             side=body.side,
+            analyze=body.analyze,
+            original_filename=body.filename,
+            subject_box=body.subject_box,
+            subject_at_ms=body.subject_at_ms,
+            focus=body.focus,
         )
     )
 
@@ -82,3 +130,213 @@ def list_my_videos(
     **남의 영상은 담기지 않는다** — 목록은 언제나 자기 것이다.
     """
     return use_case(MyVideosQuery(user_id=user_id))
+
+
+@video_router.get("/videos/public", response_model=list[PublicVideoResponse])
+def list_public_videos(
+    _user_id: CurrentUserId, use_case: ListPublicVideosUseCaseDep
+) -> list[PublicVideoResult]:
+    """공개된 클립. 최근 것이 앞에 온다. 홈의 영상 모음이 쓴다.
+
+    🔴 **로그인이 필요하다.** 익명 피드가 필요하면 열겠다 — 지금은 확인 방법이
+    "다른 계정으로 로그인해도 보인다"라 인증을 그대로 둔다.
+
+    저장 키(raw `user_id` 포함)는 안 싣는다. 업로더는 닉네임+카드 슬러그(있으면)
+    로 싣는다(`paik` 16번). 재생은 `GET /videos/{id}/playback-url` 로 받는다.
+    """
+    return use_case(PublicVideosQuery())
+
+
+@video_router.get(
+    "/videos/{video_id}/playback-url", response_model=PlaybackUrlResponse
+)
+def get_playback_url(
+    video_id: UUID,
+    user_id: CurrentUserId,
+    use_case: GetPlaybackUrlUseCaseDep,
+) -> PlaybackUrlResult:
+    """재생용 사전 서명 GET URL.
+
+    **공개 클립이거나 자기 클립일 때만.** 아니면 `404 VIDEO_NOT_FOUND` —
+    비공개 남의 클립은 "없음"과 같게 답한다.
+    """
+    return use_case(
+        GetPlaybackUrlCommand(video_id=video_id, user_id=user_id)
+    )
+
+
+@video_router.patch("/videos/{video_id}", response_model=VideoResponse)
+def update_video(
+    video_id: UUID,
+    body: UpdateVideoSchema,
+    user_id: CurrentUserId,
+    use_case: UpdateVideoUseCaseDep,
+) -> VideoResult:
+    """클립을 부분 수정한다 — 공개 여부·제목·한 줄 설명.
+
+    **보낸 필드만** 바뀐다. **자기 클립만.** 남의 클립이거나 없는 클립이면
+    `404 VIDEO_NOT_FOUND` — 존재 여부를 구별해 주지 않는다.
+    """
+    sent = body.model_fields_set
+    return use_case(
+        UpdateVideoCommand(
+            video_id=video_id,
+            user_id=user_id,
+            # `is_public` 은 불리언이라 `null` 은 뜻이 없다 — 보냈어도 무시한다.
+            is_public=(
+                body.is_public
+                if "is_public" in sent and body.is_public is not None
+                else UNSET
+            ),
+            title=body.title if "title" in sent else UNSET,
+            description=body.description if "description" in sent else UNSET,
+            is_featured=(
+                body.is_featured
+                if "is_featured" in sent and body.is_featured is not None
+                else UNSET
+            ),
+        )
+    )
+
+
+@video_router.get(
+    "/cards/{card_public_slug}/featured-video",
+    response_model=FeaturedVideoResponse,
+)
+def get_featured_video(
+    card_public_slug: str,
+    user_id: CurrentUserId,
+    use_case: GetFeaturedVideoUseCaseDep,
+) -> FeaturedVideoResult:
+    """어떤 사람의 「나를 보여주는 대표 영상」 (미결 `paik` 10번).
+
+    **로그인하면 누구나** — 추천 판에서 후보 옆에 도는 장면이다. 저장 키가 아니라
+    사전 서명 GET URL 을 준다(버킷은 닫혀 있다). 대표가 없으면 `404 NO_FEATURED_VIDEO`.
+    """
+    return use_case(
+        GetFeaturedVideoCommand(card_public_slug=card_public_slug)
+    )
+
+
+@video_router.get(
+    "/cards/{card_public_slug}/grade",
+    response_model=CardGradeResponse,
+)
+def get_card_grade(
+    card_public_slug: str,
+    user_id: CurrentUserId,
+    use_case: GetCardGradeUseCaseDep,
+) -> CardGradeResult:
+    """카드 주인의 **표시 등급** (미결 `paik` 25·26번).
+
+    **로그인하면 누구나** — 추천 판이 등급으로 후보를 좁히는 자리다. 🔴
+    리포트 전체를 열지 않는다 — 등급 한 칸(+ 검수 전 여부)만 준다. 카드
+    슬러그 자체가 없으면 `404 CARD_NOT_FOUND`; 대표 영상이 없거나 분석
+    전이면 (404 가 아니라) `grade: null` 로 답한다.
+    """
+    return use_case(GetCardGradeCommand(card_public_slug=card_public_slug))
+
+
+@video_router.post("/videos/{video_id}/keep", response_model=VideoResponse)
+def keep_video(
+    video_id: UUID,
+    user_id: CurrentUserId,
+    use_case: KeepVideoUseCaseDep,
+) -> VideoResult:
+    """"내 프로필에 리포트 저장" — `/analysis` 임시 분석을 영구로 만든다.
+
+    `kept` 를 켜고, 임시 원본(`videos/…`)이면 리포트 자리
+    (`reports/<user_id>/<video_id>/source.<ext>`)로 옮긴다(S3 `CopyObject`).
+    **자기 클립만.** 남의/없는 클립이면 `404 VIDEO_NOT_FOUND`.
+
+    **멱등이다** — 이미 저장된 클립에 다시 불러도 `200` 이고 이동은 건너뛴다.
+    """
+    return use_case(KeepVideoCommand(video_id=video_id, user_id=user_id))
+
+
+@video_router.delete(
+    "/videos/{video_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+def delete_video(
+    video_id: UUID,
+    user_id: CurrentUserId,
+    use_case: DeleteVideoUseCaseDep,
+) -> None:
+    """클립을 지운다 — DB 행(판정·작업 연쇄 포함)과 S3 객체.
+
+    **자기 클립만.** 남의 클립이거나 없는 클립이면 `404 VIDEO_NOT_FOUND`.
+    S3 정리는 best-effort다 — 실패해도 `204` 이고 남은 객체는 백스톱 스윕이 잡는다.
+    """
+    use_case(DeleteVideoCommand(video_id=video_id, user_id=user_id))
+
+
+@video_router.get(
+    "/videos/{video_id}/report", response_model=VideoReportResponse
+)
+def read_report(
+    video_id: UUID,
+    user_id: CurrentUserId,
+    use_case: ReadReportUseCaseDep,
+) -> VideoReportResponse:
+    """그 영상의 적재된 분석 리포트(미결 `jin` 27번 · `paik` 7번 · `ho` 28번).
+
+    | 에러 | 뜻 |
+    |---|---|
+    | 404 `VIDEO_NOT_FOUND` | 없는 영상이거나 남의 영상이다 |
+    | 404 `ANALYSIS_FAILED` | 분석 작업이 실패로 끝났다 — 다시 물어봐도 안 생긴다. `message` 에 실패 사유(2026-09-11 추가) |
+    | 404 `REPORT_NOT_READY` | 영상은 있고 작업이 `queued`·`running` 이라 아직 적재 전이다 |
+
+    `summary` 문장 안에는 숫자를 넣지 않는다(3장 4) — 총점·오버롤 등급·항목별
+    `stat` 은 문장이 아니라 이 응답의 필드로 나간다.
+    """
+    view = use_case(ReadReportQuery(video_id=video_id, user_id=user_id))
+    return VideoReportResponse.model_validate(view)
+
+
+@video_router.post(
+    "/videos/{video_id}/detect",
+    response_model=DetectionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def request_detection(
+    video_id: UUID,
+    user_id: CurrentUserId,
+    use_case: RequestDetectionUseCaseDep,
+    body: RequestDetectionSchema | None = None,
+) -> DetectionStatusResult:
+    """이 영상에 잡힌 사람들을 검출해 달라고 큐에 넣는다 (미결 `ho` 44번).
+
+    🔴 **`202`다 — 결과가 아니라 접수다.** GPU 인스턴스가 자동 종료돼 있을 수
+    있어(`agent-ai` autostop) 즉시 응답하지 못한다. `analyze` 작업과 같은 큐를
+    쓰고, `GET` 으로 폴링한다.
+
+    호출할 때마다 **새 작업**을 만든다 — 이전 요청을 재사용하지 않는다(지금
+    `analyze` 작업과 같은 정책). 검출된 사람이 0명이어도 **실패가 아니다** —
+    화면은 드래그로 넘어가면 된다.
+
+    | 에러 | 뜻 |
+    |---|---|
+    | 404 `VIDEO_NOT_FOUND` | 없는 영상이거나 남의 영상이다 |
+    """
+    at_ms = body.at_ms if body is not None else RequestDetectionSchema().at_ms
+    return use_case(
+        RequestDetectionCommand(user_id=user_id, video_id=video_id, at_ms=at_ms)
+    )
+
+
+@video_router.get(
+    "/videos/{video_id}/detect", response_model=DetectionResponse
+)
+def read_detection(
+    video_id: UUID,
+    user_id: CurrentUserId,
+    use_case: GetDetectionStatusUseCaseDep,
+) -> DetectionStatusResult:
+    """가장 최근 검출 요청의 상태를 본다 (미결 `ho` 44번). 화면이 폴링한다.
+
+    | 에러 | 뜻 |
+    |---|---|
+    | 404 `VIDEO_NOT_FOUND` | 없는 영상이거나 남의 영상이다 |
+    | 404 `DETECTION_NOT_FOUND` | 이 영상에 검출을 요청한 적이 없다 — 먼저 `POST` 한다 |
+    """
+    return use_case(DetectionStatusQuery(video_id=video_id, user_id=user_id))

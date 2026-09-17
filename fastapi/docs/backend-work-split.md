@@ -1,8 +1,8 @@
 # 백엔드 미구현 분담 (2026-09-03)
 
-> **받는 사람:** 백성검(패킷 A — 과금) · ~~박민호(패킷 B — 평가·신뢰)~~
+> **받는 사람:** ~~백성검(패킷 A — 과금)~~ · ~~박민호(패킷 B — 평가·신뢰)~~
 > **보낸 사람:** 정어진 (백엔드 — `fastapi/`)
-> **상태:** **패킷 B ✅ 끝났습니다 (2026-09-04)** · 패킷 A 는 아직 전달 상태입니다
+> **상태:** **패킷 B ✅ 끝났습니다 (2026-09-04)** · **패킷 A 도 만들어 `paik` 브랜치에 있습니다 (2026-09-08) — 배선(공유 파일 5곳)만 남았습니다**
 > **확인:** 각 패킷의 「먼저 확인」을 돌리면 착수 여부가 바로 나옵니다
 
 ## 🔴 패킷 B 는 끝났습니다 — 박민호 님 손을 떠났습니다 (2026-09-04)
@@ -161,7 +161,39 @@ _match = table("match", column("id"), column("played_at"))
 
 ---
 
-## 패킷 A — 과금 (백성검 님)
+## ~~패킷 A — 과금 (백성검 님)~~ 만들었습니다 (2026-09-08, 백성검)
+
+> **지시가 아니라 기록입니다.** `app/billing/`(domain·application·adapter·
+> dependencies)·라우터·마이그레이션(`20260908_billing_tables`, `down_revision`은
+> 비워 뒀습니다)·테스트를 `paik` 브랜치에 만들었습니다. **공유 파일 5곳은
+> 건드리지 않았습니다** — `main.py`·`alembic/env.py`·`tests/conftest.py` 배선은
+> 정어진 님 몫으로 남겨 뒀습니다.
+>
+> | | |
+> |---|---|
+> | 확인 | `git grep -n "analysis_credit" -- fastapi/app` (`paik` 브랜치 기준) → 결과 있음 |
+> | 계약 테스트 | `.venv/bin/pytest -q tests/billing` → **15 passed** (스텁, `tests/billing/conftest.py`가 라우터 하나만 올린 별도 앱을 씀 — `main.py` 미배선 상태라 전역 `client`를 못 씀) |
+> | DB 통합 테스트 | 썼지만 **이 환경에서 못 돌렸습니다** — `psql`이 `password authentication failed for user "supersub"`로 거부됩니다. `test_review_db.py`·`test_job_db.py` 등 기존 DB 테스트도 같은 이유로 이 환경에서 전부 실패해서, 제 쪽 문제가 아니라 **환경 문제**로 보입니다. 로컬에서 `.venv/bin/pytest -q -m db tests/billing` 로 대신 확인 부탁드립니다 |
+> | 아키텍처 검사 | `TestOrmRegistration`만 예상대로 걸립니다(`analysis_credit_orm.py`·`coach_orm.py`·`coach_referral_orm.py`가 `alembic/env.py` 미등록) — 배선 전이라 당연한 상태입니다. 그 밖의 검사는 전부 통과합니다 |
+>
+> **엔드포인트**: `GET /credits`(내 잔량+이력) · `POST /admin/credits/adjustments`(관리자 전용 수동 지급·조정) · `GET /coaches`·`GET /coaches/{id}` · `POST /coaches/{id}/referrals`. 「하지 말 것」 넷 다 지켰습니다 — 분석 경로 미연결·잔량 컬럼 없음·`coach.user_id` 없음·상점(브랜드 카탈로그) 미포함. 상세는 `docs/api-contract.md` **3-10절**, 클라이언트 반영은 `docs/client-contract-changes.md` **19번**.
+>
+> #### ⚠️ 「붙일 때 걸리는 것」 종목 코드 — 지금 스키마엔 해당 없음
+>
+> 아래 「종목 코드가 다릅니다」 경고를 보고 확인했는데, **`coach` 테이블(부록 D)에
+> 애초에 종목 컬럼이 없습니다** — `id`·`name`·`contact` 뿐입니다. 그래서 `football`
+> vs `soccer` 변환은 이번 범위에 걸리는 게 없었습니다. `market.ts`의 `Coach.sport`를
+> 실제로 반영하려면 **`coach`에 종목 컬럼을 추가하는 부록 D 변경**이 먼저 필요합니다
+> — 혼자 정하지 않고 미결 항목(`paik` 구역)으로 올렸습니다.
+>
+> #### 아직 없는 것
+>
+> - `market.ts`의 `Coach`가 갖는 `tagline`·`pricePerSession`·`levels`·`titles`·
+>   `report`(영상·장면)·`verified`·`reviews`·`lesson`은 **부록 D에 대응 컬럼이
+>   없어** 그대로 mock입니다. 화면과 스키마를 맞추는 것은 이번 범위 밖으로 봤습니다
+>   (객체 저장소 미정 — 5장 ASM-003 — 이 코치 영상에도 그대로 걸립니다)
+> - 무료 크레딧 지급·분석당 차감액 자동화는 「정해야 할 것」 그대로 미정입니다.
+>   `POST /admin/credits/adjustments`로 **수동** 지급만 됩니다
 
 부록 D 도메인 ⑥. 테이블 셋입니다.
 

@@ -8,7 +8,9 @@ from app.card.application.dtos.squad_dto import (
     CreateSquadCommand,
     DischargeMemberCommand,
     EnlistCardCommand,
+    MoveMemberCommand,
     PublicSquadQuery,
+    SetFormationCommand,
     SquadCreation,
     SquadResult,
     TeamSquadQuery,
@@ -17,7 +19,9 @@ from app.card.application.ports.input.squad_use_cases import (
     CreateSquadUseCase,
     DischargeMemberUseCase,
     EnlistCardUseCase,
+    MoveMemberUseCase,
     PublicSquadUseCase,
+    SetFormationUseCase,
     TeamSquadUseCase,
 )
 from app.card.application.ports.output.squad_port import SquadPort
@@ -114,7 +118,13 @@ class EnlistCardInteractor(EnlistCardUseCase):
         position_id, _ = found
 
         try:
-            self._repository.enlist(squad.id, command.player_card_id, position_id)
+            self._repository.enlist(
+                squad.id,
+                command.player_card_id,
+                position_id,
+                command.grid_col,
+                command.grid_row,
+            )
         except ValueError:
             # 저장소가 유일 제약 위반을 이것으로 바꿔 올린다. 500 으로 새어 나가면
             # 클라이언트가 "서버가 터졌다"로 읽는다.
@@ -122,6 +132,43 @@ class EnlistCardInteractor(EnlistCardUseCase):
                 409, "ALREADY_ENLISTED", "이미 등재된 카드입니다."
             ) from None
 
+        return to_squad_result(_squad_of(self._repository, command.team_id))
+
+
+class MoveMemberInteractor(MoveMemberUseCase):
+    def __init__(self, repository: SquadPort) -> None:
+        self._repository = repository
+
+    def __call__(self, command: MoveMemberCommand) -> SquadResult:
+        _require_owner(self._repository, command.team_id, command.actor_id)
+        squad = _squad_of(self._repository, command.team_id)
+
+        found = self._repository.find_member(command.member_id)
+        # 🔴 **그 등재가 이 팀 스쿼드의 것인지 확인한다** — discharge 와 같은 이유다.
+        #    안 하면 주장이 id 만 알고 남의 스쿼드 카드를 옮길 수 있다.
+        if found is None or found[0] != squad.id:
+            raise ApiError(404, "MEMBER_NOT_FOUND", "등재를 찾을 수 없습니다.")
+
+        position = self._repository.find_position(
+            command.team_id, command.position_code
+        )
+        if position is None:
+            raise ApiError(422, "UNKNOWN_POSITION", "이 종목에 없는 포지션입니다.")
+
+        self._repository.update_member(
+            command.member_id, position[0], command.grid_col, command.grid_row
+        )
+        return to_squad_result(_squad_of(self._repository, command.team_id))
+
+
+class SetFormationInteractor(SetFormationUseCase):
+    def __init__(self, repository: SquadPort) -> None:
+        self._repository = repository
+
+    def __call__(self, command: SetFormationCommand) -> SquadResult:
+        _require_owner(self._repository, command.team_id, command.actor_id)
+        squad = _squad_of(self._repository, command.team_id)
+        self._repository.set_formation(squad.id, command.formation)
         return to_squad_result(_squad_of(self._repository, command.team_id))
 
 

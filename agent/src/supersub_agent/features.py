@@ -24,6 +24,24 @@ L_HIP, R_HIP = 11, 12
 L_KNEE, R_KNEE = 13, 14
 L_ANKLE, R_ANKLE = 15, 16
 
+# COCO-17 관절 이름. **순서가 위 인덱스 상수와 같아야 한다** — ViTPose 출력의
+# 순서이고, 바꾸면 봉투가 엉뚱한 관절 이름을 붙인다.
+#
+# 🔴 이 목록을 봉투에 함께 싣는 이유는 **받는 쪽이 인덱스의 뜻을 추측하지
+# 않게** 하는 것이다(미결 `paik` 30번). 17점을 그냥 배열로 주면 화면 쪽이
+# 자기 상수표를 따로 들게 되고, 두 표가 갈리면 **왼쪽 무릎을 오른쪽으로**
+# 그려도 아무 데서도 안 터진다.
+KEYPOINT_NAMES = (
+    "nose",
+    "left_eye", "right_eye", "left_ear", "right_ear",
+    "left_shoulder", "right_shoulder",
+    "left_elbow", "right_elbow",
+    "left_wrist", "right_wrist",
+    "left_hip", "right_hip",
+    "left_knee", "right_knee",
+    "left_ankle", "right_ankle",
+)
+
 # 관절 체인 (몸통쪽, 각도를 잴 관절, 말단). 위상 분할은 가운데 관절의 신전
 # 각속도가 최대인 프레임을 임팩트로 삼는다 — 다리든 팔이든 구조가 같다.
 Chain = tuple[int, int, int]
@@ -74,6 +92,45 @@ LIMB_MIN_CONFIDENCE = {"leg": 0.3, "arm": 0.6}
 #       0으로 만들자 17/17 전부 실패했다 — 팔과 달리 여기서는 뺄 수 없다.
 GATE_JOINTS = {"arm": 2, "leg": 3}
 
+# 🔴 게이트 사유 문구가 쓰는 **사람 말** (2026-09-16, 미결 `ho` 41번).
+#
+# 실서버에서 사용자가 **같은 영상을 아홉 번** 올려 아홉 번 같은 이유로 떨어졌다.
+# 판정이 결정론적이라 같은 파일은 몇 번을 올려도 같은 값이 나오는데, 사유가
+# 「…유효 프레임 비율 53% < 기준 70%. 재촬영이 필요하다」였다 — **무엇을
+# 바꿔야 하는지가 없으니 「다시 올리기」가 자연스러운 다음 행동이었다.**
+#
+# 그래서 사유에 셋을 담는다: ⑴ **무엇이** 안 잡혔나(사람이 아는 부위 이름)
+# ⑵ **어떻게 찍어야** 하나 ⑶ 🔴 **같은 파일을 다시 올려도 같다**.
+# `GATE_JOINTS` 와 짝이다 — 세는 관절이 바뀌면 이 이름도 바뀌어야 하고,
+# `test_features.py` 가 둘이 어긋나면 잡는다.
+GATE_PART = {"arm": "팔", "leg": "다리"}
+GATE_JOINT_NAMES = {"arm": "어깨·팔꿈치", "leg": "골반·무릎·발목"}
+GATE_FRAMING = {"arm": "상체", "leg": "다리 전체"}
+
+
+def subject_particle(word: str) -> str:
+    """`word` 뒤에 붙일 주격 조사 — 받침이 있으면 「이」, 없으면 「가」.
+
+    🔴 **문구에 조사를 미리 박아 두지 않는다.** 그러면 부위 이름 하나를 고칠
+    때 조사까지 함께 고쳐야 하고, 실제로 「팔가」·「어깨·팔꿈치이」가 한 번
+    나갔다. 사용자에게 나가는 문장이라 이런 것이 바로 보인다.
+    """
+    last = word[-1] if word else ""
+    if "가" <= last <= "힣":  # 한글 음절이면 종성으로 판단한다
+        return "이" if (ord(last) - 0xAC00) % 28 else "가"
+    return "이"  # 숫자·영문으로 끝나면 안전한 쪽으로
+
+
+def with_particle(word: str) -> str:
+    """「다리」 → 「다리가」 · 「발목」 → 「발목이」."""
+    return f"{word}{subject_particle(word)}"
+
+# 품질 게이트의 합격선 — 스윙 측 게이트 관절의 유효 프레임 비율 하한.
+# `check_quality`의 기본값이자 `keypoint_quality_envelope`가 봉투에 적어 내는
+# 기준값이다. 🔴 **두 곳에 숫자를 적지 않는다** — 게이트가 0.7로 거른 입력에
+# 봉투가 0.6이라고 적으면 읽는 쪽이 "왜 통과했나"를 못 맞춘다.
+MIN_VALID_RATIO = 0.7
+
 # 골반·어깨 축을 각도로 쓸 수 있는 최소 투영 길이 (어깨너비 = 1.0 기준).
 #
 # 몸통이 카메라를 향하면 좌우 두 점이 겹쳐 보여 축이 짧아지고, 그 각도는 작은
@@ -120,6 +177,28 @@ LIMB_DEPENDENT_METRICS = frozenset({
     # 준비 구간에 다리 유효 프레임이 2개 미만이면 안 나온다 (미결 21번).
     # 예전에는 0.0 을 지어냈고 그것이 "잠긴 골반" 0등급으로 갔다.
     "hip_rotation_range_deg",
+})
+
+# 좌우가 반전되면 부호가 뒤집히는 지표 — **촬영 방향에 의존한다** (미결 37번).
+#
+# `normalize()`는 평행이동과 스케일만 한다. 방향은 정규화하지 않으므로, 같은
+# 자세라도 반대편에서 찍으면 각도가 정확히 `-θ`가 된다. 그래서 이 지표는
+# 「앞으로 기울었나」가 아니라 **「이미지 오른쪽으로 기울었나」**를 잰다.
+#
+# 🔴 **가정이 아니라 실측이다.** 축구 인스텝 18클립에서 18/18이 항목 등급이,
+# 8/18이 최종 등급이 바뀌었고(`eval/pending37_trunk_mirror/`), 3DSP 축구 슛
+# 200클립에서는 부호가 음수 100 / 양수 100으로 갈리고 **192/200(96%)**이
+# 반전 시 등급이 달라진다(`eval/dataset_3dsp/`). 야구 타격만 0/46인데,
+# 그 루브릭의 밴드가 0 대칭이라서다 — **같은 지표, 밴드 하나 차이다.**
+#
+# 🔴 **여기 담는 것은 「부호가 뒤집힌다」뿐이다.** 골반 회전이 카메라 축을 함께
+# 채점하는 것(미결 22번)은 **다른 결함**이라 넣지 않는다 — 축 기준(mod 180)이라
+# 반전에 부호가 안 바뀐다. 한 이름에 두 결함을 담으면 어느 쪽인지 못 읽는다.
+#
+# 이 목록은 **드러내기에만 쓰인다**(`scoring.Criterion.view_dependent`).
+# 점수·등급·`features` 어디에도 관여하지 않는다.
+MIRROR_ANTISYMMETRIC_METRICS = frozenset({
+    "trunk_forward_lean_deg_at_impact",
 })
 
 # --- 프레임 단위 지표 (미결 7번 E-3) ---------------------------------------
@@ -293,9 +372,262 @@ def _apex_frame(height: np.ndarray, usable: np.ndarray) -> int:
     return int(np.argmin(np.where(candidates, height, np.inf)))
 
 
+def gate_ratio(kps: np.ndarray, limb: str = "leg", side: str = "auto") -> float:
+    """스윙 측 게이트 관절의 유효 프레임 비율. **거르지 않고 값만 낸다.**
+
+    `check_quality`(게이트)와 `keypoint_quality_envelope`(보고)가 이것을 함께
+    쓴다. 🔴 **비율을 두 번 계산하지 않는다** — 한쪽 계산이 바뀌면 게이트가
+    0.72로 통과시킨 입력을 봉투가 0.61이라고 적는 일이 생긴다.
+    """
+    # 스윙 측 판별은 **정규화 후** 좌표로 한다. 원좌표에서는 몸 전체의 이동이
+    # 좌우 이동량에 함께 실려 반대쪽을 스윙으로 집는다.
+    swing, _ = identify_limb(normalize(kps), limb, side)
+    gate_chain = swing[:GATE_JOINTS[limb]]
+    return float(valid_frames(kps, limb, gate_chain).mean())
+
+
+def keypoint_quality_envelope(
+    kps: np.ndarray,
+    limb: str = "leg",
+    side: str = "auto",
+    threshold: float = MIN_VALID_RATIO,
+) -> dict:
+    """**키포인트 품질을 봉투가 스스로 말한다** (미결 `jin` 27번 곁가지).
+
+    계약 3장 4)의 산출물 넷 중 「신뢰도」를 담을 자리가 정해져 있지 않았다.
+    게이트(`check_quality`)가 이미 재던 값인데 **던져 버리고 있었다** — 통과
+    여부만 남고 "얼마나 여유 있게 통과했나"가 사라져, 65%로 반려된 클립과
+    71%로 겨우 통과한 클립을 읽는 쪽이 구분할 수 없었다.
+
+    🔴 **`features`에 넣지 않는다.** `timebase`·`subject`와 같은 **형제 블록**
+    이다 — 판정 입력이 그대로라 기존 평가(B-2~B-6)와 비교가 끊기지 않는다.
+
+    🔴 **키포인트 신뢰도 평균이 아니다.** ViTPose는 top-down이라 엉뚱한 박스를
+    줘도 자신 있게 관절을 낸다(`pose.subject_envelope`) — 신뢰도 평균이 높은
+    것은 "잘 잡았다"는 뜻이 아니다. 여기 값은 **사지별 기준을 넘긴 프레임의
+    비율**이고, "누구를 쟀는가"는 `subject`가 따로 답한다.
+    """
+    try:
+        ratio = gate_ratio(kps, limb, side)
+    except InsufficientQuality as exc:
+        # 정규화 자체가 안 되는 입력(어깨 너비 0)은 비율이 정의되지 않는다.
+        # 0.0으로 채우면 "쟀는데 나빴다"로 읽힌다 — 안 쟀다고 말한다.
+        return {"known": False, "why": str(exc), "limb": limb}
+    return {
+        "known": True,
+        "limb": limb,
+        "side": side,
+        # 게이트가 본 값 그대로. 0~1이다 (백분율이 아니다).
+        "swing_side_valid_ratio": round(ratio, 4),
+        # 몇 관절을 요구했는가 — 팔 2(어깨·팔꿈치) · 다리 3(발목까지).
+        "gate_joints": GATE_JOINTS[limb],
+        # 이 값 미만이면 애초에 리포트가 없다(`InsufficientQuality`).
+        "threshold": threshold,
+        # 관절 하나가 "보였다"고 인정되는 신뢰도 하한. 사지마다 다르다.
+        "min_keypoint_confidence": LIMB_MIN_CONFIDENCE.get(limb, MIN_CONFIDENCE),
+    }
+
+
+# 「직전」·「+1초」를 임팩트에서 얼마나 떨어뜨릴 것인가 (미결 `paik` 30번).
+#
+# 🔴 **화면이 정한 값이고 에이전트가 고른 것이 아니다.** 비교 카드 세 장이
+# 서로 다른 자세로 보이게 하려고 실물에서 맞춘 값이라, 여기서 말없이 바꾸면
+# 화면과 어긋난다. 고칠 이유가 생기면 **고치지 말고 미결 항목에 적는다** —
+# 그 항목이 그렇게 요구한다.
+#
+# 0.3초인 이유: 앞서 「임팩트 앞 0.5초 안에서 차는 다리 무릎각 최소」였는데,
+# 그 정의는 구조상 최소각 프레임이 임팩트 **한 프레임 전**으로 쏠려 두 카드가
+# 거의 같은 자세로 보였다 (2026-09-15 정정).
+BEFORE_IMPACT_SECONDS = 0.3
+AFTER_IMPACT_SECONDS = 1.0
+
+
+def _nearest_valid(usable: np.ndarray, t: int, lo: int, hi: int) -> int | None:
+    """[lo, hi] 안에서 t에 가장 가까운 유효 프레임. **동률이면 이른 쪽**이다.
+
+    🔴 **범위를 받는 것이 핵심이다.** 「직전」은 `[first, impact - 1]` 안에서만
+    골라야 한다 — 범위 없이 가장 가까운 것을 찾으면 임팩트 **뒤** 프레임이
+    「직전」으로 나올 수 있고, 그러면 카드 순서가 뒤집힌 채 그려진다.
+
+    동률 규칙을 한 곳에 둔다 — 두 곳에서 각자 고르면 같은 영상이 경로에 따라
+    다른 프레임을 「직전」으로 내고, 그 차이는 눈으로만 보인다.
+    """
+    lo, hi = max(0, lo), min(len(usable) - 1, hi)
+    if lo > hi:
+        return None
+    if usable[t] and lo <= t <= hi:
+        return int(t)
+    best, best_dist = None, None
+    for i in range(lo, hi + 1):          # 오름차순 + 순부등호 = 동률이면 이른 쪽
+        if not usable[i]:
+            continue
+        dist = abs(i - t)
+        if best_dist is None or dist < best_dist:
+            best, best_dist = i, dist
+    return None if best is None else int(best)
+
+
+def _kick_direction(kps: np.ndarray, impact: int, ankle: int) -> int:
+    """차는 방향 — 화면 오른쪽이 `1`, 왼쪽이 `-1`.
+
+    🔴 **`impact - 1` 과 임팩트를 견준다. 「직전」 카드와 견주지 않는다.**
+    「직전」은 임팩트 0.3초 앞이라 **되접는 도중**일 수 있고, 되접기와 펴기가
+    섞인 구간에서는 가로 이동 부호가 **실제 차는 방향과 반대로** 나온다.
+    `impact - 1` 은 늘 잡혀 있고(임팩트 각속도를 재는 조건이다) 펴는 도중의
+    마지막 한 걸음이라 방향이 안정적이다.
+
+    화면(`www/src/lib/motion/moments.ts`)이 2026-09-15에 `before` 재정의로
+    이것을 겪었고, 여기는 **그 규칙을 옮긴 것**이다 — 한쪽만 고치지 않는다.
+
+    한쪽이라도 안 잡혔으면 `1`이다(화면의 기본값과 같다). 정규화는 축마다 같은
+    부호라 픽셀로 재도 결과가 같다.
+    """
+    prev, now = kps[impact - 1, ankle], kps[impact, ankle]
+    if prev[2] < MIN_CONFIDENCE or now[2] < MIN_CONFIDENCE:
+        return 1
+    return -1 if now[0] < prev[0] else 1
+
+
+def skeleton_envelope(
+    kps: np.ndarray,
+    sampled_fps: float,
+    features: dict,
+    impact_limb: str = "leg",
+    swing_side: str = "auto",
+    frame_size: tuple[int, int] | None = None,
+) -> dict:
+    """**프레임별 관절과 세 순간** — 비교 화면이 자세를 겹쳐 그리는 자리
+    (미결 `paik` 30번).
+
+    화면은 지금 브라우저에서 관절을 **다시 뽑고 있다**(데모). 그러면 위쪽
+    분석 리포트(에이전트 값)와 겹쳐 놓은 자세가 **다른 계기에서 온 값**이라
+    숫자가 안 맞고, 영상 두 편을 매번 훑느라 느리다. 여기 값이 그 둘을 함께
+    없앤다 — **에이전트가 이미 계산한 것을 실어 보낼 뿐이다.**
+
+    🔴 **`features`를 바꾸지 않는다.** `timebase`·`subject`·`keypoint_quality`
+    와 같은 **형제 블록**이다 — 판정 입력이 그대로라 기존 평가(B-2~B-6)와
+    비교가 끊기지 않고 B-6 재실행을 부르지 않는다.
+
+    🔴 **세 순간을 여기서 새로 정의하지 않는다.** 임팩트는 `segment_phases`가
+    이미 고른 값(`features["impact_frame"]`)을 그대로 쓴다. 다시 찾으면 같은
+    규칙이 두 벌이 되고, 리포트의 임팩트와 화면의 임팩트가 갈린다.
+
+    좌표는 **프레임 크기로 나눈 정규화 값**이다 — `subject`의 박스와 같은
+    규약이라 화면 크기를 몰라도 바로 겹쳐진다. 픽셀로 되짚을 수 있게
+    `frame_size`를 함께 싣는다. (자릿수는 4자리 — 1920px에서 0.2px이라
+    그리기에 손실이 없다.)
+
+    🔴 **0~1로 자르지 않는다.** 화면 밖으로 나간 관절은 ViTPose가 프레임
+    바깥 좌표를 내고, 그것이 실제로 일어난 일이다. 잘라 넣으면 발이 화면
+    가장자리에 **붙어 있는 것처럼** 그려진다.
+
+    사람이 안 잡힌 프레임은 **`null`로 자리를 지킨다.** 빼 버리면 배열 인덱스와
+    프레임 번호가 어긋나 세 순간이 엉뚱한 자세를 가리킨다.
+    """
+    if frame_size is None:
+        # 픽셀 크기를 모르면 정규화가 성립하지 않는다. 픽셀 좌표를 대신 내면
+        # 받는 쪽이 두 좌표계를 구분할 방법이 없다 — 안 냈다고 말한다.
+        return {"known": False, "why": "frame_size가 없다 — 합성 키포인트 경로"}
+    impact = features.get("impact_frame")
+    if impact is None:
+        return {"known": False, "why": "impact_frame이 없다 — 임팩트를 못 골랐다"}
+    if not (isinstance(sampled_fps, (int, float)) and sampled_fps > 0):
+        return {"known": False, "why": f"sampled_fps가 격자로 못 쓸 값이다: {sampled_fps!r}"}
+
+    try:
+        norm = normalize(kps)
+    except InsufficientQuality as exc:
+        return {"known": False, "why": str(exc)}
+
+    # 🔴 **`extract_features`와 같은 인자로 같은 함수를 부른다.** 반대쪽 사지를
+    # auto로 남기는 것까지 같아야 「차는 다리」가 채점과 어긋나지 않는다.
+    swing_knee, _plant_knee = identify_legs(
+        norm, swing_side if impact_limb == "leg" else "auto"
+    )
+    swing_leg = "left" if swing_knee == L_KNEE else "right"
+
+    impact = int(impact)
+    width, height = float(frame_size[0]), float(frame_size[1])
+    total = int(kps.shape[0])
+
+    # 「직전」의 폴백이 보는 것은 **차는 다리 무릎각을 잴 수 있는가**다 —
+    # 그 카드가 보여주는 것이 무릎 굽힘이라 다른 관절이 잡혀도 소용이 없다.
+    # `segment_phases` 가 임팩트를 고를 때 쓰는 `usable` 과 **같은 식**이다.
+    swing_chain = LIMB_CHAINS["leg"][swing_leg]
+    knee_usable = valid_frames(kps, "leg", swing_chain) & np.isfinite(
+        chain_series(norm, swing_chain)
+    )
+    if not knee_usable.any():
+        return {"known": False, "why": "차는 다리 무릎각을 잰 프레임이 없다"}
+    first = int(np.argmax(knee_usable))
+    last = int(len(knee_usable) - 1 - np.argmax(knee_usable[::-1]))
+
+    # 🔴 **`[first, impact - 1]` 안에서만 고른다** — 범위를 안 걸면 임팩트 뒤
+    # 프레임이 「직전」으로 나올 수 있다. 화면(`www/src/lib/motion/moments.ts`)
+    # 과 같은 규칙이다.
+    before_target = max(first, impact - round(BEFORE_IMPACT_SECONDS * sampled_fps))
+    before = _nearest_valid(knee_usable, before_target, first, impact - 1)
+    if before is None:                    # 임팩트가 경계면 segment_phases가 이미 막는다
+        return {"known": False, "why": "임팩트 앞에 차는 다리를 잰 프레임이 없다"}
+
+    # 🔴 **넘치는 기준이 `total` 이 아니라 `last`(마지막 유효 프레임)다.**
+    # `total` 로 재면 뒤쪽이 미검출로 끝나는 클립에서 **빈 스켈레톤**이 카드로
+    # 나간다 — 넘친 것이 아니라 못 잡은 것이라 `after_clipped` 도 안 선다.
+    after = impact + round(AFTER_IMPACT_SECONDS * sampled_fps)
+    after_clipped = after > last
+    if after_clipped:
+        after = last
+
+    direction = _kick_direction(kps, impact, L_ANKLE if swing_leg == "left" else R_ANKLE)
+
+    xy = kps[:, :, :2].astype(np.float64)
+    conf = kps[:, :, 2].astype(np.float64)
+    joints: list[list[list[float]] | None] = []
+    for t in range(total):
+        if not (conf[t] > 0).any():
+            # 사람이 안 잡힌 프레임 — pose.py가 신뢰도 0으로 채운 자리다.
+            joints.append(None)
+            continue
+        joints.append([
+            [
+                round(float(xy[t, j, 0]) / width, 4),
+                round(float(xy[t, j, 1]) / height, 4),
+                round(float(conf[t, j]), 3),
+            ]
+            for j in range(kps.shape[1])
+        ])
+
+    return {
+        "known": True,
+        # 초 환산의 나눗수. 🔴 `target_fps`가 아니다 — 그것으로 나누면 20%
+        # 어긋난다(미결 7번 E-3).
+        "fps": round(float(sampled_fps), 4),
+        "frames": total,
+        "frame_size": [int(frame_size[0]), int(frame_size[1])],
+        # **차는 다리.** `swing_side`가 auto였으면 여기 값이 판별 결과다.
+        "swing_leg": swing_leg,
+        # **차는 방향** — 화면 오른쪽이 1, 왼쪽이 -1. 상체 기울기를 「차는
+        # 방향으로」 읽으려면 이 부호가 있어야 한다.
+        "direction": direction,
+        "keypoint_names": list(KEYPOINT_NAMES),
+        # 프레임 번호. 화면의 카드 세 장이 이 순서로 선다.
+        "moments": {"before": int(before), "impact": impact, "after": int(after)},
+        # +1초가 **클립을 넘쳐** 마지막 유효 프레임으로 물러섰는가.
+        # 🔴 이것이 없으면 화면은 「접촉 후」 카드가 **진짜 +1초인지** 알 수 없다.
+        "after_clipped": bool(after_clipped),
+        # 초도 함께 낸다 — 읽는 쪽이 `target_fps`로 나누는 실수를 막는다.
+        "moments_seconds": {
+            "before": round(before / sampled_fps, 3),
+            "impact": round(impact / sampled_fps, 3),
+            "after": round(after / sampled_fps, 3),
+        },
+        "joints": joints,
+    }
+
+
 def check_quality(
     kps: np.ndarray,
-    min_valid_ratio: float = 0.7,
+    min_valid_ratio: float = MIN_VALID_RATIO,
     limb: str = "leg",
     side: str = "auto",
 ) -> float:
@@ -317,16 +649,14 @@ def check_quality(
     LIMB_DEPENDENT_METRICS 규약에 따라 해당 채점 항목이 판정에서 제외되며
     가중치가 재정규화된다. 지지 측 지표도 같은 경로로 처리된다.
     """
-    # 스윙 측 판별은 **정규화 후** 좌표로 한다. 원좌표에서는 몸 전체의 이동이
-    # 좌우 이동량에 함께 실려 반대쪽을 스윙으로 집는다.
-    swing, _ = identify_limb(normalize(kps), limb, side)
-    gate_chain = swing[:GATE_JOINTS[limb]]
-    ratio = float(valid_frames(kps, limb, gate_chain).mean())
+    ratio = gate_ratio(kps, limb, side)
     if ratio < min_valid_ratio:
         raise InsufficientQuality(
-            f"{LIMB_NAMES[limb]} 스윙 측 키포인트({len(gate_chain)}개 관절) "
-            f"유효 프레임 비율 {ratio:.0%} < 기준 {min_valid_ratio:.0%}. "
-            "재촬영이 필요하다."
+            f"{with_particle(GATE_PART[limb])} 영상에 충분히 잡히지 않았습니다 — "
+            f"동작하는 쪽 {with_particle(GATE_JOINT_NAMES[limb])} 모두 보이는 "
+            f"프레임이 {ratio:.0%}뿐입니다(기준 {min_valid_ratio:.0%}). "
+            f"{with_particle(GATE_FRAMING[limb])} 화면 안에 들어오고 가려지지 "
+            "않게 다시 찍어 주세요. 같은 영상을 다시 올리면 결과가 같습니다."
         )
     return ratio
 
@@ -412,6 +742,7 @@ def segment_phases(
     swing: int | Chain,
     limb: str = "leg",
     event: str = "extension_peak",
+    window: tuple[int, int] | None = None,
 ) -> Phases:
     """준비·임팩트·마무리 구간을 나눈다.
 
@@ -427,6 +758,18 @@ def segment_phases(
     어느 쪽이든 언어 모델을 쓰지 않는다 — 재현성이 필요한 구간이다.
 
     swing은 관절 체인이거나, 하위 호환을 위한 무릎 인덱스 하나다.
+
+    window는 임팩트를 찾을 구간 [a, b)다 (미결 45번 ㉲-a). 한 영상에 동작이
+    여러 번 나오면 **구간마다 이 함수를 한 번씩** 부른다 — 「임팩트 여럿」을
+    이 함수 안에서 풀지 않는 것은 의도다. 그러면 "몇 개인가"(검출)와
+    "어디인가"(구간 분할)가 한 자리에 섞이고, 개수·최소 간격 같은 상수가
+    여기 붙는다. 몇 개인지는 **바깥**이 정하고 여기는 하나씩 받는다.
+
+    🔴 **window=None이면 코드 경로가 지금까지와 한 줄도 다르지 않다.**
+    바뀌면 features가 바뀌고 그때까지의 평가가 전부 무효다(B-6 재실행).
+
+    🔴 **프레임 인덱스는 클립 기준 절대값 그대로다.** 구간 안에서 0부터 다시
+    세면 도구 궤적 조회(_ball_at)와 timebase 초 환산이 조용히 틀린다.
     """
     if event not in IMPACT_EVENTS:
         raise ValueError(f"impact_event는 {list(IMPACT_EVENTS)} 중 하나여야 한다: {event!r}")
@@ -437,6 +780,16 @@ def segment_phases(
     # 임팩트는 스윙 측 관절로 정의한다. 반대쪽이 가려진 프레임까지 후보에서
     # 빼면 임팩트가 실제 지점 밖으로 밀린다 (야구 투구 실클립).
     usable = valid_frames(kps, limb, swing) & np.isfinite(series)
+    if window is not None:
+        # 구간 밖을 "검출 실패"와 같게 다룬다. 그래야 아래 임팩트 탐색·경계
+        # 검사가 **지금과 같은 규칙 그대로** 구간 안에서만 성립한다.
+        outside = np.ones_like(usable)
+        outside[max(0, window[0]):max(0, window[1])] = False
+        usable = usable & ~outside
+        if not usable.any():
+            raise InsufficientQuality(
+                f"구간 {window}에 분석 가능한 프레임이 없다."
+            )
     if event == "extension_peak":
         impact = _peak_frame(np.gradient(series), usable)
     else:
@@ -480,6 +833,7 @@ def extract_features(
     impact_limb: str = "leg",
     impact_event: str = "extension_peak",
     swing_side: str = "auto",
+    window: tuple[int, int] | None = None,
 ) -> dict[str, float | int]:
     """루브릭이 요구하는 지표를 모두 산출한다.
 
@@ -495,6 +849,12 @@ def extract_features(
 
     impact_event는 임팩트로 삼을 사건이다 (루브릭의 kinematics.impact_event).
     채찍질하는 동작은 extension_peak, 들어올려 놓는 동작은 distal_apex다.
+
+    window는 분석할 구간 [a, b)다 (미결 45번 ㉲-a). 한 영상에 동작이 여러 번
+    나오면 **구간마다 이 함수를 한 번씩** 불러 지표를 따로 낸다 — 지금의
+    파이프라인을 N번 돌리는 것이지 새 경로가 아니다. 마무리 구간도 창 안에서
+    끊기므로 두 번째 동작의 팔로스루가 첫 동작까지 끌려가지 않는다.
+    🔴 **None이면 지금까지와 산출이 비트 동일하다** (미결 45번 4회차 기준 A).
 
     swing_side는 스윙 측을 직접 지정한다("left"/"right"). 기본값 "auto"는
     이동량으로 판별하는데, 팔 종목에서는 이 판별이 약하다(identify_limb 참고).
@@ -527,7 +887,7 @@ def extract_features(
         norm, swing_side if impact_limb == "leg" else "auto"
     )
     swing_chain, support_chain = identify_limb(norm, impact_limb, swing_side)
-    phases = segment_phases(norm, swing_chain, impact_limb, impact_event)
+    phases = segment_phases(norm, swing_chain, impact_limb, impact_event, window)
     t = phases.impact
 
     xy = norm[:, :, :2]
@@ -609,8 +969,17 @@ def extract_features(
     max_additional = float(np.nanmax(flexion_after) - flexion_at_impact)
 
     # 스윙이 실제로 감속하기까지의 프레임 수.
+    #
+    # 🔴 **마무리 구간 안에서만 센다** (미결 43번 ㉳ 3회차, 2026-09-15). 예전에는
+    # `ankle_speed[t:]` 로 **클립 끝까지** 봤다. 그러면 ⑴ 구간을 주어도 이 값만
+    # 창 밖을 읽어 — 반복 동작에서 **다음 터치의 발 속도**를 이번 마무리로 세고,
+    # ⑵ 창이 없어도 **유효 구간 밖**(미검출)의 발목 움직임을 감속 판정에 썼다.
+    # 2회차가 창 있는 짝의 35%(L=10)가 창 끝을 넘긴다고 쟀고, 창 없는 산출에서도
+    # 78개 중 2개가 달라진다(그래서 이 변경은 B-6 재실행을 불렀다).
+    #
+    # `segment_phases` 가 `last - impact >= 2` 를 보장하므로 `post` 는 비지 않는다.
     ankle_speed = np.linalg.norm(np.diff(xy[:, swing_ankle], axis=0), axis=1)
-    post = ankle_speed[t:]
+    post = ankle_speed[t:ft_end]
     threshold = float(post[0]) * 0.3 if post.size else 0.0
     decel = np.argmax(post < threshold) if (post < threshold).any() else len(post)
 

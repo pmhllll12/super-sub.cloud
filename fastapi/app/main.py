@@ -6,21 +6,40 @@
 """
 
 from fastapi import FastAPI
+from prometheus_fastapi_instrumentator import Instrumentator
 
+from app.analysis.adapter.inbound.api.v1.admin_video_router import (
+    admin_video_router,
+)
 from app.analysis.adapter.inbound.api.v1.job_router import job_router
+from app.analysis.adapter.inbound.api.v1.reference_player_router import (
+    reference_player_router,
+)
 from app.analysis.adapter.inbound.api.v1.video_router import video_router
+from app.billing.adapter.inbound.api.v1.billing_router import billing_router
 from app.card.adapter.inbound.api.v1.card_router import card_router
 from app.card.adapter.inbound.api.v1.squad_router import squad_router
 from app.card.adapter.outbound.stub.card_stub_repository import DEMO_SLUG
 from app.core.config import settings
 from app.core.errors import install_error_handlers
 from app.core.logging import configure_logging
+from app.match.adapter.inbound.api.v1.match_preference_router import (
+    match_preference_router,
+)
 from app.match.adapter.inbound.api.v1.match_router import match_router
+from app.notification.adapter.inbound.api.v1.notification_router import (
+    notification_router,
+)
 from app.review.adapter.inbound.api.v1.review_router import review_router
 from app.user.adapter.inbound.api.v1.admin_router import admin_router
 from app.user.adapter.inbound.api.v1.auth_router import auth_router
+from app.user.adapter.inbound.api.v1.contacts_router import contacts_router
 from app.user.adapter.inbound.api.v1.me_router import me_router
+from app.user.adapter.inbound.api.v1.mercenary_router import mercenary_router
+from app.user.adapter.inbound.api.v1.positions_router import positions_router
+from app.user.adapter.inbound.api.v1.regions_router import regions_router
 from app.user.adapter.inbound.api.v1.team_router import team_router
+from app.user.adapter.inbound.api.v1.user_search_router import user_search_router
 from app.user.adapter.outbound.stub.user_stub_repository import (
     DEMO_EMAIL,
     DEMO_PASSWORD,
@@ -74,7 +93,16 @@ app = FastAPI(
 
 install_error_handlers(app)
 
-# 컨텍스트가 늘면 여기에 한 줄씩 추가한다 (review · billing).
+# 요청 수·지연 히스토그램·에러율을 `/metrics`(Prometheus 형식)로 낸다.
+# PER-001(목표 소요 시간)·PER-003(P95 500ms)의 검증 근거다 — 앱은 히스토그램만
+# 내고 P95 는 Prometheus 의 `histogram_quantile` 로 뽑는다.
+#
+# 🔴 `/metrics` 는 인증이 없다(`/health` 와 같은 취급). 내부 타이밍·트래픽량이
+#    드러나므로 **엣지(nginx)에서 외부 접근을 막고** 스크레이프만 통과시킨다.
+# OpenAPI 문서에는 넣지 않는다 — 운영용 엔드포인트다.
+Instrumentator().instrument(app).expose(app, include_in_schema=False)
+
+# 컨텍스트가 늘면 여기에 한 줄씩 추가한다 (review · billing · notification).
 #
 # 영상은 별도 컨텍스트가 아니라 `analysis` 안에 있다 — 부록 D 가 도메인 ② 를
 # **영상·분석 하나로** 묶었고, `video` 와 `analysis_job` 이 같은 삭제 연쇄·같은
@@ -83,13 +111,23 @@ for _router in (
     auth_router,
     me_router,
     team_router,
+    positions_router,
+    regions_router,
     match_router,
+    match_preference_router,
     card_router,
     squad_router,
     video_router,
+    admin_video_router,
     job_router,
+    reference_player_router,
     review_router,
     admin_router,
+    billing_router,
+    mercenary_router,
+    user_search_router,
+    contacts_router,
+    notification_router,
 ):
     app.include_router(_router, prefix=API_PREFIX)
 

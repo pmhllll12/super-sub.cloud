@@ -1,4 +1,4 @@
-import { BackendError, parseErrorBody } from './errors'
+import { BackendError, parseErrorBody, readRetryAfter } from './errors'
 
 /**
  * FastAPI 를 직접 부르는 낮은 층 — `Backend` 인터페이스의 두 구현
@@ -9,7 +9,9 @@ import { BackendError, parseErrorBody } from './errors'
  */
 export async function callFastApi<T>(
   path: string,
-  opts: { method: 'GET' | 'POST' | 'PATCH' | 'DELETE'; token?: string; body?: unknown },
+  // 🔴 `PUT` 은 경기 조건(계약 3-13절)이 처음 쓴다 — **통째로 교체**하는
+  // 경로라 `PATCH`(부분 수정)와 뜻이 다르다.
+  opts: { method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; token?: string; body?: unknown },
 ): Promise<T> {
   const base = process.env.BACKEND_BASE_URL
   // 🔴 여기서 잡지 않은 예외는 route handler를 그대로 깨뜨린다 — Next.js가
@@ -48,6 +50,8 @@ export async function callFastApi<T>(
     // 계약 형태가 아닌 응답(프록시가 HTML 을 주는 경우 등) — parseErrorBody 가 떨어뜨린다.
   }
 
-  if (!res.ok) throw parseErrorBody(res.status, json)
+  // 🔴 **여기서 헤더를 안 읽으면 그 뒤로는 못 읽는다** — 본문만 들고 위로
+  // 올라가면 `Retry-After` 가 이 자리에서 사라진다(계약 1번의 「프록시가 버린다」).
+  if (!res.ok) throw parseErrorBody(res.status, json, readRetryAfter(res.headers))
   return json as T
 }

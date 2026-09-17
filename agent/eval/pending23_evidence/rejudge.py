@@ -14,6 +14,14 @@ EXAONE 1.2B(bf16 2.4GB) 하나만 쓴다.
 
 조사 스크립트라 `src/`를 고치지 않는다 — production을 import만 한다.
 """
+# ┌ 🔴 2026.09.11 — 이 회차는 그대로 재실행되지 않는다 ──────────────────────┐
+# │ 축구 단일 종목 전환(미결 `ho` 39번)으로 아래가 읽는 야구·농구 루브릭이   │
+# │ 저장소에 없다. 결과는 이 폴더의 RESULTS.md 에 그대로 있고, 그것이 정본   │
+# │ 이다. 재실행하려면 루브릭을 먼저 꺼내 놓을 것:                           │
+# │     git show bf21391:agent/rubrics/<이름>.yaml > rubrics/<이름>.yaml     │
+# │ 🔴 **스크립트 로직은 고치지 않았다.** 사전 등록된 측정이라 사후에 고치면 │
+# │ RESULTS.md 가 무엇을 잰 기록인지 알 수 없게 된다.                       │
+# └─────────────────────────────────────────────────────────────────────────┘
 from __future__ import annotations
 
 import argparse
@@ -35,9 +43,12 @@ RUBRIC = ROOT / "rubrics/baseball_batting.yaml"
 def main() -> None:
     ap = argparse.ArgumentParser()
     # after2 = 앵커에 수준 낱말을 되살린 2회차 (사전 등록 부기 A).
-    # **검사기(check_evidence.py)는 손대지 않는다** — 같은 R1·R2로 판정한다.
+    # after3 = 🔴 **43번 ㉱ 2회차(2026.09.16)가 프롬프트에 단위를 붙인 뒤**의
+    #          재측정이다. 처방이 아니라 **남이 건드린 뒤의 확인**이다 —
+    #          같은 프롬프트를 23번이 재고 있으므로 고친 사람이 다시 잰다.
+    # 🔴 **측정 로직도 검사기도 안 고쳤다** — 태그 하나만 늘렸다(after2 때와 같다).
     ap.add_argument("--tag", required=True,
-                    choices=("before", "after", "after2"),
+                    choices=("before", "after", "after2", "after3"),
                     help="코드를 고치기 전/후 어느 회차인가")
     args = ap.parse_args()
 

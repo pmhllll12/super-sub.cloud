@@ -40,6 +40,11 @@ class SquadOrm(Base):
     # 공유 링크의 유일한 접근 통제다(SEC-005). 카드와 같은 96비트 난수를 쓴다.
     public_slug: Mapped[str] = mapped_column(String(40), nullable=False)
 
+    # 홈 스쿼드 판의 판 크기 (미결 `paik` 9번). 클라이언트가 `"3:3"`·`"5:5"`·
+    # `"7:7"` 로 쓴다. 값 목록을 DB 제약으로 걸지 않는 이유는 `analysis_job.status`
+    # 와 같다 — 단계가 늘 때 마이그레이션 없이 넣으려는 것. 옛 스쿼드는 NULL.
+    formation: Mapped[str | None] = mapped_column(String(8), nullable=True)
+
     __table_args__ = (
         # 부록 D.7 — 슬러그 중복 방지.
         UniqueConstraint("public_slug", name="uq_squad_public_slug"),

@@ -16,7 +16,7 @@ import { TEXT_MIN_Y, useCardStyle } from './cardStyle'
  * 미는 것보다 카드 위에서 직접 옮기는 편이 훨씬 빠르고, 결과가 눈앞에 있다.
  */
 export default function StyledCard({ card }: { card: PublicPlayerCard }) {
-  const { style, set } = useCardStyle()
+  const { style, tagline, set } = useCardStyle()
   const ref = useRef<HTMLSpanElement>(null)
   const [dragging, setDragging] = useState(false)
 
@@ -63,7 +63,9 @@ export default function StyledCard({ card }: { card: PublicPlayerCard }) {
       onPointerCancel={() => setDragging(false)}
       data-dragging={dragging ? 'true' : undefined}
     >
-      <PlayerCardView card={card} look={style} />
+      {/* 🔴 `text` 는 `style` 에 없다 — 저장하면 `tagline` 이 될 편집
+          버퍼를 여기서 실어야 타이핑이 바로 미리보기에 나온다. */}
+      <PlayerCardView card={card} look={{ ...style, text: tagline }} />
     </span>
   )
 }

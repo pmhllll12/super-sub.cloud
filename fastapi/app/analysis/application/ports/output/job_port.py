@@ -9,7 +9,10 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from uuid import UUID
 
-from app.analysis.domain.entities.job_entity import ClaimedJobEntity
+from app.analysis.domain.entities.job_entity import (
+    ClaimedJobEntity,
+    DetectionStatusEntity,
+)
 
 
 class JobPort(ABC):
@@ -41,7 +44,12 @@ class JobPort(ABC):
 
     @abstractmethod
     def finish(
-        self, job_id: UUID, status: str, failure_reason: str | None
+        self,
+        job_id: UUID,
+        status: str,
+        failure_reason: str | None,
+        report_key: str | None = None,
+        detection_result: dict | None = None,
     ) -> str | None:
         """`running` 인 작업을 끝낸다.
 
@@ -50,4 +58,33 @@ class JobPort(ABC):
 
         `finished_at` 은 여기서 찍는다. 워커가 보낸 시각을 믿으면 시계가 어긋난
         장비에서 소요 시간이 음수가 된다.
+
+        `report_key` 는 워커가 만든 리포트를 가리키는 버킷 상대 S3 키다
+        (미결 `paik` 11번). 인터랙터가 `succeeded` 가 아니면 `None` 으로 걸러
+        넘긴다 — 여기서는 받은 값을 그대로 쓴다.
+
+        `detection_result` 은 `detect` 작업의 결과다(미결 `ho` 44번). `analyze`
+        워커는 이 필드를 안 보내므로 자연히 `None` — 리포트 적재 여부는 여전히
+        `report_key` 유무로만 가른다(여기서 종류를 안 봐도 이미 갈린다).
+        """
+
+    @abstractmethod
+    def create_detect_job(self, video_id: UUID, at_ms: int) -> UUID:
+        """`detect` 작업을 큐에 새로 넣는다(미결 `ho` 44번). 항상 새 행 — 기존
+        작업 재사용 안 함(지금 `analyze` 작업과 같은 정책). 새 작업의 id를
+        돌려준다.
+        """
+
+    @abstractmethod
+    def get_latest_detection(self, video_id: UUID) -> DetectionStatusEntity | None:
+        """그 영상의 가장 최근 `detect` 작업 하나. 없으면 None."""
+
+    @abstractmethod
+    def get_latest_report_key(self, video_id: UUID) -> str | None:
+        """그 영상의 가장 최근 **성공한 `analyze`** 작업이 가리키는 리포트 키.
+
+        `paik` 29번(관절 결과 읽기)이 쓴다 — 성공한 analyze 작업이 없으면(아직
+        큐 대기·분석 중·`detect` 뿐) `None`이다. 부르는 쪽이 `VideoEntity.
+        analysis_status`로 "왜 없는지"(대기 중인지 실패했는지)를 가른다 —
+        여기는 있는지 없는지만 답한다.
         """

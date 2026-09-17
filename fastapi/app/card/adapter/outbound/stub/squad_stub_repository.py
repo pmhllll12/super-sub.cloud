@@ -91,7 +91,12 @@ class StubSquadRepository(SquadPort):
         return None if found is None else found[0]
 
     def enlist(
-        self, squad_id: UUID, player_card_id: UUID, position_id: UUID
+        self,
+        squad_id: UUID,
+        player_card_id: UUID,
+        position_id: UUID,
+        grid_col: int | None = None,
+        grid_row: int | None = None,
     ) -> SquadMemberEntity:
         squad = _SQUADS[squad_id]
         if any(m.player_card_id == player_card_id for m in squad.members):
@@ -108,9 +113,40 @@ class StubSquadRepository(SquadPort):
             position_id=position_id,
             position_code=code,
             position_label=label,
+            grid_col=grid_col,
+            grid_row=grid_row,
         )
         _SQUADS[squad_id] = replace(squad, members=[*squad.members, member])
         return member
+
+    def update_member(
+        self,
+        member_id: UUID,
+        position_id: UUID,
+        grid_col: int | None,
+        grid_row: int | None,
+    ) -> SquadMemberEntity:
+        code, label = self._position_of(position_id)
+        for squad_id, squad in _SQUADS.items():
+            for i, m in enumerate(squad.members):
+                if m.id != member_id:
+                    continue
+                moved = replace(
+                    m,
+                    position_id=position_id,
+                    position_code=code,
+                    position_label=label,
+                    grid_col=grid_col,
+                    grid_row=grid_row,
+                )
+                members = list(squad.members)
+                members[i] = moved
+                _SQUADS[squad_id] = replace(squad, members=members)
+                return moved
+        raise KeyError(member_id)
+
+    def set_formation(self, squad_id: UUID, formation: str) -> None:
+        _SQUADS[squad_id] = replace(_SQUADS[squad_id], formation=formation)
 
     def find_member(self, member_id: UUID) -> tuple[UUID, UUID] | None:
         for squad in _SQUADS.values():

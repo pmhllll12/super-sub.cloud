@@ -23,6 +23,7 @@ def build_me_result(
         email=str(user.email),
         nickname=str(user.nickname),
         created_at=user.created_at,
+        is_nickname_searchable=user.is_nickname_searchable,
         teams=[
             MembershipResult(
                 team_id=m.team_id,

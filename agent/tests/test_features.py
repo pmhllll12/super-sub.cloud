@@ -133,7 +133,7 @@ def test_low_confidence_is_rejected():
     """품질이 낮은 입력으로는 점수를 내지 않는다."""
     seq = build_sequence()
     seq[:, [F.L_KNEE, F.R_KNEE], 2] = 0.05
-    with pytest.raises(InsufficientQuality, match="유효 프레임 비율"):
+    with pytest.raises(InsufficientQuality, match="보이는 프레임이"):
         extract_features(seq)
 
 
@@ -295,7 +295,7 @@ def test_arm_gate_still_fails_when_the_elbow_is_thin():
     """팔: 팔꿈치가 부족하면 여전히 막는다 — 게이트가 느슨해지면 안 된다."""
     seq = _thin_out(_with_arm_swing(build_sequence()), [F.L_ELBOW])
 
-    with pytest.raises(InsufficientQuality, match="유효 프레임 비율"):
+    with pytest.raises(InsufficientQuality, match="보이는 프레임이"):
         F.check_quality(seq, limb="arm", side="left")
 
 
@@ -352,7 +352,7 @@ def test_leg_gate_still_requires_the_ankle():
     hip_knee = F.LIMB_CHAINS["leg"]["left"][:2]
     assert F.valid_frames(seq, "leg", hip_knee).mean() >= 0.7, "엉덩이·무릎은 충분"
 
-    with pytest.raises(InsufficientQuality, match="유효 프레임 비율"):
+    with pytest.raises(InsufficientQuality, match="보이는 프레임이"):
         F.check_quality(seq, limb="leg")
 
 
@@ -533,6 +533,121 @@ def test_distal_apex_ignores_undetected_frames():
     assert phases.impact != 3
 
 
+# --- 한 영상에 동작이 여럿 (미결 45번 ㉲-a, 4회차) -------------------------
+
+
+def test_no_window_is_the_whole_clip():
+    """🔴 **지우지 말 것** — `window=None`이 지금까지의 경로 그대로인지.
+
+    이것이 깨지면 `features`가 바뀌고 **그때까지의 평가가 전부 무효**가 된다
+    (B-6 재실행). 45번 4회차가 39클립 × 설정 3에서 비트 동일을 확인했고,
+    이 검사는 그 성질을 코드 쪽에 붙들어 둔다.
+    """
+    seq = _with_arm_swing(build_sequence())
+    norm = F.normalize(seq)
+    swing, _ = F.identify_limb(norm, "arm")
+
+    whole = F.segment_phases(norm, swing, "arm", "extension_peak")
+    spanning = F.segment_phases(
+        norm, swing, "arm", "extension_peak", window=(0, len(seq))
+    )
+
+    assert whole == spanning
+
+
+def test_a_window_cannot_move_the_impact_outside_itself():
+    """구간을 주면 임팩트가 **그 안**에서만 잡히는지.
+
+    한 영상에 동작이 여럿일 때 구간마다 한 번씩 부르는 것이 ㉲-a의 형태다.
+    창이 안 걸리면 모든 구간이 같은 전역 최대값을 집어 리포트 N개가 전부
+    같은 프레임을 가리킨다 — 실패가 조용하다.
+
+    시퀀스를 길게 잡는 것은 **구간 분할이 성립할 여유**를 주기 위해서다.
+    짧으면 경계 검사(impact가 구간 끝에 붙음)에 먼저 걸려 창이 실제로
+    걸렸는지를 못 본다 — 그쪽은 아래 빈 구간 검사가 따로 본다.
+    """
+    seq = _with_arm_swing(build_sequence(n=81, impact=50))
+    norm = F.normalize(seq)
+    swing, _ = F.identify_limb(norm, "arm")
+
+    whole = F.segment_phases(norm, swing, "arm", "extension_peak").impact
+    half = len(seq) // 2
+    far = (half, len(seq)) if whole < half else (0, half)
+
+    phases = F.segment_phases(norm, swing, "arm", "extension_peak", window=far)
+
+    assert far[0] <= phases.impact < far[1]
+    assert phases.impact != whole
+
+
+def test_an_empty_window_is_refused_not_guessed():
+    """🔴 빈 구간에 **조용히 아무 프레임이나** 내지 않는지.
+
+    구간이 미검출 구간과 겹치면 고를 것이 없다. 그때 예외 대신 값을 내면
+    근거 없는 지표가 리포트에 실린다 — 미결 21번(못 잰 것을 0.0으로 지어냄)과
+    같은 형태다.
+    """
+    seq = _with_arm_swing(build_sequence())
+    norm = F.normalize(seq)
+    swing, _ = F.identify_limb(norm, "arm")
+
+    with pytest.raises(F.InsufficientQuality):
+        F.segment_phases(norm, swing, "arm", "extension_peak", window=(3, 3))
+
+
+def test_the_deceleration_search_stays_inside_the_follow_through():
+    """🔴 **지우지 말 것** — 마무리 길이가 **구간 밖**을 읽지 않는지.
+
+    `follow_through_duration_frames` 의 감속 탐색이 `ankle_speed[t:]` 로 **클립
+    끝까지** 갔던 적이 있다(미결 43번 ㉳ 2·3회차, 2026-09-15). 그러면
+
+    - 구간을 주어도 **이 값만** 창 밖을 읽어, 반복 동작에서 **다음 터치의 발
+      속도**를 이번 마무리로 센다 (창 있는 짝의 35%가 그랬다), 그리고
+    - 창이 없어도 **유효 구간 밖**(미검출 프레임)의 발목 움직임을 감속 판정에
+      쓴다 — 평가셋 78산출 중 2개가 그랬다.
+
+    되살아나면 **조용하다**: 값이 커질 뿐 예외도 경고도 없고, 이 값은 밴드가
+    아니라 **근거 문장**으로 나가 점수에도 안 보인다.
+
+    아래 시퀀스는 스윙이 끝까지 감속하지 않으므로 탐색이 **경계까지 간다** —
+    그래서 「구간 길이와 정확히 같다」가 성립하고, 옛 규칙이면 **더 큰 값**이
+    나온다(마지막 단언이 그 여지를 확인한다).
+    """
+    seq = build_sequence()
+    seq[-5:] = 0.0                       # 꼬리 5프레임을 미검출로
+    norm = F.normalize(seq)
+    swing, _ = F.identify_limb(norm, "leg")
+    phases = F.segment_phases(norm, swing, "leg", "extension_peak")
+    ft_end = phases.follow_through[1]
+
+    feats = extract_features(seq)
+
+    assert feats["follow_through_duration_frames"] == ft_end - phases.impact
+    # 계기 검사 — 꼬리가 실제로 남아 있어야 이 검사가 뜻이 있다.
+    assert ft_end < len(seq) - 1
+
+
+def test_a_window_bounds_the_follow_through_length():
+    """구간을 주면 마무리 길이가 **그 구간 안**에서만 세어지는지.
+
+    위 검사의 창 버전이다. 한 영상에 동작이 여럿일 때(미결 45번 ㉲-a) 이것이
+    안 서면 **모든 구간의 마무리 길이가 사실상 같은 값**이 된다 — 창을 걸어도
+    값이 안 변하는 것이 2회차가 관찰한 그 모습이다.
+    """
+    seq = _with_arm_swing(build_sequence(n=81, impact=50))
+    norm = F.normalize(seq)
+    swing, _ = F.identify_limb(norm, "arm")
+    win = (30, 60)
+    phases = F.segment_phases(norm, swing, "arm", "extension_peak", window=win)
+
+    feats = extract_features(seq, impact_limb="arm", window=win)
+
+    assert feats["follow_through_duration_frames"] <= (
+        phases.follow_through[1] - phases.impact
+    )
+    assert phases.impact + feats["follow_through_duration_frames"] < win[1]
+
+
 # --- 프레임 단위 지표의 물리 시간 표기 (미결 7번 E-3) ----------------------
 
 
@@ -640,3 +755,118 @@ def test_hip_rotation_is_declared_limb_dependent():
     죽는다 — 값을 안 내는 것과 못 내는 것을 가르는 자리다.
     """
     assert "hip_rotation_range_deg" in F.LIMB_DEPENDENT_METRICS
+
+
+def test_the_mirror_declaration_matches_what_the_code_actually_does():
+    """🔴 「촬영 방향에 의존한다」는 **선언이 실제와 맞아야** 한다 (미결 37번).
+
+    좌우를 뒤집은 입력에서 부호가 뒤집히는 지표가 곧
+    `MIRROR_ANTISYMMETRIC_METRICS` 여야 한다. 이 검사가 막는 것은 두 방향이다.
+
+    - **빠뜨리기**: 새 지표가 방향에 의존하는데 선언이 없으면 `view_dependent`
+      가 조용히 `""` 를 내고, **결함이 다시 안 보이게 된다**
+    - **낡기**: 처방 (나)로 `trunk_lean` 을 방향 인식으로 고치면 이 지표는 더
+      이상 뒤집히지 않는다. 그때 선언을 안 지우면 **고쳐진 결함을 계속
+      경고하게** 된다 — 여기서 걸린다
+
+    🔴 **지우지 말 것.** 지우면 위 둘 다 조용히 지나간다.
+    """
+    seq = build_sequence(trunk_lean_at_impact=12.0)
+    mirrored = seq.copy()
+    mirrored[:, :, 0] *= -1.0  # 이미지 x 만 뒤집는다 — 좌우 라벨은 그대로다
+
+    upright = extract_features(seq)
+    flipped = extract_features(mirrored)
+    assert upright.keys() == flipped.keys(), "반전이 지표 목록을 바꾸면 안 된다"
+
+    actually_flips = {
+        k for k, v in upright.items()
+        if isinstance(v, float) and abs(v) > 1e-6
+        and flipped[k] == pytest.approx(-v, abs=0.05)
+    }
+    assert actually_flips == set(F.MIRROR_ANTISYMMETRIC_METRICS), (
+        f"선언과 실제가 다르다 — 실제로 뒤집히는 지표: {sorted(actually_flips)}, "
+        f"선언: {sorted(F.MIRROR_ANTISYMMETRIC_METRICS)}"
+    )
+
+    # 나머지는 반전에 **안 변해야** 한다. 여기가 깨지면 위 집합이 우연히 맞은 것이다.
+    for k, v in upright.items():
+        if k in actually_flips:
+            continue
+        assert flipped[k] == pytest.approx(v, abs=0.05), (
+            f"{k} 가 좌우 반전에 변한다 — 부호 반전도 아니다"
+        )
+
+
+# -- 품질 게이트 사유 문구 (미결 `ho` 41번) ----------------------------------
+#
+#    실서버에서 사용자가 **같은 영상을 아홉 번** 올려 아홉 번 같은 이유로
+#    떨어졌다. 판정이 결정론적이라 같은 파일은 몇 번을 올려도 같은 값이
+#    나오는데, 사유가 「…유효 프레임 비율 53% < 기준 70%. 재촬영이 필요하다」라
+#    **무엇을 바꿔야 하는지가 없었다.** 아래 셋이 그 세 가지 결함을 각각 막는다.
+
+
+def _gate_message(limb: str = "leg") -> str:
+    """게이트가 실제로 내는 문장 한 개."""
+    joints = [F.L_KNEE, F.R_KNEE] if limb == "leg" else [F.L_ELBOW, F.R_ELBOW]
+    seq = _thin_out(build_sequence(), joints)
+    with pytest.raises(InsufficientQuality) as caught:
+        F.check_quality(seq, limb=limb, side="left")
+    return str(caught.value)
+
+
+@pytest.mark.parametrize("limb", ["leg", "arm"])
+def test_the_gate_reason_says_what_to_change(limb):
+    """🔴 「재촬영이 필요하다」로는 **같은 파일을 다시 올리는 것**을 못 막는다.
+
+    사유가 ⑴ 어느 부위가 ⑵ 어떻게 안 잡혔고 ⑶ 어떻게 찍어야 하는지를 말해야
+    사용자가 **다른 행동**을 한다.
+    """
+    msg = _gate_message(limb)
+    assert F.GATE_PART[limb] in msg, "어느 부위인지 없다"
+    assert F.GATE_JOINT_NAMES[limb] in msg, "어느 관절이 안 잡혔는지 없다"
+    assert "다시 찍어" in msg, "무엇을 해야 하는지 없다"
+    assert "%" in msg, "얼마나 안 잡혔는지 없다 — 지원 쪽이 판단할 근거가 사라진다"
+
+
+@pytest.mark.parametrize("limb", ["leg", "arm"])
+def test_the_gate_reason_says_the_same_file_will_not_pass(limb):
+    """🔴 이 한 줄이 아홉 번을 막는다.
+
+    판정은 결정론적이다. **같은 파일을 다시 올리면 같은 값이 나온다**는 것을
+    사유가 말하지 않으면, 사용자는 다시 올려 보는 것이 합리적이다.
+    """
+    assert "같은 영상을 다시 올리면" in _gate_message(limb)
+
+
+@pytest.mark.parametrize("limb", ["leg", "arm"])
+def test_the_gate_reason_uses_no_internal_vocabulary(limb):
+    """🔴 사용자에게 내부 용어를 보여주지 않는다 (`test_sport_gate` 와 같은 취지).
+
+    「스윙 측」·「키포인트」·「유효 프레임 비율」은 우리가 코드에서 쓰는 말이지
+    사용자가 아는 말이 아니다.
+    """
+    msg = _gate_message(limb)
+    for word in ("스윙 측", "키포인트", "유효 프레임 비율", "InsufficientQuality"):
+        assert word not in msg, f"내부 용어 「{word}」가 사용자에게 나간다"
+
+
+@pytest.mark.parametrize("limb", ["leg", "arm"])
+def test_the_gate_reason_survives_the_column_limit(limb):
+    """🔴 워커가 **앞을 남기고 뒤를 자른다**(`failure_reason` 255자).
+
+    고쳐야 할 것과 「같은 파일은 소용없다」가 **문장 끝에 있어서**, 길어지면
+    정작 필요한 말부터 잘린다. 프리픽스 둘(`분석 중단:` · `품질 게이트 미달:`)이
+    앞에 더 붙는 것까지 세어 둔다.
+    """
+    full = f"품질 게이트 미달: 분석 중단: {_gate_message(limb)}"
+    assert len(full) <= 255, f"{len(full)}자 — 사유가 잘려 나간다"
+
+
+@pytest.mark.parametrize(
+    "word,expected", [("다리", "다리가"), ("팔", "팔이"), ("발목", "발목이"),
+                      ("어깨·팔꿈치", "어깨·팔꿈치가"), ("상체", "상체가")]
+)
+def test_the_particle_follows_the_word(word, expected):
+    """🔴 「팔가」·「어깨·팔꿈치이」가 한 번 나갔다 — 사용자에게 바로 보인다."""
+    assert F.with_particle(word) == expected

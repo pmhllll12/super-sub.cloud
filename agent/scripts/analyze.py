@@ -1,7 +1,7 @@
 """영상 1건 분석 — 측정 → 판정 → 합산 전 구간 실행.
 
     uv run python scripts/analyze.py data/shot01.mp4
-    uv run python scripts/analyze.py data/shot01.mp4 --repeat 5   # 재현성 확인
+    uv run python scripts/analyze.py data/shot01.mp4 --repeat 5   # 판정만 반복
     uv run python scripts/analyze.py data/pitch.mp4 --side left    # 던지는 팔 지정
 
 8GB VRAM 제약 때문에 포즈 모델과 판정 모델을 동시에 올리지 않는다.
@@ -15,6 +15,7 @@ import json
 import statistics
 import sys
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
@@ -41,8 +42,17 @@ def main() -> None:
     )
     ap.add_argument("--fps", type=int, default=DEFAULT_TARGET_FPS)
     ap.add_argument(
+        "--report", type=Path, default=None, metavar="경로",
+        help="계약 봉투(`report.json` 모양)를 이 자리에 쓴다. 🔴 **`analyze_s3` 와 "
+             "같은 `build_report` 를 쓴다** — 두 벌로 두면 로컬에서 본 봉투와 "
+             "서비스가 내는 봉투가 달라진다. S3 가 없는 자리(로컬 GPU)에서 "
+             "선수 영상처럼 **계약 모양이 필요한 것**을 낼 때 쓴다",
+    )
+    ap.add_argument(
         "--repeat", type=int, default=1,
-        help="같은 측정값으로 판정을 N회 반복해 재현성을 확인한다.",
+        help="같은 측정값으로 **판정만** N회 반복한다. 🔴 3장 표의 재현성"
+             "(동일 영상 5회)이 아니다 — 그쪽은"
+             " eval/pending34_repro/measure_repro.py 가 잰다.",
     )
     args = ap.parse_args()
 
@@ -103,8 +113,14 @@ def main() -> None:
 
     if args.repeat > 1:
         sd = statistics.pstdev(scores)
-        print(f"\n재현성: {args.repeat}회 {scores}  표준편차 {sd:.2f}")
-        print(f"  기준 3점 이내 — {'충족' if sd <= 3 else '미달'}")
+        # 🔴 **판정 단계 재현성이다.** 영상→포즈→지표 구간은 한 번만 돌았고
+        #    `features` 가 회차 간에 공유된다. 3장 표의 「동일 영상 5회」와
+        #    다른 것을 재는데 예전에는 그냥 "재현성"이라고만 적어서 3장 목표를
+        #    충족한 것처럼 읽혔다 (미결 `ho` 34번).
+        print(f"\n판정 재현성(같은 측정값): {args.repeat}회 {scores}  "
+              f"표준편차 {sd:.2f}")
+        print("  🔴 3장의 「동일 영상 5회」가 아니다 — 그쪽은"
+              " eval/pending34_repro/measure_repro.py")
 
     # 마지막 단계라 여기서 죽으면 측정·판정을 다 하고 결과만 잃는다.
     # out/ 이 없는 새 체크아웃(EC2 등)에서 실제로 그랬다.
@@ -115,6 +131,35 @@ def main() -> None:
         encoding="utf-8",
     )
     print(f"\n저장: {out}")
+
+    if args.report is not None:
+        # 🔴 **`analyze_s3` 의 `build_report` 를 그대로 쓴다.** 봉투를 여기서
+        # 손수 지으면 로컬에서 확인한 모양과 서비스가 내는 모양이 갈리는데,
+        # 그 차이는 **적재할 때에야** 드러난다 (미결 `jin` 27번이 막으려는 것).
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from analyze_s3 import build_report  # noqa: E402
+
+        report = build_report(
+            # 🔴 S3 가 아니라 **로컬 경로**다. 계약은 이 자리에 S3 URI 를 기대하므로
+            #    서비스 리포트와 헷갈리지 않게 `video_id` 를 `null` 로 둔다
+            #    (배치·평가 실행과 같은 규약이다).
+            video=str(args.video),
+            video_id=None,
+            stamp=datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ"),
+            rubric=rubric, rubric_path=args.rubric, swing_side=args.side,
+            focus=None, target_fps=args.fps, pose=pose, features=features,
+            result=result,
+            previews={},          # 로컬 경로에는 미리보기를 안 만든다
+            judge_backend=judge.backend, judge_model=judge.model_id,
+            timing={"measure_s": round(measure_s, 2)},
+        )
+        args.report.parent.mkdir(parents=True, exist_ok=True)
+        args.report.write_text(
+            json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        sk = report["skeleton"]
+        print(f"봉투: {args.report}  (schema {report['schema_version']}, "
+              f"skeleton {'있음' if sk.get('known') else '없음 — ' + sk.get('why', '')})")
 
 
 if __name__ == "__main__":

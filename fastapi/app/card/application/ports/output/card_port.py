@@ -29,6 +29,34 @@ class CardPort(ABC):
 
         `None` 을 주면 **지운다** — 안 정한 상태로 돌아간다.
         """
+
+    @abstractmethod
+    def update_style(self, user_id: UUID, style: dict | None) -> CardEntity | None:
+        """카드 꾸미기를 통째로 바꾼다. 카드가 없으면 None.
+
+        `update_tagline` 과 같은 자리다 — 여기서 바꿀 수 있는 것은 이것뿐이고,
+        `None` 을 주면 지운다(꾸미기 전으로 되돌린다). 형식 검증은 이미
+        `CardStyleSchema` 가 끝냈으므로 여기서는 통째로 갈아 끼운다 — 부분
+        병합을 하지 않는다. 화면이 늘 전체 값을 들고 있다가 저장하기 때문에
+        병합할 이유가 없고, 병합하면 화면과 서버 중 **누가 합치는지** 자리가
+        하나 더 생긴다.
+        """
+
+    @abstractmethod
+    def replace_custom_titles(
+        self, user_id: UUID, labels: list[str]
+    ) -> CardEntity | None:
+        """사람이 직접 적은 호칭을 **통째로** 갈아 끼운다(`paik` 36번).
+
+        `update_style` 과 같은 판단이다 — 부분 병합을 하지 않는다. 화면이 늘
+        전체 목록을 들고 있다가 저장하므로 합칠 이유가 없고, 병합하면 화면과
+        서버 중 **누가 합치는지** 자리가 하나 더 생긴다. 빈 목록이면 전부
+        지운다. 카드가 없으면 `None`.
+
+        🔴 **`user_title`(부여된 호칭)은 안 건드린다** — 다른 테이블이고 다른
+        뜻이다. 읽을 때만 카드의 `titles` 에 함께 실린다.
+        """
+
     @abstractmethod
     def create_for_owner(self, user_id: UUID) -> CardEntity:
         """카드를 만들어 돌려준다. **이미 있으면 있는 것을 돌려준다.**

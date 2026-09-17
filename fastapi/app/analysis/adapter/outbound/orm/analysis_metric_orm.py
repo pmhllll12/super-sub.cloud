@@ -29,6 +29,16 @@ class AnalysisMetricOrm(Base):
         Uuid, ForeignKey("analysis_job.id", ondelete="CASCADE"), nullable=False
     )
     pipeline_version: Mapped[str] = mapped_column(String(40), nullable=False)
+
+    # 🔴 어느 루브릭으로 낸 지표 묶음인가(미결 `jin` 27번). `criterion_id` 의 뜻은
+    #    종목·동작 안에서만 유일하고, `analysis_metric_criterion.criterion_id` 를
+    #    `grade.{sport}.{motion}.{id}` 로 되짚어 `metric_definition` 에 붙이려면
+    #    여기가 있어야 한다. `pipeline_version`(분석 코드 버전)과는 다른 축 —
+    #    이쪽은 채점 기준의 버전이다. 옛 행은 NULL.
+    rubric_sport: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    rubric_motion: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    rubric_version: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )

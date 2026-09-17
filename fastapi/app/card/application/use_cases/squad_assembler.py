@@ -11,6 +11,7 @@ def to_squad_result(squad: SquadEntity) -> SquadResult:
         id=squad.id,
         team_id=squad.team_id,
         public_slug=str(squad.public_slug),
+        formation=squad.formation,
         members=[
             SquadMemberResult(
                 id=m.id,
@@ -19,6 +20,8 @@ def to_squad_result(squad: SquadEntity) -> SquadResult:
                 nickname=m.nickname,
                 position_code=m.position_code,
                 position_label=m.position_label,
+                grid_col=m.grid_col,
+                grid_row=m.grid_row,
             )
             for m in squad.members
         ],

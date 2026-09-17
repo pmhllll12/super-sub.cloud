@@ -17,7 +17,10 @@ import pytest
 
 from app.card.domain.rules.card_rules import (
     FORBIDDEN_CARD_FIELDS,
+    MAX_CUSTOM_TITLE,
+    MAX_CUSTOM_TITLES,
     MAX_TAGLINE,
+    normalize_custom_titles,
     normalize_tagline,
     to_public,
     visible_titles,
@@ -142,3 +145,50 @@ class TestNormalizeTagline:
         """앞뒤 공백 때문에 거부되면 사람은 왜 막혔는지 모른다."""
         value = "가" * MAX_TAGLINE
         assert normalize_tagline(f"   {value}   ") == value
+
+
+class TestNormalizeCustomTitles:
+    """사람이 직접 적는 호칭을 저장할 모양으로 만드는 규칙 (`paik` 36번).
+
+    🔴 위 `TestNormalizeTagline` 과 같은 이유로 **규칙 층에서** 검사한다 —
+    `UpdateMyCardSchema` 의 `max_length` 가 앞단에서 막아서, 라우터를 거치면
+    개수·길이 분기까지 오지 않는다.
+    """
+
+    def test_앞뒤_공백을_턴다(self):
+        assert normalize_custom_titles(["  시야가 넓은  "]) == ["시야가 넓은"]
+
+    def test_빈_것은_버린다(self):
+        """빈 칩을 그리게 하지 않는다 — `normalize_tagline` 과 같은 판단."""
+        assert normalize_custom_titles(["왼발잡이", "", "   ", "\t\n"]) == ["왼발잡이"]
+
+    def test_None_은_전부_지운다는_뜻이다(self):
+        assert normalize_custom_titles(None) == []
+
+    def test_같은_글은_하나만_남고_먼저_쓴_순서를_지킨다(self):
+        assert normalize_custom_titles(
+            ["왼발잡이", "시야가 넓은", "왼발잡이"]
+        ) == ["왼발잡이", "시야가 넓은"]
+
+    def test_공백만_다른_것도_같은_글로_본다(self):
+        """공백을 턴 뒤에 비교한다 — 사람 눈에 같은 칩이 둘 그려지면 안 된다."""
+        assert normalize_custom_titles(["왼발잡이", "  왼발잡이 "]) == ["왼발잡이"]
+
+    def test_상한까지는_그대로다(self):
+        values = [f"{i}번 호칭" for i in range(MAX_CUSTOM_TITLES)]
+        assert normalize_custom_titles(values) == values
+
+    def test_개수_상한을_넘으면_거부한다(self):
+        """🔴 조용히 앞에서 몇 개만 남기지 않는다 — 쓴 것과 보이는 것이 달라진다."""
+        with pytest.raises(ValueError):
+            normalize_custom_titles([f"{i}번 호칭" for i in range(MAX_CUSTOM_TITLES + 1)])
+
+    def test_길이_상한을_넘으면_거부한다(self):
+        with pytest.raises(ValueError):
+            normalize_custom_titles(["가" * (MAX_CUSTOM_TITLE + 1)])
+
+    def test_중복을_턴_뒤의_개수로_잰다(self):
+        """같은 글을 여러 번 보낸 것 때문에 막히면 사람은 왜 막혔는지 모른다."""
+        assert normalize_custom_titles(["왼발잡이"] * (MAX_CUSTOM_TITLES + 1)) == [
+            "왼발잡이"
+        ]

@@ -2,16 +2,30 @@
  * 화면이 다루는 종목. **영상 분석 화면과 내 프로필이 같은 것을 쓴다** — 두 벌로
  * 두면 한쪽에만 종목이 늘어난다.
  *
- * 🔴 기본값을 두지 않는다. 축구로 박아 두면 야구 영상이 축구 루브릭으로 조용히
- * 채점된다 — 고르지 않으면 올릴 수도 분석할 수도 없어야 한다.
+ * 🔴 **축구 하나다.** 에이전트가 야구·농구 루브릭을 지웠다(미결 ho 39번,
+ * 2026-09-11). 여기 남겨 두면 사용자에게는 고를 수 있어 보이는데 워커는
+ * 「루브릭 없음」으로 거부한다.
+ *
+ * 🔴 **종목을 되살릴 때는 루브릭이 먼저다**(`agent/rubrics/`). 이름표만 여기
+ * 늘리면 멈추는 이유가 「지원하지 않는 종목」이 아니라 설정 실수처럼 읽힌다.
+ * 백엔드 `sport` 참조 테이블에는 세 종목이 그대로 있다 — 마이그레이션은
+ * 되돌리지 않기로 했으니, 여기서 빼는 것이 곧 화면에서 빼는 것이다.
  */
-export const SPORTS = [
-  { key: 'soccer', label: '축구', icon: 'sports_soccer' },
-  { key: 'baseball', label: '야구', icon: 'sports_baseball' },
-  { key: 'basketball', label: '농구', icon: 'sports_basketball' },
-] as const
+export const SPORTS = [{ key: 'soccer', label: '축구', icon: 'sports_soccer' }] as const
 
 export type SportKey = (typeof SPORTS)[number]['key']
+
+/**
+ * 분석 화면과 업로드가 쓰는 종목. **지금은 축구 하나다**(팀 결정, 2026-09-08:
+ * "일단 축구 영상만 넣고 나중에 확장한다" → 에이전트도 축구로 정리, ho 39번).
+ *
+ * 🔴 **종목을 다시 늘릴 때는 고르는 자리를 같이 되살려야 한다.** 이 상수만 바꾸고
+ * 단추를 안 되살리면 다른 종목 영상이 축구 루브릭으로 조용히 채점된다. 되살릴
+ * 자리는 `AnalysisStage` 의 머리줄(`.ss-shot-bar-right`)과 `MyVideos` 의 올리기
+ * 단추이고, 시험이 지금 "고르는 자리가 없다"를 붙들고 있으므로 **그 시험이
+ * 먼저 빨개진다.**
+ */
+export const DEFAULT_SPORT: SportKey = 'soccer'
 
 /**
  * 화면의 종목 키를 백엔드 `sport_code` 로 바꾼다. 화면은 `soccer`, 백엔드
@@ -21,6 +35,4 @@ export type SportKey = (typeof SPORTS)[number]['key']
  */
 export const SPORT_CODE: Record<SportKey, string> = {
   soccer: 'football',
-  baseball: 'baseball',
-  basketball: 'basketball',
 }

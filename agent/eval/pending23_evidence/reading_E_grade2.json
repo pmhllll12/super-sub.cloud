@@ -1,0 +1,20 @@
+{
+  "_설명": "기준 F — 2등급(잘함) 문장 방향 오독. 🔴 AI 판독이고 정답이 아니다. C 회차와 **같은 방식(문장 단위)**으로 읽었다 — 절 단위 계기는 D 회차의 30자리에만 적용했다(사전 등록이 F 에는 계기를 안 정했다).",
+  "_읽은이": "Claude (정상호 세션, 2026-09-17, E 회차)",
+  "C0": {
+    "instep_shot/swing_knee_extension 148.8": "wrong — 「차는 다리가 완전히 펴져 있었다」는 0등급 조각의 말"
+  },
+  "E": {
+    "inside_pass/follow_through 13.9": "wrong — 「슈팅과 유사한 힘 전달에 적합한 자세」. 인사이드 패스에서 슈팅을 닮는 것은 결함 쪽이다",
+    "inside_pass/follow_through 19.1": "wrong — 「비교적 **깊게** 진행되어」. 맞는 방향은 「짧게」다",
+    "inside_pass/swing_knee_extension 132.2": "wrong — 「공을 효과적으로 **위로 전달**하는 데 도움이 되었다」. 루브릭 취지는 공이 뜨면 안 된다는 것이다",
+    "inside_pass/swing_knee_extension 142.8": "wrong — 「공을 효과적으로 **공중에 띄울 수** 있어 좋았다」. 같은 형태다",
+    "instep_shot/swing_knee_extension 148.8": "wrong — 「**완전히 펴져** 있어」. C0 에서도 wrong 이었다",
+    "instep_shot/swing_knee_extension 156.2": "wrong — 「**완전히 펴져** 있어」. 🔴 C0 에서는 ok 였다 (악화)"
+  },
+  "_합계": {
+    "C0": "1/22",
+    "E": "6/22",
+    "합격선": "1건 이하 → 🔴 불합격"
+  }
+}

@@ -24,3 +24,53 @@ class StoragePort(ABC):
     @abstractmethod
     def size_of(self, storage_key: str) -> int | None:
         """올라온 객체의 크기(바이트). **없으면 None** — 아직 안 올렸다는 뜻이다."""
+
+    @abstractmethod
+    def content_hash_of(self, storage_key: str) -> str | None:
+        """올라온 객체의 내용 지문(`ho` 41번, 재업로드 감지). **없으면 None.**
+
+        S3 구현은 `ETag`(단일 PUT 업로드라 MD5)를 그대로 쓴다 — 다운로드 없이
+        이미 `size_of`가 부르는 `HeadObject`로 얻을 수 있다. 멀티파트로 올라간
+        객체처럼 `ETag`가 MD5가 아닌 경우는 **구별할 수단이 없으니 `None`을
+        돌려 안전하게 "모른다"로 처리한다** — 잘못된 지문으로 다른 영상과
+        같다고 오판하는 것보다 낫다.
+        """
+
+    @abstractmethod
+    def create_download_url(self, storage_key: str) -> tuple[str, int]:
+        """그 키를 **내려받을 수 있는** URL 과 유효 시간(초)을 만든다.
+
+        재생도 앱 서버를 지나지 않는다(PER-002). 키 존재 여부는 확인하지 않는다 —
+        서명만 만든다.
+        """
+
+    @abstractmethod
+    def move_object(self, src_key: str, dst_key: str) -> None:
+        """객체를 `src_key` 에서 `dst_key` 로 옮긴다 — 서버 쪽 복사 후 원본 삭제.
+
+        "프로필에 저장"이 임시 원본(`videos/…`)을 리포트 자리
+        (`reports/<user_id>/<video_id>/source.<ext>`)로 옮기는 자리다(미결 `jin`
+        24번). 앱 서버로 바이트가 흐르지 않는다(PER-002 — S3 `CopyObject`).
+        `src_key == dst_key` 면 아무것도 하지 않는다.
+        """
+
+    @abstractmethod
+    def read_object(self, storage_key: str) -> bytes | None:
+        """그 키의 객체 바이트를 읽는다. **없으면 None** — 아직 안 올렸다는 뜻이다.
+
+        워커가 올린 `report.json` 을 서버가 읽어 DB 로 적재하는 자리다(미결 `jin`
+        27번). 원본 클립처럼 큰 것이 아니라 리포트 JSON(수십 KB)이라 앱 서버를
+        지나도 된다 — 사전 서명 URL 이 아니라 직접 읽는다.
+        """
+
+    @abstractmethod
+    def delete_object(self, storage_key: str) -> None:
+        """그 키의 객체를 지운다. **없는 키여도 오류가 아니다**(멱등)."""
+
+    @abstractmethod
+    def delete_prefix(self, prefix: str) -> None:
+        """그 접두사 아래 객체를 전부 지운다. 아무것도 없어도 오류가 아니다.
+
+        영상을 지울 때 `reports/<user_id>/<video_id>/` 아래(리포트 JSON·미리보기)를
+        함께 치우는 자리다.
+        """

@@ -5,11 +5,18 @@
  * 훑어보는 자리라, 여기서는 수치도 판정도 안 보여준다 — 누가 언제 무엇을
  * 올렸는지만 적는다(부록 D.5 의 "카드에 수치를 그리지 않는다"와 같은 결).
  *
- * ⚠️ 전부 mock 이다. 지금 쓰는 파일은 코치 카드가 쓰는 것과 **같은 클립**이다
- * (저장소에 있는 영상이 그것뿐이라서다) — 계약에 영상 조회가 생기면
- * (5장 ASM-003, 객체 저장소 미정) 이 상수를 지우고 응답을 흘려 넣으면 된다.
+ * 🔴 **정정 (2026-09-17, 사용자 지적).** 여기 있던 **붙박이 클립 셋**(「학교
+ * 끝나고 농구 연습」·「HALF COURT」·「RELEASE」)을 지웠다. 그것들이 **실제
+ * 도메인에서 진짜 영상 뒤에 그대로 붙어 있었다** — `USE_MOCK` 은 서버 쪽
+ * 스위치라 화면에 박힌 것은 끄지 못한다(09-11 회차가 적어 둔 그 함정이다).
+ *
+ * 🔴 게다가 **셋 다 농구**였다. 종목을 축구 하나로 정리한 뒤로는(미결 `ho`
+ * 39번) 제품이 다루지 않는 종목의 장면이 첫 화면에 걸려 있던 셈이다.
+ *
+ * 이제 이 목록은 **공개된 진짜 클립뿐**이다. 하나도 없으면 화면이 그렇게
+ * 말한다(`HomeFeed` 의 빈 자리) — 없는 것을 채우지 않는다.
  */
-import type { PublishedClip } from './published'
+import type { PublicVideo } from '@/server/backend'
 
 export type FeedClip = {
   id: string
@@ -17,6 +24,13 @@ export type FeedClip = {
   title: string
   /** 올린 사람. */
   by: string
+  /**
+   * 그 사람 카드의 공개 슬러그 — 있으면 이름이 **카드로 가는 링크**가 된다.
+   *
+   * 🔴 없으면(`null`·`undefined`) **링크를 안 그리면 그만**이다. 「카드 없음」을
+   * 따로 알리지 않는다(CCC 39 의 「하지 말 것」).
+   */
+  bySlug?: string | null
   /**
    * 올린 날(YYYY-MM-DD).
    *
@@ -48,73 +62,54 @@ export type FeedClip = {
   comments: { by: string; text: string }[]
 }
 
-export const FEED: FeedClip[] = [
-  {
-    id: 'f-001',
-    title: '학교 끝나고 농구 연습',
-    by: '김도현',
-    at: '2026-08-24',
-    what: '디딤발이 공보다 앞서지 않는 순간',
-    src: '/coach-c001.mp4',
-    // 1080 × 1920 — 폰으로 세로로 찍은 것.
-    aspect: '1080 / 1920',
-    comments: [
-      { by: '오세진', text: '디딤발 자리 좋다. 이거 몇 개째야?' },
-      { by: '정하늘', text: '해 지기 직전 빛이 예쁘게 나왔네요' },
-      { by: '김도현', text: '스무 개쯤 던지고 겨우 하나 건졌습니다' },
-    ],
-  },
-  {
-    id: 'f-002',
-    title: 'HALF COURT',
-    by: '정하늘',
-    at: '2026-08-27',
-    what: '수요일 저녁 마포 코트',
-    src: '/coach-c002.mp4',
-    aspect: '1280 / 720',
-    comments: [
-      { by: '박민호', text: '수요일 저녁이면 자리 있나요?' },
-      { by: '정하늘', text: '여섯 시 넘으면 대체로 비어 있어요' },
-    ],
-  },
-  {
-    id: 'f-003',
-    title: 'RELEASE',
-    by: '오세진',
-    at: '2026-08-30',
-    what: '릴리스 직전 어깨가 열리는 자리',
-    src: '/coach-c003.mp4',
-    aspect: '1920 / 1080',
-    comments: [
-      { by: '김도현', text: '어깨 열리는 타이밍이 확실히 보이네요' },
-      { by: '오세진', text: '느리게 돌려 보면 더 잘 보입니다' },
-      { by: '정하늘', text: '이 각도 좋다' },
-      { by: '박민호', text: '다음엔 정면에서도 한 번 찍어 주세요' },
-    ],
-  },
-]
+/**
+ * 서버가 준 화면 크기 → CSS `aspect-ratio` 값(`가로 / 세로`).
+ *
+ * 🔴 **모르면 모른다고 둔다.** 둘 중 하나라도 없거나 0 이하면 16:9 로 가정한다
+ * — 한 칸만 메우면 칸이 화면을 넘거나 실처럼 눌린다. 옛 등록분(이 컬럼이 생기기
+ * 전)이 여기로 오고, 그것은 **에러가 아니다**(계약 3-6절).
+ */
+function aspectOf(width: number | null, height: number | null): string {
+  if (!width || !height || width <= 0 || height <= 0) return '16 / 9'
+  return `${width} / ${height}`
+}
 
 /**
- * 원래 목록 앞에 **내가 공개한 클립**을 얹는다.
+ * 원래 목록 앞에 **공개된 클립**을 얹는다.
  *
- * ⚠️ 남의 공개 영상은 아직 못 붙인다 — 계약에 공개 클립 목록도, 재생용 주소도
- * 없다(미결로 올렸다). 그때까지 이 자리에 늘어나는 것은 **내 것뿐**이다.
+ * 🔴 **정정 (2026-09-17, CCC 39 · 미결 `paik` 16번 해소).** 앞서 이 자리에
+ * 「늘어나는 것은 내 것뿐」이라고 적혀 있었고, 그래서 **보는 사람 닉네임
+ * 하나를 모든 줄에 붙이고** 있었다. 목록에는 **남의 공개 영상도 섞여 오므로**
+ * 그러면 남의 장면이 내 이름으로 그려진다 — 그게 `paik` 16번이었다.
+ * 이제 **줄마다 그 영상의 업로더**를 쓴다(`uploader_nickname`, 늘 온다).
  */
-export function feedWith(published: PublishedClip[], by: string): FeedClip[] {
-  return [
-    ...published.map((c) => ({
+export function feedWith(
+  published: PublicVideo[],
+  urls: Record<string, string>,
+): FeedClip[] {
+  return published.map((c) => ({
       // 🔴 원래 목록과 겹치지 않게 접두사를 붙인다. id 는 리액트 key 이자
       // 좋아요의 기준이라, 겹치면 남의 영상에 불이 켜진다.
       id: `pub-${c.id}`,
-      title: c.title,
-      by,
-      at: c.at,
-      what: c.what,
-      src: c.src,
-      aspect: c.aspect,
-      // ⚠️ 계약 5장에 댓글이 없다 — 없는 것을 지어내지 않는다.
-      comments: [],
-    })),
-    ...FEED,
-  ]
+      // 제목은 없을 수 있다(계약이 `null` 을 허용한다) — 빈 자리로 두지 않는다.
+      title: c.title ?? '제목 없는 장면',
+      /* 🔴 **서버가 준 업로더를 그대로 쓴다.** 보는 사람 이름을 기본값으로
+         깔지 않는다 — 그렇게 두면 서버가 값을 빠뜨렸을 때 **남의 영상이 다시
+         내 이름으로** 그려지고, 그 잘못이 조용히 숨는다. */
+      by: c.uploader_nickname,
+      bySlug: c.uploader_card_slug,
+      at: c.created_at.slice(0, 10),
+      what: c.description ?? '',
+      /* 🔴 **저장 키가 아니라 사전 서명 주소다**(계약 3-6절). 목록에는 아예
+         안 실려 오므로 클립마다 `playback-url` 로 따로 받는다 — 아직 못 받은
+         것은 빈 문자열이고, 그 칸은 플레이어 없이 그려진다. */
+      src: urls[c.id] ?? '',
+      /* 🔴 **서버가 준 크기로 칸을 세운다**(CCC 46, 미결 `paik` 15번의 답).
+         옛 등록분은 둘 다 `null` 이라 그때만 16:9 로 가정한다 — 그전까지의
+         동작이고 **에러가 아니다.** 영상을 읽어서 알아내지는 않는다(그때 칸
+         크기가 바뀌어 화면이 한 번 덜컥한다). */
+      aspect: aspectOf(c.width, c.height),
+    // ⚠️ 계약 5장에 댓글이 없다 — 없는 것을 지어내지 않는다.
+    comments: [],
+  }))
 }

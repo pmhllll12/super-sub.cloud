@@ -312,3 +312,4 @@ import한다. **가중치나 선택 로직을 수정하면 B-2~B-5 결과 전체
 | `labeling/labels.json` | 1차 라벨 (**수정 금지**) |
 | `PRESERVED_ASSETS.md` | `candidates/`·`cache/` 백업의 내용·생성 경위·한계 |
 | `eval_b6/RERUN.md` | **B-6을 다시 돌리기 전에 읽을 것** — 소요·비결정성·대조 절차 |
+| `eval_b6/run_meta.json` | 🔴 **그 산출을 낸 실행의 정체** — 입력 md5·커밋·`dirty`·환경·모델 리비전·배치 폴백 (2026-09-15 신설, 미결 `ho` 47번). 재실행 대조는 **여기부터** |

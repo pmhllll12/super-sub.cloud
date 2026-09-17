@@ -23,8 +23,13 @@ import json
 import os
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
+
+import yaml
 
 # 스키마에 grade가 없는 것은 의도된 것이다 — 등급은 코드가 정한다.
 #
@@ -63,7 +68,12 @@ SYSTEM_TEMPLATE = """당신은 {sport} 기술 평가관입니다. 판정은 이�
 - metric_ref: 근거가 된 측정값의 이름."""
 
 # 종목 이름이 없으면 종목을 특정하지 않는 표현을 쓴다.
-SPORT_NAMES = {"football": "축구", "baseball": "야구", "basketball": "농구"}
+#
+# 🔴 **여기에 루브릭 없는 종목을 더하지 않는다** (2026.09.11 축구 단일 종목
+# 전환). 이름표만 있고 루브릭이 없으면 그 종목 작업은 어차피 `pick_rubric`
+# 에서 멈추는데, 이름표가 있으면 **멈춘 이유가 「지원하지 않는 종목」이
+# 아니라 설정 실수처럼 읽힌다.**
+SPORT_NAMES = {"football": "축구"}
 
 # 등급을 **번호 없이** 부르는 낱말. 프롬프트에서 어투와 수준을 짝지어 주는 자리다.
 #
@@ -73,11 +83,108 @@ SPORT_NAMES = {"football": "축구", "baseball": "야구", "basketball": "농구
 # (2등급 8건 중 4건). 낱말은 어투를 정해 주면서 문장에 새어도 숫자가 아니다.
 LEVEL_WORDS = {2: "잘함", 1: "보통", 0: "아쉬움"}
 
+#: 앵커 목록의 머리말. 🔴 **상수로 둔다** — 검사가 이 문구로 프롬프트를
+#: 잘라 보는데, 문구를 고칠 때마다 검사가 `IndexError` 로 죽었다(미결 23번 E).
+#: 그러면 「검사가 깨졌다」가 「검사가 지키던 성질이 깨졌다」를 가린다.
+ANCHOR_HEADER = "근거 문장 예시 (수준에 맞는 어투를 그대로 따릅니다)"
+
+#: 지표 라벨의 정본. `contracts/metric_definitions.yaml` 이고 적재 시드와 같은
+#: 파일이다 — 화면·백엔드·프롬프트가 **같은 이름**을 쓰게 하려는 것이다.
+_METRIC_DEFS = Path(__file__).resolve().parents[2] / "contracts" / "metric_definitions.yaml"
+
+
+@lru_cache(maxsize=1)
+def metric_labels() -> dict[str, str]:
+    """지표 코드 → 사람이 읽을 라벨 (`swing_knee_angle_at_impact` → 「임팩트 시 주동 무릎 각」).
+
+    🔴 **왜 필요한가.** 프롬프트에 코드 이름을 넣으면 모델이 그대로 베껴
+    쓴다 — 실서버에 「측정값 `swing_knee_angle_at_impact`=151.6로 …」가 그대로
+    나갔다(미결 `ho` 43번 ㉱). `build_prompt` 가 이미 쓰는 논리와 같다:
+    **프롬프트에 없는 것은 베껴 쓸 수 없다.**
+
+    🔴 **`unit` 은 일부러 안 쓴다.** `follow_through_duration_frames` 의 선언
+    단위가 `s` 인데 `features` 의 실제 값은 **프레임**이다(초 환산은 봉투의
+    `frame_metrics_seconds` 가 따로 싣는다 — E-3). 단위를 붙이면 12프레임을
+    **「12초」라고 지어내게 된다.**
+
+    누락은 걱정하지 않아도 된다 —
+    `test_metric_definitions.py::test_every_rubric_metric_is_declared` 가
+    모든 루브릭 지표가 이 파일에 선언돼 있음을 이미 강제한다. 그래도 못 찾으면
+    **코드를 그대로 돌려주지 않고** 부르는 쪽이 항목명으로 떨어지게 한다.
+    """
+    if not _METRIC_DEFS.exists():  # 배포에 파일이 없으면 라벨 없이 간다
+        return {}
+    doc = yaml.safe_load(_METRIC_DEFS.read_text(encoding="utf-8")) or {}
+    return {
+        m["code"]: m["label"]
+        for m in (doc.get("metrics") or [])
+        if m.get("code") and m.get("label")
+    }
+
+
+@lru_cache(maxsize=1)
+def metric_units() -> dict[str, str]:
+    """지표 코드 → **`features` 안에서의** 단위 꼬리표 (「도」·「프레임」).
+
+    🔴 **계약의 `unit` 을 그대로 쓰면 안 된다.** `unit` 은 **DB 로 나갈 때**의
+    단위이고, `emitted_from: frame_metrics_seconds` 가 붙은 항목은 그 값이
+    **환산을 거쳐야** 초가 된다 — `features` 안에서는 여전히 **프레임**이다.
+    그 구분이 이미 계약에 적혀 있으므로 **새 키를 더하지 않는다.**
+
+    🔴 **왜 붙이는가.** 1회차가 단위를 일부러 뺐다(9프레임이 「9초」가 되는 것을
+    막으려고). 그런데 **빼는 것으로는 안 막혔다** — 「지속 시간: 9」는 단위를
+    부르는 문장이라 모델이 가장 그럴듯한 「초」를 지어냈다. 2회차 실측:
+    값을 언급한 문장 21건 중 **15건(71%)** 이 초·분을 붙였다.
+    1회차의 논리를 뒤집어 쓴다 — **참인 단위를 주면 그것을 베낀다.**
+
+    🔴 **`ratio` 에는 아무것도 안 붙인다.** 무차원이고, 무엇으로 나눴는지는
+    `scale_ref` 라 한 낱말로 줄이면 오히려 틀린 말이 된다.
+    """
+    if not _METRIC_DEFS.exists():
+        return {}
+    doc = yaml.safe_load(_METRIC_DEFS.read_text(encoding="utf-8")) or {}
+    suffix = {"deg": "도", "score": "점"}
+    units: dict[str, str] = {}
+    for m in doc.get("metrics") or []:
+        code = m.get("code")
+        if not code:
+            continue
+        if m.get("emitted_from") == "frame_metrics_seconds":
+            units[code] = "프레임"  # 🔴 환산 전이다 — 초가 아니다
+        else:
+            units[code] = suffix.get(m.get("unit", ""), "")
+    return units
+
+
+def label_for(code: str, fallback: str = "") -> str:
+    """지표 코드의 라벨. 🔴 **없으면 코드를 되돌려주지 않는다** — 그러면 유출이 살아난다."""
+    return metric_labels().get(code) or fallback or "측정값"
+
+
+def valued(code: str, value: Any) -> str:
+    """값에 **참인 단위**를 붙인다 — 「12」가 아니라 「12프레임」.
+
+    선언이 없으면 맨 숫자로 둔다. 🔴 **모르는 단위를 지어내지 않는다** —
+    그것이 이 회차가 고치는 결함 자체다.
+    """
+    return f"{value}{metric_units().get(code, '')}"
+
+
+def _labelled(measured: dict[str, Any]) -> str:
+    """`{코드: 값}` 을 사람이 읽는 한 줄로. JSON 을 그대로 넣지 않기 위한 자리.
+
+    🔴 **앵커도 측정값과 같은 자로 적는다.** 한쪽만 단위를 붙이면 모델이 두 다른
+    자를 나란히 보게 된다.
+    """
+    return " · ".join(f"{label_for(k)} {valued(k, v)}" for k, v in measured.items())
+
 
 def system_prompt(sport: str = "") -> str:
     """종목에 맞는 평가관 프롬프트.
 
-    고정 문구로 두면 야구 결과를 축구 평가관이 쓴다 — 실제로 그랬다.
+    지금 루브릭이 있는 종목은 축구뿐이지만 **기본값을 축구로 두지 않는다** —
+    종목 코드가 비거나 모르는 값이면 「생활체육」으로 쓴다. 고정 문구로 두면
+    다른 종목 결과를 축구 평가관이 쓰고, 실제로 그랬다.
     """
     return SYSTEM_TEMPLATE.format(sport=SPORT_NAMES.get(sport, "생활체육"))
 
@@ -103,6 +210,17 @@ MODELS = {
     "7.8B": "LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct",  # 원격 코드 — 버전 고정 필요
 }
 NATIVE = {"1.2B"}
+
+# 🔴 **가중치를 커밋으로 고정한다** — `pose.py` 와 같은 이유다(미결 11번).
+# 저장소 이름만 주면 업스트림이 갈아 끼워도 조용히 바뀌고, 로컬 캐시가 살아
+# 있는 동안은 드러나지 않는다. 아래 해시는 지금까지 판정을 낸 스냅숏 그대로다.
+#
+# 🔴 **3.5 계열(2.4B·7.8B)은 비워 둔다** — 이 기계에 캐시가 없어서 확인할 수 없고,
+# **확인 못 한 해시를 적는 것은 안 적는 것보다 나쁘다**(있는 근거처럼 보인다).
+# 그 둘은 원격 코드에 의존해 `transformers` 버전까지 함께 고정해야 한다.
+MODEL_REVISIONS = {
+    "LGAI-EXAONE/EXAONE-4.0-1.2B": "3abf2810673c7c0778df64a73c2d52eab32d91c4",
+}
 
 # vLLM(OpenAI 호환) 서버 주소를 담는 환경변수.
 #
@@ -149,30 +267,91 @@ def build_prompt(criterion, metrics: dict[str, Any], grade: int) -> str:
     없으면 모델이 잘한 항목을 감점처럼 쓴다(미결 23번 1회차).
     """
     word = LEVEL_WORDS[grade]
-    lines = [f"평가 항목: {criterion.id} ({criterion.name})"]
+    # 🔴 `criterion.id` 를 넣지 않는다 — `swing_knee_extension` 같은 코드가
+    #    문장에 샌다(미결 `ho` 43번 ㉱). 항목 이름만으로 충분하다.
+    lines = [f"평가 항목: {criterion.name}"]
     if criterion.rationale:
         lines.append(f"\n항목 취지: {criterion.rationale.strip()}")
 
     # 좋은 것부터 나열하되 번호를 붙이지 않는다 — 번호가 있으면 문장에 샌다.
-    lines.append("\n이 항목의 수준 (좋은 것부터):")
-    for g in (2, 1, 0):
-        mark = "  ← 이번 판정" if g == grade else ""
-        lines.append(f"- [{LEVEL_WORDS[g]}] {criterion.grades[g]}{mark}")
+    #
+    # 🔴 **`grades_plain` 이 있으면 그것을 쓴다** (미결 23번 가-2).
+    #    `grades` 는 "150~170도" 처럼 **경계 숫자를 품고 있고**, 프롬프트에
+    #    있으면 모델이 언젠가 베낀다 — 1회차에서 구간 표기로, 2회차에서
+    #    수준 정의에 박힌 "25~60도" 로, 두 번 확인했다.
+    #
+    # 🔴 **이번 판정 등급은 측정값이 앉은 조각 하나만** 넣는다. 양방향 구간의
+    #    `grades` 는 두 방향을 한 문자열에 담아("170도 초과(굴곡 부족) 또는
+    #    135~150도(과굴곡)") **모델이 방향을 고르게** 만들었고, 그게 틀렸다
+    #    (2026.09.17 판독 5건). 고를 것을 안 주면 고르다 틀릴 수 없다.
+    # 🔴 **판정 등급의 수준 문구 하나만 넣는다** (미결 23번 B). 전에는 셋을 다
+    #    넣었는데, **모델이 옆 등급 문구를 끌어와** 문장이 스스로 모순됐다:
+    #    굴곡 79.2도(= 「슈팅처럼 크다」 조각)에 *"팔로스루가 **짧고** 방향을
+    #    유지하며 마무리됐다"* — 「짧게」는 **[잘함] 수준 문구**의 말이다.
+    #    남은 오독 다섯 중 셋의 출처가 그것이었다(2026.09.17 판독).
+    #
+    # 🔴 **앵커는 셋 다 남긴다.** 눈금을 주는 것은 앵커다 — 1회차에서 앵커의
+    #    수준 표시를 뺐다가 **2등급 문장 8건 중 4건**이 무너졌다. 여기서
+    #    줄이는 것은 **수준 문구**뿐이고, `[잘함]`·[아쉬움] 앵커가 남아
+    #    「무엇이 더 낫고 무엇이 더 아쉬운가」는 그대로 보인다.
+    band_value = metrics.get(criterion.band_metric)
+    text = criterion.plain_for(grade, band_value) or criterion.grades[grade]
+    lines.append(f"\n이번 판정 수준:\n- [{LEVEL_WORDS[grade]}] {text}")
 
-    if criterion.anchors:
-        lines.append("\n근거 문장 예시 (수준에 맞는 어투를 그대로 따릅니다):")
-        for a in criterion.anchors:
-            measured = json.dumps(a["measured"], ensure_ascii=False)
+    # 🔴 **이번 판정 등급의 앵커는 값이 앉은 조각의 것만 넣는다** (가-3).
+    #    모델이 앵커의 방향을 따라가기 때문이다 — 앵커 조각이 값 조각과
+    #    다르면 오독률 63%, 같으면 14% 였다(가-2 after 30문장 대조).
+    #    다른 등급 앵커는 그대로 둔다: 어투 예시라 방향을 좁힐 이유가 없고,
+    #    1회차에서 앵커를 줄였다가 2등급 문장이 무너진 적이 있다.
+    # 🔴 **옆 등급 앵커의 「문장」을 빼는 길은 닫혔다** (2026.09.17, 미결 23번 E).
+    #    앵커 한 줄이 두 일을 한다고 보고(측정값 = 숫자 울타리 · 문장 = 방향)
+    #    옆 등급의 문장만 빼 봤다. 얻은 것은 컸다 — **방향 오독 5 → 2**,
+    #    지어낸 수치도 **1건**으로 울타리가 섰다(가설은 맞았다). 그런데
+    #    🔴 **잘함 문장이 1 → 6/22 로 무너졌다**(사전 등록 기준 F 불합격):
+    #    *"공을 효과적으로 **공중에 띄울** 수 있어 좋았다"* — 패스에서 공이
+    #    뜨는 것은 결함인데 칭찬한다. **수준별 값만 남기고 뜻을 빼면 모델이
+    #    뜻을 지어낸다.** 1회차(앵커 축소)와 같은 자리를 **세 번째로** 밟았다.
+    #    되살리려면 **새 사전 등록**이다 — `RESULTS_anchor_values.md`.
+    shown = tuple(
+        a for a in criterion.anchors
+        if int(a.get("grade", -1)) != grade
+    ) + criterion.anchors_for(grade, band_value)
+    # 🔴 **측정값 순으로** 나열한다 (미결 23번 F). 파일 순서에 기대지 않는다:
+    #    조각마다 앵커를 더하면서 새 앵커가 목록 끝에 붙어 차례가 흐트러졌다.
+    #
+    #    🔴 **예전에는 「좋은 것부터」(등급 내림차순)였다.** 근거는 「위 수준
+    #    목록과 같은 차례여야 어느 어투가 어느 수준인지 짝이 보인다」였고,
+    #    1회차에서 그 짝을 잃고 2등급 문장이 무너진 것이 그 근거였다.
+    #    **그런데 1회차에 무너진 진짜 이유는 수준 낱말이 사라진 것**이고,
+    #    낱말(`[잘함]`…)은 줄마다 그대로 붙어 있다 — 짝은 낱말이 말하지
+    #    차례가 말하지 않는다.
+    #
+    #    등급 순이 부른 문제: **앵커 사다리가 값에 대해 단조가 아니다.**
+    #    골반 회전 1등급은 양방향이라 잘함 24 → 보통 45 → 아쉬움 5 로
+    #    늘어서고, 값이 24↑45↓5 로 오르내린다. 측정값 85.8 은 셋 중 어느
+    #    것보다 큰데 **모델이 사다리에서 제자리를 못 찾았다**(C 회차).
+    #    양방향 구간에서는 이 배치가 예외가 아니라 **기본값**이다.
+    shown = tuple(sorted(
+        shown, key=lambda a: float(a["measured"][criterion.band_metric])))
+    if shown:
+        lines.append("\n" + ANCHOR_HEADER + ":")
+        for a in shown:
+            # 🔴 JSON 을 그대로 넣지 않는다 — 키가 지표 코드라 문장에 샌다.
             lines.append(
-                f"- [{LEVEL_WORDS[a['grade']]}] 측정값 {measured}"
+                f"- [{LEVEL_WORDS[a['grade']]}] {_labelled(a['measured'])}"
                 f" → \"{a['evidence']}\""
             )
 
-    lines.append("\n측정값 (이 숫자만 신뢰할 것):")
-    lines.append(json.dumps(metrics, ensure_ascii=False, indent=2))
+    # 🔴 **단위를 함께 준다** (2회차). 맨 숫자를 주면 모델이 단위를 지어내고,
+    #    프레임 값에는 「초」가 가장 그럴듯해서 「12초」가 나갔다.
+    lines.append("\n측정값 (이 숫자와 단위만 신뢰할 것):")
+    for code, value in metrics.items():
+        lines.append(f"- {label_for(code, criterion.name)}: {valued(code, value)}")
     lines.append(
         f"\n이번 판정은 [{word}]입니다. "
-        f"{criterion.band_metric}={metrics.get(criterion.band_metric)}가 그 근거입니다."
+        f"{label_for(criterion.band_metric, criterion.name)}"
+        f" {valued(criterion.band_metric, metrics.get(criterion.band_metric))}"
+        "가 그 근거입니다."
     )
     # 끝맺음도 수준에 맞춘다. **"고칠 점을 붙여라"를 잘한 항목에까지 요구하면
     # 모델이 칭찬할 자리에서 흠을 찾는다** — 1회차에서 2등급 문장이 무너진 데엔
@@ -183,6 +362,15 @@ def build_prompt(criterion, metrics: dict[str, Any], grade: int) -> str:
         f"위 [{word}] 예시와 같은 어투로 씁니다. 등급 번호나 기준 구간은 쓰지 "
         f"마세요 — 측정값을 짚어 자세가 어땠는지 서술하고, {closing}"
     )
+    # 🔴 **「한 방향으로만 말하라」고 덧붙이는 길은 닫혔다** (2026.09.17, H).
+    #    F 뒤 남은 방향 오독 넷이 전부 **한 문장 안에서 양쪽을 다 말하는**
+    #    모양이라, 끝맺음에 그것을 금지하는 한 줄을 더해 봤다.
+    #    얻은 것: 방향 오독 **4 → 2**(사전 등록 기준 E 합격).
+    #    🔴 잃은 것: **잘함 문장 1 → 3/22**(기준 F 불합격) —
+    #      "짧은 스윙이 **패스보다 슈팅에 가깝지만**, 각도 조절이 완벽하지 않아"
+    #    2등급인데 결함 쪽 어휘로 쓴다. 🔴 **틀린 문장의 총량은 5 → 5 로
+    #    그대로고 자리만 옮겼다.** 이 항목에서 일곱 번째 보는 형태다.
+    #    되살리려면 **새 사전 등록**이다 — `RESULTS_one_way.md`.
     lines.append("근거 문장을 JSON으로 출력하세요.")
     return "\n".join(lines)
 
@@ -268,11 +456,16 @@ class Judge:
             load_kwargs["dtype"] = torch.bfloat16
 
         remote = self.model_size not in NATIVE
+        # 🔴 고정된 커밋이 있으면 그것으로 받는다 (미결 11번). 로컬 경로를
+        # 모델로 줄 때는 표에 없으므로 아무것도 안 붙는다 — 경로에 `revision`
+        # 을 붙이면 그쪽이 무시되거나 경고를 내기 때문이다.
+        pin = ({"revision": MODEL_REVISIONS[self.model_id]}
+               if self.model_id in MODEL_REVISIONS else {})
         self._tokenizer = AutoTokenizer.from_pretrained(
-            self.model_id, trust_remote_code=remote
+            self.model_id, trust_remote_code=remote, **pin
         )
         self._model = AutoModelForCausalLM.from_pretrained(
-            self.model_id, trust_remote_code=remote, **load_kwargs
+            self.model_id, trust_remote_code=remote, **pin, **load_kwargs
         )
         self._model.eval()
 
@@ -368,11 +561,36 @@ class Judge:
 
         도구가 검출되지 않으면 그 항목은 빠진다 — aggregate가 남은 항목으로
         가중치를 재정규화한다.
+
+        **원격(vLLM)일 때는 항목을 동시에 던진다.** 항목당 2~3초가 순차로 쌓여
+        EC2에서 판정만 17초였다(2026-09-03 측정). 서버는 이미 배치를 관리하고
+        있고 우리는 요청을 기다리기만 하므로, 묶어 던지면 가장 느린 항목 하나로
+        줄어든다.
+
+        🔴 **점수는 이것으로 움직일 수 없다.** 등급은 프롬프트를 만들기 전에
+        코드가 정하고(`judge_criterion`의 `grade_for`), 모델이 뭐라 답하든
+        `_validate`가 그 값으로 덮어쓴다. 동시 실행이 바꿀 수 있는 것은
+        `evidence` 문장뿐이고 그건 지금도 실행마다 흔들리는 값이다.
+
+        로컬(transformers)은 순차로 둔다 — 한 GPU에 모델이 하나라 동시에 불러야
+        얻을 것이 없고, outlines·transformers를 여러 스레드에서 부르는 것은
+        안전하다고 보장된 적이 없다.
         """
-        return {
-            c.id: self.judge_criterion(c, features, rubric.sport)
-            for c in rubric.applicable_criteria(features)
-        }
+        criteria = list(rubric.applicable_criteria(features))
+        if not self._remote_ready or len(criteria) < 2:
+            return {
+                c.id: self.judge_criterion(c, features, rubric.sport)
+                for c in criteria
+            }
+
+        with ThreadPoolExecutor(max_workers=len(criteria)) as pool:
+            pending = {
+                c.id: pool.submit(self.judge_criterion, c, features, rubric.sport)
+                for c in criteria
+            }
+            # 순서는 루브릭 순서 그대로다 — dict가 삽입 순서를 지키므로
+            # 리포트의 항목 순서가 동시 실행으로 흔들리지 않는다.
+            return {cid: fut.result() for cid, fut in pending.items()}
 
     # -- 내부 (vLLM) ----------------------------------------------------
     def _generate_remote(self, messages) -> dict[str, Any]:

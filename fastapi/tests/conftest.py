@@ -5,23 +5,50 @@ from fastapi.testclient import TestClient
 
 from app.analysis.adapter.outbound.stub.video_stub_repository import (
     FakeStorage,
+    StubReportReadRepository,
     StubVideoRepository,
+    reset_report_views,
     reset_videos,
 )
 from app.analysis.adapter.outbound.stub.job_stub_repository import (
     StubJobRepository,
+    StubReportIngestRepository,
+    reset_ingested,
     reset_jobs,
 )
-from app.analysis.dependencies.job_providers import get_job_repository
+from app.analysis.adapter.outbound.stub.reference_player_stub_repository import (
+    StubReferencePlayerRepository,
+)
+from app.analysis.dependencies.job_providers import (
+    get_job_repository,
+    get_report_ingest_repository,
+)
+from app.analysis.dependencies.reference_player_providers import (
+    get_reference_player_repository,
+)
 from app.analysis.dependencies.video_providers import (
+    get_report_read_repository,
     get_storage,
     get_video_repository,
 )
 from app.core.config import settings
+from app.match.adapter.outbound.stub.match_preference_stub_repository import (
+    StubMatchPreferenceRepository,
+    reset_match_preferences,
+)
 from app.match.adapter.outbound.stub.match_stub_repository import (
     StubMatchRepository,
 )
+from app.match.dependencies.match_preference_providers import (
+    get_match_preference_repository,
+)
 from app.match.dependencies.match_providers import get_match_repository
+from app.notification.adapter.outbound.stub.notification_stub_repository import (
+    StubNotificationRepository,
+)
+from app.notification.dependencies.notification_repository_provider import (
+    get_notification_repository,
+)
 from app.review.adapter.outbound.stub.review_stub_repository import (
     StubReviewRepository,
     reset_reviews,
@@ -43,7 +70,15 @@ from app.user.adapter.outbound.stub.user_stub_repository import (
     StubUserRepository,
 )
 from app.user.adapter.outbound.stub.team_stub_repository import StubTeamRepository
+from app.user.adapter.outbound.stub.region_stub_repository import (
+    StubRegionRepository,
+)
+from app.user.adapter.outbound.stub.position_stub_repository import (
+    StubPositionRepository,
+)
 from app.user.dependencies.team_providers import get_team_repository
+from app.user.dependencies.position_providers import get_position_repository
+from app.user.dependencies.region_providers import get_region_repository
 from app.user.dependencies.user_repository_provider import get_user_repository
 
 V1 = "/api/v1"
@@ -97,7 +132,22 @@ def client() -> TestClient:
     app.dependency_overrides[get_squad_repository] = StubSquadRepository
     app.dependency_overrides[get_video_repository] = StubVideoRepository
     app.dependency_overrides[get_job_repository] = StubJobRepository
+    app.dependency_overrides[get_reference_player_repository] = (
+        StubReferencePlayerRepository
+    )
+    app.dependency_overrides[get_report_ingest_repository] = (
+        StubReportIngestRepository
+    )
+    app.dependency_overrides[get_report_read_repository] = StubReportReadRepository
     app.dependency_overrides[get_review_repository] = StubReviewRepository
+    app.dependency_overrides[get_position_repository] = StubPositionRepository
+    app.dependency_overrides[get_region_repository] = StubRegionRepository
+    app.dependency_overrides[get_match_preference_repository] = (
+        StubMatchPreferenceRepository
+    )
+    app.dependency_overrides[get_notification_repository] = (
+        StubNotificationRepository
+    )
     # 🔴 저장소도 갈아끼운다. 안 끼우면 `S3_BUCKET` 이 없어 503 이 나는데,
     #    그건 계약이 아니라 **환경 문제**라 계약 테스트가 그걸 검사하면 안 된다.
     app.dependency_overrides[get_storage] = FakeStorage
@@ -105,8 +155,11 @@ def client() -> TestClient:
     app.dependency_overrides[get_user_email_reader] = _stub_user_email_reader
     reset_videos()
     reset_jobs()
+    reset_ingested()
+    reset_report_views()
     reset_reviews()
     reset_squads()
+    reset_match_preferences()
     try:
         yield TestClient(app)
     finally:
@@ -117,7 +170,14 @@ def client() -> TestClient:
         app.dependency_overrides.pop(get_squad_repository, None)
         app.dependency_overrides.pop(get_video_repository, None)
         app.dependency_overrides.pop(get_job_repository, None)
+        app.dependency_overrides.pop(get_reference_player_repository, None)
+        app.dependency_overrides.pop(get_report_ingest_repository, None)
+        app.dependency_overrides.pop(get_report_read_repository, None)
         app.dependency_overrides.pop(get_review_repository, None)
+        app.dependency_overrides.pop(get_position_repository, None)
+        app.dependency_overrides.pop(get_region_repository, None)
+        app.dependency_overrides.pop(get_match_preference_repository, None)
+        app.dependency_overrides.pop(get_notification_repository, None)
         app.dependency_overrides.pop(get_storage, None)
         app.dependency_overrides.pop(get_token_version_reader, None)
         app.dependency_overrides.pop(get_user_email_reader, None)
@@ -178,3 +238,33 @@ def db_session():
         pytest.skip("DATABASE_URL 이 설정되지 않았다")
     with Session(engine) as session:
         yield session
+
+
+@pytest.fixture
+def new_session_factory():
+    """서로 **독립된** 세션이 여러 개 필요한 동시성 검사용(`FOR UPDATE`·
+    `SKIP LOCKED` 등 — 같은 `db_session`을 재사용하면 같은 트랜잭션이라 두
+    워커를 흉내 낼 수 없다). 만든 세션을 전부 기록해 뒀다가 테스트가 끝나면
+    닫는다 — 안 닫으면 커넥션이 풀에 안 돌아가 `test_job_db.py`·
+    `test_detection_db.py`처럼 누적되면 `QueuePool ... TimeoutError`로 번진다
+    (2026-09-15, 두 파일 다 이 문제로 실제로 걸렸다).
+    """
+    from sqlalchemy.orm import Session
+
+    from app.core.database import engine_or_none
+
+    engine = engine_or_none()
+    if engine is None:
+        pytest.skip("DATABASE_URL 이 설정되지 않았다")
+
+    sessions: list[Session] = []
+
+    def factory() -> Session:
+        session = Session(engine)
+        sessions.append(session)
+        return session
+
+    yield factory
+
+    for session in sessions:
+        session.close()

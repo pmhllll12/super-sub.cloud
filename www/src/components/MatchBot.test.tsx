@@ -23,6 +23,24 @@ describe('MatchBot — 흐름 B(모집 등록 돕기) 챗봇', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
+  it('입력이 비어 있을 때 Tab을 누르면 예시 문구가 채워진다', async () => {
+    const user = userEvent.setup()
+    render(<MatchBot open onClose={() => {}} />)
+    const input = screen.getByLabelText('메시지') as HTMLInputElement
+    input.focus()
+    await user.keyboard('{Tab}')
+    expect(input.value).toBe('이번 주 토요일 저녁에 골키퍼 1명 필요해요')
+  })
+
+  it('이미 입력한 것이 있으면 Tab이 예시 문구로 덮어쓰지 않는다', async () => {
+    const user = userEvent.setup()
+    render(<MatchBot open onClose={() => {}} />)
+    const input = screen.getByLabelText('메시지') as HTMLInputElement
+    await user.type(input, '축구')
+    await user.keyboard('{Tab}')
+    expect(input.value).toBe('축구')
+  })
+
   it('메시지를 보내면 /api/chat 을 부르고 답을 그린다', async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => {
       return new Response(
@@ -113,5 +131,39 @@ describe('MatchBot — 흐름 B(모집 등록 돕기) 챗봇', () => {
     await user.click(screen.getByRole('button', { name: '등록' }))
     await screen.findByText('그 시간은 이미 지났어요, 다른 시간을 알려주세요.')
     expect(screen.getByRole('button', { name: '등록' })).toBeInTheDocument()
+  })
+
+  it('후보 검색 결과가 오면 카드 목록으로 그린다', async () => {
+    const candidates = [
+      {
+        user_id: 'c1',
+        nickname: '이골키',
+        location: '서울 강남',
+        skill_summary: '공중볼 처리에 강함',
+        similarity: 0.86,
+      },
+    ]
+    const fetchMock = vi.fn(async () => {
+      return new Response(
+        JSON.stringify({
+          history: [],
+          reply: '이골키님이 조건에 잘 맞아요.',
+          proposal: null,
+          candidates,
+        }),
+        { status: 200 },
+      )
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const user = userEvent.setup()
+    render(<MatchBot open onClose={() => {}} />)
+    await user.type(screen.getByLabelText('메시지'), '골키퍼 구해줘')
+    await user.click(screen.getByRole('button', { name: '보내기' }))
+
+    await screen.findByText('이골키님이 조건에 잘 맞아요.')
+    expect(screen.getByRole('list', { name: '용병 후보' })).toBeInTheDocument()
+    expect(screen.getByText('이골키')).toBeInTheDocument()
+    expect(screen.getByText('공중볼 처리에 강함')).toBeInTheDocument()
   })
 })

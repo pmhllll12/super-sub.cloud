@@ -5,9 +5,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from supersub_agent.scoring import (
+    SCORE_BANDS,
     RubricError,
     aggregate,
     discover_rubrics,
@@ -77,11 +80,7 @@ def test_open_scope_is_one_motion_per_sport():
     """
     active = {k for k, r in discover_rubrics("rubrics").items() if r.is_active}
 
-    assert active == {
-        "football/instep_shot",
-        "baseball/pitching",
-        "basketball/jump_shot",
-    }
+    assert active == {"football/instep_shot"}
     sports = [k.split("/")[0] for k in active]
     assert len(sports) == len(set(sports)), "한 종목에 두 동작이 열려 있다"
 
@@ -95,15 +94,12 @@ def test_closed_motions_stay_loadable():
     """
     closed = {k: r for k, r in discover_rubrics("rubrics").items() if not r.is_active}
 
-    assert set(closed) == {
-        "football/inside_pass",
-        "basketball/layup",
-        # 야구 타격 — 야구는 pitching이 이미 열려 있어 "종목당 한 동작" 범위에
-        # 안 들어간다. 그래도 파일을 둔 것은 JHMDB 관절 정답 54건(swing_baseball)이
-        # 루브릭을 기다리고 있어서다 — 스크립트는 status를 보지 않으므로
-        # 닫힌 채로 돌릴 수 있다. 미결 3번 · 19번.
-        "baseball/batting",
-    }
+    # 2026.09.11 축구 단일 종목 전환 — 야구·농구 루브릭 4개를 지웠다.
+    # 🔴 `eval/` 은 남겨 뒀다. 사전등록 실험(7·20·34·37번)이 그 클립
+    # 측정치 위에 서 있고, 한 회차가 6종을 **같은 문서에서** 쟀기 때문에
+    # 종목으로 잘리지 않는다. 좌우·관절 매핑 검사 자체는 `eval/` 을 읽지
+    # 않는다 (`test_keypoint_source` → `scripts/analyze_keypoints.py`).
+    assert set(closed) == {"football/inside_pass"}
     for key, r in closed.items():
         assert r.criteria, key
         assert r.status == "draft", key
@@ -124,6 +120,77 @@ def test_open_ended_top_bands_are_rejected(tmp_path):
 
     with pytest.raises(RubricError, match="열려 있음"):
         discover_rubrics(tmp_path)
+
+
+def test_a_title_tells_which_way_the_posture_went():
+    """🔴 한 등급 안의 **반대 방향**을 칭호도 가른다 (2026.09.16).
+
+    「치우친 상체」는 **젖혀진 것**과 **앞으로 무너진 것**을 같은 말로 불렀다.
+    선수가 읽는 자리(리포트 상세·적재 컬럼)라 방향이 안 보이면 고칠 수가 없다.
+
+    🔴 값이 없으면 **방향을 찍지 않고 항목명**으로 떨어진다 — `card_line_for` 가
+    빈 문자열로 떨어지는 것과 같은 판단이다. 서비스 경로는 늘 값을 넘긴다.
+    """
+    rubric = load_rubric(RUBRIC_PATH)
+    trunk = rubric.get("trunk_lean")
+    back, forward = trunk.title_for(0, -8.7), trunk.title_for(0, 35.0)
+    assert back != forward, "양쪽을 같은 말로 부른다"
+    assert trunk.title_for(0) == trunk.name, "값이 없는데 방향을 골랐다"
+
+    judgments = {c.id: {"grade": 0, "evidence": ""} for c in rubric.criteria}
+    # 항목마다 **자기 0등급 구간 안**의 값을 준다. 아무 값이나 주면 구간에 없어
+    # `grade_for` 가 막는다 — 그 검사는 그대로 두는 것이 맞다.
+    feats = {}
+    for cr in rubric.criteria:
+        lo, hi = cr.bands[0][0]
+        feats[cr.band_metric] = hi - 1.0 if lo is None else (
+            lo + 1.0 if hi is None else (lo + hi) / 2)
+    got = aggregate(judgments, rubric, features=feats)
+    said = {b["criterion_id"]: b["title"] for b in got["breakdown"]}
+    assert said["trunk_lean"] == back
+
+    # 값을 안 주면 그 항목만 항목명으로 떨어진다 — 나머지는 그대로다.
+    plain = aggregate(judgments, rubric)
+    said_plain = {b["criterion_id"]: b["title"] for b in plain["breakdown"]}
+    assert said_plain["trunk_lean"] == trunk.name
+    assert said_plain["hip_rotation"] == said["hip_rotation"], "안 갈린 항목까지 변했다"
+
+
+def test_card_lines_that_do_not_line_up_with_the_bands_are_rejected(tmp_path):
+    """🔴 구간마다 쓴 문장이 **자리가 어긋나면 반대로 말한다**.
+
+    한 등급에 반대 방향 구간이 둘 있는 자리(골반 회전 1등급: 덜 돌았다 / 너무
+    많이 돌았다)에서 문장 순서가 구간 순서와 다르면 **덜 돈 선수에게 「지나치게
+    많이 돌린다」**고 말한다. 예외도 경고도 없이 문장만 반대인 형태다.
+    """
+    head = ("sport: x\nmotion: y\ncriteria:\n"
+            "  - {id: a, name: A, weight: 1.0, measured_by: [m], "
+            "grades: {0: z, 1: z, 2: z}, "
+            "bands: {metric: m, 2: [[2, 3]], 1: [[1, 2], [3, 4]], 0: [[null, 1]]}, ")
+    (tmp_path / "one.yaml").write_text(
+        head + "card_lines: {2: ok, 1: [only-one], 0: ok}}\n", encoding="utf-8")
+
+    with pytest.raises(RubricError, match="구간"):
+        discover_rubrics(tmp_path)
+
+
+def test_a_grade_may_keep_one_sentence_for_both_directions(tmp_path):
+    """문장 하나로 양쪽 구간을 부르는 것은 **허용한다** — 갈라 쓰는 것은 선택이다.
+
+    갈라 쓰면 고칠 방향이 보이지만, 모든 항목에서 두 방향을 다르게 부를 말이
+    있는 것은 아니다. 하나만 있으면 방향과 무관한 문장으로 본다.
+    """
+    body = ("sport: x\nmotion: y\ncriteria:\n"
+            "  - {id: a, name: A, weight: 1.0, measured_by: [m], "
+            "grades: {0: z, 1: z, 2: z}, "
+            "bands: {metric: m, 2: [[2, 3]], 1: [[1, 2], [3, 4]], 0: [[null, 1]]}, "
+            "card_lines: {2: ok, 1: 한 문장, 0: ok}}\n")
+    (tmp_path / "one.yaml").write_text(body, encoding="utf-8")
+
+    c = discover_rubrics(tmp_path)["x/y"].criteria[0]
+    # 값을 안 줘도 쓸 수 있다 — 방향을 고를 필요가 없는 문장이라서다.
+    assert c.card_line_for(1) == "한 문장"
+    assert c.card_line_for(1, 1.5) == "한 문장"
 
 
 def test_unknown_status_is_rejected(tmp_path):
@@ -360,8 +427,10 @@ def test_band_text_states_the_actual_interval(rubric):
     assert band_text(c, 0) == "15 이하"
 
     assert "축구" in system_prompt("football")
-    assert "야구" in system_prompt("baseball")
     assert "생활체육" in system_prompt(""), "모르는 종목은 특정하지 않는다"
+    assert "생활체육" in system_prompt("baseball"), (
+        "루브릭 없는 종목 코드에 이름을 붙이고 있다 — 축구 단일 종목이다"
+    )
 
 
 def test_out_of_band_marks_zero_grades_that_came_from_above():
@@ -405,11 +474,27 @@ def test_out_of_band_marks_zero_grades_that_came_from_above():
     assert c.out_of_band(below) == "", "아래쪽 0등급은 표시하지 않는다"
 
 
-def test_out_of_band_does_not_move_the_score():
+# features 를 줘야만 채워지거나 **달라지는** 필드들. 이 목록이 늘어날 때마다
+# 아래 검사가 「점수를 안 건드린다」를 다시 확인한다.
+#
+# 🔴 `title` 은 2026.09.16 부터 features 에 **의존한다** — 한 등급에 반대 방향
+# 구간이 둘 있는 항목(「젖혀진 상체」 / 「무너진 상체」)에서 어느 쪽인지 고르려면
+# 측정값이 있어야 하고, 없으면 방향을 찍지 않고 항목명으로 떨어진다. 그래서
+# 이 검사가 보는 것은 **점수·등급·가중치**이고 문구는 아니다.
+DISPLAY_ONLY_FIELDS = ("out_of_band", "stat", "view_dependent", "title")
+
+# 봉투 맨 위의 표시 전용 블록. `card` 와 `summary` 는 위 `title` 과 같은 이유로
+# features 에 의존한다(둘 다 칭호·구간 문구를 재료로 쓴다). 점수를 안 건드리는
+# 것은 `test_summary.py::test_the_card_does_not_move_the_score` 가 따로 본다.
+DISPLAY_ONLY_BLOCKS = ("card", "summary")
+
+
+def test_display_only_fields_do_not_move_the_score():
     """🔴 표시는 표시일 뿐이다 — **점수·등급이 바뀌면 B-6 재실행을 부른다.**
 
-    features 를 주든 안 주든 `out_of_band` 를 뺀 나머지가 한 비트도 같아야 한다.
-    이 성질 때문에 이 처방을 임계값 검수 전에 넣을 수 있었다.
+    features 를 주든 안 주든 표시 전용 필드를 뺀 나머지가 한 비트도 같아야 한다.
+    이 성질 때문에 이 처방들(구간 위 0등급 표시·항목 점수)을 임계값 검수 전에
+    넣을 수 있었다.
     """
     rubric = load_rubric(RUBRIC_PATH)
     feats = {m: 0.0 for cr in rubric.criteria for m in cr.measured_by}
@@ -419,10 +504,540 @@ def test_out_of_band_does_not_move_the_score():
     with_feats = aggregate(judgments, rubric, features=feats)
 
     strip = lambda r: {  # noqa: E731
-        **r, "breakdown": [{k: v for k, v in b.items() if k != "out_of_band"}
+        **{k: v for k, v in r.items() if k not in DISPLAY_ONLY_BLOCKS},
+        "breakdown": [{k: v for k, v in b.items()
+                            if k not in DISPLAY_ONLY_FIELDS}
                            for b in r["breakdown"]]
     }
     assert strip(without) == strip(with_feats)
     assert all(b["out_of_band"] == "" for b in without["breakdown"]), (
         "features 를 안 주면 표시가 없어야 한다"
     )
+    assert all(b["stat"] is None for b in without["breakdown"]), (
+        "features 를 안 주면 항목 점수를 **지어내지 않는다**"
+    )
+    assert all(b["view_dependent"] == "" for b in without["breakdown"]), (
+        "features 를 안 주면 촬영 방향 의존 표시가 없어야 한다"
+    )
+
+
+def test_item_score_never_contradicts_the_grade():
+    """🔴 레이더 차트가 리포트와 반대로 말하면 안 된다.
+
+    항목 점수(`score_for`)는 등급별로 겹치지 않는 자리에 놓인다 —
+    2등급 85~100 · 1등급 50~85 · 0등급 0~50. 이 성질이 깨지면 **2등급 항목이
+    1등급 항목보다 안쪽에 찍히는** 오각형이 나오고, 선수는 잘한 항목을
+    못한 것으로 읽는다.
+
+    루브릭 전체·값 범위 전체를 훑는다. 새 루브릭의 bands 에 빈틈이 생겨도
+    여기서 걸린다.
+    """
+    for key, rubric in discover_rubrics("rubrics").items():
+        for c in rubric.criteria:
+            ends = [e for iv in sum(c.bands.values(), ()) for e in iv if e is not None]
+            lo, hi = min(ends), max(ends)
+            span = (hi - lo) or 1.0
+            for step in range(-30, 131):
+                value = lo + span * step / 100.0
+                features = {c.band_metric: value}
+                try:
+                    grade = c.grade_for(features)
+                except RubricError:
+                    continue  # bands 가 덮지 않는 값 — 실제로는 도달하지 않는다
+                score = c.score_for(features)
+                floor, ceiling = SCORE_BANDS[grade]
+                assert floor <= score <= ceiling, (
+                    f"{key}/{c.id}: {c.band_metric}={value:g} 는 {grade}등급인데 "
+                    f"점수 {score} 가 {floor}~{ceiling} 밖이다"
+                )
+
+
+def test_an_open_top_band_is_not_penalised_for_being_far_from_the_middle():
+    """🔴 **위가 열린 이상 구간의 끝은 위험한 끝이 아니다.**
+
+    `hip_rotation` 의 2등급은 25~180도이고 180도 위에는 아무 등급도 없다.
+    「구간 한가운데가 최고점」으로 재면 골반을 끝까지 돌린 175도가 한가운데
+    102도보다 낮게 찍힌다 — **잘한 값을 깎는다.** `_risk_edges` 가 아래쪽
+    끝(25도)만 세는 이유다.
+    """
+    rubric = load_rubric(RUBRIC_PATH)
+    c = rubric.get("hip_rotation")
+    assert c.bands[2] == ((25.0, 180.0),), "이 검사가 전제하는 구간이 바뀌었다"
+
+    far = c.score_for({c.band_metric: 175.0})
+    middle = c.score_for({c.band_metric: 102.0})
+    edge = c.score_for({c.band_metric: 27.0})
+
+    assert far > middle > edge, (
+        "위험한 끝(25도)에서 멀어질수록 높아야 한다 — 한가운데를 최고점으로 잡으면 "
+        f"175도({far})가 102도({middle})보다 낮아진다"
+    )
+    assert far >= 99.0, "반대쪽 끝은 만점 언저리다"
+    assert edge <= 86.0, "위험한 끝에 붙은 값은 2등급 바닥이다"
+
+
+def test_item_score_is_absent_when_the_metric_was_not_measured():
+    """도구 미검출로 빠진 항목은 축이 0이 아니라 **없는** 것이다.
+
+    0으로 채우면 레이더에서 「그 항목을 못했다」로 보인다. 촬영 조건 때문에
+    선수가 깎이지 않게 하는 것은 `aggregate` 의 재정규화와 같은 취지다.
+    """
+    rubric = load_rubric(RUBRIC_PATH)
+    c = rubric.criteria[0]
+    assert c.score_for({}) is None
+
+
+# -- 동작(motion) 어휘 — 백엔드가 FK 로 쓸 값이다 (미결 `jin` 17번) -----------
+
+
+def test_the_motion_vocabulary_is_the_pair_not_the_bare_motion():
+    """🔴 동작 코드의 열쇠는 **(종목, 동작) 쌍**이지 `motion` 하나가 아니다.
+
+    지금은 `motion` 값 6개가 전역에서 겹치지 않지만 그것은 **우연이지 보장이
+    아니다.** `shot`·`serve` 처럼 여러 종목에 자연스럽게 들어갈 이름이 있고,
+    백엔드가 `motion` 만으로 참조 테이블을 만들면(미결 `jin` 17번 B안) 겹치는
+    순간 **한 행이 두 루브릭을 가리킨다** — 그러면 농구 영상이 축구 루브릭으로
+    채점되고 그 사실이 값에 안 남는다.
+
+    이 검사는 겹침을 금지하지 않는다. **겹치는 날 여기서 걸려서** 그때 쌍으로
+    갈지 이름을 바꿀지 정하게 하는 것이 목적이다.
+    """
+    found = discover_rubrics("rubrics")
+    motions = [r.motion for r in found.values()]
+    assert len(set(motions)) == len(motions), (
+        f"`motion` 이 종목을 넘어 겹친다: {sorted(motions)}. "
+        "백엔드 참조 테이블(jin 17번)이 이 값을 단독 키로 쓰고 있으면 함께 고칠 것."
+    )
+    for key, r in found.items():
+        assert key == f"{r.sport}/{r.motion}"
+
+
+def test_the_filename_matches_the_declared_sport_and_motion():
+    """파일명과 선언이 어긋나면 **목록을 파일명으로 세는 사람이 틀린다.**
+
+    미결 `jin` 17번이 "파일명(`baseball_pitching`)은 종목이 섞여 있어
+    `sport_code` 와 중복된다"고 적었는데, 그 판단이 서려면 파일명이 실제로
+    `<sport>_<motion>` 이어야 한다. 지금은 6개 전부 그렇고 **강제하는 것이
+    없었다.**
+    """
+    expected = {f"{r.sport}_{r.motion}"
+                for r in discover_rubrics("rubrics").values()}
+    actual = {p.stem for p in Path("rubrics").glob("*.yaml")}
+    assert actual == expected, (
+        f"파일명이 선언과 다르다: {sorted(actual - expected)}"
+    )
+
+
+def _trunk_criterion(rubric):
+    return next(c for c in rubric.criteria
+                if c.band_metric == "trunk_forward_lean_deg_at_impact")
+
+
+@pytest.mark.parametrize(
+    "lean, expected",
+    [
+        # 인스텝의 2등급은 [5,20], 0등급은 ≤0 — 반전하면 2 → 0 이다.
+        (12.4, "grade"),
+        # 음수도 마찬가지다. -8.7 은 0등급이고 반전하면 8.7 로 2등급이 된다.
+        (-8.7, "grade"),
+        # 25도는 1등급([20,30])이고 반전한 -25 는 0등급이다.
+        (25.0, "grade"),
+        # 🔴 33도는 반전해도 0등급이라 **등급이 안 바뀐다** — 그래도 지표가
+        # 방향에 의존한다는 것은 그대로다.
+        (33.0, "metric"),
+    ],
+)
+def test_view_dependent_says_whether_the_grade_would_have_differed(rubric, lean, expected):
+    """🔴 촬영 방향 의존을 **드러낸다** (미결 37번 처방 (다)).
+
+    같은 자세라도 반대편에서 찍으면 `trunk_lean` 이 정확히 `-θ` 가 된다.
+    그 사실을 숨기지 않는 것이 이 필드의 전부다.
+    """
+    assert _trunk_criterion(rubric).view_dependent(
+        {"trunk_forward_lean_deg_at_impact": lean}
+    ) == expected
+
+
+def test_view_dependent_is_empty_for_metrics_that_do_not_flip(rubric):
+    """무릎각·골반 회전은 좌우 반전에 안 변한다 — 경고를 남발하지 않는다."""
+    feats = {m: 30.0 for cr in rubric.criteria for m in cr.measured_by}
+    for c in rubric.criteria:
+        if c.band_metric == "trunk_forward_lean_deg_at_impact":
+            continue
+        assert c.view_dependent(feats) == "", f"{c.id} 에 근거 없는 표시가 붙었다"
+
+
+def test_a_symmetric_band_is_what_actually_stops_the_flip(tmp_path):
+    """🔴 **같은 지표, 밴드 하나 차이로 갈린다** (미결 37번의 자기 검사).
+
+    0 대칭 밴드는 좌우가 반전돼도 등급이 안 바뀌고, 비대칭 밴드는 바뀐다.
+    인스텝은 실측에서 18/18 이 뒤집혔고, 0 대칭 밴드를 쓰던 루브릭은 46클립
+    0/46 이었다 — 같은 지표, 더 큰 부호 분산, 밴드 하나 차이로 0% 대 44%.
+    **지표가 아니라 밴드가 결정한다**는 것을 여기에 고정한다.
+
+    🔴 밴드를 **여기서 직접 만든다.** 2026.09.11 축구 단일 종목 전환으로 0
+    대칭 밴드를 쓰던 야구 타격 루브릭이 사라졌는데, 그때 이 검사를 함께
+    지우면 **대조군이 없어져** "인스텝이 뒤집힌다"만 남는다. 그러면 다음
+    사람이 지표를 갈아 치우려 든다 — 고칠 자리는 밴드다.
+    """
+    text = Path(RUBRIC_PATH).read_text(encoding="utf-8")
+    symmetric = text.replace(
+        "      2: [[5, 20]]\n"
+        "      1: [[0, 5], [20, 30]]\n"
+        "      0: [[null, 0], [30, null]]\n",
+        "      2: [[-25, 25]]\n"
+        "      1: [[-42, -25], [25, 42]]\n"
+        "      0: [[null, -42], [42, null]]\n",
+    )
+    assert symmetric != text, "인스텝의 trunk_lean 밴드 표기가 바뀌었다"
+    path = tmp_path / "football_instep_shot.yaml"
+    path.write_text(symmetric, encoding="utf-8")
+
+    batting = _trunk_criterion(load_rubric(path))
+    instep = _trunk_criterion(load_rubric(RUBRIC_PATH))
+    for lean in (-30.0, -12.4, -3.0, 3.0, 12.4, 30.0):
+        feats = {"trunk_forward_lean_deg_at_impact": lean}
+        assert batting.view_dependent(feats) == "metric", (
+            f"대칭 밴드인데 {lean} 에서 등급이 뒤집혔다"
+        )
+    assert instep.view_dependent(
+        {"trunk_forward_lean_deg_at_impact": 12.4}
+    ) == "grade", "비대칭 밴드에서 뒤집힘이 안 잡혔다"
+
+
+def test_a_title_alone_does_not_mean_the_player_earned_it(rubric):
+    """🔴 `title` 은 **모든 등급에 있다** — 「받았는가」는 따로다 (`paik` 23번).
+
+    `title_for` 에 항목명 폴백이 있어 이 값은 **절대 비지 않는다.** 그런데
+    `report-contract.md` 가 그 자리를 그냥 「받은 호칭」이라고 적어 두었고,
+    화면(`www`)은 그대로 **`title` 이 채워진 항목만 호칭으로 그린다**고 구현했다
+    — 전부 채워져 있으므로 결과는 **0등급 항목에 「무너지는 축」을 다는 것**이다.
+    계약 4장이 「못 받은 것을 미달 표식으로 남기지 않는다」고 정한 것의 정반대다.
+
+    지우면 그 결함이 조용히 돌아온다. 🔴 `title_earned` 를 `title is not None`
+    으로 바꿔 쓰는 것도 여기서 걸린다.
+    """
+    for grade in (0, 1, 2):
+        result = aggregate(_judgments(grade, rubric), rubric)
+        for item in result["breakdown"]:
+            assert item["title"], f"{item['criterion_id']}: {grade}등급인데 칭호가 비었다"
+            assert item["title_earned"] is (grade == 2), (
+                f"{item['criterion_id']}: {grade}등급의 title_earned 가 "
+                f"{item['title_earned']} 다 — 「{item['title']}」"
+            )
+
+
+def test_a_grade_the_rubric_never_named_is_not_an_earned_title(rubric):
+    """🔴 루브릭이 안 적은 칭호를 **항목명으로 지어내 수여하지 않는다.**
+
+    폴백은 개발 화면이 빈칸을 안 보이게 하려는 것이지 지도자가 지어 준 칭호가
+    아니다. 최고 등급이라는 이유만으로 참을 내면, 칭호를 안 쓴 새 루브릭이
+    선수 화면에 **항목 이름을 호칭으로** 띄운다.
+    """
+    c = rubric.criteria[0]
+    assert c.title_is_earned(2) is True, "지금 루브릭은 2등급 칭호를 갖고 있다"
+    c.titles.pop(2)
+    assert c.title_for(2) == c.name, "폴백이 항목명이라는 전제가 깨졌다"
+    assert c.title_is_earned(2) is False
+
+
+# --- 숫자 없는 수준 설명 (미결 23번 가-2) -----------------------------------
+
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def _football_rubrics():
+    return discover_rubrics("rubrics")
+
+
+def test_every_live_rubric_writes_a_plain_level_for_every_grade():
+    """🔴 **판정 모델이 읽는 자리에 숫자가 없어야 한다** (미결 23번 가-2).
+
+    `grades` 는 "150~170도" 처럼 경계를 품고 있고, 프롬프트에 있으면 모델이
+    언젠가 베낀다 — 1회차에서 구간 표기로, 2회차에서 수준 정의에 박힌
+    "25~60도" 로, **두 번** 확인했다.
+
+    이 검사가 없으면 새 루브릭·새 항목이 `grades_plain` 없이 들어오고,
+    `build_prompt` 는 조용히 `grades` 로 떨어진다 — **아무도 모른다.**
+    """
+    for key, rubric in _football_rubrics().items():
+        for c in rubric.criteria:
+            for grade in (2, 1, 0):
+                assert c.grades_plain.get(grade), (
+                    f"{key}/{c.id} 의 {grade}등급에 grades_plain 이 없다. "
+                    "없으면 프롬프트가 숫자 박힌 grades 로 떨어진다."
+                )
+
+
+def test_a_plain_level_never_carries_a_number():
+    """숫자를 적으면 이 칸을 만든 이유가 없어진다."""
+    import re
+    for key, rubric in _football_rubrics().items():
+        for c in rubric.criteria:
+            for grade, lines in c.grades_plain.items():
+                for text in lines:
+                    assert not re.search(r"\d", text), (
+                        f"{key}/{c.id} {grade}등급 grades_plain 에 숫자가 있다: "
+                        f"{text!r}"
+                    )
+
+
+def test_a_two_way_grade_gets_one_plain_line_per_segment():
+    """🔴 **양방향 등급은 조각마다 하나여야 한다.**
+
+    한 문장으로 양쪽을 부르면 모델이 방향을 고르고, 그게 지금 틀리고 있는
+    자리다 — 2026.09.17 판독에서 140.2도(과굴곡)에 「굴곡 부족」이 나왔다.
+    """
+    for key, rubric in _football_rubrics().items():
+        for c in rubric.criteria:
+            for grade in (2, 1, 0):
+                segments = len(c.bands.get(grade, ()))
+                if segments < 2:
+                    continue
+                assert len(c.grades_plain[grade]) == segments, (
+                    f"{key}/{c.id} {grade}등급: 구간 {segments}개인데 "
+                    f"grades_plain 이 {len(c.grades_plain[grade])}개다"
+                )
+
+
+def test_a_plain_line_that_does_not_match_its_segments_is_refused():
+    """조각 수와 문장 수가 다르면 **적재에서 막는다** (기준 F).
+
+    `titles`·`card_lines` 와 같은 규칙이다. 어긋난 채로 지나가면 모델이
+    **반대 방향의 수준 설명**을 받는다 — 고치려는 결함 그 자체다.
+    """
+    from supersub_agent.scoring import RubricError, load_rubric
+    import yaml
+
+    raw = yaml.safe_load(
+        (ROOT / "rubrics" / "football_instep_shot.yaml").read_text(encoding="utf-8")
+    )
+    for entry in raw["criteria"]:
+        if entry["id"] == "plant_knee_flexion":
+            entry["grades_plain"][1] = ["한 줄만 적는다"]  # 구간은 둘인데
+            break
+
+    broken = ROOT / "data" / "tmp" / "broken_plain.yaml"
+    broken.parent.mkdir(parents=True, exist_ok=True)
+    broken.write_text(yaml.safe_dump(raw, allow_unicode=True), encoding="utf-8")
+    try:
+        with pytest.raises(RubricError, match="grades_plain"):
+            load_rubric(broken)
+    finally:
+        broken.unlink()
+
+
+def test_the_judged_grade_gets_only_its_own_direction():
+    """🔴 이번 판정 등급은 **값이 앉은 조각 하나만** 프롬프트에 들어간다.
+
+    고를 것을 안 주면 고르다 틀릴 수 없다. 반대 방향의 말이 프롬프트에
+    남아 있으면 그 말이 문장에 나온다 — 2026.09.17 판독이 그 형태였다.
+    """
+    from supersub_agent.judge import ANCHOR_HEADER, build_prompt
+
+    rubric = _football_rubrics()["football/instep_shot"]
+    crit = next(c for c in rubric.criteria if c.id == "plant_knee_flexion")
+    metrics = {crit.band_metric: 140.2}  # [135,150] 조각 = 과굴곡
+
+    prompt = build_prompt(crit, metrics, 1)
+
+    assert "필요보다 깊이 굽힌다" in prompt
+    assert "뻣뻣하게 선다" not in prompt, (
+        "반대 조각의 말이 프롬프트에 남았다 — 모델이 그걸 고를 수 있다"
+    )
+
+
+def test_the_prompt_stops_carrying_band_numbers():
+    """프롬프트의 수준 설명에 경계 숫자가 없어야 한다.
+
+    🔴 `grades` 가 그대로 들어가던 자리라, 이 검사가 빠지면 되돌아가도
+    아무도 모른다.
+    """
+    from supersub_agent.judge import ANCHOR_HEADER, build_prompt
+
+    rubric = _football_rubrics()["football/instep_shot"]
+    crit = next(c for c in rubric.criteria if c.id == "plant_knee_flexion")
+    prompt = build_prompt(crit, {crit.band_metric: 140.2}, 1)
+
+    head = prompt.split(ANCHOR_HEADER)[0]
+    for edge in ("135", "150", "170", "180"):
+        assert edge not in head, f"수준 설명에 경계 숫자 {edge} 가 남았다"
+
+
+# --- 앵커도 조각마다 (미결 23번 가-3) ---------------------------------------
+
+
+def test_an_anchor_never_carries_a_number_it_did_not_measure():
+    """🔴 **앵커가 숫자를 가르친다** (미결 23번 가-3).
+
+    프롬프트는 앵커를 「예시 어투」로 넣는다. 그래서 앵커에 적힌 숫자는
+    **본보기가 된다** — 실제로 둘이 샜다:
+
+    ⑴ 밴드 경계: *"기준 상한 170도 초과"* → 모델이 170 을 그대로 썼다
+       (가-2 의 R2′ 4건이 전부 이 형태였다)
+    ⑵ 단위 환산: *"어깨너비 0.29배(약 12cm)"* → 모델이 무차원 비율을
+       cm 로 바꿔 적었다. **어깨너비를 60cm 로 가정한 값**이라 재지도
+       않은 수치다
+
+    앵커에는 **자기가 잰 값만** 적는다.
+    """
+    import re
+    number = re.compile(r"-?\d+(?:\.\d+)?")
+    for key, rubric in _football_rubrics().items():
+        for c in rubric.criteria:
+            for a in c.anchors:
+                measured = [float(v) for v in a["measured"].values()]
+                for token in number.findall(a["evidence"]):
+                    n = float(token)
+                    assert any(abs(n - v) <= 0.55 for v in measured), (
+                        f"{key}/{c.id} 앵커에 안 잰 숫자 {token} 이 있다: "
+                        f"{a['evidence']!r}"
+                    )
+
+
+def test_a_two_way_grade_has_an_anchor_for_each_direction():
+    """🔴 양방향 등급은 **조각마다 앵커**가 있어야 한다.
+
+    하나뿐이면 반대쪽 값이 들어왔을 때 보여 줄 예시가 **반대 방향**이고,
+    모델은 앵커를 따라간다 — 가-2 대조에서 앵커 조각이 어긋난 자리의
+    오독률이 **63%**, 맞은 자리가 **14%** 였다.
+    """
+    for key, rubric in _football_rubrics().items():
+        for c in rubric.criteria:
+            for grade, intervals in c.bands.items():
+                if len(intervals) < 2:
+                    continue
+                covered = set()
+                for a in c.anchors:
+                    if int(a["grade"]) != grade:
+                        continue
+                    v = float(next(iter(a["measured"].values())))
+                    for i, (lo, hi) in enumerate(intervals):
+                        if (lo is None or v >= lo) and (hi is None or v <= hi):
+                            covered.add(i)
+                assert covered == set(range(len(intervals))), (
+                    f"{key}/{c.id} {grade}등급: 구간 {len(intervals)}개인데 "
+                    f"앵커가 덮는 것은 {sorted(covered)} 뿐이다"
+                )
+
+
+def test_the_prompt_shows_only_the_anchor_for_the_direction_at_hand():
+    """반대 조각의 앵커가 프롬프트에 남으면 모델이 그쪽으로 간다."""
+    from supersub_agent.judge import ANCHOR_HEADER, build_prompt
+
+    rubric = _football_rubrics()["football/instep_shot"]
+    crit = next(c for c in rubric.criteria if c.id == "plant_knee_flexion")
+
+    deep = build_prompt(crit, {crit.band_metric: 140.2}, 1)   # 과굴곡 조각
+    assert "필요보다 깊이 굽었다" in deep
+    assert "뻣뻣하게 섰다" not in deep
+
+    stiff = build_prompt(crit, {crit.band_metric: 176.5}, 1)  # 뻣뻣 조각
+    assert "뻣뻣하게 섰다" in stiff
+    assert "필요보다 깊이 굽었다" not in stiff
+
+
+def test_the_other_grades_keep_all_their_anchors():
+    """🔴 **줄이는 쪽으로 가지 않는다** — 좁히는 것은 판정 등급 하나뿐이다.
+
+    1회차에서 앵커의 수준 표시를 뺐다가 **2등급 문장 8건 중 4건**이
+    무너졌다. 어투를 잡아 주는 자리라 함부로 덜어내지 않는다.
+
+    🔴 **2026.09.17 에 「측정값은 남기고 문장만 빼는」 길을 재 봤고, 닫혔다**
+    (미결 23번 E, `RESULTS_anchor_values.md`). 얻은 것이 작지 않았다 —
+    감점 쪽 방향 오독 **5 → 2**, 지어낸 수치도 **1건**으로 울타리가 섰다.
+    그런데 **잘함 문장이 1 → 6/22 로 무너졌다**:
+
+        "짧은 스윙이 공을 효과적으로 **위로 전달**하는 데 도움이 되었다"
+        "공을 효과적으로 **공중에 띄울** 수 있어 좋았다"
+
+    패스에서 공이 뜨는 것은 **결함**인데 칭찬한다. 수준별 **값만** 남기고
+    **뜻**을 빼면 모델이 뜻을 지어낸다. 1회차와 같은 자리를 **세 번째로**
+    밟은 것이라 이 검사를 원래대로 되돌렸다.
+
+    🔴 **다시 시도하려면 새 사전 등록이다.** 「값만 남기기」는 이미 쟀으니
+    같은 것을 또 재지 말 것 — 남은 갈래는 **어느 등급의 문장을 남길지**다.
+    """
+    from supersub_agent.judge import ANCHOR_HEADER, build_prompt
+
+    rubric = _football_rubrics()["football/instep_shot"]
+    crit = next(c for c in rubric.criteria if c.id == "trunk_lean")
+    prompt = build_prompt(crit, {crit.band_metric: 12.4}, 2)  # 2등급 판정
+    anchors = prompt.split(ANCHOR_HEADER)[1]
+
+    for word in ("[잘함]", "[보통]", "[아쉬움]"):
+        assert word in anchors, f"앵커에서 {word} 가 사라졌다 — 1회차의 자리다"
+
+    # 1등급은 양방향인데 판정 등급이 아니므로 **문장까지** 둘 다 남아야 한다.
+    assert "거의 수직" in anchors, "옆 등급 앵커의 문장이 사라졌다 — E 에서 닫힌 길이다"
+    assert "조금 깊이 숙였다" in anchors, "옆 등급 앵커의 문장이 사라졌다"
+
+
+def test_an_anchor_lists_every_metric_the_criterion_measures():
+    """🔴 앵커가 `measured_by` 를 **다 적어야** 한다 (미결 23번 A).
+
+    평가는 밴드 지표가 아닌 값을 **그 등급 앵커에서** 가져와 채운다. 앵커가
+    빠뜨리면 채울 값의 출처가 없고, 예전에는 그 자리를 **상수 10.0** 이
+    메웠다 — 그 상수가 문장을 끌고 갔다(`RESULTS_second_metric.md`).
+
+    프롬프트 쪽 이유도 있다: 앵커는 「이 값들에 이렇게 쓴다」는 본보기인데
+    한 앵커만 지표를 덜 보여 주면 **본보기가 서로 다른 것을 보여 준다.**
+    """
+    for key, rubric in _football_rubrics().items():
+        for c in rubric.criteria:
+            for a in c.anchors:
+                missing = set(c.measured_by) - set(a["measured"])
+                assert not missing, (
+                    f"{key}/{c.id} {a['grade']}등급 앵커에 {sorted(missing)} 가 없다"
+                )
+
+
+def test_the_prompt_carries_only_the_judged_levels_wording():
+    """🔴 **옆 등급 수준 문구를 프롬프트에 안 넣는다** (미결 23번 B).
+
+    셋을 다 넣던 시절, 모델이 옆 등급 문구를 끌어와 문장이 스스로 모순됐다 —
+    굴곡 79.2도(「슈팅처럼 크다」 조각)에 *"팔로스루가 **짧고** 방향을
+    유지하며 마무리됐다"*. 「짧게」는 **[잘함] 수준 문구**의 말이었고,
+    남은 오독 다섯 중 셋의 출처가 그것이었다.
+    """
+    from supersub_agent.judge import ANCHOR_HEADER, build_prompt
+
+    rubric = _football_rubrics()["football/inside_pass"]
+    crit = next(c for c in rubric.criteria if c.id == "follow_through")
+    prompt = build_prompt(
+        crit,
+        {"swing_hip_flexion_after_impact_deg": 79.2,
+         "follow_through_duration_frames": 8.0},
+        1,
+    )
+    head = prompt.split(ANCHOR_HEADER)[0]
+
+    assert "패스인데 마무리가 슈팅처럼 크다" in head, "판정 등급 문구가 없다"
+    assert "짧게, 방향을 남기며" not in head, (
+        "[잘함] 수준 문구가 남았다 — 모델이 그걸 끌어온다"
+    )
+    assert "찬 직후에 다리가 그대로 멈춘다" not in head, "[아쉬움] 수준 문구가 남았다"
+
+
+def test_the_anchors_still_show_every_level():
+    """🔴 **앵커는 줄이지 않는다** — 눈금을 주는 것은 앵커다.
+
+    1회차에서 앵커의 수준 표시를 뺐다가 **2등급 문장 8건 중 4건**이
+    무너졌다. B 가 줄인 것은 수준 문구뿐이고, 어느 어투가 어느 수준인지는
+    여기가 떠받친다. 이 검사가 없으면 나중에 「프롬프트를 더 줄이자」가
+    그 자리를 다시 밟는다.
+    """
+    from supersub_agent.judge import ANCHOR_HEADER, build_prompt
+
+    rubric = _football_rubrics()["football/inside_pass"]
+    crit = next(c for c in rubric.criteria if c.id == "follow_through")
+    prompt = build_prompt(
+        crit,
+        {"swing_hip_flexion_after_impact_deg": 79.2,
+         "follow_through_duration_frames": 8.0},
+        1,
+    )
+    examples = prompt.split(ANCHOR_HEADER)[1]
+    for word in ("[잘함]", "[보통]", "[아쉬움]"):
+        assert word in examples, f"앵커에서 {word} 가 사라졌다"

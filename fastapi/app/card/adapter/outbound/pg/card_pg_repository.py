@@ -17,18 +17,21 @@ Alembic 도 이것을 보지 않으므로 카드 쪽에서 `user` 테이블을 �
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
-from sqlalchemy import column, select, table, update
+from sqlalchemy import column, delete, select, table, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.card.adapter.outbound.mappers.card_mapper import (
     to_card_entity,
+    to_custom_title_entity,
     to_title_entity,
 )
 from app.card.adapter.outbound.orm.player_card_orm import PlayerCardOrm
 from app.card.adapter.outbound.orm.title_definition_orm import TitleDefinitionOrm
+from app.card.adapter.outbound.orm.user_custom_title_orm import UserCustomTitleOrm
 from app.card.adapter.outbound.orm.user_title_orm import UserTitleOrm
 from app.card.application.ports.output.card_port import CardPort
 from app.card.domain.entities.card_entity import CardEntity
@@ -70,6 +73,53 @@ class CardPgRepository(CardPort):
             update(PlayerCardOrm)
             .where(PlayerCardOrm.user_id == user_id)
             .values(tagline=tagline)
+        ).rowcount
+        if not changed:
+            self._session.rollback()
+            return None
+        self._session.commit()
+        return self.find_by_owner(user_id)
+
+    def replace_custom_titles(
+        self, user_id: UUID, labels: list[str]
+    ) -> CardEntity | None:
+        """`paik` 36번. 통째로 갈아 끼운다 — 지우고 다시 넣는다.
+
+        🔴 **한 트랜잭션이다.** 나눠 커밋하면 지운 뒤 넣기 전에 카드를 읽는
+        요청이 호칭 없는 카드를 본다.
+        """
+        card = self._session.execute(
+            select(PlayerCardOrm.id).where(PlayerCardOrm.user_id == user_id)
+        ).first()
+        if card is None:
+            self._session.rollback()
+            return None
+
+        self._session.execute(
+            delete(UserCustomTitleOrm).where(UserCustomTitleOrm.user_id == user_id)
+        )
+        now = datetime.now(timezone.utc)
+        for offset, label in enumerate(labels):
+            # 적은 순서가 보이도록 시각을 벌린다. 같은 값이면 최근순 정렬
+            # (`visible_titles`)이 순서를 뒤집을지 말지가 정해지지 않는다.
+            self._session.add(
+                UserCustomTitleOrm(
+                    id=uuid4(),
+                    user_id=user_id,
+                    label=label,
+                    created_at=now + timedelta(microseconds=offset),
+                )
+            )
+        self._session.commit()
+        return self.find_by_owner(user_id)
+
+    def update_style(self, user_id: UUID, style: dict | None) -> CardEntity | None:
+        # 🔴 `update_tagline` 과 같은 모양이다 — `values()` 에 `style` 하나만
+        #    둔다. 위 포트 주석대로 통째로 갈아 끼운다.
+        changed = self._session.execute(
+            update(PlayerCardOrm)
+            .where(PlayerCardOrm.user_id == user_id)
+            .values(style=style)
         ).rowcount
         if not changed:
             self._session.rollback()
@@ -139,12 +189,16 @@ class CardPgRepository(CardPort):
         return to_card_entity(card_row, nickname, self._titles(card_row.user_id))
 
     def _titles(self, user_id: UUID) -> list[TitleEntity]:
-        """부여된 호칭만 온다 — `user_title` 에 행이 있다는 것이 곧 부여다.
+        """카드에 실을 호칭 — **부여된 것**(`user_title`)과 **사람이 직접
+        적은 것**(`user_custom_title`, `paik` 36번)을 합쳐서 준다.
+
+        둘을 한 목록으로 주는 이유: 화면이 `titles[]` 하나만 그린다. 어느
+        쪽인지는 `category`(`직접`)와 `code`(`custom:` 접두사)로 갈린다.
 
         일부러 **오래된 것부터** 준다. 표시 순서는 도메인 규칙이 뒤집으므로,
         여기서 이미 정렬해 두면 그 규칙이 실제로 도는지 확인되지 않는다.
         """
-        stmt = (
+        granted_stmt = (
             select(UserTitleOrm, TitleDefinitionOrm)
             .join(
                 TitleDefinitionOrm,
@@ -153,7 +207,18 @@ class CardPgRepository(CardPort):
             .where(UserTitleOrm.user_id == user_id)
             .order_by(UserTitleOrm.granted_at.asc())
         )
-        return [
+        titles = [
             to_title_entity(granted, definition)
-            for granted, definition in self._session.execute(stmt).all()
+            for granted, definition in self._session.execute(granted_stmt).all()
         ]
+
+        custom_stmt = (
+            select(UserCustomTitleOrm)
+            .where(UserCustomTitleOrm.user_id == user_id)
+            .order_by(UserCustomTitleOrm.created_at.asc())
+        )
+        titles.extend(
+            to_custom_title_entity(row)
+            for row in self._session.execute(custom_stmt).scalars()
+        )
+        return titles

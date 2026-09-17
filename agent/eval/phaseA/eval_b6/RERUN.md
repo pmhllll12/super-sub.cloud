@@ -20,6 +20,12 @@ uv run python eval/phaseA/eval_b6/selector_downstream.py
 > 그대로 따라 했으면 "그런 파일 없음"으로 죽었을 것이고, **더 나빴던 것은
 > 지우기 전에 따라 했을 경우다** — 2026-08-27에 멈춘 사본이 조용히 돌았다.
 
+> 🔴 **소요를 다시 쟀다 (2026.09.15, 미결 43번 ㉳ 3회차)** — 같은 RTX 3050 에서
+> **435초**(Track1 318 + Track2 117)와 **428초**(311 + 116)다. 아래 244초는
+> **1.8배 낙관적**이다. 그 사이 `DEFAULT_TARGET_FPS` 가 15 → 30 이 됐으니
+> (`f2dacdc`, 09-02) 프레임이 두 배인 것이 가장 큰 몫으로 보인다. **시간을
+> 잡을 때는 7~8분으로 잡을 것.**
+
 **소요 244초** (2026-08-28 실측, RTX 3050) — Track1 **169초** + Track2 **75초**.
 스크립트가 끝나면 `track1_seconds`·`track2_seconds`·`total_seconds`를 stdout에
 JSON으로 찍는다. **파일로 남기지 않으므로 그 출력을 따로 보관할 것.**
@@ -29,14 +35,38 @@ JSON으로 찍는다. **파일로 남기지 않으므로 그 출력을 따로 �
 > **합집합만** 포즈한다(`kp_cache[(t, g)]`). 포즈는 박스당 중앙 18.0ms다
 > (`eval_b2/pose_quality_timing.csv`).
 
-산출물 두 개를 **덮어쓴다.**
+산출물 **셋**을 덮어쓴다.
 
 | 파일 | 내용 |
 |---|---|
 | `selector_downstream_comparison.csv` | Track 1, 195행 × 38열 |
 | `selector_downstream_rubric_clips.csv` | Track 2, 110행 × 40열 |
+| **`run_meta.json`** | 🔴 **이 실행이 무엇으로 무엇을 만들었는지** (2026-09-15 신설) |
 
-**덮어쓰기 전에 기존 두 파일을 반드시 복사해 둘 것.** 대조(아래)의 기준선이다.
+**덮어쓰기 전에 기존 파일을 반드시 복사해 둘 것.** 대조(아래)의 기준선이다.
+
+### 🔴 `run_meta.json` — 2026-09-15 에 규칙을 바꿨다
+
+앞서 스크립트에 *「실행 메타는 파일로 남기지 않는다(승인된 산출물 목록에
+없음). 보고서에 적는다」*고 적혀 있었다. **그 규칙이 대가를 치렀다** — 산출이
+재현되지 않는데 **그때 무엇으로 돌렸는지가 아무 데도 없어서** 원인을 못 갈랐다
+(미결 `ho` 47번). 「보고서에 적는다」는 **사람이 적어야 남는다**는 뜻이고,
+그날 아무도 안 적었다.
+
+| 담는 것 | 그게 답해 주는 질문 |
+|---|---|
+| `inputs` — **읽은 영상 전부의 md5·크기**(Track 1 39 · Track 2 22) | 🔴 **「그때와 같은 파일로 돌렸나」** — `agent/data/` 는 `.gitignore` 라 이것 말고는 되짚을 길이 없다 |
+| `git` — 커밋·브랜치·**`dirty`** | 🔴 `dirty` 가 참이면 이 산출은 **어느 커밋의 것도 아니다** |
+| `env` — python·torch·cuda·cudnn·transformers·opencv·numpy·GPU·TF32 설정 | 「환경이 변했나」(N-3) |
+| `models` — 저장소와 **리비전** | 「같은 가중치인가」(N-1) |
+| `batching` — `oom_events`·`min_batch` | 🔴 **「폴백이 일어났나」**(N-2) — 예전에는 알 방법이 없었다 |
+| `constants` — target fps·`MAX_BATCH`·검출 문턱·selector 목록 | 「같은 동작점인가」(미결 10번) |
+| `outputs` — 두 CSV 의 md5·크기 | 「이 메타가 **이 산출의** 것인가」 |
+
+🔴 **CSV 를 다 쓴 뒤에 쓴다** — 메타 수집이 터져도 결과는 남는다. 수집 실패는
+조용히 넘기지 않고 해당 칸에 `error` 로 적힌다.
+🔴 **인프라 식별자를 안 담는다**(공개 저장소다) — 절대 경로·호스트명 대신
+**파일 지문**으로 적는다.
 
 ## 필요한 자산
 
@@ -48,7 +78,7 @@ JSON으로 찍는다. **파일로 남기지 않으므로 그 출력을 따로 �
 | `eval_b2/eval_b2.py`, `labeling/targets.py` | 저장소·`/mnt/d` 동일 (diff 확인) | import 실패 |
 | Track 2 영상 22개 | `agent/data/*.mp4` 3 + `agent/data/goldenset/soccerkicks_video/*.avi` 19 | Track 2 축소 |
 | 루브릭 | `agent/rubrics/` | Track 2 등급 산출 불가 |
-| 모델 가중치 | HF 캐시 (`usyd-community/vitpose-base-simple`, `PekingU/rtdetr_r50vd_coco_o365`) | 재다운로드 약 2.4GB |
+| 모델 가중치 | HF 캐시 (`usyd-community/vitpose-base-simple` @ `a93ac0c6`, `PekingU/rtdetr_r50vd_coco_o365` @ `457857ce`) | 재다운로드 약 2.4GB. **해시는 `pose.py` 가 정본**이고 2026.09.11에 고정했다 |
 
 #### ✅ 경로를 `paths.py`로 옮겼다 (2026-09-08, 미결 11·14번)
 
@@ -70,24 +100,84 @@ JSON으로 찍는다. **파일로 남기지 않으므로 그 출력을 따로 �
 마지막으로 돌린 쪽이 덮어썼고, **무엇을 읽고 있는지 알 수 없었다**(미결 10·14번).
 `SUPERSUB_PHASEA_TARGET` 으로 바꾼다(기본값은 `pose.DEFAULT_TARGET_FPS`).
 
+## 🔴 산출물의 출처 — 「2026-08-28 판」이 아니다 (2026.09.15 정정)
+
+이 문서가 여러 곳에서 *"기존 CSV 는 2026-08-28 에 산출됐다"* 고 적어 두었는데
+**틀렸다.** git 이력이 답이다:
+
+| 커밋 | 날짜 | 왜 다시 돌았나 |
+|---|---|---|
+| `f8aba85` | 2026-08-28 | 최초 산출 |
+| `4626870` | 2026-09-02 | target 30 전환 재실행 |
+| `426de4d` | 2026-09-08 | 미결 21번(못 잰 골반 회전을 0.0 으로 지어내지 않는다) |
+| (아래 참조) | **2026-09-15** | **미결 43번 ㉳ 3회차** — 마무리 길이를 구간 안에서 센다. 커밋은 `git log -- selector_downstream_comparison.csv` 로 찾는다 |
+
+🔴 **정정 (같은 날, 47번 1회차) — 위 표의 「09-08 판」은 Track 1 뿐이다.**
+**Track 2 CSV 는 `426de4d` 에서 한 바이트도 안 바뀌었고 실제로는 `4626870`
+(2026-09-02) 산출이다**(md5 `7e41a201…` 이 두 커밋에서 같다). 그리고
+**그 차이는 코드가 아니다** — 09-02 · 09-08 · 오늘 세 시점 코드의 Track 2
+재실행이 **서로 불일치 0** 이다. 남은 후보는 **버전 관리 밖**(입력 클립 ·
+그 실행의 정체)이라
+[`../../pending47_baseline_audit/input_fingerprints.csv`](../../pending47_baseline_audit/input_fingerprints.csv)
+에 **입력 61개의 md5** 를 남겼다 — **다음 감사는 이걸 먼저 대 볼 것.**
+
+🔴 **아래는 발견 당시 기록이다** (현상은 그대로이고 원인 진단만 위로 바뀌었다) —
+겹치는 290행 중
+**85행(전부 Track 2)** 이 다르고, 임팩트 정의와 무관해야 할
+`detected_frames`·`usable_ratio_*` 까지 어긋난다. **원인은 환경도 가중치도
+비결정성도 아니다**(아래 「배제됨」에 실측을 붙였다). 정본과 남은 조사는
+**미결 `ho` 47번**, 측정은
+[`../../pending43_leak_fix/RESULTS.md`](../../pending43_leak_fix/RESULTS.md) 5절.
+
 ## 비결정성 요소
 
 같은 입력으로 다시 돌려도 **결과가 같다는 보장이 없다.** 원인을 위험도 순으로 적는다.
 
+> ✅ **실행 간 재현성에 처음으로 실측이 붙었다 (2026.09.15).** 같은 코드로 두
+> 번 돌린 290행이 **의도적으로 바꾼 두 열 말고 전부 비트 동일**이었다
+> (`pending43_leak_fix/compare_e2.out`). 🔴 **N-2·N-3 이 사라졌다는 뜻은
+> 아니다** — 이 기계·이 드라이버에서 **두 번** 그랬다는 뜻이다. 다만
+> **불일치를 봤을 때 「GPU 탓」을 먼저 집는 것은 이제 근거가 약하다.**
+
 ### 높음
 
-**N-1. 모델 가중치가 리비전 없이 이름으로만 고정돼 있다.**
-`pose.py`의 `POSE_MODEL`·`PERSON_DETECTOR`가 HF 저장소 **이름**만 담고 있고
-`revision=`이 없다. 업스트림이 파일을 갈아 끼우면 조용히 바뀐다. 로컬 HF 캐시가
-살아 있는 동안은 드러나지 않다가, 캐시를 지우거나 다른 기계에서 돌리는 순간
-어긋난다. **가장 흔하고 가장 늦게 발견되는 원인이다.**
+**N-1. ✅ 닫았다 (2026.09.11) — 가중치를 커밋으로 고정했다.**
+
+> 아래 진단은 그대로 옳았다. **고친 것은 원인이고, 기록은 남긴다.**
+>
+> `pose.py`에 `PERSON_DETECTOR_REVISION`·`POSE_MODEL_REVISION`을 두고
+> `from_pretrained(..., revision=...)`로 넘긴다. **이 재실행 경로도 같은 상수를
+> 쓴다** — `candidates.py`·`eval_b6/selector_downstream.py`·
+> `eval_b2/pose_quality.py`·`eval_b2/other_sports.py`·`other_sports.py`·
+> `soccer_check.py`·`eval_b2/render_soccer_diffs.py`.
+>
+> 🔴 **고정한 해시는 지금까지의 모든 결과를 낸 스냅숏 그대로다**(2026.09.11 HF
+> 캐시의 `refs/main`). 그래서 이 조치는 **과거 CSV를 무효화하지 않는다** — 값을
+> 바꾼 것이 아니라 **다음에 바뀌는 것을 막았다.**
+>
+> 표류는 `tests/test_model_pins.py::test_the_pin_still_matches_this_machines_cache`
+> 가 알려 준다. 🔴 **빨개지면 고정을 캐시에 맞추지 말 것** — 그것이 과거 결과와
+> 다른 가중치로 조용히 갈아타는 것이다. 올리려면 재실행 회차와 함께 올린다.
+>
+> **원래 진단**: `pose.py`의 `POSE_MODEL`·`PERSON_DETECTOR`가 HF 저장소 **이름**만
+> 담고 있고 `revision=`이 없었다. 업스트림이 파일을 갈아 끼우면 조용히 바뀌고,
+> 로컬 HF 캐시가 살아 있는 동안은 드러나지 않다가 캐시를 지우거나 다른 기계에서
+> 돌리는 순간 어긋난다. **가장 흔하고 가장 늦게 발견되는 원인이었다.**
 
 **N-2. `MAX_BATCH=24`의 OOM 폴백이 배치 크기를 바꾼다.**
 `selector_downstream.py:106`의 `except torch.cuda.OutOfMemoryError`가 배치를
 24 → 12 → 6으로 반씩 줄인다. 배치 크기가 달라지면 커널의 감산 순서가 달라져
 부동소수점 마지막 자리가 흔들릴 수 있다. **다른 프로세스가 GPU를 쓰고 있었는지에
-따라 결과가 달라질 수 있는 구조다.** 재실행 전에 GPU를 비우고, 폴백이 일어났는지
-확인할 방법이 현재 없다(로그를 남기지 않는다).
+따라 결과가 달라질 수 있는 구조다.** 재실행 전에 GPU를 비운다.
+
+> ✅ **정정 (2026-09-15) — 「폴백이 일어났는지 확인할 방법이 현재 없다」는 이제
+> 아니다.** `run_meta.json` 의 `batching` 이 `oom_events` 와 `min_batch` 를
+> 싣는다. **`min_batch` 가 24 보다 작으면 그 실행은 폴백이 일어난 실행**이고,
+> 그 산출을 다른 실행과 마지막 자리까지 대 보는 것은 의미가 없다.
+>
+> 🔴 **그리고 Track 2 에서는 이 위험이 구조적으로 없다** (미결 47번 1회차):
+> `_pose_batch` 에 들어가는 박스가 **한 프레임당 1~3개**라 `MAX_BATCH`=24 를
+> 넘을 일이 없어 **쪼개지지 않는다.** 남는 것은 Track 1 쪽이다.
 
 **N-3. cuDNN 비결정성과 TF32.**
 `torch.backends.cudnn.deterministic`이 설정돼 있지 않고(현재 `False`),
@@ -116,6 +206,30 @@ Track 2의 selector도 같은 식이며 차이는 `pose_quality`를 그 실행�
 전부 결정적이다.
 
 ## 재실행 후 대조 절차
+
+### 0. 🔴 **`run_meta.json` 부터 본다** (2026-09-15 신설)
+
+CSV 를 한 줄도 열기 전에, 기존 메타와 이번 메타를 대 본다. **다르면 그
+차이가 곧 원인 후보**이고, 아래 1~5단계를 건너뛸 수 있다.
+
+```bash
+# 예: 입력이 그때와 같은가
+python - <<'PY'
+import json
+a=json.load(open("run_meta.json")); b=json.load(open("<옛 메타>"))
+for k in ("git","env","models","constants","batching"):
+    if a[k]!=b[k]: print("다름:", k)
+fa={x["name"]:x["md5"] for x in a["inputs"]["track2"]}
+fb={x["name"]:x["md5"] for x in b["inputs"]["track2"]}
+print("입력이 다른 클립:", [n for n in fa if fa[n]!=fb.get(n)])
+PY
+```
+
+🔴 **옛 산출에는 이 파일이 없다** (규칙이 2026-09-15 에 바뀌었다). 그때 것과
+대 보려면 [`../../pending47_baseline_audit/input_fingerprints.csv`](../../pending47_baseline_audit/input_fingerprints.csv)
+가 **2026-09-15 시점의 입력 지문**을 들고 있다 — 그 이전은 **기록이 없다.**
+
+### 1. 그다음에 CSV
 
 기존 CSV 두 개가 **완전한 지문**이다 — 지표 11개 + `delta_*` 11개 + `grade` +
 `grade_changed` + 품질 비율 + 실패 사유가 (clip × mode) 305행에 전부 들어 있다.
@@ -147,8 +261,10 @@ Track 2의 selector도 같은 식이며 차이는 `pose_quality`를 그 실행�
 
 1. **행 수·키 집합이 다른가** → N-4. `agent/data/` 디렉터리 내용을 확인한다.
 2. **`detected_frames`·`usable_ratio_*`가 다른가** → 포즈나 검출이 달라졌다.
-   N-1(모델 리비전)을 가장 먼저 본다. HF 캐시의 커밋 해시를 확인하고,
-   기존 CSV가 만들어진 2026-08-28 시점과 같은 가중치인지 대조한다.
+   ~~N-1(모델 리비전)을 가장 먼저 본다.~~ → **N-1은 닫혔다 (2026.09.11)** —
+   가중치가 커밋으로 고정돼 있고 `tests/test_model_pins.py` 가 캐시와 대조한다.
+   그 검사가 초록이면 **가중치는 용의자가 아니다.** 빨갛다면 그 메시지가
+   무엇이 어긋났는지 말해 준다.
 3. **`selected_target_difference`가 다른가** → Track 1이면 `candidates/`나
    `pose_quality.csv`가 바뀐 것이다(둘 다 파일이므로 md5로 확인된다).
    Track 2면 포즈가 달라져 `pose_quality`가 달라진 것이다 → 2번으로 돌아간다.

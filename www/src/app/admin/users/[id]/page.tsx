@@ -71,6 +71,14 @@ export default async function AdminUserDetailPage({
           )}
         </section>
 
+        <Link
+          href={`/admin/videos?user=${encodeURIComponent(user.id)}`}
+          className="text-sm underline"
+          style={{ color: 'var(--ss-accent)' }}
+        >
+          이 사람 영상·분석 상태 보기 →
+        </Link>
+
         <ForceDeleteButton userId={user.id} nickname={user.nickname} />
       </GlassPanel>
     </main>

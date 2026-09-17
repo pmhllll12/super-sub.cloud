@@ -26,6 +26,44 @@ class MockAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<Session> signup({
+    required String email,
+    required String password,
+    required String nickname,
+  }) async {
+    await Future<void>.delayed(_delay);
+    if (_db.findUserByEmail(email) != null) {
+      throw const AuthException(
+        '이미 가입된 이메일입니다',
+        code: 'EMAIL_ALREADY_EXISTS',
+      );
+    }
+    final user = AppUser(
+      id: 'u-${DateTime.now().microsecondsSinceEpoch}',
+      email: email,
+      nickname: nickname,
+      createdAt: DateTime.now(),
+    );
+    // 저장소에 실제로 써넣는다 — 로그아웃 뒤 같은 이메일로 다시 들어올 수 있어야 한다.
+    _db.users.add(user);
+    return _current = Session(user: user);
+  }
+
+  /// 서버가 없어 토큰을 검증할 수 없다 — 빈 토큰만 거절하고, 나머지는
+  /// 데이터가 있는 개인 사용자로 들인다.
+  @override
+  Future<Session> loginWithGoogle({required String idToken}) async {
+    await Future<void>.delayed(_delay);
+    if (idToken.isEmpty) {
+      throw const AuthException(
+        '구글 토큰을 확인할 수 없습니다',
+        code: 'INVALID_GOOGLE_TOKEN',
+      );
+    }
+    return _current = Session(user: _db.findUserById(MockDb.playerId)!);
+  }
+
+  @override
   Future<Session> loginAs(String userId) async {
     await Future<void>.delayed(_delay);
     final user = _db.findUserById(userId);

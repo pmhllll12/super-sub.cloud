@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/sport/current_sport.dart';
 import '../data/auth_providers.dart';
+import '../data/google_id_token.dart';
 import '../data/models/app_user.dart';
 
 sealed class SessionState {
@@ -50,6 +51,24 @@ class SessionController extends Notifier<SessionState> {
       state = const SessionLoggedOut();
       rethrow;
     }
+  }
+
+  Future<void> signup(String email, String password, String nickname) async {
+    final session = await ref
+        .read(authRepositoryProvider)
+        .signup(email: email, password: password, nickname: nickname);
+    state = SessionLoggedIn(session.user);
+  }
+
+  /// 구글 창을 띄우고, 토큰을 받으면 서버에 로그인한다. 창을 닫았으면 아무 일도
+  /// 없던 것으로 한다 — 오류가 아니다.
+  Future<void> loginWithGoogle() async {
+    final idToken = await ref.read(googleIdTokenSourceProvider).fetchIdToken();
+    if (idToken == null || !ref.mounted) return;
+    final session = await ref
+        .read(authRepositoryProvider)
+        .loginWithGoogle(idToken: idToken);
+    state = SessionLoggedIn(session.user);
   }
 
   Future<void> loginAs(String userId) async {

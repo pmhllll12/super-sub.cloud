@@ -44,7 +44,7 @@ def chain(db_client, db_session):
     email = f"analysis-{uuid.uuid4().hex[:12]}@super-sub.example"
     signup = db_client.post(
         f"{V1}/auth/signup",
-        json={"email": email, "password": PASSWORD, "nickname": "업로더"},
+        json={"email": email, "password": PASSWORD, "nickname": f"업로더{uuid.uuid4().hex[:6]}"},
     )
     assert signup.status_code == 201, signup.text
     user_id = uuid.UUID(signup.json()["id"])
@@ -54,9 +54,7 @@ def chain(db_client, db_session):
     code = f"knee-angle-{uuid.uuid4().hex[:6]}"
 
     db_session.add(
-        MetricDefinitionOrm(
-            code=code, label="임팩트 시 무릎 각도", unit="deg", sport_code="football"
-        )
+        MetricDefinitionOrm(code=code, label="임팩트 시 무릎 각도", unit="deg")
     )
     db_session.add(
         VideoOrm(

@@ -30,6 +30,8 @@ PASSWORD = "supersub2026"
 
 
 def _signup(db_client, nickname):
+    # 임의 접미사 — `uq_user_nickname`(2026.09.15) 도입 후 재실행 간 충돌 방지.
+    nickname = f"{nickname}{uuid.uuid4().hex[:6]}"
     email = f"squad-{uuid.uuid4().hex[:12]}@super-sub.example"
     res = db_client.post(
         f"{V1}/auth/signup",
@@ -103,7 +105,7 @@ class TestEnlist:
         assert res.status_code == 201, res.text
 
         member = res.json()["members"][0]
-        assert member["nickname"] == "구성원"
+        assert member["nickname"] == team["member"]["nickname"]
         assert member["position_code"] == "GK"
         assert member["position_label"] == "골키퍼"
         assert member["card_public_slug"]
@@ -163,6 +165,90 @@ class TestConstraints:
         assert left == 0
 
 
+class TestBoardLayout:
+    """홈 판 배치가 **실제 컬럼**에 남는지 (미결 `paik` 9번)."""
+
+    def test_판_크기가_컬럼에_남고_되읽힌다(self, db_client, db_session, team):
+        squad = _create_squad(db_client, team)
+        res = db_client.patch(
+            f"{V1}/teams/{team['id']}/squad",
+            json={"formation": "7:7"},
+            headers=team["owner"]["headers"],
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["formation"] == "7:7"
+
+        stored = db_session.execute(
+            text("SELECT formation FROM squad WHERE id = :id"),
+            {"id": uuid.UUID(squad["id"])},
+        ).scalar_one()
+        assert stored == "7:7"
+
+        # 되읽기 경로(GET)도 채운다.
+        again = db_client.get(
+            f"{V1}/teams/{team['id']}/squad", headers=team["owner"]["headers"]
+        )
+        assert again.json()["formation"] == "7:7"
+
+    def test_등재_칸이_컬럼에_남고_조인_경로가_되읽는다(self, db_client, db_session, team):
+        _create_squad(db_client, team)
+        enlisted = db_client.post(
+            f"{V1}/teams/{team['id']}/squad/members",
+            json={
+                "player_card_id": str(team["member"]["card_id"]),
+                "position_code": "GK",
+                "grid_col": 1,
+                "grid_row": 3,
+            },
+            headers=team["owner"]["headers"],
+        )
+        assert enlisted.status_code == 201, enlisted.text
+        member_id = uuid.UUID(enlisted.json()["members"][0]["id"])
+
+        col, row = db_session.execute(
+            text("SELECT grid_col, grid_row FROM squad_member WHERE id = :id"),
+            {"id": member_id},
+        ).one()
+        assert (col, row) == (1, 3)
+
+        # `_with_members` 조인 경로(공개 조회)도 칸을 싣는다.
+        slug = db_client.get(
+            f"{V1}/teams/{team['id']}/squad", headers=team["owner"]["headers"]
+        ).json()["public_slug"]
+        m = db_client.get(f"{V1}/squads/{slug}").json()["members"][0]
+        assert (m["grid_col"], m["grid_row"]) == (1, 3)
+
+    def test_이동이_포지션과_칸을_함께_바꾼다(self, db_client, db_session, team):
+        _create_squad(db_client, team)
+        member_id = db_client.post(
+            f"{V1}/teams/{team['id']}/squad/members",
+            json={
+                "player_card_id": str(team["member"]["card_id"]),
+                "position_code": "GK",
+            },
+            headers=team["owner"]["headers"],
+        ).json()["members"][0]["id"]
+
+        moved = db_client.patch(
+            f"{V1}/teams/{team['id']}/squad/members/{member_id}",
+            json={"position_code": "DF", "grid_col": 2, "grid_row": 1},
+            headers=team["owner"]["headers"],
+        )
+        assert moved.status_code == 200, moved.text
+        m = moved.json()["members"][0]
+        assert m["position_code"] == "DF"
+        assert (m["grid_col"], m["grid_row"]) == (2, 1)
+
+        pos_code, col, row = db_session.execute(
+            text(
+                "SELECT p.code, sm.grid_col, sm.grid_row FROM squad_member sm "
+                "JOIN position p ON p.id = sm.position_id WHERE sm.id = :id"
+            ),
+            {"id": uuid.UUID(member_id)},
+        ).one()
+        assert (pos_code, col, row) == ("DF", 2, 1)
+
+
 class TestReadPaths:
     def test_공개_슬러그로_인증_없이_읽힌다(self, db_client, team):
         squad = _create_squad(db_client, team)
@@ -170,7 +256,7 @@ class TestReadPaths:
 
         res = db_client.get(f"{V1}/squads/{squad['public_slug']}")
         assert res.status_code == 200, res.text
-        assert res.json()["members"][0]["nickname"] == "구성원"
+        assert res.json()["members"][0]["nickname"] == team["member"]["nickname"]
 
     def test_생성은_멱등이다(self, db_client, team):
         first = _create_squad(db_client, team)

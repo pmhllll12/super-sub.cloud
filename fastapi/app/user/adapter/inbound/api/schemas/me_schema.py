@@ -24,13 +24,16 @@ class TeamMembershipResponse(BaseModel):
 
 
 class UpdateMeSchema(BaseModel):
-    """지금은 닉네임만 바꾼다.
+    """닉네임은 항상 보낸다. `is_nickname_searchable`은 **보낸 경우에만** 바뀐다
+    (`model_fields_set`으로 가른다, `UpdateMyCardSchema`와 같은 판단) — 지인
+    검색(`GET /users/search`) 노출 여부다.
 
     이메일은 계정 식별자라 여기서 받지 않는다 — 바꾸려면 재인증과 중복 검사가
     붙으므로 별도 엔드포인트다.
     """
 
     nickname: str = Field(min_length=1, max_length=MAX_NICKNAME_LENGTH)
+    is_nickname_searchable: bool | None = None
 
 
 class ChangePasswordSchema(BaseModel):
@@ -64,4 +67,6 @@ class MeResponse(BaseModel):
     email: EmailStr
     nickname: str
     created_at: Rfc3339
+    # 지인 검색(`GET /users/search`)에 노출되는지 — 기본 `true`.
+    is_nickname_searchable: bool
     teams: list[TeamMembershipResponse]

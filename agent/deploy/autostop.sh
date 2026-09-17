@@ -40,7 +40,10 @@ GPU_UTIL_BUSY="${GPU_UTIL_BUSY:-10}"
 #
 # POSIX 확장 정규식이다 (pgrep 이 regcomp 를 쓴다) — `\S` 같은 GNU 확장은
 # 쓰지 않는다.
-BUSY_PATTERN="${BUSY_PATTERN:-^[^[:space:]]*(python[0-9.]*|uv)[[:space:]].*(analyze_s3|analyze|measure|track_overlay)\.py|^[^[:space:]]*hf[[:space:]]+download|^[^[:space:]]*aws[[:space:]]+s3}"
+# 🔴 `detect_subjects` 도 들어 있다 (2026-09-16, 미결 `ho` 44번). 검출은 몇 십
+# 초짜리라 짧지만, 그 사이에 타이머가 만료되면 **사용자가 화면에서 기다리는
+# 동안 전원이 내려간다.** 짧다는 것은 안 걸릴 이유가 아니라 덜 걸릴 이유다.
+BUSY_PATTERN="${BUSY_PATTERN:-^[^[:space:]]*(python[0-9.]*|uv)[[:space:]].*(analyze_s3|analyze|measure|track_overlay|detect_subjects)\.py|^[^[:space:]]*hf[[:space:]]+download|^[^[:space:]]*aws[[:space:]]+s3}"
 
 HOLD_FILE="${HOLD_FILE:-/run/supersub-autostop.hold}"
 STATE_FILE="${STATE_FILE:-/run/supersub-autostop.idle-since}"

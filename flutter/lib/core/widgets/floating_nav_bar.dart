@@ -1,15 +1,18 @@
 import 'dart:math';
-import 'dart:ui';
 
-import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../design_scale.dart';
 import '../theme/app_theme.dart';
 import '../../features/intro/presentation/brand_mark.dart';
-import 'glass_surface.dart';
-import 'refractive_glass.dart';
+
+/// 하단 바와 로고 알약의 면 색 — **진회색**(2026-09-16 사용자 지정.
+/// 유리 → 검정 → 진회색 순으로 왔다).
+///
+/// 🔴 홈 바탕이 완전한 검정이라 바까지 검정이면 바가 안 보인다. 홈의
+/// `_kSheetColor`(스쿼드 판 · 영상 분석 판)와 **같은 값**이다 — 넷이 한 켜다.
+const Color kNavBarColor = Color(0xFF1C1C1E);
 
 /// 바가 차지하는 높이(디자인 px). 시안 실측값이다.
 const double kBottomBarHeight = 155;
@@ -28,16 +31,10 @@ class FloatingNavBar extends StatelessWidget {
     super.key,
     required this.currentIndex,
     required this.onTap,
-    this.refraction,
   });
 
   final int currentIndex;
   final ValueChanged<int> onTap;
-
-  /// 유리 세기. null이면 셰이더를 아예 쓰지 않고 흐림 유리로 그린다.
-  /// 0과 null은 뜻이 다르다 — 0은 "굴절 중, 분산만 없음"이고 null은 "이
-  /// 화면은 이 유리를 안 씀"이다.
-  final ValueListenable<double>? refraction;
 
   /// 인덱스 0(홈)은 로고 알약이 가져갔다. 남은 셋만 아이콘으로 그린다.
   ///
@@ -49,7 +46,9 @@ class FloatingNavBar extends StatelessWidget {
   /// 쇼핑백·북마크라 여기서는 뜻이 안 맞는다.
   static const _icons = {
     1: Symbols.videocam,
-    2: Symbols.sports_soccer,
+    // 레슨 · 코치(2026-09-15 — 축구공을 대신한다). 홈의 「레슨 · 코치」 카드가
+    // 여기로 옮겨 왔다. 용병 매칭 · 내 팀은 홈의 스쿼드 판이 맡는다.
+    2: Symbols.school,
     3: Symbols.id_card,
   };
 
@@ -109,27 +108,12 @@ class FloatingNavBar extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           Positioned.fill(
+            // 🔴 **완전한 검정이다**(2026-09-15 사용자 요청). 전에는 흐림 유리였다 —
+            // 홈 바탕을 흰색으로 바꾸자 유리 위의 흰 아이콘이 묻혔다. 검은 면을
+            // 로고 홈 모양대로 자른다.
             child: ClipPath(
               clipper: notch,
-              // 유리는 홈 모양대로 잘린다. ClipPath가 없으면 BackdropFilter가
-              // 화면 전체에 걸린다.
-              child: refraction == null
-                  ? BackdropFilter(
-                      filter: ImageFilter.blur(
-                        sigmaX: kGlassBlur,
-                        sigmaY: kGlassBlur,
-                      ),
-                      child: ColoredBox(color: kGlassFill),
-                    )
-                  : RefractiveGlass(
-                      notch: GlassNotch(
-                        left: notch.left,
-                        right: notch.right,
-                        depth: notch.depth,
-                        radius: notch.radius,
-                      ),
-                      strength: refraction!,
-                    ),
+              child: const ColoredBox(color: kNavBarColor),
             ),
           ),
           // 아이콘은 홈 오른쪽에 균등 배치하고, 세로 중심을 알약에 맞춘다.
@@ -165,7 +149,6 @@ class FloatingNavBar extends StatelessWidget {
             child: _LogoButton(
               key: const Key('navbar-logo'),
               onTap: () => onTap(0),
-              refraction: refraction,
             ),
           ),
         ],
@@ -279,10 +262,9 @@ class _NavIcon extends StatelessWidget {
 ///
 /// **로그인 화면에서 날아온 `SUPERSUB`가 여기 앉는다.**
 class _LogoButton extends StatelessWidget {
-  const _LogoButton({super.key, required this.onTap, this.refraction});
+  const _LogoButton({super.key, required this.onTap});
 
   final VoidCallback onTap;
-  final ValueListenable<double>? refraction;
 
   @override
   Widget build(BuildContext context) {
@@ -310,25 +292,11 @@ class _LogoButton extends StatelessWidget {
               ),
             ),
           );
-          if (refraction == null) {
-            return GlassSurface(
-              borderRadius: BorderRadius.circular(radius),
-              child: logo,
-            );
-          }
+          // 알약도 바와 같은 **검정**이다(유리였다). 바에서 파낸 홈 안에 따로
+          // 선 조각이라 제 면을 따로 칠한다.
           return ClipRRect(
             borderRadius: BorderRadius.circular(radius),
-            child: RefractiveGlass(
-              notch: GlassNotch(
-                left: 0,
-                right: box.maxWidth,
-                depth: box.maxHeight,
-                radius: radius,
-                pill: true,
-              ),
-              strength: refraction!,
-              child: logo,
-            ),
+            child: ColoredBox(color: kNavBarColor, child: logo),
           );
         },
       ),

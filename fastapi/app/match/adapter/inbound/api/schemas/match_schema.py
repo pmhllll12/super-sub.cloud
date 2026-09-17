@@ -51,7 +51,11 @@ class PositionNeedResponse(BaseModel):
 
 
 class MatchResponse(BaseModel):
-    """**종목이 없다.** 주최 팀이 결정한다(부록 D.4) — `GET /teams/{team_id}` 를 본다."""
+    """**종목이 없다.** 주최 팀이 결정한다(부록 D.4) — `GET /teams/{team_id}` 를 본다.
+
+    `opponent_team_id`가 있으면 **팀 대 팀으로 확정된 경기**다(`paik` 17번,
+    `team_match_request` 수락으로만 생긴다) — `needs`는 항상 빈 배열이다.
+    """
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -60,6 +64,7 @@ class MatchResponse(BaseModel):
     played_at: Rfc3339
     place: str
     needs: list[PositionNeedResponse]
+    opponent_team_id: UUID | None = None
 class MatchListingResponse(BaseModel):
     """탐색 목록 한 줄.
 
@@ -113,3 +118,48 @@ class ApplySchema(BaseModel):
     """`user_id` 를 비우면 **본인이 지원**한다. 채우면 주장이 그 사람에게 제안한다."""
 
     user_id: UUID | None = None
+
+
+class CreateTeamMatchRequestSchema(BaseModel):
+    """팀 대 팀 경기 신청. `paik` 17번. `played_at` 은 타임존이 있는 시각이다."""
+
+    target_team_id: UUID
+    played_at: datetime
+    place: str = Field(min_length=1, max_length=120)
+
+
+class TeamMatchRequestResponse(BaseModel):
+    """신청 1건. `status`: `pending`·`accepted`·`rejected`·`cancelled`.
+
+    `match_id`는 `accepted`일 때만 찬다 — 그 값으로 `GET /matches/{id}`를
+    불러 확정 경기를 본다.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    requester_team_id: UUID
+    target_team_id: UUID
+    proposed_played_at: Rfc3339
+    proposed_place: str
+    status: str
+    created_at: Rfc3339
+    responded_at: Rfc3339 | None
+    match_id: UUID | None
+    # 두 팀의 표시용 값(`paik` 31번, 2026-09-17 추가). 알림 줄이 「망원
+    # 유나이티드 · 서울 마포구」를 그대로 쓴다.
+    #
+    # 🔴 **감싸지 않고 덧붙였다** — 화면이 이미 읽는 id 칸의 자리는 그대로다.
+    # 🔴 **화면이 이 값을 캐시하지 않는다** — 팀 이름은 바뀔 수 있고(`PATCH
+    # /teams/{id}`), 서버가 매번 `team` 에서 읽어 주므로 그때그때 쓴다.
+    requester_team_name: str
+    requester_team_region: str
+    target_team_name: str
+    target_team_region: str
+    # 그 팀 **스쿼드의 공개 슬러그** (`paik` 22번 후속, 2026-09-17). 대기
+    # 화면이 상대 팀 판을 그리는 데 쓴다 — `GET /squads/{slug}` 는 누구나
+    # 읽으므로 소속이 아니어도 볼 수 있다.
+    # 🔴 **스쿼드를 아직 안 만든 팀이면 `None` 이고 그게 정상이다**(생성이
+    # 멱등이라 늦게 생긴다). 빈 문자열로 채우지 않는다.
+    requester_squad_public_slug: str | None = None
+    target_squad_public_slug: str | None = None

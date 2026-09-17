@@ -7,11 +7,15 @@
 - 재가입이 **새 행**으로 남아 이력이 보존되는가 (유일 제약이 `joined_at` 을 묶는다)
 - 나간 팀이 `GET /me` 의 `teams` 에서 빠지는가 (도메인 규칙과 저장소의 연결)
 - `sport` 테이블에 없는 종목이 실제로 걸리는가 (외래키가 없어 앱이 막는다)
+- 🔴 **해체가 `match`·`team_match_request` 를 원시 SQL 로 옳게 다루는가**
+  (`paik` 35번) — 저쪽은 `match` 컨텍스트라 `table()`/`column()` 으로 읽고 쓴다.
+  저쪽 컬럼 이름이 바뀌어도 파이썬이 안 잡아 주므로 **여기가 유일한 방어선이다**
 """
 
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import text
@@ -25,6 +29,7 @@ TEAM = {"name": "번개FC", "region": "서울 강남", "sport_code": "football"}
 
 
 def _account(db_client, nickname):
+    nickname = f"{nickname}{uuid.uuid4().hex[:6]}"
     email = f"team-{uuid.uuid4().hex[:12]}@super-sub.example"
     signup = db_client.post(
         f"{V1}/auth/signup",
@@ -53,6 +58,36 @@ def people(db_client, db_session):
     ids = [str(owner["id"]), str(member["id"])]
     db_session.execute(
         text("delete from team_member where user_id = any(:u)"), {"u": ids}
+    )
+    # 🔴 경기가 팀을 참조하므로 팀보다 **먼저** 지운다(외래키 방향의 역순).
+    # 팀 정보 수정 검사(`TestUpdateTeamInDb`)가 경기 탐색까지 보느라 경기를
+    # 만든다 — 안 지우면 아래 팀 삭제가 `match_team_id_fkey` 로 막힌다.
+    orphan_teams = (
+        "select id from team where id not in (select team_id from team_member) "
+        "and name = :n"
+    )
+    db_session.execute(
+        text(
+            "delete from match_position_need where match_id in "
+            f"(select id from match where team_id in ({orphan_teams}))"
+        ),
+        {"n": TEAM["name"]},
+    )
+    db_session.execute(
+        text(f"delete from match where team_id in ({orphan_teams})"),
+        {"n": TEAM["name"]},
+    )
+    # 🔴 경기 신청도 팀을 참조한다(NO ACTION) — 해체 검사가 만든다(`paik` 35번).
+    db_session.execute(
+        text(
+            f"delete from team_match_request where requester_team_id in ({orphan_teams}) "
+            f"or target_team_id in ({orphan_teams})"
+        ),
+        {"n": TEAM["name"]},
+    )
+    db_session.execute(
+        text(f"delete from team_invitation where team_id in ({orphan_teams})"),
+        {"n": TEAM["name"]},
     )
     db_session.execute(
         text(
@@ -111,14 +146,37 @@ class TestCreateTeamInDb:
         assert res.status_code == 422
         assert error_code(res) == "UNKNOWN_SPORT"
 
-    def test_마이그레이션이_넣은_세_종목은_통과한다(self, db_client, people):
-        for code in ("football", "baseball", "basketball"):
+    def test_지금_받는_종목은_통과한다(self, db_client, people):
+        """`ho` 39번으로 축구만 `active` 다 — 세 종목 다 통과하던 검사를 바꿨다."""
+        res = db_client.post(
+            f"{V1}/teams",
+            json={**TEAM, "sport_code": "football"},
+            headers=people["owner"]["headers"],
+        )
+        assert res.status_code == 201, res.text
+
+    def test_내려간_종목은_행은_있지만_새로_못_만든다(
+        self, db_client, db_session, people
+    ):
+        """🔴 「없는 종목」과 다르다 — 행은 그대로 있어야 한다(`ho` 39번).
+
+        이미 그 종목으로 올라간 데이터(2026-09-16 실측 `video` 야구 165건)가
+        참조하고 있어 지울 수 없다. 그래서 `UNKNOWN_SPORT`(없다)가 아니라
+        `SPORT_NOT_AVAILABLE`(지금 안 받는다)로 가른다.
+        """
+        for code in ("baseball", "basketball"):
+            still_there = db_session.execute(
+                text("select active from sport where code = :c"), {"c": code}
+            ).scalar_one()
+            assert still_there is False, f"{code} 행이 사라졌다"
+
             res = db_client.post(
                 f"{V1}/teams",
                 json={**TEAM, "sport_code": code},
                 headers=people["owner"]["headers"],
             )
-            assert res.status_code == 201, f"{code}: {res.text}"
+            assert res.status_code == 422, f"{code}: {res.text}"
+            assert error_code(res) == "SPORT_NOT_AVAILABLE"
 
 
 class TestMembershipInDb:
@@ -239,3 +297,240 @@ class TestMemberCardReference:
         assert by_user[str(owner["id"])]["player_card_id"] is not None
         assert by_user[str(member["id"])]["player_card_id"] is None
 
+
+
+class TestUpdateTeamInDb:
+    """`PATCH /teams/{id}` 를 **실제 PostgreSQL** 에 대고 확인한다 (2026-09-16).
+
+    스텁이 답할 수 없는 것: 행이 실제로 바뀌는가, 그리고 🔴 **바뀐 지역이
+    경기 탐색(`GET /matches?region=`)에 곧바로 반영되는가** — 그 검색이
+    `team.region` 을 조인해 거르기 때문에 이 경로를 낸 이유가 거기 있다.
+    """
+
+    def test_지역이_실제로_바뀐다(self, db_client, db_session, people):
+        team = _create(db_client, people)
+        res = db_client.patch(
+            f"{V1}/teams/{team['id']}",
+            json={"region": "부산 해운대구"},
+            headers=people["owner"]["headers"],
+        )
+        assert res.status_code == 200, res.text
+
+        row = db_session.execute(
+            text("select name, region from team where id = :i"), {"i": team["id"]}
+        ).one()
+        assert row.region == "부산 해운대구"
+        assert row.name == TEAM["name"]
+
+    def test_바꾼_지역으로_경기_탐색에_걸린다(self, db_client, people):
+        """이 경로를 낸 이유 — 지역이 틀리면 그 팀 경기가 검색에서 통째로 빠진다."""
+        team = _create(db_client, people)
+        tag = uuid.uuid4().hex[:8]
+        db_client.patch(
+            f"{V1}/teams/{team['id']}",
+            json={"region": f"부산 해운대구 {tag}"},
+            headers=people["owner"]["headers"],
+        )
+
+        made = db_client.post(
+            f"{V1}/teams/{team['id']}/matches",
+            json={
+                "played_at": (
+                    datetime.now(timezone.utc) + timedelta(days=5)
+                ).isoformat(),
+                "place": "해운대 구장",
+                "needs": [{"position_code": "GK", "head_count": 1}],
+            },
+            headers=people["owner"]["headers"],
+        )
+        assert made.status_code == 201, made.text
+
+        found = db_client.get(
+            f"{V1}/matches",
+            params={"region": tag},
+            headers=people["owner"]["headers"],
+        )
+        assert found.status_code == 200, found.text
+        assert [i["team_name"] for i in found.json()["items"]] == [TEAM["name"]]
+
+    def test_주장이_아니면_행이_안_바뀐다(self, db_client, db_session, people):
+        team = _create(db_client, people)
+        db_client.post(
+            f"{V1}/teams/{team['id']}/members",
+            json={},
+            headers=people["member"]["headers"],
+        )
+
+        res = db_client.patch(
+            f"{V1}/teams/{team['id']}",
+            json={"region": "대구"},
+            headers=people["member"]["headers"],
+        )
+        assert res.status_code == 403
+
+        region = db_session.execute(
+            text("select region from team where id = :i"), {"i": team["id"]}
+        ).scalar_one()
+        assert region == TEAM["region"]
+
+
+class TestDisbandTeamInDb:
+    """팀 해체 — `paik` 35번. **행을 지우지 않는다.**"""
+
+    def _disband(self, db_client, people, team):
+        res = db_client.delete(
+            f"{V1}/teams/{team['id']}", headers=people["owner"]["headers"]
+        )
+        assert res.status_code == 204, res.text
+
+    def test_팀_행은_남고_disbanded_at_만_찬다(self, db_client, db_session, people):
+        """🔴 지난 경기·평가가 이 팀 이름을 가리킨다 — 지우면 그것들이 깨진다."""
+        team = _create(db_client, people)
+        self._disband(db_client, people, team)
+
+        row = db_session.execute(
+            text("select name, disbanded_at from team where id = :i"),
+            {"i": team["id"]},
+        ).one()
+        assert row.name == TEAM["name"]
+        assert row.disbanded_at is not None
+
+    def test_남은_구성원이_전부_left_at_으로_나간다(
+        self, db_client, db_session, people
+    ):
+        """그래야 `GET /me` 의 `teams` 에서 사라진다 — 거기서 `left_at` 으로 거른다."""
+        team = _create(db_client, people)
+        db_client.post(
+            f"{V1}/teams/{team['id']}/members",
+            json={},
+            headers=people["member"]["headers"],
+        )
+        self._disband(db_client, people, team)
+
+        still_in = db_session.execute(
+            text(
+                "select count(*) from team_member "
+                "where team_id = :t and left_at is null"
+            ),
+            {"t": team["id"]},
+        ).scalar_one()
+        assert still_in == 0
+
+        for person in (people["owner"], people["member"]):
+            me = db_client.get(f"{V1}/me", headers=person["headers"]).json()
+            assert [t["team_id"] for t in me["teams"]] == []
+
+    def test_대기_중이던_초대가_닫힌다(self, db_client, db_session, people):
+        """안 닫으면 해체된 팀의 초대가 남의 초대함에 남는다."""
+        team = _create(db_client, people)
+        db_client.post(
+            f"{V1}/teams/{team['id']}/invitations",
+            json={"invited_user_id": str(people["member"]["id"])},
+            headers=people["owner"]["headers"],
+        )
+        self._disband(db_client, people, team)
+
+        status_ = db_session.execute(
+            text("select status from team_invitation where team_id = :t"),
+            {"t": team["id"]},
+        ).scalar_one()
+        assert status_ == "cancelled"
+
+        inbox = db_client.get(
+            f"{V1}/me/invitations", headers=people["member"]["headers"]
+        ).json()
+        assert inbox == []
+
+    def test_대기_중이던_경기_신청이_닫힌다(self, db_client, db_session, people):
+        """🔴 `team_match_request` 는 `match` 컨텍스트다 — 원시 SQL 로 닫는 자리."""
+        team = _create(db_client, people)
+        opponent = db_client.post(
+            f"{V1}/teams",
+            json={**TEAM, "region": "서울 송파"},
+            headers=people["member"]["headers"],
+        )
+        assert opponent.status_code == 201, opponent.text
+
+        made = db_client.post(
+            f"{V1}/teams/{team['id']}/match-requests",
+            json={
+                "target_team_id": opponent.json()["id"],
+                "played_at": (
+                    datetime.now(timezone.utc) + timedelta(days=7)
+                ).isoformat(),
+                "place": "망원 실내구장 A",
+            },
+            headers=people["owner"]["headers"],
+        )
+        assert made.status_code == 201, made.text
+
+        self._disband(db_client, people, team)
+
+        status_ = db_session.execute(
+            text("select status from team_match_request where id = :i"),
+            {"i": made.json()["id"]},
+        ).scalar_one()
+        assert status_ == "cancelled"
+
+    def test_앞으로_있을_경기가_있으면_막힌다(self, db_client, db_session, people):
+        """🔴 `match` 도 `match` 컨텍스트다 — 원시 SQL 로 세는 자리.
+
+        상대 팀에는 약속이라 조용히 사라지면 안 된다. 경기 탐색이 다가오는
+        경기만 보므로, 이 규칙 하나로 「없는 팀의 경기가 뜬다」가 안 생긴다.
+        """
+        team = _create(db_client, people)
+        made = db_client.post(
+            f"{V1}/teams/{team['id']}/matches",
+            json={
+                "played_at": (
+                    datetime.now(timezone.utc) + timedelta(days=7)
+                ).isoformat(),
+                "place": "망원 실내구장 A",
+                "needs": [{"position_code": "GK", "head_count": 1}],
+            },
+            headers=people["owner"]["headers"],
+        )
+        assert made.status_code == 201, made.text
+
+        blocked = db_client.delete(
+            f"{V1}/teams/{team['id']}", headers=people["owner"]["headers"]
+        )
+        assert blocked.status_code == 409
+        assert error_code(blocked) == "TEAM_HAS_UPCOMING_MATCH"
+
+        alive = db_session.execute(
+            text("select disbanded_at from team where id = :i"), {"i": team["id"]}
+        ).scalar_one()
+        assert alive is None
+
+    def test_주장_세우기가_실제_행을_바꾼다(self, db_client, db_session, people):
+        """`LAST_OWNER` 안내가 가리키던 경로다 — 그전에는 실물이 없었다."""
+        team = _create(db_client, people)
+        db_client.post(
+            f"{V1}/teams/{team['id']}/members",
+            json={},
+            headers=people["member"]["headers"],
+        )
+
+        res = db_client.patch(
+            f"{V1}/teams/{team['id']}/members/{people['member']['id']}",
+            json={"role": "owner"},
+            headers=people["owner"]["headers"],
+        )
+        assert res.status_code == 200, res.text
+
+        role = db_session.execute(
+            text(
+                "select role from team_member "
+                "where team_id = :t and user_id = :u and left_at is null"
+            ),
+            {"t": team["id"], "u": str(people["member"]["id"])},
+        ).scalar_one()
+        assert role == "owner"
+
+        # 이제 기존 주장이 실제로 나갈 수 있다.
+        left = db_client.delete(
+            f"{V1}/teams/{team['id']}/members/{people['owner']['id']}",
+            headers=people["owner"]["headers"],
+        )
+        assert left.status_code == 204, left.text

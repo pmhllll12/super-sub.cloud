@@ -2,12 +2,36 @@
 
 import { useEffect, useState } from 'react'
 import type { MyVideo } from '@/server/backend'
-import { SPORTS, SPORT_CODE, type SportKey } from '@/lib/sports'
+import { DEFAULT_SPORT, SPORT_CODE } from '@/lib/sports'
 import { checkClip, uploadClip, type ClipMeta } from '@/lib/uploadClip'
-import { listPublished, publish, unpublish } from '@/lib/published'
-import { reportFor, type SavedReport } from '@/lib/savedReports'
-import { loadFeatured, setFeatured } from '@/lib/featuredClip'
+import { duplicateNotice } from '@/lib/duplicateNotice'
+import { publish, unpublish } from '@/lib/published'
+import { fetchReport, type ReportResult } from '@/lib/savedReports'
+import { featuredOf, setFeatured } from '@/lib/featuredClip'
+import { isDirectKey, usePlaybackUrls } from '@/lib/playbackUrl'
 import ReportView from '@/components/analysis/ReportView'
+import { SECTION_GLASS } from './glass'
+import { useReportPanel } from './reportPanel'
+
+/** 판이 왼쪽으로 물러나는 시간 — `globals.css` 의 `ss-p-report-out` 과 같아야
+ *  한다. 짧으면 연출 도중에 잘리고, 길면 사라진 자리가 남는다. */
+const REPORT_EXIT_MS = 320
+
+/**
+ * 갈래를 바꿀 때 **나가는 데** 걸리는 시간 — `globals.css` 의
+ * `.ss-profile-swap` 전환 길이와 같아야 한다(사용자 요청, 2026-09-16:
+ * "너무 사라지고 나오는게 부자연스러워").
+ *
+ * 🔴 **나간 뒤에 갈아 끼운다.** 누르자마자 `tab` 을 바꾸면 옛 내용이 그
+ * 자리에서 사라지고 새것이 툭 나타난다 — 그 툭이 사용자가 지적한 것이다.
+ * 그래서 나가는 동안은 `tab` 을 **그대로 두고**(옛 내용이 계속 그려진다)
+ * 이 시간 뒤에 바꾼다. 들어오는 쪽은 CSS 가 되돌아오면서 저절로 된다.
+ */
+const TAB_SWAP_MS = 240
+
+/** 공개 폼이 펼쳐지고 접히는 시간 — `globals.css` 의 `.ss-profile-publish-slot`
+ *  전환 길이와 같아야 한다. 짧으면 내용이 먼저 사라져 툭 접힌다. */
+const PUBLISH_SLIDE_MS = 260
 
 /**
  * 내가 올린 클립 — **두 갈래로 갈라 한 번에 한 편만** 보여준다(사용자 요청).
@@ -45,15 +69,18 @@ function videoState(v: MyVideo): { key: string; label: string } {
 /**
  * 이 클립을 화면에서 **틀어 볼 수 있는가.**
  *
- * 🔴 계약이 주는 것은 저장 키뿐이고 **조회용 주소가 아직 없다**(3-6절
- * "아직 없는 것"). 그래서 `/` 로 시작하는 키 — 지금은 mock 이 넣어 준
- * `public/` 의 목업 영상 — 만 그대로 재생하고, 진짜 백엔드가 주는
- * `videos/<user_id>/<uuid>.mp4` 는 null 을 돌려 그림 없이 메타만 그린다.
+ * 🔴 **사전 서명 주소가 생겨서 채웠다**(2026-09-08, 계약 3-6절
+ * `GET /videos/{id}/playback-url` — 미결 paik 12번 해소). 그전에는 저장 키밖에
+ * 없어서 진짜 백엔드에서는 null 을 돌려 **플레이어를 아예 안 그렸다**(키를
+ * 그대로 `<video src>` 에 넣으면 403 과 깨진 플레이어가 뜬다).
  *
- * 조회용 사전 서명 URL 이 생기면 **이 함수 하나만** 고치면 된다.
+ * 🔴 주소는 **`usePlaybackUrls` 가 받아 온다** — 만료되는 값이라 컴포넌트가
+ * 들고 있어야 다시 받을 수 있다. 여기서는 받아 둔 것을 꺼내기만 한다.
+ * `/` 로 시작하는 키는 mock 이 주는 `public/` 경로라 그대로가 주소다.
  */
-function previewSrc(v: MyVideo): string | null {
-  return v.storage_key.startsWith('/') ? v.storage_key : null
+function previewSrc(v: MyVideo, urls: Record<string, string>): string | null {
+  if (isDirectKey(v.storage_key)) return v.storage_key
+  return urls[v.id] ?? null
 }
 
 type TabKey = 'analyzed' | 'uploaded'
@@ -89,6 +116,15 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
    * 안 나타나면 올라간 건지 알 수가 없어서 앞에 얹어 둔다.
    */
   const [added, setAdded] = useState<MyVideo[]>([])
+  /**
+   * 방금 지운 것. 목록의 정본은 서버가 준 `videos` 이고 여기서 다시 받아
+   * 오지 않으므로, 지운 것을 이쪽에서 걸러 낸다 — 새로고침하면 서버 목록이
+   * 이미 그것을 빼고 온다.
+   */
+  const [removed, setRemoved] = useState<string[]>([])
+  /** 지울지 한 번 더 묻는 중인 영상 id. 되돌릴 수 없어서 곧바로 안 지운다. */
+  const [confirming, setConfirming] = useState<string | null>(null)
+  const [removing, setRemoving] = useState(false)
   /** 고른 파일. 크기를 재기 전에는 아직 못 올린다. */
   const [picked, setPicked] = useState<File | null>(null)
   const [pickedUrl, setPickedUrl] = useState<string | null>(null)
@@ -99,16 +135,32 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
   /**
    * 공개로 돌린 영상들.
    *
-   * 🔴 `listPublished()` 를 그릴 때 부르지 않는다 — 저장소는 서버에 없으므로
-   * 서버가 그린 첫 화면과 브라우저가 그린 것이 갈려 하이드레이션이 깨진다.
-   * 붙은 **뒤에** 한 번 읽는다.
+   * 🔴 **정본은 서버의 `is_public` 이다**(CCC 20) — 전에는 브라우저 저장소라
+   * 다른 기기에서도 남에게도 안 보였다. 첫 값을 목록에서 뽑고 그 뒤로는 이
+   * 화면이 들고 있는다(목록은 서버 컴포넌트가 준 prop 이라 다시 안 온다).
+   *
+   * 🔴 **그릴 때 읽어도 된다** — 저장소가 아니라 prop 이라 서버와 브라우저의
+   * 첫 그림이 같다. effect 로 미뤄야 했던 이유가 사라졌다.
    */
-  const [pubIds, setPubIds] = useState<string[]>([])
+  const [pubIds, setPubIds] = useState<string[]>(() =>
+    videos.filter((v) => v.is_public).map((v) => v.id),
+  )
   /** 공개 폼이 열린 영상 id 와 적고 있는 값. */
   const [form, setForm] = useState<{ id: string; title: string; what: string } | null>(null)
+  /**
+   * 폼이 **펼쳐져 있는가** — `form`(내용)과 따로 둔다.
+   *
+   * 🔴 접는 연출이 도는 동안 내용이 남아 있어야 한다. 접자마자 `form` 을
+   * 비우면 칸이 **툭** 접힌다 — 미끄러질 것이 없어서다. 그래서 이 값을 먼저
+   * 내리고, 다 접힌 뒤에 아래 타이머가 `form` 을 비운다.
+   */
+  const [formOpen, setFormOpen] = useState(false)
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- 위 주석 참고: 붙은 뒤에 읽어야 한다.
-  useEffect(() => setPubIds(listPublished().map((c) => c.id)), [])
+  useEffect(() => {
+    if (formOpen || !form) return
+    const id = setTimeout(() => setForm(null), PUBLISH_SLIDE_MS)
+    return () => clearTimeout(id)
+  }, [formOpen, form])
 
   useEffect(() => {
     if (!picked) {
@@ -130,12 +182,34 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
     }
   }, [picked])
 
-  const all = [...added, ...videos]
+  const all = [...added, ...videos].filter((x) => !removed.includes(x.id))
+  /**
+   * 재생 주소 — 계약이 저장 키만 주므로 클립마다 사전 서명 주소를 따로 받는다
+   * (`lib/playbackUrl.ts`). 목록이 바뀔 때만 다시 받는다.
+   */
+  const playbackUrls = usePlaybackUrls(all)
   const analyzed = all.filter((v) => v.analysis_job_id !== null)
   const uploaded = all.filter((v) => v.analysis_job_id === null)
 
   const [tab, setTab] = useState<TabKey>(analyzed.length > 0 ? 'analyzed' : 'uploaded')
   const [at, setAt] = useState(0)
+  /**
+   * 나가는 중이면 **갈 곳**, 아니면 `null`. 이 값이 있는 동안 화면은 아직
+   * 옛 갈래(`tab`)를 그리고 있고, 판만 오른쪽으로 물러나는 중이다.
+   */
+  const [leaving, setLeaving] = useState<TabKey | null>(null)
+
+  /* 🔴 다 나간 뒤에 갈아 끼운다. 타이머가 도는 중에 컴포넌트가 사라지면
+     치운다 — 안 그러면 없는 것에 setState 한다. */
+  useEffect(() => {
+    if (!leaving) return
+    const id = setTimeout(() => {
+      setTab(leaving)
+      setAt(0)
+      setLeaving(null)
+    }, TAB_SWAP_MS)
+    return () => clearTimeout(id)
+  }, [leaving])
 
   const shown = tab === 'analyzed' ? analyzed : uploaded
   // 🔴 자리를 상태로 들고 있으므로 목록이 짧은 갈래로 옮겨 가면 넘칠 수 있다.
@@ -145,37 +219,166 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
   const v = shown[i]
 
   /**
-   * 이 영상에 매달린 분석 리포트.
+   * 이 영상의 분석 리포트 — 🔴 **서버에서 읽는다**(CCC 31, 미결 `paik` 7번).
+   * 전에는 화면이 만든 자리 표시를 `localStorage` 에 둔 것이라 다른 기기에서는
+   * 안 보였고, 애초에 진짜 분석 결과가 아니었다.
    *
-   * 🔴 **그릴 때 읽지 않는다** — 서버엔 없는 값이라 하이드레이션이 깨진다
-   * (공개 목록 · 카드 꾸미기에서 이미 데인 자리다). 영상이 바뀔 때마다
-   * effect 에서 다시 읽는다.
+   * 🔴 **영상이 바뀌면 다시 읽는다.** 늦게 온 응답이 새 영상의 리포트를
+   * 덮지 않도록 `alive` 로 막는다 — 빠르게 넘기면 실제로 그렇게 엇갈린다.
    */
-  const [report, setReport] = useState<SavedReport | null>(null)
+  /**
+   * 🔴 **어느 영상의 리포트인지 함께 들고 있는다.** 그래야 영상을 넘길 때
+   * 상태를 비우지 않아도 된다 — 비우는 일(effect 안의 즉시 setState)은
+   * 렌더를 연쇄시킨다. id 가 다르면 그릴 때 없는 것으로 친다.
+   */
+  const [got, setGot] = useState<{ id: string; result: ReportResult } | null>(null)
   useEffect(() => {
-    setReport(v ? reportFor(v.id) : null)
+    if (!v) return
+    let alive = true
+    void fetchReport(v.id).then((r) => {
+      // 늦게 온 응답이 다른 영상의 자리에 앉지 않는다 — 빠르게 넘기면 실제로 엇갈린다.
+      if (alive) setGot({ id: v.id, result: r })
+    })
+    return () => {
+      alive = false
+    }
   }, [v])
+  const report = v && got?.id === v.id ? got.result : null
+
+  /**
+   * 🔴 **리포트는 영상 아래가 아니라 왼쪽 칸을 덮는 판이다**(사용자 요청,
+   * 2026-09-11). 아래에 두면 영상을 보면서 읽을 수가 없어 굴려 내려가야
+   * 했다 — 이제 「해당 영상 리포트 보기」가 왼쪽 칸을 밀어내고 그 자리에 판이
+   * 들어온다. 켜짐은 `ProfileStage` 가 쥔다(`data-report`).
+   *
+   * 🔴 닫을 때도 **물러나는 것을 보여 준다** — 곧바로 떼면 판이 툭 사라진다.
+   * 그동안 DOM 에 남아 있어야 해서 `closing` 을 따로 둔다(추천 판과 같은 방식).
+   */
+  const { open: panelOpen, setOpen: setPanelOpen } = useReportPanel()
+  const [closing, setClosing] = useState(false)
+  const panelOn = panelOpen || closing
+
+  const closePanel = () => {
+    setPanelOpen(false)
+    setClosing(true)
+    setTimeout(() => setClosing(false), REPORT_EXIT_MS)
+  }
+
+  /* 🔴 **영상을 넘기면 닫는다.** 판은 「해당 영상」의 리포트라, 열어 둔 채로
+     다른 영상으로 넘어가면 무엇을 보고 있는지가 어긋난다. */
+  useEffect(() => {
+    setPanelOpen(false)
+    // `setPanelOpen` 은 무대가 준 setState 라 매 렌더 같은 것이 아니다 —
+    // 넣으면 영상이 안 바뀌어도 계속 닫힌다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [v?.id])
 
   /**
    * 나를 보여주는 **대표 영상**으로 세워 둔 클립의 id.
    *
-   * 🔴 그릴 때 읽지 않는다 — 서버엔 없는 값이라 하이드레이션이 깨진다.
+   * 🔴 **정본은 서버의 `is_featured` 다**(CCC 27) — 전에는 `localStorage` 라
+   * 다른 기기에서는 안 보였다. 첫 값을 목록에서 뽑고, 그 뒤로는 이 화면이
+   * 들고 있는다(목록은 서버 컴포넌트가 준 prop 이라 다시 안 온다).
+   *
+   * 🔴 **그릴 때 읽어도 된다** — 저장소가 아니라 prop 이라 서버와 브라우저의
+   * 첫 그림이 같다. 저장소를 읽던 때 effect 로 미뤄야 했던 이유가 사라졌다.
    */
-  const [featured, setFeaturedId] = useState<string | null>(null)
-  useEffect(() => {
-    setFeaturedId(loadFeatured()?.videoId ?? null)
-  }, [])
+  const [featured, setFeaturedId] = useState<string | null>(
+    () => featuredOf(videos)?.id ?? null,
+  )
+  /** 대표를 바꾸다 실패한 사유 — 반려된 클립은 422 `CANNOT_FEATURE` 다. */
+  const [featuredBusy, setFeaturedBusy] = useState(false)
 
-  /** 세우거나 푼다. 같은 영상을 다시 누르면 풀린다 — 대표는 하나뿐이다. */
-  function toggleFeatured(target: MyVideo) {
+  /**
+   * 세우거나 푼다. 같은 영상을 다시 누르면 풀린다 — 대표는 하나뿐이다.
+   *
+   * 🔴 **서버가 바꾼 뒤에야 화면을 바꾼다.** 먼저 바꾸고 나중에 부르면,
+   * 실패했을 때(반려된 클립 · 남의 클립) 세워진 것처럼 보이는데 실제로는
+   * 아니다 — 지우기가 같은 이유로 같은 순서를 쓴다.
+   * 🔴 **옛 대표를 따로 내리지 않는다.** 사람당 하나는 서버가 지킨다.
+   */
+  async function toggleFeatured(target: MyVideo) {
+    if (featuredBusy) return
+    setFeaturedBusy(true)
+    setNotice(null)
     const on = featured === target.id
-    setFeatured(on ? null : { videoId: target.id, src: previewSrc(target) })
-    setFeaturedId(on ? null : target.id)
+    try {
+      await setFeatured(target.id, !on)
+      setFeaturedId(on ? null : target.id)
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : '대표 영상을 바꾸지 못했습니다.')
+    } finally {
+      setFeaturedBusy(false)
+    }
   }
 
+  /**
+   * 이 클립을 지운다 — **저장소의 영상과 그 분석 리포트까지.**
+   *
+   * 🔴 되돌릴 수 없어서 한 번 더 묻는다(`confirming`). `window.confirm` 을
+   * 쓰지 않는다 — 이 사이트는 제 판을 그려 왔고, 그쪽은 시험에서도 못 누른다.
+   *
+   * 🔴 **서버가 지운 뒤에야 화면에서 뺀다.** 먼저 빼고 나중에 부르면, 실패한
+   * 경우 사라진 것처럼 보이는데 실제로는 남아 있다.
+   *
+   * 🔴 아직 브라우저에만 있는 것들(공개 · 리포트)도 함께 거둔다 — 계약에
+   * 자리가 없어 여기 남아 있는 값들이라(미결 paik 5·7번) 서버가 지워 주지
+   * 못한다. **대표는 이제 여기 없다**(CCC 27) — 클립의 성질이라 클립이
+   * 지워지면 서버에서 같이 없어진다.
+   */
+  async function removeVideo(target: MyVideo) {
+    if (removing) return
+    setRemoving(true)
+    setNotice(null)
+    try {
+      const res = await fetch(`/api/videos/${encodeURIComponent(target.id)}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        const body: unknown = await res.json().catch(() => null)
+        const msg =
+          typeof body === 'object' && body !== null && 'error' in body
+            ? ((body as { error?: { message?: string } }).error?.message ?? null)
+            : null
+        throw new Error(msg ?? '지우지 못했습니다.')
+      }
+      /* 🔴 **대표도 공개도 서버에 따로 지울 것이 없다** — 둘 다 클립의
+         성질이라 클립이 사라지면서 같이 없어진다(CCC 20 · 27). 여기서
+         `unpublish` 를 부르면 **방금 지운 영상에 PATCH 를 쏘게 되고** 404 다.
+         화면에 남은 표시만 거둔다. */
+      if (featured === target.id) setFeaturedId(null)
+      setPubIds((prev) => prev.filter((id) => id !== target.id))
+      /* 🔴 리포트도 따로 지울 것이 없다 — 서버에 있고 영상과 함께 사라진다
+         (전에는 `localStorage` 라 여기서 손으로 지웠다). */
+      setAdded((prev) => prev.filter((x) => x.id !== target.id))
+      setRemoved((prev) => [...prev, target.id])
+      setConfirming(null)
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : '지우지 못했습니다.')
+    } finally {
+      setRemoving(false)
+    }
+  }
+
+  /**
+   * 갈래 바꾸기 — **나가는 것을 먼저 보여주고** 갈아 끼운다.
+   *
+   * 🔴 `tab` 을 여기서 바로 안 바꾼다. 바꾸면 옛 내용이 그 프레임에 사라지고
+   * 새것이 나타나 「툭」 끊긴다(사용자 지적). `leaving` 만 세우면 옛 내용이
+   * 그려진 채로 오른쪽으로 물러나고, 아래 타이머가 다 나간 뒤에 바꾼다.
+   *
+   * ⚠️ **나가는 중에 또 누르면 무시한다.** 받아 주면 타이머가 겹쳐 중간에
+   * 갈아 끼워지고, 반쯤 물러난 자리에서 새 내용이 나온다.
+   */
   function pick(next: TabKey) {
-    setTab(next)
-    setAt(0)
+    if (next === tab || leaving) return
+    // 연출을 끈 사람에게는 기다릴 이유가 없다 — 그 자리에서 갈아 끼운다.
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      setTab(next)
+      setAt(0)
+      return
+    }
+    setLeaving(next)
   }
 
   function step(delta: number) {
@@ -209,14 +412,14 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
     setPicked(f)
   }
 
-  async function send(sport: SportKey) {
+  async function send() {
     if (!picked || !meta || busy) return
     setBusy(true)
     setNotice(null)
     try {
       const saved = await uploadClip({
         file: picked,
-        sportCode: SPORT_CODE[sport],
+        sportCode: SPORT_CODE[DEFAULT_SPORT],
         meta,
         analyze: false,
       })
@@ -226,6 +429,11 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
       if (!saved.passed) {
         setNotice(saved.reject_reason ?? '규격에 맞지 않아 반려됐습니다.')
       } else {
+        /* 🔴 **같은 영상을 다시 올렸으면 그 자리에서 말한다**(CCC 48,
+           미결 `ho` 41번). 이 사실은 **등록 응답에만** 실려 오므로 지금
+           안 적으면 다시 볼 방법이 없다. 막지는 않는다 — 올라간 것은
+           올라간 것이고, 이건 안내다. */
+        setNotice(duplicateNotice(saved))
         /* 🔴 **보낸 뜻이 아니라 돌아온 응답을 믿는다.** 계약이 아직 `analyze` 를
            모르므로 백엔드가 그것을 무시하고 분석을 걸 수 있다 — 그러면
            `analysis_job_id` 가 채워져 오고, 그때는 「분석 영상」이 사실이다. */
@@ -239,31 +447,52 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
     }
   }
 
-  function togglePublish(target: MyVideo) {
+  /**
+   * 🔴 **서버가 바꾼 뒤에야 화면을 바꾼다.** 먼저 끄고 나중에 부르면, 실패한
+   * 경우 비공개로 보이는데 실제로는 **남에게 계속 보인다** — 되돌릴 수 없는
+   * 쪽으로 틀리는 것이라 지우기와 같은 순서를 쓴다.
+   */
+  /** 폼을 접는다 — 미끄러짐이 끝난 뒤에 내용을 비운다(빈 칸이 먼저 사라지면 툭 접힌다). */
+  function closeForm() {
+    setFormOpen(false)
+  }
+
+  async function togglePublish(target: MyVideo) {
     if (pubIds.includes(target.id)) {
-      unpublish(target.id)
-      setPubIds((prev) => prev.filter((x) => x !== target.id))
-      setForm(null)
+      setNotice(null)
+      try {
+        await unpublish(target.id)
+        setPubIds((prev) => prev.filter((x) => x !== target.id))
+        setForm(null)
+        setFormOpen(false)
+      } catch (e) {
+        setNotice(e instanceof Error ? e.message : '공개를 풀지 못했습니다.')
+      }
+      return
+    }
+    // 🔴 **열려 있으면 닫는다**(사용자 요청) — 같은 단추가 「전체 공개」이자 「닫기」다.
+    if (formOpen && form?.id === target.id) {
+      closeForm()
       return
     }
     // 켜는 것만으로는 안 올린다 — 제목이 있어야 영상 모음에서 이름이 생긴다.
     setForm({ id: target.id, title: '', what: '' })
+    setFormOpen(true)
   }
 
-  function savePublish(target: MyVideo) {
+  async function savePublish(target: MyVideo) {
     if (!form || !form.title.trim()) return
-    publish({
-      id: target.id,
-      title: form.title.trim(),
-      what: form.what.trim(),
-      /* 조회용 주소가 없어(계약 3-6절 "아직 없는 것") 실제 백엔드가 준 키는
-         영상 모음에서도 안 틀린다 — `previewSrc` 와 같은 한계다. */
-      src: previewSrc(target) ?? target.storage_key,
-      aspect: ratio ? `${ratio} / 1` : '16 / 9',
-      at: target.created_at.slice(0, 10),
-    })
-    setPubIds((prev) => [...prev, target.id])
-    setForm(null)
+    setNotice(null)
+    try {
+      /* 🔴 **공개와 제목을 한 번에 보낸다.** 나눠 보내면 그 사이에 끊겼을 때
+         이름 없는 영상이 남에게 보인다. 재생 주소도 비율도 안 보낸다 —
+         목록은 서버가 그리고, 재생은 `playback-url` 로 따로 받는다. */
+      await publish(target.id, { title: form.title.trim(), description: form.what.trim() })
+      setPubIds((prev) => [...prev, target.id])
+      setForm(null)
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : '공개하지 못했습니다.')
+    }
   }
 
   return (
@@ -282,9 +511,12 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
             key={key}
             type="button"
             role="tab"
-            aria-selected={tab === key}
+            /* 🔴 **누른 쪽이 바로 켜진다.** 내용은 아직 물러나는 중이지만
+               알약까지 기다리면 눌러도 반응이 없는 것처럼 읽힌다 — 누른
+               자리가 먼저 답하고 내용이 따라온다. */
+            aria-selected={(leaving ?? tab) === key}
             className="ss-profile-tab"
-            data-on={tab === key}
+            data-on={(leaving ?? tab) === key}
             onClick={() => pick(key)}
           >
             {label}
@@ -307,6 +539,27 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
         </span>
         업로드
       </label>
+
+      {/* 🔴 **영상 오른쪽 위**(사용자 요청). 이 줄은 `justify-content: center`
+          라 알약들이 가운데 서는데, 여기에 항목을 하나 더 넣으면 그 무리가
+          통째로 왼쪽으로 밀린다 — 그래서 **흐름 밖 절대배치**로 오른쪽 끝에
+          건다(스쿼드 판의 「팀 매칭」에서 같은 것을 겪었다).
+
+          ⚠️ 리포트 상태를 안 가린다 — 「분석 중」·「찾을 수 없음」도 판 안에서
+          말한다. 단추가 상태마다 사라지면 눌러 볼 데가 없어진다. */}
+      {tab === 'analyzed' && report && !panelOpen && (
+        <button
+          type="button"
+          className="ss-profile-report-open"
+          /* 🔴 **판과 같이 들고 난다**(사용자 요청) — 이 단추도 오른쪽으로
+             물러났다가 오른쪽에서 돌아온다. 흐름 밖 절대배치라 판 안에 못
+             넣어서, 같은 신호를 따로 받는다. */
+          data-leaving={leaving ? 'true' : undefined}
+          onClick={() => setPanelOpen(true)}
+        >
+          해당 영상 리포트 보기
+        </button>
+      )}
       </div>
 
       {/* 올리는 중에 무슨 일이 있었는지 — 거른 사유 · 반려 사유 · 실패 사유. */}
@@ -338,31 +591,41 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
           />
           <div className="ss-profile-picked-ask">
             <p className="ss-profile-picked-name">{picked.name}</p>
-            {/* 🔴 기본값을 축구로 박아 두면 야구 영상이 축구 루브릭으로 조용히
-                채점된다 — 고르는 순간 올라간다. */}
-            <span className="ss-shot-sports" role="group" aria-label="종목">
-              {SPORTS.map((sp) => (
-                <button
-                  key={sp.key}
-                  type="button"
-                  className="ss-shot-sport"
-                  disabled={!meta || busy}
-                  onClick={() => send(sp.key)}
-                >
-                  <span className="material-symbols-outlined" aria-hidden="true">
-                    {sp.icon}
-                  </span>
-                  {sp.label}
-                </button>
-              ))}
+            {/* 🔴 **종목을 묻지 않는다** — 축구 하나다(`lib/sports.ts`, 미결 ho 39번).
+                고를 것이 하나뿐인 단추는 무엇을 고르라는 것인지 안 읽힌다.
+                종목을 되살리면 여기에 고르는 자리를 같이 되살린다 — 안 그러면
+                다른 종목 영상이 축구 루브릭으로 조용히 채점된다. */}
+            <span className="ss-shot-sports">
+              <button
+                type="button"
+                className="ss-shot-sport"
+                disabled={!meta || busy}
+                onClick={send}
+              >
+                <span className="material-symbols-outlined" aria-hidden="true">
+                  upload
+                </span>
+                올리기
+              </button>
             </span>
             <p className="ss-profile-picked-hint">
-              {busy ? '올리는 중입니다…' : '종목을 고르면 올라갑니다.'}
+              {busy ? '올리는 중입니다…' : '축구 영상만 받습니다.'}
             </p>
           </div>
         </div>
       )}
 
+      {/* 🔴 **갈래가 바뀔 때 오른쪽으로 물러났다가 오른쪽에서 돌아온다**
+          (사용자 요청, 2026-09-16). 감싸는 판 하나에 전환을 걸어 두면
+          나가기와 들어오기가 **같은 전환의 양방향**이라 따로 맞출 것이 없다
+          — `data-leaving` 이 서면 물러나고, 지워지면 제자리로 돌아온다.
+
+          🔴 **내용은 그 사이에 갈린다**(`tab` 이 바뀌는 시점이 물러난 뒤다).
+          보이지 않는 동안 갈리므로 갈리는 순간이 안 보인다.
+
+          ⚠️ 알림줄·고른 파일은 **이 밖에** 둔다 — 갈래와 무관하게 남아야
+          하는 것들이라 같이 물러나면 「올리는 중」이 사라진 것처럼 읽힌다. */}
+      <div className="ss-profile-swap" data-leaving={leaving ? 'true' : undefined}>
       {!v ? (
         <p className="ss-profile-muted">
           {tab === 'analyzed'
@@ -375,7 +638,17 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
             className="ss-profile-video-frame"
             style={{ '--ss-video-r': ratio ?? 16 / 9 } as React.CSSProperties}
           >
-            {previewSrc(v) && (
+            {/* 🔴 **키가 고정된 자리다**(2026-09-08, 사용자 요청: "세로영상이든
+                가로영상이든 단추 위치가 안 바뀌게"). 영상은 자기 비 그대로
+                이 안에서 가운데 서고, 남는 자리는 비워 둔다 — 자리를 영상
+                키에 맡기면 세로 영상에서 아래 것들이 통째로 64px 내려간다
+                (실측). **영상을 늘리거나 자르지 않는다.**
+
+                🔴 재생 주소가 없어도(배포에서 그렇다 — 미결 paik 12번) 이
+                자리는 그대로 둔다. 비면 판이 접혀서 무엇이 잘못됐는지보다
+                화면이 깨진 것처럼 보인다. */}
+            <div className="ss-profile-video-slot">
+            {previewSrc(v, playbackUrls) && (
               /* 🔴 `key` 를 영상 id 로 준다. 없으면 다음 영상으로 넘길 때 리액트가
                  같은 <video> 를 재사용해서 **src 만 갈리고 재생 위치 · 재생 중
                  여부가 그대로 남는다.** `preload="metadata"` 인 것도 그대로다 —
@@ -383,7 +656,7 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
               <video
                 key={v.id}
                 className="ss-profile-video-player"
-                src={previewSrc(v) ?? undefined}
+                src={previewSrc(v, playbackUrls) ?? undefined}
                 controls={showControls}
                 muted
                 playsInline
@@ -407,6 +680,7 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
                 }}
               />
             )}
+            </div>
 
           {/* ⚠️ 영상 아래 붙던 상자(종목 · 날짜 · 길이 · 상태 배지)는 걷어냈다
               (사용자 요청). 어떤 갈래인지는 **위 알약이 이미 말하고 있어서**
@@ -426,57 +700,6 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
 
               ⚠️ 반려된 클립에는 안 낸다 — 서버가 안 보는 영상이다. */}
 
-          {/* 🔴 **업로드 갈래에서만** 낸다. 분석을 건 영상은 리포트를 보려고 올린
-              것이고, 영상 모음은 올린 장면을 훑는 자리다 — 성격이 다르다. */}
-          {tab === 'uploaded' && (
-            <div className="ss-profile-publish">
-              <button
-                type="button"
-                className="ss-profile-publish-toggle"
-                data-on={pubIds.includes(v.id) ? 'true' : undefined}
-                aria-pressed={pubIds.includes(v.id)}
-                onClick={() => togglePublish(v)}
-              >
-                <span className="material-symbols-outlined" aria-hidden="true">
-                  {pubIds.includes(v.id) ? 'visibility' : 'visibility_off'}
-                </span>
-                {pubIds.includes(v.id) ? '공개 중' : '공개'}
-              </button>
-
-              {form?.id === v.id && (
-                <div className="ss-profile-publish-form">
-                  <label htmlFor="ss-pub-title">제목</label>
-                  <input
-                    id="ss-pub-title"
-                    value={form.title}
-                    maxLength={40}
-                    onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  />
-                  <label htmlFor="ss-pub-what">한 줄 설명</label>
-                  <input
-                    id="ss-pub-what"
-                    value={form.what}
-                    maxLength={60}
-                    onChange={(e) => setForm({ ...form, what: e.target.value })}
-                  />
-                  {/* ⚠️ 서버에 공개 여부를 둘 자리가 아직 없다(미결). 그것을
-                      숨기면 다른 기기에서 안 보일 때 고장으로 읽힌다. */}
-                  <p className="ss-profile-publish-note">
-                    아직 이 브라우저에만 남습니다 — 다른 기기나 다른 사람에게는 보이지
-                    않습니다.
-                  </p>
-                  <button
-                    type="button"
-                    className="ss-profile-publish-save"
-                    disabled={!form.title.trim()}
-                    onClick={() => savePublish(v)}
-                  >
-                    공개하기
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
 
             {/* 🔴 **한 편뿐이어도 그린다**(사용자 요청) — `1 / 1` 이 보여야 갈래
                 안에 몇 편이 있는지 알 수 있고, 갈래를 바꿔도 줄이 사라졌다
@@ -486,20 +709,115 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
                   줄이 둘로 갈려 판이 그만큼 길어진다. 넘기는 단추는 가운데
                   그대로여야 하므로 이 단추만 흐름 밖으로 빼서 오른쪽에 건다.
                   ⚠️ 반려된 클립에는 안 낸다 — 서버가 안 보는 영상이다. */}
-              {v.passed && (
-                <button
-                  type="button"
-                  className="ss-profile-featured-btn"
-                  data-on={featured === v.id ? 'true' : undefined}
-                  aria-pressed={featured === v.id}
-                  onClick={() => toggleFeatured(v)}
-                >
-                  <span className="material-symbols-outlined" aria-hidden="true">
-                    {featured === v.id ? 'stars' : 'star'}
-                  </span>
-                  나를 보여주는 대표 영상
-                </button>
-              )}
+              {/* 🔴 **지우기는 줄의 왼쪽 끝**이다 — 대표 영상 단추와 마주 본다.
+                  그 단추와 같은 이유로 흐름 밖으로 뺀다: 흐름에 두면 가운데
+                  넘기는 단추가 그만큼 밀려 영상마다 자리가 갈린다.
+
+                  ⚠️ 되돌릴 수 없는 단추가 화살표 바로 옆에 있으면 안 된다 —
+                  그래서 반대쪽 끝이고, 누르면 한 번 더 묻는다. */}
+              <span className="ss-profile-del">
+                {confirming === v.id ? (
+                  <>
+                    <button
+                      type="button"
+                      className="ss-profile-del-btn"
+                      data-armed="true"
+                      disabled={removing}
+                      onClick={() => removeVideo(v)}
+                    >
+                      {removing ? '지우는 중…' : '정말 지웁니다'}
+                    </button>
+                    <button
+                      type="button"
+                      className="ss-profile-del-btn"
+                      disabled={removing}
+                      onClick={() => setConfirming(null)}
+                    >
+                      취소
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="ss-profile-del-btn"
+                    onClick={() => setConfirming(v.id)}
+                  >
+                    <span className="material-symbols-outlined" aria-hidden="true">
+                      delete
+                    </span>
+                    해당 영상 삭제
+                  </button>
+                )}
+              </span>
+              {/* 🔴 **줄의 오른쪽 끝에 둘이 나란히 선다**(사용자 요청,
+                  2026-09-11). 「전체 공개」가 「대표 영상 설정」의 왼쪽이다 —
+                  전에는 영상 바로 아래 왼쪽에 따로 떠 있어서, 같은 영상에
+                  대한 일인데 자리가 갈려 있었다.
+                  ⚠️ 둘을 **한 상자**로 묶어 흐름 밖에 건다. 각자 `right` 를
+                  주면 대표 단추의 폭(글자가 「대표 영상 설정」 ↔ 「대표 영상」
+                  으로 갈린다)을 왼쪽 단추가 알아야 한다. */}
+              <span className="ss-profile-nav-right">
+                {/* 🔴 **업로드 갈래에서만** 낸다. 분석을 건 영상은 리포트를 보려고 올린
+                          것이고, 영상 모음은 올린 장면을 훑는 자리다 — 성격이 다르다. */}
+                      {tab === 'uploaded' && (
+                        <div className="ss-profile-publish">
+                          <button
+                            type="button"
+                            className="ss-profile-publish-toggle"
+                            data-on={pubIds.includes(v.id) ? 'true' : undefined}
+                            aria-pressed={pubIds.includes(v.id)}
+                            onClick={() => togglePublish(v)}
+                          >
+                            <span className="material-symbols-outlined" aria-hidden="true">
+                              {pubIds.includes(v.id)
+                                ? 'visibility'
+                                : formOpen && form?.id === v.id
+                                  ? 'close'
+                                  : 'visibility_off'}
+                            </span>
+                            {/* 🔴 **열려 있으면 「닫기」다**(사용자 요청,
+                                2026-09-16). 같은 단추가 여는 자리이자 닫는
+                                자리라, 열어 놓고 되돌릴 데를 따로 찾지 않는다. */}
+                            {pubIds.includes(v.id)
+                              ? '전체 공개 중'
+                              : formOpen && form?.id === v.id
+                                ? '닫기'
+                                : '전체 공개'}
+                          </button>
+                        </div>
+                      )}
+                {/* 🔴 **분석 갈래에서만** 낸다(사용자 요청, 2026-09-16).
+
+                    두 갈래는 **영상이 가는 곳이 다르다.** 그냥 올린 영상은
+                    「전체 공개」에 따라 **영상 모음(`/home`)에 나오나 안 나오나**
+                    뿐이고, 분석을 안 해서 리포트가 없으니 **추천 판에는 아예 안
+                    들어간다.** 대표 영상은 그 추천 판에서 나를 소개하는 장면이라,
+                    여기에 단추를 두면 아무 데도 안 쓰이는 값을 고르게 된다.
+
+                    ⚠️ **서버가 막는 것은 아니다.** 계약(3-6절)이 거부하는 것은
+                    반려된 클립(`passed: false` → `422 CANNOT_FEATURE`)뿐이고,
+                    분석 안 한 영상도 세울 수는 있다 — 여기서 안 내주는 것은
+                    화면의 판단이다.
+
+                    ⚠️ 이 단추가 **내리는 자리이기도 하다.** 업로드 영상이 이미
+                    대표로 서 있는 사람은 여기서 못 내린다 — 분석 영상 하나를
+                    대표로 세우면 자동으로 내려간다(사람당 하나). 아래 알림도
+                    같이 막으므로 그 상태는 이 갈래에서 아예 안 보인다. */}
+                {v.passed && tab === 'analyzed' && (
+                  <button
+                    type="button"
+                    className="ss-profile-featured-btn"
+                    data-on={featured === v.id ? 'true' : undefined}
+                    aria-pressed={featured === v.id}
+                    onClick={() => toggleFeatured(v)}
+                  >
+                    <span className="material-symbols-outlined" aria-hidden="true">
+                      {featured === v.id ? 'stars' : 'star'}
+                    </span>
+                    대표 영상 설정
+                  </button>
+                )}
+              </span>
               <button
                 type="button"
                 className="ss-profile-step"
@@ -527,19 +845,90 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
               </button>
             </div>
 
-            {/* 영상 폭에 맞춰 늘었다 줄었다 하는 흰 선(사용자 요청). 상자가
-                이미 영상 크기라 `100%` 면 된다 — 폭을 다시 계산하지 않는다.
+            {/* 공개 폼 — 🔴 **흐름 안에 둔다**(사용자 요청, 2026-09-16).
+                전에는 단추 아래로 **떠올랐고**(절대배치), 그래서 아래 선과
+                썸네일 줄을 덮어 잘려 보였다. 이제 자리를 차지하며 열리므로
+                아래 것들이 **부드럽게 밀려 내려간다.**
 
-                🔴 **비를 알기 전에는 감춘다.** 그전에는 상자가 기본값(16:9)
-                이라, 세로 영상이면 선이 영상보다 넓게 그어진 채로 한 박자
-                보였다가 줄어든다(실측). 폭이 맞을 때만 나타나게 한다. */}
-            {/* ⚠️ 어디에 남는지 밝힌다 — 계약에 자리가 없어 이 브라우저에만
-                남는다(공개 여부 · 카드 꾸미기와 같은 규칙). 단추와 달리 이건
-                흐름 안에 둔다 — 겹쳐 놓으면 넘기는 단추를 덮는다. */}
-            {v.passed && featured === v.id && (
+                🔴 **높이를 모르고도 미끄러지게** `grid-template-rows: 0fr → 1fr`
+                을 쓴다. `height: auto` 는 전환이 안 되고, 고정 px 을 적으면
+                글자 크기나 문구가 바뀔 때마다 다시 재야 한다.
+
+                🔴 **자리는 늘 있고 내용만 든다.** 열 때 요소가 새로 붙으면
+                전환이 시작할 곳(0fr)이 없어 툭 나타난다 — 갈래 바꾸기에서
+                쓴 것과 같은 이유다. 닫을 때도 `form` 을 바로 안 비우고
+                미끄러짐이 끝난 뒤에 비운다. */}
+            {tab === 'uploaded' && !pubIds.includes(v.id) && (
+              <div
+                className="ss-profile-publish-slot"
+                data-open={formOpen && form?.id === v.id ? 'true' : undefined}
+              >
+                <div className="ss-profile-publish-slot-inner">
+                  {/* 🔴 흐림은 **인라인으로만** 준다 — `globals.css` 에 적으면
+                      Lightning CSS 를 지나며 떨어져 나간다(`me/glass.ts`).
+                      왼쪽 칸의 「정보」 판들과 같은 값을 쓴다. */}
+                  {form?.id === v.id && (
+                    <div className="ss-profile-publish-form" style={SECTION_GLASS}>
+                      <div className="ss-profile-publish-fields">
+                        <label className="ss-profile-publish-field">
+                          <span>제목</span>
+                          <input
+                            value={form.title}
+                            maxLength={40}
+                            placeholder="무엇을 보는 장면인가요"
+                            aria-label="제목"
+                            onChange={(e) => setForm({ ...form, title: e.target.value })}
+                          />
+                        </label>
+                        <label className="ss-profile-publish-field">
+                          <span>한 줄 설명</span>
+                          <input
+                            value={form.what}
+                            maxLength={60}
+                            placeholder="없어도 됩니다"
+                            aria-label="한 줄 설명"
+                            onChange={(e) => setForm({ ...form, what: e.target.value })}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          className="ss-profile-publish-save"
+                          disabled={!form.title.trim()}
+                          onClick={() => savePublish(v)}
+                        >
+                          공개하기
+                        </button>
+                      </div>
+                      {/* 🔴 **공개는 되돌릴 수 있지만 그 사이에 남이 본다.**
+                          무엇이 일어나는지 누르기 전에 말한다(CCC 20 으로 서버에
+                          올라가면서 이 문구가 「이 브라우저에만」에서 바뀌었다). */}
+                      <p className="ss-profile-publish-note">
+                        영상 모음에서 다른 사람에게도 보입니다 — 언제든 다시 내릴 수 있습니다.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 상자 폭을 그대로 쓰는 흰 선 — `100%` 면 된다.
+
+                🔴 **상자는 이제 영상 비를 안 따른다**(2026-09-08, 사용자 요청).
+                세로 영상에서 줄이 좁아져 오른쪽 끝 단추가 가운데 화살표를
+                덮었기 때문이다 — `globals.css` 의 `.ss-profile-video-frame`
+                주석에 왜 뒤집었는지 적어 두었다.
+
+                🔴 **비를 알기 전에는 감춘다.** 폭은 이제 안 틀리지만, 영상이
+                아직 안 그려졌는데 선만 먼저 뜨면 허공에 그은 줄로 보인다. */}
+            {/* 무엇에 쓰이는 값인지 밝힌다. 단추와 달리 이건 흐름 안에 둔다 —
+                겹쳐 놓으면 넘기는 단추를 덮는다.
+
+                🔴 **단추와 같은 갈래에서만** 낸다(사용자 요청, 2026-09-16).
+                그냥 올린 영상은 리포트가 없어 **추천 판에 아예 안 들어간다** —
+                거기 두면 「이 장면이 돕니다」가 **사실이 아닌 말**이 된다. */}
+            {v.passed && tab === 'analyzed' && featured === v.id && (
               <p className="ss-profile-featured-note">
-                추천 판에서 나를 소개할 때 이 장면이 돕니다 — 아직 이 브라우저에만
-                남습니다.
+                추천 판에서 나를 소개할 때 이 장면이 돕니다.
               </p>
             )}
 
@@ -557,7 +946,7 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
           {
             <ul className="ss-profile-strip">
               {shown.map((sv, idx) => {
-                const src = previewSrc(sv)
+                const src = previewSrc(sv, playbackUrls)
                 return (
                   <li key={sv.id}>
                     <button
@@ -572,7 +961,13 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
                         /* 🔴 소리를 끄고 메타데이터만 받는다 — 목록에 여럿이
                            놓이므로 본편까지 받으면 이 줄 하나로 수십 MB 가
                            나간다. 첫 프레임만 표지로 쓴다. */
-                        <video src={src} muted playsInline preload="metadata" />
+                        /* 🔴 주소 뒤의 `#t=0.1` 이 있어야 **그림이 그려진다.**
+                           `preload="metadata"` 만으로는 브라우저가 길이·크기만
+                           받고 화면은 안 그려서, 갈래를 오갈 때 섬네일이
+                           **검은 칸으로 남는다**(사용자 지적). 0 이 아니라
+                           0.1 인 것은 맨 첫 칸이 검은 영상이 흔해서다 —
+                           추천 판과 코치 목록이 같은 이유로 그렇게 한다. */
+                        <video src={`${src}#t=0.1`} muted playsInline preload="metadata" />
                       ) : (
                         /* 조회용 주소가 없는 클립(실물 백엔드) — 순서만 적는다. */
                         <span className="ss-profile-strip-blank">{idx + 1}</span>
@@ -591,20 +986,53 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
               그림은 분석 화면과 **같은 것**을 쓴다(`ReportView`) — 두 벌로
               두면 한쪽만 늙는다.
 
-              ⚠️ 계약에 리포트를 **읽는** 경로가 없어(미결 paik 7번) 이 값은
-              그 브라우저에만 있다. 그래서 아래에 그렇게 적어 둔다 — 숨기면
-              다른 기기에서 안 보일 때 고장으로 읽힌다. */}
-          {tab === 'analyzed' && report && (
-            <section className="ss-profile-report" aria-label="분석 리포트">
-              <h3 className="ss-profile-report-head">분석 리포트</h3>
-              <ReportView report={report} />
-              <p className="ss-profile-report-note">
-                {report.savedAt} 에 남겼습니다 — 아직 이 브라우저에만 남습니다.
-              </p>
+              🔴 **「아직」과 「없다」를 갈라 그린다**(미결 paik 7번의 「하지 말
+              것」) — 분석 중인 클립에 빈 자리를 보이면 결과가 없는 것처럼
+              읽힌다. */}
+          {tab === 'analyzed' && report && panelOn && (
+            <section
+              className="ss-profile-report"
+              aria-label="분석 리포트"
+              data-state={closing ? 'closing' : 'open'}
+              style={SECTION_GLASS}
+            >
+              <div className="ss-profile-report-bar">
+                <h3 className="ss-profile-report-head">분석 리포트</h3>
+                {/* 🔴 닫는 길을 **판 안에도** 둔다. 여는 단추는 왼쪽 칸이
+                    밀려난 뒤 이 판에 가려서, 그것만으로는 되돌릴 수 없다. */}
+                <button
+                  type="button"
+                  className="ss-profile-report-close"
+                  onClick={closePanel}
+                >
+                  닫기
+                </button>
+              </div>
+              {report.state === 'ready' ? (
+                <>
+                  <ReportView report={report.report} />
+                  <p className="ss-profile-report-note">{report.report.savedAt} 에 분석했습니다.</p>
+                </>
+              ) : (
+                <p className="ss-profile-report-note" role="status">
+                  {/* 🔴 **사유 문구를 서버에서 그대로 받아 쓰지 않는다.** 위
+                      알림줄이 이미 같은 문장을 낼 수 있어(대표 세우기 실패 ·
+                      지우기 실패) 같은 글이 화면에 둘이 뜬다 — 실제로 그렇게
+                      겹쳤다. 여기는 리포트 자리라는 것이 드러나야 한다. */}
+                  {report.state === 'not-ready'
+                    ? '분석 중입니다 — 끝나면 여기에 나옵니다.'
+                    : report.state === 'failed'
+                      ? `분석에 실패했습니다 — ${report.reason}`
+                      : report.state === 'missing'
+                        ? '리포트를 찾을 수 없습니다.'
+                        : '리포트를 읽지 못했습니다.'}
+                </p>
+              )}
             </section>
           )}
         </div>
       )}
+      </div>
     </>
   )
 }

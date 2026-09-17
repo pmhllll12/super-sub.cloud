@@ -31,15 +31,6 @@ from app.analysis.domain.rules.job_rules import QUEUED, RUNNING
 pytestmark = pytest.mark.db
 
 
-def _new_session():
-    from app.core.database import engine_or_none
-
-    engine = engine_or_none()
-    if engine is None:
-        pytest.skip("DATABASE_URL 이 설정되지 않았다")
-    return Session(engine)
-
-
 #: 🔴 **개발 DB 의 큐는 비어 있지 않다.** `test_video_db.py` 가 업로드를 검사하며
 #: 만든 작업이 백 건 넘게 `queued` 로 남아 있다(2026-09-04 확인: 151 건). 그것들이
 #: 내 것보다 오래됐으면 `claim_next` 는 **남의 것을 집는다** — 실제로 그렇게 깨졌고,
@@ -58,7 +49,7 @@ def queued(db_session):
     db_session.execute(
         text('insert into "user" (id, email, nickname, created_at, token_version) '
              "values (:i, :e, :n, now(), 0) on conflict do nothing"),
-        {"i": user_id, "e": f"worker-{user_id}@example.test", "n": "워커검사"},
+        {"i": user_id, "e": f"worker-{user_id}@example.test", "n": f"워커검사{str(user_id)[:6]}"},
     )
 
     made = []
@@ -101,16 +92,16 @@ def queued(db_session):
     db_session.commit()
 
 
-def test_오래된_것부터_집는다(db_session, queued):
-    claimed = JobPgRepository(_new_session()).claim_next()
+def test_오래된_것부터_집는다(db_session, queued, new_session_factory):
+    claimed = JobPgRepository(new_session_factory()).claim_next()
     assert claimed is not None
     assert claimed.job_id == queued["oldest"][0]
     assert claimed.storage_key.startswith(f"videos/{queued['user_id']}/")
     assert claimed.sport_code == "baseball"
 
 
-def test_집으면_running_과_started_at_이_찬다(db_session, queued):
-    claimed = JobPgRepository(_new_session()).claim_next()
+def test_집으면_running_과_started_at_이_찬다(db_session, queued, new_session_factory):
+    claimed = JobPgRepository(new_session_factory()).claim_next()
     assert claimed is not None
 
     db_session.expire_all()
@@ -120,10 +111,10 @@ def test_집으면_running_과_started_at_이_찬다(db_session, queued):
     assert row.finished_at is None      # 아직 안 끝났다
 
 
-def test_두_워커가_같은_작업을_집지_않는다(db_session, queued):
+def test_두_워커가_같은_작업을_집지_않는다(db_session, queued, new_session_factory):
     """🔴 이 검사가 이 파일의 존재 이유다. 스텁으로는 절대 안 걸린다."""
-    first = JobPgRepository(_new_session()).claim_next()
-    second = JobPgRepository(_new_session()).claim_next()
+    first = JobPgRepository(new_session_factory()).claim_next()
+    second = JobPgRepository(new_session_factory()).claim_next()
 
     assert first is not None and second is not None
     assert first.job_id != second.job_id
@@ -132,9 +123,9 @@ def test_두_워커가_같은_작업을_집지_않는다(db_session, queued):
     }
 
 
-def test_잠긴_행을_건너뛰고_다음_것을_집는다(db_session, queued):
+def test_잠긴_행을_건너뛰고_다음_것을_집는다(db_session, queued, new_session_factory):
     """`SKIP LOCKED` 가 빠지면 여기서 **멈춘다** — `lock_timeout` 이 그걸 드러낸다."""
-    holder = _new_session()
+    holder = new_session_factory()
     # 워커 하나가 가장 오래된 행을 잠근 채 아직 커밋하지 않은 상태를 만든다.
     locked = holder.execute(
         select(AnalysisJobOrm.id)
@@ -146,7 +137,7 @@ def test_잠긴_행을_건너뛰고_다음_것을_집는다(db_session, queued):
     assert locked == queued["oldest"][0]
 
     try:
-        other = _new_session()
+        other = new_session_factory()
         # 🔴 멈추면 2초 뒤에 오류가 난다. 이것이 없으면 검사가 영원히 걸린다.
         other.execute(text("set local lock_timeout = '2s'"))
         claimed = JobPgRepository(other).claim_next()
@@ -158,16 +149,16 @@ def test_잠긴_행을_건너뛰고_다음_것을_집는다(db_session, queued):
         holder.close()
 
 
-def test_finish_는_running_일_때만_바꾼다(db_session, queued):
+def test_finish_는_running_일_때만_바꾼다(db_session, queued, new_session_factory):
     job_id = queued["oldest"][0]
 
     # queued 인 채로 끝내려 하면 현재 상태를 돌려준다 — 라우터가 409 로 옮긴다.
-    assert JobPgRepository(_new_session()).finish(job_id, "succeeded", None) == QUEUED
+    assert JobPgRepository(new_session_factory()).finish(job_id, "succeeded", None) == QUEUED
 
-    claimed = JobPgRepository(_new_session()).claim_next()
+    claimed = JobPgRepository(new_session_factory()).claim_next()
     assert claimed is not None and claimed.job_id == job_id
 
-    assert JobPgRepository(_new_session()).finish(job_id, "succeeded", None) is None
+    assert JobPgRepository(new_session_factory()).finish(job_id, "succeeded", None) is None
 
     db_session.expire_all()
     row = db_session.get(AnalysisJobOrm, job_id)
@@ -175,11 +166,68 @@ def test_finish_는_running_일_때만_바꾼다(db_session, queued):
     assert row.finished_at is not None
 
     # 두 번째 보고는 막힌다. 통과시키면 finished_at 이 뒤로 밀린다.
-    assert JobPgRepository(_new_session()).finish(job_id, "failed", "x") == "succeeded"
+    assert JobPgRepository(new_session_factory()).finish(job_id, "failed", "x") == "succeeded"
 
 
-def test_없는_작업은_missing_이다(db_session):
-    assert JobPgRepository(_new_session()).finish(uuid.uuid4(), "failed", None) == "missing"
+def test_없는_작업은_missing_이다(db_session, new_session_factory):
+    assert JobPgRepository(new_session_factory()).finish(uuid.uuid4(), "failed", None) == "missing"
+
+
+def test_claim_이_지정_박스를_실어_준다(db_session, queued, new_session_factory):
+    """미결 `paik` 6번 — `analysis_job.subject_box`(JSON) 가 claim 응답까지 온다."""
+    job_id, _ = queued["oldest"]
+    db_session.execute(
+        text(
+            "UPDATE analysis_job SET subject_box = :b, subject_at_ms = :t "
+            "WHERE id = :i"
+        ),
+        {"b": '[0.39, 0.35, 0.12, 0.4]', "t": 4200, "i": job_id},
+    )
+    db_session.commit()
+
+    session = new_session_factory()
+    try:
+        claimed = JobPgRepository(session).claim_next()
+    finally:
+        session.close()
+    assert claimed is not None and claimed.job_id == job_id
+    assert claimed.subject_box == [0.39, 0.35, 0.12, 0.4]
+    assert claimed.subject_at_ms == 4200
+
+
+def test_지정이_없는_작업은_claim_에서_None_이다(db_session, queued, new_session_factory):
+    job_id, _ = queued["oldest"]
+    session = new_session_factory()
+    try:
+        claimed = JobPgRepository(session).claim_next()
+    finally:
+        session.close()
+    assert claimed is not None and claimed.job_id == job_id
+    assert claimed.subject_box is None and claimed.subject_at_ms is None
+
+
+def test_finish_가_리포트_자리를_컬럼에_남긴다(db_session, queued, new_session_factory):
+    """미결 `paik` 11번 — `report_key` 가 실제 컬럼에 써지는지 (스텁이 아니라 DB)."""
+    job_id = queued["oldest"][0]
+    assert JobPgRepository(new_session_factory()).claim_next().job_id == job_id
+
+    key = "reports/u1/v1/report.json"
+    assert (
+        JobPgRepository(new_session_factory()).finish(job_id, "succeeded", None, key)
+        is None
+    )
+
+    db_session.expire_all()
+    assert db_session.get(AnalysisJobOrm, job_id).report_key == key
+
+
+def test_리포트_자리를_안_넘기면_컬럼이_비어_있다(db_session, queued, new_session_factory):
+    job_id = queued["oldest"][0]
+    assert JobPgRepository(new_session_factory()).claim_next().job_id == job_id
+    assert JobPgRepository(new_session_factory()).finish(job_id, "succeeded", None) is None
+
+    db_session.expire_all()
+    assert db_session.get(AnalysisJobOrm, job_id).report_key is None
 
 
 def _stall(db_session, job_id, minutes):
@@ -192,24 +240,24 @@ def _stall(db_session, job_id, minutes):
     db_session.commit()
 
 
-def test_회수는_아직_도는_것을_건드리지_않는다(db_session, queued):
+def test_회수는_아직_도는_것을_건드리지_않는다(db_session, queued, new_session_factory):
     """🔴 임계 시간이 짧으면 돌고 있는 작업을 빼앗아 같은 클립을 두 번 분석한다."""
-    claimed = JobPgRepository(_new_session()).claim_next()
+    claimed = JobPgRepository(new_session_factory()).claim_next()
     assert claimed is not None
 
-    requeued, failed = JobPgRepository(_new_session()).reclaim_stale(30)
+    requeued, failed = JobPgRepository(new_session_factory()).reclaim_stale(30)
     assert (requeued, failed) == (0, 0)
 
     db_session.expire_all()
     assert db_session.get(AnalysisJobOrm, claimed.job_id).status == RUNNING
 
 
-def test_오래_멈춘_것은_큐로_돌아온다(db_session, queued):
-    claimed = JobPgRepository(_new_session()).claim_next()
+def test_오래_멈춘_것은_큐로_돌아온다(db_session, queued, new_session_factory):
+    claimed = JobPgRepository(new_session_factory()).claim_next()
     assert claimed is not None
     _stall(db_session, claimed.job_id, 999)
 
-    requeued, failed = JobPgRepository(_new_session()).reclaim_stale(30)
+    requeued, failed = JobPgRepository(new_session_factory()).reclaim_stale(30)
     assert (requeued, failed) == (1, 0)
 
     db_session.expire_all()
@@ -219,18 +267,18 @@ def test_오래_멈춘_것은_큐로_돌아온다(db_session, queued):
     assert "회수됨" in (row.failure_reason or "")
 
 
-def test_두_번째로_멈추면_실패로_끝난다(db_session, queued):
+def test_두_번째로_멈추면_실패로_끝난다(db_session, queued, new_session_factory):
     """되돌리기만 하면 워커를 죽이는 클립이 큐를 영원히 돈다."""
-    claimed = JobPgRepository(_new_session()).claim_next()
+    claimed = JobPgRepository(new_session_factory()).claim_next()
     assert claimed is not None
     _stall(db_session, claimed.job_id, 999)
-    assert JobPgRepository(_new_session()).reclaim_stale(30) == (1, 0)
+    assert JobPgRepository(new_session_factory()).reclaim_stale(30) == (1, 0)
 
-    again = JobPgRepository(_new_session()).claim_next()
+    again = JobPgRepository(new_session_factory()).claim_next()
     assert again is not None and again.job_id == claimed.job_id
     _stall(db_session, claimed.job_id, 999)
 
-    assert JobPgRepository(_new_session()).reclaim_stale(30) == (0, 1)
+    assert JobPgRepository(new_session_factory()).reclaim_stale(30) == (0, 1)
 
     db_session.expire_all()
     row = db_session.get(AnalysisJobOrm, claimed.job_id)
@@ -238,7 +286,7 @@ def test_두_번째로_멈추면_실패로_끝난다(db_session, queued):
     assert row.finished_at is not None
 
 
-def test_되돌린_행은_running_에서_빠진다(db_session, queued):
+def test_되돌린_행은_running_에서_빠진다(db_session, queued, new_session_factory):
     """두 UPDATE 가 겹치지 않게 만드는 **불변식**을 고정한다.
 
     되돌리는 쪽이 `status` 를 `queued` 로 바꾸기 때문에 그 행은 `running` 조건에서
@@ -248,15 +296,15 @@ def test_되돌린_행은_running_에서_빠진다(db_session, queued):
     통과했다** — 순서가 아니라 이 불변식이 지키고 있어서다. 판별 못 하는 검사를
     두면 안 되므로 지키는 것을 직접 본다.
     """
-    claimed = JobPgRepository(_new_session()).claim_next()
+    claimed = JobPgRepository(new_session_factory()).claim_next()
     assert claimed is not None
     _stall(db_session, claimed.job_id, 999)
 
-    assert JobPgRepository(_new_session()).reclaim_stale(30) == (1, 0)
+    assert JobPgRepository(new_session_factory()).reclaim_stale(30) == (1, 0)
 
     db_session.expire_all()
     row = db_session.get(AnalysisJobOrm, claimed.job_id)
     assert row.status == QUEUED, "되돌렸는데 running 이면 다음 문장에 또 걸린다"
 
     # 곧바로 한 번 더 회수해도 아무 일이 없어야 한다 (이미 running 이 아니다).
-    assert JobPgRepository(_new_session()).reclaim_stale(30) == (0, 0)
+    assert JobPgRepository(new_session_factory()).reclaim_stale(30) == (0, 0)

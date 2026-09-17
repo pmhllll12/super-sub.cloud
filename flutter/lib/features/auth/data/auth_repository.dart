@@ -2,9 +2,18 @@ import 'models/app_user.dart';
 import 'models/session.dart';
 
 class AuthException implements Exception {
-  const AuthException(this.message);
+  const AuthException(this.message, {this.code, this.retryAfter});
 
   final String message;
+
+  /// 서버 에러 `code` (계약: `{"error": {"code", "message"}}`) — 분기는 이걸로
+  /// 한다. Mock 은 서버가 없어 늘 `null`이다.
+  final String? code;
+
+  /// 429 일 때 몇 초 기다려야 하는가(서버가 준 `Retry-After`, 정수 초).
+  /// 429 가 아니거나 헤더가 없으면 `null` — 웹(`www/`)의 `ApiCallError.retryAfter`와
+  /// 같은 성질이다.
+  final int? retryAfter;
 
   @override
   String toString() => message;
@@ -18,7 +27,21 @@ class AuthException implements Exception {
 abstract class AuthRepository {
   Future<Session> login({required String email, required String password});
 
-  /// 개발용 바로 진입. 릴리즈 빌드의 UI에서는 호출되지 않는다.
+  /// 가입하고 **그 계정으로 로그인된 세션**을 돌려준다(계약 `POST /auth/signup`).
+  ///
+  /// 가입만 하고 끝내면 방금 친 비밀번호를 로그인 화면에서 한 번 더 치게 된다.
+  /// 이미 있는 이메일이면 [AuthException](`EMAIL_ALREADY_EXISTS`)을 던진다.
+  Future<Session> signup({
+    required String email,
+    required String password,
+    required String nickname,
+  });
+
+  /// 구글이 준 **ID 토큰**으로 로그인한다(계약 `POST /auth/google`). 처음 보는
+  /// 구글 계정이면 서버가 그 자리에서 가입까지 한다 — 가입 경로가 따로 없다.
+  Future<Session> loginWithGoogle({required String idToken});
+
+  /// 시험이 로그인된 화면을 준비할 때 쓰는 바로 진입. 앱 화면에는 버튼이 없다.
   Future<Session> loginAs(String userId);
 
   Future<void> logout();

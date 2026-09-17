@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { feedWith } from '@/lib/feed'
-import { listPublished, type PublishedClip } from '@/lib/published'
+import { listPublished } from '@/lib/published'
+import type { PublicVideo } from '@/server/backend'
+import { usePlaybackUrls } from '@/lib/playbackUrl'
 
 /**
  * 홈을 내리면 나오는 **영상 모음** — 필름 한 줄이 화면 가운데를 지나간다.
@@ -19,7 +21,11 @@ import { listPublished, type PublishedClip } from '@/lib/published'
  * 🔴 **뜬 상태에서만 산다.** 홈이 아직 위에 있을 때는 이 판이 화면 밖에 있으므로
  * 영상을 틀지 않는다 — 안 보이는 영상을 트는 것은 데이터만 쓰는 일이다.
  */
-export default function HomeFeed({ active, by }: { active: boolean; by: string }) {
+/* 🔴 **보는 사람 닉네임을 더는 안 받는다**(2026-09-17, 미결 `paik` 16번).
+   전에는 `by` 를 받아 공개 클립 **전부**에 붙였고, 목록에 남의 영상이 섞이면
+   그것이 내 이름으로 그려졌다. 이제 줄마다 서버가 준 업로더를 쓴다 —
+   **손에 닿는 「나」가 아예 없어야** 같은 실수가 되살아나지 않는다. */
+export default function HomeFeed({ active }: { active: boolean }) {
   const [i, setI] = useState(0)
   /** 좋아요를 누른 영상. ⚠️ 이 화면 안에서만 산다(계약에 좋아요가 없다). */
   const [liked, setLiked] = useState<string[]>([])
@@ -83,18 +89,28 @@ export default function HomeFeed({ active, by }: { active: boolean; by: string }
 
   /** 앞뒤로 **끝없이** 돈다 — 마지막에서 오른쪽으로 가면 처음으로. */
   /**
-   * 내가 공개로 돌린 클립.
+   * 공개로 돌린 클립 — **남의 것까지**(CCC 20, 미결 `paik` 5번).
    *
-   * 🔴 그릴 때 저장소를 읽지 않는다 — 서버에는 그 값이 없어서 서버가 그린 첫
-   * 화면과 브라우저가 그린 것이 갈리면 하이드레이션이 깨진다. 붙은 뒤에 읽는다.
+   * 🔴 전에는 브라우저 저장소라 **내 것만** 붙었다. 이제
+   * `GET /videos/public` 이라 다른 사람이 공개한 것도 온다.
    *
-   * ⚠️ 아직 **내 것만** 붙는다. 남의 공개 영상은 계약에 목록도 재생 주소도
-   * 없어서(미결) 못 가져온다.
+   * 🔴 **그릴 때 부르지 않는다** — 서버가 그린 첫 화면과 갈리면 하이드레이션이
+   * 깨진다. 붙은 뒤에 받는다.
    */
-  const [published, setPublished] = useState<PublishedClip[]>([])
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- 저장소는 서버에 없다. 붙은 뒤에 읽어야 하이드레이션이 안 깨진다.
-  useEffect(() => setPublished(listPublished()), [])
-  const clips = feedWith(published, by)
+  const [published, setPublished] = useState<PublicVideo[]>([])
+  useEffect(() => {
+    let alive = true
+    void listPublished().then((list) => {
+      if (alive) setPublished(list)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
+  /* 🔴 **재생 주소는 목록에 안 실려 온다** — 클립마다 따로 받는다(만료되는
+     값이라 캐시하지 않는다). 저장 키가 없으므로 늘 받는 쪽으로 간다. */
+  const publicUrls = usePlaybackUrls(published)
+  const clips = feedWith(published, publicUrls)
 
   const go = (step: number) => setI((prev) => (prev + step + clips.length) % clips.length)
 
@@ -224,6 +240,19 @@ export default function HomeFeed({ active, by }: { active: boolean; by: string }
     })
   }, [i, active])
 
+  /* 🔴 **없으면 없다고 말한다**(2026-09-17). 여기 붙박이 클립 셋이 있어서
+     목록이 빌 일이 없었는데, 그것들이 **실제 도메인에서 진짜 영상 뒤에 그대로
+     붙어** 있었다(게다가 셋 다 농구였다 — 종목은 축구 하나로 정리됐다).
+     지우고 나면 공개된 영상이 하나도 없는 순간이 생긴다 — 아래 `clips[i]` 가
+     그대로 터지므로 여기서 먼저 받는다. */
+  if (clips.length === 0) {
+    return (
+      <div className="ss-feed" ref={box} data-active={active} data-library={library}>
+        <p className="ss-feed-empty">아직 공개된 영상이 없습니다.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="ss-feed" ref={box} data-active={active} data-library={library}>
       <div
@@ -275,7 +304,16 @@ export default function HomeFeed({ active, by }: { active: boolean; by: string }
       <div className="ss-feed-bar">
         {/* 왼쪽 알약 — 지금 보는 영상이 누구의 무엇인지. */}
         <p className="ss-feed-pill ss-feed-who">
-          <b>{clips[i].by}</b>
+          {/* 🔴 **카드가 있는 사람은 눌러서 그 카드로 간다**(CCC 39 의 성질 2).
+              없으면 링크를 안 그리고 이름만 둔다 — 「카드 없음」을 따로 알리지
+              않는다(같은 계약의 「하지 말 것」). */}
+          {clips[i].bySlug ? (
+            <a className="ss-feed-who-link" href={`/c/${clips[i].bySlug}`}>
+              {clips[i].by}
+            </a>
+          ) : (
+            <b>{clips[i].by}</b>
+          )}
           {/* 가르는 선. 낭독기는 이걸 읽을 필요가 없다 — 이름과 제목은 이미
               따로 읽힌다. */}
           <i aria-hidden="true">|</i>

@@ -37,10 +37,11 @@ def card(db_client, db_session):
 
     시드된 데모 데이터에 기대지 않는다 — 기대면 테스트가 시드 실행 여부에 묶인다.
     """
+    nickname = f"카드주인{uuid.uuid4().hex[:6]}"
     email = f"card-{uuid.uuid4().hex[:12]}@super-sub.example"
     signup = db_client.post(
         f"{V1}/auth/signup",
-        json={"email": email, "password": PASSWORD, "nickname": "카드주인"},
+        json={"email": email, "password": PASSWORD, "nickname": nickname},
     )
     assert signup.status_code == 201, signup.text
     user_id = uuid.UUID(signup.json()["id"])
@@ -94,6 +95,7 @@ def card(db_client, db_session):
 
     yield {
         "email": email,
+        "nickname": nickname,
         "slug": slug,
         "card_id": str(card_id),
         "headers": {"Authorization": f"Bearer {login.json()['access_token']}"},
@@ -116,10 +118,11 @@ def card(db_client, db_session):
 @pytest.fixture
 def fresh_account(db_client, db_session):
     """카드가 **없는** 계정 하나. 끝나면 카드까지 지운다."""
+    nickname = f"새사람{uuid.uuid4().hex[:6]}"
     email = f"newcard-{uuid.uuid4().hex[:12]}@super-sub.example"
     signup = db_client.post(
         f"{V1}/auth/signup",
-        json={"email": email, "password": PASSWORD, "nickname": "새사람"},
+        json={"email": email, "password": PASSWORD, "nickname": nickname},
     )
     assert signup.status_code == 201, signup.text
     user_id = uuid.UUID(signup.json()["id"])
@@ -130,6 +133,7 @@ def fresh_account(db_client, db_session):
 
     yield {
         "user_id": user_id,
+        "nickname": nickname,
         "headers": {"Authorization": f"Bearer {login.json()['access_token']}"},
     }
 
@@ -153,15 +157,16 @@ class TestMyCardFromDb:
         컬럼 이름이 바뀌면 파이썬이 못 잡는다 — 여기가 유일한 방어선이다.
         """
         body = db_client.get(f"{V1}/me/card", headers=card["headers"]).json()
-        assert body["user"]["nickname"] == "카드주인"
+        assert body["user"]["nickname"] == card["nickname"]
 
     def test_닉네임을_바꾸면_카드에도_반영된다(self, db_client, card):
         """카드가 닉네임을 **복사해 두지 않고** 조인해서 읽는다는 증거다."""
+        new_nickname = f"바뀐주인{uuid.uuid4().hex[:6]}"
         db_client.patch(
-            f"{V1}/me", json={"nickname": "바뀐주인"}, headers=card["headers"]
+            f"{V1}/me", json={"nickname": new_nickname}, headers=card["headers"]
         )
         body = db_client.get(f"{V1}/me/card", headers=card["headers"]).json()
-        assert body["user"]["nickname"] == "바뀐주인"
+        assert body["user"]["nickname"] == new_nickname
 
     def test_호칭이_최신순으로_나온다(self, db_client, card):
         """저장소는 오래된 것부터 준다. 뒤집는 것은 도메인 규칙의 몫이다."""
@@ -176,7 +181,11 @@ class TestMyCardFromDb:
         email = f"nocard-{uuid.uuid4().hex[:10]}@super-sub.example"
         db_client.post(
             f"{V1}/auth/signup",
-            json={"email": email, "password": PASSWORD, "nickname": "카드없음"},
+            json={
+                "email": email,
+                "password": PASSWORD,
+                "nickname": f"카드없음{uuid.uuid4().hex[:6]}",
+            },
         )
         login = db_client.post(
             f"{V1}/auth/login", json={"email": email, "password": PASSWORD}
@@ -272,14 +281,14 @@ class TestCreateMyCardInDb:
         res = db_client.get(f"{V1}/cards/{slug}")
         assert res.status_code == 200, res.text
         # 닉네임이 `user` 테이블에서 읽힌다 — 카드는 복사해 두지 않는다.
-        assert res.json()["user"]["nickname"] == "새사람"
+        assert res.json()["user"]["nickname"] == fresh_account["nickname"]
 
     def test_슬러그가_이름에서_유도되지_않는다(self, db_client, fresh_account):
         """SEC-005 — 이름을 알아도 공개 주소를 맞힐 수 없어야 한다."""
         slug = db_client.post(
             f"{V1}/me/card", headers=fresh_account["headers"]
         ).json()["public_slug"]
-        assert "새사람" not in slug
+        assert fresh_account["nickname"] not in slug
         assert len(slug) >= 16
 
 
@@ -350,3 +359,192 @@ class TestTaglineInDb:
         after = db_client.get(f"{V1}/me/card", headers=headers).json()["public_slug"]
         assert after == before
         assert db_client.get(f"{V1}/cards/{before}").status_code == 200
+
+
+_STYLE = {
+    "bg": "#91ea92",
+    "logo": "#0b0b0b",
+    "text_color": "#0b0b0b",
+    "text_x": 50,
+    "text_y": 34,
+    "brush": 0,
+    "brush_color": "#0b0b0b",
+    "brush_scale": 1,
+    "brush_x": 0,
+    "brush_y": 0,
+}
+
+
+class TestStyleInDb:
+    """카드 꾸미기가 **실제로 저장되고 공개 카드에도 나가는가**(미결 `paik` 3번
+    나머지, 2026-09-11). `TestTaglineInDb` 와 같은 자리 — JSON 컬럼이라
+    저장소가 그대로 돌려주는지만 봐도 스텁과 다르지 않을 것 같지만, **컬럼이
+    실재하는지**(`add_column` 이 실제로 적용됐는지)는 진짜 DB 로만 걸린다.
+    """
+
+    def test_저장되고_다시_읽힌다(self, db_client, db_session, fresh_account):
+        headers = fresh_account["headers"]
+        db_client.post(f"{V1}/me/card", headers=headers)
+
+        res = db_client.patch(f"{V1}/me/card", json={"style": _STYLE}, headers=headers)
+        assert res.status_code == 200, res.text
+        assert res.json()["style"] == _STYLE
+
+        row = db_session.execute(
+            text("select style from player_card where user_id = :u"),
+            {"u": str(fresh_account["user_id"])},
+        ).scalar_one()
+        assert row == _STYLE, "컬럼에 안 들어갔다"
+        assert db_client.get(f"{V1}/me/card", headers=headers).json()["style"] == _STYLE
+
+    def test_공개_카드에도_나간다(self, db_client, fresh_account):
+        """🔴 안 실으면 **남이 보는 카드만** 안 꾸며진다."""
+        headers = fresh_account["headers"]
+        slug = db_client.post(f"{V1}/me/card", headers=headers).json()["public_slug"]
+        db_client.patch(f"{V1}/me/card", json={"style": _STYLE}, headers=headers)
+
+        public = db_client.get(f"{V1}/cards/{slug}")
+        assert public.status_code == 200
+        assert public.json()["style"] == _STYLE
+
+    def test_지우면_NULL_이_된다(self, db_client, db_session, fresh_account):
+        headers = fresh_account["headers"]
+        db_client.post(f"{V1}/me/card", headers=headers)
+        db_client.patch(f"{V1}/me/card", json={"style": _STYLE}, headers=headers)
+
+        db_client.patch(f"{V1}/me/card", json={"style": None}, headers=headers)
+
+        row = db_session.execute(
+            text("select style from player_card where user_id = :u"),
+            {"u": str(fresh_account["user_id"])},
+        ).scalar_one()
+        assert row is None
+
+    def test_안_꾸민_카드는_null_로_나간다(self, db_client, fresh_account):
+        created = db_client.post(f"{V1}/me/card", headers=fresh_account["headers"])
+        assert created.json()["style"] is None
+
+    def test_tagline과_style은_따로_바뀐다(self, db_client, fresh_account):
+        """🔴 **여기가 이번에 새로 생긴 위험이다.** `style` 을 추가하기 전에는
+        PATCH 본문에 `tagline` 이 안 실려도 (Pydantic 기본값 `None` 때문에)
+        조용히 지워질 뻔했다 — `model_fields_set` 로 "보낸 필드만" 바꾸도록
+        고쳐 막았다."""
+        headers = fresh_account["headers"]
+        db_client.post(f"{V1}/me/card", headers=headers)
+        db_client.patch(f"{V1}/me/card", json={"tagline": "숨은 왼발"}, headers=headers)
+
+        res = db_client.patch(f"{V1}/me/card", json={"style": _STYLE}, headers=headers)
+        assert res.status_code == 200, res.text
+        assert res.json()["tagline"] == "숨은 왼발", "style 만 보냈는데 지워졌다"
+        assert res.json()["style"] == _STYLE
+
+    def test_사진_관련_필드는_거부한다(self, db_client, fresh_account):
+        """🔴 사진 저장 위치가 아직 없다 — `photo`·`mode` 등을 조용히
+        무시하지 않고 422 로 막는다(`CardStyleSchema` 가 `extra=forbid`)."""
+        headers = fresh_account["headers"]
+        db_client.post(f"{V1}/me/card", headers=headers)
+        res = db_client.patch(
+            f"{V1}/me/card",
+            json={"style": {**_STYLE, "mode": "full"}},
+            headers=headers,
+        )
+        assert res.status_code == 422
+        assert error_code(res) == "VALIDATION_ERROR"
+
+
+class TestCustomTitlesInDb:
+    """사람이 직접 적는 호칭 (`paik` 36번).
+
+    스텁이 답할 수 없는 것들이다:
+
+    - `user_custom_title` 행이 **실제로** 생기고 갈아 끼울 때 옛 행이 지워지는가
+    - 🔴 **남이 보는 카드에도 실리는가** — 그 항목의 「만족해야 할 성질」 2번이다
+    - 부여된 호칭과 **한 목록으로 합쳐져** 최근순으로 나오는가
+    """
+
+    def _written(self, body):
+        return [t["label"] for t in body["titles"] if t["category"] is None]
+
+    def test_행이_실제로_생긴다(self, db_client, db_session, card):
+        res = db_client.patch(
+            f"{V1}/me/card",
+            json={"titles": ["시야가 넓은", "왼발잡이"]},
+            headers=card["headers"],
+        )
+        assert res.status_code == 200, res.text
+
+        labels = db_session.execute(
+            text(
+                "select label from user_custom_title uct "
+                "join player_card pc on pc.user_id = uct.user_id "
+                "where pc.public_slug = :s order by uct.created_at"
+            ),
+            {"s": card["slug"]},
+        ).scalars().all()
+        assert labels == ["시야가 넓은", "왼발잡이"]
+
+    def test_갈아_끼우면_옛_행이_사라진다(self, db_client, db_session, card):
+        """🔴 쌓이면 상한(3개)이 뜻을 잃는다."""
+        db_client.patch(
+            f"{V1}/me/card",
+            json={"titles": ["하나", "둘", "셋"]},
+            headers=card["headers"],
+        )
+        db_client.patch(
+            f"{V1}/me/card", json={"titles": ["넷"]}, headers=card["headers"]
+        )
+
+        count = db_session.execute(
+            text(
+                "select count(*) from user_custom_title uct "
+                "join player_card pc on pc.user_id = uct.user_id "
+                "where pc.public_slug = :s"
+            ),
+            {"s": card["slug"]},
+        ).scalar_one()
+        assert count == 1
+
+    def test_남이_보는_카드에도_실린다(self, db_client, card):
+        """만족해야 할 성질 2번 — 화면은 `GET /cards/{slug}` 하나만 본다."""
+        db_client.patch(
+            f"{V1}/me/card", json={"titles": ["왼발잡이"]}, headers=card["headers"]
+        )
+        public = db_client.get(f"{V1}/cards/{card['slug']}")
+        assert public.status_code == 200, public.text
+        assert self._written(public.json()) == ["왼발잡이"]
+
+    def test_부여된_호칭과_한_목록으로_최근순이다(self, db_client, card):
+        """직접 적은 것이 방금 쓴 것이라 앞에 온다 — 정렬 축이 하나다."""
+        body = db_client.patch(
+            f"{V1}/me/card", json={"titles": ["왼발잡이"]}, headers=card["headers"]
+        ).json()
+
+        labels = [t["label"] for t in body["titles"]]
+        # 픽스처가 넣은 부여 호칭 둘이 그대로 있고, 방금 쓴 것이 맨 앞이다.
+        assert labels[0] == "왼발잡이"
+        assert set(labels[1:]) == {"슈팅이 매서운", "주말 개근"}
+
+    def test_계정을_지우면_따라_지워진다(self, db_client, db_session, card):
+        """외래키 연쇄(`ondelete=CASCADE`)가 실제로 걸려 있는지 본다."""
+        db_client.patch(
+            f"{V1}/me/card", json={"titles": ["왼발잡이"]}, headers=card["headers"]
+        )
+        user_id = db_session.execute(
+            text("select user_id from player_card where public_slug = :s"),
+            {"s": card["slug"]},
+        ).scalar_one()
+
+        db_session.execute(
+            text("delete from user_title where user_id = :u"), {"u": user_id}
+        )
+        db_session.execute(
+            text("delete from player_card where user_id = :u"), {"u": user_id}
+        )
+        db_session.execute(text('delete from "user" where id = :u'), {"u": user_id})
+        db_session.commit()
+
+        left = db_session.execute(
+            text("select count(*) from user_custom_title where user_id = :u"),
+            {"u": user_id},
+        ).scalar_one()
+        assert left == 0

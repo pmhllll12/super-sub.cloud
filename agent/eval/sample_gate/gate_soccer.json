@@ -1,0 +1,211 @@
+[
+ {
+  "clip": "10_penalty1_91169c09.avi",
+  "frames": 61,
+  "size": "522x358",
+  "person_height_px": 169.4,
+  "multi_frames": 61,
+  "cand_median": 2,
+  "cand_max": 3,
+  "ball_frames": 45,
+  "near_multi_frames": 0
+ },
+ {
+  "clip": "11_freekick_930ede06.avi",
+  "frames": 66,
+  "size": "1280x720",
+  "person_height_px": 540.9,
+  "multi_frames": 1,
+  "cand_median": 1.0,
+  "cand_max": 2,
+  "ball_frames": 51,
+  "near_multi_frames": 0
+ },
+ {
+  "clip": "12_penalty_a821a39e.avi",
+  "frames": 116,
+  "size": "592x446",
+  "person_height_px": 259.7,
+  "multi_frames": 0,
+  "cand_median": 1.0,
+  "cand_max": 1,
+  "ball_frames": 60,
+  "near_multi_frames": 0
+ },
+ {
+  "clip": "13_freekick_616f8db5.avi",
+  "frames": 102,
+  "size": "762x578",
+  "person_height_px": 352.4,
+  "multi_frames": 2,
+  "cand_median": 1.0,
+  "cand_max": 2,
+  "ball_frames": 63,
+  "near_multi_frames": 0
+ },
+ {
+  "clip": "14_penalty1_980ede07.avi",
+  "frames": 75,
+  "size": "304x264",
+  "person_height_px": 152.6,
+  "multi_frames": 0,
+  "cand_median": 1,
+  "cand_max": 1,
+  "ball_frames": 75,
+  "near_multi_frames": 0
+ },
+ {
+  "clip": "14_penalty_db7e99af.avi",
+  "frames": 82,
+  "size": "420x314",
+  "person_height_px": 143.7,
+  "multi_frames": 0,
+  "cand_median": 1.0,
+  "cand_max": 1,
+  "ball_frames": 50,
+  "near_multi_frames": 0
+ },
+ {
+  "clip": "16_penalty1_44038699.avi",
+  "frames": 64,
+  "size": "908x720",
+  "person_height_px": 586.9,
+  "multi_frames": 14,
+  "cand_median": 1.0,
+  "cand_max": 2,
+  "ball_frames": 16,
+  "near_multi_frames": 1
+ },
+ {
+  "clip": "18_freekick1_f4ff1a25.avi",
+  "frames": 44,
+  "size": "630x674",
+  "person_height_px": 321.5,
+  "multi_frames": 0,
+  "cand_median": 1.0,
+  "cand_max": 1,
+  "ball_frames": 40,
+  "near_multi_frames": 0
+ },
+ {
+  "clip": "18_freekick3_681418eb.avi",
+  "frames": 62,
+  "size": "718x674",
+  "person_height_px": 334.9,
+  "multi_frames": 0,
+  "cand_median": 1.0,
+  "cand_max": 1,
+  "ball_frames": 60,
+  "near_multi_frames": 0
+ },
+ {
+  "clip": "18_freekick_5033c49b.avi",
+  "frames": 57,
+  "size": "722x674",
+  "person_height_px": 323.9,
+  "multi_frames": 0,
+  "cand_median": 1,
+  "cand_max": 1,
+  "ball_frames": 37,
+  "near_multi_frames": 0
+ },
+ {
+  "clip": "19_freekick1_da3f1406.avi",
+  "frames": 63,
+  "size": "772x720",
+  "person_height_px": 368.4,
+  "multi_frames": 1,
+  "cand_median": 1,
+  "cand_max": 2,
+  "ball_frames": 62,
+  "near_multi_frames": 0
+ },
+ {
+  "clip": "19_freekick2_86f6c708.avi",
+  "frames": 138,
+  "size": "856x720",
+  "person_height_px": 386.3,
+  "multi_frames": 0,
+  "cand_median": 1.0,
+  "cand_max": 1,
+  "ball_frames": 72,
+  "near_multi_frames": 0
+ },
+ {
+  "clip": "19_freekick_940922f8.avi",
+  "frames": 57,
+  "size": "636x720",
+  "person_height_px": 412.6,
+  "multi_frames": 0,
+  "cand_median": 1,
+  "cand_max": 1,
+  "ball_frames": 33,
+  "near_multi_frames": 0
+ },
+ {
+  "clip": "21_freekick_3ee04674.avi",
+  "frames": 70,
+  "size": "754x584",
+  "person_height_px": 404.3,
+  "multi_frames": 5,
+  "cand_median": 1.0,
+  "cand_max": 2,
+  "ball_frames": 62,
+  "near_multi_frames": 0
+ },
+ {
+  "clip": "23_freekick_a972f2ea.avi",
+  "frames": 57,
+  "size": "846x720",
+  "person_height_px": 365.9,
+  "multi_frames": 7,
+  "cand_median": 1,
+  "cand_max": 3,
+  "ball_frames": 57,
+  "near_multi_frames": 0
+ },
+ {
+  "clip": "25_freekick1_86d715b9.avi",
+  "frames": 43,
+  "size": "748x420",
+  "person_height_px": 228.4,
+  "multi_frames": 0,
+  "cand_median": 1,
+  "cand_max": 1,
+  "ball_frames": 18,
+  "near_multi_frames": 0
+ },
+ {
+  "clip": "25_freekick_c76aa778.avi",
+  "frames": 46,
+  "size": "748x420",
+  "person_height_px": 225.1,
+  "multi_frames": 2,
+  "cand_median": 1.0,
+  "cand_max": 2,
+  "ball_frames": 27,
+  "near_multi_frames": 0
+ },
+ {
+  "clip": "OpenPose_5T_df2d1ce9.avi",
+  "frames": 63,
+  "size": "1280x720",
+  "person_height_px": 351.8,
+  "multi_frames": 8,
+  "cand_median": 1,
+  "cand_max": 3,
+  "ball_frames": 43,
+  "near_multi_frames": 0
+ },
+ {
+  "clip": "Y1_2ff12fb9.avi",
+  "frames": 31,
+  "size": "854x480",
+  "person_height_px": 279.2,
+  "multi_frames": 0,
+  "cand_median": 1,
+  "cand_max": 1,
+  "ball_frames": 29,
+  "near_multi_frames": 0
+ }
+]

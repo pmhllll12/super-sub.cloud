@@ -57,10 +57,30 @@ def _create(client, team, actor):
     return client.post(f"{V1}/teams/{team['id']}/squad", headers=_headers(actor))
 
 
-def _enlist(client, team, actor, card_id, position_code="GK"):
+def _enlist(client, team, actor, card_id, position_code="GK", **extra):
     return client.post(
         f"{V1}/teams/{team['id']}/squad/members",
-        json={"player_card_id": str(card_id), "position_code": position_code},
+        json={
+            "player_card_id": str(card_id),
+            "position_code": position_code,
+            **extra,
+        },
+        headers=_headers(actor),
+    )
+
+
+def _move(client, team, actor, member_id, **body):
+    return client.patch(
+        f"{V1}/teams/{team['id']}/squad/members/{member_id}",
+        json=body,
+        headers=_headers(actor),
+    )
+
+
+def _set_formation(client, team, actor, formation):
+    return client.patch(
+        f"{V1}/teams/{team['id']}/squad",
+        json={"formation": formation},
         headers=_headers(actor),
     )
 
@@ -238,6 +258,158 @@ class TestDischarge:
 
         res = client.delete(
             f"{V1}/teams/{other_team}/squad/members/{mine}",
+            headers=_headers(other_owner),
+        )
+        assert res.status_code == 404
+        assert error_code(res) == "MEMBER_NOT_FOUND"
+
+
+class TestGridOnEnlist:
+    """등재하면서 홈 판 칸에 올리기 (미결 `paik` 9번)."""
+
+    def test_칸과_함께_등재한다(self, client, football):
+        _create(client, football, football["owner"])
+        res = _enlist(
+            client, football, football["owner"], football["member_card"],
+            grid_col=1, grid_row=2,
+        )
+        assert res.status_code == 201, res.text
+        m = res.json()["members"][0]
+        assert (m["grid_col"], m["grid_row"]) == (1, 2)
+
+    def test_칸_없이_등재하면_null_이다(self, client, football):
+        _create(client, football, football["owner"])
+        m = _enlist(
+            client, football, football["owner"], football["member_card"]
+        ).json()["members"][0]
+        assert m["grid_col"] is None and m["grid_row"] is None
+
+    def test_칸을_한쪽만_주면_422_다(self, client, football):
+        _create(client, football, football["owner"])
+        res = _enlist(
+            client, football, football["owner"], football["member_card"],
+            grid_col=1,
+        )
+        assert res.status_code == 422
+
+    def test_픽셀_좌표는_거부한다(self, client, football):
+        _create(client, football, football["owner"])
+        res = _enlist(
+            client, football, football["owner"], football["member_card"],
+            grid_col=340, grid_row=512,
+        )
+        assert res.status_code == 422
+
+
+class TestSetFormation:
+    """홈 판의 판 크기 저장 (미결 `paik` 9번)."""
+
+    def test_주장은_판_크기를_저장한다(self, client, football):
+        _create(client, football, football["owner"])
+        res = _set_formation(client, football, football["owner"], "5:5")
+        assert res.status_code == 200, res.text
+        assert res.json()["formation"] == "5:5"
+
+    def test_기본은_null_이다(self, client, football):
+        squad = _create(client, football, football["owner"]).json()
+        assert squad["formation"] is None
+
+    def test_구성원은_못_바꾼다(self, client, football):
+        _create(client, football, football["owner"])
+        assert _set_formation(
+            client, football, football["member"], "5:5"
+        ).status_code == 403
+
+    def test_스쿼드가_없으면_404_다(self, client, football):
+        res = _set_formation(client, football, football["owner"], "5:5")
+        assert res.status_code == 404
+        assert error_code(res) == "SQUAD_NOT_FOUND"
+
+    def test_인증이_필요하다(self, client, football):
+        res = client.patch(
+            f"{V1}/teams/{football['id']}/squad", json={"formation": "5:5"}
+        )
+        assert res.status_code == 401
+
+
+class TestMoveMember:
+    """등재의 포지션·판 배치 바꾸기 (미결 `paik` 9번). 3-7 「포지션 바꾸기」도 여기."""
+
+    def _enlisted(self, client, football):
+        _create(client, football, football["owner"])
+        return _enlist(
+            client, football, football["owner"], football["member_card"], "GK"
+        ).json()["members"][0]["id"]
+
+    def test_포지션과_칸을_함께_바꾼다(self, client, football):
+        member_id = self._enlisted(client, football)
+        res = _move(
+            client, football, football["owner"], member_id,
+            position_code="DF", grid_col=0, grid_row=2,
+        )
+        assert res.status_code == 200, res.text
+        m = res.json()["members"][0]
+        assert m["position_code"] == "DF"
+        assert (m["grid_col"], m["grid_row"]) == (0, 2)
+
+    def test_칸을_비우면_판에서만_빠진다(self, client, football):
+        member_id = self._enlisted(client, football)
+        _move(
+            client, football, football["owner"], member_id,
+            position_code="GK", grid_col=1, grid_row=0,
+        )
+        res = _move(
+            client, football, football["owner"], member_id,
+            position_code="GK", grid_col=None, grid_row=None,
+        )
+        assert res.status_code == 200, res.text
+        m = res.json()["members"][0]
+        assert m["position_code"] == "GK"           # 등재는 남는다
+        assert m["grid_col"] is None and m["grid_row"] is None
+
+    def test_칸을_한쪽만_주면_422_다(self, client, football):
+        member_id = self._enlisted(client, football)
+        res = _move(
+            client, football, football["owner"], member_id,
+            position_code="GK", grid_row=1,
+        )
+        assert res.status_code == 422
+
+    def test_없는_포지션은_422_다(self, client, football):
+        member_id = self._enlisted(client, football)
+        res = _move(
+            client, football, football["owner"], member_id, position_code="XX"
+        )
+        assert res.status_code == 422
+        assert error_code(res) == "UNKNOWN_POSITION"
+
+    def test_없는_등재는_404_다(self, client, football):
+        _create(client, football, football["owner"])
+        res = _move(
+            client, football, football["owner"], uuid4(), position_code="GK"
+        )
+        assert res.status_code == 404
+        assert error_code(res) == "MEMBER_NOT_FOUND"
+
+    def test_구성원은_못_옮긴다(self, client, football):
+        member_id = self._enlisted(client, football)
+        res = _move(
+            client, football, football["member"], member_id, position_code="DF"
+        )
+        assert res.status_code == 403
+
+    def test_남의_스쿼드_등재는_못_옮긴다(self, client, football):
+        """🔴 discharge 와 같은 벽 — id 만으로 남의 스쿼드를 건드릴 수 없다."""
+        member_id = self._enlisted(client, football)
+
+        other_team, other_owner = uuid4(), uuid4()
+        register_team(other_team, "football")
+        register_role(other_team, other_owner, "owner")
+        client.post(f"{V1}/teams/{other_team}/squad", headers=_headers(other_owner))
+
+        res = client.patch(
+            f"{V1}/teams/{other_team}/squad/members/{member_id}",
+            json={"position_code": "GK"},
             headers=_headers(other_owner),
         )
         assert res.status_code == 404

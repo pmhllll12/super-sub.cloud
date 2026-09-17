@@ -62,11 +62,21 @@ def _resolve_needs(
 
 
 def _require_captain(repository: MatchPort, match_id: UUID, actor_id: UUID):
-    """경기가 있고 부르는 사람이 그 팀 주장인지. 아니면 여기서 끝난다."""
+    """경기가 있고 부르는 사람이 **그 경기에 관여하는 팀** 주장인지.
+
+    🔴 **팀 대 팀으로 확정된 경기**(`opponent_team_id` 있음, `paik` 17번)는
+    상대 팀 주장도 관리할 수 있다 — 자기가 걸지 않은 경기라도 자기 팀이
+    당사자이기 때문이다. 이전에는 `team_id`(주최) 쪽만 봤다.
+    """
     match = repository.find_match(match_id)
     if match is None:
         raise ApiError(404, "MATCH_NOT_FOUND", "경기를 찾을 수 없습니다.")
-    if not can_register(repository.team_role_of(match.team_id, actor_id)):
+    role = can_register(repository.team_role_of(match.team_id, actor_id))
+    if not role and match.opponent_team_id is not None:
+        role = can_register(
+            repository.team_role_of(match.opponent_team_id, actor_id)
+        )
+    if not role:
         raise ApiError(403, "FORBIDDEN", "주장만 경기를 관리할 수 있습니다.")
     return match
 
@@ -174,7 +184,7 @@ class CancelMatchInteractor(CancelMatchUseCase):
                 "지원자가 있어 취소할 수 없습니다. 지원을 먼저 정리해 주십시오.",
             )
 
-        self._repository.delete_match(command.match_id)
+        self._repository.delete_match(command.match_id, command.actor_id)
 
 
 class ReadMatchInteractor(ReadMatchUseCase):

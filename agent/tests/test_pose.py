@@ -695,3 +695,215 @@ def test_nothing_cut_means_nothing_to_blame(tmp_path):
 
     assert r.truncated is False
     assert r.limited_by is None
+
+
+# --- 메모리 가드는 장수가 아니라 바이트다 (미결 ho 9번) ----------------------
+#
+# 기준과 판정은 `eval/pending9_budget/`. 여기서 고정하는 것은 **동작**이다.
+
+
+def test_the_guard_reads_the_resolution_instead_of_a_fixed_frame_count(tmp_path):
+    """🔴 같은 장수가 해상도마다 다른 메모리를 먹는다.
+
+    300장이 4K 세로에서 7,465MB이고 1080p에서 1,866MB다 — 한쪽에는 딱 맞고
+    다른 쪽에는 4배 헐겁다. 장수로 막으면 **헐거운 쪽이 분석 창으로 대가를
+    치른다**: 실효 fps가 30을 넘는 소스에서 보기로 한 10초 중 최악 6.74초만
+    봤다. 예산을 바이트로 두면 낮은 해상도에서 장수가 늘어 창을 지킨다.
+    """
+    assert pose.frames_within_budget(2160, 3840) == 300, (
+        "4K 세로는 지금 동작 그대로여야 한다 — 예산이 그 값으로 정해져 있다"
+    )
+    assert pose.frames_within_budget(1920, 1080) > 445, (
+        "1080p는 최악 fps(44.5)의 10초 창 445장을 담을 수 있어야 한다"
+    )
+    assert pose.frames_within_budget(1280, 720) > pose.frames_within_budget(1920, 1080)
+
+
+def test_a_low_resolution_clip_keeps_the_whole_window(tmp_path):
+    """가드가 창을 먹지 않는다 — 이 항목이 사려던 것이 이것이다.
+
+    작은 클립이라 예산 안에 여유가 많다. 잘렸다면 그 범인은 **창**이어야지
+    가드여서는 안 된다.
+
+    🔴 **잘리는 클립으로 잰다.** 안 잘리는 클립에서는 `limited_by`가 None 이라
+    「가드가 안 이겼다」가 공허하다 — 옛 장수 가드(300)에서도 통과해 버린다.
+    여기서는 창이 이겨야 하고, 옛 동작이라면 300장에서 가드가 이겼다.
+    """
+    clip = write_clip(tmp_path / "small.avi", n_frames=500, fps=40.0)
+
+    r = pose.read_frames_ex(clip, target_fps=30, max_seconds=10.0)
+
+    assert r.truncated is True, "500장짜리를 10초 창으로 잘랐으니 잘린 것이 맞다"
+    assert r.limited_by == "window", (
+        "잘랐다면 범인은 창이어야 한다 — 옛 장수 가드(300)라면 memory_guard 였다"
+    )
+    assert len(r.frames) == 400, "40fps·10초 창은 400장이다 (옛 동작은 300장)"
+
+
+def test_an_explicit_frame_cap_still_wins(tmp_path):
+    """🔴 명시적으로 넘긴 장수를 예산이 덮지 않는다.
+
+    평가 스크립트가 장수를 고정해 돌리는 자리가 있다
+    (`eval/pending9_rss/measure_rss.py`). 기본값이 바뀌었다고 그 값을
+    무시하면 **그 회차들이 조용히 다른 것을 잰다.**
+    """
+    clip = write_clip(tmp_path / "c.avi", n_frames=60, fps=30.0)
+
+    r = pose.read_frames_ex(clip, target_fps=30, max_frames=10, max_seconds=10.0)
+
+    assert len(r.frames) == 10
+    assert r.max_frames == 10
+
+
+def test_the_result_carries_the_guard_it_actually_used(tmp_path):
+    """넘긴 값(None)이 아니라 **실제로 쓴 값**이 결과에 남는다.
+
+    재디코딩(`load_frames`)이 같은 장수를 잘라야 하고, 「무엇으로 잘랐나」를
+    사후에 읽을 수 있어야 한다.
+    """
+    clip = write_clip(tmp_path / "c.avi", n_frames=30, fps=30.0, size=(64, 48))
+
+    r = pose.read_frames_ex(clip, target_fps=30)
+
+    assert r.max_frames == pose.frames_within_budget(64, 48)
+    assert r.max_frames != pose.DEFAULT_MAX_FRAMES, "이 크기는 폴백 값과 달라야 한다"
+
+
+def test_the_budget_never_asks_the_machine_how_much_ram_is_left():
+    """🔴 **결정성.** 예산이 기계 상태에 의존하면 점수가 흔들린다.
+
+    남은 메모리를 조회해 예산을 정하면 같은 클립이 그때그때 다른 장수로
+    분석되고, 그 차이가 아무 데도 안 남는다. 편해 보이는 쪽이 조용히 틀리는
+    쪽이라 **상수로 두고 동거 프로세스 몫은 값을 정할 때 뺐다**
+    (`eval/pending9_budget/PREREGISTRATION.md` 2절).
+    """
+    import inspect
+    import re
+
+    src = inspect.getsource(pose.frames_within_budget)
+    probes = re.findall(
+        r"meminfo|MemAvailable|virtual_memory|psutil|os\.environ|getenv|sysconf", src
+    )
+    assert not probes, f"예산 계산이 런타임 상태를 본다: {probes}"
+    assert len({pose.frames_within_budget(1920, 1080) for _ in range(20)}) == 1
+
+
+# --- 미리보기 인코딩 (2026-09-15) -----------------------------------------
+#
+# VP8 인코딩이 미리보기 시간의 거의 전부였다(300프레임에서 그리기 0.42초 ·
+# 인코딩 19.2초). ffmpeg에 realtime 설정으로 넘겨 2.4초로 줄였는데, 그 과정에서
+# **깨지면 안 되는 성질 셋**이 생겼다 — 아래가 그것을 잡는다.
+
+
+def _clip_inputs(n=6, size=(64, 48)):
+    frames = [np.full((size[1], size[0], 3), i * 20 % 256, dtype=np.uint8)
+              for i in range(n)]
+    kps = np.zeros((n, 17, 3), dtype=np.float64)
+    kps[:, :, 0] = np.linspace(8, size[0] - 8, 17)
+    kps[:, :, 1] = np.linspace(8, size[1] - 8, 17)
+    kps[:, :, 2] = 0.9
+    return frames, kps
+
+
+def test_the_preview_is_still_vp8_webm(tmp_path):
+    """코덱은 바뀌지 않았다 — 브라우저가 재생하는 것이 바뀌면 화면이 깨진다.
+
+    빠른 인코더로 옮긴 것이지 **형식을 바꾼 것이 아니다.** mp4가 더 빠르지만
+    그건 화면 쪽과 합의할 일이고(계약은 `previews`를 URI로만 규정한다) 여기서
+    조용히 갈아치우면 안 된다.
+    """
+    frames, kps = _clip_inputs()
+    out = tmp_path / "tracked.webm"
+    info = pose.render_tracked_clip(frames, kps, out, 10.0)
+
+    assert info["frames"] == len(frames)
+    assert info["bytes"] > 0
+    # WebM(Matroska) 컨테이너의 EBML 서명. 확장자가 아니라 실제 바이트를 본다.
+    assert out.read_bytes()[:4] == b"\x1a\x45\xdf\xa3"
+
+
+def test_the_preview_still_renders_without_ffmpeg(tmp_path, monkeypatch):
+    """ffmpeg이 없는 기계에서도 그림이 나온다 — 느릴 뿐이다.
+
+    빠른 경로를 외부 바이너리에 기댄 대가로 **그 바이너리가 없을 때**가
+    생겼다. 없으면 예전 OpenCV 경로로 떨어지고, 산출물은 그대로 나온다.
+    """
+    monkeypatch.setattr(pose.shutil, "which", lambda _name: None)
+    frames, kps = _clip_inputs()
+    out = tmp_path / "fallback.webm"
+
+    info = pose.render_tracked_clip(frames, kps, out, 10.0)
+
+    assert info["bytes"] > 0
+
+
+def test_a_broken_encoder_raises_instead_of_leaving_a_half_file(tmp_path,
+                                                               monkeypatch):
+    """인코딩 실패는 **예외로** 올라온다 — 조용히 빈 파일을 남기지 않는다.
+
+    `build_previews`가 이 예외를 받아 미리보기만 빼고 분석을 계속한다
+    (`test_deploy_paths.py::test_preview_failure_does_not_break_the_analysis`).
+    여기서 삼키면 리포트에 **재생되지 않는 URI**가 실린다.
+    """
+    monkeypatch.setattr(pose.shutil, "which", lambda _name: "/bin/false")
+    frames, kps = _clip_inputs()
+
+    with pytest.raises(RuntimeError):
+        pose.render_tracked_clip(frames, kps, tmp_path / "broken.webm", 10.0)
+
+
+# --- 무엇으로 쟀는가 (미결 49번) --------------------------------------------
+
+
+def test_the_preprocessing_identity_reads_the_real_object_not_a_guess():
+    """🔴 **실물에서 읽는다** — 설치 여부로 추측하지 않는다.
+
+    미결 49번이 막고 있는 것은 이것이다: 평가 기계와 EC2 가 `torchvision`
+    유무로 **다른 전처리기**를 골라, 같은 영상이 다른 등급을 받는다(축구
+    19편 중 2편이 등급 문자까지, 미결 47번 5회차). 원인 규명에 닷새가 든
+    이유는 **어느 쪽으로 돌았는지가 산출에 안 남아 있었기 때문**이다.
+
+    그래서 이름을 하드코딩하거나 `is_torchvision_available()` 로 되짚어
+    지으면 안 된다 — 업스트림이 고르는 규칙을 바꾸는 날 그 값은 조용히
+    거짓이 된다. **건네받은 객체의 실제 클래스 이름**이어야 한다.
+    """
+    class RTDetrImageProcessorPil:
+        pass
+
+    class VitPoseImageProcessor:
+        pass
+
+    ident = pose.preprocessing_identity(
+        detector=RTDetrImageProcessorPil(), pose=VitPoseImageProcessor()
+    )
+
+    assert ident["detector"] == "RTDetrImageProcessorPil"
+    assert ident["pose"] == "VitPoseImageProcessor"
+
+
+def test_the_preprocessing_identity_also_records_whether_torchvision_is_there():
+    """고른 **결과**와 고르는 데 쓰인 **입력**을 함께 적는다.
+
+    둘이 어긋나는 날(업스트림이 규칙을 바꾸는 날)이 오면 그것이 알아야 할
+    사건이고, 하나만 적어 두면 그 사건이 안 보인다.
+    """
+    from transformers.utils.import_utils import is_torchvision_available
+
+    ident = pose.preprocessing_identity(detector=object())
+
+    assert ident["torchvision"] is bool(is_torchvision_available())
+
+
+def test_a_result_without_a_preprocessor_says_nothing_instead_of_guessing():
+    """합성 키포인트 경로는 전처리기를 안 쓴다 — `None` 이다.
+
+    🔴 기본값을 채우면 **안 쓴 전처리기를 썼다고 말하게 된다.** 봉투 쪽도
+    같은 규칙이다(`test_report_contract.py`).
+    """
+    result = PoseResult(
+        keypoints=np.zeros((3, 17, 3), dtype=np.float32),
+        source_fps=30.0,
+        sampled_fps=15.0,
+    )
+
+    assert result.preprocessing is None

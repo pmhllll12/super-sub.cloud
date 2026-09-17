@@ -65,6 +65,12 @@ class Settings(BaseSettings):
         """접속 대상이 정해져 있는지. 아직 RDS 인스턴스가 없어 기본값은 False다."""
         return bool(self.database_url or self.rds_host)
 
+    # --- 용병 매칭 임베딩 (Gemini) ----------------------------------------------
+    # 🔴 비어 있으면 `skill_summary`가 바뀌는 프로필 수정·후보 검색이 503
+    #    (`EMBEDDING_NOT_CONFIGURED`)으로 떨어진다. `www/`의 챗봇 키(같은 이름
+    #    `GEMINI_API_KEY`)와는 **별도 배포 시크릿**이다 — 서비스가 다르다.
+    gemini_api_key: str = ""
+
     # --- 객체 저장소 (업로드 클립) ---------------------------------------------
     # 🔴 비어 있으면 업로드 경로가 503 이다. 조용한 기본값(로컬 디렉터리 등)을
     #    두면 설정을 빠뜨렸을 때 파일이 엉뚱한 곳에 쌓이고, 알아차리는 시점은
@@ -101,6 +107,14 @@ class Settings(BaseSettings):
     #    포즈 추출만 1080p 46프레임에 7초였고(`agent/deploy/README.md`), 판정·
     #    미리보기가 더 붙는다. 실측이 나오면 줄인다.
     analysis_job_timeout_minutes: int = 30
+
+    # 저장 안 한(`kept=false`) `/analysis` 업로드를 백스톱으로 정리하기까지
+    # 기다리는 시간(시간). 미결 `jin` 24번. 빠른 길은 프론트가 화면을 벗어날 때
+    # 부르는 `DELETE /videos/{id}` 이고, 이건 그것이 놓친 것(브라우저가 죽는 등)
+    # 을 결국 회수하는 자리다 — 짧게 잡으면 GPU 자동 종료로 `queued` 대기하는
+    # 정상 작업이나, 사용자가 결과를 보고 자리를 비웠다 저장하러 오는 경우를
+    # 지운다. 공격적 청소가 목적이 아니라 24로 넉넉히 둔다.
+    provisional_video_ttl_hours: int = 24
 
 
 settings = Settings()

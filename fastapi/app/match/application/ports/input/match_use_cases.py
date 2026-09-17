@@ -10,14 +10,19 @@ from app.match.application.dtos.match_dto import (
     ApplicationsQuery,
     ApplyCommand,
     CancelMatchCommand,
+    CancelTeamMatchRequestCommand,
     CreateMatchCommand,
+    CreateTeamMatchRequestCommand,
     UpdateMatchCommand,
     MatchQuery,
     MatchResult,
     MatchSearchQuery,
     MatchSearchResult,
     RemoveApplicationCommand,
+    RespondTeamMatchRequestCommand,
     TeamMatchesQuery,
+    TeamMatchRequestResult,
+    TeamMatchRequestsQuery,
 )
 
 
@@ -77,3 +82,44 @@ class ListApplicationsUseCase(ABC):
     @abstractmethod
     def __call__(self, query: ApplicationsQuery) -> list[ApplicationResult]:
         """주장은 전부, 그 외에는 자기 건만 본다."""
+
+
+class CreateTeamMatchRequestUseCase(ABC):
+    @abstractmethod
+    def __call__(
+        self, command: CreateTeamMatchRequestCommand
+    ) -> TeamMatchRequestResult:
+        """팀이 팀에게 경기를 건다. **양쪽 다 주장이어야** 뜻이 선다(신청 팀은
+        지금, 대상 팀은 수락할 때)."""
+
+
+class ListTeamMatchRequestsUseCase(ABC):
+    @abstractmethod
+    def __call__(
+        self, query: TeamMatchRequestsQuery
+    ) -> list[TeamMatchRequestResult]:
+        """그 팀이 보낸 것 + 받은 것. **주장만** 본다."""
+
+
+class AcceptTeamMatchRequestUseCase(ABC):
+    @abstractmethod
+    def __call__(
+        self, command: RespondTeamMatchRequestCommand
+    ) -> TeamMatchRequestResult:
+        """대상 팀 주장이 수락한다 — 확정 경기가 생긴다."""
+
+
+class RejectTeamMatchRequestUseCase(ABC):
+    @abstractmethod
+    def __call__(
+        self, command: RespondTeamMatchRequestCommand
+    ) -> TeamMatchRequestResult:
+        """대상 팀 주장이 거절한다."""
+
+
+class CancelTeamMatchRequestUseCase(ABC):
+    @abstractmethod
+    def __call__(
+        self, command: CancelTeamMatchRequestCommand
+    ) -> TeamMatchRequestResult:
+        """신청 팀 주장이 스스로 무른다. **아직 pending일 때만.**"""

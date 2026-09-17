@@ -35,4 +35,8 @@ GPU_UTIL_BUSY=10
 # 편집기를 열어 둔 채 자리를 뜨면 영영 안 꺼진다. 실제로 실행하는 인터프리터만
 # 걸리게 묶어 둔 것이니, 고칠 때도 이 성질을 지킬 것.
 # POSIX 확장 정규식이다 (`\S` 같은 GNU 확장은 안 된다).
-BUSY_PATTERN='^[^[:space:]]*(python[0-9.]*|uv)[[:space:]].*(analyze_s3|analyze|measure|track_overlay)\.py|^[^[:space:]]*hf[[:space:]]+download|^[^[:space:]]*aws[[:space:]]+s3'
+#
+# 🔴 `detect_subjects` 가 2026-09-16 에 더해졌다 (미결 `ho` 44번). **이미
+# /etc 에 복사해 둔 conf 는 자동으로 안 바뀐다** — 그 파일에서 이 줄을 지웠거나
+# 옛 값을 박아 두었다면 검출 중에 인스턴스가 꺼질 수 있다.
+BUSY_PATTERN='^[^[:space:]]*(python[0-9.]*|uv)[[:space:]].*(analyze_s3|analyze|measure|track_overlay|detect_subjects)\.py|^[^[:space:]]*hf[[:space:]]+download|^[^[:space:]]*aws[[:space:]]+s3'

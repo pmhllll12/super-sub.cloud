@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PublicPlayerCard, Squad } from '@/server/backend'
 import SquadPanel from '@/components/SquadPanel'
 import SiteHeader from '@/components/SiteHeader'
+import { useNotifyInbox } from '@/lib/useNotifyInbox'
 import HomeNav, { type Destination } from '@/components/HomeNav'
-import { MATCH_BOT } from '@/lib/destinations'
+import { MATCH_BOT, TEAM_SEEK } from '@/lib/destinations'
 import { useIntroDone } from '@/lib/useIntroDone'
 import { useHideChrome, useLeaving } from '@/lib/pageTransition'
 import LogoutButton from '@/components/LogoutButton'
@@ -38,6 +39,9 @@ export default function HomeStage({
   user,
   card,
   squad = null,
+  sportCode = null,
+  teamName = null,
+  myCardId = null,
   destinations,
   featured = [],
   defaultActive = null,
@@ -47,6 +51,12 @@ export default function HomeStage({
   card?: PublicPlayerCard | null
   /** 팀의 스쿼드. 팀이 없거나 아직 안 만들었으면 null 이다. */
   squad?: Squad | null
+  /** 그 팀의 종목 — 스쿼드 판이 포지션 목록을 받아 올 때 쓴다(CCC 28). */
+  sportCode?: string | null
+  /** 홈에 그리는 팀 이름 — 스쿼드 판의 머리글. 소속이 없으면 `null`. */
+  teamName?: string | null
+  /** 내 카드 id — 판에 나를 앉힐 때 쓴다(계약이 `player_card_id` 를 받는다). */
+  myCardId?: string | null
   destinations: Destination[]
   /**
    * 헤드라인 자리에 **유리 알약 버튼**으로 크게 내놓는 목적지들.
@@ -212,8 +222,27 @@ export default function HomeStage({
       // 손가락이 위로 = 내용은 아래로 = 내리는 것.
       move(dirOf(touchY - (e.touches[0]?.clientY ?? 0)))
     }
+    /**
+     * 🔴 **글자를 치는 중인가.** 여기서 「내려가기」로 받는 글쇠 셋이 하필
+     * 글을 쓰는 사람에게도 오는 것들이다 — 스페이스는 **띄어쓰기**이고
+     * 화살표는 **글자 사이를 오가는 것**이다.
+     *
+     * 안 보면 챗봇에 「안녕하세요. 」까지 치는 순간 영상 모음으로 넘어간다
+     * (사용자 지적, 2026-09-08). 굴림 쪽이 `onOwnPanel` 로 갈라 놓은 것과
+     * 같은 판단인데, 자판은 **판 밖의 입력칸**(어디에 생기든)에서도 막아야
+     * 해서 조건이 하나 더 있다.
+     */
+    const isTyping = (t: EventTarget | null) =>
+      t instanceof HTMLElement &&
+      (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))
+
     /** 자판으로도 오갈 수 있어야 한다 — 굴림이 없으니 이게 유일한 다른 길이다. */
     const onKey = (e: KeyboardEvent) => {
+      /* 🔴 **한글 조합 중에는 아무것도 안 한다.** IME 가 글자를 맞추는 동안
+         브라우저는 `keydown` 을 그대로 흘려보내는데, 그때의 스페이스는 조합을
+         끝내는 신호지 「내려가기」가 아니다. `isComposing` 이 그것을 말한다 —
+         입력칸 밖(조합 중인 IME 창)에서 올 수도 있어 아래 두 검사로는 안 걸린다. */
+      if (e.isComposing || isTyping(e.target) || onOwnPanel(e.target)) return
       if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') move(1)
       else if (e.key === 'ArrowUp' || e.key === 'PageUp') move(-1)
     }
@@ -286,6 +315,12 @@ export default function HomeStage({
    * 알약 선택과 **떼어 놓은 제 상태**여야 그 얽힘이 안 생긴다.
    */
   const [scouting, setScouting] = useState(false)
+
+  /* 🔴 헤더(`SiteHeader`)도 제 통을 따로 돈다 — 빨간 점과 판은 그쪽 것이고,
+     여기 것은 **대기 팝업을 띄울 신호**를 받기 위한 것이다. 폴링 둘이 도는
+     셈이지만 GET 둘이라 가볍고, 하나로 합치려면 통을 앱 전체 컨텍스트로
+     올려야 해서 그 값이 더 비싸다. */
+  const inbox = useNotifyInbox()
   /**
    * 챗봇이 열려 있는가.
    *
@@ -296,6 +331,16 @@ export default function HomeStage({
    * 통째로 없어졌다 — 알약 셋은 이제 챗봇과 아무 상관이 없다.
    */
   const [bot, setBot] = useState(false)
+  /**
+   * 알약 '팀원' 을 눌렀는가 — 켜지면 **스쿼드 판 자리에** 사람을 찾는 팀들의
+   * 명단이 선다(사용자 요청, 2026-09-08).
+   *
+   * 🔴 `picked === TEAM_SEEK` 로 판단해도 지금은 안전하다(그 제목은
+   * `defaultActive` 가 아니다). 그래도 제 상태로 드는 것은 **기본 알약이
+   * 나중에 바뀌어도 여기가 안 흔들리게** 하기 위해서다 — '용병 찾기' 를
+   * `picked` 로 열었다가 갇힌 적이 있다(destinations.ts 주석).
+   */
+  const [seeking, setSeeking] = useState(false)
 
   /**
    * 🔴 **판 오른쪽 자리는 한 번에 하나만 쓴다**(사용자 지적: AI 를 켠 채
@@ -314,6 +359,7 @@ export default function HomeStage({
       // 챗봇이 서는 곳은 **첫째 칸**이다 — 추천 판을 밀어낸다. 둘째 칸의
       // 지인 판까지 닫을 이유는 없지만, 짝으로 여닫는 것이라 같이 접는다.
       setScouting(false)
+      setSeeking(false)
       setPicked(defaultActive)
       setActive(defaultActive)
     },
@@ -330,10 +376,16 @@ export default function HomeStage({
     setPicked(title)
     setBot(false)
     setScouting((on) => (title === MATCH_BOT ? !on : false))
+    /* 🔴 '팀원' 도 **한 번 더 누르면 닫힌다**(토글). 이 판은 스쿼드 판을
+       대신 서므로, 닫을 길이 판의 × 뿐이면 알약을 눌러 놓고 되돌리는 길이
+       없다 — '팀장' 과 같은 규칙이다. */
+    setSeeking((on) => (title === TEAM_SEEK ? !on : false))
   }, [])
 
   /** 판의 × — 둘 중 어느 쪽을 닫아도 짝으로 접힌다(한 단추가 연 한 벌이다). */
   const closeScout = useCallback(() => setScouting(false), [])
+  /** 팀원 판의 × — 스쿼드 판이 도로 선다. */
+  const closeSeek = useCallback(() => setSeeking(false), [])
 
   return (
     <>
@@ -341,13 +393,16 @@ export default function HomeStage({
           위, 무대(z-index 10) 아래에 깔려 사진만 덮는다. 덩어리들이 다 빠져나간
           뒤에 움직이도록 늦춘다(globals.css). */}
       <div className="ss-home-outro" data-up={out} aria-hidden={!out}>
-        <HomeFeed active={out} by={user?.nickname ?? '나'} />
+        <HomeFeed active={out} />
       </div>
 
       {/* 헤더는 모든 화면이 같이 쓴다(SiteHeader). 홈에서만 화면에
           고정한다 — 한 화면을 통째로 쓰는 배치라 흐름에 두면 가운데 정렬이
           밀린다. */}
-      <SiteHeader user={user} card={card} destinations={destinations} fixed />
+      {/* 🔴 **알림함을 내려보낸다**(2026-09-17). 헤더가 제 통을 따로 만들면
+          거기서 수락한 결과(`acceptedTeam`)가 대기 화면을 그리는 `SquadPanel`
+          쪽 통에 **영영 안 들어간다** — 눌러도 아무 일이 없었다. */}
+      <SiteHeader user={user} card={card} destinations={destinations} fixed inbox={inbox} />
 
       {/* 헤드라인 · 보조 문구 · 정보 블록. 로그인 화면과 같은 문구를 쓴다 —
           두 화면이 한 목소리로 들리게. */}
@@ -383,8 +438,19 @@ export default function HomeStage({
               />
             </div>
             <SquadPanel
+              /* 경기 신청 · 확정은 헤더의 알림함과 한 벌이다 — 신청은 여기서
+                 걸고, **확정은 알림이 알려 준다**(사용자 요청, 2026-09-16). */
+              myTeamId={inbox.teamId}
+              onRequested={(requestId, team) => inbox.noteSent(requestId, team.id)}
+              acceptedTeamId={inbox.acceptedTeamId}
+              acceptedTeam={inbox.acceptedTeam}
+              acceptedMatchId={inbox.acceptedMatchId}
+              onAcceptedShown={inbox.clearAccepted}
               card={card}
               squad={squad}
+              sportCode={sportCode}
+              teamName={teamName}
+              myCardId={myCardId}
               scouting={scouting}
               // 🔴 챗봇도 **판 오른쪽 그 자리**에서 나온다(사용자 요청) —
               // 지인 찾기 · AI 추천과 같은 자리다. 그 자리는 `.ss-squad-wrap`
@@ -392,6 +458,11 @@ export default function HomeStage({
               bot={bot}
               onBotChange={showBot}
               onCloseScouting={closeScout}
+              // 빈 자리(+)를 눌러도 알약과 **같은 한 벌**이 열린다
+              // (사용자 요청, 2026-09-16) — 추천 판 옆에 지인 찾기 판도 선다.
+              onOpenScouting={() => setScouting(true)}
+              seeking={seeking}
+              onCloseSeeking={closeSeek}
             />
           </div>
 

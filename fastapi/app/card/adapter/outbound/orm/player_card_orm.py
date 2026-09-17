@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import ForeignKey, String, UniqueConstraint, Uuid
+from sqlalchemy import JSON, ForeignKey, String, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -29,6 +29,13 @@ class PlayerCardOrm(Base):
     # `user_title`(분석이 주는 호칭)과도 다른 값이다 — 이것만 사람이 고른다.
     # 🔴 부록 D 에 없는 컬럼이다(2026-09-04 에 늘렸다). ERD 갱신은 미결 항목.
     tagline: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # 카드 꾸미기 — 바탕 · 로고 · 글자 색 · 글자 자리 · 붓자국(미결 `paik` 3번
+    # 나머지, 2026-09-11). `analysis_job.subject_box`·`focus` 와 같은 축의
+    # 판단이다: 값의 모양은 화면(`www/src/app/(app)/me/cardStyle.tsx`)이 정하고
+    # 여기는 형식만 본다(`CardStyleSchema`) — 그래서 타입 컬럼을 늘어놓지 않고
+    # JSON 하나로 둔다. **사진은 여기 없다** — 저장 위치(S3 등)가 아직 안
+    # 정해져서 `og_image_key` 와 같은 처지다(미결 3번 「하지 말 것」).
+    style: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     __table_args__ = (
         # 부록 D.7 — 사용자당 카드 1건, 슬러그 중복 방지.

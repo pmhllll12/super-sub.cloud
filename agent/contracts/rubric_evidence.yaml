@@ -1,0 +1,387 @@
+# 루브릭 근거·검증 상태 — 4축 정본
+#
+# 🔴 **여기는 「검증됐다」를 적는 곳이 아니라 「어디까지 됐는지」를 적는 곳이다.**
+#
+# 외부 검토가 두 번(2026-09-09 · 2026-09-10) 같은 말을 했다:
+#   ① 동작 선택의 생체역학적 방향성은 상당 부분 타당하지만
+#   ② YAML 의 점수 구간·임계값·임팩트 이벤트까지 검증된 상태는 아니다
+# 둘을 갈라 보라는 것이고, 이 파일이 그 분리를 **기계로 강제한다**
+# (`tests/test_rubric_evidence.py`). 미결 `ho` 36번의 「다음」이다.
+#
+# 🔴 **4축은 서로 다른 층에 산다.** 평면으로 적으면 같은 판정이 복사돼
+#    한쪽만 낡는다(이 저장소가 미결 10번에서 겪은 형태다).
+#
+#      측정 타당성  → **지표**의 성질   (`hip_rotation_range_deg` 문제는
+#                                        그것을 쓰는 루브릭 전부에 있다)
+#      이벤트 타당성 → **루브릭**의 성질 (`kinematics.impact_event` 가 정한다)
+#      생체역학 근거 → **세부기준**의 성질
+#      임계값 타당성 → **세부기준**의 성질
+#
+# 🔴 **미검증 인용을 여기 적지 않는다.** 외부 검토가 PubMed 링크를 여럿 달아
+#    왔지만 **원문을 열어 확인하지 않았다.** 미검증 인용을 정본에 박으면
+#    「출처 없음」보다 나쁘다 — 없는 근거를 있다고 말하는 것이 된다. 그래서
+#    `citation` 은 `citation_verified: true` 없이는 **검사가 거부한다**.
+#    확인한 사람이 둘을 함께 넣는다. (미결 36번 「하지 말 것」)
+#
+#    🔴 **「인용을 아예 적지 않는다」던 것을 정정했다 (2026.09.12, 미결 34번).**
+#    원문을 실제로 열어 확인한 자리에는 `cited_verified` + `citation` 이
+#    붙는다. 지금 3개다(인스텝의 `swing_knee_extension` ·`follow_through` ·
+#    `plant_foot_position`). 🔴 **그 셋 중 둘은 문헌이 우리 밴드와 어긋난다** —
+#    인용이 붙었다는 것이 임계값을 지지한다는 뜻이 아니라는 실물이다.
+#
+# 🔴 **이 파일을 근거로 임계값을 옮기지 않는다.** 외부 검토는 AI 단독 판독이고,
+#    「분포에 맞춰 긋는 길」은 미결 34번에서 이미 기각됐다.
+#
+# 🔴 `rubrics/` 안에 두지 않는다 — `discover_rubrics` 가 그 폴더의 `*.yaml` 을
+#    전부 루브릭으로 읽어 배포에서 죽는다 (2026.09.09 에 한 번 겪었다).
+
+schema_version: 1
+
+# --- 닫힌 어휘 -------------------------------------------------------------
+# 🔴 「검증됨(verified)」이 **없다.** 이 프로젝트에 그렇게 말할 수 있는 축이
+#    아직 하나도 없어서다. 어휘에 없으면 잘못 적을 수도 없다.
+levels:
+  measured_internal: >-
+    우리 측정으로 확인했다. 정답 라벨이 아니라 내부 측정이므로 「맞다」가
+    아니라 「이 표본에서 이렇게 나왔다」다.
+  refuted_internal: >-
+    우리 측정이 **결함을 보였다.** 부정적 결론이라 AI 판독으로도 설 수 있다.
+  cited_unverified: >-
+    외부 검토가 문헌을 들었으나 **우리가 원문을 확인하지 않았다.**
+    근거로 인용하지 않는다 — 「그렇게 주장하는 검토를 받았다」까지다.
+  cited_verified: >-
+    **원문 본문을 열어 수치를 확인했다.** 🔴 **우리 임계값이 옳다는 뜻이
+    아니다** — 문헌이 그 값을 보고한다는 것까지고, 우리 파이프라인이 같은
+    것을 같은 시점에 옳게 재는지는 `measurement_validity`·`event_validity`
+    가 따로 답한다. 조건은 미결 34번 사전 등록 넷이다: 본문을 열었다 ·
+    수치가 본문에 있다 · 같은 것을 잰다 · 접근 경로를 적었다.
+  unverified: >-
+    아무 근거도 대조하지 않았다. 지금 대다수가 여기다.
+  blocked: >-
+    판정하려면 정답이 필요한데 그 경로가 닫혀 있다. 무엇이 막고 있는지를
+    `blocked_by` 에 적는다.
+
+axis_layer:
+  biomechanical_basis: criterion
+  measurement_validity: metric
+  event_validity: rubric
+  threshold_validity: criterion
+
+# --- 전 항목에 걸리는 것 ---------------------------------------------------
+global:
+  - id: fps_dependence
+    level: refuted_internal
+    axis: measurement_validity
+    note: >-
+      같은 영상을 다른 프레임레이트로 넣으면 **최종 등급이 37% 바뀐다**
+      (외부 포즈 모의). 실영상 재인코딩으로는 총점 평균 17.1점·최악 38점·
+      등급 29% 변동이다. **이것은 어느 한 지표의 문제가 아니라 전 지표에
+      걸린다** — 아래 지표별 판정은 이 위에서 읽어야 한다.
+    evidence: 미결 ho 7번 · eval/pending7_fps/ · eval/pending7_realfps/
+  - id: band_upper_bound_leak
+    level: refuted_internal
+    axis: threshold_validity
+    note: >-
+      **측정 당시 6개 루브릭 30개 항목이 전부 상한이 닫혀 있었고, 축구 2종만
+      남은 지금도 같다.** 구간을 넘긴 값이 0등급으로 나가 **측정 실패가
+      감점이 된다** — 0등급 117건 중 23건(20%)이
+      구간 **위**에서 왔다. 표시(`out_of_band`)만 붙였고 점수는 안 바꿨다.
+      🔴 임계값 **숫자**의 문제가 아니라 **구간 표현**의 문제다.
+    evidence: 미결 ho 20번 · eval/pending20_band_floor/
+  - id: no_grade_ground_truth
+    level: blocked
+    axis: threshold_validity
+    blocked_by: 지도자 검수자 미확보 (미결 ho 2번 · min 4번)
+    note: >-
+      임계값은 전부 **지도자 검수 전 임시값**이다. QWK·MAE 는 사람 라벨이
+      없으면 아예 못 낸다. 「(A) 임계값 검수」는 지도자 1명이면 적은 수로
+      지금 시작할 수 있다고 회신해 두었다.
+    evidence: 미결 ho 2번 · ho 34번
+
+# --- 지표별: 측정 타당성 ---------------------------------------------------
+# 🔴 단위를 이름에서 유추하지 말 것 — `plant_foot_to_ball_offset` 은 픽셀이
+#    아니라 **어깨너비 배수**다.
+metrics:
+  hip_rotation_range_deg:
+    measurement_validity:
+      level: refuted_internal
+      note: >-
+        🔴 **회전의 일부(24%)만 담는다.** 골반 좌우 키포인트 사이 각도를
+        쓰는데 그것이 **카메라 축을 함께 채점한다** — 같은 회전이라도 촬영
+        방향이 바뀌면 값이 바뀐다. 실클립 n=4 로는 지표 문제인지 포즈
+        품질인지 못 가른다. 못 잰 것을 0.0 으로 지어내던 결함은 해소했다
+        (키를 안 넣는다).
+      evidence: 미결 ho 22번 · ho 21번 · eval/pending21_hip_rotation/
+  swing_knee_angle_at_impact:
+    measurement_validity:
+      level: measured_internal
+      note: >-
+        무릎은 **깨끗한 편이다** — JHMDB 46편에서 95.6도 이상으로만 나온다.
+        하한이 낮게 관측된 것은 실클립 4건뿐이다. 🔴 상한 쪽은
+        `band_upper_bound_leak` 이 그대로 걸린다.
+      evidence: 미결 ho 20번 · eval/pending20_band_floor/
+  plant_knee_angle_at_impact:
+    measurement_validity:
+      level: unverified
+      note: >-
+        무릎 관절이라 `swing_knee_angle_at_impact` 와 같은 계열로 보이지만
+        **디딤발 쪽은 따로 재 본 적이 없다.** 스윙 측과 달리 임팩트 프레임
+        정의에 쓰이지 않아 가림 조건이 다르다.
+  trunk_forward_lean_deg_at_impact:
+    measurement_validity:
+      level: refuted_internal
+      note: >-
+        🔴 **촬영 방향을 함께 채점한다 — 쟀다 (2026.09.10, 미결 37번).**
+        `arctan2(trunk[0], -trunk[1])` 이고 `normalize()` 가 방향을 정규화하지
+        않아, 좌우가 반전되면 각도가 **정확히 `-θ`** 다. 「앞으로 기울었나」가
+        아니라 **「이미지 오른쪽으로 기울었나」**를 잰다.
+        크기: 축구 인스텝(active) 18클립에서 항목 등급 **18/18(100%)** ·
+        최종 등급 **8/18(44%)** 변동, 총점 평균 **12.7점**(3장 허용치 3점의
+        4.2배). 🔴 **가정이 아니라 이미 나고 있다** — 원 실측의 부호가
+        인스텝 음수 8 : 양수 10 으로 갈려 있다.
+        ✅ (종목 정리 전 기록) 밴드가 **0 대칭**이던 루브릭에서는 같은 지표가
+        **0/46** 이었다 — 더 큰 부호 분산에도 0% 대 44%. **지표가 아니라
+        밴드가 결정한다**는 근거이고, 검사로는
+        `test_scoring.py::test_a_symmetric_band_is_what_actually_stops_the_flip`
+        가 남아 있다.
+        🔴 **인사이드 패스는 표본 0이라 못 쟀다**(「안 난다」가 아니다).
+        ⚠️ 2026-09-10 외부 검토는 여기에 더해 **측방(contralateral) 기울기·
+        어깨 외전과 함께 보지 않으면 한 각도로 좋다/나쁘다를 못 정한다**고
+        지적했다 (미확인 인용이라 근거로 쓰지 않는다).
+      evidence: 미결 ho 37번 · eval/pending37_trunk_mirror/
+  swing_hip_flexion_after_impact_deg:
+    measurement_validity:
+      level: unverified
+      note: >-
+        임팩트 **뒤** 구간을 재므로 `event_validity` 에 직접 얹혀 있다 —
+        임팩트 프레임이 밀리면 이 값이 통째로 밀린다. 팔 종목에서 같은 계열의
+        지표가 109.2도짜리 가짜 값을 낸 적이 있다(2026.09.11 이전 기록).
+  plant_foot_to_ball_offset:
+    measurement_validity:
+      level: unverified
+      note: >-
+        🔴 **단위가 어깨너비 배수다**(픽셀이 아니다). 그리고 **정지한 공을
+        전제한 기하**다 — 축구는 세워 둔 공이라 전제가 서지만, 날아오는 공을
+        다루는 종목으로는 그대로 못 옮긴다 (종목 정리 전 야구 타격의
+        `bat_path` 가 보류된 사유 중 하나가 이것이었다).
+  follow_through_duration_frames:
+    measurement_validity:
+      level: refuted_internal
+      note: >-
+        🔴 **프레임 단위라 fps 에 직접 종속된다.** 같은 동작이 30fps 와
+        60fps 에서 다른 값을 낸다 — `fps_dependence` 의 가장 직접적인 사례다.
+        결과 봉투에 `timebase` 로 초 환산을 붙여 **드러내는 데까지** 했고,
+        지표 자체는 안 고쳤다(고치면 B-6 재실행을 부른다).
+      evidence: 미결 ho 7번 · 로드맵 ② E-3
+
+# --- 루브릭별: 이벤트 타당성 -----------------------------------------------
+# `extension_peak` = 스윙 관절 **신전 각속도**가 최대인 프레임 (`features.py`).
+# 🔴 **접촉·릴리스 프레임이 아니다.** 둘이 같다는 근거가 우리에게 없다.
+rubrics:
+  football/inside_pass:
+    status: draft
+    impact_event: extension_peak
+    event_validity:
+      level: unverified
+      note: >-
+        🔴 **팔 종목의 진단을 그대로 옮기지 않는다.** 다리는 무릎 신전
+        각속도이고 임팩트 전후 구조가 팔과 다르다 — 루브릭 자신이 임팩트
+        시점을 **완전 신전 전**(140~165도)으로 잡고 있어, 각속도 피크와
+        접촉의 관계가 팔 종목과 같은 방향인지 **재 본 적이 없다.**
+      blocked_by: 접촉 프레임 정답 없음 (축구 표본 확대도 닫힌 경로 — 상한 38건)
+  football/instep_shot:
+    status: active
+    impact_event: extension_peak
+    event_validity:
+      level: unverified
+      note: 인사이드 패스와 같다 — 다리 종목의 이벤트 타당성은 안 쟀다.
+      blocked_by: 접촉 프레임 정답 없음
+
+# --- 세부기준별: 생체역학 근거 · 임계값 타당성 ------------------------------
+# 🔴 `threshold_validity` 는 **전부 `unverified`** 다. 예외가 없다 —
+#    지도자 검수 전 임시값이고, 여기에 `band_upper_bound_leak` 가 겹친다.
+#    한 항목만 다르게 적고 싶어지면 그때가 사전 등록을 받을 때다.
+criteria:
+  # 🔴 **인사이드 패스 5/5 — 찾았고, 없었다** (2026.09.12, 미결 34번).
+  #    2026-09-12 검색에서 **인사이드 패스의 관절각 수치를 보고하는 문헌을
+  #    하나도 못 찾았다.** 쓴 리뷰(Petrolo 외)는 **인스텝 전용**이고, 정본이
+  #    이미 적어 둔 경고(「패스 같은 기술은 상세한 biomechanical 연구가
+  #    상대적으로 부족하다」)와 같은 방향이다.
+  #    🔴 **이것도 결과다** — draft 를 active 로 올리는 날, 이 5개 항목은
+  #    인스텝보다 **근거가 한 칸 더 얕은 상태**로 올라간다.
+  #    🔴 인스텝에서 찾은 값을 여기로 옮기지 않는다(사전 등록 함정 「종목·기술」).
+  football/inside_pass:
+    plant_foot_position:
+      biomechanical_basis:
+        level: unverified
+        note: >-
+          🔴 **인스텝 킥의 근거를 여기로 옮기지 않는다.** 검토가 「패스 같은
+          기술은 상세한 biomechanical 연구가 상대적으로 부족하다」고 명시했다.
+          같은 이름의 항목이라도 근거 수준이 다르다.
+          **2026.09.12 문헌 검색: 못 찾았다.** 인스텝 쪽에는 원 논문 확인
+          값이 붙었지만(`football/instep_shot.plant_foot_position`) 이 항목은
+          그대로 근거 없음이다.
+      threshold_validity: {level: unverified}
+    swing_knee_extension:
+      biomechanical_basis:
+        level: unverified
+        note: >-
+          **2026.09.12 문헌 검색: 못 찾았다.** 인사이드 패스의 임팩트 시
+          무릎각을 보고하는 문헌이 없다.
+      threshold_validity: {level: unverified}
+    trunk_lean:
+      biomechanical_basis:
+        level: unverified
+        note: >-
+          **2026.09.12 문헌 검색: 못 찾았다.** 🔴 찾았더라도 인스텝과 같은
+          벽을 만났을 것이다 — **우리 상체 지표가 이미지 축을 함께 잰다**는
+          것이 반증돼 있다(미결 37번). 🔴 **인사이드 패스는 그 회차에서
+          표본 0이라 크기조차 못 쟀다**(「안 난다」가 아니다).
+      threshold_validity: {level: unverified}
+    hip_rotation:
+      biomechanical_basis:
+        level: unverified
+        note: >-
+          **2026.09.12 문헌 검색: 못 찾았다.** 🔴 측정 쪽은 인스텝과 같은
+          반증을 공유한다(`hip_rotation_range_deg` 는 회전의 24%만 담는다).
+      threshold_validity: {level: unverified}
+    follow_through:
+      biomechanical_basis:
+        level: unverified
+        note: >-
+          🔴 검토가 이 구간을 콕 집어 「프로젝트가 설정한 heuristic threshold
+          이지 스포츠 과학에서 보편적으로 인정된 scoring 기준이 아니다」라고
+          했다. **검토 당시 6종 중 근거가 가장 약한 자리로 지목됐다.**
+          **2026.09.12 문헌 검색: 못 찾았다.** 🔴 인스텝 쪽은 같은 회차에
+          숫자가 붙었고 **우리 문턱이 문헌의 1/3**로 드러났다 — 그 값을
+          여기로 옮기지 않는다(리뷰가 인스텝 전용이다).
+      threshold_validity: {level: unverified}
+  football/instep_shot:
+    plant_knee_flexion:
+      biomechanical_basis:
+        level: cited_unverified
+        note: >-
+          검토가 plant/support leg position 을 연구 대상으로 들었다. **원문 미확인.**
+          🔴 **수치는 찾았는데 인용 조건을 못 채웠다 (2026.09.12, 미결 34번).**
+          Petrolo 외 리뷰의 **근거표**에 지지다리 신전 `156.4 ± 7.4도(남)` ·
+          `161.2 ± 5.5도(여)`(Ruscello 2020)가 있고 **둘 다 우리 2등급
+          창(150~170) 안**이다. 그런데 사전 등록 조건 1이
+          **「리뷰를 인용하려면 그 리뷰 본문에 수치가 있어야 한다 —
+          2차 요약(리뷰의 표 포함)만으로는 안 된다」**라서 `cited_verified`
+          로 못 올린다. 🔴 그 조건이 헛돈 것이 아니다: 같은 리뷰에서
+          **본문과 근거표가 어긋난 자리를 실제로 잡았다**(본문 「지지발 무릎
+          굴곡 21.4도」 대 근거표 「굴곡 **ROM** −21.4도」 — 본문만 봤으면
+          「내각 158.6도 = 우리 2등급 한가운데」라는 **없는 근거**를 만들
+          뻔했다). 올리려면 Ruscello 2020 원문을 열어야 한다.
+      threshold_validity: {level: unverified}
+    swing_knee_extension:
+      biomechanical_basis:
+        level: cited_verified
+        citation: >-
+          Petrolo 외. Kinematic Determinants of the Instep Soccer Kick in Elite
+          Adult Soccer Players: A Systematic Review. 🔴 **미간행 원고**(학술지
+          게재 표기 없음, OSF 등록 2022-10-27). 리뷰 본문 65쪽 열람.
+          https://doi.org/10.17605/OSF.IO/Q2UBJ (열람 2026-09-12)
+        citation_verified: true
+        note: >-
+          🔴 **두 검토가 모두 (당시) 6종 중 근거가 가장 좋은 쪽으로 꼽았다** —
+          hip → knee → ankle 의 proximal-to-distal sequence 가 인스텝 킥의
+          핵심으로 보고된다는 것이다. **방향은 그대로 서 있다.**
+          🔴 **그런데 숫자를 대 보니 우리 밴드와 거의 안 겹친다
+          (2026.09.12, 미결 34번).** 리뷰 본문이 엘리트 남자 **공 접촉 시점**
+          무릎 굴곡을 `35.3 ± 10.0 ~ 55.0 ± 7.5도` 로 보고하는데, 우리 규약
+          (**내각**, 펴면 180도)으로 `180 − x` 를 하면 **125.0~144.7도**다.
+          우리 2등급은 `140~165` 이고 **140 미만이 0등급**이라 보고된 범위의
+          대부분이 「풀린 채찍」에 떨어진다. 엘리트 여자도 같다(굴곡
+          45 ± 9 ~ 55.6 ± 6.6 → 내각 124~135).
+          🔴 **이것을 「우리 밴드가 틀렸다」로 바로 읽으면 안 된다 — 시점이
+          다르다.** 문헌은 **공 접촉**이고 우리 임팩트는 `extension_peak`
+          (무릎 신전 각속도 최대)이며, 둘이 같다는 근거가 우리에게 없다
+          (`event_validity: unverified`). 다만 리뷰가 그 간극에도 한 줄을
+          준다 — *각속도 피크 시점의 무릎각 `56.9 ± 5.7도`* → **내각 123.1도**
+          로 **그쪽도 우리 2등급 밖**이다. 두 시점 어느 쪽으로 읽어도 문헌
+          값은 우리 창 아래에 있다. 🔴 **밴드를 옮기지 않았다** — 옮기려면
+          접촉 프레임 정답이 먼저다.
+      threshold_validity: {level: unverified}
+    trunk_lean:
+      biomechanical_basis:
+        level: cited_unverified
+        note: >-
+          검토가 trunk movement 를 분석 대상으로 들었다. **원문 미확인.**
+          🔴 **찾았지만 쓸 수 없었다 — 문헌이 다른 것을 잰다 (2026.09.12,
+          미결 34번).** 리뷰 본문이 주는 둘이 다 우리 지표와 안 맞는다:
+          ⑴ 접촉 시 **척추 굴곡** `41.4 ± 8.8도` 는 **척추 분절 사이** 각이지
+          몸통-수직 각이 아니다 · ⑵ 여자 **몸통 신전** `5.8 ± 8.3도` 는 표적
+          기준 전역 각인데, 🔴 **우리 상체 지표는 이미 「이미지 축을 함께
+          잰다」로 반증돼 있다**(미결 37번 — 좌우 반전에 정확히 `-θ`).
+          **같은 것을 재지 않는 값을 인용하지 않는다**(사전 등록 조건 3).
+          🔴 이 항목은 인용이 아니라 **지표를 먼저 고쳐야 하는 자리**다.
+      threshold_validity: {level: unverified}
+    hip_rotation:
+      biomechanical_basis:
+        level: cited_unverified
+        note: >-
+          검토가 pelvis rotation 을 분석 대상으로 들었다. **원문 미확인.**
+          🔴 근거가 좋아도 **측정 쪽이 반증됐다**(회전의 24%만 담는다) —
+          축이 다르면 판정도 다르다는 것을 보여 주는 자리다.
+          🔴 **수치는 찾았는데 인용 조건을 못 채웠다 (2026.09.12, 미결 34번).**
+          Petrolo 외 리뷰의 **근거표**에 골반 수평면 `ROM 21.1 ± 5.2도`
+          (Augustus 2021)가 있고, 그 **평균이 우리 1등급**(15~25)이다 —
+          우리 2등급 문턱은 `25도 이상`이라 **엘리트 평균이 2등급에 못 든다.**
+          `plant_knee_flexion` 과 같은 사유로 `cited_verified` 가 아니다
+          (근거표는 2차 요약이다). 🔴 그리고 올려도 값이 안 선다 — 우리
+          지표가 담는 것이 회전의 24%뿐이라 **같은 양을 비교하는 것이
+          아니다.**
+      threshold_validity: {level: unverified}
+    follow_through:
+      biomechanical_basis:
+        level: cited_verified
+        citation: >-
+          Petrolo 외. Kinematic Determinants of the Instep Soccer Kick in Elite
+          Adult Soccer Players: A Systematic Review. 🔴 **미간행 원고**(학술지
+          게재 표기 없음, OSF 등록 2022-10-27). 리뷰 본문 65쪽 열람.
+          https://doi.org/10.17605/OSF.IO/Q2UBJ (열람 2026-09-12)
+        citation_verified: true
+        note: >-
+          🔴 **두 차례 외부 검토가 「근거가 가장 약한 자리」로 지목했던 곳인데
+          숫자가 처음 붙었다 (2026.09.12, 미결 34번).** 리뷰 본문이 엘리트
+          남자의 접촉 시 고관절 굴곡 `6.4 ± 11.1 ~ 28 ± 9도` 와 팔로스루 끝
+          `97 ± 16도` 를 함께 보고한다 — **추가 굴곡 69~91도**다.
+          **방향은 문헌이 지지한다**(임팩트 뒤 고관절 굴곡이 크게 더 진행된다).
+          🔴 **크기는 우리가 크게 낮게 잡았다** — 우리 2등급 문턱이
+          `30도 이상`이라 **엘리트는 사실상 전원 2등급**이고, 문헌 값의 1/3
+          자리에 금이 그어져 있다. 변별이 안 된다는 뜻이지 틀렸다는 뜻은
+          아니다(생활체육 표본은 엘리트가 아니다). 🔴 **문턱을 안 옮겼다** —
+          시점(`extension_peak` 대 접촉)이 먼저 풀려야 하고, 이 지표는
+          `event_validity` 에 직접 얹혀 있다.
+      threshold_validity: {level: unverified}
+    plant_foot_position:
+      biomechanical_basis:
+        level: cited_verified
+        citation: >-
+          Kapidžić 외 (2014). Kinematic Analysis of the Instep Kick in Youth
+          Soccer Players. J Hum Kinet 42:81–90. **원 논문 전문**(PMC 공개)
+          열람. https://doi.org/10.2478/hukin-2014-0063 (열람 2026-09-12)
+        citation_verified: true
+        note: >-
+          검토가 support/plant leg position 을 연구에서 분석되는 대상으로
+          들었고, 🔴 **이 회차에서 원 논문 전문을 열었다 (2026.09.12, 미결
+          34번).** 13세 유소년 13명(2대 300Hz)의 지지발–공 거리
+          `14.13 ± 7.43 cm`. 리뷰 본문은 엘리트 값을 더 준다 — 남자 `0.27 m`
+          (Navandar 2018) · 여자 `x축 0.33 ± 0.07 m`(Ruscello 2020).
+          🔴 **엘리트 성인 둘 다 우리 1등급이다** — 우리 2등급 상한이
+          어깨너비 0.5배(루브릭이 약 20cm 로 환산)라 27~33cm 는
+          「어긋난 디딤 자리」가 된다. **유소년만 2등급이다.**
+          🔴 **비교 자체에 한계가 둘 있다.** ⑴ 문헌은 **cm** 이고 우리는
+          **어깨너비 배수**라, 어깨가 좁은 아이는 같은 cm 가 더 큰 배수가 되어
+          **방향이 뒤집힐 수도 있다** · ⑵ 축이 안 맞는다 — Kapidžić 는
+          *foot posterior displacement* 로 **앞뒤**를 가리키는 듯하고 Ruscello
+          는 x·y 를 나눠 보고하는데, 우리 값은 **이미지 수평 성분**이라 측면
+          촬영에서는 앞뒤·정면에서는 좌우로 읽힌다.
+          🔴 **공개 지도 자료는 이 수치화 자체를 권하지 않는다** —
+          Harves(CoachingAmericanSoccer.com, 열람 2026-09-12): *"Some coaches
+          have tried to quantify the distance in inches that the plant foot
+          should be placed to the side of the ball. This is not recommended."*
+          **우리가 하는 일이 정확히 그 수치화다.** 지도자 검수(미결 ho 2번)
+          에서 가장 먼저 물어볼 자리로 올려 두었다.
+      threshold_validity: {level: unverified}

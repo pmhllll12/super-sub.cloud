@@ -23,7 +23,11 @@ from pathlib import Path
 # 명세가 정한 기본 위치. 윈도우 표기 그대로 두고 아래에서 번역한다.
 DEFAULT_ROOT = "D:/sports_dataset"
 
-SPORTS = ("soccer", "baseball", "basketball")
+# 🔴 축구 단일 종목이다 (2026.09.11). 여기에 종목을 되살리려면 **루브릭이
+# 먼저** 있어야 한다 — 받아 놓고 채점할 루브릭이 없으면 디스크만 찬다.
+# 종목 코드가 `soccer` 인 것은 출처(SoccerNet)의 이름이고, 루브릭·백엔드
+# 쪽 종목 코드는 `football` 이다. 둘을 같은 값으로 맞추지 말 것.
+SPORTS = ("soccer",)
 
 # 한 번에 받아서 처리할 클립 수.
 BATCH_SIZE = 100
@@ -98,7 +102,7 @@ class Settings:
     s3_prefix: str | None = None
     s3_region: str | None = None
     # 🔴 루브릭을 기본값에 맡기지 않는다 — 미결 17번 「하지 말 것」.
-    # 안 주면 야구 영상이 축구 루브릭으로 채점된다.
+    # 안 주면 인사이드 패스 영상이 인스텝 루브릭으로 채점된다.
     rubric: str = ""
     # pose 만 뽑을지, 판정(LLM)까지 갈지.
     stage: str = "pose"

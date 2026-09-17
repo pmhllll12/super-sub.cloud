@@ -1,7 +1,8 @@
 """Phase A 평가 자산의 위치를 한 곳에서 정한다.
 
-**왜 있는가.** 평가 스크립트 14개가 `ROOT = Path("/mnt/d/supersub-phaseA")`를
-각자 하드코딩하고 있었다(미결 14번). 그래서
+**왜 있는가.** 평가 스크립트들이 `ROOT = Path("/mnt/d/supersub-phaseA")`를
+각자 하드코딩하고 있었다(미결 14번 — 2026.09.11에 **파일 35개에 걸친 49곳을 이
+모듈과 상대 경로로 모았다**). 그래서
 
 - 다른 기계에서는 아무것도 안 돌고,
 - 저장소에 사본을 떠 두어도 **읽히지 않았다** — 미결 11번이 "읽히지 않는
@@ -30,6 +31,10 @@
 | `frames/`, `labeling/renders/` (31MB) | `/mnt/d` 뿐 |
 
 외부 경로는 `SUPERSUB_PHASEA_ROOT`로 바꿀 수 있다.
+
+🔴 **여기가 기계별 경로를 적어도 되는 유일한 자리다.** `tests/test_eval_paths.py`
+가 `eval/`·`src/`·`scripts/` 를 훑어 그 밖의 하드코딩을 막는다 — 예외 목록에
+더하는 것으로 통과시키지 말 것(그러면 다음 사람이 그 줄을 보고 또 박는다).
 """
 from __future__ import annotations
 
@@ -64,6 +69,90 @@ def require_external(what: str = "") -> Path:
             "다른 위치에 있으면 SUPERSUB_PHASEA_ROOT 로 알려줄 것."
         )
     return root
+
+
+_DEFAULT_SOCCER = Path("/mnt/d/sports_dataset/soccer/clips")
+
+
+def soccer_clips_root() -> Path:
+    """축구 클립(`*.avi`) — **Phase A 자산이 아니다.**
+
+    Phase A 골든셋 39편은 전부 야구(Kinetics `hitting baseball` 전수)라,
+    「축구인가」를 묻는 회차(미결 `ho` 43번 ㉮)에는 **양성 층이 없다.**
+    그 층을 여기서 온다.
+
+    🔴 **다른 데이터셋인데 왜 이 파일에 두는가.** `tests/test_eval_paths.py`
+    가 `eval/` 어디에도 기계별 경로를 못 박게 막고, 그 검사 문구가
+    **「예외 목록에 추가하는 것은 답이 아니다」**라고 적어 두었기 때문이다.
+    경로를 적어도 되는 자리는 이 모듈 하나다 — 두 번째 자리를 만들면
+    미결 14번이 되살아난다.
+
+    `SUPERSUB_SOCCER_ROOT` 로 바꾼다. **존재를 보장하지 않는다.**
+    """
+    return Path(os.environ.get("SUPERSUB_SOCCER_ROOT", _DEFAULT_SOCCER))
+
+
+_DEFAULT_SOCCERNET = Path("/mnt/d/sports_dataset_probe/soccernet")
+
+
+def soccernet_clips_root() -> Path:
+    """SoccerNet 방송 클립(`*.mp4`) — **다인 축구 표본의 후보다** (미결 `ho` 46번).
+
+    위 `soccer_clips_root()` 의 19편은 **전부 1인 훈련 영상**이라
+    「여러 명 중 누구를 고르는가」를 못 잰다(미결 18번 11회차). 방송 클립은
+    그 성질을 **가질 수 있는** 유일한 후보이고, 받는 길은
+    `scripts/dataset_pipeline/sources.py` 의 `SoccerNet10s` 에 이미 있다.
+
+    🔴 **「있다」가 아니라 「후보다」.** 224p 라 선수가 작고, 우리 검출기가
+    2명 이상을 실제로 집는지는 **받아서 재 봐야** 안다 — 그 관문이
+    `eval/sample_gate/`다.
+
+    🔴 **별도 뿌리에 둔다.** 기존 `clips/batch_0000` 과 `_state.json`(수집
+    커서)을 건드리면 앞선 회차의 재실행이 달라진다.
+
+    `SUPERSUB_SOCCERNET_ROOT` 로 바꾼다. **존재를 보장하지 않는다.**
+    """
+    return Path(os.environ.get("SUPERSUB_SOCCERNET_ROOT", _DEFAULT_SOCCERNET))
+
+
+_DEFAULT_MOTION_ID = Path("/mnt/d/sports-pose/soccer/motion_id")
+
+
+def motion_id_root() -> Path:
+    """슛·패스 두 층의 드릴 클립 (미결 `ho` 52번) — **Phase A 자산이 아니다.**
+
+    「영상만 보고 슛인가 패스인가」를 재려면 두 클래스가 다 있어야 하는데,
+    우리가 가진 축구 클립은 **전부 슛 쪽**이다(골든셋 19 · 3DSP 200 ·
+    SoccerNet `Shots` 100). 패스 라벨이 붙은 클립이 **하나도 없어서** 새로
+    받았고, 그 뿌리가 여기다.
+
+    🔴 **두 층을 같은 성격(단독 선수 드릴)으로 맞춰 받는다.** 한쪽만 중계
+    영상이면 분류기가 동작이 아니라 **촬영 방식**을 배운다. 그래서 위
+    `soccer_clips_root()`(세트피스 중계)와 섞지 않고 별도 뿌리에 둔다.
+
+    🔴 **영상은 각 업로더의 저작물이라 저장소에 커밋하지 않는다** — 커밋하는
+    것은 출처 표(`clips_manifest.csv`)뿐이다.
+
+    `SUPERSUB_MOTION_ID_ROOT` 로 바꾼다. **존재를 보장하지 않는다.**
+    """
+    return Path(os.environ.get("SUPERSUB_MOTION_ID_ROOT", _DEFAULT_MOTION_ID))
+
+
+def motion_id_cache() -> Path:
+    """`motion_id` 클립의 **키포인트·공 궤적 캐시** (미결 `ho` 52번 2회차).
+
+    🔴 **왜 캐시를 두는가.** 1회차는 확인할 것이 하나 생길 때마다 **GPU 로 30분**
+    을 다시 썼다. 포즈는 결정론적이라 같은 영상·같은 `target_fps` 면 같은 값이
+    나오는데도 매번 다시 뽑은 것이다. 한 번 떠 두면 이후 진단이 **초 단위**가
+    되고, 그래야 「임팩트가 진짜 킥인가」 같은 질문을 값싸게 물을 수 있다.
+
+    🔴 **동작점을 이름에 드러낸다** — `phaseA` 의 `cache_target15/`·
+    `cache_target30/` 와 같은 규칙이다. 어느 fps 로 뽑았는지 이름에 없으면
+    섞어 쓰게 되고, 그것이 미결 10번의 형태다.
+
+    저장소에 넣지 않는다 — 영상에서 파생된 것이고 크기도 있다.
+    """
+    return motion_id_root() / "cache_target30"
 
 
 def default_target() -> int:

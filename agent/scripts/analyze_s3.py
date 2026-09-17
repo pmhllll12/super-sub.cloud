@@ -1,7 +1,7 @@
 """S3 영상 1건 분석 — 내려받기 → 측정 → 판정 → 리포트 업로드.
 
-    uv run python scripts/analyze_s3.py s3://버킷/videos/pitch01.mp4 \
-        --rubric rubrics/baseball_pitching.yaml \
+    uv run python scripts/analyze_s3.py s3://버킷/videos/shot01.mp4 \
+        --rubric rubrics/football_instep_shot.yaml \
         --out s3://버킷/reports \
         --side left
 
@@ -32,6 +32,8 @@ from supersub_agent.features import (  # noqa: E402
     InsufficientQuality,
     extract_features,
     frame_metrics_as_seconds,
+    keypoint_quality_envelope,
+    skeleton_envelope,
     verify_rubric_coverage,
 )
 from supersub_agent.judge import Judge  # noqa: E402
@@ -43,6 +45,9 @@ from supersub_agent.pose import (  # noqa: E402
     extract_keypoints,
     parse_subject_spec,
     render_tracked_clip,
+    SportMismatch,
+    TOOL_KO,
+    sport_conflict,
     subject_envelope,
 )
 from supersub_agent.scoring import aggregate, load_rubric  # noqa: E402
@@ -121,6 +126,78 @@ def report_slug(key: str) -> str:
     return f"{parent}/{stem}" if parent and parent != "videos" else stem
 
 
+def focus_envelope(rubric, requested: str | None) -> dict:
+    """올린 사람이 고른 「집중해서 볼 항목」 (미결 `paik` 8번).
+
+    🔴 **채점에는 영향이 없다.** 고른 항목만 채점하고 가중치를 재정규화하는
+    길(그쪽 항목의 B안)은 택하지 않았다 — 같은 영상이 **고른 것에 따라 다른
+    점수**를 내면 선수끼리 비교가 안 되고, 스카우팅은 비교가 전부다.
+    측정 실패로 항목이 빠지는 것(`applicable_criteria`)과는 다르다. 그쪽은
+    촬영 조건이 강제한 것이고 이쪽은 사용자가 고른 것이다.
+
+    🔴 **모르는 id 를 조용히 버리지 않는다.** 화면이 낡은 id 를 보내거나
+    종목이 어긋나면 사용자가 고른 것이 아무 일도 안 일어난 채 사라진다.
+    그렇다고 분석을 실패시키지도 않는다 — 강조 힌트 하나 때문에 리포트가
+    통째로 없어지는 것이 더 나쁘다. **둘 다 적어서 드러낸다.**
+
+    빈 값은 「전체적으로」다. 그것이 기본이자 가장 흔한 경우다.
+    """
+    ids = [t.strip() for t in (requested or "").split(",") if t.strip()]
+    known = set(rubric.criterion_ids)
+    applied = [i for i in ids if i in known]
+    unknown = [i for i in ids if i not in known]
+    if unknown:
+        print(f"  ⚠️ 루브릭에 없는 집중 항목 {unknown} — 리포트에 남기고 계속한다")
+    return {"requested": ids, "applied": applied, "unknown": unknown}
+
+
+def owner_from_key(key: str) -> str | None:
+    """`videos/<user_id>/…` 에서 소유자를 꺼낸다. 모양이 다르면 None.
+
+    🔴 **파일 이름이 아니라 접두사에서 읽는다.** 미결 `jin` 24번이 키를
+    `videos/<user_id>/<닉네임>-<원본이름>-<시각>-<video_id 앞 8자>.<ext>` 로
+    바꾸기로 했는데 **`<user_id>/` 접두사는 그대로 둔다** — 소유 검사가 그
+    접두사로 돌기 때문이다. 그래서 파일명 규칙이 바뀌어도 이 함수는 안 깨진다.
+    파일명 끝의 8자는 `video_id` 의 **앞부분일 뿐**이라 자리를 정하는 데
+    쓰면 안 된다.
+    """
+    parts = PurePosixPath(key).parts
+    if len(parts) >= 3 and parts[0] == "videos":
+        return parts[1]
+    return None
+
+
+def report_targets(
+    out: str, key: str, video_id: str | None, stamp: str
+) -> tuple[str, str]:
+    """(리포트 URI, 미리보기를 놓을 접두사).
+
+    계약(`jin` 24번)의 자리는 **영상 하나에 폴더 하나**다 —
+    `reports/<user_id>/<video_id>/report.json` 과 같은 폴더의 미리보기.
+    「저장」을 누르면 fastapi 가 원본을 `source.mp4` 로 **이 폴더에** 옮기므로,
+    한 영상에 대한 것이 한자리에 모인다.
+
+    🔴 **`video_id` 가 없으면 옛 자리를 그대로 쓴다.** 배치·평가 실행은
+    백엔드 작업이 아니라 `video_id` 가 없고, 그때는 회차별 타임스탬프가 맞다 —
+    같은 영상을 조건을 바꿔 여러 번 돌리는 것이 그쪽의 일상이다. 계약 자리로
+    끌고 오면 앞 회차를 덮어써서 비교가 사라진다.
+
+    🔴 **계약 자리에는 타임스탬프가 없다** — 재분석이 앞의 리포트를 덮는다.
+    같은 영상의 최신 결과가 하나 있는 것이 계약의 뜻이고, 언제 낸 것인지는
+    리포트 안의 `analyzed_at`·`code_version` 이 싣는다.
+    """
+    if video_id:
+        owner = owner_from_key(key)
+        base = f"{owner}/{video_id}" if owner else video_id
+        return storage.join_uri(out, base, "report.json"), storage.join_uri(out, base)
+
+    base = report_slug(key)
+    return (
+        storage.join_uri(out, base, f"{stamp}.json"),
+        storage.join_uri(out, base, stamp),
+    )
+
+
 def resolve_videos(uri: str, region: str | None) -> list[str]:
     """인자로 받은 것이 파일이든 **폴더든** 분석할 영상 목록으로 바꾼다.
 
@@ -146,8 +223,13 @@ def resolve_videos(uri: str, region: str | None) -> list[str]:
     return found
 
 
-def analyze_one(video: str, args, rubric, subject) -> None:
-    """영상 한 편을 분석해 리포트를 올린다."""
+def analyze_one(video: str, args, rubric, subject) -> str:
+    """영상 한 편을 분석해 리포트를 올리고, **올린 자리를 돌려준다.**
+
+    자리를 돌려주는 것은 워커가 완료 보고에 실어야 해서다(미결 `paik` 11번).
+    🔴 **부르는 쪽이 자리를 다시 계산하게 두지 않는다** — 규칙(`report_targets`)이
+    두 곳에 생기면 조용히 갈린다. 아는 쪽이 말해 주는 것이 맞다.
+    """
     # --- 내려받기 --------------------------------------------------------
     # 임시 디렉터리에 받고 **끝까지 살려 둔다.** 미리보기 렌더링이 원본을 다시
     # 디코딩하기 때문이다(PoseResult가 프레임을 들고 있지 않으므로). 붙들고
@@ -170,10 +252,26 @@ def analyze_one(video: str, args, rubric, subject) -> None:
             pose = extract_keypoints(
                 local, target_fps=args.fps, observe=False, subject=subject
             )
+            # 🔴 **종목 확인은 측정보다 먼저** (미결 `ho` 43번 ㉮). 다른 종목
+            #    영상을 축구 루브릭으로 재면 숫자는 나오는데 뜻이 없다 —
+            #    지금까지 그렇게 점수가 나가고 있었다.
+            conflict = sport_conflict(pose.objects, rubric.sport)
+            if conflict:
+                raise SportMismatch(
+                    f"{TOOL_KO.get(conflict, conflict)}가 보입니다 — "
+                    f"{rubric.sport_ko or rubric.sport} 영상이 아닌 것 같습니다."
+                )
             features = extract_features(
                 pose.keypoints, pose.objects, rubric.impact_limb,
                 rubric.impact_event, args.side,
             )
+        except SportMismatch as exc:
+            # 🔴 품질 게이트(2)와 **다른 코드**를 쓴다. 뭉뚱그리면 워커가
+            #    「품질 게이트 미달 — 재촬영이 필요하다」로 보고하고, 그러면
+            #    사용자는 **같은 파일을 다시 올린다**(미결 41번에서 아홉 번).
+            #    이쪽은 다시 찍어서 풀리는 것이 아니라 **다른 영상**이 필요하다.
+            print(f"\n종목 불일치: {exc}")
+            raise SystemExit(3) from exc
         except InsufficientQuality as exc:
             print(f"\n분석 중단: {exc}")
             raise SystemExit(2) from exc
@@ -208,35 +306,130 @@ def analyze_one(video: str, args, rubric, subject) -> None:
         # --- 미리보기 ------------------------------------------------------
         # 판정이 끝난 뒤다. 프레임을 다시 디코딩하므로 판정 모델과 겹치지 않는다.
         stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-        slug = report_slug(storage.parse_s3_uri(video)[1])
+        report_uri, preview_prefix = report_targets(
+            args.out, storage.parse_s3_uri(video)[1], args.video_id, stamp
+        )
         t0 = time.time()
         previews = build_previews(pose, int(features["impact_frame"]), Path(tmp))
         preview_s = time.time() - t0
 
         preview_uris: dict[str, str] = {}
         for kind, path in previews.items():
-            uri = storage.join_uri(args.out, slug, stamp, path.name)
+            uri = storage.join_uri(preview_prefix, path.name)
             storage.upload_file(path, uri, region=args.region)
             preview_uris[kind] = uri
             print(f"  미리보기 {kind}: {path.stat().st_size / 1e6:.2f}MB → {uri}")
 
     # --- 리포트 업로드 -----------------------------------------------------
-    target = storage.join_uri(args.out, slug, f"{stamp}.json")
+    target = report_uri
 
-    report = {
+    report = build_report(
+        video=video,
+        video_id=args.video_id,
+        stamp=stamp,
+        rubric=rubric,
+        rubric_path=args.rubric,
+        swing_side=args.side,
+        focus=args.focus,
+        target_fps=args.fps,
+        pose=pose,
+        features=features,
+        result=result,
+        previews=preview_uris,
+        judge_backend=judge.backend,
+        judge_model=judge.model_id,
+        timing={
+            "fetch_s": round(fetch_s, 2),
+            "measure_s": round(measure_s, 2),
+            "judge_s": round(judge_s, 2),
+            "preview_s": round(preview_s, 2),
+        },
+    )
+    storage.upload_json(report, target, region=args.region)
+    print(f"\n저장: {target}")
+    print(json.dumps(report["timing"], ensure_ascii=False))
+    return target
+
+
+# --- 리포트 봉투 ------------------------------------------------------------
+#
+# 🔴 **여기 키를 늘리거나 줄이는 것은 계약 변경이다** (미결 `jin` 27번).
+# 적재(`POST /analyses`)·읽기 경로·화면이 같은 JSON 을 읽으므로, 조용히 바꾸면
+# 백엔드는 배포 뒤 실서버에서만 알게 된다. 정본 목록은
+# `contracts/report_schema.yaml` 이고 `tests/test_report_contract.py` 가 이
+# 함수의 산출과 그 파일이 어긋나면 빨개진다.
+# 🔴 값은 `contracts/report_schema.yaml` 의 `version` 과 **같아야 한다**
+# (테스트가 본다). 필드를 늘렸으면 minor 를 올린다 — 1.1 은 `view_dependent`
+# 가 늘어난 봉투다 (미결 `ho` 37·38번). 1.2 는 `title_earned` (미결 `paik` 23번).
+# 1.3 은 `skeleton` — 관절 시계열과 세 순간 (미결 `paik` 30번).
+# 1.4 는 그 안의 `direction`·`after_clipped` (같은 항목, 화면 타입과 대조해 찾음).
+# 1.5 는 `result.card` — 추천 판의 설명 칸 (미결 `paik` 27번).
+# 1.6 은 `preprocessing` — 무엇으로 쟀는가 (미결 49번).
+REPORT_SCHEMA_VERSION = "1.6"
+
+
+def build_report(
+    *,
+    video: str,
+    video_id: str | None,
+    stamp: str,
+    rubric,
+    rubric_path: str,
+    swing_side: str,
+    focus: str | None,
+    target_fps: int,
+    pose,
+    features: dict,
+    result: dict,
+    previews: dict[str, str],
+    judge_backend: str,
+    judge_model: str,
+    timing: dict,
+) -> dict:
+    """S3 에 올릴 리포트 **봉투**를 짓는다 — 업로드는 하지 않는다.
+
+    분석 절차에서 떼어 둔 이유는 하나다: **봉투를 검사할 수 있어야 해서다.**
+    안에 있으면 S3 와 영상과 판정 모델이 다 있어야 키 하나를 확인할 수 있고,
+    그러면 확인하지 않게 된다.
+    """
+    return {
+        # 🔴 **읽는 쪽이 봉투 모양을 가릴 수 있게 한다** (미결 `jin` 27번).
+        # 모르는 major 면 **적재를 거부하는 것이 맞다** — 필드가 빠진 리포트를
+        # 반쯤 적재하면 어느 행이 낡은 스키마에서 온 것인지 사후에 구분할 수
+        # 없다. 올릴 때는 계약으로 알린다(조용히 안 바꾼다).
+        "schema_version": REPORT_SCHEMA_VERSION,
+        # 🔴 **「저장」 뒤에는 이 키가 죽는다.** `jin` 24번의 `keep` 이 원본을
+        # `reports/<user_id>/<video_id>/source.mp4` 로 옮기고 `videos/` 쪽을
+        # 지우기 때문이다. 여기 값은 **분석 시점의 자리**이고, 옮긴 뒤의 자리를
+        # 아는 것은 fastapi 뿐이다 — 그쪽에서 갱신하거나 리포트를 DB로 옮길 때
+        # 정리한다(`jin` 24번에 적어 두었다).
         "source_video": video,
+        # 🔴 **어느 영상의 리포트인지를 봉투가 스스로 말한다** (미결 `jin` 24번 (1)).
+        # `source_video` 는 「저장」 뒤에 죽는다 — `keep` 이 원본을 옮기고
+        # `videos/` 쪽을 지우기 때문이다. 그러면 **리포트 안에서 어느 영상
+        # 것인지 가리키는 값이 하나도 안 남고**, 읽는 쪽이 S3 키를 파싱해
+        # 되짚어야 한다. 자리를 정하는 규칙이 두 곳에 생기는 것이라 `paik`
+        # 11번에서 배제한 형태와 같다 — **아는 쪽이 적어 준다.**
+        #
+        # 배치·평가 실행에는 `video_id` 가 없다(백엔드 작업이 아니다).
+        # 그때는 `null` 이다 — 모르면 지어내지 않는다.
+        "video_id": video_id,
         "analyzed_at": stamp,
         "code_version": code_version(),
         "rubric": {
             "sport": rubric.sport, "motion": rubric.motion,
-            "version": rubric.version, "path": args.rubric,
+            "version": rubric.version, "path": rubric_path,
             "impact_limb": rubric.impact_limb,
             "impact_event": rubric.impact_event,
         },
         # swing_side는 impact_limb에만 적용된다 — 반대쪽 사지 지표는 auto
         # 판별로 나온 값이다 (features.extract_features 참고).
-        "swing_side": args.side,
-        "target_fps": args.fps,
+        "swing_side": swing_side,
+        # 올린 사람이 「집중해서 볼 항목」으로 고른 것 (미결 `paik` 8번).
+        # 🔴 **채점을 바꾸지 않는다** — 같은 영상이 고른 것에 따라 다른 점수를
+        # 내면 선수끼리 비교가 안 된다. 화면이 강조·정렬에 쓰라고 싣는다.
+        "focus": focus_envelope(rubric, focus),
+        "target_fps": target_fps,
         "sampled_fps": round(float(pose.sampled_fps), 2),
         "frames": int(len(pose.keypoints)),
         # 프레임 단위 지표를 초로 (미결 7번 E-3). `sampled_fps`가 바로 위에
@@ -245,28 +438,48 @@ def analyze_one(video: str, args, rubric, subject) -> None:
         "frame_metrics_seconds": frame_metrics_as_seconds(
             features, float(pose.sampled_fps)
         ),
-        "judge_backend": judge.backend,
-        "judge_model": judge.model_id,
+        "judge_backend": judge_backend,
+        "judge_model": judge_model,
+        # **무엇으로 쟀는가** — 이미지 전처리기의 실물 이름 (미결 49번).
+        # `judge_backend`·`code_version` 과 같은 층이다: 이 값을 낸 것이
+        # 무엇인지 봉투가 스스로 말한다. 🔴 지금 **평가 기계와 EC2 가 다른
+        # 전처리기로 돌고 있고**(`torchvision` 유무), 그래서 같은 영상이 다른
+        # 등급을 받는다. 어느 쪽으로 통일할지는 결정 대기지만, 그때까지도
+        # **어느 쪽으로 돈 결과인지는 드러나 있어야 한다.**
+        # 전처리기를 안 쓴 경로(합성 키포인트)는 `null` 이다 — 지어내지 않는다.
+        "preprocessing": pose.preprocessing,
         # 스켈레톤은 ViTPose 키포인트로 그린 것이다 — 추가 추론이 없고
         # YOLO는 이 경로에 없다. 비어 있으면 렌더링에 실패한 것이고,
         # 그래도 위의 측정·판정은 그대로 유효하다.
-        "previews": preview_uris,
-        "timing": {
-            "fetch_s": round(fetch_s, 2),
-            "measure_s": round(measure_s, 2),
-            "judge_s": round(judge_s, 2),
-            "preview_s": round(preview_s, 2),
-        },
+        "previews": previews,
+        "timing": timing,
         # **누구를** 분석했는지 — 지정/자동/폴백과 선택 박스 시계열.
         # 🔴 폴백을 조용히 넘기지 않는다. 이것이 없으면 "찍은 사람이 실제로
         # 분석됐는가"를 사후에 확인할 방법이 없다 (미결 18번).
         "subject": subject_envelope(pose, int(len(pose.keypoints))),
+        # **얼마나 잘 잡힌 키포인트로 낸 값인가** (미결 `jin` 27번 곁가지).
+        # 계약 3장 4)의 「신뢰도」 자리다. 게이트가 이미 재던 값인데 통과 여부만
+        # 남기고 버리고 있었다 — 71%로 겨우 통과한 클립과 여유 있게 통과한
+        # 클립을 읽는 쪽이 구분할 수 없었다.
+        # 🔴 `features` 의 형제 블록이다 — 판정 입력이 그대로다.
+        "keypoint_quality": keypoint_quality_envelope(
+            pose.keypoints, rubric.impact_limb, swing_side
+        ),
+        # **프레임별 관절과 세 순간** (미결 `paik` 30번). 비교 화면이 자세를
+        # 겹쳐 그리는 자리다 — 지금은 브라우저가 관절을 다시 뽑고 있어서
+        # 위쪽 리포트와 **다른 계기에서 온 값**으로 겹쳐 놓고 있다.
+        # 🔴 여기도 `features` 의 형제 블록이다 — 판정 입력이 그대로다.
+        "skeleton": skeleton_envelope(
+            pose.keypoints,
+            float(pose.sampled_fps),
+            features,
+            rubric.impact_limb,
+            swing_side,
+            pose.frame_size,
+        ),
         "features": features,
         "result": result,
     }
-    storage.upload_json(report, target, region=args.region)
-    print(f"\n저장: {target}")
-    print(json.dumps(report["timing"], ensure_ascii=False))
 
 
 
@@ -287,6 +500,12 @@ def main() -> None:
     ap.add_argument("--fps", type=int, default=DEFAULT_TARGET_FPS)
     ap.add_argument("--region", default=None, help="S3 리전 (미지정 시 기본 설정)")
     ap.add_argument(
+        "--video-id", default=None,
+        help="백엔드의 video.id. 주면 리포트를 계약 자리 "
+             "`<out>/<user_id>/<video_id>/report.json` 에 놓는다. "
+             "🔴 주지 않으면 옛 자리(회차별 타임스탬프)를 쓴다 — 배치·평가용이다",
+    )
+    ap.add_argument(
         "--subject-box", default=None, metavar="x,y,w,h",
         help="분석할 사람의 **정규화 0~1** 박스. 사람이 화면에서 찍은 값이다. "
              "🔴 표시 해상도 픽셀이 아니다 — 주지 않으면 지금까지처럼 자동으로 고른다",
@@ -294,6 +513,19 @@ def main() -> None:
     ap.add_argument(
         "--subject-at-ms", type=float, default=None,
         help="--subject-box 를 그린 영상 시각(밀리초). 박스를 주면 함께 주어야 한다",
+    )
+    ap.add_argument(
+        "--focus", default=None, metavar="id,id",
+        help="올린 사람이 집중해서 보고 싶다고 고른 채점 항목 id (루브릭의 "
+             "`criteria[].id`, 쉼표로 구분). 🔴 **채점을 바꾸지 않는다** — "
+             "화면 강조용으로 리포트에 실릴 뿐이다(미결 `paik` 8번). "
+             "안 주면 「전체적으로」다",
+    )
+    ap.add_argument(
+        "--result-json", default=None, metavar="경로",
+        help="올린 리포트의 자리를 이 파일에 JSON 으로 남긴다. 워커가 완료 "
+             "보고에 실으려고 읽는다(미결 `paik` 11번). 🔴 stdout 을 긁지 "
+             "않는 것은 로그 문구가 바뀌면 조용히 깨지기 때문이다",
     )
     # 🔴 `--skip-analyzed` 를 **일부러 뺐다** (2026-09-08, 미결 jin 20번).
     #    `reports/` 유무로 "안 돈 것"을 가리는 것은 두 번째 큐였다. 큐의 정본은
@@ -318,6 +550,13 @@ def main() -> None:
           f"({len(rubric.criteria)}개 항목)")
 
     videos = resolve_videos(video_uri := args.video, args.region)
+    if len(videos) > 1 and args.video_id:
+        # 🔴 한 폴더의 여러 편이 같은 자리에 리포트를 쓰면 **서로 덮는다.**
+        #    계약 자리에는 타임스탬프가 없어서 마지막 것만 남는다.
+        raise SystemExit(
+            f"{video_uri} 아래에 영상이 {len(videos)}편인데 --video-id 가 하나다. "
+            "video_id 는 영상 한 편의 것이므로 영상을 직접 지정할 것."
+        )
     if len(videos) > 1 and subject is not None:
         raise SystemExit(
             f"{video_uri} 아래에 영상이 {len(videos)}편이다. 대상 지정"
@@ -326,10 +565,12 @@ def main() -> None:
 
     print(f"대상 {len(videos)}편")
     failed = 0
+    produced: list[dict[str, str]] = []
     for i, video in enumerate(videos, 1):
         print(f"\n[{i}/{len(videos)}] {video}")
         try:
-            analyze_one(video, args, rubric, subject)
+            produced.append({"video": video,
+                             "report_uri": analyze_one(video, args, rubric, subject)})
         except SystemExit as exc:
             # 🔴 영상을 **한 편만** 준 경우는 종료 코드를 그대로 올린다.
             #    워커(scripts/worker.py)가 이 코드 하나로 succeeded/failed 를
@@ -349,6 +590,14 @@ def main() -> None:
     # 🔴 여러 편 중 일부 실패는 0으로 끝낸다 — 스캔은 "돌 수 있는 것을 돌리는"
     #    작업이고, 한 편의 품질 미달로 스캔 전체가 실패가 되면 재시도가 무한히
     #    돈다. 한 편짜리 호출(위 raise)과는 뜻이 다르다.
+
+    # 🔴 **성공한 것만 적는다.** 한 편짜리 호출이 실패하면 위에서 그대로
+    #    올라가 여기 못 온다 — 그래서 실패한 작업의 파일은 아예 안 생기고,
+    #    워커는 "없으면 안 싣는다"로 읽으면 된다.
+    if args.result_json:
+        Path(args.result_json).write_text(
+            json.dumps({"reports": produced}, ensure_ascii=False), encoding="utf-8"
+        )
 
 
 if __name__ == "__main__":

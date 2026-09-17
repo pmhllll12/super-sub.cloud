@@ -13,6 +13,8 @@ pydantic[email]      # EmailStr — 계약의 INVALID_EMAIL 검증에 필요하�
 sqlalchemy           # 2.x. 동기로 쓴다 — 라우터·인터랙터가 전부 def 다
 psycopg[binary]      # psycopg3. SQLAlchemy URL 에 +psycopg 를 붙여야 한다
 alembic              # 스키마 변경
+pgvector             # SQLAlchemy Vector 컬럼 타입 — user 임베딩 매칭에 쓴다
+google-genai         # Gemini 임베딩 API — 용병 프로필·검색어를 벡터로 바꾼다
 
 # --- 인증 (해싱·JWT 교체 작업에서 쓴다) ---------------------------------------
 # passlib 을 쓰지 않는다 — bcrypt 4.x/5.x 버전 감지에서 깨진 사례가 있어
@@ -24,3 +26,8 @@ pyjwt[crypto]        # crypto 는 구글 ID 토큰(RS256) 검증에 필요해진
 # 업로드 클립을 S3 에 둔다(SFR-001). 사전 서명 URL 발급과 HEAD 뿐이라 boto3 만
 # 있으면 되고, 자격증명은 기본 체인(EC2 역할 -> 환경변수)에서 찾는다.
 boto3
+
+# --- 관측 ----------------------------------------------------------------------
+# 요청 수·지연 히스토그램·에러율을 /metrics 로 노출한다. P95(PER-001·PER-003)는
+# Prometheus 에서 histogram_quantile 로 뽑는다 — 앱은 히스토그램만 낸다.
+prometheus-fastapi-instrumentator

@@ -1,0 +1,1076 @@
+{
+  "tag": "trace_C3",
+  "arm": "C3",
+  "drop_rationale": true,
+  "drop_other_anchors": true,
+  "backend": "transformers",
+  "model": "LGAI-EXAONE/EXAONE-4.0-1.2B",
+  "clips": {
+    "football/inside_pass": {
+      "score": null,
+      "grade": null,
+      "items": [
+        {
+          "criterion_id": "plant_foot_position",
+          "name": "디딤발 위치",
+          "grade": 2,
+          "stored_grade": 2,
+          "segment": 0,
+          "band_value": 0.1,
+          "evidence": "디딤발이 공 옆 어깨너비 0.22배에 붙어 방향이 고정됐다",
+          "metric_ref": "plant_foot_to_ball_offset",
+          "given_metrics": {
+            "plant_foot_to_ball_offset": 0.1
+          }
+        },
+        {
+          "criterion_id": "plant_foot_position",
+          "name": "디딤발 위치",
+          "grade": 2,
+          "stored_grade": 2,
+          "segment": 0,
+          "band_value": 0.3,
+          "evidence": "디딤발이 공 옆 어깨너비 0.22배에 붙어 방향이 고정됐다",
+          "metric_ref": "plant_foot_to_ball_offset",
+          "given_metrics": {
+            "plant_foot_to_ball_offset": 0.3
+          }
+        },
+        {
+          "criterion_id": "plant_foot_position",
+          "name": "디딤발 위치",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 0,
+          "band_value": 0.5,
+          "evidence": "간격 0.5배로 조준이 다소 헐겁다",
+          "metric_ref": "plant_foot_to_ball_offset",
+          "given_metrics": {
+            "plant_foot_to_ball_offset": 0.5
+          }
+        },
+        {
+          "criterion_id": "plant_foot_position",
+          "name": "디딤발 위치",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 0,
+          "band_value": 0.6,
+          "evidence": "간격 0.6배로 조준이 다소 헐겁다",
+          "metric_ref": "plant_foot_to_ball_offset",
+          "given_metrics": {
+            "plant_foot_to_ball_offset": 0.6
+          }
+        },
+        {
+          "criterion_id": "plant_foot_position",
+          "name": "디딤발 위치",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 0,
+          "band_value": 5.5,
+          "evidence": "디딤발-공 수평 거리 5.5로 판정 수준 [아쉬움]",
+          "metric_ref": "plant_foot_to_ball_offset",
+          "given_metrics": {
+            "plant_foot_to_ball_offset": 5.5
+          }
+        },
+        {
+          "criterion_id": "plant_foot_position",
+          "name": "디딤발 위치",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 0,
+          "band_value": 8.0,
+          "evidence": "디딤발-공 수평 거리 8.0 → '간격이 길어 방향이 흔들리는 자세다', 적절한 발 위치로 공을 더 정확히 받으려면 발을 약간 더 앞으로 빼는 연습이 필요할 것입니다.",
+          "metric_ref": "plant_foot_to_ball_offset",
+          "given_metrics": {
+            "plant_foot_to_ball_offset": 8.0
+          }
+        },
+        {
+          "criterion_id": "swing_knee_extension",
+          "name": "차는 다리 뻗기",
+          "grade": 2,
+          "stored_grade": 2,
+          "segment": 0,
+          "band_value": 132.2,
+          "evidence": "임팩트 시 주동 무릎 각 132.2도로 스윙이 짧게 절제됐다.",
+          "metric_ref": "swing_knee_angle_at_impact",
+          "given_metrics": {
+            "swing_knee_angle_at_impact": 132.2
+          }
+        },
+        {
+          "criterion_id": "swing_knee_extension",
+          "name": "차는 다리 뻗기",
+          "grade": 2,
+          "stored_grade": 2,
+          "segment": 0,
+          "band_value": 142.8,
+          "evidence": "임팩트 시 주동 무릎 각 142.8도로 스윙이 짧게 절제됐다.",
+          "metric_ref": "swing_knee_angle_at_impact",
+          "given_metrics": {
+            "swing_knee_angle_at_impact": 142.8
+          }
+        },
+        {
+          "criterion_id": "swing_knee_extension",
+          "name": "차는 다리 뻗기",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 0,
+          "band_value": 160.2,
+          "evidence": "임팩트 시 주동 무릎 각 160.2도로 스윙이 다소 커졌다. 더 정확한 각도 유지가 필요해 보인다.",
+          "metric_ref": "swing_knee_angle_at_impact",
+          "given_metrics": {
+            "swing_knee_angle_at_impact": 160.2
+          }
+        },
+        {
+          "criterion_id": "swing_knee_extension",
+          "name": "차는 다리 뻗기",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 0,
+          "band_value": 164.8,
+          "evidence": "임팩트 시 주동 무릎 각 164.8도로 스윙이 다소 커졌다.",
+          "metric_ref": "swing_knee_angle_at_impact",
+          "given_metrics": {
+            "swing_knee_angle_at_impact": 164.8
+          }
+        },
+        {
+          "criterion_id": "swing_knee_extension",
+          "name": "차는 다리 뻗기",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 0,
+          "band_value": 42.0,
+          "evidence": "임팩트 시 주동 무릎 각 42.0도로 무릎이 너무 접혀 공을 효과적으로 밀어내지 못했다.",
+          "metric_ref": "swing_knee_angle_at_impact",
+          "given_metrics": {
+            "swing_knee_angle_at_impact": 42.0
+          }
+        },
+        {
+          "criterion_id": "swing_knee_extension",
+          "name": "차는 다리 뻗기",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 0,
+          "band_value": 78.0,
+          "evidence": "임팩트 시 주동 무릎 각 78.0도가 너무 작아 공을 효과적으로 밀어내지 못했다. 무릎을 더 개방시켜 충격을 분산시키면 도움이 될 것 같습니다.",
+          "metric_ref": "swing_knee_angle_at_impact",
+          "given_metrics": {
+            "swing_knee_angle_at_impact": 78.0
+          }
+        },
+        {
+          "criterion_id": "swing_knee_extension",
+          "name": "차는 다리 뻗기",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 1,
+          "band_value": 174.8,
+          "evidence": "임팩트 시 주동 무릎 각 174.8도로 차는 다리가 슈팅처럼 끝까지 고정되어 있다. 패스 의도를 완전히 잃고 슈팅 자세로 전환된 것 같다.",
+          "metric_ref": "swing_knee_angle_at_impact",
+          "given_metrics": {
+            "swing_knee_angle_at_impact": 174.8
+          }
+        },
+        {
+          "criterion_id": "swing_knee_extension",
+          "name": "차는 다리 뻗기",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 1,
+          "band_value": 177.2,
+          "evidence": "임팩트 시 주동 무릎 각 177.2도로 차는 다리가 슈팅처럼 끝까지 고정되어 있다.",
+          "metric_ref": "swing_knee_angle_at_impact",
+          "given_metrics": {
+            "swing_knee_angle_at_impact": 177.2
+          }
+        },
+        {
+          "criterion_id": "trunk_lean",
+          "name": "상체 기울기",
+          "grade": 2,
+          "stored_grade": 2,
+          "segment": 0,
+          "band_value": 6.5,
+          "evidence": "임팩트 시 몸통 전후 기울기 6.5도 유지로 상체를 곧게 유지하며 공을 컨트롤했다.",
+          "metric_ref": "trunk_forward_lean_deg_at_impact",
+          "given_metrics": {
+            "trunk_forward_lean_deg_at_impact": 6.5
+          }
+        },
+        {
+          "criterion_id": "trunk_lean",
+          "name": "상체 기울기",
+          "grade": 2,
+          "stored_grade": 2,
+          "segment": 0,
+          "band_value": 10.5,
+          "evidence": "임팩트 시 몸통 전후 기울기 10.5도 유지로 상체를 곧게 유지하며 공을 컨트롤했다.",
+          "metric_ref": "trunk_forward_lean_deg_at_impact",
+          "given_metrics": {
+            "trunk_forward_lean_deg_at_impact": 10.5
+          }
+        },
+        {
+          "criterion_id": "trunk_lean",
+          "name": "상체 기울기",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 0,
+          "band_value": 18.5,
+          "evidence": "임팩트 시 몸통 전후 기울기 18.5도로 상체가 과하게 숙여졌다. 더 높이 유지하면 공을 더 효과적으로 차는 데 도움이 될 것입니다.",
+          "metric_ref": "trunk_forward_lean_deg_at_impact",
+          "given_metrics": {
+            "trunk_forward_lean_deg_at_impact": 18.5
+          }
+        },
+        {
+          "criterion_id": "trunk_lean",
+          "name": "상체 기울기",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 0,
+          "band_value": 21.5,
+          "evidence": "임팩트 시 몸통 전후 기울기 21.5도로 상체가 과하게 숙여졌다. 더 자세를 유지하면 공을 더 효과적으로 차는 데 도움이 될 것입니다.",
+          "metric_ref": "trunk_forward_lean_deg_at_impact",
+          "given_metrics": {
+            "trunk_forward_lean_deg_at_impact": 21.5
+          }
+        },
+        {
+          "criterion_id": "trunk_lean",
+          "name": "상체 기울기",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 0,
+          "band_value": 0.7,
+          "evidence": "임팩트 시 몸통 전후 기울기 -3.0도 → 상체가 뒤로 젖혀져 패스가 뜨는 모습이 관찰됨",
+          "metric_ref": "trunk_forward_lean_deg_at_impact",
+          "given_metrics": {
+            "trunk_forward_lean_deg_at_impact": 0.7
+          }
+        },
+        {
+          "criterion_id": "trunk_lean",
+          "name": "상체 기울기",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 0,
+          "band_value": 1.3,
+          "evidence": "임팩트 시 몸통 전후 기울기 -3.0도 → 상체가 뒤로 젖혀져 패스가 뜨는 모습이 관찰됨",
+          "metric_ref": "trunk_forward_lean_deg_at_impact",
+          "given_metrics": {
+            "trunk_forward_lean_deg_at_impact": 1.3
+          }
+        },
+        {
+          "criterion_id": "trunk_lean",
+          "name": "상체 기울기",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 1,
+          "band_value": 29.8,
+          "evidence": "임팩트 시 몸통 전후 기울기 29.8도로 상체를 공 위로 깊이 숙였다.",
+          "metric_ref": "trunk_forward_lean_deg_at_impact",
+          "given_metrics": {
+            "trunk_forward_lean_deg_at_impact": 29.8
+          }
+        },
+        {
+          "criterion_id": "trunk_lean",
+          "name": "상체 기울기",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 1,
+          "band_value": 32.2,
+          "evidence": "임팩트 시 몸통 전후 기울기 32.2도로 상체를 공 위로 깊이 숙였다.",
+          "metric_ref": "trunk_forward_lean_deg_at_impact",
+          "given_metrics": {
+            "trunk_forward_lean_deg_at_impact": 32.2
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 2,
+          "stored_grade": 2,
+          "segment": 0,
+          "band_value": 22.0,
+          "evidence": "골반 회전 범위 22.0도가 정확히 측정되어 인사이드 면이 공을 향해 적절히 열리고 있었다.",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 22.0
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 2,
+          "stored_grade": 2,
+          "segment": 0,
+          "band_value": 28.0,
+          "evidence": "골반 회전 범위 28.0도가 판정 기준을 충족하며 인사이드 면이 공을 효과적으로 향하도록 개방되었다.",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 28.0
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 0,
+          "band_value": 10.4,
+          "evidence": "골반 회전 범위 10.4도로 판정 수준인 보통 판정과 일치하며, 회전 범위가 부족해 비뚤어진 자세를 보이는 것 같습니다. 골반을 더 넓게 열고 회전하면 균형 잡힌 움직임이 가능할 것입니다.",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 10.4
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 0,
+          "band_value": 12.6,
+          "evidence": "골반 회전 범위 12.6도로 판정 수준인 보통 판정과 비교해 골반이 충분히 열리지 않아 비뚤어진 자세가 관찰됨",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 12.6
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 1,
+          "band_value": 85.8,
+          "evidence": "골반 회전 범위 85.8도가 판정 기준을 초과하여 지나치게 많이 돌렸다.",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 85.8
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 1,
+          "band_value": 129.2,
+          "evidence": "골반 회전 범위 129.2도가 판정 기준을 초과하여 지나치게 많이 돌렸다.",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 129.2
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 0,
+          "band_value": 2.8,
+          "evidence": "골반 회전 범위 2.8도가 부족해 인사이드 공이 닿지 않는다",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 2.8
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 0,
+          "band_value": 5.2,
+          "evidence": "골반 회전 범위 5.2도로 인사이드 면이 공에 닿지 않는다. 더 넓은 회전 범위가 필요하다",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 5.2
+          }
+        },
+        {
+          "criterion_id": "follow_through",
+          "name": "차고 난 뒤 마무리",
+          "grade": 2,
+          "stored_grade": 2,
+          "segment": 0,
+          "band_value": 13.9,
+          "evidence": "임팩트 후 주동 고관절 굴곡 13.9도로 방향을 유지하며 안정적으로 마무리했다.",
+          "metric_ref": "swing_hip_flexion_after_impact_deg",
+          "given_metrics": {
+            "swing_hip_flexion_after_impact_deg": 13.9,
+            "follow_through_duration_frames": 4.0
+          }
+        },
+        {
+          "criterion_id": "follow_through",
+          "name": "차고 난 뒤 마무리",
+          "grade": 2,
+          "stored_grade": 2,
+          "segment": 0,
+          "band_value": 19.1,
+          "evidence": "임팩트 후 주동 고관절 굴곡 19.1도로 방향을 명확히 유지하며 멈추었다.",
+          "metric_ref": "swing_hip_flexion_after_impact_deg",
+          "given_metrics": {
+            "swing_hip_flexion_after_impact_deg": 19.1,
+            "follow_through_duration_frames": 4.0
+          }
+        },
+        {
+          "criterion_id": "follow_through",
+          "name": "차고 난 뒤 마무리",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 0,
+          "band_value": 4.8,
+          "evidence": "임팩트 후 주동 고관절 굴곡 4.8도로 차는 다리가 비교적 짧게 나갔다. 더 강하게 차면 발 끝까지 도달하는 속도가 빨라질 수 있다.",
+          "metric_ref": "swing_hip_flexion_after_impact_deg",
+          "given_metrics": {
+            "swing_hip_flexion_after_impact_deg": 4.8,
+            "follow_through_duration_frames": 2.0
+          }
+        },
+        {
+          "criterion_id": "follow_through",
+          "name": "차고 난 뒤 마무리",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 0,
+          "band_value": 6.2,
+          "evidence": "임팩트 후 주동 고관절 굴곡 6.2도로 차는 다리가 충분히 뒤로 나가지 않았다. 더 깊은 굴곡으로 힘을 집중하면 발 위치가 더 안정적으로 유지될 수 있을 것이다.",
+          "metric_ref": "swing_hip_flexion_after_impact_deg",
+          "given_metrics": {
+            "swing_hip_flexion_after_impact_deg": 6.2,
+            "follow_through_duration_frames": 2.0
+          }
+        },
+        {
+          "criterion_id": "follow_through",
+          "name": "차고 난 뒤 마무리",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 1,
+          "band_value": 79.2,
+          "evidence": "패스 후 임팩트 시 주동 고관절 굴곡이 79.2도로 슈팅처럼 크게 유지되었다. 팔로스루 지속 시간은 8프레임으로 비교적 짧은 편이다. 더 강하고 안정된 마무리를 위해 고관절 각도를 약간 더 높이는 연습이 필요할 것 같다.",
+          "metric_ref": "swing_hip_flexion_after_impact_deg",
+          "given_metrics": {
+            "swing_hip_flexion_after_impact_deg": 79.2,
+            "follow_through_duration_frames": 8.0
+          }
+        },
+        {
+          "criterion_id": "follow_through",
+          "name": "차고 난 뒤 마무리",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 1,
+          "band_value": 125.8,
+          "evidence": "패스 후 임팩트 시 주동 고관절 굴곡이 125.8도로 상당히 높아 슈팅처럼 마무리되었다.",
+          "metric_ref": "swing_hip_flexion_after_impact_deg",
+          "given_metrics": {
+            "swing_hip_flexion_after_impact_deg": 125.8,
+            "follow_through_duration_frames": 8.0
+          }
+        },
+        {
+          "criterion_id": "follow_through",
+          "name": "차고 난 뒤 마무리",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 0,
+          "band_value": 1.0,
+          "evidence": "임팩트 후 주동 고관절 굴곡 1.0도가 부족해 팔로스루가 즉시 멈추는 모습이 보였다. 추가 굴곡 0.5도 정도 더 주면 실행력이 향상될 것이다.",
+          "metric_ref": "swing_hip_flexion_after_impact_deg",
+          "given_metrics": {
+            "swing_hip_flexion_after_impact_deg": 1.0,
+            "follow_through_duration_frames": 1.0
+          }
+        },
+        {
+          "criterion_id": "follow_through",
+          "name": "차고 난 뒤 마무리",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 0,
+          "band_value": 2.0,
+          "evidence": "추가 굴곡 1.5도로 임팩트 직후 스윙이 끊겼다",
+          "metric_ref": "swing_hip_flexion_after_impact_deg",
+          "given_metrics": {
+            "swing_hip_flexion_after_impact_deg": 2.0,
+            "follow_through_duration_frames": 1.0
+          }
+        }
+      ]
+    },
+    "football/instep_shot": {
+      "score": null,
+      "grade": null,
+      "items": [
+        {
+          "criterion_id": "plant_knee_flexion",
+          "name": "디딤발 무릎 굽히기",
+          "grade": 2,
+          "stored_grade": 2,
+          "segment": 0,
+          "band_value": 157.0,
+          "evidence": "임팩트 시 디딤발 무릎각 157.0도로 기준 범위 중앙",
+          "metric_ref": "plant_knee_angle_at_impact",
+          "given_metrics": {
+            "plant_knee_angle_at_impact": 157.0
+          }
+        },
+        {
+          "criterion_id": "plant_knee_flexion",
+          "name": "디딤발 무릎 굽히기",
+          "grade": 2,
+          "stored_grade": 2,
+          "segment": 0,
+          "band_value": 163.0,
+          "evidence": "임팩트 시 디딤발 무릎각 163.0도가 잘된 자세를 보여주었다. 무릎 각도가 적절하게 굽혀져 있어 몸을 효과적으로 버틸 수 있었다.",
+          "metric_ref": "plant_knee_angle_at_impact",
+          "given_metrics": {
+            "plant_knee_angle_at_impact": 163.0
+          }
+        },
+        {
+          "criterion_id": "plant_knee_flexion",
+          "name": "디딤발 무릎 굽히기",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 0,
+          "band_value": 140.2,
+          "evidence": "임팩트 시 디딤발 무릎 각 140.2도로 필요보다 깊이 굽혔다. 무릎 각도가 과도하게 낮아 발이 불안정해지고 균형 유지가 어려울 수 있다. 더 넓은 각도(예: 145도 이상)로 조정하면 안정성과 충격 흡수에 도움이 될 것이다.",
+          "metric_ref": "plant_knee_angle_at_impact",
+          "given_metrics": {
+            "plant_knee_angle_at_impact": 140.2
+          }
+        },
+        {
+          "criterion_id": "plant_knee_flexion",
+          "name": "디딤발 무릎 굽히기",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 0,
+          "band_value": 144.8,
+          "evidence": "임팩트 시 디딤발 무릎 각 144.8도로 필요보다 깊이 굽혔다. 무릎 각도가 과도하게 낮아 발이 불안정해지고 균형 유지가 어려울 수 있다. 더 넓은 각도(예: 150도 이상)로 조정하면 안정성과 충격 흡수에 도움이 될 것이다.",
+          "metric_ref": "plant_knee_angle_at_impact",
+          "given_metrics": {
+            "plant_knee_angle_at_impact": 144.8
+          }
+        },
+        {
+          "criterion_id": "plant_knee_flexion",
+          "name": "디딤발 무릎 굽히기",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 1,
+          "band_value": 173.5,
+          "evidence": "임팩트 시 디딤발 무릎 각 173.5도로 거의 굽히지 않고 뻣뻣하게 선 자세",
+          "metric_ref": "plant_knee_angle_at_impact",
+          "given_metrics": {
+            "plant_knee_angle_at_impact": 173.5
+          }
+        },
+        {
+          "criterion_id": "plant_knee_flexion",
+          "name": "디딤발 무릎 굽히기",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 1,
+          "band_value": 176.5,
+          "evidence": "임팩트 시 디딤발 무릎 각 176.5도로 디딤발을 거의 굽히지 않고 뻣뻣하게 섰다.",
+          "metric_ref": "plant_knee_angle_at_impact",
+          "given_metrics": {
+            "plant_knee_angle_at_impact": 176.5
+          }
+        },
+        {
+          "criterion_id": "plant_knee_flexion",
+          "name": "디딤발 무릎 굽히기",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 0,
+          "band_value": 47.2,
+          "evidence": "임팩트 시 디딤발 무릎 각 47.2도로 디딤발이 버티지 못하고 주저앉았다",
+          "metric_ref": "plant_knee_angle_at_impact",
+          "given_metrics": {
+            "plant_knee_angle_at_impact": 47.2
+          }
+        },
+        {
+          "criterion_id": "plant_knee_flexion",
+          "name": "디딤발 무릎 굽히기",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 0,
+          "band_value": 87.8,
+          "evidence": "임팩트 시 디딤발 무릎 각 87.8도로 무릎이 충분히 지지되지 않고 주저앉았다.",
+          "metric_ref": "plant_knee_angle_at_impact",
+          "given_metrics": {
+            "plant_knee_angle_at_impact": 87.8
+          }
+        },
+        {
+          "criterion_id": "swing_knee_extension",
+          "name": "차는 다리 뻗기",
+          "grade": 2,
+          "stored_grade": 2,
+          "segment": 0,
+          "band_value": 148.8,
+          "evidence": "임팩트 시 주동 무릎 각 148.8도로 차는 다리가 안정적이었다.",
+          "metric_ref": "swing_knee_angle_at_impact",
+          "given_metrics": {
+            "swing_knee_angle_at_impact": 148.8
+          }
+        },
+        {
+          "criterion_id": "swing_knee_extension",
+          "name": "차는 다리 뻗기",
+          "grade": 2,
+          "stored_grade": 2,
+          "segment": 0,
+          "band_value": 156.2,
+          "evidence": "임팩트 시 주동 무릎 각 156.2도로 차는 다리가 완전히 펴져 있다.",
+          "metric_ref": "swing_knee_angle_at_impact",
+          "given_metrics": {
+            "swing_knee_angle_at_impact": 156.2
+          }
+        },
+        {
+          "criterion_id": "swing_knee_extension",
+          "name": "차는 다리 뻗기",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 0,
+          "band_value": 168.5,
+          "evidence": "임팩트 시 주동 무릎 각 168.5도로 차는 다리가 거의 펴져 있었다. 약간 더 펴서 차면 체중 분산이 더 효율적일 것 같다.",
+          "metric_ref": "swing_knee_angle_at_impact",
+          "given_metrics": {
+            "swing_knee_angle_at_impact": 168.5
+          }
+        },
+        {
+          "criterion_id": "swing_knee_extension",
+          "name": "차는 다리 뻗기",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 0,
+          "band_value": 171.5,
+          "evidence": "임팩트 시 주동 무릎 각 171.5도로 차는 다리가 거의 펴져 있었다. 약간 더 펴서 차면 체중 분산이 더 효율적일 수 있다.",
+          "metric_ref": "swing_knee_angle_at_impact",
+          "given_metrics": {
+            "swing_knee_angle_at_impact": 171.5
+          }
+        },
+        {
+          "criterion_id": "swing_knee_extension",
+          "name": "차는 다리 뻗기",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 0,
+          "band_value": 49.0,
+          "evidence": "임팩트 순간에도 주동 무릎 각이 49.0도로 거의 펴지지 않았다",
+          "metric_ref": "swing_knee_angle_at_impact",
+          "given_metrics": {
+            "swing_knee_angle_at_impact": 49.0
+          }
+        },
+        {
+          "criterion_id": "swing_knee_extension",
+          "name": "차는 다리 뻗기",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 0,
+          "band_value": 91.0,
+          "evidence": "임팩트 순간에도 주동 무릎 각이 91도로 거의 펴지지 않았다.",
+          "metric_ref": "swing_knee_angle_at_impact",
+          "given_metrics": {
+            "swing_knee_angle_at_impact": 91.0
+          }
+        },
+        {
+          "criterion_id": "swing_knee_extension",
+          "name": "차는 다리 뻗기",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 1,
+          "band_value": 179.8,
+          "evidence": "임팩트 시 주동 무릎 각 179.8도로 임팩트 전 완전 신전이 부족해 가속 구간에서 불안정했다.",
+          "metric_ref": "swing_knee_angle_at_impact",
+          "given_metrics": {
+            "swing_knee_angle_at_impact": 179.8
+          }
+        },
+        {
+          "criterion_id": "swing_knee_extension",
+          "name": "차는 다리 뻗기",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 1,
+          "band_value": 182.2,
+          "evidence": "임팩트 시 주동 무릎 각 182.2도로 임팩트 전 완전 신전이 부족해 가속 구간에서 불안정했다.",
+          "metric_ref": "swing_knee_angle_at_impact",
+          "given_metrics": {
+            "swing_knee_angle_at_impact": 182.2
+          }
+        },
+        {
+          "criterion_id": "trunk_lean",
+          "name": "상체 기울기",
+          "grade": 2,
+          "stored_grade": 2,
+          "segment": 0,
+          "band_value": 10.2,
+          "evidence": "임팩트 시 몸통 전후 기울기 10.2도로 공 위를 안정적으로 덮는 자세를 유지했다.",
+          "metric_ref": "trunk_forward_lean_deg_at_impact",
+          "given_metrics": {
+            "trunk_forward_lean_deg_at_impact": 10.2
+          }
+        },
+        {
+          "criterion_id": "trunk_lean",
+          "name": "상체 기울기",
+          "grade": 2,
+          "stored_grade": 2,
+          "segment": 0,
+          "band_value": 14.8,
+          "evidence": "임팩트 시 몸통 전후 기울기 14.8도로 공 위를 안정적으로 덮는 자세를 유지했다.",
+          "metric_ref": "trunk_forward_lean_deg_at_impact",
+          "given_metrics": {
+            "trunk_forward_lean_deg_at_impact": 14.8
+          }
+        },
+        {
+          "criterion_id": "trunk_lean",
+          "name": "상체 기울기",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 0,
+          "band_value": 1.8,
+          "evidence": "임팩트 시 몸통 전후 기울기 1.8도로 거의 수직 자세 유지",
+          "metric_ref": "trunk_forward_lean_deg_at_impact",
+          "given_metrics": {
+            "trunk_forward_lean_deg_at_impact": 1.8
+          }
+        },
+        {
+          "criterion_id": "trunk_lean",
+          "name": "상체 기울기",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 0,
+          "band_value": 3.2,
+          "evidence": "임팩트 시 몸통 전후 기울기 3.2도 → 수직에 가깝지만 약간의 기울기로 인해 체중 전달이 다소 부족하게 느껴졌다. 더 안정적인 자세를 유지하면 차는 효율이 향상될 것이다.",
+          "metric_ref": "trunk_forward_lean_deg_at_impact",
+          "given_metrics": {
+            "trunk_forward_lean_deg_at_impact": 3.2
+          }
+        },
+        {
+          "criterion_id": "trunk_lean",
+          "name": "상체 기울기",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 1,
+          "band_value": 23.5,
+          "evidence": "임팩트 시 몸통 전후 기울기 23.5도로 상체를 공 위로 약간 깊이 숙였다.",
+          "metric_ref": "trunk_forward_lean_deg_at_impact",
+          "given_metrics": {
+            "trunk_forward_lean_deg_at_impact": 23.5
+          }
+        },
+        {
+          "criterion_id": "trunk_lean",
+          "name": "상체 기울기",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 1,
+          "band_value": 26.5,
+          "evidence": "임팩트 시 몸통 전후 기울기 26.5도로 상체를 공 위로 조금 깊이 숙였다.",
+          "metric_ref": "trunk_forward_lean_deg_at_impact",
+          "given_metrics": {
+            "trunk_forward_lean_deg_at_impact": 26.5
+          }
+        },
+        {
+          "criterion_id": "trunk_lean",
+          "name": "상체 기울기",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 1,
+          "band_value": 34.8,
+          "evidence": "임팩트 시 몸통 전후 기울기 34.8도로 상체가 공 위로 크게 무너졌다.",
+          "metric_ref": "trunk_forward_lean_deg_at_impact",
+          "given_metrics": {
+            "trunk_forward_lean_deg_at_impact": 34.8
+          }
+        },
+        {
+          "criterion_id": "trunk_lean",
+          "name": "상체 기울기",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 1,
+          "band_value": 37.2,
+          "evidence": "임팩트 시 몸통 전후 기울기 37.2도로 상체가 공 위로 크게 무너졌다.",
+          "metric_ref": "trunk_forward_lean_deg_at_impact",
+          "given_metrics": {
+            "trunk_forward_lean_deg_at_impact": 37.2
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 2,
+          "stored_grade": 2,
+          "segment": 0,
+          "band_value": 79.2,
+          "evidence": "골반 회전 범위 34.2도로 백스윙에서 임팩트까지 크게 열렸다.",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 79.2
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 2,
+          "stored_grade": 2,
+          "segment": 0,
+          "band_value": 125.8,
+          "evidence": "골반 회전 범위 34.2도로 백스윙에서 임팩트까지 크게 열렸다.",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 125.8
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 0,
+          "band_value": 18.5,
+          "evidence": "골반 회전 범위 18.5도로 중간 구간에 해당하나, 완전히 개방되지 않아 약간의 개선이 필요합니다.",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 18.5
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 0,
+          "band_value": 21.5,
+          "evidence": "골반 회전 범위 21.5도로 중간 구간에 해당하나, 완전히 개방되지 않아 조금 더 회전이 필요합니다.",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 21.5
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 0,
+          "band_value": 5.2,
+          "evidence": "회전 범위 9.1도로 골반 회전이 거의 없음",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 5.2
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 0,
+          "band_value": 9.8,
+          "evidence": "회전 범위 9.8도로 골반 회전이 거의 없음",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 9.8
+          }
+        },
+        {
+          "criterion_id": "follow_through",
+          "name": "차고 난 뒤 마무리",
+          "grade": 2,
+          "stored_grade": 2,
+          "segment": 0,
+          "band_value": 82.5,
+          "evidence": "임팩트 후 주동 고관절 굴곡 82.5도가 잘 구현되어 추가 진행이 가능했다.",
+          "metric_ref": "swing_hip_flexion_after_impact_deg",
+          "given_metrics": {
+            "swing_hip_flexion_after_impact_deg": 82.5,
+            "follow_through_duration_frames": 9.0
+          }
+        },
+        {
+          "criterion_id": "follow_through",
+          "name": "차고 난 뒤 마무리",
+          "grade": 2,
+          "stored_grade": 2,
+          "segment": 0,
+          "band_value": 127.5,
+          "evidence": "임팩트 후 주동 고관절 굴곡 127.5도가 잘 구현되어 추가 진행이 관찰됨",
+          "metric_ref": "swing_hip_flexion_after_impact_deg",
+          "given_metrics": {
+            "swing_hip_flexion_after_impact_deg": 127.5,
+            "follow_through_duration_frames": 9.0
+          }
+        },
+        {
+          "criterion_id": "follow_through",
+          "name": "차고 난 뒤 마무리",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 0,
+          "band_value": 20.2,
+          "evidence": "임팩트 후 주동 고관절 굴곡이 20.2도로 측정되었습니다. 이는 기준 수준보다 약간 부족한 각도입니다. 더 깊은 굴곡이 있었다면 주동 다리가 더 안정적으로 유지되는 데 도움이 될 것입니다.",
+          "metric_ref": "swing_hip_flexion_after_impact_deg",
+          "given_metrics": {
+            "swing_hip_flexion_after_impact_deg": 20.2,
+            "follow_through_duration_frames": 5.0
+          }
+        },
+        {
+          "criterion_id": "follow_through",
+          "name": "차고 난 뒤 마무리",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 0,
+          "band_value": 24.8,
+          "evidence": "임팩트 후 주동 고관절 굴곡이 24.8도로 비교적 높게 유지되었으나, 팔로스루 지속 시간이 5.0프레임으로 짧은 점이 개선 필요",
+          "metric_ref": "swing_hip_flexion_after_impact_deg",
+          "given_metrics": {
+            "swing_hip_flexion_after_impact_deg": 24.8,
+            "follow_through_duration_frames": 5.0
+          }
+        },
+        {
+          "criterion_id": "follow_through",
+          "name": "차고 난 뒤 마무리",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 0,
+          "band_value": 5.2,
+          "evidence": "차직후 다리가 완전히 멈추어 추가 굴곡이 발생하지 않았다.",
+          "metric_ref": "swing_hip_flexion_after_impact_deg",
+          "given_metrics": {
+            "swing_hip_flexion_after_impact_deg": 5.2,
+            "follow_through_duration_frames": 2.0
+          }
+        },
+        {
+          "criterion_id": "follow_through",
+          "name": "차고 난 뒤 마무리",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 0,
+          "band_value": 9.8,
+          "evidence": "임팩트 후 주동 고관절 굴곡 9.8도로 차는 다리가 완전히 고정되어 추가 회전이나 자연스러운 흐름이 부족하다.",
+          "metric_ref": "swing_hip_flexion_after_impact_deg",
+          "given_metrics": {
+            "swing_hip_flexion_after_impact_deg": 9.8,
+            "follow_through_duration_frames": 2.0
+          }
+        },
+        {
+          "criterion_id": "plant_foot_position",
+          "name": "디딤발 위치",
+          "grade": 2,
+          "stored_grade": 2,
+          "segment": 0,
+          "band_value": 0.2,
+          "evidence": "디딤발이 공 옆에 수평으로 어깨너비 0.2배 떨어져 있다.",
+          "metric_ref": "plant_foot_to_ball_offset",
+          "given_metrics": {
+            "plant_foot_to_ball_offset": 0.2
+          }
+        },
+        {
+          "criterion_id": "plant_foot_position",
+          "name": "디딤발 위치",
+          "grade": 2,
+          "stored_grade": 2,
+          "segment": 0,
+          "band_value": 0.3,
+          "evidence": "디딤발이 공 옆에 수평으로 어깨너비 0.3배 떨어져 있다.",
+          "metric_ref": "plant_foot_to_ball_offset",
+          "given_metrics": {
+            "plant_foot_to_ball_offset": 0.3
+          }
+        },
+        {
+          "criterion_id": "plant_foot_position",
+          "name": "디딤발 위치",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 0,
+          "band_value": 0.6,
+          "evidence": "수평 간격 0.6배로 공에서 다소 벗어났다.",
+          "metric_ref": "plant_foot_to_ball_offset",
+          "given_metrics": {
+            "plant_foot_to_ball_offset": 0.6
+          }
+        },
+        {
+          "criterion_id": "plant_foot_position",
+          "name": "디딤발 위치",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 0,
+          "band_value": 0.8,
+          "evidence": "수평 간격 0.8배로 공에서 다소 벗어났다.",
+          "metric_ref": "plant_foot_to_ball_offset",
+          "given_metrics": {
+            "plant_foot_to_ball_offset": 0.8
+          }
+        },
+        {
+          "criterion_id": "plant_foot_position",
+          "name": "디딤발 위치",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 0,
+          "band_value": 5.7,
+          "evidence": "수평 간격 1.24배로 디딤발이 공에서 크게 떨어졌다.",
+          "metric_ref": "plant_foot_to_ball_offset",
+          "given_metrics": {
+            "plant_foot_to_ball_offset": 5.7
+          }
+        },
+        {
+          "criterion_id": "plant_foot_position",
+          "name": "디딤발 위치",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 0,
+          "band_value": 8.1,
+          "evidence": "수평 간격 8.1배로 디딤발이 공에서 크게 떨어졌다. 더 정확한 위치 유지가 필요하다",
+          "metric_ref": "plant_foot_to_ball_offset",
+          "given_metrics": {
+            "plant_foot_to_ball_offset": 8.1
+          }
+        }
+      ]
+    }
+  }
+}

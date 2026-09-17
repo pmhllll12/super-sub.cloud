@@ -12,7 +12,9 @@ from app.card.application.ports.input.squad_use_cases import (
     CreateSquadUseCase,
     DischargeMemberUseCase,
     EnlistCardUseCase,
+    MoveMemberUseCase,
     PublicSquadUseCase,
+    SetFormationUseCase,
     TeamSquadUseCase,
 )
 from app.card.application.ports.output.squad_port import SquadPort
@@ -20,7 +22,9 @@ from app.card.application.use_cases.squad_interactors import (
     CreateSquadInteractor,
     DischargeMemberInteractor,
     EnlistCardInteractor,
+    MoveMemberInteractor,
     PublicSquadInteractor,
+    SetFormationInteractor,
     TeamSquadInteractor,
 )
 from app.core.database import get_session
@@ -57,6 +61,16 @@ def get_discharge_member_use_case(
     return DischargeMemberInteractor(repository)
 
 
+def get_move_member_use_case(repository: SquadRepositoryDep) -> MoveMemberUseCase:
+    return MoveMemberInteractor(repository)
+
+
+def get_set_formation_use_case(
+    repository: SquadRepositoryDep,
+) -> SetFormationUseCase:
+    return SetFormationInteractor(repository)
+
+
 CreateSquadUseCaseDep = Annotated[
     CreateSquadUseCase, Depends(get_create_squad_use_case)
 ]
@@ -67,4 +81,8 @@ PublicSquadUseCaseDep = Annotated[
 EnlistCardUseCaseDep = Annotated[EnlistCardUseCase, Depends(get_enlist_card_use_case)]
 DischargeMemberUseCaseDep = Annotated[
     DischargeMemberUseCase, Depends(get_discharge_member_use_case)
+]
+MoveMemberUseCaseDep = Annotated[MoveMemberUseCase, Depends(get_move_member_use_case)]
+SetFormationUseCaseDep = Annotated[
+    SetFormationUseCase, Depends(get_set_formation_use_case)
 ]

@@ -15,9 +15,12 @@ import base64
 import gc
 import logging
 import math
+import shutil
+import subprocess
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 import cv2
 import numpy as np
@@ -31,6 +34,22 @@ _log = logging.getLogger(__name__)
 
 PERSON_DETECTOR = "PekingU/rtdetr_r50vd_coco_o365"
 POSE_MODEL = "usyd-community/vitpose-base-simple"
+
+# 🔴 **가중치를 커밋으로 고정한다** (2026.09.11, 미결 11번의 남은 것).
+#
+# 저장소 이름만으로 적재하면 업스트림이 가중치를 갈아 끼워도 **조용히 바뀐다** —
+# 그리고 로컬 HF 캐시가 살아 있는 동안은 드러나지도 않는다. 그때 판단은 "이번
+# 결과를 채택할까"가 아니라 **"B-2~B-6의 어느 결론까지 다시 봐야 하는가"** 가
+# 된다(미결 11번이 적어 둔 형태).
+#
+# 아래 두 해시는 **지금까지의 모든 결과를 낸 스냅숏 그대로**다(2026.09.11 캐시의
+# `refs/main`). 그래서 이 고정은 값을 바꾸지 않는다 — **다음에 바뀌는 것을 막는다.**
+#
+# 🔴 올릴 때는 **재실행 회차와 함께** 올린다. 해시만 바꾸면 그 뒤 결과가 앞의
+# 결과와 같은 가중치에서 나왔다는 근거가 사라진다.
+PERSON_DETECTOR_REVISION = "457857cec8ac28ddede40ecee9eed2beca321af8"
+POSE_MODEL_REVISION = "a93ac0c67e0b7e2c55287d21d4c460c8f3c54d45"
+
 COCO_PERSON_LABEL = 0
 
 # 샘플링 목표 fps의 **단일 진실원**. 서비스도 평가도 이 값을 쓴다.
@@ -51,11 +70,45 @@ DEFAULT_TARGET_FPS = 30
 # 기존 동작을 그대로 보존한다. 평가셋 39클립이 전부 10초 이하라 무변화다.
 DEFAULT_MAX_SECONDS = 10.0
 
-# **메모리 가드(장).** 분석 의도가 아니라 미결 9번(4K에서 host RAM이 먼저
-# 터진다)이 정한 상한이다. 4K 300장이 약 7GB이고 g4dn.xlarge의 host RAM은
-# 16GB다. 창을 넓히고 싶으면 DEFAULT_MAX_SECONDS를 올릴 것 — 이 값을 올리면
-# 메모리 한계를 올리는 것이지 창을 넓히는 것이 아니다.
+# **메모리 가드(바이트).** 분석 의도가 아니라 미결 9번(4K에서 host RAM이 먼저
+# 터진다)이 정한 상한이다. 창을 넓히고 싶으면 DEFAULT_MAX_SECONDS를 올릴 것 —
+# 이 값을 올리면 메모리 한계를 올리는 것이지 창을 넓히는 것이 아니다.
+#
+# 🔴 **장수가 아니라 바이트인 이유**: 장수로 막으면 해상도를 못 본다. 같은
+# 300장이 4K 세로에서 7,465MB이고 1080p에서 1,866MB다 — 한쪽에는 딱 맞고
+# 다른 쪽에는 4배 헐겁다. 헐거운 쪽이 치르는 대가가 **분석 창**이었다:
+# 실효 fps가 30을 넘는 소스에서 가드가 창을 이겨 보기로 한 10초 중 최악
+# **6.74초**만 봤다(`eval/pending9_window/`).
+#
+# 값이 이것인 이유: **지금의 4K 세로 300장과 같은 바이트다.** 실측 여유는
+# 11,214MB로 더 크지만(인스턴스 16,162 − 동거 vLLM 3,200 − base 1,748)
+# 올리지 않는다 — 올리면 4K 클립의 장수가 늘어 **결과가 달라지고**, 그건
+# 창을 지키는 일이 아니라 동작점 이동이다. 이 값에 고정하면 4K는 한 비트도
+# 안 바뀌고 낮은 해상도만 풀린다.
+#
+# 🔴 **런타임에 남은 메모리를 조회해 정하지 않는다.** 그러면 같은 클립이
+# 기계 상태에 따라 다른 장수로 분석되어 점수가 흔들리고, 그 차이가 아무
+# 데도 안 남는다. 예산은 상수이고 동거 프로세스 몫은 **이 값을 정할 때**
+# 뺐다 (`eval/pending9_budget/PREREGISTRATION.md` 2절).
+DEFAULT_MAX_FRAME_BYTES = 2160 * 3840 * 3 * 300      # 7,465MB
+
+# 예산을 장수로 환산할 수 없을 때 쓰는 값. 컨테이너가 해상도를 안 알려주는
+# 경우가 있어서 남긴다 — **모르면 지금까지의 동작을 그대로 한다.**
 DEFAULT_MAX_FRAMES = 300
+
+
+def frames_within_budget(width: int, height: int,
+                         budget_bytes: int = DEFAULT_MAX_FRAME_BYTES) -> int:
+    """이 해상도로 예산 안에 들 수 있는 장수. BGR uint8 한 벌 기준이다.
+
+    한 벌인 것은 재디코딩(D-1, 2026.09.01) 덕이고 실측이 그것을 확인했다 —
+    `RSS ≈ base + k × frame_bytes` 에서 `k ≈ 0.98`, 즉 프레임을 정확히 한 벌만
+    든다(`eval/pending9_rss/RESULTS.md`).
+
+    해상도를 모르면 부를 수 없다 — 그때는 `DEFAULT_MAX_FRAMES` 로 떨어진다.
+    """
+    per_frame = max(1, int(width) * int(height) * 3)
+    return max(1, budget_bytes // per_frame)
 
 # 실효 fps가 목표의 이 비율보다 낮으면 경고한다. **절벽만 막는다** —
 # 미결 7번이 확인했듯 30↔60에서도 등급이 37% 바뀌므로, 이 경고가 fps 불변성을
@@ -75,6 +128,58 @@ TRACKED_LABELS = {
     34: "baseball_bat",
     38: "tennis_racket",
 }
+
+# 종목과 **어긋나는** 도구 — 이게 보이면 그 종목 영상이 아니다 (미결 `ho` 43번 ㉮).
+#
+# 🔴 **거절은 「없음」이 아니라 「있음」으로만 한다.** 「공이 안 보이니 축구가
+# 아니다」로 두면 정상 업로드를 대량으로 막는다 — 축구 클립에서도 공은 자주
+# 안 보인다(phaseA 골든셋 18편에서 `plant_foot_to_ball_offset` 0/18).
+#
+# 🔴 **`sports_ball` 은 여기 못 쓴다.** COCO 에서 축구공·농구공·야구공이 전부
+# 한 클래스(32)라 종목을 안 가른다. 실측으로도 야구 39편 중 12편이 공을 갖고
+# 있어, 「공이 있으면 축구」로 두면 그 12편이 그대로 통과한다.
+#
+# 🔴 **그래서 농구는 원리적으로 못 거른다** — 구별되는 도구가 COCO 에 없다.
+# 야구도 투구·수비는 배트가 화면에 없어 못 잡는다. 실패가 아니라 **범위**다.
+#
+# 실측 1회차 (`eval/pending43_sport_gate/`, 58편 전수, 사전 등록 `8969ce3`):
+#   축구 19편  오거절 **0** — 19편 전부 `sports_ball` 하나뿐, 배트·라켓 0건
+#   야구 39편  거절 **27 (69%)** — 통과한 12편은 배트 궤적이 안 남은 것들이다
+# 🔴 **31%는 그냥 통과한다. 벽이 아니라 걸름망이다.**
+COUNTER_EVIDENCE_TOOLS = {
+    "football": ("baseball_bat", "tennis_racket"),
+}
+
+#: 거절 사유를 사람 말로 적기 위한 이름. 🔴 사용자에게 `baseball_bat` 을
+#: 보여주지 않는다 — 근거 문장에서 코드 심벌을 걷어낸 것과 같은 취지다(㉱).
+TOOL_KO = {
+    "sports_ball": "공",
+    "baseball_bat": "야구 배트",
+    "tennis_racket": "라켓",
+}
+
+
+class SportMismatch(ValueError):
+    """올라온 영상이 그 종목이 아니다 (미결 `ho` 43번 ㉮).
+
+    🔴 **품질 문제와 다르다.** 품질 게이트는 「다시 찍으면 풀린다」이고 이쪽은
+    **「다른 영상을 올려야 풀린다」**다. 같은 사유로 뭉뚱그리면 사용자가 같은
+    파일을 다시 올린다 — 미결 41번이 실서버에서 아홉 번 그랬다.
+    """
+
+
+def sport_conflict(objects: dict[str, np.ndarray], sport: str) -> str | None:
+    """이 영상에 **그 종목과 어긋나는 도구**가 있으면 그 이름, 없으면 None.
+
+    `objects` 는 `stack_object_tracks` 를 이미 지난 것이라 **확실한 검출이 몇
+    프레임 있는 도구만** 들어 있다(문턱은 아래 두 상수). 여기서 문턱을 다시
+    정하지 않는 이유가 그것이다 — 손잡이가 둘이 되면 갈라진다.
+    """
+    for tool in COUNTER_EVIDENCE_TOOLS.get(sport, ()):
+        if tool in objects:
+            return tool
+    return None
+
 
 # 도구 궤적으로 인정할 기준: **확실한 검출이 몇 프레임 있는가**.
 #
@@ -272,6 +377,10 @@ class PoseResult:
     # 대상을 어떻게 골랐는가. 기본값은 지금까지의 동작(auto)이라 이 필드를
     # 모르는 기존 호출부가 그대로 맞다.
     subject_selection: SubjectSelection = field(default_factory=SubjectSelection)
+    # 이 키포인트를 낸 **이미지 전처리기의 실물 이름** (미결 49번).
+    # 전처리기를 안 쓴 결과(합성 키포인트)는 None 이고, 기본값이 None 이라
+    # 이 필드를 모르는 기존 호출부는 그대로 동작한다.
+    preprocessing: dict[str, Any] | None = None
 
     def subject_box_frames(self) -> int:
         """대상을 실제로 고른 프레임 수."""
@@ -353,12 +462,17 @@ class FrameRead(NamedTuple):
     # 잘렸다면 **무엇이 잘랐는가**: "window"(분석 창) 또는 "memory_guard".
     # 안 잘렸으면 None. 창과 가드는 뜻이 다르다 — 아래 `read_frames_ex` 참고.
     limited_by: str | None
+    # 이 회차에 **실제로 쓴** 가드(장). 기본값은 해상도에서 계산되므로
+    # 부르는 쪽이 넘긴 값과 다를 수 있다. 재디코딩이 같은 장수를 잘라야 해서
+    # `PoseResult`가 이 값을 들고 다닌다 — 넘긴 값(None)을 들고 다니면
+    # 「무엇으로 잘랐나」가 결과에 안 남는다.
+    max_frames: int = DEFAULT_MAX_FRAMES
 
 
 def read_frames(
     video_path: str | Path,
     target_fps: int = DEFAULT_TARGET_FPS,
-    max_frames: int = DEFAULT_MAX_FRAMES,
+    max_frames: int | None = None,
     max_seconds: float = DEFAULT_MAX_SECONDS,
 ) -> tuple[list[np.ndarray], float, float]:
     """`read_frames_ex`의 앞 세 값만 돌려주는 껍데기.
@@ -374,7 +488,7 @@ def read_frames(
 def read_frames_ex(
     video_path: str | Path,
     target_fps: int = DEFAULT_TARGET_FPS,
-    max_frames: int = DEFAULT_MAX_FRAMES,
+    max_frames: int | None = None,
     max_seconds: float = DEFAULT_MAX_SECONDS,
 ) -> FrameRead:
     """OpenCV로 디코딩하고 target_fps에 가장 가까운 정수 간격으로 다운샘플링한다.
@@ -390,6 +504,11 @@ def read_frames_ex(
       max_seconds — **분석 창.** 몇 초까지 볼 것인가. 소스 fps와 무관하다.
       max_frames  — **메모리 가드.** 몇 장까지 들 것인가. 미결 9번(4K에서 host
                     RAM이 먼저 터진다)이 정한 값이며 분석 의도가 아니다.
+                    **기본값은 해상도에서 계산한다**(`DEFAULT_MAX_FRAME_BYTES`)
+                    — 장수로 고정하면 해상도를 못 봐서 낮은 해상도에서
+                    쓸데없이 창을 먹는다. 명시적으로 넘기면 그 값이 이긴다:
+                    평가 스크립트가 장수를 고정해 돌리는 자리가 있고, 그
+                    뜻이 바뀌면 그 회차들이 조용히 다른 것을 잰다.
 
     프레임 수만으로 막으면 **덮는 실시간 길이가 fps에 따라 달라진다** — 300장은
     30fps에서 10.0초지만 24fps에서는 12.5초다. 같은 동작을 담은 두 인코딩이 서로
@@ -407,6 +526,19 @@ def read_frames_ex(
     src_fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     step = max(1, round(src_fps / target_fps))
     sampled_fps = src_fps / step
+
+    # 가드를 **해상도에서** 정한다. 부르는 쪽이 장수를 명시했으면 그것이 이긴다.
+    # 🔴 컨테이너가 해상도를 안 알려주면(0이나 음수) **지어내지 않고**
+    # 지금까지의 장수 가드로 떨어진다 — 4K를 1080p로 착각해 예산을 네 배로
+    # 여는 것보다 낫다.
+    if max_frames is None:
+        w = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+        h = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        max_frames = (
+            frames_within_budget(int(w), int(h))
+            if w and h and w > 0 and h > 0
+            else DEFAULT_MAX_FRAMES
+        )
 
     # t < max_seconds 인 프레임의 개수. k 번째 표본의 시각이 k / sampled_fps 이므로
     # k < max_seconds * sampled_fps 이고, 개수는 그 값의 올림이다.
@@ -468,7 +600,7 @@ def read_frames_ex(
         raise ValueError(f"프레임을 읽지 못했습니다: {video_path}")
     return FrameRead(
         frames, src_fps, sampled_fps, truncated, source_seconds,
-        limited_by if truncated else None,
+        limited_by if truncated else None, max_frames,
     )
 
 
@@ -814,7 +946,7 @@ def extract_keypoints(
     device: str | None = None,
     observe: bool = True,
     rubric_key: str | None = None,
-    max_frames: int = DEFAULT_MAX_FRAMES,
+    max_frames: int | None = None,
     max_seconds: float = DEFAULT_MAX_SECONDS,
     subject: SubjectRequest | None = None,
 ) -> PoseResult:
@@ -846,10 +978,11 @@ def extract_keypoints(
     read = read_frames_ex(video_path, target_fps, max_frames, max_seconds)
     frames, src_fps, sampled_fps = read.frames, read.source_fps, read.sampled_fps
 
-    det_processor = AutoProcessor.from_pretrained(PERSON_DETECTOR)
-    detector = RTDetrForObjectDetection.from_pretrained(PERSON_DETECTOR).to(device).eval()
-    pose_processor = AutoProcessor.from_pretrained(POSE_MODEL)
-    pose_model = VitPoseForPoseEstimation.from_pretrained(POSE_MODEL).to(device).eval()
+    det_processor, detector = _load_detector(device)
+    pose_processor = AutoProcessor.from_pretrained(
+        POSE_MODEL, revision=POSE_MODEL_REVISION)
+    pose_model = VitPoseForPoseEstimation.from_pretrained(
+        POSE_MODEL, revision=POSE_MODEL_REVISION).to(device).eval()
 
     all_kps: list[np.ndarray] = []
     # 프레임별 person 후보 수 — 사람이 없던 프레임도 (0, 0)으로 채운다.
@@ -941,7 +1074,10 @@ def extract_keypoints(
         # 판정 모델이 올라갈 때 원본 프레임이 메모리에 남지 않는다.
         video_path=str(video_path),
         target_fps=target_fps,
-        max_frames=max_frames,
+        # 🔴 **넘긴 값이 아니라 실제로 쓴 값**을 싣는다. 기본값은 해상도에서
+        # 계산되므로 넘긴 것은 None 일 수 있고, 그걸 그대로 들고 다니면
+        # 재디코딩이 「무엇으로 잘랐는지」를 결과에서 읽을 수 없다.
+        max_frames=read.max_frames,
         max_seconds=max_seconds,
         truncated=read.truncated,
         source_seconds=read.source_seconds,
@@ -951,10 +1087,178 @@ def extract_keypoints(
         subject_boxes=subject_boxes,
         frame_size=(width, height),
         subject_selection=selection,
+        # 🔴 **무엇으로 쟀는지를 결과가 스스로 말한다** (미결 49번).
+        # 적재·검출 블록 안에서 읽는 이유는 **실제로 쓴 객체**에서 읽어야
+        # 해서다 — 밖에서 다시 만들면 그건 "같을 것"이라는 가정이다.
+        preprocessing=preprocessing_identity(
+            detector=det_processor, pose=pose_processor
+        ),
     )
     if observe:
         _record_input_observation(result, rubric_key)
     return result
+
+
+def preprocessing_identity(**processors: Any) -> dict[str, Any]:
+    """이 값을 낸 **이미지 전처리기의 실물 이름** (미결 49번).
+
+    🔴 **설치 여부가 아니라 「고른 결과」를 적는다.** transformers 5.x 는
+    `torchvision` 이 있느냐로 **다른 전처리기를 고르고**
+    (`RTDetrImageProcessor` ↔ `RTDetrImageProcessorPil`), 리사이즈가 갈리면
+    픽셀이 달라져 **같은 영상이 다른 등급을 받는다** — 축구 19편 중 **2편이
+    등급 문자까지** 갈렸다(미결 47번 5회차. `D→B` · `D→C`).
+
+    그래서 `is_torchvision_available()` 만 적는 것으로는 모자란다. 그건
+    **고르는 데 쓰인 입력**이지 고른 결과가 아니고, 업스트림이 고르는 규칙을
+    바꾸면 같은 값이 다른 전처리기를 뜻하게 된다. **실물에서 읽으면** 그
+    변화가 결과에 그대로 드러난다. (`env.torchvision` 은 함께 적는다 — 둘이
+    어긋나는 날이 오면 그게 알아야 할 사건이다.)
+
+    🔴 **점수를 바꾸지 않는다.** 무엇으로 쟀는지를 적을 뿐이라 `features` 에
+    한 키도 안 더하고 **B-6 재실행을 부르지 않는다**.
+
+    이것이 필요한 이유는 평가 기계와 EC2 서비스가 **다른 경로로 돌고 있기**
+    때문이다(미결 49번). 어느 쪽으로 통일할지는 결정 대기지만, **어느 쪽으로
+    돌았는지는 결과가 스스로 말해야 한다** — 안 그러면 다음에 갈렸을 때
+    47번처럼 닷새를 쓴다.
+    """
+    from transformers.utils.import_utils import is_torchvision_available
+
+    identity: dict[str, Any] = {
+        name: type(p).__name__ for name, p in processors.items()
+    }
+    identity["torchvision"] = bool(is_torchvision_available())
+    return identity
+
+
+def _load_detector(device: str):
+    """사람·도구 검출기 한 벌. 🔴 **적재를 한 곳에 둔다.**
+
+    `revision=` 을 빼면 업스트림이 가중치를 갈아 끼워도 **조용히 바뀐다**
+    (미결 11번). 부르는 곳이 둘(`extract_keypoints` · `detect_candidates`)인데
+    한쪽만 고정하면 그 한쪽이 다른 가중치로 돌고, 로컬 캐시가 사는 동안은
+    드러나지도 않는다. 그래서 두 곳이 **같은 함수**를 부른다.
+
+    🔴 import 가 함수 안에 있는 것은 의도다 — `transformers` 는 무거워서
+    모듈을 읽는 것만으로 끌어오면 CLI 도움말조차 느려진다.
+    """
+    from transformers import AutoProcessor, RTDetrForObjectDetection
+
+    processor = AutoProcessor.from_pretrained(
+        PERSON_DETECTOR, revision=PERSON_DETECTOR_REVISION)
+    detector = RTDetrForObjectDetection.from_pretrained(
+        PERSON_DETECTOR, revision=PERSON_DETECTOR_REVISION).to(device).eval()
+    return processor, detector
+
+
+def detect_candidates(
+    video_path: str | Path,
+    at_ms: float,
+    target_fps: int = DEFAULT_TARGET_FPS,
+    device: str | None = None,
+    max_seconds: float = DEFAULT_MAX_SECONDS,
+) -> dict:
+    """한 시각에서 **고를 수 있는 사람들**과 공 (미결 `ho` 44번).
+
+    화면이 「이 사람으로 분석」을 띄우려면 분석을 걸기 **전에** 후보를 알아야
+    한다. 지금은 사용자가 눈으로 보고 박스를 직접 그린다.
+
+    🔴 **좌표는 정규화 0~1 이다.** 여기서 나온 `box` 를 **그대로**
+    `--subject-box` 로 돌려보낼 수 있어야 한다 — 중간에 변환이 끼면 그 자리가
+    곧 버그다(표시 해상도는 기기마다 다르고, `parse_subject_spec` 은 범위 밖을
+    클램프가 아니라 **거부**한다). `tests/test_detect_candidates.py` 가 그
+    왕복을 검사한다.
+
+    🔴 **`anchor_frame_for` 를 쓴다** — `--subject-at-ms` 가 쓰는 것과 **같은
+    함수**다. 다른 산술로 프레임을 고르면 사용자가 고른 사람과 분석이 따라간
+    사람이 갈린다.
+
+    🔴 **후보를 고르지 않는다.** 순서는 **넓이 내림차순**이고 그뿐이다.
+    「공에 가장 가까운 사람」을 추천으로 끼워 넣지 않았다 — 임팩트 뒤에는 공이
+    **이미 떠나가고 있어서** 그 순간 공에 가까운 사람이 찬 사람이 아닌 경우가
+    흔하다. 재 보지 않은 신호를 추천으로 내면 사용자는 그게 근거 있는 줄 안다.
+    공 위치는 **주기만 한다.**
+    """
+    import torch  # 무거운 의존은 함수 안에서 — `extract_keypoints` 와 같은 규약
+
+    device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+    read = read_frames_ex(video_path, target_fps, None, max_seconds)
+    if not read.frames:
+        raise ValueError("프레임을 하나도 읽지 못했다")
+
+    frame_idx, grid_offset, clamped = anchor_frame_for(
+        at_ms, read.sampled_fps, len(read.frames)
+    )
+    frame = read.frames[frame_idx]
+    height, width = frame.shape[:2]
+
+    processor, detector = _load_detector(device)
+    try:
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        inputs = processor(images=rgb, return_tensors="pt").to(device)
+        with torch.inference_mode():
+            out = detector(**inputs)
+        detections = processor.post_process_object_detection(
+            out, target_sizes=[(height, width)], threshold=0.3
+        )[0]
+    finally:
+        del detector
+        gc.collect()
+        if device == "cuda":
+            torch.cuda.empty_cache()
+
+    # 🔴 selector 와 **같은 문턱**을 쓴다. 여기만 낮추면 화면에 보이는데
+    #    고르면 분석이 안 되는 사람이 생긴다.
+    people = []
+    for score, label, box in zip(
+        detections["scores"], detections["labels"], detections["boxes"]
+    ):
+        if int(label) != COCO_PERSON_LABEL or float(score) < PERSON_ELIGIBLE_THRESHOLD:
+            continue
+        x1, y1, x2, y2 = (float(v) for v in box)
+        w, h = (x2 - x1) / width, (y2 - y1) / height
+        if w <= 0 or h <= 0:
+            continue
+        people.append({
+            # 정규화 뒤 부동소수 오차로 1.0 을 넘으면 `parse_subject_spec` 이
+            # 거부한다 — 만들어 내는 쪽에서 창 안으로 맞춘다.
+            "box": _clip_unit_box(x1 / width, y1 / height, w, h),
+            "score": round(float(score), 3),
+        })
+    people.sort(key=lambda p: p["box"][2] * p["box"][3], reverse=True)
+
+    tools = _tracked_centers(detections)
+    ball = tools.get("sports_ball")
+    return {
+        "at_ms": float(at_ms),
+        "frame": frame_idx,
+        "grid_offset_frames": grid_offset,
+        "at_clamped": clamped,
+        "sampled_fps": read.sampled_fps,
+        "frame_size": [width, height],
+        "people": people,
+        "ball": (
+            {"x": round(ball[0] / width, 4), "y": round(ball[1] / height, 4),
+             "score": round(ball[2], 3)}
+            if ball else None
+        ),
+    }
+
+
+def _clip_unit_box(x: float, y: float, w: float, h: float
+                   ) -> list[float]:
+    """정규화 박스를 0~1 창 안으로 맞춘다 — **반올림 오차만** 흡수한다.
+
+    🔴 **큰 어긋남을 조용히 덮는 자리가 아니다.** `parse_subject_spec` 이
+    범위 밖을 거부하는 것은 화면 픽셀이 잘못 온 것을 잡으려는 것이고, 그
+    규칙은 그대로 둔다. 여기서 다루는 것은 픽셀→정규화 나눗셈에서 생기는
+    1e-9 수준의 초과뿐이다.
+    """
+    x = min(max(x, 0.0), 1.0)
+    y = min(max(y, 0.0), 1.0)
+    w = min(max(w, 0.0), 1.0 - x)
+    h = min(max(h, 0.0), 1.0 - y)
+    return [round(x, 6), round(y, 6), round(w, 6), round(h, 6)]
 
 
 def stack_object_tracks(
@@ -1087,6 +1391,70 @@ def _subject_windows(
     return tops, cw, ch
 
 
+@contextmanager
+def _clip_encoder(out_path: Path, fps: float, size: tuple[int, int]):
+    """BGR 프레임을 받아 VP8/WebM으로 쓰는 인코더 — ffmpeg이 있으면 그쪽으로.
+
+    **인코딩이 미리보기 시간의 거의 전부다.** 300프레임 1280×726 클립에서
+    그리기 0.42초 · 인코딩 19.2초였다(2026-09-15 실측, RTX 3050). OpenCV의
+    VideoWriter는 libvpx를 화질 우선 기본값으로 부르는데, 같은 VP8/WebM을
+    ffmpeg에 realtime 설정으로 넘기면 **2.4초**에 나오고 파일도 18.4MB에서
+    1.7MB로 준다. 코덱이 그대로라 브라우저 재생 호환은 바뀌지 않는다.
+
+    🔴 **화질이 조금 떨어지는 대신 시간을 산 것이다.** 미리보기는 검수용
+    그림이고 측정·판정은 이 함수를 지나지 않으므로 점수에는 닿지 않는다.
+
+    ffmpeg이 없으면 예전 경로(OpenCV)로 떨어진다 — 느릴 뿐 결과는 나온다.
+    EC2에는 깔려 있다(`deploy/README.md`의 apt 목록).
+    """
+    ow, oh = size
+    rate = max(1.0, fps)
+    ffmpeg = shutil.which("ffmpeg")
+
+    if ffmpeg is None:
+        _log.info("ffmpeg이 없어 OpenCV 인코더로 떨어진다 — 미리보기가 느려진다")
+        writer = cv2.VideoWriter(
+            str(out_path), cv2.VideoWriter_fourcc(*"VP80"), rate, (ow, oh)
+        )
+        if not writer.isOpened():
+            raise RuntimeError(f"인코더를 열 수 없습니다: {out_path}")
+        try:
+            yield writer.write
+        finally:
+            writer.release()
+        return
+
+    proc = subprocess.Popen(
+        [ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+         "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{ow}x{oh}",
+         "-r", f"{rate:.4f}", "-i", "-",
+         "-c:v", "libvpx", "-b:v", "1M",
+         # 이 둘이 19.2초를 2.4초로 만든다. cpu-used는 libvpx의 속도 단계다.
+         "-deadline", "realtime", "-cpu-used", "8",
+         "-an", str(out_path)],
+        stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+    )
+
+    def write(frame: np.ndarray) -> None:
+        # 연속 메모리여야 한다 — resize 결과는 그렇지만 크롭만 온 경우를 막는다.
+        proc.stdin.write(np.ascontiguousarray(frame).tobytes())
+
+    try:
+        yield write
+    except BrokenPipeError as exc:  # ffmpeg이 먼저 죽은 경우
+        proc.kill()
+        raise RuntimeError(f"인코더가 중단되었습니다: {out_path}") from exc
+    finally:
+        if proc.stdin and not proc.stdin.closed:
+            try:
+                proc.stdin.close()
+            except BrokenPipeError:
+                pass
+        err = proc.stderr.read().decode("utf-8", "replace").strip()
+        if proc.wait() != 0:
+            raise RuntimeError(f"인코딩 실패({proc.returncode}): {err or out_path}")
+
+
 def render_tracked_clip(
     frames: list[np.ndarray],
     keypoints: np.ndarray,
@@ -1104,6 +1472,7 @@ def render_tracked_clip(
 
     코덱은 VP8/WebM이다 — OpenCV의 pip 빌드에는 H.264 인코더가 없고(라이선스),
     mp4v는 브라우저가 재생하지 못한다. WebM은 브라우저가 기본 지원한다.
+    인코더를 어디로 보내는지는 `_clip_encoder`가 정한다.
     """
     if not frames:
         raise ValueError("프레임이 없습니다")
@@ -1113,13 +1482,8 @@ def render_tracked_clip(
 
     ow = out_width
     oh = int(round(ow * ch / cw / 2) * 2)      # 짝수 — 인코더가 요구한다
-    writer = cv2.VideoWriter(
-        str(out_path), cv2.VideoWriter_fourcc(*"VP80"), max(1.0, fps), (ow, oh)
-    )
-    if not writer.isOpened():
-        raise RuntimeError(f"인코더를 열 수 없습니다: {out_path}")
 
-    try:
+    with _clip_encoder(out_path, fps, (ow, oh)) as write:
         for t, frame in enumerate(frames):
             canvas = draw_overlay(frame, keypoints[t], min_conf)
             x, y = tops[t]
@@ -1134,9 +1498,7 @@ def render_tracked_clip(
                             0.9, (0, 0, 255), 2, cv2.LINE_AA)
             cv2.putText(crop, f"{t}", (14, oh - 14), cv2.FONT_HERSHEY_SIMPLEX,
                         0.6, (240, 240, 240), 2, cv2.LINE_AA)
-            writer.write(crop)
-    finally:
-        writer.release()
+            write(crop)
 
     return {"frames": len(frames), "size": (ow, oh), "fps": fps,
             "bytes": out_path.stat().st_size if out_path.exists() else 0}

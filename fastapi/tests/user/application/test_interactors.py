@@ -131,6 +131,34 @@ class FakeUserRepository(UserPort):
     def has_card(self, user_id: UUID) -> bool:
         return False
 
+    def update_searchable(self, user_id: UUID, is_nickname_searchable: bool) -> None:
+        pass
+
+    def card_slugs(self, user_ids: list[UUID]) -> dict[UUID, str]:
+        # 이 대역이 보는 것은 카드가 아니다 — 빈 표면 충분하다(미결 `paik` 39번).
+        return {}
+
+    def search_by_nickname(self, *, q: str, exclude_user_id: UUID, limit: int):
+        return []
+
+    def find_contact(self, user_a: UUID, user_b: UUID):
+        return None
+
+    def find_contact_by_id(self, contact_id: UUID):
+        return None
+
+    def create_contact_request(self, requester_id: UUID, target_id: UUID, note):
+        raise NotImplementedError
+
+    def accept_contact_request(self, contact_id: UUID):
+        raise NotImplementedError
+
+    def list_accepted_contacts(self, user_id: UUID):
+        return []
+
+    def list_incoming_contact_requests(self, user_id: UUID):
+        return []
+
 
 class TestSignupInteractor:
     def test_이메일을_정규화해서_돌려준다(self):

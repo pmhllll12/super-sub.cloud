@@ -50,7 +50,7 @@ ssh <gpu-instance> 'systemctl list-units --type=service | grep -i worker'
 ## 1. 작업 하나 집기
 
 ```
-POST https://api.supersub-ai.com/api/v1/internal/analysis-jobs/claim
+POST https://<API 호스트>/api/v1/internal/analysis-jobs/claim
 X-Worker-Token: <공유 시크릿>
 ```
 
@@ -66,12 +66,26 @@ X-Worker-Token: <공유 시크릿>
   "storage_key": "videos/<user_id>/<uuid>.mp4",
   "sport_code": "baseball",
   "side": "right",
-  "duration_ms": 4200
+  "duration_ms": 4200,
+  "subject_box": [0.39, 0.35, 0.12, 0.4],
+  "subject_at_ms": 4200,
+  "focus": ["follow_through", "guide_hand"]
 }
 ```
 
 - `storage_key` 앞에 `s3://supersub-ai/` 를 붙이면 `analyze_s3.py` 의 첫 인자입니다
 - `side` 는 없을 수 있습니다(`null`). 그러면 `--side` 를 주지 마십시오
+- ✅ **`focus` — 「집중해서 볼 항목」** (미결 `paik` 8번). 백엔드가 이제 claim 응답에
+  실어 보냅니다. `worker.py` 의 `analyze_command` 는 **이미 `job.get("focus")` 를
+  읽어 `--focus a,b,c` 로 넘기고 있어** 그대로 흘러갑니다. 🔴 **`null`·빈 리스트면
+  아무것도 안 붙입니다** — 「전체적으로」입니다
+- 🔴 **`subject_box`·`subject_at_ms` — 「이 사람으로 분석」** (미결 `paik` 6번).
+  있으면 `--subject-box "x,y,w,h" --subject-at-ms <ms>` 로 넘겨 주십시오
+  (`--focus` 와 같은 자리 — `worker.py` 의 `analyze_command`). **없으면(`null`)
+  아무것도 붙이지 않습니다** — 「자동으로 고르기」가 정식 경로입니다. 등록 시
+  정규화·기하 검증을 마친 값이라 워커가 다시 검사할 필요는 없습니다.
+  ⚠️ 백엔드는 이 값을 claim 응답에 실었습니다. `analyze_command` 배선은 아직입니다
+  (미결 `paik` 6번 — `--focus` 와 같은 상태)
 - 🔴 **`POST` 입니다.** 조회처럼 보여도 이 호출은 작업을 하나 **소비**합니다 —
   실패해서 재시도하면 **다른 작업을 집습니다**(같은 것이 아닙니다)
 
@@ -127,10 +141,11 @@ uv run python scripts/analyze_s3.py \
 ## 4. 결과 보고
 
 ```
-PATCH https://api.supersub-ai.com/api/v1/internal/analysis-jobs/<job_id>
+PATCH https://<API 호스트>/api/v1/internal/analysis-jobs/<job_id>
 X-Worker-Token: <공유 시크릿>
 
 {"status": "succeeded"}
+{"status": "succeeded", "report_key": "reports/<user_id>/<video_id>/report.json"}
 {"status": "failed", "failure_reason": "품질 게이트 미달: …"}
 ```
 
@@ -141,6 +156,19 @@ X-Worker-Token: <공유 시크릿>
 | 404 | `JOB_NOT_FOUND` | 없는 작업입니다. **재시도 무의미** |
 | 409 | `JOB_NOT_RUNNING` | 집지 않았거나 이미 끝났습니다. **재시도 무의미** |
 | 422 | `INVALID_JOB_STATUS` | `succeeded`·`failed` 만 받습니다 |
+
+### `report_key` — 리포트 자리 (2026-09-09 추가, 미결 `paik` 11번)
+
+**선택 필드.** 분석이 남긴 리포트의 **버킷 상대 키**를 함께 실어 주십시오
+(`--result-json` 이 적어 준 자리 파일에서 읽어서). 백엔드는 이 값을 그대로
+`analysis_job` 에 남기고, 화면이 리포트를 찾을 때 씁니다.
+
+| | |
+|---|---|
+| 형태 | `s3://` 를 뗀 버킷 상대 키. 예: `reports/<user_id>/<video_id>/report.json`. 1024자 넘으면 422 |
+| `succeeded` 일 때만 | `failed` 와 함께 보내면 백엔드가 버립니다 — 굳이 안 실어도 됩니다 |
+| 없어도 됨 | 리포트가 다른 버킷이거나 자리 파일이 없으면 안 실어도 `204` 입니다. 화면이 리포트를 못 찾을 뿐입니다 — 보고 자체를 막지 마십시오 |
+| 자리 규칙 | 정본은 `analyze_s3` 입니다. 백엔드에 규칙을 복사하지 않습니다 — 아는 쪽이 값으로 말해 주는 구조입니다 |
 
 **`finished_at` 을 보내지 않습니다.** 서버가 찍습니다 — 워커의 시계가 어긋나면
 소요 시간이 음수가 됩니다. `started_at` 도 `claim` 이 찍었습니다.
@@ -170,6 +198,69 @@ X-Worker-Token: <공유 시크릿>
 🔴 **값은 제가 서버에 넣고 따로 전달드립니다.** 저장소에 커밋하지 마십시오.
 (백엔드는 `WORKER_TOKEN` 환경변수로 읽습니다. 비어 있으면 **모든 요청이 401**
 입니다 — 값을 안 넣은 배포에서 큐가 열려 있는 것보다 멈춰 있는 편이 낫다고 봤습니다.)
+
+---
+
+## 6. 검출(`detect`) 작업 — 미결 `ho` 44번 (2026-09-15 추가)
+
+「이 영상에 잡힌 사람들」을 화면이 미리 보는 기능입니다. **같은 큐, 같은
+`claim`/완료 경로**를 씁니다 — 새 엔드포인트가 아닙니다. `detect_subjects.py`는
+이미 만들어 두신 것 그대로 쓰시면 됩니다(`51d7c75`).
+
+### 만족해야 할 성질
+
+1. **`claim` 응답에 `job_type` 필드가 새로 옵니다** — `"analyze"` 또는
+   `"detect"`. `"detect"`면 `analyze_s3.py` 대신 `detect_subjects.py`를
+   부릅니다
+2. `detect` 작업의 `claim` 응답에서 쓸 것은 `storage_key`(영상 자리)와
+   `subject_at_ms`(검출할 시각, ms)뿐입니다 — `sport_code`·`subject_box`·
+   `focus`는 `analyze` 전용이니 무시하면 됩니다(값이 비어 있거나 의미가
+   없을 수 있습니다)
+3. **완료 보고에 `detection_result`를 실어 주십시오** —
+   `detect_subjects.py --result-json`이 낸 JSON(`people`·`ball`) **그대로**,
+   변환 없이
+
+```json
+// claim 응답 (detect)
+{
+  "job_id": "…", "video_id": "…",
+  "storage_key": "videos/<user_id>/<uuid>.mp4",
+  "job_type": "detect",
+  "subject_at_ms": 1000,
+  "sport_code": "football", "side": null, "duration_ms": null,
+  "subject_box": null, "focus": null
+}
+```
+
+```
+PATCH .../internal/analysis-jobs/<job_id>
+{
+  "status": "succeeded",
+  "detection_result": {
+    "people": [{"box": [0.287, 0.199, 0.168, 0.666], "score": 0.909}],
+    "ball": {"x": 0.661, "y": 0.706, "score": 0.918}
+  }
+}
+```
+
+### 확인
+
+```bash
+# 워커 코드 배선 여부
+git grep -n 'job_type' -- agent/
+```
+
+### 하지 말 것 (이 절 전용)
+
+- 🔴 **`job_type`을 안 보고 `analyze_s3.py`로 통째로 처리하지 않기.** `detect`
+  작업엔 `sport_code`가 비어 있을 수 있어 그대로 돌리면 엉뚱하게 죽거나
+  (최악의 경우) 조용히 틀린 걸 냅니다
+- 🔴 **`detect` 결과에 `report_key`를 실어 보내지 않기.** `detect` 작업은
+  리포트가 없습니다 — 백엔드가 그 필드를 가지고 리포트 적재를 시도하지
+  않는 것은 `report_key`가 없어야 성립합니다(있으면 있는 대로 적재를
+  시도하다 실패합니다)
+- **검출 0명을 실패로 보고하지 않기.** 화면은 0명이면 드래그로 넘어갑니다
+  — `succeeded` + `{"people": [], "ball": null}` 이 정상 경로입니다
 
 ---
 
@@ -207,7 +298,7 @@ X-Worker-Token: <공유 시크릿>
 ```bash
 # 큐가 줄어드는가
 curl -s -H "X-Worker-Token: <값>" \
-  -X POST https://api.supersub-ai.com/api/v1/internal/analysis-jobs/claim -i | head -1
+  -X POST https://<API 호스트>/api/v1/internal/analysis-jobs/claim -i | head -1
 # 204 면 빈 것, 200 이면 하나 집은 것 (🔴 이 명령 자체가 작업을 하나 소비합니다)
 
 # 리포트가 생기는가

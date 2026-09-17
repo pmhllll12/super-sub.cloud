@@ -12,14 +12,18 @@ import {
 } from '@/server/backend'
 import { requireUser } from '@/server/currentUser'
 import { SESSION_COOKIE } from '@/server/session'
+import { HOME_TEAM_COOKIE, pickTeamId } from '@/lib/homeTeam'
 import AccountActions from './AccountActions'
+import TeamActions from './TeamActions'
+import TitlesForm from './TitlesForm'
 import CardEditor from './CardEditor'
 import StyledCard from './StyledCard'
 import { CardStyleProvider } from './cardStyle'
+import MyMatches from './MyMatches'
 import MyVideos from './MyVideos'
 import ProfileStage from './ProfileStage'
 import NicknameForm from './NicknameForm'
-import { when, ymd } from './format'
+import { ymd } from './format'
 import { SECTION_GLASS, SHEET_GLASS } from './glass'
 
 /** 정보 절의 한 줄 — 흐린 이름표와 진한 값. */
@@ -66,11 +70,14 @@ export function MeBody({
   videos,
   matches,
   editing = false,
+  homeTeamId,
 }: {
   user: User
   card: PlayerCard | null
   videos: MyVideo[]
   matches: Match[]
+  /** 홈이 지금 그리는 팀 — 소속이 여럿일 때 어느 것이 그것인지 표시한다. */
+  homeTeamId?: string
   /**
    * 카드 편집 모드인가. 🔴 **주소(`/me?edit=1`)가 들고 있다** — 컴포넌트
    * 상태로 두면 뒤로 가기로 닫을 수 없고, 새로고침하면 풀린다.
@@ -83,7 +90,7 @@ export function MeBody({
     <ProfileStage editing={editing}>
       {/* 🔴 카드와 편집기가 화면에서 떨어져 있어(카드는 선 위, 편집기는 선
           아래) 한쪽이 상태를 들 수 없다 — 둘을 함께 감싼다. */}
-      <CardStyleProvider>
+      <CardStyleProvider card={card}>
       {/* 판 **바깥 위**에 얹는 한 마디. 워드마크가 가운데에 서므로 이쪽은
           왼쪽 끝에 둔다 — 둘이 같은 줄에서 좌우로 갈린다. */}
       <p className="ss-profile-title">MY PROFILE</p>
@@ -111,38 +118,17 @@ export function MeBody({
             <div className="ss-profile-body">
             <section className="ss-profile-bio" style={SECTION_GLASS}>
               <h2 className="ss-profile-h">소속</h2>
-              {user.teams.length === 0 ? (
-                <p className="ss-profile-muted">아직 소속된 팀이 없습니다.</p>
-              ) : (
-                <ul className="ss-profile-teams">
-                  {user.teams.map((t) => (
-                    <li key={t.team_id}>
-                      <p className="ss-profile-team-name">{t.name}</p>
-                      <p className="ss-profile-muted">
-                        {t.region} · {t.sport_code}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <TeamActions teams={user.teams} userId={user.id} homeTeamId={homeTeamId} />
             </section>
 
             <section className="ss-profile-info" style={SECTION_GLASS}>
               <h2 className="ss-profile-h">정보</h2>
               <dl>
                 <InfoRow label="호칭">
-                  {titles.length === 0 ? (
-                    <span className="ss-profile-muted">아직 받은 호칭이 없습니다.</span>
-                  ) : (
-                    <span className="ss-profile-pills">
-                      {titles.map((t) => (
-                        <span key={t.code} className="ss-profile-pill">
-                          <b>{t.category}</b>
-                          {t.label}
-                        </span>
-                      ))}
-                    </span>
-                  )}
+                  {/* 🔴 **사람이 직접 적는다**(2026-09-16 결정, 미결 `paik` 36번).
+                      원래는 분석이 붙이는 값이라 화면이 읽기만 했다 — 팀이 다시
+                      정하면서 여기서 고친다. 분류(강점·활동)는 안 받는다. */}
+                  <TitlesForm titles={titles.map((t) => t.label)} />
                 </InfoRow>
                 <InfoRow label="이메일">{user.email}</InfoRow>
                 <InfoRow label="함께한 날">{ymd(user.created_at)}부터</InfoRow>
@@ -151,29 +137,22 @@ export function MeBody({
 
             <section className="ss-profile-matches" style={SECTION_GLASS}>
               <h2 className="ss-profile-h">내 경기</h2>
-              {matches.length === 0 ? (
-                /* ⚠️ "경기가 없다" 가 아니라 "**다가오는** 것이 없다" 다 —
-                   계약이 지난 경기를 이 목록에서 빼기 때문이다(3-4절).
-                   지난 경기가 있어도 여기는 비어 있을 수 있다. */
-                <p className="ss-profile-muted">다가오는 경기가 없습니다.</p>
-              ) : (
-                <ul className="ss-profile-match-list">
-                  {matches.map((m) => (
-                    <li key={m.id}>
-                      <p className="ss-profile-match-when">{when(m.played_at)}</p>
-                      <p className="ss-profile-match-place">{m.place}</p>
-                      {m.needs.length > 0 && (
-                        <p className="ss-profile-muted">
-                          {m.needs.map((n) => `${n.position_label} ${n.head_count}`).join(' · ')}
-                        </p>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
+              {/* 🔴 목록은 **브라우저에서** 그린다 — 팀 매칭으로 잡힌 경기가
+                  저장소에 있어서, 서버가 그린 첫 화면에 그것을 얹으면
+                  하이드레이션이 깨진다. 붙은 뒤에 읽는 일을 그쪽이 맡는다. */}
+              <MyMatches matches={matches} />
             </section>
 
-            <AccountActions />
+            {/* 🔴 **기본은 켜짐**이다. 옛 응답에 이 칸이 없을 수 있어
+                `?? true` 로 받는다 — 모른다고 꺼진 것으로 그리면 사실과
+                반대가 되고, 그 사람은 검색에 뜨는데 안 뜬다고 읽는다. */}
+            {/* 🔴 `nickname` 도 넘긴다 — `PATCH /me` 가 **늘 함께 받는다**
+                (계약 3-2절 · `UpdateMeSchema`). 아래 스위치가 그것을 실어야
+                한다. */}
+            <AccountActions
+              searchable={user.is_nickname_searchable ?? true}
+              nickname={user.nickname}
+            />
             </div>
           </div>
 
@@ -184,8 +163,10 @@ export function MeBody({
             <div className="ss-profile-id-main">
               <div className="ss-profile-face-col">
                 {card ? (
-                  /* 편집 중에만 꾸민 값을 입는다 — 평소에는 서버가 준 그대로다
-                     (설정은 아직 저장되지 않는다).
+                  /* 편집 중이 아니어도 꾸민 값이 보인다 — `PlayerCardView` 가
+                     `look` 을 안 받으면 `card.style` 을 스스로 읽는다(CCC 35).
+                     편집 중에는 **아직 저장 안 한 초안**을 보여줘야 하므로
+                     `StyledCard` 가 그 초안(`useCardStyle()`)을 직접 싣는다.
                      🔴 편집 중에는 `StyledCard` 가 **바깥 상자까지** 그린다.
                      `.ss-pcard-mini > .ss-pcard` 가 직계 자식을 찾으므로 사이에
                      상자를 끼울 수 없다. */
@@ -264,7 +245,8 @@ export default async function MePage({
   // 카드가 아직 없는 것은 정상이다 — CARD_NOT_FOUND 는 화면 안에서
   // "아직 없습니다"로 안내한다. 401 은 requireUser() 가 이미 걸러 냈지만
   // 그 사이 토큰이 죽을 수도 있어 여기서도 로그인으로 보낸다.
-  const token = (await cookies()).get(SESSION_COOKIE)?.value
+  const jar = await cookies()
+  const token = jar.get(SESSION_COOKIE)?.value
   let card: PlayerCard | null = null
   let videos: MyVideo[] = []
   let matches: Match[] = []
@@ -310,6 +292,7 @@ export default async function MePage({
       videos={videos}
       matches={matches}
       editing={edit === '1'}
+      homeTeamId={pickTeamId(user.teams, jar.get(HOME_TEAM_COOKIE)?.value)}
     />
   )
 }

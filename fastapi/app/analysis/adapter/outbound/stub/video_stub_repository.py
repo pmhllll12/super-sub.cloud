@@ -6,43 +6,273 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+from datetime import datetime, timedelta, timezone
+from typing import Any
 from uuid import UUID
 
+from app.analysis.application.dtos.video_dto import UNSET, UserRef
 from app.analysis.application.ports.output.storage_port import StoragePort
 from app.analysis.application.ports.output.video_port import VideoPort
-from app.analysis.domain.entities.video_entity import VideoEntity
+from app.analysis.domain.entities.video_entity import (
+    CardGradeRow,
+    PriorAnalysisOutcome,
+    VideoEntity,
+)
 
 _SPORTS = ("football", "baseball", "basketball")
+# 지금 새로 받는 종목(`sport.active`, `ho` 39번). 나머지는 행만 남아 있다.
+_ACTIVE_SPORTS = ("football",)
 
 _VIDEOS: dict[UUID, VideoEntity] = {}
 # 가짜 저장소에 "올라와 있는" 객체. 키 -> 크기(바이트).
 _OBJECTS: dict[str, int] = {}
+# 가짜 저장소 객체의 내용 지문(`ho` 41번). 키 -> 해시. 안 부르면 없음(None) —
+# 대부분 테스트는 재업로드 감지와 무관하다.
+_HASHES: dict[str, str] = {}
+# 바이트를 실제로 읽어야 하는 객체(리포트 JSON 등). 키 -> 바이트.
+_BLOBS: dict[str, bytes] = {}
+# 스텁은 `player_card` 를 모른다 — 검사가 "이 슬러그는 이 사람 카드"라고 알려 준다.
+_CARD_SLUGS: dict[str, UUID] = {}
+# 스텁은 `user` 도 모른다 — 검사가 "이 사람은 이 닉네임"이라고 알려 준다
+# (`paik` 16번, `uploader_info`).
+_NICKNAMES: dict[UUID, str] = {}
+# 스텁은 `analysis_report` 도 `review`/`review_selection` 도 모른다 — 검사가
+# 등급 원자료를 직접 채운다(미결 `paik` 25·26번, `find_card_grade`). user_id 로 건다.
+_REPORT_GRADES: dict[UUID, tuple[str | None, bool | None]] = {}
+# 추천 판 카드의 불릿(`paik` 33번). 안 부르면 `None` — `card` 없는 봉투로
+# 적재된 리포트와 같다.
+_REPORT_CARD_NOTES: dict[UUID, list[str]] = {}
+_TRUST_COUNTS: dict[UUID, tuple[int, int]] = {}
 
 
 def reset_videos() -> None:
     _VIDEOS.clear()
     _OBJECTS.clear()
+    _BLOBS.clear()
+    _HASHES.clear()
+    _CARD_SLUGS.clear()
+    _NICKNAMES.clear()
+    _REPORT_GRADES.clear()
+    _REPORT_CARD_NOTES.clear()
+    _TRUST_COUNTS.clear()
 
 
-def put_object(storage_key: str, size_bytes: int) -> None:
+def put_blob(storage_key: str, data: bytes) -> None:
+    """검사가 "이 키에 이 바이트가 올라와 있다"고 알려 준다(`read_object` 용)."""
+    _BLOBS[storage_key] = data
+
+
+def register_card_slug(public_slug: str, user_id: UUID) -> None:
+    """`find_featured_by_card_slug` 가 슬러그→user_id 를 풀 수 있게 한다(미결 `paik` 10번)."""
+    _CARD_SLUGS[public_slug] = user_id
+
+
+def register_nickname(user_id: UUID, nickname: str) -> None:
+    """`uploader_info` 가 user_id→닉네임을 풀 수 있게 한다(`paik` 16번)."""
+    _NICKNAMES[user_id] = nickname
+
+
+def register_report_grade(
+    user_id: UUID, overall_grade: str | None, provisional: bool | None
+) -> None:
+    """`find_card_grade` 가 쓸 분석 등급(미결 `paik` 25·26번). 안 부르면 그
+    사람은 분석 전(`overall_grade=None`)으로 본다."""
+    _REPORT_GRADES[user_id] = (overall_grade, provisional)
+
+
+def register_card_notes(user_id: UUID, notes: list[str]) -> None:
+    """`find_card_grade` 가 함께 줄 카드 불릿(`paik` 33번).
+
+    안 부르면 `None` 이다 — 봉투에 `card` 가 없던 시절 적재분과 같다.
+    """
+    _REPORT_CARD_NOTES[user_id] = notes
+
+
+def register_trust_counts(user_id: UUID, positive: int, total: int) -> None:
+    """`find_card_grade` 가 쓸 신뢰 축 — 재매칭 의사를 표한 평가 중 긍정
+    건수/전체 건수(`paik` 26번). 안 부르면 0/0(리뷰 없음과 같다)."""
+    _TRUST_COUNTS[user_id] = (positive, total)
+
+
+def put_object(
+    storage_key: str, size_bytes: int, *, content_hash: str | None = None
+) -> None:
     """검사가 "이 키에 이만한 파일이 올라와 있다"고 알려 준다.
 
     실제 업로드를 흉내 내는 자리다. 이것을 부르지 않으면 등록은
     `FILE_NOT_UPLOADED` 로 떨어진다 — 실물과 같은 동작이다.
+
+    `content_hash` 는 재업로드 감지(`ho` 41번) 테스트에서만 준다 — 안 주면
+    실물의 "지문을 못 구했다" 경우와 같다(`None`).
     """
     _OBJECTS[storage_key] = size_bytes
+    if content_hash is not None:
+        _HASHES[storage_key] = content_hash
 
 
 class StubVideoRepository(VideoPort):
     def sport_exists(self, sport_code: str) -> bool:
         return sport_code in _SPORTS
 
+    def sport_is_active(self, sport_code: str) -> bool:
+        return sport_code in _ACTIVE_SPORTS
+
+    def uploader_nickname(self, user_id: UUID) -> str | None:
+        # 스텁은 `user` 를 모른다 — 키 슬러그는 "user" 로 떨어진다. 닉네임이
+        # 실제로 키에 들어가는지는 `test_video_db.py`(진짜 `user` 행)가 본다.
+        return None
+
     def register(self, video: VideoEntity) -> None:
         _VIDEOS[video.id] = video
 
     def list_by_user(self, user_id: UUID) -> list[VideoEntity]:
+        mine = [
+            v for v in _VIDEOS.values() if v.user_id == user_id and v.kept
+        ]
+        return sorted(mine, key=lambda v: v.created_at, reverse=True)
+
+    def list_all_by_user(self, user_id: UUID) -> list[VideoEntity]:
         mine = [v for v in _VIDEOS.values() if v.user_id == user_id]
         return sorted(mine, key=lambda v: v.created_at, reverse=True)
+
+    def resolve_user(self, identifier: str) -> UserRef | None:
+        # 스텁은 `user` 를 모른다 — UUID 꼴이면 그 사람이 있다고 보고(닉네임·
+        # 이메일은 빈 값), 이메일 꼴은 못 찾는다. 실제 조회는 `test_video_db.py`.
+        try:
+            return UserRef(id=UUID(identifier), nickname="", email="")
+        except ValueError:
+            return None
+
+    def get(self, video_id: UUID) -> VideoEntity | None:
+        return _VIDEOS.get(video_id)
+
+    def update_video(
+        self,
+        video_id: UUID,
+        user_id: UUID,
+        *,
+        is_public: bool | Any = UNSET,
+        title: str | None | Any = UNSET,
+        description: str | None | Any = UNSET,
+        is_featured: bool | Any = UNSET,
+    ) -> VideoEntity | None:
+        video = _VIDEOS.get(video_id)
+        if video is None or video.user_id != user_id:
+            return None
+        changes: dict[str, Any] = {}
+        if is_public is not UNSET:
+            changes["is_public"] = is_public
+        if title is not UNSET:
+            changes["title"] = title
+        if description is not UNSET:
+            changes["description"] = description
+        if is_featured is not UNSET:
+            if is_featured:
+                # 사람당 하나 — 먼저 남을 내린다(실물의 부분 유일 인덱스와 같은 효과).
+                for vid, v in list(_VIDEOS.items()):
+                    if v.user_id == user_id and v.is_featured and vid != video_id:
+                        _VIDEOS[vid] = replace(v, is_featured=False)
+            changes["is_featured"] = is_featured
+        updated = replace(video, **changes)
+        _VIDEOS[video_id] = updated
+        return updated
+
+    def find_featured_by_card_slug(
+        self, card_public_slug: str
+    ) -> VideoEntity | None:
+        owner = _CARD_SLUGS.get(card_public_slug)
+        if owner is None:
+            return None
+        for v in _VIDEOS.values():
+            if v.user_id != owner or not v.is_featured:
+                continue
+            if not (v.validation and v.validation.passed):
+                return None
+            return v
+        return None
+
+    def find_card_grade(self, card_public_slug: str) -> CardGradeRow | None:
+        owner = _CARD_SLUGS.get(card_public_slug)
+        if owner is None:
+            return None
+        overall_grade, provisional = _REPORT_GRADES.get(owner, (None, None))
+        positive, total = _TRUST_COUNTS.get(owner, (0, 0))
+        return CardGradeRow(
+            overall_grade=overall_grade,
+            provisional=provisional,
+            trust_positive=positive,
+            trust_total=total,
+            card_notes=_REPORT_CARD_NOTES.get(owner),
+        )
+
+    def list_public(self, limit: int) -> list[VideoEntity]:
+        public = [v for v in _VIDEOS.values() if v.is_public and v.kept]
+        public.sort(key=lambda v: v.created_at, reverse=True)
+        return public[:limit]
+
+    def uploader_info(
+        self, user_ids: list[UUID]
+    ) -> dict[UUID, tuple[str, str | None]]:
+        slug_by_user = {v: k for k, v in _CARD_SLUGS.items()}
+        return {
+            uid: (_NICKNAMES[uid], slug_by_user.get(uid))
+            for uid in user_ids
+            if uid in _NICKNAMES
+        }
+
+    def mark_kept(
+        self, video_id: UUID, user_id: UUID, *, storage_key: str
+    ) -> VideoEntity | None:
+        video = _VIDEOS.get(video_id)
+        if video is None or video.user_id != user_id:
+            return None
+        updated = replace(video, kept=True, storage_key=storage_key)
+        _VIDEOS[video_id] = updated
+        return updated
+
+    def delete(self, video_id: UUID, user_id: UUID) -> VideoEntity | None:
+        video = _VIDEOS.get(video_id)
+        if video is None or video.user_id != user_id:
+            return None
+        return _VIDEOS.pop(video_id)
+
+    def admin_delete(self, video_id: UUID) -> VideoEntity | None:
+        return _VIDEOS.pop(video_id, None)
+
+    def find_prior_outcome(
+        self, user_id: UUID, content_hash: str
+    ) -> PriorAnalysisOutcome | None:
+        candidates = [
+            v
+            for v in _VIDEOS.values()
+            if v.user_id == user_id
+            and v.content_hash == content_hash
+            and v.analysis_status in ("succeeded", "failed")
+            and v.subject_box is None
+            and not v.focus
+        ]
+        if not candidates:
+            return None
+        latest = max(candidates, key=lambda v: v.created_at)
+        return PriorAnalysisOutcome(
+            video_id=latest.id,
+            status=latest.analysis_status,
+            failure_reason=latest.analysis_failure_reason,
+        )
+
+    def sweep_provisional(self, ttl_hours: int) -> list[VideoEntity]:
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=ttl_hours)
+        stale = [
+            v
+            for v in _VIDEOS.values()
+            if not v.kept
+            and v.created_at < cutoff
+            and v.analysis_status not in ("queued", "running")
+        ]
+        for v in stale:
+            del _VIDEOS[v.id]
+        return stale
 
 
 class FakeStorage(StoragePort):
@@ -58,5 +288,61 @@ class FakeStorage(StoragePort):
     def create_upload_url(self, storage_key: str, content_type: str) -> tuple[str, int]:
         return f"https://storage.invalid/{storage_key}", self.TTL_SECONDS
 
+    def create_download_url(self, storage_key: str) -> tuple[str, int]:
+        return f"https://storage.invalid/get/{storage_key}", self.TTL_SECONDS
+
     def size_of(self, storage_key: str) -> int | None:
         return _OBJECTS.get(storage_key)
+
+    def content_hash_of(self, storage_key: str) -> str | None:
+        return _HASHES.get(storage_key)
+
+    def move_object(self, src_key: str, dst_key: str) -> None:
+        if src_key == dst_key:
+            return
+        size = _OBJECTS.pop(src_key, None)
+        if size is not None:
+            _OBJECTS[dst_key] = size
+        content_hash = _HASHES.pop(src_key, None)
+        if content_hash is not None:
+            _HASHES[dst_key] = content_hash
+
+    def read_object(self, storage_key: str) -> bytes | None:
+        return _BLOBS.get(storage_key)
+
+    def delete_object(self, storage_key: str) -> None:
+        _OBJECTS.pop(storage_key, None)
+        _BLOBS.pop(storage_key, None)
+        _HASHES.pop(storage_key, None)
+
+    def delete_prefix(self, prefix: str) -> None:
+        for key in [k for k in _OBJECTS if k.startswith(prefix)]:
+            del _OBJECTS[key]
+        for key in [k for k in _BLOBS if k.startswith(prefix)]:
+            del _BLOBS[key]
+        for key in [k for k in _HASHES if k.startswith(prefix)]:
+            del _HASHES[key]
+
+
+# 리포트 조회는 적재된 DB 가 있어야 뜻이 있다 — 계약 테스트는 "없을 때 404" 만
+# 본다. 실제 조립은 `tests/analysis/adapter/test_report_read_db.py` 가 진짜
+# PostgreSQL 로 본다.
+_REPORT_VIEWS: dict[UUID, object] = {}
+
+
+def set_report_view(video_id: UUID, view: object) -> None:
+    _REPORT_VIEWS[video_id] = view
+
+
+def reset_report_views() -> None:
+    _REPORT_VIEWS.clear()
+
+
+class StubReportReadRepository:
+    def find_for_video(self, video_id: UUID, user_id: UUID) -> object | None:
+        # 실물은 `video.user_id == user_id` 를 조인 조건에 건다 — 남의 영상이면
+        # 뷰가 있어도 `None`. `_VIDEOS` 에 주인이 등록돼 있으면 그것을 본다.
+        owner = _VIDEOS.get(video_id)
+        if owner is not None and owner.user_id != user_id:
+            return None
+        return _REPORT_VIEWS.get(video_id)

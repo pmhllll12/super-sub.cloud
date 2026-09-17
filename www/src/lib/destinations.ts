@@ -9,7 +9,13 @@ import { type Destination } from '@/components/HomeNav'
  */
 
 /**
- * 알약 '용병 찾기' 의 제목 — **이 줄에서 유일하게 실제 동작이 붙어 있다.**
+ * 알약 '팀장' 의 제목.
+ *
+ * 🔴 **이름이 「용병 찾기」에서 「팀장」으로 바뀌었다**(사용자 요청, 2026-09-08).
+ * 짝인 「팀 찾기」도 「팀원」이 됐다 — 두 알약이 *무엇을 찾는가*가 아니라
+ * **내가 어느 쪽인가**를 고르는 자리가 됐기 때문이다. 상수 이름(`MATCH_BOT`)은
+ * 그대로 둔다: 값만 바뀌었고, 이름까지 갈면 이 값을 읽는 곳이 전부 흔들린다.
+ *
  * 누르면 스쿼드 판 오른쪽에 **AI 추천 판과 지인 찾기 판이 나란히** 열린다
  * (`HomeStage` → `SquadPanel`). 그 판단을 제목으로 하므로 아래 FEATURED 의
  * 제목과 **글자까지 같아야** 한다.
@@ -23,7 +29,7 @@ import { type Destination } from '@/components/HomeNav'
  * ⚠️ 챗봇(`MatchBot`)은 이 알약이 아니라 판 오른쪽 변의 **AI 단추**가 연다
  * (`SquadPanel` 의 `ss-home-ai`).
  */
-export const MATCH_BOT = '용병 찾기'
+export const MATCH_BOT = '팀장'
 
 // 홈 상단 글자 내비에 적히는 목적지. 앱(flutter/.../home_screen.dart)의
 // _kDestinations 에서 출발했지만 2026-08-30 에 웹에서 다시 골랐다:
@@ -36,23 +42,34 @@ export const MATCH_BOT = '용병 찾기'
 //     알약 버튼으로 옮기고 이름도 '용병 찾기' · '팀 찾기' 로 바꿨다
 //     (FEATURED). 같은 이유로 두 목록은 안 겹친다.
 //
-// href 가 있는 '영상 분석'은 requireUser() 에 걸리는 로그인 전용 화면이다 —
+// 셋 다 requireUser() 에 걸리는 로그인 전용 화면(app/(app)/ 그룹)이다 —
 // authRequired: true 로 표시해 두면 로그인 안 한 사람에게 카드가 "로그인이
-// 필요합니다"를 미리 보여준다(링크는 살려 둔다). 나머지는 아직 갈 곳이
-// 없어 카드가 링크가 아니다(눌러도 아무 일이 없다).
+// 필요합니다"를 미리 보여준다(링크는 살려 둔다).
 // 헤드라인 자리(옛 `FIND YOUR SQUAD`)에 유리 알약 버튼으로 크게 내놓는 둘.
 // **아래 DESTINATIONS 와 겹치지 않는다** — 같은 곳으로 가는 항목을 한 화면에
 // 둘 두지 않는다(우상단 '내 프로필'을 글자 줄에서 뺀 것과 같은 규칙).
+/**
+ * 알약 '팀원' 의 제목. 누르면 **스쿼드 판이 물러나고 그 자리에** 아직 사람을
+ * 못 채운 팀들의 명단이 선다(`TeamSeek`, 사용자 요청 2026-09-08).
+ *
+ * 🔴 `MATCH_BOT` 과 달리 이 값은 `DEFAULT_FEATURED` 가 **아니라서** 눌림
+ * (`picked`)으로 판단해도 안전하다. 그래도 `HomeStage` 는 제 상태로 든다 —
+ * 기본 알약이 무엇인지가 나중에 바뀌어도 여기가 안 흔들리게.
+ */
+export const TEAM_SEEK = '팀원'
+
 export const FEATURED: Destination[] = [
   {
     title: MATCH_BOT,
     icon: 'sports_soccer',
-    summary: '사람이 모자란 경기에\n뛸 사람을 찾습니다',
+    summary: '내 팀에 사람이 모자랍니다\n뛸 사람을 찾습니다',
   },
   {
-    title: '팀 찾기',
+    // 🔴 이 제목으로 판을 가른다(`HomeStage` 의 `seeking`) — **글자까지
+    // 같아야 한다.** 상수로 뺀 이유는 두 곳에 같은 글자를 두지 않기 위해서다.
+    title: TEAM_SEEK,
     icon: 'groups',
-    summary: '함께 뛸 팀을 찾고\n지원합니다',
+    summary: '아직 사람을 못 채운\n팀들을 훑습니다',
   },
   // 🔴 '지인 찾기' 알약은 **없앴다**(사용자 요청, 2026-09-08). 용병을 찾는
   // 일과 아는 사람을 찾는 일이 결국 **같은 자리를 채우는 한 가지 일**이라,
@@ -64,6 +81,12 @@ export const FEATURED: Destination[] = [
 /** 아무것도 안 가리켰을 때 강조해 둘 항목 — 둘 중 '용병 찾기'가 기본이다.
  *  🔴 이 값이 곧 MATCH_BOT 이라 **판을 여는 조건으로 쓰면 안 된다**(위 주석). */
 export const DEFAULT_FEATURED = FEATURED[0].title
+
+/**
+ * 「알림」 글자의 제목 — 이 값으로 판과 빨간 점을 붙인다(`HomeNav` 의
+ * `panels` · `badges`). 🔴 **글자까지 같아야 한다**(`MATCH_BOT` 과 같은 규칙).
+ */
+export const NOTIFY = '알림'
 
 export const DESTINATIONS: Destination[] = [
   {
@@ -84,5 +107,16 @@ export const DESTINATIONS: Destination[] = [
     title: '경기장 예약',
     icon: 'stadium',
     summary: '가까운 구장을 찾고\n시간을 잡습니다',
+    href: '/venues',
+    authRequired: true,
+  },
+  {
+    /* 🔴 **맨 오른쪽이다**(사용자 요청, 2026-09-16 — 「경기장 예약 오른쪽으로」.
+       같은 날 「영상 분석 왼쪽」이었다가 옮겼다).
+       갈 곳이 없다(`href` 없음) — 누르면 판이 열리고 거기서 바로 수락한다.
+       `HomeNav` 가 href 없는 항목을 버튼으로 그린다. */
+    title: NOTIFY,
+    icon: 'circle_notifications',
+    summary: '받은 경기 신청 · 팀 초대와\n지인 신청이 여기 모입니다',
   },
 ]

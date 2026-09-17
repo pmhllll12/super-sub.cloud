@@ -7,16 +7,38 @@
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 from abc import ABC, abstractmethod
 
-from app.analysis.domain.entities.video_entity import VideoEntity
+from app.analysis.application.dtos.video_dto import UNSET, UserRef
+from app.analysis.domain.entities.video_entity import (
+    CardGradeRow,
+    PriorAnalysisOutcome,
+    VideoEntity,
+)
 
 
 class VideoPort(ABC):
     @abstractmethod
     def sport_exists(self, sport_code: str) -> bool: ...
+
+    @abstractmethod
+    def sport_is_active(self, sport_code: str) -> bool:
+        """**지금 새로 받을 수 있는 종목인가**(`sport.active`, `ho` 39번).
+
+        루브릭이 사라진 종목(야구·농구)은 행은 남아 있지만 `false` 다 —
+        그 종목으로 이미 올라간 영상이 참조하고 있어 지울 수 없어서다.
+        등록만 막고 **조회·목록은 그대로 둔다**(옛 영상이 계속 보여야 한다).
+        """
+
+    @abstractmethod
+    def uploader_nickname(self, user_id: UUID) -> str | None:
+        """그 사람의 현재 닉네임 — 저장 키를 사람이 알아보게 짓는 데 쓴다(미결
+        `jin` 24번). `sport_exists` 처럼 `user` 컨텍스트를 임포트하지 않고
+        `table()`/`column()` 로 `user.nickname` 만 읽는다.
+        """
 
     @abstractmethod
     def register(self, video: VideoEntity) -> None:
@@ -36,4 +58,131 @@ class VideoPort(ABC):
 
         검사 결과와 **가장 최근** 분석 작업의 상태를 함께 채운다 — `/videos`
         화면 한 줄이 그 셋을 같이 보여주기 때문이다.
+        """
+
+    @abstractmethod
+    def get(self, video_id: UUID) -> VideoEntity | None:
+        """영상 1건. 업로더 구분 없이 — 소유 판단은 부르는 쪽이 한다."""
+
+    @abstractmethod
+    def update_video(
+        self,
+        video_id: UUID,
+        user_id: UUID,
+        *,
+        is_public: bool | Any = UNSET,
+        title: str | None | Any = UNSET,
+        description: str | None | Any = UNSET,
+        is_featured: bool | Any = UNSET,
+    ) -> VideoEntity | None:
+        """클립을 부분 수정하고 갱신된 영상을 돌려준다.
+
+        `UNSET` 인 필드는 건드리지 않는다. **`user_id` 로 소유를 확인한다** —
+        남의 클립이거나 없는 클립이면 `None`.
+
+        🔴 `is_featured=True` 면 **같은 사람의 다른 대표를 먼저 내리고** 이 클립을
+        세운다(사람당 하나 — 부분 유일 인덱스). 반려 클립 차단은 인터랙터가 한다.
+        """
+
+    @abstractmethod
+    def find_featured_by_card_slug(self, card_public_slug: str) -> VideoEntity | None:
+        """카드 슬러그 → 그 주인의 대표 영상 (미결 `paik` 10번).
+
+        `player_card` 는 `card` 컨텍스트 테이블이라 임포트하지 않고 슬러그→`user_id`
+        만 원시 쿼리로 읽는다(관리자 목록이 `user` 를 읽는 방식과 같다).
+        대표가 없거나·반려됐거나·슬러그가 없으면 `None`.
+        """
+
+    @abstractmethod
+    def find_card_grade(self, card_public_slug: str) -> CardGradeRow | None:
+        """카드 슬러그 → 등급 원자료(미결 `paik` 25·26번).
+
+        슬러그가 없으면 `None`. 슬러그는 찾았지만 대표 영상이 없거나 분석
+        전이면 `overall_grade`/`provisional` 이 `None`인 행(슬러그를 찾았다는
+        사실은 남는다 — 인터랙터가 그걸로 404 를 가른다). 신뢰 축은 `review`·
+        `review_selection`(`review` 컨텍스트 테이블)을 원시 쿼리로 읽는다.
+        """
+
+    @abstractmethod
+    def mark_kept(
+        self, video_id: UUID, user_id: UUID, *, storage_key: str
+    ) -> VideoEntity | None:
+        """`kept=True` 로 놓고 `storage_key` 를 갱신한다("프로필에 저장", 미결
+        `jin` 24번). S3 이동은 부르는 쪽이 이미 했다 — 여기는 DB 만 맞춘다.
+        **`user_id` 로 소유를 확인한다** — 남의/없는 클립이면 `None`.
+        갱신된 영상을 판정·최근 작업과 함께 돌려준다.
+        """
+
+    @abstractmethod
+    def delete(self, video_id: UUID, user_id: UUID) -> VideoEntity | None:
+        """영상 행을 지우고 지운 영상을 돌려준다(S3 정리에 `storage_key` 가 필요).
+
+        `video_validation`·`analysis_job`(·그 하위)은 외래키 `ON DELETE CASCADE`
+        로 따라 지워진다(SEC-006). **`user_id` 로 소유를 확인한다** — 남의/없는
+        클립이면 `None`.
+        """
+
+    @abstractmethod
+    def sweep_provisional(self, ttl_hours: int) -> list[VideoEntity]:
+        """저장 안 한 임시 영상 중 오래된 것을 지우고 목록으로 돌려준다(미결
+        `jin` 24번 백스톱).
+
+        조건: `kept=false` · `created_at` 이 `ttl_hours` 보다 오래됨 · **진행
+        중인 `analysis_job`(`queued`/`running`)이 없음** — 아직 분석을 기다리는
+        것을 지우면 안 된다(GPU 인스턴스가 꺼져 있으면 몇 시간 대기가 정상이다).
+        지운 영상의 `storage_key` 는 부르는 쪽이 S3 정리에 쓴다.
+        """
+
+    @abstractmethod
+    def list_public(self, limit: int) -> list[VideoEntity]:
+        """공개된 클립. **최근 것이 앞에 온다.** 업로더 구분 없이 훑는다.
+
+        홈의 영상 모음이 쓴다. 반려 사유·분석 상태는 채우지 않는다 — 목록이
+        보여주지 않는다.
+        """
+
+    @abstractmethod
+    def uploader_info(
+        self, user_ids: list[UUID]
+    ) -> dict[UUID, tuple[str, str | None]]:
+        """영상 소유자들의 표시 정보 — `{user_id: (닉네임, 카드 공개 슬러그)}`.
+
+        `paik` 16번(공개 목록에 업로더가 없어 남의 영상이 내 이름으로 보이던
+        문제). 닉네임은 모든 사용자가 갖고(now 유일 제약도 걸림), 카드는 만든
+        사람만 있어 슬러그는 `None`일 수 있다 — 화면은 슬러그가 있을 때만
+        카드로 링크를 건다. `user`·`card` 컨텍스트를 원시 쿼리로만 읽는다
+        (경계 유지, 위 파일 docstring 참조).
+        """
+
+    @abstractmethod
+    def resolve_user(self, identifier: str) -> UserRef | None:
+        """`user.id`(UUID 문자열) 또는 이메일로 사람을 찾는다(미결 `jin` 24번
+        관리자 영상 목록). `sport_exists` 처럼 `user` 컨텍스트를 임포트하지 않고
+        `table()`/`column()` 로 `user` 의 `id`·`nickname`·`email` 만 읽는다.
+        못 찾으면 `None`.
+        """
+
+    @abstractmethod
+    def list_all_by_user(self, user_id: UUID) -> list[VideoEntity]:
+        """그 사람의 영상 **전부**. `list_by_user` 와 달리 `kept=false` 임시분도
+        담는다 — 관리자는 아직 저장 안 한 클립까지 봐야 문제 영상을 찾는다.
+        최근 것이 앞에 오고, 판정·최근 작업 상태를 함께 채운다.
+        """
+
+    @abstractmethod
+    def admin_delete(self, video_id: UUID) -> VideoEntity | None:
+        """소유 검사 없이 영상 행을 지운다(관리자 전용). 연쇄·반환값은 `delete`
+        와 같다. 없는 클립이면 `None`.
+        """
+
+    @abstractmethod
+    def find_prior_outcome(
+        self, user_id: UUID, content_hash: str
+    ) -> PriorAnalysisOutcome | None:
+        """그 사용자가 올린 같은 내용(`content_hash`)의 영상 중, 「이 사람으로
+        분석」·「집중해서 볼 항목」 지정 없이(자동 선택 경로) 분석까지 끝난
+        것 중 가장 최근 결과(`ho` 41번, 중복 업로드 재사용).
+
+        🔴 지정이 있는 작업은 대상에서 뺀다 — 같은 영상이어도 어느 사람을
+        보라고 골랐는지가 다르면 측정 결과가 다를 수 있다. 없으면 `None`.
         """

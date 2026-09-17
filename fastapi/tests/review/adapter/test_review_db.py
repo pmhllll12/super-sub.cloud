@@ -45,7 +45,7 @@ def played(db_session):
     team_id, match_id = uuid.uuid4(), uuid.uuid4()
     now = datetime.now(timezone.utc)
 
-    for uid, nick in ((owner, "주장"), (mercenary, "용병")):
+    for uid, nick in ((owner, f"주장{uuid.uuid4().hex[:6]}"), (mercenary, f"용병{uuid.uuid4().hex[:6]}")):
         db_session.execute(
             text('insert into "user" (id, email, nickname, created_at, token_version) '
                  "values (:i, :e, :n, now(), 0)"),
@@ -136,8 +136,8 @@ def test_확정되지_않은_지원은_참가자가_아니다(db_session, played
     pending = uuid.uuid4()
     db_session.execute(
         text('insert into "user" (id, email, nickname, created_at, token_version) '
-             "values (:i, :e, '대기', now(), 0)"),
-        {"i": pending, "e": f"pend-{pending}@example.test"},
+             "values (:i, :e, :n, now(), 0)"),
+        {"i": pending, "e": f"pend-{pending}@example.test", "n": f"대기{uuid.uuid4().hex[:6]}"},
     )
     db_session.execute(
         text("insert into match_application "

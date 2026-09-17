@@ -17,6 +17,7 @@ from app.match.domain.entities.match_entity import (
     MatchEntity,
     MatchListingEntity,
     PositionNeedEntity,
+    TeamMatchRequestEntity,
 )
 
 
@@ -72,13 +73,16 @@ class MatchPort(ABC):
         """
 
     @abstractmethod
-    def delete_match(self, match_id: UUID) -> None:
+    def delete_match(self, match_id: UUID, actor_id: UUID) -> None:
         """경기를 지운다. 필요 포지션도 함께 지운다.
 
         🔴 **취소를 행 삭제로 표현한다.** 부록 D 의 `match` 에는 상태 컬럼이 없고
         D.8 도 취소를 다루지 않는다 — **ERD 에 없는 컬럼은 늘리지 않는다.**
         대신 스키마가 이미 말하고 있는 것을 따른다: 지원이 붙은 경기는 외래키가
         막는다.
+
+        `actor_id`는 알림용이다(`paik` 17번) — 팀 대 팀 확정 경기가 취소되면
+        **취소한 쪽이 아닌 상대 팀 주장(들)**에게 알린다.
         """
 
     @abstractmethod
@@ -156,4 +160,61 @@ class MatchPort(ABC):
         🔴 **이것이 `delete_match` 의 409 를 푸는 유일한 길이다**(미결 `jin` 16번).
         `match_application.match_id` 가 RESTRICT 라 행이 남아 있으면 경기를
         못 지운다. 거절을 컬럼으로 담으면 행이 남아 그대로 막힌다.
+        """
+
+    # ------------------------------------------------------------------
+    # 팀 대 팀 경기 신청 (`team_match_request`). `paik` 17번.
+    # ------------------------------------------------------------------
+
+    @abstractmethod
+    def owner_user_ids(self, team_id: UUID) -> list[UUID]:
+        """지금 그 팀의 주장(들). 알림을 보낼 대상이다.
+
+        `team` 이 소유자 이양을 안 두는 스키마라(`TeamRole` docstring 참고)
+        보통 하나지만, 복수여도 전부에게 알린다.
+        """
+
+    @abstractmethod
+    def create_team_match_request(
+        self, request: TeamMatchRequestEntity
+    ) -> TeamMatchRequestEntity:
+        """신청 생성과 **대상 팀 주장(들)에게 보내는 알림**을 같은 트랜잭션에서.
+
+        🔴 **표시용 값이 채워진 엔티티를 돌려준다**(`paik` 31번). 인터랙터가
+        만든 엔티티에는 팀 이름·지역이 비어 있다 — 그것들은 저장되는 값이
+        아니라 `team` 에서 읽어 오는 조회 결과라 저장소만 채울 수 있다.
+        """
+
+    @abstractmethod
+    def find_team_match_request(
+        self, request_id: UUID
+    ) -> TeamMatchRequestEntity | None: ...
+
+    @abstractmethod
+    def list_team_match_requests(
+        self, team_id: UUID
+    ) -> list[TeamMatchRequestEntity]:
+        """그 팀이 **보낸 것 + 받은 것** 전부, 최신순."""
+
+    @abstractmethod
+    def accept_team_match_request(
+        self, request_id: UUID
+    ) -> TeamMatchRequestEntity:
+        """수락한다 — 확정 경기를 만들고, 신청 팀에 알리고, **두 팀의 다른
+        `pending` 신청을 전부 `cancelled` 로 정리한다**(동시 확정 방지, 본문의
+        "하지 말 것"). 전부 같은 트랜잭션.
+        """
+
+    @abstractmethod
+    def reject_team_match_request(
+        self, request_id: UUID
+    ) -> TeamMatchRequestEntity:
+        """거절한다 — 신청 팀에 알린다."""
+
+    @abstractmethod
+    def cancel_team_match_request(
+        self, request_id: UUID
+    ) -> TeamMatchRequestEntity:
+        """신청 팀이 스스로 무른다. 알림은 없다 — 아직 상대가 안 받은 것일
+        수도 있고, 자기 행동을 자기에게 알릴 이유가 없다.
         """

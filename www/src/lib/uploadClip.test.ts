@@ -113,6 +113,71 @@ describe('uploadClip — 세 단계', () => {
     expect(result.reject_reason).toBe('해상도가 상한을 넘습니다')
   })
 
+  /**
+   * 🔴 **누구를 분석할지**(CCC 26, 미결 `paik` 6번) — `subject_box` 는 정규화
+   * 0~1 이고 `subject_at_ms` 와 **함께** 나간다. 한쪽만 가면 422 다.
+   */
+  describe('대상 지정 박스', () => {
+    const subject = { box: [0.1, 0.2, 0.3, 0.4] as [number, number, number, number], atMs: 2400 }
+
+    it('둘을 함께 싣는다', async () => {
+      const calls = stubFetch(passed)
+      await uploadClip({ file, sportCode: 'football', meta, subject })
+      expect(JSON.parse(calls[2].init?.body as string)).toMatchObject({
+        subject_box: [0.1, 0.2, 0.3, 0.4],
+        subject_at_ms: 2400,
+      })
+    })
+
+    /* 🔴 **지정이 없으면 통째로 생략한다** — 그게 「자동으로 고르기」이고
+       정식 경로다. 억지로 채우면 없는 지정을 있는 것처럼 만든다. */
+    it('지정이 없으면 두 필드가 아예 안 나간다', async () => {
+      const calls = stubFetch(passed)
+      await uploadClip({ file, sportCode: 'football', meta })
+      const body = JSON.parse(calls[2].init?.body as string)
+      expect(body).not.toHaveProperty('subject_box')
+      expect(body).not.toHaveProperty('subject_at_ms')
+    })
+
+    /* 🔴 **한쪽만 보낼 수가 없다.** 계약이 「함께 아니면 422」로 정해서, 두
+       값을 한 덩어리(`ClipSubject`)로 받는다 — 부르는 쪽이 어길 방법이 없다.
+       이 시험은 그 성질을 글로 남겨 둔다. */
+    it('박스만 있고 시각이 없는 요청은 만들 수 없다', async () => {
+      const calls = stubFetch(passed)
+      await uploadClip({ file, sportCode: 'football', meta, subject })
+      const body = JSON.parse(calls[2].init?.body as string)
+      expect('subject_box' in body).toBe('subject_at_ms' in body)
+    })
+  })
+
+  /**
+   * 🔴 **어디를 집중해서 볼지**(CCC 29, 미결 `paik` 8번) — 루브릭의
+   * `criteria[].id` 다. 한글 표시 이름이 아니다.
+   */
+  describe('집중해서 볼 항목', () => {
+    it('고른 항목의 id 를 싣는다', async () => {
+      const calls = stubFetch(passed)
+      await uploadClip({
+        file,
+        sportCode: 'football',
+        meta,
+        focus: ['follow_through', 'guide_hand'],
+      })
+      expect(JSON.parse(calls[2].init?.body as string).focus).toEqual([
+        'follow_through',
+        'guide_hand',
+      ])
+    })
+
+    /* 🔴 **빈 목록도 생략도 정상이다** — 「전체적으로」가 기본이자 가장 흔한
+       경우라 실패로 만들지 않는다. 보낼 것이 없으면 필드도 없다. */
+    it('빈 목록이면 아예 안 나간다', async () => {
+      const calls = stubFetch(passed)
+      await uploadClip({ file, sportCode: 'football', meta, focus: [] })
+      expect(JSON.parse(calls[2].init?.body as string)).not.toHaveProperty('focus')
+    })
+  })
+
   it('자리를 못 받으면 그 사유로 실패한다', async () => {
     vi.stubGlobal(
       'fetch',

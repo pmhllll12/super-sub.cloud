@@ -7,19 +7,47 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
+from app.analysis.adapter.outbound.pg.report_read_pg_repository import (
+    ReportReadPgRepository,
+)
 from app.analysis.adapter.outbound.pg.video_pg_repository import VideoPgRepository
 from app.analysis.adapter.outbound.s3.s3_storage import S3Storage
-from app.analysis.application.ports.input.video_use_cases import (
-    CreateUploadUrlUseCase,
-    ListMyVideosUseCase,
-    RegisterVideoUseCase,
+from app.analysis.application.ports.input.report_read_use_case import (
+    ReadReportUseCase,
 )
+from app.analysis.application.ports.input.video_use_cases import (
+    AdminDeleteVideoUseCase,
+    CreateUploadUrlUseCase,
+    DeleteVideoUseCase,
+    GetCardGradeUseCase,
+    GetFeaturedVideoUseCase,
+    GetPlaybackUrlUseCase,
+    KeepVideoUseCase,
+    ListAdminVideosUseCase,
+    ListMyVideosUseCase,
+    ListPublicVideosUseCase,
+    RegisterVideoUseCase,
+    UpdateVideoUseCase,
+)
+from app.analysis.application.ports.output.report_read_port import ReportReadPort
 from app.analysis.application.ports.output.storage_port import StoragePort
 from app.analysis.application.ports.output.video_port import VideoPort
+from app.analysis.application.use_cases.report_read_interactor import (
+    ReadReportInteractor,
+)
 from app.analysis.application.use_cases.video_interactors import (
+    AdminDeleteVideoInteractor,
     CreateUploadUrlInteractor,
+    DeleteVideoInteractor,
+    GetCardGradeInteractor,
+    GetFeaturedVideoInteractor,
+    GetPlaybackUrlInteractor,
+    KeepVideoInteractor,
+    ListAdminVideosInteractor,
     ListMyVideosInteractor,
+    ListPublicVideosInteractor,
     RegisterVideoInteractor,
+    UpdateVideoInteractor,
 )
 from app.core.config import settings
 from app.core.database import get_session
@@ -56,8 +84,28 @@ def get_storage() -> StoragePort:
 StorageDep = Annotated[StoragePort, Depends(get_storage)]
 
 
-def get_create_upload_url_use_case(storage: StorageDep) -> CreateUploadUrlUseCase:
-    return CreateUploadUrlInteractor(storage)
+def get_storage_optional() -> StoragePort | None:
+    """버킷이 없으면 `None`. **503 을 내지 않는다** — 워커 큐 소비처럼 S3 가
+    없어도 돌아야 하는 자리에서 쓴다(그 자리의 S3 정리는 best-effort).
+    """
+    if not settings.s3_bucket:
+        return None
+    return S3Storage(
+        bucket=settings.s3_bucket,
+        region=settings.aws_region,
+        url_ttl_seconds=settings.upload_url_ttl_seconds,
+    )
+
+
+StorageOptionalDep = Annotated[
+    StoragePort | None, Depends(get_storage_optional)
+]
+
+
+def get_create_upload_url_use_case(
+    repository: VideoRepositoryDep, storage: StorageDep
+) -> CreateUploadUrlUseCase:
+    return CreateUploadUrlInteractor(repository, storage)
 
 
 def get_register_video_use_case(
@@ -72,6 +120,60 @@ def get_list_my_videos_use_case(
     return ListMyVideosInteractor(repository)
 
 
+def get_update_video_use_case(
+    repository: VideoRepositoryDep,
+) -> UpdateVideoUseCase:
+    return UpdateVideoInteractor(repository)
+
+
+def get_list_public_videos_use_case(
+    repository: VideoRepositoryDep,
+) -> ListPublicVideosUseCase:
+    return ListPublicVideosInteractor(repository)
+
+
+def get_playback_url_use_case(
+    repository: VideoRepositoryDep, storage: StorageDep
+) -> GetPlaybackUrlUseCase:
+    return GetPlaybackUrlInteractor(repository, storage)
+
+
+def get_featured_video_use_case(
+    repository: VideoRepositoryDep, storage: StorageDep
+) -> GetFeaturedVideoUseCase:
+    return GetFeaturedVideoInteractor(repository, storage)
+
+
+def get_card_grade_use_case(
+    repository: VideoRepositoryDep,
+) -> GetCardGradeUseCase:
+    return GetCardGradeInteractor(repository)
+
+
+def get_delete_video_use_case(
+    repository: VideoRepositoryDep, storage: StorageDep
+) -> DeleteVideoUseCase:
+    return DeleteVideoInteractor(repository, storage)
+
+
+def get_keep_video_use_case(
+    repository: VideoRepositoryDep, storage: StorageDep
+) -> KeepVideoUseCase:
+    return KeepVideoInteractor(repository, storage)
+
+
+def get_list_admin_videos_use_case(
+    repository: VideoRepositoryDep,
+) -> ListAdminVideosUseCase:
+    return ListAdminVideosInteractor(repository)
+
+
+def get_admin_delete_video_use_case(
+    repository: VideoRepositoryDep, storage: StorageDep
+) -> AdminDeleteVideoUseCase:
+    return AdminDeleteVideoInteractor(repository, storage)
+
+
 CreateUploadUrlUseCaseDep = Annotated[
     CreateUploadUrlUseCase, Depends(get_create_upload_url_use_case)
 ]
@@ -80,4 +182,54 @@ RegisterVideoUseCaseDep = Annotated[
 ]
 ListMyVideosUseCaseDep = Annotated[
     ListMyVideosUseCase, Depends(get_list_my_videos_use_case)
+]
+UpdateVideoUseCaseDep = Annotated[
+    UpdateVideoUseCase, Depends(get_update_video_use_case)
+]
+ListPublicVideosUseCaseDep = Annotated[
+    ListPublicVideosUseCase, Depends(get_list_public_videos_use_case)
+]
+GetPlaybackUrlUseCaseDep = Annotated[
+    GetPlaybackUrlUseCase, Depends(get_playback_url_use_case)
+]
+GetFeaturedVideoUseCaseDep = Annotated[
+    GetFeaturedVideoUseCase, Depends(get_featured_video_use_case)
+]
+GetCardGradeUseCaseDep = Annotated[
+    GetCardGradeUseCase, Depends(get_card_grade_use_case)
+]
+DeleteVideoUseCaseDep = Annotated[
+    DeleteVideoUseCase, Depends(get_delete_video_use_case)
+]
+KeepVideoUseCaseDep = Annotated[
+    KeepVideoUseCase, Depends(get_keep_video_use_case)
+]
+ListAdminVideosUseCaseDep = Annotated[
+    ListAdminVideosUseCase, Depends(get_list_admin_videos_use_case)
+]
+AdminDeleteVideoUseCaseDep = Annotated[
+    AdminDeleteVideoUseCase, Depends(get_admin_delete_video_use_case)
+]
+
+
+def get_report_read_repository(
+    session: Annotated[Session, Depends(get_session)],
+) -> ReportReadPort:
+    return ReportReadPgRepository(session)
+
+
+ReportReadRepositoryDep = Annotated[
+    ReportReadPort, Depends(get_report_read_repository)
+]
+
+
+def get_read_report_use_case(
+    repository: ReportReadRepositoryDep,
+    video_repository: VideoRepositoryDep,
+) -> ReadReportUseCase:
+    return ReadReportInteractor(repository, video_repository)
+
+
+ReadReportUseCaseDep = Annotated[
+    ReadReportUseCase, Depends(get_read_report_use_case)
 ]

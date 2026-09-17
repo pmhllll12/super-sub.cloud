@@ -1,14 +1,37 @@
 import type {
   AdminUserDetail,
   AdminUserListResult,
+  AdminVideoListResult,
+  AppNotification,
   AuthToken,
+  Contact,
+  ContactRequest,
+  UserSearchResult,
+  TeamDetail,
+  CardGrade,
+  SquadCandidate,
+  TeamMatchRequest,
+  CardStyleWire,
   CreateMatchInput,
+  FeaturedVideo,
+  MercenaryCandidate,
   PlayerCard,
+  Position,
   PublicPlayerCard,
   Match,
+  MatchSearch,
   MyVideo,
+  VideoReport,
+  PublicVideo,
+  SearchMercenaryCandidatesInput,
   Squad,
   SignupResult,
+  TeamInvitation,
+  ReceivedInvitation,
+  Region,
+  MatchSlot,
+  TeamMatchPreference,
+  MatchCandidate,
   User,
 } from './types'
 
@@ -21,7 +44,14 @@ export interface Backend {
   login(input: { email: string; password: string }): Promise<AuthToken>
   loginWithGoogle(input: { id_token: string }): Promise<AuthToken>
   getMe(token: string): Promise<User>
-  updateMe(token: string, input: { nickname: string }): Promise<User>
+  /**
+   * 내 정보를 고친다. **보낸 칸만 바뀐다** — 안 보낸 것은 그대로다(계약).
+   * 그래서 닉네임만 고칠 때 검색 노출을 실어 보내지 않는다.
+   */
+  updateMe(
+    token: string,
+    input: { nickname?: string; is_nickname_searchable?: boolean },
+  ): Promise<User>
   /** 🔴 성공하면 **기존 토큰이 전부 무효가 된다**(SEC-004) — 다시 로그인시켜야 한다. */
   changePassword(
     token: string,
@@ -37,25 +67,202 @@ export interface Backend {
    * 행위**여야 하기 때문이다 — 프리페치나 봇이 카드를 만들면 안 된다.
    */
   createMyCard(token: string): Promise<PlayerCard>
+  /**
+   * 카드의 한 줄(`tagline`)과 꾸미기(`style`)를 바꾼다 — 계약 3장, CCC 18·35.
+   *
+   * 🔴 **보낸 필드만 바뀐다** — `updateVideo` 와 같은 판단이다. `tagline`
+   * 만 보내면 `style` 은 그대로고, 반대도 마찬가지다. 그래서 입력 타입에
+   * `?`(생략 가능)를 뒀다 — `undefined` 로라도 보내면 "보냈다"로 읽힐 수
+   * 있으니 **키 자체를 빼고** 부른다. `null` 은 "지운다"는 뜻이 있는 값이다.
+   * 🔴 `style` 을 보낼 땐 **전체 값**을 보낸다 — 서버가 부분 병합을 안 한다.
+   */
+  /**
+   * 카드에서 **사람이 정하는 값**을 바꾼다. 보낸 칸만 바뀐다(계약 3-5절).
+   *
+   * ⚠️ `titles` 는 **아직 계약에 없다**(미결 `paik` 36번 — 요청해 두었다).
+   * 호칭을 사람이 직접 적기로 바뀌면서(2026-09-16) 필요해진 칸이고, 지금은
+   * mock 만 받는다. 🔴 **진짜 서버가 이 칸을 받기 전까지 실서버에서는
+   * 저장되지 않는다** — 화면이 그것을 숨기지 않고 말한다.
+   */
+  updateMyCard(
+    token: string,
+    input: { tagline?: string | null; style?: CardStyleWire | null; titles?: string[] },
+  ): Promise<PlayerCard>
   getPublicCard(slug: string): Promise<PublicPlayerCard>
   /** 내가 올린 클립 목록. **최근 것이 앞에 온다.** */
   listMyVideos(token: string): Promise<MyVideo[]>
+  /**
+   * 그 클립을 **재생할 수 있는 주소**(사전 서명 GET URL) — 계약 3-6절.
+   *
+   * 🔴 **캐시하지 않는다.** `expires_in`(기본 900초) 뒤 만료되므로 재생 직전에
+   * 받는다. 저장 키를 그대로 `<video src>` 에 넣으면 403 이다.
+   * 🔴 공개 클립이면 남의 것도, 내 것이면 비공개여도 받는다. 아니면 404.
+   */
+  getPlaybackUrl(token: string, videoId: string): Promise<{ url: string; expires_in: number }>
+  /**
+   * 내가 올린 클립을 **지운다** — 저장소의 영상 파일과 그 분석 리포트까지.
+   *
+   * 🔴 되돌릴 수 없다. 화면이 먼저 한 번 더 묻는다(`MyVideos`).
+   * 🔴 남의 클립은 404 `VIDEO_NOT_FOUND` 다 — "있는데 남의 것"과 "없는 것"을
+   *    가르면 남의 클립 id 를 훑어 존재를 알아낼 수 있다.
+   *
+   * ⚠️ **아직 계약에 없다**(미결 paik 13번). 진짜 백엔드에서는 404 가 온다 —
+   * 지금 도는 것은 mock 뿐이다.
+   */
+  deleteMyVideo(token: string, videoId: string): Promise<void>
+  /**
+   * 「내 프로필에 리포트 저장」 — `POST /videos/{id}/keep`(계약 3-6절,
+   * 미결 `jin` 24번 5조각).
+   *
+   * 🔴 **작업이 생긴 클립은 등록만으로는 임시(`kept=false`)다**(2026-09-11
+   * 백엔드 정정 — 사용자가 "분석에 실패한 영상이 안 지워진다"고 지적해서
+   * 바뀌었다). 이 호출 전까지는 화면을 벗어나면 곧 지워지거나
+   * (`deleteMyVideo`/`pagehide`), 그것도 놓치면 24시간 뒤 서버 백스톱이
+   * 지운다 — **분석에 실패해 다시 볼 리포트가 없는 클립을 그대로 두는
+   * 길**이다. 이 호출을 부르면 영구가 되고, 임시 원본이던 것은 리포트
+   * 자리로 옮겨져 `storage_key` 가 바뀐다.
+   * 🔴 **멱등이다** — 이미 저장된 클립에 다시 불러도 그대로다.
+   * 🔴 남의/없는 클립은 404 `VIDEO_NOT_FOUND`.
+   */
+  keepVideo(token: string, videoId: string): Promise<MyVideo>
+  /**
+   * 내 클립을 **부분 수정**한다 — 보낸 것만 바뀐다(계약 3-6절 `PATCH /videos`).
+   *
+   * 🔴 `is_featured: true` 는 「나를 보여주는 대표 영상」으로 세우는 것이고
+   * **사람당 하나**라, 세우면 옛 대표가 서버에서 자동으로 내려간다. 화면이
+   * 옛 것을 먼저 내리는 두 번 호출을 하지 않는다 — 그 사이에 끊기면 대표가
+   * 하나도 없는 상태로 남는다.
+   * 🔴 **반려된 클립(`passed: false`)은 대표가 될 수 없다** — 422 `CANNOT_FEATURE`.
+   * 🔴 남의 클립은 404 `VIDEO_NOT_FOUND` 다.
+   *
+   * 🔴 **셋 중 보낸 것만 바뀐다.** 공개 여부만 토글할 때 제목이 지워지지
+   * 않는다 — 그래서 화면이 "안 바꾸는 값"을 다시 실어 보낼 필요가 없다.
+   * 🔴 `title`·`description` 에 **`null` 이나 공백을 보내면 지운다**
+   * (`PATCH /me/card` 의 `tagline` 과 같은 규칙). 길이는 100 · 280 자다.
+   */
+  updateVideo(
+    token: string,
+    videoId: string,
+    input: {
+      is_featured?: boolean
+      is_public?: boolean
+      title?: string | null
+      description?: string | null
+    },
+  ): Promise<MyVideo>
+  /**
+   * **공개된 클립 전부** — 남의 것까지. 최근 것이 앞, 최대 100건(계약 3-6절).
+   *
+   * 🔴 **로그인이 필요하다.** 익명 홈에서 부를 자리가 생기면 계약을 다시
+   * 봐야 한다(정어진 님이 그렇게 적어 두셨다).
+   */
+  listPublicVideos(token: string): Promise<PublicVideo[]>
+  /**
+   * 그 사람의 **대표 영상** — 카드 슬러그로 읽는다(계약 3-6절).
+   *
+   * 🔴 **내부 `user_id` 가 아니라 카드 슬러그다** — 내부 id 를 밖에 내보내지
+   * 않는 것이 카드와 같은 원칙이다.
+   * 🔴 대표가 없든 슬러그가 없든 그 대표가 반려됐든 **밖에서는 다 404
+   * `NO_FEATURED_VIDEO`** 다 — 갈라 주면 남의 상태를 훑을 수 있다.
+   */
+  /**
+   * 그 클립의 **분석 리포트** — `GET /videos/{id}/report` (CCC 31, 2026-09-10).
+   *
+   * 🔴 **아직 적재 전이면 404 `REPORT_NOT_READY`** 다. 「분석 중」과 「결과가
+   * 없다」가 같아 보이면 안 되므로 **빈 리포트를 지어 주지 않는다**(미결
+   * `paik` 7번의 「하지 말 것」).
+   * 🔴 남의 영상은 404 `VIDEO_NOT_FOUND` — 있고 없고를 알려 주지 않는다.
+   */
+  getVideoReport(token: string, videoId: string): Promise<VideoReport>
+
+  getFeaturedVideo(token: string, cardSlug: string): Promise<FeaturedVideo>
+  /**
+   * 종목별 포지션 목록 — 로그인하면 누구나(계약 3-3절).
+   *
+   * 🔴 없는 `sport_code` 는 **빈 배열이 아니라 422 `UNKNOWN_SPORT`** 다
+   * (`searchMatches` 와 같은 판단) — 오타와 "그 종목 포지션이 아직 없다"가
+   * 같아 보이면 안 된다. 그래서 **빈 값을 실어 보내지 않는다.**
+   */
+  listPositions(token: string, params?: { sport_code?: string }): Promise<Position[]>
   /** 그 팀의 **다가오는** 경기. 이른 것이 앞에 온다. */
   listTeamMatches(token: string, teamId: string): Promise<Match[]>
+  /**
+   * 모집 중인 경기를 훑는다 — **팀 id 를 몰라도 되는 유일한 경로다.**
+   * 「팀원」 판이 쓴다: 아직 사람을 못 채운 팀들의 명단이다.
+   *
+   * 🔴 **다가오는 것만** 오고 이른 것이 앞이다. 종목 코드가 틀리면 빈 배열이
+   * 아니라 422 `UNKNOWN_SPORT` 다 — 오타와 "그런 경기가 없다"가 같아 보이면
+   * 사용자가 없는 것을 계속 기다린다.
+   */
+  searchMatches(
+    token: string,
+    params?: { sport_code?: string; region?: string; page?: number; size?: number },
+  ): Promise<MatchSearch>
   /** 경기를 새로 연다. 주장만 — 아니면 403 `FORBIDDEN`. */
   createTeamMatch(token: string, teamId: string, input: CreateMatchInput): Promise<Match>
+  /**
+   * 용병 후보 검색(api-contract.md 3-11절, min 16·17번) — **SFR-006·007과
+   * 별개**다(그쪽은 지원 후 채점·추천, 이건 지원 전 검색). `is_searchable`인
+   * 사람만, 유사도 내림차순. 없으면 빈 배열(에러 아님).
+   *
+   * ⚠️ 아직 `fastapi/app/main.py`에 라우터가 배선되지 않아 지금은 404다
+   * (min 17번) — 정어진의 배선을 기다린다.
+   */
+  searchMercenaryCandidates(
+    token: string,
+    input: SearchMercenaryCandidatesInput,
+  ): Promise<MercenaryCandidate[]>
   /** 팀의 스쿼드. 소속이면 본다. **아직 없으면 404 SQUAD_NOT_FOUND** 다. */
   getSquad(token: string, teamId: string): Promise<Squad>
+  /**
+   * 공개 슬러그로 읽는 **남의 스쿼드** (계약 3-7절, CCC 53번).
+   *
+   * 🔴 **토큰을 안 받는다.** 슬러그가 96비트 난수라 그 자체가 접근
+   * 통제다(SEC-005 — `getPublicCard` 와 같은 결). 초대받은 사람은 **아직
+   * 그 팀 소속이 아니라서** 소속을 요구하는 `getSquad` 로는 못 읽는다.
+   */
+  getSquadBySlug(publicSlug: string): Promise<Squad>
   /** 스쿼드를 연다. **멱등** — 이미 있으면 그것을 그대로 돌려준다. 주장만. */
   createSquad(token: string, teamId: string): Promise<Squad>
-  /** 카드를 자리에 등재한다. 주장만. **바뀐 스쿼드 전체**를 돌려준다. */
+  /**
+   * 카드를 자리에 등재한다. 주장만. **바뀐 스쿼드 전체**를 돌려준다.
+   *
+   * `grid_col`·`grid_row` 는 선택이다 — 등재하면서 홈 판 칸에 바로 올릴 때
+   * 준다. 🔴 **함께 주거나 함께 비운다**(한쪽만 = 422).
+   */
   addSquadMember(
     token: string,
     teamId: string,
-    input: { player_card_id: string; position_code: string },
+    input: {
+      player_card_id: string
+      position_code: string
+      grid_col?: number | null
+      grid_row?: number | null
+    },
   ): Promise<Squad>
   /** 등재를 뺀다(카드는 지워지지 않는다). 주장만. */
   removeSquadMember(token: string, teamId: string, memberId: string): Promise<Squad>
+  /**
+   * 홈 스쿼드 판의 **판 크기**를 저장한다. 주장만. 바뀐 스쿼드 전체를 돌려준다
+   * (계약 3-7절 `PATCH /teams/{id}/squad`, 2026-09-09).
+   */
+  setSquadFormation(token: string, teamId: string, formation: string): Promise<Squad>
+  /**
+   * 등재 하나의 **포지션 · 판 배치**를 바꾼다. 주장만. 바뀐 스쿼드 전체를
+   * 돌려준다 (계약 3-7절, 2026-09-09).
+   *
+   * 🔴 `position_code` 는 **항상 준다** — 등재는 포지션 없이 존재하지 않는다.
+   * 칸만 옮길 때는 지금 코드를 그대로 실어 보낸다.
+   * 🔴 `grid_col`·`grid_row` 는 **함께 주거나 함께 비운다.** 둘 다 `null` 이면
+   * 등재는 남기고 **판에서만** 뺀다.
+   * 🔴 **포지션을 칸에서 역산하지 않는다** — 손으로 정한 값이라 자리와 다를 수 있다.
+   */
+  updateSquadMember(
+    token: string,
+    teamId: string,
+    memberId: string,
+    input: { position_code: string; grid_col: number | null; grid_row: number | null },
+  ): Promise<Squad>
   /** 관리자 전용. 관리자가 아니면 403 FORBIDDEN 이 던져진다. */
   listUsers(
     token: string,
@@ -63,4 +270,189 @@ export interface Backend {
   ): Promise<AdminUserListResult>
   getUserDetail(token: string, userId: string): Promise<AdminUserDetail>
   forceDeleteUser(token: string, userId: string): Promise<void>
+  /** 관리자 전용. `user` 는 `user.id` 또는 이메일. 없는 사람이면 404 USER_NOT_FOUND. */
+  listAdminVideos(token: string, user: string): Promise<AdminVideoListResult>
+
+  /* ── 지인 · 알림 (계약 3-12절, CCC 37번) ───────────────────────────────
+   *
+   * 🔴 **상호 관계다.** 신청(`requestContact`)은 한쪽이 하지만 상대가
+   * 수락(`acceptContact`)해야 양쪽 목록에 뜬다. 그래서 "검색해서 나온 사람"과
+   * "내 지인"은 **다른 목록**이다 — 화면에서 하나로 합치면 안 된다.
+   */
+
+  /** 닉네임 부분일치로 사람 찾기. 최대 20명, **본인과 검색을 끈 사람은 빠진다.** */
+  searchUsers(token: string, q: string): Promise<UserSearchResult[]>
+  /** 수락된 지인 목록. */
+  listContacts(token: string): Promise<{ items: Contact[] }>
+  /** 나에게 온 대기중 신청. 내가 보낸 신청은 여기 안 온다(계약에 그 경로가 없다). */
+  listContactRequests(token: string): Promise<ContactRequest[]>
+  /**
+   * 지인 신청. 422 `CANNOT_REQUEST_SELF` · 404 `USER_NOT_FOUND` ·
+   * 409 `ALREADY_REQUESTED`(방향 무관 · 이미 지인인 경우 포함).
+   */
+  requestContact(
+    token: string,
+    input: { target_user_id: string; note?: string },
+  ): Promise<ContactRequest>
+  /** 내가 대상인 대기중 신청만 수락된다. 403 `FORBIDDEN` · 409 `ALREADY_ACCEPTED`. */
+  acceptContact(token: string, contactId: string): Promise<ContactRequest>
+  /** 알림 목록(폴링). 최신순 최대 50건. */
+  listNotifications(token: string, unreadOnly?: boolean): Promise<AppNotification[]>
+  /** 읽음 처리. **멱등이다** — 이미 읽었어도 200. */
+  readNotification(token: string, notificationId: string): Promise<AppNotification>
+
+  /* ── 팀 대 팀 경기 신청 (계약 3-15절, CCC 42번) ─────────────────────── */
+
+  /** 경기 걸기. **신청 팀 주장만.** 422 `CANNOT_REQUEST_SELF`·`PAST_MATCH`. */
+  requestTeamMatch(
+    token: string,
+    teamId: string,
+    input: { target_team_id: string; played_at: string; place: string },
+  ): Promise<TeamMatchRequest>
+  /** 그 팀이 **보낸 것 + 받은 것** 전부, 최신순. 주장만. */
+  listTeamMatchRequests(token: string, teamId: string): Promise<TeamMatchRequest[]>
+  /** 수락 → 확정 경기 생성(`match_id`). **대상 팀 주장만.** */
+  acceptTeamMatch(token: string, teamId: string, requestId: string): Promise<TeamMatchRequest>
+  /** 거절. **대상 팀 주장만.** */
+  rejectTeamMatch(token: string, teamId: string, requestId: string): Promise<TeamMatchRequest>
+  /** 신청 팀이 스스로 무르기 — `pending` 일 때만. 알림이 안 간다. */
+  cancelTeamMatch(token: string, teamId: string, requestId: string): Promise<TeamMatchRequest>
+
+  /* ── 표시 등급 · 추천 후보 (계약 3-6·3-16절, CCC 43·44번) ──────────────
+   *
+   * 🔴 **경계는 서버가 긋는다.** 두 응답 모두 `grade`(`S`~`F`)와
+   * `provisional` 을 짝으로 준다 — 화면은 받아서 그리기만 한다.
+   */
+
+  /* ── 팀 만들기 · 나가기 (계약 3-3절) ──────────────────────────────── */
+
+  /** 팀을 만든다. 🔴 **만든 사람이 `owner` 로 함께 들어간다.** */
+  createTeam(
+    token: string,
+    input: { name: string; region: string; sport_code: string },
+  ): Promise<TeamDetail>
+  /**
+   * 팀 이름·지역을 고친다 — **주장만**(403), 계약 3-3절 `PATCH /teams/{id}`.
+   *
+   * 🔴 **`null` 로 지우지 못한다**(422). 둘 다 NOT NULL 이라 「안 정한 상태」가
+   * 없다 — 안 바꿀 필드는 **아예 뺀다.** (`PATCH /me/card` 의 `tagline` 과
+   * 반대다. 그쪽은 `null` 이 「지우기」다.)
+   *
+   * 🔴 **`sport_code` 는 못 바꾼다** — 본문에 자리가 없다. 포지션·스쿼드·경기가
+   * 전부 그 값에 매달려 있어서, 바꾸면 이미 앉힌 포지션이 다른 종목 것이 된다.
+   *
+   * 🔴 **이게 왜 필요한가**: 「사람을 찾는 팀」이 지역으로 거르는데(그 값이
+   * `team.region` 이다) 오타를 내거나 연고를 옮기면 **그 팀 경기가 탐색에서
+   * 통째로 빠졌고 고칠 방법이 없었다.**
+   */
+  updateTeam(
+    token: string,
+    teamId: string,
+    input: { name?: string; region?: string },
+  ): Promise<TeamDetail>
+  /**
+   * 팀에서 나간다(본인) 또는 뺀다(주장).
+   *
+   * 🔴 `memberId` 는 **그 사람의 `user_id`** 다 — 소속 행의 id 가 아니다.
+   * 🔴 **마지막 주장은 못 나간다**(`409 LAST_OWNER`) — 소유권 이양 경로가
+   * 아직 없다. 화면에서 미리 막지 말고 그 코드를 받아 안내한다.
+   */
+  leaveTeam(token: string, teamId: string, memberId: string): Promise<void>
+
+  /**
+   * 확정 경기를 **무른다** — 계약 3-4절 `DELETE /matches/{match_id}`, `204`.
+   *
+   * 🔴 **팀 대 팀이면 주최·상대 어느 쪽 주장이든** 취소할 수 있다(2026-09-16에
+   * 넓어졌다). 취소 안 한 쪽 주장에게 `team_match_cancelled` 알림이 간다.
+   *
+   * 🔴 **취소는 행 삭제다.** `match` 에 상태 컬럼이 없다 — 그래서 지원이 붙어
+   * 있으면 DB 가 못 지우게 막고(`409 MATCH_HAS_APPLICATIONS`), 지원을 먼저
+   * 정리해야 한다. 화면에서 미리 막지 말고 **그 코드를 받아 그대로 안내한다** —
+   * 지원이 몇인지는 서버만 안다(마지막 주장 나가기와 같은 원칙).
+   */
+  cancelMatch(token: string, matchId: string): Promise<void>
+
+  /* ── 팀 초대 (계약 3-3절 「팀 초대」, CCC 49·53번) ──────────────────
+   *
+   * 🔴 **동의 없이 꽂지 않는다**(2026-09-10 박민호 결정) — 주장이 부르고
+   * 받은 사람이 수락해야 팀원이 된다.
+   */
+
+  /** 초대를 보낸다 — **주장만**. `positionCode` 는 선택(안 정한 초대도 정상). */
+  inviteToTeam(
+    token: string,
+    teamId: string,
+    input: { invited_user_id: string; position_code?: string },
+  ): Promise<TeamInvitation>
+  /**
+   * 그 팀이 보낸 초대 **전부**(상태 무관), 최신순 — 주장만.
+   *
+   * 🔴 **판을 되살리는 값이다.** 앉힌 사람이 새로고침 뒤에도 그 자리에 있는
+   * 것은 이 목록 덕이다(사용자 설계, 2026-09-17).
+   */
+  listTeamInvitations(token: string, teamId: string): Promise<TeamInvitation[]>
+  /**
+   * 보낸 초대를 **무른다** — 주장만. 🔴 `204` 가 아니라 무른 초대를 그대로
+   * 돌려준다(상태 전이라 다른 응답과 같은 파서를 쓴다).
+   *
+   * ⚠️ **알림이 없다** — 보낸 쪽이 스스로 하는 것이라 알릴 상대가 없다.
+   */
+  cancelTeamInvitation(
+    token: string,
+    teamId: string,
+    invitationId: string,
+  ): Promise<TeamInvitation>
+  /** 내가 받은, **아직 답 안 한** 초대만. 팀 넉 칸이 더 붙는다(CCC 53). */
+  listMyInvitations(token: string): Promise<ReceivedInvitation[]>
+  /** 수락 — 그때 `team_member` 가 `member` 로 생긴다. */
+  acceptInvitation(token: string, invitationId: string): Promise<TeamInvitation>
+  /**
+   * 거절 — 🔴 **실패가 아니다.** `200` 이고 아무것도 안 바뀐 것이 맞는
+   * 결과다(계약의 「하지 말 것」).
+   */
+  rejectInvitation(token: string, invitationId: string): Promise<TeamInvitation>
+
+  /* ── 경기 조건·지역·후보 (계약 3-13절, CCC 40번) ──────────────────── */
+
+  /**
+   * 지역 목록 — 조건 판의 「어느 동네에서」 후보.
+   *
+   * 🔴 **화면이 목록을 들고 있지 않는다**(`lib/regions.ts` 의 붙박이 60곳을
+   * 걷어낸 자리다). 저장은 `id` 로 하므로 이름만으로는 아무것도 못 보낸다.
+   */
+  listRegions(token: string): Promise<Region[]>
+  /** 우리 팀 경기 조건. 소속이면 읽는다. */
+  getTeamMatchPrefs(token: string, teamId: string): Promise<TeamMatchPreference>
+  /**
+   * 우리 팀 경기 조건을 **통째로 교체**한다 — **팀장만**(아니면 403).
+   *
+   * 🔴 **이걸 안 보내면 우리 팀은 남의 후보 목록에 안 뜬다** — 서버가
+   * 「경기 조건을 하나라도 등록한 팀만」 후보로 고른다(계약 3-13절).
+   * 🔴 부분 수정이 아니다. 하나만 더하려도 전체를 다시 보낸다.
+   */
+  putTeamMatchPrefs(
+    token: string,
+    teamId: string,
+    input: { region_ids: string[]; slots: MatchSlot[] },
+  ): Promise<TeamMatchPreference>
+  /**
+   * 「맞는 상대」 후보 — **이미 정렬돼 있다.** 그 팀 소속만(아니면 403).
+   *
+   * 🔴 화면이 겹침을 다시 계산하지 않는다 — `reasons` 를 그대로 적는다.
+   */
+  listMatchCandidates(token: string, teamId: string): Promise<MatchCandidate[]>
+
+  /** 남의 표시 등급. 로그인하면 누구나(`featured-video` 와 같은 원칙). */
+  getCardGrade(token: string, cardPublicSlug: string): Promise<CardGrade>
+  /**
+   * 빈 자리에 넣을 후보들 — **이미 정렬돼서 온다.**
+   *
+   * `grade` 를 주면 그 칸으로만 하드 필터, 안 주면 거르지 않고 팀 평균과
+   * 가까운 순으로 정렬만 한다.
+   */
+  listSquadCandidates(
+    token: string,
+    teamId: string,
+    params: { position_code: string; grade?: string },
+  ): Promise<SquadCandidate[]>
 }

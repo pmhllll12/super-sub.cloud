@@ -10,12 +10,15 @@
  * 🔴 **종목당 `status: active` 인 루브릭 하나만 싣는다.** 루브릭 파일이 그
  * 규칙을 스스로 적어 두었다 — *"status: 사용자 선택지에 올릴지 여부 — active만
  * 오른다. draft는 파일은 갖추었으나 아직 열지 않은 동작이다."*
- * 그래서 아래 셋에는 draft 인 인사이드 패스 · 타격 · 레이업이 **없다.**
- * (2026-09-08 기준. `grep -l 'status: active' agent/rubrics/*.yaml` 로 확인한다.)
+ * 그래서 아래에는 draft 인 인사이드 패스가 **없다.**
+ * (`grep -l 'status: active' agent/rubrics/*.yaml` 로 확인한다.)
+ *
+ * 🔴 **축구 하나다.** 에이전트가 야구·농구 루브릭을 지웠다(미결 ho 39번,
+ * 2026-09-11). 되살릴 때는 루브릭 파일이 먼저고 이 사본은 그다음이다 —
+ * 루브릭 없이 여기만 늘리면 워커가 「루브릭 없음」으로 거부한다.
  *
  * 🔴 **`deferred` 항목은 뺐다.** 루브릭이 "지금은 못 잰다"고 미뤄 둔 것들이다
- * (농구의 릴리스 높이 · 팔꿈치 정렬, 축구의 임팩트 지점 · 스윙 가속 타이밍,
- * 야구의 릴리스 포인트 일관성 · 그립). 못 보는 것을 고르게 하면 고르고도
+ * (임팩트 지점 · 스윙 가속 타이밍). 못 보는 것을 고르게 하면 고르고도
  * 아무 답을 못 받는다.
  *
  * ⚠️ **고른 값을 아직 아무 데도 못 보낸다.** 계약 3-6절에 실을 자리가 없고
@@ -45,34 +48,12 @@ export const FOCUS: Record<SportKey, SportFocus> = {
     motion: '인스텝 슈팅',
     rubric: 'football_instep_shot',
     items: [
-      { id: 'plant_knee_flexion', label: '디딤발 무릎 굴곡' },
-      { id: 'swing_knee_extension', label: '차는 다리 무릎 신전' },
+      { id: 'plant_knee_flexion', label: '디딤발 무릎 굽히기' },
+      { id: 'swing_knee_extension', label: '차는 다리 뻗기' },
       { id: 'trunk_lean', label: '상체 기울기' },
-      { id: 'hip_rotation', label: '골반 회전' },
-      { id: 'follow_through', label: '팔로스루' },
+      { id: 'hip_rotation', label: '골반 돌리기' },
+      { id: 'follow_through', label: '차고 난 뒤 마무리' },
       { id: 'plant_foot_position', label: '디딤발 위치' },
-    ],
-  },
-  baseball: {
-    motion: '투구',
-    rubric: 'baseball_pitching',
-    items: [
-      { id: 'release_arm_extension', label: '릴리스 팔 신전' },
-      { id: 'hip_shoulder_separation', label: '골반-어깨 분리' },
-      { id: 'stride_leg_block', label: '디딤발 버팀' },
-      { id: 'trunk_tilt', label: '상체 기울기' },
-      { id: 'arm_deceleration', label: '팔 감속' },
-    ],
-  },
-  basketball: {
-    motion: '점프슛',
-    rubric: 'basketball_jump_shot',
-    items: [
-      { id: 'release_arm_extension', label: '슛하는 팔 신전' },
-      { id: 'guide_hand', label: '가이드 핸드' },
-      { id: 'follow_through', label: '팔로스루' },
-      { id: 'trunk_alignment', label: '상체 정렬' },
-      { id: 'leg_drive', label: '하체 신전' },
     ],
   },
 }

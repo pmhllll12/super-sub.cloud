@@ -31,6 +31,32 @@ class EnlistCardCommand:
     team_id: UUID
     player_card_id: UUID
     position_code: str
+    # 등재하면서 판에 바로 올릴 때의 칸. 안 올리면 둘 다 None (both-or-neither).
+    grid_col: int | None = None
+    grid_row: int | None = None
+
+
+@dataclass(frozen=True)
+class MoveMemberCommand:
+    """등재 하나의 포지션·판 배치를 바꾼다 (미결 `paik` 9번).
+
+    `position_code` 는 항상 있다 — 등재는 포지션 없이 존재할 수 없다. 판에서만
+    빼려면 `grid_col`·`grid_row` 를 둘 다 None 으로 준다(both-or-neither).
+    """
+
+    actor_id: UUID
+    team_id: UUID
+    member_id: UUID
+    position_code: str
+    grid_col: int | None
+    grid_row: int | None
+
+
+@dataclass(frozen=True)
+class SetFormationCommand:
+    actor_id: UUID
+    team_id: UUID
+    formation: str
 
 
 @dataclass(frozen=True)
@@ -48,6 +74,8 @@ class SquadMemberResult:
     nickname: str
     position_code: str
     position_label: str
+    grid_col: int | None = None
+    grid_row: int | None = None
 
 
 @dataclass(frozen=True)
@@ -55,6 +83,7 @@ class SquadResult:
     id: UUID
     team_id: UUID
     public_slug: str
+    formation: str | None = None
     members: list[SquadMemberResult] = field(default_factory=list)
 
 

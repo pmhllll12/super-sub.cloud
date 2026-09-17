@@ -6,6 +6,9 @@ import type { PublicPlayerCard } from '@/server/backend'
 import PlayerCardView from '@/components/PlayerCardView'
 import BrandMark from '@/components/ui/BrandMark'
 import HomeNav, { type Destination } from '@/components/HomeNav'
+import NotifyPanel from '@/components/NotifyPanel'
+import { NOTIFY } from '@/lib/destinations'
+import { useNotifyInbox } from '@/lib/useNotifyInbox'
 import { HEADER_LINK_CLASS, HEADER_LINK_HOVER_CLASS } from '@/components/LogoutButton'
 import { useIntroDone } from '@/lib/useIntroDone'
 import { TransitionLink, useChromeHidden, useLeaving } from '@/lib/pageTransition'
@@ -30,12 +33,21 @@ export default function SiteHeader({
   card = null,
   destinations,
   fixed = false,
+  inbox: given,
 }: {
   user: { nickname: string } | null
   card?: PublicPlayerCard | null
   destinations: Destination[]
   /** 홈처럼 화면에 고정할 것인가. 기본은 흐름에 둔다. */
   fixed?: boolean
+  /**
+   * 알림함 — **홈이 제 것을 내려보낸다**(2026-09-17).
+   *
+   * 🔴 **안 주면 헤더가 제 통을 만든다.** 둘 다 만들면 헤더에서 수락한
+   * 결과가 대기 화면을 그리는 쪽에 **영영 안 닿는다** — 실제로 「수락하기를
+   * 눌러도 아무 일이 없다」로 나타났다(사용자가 로컬에서 잡았다).
+   */
+  inbox?: ReturnType<typeof useNotifyInbox>
 }) {
   /**
    * 인트로가 걷히면 각자 바깥에서 제자리로 들어온다(globals.css 의
@@ -52,6 +64,17 @@ export default function SiteHeader({
 
   /** 지금 가리킨 목적지. 글자 줄 안에서만 쓰는 강조다. */
   const [active, setActive] = useState<string | null>(null)
+
+  /**
+   * 알림함 — 「알림」 글자의 빨간 점과 그 아래 판이 이걸 읽는다.
+   *
+   * 🔴 **밖에서 주면 그것을 쓴다**(2026-09-17). 헤더와 홈이 **각자** 통을
+   * 만들던 때에는, 헤더에서 수락한 결과(`acceptedTeam`)가 대기 화면을 그리는
+   * `SquadPanel` 쪽 통에 **영영 안 들어갔다** — 눌러도 아무 일이 없었다.
+   * 홈은 제 통을 내려보내고, 통이 필요 없는 다른 화면은 안 준다.
+   */
+  const own = useNotifyInbox()
+  const inbox = given ?? own
 
   /**
    * 🔴 **지금 보고 있는 화면은 목적지에서 뺀다**(사용자 요청). 영상 분석
@@ -79,6 +102,19 @@ export default function SiteHeader({
    * 같은 방식으로 돌아온다.
    */
   const bare = pathname === '/me'
+
+  /**
+   * 🔴 **목적지 글자와 「내 프로필」을 접는 화면들.**
+   *
+   * `/me` 는 위 `bare` 가 워드마크를 가운데로 보내는 것까지 함께 하지만,
+   * **접는 것과 가운데로 보내는 것은 다른 일**이다 — 경기장 예약은 판이
+   * 화면을 꽉 채우는 자리라 머리줄이 비어야 하고(사용자 요청, 2026-09-10),
+   * 워드마크까지 움직이면 그 화면만 홈처럼 보인다.
+   *
+   * 🔴 접는 방식은 `bare` 와 같다 — **DOM 에서 빼지 않고 안 보이게만** 한다
+   * (아래 주석: 빼면 남은 것들이 자리를 다시 나눠 갖아 줄이 좌우로 튄다).
+   */
+  const quiet = bare || pathname === '/venues'
 
   /**
    * 🔴 **되돌아오는 연출**을 위한 표시.
@@ -142,12 +178,25 @@ export default function SiteHeader({
         <BrandMark size={26} />
       </TransitionLink>
 
-      <div className={`ss-home-nav-slot${bare ? ' ss-home-gone' : ''}`}>
+      <div className={`ss-home-nav-slot${quiet ? ' ss-home-gone' : ''}`}>
         <HomeNav
           destinations={shown}
           loggedIn={Boolean(user)}
           active={active}
           onActivate={setActive}
+          badges={{ [NOTIFY]: inbox.count > 0 }}
+          panels={{
+            [NOTIFY]: (
+              <NotifyPanel
+                items={inbox.items}
+                onAcceptMatch={inbox.acceptMatch}
+                onRejectMatch={inbox.rejectMatch}
+                onAcceptContact={inbox.acceptContact}
+                onAcceptInvitation={inbox.acceptInvitation}
+                onRejectInvitation={inbox.rejectInvitation}
+              />
+            ),
+          }}
         />
       </div>
 
@@ -159,7 +208,7 @@ export default function SiteHeader({
            눌러 보기 전엔 어디로 가는지 알 수 없다. */
         <TransitionLink
           href="/me"
-          className={`ss-home-profile shrink-0${bare ? ' ss-home-gone' : ''}`}
+          className={`ss-home-profile shrink-0${quiet ? ' ss-home-gone' : ''}`}
         >
           {card ? (
             <span className="ss-pcard-mini">

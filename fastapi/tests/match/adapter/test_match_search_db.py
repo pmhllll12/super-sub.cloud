@@ -37,7 +37,7 @@ def owner(db_client):
     email = f"search-{uuid.uuid4().hex[:12]}@super-sub.example"
     signup = db_client.post(
         f"{V1}/auth/signup",
-        json={"email": email, "password": PASSWORD, "nickname": "주장"},
+        json={"email": email, "password": PASSWORD, "nickname": f"주장{uuid.uuid4().hex[:6]}"},
     )
     assert signup.status_code == 201, signup.text
     login = db_client.post(
@@ -60,13 +60,24 @@ def world(db_client, db_session, owner):
     ]
     made = {}
     for sport, name, region, position, days in plan:
+        # 🔴 **팀은 축구로 만들고 종목은 뒤에서 바꾼다**(`ho` 39번, 2026-09-16).
+        # 야구·농구는 `sport.active=false` 라 이제 API 로 새로 못 만든다. 그런데
+        # 이 픽스처가 필요한 것은 **이미 그 종목으로 올라가 있는 옛 팀**이고,
+        # 그런 데이터는 실제로 DB 에 있다(야구 영상 165건). 검색·거르기가
+        # 내려간 종목에도 그대로 돌아야 한다는 것이 이 검사의 요점이 된다.
         created = db_client.post(
             f"{V1}/teams",
-            json={"name": name, "region": region, "sport_code": sport},
+            json={"name": name, "region": region, "sport_code": "football"},
             headers=owner["headers"],
         )
         assert created.status_code == 201, created.text
         team_id = created.json()["id"]
+        if sport != "football":
+            db_session.execute(
+                text("update team set sport_code = :s where id = :i"),
+                {"s": sport, "i": team_id},
+            )
+            db_session.commit()
 
         match = db_client.post(
             f"{V1}/teams/{team_id}/matches",

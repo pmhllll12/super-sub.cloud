@@ -12,6 +12,13 @@ grep -n '담당.*정상호' jekyll/pages/pending.markdown   # 나에게 온 요�
 cd agent && uv sync && uv run pytest tests/ -q         # 지금 초록인지
 ```
 
+🔴 **여기 있던 「첫 작업: 미결 `jin` 23번」을 지웠다 (2026.09.14)** — 그 항목은
+**2026.09.10에 시드까지 해소**됐는데 이 줄이 남아 있었다. 진입점에 낡은 지시가
+있으면 **다음 세션이 닫힌 일을 다시 한다.**
+
+**첫 작업은 고정하지 않는다.** 위 `grep` 결과와 로드맵을 보고 정한다 —
+그 둘이 늘 최신이고, 여기 박아 두면 또 낡는다.
+
 그리고 **[남은 작업 로드맵](../jekyll/pages/roadmap.markdown)** — 남은 작업의
 순서, 재조사하면 안 되는 **닫힌 경로**, 함정, 현재 상수값이 한 장에 있다.
 로드맵은 진입점일 뿐이고 **정본은 미결 항목**이다. 둘이 어긋나면 미결 항목이 이긴다.
@@ -45,8 +52,9 @@ cd agent && uv sync && uv run pytest tests/ -q         # 지금 초록인지
 
 **(4) 코드는 저장소, 데이터는 `/mnt/d`.** 스크립트가 `/mnt/d`의 낡은 모듈을
 import해 재매핑이 빠진 채 평가가 돈 적이 있다 — **예외도 경고도 없이 숫자만
-달랐다.** 경로는 `eval/phaseA/paths.py`로 모으는 중이다(아직 14곳이 하드코딩이다,
-미결 14번).
+달랐다.** 경로는 `eval/phaseA/paths.py` 한 곳에서 정한다 (2026.09.11에 모았다,
+미결 14번). `tests/test_eval_paths.py` 가 새 하드코딩을 막는다 — **예외 목록에
+더해서 통과시키지 않는다.**
 
 ## 무엇이 무엇을 정하는가
 
@@ -82,8 +90,14 @@ uv run pytest tests/ -q     # 초록이 기본값이다
 | `test_observability.py::test_eligible_threshold_matches_the_selector` | 관측 기준과 selector 동작 기준이 갈라지는 것 |
 | `test_deploy_paths.py` | vLLM 백엔드가 **다른 모델을 서빙해도** 조용히 판정하는 것 |
 | `test_worker.py::test_a_single_video_propagates_its_exit_code` | 실패한 분석이 `succeeded` 로 보고되는 것 (리포트가 없는데 큐는 줄어든다) |
-| `test_worker.py::test_the_command_always_names_a_rubric` | 야구·농구를 **축구 루브릭으로** 채점하는 것 (`--rubric` 기본값이 축구다) |
+| `test_worker.py::test_the_command_always_names_a_rubric` | 인사이드 패스를 **인스텝 루브릭으로** 채점하는 것 (`--rubric` 기본값이 인스텝이다) |
+| `test_worker.py::test_a_sport_we_do_not_support_is_refused_not_guessed` | 축구 아닌 `sport_code` 가 **축구 루브릭으로** 채점되는 것. 백엔드 참조 테이블에는 다른 종목이 남아 있다 (2026.09.11 축구 단일 종목 전환) |
 | `test_worker.py::test_the_analysis_child_is_seen_as_busy_by_autostop` | 분석 도중에 인스턴스가 꺼지는 것 (그 작업은 `running` 인 채 남는다) |
+| `test_worker.py::test_an_empty_api_base_is_a_config_error` | 백엔드 호스트명이 기본값으로 되살아나 **공개 저장소에 다시 실리는 것** (미결 `jin` 22번) |
+| `test_worker.py::test_focus_does_not_change_the_score` | 「집중해서 볼 항목」이 채점 경로에 새어드는 것 — 그러면 **같은 영상의 점수가 사용자 선택에 따라 달라져** 선수끼리 비교가 안 된다 (미결 `paik` 8번) |
+| `test_eval_paths.py` | 평가·서비스 코드에 **기계별 경로**가 박히는 것. 박히면 다른 기계에서 안 돌고, 저장소 사본을 떠도 읽히지 않는다 (미결 14번) |
+| `test_model_pins.py` | 모델 가중치가 **이름만으로** 적재되는 것 — 업스트림이 갈아 끼우면 조용히 바뀌고 로컬 캐시가 사는 동안 안 드러난다. 표류를 캐시에 맞춰 「고정」을 올리는 것도 막는다 (미결 11번 N-1) |
+| `test_metric_definitions.py::test_every_rubric_metric_is_declared` | 새 루브릭 코드가 시드 정본에 빠진 채 배포되는 것. 에이전트 테스트는 다 통과하고 **실서버 적재에서만** `UNKNOWN_METRIC_CODE` 로 터진다 (미결 `jin` 23번) |
 
 ## 남의 영역
 

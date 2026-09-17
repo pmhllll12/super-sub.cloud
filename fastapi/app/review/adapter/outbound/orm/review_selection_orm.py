@@ -20,8 +20,9 @@ from app.core.database import Base
 class ReviewSelectionOrm(Base):
     __tablename__ = "review_selection"
 
+    # 평가가 지워지면 선택 결과도 함께 — 없으면 평가 삭제를 이 행이 막는다(2026-09-17).
     review_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("review.id"), primary_key=True
+        Uuid, ForeignKey("review.id", ondelete="CASCADE"), primary_key=True
     )
     option_code: Mapped[str] = mapped_column(
         String(40), ForeignKey("review_option.code"), primary_key=True

@@ -8,7 +8,9 @@ from app.card.application.dtos.squad_dto import (
     CreateSquadCommand,
     DischargeMemberCommand,
     EnlistCardCommand,
+    MoveMemberCommand,
     PublicSquadQuery,
+    SetFormationCommand,
     SquadCreation,
     SquadResult,
     TeamSquadQuery,
@@ -43,3 +45,15 @@ class DischargeMemberUseCase(ABC):
     @abstractmethod
     def __call__(self, command: DischargeMemberCommand) -> SquadResult:
         """등재를 뺀다. **주장만 할 수 있다.**"""
+
+
+class MoveMemberUseCase(ABC):
+    @abstractmethod
+    def __call__(self, command: MoveMemberCommand) -> SquadResult:
+        """등재의 포지션·판 배치를 바꾼다. **주장만 할 수 있다.** (미결 `paik` 9번)"""
+
+
+class SetFormationUseCase(ABC):
+    @abstractmethod
+    def __call__(self, command: SetFormationCommand) -> SquadResult:
+        """판 크기를 저장한다. **주장만 할 수 있다.** (미결 `paik` 9번)"""

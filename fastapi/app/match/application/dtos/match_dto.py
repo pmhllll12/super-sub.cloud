@@ -112,6 +112,9 @@ class MatchResult:
     played_at: datetime
     place: str
     needs: list[PositionNeedResult] = field(default_factory=list)
+    opponent_team_id: UUID | None = None
+
+
 @dataclass(frozen=True)
 class ApplyCommand:
     actor_id: UUID
@@ -151,3 +154,67 @@ class ApplicationResult:
     team_accepted_at: datetime | None
     user_accepted_at: datetime | None
     confirmed: bool
+
+
+# ---------------------------------------------------------------------------
+# 팀 대 팀 경기 신청 (`team_match_request`). `paik` 17번.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class CreateTeamMatchRequestCommand:
+    actor_id: UUID
+    requester_team_id: UUID
+    target_team_id: UUID
+    proposed_played_at: datetime
+    proposed_place: str
+
+
+@dataclass(frozen=True)
+class RespondTeamMatchRequestCommand:
+    """수락·거절이 같은 모양이다 — 둘 다 "그 팀 주장이 대기중 신청 하나에
+    답한다"는 같은 일이라서다. 실제 처리(만들 match·알림)만 갈린다.
+    """
+
+    actor_id: UUID
+    team_id: UUID
+    request_id: UUID
+
+
+@dataclass(frozen=True)
+class CancelTeamMatchRequestCommand:
+    actor_id: UUID
+    team_id: UUID
+    request_id: UUID
+
+
+@dataclass(frozen=True)
+class TeamMatchRequestsQuery:
+    actor_id: UUID
+    team_id: UUID
+
+
+@dataclass(frozen=True)
+class TeamMatchRequestResult:
+    id: UUID
+    requester_team_id: UUID
+    target_team_id: UUID
+    proposed_played_at: datetime
+    proposed_place: str
+    status: str
+    created_at: datetime
+    responded_at: datetime | None
+    match_id: UUID | None
+    # 두 팀의 표시용 값(`paik` 31번). **감싸지 않고 덧붙인다** — 화면이 이미
+    # 읽는 id 칸의 자리가 바뀌면 배선이 깨진다.
+    requester_team_name: str = ""
+    requester_team_region: str = ""
+    target_team_name: str = ""
+    target_team_region: str = ""
+    # 그 팀 **스쿼드의 공개 슬러그** (`paik` 22번 후속, 2026-09-17). 대기
+    # 화면이 상대 팀 판을 그리는 데 쓴다 — `GET /squads/{slug}` 는 누구나
+    # 읽으므로 소속이 아니어도 볼 수 있다.
+    # 🔴 **스쿼드를 아직 안 만든 팀이면 `None` 이고 그게 정상이다**(생성이
+    # 멱등이라 늦게 생긴다). 빈 문자열로 채우지 않는다.
+    requester_squad_public_slug: str | None = None
+    target_squad_public_slug: str | None = None

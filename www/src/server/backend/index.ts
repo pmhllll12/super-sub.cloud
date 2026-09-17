@@ -16,4 +16,4 @@ export function getBackend(): Backend {
 
 export type { Backend } from './gateway'
 export * from './types'
-export { BackendError, errorResponseBody } from './errors'
+export { BackendError, errorResponseBody, readRetryAfter } from './errors'

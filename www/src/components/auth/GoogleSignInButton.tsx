@@ -79,10 +79,19 @@ const MAX_BUTTON_WIDTH = 400
 export default function GoogleSignInButton({
   onError,
   text = 'signin_with',
+  limit,
 }: {
   onError: (message: string) => void
   /** signin_with(…로 로그인) / signup_with(…로 가입) — 페이지 문맥에 맞게 지정 */
   text?: 'signin_with' | 'signup_with'
+  /**
+   * 429 잠금 — 로그인 · 가입과 **같은 창을 나눠 쓴다**(계약 1번, 같은 출처
+   * 1분 10회). 그래서 페이지가 쥔 것을 그대로 받는다.
+   *
+   * 🔴 **잠금을 버튼에 걸지 않는다.** 구글 버튼을 감추거나 덮으면 구글이
+   * 클릭을 통째로 무시한다(§6 — 클릭재킹 방지). 막는 자리는 **보내는 쪽**이다.
+   */
+  limit?: { locked: boolean; lockFrom: (err: unknown) => boolean }
 }) {
   const router = useRouter()
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -90,12 +99,20 @@ export default function GoogleSignInButton({
   const initialized = useRef(false)
 
   async function handleCredential(idToken: string) {
+    /* 🔴 **잠긴 동안에는 보내지 않는다.** 구글 쪽에서 토큰이 다시 와도
+       우리 서버로는 안 나간다 — 창이 지나기 전에는 계속 거부되고 서버
+       자원만 쓴다(계약 1번). 이미 띄운 안내는 그대로 남는다. */
+    if (limit?.locked) return
     try {
       await apiPost('/api/auth/google', { id_token: idToken })
       router.push('/home')
       router.refresh()
     } catch (err) {
       // 503 GOOGLE_LOGIN_NOT_CONFIGURED 도 서버가 준 message 를 그대로 보여준다.
+      /* 🔴 잠금 문구(남은 초)는 **페이지가 그린다** — `limit.note` 는 렌더
+         시점 값이라 여기서 읽으면 방금 건 잠금이 아직 안 반영돼 있다.
+         여기서는 서버가 준 사유만 올린다. */
+      limit?.lockFrom(err)
       onError(apiErrorMessage(err))
     }
   }

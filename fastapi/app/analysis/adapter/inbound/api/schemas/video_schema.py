@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.shared import Rfc3339
 
@@ -18,6 +18,9 @@ class UploadUrlSchema(BaseModel):
 
     content_type: str = Field(min_length=1, max_length=100)
     size_bytes: int = Field(ge=1)
+    # 원본 파일 이름. 저장 키를 사람이 알아볼 수 있게 짓는 데 쓴다(미결 `jin`
+    # 24번). 슬러그화되므로 이상한 문자여도 안전하다.
+    filename: str = Field(min_length=1, max_length=255)
 
 
 class UploadUrlResponse(BaseModel):
@@ -40,6 +43,10 @@ class RegisterVideoSchema(BaseModel):
 
     `side` 는 던지는 팔·차는 발이다. 자동 판별이 팔 종목에서 신뢰할 수 없어
     (5장 CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 자동 판별을 쓴다.
+
+    `analyze` 가 거짓이면 규격은 검사하되 분석 작업을 만들지 않는다. 기록으로
+    남기려고 올리는 클립("업로드 영상")과 실력을 재려고 올리는 클립을 가르는
+    자리다. 생략하면 참 — 안 보내던 클라이언트의 동작이 그대로다.
     """
 
     sport_code: str = Field(min_length=1, max_length=20)
@@ -48,6 +55,58 @@ class RegisterVideoSchema(BaseModel):
     width: int = Field(ge=1)
     height: int = Field(ge=1)
     side: str | None = Field(default=None, max_length=5)
+    analyze: bool = True
+    # 원본 파일 이름. DB 에 온전히 남긴다 — 저장 키는 슬러그라 손실적이다(jin 24).
+    filename: str | None = Field(default=None, max_length=255)
+
+    # 「이 사람으로 분석」 (미결 `paik` 6번). 정규화 `[x, y, w, h]` (0~1) 와 그
+    # 박스를 그린 영상 시각(ms). 🔴 **정규화 좌표만** — 화면 픽셀을 보내면 422 다
+    # (조용히 클램프하면 엉뚱한 사람을 분석하고도 "지정대로 했다"고 답한다).
+    # 지정이 없으면 둘 다 생략한다 — 「자동으로 고르기」가 정식 경로다.
+    subject_box: list[float] | None = Field(default=None, min_length=4, max_length=4)
+    subject_at_ms: int | None = Field(default=None, ge=0)
+
+    # 「집중해서 볼 항목」 (미결 `paik` 8번). 루브릭 `criteria[].id` 리스트
+    # (예: `["follow_through", "guide_hand"]`). 🔴 **빈 목록·생략 = 「전체적으로」**
+    # 가 기본이자 가장 흔한 경우다 — 실패로 만들지 않는다. 각 항목의 실재
+    # 여부는 서버가 못 본다(루브릭은 `agent/`) — 형식만 본다(공백·중복 정리).
+    focus: list[str] | None = Field(default=None, max_length=24)
+
+    @model_validator(mode="after")
+    def _clean_focus(self) -> "RegisterVideoSchema":
+        if self.focus is None:
+            return self
+        seen: list[str] = []
+        for raw in self.focus:
+            item = raw.strip()
+            if not item:
+                continue
+            if len(item) > 40:
+                raise ValueError("focus 항목이 너무 깁니다(40자 상한).")
+            if item not in seen:
+                seen.append(item)
+        self.focus = seen or None
+        return self
+
+    @model_validator(mode="after")
+    def _check_subject(self) -> "RegisterVideoSchema":
+        box, at = self.subject_box, self.subject_at_ms
+        if (box is None) != (at is None):
+            raise ValueError(
+                "subject_box 와 subject_at_ms 는 함께 주거나 함께 생략합니다."
+            )
+        if box is None:
+            return self
+        x, y, w, h = box
+        if not all(0.0 <= v <= 1.0 for v in box):
+            raise ValueError("subject_box 는 정규화 좌표입니다(0~1). 픽셀이 아닙니다.")
+        if w <= 0 or h <= 0:
+            raise ValueError("subject_box 의 너비·높이는 0보다 커야 합니다.")
+        if x + w > 1.0 or y + h > 1.0:
+            raise ValueError("subject_box 가 화면을 벗어납니다.")
+        if at is not None and at > self.duration_ms:
+            raise ValueError("subject_at_ms 가 클립 길이를 벗어납니다.")
+        return self
 
 
 class VideoResponse(BaseModel):
@@ -70,3 +129,188 @@ class VideoResponse(BaseModel):
     reject_reason: str | None
     analysis_job_id: UUID | None
     analysis_status: str | None
+    is_public: bool
+    title: str | None
+    description: str | None
+    kept: bool
+    is_featured: bool
+    # 같은 내용의 다른(자기) 영상 결과를 재사용했으면 그 영상(`ho` 41번,
+    # 중복 업로드). 등록 응답에서만 `duplicate_status`/`duplicate_failure_
+    # reason` 도 함께 채워진다 — 그 결과를 자세히 보려면 이 id로
+    # `GET /videos/{id}/report` 를 부른다.
+    duplicate_of_video_id: UUID | None
+    duplicate_status: str | None
+    duplicate_failure_reason: str | None
+
+
+class UpdateVideoSchema(BaseModel):
+    """클립을 부분 수정한다. `PATCH /videos/{id}` 본문.
+
+    셋 다 생략 가능하다 — **보낸 것만** 바뀐다(`model_fields_set` 로 가른다).
+    `title`·`description` 은 `null` 이나 공백만 보내면 지운다.
+    """
+
+    is_public: bool | None = None
+    title: str | None = Field(default=None, max_length=100)
+    description: str | None = Field(default=None, max_length=280)
+    # 「대표 영상」 토글 (미결 `paik` 10번). `true` 로 세우면 그 사람의 다른 대표는
+    # 자동으로 내려간다(사람당 하나). 반려된 클립엔 못 세운다(422 `CANNOT_FEATURE`).
+    is_featured: bool | None = None
+
+
+class PlaybackUrlResponse(BaseModel):
+    """재생용 사전 서명 GET URL. `url` 에 바로 GET 하면 원본이 온다."""
+
+    url: str
+    expires_in: int
+
+
+class FeaturedVideoResponse(BaseModel):
+    """어떤 사람의 대표 영상 하나(미결 `paik` 10번). `GET /cards/{slug}/featured-video`.
+
+    저장 키가 아니라 **사전 서명 GET URL** 을 준다 — 버킷은 닫혀 있다(5번과 같은 원칙).
+    대표가 없으면 이 응답이 아니라 `404 NO_FEATURED_VIDEO` 다.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    video_id: UUID
+    url: str
+    expires_in: int
+    sport_code: str
+    duration_ms: int | None
+
+
+class CardGradeResponse(BaseModel):
+    """카드 슬러그의 **표시 등급**(미결 `paik` 25·26번). `GET /cards/{slug}/grade`.
+
+    `S`·`A`·`B`·`C`·`D`·`F` 여섯 중 하나 — 계산 규칙은 `grade_rules.py`(재매칭
+    의사의 Wilson 95% 신뢰구간). 대표 영상이 없거나 분석 전이면 `grade` 가
+    `null`이다. **`provisional`이 `true`인 동안은 화면에 "검수 전"을 달아야
+    한다** — 등급 문자만 떼어 쓰지 않는다(`paik` 26번).
+
+    `notes` 는 추천 판 카드의 **불릿 한두 줄**(`paik` 33번). 🔴 여전히 리포트
+    전체가 아니다 — 25번이 막아 둔 것 중 **한 칸만** 여는 것이고 수치·항목별
+    점수는 안 실린다. `card` 없는 봉투로 적재됐거나 분석 전이면 `null` 이고,
+    **한 줄뿐인 것이 정상이다**(두 줄을 채우려고 지어내지 않는다).
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    grade: str | None
+    provisional: bool | None
+    notes: list[str] | None = None
+
+
+class PublicVideoResponse(BaseModel):
+    """홈 영상 모음 한 줄. **저장 키는 안 실린다** — 저장 키엔 업로더 `user_id`가
+    그대로 들어 있어서다. 업로더는 대신 `uploader_nickname`(항상 있음)과
+    `uploader_card_slug`(카드를 만들었으면, 없으면 `null`)로 싣는다(`paik`
+    16번). 재생은 `GET /videos/{id}/playback-url`로 따로 받는다.
+
+    `width`·`height`는 화면 비율(`paik` 15번) — 이 컬럼이 생기기 전 등록분은
+    둘 다 `null`이다. 그럴 땐 화면이 16:9로 가정해도 된다(기존 동작).
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    sport_code: str
+    duration_ms: int | None
+    created_at: Rfc3339
+    title: str | None
+    description: str | None
+    uploader_nickname: str
+    uploader_card_slug: str | None
+    width: int | None
+    height: int | None
+
+
+class AdminVideoRowResponse(BaseModel):
+    """관리자 영상 목록 한 줄. **사람이 읽을 수 있게** 원본 이름·업로드일·상태를
+    싣고, S3 로 되짚을 `storage_key` 와 리포트 폴더 접두사를 함께 준다 — 목록에서
+    N개 객체마다 사전 서명을 하지 않으려는 것이다(재생·리포트는 이 값으로 짚는다).
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    sport_code: str
+    original_filename: str | None
+    storage_key: str
+    created_at: Rfc3339
+    kept: bool
+    is_public: bool
+    passed: bool
+    reject_reason: str | None
+    analysis_status: str | None
+    analysis_failure_reason: str | None
+    report_prefix: str
+
+
+class AdminVideoListResponse(BaseModel):
+    """한 사람(`?user=<uid|email>`)의 영상 전부. 닉네임·이메일은 **현재 값**이다
+    (DB 조인이라 rename 이 반영된다 — 옛 저장 키에 얼어붙은 닉네임과 다르다).
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    user_id: UUID
+    nickname: str
+    email: str
+    items: list[AdminVideoRowResponse]
+
+
+class ReportCriterionResponse(BaseModel):
+    """리포트 항목 하나. 🔴 `band`·가중치·`contribution`은 없다 — `band`는
+    임계값이 검수 전이고(미결 24번), 나머지는 개발 확인용이다.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    criterion_id: str
+    name: str
+    grade: int | None  # None = 제외. 0 점이 아니다.
+    title: str | None
+    # 「받은 호칭」인가(`paik` 23·`ho` 40번). `title`은 모든 등급에 있어서
+    # 유무로 「받은 호칭」을 못 가른다 — 참인 항목만 그렇게 그린다. `None`은
+    # `skipped`거나 이 필드가 생기기 전 적재분 — 거짓으로 지어내지 않는다.
+    title_earned: bool | None
+    evidence: str | None
+    metric_ref: str | None
+    skipped: bool
+    stat: float | None  # 레이더 축 값 0~100(`ho` 28번). None = 못 잼 — 0이 아니다.
+
+
+class ReportSceneResponse(BaseModel):
+    """판단의 근거가 된 장면. `at_seconds` 로 그 시각으로 이동한다."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    metric_code: str
+    label: str
+    at_seconds: float
+
+
+class VideoReportResponse(BaseModel):
+    """적재된 분석 리포트(미결 `jin` 27번 · `paik` 7번 · `ho` 28번).
+    `GET /videos/{id}/report`.
+
+    🔴 **허용목록이다** — DB 조립(계약 3-1). `summary` 문장 안에는 숫자를 넣지
+    않는다(3장 4) — 하지만 총점(`total_score`)·오버롤 등급(`overall_grade`)·
+    항목별 `stat`은 문장이 아니라 이 응답의 구조화된 필드로 나간다(`ho` 28번).
+    영상 하나(=분석 1회)의 값이다 — 선수 단위로 합친 오버롤은 아직 없다.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    video_id: UUID
+    analyzed_at: Rfc3339
+    summary: str
+    provisional: bool | None
+    total_score: float | None  # 0~100, 항목 가중합. 옛 행은 None.
+    overall_grade: str | None  # A/B/C/D. 옛 행은 None.
+    breakdown: list[ReportCriterionResponse]
+    scenes: list[ReportSceneResponse]
+    previews: dict[str, str] | None
+    keypoint_quality: dict[str, object] | None

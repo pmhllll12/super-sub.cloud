@@ -245,3 +245,127 @@ def test_preview_failure_does_not_break_the_analysis(tmp_path, monkeypatch):
 
     assert "tracked_video" not in out
     assert "impact_image" in out, "먼저 만들어진 것은 남는다"
+
+
+# -- 판정 동시 호출 (2026-09-15) -------------------------------------------
+#
+# 항목당 2~3초가 순차로 쌓여 EC2 판정이 17초였다. 원격일 때만 동시에 던진다.
+# 아래 셋이 그 변경이 지켜야 할 성질이다.
+
+class _Rubric:
+    sport = "football"
+
+    def __init__(self, criteria):
+        self._criteria = criteria
+
+    def applicable_criteria(self, features):
+        return tuple(self._criteria)
+
+
+class _Criterion:
+    """프롬프트를 만드는 데 필요한 만큼만 흉내낸다 (build_prompt 참고)."""
+
+    def __init__(self, cid, grade):
+        self.id = cid
+        self.name = "디딤발 무릎 굽히기"
+        self.rationale = ""
+        self.measured_by = ("knee",)
+        self.band_metric = "knee"
+        self.grades = {0: "거의 안 굽음", 1: "조금 굽음", 2: "충분히 굽음"}
+        self.anchors = ()
+        self._grade = grade
+
+    def grade_for(self, features):
+        return self._grade
+
+    # 🔴 **일부러 빈 값을 돌려준다** (미결 23번 가-2). `build_prompt` 는
+    #    `grades_plain` 이 없으면 `grades` 로 떨어지는데, 이 스텁이 그
+    #    **폴백 경로**를 지나는 쪽이다. 여기에 문구를 채워 넣으면 폴백이
+    #    실제로 도는지 아무도 안 보게 된다 — 이 배선 검사가 보는 것은
+    #    프롬프트 문구가 아니라 **동시성과 순서**다.
+    def plain_for(self, grade, value=None):
+        return ""
+
+    def plain_all(self, grade):
+        return ""
+
+    def anchors_for(self, grade, value=None):
+        return ()
+
+
+def _judge_with_fake_server(monkeypatch, *, delay: float = 0.0):
+    """모든 항목이 같은 문장을 받는 vLLM. 지연을 주면 동시성이 시간에 드러난다."""
+    import time as _t
+
+    def fake_urlopen(req, timeout=None):
+        url = req if isinstance(req, str) else req.full_url
+        if url.endswith("/v1/models"):
+            body = {"data": [{"id": Judge().model_id}]}
+            return _FakeResponse(json.dumps(body).encode())
+        _t.sleep(delay)
+        payload = {"choices": [{"message": {"content":
+                   '{"evidence": "무릎이 덜 굽었다", "metric_ref": "knee"}'}}]}
+        return _FakeResponse(json.dumps(payload).encode())
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    judge = Judge(base_url="http://127.0.0.1:8000")
+    judge.load()
+    return judge
+
+
+def test_remote_judging_runs_the_criteria_at_the_same_time(monkeypatch):
+    """6항목이 순차로 쌓이지 않는다 — 가장 느린 하나로 줄어든다."""
+    import time as _t
+
+    judge = _judge_with_fake_server(monkeypatch, delay=0.2)
+    rubric = _Rubric([_Criterion(f"c{i}", i % 3) for i in range(6)])
+
+    t0 = _t.time()
+    out = judge.judge_all(rubric, {"knee": 141.7})
+    elapsed = _t.time() - t0
+
+    assert len(out) == 6
+    assert elapsed < 0.2 * 6 / 2, f"순차로 돌고 있다 ({elapsed:.2f}초)"
+
+
+def test_concurrency_cannot_move_a_grade(monkeypatch):
+    """🔴 등급은 코드가 정한 값 그대로다 — 모델도, 실행 순서도 못 바꾼다.
+
+    이것이 이 변경을 안전하게 만드는 성질이다. 깨지면 같은 영상의 점수가
+    동시 실행 여부에 따라 달라진다.
+    """
+    judge = _judge_with_fake_server(monkeypatch)
+    grades = {f"c{i}": i % 3 for i in range(6)}
+    rubric = _Rubric([_Criterion(cid, g) for cid, g in grades.items()])
+
+    out = judge.judge_all(rubric, {"knee": 141.7})
+
+    assert {cid: j["grade"] for cid, j in out.items()} == grades
+
+
+def test_the_report_keeps_the_rubric_order(monkeypatch):
+    """먼저 끝난 항목이 앞으로 오지 않는다 — 화면의 항목 순서가 흔들린다."""
+    judge = _judge_with_fake_server(monkeypatch)
+    ids = [f"c{i}" for i in range(6)]
+    rubric = _Rubric([_Criterion(cid, 1) for cid in ids])
+
+    assert list(judge.judge_all(rubric, {"knee": 1.0})) == ids
+
+
+def test_local_judging_stays_sequential(monkeypatch):
+    """로컬은 GPU에 모델이 하나다 — 동시에 불러 봐야 얻을 것이 없고,
+    outlines·transformers 가 여러 스레드에서 안전하다는 보장도 없다."""
+    monkeypatch.delenv(VLLM_URL_ENV, raising=False)
+    judge = Judge()
+    judge._model = object()          # load() 를 지나온 것처럼 보이게만 한다
+    seen: list[str] = []
+
+    def fake_one(criterion, features, sport=""):
+        seen.append(criterion.id)
+        return {"grade": 1, "evidence": "", "metric_ref": "knee"}
+
+    monkeypatch.setattr(judge, "judge_criterion", fake_one)
+    rubric = _Rubric([_Criterion(f"c{i}", 1) for i in range(4)])
+    judge.judge_all(rubric, {})
+
+    assert seen == ["c0", "c1", "c2", "c3"]

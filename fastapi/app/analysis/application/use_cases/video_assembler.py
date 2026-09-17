@@ -2,8 +2,28 @@
 
 from __future__ import annotations
 
-from app.analysis.application.dtos.video_dto import VideoResult
+from app.analysis.application.dtos.video_dto import PublicVideoResult, VideoResult
 from app.analysis.domain.entities.video_entity import VideoEntity
+
+
+def to_public_video_result(
+    video: VideoEntity, uploader_nickname: str, uploader_card_slug: str | None
+) -> PublicVideoResult:
+    """공개 목록 한 줄. 저장 키(raw)·분석 상태는 싣지 않는다. 업로더는
+    닉네임+카드 슬러그로 싣는다(`paik` 16번) — 호출부가 배치로 구해서 넘긴다.
+    """
+    return PublicVideoResult(
+        id=video.id,
+        sport_code=video.sport_code,
+        duration_ms=video.duration_ms,
+        created_at=video.created_at,
+        title=video.title,
+        description=video.description,
+        uploader_nickname=uploader_nickname,
+        uploader_card_slug=uploader_card_slug,
+        width=video.width,
+        height=video.height,
+    )
 
 
 def to_video_result(video: VideoEntity) -> VideoResult:
@@ -25,4 +45,12 @@ def to_video_result(video: VideoEntity) -> VideoResult:
         reject_reason=validation.reject_reason if validation else None,
         analysis_job_id=video.analysis_job_id,
         analysis_status=video.analysis_status,
+        is_public=video.is_public,
+        is_featured=video.is_featured,
+        title=video.title,
+        description=video.description,
+        kept=video.kept,
+        duplicate_of_video_id=video.duplicate_of_video_id,
+        duplicate_status=video.duplicate_status,
+        duplicate_failure_reason=video.duplicate_failure_reason,
     )

@@ -12,7 +12,7 @@ S3 영상을 분석해 리포트를 S3로 되돌려 놓는 데까지의 순서�
 
 > ### 격리 수준 — "완전히 분리"가 아니다
 >
-> 처음 계획은 **AI 전용 계정**이었지만, 실제로 쓰는 계정(`0706-0555-3723`,
+> 처음 계획은 **AI 전용 계정**이었지만, 실제로 쓰는 계정(`<AWS 계정 ID>`,
 > IAM 사용자 `ho`)이 **팀 프로젝트와 같은 계정**이다. 계정 경계는 공유되므로
 > 아래는 공유된다.
 >
@@ -258,7 +258,7 @@ aws s3 cp /tmp/_probe.txt s3://$BUCKET/videos/_probe.txt    # AccessDenied 가 �
 
 ### 3-1. 전용 VPC — **추가 비용 없음**
 
-팀 계정을 공유해 쓰므로(계정 `0706-0555-3723`) 네트워크만이라도 갈라 둔다.
+팀 계정을 공유해 쓰므로(계정 `<AWS 계정 ID>`) 네트워크만이라도 갈라 둔다.
 기본 VPC에 넣으면 팀 리소스와 같은 네트워크에 놓이고, 나중에 옮기려면
 **인스턴스를 다시 만들어야 한다** — VPC는 생성 후 바꿀 수 없다.
 
@@ -534,6 +534,10 @@ uv run python -m pytest -q   # GPU 없이 도는 테스트들 — 전부 통과�
 
 EC2에서 받아서 올린다. 로컬에서 올리면 집 회선으로 5GB를 올려야 한다.
 
+> ✅ **이미 올라가 있다 (2026.09.17).** `models/exaone-4.0-1.2b/` 에 13개
+> 객체 2.4GiB. 아래는 **새 버킷을 만들 때나 모델을 바꿀 때** 쓴다. 지금
+> 필요한 것은 5-1′(복구)뿐이다.
+
 ```bash
 cd ~/super-sub.cloud/agent
 uv pip install "huggingface_hub[cli]"   # ← uv run pip 이 아니다. 아래 참고
@@ -546,6 +550,42 @@ aws s3 sync /opt/supersub/models/exaone-4.0-1.2b \
   s3://$BUCKET/models/exaone-4.0-1.2b \
   --exclude ".cache/*" --exclude "*.lock"
 ```
+
+🔴 **위 `sync` 는 EC2 역할로 그냥 돌면 `AccessDenied` 다.** 2-1 정책이
+`models/` 에 **쓰기를 안 준다**(읽기만 준다). 올릴 때는 **버킷 정책에 문장
+하나를 한시적으로** 더한다 — IAM 을 못 고치는 계정도 S3 권한만 있으면 된다.
+명시적 Deny 가 아니라 **Allow 가 없는 것**이라 어느 쪽에서 주든 통과한다.
+
+```json
+{ "Sid": "TempModelUpload", "Effect": "Allow",
+  "Principal": { "AWS": "arn:aws:iam::<AWS 계정 ID>:role/<EC2 역할>" },
+  "Action": ["s3:PutObject", "s3:AbortMultipartUpload"],
+  "Resource": "arn:aws:s3:::$BUCKET/models/*" }
+```
+
+기존 정책의 `Statement` 배열에 **더한다** — 🔴 통째로 바꾸면 TLS 강제
+(`DenyInsecureTransport`)가 날아간다. `AbortMultipartUpload` 은 2.4GB 가
+멀티파트로 올라가서 끊겼을 때 조각을 치우려고 함께 준다.
+🔴 **올린 뒤 그 문장을 다시 뺀다.** 모델은 한 번 올리면 끝이고, 쓰기를 상시로
+두면 워커가 **읽기 전용이어야 할 자리**에 쓸 수 있게 된다.
+
+### 5-1′. 새 인스턴스에서 되받는다 (복구)
+
+**이쪽이 평소에 쓰는 경로다.** 읽기는 역할에 이미 있으므로 정책을 건드릴
+일이 없다. HF 를 다시 안 거치므로 레이트리밋도, 리비전이 갈릴 걱정도 없다.
+
+```bash
+SUPERSUB_MODEL_S3=s3://$BUCKET/models/exaone-4.0-1.2b \
+SUPERSUB_MODEL_DIR=/opt/supersub/models/exaone-4.0-1.2b \
+  deploy/sync_model.sh
+```
+
+> **왜 백업이 필요한가.** `judge.py` 의 `MODEL_REVISIONS` 가 가중치를 커밋
+> 해시로 고정하지만(미결 11번), **해시는 「무엇을 받아야 하는지」만 말하지
+> 「그것이 계속 거기 있다」를 보장하지 않는다.** 업스트림이 저장소를 내리면
+> 고정한 해시는 가리킬 것이 없고 B-6 재실행이 그 자리에서 막힌다. S3 사본이
+> 그 유일한 방어다. 2026.09.17 에 왕복 검증까지 했다 — S3 에서 되받은
+> `model.safetensors` 의 sha256 이 EC2 원본·고정 리비전과 **셋 다 같다**.
 
 `/opt/supersub`에 권한이 없으면 먼저:
 `sudo mkdir -p /opt/supersub/models && sudo chown -R ubuntu:ubuntu /opt/supersub`
@@ -606,17 +646,20 @@ sudo mkdir -p /etc/supersub
 sudo cp deploy/vllm.env.example /etc/supersub/vllm.env
 sudo chmod 600 /etc/supersub/vllm.env
 
-# IAM 역할이 없으면(README-console 2-C) S3를 건너뛴다 — 5-1에서 HF로 받은
-# /opt/supersub/models/exaone-4.0-1.2b 를 그대로 쓴다.
-sudo sed -i 's|^SUPERSUB_MODEL_S3=.*|SUPERSUB_MODEL_S3=|' /etc/supersub/vllm.env
-
 sudo cp deploy/supersub-vllm.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now supersub-vllm
 ```
 
-> 예시 파일에 버킷 이름(`supersub-ai`)이 이미 들어 있다. 다른 버킷을 쓸 때만
-> `SUPERSUB_MODEL_S3` 줄을 고친다.
+> 🔴 **`SUPERSUB_MODEL_S3` 는 비운 채로 둔다** — 예시 파일의 기본값이 이미
+> 비어 있다. **S3 사본은 백업이지 기동 경로가 아니다** (2026.09.17). 채우면
+> `ExecStartPre=sync_model.sh` 가 **기동할 때마다** S3 에 다녀오고, 그 호출이
+> 실패하면 가중치가 디스크에 있는데도 vLLM 이 안 뜬다. 가중치를 되받는 것은
+> **5-1′ 을 한 번 돌리는 것**이고, 그 뒤엔 로컬만 보면 된다.
+>
+> 🔴 예전에는 이 자리에 `sed` 로 값을 비우는 줄이 있었다. 예시 파일이
+> S3 경로를 담고 있어서였는데, **예시와 절차가 서로 반대라** 둘 중 무엇이
+> 맞는지 읽는 사람마다 달랐다. 예시 쪽을 비우는 것으로 맞췄다.
 
 **확인:**
 ```bash
@@ -687,14 +730,14 @@ WSL 개발은 변수가 없으니 그대로다.
 
 ```bash
 # 영상 올리기 (로컬에서)
-aws s3 cp ./pitch01.mp4 s3://$BUCKET/videos/pitch01.mp4
+aws s3 cp ./shot01.mp4 s3://$BUCKET/videos/shot01.mp4
 
 # 분석 (EC2에서)
 cd ~/super-sub.cloud/agent
-uv run python scripts/analyze_s3.py s3://$BUCKET/videos/pitch01.mp4 \
-  --rubric rubrics/baseball_pitching.yaml \
+uv run python scripts/analyze_s3.py s3://$BUCKET/videos/shot01.mp4 \
+  --rubric rubrics/football_instep_shot.yaml \
   --out s3://$BUCKET/reports \
-  --side left
+  --side right
 ```
 
 무슨 일이 일어나는가:
@@ -707,21 +750,35 @@ uv run python scripts/analyze_s3.py s3://$BUCKET/videos/pitch01.mp4 \
 | 4 | `scoring.Criterion.grade_for` — **등급을 코드가 정한다.** 모델이 아니다 |
 | 5 | `Judge` → vLLM `/v1/chat/completions` — 확정된 등급의 **근거 문장만** 생성. 항목 하나씩, `temperature=0`, `guided_json`으로 스키마 강제 |
 | 6 | **미리보기 렌더링** — 원본을 다시 디코딩해 임팩트 스켈레톤 `impact.jpg`와 대상 추적 영상 `tracked.webm`을 만든다. 추가 추론이 없다(ViTPose 키포인트로 그리기만 한다) |
-| 7 | `storage.upload_json` — `s3://버킷/reports/pitch01/<타임스탬프>.json` |
+| 7 | `storage.upload_json` — `s3://버킷/reports/shot01/<타임스탬프>.json` |
 
 리포트에는 측정값·판정·타이밍과 함께 `code_version`(git 커밋)과
 `judge_backend`가 들어간다. 수동 배포라 EC2 코드 시점이 리포트마다 다를 수
 있어서다.
 
+#### 🔴 리포트 자리가 둘이다 — `--video-id` 를 주느냐로 갈린다
+
+| | 자리 | 언제 |
+|---|---|---|
+| **계약 자리** | `reports/<user_id>/<video_id>/report.json` + 같은 폴더의 `impact.jpg`·`tracked.webm` | **워커가 부를 때.** `claim` 이 준 `video_id` 를 넘긴다 |
+| 옛 자리 | `reports/<업로드 폴더>/<파일명>/<타임스탬프>.json` + `<타임스탬프>/` 아래 미리보기 | **손으로·배치로 부를 때.** 아래 6-2 예시가 이쪽이다 |
+
+계약 자리는 **영상 하나에 폴더 하나**다 — 「저장」을 누르면 fastapi 가 원본을
+같은 폴더에 `source.mp4` 로 옮기므로 한 영상에 대한 것이 한자리에 모인다
+(미결 `jin` 24번). 타임스탬프가 없어서 **재분석은 앞의 리포트를 덮는다**.
+
+배치·평가가 옛 자리를 쓰는 것은 의도다. 같은 영상을 조건을 바꿔 여러 번
+돌리는 것이 그쪽의 일상이라 회차별 타임스탬프가 있어야 비교가 남는다.
+
 **확인:**
 ```bash
-aws s3 ls --recursive s3://$BUCKET/reports/pitch01/
+aws s3 ls --recursive s3://$BUCKET/reports/shot01/
 # <타임스탬프>.json  · <타임스탬프>/impact.jpg  · <타임스탬프>/tracked.webm
 
-aws s3 cp s3://$BUCKET/reports/pitch01/<타임스탬프>.json - | python3 -m json.tool | head -40
+aws s3 cp s3://$BUCKET/reports/shot01/<타임스탬프>.json - | python3 -m json.tool | head -40
 
 # 그림을 눈으로 보려면 받아서 연다 (버킷은 퍼블릭이 아니다)
-aws s3 cp s3://$BUCKET/reports/pitch01/<타임스탬프>/impact.jpg .
+aws s3 cp s3://$BUCKET/reports/shot01/<타임스탬프>/impact.jpg .
 ```
 
 ### 6-3. 툴 콜링에 대해
@@ -768,9 +825,9 @@ sudo systemctl enable --now supersub-worker
 # 설정이 맞는가 (집지 않고 루브릭 선택만 점검한다)
 cd ~/super-sub.cloud/agent
 uv run python scripts/worker.py --dry-run
-#   baseball → baseball_pitching.yaml
-#   basketball → basketball_jump_shot.yaml
 #   football → football_instep_shot.yaml
+# 🔴 목록은 rubrics/ 가 정한다. 축구만 뜨는 것이 정상이다
+#    (2026.09.11 축구 단일 종목 전환).
 
 systemctl status supersub-worker
 journalctl -u supersub-worker -f          # 작업을 집으면 여기 흐른다

@@ -20,8 +20,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "labeling"))
 from targets import load_candidates  # noqa: E402
 
-B2 = Path("/mnt/d/supersub-phaseA/eval_b2")
-B3 = Path("/mnt/d/supersub-phaseA/eval_b3")
+
+# 🔴 경로를 박지 않는다 — `eval/phaseA/paths.py` 가 정한다 (미결 14번).
+#    박아 두면 다른 기계에서 안 돌고, 저장소 사본을 떠도 읽히지 않는다.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from paths import external_root  # noqa: E402
+
+B2 = external_root() / "eval_b2"
+B3 = external_root() / "eval_b3"
 B3.mkdir(exist_ok=True)
 
 FIELDS = ["clip_id", "ratio", "frame", "n_candidates", "image",

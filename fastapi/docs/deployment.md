@@ -1,18 +1,92 @@
-# 백엔드 배포 준비
+# 백엔드 배포
 
-> **상태:** **구현됨 — SSH 터널로 도는 것까지 확인** · 2026-09-02
-> **확인:** `ssh supersub 'systemctl is-active supersub-api'` → `active`,
-> 터널을 열고 `curl -s localhost:8000/health` → `"status":"ok"`.
-> **밖에서는 아직 안 보인다** — 보안 그룹은 22 만 열려 있다(6-8 절).
-> **메모:** 여기 적힌 것은 **배포 환경이 생겼을 때 순서대로 밟는 절차**다. 로컬
-> 개발에 필요한 것은 `.env.example` 이 안내한다.
+> **상태:** **구현됨 — k3s + GitHub Actions CD** · 2026-09-09
+> **확인:** `curl -s https://<API 호스트>/health` → `{"status":"ok",...}` ·
+> `ssh supersub 'sudo k3s kubectl get pods'` → `supersub-api-trial-*` 가 `Running`
+> (네임스페이스 `default` — `jin` 32번 이전엔 `supersub`로 잘못 적혀 있었다).
+> **메모:** 배포는 이제 **손으로 밟는 절차가 아니라 자동**이다 — `main` 의
+> `fastapi/**` 가 바뀌면 이미지가 빌드돼 Docker Hub 로 가고, 서버가 그걸 폴링해
+> 재배포한다. 아래 「현재 배포」가 그 흐름이고, 사람이 하는 것은 **DB·시크릿·S3**
+> 준비뿐이다(1·2·9절). 로컬 개발은 `.env.example` 이 안내한다.
+>
+> 🔴 **옛 systemd 절차(0·3~6절, 8절 일부)는 「롤백·최초 세팅 기록」으로 남긴다** —
+> 지금 흐름이 아니다. k3s 가 못 돌 때 되돌리는 경로이자, 서버(`supersub`)가
+> 2026-09-02 에 처음 세팅됐을 때의 기록이다. min 14번 정책(빌드·구동은 k3s 로만).
 
-아래 순서에는 이유가 있다. **1번은 마이그레이션보다 먼저**여야 하고, 2번이 빠지면
-조용히 잘못 동작한다. **0번은 2026-09-02 에 서버가 생기면서 앞에 붙었다** — 거기 적힌 셋이 정해지기 전에는 1번을 시작할 수 없다.
+---
+
+## 현재 배포 — k3s + CD (2026-09-09)
+
+> 절차의 세부·함정은 `www/docs/2026-09-09-K3S-harness.md`(박민호) 가 정본이다.
+> 여기는 백엔드 관점에서 **무엇이 어떻게 도는지**와 **사람이 준비할 것**을 적는다.
+
+### 흐름
+
+```
+main 에 fastapi/** push
+  → GitHub Actions (.github/workflows/backend-docker-build.yml)
+      docker build (context: fastapi, file: fastapi/Dockerfile)
+      → push  pmhllll12/supersub:latest
+  → supersub 서버의 supersub-cd.timer (2분 폴링)
+      새 digest 감지 → kubectl rollout restart deployment/supersub-api-trial  (ns: default)
+  → 파드 재생성 (strategy: Recreate)
+      initContainer: alembic upgrade head   ← 마이그레이션 (커밋 5f85c9d)
+      app 컨테이너: uvicorn app.main:app :8080  (hostNetwork)
+```
+
+- **포트 8080 · hostNetwork.** 파드가 호스트 네트워크를 그대로 써서 `localhost:5432`
+  의 호스트 PostgreSQL 에 붙는다(DB 는 파드로 안 옮긴다 — 아래 「DB 는 그대로」).
+  단일 노드에서 `hostNetwork` 라 롤링 업데이트가 포트 충돌하므로 `strategy: Recreate`.
+- **이미지에 `.env` 가 없다.** `fastapi/.dockerignore` 가 `.env`·`.env.*` 를 막는다 —
+  2026-09-09 에 `.env` 가 이미지에 구워져 Docker Hub 에 올라간 사고(미결 min 11번)
+  뒤로 git 으로 관리한다. 🔴 **`COPY . .` 로 되돌리지 말 것** — `Dockerfile` 은
+  `app/`·`alembic/`·`alembic.ini` 만 명시적으로 넣는다.
+- **설정 주입**: `kubectl create secret generic supersub-api-env
+  --from-env-file=<서버의 .env>` → Deployment 가 `envFrom` 으로 읽는다. `.env`
+  파일 자체는 서버에만 있고 저장소·이미지에 없다. 키 목록(값 말고 이름만)의
+  정본은 `.env.example` — Secret에 실제로 들어있는 8개 키
+  (`APP_ENV`·`DATABASE_URL`·`JWT_SECRET`·`GOOGLE_CLIENT_IDS`·`ADMIN_EMAILS`·
+  `WORKER_TOKEN`·`AWS_REGION`·`S3_BUCKET`)가 전부 거기 있다(`jin` 32번 확인,
+  2026.09.15).
+- **매니페스트 자체**는 `fastapi/deploy/k8s/deployment.yaml` — 서버의
+  `~/k3s-trial/`에만 있던 것을 그대로 옮겨 담았다(`jin` 32번). 이름·네임스페이스를
+  `supersub-api-trial`/`default`로 유지할지는 아직 정리 전이고, 지금은 **실물을
+  그대로 커밋하는 것**까지만 했다.
+- **마이그레이션**은 initContainer 가 매 배포마다 `alembic upgrade head` 를 돈다.
+  head 면 no-op 라 안전하다. 🔴 **`CREATE EXTENSION vector` 는 여기 없다** — 그건
+  슈퍼유저 일회성이라 1절이 따로 다룬다.
+
+### 사람이 준비할 것 (한 번씩)
+
+| | 무엇 | 어디 |
+|---|---|---|
+| GitHub Actions Secrets | `DOCKERHUB_USERNAME` · `DOCKERHUB_TOKEN`(Read & Write) | 저장소 Settings → Secrets and variables → Actions. 없으면 CD 가 push 단계에서 실패한다 |
+| DB 확장 | `CREATE EXTENSION vector` (슈퍼유저, 호스트 DB 에 한 번) | **1절** |
+| 환경변수 | `supersub-api-env` Secret 에 들어갈 값 | **2절** (`.env.example` 이 목록) |
+| S3 버킷·IAM | 업로드 클립 저장소 | **9절** (변화 없음) |
+| 백업 | DB 덤프·복원 | **7절** (변화 없음 — DB 는 여전히 호스트 systemd Postgres) |
+
+### DB 는 그대로 — 파드로 안 옮긴다
+
+`postgresql` 은 `supersub` 서버에서 **systemd 로** 계속 돈다(18.6, 6-1절). k3s 로
+옮기는 것은 **앱뿐이다.** DB 를 StatefulSet + PV 로 옮기는 것은 백업·볼륨 계획이
+선행돼야 하는 별도 결정이고, min 14 정책("빌드·구동은 k3s 로만")도 앱이 대상이지
+DB 스토리지가 아니다. 그래서 7절(백업)·1절(확장)은 그대로 유효하다.
+
+### 롤백
+
+k3s 배포가 깨지면 옛 systemd 서비스로 되돌린다. `supersub-api.service` 는
+**지우지 않고 `disable` 만** 해 뒀다(있으면 `systemctl enable --now supersub-api`
+로 8000 을 다시 띄운다). 절차는 아래 6절이 그대로 롤백 런북이다.
 
 ---
 
 ## 0. 배포 대상 서버 — 무엇이 있고 무엇이 없나 (2026-09-02 확인)
+
+> 🔴 **이 절은 「최초 세팅 기록」이다.** 서버(`supersub`)에 파이썬·PostgreSQL·
+> systemd 서비스를 처음 올린 2026-09-02 의 상태다. 지금 배포는 위 「현재 배포」
+> (k3s + CD)다. 서버 사양(t3.large·7.8GB·디스크)과 「인스턴스 켠 순서」(8절)만
+> 계속 유효하고, 나머지는 그때 어떻게 세웠는지의 기록으로 읽는다.
 
 EC2 인스턴스 하나가 생겼다(`ssh supersub` · 서울 리전 · t3.large · vCPU 2 · 메모리
 7.8GB · **디스크 30GB** 중 28GB 여유). **접속 정보는 저장소에 두지 않는다** — 개인
@@ -95,6 +169,10 @@ sudo -u nobody /usr/local/bin/python3.14 -V      # 여기서 막히면 경로 �
 
 ## 1. DB 확장을 먼저 만든다 — 마이그레이션 전에
 
+> **k3s 배포에서도 그대로 유효하다.** initContainer 는 `alembic upgrade` 만 돌고
+> 확장은 안 만든다. 확장은 **호스트 PostgreSQL 에 슈퍼유저로 한 번** 만들어 두면
+> 되고, 그 뒤로는 손댈 일이 없다.
+
 🔴 **`CREATE EXTENSION vector` 는 슈퍼유저만 할 수 있다.** 앱 계정으로는 안 된다.
 
 `pgvector` 는 SFR-005(유사 선수 검색)가 쓸 확장이다. 확장이 없으면 `vector` 타입을
@@ -111,6 +189,49 @@ CREATE EXTENSION IF NOT EXISTS vector;
 ```bash
 wsl.exe -d Ubuntu-26.04 -u root -- su - postgres -c "psql -d supersub -c 'CREATE EXTENSION IF NOT EXISTS vector'"
 ```
+
+### 운영 서버(Amazon Linux 2023 + Amazon 빌드 PostgreSQL 18) 에서 (2026-09-11 실측)
+
+AL2023 저장소엔 pgvector 가 없다. PGDG 저장소를 더해 설치한다 — **버전을 반드시
+`postgresql18` 버전(여기선 18)에 맞춘다.**
+
+```bash
+sudo dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/AL-2023-x86_64/pgdg-amazonlinux-repo-latest.rpm
+sudo dnf install -y pgvector_18
+```
+
+🔴 **`pgdg-redhat-repo-latest.noarch.rpm` 이 아니라 `pgdg-amazonlinux-repo-latest.rpm`
+이다** — RHEL 용 이름을 그대로 쓰면 404 다. `AL-2023-x86_64/` 디렉터리 안의 실제
+파일명을 확인할 것.
+
+🔴 **함정 1 — PGDG 저장소 메타데이터 GPG 검증이 (일시적으로) 실패할 수 있다.**
+`dnf install pgvector_18` 이 `repomd.xml GPG signature verification error: Bad GPG
+signature` 로 막힐 수 있다(막 재배포된 메타데이터가 CDN 에지 간에 아직 다 퍼지지
+않았을 때 나타나는 것으로 보인다 — 재시도해도 몇 분간 계속될 수 있다). **이때
+`gpgcheck`/`repo_gpgcheck` 를 끄고 넘어가지 않는다.** 대신 신뢰 사슬을 손으로
+재현한다: `repomd.xml`(GPG 서명, `gpg --verify`) → `primary.xml.gz`(sha256 이
+`repomd.xml` 기재값과 일치하는지) → 대상 rpm(sha256 이 `primary.xml` 기재값과
+일치하는지) 을 각각 대조하고, `.rpm` 을 로컬 파일로 `dnf install ./pgvector_18-*.rpm`
+한다(임베디드 서명도 `rpm -K` 로 별도 확인 가능). `dnf repolist`가 정상화되면
+이후엔 그냥 `dnf install pgvector_18` 로 돌아가면 된다.
+
+🔴 **함정 2 — 설치돼도 안 보일 수 있다: 경로 프리픽스 불일치.** PGDG 의
+`pgvector_18` 은 자기 프리픽스(`/usr/pgsql-18/...`)에 설치되는데, **Amazon 이
+빌드한 `postgresql18-server` 는 다른 경로**(컨트롤 파일 `/usr/share/pgsql/
+extension/`, 모듈 `.so` `/usr/lib64/pgsql/`)를 본다. `rpm` 설치 자체는 성공해도
+`pg_available_extensions` 에 `vector` 행이 아예 안 뜬다(설치 안 됨이 아니라
+**서버가 못 찾는 것**). 대칭 심볼릭 링크로 잇는다(가역적):
+
+```bash
+sudo ln -sf /usr/pgsql-18/lib/vector.so /usr/lib64/pgsql/vector.so
+for f in /usr/pgsql-18/share/extension/vector*; do
+  sudo ln -sf "$f" "/usr/share/pgsql/extension/$(basename "$f")"
+done
+```
+
+이 링크 뒤 `pg_available_extensions` 에 `vector` 가 뜨면 아래 「확인」·본문의
+`CREATE EXTENSION` 이 그대로 통한다. **PGDG `postgresql18-devel` 을 추가로 설치하지
+않는다** — 같은 프리픽스 문제를 반복하고 Amazon 패키지와 충돌 위험만 늘린다.
 
 **확인** — 앱 계정으로 접속해 `installed_version` 이 나오면 된 것이다.
 
@@ -189,6 +310,10 @@ curl -s -o /dev/null -w '%{http_code}\n' https://<배포주소>/docs   # 404 여
 
 ## 3. 마이그레이션
 
+> **지금은 배포가 자동으로 돈다** — Deployment 의 initContainer 가 매 배포마다
+> `alembic upgrade head` 를 실행한다(커밋 `5f85c9d`). head 면 no-op 다. 아래는
+> 손으로 돌릴 때(롤백·로컬)의 명령이다.
+
 ```bash
 alembic upgrade head
 alembic check        # "No new upgrade operations detected." 여야 한다
@@ -196,23 +321,70 @@ alembic check        # "No new upgrade operations detected." 여야 한다
 
 `create_all` 을 쓰지 않는다 — 마이그레이션이 스키마의 정본이다.
 
+🔴 **새 마이그레이션을 냈으면 `CREATE EXTENSION vector` 가 이미 돼 있는지 본다**(1절).
+initContainer 는 확장을 만들지 않는다 — 확장이 없으면 `vector` 타입을 쓰는
+마이그레이션이 initContainer 안에서 멈추고 파드가 안 뜬다.
+
 ---
 
 ## 4. 리버스 프록시·로드밸런서 뒤에 둘 때
 
-> **✅ 2026-09-03 에 박민호가 다 세웠다.** `https://api.supersub-ai.com` 이 밖에서
+> **✅ 2026-09-03 에 박민호가 다 세웠다.** `https://<API 호스트>` 이 밖에서
 > 200 을 낸다 — A 레코드(가비아) · 80·443 개방 · nginx · Let's Encrypt 까지.
 > `http` 는 301 로 넘어간다. 이 절의 "그날 함께 한다"는 서술이 그날이 됐다.
 >
 > ```bash
-> curl -s -o /dev/null -w '%{http_code}\n' https://api.supersub-ai.com/health   # 200
+> curl -s -o /dev/null -w '%{http_code}\n' https://<API 호스트>/health   # 200
 > ```
 
-🔴 **`X-Forwarded-For` 를 신뢰하도록 설정하지 않으면** 인증 로그의 `client` 와
-**요청 제한(SEC-009)의 키가 전부 LB 주소가 된다.** 즉 모든 사용자가 한 덩어리로
-묶여 서로의 제한에 걸린다.
+### 🔴 앞단은 nginx 가 **아니다** — Cloudflare 가 그 앞에 있다 (2026-09-17 확인)
 
-### ✅ 그것도 09-03 에 붙었다 — **systemd drop-in 이다**
+**이 문서가 오래 nginx 를 최전선으로 적어 두었는데 사실이 아니다.** 실물은
+**Cloudflare 프록시 모드(오렌지 클라우드) DNS** 가 앞에 있다 — nginx 가 받는
+`$remote_addr` 가 전부 Cloudflare 대역이다. `cloudflared` 터널이 아니고
+서버에 자격증명도 없다. **계정·대시보드는 박민호가 쥐고 있다**(미결 `jin`
+37번).
+
+```
+사용자 → Cloudflare(프록시) → nginx(443) → k3s 파드(8080)
+```
+
+**언제 붙었는지는 이 저장소에 기록이 없다.** 그래서 두 가지가 딸려 왔다.
+
+1. **봇 차단이 우리 워커를 끊은 적이 있다** — 2026-09-16 08:27부터 워커의
+   `claim` 이 전부 `403`(`error code: 1010`)이었다. 기준은 User-Agent 하나이고
+   **오리진까지 안 오므로 백엔드 로그에 흔적이 없다**(미결 `ho` 53번).
+   🔴 **증상이 "백엔드는 멀쩡한데 밖에서만 막힌다"면 앞단을 먼저 본다.**
+2. **원주소 복원이 없다** — 아래.
+
+### 🔴 `X-Forwarded-For` 를 신뢰하도록 설정하지 않으면
+
+인증 로그의 `client` 와 **요청 제한(SEC-009)의 키가 전부 LB 주소가 된다.**
+즉 모든 사용자가 한 덩어리로 묶여 서로의 제한에 걸린다.
+
+### ⚠️ 09-03 에 붙였지만 **k3s 이관에서 딸려오지 않았다** (2026-09-17 확인)
+
+아래는 **systemd 시절**의 기록이다. 지금 앱은 k3s 파드에서 돌고
+`supersub-api.service` 는 `inactive` 다(이관 완료라 정상이다). 그런데 파드
+인자는 이것뿐이라 **드롭인의 `--proxy-headers` 가 사라졌다**:
+
+```
+uvicorn app.main:app --host 0.0.0.0 --port 8080
+```
+
+거기에 nginx 쪽 원주소 복원(`set_real_ip_from`·`real_ip_header
+CF-Connecting-IP`)도 없어서, 지금 `client=` 는 **Cloudflare 엣지 주소**로
+찍힌다 — 바로 위 경고가 실제로 일어나고 있다. 🔴 **둘 다 박민호 구역이라
+미결 `jin` 37번으로 올렸다.**
+
+> **확인(지금 기준):**
+> ```bash
+> sudo k3s kubectl logs deploy/supersub-api-trial --tail=200 \
+>   | grep -o 'client=[^ ]*' | sort | uniq -c
+> ```
+> Cloudflare 대역으로만 찍히면 안 고쳐진 것이다.
+
+### ✅ 그것도 09-03 에 붙었다 — **systemd drop-in 이다** (옛 기록)
 
 박민호가 유닛 파일을 고치는 대신 **드롭인으로 덮었다.** 그래서 `supersub-api.service`
 본체(저장소의 것)에는 안 보인다.
@@ -233,8 +405,10 @@ ExecStart=… uvicorn app.main:app --host 127.0.0.1 --port 8000 \
 `127.0.0.1` 이면 충분하고, 넓히면 **클라이언트가 `X-Forwarded-For` 를 위조해 요청
 제한을 우회**할 수 있다.
 
-> **확인:** `systemctl cat supersub-api | grep proxy-headers` — 안 걸리면 드롭인이
-> 없는 것이고, 그러면 SEC-009 가 모든 사용자를 한 덩어리로 묶는다.
+> ~~**확인:** `systemctl cat supersub-api | grep proxy-headers`~~ 🔴 **이 확인은
+> 낡았다 (2026-09-17)** — systemd 는 이제 `inactive` 라 이 명령은 아무것도
+> 못 잡는다. **위 k3s 기준 확인을 쓴다.** 확인 명령이 낡으면 「안 걸린다」가
+> 「문제가 없다」로 읽혀서, 이번에도 그렇게 한동안 안 보였다.
 
 같은 이유로 DB 접속은 `sslmode=verify-full` 을 쓴다. 기본값으로 둔 `require` 는
 **암호화만 하고 인증서를 검증하지 않아** 중간자 공격을 막지 못한다.
@@ -255,7 +429,13 @@ DATABASE_URL=postgresql://<user>:<pw>@<host>:5432/<db>?sslmode=verify-full
 | 삭제 연쇄가 **DB 까지만** | 객체 저장소가 정해지지 않아 원본·썸네일·추출 프레임이 남는다 (5장 SEC-006 · ASM-003) |
 | `Retry-After` 헤더가 없다 | 429 응답에 재시도 시점을 싣지 않는다. 클라이언트가 즉시 재시도하지 않도록 별도 합의가 필요하다 |
 
-## 6. 실제로 밟은 순서 (2026-09-02, SSH 터널까지)
+## 6. 실제로 밟은 순서 (2026-09-02, SSH 터널까지) — **옛 방식 · 롤백 런북**
+
+> 🔴 **지금 배포가 아니다.** 서버를 2026-09-02 에 처음 세울 때 밟은 순서이고,
+> 지금은 **k3s 배포가 깨졌을 때 8000 systemd 로 되돌리는 런북**으로 쓴다.
+> 6-1(PostgreSQL)은 지금도 유효하다 — DB 는 여전히 이 systemd Postgres 다.
+> 6-5(systemd)의 `supersub-api.service` 는 `disable` 만 해 뒀으니
+> `systemctl enable --now supersub-api` 로 되살린다.
 
 같은 인스턴스에 PostgreSQL 을 두기로 했고(비용 없음), 보안 그룹은 열지 않았다.
 **밖에서는 아직 안 보인다** — 확인은 SSH 터널로 한다.
@@ -372,7 +552,7 @@ ssh supersub 'cd ~/supersub/app && git pull && cd fastapi \
 
 | 무엇 | 왜 |
 |---|---|
-| ~~80·443 개방 · nginx · TLS~~ | ✅ **2026-09-03 에 박민호가 세웠다** — 4절. `https://api.supersub-ai.com` 이 밖에서 200 을 낸다 |
+| ~~80·443 개방 · nginx · TLS~~ | ✅ **2026-09-03 에 박민호가 세웠다** — 4절. `https://<API 호스트>` 이 밖에서 200 을 낸다 |
 | **`pgvector`** | AL2023 저장소에 **패키지가 없다.** 지금 마이그레이션은 `vector` 를 안 써서 없이도 돌았다 — `player_vector` 가 들어올 때 소스 빌드(`gcc` 필요)를 해야 한다 |
 | ~~백업~~ | ✅ 2026-09-02 에 걸었다 — 7절. **다만 같은 디스크에 쌓인다**(밖으로 옮기는 것은 별도) |
 | **로그 회전·모니터링** | journald 기본값에 기대고 있다 |
@@ -452,15 +632,17 @@ df -h /                     # 30G 로 보이면 끝
 
 ---
 
-## 8. 인스턴스를 껐다 켤 때 (2026-09-02)
+## 8. 인스턴스를 껐다 켤 때 (2026-09-02, k3s 반영 2026-09-09)
 
-비용 때문에 주기적으로 끈다. **서비스는 알아서 돌아온다** — `postgresql`·
-`supersub-api`·`supersub-backup.timer` 가 전부 `enabled` 라 부팅하면 스스로 뜬다.
+비용 때문에 주기적으로 끈다. **서비스는 알아서 돌아온다** — 부팅하면 스스로 뜬다.
 
 ```bash
-ssh supersub 'systemctl is-enabled postgresql supersub-api supersub-backup.timer'
-# 셋 다 enabled 여야 한다. disabled 가 보이면 그건 껐다 켠 뒤 안 뜬다는 뜻이다
-ssh supersub 'systemctl is-active postgresql supersub-api'   # 켠 뒤 확인
+# DB·백업·CD·k3s 가 전부 enabled 여야 한다
+ssh supersub 'systemctl is-enabled postgresql supersub-backup.timer supersub-cd.timer k3s'
+# 🔴 supersub-api(옛 8000 systemd)는 disabled 가 정상이다 — k3s 로 넘어갔다(롤백용으로만 남김)
+ssh supersub 'systemctl is-active postgresql k3s'
+ssh supersub 'sudo k3s kubectl get pods'        # supersub-api-trial-* 가 Running
+curl -s -o /dev/null -w '%{http_code}\n' https://<API 호스트>/health   # 200
 ```
 
 🔴 **09-02 의 "탄력적 IP 를 붙이지 않는다" 를 정정한다 (2026-09-03 사용자 결정).**
@@ -526,7 +708,7 @@ ssh supersub 'systemctl is-active postgresql supersub-api supersub-backup.timer'
 | 안 올린 키로 `POST /videos` | **422 `FILE_NOT_UPLOADED`** ← `s3:ListBucket` 이 붙었다는 증거다 |
 | 사전 서명 URL 로 S3 에 PUT | **200** |
 | `POST /videos` | `passed: true` · `analysis_status: "queued"` |
-| 4K 로 등록 | `passed: false` · 사유 `"해상도가 상한을 넘습니다: 3840x2160 (상한 1920x1080)"` |
+| 8K 로 등록 | `passed: false` · 사유 `"해상도가 상한을 넘습니다: 7680x4320 (상한 긴 변 3840 · 짧은 변 2160)"` — 2026-09-11 정정: 4K(3840x2160)까지는 이제 `passed: true`다 |
 | `GET /videos` | 둘 다, 최근 것이 앞에 |
 | 검사 계정 삭제 | `user` 하나를 지우니 `video`·`video_validation`·`analysis_job` 까지 함께 사라졌다 (**SEC-006 실물 확인**) |
 
@@ -534,9 +716,13 @@ ssh supersub 'systemctl is-active postgresql supersub-api supersub-backup.timer'
 실제 경로는 `~/supersub/app/fastapi/.env` 다(6-3 절에 처음부터 적혀 있었다).
 **짐작한 경로는 "0 건"이 아니라 "파일 없음"을 내고, 그것을 미착수로 오독한다.**
 
-⚠️ **연기 검사가 S3 에 1KB 객체 둘을 남겼다.** 역할에 `s3:DeleteObject` 가 없어
-서버에서 지울 수 없다 — 콘솔에서 `videos/` 아래를 한 번 비우면 된다. **클립 삭제
-기능을 만들 때 정책에 `s3:DeleteObject` 를 더해야 한다**(지금은 일부러 뺐다).
+⚠️ **연기 검사가 S3 에 1KB 객체 둘을 남겼다.** 09-03 당시 역할에 `s3:DeleteObject`
+가 없어 서버에서 지울 수 없었다 — 콘솔에서 `videos/` 아래를 한 번 비우면 된다.
+✅ **2026-09-08: 정책을 3문짜리(`s3:DeleteObject` + `reports/*`)로 교체했고
+서버에서 스모크 통과.** 클립 삭제·`keep` 이동(`CopyObject` videos→reports)·백스톱
+스윕이 쓰는 권한이 다 열렸고 `models/*` 은 여전히 거부된다. 미결 `jin` 24번 IAM
+조각. (단, **그 조각들 코드는 아직 서버에 배포되지 않았다** — 서버 head
+`5db18b239336`. 배포하면 IAM 은 이미 준비돼 있다.)
 
 | | |
 |---|---|
@@ -571,17 +757,27 @@ aws s3 ls s3://supersub-ai/      # 접두사 구조도 함께 본다
 | | 접두사 단위로 되나 |
 |---|---|
 | **수명 주기 규칙** | ✅ 된다. `videos/` 에만 보관 기간을 걸 수 있다 |
-| **IAM 권한** | ✅ 된다. EC2 역할에 `arn:aws:s3:::supersub-ai/videos/*` 만 주면 `models/`·`reports/` 에는 손을 못 댄다 |
+| **IAM 권한** | ✅ 된다. 접두사별로 `Resource` 를 쪼갤 수 있다. 백엔드는 `videos/*` 와 `reports/*` **둘 다** 필요하고(아래) `models/` 에는 손을 못 댄다 |
 | **CORS 규칙** | 🔴 **안 된다.** 버킷 전체에 걸린다 — 웹 업로드를 열면 다른 접두사에도 같은 규칙이 적용된다 |
 | 콘솔의 **"비어 있음"** | 🔴 **안 된다.** 버킷 전체를 지운다. 셋이 함께 날아간다 |
 
 > 09-03 에 위 표의 앞 둘을 "버킷 단위라 나눌 수 없다"고 잘못 적었다가 고쳤다.
 > **버킷 단위로 남는 것은 CORS 와 일괄 삭제 둘뿐이다.**
 
-### 서버에 줄 권한 — 인스턴스 역할 (2026-09-03)
+### 서버에 줄 권한 — 인스턴스 역할 (2026-09-03 · 2026-09-08 확장)
 
 클립은 앱 서버를 지나지 않고 사용자가 사전 서명 URL 로 S3 에 직접 올린다(PER-002).
-서버가 하는 일은 **URL 발급과 HEAD** 뿐이라 필요한 권한이 좁다.
+서버가 직접 S3 를 부르는 자리는 이렇다.
+
+| 코드 | S3 호출 | 필요 권한 |
+|---|---|---|
+| 사전 서명 URL 발급(PUT·GET) | 서명만 — S3 호출 없음 | 없음 (자격증명만) |
+| `size_of` (등록 시 실측) | `HeadObject` | `s3:GetObject` + `s3:ListBucket`\* |
+| `DELETE /videos/{id}` · 백스톱 스윕 | `DeleteObject` · `list_objects_v2` + `DeleteObjects` | `s3:DeleteObject`(`videos/*`·`reports/*`) · `s3:ListBucket` |
+| `POST /videos/{id}/keep` (프로필에 저장) | `CopyObject`(`videos/*`→`reports/*`) + `DeleteObject`(원본) | `s3:GetObject`+`s3:PutObject`+`s3:DeleteObject` 양쪽 접두사 |
+| 리포트 읽기(`paik` 7, 예정) | `GetObject`(`reports/*`) | `s3:GetObject`(`reports/*`) |
+
+\* `s3:ListBucket` 이 왜 `HeadObject` 에 필요한지는 아래 절.
 
 🔴 **장기 액세스 키를 서버 `.env` 에 두지 않는다** — boto3 가 인스턴스 역할을
 먼저 찾는다(`.env.example` 의 AWS 절).
@@ -590,7 +786,9 @@ aws s3 ls s3://supersub-ai/      # 접두사 구조도 함께 본다
 HEAD 요청은 **`s3:GetObject`** 로 인가된다. 없는 액션을 정책에 적으면 조용히
 아무 효과가 없고, **문법 오류도 안 난다.**
 
-붙일 인라인 정책은 이것이다.
+붙일 인라인 정책은 이것이다. **🔴 2026-09-08 에 `s3:DeleteObject` 와 `reports/*`
+문(statement)을 더했다** — `keep` 이동·삭제·스윕(미결 `jin` 24번) 때문이다.
+`models/` 는 여전히 못 건드린다.
 
 ```json
 {
@@ -599,8 +797,14 @@ HEAD 요청은 **`s3:GetObject`** 로 인가된다. 없는 액션을 정책에 �
     {
       "Sid": "SupersubVideoObjects",
       "Effect": "Allow",
-      "Action": ["s3:PutObject", "s3:GetObject"],
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
       "Resource": "arn:aws:s3:::supersub-ai/videos/*"
+    },
+    {
+      "Sid": "SupersubReportObjects",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::supersub-ai/reports/*"
     },
     {
       "Sid": "SupersubBucketList",
@@ -611,6 +815,12 @@ HEAD 요청은 **`s3:GetObject`** 로 인가된다. 없는 액션을 정책에 �
   ]
 }
 ```
+
+🔴 **`reports/*` 는 원래 정상호 접두사다.** 백엔드가 여기에 쓰기·삭제를 갖는 이유는
+⑴ `keep` 이 원본을 `reports/<user_id>/<video_id>/source.<ext>` 로 옮기고 ⑵ 클립을
+지우면 그 `reports/<user_id>/<video_id>/` 폴더(리포트·미리보기 포함)도 함께 지우기
+때문이다. 백엔드는 `reports/` 아래 **자기가 아는 `<user_id>/<video_id>/` 접두사만**
+건드린다. 워커가 리포트를 쓰는 것은 별개 주체(GPU 인스턴스)라 이 정책과 무관하다.
 
 #### 🔴 `s3:ListBucket` 이 왜 필요한가 — 404 와 403 을 가르기 위해서다
 
@@ -624,24 +834,57 @@ HEAD 요청은 **`s3:GetObject`** 로 인가된다. 없는 액션을 정책에 �
 
 ⚠️ `s3:prefix` 조건으로 좁히고 싶겠지만 **HeadObject 는 `s3:prefix` 를 넘기지
 않아서** 조건이 안 맞아 다시 403 이 된다. 버킷 전체에 주되, 이것으로 열리는 것은
-**키 이름 목록뿐**이고 `models/`·`reports/` 의 **내용은 못 읽는다**(위 `Resource`
-가 `videos/*` 로 좁혀져 있다).
+**키 이름 목록뿐**이고 `models/` 의 **내용은 못 읽는다**(위 오브젝트 문 둘이
+`videos/*`·`reports/*` 로 좁혀져 있다).
 
-#### 🔴 `jin` 계정으로는 붙일 수 없다 (2026-09-03 확인)
+#### 역할은 이미 붙어 있었다 — **정책만 교체했다** (2026-09-08 ✅)
 
-콘솔에서 막힌다.
+09-03 스모크가 통과했다는 것은 인스턴스 역할이 **이미 붙어 있고** 2문짜리 정책
+(`videos/*` Put+Get · `ListBucket`)이 들어 있었다는 뜻이다. 인스턴스 메타데이터로
+확인된다(`curl .../iam/info` → `InstanceProfileArn` 이 찍힌다).
 
+그래서 09-08 변경은 **새 역할을 만드는 게 아니라** 그 역할의 **인라인 정책 하나를
+위 3문짜리 JSON 으로 통째 교체**하는 것이었다.
+
+- 자리: **IAM 콘솔 → 역할(Roles) → (인스턴스에 붙은 그 역할) → 권한 → 인라인
+  정책 편집 → JSON 탭 → 교체 → 저장.** EC2 의 「작업 → 보안 → IAM 역할 수정」은
+  *붙일 역할을 바꾸는* 자리라 **건드리지 않는다** — 잘못하면 붙어 있는 역할이
+  떨어진다(미결 8번의 "IAM 역할 없음" 함정).
+- 🔴 **`jin` IAM 사용자는 09-03 에 `iam:ListInstanceProfiles` 에서 막혔다.**
+  역할 목록·편집이 권한 오류(`is not authorized to perform: iam:…`)를 내면
+  **계정 소유자(박민호)** 가 해야 한다.
+
+#### ✅ 반영·검증됨 (2026-09-08)
+
+정책을 저장한 **첫 시도는 세 번째 문(`SupersubBucketList`)만 들어가** `videos/*`
+`PutObject` 까지 막혔었다(업로드도 깨졌다). 전체 JSON 을 다시 붙여 저장하니
+스모크가 다 통과했다.
+
+역할이 실제로 무엇을 할 수 있는지는 **인스턴스 역할 자격증명으로 직접 태워** 본다
+— API 를 거치지 않으므로 코드 배포 상태와 무관하다.
+
+```bash
+# 서버에서, .venv 의 boto3 로 (인스턴스 역할 자동 사용)
+ssh supersub 'cd ~/supersub/app/fastapi && .venv/bin/python - <<PY
+import boto3, time
+c = boto3.client("s3", region_name="ap-northeast-2")
+B = "supersub-ai"; ts = time.strftime("%Y%m%d-%H%M%S")
+v, r = f"videos/_smoke/{ts}.txt", f"reports/_smoke/{ts}.txt"
+c.put_object(Bucket=B, Key=v, Body=b"x")                                  # Put videos/*
+c.copy_object(Bucket=B, CopySource={"Bucket": B, "Key": v}, Key=r)        # keep 이동
+c.get_object(Bucket=B, Key=r); c.delete_object(Bucket=B, Key=v)           # Get/Delete
+c.delete_object(Bucket=B, Key=r)
+try:
+    c.put_object(Bucket=B, Key=f"models/_smoke/{ts}.txt", Body=b"x"); print("BAD: models 써짐")
+except Exception: print("OK: models 거부, 나머지 통과")
+PY'
 ```
-User: arn:aws:iam::…:user/jin is not authorized to perform:
-iam:ListInstanceProfiles … because no identity-based policy allows it
-```
 
-**계정 소유자(박민호)가 해야 한다.** 그쪽 콘솔에서는 오류 없이 역할 목록이 뜬다.
-미결 8번에 정책 JSON 과 함께 올려 두었다.
+기대: `OK: models 거부, 나머지 통과`. `AccessDenied` 가 하나라도 나오면 저장된
+정책에 그 문이 빠진 것 — 전체 JSON 을 다시 붙인다.
 
-⚠️ **이미 있는 `pmh12-role` 을 그냥 붙이지 않는다.** 다른 인스턴스용으로 만든
-역할이라 무엇이 들어 있는지 모른다 — 넓으면 필요 이상으로 열리고, 좁으면 S3 가
-안 된다. **새 역할에 위 정책 하나만** 붙이는 편이 낫다.
+🔴 **코드는 아직 배포 전이라** `POST /videos/{id}/keep`·`DELETE /videos/{id}`·
+스윕은 서버에 없다(head `5db18b239336`). 배포하면 IAM 은 이미 준비돼 있다.
 
 ### CORS — 브라우저에서 올릴 때만 필요하다
 
