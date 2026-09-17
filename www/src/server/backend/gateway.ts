@@ -318,6 +318,25 @@ export interface Backend {
     input: { name: string; region: string; sport_code: string },
   ): Promise<TeamDetail>
   /**
+   * 팀 이름·지역을 고친다 — **주장만**(403), 계약 3-3절 `PATCH /teams/{id}`.
+   *
+   * 🔴 **`null` 로 지우지 못한다**(422). 둘 다 NOT NULL 이라 「안 정한 상태」가
+   * 없다 — 안 바꿀 필드는 **아예 뺀다.** (`PATCH /me/card` 의 `tagline` 과
+   * 반대다. 그쪽은 `null` 이 「지우기」다.)
+   *
+   * 🔴 **`sport_code` 는 못 바꾼다** — 본문에 자리가 없다. 포지션·스쿼드·경기가
+   * 전부 그 값에 매달려 있어서, 바꾸면 이미 앉힌 포지션이 다른 종목 것이 된다.
+   *
+   * 🔴 **이게 왜 필요한가**: 「사람을 찾는 팀」이 지역으로 거르는데(그 값이
+   * `team.region` 이다) 오타를 내거나 연고를 옮기면 **그 팀 경기가 탐색에서
+   * 통째로 빠졌고 고칠 방법이 없었다.**
+   */
+  updateTeam(
+    token: string,
+    teamId: string,
+    input: { name?: string; region?: string },
+  ): Promise<TeamDetail>
+  /**
    * 팀에서 나간다(본인) 또는 뺀다(주장).
    *
    * 🔴 `memberId` 는 **그 사람의 `user_id`** 다 — 소속 행의 id 가 아니다.

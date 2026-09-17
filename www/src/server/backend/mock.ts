@@ -1450,6 +1450,55 @@ export const mockBackend: Backend = {
     } satisfies TeamDetail
   },
 
+  async updateTeam(token, teamId, input) {
+    const u = requireUser(token)
+    /* 🔴 **주장만**(계약) — `requireCaptain` 이 없는 팀은 404, 구성원은 403 을
+       낸다. 화면은 애초에 주장에게만 단추를 내지만, 여기서도 막아야 mock 이
+       계약과 같은 것을 거절한다. */
+    requireCaptain(u, teamId)
+
+    /* 🔴 **`null` 은 422 다 — 조용히 무시하지 않는다**(계약의 「하지 말 것」).
+       둘 다 NOT NULL 이라 「지우기」가 없다. 여기서 그냥 건너뛰면 화면은
+       200 을 받고 **아무것도 안 바뀐 것을 성공으로** 읽는다 — 호칭 저장이
+       실서버에서 정확히 그렇게 실패했다(2026-09-16, `extra='ignore'`).
+       타입에는 `null` 이 없지만 BFF 를 거치지 않고 들어올 수 있어 실제로 본다. */
+    for (const key of ['name', 'region'] as const) {
+      if ((input as Record<string, unknown>)[key] === null) {
+        throw new BackendError(422, 'VALIDATION_ERROR', `${key} 는 비울 수 없습니다.`)
+      }
+    }
+
+    const team = u.teams.find((t) => t.team_id === teamId)!
+    const name = input.name === undefined ? team.name : input.name.trim()
+    const region = input.region === undefined ? team.region : input.region.trim()
+    if (!name || !region) {
+      throw new BackendError(422, 'VALIDATION_ERROR', '이름과 지역이 필요합니다.')
+    }
+
+    /* 🔴 **`sport_code` 는 안 받는다** — 본문에 자리가 없어 서버가 무시한다.
+       받는 시늉을 하면 개발에서만 종목이 바뀌어 보인다. */
+    users.set(token, {
+      ...u,
+      teams: u.teams.map((t) => (t.team_id === teamId ? { ...t, name, region } : t)),
+    })
+    return {
+      id: teamId,
+      name,
+      region,
+      sport_code: team.sport_code,
+      members: [
+        {
+          user_id: u.id,
+          nickname: u.nickname,
+          role: 'owner',
+          joined_at: team.joined_at,
+          player_card_id: null,
+          card_public_slug: null,
+        },
+      ],
+    } satisfies TeamDetail
+  },
+
   async leaveTeam(token, teamId, memberId) {
     const u = requireUser(token)
     const mine = u.teams.find((t) => t.team_id === teamId)

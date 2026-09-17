@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import TeamActions from './TeamActions'
 
@@ -88,13 +88,16 @@ describe('프로필 — 소속', () => {
     render(<TeamActions teams={[]} userId="u1" />)
     await user.click(screen.getByRole('button', { name: '팀 만들기' }))
     await user.type(screen.getByLabelText('팀 이름'), '번개FC')
-    await user.type(screen.getByLabelText(/지역/), '서울 강남')
+    /* 🔴 **목록의 값이어야 한다**(2026-09-17, 계약 52번과 함께 바뀜) — 전에는
+       자유 입력이라 「서울 강남」으로도 만들어졌는데, 그러면 「사람을 찾는 팀」
+       이 지역으로 거를 때 그 팀이 통째로 빠진다. */
+    await user.type(screen.getByLabelText(/지역/), '서울 강남구')
     await user.click(screen.getByRole('button', { name: '만들기' }))
 
     await waitFor(() => expect(refresh).toHaveBeenCalled())
     const made = sent.find((s) => s.url === '/api/teams' && s.method === 'POST')
     expect(made).toBeDefined()
-    expect(JSON.parse(made!.body!)).toEqual({ name: '번개FC', region: '서울 강남' })
+    expect(JSON.parse(made!.body!)).toEqual({ name: '번개FC', region: '서울 강남구' })
     expect(sent.some((s) => s.url === '/api/teams/t9/squad')).toBe(true)
   })
 
@@ -188,5 +191,159 @@ describe('프로필 — 팀 만들기가 나오는 때', () => {
       'aria-pressed',
       'false',
     )
+  })
+})
+
+/**
+ * **팀 이름·지역 수정** (계약 3-3절 `PATCH /teams/{id}`, CCC 52번, 2026-09-17).
+ *
+ * 🔴 **왜 급했나**: 「사람을 찾는 팀」이 지역으로 거르는데 그 값이
+ * `team.region` 이다 — 오타를 내거나 연고를 옮기면 **그 팀 경기가 탐색에서
+ * 통째로 빠지는데 고칠 방법이 없었다.**
+ *
+ * ⚠️ **질의를 수정 폼 안으로 좁힌다**(`within`). 팀 만들기 폼은 접혀 있을 뿐
+ * **늘 DOM 에 있어서**(부드럽게 펴지려면 전환할 대상이 있어야 한다) 「팀
+ * 이름」·「지역」 라벨이 화면에 둘씩 있다 — 안 좁히면 질의가 둘 다 집는다.
+ */
+describe('프로필 — 팀 이름·지역 수정', () => {
+  let sent: { url: string; method: string; body: string | null }[]
+
+  const OWNED = {
+    team_id: 't1',
+    name: '번개FC',
+    region: '서울 강남구',
+    sport_code: 'football',
+    role: 'owner',
+  }
+
+  /** 팀 줄 안의 수정 폼 — 만들기 폼은 `<ul>` 밖에 있어 `li` 로 갈린다. */
+  function editForm(container: HTMLElement) {
+    return within(container.querySelector('li .ss-profile-form-fold') as HTMLElement)
+  }
+
+  beforeEach(() => {
+    sent = []
+    refresh.mockClear()
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      (input: RequestInfo | URL, init?: RequestInit) => {
+        sent.push({
+          url: String(input),
+          method: init?.method ?? 'GET',
+          body: typeof init?.body === 'string' ? init.body : null,
+        })
+        return Promise.resolve(new Response(JSON.stringify({ id: 't1' }), { status: 200 }))
+      },
+    )
+  })
+  afterEach(() => vi.restoreAllMocks())
+
+  /* 🔴 **주장만**(계약) — 구성원이 부르면 403 이다. */
+  it('구성원에게는 수정 단추를 안 낸다', () => {
+    render(<TeamActions teams={[{ ...OWNED, role: 'member' }]} userId="u1" />)
+    expect(screen.queryByRole('button', { name: '수정' })).toBeNull()
+  })
+
+  it('주장에게는 수정 단추가 나온다', () => {
+    render(<TeamActions teams={[OWNED]} userId="u1" />)
+    expect(screen.getByRole('button', { name: '수정' })).toBeInTheDocument()
+  })
+
+  /* 평소에는 접혀 있고 탭으로도 못 닿는다 — 만들기 폼과 같은 방식이다. */
+  it('평소에는 수정 폼이 접혀 있다', () => {
+    const { container } = render(<TeamActions teams={[OWNED]} userId="u1" />)
+    const fold = container.querySelector('li .ss-profile-form-fold')
+    expect(fold).toHaveAttribute('data-open', 'false')
+    expect(fold?.firstElementChild).toHaveAttribute('inert')
+  })
+
+  /* 빈 칸에서 시작하면 안 바꿀 필드까지 사람이 다시 적게 된다. */
+  it('펴면 지금 값으로 채워져 있다', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<TeamActions teams={[OWNED]} userId="u1" />)
+    await user.click(screen.getByRole('button', { name: '수정' }))
+    const f = editForm(container)
+    expect(f.getByLabelText('팀 이름')).toHaveValue('번개FC')
+    expect(f.getByLabelText(/지역/)).toHaveValue('서울 강남구')
+  })
+
+  /**
+   * 🔴 **바뀐 것만 싣는다**(계약의 「하지 말 것」) — 안 바꿀 필드는 `null` 도
+   * 빈 값도 아니고 **아예 빼야** 한다. `null` 을 보내면 422 다.
+   */
+  it('이름만 고치면 name 만 보낸다', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<TeamActions teams={[OWNED]} userId="u1" />)
+    await user.click(screen.getByRole('button', { name: '수정' }))
+    const f = editForm(container)
+    await user.clear(f.getByLabelText('팀 이름'))
+    await user.type(f.getByLabelText('팀 이름'), '천둥FC')
+    await user.click(f.getByRole('button', { name: '저장' }))
+
+    await waitFor(() => expect(refresh).toHaveBeenCalled())
+    const patch = sent.find((s) => s.method === 'PATCH')
+    expect(patch?.url).toBe('/api/teams/t1')
+    expect(JSON.parse(patch!.body!)).toEqual({ name: '천둥FC' })
+  })
+
+  it('지역만 고치면 region 만 보낸다', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<TeamActions teams={[OWNED]} userId="u1" />)
+    await user.click(screen.getByRole('button', { name: '수정' }))
+    const f = editForm(container)
+    await user.clear(f.getByLabelText(/지역/))
+    await user.type(f.getByLabelText(/지역/), '부산 해운대구')
+    await user.click(f.getByRole('button', { name: '저장' }))
+
+    await waitFor(() => expect(refresh).toHaveBeenCalled())
+    expect(JSON.parse(sent.find((s) => s.method === 'PATCH')!.body!)).toEqual({
+      region: '부산 해운대구',
+    })
+  })
+
+  /* 둘 다 그대로면 부를 것이 없다 — 접기만 한다. */
+  it('아무것도 안 바꾸면 서버를 안 부른다', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<TeamActions teams={[OWNED]} userId="u1" />)
+    await user.click(screen.getByRole('button', { name: '수정' }))
+    await user.click(editForm(container).getByRole('button', { name: '저장' }))
+    expect(sent.some((s) => s.method === 'PATCH')).toBe(false)
+  })
+
+  /**
+   * 🔴 **저장되는 값은 목록의 것**이다 — 「강남」·「강남구」·「서울 강남구」가
+   * 다 다른 값이면 대조가 깨져서, 고쳐도 여전히 탐색에서 빠진다.
+   */
+  it('목록에 없는 동네면 저장이 안 눌리고 그렇게 말한다', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<TeamActions teams={[OWNED]} userId="u1" />)
+    await user.click(screen.getByRole('button', { name: '수정' }))
+    const f = editForm(container)
+    await user.clear(f.getByLabelText(/지역/))
+    await user.type(f.getByLabelText(/지역/), '없는동네')
+
+    expect(f.getByRole('button', { name: '저장' })).toBeDisabled()
+    expect(f.getByText('그런 동네가 목록에 없습니다.')).toBeInTheDocument()
+  })
+
+  it('적은 것과 겹치는 동네를 후보로 내고, 누르면 그 값이 된다', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<TeamActions teams={[OWNED]} userId="u1" />)
+    await user.click(screen.getByRole('button', { name: '수정' }))
+    const f = editForm(container)
+    await user.clear(f.getByLabelText(/지역/))
+    await user.type(f.getByLabelText(/지역/), '해운대')
+    await user.click(f.getByRole('button', { name: '부산 해운대구' }))
+
+    expect(f.getByLabelText(/지역/)).toHaveValue('부산 해운대구')
+    expect(f.getByRole('button', { name: '저장' })).toBeEnabled()
+  })
+
+  /* 🔴 **종목은 못 바꾼다** — 계약 본문에 자리가 없고, 포지션·스쿼드·경기가
+     전부 그 값에 매달려 있다. */
+  it('종목을 고치는 자리는 없다', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<TeamActions teams={[OWNED]} userId="u1" />)
+    await user.click(screen.getByRole('button', { name: '수정' }))
+    expect(editForm(container).queryByLabelText(/종목/)).toBeNull()
   })
 })

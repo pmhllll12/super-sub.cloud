@@ -245,3 +245,82 @@ describe('mockBackend', () => {
     })
   })
 })
+
+/**
+ * **`PATCH /teams/{id}` — mock 이 계약만큼 엄한가** (CCC 52번, 2026-09-17).
+ *
+ * 🔴 **mock 이 실서버보다 너그러우면 배포에서만 터진다.** 2026-09-16 에 같은
+ * 원인으로 세 번 데였다(지인 검색 스위치 · 팀 만들기 종목 · 호칭 저장). 특히
+ * 마지막 것은 서버가 모르는 필드를 **조용히 버리고 200** 을 줘서 **실패가
+ * 성공처럼** 보였다 — 붙드는 것은 화면이 아니라 **mock 이 다시 너그러워지지
+ * 않는 것**이라 여기서 잠근다.
+ */
+describe('mock — 팀 이름·지역 수정', () => {
+  async function owner() {
+    const t = await mockBackend.login({
+      email: 'demo@super-sub.example',
+      password: 'supersub2026',
+    })
+    const team = await mockBackend.createTeam(t.access_token, {
+      name: '강남 FC',
+      region: '서울 강남구',
+      sport_code: 'football',
+    })
+    return { token: t.access_token, teamId: team.id }
+  }
+
+  it('주장은 이름·지역을 고친다', async () => {
+    const { token, teamId } = await owner()
+    const after = await mockBackend.updateTeam(token, teamId, { region: '부산 해운대구' })
+    expect(after).toMatchObject({ id: teamId, name: '강남 FC', region: '부산 해운대구' })
+  })
+
+  it('보낸 칸만 바뀐다 — 뺀 칸은 그대로다', async () => {
+    const { token, teamId } = await owner()
+    const after = await mockBackend.updateTeam(token, teamId, { name: '천둥FC' })
+    expect(after).toMatchObject({ name: '천둥FC', region: '서울 강남구' })
+  })
+
+  it('아무것도 안 보내면 아무것도 안 바뀐다', async () => {
+    const { token, teamId } = await owner()
+    const after = await mockBackend.updateTeam(token, teamId, {})
+    expect(after).toMatchObject({ name: '강남 FC', region: '서울 강남구' })
+  })
+
+  /* 🔴 **`null` 은 지우기가 아니라 422 다** — 둘 다 NOT NULL 이라 「안 정한
+     상태」가 없다. 조용히 건너뛰면 화면이 200 을 성공으로 읽는다. */
+  it('null 을 보내면 422 다 — 조용히 무시하지 않는다', async () => {
+    const { token, teamId } = await owner()
+    await expect(
+      mockBackend.updateTeam(token, teamId, { region: null } as unknown as { region?: string }),
+    ).rejects.toMatchObject({ status: 422, code: 'VALIDATION_ERROR' })
+  })
+
+  it('빈 글자도 422 다', async () => {
+    const { token, teamId } = await owner()
+    await expect(mockBackend.updateTeam(token, teamId, { name: '   ' })).rejects.toMatchObject({
+      status: 422,
+    })
+  })
+
+  /* 🔴 **주장만**(계약) — 구성원은 403, 없는 팀은 404. */
+  it('구성원이면 403 이다', async () => {
+    const t = await mockBackend.login({
+      email: 'demo@super-sub.example',
+      password: 'supersub2026',
+    })
+    const me = await mockBackend.getMe(t.access_token)
+    const asMember = me.teams.find((x) => x.role !== 'owner')
+    if (!asMember) return // 데모 계정이 전부 주장이면 이 갈래는 여기서 못 밟는다
+    await expect(
+      mockBackend.updateTeam(t.access_token, asMember.team_id, { name: '아무거나' }),
+    ).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' })
+  })
+
+  it('없는 팀이면 404 다', async () => {
+    const { token } = await owner()
+    await expect(mockBackend.updateTeam(token, '없는팀', { name: 'x' })).rejects.toMatchObject({
+      status: 404,
+    })
+  })
+})

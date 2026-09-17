@@ -342,6 +342,14 @@ export const fastapiBackend: Backend = {
     return callFastApi<TeamDetail>('/teams', { method: 'POST', token, body: input })
   },
 
+  updateTeam(token, teamId, input) {
+    return callFastApi<TeamDetail>(`/teams/${encodeURIComponent(teamId)}`, {
+      method: 'PATCH',
+      token,
+      body: input,
+    })
+  },
+
   async leaveTeam(token, teamId, memberId) {
     await callFastApi<null>(
       `/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(memberId)}`,
