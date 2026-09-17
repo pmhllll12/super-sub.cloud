@@ -130,3 +130,69 @@ describe('홈 — 굴림으로 영상 모음을 오간다', () => {
     expect(push).toHaveBeenCalledTimes(1)
   })
 })
+
+/**
+ * 🔴 **수락하면 대기 화면이 뜬다 — 헤더와 판이 이어져 있는가** (2026-09-17).
+ *
+ * 사용자가 로컬에서 「수락하기 눌렀는데 왜 대기화면 안 뜸?」으로 잡았다.
+ * 원인은 `SiteHeader` 와 `HomeStage` 가 **각각** `useNotifyInbox()` 를 불러서,
+ * 헤더에서 수락한 결과가 대기 화면을 그리는 `SquadPanel` 쪽 통에 **영영 안
+ * 들어간** 것이다.
+ *
+ * 🔴 **조각마다 시험이 통과해도 이어지는지는 따로 봐야 한다** — 그날 그걸
+ * 안 봐서 사용자가 대신 잡았다. 그래서 이 시험은 **끝에서 끝까지** 간다:
+ * 알림을 열고 → 수락하고 → 대기 화면이 뜨는지.
+ */
+describe('홈 — 경기 신청을 수락하면 대기 화면이 뜬다', () => {
+  const REQUEST = {
+    id: 'tmr0',
+    requester_team_id: 'mt-away',
+    target_team_id: 'team-mine',
+    proposed_played_at: '2026-09-19T09:00:00+09:00',
+    proposed_place: '망원 실내구장 A',
+    status: 'pending',
+    match_id: null,
+    requester_team_name: '망원 유나이티드',
+    requester_team_region: '서울 마포구',
+    target_team_name: '번개FC',
+    target_team_region: '서울 강남구',
+    requester_squad_public_slug: null,
+    target_squad_public_slug: null,
+  }
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('헤더에서 수락한 결과가 판까지 닿는다', async () => {
+    const { screen, waitFor } = await import('@testing-library/react')
+    const userEvent = (await import('@testing-library/user-event')).default
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        const u = String(url)
+        const body = u.endsWith('/api/me')
+          ? { teams: [{ team_id: 'team-mine', role: 'owner', name: '번개FC' }] }
+          : u.includes('/match-requests')
+            ? [REQUEST]
+            : []
+        return Promise.resolve({ ok: true, status: 200, json: async () => body })
+      }),
+    )
+
+    render(
+      <HomeStage
+        user={{ nickname: '홍길동' }}
+        destinations={[{ title: '알림', icon: 'circle_notifications', summary: '받은 신청' }]}
+        featured={[]}
+      />,
+    )
+
+    await userEvent.click(await screen.findByRole('button', { name: /알림/ }))
+    await userEvent.click(await screen.findByRole('button', { name: '수락하기' }))
+
+    // 🔴 **이 한 줄이 「이어져 있는가」다** — 조각 시험으로는 안 잡힌다.
+    await waitFor(() =>
+      expect(screen.getByRole('dialog', { name: '경기가 잡혔습니다' })).toBeInTheDocument(),
+    )
+  })
+})
