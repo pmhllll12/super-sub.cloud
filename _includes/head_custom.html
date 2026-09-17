@@ -21,4 +21,9 @@
     }
   })();
 </script>
-<link rel="stylesheet" id="site-custom-css" href="{{ "/assets/main.css" | relative_url }}">
+{%- comment -%}
+  🔴 main.css 주소에 빌드 시각을 붙인다(2026-09-17). 사이트는 CSS 를 4시간 캐시하게 내보내서
+  (cache-control max-age=14400), 주소가 같으면 브라우저가 옛 CSS 를 그대로 쓴다 — 배포 직후
+  새 HTML(새 사이드바·단추)에 옛 CSS(옛 레이아웃)가 붙어 보였다(사용자 지적).
+{%- endcomment %}
+<link rel="stylesheet" id="site-custom-css" href="{{ "/assets/main.css" | relative_url }}?v={{ site.time | date: '%Y%m%d%H%M%S' }}">
