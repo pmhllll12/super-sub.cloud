@@ -8,13 +8,12 @@ import type { PosCode } from '@/lib/pitchGrid'
  * 크기로 거르고 근거를 `whyMatches()` 로 다시 계산하던 코드는 **걷었다**
  * (계약이 「다시 계산하지 말 것」으로 못 박았다).
  *
- * ⚠️ **아직 남은 mock 하나 — 아래 `TEAMS` · `teamById`.** 대기 팝업
- * (`MatchWaiting`)이 **상대 팀의 이름과 판**을 그리는 데 쓴다.
- * 🔴 **`USE_MOCK` 으로 안 꺼진다**(화면에 박힌 mock 이다) — 그 목록에 없는
- * 진짜 팀이 수락하면 이름이 「상대 팀」으로 나오고 판이 빈다.
- * 🔴 걷으려면 **상대 팀 스쿼드의 공개 슬러그**가 필요하다 — 경기 신청
- * 응답에는 팀 이름·지역만 오고 슬러그가 없다(초대에만 실린다, CCC 53번).
- * 정어진에게 요청할 자리다.
+ * ✅ **mock 이 하나도 없다**(2026-09-17). 마지막까지 남아 있던 붙박이 7팀
+ * (`TEAMS`)과 `teamById` 를 걷었다 — 대기 팝업이 상대 팀 이름·판을 거기서
+ * 찾던 자리였고, **`USE_MOCK` 으로 안 꺼지는 화면 mock** 이라 실제 도메인
+ * 에서도 그것이 떴다(목록에 없는 진짜 팀이 수락하면 「상대 팀」에 빈 판).
+ * 🔴 경기 신청 응답이 **두 팀 스쿼드의 공개 슬러그**를 실어 주면서
+ * (`api-contract.md` 3-15절) `GET /squads/{slug}` 로 상대 판을 진짜로 읽는다.
  */
 
 /** 판 위의 한 명 — 읽기 전용 판이 그리는 최소값. */
@@ -54,131 +53,6 @@ export type MatchTeam = {
 
 /** 우리 팀 — 대기 팝업의 왼쪽에 선다. */
 export type MyTeamSummary = { name: string; squad: PitchPlayer[] }
-
-/**
- * 판 한 벌 — 🔴 **크기마다 자리가 다르다.** `SquadPanel` 의 `FORMATIONS` 와
- * 같은 칸을 써야 대기 팝업의 두 판이 같은 모양으로 선다.
- */
-function squad3(n: [string, string, string]): PitchPlayer[] {
-  return [
-    { nickname: n[0], col: 1, row: 0, pos: 'FW' },
-    { nickname: n[1], col: 1, row: 1, pos: 'MF' },
-    { nickname: n[2], col: 1, row: 3, pos: 'GK' },
-  ]
-}
-
-function squad5(n: [string, string, string, string, string]): PitchPlayer[] {
-  return [
-    { nickname: n[0], col: 1, row: 0, pos: 'FW' },
-    { nickname: n[1], col: 0, row: 1, pos: 'MF' },
-    { nickname: n[2], col: 2, row: 1, pos: 'MF' },
-    { nickname: n[3], col: 1, row: 2, pos: 'DF' },
-    { nickname: n[4], col: 1, row: 3, pos: 'GK' },
-  ]
-}
-
-function squad7(n: [string, string, string, string, string, string, string]): PitchPlayer[] {
-  return [
-    { nickname: n[0], col: 1, row: 0, pos: 'FW' },
-    { nickname: n[1], col: 0, row: 1, pos: 'MF' },
-    { nickname: n[2], col: 1, row: 1, pos: 'MF' },
-    { nickname: n[3], col: 2, row: 1, pos: 'MF' },
-    { nickname: n[4], col: 0, row: 2, pos: 'DF' },
-    { nickname: n[5], col: 2, row: 2, pos: 'DF' },
-    { nickname: n[6], col: 1, row: 3, pos: 'GK' },
-  ]
-}
-
-/**
- * ⚠️ 붙박이 목록. 🔴 **우리와 판 크기가 같은 팀만** 보여 준다 — 5:5 를 짜 놓고
- * 7:7 팀이 나오면 그 자체로 「비슷하다」가 아니다.
- *
- * 🔴 **세 크기를 다 채워 둔다.** 5:5 만 넣어 뒀더니 판을 7:7 로 바꾼 사람에게
- * 「조건이 맞는 팀이 없습니다」만 떴다(사용자 지적, 2026-09-10) — mock 이
- * 비어 있는 것과 조건이 안 맞는 것이 화면에서 같아 보인다.
- */
-const TEAMS: Omit<MatchTeam, 'why'>[] = [
-  {
-    id: 'mt-1',
-    name: '번개FC',
-    region: '서울 강남구',
-    size: '5',
-    playedAt: '2026-09-19T10:00:00',
-    place: '강남 풋살장 2구장',
-    squad: squad5(['정우진', '한서준', '오세영', '문지호', '배준영']),
-  },
-  {
-    id: 'mt-2',
-    name: '망원 유나이티드',
-    region: '서울 마포구',
-    size: '5',
-    playedAt: '2026-09-19T09:00:00',
-    place: '망원 실내구장 A',
-    squad: squad5(['임재현', '고동현', '류시온', '남기준', '천우빈']),
-  },
-  {
-    id: 'mt-3',
-    name: '수원 슈터스',
-    region: '경기 수원시',
-    size: '5',
-    playedAt: '2026-09-20T11:00:00',
-    place: '수원 스포츠센터',
-    squad: squad5(['서동하', '윤태경', '강민석', '조성빈', '백승우']),
-  },
-  // ── 3:3 ─────────────────────────────────────────────────────────
-  {
-    id: 'mt-4',
-    name: '삼삼오오',
-    region: '서울 강남구',
-    size: '3',
-    playedAt: '2026-09-19T14:00:00',
-    place: '역삼 미니풋살장',
-    squad: squad3(['하도윤', '신재훈', '권해성']),
-  },
-  {
-    id: 'mt-5',
-    name: '반포 트리오',
-    region: '서울 서초구',
-    size: '3',
-    playedAt: '2026-09-20T16:00:00',
-    place: '반포 한강공원 구장',
-    squad: squad3(['진성우', '유하람', '노건희']),
-  },
-  // ── 7:7 ─────────────────────────────────────────────────────────
-  {
-    id: 'mt-6',
-    name: '강남 세븐스',
-    region: '서울 강남구',
-    size: '7',
-    playedAt: '2026-09-19T10:00:00',
-    place: '대치 축구장',
-    squad: squad7(['차민준', '홍시우', '구태양', '양지환', '심재원', '표현우', '방동석']),
-  },
-  {
-    id: 'mt-7',
-    name: '한강 유나이티드',
-    region: '서울 용산구',
-    size: '7',
-    playedAt: '2026-09-20T09:30:00',
-    place: '이촌 한강 축구장',
-    squad: squad7(['설민호', '주하준', '탁서진', '변우성', '남시혁', '연도현', '석준혁']),
-  },
-]
-
-/**
- * 팀 id 로 그 팀을 찾는다 — **이름을 그릴 때** 쓴다.
- *
- * 🔴 **계약 응답에 팀 이름이 없다**(3-15절 — `requester_team_id` 만 온다).
- * 알림 판이 「망원 유나이티드가 경기를 걸었습니다」라고 쓰려면 id → 이름이
- * 필요한데, 그 경로가 아직 없어서 이 붙박이 목록으로 맞춘다.
- *
- * ⚠️ **진짜 백엔드에서는 여기서 못 찾는 id 가 온다** — 그때는 `null` 이고,
- * 부르는 쪽이 「상대 팀」으로 적는다. 이름을 지어내지 않는다.
- * 계약에 팀 이름을 실어 달라고 미결로 올렸다(paik 「경기 신청 알림에 팀 이름」).
- */
-export function teamById(id: string): Omit<MatchTeam, 'why'> | null {
-  return TEAMS.find((t) => t.id === id) ?? null
-}
 
 /**
  * 경기를 신청한다 — 상대 팀장에게 알림이 가고, **상대가 수락해야** 확정된다.

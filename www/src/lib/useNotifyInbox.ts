@@ -36,6 +36,14 @@ export type InboxMatch = {
   region: string | null
   playedAt: string
   place: string
+  /**
+   * 상대 팀 **스쿼드의 공개 슬러그** (2026-09-17, `paik` 22번 후속).
+   *
+   * 🔴 **대기 화면이 상대 판을 그리는 값이다.** 전에는 붙박이 목록에서
+   * 찾아서, 그 목록에 없는 진짜 팀이면 이름이 「상대 팀」이 되고 판이 비었다.
+   * ⚠️ 스쿼드를 아직 안 만든 팀이면 `null` 이고 그게 정상이다.
+   */
+  opponentSquadSlug: string | null
 }
 
 /** 받은 지인 신청 한 줄. */
@@ -92,6 +100,18 @@ export function useNotifyInbox() {
    */
   const [acceptedTeamId, setAcceptedTeamId] = useState<string | null>(null)
   /**
+   * 잡힌 상대 팀의 **표시용 값** — 이름·지역·판 슬러그.
+   *
+   * 🔴 **id 만으로는 대기 화면을 못 그린다.** 전에는 그래서 붙박이 목록에서
+   * 찾았고, 없는 팀이면 「상대 팀」에 빈 판이었다. 이제 신청 응답이 셋 다 준다.
+   */
+  const [acceptedTeam, setAcceptedTeam] = useState<{
+    id: string
+    name: string | null
+    region: string | null
+    squadSlug: string | null
+  } | null>(null)
+  /**
    * 그렇게 잡힌 **경기의 id**. 🔴 **무르려면 이것이 있어야 한다**(미결 `paik`
    * 34번) — 계약의 취소는 `DELETE /matches/{match_id}` 라 팀 id 로는 못 부른다.
    * 팀 id 만 들고 있던 것이 34번이 열려 있던 이유였다.
@@ -143,6 +163,9 @@ export function useNotifyInbox() {
             requester_team_region: string | null
             target_team_name: string | null
             target_team_region: string | null
+            /* 두 팀 판의 공개 슬러그 — 대기 화면이 상대 판을 그린다. */
+            requester_squad_public_slug: string | null
+            target_squad_public_slug: string | null
           }[]
           for (const r of rows) {
             // 받은 것 중 **아직 대기중**인 것만 응답할 거리가 있다.
@@ -160,6 +183,7 @@ export function useNotifyInbox() {
                 region: r.requester_team_region ?? null,
                 playedAt: r.proposed_played_at,
                 place: r.proposed_place,
+                opponentSquadSlug: r.requester_squad_public_slug ?? null,
               })
             }
             // 내가 건 것이 수락됐으면 그 순간 대기 화면을 띄운다.
@@ -169,6 +193,12 @@ export function useNotifyInbox() {
               sent.current.some((s) => s.requestId === r.id)
             ) {
               setAcceptedTeamId(r.target_team_id)
+              setAcceptedTeam({
+                id: r.target_team_id,
+                name: r.target_team_name ?? null,
+                region: r.target_team_region ?? null,
+                squadSlug: r.target_squad_public_slug ?? null,
+              })
               // 수락된 행에는 확정 경기 id 가 실려 온다(계약 `match_id`).
               setAcceptedMatchId(r.match_id ?? null)
             }
@@ -246,6 +276,12 @@ export function useNotifyInbox() {
          켠다. 폴링이 다시 돌기를 기다리면 최대 15초 동안 아무 일도 안 일어난
          것처럼 보인다. */
       setAcceptedTeamId(item.opponentTeamId)
+      setAcceptedTeam({
+        id: item.opponentTeamId,
+        name: item.name,
+        region: item.region,
+        squadSlug: item.opponentSquadSlug,
+      })
       await reload()
     },
     [reload],
@@ -310,8 +346,10 @@ export function useNotifyInbox() {
     count: items.length,
     acceptedTeamId,
     acceptedMatchId,
+    acceptedTeam,
     clearAccepted: () => {
       setAcceptedTeamId(null)
+      setAcceptedTeam(null)
       setAcceptedMatchId(null)
     },
     acceptMatch,

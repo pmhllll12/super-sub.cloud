@@ -19,6 +19,7 @@ const MATCH: InboxItem = {
   region: '서울 마포구',
   playedAt: '2026-09-19T09:00:00+09:00',
   place: '망원 실내구장 A',
+  opponentSquadSlug: null,
 }
 
 describe('알림 판', () => {
@@ -60,7 +61,7 @@ describe('알림 판', () => {
   it('상대 팀 이름을 모르면 「상대 팀」으로 적는다', () => {
     render(
       <NotifyPanel
-        items={[{ ...MATCH, name: null, region: null }]}
+        items={[{ ...MATCH, name: null, region: null } as InboxItem]}
         onAcceptMatch={vi.fn()}
         onRejectMatch={vi.fn()}
         onAcceptContact={vi.fn()}

@@ -10,7 +10,7 @@ import TeamSeek from '@/components/TeamSeek'
 import MatchBot from '@/components/MatchBot'
 import TeamMatch from '@/components/TeamMatch'
 import MatchWaiting from '@/components/MatchWaiting'
-import { teamById, type MatchTeam } from '@/lib/teamMatch'
+import { type MatchTeam, type PitchPlayer } from '@/lib/teamMatch'
 import {
   addSeat,
   formationToSize,
@@ -266,6 +266,7 @@ export default function SquadPanel({
   myTeamId = null,
   onRequested,
   acceptedTeamId = null,
+  acceptedTeam = null,
   acceptedMatchId = null,
   onAcceptedShown,
   seeking = false,
@@ -346,6 +347,18 @@ export default function SquadPanel({
    * 수락한 쪽이든, 확정되는 순간은 이 화면 바깥이라 부모가 알려 줘야 한다.
    */
   acceptedTeamId?: string | null
+  /**
+   * 잡힌 상대 팀의 **표시용 값** — 이름·지역·판 슬러그 (2026-09-17).
+   *
+   * 🔴 **id 만으로는 대기 화면을 못 그린다.** 전에는 붙박이 목록(`teamById`)
+   * 에서 찾아서, 그 목록에 없는 진짜 팀이면 「상대 팀」에 빈 판이었다.
+   */
+  acceptedTeam?: {
+    id: string
+    name: string | null
+    region: string | null
+    squadSlug: string | null
+  } | null
   /**
    * 그렇게 잡힌 **경기 id** — 「무르기」가 이걸로 취소한다(계약은
    * `DELETE /matches/{match_id}`). 🔴 **없으면 무르기 단추를 안 낸다** —
@@ -562,12 +575,54 @@ export default function SquadPanel({
    * 빈 판을 띄우느니 안 띄우는 편이 낫다.
    */
   useEffect(() => {
-    if (!acceptedTeamId) return
-    const them = teamById(acceptedTeamId)
-    if (!them) return
-    const team: MatchTeam = { ...them, why: [] }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMatched(team)
+    if (!acceptedTeam) return
+    let alive = true
+    void (async () => {
+      /* 🔴 **상대 판을 진짜로 읽는다**(2026-09-17). 전에는 붙박이 목록
+         (`teamById`)에서 찾아서, 그 목록에 없는 진짜 팀이 수락하면 이름이
+         「상대 팀」으로 나오고 판이 비었다 — 화면에 박힌 마지막 mock 이었다.
+         이제 신청 응답이 이름·지역·판 슬러그를 준다.
+         ⚠️ 스쿼드를 아직 안 만든 팀이면 슬러그가 없고, 그때는 판 없이 그린다. */
+      let squad: PitchPlayer[] = []
+      if (acceptedTeam.squadSlug) {
+        try {
+          const res = await fetch(`/api/squads/${encodeURIComponent(acceptedTeam.squadSlug)}`)
+          if (res.ok) {
+            const got = (await res.json().catch(() => null)) as Squad | null
+            squad = (got?.members ?? [])
+              .filter((m) => m.grid_col !== null && m.grid_row !== null)
+              .map((m) => ({
+                nickname: m.nickname,
+                col: m.grid_col as number,
+                row: m.grid_row as number,
+                pos: rowPos(m.grid_row as number),
+              }))
+          }
+        } catch {
+          /* 판을 못 읽어도 대기 화면은 띄운다 — 이름·시각이 더 중요하다. */
+        }
+      }
+      if (!alive) return
+      const team: MatchTeam = {
+        id: acceptedTeam.id,
+        /* 🔴 이름을 지어내지 않는다 — 옛 응답이면 `null` 이다. */
+        name: acceptedTeam.name ?? '상대 팀',
+        region: acceptedTeam.region ?? '',
+        size,
+        playedAt: '',
+        place: '',
+        why: [],
+        squad,
+      }
+      setMatched(team)
+    })()
+    return () => {
+      alive = false
+    }
+  }, [acceptedTeam, size])
+
+  useEffect(() => {
+    if (!acceptedTeam) return
     /* 🔴 **브라우저에 따로 적지 않는다**(2026-09-16). 전에는 `book(team)` 으로
        localStorage 에 남겼다 — 계약에 확정 경기 자리가 없던 시절의 임시였다.
        이제 수락하면 서버에 진짜 `match` 가 생기고(계약 3-15절) 「내 경기」가
