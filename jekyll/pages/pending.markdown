@@ -12228,3 +12228,51 @@ grep -n 'squad' fastapi/app/match/application/use_cases/team_match_request_inter
 ```
 
 아무것도 안 걸리면 그대로입니다.
+
+### 43. **`GET /positions` 에 `id` 를 실었습니다** — 포지션을 등록할 방법이 없었습니다 (2026-09-17 신설)
+
+- **담당**: 정어진(검토 · **배포**) · **제기**: 백성검 · **기한**: 배포 때 (지금 실서버는 아직 옛 응답입니다)
+
+**남의 구역(`fastapi/`)을 직접 고쳤습니다 — 사용자 승인을 받았습니다.** 계약이
+바뀌는 변경이라 여기 남깁니다.
+
+**무엇이 막혀 있었나.** `PUT /me/match-preferences` 는 포지션을
+**`position_ids`(UUID)** 로 받는데, **그 UUID 를 내주는 경로가 없었습니다.**
+`GET /positions` 는 `{sport_code, code, label}` 만 줬고, 계약 문서에는
+`position_ids` 라는 말 자체가 없었습니다(`grep` 0건). 약칭으로는 못 보냅니다 —
+**종목 안에서만 유일**해서 `C` 하나로는 포수인지 센터인지 안 가려집니다.
+
+그래서 **아무도 `member_match_position` 에 등록된 적이 없었고**, 그것이
+`GET /teams/{id}/squad/candidates` 의 **첫 하드 필터**라 AI 추천 판이 늘
+0명이었습니다. 사용자가 실서버에서 그것을 보고 물어서 찾았습니다.
+
+**무엇을 했나.** `PositionResponse` 에 `id` 를 더했습니다(엔티티 → DTO →
+pg/스텁 저장소까지). 지역이 `GET /regions` 로 `id` 를 받는 것과 같은 결이라
+모양을 맞췄습니다. 계약 문서 3-3·3-13절도 함께 고쳤습니다 —
+**3-13절에는 `/me/match-preferences` 의 본문 모양이 아예 없어서 새로 적었습니다.**
+
+- 스텁 저장소의 id 는 `uuid5` 로 지은 **가짜**입니다(실물 DB 값이 아닙니다).
+  `test_sport_position_db.py` 가 실물 행과 `id` 까지 대조해서 그 가짜가 새어
+  나가는 것을 잡습니다.
+- 화면 쪽(`www`)은 이미 배선을 마쳤습니다 — 「사람을 찾는 팀」의 「내 자리」가
+  `PUT /me/match-preferences` 로 올라갑니다(전에는 `localStorage` 였습니다).
+
+🔴 **배포가 필요합니다.** 백엔드가 배포되기 전까지 실서버 `GET /positions` 는
+`id` 없이 오고, 그러면 화면이 포지션을 **하나도 못 올립니다**(약칭→id 가 안
+풀리면 조용히 빈 값으로 저장하지 않고 「고른 자리를 서버 목록에서 찾지
+못했습니다」로 막습니다 — 조용히 등록 안 되는 쪽이 더 나쁘다는 판단입니다).
+
+**확인** — 실서버에 반영됐는지:
+
+```bash
+curl -s "https://supersub-ai.com/api/positions?sport_code=football" -b <로그인 쿠키> | head -c 200
+```
+
+`"id"` 가 보이면 반영된 것입니다. 로컬에서는:
+
+```bash
+cd fastapi && .venv/bin/pytest -q tests/user/adapter/test_positions_router.py
+```
+
+**하지 말 것**: 스텁의 `_fake_id()` 값을 실서버에 보내지 마십시오 —
+`422 UNKNOWN_POSITION` 입니다.

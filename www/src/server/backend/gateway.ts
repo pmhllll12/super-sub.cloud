@@ -31,6 +31,7 @@ import type {
   Region,
   MatchSlot,
   TeamMatchPreference,
+  MemberMatchPreference,
   MatchCandidate,
   User,
 } from './types'
@@ -435,6 +436,20 @@ export interface Backend {
     teamId: string,
     input: { region_ids: string[]; slots: MatchSlot[] },
   ): Promise<TeamMatchPreference>
+  /** 내 경기 조건(지역·시간·**포지션**). 안 정했으면 빈 목록들이 온다. */
+  getMyMatchPrefs(token: string): Promise<MemberMatchPreference>
+  /**
+   * 내 경기 조건을 **통째로 교체**한다.
+   *
+   * 🔴 **이걸 안 보내면 나는 남의 AI 추천 후보에 안 뜬다** — 서버의 첫 하드
+   * 필터가 「그 포지션을 등록했는가」다(계약 3-13절). 팀 조건을 안 올리면
+   * 우리 팀이 안 보이는 것과 짝을 이루는 규칙이다.
+   * 🔴 **팀 조건과 안 섞인다** — 같은 사람이 팀장이면서 팀원일 수 있다.
+   */
+  putMyMatchPrefs(
+    token: string,
+    input: { region_ids: string[]; slots: MatchSlot[]; position_ids: string[] },
+  ): Promise<MemberMatchPreference>
   /**
    * 「맞는 상대」 후보 — **이미 정렬돼 있다.** 그 팀 소속만(아니면 403).
    *

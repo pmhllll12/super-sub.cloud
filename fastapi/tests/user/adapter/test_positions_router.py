@@ -4,7 +4,7 @@
 `test_sport_position_db.py` 가 실물로 대조한다.
 """
 
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from app.core.security import issue_access_token
 from tests.conftest import V1, error_code
@@ -22,7 +22,26 @@ class TestListPositions:
         rows = client.get(f"{V1}/positions", headers=_headers()).json()
         sports = {r["sport_code"] for r in rows}
         assert sports == {"football", "baseball", "basketball"}
-        assert {"code", "label", "sport_code"} == set(rows[0])
+        assert {"id", "code", "label", "sport_code"} == set(rows[0])
+
+    def test_id_가_함께_온다(self, client):
+        """🔴 **이게 없으면 클라이언트가 자기 포지션을 등록할 수 없다**
+        (2026-09-17, 미결 `paik`).
+
+        `PUT /me/match-preferences` 는 포지션을 **`position_ids`(UUID)** 로
+        받는데, 그 UUID 를 내주는 경로가 여기 말고는 없었다. 약칭(`code`)으로는
+        못 보낸다 — **종목 안에서만 유일**하라서 `C` 하나로는 포수인지 센터인지
+        가려지지 않는다(그래서 `position` 은 대리키를 쓴다, 부록 D.7).
+        지역이 `GET /regions` 로 `id` 를 받는 것과 같은 결이다.
+        """
+        rows = client.get(
+            f"{V1}/positions?sport_code=football", headers=_headers()
+        ).json()
+        ids = [r["id"] for r in rows]
+        # 포지션마다 다른 id 여야 한다 — 하나라도 겹치면 등록이 엉뚱한 자리로 간다.
+        assert len(set(ids)) == len(rows) >= 4
+        for value in ids:
+            UUID(value)
 
     def test_종목으로_거른다(self, client):
         rows = client.get(

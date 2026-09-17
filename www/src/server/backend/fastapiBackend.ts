@@ -29,6 +29,7 @@ import type {
   ReceivedInvitation,
   Region,
   TeamMatchPreference,
+  MemberMatchPreference,
   MatchCandidate,
   User,
 } from './types'
@@ -221,6 +222,21 @@ export const fastapiBackend: Backend = {
       `/teams/${encodeURIComponent(teamId)}/match-preferences`,
       { method: 'PUT', token, body: input },
     )
+  },
+
+  getMyMatchPrefs(token) {
+    return callFastApi<MemberMatchPreference>('/me/match-preferences', {
+      method: 'GET',
+      token,
+    })
+  },
+
+  putMyMatchPrefs(token, input) {
+    return callFastApi<MemberMatchPreference>('/me/match-preferences', {
+      method: 'PUT',
+      token,
+      body: input,
+    })
   },
 
   listMatchCandidates(token, teamId) {

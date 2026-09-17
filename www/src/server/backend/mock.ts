@@ -26,6 +26,7 @@ import type {
   ReceivedInvitation,
   Region,
   TeamMatchPreference,
+  MemberMatchPreference,
   MatchCandidate,
   SignupResult,
   TeamInvitation,
@@ -127,17 +128,21 @@ function requireAdmin(token: string): User {
  * 둘 다 있다. 코드만으로 이름을 찾으면 안 된다.
  */
 const POSITIONS: Position[] = [
-  { sport_code: 'baseball', code: 'P', label: '투수' },
-  { sport_code: 'baseball', code: 'C', label: '포수' },
-  { sport_code: 'baseball', code: 'IF', label: '내야수' },
-  { sport_code: 'baseball', code: 'OF', label: '외야수' },
-  { sport_code: 'basketball', code: 'G', label: '가드' },
-  { sport_code: 'basketball', code: 'F', label: '포워드' },
-  { sport_code: 'basketball', code: 'C', label: '센터' },
-  { sport_code: 'football', code: 'GK', label: '골키퍼' },
-  { sport_code: 'football', code: 'DF', label: '수비수' },
-  { sport_code: 'football', code: 'MF', label: '미드필더' },
-  { sport_code: 'football', code: 'FW', label: '공격수' },
+  /* 🔴 **`id` 는 mock 안에서만 통하는 값이다**(실물은 UUID). 내 경기 조건이
+     포지션을 `position_ids` 로 받으므로(계약 3-13절) 여기도 id 가 있어야
+     그 경로를 시험할 수 있다. 사람이 읽을 수 있게 지어 두는 대신, 실서버
+     값과 헷갈리지 않도록 **UUID 모양을 일부러 안 쓴다.** */
+  { id: 'ps-baseball-p', sport_code: 'baseball', code: 'P', label: '투수' },
+  { id: 'ps-baseball-c', sport_code: 'baseball', code: 'C', label: '포수' },
+  { id: 'ps-baseball-if', sport_code: 'baseball', code: 'IF', label: '내야수' },
+  { id: 'ps-baseball-of', sport_code: 'baseball', code: 'OF', label: '외야수' },
+  { id: 'ps-basketball-g', sport_code: 'basketball', code: 'G', label: '가드' },
+  { id: 'ps-basketball-f', sport_code: 'basketball', code: 'F', label: '포워드' },
+  { id: 'ps-basketball-c', sport_code: 'basketball', code: 'C', label: '센터' },
+  { id: 'ps-football-gk', sport_code: 'football', code: 'GK', label: '골키퍼' },
+  { id: 'ps-football-df', sport_code: 'football', code: 'DF', label: '수비수' },
+  { id: 'ps-football-mf', sport_code: 'football', code: 'MF', label: '미드필더' },
+  { id: 'ps-football-fw', sport_code: 'football', code: 'FW', label: '공격수' },
   /* 🔴 **`futsal` 을 걷었다**(2026-09-16). 서버의 `sport` 참조 테이블에 그 행이
      없다 — 마이그레이션 `20260901_sport_and_position.py` 가 **폐기**하고
      `football` 로 옮겼다(`_RETIRED = "futsal"`). 여기 남겨 두면 없는 종목을
@@ -536,6 +541,13 @@ const DEMO_REGIONS: Region[] = REGIONS.map((label, i) => {
 
 /** 팀별 경기 조건 — `PUT` 이 통째로 갈아 끼운다. */
 const teamPrefs = new Map<string, TeamMatchPreference>()
+
+/**
+ * 사람별 경기 조건 — 팀 조건과 **다른 저장소**다(계약이 절대 안 섞는다).
+ * 같은 사람이 팀장이면서 팀원일 수 있어서, 한 곳에 두면 「우리 팀이 찾는
+ * 경기」와 「내가 뛸 수 있는 때」가 섞인다.
+ */
+const memberPrefs = new Map<string, MemberMatchPreference>()
 
 /**
  * 「맞는 상대」 후보 (계약 3-13절).
@@ -1628,6 +1640,48 @@ export const mockBackend: Backend = {
     // 🔴 **통째로 교체**다(계약) — 부분 병합을 하지 않는다.
     const next = { team_id: teamId, region_ids: [...region_ids], slots: [...slots] }
     teamPrefs.set(teamId, next)
+    return next
+  },
+
+  async getMyMatchPrefs(token) {
+    const me = requireUser(token)
+    return (
+      memberPrefs.get(me.id) ?? {
+        user_id: me.id,
+        region_ids: [],
+        slots: [],
+        position_ids: [],
+      }
+    )
+  },
+
+  async putMyMatchPrefs(token, { region_ids, slots, position_ids }) {
+    const me = requireUser(token)
+    /* 🔴 **실서버처럼 막는다.** mock 이 너그러우면 배포에서만 터진다 —
+       1.12 회차에 같은 원인으로 세 번 겪었다. */
+    for (const id of region_ids) {
+      if (!DEMO_REGIONS.some((r) => r.id === id)) {
+        throw new BackendError(422, 'UNKNOWN_REGION', '그런 지역이 없습니다.')
+      }
+    }
+    for (const id of position_ids) {
+      if (!POSITIONS.some((p) => p.id === id)) {
+        throw new BackendError(422, 'UNKNOWN_POSITION', '그런 포지션이 없습니다.')
+      }
+    }
+    for (const s of slots) {
+      if (s.weekday < 0 || s.weekday > 6 || s.start_time >= s.end_time) {
+        throw new BackendError(422, 'INVALID_TIME_SLOT', '시간대가 올바르지 않습니다.')
+      }
+    }
+    // 🔴 **통째로 교체**다(계약) — 부분 병합을 하지 않는다.
+    const next = {
+      user_id: me.id,
+      region_ids: [...region_ids],
+      slots: [...slots],
+      position_ids: [...position_ids],
+    }
+    memberPrefs.set(me.id, next)
     return next
   },
 

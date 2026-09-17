@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from uuid import UUID
 
 
 @dataclass(frozen=True)
@@ -14,6 +15,7 @@ class ListPositionsQuery:
 
 @dataclass(frozen=True)
 class PositionResult:
+    id: UUID
     sport_code: str
     code: str
     label: str

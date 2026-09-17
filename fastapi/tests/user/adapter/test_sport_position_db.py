@@ -174,12 +174,17 @@ class TestPositionsEndpoint:
         return {"Authorization": f"Bearer {login.json()['access_token']}"}
 
     def test_엔드포인트가_DB_행과_일치한다(self, db_client, db_session):
+        """🔴 **`id` 까지 대조한다** — 클라이언트가 그 값을 그대로
+        `PUT /me/match-preferences` 의 `position_ids` 로 되돌려 보내므로,
+        스텁이 만드는 가짜 id 가 새어 나오면 실서버에서 `422
+        UNKNOWN_POSITION` 이 된다. 여기가 그것을 잡는 유일한 자리다.
+        """
         want = {
-            (p.sport_code, p.code, p.label)
+            (str(p.id), p.sport_code, p.code, p.label)
             for p in db_session.query(PositionOrm).all()
         }
         got = {
-            (r["sport_code"], r["code"], r["label"])
+            (r["id"], r["sport_code"], r["code"], r["label"])
             for r in db_client.get(
                 f"{V1}/positions", headers=self._token(db_client)
             ).json()

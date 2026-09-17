@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -12,6 +14,10 @@ class PositionResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+    # 🔴 `id` 가 다른 도메인이 포지션을 지목하는 값이다 — 클라이언트는 이것을
+    #    `PUT /me/match-preferences` 의 `position_ids` 로 되돌려 보낸다.
+    #    `code` 로는 못 보낸다(종목 안에서만 유일하다).
+    id: UUID
     sport_code: str
     code: str
     label: str

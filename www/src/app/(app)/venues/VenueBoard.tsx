@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react'
 import { SPORT_LABEL } from '@/lib/market'
-import { HOURS, loadPrefs, type MatchPrefs } from '@/lib/matchPrefs'
+import { HOURS, type MatchPrefs } from '@/lib/matchPrefs'
+import { loadMyPrefs } from '@/lib/myPrefsStore'
 import {
   EMPTY_QUERY,
   countOpen,
@@ -70,27 +71,33 @@ export default function VenueBoard({ venues }: { venues: Venue[] }) {
 
   /**
    * 🔴 **정해 둔 경기 조건을 여기서 다시 묻지 않는다.** 팀 매칭에서 이미
-   * 받아 둔 것(`lib/matchPrefs.ts`)을 그대로 조건으로 건다 — 같은 것을 두 번
-   * 물으면 두 값이 어긋난다.
+   * 받아 둔 것을 그대로 조건으로 건다 — 같은 것을 두 번 물으면 두 값이
+   * 어긋난다.
    *
-   * 🔴 **누를 때 읽는다.** 그리는 동안 읽으면 서버에는 없는 값이라(브라우저
-   * 저장소다) 서버가 그린 것과 달라져 물갈이(hydration)에서 어긋난다.
+   * 🔴 **서버에서 읽는다**(2026-09-17). 전에는 `lib/matchPrefs.ts` 의
+   * `localStorage` 를 봤는데, 조건이 서버로 옮겨 가면서 **아무도 그 저장소에
+   * 안 쓰게 됐다** — 그대로 뒀으면 이 단추가 늘 「조건이 없습니다」만 내는
+   * 죽은 기능이 된다.
+   * 🔴 **누를 때 읽는다.** 그리는 동안 읽으면 서버가 그린 첫 화면과 달라져
+   * 물갈이(hydration)에서 어긋난다.
+   * ⚠️ **내 조건만 본다.** 팀 조건은 팀 id 가 있어야 읽는데 이 판은 팀을
+   * 모른다 — 지역·시간만 쓰는 자리라 내 조건으로 충분하다.
    */
-  function togglePrefs() {
+  async function togglePrefs() {
     if (q.prefs) {
       set({ prefs: null })
       setPrefsNote(null)
       return
     }
-    const team = loadPrefs('team')
-    const mine = loadPrefs('me')
-    const picked: MatchPrefs | null = team ?? mine
+    /* 종목은 안 넘긴다 — 여기서 쓰는 것은 지역·시간뿐이라 포지션 약칭을
+       풀 필요가 없다. */
+    const picked: MatchPrefs | null = await loadMyPrefs(null)
     if (!picked) {
       setPrefsNote('아직 정해 둔 경기 조건이 없습니다 — 홈 스쿼드판의 「팀 매칭」에서 정합니다.')
       return
     }
     set({ prefs: picked })
-    setPrefsNote(team ? '팀 조건으로 걸렀습니다.' : '내 조건으로 걸렀습니다.')
+    setPrefsNote('내 조건으로 걸렀습니다.')
   }
 
   return (
@@ -225,7 +232,7 @@ export default function VenueBoard({ venues }: { venues: Venue[] }) {
               className="ss-vb-pill"
               data-on={q.prefs ? 'true' : undefined}
               aria-pressed={q.prefs !== null}
-              onClick={togglePrefs}
+              onClick={() => void togglePrefs()}
             >
               정해 둔 조건에 맞는 곳만
             </button>

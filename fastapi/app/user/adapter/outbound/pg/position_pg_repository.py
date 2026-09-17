@@ -28,11 +28,14 @@ class PositionPgRepository(PositionPort):
 
     def list_positions(self, sport_code: str | None) -> list[PositionEntity]:
         stmt = select(
-            PositionOrm.sport_code, PositionOrm.code, PositionOrm.label
+            PositionOrm.id,
+            PositionOrm.sport_code,
+            PositionOrm.code,
+            PositionOrm.label,
         ).order_by(PositionOrm.sport_code, PositionOrm.code)
         if sport_code is not None:
             stmt = stmt.where(PositionOrm.sport_code == sport_code)
         return [
-            PositionEntity(sport_code=r[0], code=r[1], label=r[2])
+            PositionEntity(id=r[0], sport_code=r[1], code=r[2], label=r[3])
             for r in self._session.execute(stmt).tuples().all()
         ]

@@ -27,7 +27,7 @@ class ListPositionsInteractor(ListPositionsUseCase):
 
         return [
             PositionResult(
-                sport_code=p.sport_code, code=p.code, label=p.label
+                id=p.id, sport_code=p.sport_code, code=p.code, label=p.label
             )
             for p in self._repository.list_positions(query.sport_code)
         ]
