@@ -110,10 +110,13 @@ criteria:
         evidence: "디딤발 무릎각 158도로 기준 범위 중앙"
       - measured: {plant_knee_angle_at_impact: 176.4}
         grade: 1
-        evidence: "무릎각 176.4도로 거의 편 상태, 기준 상한 170도 초과"
+        evidence: "무릎각 176.4도로 디딤발을 거의 굽히지 않고 뻣뻣하게 섰다"
       - measured: {plant_knee_angle_at_impact: 128.2}
         grade: 0
-        evidence: "무릎각 128.2도로 하한 135도 미달, 과도한 굴곡"
+        evidence: "무릎각 128.2도로 디딤발이 버티지 못하고 주저앉았다"
+      - measured: {plant_knee_angle_at_impact: 142.0}
+        grade: 1
+        evidence: "무릎각 142도로 디딤발이 필요보다 깊이 굽었다"
 
   - id: swing_knee_extension
     name: 차는 다리 뻗기
@@ -159,10 +162,13 @@ criteria:
         evidence: "무릎각 152도로 기준 범위 중앙, 임팩트 시점에 신전 여유 확보"
       - measured: {swing_knee_angle_at_impact: 171.0}
         grade: 1
-        evidence: "무릎각 171도로 기준 상한 165도 초과, 과신전 근접"
+        evidence: "무릎각 171도로 임팩트 순간에 무릎이 거의 다 펴져 있었다"
       - measured: {swing_knee_angle_at_impact: 179.2}
         grade: 0
         evidence: "무릎각 179.2도로 임팩트 전 완전 신전, 가속 구간 소실"
+      - measured: {swing_knee_angle_at_impact: 118.0}
+        grade: 0
+        evidence: "무릎각 118도로 임팩트 순간에도 무릎이 거의 펴지지 않았다"
 
   - id: trunk_lean
     name: 상체 기울기
@@ -217,6 +223,12 @@ criteria:
       - measured: {trunk_forward_lean_deg_at_impact: -8.7}
         grade: 0
         evidence: "기울기 -8.7도로 상체가 뒤로 젖혀짐"
+      - measured: {trunk_forward_lean_deg_at_impact: 25.0}
+        grade: 1
+        evidence: "기울기 25도로 상체를 공 위로 조금 깊이 숙였다"
+      - measured: {trunk_forward_lean_deg_at_impact: 35.0}
+        grade: 0
+        evidence: "기울기 35도로 상체가 공 위로 크게 무너졌다"
 
   - id: hip_rotation
     name: 골반 돌리기
@@ -253,7 +265,7 @@ criteria:
     anchors:
       - measured: {hip_rotation_range_deg: 34.2}
         grade: 2
-        evidence: "골반 회전 범위 34.2도로 기준 25도 초과"
+        evidence: "골반 회전 범위 34.2도로 백스윙에서 임팩트까지 크게 열렸다"
       - measured: {hip_rotation_range_deg: 19.8}
         grade: 1
         evidence: "회전 범위 19.8도로 중간 구간"
@@ -339,13 +351,13 @@ criteria:
     anchors:
       - measured: {plant_foot_to_ball_offset: 0.29}
         grade: 2
-        evidence: "디딤발이 공과 수평으로 어깨너비 0.29배(약 12cm) 떨어져 나란하다"
+        evidence: "디딤발이 공과 수평으로 어깨너비 0.29배 떨어져 나란하다"
       - measured: {plant_foot_to_ball_offset: 0.71}
         grade: 1
-        evidence: "수평 간격 0.71배(약 28cm)로 공에서 다소 벗어났다"
+        evidence: "수평 간격 0.71배로 공에서 다소 벗어났다"
       - measured: {plant_foot_to_ball_offset: 1.24}
         grade: 0
-        evidence: "수평 간격 1.24배(약 50cm)로 디딤발이 공에서 크게 떨어졌다"
+        evidence: "수평 간격 1.24배로 디딤발이 공에서 크게 떨어졌다"
 
 # 공 위치 검출기가 붙은 뒤 활성화할 항목.
 # 포즈 추정만으로는 측정할 수 없어 v0.1에서 제외한다.

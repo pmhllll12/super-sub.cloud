@@ -163,11 +163,20 @@ def test_the_anchors_use_the_same_ruler_as_the_measurement(key, criterion):
     측정값만 단위를 붙이면 모델이 두 다른 자를 나란히 보게 된다. (같은 이유로
     측정값을 초로 환산하는 것도 안 된다 — 앵커가 프레임이고, 그 앵커가 어느
     fps 격자에서 매겨졌는지는 미결 7번이 아직 안 닫았다.)
+
+    🔴 **앵커마다 자기 자리에서 본다** (2026.09.17, 미결 23번 가-3). 전에는
+    프롬프트 하나를 만들어 **모든 앵커**가 거기 있다고 보았는데, 이제
+    판정 등급의 앵커는 **값이 앉은 조각의 것만** 실린다(양방향 구간에서
+    반대 방향 예시가 모델을 끌고 가서다). 그래서 앵커마다 **그 앵커의 값으로**
+    프롬프트를 만들어 본다 — 검사의 목적(같은 자를 쓰는가)은 그대로고,
+    오히려 **앵커 하나하나가 실제로 실리는지**까지 함께 본다.
     """
     from supersub_agent.judge import metric_units
 
-    prompt = build_prompt(criterion, {m: 12 for m in criterion.measured_by}, 1)
     for anchor in criterion.anchors or []:
+        metrics = {m: 12 for m in criterion.measured_by}
+        metrics.update(anchor["measured"])
+        prompt = build_prompt(criterion, metrics, int(anchor["grade"]))
         for code, value in anchor["measured"].items():
             unit = metric_units().get(code, "")
             if unit:

@@ -289,6 +289,9 @@ class _Criterion:
     def plain_all(self, grade):
         return ""
 
+    def anchors_for(self, grade, value=None):
+        return ()
+
 
 def _judge_with_fake_server(monkeypatch, *, delay: float = 0.0):
     """모든 항목이 같은 문장을 받는 vLLM. 지연을 주면 동시성이 시간에 드러난다."""

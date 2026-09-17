@@ -167,6 +167,46 @@ class Criterion:
                 return text
         return ""
 
+    def anchors_for(self, grade: int, value: float | None = None
+                    ) -> tuple[dict[str, Any], ...]:
+        """이번 판정 등급에 **보여 줄** 앵커 (미결 23번 가-3).
+
+        🔴 **모델은 앵커의 방향을 따라간다.** 가-2 after 30문장을 대조하니
+        앵커가 앉은 조각이 측정값의 조각과 **다르면 오독률 63%**(10/16),
+        **같으면 14%**(2/14)였다. 값이 「너무 접힘」 쪽인데 앵커가 「너무 폄」
+        쪽이면 문장이 앵커 쪽으로 간다.
+
+        그래서 **값이 앉은 조각의 앵커만** 돌려준다. 고를 것을 안 주면
+        고르다 틀릴 수 없다.
+
+        🔴 **앵커를 지우는 것이 아니다.** 반대 조각 앵커는 루브릭에 그대로
+        살아 있고, 그쪽 값이 들어오면 그때 쓰인다. 1회차에서 앵커의 수준
+        표시를 뺐다가 2등급 문장이 무너진 적이 있어 **줄이는 방향으로는
+        가지 않는다** — 고르는 것뿐이다.
+
+        값을 모르거나 조각을 못 가리면 **그 등급 앵커를 전부** 준다.
+        (예시가 없는 것보다 낫다 — 어투를 잡아 주는 자리다.)
+        """
+        same = tuple(a for a in self.anchors if int(a.get("grade", -1)) == grade)
+        intervals = self.bands.get(grade, ())
+        if value is None or len(intervals) < 2 or not same:
+            return same
+
+        def segment_of(v: float) -> int | None:
+            for i, (lo, hi) in enumerate(intervals):
+                if (lo is None or v >= lo) and (hi is None or v <= hi):
+                    return i
+            return None
+
+        want = segment_of(value)
+        if want is None:
+            return same
+        picked = tuple(
+            a for a in same
+            if segment_of(float(next(iter(a["measured"].values())))) == want
+        )
+        return picked or same
+
     def plain_all(self, grade: int) -> str:
         """그 등급의 수준 설명 **전부** — 판정 등급이 **아닌** 등급에 쓴다.
 

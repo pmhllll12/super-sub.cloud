@@ -77,13 +77,13 @@ criteria:
     anchors:
       - measured: {plant_foot_to_ball_offset: 0.22}
         grade: 2
-        evidence: "디딤발이 공 옆 어깨너비 0.22배(약 9cm)에 붙어 방향이 고정됐다"
+        evidence: "디딤발이 공 옆 어깨너비 0.22배에 붙어 방향이 고정됐다"
       - measured: {plant_foot_to_ball_offset: 0.58}
         grade: 1
-        evidence: "간격 0.58배(약 23cm)로 조준이 다소 헐겁다"
+        evidence: "간격 0.58배로 조준이 다소 헐겁다"
       - measured: {plant_foot_to_ball_offset: 0.95}
         grade: 0
-        evidence: "간격 0.95배(약 38cm)로 디딤발이 공에서 떨어져 방향이 흔들린다"
+        evidence: "간격 0.95배로 디딤발이 공에서 떨어져 방향이 흔들린다"
 
   - id: swing_knee_extension
     name: 차는 다리 뻗기
@@ -133,6 +133,9 @@ criteria:
       - measured: {swing_knee_angle_at_impact: 176.0}
         grade: 0
         evidence: "무릎각 176도로 완전히 펴져 패스가 아니라 슈팅 궤적이 된다"
+      - measured: {swing_knee_angle_at_impact: 95.0}
+        grade: 0
+        evidence: "무릎각 95도로 무릎이 너무 접혀 공을 밀어내지 못했다"
 
   - id: trunk_lean
     name: 상체 기울기
@@ -182,6 +185,9 @@ criteria:
       - measured: {trunk_forward_lean_deg_at_impact: -3.0}
         grade: 0
         evidence: "기울기 -3도로 상체가 젖혀져 패스가 뜬다"
+      - measured: {trunk_forward_lean_deg_at_impact: 30.0}
+        grade: 0
+        evidence: "기울기 30도로 상체를 공 위로 깊이 숙였다"
 
   - id: hip_rotation
     name: 골반 돌리기
@@ -233,6 +239,9 @@ criteria:
       - measured: {hip_rotation_range_deg: 5.0}
         grade: 0
         evidence: "회전 5도로 골반이 닫혀 발끝으로 밀게 된다"
+      - measured: {hip_rotation_range_deg: 45.0}
+        grade: 1
+        evidence: "회전 45도로 골반을 지나치게 많이 돌렸다"
 
   - id: follow_through
     name: 차고 난 뒤 마무리
@@ -282,6 +291,9 @@ criteria:
       - measured: {swing_hip_flexion_after_impact_deg: 1.5, follow_through_duration_frames: 1}
         grade: 0
         evidence: "추가 굴곡 1.5도로 임팩트 직후 스윙이 끊겼다"
+      - measured: {swing_hip_flexion_after_impact_deg: 5.0}
+        grade: 1
+        evidence: "굴곡 5도로 찬 뒤 다리가 조금밖에 안 나갔다"
 
 # 아직 측정할 수 없는 항목.
 deferred:

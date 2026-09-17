@@ -1,25 +1,154 @@
 {
   "_설명": "기준 D — 방향 오독 판독 (미결 23번 가-2). 🔴 AI 판독이라 정답이 아니다. 사람이 다시 읽으라고 남긴다. 판정 규칙: 문장이 **반대 조각의 방향**을 주장하는 절을 포함하면 오독으로 센다.",
   "_읽은이": "Claude (정상호 세션, 2026-09-17)",
-  "_애매했던_것": ["inside_pass/follow_through 4.8", "inside_pass/follow_through 6.2", "inside_pass/hip_rotation 85.8"],
+  "_애매했던_것": [
+    "inside_pass/follow_through 4.8",
+    "inside_pass/follow_through 6.2",
+    "inside_pass/hip_rotation 85.8"
+  ],
   "before": {
-    "inside_pass/swing_knee_extension": {"42.0": "ok", "78.0": "ok", "174.8": "ok", "177.2": "ok"},
-    "inside_pass/trunk_lean":           {"0.7": "ok", "1.3": "wrong", "29.8": "wrong", "32.2": "wrong"},
-    "inside_pass/hip_rotation":         {"10.4": "ok", "12.6": "ok", "85.8": "ok", "129.2": "ok"},
-    "inside_pass/follow_through":       {"4.8": "wrong", "6.2": "wrong", "79.2": "wrong", "125.8": "wrong"},
-    "instep_shot/plant_knee_flexion":   {"140.2": "wrong", "144.8": "wrong", "173.5": "ok", "176.5": "wrong"},
-    "instep_shot/swing_knee_extension": {"49.0": "ok", "91.0": "ok", "179.8": "wrong", "182.2": "wrong"},
-    "instep_shot/trunk_lean_g1":        {"1.8": "ok", "3.2": "ok", "23.5": "wrong", "26.5": "wrong"},
-    "instep_shot/trunk_lean_g0":        {"34.8": "wrong", "37.2": "wrong"}
+    "inside_pass/swing_knee_extension": {
+      "42.0": "ok",
+      "78.0": "ok",
+      "174.8": "ok",
+      "177.2": "ok"
+    },
+    "inside_pass/trunk_lean": {
+      "0.7": "ok",
+      "1.3": "wrong",
+      "29.8": "wrong",
+      "32.2": "wrong"
+    },
+    "inside_pass/hip_rotation": {
+      "10.4": "ok",
+      "12.6": "ok",
+      "85.8": "ok",
+      "129.2": "ok"
+    },
+    "inside_pass/follow_through": {
+      "4.8": "wrong",
+      "6.2": "wrong",
+      "79.2": "wrong",
+      "125.8": "wrong"
+    },
+    "instep_shot/plant_knee_flexion": {
+      "140.2": "wrong",
+      "144.8": "wrong",
+      "173.5": "ok",
+      "176.5": "wrong"
+    },
+    "instep_shot/swing_knee_extension": {
+      "49.0": "ok",
+      "91.0": "ok",
+      "179.8": "wrong",
+      "182.2": "wrong"
+    },
+    "instep_shot/trunk_lean_g1": {
+      "1.8": "ok",
+      "3.2": "ok",
+      "23.5": "wrong",
+      "26.5": "wrong"
+    },
+    "instep_shot/trunk_lean_g0": {
+      "34.8": "wrong",
+      "37.2": "wrong"
+    }
   },
   "after": {
-    "inside_pass/swing_knee_extension": {"42.0": "wrong", "78.0": "ok", "174.8": "ok", "177.2": "ok"},
-    "inside_pass/trunk_lean":           {"0.7": "ok", "1.3": "ok", "29.8": "wrong", "32.2": "wrong"},
-    "inside_pass/hip_rotation":         {"10.4": "ok", "12.6": "ok", "85.8": "wrong", "129.2": "ok"},
-    "inside_pass/follow_through":       {"4.8": "ok", "6.2": "ok", "79.2": "wrong", "125.8": "wrong"},
-    "instep_shot/plant_knee_flexion":   {"140.2": "ok", "144.8": "wrong", "173.5": "ok", "176.5": "ok"},
-    "instep_shot/swing_knee_extension": {"49.0": "ok", "91.0": "wrong", "179.8": "ok", "182.2": "ok"},
-    "instep_shot/trunk_lean_g1":        {"1.8": "ok", "3.2": "ok", "23.5": "wrong", "26.5": "wrong"},
-    "instep_shot/trunk_lean_g0":        {"34.8": "wrong", "37.2": "wrong"}
-  }
+    "inside_pass/swing_knee_extension": {
+      "42.0": "wrong",
+      "78.0": "ok",
+      "174.8": "ok",
+      "177.2": "ok"
+    },
+    "inside_pass/trunk_lean": {
+      "0.7": "ok",
+      "1.3": "ok",
+      "29.8": "wrong",
+      "32.2": "wrong"
+    },
+    "inside_pass/hip_rotation": {
+      "10.4": "ok",
+      "12.6": "ok",
+      "85.8": "wrong",
+      "129.2": "ok"
+    },
+    "inside_pass/follow_through": {
+      "4.8": "ok",
+      "6.2": "ok",
+      "79.2": "wrong",
+      "125.8": "wrong"
+    },
+    "instep_shot/plant_knee_flexion": {
+      "140.2": "ok",
+      "144.8": "wrong",
+      "173.5": "ok",
+      "176.5": "ok"
+    },
+    "instep_shot/swing_knee_extension": {
+      "49.0": "ok",
+      "91.0": "wrong",
+      "179.8": "ok",
+      "182.2": "ok"
+    },
+    "instep_shot/trunk_lean_g1": {
+      "1.8": "ok",
+      "3.2": "ok",
+      "23.5": "wrong",
+      "26.5": "wrong"
+    },
+    "instep_shot/trunk_lean_g0": {
+      "34.8": "wrong",
+      "37.2": "wrong"
+    }
+  },
+  "after3_anchors": {
+    "inside_pass/swing_knee_extension": {
+      "42.0": "ok",
+      "78.0": "ok",
+      "174.8": "ok",
+      "177.2": "ok"
+    },
+    "inside_pass/trunk_lean": {
+      "0.7": "ok",
+      "1.3": "ok",
+      "29.8": "wrong",
+      "32.2": "wrong"
+    },
+    "inside_pass/hip_rotation": {
+      "10.4": "ok",
+      "12.6": "ok",
+      "85.8": "wrong",
+      "129.2": "ok"
+    },
+    "inside_pass/follow_through": {
+      "4.8": "wrong",
+      "6.2": "wrong",
+      "79.2": "wrong",
+      "125.8": "wrong"
+    },
+    "instep_shot/plant_knee_flexion": {
+      "140.2": "ok",
+      "144.8": "ok",
+      "173.5": "ok",
+      "176.5": "ok"
+    },
+    "instep_shot/swing_knee_extension": {
+      "49.0": "ok",
+      "91.0": "ok",
+      "179.8": "ok",
+      "182.2": "ok"
+    },
+    "instep_shot/trunk_lean_g1": {
+      "1.8": "ok",
+      "3.2": "ok",
+      "23.5": "ok",
+      "26.5": "ok"
+    },
+    "instep_shot/trunk_lean_g0": {
+      "34.8": "ok",
+      "37.2": "ok"
+    }
+  },
+  "_after3_주석": "가-3(앵커도 조각마다) 뒤. 🔴 follow_through 4.8·6.2 는 가-2에서 ok 였다가 wrong 이 됐다 — 방향이 아니라 **두 번째 지표**(follow_through_duration_frames=10)를 근거로 「지속 시간이 길어져 슈팅처럼 과도하게 뻗었다」고 말한다. 조각 문제와 다른 결함이다."
 }

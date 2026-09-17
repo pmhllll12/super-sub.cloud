@@ -863,3 +863,93 @@ def test_the_prompt_stops_carrying_band_numbers():
     head = prompt.split("근거 문장 예시")[0]
     for edge in ("135", "150", "170", "180"):
         assert edge not in head, f"수준 설명에 경계 숫자 {edge} 가 남았다"
+
+
+# --- 앵커도 조각마다 (미결 23번 가-3) ---------------------------------------
+
+
+def test_an_anchor_never_carries_a_number_it_did_not_measure():
+    """🔴 **앵커가 숫자를 가르친다** (미결 23번 가-3).
+
+    프롬프트는 앵커를 「예시 어투」로 넣는다. 그래서 앵커에 적힌 숫자는
+    **본보기가 된다** — 실제로 둘이 샜다:
+
+    ⑴ 밴드 경계: *"기준 상한 170도 초과"* → 모델이 170 을 그대로 썼다
+       (가-2 의 R2′ 4건이 전부 이 형태였다)
+    ⑵ 단위 환산: *"어깨너비 0.29배(약 12cm)"* → 모델이 무차원 비율을
+       cm 로 바꿔 적었다. **어깨너비를 60cm 로 가정한 값**이라 재지도
+       않은 수치다
+
+    앵커에는 **자기가 잰 값만** 적는다.
+    """
+    import re
+    number = re.compile(r"-?\d+(?:\.\d+)?")
+    for key, rubric in _football_rubrics().items():
+        for c in rubric.criteria:
+            for a in c.anchors:
+                measured = [float(v) for v in a["measured"].values()]
+                for token in number.findall(a["evidence"]):
+                    n = float(token)
+                    assert any(abs(n - v) <= 0.55 for v in measured), (
+                        f"{key}/{c.id} 앵커에 안 잰 숫자 {token} 이 있다: "
+                        f"{a['evidence']!r}"
+                    )
+
+
+def test_a_two_way_grade_has_an_anchor_for_each_direction():
+    """🔴 양방향 등급은 **조각마다 앵커**가 있어야 한다.
+
+    하나뿐이면 반대쪽 값이 들어왔을 때 보여 줄 예시가 **반대 방향**이고,
+    모델은 앵커를 따라간다 — 가-2 대조에서 앵커 조각이 어긋난 자리의
+    오독률이 **63%**, 맞은 자리가 **14%** 였다.
+    """
+    for key, rubric in _football_rubrics().items():
+        for c in rubric.criteria:
+            for grade, intervals in c.bands.items():
+                if len(intervals) < 2:
+                    continue
+                covered = set()
+                for a in c.anchors:
+                    if int(a["grade"]) != grade:
+                        continue
+                    v = float(next(iter(a["measured"].values())))
+                    for i, (lo, hi) in enumerate(intervals):
+                        if (lo is None or v >= lo) and (hi is None or v <= hi):
+                            covered.add(i)
+                assert covered == set(range(len(intervals))), (
+                    f"{key}/{c.id} {grade}등급: 구간 {len(intervals)}개인데 "
+                    f"앵커가 덮는 것은 {sorted(covered)} 뿐이다"
+                )
+
+
+def test_the_prompt_shows_only_the_anchor_for_the_direction_at_hand():
+    """반대 조각의 앵커가 프롬프트에 남으면 모델이 그쪽으로 간다."""
+    from supersub_agent.judge import build_prompt
+
+    rubric = _football_rubrics()["football/instep_shot"]
+    crit = next(c for c in rubric.criteria if c.id == "plant_knee_flexion")
+
+    deep = build_prompt(crit, {crit.band_metric: 140.2}, 1)   # 과굴곡 조각
+    assert "필요보다 깊이 굽었다" in deep
+    assert "뻣뻣하게 섰다" not in deep
+
+    stiff = build_prompt(crit, {crit.band_metric: 176.5}, 1)  # 뻣뻣 조각
+    assert "뻣뻣하게 섰다" in stiff
+    assert "필요보다 깊이 굽었다" not in stiff
+
+
+def test_the_other_grades_keep_all_their_anchors():
+    """🔴 **줄이는 쪽으로 가지 않는다** — 좁히는 것은 판정 등급 하나뿐이다.
+
+    1회차에서 앵커의 수준 표시를 뺐다가 **2등급 문장 8건 중 4건**이
+    무너졌다. 어투를 잡아 주는 자리라 함부로 덜어내지 않는다.
+    """
+    from supersub_agent.judge import build_prompt
+
+    rubric = _football_rubrics()["football/instep_shot"]
+    crit = next(c for c in rubric.criteria if c.id == "trunk_lean")
+    prompt = build_prompt(crit, {crit.band_metric: 12.4}, 2)  # 2등급 판정
+
+    # 1등급은 양방향인데 판정 등급이 아니므로 둘 다 남아야 한다.
+    assert "거의 수직" in prompt
+    assert "조금 깊이 숙였다" in prompt

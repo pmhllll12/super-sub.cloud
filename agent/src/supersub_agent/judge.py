@@ -289,9 +289,23 @@ def build_prompt(criterion, metrics: dict[str, Any], grade: int) -> str:
             text = criterion.plain_all(g) or criterion.grades[g]
         lines.append(f"- [{LEVEL_WORDS[g]}] {text}{mark}")
 
-    if criterion.anchors:
+    # 🔴 **이번 판정 등급의 앵커는 값이 앉은 조각의 것만 넣는다** (가-3).
+    #    모델이 앵커의 방향을 따라가기 때문이다 — 앵커 조각이 값 조각과
+    #    다르면 오독률 63%, 같으면 14% 였다(가-2 after 30문장 대조).
+    #    다른 등급 앵커는 그대로 둔다: 어투 예시라 방향을 좁힐 이유가 없고,
+    #    1회차에서 앵커를 줄였다가 2등급 문장이 무너진 적이 있다.
+    shown = tuple(
+        a for a in criterion.anchors
+        if int(a.get("grade", -1)) != grade
+    ) + criterion.anchors_for(grade, band_value)
+    # 🔴 **좋은 것부터** 나열한다 — 위 수준 목록과 같은 차례여야 어느 어투가
+    #    어느 수준인지 짝이 보인다(1회차에서 그 짝을 잃고 2등급 문장이
+    #    무너졌다). 파일 순서에 기대지 않는다: 조각마다 앵커를 더하면서
+    #    새 앵커가 목록 끝에 붙어 차례가 흐트러졌다.
+    shown = tuple(sorted(shown, key=lambda a: -int(a.get("grade", 0))))
+    if shown:
         lines.append("\n근거 문장 예시 (수준에 맞는 어투를 그대로 따릅니다):")
-        for a in criterion.anchors:
+        for a in shown:
             # 🔴 JSON 을 그대로 넣지 않는다 — 키가 지표 코드라 문장에 샌다.
             lines.append(
                 f"- [{LEVEL_WORDS[a['grade']]}] {_labelled(a['measured'])}"
