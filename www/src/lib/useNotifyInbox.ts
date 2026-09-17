@@ -45,7 +45,36 @@ export type InboxContact = {
   note: string | null
 }
 
-export type InboxItem = InboxMatch | InboxContact
+/**
+ * 받은 **팀 초대** 한 줄 (계약 3-3절, CCC 53번 · 미결 `paik` 37번).
+ *
+ * 🔴 **줄마다 팀을 따로 부르지 않는다.** 서버가 초대 한 줄에 팀 이름·지역·
+ * 부르는 자리·스쿼드 슬러그를 실어 준다 — 그러라고 실어 준 값이다.
+ */
+export type InboxInvitation = {
+  kind: 'invitation'
+  id: string
+  teamName: string | null
+  teamRegion: string | null
+  /**
+   * 부르는 자리의 **이름**(「골키퍼」). 🔴 **약칭(`position_code`)으로 이름을
+   * 지어내지 않는다** — 종목마다 같은 약칭이 다른 뜻이라(축구 `FW` ≠ 농구
+   * `FW`) 클라이언트가 표를 들면 갈린다. 서버가 이름을 같이 준다.
+   *
+   * 🔴 `null` 은 **실패가 아니다** — 자리를 안 정한 초대(「우리 팀에
+   * 오세요」)가 정상이다. 그때는 화면이 그 줄을 안 그린다.
+   */
+  posLabel: string | null
+  posCode: string | null
+  /**
+   * 그 팀 판의 **공개 슬러그** — 이걸로 `GET /api/squads/{slug}` 를 불러
+   * 판을 보고 수락 여부를 정한다. 스쿼드를 아직 안 만든 팀이면 `null` 이고,
+   * 그것도 정상이다.
+   */
+  squadSlug: string | null
+}
+
+export type InboxItem = InboxMatch | InboxContact | InboxInvitation
 
 /** 얼마마다 다시 묻는가. 사람이 수락하는 속도라 촘촘할 이유가 없다. */
 const POLL_MS = 15_000
@@ -161,6 +190,35 @@ export function useNotifyInbox() {
     } catch {
       /* 위와 같다. */
     }
+    /* 🔴 **`teamId` 밖에서 읽는다.** 경기 신청은 주장인 내 팀 밑으로 오지만
+       초대는 **나에게** 오는 것이고, 초대를 받는 사람은 대개 아직 팀이 없다 —
+       팀 유무에 묶으면 정작 받아야 할 사람에게 안 뜬다. */
+    try {
+      const res = await fetch('/api/me/invitations')
+      if (res.ok) {
+        const rows = ((await res.json().catch(() => null)) ?? []) as {
+          id: string
+          position_code: string | null
+          position_label: string | null
+          team_name: string | null
+          team_region: string | null
+          squad_public_slug: string | null
+        }[]
+        for (const r of rows) {
+          next.push({
+            kind: 'invitation',
+            id: r.id,
+            teamName: r.team_name ?? null,
+            teamRegion: r.team_region ?? null,
+            posLabel: r.position_label ?? null,
+            posCode: r.position_code ?? null,
+            squadSlug: r.squad_public_slug ?? null,
+          })
+        }
+      }
+    } catch {
+      /* 위와 같다. */
+    }
     setItems(next)
   }, [teamId])
 
@@ -212,6 +270,35 @@ export function useNotifyInbox() {
     [reload],
   )
 
+  /**
+   * 초대를 **수락한다** — 그때 `team_member` 가 `member` 로 생긴다(계약).
+   *
+   * 🔴 수락 뒤 홈이 그 팀을 그리게 하지 않는다 — 홈 팀은 쿠키가 고르고
+   * (`lib/homeTeam.ts`), 서버는 그 값이 내 소속이 아니면 안 믿는다.
+   */
+  const acceptInvitation = useCallback(
+    async (item: InboxInvitation) => {
+      const res = await fetch(`/api/me/invitations/${encodeURIComponent(item.id)}/accept`, {
+        method: 'POST',
+      })
+      if (!res.ok) throw new Error('수락하지 못했습니다.')
+      await reload()
+    },
+    [reload],
+  )
+
+  /**
+   * 초대를 **거절한다**. 🔴 거절은 **실패가 아니다** — 200 이고 아무것도 안
+   * 바뀐 것이 맞는 결과다(계약의 「하지 말 것」).
+   */
+  const rejectInvitation = useCallback(
+    async (item: InboxInvitation) => {
+      await fetch(`/api/me/invitations/${encodeURIComponent(item.id)}/reject`, { method: 'POST' })
+      await reload()
+    },
+    [reload],
+  )
+
   /** 내가 신청을 걸었다고 알려 준다 — 수락되는 순간을 알아보려면 필요하다. */
   const noteSent = useCallback((requestId: string, targetTeamId: string) => {
     sent.current = [...sent.current, { requestId, targetTeamId }]
@@ -230,6 +317,8 @@ export function useNotifyInbox() {
     acceptMatch,
     rejectMatch,
     acceptContact,
+    acceptInvitation,
+    rejectInvitation,
     noteSent,
     reload,
   }

@@ -41,3 +41,59 @@ export function cellExists(col: number, row: number): boolean {
 export function rowPos(row: number): PosCode {
   return ROW_POS[Math.min(row, ROWS - 1)]
 }
+
+/** 판 크기 — 풋살 5인이 기본이다. */
+export type SquadSize = '3' | '5' | '7'
+
+/** 포메이션의 자리 하나. `area` 는 역할+번호(크기를 바꿔도 같은 사람이 제자리). */
+export type SlotSpec = { area: string; col: number; row: number }
+
+/**
+ * 🔴 **크기마다 설 수 있는 자리는 정해져 있다**(사용자 지적, 2026-09-17 —
+ * 「위치가 몇 개로 정해져 있는데」). 판은 3×4 격자지만 **아무 칸이나 쓰는
+ * 것이 아니다** — 5:5 는 1-2-1 이라 MF 는 왼쪽·오른쪽 둘뿐이고 가운데는
+ * MF 자리가 아니다.
+ *
+ * 🔴 **`SquadPanel` 의 `FORMATIONS` 가 이 표를 쓴다** — 좌표를 두 벌로
+ * 베끼면 한쪽만 고쳐져 판마다 자리가 갈린다(이 파일이 있는 이유다).
+ */
+export const FORMATION_SLOTS: Record<SquadSize, SlotSpec[]> = {
+  // 1-1-1 — 셋이면 공격 · 중원 · 골키퍼 하나씩이다.
+  '3': [
+    { area: 'fw1', col: 1, row: 0 },
+    { area: 'mf1', col: 1, row: 1 },
+    { area: 'gk', col: 1, row: 3 },
+  ],
+  // 1-2-1 — 풋살 5인. 이 판이 원래 그리던 것이다.
+  '5': [
+    { area: 'fw1', col: 1, row: 0 },
+    { area: 'mf1', col: 0, row: 1 },
+    { area: 'mf2', col: 2, row: 1 },
+    { area: 'df1', col: 1, row: 2 },
+    { area: 'gk', col: 1, row: 3 },
+  ],
+  // 2-3-1 — 7인제에서 가장 흔한 형태다.
+  '7': [
+    { area: 'fw1', col: 1, row: 0 },
+    { area: 'mf1', col: 0, row: 1 },
+    { area: 'mf2', col: 1, row: 1 },
+    { area: 'mf3', col: 2, row: 1 },
+    { area: 'df1', col: 0, row: 2 },
+    { area: 'df2', col: 2, row: 2 },
+    { area: 'gk', col: 1, row: 3 },
+  ],
+}
+
+/** 처음 여는 크기 — 풋살 5인(사용자 요청). */
+export const DEFAULT_SIZE: SquadSize = '5'
+
+/**
+ * 서버가 준 `formation`(`"5:5"`)을 판 크기로 읽는다.
+ *
+ * 🔴 **아직 안 정했으면 `null` 이고 그게 정상이다**(계약 3-7절) — 그때는
+ * 기본 크기로 본다. 모르는 값도 마찬가지다.
+ */
+export function sizeOfFormation(formation: string | null | undefined): SquadSize {
+  const head = (formation ?? '').split(':')[0]
+  return head === '3' || head === '5' || head === '7' ? head : DEFAULT_SIZE
+}

@@ -18,7 +18,16 @@ import {
   saveSeat,
   seatOf,
 } from '@/lib/squadBoard'
-import { COLS, ROWS, ROW_POS, cellExists, rowPos, type PosCode } from '@/lib/pitchGrid'
+import {
+  COLS,
+  ROWS,
+  ROW_POS,
+  FORMATION_SLOTS,
+  cellExists,
+  rowPos,
+  type PosCode,
+  type SquadSize,
+} from '@/lib/pitchGrid'
 import { fetchPositions } from '@/lib/positions'
 import { loadFeaturedOf } from '@/lib/featuredClip'
 import { apiDelete, apiPost } from '@/lib/api/client'
@@ -102,7 +111,9 @@ function applyPos(seat: Slot, code: string): void {
 }
 
 /** 판의 크기 — 3:3 · 5:5 · 7:7. 화면 글자와 같은 값이라 그대로 쓴다. */
-export type SquadSize = '3' | '5' | '7'
+/* 🔴 정본은 `lib/pitchGrid.ts` 다 — 좌표와 크기를 두 벌로 두면 판마다
+   자리가 갈린다. 여기서는 쓰던 이름을 이어 주기만 한다. */
+export type { SquadSize }
 
 /**
  * 크기마다의 포메이션.
@@ -118,39 +129,9 @@ export type SquadSize = '3' | '5' | '7'
  * (CCC 28) `posCodes` 가 그것을 받는다 — 둘은 다른 축이라 섞지 않는다.
  */
 export const FORMATIONS: Record<SquadSize, { label: string; slots: Slot[] }> = {
-  // 1-1-1 — 셋이면 공격 · 중원 · 골키퍼 하나씩이다.
-  '3': {
-    label: '3 : 3',
-    slots: [
-      { area: 'fw1', col: 1, row: 0 },
-      { area: 'mf1', col: 1, row: 1 },
-      { area: 'gk', col: 1, row: 3 },
-    ],
-  },
-  // 1-2-1 — 풋살 5인. 이 판이 원래 그리던 것이다.
-  '5': {
-    label: '5 : 5',
-    slots: [
-      { area: 'fw1', col: 1, row: 0 },
-      { area: 'mf1', col: 0, row: 1 },
-      { area: 'mf2', col: 2, row: 1 },
-      { area: 'df1', col: 1, row: 2 },
-      { area: 'gk', col: 1, row: 3 },
-    ],
-  },
-  // 2-3-1 — 7인제에서 가장 흔한 형태다.
-  '7': {
-    label: '7 : 7',
-    slots: [
-      { area: 'fw1', col: 1, row: 0 },
-      { area: 'mf1', col: 0, row: 1 },
-      { area: 'mf2', col: 1, row: 1 },
-      { area: 'mf3', col: 2, row: 1 },
-      { area: 'df1', col: 0, row: 2 },
-      { area: 'df2', col: 2, row: 2 },
-      { area: 'gk', col: 1, row: 3 },
-    ],
-  },
+  '3': { label: '3 : 3', slots: FORMATION_SLOTS['3'] },
+  '5': { label: '5 : 5', slots: FORMATION_SLOTS['5'] },
+  '7': { label: '7 : 7', slots: FORMATION_SLOTS['7'] },
 }
 
 /** 처음 여는 크기 — 풋살 5인(사용자 요청). */

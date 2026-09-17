@@ -555,6 +555,21 @@ body::-webkit-scrollbar {
   opacity: 0.45;
 }
 
+/* ── 받은 팀 초대 줄 (미결 `paik` 37번) ──────────────────────────────
+   판은 줄 **왼쪽으로 날아 나온다** — 규칙은 `.ss-mini` 뒤에 모아 두었다
+   (아래 「초대 판」 절). 🔴 **여기 두면 안 된다**: 같은 특이도라 13,000줄
+   뒤의 `.ss-mini .ss-squad` 가 이겨서 카드 폭이 안 줄어든다. */
+.ss-notify-row--invite {
+  /* 판이 이 줄을 기준으로 왼쪽에 선다. */
+  position: relative;
+}
+
+/* 부르는 자리 — 「무엇을 해 달라는 것인지」라 다른 설명보다 앞선다. */
+.ss-notify-pos {
+  color: color-mix(in srgb, var(--ss-accent) 88%, var(--ss-fg));
+  font-weight: 600;
+}
+
 /* ── 알약 변형 (variant="pill") ────────────────────────────────────────
    헤드라인 자리의 주요 목적지. 글자 줄과 **동작은 같고 생김새만 다르다**
    (HomeNav 주석 참고). 왼쪽 정렬이고 칸 사이도 글자 줄(40px)보다 좁다 —
@@ -13847,6 +13862,209 @@ body:has(.ss-venues) .ss-home-header {
 /* 읽기 전용이라 끄는 손짓이 없다 — 커서도 그렇게 말한다. */
 .ss-mini .ss-squad-seat {
   cursor: default;
+}
+
+/* ── 초대 판 — 알림 줄 **왼쪽으로** 날아 나온다 (미결 `paik` 37번) ────
+   🔴 **이 절은 반드시 위 `.ss-mini` 규칙 뒤에 있어야 한다.** 특이도가 같아
+   (0,2,0) 순서로만 이긴다 — 앞에 뒀다가 카드 폭 62 가 `.ss-mini` 의 92 에
+   져서 **판이 화면을 통째로 넘었다**(2026-09-17, 사용자 지적). 1.11 회차가
+   `.ss-profile-tab--danger` 로 똑같이 밟고 「변형은 기본 규칙 뒤에」라고
+   적어 둔 자리다.
+
+   🔴 **흐름에서 뺀다**(absolute). 줄 안에 두면 판이 목록을 밀어내서 **아래
+   알림들이 화면 밖으로 쫓겨난다** — 알림은 여럿일 수 있다. */
+.ss-notify-squad {
+  position: absolute;
+  /* 줄의 왼쪽 바깥 — 알림 판이 오른쪽 끝에 붙어 있으므로 왼쪽이 빈 자리다. */
+  right: calc(100% + 12px);
+  top: 0;
+  z-index: 1;
+  width: 230px;
+  padding: 10px 8px 12px;
+  border-radius: 14px;
+  /* 이제 제 면을 가진 판이다 — 줄 안에 있을 때는 줄의 바탕을 빌렸다. */
+  background-color: color-mix(in srgb, var(--ss-bg) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 14%, transparent);
+  box-shadow: 0 18px 40px rgb(0 0 0 / 38%);
+  /* 혹시 판이 길어져도 화면을 안 넘는다. */
+  max-height: 72vh;
+  overflow: auto;
+  /* 뜨는 결을 드롭다운과 맞춘다(220ms · 같은 easing) — 다르면 두 판이 따로
+     논다(`.ss-home-nav-card` 주석). */
+  animation: ss-notify-squad-in 220ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* 오른쪽(줄 쪽)에서 밀려 나온다 — 「저 줄에서 나왔다」로 읽혀야 한다. */
+@keyframes ss-notify-squad-in {
+  from {
+    opacity: 0;
+    transform: translateX(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 🔴 **진입 연출을 끈다.** `.ss-mini` 는 대기 팝업에서 옆으로 날아 들어오는
+   판이라 **760ms 지연**이 걸려 있다 — 안 끄면 「판 보기」를 누른 뒤 0.76초
+   동안 아무것도 안 나타난다. 뜨는 것은 바깥 상자(위)가 맡는다. */
+.ss-notify-squad .ss-mini {
+  animation: none;
+  color: var(--ss-fg);
+}
+
+/* 🔴 **카드 폭 하나로 판 전체가 줄어든다**(`.ss-squad` 주석) — 줄 키도
+   칸도 이 값에서 계산되므로 다른 숫자를 손으로 박으면 어긋난다.
+   48 × 3칸 + 칸사이 12 × 2 + 좌우 여백 = 약 190px → 230px 판에 든다. */
+.ss-notify-squad .ss-squad {
+  --ss-pcard-mini-w: 40;
+  padding: 0;
+}
+
+/* 🔴 **줄 키의 이름표 자리를 같이 줄인다** — 이걸 안 하면 판이 홀쭉해진다.
+   기본 `--ss-squad-row` 는 `카드키 + 1.35rem` 인데 그 **1.35rem 은 카드가
+   줄어도 안 줄어드는 고정값**이다: 홈(94px)에서는 줄 키의 14% 인데 여기
+   (40px)에서는 28% 가 되어 판이 세로로만 길어졌다.
+
+   실측(계산): 고치기 전 176×373 = **0.472** · 홈 판 518×702 = **0.738**
+   · 고친 뒤 204×281 = **0.725**. 경기장 선이 `preserveAspectRatio="none"`
+   으로 이 상자에 늘어나므로, 비율이 어긋나면 **경기장 자체가 다른 모양**이 된다. */
+.ss-notify-squad .ss-squad-board {
+  --ss-squad-row: calc(var(--ss-pcard-mini-w, 92) * 1px * 4.1 / 3 + 0.65rem);
+  padding: 8px 8px 4px;
+  /* 칸 사이는 홈과 **같은 비율**로 — 홈이 카드 94 에 간격 80(0.85배)이다. */
+  column-gap: 34px;
+  row-gap: 3px;
+  /* 🔴 **칸을 가운데로 모은다**(사용자 지적, 2026-09-17 — 「왜 왼쪽으로
+     치우쳐짐?」). 칸이 `40px` 고정이라 상자보다 좁으면 남는 폭이 생기는데,
+     격자는 기본이 `justify-content: start` 라 **칸이 왼쪽으로 몰린다.**
+     경기장 선(SVG)은 `inset: 0` 으로 상자 전체를 채우므로, 선의 가운데와
+     카드의 가운데가 그 남는 폭만큼 어긋난다(실측 약 10px).
+
+     ⚠️ 홈 판에서는 안 드러난다 — 거기는 상자 폭이 칸 합과 맞아 남는 폭이
+     없다. 카드를 줄여 쓰는 이 자리에서만 생기는 문제다. */
+  justify-content: center;
+}
+
+.ss-notify-squad .ss-mini-team {
+  margin-bottom: 2px;
+  font-size: 0.75rem;
+}
+
+/* 🔴 이름표 글자는 위에서 잡은 **0.65rem 자리 안에** 들어가야 한다 — 넘치면
+   줄 키가 그만큼 밀려 판 비율이 다시 어긋난다. */
+.ss-notify-squad .ss-squad-pos {
+  font-size: 0.5rem;
+  line-height: 1.3;
+}
+
+/* 🔴 **내 자리는 깜빡인다** (사용자 요청, 2026-09-17) — 「팀장이 정해 둔
+   자리에서 내 카드가 깜빡여야」. 판만 그리면 저 팀의 짜임까지만 보이고
+   **내가 어디로 불렸는지**가 안 보인다. */
+.ss-notify-squad .ss-squad-seat[data-mine='true'] {
+  animation: ss-invite-mine 1.4s ease-in-out infinite;
+}
+
+.ss-notify-squad .ss-squad-seat[data-mine='true'] .ss-pcard-mini {
+  border-radius: 6px;
+  outline: 2px solid var(--ss-accent);
+  outline-offset: 2px;
+}
+
+/* 자리 이름표도 같이 살린다 — 카드만 빛나면 어느 자리인지가 안 읽힌다. */
+.ss-notify-squad .ss-squad-seat[data-mine='true'] .ss-squad-pos {
+  color: var(--ss-accent);
+  font-weight: 800;
+}
+
+@keyframes ss-invite-mine {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-notify-squad .ss-squad-seat[data-mine='true'] {
+    animation: none;
+  }
+}
+
+/* ── 겹친 판 물리기 (사용자 요청, 2026-09-17) ────────────────────────
+   초대 판은 알림에서 **왼쪽으로** 나오는데, 그 자리에 「AI 추천」·「지인
+   찾기」 판이 **겹쳐 있을 때가 있다.** 그때 뒤엣것을 물려 앞의 판이 읽히게
+   한다. 표식은 `NotifyPanel` 이 문서 뿌리에 건다(그 둘은 헤더가 아니라
+   페이지 쪽 조각이라 props 로 넘길 길이 없다).
+
+   🔴 **범위가 둘이다**(사용자 요청):
+     · 알림 판만 열렸을 때 — 그 아래 깔린 **「지인 찾기」만**
+     · 초대 판까지 열었을 때 — 판이 덮는 **둘 다**
+
+   🔴 **판 자체에 `blur()` 를 걸지 않는다**(사용자 지적 — 「외곽 경계가 너무
+   잘 보여서 이질적이야」). 상자에 걸면 **테두리까지 뭉개져** 네모난 흐림
+   자국이 배경 위에 뜬다. 틀은 또렷이 두고 **안쪽 내용만** 흐리면 그 경계가
+   안 생긴다.
+
+   🔴 **흐림은 밝기를 안 바꾼다**(1.12 회차에 실측으로 확인한 것) — 뒤로
+   물러나 보이게 하는 것은 흐림이 아니라 **어둡게 누르는 쪽**이다. 그래서
+   상자에는 `brightness`, 내용에는 `blur` 로 나눠 건다.
+
+   🔴 **전이는 기본 규칙에 건다** — 표식이 붙을 때만 걸면 **걷힐 때는 툭
+   돌아온다**(전이는 두 상태 모두에 있어야 양방향으로 돈다).
+   🔴 `.ss-friends` 는 `.ss-suggest` 를 **함께** 달고 있어, 아래 `.ss-suggest`
+   규칙은 둘 다 잡는다. */
+.ss-suggest {
+  transition: filter 280ms ease;
+}
+
+.ss-suggest > * {
+  transition: filter 280ms ease;
+}
+
+/* 알림 판이 열려 있는 동안 — **「지인 찾기」만** 물린다. */
+:root[data-ss-notify='true'] .ss-friends,
+/* 초대 판까지 열면 **둘 다** — 판이 그 자리를 덮는다. */
+:root[data-ss-peek='true'] .ss-suggest {
+  filter: brightness(0.5) saturate(0.85);
+}
+
+:root[data-ss-notify='true'] .ss-friends > *,
+:root[data-ss-peek='true'] .ss-suggest > * {
+  filter: blur(4px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-suggest,
+  .ss-suggest > * {
+    transition-duration: 1ms;
+  }
+}
+
+/* 좁은 화면에서는 왼쪽에 설 자리가 없다 — 줄 아래로 내려온다.
+   🔴 흐름으로 **돌아오는** 것이므로 줄을 접어 주고(`wrap`) 제 줄을 통째로
+   차지하게 한다(`flex-basis: 100%`) — 안 그러면 단추 옆에 끼어 줄이 터진다. */
+@media (max-width: 720px) {
+  .ss-notify-row--invite {
+    flex-wrap: wrap;
+  }
+
+  .ss-notify-squad {
+    position: static;
+    flex-basis: 100%;
+    width: auto;
+    margin-top: 10px;
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-notify-squad {
+    animation-duration: 1ms;
+  }
 }
 
 /* ── 경기 조건 판 (사용자 결정, 2026-09-10) ────────────────────────

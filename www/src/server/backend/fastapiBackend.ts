@@ -202,6 +202,11 @@ export const fastapiBackend: Backend = {
     })
   },
 
+  getSquadBySlug(publicSlug) {
+    // 🔴 `token` 을 안 넘긴다 — 계약이 이 경로를 인증 없이 열어 두었다.
+    return callFastApi<Squad>(`/squads/${encodeURIComponent(publicSlug)}`, { method: 'GET' })
+  },
+
   createSquad(token, teamId) {
     return callFastApi<Squad>(`/teams/${encodeURIComponent(teamId)}/squad`, {
       method: 'POST',

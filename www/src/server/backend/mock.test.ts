@@ -376,3 +376,37 @@ describe('mock — 확정 경기 무르기', () => {
     await expect(mockBackend.cancelMatch(token, matchId)).rejects.toMatchObject({ status: 404 })
   })
 })
+
+/**
+ * **로컬에서 받은 초대를 실제로 볼 수 있는가** (미결 `paik` 37번).
+ *
+ * 🔴 mock 의 초대 Map 은 원래 **비어 있었다** — 거기 들어가려면 누군가 나를
+ * 초대해야 하는데, 데모 계정은 제 팀의 **주장**이라 남을 초대할 수만 있었다.
+ * 그래서 `USE_MOCK=1` 로 띄워도 초대 줄이 **영영 안 떴다.** 씨앗을 하나 둔다.
+ */
+describe('mock — 받은 팀 초대 씨앗', () => {
+  const TOKEN = 'mock-access-token-demo'
+
+  it('데모 계정에게 받은 초대가 하나 있다 — 안 그러면 화면을 못 본다', async () => {
+    const rows = await mockBackend.listMyInvitations(TOKEN)
+    expect(rows.length).toBeGreaterThan(0)
+    expect(rows[0].status).toBe('pending')
+  })
+
+  /* 🔴 **내 팀이 나를 부르는 모양이면 안 된다** — 데모 계정은 번개FC 주장이라
+     자기가 자기를 초대한 꼴이 된다. 초대는 **다른 팀**에서 와야 말이 된다. */
+  it('초대한 팀은 내 팀이 아니다 — 자기가 자기를 부르지 않는다', async () => {
+    const rows = await mockBackend.listMyInvitations(TOKEN)
+    expect(rows[0].team_name).not.toBe('번개FC')
+    expect(rows[0].team_name).toBeTruthy()
+    expect(rows[0].team_region).toBeTruthy()
+  })
+
+  it('판을 볼 수 있게 슬러그가 실린다', async () => {
+    const rows = await mockBackend.listMyInvitations(TOKEN)
+    expect(rows[0].squad_public_slug).toBeTruthy()
+    // 그 슬러그로 실제 판이 읽혀야 한다 — 「판 보기」가 그걸 부른다.
+    const squad = await mockBackend.getSquadBySlug(rows[0].squad_public_slug as string)
+    expect(squad.members.length).toBeGreaterThan(0)
+  })
+})

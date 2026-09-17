@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import type { InboxItem, InboxMatch } from '@/lib/useNotifyInbox'
+import { useEffect, useState } from 'react'
+import InviteSquad from '@/components/InviteSquad'
+import type { InboxInvitation, InboxItem, InboxMatch } from '@/lib/useNotifyInbox'
 
 /**
  * 「알림」 글자 아래로 떠오르는 판 — **가리키기만 하면 나온다**(사용자 요청,
@@ -19,14 +20,58 @@ export default function NotifyPanel({
   onAcceptMatch,
   onRejectMatch,
   onAcceptContact,
+  onAcceptInvitation,
+  onRejectInvitation,
 }: {
   items: InboxItem[]
   onAcceptMatch: (item: InboxMatch) => Promise<unknown>
   onRejectMatch: (item: InboxMatch) => Promise<unknown>
   onAcceptContact: (item: Extract<InboxItem, { kind: 'contact' }>) => Promise<unknown>
+  onAcceptInvitation?: (item: InboxInvitation) => Promise<unknown>
+  onRejectInvitation?: (item: InboxInvitation) => Promise<unknown>
 }) {
   /** 지금 처리 중인 줄 — 두 번 눌러 두 번 보내는 것을 막는다. */
   const [busy, setBusy] = useState<string | null>(null)
+  /** 판을 펼쳐 둔 초대 — 한 번에 하나만 편다(판이 커서 둘이 겹치면 읽기 나쁘다). */
+  const [peek, setPeek] = useState<string | null>(null)
+
+  /**
+   * 🔴 **판을 열면 뒤의 판들을 흐린다**(사용자 요청, 2026-09-17). 초대 판은
+   * 알림에서 왼쪽으로 나오는데 그 자리에 「AI 추천」·「지인 찾기」 판이 **겹쳐
+   * 있을 때가 있다.**
+   *
+   * 그 둘은 헤더가 아니라 **페이지 쪽 조각**이라 props 로 넘길 길이 없다 —
+   * 문서 뿌리에 표식만 걸고 흐리는 것은 CSS 가 맡는다(`globals.css` 의
+   * 「겹친 판 흐리기」). 부모를 거쳐 신호를 내리려면 `SquadPanel` 까지
+   * 줄줄이 고쳐야 하고, 그건 이 한 가지 때문에 치르기엔 큰 값이다.
+   *
+   * 🔴 **정리에서 반드시 걷는다** — 안 걷으면 알림 판이 닫힌 뒤에도 화면이
+   * 흐린 채로 남는다.
+   */
+  useEffect(() => {
+    if (!peek) return
+    const root = document.documentElement
+    root.dataset.ssPeek = 'true'
+    return () => {
+      delete root.dataset.ssPeek
+    }
+  }, [peek])
+
+  /**
+   * 알림 판이 열려 있는 **그 자체**의 표식. 이 조각은 판이 열렸을 때만
+   * 붙으므로, 붙어 있는 동안이 곧 열려 있는 동안이다.
+   *
+   * 🔴 **초대 판과 범위가 다르다**(사용자 요청, 2026-09-17) — 알림 판만
+   * 열렸을 때는 그 아래 깔린 **「지인 찾기」만** 물리고, 초대 판까지 열면
+   * 그 판이 덮는 **둘 다** 물린다.
+   */
+  useEffect(() => {
+    const root = document.documentElement
+    root.dataset.ssNotify = 'true'
+    return () => {
+      delete root.dataset.ssNotify
+    }
+  }, [])
 
   async function run(id: string, fn: () => Promise<unknown>) {
     if (busy) return
@@ -79,6 +124,63 @@ export default function NotifyPanel({
                   거절
                 </button>
               </span>
+            </li>
+          ) : item.kind === 'invitation' ? (
+            <li key={item.id} className="ss-notify-row ss-notify-row--invite">
+              <span className="ss-notify-text">
+                {/* 🔴 팀 이름을 모르면 **지어내지 않는다** — 옛 응답이면 null 이다. */}
+                <span className="ss-notify-name">{item.teamName ?? '어느 팀'}</span>
+                <span className="ss-notify-note">
+                  {item.teamRegion ? `${item.teamRegion} · ` : ''}
+                  팀에 초대했습니다
+                </span>
+                {/* 🔴 **자리를 안 정한 초대가 정상이다** — 그때는 이 줄이 없다.
+                    이름은 서버가 준 `position_label` 이고, 약칭으로 지어내지
+                    않는다(종목마다 같은 약칭이 다른 뜻이다). */}
+                {item.posLabel ? (
+                  <span className="ss-notify-note ss-notify-pos">
+                    {item.posLabel}
+                    {item.posCode ? `(${item.posCode})` : ''}로 부릅니다
+                  </span>
+                ) : null}
+                {/* 스쿼드를 아직 안 만든 팀이면 슬러그가 없다 — 그것도 정상이다. */}
+                {item.squadSlug === null ? (
+                  <span className="ss-notify-note">아직 판이 없습니다</span>
+                ) : null}
+              </span>
+              <span className="ss-notify-acts">
+                {item.squadSlug !== null ? (
+                  <button
+                    type="button"
+                    className="ss-notify-act ss-notify-act--ghost"
+                    aria-expanded={peek === item.id}
+                    onClick={() => setPeek(peek === item.id ? null : item.id)}
+                  >
+                    {peek === item.id ? '스쿼드 닫기' : '스쿼드'}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="ss-notify-act"
+                  disabled={busy === item.id}
+                  onClick={() => void run(item.id, async () => onAcceptInvitation?.(item))}
+                >
+                  수락하기
+                </button>
+                <button
+                  type="button"
+                  className="ss-notify-act ss-notify-act--ghost"
+                  disabled={busy === item.id}
+                  onClick={() => void run(item.id, async () => onRejectInvitation?.(item))}
+                >
+                  거절
+                </button>
+              </span>
+              {/* 🔴 **펼친 줄에서만 그린다** — 목록을 그릴 때 줄마다 판을 읽으면
+                  열지도 않은 판을 초대 수만큼 부르게 된다. */}
+              {peek === item.id && item.squadSlug !== null ? (
+                <InviteSquad slug={item.squadSlug} teamName={item.teamName ?? "초대한 팀"} posCode={item.posCode} />
+              ) : null}
             </li>
           ) : (
             <li key={item.id} className="ss-notify-row">

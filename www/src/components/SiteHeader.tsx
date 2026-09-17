@@ -176,6 +176,8 @@ export default function SiteHeader({
                 onAcceptMatch={inbox.acceptMatch}
                 onRejectMatch={inbox.rejectMatch}
                 onAcceptContact={inbox.acceptContact}
+                onAcceptInvitation={inbox.acceptInvitation}
+                onRejectInvitation={inbox.rejectInvitation}
               />
             ),
           }}

@@ -210,6 +210,14 @@ export interface Backend {
   ): Promise<MercenaryCandidate[]>
   /** 팀의 스쿼드. 소속이면 본다. **아직 없으면 404 SQUAD_NOT_FOUND** 다. */
   getSquad(token: string, teamId: string): Promise<Squad>
+  /**
+   * 공개 슬러그로 읽는 **남의 스쿼드** (계약 3-7절, CCC 53번).
+   *
+   * 🔴 **토큰을 안 받는다.** 슬러그가 96비트 난수라 그 자체가 접근
+   * 통제다(SEC-005 — `getPublicCard` 와 같은 결). 초대받은 사람은 **아직
+   * 그 팀 소속이 아니라서** 소속을 요구하는 `getSquad` 로는 못 읽는다.
+   */
+  getSquadBySlug(publicSlug: string): Promise<Squad>
   /** 스쿼드를 연다. **멱등** — 이미 있으면 그것을 그대로 돌려준다. 주장만. */
   createSquad(token: string, teamId: string): Promise<Squad>
   /**

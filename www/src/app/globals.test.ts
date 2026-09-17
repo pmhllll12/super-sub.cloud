@@ -137,3 +137,45 @@ describe('globals.css', () => {
     expect(rule).toMatch(/color:\s*var\(--ss-error\)/)
   })
 })
+
+/**
+ * 🔴 **초대 판의 카드 폭 규칙은 `.ss-mini` 규칙보다 뒤에 있어야 한다.**
+ *
+ * 둘 다 `.<조상> .ss-squad` 라 특이도가 같다(0,2,0) — 같으면 **파일에 나중에
+ * 적힌 것이 이긴다.** 초대 판 규칙을 앞(560줄쯤)에 뒀다가 13,000줄 뒤의
+ * `.ss-mini .ss-squad { --ss-pcard-mini-w: 92 }` 에 져서, 알림 판(230px)에
+ * 92px 카드 3열이 들어가 **판이 화면을 통째로 넘었다**(2026-09-17, 사용자가
+ * 화면으로 잡았다).
+ *
+ * 1.11 회차가 `.ss-profile-tab--danger` 로 똑같이 밟고 「CSS 변형은 기본 규칙
+ * *뒤*에 둔다」고 적어 둔 그 함정이다. 눈으로는 안 보이므로 순서를 시험이 붙든다.
+ */
+describe('CSS 규칙 순서 — 같은 특이도는 순서로만 이긴다', () => {
+  it('초대 판의 카드 폭이 `.ss-mini` 기본값보다 뒤에 온다', () => {
+    const base = CSS.indexOf('.ss-mini .ss-squad {')
+    const override = CSS.indexOf('.ss-notify-squad .ss-squad {')
+
+    expect(base).toBeGreaterThan(-1)
+    expect(override).toBeGreaterThan(-1)
+    expect(override).toBeGreaterThan(base)
+  })
+
+  /* 판이 줄 안에 들어가면 **아래 알림들을 화면 밖으로 밀어낸다** — 알림은
+     여럿일 수 있다. 흐름에서 빼는 것이 이 판의 요점이다. */
+  it('초대 판은 흐름에서 빠져 줄 왼쪽에 선다', () => {
+    const block = CSS.slice(
+      CSS.indexOf('.ss-notify-squad {'),
+      CSS.indexOf('@keyframes ss-notify-squad-in'),
+    )
+    expect(block).toMatch(/position:\s*absolute/)
+    expect(block).toMatch(/right:\s*calc\(100% \+/)
+  })
+
+  /* `.ss-mini` 는 대기 팝업에서 옆으로 날아드는 판이라 760ms 지연이 걸려
+     있다 — 안 끄면 「판 보기」를 누른 뒤 0.76초 동안 아무것도 안 나타난다. */
+  it('대기 팝업의 760ms 지연 연출을 끈다', () => {
+    const i = CSS.indexOf('.ss-notify-squad .ss-mini {')
+    expect(i).toBeGreaterThan(-1)
+    expect(CSS.slice(i, i + 120)).toMatch(/animation:\s*none/)
+  })
+})

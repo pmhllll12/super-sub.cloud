@@ -31,6 +31,8 @@ import type {
 const DEMO_EMAIL = 'demo@super-sub.example'
 const DEMO_PASSWORD = 'supersub2026'
 const DEMO_TOKEN = 'mock-access-token-demo'
+/** 데모 계정의 사용자 id — 받은 초대가 이 값을 가리켜야 나에게 온 것이 된다. */
+const DEMO_USER_ID = '3f1c0000-0000-4000-8000-000000000001'
 /** 데모 계정이 속한 팀. 스쿼드 · 경기가 이 id 를 함께 읽는다. */
 const DEMO_TEAM_ID = '9a2e0000-0000-4000-8000-000000000002'
 const EXPIRES_IN = 604800
@@ -436,6 +438,84 @@ let demoSquad: Squad | null = {
   ],
 }
 
+/**
+ * **나를 부른 다른 팀** — 받은 초대를 로컬에서 보려면 있어야 한다
+ * (미결 `paik` 37번).
+ *
+ * 🔴 **데모 계정은 번개FC 의 주장이다.** 그래서 mock 이 스스로 만들 수 있는
+ * 초대는 전부 *내가 남에게* 보내는 것뿐이고, **받은 초대는 영영 0건**이었다 —
+ * `USE_MOCK=1` 로 띄워도 초대 줄을 못 봤다. 초대는 **밖에서** 와야 말이 된다.
+ */
+const INVITER_TEAM = {
+  id: '9a2e0000-0000-4000-8000-000000000077',
+  name: '망원 유나이티드',
+  region: '서울 마포구',
+  sport_code: 'football',
+}
+
+/**
+ * 그 팀의 판 — 「판 보기」가 이걸 그린다.
+ *
+ * 🔴 **자리를 비워 둔다.** 나를 GK 로 부르고 있으므로 GK 줄(행 3)이 비어야
+ * "저 자리에 나를 부르는구나"가 판에서 읽힌다 — 다 차 있으면 초대가 뜻을
+ * 잃는다.
+ */
+const inviterSquad: Squad = {
+  id: 'sq2',
+  team_id: INVITER_TEAM.id,
+  public_slug: 'mW7pQ2xR9kT4bV6n',
+  formation: '5:5',
+  /* 🔴 **5:5 는 1-2-1 이다** — 칸을 아무 데나 두지 않는다(`lib/pitchGrid.ts`
+     의 `FORMATION_SLOTS`). FW(1,0) · MF(0,1) · MF(2,1) · DF(1,2) · GK(1,3).
+     처음엔 DF 를 (2,2) 에 뒀는데 그건 **7:7 의 자리**라 판에 없는 칸에 카드가
+     떠 있었다(2026-09-17, 사용자가 화면으로 잡았다).
+
+     🔴 **GK 를 비워 둔다** — 나를 GK 로 부르고 있으므로 그 자리가 비어야
+     「저기로 부르는구나」가 판에서 읽힌다. */
+  members: [
+    {
+      id: 'sm-i1',
+      player_card_id: '5e7a0000-0000-4000-8000-000000000011',
+      card_public_slug: 'park-jisung-7c1d',
+      nickname: '박지성',
+      position_code: 'FW',
+      position_label: '공격수',
+      grid_col: 1,
+      grid_row: 0,
+    },
+    {
+      id: 'sm-i2',
+      player_card_id: '5e7a0000-0000-4000-8000-000000000012',
+      card_public_slug: 'son-heungmin-3b9f',
+      nickname: '손흥민',
+      position_code: 'MF',
+      position_label: '미드필더',
+      grid_col: 0,
+      grid_row: 1,
+    },
+    {
+      id: 'sm-i3',
+      player_card_id: '5e7a0000-0000-4000-8000-000000000013',
+      card_public_slug: 'ki-sungyueng-5f3a',
+      nickname: '기성용',
+      position_code: 'MF',
+      position_label: '미드필더',
+      grid_col: 2,
+      grid_row: 1,
+    },
+    {
+      id: 'sm-i4',
+      player_card_id: '5e7a0000-0000-4000-8000-000000000014',
+      card_public_slug: 'kim-minjae-8a2c',
+      nickname: '김민재',
+      position_code: 'DF',
+      position_label: '수비수',
+      grid_col: 1,
+      grid_row: 2,
+    },
+  ],
+}
+
 /** `POST /me/card` 로 생긴 카드들. 데모 계정은 위 `card` 를 그대로 쓴다. */
 const made = new Map<string, PlayerCard>()
 
@@ -608,7 +688,25 @@ function requireCaptain(u: User, teamId: string): void {
  * 사라지는 것은 **상대가 거절하거나 주장이 무를 때뿐**이다(사용자 설계,
  * 2026-09-17).
  */
-const invitations = new Map<string, TeamInvitation>()
+const invitations = new Map<string, TeamInvitation>([
+  /* 🔴 **씨앗 하나.** 위 `INVITER_TEAM` 주석 참고 — 이게 없으면 로컬에서
+     받은 초대 화면을 볼 방법이 없다. 자리를 정한 초대(GK)로 둔다. */
+  [
+    'inv-seed-1',
+    {
+      id: 'inv-seed-1',
+      team_id: INVITER_TEAM.id,
+      invited_user_id: DEMO_USER_ID,
+      status: 'pending',
+      created_at: '2026-09-17T18:20:00Z',
+      responded_at: null,
+      position_code: 'GK',
+      position_label: '골키퍼',
+      invited_user_nickname: '홍길동',
+      invited_user_card_slug: 'hong-gildong-4f2a',
+    },
+  ],
+])
 
 /** 수락·거절은 **받은 본인만**, 그리고 **대기 중일 때만** 된다(계약). */
 function respondToInvitation(
@@ -1233,16 +1331,21 @@ export const mockBackend: Backend = {
     return [...invitations.values()]
       .filter((iv) => iv.invited_user_id === u.id && iv.status === 'pending')
       .sort((a, b) => b.created_at.localeCompare(a.created_at))
-      .map(
-        (iv): ReceivedInvitation => ({
+      .map((iv): ReceivedInvitation => {
+        /* 🔴 **부른 팀에서 읽는다.** 전에는 넷을 전부 번개FC 로 박아 뒀는데,
+           그러면 어느 팀이 불렀든 내 팀 이름이 찍혀 **자기가 자기를 부른 것**
+           처럼 보인다. id 로 갈라야 화면이 실서버와 같은 것을 그린다. */
+        const inviter = iv.team_id === INVITER_TEAM.id ? INVITER_TEAM : null
+        const squad = iv.team_id === INVITER_TEAM.id ? inviterSquad : demoSquad
+        return {
           ...iv,
-          team_name: '번개FC',
-          team_region: '서울 강남구',
-          team_sport_code: 'football',
+          team_name: inviter?.name ?? '번개FC',
+          team_region: inviter?.region ?? '서울 강남구',
+          team_sport_code: inviter?.sport_code ?? 'football',
           // 스쿼드를 아직 안 만든 팀이면 `null` 이다 — 정상값이다.
-          squad_public_slug: demoSquad?.public_slug ?? null,
-        }),
-      )
+          squad_public_slug: squad?.public_slug ?? null,
+        }
+      })
   },
 
   async acceptInvitation(token, invitationId) {
@@ -1339,6 +1442,17 @@ export const mockBackend: Backend = {
       throw new BackendError(404, 'SQUAD_NOT_FOUND', '스쿼드를 아직 만들지 않았습니다.')
     }
     return demoSquad
+  },
+
+  async getSquadBySlug(publicSlug) {
+    // 🔴 `requireUser` 를 안 부른다 — 계약이 인증 없이 여는 경로다(SEC-005).
+    // 🔴 **남의 팀 판도 찾는다** — 이 경로가 있는 이유가 그것이다(초대받은
+    //    사람은 부른 팀 소속이 아니다).
+    const found = [demoSquad, inviterSquad].find((s) => s?.public_slug === publicSlug)
+    if (!found) {
+      throw new BackendError(404, 'SQUAD_NOT_FOUND', '그런 스쿼드가 없습니다.')
+    }
+    return found
   },
 
   async createSquad(token, teamId) {
