@@ -93,8 +93,11 @@ class CreateTeamMatchRequestInteractor(CreateTeamMatchRequestUseCase):
             status=PENDING,
             created_at=datetime.now(timezone.utc),
         )
-        self._repository.create_team_match_request(request)
-        return to_team_match_request_result(request)
+        # 🔴 만든 엔티티가 아니라 **저장소가 돌려준 것**을 쓴다 — 팀 이름·지역은
+        # `team` 에서 읽어 오는 값이라 여기서는 채울 수 없다(`paik` 31번).
+        return to_team_match_request_result(
+            self._repository.create_team_match_request(request)
+        )
 
 
 class ListTeamMatchRequestsInteractor(ListTeamMatchRequestsUseCase):

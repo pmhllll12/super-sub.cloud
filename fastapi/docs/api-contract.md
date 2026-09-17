@@ -1268,9 +1268,59 @@ trunk_alignment       2개 루브릭  basketball_jump_shot · basketball_layup  
 | 404 | `TEAM_NOT_FOUND` · `NOT_A_MEMBER` |
 | 409 | `LAST_OWNER` — 마지막 주장은 나갈 수 없다 |
 
-🔴 **마지막 주장이 나가면 아무도 남을 넣을 수 없는 팀이 된다.** 소유권 이양 API 가
-아직 없어 되돌릴 방법이 없으므로 미리 막는다. 팀 해체도 같은 이유로 아직 없다 —
-필요해지면 이양과 함께 낸다.
+🔴 **마지막 주장이 나가면 아무도 남을 넣을 수 없는 팀이 된다.** 그래서 미리 막는데,
+**되돌리는 길이 2026-09-17 에 둘 생겼다**(`paik` 35번) — 다른 사람을 주장으로
+세우거나(`PATCH .../members/{id}`), 팀을 해체하거나(`DELETE /teams/{id}`).
+혼자인 팀은 세울 상대가 없으므로 후자다.
+
+> 🔴 **앞서 이 자리에 "소유권 이양 API 가 아직 없다 · 팀 해체도 아직 없다"고
+> 적어 두었던 것을 정정한다** — 둘 다 생겼다(아래 두 절).
+
+### `PATCH /api/v1/teams/{team_id}/members/{member_id}` (2026-09-17 추가, `paik` 35번)
+
+인증 필요. **주장만.** 구성원의 역할을 바꾼다 — 실질적으로 **주장 세우기**다.
+
+```json
+{ "role": "owner" }
+```
+
+`200 OK` — 갱신된 팀(`GET /teams/{id}` 와 같은 형태). `role` 은 `owner`·`member`
+둘뿐이고 그 밖의 값은 422 다.
+
+🔴 **기존 주장은 그대로 주장이다.** 주장은 여럿일 수 있다. 넘기고 나가려면
+세운 다음 `DELETE /teams/{team_id}/members/{내 id}` 로 나가면 된다 — 한 번에
+둘을 하면 「넘기기만」 하려는 경우를 표현할 수 없다.
+
+| 에러 | code |
+|---|---|
+| 403 | `FORBIDDEN` — 주장이 아니다 |
+| 404 | `TEAM_NOT_FOUND` · `NOT_A_MEMBER` |
+| 409 | `TEAM_DISBANDED` — 해체된 팀이다 |
+
+### `DELETE /api/v1/teams/{team_id}` — 팀 해체 (2026-09-17 추가, `paik` 35번)
+
+인증 필요. **주장만.** `204 No Content`.
+
+🔴 **행을 지우지 않는다.** `team.disbanded_at` 을 찍고 남은 구성원을 전부
+내보내고(그래서 `GET /me` 의 `teams` 에서 사라진다) 대기 중이던 초대·경기
+신청을 `cancelled` 로 닫는다. **지난 경기·평가·스쿼드는 그대로 남는다** —
+그것들이 이 팀 이름을 가리키기 때문이다(`team_member.left_at` 과 같은 판단,
+부록 D.6).
+
+해체된 팀은 **새로 만드는 자리만** 막힌다 — 가입·초대·팀 수정이 409
+`TEAM_DISBANDED` 다. **읽기는 그대로 된다**(`GET /teams/{id}` 가 200 이고
+`disbanded_at` 이 차 있으며 `members` 가 빈 배열이다). `sport.active` 와 같은
+판단이다(`ho` 39번).
+
+| 에러 | code |
+|---|---|
+| 403 | `FORBIDDEN` — 주장이 아니다 |
+| 404 | `TEAM_NOT_FOUND` |
+| 409 | `TEAM_DISBANDED` — 이미 해체됐다 |
+| 409 | `TEAM_HAS_UPCOMING_MATCH` — **앞으로 있을** 경기가 있다. 상대에게는 약속이라 먼저 정리해야 한다(지난 경기는 세지 않는다) |
+
+그래서 `GET /teams/{id}` 응답에 `disbanded_at` 이 생겼다 — 살아 있는 팀은
+`null` 이다.
 
 ### 팀 초대 — `team_invitation` (2026-09-16 추가, `min` 20번)
 
@@ -1291,15 +1341,47 @@ trunk_alignment       2개 루브릭  basketball_jump_shot · basketball_layup  
   "invited_user_id": "9a2e...",
   "status": "pending",
   "created_at": "2026-09-16T09:00:00Z",
-  "responded_at": null
+  "responded_at": null,
+  "position_code": "GK",
+  "position_label": "골키퍼"
 }
 ```
 
+`position_*`(「부르는 자리」, 2026-09-17 추가·`paik` 37번)는 **둘 다 `null` 일
+수 있다** — 자리를 안 정한 초대(「우리 팀에 오세요」)가 정상이다. 약칭과 이름을
+함께 주는 이유는 구성원의 카드 둘과 같다 — 하나만 주면 화면이 나머지를 얻을
+경로가 없다.
+
+#### `GET /me/invitations` 만 네 칸을 더 준다 (2026-09-17, `paik` 37번)
+
+받는 사람은 **아직 그 팀 소속이 아니고**, 알림에서 바로 수락 여부를 정한다.
+팀 id 하나로는 이름도 모르는 팀의 초대를 판단할 수가 없어서 위 응답에 넷을
+덧붙인다(**감싸지 않는다** — 기존 칸의 자리가 바뀌면 화면 배선이 깨진다).
+
+```json
+{
+  "...": "위 칸 전부 그대로",
+  "team_name": "번개FC",
+  "team_region": "서울 강남",
+  "team_sport_code": "football",
+  "squad_public_slug": "sq-abc123"
+}
+```
+
+- `squad_public_slug` 로 `GET /squads/{public_slug}`(누구나 읽는다)를 불러
+  **그 팀 판이 어떻게 짜였는지** 보여 줄 수 있다. 스쿼드를 아직 안 만든
+  팀이면 `null` 이다(스쿼드 생성은 멱등이라 늦게 생긴다)
+- 🔴 **경기 시각·구장은 없다.** 초대는 경기에 묶이지 않는다 — 「우리 팀에
+  오세요」이지 「이 경기에 와 달라」가 아니다. 경기 쪽은 `team_match_request`
+  (팀 대 팀)가 따로 담는다
+- 🔴 팀 이름만 필요하면 `GET /teams/{team_id}` 도 된다 — **소속이 아니어도
+  읽힌다**(인증만 필요). 목록에서 줄마다 부르지 않아도 되게 여기에 실어 줄 뿐이다
+
 | 경로 | 누가 | 무엇 |
 |---|---|---|
-| `POST /api/v1/teams/{team_id}/invitations` | **그 팀 주장** | 초대를 보낸다. 본문은 `{"invited_user_id": "..."}`. `201` |
+| `POST /api/v1/teams/{team_id}/invitations` | **그 팀 주장** | 초대를 보낸다. 본문은 `{"invited_user_id": "...", "position_code": "GK"}` — `position_code` 는 **선택**. `201` |
 | `GET /api/v1/teams/{team_id}/invitations` | **그 팀 주장** | 그 팀이 보낸 초대 전부(상태 무관), 최신순 |
-| `GET /api/v1/me/invitations` | 본인 | 내가 받은, **아직 답 안 한** 초대만, 최신순 |
+| `GET /api/v1/me/invitations` | 본인 | 내가 받은, **아직 답 안 한** 초대만, 최신순. **팀 네 칸이 더 붙는다**(위) |
 | `POST /api/v1/me/invitations/{invitation_id}/accept` | **받은 사람 본인** | 수락 — `team_member` 가 `member` 로 생긴다 |
 | `POST /api/v1/me/invitations/{invitation_id}/reject` | **받은 사람 본인** | 거절 — 아무것도 안 바뀐다 |
 | `DELETE /api/v1/teams/{team_id}/invitations/{invitation_id}` | **그 팀 주장** | 보낸 쪽이 무른다. 🔴 `204` 가 아니라 무른 초대를 그대로 돌려준다(`team_match_request` 의 취소와 같은 이유 — 삭제라기보다 상태 전이다) |
@@ -1311,6 +1393,7 @@ trunk_alignment       2개 루브릭  basketball_jump_shot · basketball_layup  
 | 409 | `ALREADY_MEMBER` | 이미 그 팀 구성원이다 |
 | 409 | `ALREADY_INVITED` | 그 사람에게 보낸 대기 중 초대가 이미 있다 |
 | 409 | `TEAM_INVITATION_ALREADY_RESPONDED` | 이미 답이 난 초대다 |
+| 422 | `UNKNOWN_POSITION` | 이 팀 종목에 없는 `position_code` 다. 약칭은 **종목 안에서만** 유일하다(축구 `FW` ≠ 농구 `FW`) — 목록은 `GET /positions?sport_code=` |
 
 **알림**(`GET /me/notifications`)은 셋이다 — 보낼 때 받은 사람에게
 `team_invitation_sent`, 수락·거절할 때 그 팀 주장(들)에게
@@ -2053,12 +2136,33 @@ failure_reason`도 `null`이다 — `duplicate_of_video_id`만 그대로 남는�
 ### `GET /api/v1/cards/{card_public_slug}/grade` — 남의 표시 등급 (2026-09-16 추가, 미결 `paik` 25·26번)
 
 카드 주인의 **표시 등급**(`S`~`F`)을 카드 슬러그로 가져온다. AI 추천 판이 후보를
-등급으로 좁히는 자리라 생겼다(`paik` 25번). **리포트 전체가 아니라 등급 한
-칸만** 준다 — 근거 문장·수치는 여기 안 실린다.
+등급으로 좁히는 자리라 생겼다(`paik` 25번). **리포트 전체가 아니라 좁은 칸만**
+준다 — 항목별 점수·수치·근거(evidence)는 여기 안 실린다.
 
 ```json
-{ "grade": "S", "provisional": false }
+{
+  "grade": "S", "provisional": false,
+  "notes": ["차는 다리를 끝까지 뻗습니다", "디딤발을 공 옆에 붙입니다"]
+}
 ```
+
+#### `notes` — 추천 판 카드의 불릿 (2026-09-17 추가, `paik` 33번)
+
+봉투의 `result.card.notes`(1.5)를 `analysis_report.card_notes` 로 적재한 값을
+그대로 준다. 추천 판이 「왜 이 사람인가」에 답하는 자리다.
+
+- 🔴 **한 줄뿐인 것이 정상이다** — 두 줄을 채우려고 지어내지 않는 것이 봉투
+  쪽 규칙이다(`ho` 50번).
+- 🔴 **`null` 은 「분석이 없다」가 아니다** — `card` 칸이 없던 봉투(1.4 이하)로
+  적재된 리포트이거나 분석 전이다. 화면은 그 줄을 안 그리면 된다.
+- 🔴 **수치가 없다.** 카드에 수치를 안 그리는 규칙 그대로다(4장).
+- 🔴 **화면이 짓지 않는다** — 분석이 낸 문장이다.
+
+> 25번이 이 경로를 낼 때 「리포트 전체를 열지 말 것」이라 적었고 그때는 등급
+> 한 칸만 냈다. **2026-09-17에 제기자가 그 판단을 스스로 정정해**(「그때는
+> 등급만 필요했습니다. 지금은 문장도 필요합니다 — 다만 리포트를 통째로 여는
+> 것은 여전히 반대입니다」) **한 칸만** 더 열었다. 항목별 점수·근거는 여전히
+> 자기 것만 본다.
 
 - 🔴 **로그인하면 누구나** — `featured-video` 와 같은 원칙.
 - `grade` 는 `S`·`A`·`B`·`C`·`D`·`F` 여섯 중 하나, 또는 **대표 영상이 없거나
@@ -2078,6 +2182,9 @@ failure_reason`도 `null`이다 — `duplicate_of_video_id`만 그대로 남는�
 | 에러 | code | 언제 |
 |---|---|---|
 | 404 | `CARD_NOT_FOUND` | 그 슬러그의 카드가 아예 없다 |
+
+같은 값이 **추천 판 응답에도** 실린다 — `GET /teams/{id}/squad/candidates` 의
+`notes`(3-14절). 그쪽을 쓰면 후보마다 이 경로를 다시 부르지 않아도 된다.
 
 ### 아직 없는 것
 
@@ -3032,11 +3139,27 @@ S3에 없다(EC2 역할이 `videos/` 접두사에 쓰기 권한이 없어 못 �
   "id": "c2a1...", "requester_team_id": "9a1e...", "target_team_id": "b3f1...",
   "proposed_played_at": "2026-09-20T10:00:00+09:00", "proposed_place": "강남 풋살장",
   "status": "pending", "created_at": "2026-09-15T09:00:00Z",
-  "responded_at": null, "match_id": null
+  "responded_at": null, "match_id": null,
+  "requester_team_name": "번개FC", "requester_team_region": "서울 강남",
+  "target_team_name": "망원 유나이티드", "target_team_region": "서울 마포구"
 }
 ```
 
 대상 팀 주장(들)에게 알림(`team_match_requested`)이 간다.
+
+#### 두 팀의 표시용 값 (2026-09-17 추가, `paik` 31번)
+
+`*_name`·`*_region` 넷은 **조회 결과**다 — 신청 행에 복사해 두는 것이 아니라
+매번 `team` 에서 읽는다. 그래서 팀 이름이 바뀌면(`PATCH /teams/{id}`)
+**다음 조회에 바로 반영된다.**
+
+🔴 **클라이언트가 이 값을 캐시하지 않는다.** 캐시하면 이름이 바뀐 뒤 조용히
+옛 이름이 남는다 — 서버가 주는 값을 그때그때 쓴다.
+
+> 팀 하나를 읽는 경로(`GET /teams/{team_id}`)는 **그전에도 있었고 소속이
+> 아니어도 읽힌다.** 넷을 얹은 것은 그 경로가 없어서가 아니라, 목록에서
+> **줄마다 부르지 않아도 되게** 하려는 것이다(`MatchListingEntity` 가 주최
+> 팀 값을 얹는 것과 같은 판단).
 
 | 에러 | code |
 |---|---|
@@ -3108,9 +3231,10 @@ S3에 없다(EC2 역할이 `videos/` 접두사에 쓰기 권한이 없어 못 �
 ```json
 [
   { "user_id": "7c05...", "nickname": "김선우", "card_public_slug": "kim-abc1",
-    "grade": "A", "provisional": false },
+    "grade": "A", "provisional": false,
+    "notes": ["차는 다리를 끝까지 뻗습니다", "디딤발을 공 옆에 붙입니다"] },
   { "user_id": "3af2...", "nickname": "오재현", "card_public_slug": null,
-    "grade": null, "provisional": null }
+    "grade": null, "provisional": null, "notes": null }
 ]
 ```
 
@@ -3123,6 +3247,10 @@ S3에 없다(EC2 역할이 `videos/` 접두사에 쓰기 권한이 없어 못 �
   실력 축 거리**로 정렬한다(`S`=`A`, `F`=`D`로 같은 자리 — 26번 규칙). 등급을
   모르는 후보는 뒤로 가되 사라지지 않는다(`grade: null`).
 - 🔴 **거리·유사도 점수는 응답에 없다** — 순서는 이미 서버가 정렬했다.
+- `notes`(2026-09-17 추가, `paik` 33번)는 **카드에 그릴 불릿 한두 줄**이다 —
+  `GET /cards/{slug}/grade` 의 같은 칸과 **같은 값**이고 같은 리포트에서 온다.
+  여기 실은 이유는 후보마다 그 경로를 다시 부르지 않게 하려는 것이다.
+  🔴 **`null`·한 줄이 모두 정상**이고 화면이 짓지 않는다(3-6절의 설명 참조).
 - `grade`·`provisional`은 25·26번과 같은 계산(신뢰 축은 저장하지 않고 매
   요청 다시 집계).
 

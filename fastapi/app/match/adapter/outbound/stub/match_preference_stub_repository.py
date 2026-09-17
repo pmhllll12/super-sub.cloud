@@ -56,6 +56,8 @@ _TEAM_POSITIONS: dict[tuple[UUID, str], UUID] = {}  # (team_id, code) -> positio
 _SEATED: dict[UUID, set[UUID]] = {}  # team_id -> 이미 스쿼드에 앉은 user_id
 _CANDIDATE_GRADES: dict[UUID, tuple[str | None, bool | None]] = {}
 _CANDIDATE_SLUGS: dict[UUID, str | None] = {}
+# 추천 판 카드의 불릿(`paik` 33번). 안 부르면 `None`.
+_CANDIDATE_NOTES: dict[UUID, list[str]] = {}
 _CANDIDATE_ACTIVITY: dict[UUID, datetime | None] = {}
 
 
@@ -76,6 +78,7 @@ def reset_match_preferences() -> None:
         _SEATED,
         _CANDIDATE_GRADES,
         _CANDIDATE_SLUGS,
+        _CANDIDATE_NOTES,
         _CANDIDATE_ACTIVITY,
     ):
         d.clear()
@@ -122,6 +125,14 @@ def register_candidate_grade(
     """`squad_recruitment_facts` 가 쓸 등급(`paik` 25·26·27번). 안 부르면
     분석 전(`None`)으로 본다."""
     _CANDIDATE_GRADES[user_id] = (grade, provisional)
+
+
+def register_candidate_notes(user_id: UUID, notes: list[str]) -> None:
+    """`squad_recruitment_facts` 가 함께 줄 카드 불릿(`paik` 33번).
+
+    안 부르면 `None` 이다 — `card` 없는 봉투로 적재됐거나 분석 전과 같다.
+    """
+    _CANDIDATE_NOTES[user_id] = notes
 
 
 def register_candidate_card(user_id: UUID, public_slug: str | None) -> None:
@@ -282,6 +293,7 @@ class StubMatchPreferenceRepository(MatchPreferencePort):
                 grade=_CANDIDATE_GRADES.get(uid, (None, None))[0],
                 provisional=_CANDIDATE_GRADES.get(uid, (None, None))[1],
                 last_active_at=_CANDIDATE_ACTIVITY.get(uid),
+                notes=_CANDIDATE_NOTES.get(uid),
             )
             for uid in candidate_ids
         ]

@@ -7,6 +7,9 @@
   동시 확정 방지로 정리된 쪽 양쪽에게) — `notification`은 `match`가 임포트
   못 하는 남의 테이블이라 원시 SQL로 직접 대조한다
 - 동시 확정 방지가 실제 트랜잭션에서 두 팀 다 정리하는가
+- 🔴 **팀 이름·지역을 `team` 에서 그때그때 읽는가**(`paik` 31번) — `team` 은
+  `user` 컨텍스트라 원시 SQL(`table()`/`column()`)로 읽는다. 저쪽 컬럼 이름이
+  바뀌어도 파이썬이 안 잡아 주므로 **여기가 유일한 방어선이다**
 """
 
 from __future__ import annotations
@@ -262,3 +265,49 @@ class TestCancelMatch:
             )
         ).scalar_one()
         assert notif == world["b_owner"]["id"]
+
+
+class TestTeamNamesFromRealTable:
+    """`paik` 31번 — 표시용 팀 값이 실제 `team` 테이블에서 온다."""
+
+    def _create(self, db_client, world):
+        res = db_client.post(
+            f"{V1}/teams/{world['team_a']}/match-requests",
+            json={
+                "target_team_id": str(world["team_b"]),
+                "played_at": _future(),
+                "place": "강남 풋살장",
+            },
+            headers=world["a_owner"]["headers"],
+        )
+        assert res.status_code == 201, res.text
+        return res.json()
+
+    def test_두_팀의_이름과_지역이_실물에서_온다(self, db_client, world):
+        body = self._create(db_client, world)
+        assert body["requester_team_name"] == "팀A"
+        assert body["target_team_name"] == "팀B"
+        assert body["requester_team_region"] == "서울"
+        assert body["target_team_region"] == "서울"
+
+    def test_팀_이름을_고치면_다음_조회에_바로_반영된다(self, db_client, world):
+        """🔴 이것이 「화면에서 캐시하지 마십시오」의 근거다(항목의 「하지 말 것」).
+
+        값이 신청 행에 **복사돼 있었다면** 옛 이름이 그대로 남는다 — 매번
+        `team` 에서 읽기 때문에 안 남는다.
+        """
+        self._create(db_client, world)
+
+        renamed = db_client.patch(
+            f"{V1}/teams/{world['team_a']}",
+            json={"name": "천둥FC", "region": "부산 해운대구"},
+            headers=world["a_owner"]["headers"],
+        )
+        assert renamed.status_code == 200, renamed.text
+
+        rows = db_client.get(
+            f"{V1}/teams/{world['team_b']}/match-requests",
+            headers=world["b_owner"]["headers"],
+        ).json()
+        assert [r["requester_team_name"] for r in rows] == ["천둥FC"]
+        assert [r["requester_team_region"] for r in rows] == ["부산 해운대구"]

@@ -231,10 +231,22 @@ class StubMatchRepository(StubApplicationsMixin, MatchPort):
             if t == team_id and role == "owner"
         ]
 
-    def create_team_match_request(self, request: TeamMatchRequestEntity) -> None:
+    def create_team_match_request(
+        self, request: TeamMatchRequestEntity
+    ) -> TeamMatchRequestEntity:
         """알림 생성은 흉내 내지 않는다 — `notification_stub_repository.py`와
         같은 철학(알림은 DB 테스트만 본다)."""
-        _TEAM_MATCH_REQUESTS[request.id] = request
+        requester = _TEAM_META.get(request.requester_team_id, ("", ""))
+        target = _TEAM_META.get(request.target_team_id, ("", ""))
+        filled = replace(
+            request,
+            requester_team_name=requester[0],
+            requester_team_region=requester[1],
+            target_team_name=target[0],
+            target_team_region=target[1],
+        )
+        _TEAM_MATCH_REQUESTS[request.id] = filled
+        return filled
 
     def find_team_match_request(
         self, request_id: UUID

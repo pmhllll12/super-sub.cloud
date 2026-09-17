@@ -224,7 +224,9 @@ class VideoPgRepository(VideoPort):
         # 시 통과한 것만 작업이 생긴다) 이 조인이 자연히 걸러 낸다.
         report = self._session.execute(
             select(
-                AnalysisReportOrm.overall_grade, AnalysisReportOrm.provisional
+                AnalysisReportOrm.overall_grade,
+                AnalysisReportOrm.provisional,
+                AnalysisReportOrm.card_notes,
             )
             .select_from(VideoOrm)
             .join(AnalysisJobOrm, AnalysisJobOrm.video_id == VideoOrm.id)
@@ -268,6 +270,7 @@ class VideoPgRepository(VideoPort):
             provisional=report.provisional if report else None,
             trust_positive=trust_positive,
             trust_total=trust_total,
+            card_notes=report.card_notes if report else None,
         )
 
     def mark_kept(

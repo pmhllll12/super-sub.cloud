@@ -90,3 +90,8 @@ class SquadCandidateResponse(BaseModel):
     card_public_slug: str | None
     grade: str | None
     provisional: bool | None
+    # 카드에 그릴 불릿 **한두 줄**(`paik` 33번). 🔴 **화면이 짓지 않는다** —
+    # 분석이 낸 문장이다. `null`(옛 봉투로 적재·분석 전)이면 그 줄을 안
+    # 그리면 되고, **한 줄뿐인 것도 정상이다**(두 줄을 채우려고 지어내지
+    # 않는 것이 봉투 쪽 규칙이다).
+    notes: list[str] | None = None

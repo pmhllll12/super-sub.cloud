@@ -17,6 +17,7 @@ from app.match.adapter.outbound.stub.match_preference_stub_repository import (
     register_candidate_activity,
     register_candidate_card,
     register_candidate_grade,
+    register_candidate_notes,
     register_last_match,
     register_position,
     register_seated,
@@ -405,6 +406,10 @@ class TestSquadCandidates:
         assert order == [str(cand_a), str(cand_c), str(cand_d), str(cand_none)]
 
     def test_거리_점수는_응답에_없다(self, client):
+        """🔴 **2026-09-17에 `notes` 가 늘었다**(`paik` 33번) — 카드에 그릴
+        불릿이다. 이 검사가 지키는 선은 그대로다: **실력 축 거리·유사도 점수는
+        여전히 안 나간다**(20번과 같은 원칙 — 순서가 곧 답이다).
+        """
         team_id, owner, cand = uuid4(), uuid4(), uuid4()
         position_id = uuid4()
         register_team(team_id)
@@ -421,4 +426,46 @@ class TestSquadCandidates:
         assert res.status_code == 200, res.text
         assert set(res.json()[0]) == {
             "user_id", "nickname", "card_public_slug", "grade", "provisional",
+            "notes",
         }
+
+    def test_후보_카드의_불릿이_함께_온다(self, client):
+        """`paik` 33번 — 「왜 이 사람인가」에 답하는 문장이다.
+
+        🔴 추천 판이 후보마다 `GET /cards/{slug}/grade` 를 또 부르지 않아도
+        되게 여기 싣는다(같은 리포트에서 온 값이다).
+        """
+        team_id, owner, cand = uuid4(), uuid4(), uuid4()
+        position_id = uuid4()
+        register_team(team_id)
+        register_team_member(team_id, owner, "owner", "주장")
+        register_team_position(team_id, "GK", position_id)
+        _set_member_position(client, cand, position_id)
+        register_candidate_grade(cand, "A", provisional=False)
+        register_candidate_notes(cand, ["차는 다리를 끝까지 뻗습니다"])
+
+        res = client.get(
+            f"{V1}/teams/{team_id}/squad/candidates",
+            params={"position_code": "GK"},
+            headers=_headers(owner),
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()[0]["notes"] == ["차는 다리를 끝까지 뻗습니다"]
+
+    def test_불릿이_없는_후보는_null_이다(self, client):
+        """🔴 `null` 은 「분석이 없다」가 아니다 — 그 줄을 안 그리면 된다."""
+        team_id, owner, cand = uuid4(), uuid4(), uuid4()
+        position_id = uuid4()
+        register_team(team_id)
+        register_team_member(team_id, owner, "owner", "주장")
+        register_team_position(team_id, "GK", position_id)
+        _set_member_position(client, cand, position_id)
+        register_candidate_grade(cand, "B", provisional=False)
+
+        res = client.get(
+            f"{V1}/teams/{team_id}/squad/candidates",
+            params={"position_code": "GK"},
+            headers=_headers(owner),
+        )
+        assert res.json()[0]["notes"] is None
+        assert res.json()[0]["grade"] == "B"
