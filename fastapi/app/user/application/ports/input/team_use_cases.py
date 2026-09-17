@@ -14,6 +14,7 @@ from app.user.application.dtos.team_dto import (
     CreateTeamInvitationCommand,
     JoinTeamCommand,
     LeaveTeamCommand,
+    MyTeamInvitationResult,
     MyTeamInvitationsQuery,
     RespondTeamInvitationCommand,
     TeamInvitationResult,
@@ -70,8 +71,12 @@ class ListMyTeamInvitationsUseCase(ABC):
     @abstractmethod
     def __call__(
         self, query: MyTeamInvitationsQuery
-    ) -> list[TeamInvitationResult]:
-        """내가 받은, 아직 답 안 한 초대 목록."""
+    ) -> list[MyTeamInvitationResult]:
+        """내가 받은, 아직 답 안 한 초대 목록.
+
+        🔴 팀 이름·지역·종목과 스쿼드 슬러그를 **함께** 준다(`paik` 37번) —
+        받는 사람은 그 팀 소속이 아니라, 초대 한 줄만 보고 정한다.
+        """
 
 
 class AcceptTeamInvitationUseCase(ABC):

@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from uuid import UUID
 
 from app.user.domain.entities.team_entity import (
+    MyTeamInvitationEntity,
     TeamEntity,
     TeamInvitationEntity,
     TeamMemberEntity,
@@ -93,8 +94,18 @@ class TeamPort(ABC):
     @abstractmethod
     def list_my_pending_invitations(
         self, user_id: UUID
-    ) -> list[TeamInvitationEntity]:
-        """내가 받은, 아직 답 안 한 초대만, 최신순."""
+    ) -> list[MyTeamInvitationEntity]:
+        """내가 받은, 아직 답 안 한 초대만, 최신순.
+
+        🔴 **팀 쪽 값을 함께 싣는다**(`paik` 37번) — 받는 사람은 그 팀 소속이
+        아니라 팀 화면을 거치지 않고 알림에서 바로 정한다. 스쿼드 슬러그까지
+        함께 주면 화면이 이미 있는 `GET /squads/{slug}` 로 판을 그릴 수 있어
+        새 경로가 필요 없다.
+        """
+
+    @abstractmethod
+    def find_position(self, sport_code: str, code: str) -> tuple[UUID, str] | None:
+        """`(id, label)`. 약칭은 **종목 안에서만** 유일하므로 종목과 함께 찾는다."""
 
     @abstractmethod
     def accept_team_invitation(self, invitation_id: UUID) -> TeamInvitationEntity:

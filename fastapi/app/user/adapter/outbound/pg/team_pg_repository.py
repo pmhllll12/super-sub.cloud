@@ -16,6 +16,7 @@ from sqlalchemy import column, insert, select, table, update
 from sqlalchemy.orm import Session
 
 from app.core.errors import ApiError
+from app.user.adapter.outbound.orm.position_orm import PositionOrm
 from app.user.adapter.outbound.orm.sport_orm import SportOrm
 from app.user.adapter.outbound.orm.team_invitation_orm import TeamInvitationOrm
 from app.user.adapter.outbound.orm.team_member_orm import TeamMemberOrm
@@ -23,6 +24,7 @@ from app.user.adapter.outbound.orm.team_orm import TeamOrm
 from app.user.adapter.outbound.orm.user_orm import UserOrm
 from app.user.application.ports.output.team_port import TeamPort
 from app.user.domain.entities.team_entity import (
+    MyTeamInvitationEntity,
     TeamEntity,
     TeamInvitationEntity,
     TeamMemberEntity,
@@ -33,6 +35,9 @@ from app.user.domain.value_objects.team_role_vo import TeamRole
 
 # 소유하지 않는 테이블에서 **읽기만** 한다. 위 docstring 참조.
 _card = table("player_card", column("id"), column("user_id"), column("public_slug"))
+
+# `squad` 도 `card` 컨텍스트다 — 위와 같은 이유로 임포트하지 않는다(`paik` 37번).
+_squad = table("squad", column("team_id"), column("public_slug"))
 
 # `notification` 은 `notification` 컨텍스트의 테이블이다. 임포트하지 않고
 # 원시 SQL 로 쓴다 — `user_pg_repository.py`의 `_notification`과 같은 방식·이유.
@@ -264,6 +269,7 @@ class TeamPgRepository(TeamPort):
                 team_id=invitation.team_id,
                 invited_user_id=invitation.invited_user_id,
                 status=invitation.status,
+                position_id=invitation.position_id,
                 created_at=invitation.created_at,
             )
         )
@@ -302,16 +308,35 @@ class TeamPgRepository(TeamPort):
 
     def list_my_pending_invitations(
         self, user_id: UUID
-    ) -> list[TeamInvitationEntity]:
+    ) -> list[MyTeamInvitationEntity]:
+        # 스쿼드는 `team_id` 에 유일 제약이 없다(`squad_orm.py` 참고 — ERD 에
+        # 없는 제약은 늘리지 않았고 앱이 팀당 하나로 다룬다). 그래서 상관
+        # 서브쿼리에 `limit(1)` 을 건다 — 여러 행이 생겨도 질의가 안 깨진다.
+        squad_slug = (
+            select(_squad.c.public_slug)
+            .where(_squad.c.team_id == TeamInvitationOrm.team_id)
+            .limit(1)
+            .scalar_subquery()
+        )
         stmt = (
-            select(TeamInvitationOrm)
+            select(TeamInvitationOrm, TeamOrm, squad_slug)
+            .join(TeamOrm, TeamOrm.id == TeamInvitationOrm.team_id)
             .where(
                 TeamInvitationOrm.invited_user_id == user_id,
                 TeamInvitationOrm.status == PENDING,
             )
             .order_by(TeamInvitationOrm.created_at.desc())
         )
-        return [self._to_invitation(r) for r in self._session.execute(stmt).scalars()]
+        return [
+            MyTeamInvitationEntity(
+                invitation=self._to_invitation(invitation),
+                team_name=team.name,
+                team_region=team.region,
+                team_sport_code=team.sport_code,
+                squad_public_slug=slug,
+            )
+            for invitation, team, slug in self._session.execute(stmt)
+        ]
 
     def accept_team_invitation(self, invitation_id: UUID) -> TeamInvitationEntity:
         row = self._session.get(TeamInvitationOrm, invitation_id)
@@ -351,7 +376,22 @@ class TeamPgRepository(TeamPort):
         self._session.commit()
         return self._to_invitation(row)
 
+    def find_position(self, sport_code: str, code: str) -> tuple[UUID, str] | None:
+        stmt = select(PositionOrm.id, PositionOrm.label).where(
+            PositionOrm.sport_code == sport_code, PositionOrm.code == code
+        )
+        row = self._session.execute(stmt).first()
+        return None if row is None else (row[0], row[1])
+
     def _to_invitation(self, row: TeamInvitationOrm) -> TeamInvitationEntity:
+        # 자리를 정한 초대만 포지션 한 줄을 더 읽는다. 목록이 작고(한 사람이
+        # 받은 대기 초대·한 팀이 보낸 초대) 같은 포지션은 세션 identity map 이
+        # 재사용하므로 조인으로 넓히는 대신 이 편을 골랐다.
+        position = (
+            None
+            if row.position_id is None
+            else self._session.get(PositionOrm, row.position_id)
+        )
         return TeamInvitationEntity(
             id=row.id,
             team_id=row.team_id,
@@ -359,4 +399,7 @@ class TeamPgRepository(TeamPort):
             status=row.status,
             created_at=row.created_at,
             responded_at=row.responded_at,
+            position_id=row.position_id,
+            position_code=None if position is None else position.code,
+            position_label=None if position is None else position.label,
         )

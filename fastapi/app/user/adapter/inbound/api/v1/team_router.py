@@ -15,6 +15,7 @@ from app.user.adapter.inbound.api.schemas.team_schema import (
     AddMemberSchema,
     CreateTeamInvitationSchema,
     CreateTeamSchema,
+    MyTeamInvitationResponse,
     TeamInvitationResponse,
     TeamResponse,
     UpdateTeamSchema,
@@ -25,6 +26,7 @@ from app.user.application.dtos.team_dto import (
     CreateTeamInvitationCommand,
     JoinTeamCommand,
     LeaveTeamCommand,
+    MyTeamInvitationResult,
     MyTeamInvitationsQuery,
     RespondTeamInvitationCommand,
     TeamInvitationResult,
@@ -166,10 +168,17 @@ def create_team_invitation(
     | 404 `USER_NOT_FOUND` | 그 사람이 없다 |
     | 409 `ALREADY_MEMBER` | 이미 이 팀의 구성원이다 |
     | 409 `ALREADY_INVITED` | 이미 그 사람에게 보낸 대기 중 초대가 있다 |
+    | 422 `UNKNOWN_POSITION` | 이 팀 종목에 없는 `position_code` 다 |
+
+    `position_code`(「부르는 자리」)는 **선택이다** — 안 주면 자리를 안 정한
+    초대가 된다(`paik` 37번).
     """
     return use_case(
         CreateTeamInvitationCommand(
-            actor_id=user_id, team_id=team_id, invited_user_id=body.invited_user_id
+            actor_id=user_id,
+            team_id=team_id,
+            invited_user_id=body.invited_user_id,
+            position_code=body.position_code,
         )
     )
 
@@ -187,11 +196,21 @@ def list_team_invitations(
     return use_case(TeamInvitationsQuery(actor_id=user_id, team_id=team_id))
 
 
-@team_router.get("/me/invitations", response_model=list[TeamInvitationResponse])
+@team_router.get("/me/invitations", response_model=list[MyTeamInvitationResponse])
 def list_my_invitations(
     user_id: CurrentUserId, use_case: ListMyTeamInvitationsUseCaseDep
-) -> list[TeamInvitationResult]:
-    """내가 받은, 아직 답 안 한 초대 목록."""
+) -> list[MyTeamInvitationResult]:
+    """내가 받은, 아직 답 안 한 초대 목록.
+
+    🔴 **초대 한 줄만 보고 정할 수 있게** 팀 이름·지역·종목과 그 팀 스쿼드의
+    공개 슬러그를 함께 싣는다(`paik` 37번). 받는 사람은 아직 그 팀 소속이
+    아니라 팀 화면을 거치지 않는다.
+
+    `squad_public_slug` 는 `GET /squads/{slug}`(누구나 읽는다)에 그대로 넣어
+    그 팀 판을 그리는 데 쓴다 — 어느 자리가 비었는지 보고 정하라는 것이다.
+
+    🔴 **경기 시각·구장은 없다** — 초대는 경기에 묶이지 않는다.
+    """
     return use_case(MyTeamInvitationsQuery(user_id=user_id))
 
 

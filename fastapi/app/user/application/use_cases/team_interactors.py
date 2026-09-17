@@ -15,6 +15,7 @@ from app.user.application.dtos.team_dto import (
     CreateTeamInvitationCommand,
     JoinTeamCommand,
     LeaveTeamCommand,
+    MyTeamInvitationResult,
     MyTeamInvitationsQuery,
     RespondTeamInvitationCommand,
     TeamInvitationResult,
@@ -38,6 +39,7 @@ from app.user.application.ports.input.team_use_cases import (
 )
 from app.user.application.ports.output.team_port import TeamPort
 from app.user.application.use_cases.team_assembler import (
+    to_my_team_invitation_result,
     to_team_invitation_result,
     to_team_result,
 )
@@ -227,12 +229,31 @@ class CreateTeamInvitationInteractor(_TeamInteractorBase, CreateTeamInvitationUs
                 "이미 이 사람에게 보낸 대기 중인 초대가 있습니다.",
             )
 
+        position_id = position_code = position_label = None
+        if command.position_code is not None:
+            found = self._repository.find_position(
+                team.sport_code, command.position_code
+            )
+            if found is None:
+                # 약칭은 **종목 안에서만** 유일하다 — 농구 `C`(센터)로 축구
+                # 팀에 초대하는 것은 오타지 빈 자리가 아니다.
+                raise ApiError(
+                    422,
+                    "UNKNOWN_POSITION",
+                    "이 팀 종목에 없는 포지션입니다.",
+                )
+            position_id, position_label = found
+            position_code = command.position_code
+
         invitation = TeamInvitationEntity(
             id=uuid4(),
             team_id=team.id,
             invited_user_id=command.invited_user_id,
             status=PENDING,
             created_at=datetime.now(timezone.utc),
+            position_id=position_id,
+            position_code=position_code,
+            position_label=position_label,
         )
         self._repository.create_team_invitation(invitation)
         return to_team_invitation_result(invitation)
@@ -257,9 +278,9 @@ class ListMyTeamInvitationsInteractor(ListMyTeamInvitationsUseCase):
 
     def __call__(
         self, query: MyTeamInvitationsQuery
-    ) -> list[TeamInvitationResult]:
+    ) -> list[MyTeamInvitationResult]:
         return [
-            to_team_invitation_result(i)
+            to_my_team_invitation_result(i)
             for i in self._repository.list_my_pending_invitations(query.user_id)
         ]
 

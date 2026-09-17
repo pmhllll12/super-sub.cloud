@@ -1291,15 +1291,47 @@ trunk_alignment       2개 루브릭  basketball_jump_shot · basketball_layup  
   "invited_user_id": "9a2e...",
   "status": "pending",
   "created_at": "2026-09-16T09:00:00Z",
-  "responded_at": null
+  "responded_at": null,
+  "position_code": "GK",
+  "position_label": "골키퍼"
 }
 ```
 
+`position_*`(「부르는 자리」, 2026-09-17 추가·`paik` 37번)는 **둘 다 `null` 일
+수 있다** — 자리를 안 정한 초대(「우리 팀에 오세요」)가 정상이다. 약칭과 이름을
+함께 주는 이유는 구성원의 카드 둘과 같다 — 하나만 주면 화면이 나머지를 얻을
+경로가 없다.
+
+#### `GET /me/invitations` 만 네 칸을 더 준다 (2026-09-17, `paik` 37번)
+
+받는 사람은 **아직 그 팀 소속이 아니고**, 알림에서 바로 수락 여부를 정한다.
+팀 id 하나로는 이름도 모르는 팀의 초대를 판단할 수가 없어서 위 응답에 넷을
+덧붙인다(**감싸지 않는다** — 기존 칸의 자리가 바뀌면 화면 배선이 깨진다).
+
+```json
+{
+  "...": "위 칸 전부 그대로",
+  "team_name": "번개FC",
+  "team_region": "서울 강남",
+  "team_sport_code": "football",
+  "squad_public_slug": "sq-abc123"
+}
+```
+
+- `squad_public_slug` 로 `GET /squads/{public_slug}`(누구나 읽는다)를 불러
+  **그 팀 판이 어떻게 짜였는지** 보여 줄 수 있다. 스쿼드를 아직 안 만든
+  팀이면 `null` 이다(스쿼드 생성은 멱등이라 늦게 생긴다)
+- 🔴 **경기 시각·구장은 없다.** 초대는 경기에 묶이지 않는다 — 「우리 팀에
+  오세요」이지 「이 경기에 와 달라」가 아니다. 경기 쪽은 `team_match_request`
+  (팀 대 팀)가 따로 담는다
+- 🔴 팀 이름만 필요하면 `GET /teams/{team_id}` 도 된다 — **소속이 아니어도
+  읽힌다**(인증만 필요). 목록에서 줄마다 부르지 않아도 되게 여기에 실어 줄 뿐이다
+
 | 경로 | 누가 | 무엇 |
 |---|---|---|
-| `POST /api/v1/teams/{team_id}/invitations` | **그 팀 주장** | 초대를 보낸다. 본문은 `{"invited_user_id": "..."}`. `201` |
+| `POST /api/v1/teams/{team_id}/invitations` | **그 팀 주장** | 초대를 보낸다. 본문은 `{"invited_user_id": "...", "position_code": "GK"}` — `position_code` 는 **선택**. `201` |
 | `GET /api/v1/teams/{team_id}/invitations` | **그 팀 주장** | 그 팀이 보낸 초대 전부(상태 무관), 최신순 |
-| `GET /api/v1/me/invitations` | 본인 | 내가 받은, **아직 답 안 한** 초대만, 최신순 |
+| `GET /api/v1/me/invitations` | 본인 | 내가 받은, **아직 답 안 한** 초대만, 최신순. **팀 네 칸이 더 붙는다**(위) |
 | `POST /api/v1/me/invitations/{invitation_id}/accept` | **받은 사람 본인** | 수락 — `team_member` 가 `member` 로 생긴다 |
 | `POST /api/v1/me/invitations/{invitation_id}/reject` | **받은 사람 본인** | 거절 — 아무것도 안 바뀐다 |
 | `DELETE /api/v1/teams/{team_id}/invitations/{invitation_id}` | **그 팀 주장** | 보낸 쪽이 무른다. 🔴 `204` 가 아니라 무른 초대를 그대로 돌려준다(`team_match_request` 의 취소와 같은 이유 — 삭제라기보다 상태 전이다) |
@@ -1311,6 +1343,7 @@ trunk_alignment       2개 루브릭  basketball_jump_shot · basketball_layup  
 | 409 | `ALREADY_MEMBER` | 이미 그 팀 구성원이다 |
 | 409 | `ALREADY_INVITED` | 그 사람에게 보낸 대기 중 초대가 이미 있다 |
 | 409 | `TEAM_INVITATION_ALREADY_RESPONDED` | 이미 답이 난 초대다 |
+| 422 | `UNKNOWN_POSITION` | 이 팀 종목에 없는 `position_code` 다. 약칭은 **종목 안에서만** 유일하다(축구 `FW` ≠ 농구 `FW`) — 목록은 `GET /positions?sport_code=` |
 
 **알림**(`GET /me/notifications`)은 셋이다 — 보낼 때 받은 사람에게
 `team_invitation_sent`, 수락·거절할 때 그 팀 주장(들)에게

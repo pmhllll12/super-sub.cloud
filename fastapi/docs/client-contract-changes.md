@@ -2212,6 +2212,85 @@ PATCH /teams/{team_id}   { }                            // 아무것도 안 바�
 
 ---
 
+## 53. 받은 초대 한 줄에 **팀 이름·부르는 자리·스쿼드 슬러그**가 실립니다 (2026-09-17 추가, `paik` 37번)
+
+`GET /me/invitations` 가 주던 것이 id 뿐이라, 받은 사람 화면이 「어느 팀이
+무엇으로 부르는지」를 그릴 값이 없었습니다.
+
+```jsonc
+GET /me/invitations
+[
+  {
+    // 지금까지 주던 칸 — 그대로입니다
+    "id": "0d2f...", "team_id": "7c05...", "invited_user_id": "9a2e...",
+    "status": "pending", "created_at": "...", "responded_at": null,
+
+    // 늘어난 칸
+    "position_code": "GK",          // null 일 수 있습니다
+    "position_label": "골키퍼",      // null 일 수 있습니다
+    "team_name": "번개FC",
+    "team_region": "서울 강남",
+    "team_sport_code": "football",
+    "squad_public_slug": "sq-abc123" // null 일 수 있습니다
+  }
+]
+```
+
+🔴 **기존 칸은 자리가 안 바뀝니다** — `team` 객체로 감싸지 않았습니다. 지금
+`row.team_id` 를 읽는 코드는 **그대로 둬도 됩니다.** 늘어난 칸만 더 읽으면
+됩니다.
+
+### 초대를 보낼 때 자리를 함께 정할 수 있습니다
+
+```jsonc
+POST /teams/{team_id}/invitations   { "invited_user_id": "...", "position_code": "GK" }
+POST /teams/{team_id}/invitations   { "invited_user_id": "..." }   // 자리 안 정함
+```
+
+`position_code` 는 **선택**입니다. 이 팀 종목에 없는 약칭이면 `422
+UNKNOWN_POSITION` 입니다 — 목록은 `GET /positions?sport_code=` 입니다.
+약칭은 **종목 안에서만** 유일합니다(축구 `FW` ≠ 농구 `FW`).
+
+### 🔴 앞서 미결 항목에 적힌 두 가지를 정정합니다
+
+1. **「받는 사람은 소속이 아니라 `GET /teams/{id}` 가 403」은 사실이 아닙니다.**
+   그 경로에는 소속 검사가 없습니다 — 인증만 있으면 누구나 읽습니다(가입하려면
+   먼저 봐야 하니까요). 즉 팀 이름은 **그전에도** 얻을 수 있었습니다. 이번에
+   실어 준 것은 목록에서 줄마다 부르지 않아도 되게 하려는 것입니다.
+   자체 우회를 이미 만드셨다면 걷어내셔도 됩니다.
+2. **경기 시각·구장은 안 줍니다.** 초대가 경기에 묶이지 않기 때문입니다 —
+   「우리 팀에 오세요」이지 「이 경기에 와 달라」가 아닙니다(`team_invitation`
+   에 경기를 가리키는 칸이 없습니다). 경기 쪽은 `team_match_request`(팀 대 팀)가
+   따로 담습니다. **그 두 칸은 빼고 그리시면 됩니다.**
+
+### 만족해야 할 성질
+
+1. **초대 한 줄만 보고 수락 여부를 정할 수 있을 것** — 팀 이름·지역, 부르는
+   자리(있으면), 그리고 판.
+2. **`squad_public_slug` 로 작은 스쿼드 판을 그릴 것** — `GET /squads/{slug}`
+   는 누구나 읽습니다. 새 경로도 새 부품도 필요 없습니다(`SquadPanel` 재사용).
+
+### 🔴 하지 말 것
+
+- **`position_*` 가 `null` 인 것을 실패로 보지 마십시오** — 자리를 안 정한
+  초대가 정상입니다. 그때는 자리 줄을 안 그리면 됩니다.
+- **`squad_public_slug` 가 `null` 인 것도 정상입니다** — 스쿼드를 아직 안 만든
+  팀입니다. 판 대신 「아직 판이 없습니다」로 두시면 됩니다.
+- **`position_code` 만 보고 이름을 지어내지 마십시오** — `position_label` 이
+  같이 갑니다. 종목마다 같은 약칭이 다른 뜻이라 클라이언트가 표를 갖고
+  있으면 갈립니다.
+
+### 확인
+
+```bash
+# 늘어난 칸이 실제로 나가는가 (로그인 토큰 필요)
+curl -s -H "Authorization: Bearer $TOKEN" "$API/api/v1/me/invitations" | jq '.[0]'
+```
+
+상세: `fastapi/docs/api-contract.md`(3-3절 「팀 초대」)
+
+---
+
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린
 것이다. 새로 붙이는 화면이 있으면 계약 문서 쪽을 본다.
 
