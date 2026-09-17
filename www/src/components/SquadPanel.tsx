@@ -14,7 +14,6 @@ import { teamById, type MatchTeam } from '@/lib/teamMatch'
 import {
   addSeat,
   formationToSize,
-  removeSeat,
   saveFormation,
   saveSeat,
   seatOf,
@@ -675,11 +674,15 @@ export default function SquadPanel({
   const mySeat = slots.find((sl) => sl.mine) ?? null
 
   /**
-   * **나를 이 자리에 앉힌다**(사용자 설계, 2026-09-16).
+   * **나를 이 자리에 앉힌다.**
    *
-   * 🔴 처음 들어온 사람의 판은 **비어 있다.** 빈 자리를 눌렀을 때 뜨는
-   * 「나」 표식을 눌러야 내 카드가 그 자리에 선다 — 전에는 FW 한 칸에
-   * 박아 두어 아무것도 안 했는데 이미 서 있었다.
+   * 🔴 **정정 (2026-09-17, 사용자 판단).** 하루 전에는 「처음 판은 비어 있고,
+   * 빈 자리를 눌러 뜨는 **「나」 표식**을 눌러야 내 카드가 선다」였다. 그
+   * 표식을 **없앴다** — 팀을 만든 사람은 **뛴다고 보고 FW 에 먼저 앉힌다**
+   * (아래 자동 착석). 옮기든 빼든 그건 그다음 일이고, **일단 앉혀 놓고**
+   * 시작하는 것이 판을 처음 여는 사람에게 자연스럽다.
+   *
+   * 이 함수는 그대로 남는다 — 자동 착석이 이것을 부른다.
    */
   function seatMe(area: string) {
     if (mySeat || !myCardId) return
@@ -707,25 +710,6 @@ export default function SquadPanel({
     }
   }
 
-  /** **나를 판에서 뺀다** — 카드는 안 지워진다. 다시 「나」 표식이 뜬다. */
-  function unseatMe(area: string) {
-    setSlots((prev) => prev.map((sl) => (sl.area === area ? { ...sl, mine: false } : sl)))
-    /* 🔴 **추천 판도 같이 닫는다**(사용자 지적, 2026-09-16: "x 로 없앴더니
-       다른 데 클릭도 안 했는데 저게 나온다"). 빼는 순간 `mySeat` 가 비는데
-       추천 판이 열린 채면 그 자리에 「나」 핀이 **곧바로** 뜬다 — 누르지도
-       않았는데 다시 넣으라고 보채는 꼴이다. 다시 넣고 싶으면 그때 누른다. */
-    setPicking(null)
-    const memberId = members[area]
-    if (squad && memberId) {
-      setMembers((prev) => {
-        const next = { ...prev }
-        delete next[area]
-        return next
-      })
-      persist(() => removeSeat(squad.team_id, memberId))
-    }
-  }
-
   /** 이름표를 눌러 포지션을 직접 정한다 — 한 번에 한 칸씩 돈다(자동 포함). */
   function cyclePos(area: string) {
     const next = slots.map((sl) => {
@@ -746,6 +730,45 @@ export default function SquadPanel({
   // 닫히는 중인 자리 — 물러나는 동안 DOM 에 남겨 둬야 애니메이션이 보인다.
   const [closing, setClosing] = useState<Slot | null>(null)
   const timer = useRef(0)
+
+  /**
+   * 🔴 **팀을 만든 사람은 FW 에 먼저 앉는다** (2026-09-17, 사용자 판단).
+   *
+   * 「나」 표식(빈 자리를 눌러 내 카드를 세우던 핀)을 없애고 대신 이것을 둔다 —
+   * **팀장은 뛴다고 보고 일단 앉혀 놓고 시작한다.** 옮기는 것도 빼는 것도
+   * 그다음 일이다.
+   *
+   * 🔴 **FW 가 차 있으면 빈 자리에 앉는다** — 남을 밀어내지는 않는다. 팀이
+   * 아직 없으면(등재 없음) 화면에만 앉고 `seatMe` 가 서버 저장을 건너뛴다.
+   *
+   * 🔴 **세션 안에서 한 번만**(`autoSeated`). 지금은 내 카드에 ⊗ 가 없어
+   * 스스로 빠질 일이 없지만, 판이 비는 다른 길(크기 바꾸기 · 늦게 온 응답)에서
+   * 이 효과가 다시 돌면 **서버로 같은 등재가 두 번** 나간다.
+   *
+   * ⚠️ 새로고침하면 서버에 남은 등재를 읽어 그 자리에 선다 — 자동 착석이
+   * `addSeat` 로 저장하기 때문이다. 판이 진짜로 비어 있을 때만 다시 앉는다.
+   */
+  const autoSeated = useRef(false)
+  useEffect(() => {
+    if (autoSeated.current) return
+    if (!myCardId || mySeat) return
+    /* 🔴 **FW 가 먼저, 차 있으면 빈 자리 아무 데나.** 「무조건 뛴다」가 전제라
+       남이 이미 앉아 있어도 나는 판에 선다 — 다만 남을 밀어내지는 않는다.
+       빈 자리가 하나도 없으면 아무것도 안 한다(그때는 판이 이미 다 찼다). */
+    const fw = slots.find((sl) => sl.area === 'fw1')
+    const seat =
+      fw && !mates[fw.area] ? fw : slots.find((sl) => !mates[sl.area] && !sl.mine)
+    if (!seat) return
+    autoSeated.current = true
+    /* 규칙은 effect 안의 setState 를 싫어하지만, 여기서 바꾸는 것은 **처음
+       한 번의 초기 상태**다 — `autoSeated` 가 막아서 연쇄가 안 생긴다. 판을
+       그린 뒤에 앉히는 것이 아니라 **앉은 판을 처음부터** 그리는 것이 뜻이다. */
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    seatMe(seat.area)
+    // `seatMe` 는 렌더마다 새로 만들어지는 함수라 넣으면 매번 다시 돈다 —
+    // 위 `autoSeated` 가 한 번만 돌게 막는다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [squad, myCardId, mySeat, slots, mates])
 
   const friendTimer = useRef(0)
   useEffect(() => () => {
@@ -1135,31 +1158,20 @@ export default function SquadPanel({
               }}
             >
               {slot.mine ? (
-                /* 🔴 **빼는 것은 ⊗ 뿐이다**(사용자 지적, 2026-09-16: "그냥
-                   카드 어디에 클릭해도 사라진다"). 카드 전체를 버튼으로 두면
-                   옮기려고 짚기만 해도 빠진다 — 되돌릴 수 없는 일에 넓은
-                   과녁을 주지 않는다.
-                   그래서 카드는 `<div>` 이고 ⊗ 가 **진짜 버튼**이다(버튼 안에
-                   버튼을 둘 수 없어 형제로 나란히 둔다). */
-                <>
-                  <div className="ss-pcard-mini">
-                    {card ? (
-                      <PlayerCardView card={card} />
-                    ) : (
-                      <BlankPlayerCard>
-                        <p className="ss-squad-note">아직 카드가 없습니다</p>
-                      </BlankPlayerCard>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    className="ss-squad-remove material-symbols-outlined"
-                    aria-label="나를 판에서 빼기"
-                    onClick={() => unseatMe(slot.area)}
-                  >
-                    cancel
-                  </button>
-                </>
+                /* 🔴 **내 카드에는 ⊗ 가 없다**(사용자 판단, 2026-09-17).
+                   팀을 만든 사람은 **뛴다는 가정**이라 판에서 빠질 일이
+                   없다 — 뺄 수 있게 두면 「안 뛴다」가 표현되는데, 그것을
+                   담을 자리가 서버에도 없다. 옮기는 것은 그대로 된다
+                   (끌어서 다른 칸으로). 남의 카드는 아래에서 ⊗ 로 뺀다. */
+                <div className="ss-pcard-mini">
+                  {card ? (
+                    <PlayerCardView card={card} />
+                  ) : (
+                    <BlankPlayerCard>
+                      <p className="ss-squad-note">아직 카드가 없습니다</p>
+                    </BlankPlayerCard>
+                  )}
+                </div>
               ) : name ? (
                 /* 앉은 남의 카드도 같은 규칙 — 카드는 그림이고 ⊗ 만 뺀다. */
                 <>
@@ -1224,43 +1236,6 @@ export default function SquadPanel({
                       add
                     </span>
                   </BlankPlayerCard>
-                </button>
-              )}
-
-              {/* 🔴 **「나」 표식**(사용자 설계, 2026-09-16). 빈 자리를 눌러
-                  추천 판을 연 그 자리 **위에 둥둥 뜬다** — 누르면 내 카드가
-                  그 자리에 선다.
-
-                  🔴 **내 자리가 정해지면 안 뜬다**(`mySeat`) — 이미 정한 것을
-                  또 고르게 하면 두 자리에 서는 것처럼 읽힌다. ⊗ 로 빼면
-                  다시 뜬다.
-
-                  ⚠️ 카드 **밖**에 둔다 — 카드 버튼 안에 버튼을 넣을 수 없다. */}
-              {!mySeat && !name && myCardId && picking?.area === slot.area && (
-                <button
-                  type="button"
-                  className="ss-squad-me"
-                  aria-label={`${posOf(slot)} 자리에 내 카드 넣기`}
-                  onClick={() => seatMe(slot.area)}
-                >
-                  {/* 🔴 **핀 모양 선화**다(사용자 요청, 2026-09-16 — 지도의
-                      「Not Listed Location」 같은 결). 채운 원은 흰 카드 위에서
-                      스티커처럼 붙었다. 획만 있으면 **카드 위에 얹힌 표시**로
-                      읽힌다. 글자는 도형 안에 들어가야 해서 `<text>` 다 —
-                      아이콘 폰트로는 가운데에 글자를 못 넣는다. */}
-                  <svg viewBox="0 0 22 26" aria-hidden="true">
-                    {/* 머리 원(중심 11,10 · 반지름 8.2)에 꼬리가 아래로 모인다.
-                        글자가 그 원 **안**에 앉아야 해서 baseline 을 중심보다
-                        조금 아래(13)에 둔다 — 한글은 가운데정렬만으로는 위로
-                        떠 보인다. */}
-                    <path
-                      d="M11 1.8a8.2 8.2 0 0 0-8.2 8.2c0 5.6 8.2 14.2 8.2 14.2s8.2-8.6 8.2-14.2A8.2 8.2 0 0 0 11 1.8Z"
-                      fill="currentColor"
-                    />
-                    <text x="11" y="13.2" textAnchor="middle">
-                      나
-                    </text>
-                  </svg>
                 </button>
               )}
 
