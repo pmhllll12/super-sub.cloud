@@ -24,6 +24,7 @@ from app.billing.domain.entities.billing_entity import (
 
 # 소유하지 않는 테이블에서 **읽기만** 한다. 위 docstring 참조.
 _user = table("user", column("id"))
+_sport = table("sport", column("code"))
 
 
 class BillingPgRepository(BillingPort):
@@ -59,23 +60,32 @@ class BillingPgRepository(BillingPort):
         )
         self._session.commit()
 
-    def list_coaches(self, offset: int, limit: int) -> tuple[list[CoachEntity], int]:
+    def list_coaches(
+        self, offset: int, limit: int, sport_code: str | None = None
+    ) -> tuple[list[CoachEntity], int]:
+        conditions = [CoachOrm.sport_code == sport_code] if sport_code else []
         total = self._session.execute(
-            select(func.count()).select_from(CoachOrm)
+            select(func.count()).select_from(CoachOrm).where(*conditions)
         ).scalar_one()
         rows = self._session.execute(
-            select(CoachOrm).order_by(CoachOrm.name).offset(offset).limit(limit)
+            select(CoachOrm)
+            .where(*conditions)
+            .order_by(CoachOrm.name)
+            .offset(offset)
+            .limit(limit)
         ).scalars()
-        coaches = [
-            CoachEntity(id=r.id, name=r.name, contact=r.contact) for r in rows
-        ]
+        coaches = [_to_coach_entity(r) for r in rows]
         return coaches, total
 
     def get_coach(self, coach_id: UUID) -> CoachEntity | None:
         row = self._session.get(CoachOrm, coach_id)
         if row is None:
             return None
-        return CoachEntity(id=row.id, name=row.name, contact=row.contact)
+        return _to_coach_entity(row)
+
+    def sport_exists(self, sport_code: str) -> bool:
+        stmt = select(_sport.c.code).where(_sport.c.code == sport_code)
+        return self._session.execute(stmt).first() is not None
 
     def save_referral(self, referral: CoachReferralEntity) -> None:
         self._session.add(
@@ -92,3 +102,9 @@ class BillingPgRepository(BillingPort):
     def user_exists(self, user_id: UUID) -> bool:
         stmt = select(_user.c.id).where(_user.c.id == user_id)
         return self._session.execute(stmt).first() is not None
+
+
+def _to_coach_entity(row: CoachOrm) -> CoachEntity:
+    return CoachEntity(
+        id=row.id, name=row.name, contact=row.contact, sport_code=row.sport_code
+    )

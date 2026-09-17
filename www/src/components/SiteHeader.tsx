@@ -6,6 +6,9 @@ import type { PublicPlayerCard } from '@/server/backend'
 import PlayerCardView from '@/components/PlayerCardView'
 import BrandMark from '@/components/ui/BrandMark'
 import HomeNav, { type Destination } from '@/components/HomeNav'
+import NotifyPanel from '@/components/NotifyPanel'
+import { NOTIFY } from '@/lib/destinations'
+import { useNotifyInbox } from '@/lib/useNotifyInbox'
 import { HEADER_LINK_CLASS, HEADER_LINK_HOVER_CLASS } from '@/components/LogoutButton'
 import { useIntroDone } from '@/lib/useIntroDone'
 import { TransitionLink, useChromeHidden, useLeaving } from '@/lib/pageTransition'
@@ -52,6 +55,10 @@ export default function SiteHeader({
 
   /** 지금 가리킨 목적지. 글자 줄 안에서만 쓰는 강조다. */
   const [active, setActive] = useState<string | null>(null)
+
+  /* 알림함 — 「알림」 글자의 빨간 점과 그 아래 판이 이걸 읽는다. 폴링이라
+     화면마다 도는데, 헤더가 화면당 하나라 통도 하나다. */
+  const inbox = useNotifyInbox()
 
   /**
    * 🔴 **지금 보고 있는 화면은 목적지에서 뺀다**(사용자 요청). 영상 분석
@@ -161,6 +168,17 @@ export default function SiteHeader({
           loggedIn={Boolean(user)}
           active={active}
           onActivate={setActive}
+          badges={{ [NOTIFY]: inbox.count > 0 }}
+          panels={{
+            [NOTIFY]: (
+              <NotifyPanel
+                items={inbox.items}
+                onAcceptMatch={inbox.acceptMatch}
+                onRejectMatch={inbox.rejectMatch}
+                onAcceptContact={inbox.acceptContact}
+              />
+            ),
+          }}
         />
       </div>
 

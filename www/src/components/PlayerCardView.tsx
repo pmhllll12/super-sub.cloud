@@ -175,11 +175,12 @@ export default function PlayerCardView({
             받은 호칭은 화면에 그리지 않지만 목록으로는 남긴다. 카드에
             무엇이 담겼는지 읽어 주는 기계는 알 수 있어야 한다. */}
         <h2 className="sr-only">호칭</h2>
+        {/* 🔴 분류는 **있을 때만** 읽는다(계약 51). 직접 적은 호칭은
+            `category` 가 `null` 이라, 그대로 이어 붙이면 앞에 빈 칸이 남아
+            「 시야가 넓은」으로 읽힌다. */}
         <ul className="sr-only">
           {card.titles.map((t) => (
-            <li key={t.code}>
-              {t.category} {t.label}
-            </li>
+            <li key={t.code}>{t.category ? `${t.category} ${t.label}` : t.label}</li>
           ))}
         </ul>
       </div>

@@ -16,6 +16,7 @@ from app.match.application.ports.input.match_preference_use_cases import (
     GetTeamPreferenceUseCase,
     ListMatchCandidatesUseCase,
     ListMemberPreferencesUseCase,
+    ListSquadCandidatesUseCase,
     SetMemberPreferenceUseCase,
     SetTeamPreferenceUseCase,
 )
@@ -27,6 +28,7 @@ from app.match.application.use_cases.match_preference_interactors import (
     GetTeamPreferenceInteractor,
     ListMatchCandidatesInteractor,
     ListMemberPreferencesInteractor,
+    ListSquadCandidatesInteractor,
     SetMemberPreferenceInteractor,
     SetTeamPreferenceInteractor,
 )
@@ -79,6 +81,12 @@ def get_list_match_candidates_use_case(
     return ListMatchCandidatesInteractor(repository)
 
 
+def get_list_squad_candidates_use_case(
+    repository: MatchPreferenceRepositoryDep,
+) -> ListSquadCandidatesUseCase:
+    return ListSquadCandidatesInteractor(repository)
+
+
 SetTeamPreferenceUseCaseDep = Annotated[
     SetTeamPreferenceUseCase, Depends(get_set_team_preference_use_case)
 ]
@@ -96,4 +104,7 @@ ListMemberPreferencesUseCaseDep = Annotated[
 ]
 ListMatchCandidatesUseCaseDep = Annotated[
     ListMatchCandidatesUseCase, Depends(get_list_match_candidates_use_case)
+]
+ListSquadCandidatesUseCaseDep = Annotated[
+    ListSquadCandidatesUseCase, Depends(get_list_squad_candidates_use_case)
 ]

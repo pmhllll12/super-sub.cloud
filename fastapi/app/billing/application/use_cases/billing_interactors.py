@@ -81,11 +81,18 @@ class ListCoachesInteractor(ListCoachesUseCase):
         self._repository = repository
 
     def __call__(self, query: ListCoachesQuery) -> CoachListResult:
+        if query.sport_code and not self._repository.sport_exists(query.sport_code):
+            raise ApiError(422, "UNKNOWN_SPORT", "지원하지 않는 종목입니다.")
         offset = (query.page - 1) * query.size
-        coaches, total = self._repository.list_coaches(offset=offset, limit=query.size)
+        coaches, total = self._repository.list_coaches(
+            offset=offset, limit=query.size, sport_code=query.sport_code
+        )
         return CoachListResult(
             items=[
-                CoachResult(id=c.id, name=c.name, contact=c.contact) for c in coaches
+                CoachResult(
+                    id=c.id, name=c.name, contact=c.contact, sport_code=c.sport_code
+                )
+                for c in coaches
             ],
             total=total,
             page=query.page,
@@ -101,7 +108,12 @@ class GetCoachInteractor(GetCoachUseCase):
         coach = self._repository.get_coach(query.coach_id)
         if coach is None:
             raise ApiError(404, "COACH_NOT_FOUND", "코치를 찾을 수 없습니다.")
-        return CoachResult(id=coach.id, name=coach.name, contact=coach.contact)
+        return CoachResult(
+            id=coach.id,
+            name=coach.name,
+            contact=coach.contact,
+            sport_code=coach.sport_code,
+        )
 
 
 class RequestCoachReferralInteractor(RequestCoachReferralUseCase):

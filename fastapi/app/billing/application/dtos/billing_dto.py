@@ -41,6 +41,7 @@ class AdjustCreditCommand:
 class ListCoachesQuery:
     page: int
     size: int
+    sport_code: str | None = None
 
 
 @dataclass(frozen=True)
@@ -48,6 +49,7 @@ class CoachResult:
     id: UUID
     name: str
     contact: str
+    sport_code: str
 
 
 @dataclass(frozen=True)

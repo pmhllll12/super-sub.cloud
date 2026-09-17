@@ -142,12 +142,30 @@ def test_breakdown_과_skipped_가_criterion_행으로():
     assert by_id["plant_knee_flexion"].grade == 2
     assert by_id["plant_knee_flexion"].view_dependent is None  # "" → None
     assert by_id["trunk_lean"].view_dependent == "grade"  # 미결 `ho` 38
+    # schema_version "1.1" 봉투엔 `title_earned` 키 자체가 없다 — 옛 적재분과
+    # 같은 모양이라 `None`이어야 한다(`ho` 40번, `False`로 지어내지 않는다).
+    assert by_id["plant_knee_flexion"].title_earned is None
+    assert by_id["trunk_lean"].title_earned is None
 
     sk = by_id["plant_foot_position"]
     assert sk.skipped is True
     assert sk.grade is None and sk.title is None and sk.evidence is None
     assert sk.view_dependent is None  # skipped 항목엔 없다
+    assert sk.title_earned is None  # skipped 항목엔 없다(`ho` 40번)
     assert sk.weight == Decimal("0.15")  # 루브릭 원값
+
+
+def test_title_earned_이_있으면_그대로_옮긴다():
+    """`ho` 40번 — schema_version 1.2. `False`가 진짜 값으로 남아야 한다."""
+    env = json.loads(json.dumps(_ENVELOPE))
+    env["schema_version"] = "1.2"
+    env["result"]["breakdown"][0]["title_earned"] = True  # 최고 등급(2)
+    env["result"]["breakdown"][1]["title_earned"] = False  # 0등급 — 호칭 아님
+
+    p = parse_report(_raw(env))
+    by_id = {c.criterion_id: c for c in p.criteria}
+    assert by_id["plant_knee_flexion"].title_earned is True
+    assert by_id["trunk_lean"].title_earned is False  # `or None`이면 사라질 값
 
 
 def test_모르는_schema_major_는_거부한다():

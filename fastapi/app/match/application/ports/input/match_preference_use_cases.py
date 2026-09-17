@@ -9,11 +9,13 @@ from app.match.application.dtos.match_preference_dto import (
     GetTeamPreferenceQuery,
     ListMatchCandidatesQuery,
     ListMemberPreferencesQuery,
+    ListSquadCandidatesQuery,
     MatchCandidateResult,
     MemberPreferenceResult,
     MemberPreferenceSummaryResult,
     SetMemberPreferenceCommand,
     SetTeamPreferenceCommand,
+    SquadCandidateResult,
     TeamPreferenceResult,
 )
 
@@ -52,3 +54,10 @@ class ListMatchCandidatesUseCase(ABC):
     def __call__(
         self, query: ListMatchCandidatesQuery
     ) -> list[MatchCandidateResult]: ...
+
+
+class ListSquadCandidatesUseCase(ABC):
+    @abstractmethod
+    def __call__(
+        self, query: ListSquadCandidatesQuery
+    ) -> list[SquadCandidateResult]: ...

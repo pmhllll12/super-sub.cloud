@@ -21,6 +21,8 @@ def to_public_video_result(
         description=video.description,
         uploader_nickname=uploader_nickname,
         uploader_card_slug=uploader_card_slug,
+        width=video.width,
+        height=video.height,
     )
 
 
@@ -48,4 +50,7 @@ def to_video_result(video: VideoEntity) -> VideoResult:
         title=video.title,
         description=video.description,
         kept=video.kept,
+        duplicate_of_video_id=video.duplicate_of_video_id,
+        duplicate_status=video.duplicate_status,
+        duplicate_failure_reason=video.duplicate_failure_reason,
     )

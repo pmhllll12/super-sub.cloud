@@ -482,7 +482,10 @@ Pydantic 검증에 걸리면 `code`는 항상 `VALIDATION_ERROR` 하나이고 `m
 - `public_slug` 는 **무작위**다(96비트, `secrets`). 닉네임에서 유도하지 않는다
   (SEC-005) — 유도하면 이름만 알고 남의 카드 주소를 맞힐 수 있고, 닉네임을 바꿔도
   옛 주소가 뜻을 남긴다
-- `titles` 는 **빈 배열**이다. 호칭은 분석 결과로 붙으므로 생성 시점에 있을 수 없다
+- `titles` 는 **빈 배열**이다. 만든 직후에는 부여된 것도 적은 것도 없다
+  (2026-09-16 정정 — 「호칭은 분석 결과로 붙는다」고 적었던 것을 고칩니다.
+  `paik` 36번으로 **사람이 직접 적는 쪽**으로 뒤집혔고, 적는 경로는
+  `PATCH /me/card` 의 `titles` 입니다)
 - `og_image_key` 는 규칙(`cards/{card_id}.png`)으로 채우지만 ⚠️ **그 위치에 파일은
   아직 없다.** 이미지 생성기도 저장 위치도 정해지지 않았다 — 지금 이 값을 그리는
   클라이언트는 없다(`www` 의 카드 화면은 고정 장식 이미지를 쓴다). 그리기 시작하려면
@@ -557,7 +560,12 @@ Pydantic 검증에 걸리면 `code`는 항상 `VALIDATION_ERROR` 하나이고 `m
 - `public_slug`·`og_image_key` — **요청 본문에 자리가 없다.** 보내도 무시된다.
   `public_slug`는 이미 공유된 주소라 바꾸면 남이 가진 링크가 죽고, `og_image_key`는
   슬러그에서 규칙으로 나오는 값이다
-- `titles` — **분석이 주는 것**이라 사람이 못 고른다(3.5)
+- ~~`titles` — **분석이 주는 것**이라 사람이 못 고른다(3.5)~~
+  🔴 **2026-09-16 정정 — 뒤집혔습니다.** 팀이 다시 정했습니다(`paik` 36번):
+  **호칭은 사람이 직접 적습니다.** 근거는 "참이든 거짓이든 경기 후 리뷰로
+  남으니 상관없다" — 신뢰는 호칭이 아니라 리뷰가 떠받칩니다. 그래서
+  `paik` 32번(분석이 붙이게 해 달라)은 ⛔ 로 닫혔고, **`titles` 가 이
+  요청의 필드로 열렸습니다**(바로 아래 절)
 - **가운데 큰 글자의 내용** — `style` 이 아니라 **`tagline` 이 그 값이다.**
   `www`가 04-09 이후 이걸 몰라 `style.text`를 새로 만들어 브라우저에만
   담고 있었는데, 이 갱신에서 `tagline` 쪽으로 합친다(`client-contract-
@@ -569,10 +577,42 @@ Pydantic 검증에 걸리면 `code`는 항상 `VALIDATION_ERROR` 하나이고 `m
   `CardStyleSchema` 가 `extra=forbid` 라 이 필드들을 보내면 조용히
   무시되지 않고 **422** 로 막힌다
 
+#### `titles` — 사람이 직접 적는 호칭 (2026-09-16 추가, `paik` 36번)
+
+```json
+{ "titles": ["시야가 넓은", "왼발잡이"] }
+```
+
+**보낸 목록이 그대로 남는다** — 부분 병합이 아니다(`style` 과 같은 판단:
+화면이 늘 전체를 들고 있다가 저장하므로 합칠 자리를 하나 더 만들지 않는다).
+`null` 이나 `[]` 를 보내면 **전부 지운다.** 안 보내면 안 건드린다.
+
+| | |
+|---|---|
+| 개수 | **3개**까지 (넘으면 422) |
+| 길이 | 한 개당 **20자**까지 — `tagline` 과 같다. 🔴 **조용히 자르지 않고 거부한다** |
+| 정리 | 앞뒤 공백을 털고, 빈 글자는 버리고, **같은 글은 하나만** 남긴다(먼저 쓴 순서) |
+
+**읽는 자리는 이미 있던 `titles[]` 다** — `GET /me/card`·`GET /cards/{slug}`
+양쪽에 부여된 호칭과 **한 목록으로 섞여** 최근순으로 나온다. 화면이 가르려면:
+
+| | 부여된 호칭 | 직접 적은 호칭 |
+|---|---|---|
+| `code` | `sharp_shooter` 같은 정의 코드 | **`custom:` 으로 시작** |
+| `category` | `강점`·`활동`·`용병` | **`null`** |
+
+🔴 **`category` 가 `null` 일 수 있게 됐습니다**(그전에는 항상 문자열).
+분류는 부록 D 가 정의한 셋뿐이고 그건 **부여되는 호칭**의 것이라, 사람이
+적은 글에는 분류를 매기지 않습니다(그 항목의 「하지 말 것」 — 분류를
+사람에게 묻지 않는다).
+
+🔴 **`tagline` 과 다른 칸이다.** 그쪽은 카드 가운데 큰 글자로 이미 쓰이고
+있어서 재활용하면 둘 중 하나를 잃는다.
+
 #### 공개 카드에도 나간다
 
 `GET /cards/{slug}` 응답에도 `tagline`·`style` 이 실린다. 안 실으면 **남이
-보는 카드만** 밋밋해진다.
+보는 카드만** 밋밋해진다. 직접 적은 호칭도 같은 이유로 여기 실린다.
 
 🔴 `tagline`·`style` 은 **부록 D 의 `player_card` 에 없는 컬럼**이다
 (각각 2026-09-04 · 2026-09-11 에 늘렸다). ERD 갱신은 미결 항목이다.
@@ -755,12 +795,12 @@ S3 의 분석 산출물(`report.json`)을 서버가 받아 점수만 걷어내�
   "overall_grade": "B",
   "breakdown": [
     { "criterion_id": "plant_knee_flexion", "name": "디딤발 무릎 굽히기",
-      "grade": 2, "title": "흔들리지 않는 축",
+      "grade": 2, "title": "흔들리지 않는 축", "title_earned": true,
       "evidence": "안정적으로 놓였습니다.", "stat": 88.5,
       "metric_ref": "plant_knee_angle_at_impact", "skipped": false },
     { "criterion_id": "plant_foot_position", "name": "디딤발 위치",
-      "grade": null, "title": null, "evidence": null, "stat": null,
-      "metric_ref": null, "skipped": true }
+      "grade": null, "title": null, "title_earned": null, "evidence": null,
+      "stat": null, "metric_ref": null, "skipped": true }
   ],
   "scenes": [
     { "metric_code": "impact_frame", "label": "임팩트 프레임", "at_seconds": 2.07 }
@@ -781,6 +821,12 @@ S3 의 분석 산출물(`report.json`)을 서버가 받아 점수만 걷어내�
 옛 행(이 필드가 생기기 전 적재분)은 `total_score`/`overall_grade` 가 `null`.
 `scenes` 는 프레임 지표(`impact_frame` 등)의 초 환산 — "이렇게 본 장면"으로
 이동하는 자리다.
+
+🔴 **`title_earned`(2026-09-16 추가, `paik` 23·`ho` 40번)로 「받은 호칭」을
+가른다.** `title`은 **모든 등급에 있다** — 0등급도 「무너지는 축」같은
+문구를 받는다. 그 값의 유무로 선을 그으면 못한 항목에 호칭을 달게 된다.
+`title_earned`가 참인 항목의 `title`만 "받은 호칭"으로 그린다. `null`이면
+`skipped`거나 이 필드가 생기기 전 적재분(둘 다 거짓으로 지어내지 않는다).
 
 | 에러 | code | 언제 |
 |---|---|---|
@@ -1092,7 +1138,7 @@ trunk_alignment       2개 루브릭  basketball_jump_shot · basketball_layup  
 | | |
 |---|---|
 | 역할 | `owner`(만든 사람) · `member`. 부록 D 는 값을 열거하지 않아 **앱이 쓰는 집합**으로 정했다 |
-| 가입 | **본인이 가입**하거나 **주장이 넣는다.** 초대·승인 테이블이 부록 D 에 없어 신청-승인 흐름은 넣지 않았다 |
+| 가입 | **본인이 가입**하거나 **주장이 넣는다.** 🔴 **2026-09-16 정정** — 「초대·승인 테이블이 부록 D 에 없어 신청-승인 흐름은 넣지 않았다」고 적었던 것을 정정합니다. `min` 20번으로 `team_invitation` 을 새로 두었고, **주장이 초대 → 받은 사람이 수락**하는 흐름이 아래 「팀 초대」 절에 있습니다(부록 D 에 없는 테이블을 늘린 것입니다) |
 | 탈퇴 | 행을 **지우지 않고** `left_at` 을 채운다(부록 D.6). 재가입은 새 행이라 이력이 남는다 |
 | 종목 | `team` 이 정한다. 경기에 종목 컬럼을 두지 않고 `match → team → sport_code` 로 결정된다(부록 D.4) |
 
@@ -1109,11 +1155,27 @@ trunk_alignment       2개 루브릭  basketball_jump_shot · basketball_layup  
 | 에러 | code |
 |---|---|
 | 422 | `UNKNOWN_SPORT` — `sport` 에 없는 종목 코드다 |
+| 422 | `SPORT_NOT_AVAILABLE` — 행은 있지만 **지금 새로 받지 않는 종목**이다 (2026-09-16 추가, `ho` 39번) |
 | 422 | `VALIDATION_ERROR` — 이름·지역이 비었거나 너무 길다 |
 
 > `team.sport_code` 에는 **외래키가 없다**(부록 D.3 의 외래키 표에 없어 늘리지 않았다).
 > DB 가 막아 주지 않으므로 앱이 `sport` 를 조회해 막는다. 종목이 늘 때는 **앱 배포 없이
 > 행만 넣으면** 되도록 고정 목록으로 두지 않았다.
+
+🔴 **`UNKNOWN_SPORT` 와 `SPORT_NOT_AVAILABLE` 은 다릅니다** (2026-09-16 추가).
+에이전트가 축구 단일 종목으로 정리되면서(`ho` 39번) 야구·농구 루브릭이
+사라졌는데, **`sport` 행은 지우지 않았습니다** — 이미 그 종목으로 올라간
+데이터가 참조하고 있어서입니다(실측: `video` 에 야구 165건). 대신
+`sport.active` 를 내렸습니다.
+
+| | 뜻 | 화면이 할 것 |
+|---|---|---|
+| `UNKNOWN_SPORT` | 그런 코드가 없다(오타·옛 코드) | 입력을 고치게 한다 |
+| `SPORT_NOT_AVAILABLE` | 코드는 맞지만 **지금은 안 받는다** | 「지금은 축구만 받습니다」로 안내한다 |
+
+**막는 것은 새로 만드는 자리뿐입니다** — 팀 만들기 · 영상 등록. 조회·거르기
+(`GET /positions` · 경기 목록 · 코치 목록의 `sport_code` 필터)는 내려간
+종목도 **그대로 돕니다**. 과거 데이터를 계속 볼 수 있어야 하기 때문입니다.
 
 ### `GET /api/v1/teams/{team_id}`
 
@@ -1151,6 +1213,35 @@ trunk_alignment       2개 루브릭  basketball_jump_shot · basketball_layup  
 |---|---|
 | 404 | `TEAM_NOT_FOUND` |
 
+### `PATCH /api/v1/teams/{team_id}` (2026-09-16 추가)
+
+인증 필요. **주장만.** 팀 이름·지역을 고친다. 응답은 `GET /teams/{id}` 와 같다.
+
+```json
+{ "region": "부산 해운대구" }
+```
+
+**왜 생겼나.** 그전에는 팀을 만들 때 적은 값이 **영영 고정**이었다 — 고칠
+경로가 없었다. 그런데 `region` 은 경기 탐색(`GET /matches?region=`)이
+거르는 값이라, 오타가 나거나 연고를 옮기면 **그 팀 경기가 검색에서 통째로
+빠진다.**
+
+| | |
+|---|---|
+| 보낸 필드만 | 둘 다 안 보내면 아무것도 안 바뀐다(빈 본문도 유효하다) |
+| 길이 | 각각 1~60자 |
+| 🔴 `null` | **못 지운다.** 둘 다 NOT NULL 이고 만들 때 필수였던 값이라 「안 정한 상태」가 없다 — `null` 을 보내면 422 다. 안 바꾸려면 **필드를 빼면** 된다 (`PATCH /me/card` 의 `tagline` 과 다른 점이다. 그쪽은 지울 수 있다) |
+
+🔴 **`sport_code` 는 못 바꾼다 — 본문에 자리가 없다.** 포지션·스쿼드·경기가
+전부 그 값에 매달려 있어서, 바꾸면 **이미 앉힌 포지션이 다른 종목 것**이
+된다. 카드가 `public_slug` 를 안 받는 것과 같은 판단이다.
+
+| 에러 | code |
+|---|---|
+| 403 | `FORBIDDEN` — 주장이 아니다(구성원도 못 고친다) |
+| 404 | `TEAM_NOT_FOUND` |
+| 422 | `VALIDATION_ERROR` — 빈 값·길이 초과·`null` |
+
 ### `POST /api/v1/teams/{team_id}/members`
 
 인증 필요. **본문을 비우면 본인이 가입**한다. `user_id` 를 담으면 주장이 남을 넣는다.
@@ -1180,6 +1271,52 @@ trunk_alignment       2개 루브릭  basketball_jump_shot · basketball_layup  
 🔴 **마지막 주장이 나가면 아무도 남을 넣을 수 없는 팀이 된다.** 소유권 이양 API 가
 아직 없어 되돌릴 방법이 없으므로 미리 막는다. 팀 해체도 같은 이유로 아직 없다 —
 필요해지면 이양과 함께 낸다.
+
+### 팀 초대 — `team_invitation` (2026-09-16 추가, `min` 20번)
+
+챗봇 용병 검색(`POST /matching/search-candidates`)이 찾아 준 사람을 **실제로
+데려오는** 자리다. 검색은 되는데 그다음이 없다는 것이 `min` 20번이었다.
+
+🔴 **동의 없이 `POST /teams/{id}/members` 로 바로 넣지 않는다**(2026-09-10
+박민호 결정) — 검색 대상자가 모르는 채로 어딘가에 등록되는 것을 막는다.
+**주장이 초대를 보내고, 받은 사람 본인이 수락해야** 소속이 된다.
+
+상태는 `pending` → `accepted` / `rejected` / `cancelled` 넷이고 `pending`
+일 때만 답할 수 있다. 응답은 넷 다 같은 모양이다:
+
+```json
+{
+  "id": "0d2f...",
+  "team_id": "7c05...",
+  "invited_user_id": "9a2e...",
+  "status": "pending",
+  "created_at": "2026-09-16T09:00:00Z",
+  "responded_at": null
+}
+```
+
+| 경로 | 누가 | 무엇 |
+|---|---|---|
+| `POST /api/v1/teams/{team_id}/invitations` | **그 팀 주장** | 초대를 보낸다. 본문은 `{"invited_user_id": "..."}`. `201` |
+| `GET /api/v1/teams/{team_id}/invitations` | **그 팀 주장** | 그 팀이 보낸 초대 전부(상태 무관), 최신순 |
+| `GET /api/v1/me/invitations` | 본인 | 내가 받은, **아직 답 안 한** 초대만, 최신순 |
+| `POST /api/v1/me/invitations/{invitation_id}/accept` | **받은 사람 본인** | 수락 — `team_member` 가 `member` 로 생긴다 |
+| `POST /api/v1/me/invitations/{invitation_id}/reject` | **받은 사람 본인** | 거절 — 아무것도 안 바뀐다 |
+| `DELETE /api/v1/teams/{team_id}/invitations/{invitation_id}` | **그 팀 주장** | 보낸 쪽이 무른다. 🔴 `204` 가 아니라 무른 초대를 그대로 돌려준다(`team_match_request` 의 취소와 같은 이유 — 삭제라기보다 상태 전이다) |
+
+| 에러 | code | 언제 |
+|---|---|---|
+| 403 | `FORBIDDEN` | 주장이 아닌데 보내려 했다 · 받은 사람이 아닌데 답하려 했다 |
+| 404 | `TEAM_NOT_FOUND` · `USER_NOT_FOUND` · `TEAM_INVITATION_NOT_FOUND` | |
+| 409 | `ALREADY_MEMBER` | 이미 그 팀 구성원이다 |
+| 409 | `ALREADY_INVITED` | 그 사람에게 보낸 대기 중 초대가 이미 있다 |
+| 409 | `TEAM_INVITATION_ALREADY_RESPONDED` | 이미 답이 난 초대다 |
+
+**알림**(`GET /me/notifications`)은 셋이다 — 보낼 때 받은 사람에게
+`team_invitation_sent`, 수락·거절할 때 그 팀 주장(들)에게
+`team_invitation_accepted` · `team_invitation_rejected`. `subject_type` 은
+전부 `team_invitation` 이고 `subject_id` 가 초대 id 다. **무르기(cancel)는
+알림이 없다** — 보낸 쪽이 스스로 하는 것이라 알릴 상대가 없다.
 
 ---
 
@@ -1691,7 +1828,10 @@ false` 기록용 업로드에는 걸지 않는다 — 그 클립은 워커를 �
   "is_featured": false,
   "title": null,
   "description": null,
-  "kept": false
+  "kept": false,
+  "duplicate_of_video_id": null,
+  "duplicate_status": null,
+  "duplicate_failure_reason": null
 }
 ```
 
@@ -1728,11 +1868,36 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
 |---|---|---|
 | 403 | `FORBIDDEN` | 남에게 발급된 저장 키다 |
 | 422 | `UNKNOWN_SPORT` | 지원하지 않는 종목 코드 |
+| 422 | `SPORT_NOT_AVAILABLE` | 행은 있지만 **지금 새로 받지 않는 종목**이다 — 위 3-3절 「`UNKNOWN_SPORT` 와 다릅니다」 참고 (2026-09-16 추가, `ho` 39번) |
 | 422 | `FILE_NOT_UPLOADED` | 그 키에 올라온 파일이 없다 |
 | 503 | `STORAGE_NOT_CONFIGURED` | 서버에 `S3_BUCKET` 이 없다 |
 
 **저장 키에 업로더가 들어 있다**(`videos/<user_id>/<uuid>.<확장자>`). 등록할 때 그
 접두사를 대조하므로 남이 올린 객체를 자기 영상으로 등록할 수 없다.
+
+#### 같은 내용을 다시 올리면 — `duplicate_of_video_id` (`ho` 41번, 2026-09-16)
+
+실서버에서 같은 영상이 게이트 미달로 아홉 번 재업로드된 사례가 나왔다 —
+분석이 결정론적이라 다시 돌려도 같은 결과가 나오는데 안내가 없어 GPU·S3만
+낭비했다. 그래서 등록할 때 **같은 사용자**가 올린 **같은 내용**(서버가 S3
+객체로 판별)의 영상 중 분석까지 끝난 것(성공·실패 무관)이 있으면 **새
+작업을 만들지 않고** 그 결과를 이 응답에 실어 알려준다.
+
+- `duplicate_of_video_id`: 결과를 빌려온 원본 영상의 id. 중복이 아니면 `null`
+- `duplicate_status`: 그 원본의 마지막 분석 상태(`succeeded`·`failed`). 자세히
+  보려면 이 값과 `duplicate_of_video_id`로 `GET /videos/{id}/report`를 부른다
+- `duplicate_failure_reason`: 실패였을 때만 그 사유. 성공이면 `null`
+
+🔴 **이 셋은 등록 응답 한 번에만 실린다.** 이 영상 자신은 작업을 아예 안
+만들었으므로(`analysis_job_id: null`), 나중에 `GET /videos`로 다시 읽으면
+`analysis_status`는 정직하게 `null`이고 `duplicate_status`·`duplicate_
+failure_reason`도 `null`이다 — `duplicate_of_video_id`만 그대로 남는다.
+등록 직후 이 응답을 놓치지 말고 화면에 반영해야 한다.
+
+「이 사람으로 분석」(`subject_box`)·「집중해서 볼 항목」(`focus`)을 지정하면
+같은 영상이어도 측정 대상이 달라질 수 있어 **중복 판단 대상에서 뺀다**(항상
+새 작업을 만든다). 중복으로 처리된 클립도 「작업이 생긴 클립」과 같은
+`kept: false`로 시작한다 — `POST /videos/{id}/keep`을 불러야 프로필에 남는다.
 
 ### `GET /api/v1/videos`
 
@@ -1772,7 +1937,7 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
 | 422 | `CANNOT_FEATURE` | 반려된 클립을 대표로 세우려 했다 |
 | 422 | `VALIDATION_ERROR` | `title`·`description` 이 길이 상한을 넘는다 |
 
-### `GET /api/v1/videos/public` — 공개 클립 목록 (2026-09-08 추가, 2026-09-15 업로더 추가)
+### `GET /api/v1/videos/public` — 공개 클립 목록 (2026-09-08 추가, 2026-09-15 업로더 추가, 2026-09-16 화면 비율 추가)
 
 홈의 영상 모음이 쓴다. **공개된 클립만**, 최근 것이 앞에 온다(최대 100건).
 
@@ -1781,7 +1946,8 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
   { "id": "7c05...", "sport_code": "football", "duration_ms": 10200,
     "created_at": "2026-09-08T09:00:00Z", "title": "우리 팀 첫 골",
     "description": "왼발 감아차기",
-    "uploader_nickname": "슛돌이", "uploader_card_slug": "shoot-dori-7f2a" }
+    "uploader_nickname": "슛돌이", "uploader_card_slug": "shoot-dori-7f2a",
+    "width": 1920, "height": 1080 }
 ]
 ```
 
@@ -1793,6 +1959,10 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
 `uploader_card_slug`(카드를 만든 사람만, 없으면 `null`)로 싣는다(`paik` 16번) —
 슬러그가 있으면 눌러서 그 사람 카드(`GET /cards/{slug}`)로 갈 수 있다. 재생은
 아래 `GET /videos/{id}/playback-url` 로 따로 받는다.
+
+`width`·`height`는 등록할 때 받은 값 그대로다(`paik` 15번, 화면이 미리 칸
+비율을 알아야 덜컥거리지 않는다). **이 컬럼이 생기기 전 등록분은 둘 다
+`null`**이다 — 화면은 그럴 때 16:9로 가정하면 된다(기존 동작).
 
 ### `GET /api/v1/videos/{video_id}/playback-url` — 재생용 주소 (2026-09-08 추가)
 
@@ -1879,6 +2049,35 @@ CON-007) 사람이 지정할 수 있게 열어 둔다. 생략하면 에이전트
 |---|---|---|
 | 404 | `NO_FEATURED_VIDEO` | 슬러그가 없든·대표를 안 세웠든·그 대표가 반려됐든 — 밖에서는 다 "없음"이다 |
 | 503 | `STORAGE_NOT_CONFIGURED` | 서버에 `S3_BUCKET` 이 없다 |
+
+### `GET /api/v1/cards/{card_public_slug}/grade` — 남의 표시 등급 (2026-09-16 추가, 미결 `paik` 25·26번)
+
+카드 주인의 **표시 등급**(`S`~`F`)을 카드 슬러그로 가져온다. AI 추천 판이 후보를
+등급으로 좁히는 자리라 생겼다(`paik` 25번). **리포트 전체가 아니라 등급 한
+칸만** 준다 — 근거 문장·수치는 여기 안 실린다.
+
+```json
+{ "grade": "S", "provisional": false }
+```
+
+- 🔴 **로그인하면 누구나** — `featured-video` 와 같은 원칙.
+- `grade` 는 `S`·`A`·`B`·`C`·`D`·`F` 여섯 중 하나, 또는 **대표 영상이 없거나
+  분석 전이면 `null`**(이 경우는 404 가 아니다 — 슬러그 자체는 있다).
+- 🔴 **계산 규칙**(`paik` 26번, 정상호 확정): 분석 등급(`A`~`D`) 위에 신뢰
+  우세(재매칭 의사 `repeat_yes`/`caution_would_not_repeat` 의 95% Wilson
+  신뢰구간 하한이 과반을 넘는가)를 얹는다. `A`+신뢰 우세 → `S`, `D`+신뢰 우세
+  아님 → `F`, 그 밖은 분석 등급 그대로. **경계는 서버가 긋는다** — 화면은
+  받은 문자를 그대로 보여주기만 한다.
+- 🔴 **`provisional` 을 등급과 함께 낸다.** `true` 인 동안은 그 등급이
+  검수 전 루브릭 산출값이라는 뜻이다 — **화면은 등급 옆에 "검수 전"을
+  달아야 한다.** 등급 문자만 떼어 쓰지 않는다(남의 화면에 박힌 문자는
+  나중에 회수가 안 된다).
+- 신뢰 축은 **저장하지 않는다** — `review`/`review_selection` 원자료를 요청마다
+  다시 집계한다(부록 D.4, 제3정규형).
+
+| 에러 | code | 언제 |
+|---|---|---|
+| 404 | `CARD_NOT_FOUND` | 그 슬러그의 카드가 아예 없다 |
 
 ### 아직 없는 것
 
@@ -2371,15 +2570,18 @@ DB(연쇄)와 S3(`storage_key` + `reports/<user_id>/<video_id>/`, best-effort)�
 ### `GET /api/v1/coaches` · `GET /api/v1/coaches/{coach_id}`
 
 인증 필요. 페이지 형식은 `GET /admin/users`와 같다(`items`·`total`·`page`·`size`).
+목록은 **`sport_code` 쿼리로 거를 수 있다**(`paik` 14번, 2026-09-16 추가) — 안
+주면 전체 종목이 다 나온다.
 
 ```json
-{"id": "…", "name": "김도현", "contact": "…"}
+{"id": "…", "name": "김도현", "contact": "…", "sport_code": "football"}
 ```
 
-⚠️ **종목·가격·소개 문장·대표 영상이 없다.** `www/src/lib/market.ts`의 `Coach`
-타입(mock)은 이보다 훨씬 풍부하지만, 부록 D의 `coach`는 `id`·`name`·`contact`
-셋뿐이다 — 화면과 스키마를 맞추는 것은 별도 결정이 필요해 미결 항목에 올렸다.
-상세 없는 코치는 404 `COACH_NOT_FOUND`.
+⚠️ **가격·소개 문장·대표 영상이 아직 없다.** `www/src/lib/market.ts`의 `Coach`
+타입(mock)은 이보다 훨씬 풍부하지만, 부록 D의 `coach`는 `id`·`name`·`contact`·
+`sport_code` 넷뿐이다 — 나머지는 화면과 스키마를 맞추는 별도 결정이 필요해
+미결 항목에 남아 있다. 상세 없는 코치는 404 `COACH_NOT_FOUND`, 모르는
+`sport_code`는 422 `UNKNOWN_SPORT`.
 
 ### `POST /api/v1/coaches/{coach_id}/referrals`
 
@@ -2398,7 +2600,8 @@ DB(연쇄)와 S3(`storage_key` + `reports/<user_id>/<video_id>/`, best-effort)�
 ### 아직 없는 것
 
 - **`market.ts`의 나머지 필드** — 가격·후기·레슨 장소 등은 부록 D에 대응
-  컬럼이 없다. 필요해지면 부록 D 변경으로 이어진다
+  컬럼이 없다(종목은 `paik` 14번으로 이미 들어왔다). 필요해지면 부록 D
+  변경으로 이어진다
 - **크레딧 자동 지급·차감** — 가입 보너스나 분석당 차감을 트리거하는 경로.
   지금은 관리자의 수동 조정뿐이다
 
@@ -2878,6 +3081,59 @@ S3에 없다(EC2 역할이 `videos/` 접두사에 쓰기 권한이 없어 못 �
 
 상세: 부록 D 도메인 ④(`team_match_request`, `match.opponent_team_id`) ·
 클라이언트 반영은 `docs/client-contract-changes.md`
+
+---
+
+## 3-16. 빈 자리 추천 후보 (2026-09-16 추가 — 미결 `paik` 27번)
+
+스쿼드 빈 자리를 채울 사람을 추천한다. 3-13절(경기 조건·후보)과 같은
+`member_match_position`/`member_match_slot` 재료를 쓰지만, **팀 대 팀**이 아니라
+**팀 대 개인**이다 — AI 추천 판(`SquadSuggest.tsx`)이 그 대상이다.
+
+### `GET /api/v1/teams/{team_id}/squad/candidates`
+
+인증 필요. **부르는 사람이 그 팀 소속이어야 한다**(아니면 403).
+
+🔴 **후보는 팀 밖에서 찾는다** — 위 제한은 **보는 권한**이지 후보 범위가
+아니다(2026-09-16에 이 줄을 후보 범위로 잘못 읽어 미결 `min` 20번에 틀린
+근거가 들어간 적이 있다). 후보 원자료는 `member_match_position` 이고,
+**현재 팀원과 이미 스쿼드에 앉은 사람은 제외**한다 — 데려올 이유가 없기
+때문이다.
+
+| 쿼리 | 필수 | 뜻 |
+|---|---|---|
+| `position_code` | 예 | 채울 자리(`GK`·`DF`·... — 팀의 종목으로 좁혀 찾는다) |
+| `grade` | 아니오 | `S`~`F` 중 하나를 주면 **그 칸으로만 하드 필터**. 안 주거나 `"any"`면 안 거르고 정렬만 한다 |
+
+```json
+[
+  { "user_id": "7c05...", "nickname": "김선우", "card_public_slug": "kim-abc1",
+    "grade": "A", "provisional": false },
+  { "user_id": "3af2...", "nickname": "오재현", "card_public_slug": null,
+    "grade": null, "provisional": null }
+]
+```
+
+- 🔴 **하드 필터**(이미 여기 있다는 것 자체가 통과했다는 뜻): 그 포지션을
+  `member_match_position`에 등록했고, ⑴ 이 팀 소속이 아니고 ⑵ 이 스쿼드에
+  이미 앉지 않았고 ⑶ 팀이 경기 시간(`team_match_slot`)을 등록해 뒀다면
+  그 시간과 겹치는 `member_match_slot`이 있다(팀이 시간을 안 등록했으면
+  이 조건은 생략).
+- **`grade`를 안 주면**: 거르지 않고 **이미 앉은 사람들의 현재 등급 평균과의
+  실력 축 거리**로 정렬한다(`S`=`A`, `F`=`D`로 같은 자리 — 26번 규칙). 등급을
+  모르는 후보는 뒤로 가되 사라지지 않는다(`grade: null`).
+- 🔴 **거리·유사도 점수는 응답에 없다** — 순서는 이미 서버가 정렬했다.
+- `grade`·`provisional`은 25·26번과 같은 계산(신뢰 축은 저장하지 않고 매
+  요청 다시 집계).
+
+| 에러 | code | 언제 |
+|---|---|---|
+| 404 | `TEAM_NOT_FOUND` | |
+| 403 | `FORBIDDEN` | 그 팀 소속이 아니다 |
+| 422 | `UNKNOWN_POSITION` | 그 팀 종목에 없는 포지션 코드 |
+
+상세: 부록 D 도메인 ①·②·④·⑤(교차 읽기) · 클라이언트 반영은
+`docs/client-contract-changes.md`
 
 ---
 

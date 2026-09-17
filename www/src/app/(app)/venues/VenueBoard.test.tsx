@@ -28,18 +28,18 @@ const BASE = [
   venue(),
   venue({
     id: 'v2',
-    name: '난지천 야구장',
+    name: '난지천 풋살장',
     region: '서울 마포구',
-    sports: ['baseball'],
+    sports: ['soccer'],
     slots: [
       { label: '평일 · 주간', hours: '09:00~17:00', open: true, reserveUrl: 'https://yeyak.example/2' },
     ],
   }),
   venue({
     id: 'v3',
-    name: '문래 농구장',
+    name: '문래 풋살장',
     region: '서울 영등포구',
-    sports: ['basketball'],
+    sports: ['soccer'],
     // 열린 시간대가 하나도 없는 곳 — 단추 대신 안내가 나와야 한다.
     slots: [{ label: '평일', hours: '06:00~20:00', open: false, reserveUrl: 'https://yeyak.example/3' }],
   }),
@@ -63,8 +63,8 @@ describe('경기장 예약 판', () => {
   it('구장을 목록으로 그린다', () => {
     open()
     expect(screen.getByText('잠실종합운동장 풋살경기장')).toBeInTheDocument()
-    expect(screen.getByText('난지천 야구장')).toBeInTheDocument()
-    expect(screen.getByText('문래 농구장')).toBeInTheDocument()
+    expect(screen.getByText('난지천 풋살장')).toBeInTheDocument()
+    expect(screen.getByText('문래 풋살장')).toBeInTheDocument()
   })
 
   /* 🔴 **바깥으로 나간다.** 새 탭으로 열고 그 사실을 낭독기에도 알린다 —
@@ -96,20 +96,13 @@ describe('경기장 예약 판', () => {
   })
 
   describe('거르기', () => {
-    it('종목으로 거른다', async () => {
-      const user = userEvent.setup()
+    /* 🔴 **종목으로 거르는 시험을 걷었다**(2026-09-16, 팀 결정: 풋살 하나만
+       한다). 고를 것이 하나뿐이면 거름망이 아니다 — 화면의 탭도, 목록의
+       야구장·농구장도 같이 걷었다. 종목을 다시 늘리면 **탭·거름망·이 시험을
+       함께** 되살린다. 아래 「고르는 자리가 없다」가 그때 먼저 빨개진다. */
+    it('종목을 고르는 자리가 없다', () => {
       open()
-      await user.click(screen.getByRole('button', { name: '야구' }))
-      expect(screen.getByText('난지천 야구장')).toBeInTheDocument()
-      expect(screen.queryByText('잠실종합운동장 풋살경기장')).toBeNull()
-    })
-
-    it('전체로 되돌리면 다 나온다', async () => {
-      const user = userEvent.setup()
-      open()
-      await user.click(screen.getByRole('button', { name: '야구' }))
-      await user.click(screen.getByRole('button', { name: '전체' }))
-      expect(screen.getByText('잠실종합운동장 풋살경기장')).toBeInTheDocument()
+      expect(screen.queryByRole('group', { name: '종목' })).toBeNull()
     })
 
     /* 데이터에 실제로 있는 구만 고를 수 있어야 한다 — 없는 것을 고르면 늘 0건이다. */
@@ -132,12 +125,12 @@ describe('경기장 예약 판', () => {
       open()
       await user.click(screen.getByRole('button', { name: '자세히' }))
       await user.click(screen.getByRole('button', { name: '마포구' }))
-      expect(screen.getByText('난지천 야구장')).toBeInTheDocument()
-      expect(screen.queryByText('문래 농구장')).toBeNull()
+      expect(screen.getByText('난지천 풋살장')).toBeInTheDocument()
+      expect(screen.queryByText('문래 풋살장')).toBeNull()
 
       await user.click(screen.getByRole('button', { name: '영등포구' }))
-      expect(screen.getByText('난지천 야구장')).toBeInTheDocument()
-      expect(screen.getByText('문래 농구장')).toBeInTheDocument()
+      expect(screen.getByText('난지천 풋살장')).toBeInTheDocument()
+      expect(screen.getByText('문래 풋살장')).toBeInTheDocument()
     })
 
     /* 🔴 **시간대 하나라도** 열려 있으면 통과다 — 시설 전체가 닫힌 것과
@@ -147,7 +140,7 @@ describe('경기장 예약 판', () => {
       open()
       await user.click(screen.getByRole('button', { name: '접수중만' }))
       expect(screen.getByText('잠실종합운동장 풋살경기장')).toBeInTheDocument()
-      expect(screen.queryByText('문래 농구장')).toBeNull()
+      expect(screen.queryByText('문래 풋살장')).toBeNull()
     })
 
     it('걸러서 비면 조건 때문이라고 말한다', async () => {
@@ -163,7 +156,7 @@ describe('경기장 예약 판', () => {
       const user = userEvent.setup()
       open([BASE[2]])
       await user.click(screen.getByRole('button', { name: '접수중만' }))
-      expect(screen.getByRole('button', { name: '전체' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: '접수중만' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: '자세히' })).toBeInTheDocument()
     })
   })
@@ -182,8 +175,8 @@ describe('경기장 예약 판', () => {
       const user = userEvent.setup()
       open()
       await user.type(screen.getByLabelText('시설 이름'), '난지천')
-      expect(screen.getByText('난지천 야구장')).toBeInTheDocument()
-      expect(screen.queryByText('문래 농구장')).toBeNull()
+      expect(screen.getByText('난지천 풋살장')).toBeInTheDocument()
+      expect(screen.queryByText('문래 풋살장')).toBeNull()
     })
 
     /* 🔴 요일과 때가 **같은 시간대 하나**에서 걸려야 한다 — 규칙 자체는
@@ -193,9 +186,9 @@ describe('경기장 예약 판', () => {
       open()
       await user.click(screen.getByRole('button', { name: '자세히' }))
       await user.click(screen.getByRole('button', { name: '주말·공휴일' }))
-      // 잠실은 「주말 · 야간」이 있고, 난지천 야구장은 평일 주간뿐이다.
+      // 잠실은 「주말 · 야간」이 있고, 난지천 풋살장은 평일 주간뿐이다.
       expect(screen.getByText('잠실 주말 풋살장')).toBeInTheDocument()
-      expect(screen.queryByText('난지천 야구장')).toBeNull()
+      expect(screen.queryByText('난지천 풋살장')).toBeNull()
     })
 
     it('그 시각에 열린 곳만 본다', async () => {
@@ -204,7 +197,7 @@ describe('경기장 예약 판', () => {
       await user.click(screen.getByRole('button', { name: '자세히' }))
       await user.selectOptions(screen.getByLabelText('이 시각에 열린 곳'), '21:00')
       expect(screen.getByText('잠실 주말 풋살장')).toBeInTheDocument()
-      expect(screen.queryByText('난지천 야구장')).toBeNull()
+      expect(screen.queryByText('난지천 풋살장')).toBeNull()
     })
 
     /* 하나씩 끄게 두면 아무도 안 되돌린다. */
@@ -213,9 +206,9 @@ describe('경기장 예약 판', () => {
       open()
       await user.click(screen.getByRole('button', { name: '자세히' }))
       await user.click(screen.getByRole('button', { name: '마포구' }))
-      expect(screen.queryByText('문래 농구장')).toBeNull()
+      expect(screen.queryByText('문래 풋살장')).toBeNull()
       await user.click(screen.getByRole('button', { name: '조건 비우기' }))
-      expect(screen.getByText('문래 농구장')).toBeInTheDocument()
+      expect(screen.getByText('문래 풋살장')).toBeInTheDocument()
     })
   })
 
@@ -237,7 +230,7 @@ describe('경기장 예약 판', () => {
       await user.click(screen.getByRole('button', { name: '자세히' }))
       await user.click(screen.getByRole('button', { name: '정해 둔 조건에 맞는 곳만' }))
       expect(screen.getByText('잠실 주말 풋살장')).toBeInTheDocument()
-      expect(screen.queryByText('난지천 야구장')).toBeNull()
+      expect(screen.queryByText('난지천 풋살장')).toBeNull()
       expect(screen.getByText('팀 조건으로 걸렀습니다.')).toBeInTheDocument()
     })
 
@@ -248,7 +241,7 @@ describe('경기장 예약 판', () => {
       await user.click(screen.getByRole('button', { name: '자세히' }))
       await user.click(screen.getByRole('button', { name: '정해 둔 조건에 맞는 곳만' }))
       expect(screen.getByText(/아직 정해 둔 경기 조건이 없습니다/)).toBeInTheDocument()
-      expect(screen.getByText('난지천 야구장')).toBeInTheDocument()
+      expect(screen.getByText('난지천 풋살장')).toBeInTheDocument()
     })
   })
 
@@ -257,7 +250,7 @@ describe('경기장 예약 판', () => {
     const { container } = open()
     const names = [...container.querySelectorAll('.ss-vb-name')].map((e) => e.textContent)
     expect(names[0]).toBe('잠실 주말 풋살장')
-    expect(names[names.length - 1]).toBe('문래 농구장')
+    expect(names[names.length - 1]).toBe('문래 풋살장')
   })
 })
 

@@ -82,6 +82,12 @@ export const FEATURED: Destination[] = [
  *  🔴 이 값이 곧 MATCH_BOT 이라 **판을 여는 조건으로 쓰면 안 된다**(위 주석). */
 export const DEFAULT_FEATURED = FEATURED[0].title
 
+/**
+ * 「알림」 글자의 제목 — 이 값으로 판과 빨간 점을 붙인다(`HomeNav` 의
+ * `panels` · `badges`). 🔴 **글자까지 같아야 한다**(`MATCH_BOT` 과 같은 규칙).
+ */
+export const NOTIFY = '알림'
+
 export const DESTINATIONS: Destination[] = [
   {
     title: '영상 분석',
@@ -103,5 +109,14 @@ export const DESTINATIONS: Destination[] = [
     summary: '가까운 구장을 찾고\n시간을 잡습니다',
     href: '/venues',
     authRequired: true,
+  },
+  {
+    /* 🔴 **맨 오른쪽이다**(사용자 요청, 2026-09-16 — 「경기장 예약 오른쪽으로」.
+       같은 날 「영상 분석 왼쪽」이었다가 옮겼다).
+       갈 곳이 없다(`href` 없음) — 누르면 판이 열리고 거기서 바로 수락한다.
+       `HomeNav` 가 href 없는 항목을 버튼으로 그린다. */
+    title: NOTIFY,
+    icon: 'circle_notifications',
+    summary: '받은 경기 신청과\n지인 신청이 여기 모입니다',
   },
 ]

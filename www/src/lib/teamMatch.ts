@@ -210,11 +210,51 @@ export function findTeams(size: string, prefs: MatchPrefs): Promise<MatchTeam[]>
 }
 
 /**
- * 경기를 신청한다 — 상대 팀장에게 알림이 가고, 수락하면 확정된다.
+ * 팀 id 로 그 팀을 찾는다 — **이름을 그릴 때** 쓴다.
  *
- * ⚠️ **아무 데도 안 보낸다.** 계약에 없는 경로라, 상대가 수락한 것으로
- * **쳐 준다.** 화면에도 그렇게 적는다 — 숨기면 진짜로 신청된 줄 안다.
+ * 🔴 **계약 응답에 팀 이름이 없다**(3-15절 — `requester_team_id` 만 온다).
+ * 알림 판이 「망원 유나이티드가 경기를 걸었습니다」라고 쓰려면 id → 이름이
+ * 필요한데, 그 경로가 아직 없어서 이 붙박이 목록으로 맞춘다.
+ *
+ * ⚠️ **진짜 백엔드에서는 여기서 못 찾는 id 가 온다** — 그때는 `null` 이고,
+ * 부르는 쪽이 「상대 팀」으로 적는다. 이름을 지어내지 않는다.
+ * 계약에 팀 이름을 실어 달라고 미결로 올렸다(paik 「경기 신청 알림에 팀 이름」).
  */
-export function applyToTeam(_teamId: string): Promise<{ accepted: true }> {
-  return new Promise((resolve) => setTimeout(() => resolve({ accepted: true }), 1400))
+export function teamById(id: string): Omit<MatchTeam, 'why'> | null {
+  return TEAMS.find((t) => t.id === id) ?? null
+}
+
+/**
+ * 경기를 신청한다 — 상대 팀장에게 알림이 가고, **상대가 수락해야** 확정된다.
+ *
+ * ✅ **2026-09-16 — 진짜 경로에 붙었다**(계약 3-15절, CCC 42번). 전에는
+ * 1.4초 뒤 `{accepted:true}` 를 돌려주는 가짜라, 신청하자마자 잡힌 것처럼
+ * 보였다.
+ *
+ * 🔴 **돌려주는 것은 「걸렸다」이지 「잡혔다」가 아니다.** 확정은 상대가
+ * 수락하는 순간이고, 그것은 알림으로 온다 — 부르는 쪽이 이 둘을 같은 것으로
+ * 다루면 대기 화면이 다시 너무 일찍 뜬다.
+ */
+export async function applyToTeam(
+  myTeamId: string,
+  team: Pick<MatchTeam, 'id' | 'playedAt' | 'place'>,
+): Promise<{ requestId: string }> {
+  const res = await fetch(`/api/teams/${encodeURIComponent(myTeamId)}/match-requests`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      target_team_id: team.id,
+      played_at: team.playedAt,
+      place: team.place,
+    }),
+  })
+  const body: unknown = await res.json().catch(() => null)
+  if (!res.ok) {
+    const msg =
+      typeof body === 'object' && body !== null && 'error' in body
+        ? ((body as { error?: { message?: string } }).error?.message ?? null)
+        : null
+    throw new Error(msg ?? '경기를 신청하지 못했습니다.')
+  }
+  return { requestId: (body as { id: string }).id }
 }
