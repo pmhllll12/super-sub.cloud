@@ -348,6 +348,62 @@ describe('스쿼드 — 팀장은 FW 에 먼저 앉는다', () => {
     expect(container.querySelectorAll('.ss-squad-pending')).toHaveLength(1)
   })
 
+  /**
+   * 🔴 **앉은 사람도 제 카드가 뜬다** (2026-09-17, 사용자 지적 — 「그 사람을
+   * 추가하면 그 사람 카드가 같이 실제로 떠야 하잖아」).
+   *
+   * 전에는 이름만 적은 **빈 카드**였다. 이제 등재의 `card_public_slug` 로
+   * `GET /cards/{slug}` 를 읽어 그 사람 카드를 그린다.
+   */
+  it('앉은 사람의 진짜 카드를 그린다', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) =>
+        Promise.resolve(
+          String(url).startsWith('/api/cards/')
+            ? {
+                ok: true,
+                status: 200,
+                json: async () => ({
+                  public_slug: 'kim-4f2a',
+                  og_image_key: 'k.png',
+                  user: { id: 'u9', nickname: '김철수' },
+                  titles: [],
+                  tagline: '피자보다 축구',
+                  style: null,
+                }),
+              }
+            : { ok: true, status: 200, json: async () => SQUAD },
+        ),
+      ),
+    )
+    render(<SquadPanel card={CARD} squad={SQUAD} myCardId={CARD.id} />)
+
+    /* 카드에만 있는 글(별칭)이 보이면 진짜 카드가 그려진 것이다.
+       ⚠️ 대역이 슬러그와 무관하게 같은 카드를 주므로 **앉은 사람 수만큼** 나온다
+       — `findAllByText` 로 받는다(하나로 받으면 「여럿 찾음」으로 튕긴다). */
+    expect((await screen.findAllByText('피자보다 축구')).length).toBeGreaterThan(0)
+    // 빈 카드에 이름만 찍히던 자리가 아니다.
+    expect(document.querySelectorAll('.ss-pcard-alias').length).toBeGreaterThan(0)
+  })
+
+  /* 🔴 **못 알아보는 응답이면 이름표로 남는다** — 엉뚱한 것을 카드 자리에
+     넣으면 판이 통째로 안 그려진다. 못 그리는 것보다 이름이라도 남는 쪽이다. */
+  it('카드를 못 읽으면 이름표로 남는다', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) =>
+        Promise.resolve(
+          String(url).startsWith('/api/cards/')
+            ? { ok: false, status: 404, json: async () => ({}) }
+            : { ok: true, status: 200, json: async () => SQUAD },
+        ),
+      ),
+    )
+    render(<SquadPanel card={CARD} squad={SQUAD} myCardId={CARD.id} />)
+    expect(await screen.findByText('김철수')).toBeInTheDocument()
+  })
+
   /* 🔴 **「준비 완료」는 없앴다**(사용자 판단, 2026-09-17). 이 표시는 「아직
      수락 안 했다」를 말하는 자리지 다 된 것을 자랑하는 자리가 아니다 —
      기다리는 것만 말하고 된 것은 조용히 둔다. */
