@@ -7048,10 +7048,40 @@ Track2 142초 · `before_rubric_clips.csv` md5 가 커밋된 CSV 와 **같은 �
 | 확인 | 정해진 뒤: `cd agent && uv run python -c "from transformers.utils.import_utils import is_torchvision_available as t; print(t())"` 가 **평가 기계와 EC2 에서 같은 값**일 것 |
 | 🔴 하지 말 것 | **`tracking` extra 를 서비스에 넣는 것으로 해결하지 않기** — `ultralytics` 가 AGPL 이라 네트워크 서비스에 링크하면 소스 공개 의무가 생깁니다(`pyproject.toml` 의 그 주석이 그래서 있습니다) |
 
-- 상세: `agent/eval/pending47_baseline_audit/RESULTS_5.md` 4절
+#### ✅ **결정을 기다리는 동안 「드러내기」를 넣었습니다** (2026.09.17) — 고친 것이 아닙니다
+
+🔴 **위 질문은 그대로 열려 있습니다.** 둘 중 무엇으로 통일할지는 여전히
+박민호 님 판단이고, 아래는 **그 결정과 무관하게 지금 되는 것**만 한 것입니다.
+
+**무엇을 했나**: 리포트 봉투가 **무엇으로 쟀는지 스스로 말하게** 했습니다.
+
+```json
+"preprocessing": { "detector": "RTDetrImageProcessor",
+                   "pose": "VitPoseImageProcessor", "torchvision": true }
+```
+
+| | |
+|---|---|
+| 왜 이것부터인가 | 47번이 원인 규명에 **닷새**를 쓴 이유가 「어느 쪽으로 돈 결과인지가 산출에 안 남아 있어서」였습니다. 결정이 언제 나든, **다시 갈리는 날 바로 보이는 것**이 먼저입니다 |
+| 🔴 **설치 여부가 아니라 고른 결과** | `is_torchvision_available()` 만 적으면 그건 **고르는 데 쓰인 입력**이지 고른 결과가 아닙니다. 업스트림이 고르는 규칙을 바꾸면 같은 값이 다른 전처리기를 뜻하게 됩니다. **건네받은 객체의 실제 클래스 이름**을 읽습니다(`preprocessing_identity`) — 검사가 이것을 강제합니다 |
+| 함께 적는 것 | `torchvision`(설치 여부)도 나란히 둡니다. **둘이 어긋나는 날이 오면 그게 알아야 할 사건**입니다 |
+| 점수 | 🔴 **한 비트도 안 바뀝니다** — `features` 에 한 키도 안 더한 형제 블록이라 **B-6 재실행 없음**(`timebase`·`view_dependent` 와 같은 성질). 검사가 묶어 뒀습니다 |
+| 실측 | 이 평가 기계: `RTDetrImageProcessor` · `torchvision: true`. EC2 는 **`RTDetrImageProcessorPil`** 이 나와야 맞습니다 — 그 차이가 47번이 찾던 바로 그것입니다 |
+| 검사 | `tests/test_pose.py` 3건 · `tests/test_report_contract.py` 3건 (549 → **555 통과**) |
+
+🔴 **정어진 님 — 계약이 늘었습니다**: `schema_version` **1.5 → 1.6**, 봉투에
+`preprocessing` 한 칸(객체, 안 쓴 경로는 `null`). **필드 추가라 minor** 이고
+모르는 키를 무시하면 **적재는 안 깨집니다** — 받으실지는 판단하셔도 됩니다.
+🔴 **백성검 님**: 화면에 할 일 없습니다(표시용 값이 아닙니다).
+
+- 이제 위 「확인」이 **EC2 에서도 됩니다** — 리포트를 열어 `preprocessing` 을
+  보면 됩니다. 전에는 인스턴스에 들어가 파이썬을 띄워야 알 수 있었습니다
+
+- 상세: `agent/eval/pending47_baseline_audit/RESULTS_5.md` 4절 · 계기는
+  `agent/contracts/report_schema.yaml` 의 `preprocessing` (변경 이력 1.6)
 - 관련: 같은 구역 **47번**(여기서 나왔습니다) · **34번**(제안서 검증 수치가 이 경로에서 납니다) · **1번**(상업 오픈 전 라이선스 정리)
 - 🔴 **지금 당장 새는 것은 없습니다** — 서비스는 돌고 있고, 값이 평가와 다를 뿐입니다. 다만 **제안서에 적는 수치가 제품의 수치가 아니게 됩니다**
-- **담당**: 박민호(제품 출력이 바뀌는 것에 대한 판단) · 정어진(정해지면 배포 절차 — `deploy/deploy.sh` 의 sync 한 줄) · 정상호(의존성 선언·재실행) · **제기**: 정상호 · **기한**: 스프린트 3 — 🔴 **(나) 기준선 재선언이 이것에 막혀 있습니다**
+- **담당**: 박민호(제품 출력이 바뀌는 것에 대한 판단 — **아직 답 대기입니다**) · 정어진(정해지면 배포 절차 — `deploy/deploy.sh` 의 sync 한 줄 · 새로 늘어난 `preprocessing` 칸을 받을지) · 정상호(의존성 선언·재실행 — **결정 나면 `pyproject.toml` 한 줄**) · **제기**: 정상호 · **기한**: 스프린트 3 — 🔴 **(나) 기준선 재선언이 이것에 막혀 있습니다**
 
 ### 50. **추천 카드의 설명 칸 — 불릿은 분석이, 한 줄 소개는 사람이** (2026-09-16 신설)
 
