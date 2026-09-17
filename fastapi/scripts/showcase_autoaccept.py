@@ -140,7 +140,7 @@ def pending(session: Session, dummies: dict[UUID, tuple[str, str]]) -> list[tupl
     for rid, team_id, captain in session.execute(
         select(req.c.id, req.c.target_team_id, tm.c.user_id)
         .select_from(req.join(tm, and_(tm.c.team_id == req.c.target_team_id,
-                                        tm.c.role == "captain", tm.c.left_at.is_(None))))
+                                        tm.c.role == "owner", tm.c.left_at.is_(None))))  # 주장 역할 값은 "owner"
         .where(tm.c.user_id.in_(ids), req.c.status == "pending")
     ).all():
         out.append((f"match_request:{rid}", dummies[captain][0],
