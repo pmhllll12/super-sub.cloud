@@ -254,3 +254,44 @@ describe('추천 판 — 대표 영상을 따라 받는다', () => {
     expect(screen.getByText('아직 대표 영상이 없습니다')).toBeInTheDocument()
   })
 })
+
+/**
+ * **추천 카드의 설명 칸** (미결 `ho` 50번, 2026-09-17).
+ *
+ * 🔴 **재는 것이 없는 문장은 안 싣는다.** 여기 붙박이로 있던 불릿
+ * (「1대1에서 잘 밀리지 않습니다」·「수비 가담이 성실합니다」)은 **경기 행동**
+ * 이라 한 편의 자세 분석으로는 못 잰다(정상호). 그런데 그 표는 **닉네임으로**
+ * 붙어서, 후보가 진짜 사용자가 된 지금 이름이 겹치면 **지어낸 문장이 그 사람의
+ * 진짜 등급 옆에** 걸린다 — 대표 영상으로 한 번 데인 자리다.
+ */
+describe('추천 판 — 카드에 적히는 말', () => {
+  /** mock 표에 있는 이름으로 후보를 세운다 — 있었다면 문구가 붙었을 자리다. */
+  const FLAVOR_ROWS = [
+    { user_id: 'u1', nickname: '김선우', card_public_slug: 'c', grade: 'A', provisional: false },
+  ]
+
+  it('재는 것이 없는 불릿은 안 그린다', async () => {
+    stubMedia()
+    stubCandidates(FLAVOR_ROWS)
+    render(
+      <SquadSuggest position="GK" me={null} teamId="t1" closing={false} onClose={() => {}} onPick={() => {}} />,
+    )
+    expect(await screen.findByText('김선우')).toBeInTheDocument()
+    // 붙박이 표에 이 사람 앞으로 적혀 있던 문장들 — 다시 들어오면 여기서 걸린다.
+    expect(screen.queryByText(/가까운 거리 슈팅 대응이 빠릅니다/)).toBeNull()
+    expect(screen.queryByText(/골문 앞을 넓게 씁니다/)).toBeNull()
+  })
+
+  /* 🔴 **출처 표식을 화면에 적지 않는다**(2026-09-17, 사용자 판단). 제품
+     화면에 「본인이 적음」·「AI가 적음」이 붙으면 읽는 사람에게 이상한 말이다 —
+     카드는 선수를 소개하는 자리다. 한 번 붙였다가 걷었으므로 시험으로 막는다. */
+  it('출처 표식을 적지 않는다', async () => {
+    stubMedia()
+    stubCandidates(FLAVOR_ROWS)
+    render(
+      <SquadSuggest position="GK" me={null} teamId="t1" closing={false} onClose={() => {}} onPick={() => {}} />,
+    )
+    expect(await screen.findByText('김선우')).toBeInTheDocument()
+    expect(screen.queryByText(/본인이 적음|AI가 적음|분석이 적음/)).toBeNull()
+  })
+})
