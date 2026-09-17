@@ -358,6 +358,8 @@ export default function SquadPanel({
     name: string | null
     region: string | null
     squadSlug: string | null
+    playedAt: string
+    place: string
   } | null
   /**
    * 그렇게 잡힌 **경기 id** — 「무르기」가 이걸로 취소한다(계약은
@@ -596,6 +598,7 @@ export default function SquadPanel({
                 col: m.grid_col as number,
                 row: m.grid_row as number,
                 pos: rowPos(m.grid_row as number),
+                cardSlug: m.card_public_slug ?? null,
               }))
           }
         } catch {
@@ -609,8 +612,8 @@ export default function SquadPanel({
         name: acceptedTeam.name ?? '상대 팀',
         region: acceptedTeam.region ?? '',
         size,
-        playedAt: '',
-        place: '',
+        playedAt: acceptedTeam.playedAt,
+        place: acceptedTeam.place,
         why: [],
         squad,
       }
@@ -1622,7 +1625,10 @@ export default function SquadPanel({
       {matched && (
         <MatchWaiting
           us={{
-            name: '우리 팀',
+            /* 🔴 **우리 팀 이름을 쓴다**(2026-09-17, 사용자 지적). 「우리 팀」
+               이라고 적어 두면 상대 이름만 진짜고 우리 쪽은 딱지가 된다 —
+               머리글이 이미 그 이름을 알고 있다(`teamName`). */
+            name: teamName ?? '우리 팀',
             /* 🔴 **판에 선 사람만** 넘긴다. 내 자리는 `card` 가 그려서
                `mates` 에 없으므로 여기서 이름을 따로 얹는다. */
             squad: slots
@@ -1633,6 +1639,8 @@ export default function SquadPanel({
                 row: sl.row,
                 pos: posOf(sl),
                 mine: sl.mine,
+                /* 리뷰 판이 이걸로 진짜 카드를 그린다 — 내 자리는 내 카드다. */
+                cardSlug: sl.mine ? (card?.public_slug ?? null) : mateSlugs[sl.area],
               })),
           }}
           them={matched}

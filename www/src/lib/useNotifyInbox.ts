@@ -110,6 +110,12 @@ export function useNotifyInbox() {
     name: string | null
     region: string | null
     squadSlug: string | null
+    /**
+     * 경기 시각·구장 — 🔴 **「경기 끝내기」가 이 값으로 갈린다**(2026-09-17).
+     * 시각이 지나면 「경기 취소」가 「경기 끝내기」로 바뀐다.
+     */
+    playedAt: string
+    place: string
   } | null>(null)
   /**
    * 그렇게 잡힌 **경기의 id**. 🔴 **무르려면 이것이 있어야 한다**(미결 `paik`
@@ -198,6 +204,8 @@ export function useNotifyInbox() {
                 name: r.target_team_name ?? null,
                 region: r.target_team_region ?? null,
                 squadSlug: r.target_squad_public_slug ?? null,
+                playedAt: r.proposed_played_at,
+                place: r.proposed_place,
               })
               // 수락된 행에는 확정 경기 id 가 실려 온다(계약 `match_id`).
               setAcceptedMatchId(r.match_id ?? null)
@@ -281,6 +289,8 @@ export function useNotifyInbox() {
         name: item.name,
         region: item.region,
         squadSlug: item.opponentSquadSlug,
+        playedAt: item.playedAt,
+        place: item.place,
       })
       await reload()
     },

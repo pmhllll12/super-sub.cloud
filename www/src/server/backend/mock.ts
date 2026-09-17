@@ -572,6 +572,47 @@ const DEMO_MATCH_CANDIDATES: MatchCandidate[] = [
   },
 ]
 
+/**
+ * **경기를 걸어 온 팀** — 초대한 팀과 **일부러 다른 팀**이다
+ * (2026-09-17, 사용자 지적: 「3:3 5:5 7:7 걸어뒀는데 이게 말이 되냐」).
+ *
+ * 🔴 **경기는 인원이 맞아야 성립한다.** 초대용 팀(`INVITER_TEAM`)은 나를
+ * GK 로 부르느라 **그 자리가 비어 있어서** 5:5 경기를 할 수 없다 — 그 팀을
+ * 경기 신청에도 쓰니 대기 화면에 **네 명짜리 상대**가 떴다. 계약도 후보를
+ * 「상대 로스터가 그 인원만큼 찼고」로 거른다(3-13절).
+ */
+const RIVAL_TEAM = {
+  id: '9a2e0000-0000-4000-8000-000000000088',
+  name: '합정 프렌즈',
+  region: '서울 마포구',
+}
+
+/** 그 팀의 판 — **5:5 를 꽉 채운다**(1-2-1, `FORMATION_SLOTS` 의 자리). */
+const rivalSquad: Squad = {
+  id: 'sq3',
+  team_id: RIVAL_TEAM.id,
+  public_slug: 'zY4nR8wK1sD6hG2m',
+  formation: '5:5',
+  members: (
+    [
+      ['정우영', 'FW', '공격수', 1, 0],
+      ['이강인', 'MF', '미드필더', 0, 1],
+      ['황희찬', 'MF', '미드필더', 2, 1],
+      ['김영권', 'DF', '수비수', 1, 2],
+      ['조현우', 'GK', '골키퍼', 1, 3],
+    ] as const
+  ).map(([nickname, code, label, col, row], i) => ({
+    id: `sm-r${i + 1}`,
+    player_card_id: `5e7a0000-0000-4000-8000-0000000000${21 + i}`,
+    card_public_slug: `rival-${i + 1}`,
+    nickname,
+    position_code: code,
+    position_label: label,
+    grid_col: col,
+    grid_row: row,
+  })),
+}
+
 /** `POST /me/card` 로 생긴 카드들. 데모 계정은 위 `card` 를 그대로 쓴다. */
 const made = new Map<string, PlayerCard>()
 
@@ -705,35 +746,86 @@ const notifications: (AppNotification & { _to: string })[] = []
  * id 는 `lib/teamMatch.ts` 의 `TEAMS` 와 맞춘다 — 그래야 화면이 상대 팀
  * 이름을 찾을 수 있다(계약 응답에는 팀 id 만 오고 이름이 없다).
  */
-const teamMatchRequests = new Map<string, TeamMatchRequest>([
-  [
-    'tmr0',
+/**
+ * 받은 경기 신청 씨앗 한 건.
+ *
+ * 🔴 **여러 건을 둔다**(2026-09-17). 하나뿐이면 **한 번 수락하면 없어져서**
+ * 대기 화면을 다시 볼 수가 없다 — 개발 서버를 통째로 죽여야 돌아오는데,
+ * Next 는 HMR 로 모듈 상태를 들고 있어 그것도 잘 안 된다(사용자가 실제로
+ * 막혔다). 로컬에서 몇 번이고 눌러 볼 수 있어야 한다.
+ */
+function seedRequest(
+  id: string,
+  playedAt: string,
+  place: string,
+): [string, TeamMatchRequest] {
+  return [
+    id,
     {
-      id: 'tmr0',
-      /* 🔴 **판을 가진 그 망원 유나이티드로 맞춘다**(`INVITER_TEAM`) — 다른
-         id 로 두면 수락해도 대기 화면의 상대 판이 빈다. */
-      requester_team_id: INVITER_TEAM.id,
+      id,
+      /* 🔴 **인원이 꽉 찬 팀에서 온다**(`RIVAL_TEAM`) — 초대용 팀은 GK 가
+         비어 있어 5:5 경기를 할 수 없다(위 주석). */
+      requester_team_id: RIVAL_TEAM.id,
       target_team_id: DEMO_TEAM_ID,
-      proposed_played_at: '2026-09-19T09:00:00+09:00',
-      proposed_place: '망원 실내구장 A',
+      proposed_played_at: playedAt,
+      proposed_place: place,
       status: 'pending',
       created_at: '2026-09-16T00:30:00Z',
       responded_at: null,
       match_id: null,
       /* 🔴 **이름·지역은 서버가 준다**(CCC 55) — 전에는 화면이 붙박이 목록에서
          찾았다. mock 도 같이 실어야 화면이 그 갈래를 밟는다. */
-      requester_team_name: INVITER_TEAM.name,
-      requester_team_region: INVITER_TEAM.region,
+      requester_team_name: RIVAL_TEAM.name,
+      requester_team_region: RIVAL_TEAM.region,
       target_team_name: '번개FC',
       target_team_region: '서울 강남구',
       /* 🔴 **두 팀 판의 공개 슬러그**(2026-09-17) — 대기 화면이 상대 판을
-         이걸로 읽는다. 우리(번개FC)는 데모 스쿼드, 상대는 위 `inviterSquad`.
-         mock 이 안 실으면 판이 빈 채로 떠서 화면이 그 갈래를 못 밟는다. */
-      requester_squad_public_slug: inviterSquad.public_slug,
+         이걸로 읽는다. mock 이 안 실으면 판이 빈 채로 뜬다. */
+      requester_squad_public_slug: rivalSquad.public_slug,
       target_squad_public_slug: demoSquad?.public_slug ?? null,
     },
-  ],
+  ]
+}
+
+const teamMatchRequests = new Map<string, TeamMatchRequest>([
+  seedRequest('tmr0', '2026-09-19T09:00:00+09:00', '망원 실내구장 A'),
+  seedRequest('tmr-b', '2026-09-20T14:00:00+09:00', '합정 풋살파크'),
+  seedRequest('tmr-c', '2026-09-26T19:30:00+09:00', '상암 월드컵 보조구장'),
+  /* 🔴 **1분 뒤 경기**(사용자 요청, 2026-09-17) — 수락해 두면 곧 「경기 취소」가
+     「경기 끝내기」로 바뀌고, 눌러서 리뷰 판을 볼 수 있다. 서버가 뜰 때마다
+     다시 계산하므로 언제 켜도 늘 「곧」이다. */
+  seedRequest('tmr-soon', new Date(Date.now() + 60_000).toISOString(), '1분 뒤 — 리뷰 보기용 (카드 붙임)'),
+  /* 하나는 실수로 써 버려도 되게 **둘을 둔다.** 서버를 다시 띄우지 않고도
+     한 번 더 볼 수 있다. */
+  seedRequest('tmr-soon2', new Date(Date.now() + 180_000).toISOString(), '3분 뒤 — 리뷰 보기용 (여유분)'),
 ])
+
+
+/**
+ * **「곧 시작」 씨앗을 다시 놓는다** — mock 전용 (2026-09-17, 사용자 요청).
+ *
+ * 🔴 **리뷰 판을 보려면 「곧 끝나는 경기」가 있어야 한다.** 그런데 한 번
+ * 수락하면 그 신청은 `pending` 이 아니게 되어 사라지고, 다시 보려면 개발
+ * 서버를 통째로 죽여야 했다(Next 가 HMR 로 모듈 상태를 들고 있어 그것도 잘
+ * 안 된다). **없으면 알아서 다시 놓는다.**
+ *
+ * ⚠️ **mock 에만 있는 편의다.** 진짜 서버는 경기를 스스로 만들지 않는다 —
+ * 이 함수는 `mock.ts` 밖으로 나가지 않는다.
+ */
+function refreshSoonSeed(): void {
+  const alive = [...teamMatchRequests.values()].some(
+    (r) => r.id.startsWith('tmr-soon') && r.status === 'pending',
+  )
+  if (alive) return
+  // 번호를 올려 새 id 로 놓는다 — 옛 것(수락·거절된 것)은 기록으로 남긴다.
+  const n = [...teamMatchRequests.keys()].filter((k) => k.startsWith('tmr-soon')).length + 1
+  const [id, made] = seedRequest(
+    `tmr-soon${n}`,
+    new Date(Date.now() + 60_000).toISOString(),
+    '1분 뒤 — 리뷰 보기용',
+  )
+  teamMatchRequests.set(id, made)
+}
 
 /** 그 팀의 주장인가 — 계약이 주장만 허용하는 경로들이 쓴다. */
 function requireCaptain(u: User, teamId: string): void {
@@ -1553,7 +1645,7 @@ export const mockBackend: Backend = {
     // 🔴 `requireUser` 를 안 부른다 — 계약이 인증 없이 여는 경로다(SEC-005).
     // 🔴 **남의 팀 판도 찾는다** — 이 경로가 있는 이유가 그것이다(초대받은
     //    사람은 부른 팀 소속이 아니다).
-    const found = [demoSquad, inviterSquad].find((s) => s?.public_slug === publicSlug)
+    const found = [demoSquad, inviterSquad, rivalSquad].find((s) => s?.public_slug === publicSlug)
     if (!found) {
       throw new BackendError(404, 'SQUAD_NOT_FOUND', '그런 스쿼드가 없습니다.')
     }
@@ -2047,6 +2139,7 @@ export const mockBackend: Backend = {
   async listTeamMatchRequests(token, teamId) {
     const me = requireUser(token)
     requireCaptain(me, teamId)
+    refreshSoonSeed()
     return [...teamMatchRequests.values()]
       .filter((r) => r.requester_team_id === teamId || r.target_team_id === teamId)
       .sort((a, b) => b.created_at.localeCompare(a.created_at))

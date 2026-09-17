@@ -435,3 +435,83 @@ describe('mock — 경기 신청에 두 팀 판의 슬러그', () => {
     expect(squad.members.length).toBeGreaterThan(0)
   })
 })
+
+/**
+ * 🔴 **경기는 인원이 맞아야 성립한다** (2026-09-17, 사용자 지적 —
+ * 「3:3 5:5 7:7 걸어뒀는데 이게 말이 되냐」).
+ *
+ * 초대용 팀(`INVITER_TEAM`)은 나를 GK 로 부르느라 **그 자리가 비어 있어서**
+ * 5:5 경기를 할 수 없다. 그 팀을 경기 신청에도 쓰니 대기 화면에 **네 명짜리
+ * 상대**가 떴다 — 계약도 후보를 「상대 로스터가 그 인원만큼 찼고」로 거른다.
+ */
+describe('mock — 경기를 걸어 온 팀은 인원이 차 있다', () => {
+  const TOKEN = 'mock-access-token-demo'
+  const TEAM = '9a2e0000-0000-4000-8000-000000000002'
+
+  it('상대 판이 5:5 를 꽉 채운다', async () => {
+    const rows = await mockBackend.listTeamMatchRequests(TOKEN, TEAM)
+    const got = rows.find((r) => r.target_team_id === TEAM)!
+    const squad = await mockBackend.getSquadBySlug(got.requester_squad_public_slug as string)
+
+    expect(squad.formation).toBe('5:5')
+    expect(squad.members.filter((m) => m.grid_col !== null)).toHaveLength(5)
+    // 🔴 GK 가 있어야 경기가 된다 — 초대용 팀은 거기가 비어 있다.
+    expect(squad.members.some((m) => m.position_code === 'GK')).toBe(true)
+  })
+
+  /* 🔴 **초대용 팀과 다른 팀이어야 한다** — 같으면 둘 중 하나가 거짓이 된다. */
+  it('경기를 건 팀은 나를 초대한 팀이 아니다', async () => {
+    const rows = await mockBackend.listTeamMatchRequests(TOKEN, TEAM)
+    const match = rows.find((r) => r.target_team_id === TEAM)!
+    const invites = await mockBackend.listMyInvitations(TOKEN)
+
+    expect(match.requester_team_name).not.toBe(invites[0].team_name)
+  })
+
+  /* 한 번 수락하면 없어지므로 **여러 건**을 둔다 — 로컬에서 다시 볼 수 있게. */
+  it('받은 경기 신청이 여러 건이다 — 한 번 눌러도 또 볼 수 있다', async () => {
+    const rows = await mockBackend.listTeamMatchRequests(TOKEN, TEAM)
+    const pending = rows.filter((r) => r.target_team_id === TEAM && r.status === 'pending')
+    expect(pending.length).toBeGreaterThan(1)
+  })
+})
+
+/**
+ * 🔴 **「곧 시작」 경기는 쓰면 다시 생긴다** — mock 전용 편의
+ * (2026-09-17, 사용자 요청: 「다시 1분 후꺼 하나 줘봐」).
+ *
+ * 리뷰 판을 보려면 곧 끝나는 경기가 있어야 하는데, 한 번 수락하면 그 신청은
+ * `pending` 이 아니게 되어 사라진다 — 다시 보려면 개발 서버를 통째로 죽여야
+ * 했다. 없으면 알아서 다시 놓는다.
+ */
+describe('mock — 「곧 시작」 경기는 다시 생긴다', () => {
+  const TOKEN = 'mock-access-token-demo'
+  const TEAM = '9a2e0000-0000-4000-8000-000000000002'
+
+  const soon = async () =>
+    (await mockBackend.listTeamMatchRequests(TOKEN, TEAM)).filter(
+      (r) => r.id.startsWith('tmr-soon') && r.status === 'pending',
+    )
+
+  it('수락해서 없어지면 새로 하나가 놓인다', async () => {
+    const before = await soon()
+    expect(before.length).toBeGreaterThan(0)
+
+    /* 🔴 **하나만 수락한다** — 수락은 그 팀의 다른 `pending` 을 전부
+       `cancelled` 로 정리한다(이중 예약 방지, 계약). 그래서 한 번이면
+       「곧 시작」이 통째로 비워진다. */
+    await mockBackend.acceptTeamMatch(TOKEN, TEAM, before[0].id)
+
+    const after = await soon()
+    expect(after.length).toBeGreaterThan(0)
+    // 🔴 **새 id 다** — 옛 것은 기록으로 남는다.
+    expect(after.every((r) => !before.some((b) => b.id === r.id))).toBe(true)
+  })
+
+  it('놓이는 경기는 1분쯤 뒤다 — 곧 「경기 끝내기」로 바뀐다', async () => {
+    const [one] = await soon()
+    const left = new Date(one.proposed_played_at).getTime() - Date.now()
+    expect(left).toBeGreaterThan(0)
+    expect(left).toBeLessThanOrEqual(5 * 60_000)
+  })
+})

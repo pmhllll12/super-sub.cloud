@@ -14367,3 +14367,281 @@ body:has(.ss-venues) .ss-home-header {
   font-size: 0.85rem;
   color: color-mix(in srgb, var(--ss-fg) 62%, transparent);
 }
+
+/* ── 경기 리뷰 (사용자 요청, 2026-09-17) ─────────────────────────────
+   경기가 끝난 뒤 함께 뛴 사람을 고르는 판. 🔴 **화면 가운데에 크게 뜬다**
+   (사용자 지적 — 오른쪽 아래 작은 판으로 뒀더니 경기장 위에 얹혀 읽기 나빴다).
+   🔴 별점이 아니라 **고르는 것**이다(계약 3-9절: `review` 에 총점이 없다). */
+.ss-mr-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background-color: rgb(0 0 0 / 52%);
+  animation: ss-mr-scrim-in 200ms ease both;
+}
+
+@keyframes ss-mr-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.ss-mr {
+  /* 🔴 **흰 판이라 색 토큰을 뒤집는다**(사용자 요청). 안쪽 글자·테두리가
+     전부 `--ss-fg`/`--ss-bg` 의 `color-mix` 라, 여기서 한 번 바꾸면 판
+     전체가 따라온다 — 규칙마다 색을 따로 박지 않는다. */
+  --ss-fg: #14181c;
+  --ss-bg: #ffffff;
+
+  width: min(720px, 100%);
+  max-height: min(86vh, 900px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 20px;
+  background-color: #fff;
+  border: 1px solid rgb(0 0 0 / 10%);
+  box-shadow: 0 30px 80px rgb(0 0 0 / 45%);
+  color: var(--ss-fg);
+  animation: ss-mr-in 240ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@keyframes ss-mr-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.ss-mr-head {
+  padding: 22px 26px 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--ss-fg) 12%, transparent);
+}
+
+.ss-mr-head h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.ss-mr-note {
+  margin: 6px 0 0;
+  font-size: 0.8125rem;
+  color: color-mix(in srgb, var(--ss-fg) 66%, transparent);
+}
+
+.ss-mr-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 22px;
+}
+
+.ss-mr-side + .ss-mr-side {
+  margin-top: 22px;
+}
+
+.ss-mr-team {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+/* 우리/상대를 **글자로도** 가른다 — 자리만으로는 안 읽힌다. */
+.ss-mr-side-tag {
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--ss-fg) 72%, transparent);
+  background-color: color-mix(in srgb, var(--ss-fg) 12%, transparent);
+}
+
+.ss-mr-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ss-mr-person {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border-radius: 12px;
+  padding: 8px 14px;
+  text-align: left;
+  font-size: 0.9375rem;
+  color: var(--ss-fg);
+  background-color: color-mix(in srgb, var(--ss-fg) 8%, transparent);
+  transition: background-color 160ms ease;
+}
+
+.ss-mr-person:hover {
+  background-color: color-mix(in srgb, var(--ss-fg) 14%, transparent);
+}
+
+/* 🔴 **카드가 줄 맨 앞에 선다**(사용자 요청, 2026-09-17). 누구인지는 이름보다
+   카드가 빨리 말한다. 판(`--ss-pcard-mini-w`)과 같은 변수를 쓰므로 숫자를
+   따로 박지 않는다 — 카드 비율·글자 크기가 전부 이 값에서 계산된다. */
+.ss-mr-card {
+  /* 🔴 **줄어드는 것은 `.ss-pcard-mini` 가 한다** — 이 변수 하나로 카드 전체가
+     같이 줄어든다(비율·글자까지). 숫자를 따로 박으면 어긋난다. */
+  --ss-pcard-mini-w: 40;
+  flex: none;
+}
+
+/* 이름 카드의 글자 — 34px 카드에 들어갈 만큼 줄인다. */
+.ss-mr-card-name {
+  font-size: 0.5rem;
+  line-height: 1.2;
+}
+
+.ss-mr-pos {
+  flex: none;
+  width: 30px;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--ss-fg) 62%, transparent);
+}
+
+.ss-mr-name {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 접어 둬도 몇 개 남겼는지 보인다. */
+.ss-mr-count {
+  flex: none;
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--ss-bg);
+  background-color: var(--ss-accent);
+}
+
+.ss-mr-opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 14px 6px;
+}
+
+.ss-mr-opt {
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 26%, transparent);
+  padding: 7px 13px;
+  font-size: 0.8125rem;
+  color: color-mix(in srgb, var(--ss-fg) 82%, transparent);
+  background: transparent;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.ss-mr-opt[data-on='true'] {
+  border-color: var(--ss-accent);
+  color: var(--ss-accent);
+  background-color: color-mix(in srgb, var(--ss-accent) 16%, transparent);
+}
+
+/* 🔴 「주의」는 **고르기 전부터** 다른 무게로 보여야 한다 — 칭찬과 같은
+   모양으로 섞어 두면 실수로 누른다(계약이 순서를 맨 뒤로 둔 것과 같은 결). */
+.ss-mr-opt[data-cat='caution'] {
+  border-style: dashed;
+}
+
+.ss-mr-opt[data-cat='caution'][data-on='true'] {
+  border-color: #ff6b6b;
+  color: #ff6b6b;
+  background-color: rgb(255 107 107 / 14%);
+}
+
+.ss-mr-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px 20px;
+  border-top: 1px solid color-mix(in srgb, var(--ss-fg) 12%, transparent);
+}
+
+.ss-mr-save,
+.ss-mr-close {
+  border-radius: 999px;
+  padding: 9px 20px;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.ss-mr-save {
+  border: 1px solid color-mix(in srgb, var(--ss-accent) 60%, transparent);
+  color: var(--ss-accent);
+  background: transparent;
+}
+
+.ss-mr-save:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.ss-mr-close {
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 26%, transparent);
+  color: color-mix(in srgb, var(--ss-fg) 76%, transparent);
+  background: transparent;
+}
+
+.ss-mr-saved {
+  margin: 0 auto 0 0;
+  font-size: 0.875rem;
+  color: var(--ss-accent);
+}
+
+/* 끝난 경기의 마무리 단추 — 취소(빨강)와 **다른 일**이라 색을 가른다. */
+.ss-mw-cancel[data-done='true'] {
+  border-color: color-mix(in srgb, var(--ss-accent) 60%, transparent);
+  color: var(--ss-accent);
+}
+
+/* 🔴 흰 판 위의 연두는 어둡게 — 어두운 바탕에서 쓰던 값 그대로면 대비가
+   무너진다(1.12 회차: 「흰 판 위 글자는 재고 고른다」). */
+.ss-mr .ss-mr-save {
+  border-color: #0f7a46;
+  color: #0f7a46;
+}
+
+.ss-mr .ss-mr-opt[data-on='true'] {
+  border-color: #0f7a46;
+  color: #0f7a46;
+  background-color: rgb(15 122 70 / 10%);
+}
+
+.ss-mr .ss-mr-count {
+  background-color: #0f7a46;
+  color: #fff;
+}
+
+.ss-mr .ss-mr-saved {
+  color: #0f7a46;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-mr,
+  .ss-mr-scrim {
+    animation-duration: 1ms;
+  }
+}

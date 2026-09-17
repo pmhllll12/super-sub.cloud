@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { MatchTeam } from '@/lib/teamMatch'
 import MatchWaiting from './MatchWaiting'
@@ -203,9 +203,105 @@ describe('경기 대기 팝업', () => {
     })
   })
 
-  // ⚠️ 지어낸 수락이라는 것을 숨기지 않는다.
-  it('데모라는 것을 적어 둔다', () => {
+  /**
+   * 🔴 **「데모입니다」를 적지 않는다**(2026-09-17, 사용자 지적).
+   *
+   * 가짜 `applyToTeam` 이 1.4초 뒤 수락을 흉내내던 시절의 문장이다 — 그때는
+   * 숨기지 않는 것이 옳았다. 지금은 수락이 **진짜로 서버에 나가고 경기가
+   * 실제로 잡힌다**(계약 3-15절). 그대로 두면 그 문장이 **거짓**이고,
+   * 조건 없이 박혀 있어서 `USE_MOCK` 으로도 안 꺼져 **실제 도메인에서도 떴다.**
+   */
+  it('데모라고 적지 않는다 — 이제 진짜로 잡힌다', () => {
     open()
-    expect(screen.getByText(/데모입니다/)).toBeInTheDocument()
+    expect(screen.queryByText(/데모입니다/)).toBeNull()
+  })
+})
+
+/**
+ * **경기가 끝나면 마무리하고 리뷰를 남긴다** (사용자 요청, 2026-09-17).
+ *
+ * 🔴 **이미 한 경기를 「취소」하는 것은 말이 안 된다** — 시각이 지나면 그
+ * 자리가 「경기 끝내기」가 되고, 누르면 리뷰로 넘어간다.
+ */
+describe('대기 화면 — 경기가 끝난 뒤', () => {
+  afterEach(() => vi.useRealTimers())
+
+  /** 경기 시각을 지나 있게 시계를 옮긴다. */
+  function afterMatch() {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-09-19T12:00:00'))
+  }
+
+  it('경기 시각이 지나면 「경기 끝내기」다 — 「경기 취소」가 아니다', async () => {
+    afterMatch()
+    render(<MatchWaiting us={US} them={THEM} onClose={vi.fn()} onCancel={vi.fn()} />)
+
+    expect(await screen.findByRole('button', { name: '경기 끝내기' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '경기 취소' })).toBeNull()
+  })
+
+  it('아직 안 지났으면 그대로 「경기 취소」다', () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-09-19T08:00:00'))
+    render(<MatchWaiting us={US} them={THEM} onClose={vi.fn()} onCancel={vi.fn()} />)
+
+    expect(screen.getByRole('button', { name: '경기 취소' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '경기 끝내기' })).toBeNull()
+  })
+
+  it('「경기 끝내기」를 누르면 우리 팀·상대 팀으로 나눠 리뷰를 받는다', async () => {
+    afterMatch()
+    const user = userEvent.setup()
+    render(<MatchWaiting us={US} them={THEM} onClose={vi.fn()} onCancel={vi.fn()} />)
+
+    await user.click(await screen.findByRole('button', { name: '경기 끝내기' }))
+
+    const panel = screen.getByRole('dialog', { name: '경기 리뷰' })
+    expect(panel).toHaveTextContent('우리 팀')
+    expect(panel).toHaveTextContent('번개FC')
+    // 양 팀 사람이 다 줄로 선다.
+    expect(screen.getByRole('button', { name: /정우진/ })).toBeInTheDocument()
+  })
+
+  /* 🔴 **강제가 아니다**(사용자 요청) — 아무것도 안 고르면 저장이 안 눌린다. */
+  it('아무것도 안 고르면 저장이 안 눌린다', async () => {
+    afterMatch()
+    const user = userEvent.setup()
+    render(<MatchWaiting us={US} them={THEM} onClose={vi.fn()} onCancel={vi.fn()} />)
+    await user.click(await screen.findByRole('button', { name: '경기 끝내기' }))
+
+    expect(screen.getByRole('button', { name: '저장' })).toBeDisabled()
+  })
+
+  it('사람을 펴서 고르면 저장할 수 있다', async () => {
+    afterMatch()
+    const user = userEvent.setup()
+    render(<MatchWaiting us={US} them={THEM} onClose={vi.fn()} onCancel={vi.fn()} />)
+    await user.click(await screen.findByRole('button', { name: '경기 끝내기' }))
+
+    await user.click(screen.getByRole('button', { name: /정우진/ }))
+    /* 🔴 **별점이 아니라 고르는 것이다**(계약 3-9절) — 문구도 서버 시드 그대로다. */
+    await user.click(screen.getByRole('button', { name: '시간을 잘 지켰다' }))
+
+    const save = screen.getByRole('button', { name: '저장' })
+    expect(save).toBeEnabled()
+    await user.click(save)
+    expect(screen.getByRole('status')).toHaveTextContent('남겼습니다')
+  })
+
+  /* 🔴 **닫으면 둘 다 내려간다**(사용자 설계) — 리뷰가 먼저, 이어서 대기 화면. */
+  it('리뷰를 닫으면 대기 화면까지 닫힌다', async () => {
+    afterMatch()
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    render(<MatchWaiting us={US} them={THEM} onClose={onClose} onCancel={vi.fn()} />)
+    await user.click(await screen.findByRole('button', { name: '경기 끝내기' }))
+
+    /* 🔴 대기 화면에도 「닫기」가 있다 — **리뷰 판 안의 것**으로 좁힌다. */
+    const panel = screen.getByRole('dialog', { name: '경기 리뷰' })
+    await user.click(within(panel).getByRole('button', { name: '닫기' }))
+
+    expect(screen.queryByRole('dialog', { name: '경기 리뷰' })).toBeNull()
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
   })
 })

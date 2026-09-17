@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import MiniPitch from '@/components/MiniPitch'
+import MatchReview from '@/components/MatchReview'
 import type { MatchTeam, MyTeamSummary } from '@/lib/teamMatch'
 import type { PublicPlayerCard } from '@/server/backend'
 
@@ -70,6 +71,40 @@ export default function MatchWaiting({
    * 내려가는 것을 아무도 못 본다(추천 판이 같은 이유로 같은 것을 한다).
    */
   const [leaving, setLeaving] = useState(false)
+  /**
+   * 🔴 **경기 시각이 지났으면 「경기 끝내기」다**(사용자 요청, 2026-09-17).
+   * 이미 한 경기를 「취소」하는 것은 말이 안 되고, 그 자리에서 리뷰로 넘어간다.
+   *
+   * ⚠️ **그릴 때 시계를 읽지 않는다** — 서버가 그린 것과 달라져 hydration 이
+   * 깨진다. 붙은 뒤에 한 번 재고, 그 뒤로는 1분마다 다시 본다(경기 시각을
+   * 걸쳐 두고 화면을 열어 둔 사람에게도 바뀌어야 한다).
+   */
+  const [over, setOver] = useState(false)
+  useEffect(() => {
+    const at = new Date(them.playedAt).getTime()
+    if (Number.isNaN(at)) return
+    let id = 0
+    /* 🔴 **그 시각에 정확히 바뀐다.** 주기적으로 훑으면 최대 그 주기만큼
+       늦게 바뀐다 — 경기 시각을 코앞에 두고 화면을 열어 둔 사람에게는 그게
+       「안 바뀐다」로 보인다. 남은 시간만큼만 재고, 멀면 잘라서 다시 잰다
+       (`setTimeout` 은 아주 긴 값에서 제대로 안 돈다). */
+    const tick = () => {
+      const left = at - Date.now()
+      if (left <= 0) {
+        setOver(true)
+        return
+      }
+      setOver(false)
+      id = window.setTimeout(tick, Math.min(left, 60_000))
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    tick()
+    return () => clearTimeout(id)
+  }, [them.playedAt])
+
+  /** 리뷰 창을 열어 둔 상태. 🔴 닫으면 대기 화면까지 함께 내려간다. */
+  const [reviewing, setReviewing] = useState(false)
+
   /**
    * 「경기 취소」를 눌러 **한 번 더 묻는 중**인가.
    *
@@ -148,8 +183,12 @@ export default function MatchWaiting({
             <em>VS</em>
             <span>{them.name}</span>
           </p>
-          {/* ⚠️ 지어낸 수락이라는 것을 숨기지 않는다 — 숨기면 진짜로 잡힌 줄 안다. */}
-          <p className="ss-mw-note">데모입니다 — 상대의 수락을 흉내낸 것이고 실제로 잡히지 않습니다.</p>
+          {/* 🔴 **「데모입니다」를 걷었다**(2026-09-17, 사용자 지적). 가짜
+              `applyToTeam` 이 1.4초 뒤 수락을 흉내내던 시절의 문장이고, 그때는
+              숨기지 않는 것이 옳았다. 지금은 수락이 **진짜로 서버에 나가고
+              경기가 실제로 잡힌다** — 그대로 두면 그 문장이 거짓이 된다.
+              🔴 조건 없이 박혀 있어서 `USE_MOCK` 으로도 안 꺼졌다(화면에 박힌
+              mock 이다) — 실제 도메인에서도 떴다. */}
 
           {/* 🔴 **취소는 닫기(×)와 다른 일이다.** ×는 이 판을 접는 것이고,
               이것은 **잡힌 경기를 무르는 것**이다 — 그래서 자리도 뜻도 가른다. */}
@@ -204,6 +243,16 @@ export default function MatchWaiting({
                   되돌리기
                 </button>
               </>
+            ) : over ? (
+              /* 🔴 **끝난 경기는 취소가 아니라 마무리다.** 누르면 리뷰로 간다. */
+              <button
+                type="button"
+                className="ss-mw-cancel"
+                data-done="true"
+                onClick={() => setReviewing(true)}
+              >
+                경기 끝내기
+              </button>
             ) : (
               <button
                 type="button"
@@ -218,6 +267,19 @@ export default function MatchWaiting({
 
         <MiniPitch team={them.name} players={them.squad} side="them" />
       </div>
+
+      {/* 🔴 **닫으면 둘 다 내려간다**(사용자 설계) — 리뷰 창이 먼저 사라지고,
+          이어서 대기 화면이 여느 닫기와 같은 길로 내려가 홈만 남는다. */}
+      {reviewing && (
+        <MatchReview
+          us={us}
+          them={{ name: them.name, squad: them.squad }}
+          onClose={() => {
+            setReviewing(false)
+            leave(onClose)
+          }}
+        />
+      )}
     </div>,
     document.body,
   )
