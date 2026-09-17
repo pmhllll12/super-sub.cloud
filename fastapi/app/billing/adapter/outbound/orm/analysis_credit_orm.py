@@ -25,7 +25,10 @@ class AnalysisCreditOrm(Base):
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     # `user` 는 다른 컨텍스트의 테이블이라 **문자열로 참조**한다.
-    user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("user.id"), nullable=False)
+    # 탈퇴하면 함께 지운다(부록 D.6, 2026-09-17) — 크레딧은 그 사람만의 잔고 이력이다.
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("user.id", ondelete="CASCADE"), nullable=False
+    )
     delta: Mapped[int] = mapped_column(Integer, nullable=False)
     # 값 목록(signup_bonus · analysis · refund …)은 아직 정하지 않았다 — 자유
     # 텍스트로 둔다(패킷 A 문서 「정해야 할 것」).

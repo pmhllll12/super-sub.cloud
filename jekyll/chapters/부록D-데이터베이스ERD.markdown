@@ -94,7 +94,7 @@ user가 대부분의 테이블과 연결되는 허브이므로 전체를 한 장
 경기 후 평가가 떠받친다」로 정하면서 뒤쪽이 생겼다. 분석이 기준을 넘으면 호칭을 주는 설계
 (title_criteria)는 구현하지 않았다.
 
-<div style="overflow-x:auto;margin:1.2rem 0;border:1px solid #e3e1da;border-radius:6px"><a href="{{ '/assets/erd/domain3-card-title.svg' | relative_url }}?v=20260917" title="원본 크기로 열기"><img src="{{ '/assets/erd/domain3-card-title.svg' | relative_url }}?v=20260917" alt="도메인 ③ 카드·호칭 ERD" width="932" height="706" style="max-width:none;height:auto;display:block"></a></div>
+<div style="overflow-x:auto;margin:1.2rem 0;border:1px solid #e3e1da;border-radius:6px"><a href="{{ '/assets/erd/domain3-card-title.svg' | relative_url }}?v=20260917b" title="원본 크기로 열기"><img src="{{ '/assets/erd/domain3-card-title.svg' | relative_url }}?v=20260917b" alt="도메인 ③ 카드·호칭 ERD" width="932" height="706" style="max-width:none;height:auto;display:block"></a></div>
 
 
 | 테이블 | 용도 | 1행이 뜻하는 것 |
@@ -109,7 +109,7 @@ user가 대부분의 테이블과 연결되는 허브이므로 전체를 한 장
 
 ### ④ 매칭
 
-<div style="overflow-x:auto;margin:1.2rem 0;border:1px solid #e3e1da;border-radius:6px"><a href="{{ '/assets/erd/domain4-matching.svg' | relative_url }}?v=20260917" title="원본 크기로 열기"><img src="{{ '/assets/erd/domain4-matching.svg' | relative_url }}?v=20260917" alt="도메인 ④ 매칭 ERD" width="991" height="942" style="max-width:none;height:auto;display:block"></a></div>
+<div style="overflow-x:auto;margin:1.2rem 0;border:1px solid #e3e1da;border-radius:6px"><a href="{{ '/assets/erd/domain4-matching.svg' | relative_url }}?v=20260917b" title="원본 크기로 열기"><img src="{{ '/assets/erd/domain4-matching.svg' | relative_url }}?v=20260917b" alt="도메인 ④ 매칭 ERD" width="991" height="942" style="max-width:none;height:auto;display:block"></a></div>
 
 
 | 테이블 | 용도 | 1행이 뜻하는 것 |
@@ -131,7 +131,7 @@ user가 대부분의 테이블과 연결되는 허브이므로 전체를 한 장
 평가는 선택형이므로(3.4) 선택지를 review_option에 정의하고 선택 결과를 review_selection에
 행으로 담는다.
 
-<div style="overflow-x:auto;margin:1.2rem 0;border:1px solid #e3e1da;border-radius:6px"><a href="{{ '/assets/erd/domain5-review-trust.svg' | relative_url }}?v=20260917" title="원본 크기로 열기"><img src="{{ '/assets/erd/domain5-review-trust.svg' | relative_url }}?v=20260917" alt="도메인 ⑤ 평가·신뢰 ERD" width="932" height="706" style="max-width:none;height:auto;display:block"></a></div>
+<div style="overflow-x:auto;margin:1.2rem 0;border:1px solid #e3e1da;border-radius:6px"><a href="{{ '/assets/erd/domain5-review-trust.svg' | relative_url }}?v=20260917b" title="원본 크기로 열기"><img src="{{ '/assets/erd/domain5-review-trust.svg' | relative_url }}?v=20260917b" alt="도메인 ⑤ 평가·신뢰 ERD" width="932" height="706" style="max-width:none;height:auto;display:block"></a></div>
 
 
 | 테이블 | 용도 | 1행이 뜻하는 것 |
@@ -152,7 +152,7 @@ report·no_show는 review와 직접 이어지지 않는다. 제재를 평가 점
 
 ### ⑥ 과금
 
-<div style="overflow-x:auto;margin:1.2rem 0;border:1px solid #e3e1da;border-radius:6px"><a href="{{ '/assets/erd/domain6-billing.svg' | relative_url }}?v=20260917" title="원본 크기로 열기"><img src="{{ '/assets/erd/domain6-billing.svg' | relative_url }}?v=20260917" alt="도메인 ⑥ 과금 ERD" width="903" height="410" style="max-width:none;height:auto;display:block"></a></div>
+<div style="overflow-x:auto;margin:1.2rem 0;border:1px solid #e3e1da;border-radius:6px"><a href="{{ '/assets/erd/domain6-billing.svg' | relative_url }}?v=20260917b" title="원본 크기로 열기"><img src="{{ '/assets/erd/domain6-billing.svg' | relative_url }}?v=20260917b" alt="도메인 ⑥ 과금 ERD" width="903" height="410" style="max-width:none;height:auto;display:block"></a></div>
 
 | 테이블 | 용도 | 1행이 뜻하는 것 |
 |---|---|---|
@@ -196,7 +196,7 @@ report·no_show는 review와 직접 이어지지 않는다. 제재를 평가 점
 | ③ 카드·호칭 | user_title | user_id | user | CASCADE | 호칭 대상자 |
 | ④ 매칭 | match | opponent_team_id | team | NO ACTION | 상대 팀(팀 대 팀 확정 경기, 없으면 용병 모집) |
 | ④ 매칭 | match | team_id | team | NO ACTION | 주최 팀 |
-| ④ 매칭 | match_application | user_id | user | NO ACTION | 지원자 |
+| ④ 매칭 | match_application | user_id | user | CASCADE | 지원자 |
 | ④ 매칭 | match_position_need | position_id | position | NO ACTION | 필요 포지션 |
 | ④ 매칭 | member_match_position | position_id | position | NO ACTION | 희망 포지션 |
 | ④ 매칭 | member_match_position | user_id | user | CASCADE | 조건의 주인(개인) |
@@ -209,15 +209,15 @@ report·no_show는 review와 직접 이어지지 않는다. 제재를 평가 점
 | ④ 매칭 | team_match_request | target_team_id | team | NO ACTION | 대상 팀 |
 | ④ 매칭 | team_match_slot | team_id | team | CASCADE | 조건의 주인(팀) |
 | ⑤ 평가·신뢰 | no_show | match_id | match | NO ACTION | 불참한 경기 |
-| ⑤ 평가·신뢰 | no_show | user_id | user | NO ACTION | 불참자 |
-| ⑤ 평가·신뢰 | report | reporter_id | user | NO ACTION | 신고자 |
-| ⑤ 평가·신뢰 | report | target_user_id | user | NO ACTION | 신고 대상 |
+| ⑤ 평가·신뢰 | no_show | user_id | user | CASCADE | 불참자 |
+| ⑤ 평가·신뢰 | report | reporter_id | user | SET NULL | 신고자(탈퇴하면 비운다) |
+| ⑤ 평가·신뢰 | report | target_user_id | user | CASCADE | 신고 대상 |
 | ⑤ 평가·신뢰 | review | match_id | match | NO ACTION | 대상 경기 |
-| ⑤ 평가·신뢰 | review | reviewee_id | user | NO ACTION | 피평가자 |
-| ⑤ 평가·신뢰 | review | reviewer_id | user | NO ACTION | 평가자 |
-| ⑥ 과금 | analysis_credit | user_id | user | NO ACTION | 크레딧 소유자 |
+| ⑤ 평가·신뢰 | review | reviewee_id | user | CASCADE | 피평가자 |
+| ⑤ 평가·신뢰 | review | reviewer_id | user | SET NULL | 평가자(탈퇴하면 비운다) |
+| ⑥ 과금 | analysis_credit | user_id | user | CASCADE | 크레딧 소유자 |
 | ⑥ 과금 | coach | sport_code | sport | NO ACTION | 코치의 종목 |
-| ⑥ 과금 | coach_referral | user_id | user | NO ACTION | 연결 요청자 |
+| ⑥ 과금 | coach_referral | user_id | user | CASCADE | 연결 요청자 |
 | ⑦ 알림 | notification | actor_user_id | user | SET NULL | 알림을 일으킨 사람(없을 수 있음) |
 | ⑦ 알림 | notification | recipient_user_id | user | CASCADE | 받는 사람 |
 
@@ -311,10 +311,11 @@ SEC-006은 삭제 요청 시 원본과 파생물이 함께 삭제될 것을 요�
 (`ON DELETE`)에서 계산한 것이다 — **계정을 지우면** 왼쪽 나무가 함께 지워지고, 그 안의 점선 가지가
 **영상 한 편을 지울 때** 함께 지워지는 범위다.
 
-<div style="overflow-x:auto;margin:1.2rem 0;border:1px solid #e3e1da;border-radius:6px"><a href="{{ '/assets/erd/d6-cascade.svg' | relative_url }}?v=20260917" title="원본 크기로 열기"><img src="{{ '/assets/erd/d6-cascade.svg' | relative_url }}?v=20260917" alt="D.6 계정·영상 삭제 연쇄와 삭제를 막는 기록" width="740" height="568" style="max-width:100%;height:auto;display:block"></a></div>
+<div style="overflow-x:auto;margin:1.2rem 0;border:1px solid #e3e1da;border-radius:6px"><a href="{{ '/assets/erd/d6-cascade.svg' | relative_url }}?v=20260917b" title="원본 크기로 열기"><img src="{{ '/assets/erd/d6-cascade.svg' | relative_url }}?v=20260917b" alt="D.6 계정·영상 삭제 연쇄와 작성자만 비우는 기록" width="740" height="760" style="max-width:100%;height:auto;display:block"></a></div>
 
 계정 탈퇴는 사용자 행을 실제로 지우고, 딸린 것은 이 연쇄가 지운다 — 자격증명·외부 계정 연결·카드·
-호칭·소속·영상 체인·알림·지인·받은 초대·개인 매칭 조건. 자격증명과 외부 계정 연결은 계정에 완전히
+호칭·소속·영상 체인·알림·지인·받은 초대·개인 매칭 조건, 그리고 경기 지원·불참·크레딧·코치 연결·
+스쿼드 등재·**나에 대한** 평가와 신고. 자격증명과 외부 계정 연결은 계정에 완전히
 종속되며 단독으로 남을 이유가 없다. 특히 user_identity가 남으면 **같은 구글 계정으로 다시 가입할 때
 사라진 사용자를 가리키게 된다.**
 
@@ -326,10 +327,14 @@ SEC-006은 삭제 요청 시 원본과 파생물이 함께 삭제될 것을 요�
 팀은 반대로 **해체해도 행을 지우지 않는다**(`team.disbanded_at`). 팀을 참조하는 외래키 다섯이
 삭제를 거부하는 규칙이고, 지난 경기·평가가 팀 이름을 가리킨다.
 
-🔴 **계정 삭제를 막는 기록이 있다.** 그림 오른쪽의 기록 — 경기 지원·평가(쓴 것·받은 것)·신고·
-불참·크레딧·코치 연결·스쿼드 등재 — 이 남아 있으면 외래키가 `NO ACTION` 이라 **DB가 계정 행 삭제를
-거부한다.** 2026-09-17 로컬 DB에서 경기 지원 기록이 있는 사람으로 재현했다. 이 기록들을 익명화할지,
-함께 지울지, 탈퇴를 막고 안내할지는 정해지지 않았다(D.8).
+**내 것은 지우고, 남에게 남긴 것은 작성자만 비운다.** 내가 **남에게 쓴** 평가와 **내가 한** 신고는
+지우지 않고 작성자 칸만 비운다(`SET NULL`) — 평가는 받은 사람의 신뢰 등급 원자료이고 신고는 대상의
+제재 근거라, 쓴 사람이 떠났다고 사라지면 남의 기록이 바뀐다. 경기·팀·스쿼드·코치처럼 여럿이 쓰는
+데이터는 남는다. 그림 오른쪽 「계정 삭제를 막는 기록」은 그래서 비어 있다.
+
+🔴 **정정 (2026-09-17)** — 같은 날 이 자리에 「경기 지원·평가·신고·불참·크레딧·코치 연결·스쿼드 등재
+기록이 있으면 외래키가 `NO ACTION` 이라 DB가 계정 행 삭제를 거부한다」고 적었다. 사실이었고(로컬 DB에서
+재현), **삭제 규칙을 위처럼 정해 고쳤다.** 그 기록이 있는 사람의 탈퇴를 확인하는 DB 테스트를 함께 두었다.
 
 ## D.7 주요 제약조건
 
@@ -371,7 +376,7 @@ SEC-006은 삭제 요청 시 원본과 파생물이 함께 삭제될 것을 요�
 
 | 항목 | 내용 |
 |---|---|
-| 🔴 탈퇴와 남는 기록 | 경기 지원·평가·신고·불참·크레딧·코치 연결·스쿼드 등재 기록이 있으면 DB가 계정 삭제를 거부한다(D.6). 익명화·함께 삭제·탈퇴 전 안내 중 무엇으로 할지 정해야 한다 |
+| ~~탈퇴와 남는 기록~~ | ✅ **확정됨** (2026.09.17) — 내 기록은 함께 지우고, 남에게 쓴 평가·신고는 작성자만 비운다(D.6). 그 전에는 이 기록이 있으면 DB가 탈퇴를 거부했다 |
 | 용병 매칭 조건의 중복 | user 의 용병 검색 칸과 ④의 개인 매칭 조건이 같은 개념을 따로 담는다(D.4). 합칠지, 한쪽을 다른 쪽의 폴백으로 둘지 |
 | 미구현 테이블 넷 | player_vector(선수 성향 벡터)·fitness_score(적합도)·recommendation(추천 이력)·title_criteria(분석 호칭 기준). 넣을 시점은 정해지지 않았다. title_criteria 는 호칭을 사람이 적기로 하면서(2026.09.16) 필요가 줄었다 |
 | ~~지표 항목~~ | ✅ **확정됨** — 종목 무관 물리량으로 정하고(2026.09.08) 시드로 적재했다(2026.09.10) |

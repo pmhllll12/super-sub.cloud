@@ -21,7 +21,10 @@ class CoachReferralOrm(Base):
     __tablename__ = "coach_referral"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
-    user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("user.id"), nullable=False)
+    # 탈퇴하면 함께 지운다(부록 D.6, 2026-09-17) — 코치 연결 요청은 그 사람의 것이다.
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("user.id", ondelete="CASCADE"), nullable=False
+    )
     coach_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("coach.id"), nullable=False)
     fee: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     created_at: Mapped[datetime] = mapped_column(

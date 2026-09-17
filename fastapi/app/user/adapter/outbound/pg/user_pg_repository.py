@@ -308,8 +308,11 @@ class UserPgRepository(UserPort):
         return self._session.execute(stmt).scalar_one_or_none() is not None
 
     def delete(self, user_id: UUID) -> None:
-        # 자격증명·외부 신원·카드·호칭·소속·영상 체인은 **외래키 연쇄**가 함께 지운다
-        # (부록 D.6). 여기서 하나씩 지우면 테이블이 늘 때마다 빠뜨린다.
+        # 자격증명·외부 신원·카드·호칭·소속·영상 체인, 지원·불참·크레딧·코치 연결·
+        # 스쿼드 등재·나에 대한 평가·신고는 **외래키 연쇄**가 함께 지우고, 내가 남에게
+        # 쓴 평가·신고는 작성자만 비운다(SET NULL, 2026-09-17 · 부록 D.6). 여기서
+        # 하나씩 지우면 테이블이 늘 때마다 빠뜨린다 — 규칙 없는 외래키가 새로 생기면
+        # `test_delete_me_db.py` 의 `TestDeleteMeWithRecords` 에 한 줄 넣어 확인한다.
         row = self._session.get(UserOrm, user_id)
         if row is None:
             return
