@@ -40,6 +40,16 @@ _card = table("player_card", column("id"), column("user_id"), column("public_slu
 # `squad` 도 `card` 컨텍스트다 — 위와 같은 이유로 임포트하지 않는다(`paik` 37번).
 _squad = table("squad", column("team_id"), column("public_slug"))
 
+# 🔴 초대를 수락하면 **초대받은 자리로 스쿼드에 등재한다**(2026-09-17, 정어진). 여기는
+# 읽기만이 아니라 **쓰기**다 — 알림(`_notification`)과 같은 원시 SQL 쓰기 방식이다.
+# 수락은 받은 사람이 하는데, 등재 경로(`POST /teams/{id}/squad/members`)는 주장만
+# 부를 수 있어서 화면이 대신 등재할 길이 없었다(그래서 수락해도 판에 안 섰다).
+_squad_ids = table("squad", column("id"), column("team_id"))
+_squad_member = table(
+    "squad_member", column("id"), column("squad_id"), column("player_card_id"),
+    column("position_id"), column("grid_col"), column("grid_row"),
+)
+
 # `match` 컨텍스트의 둘. 해체가 이력을 건드리지 않는지 보려면 앞으로 있을
 # 경기를 세야 하고, 대기 중인 경기 신청은 닫아야 한다(`paik` 35번).
 _match = table(
@@ -450,6 +460,7 @@ class TeamPgRepository(TeamPort):
         now = datetime.now(timezone.utc)
         row.status = ACCEPTED
         row.responded_at = now
+        self._seat_on_squad(row)
         self._notify(
             recipient_user_ids=self._owner_user_ids(row.team_id),
             notif_type=_NOTIFY_TEAM_INVITATION_ACCEPTED,
@@ -459,6 +470,42 @@ class TeamPgRepository(TeamPort):
         )
         self._session.commit()
         return self._to_invitation(row)
+
+    def _seat_on_squad(self, row: TeamInvitationOrm) -> None:
+        """수락한 사람을 **초대받은 자리**로 그 팀 스쿼드에 등재한다.
+
+        판 칸(`grid_col`·`grid_row`)은 비워 둔다 — 화면이 칸 없는 등재를 포지션으로
+        맞춰 앉히고, 주장이 옮기면 그때 칸이 생긴다(계약 3-7절). 아래 셋 중 하나라도
+        없으면 **조용히 건너뛴다** — 수락(소속) 자체는 성공이어야 하기 때문이다:
+
+        - 자리를 안 정한 초대(`position_id` 없음) — 어디 앉힐지 모른다
+        - 스쿼드가 없는 팀 — 앉힐 판이 없다
+        - 카드가 없는 사람 — 등재는 카드 단위다
+        """
+        if row.position_id is None:
+            return
+        squad_id = self._session.execute(
+            select(_squad_ids.c.id).where(_squad_ids.c.team_id == row.team_id).limit(1)
+        ).scalar_one_or_none()
+        card_id = self._session.execute(
+            select(_card.c.id).where(_card.c.user_id == row.invited_user_id)
+        ).scalar_one_or_none()
+        if squad_id is None or card_id is None:
+            return
+        already = self._session.execute(
+            select(_squad_member.c.id).where(
+                _squad_member.c.squad_id == squad_id,
+                _squad_member.c.player_card_id == card_id,
+            )
+        ).first()
+        if already is not None:
+            return
+        self._session.execute(
+            insert(_squad_member).values(
+                id=uuid4(), squad_id=squad_id, player_card_id=card_id,
+                position_id=row.position_id, grid_col=None, grid_row=None,
+            )
+        )
 
     def reject_team_invitation(self, invitation_id: UUID) -> TeamInvitationEntity:
         row = self._session.get(TeamInvitationOrm, invitation_id)

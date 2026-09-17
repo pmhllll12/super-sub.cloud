@@ -1391,7 +1391,7 @@ trunk_alignment       2개 루브릭  basketball_jump_shot · basketball_layup  
 | `POST /api/v1/teams/{team_id}/invitations` | **그 팀 주장** | 초대를 보낸다. 본문은 `{"invited_user_id": "...", "position_code": "GK"}` — `position_code` 는 **선택**. `201` |
 | `GET /api/v1/teams/{team_id}/invitations` | **그 팀 주장** | 그 팀이 보낸 초대 전부(상태 무관), 최신순 |
 | `GET /api/v1/me/invitations` | 본인 | 내가 받은, **아직 답 안 한** 초대만, 최신순. **팀 네 칸이 더 붙는다**(위) |
-| `POST /api/v1/me/invitations/{invitation_id}/accept` | **받은 사람 본인** | 수락 — `team_member` 가 `member` 로 생긴다 |
+| `POST /api/v1/me/invitations/{invitation_id}/accept` | **받은 사람 본인** | 수락 — `team_member` 가 `member` 로 생긴다. **부르는 자리(`position_code`)가 있었으면 그 자리로 스쿼드에도 등재된다**(칸은 비운 채 — 아래) |
 | `POST /api/v1/me/invitations/{invitation_id}/reject` | **받은 사람 본인** | 거절 — 아무것도 안 바뀐다 |
 | `DELETE /api/v1/teams/{team_id}/invitations/{invitation_id}` | **그 팀 주장** | 보낸 쪽이 무른다. 🔴 `204` 가 아니라 무른 초대를 그대로 돌려준다(`team_match_request` 의 취소와 같은 이유 — 삭제라기보다 상태 전이다) |
 
@@ -1403,6 +1403,12 @@ trunk_alignment       2개 루브릭  basketball_jump_shot · basketball_layup  
 | 409 | `ALREADY_INVITED` | 그 사람에게 보낸 대기 중 초대가 이미 있다 |
 | 409 | `TEAM_INVITATION_ALREADY_RESPONDED` | 이미 답이 난 초대다 |
 | 422 | `UNKNOWN_POSITION` | 이 팀 종목에 없는 `position_code` 다. 약칭은 **종목 안에서만** 유일하다(축구 `FW` ≠ 농구 `FW`) — 목록은 `GET /positions?sport_code=` |
+
+🔴 **수락하면 스쿼드에 앉는다**(2026-09-17 추가, 계약 60). 스쿼드 등재(`POST /teams/{id}/squad/members`)는
+주장만 부를 수 있어서, 받은 사람이 수락해도 판에 설 길이 없었다(주장 화면에 「수락 대기중」이 남고 새로고침하면
+자리가 사라졌다). 그래서 **수락하는 순간 서버가** 초대받은 포지션으로 등재한다 — `grid_col`·`grid_row` 는
+`null`(화면이 포지션으로 맞춰 앉히고, 주장이 옮기면 칸이 생긴다). 아래 중 하나면 **등재만 건너뛰고 수락은 성공**이다:
+자리를 안 정한 초대 · 스쿼드가 없는 팀 · 카드가 없는 사람 · 이미 등재된 사람.
 
 **알림**(`GET /me/notifications`)은 셋이다 — 보낼 때 받은 사람에게
 `team_invitation_sent`, 수락·거절할 때 그 팀 주장(들)에게
