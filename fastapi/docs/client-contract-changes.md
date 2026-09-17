@@ -2612,3 +2612,47 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 
 질문이나 규격이 애매한 곳이 있으면 알려 주기 바란다 — 클라이언트가 쓰기 불편한
 계약이면 백엔드를 고치는 편이 맞다.
+
+---
+
+## 60. 초대를 수락하면 **초대받은 자리로 스쿼드에 등재**됩니다 (2026-09-17 추가)
+
+`POST /me/invitations/{invitation_id}/accept` 가 `team_member` 에 더해 **`squad_member`** 도 만듭니다 —
+초대에 `position_code` 가 있었을 때, 그 포지션으로, **칸(`grid_col`·`grid_row`)은 `null`** 로.
+
+🔴 **왜 필요했나.** 등재 경로(`POST /teams/{id}/squad/members`)는 주장만 부를 수 있습니다. 받은 사람이
+수락해도 판에 설 길이 없어서, 주장 화면의 카드에 「수락 대기중」이 남고 **새로고침하면 수락된 초대가
+`pending` 이 아니라 자리째 사라졌습니다**(시연 중 발견).
+
+| 경우 | 결과 |
+|---|---|
+| 자리를 정한 초대 · 스쿼드 있음 · 카드 있음 | 등재됨(칸 `null`) |
+| 자리를 안 정한 초대 · 스쿼드 없음 · 카드 없음 · 이미 등재 | **등재만 건너뜀**, 수락은 `200` 그대로 |
+
+응답 모양은 **안 바뀝니다.** 마이그레이션도 없습니다.
+
+### 화면에서 한 것 — `www/src/components/SquadPanel.tsx`
+
+🔴 **정어진이 고쳤습니다**(백성검 허락, 2026-09-17).
+
+- 대기 중인 초대가 있는 동안 **3초마다** `GET /teams/{id}/invitations` 를 다시 읽는다
+- `accepted` 면 `GET /teams/{id}/squad` 에서 그 사람의 등재를 **카드 슬러그로** 찾아 그 칸에 잇고
+  `PATCH …/squad/members/{id}` 로 칸을 저장한다 → 「수락 대기중」이 내려간다
+- 카드가 없어 등재가 안 됐으면 딱지만 내린다. `rejected`·`cancelled` 면 자리를 비운다
+- 딱지 판단을 `seeded.ready`(판을 열 때 값) 대신 `isReady()` 로 — 초대가 걸려 있으면 아직, 풀리면 등재·수락으로 온 것
+
+### 먼저 확인
+
+```bash
+grep -n "isReady\|보낸 초대의 답을 기다린다" www/src/components/SquadPanel.tsx   # 있으면 반영됨
+```
+
+### 하지 말 것
+
+- 🔴 **받은 사람 화면에서 등재를 대신 부르지 마십시오** — 주장 전용 경로라 403 입니다. 등재는 서버가 합니다
+- 🔴 ⊗ 로 **이미 등재된** 사람을 뺄 때 `removeSeat` 을 부르지 않는 것은 **이번에 안 고쳤습니다**(원래 동작) —
+  그래서 등재된 사람을 ⊗ 로 빼도 새로고침하면 돌아옵니다. 필요하면 따로 고칩니다
+
+- 확인: 백엔드 `tests/user/adapter/test_team_invitation_db.py::TestAcceptSeatsOnSquad`(5건, 고치기 전 2건 실패 확인) ·
+  전체 pytest 1084 passed / 웹 `SquadPanel.test.tsx` 새 시험 2건(고치기 전 실패 확인) · 전체 vitest 889 passed · tsc 통과
+
