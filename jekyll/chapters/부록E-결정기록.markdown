@@ -2,8 +2,8 @@
 layout: default
 title: 결정 기록
 permalink: /부록E-결정기록/
-parent: 부록
-nav_order: 5
+parent: 기술
+nav_order: 9
 ---
 
 # 부록 E. 결정 기록

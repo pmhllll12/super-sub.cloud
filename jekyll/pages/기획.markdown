@@ -1,0 +1,12 @@
+---
+layout: default
+title: 기획
+permalink: /기획/
+has_children: true
+nav_order: 2
+---
+
+# 기획
+
+**왜 이 서비스인가** — 생활체육 용병 구인의 문제, 서비스 개념과 기능, 시장과 수익 모델,
+그리고 그것을 만들기 위한 요구사항을 다룹니다.

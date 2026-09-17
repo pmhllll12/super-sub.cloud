@@ -1,0 +1,12 @@
+---
+layout: default
+title: 프로젝트 관리
+permalink: /프로젝트-관리/
+has_children: true
+nav_order: 5
+---
+
+# 프로젝트 관리
+
+**어떻게 진행하나** — 조직과 역할, 일정과 스프린트, 테스트·QA, 산출물과 향후 계획,
+그리고 실제로 지나온 길입니다.

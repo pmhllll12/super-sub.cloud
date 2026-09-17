@@ -2,8 +2,8 @@
 layout: default
 title: 시스템 설계
 permalink: /06-시스템설계/
-parent: II 부. 개발 수행 계획
-nav_order: 2
+parent: 설계
+nav_order: 1
 ---
 
 ## 1) 시스템 구성도

@@ -2,8 +2,8 @@
 layout: default
 title: 백엔드 · 파이프라인
 permalink: /11-백엔드파이프라인/
-parent: III 부. 개발 진행
-nav_order: 2
+parent: 기술
+nav_order: 1
 ---
 
 # 백엔드 · 파이프라인
