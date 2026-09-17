@@ -7769,7 +7769,20 @@ Secret 자체도 매니페스트처럼 저장소에 없어서, 지금 운영에 
 — 인프라만 만들었습니다. 필요해지면 각 컨텍스트가 `user_contact`와 같은 방식
 (원시 SQL)으로 `notification`에 얹으면 됩니다.
 
-- **담당**: 백성검(`SquadFriends.tsx` 등 화면 배선 — `client-contract-changes.md` 37번 참고, `flutter/`도 필요하면) · 정어진(위 후속 과제) · **제기**: 정어진(사용자 요청) · **기한**: 급하지 않음(화면 쪽) · 후속 과제는 다음 배포 작업 때
+**✅ 화면 몫은 끝나 있었습니다 (2026.09.17, 백성검)** — 이번에 새로 만든 것이
+아니라 **09-16 회차에 이미 붙어 있었습니다.** `SquadFriends.tsx` 가
+`GET /users/search` · `POST /me/contacts` · `POST /me/contacts/{id}/accept` ·
+`GET /me/contacts/requests` 를 부르고, 알림은 `lib/useNotifyInbox.ts` 가
+폴링합니다. 수락은 **지인 판과 알림함 두 곳**에서 됩니다. 노출 스위치
+(`is_nickname_searchable`)는 `me/SearchablePref.tsx` 입니다.
+- 확인: 「먼저 확인」의 `grep -n "FRIENDS = \[" www/src/components/SquadFriends.tsx`
+  → **0건**(하드코딩 배열 없음). 성질 1·2·3 모두 실제 경로로 확인했습니다
+- ⚠️ **안 한 것 둘**: ⑴ `409 NICKNAME_ALREADY_EXISTS` 전용 문구가 없어 지금은
+  일반 오류로 보입니다(미리 막지는 않으니 「하지 말 것」에는 안 걸립니다)
+  ⑵ **`flutter/` 는 안 붙였습니다** — 앱 스쿼드 판이 아직 서버 연결 전이라
+  빈 자리(+) 시트 자체가 없습니다. 그 배선을 할 때 같이 합니다
+
+- **담당**: ~~백성검(`SquadFriends.tsx` 등 화면 배선 — `client-contract-changes.md` 37번 참고, `flutter/`도 필요하면)~~ **✅ 해소 (2026.09.17, `www` 한정 — `flutter/`는 위 ⑵)** · 정어진(위 후속 과제) · **제기**: 정어진(사용자 요청) · **기한**: 급하지 않음(화면 쪽) · 후속 과제는 다음 배포 작업 때
 
 ### 36. 프론트 반영 대기 목록 — 09-15·09-16에 낸 계약 변경, 전부 아직 mock임을 확인했습니다 (2026-09-16 신설, 저녁에 5건 추가)
 
@@ -8741,6 +8754,11 @@ AI 추천 판 **둘 다의 공통 다리**입니다. 그쪽 판에 「초대」 
 | 하지 말 것 | 🔴 `overallGrade`·`totalScore`·`radar`가 `null`인 옛 리포트(이 필드 생기기 전 적재분)를 비교에 넣을 때 죽지 않기 — `ReportView`가 이미 그 경우를 건너뛰는 방식을 참고 |
 
 - 관련: `www/src/components/analysis/ReportView.tsx`(`ReportRadar`) · `www/src/app/(app)/me/MyVideos.tsx` · `ho` 28번(오버롤 등급 읽기 경로, CCC 32)
+- 🔴 **`paik` 28번(「선수와 비교하기」)과 다른 것입니다 (2026.09.17 확인, 백성검)** —
+  28번은 **내 영상 ↔ 선수 데모 영상**의 *자세*(관절 세 순간)를 겹치는 것이고,
+  이 22번은 **내 영상 두 편끼리**의 *리포트*(등급·총점·`radar`)를 견주는 것입니다.
+  28번이 되어 있어서 이것도 된 줄 알고 닫을 뻔했습니다. 확인: `MyVideos.tsx` 에
+  비교 관련 코드 **0건** → **아직 미착수**가 맞습니다
 - **담당**: 백성검 · **제기**: 박민호 · **기한**: 확인되는 대로
 
 ### 23. 폰 실제 설치 → 가입 테스트(`retopia12@naver.com`) — DB 반영 확인함 ✅ 확인 (2026.09.14)
