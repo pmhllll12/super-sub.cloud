@@ -580,6 +580,18 @@ export type TeamMatchRequest = {
   requester_team_region: string | null
   target_team_name: string | null
   target_team_region: string | null
+  /**
+   * 두 팀 **스쿼드의 공개 슬러그** (2026-09-17, `paik` 22번 후속).
+   *
+   * 🔴 **대기 화면이 상대 판을 그리는 값이다.** 전에는 화면이 붙박이 목록
+   * (`teamMatch.ts` 의 `TEAMS`)에서 상대 팀 이름·판을 찾았고, 그 목록에 없는
+   * 진짜 팀이 수락하면 이름이 「상대 팀」으로 나오고 판이 비었다.
+   *
+   * ⚠️ **스쿼드를 아직 안 만든 팀이면 `null` 이고 그게 정상이다** — 생성이
+   * 멱등이라 늦게 생긴다. 그때는 판 없이 이름·지역만 그린다.
+   */
+  requester_squad_public_slug: string | null
+  target_squad_public_slug: string | null
 }
 
 /**

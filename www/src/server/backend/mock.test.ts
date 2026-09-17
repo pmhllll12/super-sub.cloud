@@ -410,3 +410,28 @@ describe('mock — 받은 팀 초대 씨앗', () => {
     expect(squad.members.length).toBeGreaterThan(0)
   })
 })
+
+/**
+ * **대기 화면이 상대 판을 그릴 값** (`paik` 22번 후속).
+ *
+ * 🔴 mock 이 슬러그를 안 실으면 로컬에서 **판이 빈 채로** 떠서, 화면이 그
+ * 갈래를 밟는지 확인할 수가 없다 — 「배포에서만 터진다」의 반대 경우다.
+ */
+describe('mock — 경기 신청에 두 팀 판의 슬러그', () => {
+  const TOKEN = 'mock-access-token-demo'
+  const TEAM = '9a2e0000-0000-4000-8000-000000000002'
+
+  it('받은 신청에 상대 팀 판의 슬러그가 실린다', async () => {
+    const rows = await mockBackend.listTeamMatchRequests(TOKEN, TEAM)
+    const got = rows.find((r) => r.target_team_id === TEAM)
+    expect(got).toBeDefined()
+    expect(got!.requester_squad_public_slug).toBeTruthy()
+  })
+
+  it('🔴 그 슬러그로 실제 판이 읽힌다 — 대기 화면이 그걸 그린다', async () => {
+    const rows = await mockBackend.listTeamMatchRequests(TOKEN, TEAM)
+    const got = rows.find((r) => r.target_team_id === TEAM)!
+    const squad = await mockBackend.getSquadBySlug(got.requester_squad_public_slug as string)
+    expect(squad.members.length).toBeGreaterThan(0)
+  })
+})

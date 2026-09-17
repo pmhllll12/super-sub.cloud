@@ -147,3 +147,72 @@ describe('머리줄 알림 — 판을 열어도 줄은 하나다', () => {
     expect(container.querySelectorAll('.ss-home-nav-card')).toHaveLength(1)
   })
 })
+
+/**
+ * 🔴 **알림함이 두 벌이면 수락이 화면에 안 닿는다** (2026-09-17, 사용자가
+ * 로컬에서 잡았다 — 「수락하기 눌렀는데 왜 대기화면 안 뜸?」).
+ *
+ * `SiteHeader` 와 `HomeStage` 가 각각 `useNotifyInbox()` 를 불러서, 헤더에서
+ * 수락한 결과(`acceptedTeam`)가 대기 화면을 그리는 `SquadPanel` 쪽 통에는
+ * **영영 안 들어갔다.** 헤더가 **받은 통을 쓰게** 해서 하나로 합친다.
+ */
+describe('머리줄 — 알림함을 밖에서 받을 수 있다', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('받은 통의 수락 함수를 부른다 — 제 통을 따로 만들지 않는다', async () => {
+    pathname.mockReturnValue('/')
+    const acceptMatch = vi.fn().mockResolvedValue(undefined)
+    const inbox = {
+      teamId: 'team-mine',
+      items: [
+        {
+          kind: 'team-match' as const,
+          id: 'tmr1',
+          teamId: 'team-mine',
+          opponentTeamId: 'mt-2',
+          name: '망원 유나이티드',
+          region: '서울 마포구',
+          playedAt: '2026-09-19T09:00:00+09:00',
+          place: '망원 실내구장 A',
+          opponentSquadSlug: null,
+        },
+      ],
+      count: 1,
+      acceptedTeamId: null,
+      acceptedTeam: null,
+      acceptedMatchId: null,
+      clearAccepted: vi.fn(),
+      acceptMatch,
+      rejectMatch: vi.fn(),
+      acceptContact: vi.fn(),
+      acceptInvitation: vi.fn(),
+      rejectInvitation: vi.fn(),
+      noteSent: vi.fn(),
+      reload: vi.fn(),
+    }
+
+    /* 헤더가 제 통을 안 만들어도 `/api/me` 는 부르므로 대역을 세운다. */
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ teams: [] }) }),
+    )
+
+    render(
+      <SiteHeader
+        user={{ nickname: '홍길동' }}
+        destinations={[
+          ...DESTINATIONS,
+          { title: NOTIFY, icon: 'circle_notifications', summary: '받은 신청' },
+        ]}
+        inbox={inbox}
+      />,
+    )
+
+    /* 🔴 빨간 점이 켜지면 낭독용 「새 알림 있음」이 이름에 붙는다 — 정확히
+       `'알림'` 으로는 안 잡힌다. */
+    await userEvent.click(await screen.findByRole('button', { name: /알림/ }))
+    await userEvent.click(await screen.findByRole('button', { name: '수락하기' }))
+
+    expect(acceptMatch).toHaveBeenCalled()
+  })
+})

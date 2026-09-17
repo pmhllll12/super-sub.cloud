@@ -710,7 +710,9 @@ const teamMatchRequests = new Map<string, TeamMatchRequest>([
     'tmr0',
     {
       id: 'tmr0',
-      requester_team_id: 'mt-2', // 망원 유나이티드
+      /* 🔴 **판을 가진 그 망원 유나이티드로 맞춘다**(`INVITER_TEAM`) — 다른
+         id 로 두면 수락해도 대기 화면의 상대 판이 빈다. */
+      requester_team_id: INVITER_TEAM.id,
       target_team_id: DEMO_TEAM_ID,
       proposed_played_at: '2026-09-19T09:00:00+09:00',
       proposed_place: '망원 실내구장 A',
@@ -720,10 +722,15 @@ const teamMatchRequests = new Map<string, TeamMatchRequest>([
       match_id: null,
       /* 🔴 **이름·지역은 서버가 준다**(CCC 55) — 전에는 화면이 붙박이 목록에서
          찾았다. mock 도 같이 실어야 화면이 그 갈래를 밟는다. */
-      requester_team_name: '망원 유나이티드',
-      requester_team_region: '서울 마포구',
+      requester_team_name: INVITER_TEAM.name,
+      requester_team_region: INVITER_TEAM.region,
       target_team_name: '번개FC',
       target_team_region: '서울 강남구',
+      /* 🔴 **두 팀 판의 공개 슬러그**(2026-09-17) — 대기 화면이 상대 판을
+         이걸로 읽는다. 우리(번개FC)는 데모 스쿼드, 상대는 위 `inviterSquad`.
+         mock 이 안 실으면 판이 빈 채로 떠서 화면이 그 갈래를 못 밟는다. */
+      requester_squad_public_slug: inviterSquad.public_slug,
+      target_squad_public_slug: demoSquad?.public_slug ?? null,
     },
   ],
 ])
@@ -2024,6 +2031,11 @@ export const mockBackend: Backend = {
       requester_team_region: me.teams.find((t) => t.team_id === teamId)?.region ?? null,
       target_team_name: null,
       target_team_region: null,
+      /* 건 쪽(나)의 판은 안다. 받는 쪽은 mock 이 그 팀을 안 들고 있어
+         `null` 이고 그것도 정상이다 — 스쿼드를 안 만든 팀과 같은 갈래다. */
+      requester_squad_public_slug: demoSquad?.public_slug ?? null,
+      target_squad_public_slug:
+        target_team_id === INVITER_TEAM.id ? inviterSquad.public_slug : null,
     }
     teamMatchRequests.set(made.id, made)
     /* 🔴 **알림은 상대 팀 주장에게 간다** — mock 에는 그 사람이 없으므로 아무
