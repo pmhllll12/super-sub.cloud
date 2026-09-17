@@ -2653,6 +2653,6 @@ grep -n "isReady\|보낸 초대의 답을 기다린다" www/src/components/Squad
 - 🔴 ⊗ 로 **이미 등재된** 사람을 뺄 때 `removeSeat` 을 부르지 않는 것은 **이번에 안 고쳤습니다**(원래 동작) —
   그래서 등재된 사람을 ⊗ 로 빼도 새로고침하면 돌아옵니다. 필요하면 따로 고칩니다
 
-- 확인: 백엔드 `tests/user/adapter/test_team_invitation_db.py::TestAcceptSeatsOnSquad`(5건, 고치기 전 2건 실패 확인) ·
+- 확인: 백엔드 `tests/user/adapter/test_team_invitation_db.py` 의 `TestAcceptSeatsOnSquad`(5건, 고치기 전 2건 실패 확인) ·
   전체 pytest 1084 passed / 웹 `SquadPanel.test.tsx` 새 시험 2건(고치기 전 실패 확인) · 전체 vitest 889 passed · tsc 통과
 
