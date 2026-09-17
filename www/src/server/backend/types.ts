@@ -299,6 +299,25 @@ export type MercenaryCandidate = {
  * 브라우저가 S3 를 직접 부를 수는 없다(조회용 사전 서명 URL 경로가 아직
  * 없다). 그래서 목록은 그림 없이 메타로만 그린다.
  */
+/**
+ * **등록 응답** — `MyVideo` 에 「같은 영상을 다시 올렸다」는 사실이 더 붙는다
+ * (CCC 48, 미결 `ho` 41번).
+ *
+ * 🔴 **세 필드는 등록 응답에만 산다.** 나중에 `GET /videos` 로 같은 영상을
+ * 다시 읽으면 전부 `null` 이고 그 영상 자신은 작업이 없어 `analysis_status`
+ * 까지 `null` 이다 — **받는 즉시 화면에 반영해야** 다시 볼 방법이 있다.
+ *
+ * 🔴 **「이 사람으로 분석」·「집중해서 볼 항목」을 지정한 업로드는 대상이
+ * 아니다**(늘 새로 분석한다). 그런 등록에서 안 와도 버그가 아니다.
+ */
+export type RegisteredVideo = MyVideo & {
+  /** 앞서 올린 같은 영상의 id. 없으면 중복이 아니다. */
+  duplicate_of_video_id?: string | null
+  duplicate_status?: 'queued' | 'running' | 'succeeded' | 'failed' | null
+  /** 그때 떨어진 사유(에이전트 문구). `failed` 일 때만 값이 있다. */
+  duplicate_failure_reason?: string | null
+}
+
 export type MyVideo = {
   id: string
   sport_code: string
