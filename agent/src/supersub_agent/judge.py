@@ -83,6 +83,11 @@ SPORT_NAMES = {"football": "축구"}
 # (2등급 8건 중 4건). 낱말은 어투를 정해 주면서 문장에 새어도 숫자가 아니다.
 LEVEL_WORDS = {2: "잘함", 1: "보통", 0: "아쉬움"}
 
+#: 앵커 목록의 머리말. 🔴 **상수로 둔다** — 검사가 이 문구로 프롬프트를
+#: 잘라 보는데, 문구를 고칠 때마다 검사가 `IndexError` 로 죽었다(미결 23번 E).
+#: 그러면 「검사가 깨졌다」가 「검사가 지키던 성질이 깨졌다」를 가린다.
+ANCHOR_HEADER = "근거 문장 예시 (수준에 맞는 어투를 그대로 따릅니다)"
+
 #: 지표 라벨의 정본. `contracts/metric_definitions.yaml` 이고 적재 시드와 같은
 #: 파일이다 — 화면·백엔드·프롬프트가 **같은 이름**을 쓰게 하려는 것이다.
 _METRIC_DEFS = Path(__file__).resolve().parents[2] / "contracts" / "metric_definitions.yaml"
@@ -298,6 +303,15 @@ def build_prompt(criterion, metrics: dict[str, Any], grade: int) -> str:
     #    다르면 오독률 63%, 같으면 14% 였다(가-2 after 30문장 대조).
     #    다른 등급 앵커는 그대로 둔다: 어투 예시라 방향을 좁힐 이유가 없고,
     #    1회차에서 앵커를 줄였다가 2등급 문장이 무너진 적이 있다.
+    # 🔴 **옆 등급 앵커의 「문장」을 빼는 길은 닫혔다** (2026.09.17, 미결 23번 E).
+    #    앵커 한 줄이 두 일을 한다고 보고(측정값 = 숫자 울타리 · 문장 = 방향)
+    #    옆 등급의 문장만 빼 봤다. 얻은 것은 컸다 — **방향 오독 5 → 2**,
+    #    지어낸 수치도 **1건**으로 울타리가 섰다(가설은 맞았다). 그런데
+    #    🔴 **잘함 문장이 1 → 6/22 로 무너졌다**(사전 등록 기준 F 불합격):
+    #    *"공을 효과적으로 **공중에 띄울** 수 있어 좋았다"* — 패스에서 공이
+    #    뜨는 것은 결함인데 칭찬한다. **수준별 값만 남기고 뜻을 빼면 모델이
+    #    뜻을 지어낸다.** 1회차(앵커 축소)와 같은 자리를 **세 번째로** 밟았다.
+    #    되살리려면 **새 사전 등록**이다 — `RESULTS_anchor_values.md`.
     shown = tuple(
         a for a in criterion.anchors
         if int(a.get("grade", -1)) != grade
@@ -308,7 +322,7 @@ def build_prompt(criterion, metrics: dict[str, Any], grade: int) -> str:
     #    새 앵커가 목록 끝에 붙어 차례가 흐트러졌다.
     shown = tuple(sorted(shown, key=lambda a: -int(a.get("grade", 0))))
     if shown:
-        lines.append("\n근거 문장 예시 (수준에 맞는 어투를 그대로 따릅니다):")
+        lines.append("\n" + ANCHOR_HEADER + ":")
         for a in shown:
             # 🔴 JSON 을 그대로 넣지 않는다 — 키가 지표 코드라 문장에 샌다.
             lines.append(

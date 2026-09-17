@@ -834,7 +834,7 @@ def test_the_judged_grade_gets_only_its_own_direction():
     고를 것을 안 주면 고르다 틀릴 수 없다. 반대 방향의 말이 프롬프트에
     남아 있으면 그 말이 문장에 나온다 — 2026.09.17 판독이 그 형태였다.
     """
-    from supersub_agent.judge import build_prompt
+    from supersub_agent.judge import ANCHOR_HEADER, build_prompt
 
     rubric = _football_rubrics()["football/instep_shot"]
     crit = next(c for c in rubric.criteria if c.id == "plant_knee_flexion")
@@ -854,13 +854,13 @@ def test_the_prompt_stops_carrying_band_numbers():
     🔴 `grades` 가 그대로 들어가던 자리라, 이 검사가 빠지면 되돌아가도
     아무도 모른다.
     """
-    from supersub_agent.judge import build_prompt
+    from supersub_agent.judge import ANCHOR_HEADER, build_prompt
 
     rubric = _football_rubrics()["football/instep_shot"]
     crit = next(c for c in rubric.criteria if c.id == "plant_knee_flexion")
     prompt = build_prompt(crit, {crit.band_metric: 140.2}, 1)
 
-    head = prompt.split("근거 문장 예시")[0]
+    head = prompt.split(ANCHOR_HEADER)[0]
     for edge in ("135", "150", "170", "180"):
         assert edge not in head, f"수준 설명에 경계 숫자 {edge} 가 남았다"
 
@@ -924,7 +924,7 @@ def test_a_two_way_grade_has_an_anchor_for_each_direction():
 
 def test_the_prompt_shows_only_the_anchor_for_the_direction_at_hand():
     """반대 조각의 앵커가 프롬프트에 남으면 모델이 그쪽으로 간다."""
-    from supersub_agent.judge import build_prompt
+    from supersub_agent.judge import ANCHOR_HEADER, build_prompt
 
     rubric = _football_rubrics()["football/instep_shot"]
     crit = next(c for c in rubric.criteria if c.id == "plant_knee_flexion")
@@ -943,16 +943,35 @@ def test_the_other_grades_keep_all_their_anchors():
 
     1회차에서 앵커의 수준 표시를 뺐다가 **2등급 문장 8건 중 4건**이
     무너졌다. 어투를 잡아 주는 자리라 함부로 덜어내지 않는다.
+
+    🔴 **2026.09.17 에 「측정값은 남기고 문장만 빼는」 길을 재 봤고, 닫혔다**
+    (미결 23번 E, `RESULTS_anchor_values.md`). 얻은 것이 작지 않았다 —
+    감점 쪽 방향 오독 **5 → 2**, 지어낸 수치도 **1건**으로 울타리가 섰다.
+    그런데 **잘함 문장이 1 → 6/22 로 무너졌다**:
+
+        "짧은 스윙이 공을 효과적으로 **위로 전달**하는 데 도움이 되었다"
+        "공을 효과적으로 **공중에 띄울** 수 있어 좋았다"
+
+    패스에서 공이 뜨는 것은 **결함**인데 칭찬한다. 수준별 **값만** 남기고
+    **뜻**을 빼면 모델이 뜻을 지어낸다. 1회차와 같은 자리를 **세 번째로**
+    밟은 것이라 이 검사를 원래대로 되돌렸다.
+
+    🔴 **다시 시도하려면 새 사전 등록이다.** 「값만 남기기」는 이미 쟀으니
+    같은 것을 또 재지 말 것 — 남은 갈래는 **어느 등급의 문장을 남길지**다.
     """
-    from supersub_agent.judge import build_prompt
+    from supersub_agent.judge import ANCHOR_HEADER, build_prompt
 
     rubric = _football_rubrics()["football/instep_shot"]
     crit = next(c for c in rubric.criteria if c.id == "trunk_lean")
     prompt = build_prompt(crit, {crit.band_metric: 12.4}, 2)  # 2등급 판정
+    anchors = prompt.split(ANCHOR_HEADER)[1]
 
-    # 1등급은 양방향인데 판정 등급이 아니므로 둘 다 남아야 한다.
-    assert "거의 수직" in prompt
-    assert "조금 깊이 숙였다" in prompt
+    for word in ("[잘함]", "[보통]", "[아쉬움]"):
+        assert word in anchors, f"앵커에서 {word} 가 사라졌다 — 1회차의 자리다"
+
+    # 1등급은 양방향인데 판정 등급이 아니므로 **문장까지** 둘 다 남아야 한다.
+    assert "거의 수직" in anchors, "옆 등급 앵커의 문장이 사라졌다 — E 에서 닫힌 길이다"
+    assert "조금 깊이 숙였다" in anchors, "옆 등급 앵커의 문장이 사라졌다"
 
 
 def test_an_anchor_lists_every_metric_the_criterion_measures():
@@ -982,7 +1001,7 @@ def test_the_prompt_carries_only_the_judged_levels_wording():
     유지하며 마무리됐다"*. 「짧게」는 **[잘함] 수준 문구**의 말이었고,
     남은 오독 다섯 중 셋의 출처가 그것이었다.
     """
-    from supersub_agent.judge import build_prompt
+    from supersub_agent.judge import ANCHOR_HEADER, build_prompt
 
     rubric = _football_rubrics()["football/inside_pass"]
     crit = next(c for c in rubric.criteria if c.id == "follow_through")
@@ -992,7 +1011,7 @@ def test_the_prompt_carries_only_the_judged_levels_wording():
          "follow_through_duration_frames": 8.0},
         1,
     )
-    head = prompt.split("근거 문장 예시")[0]
+    head = prompt.split(ANCHOR_HEADER)[0]
 
     assert "패스인데 마무리가 슈팅처럼 크다" in head, "판정 등급 문구가 없다"
     assert "짧게, 방향을 남기며" not in head, (
@@ -1009,7 +1028,7 @@ def test_the_anchors_still_show_every_level():
     여기가 떠받친다. 이 검사가 없으면 나중에 「프롬프트를 더 줄이자」가
     그 자리를 다시 밟는다.
     """
-    from supersub_agent.judge import build_prompt
+    from supersub_agent.judge import ANCHOR_HEADER, build_prompt
 
     rubric = _football_rubrics()["football/inside_pass"]
     crit = next(c for c in rubric.criteria if c.id == "follow_through")
@@ -1019,6 +1038,6 @@ def test_the_anchors_still_show_every_level():
          "follow_through_duration_frames": 8.0},
         1,
     )
-    examples = prompt.split("근거 문장 예시")[1]
+    examples = prompt.split(ANCHOR_HEADER)[1]
     for word in ("[잘함]", "[보통]", "[아쉬움]"):
         assert word in examples, f"앵커에서 {word} 가 사라졌다"
