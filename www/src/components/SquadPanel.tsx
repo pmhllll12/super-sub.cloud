@@ -22,6 +22,7 @@ import {
 import { COLS, ROWS, ROW_POS, cellExists, rowPos, type PosCode } from '@/lib/pitchGrid'
 import { fetchPositions } from '@/lib/positions'
 import { loadFeaturedOf } from '@/lib/featuredClip'
+import { apiDelete } from '@/lib/api/client'
 
 /**
  * 홈 첫 화면의 스쿼드 판 — 판 하나 위에 선수 카드를 **포지션 자리대로**
@@ -280,6 +281,7 @@ export default function SquadPanel({
   myTeamId = null,
   onRequested,
   acceptedTeamId = null,
+  acceptedMatchId = null,
   onAcceptedShown,
   seeking = false,
   onCloseSeeking,
@@ -357,6 +359,12 @@ export default function SquadPanel({
    * 수락한 쪽이든, 확정되는 순간은 이 화면 바깥이라 부모가 알려 줘야 한다.
    */
   acceptedTeamId?: string | null
+  /**
+   * 그렇게 잡힌 **경기 id** — 「무르기」가 이걸로 취소한다(계약은
+   * `DELETE /matches/{match_id}`). 🔴 **없으면 무르기 단추를 안 낸다** —
+   * 눌러도 아무 일이 없는 단추를 두지 않는다.
+   */
+  acceptedMatchId?: string | null
   /** 팝업을 닫았다고 부모에게 알린다 — 안 지우면 닫자마자 다시 뜬다. */
   onAcceptedShown?: () => void
   /**
@@ -1399,14 +1407,21 @@ export default function SquadPanel({
             setMatched(null)
             onAcceptedShown?.()
           }}
-          onCancel={() => {
-            /* ⚠️ **경기 취소는 아직 안 보낸다.** 계약에는 있다
-               (`DELETE /matches/{id}` — 팀 대 팀이면 양쪽 주장 누구나).
-               팝업만 닫히고 서버의 확정 경기는 남으므로, 「내 경기」에서
-               사라지지 않는다. 미결 `paik` 34번. */
-            setMatched(null)
-            onAcceptedShown?.()
-          }}
+          /* 🔴 **서버로 보낸다**(미결 `paik` 34번 해소, 2026-09-17). 전에는
+             팝업만 닫혀서 확정 경기가 「내 경기」에 그대로 남았다.
+             🔴 **경기 id 를 모르면 아예 안 낸다** — `onCancel` 을 안 주면
+             `MatchWaiting` 이 무르기 단추를 그리지 않는다. */
+          onCancel={
+            acceptedMatchId
+              ? /* 🔴 **보내기만 한다** — 판을 거두는 것은 `MatchWaiting` 이
+                   내려가기 연출을 마친 뒤 `onClose` 로 한다. 여기서 먼저
+                   거두면 실패해도 판이 사라져, 안 물러진 경기를 물러진
+                   것으로 읽는다. */
+                async () => {
+                  await apiDelete(`/api/matches/${encodeURIComponent(acceptedMatchId)}`)
+                }
+              : undefined
+          }
         />
       )}
 

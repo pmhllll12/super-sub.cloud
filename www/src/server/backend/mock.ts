@@ -1032,6 +1032,34 @@ export const mockBackend: Backend = {
     return DEMO_MATCHES.filter((m) => m.team_id === teamId)
   },
 
+  async cancelMatch(token, matchId) {
+    const u = requireUser(token)
+    const at = DEMO_MATCHES.findIndex((m) => m.id === matchId)
+    if (at === -1) throw new BackendError(404, 'MATCH_NOT_FOUND', '경기를 찾을 수 없습니다.')
+    const match = DEMO_MATCHES[at]
+
+    /* 🔴 **주최·상대 어느 쪽 주장이든**(계약, 2026-09-16에 넓어졌다). mock 은
+       상대 팀 소속을 안 들고 있어서 주최 쪽만 실제로 밟아 볼 수 있다 — 그래도
+       **주장이 아닌 경우는 막아야** 화면이 403 안내를 만들게 된다. */
+    const mine = u.teams.find((t) => t.team_id === match.team_id)
+    if (!mine || mine.role !== 'owner') {
+      throw new BackendError(403, 'FORBIDDEN', '팀 주장만 경기를 취소할 수 있습니다.')
+    }
+    /* 🔴 **지난 경기는 못 무른다**(계약) — 이미 열린 경기를 「취소」하는 것은
+       뜻이 없다. */
+    if (new Date(match.played_at).getTime() <= Date.now()) {
+      throw new BackendError(422, 'PAST_MATCH', '이미 지난 경기입니다.')
+    }
+    /* ⚠️ **`409 MATCH_HAS_APPLICATIONS` 는 여기서 못 낸다** — mock 에 지원
+       (`match_application`) 이라는 개념 자체가 없다. 실서버에서는 DB 의
+       RESTRICT 가 막아서 **지원이 하나라도 붙은 경기는 안 지워진다.**
+       그래서 화면은 그 갈래를 mock 으로는 못 밟아 본다 — 대신 **서버가 준
+       문구를 그대로 보여 주게** 해 두었고, 그쪽을 시험이 붙든다
+       (`MatchWaiting.test.tsx` 의 409 시험). 화면에서 미리 막지 않는다:
+       지원이 몇인지는 서버만 안다. */
+    DEMO_MATCHES.splice(at, 1)
+  },
+
   async createTeamMatch(token, teamId, { played_at, place, needs }) {
     const u = requireUser(token)
     const team = u.teams.find((t) => t.team_id === teamId)

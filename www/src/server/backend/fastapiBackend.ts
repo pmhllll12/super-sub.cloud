@@ -357,6 +357,13 @@ export const fastapiBackend: Backend = {
     )
   },
 
+  async cancelMatch(token, matchId) {
+    await callFastApi<null>(`/matches/${encodeURIComponent(matchId)}`, {
+      method: 'DELETE',
+      token,
+    })
+  },
+
   getCardGrade(token, cardPublicSlug) {
     return callFastApi<CardGrade>(
       `/cards/${encodeURIComponent(cardPublicSlug)}/grade`,

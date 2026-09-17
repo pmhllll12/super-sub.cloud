@@ -440,6 +440,7 @@ export default function HomeStage({
               myTeamId={inbox.teamId}
               onRequested={(requestId, team) => inbox.noteSent(requestId, team.id)}
               acceptedTeamId={inbox.acceptedTeamId}
+              acceptedMatchId={inbox.acceptedMatchId}
               onAcceptedShown={inbox.clearAccepted}
               card={card}
               squad={squad}

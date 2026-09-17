@@ -13795,6 +13795,15 @@ body:has(.ss-venues) .ss-home-header {
   color: color-mix(in srgb, #fff 56%, transparent);
 }
 
+/* 무르지 못했을 때 서버가 준 이유(2026-09-17) — 지원자가 있으면 못 무른다.
+   ⚠️ 안내(`-note`)보다 **밝게** 둔다. 같은 흐린 회색으로 두면 「데모입니다」
+   줄과 한 덩어리로 읽혀 실패한 줄을 모른다. */
+.ss-mw-error {
+  margin-top: 10px;
+  font-size: 0.74rem;
+  color: color-mix(in srgb, var(--ss-error) 85%, #fff);
+}
+
 /* 「경기 취소」 — 🔴 닫기(×)와 **다른 일**이라 자리를 가른다. 되돌릴 수 없어서
    그 자리에서 한 번 더 묻고, 그때만 두 단추가 나란히 선다. */
 .ss-mw-actions {

@@ -324,3 +324,55 @@ describe('mock — 팀 이름·지역 수정', () => {
     })
   })
 })
+
+/**
+ * **`DELETE /matches/{id}` — 확정 경기 무르기** (계약 3-4절, 미결 `paik` 34번,
+ * 2026-09-17).
+ *
+ * 🔴 **취소는 행 삭제다** — `match` 에 상태 컬럼이 없다. 그래서 지난 경기·
+ * 주장 아님은 서버가 막고, 지원이 붙은 경기는 DB 의 RESTRICT 가 막는다
+ * (`409`, mock 에는 지원 개념이 없어 여기서는 못 밟는다 — `cancelMatch` 머리말).
+ */
+describe('mock — 확정 경기 무르기', () => {
+  async function ownerWithMatch() {
+    const t = await mockBackend.login({
+      email: 'demo@super-sub.example',
+      password: 'supersub2026',
+    })
+    const me = await mockBackend.getMe(t.access_token)
+    const mine = me.teams.find((x) => x.role === 'owner')!
+    const when = new Date(Date.now() + 7 * 24 * 3600_000).toISOString()
+    const match = await mockBackend.createTeamMatch(t.access_token, mine.team_id, {
+      played_at: when,
+      place: '망원 풋살장',
+      needs: [{ position_code: 'GK', head_count: 1 }],
+    })
+    return { token: t.access_token, teamId: mine.team_id, matchId: match.id }
+  }
+
+  it('주장은 무를 수 있고, 무르면 목록에서 사라진다', async () => {
+    const { token, teamId, matchId } = await ownerWithMatch()
+    expect((await mockBackend.listTeamMatches(token, teamId)).some((m) => m.id === matchId)).toBe(
+      true,
+    )
+    await mockBackend.cancelMatch(token, matchId)
+    expect((await mockBackend.listTeamMatches(token, teamId)).some((m) => m.id === matchId)).toBe(
+      false,
+    )
+  })
+
+  it('없는 경기면 404 다', async () => {
+    const { token } = await ownerWithMatch()
+    await expect(mockBackend.cancelMatch(token, '없는경기')).rejects.toMatchObject({
+      status: 404,
+      code: 'MATCH_NOT_FOUND',
+    })
+  })
+
+  /* 🔴 두 번 무르면 두 번째는 404 다 — 행이 사라졌기 때문이다(상태 컬럼이 없다). */
+  it('두 번 무르면 두 번째는 404 다', async () => {
+    const { token, matchId } = await ownerWithMatch()
+    await mockBackend.cancelMatch(token, matchId)
+    await expect(mockBackend.cancelMatch(token, matchId)).rejects.toMatchObject({ status: 404 })
+  })
+})

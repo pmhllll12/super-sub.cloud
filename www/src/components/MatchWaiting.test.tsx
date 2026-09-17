@@ -121,9 +121,11 @@ describe('경기 대기 팝업', () => {
    */
   describe('경기 취소', () => {
     /** 취소까지 붙은 판 — 무를 길이 있어야 단추가 나온다. */
-    function openWithCancel() {
+    function openWithCancel(fail?: string) {
       const onClose = vi.fn()
-      const onCancel = vi.fn()
+      const onCancel = vi.fn(() =>
+        fail ? Promise.reject(new Error(fail)) : Promise.resolve(),
+      )
       render(<MatchWaiting us={US} them={THEM} onClose={onClose} onCancel={onCancel} />)
       return { onClose, onCancel }
     }
@@ -150,17 +152,48 @@ describe('경기 대기 팝업', () => {
       expect(onClose).not.toHaveBeenCalled()
     })
 
-    /* 🔴 **닫기와 다른 것을 부른다** — 취소는 경기를 무르는 일이라 부모가
-       「내 경기」에서도 빼야 한다. `onClose` 로 나가면 잡힌 채로 남는다. */
-    it('확인하면 내려간 뒤에 취소를 알린다', async () => {
+    /**
+     * 🔴 **정정 (2026-09-17, 미결 `paik` 34번)**: 전에는 **내려보내고 나서**
+     * 취소를 알렸다. 그때는 취소가 화면 안의 일이라 실패할 것이 없었는데,
+     * 이제 서버로 나간다(`DELETE /matches/{id}`) — **먼저 내려보내면 실패해도
+     * 판이 사라져서, 안 물러진 경기를 물러진 것으로 읽는다.** 그래서 순서를
+     * 뒤집었다: 보내고 → 성공하면 내려가고 → 다 내려간 뒤 `onClose` 로 거둔다.
+     */
+    it('확인하면 먼저 보내고, 성공한 뒤에 내려간다', async () => {
       const user = userEvent.setup()
       const { onClose, onCancel } = openWithCancel()
       await user.click(screen.getByRole('button', { name: '경기 취소' }))
       await user.click(screen.getByRole('button', { name: '정말 취소합니다' }))
 
-      expect(document.querySelector('.ss-mw')).toHaveAttribute('data-leaving', 'true')
       await waitFor(() => expect(onCancel).toHaveBeenCalled())
+      await waitFor(() =>
+        expect(document.querySelector('.ss-mw')).toHaveAttribute('data-leaving', 'true'),
+      )
+      // 다 내려간 뒤에야 부모가 판을 거둔다.
+      await waitFor(() => expect(onClose).toHaveBeenCalled())
+    })
+
+    /**
+     * 🔴 **실패하면 판이 안 닫히고 이유를 그대로 적는다.** 지원자가 붙은 경기는
+     * 서버가 `409 MATCH_HAS_APPLICATIONS` 로 막는다(행 삭제라 DB 가 못 지운다).
+     * 화면이 미리 막지 않는다 — 지원이 몇인지는 서버만 안다.
+     *
+     * ⚠️ mock 에는 지원이라는 개념이 없어 그 갈래를 못 밟는다(`mock.ts` 의
+     * `cancelMatch` 머리말) — 그래서 이 시험이 그 자리를 대신 붙든다.
+     */
+    it('무르지 못하면 판이 그대로 있고 서버가 준 이유를 적는다', async () => {
+      const user = userEvent.setup()
+      const { onClose } = openWithCancel('지원자가 있어 취소할 수 없습니다.')
+      await user.click(screen.getByRole('button', { name: '경기 취소' }))
+      await user.click(screen.getByRole('button', { name: '정말 취소합니다' }))
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        '지원자가 있어 취소할 수 없습니다.',
+      )
+      expect(document.querySelector('.ss-mw')).not.toHaveAttribute('data-leaving', 'true')
       expect(onClose).not.toHaveBeenCalled()
+      // 다시 눌러 볼 수 있어야 한다 — 한 번 실패했다고 길이 막히면 안 된다.
+      expect(screen.getByRole('button', { name: '정말 취소합니다' })).toBeEnabled()
     })
 
     /* 🔴 무를 길이 없으면 단추도 안 그린다 — 눌러도 아무 일이 없으면 안 된다. */

@@ -345,6 +345,19 @@ export interface Backend {
    */
   leaveTeam(token: string, teamId: string, memberId: string): Promise<void>
 
+  /**
+   * 확정 경기를 **무른다** — 계약 3-4절 `DELETE /matches/{match_id}`, `204`.
+   *
+   * 🔴 **팀 대 팀이면 주최·상대 어느 쪽 주장이든** 취소할 수 있다(2026-09-16에
+   * 넓어졌다). 취소 안 한 쪽 주장에게 `team_match_cancelled` 알림이 간다.
+   *
+   * 🔴 **취소는 행 삭제다.** `match` 에 상태 컬럼이 없다 — 그래서 지원이 붙어
+   * 있으면 DB 가 못 지우게 막고(`409 MATCH_HAS_APPLICATIONS`), 지원을 먼저
+   * 정리해야 한다. 화면에서 미리 막지 말고 **그 코드를 받아 그대로 안내한다** —
+   * 지원이 몇인지는 서버만 안다(마지막 주장 나가기와 같은 원칙).
+   */
+  cancelMatch(token: string, matchId: string): Promise<void>
+
   /** 남의 표시 등급. 로그인하면 누구나(`featured-video` 와 같은 원칙). */
   getCardGrade(token: string, cardPublicSlug: string): Promise<CardGrade>
   /**

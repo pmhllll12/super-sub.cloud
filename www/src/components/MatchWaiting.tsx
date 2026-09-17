@@ -57,8 +57,13 @@ export default function MatchWaiting({
   /**
    * 잡힌 경기를 **무른다** — 닫기와 다른 일이다.
    * 🔴 안 주면 취소 단추를 아예 안 그린다 — 눌러도 아무 일이 없으면 안 된다.
+   *
+   * 🔴 **서버로 나가는 일이라 실패할 수 있다**(2026-09-17, 미결 `paik` 34번).
+   * 던지면 **판이 안 닫히고 그 이유를 그대로 적는다** — 지원자가 있으면
+   * `409`, 주장이 아니면 `403`, 지난 경기면 `422` 다. 화면이 미리 막지
+   * 않는다: 지원이 몇인지도 상대 팀 주장이 누구인지도 **서버만 안다.**
    */
-  onCancel?: () => void
+  onCancel?: () => Promise<void>
 }) {
   /**
    * 내려가는 중인가 — 🔴 **아직 DOM 에 있어야 한다.** 누르자마자 지우면
@@ -73,6 +78,10 @@ export default function MatchWaiting({
    * 그쪽은 시험에서도 못 누른다. 영상 지우기가 같은 방식이다).
    */
   const [confirming, setConfirming] = useState(false)
+  /** 취소를 보내는 중 — 두 번 눌리지 않게 한다. */
+  const [cancelling, setCancelling] = useState(false)
+  /** 서버가 준 이유. 있으면 판은 그대로 서 있다. */
+  const [cancelError, setCancelError] = useState<string | null>(null)
   const timer = useRef(0)
 
   /**
@@ -145,6 +154,14 @@ export default function MatchWaiting({
           {/* 🔴 **취소는 닫기(×)와 다른 일이다.** ×는 이 판을 접는 것이고,
               이것은 **잡힌 경기를 무르는 것**이다 — 그래서 자리도 뜻도 가른다. */}
           {/* 무를 길이 없으면 단추도 안 그린다 — 눌러도 아무 일이 없으면 안 된다. */}
+          {/* 🔴 **실패하면 판은 그대로 서 있고 이유만 붙는다** — 지원자가 있어
+              못 무르는 경우(409)가 있다. 문구는 서버가 준 것을 그대로 쓴다. */}
+          {cancelError && (
+            <p role="alert" className="ss-mw-error">
+              {cancelError}
+            </p>
+          )}
+
           <div className="ss-mw-actions" hidden={!onCancel}>
             {confirming ? (
               <>
@@ -152,14 +169,37 @@ export default function MatchWaiting({
                   type="button"
                   className="ss-mw-cancel"
                   data-danger="true"
-                  onClick={() => leave(onCancel ?? onClose)}
+                  disabled={cancelling}
+                  onClick={() => {
+                    if (!onCancel) return leave(onClose)
+                    setCancelling(true)
+                    setCancelError(null)
+                    /* 🔴 **보내고 나서 내려간다.** 먼저 내려보내면 실패해도
+                       판이 사라져서, 안 물러진 경기를 물러진 것으로 읽는다. */
+                    /* `Promise.resolve` 로 감싼다 — 부모가 async 가 아니어도
+                       (시험의 대역이 그렇다) 같은 길로 흐른다. */
+                    void Promise.resolve(onCancel())
+                      /* 성공했으면 **여느 닫기와 같은 길로** 내려간다 —
+                         다 내려간 뒤에 부모가 판을 거둔다. */
+                      .then(() => leave(onClose))
+                      .catch((err: unknown) =>
+                        setCancelError(
+                          err instanceof Error ? err.message : '경기를 무르지 못했습니다.',
+                        ),
+                      )
+                      .finally(() => setCancelling(false))
+                  }}
                 >
-                  정말 취소합니다
+                  {cancelling ? '무르는 중…' : '정말 취소합니다'}
                 </button>
                 <button
                   type="button"
                   className="ss-mw-keep"
-                  onClick={() => setConfirming(false)}
+                  disabled={cancelling}
+                  onClick={() => {
+                    setConfirming(false)
+                    setCancelError(null)
+                  }}
                 >
                   되돌리기
                 </button>

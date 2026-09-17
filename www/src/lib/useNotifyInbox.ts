@@ -53,6 +53,12 @@ export function useNotifyInbox() {
    * 아니다 — 그 둘을 같게 두면 대기 화면이 상대 응답 전에 뜬다.
    */
   const [acceptedTeamId, setAcceptedTeamId] = useState<string | null>(null)
+  /**
+   * 그렇게 잡힌 **경기의 id**. 🔴 **무르려면 이것이 있어야 한다**(미결 `paik`
+   * 34번) — 계약의 취소는 `DELETE /matches/{match_id}` 라 팀 id 로는 못 부른다.
+   * 팀 id 만 들고 있던 것이 34번이 열려 있던 이유였다.
+   */
+  const [acceptedMatchId, setAcceptedMatchId] = useState<string | null>(null)
   const sent = useRef<SentState[]>([])
 
   // 내 팀 — 계약의 경기 신청 경로가 전부 `teams/{id}` 밑이라 먼저 알아야 한다.
@@ -91,6 +97,8 @@ export function useNotifyInbox() {
             proposed_played_at: string
             proposed_place: string
             status: string
+            /** 수락됐을 때만 찬다 — 「무르기」가 이걸로 부른다(계약). */
+            match_id: string | null
           }[]
           for (const r of rows) {
             // 받은 것 중 **아직 대기중**인 것만 응답할 거리가 있다.
@@ -114,6 +122,8 @@ export function useNotifyInbox() {
               sent.current.some((s) => s.requestId === r.id)
             ) {
               setAcceptedTeamId(r.target_team_id)
+              // 수락된 행에는 확정 경기 id 가 실려 온다(계약 `match_id`).
+              setAcceptedMatchId(r.match_id ?? null)
             }
           }
         }
@@ -153,6 +163,9 @@ export function useNotifyInbox() {
         { method: 'POST' },
       )
       if (!res.ok) throw new Error('수락하지 못했습니다.')
+      /* 수락 응답이 확정 경기 id 를 준다 — 대기 판의 「무르기」가 그걸 쓴다. */
+      const made = (await res.json().catch(() => null)) as { match_id?: string | null } | null
+      setAcceptedMatchId(made?.match_id ?? null)
       /* 🔴 **수락한 그 순간이 「잡혔다」이다** — 대기 화면을 띄울 신호를 여기서
          켠다. 폴링이 다시 돌기를 기다리면 최대 15초 동안 아무 일도 안 일어난
          것처럼 보인다. */
@@ -191,7 +204,11 @@ export function useNotifyInbox() {
     items,
     count: items.length,
     acceptedTeamId,
-    clearAccepted: () => setAcceptedTeamId(null),
+    acceptedMatchId,
+    clearAccepted: () => {
+      setAcceptedTeamId(null)
+      setAcceptedMatchId(null)
+    },
     acceptMatch,
     rejectMatch,
     acceptContact,
