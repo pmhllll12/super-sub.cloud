@@ -52,6 +52,8 @@ def to_team_match_request_result(
         requester_team_region=request.requester_team_region,
         target_team_name=request.target_team_name,
         target_team_region=request.target_team_region,
+        requester_squad_public_slug=request.requester_squad_public_slug,
+        target_squad_public_slug=request.target_squad_public_slug,
     )
 
 

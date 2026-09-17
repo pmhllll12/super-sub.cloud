@@ -211,3 +211,10 @@ class TeamMatchRequestResult:
     requester_team_region: str = ""
     target_team_name: str = ""
     target_team_region: str = ""
+    # 그 팀 **스쿼드의 공개 슬러그** (`paik` 22번 후속, 2026-09-17). 대기
+    # 화면이 상대 팀 판을 그리는 데 쓴다 — `GET /squads/{slug}` 는 누구나
+    # 읽으므로 소속이 아니어도 볼 수 있다.
+    # 🔴 **스쿼드를 아직 안 만든 팀이면 `None` 이고 그게 정상이다**(생성이
+    # 멱등이라 늦게 생긴다). 빈 문자열로 채우지 않는다.
+    requester_squad_public_slug: str | None = None
+    target_squad_public_slug: str | None = None

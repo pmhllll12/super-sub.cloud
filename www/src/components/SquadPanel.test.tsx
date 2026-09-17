@@ -221,37 +221,31 @@ describe('스쿼드', () => {
     expect(screen.getByRole('button', { name: 'DF 자리에 선수 넣기' })).toBeInTheDocument()
   })
 
-  /* 🔴 정정 (2026-09-16, 사용자 설계): 전에는 내 자리가 늘 판에 박혀 있어서
-     그리기만 하면 이 문구가 나왔다. 이제 내 카드는 **「나」 표식을 눌러야**
-     서므로, 앉히고 나서 본다 — 카드가 없어도 자리는 잡히고 그 자리에 「아직
-     카드가 없습니다」가 적힌다는 것이 이 시험의 뜻이다. */
+  /* 🔴 **정정 (2026-09-17, 사용자 판단)**: 09-16 에는 「나」 표식을 눌러야
+     내 자리가 섰지만, 이제 **팀장은 FW 에 저절로 앉는다** — 그래서 아무것도
+     안 눌러도 그 자리가 잡히고, 카드가 없으면 그 자리에 「아직 카드가
+     없습니다」가 적힌다는 것이 이 시험의 뜻이다. */
   it('내 카드가 없으면 그 자리에 그렇게 적는다', async () => {
-    const user = userEvent.setup()
     const { container } = render(<SquadPanel card={null} myCardId="c1" />)
-    await user.click(screen.getByRole('button', { name: 'GK 자리에 선수 넣기' }))
-    await user.click(screen.getByRole('button', { name: 'GK 자리에 내 카드 넣기' }))
 
+    await waitFor(() =>
+      expect(screen.getByText('아직 카드가 없습니다')).toBeInTheDocument(),
+    )
     expect(container.querySelectorAll('.ss-pcard')).toHaveLength(5)
-    expect(screen.getByText('아직 카드가 없습니다')).toBeInTheDocument()
   })
 })
 
 /**
- * 🔴 **내 카드는 내가 앉힌다**(사용자 설계, 2026-09-16).
+ * 🔴 **팀장은 FW 에 먼저 앉는다**(사용자 판단, 2026-09-17).
  *
- * 전에는 포메이션 상수의 FW 한 칸에 `mine: true` 가 박혀 있어서, 처음 들어온
- * 사람도 **아무것도 안 했는데 이미 판에 서 있었다.** 이제 처음 판은 비어
- * 있고, 빈 자리를 눌러 뜨는 「나」 표식을 눌러야 선다 — 「나는 주장이지만
- * 안 뛴다」가 그렇게 표현된다.
+ * **정정**: 하루 전(09-16)에는 「내 카드는 내가 앉힌다」였다 — 처음 판이 비어
+ * 있고 빈 자리를 눌러 뜨는 **「나」 표식**을 눌러야 섰다. 그 표식을 **없앴다.**
+ * 팀을 만든 사람은 **뛴다고 보고 일단 FW 에 앉혀 놓고 시작한다** — 옮기든 빼든
+ * 그건 그다음 일이다.
  *
- * 여기 다섯 시험이 그 새 규칙을 **하나씩** 붙든다. 위 describe 들이 고쳐진
- * 이유가 전부 이 규칙이므로, 이것이 무너지면 여기가 먼저 빨개져야 한다.
+ * 여기 시험들이 그 새 규칙을 하나씩 붙든다.
  */
-describe('스쿼드 — 내 카드는 내가 앉힌다', () => {
-  /** 그 자리 위의 「나」 표식. 안 떠 있으면 null. */
-  const meBadge = (pos: string) =>
-    screen.queryByRole('button', { name: `${pos} 자리에 내 카드 넣기` })
-
+describe('스쿼드 — 팀장은 FW 에 먼저 앉는다', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
@@ -268,43 +262,34 @@ describe('스쿼드 — 내 카드는 내가 앉힌다', () => {
       .filter((c) => c[1]?.method === method)
       .map((c) => ({ url: c[0] as string, body: c[1].body ? JSON.parse(String(c[1].body)) : null }))
 
-  // ① 처음 판은 비어 있다 — 이것이 이번 설계의 출발점이다.
-  it('처음 판에는 내 카드가 안 서 있다', () => {
+  // ① 아무것도 안 눌러도 내 카드가 FW 에 서 있다 — 이번 결정의 출발점이다.
+  it('처음 판에 내 카드가 FW 에 서 있다', async () => {
     const { container } = render(<SquadPanel card={CARD} myCardId={CARD.id} />)
-    expect(container.querySelector('[data-mine="true"]')).toBeNull()
-    // 내 카드가 섰다면 카드 별칭이 보였을 것이다.
-    expect(screen.queryByText('THREE LUNGS')).toBeNull()
-    // 다섯 자리가 전부 빈 자리다 — 하나도 안 찬 채로 시작한다.
-    expect(screen.getAllByRole('button', { name: /자리에 선수 넣기/ })).toHaveLength(5)
-    // 누르기 전에는 「나」 표식도 없다 — 판이 조용하다.
-    expect(container.querySelector('.ss-squad-me')).toBeNull()
-  })
-
-  // ② 빈 자리를 눌러야 그 자리 위에 「나」가 뜬다.
-  it('빈 자리를 누르면 그 자리 위에만 「나」 표식이 뜬다', async () => {
-    const user = userEvent.setup()
-    const { container } = render(<SquadPanel card={CARD} myCardId={CARD.id} />)
-    await user.click(screen.getByRole('button', { name: 'GK 자리에 선수 넣기' }))
-
-    expect(meBadge('GK')).toHaveClass('ss-squad-me')
-    // 누르지 않은 자리에는 안 뜬다 — 추천 판을 연 **그 자리**의 것이다.
-    expect(container.querySelectorAll('.ss-squad-me')).toHaveLength(1)
-  })
-
-  // ② 「나」를 눌러야 선다 — 그리고 그 앉히기는 서버에도 나간다(addSeat).
-  it('「나」를 누르면 그 자리에 내 카드가 서고 서버에도 앉힌다', async () => {
-    const fn = server()
-    const user = userEvent.setup()
-    render(<SquadPanel card={CARD} squad={SQUAD} myCardId={CARD.id} />)
-    await user.click(screen.getByRole('button', { name: 'FW 자리에 선수 넣기' }))
-    await user.click(screen.getByRole('button', { name: 'FW 자리에 내 카드 넣기' }))
-
-    const mine = document.querySelector('[data-mine="true"]') as HTMLElement
-    expect(mine).toBeInTheDocument()
+    await waitFor(() =>
+      expect(container.querySelectorAll('[data-mine="true"]')).toHaveLength(1),
+    )
+    const mine = container.querySelector('[data-mine="true"]') as HTMLElement
     expect(mine.querySelector('.ss-squad-pos')!.textContent).toBe('FW')
     // 내 카드가 그려졌다 — 이름표가 선 「남이 앉은 카드」가 아니다.
     expect(screen.getByText('THREE LUNGS')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '나를 판에서 빼기' })).toBeInTheDocument()
+  })
+
+  /* 🔴 **「나」 표식은 이제 없다.** 빈 자리를 눌러도 안 뜬다 — 한 번 있었던
+     것이라 시험으로 막는다. */
+  it('「나」 표식은 어디에도 없다', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<SquadPanel card={CARD} myCardId={CARD.id} />)
+    await waitFor(() => expect(container.querySelector('[data-mine="true"]')).toBeTruthy())
+
+    await user.click(screen.getByRole('button', { name: 'GK 자리에 선수 넣기' }))
+    expect(container.querySelector('.ss-squad-me')).toBeNull()
+    expect(screen.queryByRole('button', { name: /내 카드 넣기/ })).toBeNull()
+  })
+
+  // ② 자동으로 앉은 것도 **서버에 남는다** — 새로고침하면 사라지면 안 된다.
+  it('자동으로 앉은 자리도 서버에 등재한다', async () => {
+    const fn = server()
+    render(<SquadPanel card={CARD} squad={SQUAD} myCardId={CARD.id} />)
 
     await waitFor(() =>
       expect(sent(fn, 'POST')).toContainEqual({
@@ -314,54 +299,30 @@ describe('스쿼드 — 내 카드는 내가 앉힌다', () => {
     )
   })
 
-  // ③ 내 자리가 정해지면 다른 자리에서는 「나」가 안 뜬다 — 두 자리에 설 수 없다.
-  it('앉고 나면 다른 빈 자리를 눌러도 「나」가 안 뜬다', async () => {
-    const user = userEvent.setup()
-    const { container } = render(<SquadPanel card={CARD} myCardId={CARD.id} />)
-    await user.click(screen.getByRole('button', { name: 'FW 자리에 선수 넣기' }))
-    await user.click(screen.getByRole('button', { name: 'FW 자리에 내 카드 넣기' }))
-
-    await user.click(screen.getByRole('button', { name: 'GK 자리에 선수 넣기' }))
-    expect(meBadge('GK')).toBeNull()
-    expect(container.querySelectorAll('.ss-squad-me')).toHaveLength(0)
-    // 내 카드는 처음 앉힌 그 자리에 그대로다.
-    expect(container.querySelectorAll('[data-mine="true"]')).toHaveLength(1)
-  })
-
-  // ④ 빼면 다시 뜬다 — 등재였으면 서버에서도 뺀다(removeSeat).
-  it('내 카드를 누르면 빠지고 「나」 표식이 다시 뜬다', async () => {
-    const fn = server()
-    const user = userEvent.setup()
+  /**
+   * 🔴 **내 카드에는 ⊗ 가 없다**(사용자 판단, 2026-09-17). 팀을 만든 사람은
+   * **뛴다는 가정**이라 판에서 빠질 일이 없다 — 뺄 수 있게 두면 「안 뛴다」가
+   * 표현되는데, 그것을 담을 자리가 서버에도 없다. 남의 카드는 그대로 ⊗ 로 뺀다.
+   */
+  it('내 카드에는 빼기 단추가 없다', async () => {
     const { container } = render(
       <SquadPanel card={CARD} squad={SQUAD_WITH_ME} myCardId={CARD.id} />,
     )
     expect(container.querySelector('[data-mine="true"]')).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: '나를 판에서 빼기' }))
-    expect(container.querySelector('[data-mine="true"]')).toBeNull()
-
-    await waitFor(() =>
-      expect(sent(fn, 'DELETE').map((c) => c.url)).toContain(
-        '/api/teams/t1/squad/members/sm-me',
-      ),
-    )
-
-    // 빈 자리가 된 그 칸을 누르면 「나」가 다시 뜬다.
-    await user.click(screen.getByRole('button', { name: 'FW 자리에 선수 넣기' }))
-    expect(meBadge('FW')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '나를 판에서 빼기' })).toBeNull()
   })
 
-  // ⑤ 크기를 바꿔도 내 자리는 남는다(사용자 지적: "x 누르지 않는 이상 계속 유지").
+  // ③ 크기를 바꿔도 내 자리는 남는다(사용자 지적: "x 누르지 않는 이상 계속 유지").
   it('판 크기를 바꿔도 내 자리는 남는다', async () => {
     const user = userEvent.setup()
     const { container } = render(<SquadPanel card={CARD} myCardId={CARD.id} />)
-    await user.click(screen.getByRole('button', { name: 'FW 자리에 선수 넣기' }))
-    await user.click(screen.getByRole('button', { name: 'FW 자리에 내 카드 넣기' }))
+    await waitFor(() => expect(container.querySelector('[data-mine="true"]')).toBeTruthy())
 
     for (const s of ['3 : 3', '7 : 7', '5 : 5']) {
       await user.click(screen.getByRole('radio', { name: s }))
       expect(container.querySelectorAll('[data-mine="true"]')).toHaveLength(1)
-      expect(screen.getByRole('button', { name: '나를 판에서 빼기' })).toBeInTheDocument()
+      // 내 카드가 그대로 그려진다 — 이름표가 선 「남이 앉은 카드」가 아니다.
+      expect(screen.getByText('THREE LUNGS')).toBeInTheDocument()
     }
   })
 
@@ -385,6 +346,141 @@ describe('스쿼드 — 내 카드는 내가 앉힌다', () => {
     )
     // 내 카드는 기다릴 것이 없다 — 표식이 하나뿐이다.
     expect(container.querySelectorAll('.ss-squad-pending')).toHaveLength(1)
+  })
+
+  /**
+   * 🔴 **앉은 사람도 제 카드가 뜬다** (2026-09-17, 사용자 지적 — 「그 사람을
+   * 추가하면 그 사람 카드가 같이 실제로 떠야 하잖아」).
+   *
+   * 전에는 이름만 적은 **빈 카드**였다. 이제 등재의 `card_public_slug` 로
+   * `GET /cards/{slug}` 를 읽어 그 사람 카드를 그린다.
+   */
+  it('앉은 사람의 진짜 카드를 그린다', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) =>
+        Promise.resolve(
+          String(url).startsWith('/api/cards/')
+            ? {
+                ok: true,
+                status: 200,
+                json: async () => ({
+                  public_slug: 'kim-4f2a',
+                  og_image_key: 'k.png',
+                  user: { id: 'u9', nickname: '김철수' },
+                  titles: [],
+                  tagline: '피자보다 축구',
+                  style: null,
+                }),
+              }
+            : { ok: true, status: 200, json: async () => SQUAD },
+        ),
+      ),
+    )
+    render(<SquadPanel card={CARD} squad={SQUAD} myCardId={CARD.id} />)
+
+    /* 카드에만 있는 글(별칭)이 보이면 진짜 카드가 그려진 것이다.
+       ⚠️ 대역이 슬러그와 무관하게 같은 카드를 주므로 **앉은 사람 수만큼** 나온다
+       — `findAllByText` 로 받는다(하나로 받으면 「여럿 찾음」으로 튕긴다). */
+    expect((await screen.findAllByText('피자보다 축구')).length).toBeGreaterThan(0)
+    // 빈 카드에 이름만 찍히던 자리가 아니다.
+    expect(document.querySelectorAll('.ss-pcard-alias').length).toBeGreaterThan(0)
+  })
+
+  /**
+   * 🔴 **지인으로 앉혀도 카드가 뜬다** (미결 `paik` 39번, 2026-09-17 — 사용자
+   * 요청 「저기서 선택하면 스쿼드판에 그 사람 카드는 당연히 똑같이 떠야지」).
+   *
+   * 지인 목록이 슬러그를 안 줘서 그 줄만 이름표로 남았었다 — 같은 날 백엔드에
+   * `card_public_slug` 를 더했고(정어진 승인), 화면은 그 값을 자리로 옮긴다.
+   * **수락 전이어도 카드는 바로 보인다** — 수락 여부는 위의 「수락 대기중」이
+   * 말한다.
+   */
+  it('지인으로 앉힌 사람도 슬러그가 있으면 카드를 그린다', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        const u = String(url)
+        if (u.startsWith('/api/cards/')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              public_slug: 'friend-1',
+              og_image_key: 'k.png',
+              user: { id: 'u7', nickname: '이영희' },
+              titles: [],
+              tagline: '왼발잡이',
+              style: null,
+            }),
+          })
+        }
+        if (u.includes('/me/contacts')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              items: [
+                {
+                  contact_id: 'ct1',
+                  user_id: 'u7',
+                  nickname: '이영희',
+                  note: null,
+                  accepted_at: '2026-09-15T09:30:00Z',
+                  card_public_slug: 'friend-1',
+                },
+              ],
+            }),
+          })
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => SQUAD })
+      }),
+    )
+
+    render(
+      <SquadPanel
+        card={CARD}
+        myCardId={CARD.id}
+        scouting
+        onCloseScouting={() => {}}
+      />,
+    )
+
+    await user.click(await screen.findByRole('button', { name: /이영희/ }))
+    /* 빈 자리는 여럿이라 **하나를 집는다** — 어느 자리든 뜻은 같다. */
+    await user.click(screen.getAllByRole('button', { name: /자리에 이영희 넣기/ })[0])
+
+    expect(await screen.findByText('왼발잡이')).toBeInTheDocument()
+  })
+
+  /* 🔴 **못 알아보는 응답이면 이름표로 남는다** — 엉뚱한 것을 카드 자리에
+     넣으면 판이 통째로 안 그려진다. 못 그리는 것보다 이름이라도 남는 쪽이다. */
+  it('카드를 못 읽으면 이름표로 남는다', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) =>
+        Promise.resolve(
+          String(url).startsWith('/api/cards/')
+            ? { ok: false, status: 404, json: async () => ({}) }
+            : { ok: true, status: 200, json: async () => SQUAD },
+        ),
+      ),
+    )
+    render(<SquadPanel card={CARD} squad={SQUAD} myCardId={CARD.id} />)
+    expect(await screen.findByText('김철수')).toBeInTheDocument()
+  })
+
+  /* 🔴 **「준비 완료」는 없앴다**(사용자 판단, 2026-09-17). 이 표시는 「아직
+     수락 안 했다」를 말하는 자리지 다 된 것을 자랑하는 자리가 아니다 —
+     기다리는 것만 말하고 된 것은 조용히 둔다. */
+  it('수락된 사람에게는 아무 표식도 안 붙는다', () => {
+    const { container } = render(
+      <SquadPanel card={CARD} squad={SQUAD} myCardId={CARD.id} />,
+    )
+    // SQUAD 의 사람들은 이미 등재된 팀원이라 기다릴 것이 없다.
+    expect(screen.queryByText('준비 완료')).toBeNull()
+    expect(container.querySelector('.ss-squad-pending')).toBeNull()
   })
 })
 
@@ -989,20 +1085,19 @@ describe('스쿼드 — 판 배치가 서버에 남는다', () => {
       expect(screen.queryByRole('button', { name: /홍길동 빼기/ })).toBeNull()
     })
 
-    /* 내가 등재에 없으면 남길 데가 없다 — 판은 그대로 돌고 아무것도 안 보낸다.
+    /* 내가 그 등재(`sm-me`)의 주인이 아니면 그 id 로는 아무것도 안 보낸다.
 
-       정정 (2026-09-16, 사용자 설계): 전에는 등재가 없어도 내 카드가 판에 서
-       있어서 그냥 끌어 보면 됐다. 이제 등재가 없으면 **판에도 안 서므로**,
-       「나」 표식으로 직접 앉힌 자리(= 아직 등재가 아닌 자리)를 끌어 본다 —
-       그 자리는 서버에 남길 등재 id 가 없다는 것이 이 시험의 뜻이다.
-       (앉히면서 나가는 `POST` 는 등재를 **만드는** 길이라 별개다 — 여기서는
-       옛 등재 id 로 PATCH 가 나가지 않는지만 본다.) */
+       🔴 **정정 (2026-09-17, 사용자 판단)**: 09-16 에는 「나」 표식을 눌러
+       앉혔지만 이제 **저절로 앉는다**(팀장은 무조건 뛴다). 자동 착석이
+       등재를 **만드는** `POST` 는 별개고, 여기서 보는 것은 **남의 등재
+       id 로 PATCH 가 새어 나가지 않는지**다 — 이 판(`SQUAD`)에는 내 등재가
+       없기 때문이다. */
     it('내가 등재에 없으면 아무것도 안 보낸다', async () => {
       const fn = server()
-      const user = userEvent.setup()
       render(<SquadPanel card={CARD} squad={SQUAD} myCardId={CARD.id} />)
-      await user.click(screen.getByRole('button', { name: 'FW 자리에 선수 넣기' }))
-      await user.click(screen.getByRole('button', { name: 'FW 자리에 내 카드 넣기' }))
+      await waitFor(() =>
+        expect(document.querySelector('[data-mine="true"]')).toBeInTheDocument(),
+      )
 
       const mine = document.querySelector('[data-mine="true"]') as HTMLElement
       drag(mine, 0, 2)
@@ -1517,5 +1612,130 @@ describe('스쿼드 — 추천 판의 등급은 서버 값이다', () => {
     await openSuggest(user)
     await screen.findByText('최유진')
     expect(calls.some((u) => u.includes('/squad/candidates') && u.includes('grade='))).toBe(false)
+  })
+})
+
+/**
+ * **앉힌 사람은 남는다** (계약 49·53, 사용자 설계 2026-09-17).
+ *
+ * 🔴 「일단 앉혀 두고, **그 사람이 거부하거나 팀장이 ⊗ 를 누를 때만** 사라져야
+ * 한다」가 요구였다. 그래서 앉히기를 **초대**로 잇는다 — 서버에 남으므로
+ * 새로고침해도 그 자리에 있고, 끝나는 길은 거절과 무르기 둘뿐이다.
+ */
+describe('스쿼드 — 앉히면 초대가 나간다', () => {
+  const TEAM = 'team-mine'
+
+  function server(invitations: unknown[] = []) {
+    const sent: { url: string; method: string; body: unknown }[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+        const u = String(url)
+        sent.push({
+          url: u,
+          method: init?.method ?? 'GET',
+          body: init?.body ? JSON.parse(String(init.body)) : null,
+        })
+        if (u.includes('/invitations')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => (init?.method === 'POST' ? { id: 'inv-1' } : invitations),
+          })
+        }
+        if (u.includes('/squad/candidates')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => MF_ROWS })
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => SQUAD })
+      }),
+    )
+    return sent
+  }
+
+  const MF_ROWS = [
+    {
+      user_id: 'u-jung',
+      nickname: '정상호',
+      card_public_slug: 'jung-1',
+      grade: 'A',
+      provisional: false,
+      notes: null,
+    },
+  ]
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  /* 🔴 **부르는 자리를 함께 보낸다** — 그래야 새로고침해도 어느 칸이었는지 산다. */
+  it('추천에서 고르면 그 자리로 초대가 나간다', async () => {
+    const sent = server()
+    const user = userEvent.setup()
+    render(<SquadPanel card={CARD} myCardId={CARD.id} myTeamId={TEAM} />)
+    // 5:5 판에는 MF 가 둘이다 — 어느 쪽이든 뜻은 같다.
+    await user.click((await screen.findAllByRole('button', { name: 'MF 자리에 선수 넣기' }))[0])
+    await user.click(await screen.findByRole('button', { name: /정상호/ }))
+
+    await waitFor(() => {
+      const post = sent.find((c) => c.method === 'POST' && c.url.includes('/invitations'))
+      expect(post).toBeDefined()
+      expect(post!.body).toEqual({ invited_user_id: 'u-jung', position_code: 'MF' })
+    })
+  })
+
+  /**
+   * 🔴 **새로고침해도 그 자리에 있다.** 대기 중인 초대를 판에 되살린다 —
+   * 이것이 「앉혀 두면 남는다」를 실제로 만드는 자리다.
+   */
+  it('대기 중인 초대는 판에 되살아난다', async () => {
+    server([
+      {
+        id: 'inv-1',
+        status: 'pending',
+        position_code: 'MF',
+        invited_user_nickname: '정상호',
+        invited_user_card_slug: null,
+      },
+    ])
+    render(<SquadPanel card={CARD} myCardId={CARD.id} myTeamId={TEAM} />)
+    expect(await screen.findByText('정상호')).toBeInTheDocument()
+  })
+
+  /* 🔴 끝난 초대(거절·무르기)는 안 되살린다 — 그래서 그 자리가 비워진다. */
+  it('거절·무른 초대는 판에 안 되살아난다', async () => {
+    server([
+      {
+        id: 'inv-1',
+        status: 'rejected',
+        position_code: 'MF',
+        invited_user_nickname: '정상호',
+        invited_user_card_slug: null,
+      },
+    ])
+    render(<SquadPanel card={CARD} myCardId={CARD.id} myTeamId={TEAM} />)
+    await waitFor(() => expect(screen.getByText('MY SQUAD')).toBeInTheDocument())
+    expect(screen.queryByText('정상호')).toBeNull()
+  })
+
+  /* 🔴 ⊗ 는 **서버에서도 무른다** — 안 그러면 새로고침에 되살아난다. */
+  it('⊗ 를 누르면 초대를 무른다', async () => {
+    const sent = server([
+      {
+        id: 'inv-1',
+        status: 'pending',
+        position_code: 'MF',
+        invited_user_nickname: '정상호',
+        invited_user_card_slug: null,
+      },
+    ])
+    const user = userEvent.setup()
+    render(<SquadPanel card={CARD} myCardId={CARD.id} myTeamId={TEAM} />)
+    await user.click(await screen.findByRole('button', { name: '정상호 빼기' }))
+
+    await waitFor(() =>
+      expect(
+        sent.some(
+          (c) => c.method === 'DELETE' && c.url.endsWith('/invitations/inv-1'),
+        ),
+      ).toBe(true),
+    )
   })
 })

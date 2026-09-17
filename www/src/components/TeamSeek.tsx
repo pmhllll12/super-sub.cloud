@@ -5,6 +5,7 @@ import type { OpenMatch } from '@/server/backend'
 import { SPORTS, SPORT_CODE } from '@/lib/sports'
 import MatchPrefsForm from '@/components/MatchPrefs'
 import { loadPrefs, savePrefs, type MatchPrefs } from '@/lib/matchPrefs'
+import { useFitToViewport } from '@/lib/useFitToViewport'
 
 /**
  * 「팀원」 판 — **아직 사람을 못 채운 팀들의 명단**(사용자 요청, 2026-09-08).
@@ -64,6 +65,8 @@ export default function TeamSeek({
   sportCode?: string | null
 }) {
   const [state, setState] = useState<State>({ kind: 'loading' })
+  /* 🔴 화면 아래로 넘치지 않게 — 넘치면 판 안에서 구른다(`useFitToViewport` 머리말). */
+  const fitRef = useFitToViewport<HTMLElement>()
   /**
    * 고른 종목. `null` 이 **전체**다.
    *
@@ -153,6 +156,7 @@ export default function TeamSeek({
 
   return (
     <section
+      ref={fitRef}
       className="ss-teams"
       data-closing={closing ? 'true' : undefined}
       aria-label="사람을 찾는 팀"

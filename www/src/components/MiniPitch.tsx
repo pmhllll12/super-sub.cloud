@@ -78,6 +78,10 @@ export default function MiniPitch({
               <div
                 key={i}
                 className="ss-squad-seat"
+                /* 🔴 **내 자리를 CSS 가 찾을 수 있게 표식만 낸다**(2026-09-17).
+                   초대 판이 「팀장이 정해 둔 자리에서 내 카드가 깜빡인다」를
+                   그리는 데 쓴다 — 모양은 쓰는 쪽이 정하고 여기는 사실만 적는다. */
+                data-mine={p.mine ? 'true' : undefined}
                 style={{ gridColumn: col + 1, gridRow: row + 1 }}
               >
                 <div className="ss-pcard-mini">

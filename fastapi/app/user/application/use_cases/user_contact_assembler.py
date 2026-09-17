@@ -35,6 +35,7 @@ def to_contact_list_result(
                 nickname=s.nickname,
                 note=s.note,
                 accepted_at=s.accepted_at,
+                card_public_slug=s.card_public_slug,
             )
             for s in summaries
         ]

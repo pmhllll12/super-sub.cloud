@@ -134,6 +134,10 @@ class FakeUserRepository(UserPort):
     def update_searchable(self, user_id: UUID, is_nickname_searchable: bool) -> None:
         pass
 
+    def card_slugs(self, user_ids: list[UUID]) -> dict[UUID, str]:
+        # 이 대역이 보는 것은 카드가 아니다 — 빈 표면 충분하다(미결 `paik` 39번).
+        return {}
+
     def search_by_nickname(self, *, q: str, exclude_user_id: UUID, limit: int):
         return []
 

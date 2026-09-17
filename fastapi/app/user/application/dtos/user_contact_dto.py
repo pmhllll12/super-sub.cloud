@@ -21,6 +21,8 @@ class SearchUsersQuery:
 class UserSearchResult:
     id: UUID
     nickname: str
+    # 공개 카드 슬러그 — 카드를 안 만들었으면 `None`(미결 `paik` 39번).
+    card_public_slug: str | None = None
 
 
 @dataclass(frozen=True)
@@ -63,6 +65,7 @@ class ContactSummaryResult:
     nickname: str
     note: str | None
     accepted_at: datetime
+    card_public_slug: str | None = None
 
 
 @dataclass(frozen=True)
