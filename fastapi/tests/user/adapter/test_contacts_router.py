@@ -81,3 +81,27 @@ class TestListContactRequests:
         res = client.get(f"{V1}/me/contacts/requests", headers=auth)
         assert res.status_code == 200, res.text
         assert isinstance(res.json(), list)
+
+
+class TestContactCardSlug:
+    """지인 목록에 **카드 슬러그**가 실린다 (미결 `paik` 39번, 백성검 요청).
+
+    🔴 홈 스쿼드 판이 앉은 사람의 **진짜 카드**를 그리는데, 지인으로 앉힌
+    사람만 찾아갈 값이 없어 이름표로 남았다 — 같은 판 안에서 어디서
+    앉혔느냐에 따라 카드가 뜨기도 안 뜨기도 하면 안 된다.
+    """
+
+    def test_카드가_있으면_슬러그가_실린다(self, client, auth):
+        res = client.get(f"{V1}/me/contacts", headers=auth)
+        assert res.status_code == 200, res.text
+        items = res.json()["items"]
+        assert items, "스텁 지인이 한 명은 있어야 이 시험이 뜻이 있다"
+        # 🔴 **내부 id 가 아니라 슬러그다** — 밖으로 나가는 것은 슬러그뿐이다.
+        assert items[0]["card_public_slug"] == "kim-chulsoo-1a2b"
+
+    def test_칸_자체는_늘_있다(self, client, auth):
+        """카드를 안 만든 사람은 `null` 이다 — **빠지는 것이 아니라 null** 이라
+        화면이 「아직 못 받았다」와 「카드가 없다」를 가를 수 있다."""
+        items = client.get(f"{V1}/me/contacts", headers=auth).json()["items"]
+        for row in items:
+            assert "card_public_slug" in row

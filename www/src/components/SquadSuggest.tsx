@@ -28,79 +28,80 @@ import { ANY_GRADE, GRADES, type GradeFilter } from '@/lib/playerGrade'
  * 그래서 이 표는 **닉네임으로 찾는 장식**이다. 서버가 준 후보의 닉네임이 여기
  * 없으면 문구 없이 이름과 등급만 그린다 — 지어내지 않는다.
  *
+ * 🔴 **정정 (2026-09-17, 사용자 판단 — 미결 `ho` 50번).** 여기 있던 **불릿
+ * 두 줄(`notes`)을 걷어냈다.** 「1대1에서 잘 밀리지 않습니다」·「수비 가담이
+ * 성실합니다」 같은 문장은 **경기 행동**이라 저희가 **재는 것이 아무것도
+ * 없다**(정상호: 「아무 데도 없습니다 — 한 편의 자세 분석으로는 못 잽니다」).
+ *
+ * 🔴 그런데 이 표는 **닉네임으로** 붙는다 — 후보가 진짜 사용자가 된 지금,
+ * 실제로 「김선우」인 사람이 있으면 **지어낸 문장이 그 사람의 진짜 이름·진짜
+ * 등급 옆에** 걸린다. 2026-09-11 에 대표 영상을 `?? '/coach-c001.mp4'` 로
+ * 떨어뜨리다 똑같이 데인 자리다.
+ *
+ * 🔴 **그리고 같은 날 진짜가 왔다**(CCC 56, 미결 `paik` 33·38번). 후보 목록
+ * 응답에 `notes` 가 실려 온다 — **후보마다 `/grade` 를 다시 부르지 않는다.**
+ * 그래서 이 표에 남은 것은 **대표 영상 폴백(`clip`)과 호칭 폴백(`title`)뿐**
+ * 이고, 불릿은 서버 값만 쓴다.
+ *
  * ⚠️ 클립은 저장소의 셋(`/coach-c00N.mp4`)을 돌려 쓴다. 🔴 **영상 파일을 더
  * 넣지 말 것** — 셋이 이미 16MB 다.
  */
-const FLAVOR: Record<string, { clip: string; title: string; notes: string[] }> = {
+const FLAVOR: Record<string, { clip: string; title: string }> = {
   '김선우': {
     clip: '/coach-c001.mp4',
     title: '반응이 빠른',
-    notes: ['가까운 거리 슈팅 대응이 빠릅니다', '골문 앞을 넓게 씁니다'],
   },
   '오재현': {
     clip: '/coach-c002.mp4',
     title: '공중볼에 강한',
-    notes: ['코너와 크로스에서 먼저 나옵니다', '수비와 말을 많이 맞춥니다'],
   },
   '박도현': {
     clip: '/coach-c003.mp4',
     title: '몸싸움이 강한',
-    notes: ['1대1에서 잘 밀리지 않습니다', '세컨볼을 자주 따냅니다'],
   },
   '이건우': {
     clip: '/coach-c001.mp4',
     title: '커버가 넓은',
-    notes: ['뒷공간을 미리 메웁니다', '옆 수비가 나갔을 때 자리를 채웁니다'],
   },
   '정민석': {
     clip: '/coach-c002.mp4',
     title: '전진 패스가 좋은',
-    notes: ['수비에서 공격으로 한 번에 넘깁니다', '전환 순간에 앞을 먼저 봅니다'],
   },
   '서준혁': {
     clip: '/coach-c003.mp4',
     title: '위치 선정이 좋은',
-    notes: ['라인을 잘 맞춥니다', '오프사이드를 유도합니다'],
   },
   '최유진': {
     clip: '/coach-c001.mp4',
     title: '시야가 넓은',
-    notes: ['반대편 빈 공간을 자주 찾습니다', '한 박자 빠른 패스를 넣습니다'],
   },
   '강태원': {
     clip: '/coach-c002.mp4',
     title: '10경기 연속',
-    notes: ['활동량이 많고 꾸준합니다', '수비 가담이 성실합니다'],
   },
   '윤서준': {
     clip: '/coach-c003.mp4',
     title: '탈압박이 좋은',
-    notes: ['좁은 곳에서 공을 지킵니다', '몰리면 방향을 바꿔 빠져나옵니다'],
   },
   '조현우': {
     clip: '/coach-c001.mp4',
     title: '슈팅이 매서운',
-    notes: ['박스 안에서 망설이지 않습니다', '왼발과 오른발을 모두 씁니다'],
   },
   '임재민': {
     clip: '/coach-c002.mp4',
     title: '침투가 날카로운',
-    notes: ['뒷공간으로 먼저 달립니다', '수비 사이를 파고듭니다'],
   },
   '신동현': {
     clip: '/coach-c003.mp4',
     title: '결정력이 좋은',
-    notes: ['적은 기회에서 마무리합니다', '몸을 등지고 받아 돌아섭니다'],
   },
   '문태호': {
     clip: '/coach-c001.mp4',
     title: '연계가 좋은',
-    notes: ['등지고 받아 내주는 데 능합니다', '2대1을 잘 만듭니다'],
   },
   '배준영': {
     clip: '/coach-c002.mp4',
     title: '스피드가 빠른',
-    notes: ['측면에서 한 번에 제칩니다', '역습 때 가장 먼저 달립니다'],
   },
 }
 
@@ -111,6 +112,8 @@ type Candidate = {
   card_public_slug: string | null
   grade: string | null
   provisional: boolean | null
+  /** 분석이 낸 불릿 한두 줄 (CCC 56). 🔴 한 줄·`null` 둘 다 정상이다. */
+  notes?: string[] | null
 }
 
 type State =
@@ -146,7 +149,12 @@ export default function SquadSuggest({
   teamId?: string | null
   /** 닫히는 중 — 사라지는 동안에도 DOM 에 남아 있어야 애니메이션이 보인다. */
   closing: boolean
-  onPick: (name: string) => void
+  /**
+   * 고른 사람 — **슬러그도 같이 넘긴다**(2026-09-17). 이름만 넘기면 판이 그
+   * 사람의 **진짜 카드를 못 그린다**(빈 카드에 이름만 찍힌다). 카드를 아직 안
+   * 만든 사람은 `null` 이고, 그때는 이름표로 남는 것이 맞다.
+   */
+  onPick: (name: string, cardSlug: string | null, userId: string) => void
   onClose: () => void
 }) {
   /* 🔴 **첫 값은 「상관없음」이다**(2026-09-16에 바뀜). 전에는 판에 앉은
@@ -389,7 +397,7 @@ export default function SquadSuggest({
             <button
               type="button"
               className="ss-suggest-item"
-              onClick={() => onPick(s.nickname)}
+              onClick={() => onPick(s.nickname, s.card_public_slug, s.user_id)}
             >
               {/* 🔴 빈 선수 카드가 있던 자리다 — **그 사람의 대표 장면**으로
                   바꿨다(사용자 요청). 카드는 아직 없는 것을 그리는 표식이었고,
@@ -443,23 +451,38 @@ export default function SquadSuggest({
                   {s.provisional && <span className="ss-suggest-provisional">검수 전</span>}
                 </span>
                 {/* 🔴 **그 사람이 적은 호칭이 먼저다.** `FLAVOR` 는 화면 mock
-                    이라 진짜가 있으면 진짜가 이긴다(대표 영상과 같은 순서). */}
+                    이라 진짜가 있으면 진짜가 이긴다(대표 영상과 같은 순서).
+
+                    🔴 **출처 표식(「본인이 적음」)을 화면에 적지 않는다**
+                    (2026-09-17, 사용자 판단). `ho` 50번이 「출처를 화면에서
+                    구분해 달라」고 했지만, 제품 화면에 「본인이 적음」·「AI가
+                    적음」이 붙어 있으면 **읽는 사람에게는 이상한 말**이다 —
+                    카드는 선수를 소개하는 자리지 출처를 밝히는 자리가 아니다.
+                    대신 **섞지 않는 것으로 가른다**: 이 줄은 사람이 적은
+                    호칭만 오고(`paik` 36번), 에이전트 불릿은 아래 제 칸에
+                    따로 선다. */}
                 {(titles[s.user_id] || FLAVOR[s.nickname]?.title) && (
                   <span className="ss-suggest-title">
                     {titles[s.user_id] ?? FLAVOR[s.nickname].title}
                   </span>
                 )}
-                {FLAVOR[s.nickname] && (
-                  <>
-                    {/* 영상 분석이 정리한 특징 — 수치가 아니라 말로 적는다
-                        (카드에 수치를 그리지 않는 규칙과 같은 이유).
-                        ⚠️ 아직 mock 이다 — 계약 44번이 그은 범위다. */}
-                    <span className="ss-suggest-notes">
-                      {FLAVOR[s.nickname].notes.map((n) => (
-                        <span key={n}>{n}</span>
-                      ))}
-                    </span>
-                  </>
+                {/* 🔴 **분석이 낸 불릿**(CCC 56, 2026-09-17). 오늘 아침까지는
+                    여기 붙박이 문장이 있었는데 **재는 것이 없는 말**이라
+                    걷었고(`ho` 50번), 같은 날 정어진이 진짜 값을 냈다.
+
+                    🔴 **한 줄·`null` 둘 다 정상이다** — 두 줄을 채우려고
+                    지어내지 않는 것이 에이전트 쪽 규칙이라, 없으면 이 칸을
+                    아예 안 그린다. 화면에서 문장을 짓지 않는다.
+
+                    🔴 **이름 아래 한 줄과 다른 자리다** — 그쪽은 **사람이
+                    적은 호칭**(CCC 51)이고 이건 **분석이 낸 것**이다. 섞으면
+                    팀장이 사람이 적은 글까지 AI 판정으로 읽는다. */}
+                {s.notes && s.notes.length > 0 && (
+                  <span className="ss-suggest-notes">
+                    {s.notes.map((n) => (
+                      <span key={n}>{n}</span>
+                    ))}
+                  </span>
                 )}
               </span>
             </button>

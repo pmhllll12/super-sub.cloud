@@ -1,4 +1,4 @@
-import type { MyVideo } from '@/server/backend'
+import type { RegisteredVideo } from '@/server/backend'
 
 /**
  * 클립 업로드 — 계약 3-6절의 세 단계를 한 자리에 모은다.
@@ -97,7 +97,7 @@ export async function uploadClip(opts: {
    * 경우라 실패로 만들지 않는다.
    */
   focus?: string[]
-}): Promise<MyVideo> {
+}): Promise<RegisteredVideo> {
   const { file, sportCode, meta, analyze, subject, focus } = opts
 
   const spot = await fetch('/api/videos/upload-url', {
@@ -137,5 +137,5 @@ export async function uploadClip(opts: {
   // 🔴 반려(passed: false)는 201 이다 — 예외로 만들면 사유가 화면까지 못 온다.
   // 클라이언트는 status 가 아니라 passed 로 분기한다(계약 3-6절).
   if (!register.ok) throw new Error(await readError(register, '등록에 실패했습니다.'))
-  return (await register.json()) as MyVideo
+  return (await register.json()) as RegisteredVideo
 }

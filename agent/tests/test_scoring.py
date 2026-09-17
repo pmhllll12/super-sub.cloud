@@ -739,3 +739,305 @@ def test_a_grade_the_rubric_never_named_is_not_an_earned_title(rubric):
     c.titles.pop(2)
     assert c.title_for(2) == c.name, "폴백이 항목명이라는 전제가 깨졌다"
     assert c.title_is_earned(2) is False
+
+
+# --- 숫자 없는 수준 설명 (미결 23번 가-2) -----------------------------------
+
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def _football_rubrics():
+    return discover_rubrics("rubrics")
+
+
+def test_every_live_rubric_writes_a_plain_level_for_every_grade():
+    """🔴 **판정 모델이 읽는 자리에 숫자가 없어야 한다** (미결 23번 가-2).
+
+    `grades` 는 "150~170도" 처럼 경계를 품고 있고, 프롬프트에 있으면 모델이
+    언젠가 베낀다 — 1회차에서 구간 표기로, 2회차에서 수준 정의에 박힌
+    "25~60도" 로, **두 번** 확인했다.
+
+    이 검사가 없으면 새 루브릭·새 항목이 `grades_plain` 없이 들어오고,
+    `build_prompt` 는 조용히 `grades` 로 떨어진다 — **아무도 모른다.**
+    """
+    for key, rubric in _football_rubrics().items():
+        for c in rubric.criteria:
+            for grade in (2, 1, 0):
+                assert c.grades_plain.get(grade), (
+                    f"{key}/{c.id} 의 {grade}등급에 grades_plain 이 없다. "
+                    "없으면 프롬프트가 숫자 박힌 grades 로 떨어진다."
+                )
+
+
+def test_a_plain_level_never_carries_a_number():
+    """숫자를 적으면 이 칸을 만든 이유가 없어진다."""
+    import re
+    for key, rubric in _football_rubrics().items():
+        for c in rubric.criteria:
+            for grade, lines in c.grades_plain.items():
+                for text in lines:
+                    assert not re.search(r"\d", text), (
+                        f"{key}/{c.id} {grade}등급 grades_plain 에 숫자가 있다: "
+                        f"{text!r}"
+                    )
+
+
+def test_a_two_way_grade_gets_one_plain_line_per_segment():
+    """🔴 **양방향 등급은 조각마다 하나여야 한다.**
+
+    한 문장으로 양쪽을 부르면 모델이 방향을 고르고, 그게 지금 틀리고 있는
+    자리다 — 2026.09.17 판독에서 140.2도(과굴곡)에 「굴곡 부족」이 나왔다.
+    """
+    for key, rubric in _football_rubrics().items():
+        for c in rubric.criteria:
+            for grade in (2, 1, 0):
+                segments = len(c.bands.get(grade, ()))
+                if segments < 2:
+                    continue
+                assert len(c.grades_plain[grade]) == segments, (
+                    f"{key}/{c.id} {grade}등급: 구간 {segments}개인데 "
+                    f"grades_plain 이 {len(c.grades_plain[grade])}개다"
+                )
+
+
+def test_a_plain_line_that_does_not_match_its_segments_is_refused():
+    """조각 수와 문장 수가 다르면 **적재에서 막는다** (기준 F).
+
+    `titles`·`card_lines` 와 같은 규칙이다. 어긋난 채로 지나가면 모델이
+    **반대 방향의 수준 설명**을 받는다 — 고치려는 결함 그 자체다.
+    """
+    from supersub_agent.scoring import RubricError, load_rubric
+    import yaml
+
+    raw = yaml.safe_load(
+        (ROOT / "rubrics" / "football_instep_shot.yaml").read_text(encoding="utf-8")
+    )
+    for entry in raw["criteria"]:
+        if entry["id"] == "plant_knee_flexion":
+            entry["grades_plain"][1] = ["한 줄만 적는다"]  # 구간은 둘인데
+            break
+
+    broken = ROOT / "data" / "tmp" / "broken_plain.yaml"
+    broken.parent.mkdir(parents=True, exist_ok=True)
+    broken.write_text(yaml.safe_dump(raw, allow_unicode=True), encoding="utf-8")
+    try:
+        with pytest.raises(RubricError, match="grades_plain"):
+            load_rubric(broken)
+    finally:
+        broken.unlink()
+
+
+def test_the_judged_grade_gets_only_its_own_direction():
+    """🔴 이번 판정 등급은 **값이 앉은 조각 하나만** 프롬프트에 들어간다.
+
+    고를 것을 안 주면 고르다 틀릴 수 없다. 반대 방향의 말이 프롬프트에
+    남아 있으면 그 말이 문장에 나온다 — 2026.09.17 판독이 그 형태였다.
+    """
+    from supersub_agent.judge import ANCHOR_HEADER, build_prompt
+
+    rubric = _football_rubrics()["football/instep_shot"]
+    crit = next(c for c in rubric.criteria if c.id == "plant_knee_flexion")
+    metrics = {crit.band_metric: 140.2}  # [135,150] 조각 = 과굴곡
+
+    prompt = build_prompt(crit, metrics, 1)
+
+    assert "필요보다 깊이 굽힌다" in prompt
+    assert "뻣뻣하게 선다" not in prompt, (
+        "반대 조각의 말이 프롬프트에 남았다 — 모델이 그걸 고를 수 있다"
+    )
+
+
+def test_the_prompt_stops_carrying_band_numbers():
+    """프롬프트의 수준 설명에 경계 숫자가 없어야 한다.
+
+    🔴 `grades` 가 그대로 들어가던 자리라, 이 검사가 빠지면 되돌아가도
+    아무도 모른다.
+    """
+    from supersub_agent.judge import ANCHOR_HEADER, build_prompt
+
+    rubric = _football_rubrics()["football/instep_shot"]
+    crit = next(c for c in rubric.criteria if c.id == "plant_knee_flexion")
+    prompt = build_prompt(crit, {crit.band_metric: 140.2}, 1)
+
+    head = prompt.split(ANCHOR_HEADER)[0]
+    for edge in ("135", "150", "170", "180"):
+        assert edge not in head, f"수준 설명에 경계 숫자 {edge} 가 남았다"
+
+
+# --- 앵커도 조각마다 (미결 23번 가-3) ---------------------------------------
+
+
+def test_an_anchor_never_carries_a_number_it_did_not_measure():
+    """🔴 **앵커가 숫자를 가르친다** (미결 23번 가-3).
+
+    프롬프트는 앵커를 「예시 어투」로 넣는다. 그래서 앵커에 적힌 숫자는
+    **본보기가 된다** — 실제로 둘이 샜다:
+
+    ⑴ 밴드 경계: *"기준 상한 170도 초과"* → 모델이 170 을 그대로 썼다
+       (가-2 의 R2′ 4건이 전부 이 형태였다)
+    ⑵ 단위 환산: *"어깨너비 0.29배(약 12cm)"* → 모델이 무차원 비율을
+       cm 로 바꿔 적었다. **어깨너비를 60cm 로 가정한 값**이라 재지도
+       않은 수치다
+
+    앵커에는 **자기가 잰 값만** 적는다.
+    """
+    import re
+    number = re.compile(r"-?\d+(?:\.\d+)?")
+    for key, rubric in _football_rubrics().items():
+        for c in rubric.criteria:
+            for a in c.anchors:
+                measured = [float(v) for v in a["measured"].values()]
+                for token in number.findall(a["evidence"]):
+                    n = float(token)
+                    assert any(abs(n - v) <= 0.55 for v in measured), (
+                        f"{key}/{c.id} 앵커에 안 잰 숫자 {token} 이 있다: "
+                        f"{a['evidence']!r}"
+                    )
+
+
+def test_a_two_way_grade_has_an_anchor_for_each_direction():
+    """🔴 양방향 등급은 **조각마다 앵커**가 있어야 한다.
+
+    하나뿐이면 반대쪽 값이 들어왔을 때 보여 줄 예시가 **반대 방향**이고,
+    모델은 앵커를 따라간다 — 가-2 대조에서 앵커 조각이 어긋난 자리의
+    오독률이 **63%**, 맞은 자리가 **14%** 였다.
+    """
+    for key, rubric in _football_rubrics().items():
+        for c in rubric.criteria:
+            for grade, intervals in c.bands.items():
+                if len(intervals) < 2:
+                    continue
+                covered = set()
+                for a in c.anchors:
+                    if int(a["grade"]) != grade:
+                        continue
+                    v = float(next(iter(a["measured"].values())))
+                    for i, (lo, hi) in enumerate(intervals):
+                        if (lo is None or v >= lo) and (hi is None or v <= hi):
+                            covered.add(i)
+                assert covered == set(range(len(intervals))), (
+                    f"{key}/{c.id} {grade}등급: 구간 {len(intervals)}개인데 "
+                    f"앵커가 덮는 것은 {sorted(covered)} 뿐이다"
+                )
+
+
+def test_the_prompt_shows_only_the_anchor_for_the_direction_at_hand():
+    """반대 조각의 앵커가 프롬프트에 남으면 모델이 그쪽으로 간다."""
+    from supersub_agent.judge import ANCHOR_HEADER, build_prompt
+
+    rubric = _football_rubrics()["football/instep_shot"]
+    crit = next(c for c in rubric.criteria if c.id == "plant_knee_flexion")
+
+    deep = build_prompt(crit, {crit.band_metric: 140.2}, 1)   # 과굴곡 조각
+    assert "필요보다 깊이 굽었다" in deep
+    assert "뻣뻣하게 섰다" not in deep
+
+    stiff = build_prompt(crit, {crit.band_metric: 176.5}, 1)  # 뻣뻣 조각
+    assert "뻣뻣하게 섰다" in stiff
+    assert "필요보다 깊이 굽었다" not in stiff
+
+
+def test_the_other_grades_keep_all_their_anchors():
+    """🔴 **줄이는 쪽으로 가지 않는다** — 좁히는 것은 판정 등급 하나뿐이다.
+
+    1회차에서 앵커의 수준 표시를 뺐다가 **2등급 문장 8건 중 4건**이
+    무너졌다. 어투를 잡아 주는 자리라 함부로 덜어내지 않는다.
+
+    🔴 **2026.09.17 에 「측정값은 남기고 문장만 빼는」 길을 재 봤고, 닫혔다**
+    (미결 23번 E, `RESULTS_anchor_values.md`). 얻은 것이 작지 않았다 —
+    감점 쪽 방향 오독 **5 → 2**, 지어낸 수치도 **1건**으로 울타리가 섰다.
+    그런데 **잘함 문장이 1 → 6/22 로 무너졌다**:
+
+        "짧은 스윙이 공을 효과적으로 **위로 전달**하는 데 도움이 되었다"
+        "공을 효과적으로 **공중에 띄울** 수 있어 좋았다"
+
+    패스에서 공이 뜨는 것은 **결함**인데 칭찬한다. 수준별 **값만** 남기고
+    **뜻**을 빼면 모델이 뜻을 지어낸다. 1회차와 같은 자리를 **세 번째로**
+    밟은 것이라 이 검사를 원래대로 되돌렸다.
+
+    🔴 **다시 시도하려면 새 사전 등록이다.** 「값만 남기기」는 이미 쟀으니
+    같은 것을 또 재지 말 것 — 남은 갈래는 **어느 등급의 문장을 남길지**다.
+    """
+    from supersub_agent.judge import ANCHOR_HEADER, build_prompt
+
+    rubric = _football_rubrics()["football/instep_shot"]
+    crit = next(c for c in rubric.criteria if c.id == "trunk_lean")
+    prompt = build_prompt(crit, {crit.band_metric: 12.4}, 2)  # 2등급 판정
+    anchors = prompt.split(ANCHOR_HEADER)[1]
+
+    for word in ("[잘함]", "[보통]", "[아쉬움]"):
+        assert word in anchors, f"앵커에서 {word} 가 사라졌다 — 1회차의 자리다"
+
+    # 1등급은 양방향인데 판정 등급이 아니므로 **문장까지** 둘 다 남아야 한다.
+    assert "거의 수직" in anchors, "옆 등급 앵커의 문장이 사라졌다 — E 에서 닫힌 길이다"
+    assert "조금 깊이 숙였다" in anchors, "옆 등급 앵커의 문장이 사라졌다"
+
+
+def test_an_anchor_lists_every_metric_the_criterion_measures():
+    """🔴 앵커가 `measured_by` 를 **다 적어야** 한다 (미결 23번 A).
+
+    평가는 밴드 지표가 아닌 값을 **그 등급 앵커에서** 가져와 채운다. 앵커가
+    빠뜨리면 채울 값의 출처가 없고, 예전에는 그 자리를 **상수 10.0** 이
+    메웠다 — 그 상수가 문장을 끌고 갔다(`RESULTS_second_metric.md`).
+
+    프롬프트 쪽 이유도 있다: 앵커는 「이 값들에 이렇게 쓴다」는 본보기인데
+    한 앵커만 지표를 덜 보여 주면 **본보기가 서로 다른 것을 보여 준다.**
+    """
+    for key, rubric in _football_rubrics().items():
+        for c in rubric.criteria:
+            for a in c.anchors:
+                missing = set(c.measured_by) - set(a["measured"])
+                assert not missing, (
+                    f"{key}/{c.id} {a['grade']}등급 앵커에 {sorted(missing)} 가 없다"
+                )
+
+
+def test_the_prompt_carries_only_the_judged_levels_wording():
+    """🔴 **옆 등급 수준 문구를 프롬프트에 안 넣는다** (미결 23번 B).
+
+    셋을 다 넣던 시절, 모델이 옆 등급 문구를 끌어와 문장이 스스로 모순됐다 —
+    굴곡 79.2도(「슈팅처럼 크다」 조각)에 *"팔로스루가 **짧고** 방향을
+    유지하며 마무리됐다"*. 「짧게」는 **[잘함] 수준 문구**의 말이었고,
+    남은 오독 다섯 중 셋의 출처가 그것이었다.
+    """
+    from supersub_agent.judge import ANCHOR_HEADER, build_prompt
+
+    rubric = _football_rubrics()["football/inside_pass"]
+    crit = next(c for c in rubric.criteria if c.id == "follow_through")
+    prompt = build_prompt(
+        crit,
+        {"swing_hip_flexion_after_impact_deg": 79.2,
+         "follow_through_duration_frames": 8.0},
+        1,
+    )
+    head = prompt.split(ANCHOR_HEADER)[0]
+
+    assert "패스인데 마무리가 슈팅처럼 크다" in head, "판정 등급 문구가 없다"
+    assert "짧게, 방향을 남기며" not in head, (
+        "[잘함] 수준 문구가 남았다 — 모델이 그걸 끌어온다"
+    )
+    assert "찬 직후에 다리가 그대로 멈춘다" not in head, "[아쉬움] 수준 문구가 남았다"
+
+
+def test_the_anchors_still_show_every_level():
+    """🔴 **앵커는 줄이지 않는다** — 눈금을 주는 것은 앵커다.
+
+    1회차에서 앵커의 수준 표시를 뺐다가 **2등급 문장 8건 중 4건**이
+    무너졌다. B 가 줄인 것은 수준 문구뿐이고, 어느 어투가 어느 수준인지는
+    여기가 떠받친다. 이 검사가 없으면 나중에 「프롬프트를 더 줄이자」가
+    그 자리를 다시 밟는다.
+    """
+    from supersub_agent.judge import ANCHOR_HEADER, build_prompt
+
+    rubric = _football_rubrics()["football/inside_pass"]
+    crit = next(c for c in rubric.criteria if c.id == "follow_through")
+    prompt = build_prompt(
+        crit,
+        {"swing_hip_flexion_after_impact_deg": 79.2,
+         "follow_through_duration_frames": 8.0},
+        1,
+    )
+    examples = prompt.split(ANCHOR_HEADER)[1]
+    for word in ("[잘함]", "[보통]", "[아쉬움]"):
+        assert word in examples, f"앵커에서 {word} 가 사라졌다"

@@ -12,6 +12,9 @@ from app.core.shared import Rfc3339
 class UserSearchItemResponse(BaseModel):
     id: UUID
     nickname: str
+    # 그 사람의 공개 카드로 가는 값 — 카드를 안 만들었으면 `null`.
+    # 🔴 내부 `user_id` 로 카드를 찾게 하지 않는다(미결 `paik` 39번).
+    card_public_slug: str | None = None
 
 
 class RequestContactSchema(BaseModel):
@@ -39,6 +42,8 @@ class ContactSummaryResponse(BaseModel):
     # 내가 신청자일 때만 채워진다 — `UserContactSummary` 참고.
     note: str | None
     accepted_at: Rfc3339
+    # 공개 카드 슬러그 — 카드를 안 만들었으면 `null`(미결 `paik` 39번).
+    card_public_slug: str | None = None
 
 
 class ContactListResponse(BaseModel):

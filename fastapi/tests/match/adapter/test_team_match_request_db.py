@@ -311,3 +311,79 @@ class TestTeamNamesFromRealTable:
         ).json()
         assert [r["requester_team_name"] for r in rows] == ["천둥FC"]
         assert [r["requester_team_region"] for r in rows] == ["부산 해운대구"]
+
+
+class TestSquadSlugFromRealTable:
+    """`paik` 22번 후속 — 대기 화면이 상대 팀 판을 그릴 **공개 슬러그**.
+
+    🔴 **화면에 박힌 마지막 mock 을 걷는 값이다.** 이게 없으면 대기 팝업이
+    상대 팀 이름·판을 붙박이 목록에서 찾고, 그 목록에 없는 진짜 팀이 수락하면
+    이름이 「상대 팀」으로 나오고 판이 빈다.
+
+    🔴 `squad` 는 `card` 컨텍스트라 **원시 SQL 로 읽는다** — 그래서 이 DB
+    테스트가 유일한 방어선이다(`fastapi/CLAUDE.md` 「테스트는 두 층이다」).
+    """
+
+    def _create(self, db_client, world):
+        res = db_client.post(
+            f"{V1}/teams/{world['team_a']}/match-requests",
+            json={
+                "target_team_id": str(world["team_b"]),
+                "played_at": _future(),
+                "place": "강남 풋살장",
+            },
+            headers=world["a_owner"]["headers"],
+        )
+        assert res.status_code == 201, res.text
+        return res.json()
+
+    def test_스쿼드가_없으면_None_이고_그게_정상이다(self, db_client, world):
+        """🔴 빈 문자열로 채우지 않는다 — 스쿼드 생성이 멱등이라 늦게 생긴다."""
+        body = self._create(db_client, world)
+        assert body["requester_squad_public_slug"] is None
+        assert body["target_squad_public_slug"] is None
+
+    @staticmethod
+    def _make_squad(db_client, world, db_session):
+        """B 팀 스쿼드를 열고, 시험이 끝나면 지운다.
+
+        🔴 **스쿼드 삭제 경로가 계약에 없다**(계약 3-7절 「아직 없는 것」).
+        그리고 `squad.team_id` 는 **RESTRICT** 다 — 부록 D.6 이 팀 해체 시의
+        처리를 안 정해서 일부러 그렇게 둔 것이라, 남겨 두면 픽스처가 팀을 못
+        지운다. 그래서 여기서 직접 거둔다.
+        """
+        made = db_client.post(
+            f"{V1}/teams/{world['team_b']}/squad",
+            headers=world["b_owner"]["headers"],
+        )
+        assert made.status_code in (200, 201), made.text
+        return made.json()["public_slug"]
+
+    @staticmethod
+    def _drop_squad(db_session, world):
+        db_session.execute(
+            text("delete from squad where team_id = :t"), {"t": world["team_b"]}
+        )
+        db_session.commit()
+
+    def test_스쿼드를_만들면_그_슬러그가_실린다(self, db_client, world, db_session):
+        slug = self._make_squad(db_client, world, db_session)
+        try:
+            body = self._create(db_client, world)
+            assert body["target_squad_public_slug"] == slug
+            # 상대만 생겼으므로 우리 쪽은 그대로 없다.
+            assert body["requester_squad_public_slug"] is None
+        finally:
+            self._drop_squad(db_session, world)
+
+    def test_그_슬러그로_판을_실제로_읽을_수_있다(self, db_client, world, db_session):
+        """🔴 **소속이 아니어도 읽힌다**(SEC-005) — 그게 이 값을 싣는 이유다."""
+        slug = self._make_squad(db_client, world, db_session)
+        try:
+            body = self._create(db_client, world)
+            # A 팀 주장은 B 팀 소속이 아니다.
+            read = db_client.get(f"{V1}/squads/{body['target_squad_public_slug']}")
+            assert read.status_code == 200, read.text
+            assert read.json()["public_slug"] == slug
+        finally:
+            self._drop_squad(db_session, world)

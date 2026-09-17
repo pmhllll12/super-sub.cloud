@@ -125,6 +125,11 @@ class TeamInvitationResponse(BaseModel):
     # 함께 주는 이유는 구성원의 카드 둘과 같다 — 화면이 나머지를 얻을 경로가 없다.
     position_code: str | None
     position_label: str | None
+    # 초대받은 **사람**(2026-09-17). 🔴 **보낸 쪽 화면이 판을 되살리는 값**이다 —
+    # id 만으로는 새로고침 뒤에 누구인지도 무슨 카드인지도 그릴 수 없었다.
+    # 카드를 안 만든 사람은 슬러그가 `null` 이고, 그때는 이름표로 남는다.
+    invited_user_nickname: str | None = None
+    invited_user_card_slug: str | None = None
 
 
 class MyTeamInvitationResponse(TeamInvitationResponse):

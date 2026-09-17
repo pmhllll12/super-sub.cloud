@@ -10,18 +10,27 @@ import TeamSeek from '@/components/TeamSeek'
 import MatchBot from '@/components/MatchBot'
 import TeamMatch from '@/components/TeamMatch'
 import MatchWaiting from '@/components/MatchWaiting'
-import { teamById, type MatchTeam } from '@/lib/teamMatch'
+import { type MatchTeam, type PitchPlayer } from '@/lib/teamMatch'
 import {
   addSeat,
   formationToSize,
-  removeSeat,
   saveFormation,
   saveSeat,
   seatOf,
 } from '@/lib/squadBoard'
-import { COLS, ROWS, ROW_POS, cellExists, rowPos, type PosCode } from '@/lib/pitchGrid'
+import {
+  COLS,
+  ROWS,
+  ROW_POS,
+  FORMATION_SLOTS,
+  cellExists,
+  rowPos,
+  type PosCode,
+  type SquadSize,
+} from '@/lib/pitchGrid'
 import { fetchPositions } from '@/lib/positions'
 import { loadFeaturedOf } from '@/lib/featuredClip'
+import { apiDelete, apiPost } from '@/lib/api/client'
 
 /**
  * 홈 첫 화면의 스쿼드 판 — 판 하나 위에 선수 카드를 **포지션 자리대로**
@@ -102,7 +111,9 @@ function applyPos(seat: Slot, code: string): void {
 }
 
 /** 판의 크기 — 3:3 · 5:5 · 7:7. 화면 글자와 같은 값이라 그대로 쓴다. */
-export type SquadSize = '3' | '5' | '7'
+/* 🔴 정본은 `lib/pitchGrid.ts` 다 — 좌표와 크기를 두 벌로 두면 판마다
+   자리가 갈린다. 여기서는 쓰던 이름을 이어 주기만 한다. */
+export type { SquadSize }
 
 /**
  * 크기마다의 포메이션.
@@ -118,39 +129,9 @@ export type SquadSize = '3' | '5' | '7'
  * (CCC 28) `posCodes` 가 그것을 받는다 — 둘은 다른 축이라 섞지 않는다.
  */
 export const FORMATIONS: Record<SquadSize, { label: string; slots: Slot[] }> = {
-  // 1-1-1 — 셋이면 공격 · 중원 · 골키퍼 하나씩이다.
-  '3': {
-    label: '3 : 3',
-    slots: [
-      { area: 'fw1', col: 1, row: 0 },
-      { area: 'mf1', col: 1, row: 1 },
-      { area: 'gk', col: 1, row: 3 },
-    ],
-  },
-  // 1-2-1 — 풋살 5인. 이 판이 원래 그리던 것이다.
-  '5': {
-    label: '5 : 5',
-    slots: [
-      { area: 'fw1', col: 1, row: 0 },
-      { area: 'mf1', col: 0, row: 1 },
-      { area: 'mf2', col: 2, row: 1 },
-      { area: 'df1', col: 1, row: 2 },
-      { area: 'gk', col: 1, row: 3 },
-    ],
-  },
-  // 2-3-1 — 7인제에서 가장 흔한 형태다.
-  '7': {
-    label: '7 : 7',
-    slots: [
-      { area: 'fw1', col: 1, row: 0 },
-      { area: 'mf1', col: 0, row: 1 },
-      { area: 'mf2', col: 1, row: 1 },
-      { area: 'mf3', col: 2, row: 1 },
-      { area: 'df1', col: 0, row: 2 },
-      { area: 'df2', col: 2, row: 2 },
-      { area: 'gk', col: 1, row: 3 },
-    ],
-  },
+  '3': { label: '3 : 3', slots: FORMATION_SLOTS['3'] },
+  '5': { label: '5 : 5', slots: FORMATION_SLOTS['5'] },
+  '7': { label: '7 : 7', slots: FORMATION_SLOTS['7'] },
 }
 
 /** 처음 여는 크기 — 풋살 5인(사용자 요청). */
@@ -176,6 +157,8 @@ function seatsFromSquad(
 ): {
   slots: Slot[]
   mates: Record<string, string | null>
+  /** 그 자리 사람의 **카드 공개 슬러그** — 진짜 카드를 그리려면 필요하다. */
+  slugs: Record<string, string | null>
   members: Record<string, string>
   /** 그 자리의 사람이 **오기로 했는가**(`accepted_at` 이 찼는가). */
   ready: Record<string, boolean>
@@ -184,9 +167,10 @@ function seatsFromSquad(
   // 남의 배치를 물려받는다.
   const slots = FORMATIONS[size].slots.map((sl) => ({ ...sl }))
   const mates: Record<string, string | null> = {}
+  const slugs: Record<string, string | null> = {}
   const members: Record<string, string> = {}
   const ready: Record<string, boolean> = {}
-  if (!squad) return { slots, mates, members, ready }
+  if (!squad) return { slots, mates, slugs, members, ready }
 
   /* 0) **내 자리도 등재와 잇는다**(사용자 요청, 2026-09-10).
         전에는 「내 자리는 `card` 가 그린다」는 이유로 등재와 안 이어 놓았는데,
@@ -243,6 +227,7 @@ function seatsFromSquad(
     seat.row = cell.row
     applyPos(seat, m.position_code)
     mates[seat.area] = m.nickname
+    slugs[seat.area] = m.card_public_slug ?? null
     members[seat.area] = m.id
     /* 🔴 `accepted_at` 이 **안 오면**(옛 응답) 수락된 것으로 본다 — 그 시절엔
        팀원만 앉을 수 있어서 앉은 것이 곧 온 것이었다. 새 응답에서 비어
@@ -262,10 +247,11 @@ function seatsFromSquad(
     const seat = slots.find((sl) => !taken(sl) && posOf(sl) === m.position_code)
     if (!seat) continue
     mates[seat.area] = m.nickname
+    slugs[seat.area] = m.card_public_slug ?? null
     members[seat.area] = m.id
     ready[seat.area] = m.accepted_at !== null
   }
-  return { slots, mates, members, ready }
+  return { slots, mates, slugs, members, ready }
 }
 
 export default function SquadPanel({
@@ -280,6 +266,8 @@ export default function SquadPanel({
   myTeamId = null,
   onRequested,
   acceptedTeamId = null,
+  acceptedTeam = null,
+  acceptedMatchId = null,
   onAcceptedShown,
   seeking = false,
   onCloseSeeking,
@@ -349,7 +337,9 @@ export default function SquadPanel({
   /** 내 팀 id — 경기 신청이 이 팀 밑으로 나간다(계약 3-15절). */
   myTeamId?: string | null
   /** 신청을 **걸었다**(「잡혔다」가 아니다) — 부모가 기억해 둔다. */
-  onRequested?: (requestId: string, team: MatchTeam) => void
+  /* 🔴 **`id` 만 있으면 된다.** 쓰는 쪽(`HomeStage`)이 `team.id` 를
+     기억해 두는 것이 전부다 — 넓게 잡으면 후보(`CandidateTeam`)를 못 넘긴다. */
+  onRequested?: (requestId: string, team: { id: string }) => void
   /**
    * **상대가 수락한 팀** — 값이 들어오는 순간 대기 팝업이 뜬다.
    *
@@ -357,6 +347,26 @@ export default function SquadPanel({
    * 수락한 쪽이든, 확정되는 순간은 이 화면 바깥이라 부모가 알려 줘야 한다.
    */
   acceptedTeamId?: string | null
+  /**
+   * 잡힌 상대 팀의 **표시용 값** — 이름·지역·판 슬러그 (2026-09-17).
+   *
+   * 🔴 **id 만으로는 대기 화면을 못 그린다.** 전에는 붙박이 목록(`teamById`)
+   * 에서 찾아서, 그 목록에 없는 진짜 팀이면 「상대 팀」에 빈 판이었다.
+   */
+  acceptedTeam?: {
+    id: string
+    name: string | null
+    region: string | null
+    squadSlug: string | null
+    playedAt: string
+    place: string
+  } | null
+  /**
+   * 그렇게 잡힌 **경기 id** — 「무르기」가 이걸로 취소한다(계약은
+   * `DELETE /matches/{match_id}`). 🔴 **없으면 무르기 단추를 안 낸다** —
+   * 눌러도 아무 일이 없는 단추를 두지 않는다.
+   */
+  acceptedMatchId?: string | null
   /** 팝업을 닫았다고 부모에게 알린다 — 안 지우면 닫자마자 다시 뜬다. */
   onAcceptedShown?: () => void
   /**
@@ -476,6 +486,13 @@ export default function SquadPanel({
      역할+번호라(FORMATIONS 주석) 없어진 자리는 그리지 않을 뿐이고, 다시
      키우면 그대로 앉아 있다 — 실수로 눌렀을 때 잃는 것이 없다. */
   const [mates, setMates] = useState<Record<string, string | null>>(() => seeded.mates)
+  /**
+   * 그 자리 사람의 **카드 슬러그**. 🔴 **이름만으로는 카드를 못 그린다** —
+   * 판에 앉은 사람도 제 카드가 떠야 한다(사용자 지적, 2026-09-17: 「그 사람을
+   * 추가하면 그 사람 카드가 같이 실제로 떠야 하잖아」). 지인 판에서 앉힌
+   * 사람은 슬러그를 모를 수 있고, 그때는 지금처럼 이름표만 그린다.
+   */
+  const [mateSlugs, setMateSlugs] = useState<Record<string, string | null>>(() => seeded.slugs)
 
   /**
    * 🔴 **그릴 때 저장소를 읽지 않는다.** 서버엔 없는 값이라 첫 그림이 서버와
@@ -560,12 +577,55 @@ export default function SquadPanel({
    * 빈 판을 띄우느니 안 띄우는 편이 낫다.
    */
   useEffect(() => {
-    if (!acceptedTeamId) return
-    const them = teamById(acceptedTeamId)
-    if (!them) return
-    const team: MatchTeam = { ...them, why: [] }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMatched(team)
+    if (!acceptedTeam) return
+    let alive = true
+    void (async () => {
+      /* 🔴 **상대 판을 진짜로 읽는다**(2026-09-17). 전에는 붙박이 목록
+         (`teamById`)에서 찾아서, 그 목록에 없는 진짜 팀이 수락하면 이름이
+         「상대 팀」으로 나오고 판이 비었다 — 화면에 박힌 마지막 mock 이었다.
+         이제 신청 응답이 이름·지역·판 슬러그를 준다.
+         ⚠️ 스쿼드를 아직 안 만든 팀이면 슬러그가 없고, 그때는 판 없이 그린다. */
+      let squad: PitchPlayer[] = []
+      if (acceptedTeam.squadSlug) {
+        try {
+          const res = await fetch(`/api/squads/${encodeURIComponent(acceptedTeam.squadSlug)}`)
+          if (res.ok) {
+            const got = (await res.json().catch(() => null)) as Squad | null
+            squad = (got?.members ?? [])
+              .filter((m) => m.grid_col !== null && m.grid_row !== null)
+              .map((m) => ({
+                nickname: m.nickname,
+                col: m.grid_col as number,
+                row: m.grid_row as number,
+                pos: rowPos(m.grid_row as number),
+                cardSlug: m.card_public_slug ?? null,
+              }))
+          }
+        } catch {
+          /* 판을 못 읽어도 대기 화면은 띄운다 — 이름·시각이 더 중요하다. */
+        }
+      }
+      if (!alive) return
+      const team: MatchTeam = {
+        id: acceptedTeam.id,
+        /* 🔴 이름을 지어내지 않는다 — 옛 응답이면 `null` 이다. */
+        name: acceptedTeam.name ?? '상대 팀',
+        region: acceptedTeam.region ?? '',
+        size,
+        playedAt: acceptedTeam.playedAt,
+        place: acceptedTeam.place,
+        why: [],
+        squad,
+      }
+      setMatched(team)
+    })()
+    return () => {
+      alive = false
+    }
+  }, [acceptedTeam, size])
+
+  useEffect(() => {
+    if (!acceptedTeam) return
     /* 🔴 **브라우저에 따로 적지 않는다**(2026-09-16). 전에는 `book(team)` 으로
        localStorage 에 남겼다 — 계약에 확정 경기 자리가 없던 시절의 임시였다.
        이제 수락하면 서버에 진짜 `match` 가 생기고(계약 3-15절) 「내 경기」가
@@ -578,6 +638,19 @@ export default function SquadPanel({
 
 
   const [placing, setPlacing] = useState<string | null>(null)
+  /** 고른 지인의 카드 슬러그 — 앉히는 순간 그 자리로 옮겨 간다(미결 `paik` 39번). */
+  const [placingSlug, setPlacingSlug] = useState<string | null>(null)
+  /** 고른 지인의 `user_id` — **초대를 보내려면 이것이 있어야 한다**(계약 49). */
+  const [placingUserId, setPlacingUserId] = useState<string | null>(null)
+  /**
+   * 그 자리에 보낸 **초대 id**.
+   *
+   * 🔴 **앉힌 사람이 사라지지 않는 이유가 이것이다**(사용자 설계, 2026-09-17).
+   * 판에 앉히면 초대가 서버에 남고, 새로고침하면 `GET /teams/{id}/invitations`
+   * 로 되살아난다. **사라지는 것은 상대가 거절하거나 주장이 ⊗ 를 눌러 무를
+   * 때뿐**이다.
+   */
+  const [invites, setInvites] = useState<Record<string, string>>({})
   // 지인 찾기 판이 DOM 에 있는가 — 닫힐 때 물러나는 동안 남아 있어야 한다.
   const [friendVisible, setFriendVisible] = useState(false)
   /**
@@ -667,11 +740,15 @@ export default function SquadPanel({
   const mySeat = slots.find((sl) => sl.mine) ?? null
 
   /**
-   * **나를 이 자리에 앉힌다**(사용자 설계, 2026-09-16).
+   * **나를 이 자리에 앉힌다.**
    *
-   * 🔴 처음 들어온 사람의 판은 **비어 있다.** 빈 자리를 눌렀을 때 뜨는
-   * 「나」 표식을 눌러야 내 카드가 그 자리에 선다 — 전에는 FW 한 칸에
-   * 박아 두어 아무것도 안 했는데 이미 서 있었다.
+   * 🔴 **정정 (2026-09-17, 사용자 판단).** 하루 전에는 「처음 판은 비어 있고,
+   * 빈 자리를 눌러 뜨는 **「나」 표식**을 눌러야 내 카드가 선다」였다. 그
+   * 표식을 **없앴다** — 팀을 만든 사람은 **뛴다고 보고 FW 에 먼저 앉힌다**
+   * (아래 자동 착석). 옮기든 빼든 그건 그다음 일이고, **일단 앉혀 놓고**
+   * 시작하는 것이 판을 처음 여는 사람에게 자연스럽다.
+   *
+   * 이 함수는 그대로 남는다 — 자동 착석이 이것을 부른다.
    */
   function seatMe(area: string) {
     if (mySeat || !myCardId) return
@@ -699,24 +776,161 @@ export default function SquadPanel({
     }
   }
 
-  /** **나를 판에서 뺀다** — 카드는 안 지워진다. 다시 「나」 표식이 뜬다. */
-  function unseatMe(area: string) {
-    setSlots((prev) => prev.map((sl) => (sl.area === area ? { ...sl, mine: false } : sl)))
-    /* 🔴 **추천 판도 같이 닫는다**(사용자 지적, 2026-09-16: "x 로 없앴더니
-       다른 데 클릭도 안 했는데 저게 나온다"). 빼는 순간 `mySeat` 가 비는데
-       추천 판이 열린 채면 그 자리에 「나」 핀이 **곧바로** 뜬다 — 누르지도
-       않았는데 다시 넣으라고 보채는 꼴이다. 다시 넣고 싶으면 그때 누른다. */
-    setPicking(null)
-    const memberId = members[area]
-    if (squad && memberId) {
-      setMembers((prev) => {
-        const next = { ...prev }
-        delete next[area]
-        return next
-      })
-      persist(() => removeSeat(squad.team_id, memberId))
+  /**
+   * 판에 앉은 사람들의 **진짜 카드** (2026-09-17, 사용자 지적).
+   *
+   * 🔴 전에는 이름만 적은 빈 카드를 그렸다 — 「그 사람을 추가하면 그 사람
+   * 카드가 같이 실제로 떠야」 한다. 슬러그를 아는 사람만 받아 온다(지인 판에서
+   * 앉힌 사람은 슬러그가 없을 수 있고, 그때는 이름표만 그린다).
+   *
+   * 🔴 **슬러그로 캐시한다** — 같은 사람을 자리만 옮겨도 다시 받지 않는다.
+   * 🔴 **실패는 조용히 넘긴다.** 카드가 없거나 못 읽으면 이름표로 남는 것이
+   * 맞다 — 판이 통째로 안 뜨는 것보다 낫다.
+   */
+  const [mateCards, setMateCards] = useState<Record<string, PublicPlayerCard>>({})
+  useEffect(() => {
+    const want = Object.values(mateSlugs).filter(
+      (slug): slug is string => !!slug && !(slug in mateCards),
+    )
+    if (want.length === 0) return
+    let alive = true
+    void Promise.all(
+      want.map(async (slug) => {
+        try {
+          const res = await fetch(`/api/cards/${encodeURIComponent(slug)}`)
+          if (!res.ok) return null
+          const body = (await res.json()) as unknown
+          /* 🔴 **카드 모양인지 보고 받는다.** 아니면 그리지 않는다 — 엉뚱한
+             것이 카드 자리에 들어가면 `PlayerCardView` 가 없는 값을 읽다가
+             **판이 통째로 안 그려진다**(시험 대역이 그걸 실제로 드러냈다).
+             못 알아보면 이름표로 남는 것이 맞다. */
+          if (
+            !body ||
+            typeof body !== 'object' ||
+            typeof (body as PublicPlayerCard).public_slug !== 'string' ||
+            !(body as PublicPlayerCard).user
+          ) {
+            return null
+          }
+          return [slug, body as PublicPlayerCard] as const
+        } catch {
+          return null
+        }
+      }),
+    ).then((got) => {
+      if (!alive) return
+      const add = got.filter((x): x is readonly [string, PublicPlayerCard] => x !== null)
+      if (add.length > 0) setMateCards((prev) => ({ ...prev, ...Object.fromEntries(add) }))
+    })
+    return () => {
+      alive = false
+    }
+  }, [mateSlugs, mateCards])
+
+  /**
+   * **그 자리로 초대를 보낸다** (계약 49·53, 2026-09-17).
+   *
+   * 🔴 **동의 없이 꽂지 않는다**(2026-09-10 박민호 결정) — 그 사람이 수락해야
+   * 팀원이 된다. 그때까지 카드 위에 「수락 대기중」이 붙는다.
+   *
+   * 🔴 **부르는 자리를 함께 보낸다**(`position_code`) — 그래야 새로고침해도
+   * **어느 칸**에 앉혔는지가 살아난다.
+   *
+   * ⚠️ 팀이 아직 없으면 보낼 데가 없다 — 화면에만 앉는다(그 자리는 새로고침
+   * 하면 사라진다). 팀을 만들면 그때부터 남는다.
+   */
+  async function invite(slot: Slot, userId: string) {
+    if (!myTeamId) return
+    try {
+      const made = await apiPost<{ id: string }>(
+        `/api/teams/${encodeURIComponent(myTeamId)}/invitations`,
+        { invited_user_id: userId, position_code: posOf(slot) },
+      )
+      setInvites((prev) => ({ ...prev, [slot.area]: made.id }))
+    } catch {
+      /* 🔴 **화면에서 지우지 않는다.** 이미 앉은 것을 걷으면 사람이 방금 한
+         일이 사라진 것처럼 보인다 — 초대가 안 나갔을 뿐이라 ⊗ 로 빼면 된다.
+         (같은 사람에게 이미 보낸 초대가 있으면 `409` 다.) */
     }
   }
+
+  /**
+   * **보낸 초대를 무른다** — ⊗ 를 누를 때(계약 49).
+   *
+   * 🔴 사라지는 길은 **이것과 상대의 거절 둘뿐**이다(사용자 설계). 그래서
+   * 화면에서 지우기 전에 서버로 먼저 보낸다 — 실패하면 그대로 둔다.
+   */
+  async function cancelInvite(area: string) {
+    const id = invites[area]
+    if (!myTeamId || !id) return
+    try {
+      await apiDelete(
+        `/api/teams/${encodeURIComponent(myTeamId)}/invitations/${encodeURIComponent(id)}`,
+      )
+    } catch {
+      /* 이미 답이 났으면 409 다 — 그때는 아래 복원이 곧 맞춰 준다. */
+    }
+    setInvites((prev) => {
+      const next = { ...prev }
+      delete next[area]
+      return next
+    })
+  }
+
+  /**
+   * **판을 되살린다** — 보낸 초대 중 **아직 대기 중인 것**을 자리에 앉힌다.
+   *
+   * 🔴 이것이 「앉혀 두면 남는다」를 실제로 만드는 자리다(사용자 설계,
+   * 2026-09-17). 거절·무르기로 끝난 초대는 `status` 가 `pending` 이 아니라
+   * 여기서 빠지고, 그래서 **그 자리가 비워진다.**
+   */
+  useEffect(() => {
+    if (!myTeamId) return
+    let alive = true
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/teams/${encodeURIComponent(myTeamId)}/invitations`,
+        )
+        if (!res.ok || !alive) return
+        const rows = ((await res.json().catch(() => null)) ?? []) as {
+          id: string
+          status: string
+          position_code: string | null
+          invited_user_nickname: string | null
+          invited_user_card_slug: string | null
+        }[]
+        const pending = rows.filter((r) => r.status === 'pending')
+        if (pending.length === 0 || !alive) return
+        setSlots((now) => {
+          const nextMates: Record<string, string | null> = {}
+          const nextSlugs: Record<string, string | null> = {}
+          const nextInvites: Record<string, string> = {}
+          for (const r of pending) {
+            if (!r.invited_user_nickname) continue
+            /* 자리를 안 정한 초대는 빈 칸 아무 데나 앉힌다 — 「우리 팀에
+               오세요」도 정상 초대라 판에서 빠뜨리지 않는다. */
+            const seat =
+              now.find((sl) => posOf(sl) === r.position_code && !nextMates[sl.area]) ??
+              now.find((sl) => !sl.mine && !nextMates[sl.area])
+            if (!seat) continue
+            nextMates[seat.area] = r.invited_user_nickname
+            nextSlugs[seat.area] = r.invited_user_card_slug
+            nextInvites[seat.area] = r.id
+          }
+          setMates((prev) => ({ ...prev, ...nextMates }))
+          setMateSlugs((prev) => ({ ...prev, ...nextSlugs }))
+          setInvites((prev) => ({ ...prev, ...nextInvites }))
+          return now
+        })
+      } catch {
+        /* 못 읽어도 판은 그대로 돈다 — 되살리기만 못 한다. */
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [myTeamId])
 
   /** 이름표를 눌러 포지션을 직접 정한다 — 한 번에 한 칸씩 돈다(자동 포함). */
   function cyclePos(area: string) {
@@ -739,6 +953,45 @@ export default function SquadPanel({
   const [closing, setClosing] = useState<Slot | null>(null)
   const timer = useRef(0)
 
+  /**
+   * 🔴 **팀을 만든 사람은 FW 에 먼저 앉는다** (2026-09-17, 사용자 판단).
+   *
+   * 「나」 표식(빈 자리를 눌러 내 카드를 세우던 핀)을 없애고 대신 이것을 둔다 —
+   * **팀장은 뛴다고 보고 일단 앉혀 놓고 시작한다.** 옮기는 것도 빼는 것도
+   * 그다음 일이다.
+   *
+   * 🔴 **FW 가 차 있으면 빈 자리에 앉는다** — 남을 밀어내지는 않는다. 팀이
+   * 아직 없으면(등재 없음) 화면에만 앉고 `seatMe` 가 서버 저장을 건너뛴다.
+   *
+   * 🔴 **세션 안에서 한 번만**(`autoSeated`). 지금은 내 카드에 ⊗ 가 없어
+   * 스스로 빠질 일이 없지만, 판이 비는 다른 길(크기 바꾸기 · 늦게 온 응답)에서
+   * 이 효과가 다시 돌면 **서버로 같은 등재가 두 번** 나간다.
+   *
+   * ⚠️ 새로고침하면 서버에 남은 등재를 읽어 그 자리에 선다 — 자동 착석이
+   * `addSeat` 로 저장하기 때문이다. 판이 진짜로 비어 있을 때만 다시 앉는다.
+   */
+  const autoSeated = useRef(false)
+  useEffect(() => {
+    if (autoSeated.current) return
+    if (!myCardId || mySeat) return
+    /* 🔴 **FW 가 먼저, 차 있으면 빈 자리 아무 데나.** 「무조건 뛴다」가 전제라
+       남이 이미 앉아 있어도 나는 판에 선다 — 다만 남을 밀어내지는 않는다.
+       빈 자리가 하나도 없으면 아무것도 안 한다(그때는 판이 이미 다 찼다). */
+    const fw = slots.find((sl) => sl.area === 'fw1')
+    const seat =
+      fw && !mates[fw.area] ? fw : slots.find((sl) => !mates[sl.area] && !sl.mine)
+    if (!seat) return
+    autoSeated.current = true
+    /* 규칙은 effect 안의 setState 를 싫어하지만, 여기서 바꾸는 것은 **처음
+       한 번의 초기 상태**다 — `autoSeated` 가 막아서 연쇄가 안 생긴다. 판을
+       그린 뒤에 앉히는 것이 아니라 **앉은 판을 처음부터** 그리는 것이 뜻이다. */
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    seatMe(seat.area)
+    // `seatMe` 는 렌더마다 새로 만들어지는 함수라 넣으면 매번 다시 돈다 —
+    // 위 `autoSeated` 가 한 번만 돌게 막는다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [squad, myCardId, mySeat, slots, mates])
+
   const friendTimer = useRef(0)
   useEffect(() => () => {
     clearTimeout(timer.current)
@@ -756,6 +1009,10 @@ export default function SquadPanel({
     }
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPlacing(null)
+    setPlacingUserId(null)
+    // 고른 사람의 슬러그도 같이 놓는다 — 판이 닫혔는데 남아 있으면 다음에
+    // 앉히는 사람에게 **앞 사람 카드**가 붙는다.
+    setPlacingSlug(null)
     friendTimer.current = window.setTimeout(() => setFriendVisible(false), SUGGEST_EXIT_MS)
     return () => clearTimeout(friendTimer.current)
   }, [scouting])
@@ -1127,44 +1384,49 @@ export default function SquadPanel({
               }}
             >
               {slot.mine ? (
-                /* 🔴 **빼는 것은 ⊗ 뿐이다**(사용자 지적, 2026-09-16: "그냥
-                   카드 어디에 클릭해도 사라진다"). 카드 전체를 버튼으로 두면
-                   옮기려고 짚기만 해도 빠진다 — 되돌릴 수 없는 일에 넓은
-                   과녁을 주지 않는다.
-                   그래서 카드는 `<div>` 이고 ⊗ 가 **진짜 버튼**이다(버튼 안에
-                   버튼을 둘 수 없어 형제로 나란히 둔다). */
-                <>
-                  <div className="ss-pcard-mini">
-                    {card ? (
-                      <PlayerCardView card={card} />
-                    ) : (
-                      <BlankPlayerCard>
-                        <p className="ss-squad-note">아직 카드가 없습니다</p>
-                      </BlankPlayerCard>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    className="ss-squad-remove material-symbols-outlined"
-                    aria-label="나를 판에서 빼기"
-                    onClick={() => unseatMe(slot.area)}
-                  >
-                    cancel
-                  </button>
-                </>
+                /* 🔴 **내 카드에는 ⊗ 가 없다**(사용자 판단, 2026-09-17).
+                   팀을 만든 사람은 **뛴다는 가정**이라 판에서 빠질 일이
+                   없다 — 뺄 수 있게 두면 「안 뛴다」가 표현되는데, 그것을
+                   담을 자리가 서버에도 없다. 옮기는 것은 그대로 된다
+                   (끌어서 다른 칸으로). 남의 카드는 아래에서 ⊗ 로 뺀다. */
+                <div className="ss-pcard-mini">
+                  {card ? (
+                    <PlayerCardView card={card} />
+                  ) : (
+                    <BlankPlayerCard>
+                      <p className="ss-squad-note">아직 카드가 없습니다</p>
+                    </BlankPlayerCard>
+                  )}
+                </div>
               ) : name ? (
                 /* 앉은 남의 카드도 같은 규칙 — 카드는 그림이고 ⊗ 만 뺀다. */
                 <>
                   <div className="ss-pcard-mini">
-                    <BlankPlayerCard>
-                      <p className="ss-squad-name">{name}</p>
-                    </BlankPlayerCard>
+                    {/* 🔴 **그 사람의 진짜 카드를 그린다**(2026-09-17). 슬러그를
+                        모르거나(지인 판) 아직 못 받았으면 이름표로 남는다 —
+                        빈 카드에 이름만 찍혀 있던 것이 여기다. */}
+                    {(() => {
+                      const slug = mateSlugs[slot.area]
+                      const theirs = slug ? mateCards[slug] : undefined
+                      return theirs ? (
+                        <PlayerCardView card={theirs} />
+                      ) : (
+                        <BlankPlayerCard>
+                          <p className="ss-squad-name">{name}</p>
+                        </BlankPlayerCard>
+                      )
+                    })()}
                   </div>
                   <button
                     type="button"
                     className="ss-squad-remove material-symbols-outlined"
                     aria-label={`${name} 빼기`}
-                    onClick={() => setMates((prev) => ({ ...prev, [slot.area]: null }))}
+                    onClick={() => {
+                      setMates((prev) => ({ ...prev, [slot.area]: null }))
+                      setMateSlugs((prev) => ({ ...prev, [slot.area]: null }))
+                      // 🔴 **서버에서도 무른다** — 안 그러면 새로고침에 되살아난다.
+                      void cancelInvite(slot.area)
+                    }}
                   >
                     cancel
                   </button>
@@ -1192,8 +1454,23 @@ export default function SquadPanel({
                   onClick={() => {
                     if (placing) {
                       setMates((prev) => ({ ...prev, [slot.area]: placing }))
+                      /* 🔴 **고른 사람의 슬러그를 그 자리로 옮긴다**(미결
+                         `paik` 39번, 2026-09-17 — 사용자 요청 「저기서 선택하면
+                         스쿼드판에 그 사람 카드는 당연히 똑같이 떠야지」).
+                         지인 목록이 슬러그를 안 줘서 이름표만 뜨던 자리였고,
+                         같은 날 백엔드에 그 칸을 더했다(정어진 승인).
+
+                         🔴 **없으면 `null` 로 덮는다.** 안 덮으면 **앞 사람
+                         카드가 그대로 남아** 새 이름 위에 남의 카드가 그려진다
+                         (대표 영상에서 한 번 데인 그 모양이다). 카드를 안 만든
+                         사람은 그대로 이름표다 — 정상 갈래다. */
+                      setMateSlugs((prev) => ({ ...prev, [slot.area]: placingSlug }))
                       // 판은 열어 둔다 — 여러 명을 이어서 넣는 게 보통이다.
                       setPlacing(null)
+                      setPlacingSlug(null)
+                      setPlacingUserId(null)
+                      // 🔴 **초대를 보낸다** — 이래야 새로고침해도 남는다.
+                      if (placingUserId) void invite(slot, placingUserId)
                       return
                     }
                     clearTimeout(timer.current)
@@ -1219,59 +1496,23 @@ export default function SquadPanel({
                 </button>
               )}
 
-              {/* 🔴 **「나」 표식**(사용자 설계, 2026-09-16). 빈 자리를 눌러
-                  추천 판을 연 그 자리 **위에 둥둥 뜬다** — 누르면 내 카드가
-                  그 자리에 선다.
-
-                  🔴 **내 자리가 정해지면 안 뜬다**(`mySeat`) — 이미 정한 것을
-                  또 고르게 하면 두 자리에 서는 것처럼 읽힌다. ⊗ 로 빼면
-                  다시 뜬다.
-
-                  ⚠️ 카드 **밖**에 둔다 — 카드 버튼 안에 버튼을 넣을 수 없다. */}
-              {!mySeat && !name && myCardId && picking?.area === slot.area && (
-                <button
-                  type="button"
-                  className="ss-squad-me"
-                  aria-label={`${posOf(slot)} 자리에 내 카드 넣기`}
-                  onClick={() => seatMe(slot.area)}
-                >
-                  {/* 🔴 **핀 모양 선화**다(사용자 요청, 2026-09-16 — 지도의
-                      「Not Listed Location」 같은 결). 채운 원은 흰 카드 위에서
-                      스티커처럼 붙었다. 획만 있으면 **카드 위에 얹힌 표시**로
-                      읽힌다. 글자는 도형 안에 들어가야 해서 `<text>` 다 —
-                      아이콘 폰트로는 가운데에 글자를 못 넣는다. */}
-                  <svg viewBox="0 0 22 26" aria-hidden="true">
-                    {/* 머리 원(중심 11,10 · 반지름 8.2)에 꼬리가 아래로 모인다.
-                        글자가 그 원 **안**에 앉아야 해서 baseline 을 중심보다
-                        조금 아래(13)에 둔다 — 한글은 가운데정렬만으로는 위로
-                        떠 보인다. */}
-                    <path
-                      d="M11 1.8a8.2 8.2 0 0 0-8.2 8.2c0 5.6 8.2 14.2 8.2 14.2s8.2-8.6 8.2-14.2A8.2 8.2 0 0 0 11 1.8Z"
-                      fill="currentColor"
-                    />
-                    <text x="11" y="13.2" textAnchor="middle">
-                      나
-                    </text>
-                  </svg>
-                </button>
-              )}
-
               {/* 🔴 **수락 대기중**(사용자 설계, 2026-09-16). 추천·지인에서
                   고른 사람은 **팀 밖 사람**이라 바로 뛰는 것이 아니다 —
                   그 사람이 수락해야 선다. 카드 위에서 깜빡여 「아직 아니다」를
                   말한다.
 
+                  🔴 **「준비 완료」는 없앴다**(사용자 판단, 2026-09-17). 이
+                  표시의 목적은 「아직 수락 안 했다」를 말하는 것이지 다 된
+                  것을 자랑하는 것이 아니다 — **기다리는 것만 말하고, 된 것은
+                  조용히 둔다.** 판이 처음부터 차 있게 되면서(팀장 자동 착석)
+                  다 된 카드마다 초록 딱지가 붙는 것이 오히려 시끄러웠다.
+
                   ⚠️ **아직 서버로 안 나간다.** 합류 요청 경로와 알림 타입이
                   계약에 없다(미결 `paik` 37번) — 그때까지 이 표시는 화면
-                  안에서만 산다. 🔴 그래서 **「준비 완료」로 바뀌는 길이
-                  아직 없다**, 지어내지 않는다. */}
-              {name && (
-                <span
-                  className="ss-squad-pending"
-                  data-ready={seeded.ready[slot.area] ? 'true' : undefined}
-                  aria-live="polite"
-                >
-                  {seeded.ready[slot.area] ? '준비 완료' : '수락 대기중'}
+                  안에서만 산다. */}
+              {name && !seeded.ready[slot.area] && (
+                <span className="ss-squad-pending" aria-live="polite">
+                  수락 대기중
                 </span>
               )}
               {/* 🔴 **이름표를 눌러 포지션을 직접 정한다**(사용자 요청).
@@ -1307,7 +1548,11 @@ export default function SquadPanel({
           placing={placing}
           placed={placed}
           closing={!scouting}
-          onChoose={setPlacing}
+          onChoose={(nickname, cardSlug, userId) => {
+            setPlacing(nickname)
+            setPlacingSlug(cardSlug)
+            setPlacingUserId(userId)
+          }}
           onClose={() => onCloseScouting?.()}
         />
       )}
@@ -1380,7 +1625,10 @@ export default function SquadPanel({
       {matched && (
         <MatchWaiting
           us={{
-            name: '우리 팀',
+            /* 🔴 **우리 팀 이름을 쓴다**(2026-09-17, 사용자 지적). 「우리 팀」
+               이라고 적어 두면 상대 이름만 진짜고 우리 쪽은 딱지가 된다 —
+               머리글이 이미 그 이름을 알고 있다(`teamName`). */
+            name: teamName ?? '우리 팀',
             /* 🔴 **판에 선 사람만** 넘긴다. 내 자리는 `card` 가 그려서
                `mates` 에 없으므로 여기서 이름을 따로 얹는다. */
             squad: slots
@@ -1391,6 +1639,8 @@ export default function SquadPanel({
                 row: sl.row,
                 pos: posOf(sl),
                 mine: sl.mine,
+                /* 리뷰 판이 이걸로 진짜 카드를 그린다 — 내 자리는 내 카드다. */
+                cardSlug: sl.mine ? (card?.public_slug ?? null) : mateSlugs[sl.area],
               })),
           }}
           them={matched}
@@ -1399,14 +1649,21 @@ export default function SquadPanel({
             setMatched(null)
             onAcceptedShown?.()
           }}
-          onCancel={() => {
-            /* ⚠️ **경기 취소는 아직 안 보낸다.** 계약에는 있다
-               (`DELETE /matches/{id}` — 팀 대 팀이면 양쪽 주장 누구나).
-               팝업만 닫히고 서버의 확정 경기는 남으므로, 「내 경기」에서
-               사라지지 않는다. 미결 `paik` 34번. */
-            setMatched(null)
-            onAcceptedShown?.()
-          }}
+          /* 🔴 **서버로 보낸다**(미결 `paik` 34번 해소, 2026-09-17). 전에는
+             팝업만 닫혀서 확정 경기가 「내 경기」에 그대로 남았다.
+             🔴 **경기 id 를 모르면 아예 안 낸다** — `onCancel` 을 안 주면
+             `MatchWaiting` 이 무르기 단추를 그리지 않는다. */
+          onCancel={
+            acceptedMatchId
+              ? /* 🔴 **보내기만 한다** — 판을 거두는 것은 `MatchWaiting` 이
+                   내려가기 연출을 마친 뒤 `onClose` 로 한다. 여기서 먼저
+                   거두면 실패해도 판이 사라져, 안 물러진 경기를 물러진
+                   것으로 읽는다. */
+                async () => {
+                  await apiDelete(`/api/matches/${encodeURIComponent(acceptedMatchId)}`)
+                }
+              : undefined
+          }
         />
       )}
 
@@ -1422,8 +1679,13 @@ export default function SquadPanel({
           teamId={myTeamId}
           closing={picking === null}
           onClose={close}
-          onPick={(name) => {
+          onPick={(name, cardSlug, userId) => {
             setMates((prev) => ({ ...prev, [shown.area]: name }))
+            // 🔴 슬러그를 같이 남긴다 — 이것이 있어야 그 사람 카드가 그려진다.
+            setMateSlugs((prev) => ({ ...prev, [shown.area]: cardSlug }))
+            // 🔴 **초대를 보낸다**(계약 49) — 동의 없이 꽂지 않는다. 그 사람이
+            //    수락해야 팀원이 되고, 그때까지 카드 위에 「수락 대기중」이 붙는다.
+            void invite(shown, userId)
             close()
           }}
         />

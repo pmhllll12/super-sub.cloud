@@ -13,6 +13,13 @@ type VideoRegistration = {
   reject_reason: string | null
   analysis_job_id: string | null
   analysis_status: string | null
+  /* 🔴 **같은 영상을 다시 올렸을 때만**(CCC 48, `ho` 41번). 서버가 새 분석을
+     안 걸고 앞 결과를 여기 실어 준다 — 그때 `analysis_job_id` 는 `null` 이다.
+     🔴 **등록 응답에만 실린다.** 나중에 `GET /videos` 로 같은 영상을 읽으면
+     전부 `null` 이라, 이 응답을 놓치면 다시 볼 방법이 없다. */
+  duplicate_of_video_id?: string | null
+  duplicate_status?: string | null
+  duplicate_failure_reason?: string | null
 }
 
 /** api-contract.md 3-6절 — 클립 업로드 3단계. S3에 올린 뒤 등록·검사한다. */

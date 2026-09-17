@@ -117,6 +117,6 @@ export const DESTINATIONS: Destination[] = [
        `HomeNav` 가 href 없는 항목을 버튼으로 그린다. */
     title: NOTIFY,
     icon: 'circle_notifications',
-    summary: '받은 경기 신청과\n지인 신청이 여기 모입니다',
+    summary: '받은 경기 신청 · 팀 초대와\n지인 신청이 여기 모입니다',
   },
 ]

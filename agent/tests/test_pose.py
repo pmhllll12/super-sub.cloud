@@ -850,3 +850,60 @@ def test_a_broken_encoder_raises_instead_of_leaving_a_half_file(tmp_path,
 
     with pytest.raises(RuntimeError):
         pose.render_tracked_clip(frames, kps, tmp_path / "broken.webm", 10.0)
+
+
+# --- 무엇으로 쟀는가 (미결 49번) --------------------------------------------
+
+
+def test_the_preprocessing_identity_reads_the_real_object_not_a_guess():
+    """🔴 **실물에서 읽는다** — 설치 여부로 추측하지 않는다.
+
+    미결 49번이 막고 있는 것은 이것이다: 평가 기계와 EC2 가 `torchvision`
+    유무로 **다른 전처리기**를 골라, 같은 영상이 다른 등급을 받는다(축구
+    19편 중 2편이 등급 문자까지, 미결 47번 5회차). 원인 규명에 닷새가 든
+    이유는 **어느 쪽으로 돌았는지가 산출에 안 남아 있었기 때문**이다.
+
+    그래서 이름을 하드코딩하거나 `is_torchvision_available()` 로 되짚어
+    지으면 안 된다 — 업스트림이 고르는 규칙을 바꾸는 날 그 값은 조용히
+    거짓이 된다. **건네받은 객체의 실제 클래스 이름**이어야 한다.
+    """
+    class RTDetrImageProcessorPil:
+        pass
+
+    class VitPoseImageProcessor:
+        pass
+
+    ident = pose.preprocessing_identity(
+        detector=RTDetrImageProcessorPil(), pose=VitPoseImageProcessor()
+    )
+
+    assert ident["detector"] == "RTDetrImageProcessorPil"
+    assert ident["pose"] == "VitPoseImageProcessor"
+
+
+def test_the_preprocessing_identity_also_records_whether_torchvision_is_there():
+    """고른 **결과**와 고르는 데 쓰인 **입력**을 함께 적는다.
+
+    둘이 어긋나는 날(업스트림이 규칙을 바꾸는 날)이 오면 그것이 알아야 할
+    사건이고, 하나만 적어 두면 그 사건이 안 보인다.
+    """
+    from transformers.utils.import_utils import is_torchvision_available
+
+    ident = pose.preprocessing_identity(detector=object())
+
+    assert ident["torchvision"] is bool(is_torchvision_available())
+
+
+def test_a_result_without_a_preprocessor_says_nothing_instead_of_guessing():
+    """합성 키포인트 경로는 전처리기를 안 쓴다 — `None` 이다.
+
+    🔴 기본값을 채우면 **안 쓴 전처리기를 썼다고 말하게 된다.** 봉투 쪽도
+    같은 규칙이다(`test_report_contract.py`).
+    """
+    result = PoseResult(
+        keypoints=np.zeros((3, 17, 3), dtype=np.float32),
+        source_fps=30.0,
+        sampled_fps=15.0,
+    )
+
+    assert result.preprocessing is None

@@ -363,7 +363,9 @@ def analyze_one(video: str, args, rubric, subject) -> str:
 # 가 늘어난 봉투다 (미결 `ho` 37·38번). 1.2 는 `title_earned` (미결 `paik` 23번).
 # 1.3 은 `skeleton` — 관절 시계열과 세 순간 (미결 `paik` 30번).
 # 1.4 는 그 안의 `direction`·`after_clipped` (같은 항목, 화면 타입과 대조해 찾음).
-REPORT_SCHEMA_VERSION = "1.5"
+# 1.5 는 `result.card` — 추천 판의 설명 칸 (미결 `paik` 27번).
+# 1.6 은 `preprocessing` — 무엇으로 쟀는가 (미결 49번).
+REPORT_SCHEMA_VERSION = "1.6"
 
 
 def build_report(
@@ -438,6 +440,14 @@ def build_report(
         ),
         "judge_backend": judge_backend,
         "judge_model": judge_model,
+        # **무엇으로 쟀는가** — 이미지 전처리기의 실물 이름 (미결 49번).
+        # `judge_backend`·`code_version` 과 같은 층이다: 이 값을 낸 것이
+        # 무엇인지 봉투가 스스로 말한다. 🔴 지금 **평가 기계와 EC2 가 다른
+        # 전처리기로 돌고 있고**(`torchvision` 유무), 그래서 같은 영상이 다른
+        # 등급을 받는다. 어느 쪽으로 통일할지는 결정 대기지만, 그때까지도
+        # **어느 쪽으로 돈 결과인지는 드러나 있어야 한다.**
+        # 전처리기를 안 쓴 경로(합성 키포인트)는 `null` 이다 — 지어내지 않는다.
+        "preprocessing": pose.preprocessing,
         # 스켈레톤은 ViTPose 키포인트로 그린 것이다 — 추가 추론이 없고
         # YOLO는 이 경로에 없다. 비어 있으면 렌더링에 실패한 것이고,
         # 그래도 위의 측정·판정은 그대로 유효하다.

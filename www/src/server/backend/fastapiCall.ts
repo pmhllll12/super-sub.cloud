@@ -9,7 +9,9 @@ import { BackendError, parseErrorBody, readRetryAfter } from './errors'
  */
 export async function callFastApi<T>(
   path: string,
-  opts: { method: 'GET' | 'POST' | 'PATCH' | 'DELETE'; token?: string; body?: unknown },
+  // 🔴 `PUT` 은 경기 조건(계약 3-13절)이 처음 쓴다 — **통째로 교체**하는
+  // 경로라 `PATCH`(부분 수정)와 뜻이 다르다.
+  opts: { method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; token?: string; body?: unknown },
 ): Promise<T> {
   const base = process.env.BACKEND_BASE_URL
   // 🔴 여기서 잡지 않은 예외는 route handler를 그대로 깨뜨린다 — Next.js가

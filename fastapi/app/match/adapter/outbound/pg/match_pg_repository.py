@@ -58,6 +58,10 @@ _position = table(
     "position", column("id"), column("sport_code"), column("code"), column("label")
 )
 _user = table("user", column("id"), column("nickname"))
+# `squad` 는 `card` 컨텍스트다 — 대기 화면이 상대 팀 판을 그리려면 공개
+# 슬러그가 필요한데, 그것 때문에 컨텍스트를 임포트하지는 않는다(`paik` 31번의
+# `_team` 과 같은 방식).
+_squad = table("squad", column("team_id"), column("public_slug"))
 
 # `notification` 은 `notification` 컨텍스트의 테이블이다. 임포트하지 않고
 # 원시 SQL 로 쓴다(`user_pg_repository.py`의 `_notification`과 같은 방식·이유).
@@ -749,6 +753,18 @@ class MatchPgRepository(MatchPort):
         )
         return {r[0]: (r[1], r[2]) for r in self._session.execute(stmt)}
 
+    def _squad_slugs(self, *team_ids: UUID) -> dict[UUID, str]:
+        """`{team_id: 공개 슬러그}` — 대기 화면이 상대 팀 판을 그리는 데 쓴다.
+
+        🔴 **스쿼드를 아직 안 만든 팀은 이 표에 없다**(생성이 멱등이라 늦게
+        생긴다). 없는 것이 정상이라 빈 값으로 채우지 않고 `None` 으로 둔다 —
+        `paik` 37번(초대)이 같은 판단을 했다.
+        """
+        stmt = select(_squad.c.team_id, _squad.c.public_slug).where(
+            _squad.c.team_id.in_(team_ids)
+        )
+        return {r[0]: r[1] for r in self._session.execute(stmt)}
+
     def _to_team_match_request(
         self, row: TeamMatchRequestOrm
     ) -> TeamMatchRequestEntity:
@@ -757,6 +773,8 @@ class MatchPgRepository(MatchPort):
         briefs = self._team_briefs(row.requester_team_id, row.target_team_id)
         requester = briefs.get(row.requester_team_id, ("", ""))
         target = briefs.get(row.target_team_id, ("", ""))
+        # 판을 찾아갈 슬러그도 같이 싣는다 — 대기 화면이 상대 판을 그린다.
+        slugs = self._squad_slugs(row.requester_team_id, row.target_team_id)
         return TeamMatchRequestEntity(
             id=row.id,
             requester_team_id=row.requester_team_id,
@@ -771,4 +789,6 @@ class MatchPgRepository(MatchPort):
             requester_team_region=requester[1],
             target_team_name=target[0],
             target_team_region=target[1],
+            requester_squad_public_slug=slugs.get(row.requester_team_id),
+            target_squad_public_slug=slugs.get(row.target_team_id),
         )

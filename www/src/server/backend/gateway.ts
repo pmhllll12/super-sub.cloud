@@ -26,6 +26,12 @@ import type {
   SearchMercenaryCandidatesInput,
   Squad,
   SignupResult,
+  TeamInvitation,
+  ReceivedInvitation,
+  Region,
+  MatchSlot,
+  TeamMatchPreference,
+  MatchCandidate,
   User,
 } from './types'
 
@@ -208,6 +214,14 @@ export interface Backend {
   ): Promise<MercenaryCandidate[]>
   /** 팀의 스쿼드. 소속이면 본다. **아직 없으면 404 SQUAD_NOT_FOUND** 다. */
   getSquad(token: string, teamId: string): Promise<Squad>
+  /**
+   * 공개 슬러그로 읽는 **남의 스쿼드** (계약 3-7절, CCC 53번).
+   *
+   * 🔴 **토큰을 안 받는다.** 슬러그가 96비트 난수라 그 자체가 접근
+   * 통제다(SEC-005 — `getPublicCard` 와 같은 결). 초대받은 사람은 **아직
+   * 그 팀 소속이 아니라서** 소속을 요구하는 `getSquad` 로는 못 읽는다.
+   */
+  getSquadBySlug(publicSlug: string): Promise<Squad>
   /** 스쿼드를 연다. **멱등** — 이미 있으면 그것을 그대로 돌려준다. 주장만. */
   createSquad(token: string, teamId: string): Promise<Squad>
   /**
@@ -318,6 +332,25 @@ export interface Backend {
     input: { name: string; region: string; sport_code: string },
   ): Promise<TeamDetail>
   /**
+   * 팀 이름·지역을 고친다 — **주장만**(403), 계약 3-3절 `PATCH /teams/{id}`.
+   *
+   * 🔴 **`null` 로 지우지 못한다**(422). 둘 다 NOT NULL 이라 「안 정한 상태」가
+   * 없다 — 안 바꿀 필드는 **아예 뺀다.** (`PATCH /me/card` 의 `tagline` 과
+   * 반대다. 그쪽은 `null` 이 「지우기」다.)
+   *
+   * 🔴 **`sport_code` 는 못 바꾼다** — 본문에 자리가 없다. 포지션·스쿼드·경기가
+   * 전부 그 값에 매달려 있어서, 바꾸면 이미 앉힌 포지션이 다른 종목 것이 된다.
+   *
+   * 🔴 **이게 왜 필요한가**: 「사람을 찾는 팀」이 지역으로 거르는데(그 값이
+   * `team.region` 이다) 오타를 내거나 연고를 옮기면 **그 팀 경기가 탐색에서
+   * 통째로 빠졌고 고칠 방법이 없었다.**
+   */
+  updateTeam(
+    token: string,
+    teamId: string,
+    input: { name?: string; region?: string },
+  ): Promise<TeamDetail>
+  /**
    * 팀에서 나간다(본인) 또는 뺀다(주장).
    *
    * 🔴 `memberId` 는 **그 사람의 `user_id`** 다 — 소속 행의 id 가 아니다.
@@ -325,6 +358,89 @@ export interface Backend {
    * 아직 없다. 화면에서 미리 막지 말고 그 코드를 받아 안내한다.
    */
   leaveTeam(token: string, teamId: string, memberId: string): Promise<void>
+
+  /**
+   * 확정 경기를 **무른다** — 계약 3-4절 `DELETE /matches/{match_id}`, `204`.
+   *
+   * 🔴 **팀 대 팀이면 주최·상대 어느 쪽 주장이든** 취소할 수 있다(2026-09-16에
+   * 넓어졌다). 취소 안 한 쪽 주장에게 `team_match_cancelled` 알림이 간다.
+   *
+   * 🔴 **취소는 행 삭제다.** `match` 에 상태 컬럼이 없다 — 그래서 지원이 붙어
+   * 있으면 DB 가 못 지우게 막고(`409 MATCH_HAS_APPLICATIONS`), 지원을 먼저
+   * 정리해야 한다. 화면에서 미리 막지 말고 **그 코드를 받아 그대로 안내한다** —
+   * 지원이 몇인지는 서버만 안다(마지막 주장 나가기와 같은 원칙).
+   */
+  cancelMatch(token: string, matchId: string): Promise<void>
+
+  /* ── 팀 초대 (계약 3-3절 「팀 초대」, CCC 49·53번) ──────────────────
+   *
+   * 🔴 **동의 없이 꽂지 않는다**(2026-09-10 박민호 결정) — 주장이 부르고
+   * 받은 사람이 수락해야 팀원이 된다.
+   */
+
+  /** 초대를 보낸다 — **주장만**. `positionCode` 는 선택(안 정한 초대도 정상). */
+  inviteToTeam(
+    token: string,
+    teamId: string,
+    input: { invited_user_id: string; position_code?: string },
+  ): Promise<TeamInvitation>
+  /**
+   * 그 팀이 보낸 초대 **전부**(상태 무관), 최신순 — 주장만.
+   *
+   * 🔴 **판을 되살리는 값이다.** 앉힌 사람이 새로고침 뒤에도 그 자리에 있는
+   * 것은 이 목록 덕이다(사용자 설계, 2026-09-17).
+   */
+  listTeamInvitations(token: string, teamId: string): Promise<TeamInvitation[]>
+  /**
+   * 보낸 초대를 **무른다** — 주장만. 🔴 `204` 가 아니라 무른 초대를 그대로
+   * 돌려준다(상태 전이라 다른 응답과 같은 파서를 쓴다).
+   *
+   * ⚠️ **알림이 없다** — 보낸 쪽이 스스로 하는 것이라 알릴 상대가 없다.
+   */
+  cancelTeamInvitation(
+    token: string,
+    teamId: string,
+    invitationId: string,
+  ): Promise<TeamInvitation>
+  /** 내가 받은, **아직 답 안 한** 초대만. 팀 넉 칸이 더 붙는다(CCC 53). */
+  listMyInvitations(token: string): Promise<ReceivedInvitation[]>
+  /** 수락 — 그때 `team_member` 가 `member` 로 생긴다. */
+  acceptInvitation(token: string, invitationId: string): Promise<TeamInvitation>
+  /**
+   * 거절 — 🔴 **실패가 아니다.** `200` 이고 아무것도 안 바뀐 것이 맞는
+   * 결과다(계약의 「하지 말 것」).
+   */
+  rejectInvitation(token: string, invitationId: string): Promise<TeamInvitation>
+
+  /* ── 경기 조건·지역·후보 (계약 3-13절, CCC 40번) ──────────────────── */
+
+  /**
+   * 지역 목록 — 조건 판의 「어느 동네에서」 후보.
+   *
+   * 🔴 **화면이 목록을 들고 있지 않는다**(`lib/regions.ts` 의 붙박이 60곳을
+   * 걷어낸 자리다). 저장은 `id` 로 하므로 이름만으로는 아무것도 못 보낸다.
+   */
+  listRegions(token: string): Promise<Region[]>
+  /** 우리 팀 경기 조건. 소속이면 읽는다. */
+  getTeamMatchPrefs(token: string, teamId: string): Promise<TeamMatchPreference>
+  /**
+   * 우리 팀 경기 조건을 **통째로 교체**한다 — **팀장만**(아니면 403).
+   *
+   * 🔴 **이걸 안 보내면 우리 팀은 남의 후보 목록에 안 뜬다** — 서버가
+   * 「경기 조건을 하나라도 등록한 팀만」 후보로 고른다(계약 3-13절).
+   * 🔴 부분 수정이 아니다. 하나만 더하려도 전체를 다시 보낸다.
+   */
+  putTeamMatchPrefs(
+    token: string,
+    teamId: string,
+    input: { region_ids: string[]; slots: MatchSlot[] },
+  ): Promise<TeamMatchPreference>
+  /**
+   * 「맞는 상대」 후보 — **이미 정렬돼 있다.** 그 팀 소속만(아니면 403).
+   *
+   * 🔴 화면이 겹침을 다시 계산하지 않는다 — `reasons` 를 그대로 적는다.
+   */
+  listMatchCandidates(token: string, teamId: string): Promise<MatchCandidate[]>
 
   /** 남의 표시 등급. 로그인하면 누구나(`featured-video` 와 같은 원칙). */
   getCardGrade(token: string, cardPublicSlug: string): Promise<CardGrade>
