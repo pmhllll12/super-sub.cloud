@@ -16,6 +16,7 @@ from app.analysis.adapter.outbound.stub.video_stub_repository import (
     put_object,
     register_card_slug,
     register_nickname,
+    register_card_notes,
     register_report_grade,
     register_trust_counts,
     reset_videos,
@@ -853,7 +854,7 @@ class TestCardGrade:
             f"{V1}/cards/grade-a-plain/grade", headers=_headers(uuid4())
         )
         assert res.status_code == 200, res.text
-        assert res.json() == {"grade": "A", "provisional": False}
+        assert res.json() == {"grade": "A", "provisional": False, "notes": None}
 
     def test_신뢰_우세인_A는_S로_오른다(self, client):
         owner = uuid4()
@@ -865,7 +866,7 @@ class TestCardGrade:
             f"{V1}/cards/grade-a-trusted/grade", headers=_headers(uuid4())
         )
         assert res.status_code == 200, res.text
-        assert res.json() == {"grade": "S", "provisional": False}
+        assert res.json() == {"grade": "S", "provisional": False, "notes": None}
 
     def test_신뢰_우세_아닌_D는_F로_내려간다(self, client):
         owner = uuid4()
@@ -876,7 +877,7 @@ class TestCardGrade:
             f"{V1}/cards/grade-d-plain/grade", headers=_headers(uuid4())
         )
         assert res.status_code == 200, res.text
-        assert res.json() == {"grade": "F", "provisional": True}
+        assert res.json() == {"grade": "F", "provisional": True, "notes": None}
 
     def test_provisional을_등급과_함께_내려준다(self, client):
         """26번 「하지 말 것」 — 등급 문자만 떼어 내보내지 않는다."""
@@ -888,10 +889,17 @@ class TestCardGrade:
             f"{V1}/cards/grade-provisional/grade", headers=_headers(uuid4())
         )
         assert res.status_code == 200, res.text
-        assert res.json() == {"grade": "B", "provisional": True}
+        assert res.json() == {"grade": "B", "provisional": True, "notes": None}
 
-    def test_리포트_전체가_아니라_등급_한_칸만_준다(self, client):
-        """25번 「하지 말 것」 — 근거 문장·수치가 새면 안 된다."""
+    def test_리포트_전체가_아니라_좁은_칸만_준다(self, client):
+        """25번 「하지 말 것」 — 근거 문장·수치가 새면 안 된다.
+
+        🔴 **2026-09-17에 칸이 하나 늘었다**(`notes`, `paik` 33번). 제기자가
+        25번의 판단을 **스스로 정정했다** — "그때는 등급만 필요했습니다. 지금은
+        문장도 필요합니다. 다만 리포트를 통째로 여는 것은 여전히 반대입니다."
+        그래서 **항목별 점수·수치·근거(evidence)는 여전히 안 샌다** — 그것이
+        이 검사가 지키는 선이고, 늘어난 칸은 카드용 불릿뿐이다.
+        """
         owner = uuid4()
         register_card_slug("grade-narrow", owner)
         register_report_grade(owner, "C", provisional=False)
@@ -900,7 +908,33 @@ class TestCardGrade:
             f"{V1}/cards/grade-narrow/grade", headers=_headers(uuid4())
         )
         assert res.status_code == 200, res.text
-        assert set(res.json()) == {"grade", "provisional"}
+        assert set(res.json()) == {"grade", "provisional", "notes"}
+
+    def test_카드_불릿이_있으면_함께_온다(self, client):
+        """`paik` 33번 — 추천 판이 「왜 이 사람인가」를 쓸 문장이다."""
+        owner = uuid4()
+        register_card_slug("grade-with-notes", owner)
+        register_report_grade(owner, "B", provisional=False)
+        register_card_notes(owner, ["차는 다리를 끝까지 뻗습니다"])
+
+        res = client.get(
+            f"{V1}/cards/grade-with-notes/grade", headers=_headers(uuid4())
+        )
+        assert res.status_code == 200, res.text
+        # 🔴 **한 줄뿐인 것이 정상이다** — 두 줄을 채우려고 지어내지 않는다.
+        assert res.json()["notes"] == ["차는 다리를 끝까지 뻗습니다"]
+
+    def test_옛_봉투로_적재된_리포트는_불릿이_null_이다(self, client):
+        """🔴 `null` 은 「분석이 없다」가 아니라 「그 칸이 없는 봉투였다」이다."""
+        owner = uuid4()
+        register_card_slug("grade-no-notes", owner)
+        register_report_grade(owner, "B", provisional=False)
+
+        res = client.get(
+            f"{V1}/cards/grade-no-notes/grade", headers=_headers(uuid4())
+        )
+        assert res.json()["notes"] is None
+        assert res.json()["grade"] == "B"
 
 
 class TestPlaybackUrl:

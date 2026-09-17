@@ -121,3 +121,5 @@ class SquadCandidateResult:
     card_public_slug: str | None
     grade: str | None
     provisional: bool | None
+    # 추천 판 카드의 불릿 한두 줄(`paik` 33번). 등급과 같은 리포트에서 왔다.
+    notes: list[str] | None = None
