@@ -316,11 +316,23 @@ def build_prompt(criterion, metrics: dict[str, Any], grade: int) -> str:
         a for a in criterion.anchors
         if int(a.get("grade", -1)) != grade
     ) + criterion.anchors_for(grade, band_value)
-    # 🔴 **좋은 것부터** 나열한다 — 위 수준 목록과 같은 차례여야 어느 어투가
-    #    어느 수준인지 짝이 보인다(1회차에서 그 짝을 잃고 2등급 문장이
-    #    무너졌다). 파일 순서에 기대지 않는다: 조각마다 앵커를 더하면서
-    #    새 앵커가 목록 끝에 붙어 차례가 흐트러졌다.
-    shown = tuple(sorted(shown, key=lambda a: -int(a.get("grade", 0))))
+    # 🔴 **측정값 순으로** 나열한다 (미결 23번 F). 파일 순서에 기대지 않는다:
+    #    조각마다 앵커를 더하면서 새 앵커가 목록 끝에 붙어 차례가 흐트러졌다.
+    #
+    #    🔴 **예전에는 「좋은 것부터」(등급 내림차순)였다.** 근거는 「위 수준
+    #    목록과 같은 차례여야 어느 어투가 어느 수준인지 짝이 보인다」였고,
+    #    1회차에서 그 짝을 잃고 2등급 문장이 무너진 것이 그 근거였다.
+    #    **그런데 1회차에 무너진 진짜 이유는 수준 낱말이 사라진 것**이고,
+    #    낱말(`[잘함]`…)은 줄마다 그대로 붙어 있다 — 짝은 낱말이 말하지
+    #    차례가 말하지 않는다.
+    #
+    #    등급 순이 부른 문제: **앵커 사다리가 값에 대해 단조가 아니다.**
+    #    골반 회전 1등급은 양방향이라 잘함 24 → 보통 45 → 아쉬움 5 로
+    #    늘어서고, 값이 24↑45↓5 로 오르내린다. 측정값 85.8 은 셋 중 어느
+    #    것보다 큰데 **모델이 사다리에서 제자리를 못 찾았다**(C 회차).
+    #    양방향 구간에서는 이 배치가 예외가 아니라 **기본값**이다.
+    shown = tuple(sorted(
+        shown, key=lambda a: float(a["measured"][criterion.band_metric])))
     if shown:
         lines.append("\n" + ANCHOR_HEADER + ":")
         for a in shown:
