@@ -205,3 +205,9 @@ class TeamMatchRequestResult:
     created_at: datetime
     responded_at: datetime | None
     match_id: UUID | None
+    # 두 팀의 표시용 값(`paik` 31번). **감싸지 않고 덧붙인다** — 화면이 이미
+    # 읽는 id 칸의 자리가 바뀌면 배선이 깨진다.
+    requester_team_name: str = ""
+    requester_team_region: str = ""
+    target_team_name: str = ""
+    target_team_region: str = ""

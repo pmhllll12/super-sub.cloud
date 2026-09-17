@@ -2365,6 +2365,75 @@ curl -s -H "Authorization: Bearer $TOKEN" "$API/api/v1/teams/$TEAM_ID" | jq '.di
 
 ---
 
+## 55. 경기 신청에 **두 팀의 이름·지역**이 실립니다 (2026-09-17 추가, `paik` 31번)
+
+`TeamMatchRequestResponse` 에 넷이 더 붙습니다. 알림 판이 「**망원
+유나이티드**가 경기를 걸었습니다」를 그대로 쓸 수 있습니다.
+
+```jsonc
+{
+  // 지금까지 주던 칸 — 그대로입니다
+  "id": "...", "requester_team_id": "...", "target_team_id": "...",
+  "proposed_played_at": "...", "proposed_place": "강남 풋살장",
+  "status": "pending", "created_at": "...", "responded_at": null, "match_id": null,
+
+  // 늘어난 칸
+  "requester_team_name": "번개FC",        "requester_team_region": "서울 강남",
+  "target_team_name": "망원 유나이티드",   "target_team_region": "서울 마포구"
+}
+```
+
+🔴 **기존 칸은 자리가 안 바뀝니다** — 감싸지 않고 덧붙였습니다. 생성·목록·
+수락·거절·무르기 **다섯 경로가 전부 같은 모양**이라 파서 하나로 읽힙니다.
+
+### 🔴 먼저 정정합니다 — 「팀 하나를 읽는 경로가 없다」는 사실이 아니었습니다
+
+항목에 *"`GET /teams/{id}` 가 없고"* 라고 적혀 있었는데 **있습니다.** 계약
+문서 3-3절에 있고(1180줄) **소속이 아니어도 읽힙니다**(인증만 필요).
+
+그리고 항목의 「확인」 명령이 **오탐이었습니다**:
+
+```bash
+grep -n 'requester_team_name\|GET /api/v1/teams/{team_id}$' fastapi/docs/api-contract.md
+```
+
+끝의 `$` 가 문제입니다 — 실제 줄은 ``### `GET /api/v1/teams/{team_id}` `` 로
+**백틱으로 끝나서** 안 걸립니다. 「없다」가 아니라 **「패턴이 안 맞았다」**
+였습니다. 앞으로 그 자리는 이렇게 보시면 됩니다.
+
+```bash
+grep -n 'GET /api/v1/teams/{team_id}' fastapi/docs/api-contract.md
+```
+
+**그래도 넷을 실은 이유**는 「경로가 없어서」가 아니라 **목록에서 줄마다
+부르지 않아도 되게** 하려는 것입니다. 받은 신청이 N 건이면 `GET /teams/{id}`
+를 N 번 부르게 됩니다.
+
+### 만족해야 할 성질
+
+**받은 경기 신청 줄에 상대 팀 이름·지역이 그대로 보일 것.**
+`www/src/components/NotifyPanel.tsx` 가 이 값을 쓰고,
+`www/src/lib/teamMatch.ts` 의 붙박이 목록 폴백(`teamById`, 못 찾으면
+「상대 팀」)은 **걷으시면 됩니다.**
+
+### 🔴 하지 말 것
+
+- **이 값을 캐시하지 마십시오** — 항목에 적어 두신 그대로입니다. 서버는
+  매번 `team` 에서 읽으므로 팀 이름이 바뀌면(`PATCH /teams/{id}`) 다음
+  조회에 바로 반영됩니다. 캐시하면 그 이점이 사라집니다.
+- **id 칸을 지우지 마십시오** — 이름은 표시용이고, 팀을 가리키는 것은 여전히
+  id 입니다(스쿼드·팀 화면으로 넘어갈 때 씁니다).
+
+### 확인
+
+```bash
+grep -n 'requester_team_name' fastapi/docs/api-contract.md
+```
+
+상세: `fastapi/docs/api-contract.md`(3-15절)
+
+---
+
 전체 규격은 `fastapi/docs/api-contract.md` 에 있다. 이 문서는 **바뀐 것만** 추린
 것이다. 새로 붙이는 화면이 있으면 계약 문서 쪽을 본다.
 

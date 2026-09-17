@@ -3115,11 +3115,27 @@ S3에 없다(EC2 역할이 `videos/` 접두사에 쓰기 권한이 없어 못 �
   "id": "c2a1...", "requester_team_id": "9a1e...", "target_team_id": "b3f1...",
   "proposed_played_at": "2026-09-20T10:00:00+09:00", "proposed_place": "강남 풋살장",
   "status": "pending", "created_at": "2026-09-15T09:00:00Z",
-  "responded_at": null, "match_id": null
+  "responded_at": null, "match_id": null,
+  "requester_team_name": "번개FC", "requester_team_region": "서울 강남",
+  "target_team_name": "망원 유나이티드", "target_team_region": "서울 마포구"
 }
 ```
 
 대상 팀 주장(들)에게 알림(`team_match_requested`)이 간다.
+
+#### 두 팀의 표시용 값 (2026-09-17 추가, `paik` 31번)
+
+`*_name`·`*_region` 넷은 **조회 결과**다 — 신청 행에 복사해 두는 것이 아니라
+매번 `team` 에서 읽는다. 그래서 팀 이름이 바뀌면(`PATCH /teams/{id}`)
+**다음 조회에 바로 반영된다.**
+
+🔴 **클라이언트가 이 값을 캐시하지 않는다.** 캐시하면 이름이 바뀐 뒤 조용히
+옛 이름이 남는다 — 서버가 주는 값을 그때그때 쓴다.
+
+> 팀 하나를 읽는 경로(`GET /teams/{team_id}`)는 **그전에도 있었고 소속이
+> 아니어도 읽힌다.** 넷을 얹은 것은 그 경로가 없어서가 아니라, 목록에서
+> **줄마다 부르지 않아도 되게** 하려는 것이다(`MatchListingEntity` 가 주최
+> 팀 값을 얹는 것과 같은 판단).
 
 | 에러 | code |
 |---|---|
