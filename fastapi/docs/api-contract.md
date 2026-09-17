@@ -3150,11 +3150,24 @@ S3에 없다(EC2 역할이 `videos/` 접두사에 쓰기 권한이 없어 못 �
   "status": "pending", "created_at": "2026-09-15T09:00:00Z",
   "responded_at": null, "match_id": null,
   "requester_team_name": "번개FC", "requester_team_region": "서울 강남",
-  "target_team_name": "망원 유나이티드", "target_team_region": "서울 마포구"
+  "target_team_name": "망원 유나이티드", "target_team_region": "서울 마포구",
+  "requester_squad_public_slug": "aB3xK9mQ2pL7vN4t",
+  "target_squad_public_slug": null
 }
 ```
 
 대상 팀 주장(들)에게 알림(`team_match_requested`)이 간다.
+
+#### 두 팀 스쿼드의 **공개 슬러그** (2026-09-17 추가, `paik` 22번 후속)
+
+대기 화면이 **상대 팀 판을 그리는 데** 쓴다 — `GET /squads/{public_slug}` 는
+누구나 읽으므로(SEC-005) 소속이 아니어도 볼 수 있다. 전에는 화면이 붙박이
+목록에서 상대 팀 이름·판을 찾았고, 그 목록에 없는 진짜 팀이 수락하면 이름이
+「상대 팀」으로 나오고 판이 비었다.
+
+🔴 **스쿼드를 아직 안 만든 팀이면 `null` 이고 그게 정상이다** — 스쿼드 생성이
+멱등이라 늦게 생긴다. 빈 문자열로 채우지 않는다(`paik` 37번과 같은 판단).
+🔴 **마이그레이션 0건** — 응답 필드만 늘었다. `squad.public_slug` 는 이미 있다.
 
 #### 두 팀의 표시용 값 (2026-09-17 추가, `paik` 31번)
 

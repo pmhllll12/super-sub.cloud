@@ -31,6 +31,9 @@ _TEAMS: dict[UUID, str] = {}
 # 팀의 표시용 값(이름·지역). 탐색 목록에만 쓰여서 `_TEAMS` 와 나눠 뒀다 —
 # 합치면 종목을 읽는 자리가 전부 바뀐다.
 _TEAM_META: dict[UUID, tuple[str, str]] = {}
+# 팀 스쿼드의 공개 슬러그. **없는 팀이 정상**이라 기본값을 두지 않는다
+# (스쿼드 생성이 멱등이라 늦게 생긴다).
+_TEAM_SQUAD_SLUG: dict[UUID, str] = {}
 _ROLES: dict[tuple[UUID, UUID], str] = {}
 _MATCHES: dict[UUID, MatchEntity] = {}
 _TEAM_MATCH_REQUESTS: dict[UUID, TeamMatchRequestEntity] = {}
@@ -39,6 +42,7 @@ _TEAM_MATCH_REQUESTS: dict[UUID, TeamMatchRequestEntity] = {}
 def reset_matches() -> None:
     _TEAMS.clear()
     _TEAM_META.clear()
+    _TEAM_SQUAD_SLUG.clear()
     _ROLES.clear()
     _MATCHES.clear()
     _APPLICATIONS.clear()
@@ -56,6 +60,11 @@ def register_team(
     """
     _TEAMS[team_id] = sport_code
     _TEAM_META[team_id] = (name, region)
+
+
+def register_squad_slug(team_id: UUID, public_slug: str) -> None:
+    """그 팀 스쿼드의 공개 슬러그. 안 부르면 `None` 이고 그것도 정상이다."""
+    _TEAM_SQUAD_SLUG[team_id] = public_slug
 
 
 def register_role(team_id: UUID, user_id: UUID, role: str) -> None:
@@ -244,6 +253,8 @@ class StubMatchRepository(StubApplicationsMixin, MatchPort):
             requester_team_region=requester[1],
             target_team_name=target[0],
             target_team_region=target[1],
+            requester_squad_public_slug=_TEAM_SQUAD_SLUG.get(request.requester_team_id),
+            target_squad_public_slug=_TEAM_SQUAD_SLUG.get(request.target_team_id),
         )
         _TEAM_MATCH_REQUESTS[request.id] = filled
         return filled
