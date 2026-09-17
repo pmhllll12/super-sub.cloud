@@ -2,7 +2,8 @@
 layout: default
 title: 정확도 확보 단계 (라벨 수집)
 permalink: /labels/
-nav_order: 7
+parent: 팀 작업 공간
+nav_order: 4
 ---
 
 **독자는 라벨을 확보하러 나가는 사람이다.** "무엇을 몇 건, 어떤 조건으로

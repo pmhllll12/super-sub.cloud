@@ -146,3 +146,13 @@ class TeamMatchRequestResponse(BaseModel):
     created_at: Rfc3339
     responded_at: Rfc3339 | None
     match_id: UUID | None
+    # 두 팀의 표시용 값(`paik` 31번, 2026-09-17 추가). 알림 줄이 「망원
+    # 유나이티드 · 서울 마포구」를 그대로 쓴다.
+    #
+    # 🔴 **감싸지 않고 덧붙였다** — 화면이 이미 읽는 id 칸의 자리는 그대로다.
+    # 🔴 **화면이 이 값을 캐시하지 않는다** — 팀 이름은 바뀔 수 있고(`PATCH
+    # /teams/{id}`), 서버가 매번 `team` 에서 읽어 주므로 그때그때 쓴다.
+    requester_team_name: str
+    requester_team_region: str
+    target_team_name: str
+    target_team_region: str

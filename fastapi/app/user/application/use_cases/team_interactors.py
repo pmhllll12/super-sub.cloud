@@ -13,10 +13,13 @@ from app.user.application.dtos.team_dto import (
     CancelTeamInvitationCommand,
     CreateTeamCommand,
     CreateTeamInvitationCommand,
+    DisbandTeamCommand,
     JoinTeamCommand,
     LeaveTeamCommand,
+    MyTeamInvitationResult,
     MyTeamInvitationsQuery,
     RespondTeamInvitationCommand,
+    SetMemberRoleCommand,
     TeamInvitationResult,
     TeamInvitationsQuery,
     TeamQuery,
@@ -28,16 +31,19 @@ from app.user.application.ports.input.team_use_cases import (
     CancelTeamInvitationUseCase,
     CreateTeamInvitationUseCase,
     CreateTeamUseCase,
+    DisbandTeamUseCase,
     JoinTeamUseCase,
     LeaveTeamUseCase,
     ListMyTeamInvitationsUseCase,
     ListTeamInvitationsUseCase,
     ReadTeamUseCase,
     RejectTeamInvitationUseCase,
+    SetMemberRoleUseCase,
     UpdateTeamUseCase,
 )
 from app.user.application.ports.output.team_port import TeamPort
 from app.user.application.use_cases.team_assembler import (
+    to_my_team_invitation_result,
     to_team_invitation_result,
     to_team_result,
 )
@@ -54,8 +60,10 @@ from app.user.domain.rules.team_invitation_rules import (
 )
 from app.user.domain.rules.team_rules import (
     can_add_member,
+    can_disband_team,
     can_edit_team,
     can_remove_member,
+    can_set_member_role,
     is_last_owner,
 )
 from app.user.domain.value_objects.team_role_vo import TeamRole
@@ -74,6 +82,18 @@ class _TeamInteractorBase:
         team = self._repository.find_team(team_id)
         if team is None:
             raise ApiError(404, "TEAM_NOT_FOUND", "팀을 찾을 수 없습니다.")
+        return team
+
+    def _live_team_or_404(self, team_id: UUID) -> TeamEntity:
+        """해체된 팀이면 409 (`paik` 35번).
+
+        🔴 **404 로 숨기지 않는다.** 해체된 팀도 지난 경기·평가가 가리키는
+        실재하는 팀이라 읽기는 그대로 되고, 여기서 막는 것은 **새로 만드는
+        자리**뿐이다(`sport.active` 와 같은 판단 — `ho` 39번).
+        """
+        team = self._team_or_404(team_id)
+        if team.is_disbanded:
+            raise ApiError(409, "TEAM_DISBANDED", "해체된 팀입니다.")
         return team
 
     def _result(self, team: TeamEntity) -> TeamResult:
@@ -126,7 +146,7 @@ class UpdateTeamInteractor(_TeamInteractorBase, UpdateTeamUseCase):
     """
 
     def __call__(self, command: UpdateTeamCommand) -> TeamResult:
-        team = self._team_or_404(command.team_id)
+        team = self._live_team_or_404(command.team_id)
         members = self._repository.active_members(team.id)
 
         if not can_edit_team(_role_of(members, command.actor_id)):
@@ -145,7 +165,7 @@ class JoinTeamInteractor(_TeamInteractorBase, JoinTeamUseCase):
         target_id = command.user_id or command.actor_id
         adding_self = target_id == command.actor_id
 
-        team = self._team_or_404(command.team_id)
+        team = self._live_team_or_404(command.team_id)
         members = self._repository.active_members(team.id)
 
         if not can_add_member(_role_of(members, command.actor_id), adding_self):
@@ -184,6 +204,62 @@ class LeaveTeamInteractor(_TeamInteractorBase, LeaveTeamUseCase):
         self._repository.mark_left(team.id, command.user_id)
 
 
+class DisbandTeamInteractor(_TeamInteractorBase, DisbandTeamUseCase):
+    """팀을 해체한다 (`paik` 35번).
+
+    혼자 만든 팀을 **영영 못 버리던 것**이 이 항목이었다. 마지막 주장은
+    `LAST_OWNER` 로 나갈 수 없고, 나가지 못하니 팀이 목록에 계속 쌓였다.
+
+    🔴 **행을 지우지 않는다** — `team` 을 참조하는 외래키 다섯이 NO ACTION 이고
+    부록 D.6 이 팀 삭제 연쇄를 정하지 않았다. 지난 경기·평가가 팀 이름을
+    가리키는 것도 `team_member.left_at` 과 같다.
+    """
+
+    def __call__(self, command: DisbandTeamCommand) -> None:
+        team = self._live_team_or_404(command.team_id)
+        members = self._repository.active_members(team.id)
+
+        if not can_disband_team(_role_of(members, command.actor_id)):
+            raise ApiError(403, "FORBIDDEN", "주장만 팀을 해체할 수 있습니다.")
+
+        # 🔴 상대 팀에는 약속이다 — 조용히 사라지면 그쪽 판이 깨진다.
+        # 지난 경기는 세지 않는다(이력이다). 경기 탐색이 다가오는 경기만
+        # 보므로 이 규칙 하나로 「없는 팀의 경기가 뜬다」가 안 생긴다.
+        if self._repository.has_upcoming_match(team.id):
+            raise ApiError(
+                409,
+                "TEAM_HAS_UPCOMING_MATCH",
+                "앞으로 있을 경기가 있어 해체할 수 없습니다. 경기를 먼저 정리해 주세요.",
+            )
+
+        self._repository.disband_team(team.id)
+
+
+class SetMemberRoleInteractor(_TeamInteractorBase, SetMemberRoleUseCase):
+    """구성원의 역할을 바꾼다 — 실질적으로 **주장 세우기** (`paik` 35번).
+
+    `LAST_OWNER` 가 "다른 주장을 먼저 세워야 합니다"라고 안내하는데 그전에는
+    **세울 경로가 없었다.** 이것이 그 실물이다.
+
+    🔴 기존 주장을 강등하지 않는다 — 주장은 여럿일 수 있고(`is_last_owner` 가
+    세는 방식이 그렇다), 넘기고 나가려면 세운 뒤 기존 탈퇴 경로를 쓰면 된다.
+    한 번에 둘을 하면 「넘기기만」 하려는 경우를 표현할 수 없다.
+    """
+
+    def __call__(self, command: SetMemberRoleCommand) -> TeamResult:
+        team = self._live_team_or_404(command.team_id)
+        members = self._repository.active_members(team.id)
+
+        if not can_set_member_role(_role_of(members, command.actor_id)):
+            raise ApiError(403, "FORBIDDEN", "주장만 역할을 바꿀 수 있습니다.")
+
+        if not any(m.user_id == command.user_id for m in members):
+            raise ApiError(404, "NOT_A_MEMBER", "이 팀의 구성원이 아닙니다.")
+
+        self._repository.set_member_role(team.id, command.user_id, command.role)
+        return self._result(team)
+
+
 def _pending_invitation_or_404(
     repository: TeamPort, invitation_id: UUID
 ) -> TeamInvitationEntity:
@@ -203,7 +279,7 @@ class CreateTeamInvitationInteractor(_TeamInteractorBase, CreateTeamInvitationUs
     def __call__(
         self, command: CreateTeamInvitationCommand
     ) -> TeamInvitationResult:
-        team = self._team_or_404(command.team_id)
+        team = self._live_team_or_404(command.team_id)
         members = self._repository.active_members(team.id)
 
         if not can_manage_invitation(_role_of(members, command.actor_id)):
@@ -227,12 +303,31 @@ class CreateTeamInvitationInteractor(_TeamInteractorBase, CreateTeamInvitationUs
                 "이미 이 사람에게 보낸 대기 중인 초대가 있습니다.",
             )
 
+        position_id = position_code = position_label = None
+        if command.position_code is not None:
+            found = self._repository.find_position(
+                team.sport_code, command.position_code
+            )
+            if found is None:
+                # 약칭은 **종목 안에서만** 유일하다 — 농구 `C`(센터)로 축구
+                # 팀에 초대하는 것은 오타지 빈 자리가 아니다.
+                raise ApiError(
+                    422,
+                    "UNKNOWN_POSITION",
+                    "이 팀 종목에 없는 포지션입니다.",
+                )
+            position_id, position_label = found
+            position_code = command.position_code
+
         invitation = TeamInvitationEntity(
             id=uuid4(),
             team_id=team.id,
             invited_user_id=command.invited_user_id,
             status=PENDING,
             created_at=datetime.now(timezone.utc),
+            position_id=position_id,
+            position_code=position_code,
+            position_label=position_label,
         )
         self._repository.create_team_invitation(invitation)
         return to_team_invitation_result(invitation)
@@ -257,9 +352,9 @@ class ListMyTeamInvitationsInteractor(ListMyTeamInvitationsUseCase):
 
     def __call__(
         self, query: MyTeamInvitationsQuery
-    ) -> list[TeamInvitationResult]:
+    ) -> list[MyTeamInvitationResult]:
         return [
-            to_team_invitation_result(i)
+            to_my_team_invitation_result(i)
             for i in self._repository.list_my_pending_invitations(query.user_id)
         ]
 

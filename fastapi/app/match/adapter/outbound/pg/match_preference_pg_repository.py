@@ -10,6 +10,7 @@ repository.py`와 같은 방식이다.
 
 from __future__ import annotations
 
+from typing import NamedTuple
 from uuid import UUID, uuid4
 
 from sqlalchemy import column, delete, func, select, table
@@ -82,7 +83,26 @@ _analysis_report = table(
     column("analysis_metric_id"),
     column("overall_grade"),
     column("provisional"),
+    # 추천 판 카드의 불릿 한두 줄(`paik` 33번). 등급과 **같은 행**이라 같은
+    # 조회에서 함께 가져온다 — 따로 부르면 이 조인을 두 번 돈다.
+    column("card_notes"),
 )
+
+
+class _CandidateReport(NamedTuple):
+    """후보 한 명의 대표 영상 리포트에서 읽는 표시용 값.
+
+    셋이 **같은 행**에서 온다 — 등급과 불릿을 따로 부르면 같은 조인을 두 번
+    돈다. 대표 영상이 없거나 분석 전이면 `_NO_REPORT`(전부 `None`)다.
+    """
+
+    grade: str | None
+    provisional: bool | None
+    card_notes: list[str] | None
+
+
+_NO_REPORT = _CandidateReport(None, None, None)
+
 # `review` 컨텍스트 — 신뢰 축(재매칭 의사). `analysis`가 이미 하는 것과 같은
 # 복제(위 파일의 grade_rules 절 참조).
 _review = table("review", column("id"), column("reviewee_id"))
@@ -500,7 +520,7 @@ class MatchPreferencePgRepository(MatchPreferencePort):
 
         grades = self._grades_for(list(candidate_ids | seated_user_ids))
         seated_grades = [
-            g for uid in seated_user_ids if (g := grades.get(uid, (None, None))[0])
+            g for uid in seated_user_ids if (g := grades.get(uid, _NO_REPORT).grade)
         ]
         if not candidate_ids:
             return SquadRecruitmentFactsEntity(
@@ -535,8 +555,9 @@ class MatchPreferencePgRepository(MatchPreferencePort):
                 user_id=uid,
                 nickname=nicknames.get(uid, ""),
                 card_public_slug=slugs.get(uid),
-                grade=grades.get(uid, (None, None))[0],
-                provisional=grades.get(uid, (None, None))[1],
+                grade=grades.get(uid, _NO_REPORT).grade,
+                provisional=grades.get(uid, _NO_REPORT).provisional,
+                notes=grades.get(uid, _NO_REPORT).card_notes,
                 last_active_at=last_active.get(uid),
             )
             for uid in candidate_ids
@@ -545,11 +566,9 @@ class MatchPreferencePgRepository(MatchPreferencePort):
             seated_grades=seated_grades, candidates=candidates
         )
 
-    def _grades_for(
-        self, user_ids: list[UUID]
-    ) -> dict[UUID, tuple[str | None, bool | None]]:
-        """`user_id` → (표시 등급, `provisional`). 대표 영상이 없거나 분석
-        전이면 `(None, None)` — `analysis`의 `find_card_grade`와 같은 조인을
+    def _grades_for(self, user_ids: list[UUID]) -> dict[UUID, _CandidateReport]:
+        """`user_id` → 표시 등급·`provisional`·카드 불릿. 대표 영상이 없거나
+        분석 전이면 전부 `None` — `analysis`의 `find_card_grade`와 같은 조인을
         복제한다(컨텍스트 경계, 위 테이블 정의 참조).
         """
         if not user_ids:
@@ -563,7 +582,7 @@ class MatchPreferencePgRepository(MatchPreferencePort):
             ).all()
         )
 
-        report_by_video: dict[UUID, tuple[str | None, bool | None]] = {}
+        report_by_video: dict[UUID, _CandidateReport] = {}
         if featured_video:
             video_ids = list(featured_video.values())
             rows = self._session.execute(
@@ -571,6 +590,7 @@ class MatchPreferencePgRepository(MatchPreferencePort):
                     _analysis_job.c.video_id,
                     _analysis_report.c.overall_grade,
                     _analysis_report.c.provisional,
+                    _analysis_report.c.card_notes,
                 )
                 .select_from(
                     _analysis_job.join(
@@ -585,11 +605,13 @@ class MatchPreferencePgRepository(MatchPreferencePort):
                 .where(_analysis_job.c.video_id.in_(video_ids))
                 .order_by(_analysis_metric.c.created_at.desc())
             ).all()
-            for video_id, grade, provisional in rows:
+            for video_id, grade, provisional, card_notes in rows:
                 # 재분석은 여러 리포트를 남긴다 — DESC 순서라 먼저 만난 것이
                 # 최신이다. `paik` 21번(임팩트 순간)과 같은 "먼저 만난 것이
                 # 최신" 관례.
-                report_by_video.setdefault(video_id, (grade, provisional))
+                report_by_video.setdefault(
+                    video_id, _CandidateReport(grade, provisional, card_notes)
+                )
 
         joined = _review.join(
             _review_selection, _review_selection.c.review_id == _review.c.id
@@ -617,16 +639,20 @@ class MatchPreferencePgRepository(MatchPreferencePort):
             ).all()
         )
 
-        result: dict[UUID, tuple[str | None, bool | None]] = {}
+        result: dict[UUID, _CandidateReport] = {}
         for uid in user_ids:
             video_id = featured_video.get(uid)
-            overall_grade, provisional = (
-                report_by_video.get(video_id, (None, None))
+            found = (
+                report_by_video.get(video_id, _NO_REPORT)
                 if video_id is not None
-                else (None, None)
+                else _NO_REPORT
             )
             trust_dominant = is_trust_dominant(positives.get(uid, 0), totals.get(uid, 0))
-            result[uid] = (display_grade(overall_grade, trust_dominant), provisional)
+            result[uid] = _CandidateReport(
+                display_grade(found.grade, trust_dominant),
+                found.provisional,
+                found.card_notes,
+            )
         return result
 
 

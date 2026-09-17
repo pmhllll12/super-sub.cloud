@@ -41,9 +41,10 @@ def world(client):
     """팀 셋(A·B·C) — 각자 주장 하나, A엔 주장 아닌 팀원도 하나."""
     a, b, c = uuid4(), uuid4(), uuid4()
     a_owner, a_member, b_owner, c_owner = uuid4(), uuid4(), uuid4(), uuid4()
-    register_team(a, "football")
-    register_team(b, "football")
-    register_team(c, "football")
+    # 이름·지역을 채운다 — 알림 줄이 그 값을 쓴다(`paik` 31번).
+    register_team(a, "football", "번개FC", "서울 강남")
+    register_team(b, "football", "망원 유나이티드", "서울 마포구")
+    register_team(c, "football", "천둥FC", "서울 송파")
     register_role(a, a_owner, "owner")
     register_role(a, a_member, "member")
     register_role(b, b_owner, "owner")
@@ -254,3 +255,60 @@ class TestCancel:
             headers=_headers(world["a_owner"]),
         )
         assert res.status_code == 409
+
+
+class TestTeamNamesOnRequest:
+    """`paik` 31번 — 알림 판이 「망원 유나이티드가 경기를 걸었습니다」를 쓴다.
+
+    🔴 그전에는 id 만 왔다. 화면은 붙박이 목록에서 찾고 **못 찾으면 「상대
+    팀」으로** 적고 있었다(이름을 지어내지 않는 쪽으로 만들어 뒀다).
+    """
+
+    def test_신청_직후_응답에_두_팀의_이름과_지역이_온다(self, client, world):
+        res = _request(client, world, world["a_owner"], world["a"], world["b"])
+        assert res.status_code == 201, res.text
+        body = res.json()
+        assert body["requester_team_name"] == "번개FC"
+        assert body["requester_team_region"] == "서울 강남"
+        assert body["target_team_name"] == "망원 유나이티드"
+        assert body["target_team_region"] == "서울 마포구"
+
+    def test_받은_쪽_목록에도_이름이_실린다(self, client, world):
+        """받는 쪽이 요점이다 — 상대 팀은 **내 팀이 아니라** 이름을 모른다."""
+        _request(client, world, world["a_owner"], world["a"], world["b"])
+        rows = client.get(
+            f"{V1}/teams/{world['b']}/match-requests",
+            headers=_headers(world["b_owner"]),
+        ).json()
+        assert [r["requester_team_name"] for r in rows] == ["번개FC"]
+        assert [r["requester_team_region"] for r in rows] == ["서울 강남"]
+
+    def test_기존_칸이_그대로_남아_있다(self, client, world):
+        """🔴 감싸지 않고 덧붙였다 — 화면이 읽던 id 칸의 자리가 바뀌면 안 된다."""
+        res = _request(client, world, world["a_owner"], world["a"], world["b"])
+        body = res.json()
+        assert body["requester_team_id"] == str(world["a"])
+        assert body["target_team_id"] == str(world["b"])
+        assert set(body) >= {
+            "id",
+            "requester_team_id",
+            "target_team_id",
+            "proposed_played_at",
+            "proposed_place",
+            "status",
+            "created_at",
+            "responded_at",
+            "match_id",
+        }
+
+    def test_거절_응답에도_실린다(self, client, world):
+        """상태가 바뀌는 경로도 같은 모양이어야 화면이 한 파서로 읽는다."""
+        request_id = _request(
+            client, world, world["a_owner"], world["a"], world["b"]
+        ).json()["id"]
+        res = client.post(
+            f"{V1}/teams/{world['b']}/match-requests/{request_id}/reject",
+            headers=_headers(world["b_owner"]),
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["requester_team_name"] == "번개FC"

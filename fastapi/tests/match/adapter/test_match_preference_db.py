@@ -376,8 +376,9 @@ class TestMatchCandidates:
         assert str(team_b) not in [r["team_id"] for r in rows]
 
 
-def _grade_envelope(grade: str, provisional: bool = False):
-    return {
+def _grade_envelope(grade: str, provisional: bool = False, card_notes=None):
+    """`card_notes` 를 주면 봉투 1.5 의 `result.card` 가 실린다(`paik` 33번)."""
+    envelope = {
         "schema_version": "1.0",
         "source_video": "s3://b/videos/u/v.mp4",
         "analyzed_at": "20260910T120000Z",
@@ -417,6 +418,9 @@ def _grade_envelope(grade: str, provisional: bool = False):
             "skipped": [],
         },
     }
+    if card_notes is not None:
+        envelope["result"]["card"] = {"title": None, "notes": card_notes}
+    return envelope
 
 
 class TestSquadCandidates:
@@ -425,7 +429,9 @@ class TestSquadCandidates:
     실제 조인으로 확인한다. 컬럼 이름이 바뀌면 스텁은 못 잡는다.
     """
 
-    def _give_featured_grade(self, db_session, user_id, *, grade, provisional=False):
+    def _give_featured_grade(
+        self, db_session, user_id, *, grade, provisional=False, card_notes=None
+    ):
         now = datetime.now(timezone.utc)
         video_id, job_id = uuid.uuid4(), uuid.uuid4()
         db_session.add(
@@ -441,7 +447,7 @@ class TestSquadCandidates:
         )
         db_session.commit()
         parsed = parse_report(
-            json.dumps(_grade_envelope(grade, provisional)).encode()
+            json.dumps(_grade_envelope(grade, provisional, card_notes)).encode()
         )
         ReportIngestPgRepository(db_session).replace_for_job(job_id, parsed)
 
@@ -532,6 +538,52 @@ class TestSquadCandidates:
 
         assert rows[str(cand_none["id"])]["grade"] is None
         assert rows[str(cand_none["id"])]["provisional"] is None
+
+    def test_후보_불릿이_실제_analysis_report에서_온다(
+        self, db_client, db_session
+    ):
+        """`paik` 33번 — `analysis_report.card_notes` 를 원시 SQL 로 읽는 자리.
+
+        🔴 `analysis` 는 다른 컨텍스트라 `table()`/`column()` 으로 읽는다 —
+        저쪽 컬럼 이름이 바뀌어도 파이썬이 안 잡아 준다. 스텁은 값을 손으로
+        채우므로 **여기가 유일한 방어선이다.**
+        """
+        owner = _account(db_client, "주장")
+        team_id = _team(db_client, owner, "불릿후보")
+        gk = _position_id("GK")
+        notes = ["차는 다리를 끝까지 뻗습니다", "디딤발을 공 옆에 붙입니다"]
+
+        cand = _account(db_client, "불릿있음")
+        db_client.put(
+            f"{V1}/me/match-preferences",
+            json={"region_ids": [], "slots": [], "position_ids": [str(gk)]},
+            headers=cand["headers"],
+        )
+        self._give_featured_grade(
+            db_session, cand["id"], grade="A", card_notes=notes
+        )
+
+        # 같은 포지션인데 옛 봉투로 적재된 사람 — `null` 이어야 한다.
+        cand_old = _account(db_client, "불릿없음")
+        db_client.put(
+            f"{V1}/me/match-preferences",
+            json={"region_ids": [], "slots": [], "position_ids": [str(gk)]},
+            headers=cand_old["headers"],
+        )
+        self._give_featured_grade(db_session, cand_old["id"], grade="A")
+
+        res = db_client.get(
+            f"{V1}/teams/{team_id}/squad/candidates",
+            params={"position_code": "GK"},
+            headers=owner["headers"],
+        )
+        assert res.status_code == 200, res.text
+        rows = {r["user_id"]: r for r in res.json()}
+
+        assert rows[str(cand["id"])]["notes"] == notes
+        # 🔴 등급은 정상인데 불릿만 없는 경우다 — 「분석이 없다」가 아니다.
+        assert rows[str(cand_old["id"])]["notes"] is None
+        assert rows[str(cand_old["id"])]["grade"] == "A"
 
     def test_이미_스쿼드에_앉은_사람은_제외된다(self, db_client, db_session):
         owner = _account(db_client, "주장")

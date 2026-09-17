@@ -355,6 +355,7 @@ class GetCardGradeInteractor(GetCardGradeUseCase):
         return CardGradeResult(
             grade=display_grade(row.overall_grade, trust_dominant),
             provisional=row.provisional,
+            notes=row.card_notes,
         )
 
 

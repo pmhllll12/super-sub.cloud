@@ -6,6 +6,10 @@
   `notification`은 `user` 컨텍스트 안이지만 다른 테이블이라 원시 SQL로 대조한다
 - 수락하면 `team_member` 행이 **실제로** 생기는가(기존 `JoinTeamUseCase` 재사용 경로)
 - `team_invitation`이 저장·조회되는가
+- 🔴 **`GET /me/invitations` 가 `squad.public_slug` 를 실제로 읽는가**
+  (`paik` 37번) — `squad` 는 `card` 컨텍스트라 원시 SQL(`table()`/`column()`)
+  로 읽는다. 저쪽 컬럼 이름이 바뀌어도 파이썬이 안 잡아 주므로 **여기가
+  유일한 방어선이다**(`fastapi/CLAUDE.md` 「테스트는 두 층이다」)
 """
 
 from __future__ import annotations
@@ -56,6 +60,14 @@ def world(db_client, db_session):
     db_session.execute(
         text("delete from team_member where team_id = :t"), {"t": team_id}
     )
+    # 🔴 `squad.team_id` 는 RESTRICT 라(부록 D.6 이 팀 해체 처리를 안 정했다)
+    # 팀보다 먼저 지워야 한다 — 안 그러면 다음 검사가 남은 행에 걸린다.
+    db_session.execute(
+        text("delete from squad_member where squad_id in "
+             "(select id from squad where team_id = :t)"),
+        {"t": team_id},
+    )
+    db_session.execute(text("delete from squad where team_id = :t"), {"t": team_id})
     db_session.execute(text("delete from team where id = :t"), {"t": team_id})
     for acc in (owner, candidate):
         db_session.execute(
@@ -64,14 +76,73 @@ def world(db_client, db_session):
     db_session.commit()
 
 
-def _invite(db_client, world):
+def _invite(db_client, world, position_code=None):
+    body = {"invited_user_id": str(world["candidate"]["id"])}
+    if position_code is not None:
+        body["position_code"] = position_code
     res = db_client.post(
         f"{V1}/teams/{world['team_id']}/invitations",
-        json={"invited_user_id": str(world["candidate"]["id"])},
+        json=body,
         headers=world["owner"]["headers"],
     )
     assert res.status_code == 201, res.text
     return uuid.UUID(res.json()["id"])
+
+
+def _my_invitations(db_client, world):
+    res = db_client.get(f"{V1}/me/invitations", headers=world["candidate"]["headers"])
+    assert res.status_code == 200, res.text
+    return res.json()
+
+
+class TestReceivedRowCarriesTeam:
+    """`paik` 37번 — 받는 사람은 그 팀 소속이 아니라 초대 한 줄만 보고 정한다."""
+
+    def test_팀_이름_지역_종목이_실린다(self, db_client, world):
+        _invite(db_client, world)
+        row = _my_invitations(db_client, world)[0]
+        assert row["team_name"] == TEAM["name"]
+        assert row["team_region"] == TEAM["region"]
+        assert row["team_sport_code"] == TEAM["sport_code"]
+
+    def test_스쿼드_슬러그를_실제_squad_테이블에서_읽는다(
+        self, db_client, db_session, world
+    ):
+        """🔴 `squad` 는 `card` 컨텍스트라 원시 SQL로 읽는 자리다.
+
+        스텁으로는 컬럼 이름이 갈려도 통과한다 — 실물과 대조하는 것은 여기뿐이다.
+        """
+        created = db_client.post(
+            f"{V1}/teams/{world['team_id']}/squad",
+            headers=world["owner"]["headers"],
+        )
+        assert created.status_code in (200, 201), created.text
+        slug = created.json()["public_slug"]
+
+        _invite(db_client, world)
+        assert _my_invitations(db_client, world)[0]["squad_public_slug"] == slug
+
+        # 그 슬러그로 실제 판을 열 수 있어야 쓸모가 있다(누구나 읽는 경로).
+        public = db_client.get(f"{V1}/squads/{slug}")
+        assert public.status_code == 200, public.text
+
+    def test_스쿼드가_없으면_null_이다(self, db_client, world):
+        _invite(db_client, world)
+        assert _my_invitations(db_client, world)[0]["squad_public_slug"] is None
+
+    def test_부르는_자리가_실제로_저장되고_이름까지_나온다(
+        self, db_client, db_session, world
+    ):
+        invitation_id = _invite(db_client, world, "GK")
+        stored = db_session.execute(
+            text("select position_id from team_invitation where id = :i"),
+            {"i": invitation_id},
+        ).scalar_one()
+        assert stored is not None
+
+        row = _my_invitations(db_client, world)[0]
+        assert row["position_code"] == "GK"
+        assert row["position_label"] == "골키퍼"
 
 
 class TestCreate:

@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from uuid import UUID
 
 from app.user.domain.entities.team_entity import (
+    MyTeamInvitationEntity,
     TeamEntity,
     TeamInvitationEntity,
     TeamMemberEntity,
@@ -69,6 +70,35 @@ class TeamPort(ABC):
         """`left_at` 을 채운다. **행을 지우지 않는다** — 경기·평가 이력이 참조한다."""
 
     @abstractmethod
+    def set_member_role(self, team_id: UUID, user_id: UUID, role: str) -> None:
+        """활동 중인 구성원의 역할을 바꾼다 (`paik` 35번, 주장 세우기)."""
+
+    @abstractmethod
+    def has_upcoming_match(self, team_id: UUID) -> bool:
+        """앞으로 있을 경기가 있는가 — 우리 팀이 열었거나 상대로 잡힌 것 둘 다.
+
+        🔴 `match` 는 다른 컨텍스트라 원시 SQL 로 읽는다. 해체를 막는 유일한
+        근거이므로(`paik` 35번) **지난 경기는 세지 않는다** — 그것은 이력이다.
+        """
+
+    @abstractmethod
+    def disband_team(self, team_id: UUID) -> None:
+        """팀을 해체한다 (`paik` 35번). 행은 지우지 않는다.
+
+        한 트랜잭션에서 넷을 한다:
+
+        1. `team.disbanded_at` 을 찍는다 — 새로 만드는 자리가 막힌다
+        2. 남은 구성원을 전부 `left_at` 으로 내보낸다 — 그래야 `GET /me` 의
+           `teams` 에서 사라진다(거기서 `left_at` 으로 거른다)
+        3. 대기 중이던 팀 초대를 `cancelled` 로 닫는다 — 안 닫으면 없는 팀의
+           초대가 남의 초대함에 남는다
+        4. 대기 중이던 경기 신청(보낸 것·받은 것)을 `cancelled` 로 닫는다
+
+        🔴 **지난 경기·스쿼드는 건드리지 않는다.** 이력이고, 앞으로 있을
+        경기는 애초에 `has_upcoming_match` 로 막혀서 여기 올 수 없다.
+        """
+
+    @abstractmethod
     def user_exists(self, user_id: UUID) -> bool: ...
 
     # --- 팀 초대 (`min` 20번) ------------------------------------------------
@@ -93,8 +123,18 @@ class TeamPort(ABC):
     @abstractmethod
     def list_my_pending_invitations(
         self, user_id: UUID
-    ) -> list[TeamInvitationEntity]:
-        """내가 받은, 아직 답 안 한 초대만, 최신순."""
+    ) -> list[MyTeamInvitationEntity]:
+        """내가 받은, 아직 답 안 한 초대만, 최신순.
+
+        🔴 **팀 쪽 값을 함께 싣는다**(`paik` 37번) — 받는 사람은 그 팀 소속이
+        아니라 팀 화면을 거치지 않고 알림에서 바로 정한다. 스쿼드 슬러그까지
+        함께 주면 화면이 이미 있는 `GET /squads/{slug}` 로 판을 그릴 수 있어
+        새 경로가 필요 없다.
+        """
+
+    @abstractmethod
+    def find_position(self, sport_code: str, code: str) -> tuple[UUID, str] | None:
+        """`(id, label)`. 약칭은 **종목 안에서만** 유일하므로 종목과 함께 찾는다."""
 
     @abstractmethod
     def accept_team_invitation(self, invitation_id: UUID) -> TeamInvitationEntity:

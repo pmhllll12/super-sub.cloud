@@ -10,6 +10,7 @@ import pytest
 
 from app.core.security import issue_access_token
 from app.user.adapter.outbound.stub.team_stub_repository import (
+    register_upcoming_match,
     register_user,
     reset_teams,
 )
@@ -358,3 +359,160 @@ class TestUpdateTeam:
         )
         assert res.status_code == 200, res.text
         assert res.json()["sport_code"] == TEAM["sport_code"]
+
+
+class TestSetMemberRole:
+    """주장 세우기 — `paik` 35번.
+
+    🔴 그전에는 `LAST_OWNER` 가 "다른 주장을 먼저 세워야 합니다"라고 안내하면서
+    **세울 경로를 주지 않았다.** 그 안내를 실행 가능하게 만드는 것이 이 경로다.
+    """
+
+    def _join(self, client, team, headers):
+        assert (
+            client.post(
+                f"{V1}/teams/{team['id']}/members", json={}, headers=headers
+            ).status_code
+            == 201
+        )
+
+    def _member(self, client, team, headers):
+        user_id = uuid4()
+        register_user(user_id)
+        member_headers = _headers(user_id)
+        self._join(client, team, member_headers)
+        return {"id": user_id, "headers": member_headers}
+
+    def test_주장이_다른_사람을_주장으로_세운다(self, client, owner, team):
+        member = self._member(client, team, owner["headers"])
+        res = client.patch(
+            f"{V1}/teams/{team['id']}/members/{member['id']}",
+            json={"role": "owner"},
+            headers=owner["headers"],
+        )
+        assert res.status_code == 200, res.text
+        roles = {m["user_id"]: m["role"] for m in res.json()["members"]}
+        assert roles[str(member["id"])] == "owner"
+        # 🔴 기존 주장은 그대로 주장이다 — 넘기고 나가려면 세운 뒤 나간다.
+        assert roles[str(owner["id"])] == "owner"
+
+    def test_세우고_나면_기존_주장이_나갈_수_있다(self, client, owner, team):
+        """이 항목의 요점이다 — 막혀 있던 길이 실제로 뚫렸는지 본다."""
+        member = self._member(client, team, owner["headers"])
+        blocked = client.delete(
+            f"{V1}/teams/{team['id']}/members/{owner['id']}",
+            headers=owner["headers"],
+        )
+        assert blocked.status_code == 409
+        assert error_code(blocked) == "LAST_OWNER"
+
+        client.patch(
+            f"{V1}/teams/{team['id']}/members/{member['id']}",
+            json={"role": "owner"},
+            headers=owner["headers"],
+        )
+        freed = client.delete(
+            f"{V1}/teams/{team['id']}/members/{owner['id']}",
+            headers=owner["headers"],
+        )
+        assert freed.status_code == 204, freed.text
+
+    def test_일반_구성원은_못_바꾼다(self, client, owner, team):
+        member = self._member(client, team, owner["headers"])
+        res = client.patch(
+            f"{V1}/teams/{team['id']}/members/{member['id']}",
+            json={"role": "owner"},
+            headers=member["headers"],
+        )
+        assert res.status_code == 403
+
+    def test_소속이_아닌_사람은_404(self, client, owner, team):
+        res = client.patch(
+            f"{V1}/teams/{team['id']}/members/{uuid4()}",
+            json={"role": "owner"},
+            headers=owner["headers"],
+        )
+        assert res.status_code == 404
+        assert error_code(res) == "NOT_A_MEMBER"
+
+    def test_모르는_역할은_422(self, client, owner, team):
+        member = self._member(client, team, owner["headers"])
+        res = client.patch(
+            f"{V1}/teams/{team['id']}/members/{member['id']}",
+            json={"role": "captain"},
+            headers=owner["headers"],
+        )
+        assert res.status_code == 422
+
+
+class TestDisbandTeam:
+    """팀 해체 — `paik` 35번. **행을 지우지 않는다.**"""
+
+    def test_주장이_해체하면_204(self, client, owner, team):
+        res = client.delete(f"{V1}/teams/{team['id']}", headers=owner["headers"])
+        assert res.status_code == 204, res.text
+
+    def test_해체해도_팀은_읽힌다(self, client, owner, team):
+        """🔴 지난 경기·평가가 이 팀 이름을 가리킨다 — 404 로 숨기지 않는다."""
+        client.delete(f"{V1}/teams/{team['id']}", headers=owner["headers"])
+        res = client.get(f"{V1}/teams/{team['id']}", headers=owner["headers"])
+        assert res.status_code == 200
+        assert res.json()["disbanded_at"] is not None
+        # 구성원은 전부 내보내진다 — 그래야 `GET /me` 의 `teams` 에서 사라진다.
+        assert res.json()["members"] == []
+
+    def test_해체된_팀에는_못_들어간다(self, client, owner, team):
+        """🔴 이것이 컬럼을 둔 이유다 — 자기-가입은 아무나 할 수 있어서
+        표시가 없으면 해체한 팀이 되살아난다."""
+        client.delete(f"{V1}/teams/{team['id']}", headers=owner["headers"])
+        res = client.post(
+            f"{V1}/teams/{team['id']}/members", json={}, headers=_headers()
+        )
+        assert res.status_code == 409
+        assert error_code(res) == "TEAM_DISBANDED"
+
+    def test_해체된_팀은_못_고치고_못_초대한다(self, client, owner, team):
+        client.delete(f"{V1}/teams/{team['id']}", headers=owner["headers"])
+        edited = client.patch(
+            f"{V1}/teams/{team['id']}",
+            json={"name": "부활FC"},
+            headers=owner["headers"],
+        )
+        assert error_code(edited) == "TEAM_DISBANDED"
+
+        invited = client.post(
+            f"{V1}/teams/{team['id']}/invitations",
+            json={"invited_user_id": str(uuid4())},
+            headers=owner["headers"],
+        )
+        assert error_code(invited) == "TEAM_DISBANDED"
+
+    def test_두_번_해체하면_409(self, client, owner, team):
+        client.delete(f"{V1}/teams/{team['id']}", headers=owner["headers"])
+        res = client.delete(f"{V1}/teams/{team['id']}", headers=owner["headers"])
+        assert res.status_code == 409
+        assert error_code(res) == "TEAM_DISBANDED"
+
+    def test_일반_구성원은_해체_못_한다(self, client, owner, team):
+        member_headers = _headers()
+        client.post(
+            f"{V1}/teams/{team['id']}/members", json={}, headers=member_headers
+        )
+        res = client.delete(f"{V1}/teams/{team['id']}", headers=member_headers)
+        assert res.status_code == 403
+
+    def test_앞으로_있을_경기가_있으면_409(self, client, owner, team):
+        """🔴 상대 팀에는 약속이다 — 조용히 사라지면 그쪽 판이 깨진다."""
+        from uuid import UUID
+
+        register_upcoming_match(UUID(team["id"]))
+        res = client.delete(f"{V1}/teams/{team['id']}", headers=owner["headers"])
+        assert res.status_code == 409
+        assert error_code(res) == "TEAM_HAS_UPCOMING_MATCH"
+
+    def test_없는_팀은_404(self, client, owner):
+        res = client.delete(f"{V1}/teams/{uuid4()}", headers=owner["headers"])
+        assert res.status_code == 404
+
+    def test_인증이_필요하다(self, client, team):
+        assert client.delete(f"{V1}/teams/{team['id']}").status_code == 401

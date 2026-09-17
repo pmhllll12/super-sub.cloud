@@ -4,12 +4,13 @@
 진짜 PostgreSQL로 본다.
 """
 
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
 from app.core.security import issue_access_token
 from app.user.adapter.outbound.stub.team_stub_repository import (
+    register_squad,
     register_user,
     reset_teams,
 )
@@ -51,11 +52,12 @@ def team(client, owner):
     return res.json()
 
 
-def _invite(client, team_id, owner_headers, invited_user_id):
+def _invite(client, team_id, owner_headers, invited_user_id, position_code=None):
+    body = {"invited_user_id": str(invited_user_id)}
+    if position_code is not None:
+        body["position_code"] = position_code
     return client.post(
-        f"{V1}/teams/{team_id}/invitations",
-        json={"invited_user_id": str(invited_user_id)},
-        headers=owner_headers,
+        f"{V1}/teams/{team_id}/invitations", json=body, headers=owner_headers
     )
 
 
@@ -124,6 +126,41 @@ class TestListTeamInvitations:
         assert res.json()[0]["invited_user_id"] == str(candidate["id"])
 
 
+class TestInvitationPosition:
+    """「부르는 자리」 — `paik` 37번. **선택이다.**"""
+
+    def test_자리를_안_정해도_초대가_된다(self, client, team, owner, candidate):
+        res = _invite(client, team["id"], owner["headers"], candidate["id"])
+        assert res.status_code == 201, res.text
+        assert res.json()["position_code"] is None
+        assert res.json()["position_label"] is None
+
+    def test_자리를_정하면_약칭과_이름이_함께_나온다(
+        self, client, team, owner, candidate
+    ):
+        res = _invite(client, team["id"], owner["headers"], candidate["id"], "GK")
+        assert res.status_code == 201, res.text
+        assert res.json()["position_code"] == "GK"
+        # 🔴 이름까지 주는 것이 요점이다 — 화면이 약칭만으로는 「골키퍼」를
+        # 못 쓴다(포지션 목록을 따로 부르지 않는 한).
+        assert res.json()["position_label"] == "골키퍼"
+
+    def test_다른_종목의_약칭은_422다(self, client, team, owner, candidate):
+        # 야구의 `P`(투수). 축구 팀이라 없는 자리다 — 약칭은 종목 안에서만
+        # 유일하므로 이것이 오타인지 아닌지는 종목을 봐야 안다.
+        res = _invite(client, team["id"], owner["headers"], candidate["id"], "P")
+        assert res.status_code == 422
+        assert error_code(res) == "UNKNOWN_POSITION"
+
+    def test_받은_목록에도_자리가_실린다(self, client, team, owner, candidate):
+        _invite(client, team["id"], owner["headers"], candidate["id"], "FW")
+        row = client.get(
+            f"{V1}/me/invitations", headers=candidate["headers"]
+        ).json()[0]
+        assert row["position_code"] == "FW"
+        assert row["position_label"] == "공격수"
+
+
 class TestListMyInvitations:
     def test_내가_받은_대기중_초대만_보인다(self, client, team, owner, candidate):
         _invite(client, team["id"], owner["headers"], candidate["id"])
@@ -131,6 +168,54 @@ class TestListMyInvitations:
         assert res.status_code == 200
         assert len(res.json()) == 1
         assert res.json()[0]["team_id"] == team["id"]
+
+    def test_팀_이름과_지역이_초대_한_줄에_실린다(
+        self, client, team, owner, candidate
+    ):
+        """`paik` 37번. 받는 사람은 그 팀 소속이 아니라 팀 화면을 안 거친다."""
+        _invite(client, team["id"], owner["headers"], candidate["id"])
+        row = client.get(
+            f"{V1}/me/invitations", headers=candidate["headers"]
+        ).json()[0]
+        assert row["team_name"] == TEAM["name"]
+        assert row["team_region"] == TEAM["region"]
+        assert row["team_sport_code"] == TEAM["sport_code"]
+
+    def test_기존_칸이_그대로_남아_있다(self, client, team, owner, candidate):
+        """🔴 감싸지 않고 덧붙였다 — 화면이 읽던 칸이 한 겹 들어가면 안 된다."""
+        _invite(client, team["id"], owner["headers"], candidate["id"])
+        row = client.get(
+            f"{V1}/me/invitations", headers=candidate["headers"]
+        ).json()[0]
+        assert set(row) >= {
+            "id",
+            "team_id",
+            "invited_user_id",
+            "status",
+            "created_at",
+            "responded_at",
+        }
+        assert "invitation" not in row
+
+    def test_스쿼드가_있으면_공개_슬러그를_준다(
+        self, client, team, owner, candidate
+    ):
+        """이 한 칸으로 화면이 `GET /squads/{slug}` 를 불러 판을 그린다."""
+        # 🔴 스텁은 UUID 로 키를 잡는다 — JSON 의 문자열 그대로 넣으면 안 걸린다.
+        register_squad(UUID(team["id"]), "sq-abc123")
+        _invite(client, team["id"], owner["headers"], candidate["id"])
+        row = client.get(
+            f"{V1}/me/invitations", headers=candidate["headers"]
+        ).json()[0]
+        assert row["squad_public_slug"] == "sq-abc123"
+
+    def test_스쿼드가_아직_없으면_null_이다(self, client, team, owner, candidate):
+        """🔴 빈 값이 정상이다 — 스쿼드는 늦게 생긴다(생성이 멱등이다)."""
+        _invite(client, team["id"], owner["headers"], candidate["id"])
+        row = client.get(
+            f"{V1}/me/invitations", headers=candidate["headers"]
+        ).json()[0]
+        assert row["squad_public_slug"] is None
 
     def test_남이_받은_초대는_안_보인다(self, client, team, owner, candidate):
         _invite(client, team["id"], owner["headers"], candidate["id"])
