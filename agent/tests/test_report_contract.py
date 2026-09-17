@@ -44,8 +44,7 @@ def _declared(block: dict) -> set[str]:
     return set(block["fields"])
 
 
-@pytest.fixture(scope="module")
-def report() -> dict:
+def build_envelope(preprocessing: dict | None = None) -> dict:
     """합성 키포인트로 **실제 `build_report`** 를 지나온 봉투.
 
     스텁으로 손수 만든 dict 를 검사하면 계약과 스텁이 맞는지만 보게 된다 —
@@ -59,6 +58,7 @@ def report() -> dict:
         sampled_fps=15.0,
         frame_size=(1920, 1080),
         subject_boxes=[None] * len(kps),
+        preprocessing=preprocessing,
     )
     rubric = load_rubric(RUBRIC_PATH)
     features = extract_features(
@@ -95,6 +95,12 @@ def report() -> dict:
         judge_model="stub-model",
         timing={"fetch_s": 1.0, "measure_s": 2.0, "judge_s": 3.0, "preview_s": 4.0},
     )
+
+
+@pytest.fixture(scope="module")
+def report() -> dict:
+    """전처리기를 안 쓴 경로(합성 키포인트)의 봉투 — 지금까지의 기본값이다."""
+    return build_envelope()
 
 
 # --- 봉투 ------------------------------------------------------------------
@@ -204,3 +210,52 @@ def test_the_quality_block_is_not_part_of_features():
     after = extract_features(kps, {}, "leg", "extension_peak", "auto")
     assert set(after) == set(before)
     assert "keypoint_quality" not in after
+
+
+# --- 무엇으로 쟀는가 (미결 49번) --------------------------------------------
+
+
+def test_the_envelope_says_which_preprocessor_produced_the_grade(report):
+    """🔴 **봉투가 「무엇으로 쟀는가」를 스스로 말한다.**
+
+    미결 49번: 평가 기계와 EC2 서비스가 `torchvision` 유무로 **다른 이미지
+    전처리기**를 골라, 같은 영상이 다른 등급을 받는다(축구 19편 중 2편이 등급
+    문자까지 — 미결 47번 5회차). 어느 쪽으로 통일할지는 **결정 대기**지만,
+    그때까지도 **어느 쪽으로 돈 결과인지는 드러나 있어야 한다** — 47번이
+    닷새 걸린 이유가 정확히 그것이 산출에 안 남아 있어서였다.
+
+    값은 `pose` 에서 온 것을 **무변환**으로 싣는다. 봉투가 다시 만들면 그건
+    "같을 것"이라는 가정이고, 실제로 갈리는 날 그 가정이 사실을 덮는다.
+    """
+    ident = {
+        "detector": "RTDetrImageProcessorPil",
+        "pose": "VitPoseImageProcessor",
+        "torchvision": False,
+    }
+
+    assert build_envelope(preprocessing=ident)["preprocessing"] == ident
+
+
+def test_a_report_without_a_preprocessor_says_null_instead_of_guessing(report):
+    """합성 키포인트 경로는 전처리기를 안 쓴다 — `null` 이다.
+
+    🔴 **기본값을 채우지 않는다.** 채우면 안 쓴 전처리기를 썼다고 말하게 되고,
+    그러면 이 필드를 심은 이유 자체가 없어진다 — 적힌 값이 참이 아니게 된다.
+    `video_id`·`frame_metrics_seconds` 와 같은 규칙이다.
+    """
+    assert report["preprocessing"] is None
+
+
+def test_naming_the_preprocessor_does_not_move_the_score(report):
+    """🔴 **드러내기지 고치기가 아니다** — 점수를 한 비트도 안 건드린다.
+
+    `features` 에 한 키도 안 더하는 형제 블록이라 판정 입력이 그대로이고
+    **B-6 재실행을 부르지 않는다**(`timebase`·`view_dependent` 와 같은 성질).
+    이 검사가 없으면 나중에 누군가 이 값을 채점에 끌어다 쓰고도 모른다.
+    """
+    named = build_envelope(
+        preprocessing={"detector": "RTDetrImageProcessor", "torchvision": True}
+    )
+
+    assert named["result"] == report["result"]
+    assert named["features"] == report["features"]

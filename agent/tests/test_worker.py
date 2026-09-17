@@ -301,6 +301,40 @@ def _intercept(worker, monkeypatch, responses):
     return sent
 
 
+def test_every_backend_call_names_itself_in_the_user_agent(worker, cfg, monkeypatch):
+    """🔴 UA 를 안 주면 urllib 이 `Python-urllib/3.x` 를 보내고, 백엔드 앞단
+    Cloudflare 가 그 문자열을 403(`error code: 1010`)으로 끊는다. 2026.09.16
+    08:27 부터 워커가 작업을 한 건도 못 집은 원인이다 — **오리진까지 가지
+    않으므로 백엔드 로그에는 아무것도 안 남고**, 워커 저널의 403 만 보고
+    토큰을 의심하게 된다. `_request` 하나만 보면 되는 이유는 claim 과 보고가
+    둘 다 여기를 지나서다.
+    """
+    seen: list = []
+
+    class _Resp:
+        status = 204
+
+        def read(self) -> bytes:
+            return b""
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc) -> bool:
+            return False
+
+    def fake_urlopen(req, timeout=None):
+        seen.append(req)
+        return _Resp()
+
+    monkeypatch.setattr(worker.urllib.request, "urlopen", fake_urlopen)
+    worker._request(cfg, "POST", "/internal/analysis-jobs/claim")
+
+    ua = seen[0].get_header("User-agent")
+    assert ua, "UA 를 안 주면 urllib 이 기본값을 채운다"
+    assert "Python-urllib" not in ua
+
+
 def test_an_empty_queue_is_not_an_error(worker, cfg, monkeypatch):
     """🔴 204 를 오류로 다루면 저널이 빈 폴링으로 찬다. 큐가 빈 것이 정상이다."""
     _intercept(worker, monkeypatch, [(204, b"")])

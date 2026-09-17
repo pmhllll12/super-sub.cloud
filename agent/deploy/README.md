@@ -534,6 +534,10 @@ uv run python -m pytest -q   # GPU 없이 도는 테스트들 — 전부 통과�
 
 EC2에서 받아서 올린다. 로컬에서 올리면 집 회선으로 5GB를 올려야 한다.
 
+> ✅ **이미 올라가 있다 (2026.09.17).** `models/exaone-4.0-1.2b/` 에 13개
+> 객체 2.4GiB. 아래는 **새 버킷을 만들 때나 모델을 바꿀 때** 쓴다. 지금
+> 필요한 것은 5-1′(복구)뿐이다.
+
 ```bash
 cd ~/super-sub.cloud/agent
 uv pip install "huggingface_hub[cli]"   # ← uv run pip 이 아니다. 아래 참고
@@ -546,6 +550,42 @@ aws s3 sync /opt/supersub/models/exaone-4.0-1.2b \
   s3://$BUCKET/models/exaone-4.0-1.2b \
   --exclude ".cache/*" --exclude "*.lock"
 ```
+
+🔴 **위 `sync` 는 EC2 역할로 그냥 돌면 `AccessDenied` 다.** 2-1 정책이
+`models/` 에 **쓰기를 안 준다**(읽기만 준다). 올릴 때는 **버킷 정책에 문장
+하나를 한시적으로** 더한다 — IAM 을 못 고치는 계정도 S3 권한만 있으면 된다.
+명시적 Deny 가 아니라 **Allow 가 없는 것**이라 어느 쪽에서 주든 통과한다.
+
+```json
+{ "Sid": "TempModelUpload", "Effect": "Allow",
+  "Principal": { "AWS": "arn:aws:iam::<AWS 계정 ID>:role/<EC2 역할>" },
+  "Action": ["s3:PutObject", "s3:AbortMultipartUpload"],
+  "Resource": "arn:aws:s3:::$BUCKET/models/*" }
+```
+
+기존 정책의 `Statement` 배열에 **더한다** — 🔴 통째로 바꾸면 TLS 강제
+(`DenyInsecureTransport`)가 날아간다. `AbortMultipartUpload` 은 2.4GB 가
+멀티파트로 올라가서 끊겼을 때 조각을 치우려고 함께 준다.
+🔴 **올린 뒤 그 문장을 다시 뺀다.** 모델은 한 번 올리면 끝이고, 쓰기를 상시로
+두면 워커가 **읽기 전용이어야 할 자리**에 쓸 수 있게 된다.
+
+### 5-1′. 새 인스턴스에서 되받는다 (복구)
+
+**이쪽이 평소에 쓰는 경로다.** 읽기는 역할에 이미 있으므로 정책을 건드릴
+일이 없다. HF 를 다시 안 거치므로 레이트리밋도, 리비전이 갈릴 걱정도 없다.
+
+```bash
+SUPERSUB_MODEL_S3=s3://$BUCKET/models/exaone-4.0-1.2b \
+SUPERSUB_MODEL_DIR=/opt/supersub/models/exaone-4.0-1.2b \
+  deploy/sync_model.sh
+```
+
+> **왜 백업이 필요한가.** `judge.py` 의 `MODEL_REVISIONS` 가 가중치를 커밋
+> 해시로 고정하지만(미결 11번), **해시는 「무엇을 받아야 하는지」만 말하지
+> 「그것이 계속 거기 있다」를 보장하지 않는다.** 업스트림이 저장소를 내리면
+> 고정한 해시는 가리킬 것이 없고 B-6 재실행이 그 자리에서 막힌다. S3 사본이
+> 그 유일한 방어다. 2026.09.17 에 왕복 검증까지 했다 — S3 에서 되받은
+> `model.safetensors` 의 sha256 이 EC2 원본·고정 리비전과 **셋 다 같다**.
 
 `/opt/supersub`에 권한이 없으면 먼저:
 `sudo mkdir -p /opt/supersub/models && sudo chown -R ubuntu:ubuntu /opt/supersub`
@@ -606,17 +646,20 @@ sudo mkdir -p /etc/supersub
 sudo cp deploy/vllm.env.example /etc/supersub/vllm.env
 sudo chmod 600 /etc/supersub/vllm.env
 
-# IAM 역할이 없으면(README-console 2-C) S3를 건너뛴다 — 5-1에서 HF로 받은
-# /opt/supersub/models/exaone-4.0-1.2b 를 그대로 쓴다.
-sudo sed -i 's|^SUPERSUB_MODEL_S3=.*|SUPERSUB_MODEL_S3=|' /etc/supersub/vllm.env
-
 sudo cp deploy/supersub-vllm.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now supersub-vllm
 ```
 
-> 예시 파일에 버킷 이름(`supersub-ai`)이 이미 들어 있다. 다른 버킷을 쓸 때만
-> `SUPERSUB_MODEL_S3` 줄을 고친다.
+> 🔴 **`SUPERSUB_MODEL_S3` 는 비운 채로 둔다** — 예시 파일의 기본값이 이미
+> 비어 있다. **S3 사본은 백업이지 기동 경로가 아니다** (2026.09.17). 채우면
+> `ExecStartPre=sync_model.sh` 가 **기동할 때마다** S3 에 다녀오고, 그 호출이
+> 실패하면 가중치가 디스크에 있는데도 vLLM 이 안 뜬다. 가중치를 되받는 것은
+> **5-1′ 을 한 번 돌리는 것**이고, 그 뒤엔 로컬만 보면 된다.
+>
+> 🔴 예전에는 이 자리에 `sed` 로 값을 비우는 줄이 있었다. 예시 파일이
+> S3 경로를 담고 있어서였는데, **예시와 절차가 서로 반대라** 둘 중 무엇이
+> 맞는지 읽는 사람마다 달랐다. 예시 쪽을 비우는 것으로 맞췄다.
 
 **확인:**
 ```bash

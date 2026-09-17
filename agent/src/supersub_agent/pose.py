@@ -20,7 +20,7 @@ import subprocess
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 import cv2
 import numpy as np
@@ -377,6 +377,10 @@ class PoseResult:
     # 대상을 어떻게 골랐는가. 기본값은 지금까지의 동작(auto)이라 이 필드를
     # 모르는 기존 호출부가 그대로 맞다.
     subject_selection: SubjectSelection = field(default_factory=SubjectSelection)
+    # 이 키포인트를 낸 **이미지 전처리기의 실물 이름** (미결 49번).
+    # 전처리기를 안 쓴 결과(합성 키포인트)는 None 이고, 기본값이 None 이라
+    # 이 필드를 모르는 기존 호출부는 그대로 동작한다.
+    preprocessing: dict[str, Any] | None = None
 
     def subject_box_frames(self) -> int:
         """대상을 실제로 고른 프레임 수."""
@@ -1083,10 +1087,48 @@ def extract_keypoints(
         subject_boxes=subject_boxes,
         frame_size=(width, height),
         subject_selection=selection,
+        # 🔴 **무엇으로 쟀는지를 결과가 스스로 말한다** (미결 49번).
+        # 적재·검출 블록 안에서 읽는 이유는 **실제로 쓴 객체**에서 읽어야
+        # 해서다 — 밖에서 다시 만들면 그건 "같을 것"이라는 가정이다.
+        preprocessing=preprocessing_identity(
+            detector=det_processor, pose=pose_processor
+        ),
     )
     if observe:
         _record_input_observation(result, rubric_key)
     return result
+
+
+def preprocessing_identity(**processors: Any) -> dict[str, Any]:
+    """이 값을 낸 **이미지 전처리기의 실물 이름** (미결 49번).
+
+    🔴 **설치 여부가 아니라 「고른 결과」를 적는다.** transformers 5.x 는
+    `torchvision` 이 있느냐로 **다른 전처리기를 고르고**
+    (`RTDetrImageProcessor` ↔ `RTDetrImageProcessorPil`), 리사이즈가 갈리면
+    픽셀이 달라져 **같은 영상이 다른 등급을 받는다** — 축구 19편 중 **2편이
+    등급 문자까지** 갈렸다(미결 47번 5회차. `D→B` · `D→C`).
+
+    그래서 `is_torchvision_available()` 만 적는 것으로는 모자란다. 그건
+    **고르는 데 쓰인 입력**이지 고른 결과가 아니고, 업스트림이 고르는 규칙을
+    바꾸면 같은 값이 다른 전처리기를 뜻하게 된다. **실물에서 읽으면** 그
+    변화가 결과에 그대로 드러난다. (`env.torchvision` 은 함께 적는다 — 둘이
+    어긋나는 날이 오면 그게 알아야 할 사건이다.)
+
+    🔴 **점수를 바꾸지 않는다.** 무엇으로 쟀는지를 적을 뿐이라 `features` 에
+    한 키도 안 더하고 **B-6 재실행을 부르지 않는다**.
+
+    이것이 필요한 이유는 평가 기계와 EC2 서비스가 **다른 경로로 돌고 있기**
+    때문이다(미결 49번). 어느 쪽으로 통일할지는 결정 대기지만, **어느 쪽으로
+    돌았는지는 결과가 스스로 말해야 한다** — 안 그러면 다음에 갈렸을 때
+    47번처럼 닷새를 쓴다.
+    """
+    from transformers.utils.import_utils import is_torchvision_available
+
+    identity: dict[str, Any] = {
+        name: type(p).__name__ for name, p in processors.items()
+    }
+    identity["torchvision"] = bool(is_torchvision_available())
+    return identity
 
 
 def _load_detector(device: str):
