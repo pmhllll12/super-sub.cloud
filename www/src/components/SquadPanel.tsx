@@ -11,10 +11,11 @@ import MatchBot from '@/components/MatchBot'
 import TeamMatch from '@/components/TeamMatch'
 import MatchWaiting from '@/components/MatchWaiting'
 import { type MatchTeam, type PitchPlayer } from '@/lib/teamMatch'
-import { readSeeking, stopSeeking } from '@/lib/seekingStore'
+import { markMatchDone, readSeeking, stopSeeking } from '@/lib/seekingStore'
 import {
   addSeat,
   formationToSize,
+  removeSeat,
   saveFormation,
   saveSeat,
   seatOf,
@@ -1073,16 +1074,43 @@ export default function SquadPanel({
    * 화면에서 지우기 전에 서버로 먼저 보낸다 — 실패하면 그대로 둔다.
    */
   async function cancelInvite(area: string) {
+    if (!myTeamId) return
     const id = invites[area]
-    if (!myTeamId || !id) return
-    try {
-      await apiDelete(
-        `/api/teams/${encodeURIComponent(myTeamId)}/invitations/${encodeURIComponent(id)}`,
-      )
-    } catch {
-      /* 이미 답이 났으면 409 다 — 그때는 아래 복원이 곧 맞춰 준다. */
+    if (id) {
+      try {
+        await apiDelete(
+          `/api/teams/${encodeURIComponent(myTeamId)}/invitations/${encodeURIComponent(id)}`,
+        )
+      } catch {
+        /* 이미 답이 났으면 409 다 — 그때는 아래 복원이 곧 맞춰 준다. */
+      }
+      setInvites((prev) => {
+        const next = { ...prev }
+        delete next[area]
+        return next
+      })
     }
-    setInvites((prev) => {
+
+    /**
+     * 🔴 **이미 등재된 사람도 서버에서 뺀다** (2026-09-18, 사용자 지적:
+     * 「취소를 눌러 내보냈는데 계속 팀에 상주한다」).
+     *
+     * 전에는 **대기 중인 초대만** 물렀다. 수락이 끝나면 무를 초대가 없어
+     * `id` 가 비고, 위에서 그대로 돌아가 **서버로 아무것도 안 나갔다** —
+     * 화면에서만 사라졌다가 새로고침에 되살아났다. 등재를 만드는 쪽은
+     * 이미 서버였는데(수락하면 서버가 등재한다, 계약 60) **지우는 쪽만
+     * 화면에 남아 있어서** 생긴 어긋남이다.
+     */
+    const memberId = members[area]
+    if (!memberId) return
+    try {
+      await removeSeat(myTeamId, memberId)
+    } catch {
+      /* 🔴 **판을 멈추지 않는다** — 주장이 아니면 403 이고, 그 경우 화면은
+         원래도 ⊗ 를 안 그린다. 실패하면 다음 조회가 제자리로 돌려 놓는다. */
+      return
+    }
+    setMembers((prev) => {
       const next = { ...prev }
       delete next[area]
       return next
@@ -2022,6 +2050,12 @@ export default function SquadPanel({
           onClose={() => {
             setMatched(null)
             onAcceptedShown?.()
+          }}
+          /* 🔴 **머리칸의 「경기 잡힘」에서 뺀다**(사용자 요청, 2026-09-18).
+             서버에 「끝난 경기」 상태가 없어 브라우저에 적어 둔다 — 그 한계는
+             `seekingStore` 머리말에 적었다. */
+          onFinished={() => {
+            if (acceptedMatchId) markMatchDone(acceptedMatchId)
           }}
           /* 🔴 **서버로 보낸다**(미결 `paik` 34번 해소, 2026-09-17). 전에는
              팝업만 닫혀서 확정 경기가 「내 경기」에 그대로 남았다.

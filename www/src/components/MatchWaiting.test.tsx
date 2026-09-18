@@ -196,10 +196,73 @@ describe('경기 대기 팝업', () => {
       expect(screen.getByRole('button', { name: '정말 취소합니다' })).toBeEnabled()
     })
 
-    /* 🔴 무를 길이 없으면 단추도 안 그린다 — 눌러도 아무 일이 없으면 안 된다. */
+    /* 🔴 무를 길이 없으면 단추도 안 그린다 — 눌러도 아무 일이 없으면 안 된다.
+       🔴 **칸 전체를 숨기지는 않는다**(2026-09-18) — 「경기 완료」는 취소와
+       달리 서버로 나가는 것이 없어 `onCancel` 과 무관하다. 전에는 칸째
+       숨겨서 마무리까지 같이 사라졌다. */
     it('무를 길이 없으면 단추를 안 낸다', () => {
       open()
       expect(screen.queryByRole('button', { name: '경기 취소' })).toBeNull()
+      expect(screen.getByRole('button', { name: '경기 완료' })).toBeInTheDocument()
+    })
+  })
+
+  /**
+   * 🔴 **시각이 되기 전에도 손으로 끝낼 수 있다** (사용자 요청, 2026-09-18).
+   *
+   * 전에는 마무리가 **경기 시각이 지나야만** 열렸다(`over`). 먼저 치른 경기를
+   * 적을 길이 없었다. 🔴 되돌릴 수 없는 결정이라 **바로 넘기지 않고 한 번 더
+   * 묻는다.**
+   */
+  describe('경기 완료 — 손으로, 그러나 한 번 더 묻고', () => {
+    it('시각 전에도 「경기 완료」가 있다', () => {
+      open()
+      expect(screen.getByRole('button', { name: '경기 완료' })).toBeInTheDocument()
+    })
+
+    it('🔴 누르면 바로 안 끝나고 되돌릴 수 없다고 먼저 말한다', async () => {
+      const user = userEvent.setup()
+      open()
+      await user.click(screen.getByRole('button', { name: '경기 완료' }))
+
+      expect(screen.getByText(/정말로 경기가 완료되었나요/)).toBeInTheDocument()
+      expect(screen.getByText(/되돌릴 수 없습니다/)).toBeInTheDocument()
+      /* 아직 리뷰로 안 갔다 — 물어보는 중이다. */
+      expect(screen.queryByRole('dialog', { name: '경기 리뷰' })).toBeNull()
+    })
+
+    it('경고 안의 「경기 완료」를 눌러야 리뷰로 간다', async () => {
+      const user = userEvent.setup()
+      open()
+      await user.click(screen.getByRole('button', { name: '경기 완료' }))
+      await user.click(screen.getByRole('button', { name: '경기 완료' }))
+
+      expect(await screen.findByRole('dialog', { name: '경기 리뷰' })).toBeInTheDocument()
+    })
+
+    /* 🔴 **취소처럼 머리칸의 「경기 잡힘」에서 사라져야 한다**(사용자 요청,
+       2026-09-18). 서버에 완료 상태가 없어 부모가 브라우저에 적는다. */
+    it('확인하면 부모에게 「끝났다」를 알린다', async () => {
+      const user = userEvent.setup()
+      const onFinished = vi.fn()
+      render(
+        <MatchWaiting us={US} them={THEM} onClose={vi.fn()} onFinished={onFinished} />,
+      )
+      await user.click(screen.getByRole('button', { name: '경기 완료' }))
+      expect(onFinished).not.toHaveBeenCalled() // 아직 묻는 중이다
+      await user.click(screen.getByRole('button', { name: '경기 완료' }))
+      expect(onFinished).toHaveBeenCalledTimes(1)
+    })
+
+    it('「되돌리기」를 누르면 아무 일도 없다', async () => {
+      const user = userEvent.setup()
+      open()
+      await user.click(screen.getByRole('button', { name: '경기 완료' }))
+      await user.click(screen.getByRole('button', { name: '되돌리기' }))
+
+      expect(screen.queryByText(/정말로 경기가 완료되었나요/)).toBeNull()
+      expect(screen.queryByRole('dialog', { name: '경기 리뷰' })).toBeNull()
+      expect(screen.getByRole('button', { name: '경기 완료' })).toBeInTheDocument()
     })
   })
 
