@@ -165,6 +165,21 @@ export default function TeamActions({
    * 화면이 짐작해서 미리 해체를 들이밀면 **나갈 수 있는 사람이 팀을 없앤다.**
    */
   const [disbandable, setDisbandable] = useState<string | null>(null)
+  /**
+   * **이미 떠난 팀** — 나갔거나 해체한 팀의 id.
+   *
+   * 🔴 **`router.refresh()` 하나로는 모자랐다**(사용자 지적, 2026-09-18:
+   * 「팀 해체 했는데, 팀 왜 안사라지고 …아예 안나와야지」). 개발 모드에서
+   * Next 는 라우트 핸들러와 서버 컴포넌트를 **다른 모듈 그래프**로 묶어서,
+   * mock 을 고친 쪽과 목록을 그리는 쪽이 갈린다 — 해체는 됐는데 줄이 그대로
+   * 남았고, 거기서 나가기를 다시 누르니 **「구성원이 아닙니다」**가 떴다.
+   * (1.11 회차가 스위치·호칭에서 겪고 「응답을 쓰라」고 적어 둔 그 함정이다.)
+   *
+   * 🔴 **mock 우회가 아니다.** 실서버에서도 다시 받아 오기를 기다리지 않고
+   * 그 자리에서 사라지는 편이 맞다 — `router.refresh()` 는 그대로 두고,
+   * 돌아온 목록에 그 팀이 없으면 이 값은 그냥 아무 일도 안 한다.
+   */
+  const [left, setLeft] = useState<string[]>([])
   /** 지금 고치는 중인 팀. 한 번에 하나만 편다 — 여럿이 펴져 있으면 어느 것을
    *  저장하는지가 안 읽힌다. */
   const [editing, setEditing] = useState<string | null>(null)
@@ -241,6 +256,7 @@ export default function TeamActions({
     setDisbandable(null)
     try {
       await apiDelete(`/api/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}`)
+      setLeft((prev) => [...prev, teamId])
       router.refresh()
     } catch (err) {
       setError(apiErrorMessage(err))
@@ -273,7 +289,11 @@ export default function TeamActions({
     setError(null)
     try {
       await apiDelete(`/api/teams/${encodeURIComponent(teamId)}`)
+      setLeft((prev) => [...prev, teamId])
       setDisbandable(null)
+      /* 🔴 **권유 문구도 같이 지운다.** 그 줄이 사라졌는데 「혼자뿐이라
+         해체해야 합니다」가 남아 있으면 무엇에 대한 말인지 알 수 없다. */
+      setError(null)
       router.refresh()
     } catch (err) {
       /* 🔴 **앞으로 있을 경기가 있으면 막힌다**(`409
@@ -286,9 +306,17 @@ export default function TeamActions({
     }
   }
 
+  /**
+   * 화면에 그릴 팀 — **떠난 것은 뺀다**(위 `left` 주석).
+   *
+   * 🔴 목록과 「아직 소속된 팀이 없습니다」가 **같은 값**을 봐야 한다. 한쪽만
+   * 거르면 마지막 팀을 떠난 뒤 목록은 비었는데 안내는 안 뜨는 빈 판이 된다.
+   */
+  const shown = teams.filter((t) => !left.includes(t.team_id))
+
   return (
     <>
-      {teams.length === 0 ? (
+      {shown.length === 0 ? (
         /* 🔴 **한 줄로 끝낸다**(사용자 요청, 2026-09-16). 앞서 여기에
            「팀을 만들어야 스쿼드와 경기 신청을 쓸 수 있습니다」를 덧붙여
            무엇이 막히는지 적었는데, 바로 아래에 **「팀 만들기」 단추가 이미
@@ -296,7 +324,7 @@ export default function TeamActions({
         <p className="ss-profile-muted">아직 소속된 팀이 없습니다.</p>
       ) : (
         <ul className="ss-profile-teams">
-          {teams.map((t) => (
+          {shown.map((t) => (
             <li key={t.team_id}>
               {/* 🔴 **나가기는 팀 이름 오른쪽**이다(사용자 요청, 2026-09-16) —
                   어느 팀을 나가는지가 이름 옆에 있어야 붙는다. 아래 따로 두면

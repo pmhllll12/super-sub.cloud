@@ -477,3 +477,92 @@ describe('프로필 — 마지막 주장의 팀 해체', () => {
     expect(screen.queryByRole('button', { name: '팀 해체하기' })).toBeNull()
   })
 })
+
+/**
+ * **떠난 팀은 그 자리에서 사라진다** (사용자 지적, 2026-09-18).
+ *
+ * 「팀 해체 했는데, 팀 왜 안사라지고 그 팀의 구성원이 아닙니다.로 나옴?
+ * 아예 안나와야지」
+ *
+ * 🔴 **`router.refresh()` 하나로는 모자랐다.** 개발 모드에서 Next 는 라우트
+ * 핸들러와 서버 컴포넌트를 **다른 모듈 그래프**로 묶어서, mock 을 고친 쪽과
+ * 목록을 그리는 쪽이 갈린다(1.11 회차가 스위치·호칭에서 겪고 적어 둔 그
+ * 함정이다). 해체는 됐는데 목록은 그대로였고, 거기서 나가기를 다시 누르니
+ * **「그 팀의 구성원이 아닙니다」**(이미 나간 뒤라 404)가 떴다.
+ *
+ * 🔴 고치는 법은 1.11 의 결론과 같다 — **화면이 결과를 직접 반영한다.**
+ * mock 우회가 아니라 어느 모드에서든 맞는 방식이고, 실서버에서도 다시 받아
+ * 오기를 기다리지 않고 그 자리에서 사라진다.
+ */
+describe('프로필 — 떠난 팀은 목록에서 빠진다', () => {
+  const TWO = [
+    { team_id: 't1', name: '번개FC', region: '서울 강남', sport_code: 'football', role: 'owner' },
+    { team_id: 't2', name: '한강FC', region: '서울 마포구', sport_code: 'football', role: 'member' },
+  ]
+
+  function stubOk() {
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      /* 🔴 **주장인 t1 만** 막는다. 전부 막으면 팀원으로 나가는 갈래까지
+         409 가 되어, 시험이 잡으려던 것과 다른 것을 재게 된다. */
+      if ((init?.method ?? 'GET') === 'DELETE' && String(input).includes('/teams/t1/members/')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ error: { code: 'LAST_OWNER', message: '마지막 주장은 팀을 나갈 수 없습니다.' } }),
+            { status: 409 },
+          ),
+        )
+      }
+      if ((init?.method ?? 'GET') === 'DELETE') {
+        return Promise.resolve(new Response(null, { status: 204 }))
+      }
+      return Promise.resolve(new Response(JSON.stringify({ id: 't9' }), { status: 201 }))
+    })
+  }
+
+  beforeEach(() => {
+    refresh.mockClear()
+    stubOk()
+  })
+  afterEach(() => vi.restoreAllMocks())
+
+  it('해체한 팀이 그 자리에서 사라진다', async () => {
+    const user = userEvent.setup()
+    render(<TeamActions teams={TWO} userId="u1" />)
+    await user.click(screen.getAllByRole('button', { name: '팀 나가기' })[0])
+    await user.click(await screen.findByRole('button', { name: '팀 해체하기' }))
+
+    await waitFor(() => expect(screen.queryByText('번개FC')).toBeNull())
+    // 🔴 **남은 팀은 그대로다** — 하나 없앴다고 목록을 비우면 안 된다.
+    expect(screen.getByText('한강FC')).toBeInTheDocument()
+  })
+
+  /* 사라진 팀 자리에 「해체하시겠습니까」가 남아 있으면 안 된다. */
+  it('해체한 뒤에는 권유도 사라진다', async () => {
+    const user = userEvent.setup()
+    render(<TeamActions teams={TWO} userId="u1" />)
+    await user.click(screen.getAllByRole('button', { name: '팀 나가기' })[0])
+    await user.click(await screen.findByRole('button', { name: '팀 해체하기' }))
+
+    await waitFor(() => expect(screen.queryByText('번개FC')).toBeNull())
+    expect(screen.queryByRole('button', { name: '팀 해체하기' })).toBeNull()
+  })
+
+  /* 나가기도 같다 — 성공했으면 그 줄이 남아 있을 이유가 없다. */
+  it('나간 팀도 그 자리에서 사라진다', async () => {
+    const user = userEvent.setup()
+    render(<TeamActions teams={TWO} userId="u1" />)
+    await user.click(screen.getAllByRole('button', { name: '팀 나가기' })[1])
+
+    await waitFor(() => expect(screen.queryByText('한강FC')).toBeNull())
+    expect(screen.getByText('번개FC')).toBeInTheDocument()
+  })
+
+  /* 🔴 마지막 팀이 사라지면 **「아직 소속된 팀이 없습니다」**로 돌아간다. */
+  it('마지막 팀까지 떠나면 빈 안내로 돌아간다', async () => {
+    const user = userEvent.setup()
+    render(<TeamActions teams={[TWO[1]]} userId="u1" />)
+    await user.click(screen.getByRole('button', { name: '팀 나가기' }))
+
+    expect(await screen.findByText('아직 소속된 팀이 없습니다.')).toBeInTheDocument()
+  })
+})
