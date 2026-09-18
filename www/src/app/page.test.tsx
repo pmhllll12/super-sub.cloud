@@ -72,10 +72,17 @@ describe('홈 화면 — /', () => {
     expect(screen.queryByRole('button', { name: '내 프로필' })).toBeNull()
   })
 
-  // 카드가 아직 없는 사람에게는 닉네임 글자가 그 자리를 대신한다.
-  it('카드가 없으면 닉네임이 그 자리를 대신한다', () => {
+  // 🔴 카드가 아직 없어도 **빈 카드 틀**이 그 자리에 선다(사용자 요청, 2026-09-19).
+  // 전에는 닉네임 글자가 대신했는데 「여기서 카드를 만든다」가 안 읽혔다.
+  // 가운데는 비어 있다 — `+` 는 「누르면 채운다」는 스쿼드 판의 표식이다.
+  it('카드가 없으면 닉네임이 아니라 빈 카드 틀(+ 없음)이 그 자리에 선다', () => {
     render(<HomeBody user={{ nickname: '홍길동' }} />)
-    expect(screen.getByRole('link', { name: /홍길동/ })).toHaveAttribute('href', '/me')
+    const link = screen.getByRole('link', { name: /내 프로필/ })
+    expect(link).toHaveAttribute('href', '/me')
+    expect(link).not.toHaveTextContent('홍길동')
+    const blank = link.querySelector('.ss-pcard-blank')
+    expect(blank).not.toBeNull()
+    expect(blank!.querySelector('.ss-squad-seat-body')!.textContent).toBe('')
   })
 
   it('카드가 있으면 그 카드를 눌러 프로필로 간다', () => {

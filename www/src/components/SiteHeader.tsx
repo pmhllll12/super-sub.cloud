@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import type { PublicPlayerCard } from '@/server/backend'
 import PlayerCardView from '@/components/PlayerCardView'
+import BlankPlayerCard from '@/components/BlankPlayerCard'
 import BrandMark from '@/components/ui/BrandMark'
 import HomeNav, { type Destination } from '@/components/HomeNav'
 import NotifyPanel from '@/components/NotifyPanel'
@@ -240,13 +241,14 @@ export default function SiteHeader({
           href="/me"
           className={`ss-home-profile shrink-0${quiet ? ' ss-home-gone' : ''}`}
         >
-          {card ? (
-            <span className="ss-pcard-mini">
-              <PlayerCardView card={card} />
-            </span>
-          ) : (
-            <span style={{ color: 'var(--ss-fg)' }}>{user.nickname}</span>
-          )}
+          {/* 🔴 **카드가 없어도 카드 모양으로 둔다**(사용자 요청, 2026-09-19).
+              전에는 닉네임 글자로 대신했는데, 그러면 「여기서 카드를 만든다」가
+              안 읽힌다. 스쿼드 판의 빈 자리와 같은 빈 카드 틀에서 `+` 만 뺀
+              것 — `+` 는 「누르면 채운다」는 뜻이라 여기(프로필로 가는 길)에는
+              안 맞는다. */}
+          <span className="ss-pcard-mini">
+            {card ? <PlayerCardView card={card} /> : <BlankPlayerCard />}
+          </span>
           <span className="ss-home-profile-label">내 프로필</span>
         </TransitionLink>
       ) : (
