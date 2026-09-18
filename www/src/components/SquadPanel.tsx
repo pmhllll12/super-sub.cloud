@@ -1102,19 +1102,54 @@ export default function SquadPanel({
      * 화면에 남아 있어서** 생긴 어긋남이다.
      */
     const memberId = members[area]
-    if (!memberId) return
-    try {
-      await removeSeat(myTeamId, memberId)
-    } catch {
-      /* 🔴 **판을 멈추지 않는다** — 주장이 아니면 403 이고, 그 경우 화면은
-         원래도 ⊗ 를 안 그린다. 실패하면 다음 조회가 제자리로 돌려 놓는다. */
-      return
+    if (memberId) {
+      try {
+        await removeSeat(myTeamId, memberId)
+      } catch {
+        /* 🔴 **판을 멈추지 않는다** — 주장이 아니면 403 이고, 그 경우 화면은
+           원래도 ⊗ 를 안 그린다. 실패하면 다음 조회가 제자리로 돌려 놓는다. */
+        return
+      }
+      setMembers((prev) => {
+        const next = { ...prev }
+        delete next[area]
+        return next
+      })
     }
-    setMembers((prev) => {
-      const next = { ...prev }
-      delete next[area]
-      return next
-    })
+
+    /**
+     * 🔴 **팀에서도 내보낸다** (사용자 결정, 2026-09-18: 「x 가 팀에서도
+     * 빠지는 것」).
+     *
+     * 판에서 내리는 것만으로는 그 사람이 여전히 팀원이라, **AI 추천 후보에서
+     * 계속 빠진다**(추천은 그 팀 소속을 뺀다). 운영에서 그렇게 12명이 쌓여
+     * 추천 목록이 말랐다.
+     *
+     * 🔴 **`memberId` 는 그 사람의 `user_id` 다** — 소속 행의 id 가 아니다
+     * (계약 3-3절, 프록시 라우트 머리말). 판이 들고 있는 것은 카드 슬러그
+     * 뿐이라 카드를 한 번 읽어 주인을 알아낸다.
+     *
+     * ⚠️ 서버가 행을 지우지 않고 `left_at` 을 채운다 — 되돌리려면 다시
+     * 초대하면 된다.
+     */
+    const slug = mateSlugs[area]
+    if (!slug) return
+    try {
+      const res = await fetch(`/api/cards/${encodeURIComponent(slug)}`)
+      if (!res.ok) return
+      const owner = (await res.json().catch(() => null)) as {
+        user?: { id?: string }
+      } | null
+      const userId = owner?.user?.id
+      /* 🔴 **나는 안 내보낸다.** 내 카드에는 ⊗ 가 없지만(위 주석) 한 겹 더
+         막는다 — 주장이 스스로 나가면 팀이 주인을 잃는다(`409 LAST_OWNER`). */
+      if (!userId || userId === card?.user.id) return
+      await apiDelete(
+        `/api/teams/${encodeURIComponent(myTeamId)}/members/${encodeURIComponent(userId)}`,
+      )
+    } catch {
+      /* 못 내보내도 판에서는 이미 빠졌다 — 화면을 멈추지 않는다. */
+    }
   }
 
   /**
