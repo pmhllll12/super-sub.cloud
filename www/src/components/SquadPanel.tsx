@@ -1465,8 +1465,8 @@ export default function SquadPanel({
      않는다** — 빈 자리를 직접 눌러 연 뒤(picking 이 이미 있다) 알약 상태가
      바뀌었다고 그 자리를 첫 빈 자리로 되돌리면, 방금 고른 자리가 사라진다. */
   useEffect(() => {
-    clearTimeout(timer.current)
     if (scouting) {
+      clearTimeout(timer.current)
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setClosing(null)
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -1474,10 +1474,19 @@ export default function SquadPanel({
       return
     }
     // 꺼지면 추천 판도 같이 접는다 — 한 단추가 연 한 벌이다.
+    /* 🔴 **타이머는 여기서 새로 걸 때만 지운다**(2026-09-18, 사용자 지적:
+       「판들 나왔다가 닫고 다시 클릭하면 또 클릭 안돼」).
+       판의 × 는 `close()` 가 물러나는 타이머를 건 **뒤에** `onCloseScouting`
+       으로 이 effect 를 부른다. 여기서 먼저 `clearTimeout` 을 하면 그 타이머가
+       지워지고, `picking` 은 이미 비어 있어 새 타이머도 안 걸린다 — 그래서
+       `closing` 이 영영 안 비워져 **안 보이는 추천 판이 DOM 에 남았다.**
+       그 판을 보고 「열려 있다」를 가르는 쪽(`body:has(.ss-suggest)`)이 전부
+       속았다 — 홈 안내가 판을 닫아도 안 돌아오던 옛 증상도 이것이다. */
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPicking((now) => {
       if (now) {
         setClosing(now)
+        clearTimeout(timer.current)
         timer.current = window.setTimeout(() => setClosing(null), SUGGEST_EXIT_MS)
       }
       return null

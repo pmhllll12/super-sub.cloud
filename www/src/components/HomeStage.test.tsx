@@ -1,6 +1,7 @@
-import { render, act, screen } from '@testing-library/react'
+import { render, act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import HomeStage from './HomeStage'
+import { MATCH_BOT } from '@/lib/destinations'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn() }),
@@ -97,6 +98,40 @@ describe('홈 — 눌러야만 영상 모음으로 간다', () => {
     setup()
     await userEvent.click(screen.getByRole('button', { name: /영상 둘러보기/ }))
     expect(push).toHaveBeenCalledTimes(1)
+  })
+
+  /**
+   * 🔴 **판을 열었다 닫은 뒤에도 눌린다**(사용자 지적, 2026-09-18: 「판들
+   * 나왔다가 닫고 다시 클릭해서 영상 페이지로 넘어가려고 하면 또 클릭 안돼」).
+   *
+   * 추천 판의 × 가 물러나는 타이머를 걸자마자, 같은 손짓이 끈 `scouting` 의
+   * effect 가 **그 타이머를 지웠다** — 그래서 물러난 판(`.ss-suggest`)이 안
+   * 보이는 채로 DOM 에 영영 남았고, 그것을 보고 판단하는 쪽이 전부 「판이
+   * 열려 있다」로 읽었다. 안내가 안 돌아오던 옛 증상(visibility)도 이것이다.
+   */
+  it('추천 판을 열었다 닫으면 판이 DOM 에서 빠지고 단추가 다시 눌린다', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] }),
+    )
+    render(
+      <HomeStage
+        user={{ nickname: '홍길동' }}
+        destinations={[]}
+        featured={[{ title: MATCH_BOT, icon: 'groups', summary: '' }]}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: MATCH_BOT }))
+    await userEvent.click(await screen.findByRole('button', { name: '추천 닫기' }))
+
+    await waitFor(() => expect(document.querySelector('.ss-suggest')).toBeNull(), {
+      timeout: 1500,
+    })
+    const hint = screen.getByRole('button', { name: /영상 둘러보기/ })
+    expect(hint).toBeEnabled()
+    await userEvent.click(hint)
+    expect(push).toHaveBeenCalledTimes(1)
+    vi.unstubAllGlobals()
   })
 
   it('두 번 빠르게 눌러도 걸음은 하나다', async () => {

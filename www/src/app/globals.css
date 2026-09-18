@@ -7331,13 +7331,16 @@ body:has(.ss-market-entry) {
    안내는 z auto(0) 라 가만히 두면 판 뒤로 들어간다 — 두 요소가 `.ss-home-left`
    를 사이에 두고도 같은 쌓임 맥락(`.ss-home-stage`, z 10)에 있어서 숫자만으로
    갈린다(`.ss-home-left` 는 `position: relative` 지만 z 가 없어 맥락을 안 만든다).
-   그러니 여기서 할 일은 **누르지 못하게 하는 것 하나**뿐이다.
+   못 누르게 하는 것은 **`HomeStage` 의 `disabled={scouting}`** 이 한다.
+
+   ⛔ **`body:has(.ss-suggest)` 로 가르지 말 것**(2026-09-18). 한때 여기서
+   `pointer-events: none` 을 걸었는데, 추천 판은 닫힌 뒤에도 물러나는 동안
+   DOM 에 남고 — 타이머 경합으로 **영영 남은** 적도 있다(`SquadPanel` 의
+   `scouting` effect 주석) — 그러면 판을 닫아도 단추가 안 눌렸다(사용자
+   지적). 「열려 있는가」는 DOM 에 무엇이 있느냐가 아니라 **상태**로 본다.
 
    🔴 `visibility: hidden` 으로 돌아가지 말 것 — 그러면 판을 열어 둔 채로는
    영상 모음으로 가는 길이 **있는 줄도 모르게** 된다. 보이되 안 눌린다. */
-body:has(.ss-suggest) .ss-home-hint {
-  pointer-events: none;
-}
 
 /* 눌리는 것이라고 말해 준다 — 안내문이던 시절엔 없던 몫이다.
    🔴 **`opacity` 도 `transform` 도 못 쓴다.** 아래 들어오는 연출이 `both` 로

@@ -479,10 +479,11 @@ export default function HomeStage({
             무대 **안**에 두므로 아래로 내릴 때 나머지와 같이 나간다. */}
         {/* 🔴 **옆 판이 열려 있는 동안은 안 눌린다**(사용자 요청, 2026-09-18:
             「판이랑 겹칠 때는 그냥 판이 위로 오게 · 판을 닫아야 클릭」).
-            겹쳐 보이는 것은 CSS 가 판을 위에 두어 푸는데(globals.css 의
-            `body:has(.ss-suggest)`), 그 `pointer-events: none` 은 **마우스만**
-            막는다 — 자판으로 짚어 Enter 를 누르면 그대로 넘어간다. 못 누르게
-            하는 뜻은 여기 `disabled` 가 정본이고 CSS 는 보이는 쪽 몫이다. */}
+            겹쳐 보이는 것은 CSS 의 쌓임 순서가 판을 위에 두어 풀고, 못 누르게
+            하는 것은 여기 `disabled` **하나**가 맡는다(마우스·자판 둘 다).
+            🔴 DOM 에 판이 있느냐(`body:has(.ss-suggest)`)로 가르지 않는다 —
+            닫힌 판이 물러나는 동안(또는 타이머 경합으로 영영) DOM 에 남아
+            판을 닫아도 안 눌렸다(사용자 지적, 2026-09-18). */}
         <button
           type="button"
           className="ss-market-scroll ss-home-hint"
