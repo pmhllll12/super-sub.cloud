@@ -82,6 +82,9 @@ exclude:
   - supersub-preview.service
   - fastapi/
   - www/
+  # 사이트 페이지·그림 생성기. 결과물(jekyll/progress/·assets/erd/)은 발행되지만
+  # 만드는 쪽은 발행 대상이 아니다. git 에는 그대로 있다 — `tools/README.md`.
+  - tools/
   # 팀·개인용 작업 지침이라 공개 사이트에 실을 것이 아니다.
   # ⚠️ 이건 **Jekyll 발행 제외**일 뿐 git 과는 무관하다 — CLAUDE.md 는 그대로
   #    저장소에 있고 pull 하면 받는다(fastapi/ 와 같다).
