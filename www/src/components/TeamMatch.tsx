@@ -146,6 +146,35 @@ export default function TeamMatch({
   /** 지금 신청 칸을 열어 둔 팀. 한 번에 하나다. */
   const [picking, setPicking] = useState<string | null>(null)
   const [pickedAt, setPickedAt] = useState<Proposal | null>(null)
+  /**
+   * **직접 고른 시각** — `datetime-local` 의 값(`2026-09-18T19:30`).
+   *
+   * 🔴 **제안만으로는 오늘 경기를 못 잡는다.** 제안은 조건(요일+시간대)에서
+   * 「**다음에** 오는 그 요일」로 만들어져서(`nextOccurrence`), 조건이
+   * 토요일뿐이면 아무리 빨라도 다음 토요일이다. 시연에서 대기 화면 → 경기
+   * 끝내기 → 리뷰를 한자리에서 보여 주려면 **몇 분 뒤**로 잡을 수 있어야
+   * 한다(사용자 요청, 2026-09-18).
+   *
+   * 🔴 **제안을 대신하는 것이 아니다** — 비어 있으면 전처럼 제안을 쓴다.
+   * 평소에는 그쪽이 맞다(「시각을 지어내지 않는다」).
+   */
+  const [customAt, setCustomAt] = useState('')
+
+  /**
+   * 직접 고른 값을 실제 시각으로. **모양이 덜 됐으면 `null`** 이다 —
+   * `datetime-local` 은 사람이 타이핑하는 동안 반쯤 채워진 값을 준다.
+   *
+   * 🔴 **지난 시각은 안 쓴다.** 서버가 받아 줘도 아무도 못 뛰고, 대기 화면이
+   * 열리자마자 「경기 끝내기」로 바뀐다(`matchProposal.ts` 의 같은 판단).
+   */
+  const customDate = useMemo(() => {
+    if (!customAt) return null
+    const at = new Date(customAt)
+    if (Number.isNaN(at.getTime())) return null
+    return at
+  }, [customAt])
+  /** 골라 놓고 **지난** 시각이면 신청을 막는다 — 왜 안 눌리는지 옆에 적는다. */
+  const customIsPast = customDate !== null && customDate.getTime() <= Date.now()
   const [pickedPlace, setPickedPlace] = useState<string>('')
 
   /**
@@ -173,7 +202,10 @@ export default function TeamMatch({
     if (waiting || !teamId) return
     /* 🔴 **고르지 않았으면 안 보낸다.** 시각·구장을 화면이 채우면 아무도 못
        뛰는 경기가 잡힌다 — 조건이 없으면 고를 것도 없다(`proposals` 가 빈다). */
-    if (!pickedAt || !pickedPlace) {
+    /* 🔴 **직접 고른 값이 있으면 그것이 이긴다.** 둘 다 비면 보낼 시각이
+       없다 — 조건도 없고 직접 고르지도 않은 경우다. */
+    const at = customDate ?? pickedAt?.at ?? null
+    if (!at || !pickedPlace) {
       setError('경기 시각과 구장을 고르세요.')
       return
     }
@@ -182,7 +214,7 @@ export default function TeamMatch({
     try {
       const { requestId } = await applyToTeam(teamId, {
         id: team.id,
-        playedAt: toPlayedAt(pickedAt.at),
+        playedAt: toPlayedAt(at),
         place: pickedPlace,
       })
       setPicking(null)
@@ -321,27 +353,53 @@ export default function TeamMatch({
                   서버에 올린 우리 조건에서, 구장은 경기장 목록에서 온다. */}
               {picking === t.id && (
                 <div className="ss-tm-pick">
-                  {proposals.length === 0 ? (
-                    <p className="ss-tm-note">
-                      경기 조건에 시간대가 없습니다 — 「설정 수정」에서 먼저 정하세요.
-                    </p>
-                  ) : (
-                    <>
+                  <>
+                      {/* 🔴 **제안이 없어도 신청은 할 수 있어야 한다**(2026-09-18).
+                          전에는 여기서 「조건에 시간대가 없습니다」로 끝나
+                          **판이 통째로 닫혔다** — 그런데 시간 조건을 비우는
+                          것은 추천 후보 필터를 푸는 정상적인 길이라(프로필의
+                          「시간 조건 지우기」), 그 상태에서 경기를 못 걸면
+                          앞뒤가 안 맞는다. 아래 「직접 고르기」로 잡으면 된다. */}
+                      {proposals.length === 0 ? (
+                        <p className="ss-tm-note">
+                          경기 조건에 시간대가 없습니다 — 아래에서 직접 고르세요.
+                        </p>
+                      ) : (
+                        <label className="ss-tm-pick-row">
+                          <span>언제</span>
+                          <select
+                            value={pickedAt?.label ?? ''}
+                            onChange={(e) =>
+                              setPickedAt(proposals.find((x) => x.label === e.target.value) ?? null)
+                            }
+                          >
+                            {proposals.map((x) => (
+                              <option key={x.label} value={x.label}>
+                                {x.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
+                      {/* 🔴 **직접 고르는 길**(사용자 요청, 2026-09-18 — 시연
+                          촬영). 제안은 「다음에 오는 그 요일」이라 조건이
+                          토요일뿐이면 다음 토요일이다 — 몇 분 뒤로 잡을 수가
+                          없어서 대기 화면 → 경기 끝내기 → 리뷰를 한자리에서
+                          못 보여 준다. 적으면 이 값이 제안을 이긴다. */}
                       <label className="ss-tm-pick-row">
-                        <span>언제</span>
-                        <select
-                          value={pickedAt?.label ?? ''}
-                          onChange={(e) =>
-                            setPickedAt(proposals.find((x) => x.label === e.target.value) ?? null)
-                          }
-                        >
-                          {proposals.map((x) => (
-                            <option key={x.label} value={x.label}>
-                              {x.label}
-                            </option>
-                          ))}
-                        </select>
+                        <span>직접 고르기</span>
+                        <input
+                          type="datetime-local"
+                          value={customAt}
+                          onChange={(e) => setCustomAt(e.target.value)}
+                        />
                       </label>
+                      {customIsPast && (
+                        <p className="ss-tm-note" role="alert">
+                          지난 시각입니다 — 앞으로 올 시각을 고르세요.
+                        </p>
+                      )}
+
                       <label className="ss-tm-pick-row">
                         <span>어디서</span>
                         <select
@@ -359,13 +417,17 @@ export default function TeamMatch({
                       <button
                         type="button"
                         className="ss-tm-apply"
-                        disabled={waiting !== null || !pickedAt || !pickedPlace}
+                        disabled={
+                          waiting !== null ||
+                          !pickedPlace ||
+                          customIsPast ||
+                          (!customDate && !pickedAt)
+                        }
                         onClick={() => void apply(t)}
                       >
                         이 시각으로 신청
                       </button>
-                    </>
-                  )}
+                  </>
                 </div>
               )}
             </li>
