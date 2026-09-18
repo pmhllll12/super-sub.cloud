@@ -68,3 +68,42 @@ describe('사용법 영상', () => {
     expect(container.querySelector<HTMLElement>('.ss-demo-video')!.dataset.slotted).toBe('false')
   })
 })
+
+describe('되감기 막대', () => {
+  it('분:초 로 적는다', async () => {
+    const { formatTime } = await import('./DemoVideo')
+    expect(formatTime(0)).toBe('0:00')
+    expect(formatTime(83.4)).toBe('1:23')
+    expect(formatTime(120.07)).toBe('2:00')
+    expect(formatTime(NaN)).toBe('0:00')
+  })
+
+  it('막대를 누른 자리로 건너뛰고, 멈춤으로 새지 않는다', async () => {
+    const { container } = render(<DemoVideo />)
+    const video = container.querySelector('video')!
+    Object.defineProperty(video, 'duration', { configurable: true, value: 120 })
+    fireEvent(video, new Event('loadedmetadata'))
+    await act(async () => {})
+    const seek = screen.getByRole('slider', { name: '사용법 영상 재생 위치' })
+    seek.getBoundingClientRect = () => ({ left: 100, width: 200, top: 0, height: 15 }) as DOMRect
+    ;(HTMLMediaElement.prototype.pause as ReturnType<typeof vi.fn>).mockClear()
+    fireEvent.pointerDown(seek, { clientX: 150, pointerId: 1 })
+    fireEvent.click(seek)
+    expect(video.currentTime).toBe(30) // 200px 막대의 1/4 → 120초의 1/4
+    expect(HTMLMediaElement.prototype.pause).not.toHaveBeenCalled()
+    expect(screen.getByText('0:30 / 2:00')).toBeInTheDocument()
+  })
+
+  it('자판 ←→ 로 5초씩 움직인다', async () => {
+    const { container } = render(<DemoVideo />)
+    const video = container.querySelector('video')!
+    Object.defineProperty(video, 'duration', { configurable: true, value: 120 })
+    fireEvent(video, new Event('loadedmetadata'))
+    await act(async () => {})
+    const seek = screen.getByRole('slider')
+    fireEvent.keyDown(seek, { key: 'End' })
+    expect(video.currentTime).toBe(120)
+    fireEvent.keyDown(seek, { key: 'ArrowLeft' })
+    expect(video.currentTime).toBe(115)
+  })
+})

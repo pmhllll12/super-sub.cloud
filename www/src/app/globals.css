@@ -15026,6 +15026,104 @@ a.ss-seeking-pill:hover {
   border-color: transparent transparent transparent var(--ss-demo-edge);
 }
 
+/* 되감기 막대 — 유튜브처럼 빨간 진행 · 회색 남은 길. 평소엔 숨고 가리키거나
+   (포커스·멈춤 포함) 뜬다. 🔴 `opacity` 로만 감춘다 — `display:none` 이면 자판으로
+   막대에 못 닿는다. */
+.ss-demo-video {
+  --ss-demo-progress: #ff0033;
+}
+
+.ss-demo-video-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 10px 6px;
+  background: linear-gradient(to top, color-mix(in srgb, var(--ss-bg) 75%, transparent), transparent);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.ss-demo-video:hover .ss-demo-video-bar,
+.ss-demo-video:focus-within .ss-demo-video-bar,
+.ss-demo-video:has([aria-pressed='true']) .ss-demo-video-bar {
+  opacity: 1;
+}
+
+/* 눌리는 자리는 넉넉히(위아래 6px), 그려지는 막대는 얇게 — 3px 막대를 정확히
+   누르라고 하면 안 된다. */
+.ss-demo-video-seek {
+  position: relative;
+  height: 15px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.ss-demo-video-seek::before,
+.ss-demo-video-seek-fill {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  height: 3px;
+  border-radius: 2px;
+  transition: height 0.1s ease, top 0.1s ease;
+}
+
+.ss-demo-video-seek::before {
+  right: 0;
+  background: color-mix(in srgb, var(--ss-demo-edge) 35%, transparent);
+}
+
+.ss-demo-video-seek-fill {
+  background: var(--ss-demo-progress);
+}
+
+/* 막대 끝의 동그란 손잡이 — 가리킬 때만. */
+.ss-demo-video-seek-fill::after {
+  content: '';
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--ss-demo-progress);
+  transform: translateY(-50%) scale(0);
+  transition: transform 0.1s ease;
+}
+
+.ss-demo-video-seek:hover::before,
+.ss-demo-video-seek:hover .ss-demo-video-seek-fill,
+.ss-demo-video-seek:focus-visible::before,
+.ss-demo-video-seek:focus-visible .ss-demo-video-seek-fill {
+  top: 5px;
+  height: 5px;
+}
+
+.ss-demo-video-seek:hover .ss-demo-video-seek-fill::after,
+.ss-demo-video-seek:focus-visible .ss-demo-video-seek-fill::after {
+  transform: translateY(-50%) scale(1);
+}
+
+.ss-demo-video-seek:focus-visible {
+  outline: 2px solid var(--ss-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.ss-demo-video-time {
+  color: var(--ss-demo-edge);
+  font-size: 11px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
 @keyframes ss-demo-in {
   from { opacity: 0; }
   to { opacity: 1; }

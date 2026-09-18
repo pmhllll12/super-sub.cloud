@@ -46,6 +46,8 @@ export default function DemoVideo() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [box, setBox] = useState<Box | null>(null)
   const [paused, setPaused] = useState(false)
+  const [time, setTime] = useState(0)
+  const [duration, setDuration] = useState(0)
 
   // 자리 재기 — 로그인 화면의 자리를 따라가고, 없으면 구석으로.
   //
@@ -80,6 +82,53 @@ export default function DemoVideo() {
     v.play().catch(() => setPaused(true)) // 막히면 「눌러서 재생」 상태로 남긴다
   }, [introDone])
 
+  // 🔴 길이는 마운트 때 **직접 한 번 읽는다.** `<video>` 는 서버 HTML 에 실려 와
+  // React 가 붙기 전에 이미 메타데이터를 받아 버린다 — 그러면 `loadedmetadata` 를
+  // 놓쳐 길이가 0 으로 남고 막대가 통째로 죽는다(헤드리스 크롬에서 실제로 겪었다).
+  useEffect(() => {
+    const v = videoRef.current
+    if (v && v.readyState >= 1 && Number.isFinite(v.duration)) setDuration(v.duration)
+  }, [])
+
+  // 진행 막대 — 재생 중에는 프레임마다 읽는다. `timeupdate` 는 초당 네 번쯤이라
+  // 막대가 뚝뚝 끊겨 움직인다(유튜브처럼 매끄럽게 가야 한다).
+  useEffect(() => {
+    const v = videoRef.current
+    if (!v || paused) return
+    let raf = 0
+    const tick = () => {
+      setTime(v.currentTime)
+      raf = requestAnimationFrame(tick)
+    }
+    tick()
+    return () => cancelAnimationFrame(raf)
+  }, [paused])
+
+  const seekTo = (t: number) => {
+    const v = videoRef.current
+    if (!v || !duration) return
+    const next = Math.min(Math.max(t, 0), duration)
+    v.currentTime = next
+    setTime(next)
+  }
+
+  // 막대 위 가로 위치 → 시각. 누른 채 끌면 따라간다(포인터를 붙잡아 막대 밖으로
+  // 나가도 놓치지 않는다).
+  const seekFromPointer = (e: React.PointerEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    if (r.width <= 0) return
+    seekTo(((e.clientX - r.left) / r.width) * duration)
+  }
+
+  const onSeekKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const step = { ArrowLeft: -5, ArrowRight: 5, ArrowDown: -5, ArrowUp: 5 }[e.key]
+    if (step !== undefined) seekTo(time + step)
+    else if (e.key === 'Home') seekTo(0)
+    else if (e.key === 'End') seekTo(duration)
+    else return
+    e.preventDefault()
+  }
+
   const toggle = () => {
     const v = videoRef.current
     if (!v) return
@@ -103,6 +152,8 @@ export default function DemoVideo() {
         preload="auto"
         onPlay={() => setPaused(false)}
         onPause={() => setPaused(true)}
+        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+        onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
       />
       <button
         type="button"
@@ -113,6 +164,44 @@ export default function DemoVideo() {
       >
         {paused && <span aria-hidden="true" className="ss-demo-video-play" />}
       </button>
+      {/* 유튜브식 되감기 막대(사용자 요청) — 앞부분을 다시 보거나 원하는 데로 건너뛴다.
+          🔴 **멈춤 단추(영상 전체) 위에 겹쳐 둔다** — 막대를 누른 것이 멈춤으로
+          새지 않게 이 칸은 자기 클릭을 삼킨다. 평소엔 숨고, 가리키거나 멈췄을 때
+          뜬다 — 작은 영상이라 늘 떠 있으면 자막을 가린다. */}
+      <div className="ss-demo-video-bar" onClick={(e) => e.stopPropagation()}>
+        <div
+          role="slider"
+          tabIndex={0}
+          aria-label="사용법 영상 재생 위치"
+          aria-valuemin={0}
+          aria-valuemax={Math.round(duration)}
+          aria-valuenow={Math.round(time)}
+          aria-valuetext={`${formatTime(time)} / ${formatTime(duration)}`}
+          className="ss-demo-video-seek"
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture?.(e.pointerId)
+            seekFromPointer(e)
+          }}
+          onPointerMove={(e) => {
+            if (e.currentTarget.hasPointerCapture?.(e.pointerId)) seekFromPointer(e)
+          }}
+          onKeyDown={onSeekKey}
+        >
+          <span
+            className="ss-demo-video-seek-fill"
+            style={{ width: `${duration ? (time / duration) * 100 : 0}%` }}
+          />
+        </div>
+        <span className="ss-demo-video-time">
+          {formatTime(time)} / {formatTime(duration)}
+        </span>
+      </div>
     </div>
   )
+}
+
+/** 초 → `분:초`(예: 83.4 → `1:23`). 유튜브와 같은 꼴이다. */
+export function formatTime(sec: number): string {
+  const s = Math.max(0, Math.floor(Number.isFinite(sec) ? sec : 0))
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
