@@ -197,6 +197,29 @@ export default function DemoVideo() {
     setTravel('entering')
   }, [travel, pathname, base])
 
+  // ── 새로고침해도 둔 자리 그대로(사용자 요청, 2026-09-19) ────────────────────
+  // 옮기고 키운 자리·닫힘을 이 탭(sessionStorage)에 적어 두고, 다음에 열 때 읽는다.
+  // 전에는 메모리에만 있어서 새로고침하면 **기본 자리(왼쪽 아래)로 돌아갔다.**
+  // 🔴 **자리의 종류가 같을 때만** 되살린다 — 홈에 둔 자리를 로그인 화면(영상 자리가
+  // 따로 있다)에 들이밀지 않는다. 화면 좌표로 적고, 도착한 화면의 기준 상자에 맞춰
+  // 배율·옮김을 다시 계산한다(로그인 → 홈 이동과 같은 방식).
+  // 🔴 **위의 되돌리기(setAdj(null)) 뒤에 둔다** — 같은 커밋에서 나중 것이 이긴다.
+  const restored = useRef(false)
+  useEffect(() => {
+    if (restored.current || !base) return
+    restored.current = true
+    const saved = readPlace()
+    if (!saved) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (saved.closed) setClosed(true)
+    if (saved.slotted !== base.slotted) return
+    setAdj({
+      scale: saved.rect.width / base.width,
+      dx: saved.rect.left - base.left,
+      dy: saved.rect.top - base.top,
+    })
+  }, [base])
+
 
   useEffect(() => {
     if (travel === 'entering') {
@@ -228,6 +251,12 @@ export default function DemoVideo() {
         window.innerHeight,
       )
     : null
+
+  // 적기 — 되살린 뒤부터, 오가는 중(빠졌다 들어오는 연출)이 아닐 때만.
+  useEffect(() => {
+    if (!restored.current || !rect || !base || travel !== 'none') return
+    writePlace({ slotted: base.slotted, rect, closed })
+  }, [rect?.left, rect?.top, rect?.width, rect?.height, base?.slotted, closed, travel]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // 모서리 끌기 — **맞은편 모서리를 붙박고** 끄는 쪽으로 커지고 작아진다. 비율은
   // 영상 그대로, 작게는 기본의 **딱 절반**까지(사용자 요청), 크게는 창 안까지.
@@ -601,6 +630,29 @@ export const SPOT_IN_MS = 600
 export const LOCK_MAX_MS = 12000
 /** 어둠과 안내가 스르르 걷히는 시간 — CSS 의 전이 길이와 같아야 한다. */
 const SPOT_FADE_MS = 600
+
+/** 둔 자리를 적는 곳(이 탭 동안). */
+const PLACE_KEY = 'ss-demo-place-v1'
+type Place = { slotted: boolean; rect: Box; closed: boolean }
+
+/** 🔴 저장소는 막혀 있을 수 있다(사파리 사생활 보호 등) — 못 읽으면 기본 자리로. */
+function readPlace(): Place | null {
+  try {
+    const raw = window.sessionStorage.getItem(PLACE_KEY)
+    const p = raw ? (JSON.parse(raw) as Place) : null
+    return p && p.rect && p.rect.width > 0 && p.rect.height > 0 ? p : null
+  } catch {
+    return null
+  }
+}
+
+function writePlace(p: Place): void {
+  try {
+    window.sessionStorage.setItem(PLACE_KEY, JSON.stringify(p))
+  } catch {
+    // 못 적으면 새로고침 때 기본 자리로 갈 뿐이다.
+  }
+}
 
 /** 빠져나가는 시간 — 빠르게(사용자 요청). CSS `ss-demo-leave` 와 같아야 한다. */
 const LEAVE_MS = 260

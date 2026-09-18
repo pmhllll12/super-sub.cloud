@@ -1570,7 +1570,7 @@ export default function SquadPanel({
         <SpotNudge
           // 카드 모양과 「내 프로필」 글자만 — 둘레 배경은 어둡게(사용자 정정).
           targets={['.ss-home-profile .ss-pcard', '.ss-home-profile-label']}
-          message="내 프로필에서 카드를 먼저 만들어주세요."
+          message={'내 프로필에서\n카드를 먼저 만들어주세요.'}
           onDone={() => setNeedCard(false)}
         />
       )}

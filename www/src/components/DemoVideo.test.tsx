@@ -10,6 +10,8 @@ vi.mock('next/navigation', () => ({ usePathname: () => pathname }))
 // jsdom 은 재생을 못 한다 — play/pause 가 이벤트만 쏘게 흉내 낸다.
 let paused = true
 beforeEach(() => {
+  // 둔 자리가 탭 저장소에 남는다 — 앞 시험이 옮긴 자리가 다음 시험에 새지 않게.
+  sessionStorage.clear()
   introDone = true
   pathname = '/login'
   paused = true
@@ -431,5 +433,61 @@ describe('로그인 → 홈: 가장 가까운 가장자리로 빠졌다가 같�
     void leaveDemoVideo().then(() => (resolved = true))
     await act(async () => {})
     expect(resolved).toBe(true)
+  })
+})
+
+describe('새로고침해도 둔 자리 그대로', () => {
+  beforeEach(() => sessionStorage.clear())
+
+  function withSlot() {
+    const slot = document.createElement('div')
+    slot.setAttribute('data-demo-slot', '')
+    slot.getBoundingClientRect = () => ({ top: 300, left: 400, width: 400, height: 200 }) as DOMRect
+    document.body.appendChild(slot)
+    return () => slot.remove()
+  }
+
+  it('옮긴 자리를 적어 두고, 다시 열면 그 자리·크기로 나온다', async () => {
+    const cleanup = withSlot()
+    HTMLElement.prototype.setPointerCapture = () => {}
+    HTMLElement.prototype.hasPointerCapture = () => true
+    const first = render(<DemoVideo />)
+    await act(async () => {})
+    const video = screen.getByRole('button', { name: '사용법 영상 멈춤' })
+    fireEvent.pointerDown(video, { clientX: 500, clientY: 400, button: 0, pointerId: 1 })
+    fireEvent.pointerMove(video, { clientX: 400, clientY: 350, pointerId: 1 })
+    fireEvent.pointerUp(video, { pointerId: 1 })
+    fireEvent.click(video)
+    first.unmount() // 새로고침
+
+    const again = render(<DemoVideo />)
+    await act(async () => {})
+    const box = again.container.querySelector<HTMLElement>('.ss-demo-video')!
+    expect(box.style.left).toBe('300px')
+    expect(box.style.top).toBe('250px')
+    expect(box.style.width).toBe('400px')
+    cleanup()
+  })
+
+  it('닫아 둔 것도 닫힌 채로 되살린다', async () => {
+    const first = render(<DemoVideo />)
+    await act(async () => {})
+    fireEvent.click(screen.getByRole('button', { name: '시연영상 닫기' }))
+    first.unmount()
+    render(<DemoVideo />)
+    await act(async () => {})
+    expect(screen.getByRole('button', { name: '시연 영상 다시보기' })).toBeInTheDocument()
+  })
+
+  it('다른 종류의 자리(홈 구석)에 둔 것은 로그인 화면에 안 들이민다', async () => {
+    sessionStorage.setItem(
+      'ss-demo-place-v1',
+      JSON.stringify({ slotted: false, rect: { left: 900, top: 500, width: 300, height: 150 }, closed: false }),
+    )
+    const cleanup = withSlot()
+    const { container } = render(<DemoVideo />)
+    await act(async () => {})
+    expect(container.querySelector<HTMLElement>('.ss-demo-video')!.style.left).toBe('400px')
+    cleanup()
   })
 })
