@@ -186,6 +186,18 @@ export default function AuthShell({
               }
             >
               <div className="flex flex-col items-center gap-3 text-center">
+                {/* 🔴 **한 줄만 더한다**(사용자 요청, 2026-09-18). 로고 위가
+                    원래 비어 있던 자리라 여기 넣는다 — 아래 것들(로고·안내
+                    문구·입력칸·단추)의 **크기도 간격도 안 건드린다.**
+
+                    🔴 **`whitespace-nowrap` 을 주지 않는다.** 375px 화면에서는
+                    이 문장이 한 줄에 안 들어가 카드를 넘긴다. 대신 한글
+                    줄바꿈 둘을 함께 건다 — `break-keep`(어절을 안 자름) +
+                    `text-pretty`(마지막 줄 외톨이 방지). 하나만으로는
+                    「…라이 / 프」가 남는다. */}
+                <p className="break-keep text-pretty text-2xl font-bold leading-snug sm:text-3xl">
+                  AI가 완성하는 스포츠 라이프
+                </p>
                 <BrandMark size={34} className="sm:hidden" />
                 <BrandMark size={48} className="hidden sm:inline" />
                 <h1 className="sr-only">{formTitle}</h1>
