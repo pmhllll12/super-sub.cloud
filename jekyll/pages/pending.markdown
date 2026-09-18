@@ -5496,7 +5496,35 @@ cd agent && uv run python scripts/export_metric_definitions.py --include-draft
 | `--include-draft` | 등급과 **동일하게** 동작합니다 |
 | 정본 | `agent/contracts/metric_definitions.yaml` 에 `stat_code_format`·`stat_unit`·`stat_range` 를 선언했습니다 — 백엔드가 라벨·단위를 지어내지 않게 |
 | 산출물 | `agent/scripts/export_metric_definitions.py --json` 그대로 |
-| 행 수 | **active 45행** · `--include-draft` **73행** |
+| 행 수 | ~~**active 45행** · `--include-draft` **73행**~~ → 🔴 **낡았습니다. 아래 정정** |
+
+#### 🔴 정정 (2026.09.18) — **이 항목의 수치가 전부 낡았습니다**
+
+2026.09.09에 낸 값입니다. **2026.09.11에 축구 단일 종목으로 정리하면서**
+(39번) 야구·농구 루브릭을 지웠고, **그때 이 항목을 안 다시 쟀습니다.**
+
+| | 그때 적은 값 | **지금 실측 (2026.09.18)** |
+|---|---|---|
+| active 행 수 | 45 | **25** |
+| `--include-draft` | 73 | **35** |
+| 가장 긴 `code` | 48자 `grade.basketball.jump_shot.release_arm_extension` | **47자** `grade.football.instep_shot.swing_knee_extension` |
+| `String(50)` 여유 | 2자 | **3자** |
+
+🔴 **가장 긴 코드로 들었던 그 농구 코드는 이제 없습니다.** 결론(「`String(50)`
+안에 든다 · 컬럼 확장 불필요」)은 **그대로 유효하고 오히려 여유가 늘었습니다**
+— 바뀐 것은 근거로 든 값입니다.
+
+🔴 **정어진 님 — 시드는 39번 쪽입니다.** `20260910_seed_metric_definition.py`
+가 이 항목의 09-09 산출을 그대로 옮긴 것이라 **`grade.basketball.*`·
+`grade.baseball.*` 행이 들어 있습니다.** 39번의 「종목 코드가 남은 곳」 표에
+그 파일이 **이미 올라가 있고 담당도 정어진 님으로 적혀 있습니다** — 여기서
+새로 요청하는 것이 아니라, **이 항목의 수치를 보고 시드를 맞추시면 안 된다**는
+표시입니다. 🔴 **지금 깨지는 것은 없습니다**(에이전트가 그 코드를 안 낼 뿐,
+참조 테이블에 남아 있어도 적재는 안 깨집니다).
+
+확인: `cd agent && uv run python scripts/export_metric_definitions.py`
+(맨 아래에 가장 긴 code 글자 수가 함께 나옵니다) ·
+`uv run pytest tests/test_metric_definitions.py -q` → **10 통과**(2026.09.18 실측)
 
 `impact_frame` 은 **행으로 그대로 뒀습니다** — 빼지 않았습니다.
 
@@ -6365,7 +6393,31 @@ git show bf21391:agent/rubrics/baseball_batting.yaml > agent/rubrics/baseball_ba
 할 수 있는 것이 없고, 명령이 그대로 도는 값이 문서의 값이기 때문입니다.
 다만 **커밋 전 grep 에 버킷 패턴이 없는 것**도 함께 정해 주시면 좋겠습니다.
 
-- 확인: `grep -rn 's3://supersub-ai' --include='*.md' --include='*.markdown' . | wc -l` → 19
+#### 🔴 갱신 (2026.09.18) — **그 사이 숫자가 흔들렸습니다. 이 항목의 논거입니다**
+
+항목에 적은 **19곳**이 지금 **20곳**입니다. 되짚어 보니 **19 → 21 → 20** 으로
+오갔습니다(09-11 의 제 43번 커밋이 둘 늘렸고, 그 뒤 압축·아카이브가 하나
+줄였습니다).
+
+🔴 **이것이 이 항목이 말하려던 바로 그것입니다** — 규칙과 실물이 다르면
+**아무도 틀리지 않으면서 숫자가 움직입니다.** 커밋 전 검사에 버킷 패턴이
+없으니 늘어도 안 걸리고, 줄어도 아무도 모릅니다.
+
+지금 분포(2026.09.18 실측, 20곳):
+
+| 파일 | |
+|---|---|
+| `jekyll/pages/pending.markdown` | 6 |
+| `fastapi/docs/worker-interface.md` | 4 |
+| `jekyll/pages/pending-archive.markdown` · `_posts/2026-09-03-…` | 각 3 |
+| `fastapi/docs/deployment.md` · `agent/scripts/dataset_pipeline/README.md` · `agent/deploy/README.md` · `agent/deploy/README-console.md` | 각 1 |
+
+🔴 **여전히 안 고쳤습니다** — (가)/(나) 판단이 나기 전에 제가 건드리면 같은
+일이 반복됩니다. **판단만 주시면 제 구역(`agent/`·`jekyll/`) 몫은 제가 합니다.**
+
+- 확인: `grep -rn 's3://supersub-ai' --include='*.md' --include='*.markdown' . | wc -l`
+  → ~~19~~ **20** (2026.09.18 실측). 🔴 **이 숫자 자체가 고정값이 아닙니다** —
+  판단이 나기 전까지는 흔들립니다
 - 관련: 루트 `CLAUDE.md` 「공개 사이트에 인프라 식별자를 쓰지 않습니다」 · `jin` 21·22번(식별자 정리)
 - **담당**: 박민호(규칙 소유) · 정어진(`jin` 22번에서 남긴 판단이 있으면) · **제기**: 정상호 · **기한**: 급하지 않음 (지금 새는 것은 없습니다 — 규칙과 실물이 다른 것이 문제입니다)
 
