@@ -13,7 +13,8 @@ import {
   judgeEmail,
   judgeNickname,
   judgeSeat,
-  nextJudgeSeat,
+  judgeSeats,
+  setJudgeSeat,
   readJudgeSeat,
 } from '@/lib/judgeSeat'
 
@@ -144,20 +145,33 @@ export default function LoginPage() {
           >
             심사위원용 로그인{seat ? ` (${seat}번)` : ''}
           </PillButton>
-          {/* 🔴 **번호를 보여 주는 것이 이 방식의 안전장치다**(2026-09-18).
-              브라우저마다 무작위로 고르므로 **둘이 같은 번호를 뽑을 수 있다**
-              (10개면 드물다). 같은 번호를 든 사람이 옆에 있으면 한쪽이 여기서
-              옮기면 된다 — 번호를 안 보여 주면 부딪힌 줄도 모른다. */}
-          {seat !== null && (
-            <button
-              type="button"
-              className="text-xs underline"
-              style={{ color: MUTED }}
-              onClick={() => setSeat(nextJudgeSeat())}
+          {/* 🔴 **번호를 직접 고른다**(사용자 요청, 2026-09-18). 전에는
+              「바꾸기」가 **무작위로 다른 번호**를 집어서, 원하는 자리를
+              고를 수가 없었다. 무작위는 이제 **처음 배정**에만 남는다 —
+              아무도 안 고르고 그냥 누르면 서로 다른 자리로 흩어지게 하려는 것이다.
+
+              🔴 **번호를 보여 주는 것이 이 방식의 안전장치다** — 둘이 같은
+              번호를 쓰면 판·알림을 공유한다. 보여 줘야 부딪힌 것을 알아채고
+              한쪽이 옮긴다. */}
+          <label className="flex items-center gap-2 text-xs" style={{ color: MUTED }}>
+            심사위원 번호
+            <select
+              className="rounded border bg-transparent px-2 py-1"
+              style={{ color: 'var(--ss-fg)', borderColor: MUTED }}
+              value={seat ?? ''}
+              onChange={(e) => {
+                const picked = setJudgeSeat(Number(e.target.value))
+                if (picked !== null) setSeat(picked)
+              }}
             >
-              다른 심사위원 계정으로 바꾸기
-            </button>
-          )}
+              {seat === null && <option value="">자동</option>}
+              {judgeSeats().map((n) => (
+                <option key={n} value={n} style={{ color: '#000' }}>
+                  {n}번
+                </option>
+              ))}
+            </select>
+          </label>
         </>
       }
     >
