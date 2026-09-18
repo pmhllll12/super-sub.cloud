@@ -50,13 +50,10 @@ export default function CardEditor({ card }: { card: PlayerCard | null }) {
     return (
       <div className="ss-profile-editor">
         <h2 className="ss-profile-h">선수 카드 만들기</h2>
-        {/* 🔴 **분석을 기다릴 필요가 없다**는 것이 이 문장의 요점이다.
-            카드는 부탁하면 바로 생기고(계약 3장), 분석이 붙이는 것은 카드가
-            아니라 호칭이다. */}
-        <p className="ss-profile-muted">
-          지금 바로 만들 수 있습니다 — 분석을 기다리지 않아도 됩니다. 만들면 공유할 수 있는
-          주소가 생기고, 호칭은 나중에 경기 영상이 분석되면 카드에 붙습니다.
-        </p>
+        {/* 🔴 **한 줄만**(사용자 요청, 2026-09-19). 전에는 「분석을 기다리지 않아도
+            됩니다 … 호칭은 나중에 경기 영상이 분석되면 카드에 붙습니다」까지 적었는데,
+            호칭은 이제 **사람이 직접 정한다**(`paik` 36번) — 그 문장이 틀린 말이 됐다. */}
+        <p className="ss-profile-muted">지금 바로 만들 수 있습니다</p>
         {error && (
           <p role="alert" className="ss-profile-video-reason">
             {error}
