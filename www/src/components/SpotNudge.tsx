@@ -35,7 +35,11 @@ function holeOf(el: Element): Hole | null {
   }
   const css = parseFloat(cs.borderTopLeftRadius) || 0
   const scale = el instanceof HTMLElement && el.offsetWidth ? box.width / el.offsetWidth : 1
-  return { top: box.top, left: box.left, width: box.width, height: box.height, r: css * scale }
+  // 🔴 **둥글기는 짧은 변의 절반까지만.** 알약 단추는 `border-radius: 999px` 라
+  // 그대로 SVG 의 rx 로 주면 브라우저가 가로·세로를 **따로** 줄여 구멍이 알약이
+  // 아니라 **타원**이 됐다(「프로필 카드 수정」 안쪽에 타원이 비침 — 사용자 지적).
+  const r = Math.min(css * scale, box.width / 2, box.height / 2)
+  return { top: box.top, left: box.left, width: box.width, height: box.height, r }
 }
 
 /**
@@ -143,7 +147,7 @@ export default function SpotNudge({
           <mask id="ss-nudge-mask">
             <rect width="100%" height="100%" fill="white" />
             {holes.map((h, i) => (
-              <rect key={i} x={h.left} y={h.top} width={h.width} height={h.height} rx={h.r} fill="black" />
+              <rect key={i} x={h.left} y={h.top} width={h.width} height={h.height} rx={h.r} ry={h.r} fill="black" />
             ))}
           </mask>
         </defs>

@@ -63,3 +63,23 @@ describe('한 곳만 밝게 두는 안내', () => {
     cleanup()
   })
 })
+
+describe('구멍의 둥글기', () => {
+  it('알약 단추(999px)는 높이의 절반으로 — 타원이 되지 않게 rx·ry 가 같다', () => {
+    const btn = document.createElement('a')
+    btn.className = 'pill'
+    btn.style.borderTopLeftRadius = '999px' // jsdom 은 줄임 속성을 안 펼친다
+    btn.style.borderTopWidth = '1px'
+    btn.style.border = '1px solid white'
+    btn.textContent = '프로필 카드 수정'
+    btn.getBoundingClientRect = () => ({ top: 700, left: 80, width: 180, height: 36 }) as DOMRect
+    document.body.appendChild(btn)
+    const { baseElement } = render(<SpotNudge targets={['.pill']} message="안내" onDone={() => {}} />)
+    const hole = baseElement.querySelector('mask rect[fill="black"]')!
+    expect(hole.getAttribute('rx')).toBe('18')
+    expect(hole.getAttribute('ry')).toBe('18')
+    // 테두리가 있으니 글자 폭이 아니라 단추 상자째 뚫는다
+    expect(hole.getAttribute('width')).toBe('180')
+    btn.remove()
+  })
+})

@@ -1569,7 +1569,9 @@ export default function SquadPanel({
       {needCard && (
         <SpotNudge
           // 카드 모양과 「내 프로필」 글자만 — 둘레 배경은 어둡게(사용자 정정).
-          targets={['.ss-home-profile .ss-pcard', '.ss-home-profile-label']}
+          // 🔴 둥근 모서리는 `.ss-pcard` 가 아니라 **`.ss-pcard-inner`** 에 있다 — 바깥을
+          //    겨누면 구멍이 네모라 모서리 밖 배경이 비친다.
+          targets={['.ss-home-profile .ss-pcard-inner', '.ss-home-profile-label']}
           message={'내 프로필에서\n카드를 먼저 만들어주세요.'}
           onDone={() => setNeedCard(false)}
         />

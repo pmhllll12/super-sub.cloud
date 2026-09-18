@@ -25,7 +25,7 @@ export default function NoCardNudge() {
   if (!on || done) return null
   return (
     <SpotNudge
-      targets={['.ss-profile-face', '.ss-profile-edit-link']}
+      targets={['.ss-profile-face .ss-pcard-inner', '.ss-profile-edit-link']}
       message="먼저 내 카드를 만들어주세요."
       note="right"
       onDone={() => setDone(true)}
