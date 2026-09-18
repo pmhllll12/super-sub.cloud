@@ -304,4 +304,82 @@ describe('대기 화면 — 경기가 끝난 뒤', () => {
     expect(screen.queryByRole('dialog', { name: '경기 리뷰' })).toBeNull()
     await waitFor(() => expect(onClose).toHaveBeenCalled())
   })
+
+  /**
+   * 🔴 **판의 카드를 누르면 간단한 프로필**(사용자 요청, 2026-09-18:
+   * "카드를 클릭하면 클릭한 대상의 프로필을 간단하게 볼수있으면 좋겠어.
+   * 랭크라던가 별명같은거. 경기매칭된 상태는 유지 되어야해").
+   */
+  describe('판의 카드를 누르면 프로필이 뜬다', () => {
+    const card = { user: { nickname: '정우진' }, titles: [], tagline: '주말엔 공 찬다' }
+    const grade = { grade: 'A', provisional: true, notes: ['차는 다리를 끝까지 뻗습니다'] }
+
+    const stubCards = () =>
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string) => ({
+          ok: true,
+          status: 200,
+          json: async () => (url.endsWith('/grade') ? grade : card),
+        })),
+      )
+
+    const WITH_SLUG: MatchTeam = {
+      ...THEM,
+      squad: [{ nickname: '정우진', col: 1, row: 0, pos: 'FW', cardSlug: 'jung-4f2a' }],
+    }
+
+    it('이름 · 등급 · 한 줄을 보여 준다', async () => {
+      stubCards()
+      const user = userEvent.setup()
+      render(<MatchWaiting us={US} them={WITH_SLUG} onClose={vi.fn()} />)
+      await user.click(screen.getByRole('button', { name: '정우진 프로필 보기' }))
+
+      const who = await screen.findByRole('complementary', { name: '정우진 프로필' })
+      expect(within(who).getByText('A')).toBeInTheDocument()
+      expect(within(who).getByText('주말엔 공 찬다')).toBeInTheDocument()
+    })
+
+    /* 🔴 계약이 못 박은 것 — 등급 문자만 떼어 쓰지 않는다. */
+    it('검수 전이면 등급 옆에 그렇게 적는다', async () => {
+      stubCards()
+      const user = userEvent.setup()
+      render(<MatchWaiting us={US} them={WITH_SLUG} onClose={vi.fn()} />)
+      await user.click(screen.getByRole('button', { name: '정우진 프로필 보기' }))
+      expect(await screen.findByText('검수 전')).toBeInTheDocument()
+    })
+
+    /* 🔴 **사용자가 못 박은 조건** — 프로필을 닫아도 경기 화면은 남는다. */
+    it('프로필을 닫아도 경기 화면은 그대로다', async () => {
+      stubCards()
+      const user = userEvent.setup()
+      const onClose = vi.fn()
+      render(<MatchWaiting us={US} them={WITH_SLUG} onClose={onClose} />)
+      await user.click(screen.getByRole('button', { name: '정우진 프로필 보기' }))
+
+      const who = await screen.findByRole('complementary', { name: '정우진 프로필' })
+      await user.click(within(who).getByRole('button', { name: '닫기' }))
+
+      expect(screen.queryByRole('complementary', { name: '정우진 프로필' })).toBeNull()
+      expect(onClose).not.toHaveBeenCalled()
+      expect(screen.getByText('9월 19일 토요일 10:00')).toBeInTheDocument()
+    })
+
+    /* 🔴 등급이 없는 것은 고장이 아니다 — 대표 영상이 없거나 분석 전이다. */
+    it('등급이 없으면 그렇다고 적는다', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string) => ({
+          ok: true,
+          status: 200,
+          json: async () =>
+            url.endsWith('/grade') ? { grade: null, provisional: false, notes: null } : card,
+        })),
+      )
+      const user = userEvent.setup()
+      render(<MatchWaiting us={US} them={WITH_SLUG} onClose={vi.fn()} />)
+      await user.click(screen.getByRole('button', { name: '정우진 프로필 보기' }))
+      expect(await screen.findByText('아직 분석된 등급이 없습니다.')).toBeInTheDocument()
+    })
+  })
 })

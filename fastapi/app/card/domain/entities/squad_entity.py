@@ -7,6 +7,18 @@ from uuid import UUID
 
 from app.card.domain.value_objects.public_slug_vo import PublicSlug
 
+# 🔴 **새 스쿼드가 갖고 시작하는 판 크기** (2026-09-18).
+#
+# 전에는 `None` 으로 만들고 사용자가 크기 단추를 눌러 **바꿀 때만** 저장했다.
+# 그런데 화면은 값이 없을 때도 기본 판(5:5)을 **켜진 것처럼 그린다** — 이미
+# 켜져 보이니 아무도 누르지 않았고, 그래서 실제로는 거의 모든 스쿼드가
+# `NULL` 로 남았다. 팀 매칭의 첫 하드 필터가 `formation` 동등 비교라
+# (`list_candidate_facts`), 그 결과 **어느 팀에게도 상대가 안 잡혔다.**
+#
+# 값을 지어내는 것이 아니다 — **화면이 내내 보여 주던 값을 저장만 한다.**
+# 화면의 기본값(`SquadPanel.tsx` 의 `DEFAULT_SIZE`)과 같은 값이어야 한다.
+DEFAULT_FORMATION = "5:5"
+
 
 @dataclass(frozen=True)
 class SquadMemberEntity:
@@ -52,7 +64,11 @@ class SquadEntity:
     team_id: UUID
     public_slug: PublicSlug
     # 판 크기 — 클라이언트가 `"3:3"`·`"5:5"`·`"7:7"` 로 쓴다 (미결 `paik` 9번).
-    # 아직 안 정한 스쿼드는 None. 서버는 값 집합을 검사하지 않는다(단계가 늘 때
-    # 마이그레이션 없이 넣으려는 것 — `analysis_job.status` 와 같은 판단).
+    # 서버는 값 집합을 검사하지 않는다(단계가 늘 때 마이그레이션 없이 넣으려는
+    # 것 — `analysis_job.status` 와 같은 판단).
+    #
+    # 🔴 **새로 만드는 스쿼드는 `DEFAULT_FORMATION` 을 갖고 시작한다**(2026-09-18).
+    # 타입이 `| None` 인 것은 **2026-09-18 이전에 만들어진 옛 스쿼드** 때문이다 —
+    # 읽는 쪽은 여전히 None 을 만날 수 있다.
     formation: str | None = None
     members: list[SquadMemberEntity] = field(default_factory=list)

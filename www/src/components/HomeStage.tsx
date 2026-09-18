@@ -5,6 +5,7 @@ import type { PublicPlayerCard, Squad } from '@/server/backend'
 import SquadPanel from '@/components/SquadPanel'
 import SiteHeader from '@/components/SiteHeader'
 import { useNotifyInbox } from '@/lib/useNotifyInbox'
+import { takeMatchOpen } from '@/lib/seekingStore'
 import HomeNav, { type Destination } from '@/components/HomeNav'
 import { MATCH_BOT, TEAM_SEEK } from '@/lib/destinations'
 import { useIntroDone } from '@/lib/useIntroDone'
@@ -329,6 +330,25 @@ export default function HomeStage({
      셈이지만 GET 둘이라 가볍고, 하나로 합치려면 통을 앱 전체 컨텍스트로
      올려야 해서 그 값이 더 비싸다. */
   const inbox = useNotifyInbox()
+
+  /**
+   * 🔴 **다른 화면에서 「경기 잡힘」을 누르고 온 경우**(사용자 요청,
+   * 2026-09-18). 경기 화면을 그리는 것은 이 아래 스쿼드 판뿐이라, 다른
+   * 화면에서는 「열어 달라」만 적어 두고 홈으로 보낸다 — 여기서 집어 연다.
+   *
+   * 🔴 **집으면서 지운다**(`takeMatchOpen`). 안 지우면 그 뒤로 홈에 들어올
+   * 때마다 경기 화면이 저절로 뜬다 — 「누를 때만 뜬다」가 규칙이다.
+   * 🔴 `confirmed` 를 기다린다 — 첫 조회가 오기 전에는 열 내용이 없다.
+   */
+  const asked = useRef<string | null>(null)
+  useEffect(() => {
+    if (asked.current === null) asked.current = takeMatchOpen()
+    if (!asked.current || !inbox.confirmed) return
+    if (asked.current !== inbox.confirmed.matchId) return
+    asked.current = null
+    inbox.reopenConfirmed()
+  }, [inbox])
+
   /**
    * 챗봇이 열려 있는가.
    *
@@ -410,7 +430,15 @@ export default function HomeStage({
       {/* 🔴 **알림함을 내려보낸다**(2026-09-17). 헤더가 제 통을 따로 만들면
           거기서 수락한 결과(`acceptedTeam`)가 대기 화면을 그리는 `SquadPanel`
           쪽 통에 **영영 안 들어간다** — 눌러도 아무 일이 없었다. */}
-      <SiteHeader user={user} card={card} destinations={destinations} fixed inbox={inbox} />
+      <SiteHeader
+        user={user}
+        card={card}
+        destinations={destinations}
+        fixed
+        inbox={inbox}
+        /* 🔴 **홈만 준다** — 경기 화면은 아래 스쿼드 판이 그린다. */
+        onReopenMatch={inbox.reopenConfirmed}
+      />
 
       {/* 헤드라인 · 보조 문구 · 정보 블록. 로그인 화면과 같은 문구를 쓴다 —
           두 화면이 한 목소리로 들리게. */}
@@ -452,6 +480,7 @@ export default function HomeStage({
               onRequested={(requestId, team) => inbox.noteSent(requestId, team.id)}
               acceptedTeamId={inbox.acceptedTeamId}
               acceptedTeam={inbox.acceptedTeam}
+              acceptedUs={inbox.acceptedUs}
               acceptedMatchId={inbox.acceptedMatchId}
               onAcceptedShown={inbox.clearAccepted}
               card={card}

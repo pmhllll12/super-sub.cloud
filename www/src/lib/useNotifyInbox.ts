@@ -44,6 +44,15 @@ export type InboxMatch = {
    * ⚠️ 스쿼드를 아직 안 만든 팀이면 `null` 이고 그게 정상이다.
    */
   opponentSquadSlug: string | null
+  /**
+   * **우리 팀의 이름·판 슬러그** — 수락하면 대기 화면의 왼쪽이 된다.
+   *
+   * 🔴 **홈 판의 팀 이름을 쓰지 않는다**(2026-09-18에 고쳤다). 같은 사람이
+   * 여러 팀에 속할 수 있고 홈 판은 그중 **쿠키가 고른 팀**을 보여 준다 —
+   * 그 팀이 이 경기의 팀이 아니면 화면에 **경기에 없는 이름**이 적힌다.
+   */
+  ourName: string | null
+  ourSquadSlug: string | null
 }
 
 /** 받은 지인 신청 한 줄. */
@@ -84,6 +93,33 @@ export type InboxInvitation = {
 
 export type InboxItem = InboxMatch | InboxContact | InboxInvitation
 
+/**
+ * **이미 잡힌 경기** — 서버가 아는 사실이라 **새로고침해도 남는다**
+ * (사용자 요청, 2026-09-18: "경기매칭이 성사된 상태에서 다른페이지를
+ * 이동했어도 다시 경기매칭이 성사된 페이지로 돌아올수있게").
+ *
+ * 🔴 **아래 `acceptedTeam` 과 다른 것이다.** 그쪽은 「방금 잡혔다」는 **사건**
+ * 이라 한 번 보여 주고 지워지고, 이쪽은 「잡혀 있다」는 **상태**라 경기가
+ * 취소될 때까지 남는다. 사건만 있던 때에는 새로고침하면 그 화면으로 돌아갈
+ * 길이 아예 없었다 — 그 길이 이 값이다.
+ *
+ * 🔴 **우리 쪽도 담는다.** 신청은 우리가 걸 수도 받을 수도 있어서, 어느
+ * 쪽이 우리인지는 `teamId` 와 대조해야 정해진다.
+ */
+export type ConfirmedMatch = {
+  /** 확정 경기 id — 무르기(`DELETE /matches/{id}`)가 이걸 쓴다. */
+  matchId: string
+  us: { id: string; name: string | null; squadSlug: string | null }
+  them: {
+    id: string
+    name: string | null
+    region: string | null
+    squadSlug: string | null
+  }
+  playedAt: string
+  place: string
+}
+
 /** 얼마마다 다시 묻는가. 사람이 수락하는 속도라 촘촘할 이유가 없다. */
 const POLL_MS = 15_000
 
@@ -123,6 +159,18 @@ export function useNotifyInbox() {
    * 팀 id 만 들고 있던 것이 34번이 열려 있던 이유였다.
    */
   const [acceptedMatchId, setAcceptedMatchId] = useState<string | null>(null)
+  /**
+   * **우리 쪽 팀** — 잡힌 경기에서 우리가 어느 팀인가.
+   *
+   * 🔴 **홈 판이 보여 주는 팀과 다를 수 있다**(2026-09-18에 고쳤다). 대기
+   * 화면이 우리 이름을 **홈 판의 팀 이름**에서 가져오고 있어서, 홈 판이 다른
+   * 팀을 보고 있는 계정에서는 **경기에 없는 팀 이름**이 적혔다 — 운영에서
+   * 실제로 「FC 강남 VS ㅈㅂㄷ」로 나왔는데, 그 경기는 「ㅇㅅㅇ VS ㅈㅂㄷ」
+   * 였다. 이름은 **경기에서** 가져와야 한다.
+   */
+  const [acceptedUs, setAcceptedUs] = useState<ConfirmedMatch['us'] | null>(null)
+  /** 지금 잡혀 있는 경기(상태). 머리칸 표시가 이걸 쓴다. */
+  const [confirmed, setConfirmed] = useState<ConfirmedMatch | null>(null)
   const sent = useRef<SentState[]>([])
 
   // 내 팀 — 계약의 경기 신청 경로가 전부 `teams/{id}` 밑이라 먼저 알아야 한다.
@@ -173,6 +221,63 @@ export function useNotifyInbox() {
             requester_squad_public_slug: string | null
             target_squad_public_slug: string | null
           }[]
+          /* 🔴 **잡혀 있는 경기를 매번 다시 센다**(2026-09-18). 아래
+             `acceptedTeam` 은 「방금 잡혔다」는 사건이라 이 화면에서 신청을
+             건 사람에게만, 한 번만 뜬다 — 새로고침하면 `sent` 가 비어 영영
+             안 뜬다. 이 값은 **서버가 아는 사실**이라 누가 걸었든, 언제
+             들어왔든 남는다. 지난 경기는 빼고 가장 이른 것 하나만 본다. */
+          const now = Date.now()
+          const live = rows
+            .filter(
+              (r) =>
+                r.status === 'accepted' &&
+                r.match_id &&
+                new Date(r.proposed_played_at).getTime() >= now,
+            )
+            .sort(
+              (a, b) =>
+                new Date(a.proposed_played_at).getTime() -
+                new Date(b.proposed_played_at).getTime(),
+            )[0]
+          setConfirmed(
+            live
+              ? {
+                  matchId: live.match_id as string,
+                  /* 🔴 **우리가 건 쪽인지 받은 쪽인지로 갈린다** — 이름을 홈
+                     판에서 가져오면 홈 판이 다른 팀일 때 엉뚱한 이름이 적힌다. */
+                  ...(live.requester_team_id === teamId
+                    ? {
+                        us: {
+                          id: live.requester_team_id,
+                          name: live.requester_team_name ?? null,
+                          squadSlug: live.requester_squad_public_slug ?? null,
+                        },
+                        them: {
+                          id: live.target_team_id,
+                          name: live.target_team_name ?? null,
+                          region: live.target_team_region ?? null,
+                          squadSlug: live.target_squad_public_slug ?? null,
+                        },
+                      }
+                    : {
+                        us: {
+                          id: live.target_team_id,
+                          name: live.target_team_name ?? null,
+                          squadSlug: live.target_squad_public_slug ?? null,
+                        },
+                        them: {
+                          id: live.requester_team_id,
+                          name: live.requester_team_name ?? null,
+                          region: live.requester_team_region ?? null,
+                          squadSlug: live.requester_squad_public_slug ?? null,
+                        },
+                      }),
+                  playedAt: live.proposed_played_at,
+                  place: live.proposed_place,
+                }
+              : null,
+          )
+
           for (const r of rows) {
             // 받은 것 중 **아직 대기중**인 것만 응답할 거리가 있다.
             if (r.status === 'pending' && r.target_team_id === teamId) {
@@ -190,6 +295,9 @@ export function useNotifyInbox() {
                 playedAt: r.proposed_played_at,
                 place: r.proposed_place,
                 opponentSquadSlug: r.requester_squad_public_slug ?? null,
+                /* 받은 신청이므로 **우리가 target** 이다. */
+                ourName: r.target_team_name ?? null,
+                ourSquadSlug: r.target_squad_public_slug ?? null,
               })
             }
             // 내가 건 것이 수락됐으면 그 순간 대기 화면을 띄운다.
@@ -206,6 +314,12 @@ export function useNotifyInbox() {
                 squadSlug: r.target_squad_public_slug ?? null,
                 playedAt: r.proposed_played_at,
                 place: r.proposed_place,
+              })
+              /* 🔴 **우리 쪽은 「건 팀」이다** — 홈 판이 보여 주는 팀이 아니다. */
+              setAcceptedUs({
+                id: r.requester_team_id,
+                name: r.requester_team_name ?? null,
+                squadSlug: r.requester_squad_public_slug ?? null,
               })
               // 수락된 행에는 확정 경기 id 가 실려 온다(계약 `match_id`).
               setAcceptedMatchId(r.match_id ?? null)
@@ -292,6 +406,12 @@ export function useNotifyInbox() {
         playedAt: item.playedAt,
         place: item.place,
       })
+      /* 🔴 받은 신청을 수락한 것이므로 **우리는 받은 팀**이다. */
+      setAcceptedUs({
+        id: item.teamId,
+        name: item.ourName,
+        squadSlug: item.ourSquadSlug,
+      })
       await reload()
     },
     [reload],
@@ -357,9 +477,33 @@ export function useNotifyInbox() {
     acceptedTeamId,
     acceptedMatchId,
     acceptedTeam,
+    acceptedUs,
+    /** 지금 잡혀 있는 경기 — 머리칸 표시가 읽는다. 없으면 `null`. */
+    confirmed,
+    /**
+     * **잡힌 경기 화면을 다시 연다** — 머리칸 표시를 눌렀을 때.
+     *
+     * 🔴 저절로 부르지 않는다(사용자 결정, 2026-09-18). 전체 화면을 덮는
+     * 판이라 들어올 때마다 뜨면 다른 일을 하러 온 사람이 매번 닫아야 한다.
+     */
+    reopenConfirmed: () => {
+      if (!confirmed) return
+      setAcceptedTeamId(confirmed.them.id)
+      setAcceptedTeam({
+        id: confirmed.them.id,
+        name: confirmed.them.name,
+        region: confirmed.them.region,
+        squadSlug: confirmed.them.squadSlug,
+        playedAt: confirmed.playedAt,
+        place: confirmed.place,
+      })
+      setAcceptedUs(confirmed.us)
+      setAcceptedMatchId(confirmed.matchId)
+    },
     clearAccepted: () => {
       setAcceptedTeamId(null)
       setAcceptedTeam(null)
+      setAcceptedUs(null)
       setAcceptedMatchId(null)
     },
     acceptMatch,

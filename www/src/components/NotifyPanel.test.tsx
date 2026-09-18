@@ -20,6 +20,8 @@ const MATCH: InboxItem = {
   playedAt: '2026-09-19T09:00:00+09:00',
   place: '망원 실내구장 A',
   opponentSquadSlug: null,
+  ourName: '우리 팀',
+  ourSquadSlug: null,
 }
 
 describe('알림 판', () => {
