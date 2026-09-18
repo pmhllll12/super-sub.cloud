@@ -1564,7 +1564,12 @@ body::-webkit-scrollbar {
    바닥에 앉힌다(contain · bottom). 올린 사진처럼 cover 로 채우면 양팔이 잘렸다
    (사용자 지적). 얼굴은 그림 자체가 가로 가운데로 만들어져 있다. */
 .ss-pcard[data-photo-default='true'] .ss-pcard-figure {
-  inset-inline: 0;
+  /* 🔴 **크게**(사용자 요청 — 카드 폭에 딱 맞췄더니 인물이 작았다). 칸을 카드보다
+     양옆으로 25%씩 넓혀 인물을 1.5배로 키운다 — 넘친 팔 끝은 카드 테두리가
+     자른다. 가운데를 기준으로 넓혀서 얼굴은 여전히 가로 가운데다. 키운 만큼
+     위로 올라올 자리가 필요해 칸의 윗변도 38% 로 올렸다(로고·글자는 그 위다). */
+  inset-inline: -25%;
+  top: 38%;
 }
 
 .ss-pcard[data-photo-default='true'] .ss-pcard-figure img {
