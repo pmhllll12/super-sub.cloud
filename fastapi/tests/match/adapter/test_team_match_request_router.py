@@ -158,6 +158,27 @@ class TestDuplicateGuard:
         res = _request(client, world, world["a_owner"], world["a"], world["b"])
         assert res.status_code == 201, res.text
 
+    def test_잡힌_경기를_물린_뒤에는_다시_걸_수_있다(self, client, world):
+        """🔴 **`status` 만 보면 여기서 막힌다**(2026-09-18 정정).
+
+        경기 취소는 `match` 행을 지울 뿐이고 신청의 `status` 는 `accepted` 로
+        남는다 — 실물에서는 FK 가 `match_id` 만 비운다. 운영에 그런 행이 11건
+        있었고, 그대로 뒀으면 **한 번 물린 상대와 영영 못 붙는다.**
+        """
+        req = _request(client, world, world["a_owner"], world["a"], world["b"]).json()
+        accepted = client.post(
+            f"{V1}/teams/{world['b']}/match-requests/{req['id']}/accept",
+            headers=_headers(world["b_owner"]),
+        ).json()
+        cancelled = client.delete(
+            f"{V1}/matches/{accepted['match_id']}",
+            headers=_headers(world["a_owner"]),
+        )
+        assert cancelled.status_code in (200, 204), cancelled.text
+
+        res = _request(client, world, world["a_owner"], world["a"], world["b"])
+        assert res.status_code == 201, res.text
+
     def test_무른_뒤에는_다시_걸_수_있다(self, client, world):
         req = _request(client, world, world["a_owner"], world["a"], world["b"]).json()
         client.delete(
