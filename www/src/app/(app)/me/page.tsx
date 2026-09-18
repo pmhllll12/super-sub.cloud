@@ -21,6 +21,7 @@ import StyledCard from './StyledCard'
 import { CardStyleProvider } from './cardStyle'
 import MyMatches from './MyMatches'
 import MyVideos from './MyVideos'
+import NoCardNudge from './NoCardNudge'
 import ProfileStage from './ProfileStage'
 import NicknameForm from './NicknameForm'
 import { ymd } from './format'
@@ -104,7 +105,13 @@ export function MeBody({
               있었는데 **사실이 아니었다.** 카드는 분석과 무관하게, 사용자가
               부탁할 때 생긴다(계약 3장 「카드는 언제 생기나 — 요청할 때」).
               분석이 붙이는 것은 카드가 아니라 **호칭**이다. */}
-          {!card && (
+          {/* 🔴 **편집 중에는 안 그린다**(2026-09-19). 편집 중 왼쪽 칸은 격자이고
+              꾸미개가 둘째 줄에 박혀 있어서, 이 문장이 첫 줄을 먹으면 줄이 하나씩
+              밀려 「카드 만들기」 판이 **카드 옆이 아니라 맨 위로** 떴다(사용자
+              지적 「위치가 왜 저럼?」). 편집기가 이미 열려 있으니 「수정에서
+              만들 수 있다」는 안내도 필요 없다. */}
+          {!card && !editing && <NoCardNudge />}
+          {!card && !editing && (
             <p className="ss-profile-nocard">
               아직 선수 카드가 없습니다 — <strong>프로필 카드 수정</strong>에서 바로 만들 수
               있습니다.

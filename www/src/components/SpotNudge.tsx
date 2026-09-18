@@ -19,14 +19,21 @@ type Hole = { top: number; left: number; width: number; height: number; r: numbe
 function holeOf(el: Element): Hole | null {
   const box = el.getBoundingClientRect()
   if (box.width <= 0) return null
-  if (el.children.length === 0 && el.textContent?.trim()) {
+  // 글자 폭으로 뚫는 것은 **맨 글자**일 때만 — 테두리나 바탕이 있는 상자(프로필의
+  // 빈 얼굴 「홍」, 「프로필 카드 수정」 단추)는 글자만 든 요소여도 상자째 뚫는다.
+  const cs = getComputedStyle(el)
+  const bare =
+    (parseFloat(cs.borderTopWidth) || 0) === 0 &&
+    (cs.backgroundColor === 'transparent' || cs.backgroundColor === 'rgba(0, 0, 0, 0)') &&
+    (cs.backgroundImage === 'none' || cs.backgroundImage === '')
+  if (bare && el.children.length === 0 && el.textContent?.trim()) {
     const range = document.createRange()
     range.selectNodeContents(el)
     // jsdom 등 Range 의 상자를 못 재는 곳에서는 요소 상자로 떨어진다.
     const t = typeof range.getBoundingClientRect === 'function' ? range.getBoundingClientRect() : null
     if (t && t.width > 0) return { top: t.top, left: t.left, width: t.width, height: t.height, r: 2 }
   }
-  const css = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0
+  const css = parseFloat(cs.borderTopLeftRadius) || 0
   const scale = el instanceof HTMLElement && el.offsetWidth ? box.width / el.offsetWidth : 1
   return { top: box.top, left: box.left, width: box.width, height: box.height, r: css * scale }
 }
@@ -51,15 +58,21 @@ export default function SpotNudge({
   targets,
   message,
   onDone,
+  note = 'below',
 }: {
   /** 밝게 남길 요소들의 CSS 선택자. 하나도 못 찾으면 가운데에 문장만 띄운다. */
   targets: string[]
   message: string
   onDone: () => void
+  /**
+   * 문장 자리 — `below` 는 구멍들 밑 가운데, `right` 는 **마지막 과녁의 오른쪽**
+   * 세로 가운데(프로필의 「프로필 카드 수정」 옆, 사용자 요청).
+   */
+  note?: 'below' | 'right'
 }) {
   const [state, setState] = useState<'in' | 'on' | 'out'>('in')
   const [holes, setHoles] = useState<Hole[]>([])
-  const [noteLeft, setNoteLeft] = useState<number | null>(null)
+  const [notePos, setNotePos] = useState<{ top: number; left: number } | null>(null)
   const noteRef = useRef<HTMLParagraphElement>(null)
   const doneRef = useRef(onDone)
   useEffect(() => {
@@ -97,23 +110,31 @@ export default function SpotNudge({
       // 문장은 구멍들 밑 가운데 — 단 창 밖으로 안 나가게 양옆 16px 안으로 밀어 넣는다
       // (「내 프로필」은 오른쪽 끝이라 그대로 두면 문장 반이 잘린다).
       const w = noteRef.current?.offsetWidth ?? 0
-      const lo = Math.min(...next.map((h) => h.left))
-      const hi = Math.max(...next.map((h) => h.left + h.width))
-      const center = next.length ? (lo + hi) / 2 : window.innerWidth / 2
-      const left = Math.min(Math.max(center, w / 2 + 16), window.innerWidth - w / 2 - 16)
-      const sig = next.map((h) => `${h.top}|${h.left}|${h.width}|${h.height}`).join(';') + `#${left}`
+      const nh = noteRef.current?.offsetHeight ?? 0
+      let pos: { top: number; left: number }
+      const tail = next[next.length - 1]
+      if (note === 'right' && tail) {
+        // 문장의 **가운데**가 left 에 오도록(CSS 가 -50% 로 당긴다) 반 폭을 더한다.
+        pos = { top: tail.top + tail.height / 2 - nh / 2, left: tail.left + tail.width + 16 + w / 2 }
+      } else {
+        const lo = Math.min(...next.map((h) => h.left))
+        const hi = Math.max(...next.map((h) => h.left + h.width))
+        const center = next.length ? (lo + hi) / 2 : window.innerWidth / 2
+        const bottom = next.length ? Math.max(...next.map((h) => h.top + h.height)) + 14 : window.innerHeight / 2
+        pos = { top: bottom, left: center }
+      }
+      pos.left = Math.min(Math.max(pos.left, w / 2 + 16), window.innerWidth - w / 2 - 16)
+      const sig = next.map((h) => `${h.top}|${h.left}|${h.width}|${h.height}`).join(';') + `#${pos.top}|${pos.left}`
       if (sig !== last) {
         last = sig
         setHoles(next)
-        setNoteLeft(left)
+        setNotePos(pos)
       }
       raf = requestAnimationFrame(measure)
     }
     measure()
     return () => cancelAnimationFrame(raf)
-  }, [key])
-
-  const bottom = holes.length ? Math.max(...holes.map((h) => h.top + h.height)) : null
+  }, [key, note])
 
   return createPortal(
     <>
@@ -133,10 +154,7 @@ export default function SpotNudge({
         role="status"
         className="ss-nudge-note"
         data-state={state}
-        style={{
-          top: bottom !== null ? bottom + 14 : '50%',
-          left: noteLeft ?? '50%',
-        }}
+        style={{ top: notePos?.top ?? '50%', left: notePos?.left ?? '50%' }}
       >
         {message}
       </p>
