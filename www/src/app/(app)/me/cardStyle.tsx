@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useMemo, useState } from 'react'
-import { apiPatch } from '@/lib/api/client'
+import { ApiCallError, apiPatch } from '@/lib/api/client'
 import { ALIAS } from '@/components/PlayerCardView'
 import type { CardStyleWire, PlayerCard } from '@/server/backend'
 
@@ -155,6 +155,26 @@ function toWire(style: CardStyle): CardStyleWire {
   }
 }
 
+/**
+ * **사진 칸을 뺀 옛 모양** — 배포 전 서버가 받던 아홉 칸.
+ *
+ * 🔴 **`toWire` 에서 지우는 방식으로 만든다.** 아홉을 손으로 다시 적으면
+ * 나중에 칸이 하나 늘 때 여기만 빠져서, **옛 서버로 떨어진 저장만 조용히
+ * 값을 잃는다.**
+ */
+function toLegacyWire(style: CardStyle): Omit<
+  CardStyleWire,
+  'photo_key' | 'photo_scale' | 'photo_x' | 'photo_y' | 'mode'
+> {
+  const { photo_key, photo_scale, photo_x, photo_y, mode, ...rest } = toWire(style)
+  void photo_key
+  void photo_scale
+  void photo_x
+  void photo_y
+  void mode
+  return rest
+}
+
 type Ctx = {
   style: CardStyle
   /** 가운데 큰 글자의 편집 버퍼 — 저장하면 `tagline` 이 된다. */
@@ -208,14 +228,31 @@ export function CardStyleProvider({
         setTagline(ALIAS)
       },
       save: async () => {
+        const body = { tagline: tagline.trim() || null, style: toWire(style) }
         try {
-          await apiPatch('/api/me/card', {
-            tagline: tagline.trim() || null,
-            style: toWire(style),
-          })
+          await apiPatch('/api/me/card', body)
           return true
-        } catch {
-          return false
+        } catch (err) {
+          /* 🔴 **옛 서버는 사진 칸을 받으면 422 다.** `CardStyleSchema` 가
+             `extra="forbid"` 라, 아직 배포 안 된 서버가 `photo_key`·`mode` 를
+             받으면 **카드 저장이 통째로 막힌다** — 사진뿐 아니라 한 줄·색·
+             붓자국까지.
+
+             배포는 「백엔드 먼저」가 맞지만 **자동으로 그렇게 되지 않는다**:
+             main 에 머지하면 `www`(Vercel)는 바로 나가고 백엔드는 이미지만
+             빌드된 뒤 사람이 k3s 에 롤아웃한다. 그 사이 몇 분을 여기서
+             버틴다 — 사진은 못 담아도 **나머지는 저장된다.**
+
+             🔴 **422 만 다시 보낸다.** 401·403·500 은 사진과 무관한 실패라,
+             다시 보내면 같은 실패를 두 번 겪고 사용자만 기다린다.
+             🔴 배포가 끝나면 이 길은 **아예 안 탄다.** 나중에 걷어도 된다. */
+          if (!(err instanceof ApiCallError) || err.status !== 422) return false
+          try {
+            await apiPatch('/api/me/card', { ...body, style: toLegacyWire(style) })
+            return true
+          } catch {
+            return false
+          }
         }
       },
     }),
