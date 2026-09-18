@@ -251,3 +251,21 @@ describe('팀 줄의 단추 두 개', () => {
     expect(block).not.toMatch(/--ss-danger/)
   })
 })
+
+/**
+ * **카드 그림이 끌려 나오지 않는다** (사용자 지적, 2026-09-18).
+ *
+ * 🔴 `PlayerCardView` 의 `draggable={false}` 가 본 막음이고, 이 규칙은 그
+ * 속성을 빠뜨린 `<img>` 가 새로 생겨도 같은 일이 안 나게 하는 그물이다.
+ * `user-select: none` 은 **글자 선택만** 막아서 여기에 쓸 수 없다.
+ */
+describe('카드 사진은 브라우저가 끌어가지 못한다', () => {
+  it('`.ss-pcard-figure img` 가 네이티브 드래그를 끈다', () => {
+    const i = CSS.indexOf('.ss-pcard-figure img {')
+    expect(i).toBeGreaterThan(-1)
+    /* 🔴 **`}` 로 끝을 찾으면 안 된다** — 이 규칙의 주석 안에
+       `draggable={false}` 가 들어 있어 거기서 잘린다. 줄머리의 `}` 가
+       블록의 끝이다. */
+    expect(CSS.slice(i, CSS.indexOf('\n}', i))).toMatch(/-webkit-user-drag:\s*none/)
+  })
+})

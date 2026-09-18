@@ -1551,6 +1551,12 @@ body::-webkit-scrollbar {
   object-fit: cover;
   object-position: top center;
   filter: grayscale(1) contrast(1.06);
+  /* 🔴 **카드를 끌면 사진이 따라 나오던 것**(사용자 지적, 2026-09-18).
+     브라우저는 `<img>` 를 집으면 반투명 유령 그림을 만들어 따라다니게 한다.
+     `PlayerCardView` 의 `draggable={false}` 가 본 막음이고, 이 줄은 **그
+     속성을 빠뜨린 `<img>` 가 새로 생겨도** 같은 일이 안 나게 하는 그물이다
+     (`-webkit-` 만 있는 비표준 속성이라 크롬·사파리에서 듣는다). */
+  -webkit-user-drag: none;
 }
 
 /* 작게 줄인 카드 — 홈 헤더에서 닉네임 자리를 대신한다. 폭만 줄이면 안쪽
@@ -2146,8 +2152,14 @@ body::-webkit-scrollbar {
   filter: drop-shadow(0 12px 22px rgb(0 0 0 / 45%));
 }
 
-/* 🔴 카드를 끌 때 브라우저가 그림·글자를 대신 끌어가지 않게 한다. 터치에서는
-   `touch-action` 이 없으면 화면이 같이 굴러간다. */
+/* 🔴 카드를 끌 때 브라우저가 **글자**를 대신 끌어가지 않게 한다. 터치에서는
+   `touch-action` 이 없으면 화면이 같이 굴러간다.
+
+   🔴 **정정 (2026-09-18)**: 이 주석은 「그림·글자」라고 적혀 있었지만
+   `user-select` 가 막는 것은 **글자 선택뿐**이다. `<img>` 의 네이티브
+   드래그(반투명 유령 그림)는 안 막혀서, 카드를 끌면 사람 사진이 따라
+   나왔다(사용자가 화면으로 잡았다). 그림 쪽은 `draggable={false}`
+   (`PlayerCardView`)와 아래 `.ss-pcard-figure img` 의 `user-drag` 가 막는다. */
 .ss-squad-seat {
   touch-action: none;
   -webkit-user-select: none;
