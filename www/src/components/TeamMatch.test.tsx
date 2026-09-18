@@ -433,21 +433,31 @@ describe('비슷한 팀 명단', () => {
     expect(ev.defaultPrevented).toBe(true)
   })
 
-  /* 🔴 **목록이 아직 구를 수 있으면 막지 않는다** — 막아 버리면 목록 자체가
-     안 움직인다. 페이지로 넘어가는 것만 막는 것이 요점이다. */
-  it('목록이 구를 수 있으면 그 휠은 그대로 둔다', async () => {
+  /* 🔴 **목록 위에서도 우리가 처리한다.** 앞서는 「목록이 구를 수 있으면
+     브라우저에 맡긴다」로 두었는데 **배포본에서 페이지가 계속 내려갔다** —
+     CSS(`overscroll-behavior: contain`)는 멀쩡했다. 네이티브 체이닝 규칙에
+     안 기대고 직접 굴린다. */
+  it('목록 위에서 굴려도 우리가 목록을 굴리고 페이지는 막는다', async () => {
     open()
     await screen.findByText('망원 유나이티드')
 
     const list = document.querySelector('.ss-tm-list') as HTMLElement
-    // jsdom 은 크기를 안 재므로 구를 여지가 있다고 알려 준다.
+    // jsdom 은 크기를 안 잰다 — 구를 여지가 있다고 알려 준다.
     Object.defineProperty(list, 'scrollHeight', { value: 900, configurable: true })
     Object.defineProperty(list, 'clientHeight', { value: 300, configurable: true })
     list.scrollTop = 0
-
     const ev = new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true })
     list.dispatchEvent(ev)
 
-    expect(ev.defaultPrevented).toBe(false)
+    expect(list.scrollTop).toBe(120)
+    expect(ev.defaultPrevented).toBe(true)
+  })
+
+  /* 🔴 **붙었는지 화면에서 볼 수 있어야 한다** — 안 붙으면 증상이 고치기
+     전과 똑같아서, 배포가 안 된 것인지 코드가 틀린 것인지 못 가른다. */
+  it('판에 붙었다는 표식을 남긴다', async () => {
+    open()
+    await screen.findByText('망원 유나이티드')
+    expect(document.querySelector('.ss-tm')).toHaveAttribute('data-wheel-guard', 'on')
   })
 })

@@ -27,6 +27,50 @@ function open(card: PlayerCard = CARD) {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('카드 꾸미기 — 되돌리기와 저장', () => {
+  /* 🔴 **글자를 안 쓰고 싶은 사람이 있다** (2026-09-18 사용자 요청). 지우고
+     저장하면 지운 채로 남아야 하는데, 예전엔 다시 열 때마다 자리 표시가
+     도로 채워져 **지울 방법이 없었다.** 칸에 적힌 `비우면 글자 없이` 가
+     이미 그렇게 약속하고 있었고 동작만 안 따라갔다. */
+  const SAVED = {
+    bg: '#111111',
+    logo: '#222222',
+    text_color: '#333333',
+    text_x: 50,
+    text_y: 34,
+    brush: 0,
+    brush_color: '#0b0b0b',
+    brush_scale: 1,
+    brush_x: 0,
+    brush_y: 0,
+  }
+
+  it('일부러 비워 둔 카드를 다시 열면 빈 칸으로 시작한다', () => {
+    open({ ...CARD, tagline: null, style: SAVED })
+    expect(screen.getByLabelText('카드에 넣을 글자')).toHaveValue('')
+  })
+
+  it('한 번도 안 꾸민 카드는 자리 표시로 시작한다', () => {
+    open({ ...CARD, tagline: null, style: null })
+    expect(screen.getByLabelText('카드에 넣을 글자')).toHaveValue('THREE LUNGS')
+  })
+
+  it('글자를 지우고 저장하면 tagline 을 null 로 보낸다', async () => {
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(JSON.stringify({ ...CARD, tagline: null }), { status: 200 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    open({ ...CARD, tagline: '지난번 것', style: SAVED })
+
+    await userEvent.clear(screen.getByLabelText('카드에 넣을 글자'))
+    await userEvent.click(screen.getByRole('button', { name: '저장' }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]!.body))
+    // 🔴 빈 문자열이 아니라 `null` 이다 — 계약이 공백을 「안 정한 상태」로 본다.
+    expect(body.tagline).toBeNull()
+  })
+
   it('되돌리는 단추 이름은 「초기화」다', () => {
     open()
     expect(screen.getByRole('button', { name: '초기화' })).toBeInTheDocument()

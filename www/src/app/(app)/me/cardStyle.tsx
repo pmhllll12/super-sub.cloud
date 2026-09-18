@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useMemo, useState } from 'react'
 import { ApiCallError, apiPatch } from '@/lib/api/client'
-import { ALIAS } from '@/components/PlayerCardView'
+import { ALIAS, aliasOf } from '@/components/PlayerCardView'
 import type { CardStyleWire, PlayerCard } from '@/server/backend'
 
 /**
@@ -213,9 +213,10 @@ export function CardStyleProvider({
     ...fromWire(card?.style),
     photo: card?.photo_url ?? null,
   }))
-  // 🔴 안 정했으면 `ALIAS` 자리 표시로 시작한다 — 지금 카드(비편집 화면)에
-  // 보이는 것과 편집기를 여는 순간 보이는 것이 달라지면 안 된다.
-  const [tagline, setTagline] = useState(() => card?.tagline ?? ALIAS)
+  // 🔴 **지금 카드에 보이는 그 글자로** 시작한다 — 편집기를 여는 순간 다른
+  // 글자가 뜨면 안 된다. 그래서 `aliasOf` 를 같이 쓴다: 일부러 비워 둔
+  // 사람에게는 빈 칸이, 한 번도 안 꾸민 사람에게는 자리 표시가 온다.
+  const [tagline, setTagline] = useState(() => (card ? aliasOf(card) : ALIAS))
 
   const value = useMemo<Ctx>(
     () => ({
