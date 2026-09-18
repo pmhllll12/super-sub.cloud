@@ -2503,5 +2503,7 @@ describe('카드 없이 빈 자리를 누르면', () => {
     expect(seat).not.toBeDisabled()
     await userEvent.click(seat)
     expect(screen.getByRole('status')).toHaveTextContent('내 프로필에서 팀을 먼저 만들어주세요.')
+    // 다음 프로필 방문에서 한 번 가리키라는 표를 남긴다
+    expect(sessionStorage.getItem('ss-team-nudge-pending')).toBe('1')
   })
 })

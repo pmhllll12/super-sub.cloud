@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { Match, MyVideo, PlayerCard, User } from '@/server/backend'
 import { HIDDEN_MARKS, MARKS } from '@/components/CardMark'
+import { markTeamNudge } from '@/lib/teamNudge'
 import { MeBody } from './page'
 
 // NicknameForm 이 useRouter 를 쓴다.
@@ -636,10 +637,24 @@ describe('프로필 안내', () => {
     expect(screen.getByText('먼저 내 카드를 만들어주세요.')).toBeInTheDocument()
   })
 
-  it('카드는 있는데 팀이 없으면 「팀 만들기」 밑에 「팀을 만들어주세요.」', () => {
+  // 🔴 팀 안내는 **홈에서 「팀을 먼저 만들어주세요」가 뜬 뒤 한 번만**(lib/teamNudge).
+  it('팀이 없어도 표가 없으면 안 띄운다 — 팀 없이 쓰는 사람도 있다', () => {
+    sessionStorage.clear()
     render(<MeBody user={{ ...USER, teams: [] }} card={CARD} videos={[]} matches={[]} />)
     act(() => vi.advanceTimersByTime(1700))
+    expect(screen.queryByText('팀을 만들어주세요.')).toBeNull()
+  })
+
+  it('홈에서 표를 받았으면 한 번만 — 다시 들어오면 안 뜬다', () => {
+    sessionStorage.clear()
+    markTeamNudge()
+    const first = render(<MeBody user={{ ...USER, teams: [] }} card={CARD} videos={[]} matches={[]} />)
+    act(() => vi.advanceTimersByTime(1700))
     expect(screen.getByText('팀을 만들어주세요.')).toBeInTheDocument()
+    first.unmount()
+    render(<MeBody user={{ ...USER, teams: [] }} card={CARD} videos={[]} matches={[]} />)
+    act(() => vi.advanceTimersByTime(1700))
+    expect(screen.queryByText('팀을 만들어주세요.')).toBeNull()
   })
 
   it('카드도 팀도 있으면 아무것도 안 띄운다', () => {

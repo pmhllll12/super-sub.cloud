@@ -40,6 +40,7 @@ import {
 } from '@/lib/inviteSeats'
 import { apiDelete, apiPost } from '@/lib/api/client'
 import SpotNudge from '@/components/SpotNudge'
+import { markTeamNudge } from '@/lib/teamNudge'
 
 /**
  * 홈 첫 화면의 스쿼드 판 — 판 하나 위에 선수 카드를 **포지션 자리대로**
@@ -1931,6 +1932,8 @@ export default function SquadPanel({
                     // 카드는 있는데 팀이 없다 — 설 판이 없다. 팀부터.
                     if (!isCaptain && noTeam) {
                       setNeed('team')
+                      // 다음에 내 프로필에 가면 「팀 만들기」를 **한 번** 가리킨다(lib/teamNudge).
+                      markTeamNudge()
                       return
                     }
                     if (placing) {
