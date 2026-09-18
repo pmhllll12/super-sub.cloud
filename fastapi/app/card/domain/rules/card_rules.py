@@ -6,9 +6,7 @@
 
 from __future__ import annotations
 
-from uuid import UUID
-
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from app.card.domain.entities.card_entity import CardEntity, PublicCardEntity
 from app.card.domain.entities.title_entity import TitleEntity
@@ -49,6 +47,81 @@ def og_image_key_for(card_id: UUID) -> str:
     쓴다). 그리기 시작하면 **생성기가 먼저 있어야 한다.**
     """
     return f"cards/{card_id}.png"
+
+
+# 카드 사진으로 받는 확장자 (2026-09-18, 사용자 요청).
+#
+# 🔴 **화이트리스트다.** 클라이언트가 고른 확장자를 그대로 키에 붙이므로,
+# 열어 두면 `.html` 을 우리 버킷에 올려 같은 도메인에서 열 수 있다. 사전 서명
+# PUT 은 내용을 검사하지 않는다 — 막는 곳은 여기뿐이다.
+PHOTO_EXTENSIONS = frozenset({"jpg", "jpeg", "png", "webp"})
+
+# 확장자 ↔ 콘텐츠 타입. 사전 서명은 `ContentType` 을 **서명에 넣으므로**
+# 올릴 때와 정확히 같아야 한다 — 다르면 S3 가 403 을 준다.
+PHOTO_CONTENT_TYPES = {
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "png": "image/png",
+    "webp": "image/webp",
+}
+
+# 받는 쪽 — **이 목록에 없으면 안 받는다.**
+# ⚠️ `image/svg+xml` 은 **일부러 없다**: SVG 는 스크립트를 담을 수 있고, 우리
+#    버킷에서 내려가면 같은 출처처럼 다뤄질 여지가 있다.
+_EXTENSION_BY_CONTENT_TYPE = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+}
+
+
+def extension_for_content_type(content_type: str) -> str | None:
+    """콘텐츠 타입 → 확장자. **모르는 것이면 `None`.**
+
+    🔴 **화이트리스트로 뒤집어 읽는다** — 클라이언트가 확장자를 고르게 두면
+    타입과 어긋난 키가 생긴다(`image/jpeg` 라며 `.html` 로). 타입 하나만 받고
+    확장자는 우리가 정한다.
+    """
+    return _EXTENSION_BY_CONTENT_TYPE.get(content_type.split(";")[0].strip().lower())
+
+
+def build_photo_key(user_id: UUID, card_id: UUID, extension: str) -> str:
+    """카드 사진의 저장 키.
+
+    `cards/photos/<user_id>/<card_id>-<8자>.<확장자>`
+
+    🔴 **`<user_id>/` 접두사가 접근 통제다.** 사전 서명 PUT 은 키만 알면
+    만들어지므로, 저장할 때 이 접두사를 대조해 **남이 올린 객체를 자기 카드
+    사진으로 등록하는 것**을 막는다(`owns_photo_key`). 영상의
+    `build_storage_key`·`owns_key` 와 같은 짜임이다.
+
+    🔴 **`<8자>` 무작위가 있어야 한다.** 없으면 같은 카드의 두 번째 사진이
+    첫 번째를 **조용히 덮고**, 옛 사진은 되돌릴 수 없다. 사전 서명 URL 을
+    받아 놓고 안 올린 경우도 있어서 키는 매번 새로 짓는 편이 안전하다.
+
+    ⚠️ 확장자는 **화이트리스트**다(`PHOTO_EXTENSIONS`) — 위 주석 참고.
+    """
+    ext = extension.lower().lstrip(".")
+    if ext not in PHOTO_EXTENSIONS:
+        raise ValueError(f"카드 사진으로 받지 않는 확장자다: {extension}")
+    return f"cards/photos/{user_id}/{card_id}-{uuid4().hex[:8]}.{ext}"
+
+
+def owns_photo_key(storage_key: str, user_id: UUID) -> bool:
+    """그 키가 **이 사람 자리**에 있는가.
+
+    🔴 **이것이 없으면 남의 사진 키를 자기 카드에 붙일 수 있다.** 키는 비밀이
+    아니고(응답에 실려 나간다) 사전 서명도 키만 있으면 만들어지므로, 저장
+    시점에 접두사를 대조하는 것이 유일한 방어선이다.
+
+    🔴 **`..` 가 든 키를 막는다.** 접두사만 보면
+    `cards/photos/<나>/../../남의것` 이 통과한다 — S3 키는 경로가 아니라 문자열
+    이라 그대로 저장되지만, 나중에 이 값을 경로처럼 쓰는 코드가 생기면 새어
+    나간다. 규칙이 싼 자리에서 막아 둔다.
+    """
+    if ".." in storage_key:
+        return False
+    return storage_key.startswith(f"cards/photos/{user_id}/")
 
 
 def to_public(card: CardEntity) -> PublicCardEntity:

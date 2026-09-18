@@ -27,6 +27,26 @@ _STYLE = {
     "brush_y": 0,
 }
 
+# 사진 다섯 칸의 **기본값**(2026-09-18). 🔴 안 보내도 응답에는 늘 실린다 —
+# 기본값이 있어야 지금 돌고 있는 클라이언트가 422 를 안 맞는다(스키마 주석).
+_PHOTO_DEFAULTS = {
+    "photo_key": None,
+    "photo_scale": 1,
+    "photo_x": 0,
+    "photo_y": 0,
+    "mode": "cutout",
+}
+
+# 사진 칸까지 채운 값 — 「보낸 대로 남는가」를 볼 때 쓴다.
+_STYLE_WITH_PHOTO = {
+    **_STYLE,
+    "photo_key": None,
+    "photo_scale": 1.4,
+    "photo_x": -12,
+    "photo_y": 8,
+    "mode": "full",
+}
+
 
 @pytest.fixture(autouse=True)
 def _clean():
@@ -42,10 +62,15 @@ class TestUpdateStyle:
     def test_꾸미기를_정한다(self, client, auth):
         res = client.patch(CARD, json={"style": _STYLE}, headers=auth)
         assert res.status_code == 200, res.text
-        assert res.json()["style"] == _STYLE
+        # 🔴 **사진 칸을 안 보내도 기본값이 실려 온다**(2026-09-18) — 보낸
+        # 아홉은 그대로고 다섯이 더 붙는다.
+        assert res.json()["style"] == {**_STYLE, **_PHOTO_DEFAULTS}
 
         # 다시 읽어도 남아 있어야 한다.
-        assert client.get(CARD, headers=auth).json()["style"] == _STYLE
+        assert client.get(CARD, headers=auth).json()["style"] == {
+            **_STYLE,
+            **_PHOTO_DEFAULTS,
+        }
 
     def test_null을_보내면_지운다(self, client, auth):
         client.patch(CARD, json={"style": _STYLE}, headers=auth)
@@ -60,7 +85,10 @@ class TestUpdateStyle:
         # `tagline` 만 보낸다 — `style` 은 요청 본문에 아예 없다.
         res = client.patch(CARD, json={"tagline": "x"}, headers=auth)
         assert res.status_code == 200, res.text
-        assert res.json()["style"] == _STYLE, "안 보냈는데 지워지거나 바뀌었다"
+        assert res.json()["style"] == {
+            **_STYLE,
+            **_PHOTO_DEFAULTS,
+        }, "안 보냈는데 지워지거나 바뀌었다"
 
     @pytest.mark.parametrize("field", ["bg", "logo", "text_color", "brush_color"])
     def test_색이_16진수가_아니면_422(self, client, auth, field):
@@ -102,3 +130,45 @@ class TestNoCard:
         res = client.patch(CARD, json={"style": _STYLE}, headers=headers)
         assert res.status_code == 404
         assert error_code(res) == "CARD_NOT_FOUND"
+
+
+class TestPhotoStyle:
+    """사진 다섯 칸 (2026-09-18, 사용자 요청).
+
+    🔴 **바이트는 여기 안 담는다** — `style` 에는 S3 키만 온다. data URL 로
+    담으면 카드를 읽는 모든 응답에 사진이 실린다(스쿼드 판은 한 번에 5~7장).
+    """
+
+    def test_안_보내면_기본값이_된다(self, client, auth):
+        """🔴 **이것이 깨지면 지금 돌고 있는 클라이언트가 전부 422 다.**"""
+        res = client.patch(CARD, json={"style": _STYLE}, headers=auth)
+        assert res.status_code == 200, res.text
+        assert res.json()["style"]["mode"] == "cutout"
+        assert res.json()["style"]["photo_key"] is None
+
+    def test_보낸_대로_남는다(self, client, auth):
+        res = client.patch(CARD, json={"style": _STYLE_WITH_PHOTO}, headers=auth)
+        assert res.status_code == 200, res.text
+        got = res.json()["style"]
+        assert got["mode"] == "full"
+        assert got["photo_scale"] == 1.4
+        assert got["photo_x"] == -12
+
+    def test_모르는_모드는_422(self, client, auth):
+        bad = {**_STYLE, "mode": "background"}
+        res = client.patch(CARD, json={"style": bad}, headers=auth)
+        assert res.status_code == 422
+        assert error_code(res) == "VALIDATION_ERROR"
+
+    def test_사진_자리는_음수가_된다(self, client, auth):
+        """글자 자리(`text_x`)와 다르다 — 사진은 칸보다 크게 잡아 밀어 넣는다."""
+        res = client.patch(
+            CARD, json={"style": {**_STYLE, "photo_x": -40}}, headers=auth
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["style"]["photo_x"] == -40
+
+    def test_키가_너무_길면_422(self, client, auth):
+        bad = {**_STYLE, "photo_key": "cards/photos/" + "x" * 300}
+        res = client.patch(CARD, json={"style": bad}, headers=auth)
+        assert res.status_code == 422

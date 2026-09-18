@@ -122,6 +122,8 @@ class TestOpenApi:
             f"{V1}/me",
             f"{V1}/me/password",
             f"{V1}/me/card",
+            # 카드 사진 올릴 자리 (2026-09-18, 백성검 — 사용자 허락).
+            f"{V1}/me/card/photo-upload-url",
             V1 + "/cards/{public_slug}",
             f"{V1}/positions",
             f"{V1}/teams",

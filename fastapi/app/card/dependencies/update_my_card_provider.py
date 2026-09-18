@@ -13,10 +13,13 @@ from app.card.application.use_cases.update_my_card_interactor import (
     UpdateMyCardInteractor,
 )
 from app.card.dependencies.card_repository_provider import CardRepositoryDep
+from app.card.dependencies.photo_storage_provider import CardPhotoStorageOptionalDep
 
 
-def get_update_my_card_use_case(repository: CardRepositoryDep) -> UpdateMyCardUseCase:
-    return UpdateMyCardInteractor(repository)
+def get_update_my_card_use_case(
+    repository: CardRepositoryDep, photos: CardPhotoStorageOptionalDep
+) -> UpdateMyCardUseCase:
+    return UpdateMyCardInteractor(repository, photos)
 
 
 UpdateMyCardUseCaseDep = Annotated[
