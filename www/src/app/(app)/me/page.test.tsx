@@ -487,13 +487,41 @@ describe('내 프로필 — /me', () => {
     const file = new File(['x'], 'me.png', { type: 'image/png' })
     fireEvent.change(screen.getByLabelText('사진 고르기'), { target: { files: [file] } })
 
-    // FileReader 는 비동기다 — 읽기가 끝나야 카드에 실린다.
+    /* 🔴 **미리보기가 먼저 선다**(2026-09-18). 올리는 동안 카드가 그대로면
+       「눌렀는데 아무 일도 안 난다」로 보인다 — 고르는 즉시 `blob:` 으로
+       그려 놓고, S3 업로드는 그 뒤에 돈다.
+       (앞서 이 시험은 `data:`(FileReader)를 기대했다 — 사진을 브라우저에만
+       두던 시절의 값이다.) */
     await waitFor(() => {
       expect(container.querySelector('.ss-pcard-figure img')!.getAttribute('src')).toMatch(
-        /^data:/,
+        /^blob:/,
       )
     })
     expect(container.querySelectorAll('input[type="range"]')).toHaveLength(3)
+  })
+
+  /**
+   * 🔴 **올라가기 전에 저장하면 사진이 안 남는다** — 서버로 가는 값은 S3
+   * 키인데 그것이 아직 없기 때문이다. 말 안 해 주면 「저장했는데 사라졌다」가
+   * 된다. 여기서는 업로드가 실패하는 상황을 세워 그 자리를 본다.
+   */
+  it('사진이 안 올라갔으면 그렇다고 적는다', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(null, { status: 500 }),
+    )
+    const { container } = render(
+      <MeBody user={USER} card={CARD} videos={[]} matches={[]} editing />,
+    )
+    fireEvent.click(screen.getByRole('tab', { name: '사진' }))
+    const file = new File(['x'], 'me.png', { type: 'image/png' })
+    fireEvent.change(screen.getByLabelText('사진 고르기'), { target: { files: [file] } })
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/올리지 못했습니다/)
+    // 미리보기는 그대로 서 있다 — 고른 것이 사라지면 더 혼란스럽다.
+    expect(container.querySelector('.ss-pcard-figure img')!.getAttribute('src')).toMatch(
+      /^blob:/,
+    )
+    vi.restoreAllMocks()
   })
 
   // 🔴 사용자 요청 — 글자를 카드 위에서 끌어 놓는다. 다만 `PLAYER CARD`

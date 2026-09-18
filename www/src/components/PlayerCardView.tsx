@@ -64,9 +64,13 @@ type CardLook = {
   brushY?: number
 }
 
-/** `card.style` (서버, 스네이크) → `CardLook` (이 파일, 캐멀). 사진 관련은
- * 서버에 없으므로 안 채운다 — 호출부가 `??` 로 기본값을 따로 잡는다. */
-function styleToLook(style: NonNullable<PublicPlayerCard['style']>): CardLook {
+/** `card.style` (서버, 스네이크) → `CardLook` (이 파일, 캐멀).
+ *
+ * 🔴 **그림 주소는 `style` 이 아니라 `card.photo_url` 에서 온다**(2026-09-18) —
+ * `style` 에는 S3 키만 있고, 그 키로 서명한 주소를 서버가 따로 실어 준다.
+ * 그래서 카드를 통째로 받는다. */
+function styleToLook(card: PublicPlayerCard): CardLook {
+  const style = card.style!
   return {
     bg: style.bg,
     logo: style.logo,
@@ -78,6 +82,13 @@ function styleToLook(style: NonNullable<PublicPlayerCard['style']>): CardLook {
     brushScale: style.brush_scale,
     brushX: style.brush_x,
     brushY: style.brush_y,
+    /* 🔴 **없을 수 있다** — 배포 전 실서버는 아직 안 보낸다. 그때는 기본
+       장식 그림으로 떨어진다(아래 `photo` 의 `??`). */
+    photo: card.photo_url ?? null,
+    photoScale: style.photo_scale,
+    photoX: style.photo_x,
+    photoY: style.photo_y,
+    mode: style.mode,
   }
 }
 
@@ -91,7 +102,7 @@ export default function PlayerCardView({
   // 🔴 **`look` 이 없어도 `card.style` 이 있으면 꾸며진 대로 그린다.** 이게
   // 없으면 저장은 되는데 편집기 밖(내 프로필 평소 보기 · 공개 카드 링크)
   // 에서는 안 보이는 반쪽짜리가 된다 — 저장한 보람이 없어진다.
-  const effective = look ?? (card.style ? styleToLook(card.style) : undefined)
+  const effective = look ?? (card.style ? styleToLook(card) : undefined)
   const alias = look?.text ?? card.tagline ?? ALIAS
   const photo = effective?.photo ?? '/player_cutout.png'
   const full = effective?.mode === 'full'

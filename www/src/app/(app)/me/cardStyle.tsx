@@ -19,10 +19,16 @@ import type { CardStyleWire, PlayerCard } from '@/server/backend'
  * 합쳤다. 아래 `tagline`은 그 자리다(자리 이름을 그대로 쓴다 — 다른 개념이
  * 아니라 같은 값의 편집 버퍼다).
  *
- * ⚠️ **사진 관련 넷(`photo`·`photoScale`·`photoX`·`photoY`)과 `mode`는
- * 여전히 서버에 없다.** `og_image_key`가 "규칙은 있는데 파일이 없는" 것과
- * 같은 이유다(저장 위치 미정) — `cardStyleStore.ts` 없이 **이 세션 동안만**
- * 남는다. 새로고침하면 사라지는 것이 지금은 맞는 동작이다.
+ * 🔴 **정정 (2026-09-18, 사용자 요청): 사진도 저장된다.** 앞서 여기에
+ * "사진 관련 넷과 `mode` 는 여전히 서버에 없다 — 이 세션 동안만 남는다"고
+ * 적어 두었는데, 자리를 냈다(계약 3-5절).
+ *
+ *   `photoKey`  — **S3 키**. 이것이 서버로 가는 값이다
+ *   `photo`     — **그려 줄 주소**. 서버가 준 `photo_url`(사전 서명)이거나,
+ *                 방금 고른 사진의 미리보기다. **서버로 안 간다**
+ *
+ * 🔴 둘을 가른 이유: 그림 자체를 `style` 에 담으면 카드를 읽는 모든 응답에
+ * 사진이 실린다 — 스쿼드 판 하나가 자리마다 카드를 부른다.
  */
 export type CardStyle = {
   /** 카드 바탕. */
@@ -39,12 +45,21 @@ export type CardStyle = {
   textX: number
   textY: number
   /**
-   * 올린 사진. **브라우저 안에만, 이 세션 동안만 있다**(파일을 읽은 data
-   * URL) — 카드 이미지를 올릴 자리가 계약에 정해져 있지 않아서 서버로
-   * 보내지 않는다. `og_image_key` 가 "그 위치에 파일이 아직 없다" 인 것과
-   * 같은 자리다.
+   * **그려 줄 사진 주소.** 서버가 준 `photo_url`(사전 서명, 유효 시간 있음)
+   * 이거나, 방금 고른 사진의 미리보기(`blob:`)다.
+   *
+   * 🔴 **이 값은 서버로 안 간다** — `toWire` 가 안 싣는다. 서버로 가는 것은
+   * 아래 `photoKey` 하나다.
    */
   photo: string | null
+  /**
+   * **S3 키** — 서버에 저장되는 값(`style.photo_key`).
+   *
+   * 🔴 `photo` 는 있는데 이것이 `null` 이면 **아직 안 올라갔다**는 뜻이다
+   * (고르자마자 미리보기부터 뜨고 업로드는 그다음이다). 그 상태로 저장하면
+   * 사진이 안 남으므로, 편집기가 올리기가 끝난 뒤에 이 값을 채운다.
+   */
+  photoKey: string | null
   /** 사진 크기(1 이 원래 크기). */
   photoScale: number
   /** 사진 위치 — 카드 폭 · 높이에 대한 백분율. */
@@ -79,6 +94,7 @@ export const DEFAULT_CARD_STYLE: CardStyle = {
   textX: 50,
   textY: 34,
   photo: null,
+  photoKey: null,
   photoScale: 1,
   photoX: 0,
   photoY: 0,
@@ -105,10 +121,20 @@ function fromWire(wire: CardStyleWire | null | undefined): CardStyle {
     brushScale: wire.brush_scale,
     brushX: wire.brush_x,
     brushY: wire.brush_y,
+    /* 🔴 **없을 수 있다** — 배포 전 실서버는 이 다섯을 아직 안 보낸다.
+       그때는 기본값으로 떨어진다(타입이 선택인 이유). */
+    photoKey: wire.photo_key ?? null,
+    photoScale: wire.photo_scale ?? DEFAULT_CARD_STYLE.photoScale,
+    photoX: wire.photo_x ?? DEFAULT_CARD_STYLE.photoX,
+    photoY: wire.photo_y ?? DEFAULT_CARD_STYLE.photoY,
+    mode: wire.mode ?? DEFAULT_CARD_STYLE.mode,
   }
 }
 
-/** 사진 관련 넷은 서버에 자리가 없다 — 여기서 빠지는 것이 그 경계다. */
+/**
+ * 🔴 **`photo` 는 여기서 빠진다** — 그것은 그려 줄 주소(사전 서명이거나
+ * `blob:`)라 저장할 값이 아니다. 서버로 가는 것은 `photo_key` 다.
+ */
 function toWire(style: CardStyle): CardStyleWire {
   return {
     bg: style.bg,
@@ -121,6 +147,11 @@ function toWire(style: CardStyle): CardStyleWire {
     brush_scale: style.brushScale,
     brush_x: style.brushX,
     brush_y: style.brushY,
+    photo_key: style.photoKey,
+    photo_scale: style.photoScale,
+    photo_x: style.photoX,
+    photo_y: style.photoY,
+    mode: style.mode,
   }
 }
 
@@ -154,7 +185,14 @@ export function CardStyleProvider({
   card: PlayerCard | null
   children: React.ReactNode
 }) {
-  const [style, setStyle] = useState<CardStyle>(() => fromWire(card?.style))
+  /* 🔴 **그려 줄 주소는 `card.photo_url` 에서 온다** — `style` 에는 키만
+     있고, 그 키로 서명한 주소를 서버가 따로 실어 준다. 여기서 안 채우면
+     새로고침한 뒤 사진이 사라진 것처럼 보인다(키는 남아 있는데 그릴 주소가
+     없어서다). */
+  const [style, setStyle] = useState<CardStyle>(() => ({
+    ...fromWire(card?.style),
+    photo: card?.photo_url ?? null,
+  }))
   // 🔴 안 정했으면 `ALIAS` 자리 표시로 시작한다 — 지금 카드(비편집 화면)에
   // 보이는 것과 편집기를 여는 순간 보이는 것이 달라지면 안 된다.
   const [tagline, setTagline] = useState(() => card?.tagline ?? ALIAS)

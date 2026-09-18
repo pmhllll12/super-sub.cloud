@@ -2115,6 +2115,32 @@ export const mockBackend: Backend = {
     } satisfies TeamDetail
   },
 
+  /**
+   * **카드 사진 올릴 자리** — mock 은 S3 가 없으니 흉내만 낸다.
+   *
+   * 🔴 **계약보다 너그럽게 두지 않는다**(1.12 의 「mock 이 실서버보다
+   * 너그러우면 배포에서만 터진다」). 서버가 받는 타입 셋만 받고, 나머지는
+   * 실서버와 같은 `422 UNSUPPORTED_PHOTO_TYPE` 로 막는다.
+   *
+   * ⚠️ 여기서 주는 `upload_url` 은 **가짜다.** 화면은 올리기 실패를 견뎌야
+   * 하고(사진 없는 카드로 떨어진다), 그 갈래를 로컬에서 밟게 하려는 것이다.
+   */
+  async createCardPhotoUploadUrl(token, contentType) {
+    const u = requireUser(token)
+    const ext = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[
+      contentType
+    ]
+    if (!ext) {
+      throw new BackendError(
+        422,
+        'UNSUPPORTED_PHOTO_TYPE',
+        '사진으로 올릴 수 없는 형식입니다.',
+      )
+    }
+    const key = `cards/photos/${u.id}/${Math.random().toString(16).slice(2, 10)}.${ext}`
+    return { upload_url: `https://mock.invalid/put/${key}`, storage_key: key, expires_in: 900 }
+  },
+
   async leaveTeam(token, teamId, memberId) {
     const u = requireUser(token)
     const mine = u.teams.find((t) => t.team_id === teamId)
