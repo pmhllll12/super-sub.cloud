@@ -5,7 +5,8 @@ import {
   judgeEmail,
   judgeNickname,
   judgeSeat,
-  nextJudgeSeat,
+  judgeSeats,
+  setJudgeSeat,
   readJudgeSeat,
 } from './judgeSeat'
 
@@ -41,16 +42,30 @@ describe('심사위원 자리 배정', () => {
     for (let i = 0; i < 20; i += 1) expect(judgeSeat()).toBe(first)
   })
 
-  it('🔴 「바꾸기」는 **지금 것을 뺀** 나머지에서 고른다', () => {
-    const first = judgeSeat()
-    for (let i = 0; i < 20; i += 1) {
-      const before = readJudgeSeat()
-      const next = nextJudgeSeat()
-      expect(next).not.toBe(before)
-      expect(next).toBeGreaterThanOrEqual(1)
-      expect(next).toBeLessThanOrEqual(JUDGE_SEATS)
+  /**
+   * 🔴 **사람이 고르면 그쪽이 이긴다** (사용자 요청, 2026-09-18: 「선택
+   * 가능하게 해줘. 지금은 랜덤이네」). 무작위는 **처음 배정**에만 남는다.
+   */
+  it('고른 번호가 그대로 남는다', () => {
+    judgeSeat() // 먼저 무작위로 하나 배정된 상태에서
+    expect(setJudgeSeat(7)).toBe(7)
+    expect(readJudgeSeat()).toBe(7)
+    expect(judgeSeat()).toBe(7) // 이미 있으니 다시 안 고른다
+  })
+
+  it('고를 수 있는 번호가 1~10 으로 나온다', () => {
+    expect(judgeSeats()).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    expect(judgeSeats()).toHaveLength(JUDGE_SEATS)
+  })
+
+  /* 🔴 없는 번호를 기억해 두면 그 계정이 없어 **로그인 단추가 가입부터**
+     시도하고, 시연 자리에서 팀도 판도 없는 빈 계정이 생긴다. */
+  it('🔴 범위 밖은 안 바꾸고 null 을 돌려준다', () => {
+    setJudgeSeat(3)
+    for (const bad of [0, -1, 11, 99, 1.5, Number.NaN]) {
+      expect(setJudgeSeat(bad)).toBeNull()
+      expect(readJudgeSeat()).toBe(3)
     }
-    expect(first).toBeGreaterThanOrEqual(1)
   })
 
   it('저장된 값이 범위 밖이면 없는 것으로 읽는다', () => {
