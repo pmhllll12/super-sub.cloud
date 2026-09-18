@@ -48,6 +48,7 @@ export default function MatchWaiting({
   them,
   myCard = null,
   onClose,
+  onFinished,
   onCancel,
 }: {
   us: MyTeamSummary
@@ -56,6 +57,13 @@ export default function MatchWaiting({
   myCard?: PublicPlayerCard | null
   /** 판을 접는다 — **경기는 그대로다**(×·Esc). */
   onClose: () => void
+  /**
+   * **경기를 끝냈다** — 「경기 완료」를 확인한 순간(사용자 요청, 2026-09-18).
+   *
+   * 🔴 닫기(`onClose`)와 다른 일이다. 닫기는 판만 접고, 이것은 **그 경기가
+   * 끝났다는 사실**을 알린다 — 부모가 머리칸 표시에서 뺀다.
+   */
+  onFinished?: () => void
   /**
    * 잡힌 경기를 **무른다** — 닫기와 다른 일이다.
    * 🔴 안 주면 취소 단추를 아예 안 그린다 — 눌러도 아무 일이 없으면 안 된다.
@@ -292,6 +300,11 @@ export default function MatchWaiting({
                   data-done="true"
                   onClick={() => {
                     setFinishing(false)
+                    /* 🔴 **머리칸의 「경기 잡힘」에서 뺀다**(사용자 요청,
+                       2026-09-18: 취소처럼 사라지게). 서버에 「끝난 경기」
+                       상태가 없어(계약에 취소만 있다) 부모가 브라우저에
+                       적어 둔다 — 한계는 `seekingStore` 머리말. */
+                    onFinished?.()
                     setReviewing(true)
                   }}
                 >

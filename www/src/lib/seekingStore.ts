@@ -128,6 +128,50 @@ export function __resetSeeking(): void {
   write(null)
 }
 
+/* ── 「이 경기는 끝냈다」 ────────────────────────────────────────────────
+   🔴 **서버에 「끝난 경기」라는 상태가 없다**(계약에 `DELETE`(취소)는 있어도
+   완료는 없고, 리뷰 저장도 아직 화면 안에만 있다). 그래서 팀장이 「경기 완료」
+   를 누른 사실을 **이 브라우저에** 적어 두고 머리칸 표시에서 뺀다.
+
+   ⚠️ **한계**: 다른 기기·다른 사람 화면에서는 그대로 보인다. 제대로 하려면
+   계약에 완료 상태가 생겨야 한다(그때 이 칸은 걷는다). */
+
+const DONE_KEY = 'ss-finished-matches-v1'
+
+function readDone(): string[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem(DONE_KEY)
+    const v = raw ? (JSON.parse(raw) as unknown) : null
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+/** 그 경기를 끝냈다고 적는다 — 머리칸 표시에서 빠진다. */
+export function markMatchDone(matchId: string): void {
+  if (typeof window === 'undefined' || !matchId) return
+  const now = readDone()
+  if (now.includes(matchId)) return
+  try {
+    /* 🔴 **끝없이 쌓이지 않게 자른다** — 오래된 것부터 버린다. 한 사람이
+       기억해야 할 「끝낸 경기」가 수십 개일 이유가 없다. */
+    window.localStorage.setItem(
+      DONE_KEY,
+      JSON.stringify([...now, matchId].slice(-50)),
+    )
+  } catch {
+    /* 못 적으면 표시가 남을 뿐이다 — 화면을 멈추지 않는다. */
+  }
+  window.dispatchEvent(new Event(CHANGED))
+}
+
+/** 그 경기를 이미 끝냈는가. */
+export function isMatchDone(matchId: string | null | undefined): boolean {
+  return Boolean(matchId) && readDone().includes(matchId as string)
+}
+
 /* ── 잡힌 경기 화면을 다시 여는 「부탁」 ─────────────────────────────────
    머리칸 표시는 **모든 화면**에 있는데 경기 화면을 그리는 것은 **홈의 판**
    하나뿐이다. 그래서 홈이 아닌 데서 누르면 「열어 달라」를 여기 적어 두고
