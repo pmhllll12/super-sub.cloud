@@ -97,21 +97,31 @@ export default function TeamMatch({
   useEffect(() => {
     const panel = fitRef.current
     if (!panel) return
+    /* 🔴 **붙었다는 표식을 남긴다.** 안 붙으면 증상이 「고치기 전과 똑같음」
+       이라 배포가 안 된 것인지 코드가 틀린 것인지 화면만 보고는 못 가른다 —
+       실제로 그것 때문에 한 번 헤맸다(2026-09-18). 검사 도구에서
+       `data-wheel-guard` 를 보면 바로 갈린다. */
+    panel.dataset.wheelGuard = 'on'
+
     function onWheel(e: WheelEvent) {
       const list = listRef.current
       if (!list) return
-      const down = e.deltaY > 0
-      const canScroll = down
-        ? list.scrollTop + list.clientHeight < list.scrollHeight - 1
-        : list.scrollTop > 0
-      const inList = list.contains(e.target as Node)
-      if (inList && canScroll) return
-      // 머리·아래에서 굴려도 **목록이** 구른다 — 판 위라면 어디서든 자연스럽게.
-      if (!inList && canScroll) list.scrollTop += e.deltaY
+      /* 🔴 **네이티브 체이닝 규칙에 안 기댄다.** 앞서는 「목록이 구를 수
+         있으면 브라우저에 맡기고 `overscroll-behavior: contain` 이 끝을
+         막는다」로 두었는데, **배포본에서 그게 안 먹었다** — CSS 는 멀쩡히
+         살아 있는데(빌드본에서 확인) 페이지가 계속 내려갔다.
+
+         그래서 판 위의 휠은 **무조건 우리가 처리한다**: 목록을 직접 굴리고
+         기본 동작을 막는다. 어디에 커서가 있든(카드·머리줄·아래 안내·여백)
+         같게 돌고, 페이지는 움직이지 않는다. */
+      list.scrollTop += e.deltaY
       e.preventDefault()
     }
     panel.addEventListener('wheel', onWheel, { passive: false })
-    return () => panel.removeEventListener('wheel', onWheel)
+    return () => {
+      delete panel.dataset.wheelGuard
+      panel.removeEventListener('wheel', onWheel)
+    }
   }, [fitRef])
   /** 지금 수락을 기다리는 팀. 하나뿐이다 — 두 곳에 동시에 신청하지 않는다. */
   const [waiting, setWaiting] = useState<string | null>(null)
