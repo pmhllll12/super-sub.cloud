@@ -96,19 +96,22 @@ export default function AuthShell({
           {/* 카드 왼쪽 — 사진 칸. 좁은 화면에서는 숨긴다(폼만 남기기 위해). */}
           <div className="relative hidden lg:block">
             {/* eslint-disable-next-line @next/next/no-img-element -- 장식용 고정 사진 */}
-            <img
-              src="/login_figure.jpg"
-              alt=""
-              className="absolute inset-0 h-full w-full object-cover"
-            />
-            <div
-              aria-hidden="true"
-              className="absolute inset-0"
-              style={{
+             <video
+                autoPlay
+                muted
+                playsInline
+                className="absolute inset-0 h-full w-full object-cover"
+              >
+              <source src="/videos/demo.mp4" type="video/mp4" />
+              </video>
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-0"
+                style={{
                 background:
-                  'linear-gradient(to top, color-mix(in srgb, var(--ss-bg) 90%, transparent) 0%, color-mix(in srgb, var(--ss-bg) 10%, transparent) 45%, color-mix(in srgb, var(--ss-bg) 70%, transparent) 100%)',
-              }}
-            />
+        'linear-gradient(to top, color-mix(in srgb, var(--ss-bg) 90%, transparent) 0%, color-mix(in srgb, var(--ss-bg) 10%, transparent) 45%, color-mix(in srgb, var(--ss-bg) 70%, transparent) 100%)',
+               }}
+              />
             {/* 헤드라인+설명은 한 덩어리로 사진 칸의 세로 가운데에 놓는다
                 (가로는 기존대로 왼쪽 정렬 유지). 줄바꿈은 자연 줄바꿈에
                 맡기지 않고 명시적으로 두 줄로 고정한다 — "안개 속에서도," /
