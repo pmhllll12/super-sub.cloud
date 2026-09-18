@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { applyToTeam, findCandidates, type CandidateTeam } from '@/lib/teamMatch'
 import { proposalsFrom, toPlayedAt, type Proposal } from '@/lib/matchProposal'
 import { VENUES } from '@/lib/venues'
@@ -77,6 +77,42 @@ export default function TeamMatch({
   /* 🔴 화면 아래로 넘치지 않게 — 「팀원」 판과 같은 상자에 매달려 있어 같은
      문제를 겪는다(`useFitToViewport` 머리말). */
   const fitRef = useFitToViewport<HTMLElement>()
+  /** 굴릴 대상 — 판 안의 목록. 아래 휠 처리기가 이것을 대신 굴린다. */
+  const listRef = useRef<HTMLUListElement>(null)
+
+  /**
+   * **판 안에서 굴리면 페이지가 안 움직인다** (사용자 지적, 2026-09-18:
+   * 「팀 매칭 판에서 다른 팀 보려고 스크롤 하면 아예 비디오로 내려와」).
+   *
+   * 🔴 `.ss-tm-list` 에는 이미 `overscroll-behavior: contain` 이 있다. 새는
+   * 자리는 **목록 밖**이다 — 머리줄이나 아래 안내 위에서 굴리면 그 휠은
+   * 목록이 아니라 **페이지**로 가고, 홈은 아래가 영상 모음이라 거기까지
+   * 내려간다. CSS 로는 못 막는다(그 자리들은 스크롤 상자가 아니다).
+   *
+   * 🔴 **목록이 아직 구를 수 있으면 막지 않는다** — 다 막으면 목록 자체가
+   * 안 움직인다. 페이지로 넘어가는 것만 막는 것이 요점이다.
+   * 🔴 **`passive: false` 로 붙인다** — React 의 `onWheel` 은 passive 라
+   * `preventDefault()` 가 조용히 무시된다.
+   */
+  useEffect(() => {
+    const panel = fitRef.current
+    if (!panel) return
+    function onWheel(e: WheelEvent) {
+      const list = listRef.current
+      if (!list) return
+      const down = e.deltaY > 0
+      const canScroll = down
+        ? list.scrollTop + list.clientHeight < list.scrollHeight - 1
+        : list.scrollTop > 0
+      const inList = list.contains(e.target as Node)
+      if (inList && canScroll) return
+      // 머리·아래에서 굴려도 **목록이** 구른다 — 판 위라면 어디서든 자연스럽게.
+      if (!inList && canScroll) list.scrollTop += e.deltaY
+      e.preventDefault()
+    }
+    panel.addEventListener('wheel', onWheel, { passive: false })
+    return () => panel.removeEventListener('wheel', onWheel)
+  }, [fitRef])
   /** 지금 수락을 기다리는 팀. 하나뿐이다 — 두 곳에 동시에 신청하지 않는다. */
   const [waiting, setWaiting] = useState<string | null>(null)
   /** 신청이 실제로 나간 팀 — 줄에 「수락 대기 중」이라고 적는다. */
@@ -354,7 +390,7 @@ export default function TeamMatch({
       )}
 
       {!asking && state.kind === 'ok' && state.teams.length > 0 && (
-        <ul className="ss-tm-list">
+        <ul ref={listRef} className="ss-tm-list">
           {state.teams.map((t) => (
             <li key={t.id} className="ss-tm-row">
               <span className="ss-tm-name">{t.name}</span>

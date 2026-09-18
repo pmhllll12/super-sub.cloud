@@ -411,4 +411,43 @@ describe('비슷한 팀 명단', () => {
     // 판이 닫히지 않는다 — 직접 고르는 칸이 있다.
     expect(screen.getByLabelText('직접 고르기')).toBeInTheDocument()
   })
+
+  /**
+   * **판 안에서 굴리면 페이지가 안 움직인다** (사용자 지적, 2026-09-18).
+   *
+   * 「A팀 매칭 판에서 다른 팀 보려고 스크롤 하면 아예 비디오 여기로 내려와」
+   *
+   * 🔴 `.ss-tm-list` 에는 이미 `overscroll-behavior: contain` 이 있었다.
+   * 새는 자리는 **목록 밖**이다 — 머리줄(「설정 수정」)이나 아래 안내
+   * (「신청은 상대 팀장에게 갑니다」) 위에서 굴리면 그 휠은 목록이 아니라
+   * **페이지**로 가고, 홈은 아래가 영상 모음이라 거기까지 내려간다.
+   */
+  it('목록 밖에서 굴려도 페이지로 안 넘긴다', async () => {
+    open()
+    await screen.findByText('망원 유나이티드')
+
+    const foot = screen.getByText(/수락해야 경기가 잡힙니다/)
+    const ev = new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true })
+    foot.dispatchEvent(ev)
+
+    expect(ev.defaultPrevented).toBe(true)
+  })
+
+  /* 🔴 **목록이 아직 구를 수 있으면 막지 않는다** — 막아 버리면 목록 자체가
+     안 움직인다. 페이지로 넘어가는 것만 막는 것이 요점이다. */
+  it('목록이 구를 수 있으면 그 휠은 그대로 둔다', async () => {
+    open()
+    await screen.findByText('망원 유나이티드')
+
+    const list = document.querySelector('.ss-tm-list') as HTMLElement
+    // jsdom 은 크기를 안 재므로 구를 여지가 있다고 알려 준다.
+    Object.defineProperty(list, 'scrollHeight', { value: 900, configurable: true })
+    Object.defineProperty(list, 'clientHeight', { value: 300, configurable: true })
+    list.scrollTop = 0
+
+    const ev = new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true })
+    list.dispatchEvent(ev)
+
+    expect(ev.defaultPrevented).toBe(false)
+  })
 })
