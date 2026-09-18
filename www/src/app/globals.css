@@ -13777,6 +13777,20 @@ body:has(.ss-venues) .ss-home-header {
   color: color-mix(in srgb, var(--ss-error) 85%, #fff);
 }
 
+/* 🔴 「경기 완료」를 되묻는 줄 (2026-09-18) — **오류가 아니라 경고**라 붉은색을
+   쓰지 않는다. 오류 줄과 같은 색이면 「무언가 잘못됐다」로 읽힌다. */
+.ss-mw-warn {
+  margin-top: 10px;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--ss-fg) 82%, transparent);
+}
+
+.ss-mw-warn strong {
+  color: var(--ss-fg);
+  font-weight: 700;
+}
+
 /* 「경기 취소」 — 🔴 닫기(×)와 **다른 일**이라 자리를 가른다. 되돌릴 수 없어서
    그 자리에서 한 번 더 묻고, 그때만 두 단추가 나란히 선다. */
 .ss-mw-actions {
