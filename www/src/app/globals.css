@@ -14955,3 +14955,78 @@ a.ss-seeking-pill:hover {
   font-size: 1.1rem;
   line-height: 1;
 }
+
+/* ── 사용법 영상(해커톤 제출용, 2026-09-18) — components/DemoVideo.tsx ──
+   로그인 화면에서는 JS 가 잰 자리(top/left/width/height)를 인라인으로 받고,
+   자리가 없는 화면에서는 아래 기본값대로 왼쪽 아래 구석에 뜬다.
+
+   🔴 테두리는 **완전한 흰색 · 아주 얇게**(사용자 요청). `--ss-fg` 를 쓰지 않는다 —
+   흰 판 화면들이 그 값을 검정·짙은 초록으로 뒤집어 쓴다. 이 규칙 안에서만 쓰는
+   값이라 여기 한 번 적는다. */
+.ss-demo-video {
+  --ss-demo-edge: #ffffff;
+  position: fixed;
+  z-index: 55;
+  left: 1.5rem;
+  bottom: 1.5rem;
+  width: min(20rem, 40vw);
+  aspect-ratio: 1920 / 1040;
+  border: 1px solid var(--ss-demo-edge);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--ss-bg);
+  animation: ss-demo-in 0.5s ease-out both;
+}
+
+/* 자리에 앉았을 때는 구석 기본값(bottom)이 끼어들면 안 된다. */
+.ss-demo-video[data-slotted='true'] {
+  bottom: auto;
+  aspect-ratio: auto;
+}
+
+.ss-demo-video[hidden] {
+  display: none;
+}
+
+.ss-demo-video video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 영상 전체가 누르는 자리다 — 누르면 멈추고 다시 누르면 이어서. */
+.ss-demo-video-toggle {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.ss-demo-video-toggle[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--ss-bg) 35%, transparent);
+}
+
+.ss-demo-video-toggle:focus-visible {
+  outline: 2px solid var(--ss-accent);
+  outline-offset: -4px;
+  border-radius: inherit;
+}
+
+/* 멈췄을 때만 보이는 ▶ — 멈춘 줄 모르고 「영상이 안 나온다」로 읽히지 않게. */
+.ss-demo-video-play {
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 14px 0 14px 24px;
+  border-color: transparent transparent transparent var(--ss-demo-edge);
+}
+
+@keyframes ss-demo-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
