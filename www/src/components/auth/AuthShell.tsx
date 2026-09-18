@@ -102,7 +102,7 @@ export default function AuthShell({
                 playsInline
                 className="absolute inset-0 h-full w-full object-cover"
               >
-              <source src="/videos/demo.mp4" type="video/mp4" />
+              <source src="/demo.mp4" type="video/mp4" />
               </video>
                 <div
                   aria-hidden="true"
