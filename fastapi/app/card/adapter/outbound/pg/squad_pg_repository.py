@@ -23,7 +23,11 @@ from app.card.adapter.outbound.orm.player_card_orm import PlayerCardOrm
 from app.card.adapter.outbound.orm.squad_member_orm import SquadMemberOrm
 from app.card.adapter.outbound.orm.squad_orm import SquadOrm
 from app.card.application.ports.output.squad_port import SquadPort
-from app.card.domain.entities.squad_entity import SquadEntity, SquadMemberEntity
+from app.card.domain.entities.squad_entity import (
+    DEFAULT_FORMATION,
+    SquadEntity,
+    SquadMemberEntity,
+)
 from app.card.domain.value_objects.public_slug_vo import PublicSlug
 
 # 소유하지 않는 테이블에서 **읽기만** 한다. 위 docstring 참조.
@@ -96,6 +100,11 @@ class SquadPgRepository(SquadPort):
                 id=uuid4(),
                 team_id=team_id,
                 public_slug=str(PublicSlug.generate()),
+                # 🔴 판 크기를 **만들 때 정해 둔다**(2026-09-18). 비워 두면
+                # 화면은 기본 판을 켜진 것처럼 그리는데 DB 는 NULL 이라,
+                # 팀 매칭의 첫 하드 필터(`formation` 동등 비교)에서 통째로
+                # 떨어진다. 까닭은 `squad_entity.DEFAULT_FORMATION`.
+                formation=DEFAULT_FORMATION,
             )
             self._session.add(squad)
             try:

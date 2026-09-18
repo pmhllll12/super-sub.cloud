@@ -7,6 +7,7 @@ import { VENUES } from '@/lib/venues'
 import MatchPrefsForm from '@/components/MatchPrefs'
 import { type MatchPrefs } from '@/lib/matchPrefs'
 import { loadTeamPrefs, saveTeamPrefs } from '@/lib/teamPrefsStore'
+import { startSeeking, stopSeeking } from '@/lib/seekingStore'
 import { useFitToViewport } from '@/lib/useFitToViewport'
 
 /**
@@ -98,12 +99,22 @@ export default function TeamMatch({
       return
     }
     let alive = true
-    void loadTeamPrefs(teamId).then((saved) => {
-      if (!alive) return
-      setPrefs(saved)
-      setAsking(saved === null)
-      setReady(true)
-    })
+    void loadTeamPrefs(teamId)
+      .then((saved) => {
+        if (!alive) return
+        setPrefs(saved)
+        setAsking(saved === null)
+        setReady(true)
+      })
+      /* 🔴 **던지면 판이 「찾고 있습니다…」에서 멈춘다**(2026-09-18). 이 통은
+         `ready` 가 서야 다음을 그리는데, 조회가 거절되면 그 줄에 영영 못
+         닿았다 — 연결이 한 번 끊긴 것뿐인데 판이 굳는다. 못 읽었으면 **조건을
+         안 정한 것처럼** 물어본다: 다시 정하면 그대로 이어진다. */
+      .catch(() => {
+        if (!alive) return
+        setAsking(true)
+        setReady(true)
+      })
     return () => {
       alive = false
     }
@@ -232,6 +243,24 @@ export default function TeamMatch({
               설정 수정
             </button>
           )}
+          {/* 🔴 **× 와 다른 일을 한다**(2026-09-18). × 는 이 판을 닫을 뿐이고
+              찾기는 계속된다 — 머리칸에 「팀 찾는 중」이 남는다. 그만두는 길이
+              따로 없으면 한 번 시작한 표시를 영영 못 끈다. */}
+          {prefs && !asking && (
+            <button
+              type="button"
+              className="ss-tm-edit"
+              onClick={() => {
+                stopSeeking()
+                onClose()
+              }}
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">
+                search_off
+              </span>
+              그만 찾기
+            </button>
+          )}
           <button type="button" className="ss-tm-close" onClick={onClose} aria-label="닫기">
             <span className="material-symbols-outlined" aria-hidden="true">
               close
@@ -251,6 +280,12 @@ export default function TeamMatch({
                3-13절). 실패하면 화면이 그것을 숨기지 않고 말한다. */
             setPrefs(next)
             setAsking(false)
+            /* 🔴 **「팀 찾기」를 누른 이 순간이 「찾기 시작」이다**(사용자
+               요청, 2026-09-18). 이 표시가 있어야 다른 화면으로 가도 머리칸에
+               「팀 찾는 중」이 남고, 돌아왔을 때 이 판이 다시 펴진다.
+               ⚠️ 조건 저장과 **따로** 둔다 — 저장이 실패해도 찾는 중이라는
+               사실 자체는 맞고, 실패는 아래에서 따로 말한다. */
+            if (teamId) startSeeking(teamId)
             void saveTeamPrefs(teamId, next).catch(() =>
               setError('조건을 저장하지 못했습니다 — 다시 시도해 주세요.'),
             )

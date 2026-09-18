@@ -15,6 +15,7 @@ from app.card.adapter.outbound.stub.squad_stub_repository import (
     register_team,
     reset_squads,
 )
+from app.card.domain.entities.squad_entity import DEFAULT_FORMATION
 from app.core.security import issue_access_token
 from tests.conftest import V1, error_code
 
@@ -310,9 +311,20 @@ class TestSetFormation:
         assert res.status_code == 200, res.text
         assert res.json()["formation"] == "5:5"
 
-    def test_기본은_null_이다(self, client, football):
+    def test_만들면_기본_판_크기를_갖고_시작한다(self, client, football):
+        """🔴 **2026-09-18 에 뒤집혔다 — 전에는 `None` 을 못 박던 자리다.**
+
+        왜 바꿨나: 화면은 값이 없어도 기본 판(5:5)을 **켜진 것처럼** 그린다.
+        그래서 아무도 크기 단추를 누르지 않았고, 저장은 「바꿀 때만」 일어나서
+        실제 DB 는 거의 전부 `NULL` 이었다. 팀 매칭의 첫 하드 필터가
+        `formation` 동등 비교라(`list_candidate_facts`) **어느 팀에게도
+        상대가 안 잡혔다** — 운영에서 7팀 중 6팀이 그랬다.
+
+        값을 지어내는 것이 아니라 **화면이 내내 보여 주던 값을 저장만 한다.**
+        읽는 쪽은 옛 스쿼드 때문에 여전히 `None` 을 만날 수 있다.
+        """
         squad = _create(client, football, football["owner"]).json()
-        assert squad["formation"] is None
+        assert squad["formation"] == DEFAULT_FORMATION
 
     def test_구성원은_못_바꾼다(self, client, football):
         _create(client, football, football["owner"])
