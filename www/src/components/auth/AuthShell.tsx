@@ -5,11 +5,7 @@ const MUTED = 'color-mix(in srgb, var(--ss-fg) 60%, transparent)'
 /**
  * 로그인/회원가입 공통 껍데기 — 배경 위에 뜬 카드.
  *
- * 화면 전체에 어둡게 깐 데모 영상(SUPER_SUB_2min_demo_KR_subtitled.mp4) 위에
- * 둥근 카드(2026-09-18, 사용자 요청 — 전에는 정지 사진 home_figure.jpg였고,
- * 그 전에는 이 영상을 카드 왼쪽 사진 칸에 넣었다가 카드 절반 폭으로만
- * 보여서 되돌린 적이 있다). `/public/demo.mp4`는 업로드가 깨져 2바이트뿐이라
- * 쓰지 않는다 — 반드시 긴 이름 쪽을 쓴다. 카드 왼쪽
+ * 화면 전체에 어둡게 깐 사진(home_figure.jpg) 위에 둥근 카드. 카드 왼쪽
  * 절반은 다른 사진(login_figure.jpg) 위에 헤드라인을 얹는다 — lg 미만에서는
  * 통째로 숨겨 폼만 남긴다(375px 에서도 폼이 화면 안에 들어와야 하니까).
  * 오른쪽 절반이 실제 폼 — 워드마크(BrandMark)를 폼 칸 맨 위에 두고, 그 아래
@@ -37,19 +33,15 @@ export default function AuthShell({
   return (
     <main className="relative flex min-h-screen w-full items-center justify-center overflow-hidden p-3 sm:p-4 lg:p-6">
       {/* 화면 전체 배경 — 카드가 도드라지도록 크게 어둡게 깐다. 카드가
-          주인공이라 영상은 흐리고 어둡게만 깔린다(정지 사진일 때와 같은
-          처리 — object-cover 로 화면을 항상 꽉 채운다). */}
+          주인공이라 사진은 흐리고 어둡게만 깔린다. */}
       <div aria-hidden="true" className="fixed inset-0 -z-10 overflow-hidden">
-        <video
-          autoPlay
-          muted
-          loop
-          playsInline
+        {/* eslint-disable-next-line @next/next/no-img-element -- 장식용 고정 배경 */}
+        <img
+          src="/home_figure.jpg"
+          alt=""
           className="h-full w-full object-cover"
           style={{ filter: 'blur(6px) saturate(0.9)', transform: 'scale(1.05)' }}
-        >
-          <source src="/SUPER_SUB_2min_demo_KR_subtitled.mp4" type="video/mp4" />
-        </video>
+        />
         <div
           className="absolute inset-0"
           style={{ background: 'color-mix(in srgb, var(--ss-bg) 70%, transparent)' }}
