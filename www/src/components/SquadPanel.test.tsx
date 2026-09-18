@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { PlayerCard, Squad } from '@/server/backend'
+import { inviteSeat, rememberInviteSeat } from '@/lib/inviteSeats'
 import SquadPanel from './SquadPanel'
 
 /** 서버가 준 스쿼드 — MF 둘과 GK 하나가 등재돼 있다. */
@@ -2069,5 +2070,109 @@ describe('스쿼드 — 칸 없는 내 등재도 판에 선다', () => {
       <SquadPanel isCaptain={false} card={CARD} squad={TEAM_SQUAD} myCardId={CARD.id} />,
     )
     expect(screen.queryByRole('button', { name: /홍길동 빼기/ })).toBeNull()
+  })
+})
+
+/**
+ * **초대로 고른 칸이 새로고침을 넘긴다** (사용자 지적, 2026-09-18, 실제 도메인).
+ *
+ * 「지인 초대로 오른쪽 미드필더에 넣었는데, 새로고침하니까 왼쪽 미드필더로
+ * 자리를 옮겼고」.
+ *
+ * 🔴 **뿌리는 계약에 칸이 없는 것이다** — 초대 본문은 `position_code` 까지라
+ * 좌·우가 서버 어디에도 안 남는다. 판을 되살리는 쪽이 아는 것이 `MF` 하나뿐
+ * 이라 **늘 첫 빈 MF(왼쪽)** 로 앉혔다. 수락돼 등재에 칸이 저장될 때까지만
+ * 브라우저가 다리를 놓는다(`lib/inviteSeats.ts`).
+ */
+describe('스쿼드 — 초대로 고른 칸은 새로고침해도 그대로다', () => {
+  const TEAM = 'team-mine'
+  /** 오른쪽 MF — 5:5 판에서 왼쪽 MF 보다 **뒤에 오는** 자리다. */
+  const RIGHT_MF = { col: 2, row: 1 }
+
+  function serve(status = 'pending') {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        const u = String(url)
+        if (u.includes('/invitations')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => [
+              {
+                id: 'inv-오른쪽',
+                status,
+                position_code: 'MF',
+                invited_user_id: 'u9',
+                invited_user_nickname: '정상호',
+                invited_user_card_slug: null,
+              },
+            ],
+          })
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => SQUAD })
+      }),
+    )
+  }
+
+  beforeEach(() => globalThis.localStorage?.clear())
+  afterEach(() => vi.unstubAllGlobals())
+
+  const seatOfName = (name: string) =>
+    screen.getByRole('button', { name: new RegExp(name) }).closest('.ss-squad-seat') as HTMLElement
+
+  it('기억해 둔 칸에 되살린다', async () => {
+    rememberInviteSeat('inv-오른쪽', RIGHT_MF)
+    serve()
+    render(<SquadPanel isCaptain card={CARD} myCardId={CARD.id} myTeamId={TEAM} />)
+
+    await screen.findByText('정상호')
+    /* 격자는 1부터 센다 — 2열이면 `gridColumn: 3`. */
+    expect(seatOfName('정상호').style.gridColumn).toBe('3')
+  })
+
+  /* 🔴 **기억이 없으면 전처럼 왼쪽이다** — 다른 기기에서 열었을 때가 그렇다.
+     판이 깨지는 것이 아니라 좌·우만 못 살리는 것임을 못 박는다. */
+  it('기억이 없으면 포지션의 첫 자리로 앉는다', async () => {
+    serve()
+    render(<SquadPanel isCaptain card={CARD} myCardId={CARD.id} myTeamId={TEAM} />)
+
+    await screen.findByText('정상호')
+    expect(seatOfName('정상호').style.gridColumn).toBe('1')
+  })
+
+  /* 🔴 **끝난 초대의 칸은 쓸어 낸다** — 안 그러면 저장소가 영영 자란다. */
+  it('목록에서 사라진 초대의 기억을 버린다', async () => {
+    rememberInviteSeat('inv-오른쪽', RIGHT_MF)
+    rememberInviteSeat('inv-끝남', { col: 0, row: 1 })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        const u = String(url)
+        if (u.includes('/invitations')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => [
+              {
+                id: 'inv-오른쪽',
+                status: 'pending',
+                position_code: 'MF',
+                invited_user_id: 'u9',
+                invited_user_nickname: '정상호',
+                invited_user_card_slug: null,
+              },
+              { id: 'inv-끝남', status: 'rejected', position_code: 'MF' },
+            ],
+          })
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => SQUAD })
+      }),
+    )
+    render(<SquadPanel isCaptain card={CARD} myCardId={CARD.id} myTeamId={TEAM} />)
+
+    await screen.findByText('정상호')
+    await waitFor(() => expect(inviteSeat('inv-끝남')).toBeNull())
+    expect(inviteSeat('inv-오른쪽')).toEqual(RIGHT_MF)
   })
 })

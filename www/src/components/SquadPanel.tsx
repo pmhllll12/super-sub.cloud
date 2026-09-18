@@ -30,6 +30,12 @@ import {
 } from '@/lib/pitchGrid'
 import { fetchPositions } from '@/lib/positions'
 import { loadFeaturedOf } from '@/lib/featuredClip'
+import {
+  forgetInviteSeat,
+  inviteSeat,
+  pruneInviteSeats,
+  rememberInviteSeat,
+} from '@/lib/inviteSeats'
 import { apiDelete, apiPost } from '@/lib/api/client'
 
 /**
@@ -891,7 +897,13 @@ export default function SquadPanel({
    * 팀원이 된다. 그때까지 카드 위에 「수락 대기중」이 붙는다.
    *
    * 🔴 **부르는 자리를 함께 보낸다**(`position_code`) — 그래야 새로고침해도
-   * **어느 칸**에 앉혔는지가 살아난다.
+   * **어느 자리**에 앉혔는지가 살아난다.
+   *
+   * 🔴 **칸은 계약에 실을 데가 없다**(2026-09-18). 본문이 받는 것은
+   * `position_code` 까지라, 같은 포지션 자리가 둘인 판(MF 좌·우)에서는
+   * **좌·우가 서버에 안 남아** 새로고침하면 늘 왼쪽으로 앉았다. 수락되는
+   * 순간 등재에 `PATCH` 로 저장될 때까지만 **브라우저에 다리를 놓는다**
+   * (`lib/inviteSeats.ts` 머리말 — 계약에 두 칸이 생기면 걷는다).
    *
    * ⚠️ 팀이 아직 없으면 보낼 데가 없다 — 화면에만 앉는다(그 자리는 새로고침
    * 하면 사라진다). 팀을 만들면 그때부터 남는다.
@@ -903,6 +915,7 @@ export default function SquadPanel({
         `/api/teams/${encodeURIComponent(myTeamId)}/invitations`,
         { invited_user_id: userId, position_code: posOf(slot) },
       )
+      rememberInviteSeat(made.id, { col: slot.col, row: slot.row })
       setInvites((prev) => ({ ...prev, [slot.area]: made.id }))
     } catch {
       /* 🔴 **화면에서 지우지 않는다.** 이미 앉은 것을 걷으면 사람이 방금 한
@@ -962,6 +975,12 @@ export default function SquadPanel({
            순간 판에서 사라졌다.** 수락은 초대의 끝이 아니라 **팀원이 됐다**는
            뜻이라, 거절·무르기(`rejected`·`cancelled`)와 같이 묶으면 안 된다. */
         const shown = rows.filter((r) => r.status === 'pending' || r.status === 'accepted')
+        /* 🔴 **끝난 초대의 칸은 버린다.** 안 그러면 브라우저 기억이 영영
+           자란다 — 거절·무르기는 내 화면을 안 거치고 끝날 수 있다. */
+        pruneInviteSeats(
+          rows.map((r) => r.id),
+          shown.map((r) => r.id),
+        )
         if (shown.length === 0 || !alive) return
         setSlots((now) => {
           setMates((prevMates) => {
@@ -979,10 +998,19 @@ export default function SquadPanel({
               const who = r.invited_user_nickname
               if (!who || seated.has(who)) continue
               const free = (sl: Slot) => !sl.mine && !nextMates[sl.area]
+              /* 🔴 **보낼 때 고른 칸이 먼저다**(2026-09-18, 사용자 지적).
+                 계약에 칸이 없어 포지션만으로 되살리면 같은 포지션 자리가
+                 둘일 때(MF 좌·우) **늘 첫 자리**로 가고, 오른쪽에 앉힌
+                 사람이 새로고침마다 왼쪽으로 옮겨 앉았다. 그 자리가 이미
+                 찼으면(그 사이 남이 앉았다) 전처럼 포지션으로 떨어진다. */
+              const want = inviteSeat(r.id)
               /* 자리를 안 정한 초대는 빈 칸 아무 데나 앉힌다 — 「우리 팀에
                  오세요」도 정상 초대라 판에서 빠뜨리지 않는다. */
               const seat =
-                now.find((sl) => posOf(sl) === r.position_code && free(sl)) ?? now.find(free)
+                (want &&
+                  now.find((sl) => sl.col === want.col && sl.row === want.row && free(sl))) ??
+                now.find((sl) => posOf(sl) === r.position_code && free(sl)) ??
+                now.find(free)
               if (!seat) continue
               nextMates[seat.area] = who
               seated.add(who)
@@ -1067,6 +1095,8 @@ export default function SquadPanel({
         for (const r of answered) {
           const area = areaOf.get(r.id) as string
           if (r.status !== 'accepted') {
+            /* 거절·무르기로 끝났다 — 그 칸을 기억해 둘 이유가 없다. */
+            forgetInviteSeat(r.id)
             setMates((prev) => ({ ...prev, [area]: null }))
             setMateSlugs((prev) => ({ ...prev, [area]: null }))
             continue
@@ -1081,9 +1111,13 @@ export default function SquadPanel({
           setMembers((prev) => ({ ...prev, [area]: seated.id }))
           const sl = slotsRef.current.find((x) => x.area === area)
           if (sl) {
-            void saveSeat(myTeamId, seated.id, posOf(sl), { col: sl.col, row: sl.row }).catch(
-              () => {},
-            )
+            /* 🔴 **여기가 브라우저 기억이 서버로 승격되는 자리다.** 이 칸이
+               등재에 남으면 그다음부터는 어느 기기에서 열어도 같은 자리라,
+               기억은 더 들고 있을 이유가 없다. 저장이 실패하면(주장이 아닌
+               화면 등) **안 지운다** — 다음 기회에 다시 올린다. */
+            void saveSeat(myTeamId, seated.id, posOf(sl), { col: sl.col, row: sl.row })
+              .then(() => forgetInviteSeat(r.id))
+              .catch(() => {})
           }
         }
         setInvites((prev) => {
