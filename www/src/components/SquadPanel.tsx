@@ -311,6 +311,13 @@ function pitchFromSquad(squad: Squad | null, size: SquadSize): PitchPlayer[] {
     }))
 }
 
+/**
+ * 🔴 **홈의 「AI」 단추 지금은 안 보인다**(사용자 요청, 2026-09-19 — 챗봇 용병
+ * 찾기가 아직 제대로 구현되지 않았다). 단추·챗봇(`MatchBot`) 코드는 **그대로 둔다** —
+ * 다시 쓰려면 이 값만 `true` 로.
+ */
+const SHOW_AI_BUTTON = false
+
 export default function SquadPanel({
   card,
   squad = null,
@@ -2046,15 +2053,17 @@ export default function SquadPanel({
           라 CSS 상수가 없고(내용이 정한다), 판 바깥에서 맞추려면 그 폭을
           다시 재서 두 곳에서 자리를 정하게 된다. 판 안에서는 `right: 0`
           한 줄이면 무슨 폭이든 정확히 오른쪽 끝이다. */}
-      <button
-        type="button"
-        className="ss-home-ai ss-traveling-edge"
-        aria-label="AI 용병 찾기"
-        aria-expanded={bot}
-        onClick={() => onBotChange?.(!bot)}
-      >
-        AI
-      </button>
+      {SHOW_AI_BUTTON && (
+        <button
+          type="button"
+          className="ss-home-ai ss-traveling-edge"
+          aria-label="AI 용병 찾기"
+          aria-expanded={bot}
+          onClick={() => onBotChange?.(!bot)}
+        >
+          AI
+        </button>
+      )}
 
       {/* AI 챗봇 — 추천 판과 **같은 첫째 칸**이다(사용자 요청). 여는 쪽이
           상대를 닫는다(`onBotChange` · 빈 자리 누르기). 둘째 칸의 지인 판과는
