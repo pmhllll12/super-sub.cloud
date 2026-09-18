@@ -2002,3 +2002,72 @@ describe('스쿼드 — 수락한 팀원', () => {
     )
   })
 })
+
+/**
+ * **수락해서 들어온 내 자리 — 칸이 아직 없다** (사용자 지적, 2026-09-18, 실제 도메인).
+ *
+ * 「지인 화면에서는 초대 수락했는데, 그곳에 팀장인 나만 공격수 자리에 보이고
+ * 지인 카드는 보이지도 않아.」
+ *
+ * 🔴 **계약 60**(2026-09-17)이 「수락하면 **칸은 `null`** 로 등재」를 만들면서
+ * 드러난 구멍이다. `seatsFromSquad` 는 내 등재를 **칸이 있을 때만**(0단계) 잡고,
+ * 1단계와 2단계는 **둘 다 `m === me` 를 건너뛴다** — 그래서 칸 없는 내 등재는
+ * 세 단계 어디에도 안 걸려 **판에서 통째로 사라졌다.** 남의 칸 없는 등재는
+ * 2단계가 그려 주는데 **나만 빠지던** 것이다.
+ *
+ * 🔴 그 상태에서 자동 착석도 못 구한다 — `seatMe` 가 `isCaptain` 이 아니면
+ * 돌아서고(등재는 주장 전용, 403), 팀원에게는 **빈 화면만** 남는다.
+ */
+describe('스쿼드 — 칸 없는 내 등재도 판에 선다', () => {
+  const CAPTAIN_AT_FW: Squad['members'][number] = {
+    id: 'sm-cap',
+    player_card_id: 'c-cap',
+    card_public_slug: 'pizza-0001',
+    nickname: '피자',
+    position_code: 'FW',
+    position_label: '공격수',
+    grid_col: 1,
+    grid_row: 0,
+  }
+  /** 수락으로 들어온 내 등재 — 서버가 **칸을 비운 채** 만든다(계약 60). */
+  const ME_NO_CELL: Squad['members'][number] = {
+    ...meAt(0, 0, 'MF'),
+    grid_col: null,
+    grid_row: null,
+  }
+  const TEAM_SQUAD: Squad = { ...SQUAD, members: [CAPTAIN_AT_FW, ME_NO_CELL] }
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('팀원 화면에서 내 카드가 판에 선다', () => {
+    render(
+      <SquadPanel isCaptain={false} card={CARD} squad={TEAM_SQUAD} myCardId={CARD.id} />,
+    )
+    expect(document.querySelectorAll('[data-mine="true"]')).toHaveLength(1)
+  })
+
+  /* 등재의 포지션(MF)으로 선다 — 아무 빈 자리가 아니다. */
+  it('내 포지션 자리에 선다', () => {
+    render(
+      <SquadPanel isCaptain={false} card={CARD} squad={TEAM_SQUAD} myCardId={CARD.id} />,
+    )
+    const mine = document.querySelector('[data-mine="true"]') as HTMLElement
+    expect(mine.querySelector('.ss-squad-pos')!.textContent).toBe('MF')
+  })
+
+  /* 🔴 **팀장 자리를 안 뺏는다.** 내가 남의 칸으로 들어가면 그 사람이 밀린다. */
+  it('칸이 저장된 팀장은 제자리에 그대로 있다', () => {
+    render(
+      <SquadPanel isCaptain={false} card={CARD} squad={TEAM_SQUAD} myCardId={CARD.id} />,
+    )
+    expect(screen.getByText('피자')).toBeInTheDocument()
+  })
+
+  /* 🔴 **이름표로 그리지 않는다** — 내 자리는 `card` 가 그린다(두 장이 되면 안 된다). */
+  it('내 자리에 이름표를 붙이지 않는다', () => {
+    render(
+      <SquadPanel isCaptain={false} card={CARD} squad={TEAM_SQUAD} myCardId={CARD.id} />,
+    )
+    expect(screen.queryByRole('button', { name: /홍길동 빼기/ })).toBeNull()
+  })
+})

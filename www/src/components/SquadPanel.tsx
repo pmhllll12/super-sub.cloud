@@ -241,11 +241,27 @@ function seatsFromSquad(
         서버의 **기존 행이 전부 null 이라** 판이 통째로 비어 보인다 — 등재된
         사람이 화면에서 사라지는 쪽이 더 나쁘다. 앉혀서 보여 주되 **여기서
         저장하지는 않는다**(판을 여는 것만으로 서버가 바뀌면 안 된다). 그
-        사람을 한 번 옮기면 그때 칸이 서버에 생긴다. */
+        사람을 한 번 옮기면 그때 칸이 서버에 생긴다.
+
+        🔴 **여기서 `me` 를 빼면 안 된다**(2026-09-18, 사용자 지적 — 실제
+        도메인에서 「수락했는데 내 카드가 안 보인다」). 0단계는 **칸이 있는**
+        내 등재만 잡고 1단계는 `me` 를 건너뛰므로, 여기서까지 건너뛰면
+        **칸 없는 내 등재는 세 단계 어디에도 안 걸려 판에서 사라진다.**
+        남의 칸 없는 등재는 그려 주면서 나만 빠지던 것이고, 계약 60이
+        「수락하면 칸은 `null` 로 등재」를 만든 뒤로는 **수락해서 들어온
+        사람 전부가** 자기 판에서 자기를 못 보게 됐다. */
   for (const m of squad.members) {
-    if (m === me || seatOf(m)) continue
+    if (seatOf(m)) continue
     const seat = slots.find((sl) => !taken(sl) && posOf(sl) === m.position_code)
     if (!seat) continue
+    /* 🔴 내 자리는 **이름표를 안 붙인다** — 거기는 `card` 가 그린다. 0단계의
+       주석과 같은 이유다(`mates` 에 넣으면 내 카드 대신 이름표가 선다). */
+    if (m === me) {
+      seat.mine = true
+      members[seat.area] = m.id
+      applyPos(seat, m.position_code)
+      continue
+    }
     mates[seat.area] = m.nickname
     slugs[seat.area] = m.card_public_slug ?? null
     members[seat.area] = m.id
