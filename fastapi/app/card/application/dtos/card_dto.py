@@ -35,6 +35,11 @@ class CreateMyCardCommand:
 
 
 @dataclass(frozen=True)
+class DeleteMyCardCommand:
+    user_id: UUID
+
+
+@dataclass(frozen=True)
 class PublicCardQuery:
     public_slug: str
 

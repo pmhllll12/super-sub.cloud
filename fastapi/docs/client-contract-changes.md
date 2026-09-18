@@ -2759,3 +2759,35 @@ grep -n 'applyToTeam' -A 25 www/src/lib/teamMatch.ts | grep -n 'error?.message'
   `tests/match/adapter/test_team_match_request_db.py` 의 `TestDuplicateGuard`
   (2건, 실물 SQL·지난 경기) · 전체 pytest 1126 passed / skipped 0
 
+## 63. 카드를 **지울 수 있습니다** — `DELETE /me/card` (2026-09-19 추가, 백성검)
+
+계약 3장에 `DELETE /api/v1/me/card` 가 생겼습니다(`api-contract.md` 같은 절).
+**204, 원래 없었어도 204**(멱등). 지우면 공유 링크가 404 가 되고 스쿼드 판
+자리도 같이 빠집니다(CASCADE). **호칭은 사람에 붙어 있어 남습니다.**
+
+**왜 생겼나.** 카드 편집기의 「초기화」가 **카드를 안 만든 처음 상태로** 돌아가야
+한다는 요청(사용자, 2026-09-19). 지금까지 서버에는 만들기·고치기만 있어서
+화면이 할 수 있는 것은 「꾸밈을 기본값으로」뿐이었습니다.
+
+### 만족해야 할 성질
+
+- `www`: 「초기화」가 이 경로를 부르고, 끝나면 **카드 없는 화면**(기본 빈 카드)으로
+  돌아간다 — **백성검이 같은 커밋 묶음으로 반영했습니다**(`CardEditor.tsx`)
+- `flutter`: 지우는 화면이 없으면 **할 일 없음.** 만들 때는 되돌릴 수 없다는 확인을
+  한 번 거치게 하십시오
+
+### 먼저 확인
+
+```bash
+grep -rn "DELETE.*me/card\|apiDelete('/api/me/card')" www/src flutter/lib
+```
+
+### 하지 말 것
+
+- 🔴 **확인 없이 지우지 마십시오** — 공유 링크와 스쿼드 자리가 돌아오지 않습니다
+- 🔴 **404 를 기다리지 마십시오** — 없을 때도 204 입니다. 실패는 401·5xx 뿐입니다
+
+- 확인: 백엔드 `tests/card/adapter/test_card_router.py` 의 `TestDeleteMyCard`(6건) ·
+  `tests/card/adapter/test_card_db.py` 의 `TestDeleteMyCardInDb`(2건, 실물 DB) ·
+  `tests/card/application/test_interactors.py` 의 `TestDeleteMyCardInteractor`(2건) ·
+  전체 pytest 1138 passed / skipped 0 · `alembic check` 변경 없음 · head 하나

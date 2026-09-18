@@ -69,6 +69,12 @@ export interface Backend {
    */
   createMyCard(token: string): Promise<PlayerCard>
   /**
+   * 카드를 지운다 — **카드를 안 만든 처음 상태로**(`DELETE /me/card`, CCC 63,
+   * 2026-09-19). 멱등 — 원래 없었어도 성공이다. 🔴 되돌릴 수 없다: 공유 링크가
+   * 죽고 스쿼드 판 자리가 같이 빠진다. 호칭은 사람에 붙어 남는다.
+   */
+  deleteMyCard(token: string): Promise<void>
+  /**
    * 카드의 한 줄(`tagline`)과 꾸미기(`style`)를 바꾼다 — 계약 3장, CCC 18·35.
    *
    * 🔴 **보낸 필드만 바뀐다** — `updateVideo` 와 같은 판단이다. `tagline`

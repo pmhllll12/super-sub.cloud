@@ -4,7 +4,8 @@ import type { PlayerCard } from '@/server/backend'
 import { CardStyleProvider, DEFAULT_CARD_STYLE } from './cardStyle'
 import CardEditor from './CardEditor'
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: () => {} }) }))
+const refresh = vi.fn()
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }))
 
 const CARD: PlayerCard = {
   id: 'c1',
@@ -143,13 +144,54 @@ describe('카드 꾸미기 — 되돌리기와 저장', () => {
     expect(screen.getByLabelText('카드에 넣을 글자')).toHaveAttribute('maxLength', '20')
   })
 
-  // 초기화는 화면의 값만 공장 기본값으로 되돌린다 — 저장을 눌러야 서버도 바뀐다.
-  it('초기화하면 화면이 공장 기본값으로 돌아간다', async () => {
-    const user = userEvent.setup()
-    open({ ...CARD, tagline: '지난번 것' })
-    expect(screen.getByLabelText('카드에 넣을 글자')).toHaveValue('지난번 것')
+  /* 🔴 **초기화는 카드를 지운다**(사용자 요청, 2026-09-19) — 카드를 안 만든 처음
+     상태로. 되돌릴 수 없어서 한 번 묻는다. 전에는 화면 값만 기본값으로 돌렸다. */
+  describe('초기화 — 카드를 지우고 처음 상태로', () => {
+    afterEach(() => {
+      vi.restoreAllMocks()
+      refresh.mockClear()
+    })
 
-    await user.click(screen.getByRole('button', { name: '초기화' }))
-    expect(screen.getByLabelText('카드에 넣을 글자')).toHaveValue('THREE LUNGS')
+    function stubFetch(status: number) {
+      return vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(status === 204 ? null : JSON.stringify({ error: { code: 'X', message: '없음' } }), {
+          status,
+        }),
+      )
+    }
+
+    it('묻고, 아니오면 아무것도 안 한다', async () => {
+      const user = userEvent.setup()
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+      const fetch = stubFetch(204)
+      open({ ...CARD, tagline: '지난번 것' })
+      await user.click(screen.getByRole('button', { name: '초기화' }))
+      expect(confirm).toHaveBeenCalled()
+      expect(fetch).not.toHaveBeenCalled()
+      expect(screen.getByLabelText('카드에 넣을 글자')).toHaveValue('지난번 것')
+    })
+
+    it('예면 DELETE /api/me/card 를 부르고 화면을 새로 읽는다', async () => {
+      const user = userEvent.setup()
+      vi.spyOn(window, 'confirm').mockReturnValue(true)
+      const fetch = stubFetch(204)
+      open(CARD)
+      await user.click(screen.getByRole('button', { name: '초기화' }))
+      await waitFor(() => expect(refresh).toHaveBeenCalled())
+      const [url, init] = fetch.mock.calls[0]
+      expect(url).toBe('/api/me/card')
+      expect((init as RequestInit).method).toBe('DELETE')
+    })
+
+    it('서버가 아직 지우기를 모르면(404) 꾸밈만 기본값으로 — 그렇다고 말한다', async () => {
+      const user = userEvent.setup()
+      vi.spyOn(window, 'confirm').mockReturnValue(true)
+      stubFetch(404)
+      open({ ...CARD, tagline: '지난번 것' })
+      await user.click(screen.getByRole('button', { name: '초기화' }))
+      expect(await screen.findByRole('alert')).toHaveTextContent('서버가 아직 카드 지우기를 모릅니다')
+      expect(screen.getByLabelText('카드에 넣을 글자')).toHaveValue('THREE LUNGS')
+      expect(refresh).not.toHaveBeenCalled()
+    })
   })
 })

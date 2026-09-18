@@ -22,6 +22,17 @@ export async function POST(req: NextRequest) {
 }
 
 /**
+ * 카드를 지운다 — `DELETE /api/v1/me/card`(CCC 63, 2026-09-19). 편집기의
+ * 「초기화」가 부른다 — **카드를 안 만든 처음 상태로.** 멱등이라 원래 없었어도 204.
+ */
+export async function DELETE(req: NextRequest) {
+  return withAuth(req, async (token) => {
+    await getBackend().deleteMyCard(token)
+    return new NextResponse(null, { status: 204 })
+  })
+}
+
+/**
  * 카드의 한 줄(`tagline`)과 꾸미기(`style`)를 바꾼다 — 계약 3장, CCC 18·35.
  *
  * 🔴 **보낸 필드만 통과시킨다** — `PATCH /videos/{id}` route handler 와 같은

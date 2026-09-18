@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { apiErrorMessage, apiPost } from '@/lib/api/client'
+import { ApiCallError, apiDelete, apiErrorMessage, apiPost } from '@/lib/api/client'
 import { uploadCardPhoto } from '@/lib/cardPhoto'
 import PillButton from '@/components/ui/PillButton'
 import type { PlayerCard } from '@/server/backend'
@@ -144,8 +144,36 @@ function ColorRow({
 }
 
 /** 1단계 — 바탕 · 로고 · 글자와 그 색. 사진 · 붓은 다음 단계다. */
+/** 초기화를 누르면 묻는 말 — 되돌릴 수 없는 일이라 한 번 확인한다. */
+export const WIPE_CONFIRM =
+  '카드를 지우고 처음(카드를 안 만든) 상태로 돌아갑니다.\n공유 링크와 스쿼드 판 자리가 사라지고 되돌릴 수 없습니다.'
+
 function CardLooks() {
   const { style, tagline, set, setTagline, reset, save } = useCardStyle()
+  const router = useRouter()
+  const [wipeNote, setWipeNote] = useState<string | null>(null)
+
+  /* 🔴 **「초기화」는 카드를 지운다**(사용자 요청, 2026-09-19) — 카드를 안 만든
+     처음 상태(기본 빈 카드)로 돌아가고, 편집을 닫아도 그대로다. 전에는 화면의
+     값만 공장 기본값으로 되돌렸다(저장을 눌러야 반영). 되돌릴 수 없는 일이라
+     **한 번 묻는다.**
+     ⚠️ 서버가 아직 지우기를 모르면(배포 전 — 404·405) **예전 동작**(화면 값만
+     기본값)으로 물러나고 그렇다고 말한다. 지운 척하지 않는다. */
+  async function wipe() {
+    if (!window.confirm(WIPE_CONFIRM)) return
+    setWipeNote(null)
+    reset()
+    try {
+      await apiDelete('/api/me/card')
+      router.refresh()
+    } catch (err) {
+      if (err instanceof ApiCallError && (err.status === 404 || err.status === 405)) {
+        setWipeNote('서버가 아직 카드 지우기를 모릅니다 — 꾸밈만 기본값으로 되돌렸습니다(저장을 눌러야 반영).')
+      } else {
+        setWipeNote(apiErrorMessage(err))
+      }
+    }
+  }
   /** 방금 저장했는가 — `null` 이면 아직 아무 말도 안 한다. */
   const [savedOk, setSavedOk] = useState<boolean | null>(null)
   const [saving, setSaving] = useState(false)
@@ -179,11 +207,11 @@ function CardLooks() {
         />
       </dl>
 
-      {/* 🔴 **초기화는 화면의 값만** **공장 기본값**으로 되돌린다. 저장된
-          것까지 지우면 되돌리기가 곧 삭제가 되어 무섭게 쓰인다 — 되돌린 뒤
-          저장을 눌러야 저장본도 바뀐다. */}
+      {/* 🔴 **초기화는 카드를 지운다**(위 `wipe`, 2026-09-19 사용자 요청으로
+          뒤집음). 전에는 「화면 값만 기본값으로 — 지우면 무섭게 쓰인다」였고,
+          그 걱정은 **확인 한 번**으로 받는다. */}
       <div className="ss-card-actions">
-        <button type="button" className="ss-profile-tab" onClick={reset}>
+        <button type="button" className="ss-profile-tab" onClick={() => void wipe()}>
           초기화
         </button>
         <button
@@ -203,6 +231,11 @@ function CardLooks() {
       </div>
 
       {/* ✅ 서버에 담긴다(CCC 35) — 다른 기기 · 공개 카드 링크에도 반영된다. */}
+      {wipeNote && (
+        <p className="ss-profile-video-reason" role="alert">
+          {wipeNote}
+        </p>
+      )}
       {savedOk === true && (
         <p className="ss-profile-publish-note" role="status">
           저장했습니다 — 다른 기기와 공개 카드 링크에도 반영됩니다.

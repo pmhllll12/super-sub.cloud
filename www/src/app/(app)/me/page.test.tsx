@@ -568,13 +568,17 @@ describe('내 프로필 — /me', () => {
     expect(pcard.style.getPropertyValue('--ss-pcard-text-y')).toBe('24%')
   })
 
+  // 초기화는 이제 카드를 지운다(묻고 나서) — 화면 값도 먼저 기본값으로 돌린다.
   it('초기화로 되돌릴 수 있다', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }))
     const { container } = render(
       <MeBody user={USER} card={CARD} videos={[]} matches={[]} editing />,
     )
     fireEvent.change(screen.getByLabelText('카드에 넣을 글자'), { target: { value: '바뀜' } })
     fireEvent.click(screen.getByRole('button', { name: '초기화' }))
     expect(container.querySelector('.ss-pcard-alias')!.textContent).toBe('THREE LUNGS')
+    vi.restoreAllMocks()
   })
 
   // 🔴 편집기는 **늘 그려 두고 접는다** — 열 때만 그리면 닫을 때 뚝 사라진다.
