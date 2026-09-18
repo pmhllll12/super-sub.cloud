@@ -487,7 +487,11 @@ export default function HomeStage({
           type="button"
           className="ss-market-scroll ss-home-hint"
           onClick={() => goOut(true)}
-          disabled={scouting}
+          /* 🔴 `out` 도 함께 끈다 — 화면 바닥에 **붙박인**(fixed) 단추라
+             영상 모음이 올라온 뒤에도 그 자리에 남는다. 마우스는 CSS 가
+             막지만(`[data-ss-home-out='true'] .ss-home-stage`), 자판으로
+             짚는 것까지 막으려면 여기서 꺼야 한다. */
+          disabled={scouting || out}
         >
           {/* 그림을 한 겹 싸는 이유 — 껍데기는 자리를 잡고, 안쪽 그림은 제
               흔들림(transform)을 쓴다. 한 겹으로 하면 둘이 서로 덮어쓴다. */}
