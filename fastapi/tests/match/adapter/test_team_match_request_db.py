@@ -136,6 +136,85 @@ class TestCreate:
         assert notif.subject_type == "team_match_request"
 
 
+class TestDuplicateGuard:
+    """겹쳐 걸기 방지가 **실물 SQL 로도** 도는가 (2026-09-18).
+
+    계약 테스트(`test_team_match_request_router.py`)는 스텁의 파이썬 비교를 볼
+    뿐이다. 여기서 보는 것은 저 `or_`/`and_` 조합이 PostgreSQL 에서 같은 답을
+    내는가, 그리고 **지난 경기는 안 막는가**다 — 뒤엣것은 API 로는 과거 시각을
+    못 넣어서(`PAST_MATCH`) 스텁으로 만들 수 없는 상황이다.
+    """
+
+    def _create(self, db_client, world, **kw):
+        return db_client.post(
+            f"{V1}/teams/{world['team_a']}/match-requests",
+            json={
+                "target_team_id": str(world["team_b"]),
+                "played_at": kw.get("played_at", _future()),
+                "place": "강남 풋살장",
+            },
+            headers=world["a_owner"]["headers"],
+        )
+
+    def test_잡힌_경기가_있으면_실물에서도_409(self, db_client, world):
+        request_id = self._create(db_client, world).json()["id"]
+        accepted = db_client.post(
+            f"{V1}/teams/{world['team_b']}/match-requests/{request_id}/accept",
+            headers=world["b_owner"]["headers"],
+        )
+        assert accepted.status_code == 200, accepted.text
+
+        again = self._create(db_client, world)
+        assert again.status_code == 409, again.text
+        assert error_code(again) == "TEAM_MATCH_REQUEST_ALREADY_LIVE"
+
+    def test_물린_경기는_막지_않는다(self, db_client, db_session, world):
+        """🔴 실물 FK 가 `SET NULL` 인 것에 기댄다 — 그래서 여기서 봐야 한다.
+
+        취소는 `match` 행만 지우고 신청의 `status` 는 `accepted` 로 남는다.
+        `status` 만 세면 **한 번 물린 상대와 영영 못 붙는다**(운영에 그런 행이
+        11건 있었다).
+        """
+        request_id = self._create(db_client, world).json()["id"]
+        accepted = db_client.post(
+            f"{V1}/teams/{world['team_b']}/match-requests/{request_id}/accept",
+            headers=world["b_owner"]["headers"],
+        ).json()
+        db_client.delete(
+            f"{V1}/matches/{accepted['match_id']}",
+            headers=world["a_owner"]["headers"],
+        )
+        row = db_session.execute(
+            text("select status, match_id from team_match_request where id = :i"),
+            {"i": request_id},
+        ).one()
+        # 전제가 무너지면(FK 가 바뀌면) 아래 단언보다 여기서 먼저 걸린다.
+        assert row.status == "accepted" and row.match_id is None
+
+        again = self._create(db_client, world)
+        assert again.status_code == 201, again.text
+
+    def test_지난_경기는_막지_않는다(self, db_client, db_session, world):
+        """🔴 안 그러면 **한 번 붙은 팀과는 다시는 못 붙는다.**"""
+        request_id = self._create(db_client, world).json()["id"]
+        db_client.post(
+            f"{V1}/teams/{world['team_b']}/match-requests/{request_id}/accept",
+            headers=world["b_owner"]["headers"],
+        )
+        # API 로는 과거 시각을 넣을 수 없으므로(`PAST_MATCH`) 직접 민다.
+        db_session.execute(
+            text(
+                "update team_match_request set proposed_played_at = :t"
+                " where id = :i"
+            ),
+            {"t": datetime.now(timezone.utc) - timedelta(days=1), "i": request_id},
+        )
+        db_session.commit()
+
+        again = self._create(db_client, world)
+        assert again.status_code == 201, again.text
+
+
 class TestAccept:
     def _create(self, db_client, world, **kw):
         return db_client.post(

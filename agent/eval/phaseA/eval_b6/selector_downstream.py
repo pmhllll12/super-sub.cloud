@@ -516,6 +516,16 @@ def _write_run_meta(dev: str, timing: dict) -> Path:
 def main() -> None:
     from transformers import AutoProcessor, RTDetrForObjectDetection, VitPoseForPoseEstimation
 
+    # 🔴 **돌기 전에 환경부터 본다** (2026-09-18, 미결 47번). 5회차가 심은
+    #    `run_meta.json` 은 환경을 **적기만** 한다 — 틀린 환경에서도 그대로 돌아
+    #    숫자를 내놓고, 그 숫자는 맞는 숫자와 **생김새가 같다.** 47번이 그렇게
+    #    났고 알아채는 데 다섯 회차가 걸렸다. 🔴 `track2()` 는 한 줄도 안
+    #    바뀐다 — 막는 것은 그 앞이다.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from env_guard import preflight  # noqa: PLC0415
+
+    preflight("B-6 (selector_downstream)")
+
     dev = "cuda" if torch.cuda.is_available() else "cpu"
     t0 = time.time()
     pproc = AutoProcessor.from_pretrained(POSE_MODEL, revision=POSE_MODEL_REVISION)

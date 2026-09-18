@@ -126,6 +126,39 @@ const POLL_MS = 15_000
 
 type SentState = { requestId: string; targetTeamId: string }
 
+/**
+ * 이 신청이 **지금 살아 있는 확정 경기**인가.
+ *
+ * 🔴 **이 판단을 두 곳이 따로 하면 안 된다**(2026-09-18, 사용자가 세 번 신고).
+ * 머리칸의 「경기 잡힘」과 대기 화면을 띄우는 `acceptedTeam` 이 **서로 다른
+ * 조건**을 쓰고 있었다 — 앞쪽만 `match_id`·`isMatchDone` 을 보고, 뒤쪽은
+ * `status === 'accepted'` 만 봤다. 그래서 「경기 완료」를 누르면
+ *
+ *   1. 머리칸 표시는 사라지고 (앞쪽 조건이 걸러 줌)
+ *   2. **같은 `reload()` 가 뒤쪽을 다시 켜서 판이 곧바로 되살아났다**
+ *
+ * 새로고침하면 멀쩡해 보인 것은 `sent` 가 **ref 라 새로고침에 비어서**
+ * 뒤쪽 가지가 아예 안 도는 것뿐이었다 — 고쳐진 게 아니라 안 돌았던 것이다.
+ * 경기 취소도 같다: 취소는 `match` 행만 지우고 `status` 는 `accepted` 로
+ * 남으므로(FK 가 `match_id` 만 비운다), `status` 만 보는 쪽은 계속 켠다.
+ *
+ * 🔴 **`match_id` 가 비면 물린 경기다** — 서버의 겹치기 방지도 같은 것을 본다
+ * (계약 3-15절). 화면과 서버가 같은 뜻으로 읽어야 한다.
+ */
+function isLiveConfirmed(
+  r: { status: string; match_id: string | null; proposed_played_at: string },
+  now: number,
+): boolean {
+  return (
+    r.status === 'accepted' &&
+    !!r.match_id &&
+    new Date(r.proposed_played_at).getTime() >= now &&
+    /* 팀장이 「경기 완료」를 누른 것. 서버에 완료 상태가 없어 브라우저에
+       적어 둔 것을 본다 — 한계는 `seekingStore` 머리말에 적었다. */
+    !isMatchDone(r.match_id)
+  )
+}
+
 export function useNotifyInbox() {
   const [teamId, setTeamId] = useState<string | null>(null)
   const [items, setItems] = useState<InboxItem[]>([])
@@ -229,17 +262,7 @@ export function useNotifyInbox() {
              들어왔든 남는다. 지난 경기는 빼고 가장 이른 것 하나만 본다. */
           const now = Date.now()
           const live = rows
-            .filter(
-              (r) =>
-                r.status === 'accepted' &&
-                r.match_id &&
-                new Date(r.proposed_played_at).getTime() >= now &&
-                /* 🔴 **팀장이 「경기 완료」를 누른 경기는 뺀다**(2026-09-18,
-                   사용자 요청: 취소처럼 「경기 잡힘」에서 사라지게). 서버에
-                   완료 상태가 없어 브라우저에 적어 둔 것을 본다 —
-                   한계는 `seekingStore` 머리말에 적었다. */
-                !isMatchDone(r.match_id),
-            )
+            .filter((r) => isLiveConfirmed(r, now))
             .sort(
               (a, b) =>
                 new Date(a.proposed_played_at).getTime() -
@@ -306,9 +329,11 @@ export function useNotifyInbox() {
                 ourSquadSlug: r.target_squad_public_slug ?? null,
               })
             }
-            // 내가 건 것이 수락됐으면 그 순간 대기 화면을 띄운다.
+            /* 내가 건 것이 수락됐으면 그 순간 대기 화면을 띄운다.
+               🔴 **「살아 있는가」는 위 `live` 와 같은 함수로 본다** — 갈리면
+               완료·취소한 경기를 이쪽이 다시 켠다(`isLiveConfirmed` 머리말). */
             if (
-              r.status === 'accepted' &&
+              isLiveConfirmed(r, now) &&
               r.requester_team_id === teamId &&
               sent.current.some((s) => s.requestId === r.id)
             ) {

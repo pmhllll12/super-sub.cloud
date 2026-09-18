@@ -75,19 +75,25 @@ export function judgeSeat(): number {
 }
 
 /**
- * **다른 번호로 옮긴다** — 지금 것을 빼고 그중에서 고른다.
+ * **번호를 직접 고른다** (사용자 요청, 2026-09-18: 「선택 가능하게 해줘.
+ * 지금은 랜덤이네」).
  *
- * 같은 번호를 든 사람을 만났을 때 쓴다. 🔴 지금 번호는 후보에서 뺀다 —
- * 안 빼면 「눌렀는데 그대로」가 나온다.
+ * 무작위는 이제 **처음 배정**에만 쓴다 — 아무도 안 고르고 그냥 눌렀을 때
+ * 서로 다른 자리로 흩어지게 하려는 것이다. 사람이 뜻을 갖고 고르면 그쪽이 이긴다.
+ *
+ * 🔴 **범위 밖이면 안 바꾸고 `null` 을 돌려준다.** 없는 번호를 기억해 두면 그
+ * 계정이 없으므로 로그인 단추가 **가입부터** 시도하고, 시연 자리에서 팀도
+ * 판도 없는 빈 계정이 생긴다.
  */
-export function nextJudgeSeat(): number {
-  const now = read()
-  const others = Array.from({ length: JUDGE_SEATS }, (_, i) => i + 1).filter(
-    (n) => n !== now,
-  )
-  const picked = others[Math.floor(Math.random() * others.length)] ?? 1
-  write(picked)
-  return picked
+export function setJudgeSeat(seat: number): number | null {
+  if (!Number.isInteger(seat) || seat < 1 || seat > JUDGE_SEATS) return null
+  write(seat)
+  return seat
+}
+
+/** 고를 수 있는 번호 전부 — 화면이 목록을 그릴 때 쓴다. */
+export function judgeSeats(): number[] {
+  return Array.from({ length: JUDGE_SEATS }, (_, i) => i + 1)
 }
 
 /** 시험에서만 쓴다. */

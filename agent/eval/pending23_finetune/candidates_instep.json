@@ -1,0 +1,4050 @@
+{
+  "tag": "candidates_instep",
+  "model": "LGAI-EXAONE/EXAONE-4.0-1.2B",
+  "n_requested": 12,
+  "temperature": 0.9,
+  "top_p": 0.95,
+  "seed": 20260918,
+  "slots": [
+    {
+      "slot_id": "plant_knee_flexion|g2|s0",
+      "criterion_id": "plant_knee_flexion",
+      "name": "디딤발 무릎 굽히기",
+      "grade": 2,
+      "segment": 0,
+      "value": 157.0,
+      "plain": "디딤발 무릎을 알맞게 굽혀 몸을 버틴다",
+      "plain_all": "디딤발 무릎을 알맞게 굽혀 몸을 버틴다",
+      "given_metrics": {
+        "plant_knee_angle_at_impact": 157.0
+      },
+      "candidates": [
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 157.0도로 정상 범위 내에서 정렬되어 체중이 효과적으로 전달되었다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤발 무릎각 157.0도로 기준 범위 중앙이면서 완전히 완곡하게 구부려 발 전체가 안정적으로 체중을 견딜 수 있었다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "이 판정 수준에서Impact 시 디딤발 무릎 각 157.0도가 측정되었습니다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤발 무릎 각 157.0도로 정확한 각도 유지가 확인됐습니다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 157.0도로 기준 범위 중앙이며 몸을 효과적으로 버텨내고 있다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 157.0도로 기준 범위 내에서 최적의 각도를 유지했다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤발 무릎각 157.0도가 정확히 기준 범위 중앙에 위치해 있어 체중을 효과적으로 전달하고 상체 안정성을 높였다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 157.0도로 최대한 깊게 굽혀 몸을 효과적으로 방지했다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 157.0도가 측정되어 정상적인 기준 범위 중앙에 해당한다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 157.0도로 적절한 각도로 발을 안정적으로 고정했다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "이 경기에서 디딤발 무릎 굽기 각도 157.0도가 측정되어 정확한 안정성을 보였습니다.",
+          "metric_ref": "디입 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 157.0도로 표준 범위에 근접해 안정성을 확보했습니다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "plant_knee_flexion|g2|s0",
+      "criterion_id": "plant_knee_flexion",
+      "name": "디딤발 무릎 굽히기",
+      "grade": 2,
+      "segment": 0,
+      "value": 163.0,
+      "plain": "디딤발 무릎을 알맞게 굽혀 몸을 버틴다",
+      "plain_all": "디딤발 무릎을 알맞게 굽혀 몸을 버틴다",
+      "given_metrics": {
+        "plant_knee_angle_at_impact": 163.0
+      },
+      "candidates": [
+        {
+          "evidence": "이 자세에서무릎각 163.0도로 각도가 적절해 상체가 더 안정적이고 힘 전달에 효율적이었다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 발 무릎 굽히기 각도 163.0도로 완전히 적절하게 구부러진 상태입니다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 163.0도로 적절하게 굽혀 몸을 prosecutions으로 버티는 모습이 보입니다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 발 무릎 각이 163.0도로 충분히 굽어 있어 체중을 효과적으로 버티고 있다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발 무릎각 163.0도가 기준 범위 중앙에 적합하게 선 자세를 보였다",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발 무릎 굽히기 measurement: 임팩트 시 디딤 무릎 각 163.0도",
+          "metric_ref": "무릎각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤발 무릎각 163.0도가 측정되어 기준 범위 이상으로 적절한 굽힘을 보였다",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤발 무릎각 163.0도가 기준을 충족하여 몸을 효과적으로 utilized했다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "",
+          "metric_ref": "",
+          "flags": [
+            "no_json"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤발 무릎각 163.0도로 기준 범위 중앙이다.",
+          "metric_ref": "디디 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 163.0도로 기준 범위 중앙에 위치해 상체 안정감이 높고 체중을 효과적으로 utilized한다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 발 무릎 굽기 각도 163.0도가 관찰되었으며, 이는 필요한 범위에 근접한 안정적인 자세를 보여줍니다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "plant_knee_flexion|g1|s0",
+      "criterion_id": "plant_knee_flexion",
+      "name": "디딤발 무릎 굽히기",
+      "grade": 1,
+      "segment": 0,
+      "value": 140.2,
+      "plain": "디딤발 무릎을 필요보다 깊이 굽힌다",
+      "plain_all": "디딤발 무릎을 필요보다 깊이 굽힌다 또는 디딤발 무릎을 거의 굽히지 않고 뻣뻣하게 선다",
+      "given_metrics": {
+        "plant_knee_angle_at_impact": 140.2
+      },
+      "candidates": [
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 140.2도로 과도하게 굽은 상태",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 140.2도로 디딤발이 필요보다 깊이 굽아 힘 전달이 약간 끊길 수 있다",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 140.2도로 기준 범위를 약간 벗어난 편이다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 140.2도로 디딤발이 기준보다 깊이 굽혀 있었다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤발 무릎 각 140.2도로 필요보다 깊이 굽은 자세 확인",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 140.2도로 기준 범위를 약간 벗어나 과도하게 굽은 자세를 보였다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 140.2도로 디트리머가 필요보다 깊이 굽은 상태입니다.",
+          "metric_ref": "디트리머 무릎각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 140.2도로 디딤발이 필요보다 깊이 굽았다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 140.2도로 디딤발이 필요보다 깊이 굽았다",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤발 무릎 각 140.2도로 디트리프가 필요보다 깊이 굽았다",
+          "metric_ref": "디트리프 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "plant_knee_flexion|g1|s0",
+      "criterion_id": "plant_knee_flexion",
+      "name": "디딤발 무릎 굽히기",
+      "grade": 1,
+      "segment": 0,
+      "value": 144.8,
+      "plain": "디딤발 무릎을 필요보다 깊이 굽힌다",
+      "plain_all": "디딤발 무릎을 필요보다 깊이 굽힌다 또는 디딤발 무릎을 거의 굽히지 않고 뻣뻣하게 선다",
+      "given_metrics": {
+        "plant_knee_angle_at_impact": 144.8
+      },
+      "candidates": [
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 144.8도로디딤발이 필요보다 깊이 굽았다",
+          "metric_ref": "디트리피 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 144.8도로 디딤발이 기준보다 깊이 굽혀 체중 분산이 부족했다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 144.8도로 기준 범위를 약간 벗어나게 굽은 상태다. 약간 더 flexibility를 주면 체중이 분산되어 균형 유지가 더 좋아질 것이다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 144.8도로디미 발이 필요보다 깊이 굽았다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 144.8도로 디딤발이 필요보다 깊이 굽았습니다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 144.8도로 기준 범위 대비 깊은 굽기가 확인되었다",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 144.8도로 기준보다 약간 깊이 굽혀 힘 전달이 원활하지 않았다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 144.8도로 기준보다 깊이 굽은 편이며, 상체 안정성 측면에서 소폭 개선이 필요해 보인다.",
+          "metric_ref": "디템 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 144.8도로 디딤발이 필요보다 깊이 굽았다",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 144.8도로 디딤발이 필요보다 깊이 굽았다. 조금 더 짧게 조정하면 전체적인 자세와 체중 전달 효율이 향상될 것입니다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 144.8도로 기준 범위 내에 있으나 약간 짧은 편이다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "plant_knee_flexion|g1|s1",
+      "criterion_id": "plant_knee_flexion",
+      "name": "디딤발 무릎 굽히기",
+      "grade": 1,
+      "segment": 1,
+      "value": 173.5,
+      "plain": "디딤발 무릎을 거의 굽히지 않고 뻣뻣하게 선다",
+      "plain_all": "디딤발 무릎을 필요보다 깊이 굽힌다 또는 디딤발 무릎을 거의 굽히지 않고 뻣뻣하게 선다",
+      "given_metrics": {
+        "plant_knee_angle_at_impact": 173.5
+      },
+      "candidates": [
+        {
+          "evidence": "",
+          "metric_ref": "",
+          "flags": [
+            "no_json"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 173.5도로 디딤발이 충분한 굽기를 보이지 않아 체중 전달이 효율적이지 않았다",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 173.5도로 일반적인 안정화 각도보다 지나치게 뻣뻣하며 체중 전달 효율이 떨어졌다.",
+          "metric_ref": "임팩트 시 디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 173.5도로 일반적인 기준보다도 낮은 각도로 인해 안정성에 한계가 보였습니다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['임팩트 시 디딤 무릎 각 173.5도로 기술이 부족하고 뻣뻣한 상태였다.', '디딤발이 충분히 휘어지지 않아 충격 흡수력이 떨어집니다.']",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 173.5도로 디딤발이 sufficiently 굽지 않아 상체 불안정, 힘 전달 저하",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 173.5도로 디딤발이 약간 굽지 않고 뻣뻣하게 선 상태였다",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 173.5도로 디딤발이 거의 굽히지 않고 뻣뻣하게 섰다",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 173.5도로 디비전발이 무릎까지 충분히 굽히지 않아 힘이 제대로 전달되지 않았습니다.",
+          "metric_ref": "디비전 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 173.5도로디딤발이 충분히 굽지 않아 상체가 불안정했고 체중 전달이 제대로 이루어지지 않았다.",
+          "metric_ref": "임팩트 시 디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 173.5도로 무릎이 충분히 굽지 않아 안정성과 힘 전달에 저하가 관찰됐다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['디침발 무릎 각 173.5도로 기준보다 뻣뻣하게 선 자세를 기록했다', 'Impact 시 무릎각 173.5도로 디딤발이 약간만 굽지 않아 안정성 부족이관찰되었다']",
+          "metric_ref": "디침발 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "plant_knee_flexion|g1|s1",
+      "criterion_id": "plant_knee_flexion",
+      "name": "디딤발 무릎 굽히기",
+      "grade": 1,
+      "segment": 1,
+      "value": 176.5,
+      "plain": "디딤발 무릎을 거의 굽히지 않고 뻣뻣하게 선다",
+      "plain_all": "디딤발 무릎을 필요보다 깊이 굽힌다 또는 디딤발 무릎을 거의 굽히지 않고 뻣뻣하게 선다",
+      "given_metrics": {
+        "plant_knee_angle_at_impact": 176.5
+      },
+      "candidates": [
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 176.5도로 디딤발이 충분히 굽지 않아 체중 분포가 불균형했다",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 176.5도로 디딤발이 완전히 굽지 않아 충격을 제대로 흡수하지 못하고 방향 전환이 어려웠다",
+          "metric_ref": "디디뮬 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 176.5도로 디딤발이 거의 굽히지 않고 뻣뻣하게 섰다",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤 발 무릎 굽기가 충분히 표현되지 않아 임팩트 시 무릎 각도 176.5도로 뻣뻣하게 선 상태였습니다. 약간 더 굽은 각도를 유지하면 체중 분배 효율이 개선될 것입니다.",
+          "metric_ref": "임팩트 시 디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "\"디딤발 무릎각 176.5도로 phosphory되지 않고 뻣뻣하게 선 자세라 임팩트 시 안정성과 체중 전달에 방해가 된다.",
+          "metric_ref": "임팩트 시 디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['디트리프 발 무릎 굽힘 각도 임팩트 시 176.5도로 거의 굽히지 않고 뻣뻣하게 선 자세가 확인되었다.', '기준 범위를 벗어나지만 측정값만 참고하여 분석했다.']",
+          "metric_ref": "디트리프 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발 무릎각 176.5도로 자연스럽게 차는 다리가 무릎이 거의 직선에 가깝게 유지되었습니다. 상체가 약간 앞으로 기울면서 무게 분산에 어려움을 느꼈습니다.",
+          "metric_ref": "임팩트 시 디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 176.5도",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발 무릎 굽기 각도 176.5도가 판정 기준을 충족하지 못해 뻣뻣하게 선 상태였다",
+          "metric_ref": "임팩트 시 디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 176.5도로 디딤발이 거의 굽히지 않고 뻣뻣하게 선 자세였다",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 176.5도 → '디딤발이 깊이 굽어지지 않고 뻣뻣하게 섰다.', '\n slight improvement을 위해 무릎을 더 깊게 굽혀 충격 흡수 효과를 높이자.'",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 176.5도로 디딤발이 너무 뻣뻣하고 충분히 굽지 않아 체중 전달이 wasn't 효과적이었다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "plant_knee_flexion|g0|s0",
+      "criterion_id": "plant_knee_flexion",
+      "name": "디딤발 무릎 굽히기",
+      "grade": 0,
+      "segment": 0,
+      "value": 47.2,
+      "plain": "디딤발 무릎이 버티지 못하고 주저앉는다",
+      "plain_all": "디딤발 무릎이 버티지 못하고 주저앉는다",
+      "given_metrics": {
+        "plant_knee_angle_at_impact": 47.2
+      },
+      "candidates": [
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 47.2도로 디킴발이 충분히 굽지 못해 하중이 제대로 전달되지 않았습니다.",
+          "metric_ref": "디림 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['임팩트 시 디딤 무릎 각 47.2도로 디딤발이 충분히 굽지 못하고 주저앉는 자세였다.']",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 47.2도로 디딤발이 버티지 못하고 주저앉았다. 약간 더 굽어 주면 체중이 더 잘 전달될 것이다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 47.2도로 디딤발이 버티지 못하고 주저앉았다",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 47.2도로 디딤발이 충분히 굽지 못해 상체가 불안정하고 체중 전달 효율이 떨어졌다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤발 무릎각 47.2도로 디딤발이 충분히 굽지 못해 주저앉았다",
+          "metric_ref": "디디 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 47.2도로 디딤발이 충분히 굽지 못해 안정성과 체중 전달이 단절되었다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 47.2도로 디딤발이 충분히 굽지 못해 발끝이 바닥에 닿았고 상체가 불안정해지는 모습을 보였습니다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 47.2도로 디딤발이 버티지 못하고 주저앉았다.",
+          "metric_ref": "디디뮨 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 47.2도로 디딤발이 충분히 굽지 못해 균형을 잃었고 안정성에 조금 불량이 있었다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "plant_knee_flexion|g0|s0",
+      "criterion_id": "plant_knee_flexion",
+      "name": "디딤발 무릎 굽히기",
+      "grade": 0,
+      "segment": 0,
+      "value": 87.8,
+      "plain": "디딤발 무릎이 버티지 못하고 주저앉는다",
+      "plain_all": "디딤발 무릎이 버티지 못하고 주저앉는다",
+      "given_metrics": {
+        "plant_knee_angle_at_impact": 87.8
+      },
+      "candidates": [
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 87.8도로 디딤발이 버티지 못하고 주저앉았다",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 87.8도로 디딤발이 버티지 못하고 주저앉았다. 더 깊게 굽혀 체중을 효과적으로 분산시키면 발 전체 안정성과 힘 전달이 개선될 것이다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 87.8도로디딤발이 버티지 못하고 주저앉았다. 더 깊게 굽히면 체중 분산에 도움이 될 것이다.",
+          "metric_ref": "임팩트 시 디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['임팩트 시 디딤 무릎 각 87.8도로 디딤발이 버티지 못하고 주저앉았다.', '무릎각이 충분하지 않아 체중 전달 효율이 떨어집니다.']",
+          "metric_ref": "임팩트 시 디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 87.8도로 디프로미가 충분히 굽지 못해 무게 중심이 좌우로 흔들리며 불안정하게 서 있었다.",
+          "metric_ref": "디피� 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 87.8도로 디딤발이 충분히 굽지 못하고 sits down.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 87.8도로디딤발이 충분히 굽지 못해 무릎이 주저앉는 모습을 확인했습니다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 87.8도로 디딤발이 barely 굽지 않고 뻣뻣하게 선 상태다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 87.8도로 디딤발이 충분히 굽지 못해 균형을 잃고 주저앉았다",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤발 무릎각 87.8도로 무릎이 충분히 굽지 못해 체중 전달이 끊겨 보였다",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 디딤 무릎 각 87.8도로 디딤발이 버티지 못하고 주저앉았다. 깊이 굽은 각도가 부족해 힘 전달이 완전히 끊어진 모습이다.",
+          "metric_ref": "디딤 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "swing_knee_extension|g2|s0",
+      "criterion_id": "swing_knee_extension",
+      "name": "차는 다리 뻗기",
+      "grade": 2,
+      "segment": 0,
+      "value": 148.8,
+      "plain": "임팩트 순간에 차는 무릎이 알맞게 펴진다",
+      "plain_all": "임팩트 순간에 차는 무릎이 알맞게 펴진다",
+      "given_metrics": {
+        "swing_knee_angle_at_impact": 148.8
+      },
+      "candidates": [
+        {
+          "evidence": "임팩트 순간 주동 무릎 각 148.8도로 무릎 신전 여유가 충분히 확보되어 발등 속도 형성에 최적화되었다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 직전 무릎이 접혔다가 적절히 펴져 발등 가속에 기여했다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 직전 무릎이 적당하게 펴져 있었고,\n무릎 각 148.8도로 임팩트 순간에 신전이 원활하게 구현되어 발이 빠르게 방향을 전환하는 데 도움이 되었다.",
+          "metric_ref": "임팩트 시 주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 직전 주동 무릎 각이 148.8도로 적절히 펴져 있었다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 148.8도가 측정되었다. 이 각도는 임팩트 순간 무릎 신전이 어느 정도 완료되었음을 보여주어 발등 속도 생성에 이상적인 위치를 제공했다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 148.8도로 기준 범위 중앙에 위치했으며, 임팩트 순간 무릎이 완전히 신전되어 발등 속도 향상에 효과적이었다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 148.8도로 차는 다리가 이미 약간 준비되어 있었으나 최적의 각도 도달에는 다소 부족했다. 무릎을 더 완전하게 펴서 차는 각도를 높이면 발등 speed가 더 안정적으로 증가할 수 있을 것이다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 직전 주동 무릎 각 148.8도로 임팩트 순간 무릎이 완전히 펴지지 않아 발등 속도가 지연되었다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 148.8도로 무릎이 비교적 일찍 접혔으나, 전체적으로는 적정 수준의 신전 상태 유지",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 직전 무릎각이 148.8도로 적절히 펴져 있었다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 순간 주동 무릎 각 148.8도로 임팩턴스에 필요한 최적 각도보다 다소 낮게 유지되었다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 148.8도로 차는 다리가 거의 펴져 있었다. 이 자세는 정확한 임팩트 전환 시점을 확보했기 때문에 발등 속도 조절에 도움이 되었다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "swing_knee_extension|g2|s0",
+      "criterion_id": "swing_knee_extension",
+      "name": "차는 다리 뻗기",
+      "grade": 2,
+      "segment": 0,
+      "value": 156.2,
+      "plain": "임팩트 순간에 차는 무릎이 알맞게 펴진다",
+      "plain_all": "임팩트 순간에 차는 무릎이 알맞게 펴진다",
+      "given_metrics": {
+        "swing_knee_angle_at_impact": 156.2
+      },
+      "candidates": [
+        {
+          "evidence": "임팩트 순간 주동 무릎 각 156.2도가 기준을 적절히 충족시켜 정확한 발등 가속을 구현했다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 156.2도가 기준 범위 내 적절하게 유지되어 정확한 발등 속도 발생",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 순간 주동 무릎 각 156.2도로 기준 범위 내 적합하게 신전되어 있으며, 충격 흡수 효율이 좋았다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 156.2도로 기준 범위 중앙을 유지하며 임팩트 순간에 적절히 신전되었다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 직전 무릎이 알맞게 펴져 있었다",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 순간 주동 무릎 각 156.2도로 임팩트 시 무릎이 완전히 신전되어 최적의 충격 흡수와 가속 효율을 발휘했다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 156.2도로 임팩트 순간에 무릎이 기준 범위 중앙 정도로 잘 펴졌다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 156.2도로 기준 범위 중앙에 위치하여 임팩트 순간 무릎 신전이 원활하게 이루어졌다",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 직전 무릎이 알맞게 펴져 있었다.",
+          "metric_ref": "주동 무릎 각 156.2도",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 156.2도로 임팩트 순간에 무릎이 알맞게 펴졌다",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 156.2도로 임팩트 순간 무릎이 완전히 신전되어 효과적인 충격 전달이 이루어졌다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 156.2도로 임팩트 순간 무릎이 기준 범위 중앙에 도달해 설계된 설계 효율성을 발휘했다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "swing_knee_extension|g1|s0",
+      "criterion_id": "swing_knee_extension",
+      "name": "차는 다리 뻗기",
+      "grade": 1,
+      "segment": 0,
+      "value": 168.5,
+      "plain": "임팩트 순간에 무릎이 거의 다 펴져 있다",
+      "plain_all": "임팩트 순간에 무릎이 거의 다 펴져 있다",
+      "given_metrics": {
+        "swing_knee_angle_at_impact": 168.5
+      },
+      "candidates": [
+        {
+          "evidence": "임팩트 시 주동 무릎 각 168.5도로 임팩트 순간에 무릎이 거의 펴지지 않아 발등 속도가 기준 이상으로 발현되지 않았다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 168.5도로iments 각도가 너무 열려 있어 Impact 순간 가속이 제한되었습니다. 더 힘을 주어 신전을 완전히 당기는 연습이 필요합니다.",
+          "metric_ref": "swing_knee_angle_at_impact",
+          "flags": []
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 168.5도로 임팩트 순간 무릎이 거의 펴지지 않았다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 168.5도로 이미 대부분 신전 상태였음",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 168.5도로 임팩트 순간에도 무릎이 거의 펴지지 않았다",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 168.5도로 임팩트 순간에 무릎이 거의 펴지지 않았다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 168.5도로 무릎 각도가 충분히 펴지지 않아 발등 속도 전달이 wasn't maximized 가능성 있음",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 168.5도로 측정되었습니다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 168.5도로 임팩트 직전 무릎이 제대로 펴지지 않아 발등 속도 생성에는 한계가 있었다. 더 깊은 각도 유지 시 가속 효율이 향상될 수 있을 것이다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 168.5도로 임팩트 순간에도 무릎이 거의 펴지지 않았다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 168.5도로 임팩트 직전 무릎이 충분히 펴지지 않아 발등 속도 유지 능력에 미흡했다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['임팩트 시 주동 무릎 각 168.5도로 임팩트 직전 무릎 신전이 충분히 확보되지 않았다', '가속 구간에서 충분한 힘 방출이 미흡하였다']",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "swing_knee_extension|g1|s0",
+      "criterion_id": "swing_knee_extension",
+      "name": "차는 다리 뻗기",
+      "grade": 1,
+      "segment": 0,
+      "value": 171.5,
+      "plain": "임팩트 순간에 무릎이 거의 다 펴져 있다",
+      "plain_all": "임팩트 순간에 무릎이 거의 다 펴져 있다",
+      "given_metrics": {
+        "swing_knee_angle_at_impact": 171.5
+      },
+      "candidates": [
+        {
+          "evidence": "",
+          "metric_ref": "",
+          "flags": [
+            "no_json"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 171.5도로 임팩트 순간에 무릎이 거의 완전히 뻗어 있어 가속 효과가 감소했다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 171.5도로 임팩트 순간에도 무릎이 거의 펴지지 않았다",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 171.5도로 임팩트 순간에 무릎이 거의 다 펴져 있었다",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['임팩트 직전 주동 무릎 각은 171.5도로 완전히 펴져 있었다', '이로 인해 가속 시 발등 속도 발생 속도가 낮아질 수 있었다']",
+          "metric_ref": "임팩트 시 주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 171.5도로 임팩트 순간에도 무릎이 거의 펴지지 않았다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 순간 주동 무릎 각이 171.5도로 이미 거의 신전된 상태였다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 171.5도로 임팩트 순간에 무릎이 거의 모두 펴져 있었다",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 171.5도로 임팩트 순간에 무릎이 거의 완전히 펴져 있었다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 171.5도로 임팩트 순간에 무릎이 거의 펴지지 않았다",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "swing_knee_extension|g0|s0",
+      "criterion_id": "swing_knee_extension",
+      "name": "차는 다리 뻗기",
+      "grade": 0,
+      "segment": 0,
+      "value": 49.0,
+      "plain": "임팩트 순간에도 무릎이 거의 펴지지 않는다",
+      "plain_all": "임팩트 순간에도 무릎이 거의 펴지지 않는다 또는 임팩트 전에 무릎이 이미 다 펴져 버린다",
+      "given_metrics": {
+        "swing_knee_angle_at_impact": 49.0
+      },
+      "candidates": [
+        {
+          "evidence": "[충격 순간 무릎각 49.0도 → 임팩트 시 아직도 충분히 펴지 않아 발등 속도 생성이 늦었음. 무릎 신전 여유 부족이 주요 개선점]",
+          "metric_ref": "임팩트 시 주동 무릎각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['[아쉬움] 임팩트 시 주동 무릎 각 49.0도로 무릎이 완전히 펴지지 않아 발등 속도 생성에 불리했다']",
+          "metric_ref": "임팩트 시 주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['[아쉬움] 임팩트 시 주동 무릎 각 49.0도로 임팩트 순간에도 무릎이 거의 펴지지 않아 발등 속도 증가 효과 기대되었으나 한계를 보였다', '[잘함] 의도한 가속화 범위보다 각도가 낮아 충격 흡수 효율은 다소 떨어질 수 있다']",
+          "metric_ref": "임팩트 시 주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['[Judgment] 임팩트 시 주동 무릎 각 49.0도로 주동 무릎이 지나치게 낮게 위치해 있어, 발등 가속 구간을 효과적으로 활용하기 어려웠습니다.', '[ disadvantaging] 무릎 각도 부족으로 임팩트 후 신속한 방향 전환에 어려움을 겪을 수 있습니다.']",
+          "metric_ref": "임팩트 시 주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['[아쉬움] 임팩트 시 주동 무릎 각 49.0도로 임팩트 순간에도 무릎이 거의 펴지지 않았다.', ' 무릎 각도가 낮아 임팩트 때 신전 공간이 충분하지 않았을 가능성이 있다.']",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['[아쉬움] 임팩트 시 주동 무릎 각 49.0도로 임팩트 순간에도 무릎이 거의 펴지지 않았다', 'Impact 발생 전 무릎 각도가 낮아 발등 가속 효과가 제대로 발휘되지 않았다. 더 높이 신전했다면 strike의 정확도가 향상될 수 있었다.']",
+          "metric_ref": "임팩트 시 주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['[이유] 임팩트 시 주동 무릎 각이 49.0도로 극히 낮아 무릎 신전이 부족했다', '[ noticed ] 임팩트 즉시 무릎이 충분히 펴지지 않아 발등으로의 충격이 완전히 전달되지 않았다']",
+          "metric_ref": "임팩트 시 주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['임팩트 시 주동 무릎 각 49.0도로 임팩트 순간에도 무릎이 거의 펴지지 않았다', '무릎을 더 펴면 마지막 순간까지 올바른 충격 흡수가 가능할 것이다']",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "[아쉬움] 임팩트 시 주동 무릎 각 49.0도 측정값 확인, 무릎이 충분히 펴지지 않아 발등 속도 생성 효과 미흡",
+          "metric_ref": "임팩트 시 주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['[ 아쉬움] 임팩트 시 주동 무릎 각 49.0도에서 무릎이 완전히 펴지지 않아 발등 가속 효과 감소', '[조금 더] 임팩트 순간에 무릎 fully extend되지 않았으며, 이로 인해 최적의 충격 흡수 및 발전력 전달이 미흡했다']",
+          "metric_ref": "임팩트 시 주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['임팩트 시 주동 무릎 각 49.0도로 임팩트 순간에도 무릎이 거의 펴지지 않았다.', ' 무릎 각도 부족으로 가속 구간을 효과적으로 활용하지 못한 측면이 있다.']",
+          "metric_ref": "임팩트 시 주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "[ 아쉬움] 임팩트 시 주동 무릎 각 49.0도로 임팩트 순간에도 무릎이 거의 펴지지 않았다. 임팩트 속도 조절이 늦어져 발등으로의 충격이 상대적으로 증가한 측면이 있다.",
+          "metric_ref": "임팩트 시 주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "swing_knee_extension|g0|s0",
+      "criterion_id": "swing_knee_extension",
+      "name": "차는 다리 뻗기",
+      "grade": 0,
+      "segment": 0,
+      "value": 91.0,
+      "plain": "임팩트 순간에도 무릎이 거의 펴지지 않는다",
+      "plain_all": "임팩트 순간에도 무릎이 거의 펴지지 않는다 또는 임팩트 전에 무릎이 이미 다 펴져 버린다",
+      "given_metrics": {
+        "swing_knee_angle_at_impact": 91.0
+      },
+      "candidates": [
+        {
+          "evidence": "임팩트 시 주동 무릎 각 91.0도",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "[아쉬움] 임팩트 시 주동 무릎 각 91.0도로 임팩트 순간에도 무릎이 거의 펴지지 않아 발등 속도 기대했으나 실제 구현도 미흡했다.",
+          "metric_ref": "임팩트 시 주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['임팩트 시 주동 무릎 각 91.0도로 임팩트 순간에도 무릎이 거의 펴지지 않았다', '따라서 발등 속도 생성에 한계가 있었다. 무릎 각도를 좀 더 높여 임팩트 시 완전 신전 상태 유지가 필요하다']",
+          "metric_ref": "임팩트 시 주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 91.0도로 측정됨. 근거 문장: '- 무릎각 91도로 임팩트 순간에도 무릎이 거의 펴지지 않았다'",
+          "metric_ref": "임팩트 시 주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['임팩트 시 주동 무릎 각 91.0도로 임팩트 순간에도 무릎이 거의 펴지지 않았다', '무릎각이 충분히 벌어지지 않아 발등 속도가 최대화되었으나, 임팩트 실행 후 보조 자세 전환이 미흡했다']",
+          "metric_ref": "임팩트 시 주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 91.0도 → \"무릎각 91도로 임팩트 순간에도 무릎이 급격히 꺾이지 않아 발등 속도가 상대적으로 느려졌다\"",
+          "metric_ref": "임팩트 시 주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['[아쉬움] 임팩트 시 주동 무릎 각 91.0도로 무릎이 충분히 펴지지 않아 발목 안정성이 떨어집니다.', '[보통] 측정값만으로는 임팩트 시 무릎 각도 판단에 한계가 있어 추가 분석이 필요합니다.']",
+          "metric_ref": "임팩트 시 주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 91.0도로 임팩트 순간에도 무릎이 거의 펴지지 않았다. 이는 발등 속도 생성에 필요한 무릎 신전 여유가 부족했음을 의미한다.",
+          "metric_ref": "임팩트 시 주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['- [아쉬운] 임팩트 순간에도 주동 무릎 각 91.0도로 무릎 신전이 충분하지 않아 발등 속도 발생', '- 무릎을 더 크게 펴서 임팩트 전 무릎 각도를 120도로 높이면 가속 효율 향상 가능']",
+          "metric_ref": "임팩트 시 주동 무릎 각",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 91.0도 → \"임팩트 순간에도 무릎이 거의 펴지지 않아 발등 속도를 기대하기 어려웠다.\"",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "[\"[ 아쉬움] 임팩트 시 주동 무릎 각 91.0도 → 'Impact 순간 무릎이 완전히 펴지지 않고 부분적으로만 개방되었다', '발등으로의 충격력 전달은 적절했으나 가속 구간에서 무릎 각도 부족으로 반응 지연 현상 관찰'\", \"[잘함] 임팩트 시 주동 무릎 각 152.0도 → '중립 상태에서 무릎 각도가 충분해 임팩트 준비 단계부터 균형 유지 가능했다'\", \"[보통] 임팩트 시 주동 무릎 각 171.0도 → '이미 임팩트 직전 무릎 신전이 거의 완료된 상태에서 충격 흡수 효율성 감소'를 연상케 함\"]",
+          "metric_ref": "임팩트 시 주동 무릎 각",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['[아쉬움] 임팩트 시 주동 무릎 각 91.0도로 차는 다리가 전혀 펴져 있지 않아 발등 속도 생성이 기대보다 부진했다', '[잘함] 임팩트 후 무릎 각도가 152도로 완전 신전 가능한 상태였다면 충격 전달이 최적화될 수 있었을 것']",
+          "metric_ref": "임팩트 시 주동 무릎 각",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "swing_knee_extension|g0|s1",
+      "criterion_id": "swing_knee_extension",
+      "name": "차는 다리 뻗기",
+      "grade": 0,
+      "segment": 1,
+      "value": 179.8,
+      "plain": "임팩트 전에 무릎이 이미 다 펴져 버린다",
+      "plain_all": "임팩트 순간에도 무릎이 거의 펴지지 않는다 또는 임팩트 전에 무릎이 이미 다 펴져 버린다",
+      "given_metrics": {
+        "swing_knee_angle_at_impact": 179.8
+      },
+      "candidates": [
+        {
+          "evidence": "임팩트 시 주동 무릎 각 179.8도로 임팩트 전 이미 다 펴져 있었다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 179.8도로 임팩트 전 완전 신전 상태였다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "",
+          "metric_ref": "",
+          "flags": [
+            "no_json"
+          ]
+        },
+        {
+          "evidence": "임팩트 직전 주동 무릎 각 179.8도로 이미 신전이 완료되어 가속 구간을 구현하지 못했다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 179.8도로 임팩트 전 완전 신전이 확인되어 가속 구간을 확보하지 못한 점을 고려할 때 개선이 필요하다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 179.8도에서 무릎이 이미 다 펴져 있었다. 이로 인해 가속 구간을 효율적으로 활용하지 못했다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 직전 주동 무릎 각 179.8도로 무릎이 완전히 펴져 있었다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 179.8도에서 무릎이 이미 완전히 신전되어 있었음",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 직전 주동 무릎 각 179.8도로 완전히 신전되지 않아 발등 속도 생성에 문제 발생",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 179.8도로 임팩트 전에 무릎이 이미 완전 신전되어 있었다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 직전 주동 무릎 각이 179.8도로 이미 완전히 뻗어 있었다. 이로 인해 가속 효과가 확보되지 않았다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "swing_knee_extension|g0|s1",
+      "criterion_id": "swing_knee_extension",
+      "name": "차는 다리 뻗기",
+      "grade": 0,
+      "segment": 1,
+      "value": 182.2,
+      "plain": "임팩트 전에 무릎이 이미 다 펴져 버린다",
+      "plain_all": "임팩트 순간에도 무릎이 거의 펴지지 않는다 또는 임팩트 전에 무릎이 이미 다 펴져 버린다",
+      "given_metrics": {
+        "swing_knee_angle_at_impact": 182.2
+      },
+      "candidates": [
+        {
+          "evidence": "임팩트 시 주동 무릎 각 182.2도 측정값이 근거가 되어 임팩트 전 무릎이 거의 완전히 펴져 있었음을 확인했습니다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 182.2도로 임팩트 전 이미 완전 신전 상태였으며, 이로 인해 가속 구간을 효과적으로 활용하지 못했다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 182.2도가 근거하며, 이는 이미 임팩트 직전 무릎이 완전히 펴져 있었음을 의미합니다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 182.2도가 임팩트 순간 무릎이 완전히 신전된 상태를 반영해 가속 구간에 도달하지 못했음을 보여줌",
+          "metric_ref": "임팩트 시 주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 182.2도로 임팩트 전 완전 신전 상태였다. 이로 인해 가속 구간에서 효과적인 힘 전달이 어려워졌다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 직전 주동 무릎 각 182.2도가 측정되었습니다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 182.2도로 임팩트 전 완전 신전 상태였다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 182.2도로 임팩트 전 완전 신전 상태였다",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 182.2도로 임팩트 전에 무릎이 완전히 펴져 있었다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 182.2도로 임팩트 직전 무릎이 이미 완전히 신전되어 있었다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 직전 주동 무릎 각 182.2도로 이미 완전히 신전된 상태였다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 주동 무릎 각 182.2도가 측정값 근거로 사용되었습니다.",
+          "metric_ref": "주동 무릎 각",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "trunk_lean|g2|s0",
+      "criterion_id": "trunk_lean",
+      "name": "상체 기울기",
+      "grade": 2,
+      "segment": 0,
+      "value": 10.2,
+      "plain": "상체가 공 위를 알맞게 덮는다",
+      "plain_all": "상체가 공 위를 알맞게 덮는다",
+      "given_metrics": {
+        "trunk_forward_lean_deg_at_impact": 10.2
+      },
+      "candidates": [
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 10.2도로 상체가 공 위로 적절히 덮혀 있다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 10.2도로 상체가 공 위로 충분히 젖혀져 있다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 10.2도로 상체가 공 위로 알맞게 덮이는 자세를 취하고 있다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 10.2도로 상체가 공 위로 적절히 덮는 자세다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 10.2도로 상체가 공 위로 알맞게 덮어진 자세",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "기울기 10.2도로 상체가 공 위로 알맞게 덮였다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 10.2도로 상체가 공 위로 적절하게 덮였다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "기울기 10.2도로 상체가 공 위로 적절히 젖혀져 있다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 10.2도로 상체가 공 위로 완전히 덮어진 자세다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 10.2도가 상체가 공 위로 적절히 덮이는 자세를 보여주었다.",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 10.2도로 상체가 공 위를 정확히 덮는 자세 유지",
+          "metric_ref": "기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 10.2도로 상체가 공 위로 알맞게 덮는 자세를 유지했다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "trunk_lean|g2|s0",
+      "criterion_id": "trunk_lean",
+      "name": "상체 기울기",
+      "grade": 2,
+      "segment": 0,
+      "value": 14.8,
+      "plain": "상체가 공 위를 알맞게 덮는다",
+      "plain_all": "상체가 공 위를 알맞게 덮는다",
+      "given_metrics": {
+        "trunk_forward_lean_deg_at_impact": 14.8
+      },
+      "candidates": [
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 14.8도로 상체가 공 위를 알맞게 덮는 자세를 유지했습니다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 14.8도",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 14.8도로 상체가 공 위로 안정적으로 덮는 자세다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 14.8도로 상체가 공 위로 알맞게 덮는 자세를 잘 보였습니다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 14.8도로 상체가 공 위로 알맞게덮고 있다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 14.8도로 상체가 공 위로 적절히 덮는 자세 유지",
+          "metric_ref": "기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 14.8도로 상체가 공 위로 알맞게 덮는 자세 유지",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "상체 전후 기울기 14.8도로 임팩트 시 공 위로 잘 덮혔다",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 14.8도로 상체가 공 위로 적절히 덮는 자세를 보였다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 14.8도로 상체가 공 위로 적절히 덮는 자세를 유지했다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 14.8도로 상체가 공 위를 알맞게 덮고 있다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 14.8도가 상체가 공 위로 적절히 덮는 자세를 잘 표현했다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "trunk_lean|g1|s0",
+      "criterion_id": "trunk_lean",
+      "name": "상체 기울기",
+      "grade": 1,
+      "segment": 0,
+      "value": 1.8,
+      "plain": "상체를 거의 세운 채로 찬다",
+      "plain_all": "상체를 거의 세운 채로 찬다 또는 상체를 공 위로 조금 깊이 숙인다",
+      "given_metrics": {
+        "trunk_forward_lean_deg_at_impact": 1.8
+      },
+      "candidates": [
+        {
+          "evidence": "['임팩트 시 몸통 전후 기울기 1.8도는 약간 낮아 상체가 거의 수직을 유지하지 못해 공이 제대로 뜨지 않았다', '상체 전방 기울기가 제한적이므로 체중 분배 시 안정성에 개선이 필요하다']",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['기울기 -1.8도로 상체가 거의 세운 채로 변경할 때보다 임팩트 시 더 잘 전달됨', '수직에 가까운 각도 유지를 위해 다리 각도 조정 검토 필요']",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 1.8도로 상체가 거의 수직에 가깝지만 기준 범위(보통 수준 이상)를 약간 벗어나며, 체중 전달과 공 컨트롤 측면에서 약간의 개선이 필요하다",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 -8.7도로 상체가 거의 세운 채로 Change 무릎 높이를 살짝 낮추면 체중 전달이 더 부드럽게 전달될 수 있다.",
+          "metric_ref": "기울기(몸통 전후)",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "기울기 -1.8도",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "metric_ref",
+            "too_short"
+          ]
+        },
+        {
+          "evidence": "\"임팩트 시 몸통 전후 기울기 1.8도로 상체가 거의 수직에 가깝지만, 기준 범위보다 작아 상체 전방 기울기가 제한적이었다.",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 1.8도로 상체가 거의 수직에 가깝지만 기준 범위 미달",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 1.8도로 상체가 거의 세운 채로 변화",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['기울기 -1.8도로 상체가 거의 수직이지만 체중 분배가 부족하다', '기울기 1.8도로 기준을 약간 하회하는 모습을 보임']",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 1.8도로 상체가 거의 기준 범위에 근접했으나, 약간 forward 자세 유지가 부족했습니다.",
+          "metric_ref": "기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 -8.7도로 상체가 거의 세우고 있음",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 1.8도로 상체가 거의 세워짐",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "trunk_lean|g1|s0",
+      "criterion_id": "trunk_lean",
+      "name": "상체 기울기",
+      "grade": 1,
+      "segment": 0,
+      "value": 3.2,
+      "plain": "상체를 거의 세운 채로 찬다",
+      "plain_all": "상체를 거의 세운 채로 찬다 또는 상체를 공 위로 조금 깊이 숙인다",
+      "given_metrics": {
+        "trunk_forward_lean_deg_at_impact": 3.2
+      },
+      "candidates": [
+        {
+          "evidence": "기울기 -8.7도로 상체가 거의 세운 채로change이고,\n기울기 3.2도로 임팩트 시 기준보다 약간 뒤로 젖혀져 있습니다",
+          "metric_ref": "기울기 (몸통 전후)",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 3.2도",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 3.2도로 상체가 거의 수직에 가깝지만 기준 범위보다 미미해 체중 전달 효과가 부족하다",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['임팩트 시 몸통 전후 기울기 -8.7도 → 상체가 거의 수직 상태나공 위로 거의 위로만 덮였다.', '기울기 3.2도로 상체가 기준 범위보다 약간 뒤로 젖혀져 있어 체중 전달 효율이 다소 떨어졌다.']",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 3.2도로 상체가 거의 수직에 가깝지만, 전방으로 0.8도만 벗어나 약간 뒤로 젖혀져 있었다.",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['임팩트 시 몸통 전후 기울기 3.2도로 상체가 거의 세운 상태로 변경 필요', '기준 대비 약간 뒤 젖혀짐으로 인해 공 컨트롤에 공백 발생 가능성 있음']",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['임팩트 시 몸통 전후 기울기 3.2도로 상체가 약간 뒤로 젖혀져 있으나 기준 범위 내에 근접했다.', '상체와 공 위로 덮이는 정도가 미흡하여 임팩트 시 체중 전달 효율이 떨어질 수 있다.']",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['기울기 -8.7도로 상체가 거의 수직에 가까운 자세', '기울기 3.2도로 약간 뒤로 젖혀져 있어 기준에 근접하나 완전한 전방 기울기 미흡']",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['- 임팩트 시 몸통 전후 기울기 -8.7도로 상체가 거의 세운 채로 변함', '- 임팩트 시 몸통 전후 기울기 3.2도로 약간 뒤로 젖혀진 상태']",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['임팩트 시 몸통 전후 기울기 3.2도로 상체가 거의 기준 각도에 근접했다', \"수치만 강조해 서술: '기울기 3.2도로 수직에 근접하나 약간의 자유로움 존재'\", ' slight 개선점: 각도 조정을 통해 수직 하중 증가를 고려할 필요 있음']",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 -8.7도 → '기울기 -8.7도로 상체가 거의 세운 채로 차다.', 3.2도 → '기울기 3.2도로 기준 이상이지 않아Impact 시 수직에 가까운 자세를 유지하는 것이 더 적합하다.'",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "trunk_lean|g1|s1",
+      "criterion_id": "trunk_lean",
+      "name": "상체 기울기",
+      "grade": 1,
+      "segment": 1,
+      "value": 23.5,
+      "plain": "상체를 공 위로 조금 깊이 숙인다",
+      "plain_all": "상체를 거의 세운 채로 찬다 또는 상체를 공 위로 조금 깊이 숙인다",
+      "given_metrics": {
+        "trunk_forward_lean_deg_at_impact": 23.5
+      },
+      "candidates": [
+        {
+          "evidence": "['기울기 23.5도로 상체가 공 위로 조금 깊이숙였다', '상체 전방 기울기가 12.4도로 기준 범위 내에 있었으나 25.0도 미만으로 대부분 잘했다']",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['임팩트 시 몸통 전후 기울기 23.5도로 상체를 공 위로 조금 깊이 숙였다.', '기준 각도 대비 다소 덜 준비되어 공이 완전히 뜨지는 않았다']",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 23.5도로 상체를 공 위로 약간 깊게 숙였다.",
+          "metric_ref": "기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['기울기 23.5도로 상체를 공 위로 약간 깊이 superconduc먼트했다', '상체 전방 기울기는 바람직한 범위에 근접했으나 과도하게 깊어진 정도에서 아쉽다']",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 -8.7도 → '기울기 -8.7도로 상체가 공 위로 조금 깊이 숙인다.', \n기울기 23.5도 → '기울기 23.5도로 상체가 기준 범위 내에 있으나 추가 깊이 숙임이 필요함을 느낌.'",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['임팩트 시 몸통 전후 기울기 -8.7도로 상체가 뒤로 젖혀짐', '기울기 23.5도로 상체를 공 위로 조금 깊이웠다']",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "R3",
+            "metric_ref",
+            "anchor_copy"
+          ]
+        },
+        {
+          "evidence": "\"임팩트 시 몸통 전후 기울기 -8.7도로 상체가 뒤로 젖혀졌다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['기울기 -23.5도로 상체가 공 위로 깊이 숙이면서 충격 흡수 효과가 있었다', ' slightly deep forward position but slightly above typical impact range']",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "기울기 -8.7도로 상체가 후방으로 살짝 기울어지며 공 위로 덮이는 상태 유지",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "기울기 -8.7도 → 상체가 뒤로 젖혀짐",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 23.5도",
+          "metric_ref": "기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 -8.7도로 상체가 뒤로 젖혀졌다. 또한 기울기 23.5도로 공 위로 조금 깊이 숙여야 한다.",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "trunk_lean|g1|s1",
+      "criterion_id": "trunk_lean",
+      "name": "상체 기울기",
+      "grade": 1,
+      "segment": 1,
+      "value": 26.5,
+      "plain": "상체를 공 위로 조금 깊이 숙인다",
+      "plain_all": "상체를 거의 세운 채로 찬다 또는 상체를 공 위로 조금 깊이 숙인다",
+      "given_metrics": {
+        "trunk_forward_lean_deg_at_impact": 26.5
+      },
+      "candidates": [
+        {
+          "evidence": "기울기 26.5도로 상체가 공 위로 약간 깊이 숙여 있다.",
+          "metric_ref": "Impact 시 몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 -8.7도로 상체가 뒤로 젖혀졌으나 기준에 비해 약간 얕게 positioning됨",
+          "metric_ref": "구별기: 임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['기울기 26.5도로 상체가 공 위로 조금 깊이 숙이면서 임팩트 동작 시 안정성 유지', ' slightly deeper than ideal but within acceptable range for kicking technique']",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['- 임팩트 시 몸통 전후 기울기 -8.7도로 상체가 뒤로 젖혀짐', '- 측정값: 임팩트 시 몸통 전후 기울기 26.5도로 상체를 공 위로 조금 깊이 숙였다', '- 이 정도로는 기준보다 약간 부족하여 더 앞으로 숙여야 할 필요가 있다']",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "R3",
+            "metric_ref",
+            "anchor_copy"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 26.5도 → \"기울기 26.5도로 상체를 공 위로 약간 깊게 접었다.\"",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "[\"- 임팩트 시 몸통 전후 기울기 26.5도 → '기울기가 기준보다 다소 과도하게 뒤로 젖혀져 있어',\", '- 약간 더 깊게 숙이면 공이 더 잘 뜨는 위치가 될 수 있다']",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['기울기 26.5도로 상체가 공 위로 너무 깊게OSED되어 있었다', ' slight adjustment needed: 임팩트 시 상체를 더 쉽게 들어 올려 공을 받는 느낌이 더 좋아진다']",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['임팩트 시 몸통 전후 기울기 26.5도로 상체가 공 위로 조금 깊이 숙였다.', '상체 전방 기울기가 약간 과도해 추가 조정이 필요할 수 있다.']",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 -8.7도로 상체가 뒤로 젖혀졌으나,공 위로 완전히 덮이는 수준은 부족했다",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "기울기 26.5도로 상체가 공 위로 약간 깊이졌으나 완벽한 자세는 아니다",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 -8.7도로 상체가 공 위로 조금 깊이 숙였다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 -8.7도로 상체가 뒤로 젖혀졌으며, 26.5도 측정값이 기록되어 기준 범위 내에 가깝다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "trunk_lean|g0|s1",
+      "criterion_id": "trunk_lean",
+      "name": "상체 기울기",
+      "grade": 0,
+      "segment": 1,
+      "value": 34.8,
+      "plain": "상체가 공 위로 크게 무너진다",
+      "plain_all": "상체가 뒤로 젖혀진다 또는 상체가 공 위로 크게 무너진다",
+      "given_metrics": {
+        "trunk_forward_lean_deg_at_impact": 34.8
+      },
+      "candidates": [
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 34.8도로 상체가 공 위로 크게 무너졌다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 34.8도로 상체가 공 위로 과도하게 무너졌다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 34.8도가 상체가 공 위로 지나치게 무너졌다는 것을 확인했습니다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 34.8도로 상체가 공 위로 크게 무너진 상태였다.",
+          "metric_ref": "body tilt (kilogram·meter)",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기가 34.8도로 기준보다 현저히 크다",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 34.8도가 공 위로 상체가 크게 무너진 자세를 나타내며 기준을 크게 초과했다",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "기울기 34.8도로 상체가 공 위로 크게 무너졌다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 34.8도로 상체가 공 위로 크게 무너짐",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 34.8도",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "기울기 34.8도로 상체가 공 위로 크게 무너져서 공이 뜨는 효과가 wasn't achieved",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "trunk_lean|g0|s1",
+      "criterion_id": "trunk_lean",
+      "name": "상체 기울기",
+      "grade": 0,
+      "segment": 1,
+      "value": 37.2,
+      "plain": "상체가 공 위로 크게 무너진다",
+      "plain_all": "상체가 뒤로 젖혀진다 또는 상체가 공 위로 크게 무너진다",
+      "given_metrics": {
+        "trunk_forward_lean_deg_at_impact": 37.2
+      },
+      "candidates": [
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 37.2도로 상체가 공 위로 크게 무너졌다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기가 37.2도로 측정되었으며, 상체가 공 위로 과도하게 젖혀져 상승력이 저하됐다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 37.2도가 기준을 크게 초과하여 상체가 공 위로 깊이 뒤로 젖혀졌다",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 37.2도",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 37.2도로 상체가 공 위로 크게 무너집니다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 37.2도가 그 근거입니다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 37.2도가 공 위로 상체가 과도하게 기울어진 것을 보여준다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 37.2도로 상체가 공 위로 크게 무너졌다",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 37.2도가 상체가 공 위로 크게 무너졌음을 확인했습니다.",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "기울기 37.2도로 상체가 공 위로 너무 크게 무너졌다.",
+          "metric_ref": "임팩트 시 몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 시 몸통 전후 기울기 37.2도가 공 위로 상체가 크게 무너지는 자세를 보여줬다.",
+          "metric_ref": "몸통 전후 기울기",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "hip_rotation|g2|s0",
+      "criterion_id": "hip_rotation",
+      "name": "골반 돌리기",
+      "grade": 2,
+      "segment": 0,
+      "value": 79.2,
+      "plain": "백스윙에서 임팩트까지 골반이 크게 열린다",
+      "plain_all": "백스윙에서 임팩트까지 골반이 크게 열린다",
+      "given_metrics": {
+        "hip_rotation_range_deg": 79.2
+      },
+      "candidates": [
+        {
+          "evidence": "['골반 회전 범위 79.2도로 백스윙에서 임팩트까지 크게 열렸다.', '강력한 백핸드 기술로 상대방 goalkeeper에게 확실한 볼 컨트롤을 보여주었다.']",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['골반 회전 범위 79.2도가 백스윙부터 임팩트까지 현저히 개방되어 있어 상체 힘이 효과적으로 다리로 전달됐다', '회전 범위가 크게 열려 있어 기술적 완성도가 높은 자세를 보였다']",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "골반 회전 범위 79.2도로 백스윙에서 임팩트까지 크게 열렸다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['골반 회전 범위 79.2도로 백스윙에서 임팩트까지 크게 열렸다', '이로 인해 상체 힘이 다리로 효과적으로 전달되었다.']",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "골반 회전 범위 79.2도로 백스윙에서 임팩트까지 큰 회전이 이루어졌다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['골반 회전 범위 79.2도가 백스윙에서 임팩트까지 크게 열려 있어 상체 힘이 효과적으로 다리로 전달되었다.', '회전량이 충분히 넓어 충격 흡수와 힘 전달 효율성이 극대화되었다.']",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['골반 회전 범위 79.2도로 백스윙에서 임팩트까지 크게 열렸다', '큰 회전 범위가 상체 힘이 다리로 효과적으로 전달됨을 증명한다']",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['골반 회전 범위 79.2도로 백스윙에서 임팩트까지 크게 열렸다', ' 회전 범위가 충분해 상체 힘이 효과적으로 다리로 전달되었다']",
+          "metric_ref": " 골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "골반 회전 범위 79.2도가 백스윙부터 임팩트까지 크게 열리는 힘 전달을 뒷받침합니다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['골반 회전 범위 79.2도로 백스윙부터 임팩트까지 크게 열렸다.', '상체 힘이 다리로 즉시력으로 전달되는 모습이 잘 evident했다.']",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['골반 회전 범위 79.2도로 백스윙에서 임팩트까지 크게 열렸다', '이 정도 회전으로 상체 힘이 효과적으로 다리로 전달되었다']",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['골반 회전 범위 79.2도로 백스윙에서 임팩트까지 크게 열렸다.']",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "hip_rotation|g2|s0",
+      "criterion_id": "hip_rotation",
+      "name": "골반 돌리기",
+      "grade": 2,
+      "segment": 0,
+      "value": 125.8,
+      "plain": "백스윙에서 임팩트까지 골반이 크게 열린다",
+      "plain_all": "백스윙에서 임팩트까지 골반이 크게 열린다",
+      "given_metrics": {
+        "hip_rotation_range_deg": 125.8
+      },
+      "candidates": [
+        {
+          "evidence": "['골반 회전 범위 125.8도로 백스윙에서 임팩트까지 크게 열렸다.', '다리로 전달된 힘이 효과적으로 흡수됐다는 평가가 가능하다.']",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['골반 회전 범위 125.8도로 백스윙에서 임팩트까지 크게 열렸다.', '강력한 상체 힘이 다리로 즉각적으로 전달되는 느낌이었다.']",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "골반 회전 범위 125.8도로 백스윙에서 임팩트까지 크게 열렸다. 이는 상체 힘이 효과적으로 다리로 전달되는 데 최적화된 자세다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['골반 회전 범위 125.8도가백스윙부터 임팩트까지 크게 열렸다', ' 회전 범위 확보로 상체 힘이 효율적으로 다리로 전달됨']",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['골반 회전 범위 125.8도로 백스윙에서 임팩트까지 크게 열렸다', '회전 범위가 최대에에 가까워 상체 힘 전달이 원활했다']",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "골반 회전 범위 125.8도로 백스윙에서 임팩트까지 크게 회전이 열렸다.",
+          "metric_ref": " 골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "백스윙에서 임팩트까지 골반 회전 범위 125.8도가 측정되어 회전이 크게 열린 자세를 보였다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['골반 회전 범위 125.8도로 백스윙에서 임팩트까지 크게 열렸다.', '다리로 직접 힘을 전달할 수 있는 좋은 자세를 보였다.']",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "골반 회전 범위 125.8도로 백스윙에서 임팩트까지 크게 열렸다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['골반 회전 범위 125.8도로 백스윙에서 임팩트까지 크게 열렸다', '회전 범위가 충분해 상체 힘이 다리로 효과적으로 전달됨']",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "골반 회전 범위 125.8도로 백스윙에서 임팩트까지 크게 열렸다",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['골반 회전 범위 125.8도로 백스윙부터 임팩트까지 크게 열렸다', '회전 폭이 넉넉해 상체 힘이 효과적으로 다리로 전달되었다']",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "hip_rotation|g1|s0",
+      "criterion_id": "hip_rotation",
+      "name": "골반 돌리기",
+      "grade": 1,
+      "segment": 0,
+      "value": 18.5,
+      "plain": "골반이 절반쯤만 열린다",
+      "plain_all": "골반이 절반쯤만 열린다",
+      "given_metrics": {
+        "hip_rotation_range_deg": 18.5
+      },
+      "candidates": [
+        {
+          "evidence": "골반 회전 범위 18.5도로 회전 범위가 중간 구간에 불과합니다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "회전 범위 18.5도로 골반 회전이 중간 정도로 유지되었으나 최대 회전 범위(34.2도)에는 미치지 못한다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['골반 회전 범위 18.5도로 회전이 제한적이었다. 더 큰 범위로 열리면백스윙부터 임팩트까지 힘 전달이 더 원활해질 것이다.', '회전 부재가 상체 자세 안정성에 약간의 공백을 남겼다.']",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "\"골반 회전 범위 18.5도로 백스윙에서 임팩트까지 비교적 좁게 회전했으며, 회전 강도가 중간 정도입니다.",
+          "metric_ref": " 골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "회전 범위 18.5도로 골반 회전이 중간 정도였지만 절반 이상은 아닙니다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "회전 범위 18.5도로 골반 회전이 중간 수준이지만 백스윙에서 임팩트까지는 부족합니다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "골반 회전 범위 18.5도 → '회전 범위 18.5도로 중간 구간으로 어느 정도 회전은 이루었으나 완전히 열리지는 않았다.', '넓은 무릎 각도와 함께 몸통이 약간 앞으로 기울어져 상체 힘 전달에 필요한 각도가 다소 부족하다.'",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "골반 회전 범위 18.5도로 백스윙에서 임팩트까지 회전이 거의 없음",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "골반 회전 범위 18.5도로 중간 구간에 해당하나 백스윙 시 임팩트까지 완전히 회전하지 않음.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "골반 회전 범위 18.5도로 백스윙에서 임팩트까지 회전이 부족하다. 더 크게 열리면 발등 공격 시 속도가 늘어나는 등 개선점이다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "회전 범위 18.5도로 골반이 거의 열리지 않았다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "골반 회전 범위 18.5도로 중간 구간에 해당하나 백스윙에서 임팩트까지 완전히 오픈하지 않았다.",
+          "metric_ref": " 골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "hip_rotation|g1|s0",
+      "criterion_id": "hip_rotation",
+      "name": "골반 돌리기",
+      "grade": 1,
+      "segment": 0,
+      "value": 21.5,
+      "plain": "골반이 절반쯤만 열린다",
+      "plain_all": "골반이 절반쯤만 열린다",
+      "given_metrics": {
+        "hip_rotation_range_deg": 21.5
+      },
+      "candidates": [
+        {
+          "evidence": "회전 범위 21.5도로 골반 회전이 거의 없음. 중간 구간보다 회전이 부족해 상체 힘 전달이 완전하지 않았다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "회전 범위 21.5도로 중간 구간에 해당되나 백스윙부터 완전히 개방되지 않았다",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['[잘함] 골반 회전 범위 19.8도로 중간 구간', '[아쉬움] 골반 회전 범위 21.5도로 회전이 거의 없음']",
+          "metric_ref": " 골반 회전 범위",
+          "flags": [
+            "R3",
+            "metric_ref",
+            "anchor_copy"
+          ]
+        },
+        {
+          "evidence": "회전 범위 21.5도로 골반 회전이 중간 정도였으나, 완전한 백스윙 임팩트까지 회전이 충분히 진행되지 않았다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "골반 회전 범위 9.1도로 골반 회전이 거의 없었습니다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "골반 회전 범위 21.5도로 중간 구간에 머물러 백스윙부터 임팩트까지 완전히 회전되지 않았습니다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "골반 회전 범위 21.5도로 중간 정도로 회전했으나, 약간 부족해 백스윙부터 임팩트까지 완전히 열리지는 않았다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['골반 회전 범위 9.1도 → 회전 범위가 너무 작아 백스윙부터 힘 전달이 불안정함', '골반 회전 범위 19.8도 → 중간 정도 회전은 되었으나 최대 범위 미달']",
+          "metric_ref": "골반 회전 범위: 21.5도",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['회전 범위 9.1도로 골반 회전이 거의 없었음', '회전 범위 19.8도로 중간 구간을 수행했으나 최대 각도에 비해 부족함']",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "R3",
+            "metric_ref",
+            "anchor_copy"
+          ]
+        },
+        {
+          "evidence": "회전 범위 9.1도로 골반 회전이 거의 없었다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "골반 회전 범위 21.5도로 중간 구간이지만 완전히 열린 상태는 아니다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "회전 범위 21.5도로 골반이 중간 정도로만 회전되어 백스윙에서 임팩트까지 상체 힘이 다리로 전달되는 데 방해 요소가 있었다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "hip_rotation|g0|s0",
+      "criterion_id": "hip_rotation",
+      "name": "골반 돌리기",
+      "grade": 0,
+      "segment": 0,
+      "value": 5.2,
+      "plain": "골반이 거의 열리지 않는다",
+      "plain_all": "골반이 거의 열리지 않는다",
+      "given_metrics": {
+        "hip_rotation_range_deg": 5.2
+      },
+      "candidates": [
+        {
+          "evidence": "회전 범위 5.2도로 골반 회전이 거의 없다",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "골반 회전 범위 5.2도로 백스윙에서 임팩트까지 골반 회전이 거의 없었다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "회전 범위 5.2도로 골반 회전이 거의 없었다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['골반 회전 범위 5.2도로 백스윙부터 임팩트까지 회전이 제한적으로 이루어져 상체 힘 전달이 원활하지 않다.', '작은 범위로 제한된 골반 회전은 다리의 충격력이 제대로 흡수되지 않고 일부 에너지 손실이 발생할 수 있다.']",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "회전 범위 5.2도로 골반 회전이 거의 없어 상체 힘 전달이 미흡했다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "회전 범위 5.2도로 골반 회전이 거의 없음",
+          "metric_ref": " 골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "\"골반 회전 범위 5.2도로 회전이 매우 제한적이며, 백스윙에서 즉시 힘 전달이 어려울 수 있다. 골반을 더 자연스럽게 열어 주면 앞발의 안정성을 높이고 충격 흡수 효율이 개선될 것이다.",
+          "metric_ref": " 골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "골반 회전 범위 5.2도 → \"회전 범위가 5.2도로 거의 열리지 않아 백스윙에서 임팩트까지 상체 힘 전달이 원활하지 않았음\"",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "회전 범위 5.2도로 골반 회전이 거의 없다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "hip_rotation|g0|s0",
+      "criterion_id": "hip_rotation",
+      "name": "골반 돌리기",
+      "grade": 0,
+      "segment": 0,
+      "value": 9.8,
+      "plain": "골반이 거의 열리지 않는다",
+      "plain_all": "골반이 거의 열리지 않는다",
+      "given_metrics": {
+        "hip_rotation_range_deg": 9.8
+      },
+      "candidates": [
+        {
+          "evidence": "회전 범위 9.8도로 골반 회전이 거의 없어 힘 전달이 부족했다",
+          "metric_ref": " 골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "회전 범위 9.8도로 골반이 거의 열리지 않아 백스윙부터 Impact까지 상체 힘이 제대로 전달되지 않았다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "회전 범위 9.8도로 골반 회전이 거의 없어 백스윙에서Impact까지 힘 전달 효율이 저하됨",
+          "metric_ref": " 골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "회전 범위 9.8도로 골반이 거의 열리지 않아 백스윙에서 힘 전달이 원활하지 않았다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "회전 범위 9.8도로 백스윙부터 임팩트까지 골반 회전이 미미해 상체 힘 전달 효율이 떨어집니다.",
+          "metric_ref": " 골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "골반 회전 범위 9.8도로 백스윙부터 임팩트 직전까지 회전이 거의 관측되지 않았다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "골반 회전 범위 9.8도로 회전이 거의 없어 백스윙에서 힘 전달이 부족했다",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "골반 회전 범위 9.8도로 회전 폭이 좁아백스윙부터 임팩트까지 힘의 전달이 원활하지 않았다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "골반 회전 범위 9.8도로 회전이 거의 없었다. 회전을 늘리면 백스윙 시 힘 전달이 더 명확해 질 것입니다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "골반 회전 범위 9.8도로 회전이 제한적이어서 백스윙에서 상체 힘 전달이 원활하지 않았다.",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "골반 회전 범위 9.8도로 백스윙에서 임팩트까지 회전이 거의 없었다",
+          "metric_ref": "골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "회전 범위 9.8도로 골반 회전이 거의 없었다",
+          "metric_ref": " 골반 회전 범위",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "follow_through|g2|s0",
+      "criterion_id": "follow_through",
+      "name": "차고 난 뒤 마무리",
+      "grade": 2,
+      "segment": 0,
+      "value": 82.5,
+      "plain": "찬 뒤 다리가 끝까지 따라 나간다",
+      "plain_all": "찬 뒤 다리가 끝까지 따라 나간다",
+      "given_metrics": {
+        "swing_hip_flexion_after_impact_deg": 82.5,
+        "follow_through_duration_frames": 9.0
+      },
+      "candidates": [
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 82.5도가 적절하게 진행되어 감속 없이 힘이 잘 전달되었다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 82.5도가 인상적이었다",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 82.5도가 잘된 주요 근거입니다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 82.5도가 완벽했다. 추가 굴곡을 통해 감속 없이 힘이 효과적으로 전달되었다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 82.5도가 그 핵심 근거가 되었다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 82.5도가 잘한 항목입니다. 팔로스루 지속 시간 9.0프레임도 추가로 연장되어 힘의 일관성을 더했어요.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 82.5도로 차는 다리가 끝까지 자연스럽게 뻗어나가 감속 없이 힘이 효율적으로 전달됩니다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 82.5도가 강하게 유지되어 감속 없이 힘이 직접 전달됨",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡이 82.5도로 추가 진행되어 감속 없이 공 속도를 유지했다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 82.5도가 추가 진행을 이끌어 감속 없이 힘 전달이 원활했습니다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 82.5도가 측정되어 감속 없이 공 속도가 계속 전달됨",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 82.5도가 공 속도 유지에 핵심 역할을 했다. 추가 굴곡이 발생해 감속 없이력이 계속 전달됨을 확인할 수 있었다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "follow_through|g2|s0",
+      "criterion_id": "follow_through",
+      "name": "차고 난 뒤 마무리",
+      "grade": 2,
+      "segment": 0,
+      "value": 127.5,
+      "plain": "찬 뒤 다리가 끝까지 따라 나간다",
+      "plain_all": "찬 뒤 다리가 끝까지 따라 나간다",
+      "given_metrics": {
+        "swing_hip_flexion_after_impact_deg": 127.5,
+        "follow_through_duration_frames": 9.0
+      },
+      "candidates": [
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 127.5도로 차는 다리가 끝까지 뻗어 나가 감속 없이 힘이 전달되었습니다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 127.5도로 차는 다리가 계속 뻗어 나가며 감속 없이 힘이 전달됐다. 추가 굴곡이 잘 유지되어 공 속도가 유지되었다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 127.5도로 차는 다리가 끝까지 따라 went without losing power.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 127.5도가 잘 executed되어 감속 없이 힘이 전달되었다. 팔로스루 지속 시간 9.0프레임도 자연스럽게 유지되어 추가 굴곡 없이 안정된 자세를 오래 유지할 수 있었다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 127.5도가 측정되어 감속 없이 힘이 완전히 전달되었습니다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 127.5도로 추가 진행이 매우 효과적이었다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 127.5도로 차는 다리가 완전히 이완되지 않고 추가로 진행되어 공 속도가 감속 없이 유지됨",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 127.5도로 차는 다리가 거의 전혀 펴지 않고 끝까지 뻗어나가며 감속 없이 힘이 전달됐다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 127.5도로 차는 다리가 충분히 뻗어 나가 감속 없이 공을 컨트롤할 수 있었다. 추가 굴곡이 잘 이루어져 순간 정지 후에도 속도 유지에 도움이 된다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 127.5도로 차는 다리가 끝까지 부드럽게 뻗어 나가 감속 없이 힘이 잘 전달됨",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 127.5도로 차는 다리가 끝까지 따라 stayed",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 127.5도로 차는 다리가 거의 완전히 펴져 있다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "follow_through|g1|s0",
+      "criterion_id": "follow_through",
+      "name": "차고 난 뒤 마무리",
+      "grade": 1,
+      "segment": 0,
+      "value": 20.2,
+      "plain": "찬 뒤 다리가 도중에 짧아진다",
+      "plain_all": "찬 뒤 다리가 도중에 짧아진다",
+      "given_metrics": {
+        "swing_hip_flexion_after_impact_deg": 20.2,
+        "follow_through_duration_frames": 5.0
+      },
+      "candidates": [
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 20.2도로 중간 구간에 불과하며 팔로스루 지속 시간 5.0프레임도 부족하다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 20.2도가 측정된 대로 중간 구간에 해당되어 추가 굴곡으로 감속 방지 효과가 부족했습니다. 팔로스루 지속 시간은 5.0프레임으로 적절히 유지되었습니다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 20.2도가 측정값으로 자세 상태를 반영합니다. 추가 굴곡이 부족해 감속 효과가 일부 약화되었습니다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡은 20.2도로 측정되었다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡이 20.2도로 중간 정도로 진행되었습니다. 추가 굴곡이 부족해 감속 시 공이 완전히 멈추지 않았습니다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡이 20.2도로 측정되어 중간 수준이었다. 추가 굴곡 8.3도로 임팩트 직후스윙 정지를 목표로 조정이 필요할 것이다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 20.2도가 측정값이다. 이 정도 굴곡만으로는 감속 없이 힘이 제대로 전달되지 않는다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 20.2도로 부분적으로 힘이 전달되나 정지 시 공 속도가 다소 죽습니다. 추가 굴곡이나 팔로스루 유연성 향상이 필요해 보입니다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡: 20.2도",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 20.2도로 차는 다리가 중간 정도로 짧아졌다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 20.2도로 차는 다리가 일정하지 않았고, 팔로스루 지속 시간이 중간 구간에 해당했다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 20.2도로 약간 부족했으며, 팔로스루 지속 시간 5.0프레임은 decent이지만 추가 굴곡을 유도해 감속 없이 힘 전달을 강화할 필요가 있다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡이 20.2도로 중간 범위나 부족한 편이다. 추가 굴곡 8.3도 더 진행되면 감속 없이 힘이 더 효과적으로 전달될 수 있을 것이다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "follow_through|g1|s0",
+      "criterion_id": "follow_through",
+      "name": "차고 난 뒤 마무리",
+      "grade": 1,
+      "segment": 0,
+      "value": 24.8,
+      "plain": "찬 뒤 다리가 도중에 짧아진다",
+      "plain_all": "찬 뒤 다리가 도중에 짧아진다",
+      "given_metrics": {
+        "swing_hip_flexion_after_impact_deg": 24.8,
+        "follow_through_duration_frames": 5.0
+      },
+      "candidates": [
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 24.8도가 측정값으로 자세 평가 근거로 사용됨",
+          "metric_ref": "고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 24.8도가 기준 미달에 해당하며, 추가 굴곡 없이 바로 팔로스루가 시작되어 감속이 발생했다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 24.8도로 차는 다리가 중간 구간에 stop되며, 팔로스루 지속 시간 5.0프레임 동안 충격 흡수에 미흡했다. 추가 굴곡 각도를 늘리거나 다리 유연성 훈련이 필요하다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡이 22.0도로 측정값 기준에 부합하지 않아 중간 구간에 머무른 것으로 판단됨",
+          "metric_ref": "주동 고관절 굴곡",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 24.8도로 차는 다리가 도중에 짧아졌다. 추가 굴곡이 부족해 감속 효과가 상대적으로 약해졌다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 24.8도로 유지가 되지 않아 감속이 일부 발생했습니다. 추가 굴곡이 부족해 힘 전달 효율이 낮아지는 것 같아 조금 더 flexibility를 보여줄 필요가 있습니다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 24.8도로 차는 다리가 중간 정도로만 뻗어 있어 감속 없이 힘이 전달되기 어렵다. 추가로 굴곡이 있으면 공 속도 유지에 도움이 될 것이다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 24.8도로 비교적 짧게 끝나 추가 굴곡이 부족했다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 24.8도로 차는 다리가 도중에 짧아졌습니다. 추가 굴곡이 부족해 공 속도가 제대로 감속되지 않았어요.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 24.8도가 그 근거입니다. 추가 굴곡 각도가 중간 정도로 판단됩니다.\n팔로스루 지속 시간 5.0프레임은 평균적인 수준이지만 더 길게 유지하면 감속 효과가 더 좋아질 것입니다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['임팩트 후 주동 고관절 굴곡 24.8도로 여전히 부분적인 변형이 관찰됨', ' arm extensor extension 지속 시간 5.0프레임은 보통 수준에 해당함']",
+          "metric_ref": "['임팩트 후 주동 고관절 굴곡']",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 24.8도로 차는 다리가 일정한 위치를 유지하지 못하고 중도에 짧아지는 모습이 관찰되었습니다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "follow_through|g0|s0",
+      "criterion_id": "follow_through",
+      "name": "차고 난 뒤 마무리",
+      "grade": 0,
+      "segment": 0,
+      "value": 5.2,
+      "plain": "찬 직후에 다리가 그대로 멈춘다",
+      "plain_all": "찬 직후에 다리가 그대로 멈춘다",
+      "given_metrics": {
+        "swing_hip_flexion_after_impact_deg": 5.2,
+        "follow_through_duration_frames": 2.0
+      },
+      "candidates": [
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 5.2도에서 차는 다리가 완전히 이완되어 즉시 멈추었습니다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "[ 아쉬움] 임팩트 후 주동 고관절 굴곡이 5.2도로 충분히 부족하여 차는 다리가 즉시 정지했습니다. 추가 굴곡이 있었다면 공 속도를 유지하는 데 도움이 됐을 거예요.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 5.2도로 차는 다리가 거의 정지되어 있다. 추가 굴곡이 없어 힘이 완전히 전달되지 않는다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 5.2도로 차는 다리가 완전히 펴져 있지 않아 감속 효과가 제한적이다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 5.2도가 추가 굴곡 부족을 반영한다. 팔로스루 지속 시간 2.0프레임도 감속 가능성을 보여준다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "[ PFA] 임팩트 후 주동 고관절 굴곡 5.2도가 주는 근거 문장",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 5.2도가 좋은 점이 있으나, 추가 굴곡이 없어 감속이 발생했습니다. 추가 굴곡을 통해 힘 전달 효율을 높이는 연습이 필요합니다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['임팩트 직후 주동 고관절 굴곡 각도가 5.2도로 비교적 낮아 정지가 빠르게 발생했다.', '팔로스루 지속 시간 2.0프레임으로 충분하지만 충격 흡수가 미흡해 공 속도가 갑자기 멈추는 느낌이린다.']",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡: 5.2도, 팔로스루 지속 시간: 2.0프레임",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡이 5.2도로 충분히 완전하지 않아 공 속도가 멈추는 현상이 발생했습니다. 추가 굴곡 8.3도로 임팩트 직후 즉시 팔로우스루가 완료되면 감속 효과가 크게 개선될 수 있습니다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 5.2도가 공 속도 감속을 충분히 막지 못해 추가 굴곡과 팔로스루 유지에 집중할 여유가 부족하게 나타났습니다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "[아쉬움] 임팩트 후 주동 고관절 굴곡 5.2도가 짧아 공 속도 감속이 발생했습니다. 추가 굴곡으로 다리가 더 크게 뻗어 감속도 개선되어야 합니다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 5.2도로 아직 충분한 감속력 조절이 미흡하다. 추가 굴곡이 부족해 공이 그대로 계속 이동하는 경향을 보인다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "follow_through|g0|s0",
+      "criterion_id": "follow_through",
+      "name": "차고 난 뒤 마무리",
+      "grade": 0,
+      "segment": 0,
+      "value": 9.8,
+      "plain": "찬 직후에 다리가 그대로 멈춘다",
+      "plain_all": "찬 직후에 다리가 그대로 멈춘다",
+      "given_metrics": {
+        "swing_hip_flexion_after_impact_deg": 9.8,
+        "follow_through_duration_frames": 2.0
+      },
+      "candidates": [
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 9.8도가 짧게 유지되어 공 속도가 즉각 정지됨",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "['추가 굴곡 9.8도로 임팩트 직후 스윙이 즉각 중단되어 공이 급격히 감속됩니다.', '팔로스루 지속 시간이 2프레임으로 짧아 힘의 전달 효율이 떨어집니다.']",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡: 9.8도",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "[아쉬움] 임팩트 후 주동 고관절 굴곡 9.8도로 지속되지 않아 공 속도가 급정거되는 모습이 확인됩니다. 추가 굴곡 9.8도로 조절하면 관성력 증가로 감속 효과가 개선될 것입니다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 9.8도로차는 다리가 충분히 펴지지 않아 공이 감속됩니다. 추가 굴곡이 필요합니다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 9.8도로 즉시 정지되어 공 속도 조절에 부족함",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "[액션] 임팩트 후 주동 고관절 굴곡 9.8도로 차는 다리가 급정지 형태를 보인다.\n[ undesirable] 추가 굴곡 없이 즉각 정지해 공 속도가 잃어지기 쉽다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 9.8도로 차는 다리가 거의 완전히 펴져 있음.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 9.8도로 다리가 완전히 펴져 있지 않아 감속 효과가 나타난다. 추가 굴곡 8.3도로 임팩트 직후 정지하면 quicker 감속 가능",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "R3",
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "[아쉬움] 임팩트 후 주동 고관절 굴곡 9.8도로 차는 다리가 제대로 확장되지 않아 감속이 발생했다. 추가 굴곡이 필요하다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 9.8도로 정지 상태 유지",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "[ 아쉬움] 임팩트 후 주동 고관절 굴곡 9.8도로 차는 다리가 충분히 원위치되지 않아 공 속도가 즉시 감소했습니다. 추가 굴곡을 유도하면 감속 효율을 높일 수 있습니다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "임팩트 후 주동 고관절 굴곡 9.8도로 차는 다리가 완전히 펴지지 않고 짧게 멈추어 공 속도가 지연됩니다.",
+          "metric_ref": "임팩트 후 주동 고관절 굴곡",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "plant_foot_position|g2|s0",
+      "criterion_id": "plant_foot_position",
+      "name": "디딤발 위치",
+      "grade": 2,
+      "segment": 0,
+      "value": 0.2,
+      "plain": "디딤발을 공 옆에 붙여 딛는다",
+      "plain_all": "디딤발을 공 옆에 붙여 딛는다",
+      "given_metrics": {
+        "plant_foot_to_ball_offset": 0.2
+      },
+      "candidates": [
+        {
+          "evidence": "디딤발이 공과 수평 거리 0.2배로 정확히 나란하게 stood. 몸의 축이 공 위에 자연스럽게 위치했다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공 옆에 수평으로 약 0.2배 떨어져 완벽한 위치를 유지하고 있다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발과 공이 어깨너비 0.2배 떨어져 정확히 나란하게 positioned하다",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공 옆에 붙여 딛는 자세가 적절하게 유지되었습니다.\n- 수평 거리 0.2로 측정값에 부합하며, 공과의 안정적인 연결이 확인됩니다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발-공 수평 거리 0.2 → \"디딤발이 공과 약 0.2배 떨어져 적절히 나란하다\"",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공과 수평 거리 0.2배로 어깨너비와 함께 정확히 나란하게 서 있다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발과 공 사이 수평 거리 0.2가 정확히 측정되어 공과 나란한 자세를 유지했습니다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공 옆에 붙여 딛는 자세를 유지했다.",
+          "metric_ref": "디딤발-공 수평 거리: 0.2",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공 옆에 정확히 붙어 딛는 자세를 유지했다.",
+          "metric_ref": "디딤발-공 수평 거리: 0.2",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공과 수평으로 어깨너비 0.2배 떨어져 나란하다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공과 수평 거리 0.2로 정확히 연결되어 몸의 축이 공 위로 안정적으로 위치합니다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공과 수평으로 어깨너비 0.2배 떨어져 나란하다",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "plant_foot_position|g2|s0",
+      "criterion_id": "plant_foot_position",
+      "name": "디딤발 위치",
+      "grade": 2,
+      "segment": 0,
+      "value": 0.3,
+      "plain": "디딤발을 공 옆에 붙여 딛는다",
+      "plain_all": "디딤발을 공 옆에 붙여 딛는다",
+      "given_metrics": {
+        "plant_foot_to_ball_offset": 0.3
+      },
+      "candidates": [
+        {
+          "evidence": "디딤발이 공 옆에 정확히 붙여 딛는다",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공과 수평으로 어깨너비 0.3배 떨어져 나란하다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공과 수평 거리 0.3의 간격으로 나란하게 positioning을 잘 맞추었다",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공과 수평으로 어깨너비 0.3배 떨어져 나란하다",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공과 수평 거리 0.3배로 완벽하게 매칭되어 몸의 축이 공 위에 stably 선 자세를 유지하고 있다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공 옆에 거의 붙여 딛는 자세가 확인되었다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공과 수평 거리 0.3배로 정확히 나란하게 positioning을 잘 맞추었다",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공 옆에 수평으로 어깨너비 0.3배 떨어져 나란하게 착지하였다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발과 공이 수평으로 어깨너비 0.3배 떨어져 잘 정렬되었다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발과 공이 어깨너비 0.29배 떨어져 정확히 나란하게 차는 자세가 유지되었다.",
+          "metric_ref": "디딤발-공 수평 거리: 0.3",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공 옆에 붙여 딛는 자세를 잘 유지했다",
+          "metric_ref": "디딤발-공 수평 거리: 0.3",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "plant_foot_position|g1|s0",
+      "criterion_id": "plant_foot_position",
+      "name": "디딤발 위치",
+      "grade": 1,
+      "segment": 0,
+      "value": 0.6,
+      "plain": "디딤발이 공에서 조금 멀어진다",
+      "plain_all": "디딤발이 공에서 조금 멀어진다",
+      "given_metrics": {
+        "plant_foot_to_ball_offset": 0.6
+      },
+      "candidates": [
+        {
+          "evidence": "디딤발이 공과 수평 거리 0.6배로 slightly 뒤로 벗어나 있다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공과 수평 거리 0.6배로 다소 떨어져 있다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공과 수평으로 어깨너비 0.6배 떨어져 나란하다는 점은 적절하나, 약간 더 가깝게 adjusting되면 공중에 더 잘 위치할 수 있습니다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공과 수평 거리 0.6배로 약간 떨어져 있다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발-공 수평 거리 0.6 → '디딤발이 공의 어깨너비와 비슷하게 떨어져 있으나 다소 거리를 두고 위치해 있다'",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공과 수평 거리 0.6배로 다소 벗어났다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공에서 수평 거리 0.6배로 다소 떨어져 있다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발-공 수평 거리 0.6배로 판정되었으며, 이는 공의 중심보다 다소 뒤에 위치함을 나타냅니다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발과 공 사이 수평 간격이 약간 넓어 공 위에 완전히 정렬되지는 않았습니다.",
+          "metric_ref": "디딤발-공 수평 거리: 0.6",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발-공 수평 거리 0.6배로 수평 간격이 적절히 유지되었다",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발-공 수평 거리 0.6가 측정값으로 자세 평가의 기본 기준을 충족하였다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발과 공 사이 수평 간격이 0.6배로 다소 멀어져 몸의 축이 공 위에서 벗어나 있다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "plant_foot_position|g1|s0",
+      "criterion_id": "plant_foot_position",
+      "name": "디딤발 위치",
+      "grade": 1,
+      "segment": 0,
+      "value": 0.8,
+      "plain": "디딤발이 공에서 조금 멀어진다",
+      "plain_all": "디딤발이 공에서 조금 멀어진다",
+      "given_metrics": {
+        "plant_foot_to_ball_offset": 0.8
+      },
+      "candidates": [
+        {
+          "evidence": "디딤발과 공 사이 수평 간격이 0.8배로 판정되었습니다. 이는 공을 완전히 맞추지 못해 약간의 공간이 남아 있음을 나타냅니다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발-공 수평 거리 0.8 → '수평 간격이 0.29배와는 다소 멀어져 몸의 축이 공보다 앞으로 치우쳐 있다.', 이 정도라면 발 위치는 fairly 괜찮으나 최적화 여지가 있어 보입니다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공과 수평 거리 0.8배 떨어져 약간 벗어나 있다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "수평 간격 0.8배로 공에서 다소 벗어났다",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발-공 수평 거리 0.8배로 공과 다소 벗어났다",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발-공 수평 거리 0.8 → '디딤발이 공과 수평으로 어깨너비 0.8배 떨어져 나란하다'",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발과 공의 수평 거리가 0.8배로 너무 멀어 몸의 축이 공 위로 다소 벗어있다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공과 수평 거리 0.8배로 보통 수준 떨어져 있다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공과 수평 거리 0.8배로 약간 떨어져 있다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공과 수평 거리 0.8배로 다소 벗어났다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공에서 약간 멀어져 몸의 축이 공 위에 완전히 정렬되지 않았다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발과 공 간 수평 간격이 0.8배로 보통 수준이며, 적절한 조정이 필요하다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "plant_foot_position|g0|s0",
+      "criterion_id": "plant_foot_position",
+      "name": "디딤발 위치",
+      "grade": 0,
+      "segment": 0,
+      "value": 5.7,
+      "plain": "디딤발이 공에서 멀리 떨어져 딛는다",
+      "plain_all": "디딤발이 공에서 멀리 떨어져 딛는다",
+      "given_metrics": {
+        "plant_foot_to_ball_offset": 5.7
+      },
+      "candidates": [
+        {
+          "evidence": "디디발-공 수평 거리 5.7배로 디딤발이 공에서 크게 떨어졌다",
+          "metric_ref": "디디발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발-공 수평 거리 5.7로 공에서 크게 떨어져 나란하지 않다",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "\"디딤발이 공에서 수직 거리 5.7cm만큼 충분히 떨어져 나란하지 않아몸의 안정성이 lacked다. 수평 간격이 크면 공 컨트롤에 어려움을 겪을 수 있다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공에서 크게 떨어져 수평 간격이 5.7배로 유지되어 몸의 축이 공 위에 선 위치가 부자연스럽게 되었습니다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발-공 수평 거리 5.7가 그 근거입니다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발-공 수평 거리 5.7가 그 근거이다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발-공 수평 거리 5.7가 그 근거이며, 이는 자세가 공 위로 멀리 떨어져 있어 몸의 균형이 불안정했음을 나타냄",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공에서 멀리 떨어져 ||(측정값: 5.7)||",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "\"디딤발-공 수평 거리 5.7로 디딤발이 공에서 크게 벗어났다\"",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발-공 수평 거리 5.7가 그 근거이며, 이는디딤발이 공과 sufficiently 이격되어 몸의 축을 유지하기 어렵게 만든다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    },
+    {
+      "slot_id": "plant_foot_position|g0|s0",
+      "criterion_id": "plant_foot_position",
+      "name": "디딤발 위치",
+      "grade": 0,
+      "segment": 0,
+      "value": 8.1,
+      "plain": "디딤발이 공에서 멀리 떨어져 딛는다",
+      "plain_all": "디딤발이 공에서 멀리 떨어져 딛는다",
+      "given_metrics": {
+        "plant_foot_to_ball_offset": 8.1
+      },
+      "candidates": [
+        {
+          "evidence": "디딤발-공 수평 거리 8.1로 확인됨.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공에서 크게 떨어졌다",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공에서 수평 거리 8.1cm만큼 떨어져 있어 몸의 축이 공 위에 제대로 정렬되지 않았다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발-공 수평 거리 8.1가 그 근거입니다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공에서 수평 간격 8.1배 떨어져 있어 몸의 균형이 불안정했습니다.",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공에서 멀리 떨어져 딛는 자세가 유지되고 있다.",
+          "metric_ref": "디딤발-공 수평 거리: 8.1",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발-공 수평 거리 8.1로 공에서 멀리 떨어져 딛는 자세가 관찰되었다",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        },
+        {
+          "evidence": "디딤발이 공에서 수평 거리 8.1cm로 너무 넓게 떨어졌다",
+          "metric_ref": "디딤발-공 수평 거리",
+          "flags": [
+            "metric_ref"
+          ]
+        }
+      ]
+    }
+  ]
+}

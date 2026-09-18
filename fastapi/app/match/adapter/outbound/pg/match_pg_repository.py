@@ -16,7 +16,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from sqlalchemy import column, delete, func, insert, or_, select, table, update
+from sqlalchemy import and_, column, delete, func, insert, or_, select, table, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -40,7 +40,12 @@ from app.match.domain.entities.match_entity import (
     TeamMatchRequestEntity,
 )
 from app.match.domain.rules.application_rules import SIDE_TEAM, SIDE_USER
-from app.match.domain.rules.team_match_request_rules import CANCELLED, ACCEPTED, REJECTED
+from app.match.domain.rules.team_match_request_rules import (
+    ACCEPTED,
+    CANCELLED,
+    PENDING,
+    REJECTED,
+)
 
 # 소유하지 않는 테이블에서 **읽기만** 한다. 위 docstring 참조.
 _team = table(
@@ -628,6 +633,36 @@ class MatchPgRepository(MatchPort):
         )
         self._session.commit()
         return self._to_team_match_request(row)
+
+    def has_live_team_match_request(
+        self, team_id: UUID, other_team_id: UUID, now: datetime
+    ) -> bool:
+        """까닭은 `MatchPort.has_live_team_match_request` 머리말."""
+        stmt = select(TeamMatchRequestOrm.id).where(
+            or_(
+                and_(
+                    TeamMatchRequestOrm.requester_team_id == team_id,
+                    TeamMatchRequestOrm.target_team_id == other_team_id,
+                ),
+                and_(
+                    TeamMatchRequestOrm.requester_team_id == other_team_id,
+                    TeamMatchRequestOrm.target_team_id == team_id,
+                ),
+            ),
+            or_(
+                TeamMatchRequestOrm.status == PENDING,
+                # 🔴 수락된 것은 **경기가 아직 있고 안 지난 것만** 센다.
+                #    지난 경기까지 세면 그 상대와 다시는 못 잡고, `match_id` 를
+                #    안 보면 **물린 경기가 영원히 막는다**(취소는 `match` 행을
+                #    지우고 FK 가 `match_id` 만 비운다 — `status` 는 그대로다).
+                and_(
+                    TeamMatchRequestOrm.status == ACCEPTED,
+                    TeamMatchRequestOrm.match_id.is_not(None),
+                    TeamMatchRequestOrm.proposed_played_at >= now,
+                ),
+            ),
+        )
+        return self._session.execute(stmt).first() is not None
 
     def find_team_match_request(
         self, request_id: UUID
