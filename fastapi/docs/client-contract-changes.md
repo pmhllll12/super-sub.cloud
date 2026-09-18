@@ -2656,3 +2656,46 @@ grep -n "isReady\|보낸 초대의 답을 기다린다" www/src/components/Squad
 - 확인: 백엔드 `tests/user/adapter/test_team_invitation_db.py` 의 `TestAcceptSeatsOnSquad`(5건, 고치기 전 2건 실패 확인) ·
   전체 pytest 1084 passed / 웹 `SquadPanel.test.tsx` 새 시험 2건(고치기 전 실패 확인) · 전체 vitest 889 passed · tsc 통과
 
+## 61. **새 스쿼드가 판 크기를 갖고 시작합니다** — 팀 매칭이 아무에게도 안 잡히던 원인 (2026-09-18 추가)
+
+`POST /teams/{team_id}/squad` 의 응답에서 `formation` 이 **더는 `null` 이 아닙니다.**
+`"5:5"` 가 들어 있습니다.
+
+**왜 바뀌었나.** 화면은 `formation` 이 없어도 기본 판(5:5)을 **켜진 것처럼**
+그립니다. 그래서 아무도 크기 단추를 누르지 않았고, 저장은 「바꿀 때만」
+일어나므로 실제 DB 는 거의 전부 `null` 이었습니다. 「맞는 상대」의 첫 하드
+필터가 `formation` **동등 비교**라, 운영 7팀 중 6팀이 `null` 이어서
+**어느 팀에게도 상대가 안 잡혔습니다.** 사용자가 실서버에서 그것을 보고
+물어서 찾았습니다.
+
+값을 지어내는 것이 아니라 **화면이 내내 보여 주던 값을 저장만 합니다.**
+
+### 만족해야 할 성질
+
+- 🔴 **`formation` 을 「모르는 값」으로 받는 처리를 걷지 마십시오.**
+  2026-09-18 **이전에 만들어진 스쿼드는 여전히 `null`** 이고, 서버는 값 집합을
+  검사하지 않아 화면이 아직 모르는 크기(`"11:11"` 등)가 올 수도 있습니다.
+  지금처럼 「모르면 기본 판으로 연다」가 맞습니다
+- 크기 단추가 `PATCH /teams/{id}/squad` 를 부르는 것은 **그대로입니다** — 바꾼
+  것은 「처음 값이 무엇인가」뿐입니다
+
+### 먼저 확인
+
+```bash
+grep -n 'formationToSize' www/src/components/SquadPanel.tsx   # 있으면 이미 만족합니다
+```
+
+이미 `formationToSize(squad?.formation ?? null)` 로 **모르는 값이면 기본 판**을
+쓰고 있어서, **화면 쪽은 고칠 것이 없습니다.** 이 항목은 「응답이 바뀐다」는
+알림이고 반영할 작업이 아닙니다.
+
+### 하지 말 것
+
+- 🔴 **옛 스쿼드를 「고장」으로 다루지 마십시오** — `null` 은 정상입니다
+- 🔴 **화면에서 `formation` 을 대신 저장하지 마십시오**(판을 열 때 PATCH 를
+  쏘는 식) — 주장이 아니면 403 이고, 판은 누구나 열어 봅니다
+
+- 확인: 백엔드 `tests/match/adapter/test_match_preference_db.py` 의
+  `TestMatchCandidates::test_크기_단추를_한_번도_안_눌러도_서로_후보가_된다`
+  (고치기 전 빨강 확인) · 전체 pytest / 웹 전체 vitest 939 passed · tsc 통과
+
