@@ -358,7 +358,44 @@ export interface Backend {
    * 🔴 **마지막 주장은 못 나간다**(`409 LAST_OWNER`) — 소유권 이양 경로가
    * 아직 없다. 화면에서 미리 막지 말고 그 코드를 받아 안내한다.
    */
+  /**
+   * **카드 사진을 올릴 자리**를 얻는다 — 계약 3-5절
+   * `POST /me/card/photo-upload-url`, **두 단계 중 첫 단계**다.
+   *
+   * 🔴 **바이트가 우리 서버를 지나지 않는다**(PER-002). 받은 `upload_url` 로
+   * 브라우저가 S3 에 직접 PUT 하고, 그다음 `PATCH /me/card` 의
+   * `style.photo_key` 에 `storage_key` 를 실어야 **그때** 카드에 붙는다.
+   * 올리기만 하고 안 보내면 아무 일도 안 난다.
+   *
+   * 🔴 **PUT 할 때 `Content-Type` 을 요청한 값 그대로** 보내야 한다 — 서명에
+   * 들어가서 다르면 S3 가 403 이다.
+   *
+   * ⚠️ `422 UNSUPPORTED_PHOTO_TYPE`(이미지 셋만) · `404 CARD_NOT_FOUND`
+   * (카드가 먼저 있어야 한다) · `503 STORAGE_NOT_CONFIGURED`.
+   */
+  createCardPhotoUploadUrl(
+    token: string,
+    contentType: string,
+  ): Promise<{ upload_url: string; storage_key: string; expires_in: number }>
+
   leaveTeam(token: string, teamId: string, memberId: string): Promise<void>
+
+  /**
+   * **팀을 해체한다** — 계약 3-3절 `DELETE /teams/{team_id}`, **주장만**, `204`.
+   *
+   * 🔴 **행을 지우지 않는다.** `team.disbanded_at` 을 찍고 남은 구성원을 전부
+   * 내보내며(그래서 `GET /me` 의 `teams` 에서 사라진다) 대기 중이던 초대·경기
+   * 신청을 `cancelled` 로 닫는다. **지난 경기·평가·스쿼드는 그대로 남는다** —
+   * 그것들이 이 팀 이름을 가리키기 때문이다.
+   *
+   * 🔴 **마지막 주장이 팀을 버리는 유일한 길이다**(미결 `paik` 35번). 나가기는
+   * `409 LAST_OWNER` 로 막히므로, 화면은 그 코드를 받았을 때 이 길을 낸다.
+   *
+   * 🔴 **앞으로 있을 경기가 있으면 막힌다**(`409 TEAM_HAS_UPCOMING_MATCH`) —
+   * 상대에게는 약속이라 먼저 정리해야 한다(지난 경기는 안 센다). 화면에서
+   * 미리 가리지 말고 그 코드를 받아 그대로 안내한다.
+   */
+  disbandTeam(token: string, teamId: string): Promise<void>
 
   /**
    * 확정 경기를 **무른다** — 계약 3-4절 `DELETE /matches/{match_id}`, `204`.

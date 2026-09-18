@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { PREFS_KEY, type MatchPrefs } from '@/lib/matchPrefs'
 import { __resetRegionsCache } from '@/lib/teamPrefsStore'
@@ -280,5 +280,120 @@ describe('비슷한 팀 명단', () => {
     await screen.findByText('망원 유나이티드')
     expect(screen.queryByText(/명단은 아직 예시입니다/)).toBeNull()
     expect(screen.getByText(/수락해야 경기가 잡힙니다/)).toBeInTheDocument()
+  })
+
+  /**
+   * **시각을 직접 고른다** (사용자 요청, 2026-09-18 — 시연 촬영).
+   *
+   * 🔴 **제안만으로는 오늘 경기를 못 잡는다.** 제안은 조건(요일+시간대)에서
+   * 「다음에 오는 그 요일」로 만들어져서, 조건이 토요일뿐이면 **다음 토요일**
+   * 이다. 시연에서는 **1분 뒤**로 잡아야 대기 화면 → 경기 끝내기 → 리뷰까지
+   * 한자리에서 보여 줄 수 있다.
+   *
+   * 🔴 **제안을 없애지 않는다** — 평소에는 그쪽이 맞다(「지어내지 않는다」).
+   * 직접 고르기는 그 옆에 붙는 길이다.
+   */
+  it('시각을 직접 고를 수 있다', async () => {
+    const user = userEvent.setup()
+    open()
+    await screen.findByText('망원 유나이티드')
+    await user.click(screen.getAllByRole('button', { name: '경기 신청' })[0])
+
+    expect(screen.getByLabelText('직접 고르기')).toBeInTheDocument()
+  })
+
+  it('직접 고른 시각이 신청에 실린다', async () => {
+    const user = userEvent.setup()
+    open()
+    await screen.findByText('망원 유나이티드')
+    await user.click(screen.getAllByRole('button', { name: '경기 신청' })[0])
+
+    fireEvent.change(screen.getByLabelText('직접 고르기'), {
+      target: { value: '2027-03-04T19:30' },
+    })
+    await user.selectOptions(
+      screen.getByText('어디서').closest('label')!.querySelector('select')!,
+      screen.getByText('어디서').closest('label')!.querySelectorAll('option')[1].value,
+    )
+    await user.click(screen.getByRole('button', { name: '이 시각으로 신청' }))
+
+    await waitFor(() => {
+      const req = calls.find((c) => c.url.includes('/match-requests'))
+      expect(req).toBeTruthy()
+      expect(JSON.parse(req!.body!).played_at).toContain('2027-03-04T19:30')
+    })
+  })
+
+  /* 🔴 **지난 시각은 막는다** — 서버가 받아 줘도 아무도 못 뛴다
+     (`matchProposal.ts` 의 「지난 시각으로 신청하면」 주석과 같은 판단). */
+  it('지난 시각으로는 신청이 안 눌린다', async () => {
+    const user = userEvent.setup()
+    open()
+    await screen.findByText('망원 유나이티드')
+    await user.click(screen.getAllByRole('button', { name: '경기 신청' })[0])
+
+    fireEvent.change(screen.getByLabelText('직접 고르기'), {
+      target: { value: '2020-01-01T09:00' },
+    })
+    expect(screen.getByRole('button', { name: '이 시각으로 신청' })).toBeDisabled()
+  })
+
+  /**
+   * 🔴 **시간 조건이 비어도 신청은 할 수 있어야 한다** (2026-09-18).
+   *
+   * 시간을 비우는 것은 **정상적인 길**이다 — 그래야 AI 추천 후보 필터가
+   * 풀린다(프로필의 「시간 조건 지우기」). 그런데 전에는 여기서 제안이
+   * 0개라고 판이 통째로 닫혀서, **필터를 푼 팀은 경기를 못 거는** 앞뒤가
+   * 안 맞는 상태가 됐다.
+   */
+  it('조건에 시간이 없어도 직접 골라 신청할 수 있다', async () => {
+    __resetRegionsCache()
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => {
+      const u = String(input)
+      if (u.endsWith('/api/regions')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify([
+              { id: 'rg-001', city: '서울', district: '강남구', label: '서울 강남구' },
+            ]),
+            { status: 200 },
+          ),
+        )
+      }
+      if (u.includes('/match-candidates')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify([
+              {
+                team_id: 'mt-a',
+                team_name: '망원 유나이티드',
+                region_label: '서울 마포구',
+                formation: '5:5',
+                reasons: [],
+              },
+            ]),
+            { status: 200 },
+          ),
+        )
+      }
+      if (u.includes('/match-preferences')) {
+        // 🔴 지역만 있고 **시간은 비어 있다** — 「시간 조건 지우기」를 쓴 뒤다.
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ team_id: MY_TEAM, region_ids: ['rg-001'], slots: [] }),
+            { status: 200 },
+          ),
+        )
+      }
+      return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }))
+    })
+
+    const user = userEvent.setup()
+    open()
+    await screen.findByText('망원 유나이티드')
+    await user.click(screen.getAllByRole('button', { name: '경기 신청' })[0])
+
+    // 판이 닫히지 않는다 — 직접 고르는 칸이 있다.
+    expect(screen.getByLabelText('직접 고르기')).toBeInTheDocument()
   })
 })

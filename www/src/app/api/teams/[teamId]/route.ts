@@ -60,3 +60,29 @@ export async function PATCH(
     return NextResponse.json(team)
   })
 }
+
+/**
+ * 팀을 **해체한다** — 계약 3-3절 `DELETE /teams/{team_id}`, **주장만**, `204`.
+ *
+ * 🔴 **왜 이게 필요한가**(미결 `paik` 35번, 사용자 지적 2026-09-18): 나가기는
+ * 마지막 주장에게 `409 LAST_OWNER` 로 막힌다. 그래서 **혼자 만든 팀을 버릴
+ * 방법이 아예 없었다** — 계약은 2026-09-17에 길을 냈는데 이 자리가 비어 있었다.
+ *
+ * 🔴 **행을 지우지 않는다.** 서버가 `disbanded_at` 을 찍고 구성원을 내보내며
+ * 대기 중이던 초대·신청을 닫는다. 지난 경기·평가·스쿼드는 그대로 남는다.
+ *
+ * 🔴 **여기서 막지 않는다.** 주장인지, 앞으로 있을 경기가 있는지는 **서버만**
+ * 안다 — `403 FORBIDDEN` · `409 TEAM_HAS_UPCOMING_MATCH` 를 그대로 흘려보내
+ * 화면이 그 문구를 보여 준다(마지막 주장 나가기와 같은 원칙).
+ */
+export async function DELETE(
+  req: NextRequest,
+  ctx: { params: Promise<{ teamId: string }> },
+) {
+  const { teamId } = await ctx.params
+  return withAuth(req, async (token) => {
+    await getBackend().disbandTeam(token, teamId)
+    // 계약이 `204` 다 — 본문이 없다.
+    return new NextResponse(null, { status: 204 })
+  })
+}

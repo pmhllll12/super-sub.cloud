@@ -117,6 +117,7 @@ grep -n '담당.*<내 이름>' jekyll/pages/pending.markdown
 Jekyll 소스 루트는 **저장소 루트 자체**입니다 (`_config.yml`이 여기 있음). 사이트 인프라와 콘텐츠를 아래처럼 분리합니다.
 
 - **루트**: `_config.yml`, `Gemfile`, `Gemfile.lock`, `404.html`, `_layouts/`, `assets/main.scss`, `.github/workflows/pages.yml`, `supersub-preview.service`
+- **`tools/`**: 사이트 페이지·그림을 **만들어 내는** 스크립트 (`exclude:`에 등록되어 발행되지 않음). 🔴 **`jekyll/progress/`의 세 페이지, `06-시스템설계`의 1절, `assets/erd/`의 ERD 9장은 손으로 쓴 것이 아니라 여기서 나옵니다** — 그 그림·수치를 페이지에서 직접 고치면 다음 실행 때 조용히 덮입니다. 고치는 법·함정은 `tools/README.md` (2026-09-18 신설)
 - **`guide/`**: 개발환경 셋업 가이드 (7단계, 기존 자료 — 목차에는 연결되어 있지 않음)
 - **`demo/`**: 완전히 별개의 연습용 Jekyll 사이트(영상자료 디지털화 사업 RFP 템플릿). 자체 `_config.yml`/`Gemfile`/레이아웃을 가진 독립 사이트라 루트 `_config.yml`의 `exclude:`에 등록되어 이 사이트 빌드에 포함되지 않습니다. **이 프로젝트 작업 중에는 건드리지 않습니다.**
 - **`jekyll/`**: 계속 늘어나는 이 프로젝트의 콘텐츠 `.md` 파일 전용 폴더 (depth-2: `jekyll/<분류>/<파일>`)

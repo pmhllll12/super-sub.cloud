@@ -1551,6 +1551,12 @@ body::-webkit-scrollbar {
   object-fit: cover;
   object-position: top center;
   filter: grayscale(1) contrast(1.06);
+  /* 🔴 **카드를 끌면 사진이 따라 나오던 것**(사용자 지적, 2026-09-18).
+     브라우저는 `<img>` 를 집으면 반투명 유령 그림을 만들어 따라다니게 한다.
+     `PlayerCardView` 의 `draggable={false}` 가 본 막음이고, 이 줄은 **그
+     속성을 빠뜨린 `<img>` 가 새로 생겨도** 같은 일이 안 나게 하는 그물이다
+     (`-webkit-` 만 있는 비표준 속성이라 크롬·사파리에서 듣는다). */
+  -webkit-user-drag: none;
 }
 
 /* 작게 줄인 카드 — 홈 헤더에서 닉네임 자리를 대신한다. 폭만 줄이면 안쪽
@@ -2146,8 +2152,14 @@ body::-webkit-scrollbar {
   filter: drop-shadow(0 12px 22px rgb(0 0 0 / 45%));
 }
 
-/* 🔴 카드를 끌 때 브라우저가 그림·글자를 대신 끌어가지 않게 한다. 터치에서는
-   `touch-action` 이 없으면 화면이 같이 굴러간다. */
+/* 🔴 카드를 끌 때 브라우저가 **글자**를 대신 끌어가지 않게 한다. 터치에서는
+   `touch-action` 이 없으면 화면이 같이 굴러간다.
+
+   🔴 **정정 (2026-09-18)**: 이 주석은 「그림·글자」라고 적혀 있었지만
+   `user-select` 가 막는 것은 **글자 선택뿐**이다. `<img>` 의 네이티브
+   드래그(반투명 유령 그림)는 안 막혀서, 카드를 끌면 사람 사진이 따라
+   나왔다(사용자가 화면으로 잡았다). 그림 쪽은 `draggable={false}`
+   (`PlayerCardView`)와 아래 `.ss-pcard-figure img` 의 `user-drag` 가 막는다. */
 .ss-squad-seat {
   touch-action: none;
   -webkit-user-select: none;
@@ -2657,9 +2669,20 @@ body::-webkit-scrollbar {
 
 /* 🔴 **탈퇴는 판의 오른쪽 아래**(사용자 요청, 2026-09-16). 자주 쓰는 설정이
    위, 되돌릴 수 없는 것이 아래 구석이다. */
+/* 🔴 **둘이 나란히 선다** — 로그아웃 · 회원 탈퇴(2026-09-18). `gap` 이 없으면
+   두 알약이 맞붙어 **한 덩어리처럼** 보이고, 그러면 탈퇴를 누르려다 로그아웃을
+   누른다(반대도 마찬가지다). 좁은 화면에서는 줄을 바꾼다 — 안 그러면 오른쪽
+   정렬이라 왼쪽 것(로그아웃)이 판 밖으로 밀린다.
+
+   🔴 **값을 두 번 만져서 여기 왔다**(사용자 지적, 2026-09-18). 붙어 있다고
+   해서 벌렸더니(18px) 이번엔 **왼쪽 것이 너무 멀리 나갔다** — 오른쪽 정렬이라
+   간격을 키우면 탈퇴는 제자리이고 **로그아웃만 왼쪽으로 밀린다.** 「살짝만」이
+   12px 이다. 아래 시험이 이 범위를 붙든다. */
 .ss-profile-account-foot {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
+  gap: 12px;
   margin-top: 18px;
 }
 
@@ -2692,6 +2715,36 @@ body::-webkit-scrollbar {
 .ss-profile-team-leave:disabled {
   cursor: default;
   opacity: 0.5;
+}
+
+/* 🔴 **단추 둘만 따로 묶는 상자**(사용자 지적, 2026-09-18). 줄의 `gap`(14px)은
+   **팀 이름과 단추** 사이를 띄우는 값이라 그걸 줄이면 단추가 이름에 붙는다.
+   단추끼리만 좁히려고 상자를 하나 더 두었다.
+
+   ⚠️ **`gap` 을 빠뜨리면 0 이 되어 두 알약이 맞붙는다** — 상자만 넣고 이
+   규칙을 늦게 써서 실제로 한 번 그랬다(2026-09-18, 사용자가 화면으로 잡았다).
+   14px(줄 간격) 보다 좁고 0 보다는 넉넉한 값이 「살짝 붙인」 것이다. */
+.ss-profile-team-acts {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+/* 🔴 **「수정」은 완전 흰색**이다(사용자 요청, 2026-09-18). 빨강은 **되돌릴 수
+   없는 손짓의 색**인데(`--ss-danger` 주석) 수정은 접었다 폈다 하는 일이라,
+   나가기와 같은 색이면 **빨강이 경고로 안 읽힌다.**
+
+   🔴 **`.ss-profile-team-leave` 보다 뒤에 있어야 한다.** 둘 다 클래스 하나라
+   특이도가 같고(0,1,0), 같으면 **파일에 나중에 적힌 것이 이긴다** — 앞에 두면
+   빨강이 그대로 이겨서 흰색이 **한 번도 안 먹는다.** 이 저장소가 같은 함정을
+   두 번 밟은 자리라(1.11 `--danger` · 1.14 `.ss-mini`) 시험이 순서를 붙든다. */
+.ss-profile-team-edit {
+  border-color: #fff;
+  color: #fff;
+}
+
+.ss-profile-team-edit:not(:disabled):hover {
+  background-color: color-mix(in srgb, #fff 20%, transparent);
 }
 
 /* 🔴 **단추가 쓸데없이 크다**(사용자 지적, 2026-09-16). `PillButton` 은
@@ -14644,4 +14697,171 @@ body:has(.ss-venues) .ss-home-header {
   .ss-mr-scrim {
     animation-duration: 1ms;
   }
+}
+
+/* ── 「팀 찾는 중」 표시 (2026-09-18, 사용자 요청) ────────────────────────
+   머리칸에 매달려 어느 화면에서든 보인다. 찾는 중이 아니면 아예 안 그려지므로
+   자리를 차지하지 않는다(`SeekingPill`). */
+.ss-seeking-wrap {
+  /* 목적지 글자와 같은 줄에 서되, 글자가 여러 줄로 접힐 때 위에 붙는다. */
+  margin-right: 1.5rem;
+  flex: 0 0 auto;
+}
+
+.ss-seeking-pill {
+  border: 1px solid color-mix(in srgb, var(--ss-accent) 45%, transparent);
+  background: color-mix(in srgb, var(--ss-accent) 10%, transparent);
+  color: var(--ss-accent);
+  text-decoration: none;
+}
+
+a.ss-seeking-pill:hover {
+  background: color-mix(in srgb, var(--ss-accent) 18%, transparent);
+}
+
+/* 살아 있다는 표시 — 숫자가 안 바뀌는 동안에도 멈춘 화면처럼 안 보이게. */
+.ss-seeking-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: var(--ss-accent);
+  animation: ss-seeking-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes ss-seeking-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* 🔴 새로 생긴 곳은 **수가 아니라 다른 칸**으로 알린다 — 전체 수는 한 곳이
+   빠지고 다른 곳이 들어오면 그대로라 변화가 안 보인다. */
+.ss-seeking-new {
+  border-radius: 9999px;
+  padding: 0 0.4rem;
+  font-size: 0.75rem;
+  background: var(--ss-accent);
+  color: #05230f;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-seeking-dot {
+    animation: none;
+  }
+}
+
+/* 「경기 잡힘」 — 찾는 중과 **다른 색**이다. 하나는 진행 중이고 하나는
+   끝난 일이라, 같은 색이면 머리칸만 보고 어느 쪽인지 못 가린다. */
+.ss-match-pill {
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 35%, transparent);
+  background: color-mix(in srgb, var(--ss-fg) 12%, transparent);
+  color: var(--ss-fg);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.ss-match-pill:hover {
+  background: color-mix(in srgb, var(--ss-fg) 20%, transparent);
+}
+
+.ss-match-pill-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* ── 경기 화면에서 카드를 눌렀을 때 뜨는 간단한 프로필 (2026-09-18) ────── */
+.ss-mini-seat-btn {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.ss-mini-seat-btn:focus-visible {
+  outline: 2px solid var(--ss-accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.ss-who {
+  position: fixed;
+  z-index: 60;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  width: min(20rem, calc(100vw - 3rem));
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--ss-fg) 25%, transparent);
+  background: rgba(10, 12, 14, 0.92);
+  backdrop-filter: blur(12px);
+  padding: 1rem 1.1rem;
+  color: var(--ss-fg);
+}
+
+.ss-who-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.ss-who-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.ss-who-grade {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--ss-accent);
+  line-height: 1;
+}
+
+/* 🔴 「검수 전」은 등급 옆에 **반드시** 붙는다 — 계약이 그렇게 요구한다
+   (등급 문자만 떼어 쓰면 남의 화면에 박힌 뒤 회수가 안 된다). */
+.ss-who-prov {
+  font-size: 0.7rem;
+  margin-left: 0.35rem;
+  color: color-mix(in srgb, var(--ss-fg) 60%, transparent);
+}
+
+.ss-who-sub {
+  margin-top: 0.15rem;
+  font-size: 0.8rem;
+  color: color-mix(in srgb, var(--ss-fg) 60%, transparent);
+}
+
+.ss-who-titles {
+  margin-top: 0.6rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.ss-who-title {
+  border-radius: 9999px;
+  border: 1px solid color-mix(in srgb, var(--ss-accent) 45%, transparent);
+  color: var(--ss-accent);
+  font-size: 0.72rem;
+  padding: 0.05rem 0.5rem;
+}
+
+.ss-who-notes {
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--ss-fg) 80%, transparent);
+}
+
+.ss-who-close {
+  border: 0;
+  background: none;
+  color: color-mix(in srgb, var(--ss-fg) 60%, transparent);
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
 }

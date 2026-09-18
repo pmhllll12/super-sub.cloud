@@ -52,9 +52,14 @@ export type Title = {
 /**
  * 카드 꾸미기 — 바탕 · 로고 · 글자 색 · 글자 자리 · 붓자국(미결 `paik` 3번
  * 나머지, CCC 35). 가운데 큰 글자 **내용**은 여기 없다 — `PlayerCard.tagline`
- * 이 그 값이다. 사진도 없다 — 저장 위치가 아직 없어서(`og_image_key` 와 같은
- * 처지) `www` 쪽 `CardStyle`(`app/(app)/me/cardStyle.tsx`)의 photo 관련
- * 필드 넷은 이 타입에 없고 브라우저에만 남는다.
+ * 이 그 값이다.
+ *
+ * 🔴 **정정 (2026-09-18): 사진이 들어왔다.** 앞서 여기에 "사진도 없다 —
+ * 저장 위치가 아직 없어서 브라우저에만 남는다"고 적어 두었는데, 자리를 정했다:
+ * **바이트는 S3, 여기에는 키만**(`photo_key`). data URL 로 담으면 카드를 읽는
+ * 모든 응답에 사진이 실린다 — 스쿼드 판 하나가 자리마다 카드를 부른다.
+ *
+ * 🔴 **다섯 칸은 서버에서 기본값이 있다** — 안 보내도 응답에는 늘 실려 온다.
  */
 export type CardStyleWire = {
   bg: string
@@ -67,6 +72,16 @@ export type CardStyleWire = {
   brush_scale: number
   brush_x: number
   brush_y: number
+  /* 🔴 **아래 다섯은 선택이다** — 서버에는 기본값이 있어 응답에 늘 실리지만,
+     **배포 전 실서버는 아직 안 보낸다.** 필수로 두면 그 사이 옛 응답을
+     받은 화면이 타입상 거짓말을 하게 된다(`accepted_at` 과 같은 판단). */
+  /** S3 키. `null` 이면 사진을 안 쓴다 — 읽을 주소는 `PlayerCard.photo_url`. */
+  photo_key?: string | null
+  photo_scale?: number
+  /** 🔴 글자 자리와 달리 **음수가 된다** — 사진은 칸보다 크게 잡아 밀어 넣는다. */
+  photo_x?: number
+  photo_y?: number
+  mode?: 'cutout' | 'full'
 }
 
 export type PlayerCard = {
@@ -79,6 +94,15 @@ export type PlayerCard = {
   tagline: string | null
   // 안 꾸몄으면 null — 화면이 기본 모습을 그린다.
   style: CardStyleWire | null
+  /**
+   * 사진을 읽을 주소 — **사전 서명이라 유효 시간이 있고 저장되지 않는다**
+   * (부를 때마다 새로 온다). `style.photo_key` 에서 나온다.
+   *
+   * 🔴 **`null`·없음이 여럿이고 전부 정상**이다: 사진을 안 올렸다 ·
+   * 저장소가 설정 안 됐다 · 키는 있는데 파일이 아직 없다 · **배포 전 실서버라
+   * 아직 안 보낸다.** 그때 화면은 기본 장식 그림을 그린다.
+   */
+  photo_url?: string | null
 }
 
 /** GET /cards/{slug} — 공개용. id 가 없다. */

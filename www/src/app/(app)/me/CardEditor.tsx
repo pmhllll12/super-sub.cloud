@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { apiErrorMessage, apiPost } from '@/lib/api/client'
+import { uploadCardPhoto } from '@/lib/cardPhoto'
 import PillButton from '@/components/ui/PillButton'
 import type { PlayerCard } from '@/server/backend'
 import CardMark, { MARKS } from '@/components/CardMark'
@@ -259,19 +260,42 @@ function SlideRow({
 }
 
 /**
- * 사진 — 고르면 **바로 카드에 들어간다**(사용자 요청).
+ * 사진 — 고르면 **바로 카드에 들어가고, 뒤에서 올라간다**(사용자 요청).
  *
- * 🔴 파일을 서버로 보내지 않는다. 브라우저에서 읽어 data URL 로 카드에
- * 얹을 뿐이다 — 카드 이미지를 둘 자리가 계약에 아직 없다(`cardStyle` 주석).
+ * 🔴 **정정 (2026-09-18): 이제 진짜로 저장된다.** 앞서 여기에 "파일을 서버로
+ * 보내지 않는다 — 둘 자리가 계약에 아직 없다"고 적어 두었는데 자리가 났다
+ * (계약 3-5절). 파일은 **브라우저가 S3 에 직접** 올리고(PER-002), 카드에는
+ * 그 키만 붙는다.
+ *
+ * 🔴 **미리보기를 먼저 세운다.** 올리는 동안 카드가 그대로면 「눌렀는데 아무
+ * 일도 안 난다」로 보인다 — 고르는 즉시 `blob:` 으로 그려 놓고, 키는 올리기가
+ * 끝나면 채운다.
+ *
+ * 🔴 **실패를 삼키지 않는다.** 조용히 넘어가면 사람은 사진이 바뀐 줄 알고
+ * 저장까지 하는데 실제로는 옛 사진이 남는다.
  */
 function CardPhoto() {
   const { style, set } = useCardStyle()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  function pick(file: File | undefined) {
+  async function pick(file: File | undefined) {
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => set({ photo: String(reader.result) })
-    reader.readAsDataURL(file)
+    setError(null)
+    setBusy(true)
+    /* 미리보기부터. 🔴 **키는 여기서 비운다** — 옛 사진의 키가 남아 있으면
+       올리기가 실패했을 때 **새 그림 + 옛 키**로 저장돼 남이 보는 카드와
+       내가 보는 카드가 갈린다. */
+    const preview = URL.createObjectURL(file)
+    set({ photo: preview, photoKey: null })
+    try {
+      const made = await uploadCardPhoto(file)
+      set({ photo: made.previewUrl, photoKey: made.storageKey })
+    } catch {
+      setError('사진을 올리지 못했습니다 — 다시 시도해 주세요.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -312,8 +336,21 @@ function CardPhoto() {
           aria-label="사진 고르기"
           onChange={(e) => pick(e.target.files?.[0])}
         />
-        <span>{style.photo ? '다른 사진으로' : '사진 고르기'}</span>
+        <span>
+          {busy ? '올리는 중…' : style.photo ? '다른 사진으로' : '사진 고르기'}
+        </span>
       </label>
+
+      {error && (
+        <p role="alert" className="ss-profile-video-reason">
+          {error}
+        </p>
+      )}
+      {/* 🔴 **올라가기 전에 저장하면 사진이 안 남는다** — 키가 아직 없어서다.
+          그 사이를 말해 주지 않으면 「저장했는데 사라졌다」가 된다. */}
+      {!busy && style.photo && !style.photoKey && !error && (
+        <p className="ss-profile-muted">아직 안 올라갔습니다 — 다시 골라 주세요.</p>
+      )}
 
       {style.photo && (
         <>
@@ -350,7 +387,12 @@ function CardPhoto() {
           <button
             type="button"
             className="ss-profile-tab self-start"
-            onClick={() => set({ photo: null, photoScale: 1, photoX: 0, photoY: 0 })}
+            /* 🔴 **키도 같이 비운다**(2026-09-18) — 안 비우면 화면에서는
+               사라지는데 저장하면 서버에 사진이 그대로 남아, 남이 보는
+               카드에만 사진이 계속 있다. */
+            onClick={() =>
+              set({ photo: null, photoKey: null, photoScale: 1, photoX: 0, photoY: 0 })
+            }
           >
             사진 빼기
           </button>
