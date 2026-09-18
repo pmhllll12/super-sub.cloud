@@ -11705,21 +11705,6 @@ body:has(.ss-profile) {
   }
 }
 
-/* 카드가 아직 없는 사람. 같은 폭 · 같은 비율의 판에 이름 첫 글자만
-   둔다 — 자리를 비우면 바의 키가 사람마다 달라진다. */
-.ss-profile-face-empty {
-  display: grid;
-  place-items: center;
-  width: calc(var(--ss-pcard-mini-w, 104) * 1px);
-  aspect-ratio: 3 / 4.1;
-  border-radius: 14px;
-  border: 1px solid var(--ss-fg);
-  background: color-mix(in srgb, var(--ss-fg) 6%, transparent);
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--ss-fg);
-}
-
 .ss-profile-id-text {
   display: flex;
   flex-direction: column;

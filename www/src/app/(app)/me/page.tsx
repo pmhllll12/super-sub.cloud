@@ -21,6 +21,7 @@ import StyledCard from './StyledCard'
 import { CardStyleProvider } from './cardStyle'
 import MyMatches from './MyMatches'
 import MyVideos from './MyVideos'
+import BlankPlayerCard from '@/components/BlankPlayerCard'
 import NoCardNudge from './NoCardNudge'
 import ProfileStage from './ProfileStage'
 import NicknameForm from './NicknameForm'
@@ -185,10 +186,13 @@ export function MeBody({
                     </span>
                   )
                 ) : (
-                  /* 카드가 아직 없는 사람 — 자리를 비우면 줄이 무너지므로 같은
-                     크기의 판에 이름 첫 글자를 넣는다. */
-                  <span className="ss-profile-face ss-profile-face-empty" aria-hidden="true">
-                    {user.nickname.slice(0, 1)}
+                  /* 카드가 아직 없는 사람 — 🔴 **기본 빈 카드**를 둔다(사용자 요청,
+                     2026-09-19). 전에는 이름 첫 글자(「홍」)를 유리 판에 넣었는데,
+                     홈 「내 프로필」 자리와 **같은 모양**이어야 한다 — 스쿼드 판
+                     빈 자리 틀에서 `+` 만 뺀 것. 편집 중에는 같은 자리에서 커진다
+                     (`.ss-profile-face` 의 --ss-pcard-mini-w). */
+                  <span className="ss-pcard-mini ss-profile-face" aria-hidden="true">
+                    <BlankPlayerCard />
                   </span>
                 )}
 
