@@ -312,7 +312,7 @@ function pitchFromSquad(squad: Squad | null, size: SquadSize): PitchPlayer[] {
 }
 
 /**
- * 🔴 **홈의 「AI」 단추 지금은 안 보인다**(사용자 요청, 2026-09-19 — 챗봇 용병
+ * 🔴 **홈의 「AI」 단추를 지금은 안 보인다**(사용자 요청, 2026-09-19 — 챗봇 용병
  * 찾기가 아직 제대로 구현되지 않았다). 단추·챗봇(`MatchBot`) 코드는 **그대로 둔다** —
  * 다시 쓰려면 이 값만 `true` 로.
  */
