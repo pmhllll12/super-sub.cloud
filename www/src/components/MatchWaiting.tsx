@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import MiniPitch from '@/components/MiniPitch'
 import MatchReview from '@/components/MatchReview'
-import type { MatchTeam, MyTeamSummary } from '@/lib/teamMatch'
+import WhoCard from '@/components/WhoCard'
+import type { MatchTeam, MyTeamSummary, PitchPlayer } from '@/lib/teamMatch'
 import type { PublicPlayerCard } from '@/server/backend'
 
 /**
@@ -104,6 +105,11 @@ export default function MatchWaiting({
 
   /** 리뷰 창을 열어 둔 상태. 🔴 닫으면 대기 화면까지 함께 내려간다. */
   const [reviewing, setReviewing] = useState(false)
+  /**
+   * 판에서 **누른 사람** — 간단한 프로필을 옆에 띄운다(사용자 요청,
+   * 2026-09-18). 🔴 두 판 어느 쪽이든 한 번에 하나만 연다.
+   */
+  const [picked, setPicked] = useState<PitchPlayer | null>(null)
 
   /**
    * 「경기 취소」를 눌러 **한 번 더 묻는 중**인가.
@@ -173,7 +179,16 @@ export default function MatchWaiting({
       </button>
 
       <div className="ss-mw-body">
-        <MiniPitch team={us.name} players={us.squad} side="us" myCard={myCard} />
+        <MiniPitch
+          team={us.name}
+          players={us.squad}
+          side="us"
+          myCard={myCard}
+          /* 🔴 **리뷰 중에는 못 누른다.** 그때 판은 「평가할 사람 고르기」로
+             뜻이 바뀌어서, 같은 카드가 두 가지 일을 하면 어느 쪽이 될지
+             알 수 없다(낭독기에서도 같은 이름의 단추가 둘이 된다). */
+          onPick={reviewing ? undefined : setPicked}
+        />
 
         <div className="ss-mw-mid">
           <p className="ss-mw-when">{whenText(them.playedAt)}</p>
@@ -265,8 +280,26 @@ export default function MatchWaiting({
           </div>
         </div>
 
-        <MiniPitch team={them.name} players={them.squad} side="them" />
+        <MiniPitch
+          team={them.name}
+          players={them.squad}
+          side="them"
+          onPick={reviewing ? undefined : setPicked}
+        />
       </div>
+
+      {/* 🔴 **경기 화면 위에 뜬다** — 닫아도 경기 화면은 그대로다(사용자 조건:
+          「경기매칭된 상태는 유지 되어야해」). 그래서 새 경로로 보내지 않는다. */}
+      {picked && (
+        <WhoCard
+          /* 🔴 **사람이 바뀌면 다시 붙인다** — 안 그러면 앞사람 값이 잠깐
+             보인 뒤 바뀐다. 통을 비우는 일을 여기 한 줄로 끝낸다. */
+          key={picked.cardSlug ?? picked.nickname}
+          slug={picked.cardSlug ?? null}
+          fallbackName={picked.nickname}
+          onClose={() => setPicked(null)}
+        />
+      )}
 
       {/* 🔴 **닫으면 둘 다 내려간다**(사용자 설계) — 리뷰 창이 먼저 사라지고,
           이어서 대기 화면이 여느 닫기와 같은 길로 내려가 홈만 남는다. */}

@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { PlayerCard, Squad } from '@/server/backend'
+import { readSeeking, startSeeking } from '@/lib/seekingStore'
 import SquadPanel from './SquadPanel'
 
 /** 서버가 준 스쿼드 — MF 둘과 GK 하나가 등재돼 있다. */
@@ -837,6 +838,49 @@ describe('스쿼드 — 팀 매칭 단추', () => {
       screen.getByRole('region', { name: '비슷한 팀' }).querySelector('.ss-tm-close') as HTMLElement,
     )
     expect(screen.queryByRole('region', { name: '비슷한 팀' })).toBeNull()
+  })
+
+  /**
+   * 🔴 **다른 화면에 갔다 와도 찾던 자리로 돌아온다** (사용자 요청,
+   * 2026-09-18: "팀매칭을 시작하면 다른페이지로 이동해도 여전히 찾고있는
+   * 상태를 유지"). 화면을 옮기면 이 컴포넌트는 통째로 사라졌다 다시 붙으므로,
+   * 「열려 있었다」가 **브라우저에 남아 있어야** 되살아난다.
+   */
+  describe('찾는 중이면 판을 편 채로 돌아온다', () => {
+    beforeEach(() => window.localStorage.clear())
+    afterEach(() => window.localStorage.clear())
+
+    it('찾는 중으로 남아 있으면 저절로 열린다', async () => {
+      startSeeking(MY_TEAM_ID)
+      render(<SquadPanel isCaptain card={CARD} squad={FULL5} myTeamId={MY_TEAM_ID} />)
+      expect(await screen.findByRole('region', { name: '비슷한 팀' })).toBeInTheDocument()
+    })
+
+    it('안 찾는 중이면 안 열린다', () => {
+      render(<SquadPanel isCaptain card={CARD} squad={FULL5} myTeamId={MY_TEAM_ID} />)
+      expect(screen.queryByRole('region', { name: '비슷한 팀' })).toBeNull()
+    })
+
+    it('🔴 다른 팀으로 찾는 중이면 이 팀의 판은 안 연다', () => {
+      /* 팀을 옮겨 다니는 경우다. 남의 팀 찾기 때문에 이 팀 판이 열리면
+         무엇을 찾고 있는지가 어긋난다. */
+      startSeeking('다른-팀')
+      render(<SquadPanel isCaptain card={CARD} squad={FULL5} myTeamId={MY_TEAM_ID} />)
+      expect(screen.queryByRole('region', { name: '비슷한 팀' })).toBeNull()
+    })
+
+    it('되살린 뒤 × 로 닫으면 그대로 닫혀 있다 — 판 닫기와 그만두기는 다른 일', async () => {
+      /* 매번 되살리면 × 가 아무 일도 못 하는 단추가 된다. 찾기를 끝내는 것은
+         명단 머리의 「그만 찾기」다. */
+      const user = userEvent.setup()
+      startSeeking(MY_TEAM_ID)
+      render(<SquadPanel isCaptain card={CARD} squad={FULL5} myTeamId={MY_TEAM_ID} />)
+      const panel = await screen.findByRole('region', { name: '비슷한 팀' })
+      await user.click(panel.querySelector('.ss-tm-close') as HTMLElement)
+      expect(screen.queryByRole('region', { name: '비슷한 팀' })).toBeNull()
+      /* 찾기 자체는 계속된다 — 머리칸 표시가 남아야 하므로. */
+      expect(readSeeking()?.teamId).toBe(MY_TEAM_ID)
+    })
   })
 
   /* 🔴 **머리줄은 한 픽셀도 안 건드린다** — 단추를 그 줄에 넣었더니 크기
@@ -2000,5 +2044,107 @@ describe('스쿼드 — 수락한 팀원', () => {
     expect(sent.some((c) => c.method === 'POST' && c.url.endsWith('/squad/members'))).toBe(
       false,
     )
+  })
+})
+
+/**
+ * **경기가 잡힌 화면** — 2026-09-18에 사용자가 짚은 둘.
+ *
+ * 1) 「서로 다른 계정에 다르게 표시되는 부분」 — 우리 팀 이름을 **홈 판**에서
+ *    가져와서, 홈 판이 다른 팀인 계정에서는 **경기에 없는 팀 이름**이 적혔다.
+ *    운영에서 「FC 강남 VS ㅈㅂㄷ」로 나왔는데 실제 경기는 「ㅇㅅㅇ VS ㅈㅂㄷ」.
+ * 2) 상대 판에 사람이 적게 나온다 — 칸(`grid_col`/`grid_row`)이 저장된 등재만
+ *    골라서, 초대만 수락한 사람이 **본인 화면엔 있고 남의 화면엔 없었다.**
+ */
+describe('스쿼드 — 경기가 잡힌 화면', () => {
+  const member = (id: string, nickname: string, pos: string, cell: { c: number; r: number } | null) => ({
+    id,
+    player_card_id: `c-${id}`,
+    card_public_slug: `slug-${id}`,
+    nickname,
+    position_code: pos,
+    position_label: pos,
+    grid_col: cell?.c ?? null,
+    grid_row: cell?.r ?? null,
+  })
+
+  /** 상대 팀 판 — 한 명은 칸이 저장돼 있고 한 명은 **아직 없다**. */
+  const THEIR_SQUAD = {
+    id: 'sq-them',
+    team_id: 'team-them',
+    public_slug: 'them-slug',
+    formation: '5:5',
+    members: [
+      member('t1', '정우진', 'GK', { c: 1, r: 3 }),
+      /* 🔴 여기가 핵심 — 초대만 수락하고 판을 아직 안 옮긴 사람이다. */
+      member('t2', '칸없는사람', 'MF', null),
+    ],
+  }
+
+  const OUR_SQUAD = {
+    ...THEIR_SQUAD,
+    id: 'sq-us',
+    team_id: 'team-in-match',
+    public_slug: 'us-slug',
+    members: [member('u1', '우리편', 'FW', { c: 1, r: 0 })],
+  }
+
+  const stubSquads = () =>
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => ({
+        ok: true,
+        status: 200,
+        json: async () => (url.includes('us-slug') ? OUR_SQUAD : THEIR_SQUAD),
+      })),
+    )
+
+  const ACCEPTED = {
+    id: 'team-them',
+    name: '번개FC',
+    region: '서울 강남구',
+    squadSlug: 'them-slug',
+    playedAt: '2026-09-19T10:00:00',
+    place: '강남 풋살장',
+  }
+
+  it('🔴 우리 팀 이름을 **경기에서** 가져온다 — 홈 판이 다른 팀이어도', async () => {
+    stubSquads()
+    render(
+      <SquadPanel
+        isCaptain
+        card={CARD}
+        squad={SQUAD}
+        /* 홈 판은 「홈에 뜬 팀」을 보고 있다 — 경기의 팀이 아니다. */
+        teamName="홈에 뜬 팀"
+        myTeamId="team-home"
+        acceptedTeamId={ACCEPTED.id}
+        acceptedTeam={ACCEPTED}
+        acceptedUs={{ id: 'team-in-match', name: '경기에 나간 팀', squadSlug: 'us-slug' }}
+      />,
+    )
+    /* 🔴 「홈에 뜬 팀」이 아니라 「경기에 나간 팀」이어야 한다. */
+    expect(await screen.findByRole('region', { name: '경기에 나간 팀 스쿼드' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: '홈에 뜬 팀 스쿼드' })).toBeNull()
+  })
+
+  it('🔴 상대 판에 **칸이 아직 없는 등재**도 그린다', async () => {
+    stubSquads()
+    render(
+      <SquadPanel
+        isCaptain
+        card={CARD}
+        squad={SQUAD}
+        teamName="우리 팀"
+        myTeamId="team-in-match"
+        acceptedTeamId={ACCEPTED.id}
+        acceptedTeam={ACCEPTED}
+        acceptedUs={{ id: 'team-in-match', name: '우리 팀', squadSlug: 'us-slug' }}
+      />,
+    )
+    const theirs = await screen.findByRole('region', { name: '번개FC 스쿼드' })
+    expect(within(theirs).getByText('정우진')).toBeInTheDocument()
+    /* 고치기 전에는 이 사람이 **남의 화면에서만** 사라졌다. */
+    expect(within(theirs).getByText('칸없는사람')).toBeInTheDocument()
   })
 })

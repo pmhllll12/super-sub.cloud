@@ -7,8 +7,11 @@ import PlayerCardView from '@/components/PlayerCardView'
 import BrandMark from '@/components/ui/BrandMark'
 import HomeNav, { type Destination } from '@/components/HomeNav'
 import NotifyPanel from '@/components/NotifyPanel'
+import SeekingPill from '@/components/SeekingPill'
+import MatchPill from '@/components/MatchPill'
 import { NOTIFY } from '@/lib/destinations'
 import { useNotifyInbox } from '@/lib/useNotifyInbox'
+import { useTeamSeeking } from '@/lib/useTeamSeeking'
 import { HEADER_LINK_CLASS, HEADER_LINK_HOVER_CLASS } from '@/components/LogoutButton'
 import { useIntroDone } from '@/lib/useIntroDone'
 import { TransitionLink, useChromeHidden, useLeaving } from '@/lib/pageTransition'
@@ -34,6 +37,7 @@ export default function SiteHeader({
   destinations,
   fixed = false,
   inbox: given,
+  onReopenMatch,
 }: {
   user: { nickname: string } | null
   card?: PublicPlayerCard | null
@@ -48,6 +52,13 @@ export default function SiteHeader({
    * 눌러도 아무 일이 없다」로 나타났다(사용자가 로컬에서 잡았다).
    */
   inbox?: ReturnType<typeof useNotifyInbox>
+  /**
+   * 「경기 잡힘」 표시를 눌렀을 때 — **홈만 준다.**
+   *
+   * 🔴 경기 화면을 그리는 것은 홈의 스쿼드 판 하나뿐이라, 다른 화면에는 열
+   * 대상이 없다. 안 주면 표시가 **홈으로 가는 고리**가 된다.
+   */
+  onReopenMatch?: () => void
 }) {
   /**
    * 인트로가 걷히면 각자 바깥에서 제자리로 들어온다(globals.css 의
@@ -75,6 +86,16 @@ export default function SiteHeader({
    */
   const own = useNotifyInbox()
   const inbox = given ?? own
+
+  /**
+   * 「팀 찾는 중」 — 위 알림함과 **같은 이유로 여기 산다**: 머리칸이 모든
+   * 화면에 있으므로, 홈을 떠나도 찾기가 안 끊긴다(사용자 요청, 2026-09-18).
+   *
+   * 🔴 **알림함과 달리 밖에서 받지 않는다.** 이 통이 들고 있는 것은
+   * `localStorage` 한 칸이라(`seekingStore`) 어디서 만들든 같은 값을 읽고,
+   * 같은 탭 안에서는 바뀔 때 서로 알린다 — 통을 나눠 쓸 이유가 없다.
+   */
+  const seeking = useTeamSeeking()
 
   /**
    * 🔴 **지금 보고 있는 화면은 목적지에서 뺀다**(사용자 요청). 영상 분석
@@ -179,6 +200,15 @@ export default function SiteHeader({
       </TransitionLink>
 
       <div className={`ss-home-nav-slot${quiet ? ' ss-home-gone' : ''}`}>
+        {/* 🔴 **찾는 중이라는 사실이 화면을 떠나도 남는 자리다**(사용자 요청,
+            2026-09-18). 머리칸은 로그인한 모든 화면이 같이 쓰므로 여기 두면
+            홈을 떠나도 찾기가 안 끊긴다 — 알림함(`useNotifyInbox`)이 여기
+            매달린 것과 같은 이유다. 안 찾는 중이면 아무것도 안 그린다. */}
+        <SeekingPill seeking={seeking} />
+        {/* 🔴 **잡힌 경기로 돌아가는 길**(사용자 요청, 2026-09-18). 경기
+            화면을 그리는 것은 홈의 판뿐이라, 홈에서만 그 자리에서 열고
+            다른 화면에서는 홈으로 보낸다(`MatchPill`). */}
+        <MatchPill match={inbox.confirmed} onReopen={onReopenMatch} />
         <HomeNav
           destinations={shown}
           loggedIn={Boolean(user)}

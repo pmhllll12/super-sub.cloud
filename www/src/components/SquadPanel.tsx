@@ -11,6 +11,7 @@ import MatchBot from '@/components/MatchBot'
 import TeamMatch from '@/components/TeamMatch'
 import MatchWaiting from '@/components/MatchWaiting'
 import { type MatchTeam, type PitchPlayer } from '@/lib/teamMatch'
+import { readSeeking, stopSeeking } from '@/lib/seekingStore'
 import {
   addSeat,
   formationToSize,
@@ -254,6 +255,37 @@ function seatsFromSquad(
   return { slots, mates, slugs, members, ready }
 }
 
+/**
+ * **남의 스쿼드를 읽기 전용 판으로** — 경기 화면의 두 판이 이걸로 그려진다.
+ *
+ * 🔴 **내 판과 같은 규칙을 쓴다**(2026-09-18, 사용자 지적: 같은 팀인데 보는
+ * 사람마다 다르게 나온다). 전에는 여기서 `grid_col`·`grid_row` 가 **저장된
+ * 등재만** 골랐다. 그런데 칸은 판을 한 번 옮겨야 생기는 값이라, 초대를
+ * 수락해 등재만 된 사람은 **본인 화면에는 서 있고 남의 화면에는 없었다** —
+ * 운영에서 8명 등재된 팀이 남에게는 3명으로 보였다.
+ *
+ * `seatsFromSquad` 의 2단계가 「칸이 아직 없는 등재는 기본 자리에 앉힌다」를
+ * 이미 한다. 그 하나를 같이 쓰면 두 판이 갈라지지 않는다.
+ */
+/** `"5:5"` → `'5'`. 🔴 **모르는 값이면 기본 판** — 계약이 값 집합을 안 막는다. */
+function sizeOf(formation: string | null | undefined): SquadSize {
+  const from = formationToSize(formation ?? null)
+  return from && from in FORMATIONS ? (from as SquadSize) : DEFAULT_SIZE
+}
+
+function pitchFromSquad(squad: Squad | null, size: SquadSize): PitchPlayer[] {
+  const { slots, mates, slugs } = seatsFromSquad(squad, size)
+  return slots
+    .filter((sl) => mates[sl.area])
+    .map((sl) => ({
+      nickname: mates[sl.area] as string,
+      col: sl.col,
+      row: sl.row,
+      pos: posOf(sl),
+      cardSlug: slugs[sl.area] ?? null,
+    }))
+}
+
 export default function SquadPanel({
   card,
   squad = null,
@@ -268,6 +300,7 @@ export default function SquadPanel({
   onRequested,
   acceptedTeamId = null,
   acceptedTeam = null,
+  acceptedUs = null,
   acceptedMatchId = null,
   onAcceptedShown,
   seeking = false,
@@ -374,6 +407,19 @@ export default function SquadPanel({
     squadSlug: string | null
     playedAt: string
     place: string
+  } | null
+  /**
+   * **경기에서 우리 쪽인 팀** (2026-09-18).
+   *
+   * 🔴 **`teamName`(홈 판이 보여 주는 팀)과 다를 수 있다.** 한 사람이 여러
+   * 팀에 속할 수 있고 홈 판은 쿠키가 고른 팀을 그린다 — 그 팀이 이 경기의
+   * 팀이 아닌데 이름을 거기서 가져와서, 운영에서 **경기에 없는 팀 이름**이
+   * 적혔다(사용자 지적: 계정마다 다르게 보인다). 이름은 여기 것을 쓴다.
+   */
+  acceptedUs?: {
+    id: string
+    name: string | null
+    squadSlug: string | null
   } | null
   /**
    * 그렇게 잡힌 **경기 id** — 「무르기」가 이걸로 취소한다(계약은
@@ -583,6 +629,78 @@ export default function SquadPanel({
   const [matched, setMatched] = useState<MatchTeam | null>(null)
 
   /**
+   * 🔴 **찾는 중이었으면 판을 편 채로 돌아온다**(사용자 요청, 2026-09-18:
+   * "다른페이지로 이동해도 여전히 찾고있는 상태를 유지").
+   *
+   * 🔴 **한 번만 편다**(`restored`). 매번 열면 × 로 닫아도 곧바로 되살아나
+   * 닫을 길이 없어진다 — 판을 닫는 것과 **찾기를 그만두는 것은 다른 일**이고,
+   * 그만두는 것은 명단 머리의 「그만 찾기」다. 닫아도 머리칸 표시는 남는다.
+   *
+   * 🔴 그릴 때 읽지 않고 **붙은 뒤에** 읽는다 — 서버가 그린 HTML 에는 이
+   * 브라우저의 값이 있을 수 없어서, 처음부터 읽으면 양쪽이 달라진다.
+   */
+  const restored = useRef(false)
+  useEffect(() => {
+    if (restored.current || !myTeamId) return
+    const now = readSeeking()
+    if (!now || now.teamId !== myTeamId) return
+    restored.current = true
+    /* 규칙은 effect 안의 setState 를 싫어하지만, 여기는 **바깥 저장소를
+       읽어 와 React 에 넣는** 자리라 다른 길이 없다 — 그릴 때 읽으면 서버가
+       그린 HTML 과 어긋난다(`useNotifyInbox` 도 같은 이유로 풀어 둔다).
+       `restored` 가 있어 한 번만 돈다. */
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMatching(true)
+  }, [myTeamId])
+
+  /**
+   * 경기가 잡히면 **찾기를 끝낸다.** 안 그러면 상대가 정해졌는데도 머리칸에
+   * 「팀 찾는 중」이 남는다 — 화면이 사실과 어긋나는 자리다.
+   *
+   * ⚠️ 조건(지역·시간)은 서버에 그대로 둔다. 지우는 것이 아니라 **찾기만**
+   * 끝내는 것이라, 다음에 다시 켜면 그 조건으로 이어서 찾는다.
+   */
+  useEffect(() => {
+    if (matched) stopSeeking()
+  }, [matched])
+
+  /**
+   * **경기의 우리 팀이 홈 판의 팀이 아닐 때 그릴 판** (2026-09-18).
+   *
+   * 홈 판이 그 팀이면 `null` 이고, 그때는 아래에서 **지금 화면이 들고 있는
+   * 자리**를 그대로 쓴다 — 방금 앉힌 사람이 바로 보이는 쪽이 낫다. 다른
+   * 팀이면 화면에 그 팀의 자료가 없으므로 **서버에서 읽어** 그린다.
+   */
+  const [otherSideUs, setOtherSideUs] = useState<{
+    name: string
+    squad: PitchPlayer[]
+  } | null>(null)
+
+  useEffect(() => {
+    if (!acceptedUs || !acceptedUs.squadSlug || acceptedUs.id === myTeamId) {
+      setOtherSideUs(null)
+      return
+    }
+    let alive = true
+    void (async () => {
+      let pitch: PitchPlayer[] = []
+      try {
+        const res = await fetch(`/api/squads/${encodeURIComponent(acceptedUs.squadSlug as string)}`)
+        if (res.ok) {
+          const got = (await res.json().catch(() => null)) as Squad | null
+          pitch = pitchFromSquad(got, sizeOf(got?.formation))
+        }
+      } catch {
+        /* 판을 못 읽어도 이름은 맞는 것을 쓴다 — 그것이 이 고침의 핵심이다. */
+      }
+      if (alive) setOtherSideUs({ name: acceptedUs.name ?? '우리 팀', squad: pitch })
+    })()
+    return () => {
+      alive = false
+    }
+  }, [acceptedUs, myTeamId])
+
+  /**
    * 🔴 **확정되는 순간은 이 화면 바깥이다**(사용자 요청, 2026-09-16) — 신청을
    * 건 것만으로는 안 뜨고, 알림에서 수락이 확인돼야 뜬다.
    *
@@ -605,15 +723,9 @@ export default function SquadPanel({
           const res = await fetch(`/api/squads/${encodeURIComponent(acceptedTeam.squadSlug)}`)
           if (res.ok) {
             const got = (await res.json().catch(() => null)) as Squad | null
-            squad = (got?.members ?? [])
-              .filter((m) => m.grid_col !== null && m.grid_row !== null)
-              .map((m) => ({
-                nickname: m.nickname,
-                col: m.grid_col as number,
-                row: m.grid_row as number,
-                pos: rowPos(m.grid_row as number),
-                cardSlug: m.card_public_slug ?? null,
-              }))
+            /* 🔴 **내 판과 같은 규칙으로 앉힌다**(2026-09-18) — 칸이 저장된
+               사람만 고르던 것을 걷었다. 까닭은 `pitchFromSquad` 머리말. */
+            squad = pitchFromSquad(got, sizeOf(got?.formation))
           }
         } catch {
           /* 판을 못 읽어도 대기 화면은 띄운다 — 이름·시각이 더 중요하다. */
@@ -1800,25 +1912,31 @@ export default function SquadPanel({
       {/* 경기가 잡혔다 — 화면을 덮는 팝업. 닫으면 홈이 그대로 남는다. */}
       {matched && (
         <MatchWaiting
-          us={{
-            /* 🔴 **우리 팀 이름을 쓴다**(2026-09-17, 사용자 지적). 「우리 팀」
-               이라고 적어 두면 상대 이름만 진짜고 우리 쪽은 딱지가 된다 —
-               머리글이 이미 그 이름을 알고 있다(`teamName`). */
-            name: teamName ?? '우리 팀',
-            /* 🔴 **판에 선 사람만** 넘긴다. 내 자리는 `card` 가 그려서
-               `mates` 에 없으므로 여기서 이름을 따로 얹는다. */
-            squad: slots
-              .filter((sl) => sl.mine || mates[sl.area])
-              .map((sl) => ({
-                nickname: sl.mine ? (card?.user.nickname ?? '나') : (mates[sl.area] as string),
-                col: sl.col,
-                row: sl.row,
-                pos: posOf(sl),
-                mine: sl.mine,
-                /* 리뷰 판이 이걸로 진짜 카드를 그린다 — 내 자리는 내 카드다. */
-                cardSlug: sl.mine ? (card?.public_slug ?? null) : mateSlugs[sl.area],
-              })),
-          }}
+          us={
+            /* 🔴 **경기의 우리 팀이 홈 판의 팀과 다를 수 있다**(2026-09-18,
+               사용자 지적: 계정마다 다르게 표시된다). 한 사람이 여러 팀에
+               속할 수 있고 홈 판은 **쿠키가 고른 팀**을 보여 준다 — 그 팀이
+               이 경기의 팀이 아니면 **경기에 없는 이름**이 적혔다(운영에서
+               「FC 강남 VS ㅈㅂㄷ」로 나왔는데 실제 경기는 「ㅇㅅㅇ VS
+               ㅈㅂㄷ」였다). 이름은 **경기에서** 온 것을 쓴다.
+               다른 팀이면 판도 홈 판이 아니라 그 팀의 것을 그린다. */
+            otherSideUs ?? {
+              name: acceptedUs?.name ?? teamName ?? '우리 팀',
+              /* 🔴 **판에 선 사람만** 넘긴다. 내 자리는 `card` 가 그려서
+                 `mates` 에 없으므로 여기서 이름을 따로 얹는다. */
+              squad: slots
+                .filter((sl) => sl.mine || mates[sl.area])
+                .map((sl) => ({
+                  nickname: sl.mine ? (card?.user.nickname ?? '나') : (mates[sl.area] as string),
+                  col: sl.col,
+                  row: sl.row,
+                  pos: posOf(sl),
+                  mine: sl.mine,
+                  /* 리뷰 판이 이걸로 진짜 카드를 그린다 — 내 자리는 내 카드다. */
+                  cardSlug: sl.mine ? (card?.public_slug ?? null) : mateSlugs[sl.area],
+                })),
+            }
+          }
           them={matched}
           myCard={card ?? null}
           onClose={() => {
