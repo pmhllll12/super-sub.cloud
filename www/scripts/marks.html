@@ -1,0 +1,349 @@
+<!doctype html>
+<meta charset="utf-8">
+<!--
+  카드 뒤 자국(`public/marks/13~21.png`)의 **원본**이다. 2026-09-18 에 아홉을
+  더하면서 만들었다(사용자 요청 — 잉크 블룸 · 글리치 스펙트럼 · 홀로그램
+  레이어 · 모래 폭풍 · 유동 금속 · 파티클 플럭스 · 디지털 글리치 박스 ·
+  거친 숯 번짐 · 겹치는 사각형).
+
+  🔴 **PNG 를 손으로 고치지 마십시오 — `scripts/bake-marks.py` 를 다시 돌리면
+  덮입니다.** 모양을 바꾸려면 여기를 고칩니다. 01~12 는 이것으로 만든 것이
+  아니라 밖에서 받은 그림이라 여기 없습니다.
+
+    python3 scripts/bake-marks.py
+
+  왜 브라우저로 그리나 — 잉크 번짐 · 모래알 · 숯 결 같은 **질감**은 도형으로는
+  안 나오고 `feTurbulence`(노이즈)와 흐림·문턱이 있어야 한다. 그건 SVG 필터가
+  이미 잘 하는 일이라, 그리는 것은 크롬에 맡기고 굽는 것만 파이썬이 한다.
+
+  🔴 `Math.random()` 을 쓰지 않는다 — 씨앗을 박아야 다시 돌려도 **같은 그림**이
+  나온다. 안 그러면 다시 구울 때마다 사용자 카드의 자국이 조용히 바뀐다.
+-->
+<style>
+  html,body{margin:0;padding:0;background:transparent}
+  .tile{width:1200px;height:1200px;display:block}
+</style>
+<body></body>
+<script>
+// 씨앗 고정 난수 — 다시 돌려도 같은 그림이 나와야 한다.
+function rng(seed){let a=seed;return()=>{a|=0;a=(a+0x6d2b79f5)|0;let t=Math.imul(a^(a>>>15),1|a);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296}}
+const S=1200, C=600
+const ns='http://www.w3.org/2000/svg'
+function el(n,attrs,parent){const e=document.createElementNS(ns,n);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e}
+function tile(id){
+  const svg=el('svg',{class:'tile',viewBox:`0 0 ${S} ${S}`,id},document.body)
+  return svg
+}
+// 노이즈를 알파로 바꿔 모양 안에만 채우는 필터
+function grainFilter(defs,id,freq,oct,seed,gain,bias){
+  const f=el('filter',{id,x:'-25%',y:'-25%',width:'150%',height:'150%','color-interpolation-filters':'sRGB'},defs)
+  el('feTurbulence',{type:'fractalNoise',baseFrequency:freq,numOctaves:oct,seed,result:'n'},f)
+  el('feColorMatrix',{in:'n',type:'matrix',values:`0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  ${gain} 0 0 0 ${bias}`,result:'na'},f)
+  el('feComposite',{in:'na',in2:'SourceAlpha',operator:'in'},f)
+  return id
+}
+function dispFilter(defs,id,freq,oct,seed,scale,blur){
+  const f=el('filter',{id,x:'-35%',y:'-35%',width:'170%',height:'170%','color-interpolation-filters':'sRGB'},defs)
+  el('feTurbulence',{type:'fractalNoise',baseFrequency:freq,numOctaves:oct,seed,result:'t'},f)
+  el('feDisplacementMap',{in:'SourceGraphic',in2:'t',scale,xChannelSelector:'R',yChannelSelector:'G',result:'d'},f)
+  if(blur)el('feGaussianBlur',{in:'d',stdDeviation:blur},f)
+  return id
+}
+
+/* ───────────── 13 잉크 블룸 ───────────── */
+{
+  const svg=tile('m13'),defs=el('defs',{},svg)
+  dispFilter(defs,'inkD','0.004 0.005',6,11,260,3)
+  const g=el('g',{filter:'url(#inkD)',fill:'#000'},svg)
+  const r=rng(1013)
+  // 몸통 — 겹친 원 무리
+  for(let i=0;i<46;i++){
+    const ang=r()*Math.PI*2, rad=Math.pow(r(),0.62)*185
+    el('circle',{cx:C+Math.cos(ang)*rad,cy:C+Math.sin(ang)*rad*0.92,r:52+r()*78,opacity:(0.5+r()*0.5).toFixed(2)},g)
+  }
+  // 촉수 — 밖으로 뻗는 갈래
+  for(let i=0;i<22;i++){
+    const a=(i/22)*Math.PI*2+r()*0.3
+    const len=200+r()*250, w=16+r()*30
+    const mx=C+Math.cos(a)*len*0.55+(r()-0.5)*90
+    const my=C+Math.sin(a)*len*0.55+(r()-0.5)*90
+    const ex=C+Math.cos(a)*len, ey=C+Math.sin(a)*len
+    const p=el('path',{d:`M${C} ${C} Q${mx} ${my} ${ex} ${ey}`,stroke:'#000','stroke-width':w,fill:'none','stroke-linecap':'round',opacity:(0.35+r()*0.5).toFixed(2)},g)
+    // 갈래 끝의 작은 방울
+    el('circle',{cx:ex,cy:ey,r:w*(0.6+r()*0.9),opacity:(0.4+r()*0.5).toFixed(2)},g)
+  }
+  // 튄 방울
+  for(let i=0;i<40;i++){
+    const a=r()*Math.PI*2, rad=260+Math.pow(r(),0.5)*270
+    el('circle',{cx:C+Math.cos(a)*rad,cy:C+Math.sin(a)*rad,r:3+r()*17,opacity:(0.25+r()*0.6).toFixed(2)},g)
+  }
+}
+
+/* ───────────── 14 글리치 스펙트럼 (구조만) ───────────── */
+{
+  const svg=tile('m14'),defs=el('defs',{},svg)
+  grainFilter(defs,'gsGrain','0.9 0.02',4,5,1.7,-0.45)
+  const r=rng(2014)
+  const g=el('g',{fill:'#000'},svg)
+  let y=90
+  while(y<S-90){
+    const h=3+Math.pow(r(),1.8)*26
+    const x=70+(r()-0.5)*90
+    const w=S-140+(r()-0.5)*120
+    const op=0.12+Math.pow(r(),1.4)*0.88
+    if(r()<0.28){ // 끊어진 줄 — 작은 블록 여럿
+      let bx=x
+      while(bx<x+w){
+        const bw=14+r()*130
+        if(r()<0.72)el('rect',{x:bx,y,width:Math.min(bw,x+w-bx),height:h,opacity:op.toFixed(2)},g)
+        bx+=bw+r()*40
+      }
+    }else{
+      el('rect',{x,y,width:w,height:h,opacity:op.toFixed(2)},g)
+    }
+    y+=h+2+Math.pow(r(),2)*22
+  }
+  // 결 — 가로로 늘인 노이즈를 전체에 한 겹
+  el('rect',{x:70,y:80,width:S-140,height:S-160,fill:'#000',filter:'url(#gsGrain)',opacity:'0.55'},svg)
+}
+
+/* ───────────── 15 홀로그램 레이어 (구조만) ───────────── */
+{
+  const svg=tile('m15')
+  const r=rng(3015)
+  const g=el('g',{},svg)
+  // 다면체 — 바깥 고리 · 안 고리 · 꼭짓점 둘
+  const N=9, R1=470, R2=250
+  const pts=[]
+  for(let i=0;i<N;i++){const a=-Math.PI/2+(i/N)*Math.PI*2;pts.push([C+Math.cos(a)*R1,C+Math.sin(a)*R1])}
+  const inn=[]
+  for(let i=0;i<N;i++){const a=-Math.PI/2+((i+0.5)/N)*Math.PI*2;inn.push([C+Math.cos(a)*R2,C+Math.sin(a)*R2])}
+  const top=[C,C-120], bot=[C,C+150]
+  // 면 — 아주 옅게
+  const face=(a,b,c)=>el('polygon',{points:`${a} ${b} ${c}`.replace(/,/g,' ').replace(/\s+/g,' '),fill:'#000',opacity:(0.04+r()*0.09).toFixed(3)},g)
+  for(let i=0;i<N;i++){
+    const j=(i+1)%N
+    el('polygon',{points:`${pts[i][0]},${pts[i][1]} ${pts[j][0]},${pts[j][1]} ${inn[i][0]},${inn[i][1]}`,fill:'#000',opacity:(0.05+r()*0.10).toFixed(3)},g)
+    el('polygon',{points:`${inn[i][0]},${inn[i][1]} ${inn[(i+1)%N][0]},${inn[(i+1)%N][1]} ${pts[j][0]},${pts[j][1]}`,fill:'#000',opacity:(0.04+r()*0.08).toFixed(3)},g)
+  }
+  const line=(p,q,w,op)=>el('line',{x1:p[0],y1:p[1],x2:q[0],y2:q[1],stroke:'#000','stroke-width':w,'stroke-linecap':'round',opacity:op},g)
+  for(let i=0;i<N;i++){
+    const j=(i+1)%N
+    line(pts[i],pts[j],7,0.95)          // 바깥 테두리
+    line(inn[i],inn[(i+1)%N],4.5,0.75)  // 안 고리
+    line(pts[i],inn[i],4,0.7)
+    line(pts[j],inn[i],4,0.7)
+    line(inn[i],top,3,0.5)
+    line(inn[i],bot,3,0.45)
+    line(pts[i],top,2.2,0.3)
+  }
+  for(const p of pts)el('circle',{cx:p[0],cy:p[1],r:9,fill:'#000',opacity:'0.95'},g)
+  for(const p of inn)el('circle',{cx:p[0],cy:p[1],r:6,fill:'#000',opacity:'0.8'},g)
+}
+
+/* ───────────── 16 모래 폭풍 ───────────── */
+{
+  const svg=tile('m16'),defs=el('defs',{},svg)
+  grainFilter(defs,'sandA','0.55',4,21,2.2,-0.85)
+  grainFilter(defs,'sandB','0.28',5,31,1.9,-0.70)
+  const r=rng(4016)
+  // 흐르는 결 — 물결 띠를 겹쳐 쌓고 모래알로 채운다
+  const band=(y0,amp,h,ph,op,filt)=>{
+    let d=`M-40 ${y0}`
+    for(let x=-40;x<=S+40;x+=26)d+=` L${x} ${(y0+Math.sin((x/S)*Math.PI*2.1+ph)*amp+Math.sin((x/S)*Math.PI*5.3+ph*1.7)*amp*0.32).toFixed(1)}`
+    for(let x=S+40;x>=-40;x-=26)d+=` L${x} ${(y0+h+Math.sin((x/S)*Math.PI*2.1+ph+0.35)*amp*0.85).toFixed(1)}`
+    d+=' Z'
+    el('path',{d,fill:'#000',filter:`url(#${filt})`,opacity:op},svg)
+  }
+  for(let i=0;i<16;i++){
+    const y0=120+i*58+(r()-0.5)*26
+    band(y0,54+r()*74,26+r()*74,r()*6.3,(0.35+r()*0.65).toFixed(2),r()<0.5?'sandA':'sandB')
+  }
+  // 날리는 알갱이
+  const g=el('g',{fill:'#000'},svg)
+  for(let i=0;i<900;i++){
+    const x=r()*S, y=120+r()*(S-240)
+    el('circle',{cx:x.toFixed(1),cy:y.toFixed(1),r:(0.8+r()*3.4).toFixed(1),opacity:(0.1+r()*0.6).toFixed(2)},g)
+  }
+}
+
+/* ───────────── 17 유동 금속 (구조만) ───────────── */
+{
+  const svg=tile('m17'),defs=el('defs',{},svg)
+  const r=rng(5017)
+  // 🔴 파내는 것은 흰 선이 아니라 **마스크**다. 마스크 밖에서 흰색을 칠하면
+  //    알파가 꽉 차서 오히려 더 두꺼워진다(마스크 PNG 는 알파만 본다).
+  const mk=el('mask',{id:'metalMask',maskUnits:'userSpaceOnUse',x:0,y:0,width:S,height:S},defs)
+  const g=el('g',{},mk)   // 이 안의 흰색 = 남기고, 검정 = 판다
+  // 🔴 나란한 얇은 갈래를 겹치면 **줄무늬 리본**이 된다 — 수은이 아니다.
+  //    덩어리는 흐림 + 문턱("goo")으로 만든다: 겹친 원들을 뭉개고 알파 대비를
+  //    세우면 경계가 **서로 빨려들듯 이어져서** 액체 금속의 그 불룩한
+  //    이음매가 나온다. 원을 그냥 겹쳐 놓으면 눈사람이 된다.
+  const goo=el('filter',{id:'gooF',x:'-20%',y:'-20%',width:'140%',height:'140%','color-interpolation-filters':'sRGB'},defs)
+  el('feGaussianBlur',{in:'SourceGraphic',stdDeviation:34,result:'b'},goo)
+  el('feColorMatrix',{in:'b',type:'matrix',values:'1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 23 -10'},goo)
+
+  // S 자로 흐르는 심을 따라 굵기가 변하는 원을 늘어놓는다
+  const spine=[]
+  for(let i=0;i<=90;i++){
+    const t=i/90, x=110+t*(S-220)
+    spine.push([x, 600+Math.sin(t*Math.PI*2.05-0.5)*235+Math.sin(t*Math.PI*4.4)*52])
+  }
+  const blob=el('g',{filter:'url(#gooF)'},g)
+  for(let i=0;i<spine.length;i+=2){
+    const t=i/(spine.length-1)
+    // 가운데가 불룩하고 양 끝이 가늘어지는 흐름 + 방울지는 마디
+    const rad=34+Math.sin(Math.PI*t)**0.7*118+Math.sin(t*Math.PI*6.5)*26
+    el('circle',{cx:spine[i][0].toFixed(1),cy:spine[i][1].toFixed(1),r:rad.toFixed(1),fill:'#fff'},blob)
+  }
+  // 떨어져 나온 물방울 — 표면장력으로 떨어지는 그 구슬
+  for(const [fx,fy,fr] of [[188,352,54],[262,300,30],[1030,858,60],[962,918,33],[612,268,26],[598,930,30]])
+    el('circle',{cx:fx,cy:fy,r:fr,fill:'#fff'},blob)
+
+  // 크롬 반사 — 마스크 안의 **검정이 파내는 쪽**이다. 심을 따라 나란히
+  // 흐르되 끝이 가늘어져야 반사로 읽힌다(고른 굵기면 그냥 홈이다).
+  const gleam=(off,w,op)=>{
+    const seg=spine.map((p,i)=>{
+      const t=i/(spine.length-1)
+      const q=spine[Math.min(spine.length-1,i+1)],p0=spine[Math.max(0,i-1)]
+      const a=Math.atan2(q[1]-p0[1],q[0]-p0[0])+Math.PI/2
+      return `${(p[0]+Math.cos(a)*off).toFixed(1)},${(p[1]+Math.sin(a)*off).toFixed(1)}`
+    })
+    // 가운데만 굵게 — stroke 하나로는 못 하니 짧은 토막을 굵기를 바꿔 잇는다
+    for(let i=0;i<seg.length-1;i+=1){
+      const t=i/(seg.length-1)
+      const ww=w*Math.sin(Math.PI*t)**0.6
+      if(ww<0.6)continue
+      el('path',{d:`M${seg[i]} L${seg[i+1]}`,stroke:'#000',fill:'none',
+        'stroke-width':ww.toFixed(1),'stroke-linecap':'round',opacity:op},g)
+    }
+  }
+  gleam(-46,26,'1'); gleam(-8,13,'1'); gleam(30,18,'1'); gleam(66,7,'0.9'); gleam(-78,6,'0.85')
+  el('rect',{x:0,y:0,width:S,height:S,fill:'#000',mask:'url(#metalMask)'},svg)
+}
+
+/* ───────────── 18 파티클 플럭스 (구조만) ───────────── */
+{
+  const svg=tile('m18')
+  const r=rng(6018)
+  const g=el('g',{fill:'#000'},svg)
+  const ARMS=6
+  for(let a=0;a<ARMS;a++){
+    const base=(a/ARMS)*Math.PI*2
+    for(let i=0;i<340;i++){
+      const t=i/340
+      const rad=28+Math.pow(t,0.82)*520
+      const ang=base+t*3.5+ (r()-0.5)*0.30*(0.25+t)
+      const jit=(r()-0.5)*rad*0.13
+      const x=C+Math.cos(ang)*rad+jit, y=C+Math.sin(ang)*rad+jit*0.8
+      if(x<10||x>S-10||y<10||y>S-10)continue
+      const sz=(1.1+ (1-t)*7.5*r() + r()*2.6)
+      el('circle',{cx:x.toFixed(1),cy:y.toFixed(1),r:sz.toFixed(1),opacity:(0.22+ (1-t)*0.6 + r()*0.3).toFixed(2)},g)
+    }
+  }
+  // 가운데 핵
+  for(let i=0;i<260;i++){
+    const ang=r()*Math.PI*2, rad=Math.pow(r(),0.55)*70
+    el('circle',{cx:(C+Math.cos(ang)*rad).toFixed(1),cy:(C+Math.sin(ang)*rad).toFixed(1),r:(1.4+r()*6).toFixed(1),opacity:(0.5+r()*0.5).toFixed(2)},g)
+  }
+}
+
+/* ───────────── 19 디지털 글리치 박스 ───────────── */
+{
+  const svg=tile('m19')
+  const r=rng(7019)
+  const g=el('g',{},svg)
+  // 다면체 상자 — 꼭짓점을 잇고 대각선을 지른다
+  const V=[[190,300],[1010,300],[1010,900],[190,900],[330,170],[860,170],[860,760],[330,760],[600,120],[600,1040],[130,600],[1070,600]]
+  const E=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7],[8,4],[8,5],[8,0],[8,1],[9,3],[9,2],[9,7],[9,6],[10,0],[10,3],[10,4],[10,7],[11,1],[11,2],[11,5],[11,6],[0,2],[1,3],[4,6],[5,7],[8,9],[10,11]]
+  for(const [i,j] of E){
+    el('line',{x1:V[i][0],y1:V[i][1],x2:V[j][0],y2:V[j][1],stroke:'#000','stroke-width':(2+r()*5).toFixed(1),opacity:(0.4+r()*0.6).toFixed(2),'stroke-linecap':'round'},g)
+  }
+  for(const v of V)el('circle',{cx:v[0],cy:v[1],r:(5+r()*7).toFixed(1),fill:'#000',opacity:'0.9'},g)
+  // 글리치 — 선 위에 끼어드는 작은 블록과 어긋난 조각
+  for(let i=0;i<34;i++){
+    const [a,b]=E[Math.floor(r()*E.length)]
+    const t=0.15+r()*0.7
+    const x=V[a][0]+(V[b][0]-V[a][0])*t, y=V[a][1]+(V[b][1]-V[a][1])*t
+    el('rect',{x:(x-10-r()*45).toFixed(1),y:(y-4-r()*12).toFixed(1),width:(16+r()*95).toFixed(1),height:(4+r()*24).toFixed(1),fill:'#000',opacity:(0.3+r()*0.65).toFixed(2)},g)
+  }
+  for(let i=0;i<16;i++){
+    const y=150+r()*900
+    el('rect',{x:(150+r()*300).toFixed(1),y:y.toFixed(1),width:(60+r()*520).toFixed(1),height:(2+r()*7).toFixed(1),fill:'#000',opacity:(0.25+r()*0.5).toFixed(2)},g)
+  }
+}
+
+/* ───────────── 20 거친 숯 번짐 ───────────── */
+{
+  const svg=tile('m20'),defs=el('defs',{},svg)
+  grainFilter(defs,'chA','0.16',5,41,2.0,-0.62)
+  grainFilter(defs,'chB','0.42',5,47,2.1,-0.72)
+  grainFilter(defs,'chC','0.9',3,53,2.4,-1.0)
+  const r=rng(8020)
+  // 대각 문지름 — 같은 띠를 결이 다른 노이즈로 여러 겹.
+  // 🔴 모서리를 둥글리지 않는다(`rx` 를 크게 주면 겹친 층이 다 같은 알약
+  //    윤곽이라 **가장자리가 매끈한 캡슐**로 보인다 — 숯이 아니다).
+  //    대신 끝을 들쭉날쭉한 다각형으로 끊는다.
+  const smear=(cx,cy,w,h,rot,filt,op)=>{
+    const g=el('g',{transform:`rotate(${rot} ${cx} ${cy})`},svg)
+    const x0=cx-w/2,y0=cy-h/2
+    const top=[],bot=[]
+    for(let i=0;i<=11;i++){
+      const t=i/11, x=x0+t*w
+      const wob=(r()-0.5)*h*0.42
+      // 양 끝을 들여 깎는다 — 붓이 떨어지는 자리
+      const edge=Math.min(1,Math.sin(Math.PI*t)*1.9)
+      top.push(`${x.toFixed(1)},${(y0+h*(1-edge)*0.5+wob).toFixed(1)}`)
+      bot.push(`${x.toFixed(1)},${(y0+h-h*(1-edge)*0.5+(r()-0.5)*h*0.42).toFixed(1)}`)
+    }
+    el('path',{d:`M${top.join(' L')} L${bot.reverse().join(' L')} Z`,fill:'#000',filter:`url(#${filt})`,opacity:op},g)
+  }
+  for(let i=0;i<9;i++){
+    smear(600+(r()-0.5)*150,600+(r()-0.5)*190,720+r()*280,190+r()*200,-32+(r()-0.5)*16,'chA',(0.5+r()*0.5).toFixed(2))
+  }
+  for(let i=0;i<7;i++){
+    smear(600+(r()-0.5)*230,600+(r()-0.5)*250,620+r()*330,120+r()*170,-32+(r()-0.5)*22,'chB',(0.45+r()*0.5).toFixed(2))
+  }
+  // 튀는 가루
+  for(let i=0;i<5;i++){
+    smear(600+(r()-0.5)*330,600+(r()-0.5)*340,760+r()*260,260+r()*160,-32+(r()-0.5)*26,'chC',(0.3+r()*0.4).toFixed(2))
+  }
+  // 심 — 가장 진한 가운데 결
+  const g=el('g',{transform:'rotate(-32 600 600)'},svg)
+  for(let i=0;i<26;i++){
+    el('rect',{x:180+r()*180,y:560+(r()-0.5)*150,width:(220+r()*520).toFixed(1),height:(3+r()*17).toFixed(1),rx:6,fill:'#000',opacity:(0.3+r()*0.6).toFixed(2),filter:'url(#chB)'},g)
+  }
+}
+
+/* ───────────── 21 겹치는 사각형 ───────────── */
+{
+  const svg=tile('m21'),defs=el('defs',{},svg)
+  grainFilter(defs,'sqG','0.30',4,61,1.9,-0.72)
+  grainFilter(defs,'sqH','0.70',3,67,2.1,-0.86)
+  const r=rng(9021)
+  const g=el('g',{},svg)
+  let clipN=0
+  const sq=(cx,cy,s,rot,mode,op)=>{
+    const gg=el('g',{transform:`rotate(${rot.toFixed(1)} ${cx} ${cy})`,opacity:op},g)
+    const x=cx-s/2,y=cy-s/2
+    // 🔴 채움은 반드시 네모 안에 가둔다 — 안 자르면 빗금이 밖으로 새어
+    //    네모가 안 읽히고 화면이 통째로 빗금 뭉치가 된다.
+    const cid=`sqc${clipN++}`
+    const cp=el('clipPath',{id:cid,clipPathUnits:'userSpaceOnUse'},defs)
+    el('rect',{x,y,width:s,height:s},cp)
+    const inside=el('g',{'clip-path':`url(#${cid})`},gg)
+    if(mode===0){        // 결 채움
+      el('rect',{x,y,width:s,height:s,fill:'#000',filter:'url(#sqG)'},inside)
+    }else if(mode===1){  // 빗금
+      for(let v=-s;v<s*2;v+=15+r()*20)el('line',{x1:x+v,y1:y-4,x2:x+v-s,y2:y+s+4,stroke:'#000','stroke-width':(2+r()*6).toFixed(1),opacity:(0.4+r()*0.6).toFixed(2)},inside)
+    }else if(mode===2){  // 거친 채움
+      el('rect',{x,y,width:s,height:s,fill:'#000',filter:'url(#sqH)'},inside)
+    }
+    // 테두리는 어느 갈래든 남긴다 — 네모라는 것이 읽혀야 한다
+    el('rect',{x,y,width:s,height:s,fill:'none',stroke:'#000','stroke-width':(mode===3?4+r()*7:5).toFixed(1),opacity:'0.92'},gg)
+  }
+  const boxes=[[430,430,330],[760,360,290],[560,640,400],[330,720,270],[810,760,330],[620,290,230],[880,560,240],[390,560,250]]
+  boxes.forEach((b,i)=>sq(b[0],b[1],b[2],(r()-0.5)*46,i%4,(0.5+r()*0.5).toFixed(2)))
+}
+document.title='ready'
+</script>

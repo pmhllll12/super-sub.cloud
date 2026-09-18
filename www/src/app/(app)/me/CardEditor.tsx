@@ -402,7 +402,7 @@ function CardPhoto() {
   )
 }
 
-/** 붓 — 열 가지 자국 중 하나를 고르고 색 · 크기 · 자리를 정한다. */
+/** 붓 — 자국(`CardMark.MARKS`) 하나를 고르고 색 · 크기 · 자리를 정한다. */
 function CardBrushTool() {
   const { style, set } = useCardStyle()
   return (
