@@ -2064,6 +2064,62 @@ describe('스쿼드 — 수락한 팀원', () => {
  * **다시 시도하는 자리가 없다.** 운영의 「심사위원 FC」가 그래서 팀원 9명에
  * 스쿼드 0이었고, 판이 빈 채로 떠서 팀 매칭 단추도 안 켜졌다.
  */
+/**
+ * 🔴 **⊗ 로 뺀 사람이 새로고침에 되살아나던 것** (사용자 지적, 2026-09-18:
+ * 「취소를 눌러 내보냈는데 계속 팀에 상주한다」).
+ *
+ * 전에는 ⊗ 가 **대기 중인 초대만** 물렀다. 수락이 끝나면 무를 초대가 없어
+ * **서버로 아무것도 안 나갔고**, 화면에서만 사라졌다가 되돌아왔다.
+ * 등재를 만드는 쪽은 서버인데(계약 60) 지우는 쪽만 화면에 있었다.
+ */
+describe('스쿼드 — ⊗ 는 등재된 사람도 서버에서 뺀다', () => {
+  const member = (id: string, nickname: string, pos: string, col: number, row: number) => ({
+    id,
+    player_card_id: `c-${id}`,
+    card_public_slug: `slug-${id}`,
+    nickname,
+    position_code: pos,
+    position_label: pos,
+    grid_col: col,
+    grid_row: row,
+  })
+  const SEATED = {
+    ...SQUAD,
+    formation: '5:5',
+    members: [member('sm-9', '더미선수', 'MF', 0, 1)],
+  }
+
+  const calls = () => {
+    const fn = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => SEATED })
+    vi.stubGlobal('fetch', fn)
+    return fn
+  }
+  const deleted = (fn: ReturnType<typeof vi.fn>) =>
+    fn.mock.calls.filter((c) => c[1]?.method === 'DELETE').map((c) => String(c[0]))
+
+  it('🔴 등재 id 로 DELETE 를 보낸다 — 화면만 바꾸지 않는다', async () => {
+    const fn = calls()
+    const user = userEvent.setup()
+    render(
+      <SquadPanel isCaptain card={CARD} squad={SEATED} myTeamId={MY_TEAM_ID} />,
+    )
+    await user.click(await screen.findByRole('button', { name: '더미선수 빼기' }))
+
+    await waitFor(() =>
+      expect(
+        deleted(fn).some((u) => u.includes('/squad/members/') && u.includes('sm-9')),
+      ).toBe(true),
+    )
+  })
+
+  /* 주장이 아니면 ⊗ 자체가 없다 — 서버가 403 이라 눌릴 자리를 안 만든다. */
+  it('팀원 화면에는 ⊗ 가 없다', () => {
+    calls()
+    render(<SquadPanel card={CARD} squad={SEATED} myTeamId={MY_TEAM_ID} />)
+    expect(screen.queryByRole('button', { name: '더미선수 빼기' })).toBeNull()
+  })
+})
+
 describe('스쿼드 — 없으면 주장 화면이 만든다', () => {
   const calls = () => {
     const fn = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({}) })
