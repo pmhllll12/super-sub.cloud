@@ -15354,3 +15354,119 @@ a.ss-seeking-pill:hover {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* ── 테스트 번호 고르기(로그인 화면) — components/auth/SeatPicker.tsx ──
+   작은 알약 하나 + 오른쪽으로 펼치는 번호 판(5 × 2). 둘 다 **안쪽 색 없는 유리,
+   외곽선 없음**(사용자 요청 — 브라우저 기본 select 가 겹치고 안 예뻤다). */
+.ss-seat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ss-seat-pill,
+.ss-seat-panel {
+  border: 0;
+  background: transparent;
+  backdrop-filter: blur(10px) saturate(var(--ss-glass-saturate));
+  -webkit-backdrop-filter: blur(10px) saturate(var(--ss-glass-saturate));
+}
+
+.ss-seat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px 3px 11px;
+  border-radius: 999px;
+  color: var(--ss-fg);
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.ss-seat-pill:hover,
+.ss-seat-pill[aria-expanded='true'] {
+  background: color-mix(in srgb, var(--ss-fg) 8%, transparent);
+}
+
+.ss-seat-caret {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.25s ease;
+}
+
+.ss-seat-pill[aria-expanded='true'] .ss-seat-caret {
+  transform: rotate(180deg);
+}
+
+/* 판 — 알약 오른쪽 가운데에 붙어(JS 가 top/left 를 준다) 왼쪽에서 오른쪽으로
+   스르르 펼쳐진다. 🔴 펼치는 것은 clip-path 다 — 판이 옆으로 밀려 오는 것
+   (translate)만 쓰면 알약 위를 지나가며 겹친다. */
+.ss-seat-panel {
+  position: fixed;
+  z-index: 60;
+  display: grid;
+  grid-template-columns: repeat(5, auto);
+  gap: 2px;
+  padding: 5px;
+  border-radius: 14px;
+  transform: translateY(-50%);
+  animation: ss-seat-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ss-seat-panel[data-state='closing'] {
+  animation: ss-seat-out 0.22s ease-in both;
+}
+
+@keyframes ss-seat-in {
+  from { clip-path: inset(0 100% 0 0 round 14px); opacity: 0; transform: translate(-6px, -50%); }
+  to { clip-path: inset(0 0 0 0 round 14px); opacity: 1; transform: translate(0, -50%); }
+}
+
+@keyframes ss-seat-out {
+  from { clip-path: inset(0 0 0 0 round 14px); opacity: 1; }
+  to { clip-path: inset(0 100% 0 0 round 14px); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-seat-panel,
+  .ss-seat-panel[data-state='closing'] {
+    animation-duration: 0.01s;
+  }
+}
+
+.ss-seat-num {
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: color-mix(in srgb, var(--ss-fg) 75%, transparent);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.ss-seat-num:hover {
+  background: color-mix(in srgb, var(--ss-fg) 10%, transparent);
+  color: var(--ss-fg);
+}
+
+/* 지금 번호 — 색 판을 깔지 않고 글자만 민트로 또렷이. */
+.ss-seat-num[aria-pressed='true'] {
+  color: var(--ss-accent);
+  font-weight: 600;
+}
+
+.ss-seat-pill:focus-visible,
+.ss-seat-num:focus-visible {
+  outline: 2px solid var(--ss-accent);
+  outline-offset: 2px;
+}

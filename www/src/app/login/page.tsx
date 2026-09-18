@@ -9,6 +9,7 @@ import Field from '@/components/ui/Field'
 import PillButton from '@/components/ui/PillButton'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 import AuthShell from '@/components/auth/AuthShell'
+import SeatPicker from '@/components/auth/SeatPicker'
 import {
   judgeEmail,
   judgeNickname,
@@ -153,25 +154,17 @@ export default function LoginPage() {
               🔴 **번호를 보여 주는 것이 이 방식의 안전장치다** — 둘이 같은
               번호를 쓰면 판·알림을 공유한다. 보여 줘야 부딪힌 것을 알아채고
               한쪽이 옮긴다. */}
-          <label className="flex items-center gap-2 text-xs" style={{ color: MUTED }}>
-            테스터 번호
-            <select
-              className="rounded border bg-transparent px-2 py-1"
-              style={{ color: 'var(--ss-fg)', borderColor: MUTED }}
-              value={seat ?? ''}
-              onChange={(e) => {
-                const picked = setJudgeSeat(Number(e.target.value))
+          <div className="text-xs" style={{ color: MUTED }}>
+            <SeatPicker
+              label="테스트 번호"
+              seat={seat}
+              seats={judgeSeats()}
+              onPick={(n) => {
+                const picked = setJudgeSeat(n)
                 if (picked !== null) setSeat(picked)
               }}
-            >
-              {seat === null && <option value="">자동</option>}
-              {judgeSeats().map((n) => (
-                <option key={n} value={n} style={{ color: '#000' }}>
-                  {n}번
-                </option>
-              ))}
-            </select>
-          </label>
+            />
+          </div>
         </>
       }
     >
