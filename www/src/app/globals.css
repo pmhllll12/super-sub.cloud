@@ -15286,6 +15286,48 @@ a.ss-seeking-pill:hover {
 .ss-demo-resize[data-corner='bl']::after { border-bottom-width: 2px; border-left-width: 2px; border-bottom-left-radius: 6px; }
 .ss-demo-resize[data-corner='br']::after { border-bottom-width: 2px; border-right-width: 2px; border-bottom-right-radius: 6px; }
 
+/* 「시연영상을 참고해 주세요」 — 영상이 처음 다 내려온 순간 로그인 화면을 어둡게
+   하고(영상·닫기 단추는 그 위라 밝은 그대로) 영상 바로 밑에 흰 글자 한 줄.
+   🔴 어둠 판은 누르는 것을 가로채지 않는다(`pointer-events: none`) — 어디든 한 번
+   누르면 걷히되, 누른 것은 원래 일을 그대로 한다. 들어올 때·걷힐 때 모두 스르르. */
+.ss-demo-spot {
+  position: fixed;
+  inset: 0;
+  z-index: 54;
+  background: color-mix(in srgb, var(--ss-bg) 62%, transparent);
+  pointer-events: none;
+  animation: ss-demo-in 0.6s ease-out both;
+}
+
+.ss-demo-spot-note {
+  position: fixed;
+  z-index: 55;
+  margin: 0;
+  color: #ffffff; /* 완전한 흰색(사용자 요청) — 흰 판 화면들이 --ss-fg 를 뒤집어 쓴다 */
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: ss-demo-note-in 0.6s ease-out both;
+}
+
+@keyframes ss-demo-note-in {
+  from { opacity: 0; transform: translate(-50%, 6px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* 걷힐 때 — 둘이 같은 길이(SPOT_FADE_MS)로 함께 사라진다. */
+.ss-demo-spot[data-state='out'],
+.ss-demo-spot-note[data-state='out'] {
+  animation: ss-demo-out 0.6s ease-in both;
+}
+
+@keyframes ss-demo-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
 @keyframes ss-demo-in {
   from { opacity: 0; }
   to { opacity: 1; }

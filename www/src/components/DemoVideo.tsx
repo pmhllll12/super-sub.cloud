@@ -54,6 +54,33 @@ export default function DemoVideo() {
   // (still), 닫았다 다시 열면 스르르(fade).
   // 🔴 내려온 뒤 곧장 fade 로 바꾸면 애니메이션이 바뀌면서 **새로 돌아 한 번
   // 깜빡인다**(0 → 1). 그래서 가운데에 still 을 둔다.
+  // 「시연영상을 참고해 주세요」 — 로그인 화면에서 영상이 처음 다 내려왔을 때만
+  // 영상과 닫기 단추만 밝게 두고 나머지를 어둡게 하며 한 줄 띄운다(사용자 요청).
+  // on → (어디든 한 번 누르거나 5초) → out(스르르) → off.
+  const [spot, setSpot] = useState<'off' | 'on' | 'out'>('off')
+  useEffect(() => {
+    if (spot === 'on') {
+      const dismiss = () => setSpot('out')
+      const timer = setTimeout(dismiss, SPOT_MS)
+      // 캡처 단계에서 듣기만 하고 막지 않는다 — 누른 것은 원래 하던 일(입력칸
+      // 누르기·로그인 단추)을 그대로 한다. 어둠 판은 누르는 것을 가로채지 않는다.
+      window.addEventListener('pointerdown', dismiss, true)
+      return () => {
+        clearTimeout(timer)
+        window.removeEventListener('pointerdown', dismiss, true)
+      }
+    }
+    if (spot === 'out') {
+      const timer = setTimeout(() => setSpot('off'), SPOT_FADE_MS)
+      return () => clearTimeout(timer)
+    }
+  }, [spot])
+  // 다른 화면으로 가거나 닫으면 함께 걷는다.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (closed || !base?.slotted) setSpot((s) => (s === 'on' ? 'out' : s))
+  }, [closed, base?.slotted])
+
   const [entrance, setEntrance] = useState<'drop' | 'still' | 'fade'>('drop')
   // 다시 틀 때 ▶ 를 한 번 띄웠다 사라지게 하는 열쇠 — 바꿀 때마다 새로 돈다.
   const [flash, setFlash] = useState(0)
@@ -266,6 +293,22 @@ export default function DemoVideo() {
 
   return (
     <>
+      {spot !== 'off' && (
+        <>
+          {/* 어둠 판 — 영상(z 55) 바로 밑이라 영상·닫기 단추만 밝게 남는다. */}
+          <div aria-hidden="true" className="ss-demo-spot" data-state={spot} />
+          {rect && (
+            <p
+              role="status"
+              className="ss-demo-spot-note"
+              data-state={spot}
+              style={{ top: rect.top + rect.height + 14, left: rect.left + rect.width / 2 }}
+            >
+              시연영상을 참고해 주세요.
+            </p>
+          )}
+        </>
+      )}
       {/* 단추 유리의 굴절(warp 8, 사용자 요청). 로그인 카드의 `#ss-glass-warp`(50)는
           그 화면에만 있고 세기도 달라 따로 둔다. */}
       <svg width="0" height="0" aria-hidden="true" focusable="false" className="absolute">
@@ -302,7 +345,10 @@ export default function DemoVideo() {
         style={pos}
         onAnimationEnd={(e) => {
           // 안쪽(아이콘·막대)의 애니메이션도 여기로 올라온다 — 제 것만 센다.
-          if (e.target === e.currentTarget && entrance === 'drop') setEntrance('still')
+          if (e.target !== e.currentTarget || entrance !== 'drop') return
+          setEntrance('still')
+          // 로그인 화면이면 다 내려온 순간 주위를 어둡게 하고 안내 한 줄을 띄운다.
+          if (base?.slotted) setSpot('on')
         }}
       >
         {/* 닫기 — 외곽선 **바깥** 왼쪽 위(사용자 요청). 틀이 `overflow: hidden` 이라
@@ -413,6 +459,11 @@ function PlayIcon({ className }: { className: string }) {
     </svg>
   )
 }
+
+/** 「시연영상을 참고해 주세요」가 떠 있는 시간(아무도 안 누르면). */
+export const SPOT_MS = 5000
+/** 어둠과 안내가 스르르 걷히는 시간 — CSS 의 전이 길이와 같아야 한다. */
+const SPOT_FADE_MS = 600
 
 /** 영상 위에 붙은 「시연영상 닫기」 단추가 차지하는 높이(단추 + 틈). */
 const CLOSE_ROOM = 34

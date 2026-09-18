@@ -228,3 +228,65 @@ describe('가운데 아이콘', () => {
     expect(btn.querySelector('.ss-demo-video-flash')).not.toBeNull()
   })
 })
+
+describe('「시연영상을 참고해 주세요」', () => {
+  // 🔴 jsdom 에는 `AnimationEvent` 가 없어 React 가 `animationend` 대신 접두사 붙은
+  // 이름(webkitAnimationEnd 등)을 듣는다 — `fireEvent.animationEnd` 는 안 닿는다.
+  // 셋 다 쏘면 React 가 듣는 하나만 받는다.
+  function landed(el: HTMLElement) {
+    for (const type of ['animationend', 'webkitAnimationEnd', 'mozAnimationEnd', 'MSAnimationEnd', 'oanimationend'])
+      act(() => {
+        el.dispatchEvent(new Event(type, { bubbles: true }))
+      })
+  }
+
+  function landOnLogin() {
+    const slot = document.createElement('div')
+    slot.setAttribute('data-demo-slot', '')
+    slot.getBoundingClientRect = () => ({ top: 300, left: 400, width: 400, height: 200 }) as DOMRect
+    document.body.appendChild(slot)
+    const utils = render(<DemoVideo />)
+    const box = utils.container.querySelector<HTMLElement>('.ss-demo-video')!
+    landed(box) // 다 내려왔다
+    return { ...utils, cleanup: () => slot.remove() }
+  }
+
+  it('로그인 화면에서 다 내려오면 어둡게 하고 영상 바로 밑에 한 줄 띄운다', () => {
+    const { container, cleanup } = landOnLogin()
+    expect(container.querySelector('.ss-demo-spot')).not.toBeNull()
+    const note = screen.getByText('시연영상을 참고해 주세요.')
+    expect(note.style.top).toBe('514px') // 300 + 200 + 14
+    expect(note.style.left).toBe('600px') // 가운데
+    cleanup()
+  })
+
+  it('어디든 한 번 누르면 둘이 함께 걷힌다', () => {
+    vi.useFakeTimers()
+    const { container, cleanup } = landOnLogin()
+    fireEvent.pointerDown(document.body)
+    expect(container.querySelector('.ss-demo-spot')).toHaveAttribute('data-state', 'out')
+    expect(screen.getByText('시연영상을 참고해 주세요.')).toHaveAttribute('data-state', 'out')
+    act(() => vi.advanceTimersByTime(700))
+    expect(container.querySelector('.ss-demo-spot')).toBeNull()
+    expect(screen.queryByText('시연영상을 참고해 주세요.')).toBeNull()
+    cleanup()
+    vi.useRealTimers()
+  })
+
+  it('아무도 안 누르면 5초 뒤 걷힌다', () => {
+    vi.useFakeTimers()
+    const { container, cleanup } = landOnLogin()
+    act(() => vi.advanceTimersByTime(4900))
+    expect(container.querySelector('.ss-demo-spot')).toHaveAttribute('data-state', 'on')
+    act(() => vi.advanceTimersByTime(200))
+    expect(container.querySelector('.ss-demo-spot')).toHaveAttribute('data-state', 'out')
+    cleanup()
+    vi.useRealTimers()
+  })
+
+  it('로그인 화면이 아니면 띄우지 않는다', () => {
+    const { container } = render(<DemoVideo />)
+    landed(container.querySelector<HTMLElement>('.ss-demo-video')!)
+    expect(container.querySelector('.ss-demo-spot')).toBeNull()
+  })
+})
