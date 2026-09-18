@@ -137,7 +137,7 @@ export default function AuthShell({
                   <span className="block">실력을 검증합니다.</span>
                 </p>
               </div>
-              <div data-demo-slot="" aria-hidden="true" className="aspect-[1920/1040] min-w-0 flex-1" />
+              <div data-demo-slot="" aria-hidden="true" className="aspect-[1902/952] min-w-0 flex-1" />
             </div>
           </div>
 

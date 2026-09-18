@@ -14970,7 +14970,7 @@ a.ss-seeking-pill:hover {
   left: 1.5rem;
   bottom: 1.5rem;
   width: min(20rem, 40vw);
-  aspect-ratio: 1920 / 1040;
+  aspect-ratio: 1902 / 952; /* 브라우저 머리칸(위 88px)·스크롤바(오른쪽 18px)를 잘라 낸 영상 */
   border: 1px solid var(--ss-demo-edge);
   border-radius: 12px;
   overflow: hidden;

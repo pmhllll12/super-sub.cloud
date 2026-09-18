@@ -4,7 +4,14 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { useIntroDone } from '@/lib/useIntroDone'
 
-/** 사용법 안내 영상. `public/` 에 있는 21MB 원본이다(`demo.mp4` 는 업로드가 깨진 2바이트라 안 쓴다). */
+/**
+ * 사용법 안내 영상(1902×952, 17MB). 🔴 **원본 녹화에서 브라우저 머리칸(탭·주소창, 위
+ * 88px)과 스크롤바(오른쪽 18px)를 잘라 낸 것이다** — 우리 사이트만 보이게(사용자 요청).
+ * 원본은 120초 내내 같은 자리에 머리칸이 있어 한 번에 잘랐다:
+ * `ffmpeg -i 원본.mp4 -vf crop=1902:952:0:88 -c:v libx264 -crf 22 -an -movflags +faststart`
+ * 영상을 바꾸면 자리 비율(`AuthShell` 의 `aspect-[…]`, `.ss-demo-video`)도 같이 고친다.
+ * (`demo.mp4` 는 업로드가 깨진 2바이트라 안 쓴다.)
+ */
 export const DEMO_VIDEO_SRC = '/SUPER_SUB_2min_demo_KR_subtitled.mp4'
 
 /** 로그인 화면이 영상 자리로 내놓는 표식. `AuthShell` 이 단다. */
