@@ -10,11 +10,14 @@ const NUDGES = {
   card: {
     targets: ['.ss-profile-face .ss-pcard-inner', '.ss-profile-edit-link'],
     message: '먼저 내 카드를 만들어주세요.',
+    note: 'right',
   },
-  /** 카드는 있는데 팀이 없다 → 「팀 만들기」. 스쿼드 판도 경기 신청도 팀 밑이다. */
+  /** 카드는 있는데 팀이 없다 → 「팀 만들기」 단추 **하나만** 밝히고 문장은 그 **밑에**
+   *  (사용자 요청 — 스쿼드 판도 경기 신청도 팀 밑이다). */
   team: {
     targets: ['.ss-team-create-btn'],
-    message: '먼저 팀을 만들어주세요.',
+    message: '팀을 만들어주세요.',
+    note: 'below',
   },
 } as const
 
@@ -37,5 +40,5 @@ export default function ProfileNudge({ kind }: { kind: keyof typeof NUDGES }) {
   }, [])
   if (!on || done) return null
   const n = NUDGES[kind]
-  return <SpotNudge targets={[...n.targets]} message={n.message} note="right" onDone={() => setDone(true)} />
+  return <SpotNudge targets={[...n.targets]} message={n.message} note={n.note} onDone={() => setDone(true)} />
 }

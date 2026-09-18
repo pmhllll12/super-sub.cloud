@@ -636,10 +636,10 @@ describe('프로필 안내', () => {
     expect(screen.getByText('먼저 내 카드를 만들어주세요.')).toBeInTheDocument()
   })
 
-  it('카드는 있는데 팀이 없으면 「먼저 팀을 만들어주세요.」', () => {
+  it('카드는 있는데 팀이 없으면 「팀 만들기」 밑에 「팀을 만들어주세요.」', () => {
     render(<MeBody user={{ ...USER, teams: [] }} card={CARD} videos={[]} matches={[]} />)
     act(() => vi.advanceTimersByTime(1700))
-    expect(screen.getByText('먼저 팀을 만들어주세요.')).toBeInTheDocument()
+    expect(screen.getByText('팀을 만들어주세요.')).toBeInTheDocument()
   })
 
   it('카드도 팀도 있으면 아무것도 안 띄운다', () => {
@@ -647,6 +647,6 @@ describe('프로필 안내', () => {
     render(<MeBody user={teamed as typeof USER} card={CARD} videos={[]} matches={[]} />)
     act(() => vi.advanceTimersByTime(1700))
     expect(screen.queryByRole('status', { name: '' })).toBeNull()
-    expect(screen.queryByText(/먼저 .*만들어주세요/)).toBeNull()
+    expect(screen.queryByText(/만들어주세요/)).toBeNull()
   })
 })
