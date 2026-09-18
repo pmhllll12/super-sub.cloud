@@ -8,8 +8,16 @@ import BrandMark from './ui/BrandMark'
  * 검은 테두리 안에 **흰 카드**가 들어 있고, 위에서부터 워드마크 · 작은
  * 머리글 · 큰 별명이 오고, 아래 절반을 누끼 인물이 채운다.
  *
- * 인물은 `public/player_cutout.png` — 배경이 검던 원본에서 사람만 떼어
- * 낸 것이다(만든 과정은 커밋 메시지 참고). **카드 세로 가운데 위로는
+ * 사진을 안 올린 카드의 인물은 `public/player_default.webp`(2026-09-19 사용자
+ * 지정 — 축구공을 든 선수). 원본(2400×1352, 누끼)에서 만든 것:
+ *   - 🔴 **얼굴(머리 x 805~1255)이 가로 가운데**, 양팔 끝(x 597~2288)이 다 들어오게
+ *     모자라는 왼쪽을 투명으로 채웠다(사용자 요청 — 처음엔 양팔이 잘렸다)
+ *   - 🔴 오른 팔꿈치 위의 생성기 워터마크(✦, 가운데 x 2189 · y 1140)는 **지웠다**
+ *     (주변 피부로 메움). 원본에서 다시 만들면 되살아나니 같이 지울 것
+ *   - 1100px 로 줄인 WebP(투명 유지, 50KB)
+ * 이 그림은 넓어서 **자르지 않고 카드 폭에 맞춰 바닥에 앉힌다**(`data-photo-default`,
+ * globals.css) — 올린 사진처럼 네모 칸에 `cover` 로 채우면 팔이 잘린다.
+ * (전에는 `player_cutout.png` — 미식축구 선수였다.) **카드 세로 가운데 위로는
  * 올라오지 않는다** — 위쪽 절반은 워드마크와 머리글의 자리다.
  *
  * ✅ 가운데 큰 글자는 **`card.tagline`**(CCC 18·35)에서 온다 — 안 정했으면
@@ -126,13 +134,15 @@ export default function PlayerCardView({
   // 🔴 `look.text` 는 **편집 중인 초안**이라 빈 문자열이 올 수 있다. `??` 는
   //    `''` 를 통과시키므로(널만 본다) 지우는 즉시 미리보기에서도 사라진다.
   const alias = look?.text ?? aliasOf(card)
-  const photo = effective?.photo ?? '/player_cutout.png'
+  const photo = effective?.photo ?? '/player_default.webp'
   const full = effective?.mode === 'full'
   return (
     <article
       className="ss-pcard"
       aria-label={card.user.nickname}
       data-photo={full ? 'full' : undefined}
+      // 사진을 안 올린 카드 — 기본 인물은 **자르지 않고** 카드 폭에 맞춘다(아래 CSS).
+      data-photo-default={!effective?.photo && !full ? 'true' : undefined}
       data-text-free={effective ? 'true' : undefined}
       style={
         effective

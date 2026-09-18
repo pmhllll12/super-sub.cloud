@@ -1559,6 +1559,19 @@ body::-webkit-scrollbar {
   -webkit-user-drag: none;
 }
 
+/* 사진을 안 올린 카드의 기본 인물(player_default.webp) — 양팔을 벌린 넓은 그림이라
+   🔴 **자르지 않는다.** 카드 폭을 다 쓰고(inset-inline 0), 그 안에 통째로 맞춰
+   바닥에 앉힌다(contain · bottom). 올린 사진처럼 cover 로 채우면 양팔이 잘렸다
+   (사용자 지적). 얼굴은 그림 자체가 가로 가운데로 만들어져 있다. */
+.ss-pcard[data-photo-default='true'] .ss-pcard-figure {
+  inset-inline: 0;
+}
+
+.ss-pcard[data-photo-default='true'] .ss-pcard-figure img {
+  object-fit: contain;
+  object-position: center bottom;
+}
+
 /* 작게 줄인 카드 — 홈 헤더에서 닉네임 자리를 대신한다. 폭만 줄이면 안쪽
    글자 크기가 그대로 남아 짜임이 깨지므로, 제 크기로 그린 뒤 통째로
    축소한다(transform). 그러면 안쪽 여백 · 글자 · 붓자국이 전부 같은
@@ -15527,4 +15540,10 @@ a.ss-seeking-pill:hover {
 .ss-nudge-dim[data-state='out'],
 .ss-nudge-note[data-state='out'] {
   animation: ss-demo-out 0.6s ease-in both;
+}
+
+/* 카드 편집기 — 글자 자리 줄 밑의 한 줄 안내(「카드 위 글자를 끌어서 옮길 수도」). */
+.ss-card-hint {
+  margin: -4px 0 0;
+  font-size: 12px;
 }

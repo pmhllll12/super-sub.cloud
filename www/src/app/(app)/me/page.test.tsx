@@ -568,6 +568,20 @@ describe('내 프로필 — /me', () => {
     expect(pcard.style.getPropertyValue('--ss-pcard-text-y')).toBe('24%')
   })
 
+  // 🔴 글자 자리를 **슬라이더로도** 옮긴다(2026-09-19) — 끌기와 같은 값이다.
+  it('글자 좌우·위아래 슬라이더가 카드의 글자를 옮긴다', () => {
+    const { container } = render(
+      <MeBody user={USER} card={CARD} videos={[]} matches={[]} editing />,
+    )
+    const pcard = container.querySelector<HTMLElement>('.ss-card-stage .ss-pcard')!
+    fireEvent.change(screen.getByRole('slider', { name: '글자 위아래' }), { target: { value: '70' } })
+    fireEvent.change(screen.getByRole('slider', { name: '글자 좌우' }), { target: { value: '30' } })
+    expect(pcard.style.getPropertyValue('--ss-pcard-text-y')).toBe('70%')
+    expect(pcard.style.getPropertyValue('--ss-pcard-text-x')).toBe('30%')
+    // 위로는 로고 자리까지만 — 끌기와 같은 하한
+    expect(screen.getByRole('slider', { name: '글자 위아래' })).toHaveAttribute('min', '24')
+  })
+
   // 초기화는 이제 카드를 지운다(묻고 나서) — 화면 값도 먼저 기본값으로 돌린다.
   it('초기화로 되돌릴 수 있다', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true)

@@ -7,7 +7,7 @@ import { uploadCardPhoto } from '@/lib/cardPhoto'
 import PillButton from '@/components/ui/PillButton'
 import type { PlayerCard } from '@/server/backend'
 import CardMark, { HIDDEN_MARKS, MARKS } from '@/components/CardMark'
-import { useCardStyle } from './cardStyle'
+import { TEXT_MIN_Y, useCardStyle } from './cardStyle'
 
 /**
  * 선 아래의 카드 편집기.
@@ -202,7 +202,32 @@ function CardLooks() {
           value={style.textColor}
           onChange={(v) => set({ textColor: v })}
         />
+
+        {/* 🔴 **글자 자리를 여기서도 옮긴다**(사용자 요청, 2026-09-19). 카드 위
+            글자를 끄는 길(`StyledCard`)은 원래 있었는데 **아무 표시가 없어 아무도
+            몰랐다.** 같은 값(`textX`·`textY`, 저장되는 `text_x`·`text_y`)을 미는
+            것이라 둘 중 어느 쪽으로 옮겨도 같다. 범위도 끌기와 같다 — 가장자리에
+            안 붙고(6~94), 위로는 로고·머리글 자리(TEXT_MIN_Y)까지만. */}
+        <SlideRow
+          label="글자 좌우"
+          value={Math.round(style.textX)}
+          min={6}
+          max={94}
+          step={1}
+          suffix="%"
+          onChange={(v) => set({ textX: v })}
+        />
+        <SlideRow
+          label="글자 위아래"
+          value={Math.round(style.textY)}
+          min={TEXT_MIN_Y}
+          max={94}
+          step={1}
+          suffix="%"
+          onChange={(v) => set({ textY: v })}
+        />
       </dl>
+      <p className="ss-profile-muted ss-card-hint">카드 위 글자를 끌어서 옮길 수도 있습니다.</p>
 
       {/* 🔴 **초기화는 카드를 지운다**(위 `wipe`, 2026-09-19 사용자 요청으로
           뒤집음). 전에는 「화면 값만 기본값으로 — 지우면 무섭게 쓰인다」였고,
