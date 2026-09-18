@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   __resetSeeking,
+  isMatchDone,
+  markMatchDone,
   markSeen,
   readSeeking,
   startSeeking,
@@ -70,6 +72,26 @@ describe('seekingStore — 「팀 찾는 중」을 브라우저에 남긴다', (
     expect(readSeeking()).toBeNull()
     window.localStorage.setItem('ss-team-seeking-v1', JSON.stringify({ teamId: '' }))
     expect(readSeeking()).toBeNull()
+  })
+
+  it('🔴 끝낸 경기를 기억한다 — 머리칸 표시에서 빼려는 것', () => {
+    expect(isMatchDone('m1')).toBe(false)
+    markMatchDone('m1')
+    expect(isMatchDone('m1')).toBe(true)
+    /* 다른 경기는 그대로다 — 하나 끝냈다고 전부 감추면 안 된다. */
+    expect(isMatchDone('m2')).toBe(false)
+  })
+
+  it('같은 경기를 두 번 적어도 한 번만 쌓인다', () => {
+    markMatchDone('m1')
+    markMatchDone('m1')
+    const raw = JSON.parse(window.localStorage.getItem('ss-finished-matches-v1') ?? '[]')
+    expect(raw).toEqual(['m1'])
+  })
+
+  it('빈 id 는 안 적는다 — 없는 경기를 끝냈다고 하지 않는다', () => {
+    markMatchDone('')
+    expect(window.localStorage.getItem('ss-finished-matches-v1')).toBeNull()
   })
 
   it('__resetSeeking 이 칸을 비운다', () => {

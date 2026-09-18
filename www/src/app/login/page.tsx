@@ -2,13 +2,20 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { apiErrorMessage, apiPost } from '@/lib/api/client'
 import { useRateLimitLock } from '@/lib/api/rateLimit'
 import Field from '@/components/ui/Field'
 import PillButton from '@/components/ui/PillButton'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 import AuthShell from '@/components/auth/AuthShell'
+import {
+  judgeEmail,
+  judgeNickname,
+  judgeSeat,
+  nextJudgeSeat,
+  readJudgeSeat,
+} from '@/lib/judgeSeat'
 
 const FAINT = 'color-mix(in srgb, var(--ss-fg) 40%, transparent)'
 const MUTED = 'color-mix(in srgb, var(--ss-fg) 60%, transparent)'
@@ -26,11 +33,12 @@ const MUTED = 'color-mix(in srgb, var(--ss-fg) 60%, transparent)'
  * 가입시킨 뒤 다시 로그인한다. 심사위원은 **누르기만** 하면 되고, 진짜
  * 계정이라 **안이 전부 돌아간다.** 실서버에 누가 미리 만들어 둘 필요도 없다.
  */
-const JUDGE = {
-  email: 'judge@super-sub.example',
-  password: 'supersub-judge-2026',
-  nickname: '심사위원',
-}
+/**
+ * 🔴 **계정을 여러 개 두고 브라우저마다 하나를 쓴다**(2026-09-18, 사용자 요청).
+ * 전에는 상수 하나라 심사위원 전원이 **같은 계정**에 들어왔고, 판·알림·초대를
+ * 공유해서 서로의 화면을 건드렸다. 고르는 규칙은 `lib/judgeSeat.ts`.
+ */
+const JUDGE_PASSWORD = 'supersub-judge-2026'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -41,6 +49,18 @@ export default function LoginPage() {
   /* 🔴 **429 뒤에는 다시 안 보낸다**(계약 1번). 기다릴 시간은 서버가 준
      `Retry-After` 다 — 자체 타이머를 두지 않는다. */
   const limit = useRateLimitLock()
+  /**
+   * 이 브라우저에 배정된 심사위원 번호.
+   *
+   * 🔴 **그릴 때 저장소를 읽지 않는다**(하이드레이션) — 서버가 그린 HTML 에는
+   * 이 브라우저의 값이 있을 수 없다. 붙은 뒤에 읽는다.
+   * 🔴 **여기서 고르지는 않는다** — 로그인 화면을 열어 보기만 한 사람에게
+   * 번호를 물리면, 실제로 쓰는 사람보다 먼저 자리를 차지한다.
+   */
+  const [seat, setSeat] = useState<number | null>(null)
+  useEffect(() => {
+    setSeat(readJudgeSeat())
+  }, [])
 
   /**
    * 심사위원용 — **로그인하고, 계정이 없으면 만들어서 다시 로그인한다.**
@@ -54,14 +74,23 @@ export default function LoginPage() {
     if (limit.locked) return
     setError(null)
     setBusy(true)
+    /* 🔴 **이 브라우저에 배정된 번호**로 들어간다 — 없으면 그 자리에서
+       무작위로 하나 골라 기억한다(`judgeSeat`). */
+    const n = seat ?? judgeSeat()
+    setSeat(n)
+    const email = judgeEmail(n)
     try {
       try {
-        await apiPost('/api/auth/login', { email: JUDGE.email, password: JUDGE.password })
+        await apiPost('/api/auth/login', { email, password: JUDGE_PASSWORD })
       } catch {
         /* 계정이 아직 없다 — 만들고 다시 들어간다. 가입이 이미 있다고
            튕기는 것도 여기서 삼킨다(먼저 누른 사람이 있었을 뿐이다). */
-        await apiPost('/api/auth/signup', JUDGE).catch(() => null)
-        await apiPost('/api/auth/login', { email: JUDGE.email, password: JUDGE.password })
+        await apiPost('/api/auth/signup', {
+          email,
+          password: JUDGE_PASSWORD,
+          nickname: judgeNickname(n),
+        }).catch(() => null)
+        await apiPost('/api/auth/login', { email, password: JUDGE_PASSWORD })
       }
       router.push('/home')
       router.refresh()
@@ -113,8 +142,22 @@ export default function LoginPage() {
             onClick={() => void onJudge()}
             className="w-full"
           >
-            심사위원용 로그인
+            심사위원용 로그인{seat ? ` (${seat}번)` : ''}
           </PillButton>
+          {/* 🔴 **번호를 보여 주는 것이 이 방식의 안전장치다**(2026-09-18).
+              브라우저마다 무작위로 고르므로 **둘이 같은 번호를 뽑을 수 있다**
+              (10개면 드물다). 같은 번호를 든 사람이 옆에 있으면 한쪽이 여기서
+              옮기면 된다 — 번호를 안 보여 주면 부딪힌 줄도 모른다. */}
+          {seat !== null && (
+            <button
+              type="button"
+              className="text-xs underline"
+              style={{ color: MUTED }}
+              onClick={() => setSeat(nextJudgeSeat())}
+            >
+              다른 심사위원 계정으로 바꾸기
+            </button>
+          )}
         </>
       }
     >

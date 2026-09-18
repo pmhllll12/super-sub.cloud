@@ -48,6 +48,7 @@ export default function MatchWaiting({
   them,
   myCard = null,
   onClose,
+  onFinished,
   onCancel,
 }: {
   us: MyTeamSummary
@@ -56,6 +57,13 @@ export default function MatchWaiting({
   myCard?: PublicPlayerCard | null
   /** 판을 접는다 — **경기는 그대로다**(×·Esc). */
   onClose: () => void
+  /**
+   * **경기를 끝냈다** — 「경기 완료」를 확인한 순간(사용자 요청, 2026-09-18).
+   *
+   * 🔴 닫기(`onClose`)와 다른 일이다. 닫기는 판만 접고, 이것은 **그 경기가
+   * 끝났다는 사실**을 알린다 — 부모가 머리칸 표시에서 뺀다.
+   */
+  onFinished?: () => void
   /**
    * 잡힌 경기를 **무른다** — 닫기와 다른 일이다.
    * 🔴 안 주면 취소 단추를 아예 안 그린다 — 눌러도 아무 일이 없으면 안 된다.
@@ -110,6 +118,13 @@ export default function MatchWaiting({
    * 2026-09-18). 🔴 두 판 어느 쪽이든 한 번에 하나만 연다.
    */
   const [picked, setPicked] = useState<PitchPlayer | null>(null)
+  /**
+   * 「경기 완료」를 눌러 **다시 묻는 중**이다 (사용자 요청, 2026-09-18).
+   *
+   * 🔴 취소의 `confirming` 과 **따로 둔다.** 둘은 반대 방향의 되돌릴 수 없는
+   * 결정이라, 한 칸으로 합치면 「무엇을 확인하는 중인지」가 화면에서 안 갈린다.
+   */
+  const [finishing, setFinishing] = useState(false)
 
   /**
    * 「경기 취소」를 눌러 **한 번 더 묻는 중**인가.
@@ -216,7 +231,23 @@ export default function MatchWaiting({
             </p>
           )}
 
-          <div className="ss-mw-actions" hidden={!onCancel}>
+          {/* 🔴 **되돌릴 수 없다는 것을 누르기 전에 말한다**(사용자 요청,
+              2026-09-18). `role="alertdialog"` 가 아니라 글자로 두는 이유는
+              이 판 자체가 이미 화면을 덮고 있어서다 — 그 위에 또 창을 띄우면
+              닫는 길이 둘로 늘고, 「×로 닫았는데 무엇이 취소된 거지」가 된다.
+              단추는 바로 아래 같은 자리에 선다. */}
+          {finishing && (
+            <p role="alert" className="ss-mw-warn">
+              정말로 경기가 완료되었나요? <strong>이 결정은 되돌릴 수 없습니다.</strong>
+            </p>
+          )}
+
+          {/* 🔴 **전에는 `hidden={!onCancel}` 이었다**(2026-09-18에 걷었다).
+              무를 길이 없으면 이 칸을 통째로 숨겼는데, 그러면 **마무리까지
+              같이 사라진다** — 「경기 완료」·「경기 끝내기」는 취소와 달리
+              서버로 나가는 것이 없어 `onCancel` 과 무관하다. 숨길 것은 칸이
+              아니라 **취소 단추 하나**다. */}
+          <div className="ss-mw-actions">
             {confirming ? (
               <>
                 <button
@@ -258,8 +289,39 @@ export default function MatchWaiting({
                   되돌리기
                 </button>
               </>
+            ) : finishing ? (
+              /* 🔴 **되돌릴 수 없는 결정이라 한 번 더 묻는다**(사용자 요청,
+                 2026-09-18). 경기를 완료로 넘기면 리뷰를 받고, 그 뒤로는
+                 「아직 안 한 경기」로 되돌릴 길이 없다. */
+              <>
+                <button
+                  type="button"
+                  className="ss-mw-cancel"
+                  data-done="true"
+                  onClick={() => {
+                    setFinishing(false)
+                    /* 🔴 **머리칸의 「경기 잡힘」에서 뺀다**(사용자 요청,
+                       2026-09-18: 취소처럼 사라지게). 서버에 「끝난 경기」
+                       상태가 없어(계약에 취소만 있다) 부모가 브라우저에
+                       적어 둔다 — 한계는 `seekingStore` 머리말. */
+                    onFinished?.()
+                    setReviewing(true)
+                  }}
+                >
+                  경기 완료
+                </button>
+                <button
+                  type="button"
+                  className="ss-mw-keep"
+                  onClick={() => setFinishing(false)}
+                >
+                  되돌리기
+                </button>
+              </>
             ) : over ? (
-              /* 🔴 **끝난 경기는 취소가 아니라 마무리다.** 누르면 리뷰로 간다. */
+              /* 🔴 **끝난 경기는 취소가 아니라 마무리다.** 누르면 리뷰로 간다.
+                 시각이 지난 뒤라 여기서는 다시 묻지 않는다 — 아래 「경기 완료」
+                 와 달리 **이미 일어난 일을 적는 것**이다. */
               <button
                 type="button"
                 className="ss-mw-cancel"
@@ -269,13 +331,31 @@ export default function MatchWaiting({
                 경기 끝내기
               </button>
             ) : (
-              <button
-                type="button"
-                className="ss-mw-cancel"
-                onClick={() => setConfirming(true)}
-              >
-                경기 취소
-              </button>
+              <>
+                {/* 무를 길이 없으면 이것만 안 그린다 — 눌러도 아무 일이
+                    없는 단추를 두지 않는다. */}
+                {onCancel && (
+                  <button
+                    type="button"
+                    className="ss-mw-cancel"
+                    onClick={() => setConfirming(true)}
+                  >
+                    경기 취소
+                  </button>
+                )}
+                {/* 🔴 **시각이 되기 전에도 손으로 끝낼 수 있다**(사용자 요청,
+                    2026-09-18). 시각이 지나야만 마무리할 수 있으면 먼저 치른
+                    경기를 적을 길이 없다. 🔴 되돌릴 수 없으므로 **바로 넘기지
+                    않고** 위 경고를 거친다. */}
+                <button
+                  type="button"
+                  className="ss-mw-cancel"
+                  data-done="true"
+                  onClick={() => setFinishing(true)}
+                >
+                  경기 완료
+                </button>
+              </>
             )}
           </div>
         </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { isMatchDone, subscribe as subscribeStore } from '@/lib/seekingStore'
 
 /**
  * 알림함 — **내가 응답해야 하는 것**만 모은다 (계약 3-12·3-15절).
@@ -232,7 +233,12 @@ export function useNotifyInbox() {
               (r) =>
                 r.status === 'accepted' &&
                 r.match_id &&
-                new Date(r.proposed_played_at).getTime() >= now,
+                new Date(r.proposed_played_at).getTime() >= now &&
+                /* 🔴 **팀장이 「경기 완료」를 누른 경기는 뺀다**(2026-09-18,
+                   사용자 요청: 취소처럼 「경기 잡힘」에서 사라지게). 서버에
+                   완료 상태가 없어 브라우저에 적어 둔 것을 본다 —
+                   한계는 `seekingStore` 머리말에 적었다. */
+                !isMatchDone(r.match_id),
             )
             .sort(
               (a, b) =>
@@ -380,7 +386,13 @@ export function useNotifyInbox() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void reload()
     const t = window.setInterval(() => void reload(), POLL_MS)
-    return () => clearInterval(t)
+    /* 🔴 **「끝냈다」를 적는 순간 다시 센다**(2026-09-18) — 안 그러면 표시가
+       다음 폴링(최대 15초)까지 남아 「눌렀는데 아무 일도 없다」가 된다. */
+    const off = subscribeStore(() => void reload())
+    return () => {
+      clearInterval(t)
+      off()
+    }
   }, [reload])
 
   /** 경기 신청을 수락한다 — 확정 경기가 생긴다. */

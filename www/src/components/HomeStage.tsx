@@ -217,7 +217,11 @@ export default function HomeStage({
      * 자리에 판이 셋(챗봇 · 지인 찾기 · AI 추천)이라 **굴린 자리**로 본다.
      */
     const onOwnPanel = (t: EventTarget | null) =>
-      t instanceof Element && t.closest('.ss-matchbot, .ss-suggest') !== null
+      /* 🔴 **경기 판·리뷰도 제 굴림을 갖는다**(2026-09-18, 사용자 지적).
+         빠뜨렸더니 리뷰 안에서 굴린 것이 창까지 올라와 **뒤의 홈이 영상
+         모음으로 내려갔고**, 리뷰를 닫으면 그 화면이 남아 있었다. */
+      t instanceof Element &&
+      t.closest('.ss-matchbot, .ss-suggest, .ss-mw, .ss-mr, .ss-mr-scrim') !== null
 
     const onWheel = (e: WheelEvent) => {
       if (e.ctrlKey || onOwnPanel(e.target)) return
@@ -482,7 +486,14 @@ export default function HomeStage({
               acceptedTeam={inbox.acceptedTeam}
               acceptedUs={inbox.acceptedUs}
               acceptedMatchId={inbox.acceptedMatchId}
-              onAcceptedShown={inbox.clearAccepted}
+              onAcceptedShown={() => {
+                inbox.clearAccepted()
+                /* 🔴 **닫으면 메인으로 돌아온다**(사용자 요청, 2026-09-18:
+                   「리뷰 마치고 이 화면으로 넘어오는데 메인으로 넘어오게」).
+                   판이 화면을 덮고 있는 동안 뒤가 영상 모음으로 내려가
+                   있을 수 있어서, 닫는 김에 무대로 되돌린다. */
+                setOut(false)
+              }}
               card={card}
               squad={squad}
               sportCode={sportCode}
