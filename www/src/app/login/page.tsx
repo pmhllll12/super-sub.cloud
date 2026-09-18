@@ -143,7 +143,7 @@ export default function LoginPage() {
             onClick={() => void onJudge()}
             className="w-full"
           >
-            심사위원용 로그인{seat ? ` (${seat}번)` : ''}
+            테스트용 로그인{seat ? ` (${seat}번)` : ''}
           </PillButton>
           {/* 🔴 **번호를 직접 고른다**(사용자 요청, 2026-09-18). 전에는
               「바꾸기」가 **무작위로 다른 번호**를 집어서, 원하는 자리를
@@ -154,7 +154,7 @@ export default function LoginPage() {
               번호를 쓰면 판·알림을 공유한다. 보여 줘야 부딪힌 것을 알아채고
               한쪽이 옮긴다. */}
           <label className="flex items-center gap-2 text-xs" style={{ color: MUTED }}>
-            심사위원 번호
+            테스터 번호
             <select
               className="rounded border bg-transparent px-2 py-1"
               style={{ color: 'var(--ss-fg)', borderColor: MUTED }}
