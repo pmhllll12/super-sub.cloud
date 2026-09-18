@@ -1,14 +1,17 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
-import DemoVideo, { DEMO_VIDEO_SRC } from './DemoVideo'
+import DemoVideo, { DEMO_VIDEO_SRC, exitOffset } from './DemoVideo'
+import { leaveDemoVideo } from '@/lib/demoVideoExit'
 
 let introDone = true
 vi.mock('@/lib/useIntroDone', () => ({ useIntroDone: () => introDone }))
-vi.mock('next/navigation', () => ({ usePathname: () => '/login' }))
+let pathname = '/login'
+vi.mock('next/navigation', () => ({ usePathname: () => pathname }))
 
 // jsdom 은 재생을 못 한다 — play/pause 가 이벤트만 쏘게 흉내 낸다.
 let paused = true
 beforeEach(() => {
   introDone = true
+  pathname = '/login'
   paused = true
   Object.defineProperty(HTMLMediaElement.prototype, 'paused', { configurable: true, get: () => paused })
   HTMLMediaElement.prototype.play = vi.fn(function (this: HTMLMediaElement) {
@@ -361,5 +364,72 @@ describe('로그인 화면 잠금 — 영상·문장이 다 나오기 전엔 못
   it('로그인 화면이 아니면 잠그지 않는다', () => {
     render(<DemoVideo />)
     expect(screen.queryByTestId('demo-lock')).toBeNull()
+  })
+})
+
+describe('로그인 → 홈: 가장 가까운 가장자리로 빠졌다가 같은 자리로', () => {
+  it('가장 가까운 변을 고른다', () => {
+    // 1000×800 창
+    expect(exitOffset({ left: 20, top: 300, width: 200, height: 100 }, 1000, 800)).toEqual({ x: -244, y: 0 })
+    expect(exitOffset({ left: 760, top: 300, width: 200, height: 100 }, 1000, 800)).toEqual({ x: 264, y: 0 })
+    expect(exitOffset({ left: 400, top: 10, width: 200, height: 100 }, 1000, 800)).toEqual({ x: 0, y: -134 })
+    expect(exitOffset({ left: 400, top: 680, width: 200, height: 100 }, 1000, 800)).toEqual({ x: 0, y: 144 })
+  })
+
+  it('빠르게 빠진 뒤에 로그인이 이어지고, 홈에서 같은 자리·크기로 들어온다', async () => {
+    vi.useFakeTimers()
+    const slot = document.createElement('div')
+    slot.setAttribute('data-demo-slot', '')
+    slot.getBoundingClientRect = () => ({ top: 300, left: 400, width: 400, height: 200 }) as DOMRect
+    document.body.appendChild(slot)
+    const { container, rerender } = render(<DemoVideo />)
+    const box = container.querySelector<HTMLElement>('.ss-demo-video')!
+    const before = { left: box.style.left, top: box.style.top, width: box.style.width }
+
+    let resolved = false
+    // 신호는 React 밖(창 이벤트)에서 온다 — act 안에서 쏴야 상태가 반영된다.
+    act(() => {
+      void leaveDemoVideo().then(() => (resolved = true))
+    })
+    expect(box.dataset.travel).toBe('leaving')
+    expect(box.style.getPropertyValue('--ss-demo-off-x')).not.toBe('0px')
+    await act(async () => vi.advanceTimersByTime(260))
+    expect(resolved).toBe(true)
+    expect(box.dataset.travel).toBe('away')
+
+    // 홈으로 — 로그인 자리가 없어지고 경로가 바뀐다
+    slot.remove()
+    pathname = '/'
+    rerender(<DemoVideo />)
+    act(() => vi.advanceTimersByTime(40)) // 다음 프레임에 새 기준 상자를 잰다
+    expect(box.dataset.travel).toBe('entering')
+    expect({ left: box.style.left, top: box.style.top, width: box.style.width }).toEqual(before)
+    act(() => vi.advanceTimersByTime(600))
+    expect(box.dataset.travel).toBe('none')
+    vi.useRealTimers()
+  })
+
+  it('닫아 둔 채면 「다시보기」 단추가 빠졌다 들어온다', async () => {
+    vi.useFakeTimers()
+    render(<DemoVideo />)
+    act(() => {})
+    fireEvent.click(screen.getByRole('button', { name: '시연영상 닫기' }))
+    const reopen = screen.getByRole('button', { name: '시연 영상 다시보기' })
+    act(() => {
+      void leaveDemoVideo()
+    })
+    expect(reopen.dataset.travel).toBe('leaving')
+    await act(async () => vi.advanceTimersByTime(260))
+    expect(reopen.dataset.travel).toBe('away')
+    vi.useRealTimers()
+  })
+
+  it('영상이 아직 안 나왔으면(인트로 중) 기다리지 않고 곧바로 풀린다', async () => {
+    introDone = false
+    render(<DemoVideo />)
+    let resolved = false
+    void leaveDemoVideo().then(() => (resolved = true))
+    await act(async () => {})
+    expect(resolved).toBe(true)
   })
 })

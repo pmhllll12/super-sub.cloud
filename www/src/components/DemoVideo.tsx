@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { useIntroDone } from '@/lib/useIntroDone'
+import { DEMO_EXIT_EVENT, type DemoExitDetail } from '@/lib/demoVideoExit'
 
 /**
  * 사용법 안내 영상(1902×952, 17MB). 🔴 **원본 녹화에서 브라우저 머리칸(탭·주소창, 위
@@ -161,13 +162,54 @@ export default function DemoVideo() {
     return () => cancelAnimationFrame(raf)
   }, [pathname])
 
+  // ── 로그인 → 홈: 빠져나갔다가 같은 자리로 들어오기(사용자 요청) ─────────────
+  // 로그인에 성공하면 `leaveDemoVideo()` 가 신호를 보낸다 → 지금 보이는 것(영상+닫기
+  // 단추, 닫혀 있으면 「다시보기」)이 **가장 가까운 가장자리**로 빠르게 빠진다
+  // (leaving) → 숨어서 기다린다(away) → 화면이 바뀌면 **같은 가장자리에서** 들어와
+  // 로그인 화면에서의 **자리·크기 그대로** 앉는다(entering).
+  //
+  // 🔴 자리를 **화면 좌표로 들고 간다**(held). 홈의 기준 상자는 구석이라 로그인
+  // 자리 기준의 배율을 그대로 쓰면 다른 데 앉는다 — 도착한 화면의 기준 상자에
+  // 맞춰 배율·옮김을 다시 계산한다. 영상 요소는 그대로라 재생 위치·멈춤도 이어진다.
+  const [travel, setTravel] = useState<'none' | 'leaving' | 'away' | 'entering'>('none')
+  const [off, setOff] = useState({ x: 0, y: 0 })
+  const held = useRef<Box | null>(null)
+  const leftFrom = useRef<string | null>(null)
+
   // 자리의 **종류**가 바뀌면(로그인 자리 ↔ 구석) 사용자가 바꾼 크기를 버린다 —
   // 로그인 자리에서 키운 배율을 구석에 그대로 얹으면 화면 밖으로 넘친다.
+  // 🔴 단, 로그인에서 빠져나와 **들고 온 자리**가 있으면 그걸로 다시 맞춘다(아래).
   const slotted = base?.slotted
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setAdj(null)
   }, [slotted])
+
+  // 🔴 **위의 되돌리기(setAdj(null)) 뒤에 둔다** — 화면이 바뀌는 같은 커밋에서 둘 다
+  // 돌면 나중 것이 이긴다. 앞에 두면 들고 온 자리가 지워져 구석에 앉는다.
+  // 들어오기 — 화면이 바뀌고 새 기준 상자를 잰 뒤에. 🔴 경로가 바뀐 첫 렌더는
+  // 아직 **로그인 자리를 기준 상자로** 들고 있다(재기는 그다음 프레임) — 그걸로
+  // 계산하면 엉뚱한 데 앉으므로 로그인 자리(slotted)인 동안은 기다린다.
+  useEffect(() => {
+    if (travel !== 'away' || !base || pathname === leftFrom.current || base.slotted) return
+    const h = held.current
+    if (h) setAdj({ scale: h.width / base.width, dx: h.left - base.left, dy: h.top - base.top })
+    setTravel('entering')
+  }, [travel, pathname, base])
+
+
+  useEffect(() => {
+    if (travel === 'entering') {
+      const t = setTimeout(() => setTravel('none'), ENTER_MS)
+      return () => clearTimeout(t)
+    }
+    // 🔴 안전장치 — 로그인이 끝났는데 화면이 안 바뀌면(이동 실패 등) 제자리로
+    // 돌아온다. 없으면 영상이 영영 숨는다.
+    if (travel === 'away') {
+      const t = setTimeout(() => setTravel('entering'), AWAY_MAX_MS)
+      return () => clearTimeout(t)
+    }
+  }, [travel])
 
   // 🔴 **늘 창 안에 둔다**(사용자 요청 — 「사이트 밖으로 넘어가면 안 된다」). 끌어
   // 옮긴 값이든 창을 줄인 뒤든, 그리기 직전에 한 번 더 창 안으로 밀어 넣는다 —
@@ -225,6 +267,35 @@ export default function DemoVideo() {
   const onResizeUp = () => {
     drag.current = null
   }
+
+  const reopenRef = useRef<HTMLButtonElement>(null)
+  const latest = useRef({ rect, closed, introDone, travel, pathname })
+  useEffect(() => {
+    latest.current = { rect, closed, introDone, travel, pathname }
+  })
+  useEffect(() => {
+    const onExit = (e: Event) => {
+      const { done } = (e as CustomEvent<DemoExitDetail>).detail
+      const { rect: r, closed: isClosed, introDone: shown, travel: now, pathname: from } = latest.current
+      if (!r || !shown || now !== 'none') return done()
+      // 지금 **보이는 것**의 상자 — 영상+위에 붙은 닫기 단추, 닫혀 있으면 「다시보기」.
+      const b = isClosed
+        ? (reopenRef.current?.getBoundingClientRect() ?? { left: r.left, top: r.top - CLOSE_ROOM, width: 120, height: 25 })
+        : { left: r.left, top: r.top - CLOSE_ROOM, width: r.width, height: r.height + CLOSE_ROOM }
+      held.current = r
+      leftFrom.current = from
+      setOff(exitOffset(b, window.innerWidth, window.innerHeight))
+      setEntrance('still') // 돌아온 뒤 fade 가 다시 돌며 깜빡이지 않게
+      setSpot((sp) => (sp === 'on' ? 'out' : sp))
+      setTravel('leaving')
+      setTimeout(() => {
+        setTravel('away')
+        done()
+      }, LEAVE_MS)
+    }
+    window.addEventListener(DEMO_EXIT_EVENT, onExit)
+    return () => window.removeEventListener(DEMO_EXIT_EVENT, onExit)
+  }, [])
 
   const close = () => {
     videoRef.current?.pause()
@@ -369,8 +440,19 @@ export default function DemoVideo() {
       {introDone && closed && (
         <button
           type="button"
+          ref={reopenRef}
           className="ss-demo-glass-btn ss-demo-reopen"
-          style={rect ? { top: rect.top - CLOSE_ROOM, left: rect.left } : undefined}
+          data-travel={travel}
+          style={
+            rect
+              ? ({
+                  top: rect.top - CLOSE_ROOM,
+                  left: rect.left,
+                  '--ss-demo-off-x': `${off.x}px`,
+                  '--ss-demo-off-y': `${off.y}px`,
+                } as React.CSSProperties)
+              : undefined
+          }
           onPointerDown={onMoveDown}
           onPointerMove={onMoveMove}
           onPointerUp={onMoveUp}
@@ -388,8 +470,12 @@ export default function DemoVideo() {
         // 처음 나올 때만 화면 위 보이지 않는 데서 내려온다(사용자 요청). 닫았다가
         // 「다시보기」로 열 때는 그 자리에서 스르르 — 매번 떨어지면 성가시다.
         data-entrance={entrance}
+        data-travel={travel}
         hidden={!introDone || closed}
-        style={pos}
+        style={
+          pos &&
+          ({ ...pos, '--ss-demo-off-x': `${off.x}px`, '--ss-demo-off-y': `${off.y}px` } as React.CSSProperties)
+        }
         onAnimationEnd={(e) => {
           // 안쪽(아이콘·막대)의 애니메이션도 여기로 올라온다 — 제 것만 센다.
           if (e.target !== e.currentTarget || entrance !== 'drop') return
@@ -515,6 +601,32 @@ export const SPOT_IN_MS = 600
 export const LOCK_MAX_MS = 12000
 /** 어둠과 안내가 스르르 걷히는 시간 — CSS 의 전이 길이와 같아야 한다. */
 const SPOT_FADE_MS = 600
+
+/** 빠져나가는 시간 — 빠르게(사용자 요청). CSS `ss-demo-leave` 와 같아야 한다. */
+const LEAVE_MS = 260
+/** 들어오는 시간. CSS `ss-demo-enter` 와 같아야 한다. */
+const ENTER_MS = 520
+/** 빠져나간 뒤 화면이 이만큼 안 바뀌면 제자리로 돌아온다(안전장치). */
+const AWAY_MAX_MS = 5000
+
+/**
+ * 가장 가까운 가장자리로 **화면 밖까지** 밀어낼 거리. 상자 `b` 가 통째로 창 밖에
+ * 나가도록 그 변까지의 거리 + 여유(24px). 같은 값을 거꾸로 쓰면 들어오는 길이다.
+ */
+export function exitOffset(b: Box, vw: number, vh: number): { x: number; y: number } {
+  const gap = 24
+  const d = {
+    left: b.left,
+    right: vw - (b.left + b.width),
+    top: b.top,
+    bottom: vh - (b.top + b.height),
+  }
+  const nearest = (Object.keys(d) as (keyof typeof d)[]).reduce((a, k) => (d[k] < d[a] ? k : a))
+  if (nearest === 'left') return { x: -(b.left + b.width + gap), y: 0 }
+  if (nearest === 'right') return { x: vw - b.left + gap, y: 0 }
+  if (nearest === 'top') return { x: 0, y: -(b.top + b.height + gap) }
+  return { x: 0, y: vh - b.top + gap }
+}
 
 /** 영상 위에 붙은 「시연영상 닫기」 단추가 차지하는 높이(단추 + 틈). */
 const CLOSE_ROOM = 34

@@ -10,6 +10,7 @@ import PillButton from '@/components/ui/PillButton'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 import AuthShell from '@/components/auth/AuthShell'
 import SeatPicker from '@/components/auth/SeatPicker'
+import { leaveDemoVideo } from '@/lib/demoVideoExit'
 import {
   judgeEmail,
   judgeNickname,
@@ -94,6 +95,8 @@ export default function LoginPage() {
         }).catch(() => null)
         await apiPost('/api/auth/login', { email, password: JUDGE_PASSWORD })
       }
+      // 사용법 영상이 먼저 가장자리로 빠진 뒤 홈으로(홈에서 같은 데로 들어온다).
+      await leaveDemoVideo()
       router.push('/home')
       router.refresh()
     } catch (err) {
@@ -111,6 +114,8 @@ export default function LoginPage() {
     setBusy(true)
     try {
       await apiPost('/api/auth/login', { email, password })
+      // 사용법 영상이 먼저 가장자리로 빠진 뒤 홈으로(홈에서 같은 데로 들어온다).
+      await leaveDemoVideo()
       router.push('/home')
       router.refresh()
     } catch (err) {

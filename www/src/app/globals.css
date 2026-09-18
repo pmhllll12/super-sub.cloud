@@ -15469,3 +15469,37 @@ a.ss-seeking-pill:hover {
   outline: 2px solid var(--ss-accent);
   outline-offset: 2px;
 }
+
+/* ── 로그인 → 홈: 가장 가까운 가장자리로 빠졌다가 같은 데서 들어오기 ──
+   거리(--ss-demo-off-x/y)는 JS 가 잰다(exitOffset). 빠질 때는 빠르게 가속,
+   들어올 때는 끝이 느려지며 제자리에 앉는다. 🔴 이 규칙들은 data-entrance 규칙
+   **뒤에** 있어야 이긴다(특이도가 같다). */
+.ss-demo-video[data-travel='leaving'],
+.ss-demo-reopen[data-travel='leaving'] {
+  animation: ss-demo-leave 0.26s cubic-bezier(0.55, 0, 1, 0.45) both;
+}
+
+.ss-demo-video[data-travel='away'],
+.ss-demo-reopen[data-travel='away'] {
+  visibility: hidden;
+}
+
+.ss-demo-video[data-travel='entering'],
+.ss-demo-reopen[data-travel='entering'] {
+  animation: ss-demo-enter 0.52s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes ss-demo-leave {
+  to { transform: translate(var(--ss-demo-off-x), var(--ss-demo-off-y)); }
+}
+
+@keyframes ss-demo-enter {
+  from { transform: translate(var(--ss-demo-off-x), var(--ss-demo-off-y)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-demo-video[data-travel='leaving'],
+  .ss-demo-reopen[data-travel='leaving'] { animation: ss-demo-out 0.15s ease-in both; }
+  .ss-demo-video[data-travel='entering'],
+  .ss-demo-reopen[data-travel='entering'] { animation: ss-demo-in 0.2s ease-out both; }
+}
