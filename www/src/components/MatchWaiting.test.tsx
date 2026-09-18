@@ -240,6 +240,20 @@ describe('경기 대기 팝업', () => {
       expect(await screen.findByRole('dialog', { name: '경기 리뷰' })).toBeInTheDocument()
     })
 
+    /* 🔴 **취소처럼 머리칸의 「경기 잡힘」에서 사라져야 한다**(사용자 요청,
+       2026-09-18). 서버에 완료 상태가 없어 부모가 브라우저에 적는다. */
+    it('확인하면 부모에게 「끝났다」를 알린다', async () => {
+      const user = userEvent.setup()
+      const onFinished = vi.fn()
+      render(
+        <MatchWaiting us={US} them={THEM} onClose={vi.fn()} onFinished={onFinished} />,
+      )
+      await user.click(screen.getByRole('button', { name: '경기 완료' }))
+      expect(onFinished).not.toHaveBeenCalled() // 아직 묻는 중이다
+      await user.click(screen.getByRole('button', { name: '경기 완료' }))
+      expect(onFinished).toHaveBeenCalledTimes(1)
+    })
+
     it('「되돌리기」를 누르면 아무 일도 없다', async () => {
       const user = userEvent.setup()
       open()

@@ -11,7 +11,7 @@ import MatchBot from '@/components/MatchBot'
 import TeamMatch from '@/components/TeamMatch'
 import MatchWaiting from '@/components/MatchWaiting'
 import { type MatchTeam, type PitchPlayer } from '@/lib/teamMatch'
-import { readSeeking, stopSeeking } from '@/lib/seekingStore'
+import { markMatchDone, readSeeking, stopSeeking } from '@/lib/seekingStore'
 import {
   addSeat,
   formationToSize,
@@ -2050,6 +2050,12 @@ export default function SquadPanel({
           onClose={() => {
             setMatched(null)
             onAcceptedShown?.()
+          }}
+          /* 🔴 **머리칸의 「경기 잡힘」에서 뺀다**(사용자 요청, 2026-09-18).
+             서버에 「끝난 경기」 상태가 없어 브라우저에 적어 둔다 — 그 한계는
+             `seekingStore` 머리말에 적었다. */
+          onFinished={() => {
+            if (acceptedMatchId) markMatchDone(acceptedMatchId)
           }}
           /* 🔴 **서버로 보낸다**(미결 `paik` 34번 해소, 2026-09-17). 전에는
              팝업만 닫혀서 확정 경기가 「내 경기」에 그대로 남았다.
