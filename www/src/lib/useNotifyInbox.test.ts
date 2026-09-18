@@ -1,4 +1,5 @@
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
+import { markMatchDone, __resetSeeking } from './seekingStore'
 import { useNotifyInbox } from './useNotifyInbox'
 
 /**
@@ -182,5 +183,89 @@ describe('알림함 — 받은 팀 초대', () => {
     expect(
       sent.some((c) => c.method === 'POST' && c.url.endsWith('/api/me/invitations/inv1/reject')),
     ).toBe(true)
+  })
+})
+
+/**
+ * 🔴 **「완료했는데 판이 곧바로 되살아난다」** (사용자가 세 번 신고, 2026-09-18).
+ *
+ * 머리칸의 「경기 잡힘」(`confirmed`)과 대기 화면을 켜는 `acceptedTeam` 이
+ * **서로 다른 조건**을 보고 있었다. 닫아서 `clearAccepted()` 로 꺼도 **바로
+ * 다음 `reload()` 가 뒤쪽만 다시 켜서** 판이 되살아났다.
+ *
+ * 새로고침하면 멀쩡해 보인 것이 진단을 어렵게 했다 — 고쳐진 게 아니라
+ * `sent` 가 ref 라 새로고침에 비어서 그 가지가 **안 돌았을** 뿐이다.
+ * 그래서 여기서는 **새로고침 없이** 같은 훅에서 다시 불러 본다.
+ */
+describe('알림함 — 끝난 경기를 다시 켜지 않는다', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    __resetSeeking()
+  })
+
+  /** 내가 걸어서 수락된 확정 경기 한 줄. */
+  const ACCEPTED = {
+    ...ROW,
+    id: 'tmr-acc',
+    requester_team_id: 'team-mine',
+    target_team_id: 'mt-2',
+    status: 'accepted',
+    match_id: 'match-1',
+    proposed_played_at: new Date(Date.now() + 86_400_000).toISOString(),
+  }
+
+  /** 신청을 걸어 수락된 상태까지 만든다. 아래 시험들의 공통 전제다. */
+  async function accepted(rows: unknown[] = [ACCEPTED]) {
+    stub(rows)
+    const hook = renderHook(() => useNotifyInbox())
+    await waitFor(() => expect(hook.result.current.teamId).toBe('team-mine'))
+    hook.result.current.noteSent('tmr-acc', 'mt-2')
+    await act(async () => {
+      await hook.result.current.reload()
+    })
+    return hook
+  }
+
+  it('수락되면 대기 화면이 켜진다 — 이 전제가 깨지면 아래가 무의미하다', async () => {
+    const { result } = await accepted()
+    expect(result.current.acceptedTeam).not.toBeNull()
+    expect(result.current.confirmed).not.toBeNull()
+  })
+
+  it('🔴 「경기 완료」 뒤에 닫으면 다시 안 켜진다 — 새로고침 없이', async () => {
+    const { result } = await accepted()
+
+    await act(async () => {
+      markMatchDone('match-1') // 팀장이 「경기 완료」를 눌렀다
+      result.current.clearAccepted() // 리뷰를 닫았다
+      await result.current.reload() // 그 뒤 폴링이 한 번 돈다
+    })
+
+    expect(result.current.confirmed).toBeNull()
+    expect(result.current.acceptedTeam).toBeNull()
+  })
+
+  it('🔴 「경기 취소」 뒤에도 다시 안 켜진다 — `status` 는 accepted 로 남는다', async () => {
+    const { result } = await accepted()
+
+    /* 🔴 취소는 `match` 행만 지운다 — 신청의 `status` 는 `accepted` 로 남고
+       FK(`ON DELETE SET NULL`)가 `match_id` 만 비운다. `status` 만 보는 쪽은
+       이 줄을 계속 「잡혀 있다」로 읽는다. */
+    stub([{ ...ACCEPTED, match_id: null }])
+    await act(async () => {
+      result.current.clearAccepted()
+      await result.current.reload()
+    })
+
+    expect(result.current.confirmed).toBeNull()
+    expect(result.current.acceptedTeam).toBeNull()
+  })
+
+  it('지난 경기는 켜지 않는다', async () => {
+    const { result } = await accepted([
+      { ...ACCEPTED, proposed_played_at: new Date(Date.now() - 3_600_000).toISOString() },
+    ])
+    expect(result.current.confirmed).toBeNull()
+    expect(result.current.acceptedTeam).toBeNull()
   })
 })
