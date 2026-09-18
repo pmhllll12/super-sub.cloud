@@ -14980,7 +14980,7 @@ a.ss-seeking-pill:hover {
 .ss-demo-video-frame {
   position: absolute;
   inset: 0;
-  border: 1px solid var(--ss-demo-edge);
+  /* 외곽선은 **없다**(사용자 요청 — 처음엔 흰 1px 이었다). 모서리만 둥글린다. */
   border-radius: 12px;
   overflow: hidden;
   background: var(--ss-bg);
@@ -15015,13 +15015,69 @@ a.ss-seeking-pill:hover {
   border-radius: inherit;
 }
 
-/* 멈췄을 때만 보이는 ▶ — 멈춘 줄 모르고 「영상이 안 나온다」로 읽히지 않게. */
-.ss-demo-video-play {
+/* 가운데 재생/멈춤 아이콘 — 둥근 검은 판 위에 ▶ 또는 ❚❚.
+   멈춘 동안은 ▶ 가 계속 떠 있고, 누를 때마다 방금 한 일이 한 번 크게 떴다가
+   사라진다(.ss-demo-video-flash) — 「눌렸다」는 느낌(사용자 요청). */
+.ss-demo-video-icon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: clamp(40px, 16%, 64px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ss-bg) 55%, transparent);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+/* ▶ — 가운데보다 살짝 오른쪽이 눈에는 가운데다. */
+.ss-demo-video-icon[data-kind='play']::before {
+  content: '';
+  position: absolute;
+  left: 54%;
+  top: 50%;
   width: 0;
   height: 0;
   border-style: solid;
-  border-width: 14px 0 14px 24px;
+  border-width: 0.55em 0 0.55em 0.9em;
   border-color: transparent transparent transparent var(--ss-demo-edge);
+  font-size: clamp(12px, 1.4vw, 18px);
+  transform: translate(-50%, -50%);
+}
+
+/* ❚❚ — 두 막대. */
+.ss-demo-video-icon[data-kind='pause']::before,
+.ss-demo-video-icon[data-kind='pause']::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 11%;
+  height: 36%;
+  border-radius: 2px;
+  background: var(--ss-demo-edge);
+  transform: translateY(-50%);
+}
+
+.ss-demo-video-icon[data-kind='pause']::before { left: 36%; }
+.ss-demo-video-icon[data-kind='pause']::after { right: 36%; }
+
+/* 멈춘 동안 떠 있는 ▶ 는 **번쩍임(❚❚)이 사라진 뒤에** 들어온다 — 같이 뜨면
+   두 아이콘이 겹쳐 지저분하다(헤드리스 캡처로 확인). */
+.ss-demo-video-steady {
+  animation: ss-demo-in 0.2s ease-out 0.45s both;
+}
+
+.ss-demo-video-flash {
+  animation: ss-demo-flash 0.6s ease-out both;
+}
+
+@keyframes ss-demo-flash {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(0.85); }
+  to { opacity: 0; transform: translate(-50%, -50%) scale(1.6); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-demo-video-flash { animation-duration: 0.01s; }
 }
 
 /* 되감기 막대 — 유튜브처럼 빨간 진행 · 회색 남은 길. 평소엔 숨고 가리키거나
@@ -15126,10 +15182,15 @@ a.ss-seeking-pill:hover {
    🔴 `url(#ss-demo-warp)` 는 크로미움만 backdrop-filter 에서 받는다 — 다른
    브라우저는 흐림만 남고 단추는 멀쩡하다. */
 .ss-demo-glass-btn {
+  /* 은빛 — 차가운 쪽으로 기운 회색 셋(바탕 선 · 도는 빛 · 빛의 가장자리). */
+  --ss-demo-silver: rgba(200, 206, 216, 0.38);
+  --ss-demo-silver-hi: rgba(244, 246, 250, 0.95);
+  --ss-demo-silver-mid: rgba(168, 176, 188, 0.6);
   padding: 4px 11px;
   border: 0;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--ss-demo-edge) 14%, transparent);
+  /* 안쪽 색은 **없다**(사용자 요청). 유리 흐림·warp 만 남는다. */
+  background: transparent;
   backdrop-filter: blur(8px) saturate(var(--ss-glass-saturate)) url(#ss-demo-warp);
   -webkit-backdrop-filter: blur(8px) saturate(var(--ss-glass-saturate)) url(#ss-demo-warp);
   color: var(--ss-demo-edge);
@@ -15140,8 +15201,46 @@ a.ss-seeking-pill:hover {
   transition: background 0.15s ease;
 }
 
-.ss-demo-glass-btn:hover {
-  background: color-mix(in srgb, var(--ss-demo-edge) 24%, transparent);
+/* 외곽선 — 아주 얇은(1px) 은빛 선 위로 빛 한 점이 둘레를 돈다. 로그인 카드의
+   `.ss-traveling-edge` 와 같은 기법(conic-gradient + 가운데를 파낸 mask)이다. */
+.ss-demo-glass-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background:
+    conic-gradient(
+      from var(--ss-edge-angle),
+      transparent 0%,
+      transparent 36%,
+      var(--ss-demo-silver-mid) 44%,
+      var(--ss-demo-silver-hi) 50%,
+      var(--ss-demo-silver-mid) 56%,
+      transparent 64%,
+      transparent 100%
+    ),
+    var(--ss-demo-silver);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: ss-edge-spin 4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-demo-glass-btn::after {
+    animation: none;
+  }
+}
+
+.ss-demo-glass-btn:hover::after {
+  --ss-demo-silver: rgba(214, 220, 230, 0.6);
 }
 
 .ss-demo-glass-btn:focus-visible {

@@ -112,7 +112,7 @@ describe('닫기 · 크기 조절', () => {
   it('닫으면 멈추고 「시연 영상 다시보기」만 남는다 — 누르면 다시 뜬다', async () => {
     const { container } = render(<DemoVideo />)
     await act(async () => {})
-    fireEvent.click(screen.getByRole('button', { name: '닫기' }))
+    fireEvent.click(screen.getByRole('button', { name: '시연영상 닫기' }))
     expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled()
     expect(container.querySelector('.ss-demo-video')).toHaveAttribute('hidden')
     fireEvent.click(screen.getByRole('button', { name: '시연 영상 다시보기' }))
@@ -154,6 +154,62 @@ describe('닫기 · 크기 조절', () => {
     // 맞은편(오른쪽 아래)이 그대로다
     expect(box.style.left).toBe('600px')
     expect(box.style.top).toBe('400px')
+    cleanup()
+  })
+})
+
+describe('끌어 옮기기', () => {
+  function setup() {
+    const slot = document.createElement('div')
+    slot.setAttribute('data-demo-slot', '')
+    slot.getBoundingClientRect = () => ({ top: 300, left: 400, width: 400, height: 200 }) as DOMRect
+    document.body.appendChild(slot)
+    HTMLElement.prototype.setPointerCapture = () => {}
+    HTMLElement.prototype.hasPointerCapture = () => true
+    const utils = render(<DemoVideo />)
+    const box = utils.container.querySelector<HTMLElement>('.ss-demo-video')!
+    return { box, cleanup: () => slot.remove() }
+  }
+
+  it('영상을 끌면 옮겨지고, 끈 것은 멈춤으로 치지 않는다', async () => {
+    const { box, cleanup } = setup()
+    await act(async () => {})
+    const video = screen.getByRole('button', { name: '사용법 영상 멈춤' })
+    ;(HTMLMediaElement.prototype.pause as ReturnType<typeof vi.fn>).mockClear()
+    fireEvent.pointerDown(video, { clientX: 500, clientY: 400, button: 0, pointerId: 1 })
+    fireEvent.pointerMove(video, { clientX: 400, clientY: 350, pointerId: 1 })
+    fireEvent.pointerUp(video, { pointerId: 1 })
+    fireEvent.click(video)
+    expect(box.style.left).toBe('300px')
+    expect(box.style.top).toBe('250px')
+    expect(HTMLMediaElement.prototype.pause).not.toHaveBeenCalled()
+    cleanup()
+  })
+
+  it('조금 흔들린 것(4px 미만)은 그냥 누른 것 — 멈춘다', async () => {
+    const { box, cleanup } = setup()
+    await act(async () => {})
+    const video = screen.getByRole('button', { name: '사용법 영상 멈춤' })
+    fireEvent.pointerDown(video, { clientX: 500, clientY: 400, button: 0, pointerId: 1 })
+    fireEvent.pointerMove(video, { clientX: 502, clientY: 401, pointerId: 1 })
+    fireEvent.pointerUp(video, { pointerId: 1 })
+    fireEvent.click(video)
+    expect(box.style.left).toBe('400px')
+    expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled()
+    cleanup()
+  })
+
+  it('창 밖으로 끌어도 창 안에 남는다(닫기 단추 자리까지)', async () => {
+    const { box, cleanup } = setup()
+    await act(async () => {})
+    const video = screen.getByRole('button', { name: '사용법 영상 멈춤' })
+    fireEvent.pointerDown(video, { clientX: 500, clientY: 400, button: 0, pointerId: 1 })
+    fireEvent.pointerMove(video, { clientX: -3000, clientY: -3000, pointerId: 1 })
+    expect(box.style.left).toBe('8px')
+    expect(box.style.top).toBe('42px') // 8 + 닫기 단추 34
+    fireEvent.pointerMove(video, { clientX: 9000, clientY: 9000, pointerId: 1 })
+    expect(box.style.left).toBe(`${window.innerWidth - 8 - 400}px`)
+    expect(box.style.top).toBe(`${window.innerHeight - 8 - 200}px`)
     cleanup()
   })
 })

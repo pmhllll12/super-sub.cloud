@@ -50,6 +50,7 @@ export default function DemoVideo() {
   // 사용자가 모서리를 끌어 바꾼 것 — 기본 자리에서 얼마나 옮기고 키웠나.
   const [adj, setAdj] = useState<Adjust | null>(null)
   const [closed, setClosed] = useState(false)
+  const [flash, setFlash] = useState<{ kind: 'play' | 'pause'; n: number }>({ kind: 'play', n: 0 })
   const [paused, setPaused] = useState(false)
   const [time, setTime] = useState(0)
   const [duration, setDuration] = useState(0)
@@ -90,15 +91,22 @@ export default function DemoVideo() {
     setAdj(null)
   }, [slotted])
 
+  // 🔴 **늘 창 안에 둔다**(사용자 요청 — 「사이트 밖으로 넘어가면 안 된다」). 끌어
+  // 옮긴 값이든 창을 줄인 뒤든, 그리기 직전에 한 번 더 창 안으로 밀어 넣는다 —
+  // 위쪽은 바깥에 붙은 「시연영상 닫기」 단추 자리까지 비운다.
   const rect: Box | null = base
-    ? adj
-      ? {
-          left: base.left + adj.dx,
-          top: base.top + adj.dy,
-          width: base.width * adj.scale,
-          height: base.height * adj.scale,
-        }
-      : base
+    ? clampToViewport(
+        adj
+          ? {
+              left: base.left + adj.dx,
+              top: base.top + adj.dy,
+              width: base.width * adj.scale,
+              height: base.height * adj.scale,
+            }
+          : base,
+        window.innerWidth,
+        window.innerHeight,
+      )
     : null
 
   // 모서리 끌기 — **맞은편 모서리를 붙박고** 끄는 쪽으로 커지고 작아진다. 비율은
@@ -125,7 +133,7 @@ export default function DemoVideo() {
     const room = 8 // 창 가장자리와 띄울 틈
     const maxW = Math.min(
       d.right ? window.innerWidth - room - d.fx : d.fx - room,
-      (d.down ? window.innerHeight - room - d.fy : d.fy - room) * aspect,
+      (d.down ? window.innerHeight - room - d.fy : d.fy - room - CLOSE_ROOM) * aspect,
     )
     const want = Math.max(Math.abs(e.clientX - d.fx), Math.abs(e.clientY - d.fy) * aspect)
     const width = Math.max(base.width * MIN_SCALE, Math.min(want, maxW))
@@ -209,6 +217,37 @@ export default function DemoVideo() {
     if (!v) return
     if (v.paused) v.play().catch(() => {})
     else v.pause()
+    // 누를 때마다 가운데에 방금 한 일(▶ 또는 ❚❚)을 한 번 크게 띄웠다 사라지게 —
+    // 「눌렸다」는 느낌(사용자 요청, 유튜브와 같은 되먹임). 키를 바꿔 매번 새로 돈다.
+    setFlash((f) => ({ kind: v.paused ? 'pause' : 'play', n: f.n + 1 }))
+  }
+
+  // 끌어 옮기기 — 영상(과 붙은 단추)을 원하는 데 둔다(사용자 요청). 영상을 누르는
+  // 것은 원래 멈춤/재생이라 **4px 넘게 움직였을 때만** 옮기기로 치고, 그때는 뒤이어
+  // 오는 클릭을 삼킨다 — 안 그러면 옮길 때마다 영상이 멈춘다.
+  const move = useRef<{ x: number; y: number; dx: number; dy: number; moved: boolean } | null>(null)
+  const onMoveDown = (e: React.PointerEvent<HTMLElement>) => {
+    if (!base || !rect || e.button !== 0) return
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+    move.current = { x: e.clientX, y: e.clientY, dx: rect.left - base.left, dy: rect.top - base.top, moved: false }
+  }
+  const onMoveMove = (e: React.PointerEvent<HTMLElement>) => {
+    const m = move.current
+    if (!m || !base || !e.currentTarget.hasPointerCapture?.(e.pointerId)) return
+    const ox = e.clientX - m.x
+    const oy = e.clientY - m.y
+    if (!m.moved && Math.hypot(ox, oy) < DRAG_THRESHOLD) return
+    m.moved = true
+    setAdj((a) => ({ scale: a?.scale ?? 1, dx: m.dx + ox, dy: m.dy + oy }))
+  }
+  const onMoveUp = () => {
+    // 클릭은 pointerup 뒤에 온다 — 옮겼는지는 클릭 쪽이 읽고 지운다.
+    if (move.current && !move.current.moved) move.current = null
+  }
+  const consumeDrag = () => {
+    const moved = move.current?.moved ?? false
+    move.current = null
+    return moved
   }
 
   const pos = rect ? { top: rect.top, left: rect.left, width: rect.width, height: rect.height } : undefined
@@ -229,8 +268,13 @@ export default function DemoVideo() {
         <button
           type="button"
           className="ss-demo-glass-btn ss-demo-reopen"
-          style={rect ? { top: rect.top, left: rect.left } : undefined}
-          onClick={reopen}
+          style={rect ? { top: rect.top - CLOSE_ROOM, left: rect.left } : undefined}
+          onPointerDown={onMoveDown}
+          onPointerMove={onMoveMove}
+          onPointerUp={onMoveUp}
+          onClick={() => {
+            if (!consumeDrag()) reopen()
+          }}
         >
           시연 영상 다시보기
         </button>
@@ -244,8 +288,17 @@ export default function DemoVideo() {
       >
         {/* 닫기 — 외곽선 **바깥** 왼쪽 위(사용자 요청). 틀이 `overflow: hidden` 이라
             틀 밖 형제로 둔다. */}
-        <button type="button" className="ss-demo-glass-btn ss-demo-close" onClick={close}>
-          닫기
+        <button
+          type="button"
+          className="ss-demo-glass-btn ss-demo-close"
+          onPointerDown={onMoveDown}
+          onPointerMove={onMoveMove}
+          onPointerUp={onMoveUp}
+          onClick={() => {
+            if (!consumeDrag()) close()
+          }}
+        >
+          시연영상 닫기
         </button>
 
         <div className="ss-demo-video-frame">
@@ -266,9 +319,24 @@ export default function DemoVideo() {
             className="ss-demo-video-toggle"
             aria-label={paused ? '사용법 영상 재생' : '사용법 영상 멈춤'}
             aria-pressed={paused}
-            onClick={toggle}
+            onPointerDown={onMoveDown}
+            onPointerMove={onMoveMove}
+            onPointerUp={onMoveUp}
+            onClick={() => {
+              if (!consumeDrag()) toggle()
+            }}
           >
-            {paused && <span aria-hidden="true" className="ss-demo-video-play" />}
+            {/* 멈춰 있는 동안은 가운데 ▶ 가 계속 떠 있다 — 멈춘 줄 모르고 「안
+                나온다」로 읽히지 않게. */}
+            {paused && <span aria-hidden="true" className="ss-demo-video-icon ss-demo-video-steady" data-kind="play" />}
+            {flash.n > 0 && (
+              <span
+                key={flash.n}
+                aria-hidden="true"
+                className="ss-demo-video-icon ss-demo-video-flash"
+                data-kind={flash.kind === 'play' ? 'play' : 'pause'}
+              />
+            )}
           </button>
           {/* 유튜브식 되감기 막대(사용자 요청) — 앞부분을 다시 보거나 원하는 데로 건너뛴다.
               🔴 **멈춤 단추(영상 전체) 위에 겹쳐 둔다** — 막대를 누른 것이 멈춤으로
@@ -320,6 +388,24 @@ export default function DemoVideo() {
       </div>
     </>
   )
+}
+
+/** 영상 위에 붙은 「시연영상 닫기」 단추가 차지하는 높이(단추 + 틈). */
+const CLOSE_ROOM = 34
+/** 이만큼 움직여야 「옮기기」다 — 그 아래는 그냥 누른 것(멈춤/재생). */
+const DRAG_THRESHOLD = 4
+/** 창 가장자리와 띄울 틈. */
+const EDGE = 8
+
+/** 상자를 창 안으로 밀어 넣는다(위쪽은 닫기 단추 자리까지). 창보다 크면 줄인다. */
+export function clampToViewport(r: Box, vw: number, vh: number): Box {
+  const aspect = r.width / r.height
+  let width = Math.min(r.width, vw - EDGE * 2, (vh - EDGE * 2 - CLOSE_ROOM) * aspect)
+  width = Math.max(width, 0)
+  const height = width / aspect
+  const left = Math.min(Math.max(r.left, EDGE), vw - EDGE - width)
+  const top = Math.min(Math.max(r.top, EDGE + CLOSE_ROOM), vh - EDGE - height)
+  return { left, top, width, height }
 }
 
 type Corner = 'tl' | 'tr' | 'bl' | 'br'
