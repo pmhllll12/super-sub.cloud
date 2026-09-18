@@ -5,6 +5,8 @@ import { createPortal } from 'react-dom'
 
 /** 판이 닫히며 걷히는 시간 — CSS `ss-seat-out` 길이와 같아야 한다. */
 const CLOSE_MS = 220
+/** 판의 안여백 — CSS `.ss-seat-panel` 의 padding 과 같아야 한다. */
+const PANEL_PAD = 5
 
 /**
  * 테스트 번호 고르기 — 작은 알약 하나, 누르면 **오른쪽으로** 번호 판이 스르르
@@ -45,12 +47,14 @@ export default function SeatPicker({
     return () => clearTimeout(t)
   }, [state])
 
-  // 알약 오른쪽 가운데에 판의 왼쪽 가운데를 맞춘다.
+  // 판의 **첫 줄 윗끝을 알약 윗끝에** 맞춘다(사용자 요청 — 처음엔 세로 가운데를
+  // 맞춰서 첫 줄이 알약보다 위로 떴다). 번호 단추와 알약은 글자·안여백이 같아
+  // 키가 같으므로, 판의 안여백(PANEL_PAD)만큼 올리면 첫 줄이 알약과 나란하다.
   useLayoutEffect(() => {
     if (state === 'closed') return
     const place = () => {
       const r = pillRef.current?.getBoundingClientRect()
-      if (r) setAt({ top: r.top + r.height / 2, left: r.right + 8 })
+      if (r) setAt({ top: r.top - PANEL_PAD, left: r.right + 8 })
     }
     place()
     window.addEventListener('resize', place)

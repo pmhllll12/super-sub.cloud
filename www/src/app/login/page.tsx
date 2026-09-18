@@ -142,7 +142,9 @@ export default function LoginPage() {
             variant="white"
             disabled={busy || limit.locked}
             onClick={() => void onJudge()}
-            className="w-full"
+            // 위 글자(회원가입 줄)와의 틈을 구글 단추 ↔ 약관 글자 틈(32px)과 같게
+            // (사용자 요청). 바닥 줄의 gap-3(12px) + mt-5(20px).
+            className="mt-5 w-full"
           >
             테스트용 로그인{seat ? ` (${seat}번)` : ''}
           </PillButton>

@@ -15405,7 +15405,7 @@ a.ss-seeking-pill:hover {
   transform: rotate(180deg);
 }
 
-/* 판 — 알약 오른쪽 가운데에 붙어(JS 가 top/left 를 준다) 왼쪽에서 오른쪽으로
+/* 판 — 알약 오른쪽에, 첫 줄 윗끝을 알약 윗끝에 맞춰(JS 가 top/left 를 준다) 왼쪽에서 오른쪽으로
    스르르 펼쳐진다. 🔴 펼치는 것은 clip-path 다 — 판이 옆으로 밀려 오는 것
    (translate)만 쓰면 알약 위를 지나가며 겹친다. */
 .ss-seat-panel {
@@ -15414,9 +15414,8 @@ a.ss-seeking-pill:hover {
   display: grid;
   grid-template-columns: repeat(5, auto);
   gap: 2px;
-  padding: 5px;
+  padding: 5px; /* SeatPicker 의 PANEL_PAD 와 같아야 한다 */
   border-radius: 14px;
-  transform: translateY(-50%);
   animation: ss-seat-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
@@ -15425,8 +15424,8 @@ a.ss-seeking-pill:hover {
 }
 
 @keyframes ss-seat-in {
-  from { clip-path: inset(0 100% 0 0 round 14px); opacity: 0; transform: translate(-6px, -50%); }
-  to { clip-path: inset(0 0 0 0 round 14px); opacity: 1; transform: translate(0, -50%); }
+  from { clip-path: inset(0 100% 0 0 round 14px); opacity: 0; transform: translateX(-6px); }
+  to { clip-path: inset(0 0 0 0 round 14px); opacity: 1; transform: translateX(0); }
 }
 
 @keyframes ss-seat-out {
