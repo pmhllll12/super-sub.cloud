@@ -146,7 +146,7 @@ export default function LoginPage() {
             // (사용자 요청). 바닥 줄의 gap-3(12px) + mt-5(20px).
             className="mt-5 w-full"
           >
-            테스트용 로그인{seat ? ` (${seat}번)` : ''}
+            원티드 테스트용 로그인{seat ? ` (${seat}번)` : ''}
           </PillButton>
           {/* 🔴 **번호를 직접 고른다**(사용자 요청, 2026-09-18). 전에는
               「바꾸기」가 **무작위로 다른 번호**를 집어서, 원하는 자리를
