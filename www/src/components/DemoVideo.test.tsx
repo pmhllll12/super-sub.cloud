@@ -107,3 +107,53 @@ describe('되감기 막대', () => {
     expect(video.currentTime).toBe(115)
   })
 })
+
+describe('닫기 · 크기 조절', () => {
+  it('닫으면 멈추고 「시연 영상 다시보기」만 남는다 — 누르면 다시 뜬다', async () => {
+    const { container } = render(<DemoVideo />)
+    await act(async () => {})
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }))
+    expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled()
+    expect(container.querySelector('.ss-demo-video')).toHaveAttribute('hidden')
+    fireEvent.click(screen.getByRole('button', { name: '시연 영상 다시보기' }))
+    expect(container.querySelector('.ss-demo-video')).not.toHaveAttribute('hidden')
+    expect(screen.queryByRole('button', { name: '시연 영상 다시보기' })).not.toBeInTheDocument()
+  })
+
+  function setup() {
+    const slot = document.createElement('div')
+    slot.setAttribute('data-demo-slot', '')
+    slot.getBoundingClientRect = () => ({ top: 300, left: 400, width: 400, height: 200 }) as DOMRect
+    document.body.appendChild(slot)
+    const utils = render(<DemoVideo />)
+    const box = utils.container.querySelector<HTMLElement>('.ss-demo-video')!
+    const handle = (c: string) => utils.container.querySelector<HTMLElement>(`[data-corner="${c}"]`)!
+    // jsdom 에는 포인터 붙잡기가 없다 — 붙잡은 것으로 친다.
+    HTMLElement.prototype.setPointerCapture = () => {}
+    HTMLElement.prototype.hasPointerCapture = () => true
+    return { box, handle, cleanup: () => slot.remove() }
+  }
+
+  it('오른쪽 아래 모서리를 끌면 왼쪽 위를 붙박고 커진다', () => {
+    const { box, handle, cleanup } = setup()
+    fireEvent.pointerDown(handle('br'), { clientX: 800, clientY: 500, pointerId: 1 })
+    fireEvent.pointerMove(handle('br'), { clientX: 1000, clientY: 500, pointerId: 1 })
+    expect(box.style.left).toBe('400px')
+    expect(box.style.top).toBe('300px')
+    expect(box.style.width).toBe('600px')
+    expect(box.style.height).toBe('300px') // 비율 유지
+    cleanup()
+  })
+
+  it('작게는 기본의 딱 절반까지만', () => {
+    const { box, handle, cleanup } = setup()
+    fireEvent.pointerDown(handle('tl'), { clientX: 400, clientY: 300, pointerId: 1 })
+    fireEvent.pointerMove(handle('tl'), { clientX: 790, clientY: 495, pointerId: 1 })
+    expect(box.style.width).toBe('200px')
+    expect(box.style.height).toBe('100px')
+    // 맞은편(오른쪽 아래)이 그대로다
+    expect(box.style.left).toBe('600px')
+    expect(box.style.top).toBe('400px')
+    cleanup()
+  })
+})

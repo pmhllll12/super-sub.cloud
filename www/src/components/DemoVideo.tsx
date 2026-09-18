@@ -44,7 +44,12 @@ export default function DemoVideo() {
   const pathname = usePathname()
   const introDone = useIntroDone()
   const videoRef = useRef<HTMLVideoElement>(null)
-  const [box, setBox] = useState<Box | null>(null)
+  // 기본 자리 — 로그인 화면이면 그 자리, 아니면 왼쪽 아래 구석. 늘 JS 가 잰다
+  // (크기 조절 계산이 기준 상자를 알아야 해서 구석도 CSS 에 맡기지 않는다).
+  const [base, setBase] = useState<(Box & { slotted: boolean }) | null>(null)
+  // 사용자가 모서리를 끌어 바꾼 것 — 기본 자리에서 얼마나 옮기고 키웠나.
+  const [adj, setAdj] = useState<Adjust | null>(null)
+  const [closed, setClosed] = useState(false)
   const [paused, setPaused] = useState(false)
   const [time, setTime] = useState(0)
   const [duration, setDuration] = useState(0)
@@ -62,17 +67,87 @@ export default function DemoVideo() {
       const slot = document.querySelector<HTMLElement>(`[${DEMO_SLOT_ATTR}]`)
       const r = slot?.getBoundingClientRect()
       // 좁은 화면에서는 자리가 든 사진 칸이 통째로 숨는다(폭 0) — 그때는 구석으로.
-      const next = r && r.width > 0 ? { top: r.top, left: r.left, width: r.width, height: r.height } : null
-      const key = next ? `${next.top}|${next.left}|${next.width}|${next.height}` : ''
+      const next =
+        r && r.width > 0
+          ? { top: r.top, left: r.left, width: r.width, height: r.height, slotted: true }
+          : { ...cornerBox(window.innerWidth, window.innerHeight), slotted: false }
+      const key = `${next.top}|${next.left}|${next.width}|${next.height}|${next.slotted}`
       if (key !== last) {
         last = key
-        setBox(next)
+        setBase(next)
       }
       raf = requestAnimationFrame(measure)
     }
     measure()
     return () => cancelAnimationFrame(raf)
   }, [pathname])
+
+  // 자리의 **종류**가 바뀌면(로그인 자리 ↔ 구석) 사용자가 바꾼 크기를 버린다 —
+  // 로그인 자리에서 키운 배율을 구석에 그대로 얹으면 화면 밖으로 넘친다.
+  const slotted = base?.slotted
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAdj(null)
+  }, [slotted])
+
+  const rect: Box | null = base
+    ? adj
+      ? {
+          left: base.left + adj.dx,
+          top: base.top + adj.dy,
+          width: base.width * adj.scale,
+          height: base.height * adj.scale,
+        }
+      : base
+    : null
+
+  // 모서리 끌기 — **맞은편 모서리를 붙박고** 끄는 쪽으로 커지고 작아진다. 비율은
+  // 영상 그대로, 작게는 기본의 **딱 절반**까지(사용자 요청), 크게는 창 안까지.
+  const drag = useRef<{ fx: number; fy: number; right: boolean; down: boolean } | null>(null)
+  const onResizeDown = (corner: Corner) => (e: React.PointerEvent<HTMLSpanElement>) => {
+    if (!rect) return
+    e.preventDefault()
+    e.stopPropagation()
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+    const right = corner.includes('r')
+    const down = corner.includes('b')
+    drag.current = {
+      fx: right ? rect.left : rect.left + rect.width,
+      fy: down ? rect.top : rect.top + rect.height,
+      right,
+      down,
+    }
+  }
+  const onResizeMove = (e: React.PointerEvent<HTMLSpanElement>) => {
+    const d = drag.current
+    if (!d || !base || !e.currentTarget.hasPointerCapture?.(e.pointerId)) return
+    const aspect = base.width / base.height
+    const room = 8 // 창 가장자리와 띄울 틈
+    const maxW = Math.min(
+      d.right ? window.innerWidth - room - d.fx : d.fx - room,
+      (d.down ? window.innerHeight - room - d.fy : d.fy - room) * aspect,
+    )
+    const want = Math.max(Math.abs(e.clientX - d.fx), Math.abs(e.clientY - d.fy) * aspect)
+    const width = Math.max(base.width * MIN_SCALE, Math.min(want, maxW))
+    const height = width / aspect
+    setAdj({
+      scale: width / base.width,
+      dx: (d.right ? d.fx : d.fx - width) - base.left,
+      dy: (d.down ? d.fy : d.fy - height) - base.top,
+    })
+  }
+  const onResizeUp = () => {
+    drag.current = null
+  }
+
+  const close = () => {
+    videoRef.current?.pause()
+    setClosed(true)
+  }
+  const reopen = () => {
+    setClosed(false)
+    videoRef.current?.play().catch(() => {})
+  }
 
   // 인트로가 끝나면 튼다. `autoPlay` 속성에 맡기면 인트로 밑에서 이미 돌기 시작해
   // 걷혔을 때는 중간부터 보인다.
@@ -136,68 +211,134 @@ export default function DemoVideo() {
     else v.pause()
   }
 
+  const pos = rect ? { top: rect.top, left: rect.left, width: rect.width, height: rect.height } : undefined
+
   return (
-    <div
-      className="ss-demo-video"
-      data-slotted={box ? 'true' : 'false'}
-      hidden={!introDone}
-      style={box ? { top: box.top, left: box.left, width: box.width, height: box.height } : undefined}
-    >
-      <video
-        ref={videoRef}
-        src={DEMO_VIDEO_SRC}
-        muted
-        loop
-        playsInline
-        preload="auto"
-        onPlay={() => setPaused(false)}
-        onPause={() => setPaused(true)}
-        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
-        onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
-      />
-      <button
-        type="button"
-        className="ss-demo-video-toggle"
-        aria-label={paused ? '사용법 영상 재생' : '사용법 영상 멈춤'}
-        aria-pressed={paused}
-        onClick={toggle}
-      >
-        {paused && <span aria-hidden="true" className="ss-demo-video-play" />}
-      </button>
-      {/* 유튜브식 되감기 막대(사용자 요청) — 앞부분을 다시 보거나 원하는 데로 건너뛴다.
-          🔴 **멈춤 단추(영상 전체) 위에 겹쳐 둔다** — 막대를 누른 것이 멈춤으로
-          새지 않게 이 칸은 자기 클릭을 삼킨다. 평소엔 숨고, 가리키거나 멈췄을 때
-          뜬다 — 작은 영상이라 늘 떠 있으면 자막을 가린다. */}
-      <div className="ss-demo-video-bar" onClick={(e) => e.stopPropagation()}>
-        <div
-          role="slider"
-          tabIndex={0}
-          aria-label="사용법 영상 재생 위치"
-          aria-valuemin={0}
-          aria-valuemax={Math.round(duration)}
-          aria-valuenow={Math.round(time)}
-          aria-valuetext={`${formatTime(time)} / ${formatTime(duration)}`}
-          className="ss-demo-video-seek"
-          onPointerDown={(e) => {
-            e.currentTarget.setPointerCapture?.(e.pointerId)
-            seekFromPointer(e)
-          }}
-          onPointerMove={(e) => {
-            if (e.currentTarget.hasPointerCapture?.(e.pointerId)) seekFromPointer(e)
-          }}
-          onKeyDown={onSeekKey}
+    <>
+      {/* 단추 유리의 굴절(warp 8, 사용자 요청). 로그인 카드의 `#ss-glass-warp`(50)는
+          그 화면에만 있고 세기도 달라 따로 둔다. */}
+      <svg width="0" height="0" aria-hidden="true" focusable="false" className="absolute">
+        <filter id="ss-demo-warp" x="-10%" y="-10%" width="120%" height="120%" colorInterpolationFilters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.02 0.03" numOctaves="2" seed="7" result="warp" />
+          <feDisplacementMap in="SourceGraphic" in2="warp" scale="8" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </svg>
+
+      {/* 닫은 뒤 — 영상이 있던 자리 왼쪽 위에 작은 단추 하나만 남는다. */}
+      {introDone && closed && (
+        <button
+          type="button"
+          className="ss-demo-glass-btn ss-demo-reopen"
+          style={rect ? { top: rect.top, left: rect.left } : undefined}
+          onClick={reopen}
         >
-          <span
-            className="ss-demo-video-seek-fill"
-            style={{ width: `${duration ? (time / duration) * 100 : 0}%` }}
+          시연 영상 다시보기
+        </button>
+      )}
+
+      <div
+        className="ss-demo-video"
+        data-slotted={base?.slotted ? 'true' : 'false'}
+        hidden={!introDone || closed}
+        style={pos}
+      >
+        {/* 닫기 — 외곽선 **바깥** 왼쪽 위(사용자 요청). 틀이 `overflow: hidden` 이라
+            틀 밖 형제로 둔다. */}
+        <button type="button" className="ss-demo-glass-btn ss-demo-close" onClick={close}>
+          닫기
+        </button>
+
+        <div className="ss-demo-video-frame">
+          <video
+            ref={videoRef}
+            src={DEMO_VIDEO_SRC}
+            muted
+            loop
+            playsInline
+            preload="auto"
+            onPlay={() => setPaused(false)}
+            onPause={() => setPaused(true)}
+            onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+            onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
           />
+          <button
+            type="button"
+            className="ss-demo-video-toggle"
+            aria-label={paused ? '사용법 영상 재생' : '사용법 영상 멈춤'}
+            aria-pressed={paused}
+            onClick={toggle}
+          >
+            {paused && <span aria-hidden="true" className="ss-demo-video-play" />}
+          </button>
+          {/* 유튜브식 되감기 막대(사용자 요청) — 앞부분을 다시 보거나 원하는 데로 건너뛴다.
+              🔴 **멈춤 단추(영상 전체) 위에 겹쳐 둔다** — 막대를 누른 것이 멈춤으로
+              새지 않게 이 칸은 자기 클릭을 삼킨다. 평소엔 숨고, 가리키거나 멈췄을 때
+              뜬다 — 작은 영상이라 늘 떠 있으면 자막을 가린다. */}
+          <div className="ss-demo-video-bar" onClick={(e) => e.stopPropagation()}>
+            <div
+              role="slider"
+              tabIndex={0}
+              aria-label="사용법 영상 재생 위치"
+              aria-valuemin={0}
+              aria-valuemax={Math.round(duration)}
+              aria-valuenow={Math.round(time)}
+              aria-valuetext={`${formatTime(time)} / ${formatTime(duration)}`}
+              className="ss-demo-video-seek"
+              onPointerDown={(e) => {
+                e.currentTarget.setPointerCapture?.(e.pointerId)
+                seekFromPointer(e)
+              }}
+              onPointerMove={(e) => {
+                if (e.currentTarget.hasPointerCapture?.(e.pointerId)) seekFromPointer(e)
+              }}
+              onKeyDown={onSeekKey}
+            >
+              <span
+                className="ss-demo-video-seek-fill"
+                style={{ width: `${duration ? (time / duration) * 100 : 0}%` }}
+              />
+            </div>
+            <span className="ss-demo-video-time">
+              {formatTime(time)} / {formatTime(duration)}
+            </span>
+          </div>
         </div>
-        <span className="ss-demo-video-time">
-          {formatTime(time)} / {formatTime(duration)}
-        </span>
+
+        {/* 크기 조절 손잡이 — 네 모서리. 틀 밖에 두어야 `overflow: hidden` 에 안 잘린다. */}
+        {CORNERS.map((c) => (
+          <span
+            key={c}
+            aria-hidden="true"
+            data-corner={c}
+            className="ss-demo-resize"
+            onPointerDown={onResizeDown(c)}
+            onPointerMove={onResizeMove}
+            onPointerUp={onResizeUp}
+            onPointerCancel={onResizeUp}
+          />
+        ))}
       </div>
-    </div>
+    </>
   )
+}
+
+type Corner = 'tl' | 'tr' | 'bl' | 'br'
+const CORNERS: Corner[] = ['tl', 'tr', 'bl', 'br']
+
+/** 기본 크기에서 줄일 수 있는 한계 — 딱 절반(사용자 요청). */
+export const MIN_SCALE = 0.5
+
+type Adjust = { scale: number; dx: number; dy: number }
+
+/** 영상 비율(자른 뒤 1902×952). `AuthShell` 의 자리 비율과 같아야 한다. */
+const VIDEO_ASPECT = 1902 / 952
+
+/** 로그인 자리가 없는 화면의 기본 자리 — 왼쪽 아래 구석, 폭 최대 320px. */
+export function cornerBox(vw: number, vh: number): Box {
+  const gap = 24
+  const width = Math.min(320, vw * 0.4)
+  const height = width / VIDEO_ASPECT
+  return { left: gap, top: vh - gap - height, width, height }
 }
 
 /** 초 → `분:초`(예: 83.4 → `1:23`). 유튜브와 같은 꼴이다. */
