@@ -15503,3 +15503,35 @@ a.ss-seeking-pill:hover {
   .ss-demo-video[data-travel='entering'],
   .ss-demo-reopen[data-travel='entering'] { animation: ss-demo-in 0.2s ease-out both; }
 }
+
+/* ── 한 곳만 밝게 두는 안내 — components/SpotNudge.tsx ──
+   로그인 화면의 「시연영상을 참고해 주세요」(.ss-demo-spot)와 같은 어둠·같은 글자.
+   🔴 어둠은 **구멍 상자의 큰 그림자**다 — 이 상자가 과녁 둘레에 놓이고 그 밖을
+   전부 칠한다. 과녁을 z-index 로 끌어올리는 식은 헤더의 쌓임 맥락에 막힌다.
+   누르는 것은 가로채지 않는다(구멍 속 「내 프로필」도 그대로 눌린다). */
+.ss-nudge-dim {
+  position: fixed;
+  z-index: 70;
+  border-radius: 14px;
+  box-shadow: 0 0 0 200vmax color-mix(in srgb, var(--ss-bg) 62%, transparent);
+  pointer-events: none;
+  animation: ss-demo-in 0.6s ease-out both;
+}
+
+.ss-nudge-note {
+  position: fixed;
+  z-index: 70;
+  margin: 0;
+  color: #ffffff; /* 완전한 흰색 — .ss-demo-spot-note 와 같다 */
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: ss-demo-note-in 0.6s ease-out both;
+}
+
+.ss-nudge-dim[data-state='out'],
+.ss-nudge-note[data-state='out'] {
+  animation: ss-demo-out 0.6s ease-in both;
+}

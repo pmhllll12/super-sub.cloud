@@ -39,6 +39,7 @@ import {
   rememberInviteSeat,
 } from '@/lib/inviteSeats'
 import { apiDelete, apiPost } from '@/lib/api/client'
+import SpotNudge from '@/components/SpotNudge'
 
 /**
  * 홈 첫 화면의 스쿼드 판 — 판 하나 위에 선수 카드를 **포지션 자리대로**
@@ -1383,6 +1384,8 @@ export default function SquadPanel({
    * `addSeat` 로 저장하기 때문이다. 판이 진짜로 비어 있을 때만 다시 앉는다.
    */
   const autoSeated = useRef(false)
+  // 카드 없이 빈 자리를 눌렀을 때 「내 프로필」을 가리키는 안내(SpotNudge).
+  const [needCard, setNeedCard] = useState(false)
   useEffect(() => {
     if (autoSeated.current) return
     if (!myCardId || mySeat) return
@@ -1563,6 +1566,13 @@ export default function SquadPanel({
        나간 부분이 통째로 잘린다 — 실제로 그렇게 안 보였다. 자리 잡기는
        이 바깥 상자가 맡고, 두 판은 그 안에서 좌표를 잡는다. */
     <div className="ss-squad-wrap">
+      {needCard && (
+        <SpotNudge
+          target=".ss-home-profile"
+          message="내 프로필에서 카드를 먼저 만들어주세요."
+          onDone={() => setNeedCard(false)}
+        />
+      )}
       {/* 유리 굴절(warp) — backdrop-filter 는 흐림·채도만 다루고 뒤 배경을
           휘게 하지는 못한다. 그건 SVG 필터의 몫이다: 부드러운 잡음
           (feTurbulence)을 만들고 그만큼 픽셀을 밀어(feDisplacementMap)
@@ -1884,7 +1894,12 @@ export default function SquadPanel({
                      넣는 것도 등재(`POST /squad/members`)라 주장만 되고,
                      초대도 주장만 보낸다 — 눌러도 아무 일이 안 일어나는
                      단추를 두면 고장으로 읽힌다. */
-                  disabled={!isCaptain}
+                  /* 🔴 **카드가 없으면 누를 수 있게 열어 둔다**(사용자 요청,
+                     2026-09-19). 처음 온 사람은 카드도 팀도 없어서 여기가 잠겨
+                     있었고, 눌러도 **아무 일도 안 일어나 무엇을 하라는지 몰랐다.**
+                     잠긴 단추는 클릭 자체가 안 와서 안내도 못 띄운다 — 그래서
+                     열고, 누르면 할 일(카드 만들기)을 가리킨다(아래 onClick). */
+                  disabled={!isCaptain && !!myCardId}
                   aria-label={
                     placing
                       ? `${posOf(slot)} 자리에 ${placing} 넣기`
@@ -1892,6 +1907,13 @@ export default function SquadPanel({
                   }
                   aria-expanded={placing ? undefined : picking?.area === slot.area}
                   onClick={() => {
+                    // 카드도 없고 팀장도 아니면(= 처음 온 사람) 여기서 할 수 있는 게
+                    // 없다 — 먼저 할 일을 가리킨다. 팀장이면 카드가 없어도 추천이
+                    // 열리므로(원래 동작) 건드리지 않는다.
+                    if (!isCaptain && !myCardId) {
+                      setNeedCard(true)
+                      return
+                    }
                     if (placing) {
                       setMates((prev) => ({ ...prev, [slot.area]: placing }))
                       /* 🔴 **고른 사람의 슬러그를 그 자리로 옮긴다**(미결
