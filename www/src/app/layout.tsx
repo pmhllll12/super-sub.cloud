@@ -13,6 +13,7 @@ import {
 import "material-symbols/outlined.css";
 import "./globals.css";
 import IntroGate from "@/components/IntroGate";
+import DemoVideo from "@/components/DemoVideo";
 import AppFigure from "@/components/AppFigure";
 import { PageTransitionProvider } from "@/lib/pageTransition";
 
@@ -121,6 +122,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         className={`${rubik.variable} ${rubikGlitch.variable} ${abrilFatface.variable} ${shrikhand.variable} ${youngSerif.variable} ${grenze.variable} ${rakkas.variable} ${anton.variable} ${freckleFace.variable} min-h-full flex flex-col`}
       >
         <IntroGate />
+        {/* 사용법 영상(해커톤 제출용). 🔴 화면 전환 **밖**에 둔다 — 안에 두면
+            전환 연출의 transform 때문에 fixed 가 엉뚱한 데로 잡히고, 화면마다
+            새로 태어나 처음부터 다시 돈다(components/DemoVideo.tsx). */}
+        <DemoVideo />
         {/* 화면을 떠날 때 들어온 방향 그대로 되나가게 한다. 라우팅을 건너
             살아 있어야 해서 루트에 둔다(lib/pageTransition.tsx). */}
         <PageTransitionProvider>

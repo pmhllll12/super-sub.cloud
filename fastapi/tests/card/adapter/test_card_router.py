@@ -121,3 +121,53 @@ class TestCreateMyCard:
 
         body = client.post(f"{V1}/me/card", headers=self._token()).json()
         assert not (set(body) & FORBIDDEN_CARD_FIELDS)
+
+
+class TestDeleteMyCard:
+    """DELETE /me/card — 카드를 안 만든 처음 상태로 (2026-09-19, 화면의 「초기화」)."""
+
+    @pytest.fixture(autouse=True)
+    def _clean_stub(self):
+        reset_created_cards()
+        yield
+        reset_created_cards()
+
+    def _token(self, user_id=None) -> dict[str, str]:
+        return {"Authorization": f"Bearer {issue_access_token(user_id or uuid4())}"}
+
+    def test_인증이_필요하다(self, client):
+        res = client.delete(f"{V1}/me/card")
+        assert res.status_code == 401
+        assert error_code(res) == "UNAUTHORIZED"
+
+    def test_지우면_204_이고_다시_읽으면_404(self, client):
+        headers = self._token()
+        client.post(f"{V1}/me/card", headers=headers)
+        res = client.delete(f"{V1}/me/card", headers=headers)
+        assert res.status_code == 204, res.text
+        assert res.content == b""
+        read = client.get(f"{V1}/me/card", headers=headers)
+        assert read.status_code == 404
+        assert error_code(read) == "CARD_NOT_FOUND"
+
+    def test_없어도_204_다_멱등(self, client):
+        assert client.delete(f"{V1}/me/card", headers=self._token()).status_code == 204
+
+    def test_지운_카드의_공유_링크는_죽는다(self, client):
+        headers = self._token()
+        slug = client.post(f"{V1}/me/card", headers=headers).json()["public_slug"]
+        client.delete(f"{V1}/me/card", headers=headers)
+        assert client.get(f"{V1}/cards/{slug}").status_code == 404
+
+    def test_다시_만들면_새_카드다(self, client):
+        """처음 상태로 돌아간 것이므로 다음 만들기는 201 이고 슬러그도 새로 뽑힌다."""
+        headers = self._token()
+        first = client.post(f"{V1}/me/card", headers=headers).json()
+        client.delete(f"{V1}/me/card", headers=headers)
+        again = client.post(f"{V1}/me/card", headers=headers)
+        assert again.status_code == 201
+        assert again.json()["public_slug"] != first["public_slug"]
+
+    def test_데모_카드도_지워진다(self, client, auth):
+        assert client.delete(f"{V1}/me/card", headers=auth).status_code == 204
+        assert client.get(f"{V1}/me/card", headers=auth).status_code == 404

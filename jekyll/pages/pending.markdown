@@ -12752,3 +12752,26 @@ grep -n "grid_col" fastapi/docs/api-contract.md | grep -i invitation
 
 - **확인**: `grep -rnE 'supersub-video' www/` 가 0건
 - **담당**: ~~백성검~~ **✅ 고쳤습니다 (2026.09.18)** · **제기**: 백성검 · **기한**: 완료
+
+### 46. **`DELETE /me/card` 를 만들었습니다** — 카드 「초기화」가 카드를 지웁니다 · **배포 부탁** (2026-09-19 신설)
+
+사용자 요청으로 카드 편집기의 「초기화」가 **카드를 안 만든 처음 상태**로
+돌아가야 해서, 서버에 카드를 지우는 길을 **백성검이 직접** 냈습니다(사용자 승인).
+계약이 바뀌므로 알려 드립니다 — 규격은 `fastapi/docs/api-contract.md` 3장의
+`DELETE /api/v1/me/card`, 반영 목록은 `client-contract-changes.md` **63번**.
+
+- **204, 원래 없었어도 204**(멱등). 공유 링크 404 · 스쿼드 자리는 외래키 CASCADE
+  로 같이 빠짐 · **호칭은 사람에 붙어 남음**
+- **마이그레이션 없음**(`alembic check` 변경 없음 · head 하나). 공유 파일 5곳 손 안 댐
+- 포트(`CardPort.delete_by_owner`) · 인터랙터 · 프로바이더 · pg/스텁 저장소 · 라우터.
+  시험: 계약 6 · DB 2 · 유스케이스 2. **전체 pytest 1138 passed / skipped 0**
+  (pgvector 컨테이너에 CI 와 같은 순서로 올려 돌림)
+- ⚠️ 포트 파일에 `create_for_owner` 가, DTO 파일에 `CreateMyCardCommand` 가
+  **이미 두 번씩** 선언돼 있었습니다 — 동작엔 지장이 없어 손대지 않았습니다
+
+**봐 주실 것**: 규격·설계(특히 「없어도 204」와 사진 S3 객체를 안 지우는 것)가
+괜찮은지, 그리고 **배포**. 배포 전에는 실서버에서 「초기화」가 404 를 받고,
+화면은 예전 동작(꾸밈만 기본값)으로 물러나며 그렇다고 알립니다 — 깨지지는 않습니다.
+
+- **확인**: `curl -s -o /dev/null -w '%{http_code}' -X DELETE https://<API 호스트>/api/v1/me/card -H "Authorization: Bearer <토큰>"` 가 `204`
+- **담당**: 정어진(검토 · 배포) · **제기**: 백성검 · **기한**: 급하지 않음(화면이 물러나는 길이 있음)

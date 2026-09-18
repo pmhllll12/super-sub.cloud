@@ -136,7 +136,7 @@ describe('로그인 화면 — 심사위원용', () => {
 
   it('회원가입 아래에 단추가 있다', () => {
     render(<LoginPage />)
-    expect(screen.getByRole('button', { name: '심사위원용 로그인' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '원티드 테스트용 로그인' })).toBeInTheDocument()
   })
 
   /* 계정이 이미 있으면 **가입을 안 부른다** — 한 번으로 끝난다. */
@@ -144,7 +144,7 @@ describe('로그인 화면 — 심사위원용', () => {
     const calls = stub()
     render(<LoginPage />)
 
-    await userEvent.click(screen.getByRole('button', { name: '심사위원용 로그인' }))
+    await userEvent.click(screen.getByRole('button', { name: '원티드 테스트용 로그인' }))
 
     expect(calls.filter((c) => c.url.endsWith('/api/auth/login'))).toHaveLength(1)
     expect(calls.some((c) => c.url.endsWith('/api/auth/signup'))).toBe(false)
@@ -158,7 +158,7 @@ describe('로그인 화면 — 심사위원용', () => {
     const calls = stub({ loginFails: 1 })
     render(<LoginPage />)
 
-    await userEvent.click(screen.getByRole('button', { name: '심사위원용 로그인' }))
+    await userEvent.click(screen.getByRole('button', { name: '원티드 테스트용 로그인' }))
 
     expect(calls.some((c) => c.url.endsWith('/api/auth/signup'))).toBe(true)
     expect(calls.filter((c) => c.url.endsWith('/api/auth/login'))).toHaveLength(2)
@@ -172,7 +172,7 @@ describe('로그인 화면 — 심사위원용', () => {
     const calls = stub()
     render(<LoginPage />)
 
-    await userEvent.click(screen.getByRole('button', { name: '심사위원용 로그인' }))
+    await userEvent.click(screen.getByRole('button', { name: '원티드 테스트용 로그인' }))
 
     const sent = calls.find((c) => c.url.endsWith('/api/auth/login'))!
     const body = sent.body as { email?: string; password?: string }
@@ -187,7 +187,7 @@ describe('로그인 화면 — 심사위원용', () => {
     stub({ loginFails: 99 })
     render(<LoginPage />)
 
-    await userEvent.click(screen.getByRole('button', { name: '심사위원용 로그인' }))
+    await userEvent.click(screen.getByRole('button', { name: '원티드 테스트용 로그인' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('없는 계정')
   })

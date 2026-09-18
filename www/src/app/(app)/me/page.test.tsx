@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { Match, MyVideo, PlayerCard, User } from '@/server/backend'
 import { HIDDEN_MARKS, MARKS } from '@/components/CardMark'
+import { markTeamNudge } from '@/lib/teamNudge'
 import { MeBody } from './page'
 
 // NicknameForm 이 useRouter 를 쓴다.
@@ -568,13 +569,31 @@ describe('내 프로필 — /me', () => {
     expect(pcard.style.getPropertyValue('--ss-pcard-text-y')).toBe('24%')
   })
 
+  // 🔴 글자 자리를 **슬라이더로도** 옮긴다(2026-09-19) — 끌기와 같은 값이다.
+  it('글자 좌우·위아래 슬라이더가 카드의 글자를 옮긴다', () => {
+    const { container } = render(
+      <MeBody user={USER} card={CARD} videos={[]} matches={[]} editing />,
+    )
+    const pcard = container.querySelector<HTMLElement>('.ss-card-stage .ss-pcard')!
+    fireEvent.change(screen.getByRole('slider', { name: '글자 위아래' }), { target: { value: '70' } })
+    fireEvent.change(screen.getByRole('slider', { name: '글자 좌우' }), { target: { value: '30' } })
+    expect(pcard.style.getPropertyValue('--ss-pcard-text-y')).toBe('70%')
+    expect(pcard.style.getPropertyValue('--ss-pcard-text-x')).toBe('30%')
+    // 위로는 로고 자리까지만 — 끌기와 같은 하한
+    expect(screen.getByRole('slider', { name: '글자 위아래' })).toHaveAttribute('min', '24')
+  })
+
+  // 초기화는 이제 카드를 지운다(묻고 나서) — 화면 값도 먼저 기본값으로 돌린다.
   it('초기화로 되돌릴 수 있다', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }))
     const { container } = render(
       <MeBody user={USER} card={CARD} videos={[]} matches={[]} editing />,
     )
     fireEvent.change(screen.getByLabelText('카드에 넣을 글자'), { target: { value: '바뀜' } })
     fireEvent.click(screen.getByRole('button', { name: '초기화' }))
     expect(container.querySelector('.ss-pcard-alias')!.textContent).toBe('THREE LUNGS')
+    vi.restoreAllMocks()
   })
 
   // 🔴 편집기는 **늘 그려 두고 접는다** — 열 때만 그리면 닫을 때 뚝 사라진다.
@@ -602,5 +621,47 @@ describe('내 프로필 — /me', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /닉네임 편집/ }))
     expect(screen.getByRole('textbox', { name: '닉네임' })).toHaveValue('홍길동')
+  })
+})
+
+
+/* 할 일이 남은 사람이 프로필에 오면 그 단추를 가리킨다(2026-09-19) — 카드 먼저, 그다음 팀. */
+describe('프로필 안내', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  it('카드가 없으면 연출이 끝난 뒤 「먼저 내 카드를 만들어주세요.」', () => {
+    render(<MeBody user={USER} card={null} videos={[]} matches={[]} />)
+    expect(screen.queryByText('먼저 내 카드를 만들어주세요.')).toBeNull()
+    act(() => vi.advanceTimersByTime(1700))
+    expect(screen.getByText('먼저 내 카드를 만들어주세요.')).toBeInTheDocument()
+  })
+
+  // 🔴 팀 안내는 **홈에서 「팀을 먼저 만들어주세요」가 뜬 뒤 한 번만**(lib/teamNudge).
+  it('팀이 없어도 표가 없으면 안 띄운다 — 팀 없이 쓰는 사람도 있다', () => {
+    sessionStorage.clear()
+    render(<MeBody user={{ ...USER, teams: [] }} card={CARD} videos={[]} matches={[]} />)
+    act(() => vi.advanceTimersByTime(1700))
+    expect(screen.queryByText('팀을 만들어주세요.')).toBeNull()
+  })
+
+  it('홈에서 표를 받았으면 한 번만 — 다시 들어오면 안 뜬다', () => {
+    sessionStorage.clear()
+    markTeamNudge()
+    const first = render(<MeBody user={{ ...USER, teams: [] }} card={CARD} videos={[]} matches={[]} />)
+    act(() => vi.advanceTimersByTime(1700))
+    expect(screen.getByText('팀을 만들어주세요.')).toBeInTheDocument()
+    first.unmount()
+    render(<MeBody user={{ ...USER, teams: [] }} card={CARD} videos={[]} matches={[]} />)
+    act(() => vi.advanceTimersByTime(1700))
+    expect(screen.queryByText('팀을 만들어주세요.')).toBeNull()
+  })
+
+  it('카드도 팀도 있으면 아무것도 안 띄운다', () => {
+    const teamed = { ...USER, teams: [{ team_id: 't1', name: '번개FC', region: '서울', sport_code: 'football', role: 'owner', joined_at: '2026-07-01T00:00:00Z' }] }
+    render(<MeBody user={teamed as typeof USER} card={CARD} videos={[]} matches={[]} />)
+    act(() => vi.advanceTimersByTime(1700))
+    expect(screen.queryByRole('status', { name: '' })).toBeNull()
+    expect(screen.queryByText(/만들어주세요/)).toBeNull()
   })
 })

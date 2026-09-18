@@ -292,6 +292,37 @@ class TestCreateMyCardInDb:
         assert len(slug) >= 16
 
 
+class TestDeleteMyCardInDb:
+    """카드 지우기를 **실제 PostgreSQL** 에 대고 확인한다 (2026-09-19).
+
+    스텁이 답할 수 없는 것 — 행이 실제로 사라지는가, 사람(`user`)은 남는가.
+    """
+
+    def _count(self, db_session, user_id):
+        return db_session.execute(
+            text("select count(*) from player_card where user_id = :u"),
+            {"u": str(user_id)},
+        ).scalar_one()
+
+    def test_행이_실제로_사라지고_사람은_남는다(self, db_client, db_session, fresh_account):
+        headers = fresh_account["headers"]
+        db_client.post(f"{V1}/me/card", headers=headers)
+        assert self._count(db_session, fresh_account["user_id"]) == 1
+
+        res = db_client.delete(f"{V1}/me/card", headers=headers)
+        assert res.status_code == 204, res.text
+        db_session.expire_all()
+        assert self._count(db_session, fresh_account["user_id"]) == 0
+        # 계정은 그대로 — 로그인한 채 다시 만들 수 있다
+        assert db_client.get(f"{V1}/me", headers=headers).status_code == 200
+        again = db_client.post(f"{V1}/me/card", headers=headers)
+        assert again.status_code == 201, again.text
+
+    def test_없어도_204(self, db_client, fresh_account):
+        res = db_client.delete(f"{V1}/me/card", headers=fresh_account["headers"])
+        assert res.status_code == 204
+
+
 class TestTaglineInDb:
     """카드의 한 줄이 **실제로 저장되고 공개 카드에도 나가는가** (미결 `paik` 3번).
 

@@ -2473,3 +2473,37 @@ describe('스쿼드 — 경기가 잡힌 화면', () => {
     expect(within(theirs).getByText('칸없는사람')).toBeInTheDocument()
   })
 })
+
+/**
+ * **카드 없는 사람이 빈 자리를 누르면 「내 프로필」을 가리킨다** (사용자 요청,
+ * 2026-09-19). 처음 온 사람은 카드도 팀도 없어서 빈 자리가 잠겨 있었고, 눌러도
+ * 아무 일이 없어 무엇을 하라는지 몰랐다.
+ */
+describe('카드 없이 빈 자리를 누르면', () => {
+  it('잠겨 있지 않고, 누르면 「내 프로필에서 카드를 먼저 만들어주세요.」를 띄운다', async () => {
+    render(<SquadPanel card={null} squad={null} />)
+    const seat = screen.getAllByRole('button', { name: /자리에 선수 넣기/ })[0]
+    expect(seat).not.toBeDisabled()
+    await userEvent.click(seat)
+    expect(screen.getByRole('status')).toHaveTextContent('내 프로필에서 카드를 먼저 만들어주세요.')
+    // 추천 판은 안 열린다
+    expect(seat).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('카드가 있고 팀이 있는 팀원은 전처럼 잠겨 있다', () => {
+    render(<SquadPanel card={CARD} myCardId={CARD.id} squad={SQUAD} />)
+    for (const seat of screen.queryAllByRole('button', { name: /자리에 선수 넣기/ })) expect(seat).toBeDisabled()
+  })
+
+  // 🔴 카드는 만들었는데 팀이 없으면 — 판에 그냥 앉히지 않고 팀을 만들라고 한다(사용자 판단).
+  it('카드는 있고 팀이 없으면 누를 때 「팀을 먼저 만들어주세요」 — 내 카드를 판에 앉히지 않는다', async () => {
+    const { container } = render(<SquadPanel card={CARD} myCardId={CARD.id} squad={null} />)
+    expect(container.querySelector('.ss-pcard-alias')).toBeNull()
+    const seat = screen.getAllByRole('button', { name: /자리에 선수 넣기/ })[0]
+    expect(seat).not.toBeDisabled()
+    await userEvent.click(seat)
+    expect(screen.getByRole('status')).toHaveTextContent('내 프로필에서 팀을 먼저 만들어주세요.')
+    // 다음 프로필 방문에서 한 번 가리키라는 표를 남긴다
+    expect(sessionStorage.getItem('ss-team-nudge-pending')).toBe('1')
+  })
+})

@@ -127,6 +127,16 @@ class CardPgRepository(CardPort):
         self._session.commit()
         return self.find_by_owner(user_id)
 
+    def delete_by_owner(self, user_id: UUID) -> bool:
+        # 스쿼드 판의 자리(`squad_member`)는 외래키 `ondelete="CASCADE"` 라 DB 가
+        # 같이 지운다 — 여기서 따로 지우지 않는다(남의 컨텍스트 테이블이기도 하다).
+        # ⚠️ 카드 사진(S3 `cards/…`)은 안 지운다 — 키가 사라져 아무도 못 가리킬 뿐이다.
+        deleted = self._session.execute(
+            delete(PlayerCardOrm).where(PlayerCardOrm.user_id == user_id)
+        ).rowcount
+        self._session.commit()
+        return bool(deleted)
+
     def create_for_owner(self, user_id: UUID) -> CardEntity:
         """카드를 만든다. 이미 있으면 있는 것을 돌려준다 (멱등).
 

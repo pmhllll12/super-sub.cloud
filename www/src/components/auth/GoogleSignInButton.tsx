@@ -4,6 +4,7 @@ import Script from 'next/script'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef } from 'react'
 import { apiErrorMessage, apiPost } from '@/lib/api/client'
+import { leaveDemoVideo } from '@/lib/demoVideoExit'
 
 /**
  * 구글 클라이언트 ID 는 원래 공개되는 값이라 NEXT_PUBLIC_ 이 맞다 (백엔드
@@ -105,6 +106,8 @@ export default function GoogleSignInButton({
     if (limit?.locked) return
     try {
       await apiPost('/api/auth/google', { id_token: idToken })
+      // 사용법 영상이 먼저 가장자리로 빠진 뒤 홈으로(홈에서 같은 데로 들어온다).
+      await leaveDemoVideo()
       router.push('/home')
       router.refresh()
     } catch (err) {

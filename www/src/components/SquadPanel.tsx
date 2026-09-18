@@ -39,6 +39,8 @@ import {
   rememberInviteSeat,
 } from '@/lib/inviteSeats'
 import { apiDelete, apiPost } from '@/lib/api/client'
+import SpotNudge from '@/components/SpotNudge'
+import { markTeamNudge } from '@/lib/teamNudge'
 
 /**
  * 홈 첫 화면의 스쿼드 판 — 판 하나 위에 선수 카드를 **포지션 자리대로**
@@ -308,6 +310,13 @@ function pitchFromSquad(squad: Squad | null, size: SquadSize): PitchPlayer[] {
       cardSlug: slugs[sl.area] ?? null,
     }))
 }
+
+/**
+ * 🔴 **홈의 「AI」 단추를 지금은 안 보인다**(사용자 요청, 2026-09-19 — 챗봇 용병
+ * 찾기가 아직 제대로 구현되지 않았다). 단추·챗봇(`MatchBot`) 코드는 **그대로 둔다** —
+ * 다시 쓰려면 이 값만 `true` 로.
+ */
+const SHOW_AI_BUTTON = false
 
 export default function SquadPanel({
   card,
@@ -1383,6 +1392,14 @@ export default function SquadPanel({
    * `addSeat` 로 저장하기 때문이다. 판이 진짜로 비어 있을 때만 다시 앉는다.
    */
   const autoSeated = useRef(false)
+  // 할 일이 남은 채 빈 자리를 눌렀을 때 「내 프로필」을 가리키는 안내(SpotNudge).
+  // 카드가 없으면 'card', 카드는 있는데 팀이 없으면 'team'.
+  const [need, setNeed] = useState<'card' | 'team' | null>(null)
+  /* 팀이 **아예 없는가** — 스쿼드도, 홈이 보여 주는 팀 이름도, 팀 id 도 없을 때만.
+     🔴 `squad` 하나로 가르지 않는다: 팀원은 스쿼드를 **나중에** 받아 오므로(처음엔
+     null) 그 사이에 「팀 없음」으로 잘못 읽힌다. `teamName` 은 소속이면 팀장이든
+     팀원이든 온다. */
+  const noTeam = !squad && !teamName && !myTeamId
   useEffect(() => {
     if (autoSeated.current) return
     if (!myCardId || mySeat) return
@@ -1563,6 +1580,16 @@ export default function SquadPanel({
        나간 부분이 통째로 잘린다 — 실제로 그렇게 안 보였다. 자리 잡기는
        이 바깥 상자가 맡고, 두 판은 그 안에서 좌표를 잡는다. */
     <div className="ss-squad-wrap">
+      {need && (
+        <SpotNudge
+          // 카드 모양과 「내 프로필」 글자만 — 둘레 배경은 어둡게(사용자 정정).
+          // 🔴 둥근 모서리는 `.ss-pcard` 가 아니라 **`.ss-pcard-inner`** 에 있다 — 바깥을
+          //    겨누면 구멍이 네모라 모서리 밖 배경이 비친다.
+          targets={['.ss-home-profile .ss-pcard-inner', '.ss-home-profile-label']}
+          message={need === 'card' ? '내 프로필에서\n카드를 먼저 만들어주세요.' : '내 프로필에서\n팀을 먼저 만들어주세요.'}
+          onDone={() => setNeed(null)}
+        />
+      )}
       {/* 유리 굴절(warp) — backdrop-filter 는 흐림·채도만 다루고 뒤 배경을
           휘게 하지는 못한다. 그건 SVG 필터의 몫이다: 부드러운 잡음
           (feTurbulence)을 만들고 그만큼 픽셀을 밀어(feDisplacementMap)
@@ -1884,7 +1911,17 @@ export default function SquadPanel({
                      넣는 것도 등재(`POST /squad/members`)라 주장만 되고,
                      초대도 주장만 보낸다 — 눌러도 아무 일이 안 일어나는
                      단추를 두면 고장으로 읽힌다. */
-                  disabled={!isCaptain}
+                  /* 🔴 **카드가 없으면 누를 수 있게 열어 둔다**(사용자 요청,
+                     2026-09-19). 처음 온 사람은 카드도 팀도 없어서 여기가 잠겨
+                     있었고, 눌러도 **아무 일도 안 일어나 무엇을 하라는지 몰랐다.**
+                     잠긴 단추는 클릭 자체가 안 와서 안내도 못 띄운다 — 그래서
+                     열고, 누르면 할 일(카드 만들기)을 가리킨다(아래 onClick). */
+                  /* 🔴 **팀도 없으면 열어 둔다**(2026-09-19) — 카드를 만든 뒤에도 팀이
+                     없으면 설 판이 없어 여기가 다시 잠겼다. 누르면 팀을 만들라고
+                     가리킨다(카드 없는 사람과 같은 길). 🔴 팀이 없다고 내 카드를 판에
+                     그냥 앉히지 않는다 — 한 번 그렇게 했다가 되돌렸다(사용자 판단:
+                     「팀 만들라고 해야 하지 않음?」). 팀이 있는 팀원은 그대로 잠근다. */
+                  disabled={!isCaptain && !!myCardId && !noTeam}
                   aria-label={
                     placing
                       ? `${posOf(slot)} 자리에 ${placing} 넣기`
@@ -1892,6 +1929,20 @@ export default function SquadPanel({
                   }
                   aria-expanded={placing ? undefined : picking?.area === slot.area}
                   onClick={() => {
+                    // 카드도 없고 팀장도 아니면(= 처음 온 사람) 여기서 할 수 있는 게
+                    // 없다 — 먼저 할 일을 가리킨다. 팀장이면 카드가 없어도 추천이
+                    // 열리므로(원래 동작) 건드리지 않는다.
+                    if (!isCaptain && !myCardId) {
+                      setNeed('card')
+                      return
+                    }
+                    // 카드는 있는데 팀이 없다 — 설 판이 없다. 팀부터.
+                    if (!isCaptain && noTeam) {
+                      setNeed('team')
+                      // 다음에 내 프로필에 가면 「팀 만들기」를 **한 번** 가리킨다(lib/teamNudge).
+                      markTeamNudge()
+                      return
+                    }
                     if (placing) {
                       setMates((prev) => ({ ...prev, [slot.area]: placing }))
                       /* 🔴 **고른 사람의 슬러그를 그 자리로 옮긴다**(미결
@@ -2002,15 +2053,17 @@ export default function SquadPanel({
           라 CSS 상수가 없고(내용이 정한다), 판 바깥에서 맞추려면 그 폭을
           다시 재서 두 곳에서 자리를 정하게 된다. 판 안에서는 `right: 0`
           한 줄이면 무슨 폭이든 정확히 오른쪽 끝이다. */}
-      <button
-        type="button"
-        className="ss-home-ai ss-traveling-edge"
-        aria-label="AI 용병 찾기"
-        aria-expanded={bot}
-        onClick={() => onBotChange?.(!bot)}
-      >
-        AI
-      </button>
+      {SHOW_AI_BUTTON && (
+        <button
+          type="button"
+          className="ss-home-ai ss-traveling-edge"
+          aria-label="AI 용병 찾기"
+          aria-expanded={bot}
+          onClick={() => onBotChange?.(!bot)}
+        >
+          AI
+        </button>
+      )}
 
       {/* AI 챗봇 — 추천 판과 **같은 첫째 칸**이다(사용자 요청). 여는 쪽이
           상대를 닫는다(`onBotChange` · 빈 자리 누르기). 둘째 칸의 지인 판과는

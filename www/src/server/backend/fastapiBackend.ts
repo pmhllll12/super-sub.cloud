@@ -95,6 +95,10 @@ export const fastapiBackend: Backend = {
     return callFastApi<PlayerCard>('/me/card', { method: 'POST', token })
   },
 
+  async deleteMyCard(token) {
+    await callFastApi<void>('/me/card', { method: 'DELETE', token })
+  },
+
   updateMyCard(token, input) {
     return callFastApi<PlayerCard>('/me/card', { method: 'PATCH', token, body: input })
   },

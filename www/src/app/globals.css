@@ -1559,6 +1559,24 @@ body::-webkit-scrollbar {
   -webkit-user-drag: none;
 }
 
+/* 사진을 안 올린 카드의 기본 인물(player_default.webp) — 양팔을 벌린 넓은 그림이라
+   🔴 **자르지 않는다.** 카드 폭을 다 쓰고(inset-inline 0), 그 안에 통째로 맞춰
+   바닥에 앉힌다(contain · bottom). 올린 사진처럼 cover 로 채우면 양팔이 잘렸다
+   (사용자 지적). 얼굴은 그림 자체가 가로 가운데로 만들어져 있다. */
+.ss-pcard[data-photo-default='true'] .ss-pcard-figure {
+  /* 🔴 **크게**(사용자 요청 — 카드 폭에 딱 맞췄더니 인물이 작았다). 칸을 카드보다
+     양옆으로 25%씩 넓혀 인물을 1.5배로 키운다 — 넘친 팔 끝은 카드 테두리가
+     자른다. 가운데를 기준으로 넓혀서 얼굴은 여전히 가로 가운데다. 키운 만큼
+     위로 올라올 자리가 필요해 칸의 윗변도 38% 로 올렸다(로고·글자는 그 위다). */
+  inset-inline: -25%;
+  top: 38%;
+}
+
+.ss-pcard[data-photo-default='true'] .ss-pcard-figure img {
+  object-fit: contain;
+  object-position: center bottom;
+}
+
 /* 작게 줄인 카드 — 홈 헤더에서 닉네임 자리를 대신한다. 폭만 줄이면 안쪽
    글자 크기가 그대로 남아 짜임이 깨지므로, 제 크기로 그린 뒤 통째로
    축소한다(transform). 그러면 안쪽 여백 · 글자 · 붓자국이 전부 같은
@@ -11705,21 +11723,6 @@ body:has(.ss-profile) {
   }
 }
 
-/* 카드가 아직 없는 사람. 같은 폭 · 같은 비율의 판에 이름 첫 글자만
-   둔다 — 자리를 비우면 바의 키가 사람마다 달라진다. */
-.ss-profile-face-empty {
-  display: grid;
-  place-items: center;
-  width: calc(var(--ss-pcard-mini-w, 104) * 1px);
-  aspect-ratio: 3 / 4.1;
-  border-radius: 14px;
-  border: 1px solid var(--ss-fg);
-  background: color-mix(in srgb, var(--ss-fg) 6%, transparent);
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--ss-fg);
-}
-
 .ss-profile-id-text {
   display: flex;
   flex-direction: column;
@@ -14954,4 +14957,598 @@ a.ss-seeking-pill:hover {
   cursor: pointer;
   font-size: 1.1rem;
   line-height: 1;
+}
+
+/* ── 사용법 영상(해커톤 제출용, 2026-09-18) — components/DemoVideo.tsx ──
+   로그인 화면에서는 JS 가 잰 자리(top/left/width/height)를 인라인으로 받고,
+   자리가 없는 화면에서는 아래 기본값대로 왼쪽 아래 구석에 뜬다.
+
+   🔴 테두리는 **완전한 흰색 · 아주 얇게**(사용자 요청). `--ss-fg` 를 쓰지 않는다 —
+   흰 판 화면들이 그 값을 검정·짙은 초록으로 뒤집어 쓴다. 이 규칙 안에서만 쓰는
+   값이라 여기 한 번 적는다. */
+.ss-demo-video {
+  --ss-demo-edge: #ffffff;
+  position: fixed;
+  z-index: 55;
+  /* 자리(top/left/width/height)는 늘 JS 가 준다 — 로그인 자리든 구석이든,
+     모서리를 끌어 바꾼 크기든. 🔴 여기는 잘라 내지 않는다(`overflow` 없음) —
+     바깥에 붙는 닫기 단추·모서리 손잡이가 잘린다. 자르는 것은 안쪽 틀이다. */
+}
+
+/* 인트로가 끝나고 처음 나올 때 — 화면 위 보이지 않는 데서 부드럽게 내려온다
+   (사용자 요청). -100vh 에서 출발하면 어디에 앉든(아래 끝이 창 안) 출발점은
+   늘 창 위 밖이다. 붙은 「시연영상 닫기」도 같은 상자 안이라 함께 내려온다.
+   끝에 살짝 느려지는 곡선이라 떨어지는 것이 아니라 내려앉는 것으로 읽힌다. */
+.ss-demo-video[data-entrance='drop'] {
+  animation: ss-demo-drop 1.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* 닫았다 「다시보기」로 열 때만 스르르. 🔴 내려온 직후(still)엔 **아무 애니메이션도
+   걸지 않는다** — drop 에서 곧장 이것으로 바꾸면 새로 돌면서 한 번 깜빡였다. */
+.ss-demo-video[data-entrance='fade'] {
+  animation: ss-demo-in 0.5s ease-out both;
+}
+
+@keyframes ss-demo-drop {
+  from { transform: translateY(-100vh); }
+  to { transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-demo-video[data-entrance='drop'] {
+    animation: ss-demo-in 0.3s ease-out both;
+  }
+}
+
+.ss-demo-video[hidden] {
+  display: none;
+}
+
+.ss-demo-video-frame {
+  position: absolute;
+  inset: 0;
+  /* 외곽선은 **없다**(사용자 요청 — 처음엔 흰 1px 이었다). 모서리만 둥글린다. */
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--ss-bg);
+}
+
+.ss-demo-video video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 영상 전체가 누르는 자리다 — 누르면 멈추고 다시 누르면 이어서. */
+.ss-demo-video-toggle {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.ss-demo-video-toggle[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--ss-bg) 35%, transparent);
+}
+
+.ss-demo-video-toggle:focus-visible {
+  outline: 2px solid var(--ss-accent);
+  outline-offset: -4px;
+  border-radius: inherit;
+}
+
+/* 가운데 ▶ — 판(검은 원) 없이 삼각형만, 작게(사용자 요청). 밝은 장면에서도
+   읽히게 옅은 그림자만 준다. 멈춘 동안은 떠 있고, 다시 틀 때 한 번 커지며
+   사라진다(.ss-demo-video-flash). ❚❚ 는 없다. */
+.ss-demo-video-icon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: clamp(22px, 9%, 34px);
+  height: auto;
+  aspect-ratio: 1;
+  fill: var(--ss-demo-edge);
+  filter: drop-shadow(0 1px 3px color-mix(in srgb, var(--ss-bg) 60%, transparent));
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.ss-demo-video-flash {
+  animation: ss-demo-flash 0.5s ease-out both;
+}
+
+@keyframes ss-demo-flash {
+  from { opacity: 0.95; transform: translate(-50%, -50%) scale(1); }
+  to { opacity: 0; transform: translate(-50%, -50%) scale(1.5); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-demo-video-flash { animation-duration: 0.01s; }
+}
+
+
+/* 되감기 막대 — 유튜브처럼 빨간 진행 · 회색 남은 길. 가리킬 때만 뜬다. 🔴 `opacity` 로만 감춘다 — `display:none` 이면 자판으로
+   막대에 못 닿는다. */
+.ss-demo-video {
+  --ss-demo-progress: #ff0033;
+}
+
+.ss-demo-video-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 10px 6px;
+  background: linear-gradient(to top, color-mix(in srgb, var(--ss-bg) 75%, transparent), transparent);
+  opacity: 0;
+  /* 떠날 때 — **2초 기다렸다가** 0.5초에 걸쳐 스르르(사용자 요청). */
+  transition: opacity 0.5s ease 2s;
+}
+
+/* 영상에 가져다 댔을 때만 뜬다 — 들어올 때는 곧바로. 🔴 멈춰 있다고 띄우지
+   않는다(사용자 요청 — 가져다 댈 때만). 자판으로 막대에 왔을 때만 예외로 띄운다
+   (`:focus-within` 이 아니라 `:focus-visible` — 영상을 마우스로 누르면 단추에
+   포커스가 남아 막대가 영영 안 사라진다). */
+.ss-demo-video:hover .ss-demo-video-bar,
+.ss-demo-video:has(:focus-visible) .ss-demo-video-bar {
+  opacity: 1;
+  transition: opacity 0.15s ease;
+}
+
+/* 눌리는 자리는 넉넉히(위아래 6px), 그려지는 막대는 얇게 — 3px 막대를 정확히
+   누르라고 하면 안 된다. */
+.ss-demo-video-seek {
+  position: relative;
+  height: 15px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.ss-demo-video-seek::before,
+.ss-demo-video-seek-fill {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  height: 3px;
+  border-radius: 2px;
+  transition: height 0.1s ease, top 0.1s ease;
+}
+
+.ss-demo-video-seek::before {
+  right: 0;
+  background: color-mix(in srgb, var(--ss-demo-edge) 35%, transparent);
+}
+
+.ss-demo-video-seek-fill {
+  background: var(--ss-demo-progress);
+}
+
+/* 막대 끝의 동그란 손잡이 — 가리킬 때만. */
+.ss-demo-video-seek-fill::after {
+  content: '';
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--ss-demo-progress);
+  transform: translateY(-50%) scale(0);
+  transition: transform 0.1s ease;
+}
+
+.ss-demo-video-seek:hover::before,
+.ss-demo-video-seek:hover .ss-demo-video-seek-fill,
+.ss-demo-video-seek:focus-visible::before,
+.ss-demo-video-seek:focus-visible .ss-demo-video-seek-fill {
+  top: 5px;
+  height: 5px;
+}
+
+.ss-demo-video-seek:hover .ss-demo-video-seek-fill::after,
+.ss-demo-video-seek:focus-visible .ss-demo-video-seek-fill::after {
+  transform: translateY(-50%) scale(1);
+}
+
+.ss-demo-video-seek:focus-visible {
+  outline: 2px solid var(--ss-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.ss-demo-video-time {
+  color: var(--ss-demo-edge);
+  font-size: 11px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+/* 닫기 · 다시보기 단추 — 작게, 안쪽이 유리(흐림 + warp 8), 외곽선 없음(사용자 요청).
+   🔴 `url(#ss-demo-warp)` 는 크로미움만 backdrop-filter 에서 받는다 — 다른
+   브라우저는 흐림만 남고 단추는 멀쩡하다. */
+.ss-demo-glass-btn {
+  /* 은빛 — 차가운 쪽으로 기운 회색 셋(바탕 선 · 도는 빛 · 빛의 가장자리). */
+  --ss-demo-silver: rgba(200, 206, 216, 0.38);
+  --ss-demo-silver-hi: rgba(244, 246, 250, 0.95);
+  --ss-demo-silver-mid: rgba(168, 176, 188, 0.6);
+  padding: 4px 11px;
+  border: 0;
+  border-radius: 999px;
+  /* 안쪽 색은 **없다**(사용자 요청). 유리 흐림·warp 만 남는다. */
+  background: transparent;
+  backdrop-filter: blur(8px) saturate(var(--ss-glass-saturate)) url(#ss-demo-warp);
+  -webkit-backdrop-filter: blur(8px) saturate(var(--ss-glass-saturate)) url(#ss-demo-warp);
+  color: var(--ss-demo-edge);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+/* 외곽선 — 아주 얇은(1px) 은빛 선 위로 빛 한 점이 둘레를 돈다. 로그인 카드의
+   `.ss-traveling-edge` 와 같은 기법(conic-gradient + 가운데를 파낸 mask)이다. */
+.ss-demo-glass-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background:
+    conic-gradient(
+      from var(--ss-edge-angle),
+      transparent 0%,
+      transparent 36%,
+      var(--ss-demo-silver-mid) 44%,
+      var(--ss-demo-silver-hi) 50%,
+      var(--ss-demo-silver-mid) 56%,
+      transparent 64%,
+      transparent 100%
+    ),
+    var(--ss-demo-silver);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: ss-edge-spin 4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-demo-glass-btn::after {
+    animation: none;
+  }
+}
+
+.ss-demo-glass-btn:hover::after {
+  --ss-demo-silver: rgba(214, 220, 230, 0.6);
+}
+
+.ss-demo-glass-btn:focus-visible {
+  outline: 2px solid var(--ss-accent);
+  outline-offset: 2px;
+}
+
+/* 외곽선 바깥 왼쪽 위 — 틀 위에 6px 띄워 얹는다. */
+.ss-demo-close {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px);
+}
+
+.ss-demo-reopen {
+  --ss-demo-edge: #ffffff;
+  position: fixed;
+  z-index: 55;
+}
+
+/* 모서리 손잡이 — 모서리를 넉넉히(18px) 잡게 하고, 가리킬 때만 흰 ㄱ자가 보인다. */
+.ss-demo-resize {
+  position: absolute;
+  z-index: 2;
+  width: 18px;
+  height: 18px;
+  touch-action: none;
+}
+
+.ss-demo-resize::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 0 solid var(--ss-demo-edge);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.ss-demo-video:hover .ss-demo-resize::after {
+  opacity: 0.9;
+}
+
+.ss-demo-resize[data-corner='tl'] { top: -6px; left: -6px; cursor: nwse-resize; }
+.ss-demo-resize[data-corner='br'] { bottom: -6px; right: -6px; cursor: nwse-resize; }
+.ss-demo-resize[data-corner='tr'] { top: -6px; right: -6px; cursor: nesw-resize; }
+.ss-demo-resize[data-corner='bl'] { bottom: -6px; left: -6px; cursor: nesw-resize; }
+
+.ss-demo-resize[data-corner='tl']::after { border-top-width: 2px; border-left-width: 2px; border-top-left-radius: 6px; }
+.ss-demo-resize[data-corner='tr']::after { border-top-width: 2px; border-right-width: 2px; border-top-right-radius: 6px; }
+.ss-demo-resize[data-corner='bl']::after { border-bottom-width: 2px; border-left-width: 2px; border-bottom-left-radius: 6px; }
+.ss-demo-resize[data-corner='br']::after { border-bottom-width: 2px; border-right-width: 2px; border-bottom-right-radius: 6px; }
+
+/* 「시연영상을 참고해 주세요」 — 영상이 처음 다 내려온 순간 로그인 화면을 어둡게
+   하고(영상·닫기 단추는 그 위라 밝은 그대로) 영상 바로 밑에 흰 글자 한 줄.
+   🔴 어둠 판은 누르는 것을 가로채지 않는다(`pointer-events: none`) — 어디든 한 번
+   누르면 걷히되, 누른 것은 원래 일을 그대로 한다. 들어올 때·걷힐 때 모두 스르르. */
+.ss-demo-spot {
+  position: fixed;
+  inset: 0;
+  z-index: 54;
+  background: color-mix(in srgb, var(--ss-bg) 62%, transparent);
+  pointer-events: none;
+  animation: ss-demo-in 0.6s ease-out both;
+}
+
+.ss-demo-spot-note {
+  position: fixed;
+  z-index: 55;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: #ffffff; /* 완전한 흰색(사용자 요청) — 흰 판 화면들이 --ss-fg 를 뒤집어 쓴다 */
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: ss-demo-note-in 0.6s ease-out both;
+}
+
+.ss-demo-spot-note p {
+  margin: 0;
+}
+
+/* 둘째 줄 — 쓰는 법. 글자 크기는 윗줄과 **같게**(사용자 요청 — 처음엔 13px 로
+   작게 뒀다), 굵기만 가볍게 해서 윗줄의 설명으로 읽히게. */
+.ss-demo-spot-sub {
+  font-weight: 400;
+}
+
+/* 로그인 화면 잠금 — 영상·문장이 다 나오기 전엔 아무것도 못 누른다(DemoVideo 주석).
+   투명하고, 영상(z 55) 바로 밑이라 영상은 만질 수 있다. */
+.ss-demo-lock {
+  position: fixed;
+  inset: 0;
+  z-index: 54;
+}
+
+@keyframes ss-demo-note-in {
+  from { opacity: 0; transform: translate(-50%, 6px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* 걷힐 때 — 둘이 같은 길이(SPOT_FADE_MS)로 함께 사라진다. */
+.ss-demo-spot[data-state='out'],
+.ss-demo-spot-note[data-state='out'] {
+  animation: ss-demo-out 0.6s ease-in both;
+}
+
+@keyframes ss-demo-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes ss-demo-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ── 테스트 번호 고르기(로그인 화면) — components/auth/SeatPicker.tsx ──
+   작은 알약 하나 + 오른쪽으로 펼치는 번호 판(5 × 2). 둘 다 **안쪽 색 없는 유리,
+   외곽선 없음**(사용자 요청 — 브라우저 기본 select 가 겹치고 안 예뻤다). */
+.ss-seat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ss-seat-pill,
+.ss-seat-panel {
+  border: 0;
+  background: transparent;
+  backdrop-filter: blur(10px) saturate(var(--ss-glass-saturate));
+  -webkit-backdrop-filter: blur(10px) saturate(var(--ss-glass-saturate));
+}
+
+.ss-seat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px 3px 11px;
+  border-radius: 999px;
+  color: var(--ss-fg);
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.ss-seat-pill:hover,
+.ss-seat-pill[aria-expanded='true'] {
+  background: color-mix(in srgb, var(--ss-fg) 8%, transparent);
+}
+
+.ss-seat-caret {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.25s ease;
+}
+
+.ss-seat-pill[aria-expanded='true'] .ss-seat-caret {
+  transform: rotate(180deg);
+}
+
+/* 판 — 알약 오른쪽에, 첫 줄 윗끝을 알약 윗끝에 맞춰(JS 가 top/left 를 준다) 왼쪽에서 오른쪽으로
+   스르르 펼쳐진다. 🔴 펼치는 것은 clip-path 다 — 판이 옆으로 밀려 오는 것
+   (translate)만 쓰면 알약 위를 지나가며 겹친다. */
+.ss-seat-panel {
+  position: fixed;
+  z-index: 60;
+  display: grid;
+  grid-template-columns: repeat(5, auto);
+  gap: 2px;
+  padding: 5px; /* SeatPicker 의 PANEL_PAD 와 같아야 한다 */
+  border-radius: 14px;
+  animation: ss-seat-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ss-seat-panel[data-state='closing'] {
+  animation: ss-seat-out 0.22s ease-in both;
+}
+
+@keyframes ss-seat-in {
+  from { clip-path: inset(0 100% 0 0 round 14px); opacity: 0; transform: translateX(-6px); }
+  to { clip-path: inset(0 0 0 0 round 14px); opacity: 1; transform: translateX(0); }
+}
+
+@keyframes ss-seat-out {
+  from { clip-path: inset(0 0 0 0 round 14px); opacity: 1; }
+  to { clip-path: inset(0 100% 0 0 round 14px); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-seat-panel,
+  .ss-seat-panel[data-state='closing'] {
+    animation-duration: 0.01s;
+  }
+}
+
+.ss-seat-num {
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: color-mix(in srgb, var(--ss-fg) 75%, transparent);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.ss-seat-num:hover {
+  background: color-mix(in srgb, var(--ss-fg) 10%, transparent);
+  color: var(--ss-fg);
+}
+
+/* 지금 번호 — 색 판을 깔지 않고 글자만 민트로 또렷이. */
+.ss-seat-num[aria-pressed='true'] {
+  color: var(--ss-accent);
+  font-weight: 600;
+}
+
+.ss-seat-pill:focus-visible,
+.ss-seat-num:focus-visible {
+  outline: 2px solid var(--ss-accent);
+  outline-offset: 2px;
+}
+
+/* ── 로그인 → 홈: 가장 가까운 가장자리로 빠졌다가 같은 데서 들어오기 ──
+   거리(--ss-demo-off-x/y)는 JS 가 잰다(exitOffset). 빠질 때는 빠르게 가속,
+   들어올 때는 끝이 느려지며 제자리에 앉는다. 🔴 이 규칙들은 data-entrance 규칙
+   **뒤에** 있어야 이긴다(특이도가 같다). */
+.ss-demo-video[data-travel='leaving'],
+.ss-demo-reopen[data-travel='leaving'] {
+  animation: ss-demo-leave 0.26s cubic-bezier(0.55, 0, 1, 0.45) both;
+}
+
+.ss-demo-video[data-travel='away'],
+.ss-demo-reopen[data-travel='away'] {
+  visibility: hidden;
+}
+
+.ss-demo-video[data-travel='entering'],
+.ss-demo-reopen[data-travel='entering'] {
+  animation: ss-demo-enter 0.52s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes ss-demo-leave {
+  to { transform: translate(var(--ss-demo-off-x), var(--ss-demo-off-y)); }
+}
+
+@keyframes ss-demo-enter {
+  from { transform: translate(var(--ss-demo-off-x), var(--ss-demo-off-y)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-demo-video[data-travel='leaving'],
+  .ss-demo-reopen[data-travel='leaving'] { animation: ss-demo-out 0.15s ease-in both; }
+  .ss-demo-video[data-travel='entering'],
+  .ss-demo-reopen[data-travel='entering'] { animation: ss-demo-in 0.2s ease-out both; }
+}
+
+/* ── 한 곳만 밝게 두는 안내 — components/SpotNudge.tsx ──
+   로그인 화면의 「시연영상을 참고해 주세요」(.ss-demo-spot)와 같은 어둠·같은 글자.
+   🔴 어둠은 **구멍 뚫린 SVG 판**이다 — 과녁마다 그 모양대로(카드는 둥근 카드
+   모양, 글자는 글자 폭만) 뚫는다. 상자 하나로 넉넉히 뚫으면 카드 둘레의 배경이
+   밝은 네모로 남는다(사용자 정정). 과녁을 z-index 로 끌어올리는 식은 헤더의
+   쌓임 맥락에 막힌다. 누르는 것은 가로채지 않는다. */
+.ss-nudge-dim {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  pointer-events: none;
+  animation: ss-demo-in 0.6s ease-out both;
+}
+
+.ss-nudge-shade {
+  fill: color-mix(in srgb, var(--ss-bg) 62%, transparent);
+}
+
+.ss-nudge-note {
+  position: fixed;
+  z-index: 70;
+  margin: 0;
+  color: #ffffff; /* 완전한 흰색 — .ss-demo-spot-note 와 같다 */
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: center;
+  /* 문장 안의 \n 에서만 줄을 바꾼다(「내 프로필에서 / 카드를 먼저…」, 사용자 요청).
+     그 밖에는 안 꺾는다. */
+  white-space: pre;
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: ss-demo-note-in 0.6s ease-out both;
+}
+
+.ss-nudge-dim[data-state='out'],
+.ss-nudge-note[data-state='out'] {
+  animation: ss-demo-out 0.6s ease-in both;
+}
+
+/* 카드 편집기 — 글자 자리 줄 밑의 한 줄 안내(「카드 위 글자를 끌어서 옮길 수도」). */
+.ss-card-hint {
+  margin: -4px 0 0;
+  font-size: 12px;
 }
