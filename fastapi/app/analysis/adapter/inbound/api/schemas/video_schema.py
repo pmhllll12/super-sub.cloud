@@ -188,12 +188,18 @@ class CardGradeResponse(BaseModel):
     의사의 Wilson 95% 신뢰구간). 대표 영상이 없거나 분석 전이면 `grade` 가
     `null`이다. **`provisional`이 `true`인 동안은 화면에 "검수 전"을 달아야
     한다** — 등급 문자만 떼어 쓰지 않는다(`paik` 26번).
+
+    `notes` 는 추천 판 카드의 **불릿 한두 줄**(`paik` 33번). 🔴 여전히 리포트
+    전체가 아니다 — 25번이 막아 둔 것 중 **한 칸만** 여는 것이고 수치·항목별
+    점수는 안 실린다. `card` 없는 봉투로 적재됐거나 분석 전이면 `null` 이고,
+    **한 줄뿐인 것이 정상이다**(두 줄을 채우려고 지어내지 않는다).
     """
 
     model_config = ConfigDict(from_attributes=True)
 
     grade: str | None
     provisional: bool | None
+    notes: list[str] | None = None
 
 
 class PublicVideoResponse(BaseModel):

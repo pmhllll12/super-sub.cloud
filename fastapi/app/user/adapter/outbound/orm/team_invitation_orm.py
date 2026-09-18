@@ -30,6 +30,12 @@ class TeamInvitationOrm(Base):
     # pending · accepted · rejected · cancelled. DB 제약을 안 거는 이유는
     # `team_match_request.status`와 같다 — 단계가 늘 때 마이그레이션이 필요 없게.
     status: Mapped[str] = mapped_column(String(20), nullable=False)
+    # 「부르는 자리」(`paik` 37번). **선택이다** — 자리를 안 정한 초대도 정상이라
+    # NULL 은 "안 정했다"이지 "모른다"가 아니다. 약칭이 아니라 대리키로 담는
+    # 이유는 `squad_member.position_id` 와 같다(축구 `FW` ≠ 농구 `FW`).
+    position_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("position.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )

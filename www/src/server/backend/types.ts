@@ -196,6 +196,13 @@ export type Squad = {
  * 지어 다룬다.
  */
 export type Position = {
+  /**
+   * 🔴 **다른 도메인이 포지션을 지목할 때 쓰는 값**(2026-09-17에 실렸다).
+   * 내 경기 조건이 포지션을 `position_ids` 로 받는데(계약 3-13절), 약칭은
+   * **종목 안에서만** 유일해서 `code` 로는 한 줄을 못 가리킨다 — 지역이
+   * 이름 대신 `id` 로 오가는 것과 같은 이유다.
+   */
+  id: string
   sport_code: string
   code: string
   label: string
@@ -299,6 +306,25 @@ export type MercenaryCandidate = {
  * 브라우저가 S3 를 직접 부를 수는 없다(조회용 사전 서명 URL 경로가 아직
  * 없다). 그래서 목록은 그림 없이 메타로만 그린다.
  */
+/**
+ * **등록 응답** — `MyVideo` 에 「같은 영상을 다시 올렸다」는 사실이 더 붙는다
+ * (CCC 48, 미결 `ho` 41번).
+ *
+ * 🔴 **세 필드는 등록 응답에만 산다.** 나중에 `GET /videos` 로 같은 영상을
+ * 다시 읽으면 전부 `null` 이고 그 영상 자신은 작업이 없어 `analysis_status`
+ * 까지 `null` 이다 — **받는 즉시 화면에 반영해야** 다시 볼 방법이 있다.
+ *
+ * 🔴 **「이 사람으로 분석」·「집중해서 볼 항목」을 지정한 업로드는 대상이
+ * 아니다**(늘 새로 분석한다). 그런 등록에서 안 와도 버그가 아니다.
+ */
+export type RegisteredVideo = MyVideo & {
+  /** 앞서 올린 같은 영상의 id. 없으면 중복이 아니다. */
+  duplicate_of_video_id?: string | null
+  duplicate_status?: 'queued' | 'running' | 'succeeded' | 'failed' | null
+  /** 그때 떨어진 사유(에이전트 문구). `failed` 일 때만 값이 있다. */
+  duplicate_failure_reason?: string | null
+}
+
 export type MyVideo = {
   id: string
   sport_code: string
@@ -360,6 +386,21 @@ export type PublicVideo = {
    */
   width: number | null
   height: number | null
+  /**
+   * **올린 사람의 닉네임** — 늘 온다(CCC 39, 2026-09-15).
+   *
+   * 🔴 **이게 없어서 남의 공개 영상도 보는 사람 이름으로 그려졌다**(미결
+   * `paik` 16번). 목록에 남의 것이 섞이는데 화면이 「나」 하나만 알고 있었다.
+   */
+  uploader_nickname: string
+  /**
+   * 그 사람 카드의 공개 슬러그 — **카드를 만든 사람만** 있고 없으면 `null`.
+   *
+   * 🔴 `null` 이면 **링크를 안 걸면 그만**이다. 「카드 없음」이라고 따로 알릴
+   * 필요 없다(계약의 「하지 말 것」). raw `user_id` 나 저장 키는 **안 온다** —
+   * 링크는 이 값으로만 건다.
+   */
+  uploader_card_slug: string | null
 }
 
 /** `Team` 과 달리 나간 소속도 포함하므로 `left_at` 을 갖는다. */
@@ -495,6 +536,11 @@ export type AppNotification = {
     | 'team_match_accepted'
     | 'team_match_rejected'
     | 'team_match_cancelled'
+    // 팀 초대(CCC 49·53) — 보낼 때 받는 사람에게, 답할 때 그 팀 주장에게.
+    // 🔴 **무르기는 알림이 없다** — 보낸 쪽이 스스로 하는 것이라 알릴 상대가 없다.
+    | 'team_invitation_sent'
+    | 'team_invitation_accepted'
+    | 'team_invitation_rejected'
     | 'team_match_request_cancelled'
     | (string & {})
   actor_user_id: string
@@ -526,6 +572,86 @@ export type TeamMatchRequest = {
   responded_at: string | null
   /** 수락됐을 때만 찬다 — 확정된 경기 id. */
   match_id: string | null
+  /**
+   * 두 팀의 **이름·지역** (CCC 55, 미결 `paik` 31번).
+   *
+   * 🔴 **알림 줄이 이 값을 쓴다** — 전에는 화면의 붙박이 목록에서 찾고 못
+   * 찾으면 「상대 팀」이라 적었다. 이름을 지어내지 않으려고 걷었다.
+   *
+   * 🔴 **캐시하지 않는다.** 서버가 매번 `team` 에서 읽어서, 팀 이름이 바뀌면
+   * (`PATCH /teams/{id}`) 다음 조회에 바로 반영된다.
+   *
+   * 🔴 **id 칸은 그대로다** — 이름은 표시용이고 팀을 가리키는 것은 id 다.
+   */
+  requester_team_name: string | null
+  requester_team_region: string | null
+  target_team_name: string | null
+  target_team_region: string | null
+  /**
+   * 두 팀 **스쿼드의 공개 슬러그** (2026-09-17, `paik` 22번 후속).
+   *
+   * 🔴 **대기 화면이 상대 판을 그리는 값이다.** 전에는 화면이 붙박이 목록
+   * (`teamMatch.ts` 의 `TEAMS`)에서 상대 팀 이름·판을 찾았고, 그 목록에 없는
+   * 진짜 팀이 수락하면 이름이 「상대 팀」으로 나오고 판이 비었다.
+   *
+   * ⚠️ **스쿼드를 아직 안 만든 팀이면 `null` 이고 그게 정상이다** — 생성이
+   * 멱등이라 늦게 생긴다. 그때는 판 없이 이름·지역만 그린다.
+   */
+  requester_squad_public_slug: string | null
+  target_squad_public_slug: string | null
+}
+
+/**
+ * **팀 초대 한 건** (계약 3-3절 「팀 초대」, CCC 49·53번).
+ *
+ * 🔴 **동의 없이 꽂지 않는다**(2026-09-10 박민호 결정). 주장이 초대를 보내고
+ * 받은 사람이 수락해야 팀원이 된다 — `POST /teams/{id}/members` 로 바로 넣는
+ * 길은 **본인이 스스로 가입할 때만** 쓴다.
+ *
+ * 🔴 **판에 앉힌 자리가 여기 남는다**(`position_code`). 그래서 새로고침해도
+ * 그 자리가 살아 있고, **사라지는 것은 상대가 거절하거나 주장이 무를 때뿐**
+ * 이다(사용자 설계, 2026-09-17).
+ */
+export type TeamInvitation = {
+  id: string
+  team_id: string
+  invited_user_id: string
+  status: 'pending' | 'accepted' | 'rejected' | 'cancelled'
+  created_at: string
+  responded_at: string | null
+  /**
+   * 부르는 자리 — 🔴 **둘 다 `null` 일 수 있다.** 자리를 안 정한 초대
+   * (「우리 팀에 오세요」)가 정상이다. 약칭과 이름을 함께 주는 이유는 구성원
+   * 카드와 같다 — 하나만 주면 화면이 나머지를 얻을 경로가 없다.
+   */
+  position_code: string | null
+  position_label: string | null
+  /**
+   * 초대받은 **사람** — 보낸 초대 목록에만 실린다(2026-09-17).
+   *
+   * 🔴 **판을 되살리는 값이다.** id 만으로는 새로고침 뒤에 누구인지도 무슨
+   * 카드인지도 그릴 수 없었다. 카드를 안 만든 사람은 슬러그가 `null` 이고,
+   * 그때는 이름표로 남는다.
+   */
+  invited_user_nickname: string | null
+  invited_user_card_slug: string | null
+}
+
+/**
+ * **내가 받은 초대** — 위에 넉 칸이 더 붙는다(CCC 53).
+ *
+ * 🔴 받는 사람은 **아직 그 팀 소속이 아니다.** 팀 id 하나로는 이름도 모르는
+ * 팀의 초대를 판단할 수가 없어서 서버가 실어 준다(감싸지 않고 덧붙였다).
+ *
+ * 🔴 **경기 시각·구장은 없다** — 초대는 경기에 묶이지 않는다. 「우리 팀에
+ * 오세요」이지 「이 경기에 와 달라」가 아니다.
+ */
+export type ReceivedInvitation = TeamInvitation & {
+  team_name: string
+  team_region: string
+  team_sport_code: string
+  /** 그 팀 판을 보여 줄 값. 스쿼드를 아직 안 만든 팀이면 `null` 이다. */
+  squad_public_slug: string | null
 }
 
 /**
@@ -544,6 +670,11 @@ export type TeamMatchRequest = {
 export type CardGrade = {
   grade: string | null
   provisional: boolean | null
+  /**
+   * 분석이 낸 불릿 — **후보 목록의 것과 같은 값**이다(CCC 56). 슬러그만 아는
+   * 자리를 위해 여기에도 실린다. 🔴 한 줄·`null` 둘 다 정상이다.
+   */
+  notes: string[] | null
 }
 
 /**
@@ -562,6 +693,20 @@ export type SquadCandidate = {
   card_public_slug: string | null
   grade: string | null
   provisional: boolean | null
+  /**
+   * **분석이 낸 불릿 한두 줄** (CCC 56, 미결 `paik` 33·38번 · `ho` 50번).
+   *
+   * 🔴 **셋 다 정상값이다** — 두 줄 · **한 줄** · `null`. 두 줄을 채우려고
+   * 지어내지 않는 것이 에이전트 쪽 규칙이고, `null` 은 옛 봉투(1.4 이하)거나
+   * 분석 전이다. **실패로 보지 않는다.**
+   *
+   * 🔴 **후보마다 `/grade` 를 다시 부르지 않는다** — 목록 응답에 이미 있다.
+   *
+   * 🔴 **이름 아래 한 줄로 쓰지 않는다.** 그 자리는 **사람이 적는 호칭**이고
+   * (CCC 51 · `paik` 36번), 이건 그 아래 불릿이다 — 섞으면 팀장이 사람이
+   * 적은 글을 AI 판정으로 읽는다.
+   */
+  notes: string[] | null
 }
 
 /**
@@ -583,4 +728,74 @@ export type TeamDetail = {
     player_card_id: string | null
     card_public_slug: string | null
   }[]
+}
+
+/**
+ * **지역 한 줄** (계약 3-13절, CCC 40번).
+ *
+ * 🔴 `label` 이 화면에 그대로 보이는 글자이고(`서울 강남구`), 저장·조회에
+ * 쓰는 것은 `id` 다 — 이름으로 보내면 「강남구」·「서울 강남」이 다 다른
+ * 값이 되어 대조가 안 된다(`lib/regions.ts` 머리말이 그래서 목록을 뒀다).
+ */
+export type Region = {
+  id: string
+  city: string
+  district: string
+  label: string
+}
+
+/**
+ * 경기 조건의 시간대 한 칸 (계약 3-13절).
+ *
+ * 🔴 **`weekday` 는 0(월)~6(일)** 이다 — 화면의 `TimeSlot.day` 는
+ * `Date.getDay()` 와 같은 **0(일)~6(토)** 라 **기준이 서로 다르다.**
+ * 그냥 넘기면 하루씩 밀린다(`lib/matchPrefs.ts` 의 변환을 거친다).
+ * 🔴 시각은 `HH:MM:SS` 다 — 화면은 `HH:MM` 를 쓴다.
+ */
+export type MatchSlot = {
+  weekday: number
+  start_time: string
+  end_time: string
+}
+
+/** 팀 경기 조건 (계약 3-13절). `PUT` 은 **통째로 교체**다. */
+export type TeamMatchPreference = {
+  team_id: string
+  region_ids: string[]
+  slots: MatchSlot[]
+}
+
+/**
+ * **내 경기 조건** (계약 3-13절). `PUT` 은 팀 조건과 마찬가지로 **통째로 교체**다.
+ *
+ * 🔴 **팀 조건과 저장소가 다르다** — 같은 사람이 팀장이면서 팀원일 수 있어
+ * 계약이 둘을 절대 안 섞는다. 「우리 팀이 찾는 경기」와 「내가 뛸 수 있는 때」는
+ * 다른 값이다.
+ * 🔴 **`position_ids` 가 팀 조건에는 없는 칸**이고, 이게 곧 **내가 남의 AI
+ * 추천 후보로 뜨는 조건**이다(서버의 첫 하드 필터). 약칭이 아니라 id 다 —
+ * `Position.id` 머리말 참조.
+ */
+export type MemberMatchPreference = {
+  user_id: string
+  region_ids: string[]
+  slots: MatchSlot[]
+  position_ids: string[]
+}
+
+/**
+ * **「맞는 상대」 후보 한 팀** (계약 3-13절, CCC 40번).
+ *
+ * 🔴 **유사도 점수가 없다.** 순서는 **서버가 이미 정렬**했고 `reasons` 가
+ * 사실값 근거다(「토요일 11:00~12:00 겹침」처럼 이미 문장이다).
+ * 🔴 **화면이 겹침을 다시 계산하지 않는다**(계약의 「하지 말 것」) — 다시
+ * 계산하면 서버와 다른 답이 나온다.
+ * ⚠️ `reasons` 가 빈 배열인 것도 정상이다 — 소프트 근거가 0개라는 뜻이고,
+ * 하드 필터는 통과했으므로 목록에는 남는다.
+ */
+export type MatchCandidate = {
+  team_id: string
+  team_name: string
+  region_label: string
+  formation: string
+  reasons: { kind: string; detail: string }[]
 }

@@ -58,6 +58,10 @@ _position = table(
     "position", column("id"), column("sport_code"), column("code"), column("label")
 )
 _user = table("user", column("id"), column("nickname"))
+# `squad` 는 `card` 컨텍스트다 — 대기 화면이 상대 팀 판을 그리려면 공개
+# 슬러그가 필요한데, 그것 때문에 컨텍스트를 임포트하지는 않는다(`paik` 31번의
+# `_team` 과 같은 방식).
+_squad = table("squad", column("team_id"), column("public_slug"))
 
 # `notification` 은 `notification` 컨텍스트의 테이블이다. 임포트하지 않고
 # 원시 SQL 로 쓴다(`user_pg_repository.py`의 `_notification`과 같은 방식·이유).
@@ -602,9 +606,10 @@ class MatchPgRepository(MatchPort):
             ],
         )
 
-    def create_team_match_request(self, request: TeamMatchRequestEntity) -> None:
-        self._session.add(
-            TeamMatchRequestOrm(
+    def create_team_match_request(
+        self, request: TeamMatchRequestEntity
+    ) -> TeamMatchRequestEntity:
+        row = TeamMatchRequestOrm(
                 id=request.id,
                 requester_team_id=request.requester_team_id,
                 target_team_id=request.target_team_id,
@@ -612,8 +617,8 @@ class MatchPgRepository(MatchPort):
                 proposed_place=request.proposed_place,
                 status=request.status,
                 created_at=request.created_at,
-            )
         )
+        self._session.add(row)
         self._notify(
             recipient_user_ids=self.owner_user_ids(request.target_team_id),
             notif_type=_NOTIFY_TEAM_MATCH_REQUESTED,
@@ -622,6 +627,7 @@ class MatchPgRepository(MatchPort):
             now=request.created_at,
         )
         self._session.commit()
+        return self._to_team_match_request(row)
 
     def find_team_match_request(
         self, request_id: UUID
@@ -740,9 +746,35 @@ class MatchPgRepository(MatchPort):
         self._session.commit()
         return self._to_team_match_request(row)
 
+    def _team_briefs(self, *team_ids: UUID) -> dict[UUID, tuple[str, str]]:
+        """`{team_id: (이름, 지역)}`. `team` 은 `user` 컨텍스트라 원시 SQL 이다."""
+        stmt = select(_team.c.id, _team.c.name, _team.c.region).where(
+            _team.c.id.in_(team_ids)
+        )
+        return {r[0]: (r[1], r[2]) for r in self._session.execute(stmt)}
+
+    def _squad_slugs(self, *team_ids: UUID) -> dict[UUID, str]:
+        """`{team_id: 공개 슬러그}` — 대기 화면이 상대 팀 판을 그리는 데 쓴다.
+
+        🔴 **스쿼드를 아직 안 만든 팀은 이 표에 없다**(생성이 멱등이라 늦게
+        생긴다). 없는 것이 정상이라 빈 값으로 채우지 않고 `None` 으로 둔다 —
+        `paik` 37번(초대)이 같은 판단을 했다.
+        """
+        stmt = select(_squad.c.team_id, _squad.c.public_slug).where(
+            _squad.c.team_id.in_(team_ids)
+        )
+        return {r[0]: r[1] for r in self._session.execute(stmt)}
+
     def _to_team_match_request(
         self, row: TeamMatchRequestOrm
     ) -> TeamMatchRequestEntity:
+        # 표시용 값을 여기서 채운다(`paik` 31번) — 화면이 줄마다 팀을 다시
+        # 묻지 않게. 한 줄에 한 번만 읽고 두 팀을 같이 가져온다.
+        briefs = self._team_briefs(row.requester_team_id, row.target_team_id)
+        requester = briefs.get(row.requester_team_id, ("", ""))
+        target = briefs.get(row.target_team_id, ("", ""))
+        # 판을 찾아갈 슬러그도 같이 싣는다 — 대기 화면이 상대 판을 그린다.
+        slugs = self._squad_slugs(row.requester_team_id, row.target_team_id)
         return TeamMatchRequestEntity(
             id=row.id,
             requester_team_id=row.requester_team_id,
@@ -753,4 +785,10 @@ class MatchPgRepository(MatchPort):
             created_at=row.created_at,
             responded_at=row.responded_at,
             match_id=row.match_id,
+            requester_team_name=requester[0],
+            requester_team_region=requester[1],
+            target_team_name=target[0],
+            target_team_region=target[1],
+            requester_squad_public_slug=slugs.get(row.requester_team_id),
+            target_squad_public_slug=slugs.get(row.target_team_id),
         )

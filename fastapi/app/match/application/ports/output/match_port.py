@@ -177,8 +177,13 @@ class MatchPort(ABC):
     @abstractmethod
     def create_team_match_request(
         self, request: TeamMatchRequestEntity
-    ) -> None:
-        """신청 생성과 **대상 팀 주장(들)에게 보내는 알림**을 같은 트랜잭션에서."""
+    ) -> TeamMatchRequestEntity:
+        """신청 생성과 **대상 팀 주장(들)에게 보내는 알림**을 같은 트랜잭션에서.
+
+        🔴 **표시용 값이 채워진 엔티티를 돌려준다**(`paik` 31번). 인터랙터가
+        만든 엔티티에는 팀 이름·지역이 비어 있다 — 그것들은 저장되는 값이
+        아니라 `team` 에서 읽어 오는 조회 결과라 저장소만 채울 수 있다.
+        """
 
     @abstractmethod
     def find_team_match_request(

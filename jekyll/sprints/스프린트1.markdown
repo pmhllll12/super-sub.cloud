@@ -3,7 +3,7 @@ layout: default
 title: 스프린트 1 진행 일지
 permalink: /스프린트1/
 parent: 개발 구현 계획
-grand_parent: II 부. 개발 수행 계획
+grand_parent: 프로젝트 관리
 nav_order: 1
 ---
 

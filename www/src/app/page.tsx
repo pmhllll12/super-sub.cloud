@@ -21,6 +21,7 @@ export function HomeBody({
   squad = null,
   sportCode = null,
   teamName = null,
+  isCaptain = false,
 }: {
   user: Pick<User, 'nickname'> | null
   card?: PlayerCard | null
@@ -36,6 +37,12 @@ export function HomeBody({
    * `null` 이고 그때는 「MY SQUAD」로 둔다.
    */
   teamName?: string | null
+  /**
+   * 내가 그 팀의 **팀장인가**(`role === 'owner'`) — 스쿼드 판을 고칠 수 있는
+   * 사람이 팀장 하나이기 때문이다(사용자 요청, 2026-09-17).
+   * 🔴 **기본이 `false`** — 안 넘기면 못 만지는 쪽으로 떨어진다.
+   */
+  isCaptain?: boolean
 }) {
   return (
     <HomeStage
@@ -44,6 +51,7 @@ export function HomeBody({
       squad={squad}
       sportCode={sportCode}
       teamName={teamName}
+      isCaptain={isCaptain}
       myCardId={card?.id ?? null}
       destinations={DESTINATIONS}
       featured={FEATURED}
@@ -98,6 +106,11 @@ export default async function Home() {
       squad={squad}
       sportCode={team?.sport_code ?? null}
       teamName={team?.name ?? null}
+      /* 🔴 **판을 만질 수 있는 사람은 팀장 하나다**(사용자 요청, 2026-09-17).
+         서버는 이미 주장만 쓰게 막고 있었는데(계약 3-7절, 전부 403 FORBIDDEN)
+         화면이 그걸 안 보여 줘서, 팀원이 카드를 옮기고 ⊗ 로 팀장까지 뺄 수
+         있는 것처럼 보였다 — 그리고 아무것도 저장되지 않았다. */
+      isCaptain={team?.role === 'owner'}
     />
   )
 }

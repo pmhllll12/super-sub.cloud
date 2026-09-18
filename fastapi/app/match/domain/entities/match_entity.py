@@ -58,8 +58,29 @@ class TeamMatchRequestEntity:
     proposed_place: str
     status: str
     created_at: datetime
+    # 두 팀의 **표시용 값**(`paik` 31번). 알림 판이 「망원 유나이티드가 경기를
+    # 걸었습니다」를 쓰려면 id 로는 안 되고, 목록에서 줄마다 `GET /teams/{id}`
+    # 를 부르면 N+1 이 된다 — `MatchListingEntity` 가 주최 팀 값을 얹는 것과
+    # **같은 자리**다("경기 id 만 주면 화면이 팀을 한 건씩 다시 물어야 한다").
+    #
+    # 🔴 저장되는 모양이 아니라 **조회 결과**다. 값은 매번 `team` 에서 읽으므로
+    # 팀 이름이 바뀌어도 어긋날 수가 없다.
     responded_at: datetime | None = None
     match_id: UUID | None = None
+    # 🔴 **저장소가 채운다.** 인터랙터가 새 신청을 만들 때는 비어 있고
+    # (`team` 을 읽을 수 없는 자리다), 저장소가 돌려주는 엔티티부터 차 있다.
+    # 그래서 기본값이 빈 문자열이다 — "없는 팀"이 아니라 "아직 안 읽었다"다.
+    requester_team_name: str = ""
+    requester_team_region: str = ""
+    target_team_name: str = ""
+    target_team_region: str = ""
+    # 그 팀 **스쿼드의 공개 슬러그** (`paik` 22번 후속, 2026-09-17). 대기
+    # 화면이 상대 팀 판을 그리는 데 쓴다 — `GET /squads/{slug}` 는 누구나
+    # 읽으므로 소속이 아니어도 볼 수 있다.
+    # 🔴 **스쿼드를 아직 안 만든 팀이면 `None` 이고 그게 정상이다**(생성이
+    # 멱등이라 늦게 생긴다). 빈 문자열로 채우지 않는다.
+    requester_squad_public_slug: str | None = None
+    target_squad_public_slug: str | None = None
 
 
 @dataclass(frozen=True)

@@ -1053,8 +1053,10 @@ class TestAdminVideos:
         assert res.json()["error"]["code"] == "VIDEO_NOT_FOUND"
 
 
-def _envelope(*, grade="A", provisional=False):
-    return {
+def _envelope(*, grade="A", provisional=False, card_notes=None):
+    """`card_notes` 를 주면 봉투 1.5 의 `result.card` 가 실린다(`paik` 33번).
+    안 주면 그 칸이 아예 없는 **옛 봉투**다 — 적재가 안 깨지는지도 함께 본다."""
+    envelope = {
         "schema_version": "1.0",
         "source_video": "s3://b/videos/u/v.mp4",
         "analyzed_at": "20260910T120000Z",
@@ -1094,6 +1096,10 @@ def _envelope(*, grade="A", provisional=False):
             "skipped": [],
         },
     }
+    if card_notes is not None:
+        # 봉투 1.5 — `title` 은 적재가 안 받는다(`ho` 50번: 추천 카드가 안 쓴다).
+        envelope["result"]["card"] = {"title": None, "notes": card_notes}
+    return envelope
 
 
 class TestCardGrade:
@@ -1104,7 +1110,9 @@ class TestCardGrade:
     (`fastapi/CLAUDE.md`「원시 SQL로 남의 테이블을 읽는 자리」).
     """
 
-    def _featured_with_report(self, db_session, user_id, *, grade, provisional):
+    def _featured_with_report(
+        self, db_session, user_id, *, grade, provisional, card_notes=None
+    ):
         """대표로 세운 영상 1개 + 그 리포트."""
         now = datetime.now(timezone.utc)
         video_id, job_id = uuid.uuid4(), uuid.uuid4()
@@ -1128,7 +1136,11 @@ class TestCardGrade:
         )
         db_session.commit()
         parsed = parse_report(
-            json.dumps(_envelope(grade=grade, provisional=provisional)).encode()
+            json.dumps(
+                _envelope(
+                    grade=grade, provisional=provisional, card_notes=card_notes
+                )
+            ).encode()
         )
         ReportIngestPgRepository(db_session).replace_for_job(job_id, parsed)
         return video_id
@@ -1248,7 +1260,7 @@ class TestCardGrade:
                 headers={"Authorization": f"Bearer {issue_access_token(viewer)}"},
             )
             assert res.status_code == 200, res.text
-            assert res.json() == {"grade": "S", "provisional": False}
+            assert res.json() == {"grade": "S", "provisional": False, "notes": None}
         finally:
             self._teardown(
                 db_session,
@@ -1256,6 +1268,62 @@ class TestCardGrade:
                 team_id=team_id,
                 match_id=match_id,
             )
+
+    def test_카드_불릿이_봉투에서_실물_DB를_거쳐_나온다(
+        self, db_client, db_session, uploader
+    ):
+        """`paik` 33번 — 봉투 → `analysis_report.card_notes` → 조회 전체 경로.
+
+        🔴 스텁으로는 파서·컬럼 이름이 갈려도 통과한다. 여기가 유일한
+        방어선이다(`fastapi/CLAUDE.md`「원시 SQL로 남의 테이블을 읽는 자리」와
+        같은 이유 — 이 체인도 조인이 여럿이다).
+        """
+        owner_id = uploader["id"]
+        notes = ["차는 다리를 끝까지 뻗습니다", "디딤발을 공 옆에 붙입니다"]
+        self._featured_with_report(
+            db_session, owner_id, grade="A", provisional=False, card_notes=notes
+        )
+        card = db_client.post(f"{V1}/me/card", headers=uploader["headers"])
+        slug = card.json()["public_slug"]
+
+        try:
+            stored = db_session.execute(
+                text(
+                    "select card_notes from analysis_report "
+                    "order by created_at desc limit 1"
+                )
+            ).scalar_one()
+            assert stored == notes
+
+            res = db_client.get(
+                f"{V1}/cards/{slug}/grade", headers=uploader["headers"]
+            )
+            assert res.status_code == 200, res.text
+            assert res.json()["notes"] == notes
+        finally:
+            self._teardown(db_session, user_ids=[owner_id])
+
+    def test_옛_봉투로_적재하면_불릿이_null_이고_적재는_안_깨진다(
+        self, db_client, db_session, uploader
+    ):
+        """🔴 `card` 는 1.5 에 생겼다 — 그 전 봉투도 그대로 적재돼야 한다."""
+        owner_id = uploader["id"]
+        self._featured_with_report(
+            db_session, owner_id, grade="A", provisional=False
+        )
+        card = db_client.post(f"{V1}/me/card", headers=uploader["headers"])
+        slug = card.json()["public_slug"]
+
+        try:
+            res = db_client.get(
+                f"{V1}/cards/{slug}/grade", headers=uploader["headers"]
+            )
+            assert res.status_code == 200, res.text
+            assert res.json()["notes"] is None
+            # 등급은 정상으로 나온다 — 「분석이 없다」가 아니다.
+            assert res.json()["grade"] == "A"
+        finally:
+            self._teardown(db_session, user_ids=[owner_id])
 
     def test_리뷰가_없으면_분석등급_그대로다(self, db_client, db_session, uploader):
         owner_id = uploader["id"]
@@ -1271,6 +1339,6 @@ class TestCardGrade:
             )
             assert res.status_code == 200, res.text
             # 리뷰 0건 → 신뢰 우세 아님 → D는 "구해 줄 근거 없음"으로 F.
-            assert res.json() == {"grade": "F", "provisional": True}
+            assert res.json() == {"grade": "F", "provisional": True, "notes": None}
         finally:
             self._teardown(db_session, user_ids=[owner_id])

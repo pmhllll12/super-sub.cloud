@@ -21,6 +21,16 @@ class TeamEntity:
     name: str
     region: str
     sport_code: str
+    # 해체 시각(`paik` 35번). `None` 이면 살아 있는 팀이다.
+    #
+    # 🔴 행을 지우지 않는다 — 지난 경기·평가가 이 팀 이름을 가리킨다
+    # (`team_member.left_at` 과 같은 판단, 부록 D.6). 해체된 팀은 **새로
+    # 만드는 자리만** 막고 읽기·이력은 그대로다(`sport.active` 와 같다).
+    disbanded_at: datetime | None = None
+
+    @property
+    def is_disbanded(self) -> bool:
+        return self.disbanded_at is not None
 
 
 @dataclass(frozen=True)
@@ -63,3 +73,47 @@ class TeamInvitationEntity:
     status: str
     created_at: datetime
     responded_at: datetime | None = None
+
+    # 초대받은 **사람**(미결 `paik` 39번 후속, 2026-09-17 — 백성검, 정어진 승인).
+    #
+    # 🔴 **보낸 쪽 화면이 판을 되살리는 값이다.** 주장이 스쿼드 판에 앉힌 사람은
+    # 초대로 남는데, id 만으로는 새로고침 뒤에 **누구인지도 무슨 카드인지도**
+    # 그릴 수가 없었다. 받는 쪽(`MyTeamInvitationEntity`)에 팀 넉 칸을 실어 준
+    # 것과 **같은 이유·같은 방식**이다 — 줄마다 따로 부르지 않게.
+    #
+    # 🔴 카드를 안 만든 사람은 슬러그가 `None` 이다 — 정상이고, 그때 화면은
+    # 이름표로 남는다.
+    invited_user_nickname: str | None = None
+    invited_user_card_slug: str | None = None
+
+    # 「부르는 자리」(`paik` 37번). 셋 다 `None` 이면 **자리를 안 정한 초대**다.
+    #
+    # 🔴 대리키와 약칭을 함께 싣는 이유는 `TeamMemberEntity` 의 카드 둘과 같다 —
+    # 담는 것은 `position_id`(약칭이 종목 간 겹친다)이고 화면에 나가는 것은
+    # 약칭·이름이라, 하나만 주면 나머지를 얻을 경로가 없다. `position_id` 는
+    # 저장용이라 API 응답에는 안 나간다.
+    position_id: UUID | None = None
+    position_code: str | None = None
+    position_label: str | None = None
+
+
+@dataclass(frozen=True)
+class MyTeamInvitationEntity:
+    """내가 **받은** 초대 한 줄 (`paik` 37번).
+
+    🔴 초대 자체가 아니라 **초대 + 그것을 판단하는 데 필요한 팀 쪽 값**이다.
+    받는 사람은 그 팀 소속이 아니어서 팀 화면을 거치지 않고 알림에서 바로
+    수락 여부를 정한다 — 이름도 모르는 팀의 초대는 판단할 수가 없다.
+
+    상속이 아니라 **합성**인 이유: 상속으로 칸을 늘리면 초대가 오가는 다른
+    경로(`GET /teams/{id}/invitations` 등)에서 그 칸들이 빈 채로 따라다니고,
+    그러면 "안 정했다"와 "안 채웠다"를 가를 수 없다.
+    """
+
+    invitation: TeamInvitationEntity
+    team_name: str
+    team_region: str
+    team_sport_code: str
+    # 그 팀 스쿼드의 공개 슬러그 — `GET /squads/{slug}` 로 판을 그린다.
+    # 스쿼드를 아직 안 만든 팀이면 `None` 이다(생성이 멱등이라 늦게 생긴다).
+    squad_public_slug: str | None

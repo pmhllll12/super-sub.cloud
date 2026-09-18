@@ -40,6 +40,9 @@ _NICKNAMES: dict[UUID, str] = {}
 # 스텁은 `analysis_report` 도 `review`/`review_selection` 도 모른다 — 검사가
 # 등급 원자료를 직접 채운다(미결 `paik` 25·26번, `find_card_grade`). user_id 로 건다.
 _REPORT_GRADES: dict[UUID, tuple[str | None, bool | None]] = {}
+# 추천 판 카드의 불릿(`paik` 33번). 안 부르면 `None` — `card` 없는 봉투로
+# 적재된 리포트와 같다.
+_REPORT_CARD_NOTES: dict[UUID, list[str]] = {}
 _TRUST_COUNTS: dict[UUID, tuple[int, int]] = {}
 
 
@@ -51,6 +54,7 @@ def reset_videos() -> None:
     _CARD_SLUGS.clear()
     _NICKNAMES.clear()
     _REPORT_GRADES.clear()
+    _REPORT_CARD_NOTES.clear()
     _TRUST_COUNTS.clear()
 
 
@@ -75,6 +79,14 @@ def register_report_grade(
     """`find_card_grade` 가 쓸 분석 등급(미결 `paik` 25·26번). 안 부르면 그
     사람은 분석 전(`overall_grade=None`)으로 본다."""
     _REPORT_GRADES[user_id] = (overall_grade, provisional)
+
+
+def register_card_notes(user_id: UUID, notes: list[str]) -> None:
+    """`find_card_grade` 가 함께 줄 카드 불릿(`paik` 33번).
+
+    안 부르면 `None` 이다 — 봉투에 `card` 가 없던 시절 적재분과 같다.
+    """
+    _REPORT_CARD_NOTES[user_id] = notes
 
 
 def register_trust_counts(user_id: UUID, positive: int, total: int) -> None:
@@ -191,6 +203,7 @@ class StubVideoRepository(VideoPort):
             provisional=provisional,
             trust_positive=positive,
             trust_total=total,
+            card_notes=_REPORT_CARD_NOTES.get(owner),
         )
 
     def list_public(self, limit: int) -> list[VideoEntity]:

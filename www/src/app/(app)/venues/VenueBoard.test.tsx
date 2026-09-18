@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { PREFS_KEY } from '@/lib/matchPrefs'
+import { __resetRefDataCache } from '@/lib/refData'
 import type { Venue } from '@/lib/venues'
 import VenueBoard from './VenueBoard'
 
@@ -214,33 +214,60 @@ describe('경기장 예약 판', () => {
 
   /* ── 정해 둔 경기 조건(팀 매칭에서 받아 둔 것) ────────────────── */
   describe('내 경기 조건', () => {
-    beforeEach(() => localStorage.clear())
+    /**
+     * 🔴 **조건은 서버에 있다**(계약 3-13절, 2026-09-17). 전에는
+     * `localStorage` 를 읽었는데, 팀 매칭 쪽이 서버로 옮겨 가면서 **아무도
+     * 그 저장소에 안 쓰게 됐다** — 그대로 뒀으면 이 단추가 늘 「조건이
+     * 없습니다」만 내는 죽은 기능이 된다.
+     */
+    const REGIONS = [
+      { id: 'rg-songpa', city: '서울', district: '송파구', label: '서울 송파구' },
+    ]
+
+    function prefs(pref: unknown) {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string) => {
+          const u = String(url)
+          const body = u.startsWith('/api/regions')
+            ? REGIONS
+            : u.startsWith('/api/positions')
+              ? []
+              : pref
+          return { ok: true, status: 200, json: async () => body }
+        }),
+      )
+    }
+
+    beforeEach(() => __resetRefDataCache())
+    afterEach(() => vi.unstubAllGlobals())
 
     /* 🔴 **여기서 다시 묻지 않는다.** 팀 매칭이 이미 받아 둔 값을 그대로 건다 —
        두 번 물으면 두 값이 어긋난다. */
     it('정해 둔 조건으로 거른다', async () => {
-      localStorage.setItem(
-        PREFS_KEY,
-        JSON.stringify({
-          team: { regions: ['서울 송파구'], times: [{ day: 6, from: '18:00', to: '22:00' }], positions: [] },
-        }),
-      )
+      prefs({
+        user_id: 'u1',
+        region_ids: ['rg-songpa'],
+        slots: [{ weekday: 5, start_time: '18:00:00', end_time: '22:00:00' }],
+        position_ids: [],
+      })
       const user = userEvent.setup()
       open()
       await user.click(screen.getByRole('button', { name: '자세히' }))
       await user.click(screen.getByRole('button', { name: '정해 둔 조건에 맞는 곳만' }))
+      expect(await screen.findByText('내 조건으로 걸렀습니다.')).toBeInTheDocument()
       expect(screen.getByText('잠실 주말 풋살장')).toBeInTheDocument()
       expect(screen.queryByText('난지천 풋살장')).toBeNull()
-      expect(screen.getByText('팀 조건으로 걸렀습니다.')).toBeInTheDocument()
     })
 
     /* 조용히 0건이 되면 고장으로 읽힌다 — 왜 못 걸렀는지 말한다. */
     it('정해 둔 조건이 없으면 그렇게 말하고 안 거른다', async () => {
+      prefs({ user_id: 'u1', region_ids: [], slots: [], position_ids: [] })
       const user = userEvent.setup()
       open()
       await user.click(screen.getByRole('button', { name: '자세히' }))
       await user.click(screen.getByRole('button', { name: '정해 둔 조건에 맞는 곳만' }))
-      expect(screen.getByText(/아직 정해 둔 경기 조건이 없습니다/)).toBeInTheDocument()
+      expect(await screen.findByText(/아직 정해 둔 경기 조건이 없습니다/)).toBeInTheDocument()
       expect(screen.getByText('난지천 풋살장')).toBeInTheDocument()
     })
   })

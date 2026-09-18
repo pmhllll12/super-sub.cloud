@@ -33,12 +33,21 @@ export default function SiteHeader({
   card = null,
   destinations,
   fixed = false,
+  inbox: given,
 }: {
   user: { nickname: string } | null
   card?: PublicPlayerCard | null
   destinations: Destination[]
   /** 홈처럼 화면에 고정할 것인가. 기본은 흐름에 둔다. */
   fixed?: boolean
+  /**
+   * 알림함 — **홈이 제 것을 내려보낸다**(2026-09-17).
+   *
+   * 🔴 **안 주면 헤더가 제 통을 만든다.** 둘 다 만들면 헤더에서 수락한
+   * 결과가 대기 화면을 그리는 쪽에 **영영 안 닿는다** — 실제로 「수락하기를
+   * 눌러도 아무 일이 없다」로 나타났다(사용자가 로컬에서 잡았다).
+   */
+  inbox?: ReturnType<typeof useNotifyInbox>
 }) {
   /**
    * 인트로가 걷히면 각자 바깥에서 제자리로 들어온다(globals.css 의
@@ -56,9 +65,16 @@ export default function SiteHeader({
   /** 지금 가리킨 목적지. 글자 줄 안에서만 쓰는 강조다. */
   const [active, setActive] = useState<string | null>(null)
 
-  /* 알림함 — 「알림」 글자의 빨간 점과 그 아래 판이 이걸 읽는다. 폴링이라
-     화면마다 도는데, 헤더가 화면당 하나라 통도 하나다. */
-  const inbox = useNotifyInbox()
+  /**
+   * 알림함 — 「알림」 글자의 빨간 점과 그 아래 판이 이걸 읽는다.
+   *
+   * 🔴 **밖에서 주면 그것을 쓴다**(2026-09-17). 헤더와 홈이 **각자** 통을
+   * 만들던 때에는, 헤더에서 수락한 결과(`acceptedTeam`)가 대기 화면을 그리는
+   * `SquadPanel` 쪽 통에 **영영 안 들어갔다** — 눌러도 아무 일이 없었다.
+   * 홈은 제 통을 내려보내고, 통이 필요 없는 다른 화면은 안 준다.
+   */
+  const own = useNotifyInbox()
+  const inbox = given ?? own
 
   /**
    * 🔴 **지금 보고 있는 화면은 목적지에서 뺀다**(사용자 요청). 영상 분석
@@ -176,6 +192,8 @@ export default function SiteHeader({
                 onAcceptMatch={inbox.acceptMatch}
                 onRejectMatch={inbox.rejectMatch}
                 onAcceptContact={inbox.acceptContact}
+                onAcceptInvitation={inbox.acceptInvitation}
+                onRejectInvitation={inbox.rejectInvitation}
               />
             ),
           }}

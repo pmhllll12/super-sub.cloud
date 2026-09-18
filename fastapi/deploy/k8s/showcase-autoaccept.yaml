@@ -1,0 +1,69 @@
+# 시연용 더미가 받은 요청을 3초 안팎에 자동 수락하는 봇 (2026-09-17, 정어진).
+#
+# `scripts/seed_showcase.py` 로 넣은 더미(showcase-NN@super-sub.example)는 사람이 아니라서
+# 지인 신청·팀 초대·경기 제안에 답이 안 온다. 이 파드가 `scripts/showcase_autoaccept.py` 를 돌려
+# 대신 누른다. 시연이 끝나면 지운다(아래 「지우기」).
+#
+# 🔴 API 파드와 같은 이미지·같은 설정(Secret supersub-api-env)을 쓴다. `hostNetwork` 도 같게 둔다 —
+#    DB 가 호스트에 있고 API 가 호스트 8080 에 떠 있어서, 봇은 `127.0.0.1` 로 둘 다에 닿는다.
+# 🔴 스크립트는 이미지에 없다(Dockerfile 이 scripts/ 를 안 넣는다) — ConfigMap 으로 넣는다.
+#    더미 비밀번호는 Secret `showcase-dummy` 에 두고 저장소에는 안 쓴다.
+#
+# 적용(서버에서):
+#   k3s kubectl create configmap showcase-autoaccept-script \
+#     --from-file=showcase_autoaccept.py=<저장소>/fastapi/scripts/showcase_autoaccept.py
+#   k3s kubectl create secret generic showcase-dummy --from-file=SHOWCASE_PASSWORD=<비밀번호 파일>
+#   k3s kubectl apply -f showcase-autoaccept.yaml
+# 로그:   k3s kubectl logs -f deploy/showcase-autoaccept
+# 지우기: k3s kubectl delete deploy/showcase-autoaccept configmap/showcase-autoaccept-script secret/showcase-dummy
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: showcase-autoaccept
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: showcase-autoaccept
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: showcase-autoaccept
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      imagePullSecrets:
+        - name: dockerhub-cred
+      containers:
+        - name: showcase-autoaccept
+          image: pmhllll12/supersub:latest
+          imagePullPolicy: IfNotPresent
+          workingDir: /app
+          command: ["python", "-u", "/app/scripts/showcase_autoaccept.py", "--api", "http://127.0.0.1:8080/api/v1"]
+          envFrom:
+            - secretRef:
+                name: supersub-api-env
+          env:
+            - name: SHOWCASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: showcase-dummy
+                  key: SHOWCASE_PASSWORD
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - name: script
+              # /app/scripts 여야 한다 — 스크립트가 자기 위치의 두 단계 위(/app)에서 app/ 을 찾는다
+              mountPath: /app/scripts
+              readOnly: true
+      volumes:
+        - name: script
+          configMap:
+            name: showcase-autoaccept-script

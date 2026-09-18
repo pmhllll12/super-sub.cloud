@@ -26,11 +26,11 @@ class SquadMemberOrm(Base):
     squad_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("squad.id", ondelete="CASCADE"), nullable=False
     )
-    # 🔴 카드 삭제 규칙은 비워 둔다(기본 RESTRICT). 부록 D.6 의 삭제 연쇄가
-    #    `player_card` 까지는 다루지만 스쿼드 등재를 어떻게 할지는 정하지 않았다.
-    #    **탈퇴한 사람의 등재를 지울지 익명으로 남길지**가 정해지면 그때 건다.
+    # 카드가 지워지면(탈퇴 연쇄) 등재도 함께 지운다 — 2026-09-17 에 정했다. 앞서
+    # 「탈퇴한 사람의 등재를 지울지 익명으로 남길지 정해지면 건다」로 비워 뒀던 자리다.
+    # 등재는 그 사람의 카드가 판에 선 사실이라 카드 없이는 뜻이 없다.
     player_card_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("player_card.id"), nullable=False
+        Uuid, ForeignKey("player_card.id", ondelete="CASCADE"), nullable=False
     )
     # `position` 은 `user` 컨텍스트에 있지만 문자열 참조라 임포트하지 않는다.
     position_id: Mapped[UUID] = mapped_column(

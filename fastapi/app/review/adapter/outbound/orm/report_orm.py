@@ -23,11 +23,14 @@ class ReportOrm(Base):
     __tablename__ = "report"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
-    reporter_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("user.id"), nullable=False
+    # 🔴 신고한 사람이 탈퇴하면 **신고는 남기고 신고자만 비운다**(2026-09-17) — 신고는
+    #    대상의 제재 근거라 신고자가 떠났다고 사라지면 안 된다. NULL = 탈퇴한 신고자.
+    reporter_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("user.id", ondelete="SET NULL"), nullable=True
     )
+    # 신고 대상이 탈퇴하면 그 사람에 대한 신고는 함께 지운다 — 제재할 계정이 없다.
     target_user_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("user.id"), nullable=False
+        Uuid, ForeignKey("user.id", ondelete="CASCADE"), nullable=False
     )
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(

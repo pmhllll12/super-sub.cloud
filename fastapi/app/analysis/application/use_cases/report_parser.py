@@ -79,6 +79,9 @@ class ParsedReport:
     provisional: bool | None
     previews: dict[str, Any] | None
     keypoint_quality: dict[str, Any] | None
+    # `result.card.notes` — 추천 판 카드의 불릿 한두 줄(`paik` 33·`ho` 50번).
+    # 🔴 **옛 봉투(1.4 이하)에는 없다** — 없으면 `None` 이고 적재는 안 깨진다.
+    card_notes: list[str] | None
     metric_values: list[MetricValueRow]
     criteria: list[CriterionRow]
 
@@ -120,6 +123,17 @@ def parse_report(raw: bytes) -> ParsedReport:
     overall_grade = str(_require(result, "grade", "result"))
     # `model_name` 은 근거 문장(evidence)을 쓴 모델이다 — 봉투의 `judge_model`.
     model_name = str(env.get("judge_model") or "unknown")
+
+    # `card` 는 1.5 에 생겼다. 🔴 없어도 깨지지 않는다 — 봉투 계약이 "필드
+    # 추가라 minor" 라고 정해 둔 자리이고, 모르는 키를 무시하는 것과 대칭이다.
+    # 문자열이 아닌 줄·빈 줄은 버린다(지어낸 자리를 담지 않는다).
+    card = result.get("card") or {}
+    raw_notes = card.get("notes") if isinstance(card, dict) else None
+    card_notes = (
+        [str(n).strip() for n in raw_notes if str(n).strip()]
+        if isinstance(raw_notes, list)
+        else None
+    ) or None
 
     features: dict[str, Any] = env.get("features") or {}
     fms: dict[str, Any] = env.get("frame_metrics_seconds") or {}
@@ -210,6 +224,7 @@ def parse_report(raw: bytes) -> ParsedReport:
         ),
         previews=env.get("previews") or None,
         keypoint_quality=env.get("keypoint_quality") or None,
+        card_notes=card_notes,
         metric_values=values,
         criteria=criteria,
     )

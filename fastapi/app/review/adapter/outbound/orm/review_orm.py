@@ -31,11 +31,16 @@ class ReviewOrm(Base):
     match_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("match.id"), nullable=False
     )
-    reviewer_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("user.id"), nullable=False
+    # 🔴 작성자가 탈퇴하면 **평가는 남기고 작성자만 비운다**(부록 D.6, 2026-09-17).
+    #    이 평가는 받은 사람의 신뢰 등급 원자료라 지우면 남의 등급이 바뀐다. 그래서
+    #    NULL 을 허용한다 — NULL 은 「탈퇴한 사용자가 쓴 평가」다. 작성자를 다시 읽어
+    #    내보내는 경로는 없다(신뢰 집계는 `reviewee_id` 와 선택지로만 센다).
+    reviewer_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("user.id", ondelete="SET NULL"), nullable=True
     )
+    # 받은 사람이 탈퇴하면 그 사람에 대한 평가는 함께 지운다 — 그 사람의 파생 데이터다.
     reviewee_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("user.id"), nullable=False
+        Uuid, ForeignKey("user.id", ondelete="CASCADE"), nullable=False
     )
     submitted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False

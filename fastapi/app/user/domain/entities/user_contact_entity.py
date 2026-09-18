@@ -48,3 +48,6 @@ class UserContactSummary:
     nickname: str
     note: str | None
     accepted_at: datetime
+    # 그 사람의 공개 카드 슬러그 — 카드를 안 만들었으면 `None`(미결 `paik` 39번).
+    # 🔴 내부 id 를 밖으로 내보내지 않으려고 **서버가 여기서 바꿔** 준다.
+    card_public_slug: str | None = None

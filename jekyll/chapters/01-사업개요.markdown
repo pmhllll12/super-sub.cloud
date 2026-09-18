@@ -2,7 +2,7 @@
 layout: default
 title: 사업 개요
 permalink: /01-사업개요/
-parent: I 부. 제안 개요
+parent: 기획
 nav_order: 1
 ---
 

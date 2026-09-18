@@ -37,6 +37,10 @@ _LEFT_TEAM_ID = UUID("c4d17b02-8e35-4a91-b6f2-0d38e5a7c914")
 _OTHER_USER_ID = UUID("9a2e5f31-6d70-4c18-b3a9-4e82d7c05a17")
 _PENDING_CONTACT_ID = UUID("6e1a2b3c-4d5e-4f60-8a71-2b3c4d5e6f71")
 
+# 카드를 만든 사람만 슬러그가 있다(미결 `paik` 39번). 🔴 **데모 본인은 일부러
+# 넣지 않는다** — 「카드가 없는 사람」 갈래를 스텁으로도 밟을 수 있어야 한다.
+_CARD_SLUG_BY_USER = {_OTHER_USER_ID: "kim-chulsoo-1a2b"}
+
 
 def _at(y: int, mo: int, d: int, h: int = 0, mi: int = 0) -> datetime:
     return datetime(y, mo, d, h, mi, tzinfo=timezone.utc)
@@ -167,6 +171,18 @@ class StubUserRepository(UserPort):
     def update_searchable(self, user_id: UUID, is_nickname_searchable: bool) -> None:
         """스텁은 고정 데이터라 저장하지 않는다. 실제 반영은 DB 테스트가 본다."""
 
+    def card_slugs(self, user_ids: list[UUID]) -> dict[UUID, str]:
+        """스텁에서는 **데모 사람만** 카드가 있다 — 나머지는 빠진다.
+
+        🔴 **없는 사람을 지어내지 않는다.** 카드를 안 만든 사람이 정상이고,
+        그때 화면은 이름표로 남는다(미결 `paik` 39번).
+        """
+        return {
+            uid: _CARD_SLUG_BY_USER[uid]
+            for uid in user_ids
+            if uid in _CARD_SLUG_BY_USER
+        }
+
     def search_by_nickname(
         self, *, q: str, exclude_user_id: UUID, limit: int
     ) -> list[UserEntity]:
@@ -230,6 +246,7 @@ class StubUserRepository(UserPort):
                 nickname="김철수",
                 note=None,
                 accepted_at=_at(2026, 9, 15, 9, 30),
+                card_public_slug=_CARD_SLUG_BY_USER.get(_OTHER_USER_ID),
             )
         ]
 

@@ -2,7 +2,8 @@
 layout: default
 title: 남은 작업 로드맵
 permalink: /roadmap/
-nav_order: 6
+parent: 팀 작업 공간
+nav_order: 3
 ---
 
 **이 문서는 진입점이다.** 상세는 [미결 항목]({{ "/pending/" | relative_url }})에

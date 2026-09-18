@@ -2,8 +2,9 @@
 
 import { useRouter } from 'next/navigation'
 import { useId, useState } from 'react'
-import { apiDelete, apiErrorMessage, apiPost } from '@/lib/api/client'
+import { apiDelete, apiErrorMessage, apiPatch, apiPost } from '@/lib/api/client'
 import { rememberHomeTeam } from '@/lib/homeTeam'
+import { REGIONS, searchRegions } from '@/lib/regions'
 import PillButton from '@/components/ui/PillButton'
 
 /**
@@ -58,6 +59,71 @@ function GrowField({
   )
 }
 
+/** 적은 글자가 목록의 지역과 정확히 같은가 — 저장해도 되는 값인가. */
+export function isRegion(value: string): boolean {
+  return REGIONS.includes(value.trim())
+}
+
+/**
+ * 지역 칸 — **자유 입력이지만 저장되는 값은 목록의 것**이다.
+ *
+ * 🔴 **왜 자유 입력만 두지 않나.** 「강남」·「강남구」·「서울 강남구」가 다 다른
+ * 값으로 저장되면 **대조가 통째로 깨진다** — 「사람을 찾는 팀」이 지역으로
+ * 거르기 때문에, 형식이 어긋난 팀은 경기가 검색에서 빠진다. 계약 52번이
+ * 「고칠 수 있게」를 급하다고 한 이유가 정확히 그것이라, 고치는 자리에서 다시
+ * 어긋난 값을 받으면 고쳐도 소용이 없다.
+ *
+ * 🔴 **경기 조건 판과 같은 방식**이다(`MatchPrefs`) — 거기는 여러 동네를
+ * 고르고 여기는 하나라 마크업만 다르고, 후보는 같은 `searchRegions` 다.
+ */
+function RegionField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+}) {
+  const id = useId()
+  const hits = searchRegions(value)
+  const exact = isRegion(value)
+  return (
+    <div className="ss-team-field">
+      <label htmlFor={id}>
+        {label}
+        <span className="ss-team-hint"> (예: 서울 강남구)</span>
+      </label>
+      <span className="ss-team-grow" data-value={value}>
+        <input
+          id={id}
+          size={1}
+          value={value}
+          autoComplete="off"
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </span>
+      {/* 고른 값과 똑같은 후보 하나만 남았으면 더 보여 줄 것이 없다. */}
+      {hits.length > 0 && !(exact && hits.length === 1) && (
+        <ul className="ss-team-hits">
+          {hits.map((r) => (
+            <li key={r}>
+              <button type="button" className="ss-team-hit" onClick={() => onChange(r)}>
+                {r}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {/* 🔴 **비어 있으면 고장으로 읽힌다** — 목록에 없다고 말한다. 지금 팀에
+          적혀 있는 값이 목록 밖일 때(예전 자유 입력분)도 이 줄이 뜬다. */}
+      {value.trim() && hits.length === 0 && (
+        <p className="ss-team-none">그런 동네가 목록에 없습니다.</p>
+      )}
+    </div>
+  )
+}
+
 /**
  * 「소속」 절의 손짓 — **팀 만들기**와 **팀 나가기**.
  *
@@ -92,6 +158,49 @@ export default function TeamActions({
   const [error, setError] = useState<string | null>(null)
   /** 나가는 중인 팀 — 여러 팀이 있어도 누른 줄만 잠긴다. */
   const [leaving, setLeaving] = useState<string | null>(null)
+  /** 지금 고치는 중인 팀. 한 번에 하나만 편다 — 여럿이 펴져 있으면 어느 것을
+   *  저장하는지가 안 읽힌다. */
+  const [editing, setEditing] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editRegion, setEditRegion] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  function openEdit(t: { team_id: string; name: string; region: string }) {
+    setError(null)
+    if (editing === t.team_id) {
+      setEditing(null)
+      return
+    }
+    setEditing(t.team_id)
+    // 🔴 **지금 값으로 채운다** — 빈 칸에서 시작하면 「둘 다 새로 적어야 하나」가
+    //    되고, 안 바꿀 필드까지 사람이 다시 적게 된다.
+    setEditName(t.name)
+    setEditRegion(t.region)
+  }
+
+  async function save(teamId: string, was: { name: string; region: string }) {
+    if (saving) return
+    /* 🔴 **바뀐 것만 싣는다**(계약의 「하지 말 것」) — 안 바꿀 필드는 `null` 도
+       빈 값도 아니고 **아예 빼야** 한다. 둘 다 그대로면 부를 것이 없다. */
+    const patch: { name?: string; region?: string } = {}
+    if (editName.trim() !== was.name) patch.name = editName.trim()
+    if (editRegion.trim() !== was.region) patch.region = editRegion.trim()
+    if (Object.keys(patch).length === 0) {
+      setEditing(null)
+      return
+    }
+    setSaving(true)
+    setError(null)
+    try {
+      await apiPatch(`/api/teams/${encodeURIComponent(teamId)}`, patch)
+      setEditing(null)
+      router.refresh()
+    } catch (err) {
+      setError(apiErrorMessage(err))
+    } finally {
+      setSaving(false)
+    }
+  }
 
   async function create(e: React.FormEvent) {
     e.preventDefault()
@@ -149,6 +258,18 @@ export default function TeamActions({
                   팀이 여럿일 때 어느 줄의 것인지 한 번 더 짚어야 한다. */}
               <p className="ss-profile-team-name">
                 <span>{t.name}</span>
+                {/* 🔴 **주장에게만 낸다**(계약 — 구성원이 부르면 403). 화면이
+                    먼저 가려도 서버가 다시 막는다. */}
+                {t.role === 'owner' && (
+                  <button
+                    type="button"
+                    className="ss-profile-team-leave"
+                    aria-expanded={editing === t.team_id}
+                    onClick={() => openEdit(t)}
+                  >
+                    {editing === t.team_id ? '접기' : '수정'}
+                  </button>
+                )}
                 <button
                   type="button"
                   className="ss-profile-team-leave"
@@ -161,6 +282,36 @@ export default function TeamActions({
               <p className="ss-profile-muted">
                 {t.region} · {t.sport_code}
               </p>
+              {/* 팀 만들기와 같은 접기다 — 붙였다 뗐다 하지 않고 늘 그린다. */}
+              {t.role === 'owner' && (
+                <div
+                  className="ss-profile-form-fold"
+                  data-open={editing === t.team_id ? 'true' : 'false'}
+                >
+                  <div inert={editing !== t.team_id}>
+                    <form
+                      className="ss-profile-account-form ss-form-compact"
+                      onSubmit={(e) => {
+                        e.preventDefault()
+                        void save(t.team_id, { name: t.name, region: t.region })
+                      }}
+                    >
+                      <GrowField label="팀 이름" value={editName} onChange={setEditName} />
+                      <RegionField label="지역" value={editRegion} onChange={setEditRegion} />
+                      {/* 🔴 **종목은 없다** — 계약 본문에 자리가 없고, 포지션·
+                          스쿼드·경기가 그 값에 매달려 있어서 바꾸면 이미 앉힌
+                          포지션이 다른 종목 것이 된다. */}
+                      <PillButton
+                        type="submit"
+                        disabled={saving || !editName.trim() || !isRegion(editRegion)}
+                        className="self-center"
+                      >
+                        {saving ? '저장 중…' : '저장'}
+                      </PillButton>
+                    </form>
+                  </div>
+                </div>
+              )}
               {/* 🔴 **소속이 여럿일 때만 낸다.** 하나뿐이면 고를 것이 없고,
                   단추만 있으면 무엇을 고르는 자리인지가 안 읽힌다. */}
               {teams.length > 1 && (
@@ -220,12 +371,16 @@ export default function TeamActions({
             <div inert={!open}>
               <form onSubmit={create} className="ss-profile-account-form ss-form-compact">
                 <GrowField label="팀 이름" value={name} onChange={setName} />
-                <GrowField label="지역" value={region} onChange={setRegion} hint="예: 서울 강남" />
+                {/* 🔴 **여기도 목록에서 고른다**(2026-09-17, 계약 52번과 함께).
+                    전에는 자유 입력이라 새 팀이 처음부터 어긋난 지역으로
+                    들어갔고, 그러면 고치는 화면을 붙여도 「만들고 나서
+                    고치는」 흐름이 된다. */}
+                <RegionField label="지역" value={region} onChange={setRegion} />
                 {/* 🔴 **가운데**(사용자 요청, 2026-09-16) — 폼이 좁아 왼쪽에
                     붙이면 아래 여백이 비어 보인다. */}
                 <PillButton
                   type="submit"
-                  disabled={busy || !name.trim() || !region.trim()}
+                  disabled={busy || !name.trim() || !isRegion(region)}
                   className="self-center"
                 >
                   만들기

@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react'
 import type { OpenMatch } from '@/server/backend'
 import { SPORTS, SPORT_CODE } from '@/lib/sports'
 import MatchPrefsForm from '@/components/MatchPrefs'
-import { loadPrefs, savePrefs, type MatchPrefs } from '@/lib/matchPrefs'
+import { loadMyPrefs, saveMyPrefs } from '@/lib/myPrefsStore'
+import type { MatchPrefs } from '@/lib/matchPrefs'
+import { useFitToViewport } from '@/lib/useFitToViewport'
 
 /**
  * 「팀원」 판 — **아직 사람을 못 채운 팀들의 명단**(사용자 요청, 2026-09-08).
@@ -64,6 +66,8 @@ export default function TeamSeek({
   sportCode?: string | null
 }) {
   const [state, setState] = useState<State>({ kind: 'loading' })
+  /* 🔴 화면 아래로 넘치지 않게 — 넘치면 판 안에서 구른다(`useFitToViewport` 머리말). */
+  const fitRef = useFitToViewport<HTMLElement>()
   /**
    * 고른 종목. `null` 이 **전체**다.
    *
@@ -88,10 +92,15 @@ export default function TeamSeek({
    * 거르기는 「지금 이 목록에서 더 좁힌다」라 층이 다르다 — 조건이 거르기의
    * **첫 값을 채우고**, 그 뒤로는 거르기가 제 일을 한다(사용자와 확인).
    *
-   * 🔴 그릴 때 저장소를 읽지 않는다(하이드레이션) — 붙은 뒤에 읽는다.
+   * 🔴 **서버에 있다**(2026-09-17). 전에는 `localStorage` 였는데, 그러면
+   * 여기서 고른 **내 자리가 서버에 안 올라가서** 남의 AI 추천 후보에 내가
+   * 영영 안 떴다 — 서버의 첫 하드 필터가 그 포지션 등록 여부다(계약 3-13절).
+   * 🔴 그릴 때 읽지 않는다(하이드레이션) — 붙은 뒤에 읽는다.
    */
   const [prefs, setPrefs] = useState<MatchPrefs | null>(null)
   const [asking, setAsking] = useState(false)
+  /** 조건을 못 올렸을 때의 문구 — 🔴 조용히 넘어가지 않는다(아래 `onDone`). */
+  const [saveError, setSaveError] = useState<string | null>(null)
   /**
    * 🔴 **조건을 읽기 전에는 목록을 받지 않는다.** `asking` 은 처음에 `false`
    * 라, 이 표시가 없으면 조건을 읽는 effect 보다 목록 effect 가 먼저 돌아
@@ -99,16 +108,23 @@ export default function TeamSeek({
    */
   const [ready, setReady] = useState(false)
   useEffect(() => {
-    const saved = loadPrefs('me')
-    setPrefs(saved)
-    setAsking(saved === null)
-    // 조건의 첫 지역을 거르기의 첫 값으로 — 없으면 그냥 전체다.
-    if (saved?.regions[0]) {
-      setRegion(saved.regions[0])
-      setAsked(saved.regions[0])
+    let alive = true
+    void (async () => {
+      const saved = await loadMyPrefs(sportCode)
+      if (!alive) return
+      setPrefs(saved)
+      setAsking(saved === null)
+      // 조건의 첫 지역을 거르기의 첫 값으로 — 없으면 그냥 전체다.
+      if (saved?.regions[0]) {
+        setRegion(saved.regions[0])
+        setAsked(saved.regions[0])
+      }
+      setReady(true)
+    })()
+    return () => {
+      alive = false
     }
-    setReady(true)
-  }, [])
+  }, [sportCode])
 
   /**
    * 🔴 **판이 열릴 때, 그리고 거르는 값이 바뀔 때만 받는다.** 그릴 때 부르면
@@ -153,6 +169,7 @@ export default function TeamSeek({
 
   return (
     <section
+      ref={fitRef}
       className="ss-teams"
       data-closing={closing ? 'true' : undefined}
       aria-label="사람을 찾는 팀"
@@ -186,21 +203,38 @@ export default function TeamSeek({
 
       {/* 🔴 조건이 먼저다 — 없으면 거르기 줄도 목록도 안 그린다. */}
       {asking && (
-        <MatchPrefsForm
-          kind="me"
-          sportCode={sportCode}
-          value={prefs}
-          onDone={(next) => {
-            savePrefs('me', next)
-            setPrefs(next)
-            setAsking(false)
-            if (next.regions[0]) {
-              setRegion(next.regions[0])
-              setAsked(next.regions[0])
-            }
-          }}
-          onCancel={prefs ? () => setAsking(false) : undefined}
-        />
+        <>
+          {/* 🔴 **올리지 못했으면 넘어가지 않고 적는다.** 조용히 닫으면
+              사용자는 등록된 줄 알고, 정작 남의 추천 목록에는 안 뜬다. */}
+          {saveError && (
+            <p role="alert" className="ss-teams-error">
+              {saveError}
+            </p>
+          )}
+          <MatchPrefsForm
+            kind="me"
+            sportCode={sportCode}
+            value={prefs}
+            onDone={(next) => {
+              void (async () => {
+                setSaveError(null)
+                try {
+                  await saveMyPrefs(sportCode, next)
+                } catch (err) {
+                  setSaveError(err instanceof Error ? err.message : '조건을 저장하지 못했습니다.')
+                  return
+                }
+                setPrefs(next)
+                setAsking(false)
+                if (next.regions[0]) {
+                  setRegion(next.regions[0])
+                  setAsked(next.regions[0])
+                }
+              })()
+            }}
+            onCancel={prefs ? () => setAsking(false) : undefined}
+          />
+        </>
       )}
 
       {/* 🔴 **거르는 줄은 늘 그린다** — 결과 안쪽에 두면 「없습니다」가 떴을 때

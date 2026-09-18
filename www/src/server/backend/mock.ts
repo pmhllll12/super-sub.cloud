@@ -1,3 +1,4 @@
+import { REGIONS } from '@/lib/regions'
 import { BackendError } from './errors'
 import type { Backend } from './gateway'
 import type {
@@ -21,13 +22,22 @@ import type {
   Squad,
   PlayerCard,
   PublicPlayerCard,
+  PublicVideo,
+  ReceivedInvitation,
+  Region,
+  TeamMatchPreference,
+  MemberMatchPreference,
+  MatchCandidate,
   SignupResult,
+  TeamInvitation,
   User,
 } from './types'
 
 const DEMO_EMAIL = 'demo@super-sub.example'
 const DEMO_PASSWORD = 'supersub2026'
 const DEMO_TOKEN = 'mock-access-token-demo'
+/** 데모 계정의 사용자 id — 받은 초대가 이 값을 가리켜야 나에게 온 것이 된다. */
+const DEMO_USER_ID = '3f1c0000-0000-4000-8000-000000000001'
 /** 데모 계정이 속한 팀. 스쿼드 · 경기가 이 id 를 함께 읽는다. */
 const DEMO_TEAM_ID = '9a2e0000-0000-4000-8000-000000000002'
 const EXPIRES_IN = 604800
@@ -118,17 +128,21 @@ function requireAdmin(token: string): User {
  * 둘 다 있다. 코드만으로 이름을 찾으면 안 된다.
  */
 const POSITIONS: Position[] = [
-  { sport_code: 'baseball', code: 'P', label: '투수' },
-  { sport_code: 'baseball', code: 'C', label: '포수' },
-  { sport_code: 'baseball', code: 'IF', label: '내야수' },
-  { sport_code: 'baseball', code: 'OF', label: '외야수' },
-  { sport_code: 'basketball', code: 'G', label: '가드' },
-  { sport_code: 'basketball', code: 'F', label: '포워드' },
-  { sport_code: 'basketball', code: 'C', label: '센터' },
-  { sport_code: 'football', code: 'GK', label: '골키퍼' },
-  { sport_code: 'football', code: 'DF', label: '수비수' },
-  { sport_code: 'football', code: 'MF', label: '미드필더' },
-  { sport_code: 'football', code: 'FW', label: '공격수' },
+  /* 🔴 **`id` 는 mock 안에서만 통하는 값이다**(실물은 UUID). 내 경기 조건이
+     포지션을 `position_ids` 로 받으므로(계약 3-13절) 여기도 id 가 있어야
+     그 경로를 시험할 수 있다. 사람이 읽을 수 있게 지어 두는 대신, 실서버
+     값과 헷갈리지 않도록 **UUID 모양을 일부러 안 쓴다.** */
+  { id: 'ps-baseball-p', sport_code: 'baseball', code: 'P', label: '투수' },
+  { id: 'ps-baseball-c', sport_code: 'baseball', code: 'C', label: '포수' },
+  { id: 'ps-baseball-if', sport_code: 'baseball', code: 'IF', label: '내야수' },
+  { id: 'ps-baseball-of', sport_code: 'baseball', code: 'OF', label: '외야수' },
+  { id: 'ps-basketball-g', sport_code: 'basketball', code: 'G', label: '가드' },
+  { id: 'ps-basketball-f', sport_code: 'basketball', code: 'F', label: '포워드' },
+  { id: 'ps-basketball-c', sport_code: 'basketball', code: 'C', label: '센터' },
+  { id: 'ps-football-gk', sport_code: 'football', code: 'GK', label: '골키퍼' },
+  { id: 'ps-football-df', sport_code: 'football', code: 'DF', label: '수비수' },
+  { id: 'ps-football-mf', sport_code: 'football', code: 'MF', label: '미드필더' },
+  { id: 'ps-football-fw', sport_code: 'football', code: 'FW', label: '공격수' },
   /* 🔴 **`futsal` 을 걷었다**(2026-09-16). 서버의 `sport` 참조 테이블에 그 행이
      없다 — 마이그레이션 `20260901_sport_and_position.py` 가 **폐기**하고
      `football` 로 옮겼다(`_RETIRED = "futsal"`). 여기 남겨 두면 없는 종목을
@@ -433,6 +447,184 @@ let demoSquad: Squad | null = {
   ],
 }
 
+/**
+ * **나를 부른 다른 팀** — 받은 초대를 로컬에서 보려면 있어야 한다
+ * (미결 `paik` 37번).
+ *
+ * 🔴 **데모 계정은 번개FC 의 주장이다.** 그래서 mock 이 스스로 만들 수 있는
+ * 초대는 전부 *내가 남에게* 보내는 것뿐이고, **받은 초대는 영영 0건**이었다 —
+ * `USE_MOCK=1` 로 띄워도 초대 줄을 못 봤다. 초대는 **밖에서** 와야 말이 된다.
+ */
+const INVITER_TEAM = {
+  id: '9a2e0000-0000-4000-8000-000000000077',
+  name: '망원 유나이티드',
+  region: '서울 마포구',
+  sport_code: 'football',
+}
+
+/**
+ * 그 팀의 판 — 「판 보기」가 이걸 그린다.
+ *
+ * 🔴 **자리를 비워 둔다.** 나를 GK 로 부르고 있으므로 GK 줄(행 3)이 비어야
+ * "저 자리에 나를 부르는구나"가 판에서 읽힌다 — 다 차 있으면 초대가 뜻을
+ * 잃는다.
+ */
+const inviterSquad: Squad = {
+  id: 'sq2',
+  team_id: INVITER_TEAM.id,
+  public_slug: 'mW7pQ2xR9kT4bV6n',
+  formation: '5:5',
+  /* 🔴 **5:5 는 1-2-1 이다** — 칸을 아무 데나 두지 않는다(`lib/pitchGrid.ts`
+     의 `FORMATION_SLOTS`). FW(1,0) · MF(0,1) · MF(2,1) · DF(1,2) · GK(1,3).
+     처음엔 DF 를 (2,2) 에 뒀는데 그건 **7:7 의 자리**라 판에 없는 칸에 카드가
+     떠 있었다(2026-09-17, 사용자가 화면으로 잡았다).
+
+     🔴 **GK 를 비워 둔다** — 나를 GK 로 부르고 있으므로 그 자리가 비어야
+     「저기로 부르는구나」가 판에서 읽힌다. */
+  members: [
+    {
+      id: 'sm-i1',
+      player_card_id: '5e7a0000-0000-4000-8000-000000000011',
+      card_public_slug: 'park-jisung-7c1d',
+      nickname: '박지성',
+      position_code: 'FW',
+      position_label: '공격수',
+      grid_col: 1,
+      grid_row: 0,
+    },
+    {
+      id: 'sm-i2',
+      player_card_id: '5e7a0000-0000-4000-8000-000000000012',
+      card_public_slug: 'son-heungmin-3b9f',
+      nickname: '손흥민',
+      position_code: 'MF',
+      position_label: '미드필더',
+      grid_col: 0,
+      grid_row: 1,
+    },
+    {
+      id: 'sm-i3',
+      player_card_id: '5e7a0000-0000-4000-8000-000000000013',
+      card_public_slug: 'ki-sungyueng-5f3a',
+      nickname: '기성용',
+      position_code: 'MF',
+      position_label: '미드필더',
+      grid_col: 2,
+      grid_row: 1,
+    },
+    {
+      id: 'sm-i4',
+      player_card_id: '5e7a0000-0000-4000-8000-000000000014',
+      card_public_slug: 'kim-minjae-8a2c',
+      nickname: '김민재',
+      position_code: 'DF',
+      position_label: '수비수',
+      grid_col: 1,
+      grid_row: 2,
+    },
+  ],
+}
+
+/**
+ * **지역 목록** (계약 3-13절). 실서버는 `region` 참조 테이블을 `lib/regions.ts`
+ * 의 60곳으로 시드했다 — 여기서도 **같은 목록**을 쓴다(두 벌로 두면 화면에서
+ * 고른 지역이 mock 에 없어 422 가 난다).
+ *
+ * ⚠️ id 는 실서버에서 UUID 다. mock 은 이름에서 만든 고정 문자열을 쓴다 —
+ * 값의 모양이 아니라 **「이름이 아니라 id 로 보낸다」는 규칙**이 여기서
+ * 확인해야 할 것이다.
+ */
+const DEMO_REGIONS: Region[] = REGIONS.map((label, i) => {
+  const [city, ...rest] = label.split(' ')
+  return { id: `rg-${String(i + 1).padStart(3, '0')}`, city, district: rest.join(' '), label }
+})
+
+/** 팀별 경기 조건 — `PUT` 이 통째로 갈아 끼운다. */
+const teamPrefs = new Map<string, TeamMatchPreference>()
+
+/**
+ * 사람별 경기 조건 — 팀 조건과 **다른 저장소**다(계약이 절대 안 섞는다).
+ * 같은 사람이 팀장이면서 팀원일 수 있어서, 한 곳에 두면 「우리 팀이 찾는
+ * 경기」와 「내가 뛸 수 있는 때」가 섞인다.
+ */
+const memberPrefs = new Map<string, MemberMatchPreference>()
+
+/**
+ * 「맞는 상대」 후보 (계약 3-13절).
+ *
+ * 🔴 **점수가 없다.** 순서는 서버가 정렬한 것이고 `reasons` 는 **사실값
+ * 문장**이다 — 화면이 겹침을 다시 계산하지 않는다(계약의 「하지 말 것」).
+ * ⚠️ `reasons` 가 빈 배열인 줄을 하나 남겨 둔다 — 소프트 근거가 0개여도
+ * 하드 필터는 통과했다는 뜻이고, 화면이 그 갈래를 실제로 밟아 봐야 한다.
+ */
+const DEMO_MATCH_CANDIDATES: MatchCandidate[] = [
+  {
+    team_id: '9a2e0000-0000-4000-8000-000000000201',
+    team_name: '망원 유나이티드',
+    region_label: '서울 마포구',
+    formation: '5:5',
+    reasons: [
+      { kind: 'time', detail: '토요일 11:00~12:00 겹침' },
+      { kind: 'region', detail: '같은 시(서울)' },
+    ],
+  },
+  {
+    team_id: '9a2e0000-0000-4000-8000-000000000202',
+    team_name: '합정 프렌즈',
+    region_label: '서울 마포구',
+    formation: '5:5',
+    reasons: [{ kind: 'time', detail: '일요일 09:00~10:30 겹침' }],
+  },
+  {
+    team_id: '9a2e0000-0000-4000-8000-000000000203',
+    team_name: '성수 웨이브',
+    region_label: '서울 성동구',
+    formation: '5:5',
+    reasons: [],
+  },
+]
+
+/**
+ * **경기를 걸어 온 팀** — 초대한 팀과 **일부러 다른 팀**이다
+ * (2026-09-17, 사용자 지적: 「3:3 5:5 7:7 걸어뒀는데 이게 말이 되냐」).
+ *
+ * 🔴 **경기는 인원이 맞아야 성립한다.** 초대용 팀(`INVITER_TEAM`)은 나를
+ * GK 로 부르느라 **그 자리가 비어 있어서** 5:5 경기를 할 수 없다 — 그 팀을
+ * 경기 신청에도 쓰니 대기 화면에 **네 명짜리 상대**가 떴다. 계약도 후보를
+ * 「상대 로스터가 그 인원만큼 찼고」로 거른다(3-13절).
+ */
+const RIVAL_TEAM = {
+  id: '9a2e0000-0000-4000-8000-000000000088',
+  name: '합정 프렌즈',
+  region: '서울 마포구',
+}
+
+/** 그 팀의 판 — **5:5 를 꽉 채운다**(1-2-1, `FORMATION_SLOTS` 의 자리). */
+const rivalSquad: Squad = {
+  id: 'sq3',
+  team_id: RIVAL_TEAM.id,
+  public_slug: 'zY4nR8wK1sD6hG2m',
+  formation: '5:5',
+  members: (
+    [
+      ['정우영', 'FW', '공격수', 1, 0],
+      ['이강인', 'MF', '미드필더', 0, 1],
+      ['황희찬', 'MF', '미드필더', 2, 1],
+      ['김영권', 'DF', '수비수', 1, 2],
+      ['조현우', 'GK', '골키퍼', 1, 3],
+    ] as const
+  ).map(([nickname, code, label, col, row], i) => ({
+    id: `sm-r${i + 1}`,
+    player_card_id: `5e7a0000-0000-4000-8000-0000000000${21 + i}`,
+    card_public_slug: `rival-${i + 1}`,
+    nickname,
+    position_code: code,
+    position_label: label,
+    grid_col: col,
+    grid_row: row,
+  })),
+}
+
 /** `POST /me/card` 로 생긴 카드들. 데모 계정은 위 `card` 를 그대로 쓴다. */
 const made = new Map<string, PlayerCard>()
 
@@ -456,6 +648,27 @@ const DEMO_DIRECTORY: UserSearchResult[] = [
   { id: '3f1c0000-0000-4000-8000-000000000007', nickname: '강도윤' },
   { id: '3f1c0000-0000-4000-8000-000000000008', nickname: '윤가온' },
 ]
+
+/**
+ * 분석이 낸 불릿 — **루브릭이 말할 수 있는 것만** 적는다(CCC 56 · `ho` 50번).
+ *
+ * 🔴 「반대편 빈 공간을 자주 찾습니다」류의 **경기 행동은 없다** — 한 편의
+ * 자세 분석으로는 못 잰다(정상호 확인). 여기 문장은 전부 **인스텝 슛·인사이드
+ * 패스 루브릭의 항목**에서 나올 법한 것이다.
+ *
+ * 🔴 **셋을 다 낸다** — 두 줄 · 한 줄 · 없음(`null`). 화면이 「늘 두 줄」로
+ * 짜이면 한 줄짜리에서 빈 칸이 남는다.
+ */
+const NOTES_POOL: Record<string, string[]> = {
+  김선우: ['차는 다리를 끝까지 뻗습니다', '디딤발을 공 옆에 붙입니다'],
+  오재현: ['상체를 공 위로 덮습니다'],
+  박도현: ['디딤발 무릎을 깊게 굽힙니다', '차고 난 뒤 몸이 앞으로 따라갑니다'],
+  이건우: ['골반을 목표 쪽으로 돌립니다'],
+  최유진: ['발목을 고정해 공을 정확히 맞춥니다', '상체가 덜 젖혀집니다'],
+  강태원: ['디딤발을 공 옆에 붙입니다'],
+  조현우: ['차는 다리를 끝까지 뻗습니다'],
+  임재민: ['골반을 목표 쪽으로 돌립니다', '차고 난 뒤 몸이 앞으로 따라갑니다'],
+}
 
 /**
  * 추천 후보 명단 — `GET /teams/{id}/squad/candidates` 와 `GET /cards/{slug}/grade`
@@ -484,7 +697,7 @@ const DEMO_CANDIDATES_BY_POSITION: Record<string, SquadCandidate[]> = {
     candidate('정민석', 'C', true),
     // 🔴 카드를 아직 안 만든 사람 — `card_public_slug` 가 `null` 이라 대표
     //    영상도 못 읽는다. 링크를 안 그리는 것으로 충분하다(계약 44번).
-    { user_id: 'u-seo', nickname: '서준혁', card_public_slug: null, grade: 'D', provisional: true },
+    { user_id: 'u-seo', nickname: '서준혁', card_public_slug: null, grade: 'D', provisional: true, notes: null },
   ],
   MF: [
     candidate('최유진', 'A', true),
@@ -498,7 +711,7 @@ const DEMO_CANDIDATES_BY_POSITION: Record<string, SquadCandidate[]> = {
     candidate('문태호', 'C', true),
     // 🔴 **등급을 모르는 사람**(대표 영상이 없거나 분석 전) — 뒤로 가되
     //    사라지지 않는다. `F` 로 치지 않는 것이 26번의 「하지 말 것」이다.
-    { user_id: 'u-bae', nickname: '배준영', card_public_slug: 'bae-junyoung', grade: null, provisional: null },
+    { user_id: 'u-bae', nickname: '배준영', card_public_slug: 'bae-junyoung', grade: null, provisional: null, notes: null },
   ],
 }
 
@@ -511,6 +724,9 @@ function candidate(
   return {
     user_id: `u-${nickname}`,
     nickname,
+    /* 🔴 **분석이 낸 불릿**(CCC 56). 한 줄·두 줄·`null` 셋 다 정상값이라
+       mock 도 셋을 다 낸다 — 화면이 「두 줄이겠지」로 짜이지 않게 한다. */
+    notes: NOTES_POOL[nickname] ?? null,
     card_public_slug: `${nickname}-card`,
     grade,
     provisional,
@@ -542,22 +758,86 @@ const notifications: (AppNotification & { _to: string })[] = []
  * id 는 `lib/teamMatch.ts` 의 `TEAMS` 와 맞춘다 — 그래야 화면이 상대 팀
  * 이름을 찾을 수 있다(계약 응답에는 팀 id 만 오고 이름이 없다).
  */
-const teamMatchRequests = new Map<string, TeamMatchRequest>([
-  [
-    'tmr0',
+/**
+ * 받은 경기 신청 씨앗 한 건.
+ *
+ * 🔴 **여러 건을 둔다**(2026-09-17). 하나뿐이면 **한 번 수락하면 없어져서**
+ * 대기 화면을 다시 볼 수가 없다 — 개발 서버를 통째로 죽여야 돌아오는데,
+ * Next 는 HMR 로 모듈 상태를 들고 있어 그것도 잘 안 된다(사용자가 실제로
+ * 막혔다). 로컬에서 몇 번이고 눌러 볼 수 있어야 한다.
+ */
+function seedRequest(
+  id: string,
+  playedAt: string,
+  place: string,
+): [string, TeamMatchRequest] {
+  return [
+    id,
     {
-      id: 'tmr0',
-      requester_team_id: 'mt-2', // 망원 유나이티드
+      id,
+      /* 🔴 **인원이 꽉 찬 팀에서 온다**(`RIVAL_TEAM`) — 초대용 팀은 GK 가
+         비어 있어 5:5 경기를 할 수 없다(위 주석). */
+      requester_team_id: RIVAL_TEAM.id,
       target_team_id: DEMO_TEAM_ID,
-      proposed_played_at: '2026-09-19T09:00:00+09:00',
-      proposed_place: '망원 실내구장 A',
+      proposed_played_at: playedAt,
+      proposed_place: place,
       status: 'pending',
       created_at: '2026-09-16T00:30:00Z',
       responded_at: null,
       match_id: null,
+      /* 🔴 **이름·지역은 서버가 준다**(CCC 55) — 전에는 화면이 붙박이 목록에서
+         찾았다. mock 도 같이 실어야 화면이 그 갈래를 밟는다. */
+      requester_team_name: RIVAL_TEAM.name,
+      requester_team_region: RIVAL_TEAM.region,
+      target_team_name: '번개FC',
+      target_team_region: '서울 강남구',
+      /* 🔴 **두 팀 판의 공개 슬러그**(2026-09-17) — 대기 화면이 상대 판을
+         이걸로 읽는다. mock 이 안 실으면 판이 빈 채로 뜬다. */
+      requester_squad_public_slug: rivalSquad.public_slug,
+      target_squad_public_slug: demoSquad?.public_slug ?? null,
     },
-  ],
+  ]
+}
+
+const teamMatchRequests = new Map<string, TeamMatchRequest>([
+  seedRequest('tmr0', '2026-09-19T09:00:00+09:00', '망원 실내구장 A'),
+  seedRequest('tmr-b', '2026-09-20T14:00:00+09:00', '합정 풋살파크'),
+  seedRequest('tmr-c', '2026-09-26T19:30:00+09:00', '상암 월드컵 보조구장'),
+  /* 🔴 **1분 뒤 경기**(사용자 요청, 2026-09-17) — 수락해 두면 곧 「경기 취소」가
+     「경기 끝내기」로 바뀌고, 눌러서 리뷰 판을 볼 수 있다. 서버가 뜰 때마다
+     다시 계산하므로 언제 켜도 늘 「곧」이다. */
+  seedRequest('tmr-soon', new Date(Date.now() + 60_000).toISOString(), '1분 뒤 — 리뷰 보기용 (카드 붙임)'),
+  /* 하나는 실수로 써 버려도 되게 **둘을 둔다.** 서버를 다시 띄우지 않고도
+     한 번 더 볼 수 있다. */
+  seedRequest('tmr-soon2', new Date(Date.now() + 180_000).toISOString(), '3분 뒤 — 리뷰 보기용 (여유분)'),
 ])
+
+
+/**
+ * **「곧 시작」 씨앗을 다시 놓는다** — mock 전용 (2026-09-17, 사용자 요청).
+ *
+ * 🔴 **리뷰 판을 보려면 「곧 끝나는 경기」가 있어야 한다.** 그런데 한 번
+ * 수락하면 그 신청은 `pending` 이 아니게 되어 사라지고, 다시 보려면 개발
+ * 서버를 통째로 죽여야 했다(Next 가 HMR 로 모듈 상태를 들고 있어 그것도 잘
+ * 안 된다). **없으면 알아서 다시 놓는다.**
+ *
+ * ⚠️ **mock 에만 있는 편의다.** 진짜 서버는 경기를 스스로 만들지 않는다 —
+ * 이 함수는 `mock.ts` 밖으로 나가지 않는다.
+ */
+function refreshSoonSeed(): void {
+  const alive = [...teamMatchRequests.values()].some(
+    (r) => r.id.startsWith('tmr-soon') && r.status === 'pending',
+  )
+  if (alive) return
+  // 번호를 올려 새 id 로 놓는다 — 옛 것(수락·거절된 것)은 기록으로 남긴다.
+  const n = [...teamMatchRequests.keys()].filter((k) => k.startsWith('tmr-soon')).length + 1
+  const [id, made] = seedRequest(
+    `tmr-soon${n}`,
+    new Date(Date.now() + 60_000).toISOString(),
+    '1분 뒤 — 리뷰 보기용',
+  )
+  teamMatchRequests.set(id, made)
+}
 
 /** 그 팀의 주장인가 — 계약이 주장만 허용하는 경로들이 쓴다. */
 function requireCaptain(u: User, teamId: string): void {
@@ -566,6 +846,67 @@ function requireCaptain(u: User, teamId: string): void {
   if (team.role !== 'owner') {
     throw new BackendError(403, 'FORBIDDEN', '팀 주장만 할 수 있습니다.')
   }
+}
+
+/**
+ * 보낸 초대들 (계약 3-3절 「팀 초대」).
+ *
+ * 🔴 **판에 앉힌 사람이 여기 남는다.** 그래서 새로고침해도 자리가 살아 있고,
+ * 사라지는 것은 **상대가 거절하거나 주장이 무를 때뿐**이다(사용자 설계,
+ * 2026-09-17).
+ */
+const invitations = new Map<string, TeamInvitation>([
+  /* 🔴 **씨앗 하나.** 위 `INVITER_TEAM` 주석 참고 — 이게 없으면 로컬에서
+     받은 초대 화면을 볼 방법이 없다. 자리를 정한 초대(GK)로 둔다. */
+  [
+    'inv-seed-1',
+    {
+      id: 'inv-seed-1',
+      team_id: INVITER_TEAM.id,
+      invited_user_id: DEMO_USER_ID,
+      status: 'pending',
+      created_at: '2026-09-17T18:20:00Z',
+      responded_at: null,
+      position_code: 'GK',
+      position_label: '골키퍼',
+      invited_user_nickname: '홍길동',
+      invited_user_card_slug: 'hong-gildong-4f2a',
+    },
+  ],
+])
+
+/** 수락·거절은 **받은 본인만**, 그리고 **대기 중일 때만** 된다(계약). */
+function respondToInvitation(
+  token: string,
+  invitationId: string,
+  status: 'accepted' | 'rejected',
+): TeamInvitation {
+  const u = requireUser(token)
+  const iv = invitations.get(invitationId)
+  if (!iv || iv.invited_user_id !== u.id) {
+    throw new BackendError(404, 'INVITATION_NOT_FOUND', '초대를 찾을 수 없습니다.')
+  }
+  if (iv.status !== 'pending') {
+    throw new BackendError(
+      409,
+      'TEAM_INVITATION_ALREADY_RESPONDED',
+      '이미 답이 난 초대입니다.',
+    )
+  }
+  const next: TeamInvitation = {
+    ...iv,
+    status,
+    responded_at: new Date().toISOString(),
+  }
+  invitations.set(invitationId, next)
+  /* 🔴 **수락·거절 둘 다 그 팀 주장에게 알림이 간다**(계약) — 무르기만
+     알림이 없다(보낸 쪽이 스스로 하는 것이라 알릴 상대가 없다). */
+  pushNotification(
+    iv.team_id,
+    status === 'accepted' ? 'team_invitation_accepted' : 'team_invitation_rejected',
+    iv.id,
+  )
+  return next
 }
 
 /** 알림 한 통을 쌓는다. `_to` 는 mock 에만 있는 칸이다(`stripTo` 참고). */
@@ -962,23 +1303,61 @@ export const mockBackend: Backend = {
   },
 
   async listPublicVideos(token) {
-    requireUser(token)
-    /* 🔴 **저장 키와 업로더를 안 싣는다** — 저장 키에 업로더의 `user_id` 가
-       들어 있어 계약이 일부러 뺐다. mock 이 더 주면 화면이 실물에 없는 값에
-       기대게 된다. 재생은 `playback-url` 로 따로 받는다. */
-    return DEMO_VIDEOS.filter((v) => v.is_public).map((v) => ({
+    const u = requireUser(token)
+    /* 🔴 **저장 키는 안 싣는다** — 거기에 업로더의 `user_id` 가 들어 있어
+       계약이 일부러 뺐다. 재생은 `playback-url` 로 따로 받는다.
+
+       ⚠️ **업로더 닉네임·카드 슬러그는 이제 싣는다**(CCC 39, 2026-09-15) —
+       그게 없어서 남의 공개 영상이 보는 사람 이름으로 그려졌다(`paik` 16번). */
+    const mine = DEMO_VIDEOS.filter((v) => v.is_public).map((v) => ({
       id: v.id,
       sport_code: v.sport_code,
       duration_ms: v.duration_ms,
       created_at: v.created_at,
       title: v.title,
       description: v.description,
+      uploader_nickname: u.nickname,
+      uploader_card_slug: card.public_slug,
       /* 🔴 **재서 넣은 실제 값이다**(CCC 46) — `ffprobe` 로 `public/` 의 파일을
          읽었다. 지어낸 값을 두면 세로 파일이 가로 칸에서 letterbox 되어, 화면이
          고쳐졌는지 mock 으로는 알 수 없게 된다. 실서버의 옛 등록분은 둘 다
          `null` 로 오고 그것은 **에러가 아니다**(화면이 16:9 로 가정한다). */
       ...(DEMO_SIZES[v.storage_key] ?? { width: null, height: null }),
     }))
+
+    /* 🔴 **남의 공개 영상도 섞어 준다**(2026-09-17). 실서버의 이 목록은 온
+       사람들의 공개 클립이다 — mock 이 내 것만 주면 화면은 **「남의 것」이라는
+       경우를 영영 못 만나고**, 바로 그래서 `paik` 16번(남의 영상이 내 이름으로
+       그려짐)이 개발에서 안 보였다. 🔴 **카드가 없는 사람도 한 명 둔다** —
+       슬러그가 `null` 인 갈래(링크를 안 그린다)를 밟아 볼 수 있어야 한다. */
+    const others: PublicVideo[] = [
+      {
+        id: 'pubv-남-1',
+        sport_code: 'football',
+        duration_ms: 12_000,
+        created_at: '2026-09-12T09:00:00Z',
+        title: '골대 앞 마무리',
+        description: '디딤발이 공보다 앞서지 않게',
+        width: 1080,
+        height: 1920,
+        uploader_nickname: '김철수',
+        uploader_card_slug: 'kim-chulsoo-1a2b',
+      },
+      {
+        id: 'pubv-남-2',
+        sport_code: 'football',
+        duration_ms: 9_000,
+        created_at: '2026-09-13T10:30:00Z',
+        title: '인사이드 패스 연습',
+        description: null,
+        width: 1920,
+        height: 1080,
+        uploader_nickname: '최카드없음',
+        // 🔴 카드를 안 만든 사람 — 링크를 안 그리는 갈래다.
+        uploader_card_slug: null,
+      },
+    ]
+    return [...mine, ...others]
   },
 
   async getFeaturedVideo(token, cardSlug): Promise<FeaturedVideo> {
@@ -1030,6 +1409,148 @@ export const mockBackend: Backend = {
   async listTeamMatches(token, teamId) {
     requireUser(token)
     return DEMO_MATCHES.filter((m) => m.team_id === teamId)
+  },
+
+  /* ── 팀 초대 (계약 3-3절, CCC 49·53번) ───────────────────────────── */
+
+  async inviteToTeam(token, teamId, { invited_user_id, position_code }) {
+    const u = requireUser(token)
+    requireCaptain(u, teamId)
+    /* 🔴 **대기 중 초대가 이미 있으면 409** — 같은 사람에게 두 번 보내면
+       받는 쪽에 같은 줄이 둘 뜬다(계약 `ALREADY_INVITED`). */
+    const already = [...invitations.values()].some(
+      (iv) =>
+        iv.team_id === teamId &&
+        iv.invited_user_id === invited_user_id &&
+        iv.status === 'pending',
+    )
+    if (already) {
+      throw new BackendError(409, 'ALREADY_INVITED', '이미 보낸 초대가 있습니다.')
+    }
+    const team = u.teams.find((t) => t.team_id === teamId)!
+    /* 🔴 **이 팀 종목에 없는 자리는 422** — 약칭은 종목 안에서만 유일하다
+       (축구 `FW` ≠ 농구 `FW`). 자리를 안 정한 초대는 정상이라 안 본다. */
+    if (position_code && !positionLabel(team.sport_code, position_code)) {
+      throw new BackendError(422, 'UNKNOWN_POSITION', '이 팀 종목에 없는 자리입니다.')
+    }
+    const made: TeamInvitation = {
+      id: `inv${invitations.size + 1}`,
+      team_id: teamId,
+      invited_user_id,
+      status: 'pending',
+      created_at: new Date().toISOString(),
+      responded_at: null,
+      position_code: position_code ?? null,
+      position_label: position_code
+        ? (positionLabel(team.sport_code, position_code) ?? null)
+        : null,
+      /* 초대받은 사람 — mock 은 후보 표에서 닉네임·슬러그를 찾는다. 못 찾으면
+         `null` 이고 그것도 정상이다(카드를 안 만든 사람과 같은 모양). */
+      invited_user_nickname:
+        DEMO_CANDIDATE_POOL.find((c) => c.user_id === invited_user_id)?.nickname ?? null,
+      invited_user_card_slug:
+        DEMO_CANDIDATE_POOL.find((c) => c.user_id === invited_user_id)?.card_public_slug ??
+        null,
+    }
+    invitations.set(made.id, made)
+    return made
+  },
+
+  async listTeamInvitations(token, teamId) {
+    const u = requireUser(token)
+    requireCaptain(u, teamId)
+    // 🔴 **상태 무관 전부**, 최신순(계약) — 판을 되살리는 값이라 거른 것을
+    //    주면 화면이 무엇을 지웠는지 모른다.
+    return [...invitations.values()]
+      .filter((iv) => iv.team_id === teamId)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+  },
+
+  async cancelTeamInvitation(token, teamId, invitationId) {
+    const u = requireUser(token)
+    requireCaptain(u, teamId)
+    const iv = invitations.get(invitationId)
+    if (!iv || iv.team_id !== teamId) {
+      throw new BackendError(404, 'INVITATION_NOT_FOUND', '초대를 찾을 수 없습니다.')
+    }
+    if (iv.status !== 'pending') {
+      throw new BackendError(
+        409,
+        'TEAM_INVITATION_ALREADY_RESPONDED',
+        '이미 답이 난 초대입니다.',
+      )
+    }
+    /* 🔴 **204 가 아니라 무른 초대를 돌려준다**(계약) — 삭제라기보다 상태
+       전이라, 화면이 같은 파서로 읽는다. */
+    const next: TeamInvitation = {
+      ...iv,
+      status: 'cancelled',
+      responded_at: new Date().toISOString(),
+    }
+    invitations.set(invitationId, next)
+    return next
+  },
+
+  async listMyInvitations(token) {
+    const u = requireUser(token)
+    /* 🔴 **아직 답 안 한 것만**(계약). 받는 사람은 그 팀 소속이 아니라 팀
+       이름을 따로 읽을 길이 없어서 넉 칸이 함께 온다(CCC 53). */
+    return [...invitations.values()]
+      .filter((iv) => iv.invited_user_id === u.id && iv.status === 'pending')
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      .map((iv): ReceivedInvitation => {
+        /* 🔴 **부른 팀에서 읽는다.** 전에는 넷을 전부 번개FC 로 박아 뒀는데,
+           그러면 어느 팀이 불렀든 내 팀 이름이 찍혀 **자기가 자기를 부른 것**
+           처럼 보인다. id 로 갈라야 화면이 실서버와 같은 것을 그린다. */
+        const inviter = iv.team_id === INVITER_TEAM.id ? INVITER_TEAM : null
+        const squad = iv.team_id === INVITER_TEAM.id ? inviterSquad : demoSquad
+        return {
+          ...iv,
+          team_name: inviter?.name ?? '번개FC',
+          team_region: inviter?.region ?? '서울 강남구',
+          team_sport_code: inviter?.sport_code ?? 'football',
+          // 스쿼드를 아직 안 만든 팀이면 `null` 이다 — 정상값이다.
+          squad_public_slug: squad?.public_slug ?? null,
+        }
+      })
+  },
+
+  async acceptInvitation(token, invitationId) {
+    return respondToInvitation(token, invitationId, 'accepted')
+  },
+
+  async rejectInvitation(token, invitationId) {
+    /* 🔴 **거절은 실패가 아니다** — 200 이고 아무것도 안 바뀐 것이 맞는
+       결과다(계약의 「하지 말 것」). */
+    return respondToInvitation(token, invitationId, 'rejected')
+  },
+
+  async cancelMatch(token, matchId) {
+    const u = requireUser(token)
+    const at = DEMO_MATCHES.findIndex((m) => m.id === matchId)
+    if (at === -1) throw new BackendError(404, 'MATCH_NOT_FOUND', '경기를 찾을 수 없습니다.')
+    const match = DEMO_MATCHES[at]
+
+    /* 🔴 **주최·상대 어느 쪽 주장이든**(계약, 2026-09-16에 넓어졌다). mock 은
+       상대 팀 소속을 안 들고 있어서 주최 쪽만 실제로 밟아 볼 수 있다 — 그래도
+       **주장이 아닌 경우는 막아야** 화면이 403 안내를 만들게 된다. */
+    const mine = u.teams.find((t) => t.team_id === match.team_id)
+    if (!mine || mine.role !== 'owner') {
+      throw new BackendError(403, 'FORBIDDEN', '팀 주장만 경기를 취소할 수 있습니다.')
+    }
+    /* 🔴 **지난 경기는 못 무른다**(계약) — 이미 열린 경기를 「취소」하는 것은
+       뜻이 없다. */
+    if (new Date(match.played_at).getTime() <= Date.now()) {
+      throw new BackendError(422, 'PAST_MATCH', '이미 지난 경기입니다.')
+    }
+    /* ⚠️ **`409 MATCH_HAS_APPLICATIONS` 는 여기서 못 낸다** — mock 에 지원
+       (`match_application`) 이라는 개념 자체가 없다. 실서버에서는 DB 의
+       RESTRICT 가 막아서 **지원이 하나라도 붙은 경기는 안 지워진다.**
+       그래서 화면은 그 갈래를 mock 으로는 못 밟아 본다 — 대신 **서버가 준
+       문구를 그대로 보여 주게** 해 두었고, 그쪽을 시험이 붙든다
+       (`MatchWaiting.test.tsx` 의 409 시험). 화면에서 미리 막지 않는다:
+       지원이 몇인지는 서버만 안다. */
+    DEMO_MATCHES.splice(at, 1)
   },
 
   async createTeamMatch(token, teamId, { played_at, place, needs }) {
@@ -1088,6 +1609,101 @@ export const mockBackend: Backend = {
       throw new BackendError(404, 'SQUAD_NOT_FOUND', '스쿼드를 아직 만들지 않았습니다.')
     }
     return demoSquad
+  },
+
+  /* ── 경기 조건·지역·후보 (계약 3-13절, CCC 40번) ─────────────────── */
+
+  async listRegions(token) {
+    requireUser(token)
+    return DEMO_REGIONS
+  },
+
+  async getTeamMatchPrefs(token, teamId) {
+    requireUser(token)
+    return teamPrefs.get(teamId) ?? { team_id: teamId, region_ids: [], slots: [] }
+  },
+
+  async putTeamMatchPrefs(token, teamId, { region_ids, slots }) {
+    requireCaptain(requireUser(token), teamId)
+    /* 🔴 **실서버처럼 막는다.** mock 이 너그러우면 배포에서만 터진다 —
+       1.12 회차에 같은 원인으로 세 번 겪었다. */
+    for (const id of region_ids) {
+      if (!DEMO_REGIONS.some((r) => r.id === id)) {
+        throw new BackendError(422, 'UNKNOWN_REGION', '그런 지역이 없습니다.')
+      }
+    }
+    for (const s of slots) {
+      if (s.weekday < 0 || s.weekday > 6 || s.start_time >= s.end_time) {
+        throw new BackendError(422, 'INVALID_TIME_SLOT', '시간대가 올바르지 않습니다.')
+      }
+    }
+    // 🔴 **통째로 교체**다(계약) — 부분 병합을 하지 않는다.
+    const next = { team_id: teamId, region_ids: [...region_ids], slots: [...slots] }
+    teamPrefs.set(teamId, next)
+    return next
+  },
+
+  async getMyMatchPrefs(token) {
+    const me = requireUser(token)
+    return (
+      memberPrefs.get(me.id) ?? {
+        user_id: me.id,
+        region_ids: [],
+        slots: [],
+        position_ids: [],
+      }
+    )
+  },
+
+  async putMyMatchPrefs(token, { region_ids, slots, position_ids }) {
+    const me = requireUser(token)
+    /* 🔴 **실서버처럼 막는다.** mock 이 너그러우면 배포에서만 터진다 —
+       1.12 회차에 같은 원인으로 세 번 겪었다. */
+    for (const id of region_ids) {
+      if (!DEMO_REGIONS.some((r) => r.id === id)) {
+        throw new BackendError(422, 'UNKNOWN_REGION', '그런 지역이 없습니다.')
+      }
+    }
+    for (const id of position_ids) {
+      if (!POSITIONS.some((p) => p.id === id)) {
+        throw new BackendError(422, 'UNKNOWN_POSITION', '그런 포지션이 없습니다.')
+      }
+    }
+    for (const s of slots) {
+      if (s.weekday < 0 || s.weekday > 6 || s.start_time >= s.end_time) {
+        throw new BackendError(422, 'INVALID_TIME_SLOT', '시간대가 올바르지 않습니다.')
+      }
+    }
+    // 🔴 **통째로 교체**다(계약) — 부분 병합을 하지 않는다.
+    const next = {
+      user_id: me.id,
+      region_ids: [...region_ids],
+      slots: [...slots],
+      position_ids: [...position_ids],
+    }
+    memberPrefs.set(me.id, next)
+    return next
+  },
+
+  async listMatchCandidates(token, teamId) {
+    requireUser(token)
+    /* 🔴 **조건을 등록한 팀만** 후보가 된다(계약의 하드 필터) — 우리 팀이
+       조건을 안 올리면 남의 목록에도 안 뜬다는 것이 그 규칙의 짝이다.
+       여기서는 그 규칙을 흉내만 낸다: 우리가 등록하기 전엔 빈 목록이다. */
+    const mine = teamPrefs.get(teamId)
+    if (!mine || (mine.region_ids.length === 0 && mine.slots.length === 0)) return []
+    return DEMO_MATCH_CANDIDATES
+  },
+
+  async getSquadBySlug(publicSlug) {
+    // 🔴 `requireUser` 를 안 부른다 — 계약이 인증 없이 여는 경로다(SEC-005).
+    // 🔴 **남의 팀 판도 찾는다** — 이 경로가 있는 이유가 그것이다(초대받은
+    //    사람은 부른 팀 소속이 아니다).
+    const found = [demoSquad, inviterSquad, rivalSquad].find((s) => s?.public_slug === publicSlug)
+    if (!found) {
+      throw new BackendError(404, 'SQUAD_NOT_FOUND', '그런 스쿼드가 없습니다.')
+    }
+    return found
   },
 
   async createSquad(token, teamId) {
@@ -1450,6 +2066,55 @@ export const mockBackend: Backend = {
     } satisfies TeamDetail
   },
 
+  async updateTeam(token, teamId, input) {
+    const u = requireUser(token)
+    /* 🔴 **주장만**(계약) — `requireCaptain` 이 없는 팀은 404, 구성원은 403 을
+       낸다. 화면은 애초에 주장에게만 단추를 내지만, 여기서도 막아야 mock 이
+       계약과 같은 것을 거절한다. */
+    requireCaptain(u, teamId)
+
+    /* 🔴 **`null` 은 422 다 — 조용히 무시하지 않는다**(계약의 「하지 말 것」).
+       둘 다 NOT NULL 이라 「지우기」가 없다. 여기서 그냥 건너뛰면 화면은
+       200 을 받고 **아무것도 안 바뀐 것을 성공으로** 읽는다 — 호칭 저장이
+       실서버에서 정확히 그렇게 실패했다(2026-09-16, `extra='ignore'`).
+       타입에는 `null` 이 없지만 BFF 를 거치지 않고 들어올 수 있어 실제로 본다. */
+    for (const key of ['name', 'region'] as const) {
+      if ((input as Record<string, unknown>)[key] === null) {
+        throw new BackendError(422, 'VALIDATION_ERROR', `${key} 는 비울 수 없습니다.`)
+      }
+    }
+
+    const team = u.teams.find((t) => t.team_id === teamId)!
+    const name = input.name === undefined ? team.name : input.name.trim()
+    const region = input.region === undefined ? team.region : input.region.trim()
+    if (!name || !region) {
+      throw new BackendError(422, 'VALIDATION_ERROR', '이름과 지역이 필요합니다.')
+    }
+
+    /* 🔴 **`sport_code` 는 안 받는다** — 본문에 자리가 없어 서버가 무시한다.
+       받는 시늉을 하면 개발에서만 종목이 바뀌어 보인다. */
+    users.set(token, {
+      ...u,
+      teams: u.teams.map((t) => (t.team_id === teamId ? { ...t, name, region } : t)),
+    })
+    return {
+      id: teamId,
+      name,
+      region,
+      sport_code: team.sport_code,
+      members: [
+        {
+          user_id: u.id,
+          nickname: u.nickname,
+          role: 'owner',
+          joined_at: team.joined_at,
+          player_card_id: null,
+          card_public_slug: null,
+        },
+      ],
+    } satisfies TeamDetail
+  },
+
   async leaveTeam(token, teamId, memberId) {
     const u = requireUser(token)
     const mine = u.teams.find((t) => t.team_id === teamId)
@@ -1469,7 +2134,12 @@ export const mockBackend: Backend = {
     // 모르는 슬러그는 **404 가 아니라 빈 등급**이다 — 계약이 「대표 영상이
     // 없거나 분석 전」을 `null` 로 내기로 했고, 슬러그가 없는 것도 화면에서는
     // 같은 뜻이다(보여 줄 등급이 없다).
-    return { grade: found?.grade ?? null, provisional: found?.provisional ?? null }
+    // 불릿도 **후보 목록과 같은 값**이다(CCC 56) — 두 자리가 갈리면 안 된다.
+    return {
+      grade: found?.grade ?? null,
+      provisional: found?.provisional ?? null,
+      notes: found?.notes ?? null,
+    }
   },
 
   async listSquadCandidates(token, teamId, { position_code, grade }) {
@@ -1501,6 +2171,17 @@ export const mockBackend: Backend = {
       created_at: new Date().toISOString(),
       responded_at: null,
       match_id: null,
+      /* 건 쪽은 나다 — 내 팀 이름을 싣는다. 받는 쪽은 mock 이 그 팀을 안
+         들고 있어 `null` 이고, 그것도 **정상값**이다(옛 응답과 같은 모양). */
+      requester_team_name: me.teams.find((t) => t.team_id === teamId)?.name ?? null,
+      requester_team_region: me.teams.find((t) => t.team_id === teamId)?.region ?? null,
+      target_team_name: null,
+      target_team_region: null,
+      /* 건 쪽(나)의 판은 안다. 받는 쪽은 mock 이 그 팀을 안 들고 있어
+         `null` 이고 그것도 정상이다 — 스쿼드를 안 만든 팀과 같은 갈래다. */
+      requester_squad_public_slug: demoSquad?.public_slug ?? null,
+      target_squad_public_slug:
+        target_team_id === INVITER_TEAM.id ? inviterSquad.public_slug : null,
     }
     teamMatchRequests.set(made.id, made)
     /* 🔴 **알림은 상대 팀 주장에게 간다** — mock 에는 그 사람이 없으므로 아무
@@ -1512,6 +2193,7 @@ export const mockBackend: Backend = {
   async listTeamMatchRequests(token, teamId) {
     const me = requireUser(token)
     requireCaptain(me, teamId)
+    refreshSoonSeed()
     return [...teamMatchRequests.values()]
       .filter((r) => r.requester_team_id === teamId || r.target_team_id === teamId)
       .sort((a, b) => b.created_at.localeCompare(a.created_at))
