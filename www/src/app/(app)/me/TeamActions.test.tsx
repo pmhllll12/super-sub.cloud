@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import TeamActions from './TeamActions'
+import { __resetRegionsCache } from '@/lib/teamPrefsStore'
 
 const refresh = vi.fn()
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }))
@@ -564,5 +565,119 @@ describe('프로필 — 떠난 팀은 목록에서 빠진다', () => {
     await user.click(screen.getByRole('button', { name: '팀 나가기' }))
 
     expect(await screen.findByText('아직 소속된 팀이 없습니다.')).toBeInTheDocument()
+  })
+})
+
+/**
+ * **경기 조건을 스쿼드와 무관하게 고친다** (사용자 지적, 2026-09-18).
+ *
+ * 🔴 **스스로 빠져나올 수 없는 구조였다.** 조건을 고치는 자리가 「팀 매칭」
+ * 판 안에만 있는데, 그 판은 **스쿼드가 다 차야** 열린다. 그런데 서버는
+ * 「팀이 경기 시간을 등록해 뒀으면 그 시간과 겹치는 사람만」 추천 후보로
+ * 주므로(`match_preference_pg_repository.squad_recruitment_facts`), **시간을
+ * 한 번 잘못 저장하면 후보가 0명이 되고 → 스쿼드를 못 채우고 → 조건을 고칠
+ * 판도 못 연다.** 실서버의 심사위원 계정이 정확히 그 상태였다.
+ *
+ * 그래서 프로필의 팀 「수정」에서도 조건을 손댈 수 있게 한다 — 여기는
+ * 스쿼드가 비어 있어도 열린다.
+ */
+describe('프로필 — 팀 경기 조건도 여기서 고친다', () => {
+  const OWNER = [
+    { team_id: 't1', name: '번개FC', region: '서울 강남구', sport_code: 'football', role: 'owner' },
+  ]
+  const MEMBER = [{ ...OWNER[0], role: 'member' }]
+
+  beforeEach(() => {
+    /* 🔴 **지역 목록 캐시를 비운다.** 참조 데이터라 모듈에 한 번만 담는데
+       (`refData.ts`), 앞선 시험이 담아 둔 목록이 남아 있으면 여기서 고른
+       지역을 **못 찾아 저장이 통째로 막힌다**(`saveTeamPrefs` 의 안전장치).
+       단독으로는 통과하고 같이 돌리면 깨지던 자리다. */
+    __resetRegionsCache()
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('/match-preferences')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ region_ids: [], slots: [] }), { status: 200 }),
+        )
+      }
+      return Promise.resolve(new Response(JSON.stringify({ id: 't9' }), { status: 200 }))
+    })
+  })
+  afterEach(() => vi.restoreAllMocks())
+
+  it('수정을 열면 경기 조건도 고칠 수 있다', async () => {
+    const user = userEvent.setup()
+    render(<TeamActions teams={OWNER} userId="u1" />)
+    await user.click(screen.getByRole('button', { name: '수정' }))
+
+    expect(await screen.findByRole('button', { name: /경기 조건/ })).toBeInTheDocument()
+  })
+
+  /* 🔴 **스쿼드가 비어 있어도 열린다** — 그것이 이 자리를 만든 이유다.
+     팀 매칭 판은 다 차야 열리므로 거기로는 못 간다. */
+  it('스쿼드가 비어도 조건 판이 열린다', async () => {
+    const user = userEvent.setup()
+    render(<TeamActions teams={OWNER} userId="u1" />)
+    await user.click(screen.getByRole('button', { name: '수정' }))
+    await user.click(await screen.findByRole('button', { name: /경기 조건/ }))
+
+    expect(await screen.findByText('어떤 경기를 찾으세요?')).toBeInTheDocument()
+  })
+
+  /**
+   * 🔴 **시간을 지우는 길이 따로 있어야 한다.** 조건 판의 「팀 찾기」는
+   * `지역 ≥ 1 && 시간 ≥ 1` 이어야 눌려서(`MatchPrefs.tsx` 의 `ready`),
+   * **그 판으로는 시간을 없앨 수가 없다.** 그런데 추천 후보를 막는 것이
+   * 바로 그 시간이라, 없애는 길이 없으면 고리가 안 끊긴다.
+   *
+   * 🔴 **지역은 남긴다** — 지역까지 지우면 우리 팀이 남의 「비슷한 팀」
+   * 후보에서도 빠진다(그쪽 하드 필터가 「지역 또는 시간을 하나라도
+   * 등록한 팀만」이다).
+   */
+  it('시간만 지우는 길이 있다 — 지역은 남긴다', async () => {
+    const sent: { url: string; body: unknown }[] = []
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (init?.method === 'PUT') {
+          sent.push({ url, body: JSON.parse(String(init.body)) })
+          return Promise.resolve(new Response(null, { status: 204 }))
+        }
+        if (url.includes('/match-preferences')) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                region_ids: ['r1'],
+                slots: [{ weekday: 1, start_time: '19:00:00', end_time: '22:00:00' }],
+              }),
+              { status: 200 },
+            ),
+          )
+        }
+        if (url.includes('/regions')) {
+          return Promise.resolve(
+            new Response(JSON.stringify([{ id: 'r1', label: '서울 강남구' }]), {
+              status: 200,
+            }),
+          )
+        }
+        return Promise.resolve(new Response(JSON.stringify({ id: 't9' }), { status: 200 }))
+      },
+    )
+    const user = userEvent.setup()
+    render(<TeamActions teams={OWNER} userId="u1" />)
+    await user.click(screen.getByRole('button', { name: '수정' }))
+    await user.click(await screen.findByRole('button', { name: /시간 조건 지우기/ }))
+
+    await waitFor(() => expect(sent).toHaveLength(1))
+    const body = sent[0].body as { region_ids: string[]; slots: unknown[] }
+    expect(body.slots).toEqual([])
+    expect(body.region_ids).toEqual(['r1'])
+  })
+
+  /* 팀원에게는 「수정」 자체가 없다 — 조건도 주장만 고친다(서버가 403). */
+  it('팀원에게는 안 보인다', () => {
+    render(<TeamActions teams={MEMBER} userId="u1" />)
+    expect(screen.queryByRole('button', { name: '수정' })).toBeNull()
   })
 })

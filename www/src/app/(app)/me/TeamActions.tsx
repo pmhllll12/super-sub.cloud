@@ -6,6 +6,9 @@ import { ApiCallError, apiDelete, apiErrorMessage, apiPatch, apiPost } from '@/l
 import { rememberHomeTeam } from '@/lib/homeTeam'
 import { REGIONS, searchRegions } from '@/lib/regions'
 import PillButton from '@/components/ui/PillButton'
+import MatchPrefsForm from '@/components/MatchPrefs'
+import { loadTeamPrefs, saveTeamPrefs } from '@/lib/teamPrefsStore'
+import { EMPTY_PREFS, type MatchPrefs } from '@/lib/matchPrefs'
 
 /**
  * 팀 만들기 폼 전용 입력칸 — **적은 만큼만 넓어진다**(사용자 요청, 2026-09-16).
@@ -186,6 +189,62 @@ export default function TeamActions({
   const [editName, setEditName] = useState('')
   const [editRegion, setEditRegion] = useState('')
   const [saving, setSaving] = useState(false)
+  /**
+   * **경기 조건 판을 연 팀** (사용자 지적, 2026-09-18).
+   *
+   * 🔴 **여기가 없으면 스스로 빠져나올 수 없다.** 조건을 고치는 자리가
+   * 「팀 매칭」 판 안에만 있었는데 그 판은 **스쿼드가 다 차야** 열린다.
+   * 그런데 서버는 「팀이 경기 시간을 등록해 뒀으면 그 시간과 겹치는
+   * 사람만」 추천 후보로 준다 — **시간을 한 번 잘못 저장하면 후보가 0명이
+   * 되고 → 스쿼드를 못 채우고 → 고칠 판도 못 연다.** 실서버의 심사위원
+   * 계정이 정확히 그 상태였다.
+   */
+  const [prefsFor, setPrefsFor] = useState<string | null>(null)
+  /** 그 팀의 지금 조건. **`null` 은 「아직 안 정했다」**(빈 조건과 다르다). */
+  const [teamPrefs, setTeamPrefs] = useState<MatchPrefs | null>(null)
+  const [prefsBusy, setPrefsBusy] = useState(false)
+
+  /**
+   * **시간 조건만 비운다** — 지역은 그대로 둔다.
+   *
+   * 🔴 **왜 필요한가.** 서버는 「팀이 경기 시간을 등록해 뒀으면 그 시간과
+   * 겹치는 사람만」 추천 후보로 준다. 시간이 **없으면 그 필터를 통째로
+   * 건너뛴다** — 그래서 후보가 0명일 때 빠져나오는 가장 확실한 길이다.
+   */
+  async function clearTimes(teamId: string) {
+    if (prefsBusy) return
+    setError(null)
+    setPrefsBusy(true)
+    try {
+      const now = (await loadTeamPrefs(teamId)) ?? EMPTY_PREFS
+      const next = { ...now, times: [] }
+      await saveTeamPrefs(teamId, next)
+      setTeamPrefs(next)
+    } catch {
+      setError('시간 조건을 지우지 못했습니다 — 다시 시도해 주세요.')
+    } finally {
+      setPrefsBusy(false)
+    }
+  }
+
+  async function openPrefs(teamId: string) {
+    if (prefsFor === teamId) {
+      setPrefsFor(null)
+      return
+    }
+    setError(null)
+    setPrefsBusy(true)
+    /* 🔴 **지금 값부터 읽는다.** 빈 판을 먼저 열면 「그만두기」를 안 누르고
+       저장했을 때 있던 조건이 통째로 지워진다 — 이 판은 **통째로 교체**다. */
+    try {
+      setTeamPrefs(await loadTeamPrefs(teamId))
+    } catch {
+      setTeamPrefs(null)
+    } finally {
+      setPrefsBusy(false)
+      setPrefsFor(teamId)
+    }
+  }
 
   function openEdit(t: { team_id: string; name: string; region: string }) {
     setError(null)
@@ -388,6 +447,57 @@ export default function TeamActions({
                         {saving ? '저장 중…' : '저장'}
                       </PillButton>
                     </form>
+
+                    {/* 🔴 **경기 조건도 여기서 고친다**(사용자 지적,
+                        2026-09-18). 「팀 매칭」 판은 스쿼드가 다 차야 열리는데,
+                        조건이 추천 후보를 막고 있으면 스쿼드를 채울 수가
+                        없다 — 그 고리를 끊는 자리다. 폼 **밖**에 두는 것은
+                        저 위 `<form>` 의 submit 에 딸려 들어가지 않게 하려는
+                        것이다. */}
+                    <button
+                      type="button"
+                      className="ss-profile-tab ss-profile-tab--sm"
+                      aria-expanded={prefsFor === t.team_id}
+                      disabled={prefsBusy}
+                      onClick={() => void openPrefs(t.team_id)}
+                    >
+                      {prefsFor === t.team_id ? '경기 조건 접기' : '경기 조건 고치기'}
+                    </button>
+
+                    {/* 🔴 **시간만 지우는 길**(사용자 지적, 2026-09-18).
+                        조건 판의 「팀 찾기」는 `지역 ≥ 1 && 시간 ≥ 1` 이어야
+                        눌려서 **그 판으로는 시간을 없앨 수가 없다.** 그런데
+                        추천 후보를 막는 것이 바로 그 시간이다.
+
+                        🔴 **지역은 남긴다** — 지역까지 지우면 우리 팀이 남의
+                        「비슷한 팀」 후보에서도 빠진다(그쪽은 「지역 또는
+                        시간을 하나라도 등록한 팀만」이다). */}
+                    <button
+                      type="button"
+                      className="ss-profile-tab ss-profile-tab--sm"
+                      disabled={prefsBusy}
+                      onClick={() => void clearTimes(t.team_id)}
+                    >
+                      시간 조건 지우기
+                    </button>
+
+                    {prefsFor === t.team_id && (
+                      <MatchPrefsForm
+                        kind="team"
+                        value={teamPrefs}
+                        onCancel={() => setPrefsFor(null)}
+                        onDone={(next) => {
+                          setTeamPrefs(next)
+                          setPrefsFor(null)
+                          /* 🔴 **실패를 숨기지 않는다** — 조건이 안 바뀌면
+                             추천 판은 계속 비어 있는데 화면만 성공으로
+                             보인다(`myPrefsStore` 와 같은 판단). */
+                          void saveTeamPrefs(t.team_id, next).catch(() =>
+                            setError('경기 조건을 저장하지 못했습니다 — 다시 시도해 주세요.'),
+                          )
+                        }}
+                      />
+                    )}
                   </div>
                 </div>
               )}
