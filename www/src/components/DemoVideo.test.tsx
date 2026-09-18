@@ -251,21 +251,24 @@ describe('「시연영상을 참고해 주세요」', () => {
     return { ...utils, cleanup: () => slot.remove() }
   }
 
-  it('로그인 화면에서 다 내려오면 어둡게 하고 영상 바로 밑에 한 줄 띄운다', () => {
+  it('로그인 화면에서 다 내려오면 어둡게 하고 영상 바로 밑에 두 줄 띄운다', () => {
     const { container, cleanup } = landOnLogin()
     expect(container.querySelector('.ss-demo-spot')).not.toBeNull()
-    const note = screen.getByText('시연영상을 참고해 주세요.')
+    const note = screen.getByRole('status')
+    expect(note).toHaveTextContent('시연영상을 참고해 주세요.')
+    expect(note).toHaveTextContent('모서리를 끌어 크기를, 영상을 끌어 위치를 바꿀 수 있습니다.')
     expect(note.style.top).toBe('514px') // 300 + 200 + 14
     expect(note.style.left).toBe('600px') // 가운데
     cleanup()
   })
 
-  it('어디든 한 번 누르면 둘이 함께 걷힌다', () => {
+  it('어디든 한 번 누르면 둘이 함께 걷힌다(문장이 다 나온 뒤)', () => {
     vi.useFakeTimers()
     const { container, cleanup } = landOnLogin()
+    act(() => vi.advanceTimersByTime(600)) // 문장이 다 나와 잠금이 풀렸다
     fireEvent.pointerDown(document.body)
     expect(container.querySelector('.ss-demo-spot')).toHaveAttribute('data-state', 'out')
-    expect(screen.getByText('시연영상을 참고해 주세요.')).toHaveAttribute('data-state', 'out')
+    expect(screen.getByRole('status')).toHaveAttribute('data-state', 'out')
     act(() => vi.advanceTimersByTime(700))
     expect(container.querySelector('.ss-demo-spot')).toBeNull()
     expect(screen.queryByText('시연영상을 참고해 주세요.')).toBeNull()
@@ -288,5 +291,75 @@ describe('「시연영상을 참고해 주세요」', () => {
     const { container } = render(<DemoVideo />)
     landed(container.querySelector<HTMLElement>('.ss-demo-video')!)
     expect(container.querySelector('.ss-demo-spot')).toBeNull()
+  })
+})
+
+describe('로그인 화면 잠금 — 영상·문장이 다 나오기 전엔 못 누른다', () => {
+  function onLogin() {
+    const slot = document.createElement('div')
+    slot.setAttribute('data-demo-slot', '')
+    slot.getBoundingClientRect = () => ({ top: 300, left: 400, width: 400, height: 200 }) as DOMRect
+    document.body.appendChild(slot)
+    const utils = render(<DemoVideo />)
+    const box = utils.container.querySelector<HTMLElement>('.ss-demo-video')!
+    const land = () => {
+      for (const type of ['animationend', 'webkitAnimationEnd', 'mozAnimationEnd', 'MSAnimationEnd', 'oanimationend'])
+        act(() => {
+          box.dispatchEvent(new Event(type, { bubbles: true }))
+        })
+    }
+    return { ...utils, land, cleanup: () => slot.remove() }
+  }
+
+  it('내려오는 동안·문장이 나오는 동안 잠겨 있다가, 문장이 다 나오면 풀린다', () => {
+    vi.useFakeTimers()
+    const { land, cleanup } = onLogin()
+    expect(screen.getByTestId('demo-lock')).toBeInTheDocument()
+    land()
+    act(() => vi.advanceTimersByTime(500))
+    expect(screen.getByTestId('demo-lock')).toBeInTheDocument()
+    // 잠긴 동안 누른 것은 안내를 걷지도 않는다
+    fireEvent.pointerDown(document.body)
+    expect(screen.getByRole('status')).toHaveAttribute('data-state', 'on')
+    act(() => vi.advanceTimersByTime(100))
+    expect(screen.queryByTestId('demo-lock')).toBeNull()
+    cleanup()
+    vi.useRealTimers()
+  })
+
+  it('잠긴 동안 Enter 와 폼 제출을 막는다 — 영상 쪽 자판은 그대로', () => {
+    const { container, cleanup } = onLogin()
+    const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+    document.body.dispatchEvent(enter)
+    expect(enter.defaultPrevented).toBe(true)
+    const submit = new Event('submit', { bubbles: true, cancelable: true })
+    document.body.dispatchEvent(submit)
+    expect(submit.defaultPrevented).toBe(true)
+    const inVideo = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+    container.querySelector('.ss-demo-video-toggle')!.dispatchEvent(inVideo)
+    expect(inVideo.defaultPrevented).toBe(false)
+    cleanup()
+  })
+
+  it('도중에 영상을 닫으면 곧바로 풀린다(내려오기가 끊겨 끝 신호가 안 온다)', async () => {
+    const { cleanup } = onLogin()
+    await act(async () => {})
+    fireEvent.click(screen.getByRole('button', { name: '시연영상 닫기' }))
+    expect(screen.queryByTestId('demo-lock')).toBeNull()
+    cleanup()
+  })
+
+  it('무슨 일이 있어도 12초 뒤엔 풀린다', () => {
+    vi.useFakeTimers()
+    const { cleanup } = onLogin()
+    act(() => vi.advanceTimersByTime(12000))
+    expect(screen.queryByTestId('demo-lock')).toBeNull()
+    cleanup()
+    vi.useRealTimers()
+  })
+
+  it('로그인 화면이 아니면 잠그지 않는다', () => {
+    render(<DemoVideo />)
+    expect(screen.queryByTestId('demo-lock')).toBeNull()
   })
 })

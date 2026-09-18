@@ -58,23 +58,68 @@ export default function DemoVideo() {
   // 영상과 닫기 단추만 밝게 두고 나머지를 어둡게 하며 한 줄 띄운다(사용자 요청).
   // on → (어디든 한 번 누르거나 5초) → out(스르르) → off.
   const [spot, setSpot] = useState<'off' | 'on' | 'out'>('off')
+  const [unlocked, setUnlocked] = useState(false)
   useEffect(() => {
     if (spot === 'on') {
-      const dismiss = () => setSpot('out')
-      const timer = setTimeout(dismiss, SPOT_MS)
-      // 캡처 단계에서 듣기만 하고 막지 않는다 — 누른 것은 원래 하던 일(입력칸
-      // 누르기·로그인 단추)을 그대로 한다. 어둠 판은 누르는 것을 가로채지 않는다.
-      window.addEventListener('pointerdown', dismiss, true)
-      return () => {
-        clearTimeout(timer)
-        window.removeEventListener('pointerdown', dismiss, true)
-      }
+      const timer = setTimeout(() => setSpot('out'), SPOT_MS)
+      return () => clearTimeout(timer)
     }
     if (spot === 'out') {
       const timer = setTimeout(() => setSpot('off'), SPOT_FADE_MS)
       return () => clearTimeout(timer)
     }
   }, [spot])
+  // 누르면 걷힌다 — 단 **잠금이 풀린 뒤에만**(잠긴 동안 누른 것은 없던 일이다).
+  // 캡처 단계에서 듣기만 하고 막지 않는다 — 누른 것은 원래 하던 일(입력칸
+  // 누르기·로그인 단추)을 그대로 한다. 어둠 판은 누르는 것을 가로채지 않는다.
+  useEffect(() => {
+    if (spot !== 'on' || !unlocked) return
+    const dismiss = () => setSpot('out')
+    window.addEventListener('pointerdown', dismiss, true)
+    return () => window.removeEventListener('pointerdown', dismiss, true)
+  }, [spot, unlocked])
+
+  // 🔴 **영상과 안내 문장이 다 제자리에 나오기 전에는 로그인 화면을 못 누른다**
+  // (사용자 요청 — 「절대」). 심사위원이 인트로가 끝나자마자 로그인 단추부터 누르면
+  // 시연영상을 못 보고 지나간다.
+  //
+  // 막는 것은 **투명한 판**(`.ss-demo-lock`, 영상 바로 밑)이다. 창에서 클릭을 듣고
+  // 막는 식으로는 안 된다 — 구글 로그인 단추는 **다른 출처의 iframe** 이라 그 안의
+  // 클릭은 우리 창으로 안 온다. 자판(Enter·Space)과 폼 제출은 따로 막는다.
+  //
+  // 풀리는 때: 로그인 화면이면 안내 문장이 다 나온 뒤(SPOT_IN_MS), 아니면 자리를
+  // 잰 즉시. 🔴 **안전장치 둘** — 영상을 도중에 닫으면(내려오기가 끊겨
+  // animationend 가 영영 안 온다) 곧바로, 무슨 일이 있어도 LOCK_MAX_MS 뒤엔 푼다.
+  // 이게 없으면 로그인 화면이 영영 안 눌린다.
+  useEffect(() => {
+    if (unlocked) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (closed || (base && !base.slotted)) return setUnlocked(true)
+    const safety = setTimeout(() => setUnlocked(true), LOCK_MAX_MS)
+    const shown = spot === 'on' ? setTimeout(() => setUnlocked(true), SPOT_IN_MS) : undefined
+    return () => {
+      clearTimeout(safety)
+      clearTimeout(shown)
+    }
+  }, [unlocked, closed, base, spot])
+
+  useEffect(() => {
+    if (unlocked) return
+    const inDemo = (t: EventTarget | null) => t instanceof Element && !!t.closest('.ss-demo-video')
+    const block = (e: Event) => {
+      if (inDemo(e.target)) return
+      if (e instanceof KeyboardEvent && e.key !== 'Enter' && e.key !== ' ') return
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    window.addEventListener('keydown', block, true)
+    window.addEventListener('submit', block, true)
+    return () => {
+      window.removeEventListener('keydown', block, true)
+      window.removeEventListener('submit', block, true)
+    }
+  }, [unlocked])
+
   // 다른 화면으로 가거나 닫으면 함께 걷는다.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -293,19 +338,21 @@ export default function DemoVideo() {
 
   return (
     <>
+      {!unlocked && <div aria-hidden="true" className="ss-demo-lock" data-testid="demo-lock" />}
       {spot !== 'off' && (
         <>
           {/* 어둠 판 — 영상(z 55) 바로 밑이라 영상·닫기 단추만 밝게 남는다. */}
           <div aria-hidden="true" className="ss-demo-spot" data-state={spot} />
           {rect && (
-            <p
+            <div
               role="status"
               className="ss-demo-spot-note"
               data-state={spot}
               style={{ top: rect.top + rect.height + 14, left: rect.left + rect.width / 2 }}
             >
-              시연영상을 참고해 주세요.
-            </p>
+              <p>시연영상을 참고해 주세요.</p>
+              <p className="ss-demo-spot-sub">모서리를 끌어 크기를, 영상을 끌어 위치를 바꿀 수 있습니다.</p>
+            </div>
           )}
         </>
       )}
@@ -462,6 +509,10 @@ function PlayIcon({ className }: { className: string }) {
 
 /** 「시연영상을 참고해 주세요」가 떠 있는 시간(아무도 안 누르면). */
 export const SPOT_MS = 5000
+/** 안내 문장이 다 나오는 시간 — 이때 로그인 화면 잠금이 풀린다. CSS 의 들어오는 길이와 같다. */
+export const SPOT_IN_MS = 600
+/** 무슨 일이 있어도 이 안에는 로그인 화면 잠금을 푼다(인트로 최대 7초 + 내려오기 + 문장). */
+export const LOCK_MAX_MS = 12000
 /** 어둠과 안내가 스르르 걷히는 시간 — CSS 의 전이 길이와 같아야 한다. */
 const SPOT_FADE_MS = 600
 

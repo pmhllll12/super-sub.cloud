@@ -15303,6 +15303,10 @@ a.ss-seeking-pill:hover {
   position: fixed;
   z-index: 55;
   margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
   color: #ffffff; /* 완전한 흰색(사용자 요청) — 흰 판 화면들이 --ss-fg 를 뒤집어 쓴다 */
   font-size: 15px;
   font-weight: 600;
@@ -15310,6 +15314,24 @@ a.ss-seeking-pill:hover {
   pointer-events: none;
   transform: translateX(-50%);
   animation: ss-demo-note-in 0.6s ease-out both;
+}
+
+.ss-demo-spot-note p {
+  margin: 0;
+}
+
+/* 둘째 줄 — 쓰는 법. 같은 흰색에 작고 가볍게, 윗줄의 설명으로 읽히게. */
+.ss-demo-spot-sub {
+  font-size: 13px;
+  font-weight: 400;
+}
+
+/* 로그인 화면 잠금 — 영상·문장이 다 나오기 전엔 아무것도 못 누른다(DemoVideo 주석).
+   투명하고, 영상(z 55) 바로 밑이라 영상은 만질 수 있다. */
+.ss-demo-lock {
+  position: fixed;
+  inset: 0;
+  z-index: 54;
 }
 
 @keyframes ss-demo-note-in {
