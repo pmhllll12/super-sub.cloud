@@ -31,10 +31,30 @@ import BrandMark from './ui/BrandMark'
  * 화면에서 되살아나면 그 설계가 통째로 무의미해진다.
  * titles 는 **받은 것만** 온다 — 미달 표식을 만들지 않는다.
  */
-// `tagline`을 안 정한 카드가 보일 자리 표시. `cardStyle.tsx`의 편집 초안도
-// 같은 값으로 시작한다(export 하는 이유) — 편집기를 열었을 때 지금 카드에
-// 보이는 것과 다른 글자가 뜨면 안 된다.
+// 카드를 **한 번도 안 꾸민** 사람에게 보일 자리 표시. `cardStyle.tsx`의 편집
+// 초안도 같은 값으로 시작한다(export 하는 이유) — 편집기를 열었을 때 지금
+// 카드에 보이는 것과 다른 글자가 뜨면 안 된다.
 export const ALIAS = 'THREE LUNGS'
+
+/**
+ * 카드 가운데에 적을 큰 글자. **「비웠다」와 「안 정했다」를 가른다.**
+ *
+ * 🔴 서버는 둘을 구분해 주지 못한다 — 계약이 `tagline: null` 과 `"   "` 를
+ * 똑같이 「안 정한 상태」로 만든다(api-contract.md). 그래서 `tagline` 만
+ * 봐서는 **일부러 지운 사람**에게 자리 표시를 도로 씌우게 된다(2026-09-18
+ * 사용자 지적 — 「글자 안 쓰고 싶은 사람도 있다」).
+ *
+ * 가르는 값은 **`style`** 이다. `style` 이 있다는 것은 **저장을 한 번
+ * 거쳤다**는 뜻이고, 그때 글자 칸에는 카드에 보이던 값이 들어 있었다. 그러니
+ * `style` 이 있는데 `tagline` 이 비었으면 **지운 것**이다.
+ *
+ * ⚠️ 그래서 한 번도 안 꾸민 카드(`style` 이 `null`)는 지금까지처럼
+ * 자리 표시가 남는다 — 새로 가입한 사람의 카드가 갑자기 글자 없이
+ * 그려지지 않게 하려는 것이다.
+ */
+export function aliasOf(card: { tagline: string | null; style: unknown }): string {
+  return card.tagline ?? (card.style ? '' : ALIAS)
+}
 
 /**
  * 카드를 꾸민 값. **안 넘기면 `card.style` 을 쓴다**(꾸민 적이 없으면 그것도
@@ -103,7 +123,9 @@ export default function PlayerCardView({
   // 없으면 저장은 되는데 편집기 밖(내 프로필 평소 보기 · 공개 카드 링크)
   // 에서는 안 보이는 반쪽짜리가 된다 — 저장한 보람이 없어진다.
   const effective = look ?? (card.style ? styleToLook(card) : undefined)
-  const alias = look?.text ?? card.tagline ?? ALIAS
+  // 🔴 `look.text` 는 **편집 중인 초안**이라 빈 문자열이 올 수 있다. `??` 는
+  //    `''` 를 통과시키므로(널만 본다) 지우는 즉시 미리보기에서도 사라진다.
+  const alias = look?.text ?? aliasOf(card)
   const photo = effective?.photo ?? '/player_cutout.png'
   const full = effective?.mode === 'full'
   return (
