@@ -296,11 +296,22 @@ RT-DETR에 넣는 구조라 해상도를 낮추면 더 줄어들 여지가 있�
 
 ## 주의
 
-`rubrics/football_instep_shot.yaml`의 각도 임계값은 **지도자 검수 전 임시값**이다.
+`rubrics/football_instep_shot.yaml`의 각도 임계값은 **검수되지 않은 값**이다.
 `review_required: true`인 동안 `aggregate()`는 결과에 `provisional: true`를 붙인다.
-검수 전 점수를 대외에 노출하지 않는다. `titles`(칭호)와 `card_lines`(추천 카드
-불릿)도 선수에게 보이는 문구이므로 임계값과 함께 검수 대상이다 — 화면이 아니라
-루브릭에 두는 이유가 그것이다. 쓰는 규칙은 인스텝 슈팅 루브릭 머리말에 있다.
+
+🔴 **2026.09.17 — 지도자 검수 없이 가기로 했다** (미결 2번 「검수 없이 갑니다」).
+앞서 이 자리에 적혀 있던 *"검수 전 점수를 대외에 노출하지 않는다"* 를 **정정한다**
+— 서비스가 이미 돌고 있어 그 문장은 지켜지지 않고 있었고, 검수는 앞으로도 없다.
+
+그래서 **`provisional: true`가 영구다.** 🔴 **`review_required`를 `false`로
+바꾸지 않는다** — 그것이 지금 유일하게 남은 신호이고, 화면이 그 값으로
+「검수 전」 배지를 그린다(`www/src/components/SquadSuggest.tsx`). 임계값의
+출처·검증 상태는 `contracts/rubric_evidence.yaml`이 11/11 `unverified`로
+들고 있다. **두 표시 다 지우지 않는다.**
+
+`titles`(칭호)와 `card_lines`(추천 카드 불릿)도 선수에게 보이는 문구라 원래
+임계값과 함께 검수 대상이었고 — 화면이 아니라 루브릭에 두는 이유가 그것이다 —
+**이제 그것들도 검수 없이 나간다.** 쓰는 규칙은 인스텝 슈팅 루브릭 머리말에 있다.
 
 EXAONE은 **EXAONE AI Model License 1.2 - NC**로 비상업 라이선스다.
 상업적 이용에는 LG AI Research와 별도 계약이 필요하다 (미결 항목 1번).

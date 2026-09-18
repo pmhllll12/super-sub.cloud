@@ -2,9 +2,9 @@
 layout: default
 title: 개발 구현 계획
 permalink: /07-개발구현계획/
-parent: II 부. 개발 수행 계획
-nav_order: 3
 has_children: true
+parent: 프로젝트 관리
+nav_order: 1
 ---
 
 ## 1) 개발 환경 및 기술 스택

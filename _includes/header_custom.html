@@ -1,0 +1,63 @@
+{%- comment -%}
+  다크 모드 단추 (2026-09-17). 첫 테마는 head_custom.html 이 정한다 — 여기는 바꾸기만 한다.
+  고른 값은 이 브라우저에만 남는다(localStorage). 고른 적이 없으면 운영체제 설정을 계속 따른다.
+  다크는 밝은 스타일시트 위에 얹는 <link id="theme-dark-css"> 를 켜고 끄는 것이다(jtd.setTheme 을
+  쓰지 않는 이유는 head_custom.html 머리말).
+
+  🔴 스크립트 안에 `//` 한 줄 주석을 쓰지 않는다 — 테마가 HTML 을 한 줄로 압축해서, 주석 뒤의 코드가
+  전부 주석이 된다(단추가 아무 일도 안 하는 채로 조용히 깨졌다). 주석은 `/* */` 로.
+{%- endcomment %}
+<button type="button" class="theme-toggle" id="theme-toggle">다크 모드</button>
+<script>
+  (function () {
+    var btn = document.getElementById('theme-toggle');
+    var root = document.documentElement;
+    var DARK_HREF = '{{ "/assets/css/just-the-docs-dark.css" | relative_url }}';
+
+    function label(theme) {
+      btn.textContent = theme === 'dark' ? '라이트 모드' : '다크 모드';
+      btn.setAttribute('aria-label', theme === 'dark' ? '라이트 모드로 바꾸기' : '다크 모드로 바꾸기');
+    }
+
+    function apply(theme) {
+      var link = document.getElementById('theme-dark-css');
+      if (theme === 'dark') {
+        if (!link) {
+          /* 밝게 열린 페이지에서 처음 다크로 바꿀 때 — 우리 CSS 앞에 끼워 넣는다 */
+          link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.id = 'theme-dark-css';
+          link.href = DARK_HREF;
+          var custom = document.getElementById('site-custom-css');
+          custom.parentNode.insertBefore(link, custom);
+        }
+        link.disabled = false;
+      } else if (link) {
+        link.disabled = true;
+      }
+      root.setAttribute('data-theme', theme);
+      label(theme);
+    }
+
+    function saved() {
+      try { return localStorage.getItem('supersub-theme'); } catch (e) { return null; }
+    }
+
+    label(root.getAttribute('data-theme'));
+
+    btn.addEventListener('click', function () {
+      var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      try { localStorage.setItem('supersub-theme', next); } catch (e) {}
+      apply(next);
+    });
+
+    if (window.matchMedia) {
+      var mq = window.matchMedia('(prefers-color-scheme: dark)');
+      var onChange = function (e) {
+        var s = saved();
+        if (s !== 'dark' && s !== 'light') apply(e.matches ? 'dark' : 'light');
+      };
+      if (mq.addEventListener) mq.addEventListener('change', onChange);
+    }
+  })();
+</script>

@@ -666,15 +666,25 @@ export default function SquadPanel({
    */
   const [invites, setInvites] = useState<Record<string, string>>({})
   /**
-   * **수락이 끝난 자리** — 「수락 대기중」 딱지를 떼는 데 쓴다.
+   * 자리 이름 → **수락은 했는데 등재가 안 된 사람**(카드가 없거나 판이 없는 팀).
    *
-   * 🔴 `seeded.ready` 는 **등재된 사람**의 수락 시각에서 온다. 수락은 했지만
-   * 아직 등재 전인 사람(바로 아래에서 등재해 준다)은 거기 없어서, 이것이
-   * 없으면 이미 합류한 팀원 카드에 계속 「수락 대기중」이 붙어 있는다.
+   * 「수락 대기중」을 내리는 데만 쓴다 — 서버에 남길 등재 id 가 없다(2026-09-17,
+   * 정어진 · 백성검 허락).
    */
-  const [acceptedSeats, setAcceptedSeats] = useState<Record<string, boolean>>({})
-  /** 자리 → 수락한 사람의 `user_id`. 그 사람을 **등재**할 때 카드 id 를 찾는 열쇠다. */
-  const acceptedRef = useRef<Record<string, string>>({})
+  const [joined, setJoined] = useState<Record<string, true>>({})
+
+  /**
+   * 그 자리의 사람이 **오기로 했는가.**
+   *
+   * 🔴 전에는 `seeded.ready`(판을 열 때의 등재)만 봤다 — 그래서 **판을 연 뒤에
+   * 수락한 사람은 영영 「수락 대기중」**이었다. 초대가 걸려 있으면 아직이고,
+   * 답이 와서 초대가 풀리면 등재(`members`)나 `joined` 로 온 것이다.
+   */
+  function isReady(area: string): boolean {
+    if (invites[area]) return false
+    if (joined[area]) return true
+    return seeded.ready[area] ?? Boolean(members[area])
+  }
   // 지인 찾기 판이 DOM 에 있는가 — 닫힐 때 물러나는 동안 남아 있어야 한다.
   const [friendVisible, setFriendVisible] = useState(false)
   /**
@@ -928,8 +938,6 @@ export default function SquadPanel({
           id: string
           status: string
           position_code: string | null
-          /** 수락한 사람을 **등재**할 때 그 사람의 카드를 찾는 열쇠다. */
-          invited_user_id: string
           invited_user_nickname: string | null
           invited_user_card_slug: string | null
         }[]
@@ -944,7 +952,7 @@ export default function SquadPanel({
             const nextMates = { ...prevMates }
             const nextSlugs: Record<string, string | null> = {}
             const nextInvites: Record<string, string> = {}
-            const nextReady: Record<string, boolean> = {}
+            const nextJoined: Record<string, true> = {}
             /* 🔴 **이미 앉아 있는 사람을 두 번 앉히지 않는다.** 수락한 사람은
                등재(`squad_member`)로도 돌아올 수 있어서(아래 자동 등재), 그때
                같은 사람이 두 칸을 차지하는 일이 생긴다. */
@@ -968,14 +976,13 @@ export default function SquadPanel({
               } else {
                 /* 🔴 수락한 자리에는 ⊗ 로 **무를 초대가 없다** — 무르기는
                    대기 중인 것에만 있는 일이다. 대신 「수락 대기중」 딱지를
-                   떼야 한다(아래 `acceptedSeats`). */
-                nextReady[seat.area] = true
-                acceptedRef.current[seat.area] = r.invited_user_id
+                   뗀다(`joined` — 등재는 서버가 수락 순간 해 둔다). */
+                nextJoined[seat.area] = true
               }
             }
             setMateSlugs((prev) => ({ ...prev, ...nextSlugs }))
             setInvites((prev) => ({ ...prev, ...nextInvites }))
-            setAcceptedSeats((prev) => ({ ...prev, ...nextReady }))
+            setJoined((prev) => ({ ...prev, ...nextJoined }))
             return nextMates
           })
           return now
@@ -990,59 +997,97 @@ export default function SquadPanel({
   }, [myTeamId])
 
   /**
-   * **수락한 사람을 스쿼드에 등재한다** — 이것이 있어야 배치가 **남는다**
-   * (사용자 지적, 2026-09-17: "저장도 잘 안되고").
+   * **보낸 초대의 답을 기다린다** — 대기 중인 자리가 있는 동안 3초마다 다시 읽는다
+   * (2026-09-17, 정어진 · 백성검 허락).
    *
-   * 🔴 **초대 수락은 팀 가입까지만 한다.** 서버의 수락 처리는 `team_member`
-   * 를 만들 뿐 `squad_member` 를 만들지 않는다 — 그래서 수락한 사람은
-   * 판에 앉아 있어도 **등재 id 가 없고**, 등재가 없으면 옮겨도 빼도
-   * `PATCH`/`DELETE` 를 쏠 대상이 없어 **아무것도 저장되지 않았다.**
+   * 🔴 전에는 판을 열 때 **한 번만** 읽었다. 상대가 수락해도 「수락 대기중」이
+   * 그대로였고, 새로고침하면 수락된 초대는 `pending` 이 아니라 **자리째 사라졌다**
+   * — 수락한 사람이 판에서 없어지는 셈이었다.
    *
-   * 🔴 **팀장만 한다.** 등재는 주장 전용이라(계약 3-7절) 팀원이 부르면 403 이다.
-   * 🔴 이미 등재된 사람은 서버가 `409 ALREADY_ENLISTED` 로 막는다 — 삼킨다.
+   * 🔴 **등재는 서버가 수락 순간 해 둔다**(초대받은 자리로, 칸은 비운 채). 등재
+   * 경로는 주장만 부를 수 있어 받는 사람 화면이 대신 못 하기 때문이다. 여기서는
+   * 그 등재를 찾아 **이 칸**에 잇고 칸을 저장한다 — 안 이으면 옮기기가 서버로
+   * 안 나가고, 새로고침하면 포지션 기본 칸으로 돌아간다.
+   *
+   * 거절·무르기로 끝났으면 자리를 비운다(「사라지는 길은 거절과 ⊗ 둘뿐」과 같다).
    */
+  const waiting = Object.entries(invites)
+    .map(([area, id]) => `${area}=${id}`)
+    .sort()
+    .join('&')
+  const slotsRef = useRef(slots)
   useEffect(() => {
-    if (!isCaptain || !squad || !myTeamId) return
-    const want = Object.entries(acceptedRef.current).filter(
-      ([area]) => !members[area] && mates[area],
+    slotsRef.current = slots
+  }, [slots])
+  useEffect(() => {
+    if (!myTeamId || !waiting) return
+    const areaOf = new Map(
+      waiting.split('&').map((pair) => {
+        const [area, id] = pair.split('=')
+        return [id, area] as const
+      }),
     )
-    if (want.length === 0) return
     let alive = true
-    void (async () => {
+    let busy = false
+    const tick = async () => {
+      if (busy) return
+      busy = true
       try {
-        const res = await fetch(`/api/teams/${encodeURIComponent(myTeamId)}`)
+        const res = await fetch(`/api/teams/${encodeURIComponent(myTeamId)}/invitations`)
         if (!res.ok || !alive) return
-        const team = (await res.json().catch(() => null)) as {
-          members?: { user_id: string; player_card_id: string | null }[]
-        } | null
-        const cardOf = new Map(
-          (team?.members ?? []).map((m) => [m.user_id, m.player_card_id]),
-        )
-        for (const [area, userId] of want) {
-          const cardId = cardOf.get(userId)
-          const sl = slots.find((x) => x.area === area)
-          // 카드를 아직 안 만든 사람은 등재할 것이 없다 — 이름표로 남는다.
-          if (!cardId || !sl || !alive) continue
-          try {
-            const next = await addSeat(squad.team_id, {
-              playerCardId: cardId,
-              positionCode: posOf(sl),
-              cell: { col: sl.col, row: sl.row },
-            })
-            const row = next.members.find((m) => m.player_card_id === cardId)
-            if (row && alive) setMembers((prev) => ({ ...prev, [area]: row.id }))
-          } catch {
-            /* 이미 등재됐거나(409) 그 사이 팀을 나갔다 — 판은 그대로 둔다. */
+        const rows = ((await res.json().catch(() => null)) ?? []) as {
+          id: string
+          status: string
+          invited_user_card_slug: string | null
+        }[]
+        const answered = rows.filter((r) => areaOf.has(r.id) && r.status !== 'pending')
+        if (answered.length === 0) return
+        let squadNow: Squad | null = null
+        if (answered.some((r) => r.status === 'accepted')) {
+          const sq = await fetch(`/api/teams/${encodeURIComponent(myTeamId)}/squad`)
+          squadNow = sq.ok ? ((await sq.json().catch(() => null)) as Squad | null) : null
+        }
+        if (!alive) return
+        for (const r of answered) {
+          const area = areaOf.get(r.id) as string
+          if (r.status !== 'accepted') {
+            setMates((prev) => ({ ...prev, [area]: null }))
+            setMateSlugs((prev) => ({ ...prev, [area]: null }))
+            continue
+          }
+          const seated = r.invited_user_card_slug
+            ? squadNow?.members.find((m) => m.card_public_slug === r.invited_user_card_slug)
+            : undefined
+          if (!seated) {
+            setJoined((prev) => ({ ...prev, [area]: true }))
+            continue
+          }
+          setMembers((prev) => ({ ...prev, [area]: seated.id }))
+          const sl = slotsRef.current.find((x) => x.area === area)
+          if (sl) {
+            void saveSeat(myTeamId, seated.id, posOf(sl), { col: sl.col, row: sl.row }).catch(
+              () => {},
+            )
           }
         }
+        setInvites((prev) => {
+          const next = { ...prev }
+          for (const r of answered) delete next[areaOf.get(r.id) as string]
+          return next
+        })
       } catch {
-        /* 팀을 못 읽어도 판은 돈다 — 등재만 다음 기회로 미룬다. */
+        /* 못 읽으면 다음 차례에 다시 본다 — 판은 그대로 둔다. */
+      } finally {
+        busy = false
       }
-    })()
+    }
+    void tick()
+    const timer = setInterval(() => void tick(), 3000)
     return () => {
       alive = false
+      clearInterval(timer)
     }
-  }, [isCaptain, squad, myTeamId, mates, members, slots])
+  }, [myTeamId, waiting])
 
   /** 이름표를 눌러 포지션을 직접 정한다 — 한 번에 한 칸씩 돈다(자동 포함). */
   function cyclePos(area: string) {
@@ -1149,7 +1194,7 @@ export default function SquadPanel({
      ⚠️ **내 자리는 수락을 안 본다** — 내가 나를 부른 것이라 기다릴 것이 없다. */
   const full =
     !seeking &&
-    slots.every((slot) => slot.mine || (Boolean(mates[slot.area]) && seeded.ready[slot.area]))
+    slots.every((slot) => slot.mine || (Boolean(mates[slot.area]) && isReady(slot.area)))
 
   /**
    * 용병 찾기로 열 때 **어느 자리의 추천**을 낼 것인가 — 빈 자리 중 첫
@@ -1641,7 +1686,7 @@ export default function SquadPanel({
                   ⚠️ **아직 서버로 안 나간다.** 합류 요청 경로와 알림 타입이
                   계약에 없다(미결 `paik` 37번) — 그때까지 이 표시는 화면
                   안에서만 산다. */}
-              {name && !seeded.ready[slot.area] && !acceptedSeats[slot.area] && (
+              {name && !isReady(slot.area) && (
                 <span className="ss-squad-pending" aria-live="polite">
                   수락 대기중
                 </span>

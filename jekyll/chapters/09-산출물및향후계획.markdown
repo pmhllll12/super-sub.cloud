@@ -2,8 +2,8 @@
 layout: default
 title: 산출물 및 향후 계획
 permalink: /09-산출물및향후계획/
-parent: II 부. 개발 수행 계획
-nav_order: 5
+parent: 프로젝트 관리
+nav_order: 3
 ---
 
 # 09. 산출물 및 향후 계획

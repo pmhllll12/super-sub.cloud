@@ -2,7 +2,7 @@
 layout: default
 title: 현황 및 문제 정의
 permalink: /02-현황및문제정의/
-parent: I 부. 제안 개요
+parent: 기획
 nav_order: 2
 ---
 

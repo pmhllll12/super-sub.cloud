@@ -2,9 +2,9 @@
 layout: default
 title: 테스트 및 검증 계획
 permalink: /08-테스트및검증계획/
-parent: II 부. 개발 수행 계획
-nav_order: 4
 has_children: true
+parent: 프로젝트 관리
+nav_order: 2
 ---
 
 # 08. 테스트 및 검증 계획

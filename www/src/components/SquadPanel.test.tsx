@@ -1717,6 +1717,68 @@ describe('스쿼드 — 앉히면 초대가 나간다', () => {
     expect(screen.queryByText('정상호')).toBeNull()
   })
 
+  /**
+   * **답이 오면 판이 따라간다** (2026-09-17, 정어진 · 백성검 허락).
+   *
+   * 🔴 전에는 판을 열 때 한 번만 읽어서, 상대가 수락해도 「수락 대기중」이 남았다.
+   * 대기 중인 초대가 있는 동안 다시 읽고, 수락이면 서버가 만들어 둔 등재를 이
+   * 칸에 잇는다(칸 저장). 거절이면 자리를 비운다.
+   */
+  function answering(first: unknown[], later: unknown[], squad: Squad = SQUAD) {
+    const sent: { url: string; method: string; body: unknown }[] = []
+    let invitationReads = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+        const u = String(url)
+        const method = init?.method ?? 'GET'
+        sent.push({ url: u, method, body: init?.body ? JSON.parse(String(init.body)) : null })
+        if (u.endsWith('/invitations') && method === 'GET') {
+          invitationReads += 1
+          const rows = invitationReads === 1 ? first : later
+          return Promise.resolve({ ok: true, status: 200, json: async () => rows })
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => squad })
+      }),
+    )
+    return sent
+  }
+
+  const PENDING_KIM = {
+    id: 'inv-9',
+    status: 'pending',
+    position_code: 'MF',
+    invited_user_nickname: '김철수',
+    invited_user_card_slug: 'kim-4f2a',
+  }
+
+  it('상대가 수락하면 「수락 대기중」이 내려가고 그 칸이 등재에 저장된다', async () => {
+    const sent = answering([PENDING_KIM], [{ ...PENDING_KIM, status: 'accepted' }])
+    render(<SquadPanel card={CARD} myCardId={CARD.id} myTeamId={TEAM} />)
+    expect(await screen.findByText('김철수')).toBeInTheDocument()
+
+    await waitFor(() => expect(screen.queryByText('수락 대기중')).toBeNull())
+    // 서버가 수락 순간 만든 등재(sm1)를 이 칸으로 저장한다.
+    await waitFor(() =>
+      expect(
+        sent.some((c) => c.method === 'PATCH' && c.url.endsWith('/squad/members/sm1')),
+      ).toBe(true),
+    )
+  })
+
+  it('기다리는 동안 거절되면 그 자리가 비워진다', async () => {
+    const sent = answering([PENDING_KIM], [{ ...PENDING_KIM, status: 'rejected' }])
+    render(<SquadPanel card={CARD} myCardId={CARD.id} myTeamId={TEAM} />)
+    // 되살린 직후 바로 다시 읽으므로 이름이 뜨는 순간은 짧다 — 끝 상태와 「다시 읽었다」를 본다.
+    await waitFor(() =>
+      expect(
+        sent.filter((c) => c.method === 'GET' && c.url.endsWith('/invitations')).length,
+      ).toBeGreaterThanOrEqual(2),
+    )
+    await waitFor(() => expect(screen.queryByText('김철수')).toBeNull())
+    expect(screen.queryByText('수락 대기중')).toBeNull()
+  })
+
   /* 🔴 ⊗ 는 **서버에서도 무른다** — 안 그러면 새로고침에 되살아난다. */
   it('⊗ 를 누르면 초대를 무른다', async () => {
     const sent = server([
@@ -1905,23 +1967,28 @@ describe('스쿼드 — 수락한 팀원', () => {
     expect(screen.queryByText('수락 대기중')).toBeNull()
   })
 
-  /* 🔴 **이것이 저장을 살린다** — 등재가 생겨야 옮기기·빼기가 서버로 나간다. */
-  it('수락한 사람을 스쿼드에 등재한다', async () => {
+  /**
+   * 🔴 **등재는 서버가 한다** — 수락하는 순간 `squad_member` 가 생긴다
+   * (정어진, 계약 60 · 2026-09-17). 등재 경로는 주장 전용이라 **받는 사람
+   * 화면이 대신 못 한다** — 그래서 서버로 옮긴 것이다.
+   *
+   * 한때 이 화면이 대신 등재하려 했는데(같은 날 `paik` 쪽 시도), 서버가
+   * 먼저 해 두므로 **두 번 쏠 일이 없다.** 여기서 그것을 못 박는다.
+   */
+  it('그 사람을 다시 등재하려 들지 않는다 — 서버가 이미 해 뒀다', async () => {
     const sent = serve()
     render(<SquadPanel isCaptain card={CARD} squad={SQUAD} myCardId={CARD.id} myTeamId={TEAM} />)
     await screen.findByText('정상호')
 
-    await waitFor(() => {
-      /* 🔴 **그 사람의 카드**를 찾는다 — 팀장 자동 착석도 같은 경로로 나가서
-         첫 POST 를 집으면 내 카드(`c1`)가 잡힌다. */
-      const post = sent.find(
+    /* 내 자동 착석(`c1`)은 정상이다 — **그 사람 카드**로 나가는 등재만 없어야 한다. */
+    expect(
+      sent.some(
         (c) =>
           c.method === 'POST' &&
           c.url.endsWith('/squad/members') &&
           (c.body as { player_card_id?: string } | null)?.player_card_id === 'card-9',
-      )
-      expect(post).toBeDefined()
-    })
+      ),
+    ).toBe(false)
   })
 
   /* 등재는 주장 전용이다(계약 3-7절) — 팀원이 부르면 403 이라 아예 안 부른다. */

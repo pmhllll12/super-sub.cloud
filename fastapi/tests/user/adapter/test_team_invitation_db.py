@@ -207,6 +207,74 @@ class TestAccept:
         assert notif.type == "team_invitation_accepted"
 
 
+class TestAcceptSeatsOnSquad:
+    """🔴 수락하면 **초대받은 자리로 스쿼드에 등재**된다(2026-09-17, 정어진).
+
+    수락은 받은 사람이 하는데 등재 경로는 주장만 부를 수 있어, 전에는 수락해도 판에
+    안 섰다(주장 화면에 「수락 대기중」이 남고 새로고침하면 사라졌다). `squad`·
+    `squad_member`·`player_card` 는 `card` 컨텍스트라 원시 SQL로 쓰는 자리 — 여기가
+    실물과 대조하는 유일한 곳이다.
+    """
+
+    def _squad_member(self, db_session, world):
+        return db_session.execute(
+            text(
+                "select p.code, sm.grid_col, sm.grid_row from squad_member sm "
+                "join squad s on s.id = sm.squad_id "
+                "join player_card pc on pc.id = sm.player_card_id "
+                "join position p on p.id = sm.position_id "
+                "where s.team_id = :t and pc.user_id = :u"
+            ),
+            {"t": world["team_id"], "u": world["candidate"]["id"]},
+        ).all()
+
+    def _accept(self, db_client, world, invitation_id):
+        res = db_client.post(
+            f"{V1}/me/invitations/{invitation_id}/accept",
+            headers=world["candidate"]["headers"],
+        )
+        assert res.status_code == 200, res.text
+
+    def _prepare(self, db_client, world, *, squad=True, card=True):
+        if squad:
+            made = db_client.post(
+                f"{V1}/teams/{world['team_id']}/squad", headers=world["owner"]["headers"]
+            )
+            assert made.status_code in (200, 201), made.text
+        if card:
+            made = db_client.post(f"{V1}/me/card", headers=world["candidate"]["headers"])
+            assert made.status_code in (200, 201), made.text
+
+    def test_부른_자리로_칸_없이_등재된다(self, db_client, db_session, world):
+        self._prepare(db_client, world)
+        self._accept(db_client, world, _invite(db_client, world, "GK"))
+        assert [tuple(r) for r in self._squad_member(db_session, world)] == [("GK", None, None)]
+
+    def test_주장_화면의_스쿼드_응답에도_실린다(self, db_client, db_session, world):
+        self._prepare(db_client, world)
+        self._accept(db_client, world, _invite(db_client, world, "DF"))
+        squad = db_client.get(
+            f"{V1}/teams/{world['team_id']}/squad", headers=world["owner"]["headers"]
+        )
+        assert squad.status_code == 200, squad.text
+        assert [m["position_code"] for m in squad.json()["members"]] == ["DF"]
+
+    def test_자리를_안_정한_초대는_등재하지_않는다(self, db_client, db_session, world):
+        self._prepare(db_client, world)
+        self._accept(db_client, world, _invite(db_client, world))
+        assert self._squad_member(db_session, world) == []
+
+    def test_스쿼드가_없어도_수락은_된다(self, db_client, db_session, world):
+        self._prepare(db_client, world, squad=False)
+        self._accept(db_client, world, _invite(db_client, world, "GK"))
+        assert self._squad_member(db_session, world) == []
+
+    def test_카드가_없어도_수락은_된다(self, db_client, db_session, world):
+        self._prepare(db_client, world, card=False)
+        self._accept(db_client, world, _invite(db_client, world, "GK"))
+        assert self._squad_member(db_session, world) == []
+
+
 class TestReject:
     def test_거절하면_구성원이_안_되고_주장에게_알림이_간다(
         self, db_client, db_session, world

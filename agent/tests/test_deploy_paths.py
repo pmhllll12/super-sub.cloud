@@ -278,6 +278,20 @@ class _Criterion:
     def grade_for(self, features):
         return self._grade
 
+    # 🔴 **일부러 빈 값을 돌려준다** (미결 23번 가-2). `build_prompt` 는
+    #    `grades_plain` 이 없으면 `grades` 로 떨어지는데, 이 스텁이 그
+    #    **폴백 경로**를 지나는 쪽이다. 여기에 문구를 채워 넣으면 폴백이
+    #    실제로 도는지 아무도 안 보게 된다 — 이 배선 검사가 보는 것은
+    #    프롬프트 문구가 아니라 **동시성과 순서**다.
+    def plain_for(self, grade, value=None):
+        return ""
+
+    def plain_all(self, grade):
+        return ""
+
+    def anchors_for(self, grade, value=None):
+        return ()
+
 
 def _judge_with_fake_server(monkeypatch, *, delay: float = 0.0):
     """모든 항목이 같은 문장을 받는 vLLM. 지연을 주면 동시성이 시간에 드러난다."""

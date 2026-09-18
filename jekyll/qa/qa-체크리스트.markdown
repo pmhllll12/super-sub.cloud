@@ -3,7 +3,7 @@ layout: default
 title: QA 체크리스트
 permalink: /qa-체크리스트/
 parent: 테스트 및 검증 계획
-grand_parent: II 부. 개발 수행 계획
+grand_parent: 프로젝트 관리
 nav_order: 1
 ---
 
