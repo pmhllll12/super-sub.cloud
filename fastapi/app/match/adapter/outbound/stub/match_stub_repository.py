@@ -259,6 +259,20 @@ class StubMatchRepository(StubApplicationsMixin, MatchPort):
         _TEAM_MATCH_REQUESTS[request.id] = filled
         return filled
 
+    def has_live_team_match_request(
+        self, team_id: UUID, other_team_id: UUID, now: datetime
+    ) -> bool:
+        """까닭은 `MatchPort.has_live_team_match_request` 머리말."""
+        pair = {team_id, other_team_id}
+        return any(
+            {r.requester_team_id, r.target_team_id} == pair
+            and (
+                r.status == PENDING
+                or (r.status == ACCEPTED and r.proposed_played_at >= now)
+            )
+            for r in _TEAM_MATCH_REQUESTS.values()
+        )
+
     def find_team_match_request(
         self, request_id: UUID
     ) -> TeamMatchRequestEntity | None:
