@@ -442,6 +442,9 @@ describe('비슷한 팀 명단', () => {
     await screen.findByText('망원 유나이티드')
 
     const list = document.querySelector('.ss-tm-list') as HTMLElement
+    // jsdom 은 크기를 안 잰다 — 구를 여지가 있다고 알려 준다.
+    Object.defineProperty(list, 'scrollHeight', { value: 900, configurable: true })
+    Object.defineProperty(list, 'clientHeight', { value: 300, configurable: true })
     list.scrollTop = 0
     const ev = new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true })
     list.dispatchEvent(ev)
