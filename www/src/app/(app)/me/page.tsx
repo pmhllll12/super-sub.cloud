@@ -92,7 +92,10 @@ export function MeBody({
     <ProfileStage editing={editing}>
       {/* 🔴 카드와 편집기가 화면에서 떨어져 있어(카드는 선 위, 편집기는 선
           아래) 한쪽이 상태를 들 수 없다 — 둘을 함께 감싼다. */}
-      <CardStyleProvider card={card}>
+      {/* 🔴 **카드가 생기거나 없어지면(만들기·초기화) 편집 상태를 새로 잡는다.**
+          공급자는 처음 받은 카드로만 값을 채워서, 안 그러면 새로고침할 때까지
+          옛 모습(만들기 전 기본값·지우기 전 꾸밈)이 편집기와 카드에 남는다. */}
+      <CardStyleProvider key={card ? `${card.id}:${card.style ? 's' : 'n'}` : 'none'} card={card}>
       {/* 판 **바깥 위**에 얹는 한 마디. 워드마크가 가운데에 서므로 이쪽은
           왼쪽 끝에 둔다 — 둘이 같은 줄에서 좌우로 갈린다. */}
       <p className="ss-profile-title">MY PROFILE</p>

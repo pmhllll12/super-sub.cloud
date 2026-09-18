@@ -7,7 +7,7 @@ import { uploadCardPhoto } from '@/lib/cardPhoto'
 import PillButton from '@/components/ui/PillButton'
 import type { PlayerCard } from '@/server/backend'
 import CardMark, { HIDDEN_MARKS, MARKS } from '@/components/CardMark'
-import { TEXT_MIN_Y, useCardStyle } from './cardStyle'
+import { TEXT_MIN_Y, saveFirstLook, useCardStyle } from './cardStyle'
 
 /**
  * 선 아래의 카드 편집기.
@@ -37,7 +37,11 @@ export default function CardEditor({ card }: { card: PlayerCard | null }) {
     try {
       /* 🔴 멱등이라 여러 번 눌러도 카드는 하나고 슬러그도 그대로다 —
          재시도해도 이미 공유한 주소가 죽지 않는다(계약 3장). */
-      await apiPost('/api/me/card', {})
+      const made = await apiPost<PlayerCard>('/api/me/card', {})
+      // 🔴 **처음 만든 카드는 정해 둔 모습으로**(사용자 지정 — X 붓자국). 이미
+      // 꾸민 카드(style 이 있다)면 건드리지 않는다 — 멱등이라 이미 있던 카드가
+      // 돌아올 수 있다.
+      if (!made.style) await saveFirstLook()
       router.refresh()
     } catch (e) {
       setError(apiErrorMessage(e))

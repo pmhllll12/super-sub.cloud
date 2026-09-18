@@ -195,3 +195,49 @@ describe('카드 꾸미기 — 되돌리기와 저장', () => {
     })
   })
 })
+
+/* 🔴 **처음 만든 카드는 정해 둔 모습으로**(사용자 지정, 2026-09-19) — 「오려낸 X」
+   붓(12번) · 검정 · 1.4배 · 좌우 6% · 위아래 35%. 이미 꾸민 카드는 안 건드린다. */
+describe('카드 만들기 — 첫 모습', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    refresh.mockClear()
+  })
+
+  function stub(made: PlayerCard) {
+    return vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      if ((init as RequestInit).method === 'POST') return new Response(JSON.stringify(made), { status: 200 })
+      return new Response(JSON.stringify(made), { status: 200 })
+    })
+  }
+
+  it('갓 만든 카드(style 없음)에 X 붓 모습을 저장한다', async () => {
+    const user = userEvent.setup()
+    const fetch = stub({ ...CARD, style: null })
+    render(
+      <CardStyleProvider card={null}>
+        <CardEditor card={null} />
+      </CardStyleProvider>,
+    )
+    await user.click(screen.getByRole('button', { name: '카드 만들기' }))
+    await waitFor(() => expect(refresh).toHaveBeenCalled())
+    const patch = fetch.mock.calls.find(([, i]) => (i as RequestInit).method === 'PATCH')!
+    const body = JSON.parse((patch[1] as RequestInit).body as string)
+    expect(body.style).toMatchObject({ brush: 12, brush_color: '#000000', brush_scale: 1.4, brush_x: 6, brush_y: 35 })
+    // 글자도 같이 — 안 실으면 「일부러 지운 것」으로 읽혀 THREE LUNGS 가 사라진다
+    expect(body.tagline).toBe('THREE LUNGS')
+  })
+
+  it('이미 꾸민 카드가 돌아오면(멱등) 건드리지 않는다', async () => {
+    const user = userEvent.setup()
+    const fetch = stub({ ...CARD, style: { ...(CARD.style ?? {}), brush: 3 } as PlayerCard['style'] })
+    render(
+      <CardStyleProvider card={null}>
+        <CardEditor card={null} />
+      </CardStyleProvider>,
+    )
+    await user.click(screen.getByRole('button', { name: '카드 만들기' }))
+    await waitFor(() => expect(refresh).toHaveBeenCalled())
+    expect(fetch.mock.calls.some(([, i]) => (i as RequestInit).method === 'PATCH')).toBe(false)
+  })
+})
