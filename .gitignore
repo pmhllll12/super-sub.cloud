@@ -29,3 +29,7 @@ agent/*.pt
 
 # Node — www/ 의 것은 www/.gitignore 가 맡지만, 루트에서 받은 것도 넣지 않는다.
 node_modules/
+
+# 파인튜닝 어댑터 — 제품에 새어들지 않게 (미결 23번 ④, 2026-09-18)
+agent/eval/**/adapter*.pt
+agent/eval/**/*.safetensors
