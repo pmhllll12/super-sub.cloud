@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { Match, MyVideo, PlayerCard, User } from '@/server/backend'
 import { HIDDEN_MARKS, MARKS } from '@/components/CardMark'
 import { MeBody } from './page'
@@ -620,5 +620,33 @@ describe('내 프로필 — /me', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /닉네임 편집/ }))
     expect(screen.getByRole('textbox', { name: '닉네임' })).toHaveValue('홍길동')
+  })
+})
+
+
+/* 할 일이 남은 사람이 프로필에 오면 그 단추를 가리킨다(2026-09-19) — 카드 먼저, 그다음 팀. */
+describe('프로필 안내', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  it('카드가 없으면 연출이 끝난 뒤 「먼저 내 카드를 만들어주세요.」', () => {
+    render(<MeBody user={USER} card={null} videos={[]} matches={[]} />)
+    expect(screen.queryByText('먼저 내 카드를 만들어주세요.')).toBeNull()
+    act(() => vi.advanceTimersByTime(1700))
+    expect(screen.getByText('먼저 내 카드를 만들어주세요.')).toBeInTheDocument()
+  })
+
+  it('카드는 있는데 팀이 없으면 「먼저 팀을 만들어주세요.」', () => {
+    render(<MeBody user={{ ...USER, teams: [] }} card={CARD} videos={[]} matches={[]} />)
+    act(() => vi.advanceTimersByTime(1700))
+    expect(screen.getByText('먼저 팀을 만들어주세요.')).toBeInTheDocument()
+  })
+
+  it('카드도 팀도 있으면 아무것도 안 띄운다', () => {
+    const teamed = { ...USER, teams: [{ team_id: 't1', name: '번개FC', region: '서울', sport_code: 'football', role: 'owner', joined_at: '2026-07-01T00:00:00Z' }] }
+    render(<MeBody user={teamed as typeof USER} card={CARD} videos={[]} matches={[]} />)
+    act(() => vi.advanceTimersByTime(1700))
+    expect(screen.queryByRole('status', { name: '' })).toBeNull()
+    expect(screen.queryByText(/먼저 .*만들어주세요/)).toBeNull()
   })
 })

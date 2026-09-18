@@ -2490,8 +2490,18 @@ describe('카드 없이 빈 자리를 누르면', () => {
     expect(seat).toHaveAttribute('aria-expanded', 'false')
   })
 
-  it('카드가 있는 팀원은 전처럼 잠겨 있다', () => {
-    render(<SquadPanel card={CARD} myCardId={CARD.id} squad={null} />)
+  it('카드가 있고 팀이 있는 팀원은 전처럼 잠겨 있다', () => {
+    render(<SquadPanel card={CARD} myCardId={CARD.id} squad={SQUAD} />)
     for (const seat of screen.queryAllByRole('button', { name: /자리에 선수 넣기/ })) expect(seat).toBeDisabled()
+  })
+
+  // 🔴 카드는 만들었는데 팀이 없으면 — 판에 그냥 앉히지 않고 팀을 만들라고 한다(사용자 판단).
+  it('카드는 있고 팀이 없으면 누를 때 「팀을 먼저 만들어주세요」 — 내 카드를 판에 앉히지 않는다', async () => {
+    const { container } = render(<SquadPanel card={CARD} myCardId={CARD.id} squad={null} />)
+    expect(container.querySelector('.ss-pcard-alias')).toBeNull()
+    const seat = screen.getAllByRole('button', { name: /자리에 선수 넣기/ })[0]
+    expect(seat).not.toBeDisabled()
+    await userEvent.click(seat)
+    expect(screen.getByRole('status')).toHaveTextContent('내 프로필에서 팀을 먼저 만들어주세요.')
   })
 })

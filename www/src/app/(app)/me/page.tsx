@@ -22,7 +22,7 @@ import { CardStyleProvider } from './cardStyle'
 import MyMatches from './MyMatches'
 import MyVideos from './MyVideos'
 import BlankPlayerCard from '@/components/BlankPlayerCard'
-import NoCardNudge from './NoCardNudge'
+import ProfileNudge from './ProfileNudge'
 import ProfileStage from './ProfileStage'
 import NicknameForm from './NicknameForm'
 import { ymd } from './format'
@@ -114,7 +114,9 @@ export function MeBody({
               밀려 「카드 만들기」 판이 **카드 옆이 아니라 맨 위로** 떴다(사용자
               지적 「위치가 왜 저럼?」). 편집기가 이미 열려 있으니 「수정에서
               만들 수 있다」는 안내도 필요 없다. */}
-          {!card && !editing && <NoCardNudge />}
+          {/* 할 일이 남았으면 그 단추를 가리킨다 — 카드가 먼저, 그다음 팀. */}
+          {!editing && !card && <ProfileNudge kind="card" />}
+          {!editing && card && user.teams.length === 0 && <ProfileNudge kind="team" />}
           {!card && !editing && (
             <p className="ss-profile-nocard">
               아직 선수 카드가 없습니다 — <strong>프로필 카드 수정</strong>에서 바로 만들 수

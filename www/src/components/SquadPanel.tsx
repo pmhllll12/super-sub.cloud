@@ -1384,8 +1384,14 @@ export default function SquadPanel({
    * `addSeat` 로 저장하기 때문이다. 판이 진짜로 비어 있을 때만 다시 앉는다.
    */
   const autoSeated = useRef(false)
-  // 카드 없이 빈 자리를 눌렀을 때 「내 프로필」을 가리키는 안내(SpotNudge).
-  const [needCard, setNeedCard] = useState(false)
+  // 할 일이 남은 채 빈 자리를 눌렀을 때 「내 프로필」을 가리키는 안내(SpotNudge).
+  // 카드가 없으면 'card', 카드는 있는데 팀이 없으면 'team'.
+  const [need, setNeed] = useState<'card' | 'team' | null>(null)
+  /* 팀이 **아예 없는가** — 스쿼드도, 홈이 보여 주는 팀 이름도, 팀 id 도 없을 때만.
+     🔴 `squad` 하나로 가르지 않는다: 팀원은 스쿼드를 **나중에** 받아 오므로(처음엔
+     null) 그 사이에 「팀 없음」으로 잘못 읽힌다. `teamName` 은 소속이면 팀장이든
+     팀원이든 온다. */
+  const noTeam = !squad && !teamName && !myTeamId
   useEffect(() => {
     if (autoSeated.current) return
     if (!myCardId || mySeat) return
@@ -1566,14 +1572,14 @@ export default function SquadPanel({
        나간 부분이 통째로 잘린다 — 실제로 그렇게 안 보였다. 자리 잡기는
        이 바깥 상자가 맡고, 두 판은 그 안에서 좌표를 잡는다. */
     <div className="ss-squad-wrap">
-      {needCard && (
+      {need && (
         <SpotNudge
           // 카드 모양과 「내 프로필」 글자만 — 둘레 배경은 어둡게(사용자 정정).
           // 🔴 둥근 모서리는 `.ss-pcard` 가 아니라 **`.ss-pcard-inner`** 에 있다 — 바깥을
           //    겨누면 구멍이 네모라 모서리 밖 배경이 비친다.
           targets={['.ss-home-profile .ss-pcard-inner', '.ss-home-profile-label']}
-          message={'내 프로필에서\n카드를 먼저 만들어주세요.'}
-          onDone={() => setNeedCard(false)}
+          message={need === 'card' ? '내 프로필에서\n카드를 먼저 만들어주세요.' : '내 프로필에서\n팀을 먼저 만들어주세요.'}
+          onDone={() => setNeed(null)}
         />
       )}
       {/* 유리 굴절(warp) — backdrop-filter 는 흐림·채도만 다루고 뒤 배경을
@@ -1902,7 +1908,12 @@ export default function SquadPanel({
                      있었고, 눌러도 **아무 일도 안 일어나 무엇을 하라는지 몰랐다.**
                      잠긴 단추는 클릭 자체가 안 와서 안내도 못 띄운다 — 그래서
                      열고, 누르면 할 일(카드 만들기)을 가리킨다(아래 onClick). */
-                  disabled={!isCaptain && !!myCardId}
+                  /* 🔴 **팀도 없으면 열어 둔다**(2026-09-19) — 카드를 만든 뒤에도 팀이
+                     없으면 설 판이 없어 여기가 다시 잠겼다. 누르면 팀을 만들라고
+                     가리킨다(카드 없는 사람과 같은 길). 🔴 팀이 없다고 내 카드를 판에
+                     그냥 앉히지 않는다 — 한 번 그렇게 했다가 되돌렸다(사용자 판단:
+                     「팀 만들라고 해야 하지 않음?」). 팀이 있는 팀원은 그대로 잠근다. */
+                  disabled={!isCaptain && !!myCardId && !noTeam}
                   aria-label={
                     placing
                       ? `${posOf(slot)} 자리에 ${placing} 넣기`
@@ -1914,7 +1925,12 @@ export default function SquadPanel({
                     // 없다 — 먼저 할 일을 가리킨다. 팀장이면 카드가 없어도 추천이
                     // 열리므로(원래 동작) 건드리지 않는다.
                     if (!isCaptain && !myCardId) {
-                      setNeedCard(true)
+                      setNeed('card')
+                      return
+                    }
+                    // 카드는 있는데 팀이 없다 — 설 판이 없다. 팀부터.
+                    if (!isCaptain && noTeam) {
+                      setNeed('team')
                       return
                     }
                     if (placing) {
