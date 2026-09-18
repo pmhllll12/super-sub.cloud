@@ -347,6 +347,37 @@ describe('내 프로필 — /me', () => {
     expect(screen.getByText(/되돌릴 수 없습니다/)).toBeInTheDocument()
   })
 
+  /**
+   * **로그아웃을 회원 탈퇴 옆에 둔다** (사용자 요청, 2026-09-18).
+   *
+   * 🔴 여태 로그아웃은 **홈 오른쪽 아래 구석에만** 있었다. 프로필을 보다가
+   * 나가려면 홈으로 되돌아가야 했다 — 계정을 다루는 자리에 계정에서 나가는
+   * 길이 없던 셈이다.
+   *
+   * 🔴 **탈퇴와 달리 접지 않는다.** 접는 이유는 되돌릴 수 없어서인데
+   * (`AccountActions` 머리말), 로그아웃은 다시 로그인하면 그만이다.
+   */
+  it('계정 판에 로그아웃이 있다', () => {
+    render(<MeBody user={USER} card={CARD} videos={[]} matches={[]} />)
+    expect(screen.getByRole('button', { name: '로그아웃' })).toBeInTheDocument()
+  })
+
+  /* 🔴 **로그아웃은 빨갛지 않다.** 되돌릴 수 없는 손짓의 색이라(globals.css
+     의 `--ss-danger` 주석) 나란히 두면 탈퇴와 같은 무게로 읽힌다. */
+  it('로그아웃에는 위험 색을 안 쓴다', () => {
+    render(<MeBody user={USER} card={CARD} videos={[]} matches={[]} />)
+    expect(
+      screen.getByRole('button', { name: '로그아웃' }).className,
+    ).not.toContain('ss-profile-tab--danger')
+  })
+
+  /* 눌러도 탈퇴 폼이 열리면 안 된다 — 둘은 다른 일이다. */
+  it('로그아웃을 눌러도 탈퇴 폼이 안 열린다', () => {
+    render(<MeBody user={USER} card={CARD} videos={[]} matches={[]} />)
+    fireEvent.click(screen.getByRole('button', { name: '로그아웃' }))
+    expect(screen.queryByLabelText('비밀번호')).toBeNull()
+  })
+
   // 🔴 미결 jin-7 — 카드는 **부탁해야** 생긴다(POST /me/card). 그전에는
   // 화면이 "영상이 분석되면 만들어집니다" 라고 **거짓말을 하고 있었다.**
   it('카드가 없으면 편집 모드에서 만들 수 있다', () => {
