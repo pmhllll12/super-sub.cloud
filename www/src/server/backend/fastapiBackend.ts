@@ -401,11 +401,30 @@ export const fastapiBackend: Backend = {
     })
   },
 
+  async createCardPhotoUploadUrl(token, contentType) {
+    return callFastApi<{
+      upload_url: string
+      storage_key: string
+      expires_in: number
+    }>('/me/card/photo-upload-url', {
+      method: 'POST',
+      token,
+      body: { content_type: contentType },
+    })
+  },
+
   async leaveTeam(token, teamId, memberId) {
     await callFastApi<null>(
       `/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(memberId)}`,
       { method: 'DELETE', token },
     )
+  },
+
+  async disbandTeam(token, teamId) {
+    await callFastApi<null>(`/teams/${encodeURIComponent(teamId)}`, {
+      method: 'DELETE',
+      token,
+    })
   },
 
   async cancelMatch(token, matchId) {

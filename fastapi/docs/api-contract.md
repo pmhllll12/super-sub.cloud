@@ -579,12 +579,59 @@ Pydantic 검증에 걸리면 `code`는 항상 `VALIDATION_ERROR` 하나이고 `m
   `www`가 04-09 이후 이걸 몰라 `style.text`를 새로 만들어 브라우저에만
   담고 있었는데, 이 갱신에서 `tagline` 쪽으로 합친다(`client-contract-
   changes.md` 35번)
-- **사진** — `og_image_key`가 "규칙은 있는데 파일이 없는" 상태라(위 `POST
-  /me/card` 참고) 저장 위치부터 정해야 한다. 사진에 딸린 자리·크기
-  (`photoScale`·`photoX`·`photoY`)와 통째로 까는 모드(`mode`)도 사진이
-  없으면 뜻이 없어 같이 뺐다 — `www`는 넷 다 그대로 브라우저에만 둔다.
-  `CardStyleSchema` 가 `extra=forbid` 라 이 필드들을 보내면 조용히
-  무시되지 않고 **422** 로 막힌다
+- ~~**사진**~~ — 🔴 **들어왔다 (2026-09-18).** 앞서 이 자리에 "저장 위치부터
+  정해야 한다 · 보내면 422" 라고 적어 둔 것을 **정정한다.** 아래
+  「카드 사진」 절을 보라. `style` 에 `photo_key`·`photo_scale`·`photo_x`·
+  `photo_y`·`mode` 다섯이 생겼고, **전부 기본값이 있어** 안 보내도 된다
+
+#### 카드 사진 — `POST /api/v1/me/card/photo-upload-url` (2026-09-18 추가)
+
+인증 필요. 본문 `{"content_type": "image/jpeg"}`. `200`:
+
+```json
+{
+  "upload_url": "https://…(사전 서명 PUT)…",
+  "storage_key": "cards/photos/<user_id>/<card_id>-1a2b3c4d.jpg",
+  "expires_in": 900
+}
+```
+
+🔴 **바이트가 앱 서버를 지나지 않는다**(PER-002) — 브라우저가 이 주소로 S3 에
+**직접 PUT** 한다. 영상 업로드와 같은 방식이다. 그래서 `style` 에는 **키만**
+담는다: data URL 로 담으면 카드를 읽는 **모든** 응답에 사진이 실리는데,
+스쿼드 판 하나가 자리마다 카드를 부르므로 5~7장이 매번 함께 나간다.
+
+**두 단계다.**
+
+1. 이 경로로 `upload_url` 과 `storage_key` 를 받는다
+2. 그 주소로 PUT 한 뒤, `PATCH /me/card` 의 `style.photo_key` 에
+   `storage_key` 를 실어 보낸다 — **그때 카드에 붙는다**
+
+| 에러 | code | 언제 |
+|---|---|---|
+| 404 | `CARD_NOT_FOUND` | 카드가 먼저 있어야 한다(키에 카드 id 가 들어간다) |
+| 422 | `UNSUPPORTED_PHOTO_TYPE` | `image/jpeg`·`image/png`·`image/webp` 만 받는다 |
+| 503 | `STORAGE_NOT_CONFIGURED` | 버킷 설정이 없다 |
+
+**하지 말 것**
+
+- 🔴 **`Content-Type` 헤더를 요청한 값과 다르게 보내지 마십시오** — 서명에
+  들어가서 다르면 S3 가 **403** 이다
+- 🔴 **확장자를 클라이언트가 정하지 않는다** — 타입만 보내면 서버가 붙인다
+  (`image/jpeg` 라면서 `.html` 로 올리는 키가 생기지 않게)
+- 🔴 **`image/svg+xml` 은 일부러 안 받는다** — SVG 는 스크립트를 담는다
+- 🔴 **남의 `photo_key` 를 보내면 `422 PHOTO_KEY_NOT_OWNED`** 다. 키는 비밀이
+  아니라(응답에 실린다) 저장 시점에 `cards/photos/<내 user_id>/` 접두사를
+  대조한다 — 영상의 `owns_key` 와 같은 자리
+- ⚠️ **올리기만 하고 `PATCH` 를 안 하면 아무 일도 안 난다** — 그 파일은
+  아무도 안 가리키는 채로 남는다
+
+**읽는 주소는 `photo_url`** — `GET /me/card`·`GET /cards/{slug}` 응답에
+사전 서명 GET 으로 실린다. 🔴 **저장되지 않는다**(부를 때마다 새로 만든다,
+유효 시간 있음). 사진이 없거나 저장소 설정이 없으면 `null` 이고, 그때 화면은
+기본 장식 그림을 그린다.
+
+⚠️ **마이그레이션은 없다** — `player_card.style` 이 JSON 컬럼이다.
 
 #### `titles` — 사람이 직접 적는 호칭 (2026-09-16 추가, `paik` 36번)
 

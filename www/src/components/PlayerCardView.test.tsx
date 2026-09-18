@@ -84,3 +84,43 @@ describe('선수 카드', () => {
     expect(container.querySelector('meter')).toBeNull()
   })
 })
+
+/**
+ * **카드 그림은 따라 나오지 않는다** (사용자 지적, 2026-09-18).
+ *
+ * 「카드가 있는 모든 곳에서 저 사람 이미지가 계속 클릭해서 옮기면 따라
+ * 나오는데, 아예 이미지가 따라 나오지 않게 만들고」
+ *
+ * 🔴 **`user-select: none` 으로는 못 막는다.** `.ss-squad-seat` 에 그것과
+ * `touch-action: none` 이 걸려 있고 주석도 「브라우저가 그림·글자를 대신
+ * 끌어가지 않게 한다」인데, `user-select` 가 막는 것은 **글자 선택**이다.
+ * `<img>` 의 네이티브 드래그(반투명 유령 그림)는 따로 꺼야 한다.
+ *
+ * 🔴 **여기 하나만 고치면 전부 덮인다** — 스쿼드 판·헤더·프로필·공개 카드·
+ * 대기 팝업·리뷰가 전부 이 컴포넌트를 통해 사진을 그린다.
+ */
+describe('선수 카드 — 그림이 끌려 나오지 않는다', () => {
+  it('누끼 인물은 끌 수 없다', () => {
+    const { container } = render(<PlayerCardView card={card} />)
+    const img = container.querySelector('.ss-pcard-figure img') as HTMLImageElement
+    expect(img).not.toBeNull()
+    expect(img.draggable).toBe(false)
+  })
+
+  /* 사진을 통째로 까는 모드도 같은 `<img>` 다 — 갈래가 둘이라 둘 다 본다. */
+  it('사진을 통째로 깐 모드에서도 끌 수 없다', () => {
+    const { container } = render(
+      <PlayerCardView
+        card={card}
+        look={{ mode: 'full', photo: 'data:image/png;base64,iVBORw0KGgo=' }}
+      />,
+    )
+    /* 🔴 **정말 `full` 갈래를 밟았는지 먼저 본다.** prop 이름을 틀리면
+       (`style` 로 준 적이 있다) 조용히 누끼 갈래가 그려지고, 시험은
+       같은 선택자를 찾아 **통과해 버린다.** */
+    expect(container.querySelector('.ss-pcard')).toHaveAttribute('data-photo', 'full')
+    const img = container.querySelector('.ss-pcard-figure img') as HTMLImageElement
+    expect(img).not.toBeNull()
+    expect(img.draggable).toBe(false)
+  })
+})

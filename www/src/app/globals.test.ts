@@ -179,3 +179,93 @@ describe('CSS 규칙 순서 — 같은 특이도는 순서로만 이긴다', () 
     expect(CSS.slice(i, i + 120)).toMatch(/animation:\s*none/)
   })
 })
+
+/**
+ * **로그아웃과 회원 탈퇴가 안 붙어 있다** (사용자 지적, 2026-09-18: 「너무
+ * 붙어있어」).
+ *
+ * 🔴 알약은 테두리가 둥글어 **가장자리끼리 가까워 보이는 거리가 실제 간격보다
+ * 짧다** — 네모 단추와 같은 값을 주면 한 덩어리로 읽히고, 그러면 탈퇴를
+ * 누르려다 로그아웃을 누른다. 눈으로만 맞춘 값이라 시험이 붙든다.
+ */
+describe('계정 판의 단추 두 개', () => {
+  const block = () =>
+    CSS.slice(
+      CSS.indexOf('.ss-profile-account-foot {'),
+      CSS.indexOf('.ss-profile-account-foot {') + 200,
+    )
+
+  /* 🔴 **양쪽 끝이 다 틀렸던 값이다.** 좁으면 한 덩어리로 읽히고(4px),
+     넓히면 오른쪽 정렬이라 **로그아웃만 왼쪽으로 밀려난다**(18px). 둘 다
+     사용자가 화면으로 잡아 줬으므로 범위로 붙든다. */
+  it('로그아웃과 회원 탈퇴 사이를 살짝만 띄운다', () => {
+    const gap = /gap:\s*(\d+)px/.exec(block())
+    expect(gap).not.toBeNull()
+    expect(Number(gap![1])).toBeGreaterThanOrEqual(10)
+    expect(Number(gap![1])).toBeLessThanOrEqual(14)
+  })
+
+  /* 오른쪽 정렬이라 줄을 안 바꾸면 **왼쪽 것(로그아웃)이 판 밖으로** 밀린다. */
+  it('좁은 화면에서는 줄을 바꾼다', () => {
+    expect(block()).toMatch(/flex-wrap:\s*wrap/)
+  })
+})
+
+/**
+ * **팀 줄의 「수정」·「팀 나가기」** (사용자 지적, 2026-09-18).
+ *
+ * 두 번 되돌아온 자리다 — 처음엔 줄 간격(14px)만 있어 **너무 떨어져** 있었고,
+ * 상자를 넣고 `gap` 을 안 써서 이번엔 **완전히 맞붙었다.**
+ */
+describe('팀 줄의 단추 두 개', () => {
+  const acts = () =>
+    CSS.slice(
+      CSS.indexOf('.ss-profile-team-acts {'),
+      CSS.indexOf('.ss-profile-team-acts {') + 160,
+    )
+
+  it('붙지도 멀지도 않게 띄운다', () => {
+    const gap = /gap:\s*(\d+)px/.exec(acts())
+    expect(gap).not.toBeNull()
+    // 0 이면 맞붙고, 줄 간격(14px) 이상이면 묶은 뜻이 없다.
+    expect(Number(gap![1])).toBeGreaterThanOrEqual(6)
+    expect(Number(gap![1])).toBeLessThan(14)
+  })
+
+  /* 🔴 같은 특이도(0,1,0)라 **뒤에 적힌 것이 이긴다.** 앞에 두면 흰색이
+     한 번도 안 먹는다 — 이 저장소가 두 번 밟은 함정이다. */
+  it('흰색 「수정」 규칙이 빨간 기본 규칙보다 뒤에 온다', () => {
+    const base = CSS.indexOf('.ss-profile-team-leave {')
+    const edit = CSS.indexOf('.ss-profile-team-edit {')
+    expect(base).toBeGreaterThan(-1)
+    expect(edit).toBeGreaterThan(base)
+  })
+
+  /* 빨강은 되돌릴 수 없는 손짓의 색이다 — 수정이 그 색을 쓰면 안 된다. */
+  it('「수정」은 위험 색을 안 쓴다', () => {
+    const block = CSS.slice(
+      CSS.indexOf('.ss-profile-team-edit {'),
+      CSS.indexOf('.ss-profile-team-edit:not('),
+    )
+    expect(block).toMatch(/color:\s*#fff/)
+    expect(block).not.toMatch(/--ss-danger/)
+  })
+})
+
+/**
+ * **카드 그림이 끌려 나오지 않는다** (사용자 지적, 2026-09-18).
+ *
+ * 🔴 `PlayerCardView` 의 `draggable={false}` 가 본 막음이고, 이 규칙은 그
+ * 속성을 빠뜨린 `<img>` 가 새로 생겨도 같은 일이 안 나게 하는 그물이다.
+ * `user-select: none` 은 **글자 선택만** 막아서 여기에 쓸 수 없다.
+ */
+describe('카드 사진은 브라우저가 끌어가지 못한다', () => {
+  it('`.ss-pcard-figure img` 가 네이티브 드래그를 끈다', () => {
+    const i = CSS.indexOf('.ss-pcard-figure img {')
+    expect(i).toBeGreaterThan(-1)
+    /* 🔴 **`}` 로 끝을 찾으면 안 된다** — 이 규칙의 주석 안에
+       `draggable={false}` 가 들어 있어 거기서 잘린다. 줄머리의 `}` 가
+       블록의 끝이다. */
+    expect(CSS.slice(i, CSS.indexOf('\n}', i))).toMatch(/-webkit-user-drag:\s*none/)
+  })
+})

@@ -11,10 +11,13 @@ from app.card.application.use_cases.public_card_interactor import (
     PublicCardInteractor,
 )
 from app.card.dependencies.card_repository_provider import CardRepositoryDep
+from app.card.dependencies.photo_storage_provider import CardPhotoStorageOptionalDep
 
 
-def get_public_card_use_case(repository: CardRepositoryDep) -> PublicCardUseCase:
-    return PublicCardInteractor(repository)
+def get_public_card_use_case(
+    repository: CardRepositoryDep, photos: CardPhotoStorageOptionalDep
+) -> PublicCardUseCase:
+    return PublicCardInteractor(repository, photos)
 
 
 PublicCardUseCaseDep = Annotated[

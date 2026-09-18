@@ -361,6 +361,15 @@ class TestTaglineInDb:
         assert db_client.get(f"{V1}/cards/{before}").status_code == 200
 
 
+# 🔴 사진 다섯 칸은 **기본값이 있어** 안 보내도 응답에 실린다(2026-09-18).
+_PHOTO_DEFAULTS = {
+    "photo_key": None,
+    "photo_scale": 1,
+    "photo_x": 0,
+    "photo_y": 0,
+    "mode": "cutout",
+}
+
 _STYLE = {
     "bg": "#91ea92",
     "logo": "#0b0b0b",
@@ -388,14 +397,14 @@ class TestStyleInDb:
 
         res = db_client.patch(f"{V1}/me/card", json={"style": _STYLE}, headers=headers)
         assert res.status_code == 200, res.text
-        assert res.json()["style"] == _STYLE
+        assert res.json()["style"] == {**_STYLE, **_PHOTO_DEFAULTS}
 
         row = db_session.execute(
             text("select style from player_card where user_id = :u"),
             {"u": str(fresh_account["user_id"])},
         ).scalar_one()
-        assert row == _STYLE, "컬럼에 안 들어갔다"
-        assert db_client.get(f"{V1}/me/card", headers=headers).json()["style"] == _STYLE
+        assert row == {**_STYLE, **_PHOTO_DEFAULTS}, "컬럼에 안 들어갔다"
+        assert db_client.get(f"{V1}/me/card", headers=headers).json()["style"] == {**_STYLE, **_PHOTO_DEFAULTS}
 
     def test_공개_카드에도_나간다(self, db_client, fresh_account):
         """🔴 안 실으면 **남이 보는 카드만** 안 꾸며진다."""
@@ -405,7 +414,7 @@ class TestStyleInDb:
 
         public = db_client.get(f"{V1}/cards/{slug}")
         assert public.status_code == 200
-        assert public.json()["style"] == _STYLE
+        assert public.json()["style"] == {**_STYLE, **_PHOTO_DEFAULTS}
 
     def test_지우면_NULL_이_된다(self, db_client, db_session, fresh_account):
         headers = fresh_account["headers"]
@@ -436,20 +445,43 @@ class TestStyleInDb:
         res = db_client.patch(f"{V1}/me/card", json={"style": _STYLE}, headers=headers)
         assert res.status_code == 200, res.text
         assert res.json()["tagline"] == "숨은 왼발", "style 만 보냈는데 지워졌다"
-        assert res.json()["style"] == _STYLE
+        assert res.json()["style"] == {**_STYLE, **_PHOTO_DEFAULTS}
 
-    def test_사진_관련_필드는_거부한다(self, db_client, fresh_account):
-        """🔴 사진 저장 위치가 아직 없다 — `photo`·`mode` 등을 조용히
-        무시하지 않고 422 로 막는다(`CardStyleSchema` 가 `extra=forbid`)."""
+    def test_사진_관련_필드가_실제로_저장된다(self, db_client, fresh_account):
+        """🔴 **정정 (2026-09-18)**: 앞서 이 자리는 「사진 저장 위치가 아직
+        없다 — 422 로 막는다」였다. 자리를 정했다(바이트는 S3, `style` 에는
+        키만) — 이제 저장된다.
+
+        JSON 컬럼이라 스텁과 다르지 않아 보이지만, **컬럼이 실재하고 새 키가
+        진짜로 되읽히는지**는 진짜 DB 로만 걸린다(이 클래스의 머리말과 같은
+        이유). 마이그레이션이 없다는 주장도 여기서 확인된다.
+        """
         headers = fresh_account["headers"]
         db_client.post(f"{V1}/me/card", headers=headers)
         res = db_client.patch(
             f"{V1}/me/card",
-            json={"style": {**_STYLE, "mode": "full"}},
+            json={"style": {**_STYLE, "mode": "full", "photo_scale": 1.6}},
+            headers=headers,
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["style"]["mode"] == "full"
+
+        again = db_client.get(f"{V1}/me/card", headers=headers).json()["style"]
+        assert again["mode"] == "full"
+        assert again["photo_scale"] == 1.6
+
+    def test_남의_사진_키는_거부한다(self, db_client, fresh_account):
+        """🔴 키는 비밀이 아니라 **저장 시점 대조가 유일한 방어선**이다."""
+        headers = fresh_account["headers"]
+        db_client.post(f"{V1}/me/card", headers=headers)
+        stolen = "cards/photos/00000000-0000-0000-0000-000000000009/a-1.jpg"
+        res = db_client.patch(
+            f"{V1}/me/card",
+            json={"style": {**_STYLE, "photo_key": stolen}},
             headers=headers,
         )
         assert res.status_code == 422
-        assert error_code(res) == "VALIDATION_ERROR"
+        assert error_code(res) == "PHOTO_KEY_NOT_OWNED"
 
 
 class TestCustomTitlesInDb:
