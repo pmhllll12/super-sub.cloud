@@ -192,3 +192,59 @@ class TestNormalizeCustomTitles:
         assert normalize_custom_titles(["왼발잡이"] * (MAX_CUSTOM_TITLES + 1)) == [
             "왼발잡이"
         ]
+
+
+class TestCardPhotoKey:
+    """카드 사진의 저장 키 (2026-09-18, 사용자 요청).
+
+    🔴 **S3 에 둔다.** `style` JSON 에 data URL 로 담으면 카드를 읽는 모든
+    응답에 사진이 실린다 — 스쿼드 판 하나가 자리마다 카드를 부르므로 5~7장이
+    매번 함께 나간다. `storage_port` 의 PER-002(「재생도 앱 서버를 지나지
+    않는다」)와도 어긋난다. 영상과 같은 방식으로 브라우저↔S3 직통이다.
+    """
+
+    def test_키에_주인과_카드가_들어간다(self):
+        from app.card.domain.rules.card_rules import build_photo_key
+
+        user_id, card_id = uuid4(), uuid4()
+        key = build_photo_key(user_id, card_id, "jpg")
+
+        assert key.startswith(f"cards/photos/{user_id}/")
+        assert str(card_id) in key
+        assert key.endswith(".jpg")
+
+    def test_같은_사진을_두_번_올려도_키가_겹치지_않는다(self):
+        """🔴 겹치면 **옛 사진이 조용히 덮인다** — 되돌릴 수 없다."""
+        from app.card.domain.rules.card_rules import build_photo_key
+
+        user_id, card_id = uuid4(), uuid4()
+        assert build_photo_key(user_id, card_id, "jpg") != build_photo_key(
+            user_id, card_id, "jpg"
+        )
+
+    def test_확장자를_모르면_거부한다(self):
+        """🔴 임의 확장자를 받으면 `.html` 을 우리 버킷에 올릴 수 있다."""
+        from app.card.domain.rules.card_rules import build_photo_key
+
+        with pytest.raises(ValueError):
+            build_photo_key(uuid4(), uuid4(), "html")
+
+    def test_남의_키는_내_사진으로_못_쓴다(self):
+        """🔴 **이것이 없으면 남의 사진 키를 내 카드에 붙일 수 있다.**
+
+        영상의 `owns_key` 와 같은 자리다 — 사전 서명은 키만 알면 되므로,
+        저장할 때 접두사를 대조하지 않으면 키를 지어내 남의 것을 가리킨다.
+        """
+        from app.card.domain.rules.card_rules import build_photo_key, owns_photo_key
+
+        mine, other = uuid4(), uuid4()
+        key = build_photo_key(other, uuid4(), "jpg")
+
+        assert owns_photo_key(key, other) is True
+        assert owns_photo_key(key, mine) is False
+
+    def test_경로를_거슬러_올라가는_키를_막는다(self):
+        from app.card.domain.rules.card_rules import owns_photo_key
+
+        user_id = uuid4()
+        assert owns_photo_key(f"cards/photos/{user_id}/../../etc/x.jpg", user_id) is False

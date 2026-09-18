@@ -1,4 +1,6 @@
-"""시연용 더미 선수 10명 — 지인 찾기와 AI 추천 판에 뜨게 한다 (2026-09-17).
+"""시연용 더미 — 선수 10명과 **상대 팀 셋** (2026-09-17, 팀은 2026-09-18 추가).
+
+선수는 지인 찾기와 AI 추천 판에, 팀은 「비슷한 팀」(팀 매칭) 판에 뜬다.
 
 `seed_demo.py`(데모 계정 하나, 개발 전용)와 달리 **운영 사이트 시연**까지 겨냥한다.
 그래서 비밀번호를 코드에 두지 않고, 더미를 한 번에 지울 수 있게 만든다.
@@ -14,6 +16,10 @@
   `analysis_report`). 추천 판의 등급·불릿이 **대표 영상의 리포트**에서 온다.
   🔴 분석 결과는 **실제 분석이 아니다** — `pipeline_version`·`model_name` 에
   `showcase-dummy` 를 박고, 리포트 요약에 더미라고 적는다
+
+그리고 **상대 팀 셋**(`TEAMS`) — 3:3 · 5:5 · 7:7 각 하나씩, 스쿼드가 **꽉 차** 있고
+경기 조건(지역·시간)까지 등록된 상태다. 🔴 그 셋이 다 있어야 「비슷한 팀」에 뜬다
+(하드 필터 — `TEAMS` 주석). 선수만 넣으면 **그 판은 영영 비어 있다.**
 
 `--contacts-to <이메일>` 을 주면 그 계정에 더미 셋이 지인으로, 셋이 지인 신청(알림
 포함)으로 붙는다.
@@ -105,6 +111,42 @@ PLAYERS = [
 SLOTS = [(1, time(19, 0), time(22, 30)), (3, time(19, 0), time(22, 30)),
          (5, time(8, 0), time(18, 0)), (6, time(8, 0), time(18, 0))]
 
+# ── 시연용 상대 팀 (2026-09-18, 사용자 요청) ────────────────────────────────
+#
+# 🔴 **왜 팀까지 필요한가.** 「비슷한 팀」(`GET /teams/{id}/match-candidates`)의
+# 하드 필터가 **상대 스쿼드가 `formation` 인원만큼 꽉 찼을 것**을 요구한다
+# (`match_preference_pg_repository.list_candidate_facts`). 갓 만든 팀은 스쿼드에
+# 팀장 하나뿐이라 **서로가 서로의 후보에서 전부 탈락**했다 — 실제 도메인에서
+# 팀을 여럿 만들어도 목록이 늘 비어 있던 이유다. 선수 더미만으로는 이 판이
+# 절대 안 채워진다.
+#
+# 세 크기를 다 둔다 — 후보는 **판 크기가 문자열로 같아야** 걸리므로, 3:3 으로
+# 여는 팀에게는 5:5 팀이 안 보인다.
+#
+# ⚠️ 같은 선수가 여러 팀에 들어간다(등재 유일 제약은 `(squad_id, card_id)` 라
+# 스쿼드가 다르면 된다). 더미가 10명뿐이라 그렇게 하고, 시연에서는 상대 팀의
+# 판을 펼쳐 볼 때만 드러난다.
+#
+# (팀 이름, 팀 지역, formation, 팀 경기 조건 지역들, PLAYERS 차례(1부터))
+TEAMS = [
+    ("망원 유나이티드", "서울 마포구", "5:5",
+     ["서울 마포구", "서울 서대문구"], [1, 2, 3, 4, 5]),
+    ("연희 삼총사", "서울 서대문구", "3:3",
+     ["서울 서대문구", "서울 은평구"], [6, 7, 8]),
+    ("영등포 일레븐", "서울 영등포구", "7:7",
+     ["서울 영등포구", "서울 마포구"], [1, 3, 5, 6, 7, 9, 10]),
+]
+
+# formation → 등재할 격자 칸 (열, 행). **행이 곧 포지션 라인**이다(계약 3-7절).
+# 🔴 `www/src/lib/pitchGrid.ts` 의 `FORMATION_SLOTS` 와 같은 값이어야 한다 —
+#    어긋나면 상대 판에 카드가 없는 칸에 떠서 판이 깨져 보인다.
+GRID = {
+    "3:3": [(1, 0), (1, 1), (1, 3)],
+    "5:5": [(1, 0), (0, 1), (2, 1), (1, 2), (1, 3)],
+    "7:7": [(1, 0), (0, 1), (1, 1), (2, 1), (0, 2), (2, 2), (1, 3)],
+}
+ROW_POSITION = {0: "FW", 1: "MF", 2: "DF", 3: "GK"}
+
 
 def dummy_email(n: int) -> str:
     return f"{EMAIL_PREFIX}{n:02d}{EMAIL_DOMAIN}"
@@ -117,10 +159,59 @@ def dummy_user_ids(session: Session) -> list[UUID]:
     ).scalars())
 
 
+def dummy_team_ids(session: Session, user_ids: list[UUID]) -> list[UUID]:
+    """시연용 상대 팀만 고른다 — **이름이 `TEAMS` 에 있고 주장이 더미인 팀**.
+
+    🔴 이름만으로 고르지 않는다. 진짜 사람이 우연히 같은 이름을 쓸 수 있고,
+    그 팀을 지우면 되돌릴 길이 없다. 주장까지 더미여야 우리가 넣은 것이다.
+    """
+    if not user_ids:
+        return []
+    t, tm = T["team"], T["team_member"]
+    return list(session.execute(
+        select(t.c.id)
+        .select_from(t.join(tm, tm.c.team_id == t.c.id))
+        .where(t.c.name.in_([name for name, *_ in TEAMS]),
+               tm.c.user_id.in_(user_ids), tm.c.role == "owner")
+    ).scalars())
+
+
+def delete_teams(session: Session, team_ids: list[UUID]) -> None:
+    """더미 팀과 딸린 것을 **순서대로** 지운다.
+
+    🔴 `team` 을 가리키는 외래키 중 `squad`·`team_member`·`team_match_request`·
+    `match` 는 **연쇄 삭제가 아니다**(부록 D.6 이 팀 삭제 연쇄를 안 정해서
+    비워 둔 자리다 — `team_orm.py` 주석). 남겨 두면 팀 삭제가 그대로 막힌다.
+    `team_match_region`·`team_match_slot`·`team_invitation` 은 CASCADE 라
+    저절로 지워지지만, 순서를 읽는 사람이 헷갈리지 않게 여기 적지 않는다.
+    """
+    if not team_ids:
+        return
+    squad_ids = list(session.execute(
+        select(T["squad"].c.id).where(T["squad"].c.team_id.in_(team_ids))
+    ).scalars())
+    if squad_ids:
+        # `squad_member` 는 `squad` 에 CASCADE 라 스쿼드를 지우면 따라간다.
+        session.execute(delete(T["squad"]).where(T["squad"].c.id.in_(squad_ids)))
+    # 진짜 사람이 더미 팀에 경기를 신청했을 수 있다 — 그 신청이 팀 삭제를 막는다.
+    r = T["team_match_request"]
+    session.execute(delete(r).where(
+        or_(r.c.requester_team_id.in_(team_ids), r.c.target_team_id.in_(team_ids))))
+    m = T["match"]
+    session.execute(delete(m).where(
+        or_(m.c.team_id.in_(team_ids), m.c.opponent_team_id.in_(team_ids))))
+    session.execute(delete(T["team_member"]).where(T["team_member"].c.team_id.in_(team_ids)))
+    session.execute(delete(T["team"]).where(T["team"].c.id.in_(team_ids)))
+
+
 def delete_all(session: Session) -> int:
     ids = dummy_user_ids(session)
     if not ids:
         return 0
+    # 🔴 **팀을 사람보다 먼저 지운다.** 사람을 먼저 지우면 `squad_member` 가
+    #    카드 연쇄로 사라져 스쿼드만 빈 채 남고, `team_member` 가 팀 삭제를
+    #    막는다 — 그러면 다음 `--delete` 에서도 더미 팀이 계속 남는다.
+    delete_teams(session, dummy_team_ids(session, ids))
     c, n = T["user_contact"], T["notification"]
     # 지인 신청 알림은 받은 사람(더미가 아닐 수 있다) 쪽에 남는다 — 신청 행이 지워지면
     # 가리킬 곳이 없는 알림이 되므로 먼저 지운다.
@@ -135,7 +226,59 @@ def delete_all(session: Session) -> int:
     return len(ids)
 
 
-def seed(session: Session, password: str, contacts_to: str | None) -> list[dict]:
+def seed_teams(
+    session: Session,
+    made: dict[int, tuple[UUID, UUID]],
+    pos: dict[str, UUID],
+    region: dict[str, UUID],
+    now: datetime,
+) -> list[str]:
+    """시연용 상대 팀을 넣는다 — **꽉 찬 스쿼드와 경기 조건까지.**
+
+    🔴 셋 다 있어야 「비슷한 팀」에 뜬다(하드 필터 — `TEAMS` 주석):
+    ⑴ 같은 `formation` 의 스쿼드 ⑵ 그 인원만큼 찬 등재 ⑶ 지역 **또는** 시간.
+    하나라도 빠지면 그 팀은 목록에서 통째로 빠지고, 화면에는 그냥
+    「조건이 맞는 팀이 없습니다」로만 보인다 — 무엇이 모자란지는 안 나온다.
+    """
+    names = []
+    for n, (name, team_region, formation, pref_regions, roster) in enumerate(TEAMS, 1):
+        cells = GRID[formation]
+        if len(roster) != len(cells):
+            raise SystemExit(f"{name}: {formation} 는 {len(cells)}명인데 {len(roster)}명이 적혔다.")
+        team_id, squad_id = uuid4(), uuid4()
+        session.execute(insert(T["team"]).values(
+            id=team_id, name=name, region=team_region, sport_code="football",
+            disbanded_at=None))
+        for seat, player in enumerate(roster):
+            uid, _ = made[player]
+            session.execute(insert(T["team_member"]).values(
+                id=uuid4(), team_id=team_id, user_id=uid,
+                # 첫 사람이 주장이다 — `--delete` 가 더미 팀을 가려낼 때 이것을 본다.
+                role="owner" if seat == 0 else "member",
+                joined_at=now - timedelta(days=10), left_at=None))
+        session.execute(insert(T["squad"]).values(
+            id=squad_id, team_id=team_id, formation=formation,
+            public_slug=f"showcase-t{n}-{squad_id.hex[:12]}"))
+        for (col, row), player in zip(cells, roster):
+            _, card_id = made[player]
+            session.execute(insert(T["squad_member"]).values(
+                id=uuid4(), squad_id=squad_id, player_card_id=card_id,
+                position_id=pos[ROW_POSITION[row]], grid_col=col, grid_row=row))
+        for label in pref_regions:
+            if label in region:
+                session.execute(insert(T["team_match_region"]).values(
+                    id=uuid4(), team_id=team_id, region_id=region[label]))
+        for weekday, start, end in SLOTS:
+            session.execute(insert(T["team_match_slot"]).values(
+                id=uuid4(), team_id=team_id, weekday=weekday,
+                start_time=start, end_time=end))
+        names.append(f"{name}({formation})")
+    return names
+
+
+def seed(
+    session: Session, password: str, contacts_to: str | None
+) -> tuple[list[dict], list[str]]:
     u = T["user"]
     if dummy_user_ids(session):
         raise SystemExit("더미가 이미 있다 — 다시 넣으려면 --delete 뒤에 돌린다.")
@@ -143,6 +286,13 @@ def seed(session: Session, password: str, contacts_to: str | None) -> list[dict]
     taken = list(session.execute(select(u.c.nickname).where(u.c.nickname.in_(nicknames))).scalars())
     if taken:
         raise SystemExit(f"닉네임이 이미 쓰인다: {taken} — PLAYERS 의 닉네임을 바꾼다.")
+    # 🔴 **팀 이름도 미리 본다.** 넣다가 중간에 걸리면 선수만 들어간 채로 끝나고,
+    #    그러면 `--delete` 없이는 다시 못 돌린다(더미가 이미 있다고 멈춘다).
+    team_taken = list(session.execute(
+        select(T["team"].c.name).where(T["team"].c.name.in_([n for n, *_ in TEAMS]))
+    ).scalars())
+    if team_taken:
+        raise SystemExit(f"팀 이름이 이미 쓰인다: {team_taken} — TEAMS 의 이름을 바꾼다.")
 
     target_id = None
     if contacts_to:
@@ -157,6 +307,8 @@ def seed(session: Session, password: str, contacts_to: str | None) -> list[dict]
     password_hash = hash_password(password)
     now = datetime.now(timezone.utc)
     manifest = []
+    # 차례 → (사용자 id, 카드 id). 아래 `seed_teams` 가 이것으로 스쿼드를 채운다.
+    made: dict[int, tuple[UUID, UUID]] = {}
 
     for i, (nick, positions, regions, grade, notes, tagline, clip, w, h, dur, title) in enumerate(PLAYERS, 1):
         joined = now - timedelta(days=20 - i)
@@ -206,6 +358,7 @@ def seed(session: Session, password: str, contacts_to: str | None) -> list[dict]
             model_name=DUMMY_MARK, schema_version="1.5", provisional=True,
             overall_grade=grade, card_notes=notes, created_at=uploaded + timedelta(minutes=3)))
         manifest.append({"nickname": nick, "clip": clip, "storage_key": storage_key})
+        made[i] = (uid, card_id)
 
         if target_id is not None and i <= 6:
             contact_id = uuid4()
@@ -219,7 +372,9 @@ def seed(session: Session, password: str, contacts_to: str | None) -> list[dict]
                     id=uuid4(), recipient_user_id=target_id, type="contact_request",
                     actor_user_id=uid, subject_type="user_contact", subject_id=contact_id,
                     read_at=None, created_at=now - timedelta(days=3, hours=i)))
-    return manifest
+    # 🔴 **선수를 다 넣은 뒤에 팀을 넣는다** — 스쿼드가 카드 id 를 요구한다.
+    teams = seed_teams(session, made, pos, region, now)
+    return manifest, teams
 
 
 def main() -> int:
@@ -248,10 +403,11 @@ def main() -> int:
         if len(password) < 8:
             print("SHOWCASE_PASSWORD(8자 이상)를 환경변수로 준다 — 코드에 적지 않는다.", file=sys.stderr)
             return 2
-        manifest = seed(session, password, args.contacts_to)
+        manifest, teams = seed(session, password, args.contacts_to)
         session.commit()
 
     print(f"더미 {len(manifest)}명을 넣었다: " + ", ".join(m["nickname"] for m in manifest))
+    print(f"시연용 상대 팀 {len(teams)}개를 넣었다: " + ", ".join(teams))
     if args.manifest:
         Path(args.manifest).write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8")
         print(f"영상 목록: {args.manifest}")

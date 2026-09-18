@@ -64,9 +64,13 @@ type CardLook = {
   brushY?: number
 }
 
-/** `card.style` (서버, 스네이크) → `CardLook` (이 파일, 캐멀). 사진 관련은
- * 서버에 없으므로 안 채운다 — 호출부가 `??` 로 기본값을 따로 잡는다. */
-function styleToLook(style: NonNullable<PublicPlayerCard['style']>): CardLook {
+/** `card.style` (서버, 스네이크) → `CardLook` (이 파일, 캐멀).
+ *
+ * 🔴 **그림 주소는 `style` 이 아니라 `card.photo_url` 에서 온다**(2026-09-18) —
+ * `style` 에는 S3 키만 있고, 그 키로 서명한 주소를 서버가 따로 실어 준다.
+ * 그래서 카드를 통째로 받는다. */
+function styleToLook(card: PublicPlayerCard): CardLook {
+  const style = card.style!
   return {
     bg: style.bg,
     logo: style.logo,
@@ -78,6 +82,13 @@ function styleToLook(style: NonNullable<PublicPlayerCard['style']>): CardLook {
     brushScale: style.brush_scale,
     brushX: style.brush_x,
     brushY: style.brush_y,
+    /* 🔴 **없을 수 있다** — 배포 전 실서버는 아직 안 보낸다. 그때는 기본
+       장식 그림으로 떨어진다(아래 `photo` 의 `??`). */
+    photo: card.photo_url ?? null,
+    photoScale: style.photo_scale,
+    photoX: style.photo_x,
+    photoY: style.photo_y,
+    mode: style.mode,
   }
 }
 
@@ -91,7 +102,7 @@ export default function PlayerCardView({
   // 🔴 **`look` 이 없어도 `card.style` 이 있으면 꾸며진 대로 그린다.** 이게
   // 없으면 저장은 되는데 편집기 밖(내 프로필 평소 보기 · 공개 카드 링크)
   // 에서는 안 보이는 반쪽짜리가 된다 — 저장한 보람이 없어진다.
-  const effective = look ?? (card.style ? styleToLook(card.style) : undefined)
+  const effective = look ?? (card.style ? styleToLook(card) : undefined)
   const alias = look?.text ?? card.tagline ?? ALIAS
   const photo = effective?.photo ?? '/player_cutout.png'
   const full = effective?.mode === 'full'
@@ -139,11 +150,24 @@ export default function PlayerCardView({
         )}
 
         {/* 🔴 사진을 통째로 까는 모드에서는 **글자보다 먼저** 그린다 — 나중에
-            그리면 사진이 로고와 머리글을 덮는다. */}
+            그리면 사진이 로고와 머리글을 덮는다.
+
+            🔴 **`draggable={false}` 를 빠뜨리지 말 것**(사용자 지적,
+            2026-09-18: 「카드가 있는 모든 곳에서 저 사람 이미지가 계속
+            클릭해서 옮기면 따라 나오는데」). 브라우저는 `<img>` 를 집으면
+            **반투명 유령 그림**을 만들어 따라다니게 한다 — 스쿼드 판처럼
+            카드를 끌어 옮기는 자리에서는 그것이 끌기 위에 겹쳐 보인다.
+            `.ss-squad-seat` 의 `user-select: none` 으로는 **못 막는다**
+            (그건 글자 선택만 막는다 — 그 주석이 「그림도 막는다」고 적어
+            둔 것은 틀렸고 함께 고쳤다).
+
+            🔴 **카드 사진이 나오는 유일한 자리라 여기서 끝난다** — 스쿼드
+            판·헤더·프로필·공개 카드·대기 팝업·리뷰가 전부 이 컴포넌트를
+            지난다. */}
         {full && (
           <div className="ss-pcard-figure" aria-hidden="true">
             {/* eslint-disable-next-line @next/next/no-img-element -- 위와 같은 이유 */}
-            <img src={photo} alt="" decoding="async" />
+            <img src={photo} alt="" decoding="async" draggable={false} />
           </div>
         )}
 
@@ -164,7 +188,7 @@ export default function PlayerCardView({
           <div className="ss-pcard-figure" aria-hidden="true">
             {/* eslint-disable-next-line @next/next/no-img-element -- 사용자가 고른 그림이라
                 크기를 미리 알 수 없다(next/image 는 크기를 요구한다) */}
-            <img src={photo} alt="" decoding="async" />
+            <img src={photo} alt="" decoding="async" draggable={false} />
           </div>
         )}
 

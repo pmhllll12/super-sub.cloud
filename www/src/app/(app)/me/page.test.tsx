@@ -347,6 +347,37 @@ describe('내 프로필 — /me', () => {
     expect(screen.getByText(/되돌릴 수 없습니다/)).toBeInTheDocument()
   })
 
+  /**
+   * **로그아웃을 회원 탈퇴 옆에 둔다** (사용자 요청, 2026-09-18).
+   *
+   * 🔴 여태 로그아웃은 **홈 오른쪽 아래 구석에만** 있었다. 프로필을 보다가
+   * 나가려면 홈으로 되돌아가야 했다 — 계정을 다루는 자리에 계정에서 나가는
+   * 길이 없던 셈이다.
+   *
+   * 🔴 **탈퇴와 달리 접지 않는다.** 접는 이유는 되돌릴 수 없어서인데
+   * (`AccountActions` 머리말), 로그아웃은 다시 로그인하면 그만이다.
+   */
+  it('계정 판에 로그아웃이 있다', () => {
+    render(<MeBody user={USER} card={CARD} videos={[]} matches={[]} />)
+    expect(screen.getByRole('button', { name: '로그아웃' })).toBeInTheDocument()
+  })
+
+  /* 🔴 **로그아웃은 빨갛지 않다.** 되돌릴 수 없는 손짓의 색이라(globals.css
+     의 `--ss-danger` 주석) 나란히 두면 탈퇴와 같은 무게로 읽힌다. */
+  it('로그아웃에는 위험 색을 안 쓴다', () => {
+    render(<MeBody user={USER} card={CARD} videos={[]} matches={[]} />)
+    expect(
+      screen.getByRole('button', { name: '로그아웃' }).className,
+    ).not.toContain('ss-profile-tab--danger')
+  })
+
+  /* 눌러도 탈퇴 폼이 열리면 안 된다 — 둘은 다른 일이다. */
+  it('로그아웃을 눌러도 탈퇴 폼이 안 열린다', () => {
+    render(<MeBody user={USER} card={CARD} videos={[]} matches={[]} />)
+    fireEvent.click(screen.getByRole('button', { name: '로그아웃' }))
+    expect(screen.queryByLabelText('비밀번호')).toBeNull()
+  })
+
   // 🔴 미결 jin-7 — 카드는 **부탁해야** 생긴다(POST /me/card). 그전에는
   // 화면이 "영상이 분석되면 만들어집니다" 라고 **거짓말을 하고 있었다.**
   it('카드가 없으면 편집 모드에서 만들 수 있다', () => {
@@ -456,13 +487,41 @@ describe('내 프로필 — /me', () => {
     const file = new File(['x'], 'me.png', { type: 'image/png' })
     fireEvent.change(screen.getByLabelText('사진 고르기'), { target: { files: [file] } })
 
-    // FileReader 는 비동기다 — 읽기가 끝나야 카드에 실린다.
+    /* 🔴 **미리보기가 먼저 선다**(2026-09-18). 올리는 동안 카드가 그대로면
+       「눌렀는데 아무 일도 안 난다」로 보인다 — 고르는 즉시 `blob:` 으로
+       그려 놓고, S3 업로드는 그 뒤에 돈다.
+       (앞서 이 시험은 `data:`(FileReader)를 기대했다 — 사진을 브라우저에만
+       두던 시절의 값이다.) */
     await waitFor(() => {
       expect(container.querySelector('.ss-pcard-figure img')!.getAttribute('src')).toMatch(
-        /^data:/,
+        /^blob:/,
       )
     })
     expect(container.querySelectorAll('input[type="range"]')).toHaveLength(3)
+  })
+
+  /**
+   * 🔴 **올라가기 전에 저장하면 사진이 안 남는다** — 서버로 가는 값은 S3
+   * 키인데 그것이 아직 없기 때문이다. 말 안 해 주면 「저장했는데 사라졌다」가
+   * 된다. 여기서는 업로드가 실패하는 상황을 세워 그 자리를 본다.
+   */
+  it('사진이 안 올라갔으면 그렇다고 적는다', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(null, { status: 500 }),
+    )
+    const { container } = render(
+      <MeBody user={USER} card={CARD} videos={[]} matches={[]} editing />,
+    )
+    fireEvent.click(screen.getByRole('tab', { name: '사진' }))
+    const file = new File(['x'], 'me.png', { type: 'image/png' })
+    fireEvent.change(screen.getByLabelText('사진 고르기'), { target: { files: [file] } })
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/올리지 못했습니다/)
+    // 미리보기는 그대로 서 있다 — 고른 것이 사라지면 더 혼란스럽다.
+    expect(container.querySelector('.ss-pcard-figure img')!.getAttribute('src')).toMatch(
+      /^blob:/,
+    )
+    vi.restoreAllMocks()
   })
 
   // 🔴 사용자 요청 — 글자를 카드 위에서 끌어 놓는다. 다만 `PLAYER CARD`
