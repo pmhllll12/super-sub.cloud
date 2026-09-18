@@ -2495,18 +2495,3 @@ describe('카드 없이 빈 자리를 누르면', () => {
     for (const seat of screen.queryAllByRole('button', { name: /자리에 선수 넣기/ })) expect(seat).toBeDisabled()
   })
 })
-
-/** 팀이 없어도 카드가 있으면 FW 에 내 카드가 선다(2026-09-19, 사용자 지적). */
-describe('팀 없는 사람의 내 카드', () => {
-  it('카드를 만들었으면 팀이 없어도 FW 에 내 카드가 앉는다', () => {
-    const { container } = render(<SquadPanel card={CARD} myCardId={CARD.id} squad={null} />)
-    expect(container.querySelector('.ss-pcard-alias')?.textContent).toBe('THREE LUNGS')
-  })
-
-  it('팀이 있는 팀원은 여전히 스스로 앉지 않는다(등재는 팀장 몫)', async () => {
-    const { container } = render(
-      <SquadPanel card={CARD} myCardId={CARD.id} squad={SQUAD} isCaptain={false} />,
-    )
-    expect(container.querySelector('.ss-pcard-alias')).toBeNull()
-  })
-})

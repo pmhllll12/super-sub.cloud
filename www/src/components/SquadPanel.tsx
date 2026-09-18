@@ -957,12 +957,8 @@ export default function SquadPanel({
     /* 🔴 **팀장만 스스로 앉는다**(2026-09-17). 앉는 것은 곧 등재
        (`POST /squad/members`)이고 등재는 주장 전용이라, 팀원이 앉으면
        403 이 나고 **판에만 섰다가 새로고침에 사라진다.** 팀원의 카드는
-       팀장이 등재해 주었을 때 서버가 준 스쿼드로 선다.
-       🔴 **단, 팀이 아직 없으면(`squad` 없음) 앉는다**(2026-09-19, 사용자 지적 —
-       「카드 만들었는데 왜 FW 에 내 카드 안 박힘?」). 팀이 없으면 팀장도 아니라
-       여기서 같이 막혔는데, 그때는 서버로 나가는 등재가 없으므로(아래 `if (squad
-       …)`) 막을 이유가 없다 — 화면에만 선다. */
-    if ((squad && !isCaptain) || mySeat || !myCardId) return
+       팀장이 등재해 주었을 때 서버가 준 스쿼드로 선다. */
+    if (!isCaptain || mySeat || !myCardId) return
     const next = slots.map((sl) => (sl.area === area ? { ...sl, mine: true } : sl))
     setSlots(next)
     setPicking(null)
