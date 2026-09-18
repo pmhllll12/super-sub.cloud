@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { Match, MyVideo, PlayerCard, User } from '@/server/backend'
+import { HIDDEN_MARKS, MARKS } from '@/components/CardMark'
 import { MeBody } from './page'
 
 // NicknameForm 이 useRouter 를 쓴다.
@@ -438,6 +439,21 @@ describe('내 프로필 — /me', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '없음' }))
     expect(container.querySelector('.ss-card-stage .ss-pcard .ss-card-mark')).toBeNull()
+  })
+
+  // 🔴 거둔 자국은 **고르는 칸에서만** 사라진다. 배열에서 지우면 뒤 번호가
+  //    당겨져 이미 저장된 카드가 말없이 바뀌므로, 자리는 그대로 두고 안 그린다.
+  //    (`CardMark.test.tsx` 가 배열 쪽 불변을 붙든다.)
+  it('감춘 자국은 고르는 칸에 안 뜬다', () => {
+    render(<MeBody user={USER} card={CARD} videos={[]} matches={[]} editing />)
+    fireEvent.click(screen.getByRole('tab', { name: '붓' }))
+
+    for (const i of HIDDEN_MARKS) {
+      expect(screen.queryByRole('button', { name: MARKS[i] })).toBeNull()
+    }
+    // 감춘 것 말고는 다 있어야 한다 — 실수로 더 지웠는지 여기서 걸린다.
+    const shown = MARKS.filter((_, i) => !HIDDEN_MARKS.has(i)).length
+    expect(document.querySelectorAll('.ss-card-mark-pick')).toHaveLength(shown)
   })
 
   // 🔴 꾸민 값이 **그 자리의 카드**에 바로 실린다 — 미리보기를 따로 두지 않는다.

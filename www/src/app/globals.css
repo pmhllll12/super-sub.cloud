@@ -10496,7 +10496,7 @@ body:has(.ss-shot) .ss-app-figure {
   -webkit-mask-size: contain;
 }
 
-/* 고르는 칸 — 열둘을 한눈에. */
+/* 고르는 칸 — 자국을 한눈에. */
 /* 기본 자국(원래 붓칠)도 같은 자리 · 같은 변형을 받는다. */
 .ss-card-mark-default {
   display: block;

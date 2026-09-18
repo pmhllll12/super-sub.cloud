@@ -6,7 +6,7 @@ import { apiErrorMessage, apiPost } from '@/lib/api/client'
 import { uploadCardPhoto } from '@/lib/cardPhoto'
 import PillButton from '@/components/ui/PillButton'
 import type { PlayerCard } from '@/server/backend'
-import CardMark, { MARKS } from '@/components/CardMark'
+import CardMark, { HIDDEN_MARKS, MARKS } from '@/components/CardMark'
 import { useCardStyle } from './cardStyle'
 
 /**
@@ -402,7 +402,7 @@ function CardPhoto() {
   )
 }
 
-/** 붓 — 열 가지 자국 중 하나를 고르고 색 · 크기 · 자리를 정한다. */
+/** 붓 — 자국(`CardMark.MARKS`) 하나를 고르고 색 · 크기 · 자리를 정한다. */
 function CardBrushTool() {
   const { style, set } = useCardStyle()
   return (
@@ -410,26 +410,30 @@ function CardBrushTool() {
       {/* 🔴 이름만 늘어놓지 않고 **모양을 보여준다** — 「빗살」과 「격자」는
           글자로는 구별이 안 된다. */}
       <ul className="ss-card-marks">
-        {MARKS.map((name, i) => (
-          <li key={name}>
-            <button
-              type="button"
-              className="ss-card-mark-pick"
-              data-on={style.brush === i}
-              aria-pressed={style.brush === i}
-              aria-label={name}
-              onClick={() => set({ brush: i })}
-            >
-              {/* 🔴 고르는 칸에도 **같은 컴포넌트**를 그린다. 미리보기를 따로
-                  만들면 자국을 고칠 때 두 벌이 따로 늙는다. */}
-              {i === 1 ? (
-                <span className="ss-card-mark-none">없음</span>
-              ) : (
-                <CardMark index={i} seed="pick" />
-              )}
-            </button>
-          </li>
-        ))}
+        {/* 🔴 `filter` 로 걸러내지 않는다 — 걸러내면 `i` 가 다시 매겨져
+            **저장되는 번호가 밀린다.** 자리는 그대로 두고 그리지만 않는다. */}
+        {MARKS.map((name, i) =>
+          HIDDEN_MARKS.has(i) ? null : (
+            <li key={name}>
+              <button
+                type="button"
+                className="ss-card-mark-pick"
+                data-on={style.brush === i}
+                aria-pressed={style.brush === i}
+                aria-label={name}
+                onClick={() => set({ brush: i })}
+              >
+                {/* 🔴 고르는 칸에도 **같은 컴포넌트**를 그린다. 미리보기를 따로
+                    만들면 자국을 고칠 때 두 벌이 따로 늙는다. */}
+                {i === 1 ? (
+                  <span className="ss-card-mark-none">없음</span>
+                ) : (
+                  <CardMark index={i} seed="pick" />
+                )}
+              </button>
+            </li>
+          ),
+        )}
       </ul>
 
       {/* '없음'(1) 일 때만 조정할 것이 없다 — 기본(0)도 색 · 크기 · 자리를 따른다. */}

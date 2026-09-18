@@ -9,6 +9,7 @@ import { type MatchPrefs } from '@/lib/matchPrefs'
 import { loadTeamPrefs, saveTeamPrefs } from '@/lib/teamPrefsStore'
 import { startSeeking, stopSeeking } from '@/lib/seekingStore'
 import { useFitToViewport } from '@/lib/useFitToViewport'
+import { useWheelTrap } from '@/lib/useWheelTrap'
 
 /**
  * **비슷한 팀 명단** — 「팀 매칭」을 누르면 판 오른쪽에 선다(사용자 요청,
@@ -84,6 +85,9 @@ export default function TeamMatch({
    * **판 안에서 굴리면 페이지가 안 움직인다** (사용자 지적, 2026-09-18:
    * 「팀 매칭 판에서 다른 팀 보려고 스크롤 하면 아예 비디오로 내려와」).
    *
+   * 🔴 **영상 쪽 「다음 영상」 목록에서도 같은 일이 났다.** 되풀이하지 않게
+   * `lib/useWheelTrap.ts` 로 뺐다 — 왜 이렇게 하는지는 그 머리말에 있다.
+   *
    * 🔴 `.ss-tm-list` 에는 이미 `overscroll-behavior: contain` 이 있다. 새는
    * 자리는 **목록 밖**이다 — 머리줄이나 아래 안내 위에서 굴리면 그 휠은
    * 목록이 아니라 **페이지**로 가고, 홈은 아래가 영상 모음이라 거기까지
@@ -94,25 +98,7 @@ export default function TeamMatch({
    * 🔴 **`passive: false` 로 붙인다** — React 의 `onWheel` 은 passive 라
    * `preventDefault()` 가 조용히 무시된다.
    */
-  useEffect(() => {
-    const panel = fitRef.current
-    if (!panel) return
-    function onWheel(e: WheelEvent) {
-      const list = listRef.current
-      if (!list) return
-      const down = e.deltaY > 0
-      const canScroll = down
-        ? list.scrollTop + list.clientHeight < list.scrollHeight - 1
-        : list.scrollTop > 0
-      const inList = list.contains(e.target as Node)
-      if (inList && canScroll) return
-      // 머리·아래에서 굴려도 **목록이** 구른다 — 판 위라면 어디서든 자연스럽게.
-      if (!inList && canScroll) list.scrollTop += e.deltaY
-      e.preventDefault()
-    }
-    panel.addEventListener('wheel', onWheel, { passive: false })
-    return () => panel.removeEventListener('wheel', onWheel)
-  }, [fitRef])
+  useWheelTrap(fitRef, listRef)
   /** 지금 수락을 기다리는 팀. 하나뿐이다 — 두 곳에 동시에 신청하지 않는다. */
   const [waiting, setWaiting] = useState<string | null>(null)
   /** 신청이 실제로 나간 팀 — 줄에 「수락 대기 중」이라고 적는다. */
