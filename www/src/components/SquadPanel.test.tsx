@@ -2056,6 +2056,48 @@ describe('스쿼드 — 수락한 팀원', () => {
  * 2) 상대 판에 사람이 적게 나온다 — 칸(`grid_col`/`grid_row`)이 저장된 등재만
  *    골라서, 초대만 수락한 사람이 **본인 화면엔 있고 남의 화면엔 없었다.**
  */
+/**
+ * 🔴 **스쿼드가 없는 팀을 주장의 화면이 되살린다** (사용자 요청, 2026-09-18:
+ * 심사위원용 로그인이 기존 계정처럼 돌게).
+ *
+ * 팀을 만들 때 스쿼드도 여는 호출이 있는데(`TeamActions`) 실패를 삼키고
+ * **다시 시도하는 자리가 없다.** 운영의 「심사위원 FC」가 그래서 팀원 9명에
+ * 스쿼드 0이었고, 판이 빈 채로 떠서 팀 매칭 단추도 안 켜졌다.
+ */
+describe('스쿼드 — 없으면 주장 화면이 만든다', () => {
+  const calls = () => {
+    const fn = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({}) })
+    vi.stubGlobal('fetch', fn)
+    return fn
+  }
+  const posted = (fn: ReturnType<typeof vi.fn>) =>
+    fn.mock.calls.filter(
+      (c) => c[1]?.method === 'POST' && String(c[0]).endsWith('/squad'),
+    )
+
+  it('주장이고 스쿼드가 없으면 만든다', async () => {
+    const fn = calls()
+    render(<SquadPanel isCaptain card={CARD} squad={null} myTeamId={MY_TEAM_ID} />)
+    await waitFor(() => expect(posted(fn).length).toBe(1))
+    expect(String(posted(fn)[0][0])).toContain(MY_TEAM_ID)
+  })
+
+  it('🔴 이미 있으면 안 만든다', async () => {
+    const fn = calls()
+    render(<SquadPanel isCaptain card={CARD} squad={SQUAD} myTeamId={MY_TEAM_ID} />)
+    await waitFor(() => expect(fn).toHaveBeenCalled())
+    expect(posted(fn)).toHaveLength(0)
+  })
+
+  /* 계약 3-7절 — 주장 전용이라 팀원이 부르면 403 이다. 아예 안 부른다. */
+  it('🔴 팀원 화면은 안 만든다', async () => {
+    const fn = calls()
+    render(<SquadPanel card={CARD} squad={null} myTeamId={MY_TEAM_ID} />)
+    await waitFor(() => expect(fn).toHaveBeenCalled())
+    expect(posted(fn)).toHaveLength(0)
+  })
+})
+
 describe('스쿼드 — 경기가 잡힌 화면', () => {
   const member = (id: string, nickname: string, pos: string, cell: { c: number; r: number } | null) => ({
     id,

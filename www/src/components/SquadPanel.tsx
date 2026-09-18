@@ -639,6 +639,36 @@ export default function SquadPanel({
    * 🔴 그릴 때 읽지 않고 **붙은 뒤에** 읽는다 — 서버가 그린 HTML 에는 이
    * 브라우저의 값이 있을 수 없어서, 처음부터 읽으면 양쪽이 달라진다.
    */
+  /**
+   * 🔴 **스쿼드가 없으면 주장의 화면이 그 자리에서 만든다** (2026-09-18,
+   * 사용자 요청: 심사위원용 로그인이 기존 계정처럼 돌게).
+   *
+   * 팀을 만들 때 스쿼드도 같이 여는 호출이 있는데(`TeamActions`) **실패를
+   * 삼킨다** — 「팀이 생긴 것 자체를 실패로 돌리지 않는다」는 판단이었다.
+   * 그런데 **다시 시도하는 자리가 없어서**, 한 번 어긋난 팀은 영영 스쿼드가
+   * 없고 판이 빈 채로 뜬다. 운영의 「심사위원 FC」가 그랬다 — 팀원이 9명인데
+   * 스쿼드가 없어 판이 비고, 그러면 팀 매칭 단추도 안 켜진다.
+   *
+   * 🔴 **주장만**이다(계약 3-7절, 아니면 403). 🔴 **멱등이라 안전하다** —
+   * 이미 있으면 200 으로 있는 것을 돌려준다. 🔴 **한 번만 시도한다** — 실패가
+   * 반복되는 팀에서 매번 두드리지 않는다.
+   */
+  const madeSquad = useRef(false)
+  useEffect(() => {
+    if (madeSquad.current || !isCaptain || squad || !myTeamId) return
+    madeSquad.current = true
+    /* 🔴 **여기서 화면을 다시 그리지 않는다.** 스쿼드가 없는 팀은 등재도
+       없으므로 판의 모습은 어차피 그대로다 — 이 호출이 고치는 것은 **그 뒤로
+       앉히는 것이 서버에 남는가**이다(등재·배치가 전부 스쿼드 밑이다).
+       다시 그리게 하려면 라우터가 필요한데, 그 의존 하나 때문에 이 판의
+       시험 전부가 라우터 대역을 세워야 한다 — 얻는 것에 비해 비싸다. */
+    void fetch(`/api/teams/${encodeURIComponent(myTeamId)}/squad`, { method: 'POST' }).catch(
+      () => {
+        /* 못 만들어도 판은 그대로 열린다 — 빈 판이 뜨는 것이 지금 동작이다. */
+      },
+    )
+  }, [isCaptain, squad, myTeamId])
+
   const restored = useRef(false)
   useEffect(() => {
     if (restored.current || !myTeamId) return
