@@ -50,7 +50,8 @@ export default function DemoVideo() {
   // 사용자가 모서리를 끌어 바꾼 것 — 기본 자리에서 얼마나 옮기고 키웠나.
   const [adj, setAdj] = useState<Adjust | null>(null)
   const [closed, setClosed] = useState(false)
-  const [flash, setFlash] = useState<{ kind: 'play' | 'pause'; n: number }>({ kind: 'play', n: 0 })
+  // 다시 틀 때 ▶ 를 한 번 띄웠다 사라지게 하는 열쇠 — 바꿀 때마다 새로 돈다.
+  const [flash, setFlash] = useState(0)
   const [paused, setPaused] = useState(false)
   const [time, setTime] = useState(0)
   const [duration, setDuration] = useState(0)
@@ -215,11 +216,16 @@ export default function DemoVideo() {
   const toggle = () => {
     const v = videoRef.current
     if (!v) return
-    if (v.paused) v.play().catch(() => {})
-    else v.pause()
-    // 누를 때마다 가운데에 방금 한 일(▶ 또는 ❚❚)을 한 번 크게 띄웠다 사라지게 —
-    // 「눌렸다」는 느낌(사용자 요청, 유튜브와 같은 되먹임). 키를 바꿔 매번 새로 돈다.
-    setFlash((f) => ({ kind: v.paused ? 'pause' : 'play', n: f.n + 1 }))
+    // 🔴 **아이콘은 ▶ 하나뿐이다**(사용자 정정). 멈추려고 누르면 ▶ 가 떠서 남고,
+    // 다시 틀려고 누르면 그 ▶ 가 한 번 커지며 사라진다. ❚❚ 를 번쩍였다가 ▶ 로
+    // 바뀌는 것(유튜브식)은 「재생 아이콘이 나오고 정지 아이콘이 나와 이상하다」로
+    // 되돌렸다.
+    if (v.paused) {
+      v.play().catch(() => {})
+      setFlash((n) => n + 1)
+    } else {
+      v.pause()
+    }
   }
 
   // 끌어 옮기기 — 영상(과 붙은 단추)을 원하는 데 둔다(사용자 요청). 영상을 누르는
@@ -328,14 +334,10 @@ export default function DemoVideo() {
           >
             {/* 멈춰 있는 동안은 가운데 ▶ 가 계속 떠 있다 — 멈춘 줄 모르고 「안
                 나온다」로 읽히지 않게. */}
-            {paused && <span aria-hidden="true" className="ss-demo-video-icon ss-demo-video-steady" data-kind="play" />}
-            {flash.n > 0 && (
-              <span
-                key={flash.n}
-                aria-hidden="true"
-                className="ss-demo-video-icon ss-demo-video-flash"
-                data-kind={flash.kind === 'play' ? 'play' : 'pause'}
-              />
+            {paused ? (
+              <PlayIcon className="ss-demo-video-icon" />
+            ) : (
+              flash > 0 && <PlayIcon key={flash} className="ss-demo-video-icon ss-demo-video-flash" />
             )}
           </button>
           {/* 유튜브식 되감기 막대(사용자 요청) — 앞부분을 다시 보거나 원하는 데로 건너뛴다.
@@ -387,6 +389,15 @@ export default function DemoVideo() {
         ))}
       </div>
     </>
+  )
+}
+
+/** 가운데 ▶ — 판 없이 삼각형만, 작고 가늘게(사용자 요청). */
+function PlayIcon({ className }: { className: string }) {
+  return (
+    <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
+      <path d="M8.5 6.2v11.6c0 .5.5.8.9.5l9-5.8a.6.6 0 0 0 0-1L9.4 5.7c-.4-.3-.9 0-.9.5z" />
+    </svg>
   )
 }
 

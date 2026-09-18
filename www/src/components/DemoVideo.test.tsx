@@ -213,3 +213,18 @@ describe('끌어 옮기기', () => {
     cleanup()
   })
 })
+
+describe('가운데 아이콘', () => {
+  it('멈추면 ▶ 하나만 뜨고, 다시 틀면 그 ▶ 가 사라지는 연출 하나만 — ❚❚ 는 없다', async () => {
+    const { container } = render(<DemoVideo />)
+    await act(async () => {})
+    const btn = container.querySelector<HTMLElement>('.ss-demo-video-toggle')!
+    expect(btn.querySelectorAll('.ss-demo-video-icon')).toHaveLength(0) // 재생 중엔 없다
+    fireEvent.click(btn) // 멈춤
+    expect(btn.querySelectorAll('.ss-demo-video-icon')).toHaveLength(1)
+    expect(btn.querySelector('.ss-demo-video-flash')).toBeNull()
+    fireEvent.click(btn) // 재생
+    expect(btn.querySelectorAll('.ss-demo-video-icon')).toHaveLength(1)
+    expect(btn.querySelector('.ss-demo-video-flash')).not.toBeNull()
+  })
+})

@@ -15015,73 +15015,37 @@ a.ss-seeking-pill:hover {
   border-radius: inherit;
 }
 
-/* 가운데 재생/멈춤 아이콘 — 둥근 검은 판 위에 ▶ 또는 ❚❚.
-   멈춘 동안은 ▶ 가 계속 떠 있고, 누를 때마다 방금 한 일이 한 번 크게 떴다가
-   사라진다(.ss-demo-video-flash) — 「눌렸다」는 느낌(사용자 요청). */
+/* 가운데 ▶ — 판(검은 원) 없이 삼각형만, 작게(사용자 요청). 밝은 장면에서도
+   읽히게 옅은 그림자만 준다. 멈춘 동안은 떠 있고, 다시 틀 때 한 번 커지며
+   사라진다(.ss-demo-video-flash). ❚❚ 는 없다. */
 .ss-demo-video-icon {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: clamp(40px, 16%, 64px);
+  width: clamp(22px, 9%, 34px);
+  height: auto;
   aspect-ratio: 1;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--ss-bg) 55%, transparent);
+  fill: var(--ss-demo-edge);
+  filter: drop-shadow(0 1px 3px color-mix(in srgb, var(--ss-bg) 60%, transparent));
   transform: translate(-50%, -50%);
   pointer-events: none;
 }
 
-/* ▶ — 가운데보다 살짝 오른쪽이 눈에는 가운데다. */
-.ss-demo-video-icon[data-kind='play']::before {
-  content: '';
-  position: absolute;
-  left: 54%;
-  top: 50%;
-  width: 0;
-  height: 0;
-  border-style: solid;
-  border-width: 0.55em 0 0.55em 0.9em;
-  border-color: transparent transparent transparent var(--ss-demo-edge);
-  font-size: clamp(12px, 1.4vw, 18px);
-  transform: translate(-50%, -50%);
-}
-
-/* ❚❚ — 두 막대. */
-.ss-demo-video-icon[data-kind='pause']::before,
-.ss-demo-video-icon[data-kind='pause']::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  width: 11%;
-  height: 36%;
-  border-radius: 2px;
-  background: var(--ss-demo-edge);
-  transform: translateY(-50%);
-}
-
-.ss-demo-video-icon[data-kind='pause']::before { left: 36%; }
-.ss-demo-video-icon[data-kind='pause']::after { right: 36%; }
-
-/* 멈춘 동안 떠 있는 ▶ 는 **번쩍임(❚❚)이 사라진 뒤에** 들어온다 — 같이 뜨면
-   두 아이콘이 겹쳐 지저분하다(헤드리스 캡처로 확인). */
-.ss-demo-video-steady {
-  animation: ss-demo-in 0.2s ease-out 0.45s both;
-}
-
 .ss-demo-video-flash {
-  animation: ss-demo-flash 0.6s ease-out both;
+  animation: ss-demo-flash 0.5s ease-out both;
 }
 
 @keyframes ss-demo-flash {
-  from { opacity: 1; transform: translate(-50%, -50%) scale(0.85); }
-  to { opacity: 0; transform: translate(-50%, -50%) scale(1.6); }
+  from { opacity: 0.95; transform: translate(-50%, -50%) scale(1); }
+  to { opacity: 0; transform: translate(-50%, -50%) scale(1.5); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .ss-demo-video-flash { animation-duration: 0.01s; }
 }
 
-/* 되감기 막대 — 유튜브처럼 빨간 진행 · 회색 남은 길. 평소엔 숨고 가리키거나
-   (포커스·멈춤 포함) 뜬다. 🔴 `opacity` 로만 감춘다 — `display:none` 이면 자판으로
+
+/* 되감기 막대 — 유튜브처럼 빨간 진행 · 회색 남은 길. 가리킬 때만 뜬다. 🔴 `opacity` 로만 감춘다 — `display:none` 이면 자판으로
    막대에 못 닿는다. */
 .ss-demo-video {
   --ss-demo-progress: #ff0033;
@@ -15099,13 +15063,18 @@ a.ss-seeking-pill:hover {
   padding: 18px 10px 6px;
   background: linear-gradient(to top, color-mix(in srgb, var(--ss-bg) 75%, transparent), transparent);
   opacity: 0;
-  transition: opacity 0.2s ease;
+  /* 떠날 때 — **2초 기다렸다가** 0.5초에 걸쳐 스르르(사용자 요청). */
+  transition: opacity 0.5s ease 2s;
 }
 
+/* 영상에 가져다 댔을 때만 뜬다 — 들어올 때는 곧바로. 🔴 멈춰 있다고 띄우지
+   않는다(사용자 요청 — 가져다 댈 때만). 자판으로 막대에 왔을 때만 예외로 띄운다
+   (`:focus-within` 이 아니라 `:focus-visible` — 영상을 마우스로 누르면 단추에
+   포커스가 남아 막대가 영영 안 사라진다). */
 .ss-demo-video:hover .ss-demo-video-bar,
-.ss-demo-video:focus-within .ss-demo-video-bar,
-.ss-demo-video:has([aria-pressed='true']) .ss-demo-video-bar {
+.ss-demo-video:has(:focus-visible) .ss-demo-video-bar {
   opacity: 1;
+  transition: opacity 0.15s ease;
 }
 
 /* 눌리는 자리는 넉넉히(위아래 6px), 그려지는 막대는 얇게 — 3px 막대를 정확히
