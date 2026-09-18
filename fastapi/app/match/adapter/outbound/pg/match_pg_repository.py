@@ -651,10 +651,13 @@ class MatchPgRepository(MatchPort):
             ),
             or_(
                 TeamMatchRequestOrm.status == PENDING,
-                # 🔴 수락된 것은 **아직 안 지난 것만** 센다 — 지난 경기까지
-                #    세면 그 상대와 다시는 못 잡는다.
+                # 🔴 수락된 것은 **경기가 아직 있고 안 지난 것만** 센다.
+                #    지난 경기까지 세면 그 상대와 다시는 못 잡고, `match_id` 를
+                #    안 보면 **물린 경기가 영원히 막는다**(취소는 `match` 행을
+                #    지우고 FK 가 `match_id` 만 비운다 — `status` 는 그대로다).
                 and_(
                     TeamMatchRequestOrm.status == ACCEPTED,
+                    TeamMatchRequestOrm.match_id.is_not(None),
                     TeamMatchRequestOrm.proposed_played_at >= now,
                 ),
             ),

@@ -199,6 +199,14 @@ class StubMatchRepository(StubApplicationsMixin, MatchPort):
 
     def delete_match(self, match_id: UUID, actor_id: UUID) -> None:
         _MATCHES.pop(match_id, None)
+        # 🔴 **DB 의 외래키를 흉내낸다.** `team_match_request.match_id` 는
+        #    `ON DELETE SET NULL` 이라 경기가 지워지면 실물에서는 저절로
+        #    비워진다(`status` 는 `accepted` 로 남는다). 여기서 안 비우면
+        #    「물린 경기」가 스텁에서만 살아 있어, 겹치기 방지가 스텁으로는
+        #    통과하고 실물에서 다르게 돈다.
+        for rid, r in list(_TEAM_MATCH_REQUESTS.items()):
+            if r.match_id == match_id:
+                _TEAM_MATCH_REQUESTS[rid] = replace(r, match_id=None)
 
     def find_positions(
         self, team_id: UUID, codes: list[str]
@@ -268,7 +276,11 @@ class StubMatchRepository(StubApplicationsMixin, MatchPort):
             {r.requester_team_id, r.target_team_id} == pair
             and (
                 r.status == PENDING
-                or (r.status == ACCEPTED and r.proposed_played_at >= now)
+                or (
+                    r.status == ACCEPTED
+                    and r.match_id is not None
+                    and r.proposed_played_at >= now
+                )
             )
             for r in _TEAM_MATCH_REQUESTS.values()
         )

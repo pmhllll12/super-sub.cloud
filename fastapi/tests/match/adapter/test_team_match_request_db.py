@@ -168,6 +168,32 @@ class TestDuplicateGuard:
         assert again.status_code == 409, again.text
         assert error_code(again) == "TEAM_MATCH_REQUEST_ALREADY_LIVE"
 
+    def test_물린_경기는_막지_않는다(self, db_client, db_session, world):
+        """🔴 실물 FK 가 `SET NULL` 인 것에 기댄다 — 그래서 여기서 봐야 한다.
+
+        취소는 `match` 행만 지우고 신청의 `status` 는 `accepted` 로 남는다.
+        `status` 만 세면 **한 번 물린 상대와 영영 못 붙는다**(운영에 그런 행이
+        11건 있었다).
+        """
+        request_id = self._create(db_client, world).json()["id"]
+        accepted = db_client.post(
+            f"{V1}/teams/{world['team_b']}/match-requests/{request_id}/accept",
+            headers=world["b_owner"]["headers"],
+        ).json()
+        db_client.delete(
+            f"{V1}/matches/{accepted['match_id']}",
+            headers=world["a_owner"]["headers"],
+        )
+        row = db_session.execute(
+            text("select status, match_id from team_match_request where id = :i"),
+            {"i": request_id},
+        ).one()
+        # 전제가 무너지면(FK 가 바뀌면) 아래 단언보다 여기서 먼저 걸린다.
+        assert row.status == "accepted" and row.match_id is None
+
+        again = self._create(db_client, world)
+        assert again.status_code == 201, again.text
+
     def test_지난_경기는_막지_않는다(self, db_client, db_session, world):
         """🔴 안 그러면 **한 번 붙은 팀과는 다시는 못 붙는다.**"""
         request_id = self._create(db_client, world).json()["id"]
