@@ -45,6 +45,11 @@ type State =
   | { kind: 'error'; message: string }
   | { kind: 'ok'; teams: CandidateTeam[] }
 
+/** 두 자리로 맞춘다 — `datetime-local` 은 `2026-09-05T07:30` 처럼 0 을 요구한다. */
+function pad2(n: number): string {
+  return String(n).padStart(2, '0')
+}
+
 export default function TeamMatch({
   size,
   closing,
@@ -178,6 +183,11 @@ export default function TeamMatch({
    * 🔴 **지난 시각은 안 쓴다.** 서버가 받아 줘도 아무도 못 뛰고, 대기 화면이
    * 열리자마자 「경기 끝내기」로 바뀐다(`matchProposal.ts` 의 같은 판단).
    */
+  /** `Date` → `datetime-local` 값(`2026-09-18T19:30`). **지역 시각 그대로**다. */
+  const toInput = (at: Date) =>
+    `${at.getFullYear()}-${pad2(at.getMonth() + 1)}-${pad2(at.getDate())}` +
+    `T${pad2(at.getHours())}:${pad2(at.getMinutes())}`
+
   const customDate = useMemo(() => {
     if (!customAt) return null
     const at = new Date(customAt)
@@ -186,6 +196,8 @@ export default function TeamMatch({
   }, [customAt])
   /** 골라 놓고 **지난** 시각이면 신청을 막는다 — 왜 안 눌리는지 옆에 적는다. */
   const customIsPast = customDate !== null && customDate.getTime() <= Date.now()
+  /** 달력이 **지난 시각을 못 고르게** 한다 — 막는 것과 별개로 손이 덜 간다. */
+  const minAt = toInput(new Date())
   const [pickedPlace, setPickedPlace] = useState<string>('')
 
   /**
@@ -373,6 +385,13 @@ export default function TeamMatch({
                   setPicking(picking === t.id ? null : t.id)
                   setPickedAt(proposals[0] ?? null)
                   setPickedPlace('')
+                  /* 🔴 **열자마자 쓸 수 있는 시각을 채운다**(사용자 지적,
+                     2026-09-18). 비워 두었더니 달력에서 **날짜만** 고르고
+                     시각이 `00:00` 으로 남아 「지난 시각입니다」에 걸렸다 —
+                     사람이 잘못한 것이 아니라 빈 칸이 그렇게 만든 것이다.
+                     10분 뒤면 신청·수락·대기 화면을 보기에 충분하고, 시연에서
+                     경기 끝내기·리뷰까지 가는 데도 알맞다. */
+                  setCustomAt(toInput(new Date(Date.now() + 10 * 60 * 1000)))
                 }}
               >
                 {sentTo === t.id
@@ -395,7 +414,12 @@ export default function TeamMatch({
                           것은 추천 후보 필터를 푸는 정상적인 길이라(프로필의
                           「시간 조건 지우기」), 그 상태에서 경기를 못 걸면
                           앞뒤가 안 맞는다. 아래 「직접 고르기」로 잡으면 된다. */}
-                      {proposals.length === 0 ? (
+                      {/* 🔴 **직접 고른 값이 있으면 제안을 안 그린다**(사용자
+                          지적, 2026-09-18: 「내가 직접 고르면 이거는 필요없는거
+                          아님?」). 직접 고른 쪽이 이기는데 둘이 같이 떠 있으면
+                          **어느 것이 쓰이는지 알 수 없다.** 칸을 비우면 제안이
+                          다시 나온다 — 제안을 없앤 것이 아니다. */}
+                      {customAt ? null : proposals.length === 0 ? (
                         <p className="ss-tm-note">
                           경기 조건에 시간대가 없습니다 — 아래에서 직접 고르세요.
                         </p>
@@ -425,6 +449,7 @@ export default function TeamMatch({
                         <span>직접 고르기</span>
                         <input
                           type="datetime-local"
+                          min={minAt}
                           value={customAt}
                           onChange={(e) => setCustomAt(e.target.value)}
                         />

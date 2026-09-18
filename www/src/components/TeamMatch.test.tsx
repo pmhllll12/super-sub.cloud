@@ -174,19 +174,34 @@ describe('비슷한 팀 명단', () => {
 
     await user.click(screen.getAllByRole('button', { name: '경기 신청' })[0])
 
-    expect(screen.getByText('언제')).toBeInTheDocument()
+    /* 🔴 **열자마자 쓸 수 있는 시각이 채워져 있다**(2026-09-18) — 비워
+       두었더니 달력에서 날짜만 고르고 시각이 `00:00` 으로 남아 「지난
+       시각입니다」에 걸렸다. 그래서 제안 줄(「언제」) 대신 이 칸이 먼저 뜬다. */
+    const at = screen.getByLabelText('직접 고르기') as HTMLInputElement
+    expect(at.value).not.toBe('')
+    expect(new Date(at.value).getTime()).toBeGreaterThan(Date.now())
+
     expect(screen.getByText('어디서')).toBeInTheDocument()
     // 구장을 안 골랐으면 못 보낸다.
     expect(screen.getByRole('button', { name: '이 시각으로 신청' })).toBeDisabled()
   })
 
   /* 🔴 **시각은 우리 조건에서 온다** — 지어내지 않는다. 조건이 토요일뿐이면
-     고를 수 있는 것도 토요일뿐이다. */
-  it('고를 수 있는 시각은 우리 조건에서 나온다', async () => {
+     고를 수 있는 것도 토요일뿐이다.
+
+     🔴 **직접 고르기 칸을 비워야 제안이 나온다**(2026-09-18) — 둘이 같이
+     떠 있으면 어느 것이 쓰이는지 알 수 없어서, 직접 고른 값이 있으면
+     제안을 안 그린다. **제안을 없앤 것이 아니라는 것**이 이 시험이다. */
+  it('직접 고르기를 비우면 우리 조건에서 나온 시각이 돌아온다', async () => {
     const user = userEvent.setup()
     open()
     await screen.findByText('망원 유나이티드')
     await user.click(screen.getAllByRole('button', { name: '경기 신청' })[0])
+
+    // 채워져 있는 동안에는 제안 줄이 없다.
+    expect(screen.queryByText('언제')).toBeNull()
+
+    fireEvent.change(screen.getByLabelText('직접 고르기'), { target: { value: '' } })
 
     const when = screen.getByText('언제').closest('label')?.querySelector('select')
     expect(when).not.toBeNull()
