@@ -2292,6 +2292,59 @@ describe('스쿼드 — ⊗ 는 등재된 사람도 서버에서 뺀다', () => 
     render(<SquadPanel card={CARD} squad={SEATED} myTeamId={MY_TEAM_ID} />)
     expect(screen.queryByRole('button', { name: '더미선수 빼기' })).toBeNull()
   })
+
+  /**
+   * 🔴 **팀에서도 내보낸다** (사용자 결정, 2026-09-18: 「x 가 팀에서도 빠지는 것」).
+   *
+   * 판에서만 내리면 그 사람이 여전히 팀원이라 **AI 추천 후보에서 계속 빠진다**
+   * — 운영에서 그렇게 12명이 쌓여 추천 목록이 말랐다.
+   */
+  it('🔴 팀에서도 내보낸다 — 판에서만 내리면 추천 후보가 마른다', async () => {
+    const fn = vi.fn(async (url: string) => ({
+      ok: true,
+      status: 200,
+      json: async () =>
+        String(url).includes('/api/cards/')
+          ? { user: { id: 'u-dummy', nickname: '더미선수' } }
+          : SEATED,
+    }))
+    vi.stubGlobal('fetch', fn)
+    const user = userEvent.setup()
+    render(<SquadPanel isCaptain card={CARD} squad={SEATED} myTeamId={MY_TEAM_ID} />)
+    await user.click(await screen.findByRole('button', { name: '더미선수 빼기' }))
+
+    /* 🔴 `memberId` 는 **그 사람의 user_id** 다 — 소속 행의 id 가 아니다. */
+    await waitFor(() =>
+      expect(
+        deleted(fn).some((u) => u.includes(`/teams/${MY_TEAM_ID}/members/u-dummy`)),
+      ).toBe(true),
+    )
+  })
+
+  /* 🔴 **나는 안 내보낸다** — 주장이 스스로 나가면 팀이 주인을 잃는다
+     (`409 LAST_OWNER`). 내 카드엔 ⊗ 가 없지만 한 겹 더 막아 둔 것을 지킨다. */
+  it('내 카드의 주인은 팀에서 안 내보낸다', async () => {
+    const fn = vi.fn(async (url: string) => ({
+      ok: true,
+      status: 200,
+      json: async () =>
+        String(url).includes('/api/cards/')
+          ? { user: { id: CARD.user.id, nickname: CARD.user.nickname } }
+          : SEATED,
+    }))
+    vi.stubGlobal('fetch', fn)
+    const user = userEvent.setup()
+    render(<SquadPanel isCaptain card={CARD} squad={SEATED} myTeamId={MY_TEAM_ID} />)
+    await user.click(await screen.findByRole('button', { name: '더미선수 빼기' }))
+
+    /* 판에서는 내려도(위 시험) **팀 방출은 안 나간다.**
+       🔴 `/members/` 로 세면 안 된다 — 판에서 내리는 경로도
+       `/squad/members/{id}` 라 그것까지 걸린다. 팀 방출은 `squad` 가 없다. */
+    await waitFor(() => expect(deleted(fn).length).toBeGreaterThan(0))
+    const teamEject = (u: string) =>
+      u.includes(`/teams/${MY_TEAM_ID}/members/`) && !u.includes('/squad/')
+    expect(deleted(fn).some(teamEject)).toBe(false)
+  })
 })
 
 describe('스쿼드 — 없으면 주장 화면이 만든다', () => {
