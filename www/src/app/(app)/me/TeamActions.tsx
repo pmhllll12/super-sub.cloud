@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useId, useState } from 'react'
-import { apiDelete, apiErrorMessage, apiPatch, apiPost } from '@/lib/api/client'
+import { ApiCallError, apiDelete, apiErrorMessage, apiPatch, apiPost } from '@/lib/api/client'
 import { rememberHomeTeam } from '@/lib/homeTeam'
 import { REGIONS, searchRegions } from '@/lib/regions'
 import PillButton from '@/components/ui/PillButton'
@@ -158,6 +158,13 @@ export default function TeamActions({
   const [error, setError] = useState<string | null>(null)
   /** 나가는 중인 팀 — 여러 팀이 있어도 누른 줄만 잠긴다. */
   const [leaving, setLeaving] = useState<string | null>(null)
+  /**
+   * **해체를 권할 팀** — 나가기가 `409 LAST_OWNER` 로 막힌 그 팀이다.
+   *
+   * 🔴 **서버가 그렇게 답했을 때만 찬다.** 주장이 몇인지는 서버만 알고,
+   * 화면이 짐작해서 미리 해체를 들이밀면 **나갈 수 있는 사람이 팀을 없앤다.**
+   */
+  const [disbandable, setDisbandable] = useState<string | null>(null)
   /** 지금 고치는 중인 팀. 한 번에 하나만 편다 — 여럿이 펴져 있으면 어느 것을
    *  저장하는지가 안 읽힌다. */
   const [editing, setEditing] = useState<string | null>(null)
@@ -231,10 +238,48 @@ export default function TeamActions({
     if (leaving) return
     setLeaving(teamId)
     setError(null)
+    setDisbandable(null)
     try {
       await apiDelete(`/api/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}`)
       router.refresh()
     } catch (err) {
+      setError(apiErrorMessage(err))
+      /* 🔴 **여기가 「팀을 버릴 길」이 열리는 자리다**(사용자 지적,
+         2026-09-18). 마지막 주장이면 나가기가 막히는데, 그때까지는 **거기서
+         끝**이라 혼자 만든 팀을 없앨 방법이 없었다. 계약은 2026-09-17에
+         이미 길을 냈다(`DELETE /teams/{id}`, 미결 `paik` 35번).
+
+         🔴 **`LAST_OWNER` 일 때만** 권한다. 다른 이유로 막힌 사람에게
+         해체를 들이밀면 **나갈 수 있는 사람이 팀을 없앤다.**
+         🔴 status 가 아니라 `code` 로 가른다(계약이 정한 분기 방식). */
+      if (err instanceof ApiCallError && err.code === 'LAST_OWNER') {
+        setDisbandable(teamId)
+      }
+    } finally {
+      setLeaving(null)
+    }
+  }
+
+  /**
+   * **팀을 해체한다** — 마지막 주장이 팀을 버리는 유일한 길.
+   *
+   * 🔴 **한 번 더 묻지 않는다.** 이 단추는 나가기가 막힌 뒤에야 나타나고,
+   * 바로 위에 무엇이 일어나는지 적혀 있다 — 확인을 한 겹 더 두면 「왜 두 번
+   * 묻나」가 된다(탈퇴는 비밀번호를 받으므로 사정이 다르다).
+   */
+  async function disband(teamId: string) {
+    if (leaving) return
+    setLeaving(teamId)
+    setError(null)
+    try {
+      await apiDelete(`/api/teams/${encodeURIComponent(teamId)}`)
+      setDisbandable(null)
+      router.refresh()
+    } catch (err) {
+      /* 🔴 **앞으로 있을 경기가 있으면 막힌다**(`409
+         TEAM_HAS_UPCOMING_MATCH`) — 상대에게는 약속이다. 화면이 미리
+         가리지 않고 서버가 준 문구를 그대로 보여 준다. 단추는 그대로
+         두어 경기를 정리한 뒤 다시 누를 수 있게 한다. */
       setError(apiErrorMessage(err))
     } finally {
       setLeaving(null)
@@ -258,26 +303,32 @@ export default function TeamActions({
                   팀이 여럿일 때 어느 줄의 것인지 한 번 더 짚어야 한다. */}
               <p className="ss-profile-team-name">
                 <span>{t.name}</span>
-                {/* 🔴 **주장에게만 낸다**(계약 — 구성원이 부르면 403). 화면이
-                    먼저 가려도 서버가 다시 막는다. */}
-                {t.role === 'owner' && (
+                {/* 🔴 **단추 둘을 한 덩어리로 묶는다**(사용자 지적,
+                    2026-09-18: 「너무 떨어져있어, 살짝 더 붙여」). 줄의
+                    `gap`(14px)은 **이름과 단추**를 띄우려는 값이라, 그걸
+                    줄이면 단추가 팀 이름에 붙어 읽힌다. 단추끼리만 좁히려면
+                    제 `gap` 을 가진 상자가 하나 더 필요하다. */}
+                <span className="ss-profile-team-acts">
+                  {/* 🔴 **주장에게만 낸다**(계약 — 구성원이 부르면 403). */}
+                  {t.role === 'owner' && (
+                    <button
+                      type="button"
+                      className="ss-profile-team-leave ss-profile-team-edit"
+                      aria-expanded={editing === t.team_id}
+                      onClick={() => openEdit(t)}
+                    >
+                      {editing === t.team_id ? '접기' : '수정'}
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="ss-profile-team-leave"
-                    aria-expanded={editing === t.team_id}
-                    onClick={() => openEdit(t)}
+                    disabled={leaving === t.team_id}
+                    onClick={() => void leave(t.team_id)}
                   >
-                    {editing === t.team_id ? '접기' : '수정'}
+                    {leaving === t.team_id ? '나가는 중…' : '팀 나가기'}
                   </button>
-                )}
-                <button
-                  type="button"
-                  className="ss-profile-team-leave"
-                  disabled={leaving === t.team_id}
-                  onClick={() => void leave(t.team_id)}
-                >
-                  {leaving === t.team_id ? '나가는 중…' : '팀 나가기'}
-                </button>
+                </span>
               </p>
               <p className="ss-profile-muted">
                 {t.region} · {t.sport_code}
@@ -393,6 +444,25 @@ export default function TeamActions({
       {error && (
         <p role="alert" className="ss-profile-video-reason">
           {error}
+          {/* 🔴 **막힌 자리에서 바로 길을 낸다**(사용자 지적, 2026-09-18:
+              「1명밖에 없어도 나가기 누르면 해체 할 수 있어야 하잖아」).
+              이유만 적고 끝내면 **혼자 만든 팀을 버릴 방법이 없다.** 같은
+              줄에 두는 이유는 그 문장이 곧 이 단추의 까닭이기 때문이다. */}
+          {disbandable && (
+            <>
+              {' '}
+              혼자뿐이라 나가려면 팀을 해체해야 합니다. 구성원은 모두 나가고 다시
+              모아야 하며, <strong>되돌릴 수 없습니다.</strong>{' '}
+              <button
+                type="button"
+                className="ss-profile-team-leave"
+                disabled={leaving === disbandable}
+                onClick={() => void disband(disbandable)}
+              >
+                {leaving === disbandable ? '해체하는 중…' : '팀 해체하기'}
+              </button>
+            </>
+          )}
         </p>
       )}
     </>

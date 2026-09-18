@@ -347,3 +347,133 @@ describe('프로필 — 팀 이름·지역 수정', () => {
     expect(editForm(container).queryByLabelText(/종목/)).toBeNull()
   })
 })
+
+/**
+ * **주장도 팀을 버릴 수 있다 — 해체** (사용자 지적, 2026-09-18).
+ *
+ * 「팀원들도 나가고 사실 팀장도 팀 해체 할 수 있어야 하는게 당연한거 아님?
+ * 1명밖에 없어도 나가기 누르면 해체 할 수 있어야 하잖아」
+ *
+ * 🔴 여태 주장이 「팀 나가기」를 누르면 `409 LAST_OWNER` 를 받고 **거기서
+ * 끝이었다.** 계약은 2026-09-17에 이미 길을 냈는데(`DELETE /teams/{id}`,
+ * 미결 `paik` 35번) 화면이 그 길로 잇지를 않았다 — 혼자 만든 팀을 **버릴
+ * 방법이 아예 없었다.**
+ *
+ * 🔴 **화면이 미리 판단하지 않는다.** 주장이 몇인지는 서버만 알므로, 나가기를
+ * 눌러 보고 **서버가 `LAST_OWNER` 라고 답했을 때만** 해체를 권한다. 미리
+ * 가르면 주장이 둘인 팀에서 나갈 수 있는 사람에게 해체를 들이민다.
+ */
+describe('프로필 — 마지막 주장의 팀 해체', () => {
+  const refreshed = refresh
+  const OWNER = [
+    { team_id: 't1', name: '번개FC', region: '서울 강남', sport_code: 'football', role: 'owner' },
+  ]
+  let sent: { url: string; method: string }[]
+
+  /** 나가기(`members/...`)만 409 로 막고, 해체(`teams/t1`)는 통과시킨다. */
+  function stubLastOwner(disband?: { status: number; code: string; message: string }) {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        const method = init?.method ?? 'GET'
+        sent.push({ url, method })
+        if (method === 'DELETE' && url.includes('/members/')) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                error: { code: 'LAST_OWNER', message: '마지막 주장은 팀을 나갈 수 없습니다.' },
+              }),
+              { status: 409 },
+            ),
+          )
+        }
+        if (method === 'DELETE' && disband) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({ error: { code: disband.code, message: disband.message } }),
+              { status: disband.status },
+            ),
+          )
+        }
+        if (method === 'DELETE') return Promise.resolve(new Response(null, { status: 204 }))
+        return Promise.resolve(new Response(JSON.stringify({ id: 't9' }), { status: 201 }))
+      },
+    )
+  }
+
+  beforeEach(() => {
+    sent = []
+    refreshed.mockClear()
+    stubLastOwner()
+  })
+  afterEach(() => vi.restoreAllMocks())
+
+  it('나가기가 막히면 해체할 길을 낸다', async () => {
+    const user = userEvent.setup()
+    render(<TeamActions teams={OWNER} userId="u1" />)
+    await user.click(screen.getByRole('button', { name: '팀 나가기' }))
+
+    expect(await screen.findByRole('button', { name: '팀 해체하기' })).toBeInTheDocument()
+  })
+
+  /* 🔴 **되돌릴 수 없다는 것을 먼저 적는다** — 팀 이름·지난 경기는 남지만
+     구성원은 전부 나가고 다시 모아야 한다. */
+  it('해체가 무엇인지 적어 준다', async () => {
+    const user = userEvent.setup()
+    render(<TeamActions teams={OWNER} userId="u1" />)
+    await user.click(screen.getByRole('button', { name: '팀 나가기' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/되돌릴 수 없습니다/)
+  })
+
+  it('해체하면 그 팀으로 DELETE 가 나간다', async () => {
+    const user = userEvent.setup()
+    render(<TeamActions teams={OWNER} userId="u1" />)
+    await user.click(screen.getByRole('button', { name: '팀 나가기' }))
+    await user.click(await screen.findByRole('button', { name: '팀 해체하기' }))
+
+    await waitFor(() => expect(refreshed).toHaveBeenCalled())
+    expect(sent.some((s) => s.url === '/api/teams/t1' && s.method === 'DELETE')).toBe(true)
+  })
+
+  /**
+   * 🔴 **앞으로 있을 경기가 있으면 서버가 막는다**(`409
+   * TEAM_HAS_UPCOMING_MATCH`) — 상대에게는 약속이라 먼저 정리해야 한다.
+   * 화면이 미리 가리지 않고 서버가 준 문구를 그대로 보여 준다.
+   */
+  it('잡힌 경기가 있어 해체가 막히면 그 이유를 보여 준다', async () => {
+    stubLastOwner({
+      status: 409,
+      code: 'TEAM_HAS_UPCOMING_MATCH',
+      message: '앞으로 있을 경기가 있어 해체할 수 없습니다.',
+    })
+    const user = userEvent.setup()
+    render(<TeamActions teams={OWNER} userId="u1" />)
+    await user.click(screen.getByRole('button', { name: '팀 나가기' }))
+    await user.click(await screen.findByRole('button', { name: '팀 해체하기' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '앞으로 있을 경기가 있어 해체할 수 없습니다.',
+    )
+    expect(refreshed).not.toHaveBeenCalled()
+  })
+
+  /* 🔴 **다른 이유로 막힌 것에는 해체를 권하지 않는다** — 나갈 수 있는
+     사람에게 팀을 없애라고 하면 안 된다. */
+  it('LAST_OWNER 가 아니면 해체를 안 권한다', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({ error: { code: 'FORBIDDEN', message: '권한이 없습니다.' } }),
+          { status: 403 },
+        ),
+      ),
+    )
+    const user = userEvent.setup()
+    render(<TeamActions teams={OWNER} userId="u1" />)
+    await user.click(screen.getByRole('button', { name: '팀 나가기' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('권한이 없습니다.')
+    expect(screen.queryByRole('button', { name: '팀 해체하기' })).toBeNull()
+  })
+})

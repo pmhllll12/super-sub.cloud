@@ -408,6 +408,13 @@ export const fastapiBackend: Backend = {
     )
   },
 
+  async disbandTeam(token, teamId) {
+    await callFastApi<null>(`/teams/${encodeURIComponent(teamId)}`, {
+      method: 'DELETE',
+      token,
+    })
+  },
+
   async cancelMatch(token, matchId) {
     await callFastApi<null>(`/matches/${encodeURIComponent(matchId)}`, {
       method: 'DELETE',

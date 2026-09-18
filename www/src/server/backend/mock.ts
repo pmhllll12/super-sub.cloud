@@ -2128,6 +2128,26 @@ export const mockBackend: Backend = {
     users.set(token, { ...u, teams: u.teams.filter((t) => t.team_id !== teamId) })
   },
 
+  /**
+   * **팀 해체** — 계약 3-3절. 주장만, `204`.
+   *
+   * 🔴 **계약보다 너그럽게 두지 않는다**(1.12의 「mock 이 실서버보다 너그러우면
+   * 배포에서만 터진다」). 주장이 아니면 `403`, 이미 없는 팀이면 `404` 다.
+   *
+   * ⚠️ 해체된 팀을 **읽는** 갈래(`disbanded_at` 이 찬 200)는 흉내 내지 않는다 —
+   * mock 은 소속 목록에서 빼기만 한다. 화면이 밟는 길은 「해체하면 목록에서
+   * 사라진다」까지이고, 남은 기록을 읽는 자리는 아직 없다.
+   */
+  async disbandTeam(token, teamId) {
+    const u = requireUser(token)
+    const mine = u.teams.find((t) => t.team_id === teamId)
+    if (!mine) throw new BackendError(404, 'TEAM_NOT_FOUND', '그런 팀이 없습니다.')
+    if (mine.role !== 'owner') {
+      throw new BackendError(403, 'FORBIDDEN', '주장만 팀을 해체할 수 있습니다.')
+    }
+    users.set(token, { ...u, teams: u.teams.filter((t) => t.team_id !== teamId) })
+  },
+
   async getCardGrade(token, cardPublicSlug) {
     requireUser(token)
     const found = DEMO_CANDIDATE_POOL.find((c) => c.card_public_slug === cardPublicSlug)
