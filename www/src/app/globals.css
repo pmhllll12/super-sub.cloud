@@ -14970,7 +14970,6 @@ a.ss-seeking-pill:hover {
   /* 자리(top/left/width/height)는 늘 JS 가 준다 — 로그인 자리든 구석이든,
      모서리를 끌어 바꾼 크기든. 🔴 여기는 잘라 내지 않는다(`overflow` 없음) —
      바깥에 붙는 닫기 단추·모서리 손잡이가 잘린다. 자르는 것은 안쪽 틀이다. */
-  animation: ss-demo-in 0.5s ease-out both;
 }
 
 /* 인트로가 끝나고 처음 나올 때 — 화면 위 보이지 않는 데서 부드럽게 내려온다
@@ -14979,6 +14978,12 @@ a.ss-seeking-pill:hover {
    끝에 살짝 느려지는 곡선이라 떨어지는 것이 아니라 내려앉는 것으로 읽힌다. */
 .ss-demo-video[data-entrance='drop'] {
   animation: ss-demo-drop 1.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* 닫았다 「다시보기」로 열 때만 스르르. 🔴 내려온 직후(still)엔 **아무 애니메이션도
+   걸지 않는다** — drop 에서 곧장 이것으로 바꾸면 새로 돌면서 한 번 깜빡였다. */
+.ss-demo-video[data-entrance='fade'] {
+  animation: ss-demo-in 0.5s ease-out both;
 }
 
 @keyframes ss-demo-drop {

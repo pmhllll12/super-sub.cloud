@@ -50,7 +50,11 @@ export default function DemoVideo() {
   // 사용자가 모서리를 끌어 바꾼 것 — 기본 자리에서 얼마나 옮기고 키웠나.
   const [adj, setAdj] = useState<Adjust | null>(null)
   const [closed, setClosed] = useState(false)
-  const [dropped, setDropped] = useState(false)
+  // 나오는 연출 — 처음엔 위에서 내려오고(drop), 다 내려오면 **아무 연출 없음**
+  // (still), 닫았다 다시 열면 스르르(fade).
+  // 🔴 내려온 뒤 곧장 fade 로 바꾸면 애니메이션이 바뀌면서 **새로 돌아 한 번
+  // 깜빡인다**(0 → 1). 그래서 가운데에 still 을 둔다.
+  const [entrance, setEntrance] = useState<'drop' | 'still' | 'fade'>('drop')
   // 다시 틀 때 ▶ 를 한 번 띄웠다 사라지게 하는 열쇠 — 바꿀 때마다 새로 돈다.
   const [flash, setFlash] = useState(0)
   const [paused, setPaused] = useState(false)
@@ -155,6 +159,7 @@ export default function DemoVideo() {
     setClosed(true)
   }
   const reopen = () => {
+    setEntrance('fade')
     setClosed(false)
     videoRef.current?.play().catch(() => {})
   }
@@ -292,12 +297,12 @@ export default function DemoVideo() {
         data-slotted={base?.slotted ? 'true' : 'false'}
         // 처음 나올 때만 화면 위 보이지 않는 데서 내려온다(사용자 요청). 닫았다가
         // 「다시보기」로 열 때는 그 자리에서 스르르 — 매번 떨어지면 성가시다.
-        data-entrance={dropped ? 'fade' : 'drop'}
+        data-entrance={entrance}
         hidden={!introDone || closed}
         style={pos}
         onAnimationEnd={(e) => {
           // 안쪽(아이콘·막대)의 애니메이션도 여기로 올라온다 — 제 것만 센다.
-          if (e.target === e.currentTarget) setDropped(true)
+          if (e.target === e.currentTarget && entrance === 'drop') setEntrance('still')
         }}
       >
         {/* 닫기 — 외곽선 **바깥** 왼쪽 위(사용자 요청). 틀이 `overflow: hidden` 이라
