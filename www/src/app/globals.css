@@ -3815,6 +3815,12 @@ body::-webkit-scrollbar {
   background: var(--ss-bg);
   /* 왼쪽에서 밀려 들어온다 — 내 영상이 오른쪽으로 밀리는 것과 한 동작이다. */
   animation: ss-shot-compare-in 420ms var(--ss-home-out-ease) both;
+  /* 🔴 **그리드 칸의 "자동 최소 크기" 함정**(2026-09-19). 그리드 항목은
+     기본이 `min-height: auto`인데, 안에 고유 비율이 있는 콘텐츠(영상)가
+     있으면 그 비율을 지키려고 트랙이 필요한 만큼 자기 몫(55fr)을 넘어서까지
+     커진다 — 옆줄(세 순간 카드, 45fr)이 그만큼 눌린다. 0으로 꺼서 트랙이
+     순수하게 fr 비율만 따르게 한다. */
+  min-height: 0;
 }
 
 .ss-shot-compare-slot .ss-shot-track {
@@ -4776,6 +4782,13 @@ body::-webkit-scrollbar {
   background: var(--ss-bg);
   object-fit: contain;
   transition: opacity 420ms ease;
+  /* 🔴 **그리드 자동 최소 크기 함정**(2026-09-19, `.ss-shot-compare-slot`와
+     같은 이유) — 이 영상은 비교 모드에서 그리드 칸으로 들어간다
+     (`.ss-shot-frame-body[data-compare='true']`). `min-height: 0`이 없으면
+     세로가 유난히 긴 영상(예: DCI 4K 세로)일수록 그리드가 이 칸에 필요
+     이상의 자동 최소 키를 주고, 그만큼 아래 세 순간 카드 줄이 눌려
+     안 보이게 된다(실측: 865px 중 카드 줄이 10px 로 눌린 것을 확인). */
+  min-height: 0;
 }
 
 /* 🔴 닫는 동안 **미리 흐려 둔다.** 영상은 판이 다 줄어든 뒤에야 DOM 에서
