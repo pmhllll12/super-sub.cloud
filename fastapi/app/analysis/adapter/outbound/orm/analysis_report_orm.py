@@ -68,6 +68,15 @@ class AnalysisReportOrm(Base):
     keypoint_quality: Mapped[dict[str, Any] | None] = mapped_column(
         JSON, nullable=True
     )
+    # 추천 판 카드의 불릿 **한두 줄**(`result.card.notes` — `paik` 33·`ho` 50번).
+    # `summary` 와 같은 층이라 여기 둔다 — 분석 1회당 하나이고 코드가 짓는
+    # 문장이다(모델이 쓴 항목별 `evidence` 는 `analysis_metric_criterion`).
+    #
+    # 🔴 **개수가 값의 일부다** — 「두 줄을 채우려고 지어내지 않는다」가 규칙이라
+    # 한 줄뿐인 것이 정상이다. 두 컬럼으로 쪼개면 "둘째 줄이 없다"와 "빈
+    # 문자열이다"가 섞인다. NULL 은 **`card` 가 없는 봉투로 적재된 것**이지
+    # "분석이 없다"가 아니다.
+    card_notes: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False

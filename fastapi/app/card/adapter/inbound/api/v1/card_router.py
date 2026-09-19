@@ -9,12 +9,17 @@ from __future__ import annotations
 from fastapi import APIRouter, Response, status
 
 from app.card.adapter.inbound.api.schemas.card_schema import (
+    CardPhotoUploadResponse,
+    CardPhotoUploadSchema,
     MyCardResponse,
     PublicCardResponse,
     UpdateMyCardSchema,
 )
 from app.card.application.dtos.card_dto import (
+    CardPhotoUploadCommand,
+    CardPhotoUploadResult,
     CreateMyCardCommand,
+    DeleteMyCardCommand,
     MyCardQuery,
     MyCardResult,
     PublicCardQuery,
@@ -25,8 +30,10 @@ from app.card.application.ports.input.update_my_card_use_case import (
 )
 from app.card.application.dtos.card_dto import UNSET
 from app.card.dependencies.create_my_card_provider import CreateMyCardUseCaseDep
+from app.card.dependencies.delete_my_card_provider import DeleteMyCardUseCaseDep
 from app.card.dependencies.my_card_provider import MyCardUseCaseDep
 from app.card.dependencies.public_card_provider import PublicCardUseCaseDep
+from app.card.dependencies.card_photo_provider import CardPhotoUploadUseCaseDep
 from app.card.dependencies.update_my_card_provider import UpdateMyCardUseCaseDep
 from app.core.deps import CurrentUserId
 
@@ -58,6 +65,50 @@ def create_my_card(
     if not creation.created:
         response.status_code = status.HTTP_200_OK
     return creation.card
+
+
+@card_router.delete("/me/card", status_code=status.HTTP_204_NO_CONTENT)
+def delete_my_card(user_id: CurrentUserId, use_case: DeleteMyCardUseCaseDep) -> Response:
+    """내 카드를 지운다 — **카드를 안 만든 처음 상태로** (2026-09-19, 미결 `paik`).
+
+    화면의 「초기화」가 부른다(사용자 요청). 다시 `POST /me/card` 하면 **새 카드**가
+    생긴다 — 슬러그도 새로 뽑힌다.
+
+    | | |
+    |---|---|
+    | 204 | 지웠다. **원래 없었어도 204** — 멱등이다(재시도가 오류로 오지 않게) |
+    | 401 `UNAUTHORIZED` | 로그인이 필요하다 |
+
+    🔴 **되돌릴 수 없다.** 이미 공유한 카드 링크가 죽고(404), 스쿼드 판의 자리도
+    같이 빠진다(외래키 CASCADE). 호칭은 사람에 붙어 있어 남는다.
+    """
+    use_case(DeleteMyCardCommand(user_id=user_id))
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@card_router.post(
+    "/me/card/photo-upload-url",
+    response_model=CardPhotoUploadResponse,
+)
+def create_card_photo_upload_url(
+    user_id: CurrentUserId,
+    body: CardPhotoUploadSchema,
+    use_case: CardPhotoUploadUseCaseDep,
+) -> CardPhotoUploadResult:
+    """카드 사진을 올릴 **사전 서명 주소**를 만든다 (2026-09-18).
+
+    🔴 **바이트가 앱 서버를 지나지 않는다**(PER-002) — 브라우저가 이 주소로
+    S3 에 직접 PUT 한다. 영상 업로드와 같은 방식이다.
+
+    올린 뒤 `PATCH /me/card` 의 `style.photo_key` 에 `storage_key` 를 실어
+    보내면 그때 카드에 붙는다. **올리기만 하고 안 보내면 아무 일도 안 난다.**
+
+    ⚠️ PUT 할 때 `Content-Type` 헤더를 **요청한 값 그대로** 보내야 한다 —
+    서명에 들어가서 다르면 S3 가 403 이다.
+    """
+    return use_case(
+        CardPhotoUploadCommand(user_id=user_id, content_type=body.content_type)
+    )
 
 
 @card_router.patch("/me/card", response_model=MyCardResponse)

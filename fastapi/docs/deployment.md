@@ -337,11 +337,54 @@ initContainer 는 확장을 만들지 않는다 — 확장이 없으면 `vector`
 > curl -s -o /dev/null -w '%{http_code}\n' https://<API 호스트>/health   # 200
 > ```
 
-🔴 **`X-Forwarded-For` 를 신뢰하도록 설정하지 않으면** 인증 로그의 `client` 와
-**요청 제한(SEC-009)의 키가 전부 LB 주소가 된다.** 즉 모든 사용자가 한 덩어리로
-묶여 서로의 제한에 걸린다.
+### 🔴 앞단은 nginx 가 **아니다** — Cloudflare 가 그 앞에 있다 (2026-09-17 확인)
 
-### ✅ 그것도 09-03 에 붙었다 — **systemd drop-in 이다**
+**이 문서가 오래 nginx 를 최전선으로 적어 두었는데 사실이 아니다.** 실물은
+**Cloudflare 프록시 모드(오렌지 클라우드) DNS** 가 앞에 있다 — nginx 가 받는
+`$remote_addr` 가 전부 Cloudflare 대역이다. `cloudflared` 터널이 아니고
+서버에 자격증명도 없다. **계정·대시보드는 박민호가 쥐고 있다**(미결 `jin`
+37번).
+
+```
+사용자 → Cloudflare(프록시) → nginx(443) → k3s 파드(8080)
+```
+
+**언제 붙었는지는 이 저장소에 기록이 없다.** 그래서 두 가지가 딸려 왔다.
+
+1. **봇 차단이 우리 워커를 끊은 적이 있다** — 2026-09-16 08:27부터 워커의
+   `claim` 이 전부 `403`(`error code: 1010`)이었다. 기준은 User-Agent 하나이고
+   **오리진까지 안 오므로 백엔드 로그에 흔적이 없다**(미결 `ho` 53번).
+   🔴 **증상이 "백엔드는 멀쩡한데 밖에서만 막힌다"면 앞단을 먼저 본다.**
+2. **원주소 복원이 없다** — 아래.
+
+### 🔴 `X-Forwarded-For` 를 신뢰하도록 설정하지 않으면
+
+인증 로그의 `client` 와 **요청 제한(SEC-009)의 키가 전부 LB 주소가 된다.**
+즉 모든 사용자가 한 덩어리로 묶여 서로의 제한에 걸린다.
+
+### ⚠️ 09-03 에 붙였지만 **k3s 이관에서 딸려오지 않았다** (2026-09-17 확인)
+
+아래는 **systemd 시절**의 기록이다. 지금 앱은 k3s 파드에서 돌고
+`supersub-api.service` 는 `inactive` 다(이관 완료라 정상이다). 그런데 파드
+인자는 이것뿐이라 **드롭인의 `--proxy-headers` 가 사라졌다**:
+
+```
+uvicorn app.main:app --host 0.0.0.0 --port 8080
+```
+
+거기에 nginx 쪽 원주소 복원(`set_real_ip_from`·`real_ip_header
+CF-Connecting-IP`)도 없어서, 지금 `client=` 는 **Cloudflare 엣지 주소**로
+찍힌다 — 바로 위 경고가 실제로 일어나고 있다. 🔴 **둘 다 박민호 구역이라
+미결 `jin` 37번으로 올렸다.**
+
+> **확인(지금 기준):**
+> ```bash
+> sudo k3s kubectl logs deploy/supersub-api-trial --tail=200 \
+>   | grep -o 'client=[^ ]*' | sort | uniq -c
+> ```
+> Cloudflare 대역으로만 찍히면 안 고쳐진 것이다.
+
+### ✅ 그것도 09-03 에 붙었다 — **systemd drop-in 이다** (옛 기록)
 
 박민호가 유닛 파일을 고치는 대신 **드롭인으로 덮었다.** 그래서 `supersub-api.service`
 본체(저장소의 것)에는 안 보인다.
@@ -362,8 +405,10 @@ ExecStart=… uvicorn app.main:app --host 127.0.0.1 --port 8000 \
 `127.0.0.1` 이면 충분하고, 넓히면 **클라이언트가 `X-Forwarded-For` 를 위조해 요청
 제한을 우회**할 수 있다.
 
-> **확인:** `systemctl cat supersub-api | grep proxy-headers` — 안 걸리면 드롭인이
-> 없는 것이고, 그러면 SEC-009 가 모든 사용자를 한 덩어리로 묶는다.
+> ~~**확인:** `systemctl cat supersub-api | grep proxy-headers`~~ 🔴 **이 확인은
+> 낡았다 (2026-09-17)** — systemd 는 이제 `inactive` 라 이 명령은 아무것도
+> 못 잡는다. **위 k3s 기준 확인을 쓴다.** 확인 명령이 낡으면 「안 걸린다」가
+> 「문제가 없다」로 읽혀서, 이번에도 그렇게 한동안 안 보였다.
 
 같은 이유로 DB 접속은 `sslmode=verify-full` 을 쓴다. 기본값으로 둔 `require` 는
 **암호화만 하고 인증서를 검증하지 않아** 중간자 공격을 막지 못한다.

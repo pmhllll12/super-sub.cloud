@@ -4,11 +4,15 @@ import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import type { PublicPlayerCard } from '@/server/backend'
 import PlayerCardView from '@/components/PlayerCardView'
+import BlankPlayerCard from '@/components/BlankPlayerCard'
 import BrandMark from '@/components/ui/BrandMark'
 import HomeNav, { type Destination } from '@/components/HomeNav'
 import NotifyPanel from '@/components/NotifyPanel'
+import SeekingPill from '@/components/SeekingPill'
+import MatchPill from '@/components/MatchPill'
 import { NOTIFY } from '@/lib/destinations'
 import { useNotifyInbox } from '@/lib/useNotifyInbox'
+import { useTeamSeeking } from '@/lib/useTeamSeeking'
 import { HEADER_LINK_CLASS, HEADER_LINK_HOVER_CLASS } from '@/components/LogoutButton'
 import { useIntroDone } from '@/lib/useIntroDone'
 import { TransitionLink, useChromeHidden, useLeaving } from '@/lib/pageTransition'
@@ -33,12 +37,29 @@ export default function SiteHeader({
   card = null,
   destinations,
   fixed = false,
+  inbox: given,
+  onReopenMatch,
 }: {
   user: { nickname: string } | null
   card?: PublicPlayerCard | null
   destinations: Destination[]
   /** 홈처럼 화면에 고정할 것인가. 기본은 흐름에 둔다. */
   fixed?: boolean
+  /**
+   * 알림함 — **홈이 제 것을 내려보낸다**(2026-09-17).
+   *
+   * 🔴 **안 주면 헤더가 제 통을 만든다.** 둘 다 만들면 헤더에서 수락한
+   * 결과가 대기 화면을 그리는 쪽에 **영영 안 닿는다** — 실제로 「수락하기를
+   * 눌러도 아무 일이 없다」로 나타났다(사용자가 로컬에서 잡았다).
+   */
+  inbox?: ReturnType<typeof useNotifyInbox>
+  /**
+   * 「경기 잡힘」 표시를 눌렀을 때 — **홈만 준다.**
+   *
+   * 🔴 경기 화면을 그리는 것은 홈의 스쿼드 판 하나뿐이라, 다른 화면에는 열
+   * 대상이 없다. 안 주면 표시가 **홈으로 가는 고리**가 된다.
+   */
+  onReopenMatch?: () => void
 }) {
   /**
    * 인트로가 걷히면 각자 바깥에서 제자리로 들어온다(globals.css 의
@@ -56,9 +77,26 @@ export default function SiteHeader({
   /** 지금 가리킨 목적지. 글자 줄 안에서만 쓰는 강조다. */
   const [active, setActive] = useState<string | null>(null)
 
-  /* 알림함 — 「알림」 글자의 빨간 점과 그 아래 판이 이걸 읽는다. 폴링이라
-     화면마다 도는데, 헤더가 화면당 하나라 통도 하나다. */
-  const inbox = useNotifyInbox()
+  /**
+   * 알림함 — 「알림」 글자의 빨간 점과 그 아래 판이 이걸 읽는다.
+   *
+   * 🔴 **밖에서 주면 그것을 쓴다**(2026-09-17). 헤더와 홈이 **각자** 통을
+   * 만들던 때에는, 헤더에서 수락한 결과(`acceptedTeam`)가 대기 화면을 그리는
+   * `SquadPanel` 쪽 통에 **영영 안 들어갔다** — 눌러도 아무 일이 없었다.
+   * 홈은 제 통을 내려보내고, 통이 필요 없는 다른 화면은 안 준다.
+   */
+  const own = useNotifyInbox()
+  const inbox = given ?? own
+
+  /**
+   * 「팀 찾는 중」 — 위 알림함과 **같은 이유로 여기 산다**: 머리칸이 모든
+   * 화면에 있으므로, 홈을 떠나도 찾기가 안 끊긴다(사용자 요청, 2026-09-18).
+   *
+   * 🔴 **알림함과 달리 밖에서 받지 않는다.** 이 통이 들고 있는 것은
+   * `localStorage` 한 칸이라(`seekingStore`) 어디서 만들든 같은 값을 읽고,
+   * 같은 탭 안에서는 바뀔 때 서로 알린다 — 통을 나눠 쓸 이유가 없다.
+   */
+  const seeking = useTeamSeeking()
 
   /**
    * 🔴 **지금 보고 있는 화면은 목적지에서 뺀다**(사용자 요청). 영상 분석
@@ -163,6 +201,15 @@ export default function SiteHeader({
       </TransitionLink>
 
       <div className={`ss-home-nav-slot${quiet ? ' ss-home-gone' : ''}`}>
+        {/* 🔴 **찾는 중이라는 사실이 화면을 떠나도 남는 자리다**(사용자 요청,
+            2026-09-18). 머리칸은 로그인한 모든 화면이 같이 쓰므로 여기 두면
+            홈을 떠나도 찾기가 안 끊긴다 — 알림함(`useNotifyInbox`)이 여기
+            매달린 것과 같은 이유다. 안 찾는 중이면 아무것도 안 그린다. */}
+        <SeekingPill seeking={seeking} />
+        {/* 🔴 **잡힌 경기로 돌아가는 길**(사용자 요청, 2026-09-18). 경기
+            화면을 그리는 것은 홈의 판뿐이라, 홈에서만 그 자리에서 열고
+            다른 화면에서는 홈으로 보낸다(`MatchPill`). */}
+        <MatchPill match={inbox.confirmed} onReopen={onReopenMatch} />
         <HomeNav
           destinations={shown}
           loggedIn={Boolean(user)}
@@ -176,6 +223,8 @@ export default function SiteHeader({
                 onAcceptMatch={inbox.acceptMatch}
                 onRejectMatch={inbox.rejectMatch}
                 onAcceptContact={inbox.acceptContact}
+                onAcceptInvitation={inbox.acceptInvitation}
+                onRejectInvitation={inbox.rejectInvitation}
               />
             ),
           }}
@@ -192,13 +241,14 @@ export default function SiteHeader({
           href="/me"
           className={`ss-home-profile shrink-0${quiet ? ' ss-home-gone' : ''}`}
         >
-          {card ? (
-            <span className="ss-pcard-mini">
-              <PlayerCardView card={card} />
-            </span>
-          ) : (
-            <span style={{ color: 'var(--ss-fg)' }}>{user.nickname}</span>
-          )}
+          {/* 🔴 **카드가 없어도 카드 모양으로 둔다**(사용자 요청, 2026-09-19).
+              전에는 닉네임 글자로 대신했는데, 그러면 「여기서 카드를 만든다」가
+              안 읽힌다. 스쿼드 판의 빈 자리와 같은 빈 카드 틀에서 `+` 만 뺀
+              것 — `+` 는 「누르면 채운다」는 뜻이라 여기(프로필로 가는 길)에는
+              안 맞는다. */}
+          <span className="ss-pcard-mini">
+            {card ? <PlayerCardView card={card} /> : <BlankPlayerCard />}
+          </span>
           <span className="ss-home-profile-label">내 프로필</span>
         </TransitionLink>
       ) : (

@@ -79,10 +79,21 @@ class CreateTeamMatchRequestInteractor(CreateTeamMatchRequestUseCase):
         )
         if not self._repository.team_exists(command.target_team_id):
             raise ApiError(404, "TEAM_NOT_FOUND", "상대 팀을 찾을 수 없습니다.")
-        if not is_registrable(
-            command.proposed_played_at, datetime.now(timezone.utc)
-        ):
+        now = datetime.now(timezone.utc)
+        if not is_registrable(command.proposed_played_at, now):
             raise ApiError(422, "PAST_MATCH", "지난 시각으로는 걸 수 없습니다.")
+        # 🔴 같은 상대에 **이미 살아 있는 신청이 있으면 막는다**(2026-09-18).
+        #    화면도 「한 번에 한 곳」을 막지만 그건 그 브라우저의 상태뿐이라,
+        #    새로고침하거나 다른 기기로 들어오면 그대로 뚫린다 — 서버가 막아야
+        #    하는 자리다. 까닭은 `MatchPort.has_live_team_match_request` 머리말.
+        if self._repository.has_live_team_match_request(
+            command.requester_team_id, command.target_team_id, now
+        ):
+            raise ApiError(
+                409,
+                "TEAM_MATCH_REQUEST_ALREADY_LIVE",
+                "이미 이 팀과 진행 중인 신청이나 잡힌 경기가 있습니다.",
+            )
 
         request = TeamMatchRequestEntity(
             id=uuid4(),
@@ -93,8 +104,11 @@ class CreateTeamMatchRequestInteractor(CreateTeamMatchRequestUseCase):
             status=PENDING,
             created_at=datetime.now(timezone.utc),
         )
-        self._repository.create_team_match_request(request)
-        return to_team_match_request_result(request)
+        # 🔴 만든 엔티티가 아니라 **저장소가 돌려준 것**을 쓴다 — 팀 이름·지역은
+        # `team` 에서 읽어 오는 값이라 여기서는 채울 수 없다(`paik` 31번).
+        return to_team_match_request_result(
+            self._repository.create_team_match_request(request)
+        )
 
 
 class ListTeamMatchRequestsInteractor(ListTeamMatchRequestsUseCase):

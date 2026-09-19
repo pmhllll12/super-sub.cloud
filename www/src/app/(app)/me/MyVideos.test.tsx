@@ -122,6 +122,50 @@ describe('내 영상 — 올리기', () => {
   })
 
   /**
+   * 🔴 **같은 영상을 다시 올리면 그 자리에서 알린다**(CCC 48, 미결 `ho` 41번).
+   *
+   * 사람들이 게이트에 걸린 영상을 **아홉 번 그대로 다시 올렸다** — 매번 같은
+   * 이유로 떨어지는데 화면이 안 알려 줬기 때문이다. 이 사실은 **등록 응답에만**
+   * 실려 오므로, 여기서 안 적으면 다시 볼 방법이 없다.
+   */
+  it('앞서 같은 영상이 떨어졌으면 그 사유를 그 자리에서 알린다', async () => {
+    uploadClip.mockResolvedValue({
+      ...uploaded,
+      id: 'v9',
+      duplicate_of_video_id: 'v-앞서',
+      duplicate_status: 'failed',
+      duplicate_failure_reason: '사람이 화면에 너무 작게 잡혔습니다',
+    })
+    render(<MyVideos videos={[analyzed, uploaded]} />)
+    const user = await pick(mp4())
+    await user.click(screen.getByRole('button', { name: '올리기' }))
+
+    expect(await screen.findByText(/앞서 같은 이유로 분석되지 않았습니다/)).toBeInTheDocument()
+  })
+
+  /* 🔴 **막지 않는다** — 안내지 차단이 아니다(계약의 「하지 말 것」). 촬영을
+     다시 해서 올린 것일 수도 있어서, 올라간 것은 목록에 그대로 들어간다. */
+  it('중복이어도 올린 것은 그대로 들어간다', async () => {
+    uploadClip.mockResolvedValue({
+      ...uploaded,
+      id: 'v9',
+      duplicate_of_video_id: 'v-앞서',
+      duplicate_status: 'succeeded',
+    })
+    render(<MyVideos videos={[analyzed, uploaded]} />)
+    const user = await pick(mp4())
+    await user.click(screen.getByRole('button', { name: '올리기' }))
+
+    await waitFor(() => expect(uploadClip).toHaveBeenCalled())
+    expect(await screen.findByText(/그때 결과를 그대로 씁니다/)).toBeInTheDocument()
+    // 「업로드 영상」 쪽이 골라진다 — 분석 작업은 안 걸렸다(analysis_job_id 가 null).
+    expect(screen.getByRole('tab', { name: '업로드 영상' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+  })
+
+  /**
    * 🔴 계약이 아직 `analyze` 를 모른다. 백엔드가 그걸 무시하고 분석을 걸어
    * 버리면 **화면도 그렇게 말해야 한다** — 보낸 뜻이 아니라 돌아온 응답을 믿는다.
    */

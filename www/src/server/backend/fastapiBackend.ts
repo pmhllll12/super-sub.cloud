@@ -25,6 +25,12 @@ import type {
   PlayerCard,
   PublicPlayerCard,
   SignupResult,
+  TeamInvitation,
+  ReceivedInvitation,
+  Region,
+  TeamMatchPreference,
+  MemberMatchPreference,
+  MatchCandidate,
   User,
 } from './types'
 
@@ -87,6 +93,10 @@ export const fastapiBackend: Backend = {
 
   createMyCard(token) {
     return callFastApi<PlayerCard>('/me/card', { method: 'POST', token })
+  },
+
+  async deleteMyCard(token) {
+    await callFastApi<void>('/me/card', { method: 'DELETE', token })
   },
 
   updateMyCard(token, input) {
@@ -198,6 +208,51 @@ export const fastapiBackend: Backend = {
       method: 'GET',
       token,
     })
+  },
+
+  listRegions(token) {
+    return callFastApi<Region[]>('/regions', { method: 'GET', token })
+  },
+
+  getTeamMatchPrefs(token, teamId) {
+    return callFastApi<TeamMatchPreference>(
+      `/teams/${encodeURIComponent(teamId)}/match-preferences`,
+      { method: 'GET', token },
+    )
+  },
+
+  putTeamMatchPrefs(token, teamId, input) {
+    return callFastApi<TeamMatchPreference>(
+      `/teams/${encodeURIComponent(teamId)}/match-preferences`,
+      { method: 'PUT', token, body: input },
+    )
+  },
+
+  getMyMatchPrefs(token) {
+    return callFastApi<MemberMatchPreference>('/me/match-preferences', {
+      method: 'GET',
+      token,
+    })
+  },
+
+  putMyMatchPrefs(token, input) {
+    return callFastApi<MemberMatchPreference>('/me/match-preferences', {
+      method: 'PUT',
+      token,
+      body: input,
+    })
+  },
+
+  listMatchCandidates(token, teamId) {
+    return callFastApi<MatchCandidate[]>(
+      `/teams/${encodeURIComponent(teamId)}/match-candidates`,
+      { method: 'GET', token },
+    )
+  },
+
+  getSquadBySlug(publicSlug) {
+    // 🔴 `token` 을 안 넘긴다 — 계약이 이 경로를 인증 없이 열어 두었다.
+    return callFastApi<Squad>(`/squads/${encodeURIComponent(publicSlug)}`, { method: 'GET' })
   },
 
   createSquad(token, teamId) {
@@ -342,10 +397,89 @@ export const fastapiBackend: Backend = {
     return callFastApi<TeamDetail>('/teams', { method: 'POST', token, body: input })
   },
 
+  updateTeam(token, teamId, input) {
+    return callFastApi<TeamDetail>(`/teams/${encodeURIComponent(teamId)}`, {
+      method: 'PATCH',
+      token,
+      body: input,
+    })
+  },
+
+  async createCardPhotoUploadUrl(token, contentType) {
+    return callFastApi<{
+      upload_url: string
+      storage_key: string
+      expires_in: number
+    }>('/me/card/photo-upload-url', {
+      method: 'POST',
+      token,
+      body: { content_type: contentType },
+    })
+  },
+
   async leaveTeam(token, teamId, memberId) {
     await callFastApi<null>(
       `/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(memberId)}`,
       { method: 'DELETE', token },
+    )
+  },
+
+  async disbandTeam(token, teamId) {
+    await callFastApi<null>(`/teams/${encodeURIComponent(teamId)}`, {
+      method: 'DELETE',
+      token,
+    })
+  },
+
+  async cancelMatch(token, matchId) {
+    await callFastApi<null>(`/matches/${encodeURIComponent(matchId)}`, {
+      method: 'DELETE',
+      token,
+    })
+  },
+
+  /* ── 팀 초대 (계약 3-3절, CCC 49·53번) ───────────────────────────── */
+
+  inviteToTeam(token, teamId, input) {
+    return callFastApi<TeamInvitation>(
+      `/teams/${encodeURIComponent(teamId)}/invitations`,
+      { method: 'POST', token, body: input },
+    )
+  },
+
+  listTeamInvitations(token, teamId) {
+    return callFastApi<TeamInvitation[]>(
+      `/teams/${encodeURIComponent(teamId)}/invitations`,
+      { method: 'GET', token },
+    )
+  },
+
+  cancelTeamInvitation(token, teamId, invitationId) {
+    // 🔴 `204` 가 아니라 무른 초대를 돌려준다 — 같은 파서를 쓴다.
+    return callFastApi<TeamInvitation>(
+      `/teams/${encodeURIComponent(teamId)}/invitations/${encodeURIComponent(invitationId)}`,
+      { method: 'DELETE', token },
+    )
+  },
+
+  listMyInvitations(token) {
+    return callFastApi<ReceivedInvitation[]>('/me/invitations', {
+      method: 'GET',
+      token,
+    })
+  },
+
+  acceptInvitation(token, invitationId) {
+    return callFastApi<TeamInvitation>(
+      `/me/invitations/${encodeURIComponent(invitationId)}/accept`,
+      { method: 'POST', token },
+    )
+  },
+
+  rejectInvitation(token, invitationId) {
+    return callFastApi<TeamInvitation>(
+      `/me/invitations/${encodeURIComponent(invitationId)}/reject`,
+      { method: 'POST', token },
     )
   },
 

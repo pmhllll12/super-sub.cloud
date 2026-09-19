@@ -19,3 +19,17 @@ class TestSearchUsers:
     def test_q_가_없으면_422(self, client, auth):
         res = client.get(f"{V1}/users/search", headers=auth)
         assert res.status_code == 422
+
+
+class TestSearchCardSlug:
+    """닉네임 검색 결과에도 카드 슬러그가 실린다 (미결 `paik` 39번).
+
+    지인 목록과 **같은 모양**이어야 한다 — 두 자리가 갈리면 화면이 어느
+    쪽에서 왔는지에 따라 다르게 짜인다.
+    """
+
+    def test_칸이_응답_모양에_있다(self, client, auth):
+        res = client.get(f"{V1}/users/search", params={"q": "아무나"}, headers=auth)
+        assert res.status_code == 200
+        for row in res.json():
+            assert "card_public_slug" in row

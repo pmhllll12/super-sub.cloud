@@ -31,6 +31,9 @@ _TEAMS: dict[UUID, str] = {}
 # 팀의 표시용 값(이름·지역). 탐색 목록에만 쓰여서 `_TEAMS` 와 나눠 뒀다 —
 # 합치면 종목을 읽는 자리가 전부 바뀐다.
 _TEAM_META: dict[UUID, tuple[str, str]] = {}
+# 팀 스쿼드의 공개 슬러그. **없는 팀이 정상**이라 기본값을 두지 않는다
+# (스쿼드 생성이 멱등이라 늦게 생긴다).
+_TEAM_SQUAD_SLUG: dict[UUID, str] = {}
 _ROLES: dict[tuple[UUID, UUID], str] = {}
 _MATCHES: dict[UUID, MatchEntity] = {}
 _TEAM_MATCH_REQUESTS: dict[UUID, TeamMatchRequestEntity] = {}
@@ -39,6 +42,7 @@ _TEAM_MATCH_REQUESTS: dict[UUID, TeamMatchRequestEntity] = {}
 def reset_matches() -> None:
     _TEAMS.clear()
     _TEAM_META.clear()
+    _TEAM_SQUAD_SLUG.clear()
     _ROLES.clear()
     _MATCHES.clear()
     _APPLICATIONS.clear()
@@ -56,6 +60,11 @@ def register_team(
     """
     _TEAMS[team_id] = sport_code
     _TEAM_META[team_id] = (name, region)
+
+
+def register_squad_slug(team_id: UUID, public_slug: str) -> None:
+    """그 팀 스쿼드의 공개 슬러그. 안 부르면 `None` 이고 그것도 정상이다."""
+    _TEAM_SQUAD_SLUG[team_id] = public_slug
 
 
 def register_role(team_id: UUID, user_id: UUID, role: str) -> None:
@@ -190,6 +199,14 @@ class StubMatchRepository(StubApplicationsMixin, MatchPort):
 
     def delete_match(self, match_id: UUID, actor_id: UUID) -> None:
         _MATCHES.pop(match_id, None)
+        # 🔴 **DB 의 외래키를 흉내낸다.** `team_match_request.match_id` 는
+        #    `ON DELETE SET NULL` 이라 경기가 지워지면 실물에서는 저절로
+        #    비워진다(`status` 는 `accepted` 로 남는다). 여기서 안 비우면
+        #    「물린 경기」가 스텁에서만 살아 있어, 겹치기 방지가 스텁으로는
+        #    통과하고 실물에서 다르게 돈다.
+        for rid, r in list(_TEAM_MATCH_REQUESTS.items()):
+            if r.match_id == match_id:
+                _TEAM_MATCH_REQUESTS[rid] = replace(r, match_id=None)
 
     def find_positions(
         self, team_id: UUID, codes: list[str]
@@ -231,10 +248,42 @@ class StubMatchRepository(StubApplicationsMixin, MatchPort):
             if t == team_id and role == "owner"
         ]
 
-    def create_team_match_request(self, request: TeamMatchRequestEntity) -> None:
+    def create_team_match_request(
+        self, request: TeamMatchRequestEntity
+    ) -> TeamMatchRequestEntity:
         """알림 생성은 흉내 내지 않는다 — `notification_stub_repository.py`와
         같은 철학(알림은 DB 테스트만 본다)."""
-        _TEAM_MATCH_REQUESTS[request.id] = request
+        requester = _TEAM_META.get(request.requester_team_id, ("", ""))
+        target = _TEAM_META.get(request.target_team_id, ("", ""))
+        filled = replace(
+            request,
+            requester_team_name=requester[0],
+            requester_team_region=requester[1],
+            target_team_name=target[0],
+            target_team_region=target[1],
+            requester_squad_public_slug=_TEAM_SQUAD_SLUG.get(request.requester_team_id),
+            target_squad_public_slug=_TEAM_SQUAD_SLUG.get(request.target_team_id),
+        )
+        _TEAM_MATCH_REQUESTS[request.id] = filled
+        return filled
+
+    def has_live_team_match_request(
+        self, team_id: UUID, other_team_id: UUID, now: datetime
+    ) -> bool:
+        """까닭은 `MatchPort.has_live_team_match_request` 머리말."""
+        pair = {team_id, other_team_id}
+        return any(
+            {r.requester_team_id, r.target_team_id} == pair
+            and (
+                r.status == PENDING
+                or (
+                    r.status == ACCEPTED
+                    and r.match_id is not None
+                    and r.proposed_played_at >= now
+                )
+            )
+            for r in _TEAM_MATCH_REQUESTS.values()
+        )
 
     def find_team_match_request(
         self, request_id: UUID

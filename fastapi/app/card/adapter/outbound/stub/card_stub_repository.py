@@ -61,11 +61,14 @@ _CARD = CardEntity(
 # 생성 계약을 DB 없이 검사하려면 요청 사이에 남아야 한다. 저장소 인스턴스는 요청마다
 # 새로 만들어지므로(프로바이더가 클래스 자체다) 모듈에 둔다.
 _CREATED: dict[UUID, CardEntity] = {}
+# 지운 주인들. 데모 카드(`_CARD`)는 모듈 상수라 지울 수 없어서 「지웠다」를 따로 적는다.
+_DELETED: set[UUID] = set()
 
 
 def reset_created_cards() -> None:
     """만들어 둔 카드를 비운다. **검사 사이에 상태가 새지 않게** 쓴다."""
     _CREATED.clear()
+    _DELETED.clear()
 
 
 class StubCardRepository(CardPort):
@@ -76,7 +79,7 @@ class StubCardRepository(CardPort):
         found = _CREATED.get(user_id)
         if found is not None:
             return found
-        return _CARD if user_id == DEMO_USER_ID else None
+        return _CARD if user_id == DEMO_USER_ID and user_id not in _DELETED else None
 
     def find_by_slug(self, slug: PublicSlug) -> CardEntity | None:
         if slug == PublicSlug(DEMO_SLUG):
@@ -128,6 +131,12 @@ class StubCardRepository(CardPort):
         updated = replace(card, titles=kept + written)
         _CREATED[user_id] = updated
         return updated
+
+    def delete_by_owner(self, user_id: UUID) -> bool:
+        existed = self.find_by_owner(user_id) is not None
+        _CREATED.pop(user_id, None)
+        _DELETED.add(user_id)
+        return existed
 
     def create_for_owner(self, user_id: UUID) -> CardEntity:
         """멱등하게 만든다.

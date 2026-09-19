@@ -1,0 +1,204 @@
+{
+  "tag": "trace_C0",
+  "arm": "C0",
+  "drop_rationale": false,
+  "drop_other_anchors": false,
+  "backend": "transformers",
+  "model": "LGAI-EXAONE/EXAONE-4.0-1.2B",
+  "clips": {
+    "football/inside_pass": {
+      "score": null,
+      "grade": null,
+      "items": [
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 2,
+          "stored_grade": 2,
+          "segment": 0,
+          "band_value": 22.0,
+          "evidence": "골반 회전 22.0도로 인사이드 면이 공을 효과적으로 향해 열렸다.",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 22.0
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 2,
+          "stored_grade": 2,
+          "segment": 0,
+          "band_value": 28.0,
+          "evidence": "골반 회전 28.0도로 인사이드 면이 공을 효과적으로 향해 열렸다.",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 28.0
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 0,
+          "band_value": 10.4,
+          "evidence": "회전 10.4도로 인사이드 면이 약간만 열리고 방향 제어가 다소 불안정하다. 더 넓은 각도를 열면 공을 안정적으로 차는 데 도움이 될 것이다.",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 10.4
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 0,
+          "band_value": 12.6,
+          "evidence": "회전 12.6도로 골반이 덜 열려 측면으로 공을 효과적으로 차지 못했다.",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 12.6
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 1,
+          "band_value": 85.8,
+          "evidence": "골반 회전 범위 85.8도로 인사이드 면이 공에 충분히 닿지 않아 방향 제어가 어려웠다.",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 85.8
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 1,
+          "band_value": 129.2,
+          "evidence": "회전 129.2도로 골반이 지나치게 많이 열렸다. 인사이드 면으로 공을 효과적으로 차려면 회전 범위가 적정 수준이어야 한다.",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 129.2
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 0,
+          "band_value": 2.8,
+          "evidence": "골반 회전 범위 2.8도로 인사이드 면이 거의 닿지 않는다. 발끝으로 공을 밀게 되어 방향 제어가 어렵다.",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 2.8
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 0,
+          "band_value": 5.2,
+          "evidence": "골반 회전 범위 5.2도로 인사이드 면이 거의 닿지 않는다. 발끝으로 공을 밀게 되어 방향 제어가 어렵다.",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 5.2
+          }
+        }
+      ]
+    },
+    "football/instep_shot": {
+      "score": null,
+      "grade": null,
+      "items": [
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 2,
+          "stored_grade": 2,
+          "segment": 0,
+          "band_value": 79.2,
+          "evidence": "골반 회전 범위 79.2도로 백스윙에서 임팩트까지 크게 열렸다. 상체 힘이 효과적으로 다리로 전달되는 모습이 인상적이다. 더 넓은 회전 범위를 보이면 더 강력한 임팩트를 줄 수 있을 것 같다.",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 79.2
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 2,
+          "stored_grade": 2,
+          "segment": 0,
+          "band_value": 125.8,
+          "evidence": "골반 회전 범위 125.8도로 백스윙부터 임팩트까지 크게 열렸다. 상체 힘이 효과적으로 다리로 전달되는 모습이 뚜렷했다.",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 125.8
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 0,
+          "band_value": 18.5,
+          "evidence": "회전 범위 18.5도로 중간 구간에 해당하나 완전한 백스윙 임팩트 전달에는 부족합니다.",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 18.5
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 1,
+          "stored_grade": 1,
+          "segment": 0,
+          "band_value": 21.5,
+          "evidence": "회전 범위 19.8도로 중간 구간",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 21.5
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 0,
+          "band_value": 5.2,
+          "evidence": "회전 범위 5.2도로 백스윙에서 임팩트까지 골반이 거의 열리지 않아 상체 힘 전달이 미흡하다",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 5.2
+          }
+        },
+        {
+          "criterion_id": "hip_rotation",
+          "name": "골반 돌리기",
+          "grade": 0,
+          "stored_grade": 0,
+          "segment": 0,
+          "band_value": 9.8,
+          "evidence": "회전 범위 9.8도로 백스윙에서 임팩트까지 골반 회전이 거의 없었다. 상체 힘이 다리로 제대로 전달되지 않아 효율성이 떨어진다.",
+          "metric_ref": "hip_rotation_range_deg",
+          "given_metrics": {
+            "hip_rotation_range_deg": 9.8
+          }
+        }
+      ]
+    }
+  }
+}

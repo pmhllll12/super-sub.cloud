@@ -107,3 +107,7 @@ class CardGradeRow:
     provisional: bool | None
     trust_positive: int
     trust_total: int
+    # 추천 판 카드의 불릿 한두 줄(`paik` 33번 · `result.card.notes`). 같은
+    # 리포트에서 함께 읽는다 — 등급만 주고 문장을 따로 부르게 하면 같은 행을
+    # 두 번 읽는다. `card` 없는 봉투로 적재된 리포트는 `None`.
+    card_notes: list[str] | None = None

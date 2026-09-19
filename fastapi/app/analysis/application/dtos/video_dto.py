@@ -139,6 +139,10 @@ class CardGradeResult:
 
     grade: str | None
     provisional: bool | None
+    # 추천 판 카드의 불릿 **한두 줄**(`paik` 33번). 🔴 여전히 리포트 전체가
+    # 아니다 — 25번이 막아 둔 것 중 **한 칸만** 여는 것이고, 수치·항목별
+    # 점수는 안 실린다(제기자가 09-16에 그 판단을 스스로 정정했다).
+    notes: list[str] | None = None
 
 
 @dataclass(frozen=True)

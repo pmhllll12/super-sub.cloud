@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.shared import Rfc3339
@@ -23,10 +25,19 @@ class CardStyleSchema(BaseModel):
     자리다. `www` 가 04-09 이후 그걸 몰라 `style.text` 를 새로 만들었는데,
     이 마이그레이션에서 `tagline` 쪽으로 합친다.
 
-    🔴 **사진도 여기 없다** — `og_image_key` 처럼 저장 위치가 아직 안
-    정해졌다. 사진에 딸린 자리·크기(`photoScale`·`photoX`·`photoY`)와
-    통째로 까는 모드(`mode`)도 사진이 없으면 뜻이 없어 같이 뺐다. `www` 는
-    그 넷을 그대로 브라우저에만 담아 둔다.
+    🔴 **정정 (2026-09-18, 사용자 요청): 사진이 들어왔다.** 앞서 여기에
+    「사진도 여기 없다 — 저장 위치가 아직 안 정해졌다」고 적어 두었는데,
+    자리를 정했다: **바이트는 S3, 여기에는 키만** 둔다
+    (`cards/photos/<user_id>/…`, `card_rules.build_photo_key`). `style` 이
+    JSON 컬럼이라 **마이그레이션은 없다.**
+
+    🔴 **다섯 칸은 전부 기본값이 있다.** 위 아홉은 필수인데, 새 칸을 필수로
+    두면 **지금 돌고 있는 클라이언트가 전부 422** 가 된다 — 사진을 안 쓰는
+    쪽은 보내지 않는다.
+
+    🔴 **여기에 그림을 담지 않는다.** data URL 로 담으면 카드를 읽는 모든
+    응답에 사진이 실리는데, 스쿼드 판 하나가 자리마다 카드를 부르므로 5~7장이
+    매번 함께 나간다. 읽을 주소는 응답의 `photo_url`(사전 서명)이다.
 
     🔴 **`brush` 상한을 값으로 안 검사한다.** 고를 수 있는 자국 목록
     (`www/src/components/CardMark.tsx` 의 `MARKS`)은 화면 쪽 자산이라 늘어날
@@ -47,6 +58,21 @@ class CardStyleSchema(BaseModel):
     brush_scale: float = Field(ge=0.1, le=5)
     brush_x: float = Field(ge=-100, le=100)
     brush_y: float = Field(ge=-100, le=100)
+
+    # --- 사진 (2026-09-18) ---------------------------------------------------
+    # 🔴 **그림이 아니라 S3 키다.** `null` 이면 사진을 안 쓴다는 뜻이고, 그때
+    #    나머지 넷은 뜻이 없다(화면이 기본 장식 그림을 그린다).
+    # 🔴 **남의 키를 못 쓴다** — 저장할 때 `owns_photo_key` 로 접두사를
+    #    대조한다. 여기서 길이만 보는 것은 형식과 권한이 다른 층이라서다.
+    photo_key: str | None = Field(default=None, max_length=200)
+    # 카드 안에서 사진을 얼마나 키워 놓았는가. 1 이 원래 크기다.
+    photo_scale: float = Field(default=1, ge=0.1, le=5)
+    # 사진의 자리(%). 글자 자리(`text_x`)와 달리 **음수가 된다** — 사진은
+    # 칸보다 크게 잡아 놓고 밀어 넣는 것이라 왼쪽·위로 넘어간다.
+    photo_x: float = Field(default=0, ge=-100, le=100)
+    photo_y: float = Field(default=0, ge=-100, le=100)
+    # 누끼 인물(`cutout`)이냐 카드를 통째로 덮느냐(`full`).
+    mode: Literal["cutout", "full"] = "cutout"
 
 
 class TitleResponse(BaseModel):
@@ -85,6 +111,10 @@ class MyCardResponse(BaseModel):
     tagline: str | None = None
     # 카드 꾸미기. 안 꾸몄으면 null — 화면이 기본 모습을 그린다.
     style: CardStyleSchema | None = None
+    # 🔴 **사진을 읽을 주소**(2026-09-18). 사전 서명이라 **유효 시간이 있고
+    #    저장되지 않는다** — 부를 때마다 새로 만든다. `style.photo_key` 에서
+    #    나오며, 사진이 없거나 저장소가 설정 안 됐으면 `null` 이다.
+    photo_url: str | None = None
 
 
 class UpdateMyCardSchema(BaseModel):
@@ -120,3 +150,29 @@ class PublicCardResponse(BaseModel):
     # 🔴 여기에도 실린다. 안 실으면 **남이 보는 카드만** 밋밋해진다.
     tagline: str | None = None
     style: CardStyleSchema | None = None
+    # 🔴 여기에도 실린다 — 안 실으면 **남이 보는 카드만** 사진이 없다.
+    photo_url: str | None = None
+
+
+class CardPhotoUploadSchema(BaseModel):
+    """카드 사진 올릴 자리 요청 (2026-09-18).
+
+    🔴 **확장자를 받지 않는다** — 타입 하나만 받고 확장자는 서버가 정한다
+    (`extension_for_content_type`). 둘 다 받으면 `image/jpeg` 라면서 `.html`
+    로 올리는 키가 생긴다.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    # 🔴 브라우저가 **PUT 헤더로 그대로 보내야** 하는 값이다 — 서명에 들어가서
+    #    다르면 S3 가 403 을 준다.
+    content_type: str = Field(max_length=100)
+
+
+class CardPhotoUploadResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    upload_url: str
+    #: 올린 뒤 `PATCH /me/card` 의 `style.photo_key` 로 되돌려 보낸다.
+    storage_key: str
+    expires_in: int

@@ -10,7 +10,11 @@ from dataclasses import replace
 from uuid import UUID, uuid4
 
 from app.card.application.ports.output.squad_port import SquadPort
-from app.card.domain.entities.squad_entity import SquadEntity, SquadMemberEntity
+from app.card.domain.entities.squad_entity import (
+    DEFAULT_FORMATION,
+    SquadEntity,
+    SquadMemberEntity,
+)
 from app.card.domain.value_objects.public_slug_vo import PublicSlug
 
 _POSITIONS = {
@@ -70,7 +74,12 @@ class StubSquadRepository(SquadPort):
         if existing is not None:
             return existing, False
         squad = SquadEntity(
-            id=uuid4(), team_id=team_id, public_slug=PublicSlug.generate()
+            id=uuid4(),
+            team_id=team_id,
+            public_slug=PublicSlug.generate(),
+            # 실물과 같은 기본값이어야 한다 — 다르면 스텁으로 도는 계약 시험이
+            # 실물에서 안 나는 결과를 초록으로 만든다.
+            formation=DEFAULT_FORMATION,
         )
         _SQUADS[squad.id] = squad
         return squad, True

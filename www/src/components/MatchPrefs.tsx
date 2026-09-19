@@ -266,9 +266,10 @@ export default function MatchPrefsForm({
           팀 찾기
         </button>
       </div>
-
-      {/* ⚠️ 어디에 남는지 밝힌다 — 계약에 자리가 없다. */}
-      <p className="ss-prefs-note">아직 이 브라우저에만 남습니다.</p>
+      {/* 🔴 **「아직 이 브라우저에만 남습니다」를 걷었다**(2026-09-17).
+          두 쪽 다 서버로 올라간다 — 팀 조건은 `teamPrefsStore`, 내 조건은
+          `myPrefsStore` 다. 낡은 안내를 남겨 두면 사용자가 **등록이 안 된
+          줄 알고** 자기 자리를 다시 올리지 않는다. */}
     </form>
   )
 }

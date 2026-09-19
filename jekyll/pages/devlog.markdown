@@ -2,7 +2,8 @@
 layout: default
 title: 개발 로그
 permalink: /devlog/
-nav_order: 4
+parent: 팀 작업 공간
+nav_order: 1
 ---
 
 {% if site.posts.size > 0 %}

@@ -35,6 +35,11 @@ class CreateMyCardCommand:
 
 
 @dataclass(frozen=True)
+class DeleteMyCardCommand:
+    user_id: UUID
+
+
+@dataclass(frozen=True)
 class PublicCardQuery:
     public_slug: str
 
@@ -64,6 +69,13 @@ class MyCardResult:
     titles: list[TitleResult] = field(default_factory=list)
     tagline: str | None = None
     style: dict | None = None
+    #: 카드 사진의 **사전 서명 GET 주소**(2026-09-18). 저장하지 않는다 —
+    #: `style["photo_key"]` 에서 읽을 때마다 새로 만든다(유효 시간이 있다).
+    #:
+    #: 🔴 **`None` 인 경우가 셋이고 전부 정상**이다: 사진을 안 올렸다 ·
+    #: 저장소가 설정 안 됐다(로컬) · 키가 있는데 파일이 아직 없다. 화면은
+    #: 그때 기본 장식 그림을 그린다.
+    photo_url: str | None = None
 
 
 @dataclass(frozen=True)
@@ -98,3 +110,21 @@ class PublicCardResult:
     titles: list[TitleResult] = field(default_factory=list)
     tagline: str | None = None
     style: dict | None = None
+    #: 🔴 **여기에도 실린다.** 안 실으면 남이 보는 카드만 사진이 없다
+    #: (`tagline`·`style` 을 공개 응답에 실은 것과 같은 이유).
+    photo_url: str | None = None
+
+
+@dataclass(frozen=True)
+class CardPhotoUploadCommand:
+    user_id: UUID
+    #: 브라우저가 **PUT 헤더로 그대로 보낼** 값. 서명에 들어가므로 다르면 403.
+    content_type: str
+
+
+@dataclass(frozen=True)
+class CardPhotoUploadResult:
+    upload_url: str
+    #: 올린 뒤 `PATCH /me/card` 의 `style.photo_key` 로 되돌려 보낼 값.
+    storage_key: str
+    expires_in: int

@@ -10,6 +10,7 @@ import { smoothStep } from '@/lib/smoothBox'
 import { DEFAULT_SPORT, SPORT_CODE, type SportKey } from '@/lib/sports'
 import { FOCUS } from '@/lib/rubricFocus'
 import { uploadClip, type ClipSubject } from '@/lib/uploadClip'
+import { duplicateNotice } from '@/lib/duplicateNotice'
 import { fetchReport, type ReportResult } from '@/lib/savedReports'
 import { ANALYSIS_STEPS as STEPS, FINISH_STEP_MS } from '@/lib/analysisSteps'
 import ReportView from '@/components/analysis/ReportView'
@@ -1406,6 +1407,11 @@ export default function AnalysisStage() {
       if (saved.passed) {
         setSaveState('saved')
         setVideoId(saved.id)
+        /* 🔴 **앞서 올린 것과 같으면 알린다**(CCC 48). 여기서는 대개 「이
+           사람으로 분석」·「집중해서 볼 항목」을 실어 보내는데 그런 등록은
+           중복 판정에서 빠진다 — 그래서 **안 올 때가 더 많고, 안 와도 버그가
+           아니다.** 지정 없이 올린 경우에만 값이 온다. */
+        setSaveMessage(duplicateNotice(saved))
         // 🔴 첫 칸('영상 등록')이 여기서 끝난다 — 시간이 아니라 **실제로
         //    올라간 것**이 다음 칸을 켠다.
         setStep((now) => (now === 0 ? 1 : now))
@@ -2047,8 +2053,12 @@ export default function AnalysisStage() {
           </div>
         </div>
 
-        {/* 반려·오류 사유 — 성공(saved)은 진행 단계가 넘어가는 것으로 보인다. */}
-        {saveMessage && (saveState === 'rejected' || saveState === 'error') && (
+        {/* 반려·오류 사유 — 성공(saved)은 진행 단계가 넘어가는 것으로 보인다.
+            🔴 **다만 「앞서 올린 것과 같다」는 성공했을 때도 적는다**(CCC 48) —
+            그 사실은 등록 응답에만 실려 와서, 여기서 안 보여 주면 다시 볼
+            방법이 없다. 단계는 그대로 넘어간다(막는 것이 아니라 안내다). */}
+        {saveMessage &&
+          (saveState === 'rejected' || saveState === 'error' || saveState === 'saved') && (
           <p className="ss-shot-save-msg" data-tone={saveState}>
             {saveMessage}
             {/* 🔴 올리다 실패한 것은 **다시 해 볼 수 있어야 한다.** 첫 칸에서

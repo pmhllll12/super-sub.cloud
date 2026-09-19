@@ -179,6 +179,7 @@ def _to_squad_candidate_result(c: SquadCandidateFactsEntity) -> SquadCandidateRe
         card_public_slug=c.card_public_slug,
         grade=c.grade,
         provisional=c.provisional,
+        notes=c.notes,
     )
 
 

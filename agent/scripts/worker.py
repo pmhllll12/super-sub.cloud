@@ -152,6 +152,14 @@ def log(msg: str) -> None:
 
 # --- 백엔드 호출 (urllib — 의존성을 늘리지 않는다, judge.py 와 같은 이유) ----
 
+# 🔴 UA 를 비워 두지 않는다. 안 주면 urllib 이 `Python-urllib/3.x` 를 보내는데,
+# 백엔드 앞단 Cloudflare 가 **그 문자열을 차단**한다 — 2026.09.16 08:27 부터
+# claim 이 전부 `403 error code: 1010` 이었다(워커 쪽은 아무것도 안 바뀌었고
+# 같은 프로세스 안에서 갈렸다). 규칙은 대소문자를 구분해서 `Python-urllib` 만
+# 걸리고 다른 UA 는 오리진까지 간다 — EC2 에서 UA 만 바꿔 가며 확인했다.
+# 자기 이름을 밝히는 것이 원래 맞기도 하다. 앞단 예외 처리는 미결 `ho` 53번.
+USER_AGENT = "supersub-worker/1.0"
+
 
 def _request(
     cfg: Config, method: str, path: str, payload: dict | None = None
@@ -161,6 +169,7 @@ def _request(
     data = json.dumps(payload).encode() if payload is not None else None
     req = urllib.request.Request(f"{cfg.api_base}{path}", data=data, method=method)
     req.add_header("X-Worker-Token", cfg.token)
+    req.add_header("User-Agent", USER_AGENT)
     if data is not None:
         req.add_header("Content-Type", "application/json")
     try:

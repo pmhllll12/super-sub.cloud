@@ -58,6 +58,16 @@ class CardPort(ABC):
         """
 
     @abstractmethod
+    def delete_by_owner(self, user_id: UUID) -> bool:
+        """내 카드를 지운다. 지웠으면 True, 원래 없었으면 False(2026-09-19, `paik`).
+
+        🔴 **되돌릴 수 없다.** 슬러그가 사라지므로 이미 공유한 링크가 죽고, 스쿼드
+        판의 자리(`squad_member`)도 외래키 CASCADE 로 같이 빠진다. 부여된 호칭
+        (`user_title`)과 직접 적은 호칭(`user_custom_title`)은 **사람**(`user`)에
+        붙어 있어 남는다 — 다시 만든 카드에 그대로 실린다.
+        """
+
+    @abstractmethod
     def create_for_owner(self, user_id: UUID) -> CardEntity:
         """카드를 만들어 돌려준다. **이미 있으면 있는 것을 돌려준다.**
 

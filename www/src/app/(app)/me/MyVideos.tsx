@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import type { MyVideo } from '@/server/backend'
 import { DEFAULT_SPORT, SPORT_CODE } from '@/lib/sports'
 import { checkClip, uploadClip, type ClipMeta } from '@/lib/uploadClip'
+import { duplicateNotice } from '@/lib/duplicateNotice'
 import { publish, unpublish } from '@/lib/published'
 import { fetchReport, type ReportResult } from '@/lib/savedReports'
 import { featuredOf, setFeatured } from '@/lib/featuredClip'
@@ -428,6 +429,11 @@ export default function MyVideos({ videos }: { videos: MyVideo[] }) {
       if (!saved.passed) {
         setNotice(saved.reject_reason ?? '규격에 맞지 않아 반려됐습니다.')
       } else {
+        /* 🔴 **같은 영상을 다시 올렸으면 그 자리에서 말한다**(CCC 48,
+           미결 `ho` 41번). 이 사실은 **등록 응답에만** 실려 오므로 지금
+           안 적으면 다시 볼 방법이 없다. 막지는 않는다 — 올라간 것은
+           올라간 것이고, 이건 안내다. */
+        setNotice(duplicateNotice(saved))
         /* 🔴 **보낸 뜻이 아니라 돌아온 응답을 믿는다.** 계약이 아직 `analyze` 를
            모르므로 백엔드가 그것을 무시하고 분석을 걸 수 있다 — 그러면
            `analysis_job_id` 가 채워져 오고, 그때는 「분석 영상」이 사실이다. */

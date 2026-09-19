@@ -126,6 +126,7 @@ class ReportIngestPgRepository(ReportIngestPort):
                 provisional=parsed.provisional,
                 previews=parsed.previews,
                 keypoint_quality=parsed.keypoint_quality,
+                card_notes=parsed.card_notes,
                 created_at=now,
             )
         )

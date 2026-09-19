@@ -8,8 +8,16 @@ import BrandMark from './ui/BrandMark'
  * 검은 테두리 안에 **흰 카드**가 들어 있고, 위에서부터 워드마크 · 작은
  * 머리글 · 큰 별명이 오고, 아래 절반을 누끼 인물이 채운다.
  *
- * 인물은 `public/player_cutout.png` — 배경이 검던 원본에서 사람만 떼어
- * 낸 것이다(만든 과정은 커밋 메시지 참고). **카드 세로 가운데 위로는
+ * 사진을 안 올린 카드의 인물은 `public/player_default.webp`(2026-09-19 사용자
+ * 지정 — 축구공을 든 선수). 원본(2400×1352, 누끼)에서 만든 것:
+ *   - 🔴 **얼굴(머리 x 805~1255)이 가로 가운데**, 양팔 끝(x 597~2288)이 다 들어오게
+ *     모자라는 왼쪽을 투명으로 채웠다(사용자 요청 — 처음엔 양팔이 잘렸다)
+ *   - 🔴 오른 팔꿈치 위의 생성기 워터마크(✦, 가운데 x 2189 · y 1140)는 **지웠다**
+ *     (주변 피부로 메움). 원본에서 다시 만들면 되살아나니 같이 지울 것
+ *   - 1100px 로 줄인 WebP(투명 유지, 50KB)
+ * 이 그림은 넓어서 **자르지 않고 카드 폭에 맞춰 바닥에 앉힌다**(`data-photo-default`,
+ * globals.css) — 올린 사진처럼 네모 칸에 `cover` 로 채우면 팔이 잘린다.
+ * (전에는 `player_cutout.png` — 미식축구 선수였다.) **카드 세로 가운데 위로는
  * 올라오지 않는다** — 위쪽 절반은 워드마크와 머리글의 자리다.
  *
  * ✅ 가운데 큰 글자는 **`card.tagline`**(CCC 18·35)에서 온다 — 안 정했으면
@@ -31,10 +39,30 @@ import BrandMark from './ui/BrandMark'
  * 화면에서 되살아나면 그 설계가 통째로 무의미해진다.
  * titles 는 **받은 것만** 온다 — 미달 표식을 만들지 않는다.
  */
-// `tagline`을 안 정한 카드가 보일 자리 표시. `cardStyle.tsx`의 편집 초안도
-// 같은 값으로 시작한다(export 하는 이유) — 편집기를 열었을 때 지금 카드에
-// 보이는 것과 다른 글자가 뜨면 안 된다.
+// 카드를 **한 번도 안 꾸민** 사람에게 보일 자리 표시. `cardStyle.tsx`의 편집
+// 초안도 같은 값으로 시작한다(export 하는 이유) — 편집기를 열었을 때 지금
+// 카드에 보이는 것과 다른 글자가 뜨면 안 된다.
 export const ALIAS = 'THREE LUNGS'
+
+/**
+ * 카드 가운데에 적을 큰 글자. **「비웠다」와 「안 정했다」를 가른다.**
+ *
+ * 🔴 서버는 둘을 구분해 주지 못한다 — 계약이 `tagline: null` 과 `"   "` 를
+ * 똑같이 「안 정한 상태」로 만든다(api-contract.md). 그래서 `tagline` 만
+ * 봐서는 **일부러 지운 사람**에게 자리 표시를 도로 씌우게 된다(2026-09-18
+ * 사용자 지적 — 「글자 안 쓰고 싶은 사람도 있다」).
+ *
+ * 가르는 값은 **`style`** 이다. `style` 이 있다는 것은 **저장을 한 번
+ * 거쳤다**는 뜻이고, 그때 글자 칸에는 카드에 보이던 값이 들어 있었다. 그러니
+ * `style` 이 있는데 `tagline` 이 비었으면 **지운 것**이다.
+ *
+ * ⚠️ 그래서 한 번도 안 꾸민 카드(`style` 이 `null`)는 지금까지처럼
+ * 자리 표시가 남는다 — 새로 가입한 사람의 카드가 갑자기 글자 없이
+ * 그려지지 않게 하려는 것이다.
+ */
+export function aliasOf(card: { tagline: string | null; style: unknown }): string {
+  return card.tagline ?? (card.style ? '' : ALIAS)
+}
 
 /**
  * 카드를 꾸민 값. **안 넘기면 `card.style` 을 쓴다**(꾸민 적이 없으면 그것도
@@ -64,9 +92,13 @@ type CardLook = {
   brushY?: number
 }
 
-/** `card.style` (서버, 스네이크) → `CardLook` (이 파일, 캐멀). 사진 관련은
- * 서버에 없으므로 안 채운다 — 호출부가 `??` 로 기본값을 따로 잡는다. */
-function styleToLook(style: NonNullable<PublicPlayerCard['style']>): CardLook {
+/** `card.style` (서버, 스네이크) → `CardLook` (이 파일, 캐멀).
+ *
+ * 🔴 **그림 주소는 `style` 이 아니라 `card.photo_url` 에서 온다**(2026-09-18) —
+ * `style` 에는 S3 키만 있고, 그 키로 서명한 주소를 서버가 따로 실어 준다.
+ * 그래서 카드를 통째로 받는다. */
+function styleToLook(card: PublicPlayerCard): CardLook {
+  const style = card.style!
   return {
     bg: style.bg,
     logo: style.logo,
@@ -78,6 +110,13 @@ function styleToLook(style: NonNullable<PublicPlayerCard['style']>): CardLook {
     brushScale: style.brush_scale,
     brushX: style.brush_x,
     brushY: style.brush_y,
+    /* 🔴 **없을 수 있다** — 배포 전 실서버는 아직 안 보낸다. 그때는 기본
+       장식 그림으로 떨어진다(아래 `photo` 의 `??`). */
+    photo: card.photo_url ?? null,
+    photoScale: style.photo_scale,
+    photoX: style.photo_x,
+    photoY: style.photo_y,
+    mode: style.mode,
   }
 }
 
@@ -91,15 +130,19 @@ export default function PlayerCardView({
   // 🔴 **`look` 이 없어도 `card.style` 이 있으면 꾸며진 대로 그린다.** 이게
   // 없으면 저장은 되는데 편집기 밖(내 프로필 평소 보기 · 공개 카드 링크)
   // 에서는 안 보이는 반쪽짜리가 된다 — 저장한 보람이 없어진다.
-  const effective = look ?? (card.style ? styleToLook(card.style) : undefined)
-  const alias = look?.text ?? card.tagline ?? ALIAS
-  const photo = effective?.photo ?? '/player_cutout.png'
+  const effective = look ?? (card.style ? styleToLook(card) : undefined)
+  // 🔴 `look.text` 는 **편집 중인 초안**이라 빈 문자열이 올 수 있다. `??` 는
+  //    `''` 를 통과시키므로(널만 본다) 지우는 즉시 미리보기에서도 사라진다.
+  const alias = look?.text ?? aliasOf(card)
+  const photo = effective?.photo ?? '/player_default.webp'
   const full = effective?.mode === 'full'
   return (
     <article
       className="ss-pcard"
       aria-label={card.user.nickname}
       data-photo={full ? 'full' : undefined}
+      // 사진을 안 올린 카드 — 기본 인물은 **자르지 않고** 카드 폭에 맞춘다(아래 CSS).
+      data-photo-default={!effective?.photo && !full ? 'true' : undefined}
       data-text-free={effective ? 'true' : undefined}
       style={
         effective
@@ -139,11 +182,24 @@ export default function PlayerCardView({
         )}
 
         {/* 🔴 사진을 통째로 까는 모드에서는 **글자보다 먼저** 그린다 — 나중에
-            그리면 사진이 로고와 머리글을 덮는다. */}
+            그리면 사진이 로고와 머리글을 덮는다.
+
+            🔴 **`draggable={false}` 를 빠뜨리지 말 것**(사용자 지적,
+            2026-09-18: 「카드가 있는 모든 곳에서 저 사람 이미지가 계속
+            클릭해서 옮기면 따라 나오는데」). 브라우저는 `<img>` 를 집으면
+            **반투명 유령 그림**을 만들어 따라다니게 한다 — 스쿼드 판처럼
+            카드를 끌어 옮기는 자리에서는 그것이 끌기 위에 겹쳐 보인다.
+            `.ss-squad-seat` 의 `user-select: none` 으로는 **못 막는다**
+            (그건 글자 선택만 막는다 — 그 주석이 「그림도 막는다」고 적어
+            둔 것은 틀렸고 함께 고쳤다).
+
+            🔴 **카드 사진이 나오는 유일한 자리라 여기서 끝난다** — 스쿼드
+            판·헤더·프로필·공개 카드·대기 팝업·리뷰가 전부 이 컴포넌트를
+            지난다. */}
         {full && (
           <div className="ss-pcard-figure" aria-hidden="true">
             {/* eslint-disable-next-line @next/next/no-img-element -- 위와 같은 이유 */}
-            <img src={photo} alt="" decoding="async" />
+            <img src={photo} alt="" decoding="async" draggable={false} />
           </div>
         )}
 
@@ -164,7 +220,7 @@ export default function PlayerCardView({
           <div className="ss-pcard-figure" aria-hidden="true">
             {/* eslint-disable-next-line @next/next/no-img-element -- 사용자가 고른 그림이라
                 크기를 미리 알 수 없다(next/image 는 크기를 요구한다) */}
-            <img src={photo} alt="" decoding="async" />
+            <img src={photo} alt="" decoding="async" draggable={false} />
           </div>
         )}
 

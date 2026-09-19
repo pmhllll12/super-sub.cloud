@@ -205,3 +205,16 @@ class TeamMatchRequestResult:
     created_at: datetime
     responded_at: datetime | None
     match_id: UUID | None
+    # 두 팀의 표시용 값(`paik` 31번). **감싸지 않고 덧붙인다** — 화면이 이미
+    # 읽는 id 칸의 자리가 바뀌면 배선이 깨진다.
+    requester_team_name: str = ""
+    requester_team_region: str = ""
+    target_team_name: str = ""
+    target_team_region: str = ""
+    # 그 팀 **스쿼드의 공개 슬러그** (`paik` 22번 후속, 2026-09-17). 대기
+    # 화면이 상대 팀 판을 그리는 데 쓴다 — `GET /squads/{slug}` 는 누구나
+    # 읽으므로 소속이 아니어도 볼 수 있다.
+    # 🔴 **스쿼드를 아직 안 만든 팀이면 `None` 이고 그게 정상이다**(생성이
+    # 멱등이라 늦게 생긴다). 빈 문자열로 채우지 않는다.
+    requester_squad_public_slug: str | None = None
+    target_squad_public_slug: str | None = None

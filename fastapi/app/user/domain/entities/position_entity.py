@@ -7,10 +7,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from uuid import UUID
 
 
 @dataclass(frozen=True)
 class PositionEntity:
+    """🔴 **`id` 를 함께 내보낸다.** 약칭(`code`)은 종목 안에서만 유일해서
+    그것만으로는 한 줄을 못 가리킨다 — 다른 도메인이 포지션을 지목할 때
+    (`member_match_position.position_id` 등) 쓰는 값은 이 대리키다.
+    """
+
+    id: UUID
     sport_code: str
     code: str
     label: str

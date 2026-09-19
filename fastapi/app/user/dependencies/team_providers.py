@@ -18,12 +18,14 @@ from app.user.application.ports.input.team_use_cases import (
     CancelTeamInvitationUseCase,
     CreateTeamInvitationUseCase,
     CreateTeamUseCase,
+    DisbandTeamUseCase,
     JoinTeamUseCase,
     LeaveTeamUseCase,
     ListMyTeamInvitationsUseCase,
     ListTeamInvitationsUseCase,
     ReadTeamUseCase,
     RejectTeamInvitationUseCase,
+    SetMemberRoleUseCase,
     UpdateTeamUseCase,
 )
 from app.user.application.ports.output.team_port import TeamPort
@@ -32,12 +34,14 @@ from app.user.application.use_cases.team_interactors import (
     CancelTeamInvitationInteractor,
     CreateTeamInteractor,
     CreateTeamInvitationInteractor,
+    DisbandTeamInteractor,
     JoinTeamInteractor,
     LeaveTeamInteractor,
     ListMyTeamInvitationsInteractor,
     ListTeamInvitationsInteractor,
     ReadTeamInteractor,
     RejectTeamInvitationInteractor,
+    SetMemberRoleInteractor,
     UpdateTeamInteractor,
 )
 
@@ -63,6 +67,16 @@ def get_update_team_use_case(repository: TeamRepositoryDep) -> UpdateTeamUseCase
     return UpdateTeamInteractor(repository)
 
 
+def get_disband_team_use_case(repository: TeamRepositoryDep) -> DisbandTeamUseCase:
+    return DisbandTeamInteractor(repository)
+
+
+def get_set_member_role_use_case(
+    repository: TeamRepositoryDep,
+) -> SetMemberRoleUseCase:
+    return SetMemberRoleInteractor(repository)
+
+
 def get_join_team_use_case(repository: TeamRepositoryDep) -> JoinTeamUseCase:
     return JoinTeamInteractor(repository)
 
@@ -75,6 +89,12 @@ CreateTeamUseCaseDep = Annotated[CreateTeamUseCase, Depends(get_create_team_use_
 ReadTeamUseCaseDep = Annotated[ReadTeamUseCase, Depends(get_read_team_use_case)]
 UpdateTeamUseCaseDep = Annotated[
     UpdateTeamUseCase, Depends(get_update_team_use_case)
+]
+DisbandTeamUseCaseDep = Annotated[
+    DisbandTeamUseCase, Depends(get_disband_team_use_case)
+]
+SetMemberRoleUseCaseDep = Annotated[
+    SetMemberRoleUseCase, Depends(get_set_member_role_use_case)
 ]
 JoinTeamUseCaseDep = Annotated[JoinTeamUseCase, Depends(get_join_team_use_case)]
 LeaveTeamUseCaseDep = Annotated[LeaveTeamUseCase, Depends(get_leave_team_use_case)]

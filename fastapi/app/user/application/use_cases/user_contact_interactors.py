@@ -37,8 +37,16 @@ class SearchUsersInteractor(SearchUsersUseCase):
         users = self._repository.search_by_nickname(
             q=query.q, exclude_user_id=query.actor_id, limit=SEARCH_LIMIT
         )
+        # 🔴 **한 번에 읽는다**(미결 `paik` 39번) — 사람마다 따로 읽으면
+        #    검색 한 번에 스무 번 쿼리가 나간다. 카드가 없으면 `None` 이다.
+        slugs = self._repository.card_slugs([u.id for u in users])
         return [
-            UserSearchResult(id=u.id, nickname=str(u.nickname)) for u in users
+            UserSearchResult(
+                id=u.id,
+                nickname=str(u.nickname),
+                card_public_slug=slugs.get(u.id),
+            )
+            for u in users
         ]
 
 

@@ -1,0 +1,59 @@
+{
+  "_설명": "기준 D·E 판독 — C 회차(2x2 제거 실험, 미결 23번). 🔴 AI 판독이라 정답이 아니다. 사람이 다시 읽으라고 남긴다. 판정 규칙은 앞 회차와 같다: 문장이 **반대 조각의 방향**을 주장하는 절을 포함하면 오독으로 센다.",
+  "_읽은이": "Claude (정상호 세션, 2026-09-17, C 회차)",
+  "_한_번에_읽었다": "네 팔 30문장을 자리별로 나란히 놓고 한 판에 읽었다. 그래서 팔 사이 대조는 같은 잣대이고, 앞 회차 숫자와의 대조는 아니다 (아래 정정).",
+  "_🔴_정정": "C0 은 B 회차(`evidence_other_levels.json`)와 **같은 문장**인데, B 에서 D=3/30 · E=0/22 로 적은 것을 이번에 다시 읽으니 D=5/30 · E=1/22 였다. 문장도 판정 규칙도 안 바뀌었고 **판독만 다르다.** 늘어난 자리는 D: inside_pass/follow_through 79.2·125.8 (B 에서 「고쳐졌다」로 적은 둘), E: instep_shot/swing_knee_extension 148.8. 근거는 RESULTS_source_trace.md 에 적었다. 🔴 **앞 회차 D 숫자와 이번 숫자를 나란히 놓지 말 것.**",
+  "D_방향_오독": {
+    "_대상": "양방향 구간 30자리 (한 등급에 반대 방향 조각이 둘인 자리)",
+    "C0": {
+      "inside_pass/follow_through": {"4.8": "ok", "6.2": "ok", "79.2": "wrong", "125.8": "wrong"},
+      "inside_pass/hip_rotation": {"10.4": "ok", "12.6": "ok", "85.8": "wrong", "129.2": "ok"},
+      "inside_pass/swing_knee_extension": {"42.0": "ok", "78.0": "ok", "174.8": "ok", "177.2": "ok"},
+      "inside_pass/trunk_lean": {"0.7": "ok", "1.3": "ok", "29.8": "ok", "32.2": "ok"},
+      "instep_shot/plant_knee_flexion": {"140.2": "ok", "144.8": "ok", "173.5": "ok", "176.5": "ok"},
+      "instep_shot/swing_knee_extension": {"49.0": "ok", "91.0": "ok", "179.8": "ok", "182.2": "ok"},
+      "instep_shot/trunk_lean": {"1.8": "wrong", "3.2": "ok", "23.5": "wrong", "26.5": "ok", "34.8": "ok", "37.2": "ok"}
+    },
+    "C1": {
+      "inside_pass/follow_through": {"4.8": "wrong", "6.2": "wrong", "79.2": "wrong", "125.8": "wrong"},
+      "inside_pass/hip_rotation": {"10.4": "ok", "12.6": "ok", "85.8": "ok", "129.2": "ok"},
+      "inside_pass/swing_knee_extension": {"42.0": "ok", "78.0": "ok", "174.8": "ok", "177.2": "ok"},
+      "inside_pass/trunk_lean": {"0.7": "ok", "1.3": "wrong", "29.8": "ok", "32.2": "ok"},
+      "instep_shot/plant_knee_flexion": {"140.2": "ok", "144.8": "ok", "173.5": "wrong", "176.5": "wrong"},
+      "instep_shot/swing_knee_extension": {"49.0": "ok", "91.0": "ok", "179.8": "ok", "182.2": "ok"},
+      "instep_shot/trunk_lean": {"1.8": "ok", "3.2": "ok", "23.5": "wrong", "26.5": "wrong", "34.8": "ok", "37.2": "ok"}
+    },
+    "C2": {
+      "inside_pass/follow_through": {"4.8": "ok", "6.2": "ok", "79.2": "ok", "125.8": "wrong"},
+      "inside_pass/hip_rotation": {"10.4": "ok", "12.6": "wrong", "85.8": "ok", "129.2": "ok"},
+      "inside_pass/swing_knee_extension": {"42.0": "ok", "78.0": "ok", "174.8": "ok", "177.2": "ok"},
+      "inside_pass/trunk_lean": {"0.7": "ok", "1.3": "ok", "29.8": "ok", "32.2": "ok"},
+      "instep_shot/plant_knee_flexion": {"140.2": "ok", "144.8": "ok", "173.5": "ok", "176.5": "ok"},
+      "instep_shot/swing_knee_extension": {"49.0": "ok", "91.0": "ok", "179.8": "ok", "182.2": "ok"},
+      "instep_shot/trunk_lean": {"1.8": "wrong", "3.2": "ok", "23.5": "ok", "26.5": "ok", "34.8": "ok", "37.2": "ok"}
+    },
+    "C3": {
+      "inside_pass/follow_through": {"4.8": "ok", "6.2": "ok", "79.2": "wrong", "125.8": "ok"},
+      "inside_pass/hip_rotation": {"10.4": "ok", "12.6": "ok", "85.8": "ok", "129.2": "ok"},
+      "inside_pass/swing_knee_extension": {"42.0": "ok", "78.0": "ok", "174.8": "ok", "177.2": "ok"},
+      "inside_pass/trunk_lean": {"0.7": "ok", "1.3": "ok", "29.8": "ok", "32.2": "ok"},
+      "instep_shot/plant_knee_flexion": {"140.2": "ok", "144.8": "ok", "173.5": "ok", "176.5": "ok"},
+      "instep_shot/swing_knee_extension": {"49.0": "ok", "91.0": "ok", "179.8": "wrong", "182.2": "wrong"},
+      "instep_shot/trunk_lean": {"1.8": "ok", "3.2": "ok", "23.5": "ok", "26.5": "ok", "34.8": "ok", "37.2": "ok"}
+    },
+    "_합계": {"C0": "5/30", "C1": "9/30", "C2": "3/30", "C3": "3/30"}
+  },
+  "E_잘함_문장_오독": {
+    "_대상": "2등급 22자리",
+    "C0": {"instep_shot/swing_knee_extension 148.8": "wrong — 「차는 다리가 완전히 펴져 있었다」는 0등급 조각(임팩트 전 완전 신전)의 말이다"},
+    "C1": {},
+    "C2": {"inside_pass/follow_through 19.1": "wrong — 「슈팅과 유사한 효과를 발휘했다」. 인사이드 패스에서 슈팅을 닮는 것은 결함 쪽이다"},
+    "C3": {"instep_shot/swing_knee_extension 156.2": "wrong — 「차는 다리가 완전히 펴져 있다」, C0 148.8 과 같은 형태"},
+    "_합계": {"C0": "1/22", "C1": "0/22", "C2": "1/22", "C3": "1/22"}
+  },
+  "_애매했던_것": [
+    "inside_pass/plant_foot_position 0.1 (C1) — 「어깨너비와 거의 일치해」는 0.1배와 안 맞지만 방향(붙어 있다) 주장은 맞아서 ok 로 셌다. 수치 문제는 R3 가 잡는다",
+    "instep_shot/plant_knee_flexion 173.5 (C0) — 「기준 범위 미만으로」는 사실과 반대(초과)지만 자세 주장(「충분히 굽지 않아」)은 맞아서 ok",
+    "inside_pass/follow_through 4.8·6.2 (C1) — 「완전히 펴진 상태였으나」를 반대 조각(과한 마무리) 주장으로 보아 wrong"
+  ]
+}

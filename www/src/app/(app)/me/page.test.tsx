@@ -1,5 +1,7 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { Match, MyVideo, PlayerCard, User } from '@/server/backend'
+import { HIDDEN_MARKS, MARKS } from '@/components/CardMark'
+import { markTeamNudge } from '@/lib/teamNudge'
 import { MeBody } from './page'
 
 // NicknameForm 이 useRouter 를 쓴다.
@@ -347,6 +349,37 @@ describe('내 프로필 — /me', () => {
     expect(screen.getByText(/되돌릴 수 없습니다/)).toBeInTheDocument()
   })
 
+  /**
+   * **로그아웃을 회원 탈퇴 옆에 둔다** (사용자 요청, 2026-09-18).
+   *
+   * 🔴 여태 로그아웃은 **홈 오른쪽 아래 구석에만** 있었다. 프로필을 보다가
+   * 나가려면 홈으로 되돌아가야 했다 — 계정을 다루는 자리에 계정에서 나가는
+   * 길이 없던 셈이다.
+   *
+   * 🔴 **탈퇴와 달리 접지 않는다.** 접는 이유는 되돌릴 수 없어서인데
+   * (`AccountActions` 머리말), 로그아웃은 다시 로그인하면 그만이다.
+   */
+  it('계정 판에 로그아웃이 있다', () => {
+    render(<MeBody user={USER} card={CARD} videos={[]} matches={[]} />)
+    expect(screen.getByRole('button', { name: '로그아웃' })).toBeInTheDocument()
+  })
+
+  /* 🔴 **로그아웃은 빨갛지 않다.** 되돌릴 수 없는 손짓의 색이라(globals.css
+     의 `--ss-danger` 주석) 나란히 두면 탈퇴와 같은 무게로 읽힌다. */
+  it('로그아웃에는 위험 색을 안 쓴다', () => {
+    render(<MeBody user={USER} card={CARD} videos={[]} matches={[]} />)
+    expect(
+      screen.getByRole('button', { name: '로그아웃' }).className,
+    ).not.toContain('ss-profile-tab--danger')
+  })
+
+  /* 눌러도 탈퇴 폼이 열리면 안 된다 — 둘은 다른 일이다. */
+  it('로그아웃을 눌러도 탈퇴 폼이 안 열린다', () => {
+    render(<MeBody user={USER} card={CARD} videos={[]} matches={[]} />)
+    fireEvent.click(screen.getByRole('button', { name: '로그아웃' }))
+    expect(screen.queryByLabelText('비밀번호')).toBeNull()
+  })
+
   // 🔴 미결 jin-7 — 카드는 **부탁해야** 생긴다(POST /me/card). 그전에는
   // 화면이 "영상이 분석되면 만들어집니다" 라고 **거짓말을 하고 있었다.**
   it('카드가 없으면 편집 모드에서 만들 수 있다', () => {
@@ -409,6 +442,21 @@ describe('내 프로필 — /me', () => {
     expect(container.querySelector('.ss-card-stage .ss-pcard .ss-card-mark')).toBeNull()
   })
 
+  // 🔴 거둔 자국은 **고르는 칸에서만** 사라진다. 배열에서 지우면 뒤 번호가
+  //    당겨져 이미 저장된 카드가 말없이 바뀌므로, 자리는 그대로 두고 안 그린다.
+  //    (`CardMark.test.tsx` 가 배열 쪽 불변을 붙든다.)
+  it('감춘 자국은 고르는 칸에 안 뜬다', () => {
+    render(<MeBody user={USER} card={CARD} videos={[]} matches={[]} editing />)
+    fireEvent.click(screen.getByRole('tab', { name: '붓' }))
+
+    for (const i of HIDDEN_MARKS) {
+      expect(screen.queryByRole('button', { name: MARKS[i] })).toBeNull()
+    }
+    // 감춘 것 말고는 다 있어야 한다 — 실수로 더 지웠는지 여기서 걸린다.
+    const shown = MARKS.filter((_, i) => !HIDDEN_MARKS.has(i)).length
+    expect(document.querySelectorAll('.ss-card-mark-pick')).toHaveLength(shown)
+  })
+
   // 🔴 꾸민 값이 **그 자리의 카드**에 바로 실린다 — 미리보기를 따로 두지 않는다.
   it('꾸미개를 바꾸면 카드가 따라 바뀐다', () => {
     const { container } = render(
@@ -456,13 +504,41 @@ describe('내 프로필 — /me', () => {
     const file = new File(['x'], 'me.png', { type: 'image/png' })
     fireEvent.change(screen.getByLabelText('사진 고르기'), { target: { files: [file] } })
 
-    // FileReader 는 비동기다 — 읽기가 끝나야 카드에 실린다.
+    /* 🔴 **미리보기가 먼저 선다**(2026-09-18). 올리는 동안 카드가 그대로면
+       「눌렀는데 아무 일도 안 난다」로 보인다 — 고르는 즉시 `blob:` 으로
+       그려 놓고, S3 업로드는 그 뒤에 돈다.
+       (앞서 이 시험은 `data:`(FileReader)를 기대했다 — 사진을 브라우저에만
+       두던 시절의 값이다.) */
     await waitFor(() => {
       expect(container.querySelector('.ss-pcard-figure img')!.getAttribute('src')).toMatch(
-        /^data:/,
+        /^blob:/,
       )
     })
     expect(container.querySelectorAll('input[type="range"]')).toHaveLength(3)
+  })
+
+  /**
+   * 🔴 **올라가기 전에 저장하면 사진이 안 남는다** — 서버로 가는 값은 S3
+   * 키인데 그것이 아직 없기 때문이다. 말 안 해 주면 「저장했는데 사라졌다」가
+   * 된다. 여기서는 업로드가 실패하는 상황을 세워 그 자리를 본다.
+   */
+  it('사진이 안 올라갔으면 그렇다고 적는다', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(null, { status: 500 }),
+    )
+    const { container } = render(
+      <MeBody user={USER} card={CARD} videos={[]} matches={[]} editing />,
+    )
+    fireEvent.click(screen.getByRole('tab', { name: '사진' }))
+    const file = new File(['x'], 'me.png', { type: 'image/png' })
+    fireEvent.change(screen.getByLabelText('사진 고르기'), { target: { files: [file] } })
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/올리지 못했습니다/)
+    // 미리보기는 그대로 서 있다 — 고른 것이 사라지면 더 혼란스럽다.
+    expect(container.querySelector('.ss-pcard-figure img')!.getAttribute('src')).toMatch(
+      /^blob:/,
+    )
+    vi.restoreAllMocks()
   })
 
   // 🔴 사용자 요청 — 글자를 카드 위에서 끌어 놓는다. 다만 `PLAYER CARD`
@@ -493,13 +569,31 @@ describe('내 프로필 — /me', () => {
     expect(pcard.style.getPropertyValue('--ss-pcard-text-y')).toBe('24%')
   })
 
+  // 🔴 글자 자리를 **슬라이더로도** 옮긴다(2026-09-19) — 끌기와 같은 값이다.
+  it('글자 좌우·위아래 슬라이더가 카드의 글자를 옮긴다', () => {
+    const { container } = render(
+      <MeBody user={USER} card={CARD} videos={[]} matches={[]} editing />,
+    )
+    const pcard = container.querySelector<HTMLElement>('.ss-card-stage .ss-pcard')!
+    fireEvent.change(screen.getByRole('slider', { name: '글자 위아래' }), { target: { value: '70' } })
+    fireEvent.change(screen.getByRole('slider', { name: '글자 좌우' }), { target: { value: '30' } })
+    expect(pcard.style.getPropertyValue('--ss-pcard-text-y')).toBe('70%')
+    expect(pcard.style.getPropertyValue('--ss-pcard-text-x')).toBe('30%')
+    // 위로는 로고 자리까지만 — 끌기와 같은 하한
+    expect(screen.getByRole('slider', { name: '글자 위아래' })).toHaveAttribute('min', '24')
+  })
+
+  // 초기화는 이제 카드를 지운다(묻고 나서) — 화면 값도 먼저 기본값으로 돌린다.
   it('초기화로 되돌릴 수 있다', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }))
     const { container } = render(
       <MeBody user={USER} card={CARD} videos={[]} matches={[]} editing />,
     )
     fireEvent.change(screen.getByLabelText('카드에 넣을 글자'), { target: { value: '바뀜' } })
     fireEvent.click(screen.getByRole('button', { name: '초기화' }))
     expect(container.querySelector('.ss-pcard-alias')!.textContent).toBe('THREE LUNGS')
+    vi.restoreAllMocks()
   })
 
   // 🔴 편집기는 **늘 그려 두고 접는다** — 열 때만 그리면 닫을 때 뚝 사라진다.
@@ -527,5 +621,47 @@ describe('내 프로필 — /me', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /닉네임 편집/ }))
     expect(screen.getByRole('textbox', { name: '닉네임' })).toHaveValue('홍길동')
+  })
+})
+
+
+/* 할 일이 남은 사람이 프로필에 오면 그 단추를 가리킨다(2026-09-19) — 카드 먼저, 그다음 팀. */
+describe('프로필 안내', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  it('카드가 없으면 연출이 끝난 뒤 「먼저 내 카드를 만들어주세요.」', () => {
+    render(<MeBody user={USER} card={null} videos={[]} matches={[]} />)
+    expect(screen.queryByText('먼저 내 카드를 만들어주세요.')).toBeNull()
+    act(() => vi.advanceTimersByTime(1700))
+    expect(screen.getByText('먼저 내 카드를 만들어주세요.')).toBeInTheDocument()
+  })
+
+  // 🔴 팀 안내는 **홈에서 「팀을 먼저 만들어주세요」가 뜬 뒤 한 번만**(lib/teamNudge).
+  it('팀이 없어도 표가 없으면 안 띄운다 — 팀 없이 쓰는 사람도 있다', () => {
+    sessionStorage.clear()
+    render(<MeBody user={{ ...USER, teams: [] }} card={CARD} videos={[]} matches={[]} />)
+    act(() => vi.advanceTimersByTime(1700))
+    expect(screen.queryByText('팀을 만들어주세요.')).toBeNull()
+  })
+
+  it('홈에서 표를 받았으면 한 번만 — 다시 들어오면 안 뜬다', () => {
+    sessionStorage.clear()
+    markTeamNudge()
+    const first = render(<MeBody user={{ ...USER, teams: [] }} card={CARD} videos={[]} matches={[]} />)
+    act(() => vi.advanceTimersByTime(1700))
+    expect(screen.getByText('팀을 만들어주세요.')).toBeInTheDocument()
+    first.unmount()
+    render(<MeBody user={{ ...USER, teams: [] }} card={CARD} videos={[]} matches={[]} />)
+    act(() => vi.advanceTimersByTime(1700))
+    expect(screen.queryByText('팀을 만들어주세요.')).toBeNull()
+  })
+
+  it('카드도 팀도 있으면 아무것도 안 띄운다', () => {
+    const teamed = { ...USER, teams: [{ team_id: 't1', name: '번개FC', region: '서울', sport_code: 'football', role: 'owner', joined_at: '2026-07-01T00:00:00Z' }] }
+    render(<MeBody user={teamed as typeof USER} card={CARD} videos={[]} matches={[]} />)
+    act(() => vi.advanceTimersByTime(1700))
+    expect(screen.queryByRole('status', { name: '' })).toBeNull()
+    expect(screen.queryByText(/만들어주세요/)).toBeNull()
   })
 })

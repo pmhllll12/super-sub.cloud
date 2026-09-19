@@ -3,9 +3,10 @@ layout: default
 title: 부록
 permalink: /부록/
 has_children: true
-nav_order: 3
+nav_order: 7
 ---
 
 # 부록
 
-용어 정의, 관련 서식, 참고 자료, 데이터베이스 ERD, 결정 기록을 다룹니다.
+용어 정의, 관련 서식, 참고 자료를 다룹니다. 데이터베이스 ERD는 「설계」로, 결정 기록은 「기술」로 옮겼습니다
+(주소는 그대로입니다).

@@ -26,8 +26,9 @@ class NoShowOrm(Base):
     match_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("match.id"), nullable=False
     )
+    # 탈퇴하면 함께 지운다(부록 D.6, 2026-09-17) — 불참 기록은 그 사람의 것이다.
     user_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("user.id"), nullable=False
+        Uuid, ForeignKey("user.id", ondelete="CASCADE"), nullable=False
     )
     recorded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False

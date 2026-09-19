@@ -35,8 +35,9 @@ class MatchApplicationOrm(Base):
         Uuid, ForeignKey("match.id"), nullable=False
     )
     # `user` 는 `user` 컨텍스트의 테이블이라 **문자열로 참조**한다.
+    # 탈퇴하면 함께 지운다(부록 D.6, 2026-09-17) — 지원은 그 사람만의 기록이다.
     user_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("user.id"), nullable=False
+        Uuid, ForeignKey("user.id", ondelete="CASCADE"), nullable=False
     )
     team_accepted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

@@ -25,6 +25,7 @@ export default function MiniPitch({
   players,
   side,
   myCard = null,
+  onPick,
 }: {
   /** 판 위에 적을 팀 이름. */
   team: string
@@ -36,6 +37,11 @@ export default function MiniPitch({
    * 없으면(카드를 아직 안 만든 사람) 다른 자리처럼 이름 카드로 그린다.
    */
   myCard?: PublicPlayerCard | null
+  /**
+   * 카드를 눌렀다 (사용자 요청, 2026-09-18). **안 주면 못 누른다** — 이 판은
+   * 읽기 전용이고, 누를 데가 있는데 아무 일이 없는 것이 제일 나쁘다.
+   */
+  onPick?: (p: PitchPlayer) => void
 }) {
   const at = (col: number, row: number) => players.find((p) => p.col === col && p.row === row)
 
@@ -78,18 +84,41 @@ export default function MiniPitch({
               <div
                 key={i}
                 className="ss-squad-seat"
+                /* 🔴 **내 자리를 CSS 가 찾을 수 있게 표식만 낸다**(2026-09-17).
+                   초대 판이 「팀장이 정해 둔 자리에서 내 카드가 깜빡인다」를
+                   그리는 데 쓴다 — 모양은 쓰는 쪽이 정하고 여기는 사실만 적는다. */
+                data-mine={p.mine ? 'true' : undefined}
                 style={{ gridColumn: col + 1, gridRow: row + 1 }}
               >
-                <div className="ss-pcard-mini">
-                  {/* 내 카드만 진짜 카드다 — 나머지는 이름을 얹은 빈 카드다. */}
-                  {p.mine && myCard ? (
-                    <PlayerCardView card={myCard} />
+                {/* 내 카드만 진짜 카드다 — 나머지는 이름을 얹은 빈 카드다. */}
+                {(() => {
+                  const face = (
+                    <div className="ss-pcard-mini">
+                      {p.mine && myCard ? (
+                        <PlayerCardView card={myCard} />
+                      ) : (
+                        <BlankPlayerCard>
+                          <span className="ss-squad-name">{p.nickname}</span>
+                        </BlankPlayerCard>
+                      )}
+                    </div>
+                  )
+                  /* 🔴 **누를 수 있을 때만 단추로 감싼다.** 늘 단추면 읽기만
+                     하는 자리에서도 손가락 모양이 바뀌고 탭 순서에 들어간다 —
+                     눌러도 아무 일이 없는 단추가 생긴다. */
+                  return onPick ? (
+                    <button
+                      type="button"
+                      className="ss-mini-seat-btn"
+                      onClick={() => onPick(p)}
+                      aria-label={`${p.nickname} 프로필 보기`}
+                    >
+                      {face}
+                    </button>
                   ) : (
-                    <BlankPlayerCard>
-                      <span className="ss-squad-name">{p.nickname}</span>
-                    </BlankPlayerCard>
-                  )}
-                </div>
+                    face
+                  )
+                })()}
                 {/* 🔴 자리 이름표는 카드 **아래**다 — 홈의 판과 같다. */}
                 <span className="ss-squad-pos">{p.pos}</span>
               </div>

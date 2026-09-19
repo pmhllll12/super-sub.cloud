@@ -177,8 +177,39 @@ class MatchPort(ABC):
     @abstractmethod
     def create_team_match_request(
         self, request: TeamMatchRequestEntity
-    ) -> None:
-        """신청 생성과 **대상 팀 주장(들)에게 보내는 알림**을 같은 트랜잭션에서."""
+    ) -> TeamMatchRequestEntity:
+        """신청 생성과 **대상 팀 주장(들)에게 보내는 알림**을 같은 트랜잭션에서.
+
+        🔴 **표시용 값이 채워진 엔티티를 돌려준다**(`paik` 31번). 인터랙터가
+        만든 엔티티에는 팀 이름·지역이 비어 있다 — 그것들은 저장되는 값이
+        아니라 `team` 에서 읽어 오는 조회 결과라 저장소만 채울 수 있다.
+        """
+
+    @abstractmethod
+    def has_live_team_match_request(
+        self, team_id: UUID, other_team_id: UUID, now: datetime
+    ) -> bool:
+        """두 팀 사이에 **아직 살아 있는 신청**이 있는가 (2026-09-18).
+
+        「살아 있다」 = `pending`(답을 기다림) 이거나, `accepted` 이면서
+        **경기가 아직 있고**(`match_id` 가 차 있고) **아직 안 지난 것**.
+        거절·취소된 것과 이미 지난 것은 아니다.
+
+        🔴 **`match_id` 를 같이 본다**(같은 날 정정). `status` 만 보면 **물린
+        경기가 영원히 막는다** — 경기를 취소하면 `match` 행이 지워지고 FK 가
+        `SET NULL` 로 `match_id` 만 비우는데, 신청의 `status` 는 `accepted` 로
+        남는다. 운영에 그런 행이 **11건** 있었다. 화면의 「경기 잡힘」도 같은
+        조건(`match_id` 가 있어야 함)이라 이래야 서버와 화면이 같은 답을 낸다.
+
+        🔴 **방향을 가리지 않는다.** 「이 상대와 이미 잡혀 있다」는 누가 걸었는지와
+        무관하다 — 한쪽만 보면 A→B 가 잡힌 뒤 B→A 로 또 잡을 수 있다.
+
+        🔴 **이것이 없어서 같은 팀에 몇 번이든 걸 수 있었다.** 수락이 두 팀의 다른
+        `pending` 을 정리하지만(`accept_team_match_request`) 그건 `pending` 만이라,
+        이미 `accepted` 가 된 뒤에 새로 거는 것은 아무도 막지 않았다. 운영에서 한
+        팀이 같은 상대와 **확정 경기 3건**을 갖게 됐고, 하나를 끝낼 때마다 다음
+        것이 올라와 「끝냈는데 또 뜬다」로 보였다.
+        """
 
     @abstractmethod
     def find_team_match_request(

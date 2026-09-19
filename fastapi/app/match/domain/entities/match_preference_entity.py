@@ -95,6 +95,10 @@ class SquadCandidateFactsEntity:
     grade: str | None
     provisional: bool | None
     last_active_at: datetime | None
+    # 추천 판 카드의 불릿 한두 줄(`paik` 33번). 등급과 **같은 리포트**에서
+    # 왔다 — 화면이 「왜 이 사람인가」를 쓸 문장이다. `card` 없는 봉투로
+    # 적재됐거나 분석 전이면 `None`.
+    notes: list[str] | None = None
 
 
 @dataclass(frozen=True)

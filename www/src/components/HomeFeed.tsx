@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useWheelTrap } from '@/lib/useWheelTrap'
 import { feedWith } from '@/lib/feed'
 import { listPublished } from '@/lib/published'
 import type { PublicVideo } from '@/server/backend'
@@ -21,7 +22,11 @@ import { usePlaybackUrls } from '@/lib/playbackUrl'
  * 🔴 **뜬 상태에서만 산다.** 홈이 아직 위에 있을 때는 이 판이 화면 밖에 있으므로
  * 영상을 틀지 않는다 — 안 보이는 영상을 트는 것은 데이터만 쓰는 일이다.
  */
-export default function HomeFeed({ active, by }: { active: boolean; by: string }) {
+/* 🔴 **보는 사람 닉네임을 더는 안 받는다**(2026-09-17, 미결 `paik` 16번).
+   전에는 `by` 를 받아 공개 클립 **전부**에 붙였고, 목록에 남의 영상이 섞이면
+   그것이 내 이름으로 그려졌다. 이제 줄마다 서버가 준 업로더를 쓴다 —
+   **손에 닿는 「나」가 아예 없어야** 같은 실수가 되살아나지 않는다. */
+export default function HomeFeed({ active }: { active: boolean }) {
   const [i, setI] = useState(0)
   /** 좋아요를 누른 영상. ⚠️ 이 화면 안에서만 산다(계약에 좋아요가 없다). */
   const [liked, setLiked] = useState<string[]>([])
@@ -82,6 +87,23 @@ export default function HomeFeed({ active, by }: { active: boolean; by: string }
    */
   const [listY, setListY] = useState(0)
   const box = useRef<HTMLDivElement>(null)
+  /**
+   * 「다음 영상」 목록 — 여기서 굴리면 **페이지가 안 움직인다**(2026-09-18).
+   *
+   * 🔴 이 목록은 스크롤 상자가 **아니다**(`overflow` 가 없다). 그래서
+   * `overscroll-behavior` 로는 못 막고, 휠이 곧장 페이지로 샌다. 판을 통째로
+   * 삼키는 쪽으로 막는다(`useWheelTrap` 머리말).
+   *
+   * ⚠️ **붙인 까닭의 절반은 없어졌다**(2026-09-18). 원래는 여기서 굴린 것이
+   * 창까지 올라가 **홈으로 되올라가던** 것이 문제였는데, 홈이 이제 굴림을
+   * 아예 안 듣는다(`HomeStage` — 오가는 것은 누르는 것뿐이다). 남은 까닭은
+   * **페이지가 딸려 구르는 것**을 막는 몫이라 그대로 둔다.
+   *
+   * ⚠️ 닫혀 있을 때는 `pointer-events: none` 이라 휠이 여기 안 닿는다 —
+   * 그때는 페이지가 평소대로 구른다.
+   */
+  const listTrapRef = useRef<HTMLElement>(null)
+  useWheelTrap(listTrapRef, listTrapRef)
 
   /** 앞뒤로 **끝없이** 돈다 — 마지막에서 오른쪽으로 가면 처음으로. */
   /**
@@ -106,7 +128,7 @@ export default function HomeFeed({ active, by }: { active: boolean; by: string }
   /* 🔴 **재생 주소는 목록에 안 실려 온다** — 클립마다 따로 받는다(만료되는
      값이라 캐시하지 않는다). 저장 키가 없으므로 늘 받는 쪽으로 간다. */
   const publicUrls = usePlaybackUrls(published)
-  const clips = feedWith(published, publicUrls, by)
+  const clips = feedWith(published, publicUrls)
 
   const go = (step: number) => setI((prev) => (prev + step + clips.length) % clips.length)
 
@@ -236,6 +258,19 @@ export default function HomeFeed({ active, by }: { active: boolean; by: string }
     })
   }, [i, active])
 
+  /* 🔴 **없으면 없다고 말한다**(2026-09-17). 여기 붙박이 클립 셋이 있어서
+     목록이 빌 일이 없었는데, 그것들이 **실제 도메인에서 진짜 영상 뒤에 그대로
+     붙어** 있었다(게다가 셋 다 농구였다 — 종목은 축구 하나로 정리됐다).
+     지우고 나면 공개된 영상이 하나도 없는 순간이 생긴다 — 아래 `clips[i]` 가
+     그대로 터지므로 여기서 먼저 받는다. */
+  if (clips.length === 0) {
+    return (
+      <div className="ss-feed" ref={box} data-active={active} data-library={library}>
+        <p className="ss-feed-empty">아직 공개된 영상이 없습니다.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="ss-feed" ref={box} data-active={active} data-library={library}>
       <div
@@ -287,7 +322,16 @@ export default function HomeFeed({ active, by }: { active: boolean; by: string }
       <div className="ss-feed-bar">
         {/* 왼쪽 알약 — 지금 보는 영상이 누구의 무엇인지. */}
         <p className="ss-feed-pill ss-feed-who">
-          <b>{clips[i].by}</b>
+          {/* 🔴 **카드가 있는 사람은 눌러서 그 카드로 간다**(CCC 39 의 성질 2).
+              없으면 링크를 안 그리고 이름만 둔다 — 「카드 없음」을 따로 알리지
+              않는다(같은 계약의 「하지 말 것」). */}
+          {clips[i].bySlug ? (
+            <a className="ss-feed-who-link" href={`/c/${clips[i].bySlug}`}>
+              {clips[i].by}
+            </a>
+          ) : (
+            <b>{clips[i].by}</b>
+          )}
           {/* 가르는 선. 낭독기는 이걸 읽을 필요가 없다 — 이름과 제목은 이미
               따로 읽힌다. */}
           <i aria-hidden="true">|</i>
@@ -372,7 +416,13 @@ export default function HomeFeed({ active, by }: { active: boolean; by: string }
           넓어져 화면이 출렁인다. 영상이 비켜서는 것은 아래 CSS 가 따로 맡는다. */}
       {/* 🔴 **판이 아니다**(사용자 요청) — 테두리도 바탕도 없이 영상 상자와 이름 ·
           제목만 떠 있다. 목록처럼 보이게 만드는 것은 줄 간격뿐이다. */}
+      {/* 🔴 **여기서 굴리면 페이지가 안 움직인다**(사용자 지적, 2026-09-18:
+          「이 부분에서도 스크롤 하면 홈페이지로 넘어가」). 이 목록은 스크롤
+          상자가 **아니라서**(`overflow` 가 없다) 휠이 곧장 페이지로 갔다 —
+          `overscroll-behavior` 로는 못 막는 자리다. 「비슷한 팀」 판과 같은
+          처리를 공용 훅으로 건다. */}
       <aside
+        ref={listTrapRef}
         className="ss-feed-list"
         data-open={side === 'list'}
         aria-hidden={side !== 'list'}

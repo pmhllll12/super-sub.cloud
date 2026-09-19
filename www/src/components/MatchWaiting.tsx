@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import MiniPitch from '@/components/MiniPitch'
-import type { MatchTeam, MyTeamSummary } from '@/lib/teamMatch'
+import MatchReview from '@/components/MatchReview'
+import WhoCard from '@/components/WhoCard'
+import type { MatchTeam, MyTeamSummary, PitchPlayer } from '@/lib/teamMatch'
 import type { PublicPlayerCard } from '@/server/backend'
 
 /**
@@ -46,6 +48,7 @@ export default function MatchWaiting({
   them,
   myCard = null,
   onClose,
+  onFinished,
   onCancel,
 }: {
   us: MyTeamSummary
@@ -55,16 +58,74 @@ export default function MatchWaiting({
   /** 판을 접는다 — **경기는 그대로다**(×·Esc). */
   onClose: () => void
   /**
+   * **경기를 끝냈다** — 「경기 완료」를 확인한 순간(사용자 요청, 2026-09-18).
+   *
+   * 🔴 닫기(`onClose`)와 다른 일이다. 닫기는 판만 접고, 이것은 **그 경기가
+   * 끝났다는 사실**을 알린다 — 부모가 머리칸 표시에서 뺀다.
+   */
+  onFinished?: () => void
+  /**
    * 잡힌 경기를 **무른다** — 닫기와 다른 일이다.
    * 🔴 안 주면 취소 단추를 아예 안 그린다 — 눌러도 아무 일이 없으면 안 된다.
+   *
+   * 🔴 **서버로 나가는 일이라 실패할 수 있다**(2026-09-17, 미결 `paik` 34번).
+   * 던지면 **판이 안 닫히고 그 이유를 그대로 적는다** — 지원자가 있으면
+   * `409`, 주장이 아니면 `403`, 지난 경기면 `422` 다. 화면이 미리 막지
+   * 않는다: 지원이 몇인지도 상대 팀 주장이 누구인지도 **서버만 안다.**
    */
-  onCancel?: () => void
+  onCancel?: () => Promise<void>
 }) {
   /**
    * 내려가는 중인가 — 🔴 **아직 DOM 에 있어야 한다.** 누르자마자 지우면
    * 내려가는 것을 아무도 못 본다(추천 판이 같은 이유로 같은 것을 한다).
    */
   const [leaving, setLeaving] = useState(false)
+  /**
+   * 🔴 **경기 시각이 지났으면 「경기 끝내기」다**(사용자 요청, 2026-09-17).
+   * 이미 한 경기를 「취소」하는 것은 말이 안 되고, 그 자리에서 리뷰로 넘어간다.
+   *
+   * ⚠️ **그릴 때 시계를 읽지 않는다** — 서버가 그린 것과 달라져 hydration 이
+   * 깨진다. 붙은 뒤에 한 번 재고, 그 뒤로는 1분마다 다시 본다(경기 시각을
+   * 걸쳐 두고 화면을 열어 둔 사람에게도 바뀌어야 한다).
+   */
+  const [over, setOver] = useState(false)
+  useEffect(() => {
+    const at = new Date(them.playedAt).getTime()
+    if (Number.isNaN(at)) return
+    let id = 0
+    /* 🔴 **그 시각에 정확히 바뀐다.** 주기적으로 훑으면 최대 그 주기만큼
+       늦게 바뀐다 — 경기 시각을 코앞에 두고 화면을 열어 둔 사람에게는 그게
+       「안 바뀐다」로 보인다. 남은 시간만큼만 재고, 멀면 잘라서 다시 잰다
+       (`setTimeout` 은 아주 긴 값에서 제대로 안 돈다). */
+    const tick = () => {
+      const left = at - Date.now()
+      if (left <= 0) {
+        setOver(true)
+        return
+      }
+      setOver(false)
+      id = window.setTimeout(tick, Math.min(left, 60_000))
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    tick()
+    return () => clearTimeout(id)
+  }, [them.playedAt])
+
+  /** 리뷰 창을 열어 둔 상태. 🔴 닫으면 대기 화면까지 함께 내려간다. */
+  const [reviewing, setReviewing] = useState(false)
+  /**
+   * 판에서 **누른 사람** — 간단한 프로필을 옆에 띄운다(사용자 요청,
+   * 2026-09-18). 🔴 두 판 어느 쪽이든 한 번에 하나만 연다.
+   */
+  const [picked, setPicked] = useState<PitchPlayer | null>(null)
+  /**
+   * 「경기 완료」를 눌러 **다시 묻는 중**이다 (사용자 요청, 2026-09-18).
+   *
+   * 🔴 취소의 `confirming` 과 **따로 둔다.** 둘은 반대 방향의 되돌릴 수 없는
+   * 결정이라, 한 칸으로 합치면 「무엇을 확인하는 중인지」가 화면에서 안 갈린다.
+   */
+  const [finishing, setFinishing] = useState(false)
+
   /**
    * 「경기 취소」를 눌러 **한 번 더 묻는 중**인가.
    *
@@ -73,6 +134,10 @@ export default function MatchWaiting({
    * 그쪽은 시험에서도 못 누른다. 영상 지우기가 같은 방식이다).
    */
   const [confirming, setConfirming] = useState(false)
+  /** 취소를 보내는 중 — 두 번 눌리지 않게 한다. */
+  const [cancelling, setCancelling] = useState(false)
+  /** 서버가 준 이유. 있으면 판은 그대로 서 있다. */
+  const [cancelError, setCancelError] = useState<string | null>(null)
   const timer = useRef(0)
 
   /**
@@ -129,7 +194,16 @@ export default function MatchWaiting({
       </button>
 
       <div className="ss-mw-body">
-        <MiniPitch team={us.name} players={us.squad} side="us" myCard={myCard} />
+        <MiniPitch
+          team={us.name}
+          players={us.squad}
+          side="us"
+          myCard={myCard}
+          /* 🔴 **리뷰 중에는 못 누른다.** 그때 판은 「평가할 사람 고르기」로
+             뜻이 바뀌어서, 같은 카드가 두 가지 일을 하면 어느 쪽이 될지
+             알 수 없다(낭독기에서도 같은 이름의 단추가 둘이 된다). */
+          onPick={reviewing ? undefined : setPicked}
+        />
 
         <div className="ss-mw-mid">
           <p className="ss-mw-when">{whenText(them.playedAt)}</p>
@@ -139,45 +213,186 @@ export default function MatchWaiting({
             <em>VS</em>
             <span>{them.name}</span>
           </p>
-          {/* ⚠️ 지어낸 수락이라는 것을 숨기지 않는다 — 숨기면 진짜로 잡힌 줄 안다. */}
-          <p className="ss-mw-note">데모입니다 — 상대의 수락을 흉내낸 것이고 실제로 잡히지 않습니다.</p>
+          {/* 🔴 **「데모입니다」를 걷었다**(2026-09-17, 사용자 지적). 가짜
+              `applyToTeam` 이 1.4초 뒤 수락을 흉내내던 시절의 문장이고, 그때는
+              숨기지 않는 것이 옳았다. 지금은 수락이 **진짜로 서버에 나가고
+              경기가 실제로 잡힌다** — 그대로 두면 그 문장이 거짓이 된다.
+              🔴 조건 없이 박혀 있어서 `USE_MOCK` 으로도 안 꺼졌다(화면에 박힌
+              mock 이다) — 실제 도메인에서도 떴다. */}
 
           {/* 🔴 **취소는 닫기(×)와 다른 일이다.** ×는 이 판을 접는 것이고,
               이것은 **잡힌 경기를 무르는 것**이다 — 그래서 자리도 뜻도 가른다. */}
           {/* 무를 길이 없으면 단추도 안 그린다 — 눌러도 아무 일이 없으면 안 된다. */}
-          <div className="ss-mw-actions" hidden={!onCancel}>
+          {/* 🔴 **실패하면 판은 그대로 서 있고 이유만 붙는다** — 지원자가 있어
+              못 무르는 경우(409)가 있다. 문구는 서버가 준 것을 그대로 쓴다. */}
+          {cancelError && (
+            <p role="alert" className="ss-mw-error">
+              {cancelError}
+            </p>
+          )}
+
+          {/* 🔴 **되돌릴 수 없다는 것을 누르기 전에 말한다**(사용자 요청,
+              2026-09-18). `role="alertdialog"` 가 아니라 글자로 두는 이유는
+              이 판 자체가 이미 화면을 덮고 있어서다 — 그 위에 또 창을 띄우면
+              닫는 길이 둘로 늘고, 「×로 닫았는데 무엇이 취소된 거지」가 된다.
+              단추는 바로 아래 같은 자리에 선다. */}
+          {finishing && (
+            <p role="alert" className="ss-mw-warn">
+              정말로 경기가 완료되었나요? <strong>이 결정은 되돌릴 수 없습니다.</strong>
+            </p>
+          )}
+
+          {/* 🔴 **전에는 `hidden={!onCancel}` 이었다**(2026-09-18에 걷었다).
+              무를 길이 없으면 이 칸을 통째로 숨겼는데, 그러면 **마무리까지
+              같이 사라진다** — 「경기 완료」·「경기 끝내기」는 취소와 달리
+              서버로 나가는 것이 없어 `onCancel` 과 무관하다. 숨길 것은 칸이
+              아니라 **취소 단추 하나**다. */}
+          <div className="ss-mw-actions">
             {confirming ? (
               <>
                 <button
                   type="button"
                   className="ss-mw-cancel"
                   data-danger="true"
-                  onClick={() => leave(onCancel ?? onClose)}
+                  disabled={cancelling}
+                  onClick={() => {
+                    if (!onCancel) return leave(onClose)
+                    setCancelling(true)
+                    setCancelError(null)
+                    /* 🔴 **보내고 나서 내려간다.** 먼저 내려보내면 실패해도
+                       판이 사라져서, 안 물러진 경기를 물러진 것으로 읽는다. */
+                    /* `Promise.resolve` 로 감싼다 — 부모가 async 가 아니어도
+                       (시험의 대역이 그렇다) 같은 길로 흐른다. */
+                    void Promise.resolve(onCancel())
+                      /* 성공했으면 **여느 닫기와 같은 길로** 내려간다 —
+                         다 내려간 뒤에 부모가 판을 거둔다. */
+                      .then(() => leave(onClose))
+                      .catch((err: unknown) =>
+                        setCancelError(
+                          err instanceof Error ? err.message : '경기를 무르지 못했습니다.',
+                        ),
+                      )
+                      .finally(() => setCancelling(false))
+                  }}
                 >
-                  정말 취소합니다
+                  {cancelling ? '무르는 중…' : '정말 취소합니다'}
                 </button>
                 <button
                   type="button"
                   className="ss-mw-keep"
-                  onClick={() => setConfirming(false)}
+                  disabled={cancelling}
+                  onClick={() => {
+                    setConfirming(false)
+                    setCancelError(null)
+                  }}
                 >
                   되돌리기
                 </button>
               </>
-            ) : (
+            ) : finishing ? (
+              /* 🔴 **되돌릴 수 없는 결정이라 한 번 더 묻는다**(사용자 요청,
+                 2026-09-18). 경기를 완료로 넘기면 리뷰를 받고, 그 뒤로는
+                 「아직 안 한 경기」로 되돌릴 길이 없다. */
+              <>
+                <button
+                  type="button"
+                  className="ss-mw-cancel"
+                  data-done="true"
+                  onClick={() => {
+                    setFinishing(false)
+                    /* 🔴 **머리칸의 「경기 잡힘」에서 뺀다**(사용자 요청,
+                       2026-09-18: 취소처럼 사라지게). 서버에 「끝난 경기」
+                       상태가 없어(계약에 취소만 있다) 부모가 브라우저에
+                       적어 둔다 — 한계는 `seekingStore` 머리말. */
+                    onFinished?.()
+                    setReviewing(true)
+                  }}
+                >
+                  경기 완료
+                </button>
+                <button
+                  type="button"
+                  className="ss-mw-keep"
+                  onClick={() => setFinishing(false)}
+                >
+                  되돌리기
+                </button>
+              </>
+            ) : over ? (
+              /* 🔴 **끝난 경기는 취소가 아니라 마무리다.** 누르면 리뷰로 간다.
+                 시각이 지난 뒤라 여기서는 다시 묻지 않는다 — 아래 「경기 완료」
+                 와 달리 **이미 일어난 일을 적는 것**이다. */
               <button
                 type="button"
                 className="ss-mw-cancel"
-                onClick={() => setConfirming(true)}
+                data-done="true"
+                onClick={() => setReviewing(true)}
               >
-                경기 취소
+                경기 끝내기
               </button>
+            ) : (
+              <>
+                {/* 무를 길이 없으면 이것만 안 그린다 — 눌러도 아무 일이
+                    없는 단추를 두지 않는다. */}
+                {onCancel && (
+                  <button
+                    type="button"
+                    className="ss-mw-cancel"
+                    onClick={() => setConfirming(true)}
+                  >
+                    경기 취소
+                  </button>
+                )}
+                {/* 🔴 **시각이 되기 전에도 손으로 끝낼 수 있다**(사용자 요청,
+                    2026-09-18). 시각이 지나야만 마무리할 수 있으면 먼저 치른
+                    경기를 적을 길이 없다. 🔴 되돌릴 수 없으므로 **바로 넘기지
+                    않고** 위 경고를 거친다. */}
+                <button
+                  type="button"
+                  className="ss-mw-cancel"
+                  data-done="true"
+                  onClick={() => setFinishing(true)}
+                >
+                  경기 완료
+                </button>
+              </>
             )}
           </div>
         </div>
 
-        <MiniPitch team={them.name} players={them.squad} side="them" />
+        <MiniPitch
+          team={them.name}
+          players={them.squad}
+          side="them"
+          onPick={reviewing ? undefined : setPicked}
+        />
       </div>
+
+      {/* 🔴 **경기 화면 위에 뜬다** — 닫아도 경기 화면은 그대로다(사용자 조건:
+          「경기매칭된 상태는 유지 되어야해」). 그래서 새 경로로 보내지 않는다. */}
+      {picked && (
+        <WhoCard
+          /* 🔴 **사람이 바뀌면 다시 붙인다** — 안 그러면 앞사람 값이 잠깐
+             보인 뒤 바뀐다. 통을 비우는 일을 여기 한 줄로 끝낸다. */
+          key={picked.cardSlug ?? picked.nickname}
+          slug={picked.cardSlug ?? null}
+          fallbackName={picked.nickname}
+          onClose={() => setPicked(null)}
+        />
+      )}
+
+      {/* 🔴 **닫으면 둘 다 내려간다**(사용자 설계) — 리뷰 창이 먼저 사라지고,
+          이어서 대기 화면이 여느 닫기와 같은 길로 내려가 홈만 남는다. */}
+      {reviewing && (
+        <MatchReview
+          us={us}
+          them={{ name: them.name, squad: them.squad }}
+          onClose={() => {
+            setReviewing(false)
+            leave(onClose)
+          }}
+        />
+      )}
     </div>,
     document.body,
   )

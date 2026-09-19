@@ -99,9 +99,14 @@ describe('경기 조건 판', () => {
     expect(screen.getByRole('button', { name: '그만두기' })).toBeInTheDocument()
   })
 
-  // ⚠️ 어디에 남는지 밝힌다 — 계약에 자리가 없다.
-  it('브라우저에만 남는다고 적어 둔다', () => {
+  /**
+   * 🔴 **「이 브라우저에만 남습니다」는 이제 거짓이라 걷었다**(2026-09-17).
+   * 팀 조건은 `teamPrefsStore`, 내 조건은 `myPrefsStore` 로 **둘 다 서버에
+   * 올라간다.** 낡은 안내를 남겨 두면 사용자가 등록이 안 된 줄 알고 자기
+   * 자리를 다시 올리지 않는다 — 그러면 남의 AI 추천 후보에 안 뜬다.
+   */
+  it('브라우저에만 남는다고 말하지 않는다', () => {
     open()
-    expect(screen.getByText(/이 브라우저에만/)).toBeInTheDocument()
+    expect(screen.queryByText(/이 브라우저에만/)).toBeNull()
   })
 })

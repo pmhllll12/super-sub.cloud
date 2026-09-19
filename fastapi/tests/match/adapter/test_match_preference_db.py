@@ -26,6 +26,7 @@ from app.analysis.adapter.outbound.pg.report_ingest_pg_repository import (
     ReportIngestPgRepository,
 )
 from app.analysis.application.use_cases.report_parser import parse_report
+from app.card.domain.entities.squad_entity import DEFAULT_FORMATION
 from app.review.adapter.outbound.pg.review_pg_repository import ReviewPgRepository
 from app.review.domain.entities.review_entity import ReviewEntity
 from tests.conftest import V1, error_code
@@ -72,6 +73,11 @@ def _team(db_client, owner, name="팀", region="서울"):
     )
     assert res.status_code == 201, res.text
     return uuid.UUID(res.json()["id"])
+
+
+def _required_for_default() -> int:
+    """기본 판이 요구하는 인원 — `"5:5"` → 5. 상수를 두 번 적지 않으려는 것."""
+    return int(DEFAULT_FORMATION.split(":")[0])
 
 
 def _full_squad(db_client, owner, team_id, formation, extra_members):
@@ -250,6 +256,61 @@ class TestListMemberPreferences:
 
 
 class TestMatchCandidates:
+    def test_크기_단추를_한_번도_안_눌러도_서로_후보가_된다(self, db_client):
+        """🔴 **운영에서 팀 매칭이 0건이던 결함**(2026-09-18).
+
+        위아래의 다른 시험들은 `_full_squad` 가 **formation 을 손으로 PATCH**
+        해 준다. 그런데 실제 사용자는 그 단추를 누르지 않는다 — 화면이 값이
+        없을 때도 기본 판(5:5)을 **켜진 것처럼** 그리기 때문이다. 그래서
+        저장은 「바꿀 때만」 일어났고 DB 는 `NULL` 로 남았으며, 첫 하드 필터가
+        `formation` 동등 비교라 **운영 7팀 중 6팀이 서로를 못 봤다.**
+
+        이 시험만 `PATCH /teams/{id}/squad` 를 **일부러 안 부른다.** 여기가
+        「만들기」와 「매칭」이 이어지는지 보는 유일한 자리다 —
+        `DEFAULT_FORMATION` 을 지우거나 `create_for_team` 에서 빼면 여기가
+        빨개진다. 🔴 **편의를 위해 `_full_squad` 로 바꾸지 말 것** — 그 순간
+        이 시험은 아무것도 안 지킨다.
+        """
+        slot = {"weekday": 5, "start_time": "10:00:00", "end_time": "12:00:00"}
+        teams = []
+        for name in ("A", "B"):
+            owner = _account(db_client, f"주장{name}")
+            team_id = _team(db_client, owner, name)
+            # 🔴 스쿼드를 **만들기만** 한다. 크기는 안 건드린다.
+            db_client.post(f"{V1}/teams/{team_id}/squad", headers=owner["headers"])
+            mates = []
+            for i in range(_required_for_default() - 1):
+                mate = _account(db_client, f"팀원{name}{i}")
+                db_client.post(
+                    f"{V1}/teams/{team_id}/members", json={}, headers=mate["headers"]
+                )
+                mates.append(mate)
+            for member in [owner] + mates:
+                card = db_client.post(
+                    f"{V1}/me/card", headers=member["headers"]
+                ).json()
+                res = db_client.post(
+                    f"{V1}/teams/{team_id}/squad/members",
+                    json={"player_card_id": card["id"], "position_code": "FW"},
+                    headers=owner["headers"],
+                )
+                assert res.status_code == 201, res.text
+            db_client.put(
+                f"{V1}/teams/{team_id}/match-preferences",
+                json={"region_ids": [], "slots": [slot]},
+                headers=owner["headers"],
+            )
+            teams.append((owner, team_id))
+
+        (owner_a, team_a), (_, team_b) = teams
+        rows = db_client.get(
+            f"{V1}/teams/{team_a}/match-candidates", headers=owner_a["headers"]
+        ).json()
+        assert str(team_b) in [r["team_id"] for r in rows], (
+            "크기 단추를 안 눌렀다고 상대가 안 잡히면 안 된다 — "
+            f"받은 후보: {rows}"
+        )
+
     def test_판_크기가_다르면_안_나온다(self, db_client):
         owner = _account(db_client, "주장A")
         team_a = _team(db_client, owner, "A")
@@ -376,8 +437,9 @@ class TestMatchCandidates:
         assert str(team_b) not in [r["team_id"] for r in rows]
 
 
-def _grade_envelope(grade: str, provisional: bool = False):
-    return {
+def _grade_envelope(grade: str, provisional: bool = False, card_notes=None):
+    """`card_notes` 를 주면 봉투 1.5 의 `result.card` 가 실린다(`paik` 33번)."""
+    envelope = {
         "schema_version": "1.0",
         "source_video": "s3://b/videos/u/v.mp4",
         "analyzed_at": "20260910T120000Z",
@@ -417,6 +479,9 @@ def _grade_envelope(grade: str, provisional: bool = False):
             "skipped": [],
         },
     }
+    if card_notes is not None:
+        envelope["result"]["card"] = {"title": None, "notes": card_notes}
+    return envelope
 
 
 class TestSquadCandidates:
@@ -425,7 +490,9 @@ class TestSquadCandidates:
     실제 조인으로 확인한다. 컬럼 이름이 바뀌면 스텁은 못 잡는다.
     """
 
-    def _give_featured_grade(self, db_session, user_id, *, grade, provisional=False):
+    def _give_featured_grade(
+        self, db_session, user_id, *, grade, provisional=False, card_notes=None
+    ):
         now = datetime.now(timezone.utc)
         video_id, job_id = uuid.uuid4(), uuid.uuid4()
         db_session.add(
@@ -441,7 +508,7 @@ class TestSquadCandidates:
         )
         db_session.commit()
         parsed = parse_report(
-            json.dumps(_grade_envelope(grade, provisional)).encode()
+            json.dumps(_grade_envelope(grade, provisional, card_notes)).encode()
         )
         ReportIngestPgRepository(db_session).replace_for_job(job_id, parsed)
 
@@ -532,6 +599,52 @@ class TestSquadCandidates:
 
         assert rows[str(cand_none["id"])]["grade"] is None
         assert rows[str(cand_none["id"])]["provisional"] is None
+
+    def test_후보_불릿이_실제_analysis_report에서_온다(
+        self, db_client, db_session
+    ):
+        """`paik` 33번 — `analysis_report.card_notes` 를 원시 SQL 로 읽는 자리.
+
+        🔴 `analysis` 는 다른 컨텍스트라 `table()`/`column()` 으로 읽는다 —
+        저쪽 컬럼 이름이 바뀌어도 파이썬이 안 잡아 준다. 스텁은 값을 손으로
+        채우므로 **여기가 유일한 방어선이다.**
+        """
+        owner = _account(db_client, "주장")
+        team_id = _team(db_client, owner, "불릿후보")
+        gk = _position_id("GK")
+        notes = ["차는 다리를 끝까지 뻗습니다", "디딤발을 공 옆에 붙입니다"]
+
+        cand = _account(db_client, "불릿있음")
+        db_client.put(
+            f"{V1}/me/match-preferences",
+            json={"region_ids": [], "slots": [], "position_ids": [str(gk)]},
+            headers=cand["headers"],
+        )
+        self._give_featured_grade(
+            db_session, cand["id"], grade="A", card_notes=notes
+        )
+
+        # 같은 포지션인데 옛 봉투로 적재된 사람 — `null` 이어야 한다.
+        cand_old = _account(db_client, "불릿없음")
+        db_client.put(
+            f"{V1}/me/match-preferences",
+            json={"region_ids": [], "slots": [], "position_ids": [str(gk)]},
+            headers=cand_old["headers"],
+        )
+        self._give_featured_grade(db_session, cand_old["id"], grade="A")
+
+        res = db_client.get(
+            f"{V1}/teams/{team_id}/squad/candidates",
+            params={"position_code": "GK"},
+            headers=owner["headers"],
+        )
+        assert res.status_code == 200, res.text
+        rows = {r["user_id"]: r for r in res.json()}
+
+        assert rows[str(cand["id"])]["notes"] == notes
+        # 🔴 등급은 정상인데 불릿만 없는 경우다 — 「분석이 없다」가 아니다.
+        assert rows[str(cand_old["id"])]["notes"] is None
+        assert rows[str(cand_old["id"])]["grade"] == "A"
 
     def test_이미_스쿼드에_앉은_사람은_제외된다(self, db_client, db_session):
         owner = _account(db_client, "주장")
