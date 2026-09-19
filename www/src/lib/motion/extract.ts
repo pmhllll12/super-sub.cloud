@@ -12,8 +12,17 @@ import { createPersonTracker, snapToDetection, type Det, type Frame } from '@/li
 import type { Point } from '@/lib/pose'
 import type { Motion } from './types'
 
-/** 초당 몇 장을 볼까. 검출 한 장이 GPU 에서 수십 ms 라 13초 영상이 몇 초에 끝난다. */
-export const EXTRACT_FPS = 15
+/**
+ * 초당 몇 장을 볼까. 검출 한 장이 GPU 에서 수십 ms 라 13초 영상이 몇 초에 끝난다.
+ *
+ * 🔴 **15 → 10 으로 내렸다**(2026-09-19, 사용자 지적 — "결과가 너무 늦게 나와요").
+ * 이 수치는 **13초 영상 기준**이었는데, 업로드 상한(60초)에 가까운 긴 영상은
+ * 프레임 수가 그만큼 늘어(60초 × 15fps ≈ 900장, player·user 각각) 순서대로
+ * `seek` 하는 비용이 쌓여 눈에 띄게 느려진다. 10fps 로도 무릎 각속도 피크(임팩트)를
+ * 잡는 데는 충분하다 — `detectMoments` 의 여유 폭(`impact - first < 2` 등)이
+ * 프레임 수가 아니라 **fps 상대**라 값을 낮춰도 판정 기준 자체는 그대로 따라온다.
+ */
+export const EXTRACT_FPS = 10
 
 /** 추적기용 축소본 가로 픽셀 — 화면 쪽 `TRACK_W` 와 같은 값. */
 const TRACK_W = 256
