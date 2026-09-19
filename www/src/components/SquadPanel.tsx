@@ -2136,7 +2136,9 @@ export default function SquadPanel({
              수락할 상대 팀장이 없다). 위 규칙(부모가 알림을 기다린다)은
              그대로 두고, 1.5초 뒤 **이 컴포넌트가 직접** `matched`를 채운다
              — 진짜 알림이 오면 그쪽이 덮어써도 상관없다(같은 모양).
-             상대 스쿼드는 실물이 없어 빈 판으로 그린다.
+             🔴 상대 스쿼드도 실물이 없어 **우리 판의 배치(자리·포지션)를
+             그대로 옮겨** 채운다(2026-09-20, 사용자 요청 — "우리팀처럼
+             보이도록"). 이름만 팀명 기반 자리표시자다.
              🔴 실제 배포에서는 걷어야 한다(위 `demoAccepted`와 같은 경고). */
           onRequested={(requestId, team) => {
             onRequested?.(requestId, team)
@@ -2149,7 +2151,14 @@ export default function SquadPanel({
                 playedAt: team.playedAt,
                 place: team.place,
                 why: team.why,
-                squad: [],
+                squad: slots.map((sl, i) => ({
+                  nickname: `${team.name} 선수 ${i + 1}`,
+                  col: sl.col,
+                  row: sl.row,
+                  pos: posOf(sl),
+                  mine: false,
+                  cardSlug: null,
+                })),
               })
             }, DEMO_ACCEPT_MS)
           }}
