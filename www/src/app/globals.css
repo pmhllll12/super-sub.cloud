@@ -13813,6 +13813,31 @@ body:has(.ss-venues) .ss-home-header {
   animation-name: ss-mw-side-right;
 }
 
+/* 🔴 **폰에서 화면에 안 다 들어왔다**(2026-09-20, 사용자 지적). 이 판은
+   두 팀의 `.ss-squad`(주 스쿼드 편집 화면과 같은 크기)를 그대로 두 벌
+   쌓아 보여준다 — 좁은 화면에서는 `.ss-mw-body`의 `flex-wrap`이 이미
+   세로로 접어 주지만, 두 판이 원래 크기 그대로라 합친 키가 화면보다
+   훨씬 크다. 카드 폭(`--ss-pcard-mini-w`)을 줄여 판 전체를 비례로
+   작게 만든다 — 이 값이 카드·격자·줄 높이를 전부 계산하는 손잡이다
+   (주 편집 화면에는 손 안 댄다, `.ss-mini` 안에서만). */
+@media (max-width: 640px) {
+  .ss-mini .ss-squad {
+    --ss-pcard-mini-w: 52;
+  }
+
+  .ss-mw-body {
+    gap: 12px;
+    padding: 16px 8px;
+  }
+
+  /* 내용이 그래도 넘치면 판 안에서 스크롤한다 — 통째로 잘리는 것보다
+     낫다. 위쪽은 그대로 둔다(들어오는 연출이 화면 밖에서 시작해야 한다). */
+  .ss-mw {
+    align-items: start;
+    overflow-y: auto;
+  }
+}
+
 /* 양옆 판이 절반쯤 들어왔을 때 — 「무엇을 보는 화면인지」가 그때 도착한다. */
 .ss-mw-mid {
   animation: ss-mw-drop 660ms cubic-bezier(0.22, 1, 0.36, 1) 1120ms both;
