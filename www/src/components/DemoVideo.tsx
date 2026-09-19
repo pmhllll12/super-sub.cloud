@@ -712,7 +712,11 @@ const VIDEO_ASPECT = 1902 / 952
 /** 로그인 자리가 없는 화면의 기본 자리 — 왼쪽 아래 구석, 폭 최대 320px. */
 export function cornerBox(vw: number, vh: number): Box {
   const gap = 24
-  const width = Math.min(320, vw * 0.4)
+  /* 🔴 **좁은 화면(폰)에서 너무 작았다**(2026-09-20, 사용자 지적). `vw * 0.4`는
+     넓은 화면 기준으로 잡은 값이라, 폰(대략 640px 아래)에서는 320 상한에
+     한참 못 미쳐 손바닥만 해졌다. 폰에서는 화면 폭에서 여백만 뺀 값(최대
+     380)을 쓰고, 그 위(태블릿·데스크톱)는 기존 계산을 그대로 둔다. */
+  const width = vw < 640 ? Math.min(vw - gap * 2, 380) : Math.min(320, vw * 0.4)
   const height = width / VIDEO_ASPECT
   return { left: gap, top: vh - gap - height, width, height }
 }
