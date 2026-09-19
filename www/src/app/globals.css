@@ -11901,6 +11901,16 @@ body:has(.ss-profile) {
     /* 🔴 여기서는 판이 흐름에 있고 위 여백도 0 이라 걷어 올릴 것이 없다 —
        그대로 두면 판이 화면 위로 그만큼 빠져나간다. */
     --ss-profile-rise: 0px;
+    /* 🔴 **머리글이 헤더 워드마크와 겹쳤다**(2026-09-20, 사용자 지적,
+       "MY"와 "SUPERSUB"가 포개져 보였다). 92px 은 데스크톱 헤더 높이
+       기준이라 폰의 실제 헤더 아래로는 자리가 모자랐다 — 여유를 크게 둔다. */
+    --ss-profile-top: 160px;
+  }
+
+  .ss-profile-title {
+    /* 🔴 큰 글자 + 82px 왼쪽 여백이 좁은 폭에서 넘쳤다 — 같이 줄인다. */
+    --ss-profile-title-size: 2rem;
+    left: 24px;
   }
 
   .ss-profile-sheet {
@@ -11918,6 +11928,13 @@ body:has(.ss-profile) {
   .ss-profile-id {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  /* 🔴 **소속·정보가 반씩 나뉘어 너무 좁았다**(2026-09-20, 사용자 지적 —
+     "호칭 정하기"·이메일이 한 글자씩 세로로 접혔다). 2×2 를 세로 한 줄로
+     푼다 — 각 절이 폭 전체를 쓴다. */
+  .ss-profile-body {
+    grid-template-columns: 1fr;
   }
 }
 
