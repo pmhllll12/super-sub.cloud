@@ -15081,6 +15081,9 @@ a.ss-seeking-pill:hover {
   padding: 0;
   background: none;
   cursor: pointer;
+  /* 🔴 이 단추가 **영상 전체를 덮는 끌기 손잡이다**(위 주석 "영상 전체가
+     누르는 자리다") — `.ss-demo-glass-btn`과 같은 이유로 필요하다. */
+  touch-action: none;
 }
 
 .ss-demo-video-toggle[aria-pressed='true'] {
@@ -15246,6 +15249,12 @@ a.ss-seeking-pill:hover {
   white-space: nowrap;
   cursor: pointer;
   transition: background 0.15s ease;
+  /* 🔴 **끌기(옮기기) 손잡이인데 빠져 있었다**(2026-09-20, 사용자 지적 —
+     "옮기기가 힘들다"). 눈금 막대(`.ss-demo-video-seek`)·모서리 손잡이
+     (`.ss-demo-resize`)는 이미 있는데 여기만 없어서, 폰에서 이 단추를
+     누르고 끄는 동안 브라우저가 그 손짓을 화면 스크롤로 가로채 갔다
+     (같은 함정을 겪은 다른 자리와 같은 원인 · 같은 해법). */
+  touch-action: none;
 }
 
 /* 외곽선 — 아주 얇은(1px) 은빛 선 위로 빛 한 점이 둘레를 돈다. 로그인 카드의
