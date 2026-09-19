@@ -404,33 +404,27 @@ body::-webkit-scrollbar {
 
 /* 🔴 **폰에서 다섯 칸이 한 줄에 안 들어갔다**(2026-09-20, 사용자 지적 —
    "영상 분석·레슨·상점·경기장 예약·알림"이 두 줄로 접혀 보기 싫었다).
-   `column-gap: 40px`·31px 아이콘·글자 라벨은 전부 넓은 화면 기준이다.
-   폰에서는 라벨을 **화면에서만** 지운다(칸의 이름표는 여전히 이 글자가
-   맡으므로 안 보이게만 하지 지우지 않는다 — 화면 낭독기는 그대로 읽는다).
-   라벨이 빠지면 칸이 아이콘 하나 폭이 되어 다섯 개가 한 줄에 넉넉히 선다. */
+   `column-gap: 40px`·31px 아이콘·0.875rem 글자·0.08em 자간은 전부 넓은
+   화면 기준이다. 🔴 **라벨을 숨기는 시도는 되돌린다**(사용자 지적 —
+   글씨가 안 보인다) — 글자는 그대로 두고 아이콘·간격·글자 크기·자간을
+   함께 줄여서 다섯 칸이 폭 안에 들어가게 한다. */
 @media (max-width: 640px) {
   .ss-home-nav-list {
-    column-gap: 14px;
+    column-gap: 6px;
     flex-wrap: nowrap;
   }
 
   .ss-home-nav-item--stack {
-    padding: 8px 4px;
+    padding: 6px 2px;
   }
 
   .ss-home-nav-icon {
-    font-size: 22px;
+    font-size: 18px;
   }
 
-  .ss-home-nav-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
+  .ss-home-nav-item {
+    font-size: 0.6rem;
+    letter-spacing: 0;
   }
 }
 
