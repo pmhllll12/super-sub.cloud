@@ -3873,7 +3873,10 @@ body::-webkit-scrollbar {
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  min-height: 0;
+  /* 🔴 **바닥을 둔다**(2026-09-19). `min-height: 0`만 있으면 위 그리드 행이
+     조금이라도 낮게 잡히는 순간 카드가 그대로 따라 눌려 안 보인다 —
+     뼈대 그림 한 벌이 들어갈 최소 자리는 지킨다. */
+  min-height: 120px;
   padding: 8px;
   border: 1px solid color-mix(in srgb, var(--ss-fg) 22%, transparent);
   border-radius: 10px;
@@ -3894,6 +3897,12 @@ body::-webkit-scrollbar {
   flex: 1;
   width: 100%;
   min-height: 0;
+  /* 🔴 **키를 폭에서 직접 얻는다**(2026-09-19). `viewBox`가 정사각(1000×1000)인데
+     `flex: 1`만으로는 조상 상자들의 키 계산이 전부 맞아야만 키가 생긴다 —
+     그 사슬이 길고(그리드 행 → flex 열 → 그리드 카드 → flex 카드) 한 군데만
+     어긋나도 svg 키가 0 이 된다. `aspect-ratio`는 **이 요소의 폭**만 보므로
+     사슬과 무관하게 늘 그려진다. */
+  aspect-ratio: 1;
 }
 
 .ss-shot-moment-label {
