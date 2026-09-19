@@ -2489,6 +2489,27 @@ body::-webkit-scrollbar {
   }
 }
 
+/* 🔴 **폰에서 이 판(추천·지인 찾기·비슷한 팀) 폭이 0이 됐다**(2026-09-20,
+   사용자 지적 — "+ 눌러도 선수 목록이 안 나온다"). 위 `--ss-side-panel-w:
+   min(380px, calc((100vw - 620px) / 2))` 는 넓은 화면 전제다 — `100vw`가
+   620px 아래면 `calc()` 가 음수가 되고, 너비는 음수를 못 받아 0으로
+   깎인다. 그 결과 판은 DOM 에 있어도 폭 0이라 아무것도 안 보였다.
+   폰에서는 오른쪽에 나란히 세우는 대신, 화면에 고정한 채 아래에서 올라오는
+   시트로 바꾼다 — 스쿼드 판(왼쪽)이 뒤에 그대로 남는다. */
+@media (max-width: 900px) {
+  .ss-suggest,
+  .ss-tm {
+    position: fixed;
+    top: auto;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    width: auto;
+    max-height: 70vh;
+    margin-left: 0;
+  }
+}
+
 .ss-suggest-head {
   position: relative;
   display: flex;
