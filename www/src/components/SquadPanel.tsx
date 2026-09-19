@@ -2130,8 +2130,29 @@ export default function SquadPanel({
           teamId={myTeamId}
           /* 🔴 **여기서 대기 팝업을 띄우지 않는다**(사용자 요청, 2026-09-16).
              신청은 걸린 것이고 확정은 상대가 수락할 때다 — 그 순간은 알림으로
-             오므로, 부모가 이 id 를 기억해 두었다가 그때 띄운다. */
-          onRequested={(requestId, team) => onRequested?.(requestId, team)}
+             오므로, 부모가 이 id 를 기억해 두었다가 그때 띄운다.
+             🔴 **데모용 자동 확정을 여기서 덧붙인다**(2026-09-20, 사용자
+             요청 — 위 `demoAccepted` 와 같은 이유: 심사 자리에는 실제로
+             수락할 상대 팀장이 없다). 위 규칙(부모가 알림을 기다린다)은
+             그대로 두고, 1.5초 뒤 **이 컴포넌트가 직접** `matched`를 채운다
+             — 진짜 알림이 오면 그쪽이 덮어써도 상관없다(같은 모양).
+             상대 스쿼드는 실물이 없어 빈 판으로 그린다.
+             🔴 실제 배포에서는 걷어야 한다(위 `demoAccepted`와 같은 경고). */
+          onRequested={(requestId, team) => {
+            onRequested?.(requestId, team)
+            window.setTimeout(() => {
+              setMatched({
+                id: team.id,
+                name: team.name,
+                region: team.region,
+                size: team.size,
+                playedAt: team.playedAt,
+                place: team.place,
+                why: team.why,
+                squad: [],
+              })
+            }, DEMO_ACCEPT_MS)
+          }}
         />
       )}
 
