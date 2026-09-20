@@ -366,7 +366,19 @@ body::-webkit-scrollbar {
   cursor: pointer;
 }
 
-.ss-home-nav-item:hover,
+/* 🔴 **가리키기 색은 실제 마우스에서만 켠다**(2026-09-20, 사용자 지적 —
+   폰에서 한 번 눌러도 안 넘어갔다). 터치 화면은 첫 탭을 `:hover` 로
+   받는 기기가 많아서, 이 규칙이 조건 없이 걸려 있으면 첫 탭은 이 색만
+   켜고 실제 이동은 두 번째 탭에야 일어난다 — 아래
+   `@media (hover: hover)` 로 가둬 터치에서는 애초에 이 규칙이 안 걸리게
+   한다. `:focus-visible` · `[data-active]` 는 가리키기가 아니라서 그대로
+   둔다. */
+@media (hover: hover) {
+  .ss-home-nav-item:hover {
+    color: var(--ss-accent);
+  }
+}
+
 .ss-home-nav-item:focus-visible,
 .ss-home-nav-item[data-active='true'] {
   color: var(--ss-accent);
@@ -407,23 +419,40 @@ body::-webkit-scrollbar {
    `column-gap: 40px`·31px 아이콘·0.875rem 글자·0.08em 자간은 전부 넓은
    화면 기준이다. 🔴 **라벨을 숨기는 시도는 되돌린다**(사용자 지적 —
    글씨가 안 보인다) — 글자는 그대로 두고 아이콘·간격·글자 크기·자간을
-   함께 줄여서 다섯 칸이 폭 안에 들어가게 한다. */
+   함께 줄여서 다섯 칸이 폭 안에 들어가게 한다.
+
+   🔴 **그런데 그만큼 줄인 값(0.6rem·18px)이 너무 작아 이번엔 "잘 안
+   보인다"는 말을 들었다**(2026-09-20). 완전히 되돌리면 다시 두 줄로
+   접히므로, 읽을 만한 선까지만 올리고(0.6→0.72rem, 18→21px) **넘치는
+   나머지는 가로로 긋는다** — `body` 가 `overflow-x: clip` 이라(위쪽
+   규칙) 이 줄 자체에 `overflow-x: auto` 를 안 주면 다음으로 좁은 기기에서
+   또 이만큼 늘린 값이 넘칠 때 잘려서 **아예 안 보이게** 된다(글자가
+   작은 것과는 다른 종류의 "안 보임"이다). 마켓 판의 카드 줄
+   (`.ss-market-gate-cards[data-frozen='true']`)과 같은 처리. */
 @media (max-width: 640px) {
   .ss-home-nav-list {
-    column-gap: 6px;
+    column-gap: 10px;
     flex-wrap: nowrap;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .ss-home-nav-list::-webkit-scrollbar {
+    display: none;
   }
 
   .ss-home-nav-item--stack {
-    padding: 6px 2px;
+    padding: 6px 4px;
   }
 
   .ss-home-nav-icon {
-    font-size: 18px;
+    font-size: 21px;
   }
 
   .ss-home-nav-item {
-    font-size: 0.6rem;
+    font-size: 0.72rem;
     letter-spacing: 0;
   }
 }
