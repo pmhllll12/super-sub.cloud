@@ -11991,6 +11991,29 @@ body:has(.ss-profile) {
   .ss-profile-body {
     grid-template-columns: 1fr;
   }
+
+  /* 🔴 「해당 영상 리포트 보기」— 이 폭에서는 알약 줄(`.ss-profile-tabrow`)이
+     이미 가로를 다 쓰고 있어서, 흐름 밖 절대배치(오른쪽 끝)로 걸어 두면
+     「업로드 영상」 알약 위에 그대로 얹혀 글자가 가려진다(2026-09-20, 사용자
+     지적 — 모바일 스크린샷으로 확인). 흐름으로 되돌리면 `.ss-profile-tabrow`
+     가 이미 `flex-wrap: wrap` 이라 알약 줄 아래 제 줄로 저절로 접힌다.
+
+     🔴 **들고나는 연출도 같이 끈다.** 두 상태(`:not([data-entered])` ·
+     `[data-entered]`) 키프레임이 전부 `translateY(-50%)` 를 자리로 굳혀
+     두는데, `position: static` 으로 바뀐 뒤에도 그 값이 그대로 적용되면
+     단추가 제 키의 절반만큼 위로 튀어 올라 알약 줄과 다시 겹친다 — 흐림
+     모드(`prefers-reduced-motion`)가 같은 이유로 이 단추의 연출을 끈
+     자리(위 `.ss-profile-report-open { animation: none }`)와 같은 결이다. */
+  .ss-profile-report-open {
+    position: static;
+    transform: none;
+  }
+
+  .ss-profile[data-entered] .ss-profile-report-open,
+  .ss-profile[data-entered] .ss-profile-report-open[data-leaving='true'],
+  .ss-profile:not([data-entered]) .ss-profile-report-open {
+    animation: none;
+  }
 }
 
 .ss-profile-h {
