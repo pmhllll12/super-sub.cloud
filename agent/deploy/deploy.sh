@@ -12,6 +12,22 @@ REPO="${SUPERSUB_REPO:-$HOME/super-sub.cloud}"
 BRANCH="${SUPERSUB_BRANCH:-ho}"
 VLLM_URL="${SUPERSUB_VLLM_URL:-http://127.0.0.1:8000}"
 
+# 🔴 `uv` 를 PATH 에 기대지 않는다 (2026-09-21). 설치 위치가
+# `~/.local/bin` 이라 **로그인 셸에서만** PATH 에 들어온다 — 사람이 손으로
+# 돌릴 때는 보이지만 `ssh <호스트> './deploy.sh'` 처럼 비대화형으로 부르면
+# `uv: command not found` 로 2단계에서 멈춘다(실제로 겪었다). 그때 pull 은
+# 이미 끝나 있어서 **코드는 새것이고 venv 는 옛것인** 어중간한 상태가 된다.
+UV="${SUPERSUB_UV:-$(command -v uv 2>/dev/null || true)}"
+if [[ -z "$UV" ]]; then
+  for cand in "$HOME/.local/bin/uv" "$HOME/.cargo/bin/uv" /usr/local/bin/uv; do
+    if [[ -x "$cand" ]]; then UV="$cand"; break; fi
+  done
+fi
+if [[ -z "$UV" ]]; then
+  echo "uv 를 찾지 못했다. 경로를 SUPERSUB_UV 로 주거나 PATH 에 넣을 것." >&2
+  exit 1
+fi
+
 cd "$REPO"
 
 # 작업 트리가 더러우면 멈춘다. EC2에서 직접 고친 것이 있으면 pull이 그것을
@@ -37,7 +53,7 @@ cd "$REPO/agent"
 #    (어긋났다고 나오면 로컬에서 `uv lock` 하고 커밋한 뒤 다시 배포한다.)
 #
 # 🔴 `--extra aws` 를 빼지 말 것 — boto3 가 빠져 S3 경로가 죽는다.
-uv sync --locked --extra aws
+"$UV" sync --locked --extra aws
 
 echo "[3/4] vLLM 재시작"
 # 코드를 pull했다고 모델이 바뀌지는 않지만, serve_vllm.sh나 유닛이 바뀌었을 수
