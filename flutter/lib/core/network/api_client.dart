@@ -105,6 +105,15 @@ class ApiClient {
     return _decode(res);
   }
 
+  /// 지우고 **바뀐 것을 돌려받는다** — 스쿼드 등재 빼기가 그렇다(계약이
+  /// 바뀐 스쿼드 전체를 준다).
+  Future<Map<String, dynamic>> deleteReturning(String path) async {
+    final res = await _send(
+      () => _client.delete(_uri(path), headers: _headers()),
+    );
+    return _decode(res);
+  }
+
   Future<void> delete(String path) async {
     final res = await _send(
       () => _client.delete(_uri(path), headers: _headers()),

@@ -141,6 +141,54 @@ void runSquadRepositoryContract(
       expect(after.hasSeat, isFalse);
     });
 
+    test('등재를 빼면 판에서 사라진다', () async {
+      final seated = await repo.enlist(
+        teamWithSquad,
+        playerCardId: cardIdToEnlist,
+        positionCode: 'FW',
+        gridCol: freeSeat.$1,
+        gridRow: freeSeat.$2,
+      );
+      final memberId =
+          seated.members.firstWhere((m) => m.playerCardId == cardIdToEnlist).id;
+
+      final after = await repo.removeSeat(teamWithSquad, memberId: memberId);
+
+      expect(after.members.any((m) => m.id == memberId), isFalse);
+    });
+
+    /// 🔴 뺀 자리는 **다시 앉힐 수 있어야** 한다 — 못 앉으면 실수로 뺐을 때
+    /// 되돌릴 길이 없다.
+    test('뺀 자리에 다시 앉힐 수 있다', () async {
+      final seated = await repo.enlist(
+        teamWithSquad,
+        playerCardId: cardIdToEnlist,
+        positionCode: 'FW',
+        gridCol: freeSeat.$1,
+        gridRow: freeSeat.$2,
+      );
+      final memberId =
+          seated.members.firstWhere((m) => m.playerCardId == cardIdToEnlist).id;
+      await repo.removeSeat(teamWithSquad, memberId: memberId);
+
+      final again = await repo.enlist(
+        teamWithSquad,
+        playerCardId: cardIdToEnlist,
+        positionCode: 'FW',
+        gridCol: freeSeat.$1,
+        gridRow: freeSeat.$2,
+      );
+
+      expect(again.members.any((m) => m.playerCardId == cardIdToEnlist), isTrue);
+    });
+
+    test('없는 등재는 못 뺀다', () async {
+      await expectLater(
+        repo.removeSeat(teamWithSquad, memberId: 'sm-없는것-0000'),
+        throwsA(anything),
+      );
+    });
+
     test('남의 등재는 못 옮긴다', () async {
       await expectLater(
         repo.moveSeat(

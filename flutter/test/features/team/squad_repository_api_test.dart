@@ -92,6 +92,16 @@ ApiSquadRepository buildRepo() {
       return jsonRes(squadBody(), 200);
     }
 
+    if (req.method == 'DELETE') {
+      final memberId = path.split('/').last;
+      final before = members.length;
+      members.removeWhere((m) => m['id'] == memberId);
+      if (members.length == before) {
+        return err('MEMBER_NOT_FOUND', '이 팀 스쿼드의 등재가 아닙니다', 404);
+      }
+      return jsonRes(squadBody(), 200);
+    }
+
     return jsonRes(squadBody(), 200);
   });
   return ApiSquadRepository(

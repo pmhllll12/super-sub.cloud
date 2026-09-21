@@ -1,6 +1,7 @@
 import '../../../core/mock/mock_db.dart';
 import '../../../core/network/api_client.dart';
 import 'models/squad.dart';
+import 'models/team_member.dart';
 import 'squad_repository.dart';
 
 /// 백엔드 없이 도는 스쿼드 저장소.
@@ -93,6 +94,46 @@ class MockSquadRepository implements SquadRepository {
         else
           m,
     ]);
+  }
+
+  @override
+  Future<Squad> removeSeat(String teamId, {required String memberId}) async {
+    await Future<void>.delayed(_delay);
+    final squad = _requireWritable(teamId);
+    if (!squad.members.any((m) => m.id == memberId)) {
+      throw const ApiException('이 팀 스쿼드의 등재가 아닙니다',
+          code: 'MEMBER_NOT_FOUND', status: 404);
+    }
+    // 🔴 카드는 안 지운다 — 스쿼드에서 빠질 뿐이다.
+    return _replace(
+      squad,
+      [for (final m in squad.members) if (m.id != memberId) m],
+    );
+  }
+
+  @override
+  Future<void> removeTeamMember(String teamId, {required String userId}) async {
+    await Future<void>.delayed(_delay);
+    _requireWritable(teamId);
+    /* ⚠️ 서버는 행을 지우지 않고 `left_at` 을 채운다 — Mock 도 같게 한다.
+       그래야 `AppUser.teams`(널인 행만 추린다)가 실제와 같이 움직인다. */
+    for (var i = 0; i < _db.teamMembers.length; i += 1) {
+      final tm = _db.teamMembers[i];
+      if (tm.teamId != teamId || tm.userId != userId || tm.leftAt != null) {
+        continue;
+      }
+      _db.teamMembers[i] = TeamMember(
+        id: tm.id,
+        teamId: tm.teamId,
+        userId: tm.userId,
+        role: tm.role,
+        joinedAt: tm.joinedAt,
+        leftAt: DateTime.now(),
+      );
+      return;
+    }
+    throw const ApiException('그 팀의 구성원이 아닙니다',
+        code: 'NOT_A_MEMBER', status: 404);
   }
 
   Squad? _find(String teamId) {

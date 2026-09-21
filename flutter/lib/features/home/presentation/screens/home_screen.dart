@@ -345,6 +345,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
   }
 
+  /// 그 사람을 판에서 빼고 **팀에서도 내보낸다**.
+  ///
+  /// 🔴 **둘 다 해야 한다**(웹, 2026-09-18 사용자 결정: 「x 가 팀에서도
+  /// 빠지는 것」). 판에서 내리는 것만으로는 그 사람이 여전히 팀원이라
+  /// **AI 추천 후보에서 계속 빠진다**(추천은 그 팀 소속을 뺀다) — 웹 운영에서
+  /// 그렇게 12명이 쌓여 추천 목록이 말랐다.
+  Future<void> _removeSeat(
+    String teamId,
+    String memberId,
+    String? cardSlug,
+    String? mySlug,
+  ) async {
+    final repo = ref.read(squadRepositoryProvider);
+    try {
+      await repo.removeSeat(teamId, memberId: memberId);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      _notReady(e.message);
+      return;
+    }
+    ref.invalidate(squadProvider(teamId));
+
+    // 여기서부터는 **덤**이다 — 판에서는 이미 빠졌으므로 실패해도 안 알린다.
+    if (cardSlug == null || cardSlug == mySlug) return;
+    try {
+      /* 🔴 **카드를 한 번 읽어 주인을 알아낸다.** 판이 들고 있는 것은 카드
+         슬러그뿐인데, 팀에서 내보내는 경로는 **사용자 id** 를 받는다. */
+      final owner = await ref.read(cardRepositoryProvider).cardBySlug(cardSlug);
+      final userId = owner?.userId;
+      // 🔴 나는 안 내보낸다 — 주장이 스스로 나가면 팀이 주인을 잃는다.
+      if (userId == null) return;
+      await repo.removeTeamMember(teamId, userId: userId);
+    } catch (_) {
+      // 못 내보내도 판에서는 이미 빠졌다 — 화면을 멈추지 않는다.
+    }
+  }
+
   /// 판에 앉은 팀원들의 카드를 **보이는 것만** 받아 둔다.
   ///
   /// 🔴 **빌드 중에 상태를 바꾸지 않는다** — `want()` 가 provider 상태를 건드려
@@ -588,6 +625,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             onSeatMoved: (ownedTeamId != null && squad?.teamId == ownedTeamId)
                 ? (memberId, positionCode, col, row) =>
                     _moveSeat(ownedTeamId, memberId, positionCode, col, row)
+                : null,
+            onSeatRemoved: (ownedTeamId != null && squad?.teamId == ownedTeamId)
+                ? (memberId, slug) =>
+                    _removeSeat(ownedTeamId, memberId, slug, cardSeed)
                 : null,
             onSeatTap: (_) => _notReady('선수 넣기'),
           )

@@ -60,4 +60,20 @@ class ApiSquadRepository implements SquadRepository {
           },
         ),
       );
+
+  @override
+  Future<Squad> removeSeat(String teamId, {required String memberId}) async =>
+      Squad.fromJson(
+        await _api.deleteReturning(
+          '/teams/${Uri.encodeComponent(teamId)}/squad/members/'
+          '${Uri.encodeComponent(memberId)}',
+        ),
+      );
+
+  @override
+  Future<void> removeTeamMember(String teamId, {required String userId}) =>
+      _api.delete(
+        '/teams/${Uri.encodeComponent(teamId)}/members/'
+        '${Uri.encodeComponent(userId)}',
+      );
 }

@@ -27,6 +27,7 @@ class SquadBoard extends StatefulWidget {
     this.mySlug,
     this.mateCardBuilder,
     this.onSeatMoved,
+    this.onSeatRemoved,
   });
 
   /// 내 카드 붓자국의 씨앗 — 🔴 **카드의 `public_slug`** 여야 웹과 같은 무늬가
@@ -58,6 +59,12 @@ class SquadBoard extends StatefulWidget {
     int col,
     int row,
   )? onSeatMoved;
+
+  /// 그 자리 사람을 **판에서 뺐다**(⊗). 인자는 등재 id 와 카드 슬러그다 —
+  /// 슬러그는 팀에서도 내보낼 때 주인을 알아내는 데 쓴다.
+  ///
+  /// 🔴 **`null` 이면 ⊗ 를 안 그린다**(주장이 아니다).
+  final void Function(String memberId, String? cardSlug)? onSeatRemoved;
 
   @override
   State<SquadBoard> createState() => _SquadBoardState();
@@ -319,10 +326,37 @@ class _SquadBoardState extends State<SquadBoard> {
         ),
       );
     }
+    /* 🔴 **내 카드에는 ⊗ 가 없다**(웹, 2026-09-17 사용자 판단). 내 카드는
+       옮기기만 한다 — 스스로를 빼면 주장이 팀에서 나가는 셈이라 서버도
+       409 LAST_OWNER 로 막는다. 남의 카드만 ⊗ 로 뺀다.
+       🔴 **주장에게만 그린다** — `onSeatRemoved` 가 null 이면 안 그린다. */
+    final removable = !slot.mine &&
+        widget.onSeatRemoved != null &&
+        seats.memberIds.containsKey(slot.area);
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        card,
+        if (removable)
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              card,
+              Positioned(
+                top: -6,
+                right: -6,
+                child: _RemoveButton(
+                  key: Key('squad-remove-${slot.area}'),
+                  onTap: () => widget.onSeatRemoved!(
+                    seats.memberIds[slot.area]!,
+                    seats.slugs[slot.area],
+                  ),
+                ),
+              ),
+            ],
+          )
+        else
+          card,
         const SizedBox(height: _labelGap),
         SizedBox(
           height: _labelH,
@@ -360,6 +394,44 @@ class _SquadBoardState extends State<SquadBoard> {
             fontSize: 40,
             fontWeight: FontWeight.w700,
             color: _kInk,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 카드를 판에서 빼는 ⊗ — 카드 오른쪽 위 모서리에 걸친다.
+///
+/// 🔴 **누르는 자리를 카드보다 크게 잡는다.** 판의 카드는 폰에서 아주 작아서
+/// 보이는 크기 그대로 두면 손가락으로 못 누른다(최소 40×40).
+class _RemoveButton extends StatelessWidget {
+  const _RemoveButton({super.key, required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: '판에서 빼기',
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          width: 40,
+          height: 40,
+          child: Center(
+            child: Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                color: _kInk.withValues(alpha: 0.82),
+                shape: BoxShape.circle,
+                border: Border.all(color: _kOnDark, width: 1.5),
+              ),
+              child: const Icon(Icons.close, size: 14, color: _kOnDark),
+            ),
           ),
         ),
       ),

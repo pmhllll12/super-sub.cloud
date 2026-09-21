@@ -384,6 +384,103 @@ void main() {
     });
   });
 
+  group('판에서 빼기 (⊗)', () {
+    testWidgets('⊗ 를 누르면 등재 id 와 슬러그를 알려준다', (tester) async {
+      String? removedId;
+      String? removedSlug;
+      await _pump(
+        tester,
+        SquadBoard(
+          cardSeed: 'mine',
+          mySlug: 'mine',
+          squad: _squad([
+            _m(id: 'sm-9', slug: 's1', nickname: '김철수', col: 0, row: 1),
+          ]),
+          onSeatTap: (_) {},
+          onSeatRemoved: (id, slug) {
+            removedId = id;
+            removedSlug = slug;
+          },
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('squad-remove-mf1')));
+      await tester.pump();
+
+      expect(removedId, 'sm-9');
+      // 🔴 슬러그가 있어야 팀에서도 내보낼 수 있다(주인을 알아내는 열쇠).
+      expect(removedSlug, 's1');
+    });
+
+    /// 🔴 웹 2026-09-17 사용자 판단 — 내 카드는 옮기기만 한다. 스스로를 빼면
+    /// 주장이 팀에서 나가는 셈이라 서버도 409 LAST_OWNER 로 막는다.
+    testWidgets('내 카드에는 ⊗ 가 없다', (tester) async {
+      await _pump(
+        tester,
+        SquadBoard(
+          cardSeed: 'mine',
+          mySlug: 'mine',
+          squad: _squad([
+            _m(id: 'sm-me', slug: 'mine', nickname: '나', pos: 'GK', col: 1, row: 3),
+          ]),
+          onSeatTap: (_) {},
+          onSeatRemoved: (_, _) {},
+        ),
+      );
+
+      expect(find.byKey(const Key('squad-remove-gk')), findsNothing);
+    });
+
+    /// 🔴 주장이 아니면 빼도 403 이다 — 그럴 때 웹도 ⊗ 를 안 그린다.
+    testWidgets('onSeatRemoved 가 없으면(주장이 아니면) ⊗ 가 없다', (tester) async {
+      await _pump(
+        tester,
+        SquadBoard(
+          cardSeed: 'mine',
+          mySlug: 'mine',
+          squad: _squad([_m(id: 'sm-9', nickname: '김철수', col: 0, row: 1)]),
+          onSeatTap: (_) {},
+        ),
+      );
+
+      expect(find.byKey(const Key('squad-remove-mf1')), findsNothing);
+    });
+
+    testWidgets('빈 자리에는 ⊗ 가 없다', (tester) async {
+      await _pump(
+        tester,
+        SquadBoard(
+          cardSeed: 'mine',
+          mySlug: 'mine',
+          squad: _squad(const []),
+          onSeatTap: (_) {},
+          onSeatRemoved: (_, _) {},
+        ),
+      );
+
+      expect(find.byKey(const Key('squad-remove-fw1')), findsNothing);
+    });
+
+    /// 🔴 판의 카드는 폰에서 아주 작다 — 보이는 크기 그대로 두면 손가락으로
+    /// 못 누른다.
+    testWidgets('⊗ 의 누르는 자리는 40×40 이상이다', (tester) async {
+      await _pump(
+        tester,
+        SquadBoard(
+          cardSeed: 'mine',
+          mySlug: 'mine',
+          squad: _squad([_m(id: 'sm-9', nickname: '김철수', col: 0, row: 1)]),
+          onSeatTap: (_) {},
+          onSeatRemoved: (_, _) {},
+        ),
+      );
+
+      final size = tester.getSize(find.byKey(const Key('squad-remove-mf1')));
+      expect(size.width, greaterThanOrEqualTo(40));
+      expect(size.height, greaterThanOrEqualTo(40));
+    });
+  });
+
   testWidgets('빈 자리를 누르면 그 자리를 알려준다', (tester) async {
     SquadSlot? tapped;
     await _pump(

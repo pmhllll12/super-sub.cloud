@@ -52,6 +52,7 @@ class PlayerCard {
     required this.publicSlug,
     required this.nickname,
     this.id,
+    this.userId,
     this.tagline,
     this.style,
     this.photoUrl,
@@ -64,6 +65,10 @@ class PlayerCard {
     return PlayerCard(
       id: json['id'] as String?,
       publicSlug: json['public_slug'] as String,
+      // 🔴 **카드 주인의 사용자 id.** 판에서 ⊗ 로 뺄 때 팀에서도 내보내야
+      //    하는데(`DELETE /teams/{id}/members/{user_id}`), 판이 들고 있는 것은
+      //    카드 슬러그뿐이라 **카드를 한 번 읽어 주인을 알아낸다**(웹과 같다).
+      userId: user?['id'] as String?,
       nickname: (user?['nickname'] as String?) ?? '',
       tagline: json['tagline'] as String?,
       style: style == null ? null : CardStyle.fromJson(style),
@@ -81,6 +86,9 @@ class PlayerCard {
   /// 공개 주소이자 **붓자국의 씨앗**이다 — 웹과 같은 무늬가 나오려면 이 값을
   /// `PlayerCardView.seed` 로 넘겨야 한다.
   final String publicSlug;
+
+  /// 카드 주인의 사용자 id. 공개 응답에도 실린다(`user.id`).
+  final String? userId;
 
   final String nickname;
   final String? tagline;

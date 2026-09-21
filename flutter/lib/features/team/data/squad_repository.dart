@@ -41,4 +41,23 @@ abstract class SquadRepository {
     int? gridCol,
     int? gridRow,
   });
+
+  /// 등재를 **뺀다**(`DELETE /teams/{id}/squad/members/{memberId}`).
+  /// 바뀐 스쿼드 전체가 돌아온다.
+  ///
+  /// 🔴 **카드는 안 지워진다** — 스쿼드에서 빠질 뿐이다.
+  /// 🔴 **주장만 된다.**
+  Future<Squad> removeSeat(String teamId, {required String memberId});
+
+  /// 사람을 **팀에서 내보낸다**(`DELETE /teams/{id}/members/{userId}`).
+  ///
+  /// 🔴 **판에서 내리는 것만으로는 모자라다** — 그 사람이 여전히 팀원이라
+  /// **AI 추천 후보에서 계속 빠진다**(추천은 그 팀 소속을 뺀다). 웹 운영에서
+  /// 그렇게 12명이 쌓여 추천 목록이 말랐다(2026-09-18 사용자 결정).
+  ///
+  /// 🔴 **나를 내보내지 않는다** — 주장이 스스로 나가면 팀이 주인을 잃는다
+  /// (서버도 409 `LAST_OWNER` 로 막는다).
+  ///
+  /// ⚠️ 서버는 행을 지우지 않고 `left_at` 을 채운다 — 되돌리려면 다시 부른다.
+  Future<void> removeTeamMember(String teamId, {required String userId});
 }
