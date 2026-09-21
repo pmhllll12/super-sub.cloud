@@ -968,11 +968,9 @@ def extract_keypoints(
     남아 있어야 한다(api_video의 임시 파일은 응답을 만들 때까지 산다).
     """
     import torch
-    from transformers import (
-        AutoProcessor,
-        RTDetrForObjectDetection,
-        VitPoseForPoseEstimation,
-    )
+    # 검출기는 `_load_detector` 가 자기 안에서 끌어온다 — 여기서 또 부르지
+    # 않는다(적재를 한 곳에 두는 이유는 그 함수 주석 참고).
+    from transformers import AutoProcessor, VitPoseForPoseEstimation
 
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
     read = read_frames_ex(video_path, target_fps, max_frames, max_seconds)

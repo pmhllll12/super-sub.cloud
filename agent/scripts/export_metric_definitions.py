@@ -5,8 +5,9 @@
     uv run python scripts/export_metric_definitions.py --json     # 시드용
     uv run python scripts/export_metric_definitions.py --csv
 
-`rubrics/metric_definitions.yaml`(label·unit 의 정본)과 `rubrics/*.yaml`
+`contracts/metric_definitions.yaml`(label·unit 의 정본)과 `rubrics/*.yaml`
 (어떤 항목이 열려 있는가)를 합쳐 **적재에서 실제로 쓰이는 코드 전부**를 낸다.
+🔴 정본이 `rubrics/` 가 **아닌** 이유는 아래 `DEFS` 의 주석에 있다.
 
 🔴 **「루브릭이 쓰는 코드」보다 넓다.** 세 종류가 섞여 나간다:
 
@@ -147,8 +148,12 @@ def main() -> None:
         print("🔴 정본에 없는 코드를 루브릭이 쓰고 있다:", file=sys.stderr)
         for code in missing:
             print(f"   {code}", file=sys.stderr)
-        print("   rubrics/metric_definitions.yaml 에 먼저 선언할 것.",
-              file=sys.stderr)
+        # 🔴 경로를 글자로 박지 않는다 — 여기 `rubrics/metric_definitions.yaml`
+        #    이라고 적혀 있었고(2026-09-21 까지), 그대로 따르면 루브릭이 아닌
+        #    파일이 `rubrics/` 에 들어가 `discover_rubrics` 가 「채점 항목이
+        #    하나도 없음」으로 죽는다. 바로 위 `DEFS` 주석이 막으려던 바로 그
+        #    사고를 오류 메시지가 시키고 있었다. 실제 값을 찍는다.
+        print(f"   {DEFS} 에 먼저 선언할 것.", file=sys.stderr)
         raise SystemExit(1)
 
     rows = build_rows(args.include_draft)
