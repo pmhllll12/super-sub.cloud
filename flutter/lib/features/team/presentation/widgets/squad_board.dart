@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../profile/presentation/widgets/player_card_view.dart';
+import '../../board_geometry.dart';
 import '../../data/models/squad.dart';
 import '../../seats_from_squad.dart';
 
@@ -24,6 +26,7 @@ class SquadBoard extends StatefulWidget {
     this.squad,
     this.mySlug,
     this.mateCardBuilder,
+    this.onSeatMoved,
   });
 
   /// 내 카드 붓자국의 씨앗 — 🔴 **카드의 `public_slug`** 여야 웹과 같은 무늬가
@@ -43,6 +46,18 @@ class SquadBoard extends StatefulWidget {
 
   /// 빈 자리를 눌렀다. 인자는 그 자리.
   final ValueChanged<SquadSlot> onSeatTap;
+
+  /// 카드를 **다른 칸으로 옮겼다**. `memberId` 는 그 자리 등재의 id,
+  /// `positionCode` 는 **놓인 행이 뜻하는 포지션**이다.
+  ///
+  /// 🔴 **`null` 이면 아예 못 집는다** — 주장이 아니면 옮겨도 403 이라,
+  /// 끌린 뒤 되돌아가는 것보다 못 집게 하는 편이 낫다.
+  final void Function(
+    String memberId,
+    String positionCode,
+    int col,
+    int row,
+  )? onSeatMoved;
 
   @override
   State<SquadBoard> createState() => _SquadBoardState();
@@ -64,6 +79,15 @@ class _SquadBoardState extends State<SquadBoard> {
   static const double _labelH = 14;
   static const double _labelGap = 3;
 
+  /// 지금 집혀 있는 자리(`area`). `null` 이면 아무것도 안 집었다.
+  String? _dragging;
+
+  /// 집은 카드가 손끝을 따라간 거리.
+  Offset _dragOffset = Offset.zero;
+
+  /// 손끝이 지금 가리키는 칸 — 놓을 자리를 미리 보여 준다.
+  ({int col, int row})? _hoverCell;
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -84,11 +108,32 @@ class _SquadBoardState extends State<SquadBoard> {
         //    웹과 갈린다(`seats_from_squad.dart` 의 세 단계).
         final seats = seatsFromSquad(widget.squad, _size, mySlug: widget.mySlug);
 
+        final boardSize = Size(w, h);
+
         return Stack(
           children: [
             Positioned.fill(
               child: CustomPaint(painter: _PitchPainter()),
             ),
+            // 놓을 칸 미리보기 — 집고 있는 동안만.
+            if (_hoverCell != null)
+              Positioned(
+                left: _padSide + _hoverCell!.col * cellW + (cellW - cardW) / 2,
+                top: _padTop +
+                    _hoverCell!.row * cellH +
+                    (cellH - cardH - _labelGap - _labelH) / 2,
+                width: cardW,
+                height: cardH,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(cardW * 24 / 380),
+                      border: Border.all(color: AppTheme.seed, width: 2),
+                      color: AppTheme.seed.withValues(alpha: 0.14),
+                    ),
+                  ),
+                ),
+              ),
             Positioned(
               top: 12,
               left: 16,
@@ -103,7 +148,7 @@ class _SquadBoardState extends State<SquadBoard> {
                     slot.row * cellH +
                     (cellH - cardH - _labelGap - _labelH) / 2,
                 width: cardW,
-                child: _seat(slot, cardW, seats),
+                child: _draggable(slot, cardW, seats, boardSize),
               ),
           ],
         );
@@ -141,6 +186,113 @@ class _SquadBoardState extends State<SquadBoard> {
             ),
           ),
       ],
+    );
+  }
+
+  /// 그 자리를 **집을 수 있는가** — 옮길 수 있는 사람이고 등재가 있어야 한다.
+  ///
+  /// 🔴 빈 자리는 못 집는다(옮길 등재가 없다). 주장이 아니면
+  /// [SquadBoard.onSeatMoved] 가 `null` 이라 아무것도 못 집는다.
+  bool _canDrag(SquadSlot slot, SeatAssignment seats) =>
+      widget.onSeatMoved != null && seats.memberIds.containsKey(slot.area);
+
+  /// 자리 하나를 **길게 눌러 집고 끌 수 있게** 감싼다.
+  ///
+  /// 🔴 **길게 눌러야 집힌다.** 폰에서는 판이 스크롤·시트와 섞일 수 있어, 바로
+  /// 끌리면 판을 내리려다 카드를 옮기게 된다(웹은 마우스라 그 문제가 없다).
+  Widget _draggable(
+    SquadSlot slot,
+    double cardW,
+    SeatAssignment seats,
+    Size boardSize,
+  ) {
+    final seat = _seat(slot, cardW, seats);
+    if (!_canDrag(slot, seats)) return seat;
+
+    final dragging = _dragging == slot.area;
+    return GestureDetector(
+      key: Key('squad-drag-${slot.area}'),
+      behavior: HitTestBehavior.deferToChild,
+      onLongPressStart: (_) {
+        // 집혔다는 것을 손끝으로 알린다 — 화면만 바뀌면 놓치기 쉽다.
+        HapticFeedback.mediumImpact();
+        setState(() {
+          _dragging = slot.area;
+          _dragOffset = Offset.zero;
+          _hoverCell = (col: slot.col, row: slot.row);
+        });
+      },
+      onLongPressMoveUpdate: (d) {
+        if (_dragging != slot.area) return;
+        setState(() {
+          _dragOffset = d.offsetFromOrigin;
+          _hoverCell = cellAt(
+            d.localPosition + _cellCenterOf(slot, boardSize),
+            boardSize,
+            padTop: _padTop,
+            padSide: _padSide,
+            padBottom: _padBottom,
+          );
+        });
+      },
+      onLongPressEnd: (_) => _dropAt(slot, seats),
+      onLongPressCancel: _cancelDrag,
+      child: Transform.translate(
+        offset: dragging ? _dragOffset : Offset.zero,
+        child: Transform.scale(
+          // 집힌 카드는 살짝 뜬다 — 「지금 이걸 들고 있다」가 보여야 한다.
+          scale: dragging ? 1.08 : 1,
+          child: seat,
+        ),
+      ),
+    );
+  }
+
+  /// 그 자리 카드의 **왼쪽 위**가 판 안에서 어디인가 — 손끝 좌표를 판 좌표로
+  /// 옮길 때 쓴다(`onLongPressMoveUpdate` 의 `localPosition` 은 카드 기준이다).
+  Offset _cellCenterOf(SquadSlot slot, Size boardSize) => cellOrigin(
+        slot.col,
+        slot.row,
+        boardSize,
+        padTop: _padTop,
+        padSide: _padSide,
+        padBottom: _padBottom,
+      );
+
+  void _cancelDrag() {
+    if (_dragging == null) return;
+    setState(() {
+      _dragging = null;
+      _dragOffset = Offset.zero;
+      _hoverCell = null;
+    });
+  }
+
+  /// 손을 뗐다 — 놓을 수 있으면 알리고, 아니면 제자리로 돌아간다.
+  void _dropAt(SquadSlot slot, SeatAssignment seats) {
+    final cell = _hoverCell;
+    final memberId = seats.memberIds[slot.area];
+    _cancelDrag();
+    if (cell == null || memberId == null) return;
+    // 제자리면 아무 일도 안 한다 — 서버를 괜히 부르지 않는다.
+    if (cell.col == slot.col && cell.row == slot.row) return;
+    /* 🔴 **이미 찬 칸에는 못 놓는다.** 서로 자리를 바꾸려면 등재 둘을 한 번에
+       고쳐야 하는데 계약에 그런 경로가 없다 — 한쪽씩 보내면 중간에 **같은 칸에
+       둘**이 되어 서버가 막는다. 제자리로 돌려보낸다. */
+    final taken = seats.slots.any(
+      (s) => s.area != slot.area && s.col == cell.col && s.row == cell.row &&
+          (s.mine || seats.mates.containsKey(s.area)),
+    );
+    if (taken) {
+      HapticFeedback.lightImpact();
+      return;
+    }
+    widget.onSeatMoved!(
+      memberId,
+      // 🔴 포지션은 **놓인 행**이 정한다 — 계약이 position_code 를 늘 요구한다.
+      positionOfRow(cell.row),
+      cell.col,
+      cell.row,
     );
   }
 

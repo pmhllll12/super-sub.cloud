@@ -244,6 +244,146 @@ void main() {
     });
   });
 
+  group('길게 눌러 집고 끌기', () {
+    /// 카드를 집어 다른 칸에 놓는다. 좌표는 자리 키로 찾는다.
+    Future<void> dragFromTo(
+      WidgetTester tester,
+      String fromArea,
+      String toArea,
+    ) async {
+      final from = tester.getCenter(find.byKey(ValueKey('squad-seat-$fromArea')));
+      final to = tester.getCenter(find.byKey(ValueKey('squad-seat-$toArea')));
+      final gesture = await tester.startGesture(from);
+      // 길게 눌러야 집힌다.
+      await tester.pump(const Duration(milliseconds: 600));
+      await gesture.moveTo(to);
+      await tester.pump();
+      await gesture.up();
+      await tester.pump();
+    }
+
+    testWidgets('집어서 빈 칸에 놓으면 그 칸을 알려준다', (tester) async {
+      String? movedMember;
+      String? movedPos;
+      int? movedCol;
+      int? movedRow;
+      await _pump(
+        tester,
+        SquadBoard(
+          cardSeed: 'mine',
+          mySlug: 'mine',
+          squad: _squad([_m(id: 'sm-9', nickname: '김철수', pos: 'GK', col: 1, row: 3)]),
+          onSeatTap: (_) {},
+          onSeatMoved: (id, pos, col, row) {
+            movedMember = id;
+            movedPos = pos;
+            movedCol = col;
+            movedRow = row;
+          },
+        ),
+      );
+
+      await dragFromTo(tester, 'gk', 'fw1');
+
+      expect(movedMember, 'sm-9');
+      // 🔴 포지션은 **놓인 행**이 정한다 — FW 줄에 놓았으니 GK 가 아니다.
+      expect(movedPos, 'FW');
+      expect(movedCol, 1);
+      expect(movedRow, 0);
+    });
+
+    /// 🔴 옮겨도 403 이라 끌린 뒤 되돌아가는 것보다 못 집게 하는 편이 낫다.
+    testWidgets('onSeatMoved 가 없으면(주장이 아니면) 아예 안 집힌다', (tester) async {
+      await _pump(
+        tester,
+        SquadBoard(
+          cardSeed: 'mine',
+          mySlug: 'mine',
+          squad: _squad([_m(id: 'sm-9', nickname: '김철수', pos: 'GK', col: 1, row: 3)]),
+          onSeatTap: (_) {},
+        ),
+      );
+
+      expect(find.byKey(const Key('squad-drag-gk')), findsNothing);
+    });
+
+    testWidgets('빈 자리는 못 집는다 — 옮길 등재가 없다', (tester) async {
+      await _pump(
+        tester,
+        SquadBoard(
+          cardSeed: 'mine',
+          mySlug: 'mine',
+          squad: _squad(const []),
+          onSeatTap: (_) {},
+          onSeatMoved: (_, _, _, _) {},
+        ),
+      );
+
+      expect(find.byKey(const Key('squad-drag-fw1')), findsNothing);
+    });
+
+    /// 🔴 서로 자리를 바꾸려면 등재 둘을 한 번에 고쳐야 하는데 계약에 그런
+    /// 경로가 없다 — 한쪽씩 보내면 중간에 같은 칸에 둘이 된다.
+    testWidgets('이미 찬 칸에 놓으면 아무 일도 안 일어난다', (tester) async {
+      var called = 0;
+      await _pump(
+        tester,
+        SquadBoard(
+          cardSeed: 'mine',
+          mySlug: 'mine',
+          squad: _squad([
+            _m(id: 'sm-1', slug: 's1', nickname: '가', pos: 'GK', col: 1, row: 3),
+            _m(id: 'sm-2', slug: 's2', nickname: '나', pos: 'FW', col: 1, row: 0),
+          ]),
+          onSeatTap: (_) {},
+          onSeatMoved: (_, _, _, _) => called += 1,
+        ),
+      );
+
+      await dragFromTo(tester, 'gk', 'fw1');
+
+      expect(called, isZero);
+    });
+
+    testWidgets('제자리에 놓으면 서버를 안 부른다', (tester) async {
+      var called = 0;
+      await _pump(
+        tester,
+        SquadBoard(
+          cardSeed: 'mine',
+          mySlug: 'mine',
+          squad: _squad([_m(id: 'sm-9', nickname: '김철수', pos: 'GK', col: 1, row: 3)]),
+          onSeatTap: (_) {},
+          onSeatMoved: (_, _, _, _) => called += 1,
+        ),
+      );
+
+      await dragFromTo(tester, 'gk', 'gk');
+
+      expect(called, isZero);
+    });
+
+    testWidgets('내 카드도 집을 수 있다', (tester) async {
+      String? moved;
+      await _pump(
+        tester,
+        SquadBoard(
+          cardSeed: 'mine',
+          mySlug: 'mine',
+          squad: _squad([
+            _m(id: 'sm-me', slug: 'mine', nickname: '나', pos: 'GK', col: 1, row: 3),
+          ]),
+          onSeatTap: (_) {},
+          onSeatMoved: (id, _, _, _) => moved = id,
+        ),
+      );
+
+      await dragFromTo(tester, 'gk', 'df1');
+
+      expect(moved, 'sm-me');
+    });
+  });
+
   testWidgets('빈 자리를 누르면 그 자리를 알려준다', (tester) async {
     SquadSlot? tapped;
     await _pump(

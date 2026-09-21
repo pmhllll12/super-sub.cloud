@@ -13,6 +13,7 @@ import '../../../../core/widgets/bar_menu.dart';
 import '../../../../core/widgets/floating_nav_bar.dart';
 import '../../../../core/widgets/glass_panel.dart';
 import '../../../auth/presentation/session_controller.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../card/data/card_providers.dart';
 import '../../../card/presentation/mate_cards_controller.dart';
 import '../../../profile/presentation/widgets/player_card_view.dart';
@@ -318,6 +319,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     });
   }
 
+  /// 카드를 다른 칸으로 옮긴다 — 서버에 남겨야 새로고침해도 그 자리다.
+  Future<void> _moveSeat(
+    String teamId,
+    String memberId,
+    String positionCode,
+    int col,
+    int row,
+  ) async {
+    try {
+      await ref.read(squadRepositoryProvider).moveSeat(
+            teamId,
+            memberId: memberId,
+            positionCode: positionCode,
+            gridCol: col,
+            gridRow: row,
+          );
+      ref.invalidate(squadProvider(teamId));
+    } on ApiException catch (e) {
+      /* 🔴 **실패하면 알린다.** 자동 착석과 다르다 — 이건 사람이 **시킨 일**이라,
+         조용히 넘어가면 「옮겼는데 안 옮겨졌다」가 된다. 판은 서버 값으로 다시
+         그려지므로 카드는 저절로 제자리로 돌아간다. */
+      if (!mounted) return;
+      _notReady(e.message);
+    }
+  }
+
   /// 판에 앉은 팀원들의 카드를 **보이는 것만** 받아 둔다.
   ///
   /// 🔴 **빌드 중에 상태를 바꾸지 않는다** — `want()` 가 provider 상태를 건드려
@@ -401,7 +428,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
           ),
           _videoPanel(context),
-          _squadSheet(context, cardSeed, squad),
+          _squadSheet(context, cardSeed, squad, user?.ownedTeamId),
         ],
       ),
     );
@@ -531,7 +558,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  Widget _squadSheet(BuildContext context, String? cardSeed, Squad? squad) {
+  Widget _squadSheet(
+    BuildContext context,
+    String? cardSeed,
+    Squad? squad,
+    String? ownedTeamId,
+  ) {
     final geo = _sheetGeometry(context);
     final rowTop = geo.rowTop;
     final openBoardTop = geo.openBoardTop;
@@ -550,6 +582,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             squad: squad,
             mySlug: cardSeed,
             mateCardBuilder: _mateCard,
+            /* 🔴 **주장이 아니면 `null` 이다 — 아예 못 집는다.** 옮겨도 403 이라
+               끌린 뒤 되돌아가는 것보다 못 집게 하는 편이 낫다. 판이 그 팀의
+               것이 아닐 때도 마찬가지다. */
+            onSeatMoved: (ownedTeamId != null && squad?.teamId == ownedTeamId)
+                ? (memberId, positionCode, col, row) =>
+                    _moveSeat(ownedTeamId, memberId, positionCode, col, row)
+                : null,
             onSeatTap: (_) => _notReady('선수 넣기'),
           )
         : const _MemberPlaceholder();
