@@ -145,7 +145,91 @@ class CardStyle {
   final double photoY;
 
   final CardMode mode;
+
+  /// 서버로 보낼 모양(`PATCH /me/card` 의 `style`).
+  ///
+  /// 🔴 **전체 값을 보낸다** — 계약이 부분 병합을 안 한다(일부만 보내면
+  /// 나머지를 지우는 대신 **거부한다**). 화면이 늘 전체 값을 들고 있다가
+  /// 저장하므로 병합할 이유가 없다.
+  ///
+  /// 🔴 **모르는 칸은 원본에서 실어 나른다** — 서버가 칸을 늘렸는데 앱이
+  /// 아직 안 읽는 값이면, 저장 한 번에 그 값이 사라진다.
+  Map<String, dynamic> toWire() => {
+        ...raw,
+        'bg': _hex(bg),
+        'logo': _hex(logo),
+        'text_color': _hex(textColor),
+        'text_x': textX,
+        'text_y': textY,
+        'brush': brush,
+        'brush_color': _hex(brushColor),
+        'brush_scale': brushScale,
+        'brush_x': brushX,
+        'brush_y': brushY,
+        'photo_scale': photoScale,
+        'photo_x': photoX,
+        'photo_y': photoY,
+        'mode': mode == CardMode.full ? 'full' : 'cutout',
+      };
+
+  CardStyle copyWith({
+    Color? bg,
+    Color? logo,
+    Color? textColor,
+    double? textX,
+    double? textY,
+    int? brush,
+    Color? brushColor,
+    double? brushScale,
+    double? brushX,
+    double? brushY,
+    double? photoScale,
+    double? photoX,
+    double? photoY,
+    CardMode? mode,
+  }) =>
+      CardStyle(
+        raw: raw,
+        bg: bg ?? this.bg,
+        logo: logo ?? this.logo,
+        textColor: textColor ?? this.textColor,
+        textX: textX ?? this.textX,
+        textY: textY ?? this.textY,
+        brush: brush ?? this.brush,
+        brushColor: brushColor ?? this.brushColor,
+        brushScale: brushScale ?? this.brushScale,
+        brushX: brushX ?? this.brushX,
+        brushY: brushY ?? this.brushY,
+        photoScale: photoScale ?? this.photoScale,
+        photoX: photoX ?? this.photoX,
+        photoY: photoY ?? this.photoY,
+        mode: mode ?? this.mode,
+      );
 }
+
+String _hex(Color c) {
+  final v = ((c.a * 255).round() << 24) |
+      ((c.r * 255).round() << 16) |
+      ((c.g * 255).round() << 8) |
+      (c.b * 255).round();
+  return '#${(v & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
+}
+
+/// 아무것도 안 고친 상태 — **지금 카드가 그려지는 모습 그대로**다.
+CardStyle get defaultCardStyle => CardStyle.fromJson(const {});
+
+/// 🔴 **갓 만든 카드에 한 번 저장하는 모습**(웹 `FIRST_CARD_STYLE`).
+/// 붓은 「오려낸 X」(12번) · 검정 · 1.4배 · 좌우 6% · 위아래 35%.
+///
+/// 🔴 `defaultCardStyle` 자체를 이 값으로 바꾸지 **않는다** — 그러면 이미
+/// 카드가 있으면서 한 번도 안 꾸민 사람들의 카드가 **말없이 바뀐다.**
+CardStyle get firstCardStyle => CardStyle.fromJson(const {
+      'brush': 12,
+      'brush_color': '#000000',
+      'brush_scale': 1.4,
+      'brush_x': 6,
+      'brush_y': 35,
+    });
 
 /// `GET /me/card` · `POST /me/card` · `GET /cards/{slug}` 의 응답.
 ///

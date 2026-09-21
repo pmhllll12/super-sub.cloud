@@ -84,14 +84,22 @@ class _SquadBoardState extends State<SquadBoard> {
   static const double _labelH = 14;
   static const double _labelGap = 3;
 
-  /// 지금 집혀 있는 자리(`area`). `null` 이면 아무것도 안 집었다.
-  String? _dragging;
+  /* 🔴 **집은 것은 자리(`area`)가 아니라 등재(`memberId`)다** (2026-09-21).
+     전에는 자리 이름을 들고 있었는데, 끄는 동안 판이 다시 계산되면 **같은
+     자리에 다른 사람이 배정되어** 엉뚱한 카드가 끌렸다 — 사용자가 잡은
+     「골키퍼를 옮기면 포워드가 골키퍼 자리로 간다」가 이것이다. */
+  String? _draggingMemberId;
 
   /// 집은 카드가 손끝을 따라간 거리.
   Offset _dragOffset = Offset.zero;
 
   /// 손끝이 지금 가리키는 칸 — 놓을 자리를 미리 보여 준다.
   ({int col, int row})? _hoverCell;
+
+  /* 🔴 **집고 있는 동안은 판을 다시 계산하지 않는다.** 끄는 중에 서버 응답이
+     오거나 부모가 다시 그리면 자리가 재배치되어 **손에 쥔 카드가 다른 자리로
+     튄다.** 집을 때의 배치를 붙들고, 놓을 때 푼다. */
+  SeatAssignment? _frozenSeats;
 
   @override
   Widget build(BuildContext context) {
@@ -111,11 +119,12 @@ class _SquadBoardState extends State<SquadBoard> {
 
         // 🔴 자리 계산은 순수 함수 한 곳이다 — 판이 스스로 배치를 정하면
         //    웹과 갈린다(`seats_from_squad.dart` 의 세 단계).
-        final seats = seatsFromSquad(
-          widget.squad,
-          _size,
-          mySlug: widget.myCard?.publicSlug,
-        );
+        final seats = _frozenSeats ??
+            seatsFromSquad(
+              widget.squad,
+              _size,
+              mySlug: widget.myCard?.publicSlug,
+            );
 
         final boardSize = Size(w, h);
 
@@ -218,7 +227,9 @@ class _SquadBoardState extends State<SquadBoard> {
     final seat = _seat(slot, cardW, seats);
     if (!_canDrag(slot, seats)) return seat;
 
-    final dragging = _dragging == slot.area;
+    final memberId = seats.memberIds[slot.area];
+    final dragging = _draggingMemberId != null &&
+        _draggingMemberId == memberId;
     return GestureDetector(
       key: Key('squad-drag-${slot.area}'),
       behavior: HitTestBehavior.deferToChild,
@@ -226,13 +237,15 @@ class _SquadBoardState extends State<SquadBoard> {
         // 집혔다는 것을 손끝으로 알린다 — 화면만 바뀌면 놓치기 쉽다.
         HapticFeedback.mediumImpact();
         setState(() {
-          _dragging = slot.area;
+          _draggingMemberId = seats.memberIds[slot.area];
           _dragOffset = Offset.zero;
           _hoverCell = (col: slot.col, row: slot.row);
+          // 이 배치를 놓을 때까지 붙든다(위 `_frozenSeats` 주석).
+          _frozenSeats = seats;
         });
       },
       onLongPressMoveUpdate: (d) {
-        if (_dragging != slot.area) return;
+        if (_draggingMemberId != seats.memberIds[slot.area]) return;
         setState(() {
           _dragOffset = d.offsetFromOrigin;
           _hoverCell = cellAt(
@@ -269,11 +282,12 @@ class _SquadBoardState extends State<SquadBoard> {
       );
 
   void _cancelDrag() {
-    if (_dragging == null) return;
+    if (_draggingMemberId == null) return;
     setState(() {
-      _dragging = null;
+      _draggingMemberId = null;
       _dragOffset = Offset.zero;
       _hoverCell = null;
+      _frozenSeats = null;
     });
   }
 

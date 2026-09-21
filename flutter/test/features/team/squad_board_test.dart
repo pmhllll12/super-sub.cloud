@@ -463,6 +463,67 @@ void main() {
     });
   });
 
+  /* 🔴 **사용자가 실기기에서 잡은 것**(2026-09-21). 위젯 시험이 초록이었는데도
+     났다 — 시험은 **한 번의 콜백**만 봤고, 「끄는 중에 판이 다시 그려지면」을
+     안 봤다. */
+  group('끌던 중 판이 바뀌어도', () {
+    testWidgets('쥔 카드가 다른 사람으로 안 바뀐다', (tester) async {
+      String? movedId;
+      // GK 에 '가', FW 에 '나' 가 앉은 판.
+      final before = _squad([
+        _m(id: 'sm-gk', slug: 's-gk', nickname: '가', pos: 'GK', col: 1, row: 3),
+        _m(id: 'sm-fw', slug: 's-fw', nickname: '나', pos: 'FW', col: 1, row: 0),
+      ]);
+      await _pump(
+        tester,
+        SquadBoard(
+          myCard: _myCard,
+          squad: before,
+          onSeatTap: (_) {},
+          onSeatMoved: (id, _, _, _) => movedId = id,
+        ),
+      );
+
+      // GK 카드를 집는다.
+      final from = tester.getCenter(find.byKey(const ValueKey('squad-seat-gk')));
+      final gesture = await tester.startGesture(from);
+      await tester.pump(const Duration(milliseconds: 600));
+
+      /* 🔴 **끄는 도중에 판이 바뀐다** — 서버 응답이 늦게 오거나 부모가 다시
+         그리는 상황이다. 자리 이름으로 붙들고 있으면 여기서 엉뚱한 카드가
+         끌린다(그게 「골키퍼를 옮기면 포워드가 간다」였다). */
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              height: 700,
+              child: SquadBoard(
+                myCard: _myCard,
+                // 둘의 자리가 뒤바뀐 판이 도착했다.
+                squad: _squad([
+                  _m(id: 'sm-gk', slug: 's-gk', nickname: '가', pos: 'MF', col: 0, row: 1),
+                  _m(id: 'sm-fw', slug: 's-fw', nickname: '나', pos: 'GK', col: 1, row: 3),
+                ]),
+                onSeatTap: (_) {},
+                onSeatMoved: (id, _, _, _) => movedId = id,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final to = tester.getCenter(find.byKey(const ValueKey('squad-seat-df1')));
+      await gesture.moveTo(to);
+      await tester.pump();
+      await gesture.up();
+      await tester.pump();
+
+      // 🔴 집은 것은 **GK 자리**가 아니라 **그 등재**다.
+      expect(movedId, 'sm-gk');
+    });
+  });
+
   testWidgets('빈 자리를 누르면 그 자리를 알려준다', (tester) async {
     SquadSlot? tapped;
     await _pump(

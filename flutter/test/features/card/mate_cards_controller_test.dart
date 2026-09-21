@@ -31,6 +31,14 @@ class _SpyCardRepository implements CardRepository {
   Future<PlayerCard> createMyCard() => throw UnimplementedError();
 
   @override
+  Future<PlayerCard> updateCard({
+    String? tagline,
+    bool clearTagline = false,
+    CardStyle? style,
+  }) =>
+      throw UnimplementedError();
+
+  @override
   Future<PlayerCard?> myCard() => throw UnimplementedError();
 }
 

@@ -21,6 +21,8 @@ import '../../../profile/presentation/widgets/player_card_view.dart';
 import '../../../team/auto_seat.dart';
 import '../../../team/data/models/squad.dart';
 import '../../../team/data/squad_providers.dart';
+import '../../../team/data/squad_repository.dart';
+import '../../../team/optimistic_squad.dart';
 import '../../../team/seats_from_squad.dart';
 import '../../../team/presentation/widgets/squad_board.dart';
 
@@ -320,31 +322,58 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     });
   }
 
+  /* 🔴 **화면이 먼저 보여 주는 판.** `null` 이면 서버 값을 그대로 쓴다.
+     쓰기가 끝나면 서버가 준 **바뀐 스쿼드 전체**로 덮고, 실패하면 `null` 로
+     되돌려 서버 값으로 복귀한다. */
+  Squad? _shownSquad;
+
+  /// 쓰기 하나를 **화면 먼저** 반영하고 서버에 보낸다.
+  ///
+  /// 🔴 `invalidate` 로 다시 읽지 않는다 — 다시 읽는 동안 값이 비면 판이
+  /// 통째로 깜빡인다. 계약이 **바뀐 스쿼드 전체**를 주므로 그것으로 덮는다.
+  Future<void> _write(
+    Squad shown,
+    Future<Squad> Function(SquadRepository repo) call,
+  ) async {
+    setState(() => _shownSquad = shown);
+    try {
+      final next = await call(ref.read(squadRepositoryProvider));
+      if (!mounted) return;
+      setState(() => _shownSquad = next);
+    } on ApiException catch (e) {
+      /* 🔴 **되돌리고 알린다.** 사람이 시킨 일이라 조용히 넘어가면 「옮겼는데
+         안 옮겨졌다」가 된다. 화면만 옮겨 두면 새로고침에 사라져 더 나쁘다. */
+      if (!mounted) return;
+      setState(() => _shownSquad = null);
+      _notReady(e.message);
+    }
+  }
+
   /// 카드를 다른 칸으로 옮긴다 — 서버에 남겨야 새로고침해도 그 자리다.
   Future<void> _moveSeat(
     String teamId,
+    Squad squad,
     String memberId,
     String positionCode,
     int col,
     int row,
-  ) async {
-    try {
-      await ref.read(squadRepositoryProvider).moveSeat(
-            teamId,
-            memberId: memberId,
-            positionCode: positionCode,
-            gridCol: col,
-            gridRow: row,
-          );
-      ref.invalidate(squadProvider(teamId));
-    } on ApiException catch (e) {
-      /* 🔴 **실패하면 알린다.** 자동 착석과 다르다 — 이건 사람이 **시킨 일**이라,
-         조용히 넘어가면 「옮겼는데 안 옮겨졌다」가 된다. 판은 서버 값으로 다시
-         그려지므로 카드는 저절로 제자리로 돌아간다. */
-      if (!mounted) return;
-      _notReady(e.message);
-    }
-  }
+  ) =>
+      _write(
+        squadWithSeatMoved(
+          squad,
+          memberId: memberId,
+          positionCode: positionCode,
+          gridCol: col,
+          gridRow: row,
+        ),
+        (repo) => repo.moveSeat(
+          teamId,
+          memberId: memberId,
+          positionCode: positionCode,
+          gridCol: col,
+          gridRow: row,
+        ),
+      );
 
   /// 그 사람을 판에서 빼고 **팀에서도 내보낸다**.
   ///
@@ -354,19 +383,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   /// 그렇게 12명이 쌓여 추천 목록이 말랐다.
   Future<void> _removeSeat(
     String teamId,
+    Squad squad,
     String memberId,
     String? cardSlug,
     String? mySlug,
   ) async {
     final repo = ref.read(squadRepositoryProvider);
-    try {
-      await repo.removeSeat(teamId, memberId: memberId);
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      _notReady(e.message);
-      return;
-    }
-    ref.invalidate(squadProvider(teamId));
+    await _write(
+      squadWithSeatRemoved(squad, memberId: memberId),
+      (r) => r.removeSeat(teamId, memberId: memberId),
+    );
 
     // 여기서부터는 **덤**이다 — 판에서는 이미 빠졌으므로 실패해도 안 알린다.
     if (cardSlug == null || cardSlug == mySlug) return;
@@ -435,9 +461,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final cardSeed = card?.publicSlug;
     // 주장인 팀이 우선, 없으면 속한 첫 팀. 팀이 없으면 판을 안 부른다.
     final teamId = user?.primaryTeamId;
-    final squad = teamId == null
+    /* 🔴 **낙관적 판이 서버 값을 이긴다** (2026-09-21, 사용자가 실기기에서
+       잡은 것). 옮긴 뒤 서버 왕복 300ms 동안 옛 자리로 되돌아가 **「제자리로
+       갔다가 옮겨진다」**가 됐고, 다시 읽는 사이 값이 비면 **카드가 사라져**
+       보였다. 이제 화면이 그 자리에서 바뀌고, 서버 응답이 오면 덮는다. */
+    final serverSquad = teamId == null
         ? null
         : ref.watch(squadProvider(teamId)).value;
+    final squad = _shownSquad ?? serverSquad;
     _wantMateCards(squad, cardSeed);
     _autoSeatOnce(squad, card?.id, cardSeed, user?.ownedTeamId);
 
@@ -631,12 +662,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                끌린 뒤 되돌아가는 것보다 못 집게 하는 편이 낫다. 판이 그 팀의
                것이 아닐 때도 마찬가지다. */
             onSeatMoved: (ownedTeamId != null && squad?.teamId == ownedTeamId)
-                ? (memberId, positionCode, col, row) =>
-                    _moveSeat(ownedTeamId, memberId, positionCode, col, row)
+                ? (memberId, positionCode, col, row) => _moveSeat(
+                      ownedTeamId,
+                      squad!,
+                      memberId,
+                      positionCode,
+                      col,
+                      row,
+                    )
                 : null,
             onSeatRemoved: (ownedTeamId != null && squad?.teamId == ownedTeamId)
                 ? (memberId, slug) =>
-                    _removeSeat(ownedTeamId, memberId, slug, card?.publicSlug)
+                    _removeSeat(
+                      ownedTeamId,
+                      squad!,
+                      memberId,
+                      slug,
+                      card?.publicSlug,
+                    )
                 : null,
             onSeatTap: (_) => _notReady('선수 넣기'),
           )

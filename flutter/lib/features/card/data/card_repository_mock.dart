@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import '../../../core/mock/mock_db.dart';
+import '../../../core/network/api_client.dart';
 import 'card_repository.dart';
 import 'models/player_card.dart';
 
@@ -58,6 +59,39 @@ class MockCardRepository implements CardRepository {
       if (c.publicSlug == slug) return c;
     }
     return null;
+  }
+
+  @override
+  Future<PlayerCard> updateCard({
+    String? tagline,
+    bool clearTagline = false,
+    CardStyle? style,
+  }) async {
+    await Future<void>.delayed(_delay);
+    final card = _mine;
+    if (card == null) {
+      throw const ApiException('카드가 없습니다',
+          code: 'CARD_NOT_FOUND', status: 404);
+    }
+    /* 🔴 **20자까지다** — 넘으면 서버가 422 다. Mock 이 받아 주면 그 화면을
+       안 만들게 되고, 진짜 서버에서 처음으로 막힌다. */
+    if (tagline != null && tagline.length > 20) {
+      throw const ApiException('한 줄은 20자까지입니다',
+          code: 'VALIDATION_ERROR', status: 422);
+    }
+    final next = PlayerCard(
+      id: card.id,
+      userId: card.userId,
+      publicSlug: card.publicSlug,
+      nickname: card.nickname,
+      // 보낸 것만 바뀐다.
+      tagline: clearTagline ? null : (tagline ?? card.tagline),
+      style: style ?? card.style,
+      photoUrl: card.photoUrl,
+      titles: card.titles,
+    );
+    _db.cards[_db.cards.indexOf(card)] = next;
+    return next;
   }
 
   PlayerCard? get _mine {

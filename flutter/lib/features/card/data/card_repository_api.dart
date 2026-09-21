@@ -24,6 +24,22 @@ class ApiCardRepository implements CardRepository {
         () => _api.get('/cards/${Uri.encodeComponent(slug)}', authorized: false),
       );
 
+  @override
+  Future<PlayerCard> updateCard({
+    String? tagline,
+    bool clearTagline = false,
+    CardStyle? style,
+  }) async {
+    /* 🔴 **보낸 것만 바뀐다**(계약: `model_fields_set` 로 본다). 그래서
+       「안 보냄」과 「null 을 보냄」이 **다른 뜻**이다 — 후자는 「지워라」다.
+       [clearTagline] 이 그 둘을 가른다. */
+    final body = <String, dynamic>{
+      if (clearTagline) 'tagline': null else 'tagline': ?tagline,
+      'style': ?style?.toWire(),
+    };
+    return PlayerCard.fromJson(await _api.patch('/me/card', body));
+  }
+
   /// 🔴 **404 만** `null` 로 바꾼다.
   ///
   /// 401·500 까지 삼키면 「로그인이 풀렸다」와 「카드가 없다」가 같아 보여,

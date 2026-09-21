@@ -171,9 +171,12 @@ class _CardBlock extends ConsumerWidget {
 
   /// 🔴 카드는 **요청할 때** 생긴다(계약 `POST /me/card`) — 가입만으로는
   /// 안 생기고, 조회가 만들지도 않는다.
+  ///
+  /// 🔴 **첫 모습까지 저장한다** — 안 하면 앱에서 만든 카드가 웹에서 만든
+  /// 것과 다르게 보인다(`createCardWithFirstLook`).
   Future<void> _createCard(BuildContext context, WidgetRef ref) async {
     try {
-      await ref.read(cardRepositoryProvider).createMyCard();
+      await createCardWithFirstLook(ref.read(cardRepositoryProvider));
       ref.invalidate(myCardProvider);
     } catch (e) {
       if (context.mounted) _notReady(context, '$e');
