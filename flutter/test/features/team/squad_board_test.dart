@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_sub/features/profile/presentation/widgets/player_card_view.dart';
+import 'package:super_sub/features/card/data/models/player_card.dart';
 import 'package:super_sub/features/team/data/models/squad.dart';
 import 'package:super_sub/features/team/presentation/widgets/squad_board.dart';
 import 'package:super_sub/features/team/seats_from_squad.dart';
@@ -52,13 +53,15 @@ Finder _blankSeats() => find.byWidgetPredicate(
           (w.key! as ValueKey<String>).value.startsWith('squad-add-'),
     );
 
+/// 시험용 내 카드 — 슬러그가 곧 씨앗이자 「어느 등재가 나인지」의 열쇠다.
+const _myCard = PlayerCard(publicSlug: 'mine', nickname: '나');
+
 void main() {
   testWidgets('서버 스쿼드의 사람이 판에 뜬다', (tester) async {
     await _pump(
       tester,
       SquadBoard(
-        cardSeed: 'mine',
-        mySlug: 'mine',
+        myCard: _myCard,
         squad: _squad([_m(nickname: '김철수', col: 0, row: 1)]),
         onSeatTap: (_) {},
       ),
@@ -73,8 +76,7 @@ void main() {
     await _pump(
       tester,
       SquadBoard(
-        cardSeed: 'mine',
-        mySlug: 'mine',
+        myCard: _myCard,
         squad: _squad(const [], formation: '3:3'),
         onSeatTap: (_) {},
       ),
@@ -88,8 +90,7 @@ void main() {
     await _pump(
       tester,
       SquadBoard(
-        cardSeed: 'mine',
-        mySlug: 'mine',
+        myCard: _myCard,
         squad: _squad(const [], formation: null),
         onSeatTap: (_) {},
       ),
@@ -104,8 +105,7 @@ void main() {
     await _pump(
       tester,
       SquadBoard(
-        cardSeed: 'mine',
-        mySlug: 'mine',
+        myCard: _myCard,
         squad: _squad(const [], formation: '5:5'),
         onSeatTap: (_) {},
       ),
@@ -121,8 +121,7 @@ void main() {
     await _pump(
       tester,
       SquadBoard(
-        cardSeed: 'mine',
-        mySlug: 'mine',
+        myCard: _myCard,
         squad: _squad(const []),
         onSeatTap: (_) {},
       ),
@@ -136,8 +135,7 @@ void main() {
     await _pump(
       tester,
       SquadBoard(
-        cardSeed: 'mine',
-        mySlug: 'mine',
+        myCard: _myCard,
         squad: _squad([_m(slug: 'mine', nickname: '나', pos: 'DF', col: 1, row: 2)]),
         onSeatTap: (_) {},
       ),
@@ -148,14 +146,13 @@ void main() {
     expect(find.text('나'), findsNothing);
   });
 
-  /// 🔴 카드가 없으면(cardSeed == null) 내 자리도 그릴 것이 없다 — 터지지
+  /// 🔴 카드가 없으면(myCard == null) 내 자리도 그릴 것이 없다 — 터지지
   /// 않아야 한다.
   testWidgets('카드가 없어도 터지지 않는다', (tester) async {
     await _pump(
       tester,
       SquadBoard(
-        cardSeed: null,
-        mySlug: null,
+        myCard: null,
         squad: _squad([_m(nickname: '김철수', col: 0, row: 1)]),
         onSeatTap: (_) {},
       ),
@@ -170,8 +167,7 @@ void main() {
       await _pump(
         tester,
         SquadBoard(
-          cardSeed: 'mine',
-          mySlug: 'mine',
+          myCard: _myCard,
           squad: _squad([_m(slug: 's1', nickname: '김철수', col: 0, row: 1)]),
           mateCardBuilder: (slug, width) =>
               PlayerCardView(width: width, seed: slug),
@@ -188,8 +184,7 @@ void main() {
       await _pump(
         tester,
         SquadBoard(
-          cardSeed: 'mine',
-          mySlug: 'mine',
+          myCard: _myCard,
           squad: _squad([_m(slug: 's1', nickname: '김철수', col: 0, row: 1)]),
           mateCardBuilder: (slug, width) => null,
           onSeatTap: (_) {},
@@ -204,8 +199,7 @@ void main() {
       await _pump(
         tester,
         SquadBoard(
-          cardSeed: 'mine',
-          mySlug: 'mine',
+          myCard: _myCard,
           squad: _squad([_m(slug: null, nickname: '김철수', col: 0, row: 1)]),
           mateCardBuilder: (slug, width) {
             called += 1;
@@ -223,8 +217,7 @@ void main() {
       await _pump(
         tester,
         SquadBoard(
-          cardSeed: 'mine',
-          mySlug: 'mine',
+          myCard: _myCard,
           squad: _squad([
             _m(nickname: '대기', col: 0, row: 1, accepted: false),
           ]),
@@ -270,8 +263,7 @@ void main() {
       await _pump(
         tester,
         SquadBoard(
-          cardSeed: 'mine',
-          mySlug: 'mine',
+          myCard: _myCard,
           squad: _squad([_m(id: 'sm-9', nickname: '김철수', pos: 'GK', col: 1, row: 3)]),
           onSeatTap: (_) {},
           onSeatMoved: (id, pos, col, row) {
@@ -297,8 +289,7 @@ void main() {
       await _pump(
         tester,
         SquadBoard(
-          cardSeed: 'mine',
-          mySlug: 'mine',
+          myCard: _myCard,
           squad: _squad([_m(id: 'sm-9', nickname: '김철수', pos: 'GK', col: 1, row: 3)]),
           onSeatTap: (_) {},
         ),
@@ -311,8 +302,7 @@ void main() {
       await _pump(
         tester,
         SquadBoard(
-          cardSeed: 'mine',
-          mySlug: 'mine',
+          myCard: _myCard,
           squad: _squad(const []),
           onSeatTap: (_) {},
           onSeatMoved: (_, _, _, _) {},
@@ -329,8 +319,7 @@ void main() {
       await _pump(
         tester,
         SquadBoard(
-          cardSeed: 'mine',
-          mySlug: 'mine',
+          myCard: _myCard,
           squad: _squad([
             _m(id: 'sm-1', slug: 's1', nickname: '가', pos: 'GK', col: 1, row: 3),
             _m(id: 'sm-2', slug: 's2', nickname: '나', pos: 'FW', col: 1, row: 0),
@@ -350,8 +339,7 @@ void main() {
       await _pump(
         tester,
         SquadBoard(
-          cardSeed: 'mine',
-          mySlug: 'mine',
+          myCard: _myCard,
           squad: _squad([_m(id: 'sm-9', nickname: '김철수', pos: 'GK', col: 1, row: 3)]),
           onSeatTap: (_) {},
           onSeatMoved: (_, _, _, _) => called += 1,
@@ -368,8 +356,7 @@ void main() {
       await _pump(
         tester,
         SquadBoard(
-          cardSeed: 'mine',
-          mySlug: 'mine',
+          myCard: _myCard,
           squad: _squad([
             _m(id: 'sm-me', slug: 'mine', nickname: '나', pos: 'GK', col: 1, row: 3),
           ]),
@@ -391,8 +378,7 @@ void main() {
       await _pump(
         tester,
         SquadBoard(
-          cardSeed: 'mine',
-          mySlug: 'mine',
+          myCard: _myCard,
           squad: _squad([
             _m(id: 'sm-9', slug: 's1', nickname: '김철수', col: 0, row: 1),
           ]),
@@ -418,8 +404,7 @@ void main() {
       await _pump(
         tester,
         SquadBoard(
-          cardSeed: 'mine',
-          mySlug: 'mine',
+          myCard: _myCard,
           squad: _squad([
             _m(id: 'sm-me', slug: 'mine', nickname: '나', pos: 'GK', col: 1, row: 3),
           ]),
@@ -436,8 +421,7 @@ void main() {
       await _pump(
         tester,
         SquadBoard(
-          cardSeed: 'mine',
-          mySlug: 'mine',
+          myCard: _myCard,
           squad: _squad([_m(id: 'sm-9', nickname: '김철수', col: 0, row: 1)]),
           onSeatTap: (_) {},
         ),
@@ -450,8 +434,7 @@ void main() {
       await _pump(
         tester,
         SquadBoard(
-          cardSeed: 'mine',
-          mySlug: 'mine',
+          myCard: _myCard,
           squad: _squad(const []),
           onSeatTap: (_) {},
           onSeatRemoved: (_, _) {},
@@ -467,8 +450,7 @@ void main() {
       await _pump(
         tester,
         SquadBoard(
-          cardSeed: 'mine',
-          mySlug: 'mine',
+          myCard: _myCard,
           squad: _squad([_m(id: 'sm-9', nickname: '김철수', col: 0, row: 1)]),
           onSeatTap: (_) {},
           onSeatRemoved: (_, _) {},
@@ -486,8 +468,7 @@ void main() {
     await _pump(
       tester,
       SquadBoard(
-        cardSeed: 'mine',
-        mySlug: 'mine',
+        myCard: _myCard,
         squad: _squad(const []),
         onSeatTap: (s) => tapped = s,
       ),

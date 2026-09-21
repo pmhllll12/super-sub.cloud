@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../card/data/models/player_card.dart';
 import '../../../intro/presentation/brand_mark.dart';
 import 'player_card_brush.dart';
 
@@ -26,15 +27,16 @@ const double _kBaseH = _kBaseW * 4.1 / 3;
 ///
 /// 🔴 **수치를 그리지 않는다**(부록 D.5) — 점수 · 등급 · 진행률을 여기 넣지 않는다.
 ///
-/// ⚠️ 아직 옮기지 않은 것: 카드 꾸미기(`card.style` — 색 · 자국 그림 · 사진
-/// 자리)와 서버 카드(`GET /me/card`) 연결. 둘 다 붙으면 [alias] · [seed] 를
-/// 서버 값으로 넘기면 된다.
+/// [style] 을 주면 꾸민 모습으로 그린다(색 · 별명 자리 · 자국 · 사진).
+/// `null` 이면 **한 번도 안 꾸민 카드**의 기본 모습이다.
 class PlayerCardView extends StatelessWidget {
   const PlayerCardView({
     super.key,
     required this.width,
     required this.seed,
     this.alias = kDefaultCardAlias,
+    this.style,
+    this.photoUrl,
   });
 
   /// 화면에 그려질 폭. 높이는 비율로 정해진다.
@@ -46,6 +48,16 @@ class PlayerCardView extends StatelessWidget {
 
   final String alias;
 
+  /// 꾸미기. `null` 이면 한 번도 안 꾸민 카드다.
+  final CardStyle? style;
+
+  /// 🔴 **그릴 사진 주소** — `style.photo_key` 가 아니라 응답의 `photo_url`
+  /// 이다(사전 서명이고 만료가 있다).
+  final String? photoUrl;
+
+  Color get _bg => style?.bg ?? kCardBg;
+  Color get _fg => style?.textColor ?? kCardFg;
+
   @override
   Widget build(BuildContext context) => _ScaledCard(width: width, child: _card());
 
@@ -53,36 +65,18 @@ class PlayerCardView extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
       child: ColoredBox(
-        color: kCardBg,
+        color: _bg,
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // 인물 뒤 검은 붓자국.
-            CustomPaint(
-              painter: PlayerCardBrushPainter(seed: seed, color: kCardFg),
-            ),
-            // 누끼 인물 — 카드 **아래 절반만**(웹 `.ss-pcard-figure`: 좌우 16%
-            // 안쪽, 위는 세로 가운데). 아래로 넘치는 만큼은 카드가 자른다.
-            Positioned(
-              left: _kBaseW * 0.16,
-              right: _kBaseW * 0.16,
-              top: _kBaseH / 2,
-              bottom: 0,
-              child: const ColorFiltered(
-                colorFilter: _kGrayscaleContrast,
-                child: Image(
-                  image: AssetImage('assets/images/player_cutout.png'),
-                  fit: BoxFit.cover,
-                  alignment: Alignment.topCenter,
-                ),
-              ),
-            ),
+            _mark(),
+            _figure(),
             // 글자는 인물보다 위다 — 별명이 어깨와 겹치면 글자가 이긴다.
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 18),
               child: Column(
                 children: [
-                  const BrandMark(fontSize: 22, color: kCardFg),
+                  BrandMark(fontSize: 22, color: style?.logo ?? kCardFg),
                   const SizedBox(height: 12),
                   Text(
                     'PLAYER CARD',
@@ -91,20 +85,144 @@ class PlayerCardView extends StatelessWidget {
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 11 * 0.14,
-                      color: kCardFg.withValues(alpha: 0.7),
+                      color: _fg.withValues(alpha: 0.7),
                     ),
                   ),
-                  const SizedBox(height: 52),
-                  if (alias.isNotEmpty) _Alias(alias),
+                  // 🔴 꾸미지 않은 카드만 흐름 배치다 — 꾸민 카드의 별명은
+                  //    아래 _alias() 가 절대 좌표로 놓는다.
+                  if (style == null) ...[
+                    const SizedBox(height: 52),
+                    if (alias.isNotEmpty) _Alias(alias, color: _fg),
+                  ],
                 ],
               ),
             ),
+            if (style != null && alias.isNotEmpty) _alias(),
           ],
         ),
       ),
     );
   }
+
+  /// 인물 뒤 자국 — 절차적 붓자국(0) · 없음(1) · 그림(2~18).
+  Widget _mark() {
+    final s = style;
+    if (s == null) {
+      // 안 꾸민 카드는 절차적 붓자국을 **그대로, 아무 변형 없이** 그린다.
+      return CustomPaint(
+        painter: PlayerCardBrushPainter(seed: seed, color: kCardFg),
+      );
+    }
+    /* 🔴 **사진이 카드를 덮는데 기본 자국이 얹히면 더럽다** — full 이고
+       고르지 않은 자국(0)이면 아무것도 안 그린다. 사람이 **고른** 자국은
+       full 에서도 그린다(웹과 같은 규칙). */
+    if (s.mode == CardMode.full && s.brush == 0) return const SizedBox.shrink();
+
+    final Widget? drawn = switch (s.brush) {
+      0 => CustomPaint(
+          painter: PlayerCardBrushPainter(seed: seed, color: s.brushColor),
+        ),
+      _ => switch (markAssetFor(s.brush)) {
+          final String asset => Image.asset(
+              asset,
+              // 🔴 **PNG 는 그림이 아니라 알파 마스크다**(8-bit gray+alpha).
+              //    반드시 brush_color 로 칠한다.
+              color: s.brushColor,
+              colorBlendMode: BlendMode.srcIn,
+              // 🔴 안 자르고 안 늘인다 — 가운데 맞춤.
+              fit: BoxFit.contain,
+            ),
+          _ => null,
+        },
+    };
+    if (drawn == null) return const SizedBox.shrink();
+
+    /* 🔴 **translate → scale 이고 원점은 가운데다.** translate 의 %는 카드
+       크기 기준이며 **배율에 곱해지지 않는다** — 순서를 뒤집으면 자국이
+       엉뚱한 데로 간다. */
+    return Transform.translate(
+      offset: Offset(_kBaseW * s.brushX / 100, _kBaseH * s.brushY / 100),
+      child: Transform.scale(scale: s.brushScale, child: drawn),
+    );
+  }
+
+  /// 사진 또는 기본 인물.
+  Widget _figure() {
+    final s = style;
+    final photo = photoUrl;
+    final image = photo == null
+        ? const AssetImage(_kDefaultFigure) as ImageProvider
+        : NetworkImage(photo);
+    final full = s?.mode == CardMode.full;
+
+    /* **사진 없음 + cutout** — 칸이 좌우로 25%씩 넘어가고(폭 150%), 위는 38%,
+       그림은 자르지 않고(`contain`) 카드 바닥에 앉는다. 넘친 팔 끝은 카드가
+       자른다. 사진이 있으면 좌우 16% 안쪽 · 위 50% · `cover` 다. */
+    final bare = photo == null && !full;
+    final left = bare ? -_kBaseW * 0.25 : _kBaseW * 0.16;
+    final right = left;
+    final top = full
+        ? 0.0
+        : bare
+            ? _kBaseH * 0.38
+            : _kBaseH / 2;
+
+    return Positioned(
+      left: left,
+      right: right,
+      top: top,
+      bottom: 0,
+      child: ClipRect(
+        child: ColorFiltered(
+          colorFilter: _kGrayscaleContrast,
+          /* 🔴 **변환은 칸이 아니라 그림에만 건다.** 칸에 걸면 잘리는 범위까지
+             움직여 카드 밖으로 넘친다. 원점은 **아래 가운데**다. */
+          child: Transform.translate(
+            offset: Offset(
+              (s?.photoX ?? 0) / 100 * (_kBaseW - left * 2),
+              (s?.photoY ?? 0) / 100 * (_kBaseH - top),
+            ),
+            child: Transform.scale(
+              scale: s?.photoScale ?? 1,
+              alignment: Alignment.bottomCenter,
+              child: Image(
+                image: image,
+                fit: bare ? BoxFit.contain : BoxFit.cover,
+                alignment:
+                    bare ? Alignment.bottomCenter : Alignment.topCenter,
+                // 사진이 안 오면 카드가 깨지지 않게 조용히 비운다.
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 꾸민 카드의 별명 — **자기 중심**이 (`text_x`, `text_y`) 에 온다.
+  Widget _alias() {
+    final s = style!;
+    return Positioned(
+      left: _kBaseW * s.textX / 100,
+      top: _kBaseH * s.textY / 100,
+      child: FractionalTranslation(
+        translation: const Offset(-0.5, -0.5),
+        child: ConstrainedBox(
+          // 웹 `max-width: 86%`.
+          constraints: const BoxConstraints(maxWidth: _kBaseW * 0.86),
+          child: _Alias(alias, color: s.textColor),
+        ),
+      ),
+    );
+  }
 }
+
+/// 사진을 안 올린 카드에 그리는 기본 인물.
+///
+/// 🔴 **웹이 2026-09-18 에 바꾼 그림이다**(얼굴 가운데 · 양팔 · 워터마크 없음).
+/// 옛 `player_cutout.png` 를 그대로 두면 **카드 얼굴이 웹과 다르다.**
+const String _kDefaultFigure = 'assets/images/player_default.webp';
 
 /// 웹 `filter: grayscale(1) contrast(1.06)`.
 const ColorFilter _kGrayscaleContrast = ColorFilter.matrix(<double>[
@@ -118,9 +236,10 @@ const ColorFilter _kGrayscaleContrast = ColorFilter.matrix(<double>[
 /// (`-webkit-text-stroke: 1.5px` + `paint-order: stroke fill`) — Young Serif 는
 /// 굵기가 하나뿐이라 가짜 굵게 대신 이렇게 무게를 얹는다.
 class _Alias extends StatelessWidget {
-  const _Alias(this.text);
+  const _Alias(this.text, {this.color = kCardFg});
 
   final String text;
+  final Color color;
 
   // 웹 `clamp(1.75rem, 15cqw, 3.25rem)` — 안쪽 폭 344 의 15% = 51.6.
   static const double _size = (_kBaseW - 36) * 0.15;
@@ -146,10 +265,10 @@ class _Alias extends StatelessWidget {
               ..style = PaintingStyle.stroke
               ..strokeWidth = 1.5
               ..strokeJoin = StrokeJoin.round
-              ..color = kCardFg,
+              ..color = color,
           ),
         ),
-        Text(text, textAlign: TextAlign.center, style: _style(color: kCardFg)),
+        Text(text, textAlign: TextAlign.center, style: _style(color: color)),
       ],
     );
   }

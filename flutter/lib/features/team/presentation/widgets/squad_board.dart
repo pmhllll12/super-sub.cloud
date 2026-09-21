@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../card/data/models/player_card.dart';
 import '../../../profile/presentation/widgets/player_card_view.dart';
 import '../../board_geometry.dart';
 import '../../data/models/squad.dart';
@@ -21,25 +22,22 @@ const Color _kInk = Color(0xFF0B0B0B);
 class SquadBoard extends StatefulWidget {
   const SquadBoard({
     super.key,
-    required this.cardSeed,
+    required this.myCard,
     required this.onSeatTap,
     this.squad,
-    this.mySlug,
     this.mateCardBuilder,
     this.onSeatMoved,
     this.onSeatRemoved,
   });
 
-  /// 내 카드 붓자국의 씨앗 — 🔴 **카드의 `public_slug`** 여야 웹과 같은 무늬가
-  /// 나온다. 카드가 아직 없으면 `null` 이고, 그러면 판에 내 카드를 안 그린다.
-  final String? cardSeed;
+  /// 내 카드. 🔴 **씨앗·슬러그·꾸미기가 전부 여기서 나온다** — 따로 받으면
+  /// 한 곳만 넘기고 나머지를 빠뜨리게 된다(실제로 꾸미기가 그렇게 빠졌다).
+  /// 아직 안 만들었으면 `null` 이고, 그러면 판에 내 카드를 안 그린다.
+  final PlayerCard? myCard;
 
   /// 서버 스쿼드. `null` 이면 아직 안 만들었거나 안 불러온 것이다 — 둘 다
   /// 「자리가 전부 비어 있다」로 그린다.
   final Squad? squad;
-
-  /// 내 카드의 공개 슬러그 — **어느 등재가 나인지** 가리는 열쇠다.
-  final String? mySlug;
 
   /// 그 슬러그의 남의 카드를 그려 준다. 아직 안 왔으면 `null` 을 돌려주고,
   /// 그때 판은 **이름표로 물러난다**(판 전체를 로딩으로 덮지 않는다).
@@ -113,7 +111,11 @@ class _SquadBoardState extends State<SquadBoard> {
 
         // 🔴 자리 계산은 순수 함수 한 곳이다 — 판이 스스로 배치를 정하면
         //    웹과 갈린다(`seats_from_squad.dart` 의 세 단계).
-        final seats = seatsFromSquad(widget.squad, _size, mySlug: widget.mySlug);
+        final seats = seatsFromSquad(
+          widget.squad,
+          _size,
+          mySlug: widget.myCard?.publicSlug,
+        );
 
         final boardSize = Size(w, h);
 
@@ -306,8 +308,15 @@ class _SquadBoardState extends State<SquadBoard> {
   /// 자리는 셋으로 갈린다 — **내 카드 · 남의 카드 · 빈 자리.**
   Widget _seat(SquadSlot slot, double cardW, SeatAssignment seats) {
     final Widget card;
-    if (slot.mine && widget.cardSeed != null) {
-      card = PlayerCardView(width: cardW, seed: widget.cardSeed!);
+    if (slot.mine && widget.myCard != null) {
+      final mine = widget.myCard!;
+      card = PlayerCardView(
+        width: cardW,
+        seed: mine.publicSlug,
+        alias: aliasOf(mine),
+        style: mine.style,
+        photoUrl: mine.photoUrl,
+      );
     } else if (seats.mates.containsKey(slot.area)) {
       final slug = seats.slugs[slot.area];
       final mate =

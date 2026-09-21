@@ -1,5 +1,7 @@
+import 'dart:ui' show Color;
+
 import '../../../profile/presentation/widgets/player_card_view.dart'
-    show kDefaultCardAlias;
+    show kCardBg, kCardFg, kDefaultCardAlias;
 
 /// 카드에 붙은 호칭.
 ///
@@ -32,14 +34,117 @@ class CardTitle {
 ///
 /// 🔴 **그럼에도 지금 필요하다**: 별명 규칙이 「`style` 이 있는가」로 갈린다
 /// ([aliasOf]). 2단계까지 미루면 그동안 지운 글자가 되살아난다.
+/// 사진을 어떻게 앉히는가.
+enum CardMode {
+  /// 사람만 오려낸 그림 — 자르지 않고 카드 바닥에 앉힌다.
+  cutout,
+
+  /// 사진이 카드를 덮는다.
+  full,
+}
+
+/// `#rrggbb` → [Color]. 🔴 **모양이 틀리면 [fallback] 으로 물러난다** —
+/// 여기서 던지면 서버가 이상한 값 하나를 준 것으로 **판 전체가 안 뜬다.**
+Color colorOrDefault(Object? value, Color fallback) {
+  if (value is! String) return fallback;
+  final hex = value.startsWith('#') ? value.substring(1) : value;
+  if (hex.length != 6) return fallback;
+  final n = int.tryParse(hex, radix: 16);
+  return n == null ? fallback : Color(0xFF000000 | n);
+}
+
+/// 🔴 **자국 번호는 영구 계약이다.** 0 은 절차적 붓자국, 1 은 「없음」,
+/// 2~18 은 `assets/marks/01~17.png` — **파일 번호 = `brush` − 1** 이다.
+///
+/// 🔴 **목록에서 항목을 빼면 그 뒤 번호가 당겨져 남의 카드가 말없이 다른
+/// 그림이 된다.** 거둘 때는 자리를 남기고 고르는 칸에서만 숨긴다(웹 `HIDDEN_MARKS`).
+///
+/// 저장된 값이 목록보다 클 수 있으므로 범위 밖은 `null` 이다 — 아무것도 안 그린다.
+String? markAssetFor(int brush) {
+  final n = brush - 1;
+  if (n < 1 || n > 17) return null;
+  return 'assets/marks/${n.toString().padLeft(2, '0')}.png';
+}
+
 class CardStyle {
-  const CardStyle(this.raw);
+  const CardStyle({
+    required this.raw,
+    required this.bg,
+    required this.logo,
+    required this.textColor,
+    required this.textX,
+    required this.textY,
+    required this.brush,
+    required this.brushColor,
+    required this.brushScale,
+    required this.brushX,
+    required this.brushY,
+    required this.photoScale,
+    required this.photoX,
+    required this.photoY,
+    required this.mode,
+  });
 
-  factory CardStyle.fromJson(Map<String, dynamic> json) => CardStyle(json);
+  factory CardStyle.fromJson(Map<String, dynamic> json) {
+    // 🔴 `num` 이라는 이름을 쓰지 않는다 — Dart 코어 타입과 겹쳐 아래
+    //    `v is num` 이 이 함수를 가리키게 된다.
+    double dbl(String key, double fallback) {
+      final v = json[key];
+      return v is num ? v.toDouble() : fallback;
+    }
 
-  /// 🔴 **통째로 들고 있는다.** 필드를 하나씩 풀어 두면 2단계에서 모르는 필드가
-  /// 조용히 버려진다 — 서버가 칸을 늘려도 앱은 그대로 실어 나를 수 있어야 한다.
+    final textColor = colorOrDefault(json['text_color'], kCardFg);
+    return CardStyle(
+      raw: json,
+      bg: colorOrDefault(json['bg'], kCardBg),
+      // 🔴 안 주면 text_color 를 따른다 — 한 값이 여러 곳을 움직인다.
+      logo: colorOrDefault(json['logo'], textColor),
+      textColor: textColor,
+      textX: dbl('text_x', 50),
+      textY: dbl('text_y', 34),
+      brush: json['brush'] is int ? json['brush'] as int : 0,
+      brushColor: colorOrDefault(json['brush_color'], textColor),
+      brushScale: dbl('brush_scale', 1),
+      brushX: dbl('brush_x', 0),
+      brushY: dbl('brush_y', 0),
+      photoScale: dbl('photo_scale', 1),
+      photoX: dbl('photo_x', 0),
+      photoY: dbl('photo_y', 0),
+      mode: json['mode'] == 'full' ? CardMode.full : CardMode.cutout,
+    );
+  }
+
+  /// 🔴 **원본도 들고 있는다** — 서버가 칸을 늘려도 앱이 그대로 실어 나를 수
+  /// 있어야 한다(편집기가 생기면 안 읽은 칸까지 되돌려 보내야 한다).
   final Map<String, dynamic> raw;
+
+  final Color bg;
+
+  /// 위 워드마크 색 **하나만** 정한다.
+  final Color logo;
+
+  /// 🔴 **별명 + 획 + 머리글(70%) + (logo 없을 때)워드마크 + 기본 붓자국**을
+  /// 한꺼번에 정한다. 자리마다 따로 칠하면 반드시 빠지는 곳이 생긴다.
+  final Color textColor;
+
+  /// 별명의 **중심** 좌표 — 카드 폭 380 · 높이 519.33 대비 %.
+  final double textX;
+  final double textY;
+
+  final int brush;
+  final Color brushColor;
+
+  /// 🔴 자국 변환은 **translate → scale**, 원점 center.
+  final double brushScale;
+  final double brushX;
+  final double brushY;
+
+  /// 🔴 사진 변환도 translate → scale 이지만 원점이 **center bottom** 이다.
+  final double photoScale;
+  final double photoX;
+  final double photoY;
+
+  final CardMode mode;
 }
 
 /// `GET /me/card` · `POST /me/card` · `GET /cards/{slug}` 의 응답.

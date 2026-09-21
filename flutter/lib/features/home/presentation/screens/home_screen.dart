@@ -15,6 +15,7 @@ import '../../../../core/widgets/glass_panel.dart';
 import '../../../auth/presentation/session_controller.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../card/data/card_providers.dart';
+import '../../../card/data/models/player_card.dart';
 import '../../../card/presentation/mate_cards_controller.dart';
 import '../../../profile/presentation/widgets/player_card_view.dart';
 import '../../../team/auto_seat.dart';
@@ -407,7 +408,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget? _mateCard(String slug, double width) {
     final card = ref.watch(mateCardsProvider)[slug];
     if (card == null) return null;
-    return PlayerCardView(width: width, seed: card.publicSlug);
+    // 🔴 팀원 카드도 꾸민 대로 그린다 — 웹에서 꾸민 카드가 앱에서 기본
+    //    모습으로 나오면 같은 카드로 안 보인다.
+    return PlayerCardView(
+      width: width,
+      seed: card.publicSlug,
+      alias: aliasOf(card),
+      style: card.style,
+      photoUrl: card.photoUrl,
+    );
   }
 
   void _notReady([String? what]) {
@@ -465,7 +474,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
           ),
           _videoPanel(context),
-          _squadSheet(context, cardSeed, squad, user?.ownedTeamId),
+          _squadSheet(context, card, squad, user?.ownedTeamId),
         ],
       ),
     );
@@ -597,7 +606,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Widget _squadSheet(
     BuildContext context,
-    String? cardSeed,
+    PlayerCard? card,
     Squad? squad,
     String? ownedTeamId,
   ) {
@@ -615,9 +624,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
     final board = _role == _Role.captain
         ? SquadBoard(
-            cardSeed: cardSeed,
+            myCard: card,
             squad: squad,
-            mySlug: cardSeed,
             mateCardBuilder: _mateCard,
             /* 🔴 **주장이 아니면 `null` 이다 — 아예 못 집는다.** 옮겨도 403 이라
                끌린 뒤 되돌아가는 것보다 못 집게 하는 편이 낫다. 판이 그 팀의
@@ -628,7 +636,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 : null,
             onSeatRemoved: (ownedTeamId != null && squad?.teamId == ownedTeamId)
                 ? (memberId, slug) =>
-                    _removeSeat(ownedTeamId, memberId, slug, cardSeed)
+                    _removeSeat(ownedTeamId, memberId, slug, card?.publicSlug)
                 : null,
             onSeatTap: (_) => _notReady('선수 넣기'),
           )
@@ -753,7 +761,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       child: Transform.translate(
                         offset: Offset((profileW + 24) * (1 - fadeOut), 0),
                         child: _ProfileButton(
-                          seed: cardSeed,
+                          card: card,
                           onTap: _openProfile,
                         ),
                       ),
@@ -1344,11 +1352,11 @@ class _VideoFlatCopy extends StatelessWidget {
 /// 오른쪽 위 「내 프로필」 단추 — 작은 선수 카드 + 글자. 웹 헤더 오른쪽의
 /// 짜임(`SiteHeader` 의 카드 + 「내 프로필」)과 같다.
 class _ProfileButton extends StatelessWidget {
-  const _ProfileButton({required this.seed, required this.onTap});
+  const _ProfileButton({required this.card, required this.onTap});
 
-  /// 카드의 공개 슬러그. 🔴 **`null` 이면 아직 카드를 안 만든 것**이라 빈
-  /// 카드를 그린다(웹도 헤더·프로필 모두 빈 카드로 둔다).
-  final String? seed;
+  /// 🔴 **`null` 이면 아직 카드를 안 만든 것**이라 빈 카드를 그린다
+  /// (웹도 헤더·프로필 모두 빈 카드로 둔다).
+  final PlayerCard? card;
   final VoidCallback onTap;
 
   @override
@@ -1368,10 +1376,16 @@ class _ProfileButton extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (seed == null)
+                if (card == null)
                   const BlankPlayerCardView(width: _kProfileCardWidth)
                 else
-                  PlayerCardView(width: _kProfileCardWidth, seed: seed!),
+                  PlayerCardView(
+                    width: _kProfileCardWidth,
+                    seed: card!.publicSlug,
+                    alias: aliasOf(card!),
+                    style: card!.style,
+                    photoUrl: card!.photoUrl,
+                  ),
                 const SizedBox(height: 4),
                 const Text(
                   '내 프로필',
