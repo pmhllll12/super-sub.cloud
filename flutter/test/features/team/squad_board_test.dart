@@ -463,6 +463,41 @@ void main() {
     });
   });
 
+  /* 🔴🔴 **자리가 없는 칸에는 못 놓는다** (2026-09-21, 실기기 로그로 잡은
+     진짜 원인). 격자는 12칸인데 5:5 의 자리는 다섯뿐이라, (2,0) 같은 칸에
+     놓으면 `seatsFromSquad` 가 그 등재를 못 앉혀 **카드가 사라지거나 엉뚱한
+     자리에 나타난다.** */
+  group('자리가 없는 칸', () {
+    testWidgets('빈 칸(2,0)에 놓으면 아무 일도 안 일어난다', (tester) async {
+      var called = 0;
+      await _pump(
+        tester,
+        SquadBoard(
+          myCard: _myCard,
+          squad: _squad([
+            _m(id: 'sm-9', slug: 's1', nickname: '김철수', pos: 'GK', col: 1, row: 3),
+          ]),
+          onSeatTap: (_) {},
+          onSeatMoved: (_, _, _, _) => called += 1,
+        ),
+      );
+
+      // GK 카드를 집어 (2,0) — 5:5 에 자리가 없는 칸 — 으로 끈다.
+      final from = tester.getCenter(find.byKey(const ValueKey('squad-seat-gk')));
+      // mf2(2,1) 자리의 x, fw1(1,0) 자리의 y → (2,0) 칸.
+      final x = tester.getCenter(find.byKey(const ValueKey('squad-seat-mf2'))).dx;
+      final y = tester.getCenter(find.byKey(const ValueKey('squad-seat-fw1'))).dy;
+      final g = await tester.startGesture(from);
+      await tester.pump(const Duration(milliseconds: 600));
+      await g.moveTo(Offset(x, y));
+      await tester.pump();
+      await g.up();
+      await tester.pump();
+
+      expect(called, isZero, reason: '자리가 없는 칸인데 옮겨졌다');
+    });
+  });
+
   /* 🔴 **사용자가 실기기에서 잡은 것**(2026-09-21). 위젯 시험이 초록이었는데도
      났다 — 시험은 **한 번의 콜백**만 봤고, 「끄는 중에 판이 다시 그려지면」을
      안 봤다. */

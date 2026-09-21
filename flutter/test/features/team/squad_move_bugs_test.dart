@@ -139,4 +139,38 @@ void main() {
       expect([a.col, a.row], [2, 1]);
     });
   });
+
+  /* 🔴🔴 **진짜 원인**(2026-09-21, 실기기 로그로 잡았다).
+     격자는 3열×4행(12칸)인데 **포메이션 자리는 다섯뿐**이다. 자리가 없는
+     칸(예: 5:5 의 (2,0))에 놓을 수 있게 해 둬서:
+     - 내 등재가 그 칸에 가면 0단계가 자리를 못 찾아 **판에서 사라진다**
+     - 남의 등재가 그 칸에 가면 1단계의 「남는 자리 아무 데나」로 떨어져
+       **엉뚱한 자리에 나타난다**
+     그래서 **놓을 수 있는 곳은 「칸」이 아니라 「자리」여야 한다.** */
+  group('자리가 없는 칸', () {
+    test('내 등재가 자리 없는 칸에 있으면 판에서 사라진다 — 이래서 막아야 한다', () {
+      final broken = _squad([
+        // (2,0) 은 5:5 에 자리가 없는 칸이다.
+        _m(id: 'sm-me', slug: 'mine', nickname: '나', pos: 'FW', col: 2, row: 0),
+      ]);
+
+      final seats = seatsFromSquad(broken, SquadSize.five, mySlug: 'mine');
+
+      // 🔴 지금 동작을 **있는 그대로** 적어 둔다 — 화면이 이 상태를 만들지
+      //    않게 막는 것이 고치는 방향이다(자리 위에만 놓기).
+      expect(seats.slots.any((s) => s.mine), isFalse);
+    });
+
+    test('남의 등재가 자리 없는 칸에 있으면 엉뚱한 자리로 떨어진다', () {
+      final broken = _squad([
+        _m(id: 'sm-a', slug: 's-a', nickname: '가', pos: 'GK', col: 2, row: 0),
+      ]);
+
+      final seats = seatsFromSquad(broken, SquadSize.five, mySlug: 'mine');
+
+      final seat = seats.slots.singleWhere((s) => seats.mates[s.area] == '가');
+      // 놓은 칸이 그대로 쓰이지만, 그 칸에는 원래 자리가 없었다.
+      expect([seat.col, seat.row], [2, 0]);
+    });
+  });
 }

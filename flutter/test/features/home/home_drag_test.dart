@@ -59,13 +59,19 @@ Future<void> _openSheet(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 700));
 }
 
+/// 🔴 **실제 손가락처럼 끈다.** 앞선 판이 「자리 위젯의 중심」을 한 번에
+/// 옮겼는데, 그 자리에는 카드 **아래 이름표까지** 들어 있어 실제로 누르는
+/// 지점과 달랐다. 그리고 손가락은 **여러 번 나눠** 움직인다.
 Future<void> _drag(WidgetTester tester, String from, String to) async {
   final a = tester.getCenter(find.byKey(ValueKey('squad-seat-$from')));
   final b = tester.getCenter(find.byKey(ValueKey('squad-seat-$to')));
   final g = await tester.startGesture(a);
   await tester.pump(const Duration(milliseconds: 600));
-  await g.moveTo(b);
-  await tester.pump();
+  // 열 번에 나눠 옮긴다 — 실제 끌기와 같게.
+  for (var i = 1; i <= 10; i += 1) {
+    await g.moveTo(Offset.lerp(a, b, i / 10)!);
+    await tester.pump(const Duration(milliseconds: 16));
+  }
   await g.up();
   // 낙관적 갱신 + 서버 왕복(300ms).
   for (var i = 0; i < 3; i += 1) {
