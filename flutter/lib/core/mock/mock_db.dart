@@ -131,7 +131,11 @@ class MockDb {
       id: 'pc-$managerId',
       publicSlug: 'lee-gamdok-7f21',
       nickname: '이감독',
-      tagline: 'THREE LUNGS',
+      /* 🔴 **기본 별명과 다른 글자를 준다 (2026-09-21).** 전에는 여기도
+         'THREE LUNGS' 였는데, 내 카드는 tagline·style 이 없어 **기본 별명**이
+         그 글자라 판에서 두 카드가 똑같아 보였다 — 어느 것이 내 카드인지
+         목업으로 확인할 수가 없었다. */
+      tagline: 'IRON GLOVES',
     ));
 
     // 🔴 **t-bears 에는 스쿼드를 안 둔다** — 「아직 안 만든 팀」 갈래를 반드시
