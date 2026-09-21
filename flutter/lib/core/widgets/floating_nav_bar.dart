@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../design_scale.dart';
+import 'silver_edge.dart';
 import '../theme/app_theme.dart';
 import '../../features/intro/presentation/brand_mark.dart';
 
@@ -12,7 +13,11 @@ import '../../features/intro/presentation/brand_mark.dart';
 ///
 /// 🔴 홈 바탕이 완전한 검정이라 바까지 검정이면 바가 안 보인다. 홈의
 /// `_kSheetColor`(스쿼드 판 · 영상 분석 판)와 **같은 값**이다 — 넷이 한 켜다.
-const Color kNavBarColor = Color(0xFF1C1C1E);
+/// 하단 바·로고 알약의 면 — **반투명**이라 뒤의 빛무리가 비친다(2026-09-21).
+///
+/// 🔴 유리(흐림·굴절)가 아니라 **색 + 실버 테두리**다(`SilverEdge`) — 바 안에
+/// 아이콘·메뉴가 들어가서 유리로 만들면 「유리 안에 유리」가 된다.
+const Color kNavBarColor = Color(0x661C1C1E);
 
 /// 바가 차지하는 높이(디자인 px). 시안 실측값이다.
 const double kBottomBarHeight = 155;
@@ -292,11 +297,13 @@ class _LogoButton extends StatelessWidget {
               ),
             ),
           );
-          // 알약도 바와 같은 **검정**이다(유리였다). 바에서 파낸 홈 안에 따로
-          // 선 조각이라 제 면을 따로 칠한다.
-          return ClipRRect(
-            borderRadius: BorderRadius.circular(radius),
-            child: ColoredBox(color: kNavBarColor, child: logo),
+          /* 알약도 바와 같은 면이다. 바에서 파낸 홈 안에 따로 선 조각이라
+             제 면을 따로 칠한다. 🔴 **실버 테두리**로 경계를 낸다(2026-09-21) —
+             면이 반투명이라 테두리가 없으면 바와 알약이 한 덩어리로 읽힌다. */
+          return SilverEdge(
+            radius: radius,
+            fill: kNavBarColor,
+            child: logo,
           );
         },
       ),

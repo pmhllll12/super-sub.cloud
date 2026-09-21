@@ -9,9 +9,11 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/aurora_background.dart';
 import '../../../../core/widgets/bar_menu.dart';
 import '../../../../core/widgets/floating_nav_bar.dart';
 import '../../../../core/widgets/glass_panel.dart';
+import '../../../../core/widgets/silver_edge.dart';
 import '../../../auth/presentation/session_controller.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../card/data/card_providers.dart';
@@ -26,13 +28,16 @@ import '../../../team/optimistic_squad.dart';
 import '../../../team/seats_from_squad.dart';
 import '../../../team/presentation/widgets/squad_board.dart';
 
-/// 홈의 바탕 — **완전한 검정**(2026-09-16 사용자 요청. 하루 동안 흰색이었다).
-/// 사진은 안 깐다(`assets/images/home_silhouette.jpg` 는 지금 안 쓴다).
+/// 홈의 바탕 — 검정에 아주 옅은 초록을 섞었다.
 ///
-/// 🔴 판(`_kSheetColor`)·하단 바(`kNavBarColor`)는 이 바탕보다 **한 단 밝은**
-/// 진회색이다 — 바탕과 판을 밝기로만 가른다. 둘을 같은 검정으로 되돌리면
-/// 판의 경계가 사라진다.
-const Color _kHomeBg = Color(0xFF000000);
+/// 🔴 **2026-09-21 에 빛무리를 깔았다**(`AuroraBackground`). 전에는 완전한
+/// 검정이었는데(2026-09-16 사용자 요청), 그 위에 민트빛이 번지게 했다. 완전한
+/// 검정에 빛을 얹으면 글로우 **가장자리가 띠로 드러나서**(밴딩) 원이 보인다 —
+/// 바탕에 같은 계열의 아주 옅은 색이 섞여 있어야 자연스럽게 잦아든다.
+///
+/// ⚠️ **판·하단 바를 밝기로 가르던 것은 2026-09-21 에 끝났다** — 이제 둘 다
+/// 거의 투명하고 **은빛 테두리**로 갈린다(`SilverEdge`).
+const Color _kHomeBg = Color(0xFF07100B);
 
 /// 검은 바탕 위의 글자.
 const Color _kOnDark = Color(0xFFFFFFFF);
@@ -53,10 +58,18 @@ const double _kCollapsedBoardShrink = 0.82;
 /// 판 아래 손잡이 줄의 높이. 판을 끌어내리는 자리라는 표식이다.
 const double _kSheetHandleH = 28;
 
-/// 스쿼드 판 · 영상 분석 판의 면 색 — **진회색**(2026-09-16 사용자 지정).
-/// 검은 바탕(`_kHomeBg`)보다 한 단 밝아서 판이 층으로 읽힌다.
-/// 하단 바 · 로고 알약(`kNavBarColor`)과 **같은 값이어야 한다** — 넷이 한 켜다.
-const Color _kSheetColor = Color(0xFF1C1C1E);
+/// 스쿼드 판 · 영상 분석 판의 면 — **거의 투명하다**(2026-09-21).
+///
+/// 🔴 **면 색을 뺐다**(사용자 요청 「판 자체의 검정 색을 없애면 안 돼?」).
+/// 판 둘이 화면의 95%를 덮어서, 면이 조금만 불투명해도 뒤의 빛무리
+/// (`AuroraBackground`)가 통째로 가려졌다. 이제 **경계는 은빛 테두리**
+/// (`SilverEdge`)가 맡고, 면은 글자가 읽힐 만큼만 깐다.
+///
+/// 🔴 **흐림(blur)은 안 쓴다.** 판을 유리로 만들면 판 **안에 든 알약**
+/// (팀장·팀원·AI)과 겹쳐 「유리 안에 유리」가 되고, 그러면 알약이 **프레임째
+/// 사라진다**(`flutter/CLAUDE.md`). 같은 문서가 적어 둔 방법이 「층을 쌓아야
+/// 하면 흐림 없이 색만 얹는다」이고, 여기에 테두리를 더한 것이다.
+const Color _kSheetColor = Color(0x2E1C1C1E);
 
 /// 판 아래 모서리. 음악 앱의 앨범 판처럼 아래만 둥글다.
 const double _kSheetRadius = 28;
@@ -305,7 +318,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       try {
-        await ref.read(squadRepositoryProvider).enlist(
+        await ref
+            .read(squadRepositoryProvider)
+            .enlist(
               ownedTeamId,
               playerCardId: myCardId,
               positionCode: choice.positionCode,
@@ -363,23 +378,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     String positionCode,
     int col,
     int row,
-  ) =>
-      _write(
-        squadWithSeatMoved(
-          squad,
-          memberId: memberId,
-          positionCode: positionCode,
-          gridCol: col,
-          gridRow: row,
-        ),
-        (repo) => repo.moveSeat(
-          teamId,
-          memberId: memberId,
-          positionCode: positionCode,
-          gridCol: col,
-          gridRow: row,
-        ),
-      );
+  ) => _write(
+    squadWithSeatMoved(
+      squad,
+      memberId: memberId,
+      positionCode: positionCode,
+      gridCol: col,
+      gridRow: row,
+    ),
+    (repo) => repo.moveSeat(
+      teamId,
+      memberId: memberId,
+      positionCode: positionCode,
+      gridCol: col,
+      gridRow: row,
+    ),
+  );
 
   /// 그 사람을 판에서 빼고 **팀에서도 내보낸다**.
   ///
@@ -478,41 +492,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     _wantMateCards(squad, cardSeed);
     _autoSeatOnce(squad, card?.id, cardSeed, user?.ownedTeamId);
 
-    return Scaffold(
-      backgroundColor: _kHomeBg,
-      // 바는 SafeArea 밖에 떠 있다 — 안에 넣으면 홈 인디케이터 위에서 잘린다.
-      // 메뉴는 바 바로 위에 선다. 닫혀 있어도 자리를 잡아 두어 열릴 때
-      // 바가 밀리지 않는다.
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          BarMenu(
-            open: _menu,
-            loggedIn: session is SessionLoggedIn,
-            step: FloatingNavBar.iconStep(context),
-            onPick: _onMenuPick,
-          ),
-          FloatingNavBar(currentIndex: 0, onTap: _onNavTap),
-        ],
-      ),
-      extendBody: true,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // 판을 펼칠수록 뒤가 조금 눌린다 — 시선이 판으로 모인다.
-          Positioned.fill(
-            child: IgnorePointer(
-              child: AnimatedBuilder(
-                animation: _sheet,
-                builder: (context, _) => ColoredBox(
-                  color: Colors.black.withValues(alpha: 0.18 * _sheetT),
+    // 🔴 **Scaffold 를 감싼다** — 하단 바·메뉴 뒤까지 같은 빛이 이어져야 한다.
+    return AuroraBackground(
+      base: _kHomeBg,
+      child: Scaffold(
+        /* 🔴 **바탕은 투명으로 두고 빛무리가 칠한다**(`AuroraBackground`).
+         Scaffold 가 색을 칠하면 그 위에 빛무리를 깔아도 **판·바 뒤로는 안
+         비친다** — 층을 하나로 만들어야 화면 전체가 같은 빛을 받는다. */
+        backgroundColor: Colors.transparent,
+        // 바는 SafeArea 밖에 떠 있다 — 안에 넣으면 홈 인디케이터 위에서 잘린다.
+        // 메뉴는 바 바로 위에 선다. 닫혀 있어도 자리를 잡아 두어 열릴 때
+        // 바가 밀리지 않는다.
+        bottomNavigationBar: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            BarMenu(
+              open: _menu,
+              loggedIn: session is SessionLoggedIn,
+              step: FloatingNavBar.iconStep(context),
+              onPick: _onMenuPick,
+            ),
+            FloatingNavBar(currentIndex: 0, onTap: _onNavTap),
+          ],
+        ),
+        extendBody: true,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            // 판을 펼칠수록 뒤가 조금 눌린다 — 시선이 판으로 모인다.
+            Positioned.fill(
+              child: IgnorePointer(
+                child: AnimatedBuilder(
+                  animation: _sheet,
+                  builder: (context, _) => ColoredBox(
+                    color: Colors.black.withValues(alpha: 0.18 * _sheetT),
+                  ),
                 ),
               ),
             ),
-          ),
-          _videoPanel(context),
-          _squadSheet(context, card, squad, user?.ownedTeamId),
-        ],
+            _videoPanel(context),
+            _squadSheet(context, card, squad, user?.ownedTeamId),
+          ],
+        ),
       ),
     );
   }
@@ -669,23 +690,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                것이 아닐 때도 마찬가지다. */
             onSeatMoved: (ownedTeamId != null && squad?.teamId == ownedTeamId)
                 ? (memberId, positionCode, col, row) => _moveSeat(
-                      ownedTeamId,
-                      squad!,
-                      memberId,
-                      positionCode,
-                      col,
-                      row,
-                    )
+                    ownedTeamId,
+                    squad!,
+                    memberId,
+                    positionCode,
+                    col,
+                    row,
+                  )
                 : null,
             onSeatRemoved: (ownedTeamId != null && squad?.teamId == ownedTeamId)
-                ? (memberId, slug) =>
-                    _removeSeat(
-                      ownedTeamId,
-                      squad!,
-                      memberId,
-                      slug,
-                      card?.publicSlug,
-                    )
+                ? (memberId, slug) => _removeSeat(
+                    ownedTeamId,
+                    squad!,
+                    memberId,
+                    slug,
+                    card?.publicSlug,
+                  )
                 : null,
             onSeatTap: (_) => _notReady('선수 넣기'),
           )
@@ -724,15 +744,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 Positioned.fill(
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      // 🔴 **반투명으로 되돌리지 않는다**(2026-09-15 사용자 요청).
-                      // 흰 바탕 위에서 비치면 판이 뿌옇게 뜬다. 색은 `_kSheetColor`.
+                      /* 🔴 **반투명으로 되돌렸다**(2026-09-21, 사용자 요청).
+                         2026-09-15 에 「반투명으로 되돌리지 않는다」고 적어
+                         두었는데 그때는 **흰 바탕**이라 판이 뿌옇게 떴다.
+                         지금은 어두운 바탕에 빛무리가 깔려서, 판이 비쳐야
+                         그 빛이 보인다(`AuroraBackground`). */
                       color: _kSheetColor,
                       borderRadius: BorderRadius.vertical(
                         bottom: Radius.circular(radius),
                       ),
+                      /* 🔴 아래 테두리를 **은빛**으로 — 하단 바·알약과 같은
+                         결이다. 면 색을 뺀 뒤로는 **이 선이 판의 유일한
+                         경계**라 한 단 또렷하게 둔다. */
                       border: Border(
                         bottom: BorderSide(
-                          color: _kOnDark.withValues(alpha: 0.14),
+                          color: SilverEdge.silver.withValues(alpha: 0.42),
                         ),
                       ),
                       // 판 아래로 옅은 그림자 — 판이 홈 위에 떠 있는 층으로 읽힌다.
@@ -809,10 +835,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       opacity: fadeOut,
                       child: Transform.translate(
                         offset: Offset((profileW + 24) * (1 - fadeOut), 0),
-                        child: _ProfileButton(
-                          card: card,
-                          onTap: _openProfile,
-                        ),
+                        child: _ProfileButton(card: card, onTap: _openProfile),
                       ),
                     ),
                   ),
@@ -1022,31 +1045,28 @@ class _RolePill extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
+      /* 🔴 **유리에서 실버 테두리로 바꿨다**(2026-09-21, 사용자 제안). 알약이
+         유리 판 **안에** 들어가면 「유리 안에 유리」가 되어 프레임째 사라진다.
+         가는 은빛 선 하나로 경계를 내면 그 문제가 없고, 뒤의 빛무리도 비친다. */
       child: SizedBox(
         height: 38,
-        child: GlassPanel(
+        child: SilverEdge(
           radius: 19,
+          strong: selected,
           child: Material(
             type: MaterialType.transparency,
             child: InkWell(
+              borderRadius: BorderRadius.circular(19),
               onTap: onTap,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(19),
-                  border: selected
-                      ? Border.all(color: _kOnDark, width: 1.5)
-                      : null,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                  child: Center(
-                    widthFactor: 1,
-                    child: Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: selected ? AppTheme.seed : _kOnDark,
-                      ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: Center(
+                  widthFactor: 1,
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: selected ? AppTheme.seed : _kOnDark,
                     ),
                   ),
                 ),
@@ -1219,69 +1239,82 @@ class _VideoAnalysisPanelState extends State<_VideoAnalysisPanel> {
     // 🔴 **가운데로 나눈다**(2026-09-15 사용자 요청) — 위 절반은 아이콘 · 글,
     // 아래 절반에만 영상. 영상 위에 글을 얹으면 움직이는 화면 위라 글이 흔들려
     // 읽혔다. 판이 납작해지는 동안 영상 칸은 아래 절반 그대로 같이 줄어든다.
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: Material(
-        color: _kSheetColor,
-        child: InkWell(
-          key: const Key('home-video-analysis'),
-          onTap: widget.onTap,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Column(
-                children: [
-                  // 위 절반 — 아이콘 · 「영상 분석」 · 설명. 걷힐 때 살짝 위로 뜬다.
-                  Expanded(
-                    child: IgnorePointer(
-                      child: Opacity(
-                        opacity: bigText,
-                        child: Transform.translate(
-                          offset: Offset(0, -12 * (1 - bigText)),
-                          child: const _VideoPanelCopy(),
+    /* 🔴 **스쿼드 판과 같은 차림**(2026-09-21, 사용자 요청 「영상분석 쪽 판도
+       같이」) — 면 색은 거의 없고 **은빛 테두리**가 경계를 낸다. 면을 깔면
+       뒤의 빛무리가 여기서 끊겨 화면 아래쪽만 검게 죽는다. */
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(
+          color: SilverEdge.silver.withValues(alpha: 0.28),
+          width: 1,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: Material(
+          // 반투명이라 뒤의 빛무리가 비친다(위 `_kSheetColor` 주석).
+          color: _kSheetColor,
+          child: InkWell(
+            key: const Key('home-video-analysis'),
+            onTap: widget.onTap,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Column(
+                  children: [
+                    // 위 절반 — 아이콘 · 「영상 분석」 · 설명. 걷힐 때 살짝 위로 뜬다.
+                    Expanded(
+                      child: IgnorePointer(
+                        child: Opacity(
+                          opacity: bigText,
+                          child: Transform.translate(
+                            offset: Offset(0, -12 * (1 - bigText)),
+                            child: const _VideoPanelCopy(),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  // 아래 절반 — 영상만. 판 폭을 채우고 넘치는 위아래는 자른다.
-                  Expanded(
-                    child: Opacity(
-                      opacity: videoOpacity,
-                      child: video != null && _ready
-                          // 🔴 판 **끝까지** 채운다(사용자 요청 — 잘려도 된다). `cover`
-                          // 에 3% 더 키워, 기기 디코더가 가장자리를 한 줄씩 비우는
-                          // 경우에도 판 끝에 검은 틈이 안 남게 한다.
-                          ? ClipRect(
-                              child: Transform.scale(
-                                scale: 1.03,
-                                child: SizedBox.expand(
-                                  child: FittedBox(
-                                    fit: BoxFit.cover,
-                                    child: SizedBox(
-                                      width: video.value.size.width,
-                                      height: video.value.size.height,
-                                      child: VideoPlayer(video),
+                    // 아래 절반 — 영상만. 판 폭을 채우고 넘치는 위아래는 자른다.
+                    Expanded(
+                      child: Opacity(
+                        opacity: videoOpacity,
+                        child: video != null && _ready
+                            // 🔴 판 **끝까지** 채운다(사용자 요청 — 잘려도 된다). `cover`
+                            // 에 3% 더 키워, 기기 디코더가 가장자리를 한 줄씩 비우는
+                            // 경우에도 판 끝에 검은 틈이 안 남게 한다.
+                            ? ClipRect(
+                                child: Transform.scale(
+                                  scale: 1.03,
+                                  child: SizedBox.expand(
+                                    child: FittedBox(
+                                      fit: BoxFit.cover,
+                                      child: SizedBox(
+                                        width: video.value.size.width,
+                                        height: video.value.size.height,
+                                        child: VideoPlayer(video),
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            )
-                          : const SizedBox.expand(),
+                              )
+                            : const SizedBox.expand(),
+                      ),
+                    ),
+                  ],
+                ),
+                // 띠의 글 — 한 줄. 들어올 때 살짝 아래에서 올라온다.
+                IgnorePointer(
+                  child: Opacity(
+                    opacity: flatText,
+                    child: Transform.translate(
+                      offset: Offset(0, 10 * (1 - flatText)),
+                      child: const _VideoFlatCopy(),
                     ),
                   ),
-                ],
-              ),
-              // 띠의 글 — 한 줄. 들어올 때 살짝 아래에서 올라온다.
-              IgnorePointer(
-                child: Opacity(
-                  opacity: flatText,
-                  child: Transform.translate(
-                    offset: Offset(0, 10 * (1 - flatText)),
-                    child: const _VideoFlatCopy(),
-                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
