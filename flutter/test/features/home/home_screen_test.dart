@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:super_sub/core/mock/mock_db.dart';
 import 'package:super_sub/features/auth/data/auth_providers.dart';
 import 'package:super_sub/features/auth/data/auth_repository_mock.dart';
+import 'package:super_sub/core/dev/data_source.dart';
 import 'package:super_sub/features/auth/presentation/session_controller.dart';
 import 'package:super_sub/features/home/presentation/screens/home_screen.dart';
 import 'package:super_sub/features/profile/presentation/widgets/player_card_view.dart';
@@ -23,6 +24,11 @@ Future<ProviderContainer> _pumpLoggedIn(WidgetTester tester) async {
       authRepositoryProvider.overrideWith(
         (ref) => MockAuthRepository(ref.watch(mockDbProvider)),
       ),
+      /* 🔴 **목업으로 고정한다.** 이걸 빼면 카드·스쿼드 provider 가 API
+         구현체를 잡아 **시험이 실제 네트워크를 부른다** — 느리고, 서버 상태에
+         따라 결과가 흔들린다. 교체 지점이 `useMockProvider` 하나라서 여기만
+         덮으면 둘 다 따라온다. */
+      useMockProvider.overrideWith(() => _AlwaysMock()),
     ],
   );
   addTearDown(container.dispose);
@@ -40,6 +46,13 @@ Future<ProviderContainer> _pumpLoggedIn(WidgetTester tester) async {
     container.read(sessionControllerProvider.notifier).loginAs(MockDb.playerId),
   );
   await tester.pump(const Duration(milliseconds: 500));
+  /* 🔴 **더 흘려보낸다 (2026-09-21).** Mock 의 300ms 지연이 **줄줄이** 걸린다:
+     로그인이 끝나야 `teams` 를 알아 스쿼드를 부르고, 스쿼드가 와야 그 안의
+     팀원 카드를 부른다. 여기서 안 흘려보내면 시험이 「위젯 트리를 버린 뒤에도
+     타이머가 남았다」로 깨진다 — 화면 잘못이 아니라 흘려보내기가 모자란 것이다. */
+  for (var i = 0; i < 3; i += 1) {
+    await tester.pump(const Duration(milliseconds: 500));
+  }
   // **pumpAndSettle을 쓰지 않는다.** 유리 조각의 테두리를 도는 빛이 무한
   // 반복이라 영영 안 멎는다.
   return container;
@@ -63,6 +76,11 @@ Finder _blankSeats() => find.byWidgetPredicate(
       (w) => w.key is ValueKey<String> &&
           (w.key! as ValueKey<String>).value.startsWith('squad-add-'),
     );
+
+class _AlwaysMock extends DataSourceController {
+  @override
+  bool build() => true;
+}
 
 void main() {
   // 2026-09-15 — 홈 짜임을 갈았다: 판 · 영상 분석 · 오른쪽 위 내 프로필.
@@ -129,7 +147,7 @@ void main() {
 
     testWidgets('접혀 있을 때는 판이 안 눌린다', (tester) async {
       await _pumpLoggedIn(tester);
-      await tester.tap(find.byKey(const Key('squad-add-gk')), warnIfMissed: false);
+      await tester.tap(find.byKey(const Key('squad-add-fw1')), warnIfMissed: false);
       await tester.pump();
       expect(find.textContaining('선수 넣기'), findsNothing);
     });
@@ -286,12 +304,19 @@ void main() {
 
        그래서 여기 로그인 대역은 스쿼드가 없는 상태라 카드가 판에 없다.
        실제로 등재가 있을 때의 배치는 `seats_from_squad_test.dart` 가 잡는다. */
-    testWidgets('처음은 5:5 — 등재가 없으면 자리가 전부 비어 있다', (tester) async {
+    testWidgets('처음은 5:5 — 서버 스쿼드의 팀원이 자리에 앉는다', (tester) async {
       await _pumpLoggedIn(tester);
       expect(find.text('MY SQUAD'), findsOneWidget);
-      // 남는 한 장은 오른쪽 위 「내 프로필」 입구다 — 판에는 없다.
-      expect(find.byType(PlayerCardView), findsNWidgets(1));
-      expect(_blankSeats(), findsNWidgets(5));
+      /* 🔴 이 대역(`MockDb.playerId`)은 **자기 카드가 없고**(MockDb 가 일부러
+         안 만든다 — 「카드 없음」 빈 상태를 반드시 만들게 하는 장치) **등재도
+         안 했다.** 그래서 판에 내 카드는 없다.
+
+         대신 같은 팀의 등재 둘이 앉는다: 이감독(GK, 칸이 저장돼 있다)은 카드
+         슬러그가 있어 **카드**로, 박신입(MF, 칸이 없다)은 슬러그가 없어
+         **이름표**로 — 다섯 자리 중 둘이 차고 셋이 빈다. */
+      expect(find.byType(PlayerCardView), findsOneWidget);
+      expect(find.text('박신입'), findsOneWidget);
+      expect(_blankSeats(), findsNWidgets(3));
       for (final pos in const ['FW', 'DF', 'GK']) {
         expect(find.text(pos), findsOneWidget, reason: pos);
       }
@@ -303,18 +328,19 @@ void main() {
       await _openSheet(tester);
       await tester.tap(find.byKey(const Key('squad-size-seven')));
       await tester.pump();
-      // 등재가 없으므로 자리 수 = 빈 자리 수다(위 「기대를 뒤집었다」 참고).
-      expect(_blankSeats(), findsNWidgets(7));
+      // 등재 둘은 크기가 바뀌어도 그대로 앉아 있다 — 빈 자리만 는다.
+      expect(_blankSeats(), findsNWidgets(5));
 
       await tester.tap(find.byKey(const Key('squad-size-three')));
       await tester.pump();
-      expect(_blankSeats(), findsNWidgets(3));
+      expect(_blankSeats(), findsNWidgets(1));
     });
 
     testWidgets('빈 자리를 누르면 준비 중 안내가 뜬다', (tester) async {
       await _pumpLoggedIn(tester);
       await _openSheet(tester);
-      await tester.tap(find.byKey(const Key('squad-add-gk')));
+      // 🔴 GK 는 Mock 시드에서 이감독이 앉아 있다 — 빈 자리를 고른다.
+      await tester.tap(find.byKey(const Key('squad-add-fw1')));
       await tester.pump();
       expect(find.textContaining('선수 넣기'), findsOneWidget);
     });
@@ -362,5 +388,12 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     expect(container.read(sessionControllerProvider), isA<SessionLoggedOut>());
+
+    /* 🔴 로그아웃하면 카드·스쿼드 provider 가 **다시 돈다**(보는 사람이
+       바뀌었으니 당연하다). 그 Mock 지연을 흘려보내지 않으면 시험이
+       「트리를 버린 뒤에도 타이머가 남았다」로 깨진다 — 화면 잘못이 아니다. */
+    for (var i = 0; i < 3; i += 1) {
+      await tester.pump(const Duration(milliseconds: 500));
+    }
   });
 }

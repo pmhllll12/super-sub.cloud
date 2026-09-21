@@ -13,7 +13,11 @@ import '../../../../core/widgets/bar_menu.dart';
 import '../../../../core/widgets/floating_nav_bar.dart';
 import '../../../../core/widgets/glass_panel.dart';
 import '../../../auth/presentation/session_controller.dart';
+import '../../../card/data/card_providers.dart';
+import '../../../card/presentation/mate_cards_controller.dart';
 import '../../../profile/presentation/widgets/player_card_view.dart';
+import '../../../team/data/models/squad.dart';
+import '../../../team/data/squad_providers.dart';
 import '../../../team/presentation/widgets/squad_board.dart';
 
 /// 홈의 바탕 — **완전한 검정**(2026-09-16 사용자 요청. 하루 동안 흰색이었다).
@@ -264,6 +268,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
   }
 
+  /// 판에 앉은 팀원들의 카드를 **보이는 것만** 받아 둔다.
+  ///
+  /// 🔴 **빌드 중에 상태를 바꾸지 않는다** — `want()` 가 provider 상태를 건드려
+  /// 빌드 도중에 부르면 Riverpod 이 던진다. 프레임이 끝난 뒤로 미룬다.
+  void _wantMateCards(Squad? squad, String? mySlug) {
+    if (squad == null) return;
+    final slugs = <String>[];
+    for (final m in squad.members) {
+      final slug = m.cardPublicSlug;
+      // 내 카드는 내가 이미 들고 있다 — 다시 받지 않는다.
+      if (slug == null || slug == mySlug) continue;
+      slugs.add(slug);
+    }
+    if (slugs.isEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(mateCardsProvider.notifier).want(slugs);
+    });
+  }
+
+  /// 그 슬러그의 카드가 **이미 와 있으면** 그린다. 아직이면 `null` —
+  /// 판이 이름표로 물러난다.
+  Widget? _mateCard(String slug, double width) {
+    final card = ref.watch(mateCardsProvider)[slug];
+    if (card == null) return null;
+    return PlayerCardView(width: width, seed: card.publicSlug);
+  }
+
   void _notReady([String? what]) {
     ScaffoldMessenger.of(
       context,
@@ -273,10 +305,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(sessionControllerProvider);
-    // ⚠️ 카드 서버 연결(`GET /me/card`) 전이라 슬러그가 없다 — 그동안은 사용자
-    // id 를 씨앗으로 쓴다. 🔴 그래서 **지금은 웹과 붓자국 무늬가 다르다.**
-    // 연결되면 `public_slug` 로 바꾼다(그래야 웹과 같은 무늬).
-    final cardSeed = session is SessionLoggedIn ? session.user.id : '';
+    final user = session is SessionLoggedIn ? session.user : null;
+    // 🔴 붓자국 씨앗은 **카드의 공개 슬러그**다 — 이래야 웹과 같은 무늬가
+    //    나온다. 카드가 아직 없으면 `null` 이고 판은 빈 자리만 그린다.
+    final card = ref.watch(myCardProvider).value;
+    final cardSeed = card?.publicSlug;
+    // 주장인 팀이 우선, 없으면 속한 첫 팀. 팀이 없으면 판을 안 부른다.
+    final teamId = user?.primaryTeamId;
+    final squad = teamId == null
+        ? null
+        : ref.watch(squadProvider(teamId)).value;
+    _wantMateCards(squad, cardSeed);
 
     return Scaffold(
       backgroundColor: _kHomeBg,
@@ -311,7 +350,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
           ),
           _videoPanel(context),
-          _squadSheet(context, cardSeed),
+          _squadSheet(context, cardSeed, squad),
         ],
       ),
     );
@@ -441,7 +480,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  Widget _squadSheet(BuildContext context, String cardSeed) {
+  Widget _squadSheet(BuildContext context, String? cardSeed, Squad? squad) {
     final geo = _sheetGeometry(context);
     final rowTop = geo.rowTop;
     final openBoardTop = geo.openBoardTop;
@@ -455,7 +494,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final travel = expandedBottom - collapsedBottom;
 
     final board = _role == _Role.captain
-        ? SquadBoard(cardSeed: cardSeed, onSeatTap: (_) => _notReady('선수 넣기'))
+        ? SquadBoard(
+            cardSeed: cardSeed,
+            squad: squad,
+            mySlug: cardSeed,
+            mateCardBuilder: _mateCard,
+            onSeatTap: (_) => _notReady('선수 넣기'),
+          )
         : const _MemberPlaceholder();
 
     return AnimatedBuilder(
@@ -1170,7 +1215,9 @@ class _VideoFlatCopy extends StatelessWidget {
 class _ProfileButton extends StatelessWidget {
   const _ProfileButton({required this.seed, required this.onTap});
 
-  final String seed;
+  /// 카드의 공개 슬러그. 🔴 **`null` 이면 아직 카드를 안 만든 것**이라 빈
+  /// 카드를 그린다(웹도 헤더·프로필 모두 빈 카드로 둔다).
+  final String? seed;
   final VoidCallback onTap;
 
   @override
@@ -1190,7 +1237,10 @@ class _ProfileButton extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                PlayerCardView(width: _kProfileCardWidth, seed: seed),
+                if (seed == null)
+                  const BlankPlayerCardView(width: _kProfileCardWidth)
+                else
+                  PlayerCardView(width: _kProfileCardWidth, seed: seed!),
                 const SizedBox(height: 4),
                 const Text(
                   '내 프로필',
