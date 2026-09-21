@@ -277,12 +277,21 @@ void main() {
   });
 
   group('스쿼드 판', () {
-    testWidgets('처음은 5:5 — 내 카드 하나와 빈 자리 넷', (tester) async {
+    /* 🔴 **기대를 뒤집었다 (2026-09-21) — 왜인지 적어 둔다.**
+       전에는 「내 카드 하나와 빈 자리 넷」이었다. 포메이션의 FW 칸에
+       `mine: true` 가 박혀 있어서 **등재하지 않은 사람도 판에 이미 서
+       있었기** 때문이다. 웹이 2026-09-16 에 그 규칙을 뒤집었고(내 자리는
+       등재했을 때만, 내가 앉힌 칸에) 앱도 따라간다 — 등재가 없으면 판은
+       **전부 빈 자리**이고, 「나는 안 뛴다」가 그렇게 표현된다.
+
+       그래서 여기 로그인 대역은 스쿼드가 없는 상태라 카드가 판에 없다.
+       실제로 등재가 있을 때의 배치는 `seats_from_squad_test.dart` 가 잡는다. */
+    testWidgets('처음은 5:5 — 등재가 없으면 자리가 전부 비어 있다', (tester) async {
       await _pumpLoggedIn(tester);
       expect(find.text('MY SQUAD'), findsOneWidget);
-      // 내 카드는 판의 FW 자리와 오른쪽 위 「내 프로필」 두 곳에 선다.
-      expect(find.byType(PlayerCardView), findsNWidgets(2));
-      expect(_blankSeats(), findsNWidgets(4));
+      // 남는 한 장은 오른쪽 위 「내 프로필」 입구다 — 판에는 없다.
+      expect(find.byType(PlayerCardView), findsNWidgets(1));
+      expect(_blankSeats(), findsNWidgets(5));
       for (final pos in const ['FW', 'DF', 'GK']) {
         expect(find.text(pos), findsOneWidget, reason: pos);
       }
@@ -294,11 +303,12 @@ void main() {
       await _openSheet(tester);
       await tester.tap(find.byKey(const Key('squad-size-seven')));
       await tester.pump();
-      expect(_blankSeats(), findsNWidgets(6));
+      // 등재가 없으므로 자리 수 = 빈 자리 수다(위 「기대를 뒤집었다」 참고).
+      expect(_blankSeats(), findsNWidgets(7));
 
       await tester.tap(find.byKey(const Key('squad-size-three')));
       await tester.pump();
-      expect(_blankSeats(), findsNWidgets(2));
+      expect(_blankSeats(), findsNWidgets(3));
     });
 
     testWidgets('빈 자리를 누르면 준비 중 안내가 뜬다', (tester) async {

@@ -1,64 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../seats_from_squad.dart';
 import '../../../profile/presentation/widgets/player_card_view.dart';
-
-/// 판의 크기 — 3:3 · 5:5 · 7:7.
-enum SquadSize {
-  three('3 : 3'),
-  five('5 : 5'),
-  seven('7 : 7');
-
-  const SquadSize(this.label);
-
-  final String label;
-}
-
-/// 판 위의 자리. [col]·[row] 는 3열 × 4행 격자 칸이고, **행이 포지션**이다
-/// (0 FW · 1 MF · 2 DF · 3 GK — 웹 `lib/pitchGrid.ts` 의 `ROW_POS`).
-class SquadSlot {
-  const SquadSlot(this.area, this.col, this.row, {this.mine = false});
-
-  /// 역할+번호(`fw1` · `mf2` …). 🔴 크기를 바꿔도 같은 이름이 같은 자리를
-  /// 가리켜야 한다 — 웹 `FORMATIONS` 주석과 같은 이유.
-  final String area;
-  final int col;
-  final int row;
-
-  /// 내 카드가 처음 서는 자리.
-  final bool mine;
-
-  String get position => const ['FW', 'MF', 'DF', 'GK'][row];
-}
-
-/// 크기마다의 포메이션 — 웹 `SquadPanel.tsx` 의 `FORMATIONS` 를 그대로 옮겼다.
-/// 위가 공격, 아래가 골키퍼다.
-const Map<SquadSize, List<SquadSlot>> kFormations = {
-  // 1-1-1
-  SquadSize.three: [
-    SquadSlot('fw1', 1, 0, mine: true),
-    SquadSlot('mf1', 1, 1),
-    SquadSlot('gk', 1, 3),
-  ],
-  // 1-2-1 — 풋살 5인.
-  SquadSize.five: [
-    SquadSlot('fw1', 1, 0, mine: true),
-    SquadSlot('mf1', 0, 1),
-    SquadSlot('mf2', 2, 1),
-    SquadSlot('df1', 1, 2),
-    SquadSlot('gk', 1, 3),
-  ],
-  // 2-3-1
-  SquadSize.seven: [
-    SquadSlot('fw1', 1, 0, mine: true),
-    SquadSlot('mf1', 0, 1),
-    SquadSlot('mf2', 1, 1),
-    SquadSlot('mf3', 2, 1),
-    SquadSlot('df1', 0, 2),
-    SquadSlot('df2', 2, 2),
-    SquadSlot('gk', 1, 3),
-  ],
-};
 
 const Color _kOnDark = Color(0xFFFFFFFF);
 const Color _kInk = Color(0xFF0B0B0B);
