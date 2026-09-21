@@ -53,6 +53,46 @@ Offset cellOrigin(
   return Offset(padSide + col * cellW, padTop + row * cellH);
 }
 
+/// 손끝에서 **가장 가까운 자리**. 판 밖이면 `null`.
+///
+/// 🔴 **왜 「가장 가까운」인가** (2026-09-21, 사용자 지적 「아예 못 옮기게
+/// 만들면 어떡해」). 처음엔 「그 칸에 자리가 있을 때만」으로 했는데, 격자는
+/// 12칸이고 자리는 다섯뿐이라 **손끝이 칸 경계를 조금만 벗어나면 안 놓였다** —
+/// 사실상 못 옮긴다. 자리로 **붙여** 주면 대충 끌어도 들어가고, 자리 밖
+/// 좌표가 서버에 저장되는 일도 없다.
+///
+/// [slotCenters] 는 자리마다 (칸 가운데) 좌표다.
+int? nearestSlotIndex(Offset point, List<Offset> slotCenters) {
+  if (slotCenters.isEmpty) return null;
+  var best = 0;
+  var bestD = double.infinity;
+  for (var i = 0; i < slotCenters.length; i += 1) {
+    final d = (slotCenters[i] - point).distanceSquared;
+    if (d < bestD) {
+      bestD = d;
+      best = i;
+    }
+  }
+  return best;
+}
+
+/// 그 칸의 **가운데**(자리에 붙일 때 기준이 되는 점).
+Offset cellCenter(
+  int col,
+  int row,
+  Size size, {
+  required double padTop,
+  required double padSide,
+  required double padBottom,
+}) {
+  final cellW = (size.width - padSide * 2) / kBoardCols;
+  final cellH = (size.height - padTop - padBottom) / kBoardRows;
+  return Offset(
+    padSide + col * cellW + cellW / 2,
+    padTop + row * cellH + cellH / 2,
+  );
+}
+
 /// 그 행이 뜻하는 포지션. 🔴 **자리를 옮기면 포지션도 함께 바뀐다** —
 /// 계약이 `position_code` 를 늘 요구하므로 옮길 때 이 값을 실어 보낸다.
 String positionOfRow(int row) => const ['FW', 'MF', 'DF', 'GK'][row];

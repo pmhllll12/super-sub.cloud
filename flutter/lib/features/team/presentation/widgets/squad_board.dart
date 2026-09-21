@@ -276,15 +276,26 @@ class _SquadBoardState extends State<SquadBoard> {
               );
         setState(() {
           _dragOffset = d.offsetFromOrigin;
-          // 🔴 **그 칸에 자리가 있을 때만** 놓을 수 있다(위 `_hoverSlot` 주석).
-          _hoverSlot = cell == null
-              ? null
-              : seats.slots
-                  .cast<SquadSlot?>()
-                  .firstWhere(
-                    (x) => x!.col == cell.col && x.row == cell.row,
-                    orElse: () => null,
-                  );
+          /* 🔴 **가장 가까운 자리로 붙인다.** 「그 칸에 자리가 있을 때만」으로
+             하면 격자 12칸에 자리가 다섯뿐이라 손끝이 조금만 벗어나도 안
+             놓인다 — 사실상 못 옮긴다(사용자 지적). 판 밖이면 안 놓는다. */
+          if (onBoard == null || cell == null) {
+            _hoverSlot = null;
+          } else {
+            final centers = [
+              for (final x in seats.slots)
+                cellCenter(
+                  x.col,
+                  x.row,
+                  boardSize,
+                  padTop: _padTop,
+                  padSide: _padSide,
+                  padBottom: _padBottom,
+                ),
+            ];
+            final i = nearestSlotIndex(onBoard, centers);
+            _hoverSlot = i == null ? null : seats.slots[i];
+          }
         });
       },
       onLongPressEnd: (_) => _dropAt(slot, seats),

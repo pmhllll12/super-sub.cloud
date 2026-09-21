@@ -463,12 +463,18 @@ void main() {
     });
   });
 
-  /* 🔴🔴 **자리가 없는 칸에는 못 놓는다** (2026-09-21, 실기기 로그로 잡은
-     진짜 원인). 격자는 12칸인데 5:5 의 자리는 다섯뿐이라, (2,0) 같은 칸에
-     놓으면 `seatsFromSquad` 가 그 등재를 못 앉혀 **카드가 사라지거나 엉뚱한
-     자리에 나타난다.** */
+  /* 🔴🔴 **자리가 없는 칸에 놓으면 가장 가까운 자리로 붙는다**
+     (2026-09-21). 격자는 12칸인데 5:5 의 자리는 다섯뿐이다. 자리 밖 좌표를
+     그대로 저장하면 `seatsFromSquad` 가 그 등재를 못 앉혀 **카드가
+     사라지거나 엉뚱한 자리에 나타난다**(실기기 로그로 잡은 원인).
+
+     ⚠️ 처음엔 「그 칸에 자리가 있을 때만」으로 막았는데 **사실상 못 옮기게
+     됐다**(사용자 지적) — 손끝이 칸 경계를 조금만 벗어나면 안 놓였다.
+     그래서 **붙여 주는** 쪽으로 바꿨다. */
   group('자리가 없는 칸', () {
-    testWidgets('빈 칸(2,0)에 놓으면 아무 일도 안 일어난다', (tester) async {
+    testWidgets('자리 밖에 놓아도 가까운 자리로 붙는다', (tester) async {
+      var toCol = -1;
+      var toRow = -1;
       var called = 0;
       await _pump(
         tester,
@@ -478,7 +484,11 @@ void main() {
             _m(id: 'sm-9', slug: 's1', nickname: '김철수', pos: 'GK', col: 1, row: 3),
           ]),
           onSeatTap: (_) {},
-          onSeatMoved: (_, _, _, _) => called += 1,
+          onSeatMoved: (_, _, col, row) {
+            called += 1;
+            toCol = col;
+            toRow = row;
+          },
         ),
       );
 
@@ -494,7 +504,13 @@ void main() {
       await g.up();
       await tester.pump();
 
-      expect(called, isZero, reason: '자리가 없는 칸인데 옮겨졌다');
+      // 🔴 붙어야 한다 — 그리고 **자리가 있는 칸**으로만.
+      expect(called, 1, reason: '자리 밖이라고 아예 안 옮겨졌다');
+      expect(
+        kFormations[SquadSize.five]!.any((s) => s.col == toCol && s.row == toRow),
+        isTrue,
+        reason: '자리가 없는 칸($toCol,$toRow)에 저장됐다',
+      );
     });
   });
 
