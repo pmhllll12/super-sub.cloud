@@ -22,6 +22,22 @@ dependencies = [
     "opencv-python>=4.10",
     "numpy>=1.26",
     "pillow>=10.0",
+    # 🔴 **전처리기를 고르는 것이 이 패키지다** (미결 49번). transformers 는
+    # torchvision 이 있으면 `RTDetrImageProcessor`, 없으면
+    # `RTDetrImageProcessorPil` 을 고르고 **둘이 다른 값을 낸다** — 축구 19편
+    # 중 2편이 등급 문자까지 갈렸다(47번 5회차). 그런데 여태 기본 의존성이
+    # 아니라 `tracking` extra 의 ultralytics 가 딸려 오게 하던 것이라,
+    # **누가 어떤 extra 로 sync 했는가**가 결과를 정하고 있었다. 평가 기계는
+    # 들어와서 torchvision 경로, EC2 는 `--extra aws` 라 Pil 경로였다.
+    #
+    # 기본으로 박아 **선언으로** 정한다. B-1~B-6 평가 자산이 전부 torchvision
+    # 경로에서 났으므로 그쪽으로 통일한다 — 반대로 가면 그 자산을 다 다시
+    # 돌려야 한다. BSD-3 라 `ultralytics`(AGPL)와 달리 서비스에 넣어도 된다.
+    #
+    # 🔴 `torch` 와 달리 cu126 인덱스를 지정하지 않는다 — 평가 자산을 낸
+    # 기계가 **PyPI 휠 0.23.0** 을 쓰고 있고, 여기서 인덱스를 옮기면 그 자산과
+    # 다른 빌드가 된다. 실제 버전은 `uv.lock` 이 고정한다(같은 항목 4회차).
+    "torchvision>=0.21,<0.24",
     # ViTPose 전처리기가 히트맵을 원본 좌표로 되돌릴 때 scipy.ndimage의
     # affine_transform을 쓴다. transformers가 이 임포트를 is_scipy_available()로
     # 감싸 두어, 없으면 임포트는 조용히 넘어가고 실행 시점에 NameError가 난다.

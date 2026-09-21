@@ -19,7 +19,14 @@ agent/models/
 agent/out/
 agent/**/__pycache__/
 agent/.pytest_cache/
-agent/uv.lock
+# 🔴 여기 있던 `agent/uv.lock` 을 뺐다 (2026-09-21, 미결 ho 49번).
+#    위의 것들과 한 덩어리로 들어가 있었는데(에이전트 첫 커밋 1db8cb08),
+#    **성질이 반대다** — 위는 재생성되는 산출물이고 잠금 파일은 재생성을
+#    결정론으로 만드는 **선언**이다. 무시한 탓에 기계마다 따로 굳어
+#    평가 기계는 transformers 5.15.1, EC2 는 5.16.1 로 갈렸고, 그 위에서
+#    **같은 영상이 다른 등급**을 받았다. 이 저장소의 다른 잠금 파일
+#    (Gemfile.lock · fastapi/requirements.lock.txt · flutter/pubspec.lock ·
+#    www/package-lock.json)은 전부 추적된다 — 이것만 예외였다.
 
 # 모델 가중치 — 실행 시 자동 내려받는다. 저장소에 넣지 않는다.
 agent/*.pt

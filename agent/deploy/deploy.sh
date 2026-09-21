@@ -29,7 +29,15 @@ echo "      → $(git rev-parse --short HEAD) $(git log -1 --format=%s)"
 
 echo "[2/4] 의존성 동기화"
 cd "$REPO/agent"
-uv sync --extra aws
+# 🔴 `--locked` 가 핵심이다 (미결 ho 49번). 이게 없으면 uv 가 그 자리에서
+#    **다시 해석**하고, 그래서 EC2 와 평가 기계가 같은 커밋인데도
+#    transformers 5.16.1 / 5.15.1 로 갈려 **같은 영상이 다른 등급**을 받았다.
+#    `--locked` 는 `uv.lock` 과 `pyproject.toml` 이 어긋나면 **멈춘다** —
+#    조용히 다른 버전으로 도는 것보다 배포가 실패하는 편이 낫다.
+#    (어긋났다고 나오면 로컬에서 `uv lock` 하고 커밋한 뒤 다시 배포한다.)
+#
+# 🔴 `--extra aws` 를 빼지 말 것 — boto3 가 빠져 S3 경로가 죽는다.
+uv sync --locked --extra aws
 
 echo "[3/4] vLLM 재시작"
 # 코드를 pull했다고 모델이 바뀌지는 않지만, serve_vllm.sh나 유닛이 바뀌었을 수
