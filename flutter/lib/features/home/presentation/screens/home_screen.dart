@@ -340,6 +340,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       final next = await call(ref.read(squadRepositoryProvider));
       if (!mounted) return;
       setState(() => _shownSquad = next);
+      /* 🔴 **provider 도 새로 읽게 둔다.** 화면은 `_shownSquad` 로 이미
+         맞지만, provider 는 한 번 읽은 값을 들고 있어서 **홈을 떠났다
+         돌아오면 옛 자리**가 보인다. 깜빡임은 없다 — 보여 주는 것은
+         `_shownSquad` 이고 이것은 그대로 남는다. */
+      final teamId = next.teamId;
+      ref.invalidate(squadProvider(teamId));
     } on ApiException catch (e) {
       /* 🔴 **되돌리고 알린다.** 사람이 시킨 일이라 조용히 넘어가면 「옮겼는데
          안 옮겨졌다」가 된다. 화면만 옮겨 두면 새로고침에 사라져 더 나쁘다. */

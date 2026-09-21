@@ -7,6 +7,7 @@ import '../../../auth/data/models/team_membership.dart';
 import '../../../auth/presentation/session_controller.dart';
 import '../../../card/data/card_providers.dart';
 import '../../../card/data/models/player_card.dart';
+import '../../../card/presentation/card_editor_screen.dart';
 import '../widgets/player_card_view.dart';
 import 'nickname_sheet.dart';
 
@@ -154,7 +155,11 @@ class _CardBlock extends ConsumerWidget {
                   key: const Key('profile-card-edit'),
                   onPressed: card == null
                       ? () => _createCard(context, ref)
-                      : () => _notReady(context, '프로필 카드 수정'),
+                      : () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => CardEditorScreen(card: card!),
+                            ),
+                          ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _kOn,
                     side: BorderSide(color: _kOn.withValues(alpha: 0.4)),

@@ -101,6 +101,19 @@ class _SquadBoardState extends State<SquadBoard> {
      튄다.** 집을 때의 배치를 붙들고, 놓을 때 푼다. */
   SeatAssignment? _frozenSeats;
 
+  /* 🔴 **손끝을 판 좌표로 옮기려면 판의 상자가 필요하다** (2026-09-21).
+     전에는 `localPosition`(카드 기준)에 칸의 왼쪽 위를 더해서 썼는데, 카드는
+     칸 안에서 **가운데 정렬**이라 그 둘을 더해도 판 좌표가 아니다. 어긋난
+     좌표로 칸을 찾으니 `null` 이 나와 **놓아도 아무 일이 안 일어났고**,
+     우연히 다른 칸을 가리키면 **엉뚱한 카드가 옮겨졌다.** */
+  final GlobalKey _boardKey = GlobalKey();
+
+  /// 화면 좌표 → 판 좌표. 판이 아직 안 그려졌으면 `null`.
+  Offset? _toBoard(Offset global) {
+    final box = _boardKey.currentContext?.findRenderObject() as RenderBox?;
+    return box?.globalToLocal(global);
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -129,6 +142,7 @@ class _SquadBoardState extends State<SquadBoard> {
         final boardSize = Size(w, h);
 
         return Stack(
+          key: _boardKey,
           children: [
             Positioned.fill(
               child: CustomPaint(painter: _PitchPainter()),
@@ -246,15 +260,18 @@ class _SquadBoardState extends State<SquadBoard> {
       },
       onLongPressMoveUpdate: (d) {
         if (_draggingMemberId != seats.memberIds[slot.area]) return;
+        final onBoard = _toBoard(d.globalPosition);
         setState(() {
           _dragOffset = d.offsetFromOrigin;
-          _hoverCell = cellAt(
-            d.localPosition + _cellCenterOf(slot, boardSize),
-            boardSize,
-            padTop: _padTop,
-            padSide: _padSide,
-            padBottom: _padBottom,
-          );
+          _hoverCell = onBoard == null
+              ? null
+              : cellAt(
+                  onBoard,
+                  boardSize,
+                  padTop: _padTop,
+                  padSide: _padSide,
+                  padBottom: _padBottom,
+                );
         });
       },
       onLongPressEnd: (_) => _dropAt(slot, seats),
@@ -269,17 +286,6 @@ class _SquadBoardState extends State<SquadBoard> {
       ),
     );
   }
-
-  /// 그 자리 카드의 **왼쪽 위**가 판 안에서 어디인가 — 손끝 좌표를 판 좌표로
-  /// 옮길 때 쓴다(`onLongPressMoveUpdate` 의 `localPosition` 은 카드 기준이다).
-  Offset _cellCenterOf(SquadSlot slot, Size boardSize) => cellOrigin(
-        slot.col,
-        slot.row,
-        boardSize,
-        padTop: _padTop,
-        padSide: _padSide,
-        padBottom: _padBottom,
-      );
 
   void _cancelDrag() {
     if (_draggingMemberId == null) return;
