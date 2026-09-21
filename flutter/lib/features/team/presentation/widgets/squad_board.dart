@@ -93,12 +93,10 @@ class _SquadBoardState extends State<SquadBoard> {
   /// 집은 카드가 손끝을 따라간 거리.
   Offset _dragOffset = Offset.zero;
 
-  /* 🔴 **놓을 수 있는 곳은 「칸」이 아니라 「자리」다** (2026-09-21, 실기기
-     로그로 잡았다). 격자는 3열×4행(12칸)인데 포메이션 **자리는 다섯뿐**이라,
-     자리가 없는 칸(5:5 의 (2,0) 같은)에 놓으면 `seatsFromSquad` 가 그 등재를
-     못 앉힌다 — **내 카드는 판에서 사라지고**, 남의 카드는 「남는 자리 아무
-     데나」로 떨어져 **엉뚱한 자리에 나타난다.** 그래서 자리 위에만 놓는다. */
-  SquadSlot? _hoverSlot;
+  /* 🔴 **놓을 칸** — 자리 다섯은 격자(3열×4행) 위를 **돌아다닌다.** 포메이션은
+     처음 배치일 뿐이고, FW·MF·DF 줄은 세 칸 다 쓸 수 있다. 골키퍼 줄만
+     가운데 하나다(`canDropAt`). */
+  ({int col, int row})? _hoverCell;
 
   /* 🔴 **집고 있는 동안은 판을 다시 계산하지 않는다.** 끄는 중에 서버 응답이
      오거나 부모가 다시 그리면 자리가 재배치되어 **손에 쥔 카드가 다른 자리로
@@ -152,11 +150,11 @@ class _SquadBoardState extends State<SquadBoard> {
               child: CustomPaint(painter: _PitchPainter()),
             ),
             // 놓을 자리 미리보기 — 집고 있는 동안만.
-            if (_hoverSlot != null)
+            if (_hoverCell != null)
               Positioned(
-                left: _padSide + _hoverSlot!.col * cellW + (cellW - cardW) / 2,
+                left: _padSide + _hoverCell!.col * cellW + (cellW - cardW) / 2,
                 top: _padTop +
-                    _hoverSlot!.row * cellH +
+                    _hoverCell!.row * cellH +
                     (cellH - cardH - _labelGap - _labelH) / 2,
                 width: cardW,
                 height: cardH,
@@ -257,7 +255,7 @@ class _SquadBoardState extends State<SquadBoard> {
         setState(() {
           _draggingMemberId = seats.memberIds[slot.area];
           _dragOffset = Offset.zero;
-          _hoverSlot = slot;
+          _hoverCell = (col: slot.col, row: slot.row);
           // 이 배치를 놓을 때까지 붙든다(위 `_frozenSeats` 주석).
           _frozenSeats = seats;
         });
@@ -276,26 +274,9 @@ class _SquadBoardState extends State<SquadBoard> {
               );
         setState(() {
           _dragOffset = d.offsetFromOrigin;
-          /* 🔴 **가장 가까운 자리로 붙인다.** 「그 칸에 자리가 있을 때만」으로
-             하면 격자 12칸에 자리가 다섯뿐이라 손끝이 조금만 벗어나도 안
-             놓인다 — 사실상 못 옮긴다(사용자 지적). 판 밖이면 안 놓는다. */
-          if (onBoard == null || cell == null) {
-            _hoverSlot = null;
-          } else {
-            final centers = [
-              for (final x in seats.slots)
-                cellCenter(
-                  x.col,
-                  x.row,
-                  boardSize,
-                  padTop: _padTop,
-                  padSide: _padSide,
-                  padBottom: _padBottom,
-                ),
-            ];
-            final i = nearestSlotIndex(onBoard, centers);
-            _hoverSlot = i == null ? null : seats.slots[i];
-          }
+          // 🔴 놓을 수 없는 칸(골키퍼 줄 양옆)이면 미리보기도 안 뜬다.
+          _hoverCell =
+              cell == null || !canDropAt(cell.col, cell.row) ? null : cell;
         });
       },
       onLongPressEnd: (_) => _dropAt(slot, seats),
@@ -316,24 +297,33 @@ class _SquadBoardState extends State<SquadBoard> {
     setState(() {
       _draggingMemberId = null;
       _dragOffset = Offset.zero;
-      _hoverSlot = null;
+      _hoverCell = null;
       _frozenSeats = null;
     });
   }
 
   /// 손을 뗐다 — 놓을 수 있으면 알리고, 아니면 제자리로 돌아간다.
   void _dropAt(SquadSlot slot, SeatAssignment seats) {
-    final target = _hoverSlot;
+    final target = _hoverCell;
     final memberId = seats.memberIds[slot.area];
     _cancelDrag();
-    // 🔴 자리가 아닌 데 놓았으면 **아무 일도 안 한다** — 제자리로 돌아간다.
+    // 놓을 수 없는 데면 제자리로 돌아간다.
     if (target == null || memberId == null) return;
     // 제자리면 서버를 괜히 부르지 않는다.
-    if (target.area == slot.area) return;
+    if (target.col == slot.col && target.row == slot.row) return;
     /* 🔴 **이미 찬 칸에는 못 놓는다.** 서로 자리를 바꾸려면 등재 둘을 한 번에
        고쳐야 하는데 계약에 그런 경로가 없다 — 한쪽씩 보내면 중간에 **같은 칸에
        둘**이 되어 서버가 막는다. 제자리로 돌려보낸다. */
-    final taken = target.mine || seats.mates.containsKey(target.area);
+    /* 🔴 **이미 사람이 있는 칸에는 못 놓는다.** 서로 자리를 바꾸려면 등재
+       둘을 한 번에 고쳐야 하는데 계약에 그런 경로가 없다 — 한쪽씩 보내면
+       중간에 같은 칸에 둘이 되어 서버가 막는다. */
+    final taken = seats.slots.any(
+      (s) =>
+          s.area != slot.area &&
+          s.col == target.col &&
+          s.row == target.row &&
+          (s.mine || seats.mates.containsKey(s.area)),
+    );
     if (taken) {
       HapticFeedback.lightImpact();
       return;

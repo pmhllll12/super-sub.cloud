@@ -147,21 +147,39 @@ void main() {
      - 남의 등재가 그 칸에 가면 1단계의 「남는 자리 아무 데나」로 떨어져
        **엉뚱한 자리에 나타난다**
      그래서 **놓을 수 있는 곳은 「칸」이 아니라 「자리」여야 한다.** */
-  group('자리가 없는 칸', () {
-    test('내 등재가 자리 없는 칸에 있으면 판에서 사라진다 — 이래서 막아야 한다', () {
-      final broken = _squad([
-        // (2,0) 은 5:5 에 자리가 없는 칸이다.
+  /* 🔴 **자리 다섯은 격자 위를 돌아다닌다.** 포메이션은 처음 배치일 뿐이라,
+     저장된 칸에 자리가 없으면 **남는 자리를 그 칸으로 옮겨 온다.**
+     1단계는 원래 이 폴백을 갖고 있었는데 0단계(내 등재)에만 없어서,
+     내 카드를 그런 칸으로 옮기면 **판에서 사라졌다.** */
+  group('포메이션에 없던 칸', () {
+    test('내 등재가 그런 칸에 있어도 판에 그려진다', () {
+      final moved = _squad([
+        // (2,0) 은 5:5 포메이션의 기본 배치에 없는 칸이다.
         _m(id: 'sm-me', slug: 'mine', nickname: '나', pos: 'FW', col: 2, row: 0),
       ]);
 
-      final seats = seatsFromSquad(broken, SquadSize.five, mySlug: 'mine');
+      final seats = seatsFromSquad(moved, SquadSize.five, mySlug: 'mine');
 
-      // 🔴 지금 동작을 **있는 그대로** 적어 둔다 — 화면이 이 상태를 만들지
-      //    않게 막는 것이 고치는 방향이다(자리 위에만 놓기).
-      expect(seats.slots.any((s) => s.mine), isFalse);
+      final mine = seats.slots.where((s) => s.mine).toList();
+      expect(mine, hasLength(1), reason: '내 카드가 판에서 사라졌다');
+      expect([mine.single.col, mine.single.row], [2, 0]);
     });
 
-    test('남의 등재가 자리 없는 칸에 있으면 엉뚱한 자리로 떨어진다', () {
+    test('내 등재와 남의 등재가 섞여 있어도 각자 제 칸이다', () {
+      final moved = _squad([
+        _m(id: 'sm-me', slug: 'mine', nickname: '나', pos: 'FW', col: 2, row: 0),
+        _m(id: 'sm-a', slug: 's-a', nickname: '가', pos: 'DF', col: 0, row: 2),
+      ]);
+
+      final seats = seatsFromSquad(moved, SquadSize.five, mySlug: 'mine');
+
+      final mine = seats.slots.singleWhere((s) => s.mine);
+      expect([mine.col, mine.row], [2, 0]);
+      final a = seats.slots.singleWhere((s) => seats.mates[s.area] == '가');
+      expect([a.col, a.row], [0, 2]);
+    });
+
+    test('남의 등재가 그런 칸에 있으면 그 칸에 그려진다', () {
       final broken = _squad([
         _m(id: 'sm-a', slug: 's-a', nickname: '가', pos: 'GK', col: 2, row: 0),
       ]);

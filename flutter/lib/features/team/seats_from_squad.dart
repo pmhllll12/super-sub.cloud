@@ -169,8 +169,18 @@ SeatAssignment seatsFromSquad(
     }
   }
   if (me != null && me.hasSeat) {
-    final seat = firstWhere((s) => s.col == me!.gridCol && s.row == me.gridRow);
+    /* 🔴 **그 칸에 자리가 없으면 남는 자리를 옮겨 온다** (2026-09-21).
+       자리 다섯은 격자(3열×4행) 위를 **돌아다닌다** — 포메이션은 처음 배치일
+       뿐이다. 전에는 여기서 「그 칸의 자리」만 찾고 없으면 아무것도 안 해서,
+       내 등재를 FW 줄 옆칸처럼 **자리가 없던 칸**으로 옮기면 **내 카드가
+       판에서 사라졌다**(사용자가 실기기에서 잡은 것). 1단계는 원래 이 폴백을
+       갖고 있었다 — 0단계에만 없었다. */
+    final seat =
+        firstWhere((s) => s.col == me!.gridCol && s.row == me.gridRow) ??
+            firstWhere((s) => !taken(s));
     if (seat != null) {
+      seat.col = me.gridCol!;
+      seat.row = me.gridRow!;
       seat.mine = true;
       memberIds[seat.area] = me.id;
       // 포지션도 저장된 값을 쓴다(행과 같으면 「자동」인 셈이다).

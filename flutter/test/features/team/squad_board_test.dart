@@ -463,19 +463,14 @@ void main() {
     });
   });
 
-  /* 🔴🔴 **자리가 없는 칸에 놓으면 가장 가까운 자리로 붙는다**
-     (2026-09-21). 격자는 12칸인데 5:5 의 자리는 다섯뿐이다. 자리 밖 좌표를
-     그대로 저장하면 `seatsFromSquad` 가 그 등재를 못 앉혀 **카드가
-     사라지거나 엉뚱한 자리에 나타난다**(실기기 로그로 잡은 원인).
-
-     ⚠️ 처음엔 「그 칸에 자리가 있을 때만」으로 막았는데 **사실상 못 옮기게
-     됐다**(사용자 지적) — 손끝이 칸 경계를 조금만 벗어나면 안 놓였다.
-     그래서 **붙여 주는** 쪽으로 바꿨다. */
-  group('자리가 없는 칸', () {
-    testWidgets('자리 밖에 놓아도 가까운 자리로 붙는다', (tester) async {
+  /* 🔴 **자리 다섯은 격자 위를 돌아다닌다** (2026-09-21, 사용자 규칙).
+     포메이션은 **처음 배치일 뿐**이고 FW·MF·DF 줄은 **세 칸 다** 쓸 수 있다.
+     골키퍼 줄만 가운데 하나다 — 골키퍼는 한 명이고 양옆에 세우면 판이
+     무엇을 뜻하는지 안 읽힌다. */
+  group('격자 어디든', () {
+    testWidgets('포메이션에 자리가 없던 칸(2,0)에도 놓인다', (tester) async {
       var toCol = -1;
       var toRow = -1;
-      var called = 0;
       await _pump(
         tester,
         SquadBoard(
@@ -485,16 +480,14 @@ void main() {
           ]),
           onSeatTap: (_) {},
           onSeatMoved: (_, _, col, row) {
-            called += 1;
             toCol = col;
             toRow = row;
           },
         ),
       );
 
-      // GK 카드를 집어 (2,0) — 5:5 에 자리가 없는 칸 — 으로 끈다.
+      // GK 카드를 (2,0) — FW 줄 오른쪽 칸 — 으로 끈다.
       final from = tester.getCenter(find.byKey(const ValueKey('squad-seat-gk')));
-      // mf2(2,1) 자리의 x, fw1(1,0) 자리의 y → (2,0) 칸.
       final x = tester.getCenter(find.byKey(const ValueKey('squad-seat-mf2'))).dx;
       final y = tester.getCenter(find.byKey(const ValueKey('squad-seat-fw1'))).dy;
       final g = await tester.startGesture(from);
@@ -504,13 +497,35 @@ void main() {
       await g.up();
       await tester.pump();
 
-      // 🔴 붙어야 한다 — 그리고 **자리가 있는 칸**으로만.
-      expect(called, 1, reason: '자리 밖이라고 아예 안 옮겨졌다');
-      expect(
-        kFormations[SquadSize.five]!.any((s) => s.col == toCol && s.row == toRow),
-        isTrue,
-        reason: '자리가 없는 칸($toCol,$toRow)에 저장됐다',
+      expect([toCol, toRow], [2, 0]);
+    });
+
+    /// 🔴 골키퍼 줄 양옆은 못 놓는다.
+    testWidgets('골키퍼 줄 양옆에는 안 놓인다', (tester) async {
+      var called = 0;
+      await _pump(
+        tester,
+        SquadBoard(
+          myCard: _myCard,
+          squad: _squad([
+            _m(id: 'sm-9', slug: 's1', nickname: '김철수', pos: 'FW', col: 1, row: 0),
+          ]),
+          onSeatTap: (_) {},
+          onSeatMoved: (_, _, _, _) => called += 1,
+        ),
       );
+
+      final from = tester.getCenter(find.byKey(const ValueKey('squad-seat-fw1')));
+      final x = tester.getCenter(find.byKey(const ValueKey('squad-seat-mf1'))).dx;
+      final y = tester.getCenter(find.byKey(const ValueKey('squad-seat-gk'))).dy;
+      final g = await tester.startGesture(from);
+      await tester.pump(const Duration(milliseconds: 600));
+      await g.moveTo(Offset(x, y));
+      await tester.pump();
+      await g.up();
+      await tester.pump();
+
+      expect(called, isZero, reason: '골키퍼 줄 양옆에 놓였다');
     });
   });
 
