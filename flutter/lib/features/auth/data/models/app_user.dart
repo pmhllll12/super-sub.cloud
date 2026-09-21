@@ -8,12 +8,18 @@ class AppUser {
     required this.nickname,
     required this.createdAt,
     this.teams = const [],
+    this.isNicknameSearchable = true,
   });
 
   final String id;
   final String email;
   final String nickname;
   final DateTime createdAt;
+
+  /// 🔴 **지인 검색 노출 여부** — 닉네임으로 나를 찾을 수 있는가.
+  /// 용병 매칭의 `is_searchable` 과는 **다른 값이다**(계약).
+  /// 옛 서버가 이 칸을 안 주면 「보인다」로 본다(기존 동작이 그랬다).
+  final bool isNicknameSearchable;
 
   /// 내가 지금 속한 팀들(`GET /me` 의 `teams`). 🔴 **옛 서버는 이 칸을 안 줄 수
   /// 있어** 기본값이 빈 목록이다 — 없으면 「팀이 없다」로 다룬다.
@@ -34,12 +40,18 @@ class AppUser {
   String? get primaryTeamId =>
       ownedTeamId ?? (teams.isEmpty ? null : teams.first.teamId);
 
-  AppUser copyWith({String? nickname, List<TeamMembership>? teams}) => AppUser(
+  AppUser copyWith({
+    String? nickname,
+    List<TeamMembership>? teams,
+    bool? isNicknameSearchable,
+  }) =>
+      AppUser(
         id: id,
         email: email,
         nickname: nickname ?? this.nickname,
         createdAt: createdAt,
         teams: teams ?? this.teams,
+        isNicknameSearchable: isNicknameSearchable ?? this.isNicknameSearchable,
       );
 
   @override
@@ -49,6 +61,7 @@ class AppUser {
       other.email == email &&
       other.nickname == nickname &&
       other.createdAt == createdAt &&
+      other.isNicknameSearchable == isNicknameSearchable &&
       _sameTeams(other.teams);
 
   bool _sameTeams(List<TeamMembership> other) {
@@ -62,6 +75,12 @@ class AppUser {
   @override
   // 🔴 팀은 `Object.hashAll` 로 따로 섞는다 — 리스트를 그대로 넣으면 동일성이
   //    참조 기준이 되어 == 와 어긋난다.
-  int get hashCode =>
-      Object.hash(id, email, nickname, createdAt, Object.hashAll(teams));
+  int get hashCode => Object.hash(
+        id,
+        email,
+        nickname,
+        createdAt,
+        isNicknameSearchable,
+        Object.hashAll(teams),
+      );
 }

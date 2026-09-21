@@ -80,7 +80,10 @@ class MockAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<AppUser> updateProfile({required String nickname}) async {
+  Future<AppUser> updateProfile({
+    String? nickname,
+    bool? nicknameSearchable,
+  }) async {
     await Future<void>.delayed(_delay);
     final session = _current;
     if (session == null) {
@@ -90,9 +93,22 @@ class MockAuthRepository implements AuthRepository {
     if (index < 0) {
       throw const AuthException('존재하지 않는 사용자입니다');
     }
+    /* 🔴 **겹치는 닉네임은 거절한다** — 서버가 409 NICKNAME_ALREADY_EXISTS
+       를 낸다(유일 제약). Mock 이 받아 주면 그 화면을 안 만들게 된다. */
+    if (nickname != null &&
+        _db.users.any((u) => u.id != session.user.id && u.nickname == nickname)) {
+      throw const AuthException(
+        '이미 쓰는 닉네임입니다',
+        code: 'NICKNAME_ALREADY_EXISTS',
+      );
+    }
     // 저장소에 실제로 써넣는다. 세션 상태만 바꾸면 로그아웃 후 다시
     // 로그인했을 때 이전 닉네임이 돌아온다.
-    final updated = _db.users[index].copyWith(nickname: nickname);
+    // 🔴 보낸 칸만 바뀐다 — copyWith 가 null 을 「안 바꿈」으로 다룬다.
+    final updated = _db.users[index].copyWith(
+      nickname: nickname,
+      isNicknameSearchable: nicknameSearchable,
+    );
     _db.users[index] = updated;
     _current = Session(user: updated);
     return updated;

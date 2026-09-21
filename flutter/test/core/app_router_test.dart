@@ -119,7 +119,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     // redirect가 개입하지 않고 /profile에 머무른다.
-    expect(find.text('프로필'), findsOneWidget);
+    // 🔴 제목을 웹과 맞춰 「MY PROFILE」 로 바꿨다(2026-09-21).
+    expect(find.text('MY PROFILE'), findsOneWidget);
     // push로 열었으므로 뒤로가기 착지점이 있다 (I3).
     expect(find.byType(BackButton), findsOneWidget);
   });

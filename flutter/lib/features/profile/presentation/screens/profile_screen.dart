@@ -1,155 +1,372 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theme/app_theme.dart';
+import '../../../auth/data/models/app_user.dart';
+import '../../../auth/data/models/team_membership.dart';
 import '../../../auth/presentation/session_controller.dart';
+import '../../../card/data/card_providers.dart';
+import '../../../card/data/models/player_card.dart';
+import '../widgets/player_card_view.dart';
+import 'nickname_sheet.dart';
 
+/// 내 프로필 — 웹 `/me`(`app/(app)/me/page.tsx`)를 폰 세로에 맞춰 옮긴 것이다.
+///
+/// 웹은 좌우 두 단(왼쪽 정보 · 오른쪽 영상)인데 **폰에는 옆으로 펼 자리가
+/// 없어** 한 줄로 쌓는다(`www/docs/2026-08-31-앱-이식-지침.md` §2-2).
+///
+/// ⚠️ **아직 안 옮긴 것**: 영상 칸(분석·업로드·대표 영상·리포트) — 업로드와
+/// 분석에 얽혀 있어 따로 잡는다. 「프로필 카드 수정」은 다음 단계다.
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionControllerProvider);
-
     if (session is! SessionLoggedIn) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final user = session.user;
+    final card = ref.watch(myCardProvider).value;
 
     return Scaffold(
+      backgroundColor: _kBg,
       appBar: AppBar(
-        title: const Text('프로필'),
-        actions: [
-          IconButton(
-            key: const Key('profile-edit'),
-            icon: const Icon(Icons.edit),
-            tooltip: '프로필 수정',
-            onPressed: () => _showEditSheet(context, user.nickname),
-          ),
-        ],
+        backgroundColor: _kBg,
+        foregroundColor: _kOn,
+        title: const Text('MY PROFILE'),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
-          ListTile(
-            title: Text(
-              user.nickname,
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            subtitle: Text(user.email),
-          ),
-          const Divider(),
-          ListTile(
-            title: const Text('가입일'),
-            trailing: Text(
-              '${user.createdAt.year}.${user.createdAt.month}.${user.createdAt.day}',
-            ),
-          ),
+          _CardBlock(card: card, nickname: user.nickname),
+          const SizedBox(height: 16),
+          _TeamBlock(teams: user.teams),
+          const SizedBox(height: 16),
+          _InfoBlock(user: user),
+          const SizedBox(height: 16),
+          const _MatchesBlock(),
+          const SizedBox(height: 16),
+          _AccountBlock(user: user),
         ],
       ),
     );
   }
-
-  void _showEditSheet(BuildContext context, String current) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheetContext) => _EditNicknameSheet(current: current),
-    );
-  }
 }
 
-/// 서브뷰는 부모의 [WidgetRef]를 생성자로 받지 않는다.
-///
-/// 스펙 5.3의 서브뷰 17개는 대부분 바텀시트·다이얼로그다. 부모 ref를 넘기는
-/// 방식은 부모가 시트보다 오래 살아 있을 때만 우연히 동작하므로, 시트가
-/// 스스로 ConsumerStatefulWidget이 되어 자기 ref를 갖는 것을 기본형으로 둔다.
-class _EditNicknameSheet extends ConsumerStatefulWidget {
-  const _EditNicknameSheet({required this.current});
+const Color _kBg = Color(0xFF14201A);
+const Color _kOn = Color(0xFFFFFFFF);
+const Color _kPanel = Color(0xFF1E3029);
 
-  final String current;
+/// 웹의 유리판 한 칸 — 제목 + 내용.
+class _Block extends StatelessWidget {
+  const _Block({required this.title, required this.child});
 
-  @override
-  ConsumerState<_EditNicknameSheet> createState() => _EditNicknameSheetState();
-}
-
-class _EditNicknameSheetState extends ConsumerState<_EditNicknameSheet> {
-  late final TextEditingController _controller =
-      TextEditingController(text: widget.current);
-
-  bool _busy = false;
-  String? _error;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  /// login_screen.dart와 같은 관용구다. 저장은 리포지토리를 거치므로
-  /// 지연·실패가 실제로 발생한다(스펙 4.3).
-  Future<void> _run(Future<void> Function() action) async {
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      await action();
-    } catch (e) {
-      if (mounted) setState(() => _error = '$e');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
+  final String title;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _kPanel,
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('닉네임 수정'),
-          const SizedBox(height: 12),
-          TextField(
-            key: const Key('profile-nickname'),
-            controller: _controller,
-            enabled: !_busy,
-            decoration: const InputDecoration(labelText: '닉네임'),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: _kOn,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
           ),
-          if (_error != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              _error!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+/// 내 카드 + 닉네임 + 꾸미기 입구.
+class _CardBlock extends ConsumerWidget {
+  const _CardBlock({required this.card, required this.nickname});
+
+  final PlayerCard? card;
+  final String nickname;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return _Block(
+      title: '내 선수 카드',
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 🔴 카드가 없으면 빈 카드다 — 예외가 아니라 정상 상태다.
+          if (card == null)
+            const BlankPlayerCardView(width: 120)
+          else
+            PlayerCardView(
+              width: 120,
+              seed: card!.publicSlug,
+              alias: aliasOf(card!),
+              style: card!.style,
+              photoUrl: card!.photoUrl,
             ),
-          ],
-          const SizedBox(height: 16),
-          FilledButton(
-            key: const Key('profile-save'),
-            onPressed: _busy
-                ? null
-                : () => _run(() async {
-                      await ref
-                          .read(sessionControllerProvider.notifier)
-                          .updateNickname(_controller.text);
-                      // 실패하면 _run이 예외를 잡아 오류를 띄우므로
-                      // 여기까지 오지 않는다 — 시트는 성공했을 때만 닫힌다.
-                      if (context.mounted) Navigator.of(context).pop();
-                    }),
-            child: _busy
-                ? const SizedBox(
-                    height: 18,
-                    width: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('저장'),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        nickname,
+                        style: const TextStyle(
+                          color: _kOn,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      key: const Key('profile-edit'),
+                      icon: const Icon(Icons.edit, size: 18, color: _kOn),
+                      tooltip: '닉네임 수정',
+                      onPressed: () => showNicknameSheet(context, nickname),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  key: const Key('profile-card-edit'),
+                  onPressed: card == null
+                      ? () => _createCard(context, ref)
+                      : () => _notReady(context, '프로필 카드 수정'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _kOn,
+                    side: BorderSide(color: _kOn.withValues(alpha: 0.4)),
+                  ),
+                  child: Text(card == null ? '카드 만들기' : '프로필 카드 수정'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 🔴 카드는 **요청할 때** 생긴다(계약 `POST /me/card`) — 가입만으로는
+  /// 안 생기고, 조회가 만들지도 않는다.
+  Future<void> _createCard(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref.read(cardRepositoryProvider).createMyCard();
+      ref.invalidate(myCardProvider);
+    } catch (e) {
+      if (context.mounted) _notReady(context, '$e');
+    }
+  }
+}
+
+void _notReady(BuildContext context, String what) {
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(what)));
+}
+
+/// 소속 — 팀 이름 · 지역 · 종목.
+class _TeamBlock extends StatelessWidget {
+  const _TeamBlock({required this.teams});
+
+  final List<TeamMembership> teams;
+
+  @override
+  Widget build(BuildContext context) {
+    return _Block(
+      title: '소속',
+      child: teams.isEmpty
+          ? const Text('아직 팀이 없습니다', style: TextStyle(color: _kOn))
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final t in teams)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                t.name,
+                                style: const TextStyle(
+                                  color: _kOn,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              Text(
+                                '${t.region} · ${t.sportCode}',
+                                style: TextStyle(
+                                  color: _kOn.withValues(alpha: 0.7),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // 주장만 팀을 고칠 수 있다(계약 권한표).
+                        if (t.isOwner)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.seed,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: const Text(
+                              '주장',
+                              style: TextStyle(
+                                color: Color(0xFF0B0B0B),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+    );
+  }
+}
+
+/// 정보 — 이메일 · 함께한 날.
+class _InfoBlock extends StatelessWidget {
+  const _InfoBlock({required this.user});
+
+  final AppUser user;
+
+  @override
+  Widget build(BuildContext context) {
+    final d = user.createdAt;
+    final joined =
+        '${d.year}.${d.month.toString().padLeft(2, '0')}'
+        '.${d.day.toString().padLeft(2, '0')}부터';
+    return _Block(
+      title: '정보',
+      child: Column(
+        children: [
+          _row('이메일', user.email),
+          const SizedBox(height: 8),
+          _row('함께한 날', joined),
+        ],
+      ),
+    );
+  }
+
+  Widget _row(String label, String value) => Row(
+    children: [
+      SizedBox(
+        width: 76,
+        child: Text(
+          label,
+          style: TextStyle(color: _kOn.withValues(alpha: 0.7), fontSize: 13),
+        ),
+      ),
+      Expanded(
+        child: Text(value, style: const TextStyle(color: _kOn, fontSize: 13)),
+      ),
+    ],
+  );
+}
+
+class _MatchesBlock extends StatelessWidget {
+  const _MatchesBlock();
+
+  @override
+  Widget build(BuildContext context) {
+    // ⚠️ 경기 경로(`GET /teams/{id}/matches`)는 아직 안 붙였다 — 웹도 팀이
+    //    없으면 같은 문구를 보여 준다.
+    return const _Block(
+      title: '내 경기',
+      child: Text('다가오는 경기가 없습니다.', style: TextStyle(color: _kOn)),
+    );
+  }
+}
+
+/// 계정 — 지인 검색 노출 · 로그아웃.
+class _AccountBlock extends ConsumerWidget {
+  const _AccountBlock({required this.user});
+
+  final AppUser user;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return _Block(
+      title: '계정',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          /* 🔴 **`Material` 로 감싼다.** `ListTile` 은 바탕과 잉크를 가장 가까운
+             Material 에 그리는데, 색 있는 상자 안에 그냥 두면 그 상자가 효과를
+             가린다고 프레임워크가 경고를 던진다(시험이 그걸로 깨졌다). */
+          Material(
+            color: Colors.transparent,
+            child: SwitchListTile(
+              key: const Key('profile-searchable'),
+              contentPadding: EdgeInsets.zero,
+              value: user.isNicknameSearchable,
+              activeThumbColor: AppTheme.seed,
+              title: const Text(
+                '지인 검색에 나를 보이기',
+                style: TextStyle(color: _kOn, fontSize: 14),
+              ),
+              subtitle: Text(
+                '닉네임으로 나를 찾아 지인 신청을 보낼 수 있습니다.',
+                style: TextStyle(
+                  color: _kOn.withValues(alpha: 0.6),
+                  fontSize: 12,
+                ),
+              ),
+              onChanged: (v) async {
+                try {
+                  await ref
+                      .read(sessionControllerProvider.notifier)
+                      .setNicknameSearchable(v);
+                } catch (e) {
+                  if (context.mounted) _notReady(context, '$e');
+                }
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                key: const Key('profile-logout'),
+                onPressed: () =>
+                    ref.read(sessionControllerProvider.notifier).logout(),
+                style: TextButton.styleFrom(foregroundColor: _kOn),
+                child: const Text('로그아웃'),
+              ),
+            ],
           ),
         ],
       ),

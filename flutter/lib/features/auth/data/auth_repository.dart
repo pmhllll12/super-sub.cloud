@@ -50,7 +50,11 @@ abstract class AuthRepository {
   ///
   /// 호출부는 자기가 보낸 값이 아니라 돌려받은 값을 쓴다 — id·생성 시각 같은
   /// 서버 소유 필드가 응답에만 있기 때문이다(스펙 4.1 규칙 3).
-  Future<AppUser> updateProfile({required String nickname});
+  /// 프로필을 고치고 **서버가 확정한 사용자**를 돌려준다(`PATCH /me`).
+  ///
+  /// 🔴 **보낸 칸만 바뀐다** — 둘 다 선택이고, 안 보내면 그대로다.
+  /// 닉네임이 겹치면 409 `NICKNAME_ALREADY_EXISTS` 다.
+  Future<AppUser> updateProfile({String? nickname, bool? nicknameSearchable});
 
   Future<Session?> restoreSession();
 }

@@ -90,9 +90,18 @@ class ApiAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<AppUser> updateProfile({required String nickname}) {
-    // 계약 문서 5절: PATCH /me는 아직 범위 밖이다.
-    throw const AuthException('닉네임 수정은 아직 지원되지 않습니다');
+  Future<AppUser> updateProfile({
+    String? nickname,
+    bool? nicknameSearchable,
+  }) async {
+    /* 🔴 **보낸 칸만 바뀐다.** 안 보낸 칸은 서버가 안 건드리므로, `null` 을
+       그대로 실어 보내면 안 된다 — 그러면 「지우라」는 뜻이 된다. */
+    final body = <String, dynamic>{
+      'nickname': ?nickname,
+      'is_nickname_searchable': ?nicknameSearchable,
+    };
+    // 응답이 `GET /me` 와 완전히 같아 파서를 하나만 든다.
+    return _userFrom(await _call(() => _api.patch('/me', body)));
   }
 
   @override
@@ -118,8 +127,11 @@ class ApiAuthRepository implements AuthRepository {
     }
   }
 
-  Future<AppUser> _fetchMe() async {
-    final body = await _call(() => _api.get('/me'));
+  Future<AppUser> _fetchMe() async =>
+      _userFrom(await _call(() => _api.get('/me')));
+
+  /// `GET /me` · `PATCH /me` 의 응답은 **완전히 같다** — 파서가 하나다.
+  AppUser _userFrom(Map<String, dynamic> body) {
     return AppUser(
       id: body['id'] as String,
       email: body['email'] as String,
@@ -130,6 +142,8 @@ class ApiAuthRepository implements AuthRepository {
       teams: ((body['teams'] as List<dynamic>?) ?? const [])
           .map((e) => TeamMembership.fromJson(e as Map<String, dynamic>))
           .toList(growable: false),
+      // 옛 서버가 이 칸을 안 주면 「보인다」로 본다(기존 동작).
+      isNicknameSearchable: body['is_nickname_searchable'] as bool? ?? true,
     );
   }
 

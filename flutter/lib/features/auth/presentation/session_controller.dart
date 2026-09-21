@@ -86,10 +86,19 @@ class SessionController extends Notifier<SessionState> {
     state = const SessionLoggedOut();
   }
 
-  Future<void> updateNickname(String nickname) async {
-    final updated = await ref
-        .read(authRepositoryProvider)
-        .updateProfile(nickname: nickname);
+  Future<void> updateNickname(String nickname) =>
+      _patch(nickname: nickname);
+
+  /// 🔴 **지인 검색 노출** — 닉네임으로 나를 찾을 수 있는가. 용병 매칭의
+  /// `is_searchable` 과는 **다른 값이다**(계약).
+  Future<void> setNicknameSearchable(bool value) =>
+      _patch(nicknameSearchable: value);
+
+  Future<void> _patch({String? nickname, bool? nicknameSearchable}) async {
+    final updated = await ref.read(authRepositoryProvider).updateProfile(
+          nickname: nickname,
+          nicknameSearchable: nicknameSearchable,
+        );
     if (!ref.mounted) return;
     // 보낸 값이 아니라 돌려받은 사용자로 상태를 채운다(스펙 4.1 규칙 3).
     state = SessionLoggedIn(updated);

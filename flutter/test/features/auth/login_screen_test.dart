@@ -57,7 +57,7 @@ class _TooManyRequestsAuthRepository implements AuthRepository {
   Future<Session?> restoreSession() async => null;
 
   @override
-  Future<AppUser> updateProfile({required String nickname}) =>
+  Future<AppUser> updateProfile({String? nickname, bool? nicknameSearchable}) =>
       throw UnimplementedError();
 }
 
