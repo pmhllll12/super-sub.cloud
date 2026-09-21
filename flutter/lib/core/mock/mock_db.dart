@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/auth/data/models/app_user.dart';
 import '../../features/auth/data/models/team_membership.dart';
 import '../../features/card/data/models/player_card.dart';
+import '../../features/team/data/models/squad.dart';
 import '../../features/team/data/models/sport.dart';
 import '../../features/team/data/models/team.dart';
 import '../../features/team/data/models/team_member.dart';
@@ -25,6 +26,7 @@ class MockDb {
   final List<Team> teams = [];
   final List<TeamMember> teamMembers = [];
   final List<PlayerCard> cards = [];
+  final List<Squad> squads = [];
 
   AppUser? findUserByEmail(String email) {
     for (final u in users) {
@@ -118,6 +120,39 @@ class MockDb {
       publicSlug: 'lee-gamdok-7f21',
       nickname: '이감독',
       tagline: 'THREE LUNGS',
+    ));
+
+    // 🔴 **t-bears 에는 스쿼드를 안 둔다** — 「아직 안 만든 팀」 갈래를 반드시
+    //    밟게 하는 장치다(계약은 그때 404 SQUAD_NOT_FOUND 를 낸다).
+    squads.add(const Squad(
+      id: 'sq-thunder',
+      teamId: 't-thunder',
+      publicSlug: 'aB3xK9mQ2pL7vN4t',
+      formation: '5:5',
+      members: [
+        SquadMember(
+          id: 'sm-1',
+          playerCardId: 'pc-$managerId',
+          cardPublicSlug: 'lee-gamdok-7f21',
+          nickname: '이감독',
+          positionCode: 'GK',
+          positionLabel: '골키퍼',
+          gridCol: 1,
+          gridRow: 3,
+          accepted: true,
+        ),
+        // 🔴 **칸이 없는 등재** — 판에 안 올린 사람도 포지션으로 앉는다.
+        //    서버의 기존 행이 거의 전부 이 꼴이라 이 갈래를 Mock 에서도 밟는다.
+        SquadMember(
+          id: 'sm-2',
+          playerCardId: 'pc-newbie',
+          cardPublicSlug: null,
+          nickname: '박신입',
+          positionCode: 'MF',
+          positionLabel: '미드필더',
+          accepted: true,
+        ),
+      ],
     ));
 
     _attachTeams();
