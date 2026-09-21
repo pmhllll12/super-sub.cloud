@@ -8577,6 +8577,32 @@ UA 를 안 밝히는 다른 클라이언트가 같은 자리에서 또 막힙니
 
 - **위치**: `pending-archive.markdown`의 `## ho (정상호)` 구역으로 이동됨
 
+### 56. 오토스탑 제거 뒷정리 — 검사 셋이 **빨간 채 사흘** 있었습니다 (2026-09-21 신설) ✅ 해소 (2026.09.21)
+
+`a16848b`(2026-09-18, 오토스탑 제거)가 `agent/deploy/` 의 autostop 파일 6개를
+지우면서 **그걸 읽던 테스트를 같이 안 고쳤습니다.** `tests/test_worker.py` 의
+`_busy_pattern()` 이 지워진 `deploy/autostop.conf.example` 을 읽어
+`FileNotFoundError` 로 죽었고, `uv run pytest tests/` 가 **3 failed** 였습니다.
+
+🔴 **결함이 고쳐진 것이 아니라 판정 주체가 없어진 것입니다.** 셋이 지키던
+성질은 "분석 도중에 인스턴스가 꺼지지 않는다"였는데, 이제 **아무것도 인스턴스를
+끄지 않습니다** — 끄는 것은 사람 몫이고 잊으면 **월 약 $490** 입니다.
+(같은 정정이 `fastapi/docs/api-contract.md` 에 2026-09-18 자로 이미 있습니다.)
+
+| 한 것 | |
+|---|---|
+| 검사 삭제 | `test_the_analysis_child_is_seen_as_busy_by_autostop` · `test_the_worker_itself_is_not_seen_as_busy` · `test_the_detect_child_is_seen_as_busy_by_autostop` · 공용 `_busy_pattern()` — 지운 자리에 **경위 주석**을 남겼습니다 |
+| `agent/CLAUDE.md` | 「지워서는 안 되는 검사」 표에서 해당 줄 제거 + 왜 뺐는지 |
+| `agent/deploy/README.md` | 3-6 절의 설치 절차·`BUSY_PATTERN`·보류 명령을 **「없앴다 + 이제는 사람이 끈다」** 로 교체. 워커 표의 「자동 종료와의 관계」 행도 |
+| `agent/deploy/supersub-hold` | 삭제 — 지워진 `/etc/supersub/autostop.conf` 를 읽던 죽은 스크립트 |
+| `agent/scripts/worker.py` | autostop 전제 주석 3곳 정정 (별도 프로세스로 부르는 **진짜 이유는 종료 코드**입니다) |
+
+🔴 **되살리지 않습니다.** 자동 종료를 다시 넣기로 하면 `a16848b^` 에서 파일 6개를
+되살리고 **검사 셋도 함께** 되살립니다 — 한쪽만 되돌리면 같은 형태로 또 빨개집니다.
+
+- **확인**: `cd agent && uv run pytest tests/ -q` → **575 passed** (이전 3 failed 575 passed)
+- **담당**: ~~정상호~~ **✅ 끝** · **제기**: 정상호 · **기한**: 완료
+
 ## jin (정어진)
 
 ### 1. 분석 결과 적재 규격 — 지표 코드가 종목을 넘나든다 ✅ 해소 (2026.09.08)

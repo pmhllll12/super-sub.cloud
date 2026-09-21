@@ -425,79 +425,36 @@ aws ec2 start-instances --instance-ids "$IID"   # 재개 (퍼블릭 IP는 바뀐
 > 모델 받다 멈추면 그걸 고치는 GPU 시간이 아낀 돈을 금방 넘는다.
 > gp3는 나중에 **키울 수는 있어도 줄일 수 없다.**
 
-### 3-6. 자동 종료 — 끄는 것을 잊어도 꺼지게
+### 3-6. 자동 종료 — 🔴 **없앴다 (2026-09-18, `a16848b`)**
 
-위 표에서 보듯 **끄는 걸 잊는 것이 유일한 큰 위험**이다. 금요일 저녁에 한 번
-안 끄면 월요일까지 61시간이 붙어 **$40**이다.
+여기 있던 자동 종료(인스턴스가 유휴를 판정해 스스로 `poweroff`)는 **팀 결정으로
+제거했다.** `deploy/` 에서 다음 6개가 사라졌다:
 
-보통 쓰는 자동 종료(CloudWatch 알람, EC2 Instance Scheduler, Lambda)는 전부
-IAM 권한이 필요한데 `ho`는 IAM이 전면 차단이다. **인스턴스 안에서 스스로
-poweroff 하는 방식**은 AWS 자격증명이 하나도 없어도 되므로 지금 되는 유일한
-방법이고, EBS 기반 인스턴스는 안에서 halt 하면 **stop 상태로 떨어져 과금이
-멈춘다.**
-
-🔴 **설치 전에 종료 동작을 확인한다.**
-
-**EC2 → 인스턴스 선택 → 작업 → 인스턴스 설정 → 종료 동작 변경**
-
-여기가 **`중지(stop)`** 여야 한다. `종료(terminate)`면 자동 종료가 인스턴스와
-EBS를 **지운다.** 콘솔 기본값은 `중지`지만 기본값을 믿고 돌리지 않는다 —
-인스턴스 안에서는 이 값을 읽을 방법이 없다(IMDS가 노출하지 않고,
-`ec2:DescribeInstanceAttribute`는 자격증명이 필요한데 역할이 없다).
-
-```bash
-cd ~/super-sub.cloud
-sudo ./agent/deploy/install_autostop.sh --shutdown-behavior-verified
+```
+autostop.conf.example  autostop.sh  install_autostop.sh
+supersub-autostop.service  supersub-autostop.timer  uninstall_autostop.sh
 ```
 
-확인 플래그 없이 실행하면 설치를 거부하고 위 콘솔 경로를 알려 준다.
+**설치 절차·`BUSY_PATTERN`·`supersub-hold` 보류 명령도 함께 지웠다** — 없는
+스크립트의 사용법이 남아 있으면 다음 사람이 그대로 따라 하다 막힌다.
+`fastapi/docs/api-contract.md` 의 2026-09-18 정정도 같은 말을 한다.
 
-**판정 기준** (`/etc/supersub/autostop.conf`에서 바꾼다).
-
-| 상황 | 스크립트 기본값 | 🔴 `supersub-ai`에 **깔린 값** |
-|---|---|---|
-| 접속도 작업도 없음 | 30분 | **90분** |
-| 접속은 있으나 작업 없음 (터미널 켜 두고 퇴근) | 120분 | **240분** |
-| 무엇을 하든 (최후의 안전장치) | 12시간 | **18시간** |
-
-🔴 **두 값이 다르다.** 2026-09-04에 `supersub-ai`의
-`/etc/supersub/autostop.conf`만 올렸고 **스크립트 기본값(`autostop.sh`)과
-`autostop.conf.example`은 그대로 두었다** — 그 둘은 "기본값이 무엇인가"를
-설명하는 자리라 배포 한 대의 사정으로 바꾸면 다음 배포가 그 값을 물려받는다.
-되돌리려면 인스턴스에서 한 줄이다(백업이 `autostop.conf.bak.20260904`에 있다):
+🔴 **그래서 지금은 인스턴스를 사람이 끈다.** 위 3-5 의 비용표가 그대로
+살아 있고 — **켜 두고 방치하면 월 약 $490** 이다. 자동으로 막아 주던 것이
+없어졌으니 **작업이 끝나면 직접 중지한다**:
 
 ```bash
-sudo sed -i -e 's/^IDLE_MINUTES=90$/IDLE_MINUTES=30/' \
-            -e 's/^SSH_IDLE_MINUTES=240$/SSH_IDLE_MINUTES=120/' \
-            -e 's/^MAX_UPTIME_HOURS=18$/MAX_UPTIME_HOURS=12/' /etc/supersub/autostop.conf
+export IID=<인스턴스 ID>
+aws ec2 stop-instances --instance-ids "$IID"
 ```
 
-**최악의 경우 비용이 늘었다** — 잊고 두면 12시간 $7.8에서 **18시간 $11.6**이
-된다(온디맨드 $0.647/시간). 오래 걸리는 작업 앞에는 여전히 `supersub-hold`가
-맞는 도구다. 이쪽은 만료가 있고 저쪽은 없다.
+자격증명이 없어 위 명령이 안 되면 인스턴스 안에서 `sudo poweroff` 로도
+`stop` 상태로 떨어진다(종료 동작이 **`중지(stop)`** 일 때만 — `종료(terminate)`
+이면 인스턴스와 EBS가 **지워진다**. EC2 → 인스턴스 → 작업 → 인스턴스 설정 →
+종료 동작 변경에서 확인한다).
 
-"작업 중"은 **GPU 사용률 10% 초과** 또는 **분석 프로세스 실행 중**이다.
-
-> **GPU 메모리는 쓰지 않는다.** vLLM이 상주하며 VRAM을 미리 잡기 때문에
-> (`vllm.env`의 `SUPERSUB_GPU_FRACTION=0.35`), 메모리로 보면 vLLM이 떠 있는 한
-> 영원히 "바쁨"이 되어 자동 종료가 무력해진다. 사용률은 요청이 없으면 0으로
-> 떨어지므로 그쪽을 본다.
->
-> **프로세스 패턴은 명령줄 맨 앞을 고정해 두었다.** `pgrep -f`는 명령줄
-> 어디에나 그 문자열이 있으면 걸려서, 파일 이름만 적으면 `vim analyze.py`도
-> "작업 중"이 된다 — 편집기를 열어 둔 채 자리를 뜨면 영영 안 꺼진다.
-> 패턴을 고칠 때 이 성질을 깨지 않는다.
-
-오래 걸리는 작업 앞에는 **보류**를 건다. 타이머를 `systemctl stop` 하지 않는다 —
-다시 켜는 것을 잊으면 자동 종료가 없는 것과 같아진다. 보류는 만료가 있다.
-
-```bash
-sudo supersub-hold 4h     # 4시간 보류
-sudo supersub-hold        # 남은 시간 확인
-sudo supersub-hold off    # 즉시 해제
-
-journalctl -u supersub-autostop -n 30 --no-pager   # 판정 기록
-```
+다시 넣기로 하면 위 6개 파일을 `a16848b^` 에서 되살리고,
+`tests/test_worker.py` 의 autostop 검사 셋도 **함께** 되살린다.
 
 ---
 
@@ -838,7 +795,7 @@ aws s3 ls s3://$BUCKET/reports/ --recursive | tail   # 리포트가 느는가
 |---|---|
 | **토큰** | 서버의 `WORKER_TOKEN`과 **같은 값**이다. 한쪽만 넣으면 계속 401이고, 그때 워커는 종료 코드 78로 멈춘 뒤 **재시작하지 않는다**(`RestartPreventExitStatus=78`) — 저널이 401로 차는 것보다 낫다 |
 | **루브릭** | claim 응답에 동작(motion)이 없어 **종목의 `active` 루브릭 하나**를 쓴다. 0개거나 2개 이상이면 실행하지 않고 `failed`로 보고한다. draft를 승격시키면 그 종목이 그때 멈춘다 |
-| **자동 종료와의 관계** | 🔴 **워커 이름을 `BUSY_PATTERN`에 넣지 않았다.** 큐가 비어도 이 프로세스는 계속 떠 있어서, 넣으면 인스턴스가 **영영 안 꺼진다**. 분석이 도는 동안에는 자식이 `analyze_s3.py`라 기존 패턴에 그대로 걸린다 — `tests/test_worker.py`가 그 매칭을 양쪽으로 검사한다 |
+| **자동 종료와의 관계** | 🔴 **없다 — 자동 종료를 없앴다** (2026-09-18, `a16848b` · 위 3-6). 워커가 떠 있어도 인스턴스는 안 꺼지고, **분석이 도는 중에도 안 꺼진다.** 끄는 것은 사람 몫이다 |
 | **멈출 때** | 분석 중에 `stop`하면 자식을 끊고 그 작업을 `failed`로 **보고한 뒤** 나간다. 그냥 죽으면 `running`인 채로 남고 회수 규칙이 아직 없다 |
 
 **적재(`POST /analyses`)는 아직 없다** — 미결 `jin` 1번(`metric_definition`이 0행)이

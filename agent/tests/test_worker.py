@@ -12,7 +12,6 @@ from __future__ import annotations
 import importlib.util
 import json
 import re
-import subprocess
 import sys
 from pathlib import Path
 
@@ -217,50 +216,22 @@ def test_side_is_omitted_when_the_job_has_none(worker, cfg):
     assert cmd[cmd.index("--side") + 1] == "left"
 
 
-def _busy_pattern() -> str:
-    """autostop 이 "작업 중"으로 보는 패턴을 설정 예시에서 그대로 읽는다."""
-    text = (ROOT / "deploy" / "autostop.conf.example").read_text(encoding="utf-8")
-    match = re.search(r"^BUSY_PATTERN='(.+)'$", text, flags=re.MULTILINE)
-    assert match, "autostop.conf.example 에서 BUSY_PATTERN 을 찾지 못했다"
-    return match.group(1)
-
-
-def test_the_analysis_child_is_seen_as_busy_by_autostop(worker, cfg):
-    """🔴 분석 도중에 인스턴스가 꺼지면 안 된다.
-
-    autostop 은 `pgrep -f` 로 "작업 중"을 판정한다. 워커가 analyze_s3.py 를
-    **별도 프로세스로** 부르기 때문에 기존 패턴에 그대로 걸린다 — import 해서
-    안에서 돌리도록 바꾸면 이 검사가 깨지고, 실제로는 분석 도중에 전원이
-    내려간다(그때 그 작업은 running 인 채로 남는다).
-
-    파이썬 `re` 는 POSIX 문자클래스(`[[:space:]]`)를 모르므로 실제 `grep -E`
-    로 맞춰 본다 — 번역하면 그 번역이 틀릴 수 있다.
-    """
-    cmd = worker.analyze_command(cfg, _job(), ROOT / "rubrics/football_inside_pass.yaml")
-    cmdline = " ".join(cmd)
-    found = subprocess.run(
-        ["grep", "-Eq", _busy_pattern()], input=cmdline, text=True, check=False
-    )
-    assert found.returncode == 0, (
-        f"autostop 이 이 명령줄을 '작업 중'으로 보지 못한다:\n  {cmdline}\n"
-        f"  패턴: {_busy_pattern()}"
-    )
-
-
-def test_the_worker_itself_is_not_seen_as_busy(worker):
-    """🔴 반대쪽도 지킨다 — 폴링 프로세스는 "작업 중"이 **아니어야** 한다.
-
-    워커는 큐가 비어 있는 동안에도 계속 떠 있다. BUSY_PATTERN 에 워커 이름을
-    넣으면 인스턴스가 영영 안 꺼진다(상시 가동 월 $466). 지켜야 할 성질은
-    "분석 도중에 안 꺼진다"이고 그건 위 검사가 맡는다.
-    """
-    cmdline = f"{sys.executable} {ROOT}/scripts/worker.py"
-    found = subprocess.run(
-        ["grep", "-Eq", _busy_pattern()], input=cmdline, text=True, check=False
-    )
-    assert found.returncode != 0, (
-        "워커 폴링 프로세스가 '작업 중'으로 잡힌다 — 인스턴스가 안 꺼진다"
-    )
+# -- 🔴 여기 있던 autostop 검사 셋을 지웠다 (2026.09.21) --------------------
+#
+# `test_the_analysis_child_is_seen_as_busy_by_autostop` ·
+# `test_the_worker_itself_is_not_seen_as_busy` ·
+# `test_the_detect_child_is_seen_as_busy_by_autostop` 과 공용 `_busy_pattern()`.
+#
+# 셋 다 `deploy/autostop.conf.example` 의 `BUSY_PATTERN` 을 읽어 "분석 중인
+# 인스턴스가 꺼지지 않는다"를 지키고 있었는데, **오토스탑을 팀 결정으로
+# 없앴다**(`a16848b`, 2026-09-18 — `deploy/` 의 autostop 파일 6개 삭제).
+# 읽을 파일이 사라져 세 검사가 `FileNotFoundError` 로 죽고 있었다.
+#
+# 🔴 **되살리지 않는다.** 지키던 성질("분석 도중에 전원이 내려가지 않는다")은
+# 결함이 고쳐진 것이 아니라 **판정 주체가 없어진 것**이다 — 이제 인스턴스는
+# 사람이 끈다(`fastapi/docs/api-contract.md` 의 2026-09-18 정정도 같은 말).
+# 자동 종료를 다시 넣게 되면 그때 이 검사도 **함께** 되살린다. 그 전까지
+# 여기에 `BUSY_PATTERN` 을 읽는 코드를 다시 두면 또 빨개진다.
 
 
 # -- 실패 사유 --------------------------------------------------------------
@@ -1149,19 +1120,5 @@ def test_an_analyze_job_still_goes_to_the_analysis(worker, cfg, monkeypatch, job
     assert "detect_subjects.py" not in " ".join(seen[0])
 
 
-def test_the_detect_child_is_seen_as_busy_by_autostop(worker, cfg, tmp_path):
-    """🔴 검출 도중에 인스턴스가 꺼지면 안 된다.
-
-    분석 자식(`analyze_s3.py`)은 원래 패턴에 걸렸지만 `detect_subjects.py` 는
-    2026-09-16 에 더하기 전까지 **안 걸렸다.** 검출은 몇 십 초짜리라 짧은데,
-    짧다는 것은 안 걸릴 이유가 아니라 **덜 걸릴 이유**다 — 그 사이에 타이머가
-    만료되면 사용자가 화면에서 기다리는 동안 전원이 내려간다.
-    """
-    cmd = worker.detect_command(cfg, _detect_job(), tmp_path / "c.json")
-    cmdline = " ".join(cmd)
-    found = subprocess.run(
-        ["grep", "-Eq", _busy_pattern()], input=cmdline, text=True, check=False
-    )
-    assert found.returncode == 0, (
-        f"autostop 이 이 명령줄을 '작업 중'으로 보지 못한다:\n  {cmdline}"
-    )
+# 🔴 여기 있던 `test_the_detect_child_is_seen_as_busy_by_autostop` 도 위
+# 「autostop 검사 셋을 지웠다」와 같은 이유로 지웠다 (2026.09.21).
