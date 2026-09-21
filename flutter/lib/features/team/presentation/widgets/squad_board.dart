@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
-import '../../seats_from_squad.dart';
 import '../../../profile/presentation/widgets/player_card_view.dart';
+import '../../data/models/squad.dart';
+import '../../seats_from_squad.dart';
 
 const Color _kOnDark = Color(0xFFFFFFFF);
 const Color _kInk = Color(0xFF0B0B0B);
@@ -12,7 +13,6 @@ const Color _kInk = Color(0xFF0B0B0B);
 /// 카드(내 카드 + 빈 자리)까지.
 ///
 /// ⚠️ **아직 안 옮긴 것**(웹에는 있다):
-/// - 서버 스쿼드(`GET /teams/{id}/squad`) — 지금은 내 카드 말고 전부 빈 자리다
 /// - 빈 자리(+) → AI 추천 · 지인 찾기. 폰에서는 옆 판이 아니라 **아래 시트**로
 ///   연다(`www/docs/2026-08-31-앱-이식-지침.md` §4). 지금은 [onSeatTap] 만 부른다
 /// - 카드 끌어 옮기기 · 빼기(⊗) · 포지션 직접 정하기
@@ -21,10 +21,25 @@ class SquadBoard extends StatefulWidget {
     super.key,
     required this.cardSeed,
     required this.onSeatTap,
+    this.squad,
+    this.mySlug,
+    this.mateCardBuilder,
   });
 
-  /// 내 카드 붓자국의 씨앗 — `PlayerCardView.seed` 참고.
-  final String cardSeed;
+  /// 내 카드 붓자국의 씨앗 — 🔴 **카드의 `public_slug`** 여야 웹과 같은 무늬가
+  /// 나온다. 카드가 아직 없으면 `null` 이고, 그러면 판에 내 카드를 안 그린다.
+  final String? cardSeed;
+
+  /// 서버 스쿼드. `null` 이면 아직 안 만들었거나 안 불러온 것이다 — 둘 다
+  /// 「자리가 전부 비어 있다」로 그린다.
+  final Squad? squad;
+
+  /// 내 카드의 공개 슬러그 — **어느 등재가 나인지** 가리는 열쇠다.
+  final String? mySlug;
+
+  /// 그 슬러그의 남의 카드를 그려 준다. 아직 안 왔으면 `null` 을 돌려주고,
+  /// 그때 판은 **이름표로 물러난다**(판 전체를 로딩으로 덮지 않는다).
+  final Widget? Function(String slug, double width)? mateCardBuilder;
 
   /// 빈 자리를 눌렀다. 인자는 그 자리.
   final ValueChanged<SquadSlot> onSeatTap;
@@ -34,8 +49,12 @@ class SquadBoard extends StatefulWidget {
 }
 
 class _SquadBoardState extends State<SquadBoard> {
-  /// 처음 여는 크기 — 풋살 5인(웹과 같다).
-  SquadSize _size = SquadSize.five;
+  /// 사람이 알약으로 고른 크기. 🔴 **이것이 서버 값을 이긴다** — 안 그러면
+  /// 판을 3:3 으로 바꾼 직후 스쿼드가 다시 도착하면서 5:5 로 되돌아간다.
+  SquadSize? _picked;
+
+  /// 서버가 모르는 값·`null` 을 주면 기본 판(5:5)이다.
+  SquadSize get _size => _picked ?? squadSizeOf(widget.squad?.formation);
 
   // 판 안 여백 — 위는 머리글(MY SQUAD · 크기) 자리, 아래는 이름표가 선을 물지
   // 않을 만큼. 웹(46 · 22 · 8)보다 옆을 줄였다 — 폰 폭에서 카드가 한 치라도 크게.
@@ -61,6 +80,10 @@ class _SquadBoardState extends State<SquadBoard> {
         final cardW = (byHeight < byWidth ? byHeight : byWidth).clamp(0.0, double.infinity);
         final cardH = cardW * 4.1 / 3;
 
+        // 🔴 자리 계산은 순수 함수 한 곳이다 — 판이 스스로 배치를 정하면
+        //    웹과 갈린다(`seats_from_squad.dart` 의 세 단계).
+        final seats = seatsFromSquad(widget.squad, _size, mySlug: widget.mySlug);
+
         return Stack(
           children: [
             Positioned.fill(
@@ -72,7 +95,7 @@ class _SquadBoardState extends State<SquadBoard> {
               right: 12,
               child: _head(),
             ),
-            for (final slot in kFormations[_size]!)
+            for (final slot in seats.slots)
               Positioned(
                 key: ValueKey('squad-seat-${slot.area}'),
                 left: _padSide + slot.col * cellW + (cellW - cardW) / 2,
@@ -80,7 +103,7 @@ class _SquadBoardState extends State<SquadBoard> {
                     slot.row * cellH +
                     (cellH - cardH - _labelGap - _labelH) / 2,
                 width: cardW,
-                child: _seat(slot, cardW),
+                child: _seat(slot, cardW, seats),
               ),
           ],
         );
@@ -114,25 +137,36 @@ class _SquadBoardState extends State<SquadBoard> {
               key: Key('squad-size-${size.name}'),
               label: size.label,
               selected: size == _size,
-              onTap: () => setState(() => _size = size),
+              onTap: () => setState(() => _picked = size),
             ),
           ),
       ],
     );
   }
 
-  Widget _seat(SquadSlot slot, double cardW) {
-    final card = slot.mine
-        ? PlayerCardView(width: cardW, seed: widget.cardSeed)
-        : GestureDetector(
-            key: Key('squad-add-${slot.area}'),
-            onTap: () => widget.onSeatTap(slot),
-            // 가운데 + — 카드 제 크기(380 폭) 기준 120 이다(웹 `.ss-squad-plus`).
-            child: BlankPlayerCardView(
-              width: cardW,
-              child: const Icon(Icons.add, size: 150, color: _kInk),
-            ),
-          );
+  /// 자리는 셋으로 갈린다 — **내 카드 · 남의 카드 · 빈 자리.**
+  Widget _seat(SquadSlot slot, double cardW, SeatAssignment seats) {
+    final Widget card;
+    if (slot.mine && widget.cardSeed != null) {
+      card = PlayerCardView(width: cardW, seed: widget.cardSeed!);
+    } else if (seats.mates.containsKey(slot.area)) {
+      final slug = seats.slugs[slot.area];
+      final mate =
+          slug == null ? null : widget.mateCardBuilder?.call(slug, cardW);
+      // 🔴 카드가 아직 안 왔거나 슬러그가 없으면 **이름표로 물러난다.** 판
+      //    전체를 로딩으로 덮지 않는다 — 나머지 자리는 이미 그릴 수 있다.
+      card = mate ?? _nameplate(slot, cardW, seats);
+    } else {
+      card = GestureDetector(
+        key: Key('squad-add-${slot.area}'),
+        onTap: () => widget.onSeatTap(slot),
+        // 가운데 + — 카드 제 크기(380 폭) 기준 120 이다(웹 `.ss-squad-plus`).
+        child: BlankPlayerCardView(
+          width: cardW,
+          child: const Icon(Icons.add, size: 150, color: _kInk),
+        ),
+      );
+    }
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -152,6 +186,31 @@ class _SquadBoardState extends State<SquadBoard> {
           ),
         ),
       ],
+    );
+  }
+
+  /// 카드가 아직 없을 때 그 자리 사람의 **이름만** 세운다.
+  ///
+  /// 🔴 **글자 크기 40 은 카드 제 크기(380 폭) 기준이다** — `BlankPlayerCardView`
+  /// 안은 통째로 줄어들므로 여기에 화면 픽셀을 넣으면 작은 판에서 글자만 커진다.
+  Widget _nameplate(SquadSlot slot, double cardW, SeatAssignment seats) {
+    // 수락 대기중이면 흐리게 — 「아직 안 온 사람」이다.
+    final ready = seats.ready[slot.area] ?? true;
+    return BlankPlayerCardView(
+      width: cardW,
+      child: Opacity(
+        opacity: ready ? 1 : 0.45,
+        child: Text(
+          seats.mates[slot.area]!,
+          key: Key('squad-mate-${slot.area}'),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 40,
+            fontWeight: FontWeight.w700,
+            color: _kInk,
+          ),
+        ),
+      ),
     );
   }
 }
