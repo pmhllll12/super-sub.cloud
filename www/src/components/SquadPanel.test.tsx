@@ -2238,6 +2238,115 @@ describe('스쿼드 — 초대로 고른 칸은 새로고침해도 그대로다'
  * **다시 시도하는 자리가 없다.** 운영의 「심사위원 FC」가 그래서 팀원 9명에
  * 스쿼드 0이었고, 판이 빈 채로 떠서 팀 매칭 단추도 안 켜졌다.
  */
+/**
+ * 🔴 **⊗ 로 뺀 사람이 새로고침에 되살아나던 것** (사용자 지적, 2026-09-18:
+ * 「취소를 눌러 내보냈는데 계속 팀에 상주한다」).
+ *
+ * 전에는 ⊗ 가 **대기 중인 초대만** 물렀다. 수락이 끝나면 무를 초대가 없어
+ * **서버로 아무것도 안 나갔고**, 화면에서만 사라졌다가 되돌아왔다.
+ * 등재를 만드는 쪽은 서버인데(계약 60) 지우는 쪽만 화면에 있었다.
+ */
+describe('스쿼드 — ⊗ 는 등재된 사람도 서버에서 뺀다', () => {
+  const member = (id: string, nickname: string, pos: string, col: number, row: number) => ({
+    id,
+    player_card_id: `c-${id}`,
+    card_public_slug: `slug-${id}`,
+    nickname,
+    position_code: pos,
+    position_label: pos,
+    grid_col: col,
+    grid_row: row,
+  })
+  const SEATED = {
+    ...SQUAD,
+    formation: '5:5',
+    members: [member('sm-9', '더미선수', 'MF', 0, 1)],
+  }
+
+  const calls = () => {
+    const fn = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => SEATED })
+    vi.stubGlobal('fetch', fn)
+    return fn
+  }
+  const deleted = (fn: ReturnType<typeof vi.fn>) =>
+    fn.mock.calls.filter((c) => c[1]?.method === 'DELETE').map((c) => String(c[0]))
+
+  it('🔴 등재 id 로 DELETE 를 보낸다 — 화면만 바꾸지 않는다', async () => {
+    const fn = calls()
+    const user = userEvent.setup()
+    render(
+      <SquadPanel isCaptain card={CARD} squad={SEATED} myTeamId={MY_TEAM_ID} />,
+    )
+    await user.click(await screen.findByRole('button', { name: '더미선수 빼기' }))
+
+    await waitFor(() =>
+      expect(
+        deleted(fn).some((u) => u.includes('/squad/members/') && u.includes('sm-9')),
+      ).toBe(true),
+    )
+  })
+
+  /* 주장이 아니면 ⊗ 자체가 없다 — 서버가 403 이라 눌릴 자리를 안 만든다. */
+  it('팀원 화면에는 ⊗ 가 없다', () => {
+    calls()
+    render(<SquadPanel card={CARD} squad={SEATED} myTeamId={MY_TEAM_ID} />)
+    expect(screen.queryByRole('button', { name: '더미선수 빼기' })).toBeNull()
+  })
+
+  /**
+   * 🔴 **팀에서도 내보낸다** (사용자 결정, 2026-09-18: 「x 가 팀에서도 빠지는 것」).
+   *
+   * 판에서만 내리면 그 사람이 여전히 팀원이라 **AI 추천 후보에서 계속 빠진다**
+   * — 운영에서 그렇게 12명이 쌓여 추천 목록이 말랐다.
+   */
+  it('🔴 팀에서도 내보낸다 — 판에서만 내리면 추천 후보가 마른다', async () => {
+    const fn = vi.fn(async (url: string) => ({
+      ok: true,
+      status: 200,
+      json: async () =>
+        String(url).includes('/api/cards/')
+          ? { user: { id: 'u-dummy', nickname: '더미선수' } }
+          : SEATED,
+    }))
+    vi.stubGlobal('fetch', fn)
+    const user = userEvent.setup()
+    render(<SquadPanel isCaptain card={CARD} squad={SEATED} myTeamId={MY_TEAM_ID} />)
+    await user.click(await screen.findByRole('button', { name: '더미선수 빼기' }))
+
+    /* 🔴 `memberId` 는 **그 사람의 user_id** 다 — 소속 행의 id 가 아니다. */
+    await waitFor(() =>
+      expect(
+        deleted(fn).some((u) => u.includes(`/teams/${MY_TEAM_ID}/members/u-dummy`)),
+      ).toBe(true),
+    )
+  })
+
+  /* 🔴 **나는 안 내보낸다** — 주장이 스스로 나가면 팀이 주인을 잃는다
+     (`409 LAST_OWNER`). 내 카드엔 ⊗ 가 없지만 한 겹 더 막아 둔 것을 지킨다. */
+  it('내 카드의 주인은 팀에서 안 내보낸다', async () => {
+    const fn = vi.fn(async (url: string) => ({
+      ok: true,
+      status: 200,
+      json: async () =>
+        String(url).includes('/api/cards/')
+          ? { user: { id: CARD.user.id, nickname: CARD.user.nickname } }
+          : SEATED,
+    }))
+    vi.stubGlobal('fetch', fn)
+    const user = userEvent.setup()
+    render(<SquadPanel isCaptain card={CARD} squad={SEATED} myTeamId={MY_TEAM_ID} />)
+    await user.click(await screen.findByRole('button', { name: '더미선수 빼기' }))
+
+    /* 판에서는 내려도(위 시험) **팀 방출은 안 나간다.**
+       🔴 `/members/` 로 세면 안 된다 — 판에서 내리는 경로도
+       `/squad/members/{id}` 라 그것까지 걸린다. 팀 방출은 `squad` 가 없다. */
+    await waitFor(() => expect(deleted(fn).length).toBeGreaterThan(0))
+    const teamEject = (u: string) =>
+      u.includes(`/teams/${MY_TEAM_ID}/members/`) && !u.includes('/squad/')
+    expect(deleted(fn).some(teamEject)).toBe(false)
+  })
+})
+
 describe('스쿼드 — 없으면 주장 화면이 만든다', () => {
   const calls = () => {
     const fn = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({}) })
@@ -2362,5 +2471,39 @@ describe('스쿼드 — 경기가 잡힌 화면', () => {
     expect(within(theirs).getByText('정우진')).toBeInTheDocument()
     /* 고치기 전에는 이 사람이 **남의 화면에서만** 사라졌다. */
     expect(within(theirs).getByText('칸없는사람')).toBeInTheDocument()
+  })
+})
+
+/**
+ * **카드 없는 사람이 빈 자리를 누르면 「내 프로필」을 가리킨다** (사용자 요청,
+ * 2026-09-19). 처음 온 사람은 카드도 팀도 없어서 빈 자리가 잠겨 있었고, 눌러도
+ * 아무 일이 없어 무엇을 하라는지 몰랐다.
+ */
+describe('카드 없이 빈 자리를 누르면', () => {
+  it('잠겨 있지 않고, 누르면 「내 프로필에서 카드를 먼저 만들어주세요.」를 띄운다', async () => {
+    render(<SquadPanel card={null} squad={null} />)
+    const seat = screen.getAllByRole('button', { name: /자리에 선수 넣기/ })[0]
+    expect(seat).not.toBeDisabled()
+    await userEvent.click(seat)
+    expect(screen.getByRole('status')).toHaveTextContent('내 프로필에서 카드를 먼저 만들어주세요.')
+    // 추천 판은 안 열린다
+    expect(seat).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('카드가 있고 팀이 있는 팀원은 전처럼 잠겨 있다', () => {
+    render(<SquadPanel card={CARD} myCardId={CARD.id} squad={SQUAD} />)
+    for (const seat of screen.queryAllByRole('button', { name: /자리에 선수 넣기/ })) expect(seat).toBeDisabled()
+  })
+
+  // 🔴 카드는 만들었는데 팀이 없으면 — 판에 그냥 앉히지 않고 팀을 만들라고 한다(사용자 판단).
+  it('카드는 있고 팀이 없으면 누를 때 「팀을 먼저 만들어주세요」 — 내 카드를 판에 앉히지 않는다', async () => {
+    const { container } = render(<SquadPanel card={CARD} myCardId={CARD.id} squad={null} />)
+    expect(container.querySelector('.ss-pcard-alias')).toBeNull()
+    const seat = screen.getAllByRole('button', { name: /자리에 선수 넣기/ })[0]
+    expect(seat).not.toBeDisabled()
+    await userEvent.click(seat)
+    expect(screen.getByRole('status')).toHaveTextContent('내 프로필에서 팀을 먼저 만들어주세요.')
+    // 다음 프로필 방문에서 한 번 가리키라는 표를 남긴다
+    expect(sessionStorage.getItem('ss-team-nudge-pending')).toBe('1')
   })
 })

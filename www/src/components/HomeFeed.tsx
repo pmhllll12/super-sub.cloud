@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useWheelTrap } from '@/lib/useWheelTrap'
 import { feedWith } from '@/lib/feed'
 import { listPublished } from '@/lib/published'
 import type { PublicVideo } from '@/server/backend'
@@ -86,6 +87,23 @@ export default function HomeFeed({ active }: { active: boolean }) {
    */
   const [listY, setListY] = useState(0)
   const box = useRef<HTMLDivElement>(null)
+  /**
+   * 「다음 영상」 목록 — 여기서 굴리면 **페이지가 안 움직인다**(2026-09-18).
+   *
+   * 🔴 이 목록은 스크롤 상자가 **아니다**(`overflow` 가 없다). 그래서
+   * `overscroll-behavior` 로는 못 막고, 휠이 곧장 페이지로 샌다. 판을 통째로
+   * 삼키는 쪽으로 막는다(`useWheelTrap` 머리말).
+   *
+   * ⚠️ **붙인 까닭의 절반은 없어졌다**(2026-09-18). 원래는 여기서 굴린 것이
+   * 창까지 올라가 **홈으로 되올라가던** 것이 문제였는데, 홈이 이제 굴림을
+   * 아예 안 듣는다(`HomeStage` — 오가는 것은 누르는 것뿐이다). 남은 까닭은
+   * **페이지가 딸려 구르는 것**을 막는 몫이라 그대로 둔다.
+   *
+   * ⚠️ 닫혀 있을 때는 `pointer-events: none` 이라 휠이 여기 안 닿는다 —
+   * 그때는 페이지가 평소대로 구른다.
+   */
+  const listTrapRef = useRef<HTMLElement>(null)
+  useWheelTrap(listTrapRef, listTrapRef)
 
   /** 앞뒤로 **끝없이** 돈다 — 마지막에서 오른쪽으로 가면 처음으로. */
   /**
@@ -398,7 +416,13 @@ export default function HomeFeed({ active }: { active: boolean }) {
           넓어져 화면이 출렁인다. 영상이 비켜서는 것은 아래 CSS 가 따로 맡는다. */}
       {/* 🔴 **판이 아니다**(사용자 요청) — 테두리도 바탕도 없이 영상 상자와 이름 ·
           제목만 떠 있다. 목록처럼 보이게 만드는 것은 줄 간격뿐이다. */}
+      {/* 🔴 **여기서 굴리면 페이지가 안 움직인다**(사용자 지적, 2026-09-18:
+          「이 부분에서도 스크롤 하면 홈페이지로 넘어가」). 이 목록은 스크롤
+          상자가 **아니라서**(`overflow` 가 없다) 휠이 곧장 페이지로 갔다 —
+          `overscroll-behavior` 로는 못 막는 자리다. 「비슷한 팀」 판과 같은
+          처리를 공용 훅으로 건다. */}
       <aside
+        ref={listTrapRef}
         className="ss-feed-list"
         data-open={side === 'list'}
         aria-hidden={side !== 'list'}

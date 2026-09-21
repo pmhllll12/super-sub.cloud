@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { applyToTeam, findCandidates, type CandidateTeam } from '@/lib/teamMatch'
 import { proposalsFrom, toPlayedAt, type Proposal } from '@/lib/matchProposal'
 import { VENUES } from '@/lib/venues'
@@ -9,6 +9,7 @@ import { type MatchPrefs } from '@/lib/matchPrefs'
 import { loadTeamPrefs, saveTeamPrefs } from '@/lib/teamPrefsStore'
 import { startSeeking, stopSeeking } from '@/lib/seekingStore'
 import { useFitToViewport } from '@/lib/useFitToViewport'
+import { useWheelTrap } from '@/lib/useWheelTrap'
 
 /**
  * **비슷한 팀 명단** — 「팀 매칭」을 누르면 판 오른쪽에 선다(사용자 요청,
@@ -45,6 +46,11 @@ type State =
   | { kind: 'error'; message: string }
   | { kind: 'ok'; teams: CandidateTeam[] }
 
+/** 두 자리로 맞춘다 — `datetime-local` 은 `2026-09-05T07:30` 처럼 0 을 요구한다. */
+function pad2(n: number): string {
+  return String(n).padStart(2, '0')
+}
+
 export default function TeamMatch({
   size,
   closing,
@@ -65,13 +71,38 @@ export default function TeamMatch({
   /**
    * 신청을 **걸었다**. 🔴 「잡혔다」가 아니다 — 부모가 이 id 를 기억해 두었다가
    * 상대가 수락하는 순간(알림)에 대기 팝업을 띄운다.
+   *
+   * 🔴 `playedAt`·`place`를 함께 넘긴다(2026-09-20, 데모용) — 부모가
+   * 데모 자동 수락으로 대기 팝업을 스스로 띄우려면 신청한 시각·장소가
+   * 있어야 `MatchTeam` 모양을 채울 수 있다.
    */
-  onRequested: (requestId: string, team: CandidateTeam) => void
+  onRequested: (requestId: string, team: CandidateTeam & { playedAt: string; place: string }) => void
 }) {
   const [state, setState] = useState<State>({ kind: 'loading' })
   /* 🔴 화면 아래로 넘치지 않게 — 「팀원」 판과 같은 상자에 매달려 있어 같은
      문제를 겪는다(`useFitToViewport` 머리말). */
   const fitRef = useFitToViewport<HTMLElement>()
+  /** 굴릴 대상 — 판 안의 목록. 아래 휠 처리기가 이것을 대신 굴린다. */
+  const listRef = useRef<HTMLUListElement>(null)
+
+  /**
+   * **판 안에서 굴리면 페이지가 안 움직인다** (사용자 지적, 2026-09-18:
+   * 「팀 매칭 판에서 다른 팀 보려고 스크롤 하면 아예 비디오로 내려와」).
+   *
+   * 🔴 **영상 쪽 「다음 영상」 목록에서도 같은 일이 났다.** 되풀이하지 않게
+   * `lib/useWheelTrap.ts` 로 뺐다 — 왜 이렇게 하는지는 그 머리말에 있다.
+   *
+   * 🔴 `.ss-tm-list` 에는 이미 `overscroll-behavior: contain` 이 있다. 새는
+   * 자리는 **목록 밖**이다 — 머리줄이나 아래 안내 위에서 굴리면 그 휠은
+   * 목록이 아니라 **페이지**로 가고, 홈은 아래가 영상 모음이라 거기까지
+   * 내려간다. CSS 로는 못 막는다(그 자리들은 스크롤 상자가 아니다).
+   *
+   * 🔴 **목록이 아직 구를 수 있으면 막지 않는다** — 다 막으면 목록 자체가
+   * 안 움직인다. 페이지로 넘어가는 것만 막는 것이 요점이다.
+   * 🔴 **`passive: false` 로 붙인다** — React 의 `onWheel` 은 passive 라
+   * `preventDefault()` 가 조용히 무시된다.
+   */
+  useWheelTrap(fitRef, listRef)
   /** 지금 수락을 기다리는 팀. 하나뿐이다 — 두 곳에 동시에 신청하지 않는다. */
   const [waiting, setWaiting] = useState<string | null>(null)
   /** 신청이 실제로 나간 팀 — 줄에 「수락 대기 중」이라고 적는다. */
@@ -178,6 +209,11 @@ export default function TeamMatch({
    * 🔴 **지난 시각은 안 쓴다.** 서버가 받아 줘도 아무도 못 뛰고, 대기 화면이
    * 열리자마자 「경기 끝내기」로 바뀐다(`matchProposal.ts` 의 같은 판단).
    */
+  /** `Date` → `datetime-local` 값(`2026-09-18T19:30`). **지역 시각 그대로**다. */
+  const toInput = (at: Date) =>
+    `${at.getFullYear()}-${pad2(at.getMonth() + 1)}-${pad2(at.getDate())}` +
+    `T${pad2(at.getHours())}:${pad2(at.getMinutes())}`
+
   const customDate = useMemo(() => {
     if (!customAt) return null
     const at = new Date(customAt)
@@ -186,6 +222,8 @@ export default function TeamMatch({
   }, [customAt])
   /** 골라 놓고 **지난** 시각이면 신청을 막는다 — 왜 안 눌리는지 옆에 적는다. */
   const customIsPast = customDate !== null && customDate.getTime() <= Date.now()
+  /** 달력이 **지난 시각을 못 고르게** 한다 — 막는 것과 별개로 손이 덜 간다. */
+  const minAt = toInput(new Date())
   const [pickedPlace, setPickedPlace] = useState<string>('')
 
   /**
@@ -222,14 +260,15 @@ export default function TeamMatch({
     }
     setWaiting(team.id)
     setError(null)
+    const playedAt = toPlayedAt(at)
     try {
       const { requestId } = await applyToTeam(teamId, {
         id: team.id,
-        playedAt: toPlayedAt(at),
+        playedAt,
         place: pickedPlace,
       })
       setPicking(null)
-      onRequested(requestId, team)
+      onRequested(requestId, { ...team, playedAt, place: pickedPlace })
       setSentTo(team.id)
     } catch (e) {
       setError(e instanceof Error ? e.message : '경기를 신청하지 못했습니다.')
@@ -342,7 +381,7 @@ export default function TeamMatch({
       )}
 
       {!asking && state.kind === 'ok' && state.teams.length > 0 && (
-        <ul className="ss-tm-list">
+        <ul ref={listRef} className="ss-tm-list">
           {state.teams.map((t) => (
             <li key={t.id} className="ss-tm-row">
               <span className="ss-tm-name">{t.name}</span>
@@ -373,6 +412,13 @@ export default function TeamMatch({
                   setPicking(picking === t.id ? null : t.id)
                   setPickedAt(proposals[0] ?? null)
                   setPickedPlace('')
+                  /* 🔴 **열자마자 쓸 수 있는 시각을 채운다**(사용자 지적,
+                     2026-09-18). 비워 두었더니 달력에서 **날짜만** 고르고
+                     시각이 `00:00` 으로 남아 「지난 시각입니다」에 걸렸다 —
+                     사람이 잘못한 것이 아니라 빈 칸이 그렇게 만든 것이다.
+                     10분 뒤면 신청·수락·대기 화면을 보기에 충분하고, 시연에서
+                     경기 끝내기·리뷰까지 가는 데도 알맞다. */
+                  setCustomAt(toInput(new Date(Date.now() + 10 * 60 * 1000)))
                 }}
               >
                 {sentTo === t.id
@@ -395,7 +441,12 @@ export default function TeamMatch({
                           것은 추천 후보 필터를 푸는 정상적인 길이라(프로필의
                           「시간 조건 지우기」), 그 상태에서 경기를 못 걸면
                           앞뒤가 안 맞는다. 아래 「직접 고르기」로 잡으면 된다. */}
-                      {proposals.length === 0 ? (
+                      {/* 🔴 **직접 고른 값이 있으면 제안을 안 그린다**(사용자
+                          지적, 2026-09-18: 「내가 직접 고르면 이거는 필요없는거
+                          아님?」). 직접 고른 쪽이 이기는데 둘이 같이 떠 있으면
+                          **어느 것이 쓰이는지 알 수 없다.** 칸을 비우면 제안이
+                          다시 나온다 — 제안을 없앤 것이 아니다. */}
+                      {customAt ? null : proposals.length === 0 ? (
                         <p className="ss-tm-note">
                           경기 조건에 시간대가 없습니다 — 아래에서 직접 고르세요.
                         </p>
@@ -425,6 +476,7 @@ export default function TeamMatch({
                         <span>직접 고르기</span>
                         <input
                           type="datetime-local"
+                          min={minAt}
                           value={customAt}
                           onChange={(e) => setCustomAt(e.target.value)}
                         />

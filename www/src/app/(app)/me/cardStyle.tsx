@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useMemo, useState } from 'react'
 import { ApiCallError, apiPatch } from '@/lib/api/client'
-import { ALIAS } from '@/components/PlayerCardView'
+import { ALIAS, aliasOf } from '@/components/PlayerCardView'
 import type { CardStyleWire, PlayerCard } from '@/server/backend'
 
 /**
@@ -106,6 +106,22 @@ export const DEFAULT_CARD_STYLE: CardStyle = {
   brushY: 0,
 }
 
+/**
+ * **처음 만든 카드의 모습**(사용자 지정, 2026-09-19) — 「카드 만들기」 직후 이
+ * 값으로 한 번 저장해 둔다(`saveFirstLook`). 그 뒤로 바꾸는 것은 사용자 몫이다.
+ * 🔴 `DEFAULT_CARD_STYLE`(아무것도 안 고친 상태) 자체를 바꾸지 **않은** 이유 —
+ * 그러면 이미 카드가 있으면서 한 번도 안 꾸민 사람들의 카드가 말없이 바뀐다.
+ * 붓은 「오려낸 X」(`MARKS` 12번) · 검정 · 1.4배 · 좌우 6% · 위아래 35%.
+ */
+export const FIRST_CARD_STYLE: CardStyle = {
+  ...DEFAULT_CARD_STYLE,
+  brush: 12,
+  brushColor: '#000000',
+  brushScale: 1.4,
+  brushX: 6,
+  brushY: 35,
+}
+
 /** 서버 값(있으면) 위에 기본값을 채운다 — 필드가 늘어나도 옛 카드가 화면을 안 깬다. */
 function fromWire(wire: CardStyleWire | null | undefined): CardStyle {
   if (!wire) return DEFAULT_CARD_STYLE
@@ -190,6 +206,24 @@ type Ctx = {
 const CardStyleContext = createContext<Ctx | null>(null)
 
 /**
+ * 갓 만든 카드에 {@link FIRST_CARD_STYLE} 을 저장한다. 편집기 `save` 와 같은 길 —
+ * 옛 서버가 사진 칸 때문에 422 면 사진 칸 없이 한 번 더 보낸다.
+ * 🔴 **실패해도 던지지 않는다** — 카드는 이미 생겼다. 모습만 기본으로 남을 뿐이다.
+ * 🔴 **글자(`tagline`)도 같이 싣는다.** `style` 만 저장하면 「꾸민 적이 있는데 글자가
+ * 비었다 = 일부러 지웠다」(`aliasOf`)로 읽혀 **THREE LUNGS 가 사라진다**(헤드리스로 겪음).
+ */
+export async function saveFirstLook(): Promise<void> {
+  try {
+    await apiPatch('/api/me/card', { tagline: ALIAS, style: toWire(FIRST_CARD_STYLE) })
+  } catch (err) {
+    if (!(err instanceof ApiCallError) || err.status !== 422) return
+    await apiPatch('/api/me/card', { tagline: ALIAS, style: toLegacyWire(FIRST_CARD_STYLE) }).catch(
+      () => {},
+    )
+  }
+}
+
+/**
  * 카드와 편집기가 **같은 값을 본다**. 둘이 화면에서 떨어져 있어서(카드는 선
  * 위, 편집기는 선 아래) 상태를 한쪽이 들고 있을 수가 없다.
  *
@@ -213,9 +247,10 @@ export function CardStyleProvider({
     ...fromWire(card?.style),
     photo: card?.photo_url ?? null,
   }))
-  // 🔴 안 정했으면 `ALIAS` 자리 표시로 시작한다 — 지금 카드(비편집 화면)에
-  // 보이는 것과 편집기를 여는 순간 보이는 것이 달라지면 안 된다.
-  const [tagline, setTagline] = useState(() => card?.tagline ?? ALIAS)
+  // 🔴 **지금 카드에 보이는 그 글자로** 시작한다 — 편집기를 여는 순간 다른
+  // 글자가 뜨면 안 된다. 그래서 `aliasOf` 를 같이 쓴다: 일부러 비워 둔
+  // 사람에게는 빈 칸이, 한 번도 안 꾸민 사람에게는 자리 표시가 온다.
+  const [tagline, setTagline] = useState(() => (card ? aliasOf(card) : ALIAS))
 
   const value = useMemo<Ctx>(
     () => ({

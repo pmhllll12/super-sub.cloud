@@ -4,7 +4,8 @@ import type { PlayerCard } from '@/server/backend'
 import { CardStyleProvider, DEFAULT_CARD_STYLE } from './cardStyle'
 import CardEditor from './CardEditor'
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: () => {} }) }))
+const refresh = vi.fn()
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }))
 
 const CARD: PlayerCard = {
   id: 'c1',
@@ -27,6 +28,50 @@ function open(card: PlayerCard = CARD) {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('카드 꾸미기 — 되돌리기와 저장', () => {
+  /* 🔴 **글자를 안 쓰고 싶은 사람이 있다** (2026-09-18 사용자 요청). 지우고
+     저장하면 지운 채로 남아야 하는데, 예전엔 다시 열 때마다 자리 표시가
+     도로 채워져 **지울 방법이 없었다.** 칸에 적힌 `비우면 글자 없이` 가
+     이미 그렇게 약속하고 있었고 동작만 안 따라갔다. */
+  const SAVED = {
+    bg: '#111111',
+    logo: '#222222',
+    text_color: '#333333',
+    text_x: 50,
+    text_y: 34,
+    brush: 0,
+    brush_color: '#0b0b0b',
+    brush_scale: 1,
+    brush_x: 0,
+    brush_y: 0,
+  }
+
+  it('일부러 비워 둔 카드를 다시 열면 빈 칸으로 시작한다', () => {
+    open({ ...CARD, tagline: null, style: SAVED })
+    expect(screen.getByLabelText('카드에 넣을 글자')).toHaveValue('')
+  })
+
+  it('한 번도 안 꾸민 카드는 자리 표시로 시작한다', () => {
+    open({ ...CARD, tagline: null, style: null })
+    expect(screen.getByLabelText('카드에 넣을 글자')).toHaveValue('THREE LUNGS')
+  })
+
+  it('글자를 지우고 저장하면 tagline 을 null 로 보낸다', async () => {
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(JSON.stringify({ ...CARD, tagline: null }), { status: 200 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    open({ ...CARD, tagline: '지난번 것', style: SAVED })
+
+    await userEvent.clear(screen.getByLabelText('카드에 넣을 글자'))
+    await userEvent.click(screen.getByRole('button', { name: '저장' }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]!.body))
+    // 🔴 빈 문자열이 아니라 `null` 이다 — 계약이 공백을 「안 정한 상태」로 본다.
+    expect(body.tagline).toBeNull()
+  })
+
   it('되돌리는 단추 이름은 「초기화」다', () => {
     open()
     expect(screen.getByRole('button', { name: '초기화' })).toBeInTheDocument()
@@ -99,13 +144,100 @@ describe('카드 꾸미기 — 되돌리기와 저장', () => {
     expect(screen.getByLabelText('카드에 넣을 글자')).toHaveAttribute('maxLength', '20')
   })
 
-  // 초기화는 화면의 값만 공장 기본값으로 되돌린다 — 저장을 눌러야 서버도 바뀐다.
-  it('초기화하면 화면이 공장 기본값으로 돌아간다', async () => {
-    const user = userEvent.setup()
-    open({ ...CARD, tagline: '지난번 것' })
-    expect(screen.getByLabelText('카드에 넣을 글자')).toHaveValue('지난번 것')
+  /* 🔴 **초기화는 카드를 지운다**(사용자 요청, 2026-09-19) — 카드를 안 만든 처음
+     상태로. 되돌릴 수 없어서 한 번 묻는다. 전에는 화면 값만 기본값으로 돌렸다. */
+  describe('초기화 — 카드를 지우고 처음 상태로', () => {
+    afterEach(() => {
+      vi.restoreAllMocks()
+      refresh.mockClear()
+    })
 
-    await user.click(screen.getByRole('button', { name: '초기화' }))
-    expect(screen.getByLabelText('카드에 넣을 글자')).toHaveValue('THREE LUNGS')
+    function stubFetch(status: number) {
+      return vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(status === 204 ? null : JSON.stringify({ error: { code: 'X', message: '없음' } }), {
+          status,
+        }),
+      )
+    }
+
+    it('묻고, 아니오면 아무것도 안 한다', async () => {
+      const user = userEvent.setup()
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+      const fetch = stubFetch(204)
+      open({ ...CARD, tagline: '지난번 것' })
+      await user.click(screen.getByRole('button', { name: '초기화' }))
+      expect(confirm).toHaveBeenCalled()
+      expect(fetch).not.toHaveBeenCalled()
+      expect(screen.getByLabelText('카드에 넣을 글자')).toHaveValue('지난번 것')
+    })
+
+    it('예면 DELETE /api/me/card 를 부르고 화면을 새로 읽는다', async () => {
+      const user = userEvent.setup()
+      vi.spyOn(window, 'confirm').mockReturnValue(true)
+      const fetch = stubFetch(204)
+      open(CARD)
+      await user.click(screen.getByRole('button', { name: '초기화' }))
+      await waitFor(() => expect(refresh).toHaveBeenCalled())
+      const [url, init] = fetch.mock.calls[0]
+      expect(url).toBe('/api/me/card')
+      expect((init as RequestInit).method).toBe('DELETE')
+    })
+
+    it('서버가 아직 지우기를 모르면(404) 꾸밈만 기본값으로 — 그렇다고 말한다', async () => {
+      const user = userEvent.setup()
+      vi.spyOn(window, 'confirm').mockReturnValue(true)
+      stubFetch(404)
+      open({ ...CARD, tagline: '지난번 것' })
+      await user.click(screen.getByRole('button', { name: '초기화' }))
+      expect(await screen.findByRole('alert')).toHaveTextContent('서버가 아직 카드 지우기를 모릅니다')
+      expect(screen.getByLabelText('카드에 넣을 글자')).toHaveValue('THREE LUNGS')
+      expect(refresh).not.toHaveBeenCalled()
+    })
+  })
+})
+
+/* 🔴 **처음 만든 카드는 정해 둔 모습으로**(사용자 지정, 2026-09-19) — 「오려낸 X」
+   붓(12번) · 검정 · 1.4배 · 좌우 6% · 위아래 35%. 이미 꾸민 카드는 안 건드린다. */
+describe('카드 만들기 — 첫 모습', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    refresh.mockClear()
+  })
+
+  function stub(made: PlayerCard) {
+    return vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      if ((init as RequestInit).method === 'POST') return new Response(JSON.stringify(made), { status: 200 })
+      return new Response(JSON.stringify(made), { status: 200 })
+    })
+  }
+
+  it('갓 만든 카드(style 없음)에 X 붓 모습을 저장한다', async () => {
+    const user = userEvent.setup()
+    const fetch = stub({ ...CARD, style: null })
+    render(
+      <CardStyleProvider card={null}>
+        <CardEditor card={null} />
+      </CardStyleProvider>,
+    )
+    await user.click(screen.getByRole('button', { name: '카드 만들기' }))
+    await waitFor(() => expect(refresh).toHaveBeenCalled())
+    const patch = fetch.mock.calls.find(([, i]) => (i as RequestInit).method === 'PATCH')!
+    const body = JSON.parse((patch[1] as RequestInit).body as string)
+    expect(body.style).toMatchObject({ brush: 12, brush_color: '#000000', brush_scale: 1.4, brush_x: 6, brush_y: 35 })
+    // 글자도 같이 — 안 실으면 「일부러 지운 것」으로 읽혀 THREE LUNGS 가 사라진다
+    expect(body.tagline).toBe('THREE LUNGS')
+  })
+
+  it('이미 꾸민 카드가 돌아오면(멱등) 건드리지 않는다', async () => {
+    const user = userEvent.setup()
+    const fetch = stub({ ...CARD, style: { ...(CARD.style ?? {}), brush: 3 } as PlayerCard['style'] })
+    render(
+      <CardStyleProvider card={null}>
+        <CardEditor card={null} />
+      </CardStyleProvider>,
+    )
+    await user.click(screen.getByRole('button', { name: '카드 만들기' }))
+    await waitFor(() => expect(refresh).toHaveBeenCalled())
+    expect(fetch.mock.calls.some(([, i]) => (i as RequestInit).method === 'PATCH')).toBe(false)
   })
 })

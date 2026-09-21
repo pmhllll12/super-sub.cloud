@@ -366,7 +366,19 @@ body::-webkit-scrollbar {
   cursor: pointer;
 }
 
-.ss-home-nav-item:hover,
+/* 🔴 **가리키기 색은 실제 마우스에서만 켠다**(2026-09-20, 사용자 지적 —
+   폰에서 한 번 눌러도 안 넘어갔다). 터치 화면은 첫 탭을 `:hover` 로
+   받는 기기가 많아서, 이 규칙이 조건 없이 걸려 있으면 첫 탭은 이 색만
+   켜고 실제 이동은 두 번째 탭에야 일어난다 — 아래
+   `@media (hover: hover)` 로 가둬 터치에서는 애초에 이 규칙이 안 걸리게
+   한다. `:focus-visible` · `[data-active]` 는 가리키기가 아니라서 그대로
+   둔다. */
+@media (hover: hover) {
+  .ss-home-nav-item:hover {
+    color: var(--ss-accent);
+  }
+}
+
 .ss-home-nav-item:focus-visible,
 .ss-home-nav-item[data-active='true'] {
   color: var(--ss-accent);
@@ -400,6 +412,49 @@ body::-webkit-scrollbar {
 /* 글자는 원래 자간을 그대로 쓴다 — 아이콘이 위에 붙었을 뿐이다. */
 .ss-home-nav-label {
   letter-spacing: inherit;
+}
+
+/* 🔴 **폰에서 다섯 칸이 한 줄에 안 들어갔다**(2026-09-20, 사용자 지적 —
+   "영상 분석·레슨·상점·경기장 예약·알림"이 두 줄로 접혀 보기 싫었다).
+   `column-gap: 40px`·31px 아이콘·0.875rem 글자·0.08em 자간은 전부 넓은
+   화면 기준이다. 🔴 **라벨을 숨기는 시도는 되돌린다**(사용자 지적 —
+   글씨가 안 보인다) — 글자는 그대로 두고 아이콘·간격·글자 크기·자간을
+   함께 줄여서 다섯 칸이 폭 안에 들어가게 한다.
+
+   🔴 **그런데 그만큼 줄인 값(0.6rem·18px)이 너무 작아 이번엔 "잘 안
+   보인다"는 말을 들었다**(2026-09-20). 완전히 되돌리면 다시 두 줄로
+   접히므로, 읽을 만한 선까지만 올리고(0.6→0.72rem, 18→21px) **넘치는
+   나머지는 가로로 긋는다** — `body` 가 `overflow-x: clip` 이라(위쪽
+   규칙) 이 줄 자체에 `overflow-x: auto` 를 안 주면 다음으로 좁은 기기에서
+   또 이만큼 늘린 값이 넘칠 때 잘려서 **아예 안 보이게** 된다(글자가
+   작은 것과는 다른 종류의 "안 보임"이다). 마켓 판의 카드 줄
+   (`.ss-market-gate-cards[data-frozen='true']`)과 같은 처리. */
+@media (max-width: 640px) {
+  .ss-home-nav-list {
+    column-gap: 10px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .ss-home-nav-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ss-home-nav-item--stack {
+    padding: 6px 4px;
+  }
+
+  .ss-home-nav-icon {
+    font-size: 21px;
+  }
+
+  .ss-home-nav-item {
+    font-size: 0.72rem;
+    letter-spacing: 0;
+  }
 }
 
 /* 아이콘과 그 위의 빨간 점을 함께 잡는 칸. 점을 아이콘 기준으로 매달아야
@@ -1559,6 +1614,24 @@ body::-webkit-scrollbar {
   -webkit-user-drag: none;
 }
 
+/* 사진을 안 올린 카드의 기본 인물(player_default.webp) — 양팔을 벌린 넓은 그림이라
+   🔴 **자르지 않는다.** 카드 폭을 다 쓰고(inset-inline 0), 그 안에 통째로 맞춰
+   바닥에 앉힌다(contain · bottom). 올린 사진처럼 cover 로 채우면 양팔이 잘렸다
+   (사용자 지적). 얼굴은 그림 자체가 가로 가운데로 만들어져 있다. */
+.ss-pcard[data-photo-default='true'] .ss-pcard-figure {
+  /* 🔴 **크게**(사용자 요청 — 카드 폭에 딱 맞췄더니 인물이 작았다). 칸을 카드보다
+     양옆으로 25%씩 넓혀 인물을 1.5배로 키운다 — 넘친 팔 끝은 카드 테두리가
+     자른다. 가운데를 기준으로 넓혀서 얼굴은 여전히 가로 가운데다. 키운 만큼
+     위로 올라올 자리가 필요해 칸의 윗변도 38% 로 올렸다(로고·글자는 그 위다). */
+  inset-inline: -25%;
+  top: 38%;
+}
+
+.ss-pcard[data-photo-default='true'] .ss-pcard-figure img {
+  object-fit: contain;
+  object-position: center bottom;
+}
+
 /* 작게 줄인 카드 — 홈 헤더에서 닉네임 자리를 대신한다. 폭만 줄이면 안쪽
    글자 크기가 그대로 남아 짜임이 깨지므로, 제 크기로 그린 뒤 통째로
    축소한다(transform). 그러면 안쪽 여백 · 글자 · 붓자국이 전부 같은
@@ -1749,6 +1822,18 @@ body::-webkit-scrollbar {
   left: max(-120px, calc(21.333vw - 423px));
   margin-top: 18px;
   width: max-content;
+}
+
+/* 🔴 **폰에서 시연영상(구석에 뜬다)이 GK·DF 카드와 겹쳤다**(2026-09-20,
+   사용자 지적). 시연영상은 이 판과 무관하게 화면 구석에 고정으로 뜨는
+   별개 요소(`DemoVideo`)라 카드 배치를 바꾸는 대신, **판 아래에 그 영상이
+   앉을 만큼의 빈 자리**를 미리 비워 둔다 — 카드는 그대로 두고 스크롤이
+   그만큼 더 내려가게 하는 셈이다. 값은 `cornerBox`(같은 날 폰 크기로
+   키운 값)의 최대 높이(190px)에 위아래 여백을 더한 것이다. */
+@media (max-width: 639px) {
+  .ss-squad-wrap {
+    padding-bottom: 260px;
+  }
 }
 
 /* 스쿼드 판 — **판이라 할 것이 없다.** 직각, 블러 없음, 바탕색 없음.
@@ -2430,6 +2515,27 @@ body::-webkit-scrollbar {
   .ss-suggest[data-state='open'] .ss-suggest-list > li {
     animation-duration: 1ms;
     animation-delay: 0ms;
+  }
+}
+
+/* 🔴 **폰에서 이 판(추천·지인 찾기·비슷한 팀) 폭이 0이 됐다**(2026-09-20,
+   사용자 지적 — "+ 눌러도 선수 목록이 안 나온다"). 위 `--ss-side-panel-w:
+   min(380px, calc((100vw - 620px) / 2))` 는 넓은 화면 전제다 — `100vw`가
+   620px 아래면 `calc()` 가 음수가 되고, 너비는 음수를 못 받아 0으로
+   깎인다. 그 결과 판은 DOM 에 있어도 폭 0이라 아무것도 안 보였다.
+   폰에서는 오른쪽에 나란히 세우는 대신, 화면에 고정한 채 아래에서 올라오는
+   시트로 바꾼다 — 스쿼드 판(왼쪽)이 뒤에 그대로 남는다. */
+@media (max-width: 900px) {
+  .ss-suggest,
+  .ss-tm {
+    position: fixed;
+    top: auto;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    width: auto;
+    max-height: 70vh;
+    margin-left: 0;
   }
 }
 
@@ -3797,6 +3903,12 @@ body::-webkit-scrollbar {
   background: var(--ss-bg);
   /* 왼쪽에서 밀려 들어온다 — 내 영상이 오른쪽으로 밀리는 것과 한 동작이다. */
   animation: ss-shot-compare-in 420ms var(--ss-home-out-ease) both;
+  /* 🔴 **그리드 칸의 "자동 최소 크기" 함정**(2026-09-19). 그리드 항목은
+     기본이 `min-height: auto`인데, 안에 고유 비율이 있는 콘텐츠(영상)가
+     있으면 그 비율을 지키려고 트랙이 필요한 만큼 자기 몫(55fr)을 넘어서까지
+     커진다 — 옆줄(세 순간 카드, 45fr)이 그만큼 눌린다. 0으로 꺼서 트랙이
+     순수하게 fr 비율만 따르게 한다. */
+  min-height: 0;
 }
 
 .ss-shot-compare-slot .ss-shot-track {
@@ -3855,7 +3967,10 @@ body::-webkit-scrollbar {
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  min-height: 0;
+  /* 🔴 **바닥을 둔다**(2026-09-19). `min-height: 0`만 있으면 위 그리드 행이
+     조금이라도 낮게 잡히는 순간 카드가 그대로 따라 눌려 안 보인다 —
+     뼈대 그림 한 벌이 들어갈 최소 자리는 지킨다. */
+  min-height: 120px;
   padding: 8px;
   border: 1px solid color-mix(in srgb, var(--ss-fg) 22%, transparent);
   border-radius: 10px;
@@ -3876,6 +3991,12 @@ body::-webkit-scrollbar {
   flex: 1;
   width: 100%;
   min-height: 0;
+  /* 🔴 **키를 폭에서 직접 얻는다**(2026-09-19). `viewBox`가 정사각(1000×1000)인데
+     `flex: 1`만으로는 조상 상자들의 키 계산이 전부 맞아야만 키가 생긴다 —
+     그 사슬이 길고(그리드 행 → flex 열 → 그리드 카드 → flex 카드) 한 군데만
+     어긋나도 svg 키가 0 이 된다. `aspect-ratio`는 **이 요소의 폭**만 보므로
+     사슬과 무관하게 늘 그려진다. */
+  aspect-ratio: 1;
 }
 
 .ss-shot-moment-label {
@@ -4749,6 +4870,13 @@ body::-webkit-scrollbar {
   background: var(--ss-bg);
   object-fit: contain;
   transition: opacity 420ms ease;
+  /* 🔴 **그리드 자동 최소 크기 함정**(2026-09-19, `.ss-shot-compare-slot`와
+     같은 이유) — 이 영상은 비교 모드에서 그리드 칸으로 들어간다
+     (`.ss-shot-frame-body[data-compare='true']`). `min-height: 0`이 없으면
+     세로가 유난히 긴 영상(예: DCI 4K 세로)일수록 그리드가 이 칸에 필요
+     이상의 자동 최소 키를 주고, 그만큼 아래 세 순간 카드 줄이 눌려
+     안 보이게 된다(실측: 865px 중 카드 줄이 10px 로 눌린 것을 확인). */
+  min-height: 0;
 }
 
 /* 🔴 닫는 동안 **미리 흐려 둔다.** 영상은 판이 다 줄어든 뒤에야 DOM 에서
@@ -5673,9 +5801,17 @@ body::-webkit-scrollbar {
     --ss-shot-panel-w: 100vw;
   }
 
-  /* 좁으면 헤더도 낮아진다 — 위 여백을 그만큼 돌려준다. */
+  /* 🔴 **108px 로는 모자랐다**(2026-09-20, 사용자 지적 — 제목·설명이
+     머리글 5칸 아이콘 줄(영상 분석·레슨·상점·경기장 예약·알림·내 프로필)
+     과 겹쳤다). 이 값을 정할 때는 아이콘 줄이 지금처럼 라벨까지 달고 두
+     줄로 접히기 전이었던 것으로 보인다 — 폰에서 그 줄이 훨씬 커졌다.
+     🔴 **아래도 같이 늘린다** — 시연영상(폰에서 화면 구석에 뜬다, `DemoVideo`)
+     이 이 판의 스크롤 맨 아래 안내 글과 겹쳤다. 이 판은 이미
+     `overflow-y: auto` 라 아래 여백을 늘리면 그만큼 더 내려야 안내 글
+     끝이 보인다 — 스쿼드 판(`.ss-squad-wrap`)에 둔 것과 같은 처리다. */
   .ss-shot-panel {
-    padding-top: 108px;
+    padding-top: 240px;
+    padding-bottom: 280px;
   }
 
   .ss-shot-side {
@@ -7251,42 +7387,118 @@ body:has(.ss-market-entry) {
 .ss-home-hint {
   /* 🔴 **흐름 밖**이다. 흐름에 두면 이 한 줄 때문에 무대의 내용이 한 화면을
      넘어서, 가운데 정렬이던 스쿼드 판이 위로 밀려 잘렸다(사용자 지적).
-     무대가 `position: relative` 라 여기 바닥에 붙이면 아무것도 안 밀린다.
      가운데 맞추기는 좌우를 0 으로 펴서 한다 — `translateX(-50%)` 로 하면
-     아래의 들어오고 나가는 움직임(translateY)과 서로 덮어쓴다. */
-  position: absolute;
+     아래의 들어오고 나가는 움직임(translateY)과 서로 덮어쓴다.
+
+     🔴 **무대 바닥이 아니라 화면 바닥이다**(2026-09-18, 사용자 지적:
+     「지금 클릭이 안되는데?」). `absolute` 로 무대에 매달면 **무대가 창보다
+     커졌을 때 통째로 화면 밖으로 내려간다** — 스쿼드 판이 경기장 높이
+     702px 고정이라 창이 조금만 낮아도 무대가 그만큼 자란다. 재현해서 쟀다:
+
+       창          무대 높이   absolute 의 윗변   fixed 의 윗변
+       1512×857      953          903(화면 밖)      807
+       1366×768      864          814(화면 밖)      718
+       1000×632      728          678(화면 밖)      582
+
+     안내문이던 시절에는 **안 보이기만 하고 말았는데**(아래 끄트머리가 살짝
+     걸쳐 보여서 있는 줄 알았다) 단추가 된 지금은 **눌리지 않는다**로 드러난다
+     — 같은 결함이 증상만 바뀐 것이다. `fixed` 는 셋 다 화면 안이고
+     `elementFromPoint` 가 제 단추를 짚는다(실측).
+
+     ⚠️ `fixed` 여도 무대(`z-index: 10`)가 만든 쌓임 맥락 **안**에 남는다 —
+     옆 판(`.ss-suggest`, z 3)과의 앞뒤 관계는 아래 규칙 그대로다. */
+  position: fixed;
   right: 0;
   bottom: 0;
   left: 0;
+  /* 🔴 **글자만큼만 눌린다**(2026-09-18, 단추가 되면서). 좌우를 0 으로 편 채
+     두면 화면 바닥을 가로지르는 **보이지 않는 띠**가 통째로 눌리는 자리가 되어,
+     빈 데를 눌렀을 뿐인데 영상 모음으로 내려간다.
+     🔴 가운데 맞추기는 그대로 `margin-inline: auto` 로 한다 — 좌우가 0 이고
+     폭이 내용만 할 때 자동 여백이 남는 자리를 반씩 나눈다. `translateX(-50%)`
+     는 여전히 못 쓴다(들어오고 나가는 `translateY` 와 서로 덮어쓴다). */
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  /* 단추의 기본 모양을 지운다 — 보이는 것은 예전 `<p>` 와 한 픽셀도 다르지
+     않아야 한다(글꼴은 아래에서 다시 정하므로 `font` 는 상속만 시킨다). */
+  border: 0;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   /* 오른쪽 여백은 그림을 글자 왼쪽에 붙이면서도 **글자**가 가운데에 오게 하는
      셈이다(위 `.ss-market-intro .ss-market-scroll` 주석과 같은 장치).
-     아래 여백은 화면 바닥에서 띄우는 몫이다 — 무대의 안여백과 같은 값. */
-  padding-right: 38px;
+     🔴 **왼쪽에도 16 을 주고 오른쪽을 그만큼 늘려 54 로 둔다**(2026-09-18).
+     가운데를 잡는 것은 두 값의 **차이**(54 − 16 = 38 = 그림 폭 30 + 사이 8)
+     이므로 같이 늘리면 셈은 그대로이고, 둘러친 여백이 생겨 **가리키거나
+     짚었을 때 깔리는 알약**이 글자를 옥죄지 않는다. */
+  padding: 6px 54px 6px 16px;
   /* 🔴 아래 여백은 **작아야** 한다(사용자 요청). 스쿼드 옆에 열리는 판(AI 추천 ·
      지인 찾기)이 무대의 안여백(48px)까지 내려오므로, 그보다 위에 두면 창이 조금만
-     낮아도 판 위에 겹친다. 그 아래로 내려 두면 어느 크기에서도 안 겹친다. */
-  padding-bottom: 26px;
+     낮아도 판 위에 겹친다. 그 아래로 내려 두면 어느 크기에서도 안 겹친다.
+     🔴 **안여백이 아니라 바깥여백이다**(2026-09-18, 단추가 되면서). 안여백으로
+     두면 그 26px 까지 **눌리는 자리**가 되어, 글자 아래 빈 데를 눌러도 화면이
+     넘어간다. 흐름 밖 요소는 `bottom: 0` 에 바깥여백을 주면 그만큼 올라선다.
+     20 인 것은 위 안여백 6 과 합쳐 예전의 26 과 **같은 자리**가 되기 때문이다. */
+  margin-bottom: 20px;
   color: #fff;
   font-size: 1.0625rem;
   font-weight: 500;
   gap: 8px;
 }
 
-/* 🔴 옆 판(AI 추천 · 지인 찾기)이 열려 있으면 **물러난다.** 창이 낮으면 그 판이
-   화면 바닥까지 내려와 아래로 피할 자리가 없다(1440×900 에서 판 바닥 886,
-   안내 862~892 로 겹쳤다). 그리고 그때 사용자는 사람을 고르는 중이라, 내려가라는
-   말은 지금 할 말이 아니다. 판을 닫으면 도로 나온다. */
-body:has(.ss-suggest) .ss-home-hint {
-  /* 🔴 **`visibility` 로 감춘다.** `opacity` 는 못 쓴다 — 들어오는 연출이
-     그 값을 쥐고 있어서(`both`) 보통의 선언이 안 먹히고, 애니메이션으로 덮으면
-     이번엔 판을 닫았을 때 들어오는 연출의 **지연(1250ms) 구간**에 걸려 한참
-     안 보인다(둘 다 실제로 겪었다). `visibility` 는 그 연출이 안 건드리는
-     성질이라 켜고 끄는 것이 그대로 먹는다. */
-  visibility: hidden;
-  pointer-events: none;
+/* 🔴 옆 판(AI 추천 · 지인 찾기)이 열려 있어도 **안 사라진다**(사용자 요청,
+   2026-09-18: 「이 판 나오면 사라져서 그냥 사라지지 않도록」).
+
+   ⚠️ **앞서 「물러난다」로 해 둔 것을 정정한다.** 그때는 이것이 굴리라는
+   **안내문**이라 판이 떠 있는 동안 할 말이 아니라고 봤고, 창이 낮으면 판이
+   화면 바닥까지 내려와 겹치기도 했다(1440×900 에서 판 바닥 886, 안내 862~892).
+   지금은 이것이 영상 모음으로 가는 **유일한 문**이라 감추면 길이 막힌다 —
+   판을 열어 둔 채로는 영상을 보러 갈 수가 없게 된다.
+
+   🔴 겹치는 자리에서는 **판이 위다**(사용자 요청, 2026-09-18). 한 번 안내를
+   위로 올려 봤다가 되돌린 자리다 — 판 위에 얹으니 사람을 고르는 화면을
+   가로질러 떠 있었다. 판을 **닫아야** 눌리게 한다.
+
+   ⚠️ **z 를 건드리지 않는 것이 곧 그 뜻이다.** `.ss-suggest` 가 z 3 이고 이
+   안내는 z auto(0) 라 가만히 두면 판 뒤로 들어간다 — 두 요소가 `.ss-home-left`
+   를 사이에 두고도 같은 쌓임 맥락(`.ss-home-stage`, z 10)에 있어서 숫자만으로
+   갈린다(`.ss-home-left` 는 `position: relative` 지만 z 가 없어 맥락을 안 만든다).
+   못 누르게 하는 것은 **`HomeStage` 의 `disabled={scouting}`** 이 한다.
+
+   ⛔ **`body:has(.ss-suggest)` 로 가르지 말 것**(2026-09-18). 한때 여기서
+   `pointer-events: none` 을 걸었는데, 추천 판은 닫힌 뒤에도 물러나는 동안
+   DOM 에 남고 — 타이머 경합으로 **영영 남은** 적도 있다(`SquadPanel` 의
+   `scouting` effect 주석) — 그러면 판을 닫아도 단추가 안 눌렸다(사용자
+   지적). 「열려 있는가」는 DOM 에 무엇이 있느냐가 아니라 **상태**로 본다.
+
+   🔴 `visibility: hidden` 으로 돌아가지 말 것 — 그러면 판을 열어 둔 채로는
+   영상 모음으로 가는 길이 **있는 줄도 모르게** 된다. 보이되 안 눌린다. */
+
+/* 눌리는 것이라고 말해 준다 — 안내문이던 시절엔 없던 몫이다.
+   🔴 **`opacity` 도 `transform` 도 못 쓴다.** 아래 들어오는 연출이 `both` 로
+   그 둘을 쥐고 있어서 보통의 선언이 통째로 무시된다(감추기를 `visibility` 로
+   했던 것과 같은 이유). 연출이 안 건드리는 성질로만 만든다. */
+.ss-home-hint:enabled:hover,
+.ss-home-hint:focus-visible {
+  border-radius: 999px;
+  background: color-mix(in srgb, #fff 16%, transparent);
+}
+
+/* 판이 열려 있어 못 누르는 동안 — 글자는 그대로 보이고 손가락만 거둔다.
+   🔴 색을 흐리지 않는다. 옅게 만들면 「고장 났다」로 읽히는데, 실은 판을
+   닫으면 되는 것뿐이다. */
+.ss-home-hint:disabled {
+  cursor: default;
+}
+
+/* 자판으로 짚은 것은 테두리로 보인다 — 바탕만으로는 마우스와 구분이 안 된다. */
+.ss-home-hint:focus-visible {
+  outline: 2px solid var(--ss-accent);
+  outline-offset: 2px;
 }
 
 /* 들어오고 나가는 것도 나머지와 같이 — 아래에서 떠오르고, 나갈 땐 아래로 진다. */
@@ -10496,7 +10708,7 @@ body:has(.ss-shot) .ss-app-figure {
   -webkit-mask-size: contain;
 }
 
-/* 고르는 칸 — 열둘을 한눈에. */
+/* 고르는 칸 — 자국을 한눈에. */
 /* 기본 자국(원래 붓칠)도 같은 자리 · 같은 변형을 받는다. */
 .ss-card-mark-default {
   display: block;
@@ -11629,21 +11841,6 @@ body:has(.ss-profile) {
   }
 }
 
-/* 카드가 아직 없는 사람. 같은 폭 · 같은 비율의 판에 이름 첫 글자만
-   둔다 — 자리를 비우면 바의 키가 사람마다 달라진다. */
-.ss-profile-face-empty {
-  display: grid;
-  place-items: center;
-  width: calc(var(--ss-pcard-mini-w, 104) * 1px);
-  aspect-ratio: 3 / 4.1;
-  border-radius: 14px;
-  border: 1px solid var(--ss-fg);
-  background: color-mix(in srgb, var(--ss-fg) 6%, transparent);
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--ss-fg);
-}
-
 .ss-profile-id-text {
   display: flex;
   flex-direction: column;
@@ -11788,6 +11985,16 @@ body:has(.ss-profile) {
     /* 🔴 여기서는 판이 흐름에 있고 위 여백도 0 이라 걷어 올릴 것이 없다 —
        그대로 두면 판이 화면 위로 그만큼 빠져나간다. */
     --ss-profile-rise: 0px;
+    /* 🔴 **머리글이 헤더 워드마크와 겹쳤다**(2026-09-20, 사용자 지적,
+       "MY"와 "SUPERSUB"가 포개져 보였다). 92px 은 데스크톱 헤더 높이
+       기준이라 폰의 실제 헤더 아래로는 자리가 모자랐다 — 여유를 크게 둔다. */
+    --ss-profile-top: 160px;
+  }
+
+  .ss-profile-title {
+    /* 🔴 큰 글자 + 82px 왼쪽 여백이 좁은 폭에서 넘쳤다 — 같이 줄인다. */
+    --ss-profile-title-size: 2rem;
+    left: 24px;
   }
 
   .ss-profile-sheet {
@@ -11805,6 +12012,36 @@ body:has(.ss-profile) {
   .ss-profile-id {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  /* 🔴 **소속·정보가 반씩 나뉘어 너무 좁았다**(2026-09-20, 사용자 지적 —
+     "호칭 정하기"·이메일이 한 글자씩 세로로 접혔다). 2×2 를 세로 한 줄로
+     푼다 — 각 절이 폭 전체를 쓴다. */
+  .ss-profile-body {
+    grid-template-columns: 1fr;
+  }
+
+  /* 🔴 「해당 영상 리포트 보기」— 이 폭에서는 알약 줄(`.ss-profile-tabrow`)이
+     이미 가로를 다 쓰고 있어서, 흐름 밖 절대배치(오른쪽 끝)로 걸어 두면
+     「업로드 영상」 알약 위에 그대로 얹혀 글자가 가려진다(2026-09-20, 사용자
+     지적 — 모바일 스크린샷으로 확인). 흐름으로 되돌리면 `.ss-profile-tabrow`
+     가 이미 `flex-wrap: wrap` 이라 알약 줄 아래 제 줄로 저절로 접힌다.
+
+     🔴 **들고나는 연출도 같이 끈다.** 두 상태(`:not([data-entered])` ·
+     `[data-entered]`) 키프레임이 전부 `translateY(-50%)` 를 자리로 굳혀
+     두는데, `position: static` 으로 바뀐 뒤에도 그 값이 그대로 적용되면
+     단추가 제 키의 절반만큼 위로 튀어 올라 알약 줄과 다시 겹친다 — 흐림
+     모드(`prefers-reduced-motion`)가 같은 이유로 이 단추의 연출을 끈
+     자리(위 `.ss-profile-report-open { animation: none }`)와 같은 결이다. */
+  .ss-profile-report-open {
+    position: static;
+    transform: none;
+  }
+
+  .ss-profile[data-entered] .ss-profile-report-open,
+  .ss-profile[data-entered] .ss-profile-report-open[data-leaving='true'],
+  .ss-profile:not([data-entered]) .ss-profile-report-open {
+    animation: none;
   }
 }
 
@@ -13628,6 +13865,31 @@ body:has(.ss-venues) .ss-home-header {
   animation-name: ss-mw-side-right;
 }
 
+/* 🔴 **폰에서 화면에 안 다 들어왔다**(2026-09-20, 사용자 지적). 이 판은
+   두 팀의 `.ss-squad`(주 스쿼드 편집 화면과 같은 크기)를 그대로 두 벌
+   쌓아 보여준다 — 좁은 화면에서는 `.ss-mw-body`의 `flex-wrap`이 이미
+   세로로 접어 주지만, 두 판이 원래 크기 그대로라 합친 키가 화면보다
+   훨씬 크다. 카드 폭(`--ss-pcard-mini-w`)을 줄여 판 전체를 비례로
+   작게 만든다 — 이 값이 카드·격자·줄 높이를 전부 계산하는 손잡이다
+   (주 편집 화면에는 손 안 댄다, `.ss-mini` 안에서만). */
+@media (max-width: 640px) {
+  .ss-mini .ss-squad {
+    --ss-pcard-mini-w: 52;
+  }
+
+  .ss-mw-body {
+    gap: 12px;
+    padding: 16px 8px;
+  }
+
+  /* 내용이 그래도 넘치면 판 안에서 스크롤한다 — 통째로 잘리는 것보다
+     낫다. 위쪽은 그대로 둔다(들어오는 연출이 화면 밖에서 시작해야 한다). */
+  .ss-mw {
+    align-items: start;
+    overflow-y: auto;
+  }
+}
+
 /* 양옆 판이 절반쯤 들어왔을 때 — 「무엇을 보는 화면인지」가 그때 도착한다. */
 .ss-mw-mid {
   animation: ss-mw-drop 660ms cubic-bezier(0.22, 1, 0.36, 1) 1120ms both;
@@ -13828,6 +14090,20 @@ body:has(.ss-venues) .ss-home-header {
   margin-top: 10px;
   font-size: 0.74rem;
   color: color-mix(in srgb, var(--ss-error) 85%, #fff);
+}
+
+/* 🔴 「경기 완료」를 되묻는 줄 (2026-09-18) — **오류가 아니라 경고**라 붉은색을
+   쓰지 않는다. 오류 줄과 같은 색이면 「무언가 잘못됐다」로 읽힌다. */
+.ss-mw-warn {
+  margin-top: 10px;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--ss-fg) 82%, transparent);
+}
+
+.ss-mw-warn strong {
+  color: var(--ss-fg);
+  font-weight: 700;
 }
 
 /* 「경기 취소」 — 🔴 닫기(×)와 **다른 일**이라 자리를 가른다. 되돌릴 수 없어서
@@ -14864,4 +15140,607 @@ a.ss-seeking-pill:hover {
   cursor: pointer;
   font-size: 1.1rem;
   line-height: 1;
+}
+
+/* ── 사용법 영상(해커톤 제출용, 2026-09-18) — components/DemoVideo.tsx ──
+   로그인 화면에서는 JS 가 잰 자리(top/left/width/height)를 인라인으로 받고,
+   자리가 없는 화면에서는 아래 기본값대로 왼쪽 아래 구석에 뜬다.
+
+   🔴 테두리는 **완전한 흰색 · 아주 얇게**(사용자 요청). `--ss-fg` 를 쓰지 않는다 —
+   흰 판 화면들이 그 값을 검정·짙은 초록으로 뒤집어 쓴다. 이 규칙 안에서만 쓰는
+   값이라 여기 한 번 적는다. */
+.ss-demo-video {
+  --ss-demo-edge: #ffffff;
+  position: fixed;
+  z-index: 55;
+  /* 자리(top/left/width/height)는 늘 JS 가 준다 — 로그인 자리든 구석이든,
+     모서리를 끌어 바꾼 크기든. 🔴 여기는 잘라 내지 않는다(`overflow` 없음) —
+     바깥에 붙는 닫기 단추·모서리 손잡이가 잘린다. 자르는 것은 안쪽 틀이다. */
+}
+
+/* 인트로가 끝나고 처음 나올 때 — 화면 위 보이지 않는 데서 부드럽게 내려온다
+   (사용자 요청). -100vh 에서 출발하면 어디에 앉든(아래 끝이 창 안) 출발점은
+   늘 창 위 밖이다. 붙은 「시연영상 닫기」도 같은 상자 안이라 함께 내려온다.
+   끝에 살짝 느려지는 곡선이라 떨어지는 것이 아니라 내려앉는 것으로 읽힌다. */
+.ss-demo-video[data-entrance='drop'] {
+  animation: ss-demo-drop 1.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* 닫았다 「다시보기」로 열 때만 스르르. 🔴 내려온 직후(still)엔 **아무 애니메이션도
+   걸지 않는다** — drop 에서 곧장 이것으로 바꾸면 새로 돌면서 한 번 깜빡였다. */
+.ss-demo-video[data-entrance='fade'] {
+  animation: ss-demo-in 0.5s ease-out both;
+}
+
+@keyframes ss-demo-drop {
+  from { transform: translateY(-100vh); }
+  to { transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-demo-video[data-entrance='drop'] {
+    animation: ss-demo-in 0.3s ease-out both;
+  }
+}
+
+.ss-demo-video[hidden] {
+  display: none;
+}
+
+.ss-demo-video-frame {
+  position: absolute;
+  inset: 0;
+  /* 외곽선은 **없다**(사용자 요청 — 처음엔 흰 1px 이었다). 모서리만 둥글린다. */
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--ss-bg);
+}
+
+.ss-demo-video video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 영상 전체가 누르는 자리다 — 누르면 멈추고 다시 누르면 이어서. */
+.ss-demo-video-toggle {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  /* 🔴 이 단추가 **영상 전체를 덮는 끌기 손잡이다**(위 주석 "영상 전체가
+     누르는 자리다") — `.ss-demo-glass-btn`과 같은 이유로 필요하다. */
+  touch-action: none;
+}
+
+.ss-demo-video-toggle[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--ss-bg) 35%, transparent);
+}
+
+.ss-demo-video-toggle:focus-visible {
+  outline: 2px solid var(--ss-accent);
+  outline-offset: -4px;
+  border-radius: inherit;
+}
+
+/* 가운데 ▶ — 판(검은 원) 없이 삼각형만, 작게(사용자 요청). 밝은 장면에서도
+   읽히게 옅은 그림자만 준다. 멈춘 동안은 떠 있고, 다시 틀 때 한 번 커지며
+   사라진다(.ss-demo-video-flash). ❚❚ 는 없다. */
+.ss-demo-video-icon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: clamp(22px, 9%, 34px);
+  height: auto;
+  aspect-ratio: 1;
+  fill: var(--ss-demo-edge);
+  filter: drop-shadow(0 1px 3px color-mix(in srgb, var(--ss-bg) 60%, transparent));
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.ss-demo-video-flash {
+  animation: ss-demo-flash 0.5s ease-out both;
+}
+
+@keyframes ss-demo-flash {
+  from { opacity: 0.95; transform: translate(-50%, -50%) scale(1); }
+  to { opacity: 0; transform: translate(-50%, -50%) scale(1.5); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-demo-video-flash { animation-duration: 0.01s; }
+}
+
+
+/* 되감기 막대 — 유튜브처럼 빨간 진행 · 회색 남은 길. 가리킬 때만 뜬다. 🔴 `opacity` 로만 감춘다 — `display:none` 이면 자판으로
+   막대에 못 닿는다. */
+.ss-demo-video {
+  --ss-demo-progress: #ff0033;
+}
+
+.ss-demo-video-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 10px 6px;
+  background: linear-gradient(to top, color-mix(in srgb, var(--ss-bg) 75%, transparent), transparent);
+  opacity: 0;
+  /* 떠날 때 — **2초 기다렸다가** 0.5초에 걸쳐 스르르(사용자 요청). */
+  transition: opacity 0.5s ease 2s;
+}
+
+/* 영상에 가져다 댔을 때만 뜬다 — 들어올 때는 곧바로. 🔴 멈춰 있다고 띄우지
+   않는다(사용자 요청 — 가져다 댈 때만). 자판으로 막대에 왔을 때만 예외로 띄운다
+   (`:focus-within` 이 아니라 `:focus-visible` — 영상을 마우스로 누르면 단추에
+   포커스가 남아 막대가 영영 안 사라진다). */
+.ss-demo-video:hover .ss-demo-video-bar,
+.ss-demo-video:has(:focus-visible) .ss-demo-video-bar {
+  opacity: 1;
+  transition: opacity 0.15s ease;
+}
+
+/* 눌리는 자리는 넉넉히(위아래 6px), 그려지는 막대는 얇게 — 3px 막대를 정확히
+   누르라고 하면 안 된다. */
+.ss-demo-video-seek {
+  position: relative;
+  height: 15px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.ss-demo-video-seek::before,
+.ss-demo-video-seek-fill {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  height: 3px;
+  border-radius: 2px;
+  transition: height 0.1s ease, top 0.1s ease;
+}
+
+.ss-demo-video-seek::before {
+  right: 0;
+  background: color-mix(in srgb, var(--ss-demo-edge) 35%, transparent);
+}
+
+.ss-demo-video-seek-fill {
+  background: var(--ss-demo-progress);
+}
+
+/* 막대 끝의 동그란 손잡이 — 가리킬 때만. */
+.ss-demo-video-seek-fill::after {
+  content: '';
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--ss-demo-progress);
+  transform: translateY(-50%) scale(0);
+  transition: transform 0.1s ease;
+}
+
+.ss-demo-video-seek:hover::before,
+.ss-demo-video-seek:hover .ss-demo-video-seek-fill,
+.ss-demo-video-seek:focus-visible::before,
+.ss-demo-video-seek:focus-visible .ss-demo-video-seek-fill {
+  top: 5px;
+  height: 5px;
+}
+
+.ss-demo-video-seek:hover .ss-demo-video-seek-fill::after,
+.ss-demo-video-seek:focus-visible .ss-demo-video-seek-fill::after {
+  transform: translateY(-50%) scale(1);
+}
+
+.ss-demo-video-seek:focus-visible {
+  outline: 2px solid var(--ss-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.ss-demo-video-time {
+  color: var(--ss-demo-edge);
+  font-size: 11px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+/* 닫기 · 다시보기 단추 — 작게, 안쪽이 유리(흐림 + warp 8), 외곽선 없음(사용자 요청).
+   🔴 `url(#ss-demo-warp)` 는 크로미움만 backdrop-filter 에서 받는다 — 다른
+   브라우저는 흐림만 남고 단추는 멀쩡하다. */
+.ss-demo-glass-btn {
+  /* 은빛 — 차가운 쪽으로 기운 회색 셋(바탕 선 · 도는 빛 · 빛의 가장자리). */
+  --ss-demo-silver: rgba(200, 206, 216, 0.38);
+  --ss-demo-silver-hi: rgba(244, 246, 250, 0.95);
+  --ss-demo-silver-mid: rgba(168, 176, 188, 0.6);
+  padding: 4px 11px;
+  border: 0;
+  border-radius: 999px;
+  /* 안쪽 색은 **없다**(사용자 요청). 유리 흐림·warp 만 남는다. */
+  background: transparent;
+  backdrop-filter: blur(8px) saturate(var(--ss-glass-saturate)) url(#ss-demo-warp);
+  -webkit-backdrop-filter: blur(8px) saturate(var(--ss-glass-saturate)) url(#ss-demo-warp);
+  color: var(--ss-demo-edge);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  /* 🔴 **끌기(옮기기) 손잡이인데 빠져 있었다**(2026-09-20, 사용자 지적 —
+     "옮기기가 힘들다"). 눈금 막대(`.ss-demo-video-seek`)·모서리 손잡이
+     (`.ss-demo-resize`)는 이미 있는데 여기만 없어서, 폰에서 이 단추를
+     누르고 끄는 동안 브라우저가 그 손짓을 화면 스크롤로 가로채 갔다
+     (같은 함정을 겪은 다른 자리와 같은 원인 · 같은 해법). */
+  touch-action: none;
+}
+
+/* 외곽선 — 아주 얇은(1px) 은빛 선 위로 빛 한 점이 둘레를 돈다. 로그인 카드의
+   `.ss-traveling-edge` 와 같은 기법(conic-gradient + 가운데를 파낸 mask)이다. */
+.ss-demo-glass-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background:
+    conic-gradient(
+      from var(--ss-edge-angle),
+      transparent 0%,
+      transparent 36%,
+      var(--ss-demo-silver-mid) 44%,
+      var(--ss-demo-silver-hi) 50%,
+      var(--ss-demo-silver-mid) 56%,
+      transparent 64%,
+      transparent 100%
+    ),
+    var(--ss-demo-silver);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: ss-edge-spin 4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-demo-glass-btn::after {
+    animation: none;
+  }
+}
+
+.ss-demo-glass-btn:hover::after {
+  --ss-demo-silver: rgba(214, 220, 230, 0.6);
+}
+
+.ss-demo-glass-btn:focus-visible {
+  outline: 2px solid var(--ss-accent);
+  outline-offset: 2px;
+}
+
+/* 외곽선 바깥 왼쪽 위 — 틀 위에 6px 띄워 얹는다. */
+.ss-demo-close {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px);
+}
+
+.ss-demo-reopen {
+  --ss-demo-edge: #ffffff;
+  position: fixed;
+  z-index: 55;
+}
+
+/* 모서리 손잡이 — 모서리를 넉넉히(18px) 잡게 하고, 가리킬 때만 흰 ㄱ자가 보인다. */
+.ss-demo-resize {
+  position: absolute;
+  z-index: 2;
+  width: 18px;
+  height: 18px;
+  touch-action: none;
+}
+
+.ss-demo-resize::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 0 solid var(--ss-demo-edge);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.ss-demo-video:hover .ss-demo-resize::after {
+  opacity: 0.9;
+}
+
+.ss-demo-resize[data-corner='tl'] { top: -6px; left: -6px; cursor: nwse-resize; }
+.ss-demo-resize[data-corner='br'] { bottom: -6px; right: -6px; cursor: nwse-resize; }
+.ss-demo-resize[data-corner='tr'] { top: -6px; right: -6px; cursor: nesw-resize; }
+.ss-demo-resize[data-corner='bl'] { bottom: -6px; left: -6px; cursor: nesw-resize; }
+
+.ss-demo-resize[data-corner='tl']::after { border-top-width: 2px; border-left-width: 2px; border-top-left-radius: 6px; }
+.ss-demo-resize[data-corner='tr']::after { border-top-width: 2px; border-right-width: 2px; border-top-right-radius: 6px; }
+.ss-demo-resize[data-corner='bl']::after { border-bottom-width: 2px; border-left-width: 2px; border-bottom-left-radius: 6px; }
+.ss-demo-resize[data-corner='br']::after { border-bottom-width: 2px; border-right-width: 2px; border-bottom-right-radius: 6px; }
+
+/* 「시연영상을 참고해 주세요」 — 영상이 처음 다 내려온 순간 로그인 화면을 어둡게
+   하고(영상·닫기 단추는 그 위라 밝은 그대로) 영상 바로 밑에 흰 글자 한 줄.
+   🔴 어둠 판은 누르는 것을 가로채지 않는다(`pointer-events: none`) — 어디든 한 번
+   누르면 걷히되, 누른 것은 원래 일을 그대로 한다. 들어올 때·걷힐 때 모두 스르르. */
+.ss-demo-spot {
+  position: fixed;
+  inset: 0;
+  z-index: 54;
+  background: color-mix(in srgb, var(--ss-bg) 62%, transparent);
+  pointer-events: none;
+  animation: ss-demo-in 0.6s ease-out both;
+}
+
+.ss-demo-spot-note {
+  position: fixed;
+  z-index: 55;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: #ffffff; /* 완전한 흰색(사용자 요청) — 흰 판 화면들이 --ss-fg 를 뒤집어 쓴다 */
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: ss-demo-note-in 0.6s ease-out both;
+}
+
+.ss-demo-spot-note p {
+  margin: 0;
+}
+
+/* 둘째 줄 — 쓰는 법. 글자 크기는 윗줄과 **같게**(사용자 요청 — 처음엔 13px 로
+   작게 뒀다), 굵기만 가볍게 해서 윗줄의 설명으로 읽히게. */
+.ss-demo-spot-sub {
+  font-weight: 400;
+}
+
+/* 로그인 화면 잠금 — 영상·문장이 다 나오기 전엔 아무것도 못 누른다(DemoVideo 주석).
+   투명하고, 영상(z 55) 바로 밑이라 영상은 만질 수 있다. */
+.ss-demo-lock {
+  position: fixed;
+  inset: 0;
+  z-index: 54;
+}
+
+@keyframes ss-demo-note-in {
+  from { opacity: 0; transform: translate(-50%, 6px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* 걷힐 때 — 둘이 같은 길이(SPOT_FADE_MS)로 함께 사라진다. */
+.ss-demo-spot[data-state='out'],
+.ss-demo-spot-note[data-state='out'] {
+  animation: ss-demo-out 0.6s ease-in both;
+}
+
+@keyframes ss-demo-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes ss-demo-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ── 테스트 번호 고르기(로그인 화면) — components/auth/SeatPicker.tsx ──
+   작은 알약 하나 + 오른쪽으로 펼치는 번호 판(5 × 2). 둘 다 **안쪽 색 없는 유리,
+   외곽선 없음**(사용자 요청 — 브라우저 기본 select 가 겹치고 안 예뻤다). */
+.ss-seat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ss-seat-pill,
+.ss-seat-panel {
+  border: 0;
+  background: transparent;
+  backdrop-filter: blur(10px) saturate(var(--ss-glass-saturate));
+  -webkit-backdrop-filter: blur(10px) saturate(var(--ss-glass-saturate));
+}
+
+.ss-seat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px 3px 11px;
+  border-radius: 999px;
+  color: var(--ss-fg);
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.ss-seat-pill:hover,
+.ss-seat-pill[aria-expanded='true'] {
+  background: color-mix(in srgb, var(--ss-fg) 8%, transparent);
+}
+
+.ss-seat-caret {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.25s ease;
+}
+
+.ss-seat-pill[aria-expanded='true'] .ss-seat-caret {
+  transform: rotate(180deg);
+}
+
+/* 판 — 알약 오른쪽에, 첫 줄 윗끝을 알약 윗끝에 맞춰(JS 가 top/left 를 준다) 왼쪽에서 오른쪽으로
+   스르르 펼쳐진다. 🔴 펼치는 것은 clip-path 다 — 판이 옆으로 밀려 오는 것
+   (translate)만 쓰면 알약 위를 지나가며 겹친다. */
+.ss-seat-panel {
+  position: fixed;
+  z-index: 60;
+  display: grid;
+  grid-template-columns: repeat(5, auto);
+  gap: 2px;
+  padding: 5px; /* SeatPicker 의 PANEL_PAD 와 같아야 한다 */
+  border-radius: 14px;
+  animation: ss-seat-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ss-seat-panel[data-state='closing'] {
+  animation: ss-seat-out 0.22s ease-in both;
+}
+
+@keyframes ss-seat-in {
+  from { clip-path: inset(0 100% 0 0 round 14px); opacity: 0; transform: translateX(-6px); }
+  to { clip-path: inset(0 0 0 0 round 14px); opacity: 1; transform: translateX(0); }
+}
+
+@keyframes ss-seat-out {
+  from { clip-path: inset(0 0 0 0 round 14px); opacity: 1; }
+  to { clip-path: inset(0 100% 0 0 round 14px); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-seat-panel,
+  .ss-seat-panel[data-state='closing'] {
+    animation-duration: 0.01s;
+  }
+}
+
+.ss-seat-num {
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: color-mix(in srgb, var(--ss-fg) 75%, transparent);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.ss-seat-num:hover {
+  background: color-mix(in srgb, var(--ss-fg) 10%, transparent);
+  color: var(--ss-fg);
+}
+
+/* 지금 번호 — 색 판을 깔지 않고 글자만 민트로 또렷이. */
+.ss-seat-num[aria-pressed='true'] {
+  color: var(--ss-accent);
+  font-weight: 600;
+}
+
+.ss-seat-pill:focus-visible,
+.ss-seat-num:focus-visible {
+  outline: 2px solid var(--ss-accent);
+  outline-offset: 2px;
+}
+
+/* ── 로그인 → 홈: 가장 가까운 가장자리로 빠졌다가 같은 데서 들어오기 ──
+   거리(--ss-demo-off-x/y)는 JS 가 잰다(exitOffset). 빠질 때는 빠르게 가속,
+   들어올 때는 끝이 느려지며 제자리에 앉는다. 🔴 이 규칙들은 data-entrance 규칙
+   **뒤에** 있어야 이긴다(특이도가 같다). */
+.ss-demo-video[data-travel='leaving'],
+.ss-demo-reopen[data-travel='leaving'] {
+  animation: ss-demo-leave 0.26s cubic-bezier(0.55, 0, 1, 0.45) both;
+}
+
+.ss-demo-video[data-travel='away'],
+.ss-demo-reopen[data-travel='away'] {
+  visibility: hidden;
+}
+
+.ss-demo-video[data-travel='entering'],
+.ss-demo-reopen[data-travel='entering'] {
+  animation: ss-demo-enter 0.52s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes ss-demo-leave {
+  to { transform: translate(var(--ss-demo-off-x), var(--ss-demo-off-y)); }
+}
+
+@keyframes ss-demo-enter {
+  from { transform: translate(var(--ss-demo-off-x), var(--ss-demo-off-y)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-demo-video[data-travel='leaving'],
+  .ss-demo-reopen[data-travel='leaving'] { animation: ss-demo-out 0.15s ease-in both; }
+  .ss-demo-video[data-travel='entering'],
+  .ss-demo-reopen[data-travel='entering'] { animation: ss-demo-in 0.2s ease-out both; }
+}
+
+/* ── 한 곳만 밝게 두는 안내 — components/SpotNudge.tsx ──
+   로그인 화면의 「시연영상을 참고해 주세요」(.ss-demo-spot)와 같은 어둠·같은 글자.
+   🔴 어둠은 **구멍 뚫린 SVG 판**이다 — 과녁마다 그 모양대로(카드는 둥근 카드
+   모양, 글자는 글자 폭만) 뚫는다. 상자 하나로 넉넉히 뚫으면 카드 둘레의 배경이
+   밝은 네모로 남는다(사용자 정정). 과녁을 z-index 로 끌어올리는 식은 헤더의
+   쌓임 맥락에 막힌다. 누르는 것은 가로채지 않는다. */
+.ss-nudge-dim {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  pointer-events: none;
+  animation: ss-demo-in 0.6s ease-out both;
+}
+
+.ss-nudge-shade {
+  fill: color-mix(in srgb, var(--ss-bg) 62%, transparent);
+}
+
+.ss-nudge-note {
+  position: fixed;
+  z-index: 70;
+  margin: 0;
+  color: #ffffff; /* 완전한 흰색 — .ss-demo-spot-note 와 같다 */
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: center;
+  /* 문장 안의 \n 에서만 줄을 바꾼다(「내 프로필에서 / 카드를 먼저…」, 사용자 요청).
+     그 밖에는 안 꺾는다. */
+  white-space: pre;
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: ss-demo-note-in 0.6s ease-out both;
+}
+
+.ss-nudge-dim[data-state='out'],
+.ss-nudge-note[data-state='out'] {
+  animation: ss-demo-out 0.6s ease-in both;
+}
+
+/* 카드 편집기 — 글자 자리 줄 밑의 한 줄 안내(「카드 위 글자를 끌어서 옮길 수도」). */
+.ss-card-hint {
+  margin: -4px 0 0;
+  font-size: 12px;
 }

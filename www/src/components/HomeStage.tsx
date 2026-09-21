@@ -89,20 +89,28 @@ export default function HomeStage({
   const entered = useIntroDone()
 
   /**
-   * 아래로 굴리면 **화면이 통째로 비켜난다**(사용자 요청).
+   * 영상 모음으로 내려가 있는가 — **누를 때만 바뀐다**(사용자 요청,
+   * 2026-09-18).
    *
    * 다른 화면으로 갈 때와 **같은 나가는 연출**을 쓴다 — 덩어리들이 들어온 방향
    * 그대로 되나가고(`data-enter='out'`), 그다음에 배경이 위로 빠지면서 아래에서
    * 완전한 검정이 올라온다(globals.css 의 `ss-home-out` 규칙들).
    *
-   * 🔴 굴림 자체가 화면을 옮기지는 않는다. 홈은 한 화면짜리라 굴릴 것이 없고,
-   * 굴림은 **신호로만** 쓴다(레슨 · 상점 입구의 `HeroGate` 와 같은 방식).
+   * 🔴 **굴림·터치·자판으로는 안 넘어간다.** 한때 굴림을 신호로 받았는데
+   * (레슨 · 상점 입구의 `HeroGate` 와 같은 방식), 홈은 굴릴 것이 없는 한
+   * 화면이라 **의도하지 않은 굴림 하나하나가 화면을 통째로 바꿨다** — 판
+   * 위에서 굴린 것, 챗봇에 글을 치다 누른 스페이스, 트랙패드의 되튐까지
+   * 전부 이 길로 새어 들어와 그때마다 예외를 하나씩 붙이고 있었다.
+   * 길을 **누르는 것 하나로** 좁혀 그 부류를 통째로 없앤다.
+   *
+   * 🔴 되살리지 말 것 — 아래 둘이 그 자리다:
+   *   내려가기 = 무대 바닥의 「클릭해서 영상 둘러보기」 단추
+   *   올라오기 = 워드마크(`[aria-label="홈"]`) 누르기
    */
   const [out, setOut] = useState(false)
   /**
-   * 🔴 지금 상태를 **ref 로도** 들고 있는다. 굴림 듣기는 한 번만 걸고 다시 걸지
-   * 않으므로(다시 걸면 굴리는 도중에 손잡이가 바뀐다) 그 안에서 읽는 값이 늘
-   * 최신이어야 한다.
+   * 🔴 지금 상태를 **ref 로도** 들고 있는다 — `goOut` 이 기록을 건드리기 전에
+   * 같은 걸음을 두 번 걷지 않는지 보는 자물쇠다(아래 머리말).
    */
   const outRef = useRef(out)
   useEffect(() => {
@@ -117,15 +125,6 @@ export default function HomeStage({
    * 레슨 · 상점 판이 쓰는 방식과 같다(`MarketGates`).
    */
   const stepped = useRef(false)
-  /**
-   * 🔴 떠나는 중인지를 **ref 로도** 들고 있는다. 아래 굴림 듣기는 한 번만 걸고
-   * 다시 걸지 않으므로(다시 걸면 굴리는 도중에 손잡이가 바뀐다), 그 안에서
-   * 읽는 값은 늘 최신이어야 한다.
-   */
-  const leavingRef = useRef(leaving)
-  useEffect(() => {
-    leavingRef.current = leaving
-  }, [leaving])
 
   /**
    * 내려가고 올라오는 **유일한 길**. 상태를 직접 바꾸지 않고 **기록을 통해** 바꾼다
@@ -136,20 +135,16 @@ export default function HomeStage({
     /**
      * 🔴 **여기서 바로 못박는다 — 렌더를 기다리면 안 된다.**
      *
-     * 마우스 휠은 한 번 튕기면 `wheel` 이벤트가 여러 개 온다. `outRef` 를
-     * effect 에서만 갱신하면 그 전부가 **같은 옛 값**을 보고 각자 기록을
-     * 건드린다 — 내려갈 때 `pushState` 가 다섯 번 쌓이고, 올라올 때
-     * `history.back()` 이 다섯 번 나간다. 두 수가 다르면 남는 뒤로 가기가
-     * **화면 밖으로 걸어 나간다**(도메인에 올린 뒤 데스크톱 사용자들이 겪었다:
-     * 영상 모음에서 휠을 올렸더니 `/market` 으로 가거나 사이트를 떠났다.
-     * 2026-09-06 헤드리스로 재현 — 휠 1번 내리고 5번 올리면 `/market`).
+     * 한 번 누른 것이 렌더 전에 두 번 들어올 수 있다(빠른 두 번 누르기,
+     * 단추와 문서 쪽 잡개가 같은 클릭을 볼 때). `outRef` 를 effect 에서만
+     * 갱신하면 그 둘이 **같은 옛 값**을 보고 각자 기록을 건드린다 — 내려갈 때
+     * `pushState` 가 두 번 쌓이고 올라올 때 `history.back()` 이 두 번 나간다.
+     * 두 수가 다르면 남는 뒤로 가기가 **화면 밖으로 걸어 나간다**(굴림으로
+     * 오가던 시절 도메인에서 실제로 겪었다: 영상 모음에서 휠을 올렸더니
+     * `/market` 으로 가거나 사이트를 떠났다. 2026-09-06 헤드리스로 재현).
      *
-     * ⚠️ 맥북 트랙패드에서는 잘 안 드러난다. 손짓 하나가 이벤트 여럿이라는
-     * 것은 같지만, 그 사이에 `popstate` 가 끼어들면 다음 이벤트는 새 값을
-     * 보기 때문이다 — **안 나는 게 아니라 타이밍이 맞아야 난다.**
-     *
-     * 정본은 여전히 기록이다(`popstate` 가 마지막에 맞춘다). 이 값은 굴리는
-     * 도중에 같은 걸음을 두 번 걷지 않기 위한 **자물쇠**다.
+     * 정본은 여전히 기록이다(`popstate` 가 마지막에 맞춘다). 이 값은 같은
+     * 걸음을 두 번 걷지 않기 위한 **자물쇠**다.
      */
     outRef.current = next
     if (next) {
@@ -188,85 +183,26 @@ export default function HomeStage({
     setOut(true)
   }, [])
 
-  useEffect(() => {
-    /**
-     * 🔴 트랙패드는 한 번 굴리는 동안 `deltaY` 가 0 이나 아주 작은 반대 부호로도
-     * 들어온다 — 죽은 구간을 두지 않으면 내리는 몸짓 한가운데에 "올린다"가
-     * 섞여 방금 내보낸 것을 도로 불러들인다(`HeroGate` 에서 이미 겪었다).
-     */
-    const DEAD = 4
-    let touchY = 0
-
-    const move = (dir: number) => {
-      // 떠나는 중에는 아무것도 되돌리지 않는다 — 있던 자리 그대로 나가야 한다.
-      if (dir === 0 || leavingRef.current) return
-      goOut(dir > 0)
-    }
-    const dirOf = (d: number) => (d > DEAD ? 1 : d < -DEAD ? -1 : 0)
-
-    /**
-     * 🔴 **제 굴림을 가진 판 위에서는 이 신호를 안 받는다**(사용자 지적:
-     * 챗봇 대화를 훑으려다 화면이 통째로 내려갔다).
-     *
-     * 판이 `overscroll-behavior: contain` 을 써도 소용없다 — 그것은 굴림이
-     * **뒤 화면으로 새는 것**만 막고, `wheel` 이벤트가 창까지 올라오는 것은
-     * 못 막는다. 여기서 어디서 굴렸는지를 보고 갈라야 한다.
-     *
-     * `HeroGate` 가 목록 판이 열렸을 때 쓰는 것과 같은 판단이고, 방식만
-     * 다르다 — 거기는 표시 하나(`dataset.ssDetail`)로 충분한데 여기는 한
-     * 자리에 판이 셋(챗봇 · 지인 찾기 · AI 추천)이라 **굴린 자리**로 본다.
-     */
-    const onOwnPanel = (t: EventTarget | null) =>
-      t instanceof Element && t.closest('.ss-matchbot, .ss-suggest') !== null
-
-    const onWheel = (e: WheelEvent) => {
-      if (e.ctrlKey || onOwnPanel(e.target)) return
-      move(dirOf(e.deltaY))
-    }
-    const onTouchStart = (e: TouchEvent) => {
-      touchY = e.touches[0]?.clientY ?? 0
-    }
-    const onTouchMove = (e: TouchEvent) => {
-      if (onOwnPanel(e.target)) return
-      // 손가락이 위로 = 내용은 아래로 = 내리는 것.
-      move(dirOf(touchY - (e.touches[0]?.clientY ?? 0)))
-    }
-    /**
-     * 🔴 **글자를 치는 중인가.** 여기서 「내려가기」로 받는 글쇠 셋이 하필
-     * 글을 쓰는 사람에게도 오는 것들이다 — 스페이스는 **띄어쓰기**이고
-     * 화살표는 **글자 사이를 오가는 것**이다.
-     *
-     * 안 보면 챗봇에 「안녕하세요. 」까지 치는 순간 영상 모음으로 넘어간다
-     * (사용자 지적, 2026-09-08). 굴림 쪽이 `onOwnPanel` 로 갈라 놓은 것과
-     * 같은 판단인데, 자판은 **판 밖의 입력칸**(어디에 생기든)에서도 막아야
-     * 해서 조건이 하나 더 있다.
-     */
-    const isTyping = (t: EventTarget | null) =>
-      t instanceof HTMLElement &&
-      (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))
-
-    /** 자판으로도 오갈 수 있어야 한다 — 굴림이 없으니 이게 유일한 다른 길이다. */
-    const onKey = (e: KeyboardEvent) => {
-      /* 🔴 **한글 조합 중에는 아무것도 안 한다.** IME 가 글자를 맞추는 동안
-         브라우저는 `keydown` 을 그대로 흘려보내는데, 그때의 스페이스는 조합을
-         끝내는 신호지 「내려가기」가 아니다. `isComposing` 이 그것을 말한다 —
-         입력칸 밖(조합 중인 IME 창)에서 올 수도 있어 아래 두 검사로는 안 걸린다. */
-      if (e.isComposing || isTyping(e.target) || onOwnPanel(e.target)) return
-      if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') move(1)
-      else if (e.key === 'ArrowUp' || e.key === 'PageUp') move(-1)
-    }
-
-    window.addEventListener('wheel', onWheel, { passive: true })
-    window.addEventListener('touchstart', onTouchStart, { passive: true })
-    window.addEventListener('touchmove', onTouchMove, { passive: true })
-    window.addEventListener('keydown', onKey)
-    return () => {
-      window.removeEventListener('wheel', onWheel)
-      window.removeEventListener('touchstart', onTouchStart)
-      window.removeEventListener('touchmove', onTouchMove)
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [goOut])
+  /**
+   * ⛔ **여기 있던 굴림 · 터치 · 자판 듣기를 걷어냈다**(사용자 요청,
+   * 2026-09-18: 「스크롤 문제 계속 있어서 그냥 클릭해서만 넘어가게 만들자」).
+   *
+   * 무엇이 있었는지 남겨 둔다 — 되살리려는 사람이 같은 값을 다시 치르지
+   * 않도록:
+   *
+   * | 무엇 | 왜 붙어 있었나 |
+   * |---|---|
+   * | 죽은 구간 `DEAD = 4` | 트랙패드가 내리는 몸짓 한가운데에 반대 부호를 섞는다 |
+   * | `onOwnPanel` 선택자 다섯 | 챗봇 · 추천 판 · 경기 판 · 리뷰 위에서 굴린 것이 창까지 올라온다 |
+   * | `isTyping` · `isComposing` | 스페이스는 **띄어쓰기**다 — 챗봇에 「안녕하세요. 」를 치면 넘어갔다 |
+   *
+   * 🔴 셋 다 **같은 결함의 증상**이다: 굴림은 어디서 났는지가 안 적혀 오는
+   * 신호라, 화면 전체를 바꾸는 일을 그것에 맡기면 예외 목록이 끝없이 는다.
+   * 판을 하나 새로 만들 때마다 여기 선택자를 더해야 했고, 실제로 매번
+   * 빠뜨려서 사용자가 잡아 줬다(2026-09-08 · 09-18 두 번).
+   *
+   * 단추로 옮기면 그 목록이 통째로 필요 없다 — 누른 자리가 곧 뜻이다.
+   */
 
   /**
    * 🔴 배경 사진은 **레이아웃**이 그린다(`AppFigure`) — 이 컴포넌트에서 못
@@ -482,7 +418,14 @@ export default function HomeStage({
               acceptedTeam={inbox.acceptedTeam}
               acceptedUs={inbox.acceptedUs}
               acceptedMatchId={inbox.acceptedMatchId}
-              onAcceptedShown={inbox.clearAccepted}
+              onAcceptedShown={() => {
+                inbox.clearAccepted()
+                /* 🔴 **닫으면 메인으로 돌아온다**(사용자 요청, 2026-09-18:
+                   「리뷰 마치고 이 화면으로 넘어오는데 메인으로 넘어오게」).
+                   판이 화면을 덮고 있는 동안 뒤가 영상 모음으로 내려가
+                   있을 수 있어서, 닫는 김에 무대로 되돌린다. */
+                setOut(false)
+              }}
               card={card}
               squad={squad}
               sportCode={sportCode}
@@ -527,18 +470,37 @@ export default function HomeStage({
           </h1>
         </div>
 
-        {/* 🔴 **내리면 무엇이 나오는지 미리 말한다**(사용자 요청). 레슨 · 상점
-            입구와 같은 안내이고 같은 모양을 쓴다 — 같은 뜻의 것에 다른 모양을
-            주지 않는다. 다른 것은 가리키는 곳뿐이라 글만 바꾼다.
+        {/* 🔴 **영상 모음으로 가는 유일한 길**(사용자 요청, 2026-09-18).
+            한때는 「아래로 내려…」라고 적힌 **안내문**이었고 실제로 넘기는
+            것은 굴림이었다. 굴림을 걷어낸 지금은 이것이 문이므로 `<p>` 가
+            아니라 **단추**여야 한다 — 자판과 화면 낭독기가 누를 수 있는 것은
+            단추뿐이고, 굴림을 없애면서 그 둘의 길까지 없애면 안 된다.
+            모양은 레슨 · 상점 입구의 안내와 같은 것을 그대로 쓴다.
             무대 **안**에 두므로 아래로 내릴 때 나머지와 같이 나간다. */}
-        <p className="ss-market-scroll ss-home-hint">
+        {/* 🔴 **옆 판이 열려 있는 동안은 안 눌린다**(사용자 요청, 2026-09-18:
+            「판이랑 겹칠 때는 그냥 판이 위로 오게 · 판을 닫아야 클릭」).
+            겹쳐 보이는 것은 CSS 의 쌓임 순서가 판을 위에 두어 풀고, 못 누르게
+            하는 것은 여기 `disabled` **하나**가 맡는다(마우스·자판 둘 다).
+            🔴 DOM 에 판이 있느냐(`body:has(.ss-suggest)`)로 가르지 않는다 —
+            닫힌 판이 물러나는 동안(또는 타이머 경합으로 영영) DOM 에 남아
+            판을 닫아도 안 눌렸다(사용자 지적, 2026-09-18). */}
+        <button
+          type="button"
+          className="ss-market-scroll ss-home-hint"
+          onClick={() => goOut(true)}
+          /* 🔴 `out` 도 함께 끈다 — 화면 바닥에 **붙박인**(fixed) 단추라
+             영상 모음이 올라온 뒤에도 그 자리에 남는다. 마우스는 CSS 가
+             막지만(`[data-ss-home-out='true'] .ss-home-stage`), 자판으로
+             짚는 것까지 막으려면 여기서 꺼야 한다. */
+          disabled={scouting || out}
+        >
           {/* 그림을 한 겹 싸는 이유 — 껍데기는 자리를 잡고, 안쪽 그림은 제
               흔들림(transform)을 쓴다. 한 겹으로 하면 둘이 서로 덮어쓴다. */}
           <span className="ss-market-scroll-icon" aria-hidden="true">
             <span className="material-symbols-outlined">keyboard_double_arrow_down</span>
           </span>
-          아래로 내려 영상 둘러보기
-        </p>
+          클릭해서 영상 둘러보기
+        </button>
       </div>
 
       {/* 오른쪽 아래 구석 — 로그아웃 아이콘 하나. 여기 있던 01~05 번호

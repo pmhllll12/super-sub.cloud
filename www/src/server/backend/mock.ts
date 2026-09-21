@@ -43,13 +43,28 @@ const DEMO_TEAM_ID = '9a2e0000-0000-4000-8000-000000000002'
 const EXPIRES_IN = 604800
 
 /**
+ * 🔴 **mock 의 상태는 `globalThis` 에 한 벌만 둔다**(2026-09-19). 개발 서버는
+ * 라우트마다(Route Handler · 서버 컴포넌트) 이 파일을 **따로 불러올 수 있어서**,
+ * 모듈 안의 `Map` 이 여러 벌이 된다 — `POST /api/me/card` 가 만든 카드를 `/me`
+ * 페이지가 못 보고(「카드 만들기」가 200 인데 안 만들어진 것처럼 보였다), 가입한
+ * 계정으로 로그인도 안 됐다. 실제 백엔드는 DB 라 이 문제가 없다.
+ * (지금은 가입 · 로그인 · 카드 만들기에 걸리는 셋만 옮겼다.)
+ */
+function shared<T>(key: string, make: () => T): T {
+  const g = globalThis as unknown as Record<string, unknown>
+  const k = `__ssMock_${key}`
+  if (!(k in g)) g[k] = make()
+  return g[k] as T
+}
+
+/**
  * 이메일 -> 비밀번호. User/SignupResult 는 계약 응답 형태라 비밀번호를 넣지 않는다 —
  * 그래서 별도로 둔다. 프로세스가 살아 있는 동안만 유지된다.
  */
-const passwords = new Map<string, string>([[DEMO_EMAIL, DEMO_PASSWORD]])
+const passwords = shared('passwords', () => new Map<string, string>([[DEMO_EMAIL, DEMO_PASSWORD]]))
 
 /** 프로세스가 살아 있는 동안만 유지된다. mock 이므로 이걸로 충분하다. */
-const users = new Map<string, User>([
+const users = shared('users', () => new Map<string, User>([
   [
     DEMO_TOKEN,
     {
@@ -72,7 +87,7 @@ const users = new Map<string, User>([
       ],
     },
   ],
-])
+]))
 
 const card: PlayerCard = {
   id: '7b4d0000-0000-4000-8000-000000000003',
@@ -626,7 +641,9 @@ const rivalSquad: Squad = {
 }
 
 /** `POST /me/card` 로 생긴 카드들. 데모 계정은 위 `card` 를 그대로 쓴다. */
-const made = new Map<string, PlayerCard>()
+const made = shared('made', () => new Map<string, PlayerCard>())
+/** 카드를 지운 사람들(`DELETE /me/card`). 데모 카드는 상수라 「지웠다」를 따로 적는다. */
+const deletedCards = shared('deletedCards', () => new Set<string>())
 
 /**
  * 닉네임으로 찾을 수 있는 사람들 — `GET /users/search` 가 뒤지는 명단이다.
@@ -1048,9 +1065,16 @@ export const mockBackend: Backend = {
     // `_CREATED` 와 같은 판단).
     const mine = made.get(u.id)
     if (mine) return mine
-    if (u.email === DEMO_EMAIL) return card
+    if (u.email === DEMO_EMAIL && !deletedCards.has(u.id)) return card
     // 가입만으로는 카드가 생기지 않는다 — **부탁해야** 생긴다(계약 3장).
     throw new BackendError(404, 'CARD_NOT_FOUND', '아직 선수 카드가 없습니다.')
+  },
+
+  async deleteMyCard(token) {
+    const u = requireUser(token)
+    // 멱등 — 원래 없었어도 조용히 끝난다(계약 CCC 63).
+    made.delete(u.id)
+    deletedCards.add(u.id)
   },
 
   async createMyCard(token) {
@@ -1059,6 +1083,7 @@ export const mockBackend: Backend = {
     // 공유한 주소가 죽는다(계약 3장).
     const has = made.get(u.id)
     if (has) return has
+    deletedCards.delete(u.id)
     if (u.email === DEMO_EMAIL) return card
     const fresh: PlayerCard = {
       id: `card-${u.id}`,

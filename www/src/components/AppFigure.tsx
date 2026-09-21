@@ -177,7 +177,13 @@ export default function AppFigure() {
   if (shownSrc !== (target?.src ?? null)) {
     setShownSrc(target?.src ?? null)
     setSentFor(null)
+    /* 🔴 **배경이 없는 화면(로그인 등)에 왔으면, 나가는 중이 아닌 장은 곧바로
+       걷는다**(사용자 지적, 2026-09-19). 로그아웃은 링크 이동이 아니라 서버가
+       로그인으로 돌려보내는 것이라 ① 의 「나간다」 신호가 안 온다 — 그래서 홈·
+       프로필 배경이 그대로 남아 ③ 의 정리(수백 ms 뒤)까지 **로그인 창의 유리 너머로
+       비쳤다.** 나가는 연출 중인 장(`out`)은 그 연출을 마저 하게 둔다. */
     if (target) setLayers((prev) => [...prev, { ...target, phase: 'in' }])
+    else setLayers((prev) => prev.filter((l) => l.phase === 'out'))
   }
 
   // ③ 다 지나가면 맨 위 한 장만 남긴다(위 주석). 배경이 없는 화면이면 다 걷는다.

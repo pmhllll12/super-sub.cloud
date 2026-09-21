@@ -67,12 +67,17 @@ class FakeCardRepository(CardPort):
         self.tagline_calls: list[tuple[UUID, str | None]] = []
         self.style_calls: list[tuple[UUID, dict | None]] = []
         self.custom_title_calls: list[tuple[UUID, list[str]]] = []
+        self.deleted_for: list[UUID] = []
 
     def find_by_owner(self, user_id: UUID) -> CardEntity | None:
         return _card() if user_id == _OWNER_ID else None
 
     def find_by_slug(self, slug: PublicSlug) -> CardEntity | None:
         return _card() if slug == PublicSlug(_SLUG) else None
+
+    def delete_by_owner(self, user_id: UUID) -> bool:
+        self.deleted_for.append(user_id)
+        return user_id == _OWNER_ID
 
     def create_for_owner(self, user_id: UUID) -> CardEntity:
         self.created_for.append(user_id)
@@ -238,3 +243,28 @@ class TestUpdateMyCardInteractor:
             )
         assert exc.value.status_code == 404
         assert exc.value.code == "CARD_NOT_FOUND"
+
+
+class TestDeleteMyCardInteractor:
+    """내 카드 지우기 (2026-09-19, 화면의 「초기화」)."""
+
+    def test_저장소에_지우기를_맡긴다(self):
+        from app.card.application.dtos.card_dto import DeleteMyCardCommand
+        from app.card.application.use_cases.delete_my_card_interactor import (
+            DeleteMyCardInteractor,
+        )
+
+        repo = FakeCardRepository()
+        DeleteMyCardInteractor(repo)(DeleteMyCardCommand(user_id=_OWNER_ID))
+        assert repo.deleted_for == [_OWNER_ID]
+
+    def test_카드가_없어도_오류가_아니다(self):
+        """멱등 — 재시도한 두 번째 요청이 오류로 오면 화면이 잘못 알린다."""
+        from uuid import uuid4
+
+        from app.card.application.dtos.card_dto import DeleteMyCardCommand
+        from app.card.application.use_cases.delete_my_card_interactor import (
+            DeleteMyCardInteractor,
+        )
+
+        DeleteMyCardInteractor(FakeCardRepository())(DeleteMyCardCommand(user_id=uuid4()))

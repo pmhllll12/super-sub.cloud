@@ -1,18 +1,24 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { MatchTeam } from '@/lib/teamMatch'
-import MatchWaiting from './MatchWaiting'
+import MatchWaiting, { whenText } from './MatchWaiting'
 
 /**
  * **경기가 잡혔다** — 화면을 덮는 팝업(사용자 요청, 2026-09-10).
  * 가운데는 언제 · 어디서 · 누구와, 양옆은 두 팀의 판.
- */
+ *
+ * 🔴 **시각을 고정 문자열로 적지 않는다**(2026-09-20 정정). 고정 과거값이
+ * 「아직 안 지났다」(`over === false`) 분기를 시험하고 있었는데, 실제
+ * 달력이 그 날짜를 지나자 조용히 「이미 지났다」 분기로 바뀌어 시험
+ * 10건이 깨졌다(`경기 완료` 단추가 `경기 끝내기`로 바뀌는 바로 그 갈림길).
+ * 실행 시점 기준 **항상 미래**인 날짜를 만든다. */
+const PLAYED_AT = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
 const THEM: MatchTeam = {
   id: 'mt-1',
   name: '번개FC',
   region: '서울 강남구',
   size: '5',
-  playedAt: '2026-09-19T10:00:00',
+  playedAt: PLAYED_AT,
   place: '강남 풋살장 2구장',
   why: ['같은 지역'],
   squad: [
@@ -36,7 +42,7 @@ describe('경기 대기 팝업', () => {
 
   it('언제 · 어디서 · 누구와를 가운데에 적는다', () => {
     open()
-    expect(screen.getByText('9월 19일 토요일 10:00')).toBeInTheDocument()
+    expect(screen.getByText(whenText(PLAYED_AT))).toBeInTheDocument()
     expect(screen.getByText('강남 풋살장 2구장')).toBeInTheDocument()
     expect(screen.getByText('VS')).toBeInTheDocument()
   })
@@ -196,10 +202,73 @@ describe('경기 대기 팝업', () => {
       expect(screen.getByRole('button', { name: '정말 취소합니다' })).toBeEnabled()
     })
 
-    /* 🔴 무를 길이 없으면 단추도 안 그린다 — 눌러도 아무 일이 없으면 안 된다. */
+    /* 🔴 무를 길이 없으면 단추도 안 그린다 — 눌러도 아무 일이 없으면 안 된다.
+       🔴 **칸 전체를 숨기지는 않는다**(2026-09-18) — 「경기 완료」는 취소와
+       달리 서버로 나가는 것이 없어 `onCancel` 과 무관하다. 전에는 칸째
+       숨겨서 마무리까지 같이 사라졌다. */
     it('무를 길이 없으면 단추를 안 낸다', () => {
       open()
       expect(screen.queryByRole('button', { name: '경기 취소' })).toBeNull()
+      expect(screen.getByRole('button', { name: '경기 완료' })).toBeInTheDocument()
+    })
+  })
+
+  /**
+   * 🔴 **시각이 되기 전에도 손으로 끝낼 수 있다** (사용자 요청, 2026-09-18).
+   *
+   * 전에는 마무리가 **경기 시각이 지나야만** 열렸다(`over`). 먼저 치른 경기를
+   * 적을 길이 없었다. 🔴 되돌릴 수 없는 결정이라 **바로 넘기지 않고 한 번 더
+   * 묻는다.**
+   */
+  describe('경기 완료 — 손으로, 그러나 한 번 더 묻고', () => {
+    it('시각 전에도 「경기 완료」가 있다', () => {
+      open()
+      expect(screen.getByRole('button', { name: '경기 완료' })).toBeInTheDocument()
+    })
+
+    it('🔴 누르면 바로 안 끝나고 되돌릴 수 없다고 먼저 말한다', async () => {
+      const user = userEvent.setup()
+      open()
+      await user.click(screen.getByRole('button', { name: '경기 완료' }))
+
+      expect(screen.getByText(/정말로 경기가 완료되었나요/)).toBeInTheDocument()
+      expect(screen.getByText(/되돌릴 수 없습니다/)).toBeInTheDocument()
+      /* 아직 리뷰로 안 갔다 — 물어보는 중이다. */
+      expect(screen.queryByRole('dialog', { name: '경기 리뷰' })).toBeNull()
+    })
+
+    it('경고 안의 「경기 완료」를 눌러야 리뷰로 간다', async () => {
+      const user = userEvent.setup()
+      open()
+      await user.click(screen.getByRole('button', { name: '경기 완료' }))
+      await user.click(screen.getByRole('button', { name: '경기 완료' }))
+
+      expect(await screen.findByRole('dialog', { name: '경기 리뷰' })).toBeInTheDocument()
+    })
+
+    /* 🔴 **취소처럼 머리칸의 「경기 잡힘」에서 사라져야 한다**(사용자 요청,
+       2026-09-18). 서버에 완료 상태가 없어 부모가 브라우저에 적는다. */
+    it('확인하면 부모에게 「끝났다」를 알린다', async () => {
+      const user = userEvent.setup()
+      const onFinished = vi.fn()
+      render(
+        <MatchWaiting us={US} them={THEM} onClose={vi.fn()} onFinished={onFinished} />,
+      )
+      await user.click(screen.getByRole('button', { name: '경기 완료' }))
+      expect(onFinished).not.toHaveBeenCalled() // 아직 묻는 중이다
+      await user.click(screen.getByRole('button', { name: '경기 완료' }))
+      expect(onFinished).toHaveBeenCalledTimes(1)
+    })
+
+    it('「되돌리기」를 누르면 아무 일도 없다', async () => {
+      const user = userEvent.setup()
+      open()
+      await user.click(screen.getByRole('button', { name: '경기 완료' }))
+      await user.click(screen.getByRole('button', { name: '되돌리기' }))
+
+      expect(screen.queryByText(/정말로 경기가 완료되었나요/)).toBeNull()
+      expect(screen.queryByRole('dialog', { name: '경기 리뷰' })).toBeNull()
+      expect(screen.getByRole('button', { name: '경기 완료' })).toBeInTheDocument()
     })
   })
 
@@ -226,10 +295,16 @@ describe('경기 대기 팝업', () => {
 describe('대기 화면 — 경기가 끝난 뒤', () => {
   afterEach(() => vi.useRealTimers())
 
-  /** 경기 시각을 지나 있게 시계를 옮긴다. */
+  /**
+   * 경기 시각을 지나 있게 시계를 옮긴다.
+   *
+   * 🔴 **`PLAYED_AT` 기준 상대값이다**(2026-09-20 정정) — 고정 날짜였을 때는
+   * 실제 달력이 그 날짜를 지나자 `THEM`(위에서 이미 상대값으로 고쳤다)이
+   * 도리어 이 가짜 시계보다 미래가 되어 "지났다" 분기가 반대로 안 걸렸다.
+   */
   function afterMatch() {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    vi.setSystemTime(new Date('2026-09-19T12:00:00'))
+    vi.setSystemTime(new Date(new Date(PLAYED_AT).getTime() + 2 * 60 * 60 * 1000))
   }
 
   it('경기 시각이 지나면 「경기 끝내기」다 — 「경기 취소」가 아니다', async () => {
@@ -242,7 +317,7 @@ describe('대기 화면 — 경기가 끝난 뒤', () => {
 
   it('아직 안 지났으면 그대로 「경기 취소」다', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    vi.setSystemTime(new Date('2026-09-19T08:00:00'))
+    vi.setSystemTime(new Date(new Date(PLAYED_AT).getTime() - 2 * 60 * 60 * 1000))
     render(<MatchWaiting us={US} them={THEM} onClose={vi.fn()} onCancel={vi.fn()} />)
 
     expect(screen.getByRole('button', { name: '경기 취소' })).toBeInTheDocument()
@@ -362,7 +437,7 @@ describe('대기 화면 — 경기가 끝난 뒤', () => {
 
       expect(screen.queryByRole('complementary', { name: '정우진 프로필' })).toBeNull()
       expect(onClose).not.toHaveBeenCalled()
-      expect(screen.getByText('9월 19일 토요일 10:00')).toBeInTheDocument()
+      expect(screen.getByText(whenText(PLAYED_AT))).toBeInTheDocument()
     })
 
     /* 🔴 등급이 없는 것은 고장이 아니다 — 대표 영상이 없거나 분석 전이다. */

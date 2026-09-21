@@ -174,19 +174,34 @@ describe('비슷한 팀 명단', () => {
 
     await user.click(screen.getAllByRole('button', { name: '경기 신청' })[0])
 
-    expect(screen.getByText('언제')).toBeInTheDocument()
+    /* 🔴 **열자마자 쓸 수 있는 시각이 채워져 있다**(2026-09-18) — 비워
+       두었더니 달력에서 날짜만 고르고 시각이 `00:00` 으로 남아 「지난
+       시각입니다」에 걸렸다. 그래서 제안 줄(「언제」) 대신 이 칸이 먼저 뜬다. */
+    const at = screen.getByLabelText('직접 고르기') as HTMLInputElement
+    expect(at.value).not.toBe('')
+    expect(new Date(at.value).getTime()).toBeGreaterThan(Date.now())
+
     expect(screen.getByText('어디서')).toBeInTheDocument()
     // 구장을 안 골랐으면 못 보낸다.
     expect(screen.getByRole('button', { name: '이 시각으로 신청' })).toBeDisabled()
   })
 
   /* 🔴 **시각은 우리 조건에서 온다** — 지어내지 않는다. 조건이 토요일뿐이면
-     고를 수 있는 것도 토요일뿐이다. */
-  it('고를 수 있는 시각은 우리 조건에서 나온다', async () => {
+     고를 수 있는 것도 토요일뿐이다.
+
+     🔴 **직접 고르기 칸을 비워야 제안이 나온다**(2026-09-18) — 둘이 같이
+     떠 있으면 어느 것이 쓰이는지 알 수 없어서, 직접 고른 값이 있으면
+     제안을 안 그린다. **제안을 없앤 것이 아니라는 것**이 이 시험이다. */
+  it('직접 고르기를 비우면 우리 조건에서 나온 시각이 돌아온다', async () => {
     const user = userEvent.setup()
     open()
     await screen.findByText('망원 유나이티드')
     await user.click(screen.getAllByRole('button', { name: '경기 신청' })[0])
+
+    // 채워져 있는 동안에는 제안 줄이 없다.
+    expect(screen.queryByText('언제')).toBeNull()
+
+    fireEvent.change(screen.getByLabelText('직접 고르기'), { target: { value: '' } })
 
     const when = screen.getByText('언제').closest('label')?.querySelector('select')
     expect(when).not.toBeNull()
@@ -395,5 +410,54 @@ describe('비슷한 팀 명단', () => {
 
     // 판이 닫히지 않는다 — 직접 고르는 칸이 있다.
     expect(screen.getByLabelText('직접 고르기')).toBeInTheDocument()
+  })
+
+  /**
+   * **판 안에서 굴리면 페이지가 안 움직인다** (사용자 지적, 2026-09-18).
+   *
+   * 「A팀 매칭 판에서 다른 팀 보려고 스크롤 하면 아예 비디오 여기로 내려와」
+   *
+   * 🔴 `.ss-tm-list` 에는 이미 `overscroll-behavior: contain` 이 있었다.
+   * 새는 자리는 **목록 밖**이다 — 머리줄(「설정 수정」)이나 아래 안내
+   * (「신청은 상대 팀장에게 갑니다」) 위에서 굴리면 그 휠은 목록이 아니라
+   * **페이지**로 가고, 홈은 아래가 영상 모음이라 거기까지 내려간다.
+   */
+  it('목록 밖에서 굴려도 페이지로 안 넘긴다', async () => {
+    open()
+    await screen.findByText('망원 유나이티드')
+
+    const foot = screen.getByText(/수락해야 경기가 잡힙니다/)
+    const ev = new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true })
+    foot.dispatchEvent(ev)
+
+    expect(ev.defaultPrevented).toBe(true)
+  })
+
+  /* 🔴 **목록 위에서도 우리가 처리한다.** 앞서는 「목록이 구를 수 있으면
+     브라우저에 맡긴다」로 두었는데 **배포본에서 페이지가 계속 내려갔다** —
+     CSS(`overscroll-behavior: contain`)는 멀쩡했다. 네이티브 체이닝 규칙에
+     안 기대고 직접 굴린다. */
+  it('목록 위에서 굴려도 우리가 목록을 굴리고 페이지는 막는다', async () => {
+    open()
+    await screen.findByText('망원 유나이티드')
+
+    const list = document.querySelector('.ss-tm-list') as HTMLElement
+    // jsdom 은 크기를 안 잰다 — 구를 여지가 있다고 알려 준다.
+    Object.defineProperty(list, 'scrollHeight', { value: 900, configurable: true })
+    Object.defineProperty(list, 'clientHeight', { value: 300, configurable: true })
+    list.scrollTop = 0
+    const ev = new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true })
+    list.dispatchEvent(ev)
+
+    expect(list.scrollTop).toBe(120)
+    expect(ev.defaultPrevented).toBe(true)
+  })
+
+  /* 🔴 **붙었는지 화면에서 볼 수 있어야 한다** — 안 붙으면 증상이 고치기
+     전과 똑같아서, 배포가 안 된 것인지 코드가 틀린 것인지 못 가른다. */
+  it('판에 붙었다는 표식을 남긴다', async () => {
+    open()
+    await screen.findByText('망원 유나이티드')
+    expect(document.querySelector('.ss-tm')).toHaveAttribute('data-wheel-guard', 'on')
   })
 })

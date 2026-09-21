@@ -136,7 +136,7 @@ describe('로그인 화면 — 심사위원용', () => {
 
   it('회원가입 아래에 단추가 있다', () => {
     render(<LoginPage />)
-    expect(screen.getByRole('button', { name: '심사위원용 로그인' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '원티드 테스트용 로그인' })).toBeInTheDocument()
   })
 
   /* 계정이 이미 있으면 **가입을 안 부른다** — 한 번으로 끝난다. */
@@ -144,7 +144,7 @@ describe('로그인 화면 — 심사위원용', () => {
     const calls = stub()
     render(<LoginPage />)
 
-    await userEvent.click(screen.getByRole('button', { name: '심사위원용 로그인' }))
+    await userEvent.click(screen.getByRole('button', { name: '원티드 테스트용 로그인' }))
 
     expect(calls.filter((c) => c.url.endsWith('/api/auth/login'))).toHaveLength(1)
     expect(calls.some((c) => c.url.endsWith('/api/auth/signup'))).toBe(false)
@@ -158,7 +158,7 @@ describe('로그인 화면 — 심사위원용', () => {
     const calls = stub({ loginFails: 1 })
     render(<LoginPage />)
 
-    await userEvent.click(screen.getByRole('button', { name: '심사위원용 로그인' }))
+    await userEvent.click(screen.getByRole('button', { name: '원티드 테스트용 로그인' }))
 
     expect(calls.some((c) => c.url.endsWith('/api/auth/signup'))).toBe(true)
     expect(calls.filter((c) => c.url.endsWith('/api/auth/login'))).toHaveLength(2)
@@ -172,7 +172,7 @@ describe('로그인 화면 — 심사위원용', () => {
     const calls = stub()
     render(<LoginPage />)
 
-    await userEvent.click(screen.getByRole('button', { name: '심사위원용 로그인' }))
+    await userEvent.click(screen.getByRole('button', { name: '원티드 테스트용 로그인' }))
 
     const sent = calls.find((c) => c.url.endsWith('/api/auth/login'))!
     const body = sent.body as { email?: string; password?: string }
@@ -187,8 +187,28 @@ describe('로그인 화면 — 심사위원용', () => {
     stub({ loginFails: 99 })
     render(<LoginPage />)
 
-    await userEvent.click(screen.getByRole('button', { name: '심사위원용 로그인' }))
+    await userEvent.click(screen.getByRole('button', { name: '원티드 테스트용 로그인' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('없는 계정')
+  })
+
+  /**
+   * **로고 위 한 줄** (사용자 요청, 2026-09-18).
+   *
+   * 🔴 **아래 것들은 안 건드린다** — 로고·안내 문구·입력칸·단추의 크기도
+   * 간격도 그대로다. 로고 위가 원래 비어 있던 자리라 거기만 채운다.
+   */
+  it('로고 위에 한 줄이 붙는다', () => {
+    render(<LoginPage />)
+    expect(screen.getByText('AI가 완성하는 스포츠 라이프')).toBeInTheDocument()
+  })
+
+  /* 🔴 **한 줄에 못 박지 않는다** — 375px 에서 카드를 넘긴다. 한글 줄바꿈
+     둘(`break-keep`·`text-pretty`)로 어절 단위로 접는다. */
+  it('좁은 화면에서 넘치지 않게 줄바꿈을 허용한다', () => {
+    render(<LoginPage />)
+    const line = screen.getByText('AI가 완성하는 스포츠 라이프')
+    expect(line.className).not.toContain('whitespace-nowrap')
+    expect(line.className).toContain('break-keep')
   })
 })

@@ -8,7 +8,7 @@ import { ReportPanelContext } from './reportPanel'
  * 들어오는 연출이 다 끝나는 시각 — 가장 늦은 것(1080ms 지연 + 460ms)에
  * 여유를 조금 얹었다. `globals.css` 의 「들고 남」 절과 **같이 고쳐야 한다.**
  */
-const ENTER_MS = 1700
+export const ENTER_MS = 1700
 
 /**
  * 프로필 화면의 **무대**. 하는 일은 하나 — 지금 이 화면을 떠나는 중인지를
