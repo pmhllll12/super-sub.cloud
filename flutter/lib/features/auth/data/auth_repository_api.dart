@@ -4,6 +4,7 @@ import '../../../core/network/api_client.dart';
 import 'auth_repository.dart';
 import 'models/app_user.dart';
 import 'models/session.dart';
+import 'models/team_membership.dart';
 import 'token_store.dart';
 
 /// `fastapi/` 백엔드에 붙는 실제 구현.
@@ -124,6 +125,11 @@ class ApiAuthRepository implements AuthRepository {
       email: body['email'] as String,
       nickname: body['nickname'] as String,
       createdAt: DateTime.parse(body['created_at'] as String),
+      // 🔴 **내 팀은 여기서 온다** — 따로 부를 경로가 없다. 옛 서버는 이 칸을
+      //    안 줄 수 있어 없으면 빈 목록이다.
+      teams: ((body['teams'] as List<dynamic>?) ?? const [])
+          .map((e) => TeamMembership.fromJson(e as Map<String, dynamic>))
+          .toList(growable: false),
     );
   }
 

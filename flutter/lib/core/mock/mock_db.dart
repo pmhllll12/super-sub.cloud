@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/auth/data/models/app_user.dart';
+import '../../features/auth/data/models/team_membership.dart';
 import '../../features/team/data/models/sport.dart';
 import '../../features/team/data/models/team.dart';
 import '../../features/team/data/models/team_member.dart';
@@ -106,6 +107,40 @@ class MockDb {
     ]);
     // 신규 가입자(newbieId)는 의도적으로 소속을 넣지 않는다.
     // 빈 상태 UI를 반드시 만들도록 강제하는 장치다.
+
+    _attachTeams();
+  }
+
+  /// 사용자마다 [AppUser.teams] 를 채운다 — 실제 `GET /me` 가 `teams[]` 를
+  /// 함께 주기 때문이다.
+  ///
+  /// 🔴 **시드 순서 때문에 따로 돈다.** users 를 만들 때는 teamMembers 가 아직
+  /// 없어서 그 자리에서는 채울 수가 없다.
+  ///
+  /// 🔴 **`leftAt` 이 있는 행은 뺀다** — 서버도 `left_at` 이 널인 행만 추려서
+  /// 준다. 안 거르면 나간 팀이 홈 판의 대상이 되어 「탈퇴한 팀의 스쿼드」를
+  /// 그린다.
+  void _attachTeams() {
+    for (var i = 0; i < users.length; i += 1) {
+      final user = users[i];
+      final memberships = <TeamMembership>[];
+      for (final tm in teamMembers) {
+        if (tm.userId != user.id || tm.leftAt != null) continue;
+        final team = teams.where((t) => t.id == tm.teamId).firstOrNull;
+        if (team == null) continue;
+        memberships.add(
+          TeamMembership(
+            teamId: team.id,
+            name: team.name,
+            region: team.region,
+            sportCode: team.sportCode,
+            role: tm.role == TeamRole.manager ? 'owner' : 'member',
+            joinedAt: tm.joinedAt,
+          ),
+        );
+      }
+      users[i] = user.copyWith(teams: memberships);
+    }
   }
 }
 
