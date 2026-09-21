@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/auth/data/models/app_user.dart';
 import '../../features/auth/data/models/team_membership.dart';
+import '../../features/card/data/models/player_card.dart';
 import '../../features/team/data/models/sport.dart';
 import '../../features/team/data/models/team.dart';
 import '../../features/team/data/models/team_member.dart';
@@ -23,6 +24,7 @@ class MockDb {
   final List<AppUser> users = [];
   final List<Team> teams = [];
   final List<TeamMember> teamMembers = [];
+  final List<PlayerCard> cards = [];
 
   AppUser? findUserByEmail(String email) {
     for (final u in users) {
@@ -107,6 +109,16 @@ class MockDb {
     ]);
     // 신규 가입자(newbieId)는 의도적으로 소속을 넣지 않는다.
     // 빈 상태 UI를 반드시 만들도록 강제하는 장치다.
+
+    // 🔴 **playerId 의 카드는 일부러 안 만든다.** 「카드 없음」 빈 상태를
+    //    반드시 만들게 하는 장치다(위 newbieId 와 같은 이유). 카드는 화면에서
+    //    실제로 만들어야 생긴다 — 계약도 「가입만으로는 안 생긴다」이다.
+    cards.add(const PlayerCard(
+      id: 'pc-$managerId',
+      publicSlug: 'lee-gamdok-7f21',
+      nickname: '이감독',
+      tagline: 'THREE LUNGS',
+    ));
 
     _attachTeams();
   }
