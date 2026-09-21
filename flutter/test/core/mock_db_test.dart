@@ -27,16 +27,21 @@ void main() {
     expect(db.findUserByEmail('nobody@nowhere.test'), isNull);
   });
 
-  test('팀 관리자만 manager 역할을 갖는다', () {
-    final roles = db.teamMembers
-        .where((m) => m.userId == MockDb.managerId)
-        .map((m) => m.role);
-    expect(roles, contains(TeamRole.manager));
-
+  /* 🔴 **두 역할이 서로 자리를 바꿨다 (2026-09-21).** 목업으로 들어가는 계정이
+     `playerId` 인데 주장이 아니어서 **자동 착석도 자리 끌기도 켜질 수가
+     없었다**(둘 다 주장 전용) — 목업의 존재 이유가 「서버 없이 화면 작업을 잇는
+     것」인데 그게 깨졌다. 시드를 뒤집고 「주장이 아닌 사람」 갈래는 `managerId`
+     가 맡는다. 이름과 역할이 어긋나 보이는 것은 그 때문이다. */
+  test('역할이 둘 다 시드에 있다 — 주장 하나, 팀원 하나', () {
     final playerRoles = db.teamMembers
         .where((m) => m.userId == MockDb.playerId)
         .map((m) => m.role);
-    expect(playerRoles, isNot(contains(TeamRole.manager)));
+    expect(playerRoles, contains(TeamRole.manager));
+
+    final managerRoles = db.teamMembers
+        .where((m) => m.userId == MockDb.managerId)
+        .map((m) => m.role);
+    expect(managerRoles, isNot(contains(TeamRole.manager)));
   });
 
   test('신규 가입자는 팀 소속이 없다 (빈 상태 UI 검증용)', () {
@@ -51,11 +56,12 @@ void _teamsInMockDb() {
   group('AppUser.teams', () {
     test('소속이 있는 사용자는 팀이 채워진다', () {
       final db = MockDb();
-      final manager = db.findUserById(MockDb.managerId)!;
+      final player = db.findUserById(MockDb.playerId)!;
 
-      expect(manager.teams, hasLength(1));
-      expect(manager.teams.single.name, '번개 풋살클럽');
-      expect(manager.ownedTeamId, 't-thunder');
+      expect(player.teams, hasLength(1));
+      expect(player.teams.single.name, '번개 풋살클럽');
+      // 🔴 2026-09-21 에 playerId 를 주장으로 바꿨다(MockDb 주석 참고).
+      expect(player.ownedTeamId, 't-thunder');
     });
 
     test('🔴 나간 팀은 안 들어온다 — 서버도 left_at 이 널인 행만 준다', () {
@@ -67,10 +73,11 @@ void _teamsInMockDb() {
     });
 
     test('주장이 아니면 ownedTeamId 가 없지만 판은 연다', () {
-      final player = MockDb().findUserById(MockDb.playerId)!;
+      // 「주장이 아닌 사람」 갈래는 이제 managerId 가 맡는다.
+      final manager = MockDb().findUserById(MockDb.managerId)!;
 
-      expect(player.ownedTeamId, isNull);
-      expect(player.primaryTeamId, 't-thunder');
+      expect(manager.ownedTeamId, isNull);
+      expect(manager.primaryTeamId, 't-thunder');
     });
 
     test('신규 가입자는 팀이 없다 — 빈 상태를 반드시 만들게 한다', () {

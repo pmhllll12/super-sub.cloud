@@ -85,17 +85,22 @@ class MockDb {
     ]);
 
     teamMembers.addAll([
+      /* 🔴 **playerId 가 주장이다 (2026-09-21 에 바꿨다).** 전에는 managerId 가
+         주장이고 playerId 는 팀원이었는데, 목업으로 들어가는 계정이 playerId
+         라서 **자동 착석도 자리 끌기도 켜질 수가 없었다**(둘 다 주장 전용).
+         목업의 존재 이유가 「서버 없이 화면 작업을 잇는 것」인데 그게 깨졌다.
+         「주장이 아닌 사람」 갈래는 managerId 가 맡는다. */
       TeamMember(
         id: 'tm-1',
         teamId: 't-thunder',
-        userId: managerId,
+        userId: playerId,
         role: TeamRole.manager,
         joinedAt: DateTime(2026, 2, 12),
       ),
       TeamMember(
         id: 'tm-2',
         teamId: 't-thunder',
-        userId: playerId,
+        userId: managerId,
         role: TeamRole.member,
         joinedAt: DateTime(2026, 3, 5),
       ),
@@ -112,9 +117,16 @@ class MockDb {
     // 신규 가입자(newbieId)는 의도적으로 소속을 넣지 않는다.
     // 빈 상태 UI를 반드시 만들도록 강제하는 장치다.
 
-    // 🔴 **playerId 의 카드는 일부러 안 만든다.** 「카드 없음」 빈 상태를
-    //    반드시 만들게 하는 장치다(위 newbieId 와 같은 이유). 카드는 화면에서
-    //    실제로 만들어야 생긴다 — 계약도 「가입만으로는 안 생긴다」이다.
+    /* 🔴 **「카드 없음」 빈 상태는 newbieId 가 맡는다 (2026-09-21 정정).**
+       전에는 playerId 의 카드를 일부러 안 만들어 그 갈래를 강제했는데,
+       목업으로 들어가는 계정이 playerId 라서 **자동 착석을 영영 못 봤다**
+       (카드가 없으면 앉힐 것이 없다). newbieId 는 카드도 팀도 없으므로
+       빈 상태 화면은 그쪽으로 확인한다. */
+    cards.add(const PlayerCard(
+      id: 'pc-$playerId',
+      publicSlug: 'baek-seonggeom-3a71',
+      nickname: '백성검',
+    ));
     cards.add(const PlayerCard(
       id: 'pc-$managerId',
       publicSlug: 'lee-gamdok-7f21',

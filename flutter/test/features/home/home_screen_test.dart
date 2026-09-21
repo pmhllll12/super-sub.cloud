@@ -10,6 +10,7 @@ import 'package:super_sub/features/auth/data/auth_repository_mock.dart';
 import 'package:super_sub/core/dev/data_source.dart';
 import 'package:super_sub/features/auth/presentation/session_controller.dart';
 import 'package:super_sub/features/home/presentation/screens/home_screen.dart';
+import 'package:super_sub/features/team/data/squad_providers.dart';
 import 'package:super_sub/features/profile/presentation/widgets/player_card_view.dart';
 
 Future<ProviderContainer> _pumpLoggedIn(WidgetTester tester) async {
@@ -147,7 +148,7 @@ void main() {
 
     testWidgets('접혀 있을 때는 판이 안 눌린다', (tester) async {
       await _pumpLoggedIn(tester);
-      await tester.tap(find.byKey(const Key('squad-add-fw1')), warnIfMissed: false);
+      await tester.tap(find.byKey(const Key('squad-add-df1')), warnIfMissed: false);
       await tester.pump();
       expect(find.textContaining('선수 넣기'), findsNothing);
     });
@@ -307,16 +308,14 @@ void main() {
     testWidgets('처음은 5:5 — 서버 스쿼드의 팀원이 자리에 앉는다', (tester) async {
       await _pumpLoggedIn(tester);
       expect(find.text('MY SQUAD'), findsOneWidget);
-      /* 🔴 이 대역(`MockDb.playerId`)은 **자기 카드가 없고**(MockDb 가 일부러
-         안 만든다 — 「카드 없음」 빈 상태를 반드시 만들게 하는 장치) **등재도
-         안 했다.** 그래서 판에 내 카드는 없다.
-
-         대신 같은 팀의 등재 둘이 앉는다: 이감독(GK, 칸이 저장돼 있다)은 카드
-         슬러그가 있어 **카드**로, 박신입(MF, 칸이 없다)은 슬러그가 없어
-         **이름표**로 — 다섯 자리 중 둘이 차고 셋이 빈다. */
-      expect(find.byType(PlayerCardView), findsOneWidget);
+      /* 판에 서는 것 셋:
+         - **나** — 자동 착석이 FW 에 앉힌다(아래 「자동 착석」 그룹이 잡는다)
+         - **이감독** — GK, 칸이 저장돼 있고 카드 슬러그가 있어 **카드**로
+         - **박신입** — MF, 칸이 없어 포지션으로 앉고 슬러그가 없어 **이름표**로
+         카드 셋 = 내 카드 + 이감독 + 오른쪽 위 「내 프로필」 입구. */
+      expect(find.byType(PlayerCardView), findsNWidgets(3));
       expect(find.text('박신입'), findsOneWidget);
-      expect(_blankSeats(), findsNWidgets(3));
+      expect(_blankSeats(), findsNWidgets(2));
       for (final pos in const ['FW', 'DF', 'GK']) {
         expect(find.text(pos), findsOneWidget, reason: pos);
       }
@@ -328,19 +327,43 @@ void main() {
       await _openSheet(tester);
       await tester.tap(find.byKey(const Key('squad-size-seven')));
       await tester.pump();
-      // 등재 둘은 크기가 바뀌어도 그대로 앉아 있다 — 빈 자리만 는다.
-      expect(_blankSeats(), findsNWidgets(5));
+      // 앉은 셋은 크기가 바뀌어도 그대로다 — 빈 자리만 는다.
+      expect(_blankSeats(), findsNWidgets(4));
 
       await tester.tap(find.byKey(const Key('squad-size-three')));
       await tester.pump();
-      expect(_blankSeats(), findsNWidgets(1));
+      // 3:3 은 자리가 셋뿐이라 꽉 찬다.
+      expect(_blankSeats(), findsNothing);
+    });
+
+    /* 🔴 **이 회차에 빠져 있던 것**(사용자 지적). 웹은 「카드를 만들면 FW 에
+       먼저 앉힌다」인데 앱에는 그 흐름이 통째로 없었다 — 배치 함수는 등재를
+       그릴 뿐 만들지 않는다. 자리를 고르는 규칙 자체는 `auto_seat_test.dart` 가
+       잡고, 여기서는 **홈이 실제로 그것을 서버에 남기는지**를 본다. */
+    testWidgets('자동 착석 — 카드가 있으면 FW 에 앉는다', (tester) async {
+      final container = await _pumpLoggedIn(tester);
+      final me = container.read(sessionControllerProvider);
+      final teamId = (me as SessionLoggedIn).user.ownedTeamId!;
+
+      /* 🔴 **리포지토리를 직접 await 하지 않는다** — Mock 의 300ms 지연을
+         가짜 시계가 안 흘려 영영 안 끝난다(`flutter/CLAUDE.md` 의 그 함정).
+         provider 가 이미 받아 둔 값을 **동기로** 읽는다. */
+      final squad = container.read(squadProvider(teamId)).value;
+      final mine = squad!.members
+          .where((m) => m.cardPublicSlug == 'baek-seonggeom-3a71')
+          .toList();
+
+      expect(mine, hasLength(1), reason: '내 등재가 서버에 남아야 한다');
+      expect(mine.single.gridCol, 1);
+      expect(mine.single.gridRow, 0); // FW 줄
+      expect(mine.single.positionCode, 'FW');
     });
 
     testWidgets('빈 자리를 누르면 준비 중 안내가 뜬다', (tester) async {
       await _pumpLoggedIn(tester);
       await _openSheet(tester);
-      // 🔴 GK 는 Mock 시드에서 이감독이 앉아 있다 — 빈 자리를 고른다.
-      await tester.tap(find.byKey(const Key('squad-add-fw1')));
+      // 🔴 FW 는 자동 착석이, GK 는 이감독이 앉았다 — 남은 빈 자리를 고른다.
+      await tester.tap(find.byKey(const Key('squad-add-df1')));
       await tester.pump();
       expect(find.textContaining('선수 넣기'), findsOneWidget);
     });
