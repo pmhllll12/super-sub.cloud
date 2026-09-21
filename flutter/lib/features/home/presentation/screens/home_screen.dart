@@ -16,8 +16,10 @@ import '../../../auth/presentation/session_controller.dart';
 import '../../../card/data/card_providers.dart';
 import '../../../card/presentation/mate_cards_controller.dart';
 import '../../../profile/presentation/widgets/player_card_view.dart';
+import '../../../team/auto_seat.dart';
 import '../../../team/data/models/squad.dart';
 import '../../../team/data/squad_providers.dart';
+import '../../../team/seats_from_squad.dart';
 import '../../../team/presentation/widgets/squad_board.dart';
 
 /// 홈의 바탕 — **완전한 검정**(2026-09-16 사용자 요청. 하루 동안 흰색이었다).
@@ -268,6 +270,54 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
   }
 
+  /* 🔴 **세션 안 한 번만.** 판이 비는 다른 길(크기 바꾸기 · 늦게 온 응답)에서
+     이 효과가 다시 돌면 **같은 등재가 서버로 두 번** 나간다(웹과 같은 장치). */
+  bool _autoSeated = false;
+
+  /// 카드를 만든 사람을 **판에 먼저 앉힌다**(`flutter/lib/features/team/auto_seat.dart`).
+  ///
+  /// 🔴 **주장만** 한다 — 등재는 주장 전용이라 팀원이 부르면 403 이고, 판에만
+  /// 섰다가 새로고침에 사라진다. 팀원의 카드는 팀장이 등재해 주었을 때 선다.
+  void _autoSeatOnce(
+    Squad? squad,
+    String? myCardId,
+    String? myCardSlug,
+    String? ownedTeamId,
+  ) {
+    if (_autoSeated) return;
+    if (squad == null || myCardId == null || ownedTeamId == null) return;
+    if (squad.teamId != ownedTeamId) return;
+
+    final choice = pickAutoSeat(
+      squad: squad,
+      myCardSlug: myCardSlug,
+      size: squadSizeOf(squad.formation),
+    );
+    if (choice == null) return;
+
+    _autoSeated = true;
+    // 🔴 빌드 중에 서버를 부르지 않는다 — provider 상태를 건드려 Riverpod 이
+    //    던진다. 프레임이 끝난 뒤로 미룬다(`_wantMateCards` 와 같은 이유).
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      try {
+        await ref.read(squadRepositoryProvider).enlist(
+              ownedTeamId,
+              playerCardId: myCardId,
+              positionCode: choice.positionCode,
+              gridCol: choice.col,
+              gridRow: choice.row,
+            );
+        // 판을 다시 읽어 방금 생긴 등재를 그린다.
+        ref.invalidate(squadProvider(ownedTeamId));
+      } catch (_) {
+        /* 🔴 **조용히 넘어간다.** 자동 착석은 사람이 시킨 일이 아니라 판을
+           처음 여는 사람을 위한 편의다 — 실패했다고 오류 창을 띄우면 무엇
+           때문인지 모르는 알림이 뜬다. 다음에 켤 때 다시 시도한다. */
+      }
+    });
+  }
+
   /// 판에 앉은 팀원들의 카드를 **보이는 것만** 받아 둔다.
   ///
   /// 🔴 **빌드 중에 상태를 바꾸지 않는다** — `want()` 가 provider 상태를 건드려
@@ -316,6 +366,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ? null
         : ref.watch(squadProvider(teamId)).value;
     _wantMateCards(squad, cardSeed);
+    _autoSeatOnce(squad, card?.id, cardSeed, user?.ownedTeamId);
 
     return Scaffold(
       backgroundColor: _kHomeBg,

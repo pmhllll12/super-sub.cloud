@@ -21,4 +21,43 @@ class ApiSquadRepository implements SquadRepository {
       rethrow;
     }
   }
+
+  @override
+  Future<Squad> enlist(
+    String teamId, {
+    required String playerCardId,
+    required String positionCode,
+    int? gridCol,
+    int? gridRow,
+  }) async =>
+      Squad.fromJson(
+        await _api.post('/teams/${Uri.encodeComponent(teamId)}/squad/members', {
+          'player_card_id': playerCardId,
+          'position_code': positionCode,
+          // 🔴 함께 주거나 함께 비운다 — 한쪽만 주면 422 다. 그래서 둘 다
+          //    늘 싣고, 없을 때는 둘 다 null 로 간다.
+          'grid_col': gridCol,
+          'grid_row': gridRow,
+        }),
+      );
+
+  @override
+  Future<Squad> moveSeat(
+    String teamId, {
+    required String memberId,
+    required String positionCode,
+    int? gridCol,
+    int? gridRow,
+  }) async =>
+      Squad.fromJson(
+        await _api.patch(
+          '/teams/${Uri.encodeComponent(teamId)}/squad/members/'
+          '${Uri.encodeComponent(memberId)}',
+          {
+            'position_code': positionCode,
+            'grid_col': gridCol,
+            'grid_row': gridRow,
+          },
+        ),
+      );
 }

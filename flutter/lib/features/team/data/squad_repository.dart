@@ -13,4 +13,32 @@ abstract class SquadRepository {
   /// 읽기는 **소속이면 된다**(주장이 아니어도 된다). 팀 id 로 남의 팀 구성을
   /// 훑는 것을 막는 자리라, 소속이 아니면 404 가 아니라 403 이 온다.
   Future<Squad?> squadOf(String teamId);
+
+  /// 카드를 판에 **앉힌다**(`POST /teams/{id}/squad/members`). 바뀐 스쿼드
+  /// 전체가 돌아온다.
+  ///
+  /// 🔴 **주장만 된다** — 등재는 팀을 대표하는 행위다. 팀원이 부르면 403 이고,
+  /// 그때 화면에만 앉혀 두면 **새로고침에 사라진다.**
+  /// 🔴 **칸은 함께 주거나 함께 비운다** — 한쪽만 주면 서버가 422 다.
+  Future<Squad> enlist(
+    String teamId, {
+    required String playerCardId,
+    required String positionCode,
+    int? gridCol,
+    int? gridRow,
+  });
+
+  /// 등재 하나의 **포지션·칸**을 바꾼다
+  /// (`PATCH /teams/{id}/squad/members/{memberId}`).
+  ///
+  /// 🔴 [positionCode] 는 **항상 보낸다** — 등재는 포지션 없이 존재하지 않는다.
+  /// 칸만 옮길 때도 지금 코드를 그대로 싣는다(계약 3-7절).
+  /// 🔴 칸을 둘 다 `null` 로 주면 등재는 남기고 **판에서만 뺀다.**
+  Future<Squad> moveSeat(
+    String teamId, {
+    required String memberId,
+    required String positionCode,
+    int? gridCol,
+    int? gridRow,
+  });
 }
