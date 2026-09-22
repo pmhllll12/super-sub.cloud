@@ -31,10 +31,18 @@ abstract class CardRepository {
   /// 🔴 **`style` 은 전체 값을 보낸다** — 계약이 부분 병합을 안 하고 거부한다.
   /// 🔴 한 줄은 **20자까지**이고, 넘기면 422 다 — **조용히 자르지 않는다**
   /// (쓴 것과 보이는 것이 달라지고, 알아차리는 시점은 공유한 뒤다).
+  /// 🔴 **[titles] 는 보낸 목록이 그대로 남는다** — 부분 병합이 아니다
+  /// (`style` 과 같은 판단). 빈 목록을 보내면 **전부 지운다.** 안 보내면
+  /// 안 건드린다.
+  ///
+  /// 🔴 **3개 · 한 개당 20자까지**이고 넘기면 422 다 — **조용히 자르지
+  /// 않는다.** 서버가 앞뒤 공백을 털고 빈 글자를 버리고 같은 글은 하나만
+  /// 남긴다(먼저 쓴 순서).
   Future<PlayerCard> updateCard({
     String? tagline,
     bool clearTagline = false,
     CardStyle? style,
+    List<String>? titles,
   });
 
   /// 카드 사진을 올린다 — **저장 키를 돌려준다**(계약 3-5절).
@@ -56,6 +64,10 @@ abstract class CardRepository {
   /// 없으면 `404 CARD_NOT_FOUND` 다.
   Future<String> uploadCardPhoto(UploadFile file);
 }
+
+/// 직접 적는 호칭의 상한 — 계약 3절.
+const int kMaxTitles = 3;
+const int kMaxTitleLen = 20;
 
 /// 계약이 받는 사진 형식 — **셋뿐이다**(계약 3-5절).
 ///

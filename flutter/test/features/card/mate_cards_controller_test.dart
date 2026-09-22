@@ -36,6 +36,7 @@ class _SpyCardRepository implements CardRepository {
     String? tagline,
     bool clearTagline = false,
     CardStyle? style,
+    List<String>? titles,
   }) =>
       throw UnimplementedError();
 

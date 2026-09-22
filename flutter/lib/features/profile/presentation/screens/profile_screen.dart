@@ -12,6 +12,7 @@ import '../../../video/presentation/my_videos_controller.dart';
 import '../../../video/presentation/screens/my_videos_screen.dart';
 import '../widgets/player_card_view.dart';
 import 'nickname_sheet.dart';
+import 'titles_sheet.dart';
 
 /// 내 프로필 — 웹 `/me`(`app/(app)/me/page.tsx`)를 폰 세로에 맞춰 옮긴 것이다.
 ///
@@ -269,22 +270,44 @@ class _TeamBlock extends StatelessWidget {
   }
 }
 
-/// 정보 — 이메일 · 함께한 날.
-class _InfoBlock extends StatelessWidget {
+/// 정보 — 호칭 · 이메일 · 함께한 날.
+class _InfoBlock extends ConsumerWidget {
   const _InfoBlock({required this.user});
 
   final AppUser user;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final d = user.createdAt;
     final joined =
         '${d.year}.${d.month.toString().padLeft(2, '0')}'
         '.${d.day.toString().padLeft(2, '0')}부터';
+    final card = ref.watch(myCardProvider).value;
     return _Block(
       title: '정보',
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          /* 🔴 **사람이 직접 적는다**(2026-09-16 결정, 미결 `paik` 36번).
+             원래는 분석이 붙이는 값이라 화면이 읽기만 했다 — 팀이 다시
+             정하면서 여기서 고친다. 분류(강점·활동)는 **안 받는다.** */
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 76,
+                child: Text(
+                  '호칭',
+                  style: TextStyle(
+                    color: _kOn.withValues(alpha: 0.7),
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              Expanded(child: _TitlesRow(card: card)),
+            ],
+          ),
+          const SizedBox(height: 8),
           _row('이메일', user.email),
           const SizedBox(height: 8),
           _row('함께한 날', joined),
@@ -307,6 +330,73 @@ class _InfoBlock extends StatelessWidget {
       ),
     ],
   );
+}
+
+/// 호칭 알약들 + 고치는 입구.
+///
+/// 🔴 **비어 있을 때는 아무 말도 안 한다**(웹과 같은 판단). 바로 옆에
+/// 「호칭 정하기」가 서 있어서 「아직 정한 호칭이 없습니다」를 두면 **빈 것을
+/// 두 번 말하는** 자리가 된다.
+///
+/// 🔴 **미달 표식이 아니다**(계약 4장) — 빈 것은 정상이라 「없음」·자물쇠 같은
+/// 표를 대신 넣지 않는다.
+class _TitlesRow extends ConsumerWidget {
+  const _TitlesRow({required this.card});
+
+  final PlayerCard? card;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final all = card?.titles ?? const <CardTitle>[];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (all.isNotEmpty)
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final t in all)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppTheme.seed.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    t.label,
+                    style: const TextStyle(
+                      color: AppTheme.seed,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        // 🔴 카드가 없으면 고칠 데가 없다 — 호칭은 카드에 붙는다.
+        if (card != null)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              key: const Key('profile-titles-edit'),
+              style: TextButton.styleFrom(
+                foregroundColor: _kOn,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              onPressed: () => showTitlesSheet(context, card!),
+              child: Text(
+                all.isEmpty ? '호칭 정하기' : '호칭 고치기',
+                style: const TextStyle(fontSize: 13),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 }
 
 /// 내 영상 — **요약만.** 본체는 밀고 들어가는 전용 화면이다.

@@ -19,14 +19,28 @@ class CardTitle {
   factory CardTitle.fromJson(Map<String, dynamic> json) => CardTitle(
         code: json['code'] as String,
         label: json['label'] as String,
-        category: json['category'] as String,
+        /* 🔴 **`null` 일 수 있다** (2026-09-16 계약 변경, 2026-09-22 에 앱이
+           따라감). 분류는 **부여되는 호칭**의 것이고, 사람이 직접 적은 호칭
+           (`code` 가 `custom:` 으로 시작)에는 분류를 안 매긴다.
+           `as String` 으로 두면 직접 적은 호칭을 읽는 순간 **그 자리에서
+           터진다** — 카드 화면이 통째로 안 그려진다. */
+        category: json['category'] as String?,
         grantedAt: DateTime.parse(json['granted_at'] as String),
       );
 
   final String code;
   final String label;
-  final String category;
+
+  /// `강점`·`활동`·`용병` 중 하나, 또는 **`null`** — 사람이 직접 적은 호칭이다.
+  final String? category;
   final DateTime grantedAt;
+
+  /// **사람이 직접 적은 호칭인가**(계약: `code` 가 `custom:` 으로 시작).
+  ///
+  /// 🔴 **[category] 가 `null` 인지로 가르지 않는다** — 옛 적재분에도 `null`
+  /// 이 있을 수 있어서, 그걸로 가르면 부여된 옛 호칭을 「내가 적은 것」으로
+  /// 읽어 **고치기 칸에 끌어온다.**
+  bool get isCustom => code.startsWith('custom:');
 }
 
 /// 카드 꾸미기. **1단계에서는 원본 맵을 들고만 있는다** — 색·자국·사진을 실제로

@@ -36,6 +36,7 @@ class ApiCardRepository implements CardRepository {
     String? tagline,
     bool clearTagline = false,
     CardStyle? style,
+    List<String>? titles,
   }) async {
     /* 🔴 **보낸 것만 바뀐다**(계약: `model_fields_set` 로 본다). 그래서
        「안 보냄」과 「null 을 보냄」이 **다른 뜻**이다 — 후자는 「지워라」다.
@@ -43,6 +44,9 @@ class ApiCardRepository implements CardRepository {
     final body = <String, dynamic>{
       if (clearTagline) 'tagline': null else 'tagline': ?tagline,
       'style': ?style?.toWire(),
+      /* 🔴 **빈 목록도 보낸다** — 그것이 「전부 지워라」다. `?titles` 처럼
+         널 생략만 쓰면 되지만, `[]` 는 널이 아니므로 그대로 실린다. */
+      'titles': ?titles,
     };
     return PlayerCard.fromJson(await _api.patch('/me/card', body));
   }

@@ -67,6 +67,7 @@ class MockCardRepository implements CardRepository {
     String? tagline,
     bool clearTagline = false,
     CardStyle? style,
+    List<String>? titles,
   }) async {
     await Future<void>.delayed(_delay);
     final card = _mine;
@@ -80,6 +81,18 @@ class MockCardRepository implements CardRepository {
       throw const ApiException('한 줄은 20자까지입니다',
           code: 'VALIDATION_ERROR', status: 422);
     }
+    /* 🔴 **호칭도 상한을 지킨다** — 3개 · 한 개당 20자. Mock 이 받아 주면
+       그 오류 문구를 안 만들게 되고 진짜 서버에서 처음으로 422 를 본다. */
+    if (titles != null) {
+      if (titles.length > kMaxTitles) {
+        throw const ApiException('호칭은 3개까지입니다',
+            code: 'VALIDATION_ERROR', status: 422);
+      }
+      if (titles.any((t) => t.length > kMaxTitleLen)) {
+        throw const ApiException('호칭은 한 개당 20자까지입니다',
+            code: 'VALIDATION_ERROR', status: 422);
+      }
+    }
     final next = PlayerCard(
       id: card.id,
       userId: card.userId,
@@ -89,7 +102,25 @@ class MockCardRepository implements CardRepository {
       tagline: clearTagline ? null : (tagline ?? card.tagline),
       style: style ?? card.style,
       photoUrl: card.photoUrl,
-      titles: card.titles,
+      /* 🔴 **보낸 목록이 그대로 남는다** — 부분 병합이 아니다. 빈 목록이면
+         직접 적은 것이 전부 지워진다.
+         🔴 **부여된 호칭은 건드리지 않는다** — 그건 사람이 지울 수 있는 값이
+         아니다(`code` 가 `custom:` 이 아닌 것들). 서버도 같은 자리에서
+         가른다. */
+      titles: titles == null
+          ? card.titles
+          : [
+              for (final t in card.titles)
+                if (!t.isCustom) t,
+              for (final label in titles)
+                CardTitle(
+                  code: 'custom:${label.hashCode.toRadixString(16)}',
+                  label: label,
+                  // 사람이 적은 글에는 분류를 안 매긴다(계약).
+                  category: null,
+                  grantedAt: DateTime.now(),
+                ),
+            ],
     );
     _db.cards[_db.cards.indexOf(card)] = next;
     return next;

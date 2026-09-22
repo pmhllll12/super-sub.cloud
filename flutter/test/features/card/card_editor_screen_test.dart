@@ -56,6 +56,7 @@ class _SpyRepo implements CardRepository {
     String? tagline,
     bool clearTagline = false,
     CardStyle? style,
+    List<String>? titles,
   }) async {
     saves += 1;
     this.tagline = tagline;
