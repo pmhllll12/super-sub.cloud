@@ -22,29 +22,24 @@ Future<void> main() async {
   unawaited(InkBleedShader.load());
   unawaited(GlassShader.load());
 
-  await _hideNavigationBar();
+  await _hideSystemBars();
   runApp(const ProviderScope(child: SuperSubApp()));
 }
 
-/// 기기의 하단 내비게이션 바를 감춘다. 상태 바(시계·배터리)는 남긴다.
+/// 기기의 시스템 바를 감춘다 — 아래에서 쓸어 올리면 잠깐 나왔다 저절로 들어간다.
 ///
 /// 인트로의 잉크도, 로그인의 사진도 화면 끝까지 간다. 그 아래에 시스템 바가
 /// 띠로 남아 있으면 화면이 잘려 보인다.
 ///
-/// **감추기만 하면 한 번 올린 뒤 계속 떠 있다.** 사용자가 아래에서 쓸어
-/// 올리면 안드로이드가 바를 되돌려 놓고 그대로 두기 때문이다. 그래서 그
-/// 변화를 듣고 잠시 뒤 다시 감춘다.
-Future<void> _hideNavigationBar() async {
-  await SystemChrome.setEnabledSystemUIMode(
-    SystemUiMode.manual,
-    overlays: [SystemUiOverlay.top],
-  );
-  SystemChrome.setSystemUIChangeCallback((visible) async {
-    if (!visible) return;
-    await Future<void>.delayed(const Duration(seconds: 3));
-    await SystemChrome.setEnabledSystemUIMode(
-      SystemUiMode.manual,
-      overlays: [SystemUiOverlay.top],
-    );
-  });
+/// 🔴 **`immersiveSticky` 다 — 손으로 되감추지 않는다** (2026-09-22, 사용자
+/// 요청). 전에는 `manual` + `setSystemUIChangeCallback` + 3초 타이머로 같은
+/// 것을 흉내 냈는데, `manual` 에서 바가 나타나면 **아래 여백(inset)이 생겨
+/// 화면 레이아웃이 3초 동안 들썩였다.** `immersiveSticky` 는 바가 화면을
+/// **덮어서** 나타나므로 레이아웃이 안 흔들리고, 되감추는 것도 OS 가 한다.
+///
+/// ⚠️ **상태 바(시계·배터리)도 같이 감춰진다** — `immersiveSticky` 는 둘을
+/// 따로 못 고른다. 시계를 남겨야 하면 옛 `manual` 방식으로 돌아가야 하고,
+/// 그러면 위 들썩임이 같이 돌아온다(사용자가 알고 고른 것이다).
+Future<void> _hideSystemBars() async {
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 }

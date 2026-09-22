@@ -21,6 +21,7 @@ class AuroraBackground extends StatelessWidget {
     super.key,
     required this.child,
     this.base = const Color(0xFF0A0F0C),
+    this.tint,
   });
 
   final Widget child;
@@ -28,8 +29,16 @@ class AuroraBackground extends StatelessWidget {
   /// 빛무리 아래에 깔리는 바탕.
   final Color base;
 
+  /// **두 색으로 갈아 끼운다** — 내 프로필이 카드의 바탕색·자국색을 여기 넣는다
+  /// (2026-09-22, 사용자 요청). `null` 이면 브랜드 민트 그대로다.
+  ///
+  /// 🔴 **자리와 알파는 안 바꾼다** — 색만 갈린다. 배치까지 갈리면 화면마다
+  /// 다른 그림이 되어 「같은 앱」으로 안 읽힌다.
+  final ({Color a, Color b})? tint;
+
   @override
   Widget build(BuildContext context) {
+    final painter = _AuroraPainter(tint: tint);
     return ColoredBox(
       color: base,
       child: Stack(
@@ -37,16 +46,65 @@ class AuroraBackground extends StatelessWidget {
         children: [
           /* 🔴 **다시 그리지 않는다.** 빛무리는 움직이지 않으므로 위에서 무엇이
              바뀌든 다시 칠할 이유가 없다 — `RepaintBoundary` 가 그것을 층으로
-             떼어 낸다. */
-          const RepaintBoundary(
-            child: CustomPaint(painter: _AuroraPainter()),
-          ),
+             떼어 낸다. (색이 갈릴 때는 `shouldRepaint` 가 참을 돌려준다.) */
+          RepaintBoundary(child: CustomPaint(painter: painter)),
           child,
         ],
       ),
     );
   }
 }
+
+/// 색 둘이 바뀌면 **부드럽게 건너간다**(2026-09-22, 사용자 요청: 「자연스럽고
+/// 부드럽게」). 카드 꾸미기에서 색을 고치고 프로필로 돌아오면 배경이 툭
+/// 갈리는 대신 스며들 듯 옮겨 간다.
+///
+/// 🔴 **`ColorTween` 이 지금 값에서 이어간다** — 직접 `0→1` 을 감으면서 앞
+/// 색을 고정값으로 잡으면, 색을 **두 번째로** 바꿀 때 기본색으로 한 번
+/// 튕겼다가 간다. `TweenAnimationBuilder` 는 `end` 가 바뀌면 **그리고 있던
+/// 값에서** 새 목표로 이어 준다.
+///
+/// 🔴 **둘이 어긋나지 않는다** — 같은 프레임에 둘 다 새 목표를 받고 길이·
+/// 곡선이 같으므로 함께 움직인다.
+class AnimatedAuroraBackground extends StatelessWidget {
+  const AnimatedAuroraBackground({
+    super.key,
+    required this.child,
+    required this.tint,
+    this.base = const Color(0xFF0A0F0C),
+    this.duration = const Duration(milliseconds: 1200),
+  });
+
+  final Widget child;
+  final ({Color a, Color b}) tint;
+  final Color base;
+  final Duration duration;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<Color?>(
+      tween: ColorTween(end: tint.a),
+      duration: duration,
+      curve: Curves.easeInOut,
+      builder: (context, a, _) => TweenAnimationBuilder<Color?>(
+        tween: ColorTween(end: tint.b),
+        duration: duration,
+        curve: Curves.easeInOut,
+        builder: (context, b, _) => AuroraBackground(
+          base: base,
+          // 첫 프레임엔 아직 `null` 이다 — 그때는 목표 색으로 그린다.
+          tint: (a: a ?? tint.a, b: b ?? tint.b),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+/// 아무 색도 안 정한 화면의 색 둘 — 프로필이 **카드가 없을 때** 쓰는 값이다.
+/// 아래 `_glows` 의 1·3번과 같은 색이라, 기본 배경과 이어 보인다.
+const ({Color a, Color b}) kDefaultAuroraTint =
+    (a: AppTheme.seed, b: Color(0xFF1B7A8C));
 
 /// 빛무리 하나 — 화면 비율로 놓는다(기기 크기가 달라도 같은 그림).
 class _Glow {
@@ -65,7 +123,29 @@ class _Glow {
 }
 
 class _AuroraPainter extends CustomPainter {
-  const _AuroraPainter();
+  const _AuroraPainter({this.tint});
+
+  /// `null` 이면 아래 브랜드 배치 그대로. 있으면 **자리와 알파는 두고 색만**
+  /// 두 색으로 번갈아 갈아 끼운다.
+  final ({Color a, Color b})? tint;
+
+  /// 실제로 칠할 빛무리들.
+  List<_Glow> get _painted {
+    final t = tint;
+    if (t == null) return _glows;
+    /* 🔴 **번갈아 준다** — 한 색을 위 둘, 다른 색을 아래 둘에 몰면 화면이
+       위아래로 갈린 띠처럼 보인다. 엇갈리게 놓아야 두 색이 섞인다. */
+    return [
+      for (var i = 0; i < _glows.length; i += 1)
+        _Glow(
+          i.isEven ? t.a : t.b,
+          _glows[i].dx,
+          _glows[i].dy,
+          _glows[i].radius,
+          _glows[i].alpha,
+        ),
+    ];
+  }
 
   /// 🔴 **넷을 넘기지 않는다.** 겹칠수록 색이 탁해지고, 화면마다 다른 그림이
   /// 되어 「같은 앱」으로 안 읽힌다.
@@ -87,7 +167,7 @@ class _AuroraPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final short = size.shortestSide;
-    for (final g in _glows) {
+    for (final g in _painted) {
       final center = Offset(size.width * g.dx, size.height * g.dy);
       final r = short * g.radius;
       canvas.drawCircle(
@@ -108,6 +188,10 @@ class _AuroraPainter extends CustomPainter {
     }
   }
 
+  /// 🔴 **색이 갈리면 다시 칠한다.** 붙박이로 `false` 를 돌려주던 자리인데,
+  /// 색을 받게 되면서 그러면 **프로필 배경이 영영 첫 색에 멈춘다.** 자리·
+  /// 알파는 상수라 색만 견주면 된다.
   @override
-  bool shouldRepaint(_AuroraPainter oldDelegate) => false;
+  bool shouldRepaint(_AuroraPainter oldDelegate) =>
+      oldDelegate.tint?.a != tint?.a || oldDelegate.tint?.b != tint?.b;
 }

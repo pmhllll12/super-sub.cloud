@@ -7,6 +7,7 @@ import '../../../auth/data/models/team_membership.dart';
 import '../../../auth/presentation/session_controller.dart';
 import '../../../card/data/card_providers.dart';
 import '../../../card/data/models/player_card.dart';
+import '../../../../core/widgets/aurora_background.dart';
 import '../../../card/presentation/card_editor_screen.dart';
 import '../../../video/presentation/my_videos_controller.dart';
 import '../../../video/presentation/screens/my_videos_screen.dart';
@@ -35,34 +36,52 @@ class ProfileScreen extends ConsumerWidget {
     final user = session.user;
     final card = ref.watch(myCardProvider).value;
 
-    return Scaffold(
-      backgroundColor: _kBg,
-      appBar: AppBar(
-        backgroundColor: _kBg,
-        foregroundColor: _kOn,
-        title: const Text('MY PROFILE'),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-        children: [
-          _CardBlock(card: card, nickname: user.nickname),
-          const SizedBox(height: 16),
-          _TeamBlock(teams: user.teams),
-          const SizedBox(height: 16),
-          _InfoBlock(user: user),
-          const SizedBox(height: 16),
-          const _VideosBlock(),
-          const SizedBox(height: 16),
-          const _MatchesBlock(),
-          const SizedBox(height: 16),
-          _AccountBlock(user: user),
-        ],
+    /* 🔴 **배경이 내 카드의 색을 따른다**(2026-09-22, 사용자 요청). 홈의
+       빛무리와 같은 그림인데 색만 **카드 바탕색 + 자국색** 둘로 갈아 끼운다.
+       카드가 없으면 브랜드 민트 그대로다 — 「빈 카드」인데 배경만 요란하면
+       무엇을 보는 화면인지 흐려진다.
+
+       🔴 **카드 색을 고치고 돌아오면 부드럽게 건너간다** — 툭 갈리면 화면이
+       깜빡인 것처럼 보인다(`AnimatedAuroraBackground`). */
+    final tint = card?.style == null
+        ? kDefaultAuroraTint
+        : (a: card!.style!.bg, b: card.style!.brushColor);
+
+    return AnimatedAuroraBackground(
+      tint: tint,
+      base: _kBg,
+      child: Scaffold(
+        // 🔴 **배경을 비운다** — 안 비우면 빛무리를 덮는다.
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          foregroundColor: _kOn,
+          title: const Text('MY PROFILE'),
+        ),
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+          children: [
+            _CardBlock(card: card, nickname: user.nickname),
+            const SizedBox(height: 16),
+            _TeamBlock(teams: user.teams),
+            const SizedBox(height: 16),
+            _InfoBlock(user: user),
+            const SizedBox(height: 16),
+            const _VideosBlock(),
+            const SizedBox(height: 16),
+            const _MatchesBlock(),
+            const SizedBox(height: 16),
+            _AccountBlock(user: user),
+          ],
+        ),
       ),
     );
   }
 }
 
-const Color _kBg = Color(0xFF14201A);
+/// 빛무리 아래에 깔리는 바탕. 🔴 **어둡게 둔다** — 카드 색이 아무리 밝아도
+/// 배경이 밝아지면 흰 글자가 안 읽힌다.
+const Color _kBg = Color(0xFF0A0F0C);
 const Color _kOn = Color(0xFFFFFFFF);
 const Color _kPanel = Color(0xFF1E3029);
 

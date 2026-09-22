@@ -35,7 +35,11 @@ Future<ProviderContainer> _pump(WidgetTester tester, String userId) async {
   unawaited(
     container.read(sessionControllerProvider.notifier).loginAs(userId),
   );
+  /* 🔴 **두 번 흘린다 (2026-09-22).** 프로필에 「내 영상」 요약과 카드 색을
+     따르는 배경 전환(1.2초)이 붙으면서 지연이 겹쳤다 — 모자라게 흘리면
+     「트리를 버린 뒤에도 타이머가 남았다」로 깨지는데 **화면 잘못이 아니다.** */
   await tester.pump(const Duration(milliseconds: 500));
+  await tester.pump(const Duration(milliseconds: 1500));
   await tester.pumpAndSettle();
   return container;
 }
