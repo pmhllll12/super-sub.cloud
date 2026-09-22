@@ -7,25 +7,25 @@ import '../../../team/data/regions.dart';
 import '../../../team/data/team_providers.dart';
 import '../../../team/data/team_repository.dart';
 
-/// 팀을 만들거나 고친다. [team] 이 `null` 이면 만들기.
-void showTeamSheet(BuildContext context, {TeamMembership? team}) {
-  showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    builder: (_) => _TeamSheet(team: team),
-  );
-}
-
-class _TeamSheet extends ConsumerStatefulWidget {
-  const _TeamSheet({this.team});
+/// 팀을 만들거나 고치는 폼. [team] 이 `null` 이면 만들기.
+///
+/// 🔴 **바텀시트가 아니라 제자리에서 펼쳐진다**(2026-09-22, 사용자 요청:
+/// 「웹처럼 판이 아래로 자연스럽고 부드럽게 열리면서」). 시트는 화면을 덮어
+/// **어느 팀을 고치는 중인지**가 안 보인다 — 웹의 `ss-profile-form-fold` 와
+/// 같은 자리다.
+class TeamForm extends ConsumerStatefulWidget {
+  const TeamForm({super.key, this.team, required this.onDone});
 
   final TeamMembership? team;
 
+  /// 저장이 끝났거나 접을 때.
+  final VoidCallback onDone;
+
   @override
-  ConsumerState<_TeamSheet> createState() => _TeamSheetState();
+  ConsumerState<TeamForm> createState() => _TeamFormState();
 }
 
-class _TeamSheetState extends ConsumerState<_TeamSheet> {
+class _TeamFormState extends ConsumerState<TeamForm> {
   late final _name = TextEditingController(text: widget.team?.name ?? '');
   late final _region = TextEditingController(text: widget.team?.region ?? '');
 
@@ -64,7 +64,7 @@ class _TeamSheetState extends ConsumerState<_TeamSheet> {
          읽어야 프로필의 「소속」 칸이 따라온다. 화면이 제 목록을 따로 들고
          있으면 서버와 두 벌이 된다. */
       await ref.read(sessionControllerProvider.notifier).refreshMe();
-      if (mounted) Navigator.of(context).pop();
+      if (mounted) widget.onDone();
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
     } finally {
@@ -75,18 +75,11 @@ class _TeamSheetState extends ConsumerState<_TeamSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-      ),
+      padding: const EdgeInsets.only(top: 12),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(_editing ? '팀 고치기' : '팀 만들기'),
-          const SizedBox(height: 12),
           TextField(
             key: const Key('team-name'),
             controller: _name,
@@ -112,24 +105,36 @@ class _TeamSheetState extends ConsumerState<_TeamSheet> {
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ],
-          const SizedBox(height: 16),
-          FilledButton(
-            key: const Key('team-save'),
-            /* 🔴 **지역이 목록의 값일 때만 눌린다.** 자유롭게 적은 값을 받으면
-               저장은 되는데 **남의 검색에서 이 팀이 빠진다** — 지역 거르기가
-               글자 비교라서다. 그래서 보내기 전에 막는다. */
-            onPressed: (_busy ||
-                    _name.text.trim().isEmpty ||
-                    !isRegion(_region.text))
-                ? null
-                : _save,
-            child: _busy
-                ? const SizedBox(
-                    height: 18,
-                    width: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(_editing ? '저장' : '만들기'),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton(
+                  key: const Key('team-save'),
+                  /* 🔴 **지역이 목록의 값일 때만 눌린다.** 자유롭게 적은
+                     값을 받으면 저장은 되는데 **남의 검색에서 이 팀이
+                     빠진다** — 지역 거르기가 글자 비교라서다. */
+                  onPressed: (_busy ||
+                          _name.text.trim().isEmpty ||
+                          !isRegion(_region.text))
+                      ? null
+                      : _save,
+                  child: _busy
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(_editing ? '저장' : '만들기'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              TextButton(
+                key: const Key('team-cancel'),
+                onPressed: _busy ? null : widget.onDone,
+                child: const Text('취소'),
+              ),
+            ],
           ),
         ],
       ),

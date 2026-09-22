@@ -5,14 +5,6 @@ import '../../../card/data/card_providers.dart';
 import '../../../card/data/card_repository.dart';
 import '../../../card/data/models/player_card.dart';
 
-void showTitlesSheet(BuildContext context, PlayerCard card) {
-  showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    builder: (_) => _TitlesSheet(card: card),
-  );
-}
-
 /// 호칭 — **사람이 직접 적는다** (2026-09-16 결정, 미결 `paik` 36번).
 ///
 /// 🔴 **방향이 뒤집힌 자리다.** 원래는 분석이 붙이는 값이었고(계약 4장
@@ -28,16 +20,22 @@ void showTitlesSheet(BuildContext context, PlayerCard card) {
 /// ⚠️ **`category` 가 `null` 인지로 가르지 않는다** — 옛 적재분에도 `null` 이
 /// 있을 수 있어서, 그걸로 가르면 부여된 옛 호칭을 여기로 끌어와 **저장하는
 /// 순간 지워 버린다.**
-class _TitlesSheet extends ConsumerStatefulWidget {
-  const _TitlesSheet({required this.card});
+/// 🔴 **바텀시트가 아니라 제자리에서 펼쳐진다**(2026-09-22, 사용자 요청:
+/// 「웹처럼 판이 아래로 자연스럽고 부드럽게 열리면서」). 시트는 화면을 덮어
+/// **무엇을 고치는 중인지**(어느 카드의 호칭인지)가 안 보인다.
+class TitlesForm extends ConsumerStatefulWidget {
+  const TitlesForm({super.key, required this.card, required this.onDone});
 
   final PlayerCard card;
 
+  /// 저장이 끝났거나 접을 때.
+  final VoidCallback onDone;
+
   @override
-  ConsumerState<_TitlesSheet> createState() => _TitlesSheetState();
+  ConsumerState<TitlesForm> createState() => _TitlesFormState();
 }
 
-class _TitlesSheetState extends ConsumerState<_TitlesSheet> {
+class _TitlesFormState extends ConsumerState<TitlesForm> {
   late final List<TextEditingController> _fields = _seed();
 
   bool _busy = false;
@@ -89,7 +87,7 @@ class _TitlesSheetState extends ConsumerState<_TitlesSheet> {
       await ref.read(cardRepositoryProvider).updateCard(titles: next);
       // 프로필의 호칭 줄이 같은 provider 를 보므로 다시 읽게 한다.
       ref.invalidate(myCardProvider);
-      if (mounted) Navigator.of(context).pop();
+      if (mounted) widget.onDone();
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
     } finally {
@@ -100,18 +98,11 @@ class _TitlesSheetState extends ConsumerState<_TitlesSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-      ),
+      padding: const EdgeInsets.only(top: 12),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('호칭'),
-          const SizedBox(height: 12),
           for (var i = 0; i < _fields.length; i += 1)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -144,17 +135,29 @@ class _TitlesSheetState extends ConsumerState<_TitlesSheet> {
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ],
-          const SizedBox(height: 16),
-          FilledButton(
-            key: const Key('profile-titles-save'),
-            onPressed: _busy ? null : _save,
-            child: _busy
-                ? const SizedBox(
-                    height: 18,
-                    width: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('저장'),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton(
+                  key: const Key('profile-titles-save'),
+                  onPressed: _busy ? null : _save,
+                  child: _busy
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('저장'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              TextButton(
+                key: const Key('profile-titles-cancel'),
+                onPressed: _busy ? null : widget.onDone,
+                child: const Text('취소'),
+              ),
+            ],
           ),
         ],
       ),

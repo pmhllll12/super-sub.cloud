@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +12,7 @@ import '../../../card/data/card_providers.dart';
 import '../../../card/data/models/player_card.dart';
 import '../../../../core/widgets/aurora_background.dart';
 import '../../../../core/widgets/floating_nav_bar.dart';
+import '../../../../core/widgets/glass_surface.dart';
 import '../../../card/presentation/card_editor_screen.dart';
 import '../../../video/presentation/my_videos_controller.dart';
 import '../../../video/presentation/screens/my_videos_screen.dart';
@@ -112,8 +115,6 @@ class ProfileScreen extends ConsumerWidget {
 /// 배경이 밝아지면 흰 글자가 안 읽힌다.
 const Color _kBg = Color(0xFF0A0F0C);
 const Color _kOn = Color(0xFFFFFFFF);
-const Color _kPanel = Color(0xFF1E3029);
-
 /// 되돌릴 수 없는 일의 빨강 — 탈퇴·해체가 나눠 쓴다.
 const Color _kDanger = Color(0xFFD32F2F);
 
@@ -126,32 +127,36 @@ class _Block extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _kPanel,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    color: _kOn,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+    /* 🔴 **유리다**(2026-09-22, 사용자 요청: 「흰색 블러 아주 살짝만」).
+       뒤의 빛무리가 비쳐야 배경이 살아난다 — 불투명 판이면 카드 색을 따라
+       움직이는 배경이 판에 다 가려진다.
+
+       🔴 **`GlassPanel`(굴절 유리)이 아니라 `GlassSurface`(흐림 + 옅은 흰
+       기)다.** 굴절 쪽은 `ImageFilter.shader` 라 Impeller 에서만 돌고 가드가
+       필요하다 — 판이 여섯이라 그걸 다 걸 이유가 없다.
+
+       🔴 **판 안의 단추에는 유리를 또 쓰지 않는다** — 「유리 안에 유리」는
+       안쪽이 아직 안 끝난 바깥을 읽어 **내용이 프레임째로 사라진다**
+       (`refractive_glass.dart`). 안쪽 것들은 색·테두리로만 층을 낸다. */
+    return GlassSurface(
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                color: _kOn,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          child,
-        ],
+            ),
+            const SizedBox(height: 12),
+            child,
+          ],
+        ),
       ),
     );
   }
@@ -195,14 +200,15 @@ class _CardHero extends ConsumerWidget {
                   style: card!.style,
                   photoUrl: card!.photoUrl,
                 ),
+              /* 🔴 **글자다**(2026-09-22, 사용자 요청) — 아이콘(`tune`)은
+                 무엇을 고치는 단추인지 안 읽혔다. 카드 **오른쪽 위 바깥**에
+                 붙여 카드를 안 덮는다. */
               Positioned(
                 top: 0,
-                // 카드 오른쪽 바깥 — 카드 폭의 절반부터가 오른쪽 반이다.
-                left: MediaQuery.sizeOf(context).width / 2 + _cardWidth / 2 - 24,
-                child: _RoundIconButton(
+                right: 0,
+                child: _GlassButton(
                   buttonKey: const Key('profile-card-edit'),
-                  icon: card == null ? Icons.add : Icons.tune,
-                  tooltip: card == null ? '카드 만들기' : '프로필 카드 수정',
+                  label: card == null ? '카드 만들기' : '카드 수정',
                   onTap: () => card == null
                       ? _createCard(context, ref)
                       : Navigator.of(context).push(
@@ -216,13 +222,23 @@ class _CardHero extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 12),
-        // 닉네임과 고치는 단추는 **카드 바로 아래 가운데**다(사용자 요청).
+        /* 🔴 **닉네임이 카드 정중앙에 온다**(사용자 지적). 아이콘을 그냥
+           옆에 붙이면 **둘을 합친 덩어리**가 가운데 서서 닉네임만 보면
+           왼쪽으로 쏠린다.
+
+           🔴 **왼쪽에 같은 폭의 빈 자리를 둬서 균형을 맞춘다.** `Stack` 으로
+           아이콘을 흐름 밖에 띄우는 길도 있었는데, 그러면 Stack 이 글자
+           크기로 줄어들어 **아이콘이 그 밖에 놓이고 눌리지 않는다**(시험이
+           잡았다). 빈 자리는 눌릴 일이 없으니 이 쪽이 안전하다. */
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // 오른쪽 아이콘(28) + 사이(6) 만큼 왼쪽을 비운다.
+            const SizedBox(width: 34),
             Flexible(
               child: Text(
                 nickname,
+                textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: _kOn,
                   fontSize: 22,
@@ -231,12 +247,10 @@ class _CardHero extends ConsumerWidget {
               ),
             ),
             const SizedBox(width: 6),
-            _RoundIconButton(
+            _GlassIconButton(
               buttonKey: const Key('profile-edit'),
               icon: Icons.edit,
               tooltip: '닉네임 수정',
-              size: 28,
-              iconSize: 14,
               onTap: () => showNicknameSheet(context, nickname),
             ),
           ],
@@ -260,42 +274,132 @@ class _CardHero extends ConsumerWidget {
   }
 }
 
-/// 동그란 아이콘 단추 — 카드 옆·닉네임 옆처럼 **자리가 좁은 곳**에 쓴다.
-class _RoundIconButton extends StatelessWidget {
-  const _RoundIconButton({
+/// 🔴 **유리 단추 — 안쪽 색을 안 채운다**(2026-09-22, 사용자 요청).
+///
+/// 뒤를 아주 살짝 흐리고 **제일 얇은 흰 선** 하나만 두른다. 면에 색을 넣으면
+/// 카드 색을 따라 움직이는 배경이 그 자리에서 끊긴다.
+///
+/// 🔴 **판(`_Block`) 안에는 쓰지 않는다** — 「유리 안에 유리」가 되어 내용이
+/// 프레임째로 사라진다(`refractive_glass.dart`). 이 둘은 카드 둘레, 즉
+/// **판 밖**에 선다.
+class _GlassButton extends StatelessWidget {
+  const _GlassButton({
+    required this.buttonKey,
+    required this.label,
+    required this.onTap,
+  });
+
+  final Key buttonKey;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _GlassShell(
+      radius: BorderRadius.circular(999),
+      child: InkWell(
+        key: buttonKey,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          child: Text(
+            label,
+            style: const TextStyle(color: _kOn, fontSize: 12),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 같은 재질의 동그란 아이콘 단추.
+class _GlassIconButton extends StatelessWidget {
+  const _GlassIconButton({
     required this.buttonKey,
     required this.icon,
     required this.tooltip,
     required this.onTap,
-    this.size = 34,
-    this.iconSize = 17,
   });
 
   final Key buttonKey;
   final IconData icon;
   final String tooltip;
   final VoidCallback onTap;
-  final double size;
-  final double iconSize;
 
   @override
   Widget build(BuildContext context) {
     return Tooltip(
       message: tooltip,
-      child: Material(
-        color: _kPanel.withValues(alpha: 0.85),
-        shape: CircleBorder(
-          side: BorderSide(color: _kOn.withValues(alpha: 0.25)),
-        ),
-        clipBehavior: Clip.antiAlias,
+      child: _GlassShell(
+        radius: BorderRadius.circular(999),
         child: InkWell(
           key: buttonKey,
           onTap: onTap,
           child: SizedBox(
-            width: size,
-            height: size,
-            child: Icon(icon, size: iconSize, color: _kOn),
+            width: 28,
+            height: 28,
+            child: Icon(icon, size: 14, color: _kOn),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 아래로 **부드럽게 펼쳐지는 칸**(2026-09-22, 사용자 요청: 「웹처럼 판이
+/// 아래로 자연스럽고 부드럽게 열리면서」).
+///
+/// 🔴 **닫힐 때도 내용을 들고 있는다.** 접자마자 자식을 비우면 줄어들 것이
+/// 없어 **툭 접힌다** — 웹이 같은 자리에 남긴 주석과 같은 이유다.
+/// `AnimatedSize` 가 높이를 재 주므로 폼이 길어져도 맞출 것이 없다.
+///
+/// 🔴 **`ClipRect` 로 감싼다** — 줄어드는 동안 안쪽 내용이 밖으로 삐져나온다.
+class _Fold extends StatelessWidget {
+  const _Fold({required this.open, required this.child});
+
+  final bool open;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.topCenter,
+        child: open ? child : const SizedBox(width: double.infinity),
+      ),
+    );
+  }
+}
+
+/// 유리 + **제일 얇은 흰 테**. 두 단추가 재질을 나눠 쓴다 — 한쪽만 고치면
+/// 둘이 갈라진다.
+class _GlassShell extends StatelessWidget {
+  const _GlassShell({required this.radius, required this.child});
+
+  final BorderRadius radius;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: radius,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: kGlassBlur, sigmaY: kGlassBlur),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            /* 🔴 **면은 비운다** — 사용자가 「안쪽 색상 다 빼」라고 짚은
+               자리다. 형태는 아래 테두리가 세운다. */
+            border: Border.all(
+              color: _kOn,
+              // 이 기기에서 그릴 수 있는 **가장 얇은 선**.
+              width: 0.5,
+            ),
+          ),
+          // Material 이 있어야 InkWell 의 물결이 그려진다(색은 안 넣는다).
+          child: Material(color: Colors.transparent, child: child),
         ),
       ),
     );
@@ -311,13 +415,36 @@ void _notReady(BuildContext context, String what) {
 /// 🔴 **주장과 팀원이 할 수 있는 일이 다르다**(계약 3-3절 권한표):
 /// 주장은 고치고 해체하고 **나갈 수 없다**(남은 사람들의 팀이 주인 없이
 /// 남는다). 팀원은 나가기만 한다.
-class _TeamBlock extends ConsumerWidget {
+class _TeamBlock extends ConsumerStatefulWidget {
   const _TeamBlock({required this.teams});
 
   final List<TeamMembership> teams;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_TeamBlock> createState() => _TeamBlockState();
+}
+
+class _TeamBlockState extends ConsumerState<_TeamBlock> {
+  /// 펼쳐진 폼 — `null` 이면 닫힘, `''` 면 **만들기**, 그 밖이면 그 팀 고치기.
+  String? _openFor;
+
+  /// 🔴 **닫혀도 마지막 내용을 들고 있는다** — 접는 동안 폼이 사라지면
+  /// 줄어들 것이 없어 툭 접힌다.
+  String? _lastOpenFor;
+
+  void _toggle(String key) => setState(() {
+        _openFor = _openFor == key ? null : key;
+        if (_openFor != null) _lastOpenFor = _openFor;
+      });
+
+  @override
+  Widget build(BuildContext context) {
+    final teams = widget.teams;
+    final shown = _openFor ?? _lastOpenFor;
+    final editing = shown == null || shown.isEmpty
+        ? null
+        : teams.where((t) => t.teamId == shown).firstOrNull;
+
     return _Block(
       title: '소속',
       child: Column(
@@ -378,7 +505,11 @@ class _TeamBlock extends ConsumerWidget {
                           ),
                       ],
                     ),
-                    _TeamActions(team: t),
+                    _TeamActions(
+                      team: t,
+                      editing: _openFor == t.teamId,
+                      onEdit: () => _toggle(t.teamId),
+                    ),
                   ],
                 ),
               ),
@@ -386,13 +517,23 @@ class _TeamBlock extends ConsumerWidget {
             alignment: Alignment.centerLeft,
             child: OutlinedButton.icon(
               key: const Key('profile-team-create'),
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('팀 만들기'),
+              icon: Icon(_openFor == '' ? Icons.close : Icons.add, size: 18),
+              label: Text(_openFor == '' ? '닫기' : '팀 만들기'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: _kOn,
                 side: BorderSide(color: _kOn.withValues(alpha: 0.4)),
               ),
-              onPressed: () => showTeamSheet(context),
+              onPressed: () => _toggle(''),
+            ),
+          ),
+          _Fold(
+            open: _openFor != null,
+            child: TeamForm(
+              // 🔴 고치는 팀이 바뀌면 폼을 새로 세운다 — 안 그러면 칸에 옛
+              //    팀 이름이 남는다.
+              key: ValueKey('team-form-${shown ?? ''}'),
+              team: editing,
+              onDone: () => setState(() => _openFor = null),
             ),
           ),
         ],
@@ -403,9 +544,15 @@ class _TeamBlock extends ConsumerWidget {
 
 /// 팀 한 줄에 붙는 단추들.
 class _TeamActions extends ConsumerStatefulWidget {
-  const _TeamActions({required this.team});
+  const _TeamActions({
+    required this.team,
+    required this.editing,
+    required this.onEdit,
+  });
 
   final TeamMembership team;
+  final bool editing;
+  final VoidCallback onEdit;
 
   @override
   ConsumerState<_TeamActions> createState() => _TeamActionsState();
@@ -478,9 +625,9 @@ class _TeamActionsState extends ConsumerState<_TeamActions> {
         if (t.isOwner)
           TextButton(
             key: Key('team-edit-${t.teamId}'),
-            onPressed: () => showTeamSheet(context, team: t),
+            onPressed: widget.onEdit,
             style: TextButton.styleFrom(foregroundColor: _kOn),
-            child: const Text('수정'),
+            child: Text(widget.editing ? '닫기' : '수정'),
           ),
         TextButton(
           key: Key('team-leave-${t.teamId}'),
@@ -570,13 +717,21 @@ class _InfoBlock extends ConsumerWidget {
 ///
 /// 🔴 **미달 표식이 아니다**(계약 4장) — 빈 것은 정상이라 「없음」·자물쇠 같은
 /// 표를 대신 넣지 않는다.
-class _TitlesRow extends ConsumerWidget {
+class _TitlesRow extends ConsumerStatefulWidget {
   const _TitlesRow({required this.card});
 
   final PlayerCard? card;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_TitlesRow> createState() => _TitlesRowState();
+}
+
+class _TitlesRowState extends ConsumerState<_TitlesRow> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final card = widget.card;
     final all = card?.titles ?? const <CardTitle>[];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -606,7 +761,7 @@ class _TitlesRow extends ConsumerWidget {
             ],
           ),
         // 🔴 카드가 없으면 고칠 데가 없다 — 호칭은 카드에 붙는다.
-        if (card != null)
+        if (card != null) ...[
           Align(
             alignment: Alignment.centerLeft,
             child: Padding(
@@ -620,12 +775,16 @@ class _TitlesRow extends ConsumerWidget {
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(
                   key: const Key('profile-titles-edit'),
-                  onTap: () => showTitlesSheet(context, card!),
+                  onTap: () => setState(() => _open = !_open),
                   child: Padding(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     child: Text(
-                      all.isEmpty ? '호칭 정하기' : '호칭 고치기',
+                      _open
+                          ? '닫기'
+                          : all.isEmpty
+                              ? '호칭 정하기'
+                              : '호칭 고치기',
                       style: TextStyle(
                         color: _kOn.withValues(alpha: 0.85),
                         fontSize: 12,
@@ -636,6 +795,14 @@ class _TitlesRow extends ConsumerWidget {
               ),
             ),
           ),
+          _Fold(
+            open: _open,
+            child: TitlesForm(
+              card: card,
+              onDone: () => setState(() => _open = false),
+            ),
+          ),
+        ],
       ],
     );
   }

@@ -172,14 +172,16 @@ void main() {
       await _pump(tester, MockDb.newbieId);
 
       expect(find.byKey(const Key('profile-card-edit')), findsOneWidget);
-      expect(find.byTooltip('카드 만들기'), findsOneWidget);
+      expect(find.text('카드 만들기'), findsOneWidget);
     });
 
     testWidgets('카드가 있으면 수정 입구가 선다', (tester) async {
       await _pump(tester, MockDb.playerId);
 
       expect(find.byKey(const Key('profile-card-edit')), findsOneWidget);
-      expect(find.byTooltip('프로필 카드 수정'), findsOneWidget);
+      /* 🔴 **글자다**(2026-09-22) — 아이콘(`tune`)은 무엇을 고치는 단추인지
+         안 읽혔다. */
+      expect(find.text('카드 수정'), findsOneWidget);
     });
 
     /// 🔴 **머리칸을 걷으면서 나가는 길이 없어지지 않게** 아래 바를 붙였다
@@ -268,6 +270,8 @@ void main() {
     testWidgets('지역을 안 고르면 만들기가 안 눌린다', (tester) async {
       await _pump(tester, MockDb.newbieId);
 
+      await tester.ensureVisible(find.byKey(const Key('profile-team-create')));
+      await _settle(tester);
       await tester.tap(find.byKey(const Key('profile-team-create')));
       await _settle(tester);
 
@@ -297,12 +301,29 @@ void main() {
     testWidgets('만들면 소속에 뜬다', (tester) async {
       await _pump(tester, MockDb.newbieId);
 
+      await tester.ensureVisible(find.byKey(const Key('profile-team-create')));
+      await _settle(tester);
       await tester.tap(find.byKey(const Key('profile-team-create')));
       await _settle(tester);
       await tester.enterText(find.byKey(const Key('team-name')), '새 팀');
       await tester.enterText(find.byKey(const Key('team-region')), '서울 마포구');
       await _settle(tester);
+      /* 🔴 폼이 **제자리에서 펼쳐지므로**(2026-09-22) 저장 단추가 창 밖에
+         있을 수 있다 — 누르기 전에 화면 안으로 끌어온다. `ensureVisible` 은
+         스크롤 대상을 따로 안 찾아서 여기서는 이쪽이 안전하다. */
+      await tester.ensureVisible(find.byKey(const Key('team-save')));
+      await _settle(tester);
       await tester.tap(find.byKey(const Key('team-save')));
+      await _settle(tester);
+
+      /* 🔴 **위로 되올려서 본다.** `ListView` 는 보이는 것만 짓기 때문에,
+         저장 단추까지 내려간 채로 찾으면 「소속」 칸이 **트리에 아예 없어서**
+         못 찾는다(화면 잘못이 아니다). */
+      await tester.scrollUntilVisible(
+        find.text('소속'),
+        -200,
+        scrollable: find.byType(Scrollable).first,
+      );
       await _settle(tester);
 
       expect(find.text('새 팀'), findsOneWidget);
