@@ -8,6 +8,7 @@ import 'package:super_sub/features/auth/data/auth_providers.dart';
 import 'package:super_sub/features/auth/data/auth_repository_mock.dart';
 import 'package:super_sub/features/auth/presentation/session_controller.dart';
 import 'package:super_sub/core/dev/data_source.dart';
+import 'package:super_sub/core/widgets/floating_nav_bar.dart';
 import 'package:super_sub/features/profile/presentation/screens/profile_screen.dart';
 
 /// 🔴 **`pumpAndSettle` 을 안 쓴다 (2026-09-22).** 프로필 배경의 빛무리가
@@ -21,6 +22,18 @@ Future<void> _settle(WidgetTester tester) async {
   for (var i = 0; i < 8; i += 1) {
     await tester.pump(const Duration(milliseconds: 250));
   }
+}
+
+/// 🔴 **폰 세로 화면이라 아래 칸은 화면 밖이다** — 웹은 좌우 두 단인데
+/// 여기서는 한 줄로 쌓아서(이식 지침 §2-2) 「정보」부터가 스크롤 아래에 있다.
+/// 카드가 화면의 첫 얼굴이 되면서(2026-09-22) 더 내려갔다. 찾기 전에 끌어 올린다.
+Future<void> scrollTo(WidgetTester tester, Finder target) async {
+  await tester.scrollUntilVisible(
+    target,
+    200,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await _settle(tester);
 }
 
 Future<ProviderContainer> _pump(WidgetTester tester, String userId) async {
@@ -60,7 +73,11 @@ class _AlwaysMock extends DataSourceController {
 void main() {
   testWidgets('닉네임과 이메일을 보여준다', (tester) async {
     await _pump(tester, MockDb.playerId);
-    expect(find.text('백성검'), findsOneWidget);
+    /* 🔴 닉네임이 **둘** 나온다 (2026-09-22) — 카드 아래 큰 글자와 카드
+       그림 안의 글자다. 카드가 화면의 첫 얼굴이 되면서 생긴 정상 상태다. */
+    expect(find.text('백성검'), findsWidgets);
+
+    await scrollTo(tester, find.text('player@supersub.test'));
     expect(find.text('player@supersub.test'), findsOneWidget);
   });
 
@@ -122,19 +139,13 @@ void main() {
     expect(find.byKey(const Key('profile-nickname')), findsOneWidget);
   });
 
-  /* 🔴 **폰 세로 화면이라 아래 칸은 화면 밖이다** — 웹은 좌우 두 단인데
-     여기서는 한 줄로 쌓아서(이식 지침 §2-2) 「계정」이 스크롤 아래에 있다.
-     찾기 전에 끌어 올린다. */
-  Future<void> scrollTo(WidgetTester tester, Finder target) async {
-    await tester.scrollUntilVisible(target, 200, scrollable: find.byType(Scrollable).first);
-    await _settle(tester);
-  }
-
   group('웹에서 옮긴 칸들', () {
     testWidgets('소속 · 정보 · 내 경기 · 계정 칸이 선다', (tester) async {
       await _pump(tester, MockDb.playerId);
 
-      for (final title in const ['내 선수 카드', '소속', '정보', '내 경기', '계정']) {
+      /* 🔴 「내 선수 카드」는 **없앴다** (2026-09-22, 사용자 요청) — 카드
+         자체가 무엇인지 말하고 있어서 같은 말을 두 번 하던 자리다. */
+      for (final title in const ['소속', '정보', '내 경기', '계정']) {
         await scrollTo(tester, find.text(title));
         expect(find.text(title), findsOneWidget, reason: title);
       }
@@ -155,16 +166,30 @@ void main() {
     });
 
     /// 🔴 카드가 없으면 「카드 만들기」다 — 카드는 요청할 때 생긴다(계약).
+    /// 🔴 **글자가 아니라 동그란 아이콘 단추다** (2026-09-22) — 카드 오른쪽
+    /// 위에 붙어서 글자를 넣을 자리가 없다. 뜻은 `tooltip` 이 든다.
     testWidgets('카드가 없으면 만들기 단추가 선다', (tester) async {
       await _pump(tester, MockDb.newbieId);
 
-      expect(find.text('카드 만들기'), findsOneWidget);
+      expect(find.byKey(const Key('profile-card-edit')), findsOneWidget);
+      expect(find.byTooltip('카드 만들기'), findsOneWidget);
     });
 
     testWidgets('카드가 있으면 수정 입구가 선다', (tester) async {
       await _pump(tester, MockDb.playerId);
 
-      expect(find.text('프로필 카드 수정'), findsOneWidget);
+      expect(find.byKey(const Key('profile-card-edit')), findsOneWidget);
+      expect(find.byTooltip('프로필 카드 수정'), findsOneWidget);
+    });
+
+    /// 🔴 **머리칸을 걷으면서 나가는 길이 없어지지 않게** 아래 바를 붙였다
+    /// (2026-09-22, 사용자 요청). 로고 알약이 홈이다.
+    testWidgets('머리칸 대신 아래 바로 나간다', (tester) async {
+      await _pump(tester, MockDb.playerId);
+
+      expect(find.text('MY PROFILE'), findsNothing);
+      expect(find.byType(BackButton), findsNothing);
+      expect(find.byType(FloatingNavBar), findsOneWidget);
     });
 
     testWidgets('지인 검색 토글이 서버 값을 따른다', (tester) async {

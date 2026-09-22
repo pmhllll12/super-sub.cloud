@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:super_sub/app.dart';
 import 'package:super_sub/core/dev/data_source.dart';
+import 'package:super_sub/core/widgets/floating_nav_bar.dart';
 import 'package:super_sub/core/mock/mock_db.dart';
 import 'package:super_sub/features/auth/data/auth_providers.dart';
 import 'package:super_sub/features/auth/data/auth_repository_mock.dart';
@@ -143,10 +144,14 @@ void main() {
     await tester.tap(find.byKey(const Key('home-profile')));
     await _settle(tester);
 
-    // redirect가 개입하지 않고 /profile에 머무른다.
-    // 🔴 제목을 웹과 맞춰 「MY PROFILE」 로 바꿨다(2026-09-21).
-    expect(find.text('MY PROFILE'), findsOneWidget);
-    // push로 열었으므로 뒤로가기 착지점이 있다 (I3).
-    expect(find.byType(BackButton), findsOneWidget);
+    /* redirect 가 개입하지 않고 /profile 에 머무른다.
+       🔴 **머리칸을 걷었다 (2026-09-22, 사용자 요청)** — 제목(「MY PROFILE」)도
+       뒤로가기도 없다. 카드가 이 화면의 첫 얼굴이고, 그 위에 띠가 하나 더
+       있으면 카드가 밀려 내려간다. 착지했는지는 **카드 수정 입구**로 본다. */
+    expect(find.byKey(const Key('profile-card-edit')), findsOneWidget);
+    expect(find.text('MY PROFILE'), findsNothing);
+    /* 🔴 **나가는 길은 아래 바가 맡는다** — 뒤로가기를 걷으면서 길이 하나도
+       없어지지 않게 같이 붙인 것이다(로고 알약이 홈). */
+    expect(find.byType(FloatingNavBar), findsWidgets);
   });
 }

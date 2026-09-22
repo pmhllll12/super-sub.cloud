@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/data/models/app_user.dart';
@@ -8,6 +9,7 @@ import '../../../auth/presentation/session_controller.dart';
 import '../../../card/data/card_providers.dart';
 import '../../../card/data/models/player_card.dart';
 import '../../../../core/widgets/aurora_background.dart';
+import '../../../../core/widgets/floating_nav_bar.dart';
 import '../../../card/presentation/card_editor_screen.dart';
 import '../../../video/presentation/my_videos_controller.dart';
 import '../../../video/presentation/screens/my_videos_screen.dart';
@@ -56,26 +58,50 @@ class ProfileScreen extends ConsumerWidget {
       child: Scaffold(
         // 🔴 **배경을 비운다** — 안 비우면 빛무리를 덮는다.
         backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          foregroundColor: _kOn,
-          title: const Text('MY PROFILE'),
+        /* 🔴 **머리칸을 아예 안 둔다**(2026-09-22, 사용자 요청). 제목
+           (「MY PROFILE」)도 뒤로가기도 걷었다 — 카드가 이 화면의 첫 얼굴이고,
+           그 위에 띠가 하나 더 있으면 카드가 밀려 내려간다.
+           🔴 **돌아가는 길은 아래 바가 맡는다** — 로고 알약이 홈이다. 머리칸을
+           걷으면서 **나가는 길이 하나도 없어지지 않게** 같이 붙인 것이다. */
+        extendBody: true,
+        bottomNavigationBar: FloatingNavBar(
+          // 3 번이 이 화면(신분증 아이콘)이다.
+          currentIndex: 3,
+          onTap: (index) {
+            if (index == 0) {
+              context.go('/home');
+              return;
+            }
+            if (index == 1) {
+              context.go('/videos');
+              return;
+            }
+            _notReady(context, '준비 중입니다');
+          },
         ),
-        body: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-          children: [
-            _CardBlock(card: card, nickname: user.nickname),
-            const SizedBox(height: 16),
-            _TeamBlock(teams: user.teams),
-            const SizedBox(height: 16),
-            _InfoBlock(user: user),
-            const SizedBox(height: 16),
-            const _VideosBlock(),
-            const SizedBox(height: 16),
-            const _MatchesBlock(),
-            const SizedBox(height: 16),
-            _AccountBlock(user: user),
-          ],
+        body: SafeArea(
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              8,
+              16,
+              // 떠 있는 바에 마지막 칸이 가리지 않게.
+              FloatingNavBar.heightOf(context),
+            ),
+            children: [
+              _CardHero(card: card, nickname: user.nickname),
+              const SizedBox(height: 16),
+              _TeamBlock(teams: user.teams),
+              const SizedBox(height: 16),
+              _InfoBlock(user: user),
+              const SizedBox(height: 16),
+              const _VideosBlock(),
+              const SizedBox(height: 16),
+              const _MatchesBlock(),
+              const SizedBox(height: 16),
+              _AccountBlock(user: user),
+            ],
+          ),
         ),
       ),
     );
@@ -87,6 +113,9 @@ class ProfileScreen extends ConsumerWidget {
 const Color _kBg = Color(0xFF0A0F0C);
 const Color _kOn = Color(0xFFFFFFFF);
 const Color _kPanel = Color(0xFF1E3029);
+
+/// 되돌릴 수 없는 일의 빨강 — 탈퇴·해체가 나눠 쓴다.
+const Color _kDanger = Color(0xFFD32F2F);
 
 /// 웹의 유리판 한 칸 — 제목 + 내용.
 class _Block extends StatelessWidget {
@@ -128,77 +157,91 @@ class _Block extends StatelessWidget {
   }
 }
 
-/// 내 카드 + 닉네임 + 꾸미기 입구.
-class _CardBlock extends ConsumerWidget {
-  const _CardBlock({required this.card, required this.nickname});
+/// 카드가 이 화면의 **첫 얼굴**이다 — 가운데 위에 그냥 놓는다.
+///
+/// 🔴 **판(상자)도 「내 선수 카드」 제목도 없다**(2026-09-22, 사용자 요청).
+/// 카드 자체가 무엇인지 말하고 있어서 제목은 같은 말을 두 번 하는 자리였고,
+/// 상자는 카드 둘레에 테를 하나 더 둘러 **카드가 작아 보이게** 했다.
+class _CardHero extends ConsumerWidget {
+  const _CardHero({required this.card, required this.nickname});
 
   final PlayerCard? card;
   final String nickname;
 
+  /// 히어로라 프로필 안의 다른 카드보다 크다.
+  static const double _cardWidth = 200;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return _Block(
-      title: '내 선수 카드',
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 🔴 카드가 없으면 빈 카드다 — 예외가 아니라 정상 상태다.
-          if (card == null)
-            const BlankPlayerCardView(width: 120)
-          else
-            PlayerCardView(
-              width: 120,
-              seed: card!.publicSlug,
-              alias: aliasOf(card!),
-              style: card!.style,
-              photoUrl: card!.photoUrl,
-            ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        nickname,
-                        style: const TextStyle(
-                          color: _kOn,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      key: const Key('profile-edit'),
-                      icon: const Icon(Icons.edit, size: 18, color: _kOn),
-                      tooltip: '닉네임 수정',
-                      onPressed: () => showNicknameSheet(context, nickname),
-                    ),
-                  ],
+    return Column(
+      children: [
+        /* 🔴 **수정 단추가 카드 오른쪽 위에 붙는다**(사용자 요청). 흐름 안에
+           두면 카드가 그만큼 왼쪽으로 밀려 **가운데가 아니게** 된다 —
+           `Stack` 으로 띄워 카드의 가운데를 지킨다. */
+        SizedBox(
+          width: double.infinity,
+          child: Stack(
+            alignment: Alignment.topCenter,
+            clipBehavior: Clip.none,
+            children: [
+              // 🔴 카드가 없으면 빈 카드다 — 예외가 아니라 정상 상태다.
+              if (card == null)
+                const BlankPlayerCardView(width: _cardWidth)
+              else
+                PlayerCardView(
+                  width: _cardWidth,
+                  seed: card!.publicSlug,
+                  alias: aliasOf(card!),
+                  style: card!.style,
+                  photoUrl: card!.photoUrl,
                 ),
-                const SizedBox(height: 8),
-                OutlinedButton(
-                  key: const Key('profile-card-edit'),
-                  onPressed: card == null
-                      ? () => _createCard(context, ref)
-                      : () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => CardEditorScreen(card: card!),
-                            ),
+              Positioned(
+                top: 0,
+                // 카드 오른쪽 바깥 — 카드 폭의 절반부터가 오른쪽 반이다.
+                left: MediaQuery.sizeOf(context).width / 2 + _cardWidth / 2 - 24,
+                child: _RoundIconButton(
+                  buttonKey: const Key('profile-card-edit'),
+                  icon: card == null ? Icons.add : Icons.tune,
+                  tooltip: card == null ? '카드 만들기' : '프로필 카드 수정',
+                  onTap: () => card == null
+                      ? _createCard(context, ref)
+                      : Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => CardEditorScreen(card: card!),
                           ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _kOn,
-                    side: BorderSide(color: _kOn.withValues(alpha: 0.4)),
-                  ),
-                  child: Text(card == null ? '카드 만들기' : '프로필 카드 수정'),
+                        ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 12),
+        // 닉네임과 고치는 단추는 **카드 바로 아래 가운데**다(사용자 요청).
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Flexible(
+              child: Text(
+                nickname,
+                style: const TextStyle(
+                  color: _kOn,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            _RoundIconButton(
+              buttonKey: const Key('profile-edit'),
+              icon: Icons.edit,
+              tooltip: '닉네임 수정',
+              size: 28,
+              iconSize: 14,
+              onTap: () => showNicknameSheet(context, nickname),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -214,6 +257,48 @@ class _CardBlock extends ConsumerWidget {
     } catch (e) {
       if (context.mounted) _notReady(context, '$e');
     }
+  }
+}
+
+/// 동그란 아이콘 단추 — 카드 옆·닉네임 옆처럼 **자리가 좁은 곳**에 쓴다.
+class _RoundIconButton extends StatelessWidget {
+  const _RoundIconButton({
+    required this.buttonKey,
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+    this.size = 34,
+    this.iconSize = 17,
+  });
+
+  final Key buttonKey;
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+  final double size;
+  final double iconSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: _kPanel.withValues(alpha: 0.85),
+        shape: CircleBorder(
+          side: BorderSide(color: _kOn.withValues(alpha: 0.25)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          key: buttonKey,
+          onTap: onTap,
+          child: SizedBox(
+            width: size,
+            height: size,
+            child: Icon(icon, size: iconSize, color: _kOn),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -352,7 +437,7 @@ class _TeamActionsState extends ConsumerState<_TeamActions> {
   @override
   Widget build(BuildContext context) {
     final t = widget.team;
-    final danger = Theme.of(context).colorScheme.error;
+    const danger = _kDanger;
     final repo = ref.read(teamRepositoryProvider);
 
     if (_armed) {
@@ -431,8 +516,13 @@ class _InfoBlock extends ConsumerWidget {
           /* 🔴 **사람이 직접 적는다**(2026-09-16 결정, 미결 `paik` 36번).
              원래는 분석이 붙이는 값이라 화면이 읽기만 했다 — 팀이 다시
              정하면서 여기서 고친다. 분류(강점·활동)는 **안 받는다.** */
+          /* 🔴 **아래 두 줄과 라벨 자리를 맞춘다**(사용자 지적). 이름표 폭
+             (76)은 같은데 `CrossAxisAlignment.start` 라 글자 윗선이 안
+             맞았다 — 오른쪽이 알약이라 높이가 달라서다. `baseline` 은 알약이
+             글자가 아니라 못 쓰고, **가운데로 맞추면** 한 줄일 때 라벨과
+             알약이 같은 선에 온다. */
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               SizedBox(
                 width: 76,
@@ -519,18 +609,30 @@ class _TitlesRow extends ConsumerWidget {
         if (card != null)
           Align(
             alignment: Alignment.centerLeft,
-            child: TextButton(
-              key: const Key('profile-titles-edit'),
-              style: TextButton.styleFrom(
-                foregroundColor: _kOn,
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              onPressed: () => showTitlesSheet(context, card!),
-              child: Text(
-                all.isEmpty ? '호칭 정하기' : '호칭 고치기',
-                style: const TextStyle(fontSize: 13),
+            child: Padding(
+              // 알약이 있을 때만 위를 띄운다 — 없으면 라벨과 한 줄이어야 한다.
+              padding: EdgeInsets.only(top: all.isEmpty ? 0 : 6),
+              child: Material(
+                color: Colors.transparent,
+                shape: StadiumBorder(
+                  side: BorderSide(color: _kOn.withValues(alpha: 0.3)),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  key: const Key('profile-titles-edit'),
+                  onTap: () => showTitlesSheet(context, card!),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    child: Text(
+                      all.isEmpty ? '호칭 정하기' : '호칭 고치기',
+                      style: TextStyle(
+                        color: _kOn.withValues(alpha: 0.85),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -679,12 +781,18 @@ class _AccountBlock extends ConsumerWidget {
                 style: TextButton.styleFrom(foregroundColor: _kOn),
                 child: const Text('로그아웃'),
               ),
-              const SizedBox(width: 4),
-              TextButton(
+              const SizedBox(width: 8),
+              /* 🔴 **채운 빨강이다**(2026-09-22, 사용자 요청). 글자만 빨갛던
+                 때는 옆의 로그아웃과 **같은 무게**로 보여서, 되돌릴 수 없는
+                 쪽이 눈에 안 띄었다. */
+              FilledButton(
                 key: const Key('profile-delete-account'),
                 onPressed: () => showDeleteAccountSheet(context),
-                style: TextButton.styleFrom(
-                  foregroundColor: Theme.of(context).colorScheme.error,
+                style: FilledButton.styleFrom(
+                  backgroundColor: _kDanger,
+                  foregroundColor: _kOn,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  visualDensity: VisualDensity.compact,
                 ),
                 child: const Text('회원 탈퇴'),
               ),
