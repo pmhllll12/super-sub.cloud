@@ -1,12 +1,19 @@
 import '../../../core/network/api_client.dart';
+import '../../../core/network/presigned_upload.dart';
+import '../../../core/network/upload_file.dart';
 import 'card_repository.dart';
 import 'models/player_card.dart';
 
 /// `fastapi/` 백엔드에 붙는 실제 구현. 계약은 `fastapi/docs/api-contract.md` 3절.
 class ApiCardRepository implements CardRepository {
-  ApiCardRepository(this._api);
+  ApiCardRepository(this._api, {PresignedUpload? upload})
+      : _upload = upload ?? PresignedUpload();
 
   final ApiClient _api;
+
+  /// 🔴 **저장소 PUT 은 `ApiClient` 를 안 지난다** — 토큰을 실으면 서명이
+  /// 깨지고 응답이 JSON 이 아니다. 클립 업로드와 같은 것을 쓴다.
+  final PresignedUpload _upload;
 
   @override
   Future<PlayerCard?> myCard() => _orNullOn404(() => _api.get('/me/card'));
@@ -38,6 +45,29 @@ class ApiCardRepository implements CardRepository {
       'style': ?style?.toWire(),
     };
     return PlayerCard.fromJson(await _api.patch('/me/card', body));
+  }
+
+  @override
+  Future<String> uploadCardPhoto(UploadFile file) async {
+    // (1) 올릴 자리를 받는다.
+    /* 🔴 **`content_type` 만 보낸다** — 확장자는 서버가 붙인다. 클라이언트가
+       정하면 「image/jpeg 라면서 .html 로 올리는 키」가 생긴다(계약). */
+    final spot = await _api.post('/me/card/photo-upload-url', {
+      'content_type': file.contentType,
+    });
+
+    // (2) S3 에 직접. 바이트가 앱 서버를 안 지난다(PER-002).
+    await _upload.put(
+      url: Uri.parse(spot['upload_url'] as String),
+      openRead: file.openRead,
+      contentLength: file.sizeBytes,
+      // 🔴 요청한 값 그대로 — 서명에 들어 있어 다르면 S3 가 403 이다.
+      contentType: file.contentType,
+    );
+
+    /* (3) 은 부르는 쪽이 한다 — `updateCard(style: …photoKey)`.
+       🔴 여기서 몰래 PATCH 하면 아직 저장 안 한 색·글자 변경과 순서가 엉킨다. */
+    return spot['storage_key'] as String;
   }
 
   /// 🔴 **404 만** `null` 로 바꾼다.

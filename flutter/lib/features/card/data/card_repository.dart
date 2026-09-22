@@ -1,3 +1,4 @@
+import '../../../core/network/upload_file.dart';
 import 'models/player_card.dart';
 
 /// 화면이 아는 유일한 카드 계약.
@@ -35,4 +36,40 @@ abstract class CardRepository {
     bool clearTagline = false,
     CardStyle? style,
   });
+
+  /// 카드 사진을 올린다 — **저장 키를 돌려준다**(계약 3-5절).
+  ///
+  /// ```
+  /// (1) POST /me/card/photo-upload-url   올릴 자리를 받는다
+  /// (2) PUT  <upload_url>                 S3 에 직접 (PER-002)
+  /// (3) PATCH /me/card  style.photo_key   ← 부르는 쪽이 한다
+  /// ```
+  ///
+  /// 🔴 **(3)은 여기서 안 한다.** 사진은 카드 꾸미기의 한 조각이고 저장은
+  /// 편집기가 「저장」을 누를 때 **한 번에** 일어나야 한다 — 여기서 몰래
+  /// `PATCH` 하면 아직 저장 안 한 다른 변경(색·글자)과 순서가 엉킨다.
+  ///
+  /// 🔴 그래서 **올리기만 하고 키를 안 저장하면 아무 일도 안 난다** — 그
+  /// 파일은 아무도 안 가리키는 채로 남는다. 편집기가 그 사이를 말해 준다.
+  ///
+  /// 🔴 **카드가 먼저 있어야 한다** — 저장 키에 카드 id 가 들어가서,
+  /// 없으면 `404 CARD_NOT_FOUND` 다.
+  Future<String> uploadCardPhoto(UploadFile file);
+}
+
+/// 계약이 받는 사진 형식 — **셋뿐이다**(계약 3-5절).
+///
+/// 🔴 **`image/svg+xml` 은 일부러 없다** — SVG 는 스크립트를 담는다.
+const List<String> kCardPhotoTypes = ['image/jpeg', 'image/png', 'image/webp'];
+
+/// 고른 사진이 올릴 수 있는 것인가 — 통과면 `null`, 아니면 사람이 읽을 사유.
+///
+/// 🔴 **`image/*` 를 그대로 보내지 않는다.** 폰 앨범은 HEIC 도 내주는데 서버는
+/// 셋만 받는다(`UNSUPPORTED_PHOTO_TYPE`) — 여기서 안 막으면 **고른 사진이
+/// 올라가다 422 로 죽는다.**
+String? checkCardPhoto(UploadFile file) {
+  if (!kCardPhotoTypes.contains(file.contentType)) {
+    return '받지 않는 형식입니다. JPG · PNG · WebP 로 올려 주세요.';
+  }
+  return null;
 }

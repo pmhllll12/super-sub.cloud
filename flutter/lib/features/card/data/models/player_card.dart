@@ -83,6 +83,7 @@ class CardStyle {
     required this.photoX,
     required this.photoY,
     required this.mode,
+    this.photoKey,
   });
 
   factory CardStyle.fromJson(Map<String, dynamic> json) {
@@ -107,6 +108,7 @@ class CardStyle {
       brushScale: dbl('brush_scale', 1),
       brushX: dbl('brush_x', 0),
       brushY: dbl('brush_y', 0),
+      photoKey: json['photo_key'] as String?,
       photoScale: dbl('photo_scale', 1),
       photoX: dbl('photo_x', 0),
       photoY: dbl('photo_y', 0),
@@ -139,6 +141,16 @@ class CardStyle {
   final double brushX;
   final double brushY;
 
+  /// 사진의 **S3 키** — 서버에 저장되는 값이다.
+  ///
+  /// 🔴 **그릴 주소가 아니다.** 그리는 것은 `PlayerCard.photoUrl`(사전 서명
+  /// GET, 유효 시간 있음)이고, 이 값은 「어느 파일인가」만 가리킨다. 키를
+  /// 그대로 `Image.network` 에 넣으면 403 이다.
+  ///
+  /// 🔴 **올려만 두고 이 값을 저장하지 않으면 아무 일도 안 난다** — 그 파일은
+  /// 아무도 안 가리키는 채로 남는다(계약 3-5절).
+  final String? photoKey;
+
   /// 🔴 사진 변환도 translate → scale 이지만 원점이 **center bottom** 이다.
   final double photoScale;
   final double photoX;
@@ -166,6 +178,11 @@ class CardStyle {
         'brush_scale': brushScale,
         'brush_x': brushX,
         'brush_y': brushY,
+        /* 🔴 **`null` 이어도 명시한다.** 위 `...raw` 는 **앱이 모르는 칸**을
+           실어 나르기 위한 것이라, 앱이 아는 칸을 생략하면 원본의 옛 값이
+           살아남는다 — 사진을 지워도 옛 `photo_key` 가 그대로 저장돼
+           **지워지지 않는다.** */
+        'photo_key': photoKey,
         'photo_scale': photoScale,
         'photo_x': photoX,
         'photo_y': photoY,
@@ -187,6 +204,11 @@ class CardStyle {
     double? photoX,
     double? photoY,
     CardMode? mode,
+    String? photoKey,
+    /// 🔴 **「안 보냄」과 「비움」을 가른다.** 새 사진을 고르는 순간 옛 키를
+    /// 반드시 비워야 하는데(아래 편집기 주석), `photoKey: null` 로는 그 뜻을
+    /// 전할 수 없다 — `null` 은 「안 바꿈」이다.
+    bool clearPhotoKey = false,
   }) =>
       CardStyle(
         raw: raw,
@@ -200,6 +222,7 @@ class CardStyle {
         brushScale: brushScale ?? this.brushScale,
         brushX: brushX ?? this.brushX,
         brushY: brushY ?? this.brushY,
+        photoKey: clearPhotoKey ? null : (photoKey ?? this.photoKey),
         photoScale: photoScale ?? this.photoScale,
         photoX: photoX ?? this.photoX,
         photoY: photoY ?? this.photoY,

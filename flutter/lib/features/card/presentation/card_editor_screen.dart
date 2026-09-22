@@ -1,10 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../profile/presentation/widgets/player_card_view.dart';
 import '../data/card_providers.dart';
+import '../data/card_repository.dart';
 import '../data/models/player_card.dart';
+import '../data/pick_photo.dart';
 
 /// 카드 꾸미기 — 웹 `app/(app)/me/card`(`CardEditor.tsx`)를 폰에 맞춰 옮긴 것.
 ///
@@ -13,8 +17,9 @@ import '../data/models/player_card.dart';
 ///
 /// 🔴 **저장은 전체 값을 보낸다** — 계약이 부분 병합을 안 하고 거부한다.
 ///
-/// ⚠️ **사진은 아직 없다** — 올리기가 S3 사전 서명 두 단계라 따로 잡는다.
-/// 이미 올린 사진은 그려지고, 자리·배율도 서버 값 그대로 유지된다.
+/// 🔴 **사진은 「저장」을 눌러야 붙는다.** 고르면 S3 로 올라가 **키만** 손에
+/// 들어오고, 그 키는 `style.photo_key` 로 저장될 때 카드에 붙는다(계약 3-5절).
+/// 올리기만 하고 나가면 아무 일도 안 난다 — 그 사이를 화면이 말해 준다.
 class CardEditorScreen extends ConsumerStatefulWidget {
   const CardEditorScreen({super.key, required this.card});
 
@@ -30,6 +35,16 @@ class _CardEditorScreenState extends ConsumerState<CardEditorScreen> {
       TextEditingController(text: aliasOf(widget.card));
   bool _busy = false;
 
+  /// 방금 고른 사진의 **로컬 경로** — 올라가기 전에도 보여 준다.
+  String? _localPhoto;
+
+  /// 사진을 올리는 중인가. 그동안 저장을 막는다 — 🔴 키가 아직 없어서
+  /// 저장하면 **사진이 안 남는다.**
+  bool _photoBusy = false;
+
+  /// 사진 쪽 사유 — 형식 · 올리기 실패.
+  String? _photoNote;
+
   @override
   void dispose() {
     _tagline.dispose();
@@ -39,7 +54,7 @@ class _CardEditorScreenState extends ConsumerState<CardEditorScreen> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         backgroundColor: _kBg,
         appBar: AppBar(
@@ -49,7 +64,10 @@ class _CardEditorScreenState extends ConsumerState<CardEditorScreen> {
           actions: [
             TextButton(
               key: const Key('card-editor-save'),
-              onPressed: _busy ? null : _save,
+              /* 🔴 **사진이 올라가는 동안 저장을 막는다.** 그 사이에 누르면
+                 키가 아직 없어서 **사진만 쏙 빠진 채로 저장된다** — 사람은
+                 저장이 됐다고 믿는다. */
+              onPressed: (_busy || _photoBusy) ? null : _save,
               style: TextButton.styleFrom(foregroundColor: _kOn),
               child: _busy
                   ? const SizedBox(
@@ -67,6 +85,7 @@ class _CardEditorScreenState extends ConsumerState<CardEditorScreen> {
                조작 칸의 라벨과 겹쳐서 글자로 찾으면 둘이 잡힌다. */
             tabs: [
               Tab(key: Key('card-editor-tab-colors'), text: '색'),
+              Tab(key: Key('card-editor-tab-photo'), text: '사진'),
               Tab(key: Key('card-editor-tab-text'), text: '글자'),
               Tab(key: Key('card-editor-tab-mark'), text: '자국'),
             ],
@@ -82,11 +101,14 @@ class _CardEditorScreenState extends ConsumerState<CardEditorScreen> {
                 alias: _tagline.text,
                 style: _style,
                 photoUrl: widget.card.photoUrl,
+                // 방금 고른 사진이 서버 주소를 이긴다 — 안 그러면 골라도 안 바뀐다.
+                photoImage:
+                    _localPhoto == null ? null : FileImage(File(_localPhoto!)),
               ),
             ),
             Expanded(
               child: TabBarView(
-                children: [_colors(), _text(), _mark()],
+                children: [_colors(), _photo(), _text(), _mark()],
               ),
             ),
           ],
@@ -119,6 +141,158 @@ class _CardEditorScreenState extends ConsumerState<CardEditorScreen> {
           ),
         ],
       );
+
+  /// 사진 — 놓는 방법 · 고르기 · 자리.
+  Widget _photo() {
+    final hasPhoto = _localPhoto != null || widget.card.photoUrl != null;
+    /* 🔴 **아직 안 올라간 상태를 말해 준다.** 고른 그림은 보이는데 키가 없으면
+       저장해도 사진이 안 남는다 — 말 안 해 주면 「저장했는데 사라졌다」가 된다.
+       (`_localPhoto` 가 있는데 `photoKey` 가 없다 = 그 상태다.) */
+    final notUploaded =
+        _localPhoto != null && _style.photoKey == null && !_photoBusy;
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        /* 🔴 두 길을 **먼저** 고르게 한다 — 누끼를 따야 하는지가 사진을
+           준비하는 방법을 통째로 바꾼다(웹과 같은 순서). */
+        Row(
+          children: [
+            Expanded(
+              child: _ModeChip(
+                chipKey: const Key('card-editor-mode-cutout'),
+                label: '사람만 오려서',
+                on: _style.mode == CardMode.cutout,
+                onTap: () => setState(
+                  () => _style = _style.copyWith(mode: CardMode.cutout),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _ModeChip(
+                chipKey: const Key('card-editor-mode-full'),
+                label: '사진 그대로',
+                on: _style.mode == CardMode.full,
+                onTap: () => setState(
+                  () => _style = _style.copyWith(mode: CardMode.full),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _style.mode == CardMode.cutout
+              ? '배경을 지운 그림(PNG)이면 카드에 자연스럽게 섭니다.'
+              : '오려 내지 않은 사진을 그대로 깝니다 — 로고와 PLAYER CARD 만 위에 얹힙니다.',
+          style: TextStyle(color: _kOn.withValues(alpha: 0.65), fontSize: 12),
+        ),
+        const SizedBox(height: 16),
+        OutlinedButton.icon(
+          key: const Key('card-editor-photo-pick'),
+          icon: const Icon(Icons.photo_library, size: 18),
+          label: Text(
+            _photoBusy
+                ? '올리는 중…'
+                : hasPhoto
+                    ? '다른 사진으로'
+                    : '사진 고르기',
+          ),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: _kOn,
+            side: BorderSide(color: _kOn.withValues(alpha: 0.4)),
+            minimumSize: const Size.fromHeight(44),
+          ),
+          onPressed: _photoBusy ? null : _pickPhoto,
+        ),
+        if (_photoNote != null) ...[
+          const SizedBox(height: 10),
+          Text(
+            _photoNote!,
+            key: const Key('card-editor-photo-note'),
+            style: const TextStyle(color: Color(0xFFFFB4A9), fontSize: 12),
+          ),
+        ],
+        if (notUploaded) ...[
+          const SizedBox(height: 10),
+          Text(
+            '아직 안 올라갔습니다 — 다시 골라 주세요.',
+            key: const Key('card-editor-photo-pending'),
+            style: TextStyle(color: _kOn.withValues(alpha: 0.65), fontSize: 12),
+          ),
+        ],
+        if (hasPhoto) ...[
+          const SizedBox(height: 8),
+          _Slider(
+            label: '크기',
+            value: _style.photoScale,
+            // 웹과 같은 범위.
+            min: 0.4,
+            max: 2,
+            onChanged: (v) =>
+                setState(() => _style = _style.copyWith(photoScale: v)),
+          ),
+          _Slider(
+            label: '좌우',
+            value: _style.photoX,
+            min: -50,
+            max: 50,
+            onChanged: (v) =>
+                setState(() => _style = _style.copyWith(photoX: v)),
+          ),
+          _Slider(
+            label: '위아래',
+            value: _style.photoY,
+            min: -50,
+            max: 50,
+            onChanged: (v) =>
+                setState(() => _style = _style.copyWith(photoY: v)),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _pickPhoto() async {
+    setState(() => _photoNote = null);
+    final PickedPhoto? picked;
+    try {
+      picked = await ref.read(photoPickerProvider).fromGallery();
+    } catch (e) {
+      setState(() => _photoNote = '사진을 고르지 못했습니다: $e');
+      return;
+    }
+    if (picked == null) return; // 고르다 말았다 — 오류가 아니다.
+
+    /* 🔴 **폰 앨범은 HEIC 도 내준다** — 서버는 셋만 받으므로 여기서 막는다.
+       안 막으면 올라가다 422 로 죽고, 사람은 한참 기다린 뒤에 거절을 본다. */
+    final bad = checkCardPhoto(picked.file);
+    if (bad != null) {
+      setState(() => _photoNote = bad);
+      return;
+    }
+
+    /* 🔴 **미리보기부터 켜고 키는 비운다.** 옛 사진의 키가 남아 있으면
+       올리기가 실패했을 때 **새 그림 + 옛 키**로 저장돼, 내가 보는 카드와
+       남이 보는 카드가 갈린다(웹이 같은 주석을 남겼다). */
+    setState(() {
+      _localPhoto = picked!.path;
+      _style = _style.copyWith(clearPhotoKey: true);
+      _photoBusy = true;
+    });
+
+    try {
+      final key =
+          await ref.read(cardRepositoryProvider).uploadCardPhoto(picked.file);
+      if (!mounted) return;
+      setState(() => _style = _style.copyWith(photoKey: key));
+    } catch (e) {
+      if (mounted) setState(() => _photoNote = '사진을 올리지 못했습니다 — $e');
+    } finally {
+      if (mounted) setState(() => _photoBusy = false);
+    }
+  }
 
   Widget _text() => ListView(
         padding: const EdgeInsets.all(16),
@@ -240,6 +414,7 @@ class _CardEditorScreenState extends ConsumerState<CardEditorScreen> {
 
 const Color _kBg = Color(0xFF14201A);
 const Color _kOn = Color(0xFFFFFFFF);
+const Color _kSeed = Color(0xFF70ED88);
 
 /// 고를 수 있는 자국 번호.
 ///
@@ -253,6 +428,56 @@ const List<int> kPickableMarks = [
   // 7, 8 — 숨김
   9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
 ];
+
+/// 「사람만 오려서」 · 「사진 그대로」 — 둘 중 하나.
+class _ModeChip extends StatelessWidget {
+  const _ModeChip({
+    required this.chipKey,
+    required this.label,
+    required this.on,
+    required this.onTap,
+  });
+
+  final Key chipKey;
+  final String label;
+  final bool on;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      selected: on,
+      button: true,
+      child: Material(
+        color: on ? _kSeed.withValues(alpha: 0.2) : Colors.transparent,
+        borderRadius: BorderRadius.circular(999),
+        child: InkWell(
+          key: chipKey,
+          borderRadius: BorderRadius.circular(999),
+          onTap: onTap,
+          child: Container(
+            height: 38,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: on ? _kSeed : _kOn.withValues(alpha: 0.25),
+              ),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: on ? _kSeed : _kOn.withValues(alpha: 0.7),
+                fontSize: 13,
+                fontWeight: on ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _MarkChip extends StatelessWidget {
   const _MarkChip({

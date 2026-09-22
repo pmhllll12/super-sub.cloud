@@ -1,32 +1,13 @@
-/// 올릴 클립 하나 — **파일이 아니라 「읽을 수 있는 것」**이다.
+import '../../../core/network/upload_file.dart';
+
+export '../../../core/network/upload_file.dart' show UploadFile;
+
+/// 올릴 클립 하나.
 ///
-/// 🔴 **`File` 을 받지 않는다.** 그러면 리포지토리와 그 시험이 `dart:io` 와
-/// 실제 파일에 매이고, 계약 시험이 임시 파일을 만들어야 한다. 바이트를
-/// 어디서 가져오는지는 **고르는 쪽**(`pick_clip.dart`)이 알면 되는 일이다.
-class ClipFile {
-  const ClipFile({
-    required this.name,
-    required this.contentType,
-    required this.sizeBytes,
-    required this.openRead,
-  });
-
-  /// 원본 파일 이름. 저장 키를 **사람이 알아볼 수 있게** 짓는 데 쓴다 —
-  /// 서버가 슬러그화하므로 공백·문장부호·이모지가 들어와도 안전하다.
-  final String name;
-
-  /// `video/mp4` · `video/quicktime`.
-  ///
-  /// 🔴 **사전 서명에 이 값이 들어간다** — S3 에 PUT 할 때 `Content-Type` 을
-  /// 이것과 똑같이 보내야 하고, 다르면 서명이 안 맞아 거절당한다.
-  final String contentType;
-
-  final int sizeBytes;
-
-  /// 🔴 **부를 때마다 새 스트림을 준다.** 한 번 읽고 끝나는 스트림을 들고
-  /// 있으면 재시도할 때 빈 몸통을 보낸다.
-  final Stream<List<int>> Function() openRead;
-}
+/// 🔴 **카드 사진과 같은 것을 쓴다**(`core/network/upload_file.dart`) —
+/// 두 기능이 같은 두 단계(사전 서명 → S3 직접 PUT)를 밟으므로 값 객체를
+/// 두 벌로 두면 함정을 한쪽에서만 빠뜨린다. 이름만 이 기능의 말로 둔다.
+typedef ClipFile = UploadFile;
 
 /// 클라이언트가 잰 값. 서버가 다시 재려면 원본을 받아야 하고 그러면 PER-002
 /// 가 무너진다 — 잰 값을 우리가 실어 보낸다(계약 3-6절).

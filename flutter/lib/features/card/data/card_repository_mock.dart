@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import '../../../core/mock/mock_db.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/network/upload_file.dart';
 import 'card_repository.dart';
 import 'models/player_card.dart';
 
@@ -92,6 +93,34 @@ class MockCardRepository implements CardRepository {
     );
     _db.cards[_db.cards.indexOf(card)] = next;
     return next;
+  }
+
+  @override
+  Future<String> uploadCardPhoto(UploadFile file) async {
+    // 두 단계(자리 받기 · S3)를 흉내 내느라 한 박자 더 쉰다.
+    await Future<void>.delayed(_delay * 2);
+
+    /* 🔴 **카드가 먼저 있어야 한다** — 저장 키에 카드 id 가 들어가서 서버가
+       404 `CARD_NOT_FOUND` 를 낸다. Mock 이 받아 주면 「카드 만들기 전에
+       사진부터」 갈래의 오류 문구를 안 만들게 된다. */
+    final card = _mine;
+    if (card == null) {
+      throw const ApiException('카드를 먼저 만들어야 합니다',
+          code: 'CARD_NOT_FOUND', status: 404);
+    }
+
+    /* 🔴 **받는 형식 셋만**(계약 3-5절). Mock 이 HEIC 를 받아 주면 진짜
+       서버에서 처음으로 422 를 본다. */
+    final bad = checkCardPhoto(file);
+    if (bad != null) {
+      throw ApiException(bad, code: 'UNSUPPORTED_PHOTO_TYPE', status: 422);
+    }
+
+    /* 🔴 **키만 돌려준다 — 여기서 카드에 붙이지 않는다.** 붙는 것은
+       `updateCard(style: …photoKey)` 때다. Mock 이 몰래 붙여 주면 「올리기만
+       하고 저장을 안 하면 아무 일도 안 난다」를 앱에서 밟을 수가 없다. */
+    return 'cards/photos/$userId/${card.id}-'
+        '${math.Random().nextInt(0xFFFFFFF).toRadixString(16)}';
   }
 
   PlayerCard? get _mine {

@@ -37,6 +37,7 @@ class PlayerCardView extends StatelessWidget {
     this.alias = kDefaultCardAlias,
     this.style,
     this.photoUrl,
+    this.photoImage,
   });
 
   /// 화면에 그려질 폭. 높이는 비율로 정해진다.
@@ -54,6 +55,14 @@ class PlayerCardView extends StatelessWidget {
   /// 🔴 **그릴 사진 주소** — `style.photo_key` 가 아니라 응답의 `photo_url`
   /// 이다(사전 서명이고 만료가 있다).
   final String? photoUrl;
+
+  /// **아직 안 올라간 사진**을 그리는 길 — 꾸미기 화면이 고른 로컬 파일을
+  /// 여기로 넘긴다. 있으면 [photoUrl] 보다 이것이 이긴다.
+  ///
+  /// 🔴 **경로 문자열을 [photoUrl] 로 받지 않는 이유**: 그러면 이 위젯이
+  /// `dart:io` 의 `File` 을 알아야 하고, 그 순간 **웹으로는 빌드가 안 된다.**
+  /// 어디서 온 그림인지는 고르는 쪽이 알면 되는 일이다.
+  final ImageProvider? photoImage;
 
   Color get _bg => style?.bg ?? kCardBg;
   Color get _fg => style?.textColor ?? kCardFg;
@@ -149,10 +158,10 @@ class PlayerCardView extends StatelessWidget {
   /// 사진 또는 기본 인물.
   Widget _figure() {
     final s = style;
-    final photo = photoUrl;
-    final image = photo == null
-        ? const AssetImage(_kDefaultFigure) as ImageProvider
-        : NetworkImage(photo);
+    // 올라가기 전의 미리보기가 서버 주소를 이긴다 — 방금 고른 것이 보여야 한다.
+    final photo = photoImage ??
+        (photoUrl == null ? null : NetworkImage(photoUrl!) as ImageProvider);
+    final image = photo ?? const AssetImage(_kDefaultFigure) as ImageProvider;
     final full = s?.mode == CardMode.full;
 
     /* **사진 없음 + cutout** — 칸이 좌우로 25%씩 넘어가고(폭 150%), 위는 38%,

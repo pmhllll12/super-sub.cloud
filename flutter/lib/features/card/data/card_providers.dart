@@ -10,6 +10,7 @@ import 'card_repository_mock.dart';
 import '../../profile/presentation/widgets/player_card_view.dart'
     show kDefaultCardAlias;
 import 'models/player_card.dart';
+import 'pick_photo.dart';
 
 /// 🔴 **백엔드 교체 지점 — 여기 한 줄이다.** 화면·위젯·컨트롤러는 수정하지
 /// 않는다. 한 곳이라도 화면에서 구현체를 직접 만들면 그 화면만 provider 를
@@ -25,6 +26,13 @@ final cardRepositoryProvider = Provider<CardRepository>((ref) {
   }
   return ApiCardRepository(ref.watch(apiClientProvider));
 });
+
+/// 사진 고르개.
+///
+/// 🔴 **화면이 `PhotoPicker()` 를 직접 만들지 않는다.** 만들면 앨범을 실제로
+/// 여는 것 말고는 그 흐름을 **시험할 길이 아예 없다** — 고른 뒤에 일어나는
+/// 일(키 비우기 · 올리기 실패 · 저장 막기)이 전부 그 뒤에 있어서다.
+final photoPickerProvider = Provider<PhotoPicker>((ref) => PhotoPicker());
 
 /// 내 카드. 🔴 **`null` 은 정상이다** — 아직 안 만든 것이고, 화면은 그때 빈
 /// 카드를 그린다.

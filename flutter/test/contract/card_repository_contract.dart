@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:super_sub/core/network/upload_file.dart';
 import 'package:super_sub/features/card/data/card_repository.dart';
+import 'package:super_sub/features/card/data/models/player_card.dart';
 
 /// CardRepository 의 모든 구현체가 지켜야 하는 계약.
 ///
@@ -60,6 +62,56 @@ void runCardRepositoryContract(
 
     test('없는 슬러그는 null 이다', () async {
       expect(await repo.cardBySlug('no-such-slug-0000'), isNull);
+    });
+
+    UploadFile photo({String contentType = 'image/jpeg'}) => UploadFile(
+          name: '얼굴.jpg',
+          contentType: contentType,
+          sizeBytes: 4,
+          openRead: () => Stream.value(const [1, 2, 3, 4]),
+        );
+
+    /// 🔴 **키만 돌려준다.** 카드에 붙는 것은 `updateCard(style: …photoKey)`
+    /// 때다 — 올리기가 몰래 붙여 주면 편집기의 「저장」이 뜻을 잃는다.
+    test('사진을 올리면 저장 키가 온다', () async {
+      await repo.createMyCard();
+
+      final key = await repo.uploadCardPhoto(photo());
+
+      expect(key, isNotEmpty);
+    });
+
+    /// 🔴 **올리기만 하면 카드는 그대로다** — 그 파일은 아무도 안 가리키는
+    /// 채로 남는다(계약 3-5절의 「하지 말 것」).
+    test('올리기만 해서는 카드에 안 붙는다', () async {
+      await repo.createMyCard();
+
+      await repo.uploadCardPhoto(photo());
+
+      expect((await repo.myCard())?.style?.photoKey, isNull);
+    });
+
+    /// 🔴 키를 저장해야 **그때** 붙는다.
+    test('키를 저장하면 그때 붙는다', () async {
+      final card = await repo.createMyCard();
+      final key = await repo.uploadCardPhoto(photo());
+
+      final saved = await repo.updateCard(
+        style: (card.style ?? defaultCardStyle).copyWith(photoKey: key),
+      );
+
+      expect(saved.style?.photoKey, equals(key));
+    });
+
+    /// 🔴 폰 앨범은 HEIC 도 내주는데 서버는 셋만 받는다 — 여기서 안 막으면
+    /// 고른 사진이 올라가다 422 로 죽는다.
+    test('받지 않는 형식은 거부한다', () async {
+      await repo.createMyCard();
+
+      await expectLater(
+        repo.uploadCardPhoto(photo(contentType: 'image/heic')),
+        throwsA(anything),
+      );
     });
   });
 }

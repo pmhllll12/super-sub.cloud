@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:super_sub/core/network/upload_file.dart';
 import 'package:super_sub/features/card/data/card_providers.dart';
 import 'package:super_sub/features/card/data/card_repository.dart';
 import 'package:super_sub/features/card/data/models/player_card.dart';
@@ -40,6 +41,11 @@ class _SpyCardRepository implements CardRepository {
 
   @override
   Future<PlayerCard?> myCard() => throw UnimplementedError();
+
+  // 이 대역은 팀원 카드를 받는 것만 잰다 — 사진 올리기는 안 쓴다.
+  @override
+  Future<String> uploadCardPhoto(UploadFile file) =>
+      throw UnimplementedError();
 }
 
 ({ProviderContainer container, _SpyCardRepository repo}) _setUp({
