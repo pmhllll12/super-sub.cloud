@@ -100,13 +100,14 @@ class ProfileScreen extends ConsumerWidget {
               const _VideosBlock(),
               const SizedBox(height: 12),
               _Pair(
-                left: _TeamBlock(teams: user.teams),
-                right: _InfoBlock(user: user),
-              ),
-              const SizedBox(height: 12),
-              _Pair(
-                left: const _MatchesBlock(),
-                right: _AccountBlock(user: user),
+                left: [
+                  _TeamBlock(teams: user.teams),
+                  const _MatchesBlock(),
+                ],
+                right: [
+                  _InfoBlock(user: user),
+                  _AccountBlock(user: user),
+                ],
               ),
             ],
           ),
@@ -167,38 +168,47 @@ class _Block extends StatelessWidget {
   }
 }
 
-/// 판 둘을 한 줄에.
+/// 판을 **두 세로 줄**로 쌓는다.
 ///
-/// 🔴 **키를 억지로 안 맞춘다**(2026-09-22 정정). 처음엔 `IntrinsicHeight` 로
-/// 두 판의 키를 같게 했는데, 그것이 **펼쳐지는 폼을 「팍」 열리게 만들었다**
-/// (사용자가 두 번 짚었다): `IntrinsicHeight` 는 자식의 **본디 키**를 묻고,
-/// `SizeTransition` 의 본디 키는 **다 펼쳐진 높이**다 — 그래서 줄의 높이가
-/// 첫 프레임에 목표까지 뛰고, 안쪽만 천천히 자란다.
+/// 🔴 **줄(row)이 아니라 열(column)이다**(2026-09-22 정정, 사용자 지적:
+/// 「계정판도 정보 판 바로 아래에 안 붙어있잖아」). 줄로 짜면 **한 줄의
+/// 높이가 그 줄에서 제일 긴 판을 따라가서**, 짧은 쪽 아래에 빈 자리가
+/// 생기고 다음 줄이 거기서부터 시작한다. 열로 쌓으면 각 판이 **바로 위
+/// 판 밑에** 붙고, 위 판이 늘거나 줄면 아래 것이 그만큼 따라 움직인다.
 ///
-/// 키를 맞추는 것과 부드럽게 펼치는 것 중 **펼치는 쪽을 골랐다**(사용자가
-/// 고쳐 달라고 한 것이 그쪽이다). 곁가지로 「내 경기」처럼 짧은 판이 제
-/// 내용만큼만 높아진다.
+/// 🔴 그래서 `IntrinsicHeight` 도 필요 없다 — 그것이 펼침을 「팍」 열리게
+/// 만들던 것이다(같은 날 앞선 정정).
 class _Pair extends StatelessWidget {
   const _Pair({required this.left, required this.right});
 
-  final Widget left;
-  final Widget right;
+  final List<Widget> left;
+  final List<Widget> right;
 
   @override
   Widget build(BuildContext context) {
+    Widget column(List<Widget> items) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < items.length; i += 1) ...[
+              if (i > 0) const SizedBox(height: 12),
+              items[i],
+            ],
+          ],
+        );
+
     return Row(
-      // 판마다 제 키를 갖는다 — 위를 맞춰 세운다.
+      // 두 열은 서로 키를 안 맞춘다 — 각자 제 내용만큼 길다.
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(child: left),
+        Expanded(child: column(left)),
         const SizedBox(width: 12),
-        Expanded(child: right),
+        Expanded(child: column(right)),
       ],
     );
   }
 }
 
-/// 카드가 이 화면의 **첫 얼굴**이다 — 가운데 위에 그냥 놓는다.
+/// 카드가 이 화면의 **첫 얼굴**이다/// 카드가 이 화면의 **첫 얼굴**이다 — 가운데 위에 그냥 놓는다.
 ///
 /// 🔴 **판(상자)도 「내 선수 카드」 제목도 없다**(2026-09-22, 사용자 요청).
 /// 카드 자체가 무엇인지 말하고 있어서 제목은 같은 말을 두 번 하는 자리였고,
@@ -718,49 +728,38 @@ class _TeamActionsState extends ConsumerState<_TeamActions> {
       );
     }
 
-    /* 🔴 **좁아서 `Wrap` 이다** — `Row` 로 두면 「수정 · 팀 해체」가 반쪽
-       폭에서 넘친다. 넘치면 아래 줄로 내려간다. */
-    return Wrap(
-      alignment: WrapAlignment.end,
-      spacing: 4,
-      children: [
-        if (t.isOwner)
-          TextButton(
-            key: Key('team-edit-${t.teamId}'),
-            onPressed: widget.onEdit,
-            style: TextButton.styleFrom(
-              foregroundColor: _kOn,
-              visualDensity: VisualDensity.compact,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+    /* 🔴 **왼쪽부터 붙인 컴팩트 알약**(2026-09-22, 사용자 요청: 「지금 위치
+       너무 애매하고」). 오른쪽 끝에 글자만 띄워 두니 **무엇에 딸린 단추인지**
+       가 안 읽혔다 — 팀 이름 바로 아래 왼쪽에 붙어야 그 팀의 것으로 보인다. */
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          if (t.isOwner)
+            _Pill(
+              pillKey: Key('team-edit-${t.teamId}'),
+              label: widget.editing ? '닫기' : '수정',
+              onTap: widget.onEdit,
             ),
-            child: Text(
-              widget.editing ? '닫기' : '수정',
-              style: const TextStyle(fontSize: 12),
-            ),
+          _Pill(
+            pillKey: Key('team-leave-${t.teamId}'),
+            /* 🔴 **주장에게는 「나가기」를 안 낸다** — 서버가 409 로 막는다.
+               내주면 눌러 보고 거절만 받는다. 주장의 길은 해체다. */
+            label: t.isOwner ? '팀 해체' : '팀 나가기',
+            danger: true,
+            onTap: () => setState(() => _armed = true),
           ),
-        TextButton(
-          key: Key('team-leave-${t.teamId}'),
-          onPressed: () => setState(() => _armed = true),
-          style: TextButton.styleFrom(
-            foregroundColor: danger,
-            visualDensity: VisualDensity.compact,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-          ),
-          /* 🔴 **주장에게는 「나가기」를 안 낸다** — 서버가 409 로 막는다.
-             내주면 눌러 보고 거절만 받는다. 주장의 길은 해체다. */
-          child: Text(
-            t.isOwner ? '팀 해체' : '팀 나가기',
-            style: const TextStyle(fontSize: 12),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
 /// 정보 — 호칭 · 이메일 · 함께한 날.
 ///
-/// 🔴 **라벨을 값 **위에** 쌓는다**(2026-09-22). 판이 반쪽 폭이 되면서 옆에
+/// 🔴 **라벨을 값 위에 쌓는다**(2026-09-22). 판이 반쪽 폭이 되면서 옆에
 /// 붙이던 76px 이름표 때문에 이메일이 **한 글자씩 끊겨** 여러 줄로 흘렀다.
 class _InfoBlock extends ConsumerWidget {
   const _InfoBlock({required this.user});
@@ -779,9 +778,6 @@ class _InfoBlock extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          /* 🔴 **사람이 직접 적는다**(2026-09-16 결정, 미결 `paik` 36번).
-             원래는 분석이 붙이는 값이라 화면이 읽기만 했다 — 팀이 다시
-             정하면서 여기서 고친다. 분류(강점·활동)는 **안 받는다.** */
           /* 🔴 **호칭은 라벨 오른쪽에 선다**(2026-09-22, 사용자 요청).
              아래에 두면 알약 한두 개 때문에 줄이 하나 더 생겨, 옆의 이메일·
              함께한 날과 리듬이 안 맞았다. */
@@ -821,14 +817,47 @@ class _InfoBlock extends ConsumerWidget {
       );
 }
 
-/// 호칭 알약들 + 고치는 입구.
-///
-/// 🔴 **비어 있을 때는 아무 말도 안 한다**(웹과 같은 판단). 바로 옆에
-/// 「호칭 정하기」가 서 있어서 「아직 정한 호칭이 없습니다」를 두면 **빈 것을
-/// 두 번 말하는** 자리가 된다.
-///
-/// 🔴 **미달 표식이 아니다**(계약 4장) — 빈 것은 정상이라 「없음」·자물쇠 같은
-/// 표를 대신 넣지 않는다.
+/// 작은 알약 단추 — 좁은 판에서 글자 단추 대신 쓴다.
+class _Pill extends StatelessWidget {
+  const _Pill({
+    required this.pillKey,
+    required this.label,
+    required this.onTap,
+    this.danger = false,
+  });
+
+  final Key pillKey;
+  final String label;
+  final VoidCallback onTap;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    final ink = danger ? _kDanger : _kOn.withValues(alpha: 0.85);
+    return Material(
+      color: Colors.transparent,
+      shape: StadiumBorder(
+        side: BorderSide(color: ink.withValues(alpha: danger ? 0.7 : 0.3)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        key: pillKey,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          child: Text(
+            label,
+            // 🔴 좁은 칸에서 글자가 **세로로 쌓이지 않게** 한다.
+            softWrap: false,
+            overflow: TextOverflow.visible,
+            style: TextStyle(color: ink, fontSize: 12),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _TitlesRow extends ConsumerStatefulWidget {
   const _TitlesRow({required this.card});
 

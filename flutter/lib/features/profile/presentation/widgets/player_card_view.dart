@@ -68,52 +68,67 @@ class PlayerCardView extends StatelessWidget {
   Color get _fg => style?.textColor ?? kCardFg;
 
   @override
-  Widget build(BuildContext context) => _ScaledCard(width: width, child: _card());
+  Widget build(BuildContext context) =>
+      _ScaledCard(width: width, child: _card());
 
   Widget _card() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      /* 🔴 **`antiAliasWithSaveLayer` 를 쓰지 않는다**(2026-09-22에 썼다가
+    /* 🔴 **잘라 낸 것 밑에 같은 색 바탕을 깐다.** 둥근 모서리를 자르면
+       가장자리 한 줄이 **뒤에 있는 것과 섞여서** 칠해지는데, 프로필 배경은
+       빛무리가 늘 움직이고 목록은 굴러서 그 뒤가 매 프레임 달라진다 —
+       그래서 가만히 있어도 테가 어른거렸다(사용자가 세 번 짚은 그것).
+       밑에 카드 제 색을 깔아 두면 섞이는 상대가 **자기 색**이라 안 보인다. */
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: _bg,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        /* 🔴 **`antiAliasWithSaveLayer` 를 쓰지 않는다**(2026-09-22에 썼다가
          되돌렸다). 스크롤 중 가장자리가 떨리는 것을 잡으려고 넣었는데,
          **딴 층에 그린 가장자리를 다시 합성하면서 밝은 테가 남았다** —
          사용자가 「가만히 있을 때도 흰 외곽선이 보인다」로 잡아 줬다.
          떨림은 아래 `RepaintBoundary` 로 잡는다(카드를 한 번 그려 두고
          통째로 옮기므로 매 프레임 다시 섞이지 않는다). */
-      child: ColoredBox(
-        color: _bg,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            _mark(),
-            _figure(),
-            // 글자는 인물보다 위다 — 별명이 어깨와 겹치면 글자가 이긴다.
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 18),
-              child: Column(
-                children: [
-                  BrandMark(fontSize: 22, color: style?.logo ?? kCardFg),
-                  const SizedBox(height: 12),
-                  Text(
-                    'PLAYER CARD',
-                    style: TextStyle(
-                      fontFamily: 'YoungSerif',
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 11 * 0.14,
-                      color: _fg.withValues(alpha: 0.7),
+        child: ColoredBox(
+          color: _bg,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              _mark(),
+              _figure(),
+              // 글자는 인물보다 위다 — 별명이 어깨와 겹치면 글자가 이긴다.
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 20,
+                  horizontal: 18,
+                ),
+                child: Column(
+                  children: [
+                    BrandMark(fontSize: 22, color: style?.logo ?? kCardFg),
+                    const SizedBox(height: 12),
+                    Text(
+                      'PLAYER CARD',
+                      style: TextStyle(
+                        fontFamily: 'YoungSerif',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 11 * 0.14,
+                        color: _fg.withValues(alpha: 0.7),
+                      ),
                     ),
-                  ),
-                  // 🔴 꾸미지 않은 카드만 흐름 배치다 — 꾸민 카드의 별명은
-                  //    아래 _alias() 가 절대 좌표로 놓는다.
-                  if (style == null) ...[
-                    const SizedBox(height: 52),
-                    if (alias.isNotEmpty) _Alias(alias, color: _fg),
+                    // 🔴 꾸미지 않은 카드만 흐름 배치다 — 꾸민 카드의 별명은
+                    //    아래 _alias() 가 절대 좌표로 놓는다.
+                    if (style == null) ...[
+                      const SizedBox(height: 52),
+                      if (alias.isNotEmpty) _Alias(alias, color: _fg),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-            if (style != null && alias.isNotEmpty) _alias(),
-          ],
+              if (style != null && alias.isNotEmpty) _alias(),
+            ],
+          ),
         ),
       ),
     );
@@ -135,20 +150,20 @@ class PlayerCardView extends StatelessWidget {
 
     final Widget? drawn = switch (s.brush) {
       0 => CustomPaint(
-          painter: PlayerCardBrushPainter(seed: seed, color: s.brushColor),
-        ),
+        painter: PlayerCardBrushPainter(seed: seed, color: s.brushColor),
+      ),
       _ => switch (markAssetFor(s.brush)) {
-          final String asset => Image.asset(
-              asset,
-              // 🔴 **PNG 는 그림이 아니라 알파 마스크다**(8-bit gray+alpha).
-              //    반드시 brush_color 로 칠한다.
-              color: s.brushColor,
-              colorBlendMode: BlendMode.srcIn,
-              // 🔴 안 자르고 안 늘인다 — 가운데 맞춤.
-              fit: BoxFit.contain,
-            ),
-          _ => null,
-        },
+        final String asset => Image.asset(
+          asset,
+          // 🔴 **PNG 는 그림이 아니라 알파 마스크다**(8-bit gray+alpha).
+          //    반드시 brush_color 로 칠한다.
+          color: s.brushColor,
+          colorBlendMode: BlendMode.srcIn,
+          // 🔴 안 자르고 안 늘인다 — 가운데 맞춤.
+          fit: BoxFit.contain,
+        ),
+        _ => null,
+      },
     };
     if (drawn == null) return const SizedBox.shrink();
 
@@ -165,7 +180,8 @@ class PlayerCardView extends StatelessWidget {
   Widget _figure() {
     final s = style;
     // 올라가기 전의 미리보기가 서버 주소를 이긴다 — 방금 고른 것이 보여야 한다.
-    final photo = photoImage ??
+    final photo =
+        photoImage ??
         (photoUrl == null ? null : NetworkImage(photoUrl!) as ImageProvider);
     final image = photo ?? const AssetImage(_kDefaultFigure) as ImageProvider;
     final full = s?.mode == CardMode.full;
@@ -183,14 +199,14 @@ class PlayerCardView extends StatelessWidget {
     final left = full
         ? 0.0
         : bare
-            ? -_kBaseW * 0.25
-            : _kBaseW * 0.16;
+        ? -_kBaseW * 0.25
+        : _kBaseW * 0.16;
     final right = left;
     final top = full
         ? 0.0
         : bare
-            ? _kBaseH * 0.38
-            : _kBaseH / 2;
+        ? _kBaseH * 0.38
+        : _kBaseH / 2;
 
     return Positioned(
       left: left,
@@ -213,8 +229,7 @@ class PlayerCardView extends StatelessWidget {
               child: Image(
                 image: image,
                 fit: bare ? BoxFit.contain : BoxFit.cover,
-                alignment:
-                    bare ? Alignment.bottomCenter : Alignment.topCenter,
+                alignment: bare ? Alignment.bottomCenter : Alignment.topCenter,
                 // 사진이 안 오면 카드가 깨지지 않게 조용히 비운다.
                 errorBuilder: (_, _, _) => const SizedBox.shrink(),
               ),
@@ -270,13 +285,13 @@ class _Alias extends StatelessWidget {
   static const double _size = (_kBaseW - 36) * 0.15;
 
   TextStyle _style({Paint? foreground, Color? color}) => TextStyle(
-        fontFamily: 'YoungSerif',
-        fontSize: _size,
-        height: 1.02,
-        letterSpacing: _size * -0.01,
-        foreground: foreground,
-        color: color,
-      );
+    fontFamily: 'YoungSerif',
+    fontSize: _size,
+    height: 1.02,
+    letterSpacing: _size * -0.01,
+    foreground: foreground,
+    color: color,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -293,7 +308,11 @@ class _Alias extends StatelessWidget {
               ..color = color,
           ),
         ),
-        Text(text, textAlign: TextAlign.center, style: _style(color: color)),
+        Text(
+          text,
+          textAlign: TextAlign.center,
+          style: _style(color: color),
+        ),
       ],
     );
   }
@@ -309,18 +328,18 @@ class _ScaledCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    /* 🔴 **한 겹으로 떼어 둔다.** 목록 안에서 구를 때 카드까지 매 프레임
-       다시 그리면 위 가장자리 섞임이 계속 달라진다 — 떼어 두면 한 번 그린
-       것을 통째로 옮기므로 흔들리지 않는다. */
-    return RepaintBoundary(
-      child: SizedBox(
-        width: width,
-        height: width * _kBaseH / _kBaseW,
-        // 기기 글자 크기가 카드 안까지 번지면 짜임이 깨진다 — 카드는 그림이다.
-        child: MediaQuery.withNoTextScaling(
-          child: FittedBox(
-            child: SizedBox(width: _kBaseW, height: _kBaseH, child: child),
-          ),
+    /* 🔴 **`RepaintBoundary` 를 쓰지 않는다**(2026-09-22에 넣었다 뺐다).
+       스크롤 떨림을 잡으려고 넣었는데 **그 층의 오른쪽·아래 가장자리가
+       도로 보였다** — 사용자가 「특히 오른쪽이랑 아래쪽」으로 짚어 줬다.
+       경계의 크기가 정수 픽셀이 아니면 옮겨 붙일 때 가장자리가 한 줄
+       비치는데, 카드는 비율로 크기가 정해져 늘 정수일 수가 없다. */
+    return SizedBox(
+      width: width,
+      height: width * _kBaseH / _kBaseW,
+      // 기기 글자 크기가 카드 안까지 번지면 짜임이 깨진다 — 카드는 그림이다.
+      child: MediaQuery.withNoTextScaling(
+        child: FittedBox(
+          child: SizedBox(width: _kBaseW, height: _kBaseH, child: child),
         ),
       ),
     );

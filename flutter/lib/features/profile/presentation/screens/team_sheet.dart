@@ -106,9 +106,13 @@ class _TeamFormState extends ConsumerState<TeamForm> {
             ),
           ],
           const SizedBox(height: 12),
-          Row(
+          /* 🔴 **세로로 쌓는다**(2026-09-22). 반쪽 폭에서 둘을 한 줄에 두면
+             단추가 너무 좁아 **글자가 한 자씩 세로로 쌓인다**(사용자가 호칭
+             폼에서 잡아 준 그것). */
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
+              SizedBox(
                 child: FilledButton(
                   key: const Key('team-save'),
                   /* 🔴 **지역이 목록의 값일 때만 눌린다.** 자유롭게 적은
@@ -128,7 +132,6 @@ class _TeamFormState extends ConsumerState<TeamForm> {
                       : Text(_editing ? '저장' : '만들기'),
                 ),
               ),
-              const SizedBox(width: 8),
               TextButton(
                 key: const Key('team-cancel'),
                 onPressed: _busy ? null : widget.onDone,
@@ -146,6 +149,11 @@ class _TeamFormState extends ConsumerState<TeamForm> {
 ///
 /// 🔴 웹 `RegionField` 와 같은 판단이다. 「강남」·「강남구」·「서울 강남구」가
 /// 다 다른 값으로 저장되면 대조가 통째로 깨진다.
+///
+/// 🔴 **처음에는 후보를 안 쏟는다**(2026-09-22, 사용자 지적: 「애초부터 지역
+/// 주르륵 박혀있는데 이거 너무 길어서 어차피 보기도 힘들잖아」). 60개를 미리
+/// 깔면 폼이 화면을 넘겨 **정작 쳐야 할 칸이 안 보인다.** 한 글자만 쳐도
+/// 후보가 서너 개로 좁혀지므로, 적기 시작한 뒤에 보여 준다.
 class _RegionField extends StatelessWidget {
   const _RegionField({
     required this.controller,
@@ -157,10 +165,18 @@ class _RegionField extends StatelessWidget {
   final bool enabled;
   final VoidCallback onChanged;
 
+  /// 좁은 판이라 넷이면 두 줄이다. 더 내면 폼이 길어진다.
+  static const _maxHits = 4;
+
   @override
   Widget build(BuildContext context) {
+    final typed = controller.text.trim();
     final picked = isRegion(controller.text);
-    final hits = searchRegions(controller.text, limit: 8);
+    // 적기 전에는 안 보여 준다 — 고른 뒤에도 접는다.
+    final hits = (typed.isEmpty || picked)
+        ? const <String>[]
+        : searchRegions(typed, limit: _maxHits);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -170,29 +186,46 @@ class _RegionField extends StatelessWidget {
           enabled: enabled,
           decoration: InputDecoration(
             labelText: '지역',
-            hintText: '예: 서울 마포구',
-            // 🔴 왜 아무거나 못 쓰는지 말해 준다 — 안 말하면 「왜 저장이 안
-            //    되지」로 읽힌다.
-            helperText: picked ? null : '아래에서 골라 주세요',
+            hintText: '예: 마포',
+            /* 🔴 왜 아무거나 못 쓰는지 말해 준다 — 안 말하면 「왜 저장이 안
+               되지」로 읽힌다. */
+            helperText: picked
+                ? null
+                : typed.isEmpty
+                    ? '동네를 적으면 후보가 나옵니다'
+                    : hits.isEmpty
+                        ? '그런 동네가 목록에 없습니다'
+                        : '아래에서 골라 주세요',
+            helperMaxLines: 2,
             suffixIcon: picked ? const Icon(Icons.check, size: 18) : null,
           ),
           onChanged: (_) => onChanged(),
         ),
-        // 고른 뒤에는 후보를 접는다 — 다 고르고도 목록이 남아 있으면 판이 길다.
-        if (enabled && !picked)
-          Wrap(
-            spacing: 6,
-            children: [
-              for (final r in hits)
-                ActionChip(
-                  key: Key('team-region-$r'),
-                  label: Text(r, style: const TextStyle(fontSize: 12)),
-                  onPressed: () {
-                    controller.text = r;
-                    onChanged();
-                  },
-                ),
-            ],
+        if (enabled && hits.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final r in hits)
+                  ActionChip(
+                    key: Key('team-region-$r'),
+                    label: Text(
+                      r,
+                      softWrap: false,
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    onPressed: () {
+                      controller.text = r;
+                      onChanged();
+                    },
+                  ),
+              ],
+            ),
           ),
       ],
     );

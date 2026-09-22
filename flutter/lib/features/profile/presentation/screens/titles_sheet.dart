@@ -136,9 +136,13 @@ class _TitlesFormState extends ConsumerState<TitlesForm> {
             ),
           ],
           const SizedBox(height: 12),
-          Row(
+          /* 🔴 **세로로 쌓는다**(2026-09-22, 사용자 지적: 「저장 버튼에 '저장'
+             한글이 가로가 아니라 세로야」). 반쪽 폭 판에서 둘을 한 줄에 두면
+             단추가 너무 좁아 글자가 한 자씩 세로로 쌓인다. */
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
+              SizedBox(
                 child: FilledButton(
                   key: const Key('profile-titles-save'),
                   onPressed: _busy ? null : _save,
@@ -151,7 +155,6 @@ class _TitlesFormState extends ConsumerState<TitlesForm> {
                       : const Text('저장'),
                 ),
               ),
-              const SizedBox(width: 8),
               TextButton(
                 key: const Key('profile-titles-cancel'),
                 onPressed: _busy ? null : widget.onDone,
