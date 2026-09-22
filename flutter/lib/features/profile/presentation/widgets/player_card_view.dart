@@ -168,7 +168,17 @@ class PlayerCardView extends StatelessWidget {
        그림은 자르지 않고(`contain`) 카드 바닥에 앉는다. 넘친 팔 끝은 카드가
        자른다. 사진이 있으면 좌우 16% 안쪽 · 위 50% · `cover` 다. */
     final bare = photo == null && !full;
-    final left = bare ? -_kBaseW * 0.25 : _kBaseW * 0.16;
+    /* 🔴 **`full` 은 카드 **전체**다 — 좌우도 0 이다** (2026-09-22, 미결
+       `paik` 48번 해소). 여기가 16% 로 남아 있어서 「사진 그대로」가 실제로는
+       **폭 68% 짜리 띠**였고, 키우거나 옮겨도 그 띠 안에서만 움직였다
+       (사용자가 실기기에서 잡아 줬다). 웹 `globals.css` 가 `top`·`bottom`
+       만 0 으로 풀고 `inset-inline: 16%` 를 안 푼 것을 그대로 옮긴 것이다 —
+       **웹도 같이 고쳤다**(주석은 원래부터 「카드 전체」라고 적혀 있었다). */
+    final left = full
+        ? 0.0
+        : bare
+            ? -_kBaseW * 0.25
+            : _kBaseW * 0.16;
     final right = left;
     final top = full
         ? 0.0

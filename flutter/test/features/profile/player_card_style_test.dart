@@ -25,6 +25,17 @@ Color _bgOf(WidgetTester tester) => tester
     .first
     .color;
 
+/// 사진 칸(`_figure`)의 `Positioned` — 카드 바닥에 붙는 그 칸이다.
+Positioned _figureBox(WidgetTester tester) => tester
+    .widgetList<Positioned>(find.descendant(
+      of: find.byType(PlayerCardView),
+      matching: find.byType(Positioned),
+    ))
+    .firstWhere((p) => p.bottom == 0 && p.left != null);
+
+/// 카드 기준 폭 — `player_card_view.dart` 의 `_kBaseW` 와 같아야 한다.
+const double _kBaseW = 380;
+
 void main() {
   group('색', () {
     test('꾸미지 않은 카드는 기본 바탕이다', () {
@@ -140,6 +151,57 @@ void main() {
       await _pump(tester, _card());
 
       expect(find.byType(ColorFiltered), findsWidgets);
+    });
+  });
+
+  /// 🔴 **여기가 미결 `paik` 48번이다** (2026-09-22 해소).
+  ///
+  /// 웹 `globals.css` 가 `data-photo='full'` 에서 `top`·`bottom` 만 0 으로
+  /// 풀고 **좌우 `inset-inline: 16%` 를 안 풀어** 「카드 전체」라던 주석과
+  /// 달리 실제로는 **폭 68% 짜리 띠**였다. 앱이 그걸 픽셀 동일로 옮겨 와서,
+  /// 사진을 키우거나 옮겨도 그 띠 안에서만 움직였다(실기기에서 잡혔다).
+  group('사진 칸의 크기', () {
+    testWidgets('🔴 full 은 카드 전체를 덮는다 — 좌우도 0 이다', (tester) async {
+      await _pump(
+        tester,
+        PlayerCardView(
+          width: 380,
+          seed: 's',
+          style: _style({'mode': 'full'}),
+          photoImage: const AssetImage('assets/marks/01.png'),
+        ),
+      );
+
+      final box = _figureBox(tester);
+      expect(box.left, 0, reason: '좌우가 0 이어야 카드 전체다');
+      expect(box.right, 0);
+      expect(box.top, 0);
+      expect(box.bottom, 0);
+    });
+
+    /// 🔴 **cutout 은 일부러 좁다** — 글자가 위에 앉을 자리를 남긴다.
+    /// 같이 0 으로 밀면 사진이 별명·머리글을 덮는다.
+    testWidgets('cutout 은 좌우 16% 안쪽 · 위 절반이다', (tester) async {
+      await _pump(
+        tester,
+        PlayerCardView(
+          width: 380,
+          seed: 's',
+          style: _style({'mode': 'cutout'}),
+          photoImage: const AssetImage('assets/marks/01.png'),
+        ),
+      );
+
+      final box = _figureBox(tester);
+      expect(box.left, closeTo(_kBaseW * 0.16, 0.01));
+      expect(box.top, greaterThan(0));
+    });
+
+    /// 사진을 안 올린 카드의 기본 인물은 **카드보다 넓다**(양팔).
+    testWidgets('사진이 없으면 칸이 카드보다 넓다', (tester) async {
+      await _pump(tester, _card());
+
+      expect(_figureBox(tester).left, lessThan(0));
     });
   });
 }

@@ -1522,6 +1522,12 @@ body::-webkit-scrollbar {
 .ss-pcard[data-photo='full'] .ss-pcard-figure {
   top: 0;
   bottom: 0;
+  /* 🔴 **좌우도 푼다** (2026-09-22, 미결 `paik` 48번). 이 줄이 없어서 위
+     주석은 「카드 전체」인데 실제로는 아래 `.ss-pcard-figure` 의
+     `inset-inline: 16%` 가 그대로 남아 **폭 68% 짜리 띠**였다 — 키우거나
+     옮겨도 그 띠 안에서만 움직였다(앱 실기기에서 사용자가 잡아 줬다).
+     앱(`player_card_view.dart`)도 같이 고쳤다 — 둘은 픽셀 동일이어야 한다. */
+  inset-inline: 0;
 }
 
 .ss-pcard[data-photo='full'] .ss-pcard-figure > img {
