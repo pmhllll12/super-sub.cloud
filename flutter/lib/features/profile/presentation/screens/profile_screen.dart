@@ -115,9 +115,10 @@ class ProfileScreen extends ConsumerWidget {
   }
 }
 
-/// 빛무리 아래에 깔리는 바탕. 🔴 **어둡게 둔다** — 카드 색이 아무리 밝아도
-/// 배경이 밝아지면 흰 글자가 안 읽힌다.
-const Color _kBg = Color(0xFF0A0F0C);
+/// 빛무리 아래에 깔리는 바탕 — `kAuroraBase`(중성 회색)를 그대로 쓴다.
+/// 🔴 **화면마다 따로 정하지 않는다** — 갈리면 홈과 프로필이 다른 앱처럼
+/// 보인다.
+const Color _kBg = kAuroraBase;
 const Color _kOn = Color(0xFFFFFFFF);
 /// 되돌릴 수 없는 일의 빨강 — 탈퇴·해체가 나눠 쓴다.
 const Color _kDanger = Color(0xFFD32F2F);
@@ -143,7 +144,10 @@ class _Block extends StatelessWidget {
        반투명이라 뒤의 빛무리는 그대로 비친다. */
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.055),
+        /* 🔴 레퍼런스의 판(`#444444`)이 바탕(`#2F2F2F`)보다 **한 단 밝다**.
+           흰 기를 8% 얹으면 그 자리에 온다 — 회색 바탕에서는 5.5% 로는
+           판이 배경에 묻힌다. */
+        color: Colors.white.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: SilverEdge.barLine,

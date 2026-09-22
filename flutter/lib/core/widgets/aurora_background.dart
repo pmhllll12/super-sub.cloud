@@ -18,11 +18,16 @@ import '../theme/app_theme.dart';
 ///
 /// 🔴 **선수 카드는 이 위에서도 제 색을 지킨다**(연두 바탕). 카드는 밖으로
 /// 공유되는 물건이라 어디에 놓여도 같은 얼굴이어야 한다.
+///
+/// 🔴 **바탕은 중성 회색이다**(2026-09-22, 사용자가 레퍼런스로 지정).
+/// 전에는 `#0A0F0C`(거의 검정에 초록기)였는데, 빛무리를 뺀 나머지가 **검게
+/// 꺼져** 판과 배경이 한 덩어리로 읽혔다. 회색으로 올리면 판의 경계가
+/// 살아나고 빛무리는 그 위에 그대로 번진다 — **빛무리 색·자리는 안 건드렸다.**
 class AuroraBackground extends StatelessWidget {
   const AuroraBackground({
     super.key,
     required this.child,
-    this.base = const Color(0xFF0A0F0C),
+    this.base = kAuroraBase,
     this.tint,
     this.phase = 0,
   });
@@ -79,7 +84,7 @@ class AnimatedAuroraBackground extends StatefulWidget {
     super.key,
     required this.child,
     required this.tint,
-    this.base = const Color(0xFF0A0F0C),
+    this.base = kAuroraBase,
     this.duration = const Duration(milliseconds: 1200),
     this.driftPeriod = const Duration(seconds: 48),
   });
@@ -148,6 +153,9 @@ class _AnimatedAuroraBackgroundState extends State<AnimatedAuroraBackground>
     );
   }
 }
+
+/// 화면 바탕 — 빛무리 아래 깔리는 중성 회색(레퍼런스 실측값).
+const Color kAuroraBase = Color(0xFF2F2F2F);
 
 /// 아무 색도 안 정한 화면의 색 둘 — 프로필이 **카드가 없을 때** 쓰는 값이다.
 /// 아래 `_glows` 의 1·3번과 같은 색이라, 기본 배경과 이어 보인다.
