@@ -55,7 +55,10 @@ void main() {
         (a: const Color(0xFF0000FF), b: const Color(0xFF00FF00)),
       );
 
-      expect(second.shouldRepaint(first), isTrue);
+      /* 🔴 **빛무리를 끈 동안에는 다시 칠할 것이 없다**(`kAuroraGlow`).
+         켜면 색이 갈릴 때 다시 칠해야 한다 — 안 그러면 배경이 영영 첫 색에
+         멈춘다. 스위치를 되돌리면 이 시험이 그것을 붙든다. */
+      expect(second.shouldRepaint(first), kAuroraGlow);
       expect(second.shouldRepaint(second), isFalse);
     });
 

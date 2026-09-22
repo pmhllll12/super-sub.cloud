@@ -113,7 +113,15 @@ class _AnimatedAuroraBackgroundState extends State<AnimatedAuroraBackground>
   late final AnimationController _drift = AnimationController(
     vsync: this,
     duration: widget.driftPeriod,
-  )..repeat();
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    /* 🔴 **빛무리를 끈 동안에는 안 돈다.** 그리지도 않는 것을 위해 매 프레임
+       깨우면 배터리만 먹는다 — 켜면 그때부터 돈다. */
+    if (kAuroraGlow) _drift.repeat();
+  }
 
   @override
   void dispose() {
@@ -154,12 +162,26 @@ class _AnimatedAuroraBackgroundState extends State<AnimatedAuroraBackground>
   }
 }
 
-/// 화면 바탕 — 빛무리 아래 깔리는 중성 회색.
+/// 화면 바탕.
 ///
-/// 레퍼런스 실측은 `#2F2F2F` 였는데 **실기기에서 그보다 밝게 보여** 한 단
-/// 낮췄다(2026-09-22, 사용자 확인). 화면이 밝고 대비가 커서 같은 값이라도
-/// 도안 위에서보다 떠 보인다.
-const Color kAuroraBase = Color(0xFF262626);
+/// 레퍼런스 실측은 `#2F2F2F` 였는데 **실기기에서 그보다 밝게 보였다**
+/// (2026-09-22, 사용자 확인) — 화면이 밝고 대비가 커서 같은 값이라도 도안
+/// 위에서보다 떠 보인다. 두 단 낮춰 **살짝 차가운 어두운 회색**으로 왔다.
+///
+/// 🔴 **완전한 검정이 아니다.** 검정은 판·테두리와 붙어 한 덩어리로 읽히고,
+/// 유기 발광 화면에서 **검정과 그 바로 위 단이 계단처럼** 드러난다.
+const Color kAuroraBase = Color(0xFF1C1C1E);
+
+/// **빛무리를 그릴 것인가.**
+///
+/// 🔴 **지금은 끈 상태다**(2026-09-22, 사용자 요청: 「그냥 그 은은하게
+/// 퍼지는거 없애봐」). 번지는 빛이 동심원 띠로 보이는 것을 몇 번 손봤는데,
+/// 바탕이 회색이 되면서 **얻는 것보다 거슬리는 것이 커졌다.**
+///
+/// ⚠️ **끄면 「배경이 내 카드 색을 따라간다」도 같이 멈춘다** — 그 기능이
+/// 빛무리의 색을 갈아 끼우는 방식이기 때문이다. 배선(`tint` · 부드러운
+/// 전환)은 **그대로 두었으므로** 이 한 줄만 `true` 로 되돌리면 살아난다.
+const bool kAuroraGlow = false;
 
 /// 아무 색도 안 정한 화면의 색 둘 — 프로필이 **카드가 없을 때** 쓰는 값이다.
 /// 아래 `_glows` 의 1·3번과 같은 색이라, 기본 배경과 이어 보인다.
@@ -263,6 +285,8 @@ class _AuroraPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // 🔴 꺼 두면 바탕색만 남는다 — [kAuroraGlow] 머리말 참고.
+    if (!kAuroraGlow) return;
     final short = size.shortestSide;
     for (final g in _painted) {
       final center = Offset(size.width * g.dx, size.height * g.dy);
@@ -298,7 +322,8 @@ class _AuroraPainter extends CustomPainter {
   /// 알파는 상수라 색만 견주면 된다.
   @override
   bool shouldRepaint(_AuroraPainter oldDelegate) =>
-      oldDelegate.tint?.a != tint?.a ||
-      oldDelegate.tint?.b != tint?.b ||
-      oldDelegate.phase != phase;
+      kAuroraGlow &&
+      (oldDelegate.tint?.a != tint?.a ||
+          oldDelegate.tint?.b != tint?.b ||
+          oldDelegate.phase != phase);
 }

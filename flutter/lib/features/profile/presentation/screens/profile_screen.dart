@@ -144,10 +144,10 @@ class _Block extends StatelessWidget {
        반투명이라 뒤의 빛무리는 그대로 비친다. */
     return DecoratedBox(
       decoration: BoxDecoration(
-        /* 🔴 레퍼런스의 판(`#444444`)이 바탕(`#2F2F2F`)보다 **한 단 밝다**.
-           흰 기를 8% 얹으면 그 자리에 온다 — 회색 바탕에서는 5.5% 로는
-           판이 배경에 묻힌다. */
-        color: Colors.white.withValues(alpha: 0.08),
+        /* 🔴 레퍼런스에서 판은 바탕보다 **21단(256 기준) 밝았다**. 바탕이
+           `#1C1C1E` 로 내려오면서 같은 차이를 내려면 흰 기가 9% 다 —
+           8% 로는 판이 배경에 묻힌다. */
+        color: Colors.white.withValues(alpha: 0.09),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: SilverEdge.barLine,
