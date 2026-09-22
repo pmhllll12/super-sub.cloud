@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' show PointMode;
 
 import 'package:flutter/material.dart';
 
@@ -170,7 +171,11 @@ class _AnimatedAuroraBackgroundState extends State<AnimatedAuroraBackground>
 ///
 /// 🔴 **완전한 검정이 아니다.** 검정은 판·테두리와 붙어 한 덩어리로 읽히고,
 /// 유기 발광 화면에서 **검정과 그 바로 위 단이 계단처럼** 드러난다.
-const Color kAuroraBase = Color(0xFF1C1C1E);
+///
+/// 🔴 **차갑게 기울였다**(2026-09-22, 사용자가 「메탈 검정」을 물었다).
+/// 금속은 주변을 되비치므로 **완전 중성인 금속은 없다** — 파랑 쪽으로 한 끗
+/// 기운 근검정이 「금속」으로 읽힌다. 아래 [_grain] 과 한 벌이다.
+const Color kAuroraBase = Color(0xFF141417);
 
 /// **빛무리를 그릴 것인가.**
 ///
@@ -187,6 +192,9 @@ const bool kAuroraGlow = false;
 /// 아래 `_glows` 의 1·3번과 같은 색이라, 기본 배경과 이어 보인다.
 const ({Color a, Color b}) kDefaultAuroraTint =
     (a: AppTheme.seed, b: Color(0xFF1B7A8C));
+
+/// 결의 씨앗 — 바꾸면 결 무늬가 달라진다. 바꿀 이유는 거의 없다.
+const int _kGrainSeed = 20260922;
 
 /// 빛무리 하나 — 화면 비율로 놓는다(기기 크기가 달라도 같은 그림).
 class _Glow {
@@ -285,6 +293,9 @@ class _AuroraPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // 🔴 결은 빛무리와 따로 간다 — 빛무리를 꺼도 바탕은 금속이어야 한다.
+    _grain(canvas, size);
+
     // 🔴 꺼 두면 바탕색만 남는다 — [kAuroraGlow] 머리말 참고.
     if (!kAuroraGlow) return;
     final short = size.shortestSide;
@@ -320,6 +331,48 @@ class _AuroraPainter extends CustomPainter {
   /// 🔴 **색이 갈리면 다시 칠한다.** 붙박이로 `false` 를 돌려주던 자리인데,
   /// 색을 받게 되면서 그러면 **프로필 배경이 영영 첫 색에 멈춘다.** 자리·
   /// 알파는 상수라 색만 견주면 된다.
+  /// **금속의 결** — 아주 고운 점을 흩뿌린다.
+  ///
+  /// 🔴 **두 가지를 한꺼번에 한다.**
+  ///  · 평평한 면에 결이 생겨 「칠한 검정」이 아니라 **금속**으로 읽힌다.
+  ///  · 🔴 **띠(밴딩)를 지운다** — 색이 256단이라 넓은 면에서 한 단씩 끊기는
+  ///    것이 경계로 보이는데(사용자: 「그 원 선들이 너무 잘 보여」), 점이
+  ///    그 경계를 흩어 놓아 눈이 선으로 잇지 못한다. 인쇄의 망점과 같은 원리다.
+  ///
+  /// 🔴 **씨앗을 박는다.** 안 박으면 화면을 다시 그릴 때마다 결이 달라져
+  /// **배경이 지글거린다.**
+  ///
+  /// 🔴 밝은 점과 어두운 점을 **같이** 뿌린다 — 밝은 것만 뿌리면 바탕이
+  /// 통째로 밝아진다.
+  void _grain(Canvas canvas, Size size) {
+    final rand = math.Random(_kGrainSeed);
+    final count = (size.width * size.height / 900).round();
+    final light = <Offset>[];
+    final dark = <Offset>[];
+    for (var i = 0; i < count; i += 1) {
+      final p = Offset(
+        rand.nextDouble() * size.width,
+        rand.nextDouble() * size.height,
+      );
+      (rand.nextBool() ? light : dark).add(p);
+    }
+    canvas
+      ..drawPoints(
+        PointMode.points,
+        light,
+        Paint()
+          ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.030)
+          ..strokeWidth = 1.4,
+      )
+      ..drawPoints(
+        PointMode.points,
+        dark,
+        Paint()
+          ..color = const Color(0xFF000000).withValues(alpha: 0.055)
+          ..strokeWidth = 1.4,
+      );
+  }
+
   @override
   bool shouldRepaint(_AuroraPainter oldDelegate) =>
       kAuroraGlow &&

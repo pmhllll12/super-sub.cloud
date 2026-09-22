@@ -144,10 +144,18 @@ class _Block extends StatelessWidget {
        반투명이라 뒤의 빛무리는 그대로 비친다. */
     return DecoratedBox(
       decoration: BoxDecoration(
-        /* 🔴 레퍼런스에서 판은 바탕보다 **21단(256 기준) 밝았다**. 바탕이
-           `#1C1C1E` 로 내려오면서 같은 차이를 내려면 흰 기가 9% 다 —
-           8% 로는 판이 배경에 묻힌다. */
-        color: Colors.white.withValues(alpha: 0.09),
+        /* 🔴 **위가 밝고 아래가 어둡다**(2026-09-22, 「메탈」 방향).
+           평평한 한 색은 「칠한 판」으로 읽히는데, 위에서 빛을 받은 듯
+           기울여 주면 **금속판**으로 읽힌다 — 차이는 아주 작게 둔다(4단
+           남짓). 크게 주면 판마다 그러데이션이 도드라져 촌스러워진다. */
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.white.withValues(alpha: 0.11),
+            Colors.white.withValues(alpha: 0.065),
+          ],
+        ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: SilverEdge.barLine,
