@@ -169,9 +169,15 @@ class _Block extends StatelessWidget {
 
 /// 판 둘을 한 줄에.
 ///
-/// 🔴 **키를 맞춘다**(`IntrinsicHeight`) — 안 맞추면 짧은 쪽 판이 위에만
-/// 붙어 줄이 들쭉날쭉해진다. 판 안의 내용이 펼쳐지면(팀 폼·호칭 폼) 둘 다
-/// 같이 늘어난다.
+/// 🔴 **키를 억지로 안 맞춘다**(2026-09-22 정정). 처음엔 `IntrinsicHeight` 로
+/// 두 판의 키를 같게 했는데, 그것이 **펼쳐지는 폼을 「팍」 열리게 만들었다**
+/// (사용자가 두 번 짚었다): `IntrinsicHeight` 는 자식의 **본디 키**를 묻고,
+/// `SizeTransition` 의 본디 키는 **다 펼쳐진 높이**다 — 그래서 줄의 높이가
+/// 첫 프레임에 목표까지 뛰고, 안쪽만 천천히 자란다.
+///
+/// 키를 맞추는 것과 부드럽게 펼치는 것 중 **펼치는 쪽을 골랐다**(사용자가
+/// 고쳐 달라고 한 것이 그쪽이다). 곁가지로 「내 경기」처럼 짧은 판이 제
+/// 내용만큼만 높아진다.
 class _Pair extends StatelessWidget {
   const _Pair({required this.left, required this.right});
 
@@ -180,15 +186,14 @@ class _Pair extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(child: left),
-          const SizedBox(width: 12),
-          Expanded(child: right),
-        ],
-      ),
+    return Row(
+      // 판마다 제 키를 갖는다 — 위를 맞춰 세운다.
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: left),
+        const SizedBox(width: 12),
+        Expanded(child: right),
+      ],
     );
   }
 }

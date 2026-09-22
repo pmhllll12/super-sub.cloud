@@ -121,6 +121,15 @@ class FloatingNavBar extends StatelessWidget {
               child: const ColoredBox(color: kNavBarColor),
             ),
           ),
+          /* 🔴 **바 윤곽에도 실버 선**(2026-09-22, 사용자 요청). 면이
+             반투명이라 뒤가 밝으면(프로필의 빛무리) 바와 그 **파낸 홈이 같은
+             밝기로 읽혀 「사이가 채워진」 것처럼 보였다** — 선이 있어야 어디가
+             바이고 어디가 빈 자리인지 갈린다. 알약의 테두리와 같은 은빛이다. */
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(painter: _NotchEdge(notch)),
+            ),
+          ),
           // 아이콘은 홈 오른쪽에 균등 배치하고, 세로 중심을 알약에 맞춘다.
           Positioned.fromRect(
             rect: Rect.fromLTRB(
@@ -300,13 +309,42 @@ class _LogoButton extends StatelessWidget {
           /* 알약도 바와 같은 면이다. 바에서 파낸 홈 안에 따로 선 조각이라
              제 면을 따로 칠한다. 🔴 **실버 테두리**로 경계를 낸다(2026-09-21) —
              면이 반투명이라 테두리가 없으면 바와 알약이 한 덩어리로 읽힌다. */
+          /* 🔴 **면을 비운다**(2026-09-22, 사용자 지적: 「너무 탁한 색상」).
+             바와 **같은 반투명 색**을 깔고 있어서 둘이 한 덩어리로 읽혔다 —
+             알약 안은 뒤가 그대로 비쳐야 「파낸 자리」로 보인다. 형태는
+             실버 테두리가 세운다. */
           return SilverEdge(
             radius: radius,
-            fill: kNavBarColor,
+            fill: Colors.transparent,
             child: logo,
           );
         },
       ),
     );
   }
+}
+
+/// 바 윤곽을 따라 그리는 **가는 실버 선**.
+///
+/// 🔴 [_LogoNotch] 와 **같은 길**을 쓴다 — 따로 그리면 면과 선이 반 픽셀
+/// 어긋나 홈 둘레가 두 겹으로 보인다.
+class _NotchEdge extends CustomPainter {
+  const _NotchEdge(this.notch);
+
+  final _LogoNotch notch;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawPath(
+      notch.getClip(size),
+      Paint()
+        ..style = PaintingStyle.stroke
+        // 이 기기에서 그릴 수 있는 가장 얇은 선.
+        ..strokeWidth = 0.5
+        ..color = SilverEdge.silver.withValues(alpha: 0.55),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_NotchEdge old) => old.notch.shouldReclip(notch);
 }

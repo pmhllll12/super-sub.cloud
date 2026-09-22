@@ -73,6 +73,14 @@ class PlayerCardView extends StatelessWidget {
   Widget _card() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
+      /* 🔴 **`antiAliasWithSaveLayer` 다**(2026-09-22, 사용자 지적: 「스크롤
+         하면 카드 외곽에 선이 생긴다」). 기본 `antiAlias` 는 잘린 가장자리를
+         **그 자리의 배경과 섞어서** 칠하는데, 스크롤로 카드가 반 픽셀씩
+         어긋나면 그 섞인 띠가 매 프레임 달라져 **테두리 선처럼 보인다.**
+         딴 층에 그린 뒤 잘라 내면 섞을 배경이 없어 선이 안 생긴다.
+         ⚠️ 층을 하나 더 뜨는 값이 든다 — 스쿼드 판처럼 작은 카드를 여럿
+         까는 자리가 느려지면 여기부터 의심한다. */
+      clipBehavior: Clip.antiAliasWithSaveLayer,
       child: ColoredBox(
         color: _bg,
         child: Stack(
@@ -303,13 +311,18 @@ class _ScaledCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      height: width * _kBaseH / _kBaseW,
-      // 기기 글자 크기 설정이 카드 안까지 번지면 짜임이 깨진다 — 카드는 그림이다.
-      child: MediaQuery.withNoTextScaling(
-        child: FittedBox(
-          child: SizedBox(width: _kBaseW, height: _kBaseH, child: child),
+    /* 🔴 **한 겹으로 떼어 둔다.** 목록 안에서 구를 때 카드까지 매 프레임
+       다시 그리면 위 가장자리 섞임이 계속 달라진다 — 떼어 두면 한 번 그린
+       것을 통째로 옮기므로 흔들리지 않는다. */
+    return RepaintBoundary(
+      child: SizedBox(
+        width: width,
+        height: width * _kBaseH / _kBaseW,
+        // 기기 글자 크기가 카드 안까지 번지면 짜임이 깨진다 — 카드는 그림이다.
+        child: MediaQuery.withNoTextScaling(
+          child: FittedBox(
+            child: SizedBox(width: _kBaseW, height: _kBaseH, child: child),
+          ),
         ),
       ),
     );
