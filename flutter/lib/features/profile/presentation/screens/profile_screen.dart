@@ -8,6 +8,8 @@ import '../../../auth/presentation/session_controller.dart';
 import '../../../card/data/card_providers.dart';
 import '../../../card/data/models/player_card.dart';
 import '../../../card/presentation/card_editor_screen.dart';
+import '../../../video/presentation/my_videos_controller.dart';
+import '../../../video/presentation/screens/my_videos_screen.dart';
 import '../widgets/player_card_view.dart';
 import 'nickname_sheet.dart';
 
@@ -16,8 +18,9 @@ import 'nickname_sheet.dart';
 /// 웹은 좌우 두 단(왼쪽 정보 · 오른쪽 영상)인데 **폰에는 옆으로 펼 자리가
 /// 없어** 한 줄로 쌓는다(`www/docs/2026-08-31-앱-이식-지침.md` §2-2).
 ///
-/// ⚠️ **아직 안 옮긴 것**: 영상 칸(분석·업로드·대표 영상·리포트) — 업로드와
-/// 분석에 얽혀 있어 따로 잡는다. 「프로필 카드 수정」은 다음 단계다.
+/// 웹의 **오른쪽 칸(영상)은 요약 블록 하나**로만 두고 본체는 밀고 들어가는
+/// 전용 화면이다(`MyVideosScreen`) — 플레이어·스트립·리포트를 이 목록 안에
+/// 다 쌓으면 프로필이 통째로 굴러야 하는 길이가 된다.
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
@@ -46,6 +49,8 @@ class ProfileScreen extends ConsumerWidget {
           _TeamBlock(teams: user.teams),
           const SizedBox(height: 16),
           _InfoBlock(user: user),
+          const SizedBox(height: 16),
+          const _VideosBlock(),
           const SizedBox(height: 16),
           const _MatchesBlock(),
           const SizedBox(height: 16),
@@ -302,6 +307,72 @@ class _InfoBlock extends StatelessWidget {
       ),
     ],
   );
+}
+
+/// 내 영상 — **요약만.** 본체는 밀고 들어가는 전용 화면이다.
+///
+/// 🔴 **갈래별 편수를 적는다.** 웹은 편수를 안 적지만(영상 아래 `1 / N` 이
+/// 이미 말한다) 여기엔 그 줄이 없어서, 편수마저 없으면 **들어가 보기 전에는
+/// 영상이 있는지조차 모른다.**
+class _VideosBlock extends ConsumerWidget {
+  const _VideosBlock();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncVideos = ref.watch(myVideosProvider);
+
+    return _Block(
+      title: '내 영상',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: const Key('profile-videos'),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const MyVideosScreen()),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: asyncVideos.when(
+                    loading: () => Text(
+                      '불러오는 중…',
+                      style: TextStyle(color: _kOn.withValues(alpha: 0.6)),
+                    ),
+                    /* 🔴 **오류를 「없음」으로 그리지 않는다** — 로그인이
+                       풀렸는데 「아직 올린 영상이 없습니다」로 보이면 사람은
+                       자기 영상이 사라진 줄 안다. */
+                    error: (e, _) => Text(
+                      '영상을 불러오지 못했습니다',
+                      style: TextStyle(color: _kOn.withValues(alpha: 0.6)),
+                    ),
+                    data: (all) {
+                      final split = splitVideos(all);
+                      if (all.isEmpty) {
+                        return const Text(
+                          '아직 올린 영상이 없습니다',
+                          style: TextStyle(color: _kOn),
+                        );
+                      }
+                      return Text(
+                        '분석 ${split.analyzed.length} · 업로드 ${split.uploaded.length}',
+                        style: const TextStyle(color: _kOn, fontSize: 15),
+                      );
+                    },
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right,
+                  color: _kOn.withValues(alpha: 0.6),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _MatchesBlock extends StatelessWidget {

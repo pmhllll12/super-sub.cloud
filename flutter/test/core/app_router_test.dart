@@ -4,20 +4,37 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:super_sub/app.dart';
+import 'package:super_sub/core/dev/data_source.dart';
 import 'package:super_sub/core/mock/mock_db.dart';
 import 'package:super_sub/features/auth/data/auth_providers.dart';
 import 'package:super_sub/features/auth/data/auth_repository_mock.dart';
 import 'package:super_sub/features/auth/presentation/session_controller.dart';
 import 'package:super_sub/features/intro/presentation/intro_gate.dart';
 
-/// redirect는 앱의 내비게이션 정책 전체를 담고 있다 — 복원 중, 로그아웃,
-/// 로그인 화면에 남은 로그인 사용자, 통과. 네 갈래를 모두 착지 화면으로
-/// 확인한다. 종목은 더 이상 진입 조건이 아니다(홈의 칩으로 옮겼다).
-///
-/// 관용구 주의: Mock은 300ms 지연을 흉내내고 위젯 테스트의 가짜 시계는
-/// pump로만 흐른다. pumpWidget 전에 Mock Future를 await하면 영원히 끝나지
-/// 않고, 로딩 인디케이터는 무한 애니메이션이라 pumpAndSettle도 쓰지 않는다
-/// (home_screen_test.dart의 주석 참고).
+// redirect는 앱의 내비게이션 정책 전체를 담고 있다 — 복원 중, 로그아웃,
+// 로그인 화면에 남은 로그인 사용자, 통과. 네 갈래를 모두 착지 화면으로
+// 확인한다. 종목은 더 이상 진입 조건이 아니다(홈의 칩으로 옮겼다).
+//
+// 관용구 주의: Mock은 300ms 지연을 흉내내고 위젯 테스트의 가짜 시계는
+// pump로만 흐른다. pumpWidget 전에 Mock Future를 await하면 영원히 끝나지
+// 않고, 로딩 인디케이터는 무한 애니메이션이라 pumpAndSettle도 쓰지 않는다
+// (home_screen_test.dart의 주석 참고).
+
+/// 🔴 **목업 지연이 줄줄이 걸린다 (2026-09-22).** 로그인이 끝나야 팀을 알고,
+/// 팀을 알아야 스쿼드를, 스쿼드가 와야 팀원 카드를 부른다 — 여기에 프로필의
+/// 「내 영상」까지 붙어 300ms 가 여러 겹이다. 모자라게 흘리면 「트리를 버린
+/// 뒤에도 타이머가 남았다」로 깨지는데 **화면 잘못이 아니다.**
+Future<void> _settle(WidgetTester tester) async {
+  for (var i = 0; i < 6; i += 1) {
+    await tester.pump(const Duration(milliseconds: 400));
+  }
+}
+
+class _AlwaysMock extends DataSourceController {
+  @override
+  bool build() => true;
+}
+
 Future<ProviderContainer> _pumpApp(WidgetTester tester) async {
   // **폰 크기로 돌린다.** 기본 800×600은 이 앱의 화면보다 훨씬 짧아, 하단
   // 바까지 있는 화면에서 내용이 넘친다.
@@ -33,6 +50,14 @@ Future<ProviderContainer> _pumpApp(WidgetTester tester) async {
       authRepositoryProvider.overrideWith(
         (ref) => MockAuthRepository(ref.watch(mockDbProvider)),
       ),
+      /* 🔴 **목업으로 고정한다 (2026-09-22).** 이걸 안 덮으면 카드·스쿼드·영상
+         provider 가 API 구현체를 잡아 **시험이 실제 네트워크를 부른다** —
+         느리고, 서버 상태에 따라 결과가 흔들리고, 끝나지 않은 연결이 「트리를
+         버린 뒤에도 타이머가 남았다」로 터진다. 프로필에 「내 영상」 블록이
+         붙으면서 실제로 그렇게 깨져서 드러났다(그전에도 카드가 같은 길로
+         나가고 있었다). 교체 지점이 `useMockProvider` 하나라 여기만 덮으면
+         전부 따라온다 — `home_screen_test.dart` 와 같은 처리다. */
+      useMockProvider.overrideWith(_AlwaysMock.new),
     ],
   );
   addTearDown(container.dispose);
@@ -49,7 +74,7 @@ Future<ProviderContainer> _pumpHome(WidgetTester tester) async {
   unawaited(
     container.read(sessionControllerProvider.notifier).loginAs(MockDb.playerId),
   );
-  await tester.pump(const Duration(milliseconds: 500));
+  await _settle(tester);
   return container;
 }
 
@@ -61,12 +86,12 @@ void main() {
     expect(find.text('로그인'), findsNothing);
 
     // 복원·종목 조회 타이머를 소화하고 끝낸다.
-    await tester.pump(const Duration(milliseconds: 500));
+    await _settle(tester);
   });
 
   testWidgets('로그아웃 상태면 로그인 화면에 착지한다', (tester) async {
     await _pumpApp(tester);
-    await tester.pump(const Duration(milliseconds: 500));
+    await _settle(tester);
 
     expect(find.text('로그인'), findsWidgets);
   });
@@ -85,9 +110,9 @@ void main() {
     // 로그아웃은 하단 바 넷째 아이콘에서 열리는 메뉴 안에 있다.
     await tester.tap(find.byKey(const Key('navbar-icon-menu')));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
+    await _settle(tester);
     await tester.tap(find.byKey(const Key('barmenu-logout')));
-    await tester.pump(const Duration(milliseconds: 500));
+    await _settle(tester);
 
     expect(find.text('로그인'), findsWidgets);
     expect(find.byKey(const Key('home-video-analysis')), findsNothing);
@@ -98,7 +123,7 @@ void main() {
 
     // 「영상 분석」 판 — 큰 판과 납작한 띠의 글이 겹쳐 있어 글자가 아니라 판을 누른다.
     await tester.tap(find.byKey(const Key('home-video-analysis')));
-    await tester.pump(const Duration(milliseconds: 500));
+    await _settle(tester);
 
     expect(find.text('분석할 영상을 골라주세요'), findsOneWidget);
 
@@ -116,7 +141,7 @@ void main() {
 
     // 「내 프로필」은 홈 카드가 아니라 오른쪽 위 단추다(2026-09-15).
     await tester.tap(find.byKey(const Key('home-profile')));
-    await tester.pump(const Duration(milliseconds: 500));
+    await _settle(tester);
 
     // redirect가 개입하지 않고 /profile에 머무른다.
     // 🔴 제목을 웹과 맞춰 「MY PROFILE」 로 바꿨다(2026-09-21).

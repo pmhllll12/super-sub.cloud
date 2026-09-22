@@ -4,6 +4,7 @@ import '../../../core/dev/data_source.dart';
 import '../../../core/mock/mock_db.dart';
 import '../../../core/network/api_client.dart';
 import '../../auth/presentation/session_controller.dart';
+import 'models/video_report.dart';
 import 'video_repository.dart';
 import 'video_repository_api.dart';
 import 'video_repository_mock.dart';
@@ -33,5 +34,19 @@ final videoRepositoryProvider = Provider<VideoRepository>((ref) {
 /// 플레이어 자리를 비워 두고 나머지를 그대로 그린다.
 final playbackUrlProvider = FutureProvider.family<String?, String>(
   (ref, videoId) => ref.watch(videoRepositoryProvider).playbackUrl(videoId),
+  retry: (_, _) => null,
+);
+
+/// 그 영상의 분석 리포트.
+///
+/// 🔴 **실패도 값으로 온다**(`ReportResult`) — 「아직」·「실패」·「없다」를
+/// `AsyncError` 로 뭉치면 화면이 그 셋을 못 가른다. 여기서 `AsyncError` 인
+/// 것은 **읽기 자체가 안 된 경우**(네트워크·401)뿐이다.
+///
+/// retry 를 끈 이유는 `myCardProvider` 와 같다 — Riverpod 3 는 실패한
+/// provider 를 백오프로 자동 재시도하고 그동안 `AsyncLoading` 을 유지해서,
+/// 화면이 오류 대신 로딩만 계속 보여준다.
+final videoReportProvider = FutureProvider.family<ReportResult, String>(
+  (ref, videoId) => ref.watch(videoRepositoryProvider).report(videoId),
   retry: (_, _) => null,
 );
