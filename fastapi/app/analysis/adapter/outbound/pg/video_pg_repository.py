@@ -138,6 +138,16 @@ class VideoPgRepository(VideoPort):
     def list_by_user(self, user_id: UUID) -> list[VideoEntity]:
         return self._by_user(user_id, kept_only=True)
 
+    def count_kept_by_user(self, user_id: UUID) -> int:
+        # `list_by_user` 와 **같은 조건**을 센다 — 행은 읽어 오지 않는다.
+        return int(
+            self._session.execute(
+                select(func.count())
+                .select_from(VideoOrm)
+                .where(VideoOrm.user_id == user_id, VideoOrm.kept.is_(True))
+            ).scalar_one()
+        )
+
     def list_all_by_user(self, user_id: UUID) -> list[VideoEntity]:
         # 관리자는 아직 저장 안 한(`kept=false`) 임시분까지 본다.
         return self._by_user(user_id, kept_only=False)

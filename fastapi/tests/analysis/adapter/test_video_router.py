@@ -22,7 +22,11 @@ from app.analysis.adapter.outbound.stub.video_stub_repository import (
     reset_videos,
 )
 from app.analysis.domain.entities.video_entity import VideoEntity
-from app.analysis.domain.rules.video_rules import MAX_BYTES, MAX_DURATION_MS
+from app.analysis.domain.rules.video_rules import (
+    MAX_BYTES,
+    MAX_DURATION_MS,
+    MAX_VIDEOS_PER_USER,
+)
 from app.core.security import issue_access_token
 from tests.conftest import V1, error_code
 
@@ -1083,3 +1087,168 @@ class TestKeepVideo:
         )
         assert res.status_code == 404
         assert error_code(res) == "VIDEO_NOT_FOUND"
+
+
+class TestVideoLimit:
+    """계정당 **저장된**(`kept=true`) 영상 개수 상한 — 2026-09-22, 사용자 요청.
+
+    세는 것이 `kept=true` 라 자리를 차지하는 것과 안 차지하는 것이 갈린다.
+    그 경계를 여기서 고정한다 — 관문이 세 자리(`upload-url`·`videos`·`keep`)에
+    있는 이유도 아래 `test_저장할_때도_막는다` 가 근거다.
+    """
+
+    def _keep_slot(self, client, user_id, *, n=1):
+        """자리를 `n` 개 채운다. `analyze=False`(기록용 업로드)는 분석 작업이
+        안 생겨 **등록하는 순간 `kept=true`** 라 자리를 바로 차지한다.
+        """
+        ids = []
+        for _ in range(n):
+            key = _issue(client, user_id)
+            put_object(key, SIZE_OK)
+            res = _register(client, user_id, key, analyze=False)
+            assert res.status_code == 201, res.text
+            assert res.json()["kept"] is True
+            ids.append(res.json()["id"])
+        return ids
+
+    def test_상한_직전까지는_통과한다(self, client):
+        user_id = uuid4()
+        self._keep_slot(client, user_id, n=MAX_VIDEOS_PER_USER - 1)
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+        assert _register(client, user_id, key).status_code == 201
+
+    def test_상한이면_업로드_URL_을_안_준다(self, client):
+        """헛걸음을 줄이는 자리다 — 200MB 를 다 올린 뒤에 막으면 그 대역폭이
+        버려진다(`FILE_TOO_LARGE` 예비 검사와 같은 성격).
+        """
+        user_id = uuid4()
+        self._keep_slot(client, user_id, n=MAX_VIDEOS_PER_USER)
+        res = client.post(
+            f"{V1}/videos/upload-url",
+            json={
+                "content_type": "video/mp4",
+                "size_bytes": SIZE_OK,
+                "filename": "c.mp4",
+            },
+            headers=_headers(user_id),
+        )
+        assert res.status_code == 422
+        assert error_code(res) == "VIDEO_LIMIT_EXCEEDED"
+
+    def test_상한이면_등록도_막는다(self, client):
+        """URL 발급은 건너뛸 수 있다 — 자리가 있을 때 키를 미리 받아 두면 된다.
+        그래서 등록에도 같은 관문이 있어야 한다.
+        """
+        user_id = uuid4()
+        key = _issue(client, user_id)  # 자리가 있을 때 미리 받아 둔다
+        put_object(key, SIZE_OK)
+        self._keep_slot(client, user_id, n=MAX_VIDEOS_PER_USER)
+
+        res = _register(client, user_id, key)
+        assert res.status_code == 422
+        assert error_code(res) == "VIDEO_LIMIT_EXCEEDED"
+
+    def test_상한이어도_반려로_기록하지_않는다(self, client):
+        """반려(`passed:false`)로 남기면 그 행이 **또 한 자리**를 차지한다.
+        개수 초과는 등록 자체가 성립하지 않는 경우다.
+        """
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+        self._keep_slot(client, user_id, n=MAX_VIDEOS_PER_USER)
+
+        # 규격에도 걸리는 클립을 민다 — 관문이 없으면 **반려로 기록되고**,
+        # 반려는 `kept=true` 라 목록에 네 번째 줄로 남는다.
+        res = _register(client, user_id, key, duration_ms=MAX_DURATION_MS + 1)
+        assert res.status_code == 422
+        assert error_code(res) == "VIDEO_LIMIT_EXCEEDED"
+
+        mine = client.get(f"{V1}/videos", headers=_headers(user_id)).json()
+        assert len(mine) == MAX_VIDEOS_PER_USER
+
+    def test_반려된_클립도_자리를_차지한다(self, client):
+        """반려도 처음부터 `kept=true` 라 목록에 남는다 — 그래서 센다."""
+        user_id = uuid4()
+        for _ in range(MAX_VIDEOS_PER_USER):
+            key = _issue(client, user_id)
+            put_object(key, SIZE_OK)
+            res = _register(client, user_id, key, duration_ms=MAX_DURATION_MS + 1)
+            assert res.status_code == 201
+            assert res.json()["passed"] is False
+
+        res = client.post(
+            f"{V1}/videos/upload-url",
+            json={
+                "content_type": "video/mp4",
+                "size_bytes": SIZE_OK,
+                "filename": "c.mp4",
+            },
+            headers=_headers(user_id),
+        )
+        assert res.status_code == 422
+        assert error_code(res) == "VIDEO_LIMIT_EXCEEDED"
+
+    def test_임시_클립은_자리를_안_차지한다(self, client):
+        """분석 중(`kept=false`)인 클립은 화면에도 안 보이고 스윕이 걷어 간다.
+        세면 브라우저가 죽은 사람이 최대 하루 동안 자리를 잃는다.
+        """
+        user_id = uuid4()
+        for _ in range(MAX_VIDEOS_PER_USER + 2):
+            key = _issue(client, user_id)
+            put_object(key, SIZE_OK)
+            res = _register(client, user_id, key)
+            assert res.status_code == 201, res.text
+            assert res.json()["kept"] is False
+
+    def test_저장할_때도_막는다(self, client):
+        """🔴 여기가 불변식을 지키는 자리다. 자리가 있을 때 등록된 임시 클립
+        여럿이 **나중에 한꺼번에** 저장되면 앞 두 관문을 다 통과하고도 상한을
+        넘는다.
+        """
+        user_id = uuid4()
+        ids = []
+        for _ in range(MAX_VIDEOS_PER_USER + 1):
+            key = _issue(client, user_id)
+            put_object(key, SIZE_OK)
+            ids.append(_register(client, user_id, key).json()["id"])
+
+        for video_id in ids[:MAX_VIDEOS_PER_USER]:
+            res = client.post(
+                f"{V1}/videos/{video_id}/keep", headers=_headers(user_id)
+            )
+            assert res.status_code == 200, res.text
+
+        res = client.post(f"{V1}/videos/{ids[-1]}/keep", headers=_headers(user_id))
+        assert res.status_code == 422
+        assert error_code(res) == "VIDEO_LIMIT_EXCEEDED"
+
+    def test_상한이어도_이미_저장된_것을_다시_저장하면_200_이다(self, client):
+        """`keep` 은 멱등이다 — 자기 자신 때문에 막히면 안 된다."""
+        user_id = uuid4()
+        ids = self._keep_slot(client, user_id, n=MAX_VIDEOS_PER_USER)
+        res = client.post(f"{V1}/videos/{ids[0]}/keep", headers=_headers(user_id))
+        assert res.status_code == 200, res.text
+        assert res.json()["kept"] is True
+
+    def test_지우면_자리가_빈다(self, client):
+        user_id = uuid4()
+        ids = self._keep_slot(client, user_id, n=MAX_VIDEOS_PER_USER)
+        assert (
+            client.delete(
+                f"{V1}/videos/{ids[0]}", headers=_headers(user_id)
+            ).status_code
+            == 204
+        )
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+        assert _register(client, user_id, key).status_code == 201
+
+    def test_남의_영상은_내_자리를_안_차지한다(self, client):
+        other = uuid4()
+        self._keep_slot(client, other, n=MAX_VIDEOS_PER_USER)
+
+        mine = uuid4()
+        key = _issue(client, mine)
+        put_object(key, SIZE_OK)
+        assert _register(client, mine, key).status_code == 201

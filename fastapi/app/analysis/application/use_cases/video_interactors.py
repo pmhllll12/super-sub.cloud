@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from app.analysis.application.dtos.video_dto import (
     UNSET,
@@ -64,6 +64,7 @@ from app.analysis.domain.entities.video_entity import ValidationEntity, VideoEnt
 from app.analysis.domain.rules.grade_rules import display_grade, is_trust_dominant
 from app.analysis.domain.rules.video_rules import (
     MAX_BYTES,
+    MAX_VIDEOS_PER_USER,
     build_storage_key,
     extension_for,
     is_provisional_key,
@@ -77,6 +78,34 @@ _log = logging.getLogger("supersub.analysis")
 
 # 새 작업의 첫 상태. 값 목록은 `analysis_job` ORM 의 주석에 있다.
 _QUEUED = "queued"
+
+
+def _guard_video_limit(repository: VideoPort, user_id: UUID) -> None:
+    """계정당 **저장된** 영상 개수 상한(2026-09-22, 사용자 요청).
+
+    세는 것은 `kept=true` — 화면의 「업로드 영상」 목록과 같은 것이고 **반려된
+    클립도 한 자리를 차지한다**(반려도 처음부터 `kept=true` 로 남는다).
+    임시(`kept=false`, 분석 중)는 안 센다 — `VideoPort.count_kept_by_user` 참고.
+
+    🔴 **세 자리에서 부른다. 하나로는 안 막힌다.**
+
+    | 자리 | 왜 |
+    |---|---|
+    | `POST /videos/upload-url` | 헛걸음을 줄인다 — 200MB 를 다 올린 뒤에 막히면 그 대역폭이 버려진다. `MAX_BYTES` 예비 검사와 같은 성격이다 |
+    | `POST /videos` | URL 발급은 건너뛸 수 있다(키를 미리 받아 두면 된다). 등록이 실제 관문이다 |
+    | `POST /videos/{id}/keep` | 🔴 **여기가 불변식을 지키는 자리다.** 세는 것이 `kept=true` 라, 자리가 있을 때 등록된 임시 클립 여럿이 **나중에 한꺼번에** 저장되면 앞 둘을 다 통과하고도 상한을 넘는다 |
+
+    🔴 **반려(`passed: false`)로 기록하지 않고 422 를 낸다.** 반려는 "등록은
+    됐고 분석 대상이 아닐 뿐"인데(위 모듈 머리말), 개수 초과는 등록 자체가
+    성립하지 않는다 — 반려로 남기면 그 행이 또 한 자리를 차지한다.
+    """
+    if repository.count_kept_by_user(user_id) >= MAX_VIDEOS_PER_USER:
+        raise ApiError(
+            422,
+            "VIDEO_LIMIT_EXCEEDED",
+            f"영상은 계정당 {MAX_VIDEOS_PER_USER}개까지입니다. "
+            "저장된 영상을 지우고 다시 시도해 주십시오.",
+        )
 
 
 class CreateUploadUrlInteractor(CreateUploadUrlUseCase):
@@ -102,6 +131,9 @@ class CreateUploadUrlInteractor(CreateUploadUrlUseCase):
                 f"용량 상한은 {MAX_BYTES // (1024 * 1024)}MB 입니다.",
             )
 
+        # 자리가 없으면 올리기 전에 막는다. 같은 이유(헛걸음)다.
+        _guard_video_limit(self._repository, command.user_id)
+
         storage_key = build_storage_key(
             command.user_id,
             extension,
@@ -122,6 +154,7 @@ class RegisterVideoInteractor(RegisterVideoUseCase):
         self._storage = storage
 
     def __call__(self, command: RegisterVideoCommand) -> VideoResult:
+        _guard_video_limit(self._repository, command.user_id)
         if not self._repository.sport_exists(command.sport_code):
             raise ApiError(422, "UNKNOWN_SPORT", "지원하지 않는 종목입니다.")
         # 🔴 「없는 종목」과 **「지금 안 받는 종목」을 가른다**(`ho` 39번).
@@ -393,6 +426,11 @@ class KeepVideoInteractor(KeepVideoUseCase):
         if video is None or video.user_id != command.user_id:
             # 남의 클립인지 없는 클립인지 구별해 주지 않는다.
             raise ApiError(404, "VIDEO_NOT_FOUND", "클립을 찾을 수 없습니다.")
+
+        # 🔴 **이미 저장된 클립은 세지 않는다** — 같은 `keep` 을 다시 불러도
+        # 자기 자신 때문에 막히면 안 된다(이 엔드포인트는 멱등이다).
+        if not video.kept:
+            _guard_video_limit(self._repository, command.user_id)
 
         new_key = video.storage_key
         # 리포트가 딸린 분석 클립의 임시 원본만 옮긴다. `/me` 업로드(기록용,

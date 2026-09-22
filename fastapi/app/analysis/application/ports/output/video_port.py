@@ -61,6 +61,22 @@ class VideoPort(ABC):
         """
 
     @abstractmethod
+    def count_kept_by_user(self, user_id: UUID) -> int:
+        """그 사람의 **저장된**(`kept=true`) 영상 수 — 계정당 개수 상한
+        (`MAX_VIDEOS_PER_USER`) 판정에 쓴다.
+
+        🔴 `list_by_user` 와 **같은 것을 센다**(반려된 클립도 `kept=true` 라
+        한 자리를 차지한다). 목록을 세지 않고 따로 두는 이유는 상한 판정이
+        업로드 URL 발급처럼 **목록이 필요 없는 자리**에서도 일어나서다 —
+        행을 다 읽어 오는 대신 개수만 묻는다.
+
+        🔴 **임시(`kept=false`) 클립은 안 센다.** 분석 중이라 화면에도 안
+        보이고, 화면을 벗어나면 지워지거나 `provisional_video_ttl_hours`
+        스윕이 걷어 간다 — 세면 브라우저가 죽은 사람이 최대 하루 동안
+        자리를 잃는다.
+        """
+
+    @abstractmethod
     def get(self, video_id: UUID) -> VideoEntity | None:
         """영상 1건. 업로더 구분 없이 — 소유 판단은 부르는 쪽이 한다."""
 

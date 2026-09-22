@@ -35,6 +35,7 @@ from app.analysis.adapter.outbound.stub.video_stub_repository import (
     reset_videos,
 )
 from app.analysis.application.use_cases.report_parser import parse_report
+from app.analysis.domain.rules.video_rules import MAX_VIDEOS_PER_USER
 from app.analysis.dependencies.video_providers import get_storage
 from app.core.config import settings
 from app.core.security import issue_access_token
@@ -892,6 +893,72 @@ class TestListMyVideos:
         assert rows[ok]["reject_reason"] is None
         assert rows[rejected]["analysis_status"] is None
         assert "길이" in rows[rejected]["reject_reason"]
+
+
+class TestVideoLimitDb:
+    """계정당 개수 상한이 **실제 PostgreSQL 에서** 도는지 (2026-09-22).
+
+    계약 테스트는 스텁이 파이썬 리스트를 세므로 `COUNT(*) … WHERE kept` 가
+    실물 컬럼을 제대로 보는지는 여기서만 걸린다.
+    """
+
+    def _fill(self, db_client, uploader, n):
+        ids = []
+        for _ in range(n):
+            key = _upload(db_client, uploader)
+            res = _register(db_client, uploader, key, analyze=False)
+            assert res.status_code == 201, res.text
+            ids.append(res.json()["id"])
+        return ids
+
+    def test_저장된_영상이_상한이면_막힌다(self, db_client, uploader, db_session):
+        self._fill(db_client, uploader, MAX_VIDEOS_PER_USER)
+
+        user_id = uuid.UUID(
+            db_client.get(f"{V1}/me", headers=uploader["headers"]).json()["id"]
+        )
+        assert (
+            VideoPgRepository(db_session).count_kept_by_user(user_id)
+            == MAX_VIDEOS_PER_USER
+        )
+
+        res = db_client.post(
+            f"{V1}/videos/upload-url",
+            json={
+                "content_type": "video/mp4",
+                "size_bytes": SIZE_OK,
+                "filename": "over.mp4",
+            },
+            headers=uploader["headers"],
+        )
+        assert res.status_code == 422
+        assert res.json()["error"]["code"] == "VIDEO_LIMIT_EXCEEDED"
+
+    def test_임시_클립은_DB_에서도_안_세어진다(self, db_client, uploader, db_session):
+        """`kept=false` 행이 실제로 `COUNT` 에서 빠지는지 — 스텁이 아니라
+        실물 컬럼으로 확인한다.
+        """
+        for _ in range(MAX_VIDEOS_PER_USER + 1):
+            key = _upload(db_client, uploader)
+            res = _register(db_client, uploader, key)  # analyze 기본값 → 임시
+            assert res.status_code == 201, res.text
+            assert res.json()["kept"] is False
+
+        user_id = uuid.UUID(
+            db_client.get(f"{V1}/me", headers=uploader["headers"]).json()["id"]
+        )
+        assert VideoPgRepository(db_session).count_kept_by_user(user_id) == 0
+
+    def test_지우면_DB_에서_자리가_빈다(self, db_client, uploader):
+        ids = self._fill(db_client, uploader, MAX_VIDEOS_PER_USER)
+        assert (
+            db_client.delete(
+                f"{V1}/videos/{ids[0]}", headers=uploader["headers"]
+            ).status_code
+            == 204
+        )
+        key = _upload(db_client, uploader)
+        assert _register(db_client, uploader, key).status_code == 201
 
 
 def _email_of(db_client, uploader):

@@ -2842,3 +2842,92 @@ grep -rn "해상도\|MAX_LONG_SIDE\|resolution" www/src flutter/lib
   `TestRegisterVideo::test_analyze_true_여도_해상도는_상한이_없다`(4K·8K·DCI 4K 세로) ·
   전체 `pytest` **810 passed / skipped 324**(DB 없는 로컬 환경 — DB 마킹된 시험만 skip,
   그 외 0)
+
+---
+
+## 65. **영상은 계정당 3개까지입니다** — `VIDEO_LIMIT_EXCEEDED` (2026-09-22 추가, 사용자 요청)
+
+한 계정이 가질 수 있는 영상을 **3개**로 제한했습니다. 규격은
+`api-contract.md` 3-6절의 「🔴 계정당 3개」 절입니다.
+
+**무엇을 세나 — 화면의 「업로드 영상」 목록에 보이는 것 전부**(서버로는
+`kept=true`, 즉 `GET /videos` 가 돌려주는 것과 같은 집합)입니다.
+
+| | 자리를 차지하나 |
+|---|---|
+| 「내 프로필에 저장」한 영상 | **예** |
+| `analyze: false` 로 올린 기록용 영상 | **예** |
+| **반려된 클립**(`passed: false`) | **예** — 목록에 사유와 함께 남으므로 |
+| 분석 중인 임시 클립(`kept: false`) | 아니오 |
+| 남의 영상 | 아니오 |
+
+막는 자리는 **세 경로 전부**입니다 — `POST /videos/upload-url`(올리기 전),
+`POST /videos`(등록), `POST /videos/{id}/keep`(저장). 셋 다 `422` 입니다.
+
+```json
+{ "error": { "code": "VIDEO_LIMIT_EXCEEDED",
+             "message": "영상은 계정당 3개까지입니다. 저장된 영상을 지우고 다시 시도해 주십시오." } }
+```
+
+푸는 길은 `DELETE /videos/{video_id}` 하나이고, 지우면 자리는 즉시 빕니다.
+**이미 3개를 넘게 가진 계정의 영상을 지우게 하지는 않습니다** — 새로 늘리는
+것만 막습니다.
+
+### ✅ `www` 는 지금도 안 깨집니다 — 고치는 것은 **UX 뿐**입니다
+
+받는 쪽 코드를 읽고 씁니다(2026-09-22 확인).
+
+| 자리 | 확인한 것 |
+|---|---|
+| `www/src/server/backend/fastapiCall.ts` | `!res.ok` 면 `parseErrorBody(status, json, …)` 로 `BackendError` 를 던집니다 — **status·code·message 가 다 보존됩니다** |
+| `www/src/server/handler.ts` 의 `toErrorResponse` | `BackendError` 를 `{"error":{code,message}}` + 원래 status 로 되돌립니다 |
+| `www/src/lib/uploadClip.ts` 의 `readError` | `body?.error?.message` 를 읽어 `throw new Error(...)` — **서버 문구가 그대로 화면에 뜹니다** |
+
+그래서 **아무것도 안 고쳐도** 4번째 업로드를 누른 사람은 "영상은 계정당
+3개까지입니다. 저장된 영상을 지우고 다시 시도해 주십시오."를 봅니다. 아래는
+전부 **🟡 선택**입니다.
+
+### 만족해야 할 성질 (전부 선택)
+
+1. **상한에 닿았다는 것이 누르기 전에 보인다.** 목록 길이로 알 수 있습니다
+   (`GET /videos` 가 돌려주는 줄 수) — 서버가 따로 남은 개수를 주지는
+   않습니다. 3개면 업로드 단추를 비활성으로 두거나 "3/3" 같은 표시를 답니다
+2. **`VIDEO_LIMIT_EXCEEDED` 일 때 지우는 길로 안내한다** — 지금도 문구는
+   뜨지만, 이 코드일 때만 「지울 영상 고르기」로 보내면 한 번에 풀립니다
+3. **`flutter/` 는 ⏳ 아직 안 씁니다** — `flutter/lib` 에 영상 업로드 경로가
+   없는 것을 확인했습니다(`grep -rn 'upload-url' flutter/lib` → 0건).
+   붙일 때 위 성질을 같이 보시면 됩니다
+
+**파일·함수 이름은 예시지 규격이 아닙니다.** 위 세 성질만 지키면 형태는
+`www` 쪽 사정입니다.
+
+### 먼저 확인
+
+```bash
+# 화면이 이미 개수로 막고 있는가 (있으면 손대지 않습니다)
+grep -rnE "VIDEO_LIMIT_EXCEEDED|계정당|3개까지" www/src flutter/lib
+
+# 서버가 실제로 막는가 — 저장된 영상이 3개인 계정으로
+curl -s -o /dev/null -w '%{http_code}\n' -X POST https://<API 호스트>/api/v1/videos/upload-url \
+  -H "Authorization: Bearer <토큰>" -H 'Content-Type: application/json' \
+  -d '{"content_type":"video/mp4","size_bytes":52428800,"filename":"c.mp4"}'
+# -> 422 (본문의 code 가 VIDEO_LIMIT_EXCEEDED)
+```
+
+### 하지 말 것
+
+- 🔴 **화면에서 상한 숫자를 따로 하드코딩해 자체 판정하지 마십시오** — 서버
+  값이 바뀌면 화면만 어긋납니다. 막는 것은 서버가 하고, 화면은 **목록 길이**로
+  표시만 합니다
+- 🔴 **`VIDEO_LIMIT_EXCEEDED` 를 다른 422 와 뭉뚱그리지 마십시오** —
+  `UNSUPPORTED_FORMAT`·`FILE_TOO_LARGE` 는 **파일을 바꾸면** 풀리지만 이것은
+  **지워야만** 풀립니다. 안내가 같으면 사람이 파일만 계속 바꿉니다
+- 🔴 **임시 클립 수를 세지 마십시오** — 서버는 `kept=true` 만 셉니다. 분석
+  중인 것까지 세면 화면이 서버보다 먼저, 잘못 막습니다
+
+- 확인: 백엔드 `tests/analysis/adapter/test_video_router.py` 의
+  `TestVideoLimit` 10건(상한 직전 통과 · 세 경로 차단 · 반려도 한 자리 · 반려로
+  기록하지 않음 · 임시는 안 셈 · 멱등 keep 은 안 막힘 · 지우면 빔 · 남의 영상은
+  무관) · `tests/analysis/adapter/test_video_db.py` 의 `TestVideoLimitDb` 3건
+  (실물 PostgreSQL `COUNT`) · 전체 `pytest` **1147 passed / skipped 0**
+  (DB 올린 상태). 마이그레이션 없음(`alembic check` → 변경 없음, head 하나)
