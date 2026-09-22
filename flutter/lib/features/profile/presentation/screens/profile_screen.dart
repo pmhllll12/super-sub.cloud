@@ -91,18 +91,23 @@ class ProfileScreen extends ConsumerWidget {
               // 떠 있는 바에 마지막 칸이 가리지 않게.
               FloatingNavBar.heightOf(context),
             ),
+            /* 🔴 **판을 두 개씩 나란히 둔다**(2026-09-22, 사용자 요청).
+               다섯이 세로로 줄줄이 서서 화면이 한참 길었다.
+               「내 영상」만 한 줄을 다 쓴다 — 자주 들어가는 입구다. */
             children: [
               _CardHero(card: card, nickname: user.nickname),
               const SizedBox(height: 16),
-              _TeamBlock(teams: user.teams),
-              const SizedBox(height: 16),
-              _InfoBlock(user: user),
-              const SizedBox(height: 16),
               const _VideosBlock(),
-              const SizedBox(height: 16),
-              const _MatchesBlock(),
-              const SizedBox(height: 16),
-              _AccountBlock(user: user),
+              const SizedBox(height: 12),
+              _Pair(
+                left: _TeamBlock(teams: user.teams),
+                right: _InfoBlock(user: user),
+              ),
+              const SizedBox(height: 12),
+              _Pair(
+                left: const _MatchesBlock(),
+                right: _AccountBlock(user: user),
+              ),
             ],
           ),
         ),
@@ -162,6 +167,32 @@ class _Block extends StatelessWidget {
   }
 }
 
+/// 판 둘을 한 줄에.
+///
+/// 🔴 **키를 맞춘다**(`IntrinsicHeight`) — 안 맞추면 짧은 쪽 판이 위에만
+/// 붙어 줄이 들쭉날쭉해진다. 판 안의 내용이 펼쳐지면(팀 폼·호칭 폼) 둘 다
+/// 같이 늘어난다.
+class _Pair extends StatelessWidget {
+  const _Pair({required this.left, required this.right});
+
+  final Widget left;
+  final Widget right;
+
+  @override
+  Widget build(BuildContext context) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: left),
+          const SizedBox(width: 12),
+          Expanded(child: right),
+        ],
+      ),
+    );
+  }
+}
+
 /// 카드가 이 화면의 **첫 얼굴**이다 — 가운데 위에 그냥 놓는다.
 ///
 /// 🔴 **판(상자)도 「내 선수 카드」 제목도 없다**(2026-09-22, 사용자 요청).
@@ -203,9 +234,15 @@ class _CardHero extends ConsumerWidget {
               /* 🔴 **글자다**(2026-09-22, 사용자 요청) — 아이콘(`tune`)은
                  무엇을 고치는 단추인지 안 읽혔다. 카드 **오른쪽 위 바깥**에
                  붙여 카드를 안 덮는다. */
+              /* 🔴 **카드 바로 오른쪽**(2026-09-22, 사용자 요청). `right: 0`
+                 으로 두면 화면 끝에 붙어 카드와 멀어진다 — 카드가 가운데
+                 서므로 그 오른쪽 변은 `화면폭/2 + 카드폭/2` 다. */
               Positioned(
                 top: 0,
-                right: 0,
+                left: MediaQuery.sizeOf(context).width / 2 +
+                    _cardWidth / 2 +
+                    // 카드와 살짝 띄운다. 붙이면 카드 모서리를 먹는다.
+                    2,
                 child: _GlassButton(
                   buttonKey: const Key('profile-card-edit'),
                   label: card == null ? '카드 만들기' : '카드 수정',
@@ -354,26 +391,73 @@ class _GlassIconButton extends StatelessWidget {
 /// `AnimatedSize` 가 높이를 재 주므로 폼이 길어져도 맞출 것이 없다.
 ///
 /// 🔴 **`ClipRect` 로 감싼다** — 줄어드는 동안 안쪽 내용이 밖으로 삐져나온다.
-class _Fold extends StatelessWidget {
+class _Fold extends StatefulWidget {
   const _Fold({required this.open, required this.child});
 
   final bool open;
   final Widget child;
 
   @override
+  State<_Fold> createState() => _FoldState();
+}
+
+class _FoldState extends State<_Fold> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 320),
+    value: widget.open ? 1 : 0,
+  );
+
+  late final _curve = CurvedAnimation(
+    parent: _c,
+    curve: Curves.easeOutCubic,
+    reverseCurve: Curves.easeInCubic,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    /* 🔴 **다 접힌 순간을 듣는다.** `SizeTransition` 은 스스로 다시 그리지만
+       **이 `build` 는 다시 안 불린다** — 그래서 아래 「다 접히면 트리에서
+       뺀다」가 영영 안 돌고, 보이지 않는 폼이 그대로 남는다(시험이 「새 팀」을
+       둘로 세어 잡았다: 목록 하나 + 안 보이는 입력칸 하나). */
+    _c.addStatusListener((status) {
+      if (status == AnimationStatus.dismissed && mounted) setState(() {});
+    });
+  }
+
+  @override
+  void didUpdateWidget(_Fold old) {
+    super.didUpdateWidget(old);
+    if (widget.open != old.open) {
+      widget.open ? _c.forward() : _c.reverse();
+    }
+  }
+
+  @override
+  void dispose() {
+    _curve.dispose();
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return ClipRect(
-      child: AnimatedSize(
-        duration: const Duration(milliseconds: 260),
-        curve: Curves.easeOutCubic,
-        alignment: Alignment.topCenter,
-        child: open ? child : const SizedBox(width: double.infinity),
-      ),
+    /* 🔴 **다 접히면 트리에서 뺀다** — 안 빼면 보이지 않는 폼의 글쇠 포커스가
+       살아 있어, 접은 뒤에도 자판이 올라온다. */
+    if (_c.isDismissed && !widget.open) {
+      return const SizedBox(width: double.infinity);
+    }
+    return SizeTransition(
+      sizeFactor: _curve,
+      // 위에서 아래로 자란다.
+      alignment: Alignment.topCenter,
+      child: FadeTransition(opacity: _curve, child: widget.child),
     );
   }
 }
 
-/// 유리 + **제일 얇은 흰 테**. 두 단추가 재질을 나눠 쓴다 — 한쪽만 고치면
+/// 유리 + **제일 얇은 흰 테**./// 유리 + **제일 얇은 흰 테**. 두 단추가 재질을 나눠 쓴다 — 한쪽만 고치면
 /// 둘이 갈라진다.
 class _GlassShell extends StatelessWidget {
   const _GlassShell({required this.radius, required this.child});
@@ -459,36 +543,36 @@ class _TeamBlockState extends ConsumerState<_TeamBlock> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    /* 🔴 **배지를 이름 옆이 아니라 아래 줄에 둔다**
+                       (2026-09-22). 반쪽 폭에서는 이름 옆에 붙이면 긴
+                       팀 이름이 한 글자씩 끊겨 흐른다. */
+                    Text(
+                      t.name,
+                      style: const TextStyle(
+                        color: _kOn,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                t.name,
-                                style: const TextStyle(
-                                  color: _kOn,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              Text(
-                                '${t.region} · ${t.sportCode}',
-                                style: TextStyle(
-                                  color: _kOn.withValues(alpha: 0.7),
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
+                        Text(
+                          '${t.region} · ${t.sportCode}',
+                          style: TextStyle(
+                            color: _kOn.withValues(alpha: 0.7),
+                            fontSize: 11,
                           ),
                         ),
                         // 주장만 팀을 고칠 수 있다(계약 권한표).
                         if (t.isOwner)
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
+                              horizontal: 7,
+                              vertical: 1,
                             ),
                             decoration: BoxDecoration(
                               color: AppTheme.seed,
@@ -498,7 +582,7 @@ class _TeamBlockState extends ConsumerState<_TeamBlock> {
                               '주장',
                               style: TextStyle(
                                 color: Color(0xFF0B0B0B),
-                                fontSize: 11,
+                                fontSize: 10,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -517,11 +601,16 @@ class _TeamBlockState extends ConsumerState<_TeamBlock> {
             alignment: Alignment.centerLeft,
             child: OutlinedButton.icon(
               key: const Key('profile-team-create'),
-              icon: Icon(_openFor == '' ? Icons.close : Icons.add, size: 18),
-              label: Text(_openFor == '' ? '닫기' : '팀 만들기'),
+              icon: Icon(_openFor == '' ? Icons.close : Icons.add, size: 16),
+              label: Text(
+                _openFor == '' ? '닫기' : '팀 만들기',
+                style: const TextStyle(fontSize: 12),
+              ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: _kOn,
                 side: BorderSide(color: _kOn.withValues(alpha: 0.4)),
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
               ),
               onPressed: () => _toggle(''),
             ),
@@ -588,9 +677,11 @@ class _TeamActionsState extends ConsumerState<_TeamActions> {
     final repo = ref.read(teamRepositoryProvider);
 
     if (_armed) {
-      return Row(
+      // 🔴 확인 단계도 세로다 — 반쪽 폭에서 「정말 해체합니다」가 잘린다.
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
+          SizedBox(
             child: FilledButton(
               key: Key('team-confirm-${t.teamId}'),
               style: FilledButton.styleFrom(backgroundColor: danger),
@@ -608,7 +699,6 @@ class _TeamActionsState extends ConsumerState<_TeamActions> {
               ),
             ),
           ),
-          const SizedBox(width: 8),
           TextButton(
             key: Key('team-cancel-${t.teamId}'),
             onPressed: _busy ? null : () => setState(() => _armed = false),
@@ -619,23 +709,40 @@ class _TeamActionsState extends ConsumerState<_TeamActions> {
       );
     }
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
+    /* 🔴 **좁아서 `Wrap` 이다** — `Row` 로 두면 「수정 · 팀 해체」가 반쪽
+       폭에서 넘친다. 넘치면 아래 줄로 내려간다. */
+    return Wrap(
+      alignment: WrapAlignment.end,
+      spacing: 4,
       children: [
         if (t.isOwner)
           TextButton(
             key: Key('team-edit-${t.teamId}'),
             onPressed: widget.onEdit,
-            style: TextButton.styleFrom(foregroundColor: _kOn),
-            child: Text(widget.editing ? '닫기' : '수정'),
+            style: TextButton.styleFrom(
+              foregroundColor: _kOn,
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+            ),
+            child: Text(
+              widget.editing ? '닫기' : '수정',
+              style: const TextStyle(fontSize: 12),
+            ),
           ),
         TextButton(
           key: Key('team-leave-${t.teamId}'),
           onPressed: () => setState(() => _armed = true),
-          style: TextButton.styleFrom(foregroundColor: danger),
+          style: TextButton.styleFrom(
+            foregroundColor: danger,
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+          ),
           /* 🔴 **주장에게는 「나가기」를 안 낸다** — 서버가 409 로 막는다.
              내주면 눌러 보고 거절만 받는다. 주장의 길은 해체다. */
-          child: Text(t.isOwner ? '팀 해체' : '팀 나가기'),
+          child: Text(
+            t.isOwner ? '팀 해체' : '팀 나가기',
+            style: const TextStyle(fontSize: 12),
+          ),
         ),
       ],
     );
@@ -643,6 +750,9 @@ class _TeamActionsState extends ConsumerState<_TeamActions> {
 }
 
 /// 정보 — 호칭 · 이메일 · 함께한 날.
+///
+/// 🔴 **라벨을 값 **위에** 쌓는다**(2026-09-22). 판이 반쪽 폭이 되면서 옆에
+/// 붙이던 76px 이름표 때문에 이메일이 **한 글자씩 끊겨** 여러 줄로 흘렀다.
 class _InfoBlock extends ConsumerWidget {
   const _InfoBlock({required this.user});
 
@@ -663,50 +773,31 @@ class _InfoBlock extends ConsumerWidget {
           /* 🔴 **사람이 직접 적는다**(2026-09-16 결정, 미결 `paik` 36번).
              원래는 분석이 붙이는 값이라 화면이 읽기만 했다 — 팀이 다시
              정하면서 여기서 고친다. 분류(강점·활동)는 **안 받는다.** */
-          /* 🔴 **아래 두 줄과 라벨 자리를 맞춘다**(사용자 지적). 이름표 폭
-             (76)은 같은데 `CrossAxisAlignment.start` 라 글자 윗선이 안
-             맞았다 — 오른쪽이 알약이라 높이가 달라서다. `baseline` 은 알약이
-             글자가 아니라 못 쓰고, **가운데로 맞추면** 한 줄일 때 라벨과
-             알약이 같은 선에 온다. */
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              SizedBox(
-                width: 76,
-                child: Text(
-                  '호칭',
-                  style: TextStyle(
-                    color: _kOn.withValues(alpha: 0.7),
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-              Expanded(child: _TitlesRow(card: card)),
-            ],
+          _label('호칭'),
+          _TitlesRow(card: card),
+          const SizedBox(height: 10),
+          _label('이메일'),
+          /* 🔴 **이메일은 `@` 에서 끊는다.** 좁은 칸에서 기본 줄바꿈은 글자
+             단위라 `player@supersub.te` / `st` 처럼 잘린다 — 읽기 나쁘다. */
+          Text(
+            user.email.replaceFirst('@', '@\u200B'),
+            style: const TextStyle(color: _kOn, fontSize: 13),
           ),
-          const SizedBox(height: 8),
-          _row('이메일', user.email),
-          const SizedBox(height: 8),
-          _row('함께한 날', joined),
+          const SizedBox(height: 10),
+          _label('함께한 날'),
+          Text(joined, style: const TextStyle(color: _kOn, fontSize: 13)),
         ],
       ),
     );
   }
 
-  Widget _row(String label, String value) => Row(
-    children: [
-      SizedBox(
-        width: 76,
+  Widget _label(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 2),
         child: Text(
-          label,
-          style: TextStyle(color: _kOn.withValues(alpha: 0.7), fontSize: 13),
+          text,
+          style: TextStyle(color: _kOn.withValues(alpha: 0.7), fontSize: 12),
         ),
-      ),
-      Expanded(
-        child: Text(value, style: const TextStyle(color: _kOn, fontSize: 13)),
-      ),
-    ],
-  );
+      );
 }
 
 /// 호칭 알약들 + 고치는 입구.
@@ -888,7 +979,11 @@ class _MatchesBlock extends StatelessWidget {
   }
 }
 
-/// 계정 — 지인 검색 노출 · 로그아웃.
+/// 계정 — 지인 검색 노출 · 로그아웃 · 탈퇴.
+///
+/// 🔴 **반쪽 폭이라 세로로 쌓는다**(2026-09-22). `SwitchListTile` 은 제목과
+/// 스위치를 한 줄에 놓아서 좁은 칸에서 **제목이 두세 줄로 흐르고** 스위치가
+/// 구석에 끼었다. 설명줄은 걷었다 — 좁은 칸에서 넉 줄을 먹는다.
 class _AccountBlock extends ConsumerWidget {
   const _AccountBlock({required this.user});
 
@@ -899,71 +994,69 @@ class _AccountBlock extends ConsumerWidget {
     return _Block(
       title: '계정',
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          /* 🔴 **`Material` 로 감싼다.** `ListTile` 은 바탕과 잉크를 가장 가까운
-             Material 에 그리는데, 색 있는 상자 안에 그냥 두면 그 상자가 효과를
-             가린다고 프레임워크가 경고를 던진다(시험이 그걸로 깨졌다). */
-          Material(
-            color: Colors.transparent,
-            child: SwitchListTile(
-              key: const Key('profile-searchable'),
-              contentPadding: EdgeInsets.zero,
-              value: user.isNicknameSearchable,
-              activeThumbColor: AppTheme.seed,
-              title: const Text(
-                '지인 검색에 나를 보이기',
-                style: TextStyle(color: _kOn, fontSize: 14),
-              ),
-              subtitle: Text(
-                '닉네임으로 나를 찾아 지인 신청을 보낼 수 있습니다.',
-                style: TextStyle(
-                  color: _kOn.withValues(alpha: 0.6),
-                  fontSize: 12,
-                ),
-              ),
-              onChanged: (v) async {
-                try {
-                  await ref
-                      .read(sessionControllerProvider.notifier)
-                      .setNicknameSearchable(v);
-                } catch (e) {
-                  if (context.mounted) _notReady(context, '$e');
-                }
-              },
-            ),
-          ),
-          const SizedBox(height: 8),
-          /* 🔴 **로그아웃이 왼쪽, 탈퇴가 오른쪽 끝**(웹과 같은 자리). 자주
-             쓰는 것이 먼저고 **위험한 것이 끝**이다. 🔴 로그아웃은 빨갛지
-             않다 — 같은 줄에서 빨강을 나눠 쓰면 **탈퇴의 빨강이 경고로 안
-             읽힌다.** 다시 로그인하면 그만인 일이다. */
           Row(
-            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              TextButton(
-                key: const Key('profile-logout'),
-                onPressed: () =>
-                    ref.read(sessionControllerProvider.notifier).logout(),
-                style: TextButton.styleFrom(foregroundColor: _kOn),
-                child: const Text('로그아웃'),
-              ),
-              const SizedBox(width: 8),
-              /* 🔴 **채운 빨강이다**(2026-09-22, 사용자 요청). 글자만 빨갛던
-                 때는 옆의 로그아웃과 **같은 무게**로 보여서, 되돌릴 수 없는
-                 쪽이 눈에 안 띄었다. */
-              FilledButton(
-                key: const Key('profile-delete-account'),
-                onPressed: () => showDeleteAccountSheet(context),
-                style: FilledButton.styleFrom(
-                  backgroundColor: _kDanger,
-                  foregroundColor: _kOn,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  visualDensity: VisualDensity.compact,
+              Expanded(
+                child: Text(
+                  '지인 검색 노출',
+                  style: TextStyle(
+                    color: _kOn.withValues(alpha: 0.85),
+                    fontSize: 12,
+                  ),
                 ),
-                child: const Text('회원 탈퇴'),
+              ),
+              /* 🔴 **`Material` 로 감싼다.** 스위치는 잉크를 가장 가까운
+                 Material 에 그리는데, 없으면 프레임워크가 경고를 던진다
+                 (시험이 그걸로 깨졌다). */
+              Material(
+                color: Colors.transparent,
+                child: Switch(
+                  key: const Key('profile-searchable'),
+                  value: user.isNicknameSearchable,
+                  activeThumbColor: AppTheme.seed,
+                  // 좁은 칸이라 기본 여백을 줄인다.
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  onChanged: (v) async {
+                    try {
+                      await ref
+                          .read(sessionControllerProvider.notifier)
+                          .setNicknameSearchable(v);
+                    } catch (e) {
+                      if (context.mounted) _notReady(context, '$e');
+                    }
+                  },
+                ),
               ),
             ],
+          ),
+          const SizedBox(height: 8),
+          /* 🔴 **세로로 쌓는다** — 한 줄에 두면 「회원 탈퇴」가 반쪽 폭에서
+             잘린다. 자주 쓰는 로그아웃이 위, **되돌릴 수 없는 탈퇴가 아래**다.
+             🔴 로그아웃은 안 빨갛다 — 같은 칸에서 빨강을 나눠 쓰면 탈퇴의
+             빨강이 경고로 안 읽힌다. */
+          OutlinedButton(
+            key: const Key('profile-logout'),
+            onPressed: () =>
+                ref.read(sessionControllerProvider.notifier).logout(),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _kOn,
+              side: BorderSide(color: _kOn.withValues(alpha: 0.35)),
+              visualDensity: VisualDensity.compact,
+            ),
+            child: const Text('로그아웃', style: TextStyle(fontSize: 12)),
+          ),
+          const SizedBox(height: 6),
+          FilledButton(
+            key: const Key('profile-delete-account'),
+            onPressed: () => showDeleteAccountSheet(context),
+            style: FilledButton.styleFrom(
+              backgroundColor: _kDanger,
+              foregroundColor: _kOn,
+              visualDensity: VisualDensity.compact,
+            ),
+            child: const Text('회원 탈퇴', style: TextStyle(fontSize: 12)),
           ),
         ],
       ),

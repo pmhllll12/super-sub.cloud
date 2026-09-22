@@ -77,8 +77,11 @@ void main() {
        그림 안의 글자다. 카드가 화면의 첫 얼굴이 되면서 생긴 정상 상태다. */
     expect(find.text('백성검'), findsWidgets);
 
-    await scrollTo(tester, find.text('player@supersub.test'));
-    expect(find.text('player@supersub.test'), findsOneWidget);
+    /* 🔴 **이메일에 보이지 않는 줄바꿈 자리(`\u200B`)가 들어 있다**
+       (2026-09-22) — 판이 반쪽 폭이 되면서 `@` 에서 끊어 주지 않으면 글자
+       단위로 잘려 흐른다. 그래서 통글자로는 못 찾는다. */
+    await scrollTo(tester, find.textContaining('player@'));
+    expect(find.textContaining('supersub.test'), findsOneWidget);
   });
 
   testWidgets('바텀시트에서 닉네임을 바꾼다', (tester) async {
@@ -199,7 +202,9 @@ void main() {
       final me = container.read(sessionControllerProvider) as SessionLoggedIn;
 
       await scrollTo(tester, find.byKey(const Key('profile-searchable')));
-      final sw = tester.widget<SwitchListTile>(
+      // 🔴 `SwitchListTile` 이 아니라 `Switch` 다 (2026-09-22) — 반쪽 폭에서
+      //    제목과 스위치를 한 줄에 두면 제목이 두세 줄로 흐른다.
+      final sw = tester.widget<Switch>(
         find.byKey(const Key('profile-searchable')),
       );
       expect(sw.value, me.user.isNicknameSearchable);
@@ -246,6 +251,8 @@ void main() {
     testWidgets('해체는 한 번 더 묻는다', (tester) async {
       await _pump(tester, MockDb.playerId);
 
+      await tester.ensureVisible(find.byKey(const Key('team-leave-t-thunder')));
+      await _settle(tester);
       await tester.tap(find.byKey(const Key('team-leave-t-thunder')));
       await _settle(tester);
 
@@ -256,7 +263,11 @@ void main() {
     testWidgets('해체하면 소속에서 사라진다', (tester) async {
       await _pump(tester, MockDb.playerId);
 
+      await tester.ensureVisible(find.byKey(const Key('team-leave-t-thunder')));
+      await _settle(tester);
       await tester.tap(find.byKey(const Key('team-leave-t-thunder')));
+      await _settle(tester);
+      await tester.ensureVisible(find.byKey(const Key('team-confirm-t-thunder')));
       await _settle(tester);
       await tester.tap(find.byKey(const Key('team-confirm-t-thunder')));
       await _settle(tester);
@@ -326,6 +337,11 @@ void main() {
       );
       await _settle(tester);
 
+      /* 🔴 **접히는 동안에는 폼이 트리에 남아 있다** — `_Fold` 가 다 접힌
+         뒤에야 뺀다(안 그러면 보이지 않는 폼의 포커스가 살아 자판이
+         올라온다). 그 사이에는 입력칸에도 「새 팀」이 있어 **둘로** 잡힌다.
+         접힘이 끝나길 기다린 뒤에 센다. */
+      await _settle(tester);
       expect(find.text('새 팀'), findsOneWidget);
       // 🔴 만든 사람이 주장으로 들어간다(계약).
       expect(find.text('주장'), findsOneWidget);
