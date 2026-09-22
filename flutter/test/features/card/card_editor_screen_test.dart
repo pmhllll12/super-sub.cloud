@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_sub/core/network/api_client.dart';
 import 'package:super_sub/core/network/upload_file.dart';
@@ -302,6 +303,91 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('card-editor-photo-pending')), findsOneWidget);
+    });
+  });
+
+  group('색 고르기', () {
+    /// 🔴 **여기가 이 회차에 고친 것이다** (2026-09-22). 전에는 아홉 색**만**
+    /// 고를 수 있었는데 웹은 아무 색이나 고른다 — 그래서 웹에서 고른 색이
+    /// 아홉에 없으면 앱 편집기에서 **아무 것도 안 골라진 것처럼** 보였다.
+    testWidgets('빠른 선택 아홉 옆에 자유 고르개가 선다', (tester) async {
+      await _pump(tester);
+
+      // 세 줄(바탕·워드마크·글자)에 하나씩.
+      expect(find.byKey(const Key('card-editor-free-color-바탕')),
+          findsOneWidget);
+      expect(find.byKey(const Key('card-editor-free-color-워드마크')),
+          findsOneWidget);
+      expect(find.byKey(const Key('card-editor-free-color-글자')),
+          findsOneWidget);
+    });
+
+    /// 🔴 **지금 색을 글자로 보여 준다.** 빠른 선택에 없는 색일 때 동그라미만
+    /// 보면 무엇이 골라져 있는지 알 데가 없다.
+    testWidgets('지금 색의 hex 가 보인다', (tester) async {
+      await _pump(
+        tester,
+        card: PlayerCard(
+          publicSlug: 'mine',
+          nickname: '나',
+          // 아홉에 없는 색 — 웹에서 고른 것을 흉내 낸다.
+          style: CardStyle.fromJson(const {'bg': '#123456'}),
+        ),
+      );
+
+      expect(find.text('#123456'), findsOneWidget);
+    });
+
+    test('hexOf 는 #RRGGBB 로 적는다', () {
+      expect(hexOf(const Color(0xFF123456)), '#123456');
+      expect(hexOf(const Color(0xFF0B0B0B)), '#0B0B0B');
+      expect(hexOf(const Color(0xFFFFFFFF)), '#FFFFFF');
+    });
+
+    /// 🔴 저장까지 이어지는지 — 고를 수 있어도 값이 안 가면 뜻이 없다.
+    testWidgets('빠른 선택으로 고른 색이 저장에 실린다', (tester) async {
+      final repo = await _pump(tester);
+
+      await tester.tap(
+        find.byKey(const Key('card-editor-color-바탕-#0B0B0B')),
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('card-editor-save')));
+      await tester.pump();
+
+      expect(repo.style!.bg, const Color(0xFF0B0B0B));
+    });
+
+    /// 🔴 **고른 색이 hex 글자에도 곧바로 나타난다** — 그게 「내 색이 여기
+    /// 있다」를 보여 주는 유일한 자리다.
+    testWidgets('고르면 hex 글자가 따라 바뀐다', (tester) async {
+      await _pump(tester);
+
+      /* `#0B0B0B` 은 기본 글자색이라 처음부터 두 줄에 떠 있다 — 겹치지 않는
+         색으로 잰다. */
+      expect(find.text('#118AB2'), findsNothing);
+
+      await tester.tap(
+        find.byKey(const Key('card-editor-color-바탕-#118AB2')),
+      );
+      await tester.pump();
+
+      expect(find.text('#118AB2'), findsOneWidget);
+    });
+
+    /// 🔴 **투명도를 안 내준다** — 카드 색이 반투명이면 아래 무엇이 비칠지
+    /// 자리마다 달라서 같은 카드가 화면마다 다르게 보인다. 계약도 `#RRGGBB`
+    /// 만 받는다.
+    testWidgets('고르개에 투명도 칸이 없다', (tester) async {
+      await _pump(tester);
+
+      await tester.tap(find.byKey(const Key('card-editor-free-color-바탕')));
+      await tester.pumpAndSettle();
+
+      final picker = tester.widget<ColorPicker>(find.byType(ColorPicker));
+      expect(picker.enableAlpha, isFalse);
+      // 웹에서 쓴 색을 옮겨 적을 길은 남긴다.
+      expect(picker.hexInputBar, isTrue);
     });
   });
 }

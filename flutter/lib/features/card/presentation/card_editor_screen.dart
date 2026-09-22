@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
@@ -543,8 +544,15 @@ class _ColorRow extends StatelessWidget {
   final Color value;
   final ValueChanged<Color> onPick;
 
-  /// 고를 수 있는 색 — 카드가 밖으로 공유되는 물건이라 **아무 색이나** 두기보다
-  /// 읽히는 조합을 추린다.
+  /// **빠른 선택** — 읽히는 조합을 추려 둔 아홉.
+  ///
+  /// 🔴 **이것이 전부가 아니다** (2026-09-22). 전에는 이 아홉**만** 고를 수
+  /// 있었는데, 웹은 `<input type="color">` 로 **아무 색이나** 고른다 — 그래서
+  /// 웹에서 고른 색이 여기 없으면 앱 편집기에서 **아무 것도 안 골라진 것처럼**
+  /// 보였다(값이 날아가진 않지만 「내 색이 사라졌나」로 읽힌다).
+  ///
+  /// 그래도 아홉을 **버리지 않는다** — 카드가 밖으로 공유되는 물건이라 읽히는
+  /// 조합을 손쉽게 집을 길이 있는 편이 낫다. 자유 고르개는 그 아래에 둔다.
   static const _palette = [
     Color(0xFF91EA92), Color(0xFF70ED88), Color(0xFFFFFFFF),
     Color(0xFF0B0B0B), Color(0xFF1E3029), Color(0xFFFFD166),
@@ -558,14 +566,38 @@ class _ColorRow extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: _kOn, fontSize: 13)),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(color: _kOn, fontSize: 13),
+                ),
+              ),
+              /* 🔴 **지금 값을 글자로 보여 준다**(웹도 `#RRGGBB` 를 옆에
+                 적는다). 빠른 선택에 없는 색일 때 **동그라미만 보면 무엇이
+                 골라져 있는지 알 데가 없다** — 그게 이 회차에 고친 문제의
+                 절반이다. */
+              Text(
+                hexOf(value),
+                style: TextStyle(
+                  color: _kOn.withValues(alpha: 0.7),
+                  fontSize: 12,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               for (final c in _palette)
                 GestureDetector(
+                  // 시험이 「어느 색을 눌렀는지」로 찾을 수 있게 키를 단다.
+                  key: Key('card-editor-color-$label-${hexOf(c)}'),
                   onTap: () => onPick(c),
                   child: Container(
                     width: 36,
@@ -582,9 +614,120 @@ class _ColorRow extends StatelessWidget {
                     ),
                   ),
                 ),
+              /* 🔴 **자유 고르개는 빠른 선택 뒤에 선다.** 지금 색이 아홉에
+                 없으면 이 칸이 그 색으로 칠해져 있어서, 「내 색이 여기
+                 있다」가 보인다. */
+              _FreePickButton(
+                label: label,
+                value: value,
+                custom: !_palette.contains(value),
+                onPick: onPick,
+              ),
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// `#RRGGBB` — 지금 골라진 색을 글자로.
+String hexOf(Color c) {
+  String two(double v) =>
+      (v * 255).round().toRadixString(16).padLeft(2, '0').toUpperCase();
+  return '#${two(c.r)}${two(c.g)}${two(c.b)}';
+}
+
+/// 아무 색이나 고르는 자리 — 누르면 바퀴가 올라온다.
+class _FreePickButton extends StatelessWidget {
+  const _FreePickButton({
+    required this.label,
+    required this.value,
+    required this.custom,
+    required this.onPick,
+  });
+
+  final String label;
+  final Color value;
+
+  /// 지금 색이 빠른 선택 아홉에 **없는가** — 그러면 이 칸이 골라진 표시를 쥔다.
+  final bool custom;
+
+  final ValueChanged<Color> onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      key: Key('card-editor-free-color-$label'),
+      onTap: () => _open(context),
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: custom ? value : Colors.transparent,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: custom ? const Color(0xFF70ED88) : const Color(0x55FFFFFF),
+            width: custom ? 3 : 1,
+          ),
+        ),
+        child: Icon(
+          Icons.colorize,
+          size: 18,
+          // 칠해진 위에 얹히므로 대비를 그 색의 밝기로 가른다.
+          color: custom && value.computeLuminance() > 0.5
+              ? const Color(0xFF0B0B0B)
+              : _kOn,
+        ),
+      ),
+    );
+  }
+
+  /// 🔴 **고르는 동안 바로 반영한다**(`onColorChanged` → `onPick`). 웹의
+  /// `<input type="color">` 도 끌면서 바뀌므로, 닫을 때 한 번만 넘기면
+  /// **카드가 안 따라오는** 것처럼 보인다.
+  void _open(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF1E3029),
+      isScrollControlled: true,
+      builder: (sheet) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '$label 색',
+                style: const TextStyle(
+                  color: _kOn,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ColorPicker(
+                pickerColor: value,
+                onColorChanged: onPick,
+                /* 🔴 **투명도를 안 내준다.** 카드 색이 반투명이면 아래
+                   무엇이 비칠지 자리마다 달라서, 같은 카드가 판·프로필·
+                   공유 화면에서 다르게 보인다. 계약도 `#RRGGBB` 만 받는다. */
+                enableAlpha: false,
+                labelTypes: const [],
+                // `#RRGGBB` 를 직접 칠 수 있다 — 웹에서 쓴 색을 옮겨 적는 길.
+                hexInputBar: true,
+                portraitOnly: true,
+                displayThumbColor: true,
+              ),
+              TextButton(
+                key: const Key('card-editor-free-color-done'),
+                onPressed: () => Navigator.of(sheet).pop(),
+                style: TextButton.styleFrom(foregroundColor: _kOn),
+                child: const Text('닫기'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
