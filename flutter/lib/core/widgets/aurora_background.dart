@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
@@ -22,6 +24,7 @@ class AuroraBackground extends StatelessWidget {
     required this.child,
     this.base = const Color(0xFF0A0F0C),
     this.tint,
+    this.phase = 0,
   });
 
   final Widget child;
@@ -36,9 +39,14 @@ class AuroraBackground extends StatelessWidget {
   /// 다른 그림이 되어 「같은 앱」으로 안 읽힌다.
   final ({Color a, Color b})? tint;
 
+  /// **떠다니는 위상**(0~1 이 한 바퀴). 🔴 **기본이 0 이라 안 주면 예전
+  /// 그림 그대로다** — 홈은 가만히 있어야 한다(`figure_background.dart` 를
+  /// 움직이게 했다 걷어낸 것과 같은 판단).
+  final double phase;
+
   @override
   Widget build(BuildContext context) {
-    final painter = _AuroraPainter(tint: tint);
+    final painter = _AuroraPainter(tint: tint, phase: phase);
     return ColoredBox(
       color: base,
       child: Stack(
@@ -55,9 +63,9 @@ class AuroraBackground extends StatelessWidget {
   }
 }
 
-/// 색 둘이 바뀌면 **부드럽게 건너간다**(2026-09-22, 사용자 요청: 「자연스럽고
-/// 부드럽게」). 카드 꾸미기에서 색을 고치고 프로필로 돌아오면 배경이 툭
-/// 갈리는 대신 스며들 듯 옮겨 간다.
+/// 색 둘이 바뀌면 **부드럽게 건너가고**, 그 사이에도 빛무리가 **천천히
+/// 떠다닌다**(2026-09-22, 사용자 요청: 「자연스럽고 부드럽게」 · 「다양한 곳에서
+/// 나왔다 사라졌다」 · 「너무 빠르게 하면 눈 아프니까」).
 ///
 /// 🔴 **`ColorTween` 이 지금 값에서 이어간다** — 직접 `0→1` 을 감으면서 앞
 /// 색을 고정값으로 잡으면, 색을 **두 번째로** 바꿀 때 기본색으로 한 번
@@ -66,35 +74,75 @@ class AuroraBackground extends StatelessWidget {
 ///
 /// 🔴 **둘이 어긋나지 않는다** — 같은 프레임에 둘 다 새 목표를 받고 길이·
 /// 곡선이 같으므로 함께 움직인다.
-class AnimatedAuroraBackground extends StatelessWidget {
+class AnimatedAuroraBackground extends StatefulWidget {
   const AnimatedAuroraBackground({
     super.key,
     required this.child,
     required this.tint,
     this.base = const Color(0xFF0A0F0C),
     this.duration = const Duration(milliseconds: 1200),
+    this.driftPeriod = const Duration(seconds: 48),
   });
 
   final Widget child;
   final ({Color a, Color b}) tint;
   final Color base;
+
+  /// 색이 갈릴 때 건너가는 시간.
   final Duration duration;
+
+  /// 빛무리가 한 바퀴 도는 시간.
+  ///
+  /// 🔴 **길게 둔다**(사용자 요청: 「너무 빠르게 하면 눈 아프니까」). 짧으면
+  /// 배경이 꿈틀거려 **읽고 있는 글에서 눈이 끌려간다** — 배경은 알아채지
+  /// 못할 만큼만 움직여야 한다.
+  final Duration driftPeriod;
+
+  @override
+  State<AnimatedAuroraBackground> createState() =>
+      _AnimatedAuroraBackgroundState();
+}
+
+class _AnimatedAuroraBackgroundState extends State<AnimatedAuroraBackground>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _drift = AnimationController(
+    vsync: this,
+    duration: widget.driftPeriod,
+  )..repeat();
+
+  @override
+  void dispose() {
+    _drift.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    /* 🔴 **「애니메이션 줄이기」를 켠 사람에게는 멈춰 있는다.** 움직이는
+       배경은 어지럼증을 일으킬 수 있고, 운영체제가 그 뜻을 이미 받아 뒀다.
+       그때는 `phase: 0` — 예전 그림 그대로다. */
+    final still = MediaQuery.disableAnimationsOf(context);
+
     return TweenAnimationBuilder<Color?>(
-      tween: ColorTween(end: tint.a),
-      duration: duration,
+      tween: ColorTween(end: widget.tint.a),
+      duration: widget.duration,
       curve: Curves.easeInOut,
       builder: (context, a, _) => TweenAnimationBuilder<Color?>(
-        tween: ColorTween(end: tint.b),
-        duration: duration,
+        tween: ColorTween(end: widget.tint.b),
+        duration: widget.duration,
         curve: Curves.easeInOut,
-        builder: (context, b, _) => AuroraBackground(
-          base: base,
-          // 첫 프레임엔 아직 `null` 이다 — 그때는 목표 색으로 그린다.
-          tint: (a: a ?? tint.a, b: b ?? tint.b),
-          child: child,
+        builder: (context, b, _) => AnimatedBuilder(
+          animation: _drift,
+          /* 🔴 **자식을 다시 안 짓는다.** 매 프레임 도는 애니메이션이라 자식을
+             builder 안에 두면 프로필 목록 전체가 초당 60번 다시 지어진다. */
+          child: widget.child,
+          builder: (context, child) => AuroraBackground(
+            base: widget.base,
+            // 첫 프레임엔 아직 `null` 이다 — 그때는 목표 색으로 그린다.
+            tint: (a: a ?? widget.tint.a, b: b ?? widget.tint.b),
+            phase: still ? 0 : _drift.value,
+            child: child!,
+          ),
         ),
       ),
     );
@@ -123,27 +171,60 @@ class _Glow {
 }
 
 class _AuroraPainter extends CustomPainter {
-  const _AuroraPainter({this.tint});
+  const _AuroraPainter({this.tint, this.phase = 0});
+
+  /// 0~1 이 한 바퀴. 아래 [_painted] 가 이 값으로 자리와 알파를 흔든다.
+  final double phase;
 
   /// `null` 이면 아래 브랜드 배치 그대로. 있으면 **자리와 알파는 두고 색만**
   /// 두 색으로 번갈아 갈아 끼운다.
   final ({Color a, Color b})? tint;
 
-  /// 실제로 칠할 빛무리들.
+  /// 빛무리마다 다른 **흔들림 배수와 어긋난 출발점**.
+  ///
+  /// 🔴 **배수가 정수다.** 소수로 두면 「더 랜덤해 보이지만」 한 바퀴가 끝나는
+  /// 지점에서 값이 제자리로 안 돌아와 **화면이 툭 튄다.** 정수 배수 + 서로
+  /// 다른 출발점이면 이음매 없이 돌면서도 규칙이 안 읽힌다.
+  static const _drift = [
+    // (가로 배수, 세로 배수, 밝기 배수, 출발점)
+    (1, 2, 1, 0.00),
+    (2, 1, 2, 1.70),
+    (1, 3, 1, 3.10),
+    (3, 2, 2, 4.60),
+  ];
+
+  /// 빛무리가 돌아다니는 폭 — 화면 대비. 🔴 **너무 크게 두지 않는다**:
+  /// 원이 화면 한가운데로 들어오면 「번진 빛」이 아니라 **동그라미**로 읽힌다.
+  static const _amp = 0.22;
+
+  /// 밝기가 내려가는 바닥 — 🔴 **0 까지 안 내린다.** 완전히 꺼졌다 켜지면
+  /// 깜빡이는 것으로 보인다. 옅어졌다 짙어지는 정도로만 둔다.
+  static const _dim = 0.35;
+
+  /// 실제로 칠할 빛무리들 — 색을 갈아 끼우고, 자리와 밝기를 [phase] 로 흔든다.
   List<_Glow> get _painted {
     final t = tint;
-    if (t == null) return _glows;
-    /* 🔴 **번갈아 준다** — 한 색을 위 둘, 다른 색을 아래 둘에 몰면 화면이
-       위아래로 갈린 띠처럼 보인다. 엇갈리게 놓아야 두 색이 섞인다. */
+    final w = phase * 2 * math.pi;
     return [
       for (var i = 0; i < _glows.length; i += 1)
-        _Glow(
-          i.isEven ? t.a : t.b,
-          _glows[i].dx,
-          _glows[i].dy,
-          _glows[i].radius,
-          _glows[i].alpha,
-        ),
+        () {
+          final g = _glows[i];
+          final d = _drift[i % _drift.length];
+          /* 🔴 **번갈아 준다** — 한 색을 위 둘, 다른 색을 아래 둘에 몰면
+             화면이 위아래로 갈린 띠처럼 보인다. 엇갈려야 두 색이 섞인다. */
+          final color = t == null ? g.color : (i.isEven ? t.a : t.b);
+          if (phase == 0) {
+            return _Glow(color, g.dx, g.dy, g.radius, g.alpha);
+          }
+          final breath = 0.5 + 0.5 * math.sin(w * d.$3 + d.$4);
+          return _Glow(
+            color,
+            g.dx + _amp * math.sin(w * d.$1 + d.$4),
+            g.dy + _amp * math.cos(w * d.$2 + d.$4),
+            g.radius,
+            g.alpha * (_dim + (1 - _dim) * breath),
+          );
+        }(),
     ];
   }
 
@@ -193,5 +274,7 @@ class _AuroraPainter extends CustomPainter {
   /// 알파는 상수라 색만 견주면 된다.
   @override
   bool shouldRepaint(_AuroraPainter oldDelegate) =>
-      oldDelegate.tint?.a != tint?.a || oldDelegate.tint?.b != tint?.b;
+      oldDelegate.tint?.a != tint?.a ||
+      oldDelegate.tint?.b != tint?.b ||
+      oldDelegate.phase != phase;
 }

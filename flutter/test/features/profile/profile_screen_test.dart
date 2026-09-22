@@ -10,6 +10,19 @@ import 'package:super_sub/features/auth/presentation/session_controller.dart';
 import 'package:super_sub/core/dev/data_source.dart';
 import 'package:super_sub/features/profile/presentation/screens/profile_screen.dart';
 
+/// 🔴 **`pumpAndSettle` 을 안 쓴다 (2026-09-22).** 프로필 배경의 빛무리가
+/// **영영 도는 애니메이션**이라(`AnimatedAuroraBackground`) 안 멎고 10분
+/// 타임아웃까지 간다 — `flutter/CLAUDE.md` 의 그 함정이다.
+///
+/// 🔴 **여러 프레임으로 나눠 흘린다.** 한 번에 크게 흘리면 바텀시트가 올라오는
+/// 길목에서 멈춰 **단추가 화면 밖에 있다**(`tap` 이 빗나간다). 라우트 연출은
+/// 프레임마다 나아간다.
+Future<void> _settle(WidgetTester tester) async {
+  for (var i = 0; i < 8; i += 1) {
+    await tester.pump(const Duration(milliseconds: 250));
+  }
+}
+
 Future<ProviderContainer> _pump(WidgetTester tester, String userId) async {
   final container = ProviderContainer(
     overrides: [
@@ -35,12 +48,7 @@ Future<ProviderContainer> _pump(WidgetTester tester, String userId) async {
   unawaited(
     container.read(sessionControllerProvider.notifier).loginAs(userId),
   );
-  /* 🔴 **두 번 흘린다 (2026-09-22).** 프로필에 「내 영상」 요약과 카드 색을
-     따르는 배경 전환(1.2초)이 붙으면서 지연이 겹쳤다 — 모자라게 흘리면
-     「트리를 버린 뒤에도 타이머가 남았다」로 깨지는데 **화면 잘못이 아니다.** */
-  await tester.pump(const Duration(milliseconds: 500));
-  await tester.pump(const Duration(milliseconds: 1500));
-  await tester.pumpAndSettle();
+  await _settle(tester);
   return container;
 }
 
@@ -60,14 +68,14 @@ void main() {
     final container = await _pump(tester, MockDb.playerId);
 
     await tester.tap(find.byKey(const Key('profile-edit')));
-    await tester.pumpAndSettle();
+    await _settle(tester);
 
     await tester.enterText(find.byKey(const Key('profile-nickname')), '김교체');
     await tester.tap(find.byKey(const Key('profile-save')));
     // 저장은 리포지토리를 거치므로 300ms 지연이 있다. 저장 중에는
     // 인디케이터가 계속 애니메이션하므로 pumpAndSettle을 쓰면 안 된다.
     await tester.pump(const Duration(milliseconds: 500));
-    await tester.pumpAndSettle();
+    await _settle(tester);
 
     final state = container.read(sessionControllerProvider) as SessionLoggedIn;
     expect(state.user.nickname, equals('김교체'));
@@ -78,7 +86,7 @@ void main() {
     await _pump(tester, MockDb.playerId);
 
     await tester.tap(find.byKey(const Key('profile-edit')));
-    await tester.pumpAndSettle();
+    await _settle(tester);
 
     await tester.enterText(find.byKey(const Key('profile-nickname')), '김교체');
     await tester.tap(find.byKey(const Key('profile-save')));
@@ -91,14 +99,14 @@ void main() {
     expect(button.onPressed, isNull);
 
     await tester.pump(const Duration(milliseconds: 500));
-    await tester.pumpAndSettle();
+    await _settle(tester);
   });
 
   testWidgets('저장에 실패하면 시트가 닫히지 않고 오류를 보여준다', (tester) async {
     final container = await _pump(tester, MockDb.playerId);
 
     await tester.tap(find.byKey(const Key('profile-edit')));
-    await tester.pumpAndSettle();
+    await _settle(tester);
 
     // 세션이 끊긴 상태에서의 저장 = 서버가 거절하는 경우.
     // 여기서도 Future를 직접 await하면 가짜 시계가 멈춰 있어 끝나지 않는다.
@@ -108,7 +116,7 @@ void main() {
     await tester.enterText(find.byKey(const Key('profile-nickname')), '김교체');
     await tester.tap(find.byKey(const Key('profile-save')));
     await tester.pump(const Duration(milliseconds: 500));
-    await tester.pumpAndSettle();
+    await _settle(tester);
 
     expect(find.text('로그인이 필요합니다'), findsOneWidget);
     expect(find.byKey(const Key('profile-nickname')), findsOneWidget);
@@ -119,7 +127,7 @@ void main() {
      찾기 전에 끌어 올린다. */
   Future<void> scrollTo(WidgetTester tester, Finder target) async {
     await tester.scrollUntilVisible(target, 200, scrollable: find.byType(Scrollable).first);
-    await tester.pumpAndSettle();
+    await _settle(tester);
   }
 
   group('웹에서 옮긴 칸들', () {
@@ -176,7 +184,7 @@ void main() {
       await scrollTo(tester, find.byKey(const Key('profile-searchable')));
       await tester.tap(find.byKey(const Key('profile-searchable')));
       await tester.pump(const Duration(milliseconds: 500));
-      await tester.pumpAndSettle();
+      await _settle(tester);
 
       final me = container.read(sessionControllerProvider) as SessionLoggedIn;
       expect(me.user.isNicknameSearchable, isFalse);
