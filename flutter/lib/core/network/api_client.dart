@@ -77,6 +77,19 @@ class ApiClient {
     return _decode(res);
   }
 
+  /// 목록을 주는 경로 — `GET /videos` 처럼 **최상위가 배열**인 응답.
+  ///
+  /// 🔴 [get] 과 따로 두는 이유: `jsonDecode` 결과를 `Map` 으로 단정하는 곳이
+  /// 한 군데라야 한다. 한쪽에서 `as Map` 이 배열을 만나면 그 자리에서 터지는데,
+  /// 메시지가 `type 'List<dynamic>' is not a subtype of Map` 이라 **계약을
+  /// 잘못 읽은 것인지 서버가 바뀐 것인지 안 드러난다.**
+  Future<List<Map<String, dynamic>>> getList(String path) async {
+    final res = await _send(
+      () => _client.get(_uri(path), headers: _headers()),
+    );
+    return _decodeList(res);
+  }
+
   Future<Map<String, dynamic>> post(
     String path, [
     Map<String, dynamic>? body,
@@ -135,6 +148,18 @@ class ApiClient {
     } on http.ClientException catch (e) {
       throw ApiException('서버에 연결할 수 없습니다: ${e.message}');
     }
+  }
+
+  /// 배열 응답. 실패 본문은 배열이 아니라 `{"error": …}` 라 [_decode] 에
+  /// 맡겨 예외로 올린다 — 오류 처리를 두 벌로 두지 않는다.
+  List<Map<String, dynamic>> _decodeList(http.Response response) {
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      _decode(response); // 늘 던진다.
+    }
+    if (response.bodyBytes.isEmpty) return const [];
+    // 🔴 `response.body` 를 쓰지 않는다 — 아래 _decode 와 같은 이유(latin1).
+    final decoded = jsonDecode(utf8.decode(response.bodyBytes)) as List<dynamic>;
+    return decoded.cast<Map<String, dynamic>>();
   }
 
   Map<String, dynamic> _decode(http.Response response) {
