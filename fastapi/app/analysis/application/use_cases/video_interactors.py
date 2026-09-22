@@ -64,7 +64,7 @@ from app.analysis.domain.entities.video_entity import ValidationEntity, VideoEnt
 from app.analysis.domain.rules.grade_rules import display_grade, is_trust_dominant
 from app.analysis.domain.rules.video_rules import (
     MAX_BYTES,
-    MAX_VIDEOS_PER_USER,
+    MAX_VIDEOS_PER_GROUP,
     build_storage_key,
     extension_for,
     is_provisional_key,
@@ -80,12 +80,31 @@ _log = logging.getLogger("supersub.analysis")
 _QUEUED = "queued"
 
 
-def _guard_video_limit(repository: VideoPort, user_id: UUID) -> None:
-    """계정당 **저장된** 영상 개수 상한(2026-09-22, 사용자 요청).
+#: 갈래 이름 — 화면의 탭 이름 그대로 쓴다. 사람이 받는 문구에서 「업로드
+#: 영상은 3개까지」와 화면의 「업로드 영상」 탭이 같은 말이어야 한다.
+_GROUP_LABEL = {True: "분석 영상", False: "업로드 영상"}
 
-    세는 것은 `kept=true` — 화면의 「업로드 영상」 목록과 같은 것이고 **반려된
-    클립도 한 자리를 차지한다**(반려도 처음부터 `kept=true` 로 남는다).
-    임시(`kept=false`, 분석 중)는 안 센다 — `VideoPort.count_kept_by_user` 참고.
+
+def _is_full(repository: VideoPort, user_id: UUID, *, analyzed: bool) -> bool:
+    return (
+        repository.count_kept_by_user(user_id, analyzed=analyzed)
+        >= MAX_VIDEOS_PER_GROUP
+    )
+
+
+def _guard_video_limit(
+    repository: VideoPort, user_id: UUID, *, analyzed: bool
+) -> None:
+    """**갈래마다** 저장된 영상 개수 상한(2026-09-22, 사용자 요청).
+
+    세는 것은 `kept=true` 이고 **갈래를 가른다** — 화면의 두 탭과 같은 기준
+    (`analysis_job_id` 유무)이다. 반려된 클립도 한 자리를 차지하고(반려도
+    처음부터 `kept=true` 다, 업로드 갈래), 임시(`kept=false`, 분석 중)는 안
+    센다. 자세한 것은 `VideoPort.count_kept_by_user`.
+
+    🔴 **합쳐서 3개가 아니다.** 처음엔 합쳐 넣었는데 화면이 두 탭으로 갈라
+    보여주고 있어서, 합치면 분석 영상 3개가 기록용 업로드까지 막는다.
+    한 계정의 최대는 **3 + 3 = 6개**다.
 
     🔴 **세 자리에서 부른다. 하나로는 안 막힌다.**
 
@@ -99,12 +118,12 @@ def _guard_video_limit(repository: VideoPort, user_id: UUID) -> None:
     됐고 분석 대상이 아닐 뿐"인데(위 모듈 머리말), 개수 초과는 등록 자체가
     성립하지 않는다 — 반려로 남기면 그 행이 또 한 자리를 차지한다.
     """
-    if repository.count_kept_by_user(user_id) >= MAX_VIDEOS_PER_USER:
+    if _is_full(repository, user_id, analyzed=analyzed):
         raise ApiError(
             422,
             "VIDEO_LIMIT_EXCEEDED",
-            f"영상은 계정당 {MAX_VIDEOS_PER_USER}개까지입니다. "
-            "저장된 영상을 지우고 다시 시도해 주십시오.",
+            f"{_GROUP_LABEL[analyzed]}은 계정당 {MAX_VIDEOS_PER_GROUP}개까지입니다. "
+            f"저장된 {_GROUP_LABEL[analyzed]}을 지우고 다시 시도해 주십시오.",
         )
 
 
@@ -132,7 +151,24 @@ class CreateUploadUrlInteractor(CreateUploadUrlUseCase):
             )
 
         # 자리가 없으면 올리기 전에 막는다. 같은 이유(헛걸음)다.
-        _guard_video_limit(self._repository, command.user_id)
+        #
+        # 🔴 **여기서는 어느 갈래로 갈지 모를 수 있다.** 갈래는 등록할 때
+        # `analyze` 와 규격 검사 결과로 정해지는데, 이 호출에는 그게 없다.
+        # `analyze` 를 **선택으로** 받아(클라이언트가 이미 알고 있는 값이다)
+        # 주면 그 갈래를 정확히 보고, 안 주면 **양쪽이 다 찼을 때만** 막는다.
+        # 🔴 한쪽만 찼는데 막으면 **안 찬 갈래로 올리려는 사람을 잘못 막는다**
+        # — 그래서 모를 때는 관대한 쪽으로 기운다. 진짜 관문은 등록이다.
+        if command.analyze is None:
+            if _is_full(
+                self._repository, command.user_id, analyzed=True
+            ) and _is_full(self._repository, command.user_id, analyzed=False):
+                _guard_video_limit(
+                    self._repository, command.user_id, analyzed=True
+                )
+        else:
+            _guard_video_limit(
+                self._repository, command.user_id, analyzed=command.analyze
+            )
 
         storage_key = build_storage_key(
             command.user_id,
@@ -154,7 +190,6 @@ class RegisterVideoInteractor(RegisterVideoUseCase):
         self._storage = storage
 
     def __call__(self, command: RegisterVideoCommand) -> VideoResult:
-        _guard_video_limit(self._repository, command.user_id)
         if not self._repository.sport_exists(command.sport_code):
             raise ApiError(422, "UNKNOWN_SPORT", "지원하지 않는 종목입니다.")
         # 🔴 「없는 종목」과 **「지금 안 받는 종목」을 가른다**(`ho` 39번).
@@ -208,6 +243,11 @@ class RegisterVideoInteractor(RegisterVideoUseCase):
         # 같은 내용을 이미 분석해 본 적이 있으면(`prior`) 새 작업도 안 만든다 —
         # 결정론적 파이프라인이라 같은 파일은 다시 돌려도 같은 결과다.
         make_job = reason is None and command.analyze and prior is None
+        # 🔴 **개수 상한은 여기서 본다** — 갈래가 정해지는 자리가 여기다
+        # (`analysis_job_id` 가 채워지느냐 = 화면의 어느 탭에 설 것이냐).
+        # 위쪽 종목·소유·업로드 검사보다 **뒤**인 이유는 `make_job` 이
+        # 규격 검사(`reason`)와 중복 판정(`prior`)까지 봐야 정해져서다.
+        _guard_video_limit(self._repository, command.user_id, analyzed=make_job)
         # 「이미 결과가 있다」도 「작업이 있다」와 같은 취급이다 — 임시 상태로
         # 뒀다가 사용자가 「내 프로필에 저장」을 눌러야 영구가 된다.
         has_outcome = make_job or prior is not None
@@ -429,8 +469,13 @@ class KeepVideoInteractor(KeepVideoUseCase):
 
         # 🔴 **이미 저장된 클립은 세지 않는다** — 같은 `keep` 을 다시 불러도
         # 자기 자신 때문에 막히면 안 된다(이 엔드포인트는 멱등이다).
+        # 갈래는 이 클립이 설 탭 그대로다(`analysis_job_id` 유무).
         if not video.kept:
-            _guard_video_limit(self._repository, command.user_id)
+            _guard_video_limit(
+                self._repository,
+                command.user_id,
+                analyzed=video.analysis_job_id is not None,
+            )
 
         new_key = video.storage_key
         # 리포트가 딸린 분석 클립의 임시 원본만 옮긴다. `/me` 업로드(기록용,

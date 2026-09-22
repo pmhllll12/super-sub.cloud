@@ -2845,33 +2845,32 @@ grep -rn "해상도\|MAX_LONG_SIDE\|resolution" www/src flutter/lib
 
 ---
 
-## 65. **영상은 계정당 3개까지입니다** — `VIDEO_LIMIT_EXCEEDED` (2026-09-22 추가, 사용자 요청)
+## 65. **영상이 갈래마다 3개까지입니다** — `VIDEO_LIMIT_EXCEEDED` (2026-09-22 추가, 사용자 요청)
 
-한 계정이 가질 수 있는 영상을 **3개**로 제한했습니다. 규격은
-`api-contract.md` 3-6절의 「🔴 계정당 3개」 절입니다.
+영상 개수를 제한했습니다. **합쳐서 3개가 아니라 갈래마다 3개**입니다. 규격은
+`api-contract.md` 3-6절의 「🔴 갈래마다 3개」 절입니다.
 
-**무엇을 세나 — 화면의 「업로드 영상」 목록에 보이는 것 전부**(서버로는
-`kept=true`, 즉 `GET /videos` 가 돌려주는 것과 같은 집합)입니다.
+**갈래는 `MyVideos.tsx` 가 이미 쓰고 있는 두 탭과 같습니다** — 가르는 기준도
+그쪽과 같은 **`analysis_job_id` 유무**입니다.
 
-| | 자리를 차지하나 |
-|---|---|
-| 「내 프로필에 저장」한 영상 | **예** |
-| `analyze: false` 로 올린 기록용 영상 | **예** |
-| **반려된 클립**(`passed: false`) | **예** — 목록에 사유와 함께 남으므로 |
-| 분석 중인 임시 클립(`kept: false`) | 아니오 |
-| 남의 영상 | 아니오 |
+| 갈래 | 무엇이 여기 서나 | 상한 |
+|---|---|---|
+| **분석 영상** (`analysis_job_id !== null`) | 분석을 걸고 저장한 것 | 3 |
+| **업로드 영상** (`analysis_job_id === null`) | `analyze: false` 기록용 · **반려된 클립** · 중복 재사용 | 3 |
 
-막는 자리는 **세 경로 전부**입니다 — `POST /videos/upload-url`(올리기 전),
-`POST /videos`(등록), `POST /videos/{id}/keep`(저장). 셋 다 `422` 입니다.
+🔴 **한 갈래가 차도 다른 갈래는 열려 있습니다.** 한 계정의 최대는 3 + 3 = 6개.
+
+세는 것은 `GET /videos` 가 돌려주는 것(`kept=true`)뿐이고, **분석 중인 임시
+클립은 안 셉니다.** 막는 자리는 `upload-url`·`POST /videos`·`keep` 셋 다 `422`.
 
 ```json
 { "error": { "code": "VIDEO_LIMIT_EXCEEDED",
-             "message": "영상은 계정당 3개까지입니다. 저장된 영상을 지우고 다시 시도해 주십시오." } }
+             "message": "분석 영상은 계정당 3개까지입니다. 저장된 분석 영상을 지우고 다시 시도해 주십시오." } }
 ```
 
-푸는 길은 `DELETE /videos/{video_id}` 하나이고, 지우면 자리는 즉시 빕니다.
-**이미 3개를 넘게 가진 계정의 영상을 지우게 하지는 않습니다** — 새로 늘리는
-것만 막습니다.
+`message` 가 **막힌 갈래 이름을 담습니다**(「분석 영상」/「업로드 영상」 — 화면의
+탭 이름과 같은 말). `code` 는 갈래와 무관하게 하나입니다. 푸는 길은
+`DELETE /videos/{id}` 하나이고, **이미 상한을 넘게 가진 계정은 그대로 둡니다.**
 
 ### ✅ `www` 는 지금도 안 깨집니다 — 고치는 것은 **UX 뿐**입니다
 
@@ -2879,55 +2878,63 @@ grep -rn "해상도\|MAX_LONG_SIDE\|resolution" www/src flutter/lib
 
 | 자리 | 확인한 것 |
 |---|---|
-| `www/src/server/backend/fastapiCall.ts` | `!res.ok` 면 `parseErrorBody(status, json, …)` 로 `BackendError` 를 던집니다 — **status·code·message 가 다 보존됩니다** |
-| `www/src/server/handler.ts` 의 `toErrorResponse` | `BackendError` 를 `{"error":{code,message}}` + 원래 status 로 되돌립니다 |
+| `www/src/server/backend/fastapiCall.ts` | `!res.ok` 면 `parseErrorBody(status, json, …)` — **status·code·message 가 다 보존됩니다** |
+| `www/src/server/handler.ts` 의 `toErrorResponse` | `BackendError` 를 `{"error":{code,message}}` + 원래 status 로 |
 | `www/src/lib/uploadClip.ts` 의 `readError` | `body?.error?.message` 를 읽어 `throw new Error(...)` — **서버 문구가 그대로 화면에 뜹니다** |
 
-그래서 **아무것도 안 고쳐도** 4번째 업로드를 누른 사람은 "영상은 계정당
-3개까지입니다. 저장된 영상을 지우고 다시 시도해 주십시오."를 봅니다. 아래는
-전부 **🟡 선택**입니다.
+그래서 **아무것도 안 고쳐도** 상한에 닿은 사람은 "분석 영상은 계정당 3개까지입니다…"를
+봅니다. 아래는 전부 **🟡 선택**입니다.
 
 ### 만족해야 할 성질 (전부 선택)
 
-1. **상한에 닿았다는 것이 누르기 전에 보인다.** 목록 길이로 알 수 있습니다
-   (`GET /videos` 가 돌려주는 줄 수) — 서버가 따로 남은 개수를 주지는
-   않습니다. 3개면 업로드 단추를 비활성으로 두거나 "3/3" 같은 표시를 답니다
-2. **`VIDEO_LIMIT_EXCEEDED` 일 때 지우는 길로 안내한다** — 지금도 문구는
-   뜨지만, 이 코드일 때만 「지울 영상 고르기」로 보내면 한 번에 풀립니다
-3. **`flutter/` 는 ⏳ 아직 안 씁니다** — `flutter/lib` 에 영상 업로드 경로가
-   없는 것을 확인했습니다(`grep -rn 'upload-url' flutter/lib` → 0건).
-   붙일 때 위 성질을 같이 보시면 됩니다
+1. **`upload-url` 에 `analyze` 를 같이 보낸다.** 새로 생긴 **선택** 필드입니다.
+   읽어 보니 `uploadClip.ts` 는 **이미 그 값을 갖고 있고**(101행에서
+   `opts.analyze` 를 구조 분해하는데 106행 1단계 본문에만 안 실립니다),
+   프록시 라우트(`www/src/app/api/videos/upload-url/route.ts`)는 파싱한 본문을
+   **통째로** `callFastApi` 에 넘기므로 **한 줄이면 됩니다**(라우트의 타입
+   주석을 같이 넓혀 두면 읽기 좋습니다).
+   - **안 보내도 동작은 같습니다** — 등록에서 어차피 막힙니다. 다만 한쪽만 찬
+     상태에서 그 갈래로 올리려던 사람은 **200MB 를 다 올리고 나서** 막힙니다.
+     보내면 그 헛걸음이 없어집니다
+2. **탭마다 남은 자리가 보인다.** `analysis_job_id` 로 이미 두 배열
+   (`analyzed`/`uploaded`)을 만들고 있으니 길이를 그대로 쓰면 됩니다 —
+   "3/3" 표시나 업로드 단추 비활성. 서버가 남은 개수를 따로 주지는 않습니다
+3. **`VIDEO_LIMIT_EXCEEDED` 일 때 지우는 길로 안내한다** — 다른 422
+   (`FILE_TOO_LARGE` 등)는 **파일을 바꾸면** 풀리지만 이것은 **지워야만** 풀립니다
+4. **`flutter/` 는 ⏳ 아직 안 씁니다** — `flutter/lib` 에 영상 업로드 경로가
+   없는 것을 확인했습니다(`grep -rn 'upload-url' flutter/lib` → 0건)
 
-**파일·함수 이름은 예시지 규격이 아닙니다.** 위 세 성질만 지키면 형태는
-`www` 쪽 사정입니다.
+**파일·함수 이름은 예시지 규격이 아닙니다.**
 
 ### 먼저 확인
 
 ```bash
 # 화면이 이미 개수로 막고 있는가 (있으면 손대지 않습니다)
-grep -rnE "VIDEO_LIMIT_EXCEEDED|계정당|3개까지" www/src flutter/lib
+grep -rnE "VIDEO_LIMIT_EXCEEDED|3개까지" www/src flutter/lib
 
-# 서버가 실제로 막는가 — 저장된 영상이 3개인 계정으로
-curl -s -o /dev/null -w '%{http_code}\n' -X POST https://<API 호스트>/api/v1/videos/upload-url \
+# 1단계가 analyze 를 보내고 있는가
+grep -n "upload-url" -A12 www/src/lib/uploadClip.ts | grep -n analyze
+
+# 서버가 실제로 갈래마다 막는가 — 분석 영상이 3개인 계정으로
+curl -s -X POST https://<API 호스트>/api/v1/videos/upload-url \
   -H "Authorization: Bearer <토큰>" -H 'Content-Type: application/json' \
-  -d '{"content_type":"video/mp4","size_bytes":52428800,"filename":"c.mp4"}'
-# -> 422 (본문의 code 가 VIDEO_LIMIT_EXCEEDED)
+  -d '{"content_type":"video/mp4","size_bytes":52428800,"filename":"c.mp4","analyze":true}'
+# -> 422 · code VIDEO_LIMIT_EXCEEDED · message 에 「분석 영상」
+# 같은 요청에 "analyze":false 를 주면 -> 200 (업로드 갈래는 비어 있으므로)
 ```
 
 ### 하지 말 것
 
-- 🔴 **화면에서 상한 숫자를 따로 하드코딩해 자체 판정하지 마십시오** — 서버
-  값이 바뀌면 화면만 어긋납니다. 막는 것은 서버가 하고, 화면은 **목록 길이**로
-  표시만 합니다
-- 🔴 **`VIDEO_LIMIT_EXCEEDED` 를 다른 422 와 뭉뚱그리지 마십시오** —
-  `UNSUPPORTED_FORMAT`·`FILE_TOO_LARGE` 는 **파일을 바꾸면** 풀리지만 이것은
-  **지워야만** 풀립니다. 안내가 같으면 사람이 파일만 계속 바꿉니다
-- 🔴 **임시 클립 수를 세지 마십시오** — 서버는 `kept=true` 만 셉니다. 분석
-  중인 것까지 세면 화면이 서버보다 먼저, 잘못 막습니다
+- 🔴 **두 갈래를 합쳐서 세지 마십시오** — 서버는 따로 셉니다. 합치면 화면이
+  서버보다 먼저, 잘못 막습니다
+- 🔴 **화면에서 상한 숫자를 하드코딩해 자체 판정하지 마십시오** — 막는 것은
+  서버가 하고, 화면은 **배열 길이**로 표시만 합니다
+- 🔴 **임시 클립 수를 세지 마십시오** — 서버는 `kept=true` 만 셉니다
+- 🔴 **갈래 기준을 `analysis_status` 로 바꾸지 마십시오** — 분석을 걸었지만
+  아직 대기 중인 클립이 업로드 쪽으로 새어 나갑니다(`MyVideos.tsx` 머리말에
+  이미 적혀 있는 함정이고, 서버도 같은 이유로 `analysis_job` 행 유무를 봅니다)
 
 - 확인: 백엔드 `tests/analysis/adapter/test_video_router.py` 의
-  `TestVideoLimit` 10건(상한 직전 통과 · 세 경로 차단 · 반려도 한 자리 · 반려로
-  기록하지 않음 · 임시는 안 셈 · 멱등 keep 은 안 막힘 · 지우면 빔 · 남의 영상은
-  무관) · `tests/analysis/adapter/test_video_db.py` 의 `TestVideoLimitDb` 3건
-  (실물 PostgreSQL `COUNT`) · 전체 `pytest` **1147 passed / skipped 0**
-  (DB 올린 상태). 마이그레이션 없음(`alembic check` → 변경 없음, head 하나)
+  `TestVideoLimit` 15건 · `tests/analysis/adapter/test_video_db.py` 의
+  `TestVideoLimitDb` 4건 · 전체 `pytest` **1153 passed / skipped 0**(DB 올린
+  상태). 마이그레이션 없음(`alembic check` → 변경 없음, head 하나)

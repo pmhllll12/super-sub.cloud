@@ -138,13 +138,24 @@ class VideoPgRepository(VideoPort):
     def list_by_user(self, user_id: UUID) -> list[VideoEntity]:
         return self._by_user(user_id, kept_only=True)
 
-    def count_kept_by_user(self, user_id: UUID) -> int:
+    def count_kept_by_user(self, user_id: UUID, *, analyzed: bool) -> int:
         # `list_by_user` 와 **같은 조건**을 센다 — 행은 읽어 오지 않는다.
+        # 🔴 갈래는 화면과 같이 `analysis_job` 행의 유무로 가른다. 목록이
+        # 채우는 `analysis_job_id`(가장 최근 작업)와 같은 축이다.
+        has_job = (
+            select(AnalysisJobOrm.id)
+            .where(AnalysisJobOrm.video_id == VideoOrm.id)
+            .exists()
+        )
         return int(
             self._session.execute(
                 select(func.count())
                 .select_from(VideoOrm)
-                .where(VideoOrm.user_id == user_id, VideoOrm.kept.is_(True))
+                .where(
+                    VideoOrm.user_id == user_id,
+                    VideoOrm.kept.is_(True),
+                    has_job if analyzed else ~has_job,
+                )
             ).scalar_one()
         )
 

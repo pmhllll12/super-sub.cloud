@@ -132,8 +132,14 @@ class StubVideoRepository(VideoPort):
         ]
         return sorted(mine, key=lambda v: v.created_at, reverse=True)
 
-    def count_kept_by_user(self, user_id: UUID) -> int:
-        return sum(1 for v in _VIDEOS.values() if v.user_id == user_id and v.kept)
+    def count_kept_by_user(self, user_id: UUID, *, analyzed: bool) -> int:
+        return sum(
+            1
+            for v in _VIDEOS.values()
+            if v.user_id == user_id
+            and v.kept
+            and (v.analysis_job_id is not None) == analyzed
+        )
 
     def list_all_by_user(self, user_id: UUID) -> list[VideoEntity]:
         mine = [v for v in _VIDEOS.values() if v.user_id == user_id]
