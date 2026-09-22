@@ -265,6 +265,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     switch (index) {
       case 0:
         return; // 이미 홈이다.
+      /* 🔴 **3번은 내 프로필이다**(2026-09-22, 사용자 지적: 「아래 3번째꺼
+         아이콘 누르면 똑같이 내 프로필 화면 나와야 하는거 아님?」).
+         아이콘(신분증)은 처음부터 프로필이었는데 **누르면 「준비 중입니다」**
+         가 떴다 — 아래 `default` 로 떨어지고 있었다. */
+      case 3:
+        context.go('/profile');
+      // 🔴 1번은 영상이다 — 3번과 **같은 종류의 누락**이었다(2026-09-22).
+      case 1:
+        context.go('/videos');
       case 2:
         _notReady('레슨 · 코치');
       default:

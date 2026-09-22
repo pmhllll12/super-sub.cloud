@@ -10,10 +10,10 @@ import '../../../card/data/card_providers.dart';
 import '../../../card/data/models/player_card.dart';
 import '../../../../core/widgets/aurora_background.dart';
 import '../../../../core/widgets/floating_nav_bar.dart';
-import '../../../../core/widgets/silver_edge.dart';
 import '../../../card/presentation/card_editor_screen.dart';
-import '../../../video/presentation/my_videos_controller.dart';
 import '../../../video/presentation/screens/my_videos_screen.dart';
+import '../widgets/card_side_smoke.dart';
+import '../widgets/silver_sweep_border.dart';
 import '../widgets/player_card_view.dart';
 import '../../../team/data/team_providers.dart';
 import 'delete_account_sheet.dart';
@@ -80,12 +80,29 @@ class ProfileScreen extends ConsumerWidget {
             _notReady(context, '준비 중입니다');
           },
         ),
+        /* 🔴 **`bottom: false` 가 있어야 내용이 바 밑으로 지나간다**
+           (2026-09-22, 사용자 지적: 「하단바 자체에 검정 판이 또 있어서
+           안 보인다 … 판 자체가 직선으로 보이지?」).
+
+           `extendBody: true` 는 **바 높이만큼 body 의 `MediaQuery` 아래
+           여백을 늘려 준다** — `SafeArea` 가 그것을 그대로 먹어서 목록이
+           **바 윗변에서 잘렸다.** 그래서 반투명 바 뒤에 비칠 것이 아무것도
+           없었고, 잘린 자리가 **가로 직선**으로 드러났다(판 둘이 나란히
+           같은 높이에서 끊겨 더 또렷했다).
+
+           🔴 **`SafeArea` 를 통째로 걷지는 않는다** — 위쪽(상태 바)은 여전히
+           피해야 한다. 아래만 끈다.
+
+           ⚠️ 바에 가리는 것은 아래 `padding` 이 맡는다 — 둘이 **같은 일을
+           두 번** 하고 있었던 것이고, 남길 쪽은 `padding` 이다(그쪽은 자리를
+           비워 줄 뿐 **잘라 내지 않는다**). */
         body: SafeArea(
+          bottom: false,
           child: ListView(
             padding: EdgeInsets.fromLTRB(
-              16,
+              _kEdge,
               8,
-              16,
+              _kEdge,
               // 떠 있는 바에 마지막 칸이 가리지 않게.
               FloatingNavBar.heightOf(context),
             ),
@@ -94,9 +111,14 @@ class ProfileScreen extends ConsumerWidget {
                「내 영상」만 한 줄을 다 쓴다 — 자주 들어가는 입구다. */
             children: [
               _CardHero(card: card, nickname: user.nickname),
-              const SizedBox(height: 16),
+              /* 🔴 **닉네임과 판 사이를 흰 선으로 가른다**(2026-09-22, 사용자
+                 요청: 「닉네임과 내 영상 판 가운데에 완전 흰색 선으로」).
+                 위아래 여백을 같게 줘서 선이 **둘의 한가운데**에 선다. */
+              const SizedBox(height: 14),
+              const _Rule(),
+              const SizedBox(height: 14),
               const _VideosBlock(),
-              const SizedBox(height: 12),
+              const SizedBox(height: _kGap),
               _Pair(
                 left: [
                   _TeamBlock(teams: user.teams),
@@ -115,13 +137,58 @@ class ProfileScreen extends ConsumerWidget {
   }
 }
 
-/// 빛무리 아래에 깔리는 바탕 — `kAuroraBase`(중성 회색)를 그대로 쓴다.
-/// 🔴 **화면마다 따로 정하지 않는다** — 갈리면 홈과 프로필이 다른 앱처럼
-/// 보인다.
-const Color _kBg = kAuroraBase;
+/// 빛무리 아래에 깔리는 바탕 — **완전한 검정**이다(2026-09-22 정정,
+/// 사용자 요청: 「배경 완전 검정으로」).
+///
+/// 🔴 전에는 `kAuroraBase`(#141417)를 그대로 썼고 판이 그 위에 **반투명
+/// 흰 면**으로 떴다. 이제는 **바탕이 검정, 판이 `kAuroraBase`** 다 — 둘이
+/// 자리를 맞바꾼 셈이라 테두리 없이도 판의 경계가 선다(아래 [_Block]).
+///
+/// ⚠️ 홈은 여전히 `kAuroraBase` 다. 두 화면의 바탕이 갈린 것은 **일부러**이고,
+/// 되돌리려면 이 한 줄이다.
+const Color _kBg = Color(0xFF000000);
 const Color _kOn = Color(0xFFFFFFFF);
+
+/// 화면 양끝 ↔ 판 사이, 그리고 판끼리의 간격. **둘 다 같은 값**이다
+/// (2026-09-22 사용자 요청: 「양옆 화면 끝에서 판의 거리가 6픽셀 … 판끼리의
+/// 거리도 6픽셀 똑같이」). 전에는 바깥 16 · 안쪽 12 로 갈려 있었다.
+///
+/// 🔴 **논리 픽셀이다 — `DesignScale`(`context.d`)을 쓰지 않는다.** 그쪽은
+/// 화면 폭에 비례해 늘어나서 **기기마다 다른 여백**이 된다. 요청이 「어떤
+/// 휴대폰에서건」이라 비례하지 않는 값을 쓴다.
+const double _kEdge = 6;
+const double _kGap = 6;
+
 /// 되돌릴 수 없는 일의 빨강 — 탈퇴·해체가 나눠 쓴다.
 const Color _kDanger = Color(0xFFD32F2F);
+
+/// 닉네임과 아래 판들을 가르는 **완전한 흰 선**(2026-09-22, 사용자 요청).
+///
+/// 🔴 **반투명이 아니라 순백(`_kOn`)이다** — 「완전 흰색」으로 짚으신 자리다.
+/// 판의 면([kSurfaceWhite])처럼 옅게 주면 검은 바탕에서 **회색 선**이 되어
+/// 가르는 일을 못 한다.
+///
+/// 굵기는 **그 기기에서 그릴 수 있는 가장 얇은 선**이다 — 순백이라 두꺼우면
+/// 선이 아니라 띠가 되고, 카드보다 그쪽으로 눈이 간다.
+class _Rule extends StatelessWidget {
+  const _Rule();
+
+  /// 가로로 차지하는 몫 — 🔴 **화면 폭 전체가 아니다**(2026-09-22 정정,
+  /// 사용자 요청: 「지금의 3분의 2로 길이 줄이자」). 가운데 맞춤이라 좌우가
+  /// 같은 길이씩 짧아진다.
+  static const double _widthFactor = 2 / 3;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 1 / MediaQuery.devicePixelRatioOf(context),
+      child: const FractionallySizedBox(
+        widthFactor: _widthFactor,
+        child: ColoredBox(color: _kOn),
+      ),
+    );
+  }
+}
 
 /// 웹의 유리판 한 칸 — 제목 + 내용.
 class _Block extends StatelessWidget {
@@ -139,28 +206,18 @@ class _Block extends StatelessWidget {
        목록이 구르면 그 늘린 띠가 매 프레임 달라져 선으로 보인다. 판이
        여섯이라 선도 여섯이었다(사용자: 「흰 직선들이 계속 나오고」).
 
-       🔴 **대신 반투명 면 + 은빛 실선**이다 — 이 저장소가 `SilverEdge` 를
-       둔 이유와 같다(「유리가 아니다 … 흐림 없이 색만 얹는다」). 면이
-       반투명이라 뒤의 빛무리는 그대로 비친다. */
+       🔴 **대신 색만 얹는다** — 이 저장소가 `SilverEdge` 를 둔 이유와 같다
+       (「유리가 아니다 … 흐림 없이 색만 얹는다」).
+
+       🔴 **면은 [kSurfaceWhite](반투명 흰색), 테두리는 없다**(2026-09-22
+       사용자 요청: 「판들과 하단바 색상 흰색으로 · 흰색 살짝만 들어간 판으로
+       뒤에 비치긴 해야해」 + 레퍼런스 한 장).
+
+       하단바 · 로고 알약과 **같은 값**을 쓴다 — 셋이 한 재질이다. */
     return DecoratedBox(
       decoration: BoxDecoration(
-        /* 🔴 **위가 밝고 아래가 어둡다**(2026-09-22, 「메탈」 방향).
-           평평한 한 색은 「칠한 판」으로 읽히는데, 위에서 빛을 받은 듯
-           기울여 주면 **금속판**으로 읽힌다 — 차이는 아주 작게 둔다(4단
-           남짓). 크게 주면 판마다 그러데이션이 도드라져 촌스러워진다. */
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.white.withValues(alpha: 0.11),
-            Colors.white.withValues(alpha: 0.065),
-          ],
-        ),
+        color: kSurfaceWhite,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: SilverEdge.barLine,
-          width: SilverEdge.barLineWidth,
-        ),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -203,21 +260,21 @@ class _Pair extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget column(List<Widget> items) => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (var i = 0; i < items.length; i += 1) ...[
-              if (i > 0) const SizedBox(height: 12),
-              items[i],
-            ],
-          ],
-        );
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < items.length; i += 1) ...[
+          if (i > 0) const SizedBox(height: _kGap),
+          items[i],
+        ],
+      ],
+    );
 
     return Row(
       // 두 열은 서로 키를 안 맞춘다 — 각자 제 내용만큼 길다.
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(child: column(left)),
-        const SizedBox(width: 12),
+        const SizedBox(width: _kGap),
         Expanded(child: column(right)),
       ],
     );
@@ -238,6 +295,15 @@ class _CardHero extends ConsumerWidget {
   /// 히어로라 프로필 안의 다른 카드보다 크다.
   static const double _cardWidth = 200;
 
+  /// 연기가 카드 위아래로 더 차지하는 자리.
+  ///
+  /// 🔴 **0 으로 두지 말 것** — 연기가 카드 높이에서 딱 끊기면 그 끝이
+  /// **가로선**으로 보인다. 덩이들이 제풀에 옅어져 사라질 여유를 준다.
+  ///
+  /// ⚠️ **한 번 위/아래를 따로 두고 아래끝을 흰 선에 맞췄다가 되돌렸다**
+  /// (2026-09-22) — 그때는 선 위를 두 색으로 꽉 채우려던 것이었다.
+  static const double _smokePad = 96;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Column(
@@ -251,6 +317,22 @@ class _CardHero extends ConsumerWidget {
             alignment: Alignment.topCenter,
             clipBehavior: Clip.none,
             children: [
+              /* 🔴 **카드보다 먼저 그린다** — 연기는 카드 뒤에 있어야 한다.
+                 `Stack` 은 나중 것이 위이므로 이 자리를 옮기면 연기가 카드를
+                 덮는다. 카드가 없으면(빈 카드) 쓸 색도 없으니 안 그린다. */
+              if (card?.style != null)
+                Positioned(
+                  // 카드보다 위아래로 조금 넉넉히 — 연기가 카드 높이에서
+                  // 뚝 끊기면 그 끝이 **가로선**으로 드러난다.
+                  top: -_smokePad,
+                  bottom: -_smokePad,
+                  left: 0,
+                  right: 0,
+                  child: CardSideSmoke(
+                    colors: (a: card!.style!.bg, b: card!.style!.brushColor),
+                    cardWidth: _cardWidth,
+                  ),
+                ),
               // 🔴 카드가 없으면 빈 카드다 — 예외가 아니라 정상 상태다.
               if (card == null)
                 const BlankPlayerCardView(width: _cardWidth)
@@ -267,23 +349,45 @@ class _CardHero extends ConsumerWidget {
                  붙여 카드를 안 덮는다. */
               /* 🔴 **카드 바로 오른쪽**(2026-09-22, 사용자 요청). `right: 0`
                  으로 두면 화면 끝에 붙어 카드와 멀어진다 — 카드가 가운데
-                 서므로 그 오른쪽 변은 `화면폭/2 + 카드폭/2` 다. */
+                 서므로 그 오른쪽 변은 `무대폭/2 + 카드폭/2` 다.
+
+                 🔴 **「무대폭」은 화면 폭이 아니라 목록 여백을 뺀 폭이다**
+                 (2026-09-22 정정). 이 `Stack` 은 `ListView` 의 좌우 여백
+                 **안**에 있어서 좌표 0 이 화면 왼쪽이 아니다. 화면 폭을
+                 그대로 쓰면 단추가 여백만큼 오른쪽으로 밀리는데, 여백이
+                 16 이던 동안은 카드와의 틈이 18 이라 **틀린 줄 몰랐다** —
+                 여백을 [_kEdge] 로 줄이자 드러났다. */
               Positioned(
-                top: 0,
-                left: MediaQuery.sizeOf(context).width / 2 +
-                    _cardWidth / 2 +
-                    // 카드와 살짝 띄운다. 붙이면 카드 모서리를 먹는다.
-                    2,
-                child: _GlassButton(
-                  buttonKey: const Key('profile-card-edit'),
-                  label: card == null ? '카드 만들기' : '카드 수정',
-                  onTap: () => card == null
-                      ? _createCard(context, ref)
-                      : Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => CardEditorScreen(card: card!),
+                /* 🔴 **오른쪽 아래다**(2026-09-22 정정, 사용자 요청: 「카드
+                   오른쪽 위에 있는 카드 수정 버튼을 카드 오른쪽 아래로」).
+                   `top: 0` 이던 자리다. */
+                bottom: 0,
+                /* 🔴 **카드 오른쪽 변 ↔ 화면 오른쪽 끝의 한가운데**
+                   (2026-09-22, 사용자 요청).
+
+                   🔴 **`left` 에 좌표를 계산해 넣지 않는다** — 그건 단추의
+                   **왼쪽 변**을 놓는 것이라, 가운데에 맞추려면 단추 폭을 알아야
+                   하고 글자가 바뀌면(「카드 만들기」) 어긋난다. 대신 **틈 전체를
+                   상자로 잡고** 아래 `Center` 에게 맡긴다.
+
+                   `right: -_kEdge` — 이 `Stack` 은 목록의 좌우 여백 안이라
+                   화면 끝이 여기서 `-_kEdge` 다. */
+                left:
+                    (MediaQuery.sizeOf(context).width - 2 * _kEdge) / 2 +
+                    _cardWidth / 2,
+                right: -_kEdge,
+                child: Center(
+                  child: _GlassButton(
+                    buttonKey: const Key('profile-card-edit'),
+                    label: card == null ? '카드 만들기' : '카드 수정',
+                    onTap: () => card == null
+                        ? _createCard(context, ref)
+                        : Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => CardEditorScreen(card: card!),
+                            ),
                           ),
-                        ),
+                  ),
                 ),
               ),
             ],
@@ -368,12 +472,13 @@ class _GlassButton extends StatelessWidget {
       child: InkWell(
         key: buttonKey,
         onTap: onTap,
+        /* 🔴 **키웠다**(2026-09-22, 사용자 요청). 12/7·글자 12 → 14/9·글자 14.
+           ⚠️ 여기가 거의 한계다 — 이 단추는 **카드 오른쪽 변과 화면 끝 사이**
+           (약 105논리px)에 들어가야 한다. 더 키우면 그 틈을 넘어 글자가
+           줄바꿈되거나 카드를 덮는다. */
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          child: Text(
-            label,
-            style: const TextStyle(color: _kOn, fontSize: 12),
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          child: Text(label, style: const TextStyle(color: _kOn, fontSize: 14)),
         ),
       ),
     );
@@ -555,9 +660,9 @@ class _TeamBlockState extends ConsumerState<_TeamBlock> {
   String? _lastOpenFor;
 
   void _toggle(String key) => setState(() {
-        _openFor = _openFor == key ? null : key;
-        if (_openFor != null) _lastOpenFor = _openFor;
-      });
+    _openFor = _openFor == key ? null : key;
+    if (_openFor != null) _lastOpenFor = _openFor;
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -725,15 +830,17 @@ class _TeamActionsState extends ConsumerState<_TeamActions> {
               style: FilledButton.styleFrom(backgroundColor: danger),
               onPressed: _busy
                   ? null
-                  : () => _run(() => t.isOwner
-                      ? repo.disbandTeam(t.teamId)
-                      : repo.leaveTeam(t.teamId)),
+                  : () => _run(
+                      () => t.isOwner
+                          ? repo.disbandTeam(t.teamId)
+                          : repo.leaveTeam(t.teamId),
+                    ),
               child: Text(
                 _busy
                     ? '처리하는 중…'
                     : t.isOwner
-                        ? '정말 해체합니다'
-                        : '정말 나갑니다',
+                    ? '정말 해체합니다'
+                    : '정말 나갑니다',
               ),
             ),
           ),
@@ -831,9 +938,9 @@ class _InfoBlock extends ConsumerWidget {
   }
 
   Widget _label(String text) => Text(
-        text,
-        style: TextStyle(color: _kOn.withValues(alpha: 0.7), fontSize: 12),
-      );
+    text,
+    style: TextStyle(color: _kOn.withValues(alpha: 0.7), fontSize: 12),
+  );
 }
 
 /// 작은 알약 단추 — 좁은 판에서 글자 단추 대신 쓴다.
@@ -862,14 +969,17 @@ class _Pill extends StatelessWidget {
       child: InkWell(
         key: pillKey,
         onTap: onTap,
+        /* 🔴 **아주 조금만 키웠다**(2026-09-22, 사용자 요청: 「진짜 아주
+           살짝만」). 안여백 10/4 → 12/6, 글자 12 → 13. 더 키우면 반쪽 폭
+           칸에서 「팀 해체」가 「수정」 옆에 못 서고 줄이 바뀐다. */
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           child: Text(
             label,
             // 🔴 좁은 칸에서 글자가 **세로로 쌓이지 않게** 한다.
             softWrap: false,
             overflow: TextOverflow.visible,
-            style: TextStyle(color: ink, fontSize: 12),
+            style: TextStyle(color: ink, fontSize: 13),
           ),
         ),
       ),
@@ -903,8 +1013,10 @@ class _TitlesRowState extends ConsumerState<_TitlesRow> {
             children: [
               for (final t in all)
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.seed.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(999),
@@ -937,14 +1049,16 @@ class _TitlesRowState extends ConsumerState<_TitlesRow> {
                   key: const Key('profile-titles-edit'),
                   onTap: () => setState(() => _open = !_open),
                   child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     child: Text(
                       _open
                           ? '닫기'
                           : all.isEmpty
-                              ? '호칭 정하기'
-                              : '호칭 고치기',
+                          ? '호칭 정하기'
+                          : '호칭 고치기',
                       style: TextStyle(
                         color: _kOn.withValues(alpha: 0.85),
                         fontSize: 12,
@@ -976,57 +1090,92 @@ class _TitlesRowState extends ConsumerState<_TitlesRow> {
 class _VideosBlock extends ConsumerWidget {
   const _VideosBlock();
 
+  /// 판 높이.
+  ///
+  /// 🔴 **옛 판과 같은 키다**(2026-09-22 정정, 사용자 지적: 「내 영상 판 너
+  /// 맘대로 또 세로 크기 키우지 말고, 원래대로 줄여」). 사진을 깔면서 132 로
+  /// 늘렸던 것을 되돌렸다 — 화면에서 재 보니 옛 판이 **235물리px = 90논리px**
+  /// 였다.
+  ///
+  /// ⚠️ 사진이 있어야 하는 판이라 **내용이 아니라 이 값이** 키를 정한다.
+  /// 그래서 글자를 키우거나 줄여도 판은 안 움직인다.
+  static const double _height = 90;
+
+  static const double _radius = 16;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final asyncVideos = ref.watch(myVideosProvider);
+    /* 🔴 **다른 판들과 생김새가 다르다**(2026-09-22, 사용자 요청). 사진이
+       깔리고, 글자는 「내 영상」 하나뿐이며, **판 전체가 단추**다.
+       숫자(「분석 2 · 업로드 2」)와 오른쪽 `>` 는 걷었다.
 
-    return _Block(
-      title: '내 영상',
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          key: const Key('profile-videos'),
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const MyVideosScreen()),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: [
-                Expanded(
-                  child: asyncVideos.when(
-                    loading: () => Text(
-                      '불러오는 중…',
-                      style: TextStyle(color: _kOn.withValues(alpha: 0.6)),
-                    ),
-                    /* 🔴 **오류를 「없음」으로 그리지 않는다** — 로그인이
-                       풀렸는데 「아직 올린 영상이 없습니다」로 보이면 사람은
-                       자기 영상이 사라진 줄 안다. */
-                    error: (e, _) => Text(
-                      '영상을 불러오지 못했습니다',
-                      style: TextStyle(color: _kOn.withValues(alpha: 0.6)),
-                    ),
-                    data: (all) {
-                      final split = splitVideos(all);
-                      if (all.isEmpty) {
-                        return const Text(
-                          '아직 올린 영상이 없습니다',
-                          style: TextStyle(color: _kOn),
-                        );
-                      }
-                      return Text(
-                        '분석 ${split.analyzed.length} · 업로드 ${split.uploaded.length}',
-                        style: const TextStyle(color: _kOn, fontSize: 15),
-                      );
-                    },
+       🔴 **그래서 [_Block] 을 안 쓴다.** 그쪽은 제목 + 내용 두 칸짜리 틀이라
+       여기 쓰려면 제목도 안여백도 다 꺼야 하고, **끌 것이 많다는 것 자체가
+       재사용하면 안 된다는 뜻**이다(`MiniPitch` 때와 같은 판단). */
+    return SilverSweepBorder(
+      radius: _radius,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(_radius),
+        child: SizedBox(
+          height: _height,
+          width: double.infinity,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              /* 🔴 **얼굴이 가운데 오게 자른다**(사용자 요청). 원본이
+                 3340×724 짜리 가로로 긴 사진이라 `cover` 로 채우면 좌우가
+                 많이 잘리는데, 머리가 원본의 가로 한가운데에 있어서
+                 `Alignment.center` 가 곧 「얼굴 가운데」다. */
+              Image.asset(
+                'assets/images/videos_cover.jpg',
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
+              ),
+              /* 🔴 **어둡게 깐다.** 사진이 밝아서 그냥 두면 흰 글자가 연기에
+                 묻힌다. 아래로 갈수록 더 어둡게 해서 **글자가 앉는 쪽**을
+                 눌러 준다 — 글자에 그림자를 주는 것보다 깨끗하다. */
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0x99000000), Color(0x33000000)],
                   ),
                 ),
-                Icon(
-                  Icons.chevron_right,
-                  color: _kOn.withValues(alpha: 0.6),
+              ),
+              /* 🔴 **왼쪽 위 구석**(2026-09-22 정정, 사용자 요청). 한가운데
+                 큰 글자로 뒀던 것을 옮겼다 — 사진이 주인공이고 글자는 이름표다.
+                 위 그라데이션도 **위가 짙게** 뒤집었다(글자가 앉는 쪽을 눌러
+                 준다). */
+              const Align(
+                alignment: Alignment.topLeft,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(14, 10, 0, 0),
+                  child: Text(
+                    '내 분석/업로드 영상',
+                    style: TextStyle(
+                      color: _kOn,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
                 ),
-              ],
-            ),
+              ),
+              /* 🔴 **판 전체가 단추다**(사용자 요청). `Material` 이 있어야
+                 물결이 그려지고, 맨 위에 둬야 사진·글자가 탭을 안 먹는다. */
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  key: const Key('profile-videos'),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const MyVideosScreen(),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1081,21 +1230,61 @@ class _AccountBlock extends ConsumerWidget {
                  (시험이 그걸로 깨졌다). */
               Material(
                 color: Colors.transparent,
-                child: Switch(
-                  key: const Key('profile-searchable'),
-                  value: user.isNicknameSearchable,
-                  activeThumbColor: AppTheme.seed,
-                  // 좁은 칸이라 기본 여백을 줄인다.
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  onChanged: (v) async {
-                    try {
-                      await ref
-                          .read(sessionControllerProvider.notifier)
-                          .setNicknameSearchable(v);
-                    } catch (e) {
-                      if (context.mounted) _notReady(context, '$e');
-                    }
-                  },
+                /* 🔴 **작게 줄인다**(2026-09-22, 사용자 요청: 「너무 커. 좀
+                   크기 줄이고」). `Switch` 는 크기를 직접 못 받아서
+                   `Transform.scale` 로 줄인다 — 그래서 **누르는 자리도 같이**
+                   줄어든다(0.8 까지가 한계다. 더 줄이면 손가락으로 못 짚는다).
+                   🔴 `Align` 으로 감싸 **줄어든 만큼 남는 자리를 안 차지하게**
+                   한다 — 안 감싸면 옛 크기만큼 자리를 잡는다. */
+                child: Transform.scale(
+                  scale: 0.8,
+                  child: Switch(
+                    key: const Key('profile-searchable'),
+                    value: user.isNicknameSearchable,
+                    // 🔴 **흰색이다**(사용자 요청) — 브랜드 민트였다.
+                    activeThumbColor: _kOn,
+                    activeTrackColor: _kOn.withValues(alpha: 0.45),
+                    /* 🔴 **끄면 검정이다**(2026-09-22, 사용자 요청: 「끌 때는
+                       검정으로」). 기본 꺼짐 색은 테마가 주는 회색이라 **판
+                       위에서 떠 보였다.**
+
+                       🔴 **원과 면의 검정이 다르다**(2026-09-22 정정, 사용자
+                       지적: 「완전 검정으로 만들면 원의 버튼 자체가 안 보이니까」).
+                       둘 다 완전 검정이면 **원이 면에 녹아** 스위치가 빈 알약
+                       하나로 보인다. 원만 완전 검정이고 **면은 80%** 라, 판의
+                       밝기가 20% 비쳐 원의 자리가 드러난다.
+
+                       🔴 **「80% 검정」을 알파가 아니라 명도로 잡는다**
+                       (2026-09-22 재정정). 처음엔 `검정 * 알파 0.8` 로 했는데,
+                       판(`#2E2E2E`)이 20%만 비쳐 **`#090909`** 가 됐다 —
+                       순검정 원과 차이가 **9/255** 라 사용자가 「아직도 완전
+                       검정이야. 원이 안 보여」로 잡았다. 흰색에서 검정 쪽으로
+                       80% 간 **`#333333`** 이면 원(`#000000`)과 확실히 갈린다.
+
+                       ⚠️ **알파로 돌아가지 말 것** — 뒤가 어두우면 어떤 알파를
+                       줘도 순검정에 붙는다. 이건 **불투명 명도**여야 한다.
+
+                       🔴 **테두리도 남긴다** — 면이 어두워서 그것마저 없으면
+                       스위치가 어디 있는지 안 보인다. */
+                    inactiveThumbColor: _kBg,
+                    inactiveTrackColor: const Color(0xFF333333),
+                    trackOutlineColor: WidgetStateProperty.resolveWith(
+                      (states) => states.contains(WidgetState.selected)
+                          ? Colors.transparent
+                          : _kOn.withValues(alpha: 0.35),
+                    ),
+                    // 좁은 칸이라 기본 여백을 줄인다.
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    onChanged: (v) async {
+                      try {
+                        await ref
+                            .read(sessionControllerProvider.notifier)
+                            .setNicknameSearchable(v);
+                      } catch (e) {
+                        if (context.mounted) _notReady(context, '$e');
+                      }
+                    },
+                  ),
                 ),
               ),
             ],
@@ -1103,15 +1292,22 @@ class _AccountBlock extends ConsumerWidget {
           const SizedBox(height: 8),
           /* 🔴 **세로로 쌓는다** — 한 줄에 두면 「회원 탈퇴」가 반쪽 폭에서
              잘린다. 자주 쓰는 로그아웃이 위, **되돌릴 수 없는 탈퇴가 아래**다.
-             🔴 로그아웃은 안 빨갛다 — 같은 칸에서 빨강을 나눠 쓰면 탈퇴의
-             빨강이 경고로 안 읽힌다. */
-          OutlinedButton(
+
+             🔴 **흰 면에 빨간 글자다**(2026-09-22 정정, 사용자 요청:
+             「로그아웃 버튼은 흰색으로, 글자를 회원탈퇴 버튼의 똑같은
+             빨간색으로」). 빨강은 아래 탈퇴 단추와 **같은 [_kDanger]** 이고,
+             둘은 **면과 글자가 서로 뒤집힌 한 쌍**이 된다.
+
+             ⚠️ **앞서 여기 적어 둔 「로그아웃은 안 빨갛다 — 같은 칸에서 빨강을
+             나눠 쓰면 탈퇴의 빨강이 경고로 안 읽힌다」를 사용자가 뒤집었다.**
+             그 판단을 되살리지 말 것. */
+          FilledButton(
             key: const Key('profile-logout'),
             onPressed: () =>
                 ref.read(sessionControllerProvider.notifier).logout(),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: _kOn,
-              side: BorderSide(color: _kOn.withValues(alpha: 0.35)),
+            style: FilledButton.styleFrom(
+              backgroundColor: _kOn,
+              foregroundColor: _kDanger,
               visualDensity: VisualDensity.compact,
             ),
             child: const Text('로그아웃', style: TextStyle(fontSize: 12)),

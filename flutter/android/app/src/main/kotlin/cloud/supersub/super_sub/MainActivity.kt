@@ -24,6 +24,32 @@ class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         hideNavigationBar()
+        clearStatusBarScrim()
+    }
+
+    /**
+     * 🔴 **상태 바 뒤에 시스템이 까는 검은 판을 없앤다** (2026-09-22, 사용자
+     * 지적: 「기본 상단바가 스크롤하면 검정색 판이 나오는데」).
+     *
+     * 안드로이드는 화면 끝까지 그리는 앱의 상태 바 **뒤에 반투명 막(scrim)**
+     * 을 깔아 준다 — 밝은 내용이 그 아래로 지나가도 시계·배터리가 읽히게
+     * 하려는 것이다. 가만히 있을 때는 배경이 검정이라 티가 안 나다가,
+     * **내용이 그 밑을 지나가는 순간** 검은 판으로 드러난다.
+     *
+     * 🔴 **Dart 쪽 `SystemChrome.setSystemUIOverlayStyle(statusBarColor)` 로는
+     * 안 된다** — 최신 안드로이드는 그 값을 무시하고, 막을 깔지 말지는
+     * `isStatusBarContrastEnforced` 가 정한다. 그래서 여기서 잡는다.
+     *
+     * ⚠️ **대가가 있다**: 상태 바 글자가 밝은 내용 위에 오면 읽기 어려워진다.
+     * 이 앱은 화면이 늘 어두워서 괜찮지만, 밝은 화면을 만들면 그때 다시 본다.
+     */
+    private fun clearStatusBarScrim() {
+        @Suppress("DEPRECATION")
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            window.isStatusBarContrastEnforced = false
+            window.isNavigationBarContrastEnforced = false
+        }
     }
 
     /**
