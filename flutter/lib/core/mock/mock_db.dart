@@ -7,6 +7,8 @@ import '../../features/team/data/models/squad.dart';
 import '../../features/team/data/models/sport.dart';
 import '../../features/team/data/models/team.dart';
 import '../../features/team/data/models/team_member.dart';
+import '../../features/video/data/models/my_video.dart';
+import '../../features/video/data/models/video_report.dart';
 
 /// 모든 Mock 리포지토리가 공유하는 단일 인메모리 저장소.
 ///
@@ -27,6 +29,16 @@ class MockDb {
   final List<TeamMember> teamMembers = [];
   final List<PlayerCard> cards = [];
   final List<Squad> squads = [];
+
+  /// 클립은 **주인과 함께** 담는다. `MyVideo` 자신은 소유자를 안 싣는다
+  /// (계약의 `GET /videos` 가 내 것만 주므로 서버도 안 싣는다) — 그래서
+  /// 여러 사람을 흉내 내는 Mock 쪽에서만 짝지어 둔다.
+  final List<({String userId, MyVideo video})> videos = [];
+
+  List<MyVideo> videosOf(String userId) => [
+        for (final row in videos)
+          if (row.userId == userId) row.video,
+      ];
 
   AppUser? findUserByEmail(String email) {
     for (final u in users) {
@@ -171,8 +183,97 @@ class MockDb {
       ],
     ));
 
+    _seedVideos();
     _attachTeams();
   }
+
+  /// 🔴 **네 갈래를 다 둔다** — 분석 완료 · 분석 중 · 분석 안 함 · 규격 반려.
+  /// 하나라도 빠지면 그 상태의 화면을 안 만들게 되고, 진짜 서버에서 처음
+  /// 본다(Mock 이 「일부러 실패한다」와 같은 이유).
+  void _seedVideos() {
+    videos.addAll([
+      (
+        userId: playerId,
+        video: MyVideo(
+          id: 'v-analyzed',
+          sportCode: 'football',
+          storageKey: 'videos/$playerId/first-goal.mp4',
+          durationMs: 10200,
+          createdAt: DateTime(2026, 9, 20, 14, 30),
+          passed: true,
+          analysisJobId: 'job-1',
+          analysisStatus: 'succeeded',
+          title: '왼발 감아차기',
+        ),
+      ),
+      (
+        userId: playerId,
+        video: MyVideo(
+          id: 'v-running',
+          sportCode: 'football',
+          storageKey: 'videos/$playerId/practice.mp4',
+          durationMs: 8400,
+          createdAt: DateTime(2026, 9, 19, 9, 5),
+          passed: true,
+          analysisJobId: 'job-2',
+          analysisStatus: 'running',
+        ),
+      ),
+      (
+        userId: playerId,
+        video: MyVideo(
+          id: 'v-raw',
+          sportCode: 'football',
+          storageKey: 'videos/$playerId/team-match.mp4',
+          durationMs: 21000,
+          createdAt: DateTime(2026, 9, 18, 19, 40),
+          passed: true,
+        ),
+      ),
+      (
+        userId: playerId,
+        video: MyVideo(
+          id: 'v-rejected',
+          sportCode: 'football',
+          storageKey: 'videos/$playerId/too-long.mp4',
+          durationMs: 92000,
+          createdAt: DateTime(2026, 9, 17, 11, 0),
+          passed: false,
+          rejectReason: '길이가 상한을 넘습니다: 92초 (상한 60초)',
+        ),
+      ),
+    ]);
+    // 신규 가입자(newbieId)에게는 영상을 안 준다 — 「아직 올린 영상이
+    // 없습니다」 빈 상태를 반드시 만들게 하는 장치다.
+  }
+
+  /// 시드 리포트 한 벌. 🔴 축을 **여섯** 둔다 — 레이더 색이 여섯이고, 그
+  /// 상한(축구 인스텝 슛)에서 겹치거나 잘리지 않는지 목업으로 봐야 한다.
+  VideoReport reportFor(String videoId) => const VideoReport(
+        summary: '디딤발 무릎 굽히기가 강점입니다.',
+        points: [
+          ReportPoint(title: '흔들리지 않는 축', evidence: '디딤발이 안정적으로 놓였습니다.'),
+          // 🔴 **호칭이 없는 항목도 둔다** — 못 받은 항목의 문장까지 사라지면
+          //    안 된다는 규칙(CCC 47)을 목업에서도 밟는다.
+          ReportPoint(title: null, evidence: '팔로스루가 중간에 멈춥니다.'),
+          ReportPoint(title: '정확한 임팩트', evidence: '공의 가운데를 맞혔습니다.'),
+        ],
+        scenes: [
+          ReportScene(at: '0:02', what: '임팩트 프레임'),
+          ReportScene(at: '0:04', what: '팔로스루 최고점'),
+        ],
+        radar: [
+          RadarAxis(name: '디딤발 무릎 굽히기', stat: 88.5),
+          RadarAxis(name: '디딤발 위치', stat: 72),
+          RadarAxis(name: '임팩트 정확도', stat: 64),
+          RadarAxis(name: '팔로스루', stat: 41),
+          RadarAxis(name: '상체 기울기', stat: 79),
+          RadarAxis(name: '스윙 궤적', stat: 55),
+        ],
+        totalScore: 71,
+        overallGrade: 'B',
+        savedAt: '2026-09-20',
+      );
 
   /// 사용자마다 [AppUser.teams] 를 채운다 — 실제 `GET /me` 가 `teams[]` 를
   /// 함께 주기 때문이다.
