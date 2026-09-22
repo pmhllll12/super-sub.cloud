@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/auth/data/models/app_user.dart';
 import '../../features/auth/data/models/team_membership.dart';
 import '../../features/card/data/models/player_card.dart';
-import '../../features/profile/presentation/widgets/player_card_view.dart'
-    show kDefaultCardAlias;
 import '../../features/team/data/models/squad.dart';
 import '../../features/team/data/models/sport.dart';
 import '../../features/team/data/models/team.dart';
@@ -138,29 +136,33 @@ class MockDb {
        빈 상태 화면은 그쪽으로 확인한다. */
     /* 🔴 **꾸며진 채로 시드한다 (2026-09-22, 사용자 요청).** 전에는 `style`
        이 없어 목업을 올릴 때마다 **기본 연두 카드**가 떴다 — 폰에 새로 올릴
-       때마다 색을 다시 고쳐야 했다. 실기기에서 쓰던 그 카드(하늘색 바탕 ·
-       흰 자국)를 그대로 옮겼다.
+       때마다 색을 다시 고쳐야 했다. 웹에서 쓰던 그 카드를 옮겼다:
+       검은 바탕 · 붉은 글자 · 붉은 나선 자국(파티클 플럭스).
 
        🔴 **`tagline` 을 함께 둔다.** `aliasOf` 는 「`style` 이 있는데
        `tagline` 이 비었다」를 **일부러 지운 것**으로 읽는다 — 색만 넣으면
-       카드에서 글자가 사라진다(웹이 헤드리스로 겪은 그 자리). */
+       카드에서 글자가 사라진다(웹이 헤드리스로 겪은 그 자리).
+
+       🔴 **`brush: 16` 이 파티클 플럭스다** — 자국 번호는 `파일 번호 + 1`
+       이고 그 그림이 `assets/marks/15.png` 다. 목록에서 세지 말 것(숨긴
+       자국 둘 때문에 자리와 번호가 어긋난다). */
     cards.add(PlayerCard(
       id: 'pc-$playerId',
       publicSlug: 'baek-seonggeom-3a71',
       nickname: '백성검',
-      tagline: kDefaultCardAlias,
+      tagline: 'GOAL!!!!',
       style: CardStyle.fromJson(const {
-        'bg': '#118AB2',
-        'logo': '#FFFFFF',
-        'text_color': '#1E3029',
-        'brush': 12,
-        'brush_color': '#FFFFFF',
-        'brush_scale': 1.4,
-        'brush_x': 6,
-        'brush_y': 35,
-        'mode': 'full',
+        'bg': '#000000',
+        // 🔴 하나가 글자·워드마크·머리글을 함께 움직인다.
+        'text_color': '#EA3323',
+        'text_y': 30.0,
+        'brush': 16,
+        'brush_color': '#EA3323',
+        'brush_scale': 1.5,
+        'brush_y': -4.0,
       }),
     ));
+
     cards.add(const PlayerCard(
       id: 'pc-$managerId',
       publicSlug: 'lee-gamdok-7f21',

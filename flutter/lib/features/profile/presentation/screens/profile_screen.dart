@@ -1,5 +1,3 @@
-import 'dart:ui' show ImageFilter;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,7 +10,7 @@ import '../../../card/data/card_providers.dart';
 import '../../../card/data/models/player_card.dart';
 import '../../../../core/widgets/aurora_background.dart';
 import '../../../../core/widgets/floating_nav_bar.dart';
-import '../../../../core/widgets/glass_surface.dart';
+import '../../../../core/widgets/silver_edge.dart';
 import '../../../card/presentation/card_editor_screen.dart';
 import '../../../video/presentation/my_videos_controller.dart';
 import '../../../video/presentation/screens/my_videos_screen.dart';
@@ -133,19 +131,25 @@ class _Block extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    /* 🔴 **유리다**(2026-09-22, 사용자 요청: 「흰색 블러 아주 살짝만」).
-       뒤의 빛무리가 비쳐야 배경이 살아난다 — 불투명 판이면 카드 색을 따라
-       움직이는 배경이 판에 다 가려진다.
+    /* 🔴 **흐림(`BackdropFilter`)을 안 쓴다** (2026-09-22 정정).
+       처음엔 `GlassSurface`(흐림 + 옅은 흰 기)로 만들었는데, 그것이
+       **스크롤할 때 흰 직선이 여럿 나오는** 원인이었다: 흐림은 뒤를 퍼다
+       쓰는데 **판 가장자리에서는 퍼 올 것이 없어 가장자리 값을 늘려 쓰고**,
+       목록이 구르면 그 늘린 띠가 매 프레임 달라져 선으로 보인다. 판이
+       여섯이라 선도 여섯이었다(사용자: 「흰 직선들이 계속 나오고」).
 
-       🔴 **`GlassPanel`(굴절 유리)이 아니라 `GlassSurface`(흐림 + 옅은 흰
-       기)다.** 굴절 쪽은 `ImageFilter.shader` 라 Impeller 에서만 돌고 가드가
-       필요하다 — 판이 여섯이라 그걸 다 걸 이유가 없다.
-
-       🔴 **판 안의 단추에는 유리를 또 쓰지 않는다** — 「유리 안에 유리」는
-       안쪽이 아직 안 끝난 바깥을 읽어 **내용이 프레임째로 사라진다**
-       (`refractive_glass.dart`). 안쪽 것들은 색·테두리로만 층을 낸다. */
-    return GlassSurface(
-      borderRadius: BorderRadius.circular(16),
+       🔴 **대신 반투명 면 + 은빛 실선**이다 — 이 저장소가 `SilverEdge` 를
+       둔 이유와 같다(「유리가 아니다 … 흐림 없이 색만 얹는다」). 면이
+       반투명이라 뒤의 빛무리는 그대로 비친다. */
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.055),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: SilverEdge.barLine,
+          width: SilverEdge.barLineWidth,
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -208,7 +212,7 @@ class _Pair extends StatelessWidget {
   }
 }
 
-/// 카드가 이 화면의 **첫 얼굴**이다/// 카드가 이 화면의 **첫 얼굴**이다 — 가운데 위에 그냥 놓는다.
+/// 카드가 이 화면의 **첫 얼굴**이다 — 가운데 위에 그냥 놓는다.
 ///
 /// 🔴 **판(상자)도 「내 선수 카드」 제목도 없다**(2026-09-22, 사용자 요청).
 /// 카드 자체가 무엇인지 말하고 있어서 제목은 같은 말을 두 번 하는 자리였고,
@@ -486,24 +490,27 @@ class _GlassShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: radius,
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: kGlassBlur, sigmaY: kGlassBlur),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: radius,
-            /* 🔴 **면은 비운다** — 사용자가 「안쪽 색상 다 빼」라고 짚은
-               자리다. 형태는 아래 테두리가 세운다. */
-            border: Border.all(
-              color: _kOn,
-              // 이 기기에서 그릴 수 있는 **가장 얇은 선**.
-              width: 0.5,
-            ),
-          ),
-          // Material 이 있어야 InkWell 의 물결이 그려진다(색은 안 넣는다).
-          child: Material(color: Colors.transparent, child: child),
+    /* 🔴 **흐림을 안 쓴다**(2026-09-22 정정). `BackdropFilter` 로 만들었더니
+       **카드 둘레에 선이 보였다** — 흐림이 가장자리에서 퍼 올 것이 없어
+       늘려 쓰는 띠가, 카드 위에 겹쳐 앉은 이 단추 자리에서 드러났다.
+       판과 같은 이유이고 같은 처방이다. */
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        /* 🔴 **면은 비운다** — 사용자가 「안쪽 색상 다 빼」라고 짚은
+           자리다. 형태는 아래 테두리가 세운다. */
+        border: Border.all(
+          color: _kOn,
+          // 이 기기에서 그릴 수 있는 **가장 얇은 선**.
+          width: 0.5,
         ),
+      ),
+      // Material 이 있어야 InkWell 의 물결이 그려진다(색은 안 넣는다).
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: radius,
+        clipBehavior: Clip.antiAlias,
+        child: child,
       ),
     );
   }
