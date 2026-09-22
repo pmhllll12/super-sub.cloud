@@ -77,58 +77,92 @@ class PlayerCardView extends StatelessWidget {
        빛무리가 늘 움직이고 목록은 굴러서 그 뒤가 매 프레임 달라진다 —
        그래서 가만히 있어도 테가 어른거렸다(사용자가 세 번 짚은 그것).
        밑에 카드 제 색을 깔아 두면 섞이는 상대가 **자기 색**이라 안 보인다. */
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: _bg,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        /* 🔴 **`antiAliasWithSaveLayer` 를 쓰지 않는다**(2026-09-22에 썼다가
+    /* 🔴 **둥근 사각형을 한 번만 깎는다** (2026-09-23, 사용자가 네 번째로
+       짚은 뒤 **픽셀로 재서** 잡았다).
+
+       여기엔 같은 곡선이 **둘** 있었다 — 바깥 `DecoratedBox`(카드 색 바탕)와
+       안쪽 `ClipRRect`. 둘이 각각 부드럽게 깎으니 가장자리 한 줄에서 덮는
+       정도가 **곱해져** 100% 가 안 됐고, 그 틈으로 뒤가 비쳐 **선**이 됐다.
+
+       잰 값(스크롤 중 캡처, 카드 오른쪽 변):
+       · 카드 `(236,247,255)` · 배경 `(25,41,53)` · **그 줄 `(183,195,204)`**
+       · `0.75 × 236 + 0.25 × 25 = 183` — 덮는 정도가 **0.75** 라는 뜻이다.
+
+       ⚠️ **자르는 쪽을 반 픽셀 안으로 넣어 봤다가 되돌렸다**(같은 날).
+       그러면 바깥 반 픽셀에 **카드 바탕색이 파란 테로** 드러난다 — 잰 값
+       `(92,158,204)` 가 바탕색 `#73C6FF` 의 75% 다. 밑에 깔 색이 **가장자리
+       내용과 다르면** 그 색이 테가 된다.
+
+       🔴 **그래서 밑에 깔지 않는다.** 자르는 것 하나만 두면 가장자리가
+       **내용에서 배경으로** 곧장 부드러워진다 — 그것이 둥근 모서리의 정상
+       모습이고, 끼어드는 제3의 색이 없다.
+
+       ⛔ 되살리지 말 것 셋: 바깥 바탕 깔기 · `antiAliasWithSaveLayer`(밝은
+       테가 남는다) · `RepaintBoundary`(경계가 정수 픽셀이 아니라 오른쪽·아래가
+       비친다). 셋 다 **곡선이 둘이라는 것**은 못 봤다. */
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      /* 🔴 **부드럽게 깎지 않는다**(2026-09-23, 사용자가 다섯 번 짚은 직선).
+
+         기본(`Clip.antiAlias`)은 가장자리 한 줄을 **반쯤 덮인 픽셀**로 만든다.
+         스크롤 중 카드가 **소수 픽셀 자리**로 옮겨 다니면 그 덮는 정도가 매
+         프레임 달라지고, 안쪽 그림(흑백 변환된 사진)의 가장자리와 어긋나면서
+         **밝은 직선**으로 드러난다.
+
+         잰 것 — 카드 오른쪽 `x=540` 이 0.75 만 덮이고, 그 **바깥 `x=541` 에
+         흑백 사진이 한 줄 더** 나왔다(카드 내용은 푸른빛인데 그 줄만 무채색).
+         덮는 정도가 100% → 75% → 94% → 0% 로 **오르락내리락**한 것이 증거다.
+
+         `hardEdge` 는 픽셀을 **덮거나 안 덮거나** 둘 중 하나로만 잘라서 그
+         어긋남 자체가 없다. 대가는 모서리가 아주 살짝 계단지는 것인데,
+         2.6배 밀도에서는 눈에 안 띈다.
+
+         ⛔ 되살리지 말 것 셋(전부 실패): 바깥에 같은 색 바탕 깔기 ·
+         `antiAliasWithSaveLayer`(밝은 테) · `RepaintBoundary`(오른쪽·아래가
+         비친다). */
+      clipBehavior: Clip.hardEdge,
+
+      /* 🔴 **`antiAliasWithSaveLayer` 를 쓰지 않는다**(2026-09-22에 썼다가
          되돌렸다). 스크롤 중 가장자리가 떨리는 것을 잡으려고 넣었는데,
          **딴 층에 그린 가장자리를 다시 합성하면서 밝은 테가 남았다** —
          사용자가 「가만히 있을 때도 흰 외곽선이 보인다」로 잡아 줬다.
          떨림은 아래 `RepaintBoundary` 로 잡는다(카드를 한 번 그려 두고
          통째로 옮기므로 매 프레임 다시 섞이지 않는다). */
-        child: ColoredBox(
-          color: _bg,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              _mark(),
-              _figure(),
-              // 글자는 인물보다 위다 — 별명이 어깨와 겹치면 글자가 이긴다.
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 20,
-                  horizontal: 18,
-                ),
-                child: Column(
-                  children: [
-                    BrandMark(fontSize: 22, color: style?.logo ?? kCardFg),
-                    const SizedBox(height: 12),
-                    Text(
-                      'PLAYER CARD',
-                      style: TextStyle(
-                        fontFamily: 'YoungSerif',
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 11 * 0.14,
-                        color: _fg.withValues(alpha: 0.7),
-                      ),
+      child: ColoredBox(
+        color: _bg,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            _mark(),
+            _figure(),
+            // 글자는 인물보다 위다 — 별명이 어깨와 겹치면 글자가 이긴다.
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 18),
+              child: Column(
+                children: [
+                  BrandMark(fontSize: 22, color: style?.logo ?? kCardFg),
+                  const SizedBox(height: 12),
+                  Text(
+                    'PLAYER CARD',
+                    style: TextStyle(
+                      fontFamily: 'YoungSerif',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 11 * 0.14,
+                      color: _fg.withValues(alpha: 0.7),
                     ),
-                    // 🔴 꾸미지 않은 카드만 흐름 배치다 — 꾸민 카드의 별명은
-                    //    아래 _alias() 가 절대 좌표로 놓는다.
-                    if (style == null) ...[
-                      const SizedBox(height: 52),
-                      if (alias.isNotEmpty) _Alias(alias, color: _fg),
-                    ],
+                  ),
+                  // 🔴 꾸미지 않은 카드만 흐름 배치다 — 꾸민 카드의 별명은
+                  //    아래 _alias() 가 절대 좌표로 놓는다.
+                  if (style == null) ...[
+                    const SizedBox(height: 52),
+                    if (alias.isNotEmpty) _Alias(alias, color: _fg),
                   ],
-                ),
+                ],
               ),
-              if (style != null && alias.isNotEmpty) _alias(),
-            ],
-          ),
+            ),
+            if (style != null && alias.isNotEmpty) _alias(),
+          ],
         ),
       ),
     );
@@ -213,19 +247,55 @@ class PlayerCardView extends StatelessWidget {
       right: right,
       top: top,
       bottom: 0,
+      /* 🔴 **좌우·아래를 카드 밖으로 밀어 낸 채 자른다** (2026-09-23, 사용자가
+         다섯 번 짚은 **그 직선**의 진짜 원인).
+
+         이 `ClipRect` 는 사진을 **위쪽에서** 자르려고 있는 것인데, 기본으로
+         쓰면 **좌우·아래 변이 카드 변과 정확히 겹친다.** 그러면 같은 자리를
+         **두 번 깎는 셈**이라(카드의 둥근 자르기 + 이 네모 자르기) 가장자리
+         한 줄의 덮는 정도가 어긋나고, 스크롤로 옮겨 붙일 때 **밝은 직선**으로
+         드러난다.
+
+         잰 것 — 여분의 밝은 픽셀이 **사진이 그려지는 구간에서만** 나왔다.
+         카드 위쪽(바탕색만 있는 곳)에는 없었다. 그것이 「사진을 가두는 네모가
+         범인」이라는 증거다.
+
+         🔴 **위만 자르면 된다.** 좌우와 아래는 **카드의 둥근 자르기**가 이미
+         맡고 있으므로, 여기서는 넉넉히 밖으로 내보내 **겹치지 않게** 한다.
+
+         ⛔ 기본 `ClipRect()` 로 되돌리지 말 것 — 그러면 직선이 돌아온다. */
       child: ClipRect(
-        child: ColorFiltered(
-          colorFilter: _kGrayscaleContrast,
-          /* 🔴 **변환은 칸이 아니라 그림에만 건다.** 칸에 걸면 잘리는 범위까지
-             움직여 카드 밖으로 넘친다. 원점은 **아래 가운데**다. */
-          child: Transform.translate(
-            offset: Offset(
-              (s?.photoX ?? 0) / 100 * (_kBaseW - left * 2),
-              (s?.photoY ?? 0) / 100 * (_kBaseH - top),
-            ),
-            child: Transform.scale(
-              scale: s?.photoScale ?? 1,
-              alignment: Alignment.bottomCenter,
+        clipper: const _TopOnlyClip(),
+        /* 🔴 **변환은 칸이 아니라 그림에만 건다.** 칸에 걸면 잘리는 범위까지
+           움직여 카드 밖으로 넘친다. 원점은 **아래 가운데**다. */
+        child: Transform.translate(
+          offset: Offset(
+            (s?.photoX ?? 0) / 100 * (_kBaseW - left * 2),
+            (s?.photoY ?? 0) / 100 * (_kBaseH - top),
+          ),
+          child: Transform.scale(
+            scale: s?.photoScale ?? 1,
+            alignment: Alignment.bottomCenter,
+            /* 🔴 **[ColorFiltered] 를 그림 **바로 위**에 둔다** (2026-09-23,
+               사용자가 다섯 번 짚은 **그 직선**의 진짜 원인).
+
+               `ColorFiltered` 는 **제 층을 따로 뜬다**(saveLayer). 그 층의
+               경계는 **네모**인데, 전에는 이것이 `ClipRect` 바깥에 있어서
+               **그 네모가 카드의 오른쪽·아래 변과 정확히 겹쳤다** — 스크롤로
+               층을 옮겨 붙일 때마다 그 변이 **밝은 직선**으로 드러났다.
+
+               잰 것: 정지 화면엔 선이 **없고** 스크롤 중에만 나오며, 그 선이
+               **카드의 둥근 모서리를 지나쳐 직각으로** 이어진다 — 카드 모양이
+               아니라 **네모난 층의 경계**라는 뜻이다.
+
+               🔴 **그림 위로 내리면 층의 네모가 사진 크기**가 된다. 사진은
+               `cover` 로 칸보다 크게 그려지므로 그 경계가 **카드 밖**에 떨어지고,
+               바깥 `ClipRect`·`ClipRRect` 가 잘라 낸다.
+
+               ⛔ **다시 밖으로 꺼내지 말 것.** 「변환을 한 곳에 모으면
+               읽기 좋다」로 올리고 싶어지는 자리다. */
+            child: ColorFiltered(
+              colorFilter: _kGrayscaleContrast,
               child: Image(
                 image: image,
                 fit: bare ? BoxFit.contain : BoxFit.cover,
@@ -392,4 +462,23 @@ class BlankPlayerCardView extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 사진을 **위쪽에서만** 자르는 틀 — 좌우·아래는 넉넉히 내보낸다.
+///
+/// 🔴 **왜 좌우·아래를 안 자르는가**: 그 변들이 카드 변과 겹치면 같은 자리를
+/// 두 번 깎게 되어 스크롤 중 **밝은 직선**이 생긴다(위 주석 참고). 그쪽은
+/// 카드의 둥근 자르기가 이미 맡는다.
+class _TopOnlyClip extends CustomClipper<Rect> {
+  const _TopOnlyClip();
+
+  /// 카드 밖으로 얼마나 내보내는가 — 겹치지만 않으면 되므로 넉넉히.
+  static const double _out = 8;
+
+  @override
+  Rect getClip(Size size) =>
+      Rect.fromLTRB(-_out, 0, size.width + _out, size.height + _out);
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Rect> oldClipper) => false;
 }

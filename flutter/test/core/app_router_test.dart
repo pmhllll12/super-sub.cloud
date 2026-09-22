@@ -122,8 +122,13 @@ void main() {
   testWidgets('영상 분석 카드가 자기 화면으로 데려간다', (tester) async {
     await _pumpHome(tester);
 
-    // 「영상 분석」 판 — 큰 판과 납작한 띠의 글이 겹쳐 있어 글자가 아니라 판을 누른다.
-    await tester.tap(find.byKey(const Key('home-video-analysis')));
+    /* 🔴 **판이 아니라 알약을 누른다 (2026-09-22 정정).** 전에는 판 전체가
+       단추라 `home-video-analysis` 를 눌렀는데, 이제 큰 판에서 눌리는 것은
+       사진 가운데의 「영상 분석 시작하기」 **하나뿐**이다(사용자 요청).
+       ⚠️ 판을 눌러도 **지금은 통과한다** — 알약이 마침 판 한가운데라
+       `tap` 의 기본 지점이 알약에 떨어지기 때문이다. 그건 우연이라
+       기대면 안 된다. */
+    await tester.tap(find.byKey(const Key('home-video-start')));
     await _settle(tester);
 
     expect(find.text('분석할 영상을 골라주세요'), findsOneWidget);

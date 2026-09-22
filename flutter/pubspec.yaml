@@ -99,6 +99,14 @@ flutter:
     - family: YoungSerif
       fonts:
         - asset: assets/fonts/YoungSerif-Regular.ttf
+    # 홈 스쿼드 판 아래의 워드마크(SUPERSUB) 전용. 구글 폰트 Yatra One —
+    # 굵기는 400 하나뿐이다. 라이선스: YatraOne-OFL.txt
+    # 🔴 **`google_fonts` 패키지를 쓰지 않는다** — 그쪽은 첫 실행 때 글꼴을
+    # 내려받아서, 네트워크가 없으면 **다른 글꼴로 한 번 그려졌다 바뀐다.**
+    # 이 저장소는 글꼴을 전부 에셋으로 싣는다(Rubik · YoungSerif 와 같은 방식).
+    - family: YatraOne
+      fonts:
+        - asset: assets/fonts/YatraOne-Regular.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:

@@ -8,12 +8,11 @@ import '../../../auth/data/models/team_membership.dart';
 import '../../../auth/presentation/session_controller.dart';
 import '../../../card/data/card_providers.dart';
 import '../../../card/data/models/player_card.dart';
-import '../../../../core/widgets/aurora_background.dart';
+import '../../../../core/widgets/glass_pill.dart';
+import '../../../../core/widgets/screen_tint.dart';
 import '../../../../core/widgets/floating_nav_bar.dart';
 import '../../../card/presentation/card_editor_screen.dart';
 import '../../../video/presentation/screens/my_videos_screen.dart';
-import '../../../../core/widgets/card_side_smoke.dart';
-import '../widgets/silver_sweep_border.dart';
 import '../widgets/player_card_view.dart';
 import '../../../team/data/team_providers.dart';
 import 'delete_account_sheet.dart';
@@ -49,38 +48,47 @@ class ProfileScreen extends ConsumerWidget {
 
        🔴 **카드 색을 고치고 돌아오면 부드럽게 건너간다** — 툭 갈리면 화면이
        깜빡인 것처럼 보인다(`AnimatedAuroraBackground`). */
+    /// 카드가 없으면 브랜드 민트 한 쌍 — 「빈 카드」인데 배경만 요란하면
+    /// 무엇을 보는 화면인지 흐려진다.
+    const fallback = (a: Color(0xFF2EC4B6), b: Color(0xFF118AB2));
     final tint = card?.style == null
-        ? kDefaultAuroraTint
+        ? fallback
         : (a: card!.style!.bg, b: card.style!.brushColor);
 
-    return AnimatedAuroraBackground(
-      tint: tint,
-      base: _kBg,
-      child: Scaffold(
-        // 🔴 **배경을 비운다** — 안 비우면 빛무리를 덮는다.
-        backgroundColor: Colors.transparent,
-        /* 🔴 **머리칸을 아예 안 둔다**(2026-09-22, 사용자 요청). 제목
+    /* 🔴 **홈과 같은 바탕이다**(2026-09-22 사용자 요청: 「내 프로필 화면에서도
+       그냥 배경 전체로 은은하게 색상 퍼지는거 홈페이지랑 똑같이」).
+       전에는 `AnimatedAuroraBackground`(빛무리)였다 — 두 화면의 바탕이 갈려
+       오갈 때 재질이 바뀌었다. */
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: ScreenTint(a: tint.a, b: tint.b),
+        ),
+        Scaffold(
+          // 🔴 **배경을 비운다** — 안 비우면 빛무리를 덮는다.
+          backgroundColor: Colors.transparent,
+          /* 🔴 **머리칸을 아예 안 둔다**(2026-09-22, 사용자 요청). 제목
            (「MY PROFILE」)도 뒤로가기도 걷었다 — 카드가 이 화면의 첫 얼굴이고,
            그 위에 띠가 하나 더 있으면 카드가 밀려 내려간다.
            🔴 **돌아가는 길은 아래 바가 맡는다** — 로고 알약이 홈이다. 머리칸을
            걷으면서 **나가는 길이 하나도 없어지지 않게** 같이 붙인 것이다. */
-        extendBody: true,
-        bottomNavigationBar: FloatingNavBar(
-          // 3 번이 이 화면(신분증 아이콘)이다.
-          currentIndex: 3,
-          onTap: (index) {
-            if (index == 0) {
-              context.go('/home');
-              return;
-            }
-            if (index == 1) {
-              context.go('/videos');
-              return;
-            }
-            _notReady(context, '준비 중입니다');
-          },
-        ),
-        /* 🔴 **`bottom: false` 가 있어야 내용이 바 밑으로 지나간다**
+          extendBody: true,
+          bottomNavigationBar: FloatingNavBar(
+            // 3 번이 이 화면(신분증 아이콘)이다.
+            currentIndex: 3,
+            onTap: (index) {
+              if (index == 0) {
+                context.go('/home');
+                return;
+              }
+              if (index == 1) {
+                context.go('/videos');
+                return;
+              }
+              _notReady(context, '준비 중입니다');
+            },
+          ),
+          /* 🔴 **`bottom: false` 가 있어야 내용이 바 밑으로 지나간다**
            (2026-09-22, 사용자 지적: 「하단바 자체에 검정 판이 또 있어서
            안 보인다 … 판 자체가 직선으로 보이지?」).
 
@@ -96,49 +104,79 @@ class ProfileScreen extends ConsumerWidget {
            ⚠️ 바에 가리는 것은 아래 `padding` 이 맡는다 — 둘이 **같은 일을
            두 번** 하고 있었던 것이고, 남길 쪽은 `padding` 이다(그쪽은 자리를
            비워 줄 뿐 **잘라 내지 않는다**). */
-        body: SafeArea(
-          bottom: false,
-          child: ListView(
-            padding: EdgeInsets.fromLTRB(
-              _kEdge,
-              8,
-              _kEdge,
-              // 떠 있는 바에 마지막 칸이 가리지 않게.
-              FloatingNavBar.heightOf(context),
-            ),
-            /* 🔴 **판을 두 개씩 나란히 둔다**(2026-09-22, 사용자 요청).
+          body: SafeArea(
+            bottom: false,
+            child: ListView(
+              /* 🔴 **자식마다 붙는 `RepaintBoundary` 를 끈다** (2026-09-23,
+                 사용자가 다섯 번 짚은 **그 직선**의 진짜 원인).
+
+                 [ListView] 는 기본으로 **자식 하나하나를 `RepaintBoundary`
+                 로 감싼다.** 그러면 그 자식이 **제 층에 따로 그려지고**,
+                 층의 크기가 정수 픽셀이 아니면 스크롤로 옮겨 붙일 때
+                 **오른쪽·아래 가장자리 한 줄이 비친다.** 카드 높이는
+                 `폭 × 비율` 이라 정수일 수가 없다.
+
+                 ⚠️ **`player_card_view.dart` 가 같은 증상을 적어 두고도 못
+                 찾은 자리다.** 거기서는 **직접 넣은** `RepaintBoundary` 를
+                 빼고 「해결」로 봤는데, 목록이 **자동으로 하나 더** 붙이고
+                 있었다. 그래서 빼도 증상이 그대로였다.
+
+                 ⚠️ **대가**: 한 칸이 다시 그려질 때 목록 전체가 같이 다시
+                 그려진다. 이 화면은 칸이 예닐곱 개뿐이라 괜찮다 — 칸이 수십
+                 개가 되면 그때 다시 본다. */
+              addRepaintBoundaries: false,
+              padding: EdgeInsets.fromLTRB(
+                _kEdge,
+                8,
+                _kEdge,
+                // 떠 있는 바에 마지막 칸이 가리지 않게.
+                FloatingNavBar.heightOf(context),
+              ),
+              /* 🔴 **판을 두 개씩 나란히 둔다**(2026-09-22, 사용자 요청).
                다섯이 세로로 줄줄이 서서 화면이 한참 길었다.
                「내 영상」만 한 줄을 다 쓴다 — 자주 들어가는 입구다. */
-            children: [
-              _CardHero(card: card, nickname: user.nickname),
-              /* 🔴 **닉네임과 판 사이를 흰 선으로 가른다**(2026-09-22, 사용자
+              children: [
+                _CardHero(card: card, nickname: user.nickname),
+                /* 🔴 **닉네임과 판 사이를 흰 선으로 가른다**(2026-09-22, 사용자
                  요청: 「닉네임과 내 영상 판 가운데에 완전 흰색 선으로」).
                  위아래 여백을 같게 줘서 선이 **둘의 한가운데**에 선다. */
-              const SizedBox(height: 14),
-              const _Rule(),
-              const SizedBox(height: 14),
-              const _VideosBlock(),
-              const SizedBox(height: _kGap),
-              _Pair(
-                left: [
-                  _TeamBlock(teams: user.teams),
-                  const _MatchesBlock(),
-                ],
-                right: [
-                  _InfoBlock(user: user),
-                  _AccountBlock(user: user),
-                ],
-              ),
-            ],
+                const SizedBox(height: 14),
+                const _Rule(),
+                const SizedBox(height: 14),
+                const _VideosBlock(),
+                /* 🔴 **두 번째 흰 선**(2026-09-22 사용자 요청: 「내 분석/업로드
+                 영상 바로 아래에도 … 똑같이 거리 재서」). 위 선과 **같은
+                 여백(14)** 을 위아래로 둬서 선이 두 판의 한가운데에 선다.
+
+                 ⚠️ **`_kGap`(6)이 아니다.** 판끼리의 간격과 선을 두르는
+                 여백은 **다른 값**이다 — `_kGap` 으로 두면 선이 위 판에
+                 붙어 「판의 밑줄」처럼 보인다. 위 선과 같은 14 라야 둘이
+                 한 쌍으로 읽힌다. */
+                const SizedBox(height: 14),
+                const _Rule(),
+                const SizedBox(height: 14),
+                _Pair(
+                  left: [
+                    _TeamBlock(teams: user.teams),
+                    const _MatchesBlock(),
+                  ],
+                  right: [
+                    _InfoBlock(user: user),
+                    _AccountBlock(user: user),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 }
 
-/// 빛무리 아래에 깔리는 바탕 — **완전한 검정**이다(2026-09-22 정정,
-/// 사용자 요청: 「배경 완전 검정으로」).
+/* ⛔ **`_kBg`(순검정)를 지웠다**(2026-09-22) — 바탕을 [ScreenTint] 가
+   칠하고, 그 바탕은 이제 **흰색**이다. 되살리려면 이 화면의 `Stack` 첫
+   자식을 바꾼다. */
 ///
 /// 🔴 전에는 `kAuroraBase`(#141417)를 그대로 썼고 판이 그 위에 **반투명
 /// 흰 면**으로 떴다. 이제는 **바탕이 검정, 판이 `kAuroraBase`** 다 — 둘이
@@ -146,8 +184,17 @@ class ProfileScreen extends ConsumerWidget {
 ///
 /// ⚠️ 홈은 여전히 `kAuroraBase` 다. 두 화면의 바탕이 갈린 것은 **일부러**이고,
 /// 되돌리려면 이 한 줄이다.
-const Color _kBg = Color(0xFF000000);
 const Color _kOn = Color(0xFFFFFFFF);
+const Color _kOnPanel = Color(0xFF000000);
+
+/// 흰 판 **안쪽**의 글자·아이콘·테두리 색 — **완전한 검정**이다
+/// (2026-09-22 사용자 요청: 「판들의 전체 색상 완전 흰색으로 바꾸고, 글자들이나
+/// 버튼 흰색으로 겹치면 완전 검정으로」).
+///
+/// 🔴 **[_kOn] 과 짝이다.** 검은 바탕 위(카드 · 닉네임 · 흰 선 · 「내 영상」
+/// 사진 판)는 [_kOn](흰색), **흰 판 안쪽**은 이것이다. 새로 글자를 놓을 때
+/// **어느 바탕 위인지**를 보고 고른다 — 습관대로 [_kOn] 을 쓰면 흰 판에서
+/// 글자가 통째로 사라진다.
 
 /// 화면 양끝 ↔ 판 사이, 그리고 판끼리의 간격. **둘 다 같은 값**이다
 /// (2026-09-22 사용자 요청: 「양옆 화면 끝에서 판의 거리가 6픽셀 … 판끼리의
@@ -176,14 +223,18 @@ class _Rule extends StatelessWidget {
   /// 가로로 차지하는 몫 — 🔴 **화면 폭 전체가 아니다**(2026-09-22 정정,
   /// 사용자 요청: 「지금의 3분의 2로 길이 줄이자」). 가운데 맞춤이라 좌우가
   /// 같은 길이씩 짧아진다.
-  static const double _widthFactor = 2 / 3;
+  ///
+  /// 🔴 **[_VideosBlock] 이 같이 쓴다**(2026-09-22) — 그 판이 이 선 둘 사이에
+  /// 끼어 있어서 **폭이 다르면 셋이 층층이 어긋나 보인다.** 그래서 값을
+  /// 베껴 적지 않고 여기 하나를 나눠 쓴다.
+  static const double widthFactor = 2 / 3;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       height: 1 / MediaQuery.devicePixelRatioOf(context),
       child: const FractionallySizedBox(
-        widthFactor: _widthFactor,
+        widthFactor: widthFactor,
         child: ColoredBox(color: _kOn),
       ),
     );
@@ -209,14 +260,18 @@ class _Block extends StatelessWidget {
        🔴 **대신 색만 얹는다** — 이 저장소가 `SilverEdge` 를 둔 이유와 같다
        (「유리가 아니다 … 흐림 없이 색만 얹는다」).
 
-       🔴 **면은 [kSurfaceWhite](반투명 흰색), 테두리는 없다**(2026-09-22
-       사용자 요청: 「판들과 하단바 색상 흰색으로 · 흰색 살짝만 들어간 판으로
-       뒤에 비치긴 해야해」 + 레퍼런스 한 장).
+       🔴 **면이 순백이다**(2026-09-22 정정, 사용자 요청: 「소속 정보 내 경기
+       계정 판들의 전체 색상 완전 흰색으로」). 전에는 [kSurfaceWhite](흰색
+       18%)라 검은 바탕이 비쳐 **회색 판**이었다.
 
-       하단바 · 로고 알약과 **같은 값**을 쓴다 — 셋이 한 재질이다. */
+       🔴 **그래서 판 안쪽 글자는 전부 [_kOnPanel](검정)이다** — 면만 희게
+       하고 글자를 두면 **통째로 사라진다.**
+
+       ⚠️ **하단 바 · 로고 알약과 더는 같은 값이 아니다.** 셋이 한 재질이던
+       것을 이 판만 뗀 것이고, 그쪽은 [kSurfaceWhite] 그대로다. */
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: kSurfaceWhite,
+        color: _kOn,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Padding(
@@ -227,7 +282,7 @@ class _Block extends StatelessWidget {
             Text(
               title,
               style: const TextStyle(
-                color: _kOn,
+                color: _kOnPanel,
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
               ),
@@ -292,150 +347,94 @@ class _CardHero extends ConsumerWidget {
   final PlayerCard? card;
   final String nickname;
 
-  /// 히어로라 프로필 안의 다른 카드보다 크다.
   static const double _cardWidth = 200;
 
-  /// 연기가 카드 위아래로 더 차지하는 자리.
-  ///
-  /// 🔴 **0 으로 두지 말 것** — 연기가 카드 높이에서 딱 끊기면 그 끝이
-  /// **가로선**으로 보인다. 덩이들이 제풀에 옅어져 사라질 여유를 준다.
-  ///
-  /// ⚠️ **한 번 위/아래를 따로 두고 아래끝을 흰 선에 맞췄다가 되돌렸다**
-  /// (2026-09-22) — 그때는 선 위를 두 색으로 꽉 채우려던 것이었다.
-  static const double _smokePad = 96;
+  /// 카드와 오른쪽 칸 사이.
+  static const double _gap = 12;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Column(
+    /* 🔴 **카드가 왼쪽, 나머지가 그 오른쪽이다**(2026-09-22 사용자 요청:
+       「카드는 왼쪽으로 옮기고 닉네임이랑 닉네임 편집은 그 카드의 바로 오른쪽
+       위에, 카드 수정 버튼은 그 바로 아래에」).
+
+       ⚠️ **가운데 세로 쌓기였던 것을 통째로 갈았다.** 전에는 카드가 가운데
+       서고 그 아래에 닉네임 줄이 있었다 — 그때 있던 장치 둘이 **이제 필요
+       없어져서 같이 걷혔다**:
+
+       | 걷은 것 | 왜 있었나 |
+       |---|---|
+       | 닉네임 왼쪽의 빈 자리 34 | 오른쪽 연필만큼 **균형**을 맞추려던 것. 이제 왼쪽 맞춤이라 균형을 맞출 일이 없다 |
+       | 「카드 수정」의 `left` 좌표 계산 | 카드가 **가운데** 서니 그 오른쪽 틈을 좌표로 잡아야 했다. 이제 `Row` 가 자리를 잡는다 |
+
+       🔴 **[CrossAxisAlignment.start] 다** — 오른쪽 칸이 카드보다 짧으므로
+       가운데로 두면 닉네임이 카드 한가운데 높이로 내려앉는다. 「카드 바로
+       오른쪽 **위**」가 요청이다. */
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        /* 🔴 **수정 단추가 카드 오른쪽 위에 붙는다**(사용자 요청). 흐름 안에
-           두면 카드가 그만큼 왼쪽으로 밀려 **가운데가 아니게** 된다 —
-           `Stack` 으로 띄워 카드의 가운데를 지킨다. */
-        SizedBox(
-          width: double.infinity,
-          child: Stack(
-            alignment: Alignment.topCenter,
-            clipBehavior: Clip.none,
+        if (card == null)
+          const BlankPlayerCardView(width: _cardWidth)
+        else
+          PlayerCardView(
+            width: _cardWidth,
+            seed: card!.publicSlug,
+            alias: aliasOf(card!),
+            style: card!.style,
+            photoUrl: card!.photoUrl,
+          ),
+        const SizedBox(width: _gap),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              /* 🔴 **카드보다 먼저 그린다** — 연기는 카드 뒤에 있어야 한다.
-                 `Stack` 은 나중 것이 위이므로 이 자리를 옮기면 연기가 카드를
-                 덮는다. 카드가 없으면(빈 카드) 쓸 색도 없으니 안 그린다. */
-              if (card?.style != null)
-                Positioned(
-                  // 카드보다 위아래로 조금 넉넉히 — 연기가 카드 높이에서
-                  // 뚝 끊기면 그 끝이 **가로선**으로 드러난다.
-                  top: -_smokePad,
-                  bottom: -_smokePad,
-                  left: 0,
-                  right: 0,
-                  child: CardSideSmoke(
-                    colors: (a: card!.style!.bg, b: card!.style!.brushColor),
-                    cardWidth: _cardWidth,
+              // 닉네임 + 연필 — 카드 **오른쪽 위**.
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      nickname,
+                      style: const TextStyle(
+                        color: _kOn,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
-                ),
-              // 🔴 카드가 없으면 빈 카드다 — 예외가 아니라 정상 상태다.
-              if (card == null)
-                const BlankPlayerCardView(width: _cardWidth)
-              else
-                PlayerCardView(
-                  width: _cardWidth,
-                  seed: card!.publicSlug,
-                  alias: aliasOf(card!),
-                  style: card!.style,
-                  photoUrl: card!.photoUrl,
-                ),
-              /* 🔴 **글자다**(2026-09-22, 사용자 요청) — 아이콘(`tune`)은
-                 무엇을 고치는 단추인지 안 읽혔다. 카드 **오른쪽 위 바깥**에
-                 붙여 카드를 안 덮는다. */
-              /* 🔴 **카드 바로 오른쪽**(2026-09-22, 사용자 요청). `right: 0`
-                 으로 두면 화면 끝에 붙어 카드와 멀어진다 — 카드가 가운데
-                 서므로 그 오른쪽 변은 `무대폭/2 + 카드폭/2` 다.
-
-                 🔴 **「무대폭」은 화면 폭이 아니라 목록 여백을 뺀 폭이다**
-                 (2026-09-22 정정). 이 `Stack` 은 `ListView` 의 좌우 여백
-                 **안**에 있어서 좌표 0 이 화면 왼쪽이 아니다. 화면 폭을
-                 그대로 쓰면 단추가 여백만큼 오른쪽으로 밀리는데, 여백이
-                 16 이던 동안은 카드와의 틈이 18 이라 **틀린 줄 몰랐다** —
-                 여백을 [_kEdge] 로 줄이자 드러났다. */
-              Positioned(
-                /* 🔴 **오른쪽 아래다**(2026-09-22 정정, 사용자 요청: 「카드
-                   오른쪽 위에 있는 카드 수정 버튼을 카드 오른쪽 아래로」).
-                   `top: 0` 이던 자리다. */
-                bottom: 0,
-                /* 🔴 **카드 오른쪽 변 ↔ 화면 오른쪽 끝의 한가운데**
-                   (2026-09-22, 사용자 요청).
-
-                   🔴 **`left` 에 좌표를 계산해 넣지 않는다** — 그건 단추의
-                   **왼쪽 변**을 놓는 것이라, 가운데에 맞추려면 단추 폭을 알아야
-                   하고 글자가 바뀌면(「카드 만들기」) 어긋난다. 대신 **틈 전체를
-                   상자로 잡고** 아래 `Center` 에게 맡긴다.
-
-                   `right: -_kEdge` — 이 `Stack` 은 목록의 좌우 여백 안이라
-                   화면 끝이 여기서 `-_kEdge` 다. */
-                left:
-                    (MediaQuery.sizeOf(context).width - 2 * _kEdge) / 2 +
-                    _cardWidth / 2,
-                right: -_kEdge,
-                child: Center(
-                  child: _GlassButton(
-                    buttonKey: const Key('profile-card-edit'),
-                    label: card == null ? '카드 만들기' : '카드 수정',
-                    onTap: () => card == null
-                        ? _createCard(context, ref)
-                        : Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => CardEditorScreen(card: card!),
-                            ),
-                          ),
+                  const SizedBox(width: 6),
+                  _GlassIconButton(
+                    buttonKey: const Key('profile-edit'),
+                    icon: Icons.edit,
+                    tooltip: '닉네임 수정',
+                    onTap: () => showNicknameSheet(context, nickname),
                   ),
-                ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              /* 🔴 **글귀가 「프로필 카드 수정」이다**(2026-09-22 사용자 요청).
+                 「카드 수정」만으로는 **무슨 카드**인지 안 읽혔다 — 이 화면엔
+                 카드가 하나뿐이지만 다른 화면에서 오면 그렇지 않다.
+                 ⚠️ 카드가 없을 때의 글귀(「카드 만들기」)는 **안 바꿨다** —
+                 그쪽은 「만든다」가 이미 무엇인지 말한다. */
+              _GlassButton(
+                buttonKey: const Key('profile-card-edit'),
+                label: card == null ? '카드 만들기' : '프로필 카드 수정',
+                onTap: () => card == null
+                    ? _createCard(context, ref)
+                    : Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => CardEditorScreen(card: card!),
+                        ),
+                      ),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 12),
-        /* 🔴 **닉네임이 카드 정중앙에 온다**(사용자 지적). 아이콘을 그냥
-           옆에 붙이면 **둘을 합친 덩어리**가 가운데 서서 닉네임만 보면
-           왼쪽으로 쏠린다.
-
-           🔴 **왼쪽에 같은 폭의 빈 자리를 둬서 균형을 맞춘다.** `Stack` 으로
-           아이콘을 흐름 밖에 띄우는 길도 있었는데, 그러면 Stack 이 글자
-           크기로 줄어들어 **아이콘이 그 밖에 놓이고 눌리지 않는다**(시험이
-           잡았다). 빈 자리는 눌릴 일이 없으니 이 쪽이 안전하다. */
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // 오른쪽 아이콘(28) + 사이(6) 만큼 왼쪽을 비운다.
-            const SizedBox(width: 34),
-            Flexible(
-              child: Text(
-                nickname,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: _kOn,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            const SizedBox(width: 6),
-            _GlassIconButton(
-              buttonKey: const Key('profile-edit'),
-              icon: Icons.edit,
-              tooltip: '닉네임 수정',
-              onTap: () => showNicknameSheet(context, nickname),
-            ),
-          ],
         ),
       ],
     );
   }
 
-  /// 🔴 카드는 **요청할 때** 생긴다(계약 `POST /me/card`) — 가입만으로는
-  /// 안 생기고, 조회가 만들지도 않는다.
-  ///
-  /// 🔴 **첫 모습까지 저장한다** — 안 하면 앱에서 만든 카드가 웹에서 만든
-  /// 것과 다르게 보인다(`createCardWithFirstLook`).
   Future<void> _createCard(BuildContext context, WidgetRef ref) async {
     try {
       await createCardWithFirstLook(ref.read(cardRepositoryProvider));
@@ -687,7 +686,7 @@ class _TeamBlockState extends ConsumerState<_TeamBlock> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (teams.isEmpty)
-            const Text('아직 팀이 없습니다', style: TextStyle(color: _kOn))
+            const Text('아직 팀이 없습니다', style: TextStyle(color: _kOnPanel))
           else
             for (final t in teams)
               Padding(
@@ -701,7 +700,7 @@ class _TeamBlockState extends ConsumerState<_TeamBlock> {
                     Text(
                       t.name,
                       style: const TextStyle(
-                        color: _kOn,
+                        color: _kOnPanel,
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
                       ),
@@ -715,7 +714,7 @@ class _TeamBlockState extends ConsumerState<_TeamBlock> {
                         Text(
                           '${t.region} · ${t.sportCode}',
                           style: TextStyle(
-                            color: _kOn.withValues(alpha: 0.7),
+                            color: _kOnPanel.withValues(alpha: 0.7),
                             fontSize: 11,
                           ),
                         ),
@@ -759,8 +758,8 @@ class _TeamBlockState extends ConsumerState<_TeamBlock> {
                 style: const TextStyle(fontSize: 12),
               ),
               style: OutlinedButton.styleFrom(
-                foregroundColor: _kOn,
-                side: BorderSide(color: _kOn.withValues(alpha: 0.4)),
+                foregroundColor: _kOnPanel,
+                side: BorderSide(color: _kOnPanel.withValues(alpha: 0.4)),
                 visualDensity: VisualDensity.compact,
                 padding: const EdgeInsets.symmetric(horizontal: 10),
               ),
@@ -856,7 +855,7 @@ class _TeamActionsState extends ConsumerState<_TeamActions> {
           TextButton(
             key: Key('team-cancel-${t.teamId}'),
             onPressed: _busy ? null : () => setState(() => _armed = false),
-            style: TextButton.styleFrom(foregroundColor: _kOn),
+            style: TextButton.styleFrom(foregroundColor: _kOnPanel),
             child: const Text('취소'),
           ),
         ],
@@ -935,12 +934,12 @@ class _InfoBlock extends ConsumerWidget {
              단위라 `player@supersub.te` / `st` 처럼 잘린다 — 읽기 나쁘다. */
           Text(
             user.email.replaceFirst('@', '@\u200B'),
-            style: const TextStyle(color: _kOn, fontSize: 13),
+            style: const TextStyle(color: _kOnPanel, fontSize: 13),
           ),
           const SizedBox(height: 10),
           _label('함께한 날'),
           const SizedBox(height: 2),
-          Text(joined, style: const TextStyle(color: _kOn, fontSize: 13)),
+          Text(joined, style: const TextStyle(color: _kOnPanel, fontSize: 13)),
         ],
       ),
     );
@@ -948,7 +947,7 @@ class _InfoBlock extends ConsumerWidget {
 
   Widget _label(String text) => Text(
     text,
-    style: TextStyle(color: _kOn.withValues(alpha: 0.7), fontSize: 12),
+    style: TextStyle(color: _kOnPanel.withValues(alpha: 0.7), fontSize: 12),
   );
 }
 
@@ -968,7 +967,7 @@ class _Pill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ink = danger ? _kDanger : _kOn.withValues(alpha: 0.85);
+    final ink = danger ? _kDanger : _kOnPanel.withValues(alpha: 0.85);
     return Material(
       color: Colors.transparent,
       shape: StadiumBorder(
@@ -1051,7 +1050,7 @@ class _TitlesRowState extends ConsumerState<_TitlesRow> {
               child: Material(
                 color: Colors.transparent,
                 shape: StadiumBorder(
-                  side: BorderSide(color: _kOn.withValues(alpha: 0.3)),
+                  side: BorderSide(color: _kOnPanel.withValues(alpha: 0.3)),
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(
@@ -1069,7 +1068,7 @@ class _TitlesRowState extends ConsumerState<_TitlesRow> {
                           ? '호칭 정하기'
                           : '호칭 고치기',
                       style: TextStyle(
-                        color: _kOn.withValues(alpha: 0.85),
+                        color: _kOnPanel.withValues(alpha: 0.85),
                         fontSize: 12,
                       ),
                     ),
@@ -1121,71 +1120,97 @@ class _VideosBlock extends ConsumerWidget {
        🔴 **그래서 [_Block] 을 안 쓴다.** 그쪽은 제목 + 내용 두 칸짜리 틀이라
        여기 쓰려면 제목도 안여백도 다 꺼야 하고, **끌 것이 많다는 것 자체가
        재사용하면 안 된다는 뜻**이다(`MiniPitch` 때와 같은 판단). */
-    return SilverSweepBorder(
-      radius: _radius,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(_radius),
-        child: SizedBox(
-          height: _height,
-          width: double.infinity,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              /* 🔴 **얼굴이 가운데 오게 자른다**(사용자 요청). 원본이
+    /* ⚠️ **좌우를 흰 선 길이로 좁혔다가 되돌렸다**(2026-09-22, 같은 날 두
+       번). 「선 길이만큼 줄이고」였는데 다시 「양옆 화면 끝과 6픽셀만 두자」로
+       정정됐다 — 지금은 목록의 좌우 여백(`_kEdge` = 6)이 곧 이 판의 폭이다.
+       `_Rule.widthFactor` 와 **더는 엮이지 않는다.** */
+    /* ⛔ **판 테두리의 도는 실버(`SilverSweepBorder`)를 걷었다**(2026-09-22
+       사용자 요청: 「지금 판 전체에 도는거 하지 마. 외곽선도 주지 말고」).
+
+       붙였던 까닭은 「이 판이 다른 화면으로 밀고 들어가는 유일한 입구라
+       여기를 보라는 표시」였다. 🔴 **그 일을 이제 가운데 알약이 한다** —
+       누르는 자리가 알약 하나로 좁아졌으니 판 둘레가 도는 것은 **어디를
+       눌러야 하는지를 도로 흐린다.**
+
+       🔴 **테두리 자체가 없다** — 가만히 있는 선도 안 긋는다. 사진이 판의
+       모양을 그대로 보여 준다. */
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(_radius),
+      child: SizedBox(
+        height: _height,
+        width: double.infinity,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            /* 🔴 **얼굴이 가운데 오게 자른다**(사용자 요청). 원본이
                  3340×724 짜리 가로로 긴 사진이라 `cover` 로 채우면 좌우가
                  많이 잘리는데, 머리가 원본의 가로 한가운데에 있어서
                  `Alignment.center` 가 곧 「얼굴 가운데」다. */
-              Image.asset(
-                'assets/images/videos_cover.jpg',
-                fit: BoxFit.cover,
-                alignment: Alignment.center,
-              ),
-              /* 🔴 **어둡게 깐다.** 사진이 밝아서 그냥 두면 흰 글자가 연기에
+            Image.asset(
+              'assets/images/videos_cover.jpg',
+              fit: BoxFit.cover,
+              alignment: Alignment.center,
+            ),
+            /* 🔴 **어둡게 깐다.** 사진이 밝아서 그냥 두면 흰 글자가 연기에
                  묻힌다. 아래로 갈수록 더 어둡게 해서 **글자가 앉는 쪽**을
                  눌러 준다 — 글자에 그림자를 주는 것보다 깨끗하다. */
-              const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0x99000000), Color(0x33000000)],
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0x99000000), Color(0x33000000)],
+                ),
+              ),
+            ),
+            /* 🔴 **판 한가운데다**(2026-09-22 재정정, 사용자 요청: 「글자를
+                 그 판의 정중앙으로」).
+
+                 ⚠️ **왼쪽 위 구석으로 옮겼던 것을 되돌린 것이다.** 그때
+                 까닭은 「사진이 주인공이고 글자는 이름표다」였는데, 판을
+                 좁히면서 구석에 붙은 글자가 **판 폭을 거의 다 먹어** 이름표로
+                 안 읽혔다.
+
+                 ⚠️ 위 그라데이션은 **위가 짙은** 채로 뒀다 — 가운데로 오면서
+                 글자가 짙은 쪽과 옅은 쪽 사이에 걸치는데, 아래를 더 짙게
+                 뒤집으면 사진의 인물이 어두워진다. */
+            /* 🔴 **가운데 유리 알약 하나만 눌린다**(2026-09-22 정정, 사용자
+               요청: 「판 자체에 버튼을 주지 말고 … 글자에 컴팩트하게 버튼을
+               주라고, 홈페이지 스쿼드판 안의 「위로 올려 내 팀 만들기」처럼」).
+
+               ⚠️ **판 전체가 단추였던 것을 걷었다.** 판까지 눌리면 **어디를
+               눌러야 하는지**가 흐려진다.
+
+               🔴 **재질·크기가 홈의 「위로 올려 내 팀 만들기」와 같다**
+               ([GlassPill]) — 값이 한곳에 있어서 한쪽만 갈릴 일이 없다.
+               도는 실버 테두리는 안 붙인다(사용자: 「외곽선 돌아가는건
+               안해도 돼」). */
+            Center(
+              child: GlassPill(
+                key: const Key('profile-videos'),
+                /* 🔴 **흐림을 끈다** — 이 판은 **굴러가는 목록 안**에 있다
+                   (2026-09-22, 사용자 지적: 「스크롤 하면 또또또 카드 외곽에
+                   직선이 생겨」). 흐림은 뒤가 구르면 가장자리에 **흰 직선**을
+                   만든다 — [GlassPill.blur] 머리말 참고. 홈의 알약들은 뒤가
+                   움직이지 않는 사진이라 켜 둔 것이고, 여기는 다르다. */
+                blur: false,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const MyVideosScreen(),
+                  ),
+                ),
+                child: const Text(
+                  '내 분석/업로드 영상',
+                  style: TextStyle(
+                    color: _kOn,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
                   ),
                 ),
               ),
-              /* 🔴 **왼쪽 위 구석**(2026-09-22 정정, 사용자 요청). 한가운데
-                 큰 글자로 뒀던 것을 옮겼다 — 사진이 주인공이고 글자는 이름표다.
-                 위 그라데이션도 **위가 짙게** 뒤집었다(글자가 앉는 쪽을 눌러
-                 준다). */
-              const Align(
-                alignment: Alignment.topLeft,
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(14, 10, 0, 0),
-                  child: Text(
-                    '내 분석/업로드 영상',
-                    style: TextStyle(
-                      color: _kOn,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                ),
-              ),
-              /* 🔴 **판 전체가 단추다**(사용자 요청). `Material` 이 있어야
-                 물결이 그려지고, 맨 위에 둬야 사진·글자가 탭을 안 먹는다. */
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  key: const Key('profile-videos'),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const MyVideosScreen(),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -1201,7 +1226,7 @@ class _MatchesBlock extends StatelessWidget {
     //    없으면 같은 문구를 보여 준다.
     return const _Block(
       title: '내 경기',
-      child: Text('다가오는 경기가 없습니다.', style: TextStyle(color: _kOn)),
+      child: Text('다가오는 경기가 없습니다.', style: TextStyle(color: _kOnPanel)),
     );
   }
 }
@@ -1229,7 +1254,7 @@ class _AccountBlock extends ConsumerWidget {
                 child: Text(
                   '지인 검색 노출',
                   style: TextStyle(
-                    color: _kOn.withValues(alpha: 0.85),
+                    color: _kOnPanel.withValues(alpha: 0.85),
                     fontSize: 12,
                   ),
                 ),
@@ -1250,9 +1275,22 @@ class _AccountBlock extends ConsumerWidget {
                   child: Switch(
                     key: const Key('profile-searchable'),
                     value: user.isNicknameSearchable,
-                    // 🔴 **흰색이다**(사용자 요청) — 브랜드 민트였다.
+                    /* 🔴 **켜짐과 꺼짐의 밝기가 맞바뀌었다**(2026-09-22
+                       정정 — 판이 순백이 되면서).
+
+                       전에는 판이 어두워서 **켜짐이 흰색**이었다. 판이
+                       희어진 지금 그대로 두면 **켜짐이 판에 녹아** 스위치가
+                       빈 자리로 보인다.
+
+                       🔴 **둘 다 검정으로 칠하지 않는다** — 요청은 「흰색으로
+                       겹치면 검정으로」지만 켜짐·꺼짐을 **둘 다** 검정으로
+                       하면 **어느 쪽인지 알 수 없다.** 그래서 자리를
+                       맞바꿨다: 켜짐이 어둡고 꺼짐이 밝다.
+
+                       ⚠️ 아래 꺼짐 색 주석의 「#333333 vs 순검정」 계산은
+                       **어두운 판 시절의 것**이라 지금은 적용되지 않는다. */
                     activeThumbColor: _kOn,
-                    activeTrackColor: _kOn.withValues(alpha: 0.45),
+                    activeTrackColor: _kOnPanel,
                     /* 🔴 **끄면 검정이다**(2026-09-22, 사용자 요청: 「끌 때는
                        검정으로」). 기본 꺼짐 색은 테마가 주는 회색이라 **판
                        위에서 떠 보였다.**
@@ -1275,12 +1313,13 @@ class _AccountBlock extends ConsumerWidget {
 
                        🔴 **테두리도 남긴다** — 면이 어두워서 그것마저 없으면
                        스위치가 어디 있는지 안 보인다. */
-                    inactiveThumbColor: _kBg,
-                    inactiveTrackColor: const Color(0xFF333333),
+                    inactiveThumbColor: _kOnPanel,
+                    // 흰 판에서 **한 끗 어두운** 회색 — 순백이면 자리가 안 보인다.
+                    inactiveTrackColor: const Color(0xFFE2E2E2),
                     trackOutlineColor: WidgetStateProperty.resolveWith(
                       (states) => states.contains(WidgetState.selected)
                           ? Colors.transparent
-                          : _kOn.withValues(alpha: 0.35),
+                          : _kOnPanel.withValues(alpha: 0.35),
                     ),
                     // 좁은 칸이라 기본 여백을 줄인다.
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -1315,8 +1354,15 @@ class _AccountBlock extends ConsumerWidget {
             onPressed: () =>
                 ref.read(sessionControllerProvider.notifier).logout(),
             style: FilledButton.styleFrom(
-              backgroundColor: _kOn,
-              foregroundColor: _kDanger,
+              backgroundColor: _kOnPanel,
+              /* 🔴 **순백이다**(2026-09-22 정정, 사용자 요청: 「로그아웃 글자
+                 색상 빨간색에서 완전 흰색으로」).
+
+                 ⚠️ **앞서 「탈퇴와 같은 빨강을 쓴다 — 둘은 면과 글자가 서로
+                 뒤집힌 한 쌍」이라고 적어 둔 것을 사용자가 다시 뒤집었다.**
+                 판이 순백이 되면서 단추 면이 검정이 됐고, 그 위의 빨강은
+                 「되돌릴 수 없는 일」로 읽히는데 로그아웃은 그렇지 않다. */
+              foregroundColor: _kOn,
               visualDensity: VisualDensity.compact,
             ),
             child: const Text('로그아웃', style: TextStyle(fontSize: 12)),

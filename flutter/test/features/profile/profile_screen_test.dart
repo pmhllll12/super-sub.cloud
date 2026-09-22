@@ -183,8 +183,10 @@ void main() {
 
       expect(find.byKey(const Key('profile-card-edit')), findsOneWidget);
       /* 🔴 **글자다**(2026-09-22) — 아이콘(`tune`)은 무엇을 고치는 단추인지
-         안 읽혔다. */
-      expect(find.text('카드 수정'), findsOneWidget);
+         안 읽혔다.
+         🔴 **「프로필 카드 수정」으로 늘렸다**(2026-09-22 정정, 사용자 요청).
+         「카드 수정」만으로는 **무슨 카드**인지 안 읽혔다. */
+      expect(find.text('프로필 카드 수정'), findsOneWidget);
     });
 
     /// 🔴 **머리칸을 걷으면서 나가는 길이 없어지지 않게** 아래 바를 붙였다

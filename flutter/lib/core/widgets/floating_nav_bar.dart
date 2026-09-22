@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -35,7 +37,17 @@ import '../../features/intro/presentation/brand_mark.dart';
 ///
 /// ⚠️ 홈의 `_kSheetColor`(스쿼드 판 · 영상 분석 판)와 **같은 값이었는데 갈렸다.**
 /// 홈 판까지 맞출지는 홈을 만질 때 함께 정한다.
-const Color kNavBarColor = Color(0xFF1A1A1A);
+const Color kNavBarColor = Color(0x8C1A1A1A);
+
+/// 하단 바 · 로고 알약의 **흐림 세기**(2026-09-22 사용자 요청: 「둘 다
+/// 글래스로 바꾸고, 블러 살짝만 … 20퍼센트만」).
+///
+/// ⚠️ **「20%」를 무엇의 20%로 읽을지 애매해서 6 으로 뒀다** — 홈의 유리
+/// 알약이 7.2 이고, 그보다 한 끗 옅은 값이다. 더 흐리게/덜 흐리게는 이 한 줄.
+///
+/// 🔴 **면이 같이 반투명이 됐다**(`0xFF1A1A1A` → `0x8C1A1A1A`). 흐림만
+/// 주고 면을 불투명으로 두면 **뒤가 안 비쳐 흐림이 하나도 안 보인다.**
+const double kNavBarBlur = 6;
 
 /// 바가 차지하는 높이(디자인 px). 시안 실측값이다.
 const double kBottomBarHeight = 155;
@@ -131,10 +143,19 @@ class FloatingNavBar extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           Positioned.fill(
-            // 면 하나를 로고 홈 모양대로 잘라 깐다 — 색은 [kNavBarColor].
+            /* 면 하나를 로고 홈 모양대로 잘라 깐다 — 색은 [kNavBarColor].
+               🔴 **유리다**(2026-09-22 사용자 요청) — 잘라 낸 그 모양 **안**
+               에서만 뒤를 흐린다. `ClipPath` 밖에 두면 파낸 홈까지 같이
+               흐려져 알약 자리가 안 드러난다. */
             child: ClipPath(
               clipper: notch,
-              child: const ColoredBox(color: kNavBarColor),
+              child: BackdropFilter(
+                filter: ui.ImageFilter.blur(
+                  sigmaX: kNavBarBlur,
+                  sigmaY: kNavBarBlur,
+                ),
+                child: const ColoredBox(color: kNavBarColor),
+              ),
             ),
           ),
           /* ⛔ **바 윤곽의 실버 선을 걷었다**(2026-09-22 정정, 사용자 요청:
@@ -285,19 +306,19 @@ class _NavIcon extends StatelessWidget {
                 child: const CustomPaint(painter: _SelectedPlate()),
               ),
             AnimatedScale(
-          scale: active ? 1.0 : restingScale,
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOut,
-          // 굵기·등급·광학크기를 여기 한 곳에서 준다. 아이콘마다 다르면
-          // 줄이 들쭉날쭉해진다.
-          child: Icon(
-            icon,
-            color: Colors.white,
-            size: context.d(76),
-            weight: 200,
-            grade: 0,
-            opticalSize: 20,
-          ),
+              scale: active ? 1.0 : restingScale,
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              // 굵기·등급·광학크기를 여기 한 곳에서 준다. 아이콘마다 다르면
+              // 줄이 들쭉날쭉해진다.
+              child: Icon(
+                icon,
+                color: Colors.white,
+                size: context.d(76),
+                weight: 200,
+                grade: 0,
+                opticalSize: 20,
+              ),
             ),
           ],
         ),
@@ -343,10 +364,7 @@ class _SelectedPlate extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final r = size.shortestSide * 0.34;
     final rect = Offset.zero & size;
-    final rrect = RRect.fromRectAndRadius(
-      rect.deflate(1),
-      Radius.circular(r),
-    );
+    final rrect = RRect.fromRectAndRadius(rect.deflate(1), Radius.circular(r));
 
     canvas.drawRRect(rrect, Paint()..color = _fill);
 
@@ -418,24 +436,34 @@ class _LogoButton extends StatelessWidget {
          가장 어둡다. 그 차이가 틈을 보이게 한다. 값을 갈라 놓으면 알약이
          바에서 떠 보인다. */
       child: LayoutBuilder(
-        builder: (context, box) => DecoratedBox(
-          decoration: BoxDecoration(
-            color: kNavBarColor,
-            // 알약은 좌우가 반원인 스타디움 — 높이의 절반이 반경이다.
-            borderRadius: BorderRadius.circular(box.maxHeight / 2),
-          ),
-          // 알약이 좁아 크기를 못 박는다 — `FittedBox`가 남는 폭에 맞춰
-          // 줄인다. 날아오는 동안에도 같은 방식이라 착지가 안 튄다.
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: context.d(44),
-              vertical: context.d(38),
+        // 🔴 **바와 같은 유리다** — 둘이 한 재질이어야 알약이 바에서 안 뜬다.
+        builder: (context, box) => ClipRRect(
+          // 알약은 좌우가 반원인 스타디움 — 높이의 절반이 반경이다.
+          borderRadius: BorderRadius.circular(box.maxHeight / 2),
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(
+              sigmaX: kNavBarBlur,
+              sigmaY: kNavBarBlur,
             ),
-            child: FittedBox(
-              child: brandHero(
-                child: Text(
-                  kBrandText,
-                  style: BrandMark.styleFor(kBrandLandedSize, AppTheme.seed),
+            child: ColoredBox(
+              color: kNavBarColor,
+              // 알약이 좁아 크기를 못 박는다 — `FittedBox`가 남는 폭에 맞춰
+              // 줄인다. 날아오는 동안에도 같은 방식이라 착지가 안 튄다.
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: context.d(44),
+                  vertical: context.d(38),
+                ),
+                child: FittedBox(
+                  child: brandHero(
+                    child: Text(
+                      kBrandText,
+                      style: BrandMark.styleFor(
+                        kBrandLandedSize,
+                        AppTheme.seed,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
