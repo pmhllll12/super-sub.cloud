@@ -9,6 +9,8 @@ import Field from '@/components/ui/Field'
 import PillButton from '@/components/ui/PillButton'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 import AuthShell from '@/components/auth/AuthShell'
+import SeatPicker from '@/components/auth/SeatPicker'
+import { leaveDemoVideo } from '@/lib/demoVideoExit'
 import {
   judgeEmail,
   judgeNickname,
@@ -93,6 +95,8 @@ export default function LoginPage() {
         }).catch(() => null)
         await apiPost('/api/auth/login', { email, password: JUDGE_PASSWORD })
       }
+      // 사용법 영상이 먼저 가장자리로 빠진 뒤 홈으로(홈에서 같은 데로 들어온다).
+      await leaveDemoVideo()
       router.push('/home')
       router.refresh()
     } catch (err) {
@@ -110,6 +114,8 @@ export default function LoginPage() {
     setBusy(true)
     try {
       await apiPost('/api/auth/login', { email, password })
+      // 사용법 영상이 먼저 가장자리로 빠진 뒤 홈으로(홈에서 같은 데로 들어온다).
+      await leaveDemoVideo()
       router.push('/home')
       router.refresh()
     } catch (err) {
@@ -141,9 +147,11 @@ export default function LoginPage() {
             variant="white"
             disabled={busy || limit.locked}
             onClick={() => void onJudge()}
-            className="w-full"
+            // 위 글자(회원가입 줄)와의 틈을 구글 단추 ↔ 약관 글자 틈(32px)과 같게
+            // (사용자 요청). 바닥 줄의 gap-3(12px) + mt-5(20px).
+            className="mt-5 w-full"
           >
-            심사위원용 로그인{seat ? ` (${seat}번)` : ''}
+            원티드 테스트용 로그인{seat ? ` (${seat}번)` : ''}
           </PillButton>
           {/* 🔴 **번호를 직접 고른다**(사용자 요청, 2026-09-18). 전에는
               「바꾸기」가 **무작위로 다른 번호**를 집어서, 원하는 자리를
@@ -153,25 +161,17 @@ export default function LoginPage() {
               🔴 **번호를 보여 주는 것이 이 방식의 안전장치다** — 둘이 같은
               번호를 쓰면 판·알림을 공유한다. 보여 줘야 부딪힌 것을 알아채고
               한쪽이 옮긴다. */}
-          <label className="flex items-center gap-2 text-xs" style={{ color: MUTED }}>
-            심사위원 번호
-            <select
-              className="rounded border bg-transparent px-2 py-1"
-              style={{ color: 'var(--ss-fg)', borderColor: MUTED }}
-              value={seat ?? ''}
-              onChange={(e) => {
-                const picked = setJudgeSeat(Number(e.target.value))
+          <div className="text-xs" style={{ color: MUTED }}>
+            <SeatPicker
+              label="테스트 번호"
+              seat={seat}
+              seats={judgeSeats()}
+              onPick={(n) => {
+                const picked = setJudgeSeat(n)
                 if (picked !== null) setSeat(picked)
               }}
-            >
-              {seat === null && <option value="">자동</option>}
-              {judgeSeats().map((n) => (
-                <option key={n} value={n} style={{ color: '#000' }}>
-                  {n}번
-                </option>
-              ))}
-            </select>
-          </label>
+            />
+          </div>
         </>
       }
     >

@@ -39,6 +39,8 @@ import {
   rememberInviteSeat,
 } from '@/lib/inviteSeats'
 import { apiDelete, apiPost } from '@/lib/api/client'
+import SpotNudge from '@/components/SpotNudge'
+import { markTeamNudge } from '@/lib/teamNudge'
 
 /**
  * 홈 첫 화면의 스쿼드 판 — 판 하나 위에 선수 카드를 **포지션 자리대로**
@@ -308,6 +310,13 @@ function pitchFromSquad(squad: Squad | null, size: SquadSize): PitchPlayer[] {
       cardSlug: slugs[sl.area] ?? null,
     }))
 }
+
+/**
+ * 🔴 **홈의 「AI」 단추를 지금은 안 보인다**(사용자 요청, 2026-09-19 — 챗봇 용병
+ * 찾기가 아직 제대로 구현되지 않았다). 단추·챗봇(`MatchBot`) 코드는 **그대로 둔다** —
+ * 다시 쓰려면 이 값만 `true` 로.
+ */
+const SHOW_AI_BUTTON = false
 
 export default function SquadPanel({
   card,
@@ -837,6 +846,22 @@ export default function SquadPanel({
    * 정어진 · 백성검 허락).
    */
   const [joined, setJoined] = useState<Record<string, true>>({})
+  /**
+   * 🔴 **데모용 — 수락을 실서버 없이 흉내낸다**(2026-09-20, 사용자 요청).
+   * 심사·시연 자리에서는 초대받은 쪽이 실제로 수락할 사람이 없어서
+   * 「수락 대기중」이 영영 안 풀린다 — 그럼 「팀 매칭」이 뜨는 흐름 자체를
+   * 못 보여준다. 초대를 보낸 뒤 **잠깐만** 대기중 딱지를 보여주고
+   * (사용자 지시: "처음에 떴다가 1~2초 뒤에 없어지게") 곧바로 수락된
+   * 것으로 친다 — 서버 상태(`invites`)는 안 건드리고 화면 판단
+   * (`isReady`)만 여기서 이긴다. 3초 폴링(위 「보낸 초대의 답을 기다린다」)이
+   * 그 자리를 다시 `pending` 으로 채워 넣어도 `isReady`가 이 자리를 먼저
+   * 보므로 흔들리지 않는다.
+   *
+   * 🔴 **실제 배포에서는 걷어야 한다** — 진짜 수락 흐름을 가짜로 덮는
+   * 코드다. 심사·시연 용도로만 켜 둔다.
+   */
+  const [demoAccepted, setDemoAccepted] = useState<Record<string, true>>({})
+  const DEMO_ACCEPT_MS = 1500
 
   /**
    * 그 자리의 사람이 **오기로 했는가.**
@@ -846,6 +871,7 @@ export default function SquadPanel({
    * 답이 와서 초대가 풀리면 등재(`members`)나 `joined` 로 온 것이다.
    */
   function isReady(area: string): boolean {
+    if (demoAccepted[area]) return true
     if (invites[area]) return false
     if (joined[area]) return true
     return seeded.ready[area] ?? Boolean(members[area])
@@ -1060,6 +1086,10 @@ export default function SquadPanel({
       )
       rememberInviteSeat(made.id, { col: slot.col, row: slot.row })
       setInvites((prev) => ({ ...prev, [slot.area]: made.id }))
+      // 🔴 데모용 자동 수락 — 위 `demoAccepted` 선언부 주석 참고.
+      window.setTimeout(() => {
+        setDemoAccepted((prev) => ({ ...prev, [slot.area]: true }))
+      }, DEMO_ACCEPT_MS)
     } catch {
       /* 🔴 **화면에서 지우지 않는다.** 이미 앉은 것을 걷으면 사람이 방금 한
          일이 사라진 것처럼 보인다 — 초대가 안 나갔을 뿐이라 ⊗ 로 빼면 된다.
@@ -1383,6 +1413,14 @@ export default function SquadPanel({
    * `addSeat` 로 저장하기 때문이다. 판이 진짜로 비어 있을 때만 다시 앉는다.
    */
   const autoSeated = useRef(false)
+  // 할 일이 남은 채 빈 자리를 눌렀을 때 「내 프로필」을 가리키는 안내(SpotNudge).
+  // 카드가 없으면 'card', 카드는 있는데 팀이 없으면 'team'.
+  const [need, setNeed] = useState<'card' | 'team' | null>(null)
+  /* 팀이 **아예 없는가** — 스쿼드도, 홈이 보여 주는 팀 이름도, 팀 id 도 없을 때만.
+     🔴 `squad` 하나로 가르지 않는다: 팀원은 스쿼드를 **나중에** 받아 오므로(처음엔
+     null) 그 사이에 「팀 없음」으로 잘못 읽힌다. `teamName` 은 소속이면 팀장이든
+     팀원이든 온다. */
+  const noTeam = !squad && !teamName && !myTeamId
   useEffect(() => {
     if (autoSeated.current) return
     if (!myCardId || mySeat) return
@@ -1465,8 +1503,8 @@ export default function SquadPanel({
      않는다** — 빈 자리를 직접 눌러 연 뒤(picking 이 이미 있다) 알약 상태가
      바뀌었다고 그 자리를 첫 빈 자리로 되돌리면, 방금 고른 자리가 사라진다. */
   useEffect(() => {
-    clearTimeout(timer.current)
     if (scouting) {
+      clearTimeout(timer.current)
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setClosing(null)
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -1474,10 +1512,19 @@ export default function SquadPanel({
       return
     }
     // 꺼지면 추천 판도 같이 접는다 — 한 단추가 연 한 벌이다.
+    /* 🔴 **타이머는 여기서 새로 걸 때만 지운다**(2026-09-18, 사용자 지적:
+       「판들 나왔다가 닫고 다시 클릭하면 또 클릭 안돼」).
+       판의 × 는 `close()` 가 물러나는 타이머를 건 **뒤에** `onCloseScouting`
+       으로 이 effect 를 부른다. 여기서 먼저 `clearTimeout` 을 하면 그 타이머가
+       지워지고, `picking` 은 이미 비어 있어 새 타이머도 안 걸린다 — 그래서
+       `closing` 이 영영 안 비워져 **안 보이는 추천 판이 DOM 에 남았다.**
+       그 판을 보고 「열려 있다」를 가르는 쪽(`body:has(.ss-suggest)`)이 전부
+       속았다 — 홈 안내가 판을 닫아도 안 돌아오던 옛 증상도 이것이다. */
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPicking((now) => {
       if (now) {
         setClosing(now)
+        clearTimeout(timer.current)
         timer.current = window.setTimeout(() => setClosing(null), SUGGEST_EXIT_MS)
       }
       return null
@@ -1554,6 +1601,16 @@ export default function SquadPanel({
        나간 부분이 통째로 잘린다 — 실제로 그렇게 안 보였다. 자리 잡기는
        이 바깥 상자가 맡고, 두 판은 그 안에서 좌표를 잡는다. */
     <div className="ss-squad-wrap">
+      {need && (
+        <SpotNudge
+          // 카드 모양과 「내 프로필」 글자만 — 둘레 배경은 어둡게(사용자 정정).
+          // 🔴 둥근 모서리는 `.ss-pcard` 가 아니라 **`.ss-pcard-inner`** 에 있다 — 바깥을
+          //    겨누면 구멍이 네모라 모서리 밖 배경이 비친다.
+          targets={['.ss-home-profile .ss-pcard-inner', '.ss-home-profile-label']}
+          message={need === 'card' ? '내 프로필에서\n카드를 먼저 만들어주세요.' : '내 프로필에서\n팀을 먼저 만들어주세요.'}
+          onDone={() => setNeed(null)}
+        />
+      )}
       {/* 유리 굴절(warp) — backdrop-filter 는 흐림·채도만 다루고 뒤 배경을
           휘게 하지는 못한다. 그건 SVG 필터의 몫이다: 부드러운 잡음
           (feTurbulence)을 만들고 그만큼 픽셀을 밀어(feDisplacementMap)
@@ -1875,7 +1932,17 @@ export default function SquadPanel({
                      넣는 것도 등재(`POST /squad/members`)라 주장만 되고,
                      초대도 주장만 보낸다 — 눌러도 아무 일이 안 일어나는
                      단추를 두면 고장으로 읽힌다. */
-                  disabled={!isCaptain}
+                  /* 🔴 **카드가 없으면 누를 수 있게 열어 둔다**(사용자 요청,
+                     2026-09-19). 처음 온 사람은 카드도 팀도 없어서 여기가 잠겨
+                     있었고, 눌러도 **아무 일도 안 일어나 무엇을 하라는지 몰랐다.**
+                     잠긴 단추는 클릭 자체가 안 와서 안내도 못 띄운다 — 그래서
+                     열고, 누르면 할 일(카드 만들기)을 가리킨다(아래 onClick). */
+                  /* 🔴 **팀도 없으면 열어 둔다**(2026-09-19) — 카드를 만든 뒤에도 팀이
+                     없으면 설 판이 없어 여기가 다시 잠겼다. 누르면 팀을 만들라고
+                     가리킨다(카드 없는 사람과 같은 길). 🔴 팀이 없다고 내 카드를 판에
+                     그냥 앉히지 않는다 — 한 번 그렇게 했다가 되돌렸다(사용자 판단:
+                     「팀 만들라고 해야 하지 않음?」). 팀이 있는 팀원은 그대로 잠근다. */
+                  disabled={!isCaptain && !!myCardId && !noTeam}
                   aria-label={
                     placing
                       ? `${posOf(slot)} 자리에 ${placing} 넣기`
@@ -1883,6 +1950,20 @@ export default function SquadPanel({
                   }
                   aria-expanded={placing ? undefined : picking?.area === slot.area}
                   onClick={() => {
+                    // 카드도 없고 팀장도 아니면(= 처음 온 사람) 여기서 할 수 있는 게
+                    // 없다 — 먼저 할 일을 가리킨다. 팀장이면 카드가 없어도 추천이
+                    // 열리므로(원래 동작) 건드리지 않는다.
+                    if (!isCaptain && !myCardId) {
+                      setNeed('card')
+                      return
+                    }
+                    // 카드는 있는데 팀이 없다 — 설 판이 없다. 팀부터.
+                    if (!isCaptain && noTeam) {
+                      setNeed('team')
+                      // 다음에 내 프로필에 가면 「팀 만들기」를 **한 번** 가리킨다(lib/teamNudge).
+                      markTeamNudge()
+                      return
+                    }
                     if (placing) {
                       setMates((prev) => ({ ...prev, [slot.area]: placing }))
                       /* 🔴 **고른 사람의 슬러그를 그 자리로 옮긴다**(미결
@@ -1993,15 +2074,17 @@ export default function SquadPanel({
           라 CSS 상수가 없고(내용이 정한다), 판 바깥에서 맞추려면 그 폭을
           다시 재서 두 곳에서 자리를 정하게 된다. 판 안에서는 `right: 0`
           한 줄이면 무슨 폭이든 정확히 오른쪽 끝이다. */}
-      <button
-        type="button"
-        className="ss-home-ai ss-traveling-edge"
-        aria-label="AI 용병 찾기"
-        aria-expanded={bot}
-        onClick={() => onBotChange?.(!bot)}
-      >
-        AI
-      </button>
+      {SHOW_AI_BUTTON && (
+        <button
+          type="button"
+          className="ss-home-ai ss-traveling-edge"
+          aria-label="AI 용병 찾기"
+          aria-expanded={bot}
+          onClick={() => onBotChange?.(!bot)}
+        >
+          AI
+        </button>
+      )}
 
       {/* AI 챗봇 — 추천 판과 **같은 첫째 칸**이다(사용자 요청). 여는 쪽이
           상대를 닫는다(`onBotChange` · 빈 자리 누르기). 둘째 칸의 지인 판과는
@@ -2047,8 +2130,38 @@ export default function SquadPanel({
           teamId={myTeamId}
           /* 🔴 **여기서 대기 팝업을 띄우지 않는다**(사용자 요청, 2026-09-16).
              신청은 걸린 것이고 확정은 상대가 수락할 때다 — 그 순간은 알림으로
-             오므로, 부모가 이 id 를 기억해 두었다가 그때 띄운다. */
-          onRequested={(requestId, team) => onRequested?.(requestId, team)}
+             오므로, 부모가 이 id 를 기억해 두었다가 그때 띄운다.
+             🔴 **데모용 자동 확정을 여기서 덧붙인다**(2026-09-20, 사용자
+             요청 — 위 `demoAccepted` 와 같은 이유: 심사 자리에는 실제로
+             수락할 상대 팀장이 없다). 위 규칙(부모가 알림을 기다린다)은
+             그대로 두고, 1.5초 뒤 **이 컴포넌트가 직접** `matched`를 채운다
+             — 진짜 알림이 오면 그쪽이 덮어써도 상관없다(같은 모양).
+             🔴 상대 스쿼드도 실물이 없어 **우리 판의 배치(자리·포지션)를
+             그대로 옮겨** 채운다(2026-09-20, 사용자 요청 — "우리팀처럼
+             보이도록"). 이름만 팀명 기반 자리표시자다.
+             🔴 실제 배포에서는 걷어야 한다(위 `demoAccepted`와 같은 경고). */
+          onRequested={(requestId, team) => {
+            onRequested?.(requestId, team)
+            window.setTimeout(() => {
+              setMatched({
+                id: team.id,
+                name: team.name,
+                region: team.region,
+                size: team.size,
+                playedAt: team.playedAt,
+                place: team.place,
+                why: team.why,
+                squad: slots.map((sl, i) => ({
+                  nickname: `${team.name} 선수 ${i + 1}`,
+                  col: sl.col,
+                  row: sl.row,
+                  pos: posOf(sl),
+                  mine: false,
+                  cardSlug: null,
+                })),
+              })
+            }, DEMO_ACCEPT_MS)
+          }}
         />
       )}
 

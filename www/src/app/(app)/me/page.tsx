@@ -21,6 +21,8 @@ import StyledCard from './StyledCard'
 import { CardStyleProvider } from './cardStyle'
 import MyMatches from './MyMatches'
 import MyVideos from './MyVideos'
+import BlankPlayerCard from '@/components/BlankPlayerCard'
+import ProfileNudge from './ProfileNudge'
 import ProfileStage from './ProfileStage'
 import NicknameForm from './NicknameForm'
 import { ymd } from './format'
@@ -90,7 +92,10 @@ export function MeBody({
     <ProfileStage editing={editing}>
       {/* 🔴 카드와 편집기가 화면에서 떨어져 있어(카드는 선 위, 편집기는 선
           아래) 한쪽이 상태를 들 수 없다 — 둘을 함께 감싼다. */}
-      <CardStyleProvider card={card}>
+      {/* 🔴 **카드가 생기거나 없어지면(만들기·초기화) 편집 상태를 새로 잡는다.**
+          공급자는 처음 받은 카드로만 값을 채워서, 안 그러면 새로고침할 때까지
+          옛 모습(만들기 전 기본값·지우기 전 꾸밈)이 편집기와 카드에 남는다. */}
+      <CardStyleProvider key={card ? `${card.id}:${card.style ? 's' : 'n'}` : 'none'} card={card}>
       {/* 판 **바깥 위**에 얹는 한 마디. 워드마크가 가운데에 서므로 이쪽은
           왼쪽 끝에 둔다 — 둘이 같은 줄에서 좌우로 갈린다. */}
       <p className="ss-profile-title">MY PROFILE</p>
@@ -104,7 +109,15 @@ export function MeBody({
               있었는데 **사실이 아니었다.** 카드는 분석과 무관하게, 사용자가
               부탁할 때 생긴다(계약 3장 「카드는 언제 생기나 — 요청할 때」).
               분석이 붙이는 것은 카드가 아니라 **호칭**이다. */}
-          {!card && (
+          {/* 🔴 **편집 중에는 안 그린다**(2026-09-19). 편집 중 왼쪽 칸은 격자이고
+              꾸미개가 둘째 줄에 박혀 있어서, 이 문장이 첫 줄을 먹으면 줄이 하나씩
+              밀려 「카드 만들기」 판이 **카드 옆이 아니라 맨 위로** 떴다(사용자
+              지적 「위치가 왜 저럼?」). 편집기가 이미 열려 있으니 「수정에서
+              만들 수 있다」는 안내도 필요 없다. */}
+          {/* 할 일이 남았으면 그 단추를 가리킨다 — 카드가 먼저, 그다음 팀. */}
+          {!editing && !card && <ProfileNudge kind="card" />}
+          {!editing && card && user.teams.length === 0 && <ProfileNudge kind="team" />}
+          {!card && !editing && (
             <p className="ss-profile-nocard">
               아직 선수 카드가 없습니다 — <strong>프로필 카드 수정</strong>에서 바로 만들 수
               있습니다.
@@ -178,10 +191,13 @@ export function MeBody({
                     </span>
                   )
                 ) : (
-                  /* 카드가 아직 없는 사람 — 자리를 비우면 줄이 무너지므로 같은
-                     크기의 판에 이름 첫 글자를 넣는다. */
-                  <span className="ss-profile-face ss-profile-face-empty" aria-hidden="true">
-                    {user.nickname.slice(0, 1)}
+                  /* 카드가 아직 없는 사람 — 🔴 **기본 빈 카드**를 둔다(사용자 요청,
+                     2026-09-19). 전에는 이름 첫 글자(「홍」)를 유리 판에 넣었는데,
+                     홈 「내 프로필」 자리와 **같은 모양**이어야 한다 — 스쿼드 판
+                     빈 자리 틀에서 `+` 만 뺀 것. 편집 중에는 같은 자리에서 커진다
+                     (`.ss-profile-face` 의 --ss-pcard-mini-w). */
+                  <span className="ss-pcard-mini ss-profile-face" aria-hidden="true">
+                    <BlankPlayerCard />
                   </span>
                 )}
 

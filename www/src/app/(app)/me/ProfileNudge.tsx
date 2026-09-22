@@ -1,0 +1,53 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import SpotNudge from '@/components/SpotNudge'
+import { ENTER_MS } from './ProfileStage'
+import { clearTeamNudge, hasTeamNudge } from '@/lib/teamNudge'
+
+/** 무엇이 모자라는가 — 그에 따라 밝힐 자리와 문장이 갈린다. */
+const NUDGES = {
+  /** 카드가 없다 → 빈 카드와 「프로필 카드 수정」. */
+  card: {
+    targets: ['.ss-profile-face .ss-pcard-inner', '.ss-profile-edit-link'],
+    message: '먼저 내 카드를 만들어주세요.',
+    note: 'right',
+  },
+  /** 카드는 있는데 팀이 없다 → 「팀 만들기」 단추 **하나만** 밝히고 문장은 그 **밑에**
+   *  (사용자 요청 — 스쿼드 판도 경기 신청도 팀 밑이다). */
+  team: {
+    targets: ['.ss-team-create-btn'],
+    message: '팀을 만들어주세요.',
+    note: 'below',
+  },
+} as const
+
+/**
+ * **할 일이 남은 사람**이 내 프로필에 들어오면(사용자 요청, 2026-09-19) — 화면이 다
+ * 들어온 뒤 어두워지며 할 일을 하는 단추만 밝게 두고, 그 오른쪽에 한 줄. 홈의
+ * 「내 프로필에서 … 먼저 만들어주세요」와 같은 동작(5초 또는 어디든 한 번 누르면 걷힘).
+ *
+ * 🔴 **팀 안내는 홈에서 「팀을 먼저 만들어주세요」가 뜬 뒤 한 번만**(lib/teamNudge).
+ * 순서는 **카드 → 팀**이다. 카드가 없으면 스쿼드 판에 설 것이 없고, 팀이 없으면
+ * 설 판이 없다(부르는 쪽 `page.tsx` 가 가른다).
+ * 🔴 **들어오는 연출이 끝난 뒤에** 켠다 — 먼저 켜면 아직 날아 들어오는 단추를 쫓아
+ * 구멍이 움직인다.
+ */
+export default function ProfileNudge({ kind }: { kind: keyof typeof NUDGES }) {
+  const [on, setOn] = useState(false)
+  const [done, setDone] = useState(false)
+  /* 🔴 **팀 안내는 표가 있을 때 한 번만**(lib/teamNudge, 사용자 요청). 카드 안내는
+     그대로 늘 뜬다 — 카드가 없으면 이 서비스에서 할 수 있는 것이 거의 없어서다.
+     표는 렌더에서 **읽기만** 하고 지우기는 effect 에서 한다 — 개발 모드의 두 번
+     도는 effect 가 첫 번에 지워 버리면 두 번째에 「표 없음」으로 안 뜬다. */
+  const [allowed] = useState(() => kind === 'card' || hasTeamNudge())
+  useEffect(() => {
+    if (!allowed) return
+    if (kind === 'team') clearTeamNudge()
+    const t = setTimeout(() => setOn(true), ENTER_MS)
+    return () => clearTimeout(t)
+  }, [allowed, kind])
+  if (!on || done) return null
+  const n = NUDGES[kind]
+  return <SpotNudge targets={[...n.targets]} message={n.message} note={n.note} onDone={() => setDone(true)} />
+}

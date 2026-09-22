@@ -536,7 +536,8 @@ export default function TeamActions({
           <div className="ss-profile-account-foot">
             <button
               type="button"
-              className="ss-profile-tab ss-profile-tab--sm"
+              // `ss-team-create-btn` — 팀 없는 사람에게 이 단추를 가리키는 안내(ProfileNudge)의 과녁.
+              className="ss-profile-tab ss-profile-tab--sm ss-team-create-btn"
               aria-expanded={open}
               onClick={() => {
                 setOpen((v) => !v)

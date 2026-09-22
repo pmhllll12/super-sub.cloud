@@ -2759,3 +2759,86 @@ grep -n 'applyToTeam' -A 25 www/src/lib/teamMatch.ts | grep -n 'error?.message'
   `tests/match/adapter/test_team_match_request_db.py` 의 `TestDuplicateGuard`
   (2건, 실물 SQL·지난 경기) · 전체 pytest 1126 passed / skipped 0
 
+## 63. 카드를 **지울 수 있습니다** — `DELETE /me/card` (2026-09-19 추가, 백성검)
+
+계약 3장에 `DELETE /api/v1/me/card` 가 생겼습니다(`api-contract.md` 같은 절).
+**204, 원래 없었어도 204**(멱등). 지우면 공유 링크가 404 가 되고 스쿼드 판
+자리도 같이 빠집니다(CASCADE). **호칭은 사람에 붙어 있어 남습니다.**
+
+**왜 생겼나.** 카드 편집기의 「초기화」가 **카드를 안 만든 처음 상태로** 돌아가야
+한다는 요청(사용자, 2026-09-19). 지금까지 서버에는 만들기·고치기만 있어서
+화면이 할 수 있는 것은 「꾸밈을 기본값으로」뿐이었습니다.
+
+### 만족해야 할 성질
+
+- `www`: 「초기화」가 이 경로를 부르고, 끝나면 **카드 없는 화면**(기본 빈 카드)으로
+  돌아간다 — **백성검이 같은 커밋 묶음으로 반영했습니다**(`CardEditor.tsx`)
+- `flutter`: 지우는 화면이 없으면 **할 일 없음.** 만들 때는 되돌릴 수 없다는 확인을
+  한 번 거치게 하십시오
+
+### 먼저 확인
+
+```bash
+grep -rn "DELETE.*me/card\|apiDelete('/api/me/card')" www/src flutter/lib
+```
+
+### 하지 말 것
+
+- 🔴 **확인 없이 지우지 마십시오** — 공유 링크와 스쿼드 자리가 돌아오지 않습니다
+- 🔴 **404 를 기다리지 마십시오** — 없을 때도 204 입니다. 실패는 401·5xx 뿐입니다
+
+- 확인: 백엔드 `tests/card/adapter/test_card_router.py` 의 `TestDeleteMyCard`(6건) ·
+  `tests/card/adapter/test_card_db.py` 의 `TestDeleteMyCardInDb`(2건, 실물 DB) ·
+  `tests/card/application/test_interactors.py` 의 `TestDeleteMyCardInteractor`(2건) ·
+  전체 pytest 1138 passed / skipped 0 · `alembic check` 변경 없음 · head 하나
+
+## 64. **업로드 해상도 상한이 없어졌습니다** — 이제 어떤 가로·세로도 받습니다 (2026-09-19 추가, 박민호 결정)
+
+`POST /videos`의 `reject_reason`에서 해상도 검사(긴 변 3840·짧은 변 2160)를
+**완전히 없앴습니다.** `analyze`가 참이든 거짓이든 이제 해상도로는 반려하지
+않습니다 — DCI 4K 세로(2160×4096) 영상이 이 관문 하나 때문에 반려된 것을
+사용자가 화면에서 직접 겪고 결정했습니다(미결 `jin` 43번 답변).
+
+**왜 안전한가.** `ho` 9번에서 분석 워커의 메모리 가드가 장수(300) 기준에서
+**바이트** 기준으로 이미 옮겨졌습니다 — 해상도가 커질수록
+`frames_within_budget()`이 프레임 수를 스스로 줄여 예산을 지킵니다. 그래서
+여기서 해상도를 따로 재는 관문은 더는 막을 것이 없었습니다. 화소가 아주 크면
+분석이 보는 시간(초)이 짧아질 수 있지만, 그건 예산이 이미 처리하는
+`limited_by` 축이라 거부가 아니라 "그만큼만 봄"으로 남습니다. **바이트
+예산(`DEFAULT_MAX_FRAME_BYTES`)은 건드리지 않았습니다** — 그건 결과를 바꾸는
+별개 판단입니다.
+
+### 만족해야 할 성질
+
+- **`www`·`flutter` 어느 쪽이든 해상도로 업로드를 미리 막던 로직이 있으면
+  걷어냅니다.** 서버가 더는 그 사유로 반려하지 않으니, 화면이 먼저 막으면
+  서버와 화면의 판단이 어긋납니다
+- 화면의 반려 사유 문구·바텀시트가 "해상도" 문자열을 특별 취급하고 있었다면
+  (예: 해상도 상한만 다른 안내로 바꿔치기) **그 분기를 지워도 됩니다** — 이제
+  그 사유 문자열 자체가 서버에서 안 옵니다
+
+### 먼저 확인
+
+```bash
+grep -rn "해상도\|MAX_LONG_SIDE\|resolution" www/src flutter/lib
+```
+
+`www`는 이미 확인했습니다 — 해상도를 화면에서 먼저 막는 로직은 원래 없었고
+(`uploadClip.ts`가 "길이·해상도는 여기서 안 본다"라고 명시), `reject_reason`
+문자열도 그대로 화면에 표시만 할 뿐 특정 문자열을 분기하지 않아서 **`www`는
+고칠 것이 없습니다.**
+
+### 하지 말 것
+
+- 🔴 **화면에서 자체적으로 해상도 상한을 새로 두지 마십시오** — 서버가 상한을
+  없앤 이유(바이트 기준 메모리 가드)가 화면 쪽엔 없어서, 같은 근거 없이
+  다시 막는 셈이 됩니다
+- 🔴 **바이트 예산(`agent/`)을 함께 건드리지 마십시오** — 이번 결정과 다른
+  질문(몇 프레임을 볼지)입니다
+
+- 확인: 백엔드 `tests/analysis/domain/test_video_rules.py`의
+  `test_해상도는_상한이_없다` · `test_analyze_false_라도_용량과_길이는_본다` ·
+  `test_사유는_하나만_돌려준다`(8K·DCI 4K 포함) · `tests/analysis/adapter/test_video_router.py`의
+  `TestRegisterVideo::test_analyze_true_여도_해상도는_상한이_없다`(4K·8K·DCI 4K 세로) ·
+  전체 `pytest` **810 passed / skipped 324**(DB 없는 로컬 환경 — DB 마킹된 시험만 skip,
+  그 외 0)

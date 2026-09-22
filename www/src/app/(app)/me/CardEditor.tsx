@@ -2,12 +2,12 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { apiErrorMessage, apiPost } from '@/lib/api/client'
+import { ApiCallError, apiDelete, apiErrorMessage, apiPost } from '@/lib/api/client'
 import { uploadCardPhoto } from '@/lib/cardPhoto'
 import PillButton from '@/components/ui/PillButton'
 import type { PlayerCard } from '@/server/backend'
 import CardMark, { HIDDEN_MARKS, MARKS } from '@/components/CardMark'
-import { useCardStyle } from './cardStyle'
+import { TEXT_MIN_Y, saveFirstLook, useCardStyle } from './cardStyle'
 
 /**
  * 선 아래의 카드 편집기.
@@ -37,7 +37,11 @@ export default function CardEditor({ card }: { card: PlayerCard | null }) {
     try {
       /* 🔴 멱등이라 여러 번 눌러도 카드는 하나고 슬러그도 그대로다 —
          재시도해도 이미 공유한 주소가 죽지 않는다(계약 3장). */
-      await apiPost('/api/me/card', {})
+      const made = await apiPost<PlayerCard>('/api/me/card', {})
+      // 🔴 **처음 만든 카드는 정해 둔 모습으로**(사용자 지정 — X 붓자국). 이미
+      // 꾸민 카드(style 이 있다)면 건드리지 않는다 — 멱등이라 이미 있던 카드가
+      // 돌아올 수 있다.
+      if (!made.style) await saveFirstLook()
       router.refresh()
     } catch (e) {
       setError(apiErrorMessage(e))
@@ -50,13 +54,10 @@ export default function CardEditor({ card }: { card: PlayerCard | null }) {
     return (
       <div className="ss-profile-editor">
         <h2 className="ss-profile-h">선수 카드 만들기</h2>
-        {/* 🔴 **분석을 기다릴 필요가 없다**는 것이 이 문장의 요점이다.
-            카드는 부탁하면 바로 생기고(계약 3장), 분석이 붙이는 것은 카드가
-            아니라 호칭이다. */}
-        <p className="ss-profile-muted">
-          지금 바로 만들 수 있습니다 — 분석을 기다리지 않아도 됩니다. 만들면 공유할 수 있는
-          주소가 생기고, 호칭은 나중에 경기 영상이 분석되면 카드에 붙습니다.
-        </p>
+        {/* 🔴 **한 줄만**(사용자 요청, 2026-09-19). 전에는 「분석을 기다리지 않아도
+            됩니다 … 호칭은 나중에 경기 영상이 분석되면 카드에 붙습니다」까지 적었는데,
+            호칭은 이제 **사람이 직접 정한다**(`paik` 36번) — 그 문장이 틀린 말이 됐다. */}
+        <p className="ss-profile-muted">지금 바로 만들 수 있습니다</p>
         {error && (
           <p role="alert" className="ss-profile-video-reason">
             {error}
@@ -144,8 +145,36 @@ function ColorRow({
 }
 
 /** 1단계 — 바탕 · 로고 · 글자와 그 색. 사진 · 붓은 다음 단계다. */
+/** 초기화를 누르면 묻는 말 — 되돌릴 수 없는 일이라 한 번 확인한다. */
+export const WIPE_CONFIRM =
+  '카드를 지우고 처음(카드를 안 만든) 상태로 돌아갑니다.\n공유 링크와 스쿼드 판 자리가 사라지고 되돌릴 수 없습니다.'
+
 function CardLooks() {
   const { style, tagline, set, setTagline, reset, save } = useCardStyle()
+  const router = useRouter()
+  const [wipeNote, setWipeNote] = useState<string | null>(null)
+
+  /* 🔴 **「초기화」는 카드를 지운다**(사용자 요청, 2026-09-19) — 카드를 안 만든
+     처음 상태(기본 빈 카드)로 돌아가고, 편집을 닫아도 그대로다. 전에는 화면의
+     값만 공장 기본값으로 되돌렸다(저장을 눌러야 반영). 되돌릴 수 없는 일이라
+     **한 번 묻는다.**
+     ⚠️ 서버가 아직 지우기를 모르면(배포 전 — 404·405) **예전 동작**(화면 값만
+     기본값)으로 물러나고 그렇다고 말한다. 지운 척하지 않는다. */
+  async function wipe() {
+    if (!window.confirm(WIPE_CONFIRM)) return
+    setWipeNote(null)
+    reset()
+    try {
+      await apiDelete('/api/me/card')
+      router.refresh()
+    } catch (err) {
+      if (err instanceof ApiCallError && (err.status === 404 || err.status === 405)) {
+        setWipeNote('서버가 아직 카드 지우기를 모릅니다 — 꾸밈만 기본값으로 되돌렸습니다(저장을 눌러야 반영).')
+      } else {
+        setWipeNote(apiErrorMessage(err))
+      }
+    }
+  }
   /** 방금 저장했는가 — `null` 이면 아직 아무 말도 안 한다. */
   const [savedOk, setSavedOk] = useState<boolean | null>(null)
   const [saving, setSaving] = useState(false)
@@ -177,13 +206,38 @@ function CardLooks() {
           value={style.textColor}
           onChange={(v) => set({ textColor: v })}
         />
-      </dl>
 
-      {/* 🔴 **초기화는 화면의 값만** **공장 기본값**으로 되돌린다. 저장된
-          것까지 지우면 되돌리기가 곧 삭제가 되어 무섭게 쓰인다 — 되돌린 뒤
-          저장을 눌러야 저장본도 바뀐다. */}
+        {/* 🔴 **글자 자리를 여기서도 옮긴다**(사용자 요청, 2026-09-19). 카드 위
+            글자를 끄는 길(`StyledCard`)은 원래 있었는데 **아무 표시가 없어 아무도
+            몰랐다.** 같은 값(`textX`·`textY`, 저장되는 `text_x`·`text_y`)을 미는
+            것이라 둘 중 어느 쪽으로 옮겨도 같다. 범위도 끌기와 같다 — 가장자리에
+            안 붙고(6~94), 위로는 로고·머리글 자리(TEXT_MIN_Y)까지만. */}
+        <SlideRow
+          label="글자 좌우"
+          value={Math.round(style.textX)}
+          min={6}
+          max={94}
+          step={1}
+          suffix="%"
+          onChange={(v) => set({ textX: v })}
+        />
+        <SlideRow
+          label="글자 위아래"
+          value={Math.round(style.textY)}
+          min={TEXT_MIN_Y}
+          max={94}
+          step={1}
+          suffix="%"
+          onChange={(v) => set({ textY: v })}
+        />
+      </dl>
+      <p className="ss-profile-muted ss-card-hint">카드 위 글자를 끌어서 옮길 수도 있습니다.</p>
+
+      {/* 🔴 **초기화는 카드를 지운다**(위 `wipe`, 2026-09-19 사용자 요청으로
+          뒤집음). 전에는 「화면 값만 기본값으로 — 지우면 무섭게 쓰인다」였고,
+          그 걱정은 **확인 한 번**으로 받는다. */}
       <div className="ss-card-actions">
-        <button type="button" className="ss-profile-tab" onClick={reset}>
+        <button type="button" className="ss-profile-tab" onClick={() => void wipe()}>
           초기화
         </button>
         <button
@@ -203,6 +257,11 @@ function CardLooks() {
       </div>
 
       {/* ✅ 서버에 담긴다(CCC 35) — 다른 기기 · 공개 카드 링크에도 반영된다. */}
+      {wipeNote && (
+        <p className="ss-profile-video-reason" role="alert">
+          {wipeNote}
+        </p>
+      )}
       {savedOk === true && (
         <p className="ss-profile-publish-note" role="status">
           저장했습니다 — 다른 기기와 공개 카드 링크에도 반영됩니다.

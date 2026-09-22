@@ -19,6 +19,7 @@ from app.card.application.dtos.card_dto import (
     CardPhotoUploadCommand,
     CardPhotoUploadResult,
     CreateMyCardCommand,
+    DeleteMyCardCommand,
     MyCardQuery,
     MyCardResult,
     PublicCardQuery,
@@ -29,6 +30,7 @@ from app.card.application.ports.input.update_my_card_use_case import (
 )
 from app.card.application.dtos.card_dto import UNSET
 from app.card.dependencies.create_my_card_provider import CreateMyCardUseCaseDep
+from app.card.dependencies.delete_my_card_provider import DeleteMyCardUseCaseDep
 from app.card.dependencies.my_card_provider import MyCardUseCaseDep
 from app.card.dependencies.public_card_provider import PublicCardUseCaseDep
 from app.card.dependencies.card_photo_provider import CardPhotoUploadUseCaseDep
@@ -63,6 +65,25 @@ def create_my_card(
     if not creation.created:
         response.status_code = status.HTTP_200_OK
     return creation.card
+
+
+@card_router.delete("/me/card", status_code=status.HTTP_204_NO_CONTENT)
+def delete_my_card(user_id: CurrentUserId, use_case: DeleteMyCardUseCaseDep) -> Response:
+    """내 카드를 지운다 — **카드를 안 만든 처음 상태로** (2026-09-19, 미결 `paik`).
+
+    화면의 「초기화」가 부른다(사용자 요청). 다시 `POST /me/card` 하면 **새 카드**가
+    생긴다 — 슬러그도 새로 뽑힌다.
+
+    | | |
+    |---|---|
+    | 204 | 지웠다. **원래 없었어도 204** — 멱등이다(재시도가 오류로 오지 않게) |
+    | 401 `UNAUTHORIZED` | 로그인이 필요하다 |
+
+    🔴 **되돌릴 수 없다.** 이미 공유한 카드 링크가 죽고(404), 스쿼드 판의 자리도
+    같이 빠진다(외래키 CASCADE). 호칭은 사람에 붙어 있어 남는다.
+    """
+    use_case(DeleteMyCardCommand(user_id=user_id))
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @card_router.post(

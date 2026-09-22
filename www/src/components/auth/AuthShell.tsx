@@ -114,8 +114,14 @@ export default function AuthShell({
                 맡기지 않고 명시적으로 두 줄로 고정한다 — "안개 속에서도," /
                 "실력은 숨지 않습니다." 폭이 아주 좁아 둘째 줄이 넘칠 때만
                 keep-all 로 자연 줄바꿈을 허용한다. */}
-            <div className="relative flex h-full flex-col justify-center p-12">
-              <div className="flex max-w-md flex-col gap-3">
+            {/* 🔴 헤드라인 오른쪽 ~ 가운데 경계선이 **사용법 영상 자리**다
+                (2026-09-18, 해커톤 제출용 — `components/DemoVideo.tsx`). 이 칸은
+                자리만 내놓고 영상은 루트 레이아웃의 `DemoVideo` 가 재서 그 위에
+                앉는다 — 여기서 `<video>` 를 그리면 로그인 → 홈으로 갈 때 영상이
+                새로 태어나 처음부터 다시 돈다. 경계선에 붙이려고 오른쪽 여백은
+                0 이다(`pr-0`). */}
+            <div className="relative flex h-full items-center gap-8 py-12 pl-12 pr-0">
+              <div className="flex max-w-md shrink-0 flex-col gap-3">
                 <h2
                   className="text-4xl leading-tight font-semibold"
                   style={{ wordBreak: 'keep-all' }}
@@ -131,6 +137,7 @@ export default function AuthShell({
                   <span className="block">실력을 검증합니다.</span>
                 </p>
               </div>
+              <div data-demo-slot="" aria-hidden="true" className="aspect-[1902/952] min-w-0 flex-1" />
             </div>
           </div>
 

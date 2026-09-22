@@ -34,8 +34,15 @@ import type { PublicPlayerCard } from '@/server/backend'
  */
 const EXIT_MS = 620
 
-/** `2026-09-20T10:00:00` → `9월 20일 토요일 10:00`. */
-function whenText(iso: string): string {
+/**
+ * `2026-09-20T10:00:00` → `9월 20일 토요일 10:00`.
+ *
+ * 🔴 내보낸다 — 시험이 「경기 시각이 아직 안 지났다」를 재현하려면 항상
+ * 미래인 날짜를 만들어야 하는데(고정 날짜는 시간이 지나면 과거가 되어
+ * `over` 분기가 조용히 바뀐다 — 2026-09-20 에 실제로 겪었다), 화면에 뜨는
+ * 문구도 그 날짜에서 **같은 함수로** 뽑아야 시험이 스스로 어긋나지 않는다.
+ */
+export function whenText(iso: string): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return iso
   const day = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()]
