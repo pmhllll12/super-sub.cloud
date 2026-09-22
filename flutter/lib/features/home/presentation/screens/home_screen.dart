@@ -9,6 +9,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/card_side_smoke.dart';
 import '../../../../core/widgets/aurora_background.dart';
 import '../../../../core/widgets/bar_menu.dart';
 import '../../../../core/widgets/floating_nav_bar.dart';
@@ -781,6 +782,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     ),
                   ),
                 ),
+                /* 🔴 **판 안에도 카드의 두 색이 퍼진다**(2026-09-22, 사용자
+                   요청: 「바꾼 카드의 2가지 색상이 홈페이지 내 팀 만들기
+                   판에도 프로필에서 카드 옆에 나오는 것같이 똑같이」).
+                   프로필과 **같은 위젯·같은 값**이라 두 화면이 한 재질이다.
+
+                   🔴 **[cardWidth] 가 0 이다** — 프로필에서는 가운데에 카드가
+                   앉아 그만큼 비우지만, 여기는 비울 카드가 없고 판 전체에
+                   퍼져야 한다.
+
+                   🔴 **판 모서리에 맞춰 자른다** — 안 자르면 연기가 둥근
+                   모서리 밖으로 네모나게 삐져나온다. */
+                if (card?.style != null)
+                  Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.vertical(
+                        bottom: Radius.circular(radius),
+                      ),
+                      child: CardSideSmoke(
+                        colors: (
+                          a: card!.style!.bg,
+                          b: card.style!.brushColor,
+                        ),
+                        cardWidth: 0,
+                      ),
+                    ),
+                  ),
                 // 스쿼드 판 — 제 크기로 짜서 위 가운데 기준으로 줄인다.
                 // 🔴 **다 펼치기 전에는 판이 안 눌린다**(2026-09-15 사용자 요청). 작게
                 // 줄어 있을 때 빈 자리(+)가 눌리면 판을 끌어내리려던 손가락이 엉뚱한

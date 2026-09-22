@@ -12,7 +12,7 @@ import '../../../../core/widgets/aurora_background.dart';
 import '../../../../core/widgets/floating_nav_bar.dart';
 import '../../../card/presentation/card_editor_screen.dart';
 import '../../../video/presentation/screens/my_videos_screen.dart';
-import '../widgets/card_side_smoke.dart';
+import '../../../../core/widgets/card_side_smoke.dart';
 import '../widgets/silver_sweep_border.dart';
 import '../widgets/player_card_view.dart';
 import '../../../team/data/team_providers.dart';
@@ -614,8 +614,17 @@ class _GlassShell extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: radius,
-        /* 🔴 **면은 비운다** — 사용자가 「안쪽 색상 다 빼」라고 짚은
-           자리다. 형태는 아래 테두리가 세운다. */
+        /* 🔴 **면이 흰색 10% 다**(2026-09-22 정정, 사용자 요청: 「카드 수정
+           버튼 안쪽을 흰색 10퍼만 주자」).
+
+           ⚠️ 전에는 **비워** 뒀다(사용자가 「안쪽 색상 다 빼」라고 짚었던
+           자리다) — 그때는 카드 위에 얹혀서 카드 그림이 비쳐야 했다. 이제
+           단추가 카드 **밖**(오른쪽 아래 틈)으로 나와서 비칠 것이 검은
+           바탕뿐이라, 면이 없으면 글자만 떠 있는 것처럼 보인다.
+
+           🔴 **연필 단추도 같이 바뀐다** — 둘이 이 틀을 나눠 쓴다. 한쪽만
+           고치면 재질이 갈린다. */
+        color: _kOn.withValues(alpha: 0.10),
         border: Border.all(
           color: _kOn,
           // 이 기기에서 그릴 수 있는 **가장 얇은 선**.
@@ -1312,7 +1321,9 @@ class _AccountBlock extends ConsumerWidget {
             ),
             child: const Text('로그아웃', style: TextStyle(fontSize: 12)),
           ),
-          const SizedBox(height: 6),
+          // 🔴 **좁혔다**(2026-09-22, 사용자 요청: 「너무 멀다」). 6 → 3.
+          //    둘은 한 묶음(계정에서 나가는 길)이라 붙어 있는 편이 맞다.
+          const SizedBox(height: 3),
           FilledButton(
             key: const Key('profile-delete-account'),
             onPressed: () => showDeleteAccountSheet(context),
