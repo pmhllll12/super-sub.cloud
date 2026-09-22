@@ -90,6 +90,14 @@ class ApiAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AppUser> refreshMe() async {
+    final user = await _fetchMe();
+    // 캐시도 갈아 둔다 — 안 그러면 다음 restoreSession 이 옛 값을 준다.
+    _current = Session(user: user);
+    return user;
+  }
+
+  @override
   Future<void> deleteAccount({String? password}) async {
     /* 🔴 **빈 값이면 본문을 통째로 안 보낸다** — 구글로만 가입한 계정에는
        확인할 비밀번호가 없다. 빈 문자열을 실으면 서버가 틀린 비밀번호로 읽어

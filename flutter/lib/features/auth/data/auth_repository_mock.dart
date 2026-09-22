@@ -80,6 +80,25 @@ class MockAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AppUser> refreshMe() async {
+    await Future<void>.delayed(_delay);
+    final session = _current;
+    if (session == null) {
+      throw const AuthException('로그인이 필요합니다');
+    }
+    /* 🔴 **소속을 다시 엮는다.** `AppUser.teams` 는 `teamMembers` 에서
+       만들어지는 파생값이라, 팀을 만든 뒤 다시 안 엮으면 **방금 만든 팀이
+       프로필에 안 뜬다.** */
+    _db.attachTeams();
+    final user = _db.findUserById(session.user.id);
+    if (user == null) {
+      throw const AuthException('존재하지 않는 사용자입니다');
+    }
+    _current = Session(user: user);
+    return user;
+  }
+
+  @override
   Future<void> deleteAccount({String? password}) async {
     await Future<void>.delayed(_delay);
     final session = _current;

@@ -190,4 +190,99 @@ void main() {
       expect(me.user.isNicknameSearchable, isFalse);
     });
   });
+
+  group('팀', () {
+    testWidgets('팀 만들기 입구가 늘 있다', (tester) async {
+      await _pump(tester, MockDb.newbieId);
+
+      expect(find.byKey(const Key('profile-team-create')), findsOneWidget);
+    });
+
+    /// 🔴 **주장에게는 「나가기」를 안 낸다** — 서버가 409 로 막는다(남은
+    /// 사람들의 팀이 주인 없이 남는다). 내주면 눌러 보고 거절만 받는다.
+    testWidgets('주장에게는 수정·해체가 뜬다', (tester) async {
+      await _pump(tester, MockDb.playerId);
+
+      expect(find.byKey(const Key('team-edit-t-thunder')), findsOneWidget);
+      expect(find.text('팀 해체'), findsOneWidget);
+      expect(find.text('팀 나가기'), findsNothing);
+    });
+
+    testWidgets('팀원에게는 나가기만 뜬다', (tester) async {
+      await _pump(tester, MockDb.managerId);
+
+      expect(find.byKey(const Key('team-edit-t-thunder')), findsNothing);
+      expect(find.text('팀 나가기'), findsOneWidget);
+    });
+
+    /// 🔴 되돌릴 수 없어서 곧바로 안 한다.
+    testWidgets('해체는 한 번 더 묻는다', (tester) async {
+      await _pump(tester, MockDb.playerId);
+
+      await tester.tap(find.byKey(const Key('team-leave-t-thunder')));
+      await _settle(tester);
+
+      expect(find.text('정말 해체합니다'), findsOneWidget);
+      expect(find.byKey(const Key('team-cancel-t-thunder')), findsOneWidget);
+    });
+
+    testWidgets('해체하면 소속에서 사라진다', (tester) async {
+      await _pump(tester, MockDb.playerId);
+
+      await tester.tap(find.byKey(const Key('team-leave-t-thunder')));
+      await _settle(tester);
+      await tester.tap(find.byKey(const Key('team-confirm-t-thunder')));
+      await _settle(tester);
+
+      expect(find.text('번개 풋살클럽'), findsNothing);
+      expect(find.text('아직 팀이 없습니다'), findsOneWidget);
+    });
+
+    /// 🔴 **지역이 목록의 값일 때만 만들어진다** — 자유 입력을 받으면 저장은
+    /// 되는데 남의 검색에서 이 팀이 빠진다.
+    testWidgets('지역을 안 고르면 만들기가 안 눌린다', (tester) async {
+      await _pump(tester, MockDb.newbieId);
+
+      await tester.tap(find.byKey(const Key('profile-team-create')));
+      await _settle(tester);
+
+      await tester.enterText(find.byKey(const Key('team-name')), '새 팀');
+      await _settle(tester);
+      expect(
+        tester.widget<FilledButton>(find.byKey(const Key('team-save'))).onPressed,
+        isNull,
+      );
+
+      await tester.enterText(find.byKey(const Key('team-region')), '서울 마포');
+      await _settle(tester);
+      expect(
+        tester.widget<FilledButton>(find.byKey(const Key('team-save'))).onPressed,
+        isNull,
+        reason: '「서울 마포」는 목록에 없다 — 「서울 마포구」여야 한다',
+      );
+
+      await tester.enterText(find.byKey(const Key('team-region')), '서울 마포구');
+      await _settle(tester);
+      expect(
+        tester.widget<FilledButton>(find.byKey(const Key('team-save'))).onPressed,
+        isNotNull,
+      );
+    });
+
+    testWidgets('만들면 소속에 뜬다', (tester) async {
+      await _pump(tester, MockDb.newbieId);
+
+      await tester.tap(find.byKey(const Key('profile-team-create')));
+      await _settle(tester);
+      await tester.enterText(find.byKey(const Key('team-name')), '새 팀');
+      await tester.enterText(find.byKey(const Key('team-region')), '서울 마포구');
+      await _settle(tester);
+      await tester.tap(find.byKey(const Key('team-save')));
+      await _settle(tester);
+
+      expect(find.text('새 팀'), findsOneWidget);
+      // 🔴 만든 사람이 주장으로 들어간다(계약).
+      expect(find.text('주장'), findsOneWidget);
+    });
+  });
 }

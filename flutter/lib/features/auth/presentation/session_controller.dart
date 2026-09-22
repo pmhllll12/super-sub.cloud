@@ -86,6 +86,16 @@ class SessionController extends Notifier<SessionState> {
     state = const SessionLoggedOut();
   }
 
+  /// **나를 다시 읽는다** — 팀을 만들거나 나간 뒤 「소속」이 따라오게 한다.
+  ///
+  /// 🔴 **로그인 상태일 때만 상태를 바꾼다.** 읽는 사이에 로그아웃했으면
+  /// 방금 나간 사람을 다시 로그인시키게 된다.
+  Future<void> refreshMe() async {
+    final user = await ref.read(authRepositoryProvider).refreshMe();
+    if (!ref.mounted || state is! SessionLoggedIn) return;
+    state = SessionLoggedIn(user);
+  }
+
   /// **탈퇴한다** — 계정과 파생 데이터가 함께 지워진다. 되돌릴 수 없다.
   ///
   /// 🔴 **서버가 지운 뒤에 로그아웃 상태로 간다.** 먼저 상태를 바꾸면

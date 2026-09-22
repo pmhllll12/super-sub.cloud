@@ -12,8 +12,10 @@ import '../../../card/presentation/card_editor_screen.dart';
 import '../../../video/presentation/my_videos_controller.dart';
 import '../../../video/presentation/screens/my_videos_screen.dart';
 import '../widgets/player_card_view.dart';
+import '../../../team/data/team_providers.dart';
 import 'delete_account_sheet.dart';
 import 'nickname_sheet.dart';
+import 'team_sheet.dart';
 import 'titles_sheet.dart';
 
 /// 내 프로필 — 웹 `/me`(`app/(app)/me/page.tsx`)를 폰 세로에 맞춰 옮긴 것이다.
@@ -219,25 +221,33 @@ void _notReady(BuildContext context, String what) {
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(what)));
 }
 
-/// 소속 — 팀 이름 · 지역 · 종목.
-class _TeamBlock extends StatelessWidget {
+/// 소속 — 팀 이름 · 지역 · 종목, 그리고 만들기·고치기·나가기·해체.
+///
+/// 🔴 **주장과 팀원이 할 수 있는 일이 다르다**(계약 3-3절 권한표):
+/// 주장은 고치고 해체하고 **나갈 수 없다**(남은 사람들의 팀이 주인 없이
+/// 남는다). 팀원은 나가기만 한다.
+class _TeamBlock extends ConsumerWidget {
   const _TeamBlock({required this.teams});
 
   final List<TeamMembership> teams;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return _Block(
       title: '소속',
-      child: teams.isEmpty
-          ? const Text('아직 팀이 없습니다', style: TextStyle(color: _kOn))
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (final t in teams)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (teams.isEmpty)
+            const Text('아직 팀이 없습니다', style: TextStyle(color: _kOn))
+          else
+            for (final t in teams)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
                         Expanded(
                           child: Column(
@@ -283,9 +293,119 @@ class _TeamBlock extends StatelessWidget {
                           ),
                       ],
                     ),
-                  ),
-              ],
+                    _TeamActions(team: t),
+                  ],
+                ),
+              ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              key: const Key('profile-team-create'),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('팀 만들기'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _kOn,
+                side: BorderSide(color: _kOn.withValues(alpha: 0.4)),
+              ),
+              onPressed: () => showTeamSheet(context),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 팀 한 줄에 붙는 단추들.
+class _TeamActions extends ConsumerStatefulWidget {
+  const _TeamActions({required this.team});
+
+  final TeamMembership team;
+
+  @override
+  ConsumerState<_TeamActions> createState() => _TeamActionsState();
+}
+
+class _TeamActionsState extends ConsumerState<_TeamActions> {
+  /// 🔴 **되돌릴 수 없는 둘은 한 번 더 묻는다** — 나가기·해체.
+  bool _armed = false;
+  bool _busy = false;
+
+  Future<void> _run(Future<void> Function() action) async {
+    setState(() => _busy = true);
+    try {
+      await action();
+      // 🔴 소속은 `GET /me` 가 준다 — 다시 읽어야 이 칸이 따라온다.
+      await ref.read(sessionControllerProvider.notifier).refreshMe();
+    } catch (e) {
+      if (mounted) _notReady(context, '$e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _armed = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = widget.team;
+    final danger = Theme.of(context).colorScheme.error;
+    final repo = ref.read(teamRepositoryProvider);
+
+    if (_armed) {
+      return Row(
+        children: [
+          Expanded(
+            child: FilledButton(
+              key: Key('team-confirm-${t.teamId}'),
+              style: FilledButton.styleFrom(backgroundColor: danger),
+              onPressed: _busy
+                  ? null
+                  : () => _run(() => t.isOwner
+                      ? repo.disbandTeam(t.teamId)
+                      : repo.leaveTeam(t.teamId)),
+              child: Text(
+                _busy
+                    ? '처리하는 중…'
+                    : t.isOwner
+                        ? '정말 해체합니다'
+                        : '정말 나갑니다',
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            key: Key('team-cancel-${t.teamId}'),
+            onPressed: _busy ? null : () => setState(() => _armed = false),
+            style: TextButton.styleFrom(foregroundColor: _kOn),
+            child: const Text('취소'),
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        if (t.isOwner)
+          TextButton(
+            key: Key('team-edit-${t.teamId}'),
+            onPressed: () => showTeamSheet(context, team: t),
+            style: TextButton.styleFrom(foregroundColor: _kOn),
+            child: const Text('수정'),
+          ),
+        TextButton(
+          key: Key('team-leave-${t.teamId}'),
+          onPressed: () => setState(() => _armed = true),
+          style: TextButton.styleFrom(foregroundColor: danger),
+          /* 🔴 **주장에게는 「나가기」를 안 낸다** — 서버가 409 로 막는다.
+             내주면 눌러 보고 거절만 받는다. 주장의 길은 해체다. */
+          child: Text(t.isOwner ? '팀 해체' : '팀 나가기'),
+        ),
+      ],
     );
   }
 }

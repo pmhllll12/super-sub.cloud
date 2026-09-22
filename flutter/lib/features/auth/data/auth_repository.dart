@@ -68,5 +68,12 @@ abstract class AuthRepository {
   /// 토큰으로** 되돌아가 401 만 돈다.
   Future<void> deleteAccount({String? password});
 
+  /// **나를 다시 읽는다**(`GET /me`).
+  ///
+  /// 🔴 [restoreSession] 과 다르다 — 그쪽은 **캐시된 것을 그대로** 돌려준다
+  /// (앱을 켤 때 한 번 쓰는 길이다). 팀을 만들거나 나간 뒤처럼 `teams[]` 가
+  /// 바뀌었을 때는 **서버에 다시 물어야** 프로필의 「소속」이 따라온다.
+  Future<AppUser> refreshMe();
+
   Future<Session?> restoreSession();
 }

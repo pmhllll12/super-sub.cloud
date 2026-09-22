@@ -184,7 +184,7 @@ class MockDb {
     ));
 
     _seedVideos();
-    _attachTeams();
+    attachTeams();
   }
 
   /// 🔴 **네 갈래를 다 둔다** — 분석 완료 · 분석 중 · 분석 안 함 · 규격 반려.
@@ -284,7 +284,9 @@ class MockDb {
   /// 🔴 **`leftAt` 이 있는 행은 뺀다** — 서버도 `left_at` 이 널인 행만 추려서
   /// 준다. 안 거르면 나간 팀이 홈 판의 대상이 되어 「탈퇴한 팀의 스쿼드」를
   /// 그린다.
-  void _attachTeams() {
+  /// 🔴 **팀이 생기거나 사라지면 다시 부른다** — `AppUser.teams` 는 여기서
+  /// 만들어지는 파생값이라, 안 부르면 방금 만든 팀이 프로필에 안 뜬다.
+  void attachTeams() {
     for (var i = 0; i < users.length; i += 1) {
       final user = users[i];
       final memberships = <TeamMembership>[];
