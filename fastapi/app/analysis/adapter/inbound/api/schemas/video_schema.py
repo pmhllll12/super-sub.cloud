@@ -21,6 +21,11 @@ class UploadUrlSchema(BaseModel):
     # 원본 파일 이름. 저장 키를 사람이 알아볼 수 있게 짓는 데 쓴다(미결 `jin`
     # 24번). 슬러그화되므로 이상한 문자여도 안전하다.
     filename: str = Field(min_length=1, max_length=255)
+    # 🔴 **선택이다**(2026-09-22). 개수 상한이 갈래마다라서(분석 영상 /
+    # 업로드 영상) 어느 쪽을 볼지 알려 주는 힌트다 — `POST /videos` 에
+    # 보낼 `analyze` 와 같은 값을 미리 주면 된다. 안 주면 양쪽이 다 찼을
+    # 때만 막으므로 **안 보내도 동작은 같다**(헛걸음이 한 번 늘 뿐이다).
+    analyze: bool | None = None
 
 
 class UploadUrlResponse(BaseModel):

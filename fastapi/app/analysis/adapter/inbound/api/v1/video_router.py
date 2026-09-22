@@ -85,6 +85,7 @@ def create_upload_url(
             content_type=body.content_type,
             size_bytes=body.size_bytes,
             filename=body.filename,
+            analyze=body.analyze,
         )
     )
 
