@@ -86,6 +86,21 @@ class SessionController extends Notifier<SessionState> {
     state = const SessionLoggedOut();
   }
 
+  /// **탈퇴한다** — 계정과 파생 데이터가 함께 지워진다. 되돌릴 수 없다.
+  ///
+  /// 🔴 **서버가 지운 뒤에 로그아웃 상태로 간다.** 먼저 상태를 바꾸면
+  /// 실패했을 때 **계정은 살아 있는데 로그인 화면에 서 있게** 된다 — 사람은
+  /// 탈퇴된 줄 안다. 실패는 그대로 올려 화면이 사유를 보여 준다.
+  ///
+  /// 🔴 [password] 가 비어 있으면 리포지토리가 **아예 안 보낸다** — 구글로만
+  /// 가입한 계정에는 확인할 비밀번호가 없다.
+  Future<void> deleteAccount({String? password}) async {
+    await ref.read(authRepositoryProvider).deleteAccount(password: password);
+    // 로그아웃과 같은 뒷정리 — 종목은 사용자에게 매달린 컨텍스트다.
+    ref.read(currentSportProvider.notifier).clear();
+    state = const SessionLoggedOut();
+  }
+
   Future<void> updateNickname(String nickname) =>
       _patch(nickname: nickname);
 

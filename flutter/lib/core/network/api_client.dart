@@ -127,6 +127,27 @@ class ApiClient {
     return _decode(res);
   }
 
+  /// **본문이 있는 DELETE** — 탈퇴(`DELETE /me`)가 비밀번호를 싣는다.
+  ///
+  /// 🔴 [body] 가 `null` 이면 **본문을 아예 안 보낸다.** 빈 맵(`{}`)을 보내는
+  /// 것과 다르다 — 구글로만 가입한 계정은 비밀번호 칸 자체가 없어야 한다
+  /// (`{"password": ""}` 이나 `{}` 를 보내면 서버가 그것을 「틀렸다」로 읽는
+  /// 갈래가 생긴다).
+  Future<void> deleteWithBody(
+    String path, [
+    Map<String, dynamic>? body,
+  ]) async {
+    final res = await _send(
+      () => _client.delete(
+        _uri(path),
+        headers: _headers(),
+        body: body == null ? null : jsonEncode(body),
+      ),
+    );
+    // 성공이면 본문이 비어 있고(204), 실패면 _decode 가 던진다.
+    _decode(res);
+  }
+
   Future<void> delete(String path) async {
     final res = await _send(
       () => _client.delete(_uri(path), headers: _headers()),

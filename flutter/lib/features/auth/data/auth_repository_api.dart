@@ -90,6 +90,27 @@ class ApiAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<void> deleteAccount({String? password}) async {
+    /* 🔴 **빈 값이면 본문을 통째로 안 보낸다** — 구글로만 가입한 계정에는
+       확인할 비밀번호가 없다. 빈 문자열을 실으면 서버가 틀린 비밀번호로 읽어
+       **탈퇴할 방법이 사라진다**(계약 2장, 웹도 같은 처리). */
+    final hasPassword = password != null && password.isNotEmpty;
+    /* `_call` 은 본문이 있는 응답을 감싸는 도우미라 여기엔 안 맞는다
+       (`DELETE /me` 는 204 다). `ApiException` → `AuthException` 변환만
+       같은 모양으로 한다. */
+    try {
+      await _api.deleteWithBody(
+        '/me',
+        hasPassword ? {'password': password} : null,
+      );
+    } on ApiException catch (e) {
+      throw AuthException(e.message, code: e.code, retryAfter: e.retryAfter);
+    }
+    // 🔴 계정이 사라졌다 — 토큰을 안 지우면 다음에 켤 때 401 만 돈다.
+    await _api.clearToken();
+  }
+
+  @override
   Future<AppUser> updateProfile({
     String? nickname,
     bool? nicknameSearchable,

@@ -80,6 +80,24 @@ class MockAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<void> deleteAccount({String? password}) async {
+    await Future<void>.delayed(_delay);
+    final session = _current;
+    if (session == null) {
+      throw const AuthException('로그인이 필요합니다');
+    }
+    /* 🔴 **계정과 파생 데이터가 함께 사라진다**(SEC-006). Mock 이 사용자만
+       지우고 카드·영상을 남기면, 탈퇴 뒤 화면이 「없는 사람의 카드」를 그리는
+       상태를 앱에서 밟을 수가 없다. */
+    final id = session.user.id;
+    _db.users.removeWhere((u) => u.id == id);
+    _db.cards.removeWhere((c) => c.id == 'pc-$id');
+    _db.videos.removeWhere((row) => row.userId == id);
+    _db.teamMembers.removeWhere((m) => m.userId == id);
+    _current = null;
+  }
+
+  @override
   Future<AppUser> updateProfile({
     String? nickname,
     bool? nicknameSearchable,

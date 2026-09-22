@@ -12,6 +12,7 @@ import '../../../card/presentation/card_editor_screen.dart';
 import '../../../video/presentation/my_videos_controller.dart';
 import '../../../video/presentation/screens/my_videos_screen.dart';
 import '../widgets/player_card_view.dart';
+import 'delete_account_sheet.dart';
 import 'nickname_sheet.dart';
 import 'titles_sheet.dart';
 
@@ -544,6 +545,10 @@ class _AccountBlock extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 8),
+          /* 🔴 **로그아웃이 왼쪽, 탈퇴가 오른쪽 끝**(웹과 같은 자리). 자주
+             쓰는 것이 먼저고 **위험한 것이 끝**이다. 🔴 로그아웃은 빨갛지
+             않다 — 같은 줄에서 빨강을 나눠 쓰면 **탈퇴의 빨강이 경고로 안
+             읽힌다.** 다시 로그인하면 그만인 일이다. */
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
@@ -553,6 +558,15 @@ class _AccountBlock extends ConsumerWidget {
                     ref.read(sessionControllerProvider.notifier).logout(),
                 style: TextButton.styleFrom(foregroundColor: _kOn),
                 child: const Text('로그아웃'),
+              ),
+              const SizedBox(width: 4),
+              TextButton(
+                key: const Key('profile-delete-account'),
+                onPressed: () => showDeleteAccountSheet(context),
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.error,
+                ),
+                child: const Text('회원 탈퇴'),
               ),
             ],
           ),

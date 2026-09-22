@@ -56,5 +56,17 @@ abstract class AuthRepository {
   /// 닉네임이 겹치면 409 `NICKNAME_ALREADY_EXISTS` 다.
   Future<AppUser> updateProfile({String? nickname, bool? nicknameSearchable});
 
+  /// **탈퇴한다** — 계정과 파생 데이터가 함께 지워진다(`DELETE /me`, SEC-006).
+  /// 되돌릴 수 없다.
+  ///
+  /// 🔴 **[password] 는 선택이다.** 구글로만 가입한 계정에는 확인할 비밀번호가
+  /// **없어서**, 요구하면 그 사람은 탈퇴할 방법이 사라진다(계약 2장).
+  /// 그래서 **빈 값이면 아예 안 보낸다** — 빈 문자열을 보내면 서버가 그것을
+  /// 「틀린 비밀번호」로 읽는다.
+  ///
+  /// 🔴 **끝나면 토큰을 지운다** — 안 지우면 다음에 켤 때 **없는 계정의
+  /// 토큰으로** 되돌아가 401 만 돈다.
+  Future<void> deleteAccount({String? password});
+
   Future<Session?> restoreSession();
 }
