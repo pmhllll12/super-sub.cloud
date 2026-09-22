@@ -409,15 +409,16 @@ class _Fold extends StatefulWidget {
 class _FoldState extends State<_Fold> with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 320),
+    duration: const Duration(milliseconds: 420),
     value: widget.open ? 1 : 0,
   );
 
-  late final _curve = CurvedAnimation(
-    parent: _c,
-    curve: Curves.easeOutCubic,
-    reverseCurve: Curves.easeInCubic,
-  );
+  /* 🔴 **`easeOutCubic` 이 아니다**(2026-09-22 정정). 그 곡선은 **앞이
+     가파르다** — 120ms 만에 이미 85% 까지 자라서, 뒤에 붙였던 페이드가
+     걷히는 순간에는 **거의 다 펼쳐진 뒤**였다. 그래서 「한 번에 늘어나
+     있다」로 보였다(사용자가 세 번 짚었다). 앞뒤가 고른 곡선이라야 자라는
+     것이 보인다. */
+  late final _curve = CurvedAnimation(parent: _c, curve: Curves.easeInOut);
 
   @override
   void initState() {
@@ -453,11 +454,14 @@ class _FoldState extends State<_Fold> with SingleTickerProviderStateMixin {
     if (_c.isDismissed && !widget.open) {
       return const SizedBox(width: double.infinity);
     }
+    /* 🔴 **페이드를 안 겹친다.** 같은 곡선으로 흐리기까지 걸면 자라는 동안
+       내용이 안 보여서, 보일 때쯤엔 이미 다 자라 있다 — 그게 「팍」의
+       정체였다. 자라는 것 하나만 보여 준다. */
     return SizeTransition(
       sizeFactor: _curve,
       // 위에서 아래로 자란다.
       alignment: Alignment.topCenter,
-      child: FadeTransition(opacity: _curve, child: widget.child),
+      child: widget.child,
     );
   }
 }
@@ -778,10 +782,24 @@ class _InfoBlock extends ConsumerWidget {
           /* 🔴 **사람이 직접 적는다**(2026-09-16 결정, 미결 `paik` 36번).
              원래는 분석이 붙이는 값이라 화면이 읽기만 했다 — 팀이 다시
              정하면서 여기서 고친다. 분류(강점·활동)는 **안 받는다.** */
-          _label('호칭'),
-          _TitlesRow(card: card),
+          /* 🔴 **호칭은 라벨 오른쪽에 선다**(2026-09-22, 사용자 요청).
+             아래에 두면 알약 한두 개 때문에 줄이 하나 더 생겨, 옆의 이메일·
+             함께한 날과 리듬이 안 맞았다. */
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                // 알약의 첫 줄과 글자 높이를 맞춘다.
+                padding: const EdgeInsets.only(top: 3),
+                child: _label('호칭'),
+              ),
+              const SizedBox(width: 8),
+              Expanded(child: _TitlesRow(card: card)),
+            ],
+          ),
           const SizedBox(height: 10),
           _label('이메일'),
+          const SizedBox(height: 2),
           /* 🔴 **이메일은 `@` 에서 끊는다.** 좁은 칸에서 기본 줄바꿈은 글자
              단위라 `player@supersub.te` / `st` 처럼 잘린다 — 읽기 나쁘다. */
           Text(
@@ -790,18 +808,16 @@ class _InfoBlock extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
           _label('함께한 날'),
+          const SizedBox(height: 2),
           Text(joined, style: const TextStyle(color: _kOn, fontSize: 13)),
         ],
       ),
     );
   }
 
-  Widget _label(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 2),
-        child: Text(
-          text,
-          style: TextStyle(color: _kOn.withValues(alpha: 0.7), fontSize: 12),
-        ),
+  Widget _label(String text) => Text(
+        text,
+        style: TextStyle(color: _kOn.withValues(alpha: 0.7), fontSize: 12),
       );
 }
 

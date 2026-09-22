@@ -19,6 +19,8 @@ class SilverEdge extends StatelessWidget {
     this.fill = const Color(0xB31C1C1E),
     this.strong = false,
     this.padding,
+    this.line,
+    this.lineWidth,
   });
 
   final Widget child;
@@ -32,8 +34,18 @@ class SilverEdge extends StatelessWidget {
 
   final EdgeInsetsGeometry? padding;
 
+  /// 테두리 색·굵기를 직접 준다. 안 주면 아래 기본값.
+  final Color? line;
+  final double? lineWidth;
+
   /// 은빛 — 차갑게 기운 아주 옅은 회색.
   static const Color silver = Color(0xFFC9D4D8);
+
+  /// 🔴 **하단 바 윤곽과 로고 알약이 나눠 쓰는 선**(2026-09-22, 사용자 요청:
+  /// 「로고 외곽선 색상 하단바의 외곽선 색상이랑 똑같이」). 한쪽만 고치면
+  /// 알약이 바에서 떠 보이거나 묻힌다.
+  static const Color barLine = Color(0x8CC9D4D8);
+  static const double barLineWidth = 0.5;
 
   @override
   Widget build(BuildContext context) {
@@ -43,8 +55,8 @@ class SilverEdge extends StatelessWidget {
         borderRadius: BorderRadius.circular(radius),
         border: Border.all(
           // 레퍼런스의 `rgba(255,255,255,0.1)` 자리다 — 은빛으로 바꿔 달았다.
-          color: silver.withValues(alpha: strong ? 0.38 : 0.16),
-          width: 1,
+          color: line ?? silver.withValues(alpha: strong ? 0.38 : 0.16),
+          width: lineWidth ?? 1,
         ),
       ),
       child: padding == null ? child : Padding(padding: padding!, child: child),

@@ -73,14 +73,12 @@ class PlayerCardView extends StatelessWidget {
   Widget _card() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
-      /* 🔴 **`antiAliasWithSaveLayer` 다**(2026-09-22, 사용자 지적: 「스크롤
-         하면 카드 외곽에 선이 생긴다」). 기본 `antiAlias` 는 잘린 가장자리를
-         **그 자리의 배경과 섞어서** 칠하는데, 스크롤로 카드가 반 픽셀씩
-         어긋나면 그 섞인 띠가 매 프레임 달라져 **테두리 선처럼 보인다.**
-         딴 층에 그린 뒤 잘라 내면 섞을 배경이 없어 선이 안 생긴다.
-         ⚠️ 층을 하나 더 뜨는 값이 든다 — 스쿼드 판처럼 작은 카드를 여럿
-         까는 자리가 느려지면 여기부터 의심한다. */
-      clipBehavior: Clip.antiAliasWithSaveLayer,
+      /* 🔴 **`antiAliasWithSaveLayer` 를 쓰지 않는다**(2026-09-22에 썼다가
+         되돌렸다). 스크롤 중 가장자리가 떨리는 것을 잡으려고 넣었는데,
+         **딴 층에 그린 가장자리를 다시 합성하면서 밝은 테가 남았다** —
+         사용자가 「가만히 있을 때도 흰 외곽선이 보인다」로 잡아 줬다.
+         떨림은 아래 `RepaintBoundary` 로 잡는다(카드를 한 번 그려 두고
+         통째로 옮기므로 매 프레임 다시 섞이지 않는다). */
       child: ColoredBox(
         color: _bg,
         child: Stack(

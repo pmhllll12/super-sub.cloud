@@ -316,6 +316,9 @@ class _LogoButton extends StatelessWidget {
           return SilverEdge(
             radius: radius,
             fill: Colors.transparent,
+            // 🔴 바 윤곽과 **같은 선**(사용자 요청).
+            line: SilverEdge.barLine,
+            lineWidth: SilverEdge.barLineWidth,
             child: logo,
           );
         },
@@ -340,8 +343,9 @@ class _NotchEdge extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         // 이 기기에서 그릴 수 있는 가장 얇은 선.
-        ..strokeWidth = 0.5
-        ..color = SilverEdge.silver.withValues(alpha: 0.55),
+        ..strokeWidth = SilverEdge.barLineWidth
+        // 🔴 알약과 **같은 값**이다 — 갈리면 알약이 바에서 떠 보인다.
+        ..color = SilverEdge.barLine,
     );
   }
 
