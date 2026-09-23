@@ -10,7 +10,6 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../intro/presentation/brand_mark.dart';
-import '../../../../core/widgets/card_side_smoke.dart';
 import '../../../../core/widgets/glass_pill.dart';
 import '../../../../core/widgets/aurora_background.dart';
 import '../../../../core/widgets/bar_menu.dart';
@@ -785,24 +784,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   /// 한쪽만 고치면 둘이 어긋난다.
   Widget _shortcutPills(BuildContext context) {
     final geo = _sheetGeometry(context);
+    final size = MediaQuery.sizeOf(context);
     return AnimatedBuilder(
       animation: _sheet,
       builder: (context, _) {
-        final fadeOut = (1 - _sheetT / 0.4).clamp(0.0, 1.0);
+        final tc = _sheetT;
         return Positioned(
           top: geo.shortcutTop,
           left: _kVideoSideInset + _kWhiteSheetPad,
           right: _kVideoSideInset + _kWhiteSheetPad,
           height: _kShortcutRowH,
+          /* 나가기 시작하면 더 안 눌린다 — 화면 밖으로 미끄러지는 단추를
+             누를 수 있으면 손가락이 판을 끌다 엉뚱한 곳으로 간다. */
           child: IgnorePointer(
-            ignoring: fadeOut < 0.5,
-            child: Opacity(
-              opacity: fadeOut,
-              child: Row(
-                children: [
-                  for (final (i, s) in _kShortcuts.indexed) ...[
-                    if (i > 0) const SizedBox(width: _kShortcutSpacing),
-                    Expanded(
+            ignoring: tc > 0.02,
+            child: Row(
+              children: [
+                for (final (i, s) in _kShortcuts.indexed) ...[
+                  if (i > 0) const SizedBox(width: _kShortcutSpacing),
+                  Expanded(
+                    /* 🔴 **[Expanded] 안에서 민다.** 바깥을 [Transform] 으로
+                       감싸면 [Row] 가 자리를 다시 재서 남은 알약들이 같이
+                       흔들린다 — 자리는 그대로 두고 알약만 미끄러진다. */
+                    child: Transform.translate(
+                      /* 🔴 **화면 폭만큼 민다.** 알약 너비를 재서 「딱 맞게」
+                         밀면 기기마다 한 끗이 남는다(워드마크에서 겪었다).
+                         넉넉히 밀면 그럴 일이 없고, [Stack] 이 화면 밖을
+                         잘라 낸다. */
+                      offset: Offset(size.width * _shortcutExit(tc, i), 0),
                       child: _ShortcutPill(
                         key: s.key,
                         icon: s.icon,
@@ -810,14 +819,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         onTap: () => _notReady(s.label),
                       ),
                     ),
-                  ],
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
         );
       },
     );
+  }
+
+  /// 알약 [i](왼쪽부터 0)가 오른쪽 화면 밖으로 **나간 정도** 0~1.
+  ///
+  /// 🔴 **오른쪽 것부터 나간다**(2026-09-23 사용자 요청: 「오른쪽 꺼부터
+  /// 차례대로 나가게」). 그래서 시작 시각을 오른쪽일수록 이르게 준다.
+  ///
+  /// 🔴 **돌아오는 순서를 따로 두지 않는다.** 이 값이 판 진행도 하나의
+  /// **함수**라, 판을 접으면 시간이 되감기면서 **저절로 왼쪽(레슨 · 상점)
+  /// 부터** 돌아온다 — 사용자가 요청한 그 순서다. 🔴 나가는 길과 들어오는
+  /// 길을 나누면 손가락을 도중에 되돌렸을 때 알약이 제자리로 안 돌아온다
+  /// (워드마크가 같은 이유로 한 함수다).
+  ///
+  /// ⚠️ **걷어 내지(`Opacity`) 않는다** — 옆으로 나가면서 흐려지기까지 하면
+  /// 화면 밖에 닿기 전에 사라져 **나가는 것이 안 보인다.**
+  static double _shortcutExit(double tc, int i) {
+    /// 한 알약이 나가는 데 쓰는 구간, 그리고 이웃과의 시차.
+    const span = 0.52;
+    const step = 0.18;
+    final start = (_kShortcuts.length - 1 - i) * step;
+    final p = ((tc - start) / span).clamp(0.0, 1.0);
+    return Curves.easeInCubic.transform(p);
   }
 
   /// 「내 프로필」 — **화면 맨 위 오른쪽**(2026-09-22 사용자 요청).
@@ -872,27 +903,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   /// 판이 위에서 내려오는 시트라 덮지 못해서 필요했던 것이다.
   Widget _brandMark(BuildContext context) {
     final geo = _sheetGeometry(context);
-    return Positioned(
-      left: 0,
-      right: 0,
-      top: geo.rowTop + _kWordmarkTop,
-      child: IgnorePointer(
-        child: Center(
-          child: brandHero(
-            /* 🔴 **[BrandMark] 를 쓴다 — 맨 [Text] 가 아니다.** 그 위젯이
-               비행 중에 제 글자를 감춰 주는데(`kBrandFlightInProgress`),
-               안 감추면 **날아오는 글자와 여기 글자가 동시에** 보인다.
+    final size = MediaQuery.sizeOf(context);
+    return AnimatedBuilder(
+      animation: _sheet,
+      builder: (context, _) {
+        /* 🔴 **묶은 값으로 잰다.** 넘친 값으로 재면 글자가 화면 밖에서 한 번
+           더 튀는데, 안 보이는 곳에서 나는 일이라 계산만 버린다. */
+        final exit = Curves.easeInCubic.transform(_sheetT);
+        return Positioned(
+          left: 0,
+          right: 0,
+          top: geo.rowTop + _kWordmarkTop,
+          child: IgnorePointer(
+            child: Center(
+              /* 🔴 **화면 위 바깥으로 나간다**(2026-09-23 사용자 요청).
+                 판을 펼치면 스쿼드 판이 이 자리를 덮지만, 덮이는 것과
+                 **나가는 것은 다르게 보인다** — 사용자가 나가는 쪽을 골랐다.
 
-               🔴 **[kBrandLandingKeyHome] 이 인트로의 착지점이다** — 이 키가
-               없으면 `intro_gate` 가 「착지점을 못 찾았다」로 빠져 로고가
-               아예 안 날아온다(사용자가 잡은 그것). */
-            child: KeyedSubtree(
-              key: const Key('home-brand'),
-              child: const _BrandFade(),
+                 🔴 **넉넉히 민다.** 글자 높이를 재서 「딱 맞게」 밀면 기기마다
+                 글꼴 렌더링이 달라 한 획이 남는다(워드마크에서 겪었다).
+                 [Stack] 이 화면 밖을 잘라 내므로 넉넉한 쪽이 안전하다. */
+              child: Transform.translate(
+                offset: Offset(0, -size.height * 0.25 * exit),
+                /* 🔴 **키로 찾는다** — 글자로 찾으면 판 위의 선수 카드마다
+                   박힌 `SUPERSUB` 워터마크까지 걸린다(시험이 7개를 찾았다). */
+                child: const KeyedSubtree(
+                  key: Key('home-brand'),
+                  child: _BrandFade(),
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -1165,24 +1208,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         ),
                       ),
                     ),
-                    /* 🔴 **판 안에도 카드의 두 색이 퍼진다**(2026-09-22, 사용자
-                       요청: 「바꾼 카드의 2가지 색상이 홈페이지 내 팀 만들기
-                       판에도 프로필에서 카드 옆에 나오는 것같이 똑같이」).
-                       🔴 **사진이 걷히는 만큼 든다** — 둘이 같이 짙으면 사진
-                       위에 색안개를 씌운 것처럼 탁해진다. */
-                    if (card?.style != null)
-                      Positioned.fill(
-                        child: Opacity(
-                          opacity: morph,
-                          child: CardSideSmoke(
-                            colors: (
-                              a: card!.style!.bg,
-                              b: card.style!.brushColor,
-                            ),
-                            cardWidth: 0,
-                          ),
-                        ),
-                      ),
+                    /* ⛔ **카드의 두 색을 판에 퍼뜨리던 것을 걷었다**
+                       (2026-09-23 사용자 요청: 「판 카드에서 2가지 색상 추출해서
+                       하는 거 그냥 빼자. 색상 없애고」).
+
+                       2026-09-22 에 사용자 요청으로 넣었던 것이다 — 사진이
+                       걷히는 만큼 `CardSideSmoke` 가 `card.style` 의 바탕색·
+                       자국색으로 들었다. 되살릴 일이 있으면 그 커밋에서 꺼낸다.
+                       🔴 **판 면([_kSheetColor])은 그대로 둔다** — 그것까지
+                       걷으면 스쿼드 그림 뒤가 통째로 비어 글자가 안 읽힌다. */
                     /* 스쿼드 그림 — 사진이 걷힌 자리에서 자라 든다.
                        🔴 **다 펼치기 전에는 안 눌린다**(2026-09-15 사용자
                        요청). 작게 줄어 있을 때 빈 자리(+)가 눌리면 판을 끌려던

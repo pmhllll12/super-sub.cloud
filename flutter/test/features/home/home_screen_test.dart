@@ -498,18 +498,80 @@ void main() {
       expect(find.textContaining('경기장 예약 — 준비 중'), findsOneWidget);
     });
 
-    /* 판을 펼치면 스쿼드 판이 이 줄 자리까지 자라 올라온다 — 「내 프로필」과
-       **같은 방식으로** 걷힌다. */
-    testWidgets('펼치면 알약이 걷히고, 다시 접으면 돌아온다', (tester) async {
+    /* 🔴 **걷히는 게 아니라 오른쪽 화면 밖으로 나간다**(2026-09-23 사용자
+       요청: 「오른쪽 꺼부터 차례대로 나가게」). 투명도로 재면 안 된다 —
+       흐려지는 것이 아니라 **미끄러지는** 것이 맞는 동작이다. */
+    testWidgets('펼치면 알약이 오른쪽 화면 밖으로 나가고, 접으면 돌아온다',
+        (tester) async {
       await _pumpLoggedIn(tester);
-      final pill = find.byKey(const Key('home-shortcut-market'));
-      expect(_opacityAbove(tester, pill), 1);
+      final screenW =
+          tester.view.physicalSize.width / tester.view.devicePixelRatio;
+      Rect at(String k) =>
+          tester.getRect(find.byKey(Key('home-shortcut-$k')));
+      const keys = ['market', 'venue', 'alarm'];
+      final home = {for (final k in keys) k: at(k)};
+
+      for (final k in keys) {
+        expect(home[k]!.right, lessThanOrEqualTo(screenW + 1), reason: k);
+      }
 
       await _openSheet(tester);
-      expect(_opacityAbove(tester, pill), 0);
+      for (final k in keys) {
+        expect(at(k).left, greaterThanOrEqualTo(screenW), reason: '$k 화면 밖');
+      }
 
       await _openSheet(tester);
-      expect(_opacityAbove(tester, pill), 1);
+      for (final k in keys) {
+        expect(at(k).left, closeTo(home[k]!.left, 1), reason: '$k 제자리');
+      }
+    });
+
+    /* 🔴 **오른쪽 것이 먼저 나간다.** 나간 거리로 잰다 — 셋의 출발 x 가
+       애초에 달라서 좌표만으로는 못 가른다.
+
+       🔴 **돌아오는 순서는 따로 안 잡는다** — 나가는 것이 판 진행도 하나의
+       함수라, 접으면 시간이 되감기며 저절로 왼쪽(레슨 · 상점)부터 돌아온다.
+       그 성질은 위 시험의 「접으면 제자리」가 지킨다. */
+    testWidgets('나가는 순서는 오른쪽부터다', (tester) async {
+      await _pumpLoggedIn(tester);
+      const keys = ['market', 'venue', 'alarm'];
+      double left(String k) =>
+          tester.getRect(find.byKey(Key('home-shortcut-$k'))).left;
+      final home = {for (final k in keys) k: left(k)};
+
+      /* 🔴 **손가락을 든 채로 중간까지만 끈다.** 손잡이를 눌러 스프링에
+         맡기면 **한 프레임 만에 셋이 다 나가 버려** 순서를 못 잰다(처음에
+         그렇게 짰다가 둘 다 360 으로 같게 나왔다). */
+      final g = await tester.startGesture(
+        tester.getCenter(find.byKey(const Key('home-squad-sheet'))),
+      );
+      await g.moveBy(const Offset(0, -90));
+      await tester.pump();
+
+      final moved = {for (final k in keys) k: left(k) - home[k]!};
+      expect(moved['alarm']!, greaterThan(moved['venue']!), reason: '알림이 앞선다');
+      expect(moved['venue']!, greaterThanOrEqualTo(moved['market']!),
+          reason: '경기장이 레슨보다 앞선다');
+      expect(moved['alarm']!, greaterThan(0), reason: '적어도 하나는 움직였다');
+
+      // 놓고 스프링이 앉을 때까지 흘려보낸다.
+      await g.up();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1500));
+      await tester.pump(const Duration(milliseconds: 700));
+    });
+
+    /* 로고는 **화면 위 바깥으로** 나간다(같은 요청). */
+    testWidgets('펼치면 로고가 화면 위로 나가고, 접으면 돌아온다', (tester) async {
+      await _pumpLoggedIn(tester);
+      final brand = find.byKey(const Key('home-brand'));
+      final top0 = tester.getRect(brand).top;
+
+      await _openSheet(tester);
+      expect(tester.getRect(brand).bottom, lessThanOrEqualTo(0));
+
+      await _openSheet(tester);
+      expect(tester.getRect(brand).top, closeTo(top0, 1));
     });
   });
 
