@@ -102,6 +102,16 @@
   margin-top: 0.4rem;
 }
 
+// 추이 그래프의 날짜 칸(관리 지표) — 올리면 그 날짜가 옅게 떠서 십자선 역할을 하고, 값은 <title> 로 뜬다.
+// 그림은 다크 화면에서도 밝은 판 위에 있으므로 한 값으로 둔다.
+.doc-figure .hit {
+  fill: transparent;
+}
+
+.doc-figure .hit:hover {
+  fill: rgba(39, 38, 43, 0.07);
+}
+
 .stat-tiles {
   display: flex;
   flex-wrap: wrap;
