@@ -45,7 +45,13 @@ import '../../../team/presentation/widgets/squad_board.dart';
 ///
 /// ⚠️ **판·하단 바를 밝기로 가르던 것은 2026-09-21 에 끝났다** — 이제 둘 다
 /// 거의 투명하고 **은빛 테두리**로 갈린다(`SilverEdge`).
-const Color _kHomeBg = Color(0xFF000000);
+///
+/// 🔴 **더 이상 검정이 아니다 (2026-09-23 정정).** 위 「완전한 검정」은
+/// 2026-09-22 사용자 요청이었는데, 이번에 바탕을 통째로 **밝은 크림 →
+/// 살구빛**으로 뒤집었다(`ScreenTint.warm`). 이 값은 [AuroraBackground] 가
+/// **하단 바 뒤까지** 칠하는 바탕이라, 여기만 검정으로 두면 화면 아래에
+/// **검은 띠**가 남는다 — 그래서 같은 값을 쓴다.
+const Color _kHomeBg = ScreenTint.warmBase;
 
 /// 검은 바탕 위의 글자.
 const Color _kOnDark = Color(0xFFFFFFFF);
@@ -665,19 +671,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         body: Stack(
           fit: StackFit.expand,
           children: [
-            /* 🔴 **카드의 두 색이 화면 바탕을 사선으로 나눠 가진다**
-               (2026-09-22 사용자 요청 + 레퍼런스 이미지). 스쿼드 판이 영상
-               분석 판 위로 내려앉으면서 윗쪽이 **검정으로 텅 비었고**, 그
-               자리를 이것이 채운다. */
-            if (card?.style != null)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: ScreenTint(
-                    a: card!.style!.bg,
-                    b: card.style!.brushColor,
-                  ),
-                ),
-              ),
+            /* 🔴 **카드의 두 색을 안 쓴다**(2026-09-23 정정, 사용자 요청:
+               「그냥 홈페이지는 카드에서 뽑아낸 2가지 색상 말고 저
+               레퍼런스처럼」). 2026-09-22 에는 `card.style` 의 바탕색·자국색을
+               넘겼는데, 이제 **고정된 크림→살구빛 한 벌**이다.
+
+               🔴 **`if (card?.style != null)` 도 같이 걷혔다** — 카드가 없거나
+               아직 안 온 사람에게 **바탕이 통째로 검정으로 보이던** 자리다.
+               이제 누구에게나 같은 바탕이 깔린다. */
+            const Positioned.fill(
+              child: IgnorePointer(child: ScreenTint.warm()),
+            ),
             // 판을 펼칠수록 뒤가 조금 눌린다 — 시선이 판으로 모인다.
             Positioned.fill(
               child: IgnorePointer(
