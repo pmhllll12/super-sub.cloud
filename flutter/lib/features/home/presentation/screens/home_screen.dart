@@ -1471,7 +1471,11 @@ class _BrandFade extends StatefulWidget {
   const _BrandFade();
 
   /// 앉은 뒤 기다리는 시간.
-  static const delay = Duration(seconds: 2);
+  ///
+  /// ⚠️ **2초 → 1초 (2026-09-23 사용자 요청: 「1초 더 줄여도 돼? 도착하고
+  /// 변하기까지 시간이 너무 길다」).** 물드는 시간([fade])은 그대로 뒀다 —
+  /// 길다고 한 것은 **기다리는 쪽**이지 변하는 속도가 아니다.
+  static const delay = Duration(seconds: 1);
 
   /// 물드는 데 걸리는 시간 — 🔴 **넉넉히 준다.** 짧으면 「툭 바뀐다」가 되어
   /// 「부드럽고 아주 자연스럽게」와 반대가 된다.
