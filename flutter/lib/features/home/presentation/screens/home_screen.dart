@@ -51,7 +51,7 @@ import '../../../team/presentation/widgets/squad_board.dart';
 /// 살구빛**으로 뒤집었다(`ScreenTint.warm`). 이 값은 [AuroraBackground] 가
 /// **하단 바 뒤까지** 칠하는 바탕이라, 여기만 검정으로 두면 화면 아래에
 /// **검은 띠**가 남는다 — 그래서 같은 값을 쓴다.
-const Color _kHomeBg = ScreenTint.warmBase;
+const Color _kHomeBg = ScreenTint.mintBase;
 
 /// 검은 바탕 위의 글자.
 const Color _kOnDark = Color(0xFFFFFFFF);
@@ -680,7 +680,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                아직 안 온 사람에게 **바탕이 통째로 검정으로 보이던** 자리다.
                이제 누구에게나 같은 바탕이 깔린다. */
             const Positioned.fill(
-              child: IgnorePointer(child: ScreenTint.warm()),
+              child: IgnorePointer(child: ScreenTint.mint()),
             ),
             // 판을 펼칠수록 뒤가 조금 눌린다 — 시선이 판으로 모인다.
             Positioned.fill(

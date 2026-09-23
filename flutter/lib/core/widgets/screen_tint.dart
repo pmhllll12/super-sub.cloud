@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../features/profile/presentation/widgets/player_card_view.dart'
+    show kCardBg;
+
 /// 화면 바탕 — **흰 바탕 위로 카드의 두 색이 가장자리에서 번져 든다**
 /// (2026-09-22 사용자 요청 + 레퍼런스 이미지).
 ///
@@ -27,26 +30,34 @@ class ScreenTint extends StatelessWidget {
       glows = _darkGlows;
 
   /// 🔴 **홈 전용 — 카드 색을 안 쓴다**(2026-09-23 사용자 요청: 「그냥
-  /// 홈페이지는 카드에서 뽑아낸 2가지 색상 말고 저 레퍼런스처럼」).
+  /// 홈페이지는 카드에서 뽑아낸 2가지 색상 말고」).
   ///
   /// 누가 보든 **같은 한 벌**이다. 그래서 글자 대비를 한 번만 맞추면 되고,
   /// 카드 색이 진한 사람에게서 바탕이 탁해지는 일도 없다.
   ///
+  /// 🔴 **색은 [kCardBg] 그대로다**(사용자가 색을 집어 줬는데 **앱에 이미
+  /// 있던 값**이었다 — 기본 카드 바탕이자 카드 편집기의 첫 견본이다).
+  /// 새 상수를 만들지 않는다 — 두 벌이 되면 한쪽만 바뀐다.
+  ///
+  /// ⚠️ **살구빛이었다 (2026-09-23 같은 날 정정).** 처음엔 레퍼런스 그림에서
+  /// 뽑은 크림→살구빛이었는데, 사용자가 **앱 초록으로 바꿨다**. 빛무리 자리는
+  /// 그대로 두고 색과 세기만 갈았다.
+  ///
   /// 🔴 **밝은 쪽으로 뒤집힌 갈래라 빛무리 자리도 다르다.** 본래 것은 색이
-  /// **아래·옆**에서 배어 들지만(검은 바탕을 덜 가리려고), 이쪽은 레퍼런스
-  /// 그대로 **위가 살구빛이고 아래로 갈수록 희어진다** — 화면 아래 절반은
-  /// 흰 판이 차지하므로 거기서 색이 빠져야 판과 안 부딪힌다.
-  const ScreenTint.warm({super.key})
-    : a = _kWarmGlow,
-      b = _kWarmGlowSoft,
-      base = _kWarmBase,
-      glows = _warmGlows;
+  /// **아래·옆**에서 배어 들지만(검은 바탕을 덜 가리려고), 이쪽은 **위가
+  /// 물들고 아래로 갈수록 희어진다** — 화면 아래 절반은 흰 판이 차지하므로
+  /// 거기서 색이 빠져야 판과 안 부딪힌다.
+  const ScreenTint.mint({super.key})
+    : a = kCardBg,
+      b = _kMintGlowSoft,
+      base = _kMintBase,
+      glows = _mintGlows;
 
   /// 밝은 갈래의 바탕색 — 🔴 **홈이 [AuroraBackground] 에도 같은 값을 준다.**
   /// 그쪽은 하단 바 뒤까지 칠하므로, 다르면 화면 아래에 다른 색 띠가 남는다.
-  static const Color warmBase = _kWarmBase;
+  static const Color mintBase = _kMintBase;
 
-  /// 카드 바탕색 · 자국색. [ScreenTint.warm] 에서는 고정된 살구빛 둘이다.
+  /// 카드 바탕색 · 자국색. [ScreenTint.mint] 에서는 고정된 초록 둘이다.
   final Color a;
   final Color b;
 
@@ -85,11 +96,13 @@ class ScreenTint extends StatelessWidget {
   );
 }
 
-/// 🔴 **레퍼런스에서 직접 뽑은 값이다**(2026-09-23) — 눈대중이 아니라
-/// 그림의 픽셀을 재서 골랐다. 바탕은 따뜻한 흰색, 번지는 것은 살구빛 둘.
-const Color _kWarmBase = Color(0xFFF7EFEA);
-const Color _kWarmGlow = Color(0xFFE9C0AB);
-const Color _kWarmGlowSoft = Color(0xFFEFD6C9);
+/// 바탕은 **초록이 아주 조금 섞인 흰색**이다 — 순백으로 두면 색이 배어드는
+/// 자리와 안 배어드는 자리가 갈려 화면이 두 조각으로 보인다.
+const Color _kMintBase = Color(0xFFF6FAF5);
+
+/// 옅은 쪽 — [kCardBg] 를 흰색 쪽으로 끌어올린 값이다. 마주 보는 자리에
+/// 놓이므로 진한 쪽과 같은 세기면 화면이 양옆에서 조여 보인다.
+const Color _kMintGlowSoft = Color(0xFFC6F1C7);
 
 /// `(자국색인가, 중심 x, 중심 y, 반경, 세기)` — x·y 는 화면 대비 비율이고
 /// **1 을 넘거나 0 보다 작다**(중심이 화면 밖이라는 뜻이다). 반경은 폭 대비.
@@ -109,16 +122,20 @@ const List<(bool, double, double, double, double)> _darkGlows = [
   (false, 0.62, 1.16, 0.95, 0.30),
 ];
 
-/// 밝은 갈래([ScreenTint.warm]) — 🔴 **위가 진하고 아래로 갈수록 희어진다.**
+/// 밝은 갈래([ScreenTint.mint]) — 🔴 **위가 진하고 아래로 갈수록 희어진다.**
 /// 어두운 갈래와 위아래가 뒤집혀 있고, 그건 화면 아래 절반을 흰 판이 차지하기
-/// 때문이다 — 거기까지 살구빛이 내려오면 판과 바탕이 서로 부딪힌다.
-const List<(bool, double, double, double, double)> _warmGlows = [
-  // 위 가운데에서 넓게 — 레퍼런스에서 살구빛이 가장 진한 자리다.
-  (false, 0.50, -0.34, 1.45, 0.95),
+/// 때문이다 — 거기까지 색이 내려오면 판과 바탕이 서로 부딪힌다.
+///
+/// 🔴 **세기가 살구빛 때의 절반쯤이다**(사용자 요청: 「은은하게」).
+/// 0.95·0.55·0.50 → **0.46·0.26·0.22**. 초록은 같은 알파에서도 살구빛보다
+/// 훨씬 세게 읽혀서, 그대로 두면 「연둣빛으로 칠한 화면」이 된다.
+const List<(bool, double, double, double, double)> _mintGlows = [
+  // 위 가운데에서 넓게 — 색이 가장 진한 자리다.
+  (false, 0.50, -0.34, 1.45, 0.46),
   // 왼쪽 위 — 한쪽으로 치우쳐야 「칠한 면」이 아니라 「번진 것」으로 읽힌다.
-  (false, -0.14, 0.04, 1.05, 0.55),
+  (false, -0.14, 0.04, 1.05, 0.26),
   // 오른쪽 위에서 옅은 쪽으로 — 마주 보는 쪽이라 위의 것과 안 겹친다.
-  (true, 1.14, 0.12, 1.05, 0.50),
+  (true, 1.14, 0.12, 1.05, 0.22),
 ];
 
 class _ScreenTintPainter extends CustomPainter {
