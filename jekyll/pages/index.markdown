@@ -7,7 +7,7 @@ nav_exclude: true
 
 <div markdown="1" style="text-align: center; margin-top: 2rem;">
 
-##### 멀티모달 용병 스카우팅 & RAG 검증 플랫폼
+##### 멀티모달 용병 스카우팅 플랫폼
 
 <br>
 

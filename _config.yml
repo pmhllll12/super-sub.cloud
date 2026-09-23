@@ -18,7 +18,7 @@
 # You can create any custom variable you would like, and they will be accessible
 # in the templates via {{ site.myvariable }}.
 
-title: 멀티모달 용병 스카우팅 & RAG 검증 플랫폼
+title: 멀티모달 용병 스카우팅 플랫폼
 email: pmhllll12@gmail.com
 description: >- # this means to ignore newlines until "baseurl:"
   생활체육 경기 영상에서 선수의 실력을 재고, 그 근거로 팀이 빈 자리에 맞는 용병을
