@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../design_scale.dart';
+import 'silver_sweep_border.dart';
 
 /// 막대의 면 — 🔴 **유리로 돌아왔다 (2026-09-23 두 번째 정정, 사용자 요청:
 /// 「안쪽 흰색 하지말고 외곽선 없애고, 글래스로 바꿔」).** 몇 시간 전 흰색
@@ -24,11 +25,24 @@ const Color kNavBarColor = Color(0x3DFFFFFF);
 /// 덜 흐리게는 이 한 줄이다.
 const double kNavBarBlur = 9;
 
-/// 🔴 **고른 칸에만 깔리는 면**(2026-09-23 사용자 지적: 「맨 오른쪽꺼는 왜
-/// 누르지도 않았는데 진한 사각형이 있어? 누른것만 그거 좀 사이즈 줄인게 그
-/// 아이콘에 나오게」). 전에는 **메뉴 칸이 늘 이 면을 달고 있어서** 안 눌렀는데
-/// 눌린 것처럼 보였다 — 이제 `active` 인 칸 하나만 갖는다.
-const Color kNavActiveTileColor = Color(0x3DFFFFFF);
+/// 고른 칸을 두르는 **도는 금빛**(2026-09-23 사용자 요청: 「그 정사각형의
+/// 세련된 금색 실버색상이 돌아다니도록」 + 레퍼런스).
+///
+/// 🔴 **면이 아니라 선이다.** 한 번 반투명 흰 면으로 채웠는데 사용자가
+/// 레퍼런스를 다시 보냈다 — 레퍼런스의 인상은 **둥근 정사각형 테두리를 도는
+/// 빛**이지 칠한 칸이 아니다.
+///
+/// 🔴 **실버가 아니라 금빛이다** — 홈에는 「영상 분석 시작하기」 알약이 이미
+/// 실버로 돌고 있다. 같은 색이면 둘이 섞여 「어디를 보라는 건지」가 흐려진다
+/// (`silver_sweep_border.dart` 의 「한 화면에 하나」가 그 걱정이었다).
+const Color kNavActiveSweep = Color(0xFFE6D5AE);
+
+/// 빛이 지나가지 않는 동안에도 남는 바닥 선 — 없으면 빛이 없는 쪽 모서리가
+/// 통째로 사라진다.
+const Color kNavActiveSweepBase = Color(0x3DE6D5AE);
+
+/// 고른 칸의 한 변 — 둥근 **정사각형**이다(레퍼런스).
+const double kNavActiveSide = 118;
 
 /// 유리 막대 위의 아이콘 — 바탕이 어두우므로 **흰색**이다.
 const Color kNavOnWhite = Color(0xFFFFFFFF);
@@ -75,8 +89,6 @@ const double kBarInnerPad = 22;
 /// 구분선의 길이 — 막대 안쪽 높이의 절반쯤(레퍼런스가 그 정도다).
 const double kBarDividerHeight = 78;
 
-/// 고른 칸의 면이 칸 좌우에서 물러나는 거리 — 아이콘을 살짝 감쌀 만큼이다.
-const double kBarActivePad = 34;
 
 /// 화면 아래에 떠 있는 **한 덩이 둥근 막대**. 로고 칸 · 아이콘 셋 · 메뉴 칸이
 /// 한 줄로 들어간다(2026-09-23 사용자 요청 + 레퍼런스).
@@ -305,32 +317,24 @@ class _NavIcon extends StatelessWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            /* 자리는 늘 같고 판만 들고 난다 — 아이콘 크기를 직접 바꾸면
-               [Row] 가 매 프레임 다시 배치돼 이웃이 함께 흔들린다. */
-            Positioned.fill(
-              child: AnimatedOpacity(
-                opacity: active ? 1 : 0,
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOut,
-                child: Padding(
-                  /* 🔴 **아이콘보다 조금 클 만큼만**(사용자 요청: 「누른것만
-                     그거 좀 사이즈 줄인게 그 아이콘에 나오게」). 칸 너비를 다
-                     쓰면 유리 위에서 **칸이 통째로 밝아진** 것처럼 보인다. */
-                  padding: EdgeInsets.symmetric(
-                    horizontal: context.d(kBarActivePad),
-                    vertical: context.d(12),
-                  ),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: kNavActiveTileColor,
-                      borderRadius: BorderRadius.all(
-                        Radius.circular(context.d(34)),
-                      ),
-                    ),
-                  ),
+            /* 🔴 **고른 칸에만 둘레를 도는 금빛이 뜬다**(레퍼런스).
+               자리는 늘 같고 이것만 들고 난다 — 아이콘 크기를 직접 바꾸면
+               [Row] 가 매 프레임 다시 배치돼 이웃이 함께 흔들린다.
+
+               🔴 **`if` 로 넣었다 뺀다.** [Opacity] 로 감추면 안 보이는 동안에도
+               **초당 60번 다시 그리는 애니메이션이 칸마다 넷** 돈다. */
+            if (active)
+              SizedBox(
+                width: context.d(kNavActiveSide),
+                height: context.d(kNavActiveSide),
+                child: SilverSweepBorder(
+                  radius: context.d(kNavActiveSide) * 0.32,
+                  color: kNavActiveSweep,
+                  baseColor: kNavActiveSweepBase,
+                  strokeWidth: 1.2,
+                  child: const SizedBox.expand(),
                 ),
               ),
-            ),
             _navGlyph(context, icon),
           ],
         ),

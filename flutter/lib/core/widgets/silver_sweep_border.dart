@@ -6,10 +6,14 @@ import 'package:flutter/material.dart';
 /// (2026-09-22, 사용자 요청: 「그 내 영상 판만 외곽선으로 세련된 밝은 실버
 /// 색상이 돌아다니게」).
 ///
-/// 🔴 **한 화면에 하나만 쓴다.** 여럿에 붙이면 서로 다른 박자로 돌아 화면이
-/// 산만해지고, 「여기를 보라」는 뜻이 사라진다.
+/// ⚠️ **「한 화면에 하나」였는데 둘이 됐다 (2026-09-23).** 원래 규칙은 「여럿에
+/// 붙이면 서로 다른 박자로 돌아 화면이 산만해지고 『여기를 보라』는 뜻이
+/// 사라진다」였다. 사용자가 **하단 바의 고른 칸에도** 달라고 정해서, 홈에는
+/// 이제 둘이 있다 — 「영상 분석 시작하기」 알약(실버)과 **고른 칸(금빛)**.
 ///
-/// 지금 쓰는 곳은 **홈의 「영상 분석 시작하기」 알약 하나뿐**이다.
+/// 🔴 **색으로 갈라 둔 것이 그 규칙의 대신이다.** 둘이 같은 색이면 원래
+/// 걱정하던 「어디를 보라는 건지 모르겠다」가 그대로 돌아온다 — 색을 맞추지
+/// 말 것.
 ///
 /// ⚠️ **오늘 하루에 둘로 늘었다 다시 하나로 줄었다**(2026-09-22).
 /// 프로필의 「내 영상」 판에 있던 것이 홈으로 옮겨 갔고(그때 이 파일이
@@ -30,10 +34,26 @@ class SilverSweepBorder extends StatefulWidget {
     required this.child,
     required this.radius,
     this.period = const Duration(seconds: 6),
+    this.color,
+    this.baseColor,
+    this.strokeWidth,
   });
 
   final Widget child;
   final double radius;
+
+  /// 도는 빛의 색. 안 주면 밝은 실버.
+  ///
+  /// 🔴 **금빛으로도 쓴다**(2026-09-23, 사용자 요청: 「그 정사각형의 세련된
+  /// 금색 실버색상이 돌아다니도록」 + 레퍼런스). 색만 갈릴 뿐 **도는 방식은
+  /// 같다** — 길이로 자르고, 조각의 알파를 종 모양으로 떨어뜨린다.
+  final Color? color;
+
+  /// 빛이 지나가지 않는 동안에도 남는 바닥 선. 안 주면 옅은 실버.
+  final Color? baseColor;
+
+  /// 획 굵기. 안 주면 1.5.
+  final double? strokeWidth;
 
   /// 한 바퀴 도는 시간.
   ///
@@ -73,6 +93,9 @@ class _SilverSweepBorderState extends State<SilverSweepBorder>
         foregroundPainter: _SweepPainter(
           radius: widget.radius,
           turn: still ? 0.25 : _spin.value,
+          color: widget.color ?? _SweepPainter.silver,
+          base: widget.baseColor ?? _SweepPainter.dimSilver,
+          width: widget.strokeWidth ?? 1.5,
         ),
         child: child,
       ),
@@ -81,20 +104,29 @@ class _SilverSweepBorderState extends State<SilverSweepBorder>
 }
 
 class _SweepPainter extends CustomPainter {
-  const _SweepPainter({required this.radius, required this.turn});
+  const _SweepPainter({
+    required this.radius,
+    required this.turn,
+    required this.color,
+    required this.base,
+    required this.width,
+  });
 
   final double radius;
+  final Color color;
+  final Color base;
+  final double width;
 
   /// 0~1 이 한 바퀴.
   final double turn;
 
   /// 밝은 실버 — 순백보다 한 끗 차갑다. 순백은 어두운 화면에서 형광등처럼
   /// 튀고, 「세련된」과는 반대쪽이다.
-  static const Color _silver = Color(0xFFE8F0F4);
+  static const Color silver = Color(0xFFE8F0F4);
 
   /// 가만히 있는 바닥 선 — 도는 빛이 지나가지 않는 동안에도 판의 경계는
   /// 있어야 한다. 🔴 **없으면 빛이 없는 쪽 모서리가 통째로 사라진다.**
-  static const Color _base = Color(0x33C9D4D8);
+  static const Color dimSilver = Color(0x33C9D4D8);
 
   /// 빛나는 토막이 차지하는 **테두리 길이의 몫**.
   ///
@@ -120,7 +152,7 @@ class _SweepPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     // 획이 상자 안쪽으로만 그려지게 반 굵기만큼 줄인다 — 안 줄이면 바깥
     // 절반이 잘려 **선이 반쪽만 보인다.**
-    const w = 1.5;
+    final w = width;
     final rect = Rect.fromLTWH(0, 0, size.width, size.height).deflate(w / 2);
     final rrect = RRect.fromRectAndRadius(rect, Radius.circular(radius));
 
@@ -136,7 +168,7 @@ class _SweepPainter extends CustomPainter {
     canvas.drawRRect(rrect, Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = w
-      ..color = _base);
+      ..color = base);
 
     final path = Path()..addRRect(rrect);
     final metrics = path.computeMetrics().toList();
@@ -162,7 +194,7 @@ class _SweepPainter extends CustomPainter {
 
       var t0 = (head + bandLen * u0) % len;
       var t1 = (head + bandLen * u1) % len;
-      stroke.color = _silver.withValues(alpha: a);
+      stroke.color = color.withValues(alpha: a);
       if (t1 >= t0) {
         canvas.drawPath(metric.extractPath(t0, t1), stroke);
       } else {
