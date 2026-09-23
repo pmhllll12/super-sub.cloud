@@ -181,6 +181,20 @@ def test_minor_버전_차이는_통과한다():
         parse_report(_raw({**_ENVELOPE, "schema_version": v}))  # 예외 없음
 
 
+def test_모르는_키는_무시한다():
+    """`ho` 49번 — 1.6 봉투에 `preprocessing` 이 생겼다. 칸을 더하는 minor 변경이
+    적재를 깨지 않아야 에이전트가 계약을 늘릴 수 있다. 파서를 엄격 검증(모르는
+    키 거부)으로 바꾸면 여기서 걸린다."""
+    base = json.loads(json.dumps(_ENVELOPE))
+    base["schema_version"] = "1.6"
+    env = json.loads(json.dumps(base))
+    env["preprocessing"] = {"path": "torchvision"}
+    env["result"]["breakdown"][0]["new_field"] = 1  # 항목 안에 생겨도 같다
+
+    # 모르는 키는 결과를 바꾸지 않는다 — 같은 봉투에서 그 키만 뺀 것과 똑같다
+    assert parse_report(_raw(env)) == parse_report(_raw(base))
+
+
 def test_JSON_이_아니면_MalformedReport():
     with pytest.raises(MalformedReport):
         parse_report(b"not json{{")
