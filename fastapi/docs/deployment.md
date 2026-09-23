@@ -384,6 +384,27 @@ CF-Connecting-IP`)도 없어서, 지금 `client=` 는 **Cloudflare 엣지 주소
 > ```
 > Cloudflare 대역으로만 찍히면 안 고쳐진 것이다.
 
+### 🔴 `/metrics` 는 nginx 에서 막는다 (2026-09-23)
+
+`/metrics` 는 인증이 없어서 `app/main.py` 주석대로 **바깥에서 막아야** 한다. 그런데 nginx 에
+그 규칙이 없어 **공개 경로(Cloudflare 경유)로 200 · 지표 477줄**이 나가고 있었다(2026-09-23 발견) —
+경로별 요청 수·지연·상태 코드가 누구에게나 보였다. 443 서버 블록의 `location /` 앞에 한 줄을 넣었다:
+
+```nginx
+location = /metrics { return 404; }  # 지표는 서버 안(127.0.0.1:8080)에서만 수집
+```
+
+- 파일은 서버의 `/etc/nginx/conf.d/<API 호스트>.conf`, 넣기 전 원본은 `/root/nginx-before-metrics-block-20260923.conf`
+- 수집기(Prometheus)는 서버 안에서 `127.0.0.1:8080/metrics` 를 직접 읽으므로 영향이 없다
+- 우회 형태(`/metrics/` · `/metrics?x=1` · `//metrics` · `/%6Detrics`)도 최종 404 인 것을 확인했다
+- 🔴 **nginx 설정은 이 저장소에 없다** — 서버를 새로 만들면 이 줄을 다시 넣는다
+
+> **확인:**
+> ```bash
+> curl -s -o /dev/null -w '%{http_code}\n' https://<API 호스트>/metrics                     # 404
+> ssh supersub 'curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/metrics'   # 200
+> ```
+
 ### ✅ 그것도 09-03 에 붙었다 — **systemd drop-in 이다** (옛 기록)
 
 박민호가 유닛 파일을 고치는 대신 **드롭인으로 덮었다.** 그래서 `supersub-api.service`
