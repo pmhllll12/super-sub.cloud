@@ -146,6 +146,16 @@ const String _kKoFont = 'PyeojinGothic';
 /// 인사말이 화면 왼쪽에서 떨어진 거리.
 const double _kGreetLeft = 20;
 
+/// 소개 두 줄이 **흰 판 윗변에서** 떨어진 거리(2026-09-23 사용자 요청:
+/// 「그 흰색 판 바로 위에 … 안녕하세요 바로 아래 말고」).
+///
+/// ⚠️ 22 → **10**(같은 날, 「흰 판 윗변에서 10px 위에 붙여」).
+const double _kTaglineGap = 10;
+
+/// 소개 두 줄의 글자 크기 — 🔴 **인사말보다 크다**(사용자 요청).
+/// 인사말은 [_Greeting.fontSize] 26 이다.
+const double _kTaglineSize = 30;
+
 /// 워드마크(`SUPERSUB`)가 **화면 맨 위에서** 떨어진 거리.
 ///
 /// 🔴 **스쿼드 판 아랫변에 붙여 두던 것을 뗐다**(2026-09-22 정정, 사용자 요청:
@@ -739,6 +749,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             // 로고는 화면 맨 위 가운데 — 판을 펼치면 그 판이 덮는다.
             _brandMark(context),
             _greeting(context, user?.nickname),
+            _tagline(context),
             _squadSheet(context, card, squad, user?.ownedTeamId),
             // 「내 프로필」 — 화면 맨 위 오른쪽. 판보다 **뒤에 두지 않는다**.
             _profileButton(context, card),
@@ -986,6 +997,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       left: _kGreetLeft,
       top: geo.rowTop + _kWordmarkTop + kBrandHomeSize + 18,
       child: IgnorePointer(child: _Greeting(nickname: nickname)),
+    );
+  }
+
+  /// 흰 판 **바로 위**에 앉는 소개 두 줄(2026-09-23 사용자 요청).
+  ///
+  /// 🔴 **인사말 바로 아래가 아니다.** 사용자가 자리를 따로 골랐다 — 위쪽은
+  /// 인사말, 아래쪽은 이 줄로 비어 있는 공간을 나눠 쓴다.
+  ///
+  /// 🔴 **접힌 흰 판 윗변을 기준 삼는다.** 판을 펼치면 스쿼드 판이 이 줄을
+  /// 덮으므로 따라 올라갈 까닭이 없다 — 따라가게 만들면 덮이는 도중에
+  /// 글자가 판 위로 비어져 나온다.
+  Widget _tagline(BuildContext context) {
+    final geo = _sheetGeometry(context);
+    final size = MediaQuery.sizeOf(context);
+    return Positioned(
+      left: _kGreetLeft,
+      right: _kGreetLeft,
+      bottom: size.height - geo.whiteTopCollapsed + _kTaglineGap,
+      child: const IgnorePointer(
+        child: _FadeInOnSettled(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('영상으로 실력을 증명하고', style: _kTaglineStyle),
+              Text('함께 뛸 팀을 만드세요', style: _kTaglineStyle),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1557,6 +1598,74 @@ class _ShortcutPill extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 소개 두 줄의 글자 차림.
+const TextStyle _kTaglineStyle = TextStyle(
+  fontFamily: _kKoFont,
+  // 🔴 번들한 굵기가 Black 하나다 — [_kKoFont] 주석 참고.
+  fontWeight: FontWeight.w900,
+  fontSize: _kTaglineSize,
+  height: 1.25,
+  color: _kOnDark,
+);
+
+/// **로고가 내려앉은 뒤에** 스며드는 껍데기.
+///
+/// 🔴 **[kBrandSettled] 를 기다리는 까닭은 [_Greeting] 과 같다** — 인트로가
+/// 도는 동안 홈은 이미 그 아래에 지어져 있어서, 안 기다리면 잉크가 걷히는
+/// 순간 **이미 다 보이는 채로** 드러난다.
+class _FadeInOnSettled extends StatefulWidget {
+  const _FadeInOnSettled({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_FadeInOnSettled> createState() => _FadeInOnSettledState();
+}
+
+class _FadeInOnSettledState extends State<_FadeInOnSettled>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _fade = AnimationController(
+    vsync: this,
+    duration: _Greeting.fadeIn,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    kBrandSettled.addListener(_onSettled);
+    _onSettled();
+  }
+
+  void _onSettled() {
+    if (kBrandSettled.value) _fade.forward();
+  }
+
+  @override
+  void dispose() {
+    kBrandSettled.removeListener(_onSettled);
+    _fade.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _fade,
+      child: widget.child,
+      builder: (context, child) {
+        final t = Curves.easeOut.transform(_fade.value);
+        return Opacity(
+          opacity: t,
+          child: Transform.translate(
+            offset: Offset(0, _Greeting.rise * (1 - t)),
+            child: child,
+          ),
+        );
+      },
     );
   }
 }

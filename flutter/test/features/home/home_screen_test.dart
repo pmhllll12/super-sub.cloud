@@ -695,6 +695,35 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
   });
 
+  /* 소개 두 줄 — 🔴 **흰 판 바로 위**이고 **인사말보다 크다**(2026-09-23
+     사용자 요청: 「안녕하세요, 백성검님 바로 아래 말고」 「좀 더 키워서」). */
+  testWidgets('소개 두 줄이 흰 판 바로 위에, 인사말보다 크게 선다', (tester) async {
+    await _pumpLoggedIn(tester);
+    final line1 = find.text('영상으로 실력을 증명하고');
+    final line2 = find.text('함께 뛸 팀을 만드세요');
+    expect(line1, findsOneWidget);
+    expect(line2, findsOneWidget);
+
+    final white = tester.getRect(find.byKey(const Key('home-white-sheet')));
+    final block = tester.getRect(line2);
+    // 흰 판 **위**에 있고, 멀리 떨어져 있지 않다.
+    expect(block.bottom, lessThanOrEqualTo(white.top));
+    expect(white.top - block.bottom, lessThan(40));
+
+    /* 🔴 **인사말과의 틈은 재지 않는다** — 그 틈은 화면 높이에서 남는 만큼이라
+       기기마다 다르다(시험 뷰포트 360×780 에서는 13px, 실기기 411×891 에서는
+       훨씬 넓다). 「인사말 바로 아래가 아니다」를 지키는 것은 **흰 판에 붙어
+       있다**는 위 성질이고, 여기서는 순서만 본다. */
+    final hello = tester.getRect(find.text('안녕하세요, 백성검 님'));
+    expect(block.top, greaterThan(hello.bottom));
+
+    // 🔴 인사말보다 크다.
+    final size1 = tester.widget<Text>(line1).style!.fontSize!;
+    final helloSize =
+        tester.widget<Text>(find.text('안녕하세요, 백성검 님')).style!.fontSize!;
+    expect(size1, greaterThan(helloSize));
+  });
+
   testWidgets('바 메뉴를 열면 로그아웃 칸이 선다', (tester) async {
     await _pumpLoggedIn(tester);
     // 닫혀 있을 때는 아무 칸도 세우지 않는다.
