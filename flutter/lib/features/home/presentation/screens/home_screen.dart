@@ -131,6 +131,78 @@ const double _kSquadPhotoH = 180;
 /// (손잡이 + 알약 줄 + 틈).
 const double _kBoardTopInset = _kSheetHandleH + 4 + _kPillsRowH + 12;
 
+/// 판 둘과 지름길 알약 줄을 한 덩이로 받치는 **흰 판**(2026-09-23 사용자 요청:
+/// 「스쿼드판이랑 영상분석 판 아래에 흰색 판 하나」).
+///
+/// 🔴 **판 둘 안이 비치지는 않는다.** 판 면([_kSheetColor])은 거의 투명하지만
+/// 그 위에 사진(`squad_cover.jpg` · `analysis_cover.jpg`)이 `BoxFit.cover` 로
+/// 꽉 차 있어서, 이 흰색은 **판을 두르는 테와 판 사이 틈**으로만 보인다.
+///
+/// ⚠️ **한 자리만 예외다** — 스쿼드 판을 펼치면 그 사진이 걷히고 스쿼드 그림이
+/// 드는데, 그때는 판 면 너머로 이 흰색이 비친다.
+const Color _kWhiteSheetColor = Color(0xFFFFFFFF);
+
+/// 흰 판의 모서리.
+const double _kWhiteSheetRadius = 28;
+
+/// 흰 판이 **화면 양끝에서** 떨어진 거리 — 0, 즉 끝까지 편다. 판 둘이
+/// [_kVideoSideInset] 만큼 안쪽이라 그 차이가 그대로 흰 테가 된다.
+const double _kWhiteSheetSideInset = 0;
+
+/// 흰 판이 판 둘 바깥으로 남기는 테의 두께 — 🔴 **판 둘의 옆 여백
+/// ([_kVideoSideInset])과 같은 값이다.** 다르면 테가 옆과 아래에서 어긋난다.
+const double _kWhiteSheetPad = _kVideoSideInset;
+
+/// 지름길 알약 줄(레슨 · 상점 · 경기장 예약 · 알림)의 높이.
+const double _kShortcutRowH = 62;
+
+/// 알약 줄과 스쿼드 판 사이 틈.
+const double _kShortcutGap = 12;
+
+/// 알약 줄 위로 흰 판이 더 남기는 자리.
+const double _kShortcutTopPad = 14;
+
+/// 알약 셋 사이 틈.
+const double _kShortcutSpacing = 10;
+
+/// 🔴 **흰 판 위의 글자·아이콘은 검정이다.** 이 화면의 다른 글자
+/// ([_kOnDark] · 워드마크 · 「영상 분석 시작하기」)는 **검은 바탕 기준**이라
+/// 흰색인데, 이 줄만 흰 판 위에 서므로 반대로 간다 — 같이 흰색으로 두면
+/// 통째로 안 보인다.
+const Color _kOnWhite = Color(0xFF111114);
+
+/// 흰 판 위 알약의 테 — 알약 면도 흰색이라 **이 선이 유일한 경계**다.
+const Color _kPillLineOnWhite = Color(0x33111114);
+
+/// 흰 판 위에서 영상 분석 판을 가르는 **가장 얇은 은빛 선**(2026-09-23 사용자
+/// 요청: 「제일 얇은 세련된 실버 색상」).
+///
+/// 🔴 **[SilverEdge.silver](`#C9D4D8`)를 그대로 쓰면 안 보인다.** 그 값은
+/// **검은 바탕**에서 경계를 내려고 고른 밝은 은빛이라, 흰 판 위에서는 흰색에
+/// 붙어 사라진다. 한 단 진한 은빛으로 내리고 굵기는 하단 바 윤곽
+/// ([SilverEdge.barLineWidth])과 같은 0.5 로 둔다.
+const Color _kSilverOnWhite = Color(0xFF9AA7AD);
+const double _kSilverOnWhiteWidth = 0.5;
+
+/// 흰 판 맨 위 줄에 서는 지름길 셋(2026-09-23 사용자 요청).
+///
+/// 🔴 **아직 갈 곳이 없다** — 세 화면은 **웹에만** 있다(`www` 의 `/market` ·
+/// `/venues` · 알림함). 이번 회차는 사용자 판단으로 **자리와 모양만** 잡았고,
+/// 누르면 「준비 중입니다」다. 화면을 붙이는 날 `onTap` 만 갈면 된다.
+const List<({Key key, IconData icon, String label})> _kShortcuts = [
+  (
+    key: Key('home-shortcut-market'),
+    icon: Symbols.storefront,
+    label: '레슨 · 상점',
+  ),
+  (key: Key('home-shortcut-venue'), icon: Symbols.stadium, label: '경기장 예약'),
+  (
+    key: Key('home-shortcut-alarm'),
+    icon: Symbols.notifications,
+    label: '알림',
+  ),
+];
+
 /// 스쿼드 판 자리에 무엇을 세우는가 — 웹의 알약 「팀장」 · 「팀원」.
 enum _Role { captain, member }
 
@@ -617,7 +689,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 ),
               ),
             ),
+            /* 🔴 **판 둘보다 뒤다.** 받치는 것이지 덮는 것이 아니라서,
+               이 자리(영상 분석 판 **앞**)를 지켜야 한다. */
+            _whiteSheet(context),
             _videoPanel(context),
+            _shortcutPills(context),
             // 워드마크는 스쿼드 판 **아래 빈 자리**에 선다.
             _wordmark(context),
             _squadSheet(context, card, squad, user?.ownedTeamId),
@@ -651,6 +727,84 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   /// 「영상 분석」 판이 화면 **아래 끝에서** 떨어진 거리 — 하단 바 바로 위.
   double _videoBottomInset(BuildContext context) =>
       FloatingNavBar.heightOf(context) + 8;
+
+  /// 판 둘과 지름길 알약 줄을 받치는 **흰 판**(2026-09-23 사용자 요청).
+  ///
+  /// 🔴 **[IgnorePointer] 다.** 판 둘보다 뒤에 있어도 겹치는 넓이가 커서,
+  /// 손짓을 받으면 판 가장자리와 알약이 여기서 먹힌다.
+  Widget _whiteSheet(BuildContext context) {
+    final geo = _sheetGeometry(context);
+    return AnimatedBuilder(
+      animation: _sheet,
+      builder: (context, _) {
+        /* 🔴 **묶은 값으로 잰다.** 스프링이 넘친 값을 그대로 쓰면 흰 판
+           윗변이 화면 위로 튀어 나갔다 돌아온다 — 판 둘과 달리 이쪽은
+           그 출렁임이 **테 두께의 흔들림**으로 보여서 지저분하다. */
+        final top =
+            geo.whiteTopCollapsed +
+            (geo.whiteTopExpanded - geo.whiteTopCollapsed) * _sheetT;
+        return Positioned(
+          top: top,
+          left: _kWhiteSheetSideInset,
+          right: _kWhiteSheetSideInset,
+          height: (geo.whiteBottom - top).clamp(0.0, double.infinity),
+          child: const IgnorePointer(
+            key: Key('home-white-sheet'),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: _kWhiteSheetColor,
+                borderRadius: BorderRadius.all(
+                  Radius.circular(_kWhiteSheetRadius),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// 흰 판 맨 위의 지름길 알약 셋 — 가로로 나란히.
+  ///
+  /// 🔴 **「내 프로필」과 같은 방식으로 걷힌다**(앞 4할 안에). 스쿼드 판이
+  /// 위로 자라면서 이 줄 자리를 통째로 덮기 때문이다. 같은 식을 쓰므로
+  /// 한쪽만 고치면 둘이 어긋난다.
+  Widget _shortcutPills(BuildContext context) {
+    final geo = _sheetGeometry(context);
+    return AnimatedBuilder(
+      animation: _sheet,
+      builder: (context, _) {
+        final fadeOut = (1 - _sheetT / 0.4).clamp(0.0, 1.0);
+        return Positioned(
+          top: geo.shortcutTop,
+          left: _kVideoSideInset + _kWhiteSheetPad,
+          right: _kVideoSideInset + _kWhiteSheetPad,
+          height: _kShortcutRowH,
+          child: IgnorePointer(
+            ignoring: fadeOut < 0.5,
+            child: Opacity(
+              opacity: fadeOut,
+              child: Row(
+                children: [
+                  for (final (i, s) in _kShortcuts.indexed) ...[
+                    if (i > 0) const SizedBox(width: _kShortcutSpacing),
+                    Expanded(
+                      child: _ShortcutPill(
+                        key: s.key,
+                        icon: s.icon,
+                        label: s.label,
+                        onTap: () => _notReady(s.label),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   /// 「내 프로필」 — **화면 맨 위 오른쪽**(2026-09-22 사용자 요청).
   ///
@@ -805,6 +959,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     double videoFlatTop,
     double squadTopCollapsed,
     double squadTopExpanded,
+    double shortcutTop,
+    double whiteTopCollapsed,
+    double whiteTopExpanded,
+    double whiteBottom,
     double boardW,
     double boardH,
     double minScale,
@@ -829,6 +987,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     // 접히면 사진 한 장 높이, 펼치면 워드마크 아래부터 꽉.
     final squadTopCollapsed = squadBottomCollapsed - _kSquadPhotoH;
     final squadTopExpanded = rowTop;
+
+    /* 지름길 알약 줄 — 스쿼드 판 **바로 위**다. 흰 판은 그 줄까지 감싸므로
+       윗변이 여기서 한 번 더 올라간다(사용자가 고른 배치).
+
+       🔴 **펼치면 윗변이 스쿼드 판을 따라간다.** 스쿼드 판은 위로 자라
+       화면 맨 위([rowTop])까지 가는데, 흰 판이 접힌 자리에 그대로 있으면
+       **판이 흰 판 위로 삐져나온다.** 알약은 그 전에 걷힌다. */
+    final shortcutTop = squadTopCollapsed - _kShortcutGap - _kShortcutRowH;
+    final whiteTopCollapsed = shortcutTop - _kShortcutTopPad;
+    final whiteTopExpanded = squadTopExpanded - _kWhiteSheetPad;
+    /* 🔴 **아랫변은 영상 분석 판의 바닥 + 테다** — 그 판은 여닫이와 무관하게
+       바닥이 늘 같으므로([bottom]) 이 값도 고정이다. */
+    final whiteBottom = bottom + _kWhiteSheetPad;
 
     final panelW = size.width - _kVideoSideInset * 2;
     final boardW = panelW - 20;
@@ -857,6 +1028,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       videoFlatTop: videoFlatTop,
       squadTopCollapsed: squadTopCollapsed,
       squadTopExpanded: squadTopExpanded,
+      shortcutTop: shortcutTop,
+      whiteTopCollapsed: whiteTopCollapsed,
+      whiteTopExpanded: whiteTopExpanded,
+      whiteBottom: whiteBottom,
       boardW: boardW,
       boardH: boardH,
       minScale: minScale,
@@ -1226,6 +1401,64 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 ///
 /// ⚠️ **안 눌린다.** 생김새는 단추인데 판 전체가 끄는 자리다 — 부르는 쪽이
 /// [IgnorePointer] 로 감싼다.
+/// 흰 판 맨 위 줄의 지름길 알약 하나 — 아이콘 위, 글자 아래
+/// (2026-09-23 사용자가 준 그림 배치).
+///
+/// 🔴 **유리가 아니다.** 흰 판 위라 흐릴 뒤가 없고, 이 화면의 다른 알약
+/// (`GlassPill`)을 그대로 가져오면 **흰 면 위에서 아무것도 안 보인다.**
+/// 흰 면 + 가는 테로 간다 — `flutter/CLAUDE.md` 의 「층을 쌓아야 하면 흐림
+/// 없이 색만 얹는다」와 같은 판단이다.
+class _ShortcutPill extends StatelessWidget {
+  const _ShortcutPill({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: _kWhiteSheetColor,
+      /* 알약 모양은 [StadiumBorder] 가 낸다 — 반지름을 숫자로 주면 높이를
+         바꿀 때마다 같이 고쳐야 하고, 한 번 어긋나면 양 끝이 찌그러진다. */
+      shape: const StadiumBorder(
+        side: BorderSide(
+          color: _kPillLineOnWhite,
+          width: _kSilverOnWhiteWidth,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 22, color: _kOnWhite),
+            const SizedBox(height: 5),
+            /* 🔴 한 줄로 묶는다 — 「경기장 예약」이 좁은 기기에서 두 줄로
+               접히면 알약 셋의 높이가 갈린다. */
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: _kOnWhite,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _PullHint extends StatefulWidget {
   const _PullHint({required this.label, required this.show});
 
@@ -1569,14 +1802,25 @@ class _VideoAnalysisPanelState extends State<_VideoAnalysisPanel>
 
     /* 🔴 **스쿼드 판과 같은 차림**(2026-09-21, 사용자 요청 「영상분석 쪽 판도
        같이」) — 면 색은 거의 없고 **은빛 테두리**가 경계를 낸다. 면을 깔면
-       뒤의 빛무리가 여기서 끊겨 화면 아래쪽만 검게 죽는다. */
+       뒤의 빛무리가 여기서 끊겨 화면 아래쪽만 검게 죽는다.
+
+       🔴 **테 값을 갈았다**(2026-09-23 사용자 요청: 「외곽선에 제일 얇은
+       세련된 실버 색상」). 뒤에 흰 판이 깔리면서 옛 값
+       (`SilverEdge.silver` 알파 0.28 · 1px)이 **흰 바탕에 붙어 사라졌다** —
+       그 값은 검은 바탕용이다. 왜 이 색·이 굵기인지는 [_kSilverOnWhite]. */
     return DecoratedBox(
       key: const Key('home-video-analysis'),
+      /* 🔴 **자식 「앞」에 그린다**(2026-09-23). 기본값(뒤)으로 두면 아래
+         [ClipRRect] 가 **같은 모서리로 판을 꽉 채워 테를 통째로 덮는다** —
+         가장자리 픽셀을 재서 잡았다(`#fefefe`, 흰색과 1단 차이). 검은
+         바탕일 때는 사진이 어두워 테가 있는 것처럼 보였을 뿐이다.
+         🔴 **되돌리지 말 것** — 뒤로 옮기면 선이 조용히 사라진다. */
+      position: DecorationPosition.foreground,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(radius),
         border: Border.all(
-          color: SilverEdge.silver.withValues(alpha: 0.28),
-          width: 1,
+          color: _kSilverOnWhite,
+          width: _kSilverOnWhiteWidth,
         ),
       ),
       child: ClipRRect(

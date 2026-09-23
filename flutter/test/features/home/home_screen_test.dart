@@ -473,6 +473,68 @@ void main() {
     });
   });
 
+  /* 흰 판 · 알약 셋 — 2026-09-23 사용자 요청(「스쿼드판이랑 영상분석 판 아래에
+     흰색 판 하나」 · 「그 스쿼드판 위에 3개 가로로 나란히 알약 버튼」). */
+  group('흰 판 · 지름길 알약 셋', () {
+    Finder whiteSheet() => find.byKey(const Key('home-white-sheet'));
+
+    testWidgets('흰 판이 알약 줄과 판 둘을 다 감싼다', (tester) async {
+      await _pumpLoggedIn(tester);
+      final white = tester.getRect(whiteSheet());
+      final squad = tester.getRect(find.byKey(const Key('home-squad-sheet')));
+      final video = tester.getRect(find.byKey(const Key('home-video-analysis')));
+      final pills = tester.getRect(find.byKey(const Key('home-shortcut-market')));
+
+      for (final (name, r) in [('스쿼드', squad), ('영상 분석', video), ('알약', pills)]) {
+        expect(white.top, lessThanOrEqualTo(r.top), reason: '$name 윗변');
+        expect(white.bottom, greaterThanOrEqualTo(r.bottom), reason: '$name 아랫변');
+        expect(white.left, lessThanOrEqualTo(r.left), reason: '$name 왼변');
+        expect(white.right, greaterThanOrEqualTo(r.right), reason: '$name 오른변');
+      }
+    });
+
+    /* 🔴 **흰 판은 손짓을 안 받는다.** 판 둘보다 뒤에 있지만 겹치는 자리가
+       넓어서, 손짓을 받으면 판 가장자리·알약이 먹힌다. */
+    testWidgets('흰 판은 손짓을 안 받는다', (tester) async {
+      await _pumpLoggedIn(tester);
+      expect(
+        find.ancestor(of: whiteSheet(), matching: find.byType(IgnorePointer)),
+        findsWidgets,
+      );
+    });
+
+    testWidgets('알약 셋이 서고, 누르면 준비 중 안내가 뜬다', (tester) async {
+      await _pumpLoggedIn(tester);
+      for (final label in const ['레슨 · 상점', '경기장 예약', '알림']) {
+        expect(find.text(label), findsOneWidget, reason: label);
+      }
+      // 가로로 나란히 — 셋의 윗변이 같다.
+      final tops = const ['market', 'venue', 'alarm']
+          .map((k) => tester.getRect(find.byKey(Key('home-shortcut-$k'))).top)
+          .toList();
+      expect(tops[1], closeTo(tops[0], 0.5));
+      expect(tops[2], closeTo(tops[0], 0.5));
+
+      await tester.tap(find.byKey(const Key('home-shortcut-venue')));
+      await tester.pump();
+      expect(find.textContaining('경기장 예약 — 준비 중'), findsOneWidget);
+    });
+
+    /* 판을 펼치면 스쿼드 판이 이 줄 자리까지 자라 올라온다 — 「내 프로필」과
+       **같은 방식으로** 걷힌다. */
+    testWidgets('펼치면 알약이 걷히고, 다시 접으면 돌아온다', (tester) async {
+      await _pumpLoggedIn(tester);
+      final pill = find.byKey(const Key('home-shortcut-market'));
+      expect(_opacityAbove(tester, pill), 1);
+
+      await _openSheet(tester);
+      expect(_opacityAbove(tester, pill), 0);
+
+      await _openSheet(tester);
+      expect(_opacityAbove(tester, pill), 1);
+    });
+  });
+
   testWidgets('바 메뉴를 열면 로그아웃 칸이 선다', (tester) async {
     await _pumpLoggedIn(tester);
     // 닫혀 있을 때는 아무 칸도 세우지 않는다.
