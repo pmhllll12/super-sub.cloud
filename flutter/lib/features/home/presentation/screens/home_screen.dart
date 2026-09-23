@@ -2278,16 +2278,18 @@ class _VideoPanelCover extends StatelessWidget {
           /* 🔴 **알약도 같이 물러난다.** 사진만 멀어지고 알약이 제자리에
              또렷하면 **알약만 화면에 붙어 있는 것**처럼 보여 층이 갈라진다.
              사진보다 **빨리** 걷혀서(×1.6) 마지막엔 사진만 남는다. */
-          /* 🔴 **오른쪽 아래 구석**(2026-09-22 사용자 요청). 한가운데에
-             있었는데, 사진이 `VIDEO AGENT` 로 바뀌면서 **제목 글자 위에
-             얹혔다** — 구석으로 비키면 사진이 통째로 보인다. */
+          /* 🔴 **사진 한가운데다 (2026-09-23 사용자 요청: 「사진의 가운데에
+             두고」).**
+
+             ⚠️ **오른쪽 아래 구석이었다** — 2026-09-22 에 사용자가 그리로
+             빼라고 한 자리다. 까닭은 「사진이 `VIDEO AGENT` 로 바뀌면서
+             제목 글자 위에 얹혔다」였고, 가운데로 돌아온 지금 **그 겹침은
+             다시 난다.** 사용자에게 알리고 진행한 것이니, 겹쳐 보인다는
+             지적이 오면 이 자리부터 본다. */
           Align(
-            alignment: Alignment.bottomRight,
+            alignment: Alignment.center,
             child: Padding(
-              padding: const EdgeInsets.only(
-                right: _kPillInset,
-                bottom: _kPillInset,
-              ),
+              padding: const EdgeInsets.all(_kPillInset),
               child: AnimatedBuilder(
                 animation: leave,
                 builder: (context, child) => Opacity(
@@ -2407,18 +2409,22 @@ class _StartAnalysisPillState extends State<_StartAnalysisPill>
                      굳는다.** */
                   onTapCancel: _up,
                   child: const Padding(
-                    // 위아래를 살짝 넓혔다(9 → 12, 2026-09-22 사용자 요청).
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    /* 위아래를 살짝 넓혔다(9 → 12, 2026-09-22 사용자 요청).
+                       ⚠️ **한 번 더 키웠다**(2026-09-23: 「살짝만 좀 더 크기
+                       키우자」) — 안여백 16/12 → **20/15**, 글자 14 → 15,
+                       아이콘 18 → 20. 🔴 **넷을 같이 올린다** — 하나만 키우면
+                       알약이 길쭉해지거나 글자만 떠 보인다. */
+                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
                           Symbols.camera_video,
-                          size: 18,
+                          size: 20,
                           weight: 500,
                           color: Colors.white,
                         ),
-                        SizedBox(width: 7),
+                        SizedBox(width: 8),
                         Text(
                           '영상 분석 시작하기',
                           style: TextStyle(
@@ -2426,7 +2432,7 @@ class _StartAnalysisPillState extends State<_StartAnalysisPill>
                                뒤의 사진이 비친다 — 검은 글자는 사진의 어두운
                                자리(선수 · 신발)에서 묻힌다. */
                             color: Colors.white,
-                            fontSize: 14,
+                            fontSize: 15,
                             fontWeight: FontWeight.w700,
                             letterSpacing: -0.2,
                           ),
