@@ -309,6 +309,8 @@ h3 {
   }
 }
 
+// 다크 — 강조를 채도 높은 보라(#6a4fd8)로 했더니 눈이 아프다고 했다(사용자). 채도를 낮춘 회보라로
+// 두고, 하위 페이지는 바탕·테두리·글자를 한 단계씩 밝혀 잘 보이게 한다.
 html[data-theme="dark"] #site-nav > .nav-list > .nav-list-item {
   > .nav-list-link {
     background: #4a4556;
@@ -320,23 +322,23 @@ html[data-theme="dark"] #site-nav > .nav-list > .nav-list-item {
   }
 
   &.active > .nav-list-link {
-    background: #6a4fd8;
+    background: #5e5670;
     color: #fff;
   }
 
   .nav-list .nav-list-link {
-    border-color: #3f3c47;
-    background: #302d36;
-    color: #d6d2dc;
+    border-color: #55505f;
+    background: #36333e;
+    color: #ebe7f0;
 
     &:hover {
-      background: #37343e;
+      background: #403c49;
     }
 
     &.active {
-      border-color: #5a4d80;
-      background: #3d3552;
-      color: #c9bdfb;
+      border-color: #8a829c;
+      background: #4d4759;
+      color: #fff;
     }
   }
 }
