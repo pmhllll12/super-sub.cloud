@@ -67,9 +67,8 @@ class ScreenTint extends StatelessWidget {
   /// `(자국색인가, 중심 x, 중심 y, 반경, 세기)` 목록 — 아래 두 상수 중 하나.
   final List<(bool, double, double, double, double)> glows;
 
-  @override
-  /// 🔴 **상태 바 글자를 어둡게 시킨다**(2026-09-22, 사용자 지적: 「스크롤
-  /// 하면 상단바의 검은색 바가 튀어나와」).
+  /// 🔴 **상태 바 글자의 밝기를 이 위젯이 정한다**(2026-09-22, 사용자 지적:
+  /// 「스크롤 하면 상단바의 검은색 바가 튀어나와」).
   ///
   /// 바탕이 흰색이 되면서 안드로이드가 **시계·배터리를 읽히게 하려고 상태 바
   /// 뒤에 검은 막**을 깔았다. 이 앱은 그 막을 `MainActivity.kt` 에서 껐는데,
@@ -82,23 +81,37 @@ class ScreenTint extends StatelessWidget {
   /// ⚠️ **이 바탕을 쓰는 화면에만 붙는다.** 어두운 화면(인트로 · 로그인 ·
   /// 영상)에 같이 걸면 상태 바 글자가 통째로 안 보인다 — 그래서 앱 전체가
   /// 아니라 이 위젯이 들고 있다.
-  Widget build(BuildContext context) => AnnotatedRegion<SystemUiOverlayStyle>(
-    value: const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      // 안드로이드 — 어두운 아이콘.
-      statusBarIconBrightness: Brightness.dark,
-      // iOS — 같은 뜻.
-      statusBarBrightness: Brightness.light,
-    ),
-    child: CustomPaint(
-      painter: _ScreenTintPainter(a: a, b: b, base: base, glows: glows),
-    ),
-  );
+  ///
+  /// 🔴 **밝기를 [base] 에서 스스로 정한다 (2026-09-23).** 전에는 「어두운
+  /// 아이콘」으로 **박혀 있었다** — 바탕이 흰색이던 시절의 값이라, 갈래가
+  /// 늘어난 지금 그대로 두면 **검은 바탕 위에 검은 시계**가 된다.
+  /// 바탕을 또 갈아도 여기는 안 따라와도 된다.
+  @override
+  Widget build(BuildContext context) {
+    final lightBg = base.computeLuminance() > 0.5;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        // 안드로이드 — 밝은 바탕이면 어두운 아이콘.
+        statusBarIconBrightness: lightBg ? Brightness.dark : Brightness.light,
+        // iOS — 같은 뜻인데 **반대로 적는다**(바탕의 밝기를 말한다).
+        statusBarBrightness: lightBg ? Brightness.light : Brightness.dark,
+      ),
+      child: CustomPaint(
+        painter: _ScreenTintPainter(a: a, b: b, base: base, glows: glows),
+      ),
+    );
+  }
 }
 
-/// 바탕은 **초록이 아주 조금 섞인 흰색**이다 — 순백으로 두면 색이 배어드는
-/// 자리와 안 배어드는 자리가 갈려 화면이 두 조각으로 보인다.
-const Color _kMintBase = Color(0xFFF6FAF5);
+/// 🔴 **검정이다 (2026-09-23 정정, 사용자 요청: 「초록이랑 검정으로 바탕색
+/// 바꿔봐」).** 같은 날 잠깐 **초록이 아주 조금 섞인 흰색**(`#F6FAF5`)이었다 —
+/// 흰 바탕일 때는 순백을 피할 까닭이 있었다(순백이면 색이 배어드는 자리와
+/// 안 배어드는 자리가 갈려 화면이 두 조각으로 보인다). 검정으로 오면서 그
+/// 까닭은 없어졌다.
+///
+/// ⚠️ **흰 판([_kWhiteSheetColor])은 그대로 흰색이다** — 바탕만 바꿨다.
+const Color _kMintBase = Color(0xFF000000);
 
 /// 옅은 쪽 — [kCardBg] 를 흰색 쪽으로 끌어올린 값이다. 마주 보는 자리에
 /// 놓이므로 진한 쪽과 같은 세기면 화면이 양옆에서 조여 보인다.
