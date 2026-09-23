@@ -234,11 +234,13 @@ h3 {
   word-break: keep-all;
 }
 
-// --- 사이드바 — 묶음을 머리글로, 늘 펼쳐 둔다 (2026-09-23) ---------------------------
+// --- 사이드바 — 1단계를 단추로, 묶음은 늘 펼쳐 둔다 (2026-09-23) ------------------------
 // 묶음(1단계)이 접혀 있어 안에 무엇이 있는지 하나씩 눌러 봐야 했다(사용자 지적). 1단계 묶음의
-// 목록은 늘 펼치고, 묶음 이름은 작은 회색 머리글로 보인다 — 누르면 여전히 묶음 페이지로 간다.
-// 3단계(스프린트 일지 · QA 체크리스트)는 테마 기본대로 접힌다. `:has()` 를 못 쓰는 브라우저에서도
-// 목록은 펼쳐지고, 머리글 모양만 빠진다.
+// 목록은 늘 펼치고, 1단계 이름(묶음 · 프로젝트 전체 그림)은 배경 안에 글이 든 단추로 보인다
+// (사용자 요청) — 누르면 여전히 그 페이지로 간다. 지금 페이지가 든 단추는 강조색.
+// 3단계(스프린트 일지 · QA 체크리스트)는 테마 기본대로 접힌다.
+// 🔴 여백을 늘리면 사이드바가 화면보다 길어져, 테마가 현재 페이지를 보이려고 사이드바를 내린다 —
+// 맨 위 항목이 가려진다(2026-09-23 에 겪었다).
 #site-nav > .nav-list > .nav-list-item {
   > .nav-list {
     display: block;
@@ -249,21 +251,41 @@ h3 {
     display: none; // 늘 펼쳐 있으니 화살표는 뜻이 없다
   }
 
-  &:has(> .nav-list) > .nav-list-link {
+  > .nav-list-link {
     min-height: 0;
-    margin-top: 0.9rem;
-    padding-top: 0.15rem;
-    padding-bottom: 0.15rem;
-    border-bottom: 1px solid #e3e1da;
-    font-size: 0.75rem !important;
+    margin: 0.55rem 0.6rem 0.2rem;
+    padding: 0.2rem 0.8rem;
+    border-radius: 6px;
+    background: #e9e7ef;
+    background-image: none;
+    font-size: 0.8rem !important;
     font-weight: 600;
     line-height: 1.4rem;
-    letter-spacing: 0.04em;
-    color: #5c5962;
+    color: #27262b;
+
+    &:hover {
+      background: #dedae8;
+    }
+  }
+
+  &.active > .nav-list-link {
+    background: #e4dcfd;
+    color: #5e41d0;
   }
 }
 
-html[data-theme="dark"] #site-nav > .nav-list > .nav-list-item:has(> .nav-list) > .nav-list-link {
-  border-bottom-color: #44434d;
-  color: #a9a6ad;
+html[data-theme="dark"] #site-nav > .nav-list > .nav-list-item {
+  > .nav-list-link {
+    background: #3a3840;
+    color: #e6e1e8;
+
+    &:hover {
+      background: #45424c;
+    }
+  }
+
+  &.active > .nav-list-link {
+    background: #3d3552;
+    color: #c9bdfb;
+  }
 }
