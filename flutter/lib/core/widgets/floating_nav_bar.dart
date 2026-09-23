@@ -1,29 +1,38 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../design_scale.dart';
+import 'silver_edge.dart';
 import 'silver_sweep_border.dart';
 
-/// 막대의 면 — 🔴 **유리로 돌아왔다 (2026-09-23 두 번째 정정, 사용자 요청:
-/// 「안쪽 흰색 하지말고 외곽선 없애고, 글래스로 바꿔」).** 몇 시간 전 흰색
-/// 불투명으로 갔던 것을 되돌린 것이고, 외곽선([SilverEdge.onWhite])도 함께
-/// 걷었다 — 유리는 제 흐림과 옅은 면으로 경계를 낸다.
+/// 막대의 면 — 🔴 **완전한 흰색이다 (2026-09-23 세 번째 정정, 사용자 요청:
+/// 「하단 바 그냥 완전 흰색으로 바꾸고」).**
 ///
-/// 유리 → 검정 → 진회색 → 반투명 흰색 → 불투명 회색 → 흰색 → **유리** 순으로
-/// 왔고, 매번 사용자가 정했다.
+/// 유리 → 검정 → 진회색 → 반투명 흰색 → 불투명 회색 → 흰색 → 유리 →
+/// **흰색** 순으로 왔고, 매번 사용자가 정했다.
 ///
-/// 🔴 **흐림이 있어야 이 값이 뜻을 갖는다** — 면만 반투명으로 두고 흐림을 빼면
-/// 그냥 옅은 흰 막이다. [kNavBarBlur] 와 **짝이다.**
-const Color kNavBarColor = Color(0x3DFFFFFF);
+/// ⚠️ **흐림(`kNavBarBlur` 9)을 다시 걷었다** — 면이 불투명해서 흐릴 뒤가
+/// 없다. 유리로 되돌리는 날 같이 되살린다.
+///
+/// 🔴 **경계는 [SilverEdge.onWhite] 가 낸다** — 흰 면 위에서는 밝은 은빛
+/// ([SilverEdge.silver])이 흰색에 붙어 사라진다. 홈의 영상 분석 판과 **같은
+/// 값을 나눠 쓴다.**
+const Color kNavBarColor = Color(0xFFFFFFFF);
 
-/// 막대의 **흐림 세기**(2026-09-23 사용자 요청: 「블러 30퍼만 주자」).
+/// 막대 아래로 지는 그림자(2026-09-23 사용자 요청: 「그림자 자연스럽게 줘.
+/// 아래쪽에 그림자 자연스럽게」).
 ///
-/// ⚠️ **「30%」를 무엇의 30%로 읽을지 애매하다** — 2026-09-22 에 같은 식으로
-/// 「20%」를 받아 6 으로 뒀던 전례를 그대로 늘려 **9** 로 잡았다. 더 흐리게 /
-/// 덜 흐리게는 이 한 줄이다.
-const double kNavBarBlur = 9;
+/// 🔴 **아래로만 진다.** 사방으로 퍼뜨리면 막대가 「빛나는 판」이 되고,
+/// 떠 있는 것으로 안 읽힌다 — 위에서 빛이 오는 것처럼 아래로만 흘린다.
+///
+/// 🔴 **[ClipRRect] 안에 두지 않는다** — 자르면 그림자가 막대 모양대로
+/// 잘려 **아예 안 보인다.**
+const List<BoxShadow> kNavBarShadow = [
+  // 넓고 옅게 — 「떠 있다」를 만드는 쪽.
+  BoxShadow(color: Color(0x40000000), blurRadius: 26, offset: Offset(0, 10)),
+  // 좁고 진하게 — 막대 바로 아래에 닿는 그늘.
+  BoxShadow(color: Color(0x26000000), blurRadius: 8, offset: Offset(0, 3)),
+];
 
 /// 고른 칸을 두르는 **도는 금빛**(2026-09-23 사용자 요청: 「그 정사각형의
 /// 세련된 금색 실버색상이 돌아다니도록」 + 레퍼런스).
@@ -35,24 +44,28 @@ const double kNavBarBlur = 9;
 /// 🔴 **실버가 아니라 금빛이다** — 홈에는 「영상 분석 시작하기」 알약이 이미
 /// 실버로 돌고 있다. 같은 색이면 둘이 섞여 「어디를 보라는 건지」가 흐려진다
 /// (`silver_sweep_border.dart` 의 「한 화면에 하나」가 그 걱정이었다).
-const Color kNavActiveSweep = Color(0xFFE6D5AE);
+///
+/// 🔴 **밝은 금빛(`#E6D5AE`)에서 한 단 내렸다** — 막대가 흰색이 되면서 밝은
+/// 쪽은 흰 면에 붙어 사라진다. 어두운 막대에서는 **밝을수록** 보였는데 흰
+/// 막대에서는 **진할수록** 보인다 — 막대 면을 갈면 이 값도 같이 본다.
+const Color kNavActiveSweep = Color(0xFFA8894A);
 
 /// 빛이 지나가지 않는 동안에도 남는 바닥 선 — 없으면 빛이 없는 쪽 모서리가
 /// 통째로 사라진다.
-const Color kNavActiveSweepBase = Color(0x3DE6D5AE);
+const Color kNavActiveSweepBase = Color(0x3DA8894A);
 
 /// 고른 칸의 한 변 — 둥근 **정사각형**이다(레퍼런스).
 const double kNavActiveSide = 118;
 
-/// 유리 막대 위의 아이콘 — 바탕이 어두우므로 **흰색**이다.
-const Color kNavOnWhite = Color(0xFFFFFFFF);
+/// 흰 막대 위의 아이콘 — 바탕이 밝으므로 **검정**이다.
+const Color kNavOnWhite = Color(0xFF17181A);
 
 /// 칸 사이 세로선.
 ///
 /// ⚠️ **알파를 두 번 올렸다** — 물리 1픽셀짜리 선이라 낮은 알파로는 실기기에서
 /// 안 보인다. 굵히지 않고 알파만 올린다 — 굵으면 「그어 놓은 선」이 되고,
-/// 레퍼런스의 인상은 가는 실이다. 유리로 바뀌며 **흰색 쪽**으로 뒤집혔다.
-const Color kNavDividerColor = Color(0x59FFFFFF);
+/// 레퍼런스의 인상은 가는 실이다. 막대 면을 따라 흰색 ↔ 검정으로 뒤집힌다.
+const Color kNavDividerColor = Color(0x4517181A);
 
 /// 바가 차지하는 높이(디자인 px).
 ///
@@ -80,7 +93,12 @@ const double kBarBottomGap = 18;
 const double kBarTopGap = 12;
 
 /// 막대 네 모서리의 반경.
-const double kBarRadius = 52;
+///
+/// ⚠️ 52 → **34**(2026-09-23 사용자 요청: 「모서리들 너무 곡선이다. 좀 덜
+/// 주자」). 🔴 **더 줄일 때는 [kBarInnerPad] 를 같이 본다** — 그 여백은
+/// 모서리 곡선이 파고드는 만큼을 비켜 주려고 있는 것이라, 곡선이 얕아지면
+/// 남아도는 여백이 된다.
+const double kBarRadius = 34;
 
 /// 막대 안쪽 좌우 여백 — 🔴 **모서리 곡선이 파고드는 만큼보다 커야 한다.**
 /// 작으면 양 끝 칸이 그 곡선에 잘린다.
@@ -165,10 +183,11 @@ class FloatingNavBar extends StatelessWidget {
           context.d(kBarSideMargin),
           bottomInset + context.d(kBarBottomGap),
         ),
-        child: _GlassBar(
+        child: DecoratedBox(
           key: const Key('navbar-bar'),
           decoration: BoxDecoration(
             color: kNavBarColor,
+            boxShadow: kNavBarShadow,
             /* 🔴 **완전한 반원 끝이 아니다.** 한 번 스타디움(반경 = 높이)으로
                뒀더니 **메뉴 칸이 그 곡선에 잘렸다** — 칸은 네모라서 양 끝의
                반원 안으로 들어가지 못한다. 반경을 높이의 3할쯤으로 내리고,
@@ -176,9 +195,13 @@ class FloatingNavBar extends StatelessWidget {
             borderRadius: BorderRadius.all(
               Radius.circular(context.d(kBarRadius)),
             ),
-            /* ⛔ **외곽선을 걷었다**(2026-09-23 사용자 요청: 「외곽선 없애고,
-               글래스로 바꿔」). [SilverEdge.onWhite] 를 0.5px 로 둘렀던
-               자리다 — 유리가 제 흐림으로 경계를 내므로 선이 겹친다. */
+            /* 🔴 **가장 얇은 은빛 선 하나**(사용자 요청: 「외곽선 제일 얇은
+               선으로 실버 색상」). 홈의 영상 분석 판과 **같은 값**이다 —
+               갈리면 한 화면에 두 굵기·두 색이 보인다. */
+            border: Border.all(
+              color: SilverEdge.onWhite,
+              width: SilverEdge.onWhiteWidth,
+            ),
           ),
           child: Padding(
             padding: EdgeInsets.symmetric(horizontal: context.d(kBarInnerPad)),
@@ -226,35 +249,6 @@ class FloatingNavBar extends StatelessWidget {
 
 }
 
-
-/// 유리 막대 — 제 모양대로 **뒤를 흐린다.**
-///
-/// 🔴 **[ClipRRect] 안에서 흐린다.** 밖에 두면 막대 밖까지 흐려져 화면 아래가
-/// 통째로 뿌옇다.
-///
-/// 🔴 **유리 안에 유리를 넣지 않는다**(`flutter/CLAUDE.md`) — 안의 칸들은
-/// 흐림 없이 **색만** 얹는다([kNavActiveTileColor]).
-class _GlassBar extends StatelessWidget {
-  const _GlassBar({
-    super.key,
-    required this.decoration,
-    required this.child,
-  });
-
-  final BoxDecoration decoration;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: decoration.borderRadius!.resolve(null),
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: kNavBarBlur, sigmaY: kNavBarBlur),
-        child: DecoratedBox(decoration: decoration, child: child),
-      ),
-    );
-  }
-}
 
 /// 가운데 아이콘들을 가르는 가는 세로선(레퍼런스 그대로).
 ///
