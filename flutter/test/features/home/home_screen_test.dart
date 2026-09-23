@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:super_sub/core/mock/mock_db.dart';
+import 'package:super_sub/core/theme/app_theme.dart';
 import 'package:super_sub/features/auth/data/auth_providers.dart';
 import 'package:super_sub/features/auth/data/auth_repository_mock.dart';
 import 'package:super_sub/core/dev/data_source.dart';
@@ -528,6 +529,54 @@ void main() {
       find.ancestor(of: logo, matching: find.byType(IgnorePointer)),
       findsWidgets,
     );
+  });
+
+  /* 🔴 **앉고 2초 뒤에 흰색으로 물든다**(2026-09-23 사용자 요청).
+     2초를 「홈이 지어진 때」가 아니라 **`kBrandSettled`** 부터 재는 것이
+     이 기능의 핵심이다 — 인트로가 도는 동안 홈은 이미 그 아래에 지어져
+     있어서, 화면이 뜨는 대로 재면 로고가 날아오기 전에 흰색이 된다.
+
+     🔴 **`_pumpLoggedIn` 을 쓰지 않는다** — 그 도우미는 목업 지연을 흘리느라
+     가짜 시계를 2초 넘게 밀어서, 시험이 시작하자마자 **이미 흰색**을 본다.
+     여기서는 시계를 직접 몬다. */
+  testWidgets('로고가 2초 뒤 초록에서 흰색으로 물든다', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(home: HomeScreen()),
+    ));
+
+    Color colorNow() => tester
+        .widget<Text>(find.descendant(
+          of: find.byKey(const Key('home-brand')),
+          matching: find.byType(Text),
+        ))
+        .style!
+        .color!;
+
+    expect(colorNow(), AppTheme.seed, reason: '앉자마자는 초록이다');
+
+    // 2초가 되기 전에는 그대로다.
+    await tester.pump(const Duration(milliseconds: 1900));
+    expect(colorNow(), AppTheme.seed, reason: '2초 전');
+
+    // 2초를 넘겨 물드는 도중 — 초록도 흰색도 아니다.
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 550));
+    final mid = colorNow();
+    expect(mid, isNot(AppTheme.seed), reason: '물드는 중');
+    expect(mid, isNot(Colors.white), reason: '물드는 중');
+
+    await tester.pump(const Duration(milliseconds: 700));
+    expect(colorNow(), Colors.white, reason: '다 물들면 흰색');
+
+    // 컨트롤러 복원 타이머(Mock 300ms)를 흘려보내고 끝낸다.
+    await tester.pump(const Duration(milliseconds: 500));
   });
 
   testWidgets('바 메뉴를 열면 로그아웃 칸이 선다', (tester) async {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -877,10 +878,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                아예 안 날아온다(사용자가 잡은 그것). */
             child: KeyedSubtree(
               key: const Key('home-brand'),
-              child: BrandMark(
-                key: kBrandLandingKeyHome,
-                fontSize: kBrandHomeSize,
-              ),
+              child: const _BrandFade(),
             ),
           ),
         ),
@@ -1439,6 +1437,84 @@ class _ShortcutPill extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// 로고가 **앉고 2초 뒤에 초록에서 흰색으로 물든다**(2026-09-23 사용자 요청:
+/// 「홈페이지에 도착하면 2초 뒤에 흰색으로 바뀌게 … 부드럽고 아주 자연스럽게」).
+///
+/// 🔴 **2초는 「홈이 지어진 때」가 아니라 「로고가 앉은 때」부터 잰다.**
+/// 인트로가 도는 동안 홈은 **이미 그 아래에 지어져 있다**(`intro_gate` 가
+/// 착지점의 화면 좌표를 읽으려고 일부러 그렇게 해 둔 것이다). 화면이 뜨는
+/// 대로 재면 **로고가 날아오기도 전에 흰색이 되고**, 착지하는 순간 비행
+/// 글자(초록)로 **되돌아간 것처럼** 보인다. 그래서 [kBrandSettled] 를 기다린다.
+///
+/// 🔴 **[BrandMark] 를 그대로 쓴다** — 색만 바깥에서 준다. 그 위젯이 비행 중에
+/// 제 글자를 감추는 일([kBrandFlightInProgress])을 맡고 있어서, 맨 [Text] 로
+/// 바꾸면 날아오는 글자와 여기 글자가 동시에 보인다.
+class _BrandFade extends StatefulWidget {
+  const _BrandFade();
+
+  /// 앉은 뒤 기다리는 시간.
+  static const delay = Duration(seconds: 2);
+
+  /// 물드는 데 걸리는 시간 — 🔴 **넉넉히 준다.** 짧으면 「툭 바뀐다」가 되어
+  /// 「부드럽고 아주 자연스럽게」와 반대가 된다.
+  static const fade = Duration(milliseconds: 1100);
+
+  @override
+  State<_BrandFade> createState() => _BrandFadeState();
+}
+
+class _BrandFadeState extends State<_BrandFade>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _fade = AnimationController(
+    vsync: this,
+    duration: _BrandFade.fade,
+  );
+
+  Timer? _wait;
+
+  @override
+  void initState() {
+    super.initState();
+    kBrandSettled.addListener(_onSettled);
+    _onSettled();
+  }
+
+  /// 🔴 **한 번만 건다.** [kBrandSettled] 는 인트로가 오갈 때 값이 여러 번
+  /// 바뀔 수 있는데, 그때마다 타이머를 새로 걸면 2초가 계속 미뤄진다.
+  void _onSettled() {
+    if (!kBrandSettled.value || _wait != null) return;
+    _wait = Timer(_BrandFade.delay, () {
+      if (mounted) _fade.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    kBrandSettled.removeListener(_onSettled);
+    _wait?.cancel();
+    _fade.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _fade,
+      builder: (context, _) => BrandMark(
+        key: kBrandLandingKeyHome,
+        fontSize: kBrandHomeSize,
+        /* 🔴 **[Curves.easeInOut] 을 씌운다** — 선형이면 시작과 끝이 톡
+           끊겨 보인다. 가운데가 빠르고 양 끝이 느려야 한 동작으로 읽힌다. */
+        color: Color.lerp(
+          AppTheme.seed,
+          Colors.white,
+          Curves.easeInOut.transform(_fade.value),
+        )!,
       ),
     );
   }

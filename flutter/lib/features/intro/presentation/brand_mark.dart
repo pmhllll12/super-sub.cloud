@@ -48,6 +48,16 @@ final List<({GlobalKey key, double fontSize})> kBrandLandings = [
 /// 둘이 정확히 겹치므로, 그때 이 값을 내리면 바뀌는 게 안 보인다.
 final ValueNotifier<bool> kBrandFlightInProgress = ValueNotifier<bool>(false);
 
+/// 로고가 **제자리에 앉았는가.**
+///
+/// 🔴 **기본이 참이다** — 인트로 겹이 없으면 앉아 있는 것이다(`introEnabled`
+/// 가 거짓인 시험, 그리고 홈에 다시 들어오는 모든 경우). [IntroGate] 가 겹을
+/// 올리는 동안에만 거짓으로 내렸다가 비행이 끝나면 되올린다.
+///
+/// 🔴 **거짓을 기본으로 두지 말 것** — 인트로를 끄면 영영 거짓에 머물러,
+/// 이 값을 기다리는 쪽(홈 로고의 색 변화)이 **조용히 아무 일도 안 한다.**
+final ValueNotifier<bool> kBrandSettled = ValueNotifier<bool>(true);
+
 /// 인트로가 남기고 간 글자.
 ///
 /// 깨진 글꼴(RubikGlitch)로 굳은 모습 그대로다 — 인트로에서 지지직대다 굳은

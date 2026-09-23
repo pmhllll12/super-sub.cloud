@@ -54,6 +54,13 @@ class _IntroGateState extends State<IntroGate>
 
   _Phase _phase = _Phase.intro;
 
+  @override
+  void initState() {
+    super.initState();
+    // 겹이 올라가 있는 동안 로고는 아직 제자리가 아니다.
+    kBrandSettled.value = false;
+  }
+
   /// 글자가 앉을 자리(화면 좌표 + 그 화면의 글자 크기). 착지점을 못 찾으면
   /// null이고, 그때는 날리지 않는다.
   ({Rect rect, double fontSize})? _landing;
@@ -61,6 +68,7 @@ class _IntroGateState extends State<IntroGate>
   @override
   void dispose() {
     kBrandFlightInProgress.value = false;
+    kBrandSettled.value = true;
     _exit.dispose();
     super.dispose();
   }
@@ -77,6 +85,7 @@ class _IntroGateState extends State<IntroGate>
       // 날아온 글자와 착지점의 글자가 정확히 겹친 순간에 넘긴다 — 바뀌는 게
       // 안 보인다.
       kBrandFlightInProgress.value = false;
+      kBrandSettled.value = true;
       setState(() => _phase = _Phase.done);
       // **잉크 지도를 여기서 놓아주지 않는다.**
       //
