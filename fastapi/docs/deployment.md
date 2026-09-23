@@ -395,7 +395,8 @@ location = /metrics { return 404; }  # 지표는 서버 안(127.0.0.1:8080)에�
 ```
 
 - 파일은 서버의 `/etc/nginx/conf.d/<API 호스트>.conf`, 넣기 전 원본은 `/root/nginx-before-metrics-block-20260923.conf`
-- 수집기(Prometheus)는 서버 안에서 `127.0.0.1:8080/metrics` 를 직접 읽으므로 영향이 없다
+- 수집기(Prometheus)는 서버 안에서 `127.0.0.1:8080/metrics` 를 직접 읽으므로 영향이 없다 — 매니페스트는
+  `fastapi/deploy/k8s/monitoring.yaml`, 적용 절차는 같은 폴더 README 「운영 관제」(2026-09-23 서버 미적용)
 - 우회 형태(`/metrics/` · `/metrics?x=1` · `//metrics` · `/%6Detrics`)도 최종 404 인 것을 확인했다
 - 🔴 **nginx 설정은 이 저장소에 없다** — 서버를 새로 만들면 이 줄을 다시 넣는다
 

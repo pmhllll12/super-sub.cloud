@@ -1,0 +1,188 @@
+# 운영 관제 — Prometheus(지표 수집) + Grafana(그래프 화면). 2026-09-23 작성, **서버에는 아직 안 올렸다.**
+#
+# 무엇을: API 파드가 내는 `/metrics`(요청 수 · 상태 코드 · 지연 히스토그램)를 모아 요청률 · 오류율 ·
+#   지연 P50/P95/P99 를 그린다. 요구사항 PER-003(조회 응답 P95 500ms 이내)의 실측 근거가 된다.
+#
+# 🔴 둘 다 바깥에 열지 않는다. API 파드처럼 hostNetwork 로 떠서 **127.0.0.1** 에만 귀를 연다 —
+#   새 포트를 바깥에 내지 않고, 접속은 SSH 터널(`ssh -L 3000:127.0.0.1:3000 supersub`)로만 한다.
+#   `/metrics` 자체도 nginx 에서 바깥을 막았다(`../../docs/deployment.md` 「/metrics 는 nginx 에서 막는다」).
+#
+# 이 파일에 없는 것 셋은 적용 전에 손으로 만든다 — 네임스페이스 `monitoring`, Grafana 관리자
+# 비밀번호 Secret `grafana-admin`(값을 커밋하면 안 된다), 대시보드 ConfigMap `grafana-dashboards`
+# (옆의 JSON 파일에서). 절차는 `README.md` 「운영 관제」.
+#
+# 🔴 hostNetwork 파드가 127.0.0.1 에만 귀를 열면 kubelet 의 HTTP 탐침(파드 IP = 노드 IP 로 간다)이
+#   닿지 않는다 — 그래서 탐침을 두지 않았다. 한 벌짜리 관제라 재시작 정책(Always)으로 충분하다.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+    scrape_configs:
+      # API 파드(hostNetwork, 8080) — nginx 를 거치지 않고 서버 안에서 직접 읽는다
+      - job_name: supersub-api
+        metrics_path: /metrics
+        static_configs:
+          - targets: ["127.0.0.1:8080"]
+      - job_name: prometheus
+        static_configs:
+          - targets: ["127.0.0.1:9090"]
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-data
+  namespace: monitoring
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v3.0.1
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+            # 디스크가 30GB 중 9GB 남았다(2026-09-23) — 15일 또는 1GB 중 먼저 닿는 쪽에서 오래된 것부터 지운다
+            - --storage.tsdb.retention.time=15d
+            - --storage.tsdb.retention.size=1GB
+            - --web.listen-address=127.0.0.1:9090
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+            - name: data
+              mountPath: /prometheus
+      volumes:
+        - name: config
+          configMap:
+            name: prometheus-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: prometheus-data
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-provisioning
+  namespace: monitoring
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        uid: prometheus
+        type: prometheus
+        access: proxy
+        url: http://127.0.0.1:9090
+        isDefault: true
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: supersub
+        folder: Super-Sub
+        type: file
+        options:
+          path: /var/lib/grafana/dashboards
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: grafana
+          image: grafana/grafana:11.3.0
+          env:
+            - name: GF_SERVER_HTTP_ADDR
+              value: "127.0.0.1"
+            - name: GF_SERVER_HTTP_PORT
+              value: "3000"
+            - name: GF_AUTH_ANONYMOUS_ENABLED
+              value: "false"
+            - name: GF_USERS_ALLOW_SIGN_UP
+              value: "false"
+            - name: GF_ANALYTICS_REPORTING_ENABLED
+              value: "false"
+            - name: GF_ANALYTICS_CHECK_FOR_UPDATES
+              value: "false"
+            - name: GF_SECURITY_ADMIN_USER
+              value: admin
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-admin
+                  key: password
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/grafana
+            - name: provisioning
+              mountPath: /etc/grafana/provisioning/datasources/datasources.yaml
+              subPath: datasources.yaml
+            - name: provisioning
+              mountPath: /etc/grafana/provisioning/dashboards/dashboards.yaml
+              subPath: dashboards.yaml
+            - name: dashboards
+              mountPath: /var/lib/grafana/dashboards
+      volumes:
+        # 대시보드·데이터 원본은 파일(프로비저닝)이라 Grafana 자체 상태는 잃어도 된다
+        - name: data
+          emptyDir: {}
+        - name: provisioning
+          configMap:
+            name: grafana-provisioning
+        - name: dashboards
+          configMap:
+            name: grafana-dashboards

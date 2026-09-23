@@ -1,0 +1,183 @@
+{
+  "title": "Super-Sub API — 운영 관제",
+  "uid": "supersub-api",
+  "description": "API 파드의 /metrics(prometheus_fastapi_instrumentator). 워커 폴링(/api/v1/internal/*)이 요청의 대부분이라 사용자 요청과 나눠 본다. 2026-09-23 작성.",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "timezone": "browser",
+  "time": { "from": "now-24h", "to": "now" },
+  "refresh": "30s",
+  "tags": ["supersub", "api"],
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "수집 대상",
+      "description": "API 파드의 /metrics 를 읽고 있는가 — 1 이면 정상.",
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "up{job=\"supersub-api\"}" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "끊김", "color": "red" }, "1": { "text": "정상", "color": "green" } } }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] }
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "background", "graphMode": "none", "textMode": "value" }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "초당 요청 — 사용자",
+      "description": "사용자 요청 = 워커 폴링(/api/v1/internal/*) · 수집기의 /metrics · /health · 없는 경로(none)를 뺀 것. 5분 평균.",
+      "gridPos": { "x": 4, "y": 0, "w": 5, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(http_requests_total{handler!~\"/api/v1/internal/.*|/metrics|/health|none\"}[5m]))" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps", "decimals": 2 }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "none", "graphMode": "area" }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "5xx 비율 — 사용자",
+      "description": "사용자 요청 중 서버 오류(5xx) 비율, 5분. 내부(워커) 경로의 오류는 아래 「응답 코드별」에 함께 보인다.",
+      "gridPos": { "x": 9, "y": 0, "w": 5, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(http_requests_total{status=\"5xx\",handler!~\"/api/v1/internal/.*|/metrics|/health|none\"}[5m])) / clamp_min(sum(rate(http_requests_total{handler!~\"/api/v1/internal/.*|/metrics|/health|none\"}[5m])), 1e-9)" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 2,
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 0.01 }, { "color": "red", "value": 0.05 } ] }
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "PER-003 — 조회(GET) 중 0.5초 안에 끝난 비율 (1시간)",
+      "description": "요구사항 PER-003(조회 응답 P95 500ms 이내)의 판정. 사용자 GET 요청 중 0.5초 버킷 안에 든 비율이 95% 이상이면 P95 가 500ms 안이다 — 버킷 경계가 정확히 0.5초라 근사가 아니다.",
+      "gridPos": { "x": 14, "y": 0, "w": 10, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rate(http_request_duration_seconds_bucket{method=\"GET\",handler!~\"/api/v1/internal/.*|/metrics|/health|none\",le=\"0.5\"}[1h])) / clamp_min(sum(rate(http_request_duration_seconds_count{method=\"GET\",handler!~\"/api/v1/internal/.*|/metrics|/health|none\"}[1h])), 1e-9)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 0.95 } ] }
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "background", "graphMode": "none" }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "지연 P50 · P95 · P99 (전체 · 워커 폴링 포함, 초)",
+      "description": "고해상도 히스토그램(10ms~60초 버킷). 이 히스토그램은 경로 라벨이 없어 워커 폴링이 섞인다 — 사용자 요청만의 판정은 위 PER-003 칸. 점선은 목표 0.5초.",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "histogram_quantile(0.5, sum by (le) (rate(http_request_duration_highr_seconds_bucket[5m])))", "legendFormat": "P50" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_highr_seconds_bucket[5m])))", "legendFormat": "P95" },
+        { "refId": "C", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_highr_seconds_bucket[5m])))", "legendFormat": "P99" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "lineWidth": 2, "fillOpacity": 0, "thresholdsStyle": { "mode": "dashed" } },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "transparent", "value": null }, { "color": "red", "value": 0.5 } ] }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "응답 코드별 초당 요청",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (status) (rate(http_requests_total[5m]))", "legendFormat": "{{status}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "lineWidth": 2, "fillOpacity": 0 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "초당 요청 — 사용자 · 내부(워커 폴링)",
+      "description": "요청의 대부분은 분석 워커가 작업을 가져가려고 두드리는 /api/v1/internal/* 다.",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(http_requests_total{handler!~\"/api/v1/internal/.*|/metrics|/health|none\"}[5m]))", "legendFormat": "사용자" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(http_requests_total{handler=~\"/api/v1/internal/.*\"}[5m]))", "legendFormat": "내부(워커)" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "lineWidth": 2, "fillOpacity": 0 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "id": 8,
+      "type": "bargauge",
+      "title": "평균 지연이 긴 경로 상위 5 (15분)",
+      "description": "경로별 히스토그램은 버킷이 0.1·0.5·1초뿐이라 경로별 P95 대신 평균을 본다.",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "topk(5, sum by (handler) (rate(http_request_duration_seconds_sum[15m])) / clamp_min(sum by (handler) (rate(http_request_duration_seconds_count[15m])), 1e-9))",
+          "legendFormat": "{{handler}}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 3 }, "overrides": [] },
+      "options": { "orientation": "horizontal", "displayMode": "basic", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "API 메모리 (RSS)",
+      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "process_resident_memory_bytes{job=\"supersub-api\"}", "legendFormat": "RSS" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "lineWidth": 2, "fillOpacity": 0 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "hidden", "placement": "bottom" }, "tooltip": { "mode": "single" } }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "API CPU (코어)",
+      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "rate(process_cpu_seconds_total{job=\"supersub-api\"}[5m])", "legendFormat": "CPU" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "none", "decimals": 3, "custom": { "lineWidth": 2, "fillOpacity": 0 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "hidden", "placement": "bottom" }, "tooltip": { "mode": "single" } }
+    }
+  ]
+}
