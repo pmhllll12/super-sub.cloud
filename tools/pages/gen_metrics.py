@@ -69,7 +69,7 @@ TEST_AREAS = [  # (이름, 폴더, 맡은 사람, 색 = 진행 현황의 사람 
 ]
 
 # 저장소에서 셀 수 없는 값 — 잰 날짜와 근거를 함께 둔다. 값이 바뀌면 여기를 고친다.
-PYTEST_COLLECTED = ("1,153", "2026-09-23")  # cd fastapi && uv run pytest --collect-only -q
+PYTEST_COLLECTED = ("1,154", "2026-09-23")  # cd fastapi && uv run pytest --collect-only -q
 MEASURED = [  # (지표, 목표, 지금, 잰 날, (근거 글자, 주소))
     ("채점 재현성 — 같은 영상을 5번 넣은 총점의 표준편차", "3점 이내",
      "✅ 0.00 (4편 모두)", "2026-09-09", ("미결 항목 보관", "/pending-archive/")),
