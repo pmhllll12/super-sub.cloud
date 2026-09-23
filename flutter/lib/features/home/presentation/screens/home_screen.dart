@@ -985,27 +985,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     return Positioned(
       left: _kGreetLeft,
       top: geo.rowTop + _kWordmarkTop + kBrandHomeSize + 18,
-      child: IgnorePointer(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const _WavingHand(),
-            const SizedBox(height: 6),
-            Text(
-              '안녕하세요, $nickname 님',
-              style: const TextStyle(
-                fontFamily: _kKoFont,
-                // 🔴 번들한 굵기가 Black 하나다 — 위 [_kKoFont] 주석 참고.
-                fontWeight: FontWeight.w900,
-                fontSize: 22,
-                height: 1.2,
-                color: _kOnDark,
-              ),
-            ),
-          ],
-        ),
-      ),
+      child: IgnorePointer(child: _Greeting(nickname: nickname)),
     );
   }
 
@@ -1581,64 +1561,133 @@ class _ShortcutPill extends StatelessWidget {
   }
 }
 
-/// 인사말의 **흔드는 손** — 들어오면 두세 번 흔들고 멈춘다
-/// (2026-09-23 사용자 요청: 「흔드는 거 애니메이션 간단하게 … 한 2~3번만」).
+/// 인사말 한 덩이 — **로고가 내려앉은 뒤에** 스며 들고, 다 보이면 손을 흔든다
+/// (2026-09-23 사용자 요청: 「내려 앉기 전까지는 안보였다가 딱 내려 앉으면
+/// 자연스럽게 보여지기 시작하면서 다 보여지면 그때부터 한 4번 정도 손 흔들게」).
+///
+/// 🔴 **[kBrandSettled] 를 기다린다.** 인트로가 도는 동안 홈은 **이미 그 아래에
+/// 지어져 있어서**, 화면이 뜨는 대로 스며들게 하면 **인트로 뒤에서 혼자 나타났다가**
+/// 잉크가 걷히는 순간 이미 다 보이는 채로 드러난다.
+///
+/// 🔴 **흔들기는 스며들기가 *끝난 뒤* 시작한다.** 겹치면 반쯤 보이는 손이
+/// 흔들려 「덜 그려진 것이 움직인다」로 읽힌다.
 ///
 /// 🔴 **잦아들게 흔든다.** 같은 폭으로 흔들다 뚝 멈추면 「멈췄다」가 아니라
 /// 「끊겼다」로 보인다 — 진폭을 시간에 따라 0 으로 떨어뜨리면 손이 제자리에
 /// 내려앉는다.
 ///
-/// 🔴 **회전 중심을 손목 쪽(아래)에 둔다.** 한가운데를 중심으로 돌리면
+/// 🔴 **회전 중심을 손목 쪽(왼쪽 아래)에 둔다.** 한가운데를 중심으로 돌리면
 /// 손이 **제자리에서 빙글거려** 흔드는 것으로 안 읽힌다.
-class _WavingHand extends StatefulWidget {
-  const _WavingHand();
+class _Greeting extends StatefulWidget {
+  const _Greeting({required this.nickname});
+
+  final String nickname;
+
+  /// 스며드는 시간.
+  static const fadeIn = Duration(milliseconds: 650);
+
+  /// 스며들며 **살짝 올라온다** — 밑에서 떠오르면 「나타났다」가 한 동작으로 읽힌다.
+  static const rise = 10.0;
 
   /// 몇 번 흔드는가(왕복 기준).
-  static const waves = 3;
+  static const waves = 4;
 
-  static const period = Duration(milliseconds: 1400);
+  static const wavePeriod = Duration(milliseconds: 1800);
 
   /// 최대 기울기(라디안).
   static const swing = 0.30;
 
+  /// 글자·아이콘 크기(2026-09-23 사용자 요청: 「글자 살짝 더 키우자」).
+  static const fontSize = 26.0;
+  static const iconSize = 38.0;
+
   @override
-  State<_WavingHand> createState() => _WavingHandState();
+  State<_Greeting> createState() => _GreetingState();
 }
 
-class _WavingHandState extends State<_WavingHand>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
+class _GreetingState extends State<_Greeting> with TickerProviderStateMixin {
+  late final AnimationController _fade = AnimationController(
     vsync: this,
-    duration: _WavingHand.period,
-  )..forward();
+    duration: _Greeting.fadeIn,
+  );
+  late final AnimationController _wave = AnimationController(
+    vsync: this,
+    duration: _Greeting.wavePeriod,
+  );
+
+  bool _started = false;
+
+  @override
+  void initState() {
+    super.initState();
+    kBrandSettled.addListener(_onSettled);
+    _onSettled();
+  }
+
+  /// 🔴 **한 번만 시작한다.** [kBrandSettled] 는 인트로가 오갈 때 값이 여러 번
+  /// 바뀔 수 있는데, 그때마다 다시 걸면 인사말이 계속 처음부터 스며든다.
+  void _onSettled() {
+    if (!kBrandSettled.value || _started) return;
+    _started = true;
+    _fade.forward().whenComplete(() {
+      if (mounted) _wave.forward();
+    });
+  }
 
   @override
   void dispose() {
-    _c.dispose();
+    kBrandSettled.removeListener(_onSettled);
+    _fade.dispose();
+    _wave.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _c,
-      child: const Icon(
-        Symbols.waving_hand,
-        size: 34,
-        color: _kOnDark,
-        weight: 300,
-        grade: 0,
-        opticalSize: 24,
-      ),
-      builder: (context, child) {
-        final t = _c.value;
+      animation: Listenable.merge([_fade, _wave]),
+      builder: (context, _) {
+        final t = Curves.easeOut.transform(_fade.value);
+        final w = _wave.value;
         // 진폭이 1 에서 0 으로 잦아든다.
-        final amp = _WavingHand.swing * (1 - t);
-        final angle = amp * math.sin(2 * math.pi * _WavingHand.waves * t);
-        return Transform.rotate(
-          angle: angle,
-          alignment: Alignment.bottomLeft,
-          child: child,
+        final amp = _Greeting.swing * (1 - w);
+        final angle = amp * math.sin(2 * math.pi * _Greeting.waves * w);
+
+        return Opacity(
+          opacity: t,
+          child: Transform.translate(
+            offset: Offset(0, _Greeting.rise * (1 - t)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Transform.rotate(
+                  angle: angle,
+                  alignment: Alignment.bottomLeft,
+                  child: const Icon(
+                    Symbols.waving_hand,
+                    size: _Greeting.iconSize,
+                    color: _kOnDark,
+                    weight: 300,
+                    grade: 0,
+                    opticalSize: 24,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '안녕하세요, ${widget.nickname} 님',
+                  style: const TextStyle(
+                    fontFamily: _kKoFont,
+                    // 🔴 번들한 굵기가 Black 하나다 — [_kKoFont] 주석 참고.
+                    fontWeight: FontWeight.w900,
+                    fontSize: _Greeting.fontSize,
+                    height: 1.2,
+                    color: _kOnDark,
+                  ),
+                ),
+              ],
+            ),
+          ),
         );
       },
     );

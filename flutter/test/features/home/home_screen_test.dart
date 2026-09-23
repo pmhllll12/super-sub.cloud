@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:super_sub/core/mock/mock_db.dart';
 import 'package:super_sub/core/theme/app_theme.dart';
+import 'package:super_sub/features/intro/presentation/brand_mark.dart';
 import 'package:super_sub/features/auth/data/auth_providers.dart';
 import 'package:super_sub/features/auth/data/auth_repository_mock.dart';
 import 'package:super_sub/core/dev/data_source.dart';
@@ -654,6 +655,27 @@ void main() {
     final style = tester.widget<Text>(greet).style!;
     expect(style.fontFamily, 'PyeojinGothic');
     expect(style.fontWeight, FontWeight.w900);
+  });
+
+  /* 🔴 **로고가 내려앉기 전에는 안 보인다**(2026-09-23 사용자 요청).
+     인트로가 도는 동안 홈은 **이미 그 아래에 지어져 있어서**, 기다리지 않으면
+     잉크가 걷히는 순간 이미 다 보이는 채로 드러난다. */
+  testWidgets('로고가 앉기 전에는 인사말이 안 보인다', (tester) async {
+    kBrandSettled.value = false;
+    addTearDown(() => kBrandSettled.value = true);
+
+    await _pumpLoggedIn(tester);
+    final greet = find.text('안녕하세요, 백성검 님');
+    expect(_opacityAbove(tester, greet), 0, reason: '아직 안 앉았다');
+
+    // 로고가 앉으면 스며든다.
+    kBrandSettled.value = true;
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 700));
+    expect(_opacityAbove(tester, greet), 1, reason: '앉으면 다 보인다');
+
+    // 흔들기가 끝날 때까지 흘려보내고 끝낸다.
+    await tester.pump(const Duration(milliseconds: 1900));
   });
 
   /* 🔴 **닉네임이 없으면 줄을 아예 안 세운다** — 「안녕하세요, 님」처럼 이름만
