@@ -249,10 +249,11 @@ def pending_metrics():
 REQ_CATS = [("SFR", "기능"), ("SEC", "보안"), ("PER", "성능"), ("QUA", "품질")]
 
 
-def req_metrics():
+def parse_reqs(text):
+    """5장 본문에서 요약표의 상태 기호를 센다 — 관리 지표와 5장의 그림(`gen_figures.py`)이 같이 쓴다."""
     icon = {i: name for name, i, _ in STATUS}
     status, other = {}, set()
-    for line in show(REQS).splitlines():
+    for line in text.splitlines():
         m = re.match(r"^\|\s*(([A-Z]{2,4})-\d{3})\s*\|", line)
         if not m:
             continue
@@ -262,7 +263,7 @@ def req_metrics():
                 status[m.group(1)] = icon[cells[-1]]
         else:
             other.add(m.group(1))
-    ids = {m.group(1) for m in re.finditer(r"(?m)^\|\s*((?:SFR|SEC|PER|QUA)-\d{3})\s*\|", show(REQS))}
+    ids = {m.group(1) for m in re.finditer(r"(?m)^\|\s*((?:SFR|SEC|PER|QUA)-\d{3})\s*\|", text)}
     if ids - set(status):
         warn(f"상태 기호를 못 찾은 요구사항: {sorted(ids - set(status))}")
     cats = []
@@ -271,8 +272,13 @@ def req_metrics():
         cats.append((name, code, {s: sorted(k for k, v in mine.items() if v == s) for s, _, _ in STATUS}))
     return {"cats": cats, "total": len(status),
             "count": {s: sum(len(c[2][s]) for c in cats) for s, _, _ in STATUS},
-            "other": {p: len([o for o in other if o.startswith(p)]) for p in ("CON", "ASM")},
-            "updated": git("log", "-1", "--format=%cs", "HEAD", "--", REQS).strip()}
+            "other": {p: len([o for o in other if o.startswith(p)]) for p in ("CON", "ASM")}}
+
+
+def req_metrics():
+    r = parse_reqs(show(REQS))
+    r["updated"] = git("log", "-1", "--format=%cs", "HEAD", "--", REQS).strip()
+    return r
 
 
 # --- 테스트 ------------------------------------------------------------------
@@ -419,7 +425,7 @@ def fig_pending(p):
     for i, d in enumerate(DAYS):
         x0, x1 = max(L, X(i) - sx / 2), min(R, X(i) + sx / 2)
         c, r = p["created"][i], p["resolved"][i]
-        b.append(f'<rect class="hit" x="{round(x0, 1)}" y="{T}" width="{round(x1 - x0, 1)}" height="{B - T}">'
+        b.append(f'<rect class="hit" x="{round(x0, 1)}" y="{T}" width="{round(x1 - x0, 1)}" height="{B - T}" fill="transparent">'
                  f'<title>{md(d)} · 올라온 {c} · 해소 {r} · 열림 {c - r}</title></rect>')
     return figure(
         "".join(b), w, h,
@@ -430,7 +436,7 @@ def fig_pending(p):
     )
 
 
-def fig_reqs(r):
+def fig_reqs(r, caption=None):
     w, lx, bx, unit, bh, gap, y0 = 860, 20, 130, 40, 22, 18, 44
     b = []
     x = lx
@@ -465,10 +471,11 @@ def fig_reqs(r):
     return figure(
         "".join(b), w, h,
         f"요구사항 {r['total']}개의 상태: 구현됨 {c['구현됨']}, 부분 {c['부분']}, 미구현 {c['미구현']}, 미측정 {c['미측정']}.",
-        f"그림 2. 요구사항 분석(5장)의 요구사항 {r['total']}개를 분류마다 상태별로 쌓았다. "
-        "칸에 마우스를 올리면 요구사항 번호가 보인다. "
-        f"<strong>상태는 5장 표를 그대로 읽는다</strong> — 5장이 마지막으로 바뀐 날은 {r['updated']}이고, "
-        "표가 낡으면 이 그림도 같이 낡는다.",
+        caption or (
+            f"그림 2. 요구사항 분석(5장)의 요구사항 {r['total']}개를 분류마다 상태별로 쌓았다. "
+            "칸에 마우스를 올리면 요구사항 번호가 보인다. "
+            f"<strong>상태는 5장 표를 그대로 읽는다</strong> — 5장이 마지막으로 바뀐 날은 {r['updated']}이고, "
+            "표가 낡으면 이 그림도 같이 낡는다."),
     )
 
 
@@ -499,7 +506,7 @@ def fig_tests(areas):
                  f'<text x="{R}" y="{B + 16}" text-anchor="end" font-size="10" fill="{INK2}">{md(STAMP)}</text>')
         for i, d in enumerate(DAYS):
             x0, x1 = max(L, X(i) - sx / 2), min(R, X(i) + sx / 2)
-            b.append(f'<rect class="hit" x="{round(x0, 1)}" y="{T}" width="{round(x1 - x0, 1)}" height="{B - T}">'
+            b.append(f'<rect class="hit" x="{round(x0, 1)}" y="{T}" width="{round(x1 - x0, 1)}" height="{B - T}" fill="transparent">'
                      f'<title>{a["name"]} · {md(d)} · {a["series"][i]:,}개</title></rect>')
     summary = ", ".join(f"{a['name']} {a['now']:,}" for a in areas)
     return figure(
@@ -608,9 +615,10 @@ def tests_commands(t):
 
 
 # --- 페이지 ------------------------------------------------------------------
-P, Rq, Ts, Sc = pending_metrics(), req_metrics(), test_metrics(), scale_metrics()
+def main():
+    P, Rq, Ts, Sc = pending_metrics(), req_metrics(), test_metrics(), scale_metrics()
 
-PAGE = f"""---
+    PAGE = f"""---
 layout: default
 title: 관리 지표
 permalink: /관리-지표/
@@ -755,5 +763,10 @@ ls _posts/ | wc -l                                                              
 [← 목차로](/toc/)
 """
 
-OUT.write_text(PAGE, encoding="utf-8", newline="\n")
-print(f"ok — 기준 {STAMP} ({STAMP_HASH})")
+    OUT.write_text(PAGE, encoding="utf-8", newline="\n")
+    print(f"ok — 기준 {STAMP} ({STAMP_HASH})")
+
+
+# `gen_figures.py` 가 함수만 빌려 쓴다 — 불러오기만 해서는 페이지를 쓰지 않는다.
+if __name__ == "__main__":
+    main()
