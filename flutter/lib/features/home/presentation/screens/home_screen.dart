@@ -91,6 +91,22 @@ const double _kSheetHandleH = 28;
 /// 하면 흐림 없이 색만 얹는다」이고, 여기에 테두리를 더한 것이다.
 const Color _kSheetColor = Color(0x2E1C1C1E);
 
+/// 🔴 **판을 다 펼쳤을 때의 면 — 흰 서리 유리다**(2026-09-23 사용자 요청:
+/// 「스쿼드판 열었을때 기본값을 흰색 블러로」). 접힌 [_kSheetColor] 에서
+/// 판이 열리는 만큼 이 값으로 건너간다.
+const Color _kSheetColorOpen = Color(0xB3FFFFFF);
+
+/// 펼친 판의 흐림 세기.
+///
+/// 🔴 **판이 거의 다 펼쳐진 뒤에만 켠다**([_kSheetBlurFrom]). 접혔을 때
+/// 판 안에 있는 **안내 알약이 제 흐림을 갖고 있어서**, 둘이 겹치면
+/// 「유리 안에 유리」가 되어 알약이 **프레임째 사라진다**(`flutter/CLAUDE.md`).
+/// 안내 알약은 진행도 0.4 에 이미 다 걷히므로 그 뒤에서 켜면 겹치지 않는다.
+const double _kSheetBlur = 14;
+
+/// 흐림이 들기 시작하는 판 진행도 — 위 주석의 그 까닭이다.
+const double _kSheetBlurFrom = 0.45;
+
 /// 판 아래 모서리. 음악 앱의 앨범 판처럼 아래만 둥글다.
 const double _kSheetRadius = 28;
 
@@ -1152,6 +1168,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
            톡 멈춘다. 가운데가 빠르고 양 끝이 느려야 「바뀐다」가 한 동작으로
            읽힌다. */
         final morph = Curves.easeInOut.transform(tc);
+        /* 흐림이 드는 정도 — 판이 [_kSheetBlurFrom] 을 넘긴 뒤부터 1 까지.
+           🔴 **0 일 때 [BackdropFilter] 는 아무것도 안 흐린다** — 위젯을
+           넣었다 뺐다 하지 않는 편이 낫다(트리가 바뀔 때마다 한 번 깜빡인다). */
+        final glass = ((tc - _kSheetBlurFrom) / (1 - _kSheetBlurFrom))
+            .clamp(0.0, 1.0);
         final scale = geo.minScale + (1 - geo.minScale) * t;
 
         return Positioned(
@@ -1186,9 +1207,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 child: Stack(
                   clipBehavior: Clip.hardEdge,
                   children: [
-                    // 판 면 — 반투명이라 뒤가 비친다(위 `_kSheetColor` 주석).
-                    const Positioned.fill(
-                      child: ColoredBox(color: _kSheetColor),
+                    /* 판 면 — 접혔을 때는 거의 투명하고, 펼치면 **흰 서리
+                       유리**로 건너간다(2026-09-23 사용자 요청).
+                       🔴 흐림은 [_kSheetBlurFrom] 뒤에서만 든다 — 까닭은 그
+                       상수 주석에(「유리 안에 유리」). */
+                    Positioned.fill(
+                      child: ClipRect(
+                        child: BackdropFilter(
+                          filter: ui.ImageFilter.blur(
+                            sigmaX: _kSheetBlur * glass,
+                            sigmaY: _kSheetBlur * glass,
+                          ),
+                          child: ColoredBox(
+                            color: Color.lerp(
+                              _kSheetColor,
+                              _kSheetColorOpen,
+                              morph,
+                            )!,
+                          ),
+                        ),
+                      ),
                     ),
                     /* 🔴 **접혀 있을 때의 얼굴은 사진이다**(2026-09-22 사용자
                        요청). 판을 늘리면 이 사진이 걷히고 그 자리에 스쿼드
