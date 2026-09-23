@@ -498,63 +498,58 @@ void main() {
       expect(find.textContaining('경기장 예약 — 준비 중'), findsOneWidget);
     });
 
-    /* 🔴 **걷히는 게 아니라 오른쪽 화면 밖으로 나간다**(2026-09-23 사용자
-       요청: 「오른쪽 꺼부터 차례대로 나가게」). 투명도로 재면 안 된다 —
-       흐려지는 것이 아니라 **미끄러지는** 것이 맞는 동작이다. */
-    testWidgets('펼치면 알약이 오른쪽 화면 밖으로 나가고, 접으면 돌아온다',
-        (tester) async {
+    /* 🔴 **제자리에서 걷힌다**(2026-09-23 정정). 한 번 오른쪽 화면 밖으로
+       미는 것으로 만들었다가 사용자가 되돌렸다 — 「사라지는 게 스쿼드판
+       올라갈 때 다 보이니까 눈아프다」. ⛔ 옆으로 미는 것을 되살리지 말 것. */
+    testWidgets('펼치면 알약이 제자리에서 걷히고, 접으면 돌아온다', (tester) async {
       await _pumpLoggedIn(tester);
-      final screenW =
-          tester.view.physicalSize.width / tester.view.devicePixelRatio;
       Rect at(String k) =>
           tester.getRect(find.byKey(Key('home-shortcut-$k')));
       const keys = ['market', 'venue', 'alarm'];
       final home = {for (final k in keys) k: at(k)};
 
       for (final k in keys) {
-        expect(home[k]!.right, lessThanOrEqualTo(screenW + 1), reason: k);
+        expect(_opacityAbove(tester, find.byKey(Key('home-shortcut-$k'))), 1,
+            reason: k);
       }
 
       await _openSheet(tester);
       for (final k in keys) {
-        expect(at(k).left, greaterThanOrEqualTo(screenW), reason: '$k 화면 밖');
+        expect(_opacityAbove(tester, find.byKey(Key('home-shortcut-$k'))), 0,
+            reason: '$k 걷혔다');
+        // 🔴 **자리는 그대로다** — 걷히는 것이지 나가는 것이 아니다.
+        expect(at(k).left, closeTo(home[k]!.left, 0.5), reason: '$k 제자리');
       }
 
       await _openSheet(tester);
       for (final k in keys) {
-        expect(at(k).left, closeTo(home[k]!.left, 1), reason: '$k 제자리');
+        expect(_opacityAbove(tester, find.byKey(Key('home-shortcut-$k'))), 1,
+            reason: '$k 돌아왔다');
       }
     });
 
-    /* 🔴 **오른쪽 것이 먼저 나간다.** 나간 거리로 잰다 — 셋의 출발 x 가
-       애초에 달라서 좌표만으로는 못 가른다.
-
-       🔴 **돌아오는 순서는 따로 안 잡는다** — 나가는 것이 판 진행도 하나의
+    /* 🔴 **오른쪽 것이 먼저 걷힌다.**
+       🔴 **돌아오는 순서는 따로 안 잡는다** — 걷히는 정도가 판 진행도 하나의
        함수라, 접으면 시간이 되감기며 저절로 왼쪽(레슨 · 상점)부터 돌아온다.
-       그 성질은 위 시험의 「접으면 제자리」가 지킨다. */
-    testWidgets('나가는 순서는 오른쪽부터다', (tester) async {
+       그 성질은 위 시험의 「접으면 돌아온다」가 지킨다. */
+    testWidgets('걷히는 순서는 오른쪽부터다', (tester) async {
       await _pumpLoggedIn(tester);
-      const keys = ['market', 'venue', 'alarm'];
-      double left(String k) =>
-          tester.getRect(find.byKey(Key('home-shortcut-$k'))).left;
-      final home = {for (final k in keys) k: left(k)};
+      double alpha(String k) =>
+          _opacityAbove(tester, find.byKey(Key('home-shortcut-$k')));
 
       /* 🔴 **손가락을 든 채로 중간까지만 끈다.** 손잡이를 눌러 스프링에
-         맡기면 **한 프레임 만에 셋이 다 나가 버려** 순서를 못 잰다(처음에
-         그렇게 짰다가 둘 다 360 으로 같게 나왔다). */
+         맡기면 **한 프레임 만에 셋이 다 걷혀** 순서를 못 잰다. */
       final g = await tester.startGesture(
         tester.getCenter(find.byKey(const Key('home-squad-sheet'))),
       );
-      await g.moveBy(const Offset(0, -90));
+      await g.moveBy(const Offset(0, -60));
       await tester.pump();
 
-      final moved = {for (final k in keys) k: left(k) - home[k]!};
-      expect(moved['alarm']!, greaterThan(moved['venue']!), reason: '알림이 앞선다');
-      expect(moved['venue']!, greaterThanOrEqualTo(moved['market']!),
+      expect(alpha('alarm'), lessThan(alpha('venue')), reason: '알림이 앞선다');
+      expect(alpha('venue'), lessThanOrEqualTo(alpha('market')),
           reason: '경기장이 레슨보다 앞선다');
-      expect(moved['alarm']!, greaterThan(0), reason: '적어도 하나는 움직였다');
+      expect(alpha('alarm'), lessThan(1), reason: '적어도 하나는 걷히기 시작했다');
 
-      // 놓고 스프링이 앉을 때까지 흘려보낸다.
       await g.up();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 1500));

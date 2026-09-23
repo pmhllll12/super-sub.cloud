@@ -784,7 +784,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   /// 한쪽만 고치면 둘이 어긋난다.
   Widget _shortcutPills(BuildContext context) {
     final geo = _sheetGeometry(context);
-    final size = MediaQuery.sizeOf(context);
     return AnimatedBuilder(
       animation: _sheet,
       builder: (context, _) {
@@ -803,15 +802,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 for (final (i, s) in _kShortcuts.indexed) ...[
                   if (i > 0) const SizedBox(width: _kShortcutSpacing),
                   Expanded(
-                    /* 🔴 **[Expanded] 안에서 민다.** 바깥을 [Transform] 으로
-                       감싸면 [Row] 가 자리를 다시 재서 남은 알약들이 같이
-                       흔들린다 — 자리는 그대로 두고 알약만 미끄러진다. */
-                    child: Transform.translate(
-                      /* 🔴 **화면 폭만큼 민다.** 알약 너비를 재서 「딱 맞게」
-                         밀면 기기마다 한 끗이 남는다(워드마크에서 겪었다).
-                         넉넉히 밀면 그럴 일이 없고, [Stack] 이 화면 밖을
-                         잘라 낸다. */
-                      offset: Offset(size.width * _shortcutExit(tc, i), 0),
+                    /* 🔴 **제자리에서 걷힌다**(2026-09-23 정정, 사용자:
+                       「오른쪽으로 나가지 말고 그냥 제자리에서 … 사라지는 게
+                       스쿼드판 올라갈 때 다 보이니까 눈아프다」).
+                       ⛔ **옆으로 미는 것을 되살리지 말 것** — 판이 올라오는
+                       내내 알약이 화면을 가로질러서 시선이 그쪽으로 끌린다. */
+                    child: Opacity(
+                      opacity: 1 - _shortcutExit(tc, i),
                       child: _ShortcutPill(
                         key: s.key,
                         icon: s.icon,
@@ -829,10 +826,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  /// 알약 [i](왼쪽부터 0)가 오른쪽 화면 밖으로 **나간 정도** 0~1.
+  /// 알약 [i](왼쪽부터 0)가 **걷힌 정도** 0~1. 1 이면 안 보인다.
   ///
-  /// 🔴 **오른쪽 것부터 나간다**(2026-09-23 사용자 요청: 「오른쪽 꺼부터
-  /// 차례대로 나가게」). 그래서 시작 시각을 오른쪽일수록 이르게 준다.
+  /// 🔴 **오른쪽 것부터 걷힌다**(2026-09-23 사용자 요청: 「오른쪽 꺼부터
+  /// 차례대로」). 그래서 시작 시각을 오른쪽일수록 이르게 준다.
+  ///
+  /// 🔴 **판이 올라오기 전에 다 걷힌다** — 구간을 앞쪽 절반 안에 몰아넣었다.
+  /// 늦게까지 남으면 올라오는 판과 겹쳐 보여 지저분하다.
   ///
   /// 🔴 **돌아오는 순서를 따로 두지 않는다.** 이 값이 판 진행도 하나의
   /// **함수**라, 판을 접으면 시간이 되감기면서 **저절로 왼쪽(레슨 · 상점)
@@ -843,12 +843,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   /// ⚠️ **걷어 내지(`Opacity`) 않는다** — 옆으로 나가면서 흐려지기까지 하면
   /// 화면 밖에 닿기 전에 사라져 **나가는 것이 안 보인다.**
   static double _shortcutExit(double tc, int i) {
-    /// 한 알약이 나가는 데 쓰는 구간, 그리고 이웃과의 시차.
-    const span = 0.52;
-    const step = 0.18;
+    /// 한 알약이 걷히는 데 쓰는 구간, 그리고 이웃과의 시차.
+    const span = 0.30;
+    const step = 0.10;
     final start = (_kShortcuts.length - 1 - i) * step;
     final p = ((tc - start) / span).clamp(0.0, 1.0);
-    return Curves.easeInCubic.transform(p);
+    /* 🔴 [Curves.easeInCubic] 에서 갈았다 — 그쪽은 **미는 데** 맞는 곡선이라
+       (처음엔 느리고 끝에 빠르다) 걷는 데 쓰면 마지막에 툭 사라진다. */
+    return Curves.easeInOut.transform(p);
   }
 
   /// 「내 프로필」 — **화면 맨 위 오른쪽**(2026-09-22 사용자 요청).
