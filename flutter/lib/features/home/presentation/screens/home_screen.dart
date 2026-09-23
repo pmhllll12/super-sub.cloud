@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -135,6 +136,15 @@ const double _kVideoSideInset = 6;
 /// 「영상 분석 시작하기 버튼과 같이 판과의 거리 똑같이」).
 /// 한쪽만 고치면 둘이 어긋나므로 값은 **여기 하나**다.
 const double _kPillInset = 12;
+
+/// 인사말 줄의 글꼴 — 눈누의 **펴진고딕**, 번들한 것은 제일 굵은 Black 뿐이다.
+///
+/// ⚠️ **굵기를 `w900` 외의 값으로 주지 말 것** — 한 벌만 번들해서, 다른 굵기를
+/// 부르면 엔진이 **가짜로 굵게/가늘게** 그려 획이 뭉갠다(YatraOne 에서 겪었다).
+const String _kKoFont = 'PyeojinGothic';
+
+/// 인사말이 화면 왼쪽에서 떨어진 거리.
+const double _kGreetLeft = 20;
 
 /// 워드마크(`SUPERSUB`)가 **화면 맨 위에서** 떨어진 거리.
 ///
@@ -728,6 +738,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             _shortcutPills(context),
             // 로고는 화면 맨 위 가운데 — 판을 펼치면 그 판이 덮는다.
             _brandMark(context),
+            _greeting(context, user?.nickname),
             _squadSheet(context, card, squad, user?.ownedTeamId),
             // 「내 프로필」 — 화면 맨 위 오른쪽. 판보다 **뒤에 두지 않는다**.
             _profileButton(context, card),
@@ -957,6 +968,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
         );
       },
+    );
+  }
+
+  /// 화면 **왼쪽 위**의 인사말 — 흔드는 손 + 「안녕하세요, (닉네임) 님」
+  /// (2026-09-23 사용자 요청 + 레퍼런스).
+  ///
+  /// 🔴 **닉네임이 아직 없으면 줄을 안 세운다.** 세션이 오기 전에 「안녕하세요,
+  /// 님」처럼 이름만 빠진 줄이 한 번 떴다 바뀌면 그것이 더 눈에 띈다.
+  ///
+  /// 🔴 **판이 덮는다** — [Stack] 에서 스쿼드 판보다 먼저 오므로, 판을 펼치면
+  /// 따로 걷지 않아도 가려진다.
+  Widget _greeting(BuildContext context, String? nickname) {
+    if (nickname == null || nickname.isEmpty) return const SizedBox.shrink();
+    final geo = _sheetGeometry(context);
+    return Positioned(
+      left: _kGreetLeft,
+      top: geo.rowTop + _kWordmarkTop + kBrandHomeSize + 18,
+      child: IgnorePointer(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const _WavingHand(),
+            const SizedBox(height: 6),
+            Text(
+              '안녕하세요, $nickname 님',
+              style: const TextStyle(
+                fontFamily: _kKoFont,
+                // 🔴 번들한 굵기가 Black 하나다 — 위 [_kKoFont] 주석 참고.
+                fontWeight: FontWeight.w900,
+                fontSize: 22,
+                height: 1.2,
+                color: _kOnDark,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1528,6 +1577,70 @@ class _ShortcutPill extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 인사말의 **흔드는 손** — 들어오면 두세 번 흔들고 멈춘다
+/// (2026-09-23 사용자 요청: 「흔드는 거 애니메이션 간단하게 … 한 2~3번만」).
+///
+/// 🔴 **잦아들게 흔든다.** 같은 폭으로 흔들다 뚝 멈추면 「멈췄다」가 아니라
+/// 「끊겼다」로 보인다 — 진폭을 시간에 따라 0 으로 떨어뜨리면 손이 제자리에
+/// 내려앉는다.
+///
+/// 🔴 **회전 중심을 손목 쪽(아래)에 둔다.** 한가운데를 중심으로 돌리면
+/// 손이 **제자리에서 빙글거려** 흔드는 것으로 안 읽힌다.
+class _WavingHand extends StatefulWidget {
+  const _WavingHand();
+
+  /// 몇 번 흔드는가(왕복 기준).
+  static const waves = 3;
+
+  static const period = Duration(milliseconds: 1400);
+
+  /// 최대 기울기(라디안).
+  static const swing = 0.30;
+
+  @override
+  State<_WavingHand> createState() => _WavingHandState();
+}
+
+class _WavingHandState extends State<_WavingHand>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: _WavingHand.period,
+  )..forward();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      child: const Icon(
+        Symbols.waving_hand,
+        size: 34,
+        color: _kOnDark,
+        weight: 300,
+        grade: 0,
+        opticalSize: 24,
+      ),
+      builder: (context, child) {
+        final t = _c.value;
+        // 진폭이 1 에서 0 으로 잦아든다.
+        final amp = _WavingHand.swing * (1 - t);
+        final angle = amp * math.sin(2 * math.pi * _WavingHand.waves * t);
+        return Transform.rotate(
+          angle: angle,
+          alignment: Alignment.bottomLeft,
+          child: child,
+        );
+      },
     );
   }
 }

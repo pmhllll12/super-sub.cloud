@@ -96,6 +96,16 @@ flutter:
         - asset: assets/fonts/RubikGlitch-Regular.ttf
     # 선수 카드의 영문(머리글 · 별명). 웹 `--font-card`(next/font 의 Young_Serif)와
     # 같은 글꼴이다. 굵기는 400 하나뿐이다. 라이선스: YoungSerif-OFL.txt
+    # 홈 인사말(「안녕하세요, … 님」) 전용 한글 글꼴. 눈누의 **펴진고딕**이고
+    # 받은 것 중 **제일 굵은 Black** 하나만 번들한다(사용자 요청, 2026-09-23).
+    # 🔴 **`google_fonts` 패키지를 쓰지 않는다** — 다른 글꼴들과 같은 까닭이다
+    # (첫 실행 때 내려받아, 네트워크가 없으면 다른 글꼴로 한 번 그려졌다 바뀐다).
+    # ⚠️ **라이선스 파일이 내려받은 묶음에 없었다** — 다른 글꼴은 `*-OFL.txt` 를
+    # 나란히 두는 관례다. 배포 전에 배포처에서 받아 여기 같이 넣을 것.
+    - family: PyeojinGothic
+      fonts:
+        - asset: assets/fonts/PyeojinGothic-Black.ttf
+          weight: 900
     - family: YoungSerif
       fonts:
         - asset: assets/fonts/YoungSerif-Regular.ttf

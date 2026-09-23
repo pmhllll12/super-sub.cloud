@@ -636,6 +636,43 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
   });
 
+  /* 화면 왼쪽 위 인사말(2026-09-23 사용자 요청 + 레퍼런스). */
+  testWidgets('왼쪽 위에 흔드는 손과 인사말이 선다', (tester) async {
+    await _pumpLoggedIn(tester);
+    final greet = find.textContaining('안녕하세요');
+    expect(greet, findsOneWidget);
+    expect(find.text('안녕하세요, 백성검 님'), findsOneWidget);
+
+    // 왼쪽 위다 — 화면 왼쪽 절반, 위쪽 1/4 안.
+    final r = tester.getRect(greet);
+    final view = tester.view;
+    expect(r.left, lessThan(view.physicalSize.width / view.devicePixelRatio / 2));
+    expect(r.top, lessThan(view.physicalSize.height / view.devicePixelRatio / 4));
+
+    /* 🔴 **번들한 굵기가 Black 하나뿐**이라 다른 값을 주면 엔진이 가짜로
+       굵게 그려 획이 뭉갠다 — 글꼴과 굵기를 함께 잡아 둔다. */
+    final style = tester.widget<Text>(greet).style!;
+    expect(style.fontFamily, 'PyeojinGothic');
+    expect(style.fontWeight, FontWeight.w900);
+  });
+
+  /* 🔴 **닉네임이 없으면 줄을 아예 안 세운다** — 「안녕하세요, 님」처럼 이름만
+     빠진 줄이 한 번 떴다 바뀌면 그것이 더 눈에 띈다. */
+  testWidgets('로그인 전에는 인사말이 없다', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(home: HomeScreen()),
+    ));
+    expect(find.textContaining('안녕하세요'), findsNothing);
+    await tester.pump(const Duration(milliseconds: 500));
+  });
+
   testWidgets('바 메뉴를 열면 로그아웃 칸이 선다', (tester) async {
     await _pumpLoggedIn(tester);
     // 닫혀 있을 때는 아무 칸도 세우지 않는다.
