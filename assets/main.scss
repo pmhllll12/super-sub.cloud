@@ -226,3 +226,10 @@ html[data-theme="dark"] {
   line-height: 1.3 !important;
   word-break: keep-all; // 한글이 단어 중간(「플 / 랫폼」)에서 접히지 않게 — 띄어쓰기에서만 줄을 바꾼다
 }
+
+// 본문 제목도 같다 — 표지 큰 제목이 「빈 자 / 리에」처럼 접혔다
+h1,
+h2,
+h3 {
+  word-break: keep-all;
+}
