@@ -86,10 +86,44 @@ class SessionController extends Notifier<SessionState> {
     state = const SessionLoggedOut();
   }
 
-  Future<void> updateNickname(String nickname) async {
-    final updated = await ref
-        .read(authRepositoryProvider)
-        .updateProfile(nickname: nickname);
+  /// **나를 다시 읽는다** — 팀을 만들거나 나간 뒤 「소속」이 따라오게 한다.
+  ///
+  /// 🔴 **로그인 상태일 때만 상태를 바꾼다.** 읽는 사이에 로그아웃했으면
+  /// 방금 나간 사람을 다시 로그인시키게 된다.
+  Future<void> refreshMe() async {
+    final user = await ref.read(authRepositoryProvider).refreshMe();
+    if (!ref.mounted || state is! SessionLoggedIn) return;
+    state = SessionLoggedIn(user);
+  }
+
+  /// **탈퇴한다** — 계정과 파생 데이터가 함께 지워진다. 되돌릴 수 없다.
+  ///
+  /// 🔴 **서버가 지운 뒤에 로그아웃 상태로 간다.** 먼저 상태를 바꾸면
+  /// 실패했을 때 **계정은 살아 있는데 로그인 화면에 서 있게** 된다 — 사람은
+  /// 탈퇴된 줄 안다. 실패는 그대로 올려 화면이 사유를 보여 준다.
+  ///
+  /// 🔴 [password] 가 비어 있으면 리포지토리가 **아예 안 보낸다** — 구글로만
+  /// 가입한 계정에는 확인할 비밀번호가 없다.
+  Future<void> deleteAccount({String? password}) async {
+    await ref.read(authRepositoryProvider).deleteAccount(password: password);
+    // 로그아웃과 같은 뒷정리 — 종목은 사용자에게 매달린 컨텍스트다.
+    ref.read(currentSportProvider.notifier).clear();
+    state = const SessionLoggedOut();
+  }
+
+  Future<void> updateNickname(String nickname) =>
+      _patch(nickname: nickname);
+
+  /// 🔴 **지인 검색 노출** — 닉네임으로 나를 찾을 수 있는가. 용병 매칭의
+  /// `is_searchable` 과는 **다른 값이다**(계약).
+  Future<void> setNicknameSearchable(bool value) =>
+      _patch(nicknameSearchable: value);
+
+  Future<void> _patch({String? nickname, bool? nicknameSearchable}) async {
+    final updated = await ref.read(authRepositoryProvider).updateProfile(
+          nickname: nickname,
+          nicknameSearchable: nicknameSearchable,
+        );
     if (!ref.mounted) return;
     // 보낸 값이 아니라 돌려받은 사용자로 상태를 채운다(스펙 4.1 규칙 3).
     state = SessionLoggedIn(updated);

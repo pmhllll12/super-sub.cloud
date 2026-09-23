@@ -4,6 +4,15 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<!-- 클립을 앨범에서 고르고 바로 찍는다(image_picker).
+	     🔴 이 문구가 없으면 iOS 가 그 자리에서 앱을 죽인다 — 권한 거부가
+	     아니라 크래시라, 없으면 실기기에서만 처음 드러난다. -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>분석하거나 올릴 경기 영상을 고르기 위해 사진 보관함을 봅니다.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>경기 장면을 바로 찍어 올리기 위해 카메라를 씁니다.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>영상을 찍을 때 소리를 함께 담습니다.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

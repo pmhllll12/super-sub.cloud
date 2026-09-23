@@ -42,6 +42,8 @@ dependencies:
   google_sign_in: ^7.2.0
   video_player: ^2.14.0
   flutter_secure_storage: ^11.2.0
+  image_picker: ^1.2.3
+  flutter_colorpicker: ^1.1.0
 
 dev_dependencies:
   flutter_test:
@@ -67,6 +69,12 @@ flutter:
 
   assets:
     - assets/images/
+    # 카드 자국 그림 17장(약 1.2MB). 🔴 **알파 마스크다** — 색은 카드의
+    # `brush_color` 가 칠한다(`player_card_view.dart` 의 `_mark`).
+    # 🔴 PNG 를 손으로 고치지 않는다 — 원본은 웹 `www/scripts/marks.html` 이고
+    # `bake-marks.py` 가 다시 구우면 덮인다. 번호도 바꾸지 않는다(서버에
+    # 숫자로 저장되어 있어 밀면 남의 카드가 말없이 다른 그림이 된다).
+    - assets/marks/
     # 홈 「영상 분석」 판에서 되풀이되는 소개 영상. 원본 화면 기록(1964×1056 ·
     # 60fps · 21MB)을 960×512(16의 배수) · 30fps · 소리 없음으로 줄였다(약 1MB). 🔴 영상을 더
     # 늘리면 앱이 그만큼 무거워진다 — 웹 `www/public` 과 같은 주의.
@@ -91,6 +99,14 @@ flutter:
     - family: YoungSerif
       fonts:
         - asset: assets/fonts/YoungSerif-Regular.ttf
+    # 홈 스쿼드 판 아래의 워드마크(SUPERSUB) 전용. 구글 폰트 Yatra One —
+    # 굵기는 400 하나뿐이다. 라이선스: YatraOne-OFL.txt
+    # 🔴 **`google_fonts` 패키지를 쓰지 않는다** — 그쪽은 첫 실행 때 글꼴을
+    # 내려받아서, 네트워크가 없으면 **다른 글꼴로 한 번 그려졌다 바뀐다.**
+    # 이 저장소는 글꼴을 전부 에셋으로 싣는다(Rubik · YoungSerif 와 같은 방식).
+    - family: YatraOne
+      fonts:
+        - asset: assets/fonts/YatraOne-Regular.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:

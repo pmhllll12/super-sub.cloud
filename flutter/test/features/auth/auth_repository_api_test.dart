@@ -158,4 +158,47 @@ void main() {
       ),
     );
   });
+
+  /// 🔴 **내 팀은 `GET /me` 에서 온다** — 따로 부를 경로가 없다. 이 파싱이
+  /// 빠지면 홈 판이 그릴 대상 팀을 못 찾아 **스쿼드가 통째로 안 뜬다.**
+  test('GET /me 의 teams 를 AppUser 에 싣는다', () async {
+    final client = MockClient((req) async {
+      if (req.url.path.endsWith('/auth/login')) {
+        return jsonRes({'access_token': 'tok-1'}, 200);
+      }
+      return jsonRes({
+        ..._me,
+        'teams': [
+          {
+            'team_id': '9a2e',
+            'name': '번개FC',
+            'region': '서울 강남',
+            'sport_code': 'football',
+            'role': 'owner',
+            'joined_at': '2026-07-01T00:00:00Z',
+          },
+        ],
+      }, 200);
+    });
+
+    final session = await relaunch(
+      InMemoryTokenStore(),
+      client,
+    ).login(email: 'demo@supersub.test', password: 'pw');
+
+    expect(session.user.teams, hasLength(1));
+    expect(session.user.teams.single.name, '번개FC');
+    expect(session.user.ownedTeamId, '9a2e');
+  });
+
+  /// ⚠️ 옛 서버는 이 칸을 안 준다 — 없으면 「팀이 없다」이지 오류가 아니다.
+  test('teams 가 아예 없어도 터지지 않는다', () async {
+    final session = await relaunch(
+      InMemoryTokenStore(),
+      serverWith(),
+    ).login(email: 'demo@supersub.test', password: 'pw');
+
+    expect(session.user.teams, isEmpty);
+    expect(session.user.primaryTeamId, isNull);
+  });
 }

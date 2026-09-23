@@ -15,9 +15,45 @@ import '../../features/video/presentation/screens/video_analysis_screen.dart';
 /// 그래서 라우터는 한 번만 만들고, 세션 변화는 ValueNotifier로 흘려보내
 /// refreshListenable이 redirect를 다시 돌리게 한다.
 ///
-/// 로그인에서 홈으로 넘어가는 데 걸리는 시간. 로고가 하단 바 알약까지
-/// 날아가는 시간이기도 하다 — 가로지르는 거리가 길어 짧으면 눈이 못 따라간다.
-const Duration _kHomeTransition = Duration(milliseconds: 2500);
+/// 화면을 갈아 끼우는 데 걸리는 시간. 로고가 로그인 한가운데에서 하단 바
+/// 알약까지 날아가는 시간이기도 하다 — 가로지르는 거리가 길어 너무 짧으면
+/// 눈이 못 따라간다.
+///
+/// 🔴 **2500 → 1800**(2026-09-22, 사용자 요청). 2.5초는 로그인 한 번에는
+/// 어울렸지만 **탭을 오갈 때마다 걸리기엔 길었다** — 아래 [_inkPage] 가
+/// 세 화면에 같은 전환을 깔면서 그 길이가 매번 체감된다.
+///
+/// ⚠️ **로그인 → 홈도 같이 빨라진다.** 값이 하나라서 그렇다. 둘을 따로 두고
+/// 싶으면 [_inkPage] 가 길이를 인자로 받게 고친다.
+const Duration _kHomeTransition = Duration(milliseconds: 1800);
+
+/// **화면을 갈아 끼울 때 잉크가 걷힌다** — 인트로·로그인에서 쓴 것과 같은
+/// 지도·같은 알갱이라 전환이 전부 한 재질로 읽힌다.
+///
+/// 🔴 **세 화면이 나눠 쓴다**(2026-09-22, 사용자 요청: 「다른 곳에서 들어갔어도
+/// 알약 버튼 누르면 다 똑같이 점 퍼지면서 사라지게」).
+///
+/// 🔴 **전에는 `/home` 에만 걸려 있었다.** 그래서 프로필 → 홈으로 갈 때
+/// **들어오는 홈은 잉크로 배어드는데 나가는 프로필은 기본 슬라이드**여서 둘이
+/// 따로 놀았다 — 「같은 효과가 아니다」로 보인 것이 이것이다. 이제 나가는
+/// 쪽도 같은 잉크라 한 몸으로 움직인다.
+///
+/// 로고는 이 전환 위에 `Hero` 로 얹혀 로그인 한가운데에서 하단 바의 알약으로
+/// 날아간다 — 라우트 애니메이션이 그대로 비행 시간이 된다.
+CustomTransitionPage<void> _inkPage(GoRouterState state, Widget child) =>
+    CustomTransitionPage<void>(
+      key: state.pageKey,
+      transitionDuration: _kHomeTransition,
+      child: child,
+      // 앞을 조금 떼어 그 사이에 잉크가 배어들게 한다. 0으로 두면 첫
+      // 프레임에 화면이 통째로 잉크색으로 뚝 바뀐다(`ink_bleed.dart`).
+      transitionsBuilder: (_, animation, _, child) => InkPeel(
+        animation: animation,
+        ink: kIntroInkColor,
+        coverUntil: 0.35,
+        child: child,
+      ),
+    );
 
 /// **종목은 진입 조건이 아니다.** 예전에는 종목을 안 고르면 온보딩 화면으로
 /// 보냈는데, 첫 화면이 질문 하나로 채워지는 것이 이상해 홈의 칩으로 옮겼다.
@@ -54,33 +90,16 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/home',
-        // **로그인에서 홈으로 갈 때 잉크가 걷힌다.** 인트로가 나올 때 쓴 것과
-        // 같은 지도·같은 알갱이라 두 전환이 한 재질로 읽힌다.
-        //
-        // 로고는 이 전환 위에 Hero로 얹혀 로그인 한가운데에서 하단 바의
-        // 알약으로 날아간다 — 라우트 애니메이션이 그대로 비행 시간이 된다.
-        pageBuilder: (context, state) => CustomTransitionPage<void>(
-          key: state.pageKey,
-          transitionDuration: _kHomeTransition,
-          child: const HomeScreen(),
-          // 로그인 화면은 잉크로 덮여 있지 않다 — 앞을 조금 떼어 그 사이에
-          // 잉크가 배어들게 한다. 0으로 두면 첫 프레임에 화면이 통째로
-          // 잉크색으로 뚝 바뀐다(ink_bleed.dart의 InkPeel 주석).
-          transitionsBuilder: (_, animation, _, child) => InkPeel(
-            animation: animation,
-            ink: kIntroInkColor,
-            coverUntil: 0.35,
-            child: child,
-          ),
-        ),
+        pageBuilder: (context, state) => _inkPage(state, const HomeScreen()),
       ),
       GoRoute(
         path: '/videos',
-        builder: (_, _) => const VideoAnalysisScreen(),
+        pageBuilder: (context, state) =>
+            _inkPage(state, const VideoAnalysisScreen()),
       ),
       GoRoute(
         path: '/profile',
-        builder: (_, _) => const ProfileScreen(),
+        pageBuilder: (context, state) => _inkPage(state, const ProfileScreen()),
       ),
     ],
   );
