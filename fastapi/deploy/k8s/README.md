@@ -48,7 +48,8 @@ kubectl rollout status deployment/supersub-api-trial
 > 로컬에서 한 것: 짜임 검사 · 로컬 k3s 모의 적용(`--dry-run=server --validate=strict`) ·
 > PromQL 13식 문법 검사 · **로컬 k3s 에 실제로 띄워 운영 지표(SSH 터널)로 13식 전부 값이 나오는 것을
 > 확인**(아래 「로컬에서 보기」) — 그때 빈 칸 둘을 찾아 고쳤다(5xx 가 한 번도 없으면 「No data」,
-> 요청이 없으면 PER-003 이 0%). 서버에서 떠 본 적은 없다.
+> 요청이 없으면 PER-003 이 0%). 같은 날 Grafana 를 13.2.2(한국어 화면)로 올려 로컬에서 다시 띄웠다 —
+> 아래 「버전 · 라이선스 · 메모리」. 서버에서 떠 본 적은 없다.
 
 API 파드의 `/metrics` 를 15초마다 모아 요청률·오류율·지연 분위수를 그린다. 요구사항
 PER-003(조회 응답 P95 500ms 이내)을 **실측으로 판정하는 자리**다.
@@ -67,12 +68,34 @@ helm 의 kube-prometheus-stack 을 쓰지 않은 이유: 서버 한 대(디스�
 API 하나를 보는 데는 operator·node-exporter·alertmanager 까지 딸려 오는 것이 과하다. **경보는
 없다** — 지금은 보는 화면만이다.
 
+### 버전 · 라이선스 · 메모리 (2026-09-23)
+
+| 무엇 | 버전 | 라이선스 | 우리에게 뜻하는 것 |
+|---|---|---|---|
+| Grafana | **13.2.2** | **AGPLv3** | 소스를 고치지 않고 설정·대시보드 JSON 만 얹어 쓴다 — 공개 의무가 생기지 않는다. 🔴 **Grafana 소스를 고쳐 그 고친 것을 남이 네트워크로 쓰게 하면** 고친 소스를 그 사용자에게 내놓아야 한다 |
+| Prometheus | v3.0.1 | Apache 2.0 | 허용형 — 쓰고 고치는 데 제약이 거의 없다(재배포할 때 고지문 유지) |
+| API 안의 수집 라이브러리 | `prometheus-fastapi-instrumentator` 8.1.0 · `prometheus_client` 0.26.0 | ISC · Apache-2.0 + BSD-2 | 우리 코드와 함께 배포되지만 허용형이라 우리 코드를 공개할 의무가 없다 |
+
+- 우리 API 는 Grafana·Prometheus 와 **HTTP 로만** 만난다(코드로 엮이지 않는다) — AGPL 이 우리 코드로 번지지 않는다
+- 「Grafana」 이름·로고는 상표다 — 우리 제품 이름·로고처럼 쓰지 않는다
+- 사용 통계 보고·업데이트 확인은 꺼 두었다(`GF_ANALYTICS_*`)
+- 라이선스 본문 기준의 판단이다(법률 자문이 아니다). 확인: 이미지 안 `LICENSE` 첫 줄 —
+  Grafana `/usr/share/grafana/LICENSE` 는 `GNU AFFERO GENERAL PUBLIC LICENSE`, Prometheus `/LICENSE` 는 `Apache License`
+
+**Grafana 를 11.3.0 에서 13.2.2 로 올린 이유는 한국어 화면**이다 — 한국어(`ko-KR`)는 12.0 부터 들어 있고
+11.3 에는 없었다(`GF_USERS_DEFAULT_LANGUAGE=ko-KR` 로 메뉴가 한국어가 된다. 단위·경로·범례는 데이터라 그대로).
+🔴 **대신 무겁다** — 로컬 실측(2026-09-23): 프로세스 메모리가 뜬 직후 225Mi 에서 5분 뒤 585Mi 까지 올랐고
+(11.3 은 256Mi 한도 안에서 돌았다), 256Mi · 512Mi 한도에서는 한도에 수천~1만 번 닿으며 요청이 멈췄다. 그래서
+한도를 1Gi 로 두었다. 서버는 메모리 7.8GB 중 1.1GB 를 쓰고 있어(09-23) 들어가지만, **올리기 전에 로컬에서 더 오래
+두고 멈추는 값을 본다** — 계속 오르면 한도를 올리거나 12.x 와 비교한다.
+
 ### 적용 전 확인 (서버에서)
 
 ```bash
 sudo k3s kubectl get storageclass local-path   # 있어야 한다 — Prometheus 데이터(PVC)가 쓴다
 sudo ss -ltn | grep -E ':(3000|9090)\b'         # 비어 있어야 한다 — 두 포트를 쓴다
 df -h /                                         # 1GB 넘게 남아 있어야 한다 — 보관 상한이 1GB 다
+free -m                                         # 1.5GB 넘게 남아 있어야 한다 — Grafana 한도 1Gi + Prometheus 512Mi
 ```
 
 ### 적용 (서버에서, 이 폴더에서)

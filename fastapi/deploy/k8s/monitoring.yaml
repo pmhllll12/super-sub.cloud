@@ -138,7 +138,8 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: grafana
-          image: grafana/grafana:11.3.0
+          # 한국어 화면(ko-KR)이 12.0 부터라 11.3.0 에서 올렸다(2026-09-23). 라이선스·버전 판단은 README 「운영 관제」
+          image: grafana/grafana:13.2.2
           env:
             - name: GF_SERVER_HTTP_ADDR
               value: "127.0.0.1"
@@ -152,6 +153,9 @@ spec:
               value: "false"
             - name: GF_ANALYTICS_CHECK_FOR_UPDATES
               value: "false"
+            # 메뉴(시간 고르기·새로고침 등)를 한국어로. 단위·경로·범례(req/s · P95 · 2xx)는 데이터라 그대로다
+            - name: GF_USERS_DEFAULT_LANGUAGE
+              value: ko-KR
             - name: GF_SECURITY_ADMIN_USER
               value: admin
             - name: GF_SECURITY_ADMIN_PASSWORD
@@ -159,12 +163,15 @@ spec:
                 secretKeyRef:
                   name: grafana-admin
                   key: password
+          # 🔴 13.2.2 는 11.3 보다 훨씬 무겁다(로컬 2026-09-23): 256Mi 에서는 한도에 7,927번 닿으며 7분이 지나도
+          #   안 떴고, 512Mi 에서도 프로세스 메모리만 389Mi 로 커져 한도에 1만 번 넘게 닿고 요청이 60초씩 멈췄다
+          #   (OOM 은 아니고 회수에 묶였다). 1Gi 로 두고 실제 사용량을 쟀다 — README 「운영 관제」
           resources:
             requests:
               cpu: 50m
-              memory: 96Mi
+              memory: 384Mi
             limits:
-              memory: 256Mi
+              memory: 1Gi
           volumeMounts:
             - name: data
               mountPath: /var/lib/grafana
