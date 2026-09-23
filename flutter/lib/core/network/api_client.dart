@@ -50,13 +50,40 @@ class ApiClient {
   final http.Client _client;
   String? _token;
 
+  /// 저장소 읽기는 **한 번만** 한다 — 여러 요청이 동시에 나가도 같은 것을
+  /// 기다린다.
+  Future<void>? _loading;
+
+  /// 🔴 **요청이 스스로 토큰을 챙긴다 (2026-09-23).**
+  ///
+  /// 전에는 [loadToken] 을 **세션 복원이 부를 때만** 메모리에 올렸다. 그래서
+  /// 그보다 먼저 나간 요청(홈이 켜지며 보는 `GET /me/card`)이 **토큰 없이
+  /// 나가 401** 이었다 — 실기기 로그가 그 순서였다:
+  ///
+  ///     🔎API→ /me/card (tok=없음)
+  ///     🔎API→ /me      (tok=있음)
+  ///     🔎API✗ 401
+  ///
+  /// `myCardProvider` 는 `retry` 를 꺼 뒀으므로 그 401 이 **영구히 남고**,
+  /// 화면은 그것을 「카드가 없다」로 그렸다. 지킴이:
+  /// `test/core/shared_api_client_test.dart`.
+  Future<void> _ensureLoaded() {
+    if (_token != null) return Future<void>.value();
+    return _loading ??= _tokens.read().then((t) => _token ??= t);
+  }
+
   /// 저장소의 토큰을 메모리로 올린다(앱을 켤 때 한 번). 없으면 `null`.
-  Future<String?> loadToken() async => _token = await _tokens.read();
+  Future<String?> loadToken() async {
+    await _ensureLoaded();
+    return _token;
+  }
 
   /// 토큰을 메모리와 저장소 **둘 다**에 둔다 — 지금 요청에도 써야 하고,
   /// 다음에 켤 때도 있어야 한다.
   Future<void> useToken(String token) async {
     _token = token;
+    // 저장소를 다시 읽을 이유가 없어졌다 — 캐시한 읽기를 버린다.
+    _loading = null;
     await _tokens.write(token);
   }
 
@@ -64,6 +91,9 @@ class ApiClient {
   /// 되돌아간다.
   Future<void> clearToken() async {
     _token = null;
+    /* 🔴 캐시한 읽기도 버린다 — 안 버리면 로그아웃 뒤에도 [_ensureLoaded] 가
+       **지우기 전에 읽어 둔 토큰**을 돌려줘 그대로 로그인 상태가 된다. */
+    _loading = null;
     await _tokens.clear();
   }
 
@@ -163,7 +193,11 @@ class ApiClient {
         if (authorized && _token != null) 'Authorization': 'Bearer $_token',
       };
 
+  /// 🔴 **여기 한 곳에서 토큰을 보장한다.** [request] 는 닫힘(closure)이라
+  /// 헤더를 **이 `await` 뒤에** 만든다 — 그래서 모든 경로(get·post·patch·
+  /// delete·getList)가 한 번의 수정으로 같이 고쳐진다.
   Future<http.Response> _send(Future<http.Response> Function() request) async {
+    await _ensureLoaded();
     try {
       return await request();
     } on http.ClientException catch (e) {
@@ -212,7 +246,32 @@ class ApiClient {
   }
 }
 
-/// 🔴 세 리포지토리(인증 · 카드 · 스쿼드)가 **같은 한 벌**을 나눠 쓴다 —
-/// 로그인이 저장한 토큰을 나머지가 그대로 써야 하기 때문이다. 따로 만들면
-/// 카드·스쿼드 요청에 토큰이 안 실려 전부 401 이 된다.
-final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());
+/// 로그인 토큰을 어디에 남길지 — 기본은 Keystore·Keychain(미결 `min` 25번).
+///
+/// 🔴 **위젯 시험은 이것을 갈아 끼운다.** 진짜 저장소는 플랫폼 채널로 오가는데
+/// 위젯 시험의 **가짜 시계에서는 그 응답이 영영 안 온다** — 세션 복원이 안
+/// 끝나서 라우터가 첫 화면에 멈춘다(2026-09-17에 스모크 시험이 그렇게 깨졌다).
+/// 예외가 아니라 **안 오는 것**이라 `try/catch` 로는 못 푼다.
+///
+/// 🔴 **[apiClientProvider] 옆에 둔다 (2026-09-23).** 전에는
+/// `features/auth/data/auth_providers.dart` 에 있었는데, 그러면 공유
+/// [ApiClient] 가 이 저장소를 못 읽어 **자기 기본값을 따로 만들었다** —
+/// 시험이 갈아 끼운 저장소가 안 먹혔다. `auth_providers.dart` 가 이름을
+/// 그대로 다시 내보내므로 부르는 쪽은 안 고쳐도 된다.
+final tokenStoreProvider = Provider<TokenStore>(
+  (ref) => const SecureTokenStore(),
+);
+
+/// 🔴 리포지토리들이 **같은 한 벌**을 나눠 쓴다 — 로그인이 저장한 토큰을
+/// 나머지가 그대로 써야 하기 때문이다. 따로 만들면 카드·영상·스쿼드 요청에
+/// 토큰이 안 실려 전부 401 이 된다.
+///
+/// 🔴 **2026-09-23 에 실제로 그렇게 됐다.** `authRepositoryProvider` 가 이
+/// 공유본을 안 넘겨서 `ApiAuthRepository` 가 자기 [ApiClient] 를 만들었고,
+/// `/me` 만 토큰이 실리고 `/me/card`·`/videos`·`/teams/{id}/squad` 는 전부
+/// 토큰 없이 나가 401 이었다. 화면은 그 401 을 **「카드가 없다」로** 그렸다
+/// (`.value` 가 오류와 없음을 같은 `null` 로 만든다).
+/// 지킴이: `test/core/shared_api_client_test.dart`.
+final apiClientProvider = Provider<ApiClient>(
+  (ref) => ApiClient(tokens: ref.watch(tokenStoreProvider)),
+);
