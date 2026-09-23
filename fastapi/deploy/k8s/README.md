@@ -46,7 +46,9 @@ kubectl rollout status deployment/supersub-api-trial
 > **확인:** `ssh supersub 'sudo k3s kubectl get ns monitoring'` → `NotFound` 면 아직 안 올렸다
 > **메모:** 대시보드 식의 지표 이름·라벨은 서버의 실제 `/metrics`(2026-09-23)에서 확인했다.
 > 로컬에서 한 것: 짜임 검사 · 로컬 k3s 모의 적용(`--dry-run=server --validate=strict`) ·
-> PromQL 13식 문법 검사. 서버에서 떠 본 적은 없다.
+> PromQL 13식 문법 검사 · **로컬 k3s 에 실제로 띄워 운영 지표(SSH 터널)로 13식 전부 값이 나오는 것을
+> 확인**(아래 「로컬에서 보기」) — 그때 빈 칸 둘을 찾아 고쳤다(5xx 가 한 번도 없으면 「No data」,
+> 요청이 없으면 PER-003 이 0%). 서버에서 떠 본 적은 없다.
 
 API 파드의 `/metrics` 를 15초마다 모아 요청률·오류율·지연 분위수를 그린다. 요구사항
 PER-003(조회 응답 P95 500ms 이내)을 **실측으로 판정하는 자리**다.
@@ -100,10 +102,34 @@ ssh -N -L 3000:127.0.0.1:3000 supersub   # 켜 둔 채로
 # 브라우저 http://localhost:3000 → admin / 위 비밀번호 → Super-Sub 폴더 → 「Super-Sub API — 운영 관제」
 ```
 
+### 로컬에서 보기 — 서버에는 아무것도 안 깔고 (2026-09-23)
+
+이 PC 의 k3s 에 같은 매니페스트를 띄우고, 운영 API 의 지표만 SSH 터널로 읽는다. 🔴 먼저 `kubectl` 이
+**로컬 클러스터**를 가리키는지 본다 — 운영을 가리키면 서버에 깔린다.
+
+```bash
+# 1. 터널 — 켜 둔 동안만 모인다(끄면 「수집 대상」이 끊김으로 바뀌고 그 사이는 비어 있다)
+ssh -N -L 127.0.0.1:18090:127.0.0.1:8080 supersub
+
+# 2. 처음 한 번 — 수집 대상만 터널 포트로 바꿔 적용
+kubectl create namespace monitoring
+kubectl -n monitoring create secret generic grafana-admin --from-literal=password='<아무 값>'
+kubectl -n monitoring create configmap grafana-dashboards \
+  --from-file=supersub-api.json=grafana-dashboard-supersub-api.json
+sed 's/targets: \["127.0.0.1:8080"\]/targets: ["127.0.0.1:18090"]/' monitoring.yaml | kubectl apply -f -
+# 로컬만 — 이 PC 의 127.0.0.1 에만 뜨므로 로그인 없이 보기를 켠다(서버판은 로그인 그대로)
+kubectl -n monitoring set env deploy/grafana GF_AUTH_ANONYMOUS_ENABLED=true GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+```
+
+브라우저 `http://localhost:3000/d/supersub-api` — WSL 이면 Windows 브라우저에서도 열린다. 지우기는
+`kubectl delete namespace monitoring`.
+
 ### PER-003 을 읽는 법
 
 「PER-003 — 조회(GET) 중 0.5초 안에 끝난 비율 (1시간)」 칸이 **95% 이상이면 P95 가 500ms
 안**이다. 경로별 히스토그램의 버킷 경계가 정확히 0.5초라 분위수를 근사하지 않고 그대로 판정한다.
+그 1시간에 사용자 GET 이 없으면 **빈 칸**이다(판정할 것이 없다 — 0% 로 내지 않는다). 수집을 켠 지
+1시간이 안 됐으면 그동안의 몫만 본 것이다.
 
 **사용자 요청**은 워커 폴링(`/api/v1/internal/*`) · 수집기 자신의 `/metrics` · `/health` · 없는
 경로(`none`)를 뺀 것이다 — Prometheus 가 15초마다 `/metrics` 를 두드리므로 빼지 않으면 요청률과

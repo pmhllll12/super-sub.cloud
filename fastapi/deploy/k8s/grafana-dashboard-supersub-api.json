@@ -48,11 +48,11 @@
       "id": 3,
       "type": "stat",
       "title": "5xx 비율 — 사용자",
-      "description": "사용자 요청 중 서버 오류(5xx) 비율, 5분. 내부(워커) 경로의 오류는 아래 「응답 코드별」에 함께 보인다.",
+      "description": "사용자 요청 중 서버 오류(5xx) 비율, 5분. 5xx 가 한 번도 없으면 그 계열이 아예 없어서 `or vector(0)` 으로 0 을 채운다. 사용자 요청이 없으면 비율이 없으므로 빈 칸이다. 내부(워커) 경로의 오류는 아래 「응답 코드별」에 함께 보인다.",
       "gridPos": { "x": 9, "y": 0, "w": 5, "h": 4 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
-        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(http_requests_total{status=\"5xx\",handler!~\"/api/v1/internal/.*|/metrics|/health|none\"}[5m])) / clamp_min(sum(rate(http_requests_total{handler!~\"/api/v1/internal/.*|/metrics|/health|none\"}[5m])), 1e-9)" }
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "(sum(rate(http_requests_total{status=\"5xx\",handler!~\"/api/v1/internal/.*|/metrics|/health|none\"}[5m])) or vector(0)) / (sum(rate(http_requests_total{handler!~\"/api/v1/internal/.*|/metrics|/health|none\"}[5m])) > 0)" }
       ],
       "fieldConfig": {
         "defaults": {
@@ -68,14 +68,14 @@
       "id": 4,
       "type": "stat",
       "title": "PER-003 — 조회(GET) 중 0.5초 안에 끝난 비율 (1시간)",
-      "description": "요구사항 PER-003(조회 응답 P95 500ms 이내)의 판정. 사용자 GET 요청 중 0.5초 버킷 안에 든 비율이 95% 이상이면 P95 가 500ms 안이다 — 버킷 경계가 정확히 0.5초라 근사가 아니다.",
+      "description": "요구사항 PER-003(조회 응답 P95 500ms 이내)의 판정. 사용자 GET 요청 중 0.5초 버킷 안에 든 비율이 95% 이상이면 P95 가 500ms 안이다 — 버킷 경계가 정확히 0.5초라 근사가 아니다. 그 1시간에 사용자 GET 이 없으면 판정할 것이 없으므로 빈 칸이다(0% 로 내지 않는다).",
       "gridPos": { "x": 14, "y": 0, "w": 10, "h": 4 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum(rate(http_request_duration_seconds_bucket{method=\"GET\",handler!~\"/api/v1/internal/.*|/metrics|/health|none\",le=\"0.5\"}[1h])) / clamp_min(sum(rate(http_request_duration_seconds_count{method=\"GET\",handler!~\"/api/v1/internal/.*|/metrics|/health|none\"}[1h])), 1e-9)"
+          "expr": "sum(rate(http_request_duration_seconds_bucket{method=\"GET\",handler!~\"/api/v1/internal/.*|/metrics|/health|none\",le=\"0.5\"}[1h])) / (sum(rate(http_request_duration_seconds_count{method=\"GET\",handler!~\"/api/v1/internal/.*|/metrics|/health|none\"}[1h])) > 0)"
         }
       ],
       "fieldConfig": {
@@ -147,7 +147,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "topk(5, sum by (handler) (rate(http_request_duration_seconds_sum[15m])) / clamp_min(sum by (handler) (rate(http_request_duration_seconds_count[15m])), 1e-9))",
+          "expr": "topk(5, sum by (handler) (rate(http_request_duration_seconds_sum[15m])) / (sum by (handler) (rate(http_request_duration_seconds_count[15m])) > 0))",
           "legendFormat": "{{handler}}",
           "instant": true
         }
