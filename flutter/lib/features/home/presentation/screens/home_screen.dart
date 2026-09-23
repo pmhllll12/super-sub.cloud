@@ -868,12 +868,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       child: IgnorePointer(
         child: Center(
           child: brandHero(
-            /* 🔴 **키로 찾는다** — 글자로 찾으면 판 위의 선수 카드마다 박힌
-               `SUPERSUB` 워터마크까지 걸린다(시험이 7개를 찾았다). */
-            child: Text(
-              kBrandText,
+            /* 🔴 **[BrandMark] 를 쓴다 — 맨 [Text] 가 아니다.** 그 위젯이
+               비행 중에 제 글자를 감춰 주는데(`kBrandFlightInProgress`),
+               안 감추면 **날아오는 글자와 여기 글자가 동시에** 보인다.
+
+               🔴 **[kBrandLandingKeyHome] 이 인트로의 착지점이다** — 이 키가
+               없으면 `intro_gate` 가 「착지점을 못 찾았다」로 빠져 로고가
+               아예 안 날아온다(사용자가 잡은 그것). */
+            child: KeyedSubtree(
               key: const Key('home-brand'),
-              style: BrandMark.styleFor(kBrandLandedSize, AppTheme.seed),
+              child: BrandMark(
+                key: kBrandLandingKeyHome,
+                fontSize: kBrandHomeSize,
+              ),
             ),
           ),
         ),

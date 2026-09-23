@@ -1,37 +1,44 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../design_scale.dart';
-import 'silver_edge.dart';
 
-/// 막대의 면 — 🔴 **흰색이다 (2026-09-23, 사용자 요청 + 레퍼런스).**
+/// 막대의 면 — 🔴 **유리로 돌아왔다 (2026-09-23 두 번째 정정, 사용자 요청:
+/// 「안쪽 흰색 하지말고 외곽선 없애고, 글래스로 바꿔」).** 몇 시간 전 흰색
+/// 불투명으로 갔던 것을 되돌린 것이고, 외곽선([SilverEdge.onWhite])도 함께
+/// 걷었다 — 유리는 제 흐림과 옅은 면으로 경계를 낸다.
 ///
-/// 유리 → 검정 → 진회색 → 반투명 흰색 → 불투명 회색 → **흰색** 순으로 왔고,
-/// 매번 사용자가 정했다. 마지막 갈이에서 바가 **한 덩이 둥근 막대**로 다시
-/// 짜이면서 면도 레퍼런스대로 갔다.
+/// 유리 → 검정 → 진회색 → 반투명 흰색 → 불투명 회색 → 흰색 → **유리** 순으로
+/// 왔고, 매번 사용자가 정했다.
 ///
-/// 🔴 **경계는 [SilverEdge.onWhite] 가 낸다.** 흰 면 위에서는 밝은 은빛
-/// ([SilverEdge.silver])이 흰색에 붙어 사라진다 — 홈의 영상 분석 판에서
-/// 가장자리 픽셀을 재서 확인한 그것이다.
-///
-/// ⚠️ **걷은 것 둘** — 흐림(`kNavBarBlur` 6)과, 판([kSurfaceWhite])에 밝기를
-/// 맞추던 규칙(「판이 `0xAAFFFFFF` 면 바는 `0xFFAAAAAA`」). 앞은 면이
-/// 불투명해서 흐릴 뒤가 없고, 뒤는 **바탕이 검정일 때만** 성립하던 것이라
-/// 흰 면에서는 뜻이 없다. 반투명으로 되돌리는 날 둘 다 같이 본다.
-const Color kNavBarColor = Color(0xFFFFFFFF);
+/// 🔴 **흐림이 있어야 이 값이 뜻을 갖는다** — 면만 반투명으로 두고 흐림을 빼면
+/// 그냥 옅은 흰 막이다. [kNavBarBlur] 와 **짝이다.**
+const Color kNavBarColor = Color(0x3DFFFFFF);
 
-/// 메뉴 칸의 면 — 레퍼런스의 마지막 칸(회색으로 채운 타일) 자리다.
-const Color kNavMenuTileColor = Color(0xFFE9EDEE);
-
-/// 흰 막대 위의 아이콘·글자.
-const Color kNavOnWhite = Color(0xFF17181A);
-
-/// 가운데 아이콘들을 가르는 세로선.
+/// 막대의 **흐림 세기**(2026-09-23 사용자 요청: 「블러 30퍼만 주자」).
 ///
-/// ⚠️ **15%(`0x26`)로 뒀다가 올렸다** — 물리 1픽셀짜리 선이라 그 알파로는
-/// 실기기에서 **아예 안 보였다**(확대해서 확인했다). 굵히지 않고 알파만 올린다 —
-/// 굵으면 「그어 놓은 선」이 되고, 레퍼런스의 인상은 가는 실이다.
-const Color kNavDividerColor = Color(0x4517181A);
+/// ⚠️ **「30%」를 무엇의 30%로 읽을지 애매하다** — 2026-09-22 에 같은 식으로
+/// 「20%」를 받아 6 으로 뒀던 전례를 그대로 늘려 **9** 로 잡았다. 더 흐리게 /
+/// 덜 흐리게는 이 한 줄이다.
+const double kNavBarBlur = 9;
+
+/// 🔴 **고른 칸에만 깔리는 면**(2026-09-23 사용자 지적: 「맨 오른쪽꺼는 왜
+/// 누르지도 않았는데 진한 사각형이 있어? 누른것만 그거 좀 사이즈 줄인게 그
+/// 아이콘에 나오게」). 전에는 **메뉴 칸이 늘 이 면을 달고 있어서** 안 눌렀는데
+/// 눌린 것처럼 보였다 — 이제 `active` 인 칸 하나만 갖는다.
+const Color kNavActiveTileColor = Color(0x3DFFFFFF);
+
+/// 유리 막대 위의 아이콘 — 바탕이 어두우므로 **흰색**이다.
+const Color kNavOnWhite = Color(0xFFFFFFFF);
+
+/// 칸 사이 세로선.
+///
+/// ⚠️ **알파를 두 번 올렸다** — 물리 1픽셀짜리 선이라 낮은 알파로는 실기기에서
+/// 안 보인다. 굵히지 않고 알파만 올린다 — 굵으면 「그어 놓은 선」이 되고,
+/// 레퍼런스의 인상은 가는 실이다. 유리로 바뀌며 **흰색 쪽**으로 뒤집혔다.
+const Color kNavDividerColor = Color(0x59FFFFFF);
 
 /// 바가 차지하는 높이(디자인 px).
 ///
@@ -48,7 +55,9 @@ const double kBottomBarHeight = 200;
 /// 🔴 **떠 있는 막대다 (2026-09-23 사용자 요청: 「이 하단바는 양쪽 끝까지 굳이
 /// 안 가도 됨」).** 옛 바는 **일부러 화면 밖까지** 나가서 어깨가 안 보였다 —
 /// 되살리지 말 것.
-const double kBarSideMargin = 54;
+///
+/// ⚠️ 54 → **118** 로 한 번 더 좁혔다(같은 날, 「바 자체가 좌우로 너무 길어」).
+const double kBarSideMargin = 118;
 
 /// 막대가 화면 아래(안전 영역 위)에서 뜨는 거리.
 const double kBarBottomGap = 18;
@@ -65,6 +74,9 @@ const double kBarInnerPad = 22;
 
 /// 구분선의 길이 — 막대 안쪽 높이의 절반쯤(레퍼런스가 그 정도다).
 const double kBarDividerHeight = 78;
+
+/// 고른 칸의 면이 칸 좌우에서 물러나는 거리 — 아이콘을 살짝 감쌀 만큼이다.
+const double kBarActivePad = 34;
 
 /// 화면 아래에 떠 있는 **한 덩이 둥근 막대**. 로고 칸 · 아이콘 셋 · 메뉴 칸이
 /// 한 줄로 들어간다(2026-09-23 사용자 요청 + 레퍼런스).
@@ -141,7 +153,7 @@ class FloatingNavBar extends StatelessWidget {
           context.d(kBarSideMargin),
           bottomInset + context.d(kBarBottomGap),
         ),
-        child: DecoratedBox(
+        child: _GlassBar(
           key: const Key('navbar-bar'),
           decoration: BoxDecoration(
             color: kNavBarColor,
@@ -152,13 +164,9 @@ class FloatingNavBar extends StatelessWidget {
             borderRadius: BorderRadius.all(
               Radius.circular(context.d(kBarRadius)),
             ),
-            /* 🔴 **경계는 이 선 하나다**(사용자 요청: 「하단바 외곽선에 세련된
-               실버 색상」). 흰 면이라 [SilverEdge.silver] 는 안 보인다 —
-               홈의 영상 분석 판과 **같은 값**을 나눠 쓴다. */
-            border: Border.all(
-              color: SilverEdge.onWhite,
-              width: SilverEdge.onWhiteWidth,
-            ),
+            /* ⛔ **외곽선을 걷었다**(2026-09-23 사용자 요청: 「외곽선 없애고,
+               글래스로 바꿔」). [SilverEdge.onWhite] 를 0.5px 로 둘렀던
+               자리다 — 유리가 제 흐림으로 경계를 내므로 선이 겹친다. */
           ),
           child: Padding(
             padding: EdgeInsets.symmetric(horizontal: context.d(kBarInnerPad)),
@@ -184,11 +192,15 @@ class FloatingNavBar extends StatelessWidget {
                   ),
                 ],
                 _Divider(key: const Key('navbar-divider-menu')),
-                // 마지막은 탭이 아니다 — 메뉴를 연다. 그래서 활성 표시가 없다.
+                /* 마지막은 탭이 아니다 — 메뉴를 연다. 그래서 **늘 `active`
+                   가 아니다.** 🔴 한때 이 칸만 회색으로 채워 뒀는데, 사용자가
+                   「누르지도 않았는데 진한 사각형이 있다」고 짚었다 — 면은
+                   이제 고른 칸의 표시이지 이 칸의 차림이 아니다. */
                 Expanded(
-                  child: _MenuTile(
+                  child: _NavIcon(
                     key: const Key('navbar-icon-menu'),
                     icon: _menuIcon,
+                    active: false,
                     onTap: () => onTap(menuIndex),
                   ),
                 ),
@@ -202,6 +214,35 @@ class FloatingNavBar extends StatelessWidget {
 
 }
 
+
+/// 유리 막대 — 제 모양대로 **뒤를 흐린다.**
+///
+/// 🔴 **[ClipRRect] 안에서 흐린다.** 밖에 두면 막대 밖까지 흐려져 화면 아래가
+/// 통째로 뿌옇다.
+///
+/// 🔴 **유리 안에 유리를 넣지 않는다**(`flutter/CLAUDE.md`) — 안의 칸들은
+/// 흐림 없이 **색만** 얹는다([kNavActiveTileColor]).
+class _GlassBar extends StatelessWidget {
+  const _GlassBar({
+    super.key,
+    required this.decoration,
+    required this.child,
+  });
+
+  final BoxDecoration decoration;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: decoration.borderRadius!.resolve(null),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: kNavBarBlur, sigmaY: kNavBarBlur),
+        child: DecoratedBox(decoration: decoration, child: child),
+      ),
+    );
+  }
+}
 
 /// 가운데 아이콘들을 가르는 가는 세로선(레퍼런스 그대로).
 ///
@@ -221,35 +262,6 @@ class _Divider extends StatelessWidget {
       width: 1 / MediaQuery.devicePixelRatioOf(context),
       height: context.d(kBarDividerHeight),
       child: const ColoredBox(color: kNavDividerColor),
-    );
-  }
-}
-
-/// 마지막 칸 — 메뉴를 연다. 레퍼런스의 **회색으로 채운 타일** 자리다.
-///
-/// 🔴 **탭이 아니라 메뉴다.** 활성 표시를 두지 않는다 — 여기 「들어와 있는」
-/// 상태가 없다.
-class _MenuTile extends StatelessWidget {
-  const _MenuTile({super.key, required this.icon, required this.onTap});
-
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: EdgeInsets.symmetric(vertical: context.d(18)),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: kNavMenuTileColor,
-            borderRadius: BorderRadius.all(Radius.circular(context.d(40))),
-          ),
-          child: Center(child: _navGlyph(context, icon)),
-        ),
-      ),
     );
   }
 }
@@ -301,20 +313,18 @@ class _NavIcon extends StatelessWidget {
                 duration: const Duration(milliseconds: 180),
                 curve: Curves.easeOut,
                 child: Padding(
+                  /* 🔴 **아이콘보다 조금 클 만큼만**(사용자 요청: 「누른것만
+                     그거 좀 사이즈 줄인게 그 아이콘에 나오게」). 칸 너비를 다
+                     쓰면 유리 위에서 **칸이 통째로 밝아진** 것처럼 보인다. */
                   padding: EdgeInsets.symmetric(
-                    horizontal: context.d(kBarInnerPad),
+                    horizontal: context.d(kBarActivePad),
+                    vertical: context.d(12),
                   ),
                   child: DecoratedBox(
-                    /* 🔴 **채우지 않고 테만 두른다**(레퍼런스의 첫 칸이 그렇다).
-                       채우면 메뉴 칸과 **같은 모양**이 되어 「고른 것」과
-                       「메뉴」가 안 갈린다. */
                     decoration: BoxDecoration(
+                      color: kNavActiveTileColor,
                       borderRadius: BorderRadius.all(
-                        Radius.circular(context.d(40)),
-                      ),
-                      border: Border.all(
-                        color: SilverEdge.onWhite,
-                        width: SilverEdge.onWhiteWidth,
+                        Radius.circular(context.d(34)),
                       ),
                     ),
                   ),

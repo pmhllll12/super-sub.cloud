@@ -54,9 +54,9 @@ class _IntroGateState extends State<IntroGate>
 
   _Phase _phase = _Phase.intro;
 
-  /// 글자가 앉을 자리(화면 좌표). 착지점을 못 찾으면 null이고, 그때는 날리지
-  /// 않는다 — 로그인이 아닌 화면으로 나가는 경우가 그렇다.
-  Rect? _landing;
+  /// 글자가 앉을 자리(화면 좌표 + 그 화면의 글자 크기). 착지점을 못 찾으면
+  /// null이고, 그때는 날리지 않는다.
+  ({Rect rect, double fontSize})? _landing;
 
   @override
   void dispose() {
@@ -91,13 +91,23 @@ class _IntroGateState extends State<IntroGate>
     });
   }
 
-  /// 착지점의 화면 좌표. 아직 안 지어졌거나 배치 전이면 null.
-  Rect? _landingRect() {
-    final ctx = kBrandLandingKey.currentContext;
-    if (ctx == null) return null;
-    final box = ctx.findRenderObject();
-    if (box is! RenderBox || !box.hasSize) return null;
-    return box.localToGlobal(Offset.zero) & box.size;
+  /// 착지점의 화면 좌표와 **그 화면이 쓰는 글자 크기**. 아직 안 지어졌거나
+  /// 배치 전이면 null.
+  ///
+  /// 🔴 **후보를 훑는다**([kBrandLandings]) — 로그인과 홈이 각자 제 키를 갖고,
+  /// 그중 **지금 붙어 있는 것**이 착지점이다.
+  ({Rect rect, double fontSize})? _landingRect() {
+    for (final c in kBrandLandings) {
+      final ctx = c.key.currentContext;
+      if (ctx == null) continue;
+      final box = ctx.findRenderObject();
+      if (box is! RenderBox || !box.hasSize) continue;
+      return (
+        rect: box.localToGlobal(Offset.zero) & box.size,
+        fontSize: c.fontSize,
+      );
+    }
+    return null;
   }
 
   @override
@@ -141,13 +151,13 @@ class _FlyingBrand extends StatelessWidget {
   const _FlyingBrand({required this.t, required this.landing});
 
   final Animation<double> t;
-  final Rect landing;
+  final ({Rect rect, double fontSize}) landing;
 
   @override
   Widget build(BuildContext context) {
     final screen = MediaQuery.sizeOf(context);
     final from = Offset(screen.width / 2, screen.height / 2);
-    final to = landing.center;
+    final to = landing.rect.center;
 
     return IgnorePointer(
       child: AnimatedBuilder(
@@ -155,7 +165,7 @@ class _FlyingBrand extends StatelessWidget {
         builder: (context, _) {
           final v = _kFlightCurve.transform(t.value);
           final at = Offset.lerp(from, to, v)!;
-          final size = lerpDouble(kIntroBrandSize, kBrandLandedSize, v)!;
+          final size = lerpDouble(kIntroBrandSize, landing.fontSize, v)!;
           // **Positioned는 Stack의 직접 자식이어야 한다.** 바깥 Stack에
           // IgnorePointer를 통해 넘기면 배치가 먹지 않아 글자가 안 그려진다 —
           // 로고가 인트로 끝에서 사라지던 원인이 이것이었다.
