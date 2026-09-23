@@ -491,9 +491,22 @@ front matter는 `permalink: /pending-archive/`·`nav_exclude: true` — 사이�
 않는다"는 다릅니다.
 
 ```bash
-git diff --cached --name-only -- jekyll/ _posts/ guide/ agent/ fastapi/ \
-  | xargs grep -nE 'arn:aws:[a-z]+::[0-9]{12}|[0-9]{4}-[0-9]{4}-[0-9]{4}|(vpc|subnet|sg|eipalloc)-[0-9a-f]{8,}|\bi-0[0-9a-f]{16}\b|\b(3|13|15|43|52|54)\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\b|api\.[a-z0-9-]+\.[a-z]+' 2>/dev/null
+git diff --cached --name-only -z --diff-filter=d -- jekyll/ _posts/ guide/ agent/ fastapi/ \
+  | xargs -0 grep -HnE 'arn:aws:[a-z]+::[0-9]{12}|[0-9]{4}-[0-9]{4}-[0-9]{4}|(vpc|subnet|sg|eipalloc)-[0-9a-f]{8,}|\bi-0[0-9a-f]{16}\b|\b(3|13|15|43|52|54)\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\b|api\.[a-z0-9-]+\.[a-z]+'
 ```
+
+🔴 **`-z`·`-0` 을 빼지 마십시오** (2026-09-23 정정). 앞서 적었던 명령(`-z` 없이
+`xargs grep … 2>/dev/null`)은 **한글 이름 파일을 검사하지 못했습니다** — git 이 한글
+경로를 `"jekyll/progress/14-\352…"` 처럼 따옴표와 8진수로 감싸 내보내서 grep 이 파일을
+못 찾고, 그 오류를 `2>/dev/null` 이 삼켜 **「걸린 것 없음」으로 통과**했습니다. 공개 영역
+102개 중 88개가 한글 이름입니다. 한글 이름 파일에 가짜 식별자를 넣어 보니 옛 명령은
+놓치고 이 명령은 잡았습니다.
+
+- `-z`(NUL 로 구분, 경로를 감싸지 않음)와 `xargs -0` 은 macOS 에서도 돕니다(`xargs -d` 는 GNU 전용)
+- 지운 파일은 `--diff-filter=d` 로 빼므로 오류를 숨길 이유가 없습니다 — **`2>/dev/null` 을 다시 붙이지 않습니다**
+- `-H` 는 파일이 하나뿐일 때도 어느 파일인지 찍게 합니다
+- 2026-09-23 에 이 방식으로 공개 영역 전체를 훑었고 누출은 없었습니다(오탐 2건 — GitHub 의
+  공개 API 주소, 0 으로 채운 UUID)
 
 이미 배포된 값은 콘텐츠에서 지워도 **git 히스토리·검색 캐시에는 남습니다.** 그래서
 계정 ID처럼 회수가 안 되는 것은 애초에 안 쓰는 것이 유일한 방어입니다. 노출된 것을
