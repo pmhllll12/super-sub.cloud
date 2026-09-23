@@ -538,6 +538,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final user = session is SessionLoggedIn ? session.user : null;
     // 🔴 붓자국 씨앗은 **카드의 공개 슬러그**다 — 이래야 웹과 같은 무늬가
     //    나온다. 카드가 아직 없으면 `null` 이고 판은 빈 자리만 그린다.
+    /* ⚠️ **여기는 `.value` 로 둔다 — 조사하고 내린 결론이다**(2026-09-23).
+       프로필은 같은 `.value` 때문에 「못 읽음」에 「카드 만들기」를 내밀어
+       고쳤는데(`profile_screen.dart` 의 `_cardAction`), **홈은 그 자리에
+       누를 것이 없다.** 실패하면 일어나는 일 셋을 전부 짚어 봤다:
+
+       | 쓰는 자리 | `null` 일 때 | 위험 |
+       |---|---|---|
+       | `ScreenTint`(587·992) | 사선 색을 안 칠한다 | 없음 — 보기만 밋밋 |
+       | `_ProfileButton`(1962) | 빈 카드를 그린다 | 없음 — **단추는 프로필로 갈 뿐** 만들지 않는다 |
+       | `_autoSeatOnce`(554) | `myCardId == null` 이라 **그냥 빠져나간다**(366) | 없음 — 서버를 안 부른다 |
+
+       🔴 **다시 조사하지 말 것.** 여기를 `AsyncValue` 로 바꾸면 홈 전체가
+       로딩·오류 두 그림을 더 갖게 되는데, 그 값을 치를 이유가 위 표에 없다. */
     final card = ref.watch(myCardProvider).value;
     final cardSeed = card?.publicSlug;
     // 주장인 팀이 우선, 없으면 속한 첫 팀. 팀이 없으면 판을 안 부른다.

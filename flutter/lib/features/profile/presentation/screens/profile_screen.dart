@@ -39,7 +39,16 @@ class ProfileScreen extends ConsumerWidget {
     }
 
     final user = session.user;
-    final card = ref.watch(myCardProvider).value;
+    /* 🔴 **`AsyncValue` 를 통째로 들고 간다 — `.value` 로 납작하게 만들지
+       않는다**(2026-09-23). `.value` 는 **오류일 때도 로딩 중에도 `null`**
+       이라, 「못 읽었다」와 「아직 안 만들었다」가 화면에서 **같은 그림**이
+       된다. 그 자리에 뜨는 것이 「카드 만들기」라 **멀쩡한 카드가 있는데도
+       새로 만들려 하게** 된다(지킴이: `profile_card_error_test.dart`).
+
+       ⚠️ 아래 바탕색은 `.value` 를 써도 된다 — 못 읽으면 브랜드 민트로
+       물러날 뿐이고, 사용자가 잘못 누를 것이 없다. */
+    final cardAsync = ref.watch(myCardProvider);
+    final card = cardAsync.value;
 
     /* 🔴 **배경이 내 카드의 색을 따른다**(2026-09-22, 사용자 요청). 홈의
        빛무리와 같은 그림인데 색만 **카드 바탕색 + 자국색** 둘로 갈아 끼운다.
@@ -136,7 +145,7 @@ class ProfileScreen extends ConsumerWidget {
                다섯이 세로로 줄줄이 서서 화면이 한참 길었다.
                「내 영상」만 한 줄을 다 쓴다 — 자주 들어가는 입구다. */
               children: [
-                _CardHero(card: card, nickname: user.nickname),
+                _CardHero(cardAsync: cardAsync, nickname: user.nickname),
                 /* 🔴 **닉네임과 판 사이를 흰 선으로 가른다**(2026-09-22, 사용자
                  요청: 「닉네임과 내 영상 판 가운데에 완전 흰색 선으로」).
                  위아래 여백을 같게 줘서 선이 **둘의 한가운데**에 선다. */
@@ -342,10 +351,15 @@ class _Pair extends StatelessWidget {
 /// 카드 자체가 무엇인지 말하고 있어서 제목은 같은 말을 두 번 하는 자리였고,
 /// 상자는 카드 둘레에 테를 하나 더 둘러 **카드가 작아 보이게** 했다.
 class _CardHero extends ConsumerWidget {
-  const _CardHero({required this.card, required this.nickname});
+  const _CardHero({required this.cardAsync, required this.nickname});
 
-  final PlayerCard? card;
+  /// 🔴 **`PlayerCard?` 가 아니라 `AsyncValue` 다**(2026-09-23). 아래
+  /// [_cardAction] 이 「없다」와 「못 읽었다」를 갈라야 하는데, `null` 하나로는
+  /// 갈 수가 없다 — 그 둘을 같게 그린 것이 이 화면의 결함이었다.
+  final AsyncValue<PlayerCard?> cardAsync;
   final String nickname;
+
+  PlayerCard? get card => cardAsync.value;
 
   static const double _cardWidth = 200;
 
@@ -417,21 +431,51 @@ class _CardHero extends ConsumerWidget {
                  카드가 하나뿐이지만 다른 화면에서 오면 그렇지 않다.
                  ⚠️ 카드가 없을 때의 글귀(「카드 만들기」)는 **안 바꿨다** —
                  그쪽은 「만든다」가 이미 무엇인지 말한다. */
-              _GlassButton(
-                buttonKey: const Key('profile-card-edit'),
-                label: card == null ? '카드 만들기' : '프로필 카드 수정',
-                onTap: () => card == null
-                    ? _createCard(context, ref)
-                    : Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => CardEditorScreen(card: card!),
-                        ),
-                      ),
-              ),
+              _cardAction(context, ref),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  /* 🔴 **카드의 네 가지 상태를 각각 다르게 그린다**(2026-09-23).
+
+     | 상태 | 단추 | 왜 |
+     |---|---|---|
+     | 못 읽음 | **다시 시도** | 🔴 **여기서 「만들기」를 내밀면 안 된다** — 서버에 카드가 멀쩡히 있는데 읽기만 실패한 것일 수 있다 |
+     | 읽는 중 | 「불러오는 중」(안 눌림) | 느린 망에서 「만들기」가 **한 번 깜빡이고** 바뀌던 자리다. 그 순간에 눌리면 위와 같은 일이 난다 |
+     | 없음 | 카드 만들기 | 진짜로 아직 안 만든 것 |
+     | 있음 | 프로필 카드 수정 | |
+
+     ⚠️ **「없음」쪽을 같이 막지 않는다** — 오류를 가리려다 이쪽까지 막으면
+     카드를 **처음 만들 길이 사라진다**(지킴이 네 번째 시험). */
+  Widget _cardAction(BuildContext context, WidgetRef ref) {
+    /* 🔴 **`hasError` 를 `isLoading` 보다 먼저 본다.** 「다시 시도」를 누르면
+       Riverpod 이 **앞선 오류를 달고 있는 로딩**으로 가는데, 그때 로딩을
+       먼저 보면 단추가 「불러오는 중」으로 갈렸다가 실패하면 다시 돌아온다 —
+       누른 사람 눈에는 단추가 춤을 춘다. */
+    if (cardAsync.hasError) {
+      return _GlassButton(
+        buttonKey: const Key('profile-card-retry'),
+        label: '불러오지 못했습니다 · 다시 시도',
+        onTap: () => ref.invalidate(myCardProvider),
+      );
+    }
+    if (!cardAsync.hasValue) {
+      return const _GlassButton.disabled(label: '불러오는 중…');
+    }
+    final card = this.card;
+    return _GlassButton(
+      buttonKey: const Key('profile-card-edit'),
+      label: card == null ? '카드 만들기' : '프로필 카드 수정',
+      onTap: () => card == null
+          ? _createCard(context, ref)
+          : Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => CardEditorScreen(card: card),
+              ),
+            ),
     );
   }
 
@@ -460,9 +504,16 @@ class _GlassButton extends StatelessWidget {
     required this.onTap,
   });
 
+  /// 눌리지 않는 같은 모양 — 「불러오는 중」처럼 **자리는 지키되 누를 수는
+  /// 없어야 하는** 상태에 쓴다. 자리를 안 지키면 값이 도착할 때 옆 글자가
+  /// 통째로 밀린다.
+  const _GlassButton.disabled({required this.label})
+    : buttonKey = const Key('profile-card-loading'),
+      onTap = null;
+
   final Key buttonKey;
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -906,6 +957,12 @@ class _InfoBlock extends ConsumerWidget {
     final joined =
         '${d.year}.${d.month.toString().padLeft(2, '0')}'
         '.${d.day.toString().padLeft(2, '0')}부터';
+    /* ⚠️ **여기는 `.value` 로 둔다**(2026-09-23, 위 `_cardAction` 과 함께
+       조사한 결과). 못 읽으면 호칭 칸이 **비고 고치기 알약도 안 뜬다**
+       (`_TitlesRow` 가 `card != null` 일 때만 그린다) — 누를 것이 없으니
+       잘못 누를 것도 없다. 같은 화면 위쪽의 카드 단추가 이미 「불러오지
+       못했습니다」를 말하고 있어서, 여기서 한 번 더 말하면 오류 문구가
+       한 화면에 둘이 된다. */
     final card = ref.watch(myCardProvider).value;
     return _Block(
       title: '정보',
