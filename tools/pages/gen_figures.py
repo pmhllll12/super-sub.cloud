@@ -9,7 +9,7 @@
 | 3-1 서비스 흐름 | 3장 1)절 끝 | 3장 1)·2)절 본문 — 원본 표가 없어 아래 `FLOW` 상수 |
 | 5-1 요구사항 상태 | 5장 맨 앞 | 5장 요약표의 상태 기호(`gen_metrics.parse_reqs`) |
 | 7-1 스프린트 로드맵 | 7장 「스프린트 로드맵」 | 7장 로드맵 표 |
-| E-1 결정 타임라인 | 부록 E 「한눈에 보기」 | 부록 E 본문 결정의 「정한 날」 |
+| E-1 결정 타임라인 | 부록 E 「한눈에 보기」 | 부록 E 본문 결정의 「정한 날」 + 「09-05 이후 — 한 줄 색인」 표 |
 
 - 🔴 그림은 페이지 안의 표시(`<!-- gen_figures:이름 …-->` ~ `<!-- /gen_figures:이름 -->`) 사이에만
   쓴다. 그 사이를 손으로 고치면 다음 실행 때 덮인다. 표시가 없으면 정해 둔 자리에 새로 넣는다.
@@ -213,6 +213,30 @@ def fig_roadmap(text_07):
 
 
 # --- E-1 결정 타임라인 -------------------------------------------------------------
+INDEX_HEAD = "## 09-05 이후 — 한 줄 색인"  # 이 절의 표는 본문 없이 한 줄씩 적은 결정이다(2026-09-23 방식 변경)
+
+
+def parse_index(text_e, sections):
+    """「한 줄 색인」 표의 줄 → 결정. 분야 칸(「분석·AI」 같은 줄임)을 본문 절 이름에 맞춘다."""
+    out, inside = [], False
+    for line in text_e.splitlines():
+        if line.startswith("## "):
+            inside = line.strip() == INDEX_HEAD
+            continue
+        m = inside and re.match(r"^\|\s*(\d+)\s*\|\s*(20\d\d-\d\d-\d\d)\s*\|\s*(.+?)\s*\|\s*([^|]+?)\s*\|", line)
+        if not m:
+            continue
+        field = m.group(4).strip()
+        sec = next((s for s in sections if s.startswith(field)), None)
+        if sec is None:
+            gm.warn(f"부록 E 색인 {m.group(1)}번: 분야 「{field}」가 본문 절 이름({sections})과 안 맞는다")
+            continue
+        title = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", m.group(3))  # 링크는 글자만
+        out.append({"num": int(m.group(1)), "title": title, "sec": sec,
+                    "date": date(*map(int, m.group(2).split("-"))), "index": True})
+    return out
+
+
 def parse_decisions(text_e):
     sections, decisions, cur, want_date = [], [], None, False
     for line in text_e.splitlines():
@@ -241,7 +265,12 @@ def parse_decisions(text_e):
     missing = [d["num"] for d in decisions if d["date"] is None]
     if missing:
         gm.warn(f"부록 E: 정한 날을 못 찾은 결정 {missing} — 본문에도 「한눈에 보기」 표에도 날짜가 없다")
-    return sections, [d for d in decisions if d["date"]]
+    body = [dict(d, index=False) for d in decisions if d["date"]]
+    index = parse_index(text_e, sections)
+    clash = {d["num"] for d in body} & {d["num"] for d in index}
+    if clash:
+        gm.warn(f"부록 E: 본문과 색인에 같은 번호 {sorted(clash)}")
+    return sections, body + index
 
 
 def fig_decisions(text_e):
@@ -259,34 +288,60 @@ def fig_decisions(text_e):
     for s in sections:
         ys[s] = y
         y += lane_h[s] + gap
-    h = y + 22
+    h_axis = y + 22   # 날짜 눈금 줄
+    h = h_axis + 22   # 그 아래 범례 한 줄
     b = []
     for s in sections:  # 분야 줄 — 옅은 바탕으로 줄을 가른다
         b.append(f'<rect x="{x0 - 14}" y="{ys[s]}" width="{x1 - x0 + 28}" height="{lane_h[s]}" rx="4" fill="{BOX_FILL}"/>')
         n = sum(1 for d in ds if d["sec"] == s)
         b.append(text(lx, ys[s] + lane_h[s] / 2 + 4, s, 12, "start", INK))
         b.append(text(x1 + 22, ys[s] + lane_h[s] / 2 + 4, f"{n}건", 11, "start"))
-    for i in range(n_days):  # 칸이 넉넉하면 날마다, 좁으면 첫날·끝날·월요일·1일만
-        day = d0 + timedelta(i)
-        if step >= 36 or day.day == 1 or i in (0, n_days - 1) or day.weekday() == 0:
-            b.append(text(X(day), h - 6, f"{day:%m-%d}", 10.5))
+    # 날짜 눈금 — 칸이 넉넉하면 날마다. 좁으면 첫날·끝날·1일·월요일 순으로, 앞서 놓은 글자와
+    # 겹치지 않는 것만(08-31 월요일과 09-01 처럼 붙은 날이 겹쳐 찍히지 않게)
+    days = [d0 + timedelta(i) for i in range(n_days)]
+    if step >= 36:
+        ticks = days
+    else:
+        ticks = []
+        for day in [d0, d1] + [d for d in days if d.day == 1] + [d for d in days if d.weekday() == 0]:
+            if day not in ticks and all(abs(X(day) - X(t)) >= 34 for t in ticks):
+                ticks.append(day)
+    for day in sorted(ticks):
+        b.append(text(X(day), h_axis - 6, f"{day:%m-%d}", 10.5))
     for num, s, _ in gm.SPRINTS:
         if d0 < s <= d1:
-            b.append(f'<line x1="{X(s) - step / 2}" y1="{top - 10}" x2="{X(s) - step / 2}" y2="{h - 18}" stroke="{AXIS}" stroke-width="1"/>')
+            b.append(f'<line x1="{X(s) - step / 2}" y1="{top - 10}" x2="{X(s) - step / 2}" y2="{h_axis - 18}" stroke="{AXIS}" stroke-width="1"/>')
             b.append(text(X(s) - step / 2 + 4, top - 14, f"스프린트 {num} 시작", 10.5, "start"))
+
+    def dot(cx, cy, index):  # 채운 점 = 본문에 근거까지, 빈 점 = 한 줄 색인
+        if index:
+            return f'<circle cx="{cx}" cy="{cy}" r="4.5" fill="#fff" stroke="{ACCENT}" stroke-width="2"/>'
+        return f'<circle cx="{cx}" cy="{cy}" r="5" fill="{ACCENT}" stroke="#fff" stroke-width="1.5"/>'
+
     for (s, day), group in stacks.items():
         for k, d in enumerate(group):
             cx, cy = X(day), ys[s] + lane_h[s] - 12 - k * 13
             tip = f"{d['num']}) {esc(d['title'])} — {day:%m-%d}"
             b.append(f'<g><title>{tip}</title><circle class="hit" cx="{cx}" cy="{cy}" r="11" fill="transparent"/>'
-                     f'<circle cx="{cx}" cy="{cy}" r="5" fill="{ACCENT}" stroke="#fff" stroke-width="1.5"/></g>')
+                     f'{dot(cx, cy, d["index"])}</g>')
+    body = [d for d in ds if not d["index"]]
+    index = [d for d in ds if d["index"]]
+    legend = [(False, f"본문에 근거·대안까지 적은 결정 {len(body)}개"),
+              (True, f"한 줄 색인의 결정 {len(index)}개 — 상세는 원문")]
+    lx2 = x0 - 8
+    for is_index, label in legend:
+        if (is_index and not index) or (not is_index and not body):
+            continue
+        b.append(dot(lx2 + 5, h - 12, is_index))
+        b.append(text(lx2 + 15, h - 8, label, 11, "start"))
+        lx2 += 15 + gm._text_w(label, 11) + 24
     return gm.figure(
         "".join(b), w, h,
-        f"결정 타임라인: 이 부록에 기록된 결정 {len(ds)}개를 정한 날과 분야로 점을 찍었다({d0:%m-%d}~{d1:%m-%d}).",
-        f"그림 E-1. 이 부록에 기록된 결정 {len(ds)}개를 정한 날(가로)과 분야(세로)로 놓았다. 점에 마우스를 올리면 "
-        f"결정 번호와 제목이 보인다. 여기 적힌 결정은 {d1:%m-%d}까지다 — 그 뒤의 결정은 "
-        '<a href="{{ "/진행-현황/" | relative_url }}">진행 현황</a>의 전환점과 '
-        '<a href="{{ "/pending/" | relative_url }}">미결 항목</a>에 있다.',
+        f"결정 타임라인: 이 부록의 결정 {len(ds)}개를 정한 날과 분야로 점을 찍었다({d0:%m-%d}~{d1:%m-%d}). "
+        f"채운 점 {len(body)}개는 본문에 근거까지, 빈 점 {len(index)}개는 한 줄 색인이다.",
+        f"그림 E-1. 이 부록의 결정 {len(ds)}개를 정한 날(가로)과 분야(세로)로 놓았다. 채운 점은 아래 본문에 "
+        f"근거·대안까지 적은 결정, 빈 점은 「09-05 이후 — 한 줄 색인」의 결정이다. 점에 마우스를 올리면 "
+        f"결정 번호와 제목이 보인다({d1:%m-%d}까지).",
     )
 
 
