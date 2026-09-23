@@ -233,3 +233,37 @@ h2,
 h3 {
   word-break: keep-all;
 }
+
+// --- 사이드바 — 묶음을 머리글로, 늘 펼쳐 둔다 (2026-09-23) ---------------------------
+// 묶음(1단계)이 접혀 있어 안에 무엇이 있는지 하나씩 눌러 봐야 했다(사용자 지적). 1단계 묶음의
+// 목록은 늘 펼치고, 묶음 이름은 작은 회색 머리글로 보인다 — 누르면 여전히 묶음 페이지로 간다.
+// 3단계(스프린트 일지 · QA 체크리스트)는 테마 기본대로 접힌다. `:has()` 를 못 쓰는 브라우저에서도
+// 목록은 펼쳐지고, 머리글 모양만 빠진다.
+#site-nav > .nav-list > .nav-list-item {
+  > .nav-list {
+    display: block;
+    padding-left: 0;
+  }
+
+  > .nav-list-expander {
+    display: none; // 늘 펼쳐 있으니 화살표는 뜻이 없다
+  }
+
+  &:has(> .nav-list) > .nav-list-link {
+    min-height: 0;
+    margin-top: 0.9rem;
+    padding-top: 0.15rem;
+    padding-bottom: 0.15rem;
+    border-bottom: 1px solid #e3e1da;
+    font-size: 0.75rem !important;
+    font-weight: 600;
+    line-height: 1.4rem;
+    letter-spacing: 0.04em;
+    color: #5c5962;
+  }
+}
+
+html[data-theme="dark"] #site-nav > .nav-list > .nav-list-item:has(> .nav-list) > .nav-list-link {
+  border-bottom-color: #44434d;
+  color: #a9a6ad;
+}
