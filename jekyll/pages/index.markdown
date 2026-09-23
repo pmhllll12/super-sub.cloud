@@ -13,9 +13,9 @@ nav_exclude: true
 
 개발 제안서
 
-# 생활체육 경기 영상을 멀티모달로 분석하여 용병을 구인하고 RAG 검증을 자동화하는 플랫폼<br>(Hit Rate 90%, Recall@5 90% 달성)
+# 생활체육 경기 영상에서 선수의 실력을 재고, 그 근거로 팀이 빈 자리에 맞는 용병을 찾는 플랫폼
 
-*Multimodal Analysis of Amateur Sports Match Videos for Substitute Player Scouting and Automated RAG Verification*
+*Measuring Player Skill from Amateur Sports Videos and Matching Substitutes on the Evidence*
 
 <br>
 
