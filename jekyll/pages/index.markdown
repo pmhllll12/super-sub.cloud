@@ -35,6 +35,32 @@ nav_exclude: true
 데모 사이트
 [https://supersub-ai.com](https://supersub-ai.com)
 
+<br>
+
+---
+
+<br>
+
+**둘러보기**
+
+왜 만드나
+[사업 개요]({{ "/01-사업개요/" | relative_url }}) · [현황 및 문제 정의]({{ "/02-현황및문제정의/" | relative_url }}) · [서비스 제안]({{ "/03-서비스제안/" | relative_url }})
+
+어떻게 계획했나
+[개발 구현 계획]({{ "/07-개발구현계획/" | relative_url }}) · [관리 지표]({{ "/관리-지표/" | relative_url }})
+
+무엇을 요구하나
+[요구사항 분석]({{ "/05-요구사항분석/" | relative_url }})
+
+어떻게 설계했나
+[시스템 설계]({{ "/06-시스템설계/" | relative_url }}) · [데이터베이스 ERD]({{ "/부록D-데이터베이스ERD/" | relative_url }})
+
+어떻게 확인하나
+[테스트 및 검증 계획]({{ "/08-테스트및검증계획/" | relative_url }}) · [관리 지표]({{ "/관리-지표/" | relative_url }})
+
+어디까지 왔나
+[진행 현황]({{ "/진행-현황/" | relative_url }}) · [관리 지표]({{ "/관리-지표/" | relative_url }}) · [개발 로그]({{ "/devlog/" | relative_url }})
+
 </div>
 
 <div markdown="1" style="text-align: center; margin-top: 3rem;">
