@@ -3,6 +3,16 @@
          빌드에만 이 권한을 넣는다(개발 도구용). 앱이 실제로 네트워크를 쓰므로
          release 빌드가 참조하는 main에도 있어야 한다. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- 클립을 앨범에서 고른다(image_picker). 🔴 Android 13(API 33)부터
+         READ_EXTERNAL_STORAGE 가 갈라져 영상은 이 권한이다 — 옛 이름만 두면
+         13 이상에서 앨범이 비어 보인다. maxSdkVersion 쪽은 12 이하용이다. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32"/>
+    <!-- 「바로 찍기」. 🔴 <uses-feature required="false"> 를 같이 둔다 —
+         안 두면 카메라 없는 기기가 스토어에서 통째로 걸러진다. -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <application
         android:label="super_sub"
         android:name="${applicationName}"

@@ -1,64 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../card/data/models/player_card.dart';
 import '../../../profile/presentation/widgets/player_card_view.dart';
-
-/// 판의 크기 — 3:3 · 5:5 · 7:7.
-enum SquadSize {
-  three('3 : 3'),
-  five('5 : 5'),
-  seven('7 : 7');
-
-  const SquadSize(this.label);
-
-  final String label;
-}
-
-/// 판 위의 자리. [col]·[row] 는 3열 × 4행 격자 칸이고, **행이 포지션**이다
-/// (0 FW · 1 MF · 2 DF · 3 GK — 웹 `lib/pitchGrid.ts` 의 `ROW_POS`).
-class SquadSlot {
-  const SquadSlot(this.area, this.col, this.row, {this.mine = false});
-
-  /// 역할+번호(`fw1` · `mf2` …). 🔴 크기를 바꿔도 같은 이름이 같은 자리를
-  /// 가리켜야 한다 — 웹 `FORMATIONS` 주석과 같은 이유.
-  final String area;
-  final int col;
-  final int row;
-
-  /// 내 카드가 처음 서는 자리.
-  final bool mine;
-
-  String get position => const ['FW', 'MF', 'DF', 'GK'][row];
-}
-
-/// 크기마다의 포메이션 — 웹 `SquadPanel.tsx` 의 `FORMATIONS` 를 그대로 옮겼다.
-/// 위가 공격, 아래가 골키퍼다.
-const Map<SquadSize, List<SquadSlot>> kFormations = {
-  // 1-1-1
-  SquadSize.three: [
-    SquadSlot('fw1', 1, 0, mine: true),
-    SquadSlot('mf1', 1, 1),
-    SquadSlot('gk', 1, 3),
-  ],
-  // 1-2-1 — 풋살 5인.
-  SquadSize.five: [
-    SquadSlot('fw1', 1, 0, mine: true),
-    SquadSlot('mf1', 0, 1),
-    SquadSlot('mf2', 2, 1),
-    SquadSlot('df1', 1, 2),
-    SquadSlot('gk', 1, 3),
-  ],
-  // 2-3-1
-  SquadSize.seven: [
-    SquadSlot('fw1', 1, 0, mine: true),
-    SquadSlot('mf1', 0, 1),
-    SquadSlot('mf2', 1, 1),
-    SquadSlot('mf3', 2, 1),
-    SquadSlot('df1', 0, 2),
-    SquadSlot('df2', 2, 2),
-    SquadSlot('gk', 1, 3),
-  ],
-};
+import '../../board_geometry.dart';
+import '../../data/models/squad.dart';
+import '../../seats_from_squad.dart';
 
 const Color _kOnDark = Color(0xFFFFFFFF);
 const Color _kInk = Color(0xFF0B0B0B);
@@ -68,30 +16,65 @@ const Color _kInk = Color(0xFF0B0B0B);
 /// 카드(내 카드 + 빈 자리)까지.
 ///
 /// ⚠️ **아직 안 옮긴 것**(웹에는 있다):
-/// - 서버 스쿼드(`GET /teams/{id}/squad`) — 지금은 내 카드 말고 전부 빈 자리다
 /// - 빈 자리(+) → AI 추천 · 지인 찾기. 폰에서는 옆 판이 아니라 **아래 시트**로
 ///   연다(`www/docs/2026-08-31-앱-이식-지침.md` §4). 지금은 [onSeatTap] 만 부른다
 /// - 카드 끌어 옮기기 · 빼기(⊗) · 포지션 직접 정하기
 class SquadBoard extends StatefulWidget {
   const SquadBoard({
     super.key,
-    required this.cardSeed,
+    required this.myCard,
     required this.onSeatTap,
+    this.squad,
+    this.mateCardBuilder,
+    this.onSeatMoved,
+    this.onSeatRemoved,
   });
 
-  /// 내 카드 붓자국의 씨앗 — `PlayerCardView.seed` 참고.
-  final String cardSeed;
+  /// 내 카드. 🔴 **씨앗·슬러그·꾸미기가 전부 여기서 나온다** — 따로 받으면
+  /// 한 곳만 넘기고 나머지를 빠뜨리게 된다(실제로 꾸미기가 그렇게 빠졌다).
+  /// 아직 안 만들었으면 `null` 이고, 그러면 판에 내 카드를 안 그린다.
+  final PlayerCard? myCard;
+
+  /// 서버 스쿼드. `null` 이면 아직 안 만들었거나 안 불러온 것이다 — 둘 다
+  /// 「자리가 전부 비어 있다」로 그린다.
+  final Squad? squad;
+
+  /// 그 슬러그의 남의 카드를 그려 준다. 아직 안 왔으면 `null` 을 돌려주고,
+  /// 그때 판은 **이름표로 물러난다**(판 전체를 로딩으로 덮지 않는다).
+  final Widget? Function(String slug, double width)? mateCardBuilder;
 
   /// 빈 자리를 눌렀다. 인자는 그 자리.
   final ValueChanged<SquadSlot> onSeatTap;
+
+  /// 카드를 **다른 칸으로 옮겼다**. `memberId` 는 그 자리 등재의 id,
+  /// `positionCode` 는 **놓인 행이 뜻하는 포지션**이다.
+  ///
+  /// 🔴 **`null` 이면 아예 못 집는다** — 주장이 아니면 옮겨도 403 이라,
+  /// 끌린 뒤 되돌아가는 것보다 못 집게 하는 편이 낫다.
+  final void Function(
+    String memberId,
+    String positionCode,
+    int col,
+    int row,
+  )? onSeatMoved;
+
+  /// 그 자리 사람을 **판에서 뺐다**(⊗). 인자는 등재 id 와 카드 슬러그다 —
+  /// 슬러그는 팀에서도 내보낼 때 주인을 알아내는 데 쓴다.
+  ///
+  /// 🔴 **`null` 이면 ⊗ 를 안 그린다**(주장이 아니다).
+  final void Function(String memberId, String? cardSlug)? onSeatRemoved;
 
   @override
   State<SquadBoard> createState() => _SquadBoardState();
 }
 
 class _SquadBoardState extends State<SquadBoard> {
-  /// 처음 여는 크기 — 풋살 5인(웹과 같다).
-  SquadSize _size = SquadSize.five;
+  /// 사람이 알약으로 고른 크기. 🔴 **이것이 서버 값을 이긴다** — 안 그러면
+  /// 판을 3:3 으로 바꾼 직후 스쿼드가 다시 도착하면서 5:5 로 되돌아간다.
+  SquadSize? _picked;
+
+  /// 서버가 모르는 값·`null` 을 주면 기본 판(5:5)이다.
+  SquadSize get _size => _picked ?? squadSizeOf(widget.squad?.formation);
 
   // 판 안 여백 — 위는 머리글(MY SQUAD · 크기) 자리, 아래는 이름표가 선을 물지
   // 않을 만큼. 웹(46 · 22 · 8)보다 옆을 줄였다 — 폰 폭에서 카드가 한 치라도 크게.
@@ -100,6 +83,38 @@ class _SquadBoardState extends State<SquadBoard> {
   static const double _padBottom = 6;
   static const double _labelH = 14;
   static const double _labelGap = 3;
+
+  /* 🔴 **집은 것은 자리(`area`)가 아니라 등재(`memberId`)다** (2026-09-21).
+     전에는 자리 이름을 들고 있었는데, 끄는 동안 판이 다시 계산되면 **같은
+     자리에 다른 사람이 배정되어** 엉뚱한 카드가 끌렸다 — 사용자가 잡은
+     「골키퍼를 옮기면 포워드가 골키퍼 자리로 간다」가 이것이다. */
+  String? _draggingMemberId;
+
+  /// 집은 카드가 손끝을 따라간 거리.
+  Offset _dragOffset = Offset.zero;
+
+  /* 🔴 **놓을 칸** — 자리 다섯은 격자(3열×4행) 위를 **돌아다닌다.** 포메이션은
+     처음 배치일 뿐이고, FW·MF·DF 줄은 세 칸 다 쓸 수 있다. 골키퍼 줄만
+     가운데 하나다(`canDropAt`). */
+  ({int col, int row})? _hoverCell;
+
+  /* 🔴 **집고 있는 동안은 판을 다시 계산하지 않는다.** 끄는 중에 서버 응답이
+     오거나 부모가 다시 그리면 자리가 재배치되어 **손에 쥔 카드가 다른 자리로
+     튄다.** 집을 때의 배치를 붙들고, 놓을 때 푼다. */
+  SeatAssignment? _frozenSeats;
+
+  /* 🔴 **손끝을 판 좌표로 옮기려면 판의 상자가 필요하다** (2026-09-21).
+     전에는 `localPosition`(카드 기준)에 칸의 왼쪽 위를 더해서 썼는데, 카드는
+     칸 안에서 **가운데 정렬**이라 그 둘을 더해도 판 좌표가 아니다. 어긋난
+     좌표로 칸을 찾으니 `null` 이 나와 **놓아도 아무 일이 안 일어났고**,
+     우연히 다른 칸을 가리키면 **엉뚱한 카드가 옮겨졌다.** */
+  final GlobalKey _boardKey = GlobalKey();
+
+  /// 화면 좌표 → 판 좌표. 판이 아직 안 그려졌으면 `null`.
+  Offset? _toBoard(Offset global) {
+    final box = _boardKey.currentContext?.findRenderObject() as RenderBox?;
+    return box?.globalToLocal(global);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -117,18 +132,49 @@ class _SquadBoardState extends State<SquadBoard> {
         final cardW = (byHeight < byWidth ? byHeight : byWidth).clamp(0.0, double.infinity);
         final cardH = cardW * 4.1 / 3;
 
+        // 🔴 자리 계산은 순수 함수 한 곳이다 — 판이 스스로 배치를 정하면
+        //    웹과 갈린다(`seats_from_squad.dart` 의 세 단계).
+        final seats = _frozenSeats ??
+            seatsFromSquad(
+              widget.squad,
+              _size,
+              mySlug: widget.myCard?.publicSlug,
+            );
+
+        final boardSize = Size(w, h);
+
         return Stack(
+          key: _boardKey,
           children: [
             Positioned.fill(
               child: CustomPaint(painter: _PitchPainter()),
             ),
+            // 놓을 자리 미리보기 — 집고 있는 동안만.
+            if (_hoverCell != null)
+              Positioned(
+                left: _padSide + _hoverCell!.col * cellW + (cellW - cardW) / 2,
+                top: _padTop +
+                    _hoverCell!.row * cellH +
+                    (cellH - cardH - _labelGap - _labelH) / 2,
+                width: cardW,
+                height: cardH,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(cardW * 24 / 380),
+                      border: Border.all(color: AppTheme.seed, width: 2),
+                      color: AppTheme.seed.withValues(alpha: 0.14),
+                    ),
+                  ),
+                ),
+              ),
             Positioned(
               top: 12,
               left: 16,
               right: 12,
               child: _head(),
             ),
-            for (final slot in kFormations[_size]!)
+            for (final slot in seats.slots)
               Positioned(
                 key: ValueKey('squad-seat-${slot.area}'),
                 left: _padSide + slot.col * cellW + (cellW - cardW) / 2,
@@ -136,7 +182,7 @@ class _SquadBoardState extends State<SquadBoard> {
                     slot.row * cellH +
                     (cellH - cardH - _labelGap - _labelH) / 2,
                 width: cardW,
-                child: _seat(slot, cardW),
+                child: _draggable(slot, cardW, seats, boardSize),
               ),
           ],
         );
@@ -170,29 +216,188 @@ class _SquadBoardState extends State<SquadBoard> {
               key: Key('squad-size-${size.name}'),
               label: size.label,
               selected: size == _size,
-              onTap: () => setState(() => _size = size),
+              onTap: () => setState(() => _picked = size),
             ),
           ),
       ],
     );
   }
 
-  Widget _seat(SquadSlot slot, double cardW) {
-    final card = slot.mine
-        ? PlayerCardView(width: cardW, seed: widget.cardSeed)
-        : GestureDetector(
-            key: Key('squad-add-${slot.area}'),
-            onTap: () => widget.onSeatTap(slot),
-            // 가운데 + — 카드 제 크기(380 폭) 기준 120 이다(웹 `.ss-squad-plus`).
-            child: BlankPlayerCardView(
-              width: cardW,
-              child: const Icon(Icons.add, size: 150, color: _kInk),
-            ),
-          );
+  /// 그 자리를 **집을 수 있는가** — 옮길 수 있는 사람이고 등재가 있어야 한다.
+  ///
+  /// 🔴 빈 자리는 못 집는다(옮길 등재가 없다). 주장이 아니면
+  /// [SquadBoard.onSeatMoved] 가 `null` 이라 아무것도 못 집는다.
+  bool _canDrag(SquadSlot slot, SeatAssignment seats) =>
+      widget.onSeatMoved != null && seats.memberIds.containsKey(slot.area);
+
+  /// 자리 하나를 **길게 눌러 집고 끌 수 있게** 감싼다.
+  ///
+  /// 🔴 **길게 눌러야 집힌다.** 폰에서는 판이 스크롤·시트와 섞일 수 있어, 바로
+  /// 끌리면 판을 내리려다 카드를 옮기게 된다(웹은 마우스라 그 문제가 없다).
+  Widget _draggable(
+    SquadSlot slot,
+    double cardW,
+    SeatAssignment seats,
+    Size boardSize,
+  ) {
+    final seat = _seat(slot, cardW, seats);
+    if (!_canDrag(slot, seats)) return seat;
+
+    final memberId = seats.memberIds[slot.area];
+    final dragging = _draggingMemberId != null &&
+        _draggingMemberId == memberId;
+    return GestureDetector(
+      key: Key('squad-drag-${slot.area}'),
+      behavior: HitTestBehavior.deferToChild,
+      onLongPressStart: (_) {
+        // 집혔다는 것을 손끝으로 알린다 — 화면만 바뀌면 놓치기 쉽다.
+        HapticFeedback.mediumImpact();
+        setState(() {
+          _draggingMemberId = seats.memberIds[slot.area];
+          _dragOffset = Offset.zero;
+          _hoverCell = (col: slot.col, row: slot.row);
+          // 이 배치를 놓을 때까지 붙든다(위 `_frozenSeats` 주석).
+          _frozenSeats = seats;
+        });
+      },
+      onLongPressMoveUpdate: (d) {
+        if (_draggingMemberId != seats.memberIds[slot.area]) return;
+        final onBoard = _toBoard(d.globalPosition);
+        final cell = onBoard == null
+            ? null
+            : cellAt(
+                onBoard,
+                boardSize,
+                padTop: _padTop,
+                padSide: _padSide,
+                padBottom: _padBottom,
+              );
+        setState(() {
+          _dragOffset = d.offsetFromOrigin;
+          // 🔴 놓을 수 없는 칸(골키퍼 줄 양옆)이면 미리보기도 안 뜬다.
+          _hoverCell =
+              cell == null || !canDropAt(cell.col, cell.row) ? null : cell;
+        });
+      },
+      onLongPressEnd: (_) => _dropAt(slot, seats),
+      onLongPressCancel: _cancelDrag,
+      child: Transform.translate(
+        offset: dragging ? _dragOffset : Offset.zero,
+        child: Transform.scale(
+          // 집힌 카드는 살짝 뜬다 — 「지금 이걸 들고 있다」가 보여야 한다.
+          scale: dragging ? 1.08 : 1,
+          child: seat,
+        ),
+      ),
+    );
+  }
+
+  void _cancelDrag() {
+    if (_draggingMemberId == null) return;
+    setState(() {
+      _draggingMemberId = null;
+      _dragOffset = Offset.zero;
+      _hoverCell = null;
+      _frozenSeats = null;
+    });
+  }
+
+  /// 손을 뗐다 — 놓을 수 있으면 알리고, 아니면 제자리로 돌아간다.
+  void _dropAt(SquadSlot slot, SeatAssignment seats) {
+    final target = _hoverCell;
+    final memberId = seats.memberIds[slot.area];
+    _cancelDrag();
+    // 놓을 수 없는 데면 제자리로 돌아간다.
+    if (target == null || memberId == null) return;
+    // 제자리면 서버를 괜히 부르지 않는다.
+    if (target.col == slot.col && target.row == slot.row) return;
+    /* 🔴 **이미 찬 칸에는 못 놓는다.** 서로 자리를 바꾸려면 등재 둘을 한 번에
+       고쳐야 하는데 계약에 그런 경로가 없다 — 한쪽씩 보내면 중간에 **같은 칸에
+       둘**이 되어 서버가 막는다. 제자리로 돌려보낸다. */
+    /* 🔴 **이미 사람이 있는 칸에는 못 놓는다.** 서로 자리를 바꾸려면 등재
+       둘을 한 번에 고쳐야 하는데 계약에 그런 경로가 없다 — 한쪽씩 보내면
+       중간에 같은 칸에 둘이 되어 서버가 막는다. */
+    final taken = seats.slots.any(
+      (s) =>
+          s.area != slot.area &&
+          s.col == target.col &&
+          s.row == target.row &&
+          (s.mine || seats.mates.containsKey(s.area)),
+    );
+    if (taken) {
+      HapticFeedback.lightImpact();
+      return;
+    }
+    widget.onSeatMoved!(
+      memberId,
+      // 🔴 포지션은 **놓인 행**이 정한다 — 계약이 position_code 를 늘 요구한다.
+      positionOfRow(target.row),
+      target.col,
+      target.row,
+    );
+  }
+
+  /// 자리는 셋으로 갈린다 — **내 카드 · 남의 카드 · 빈 자리.**
+  Widget _seat(SquadSlot slot, double cardW, SeatAssignment seats) {
+    final Widget card;
+    if (slot.mine && widget.myCard != null) {
+      final mine = widget.myCard!;
+      card = PlayerCardView(
+        width: cardW,
+        seed: mine.publicSlug,
+        alias: aliasOf(mine),
+        style: mine.style,
+        photoUrl: mine.photoUrl,
+      );
+    } else if (seats.mates.containsKey(slot.area)) {
+      final slug = seats.slugs[slot.area];
+      final mate =
+          slug == null ? null : widget.mateCardBuilder?.call(slug, cardW);
+      // 🔴 카드가 아직 안 왔거나 슬러그가 없으면 **이름표로 물러난다.** 판
+      //    전체를 로딩으로 덮지 않는다 — 나머지 자리는 이미 그릴 수 있다.
+      card = mate ?? _nameplate(slot, cardW, seats);
+    } else {
+      card = GestureDetector(
+        key: Key('squad-add-${slot.area}'),
+        onTap: () => widget.onSeatTap(slot),
+        // 가운데 + — 카드 제 크기(380 폭) 기준 120 이다(웹 `.ss-squad-plus`).
+        child: BlankPlayerCardView(
+          width: cardW,
+          child: const Icon(Icons.add, size: 150, color: _kInk),
+        ),
+      );
+    }
+    /* 🔴 **내 카드에는 ⊗ 가 없다**(웹, 2026-09-17 사용자 판단). 내 카드는
+       옮기기만 한다 — 스스로를 빼면 주장이 팀에서 나가는 셈이라 서버도
+       409 LAST_OWNER 로 막는다. 남의 카드만 ⊗ 로 뺀다.
+       🔴 **주장에게만 그린다** — `onSeatRemoved` 가 null 이면 안 그린다. */
+    final removable = !slot.mine &&
+        widget.onSeatRemoved != null &&
+        seats.memberIds.containsKey(slot.area);
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        card,
+        if (removable)
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              card,
+              Positioned(
+                top: -6,
+                right: -6,
+                child: _RemoveButton(
+                  key: Key('squad-remove-${slot.area}'),
+                  onTap: () => widget.onSeatRemoved!(
+                    seats.memberIds[slot.area]!,
+                    seats.slugs[slot.area],
+                  ),
+                ),
+              ),
+            ],
+          )
+        else
+          card,
         const SizedBox(height: _labelGap),
         SizedBox(
           height: _labelH,
@@ -208,6 +413,69 @@ class _SquadBoardState extends State<SquadBoard> {
           ),
         ),
       ],
+    );
+  }
+
+  /// 카드가 아직 없을 때 그 자리 사람의 **이름만** 세운다.
+  ///
+  /// 🔴 **글자 크기 40 은 카드 제 크기(380 폭) 기준이다** — `BlankPlayerCardView`
+  /// 안은 통째로 줄어들므로 여기에 화면 픽셀을 넣으면 작은 판에서 글자만 커진다.
+  Widget _nameplate(SquadSlot slot, double cardW, SeatAssignment seats) {
+    // 수락 대기중이면 흐리게 — 「아직 안 온 사람」이다.
+    final ready = seats.ready[slot.area] ?? true;
+    return BlankPlayerCardView(
+      width: cardW,
+      child: Opacity(
+        opacity: ready ? 1 : 0.45,
+        child: Text(
+          seats.mates[slot.area]!,
+          key: Key('squad-mate-${slot.area}'),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 40,
+            fontWeight: FontWeight.w700,
+            color: _kInk,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 카드를 판에서 빼는 ⊗ — 카드 오른쪽 위 모서리에 걸친다.
+///
+/// 🔴 **누르는 자리를 카드보다 크게 잡는다.** 판의 카드는 폰에서 아주 작아서
+/// 보이는 크기 그대로 두면 손가락으로 못 누른다(최소 40×40).
+class _RemoveButton extends StatelessWidget {
+  const _RemoveButton({super.key, required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: '판에서 빼기',
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          width: 40,
+          height: 40,
+          child: Center(
+            child: Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                color: _kInk.withValues(alpha: 0.82),
+                shape: BoxShape.circle,
+                border: Border.all(color: _kOnDark, width: 1.5),
+              ),
+              child: const Icon(Icons.close, size: 14, color: _kOnDark),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

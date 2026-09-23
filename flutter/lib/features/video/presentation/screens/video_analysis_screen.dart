@@ -58,6 +58,15 @@ class _VideoAnalysisScreenState extends ConsumerState<VideoAnalysisScreen> {
             context.go('/home');
             return;
           }
+          // 🔴 3번은 내 프로필 — 홈과 같은 배선이다(2026-09-22).
+          if (index == 3) {
+            context.go('/profile');
+            return;
+          }
+          /* 🔴 **1번은 이 화면 자신이다**(`/videos` 가 여기다) — 아무것도 안
+             한다. `context.go` 를 부르면 같은 화면을 다시 쌓아 **뒤로 가기가
+             한 번 더 필요해진다.** */
+          if (index == 1) return;
           _notReady();
         },
       ),
