@@ -35,6 +35,7 @@ from app.analysis.adapter.outbound.stub.video_stub_repository import (
     reset_videos,
 )
 from app.analysis.application.use_cases.report_parser import parse_report
+from app.analysis.domain.rules.video_rules import MAX_VIDEOS_PER_GROUP
 from app.analysis.dependencies.video_providers import get_storage
 from app.core.config import settings
 from app.core.security import issue_access_token
@@ -199,9 +200,9 @@ class TestRegister:
     def test_반려는_판정만_남고_작업은_안_생긴다(
         self, db_client, db_session, uploader
     ):
-        # 8K — 2026-09-11 정정으로 4K(3840x2160)까지는 통과하니 그 위 값을 쓴다.
+        # 🔴 해상도는 2026-09-19 결정으로 더는 반려 사유가 아니다 — 길이 초과로 반려시킨다.
         key = _upload(db_client, uploader)
-        res = _register(db_client, uploader, key, width=7680, height=4320)
+        res = _register(db_client, uploader, key, duration_ms=60_001)
         assert res.status_code == 201, res.text
         video_id = uuid.UUID(res.json()["id"])
 
@@ -212,7 +213,7 @@ class TestRegister:
             {"id": video_id},
         ).one()
         assert passed is False
-        assert "7680x4320" in reason
+        assert "길이" in reason
 
         jobs = db_session.execute(
             text("SELECT count(*) FROM analysis_job WHERE video_id = :id"),
@@ -892,6 +893,87 @@ class TestListMyVideos:
         assert rows[ok]["reject_reason"] is None
         assert rows[rejected]["analysis_status"] is None
         assert "길이" in rows[rejected]["reject_reason"]
+
+
+class TestVideoLimitDb:
+    """갈래별 개수 상한이 **실제 PostgreSQL 에서** 도는지 (2026-09-22).
+
+    계약 테스트는 스텁이 파이썬 리스트를 세므로, `analysis_job` 을 `EXISTS`
+    로 가르는 `COUNT` 가 실물에서 맞는지는 여기서만 걸린다.
+    """
+
+    def _user_id(self, db_client, uploader):
+        return uuid.UUID(
+            db_client.get(f"{V1}/me", headers=uploader["headers"]).json()["id"]
+        )
+
+    def _fill_uploaded(self, db_client, uploader, n):
+        ids = []
+        for _ in range(n):
+            key = _upload(db_client, uploader)
+            res = _register(db_client, uploader, key, analyze=False)
+            assert res.status_code == 201, res.text
+            ids.append(res.json()["id"])
+        return ids
+
+    def _fill_analyzed(self, db_client, uploader, n):
+        ids = []
+        for _ in range(n):
+            key = _upload(db_client, uploader)
+            res = _register(db_client, uploader, key)
+            assert res.status_code == 201, res.text
+            video_id = res.json()["id"]
+            kept = db_client.post(
+                f"{V1}/videos/{video_id}/keep", headers=uploader["headers"]
+            )
+            assert kept.status_code == 200, kept.text
+            ids.append(video_id)
+        return ids
+
+    def test_갈래를_analysis_job_유무로_가른다(self, db_client, uploader, db_session):
+        """🔴 화면(`analysis_job_id`)과 같은 축인지 — 실물 조인으로 확인한다."""
+        self._fill_analyzed(db_client, uploader, MAX_VIDEOS_PER_GROUP)
+        self._fill_uploaded(db_client, uploader, 1)
+
+        repo = VideoPgRepository(db_session)
+        user_id = self._user_id(db_client, uploader)
+        assert repo.count_kept_by_user(user_id, analyzed=True) == MAX_VIDEOS_PER_GROUP
+        assert repo.count_kept_by_user(user_id, analyzed=False) == 1
+
+    def test_한_갈래가_차도_다른_갈래는_열려_있다(self, db_client, uploader):
+        self._fill_analyzed(db_client, uploader, MAX_VIDEOS_PER_GROUP)
+
+        blocked = _register(
+            db_client, uploader, _upload(db_client, uploader)
+        )
+        assert blocked.status_code == 422
+        assert blocked.json()["error"]["code"] == "VIDEO_LIMIT_EXCEEDED"
+
+        # 업로드 갈래는 비어 있다
+        assert len(self._fill_uploaded(db_client, uploader, 1)) == 1
+
+    def test_임시_클립은_DB_에서도_안_세어진다(self, db_client, uploader, db_session):
+        """`kept=false` 행이 실제로 `COUNT` 에서 빠지는지."""
+        for _ in range(MAX_VIDEOS_PER_GROUP + 1):
+            key = _upload(db_client, uploader)
+            res = _register(db_client, uploader, key)  # analyze 기본값 → 임시
+            assert res.status_code == 201, res.text
+            assert res.json()["kept"] is False
+
+        repo = VideoPgRepository(db_session)
+        user_id = self._user_id(db_client, uploader)
+        assert repo.count_kept_by_user(user_id, analyzed=True) == 0
+        assert repo.count_kept_by_user(user_id, analyzed=False) == 0
+
+    def test_지우면_DB_에서_자리가_빈다(self, db_client, uploader):
+        ids = self._fill_uploaded(db_client, uploader, MAX_VIDEOS_PER_GROUP)
+        assert (
+            db_client.delete(
+                f"{V1}/videos/{ids[0]}", headers=uploader["headers"]
+            ).status_code
+            == 204
+        )
+        assert len(self._fill_uploaded(db_client, uploader, 1)) == 1
 
 
 def _email_of(db_client, uploader):

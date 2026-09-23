@@ -1638,10 +1638,25 @@ export default function AnalysisStage() {
           {/* 🔴 비교가 뜨면 **이 상자가 반으로 갈린다** — 내 영상은 오른쪽으로
               밀리고 왼쪽에 선수 영상이 들어온다(사용자 요청). 자리를 나누는
               일만 여기서 하고, 안의 것들은 제 크기대로 따라간다. */}
+          {/* 🔴 **행 비율(55/45)을 인라인 스타일로 직접 건다**(2026-09-19,
+              사용자 지적 — "세 순간 카드가 안 뜬다"). `[data-moments='true']`
+              CSS 선택자에 맡겼더니, 이 상자에 같은 값을 노리는 규칙이
+              여러 벌 걸려 있어(`.ss-shot-frame-body[data-compare='true']` ·
+              `.ss-shot[data-grown='true'] .ss-shot-frame-body[data-compare='true']`
+              등 — 위 특이도 주석 참고) 실제로는 몇 벌인지 눈으로 다 못 셌다.
+              `.ss-shot-moments`가 `min-height: 0` · `overflow: hidden`이라
+              그 규칙이 하나라도 어긋나면 카드 줄이 소리 없이 0px 로 접힌다.
+              인라인 스타일은 그 어떤 외부 규칙보다 항상 이기므로, 이 값 하나만
+              보면 되게 만든다. */}
           <div
             className="ss-shot-frame-body"
             data-compare={compare === 'shown' ? 'true' : undefined}
             data-moments={compare === 'shown' && compareMotion.status === 'ready' ? 'true' : undefined}
+            style={
+              compare === 'shown' && compareMotion.status === 'ready'
+                ? { gridTemplateRows: '55fr 45fr' }
+                : undefined
+            }
           >
             {/* ⚠️ **데모 클립이다** — 선수 영상을 찾는 경로가 계약에도 에이전트에도
                 없다(위 `COMPARE` 주석). 진짜가 붙으면 `src` 만 갈아 끼운다. */}

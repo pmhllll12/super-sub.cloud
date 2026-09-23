@@ -366,7 +366,19 @@ body::-webkit-scrollbar {
   cursor: pointer;
 }
 
-.ss-home-nav-item:hover,
+/* 🔴 **가리키기 색은 실제 마우스에서만 켠다**(2026-09-20, 사용자 지적 —
+   폰에서 한 번 눌러도 안 넘어갔다). 터치 화면은 첫 탭을 `:hover` 로
+   받는 기기가 많아서, 이 규칙이 조건 없이 걸려 있으면 첫 탭은 이 색만
+   켜고 실제 이동은 두 번째 탭에야 일어난다 — 아래
+   `@media (hover: hover)` 로 가둬 터치에서는 애초에 이 규칙이 안 걸리게
+   한다. `:focus-visible` · `[data-active]` 는 가리키기가 아니라서 그대로
+   둔다. */
+@media (hover: hover) {
+  .ss-home-nav-item:hover {
+    color: var(--ss-accent);
+  }
+}
+
 .ss-home-nav-item:focus-visible,
 .ss-home-nav-item[data-active='true'] {
   color: var(--ss-accent);
@@ -400,6 +412,49 @@ body::-webkit-scrollbar {
 /* 글자는 원래 자간을 그대로 쓴다 — 아이콘이 위에 붙었을 뿐이다. */
 .ss-home-nav-label {
   letter-spacing: inherit;
+}
+
+/* 🔴 **폰에서 다섯 칸이 한 줄에 안 들어갔다**(2026-09-20, 사용자 지적 —
+   "영상 분석·레슨·상점·경기장 예약·알림"이 두 줄로 접혀 보기 싫었다).
+   `column-gap: 40px`·31px 아이콘·0.875rem 글자·0.08em 자간은 전부 넓은
+   화면 기준이다. 🔴 **라벨을 숨기는 시도는 되돌린다**(사용자 지적 —
+   글씨가 안 보인다) — 글자는 그대로 두고 아이콘·간격·글자 크기·자간을
+   함께 줄여서 다섯 칸이 폭 안에 들어가게 한다.
+
+   🔴 **그런데 그만큼 줄인 값(0.6rem·18px)이 너무 작아 이번엔 "잘 안
+   보인다"는 말을 들었다**(2026-09-20). 완전히 되돌리면 다시 두 줄로
+   접히므로, 읽을 만한 선까지만 올리고(0.6→0.72rem, 18→21px) **넘치는
+   나머지는 가로로 긋는다** — `body` 가 `overflow-x: clip` 이라(위쪽
+   규칙) 이 줄 자체에 `overflow-x: auto` 를 안 주면 다음으로 좁은 기기에서
+   또 이만큼 늘린 값이 넘칠 때 잘려서 **아예 안 보이게** 된다(글자가
+   작은 것과는 다른 종류의 "안 보임"이다). 마켓 판의 카드 줄
+   (`.ss-market-gate-cards[data-frozen='true']`)과 같은 처리. */
+@media (max-width: 640px) {
+  .ss-home-nav-list {
+    column-gap: 10px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .ss-home-nav-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ss-home-nav-item--stack {
+    padding: 6px 4px;
+  }
+
+  .ss-home-nav-icon {
+    font-size: 21px;
+  }
+
+  .ss-home-nav-item {
+    font-size: 0.72rem;
+    letter-spacing: 0;
+  }
 }
 
 /* 아이콘과 그 위의 빨간 점을 함께 잡는 칸. 점을 아이콘 기준으로 매달아야
@@ -1775,6 +1830,18 @@ body::-webkit-scrollbar {
   width: max-content;
 }
 
+/* 🔴 **폰에서 시연영상(구석에 뜬다)이 GK·DF 카드와 겹쳤다**(2026-09-20,
+   사용자 지적). 시연영상은 이 판과 무관하게 화면 구석에 고정으로 뜨는
+   별개 요소(`DemoVideo`)라 카드 배치를 바꾸는 대신, **판 아래에 그 영상이
+   앉을 만큼의 빈 자리**를 미리 비워 둔다 — 카드는 그대로 두고 스크롤이
+   그만큼 더 내려가게 하는 셈이다. 값은 `cornerBox`(같은 날 폰 크기로
+   키운 값)의 최대 높이(190px)에 위아래 여백을 더한 것이다. */
+@media (max-width: 639px) {
+  .ss-squad-wrap {
+    padding-bottom: 260px;
+  }
+}
+
 /* 스쿼드 판 — **판이라 할 것이 없다.** 직각, 블러 없음, 바탕색 없음.
    경기장 선과 모서리 꺾쇠만 남아 배경 사진 위에 선을 그어 놓은 모양이다.
    유리 재질(반투명 + 블러 + 둥근 모서리)을 여러 조합으로 해 봤지만
@@ -2454,6 +2521,27 @@ body::-webkit-scrollbar {
   .ss-suggest[data-state='open'] .ss-suggest-list > li {
     animation-duration: 1ms;
     animation-delay: 0ms;
+  }
+}
+
+/* 🔴 **폰에서 이 판(추천·지인 찾기·비슷한 팀) 폭이 0이 됐다**(2026-09-20,
+   사용자 지적 — "+ 눌러도 선수 목록이 안 나온다"). 위 `--ss-side-panel-w:
+   min(380px, calc((100vw - 620px) / 2))` 는 넓은 화면 전제다 — `100vw`가
+   620px 아래면 `calc()` 가 음수가 되고, 너비는 음수를 못 받아 0으로
+   깎인다. 그 결과 판은 DOM 에 있어도 폭 0이라 아무것도 안 보였다.
+   폰에서는 오른쪽에 나란히 세우는 대신, 화면에 고정한 채 아래에서 올라오는
+   시트로 바꾼다 — 스쿼드 판(왼쪽)이 뒤에 그대로 남는다. */
+@media (max-width: 900px) {
+  .ss-suggest,
+  .ss-tm {
+    position: fixed;
+    top: auto;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    width: auto;
+    max-height: 70vh;
+    margin-left: 0;
   }
 }
 
@@ -3821,6 +3909,12 @@ body::-webkit-scrollbar {
   background: var(--ss-bg);
   /* 왼쪽에서 밀려 들어온다 — 내 영상이 오른쪽으로 밀리는 것과 한 동작이다. */
   animation: ss-shot-compare-in 420ms var(--ss-home-out-ease) both;
+  /* 🔴 **그리드 칸의 "자동 최소 크기" 함정**(2026-09-19). 그리드 항목은
+     기본이 `min-height: auto`인데, 안에 고유 비율이 있는 콘텐츠(영상)가
+     있으면 그 비율을 지키려고 트랙이 필요한 만큼 자기 몫(55fr)을 넘어서까지
+     커진다 — 옆줄(세 순간 카드, 45fr)이 그만큼 눌린다. 0으로 꺼서 트랙이
+     순수하게 fr 비율만 따르게 한다. */
+  min-height: 0;
 }
 
 .ss-shot-compare-slot .ss-shot-track {
@@ -3879,7 +3973,10 @@ body::-webkit-scrollbar {
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  min-height: 0;
+  /* 🔴 **바닥을 둔다**(2026-09-19). `min-height: 0`만 있으면 위 그리드 행이
+     조금이라도 낮게 잡히는 순간 카드가 그대로 따라 눌려 안 보인다 —
+     뼈대 그림 한 벌이 들어갈 최소 자리는 지킨다. */
+  min-height: 120px;
   padding: 8px;
   border: 1px solid color-mix(in srgb, var(--ss-fg) 22%, transparent);
   border-radius: 10px;
@@ -3900,6 +3997,12 @@ body::-webkit-scrollbar {
   flex: 1;
   width: 100%;
   min-height: 0;
+  /* 🔴 **키를 폭에서 직접 얻는다**(2026-09-19). `viewBox`가 정사각(1000×1000)인데
+     `flex: 1`만으로는 조상 상자들의 키 계산이 전부 맞아야만 키가 생긴다 —
+     그 사슬이 길고(그리드 행 → flex 열 → 그리드 카드 → flex 카드) 한 군데만
+     어긋나도 svg 키가 0 이 된다. `aspect-ratio`는 **이 요소의 폭**만 보므로
+     사슬과 무관하게 늘 그려진다. */
+  aspect-ratio: 1;
 }
 
 .ss-shot-moment-label {
@@ -4773,6 +4876,13 @@ body::-webkit-scrollbar {
   background: var(--ss-bg);
   object-fit: contain;
   transition: opacity 420ms ease;
+  /* 🔴 **그리드 자동 최소 크기 함정**(2026-09-19, `.ss-shot-compare-slot`와
+     같은 이유) — 이 영상은 비교 모드에서 그리드 칸으로 들어간다
+     (`.ss-shot-frame-body[data-compare='true']`). `min-height: 0`이 없으면
+     세로가 유난히 긴 영상(예: DCI 4K 세로)일수록 그리드가 이 칸에 필요
+     이상의 자동 최소 키를 주고, 그만큼 아래 세 순간 카드 줄이 눌려
+     안 보이게 된다(실측: 865px 중 카드 줄이 10px 로 눌린 것을 확인). */
+  min-height: 0;
 }
 
 /* 🔴 닫는 동안 **미리 흐려 둔다.** 영상은 판이 다 줄어든 뒤에야 DOM 에서
@@ -5697,9 +5807,17 @@ body::-webkit-scrollbar {
     --ss-shot-panel-w: 100vw;
   }
 
-  /* 좁으면 헤더도 낮아진다 — 위 여백을 그만큼 돌려준다. */
+  /* 🔴 **108px 로는 모자랐다**(2026-09-20, 사용자 지적 — 제목·설명이
+     머리글 5칸 아이콘 줄(영상 분석·레슨·상점·경기장 예약·알림·내 프로필)
+     과 겹쳤다). 이 값을 정할 때는 아이콘 줄이 지금처럼 라벨까지 달고 두
+     줄로 접히기 전이었던 것으로 보인다 — 폰에서 그 줄이 훨씬 커졌다.
+     🔴 **아래도 같이 늘린다** — 시연영상(폰에서 화면 구석에 뜬다, `DemoVideo`)
+     이 이 판의 스크롤 맨 아래 안내 글과 겹쳤다. 이 판은 이미
+     `overflow-y: auto` 라 아래 여백을 늘리면 그만큼 더 내려야 안내 글
+     끝이 보인다 — 스쿼드 판(`.ss-squad-wrap`)에 둔 것과 같은 처리다. */
   .ss-shot-panel {
-    padding-top: 108px;
+    padding-top: 240px;
+    padding-bottom: 280px;
   }
 
   .ss-shot-side {
@@ -11873,6 +11991,16 @@ body:has(.ss-profile) {
     /* 🔴 여기서는 판이 흐름에 있고 위 여백도 0 이라 걷어 올릴 것이 없다 —
        그대로 두면 판이 화면 위로 그만큼 빠져나간다. */
     --ss-profile-rise: 0px;
+    /* 🔴 **머리글이 헤더 워드마크와 겹쳤다**(2026-09-20, 사용자 지적,
+       "MY"와 "SUPERSUB"가 포개져 보였다). 92px 은 데스크톱 헤더 높이
+       기준이라 폰의 실제 헤더 아래로는 자리가 모자랐다 — 여유를 크게 둔다. */
+    --ss-profile-top: 160px;
+  }
+
+  .ss-profile-title {
+    /* 🔴 큰 글자 + 82px 왼쪽 여백이 좁은 폭에서 넘쳤다 — 같이 줄인다. */
+    --ss-profile-title-size: 2rem;
+    left: 24px;
   }
 
   .ss-profile-sheet {
@@ -11890,6 +12018,36 @@ body:has(.ss-profile) {
   .ss-profile-id {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  /* 🔴 **소속·정보가 반씩 나뉘어 너무 좁았다**(2026-09-20, 사용자 지적 —
+     "호칭 정하기"·이메일이 한 글자씩 세로로 접혔다). 2×2 를 세로 한 줄로
+     푼다 — 각 절이 폭 전체를 쓴다. */
+  .ss-profile-body {
+    grid-template-columns: 1fr;
+  }
+
+  /* 🔴 「해당 영상 리포트 보기」— 이 폭에서는 알약 줄(`.ss-profile-tabrow`)이
+     이미 가로를 다 쓰고 있어서, 흐름 밖 절대배치(오른쪽 끝)로 걸어 두면
+     「업로드 영상」 알약 위에 그대로 얹혀 글자가 가려진다(2026-09-20, 사용자
+     지적 — 모바일 스크린샷으로 확인). 흐름으로 되돌리면 `.ss-profile-tabrow`
+     가 이미 `flex-wrap: wrap` 이라 알약 줄 아래 제 줄로 저절로 접힌다.
+
+     🔴 **들고나는 연출도 같이 끈다.** 두 상태(`:not([data-entered])` ·
+     `[data-entered]`) 키프레임이 전부 `translateY(-50%)` 를 자리로 굳혀
+     두는데, `position: static` 으로 바뀐 뒤에도 그 값이 그대로 적용되면
+     단추가 제 키의 절반만큼 위로 튀어 올라 알약 줄과 다시 겹친다 — 흐림
+     모드(`prefers-reduced-motion`)가 같은 이유로 이 단추의 연출을 끈
+     자리(위 `.ss-profile-report-open { animation: none }`)와 같은 결이다. */
+  .ss-profile-report-open {
+    position: static;
+    transform: none;
+  }
+
+  .ss-profile[data-entered] .ss-profile-report-open,
+  .ss-profile[data-entered] .ss-profile-report-open[data-leaving='true'],
+  .ss-profile:not([data-entered]) .ss-profile-report-open {
+    animation: none;
   }
 }
 
@@ -13713,6 +13871,31 @@ body:has(.ss-venues) .ss-home-header {
   animation-name: ss-mw-side-right;
 }
 
+/* 🔴 **폰에서 화면에 안 다 들어왔다**(2026-09-20, 사용자 지적). 이 판은
+   두 팀의 `.ss-squad`(주 스쿼드 편집 화면과 같은 크기)를 그대로 두 벌
+   쌓아 보여준다 — 좁은 화면에서는 `.ss-mw-body`의 `flex-wrap`이 이미
+   세로로 접어 주지만, 두 판이 원래 크기 그대로라 합친 키가 화면보다
+   훨씬 크다. 카드 폭(`--ss-pcard-mini-w`)을 줄여 판 전체를 비례로
+   작게 만든다 — 이 값이 카드·격자·줄 높이를 전부 계산하는 손잡이다
+   (주 편집 화면에는 손 안 댄다, `.ss-mini` 안에서만). */
+@media (max-width: 640px) {
+  .ss-mini .ss-squad {
+    --ss-pcard-mini-w: 52;
+  }
+
+  .ss-mw-body {
+    gap: 12px;
+    padding: 16px 8px;
+  }
+
+  /* 내용이 그래도 넘치면 판 안에서 스크롤한다 — 통째로 잘리는 것보다
+     낫다. 위쪽은 그대로 둔다(들어오는 연출이 화면 밖에서 시작해야 한다). */
+  .ss-mw {
+    align-items: start;
+    overflow-y: auto;
+  }
+}
+
 /* 양옆 판이 절반쯤 들어왔을 때 — 「무엇을 보는 화면인지」가 그때 도착한다. */
 .ss-mw-mid {
   animation: ss-mw-drop 660ms cubic-bezier(0.22, 1, 0.36, 1) 1120ms both;
@@ -15036,6 +15219,9 @@ a.ss-seeking-pill:hover {
   padding: 0;
   background: none;
   cursor: pointer;
+  /* 🔴 이 단추가 **영상 전체를 덮는 끌기 손잡이다**(위 주석 "영상 전체가
+     누르는 자리다") — `.ss-demo-glass-btn`과 같은 이유로 필요하다. */
+  touch-action: none;
 }
 
 .ss-demo-video-toggle[aria-pressed='true'] {
@@ -15201,6 +15387,12 @@ a.ss-seeking-pill:hover {
   white-space: nowrap;
   cursor: pointer;
   transition: background 0.15s ease;
+  /* 🔴 **끌기(옮기기) 손잡이인데 빠져 있었다**(2026-09-20, 사용자 지적 —
+     "옮기기가 힘들다"). 눈금 막대(`.ss-demo-video-seek`)·모서리 손잡이
+     (`.ss-demo-resize`)는 이미 있는데 여기만 없어서, 폰에서 이 단추를
+     누르고 끄는 동안 브라우저가 그 손짓을 화면 스크롤로 가로채 갔다
+     (같은 함정을 겪은 다른 자리와 같은 원인 · 같은 해법). */
+  touch-action: none;
 }
 
 /* 외곽선 — 아주 얇은(1px) 은빛 선 위로 빛 한 점이 둘레를 돈다. 로그인 카드의

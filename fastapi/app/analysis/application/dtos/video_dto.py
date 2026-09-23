@@ -20,6 +20,10 @@ class UploadUrlCommand:
     content_type: str
     size_bytes: int
     filename: str = ""  # 원본 이름 — 저장 키를 사람이 알아보게 짓는다(jin 24)
+    # 분석을 걸 것인가 — **개수 상한을 어느 갈래로 볼지 힌트**다(2026-09-22).
+    # `None` 이면 모른다는 뜻이고, 그때는 양쪽이 다 찼을 때만 막는다.
+    # 저장 키에는 영향이 없다 — 실제 갈래는 `POST /videos` 가 정한다.
+    analyze: bool | None = None
 
 
 @dataclass(frozen=True)

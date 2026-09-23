@@ -71,8 +71,12 @@ export default function TeamMatch({
   /**
    * 신청을 **걸었다**. 🔴 「잡혔다」가 아니다 — 부모가 이 id 를 기억해 두었다가
    * 상대가 수락하는 순간(알림)에 대기 팝업을 띄운다.
+   *
+   * 🔴 `playedAt`·`place`를 함께 넘긴다(2026-09-20, 데모용) — 부모가
+   * 데모 자동 수락으로 대기 팝업을 스스로 띄우려면 신청한 시각·장소가
+   * 있어야 `MatchTeam` 모양을 채울 수 있다.
    */
-  onRequested: (requestId: string, team: CandidateTeam) => void
+  onRequested: (requestId: string, team: CandidateTeam & { playedAt: string; place: string }) => void
 }) {
   const [state, setState] = useState<State>({ kind: 'loading' })
   /* 🔴 화면 아래로 넘치지 않게 — 「팀원」 판과 같은 상자에 매달려 있어 같은
@@ -256,14 +260,15 @@ export default function TeamMatch({
     }
     setWaiting(team.id)
     setError(null)
+    const playedAt = toPlayedAt(at)
     try {
       const { requestId } = await applyToTeam(teamId, {
         id: team.id,
-        playedAt: toPlayedAt(at),
+        playedAt,
         place: pickedPlace,
       })
       setPicking(null)
-      onRequested(requestId, team)
+      onRequested(requestId, { ...team, playedAt, place: pickedPlace })
       setSentTo(team.id)
     } catch (e) {
       setError(e instanceof Error ? e.message : '경기를 신청하지 못했습니다.')

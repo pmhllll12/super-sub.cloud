@@ -846,6 +846,22 @@ export default function SquadPanel({
    * 정어진 · 백성검 허락).
    */
   const [joined, setJoined] = useState<Record<string, true>>({})
+  /**
+   * 🔴 **데모용 — 수락을 실서버 없이 흉내낸다**(2026-09-20, 사용자 요청).
+   * 심사·시연 자리에서는 초대받은 쪽이 실제로 수락할 사람이 없어서
+   * 「수락 대기중」이 영영 안 풀린다 — 그럼 「팀 매칭」이 뜨는 흐름 자체를
+   * 못 보여준다. 초대를 보낸 뒤 **잠깐만** 대기중 딱지를 보여주고
+   * (사용자 지시: "처음에 떴다가 1~2초 뒤에 없어지게") 곧바로 수락된
+   * 것으로 친다 — 서버 상태(`invites`)는 안 건드리고 화면 판단
+   * (`isReady`)만 여기서 이긴다. 3초 폴링(위 「보낸 초대의 답을 기다린다」)이
+   * 그 자리를 다시 `pending` 으로 채워 넣어도 `isReady`가 이 자리를 먼저
+   * 보므로 흔들리지 않는다.
+   *
+   * 🔴 **실제 배포에서는 걷어야 한다** — 진짜 수락 흐름을 가짜로 덮는
+   * 코드다. 심사·시연 용도로만 켜 둔다.
+   */
+  const [demoAccepted, setDemoAccepted] = useState<Record<string, true>>({})
+  const DEMO_ACCEPT_MS = 1500
 
   /**
    * 그 자리의 사람이 **오기로 했는가.**
@@ -855,6 +871,7 @@ export default function SquadPanel({
    * 답이 와서 초대가 풀리면 등재(`members`)나 `joined` 로 온 것이다.
    */
   function isReady(area: string): boolean {
+    if (demoAccepted[area]) return true
     if (invites[area]) return false
     if (joined[area]) return true
     return seeded.ready[area] ?? Boolean(members[area])
@@ -1069,6 +1086,10 @@ export default function SquadPanel({
       )
       rememberInviteSeat(made.id, { col: slot.col, row: slot.row })
       setInvites((prev) => ({ ...prev, [slot.area]: made.id }))
+      // 🔴 데모용 자동 수락 — 위 `demoAccepted` 선언부 주석 참고.
+      window.setTimeout(() => {
+        setDemoAccepted((prev) => ({ ...prev, [slot.area]: true }))
+      }, DEMO_ACCEPT_MS)
     } catch {
       /* 🔴 **화면에서 지우지 않는다.** 이미 앉은 것을 걷으면 사람이 방금 한
          일이 사라진 것처럼 보인다 — 초대가 안 나갔을 뿐이라 ⊗ 로 빼면 된다.
@@ -2109,8 +2130,38 @@ export default function SquadPanel({
           teamId={myTeamId}
           /* 🔴 **여기서 대기 팝업을 띄우지 않는다**(사용자 요청, 2026-09-16).
              신청은 걸린 것이고 확정은 상대가 수락할 때다 — 그 순간은 알림으로
-             오므로, 부모가 이 id 를 기억해 두었다가 그때 띄운다. */
-          onRequested={(requestId, team) => onRequested?.(requestId, team)}
+             오므로, 부모가 이 id 를 기억해 두었다가 그때 띄운다.
+             🔴 **데모용 자동 확정을 여기서 덧붙인다**(2026-09-20, 사용자
+             요청 — 위 `demoAccepted` 와 같은 이유: 심사 자리에는 실제로
+             수락할 상대 팀장이 없다). 위 규칙(부모가 알림을 기다린다)은
+             그대로 두고, 1.5초 뒤 **이 컴포넌트가 직접** `matched`를 채운다
+             — 진짜 알림이 오면 그쪽이 덮어써도 상관없다(같은 모양).
+             🔴 상대 스쿼드도 실물이 없어 **우리 판의 배치(자리·포지션)를
+             그대로 옮겨** 채운다(2026-09-20, 사용자 요청 — "우리팀처럼
+             보이도록"). 이름만 팀명 기반 자리표시자다.
+             🔴 실제 배포에서는 걷어야 한다(위 `demoAccepted`와 같은 경고). */
+          onRequested={(requestId, team) => {
+            onRequested?.(requestId, team)
+            window.setTimeout(() => {
+              setMatched({
+                id: team.id,
+                name: team.name,
+                region: team.region,
+                size: team.size,
+                playedAt: team.playedAt,
+                place: team.place,
+                why: team.why,
+                squad: slots.map((sl, i) => ({
+                  nickname: `${team.name} 선수 ${i + 1}`,
+                  col: sl.col,
+                  row: sl.row,
+                  pos: posOf(sl),
+                  mine: false,
+                  cardSlug: null,
+                })),
+              })
+            }, DEMO_ACCEPT_MS)
+          }}
         />
       )}
 

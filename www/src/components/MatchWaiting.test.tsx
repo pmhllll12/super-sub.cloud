@@ -1,18 +1,24 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { MatchTeam } from '@/lib/teamMatch'
-import MatchWaiting from './MatchWaiting'
+import MatchWaiting, { whenText } from './MatchWaiting'
 
 /**
  * **경기가 잡혔다** — 화면을 덮는 팝업(사용자 요청, 2026-09-10).
  * 가운데는 언제 · 어디서 · 누구와, 양옆은 두 팀의 판.
- */
+ *
+ * 🔴 **시각을 고정 문자열로 적지 않는다**(2026-09-20 정정). 고정 과거값이
+ * 「아직 안 지났다」(`over === false`) 분기를 시험하고 있었는데, 실제
+ * 달력이 그 날짜를 지나자 조용히 「이미 지났다」 분기로 바뀌어 시험
+ * 10건이 깨졌다(`경기 완료` 단추가 `경기 끝내기`로 바뀌는 바로 그 갈림길).
+ * 실행 시점 기준 **항상 미래**인 날짜를 만든다. */
+const PLAYED_AT = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
 const THEM: MatchTeam = {
   id: 'mt-1',
   name: '번개FC',
   region: '서울 강남구',
   size: '5',
-  playedAt: '2026-09-19T10:00:00',
+  playedAt: PLAYED_AT,
   place: '강남 풋살장 2구장',
   why: ['같은 지역'],
   squad: [
@@ -36,7 +42,7 @@ describe('경기 대기 팝업', () => {
 
   it('언제 · 어디서 · 누구와를 가운데에 적는다', () => {
     open()
-    expect(screen.getByText('9월 19일 토요일 10:00')).toBeInTheDocument()
+    expect(screen.getByText(whenText(PLAYED_AT))).toBeInTheDocument()
     expect(screen.getByText('강남 풋살장 2구장')).toBeInTheDocument()
     expect(screen.getByText('VS')).toBeInTheDocument()
   })
@@ -289,10 +295,16 @@ describe('경기 대기 팝업', () => {
 describe('대기 화면 — 경기가 끝난 뒤', () => {
   afterEach(() => vi.useRealTimers())
 
-  /** 경기 시각을 지나 있게 시계를 옮긴다. */
+  /**
+   * 경기 시각을 지나 있게 시계를 옮긴다.
+   *
+   * 🔴 **`PLAYED_AT` 기준 상대값이다**(2026-09-20 정정) — 고정 날짜였을 때는
+   * 실제 달력이 그 날짜를 지나자 `THEM`(위에서 이미 상대값으로 고쳤다)이
+   * 도리어 이 가짜 시계보다 미래가 되어 "지났다" 분기가 반대로 안 걸렸다.
+   */
   function afterMatch() {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    vi.setSystemTime(new Date('2026-09-19T12:00:00'))
+    vi.setSystemTime(new Date(new Date(PLAYED_AT).getTime() + 2 * 60 * 60 * 1000))
   }
 
   it('경기 시각이 지나면 「경기 끝내기」다 — 「경기 취소」가 아니다', async () => {
@@ -305,7 +317,7 @@ describe('대기 화면 — 경기가 끝난 뒤', () => {
 
   it('아직 안 지났으면 그대로 「경기 취소」다', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    vi.setSystemTime(new Date('2026-09-19T08:00:00'))
+    vi.setSystemTime(new Date(new Date(PLAYED_AT).getTime() - 2 * 60 * 60 * 1000))
     render(<MatchWaiting us={US} them={THEM} onClose={vi.fn()} onCancel={vi.fn()} />)
 
     expect(screen.getByRole('button', { name: '경기 취소' })).toBeInTheDocument()
@@ -425,7 +437,7 @@ describe('대기 화면 — 경기가 끝난 뒤', () => {
 
       expect(screen.queryByRole('complementary', { name: '정우진 프로필' })).toBeNull()
       expect(onClose).not.toHaveBeenCalled()
-      expect(screen.getByText('9월 19일 토요일 10:00')).toBeInTheDocument()
+      expect(screen.getByText(whenText(PLAYED_AT))).toBeInTheDocument()
     })
 
     /* 🔴 등급이 없는 것은 고장이 아니다 — 대표 영상이 없거나 분석 전이다. */
