@@ -154,7 +154,9 @@ const double _kTaglineGap = 10;
 
 /// 소개 두 줄의 글자 크기 — 🔴 **인사말보다 크다**(사용자 요청).
 /// 인사말은 [_Greeting.fontSize] 26 이다.
-const double _kTaglineSize = 30;
+///
+/// ⚠️ 30 → **35**(2026-09-23, 같은 날).
+const double _kTaglineSize = 35;
 
 /// 워드마크(`SUPERSUB`)가 **화면 맨 위에서** 떨어진 거리.
 ///
@@ -1021,8 +1023,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('영상으로 실력을 증명하고', style: _kTaglineStyle),
-              Text('함께 뛸 팀을 만드세요', style: _kTaglineStyle),
+              /* ⚠️ **두 줄의 순서와 문장을 갈았다**(2026-09-23, 같은 날) —
+                 「영상으로 실력을 증명하고 / 함께 뛸 팀을 만드세요」가
+                 먼저였다. 팀을 앞세우는 쪽으로 사용자가 정했다. */
+              Text('함께 뛸 팀을 만들고,', style: _kTaglineStyle),
+              Text('영상으로 실력을 증명하세요.', style: _kTaglineStyle),
             ],
           ),
         ),

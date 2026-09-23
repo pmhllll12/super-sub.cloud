@@ -699,8 +699,8 @@ void main() {
      사용자 요청: 「안녕하세요, 백성검님 바로 아래 말고」 「좀 더 키워서」). */
   testWidgets('소개 두 줄이 흰 판 바로 위에, 인사말보다 크게 선다', (tester) async {
     await _pumpLoggedIn(tester);
-    final line1 = find.text('영상으로 실력을 증명하고');
-    final line2 = find.text('함께 뛸 팀을 만드세요');
+    final line1 = find.text('함께 뛸 팀을 만들고,');
+    final line2 = find.text('영상으로 실력을 증명하세요.');
     expect(line1, findsOneWidget);
     expect(line2, findsOneWidget);
 
