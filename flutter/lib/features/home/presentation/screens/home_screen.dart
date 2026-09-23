@@ -94,7 +94,10 @@ const Color _kSheetColor = Color(0x2E1C1C1E);
 /// 🔴 **판을 다 펼쳤을 때의 면 — 흰 서리 유리다**(2026-09-23 사용자 요청:
 /// 「스쿼드판 열었을때 기본값을 흰색 블러로」). 접힌 [_kSheetColor] 에서
 /// 판이 열리는 만큼 이 값으로 건너간다.
-const Color _kSheetColorOpen = Color(0xB3FFFFFF);
+///
+/// ⚠️ 70%(`0xB3`) → **30%**(`0x4D`) 로 내렸다(2026-09-23 사용자 요청:
+/// 「흰색 30퍼로 줄여봐」). 흐림([_kSheetBlur])은 그대로다.
+const Color _kSheetColorOpen = Color(0x4DFFFFFF);
 
 /// 펼친 판의 흐림 세기.
 ///
