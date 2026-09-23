@@ -173,14 +173,24 @@ const double _kShortcutTopPad = 14;
 /// 알약 셋 사이 틈.
 const double _kShortcutSpacing = 10;
 
-/// 🔴 **흰 판 위의 글자·아이콘은 검정이다.** 이 화면의 다른 글자
-/// ([_kOnDark] · 워드마크 · 「영상 분석 시작하기」)는 **검은 바탕 기준**이라
-/// 흰색인데, 이 줄만 흰 판 위에 서므로 반대로 간다 — 같이 흰색으로 두면
-/// 통째로 안 보인다.
-const Color _kOnWhite = Color(0xFF111114);
+/// 지름길 알약의 면 — 🔴 **화면 바탕과 같은 딥그린이다**(2026-09-23 사용자
+/// 요청: 「똑같은 딥그린으로 바꾸자」).
+///
+/// 🔴 **값을 여기 적지 않는다** — [ScreenTint.mintBase] 한 곳에 있다. 바탕을
+/// 또 갈면 알약도 같이 따라와야 「같은 딥그린」이라는 말이 유지된다.
+const Color _kPillFill = ScreenTint.mintBase;
 
-/// 흰 판 위 알약의 테 — 알약 면도 흰색이라 **이 선이 유일한 경계**다.
-const Color _kPillLineOnWhite = Color(0x33111114);
+/// 알약 안의 글자·아이콘 — 🔴 **순백이다**(같은 요청). 면이 어두워졌으므로
+/// 검정에서 뒤집혔다.
+///
+/// ⚠️ **알약이 흰 판 위에 있다는 것과는 무관하다** — 판이 아니라 **알약 제
+/// 면**을 기준으로 정한다. 앞서 판이 희다는 이유로 검정(`#111114`)이었다.
+const Color _kOnWhite = Color(0xFFFFFFFF);
+
+/// 알약의 테 — 🔴 **하단 바·영상 분석 판과 같은 값**([SilverEdge.onWhite])
+/// 이다. 셋이 같은 흰 판 위에 놓인 조각이라 테가 갈리면 한 화면에 두 굵기·
+/// 두 색이 보인다.
+const Color _kPillLineOnWhite = SilverEdge.onWhite;
 
 /// 흰 판 위에서 영상 분석 판을 가르는 **가장 얇은 은빛 선**(2026-09-23 사용자
 /// 요청: 「제일 얇은 세련된 실버 색상」).
@@ -1388,9 +1398,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 /// (2026-09-23 사용자가 준 그림 배치).
 ///
 /// 🔴 **유리가 아니다.** 흰 판 위라 흐릴 뒤가 없고, 이 화면의 다른 알약
-/// (`GlassPill`)을 그대로 가져오면 **흰 면 위에서 아무것도 안 보인다.**
-/// 흰 면 + 가는 테로 간다 — `flutter/CLAUDE.md` 의 「층을 쌓아야 하면 흐림
-/// 없이 색만 얹는다」와 같은 판단이다.
+/// (`GlassPill`)을 그대로 가져오면 아무것도 안 보인다. 색 면 + 가는 테로
+/// 간다 — `flutter/CLAUDE.md` 의 「층을 쌓아야 하면 흐림 없이 색만 얹는다」와
+/// 같은 판단이다.
+///
+/// ⚠️ **흰 면이었다 (2026-09-23 정정)** — 사용자가 면을 화면 바탕과 같은
+/// 딥그린으로, 글자·아이콘을 순백으로 뒤집었다.
 class _ShortcutPill extends StatelessWidget {
   const _ShortcutPill({
     super.key,
@@ -1406,9 +1419,9 @@ class _ShortcutPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: _kWhiteSheetColor,
       /* 알약 모양은 [StadiumBorder] 가 낸다 — 반지름을 숫자로 주면 높이를
          바꿀 때마다 같이 고쳐야 하고, 한 번 어긋나면 양 끝이 찌그러진다. */
+      color: _kPillFill,
       shape: const StadiumBorder(
         side: BorderSide(
           color: _kPillLineOnWhite,
