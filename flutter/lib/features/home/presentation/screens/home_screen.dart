@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../intro/presentation/brand_mark.dart';
 import '../../../../core/widgets/card_side_smoke.dart';
 import '../../../../core/widgets/glass_pill.dart';
 import '../../../../core/widgets/aurora_background.dart';
@@ -183,12 +184,10 @@ const Color _kPillLineOnWhite = Color(0x33111114);
 /// 흰 판 위에서 영상 분석 판을 가르는 **가장 얇은 은빛 선**(2026-09-23 사용자
 /// 요청: 「제일 얇은 세련된 실버 색상」).
 ///
-/// 🔴 **[SilverEdge.silver](`#C9D4D8`)를 그대로 쓰면 안 보인다.** 그 값은
-/// **검은 바탕**에서 경계를 내려고 고른 밝은 은빛이라, 흰 판 위에서는 흰색에
-/// 붙어 사라진다. 한 단 진한 은빛으로 내리고 굵기는 하단 바 윤곽
-/// ([SilverEdge.barLineWidth])과 같은 0.5 로 둔다.
-const Color _kSilverOnWhite = Color(0xFF9AA7AD);
-const double _kSilverOnWhiteWidth = 0.5;
+/// 🔴 **하단 바와 나눠 쓴다** — 값은 [SilverEdge.onWhite] 한 곳에 있고 왜
+/// 그 값인지도 거기 적혀 있다. 여기서 숫자를 다시 쓰면 둘이 갈린다.
+const Color _kSilverOnWhite = SilverEdge.onWhite;
+const double _kSilverOnWhiteWidth = SilverEdge.onWhiteWidth;
 
 /// 흰 판 맨 위 줄에 서는 지름길 셋(2026-09-23 사용자 요청).
 ///
@@ -698,8 +697,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             _whiteSheet(context),
             _videoPanel(context),
             _shortcutPills(context),
-            // 워드마크는 스쿼드 판 **아래 빈 자리**에 선다.
-            _wordmark(context),
+            // 로고는 화면 맨 위 가운데 — 판을 펼치면 그 판이 덮는다.
+            _brandMark(context),
             _squadSheet(context, card, squad, user?.ownedTeamId),
             // 「내 프로필」 — 화면 맨 위 오른쪽. 판보다 **뒤에 두지 않는다**.
             _profileButton(context, card),
@@ -844,66 +843,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  /// 스쿼드 판 **아래**에 서는 워드마크 — 순백 `SUPERSUB`
-  /// (2026-09-22 사용자 요청, 글꼴은 구글 폰트 **Yatra One**).
+  /// 화면 맨 위 가운데의 `SUPERSUB` — 🔴 **아무 단추도 아니다.**
   ///
-  /// 🔴 **이름표 알약을 대신한다.** 바로 앞 회차에 「영상 분석」이라고 적힌
-  /// 안 눌리는 흰 알약을 판 위에 뒀었는데 **사용자가 걷으라고 했다** — 판이
-  /// 무엇인지는 사진과 알약 단추가 이미 말한다. 되살리지 말 것.
+  /// 🔴 **하단 바에 있던 그 로고를 여기로 옮겼다 (2026-09-23 사용자 요청:
+  /// 「supersub 의 로고는 그냥 화면 위쪽 가운데에 그냥 두고, 그거는 아무런
+  /// 버튼이 아니게」).** 그래서 **로그인에서 날아오는 로고가 여기 착지한다**
+  /// (`brandHero`) — 글꼴·색이 비행 글자와 같아서 착지가 안 튄다.
   ///
-  /// 🔴 **판을 내리면 두 쪽으로 갈라져 화면 밖으로 나간다**(2026-09-22 사용자
-  /// 요청). `SUPER` 는 왼쪽, `SUB` 는 오른쪽이고, 둘 다 **판을 따라 내려가면서**
-  /// 나간다. 판을 도로 올리면 **역순으로 제자리에** 돌아온다.
+  /// ⛔ **되살리지 말 것 — 여기 있던 순백 `SUPER`/`SUB` 두 쪽.** YatraOne 로
+  /// 쓴 다른 워드마크였고, 판을 펼치면 양옆 화면 밖으로 갈라져 나갔다
+  /// (`_WordmarkHalf`). 사용자가 **그 글자는 없애고** 하단 바의 로고를
+  /// 올리라고 정했다 — 같은 화면에 `SUPERSUB` 가 둘이던 것이 정리된 것이다.
+  /// 2026-09-23 이전 커밋에서 꺼낸다.
   ///
-  /// 🔴 **왜 저절로 역순이 되는가** — 자리와 어긋남이 전부 판의 진행도 하나
-  /// (`_sheet`)의 **함수**이기 때문이다. 「나갈 때」와 「들어올 때」를 따로
-  /// 두지 않았다. 🔴 **따로 두지 말 것** — 둘을 나누면 손가락을 도중에
-  /// 되돌렸을 때 글자가 제자리로 안 돌아온다.
-  ///
-  /// ⚠️ **걷어 내던(`Opacity`) 것을 뺐다.** 옆으로 나가면서 흐려지기까지 하면
-  /// **화면 밖에 닿기 전에 사라져** 나가는 것이 안 보인다.
-  Widget _wordmark(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
+  /// 🔴 **나가는 연출이 없어도 된다** — 판을 펼치면 스쿼드 판이 이 글자를
+  /// **덮는다**([Stack] 에서 판이 뒤에 온다). 갈라져 나가던 것은 그 시절
+  /// 판이 위에서 내려오는 시트라 덮지 못해서 필요했던 것이다.
+  Widget _brandMark(BuildContext context) {
     final geo = _sheetGeometry(context);
-    return AnimatedBuilder(
-      animation: _sheet,
-      builder: (context, _) {
-        /* 🔴 **화면 맨 위에 고정이다**(2026-09-22 정정). 전에는 판의 아랫변에
-           붙어 판을 따라 내려갔는데, 판이 위에서 내려오는 시트가 아니게 되면서
-           **「판 아래」라는 자리 자체가 없어졌다.** 이제 판이 위로 자라며
-           **이 글자를 덮는다** — 그동안 두 쪽이 양옆으로 빠져나간다. */
-        /* 🔴 **나가는 정도는 묶은 값으로 잰다.** 넘친 값으로 재면 글자가
-           화면 밖에서 한 번 더 튀는데, 안 보이는 곳에서 나는 일이라 계산만
-           버린다. */
-        final exit = Curves.easeInCubic.transform(_sheetT);
-        /* 🔴 **화면 폭만큼 민다.** 글자 너비를 재서 「딱 맞게」 밀면 기기마다
-           글꼴 렌더링이 조금씩 달라 **한 획이 남는다.** 넉넉히 밀면 그럴
-           일이 없고, 어차피 `Stack` 이 화면 밖을 잘라 낸다. */
-        final dx = size.width * exit;
-
-        return Positioned(
-          left: 0,
-          right: 0,
-          top: geo.rowTop + _kWordmarkTop,
-          child: IgnorePointer(
-            child: Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Transform.translate(
-                    offset: Offset(-dx, 0),
-                    child: const _WordmarkHalf('SUPER'),
-                  ),
-                  Transform.translate(
-                    offset: Offset(dx, 0),
-                    child: const _WordmarkHalf('SUB'),
-                  ),
-                ],
-              ),
+    return Positioned(
+      left: 0,
+      right: 0,
+      top: geo.rowTop + _kWordmarkTop,
+      child: IgnorePointer(
+        child: Center(
+          child: brandHero(
+            /* 🔴 **키로 찾는다** — 글자로 찾으면 판 위의 선수 카드마다 박힌
+               `SUPERSUB` 워터마크까지 걸린다(시험이 7개를 찾았다). */
+            child: Text(
+              kBrandText,
+              key: const Key('home-brand'),
+              style: BrandMark.styleFor(kBrandLandedSize, AppTheme.seed),
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -1999,31 +1973,6 @@ class _VideoPanelCover extends StatelessWidget {
 /// ⚠️ **`letterSpacing` 덕분에 갈라도 글자 사이가 안 벌어진다** —
 /// `letterSpacing` 은 글자마다 **뒤에** 붙으므로 `SUPER` 의 `R` 뒤에도 같은
 /// 간격이 이미 있다. 그래서 붙여 놓으면 `SUPERSUB` 한 낱말과 **같은 폭**이다.
-class _WordmarkHalf extends StatelessWidget {
-  const _WordmarkHalf(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: const TextStyle(
-        // 🔴 **순백이다**(사용자 요청: 「완전 흰색으로」).
-        color: Colors.white,
-        fontFamily: 'YatraOne',
-        fontSize: 30,
-        /* ⚠️ Yatra One 은 굵기가 **400 하나뿐**이다. `w700` 을 주면 엔진이
-           **가짜로 굵게**(synthetic bold) 그려 이 글꼴의 특징인 획 끝 모양이
-           뭉갠다. */
-        fontWeight: FontWeight.w400,
-        letterSpacing: 1.5,
-        height: 1.0,
-      ),
-    );
-  }
-}
-
 /* 🔴 **알약 재질 값(`kSunShadow` · `sunShadow()` · `kPillBlur`)을
    `core/widgets/glass_pill.dart` 로 옮겼다**(2026-09-22). 프로필의 「내
    분석/업로드 영상」 알약이 **같은 재질**이어야 해서다 — 값을 양쪽에 적어

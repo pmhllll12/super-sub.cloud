@@ -240,34 +240,11 @@ void main() {
       expect(_opacityAbove(tester, start), 1);
     });
 
-    /* 워드마크 — 판을 내리면 `SUPER` 는 왼쪽, `SUB` 는 오른쪽 화면 밖으로
-       나가고, 올리면 **제자리로** 돌아온다(2026-09-22 사용자 요청).
-
-       🔴 **「화면 밖」을 좌표로 잰다.** 투명도로 재면 안 된다 — 이 글자는
-       걷히는 것이 아니라 **나가는** 것이라, 흐려지지 않은 채로 화면을
-       벗어나는 것이 맞는 동작이다. */
-    testWidgets('판을 내리면 SUPER · SUB 가 양옆으로 나간다', (tester) async {
-      await _pumpLoggedIn(tester);
-      final superF = find.text('SUPER');
-      final subF = find.text('SUB');
-      final screen = tester.view.physicalSize.width / tester.view.devicePixelRatio;
-
-      // 접혀 있을 때 — 둘이 붙어 한 낱말로 서 있다.
-      final s0 = tester.getRect(superF);
-      final b0 = tester.getRect(subF);
-      expect(s0.right, closeTo(b0.left, 1), reason: '둘이 붙어 있어야 한 낱말로 읽힌다');
-      expect(s0.left, greaterThan(0));
-      expect(b0.right, lessThan(screen));
-
-      await _openSheet(tester);
-      // 펼치면 — 각각 반대쪽 화면 밖이다.
-      expect(tester.getRect(superF).right, lessThanOrEqualTo(0));
-      expect(tester.getRect(subF).left, greaterThanOrEqualTo(screen));
-
-      await _openSheet(tester); // 다시 올리면 역순으로 제자리.
-      expect(tester.getRect(superF).left, closeTo(s0.left, 1));
-      expect(tester.getRect(subF).left, closeTo(b0.left, 1));
-    });
+    /* 🔴 **`SUPER`/`SUB` 가 양옆으로 나가던 시험을 지웠다 (2026-09-23).**
+       그 순백 YatraOne 워드마크 자체가 없어졌다 — 하단 바에 있던 `SUPERSUB`
+       로고를 화면 맨 위로 올리면서 한 화면에 둘이던 것을 정리했다(사용자
+       결정). 지금 그 자리를 지키는 것은 아래 「로고가 화면 맨 위 가운데에
+       선다」이다. */
 
     /* 🔴 **큰 판에서는 판을 눌러도 안 간다 — 알약만 간다**(2026-09-22 사용자
        요청: 「영상분석 시작하기 버튼만 눌리게」). 판 귀퉁이를 눌러 확인한다 —
@@ -533,6 +510,24 @@ void main() {
       await _openSheet(tester);
       expect(_opacityAbove(tester, pill), 1);
     });
+  });
+
+  /* 🔴 **아무 단추도 아니다**(2026-09-23 사용자 요청). 눌리면 홈에서 홈으로
+     가는 길이 둘이 되고, 그 자리는 이제 하단 바의 홈 아이콘이 맡는다. */
+  testWidgets('로고가 화면 맨 위 가운데에 서고, 안 눌린다', (tester) async {
+    await _pumpLoggedIn(tester);
+    final logo = find.byKey(const Key('home-brand'));
+    expect(logo, findsOneWidget);
+
+    final r = tester.getRect(logo);
+    final screenW = tester.view.physicalSize.width / tester.view.devicePixelRatio;
+    expect(r.center.dx, closeTo(screenW / 2, 1));
+    expect(r.top, lessThan(120));
+
+    expect(
+      find.ancestor(of: logo, matching: find.byType(IgnorePointer)),
+      findsWidgets,
+    );
   });
 
   testWidgets('바 메뉴를 열면 로그아웃 칸이 선다', (tester) async {
