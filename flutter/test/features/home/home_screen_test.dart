@@ -650,7 +650,7 @@ void main() {
      🔴 **`_pumpLoggedIn` 을 쓰지 않는다** — 그 도우미는 목업 지연을 흘리느라
      가짜 시계를 2초 넘게 밀어서, 시험이 시작하자마자 **이미 흰색**을 본다.
      여기서는 시계를 직접 몬다. */
-  testWidgets('로고가 1초 뒤 초록에서 흰색으로 물든다', (tester) async {
+  testWidgets('로고가 1초 뒤 초록에서 어두운 색으로 물든다', (tester) async {
     tester.view.physicalSize = const Size(1080, 2340);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
@@ -681,10 +681,12 @@ void main() {
     await tester.pump(const Duration(milliseconds: 550));
     final mid = colorNow();
     expect(mid, isNot(AppTheme.seed), reason: '물드는 중');
-    expect(mid, isNot(Colors.white), reason: '물드는 중');
+    expect(mid, isNot(const Color(0xFF222021)), reason: '물드는 중');
 
     await tester.pump(const Duration(milliseconds: 700));
-    expect(colorNow(), Colors.white, reason: '다 물들면 흰색');
+    /* ⚠️ **흰색이었다** — 맨 위 판이 밝은 회색으로 뒤집히면서(2026-09-24,
+       사용자가 바탕과 판 색을 맞바꿨다) 흰 로고가 그 위에서 사라졌다. */
+    expect(colorNow(), const Color(0xFF222021), reason: '다 물들면 판 위 글자색');
 
     // 컨트롤러 복원 타이머(Mock 300ms)를 흘려보내고 끝낸다.
     await tester.pump(const Duration(milliseconds: 500));
@@ -740,8 +742,12 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
     expect(_handAngle(tester), isNot(0), reason: '앉으면 흔든다');
 
-    // 흔들기가 끝나면 손이 제자리로 내려앉는다(진폭이 잦아든다).
-    await tester.pump(const Duration(milliseconds: 1700));
+    /* 흔들기가 끝나면 손이 제자리로 내려앉는다(진폭이 잦아든다).
+       ⚠️ **주기가 1.8초 → 2.7초로 늘었다**(2026-09-24, 흔드는 횟수를 6번으로
+       바꾸면서 속도를 지키려고 같이 늘렸다). 여기 기다림도 따라간다 —
+       🔴 **주기보다 넉넉히** 준다. 모자라면 각도가 우연히 0 근처일 때만
+       통과해서, 통과해도 믿을 수 없는 시험이 된다. */
+    await tester.pump(const Duration(milliseconds: 3000));
     expect(_handAngle(tester), closeTo(0, 0.001), reason: '잦아들어 멎는다');
   });
 
@@ -798,7 +804,7 @@ void main() {
   /* 🔴 **맨 위 다크 판**(2026-09-24 사용자 요청 + 레퍼런스: 「내 프로필 글자
      아래로 … 이 색상으로 판 하나 주자」). 판이 담는 것은 **인사말과 「내
      프로필」까지만**이고, 소개 두 줄은 판 **밖 아래**에 남는다. */
-  testWidgets('맨 위 다크 판이 인사말과 「내 프로필」을 덮는다', (tester) async {
+  testWidgets('맨 위 판이 인사말과 「내 프로필」을 덮는다', (tester) async {
     await _pumpLoggedIn(tester, device: true);
     final panel = find.byKey(const Key('home-top-panel'));
     expect(panel, findsOneWidget);
@@ -841,10 +847,17 @@ void main() {
     final white = tester.getRect(find.byKey(const Key('home-white-sheet')));
     expect(p.bottom, lessThan(white.top - taglineGap - taglineBlockH));
 
-    // 판 면은 어둡다 — 안의 흰 글자가 사는 근거다.
+    /* 🔴 **판과 바탕은 서로 다른 색이다 — 그게 판이 보이는 근거다.**
+       ⚠️ 둘을 맞바꿼 적이 있어서(2026-09-24) 「어둡다/밝다」로 못 박는다. */
     final deco =
         tester.widget<DecoratedBox>(panel).decoration as BoxDecoration;
-    expect(deco.color!.computeLuminance(), lessThan(0.05));
+    expect(deco.color, isNot(ScreenTint.mintBase));
+    expect(
+      (deco.color!.computeLuminance() - ScreenTint.mintBase.computeLuminance())
+          .abs(),
+      greaterThan(0.3),
+      reason: '판과 바탕의 밝기 차이가 있어야 판으로 보인다',
+    );
   });
 
   /* 🔴 **닉네임이 길어도 「내 프로필」을 안 침범한다** — 인사말 칸을 그 앞에서
@@ -857,18 +870,21 @@ void main() {
     expect(band.right, lessThanOrEqualTo(profile.left));
   });
 
-  /* 🔴 **바탕이 밝아졌다**(2026-09-24 사용자 요청 + 색 견본). 판 안의 흰
-     글자가 사는 근거는 그 위가 다크 판이라는 것뿐이다.
-     ⚠️ 같은 날 **판 밖의 어두운 글자**(소개 두 줄)도 함께 봤는데, 그 두 줄이
-     영상 줄로 바뀌면서 **판 밖에 글자가 하나도 안 남았다.** */
-  testWidgets('바탕은 라이트그레이고, 판 안의 글자는 희다', (tester) async {
-    expect(ScreenTint.mintBase, const Color(0xFFE4E9E7));
+  /* 🔴 **바탕과 판의 색을 맞바꿨다**(2026-09-24 사용자 요청).
+     바탕이 `#222021`, 판이 `#E4E9E7` 다. 판 위 글자는 그래서 **어둡다** —
+     판 색을 또 뒤집으면 이 시험이 먼저 깨져서 글자를 같이 안 돌렸다고 알려 준다. */
+  testWidgets('바탕과 판이 맞바뀜 있고, 판 위 글자는 어둡다', (tester) async {
+    expect(ScreenTint.mintBase, const Color(0xFF222021));
 
     await _pumpLoggedIn(tester);
     for (final t in [find.text('안녕하세요,'), find.text('백성검 님')]) {
-      expect(tester.widget<Text>(t).style!.color, const Color(0xFFFFFFFF),
-          reason: '판 안: $t');
+      expect(tester.widget<Text>(t).style!.color, const Color(0xFF222021),
+          reason: '판 위: $t');
     }
+    expect(
+      tester.widget<Text>(find.text('내 프로필')).style!.color,
+      const Color(0xFF222021),
+    );
   });
 
   testWidgets('바 메뉴를 열면 로그아웃 칸이 선다', (tester) async {

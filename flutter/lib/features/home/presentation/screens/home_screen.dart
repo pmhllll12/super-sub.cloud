@@ -65,12 +65,27 @@ const double _kCardRadius = 18;
 /// 오른쪽 위 「내 프로필」 단추의 카드 폭. 웹 헤더의 작은 카드(`.ss-pcard-mini`)
 /// 자리다 — 글자는 안 읽혀도 초록 카드와 인물로 「내 카드」임을 알아본다.
 ///
-/// 🔴 **두 번에 걸쳐 키웠다**(2026-09-22 사용자 요청) — 48 → 72(1.5배) →
-/// **94**(거기서 다시 1.3배). 스쿼드 판 밖 화면 맨 위로 나오면서 **옆에
-/// 견줄 것이 없어져** 작아 보였다.
-/// 아래 글자도 **같은 배수**로 키운다 — 카드만 키우면 글자가 상대적으로
-/// 쪼그라들어 균형이 깨진다.
-const double _kProfileCardWidth = 94;
+/// 🔴 **이 값이 판 아랫변과 영상 줄 높이를 같이 정한다.** 세 값이 한 줄로
+/// 엮여 있어서, 여기만 고치면 나머지가 따라온다:
+///
+/// | | |
+/// |---|---|
+/// | [_kProfileButtonH] | 카드 높이(4.1:3) + 글자 + 둘레 |
+/// | 판 아랫변 | `rowTop + _kProfileButtonH + _kTopPanelPadBottom` |
+/// | 영상 줄 높이 | 판 아랫변 ~ 흰 판 윗변의 남는 자리 |
+///
+/// ⚠️ **94 → 80** (2026-09-24 사용자 요청: 「내 프로필 카드 지금 살짝 줄이고
+/// 위에 판 그만큼 더 위로 옮기자. 영상 그만큼 크기 늘리자」). 판 아랫변이
+/// 212 → 193 으로 올라가고 영상 카드가 그만큼(약 19) 커진다.
+///
+/// ⚠️ 그 전에는 **두 번에 걸쳐 키웠었다**(2026-09-22) — 48 → 72(1.5배) →
+/// 94(거기서 다시 1.3배). 스쿼드 판 밖 화면 맨 위로 나오면서 **옆에 견줄
+/// 것이 없어져** 작아 보였기 때문이다. 이번에 줄인 것은 그 판단을 뒤집은
+/// 것이 아니라 **영상 줄에 자리를 내준 것**이다.
+///
+/// 아래 글자는 **같이 안 줄였다** — 14 는 이미 읽히는 최소에 가깝고,
+/// 2026-09-22 에 「카드 폭과 배수를 맞추던 규칙은 끝났다」로 정해 뒀다.
+const double _kProfileCardWidth = 80;
 
 /* ⛔ **`_kSheetCollapsedFactor`(0.5) · `_kCollapsedBoardShrink`(0.82) 를
    지웠다**(2026-09-22). 둘은 「위에서 내려오는 시트」가 **접혔을 때 화면의
@@ -185,16 +200,24 @@ const double _kSquadPhotoH = 180;
 /// (손잡이 + 알약 줄 + 틈).
 const double _kBoardTopInset = _kSheetHandleH + 4 + _kPillsRowH + 12;
 
-/// 판 둘과 지름길 알약 줄을 한 덩이로 받치는 **흰 판**(2026-09-23 사용자 요청:
+/// 판 둘과 지름길 알약 줄을 한 덩이로 받치는 **아래 판**(2026-09-23 사용자 요청:
 /// 「스쿼드판이랑 영상분석 판 아래에 흰색 판 하나」).
+///
+/// ⚠️ **순백이었다 → 맨 위 판과 같은 색으로**(2026-09-24 사용자 요청: 「하단 바
+/// 위에 있는 판도 내 프로필에 있는 판 색상으로 바꾸자」). 🔴 **이름은 그대로
+/// 둔다** — 부르는 자리(`_whiteSheet`·`home-white-sheet` 키·시험)가 그 이름을
+/// 쓰고, 색은 또 바뀔 수 있다.
+///
+/// 🔴 **[_kTopPanelColor] 를 그대로 가리킨다.** 화면 위아래 판이 **한 색**이라는
+/// 것이 사용자 결정이므로, 값을 베껴 두면 한쪽만 바뀐다.
 ///
 /// 🔴 **판 둘 안이 비치지는 않는다.** 판 면([_kSheetColor])은 거의 투명하지만
 /// 그 위에 사진(`squad_cover.jpg` · `analysis_cover.jpg`)이 `BoxFit.cover` 로
-/// 꽉 차 있어서, 이 흰색은 **판을 두르는 테와 판 사이 틈**으로만 보인다.
+/// 꽉 차 있어서, 이 색은 **판을 두르는 테와 판 사이 틈**으로만 보인다.
 ///
 /// ⚠️ **한 자리만 예외다** — 스쿼드 판을 펼치면 그 사진이 걷히고 스쿼드 그림이
-/// 드는데, 그때는 판 면 너머로 이 흰색이 비친다.
-const Color _kWhiteSheetColor = Color(0xFFFFFFFF);
+/// 드는데, 그때는 판 면 너머로 이 색이 비친다.
+const Color _kWhiteSheetColor = _kTopPanelColor;
 
 /// 흰 판의 모서리.
 const double _kWhiteSheetRadius = 28;
@@ -227,8 +250,8 @@ const double _kShortcutSpacing = 10;
 /// 로 만들어 통째로 사라지게 했다.
 ///
 /// 🔴 **이제 「어두운 면」이 짝이다** — 화면에 어두운 것이 다크 판과 이 알약
-/// 둘뿐이라 같은 상수를 쓴다. 알약 색을 갈려면 [_kTopPanelColor] 를 본다.
-const Color _kPillFill = _kTopPanelColor;
+/// 둘뿐이라 같은 상수를 쓴다. 알약 색을 갈려면 [_kInkDark] 를 본다.
+const Color _kPillFill = _kInkDark;
 
 /// 화면 맨 위 **다크 헤더 판**의 면 (2026-09-24 사용자 요청 + 레퍼런스:
 /// 「내 프로필 글자 아래로 … 이 색상으로 판 하나 주자」, 색 견본 `#222021`).
@@ -238,10 +261,25 @@ const Color _kPillFill = _kTopPanelColor;
 /// 소개 두 줄(「함께 뛸 팀을 만들고,…」)은 **판 밖 아래**에 남는다 —
 /// 판을 그 줄까지 내리지 말 것.
 ///
-/// 🔴 **판 위의 글자가 흰색인 근거다.** 바탕이 밝은 회색으로 뒤집혔어도
-/// 인사말·「내 프로필」·로고가 흰색으로 남을 수 있는 것은 이 판 덕분이다.
-/// 이 판을 걷으면 그 셋의 색도 함께 정해야 한다.
-const Color _kTopPanelColor = Color(0xFF222021);
+/// ⚠️ **바탕과 색을 맞바꿨다 (2026-09-24, 사용자 요청: 「배경 색상이랑 내
+/// 프로필 쪽 위쪽 판 색상이랑 둘만 바꿔봐」).** 판이 `#222021`, 바탕이
+/// `#E4E9E7` 이던 것을 서로 뒤집었다.
+///
+/// 🔴 **그래서 판 위의 글자가 전부 어두워졌다**([_kOnPanel]) — 인사말·손·
+/// 「내 프로필」·로고 넷이다. 이 판 색을 다시 어둡게 돌리면 **그 넷을 같이
+/// 되돌려야 한다.** 한쪽만 바꾸면 글자가 통째로 사라진다.
+const Color _kTopPanelColor = Color(0xFFE4E9E7);
+
+/// 다크 판 위의 글자 — 🔴 **판이 밝아져서 어두운 색이다.** [_kOnDark] 와
+/// 갈라 둔 까닭: 그쪽은 **스쿼드 판·사진 위**처럼 여전히 어두운 자리에서 쓰이고,
+/// 이쪽만 판 색을 따라간다. 한 상수로 묶으면 판을 바꿀 때 엉뚱한 곳이 같이 뒤집힌다.
+const Color _kOnPanel = Color(0xFF222021);
+
+/// 지름길 알약처럼 **흰 판 위에 앉는 어두운 면.**
+///
+/// 🔴 **[_kTopPanelColor] 를 따라가던 것을 끊었다** (2026-09-24). 판이 밝은
+/// 회색이 되면서 그대로 뒀으면 **알약이 흰 판 위에서 사라졌다.**
+const Color _kInkDark = Color(0xFF222021);
 
 /// 다크 판의 **아래 모서리** — 🔴 흰 판([_kWhiteSheetRadius])과 같은 값이다.
 /// 위는 화면 끝에 붙으므로 안 둥글린다. 둘이 화면 위아래에서 짝을 이룬다.
@@ -1711,7 +1749,8 @@ const TextStyle _kGreetStyle = TextStyle(
   fontWeight: FontWeight.w900,
   fontSize: _Greeting.fontSize,
   height: 1.2,
-  color: _kOnDark,
+  // 🔴 판이 밝아졌다 — [_kOnPanel] 머리말 참고.
+  color: _kOnPanel,
 );
 
 /// 인사말 한 덩이 — **화면 왼쪽 밖에서 미끄러져 들어오고**, 로고가 내려앉으면
@@ -1751,9 +1790,15 @@ class _Greeting extends StatefulWidget {
   static const enterFrom = 1.05;
 
   /// 몇 번 흔드는가(왕복 기준).
-  static const waves = 4;
+  ///
+  /// ⚠️ **4 → 6** (2026-09-24 사용자 요청. 잠깐 8이었다가 6으로 정했다).
+  /// 🔴 **[wavePeriod] 도 같은 배수로 늘린다** — 주기를 그대로 두면 같은
+  /// 1.8초 안에 여섯 번을 흔들게 되어 **속도가 1.5배**가 되고, 인사가 아니라
+  /// 허둥대는 것으로 보인다. 흔드는 **횟수만** 바꾸라는 뜻으로 읽었다.
+  /// 한 번 흔드는 데 걸리는 시간은 450ms 로 처음과 같다.
+  static const waves = 6;
 
-  static const wavePeriod = Duration(milliseconds: 1800);
+  static const wavePeriod = Duration(milliseconds: 2700);
 
   /// 최대 기울기(라디안).
   static const swing = 0.30;
@@ -1839,7 +1884,7 @@ class _GreetingState extends State<_Greeting> with TickerProviderStateMixin {
                 child: const Icon(
                   Symbols.waving_hand,
                   size: _Greeting.iconSize,
-                  color: _kOnDark,
+                  color: _kOnPanel,
                   weight: 300,
                   grade: 0,
                   opticalSize: 24,
@@ -1943,9 +1988,12 @@ class _BrandFadeState extends State<_BrandFade>
         fontSize: kBrandHomeSize,
         /* 🔴 **[Curves.easeInOut] 을 씌운다** — 선형이면 시작과 끝이 톡
            끊겨 보인다. 가운데가 빠르고 양 끝이 느려야 한 동작으로 읽힌다. */
+        /* 🔴 **흰색이 아니라 [_kOnPanel] 로 물든다** (2026-09-24). 판이 밝은
+           회색이 되면서 흰 로고가 그 위에서 사라졌다. 앉는 색만 바뀌고
+           출발색(앱 초록)과 곡선은 그대로다. */
         color: Color.lerp(
           AppTheme.seed,
-          Colors.white,
+          _kOnPanel,
           Curves.easeInOut.transform(_fade.value),
         )!,
       ),
@@ -2716,7 +2764,8 @@ class _ProfileButton extends StatelessWidget {
                      🔴 **카드 폭과 배수를 맞추던 규칙은 여기서 끝난다** —
                      이제 글자는 **읽히는 크기**로, 카드는 **보이는 크기**로
                      따로 정한다. */
-                  style: TextStyle(color: Colors.white, fontSize: 14),
+                  // 🔴 판이 밝아졌다 — [_kOnPanel] 머리말 참고.
+                  style: TextStyle(color: _kOnPanel, fontSize: 14),
                 ),
               ],
             ),
