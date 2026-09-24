@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'clip_file.dart';
 import 'models/my_video.dart';
 import 'models/public_video.dart';
+import 'models/skeleton.dart';
 import 'models/video_report.dart';
 
 /// 화면이 아는 유일한 영상 계약.
@@ -90,6 +91,34 @@ abstract class VideoRepository {
   /// 사라지면서 같이 없어진다. 여기서 `patchVideo` 를 부르면 **방금 지운
   /// 영상에 PATCH 를 쏘게 되고** 404 다.
   Future<void> deleteVideo(String videoId);
+
+  /// **프로필에 저장한다** — `kept` 를 참으로 만든다 (2026-09-24 신설).
+  ///
+  /// 🔴 **분석한 클립은 이걸 안 부르면 사라진다.** `analyze: true` 로 등록한
+  /// 클립은 `kept: false` 로 시작해서 **본인 목록에도 공개 목록에도 안 뜨고**,
+  /// 화면을 벗어나면 서버의 TTL 백스톱이 지운다(계약 3-6절). 분석 결과를
+  /// 남기려면 **리포트가 나온 뒤 이 호출이 있어야 한다.**
+  ///
+  /// 🔴 **리포트가 `ready` 일 때만 부른다.** 실패·반려로 끝났으면 남길 것이
+  /// 없다(웹도 같은 규칙이다).
+  ///
+  /// ⚠️ **멱등이다** — 이미 저장된 클립에 다시 불러도 `200` 이다.
+  /// ⚠️ **갈래마다 3개 상한이 여기 걸린다** → `422 VIDEO_LIMIT_EXCEEDED`.
+  /// 그 상한을 **진짜로 지키는 관문이 이 호출**이라, 화면은 이 자리에서
+  /// 사유를 보여 줘야 한다.
+  ///
+  /// 응답은 `GET /videos` 한 줄과 같은 모양이다 — 🔴 **`storage_key` 가
+  /// 바뀌어 온다**(임시 자리에서 리포트 자리로 옮기기 때문).
+  Future<MyVideo> keepVideo(String videoId);
+
+  /// 그 영상의 **관절 시계열** (계약 3-14절, 2026-09-25 신설).
+  ///
+  /// 🔴 **오류 셋이 [report] 와 같다** — `VIDEO_NOT_FOUND`·`ANALYSIS_FAILED`·
+  /// `REPORT_NOT_READY`. 그래서 화면이 리포트를 다루던 방식을 그대로 쓴다.
+  ///
+  /// 🔴 **옛 리포트는 `200` 으로 `{known:false}` 가 온다** — 404 가 아니다.
+  /// 「관절이 없다」와 「리포트가 없다」는 다른 상태라서다.
+  Future<SkeletonResult> skeleton(String videoId);
 
   /// 그 영상의 분석 리포트.
   ///

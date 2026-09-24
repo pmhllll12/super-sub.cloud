@@ -6,6 +6,7 @@ import '../../../core/dev/data_source.dart';
 import '../../../core/mock/mock_db.dart';
 import '../../../core/network/api_client.dart';
 import '../../auth/presentation/session_controller.dart';
+import 'models/skeleton.dart';
 import 'models/video_report.dart';
 import 'video_repository.dart';
 import 'video_repository_api.dart';
@@ -59,6 +60,16 @@ final videoPosterProvider = FutureProvider.family<Uint8List?, String>(
 /// 플레이어 자리를 비워 두고 나머지를 그대로 그린다.
 final playbackUrlProvider = FutureProvider.family<String?, String>(
   (ref, videoId) => ref.watch(videoRepositoryProvider).playbackUrl(videoId),
+  retry: (_, _) => null,
+);
+
+/// 그 영상의 **관절 시계열** (2026-09-25).
+///
+/// 🔴 **캐시해도 된다** — 분석이 끝난 영상의 관절은 안 바뀐다. 다만 응답이
+/// 크다(실측 316KB) — 여러 영상 것을 한꺼번에 들고 있지 않게, 보는 영상
+/// 하나만 `watch` 한다.
+final skeletonProvider = FutureProvider.family<SkeletonResult, String>(
+  (ref, videoId) => ref.watch(videoRepositoryProvider).skeleton(videoId),
   retry: (_, _) => null,
 );
 

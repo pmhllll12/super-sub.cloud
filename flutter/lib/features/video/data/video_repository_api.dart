@@ -5,6 +5,7 @@ import '../../../core/network/presigned_upload.dart';
 import 'clip_file.dart';
 import 'models/my_video.dart';
 import 'models/public_video.dart';
+import 'models/skeleton.dart';
 import 'models/video_report.dart';
 import 'video_repository.dart';
 
@@ -132,6 +133,39 @@ class ApiVideoRepository implements VideoRepository {
   @override
   Future<void> deleteVideo(String videoId) =>
       _api.delete('/videos/${Uri.encodeComponent(videoId)}');
+
+  @override
+  Future<MyVideo> keepVideo(String videoId) async {
+    /* 🔴 **본문이 없다** — 계약이 경로만 받는다. 응답은 `GET /videos` 한 줄과
+       같은 모양이고, `storage_key` 가 **새 자리로 바뀌어** 온다. */
+    final saved = await _api.post(
+      '/videos/${Uri.encodeComponent(videoId)}/keep',
+      const {},
+    );
+    return MyVideo.fromJson(saved);
+  }
+
+  @override
+  Future<SkeletonResult> skeleton(String videoId) async {
+    try {
+      final body =
+          await _api.get('/videos/${Uri.encodeComponent(videoId)}/skeleton');
+      return SkeletonReady(Skeleton.fromJson(body));
+    } on ApiException catch (e) {
+      // 🔴 리포트와 같은 셋이다(계약 3-14절).
+      switch (e.code) {
+        case 'REPORT_NOT_READY':
+          return const SkeletonNotReady();
+        case 'ANALYSIS_FAILED':
+          return SkeletonUnavailable(e.message);
+        case 'VIDEO_NOT_FOUND':
+          return const SkeletonUnavailable('그 영상을 찾을 수 없습니다.');
+      }
+      // 🔴 401 을 「관절 없음」으로 만들지 않는다 — `report` 와 같은 까닭.
+      if (e.status == 401 || e.status == 403) rethrow;
+      return SkeletonUnavailable(e.message);
+    }
+  }
 
   @override
   Future<ReportResult> report(String videoId) async {
