@@ -25,7 +25,7 @@ import '../../features/profile/presentation/widgets/player_card_view.dart'
 /// 지켜진다(사용자 정정: 「서로의 영역에만 있어」).
 class ScreenTint extends StatelessWidget {
   /// 카드의 두 색이 검은 바탕에 번져 드는 본래의 바탕 — **프로필이 쓴다.**
-  const ScreenTint({super.key, required this.a, required this.b})
+  const ScreenTint({super.key, required this.a, required this.b, this.topColor})
     : base = const Color(0xFF000000),
       glows = _darkGlows;
 
@@ -47,7 +47,7 @@ class ScreenTint extends StatelessWidget {
   /// **아래·옆**에서 배어 들지만(검은 바탕을 덜 가리려고), 이쪽은 **위가
   /// 물들고 아래로 갈수록 희어진다** — 화면 아래 절반은 흰 판이 차지하므로
   /// 거기서 색이 빠져야 판과 안 부딪힌다.
-  const ScreenTint.mint({super.key})
+  const ScreenTint.mint({super.key, this.topColor})
     : a = kCardBg,
       b = _kMintGlowSoft,
       base = _kMintBase,
@@ -66,6 +66,14 @@ class ScreenTint extends StatelessWidget {
 
   /// `(자국색인가, 중심 x, 중심 y, 반경, 세기)` 목록 — 아래 두 상수 중 하나.
   final List<(bool, double, double, double, double)> glows;
+
+  /// 🔴 **상태 바가 실제로 얹히는 색**(2026-09-24). 안 주면 [base] 다.
+  ///
+  /// 화면 맨 위를 **다른 색 판이 덮는** 경우가 생겼다 — 홈의 다크 헤더 판이
+  /// 그것이다. 그때 아이콘 밝기를 [base](밝은 회색)로 정하면 **어두운 판 위에
+  /// 어두운 시계**가 된다. 바탕이 아니라 **맨 위에 실제로 보이는 색**이
+  /// 이 판단의 올바른 입력이라, 부르는 쪽이 그 색을 알려 준다.
+  final Color? topColor;
 
   /// 🔴 **상태 바 글자의 밝기를 이 위젯이 정한다**(2026-09-22, 사용자 지적:
   /// 「스크롤 하면 상단바의 검은색 바가 튀어나와」).
@@ -88,7 +96,7 @@ class ScreenTint extends StatelessWidget {
   /// 바탕을 또 갈아도 여기는 안 따라와도 된다.
   @override
   Widget build(BuildContext context) {
-    final lightBg = base.computeLuminance() > 0.5;
+    final lightBg = (topColor ?? base).computeLuminance() > 0.5;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -104,21 +112,25 @@ class ScreenTint extends StatelessWidget {
   }
 }
 
-/// 🔴 **사용자가 집어 준 파스텔 딥그린이다 (2026-09-23 여섯 번째 정정:
-/// 「좀 더 파스텔 색상」 + 색 견본).** 하루 사이 흰색(`#F6FAF5`) → 순검정 →
-/// `#131213` → 밝은 회색(`#EFEFEF`) → 딥그린(`#0F2E1F`) → **이 값**으로 왔다.
+/// 🔴 **사용자가 집어 준 라이트그레이다 (2026-09-24, 색 견본).** 색 이력:
+/// 흰색(`#F6FAF5`) → 순검정 → `#131213` → 밝은 회색(`#EFEFEF`) →
+/// 딥그린(`#0F2E1F`) → 파스텔 딥그린(`#38483D`) → **이 값**.
 ///
-/// ⚠️ **앞선 값은 [kCardBg](`#91EA92`)를 그대로 어둡게 내린 것이었다** —
-/// 색상각(120°)을 지킨 값. 이번 것은 사용자가 고른 것이라 **채도가 더 낮고
-/// 색상각도 조금 다르다**(134°). 앱 초록과 계열을 맞추는 규칙을 이 값이
-/// 대신하므로, 다음에 또 갈 때 「초록을 어둡게 내려라」로 되돌리지 말 것.
+/// ⚠️ **초록 계열을 아예 벗어났다.** `#38483D` 까지는 [kCardBg](`#91EA92`)와
+/// 계열을 맞추는 규칙이 살아 있었지만(색상각 120°→134°), 이 값은 **레퍼런스
+/// 그림의 밝은 바탕**에서 왔다. 「앱 초록을 밝게/어둡게 옮겨라」로 되돌리지 말 것.
 ///
-/// 🔴 **지름길 알약 셋이 같은 값을 쓴다**(`home_screen.dart` 의 `_kPillFill`).
-/// 여기만 갈면 알약도 따라온다 — 그러라고 한 곳에 뒀다.
+/// 🔴 **밝은 쪽으로 뒤집혔다 — 딸려 온 것이 셋이다**(앞 주석이 경고하던 그것):
+/// ① 지름길 알약이 **더는 이 값을 안 쓴다**(`home_screen.dart` 의 `_kPillFill`
+/// 이 다크 판과 같은 상수로 갈라져 나갔다 — 여기만 갈면 따라오던 관계가
+/// 끝났으므로 알약 색을 바꾸려면 그쪽을 본다) ② 소개 두 줄이 흰색에서
+/// 어두운 글자로 뒤집혔다 ③ 인사말·「내 프로필」·로고의 흰 글자는 그 위를
+/// **다크 헤더 판**이 받치게 해서 살렸다.
 ///
-/// ⚠️ **어두운 쪽이라 흰 글자가 산다.** 밝은 쪽으로 갈 일이 있으면 홈의
-/// 「내 프로필」 흰 글자와 순백 흰 판의 경계를 같이 봐야 한다.
-const Color _kMintBase = Color(0xFF38483D);
+/// ⚠️ **순백 흰 판([_kWhiteSheetColor])과의 대비가 약하다** — 레퍼런스도 같은
+/// 짜임(밝은 회색 바탕 + 흰 카드)이라 의도한 것이다. 더 또렷하게 하려면
+/// 이 값을 낮추지 말고 **흰 판에 테나 그림자**를 주는 쪽으로 간다.
+const Color _kMintBase = Color(0xFFE4E9E7);
 
 /// 옅은 쪽 — [kCardBg] 를 흰색 쪽으로 끌어올린 값이다. 마주 보는 자리에
 /// 놓이므로 진한 쪽과 같은 세기면 화면이 양옆에서 조여 보인다.

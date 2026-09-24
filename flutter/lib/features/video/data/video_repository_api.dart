@@ -1,7 +1,10 @@
+import 'dart:typed_data';
+
 import '../../../core/network/api_client.dart';
 import '../../../core/network/presigned_upload.dart';
 import 'clip_file.dart';
 import 'models/my_video.dart';
+import 'models/public_video.dart';
 import 'models/video_report.dart';
 import 'video_repository.dart';
 
@@ -21,6 +24,28 @@ class ApiVideoRepository implements VideoRepository {
   Future<List<MyVideo>> myVideos() async {
     final rows = await _api.getList('/videos');
     return [for (final r in rows) MyVideo.fromJson(r)];
+  }
+
+  @override
+  Future<List<PublicVideo>> publicVideos() async {
+    final rows = await _api.getList('/videos/public');
+    return [for (final r in rows) PublicVideo.fromJson(r)];
+  }
+
+  @override
+  Future<Uint8List?> poster(String videoId) async {
+    try {
+      return await _api.getBytes(
+        '/videos/${Uri.encodeComponent(videoId)}/poster',
+      );
+    } on ApiException catch (e) {
+      /* 🔴 **404 둘을 같게 삼킨다** — `VIDEO_NOT_FOUND`(없거나 비공개 남의 것)와
+         `POSTER_NOT_AVAILABLE`(장면을 못 떴다). 화면이 할 일이 같다: 자리표시.
+         🔴 **503 도 삼킨다** — 저장소가 안 붙은 배포다(`playbackUrl` 과 같은
+         판단). 401·500 은 그대로 올린다. */
+      if (e.status == 404 || e.code == 'STORAGE_NOT_CONFIGURED') return null;
+      rethrow;
+    }
   }
 
   @override

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/dev/data_source.dart';
@@ -23,6 +25,29 @@ final videoRepositoryProvider = Provider<VideoRepository>((ref) {
   }
   return ApiVideoRepository(ref.watch(apiClientProvider));
 });
+
+/// 누군가 공개해 둔 영상 목록 — 홈의 영상 줄이 쓴다.
+///
+/// 🔴 **내 것만이 아니다.** 앱에서 올리든 웹에서 올리든 **공개로 돌린 것**이
+/// 여기 다 온다(서버 질의가 `is_public && kept`).
+///
+/// 🔴 **홈을 열 때 한 번 받는다.** 웹에서 방금 공개로 바꿔도 이미 떠 있는
+/// 화면에는 안 나타난다 — 다시 들어와야 보인다.
+///
+/// retry 를 끈 까닭은 아래 [videoReportProvider] 와 같다.
+final publicVideosProvider = FutureProvider(
+  (ref) => ref.watch(videoRepositoryProvider).publicVideos(),
+  retry: (_, _) => null,
+);
+
+/// 카드에 깔 **한 장면**(JPEG).
+///
+/// 🔴 **재생 주소와 달리 캐시해도 된다** — 사전 서명이 아니라 그림 자체라
+/// 만료가 없다. Riverpod 이 들고 있으므로 되감아 와도 다시 안 받는다.
+final videoPosterProvider = FutureProvider.family<Uint8List?, String>(
+  (ref, videoId) => ref.watch(videoRepositoryProvider).poster(videoId),
+  retry: (_, _) => null,
+);
 
 /// 지금 보고 있는 영상의 **재생 주소**.
 ///

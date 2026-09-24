@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
@@ -120,6 +121,22 @@ class ApiClient {
     return _decodeList(res);
   }
 
+  /// 본문이 **JSON 이 아닌** 경로 — 지금은 포스터 JPEG 하나다.
+  ///
+  /// 🔴 [get] 으로 못 받는다: 그쪽은 본문을 UTF-8 글자로 읽고 `jsonDecode` 를
+  /// 거는데, JPEG 바이트를 그렇게 다루면 **본문을 망가뜨리고** 터지는 자리도
+  /// 엉뚱하다(「JSON 이 아니다」가 아니라 「글자가 아니다」로 난다).
+  ///
+  /// 🔴 **실패는 그대로 올린다** — 404(없음·못 뜸)를 `null` 로 삼키는 판단은
+  /// 부르는 쪽(리포지토리)에서 한다. 여기서 삼키면 401·500 도 같이 묻힌다.
+  Future<Uint8List> getBytes(String path) async {
+    final res = await _send(
+      () => _client.get(_uri(path), headers: _headers()),
+    );
+    if (res.statusCode >= 400) _throwFor(res);
+    return res.bodyBytes;
+  }
+
   Future<Map<String, dynamic>> post(
     String path, [
     Map<String, dynamic>? body,
@@ -229,7 +246,26 @@ class ApiClient {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return decoded;
     }
-    final error = decoded['error'] as Map<String, dynamic>?;
+    _throwFor(response);
+  }
+
+  /// 실패 응답을 [ApiException] 으로 올린다.
+  ///
+  /// 🔴 **[_decode] 에서 떼어 낸 것이다**(2026-09-24). 본문이 JSON 이 아닌
+  /// 경로([getBytes])가 생기면서 **오류를 푸는 자리는 같아야** 했다 — 둘로
+  /// 나뉘면 한쪽만 `Retry-After` 를 읽거나 한쪽만 `code` 를 싣게 된다.
+  ///
+  /// 🔴 **오류 본문은 언제나 JSON 이다** — 성공 본문이 JPEG 이어도 그렇다.
+  Never _throwFor(http.Response response) {
+    Map<String, dynamic>? body;
+    try {
+      body = response.bodyBytes.isEmpty
+          ? null
+          : jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    } catch (_) {
+      body = null; // 오류 본문이 JSON 이 아닐 수도 있다(프록시·게이트웨이).
+    }
+    final error = body?['error'] as Map<String, dynamic>?;
     // 🔴 서버가 값을 안 주면 0 이 아니라 최소 1초 — 0 이면 잠금이 곧바로
     // 풀려 "429 직후 재요청이 안 나간다"가 깨진다(웹과 같은 판단).
     final rawRetryAfter = response.headers['retry-after'];

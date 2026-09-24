@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,20 +7,54 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:super_sub/core/mock/mock_db.dart';
 import 'package:super_sub/core/theme/app_theme.dart';
+import 'package:super_sub/core/widgets/screen_tint.dart';
 import 'package:super_sub/features/intro/presentation/brand_mark.dart';
 import 'package:super_sub/features/auth/data/auth_providers.dart';
 import 'package:super_sub/features/auth/data/auth_repository_mock.dart';
 import 'package:super_sub/core/dev/data_source.dart';
 import 'package:super_sub/features/auth/presentation/session_controller.dart';
 import 'package:super_sub/features/home/presentation/screens/home_screen.dart';
+import 'package:super_sub/features/home/presentation/widgets/home_video_strip.dart';
 import 'package:super_sub/features/team/data/squad_providers.dart';
 import 'package:super_sub/features/profile/presentation/widgets/player_card_view.dart';
 
-Future<ProviderContainer> _pumpLoggedIn(WidgetTester tester) async {
+/* 🔴 **자리를 재는 시험은 실기기를 그대로 흉내 낸다**(`device: true`).
+   아래 값은 2026-09-24 에 실기기에서 `MediaQuery` 를 찍어 온 것이다:
+
+       size=411.4×891.4  dpr=2.625  padding.top=38.5
+
+   기본값(1080×2340 @ dpr 3 = **360×780**, 인셋 0)과 갈리는 것이 셋이고,
+   **셋 다 실기기에 없는 겹침을 시험에서만 만든다.**
+
+   1\. **상태 바 자리가 없다** — 홈은 맨 위 것들을 전부 `safeTop + 8` 에서
+      시작하므로, 0 이면 판·인사말·「내 프로필」이 통째로 38px 위로 붙는다.
+   2\. **세로가 111 짧다** — 아래에서 올라오는 흰 판이 그만큼 위로 붙고,
+      그 위에 매달린 소개 두 줄도 같이 올라온다.
+   3\. 🔴 **가로가 51 좁다 — 이게 제일 고약하다.** 소개 두 줄(35)은 실기기
+      폭에 **간신히** 한 줄로 들어간다. 조금만 좁아도 각 줄이 두 줄로 접혀
+      덩이가 두 배가 된다. **411.0 과 411.4 도 갈린다** — 그래서 논리 폭을
+      맞추지 말고 `physicalSize`·`devicePixelRatio` 를 기기 값 그대로 준다.
+
+   ⚠️ 실제로 2026-09-24 에 1·2 때문에 「판이 소개 두 줄을 침범한다」고 잘못
+   읽고 판을 한 번 늘렸다 되돌렸다. **재는 시험은 기기와 같은 화면에서 잰다.** */
+const Size _kDevicePhysicalSize = Size(1080, 2340);
+const double _kDeviceDpr = 2.625;
+const double _kDeviceTopInset = 38.5 * _kDeviceDpr;
+
+Future<ProviderContainer> _pumpLoggedIn(
+  WidgetTester tester, {
+  bool device = false,
+  bool settle = true,
+}) async {
   // **폰 크기로 돌린다.** 홈은 판 · 영상 분석 · 하단 바가 세로로 꽉 차는
   // 화면이라 기본 800×600 에서는 판이 짜부라진다(app_router_test.dart 와 같다).
-  tester.view.physicalSize = const Size(1080, 2340);
-  tester.view.devicePixelRatio = 3;
+  tester.view.physicalSize =
+      device ? _kDevicePhysicalSize : const Size(1080, 2340);
+  tester.view.devicePixelRatio = device ? _kDeviceDpr : 3;
+  if (device) {
+    tester.view.padding = const FakeViewPadding(top: _kDeviceTopInset);
+    tester.view.viewPadding = const FakeViewPadding(top: _kDeviceTopInset);
+  }
   addTearDown(tester.view.reset);
 
   final container = ProviderContainer(
@@ -53,8 +88,13 @@ Future<ProviderContainer> _pumpLoggedIn(WidgetTester tester) async {
      로그인이 끝나야 `teams` 를 알아 스쿼드를 부르고, 스쿼드가 와야 그 안의
      팀원 카드를 부른다. 여기서 안 흘려보내면 시험이 「위젯 트리를 버린 뒤에도
      타이머가 남았다」로 깨진다 — 화면 잘못이 아니라 흘려보내기가 모자란 것이다. */
-  for (var i = 0; i < 3; i += 1) {
-    await tester.pump(const Duration(milliseconds: 500));
+  /* 🔴 **`settle: false` 는 들어오는 동작의 첫 프레임을 보려는 것이다.**
+     위 500ms 한 번으로 세션이 와서 인사말이 **막 세워진** 참이라, 여기서
+     더 흘려보내지 않으면 들어오기가 아직 0 이다. */
+  if (settle) {
+    for (var i = 0; i < 3; i += 1) {
+      await tester.pump(const Duration(milliseconds: 500));
+    }
   }
   // **pumpAndSettle을 쓰지 않는다.** 유리 조각의 테두리를 도는 빛이 무한
   // 반복이라 영영 안 멎는다.
@@ -98,6 +138,19 @@ double _opacityAbove(WidgetTester tester, Finder target) {
 /// ⚠️ `_opacityAbove` 로 재면 **감싼 `Opacity` 가 없어 늘 1** 이 나온다.
 double _hintAlpha(WidgetTester tester, String label) =>
     tester.widget<Text>(find.text(label)).style!.color!.a;
+
+/// 흔드는 손의 **지금 각도**(라디안) — 회전 행렬에서 되읽는다.
+/// 0 이면 안 흔드는 중이다.
+double _handAngle(WidgetTester tester) {
+  final m = tester
+      .widget<Transform>(find.byKey(const Key('home-greeting-hand')))
+      .transform;
+  return math.atan2(m.storage[1], m.storage[0]);
+}
+
+/// 인사말이 화면 왼쪽에서 떨어진 거리 — `home_screen.dart` 의 `_kGreetLeft`.
+/// 🔴 그쪽이 정본이고 여기는 옮겨 적은 것이다(비공개라 못 부른다).
+const double _kGreetLeft = 20;
 
 Finder _blankSeats() => find.byWidgetPredicate(
       (w) => w.key is ValueKey<String> &&
@@ -642,7 +695,11 @@ void main() {
     await _pumpLoggedIn(tester);
     final greet = find.textContaining('안녕하세요');
     expect(greet, findsOneWidget);
-    expect(find.text('안녕하세요, 백성검 님'), findsOneWidget);
+    /* 🔴 **닉네임은 다음 줄이다**(2026-09-24 사용자 요청: 「안녕하세요, 다음에
+       나오는 닉네임은 다음줄로 내려버리자. 길 수도 있으니까」). 한 덩이
+       문자열(`'안녕하세요, 백성검 님'`)로 찾으면 **아무것도 못 찾는다.** */
+    expect(find.text('안녕하세요,'), findsOneWidget);
+    expect(find.text('백성검 님'), findsOneWidget);
 
     // 왼쪽 위다 — 화면 왼쪽 절반, 위쪽 1/4 안.
     final r = tester.getRect(greet);
@@ -657,24 +714,46 @@ void main() {
     expect(style.fontWeight, FontWeight.w900);
   });
 
-  /* 🔴 **로고가 내려앉기 전에는 안 보인다**(2026-09-23 사용자 요청).
-     인트로가 도는 동안 홈은 **이미 그 아래에 지어져 있어서**, 기다리지 않으면
-     잉크가 걷히는 순간 이미 다 보이는 채로 드러난다. */
-  testWidgets('로고가 앉기 전에는 인사말이 안 보인다', (tester) async {
+  /* 🔴 **인사말은 로고를 안 기다리고 왼쪽 밖에서 들어온다. 흔들기만 기다린다**
+     (2026-09-24 사용자 요청: 「글자랑 아이콘 supersub 도착할 때까지 안 나오는
+     거 하지 말고 처음부터 왼쪽 밖에서 들어오게 하고, 도착하면 그때 손 흔드는
+     애니메이션 나오게 해줘」).
+
+     ⚠️ **2026-09-23 에는 반대였다** — 로고가 앉을 때까지 **안 보였다가**
+     스며들었다. 되살리지 말 것. */
+  testWidgets('인사말은 로고를 안 기다리고 왼쪽 밖에서 들어온다', (tester) async {
     kBrandSettled.value = false;
     addTearDown(() => kBrandSettled.value = true);
 
-    await _pumpLoggedIn(tester);
-    final greet = find.text('안녕하세요, 백성검 님');
-    expect(_opacityAbove(tester, greet), 0, reason: '아직 안 앉았다');
+    await _pumpLoggedIn(tester, device: true);
+    final greet = find.text('안녕하세요,');
 
-    // 로고가 앉으면 스며든다.
+    // 🔴 로고가 아직 안 앉았는데도 **제자리에 다 들어와 있다**.
+    expect(tester.getRect(greet).left, closeTo(_kGreetLeft, 1));
+
+    // 🔴 그런데 손은 아직 안 흔든다 — 로고를 기다린다.
+    expect(_handAngle(tester), 0, reason: '아직 안 앉았다');
+
+    // 로고가 앉으면 그때 흔든다.
     kBrandSettled.value = true;
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 700));
-    expect(_opacityAbove(tester, greet), 1, reason: '앉으면 다 보인다');
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(_handAngle(tester), isNot(0), reason: '앉으면 흔든다');
 
-    // 흔들기가 끝날 때까지 흘려보내고 끝낸다.
+    // 흔들기가 끝나면 손이 제자리로 내려앉는다(진폭이 잦아든다).
+    await tester.pump(const Duration(milliseconds: 1700));
+    expect(_handAngle(tester), closeTo(0, 0.001), reason: '잦아들어 멎는다');
+  });
+
+  /* 들어오는 동작 자체 — 첫 프레임에는 **화면 왼쪽 밖**에 있다. */
+  testWidgets('인사말이 화면 왼쪽 밖에서 출발한다', (tester) async {
+    await _pumpLoggedIn(tester, device: true, settle: false);
+    expect(tester.getRect(find.text('안녕하세요,')).right, lessThan(0),
+        reason: '첫 프레임에는 화면 밖 왼쪽');
+
+    await tester.pump(const Duration(milliseconds: 800));
+    expect(tester.getRect(find.text('안녕하세요,')).left,
+        closeTo(_kGreetLeft, 1));
     await tester.pump(const Duration(milliseconds: 1900));
   });
 
@@ -695,33 +774,101 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
   });
 
-  /* 소개 두 줄 — 🔴 **흰 판 바로 위**이고 **인사말보다 크다**(2026-09-23
-     사용자 요청: 「안녕하세요, 백성검님 바로 아래 말고」 「좀 더 키워서」). */
-  testWidgets('소개 두 줄이 흰 판 바로 위에, 인사말보다 크게 선다', (tester) async {
-    await _pumpLoggedIn(tester);
-    final line1 = find.text('함께 뛸 팀을 만들고,');
-    final line2 = find.text('영상으로 실력을 증명하세요.');
-    expect(line1, findsOneWidget);
-    expect(line2, findsOneWidget);
+  /* 🔴 **소개 두 줄이 있던 자리에 공개 영상 줄이 선다**(2026-09-24 사용자
+     요청: 「그 글자를 없애고, 거기에 우리 실제로 업로드된 영상들 나오게」).
+     ⛔ 그 두 줄을 되살리지 말 것 — 아래가 그것도 함께 지킨다. */
+  testWidgets('소개 두 줄이 없고, 그 자리에 영상 줄이 선다', (tester) async {
+    await _pumpLoggedIn(tester, device: true);
 
+    expect(find.text('함께 뛸 팀을 만들고,'), findsNothing);
+    expect(find.text('영상으로 실력을 증명하세요.'), findsNothing);
+
+    final strip = find.byType(HomeVideoStrip);
+    expect(strip, findsOneWidget);
+
+    // 다크 판 **아래**, 흰 판 **위**다.
+    final r = tester.getRect(strip);
+    final panel = tester.getRect(find.byKey(const Key('home-top-panel')));
     final white = tester.getRect(find.byKey(const Key('home-white-sheet')));
-    final block = tester.getRect(line2);
-    // 흰 판 **위**에 있고, 멀리 떨어져 있지 않다.
-    expect(block.bottom, lessThanOrEqualTo(white.top));
-    expect(white.top - block.bottom, lessThan(40));
+    expect(r.top, greaterThanOrEqualTo(panel.bottom));
+    expect(r.bottom, lessThanOrEqualTo(white.top));
+    expect(r.height, greaterThan(60), reason: '카드가 설 만한 높이는 된다');
+  });
 
-    /* 🔴 **인사말과의 틈은 재지 않는다** — 그 틈은 화면 높이에서 남는 만큼이라
-       기기마다 다르다(시험 뷰포트 360×780 에서는 13px, 실기기 411×891 에서는
-       훨씬 넓다). 「인사말 바로 아래가 아니다」를 지키는 것은 **흰 판에 붙어
-       있다**는 위 성질이고, 여기서는 순서만 본다. */
-    final hello = tester.getRect(find.text('안녕하세요, 백성검 님'));
-    expect(block.top, greaterThan(hello.bottom));
+  /* 🔴 **맨 위 다크 판**(2026-09-24 사용자 요청 + 레퍼런스: 「내 프로필 글자
+     아래로 … 이 색상으로 판 하나 주자」). 판이 담는 것은 **인사말과 「내
+     프로필」까지만**이고, 소개 두 줄은 판 **밖 아래**에 남는다. */
+  testWidgets('맨 위 다크 판이 인사말과 「내 프로필」을 덮는다', (tester) async {
+    await _pumpLoggedIn(tester, device: true);
+    final panel = find.byKey(const Key('home-top-panel'));
+    expect(panel, findsOneWidget);
 
-    // 🔴 인사말보다 크다.
-    final size1 = tester.widget<Text>(line1).style!.fontSize!;
-    final helloSize =
-        tester.widget<Text>(find.text('안녕하세요, 백성검 님')).style!.fontSize!;
-    expect(size1, greaterThan(helloSize));
+    final p = tester.getRect(panel);
+    final view = tester.view;
+    final screenW = view.physicalSize.width / view.devicePixelRatio;
+
+    // 화면 맨 위에서 좌우 끝까지 — 흰 판과 같은 방식이다.
+    expect(p.top, 0);
+    expect(p.left, 0);
+    expect(p.right, screenW);
+
+    // 인사말 두 줄과 「내 프로필」이 **판 안**에 든다.
+    for (final inside in [
+      find.text('안녕하세요,'),
+      find.text('백성검 님'),
+      find.text('내 프로필'),
+    ]) {
+      final r = tester.getRect(inside);
+      expect(p.contains(r.topLeft), isTrue, reason: '$inside 이 판 밖이다');
+      expect(p.contains(r.bottomRight), isTrue, reason: '$inside 이 판 밖이다');
+    }
+
+    /* 🔴 **소개 두 줄이 들어설 자리가 판 아래에 남아 있다** — 사용자가 자리를
+       갈랐다(「그 판을 함께 내 프로필 아래쪽으로 해줘. 함께 뛸 팀을 만들고
+       여기까지 하지 말고」). 판이 그 자리를 먹으면 어두운 글자가 어두운 판에
+       얹혀 **그대로 사라진다.**
+
+       🔴 **렌더된 글자 상자를 재지 않는다 — 두 번 속았다.** 그 줄은 실기기
+       폭에 **간신히** 들어가서, 시험 환경의 글꼴 지표가 조금만 달라도 한 줄이
+       더 접히고 상자가 통째로 위로 올라온다(같은 폭·dpr 로 맞춰도 그랬다).
+       그래서 **자리를 계산해서** 잰다 — 소개 두 줄은 흰 판 윗변에서 10 위에
+       매달린 **2줄(35 × 1.25 × 2 = 87.5)** 덩이다.
+
+       실기기 실측(2026-09-24): 판 아랫변 225.94 · 소개 두 줄 윗변 239.74 —
+       **13.8 여유.** 아래 단언이 그 여유를 지킨다. */
+    const taglineBlockH = 35 * 1.25 * 2;
+    const taglineGap = 10;
+    final white = tester.getRect(find.byKey(const Key('home-white-sheet')));
+    expect(p.bottom, lessThan(white.top - taglineGap - taglineBlockH));
+
+    // 판 면은 어둡다 — 안의 흰 글자가 사는 근거다.
+    final deco =
+        tester.widget<DecoratedBox>(panel).decoration as BoxDecoration;
+    expect(deco.color!.computeLuminance(), lessThan(0.05));
+  });
+
+  /* 🔴 **닉네임이 길어도 「내 프로필」을 안 침범한다** — 인사말 칸을 그 앞에서
+     끊어 두고 넘치면 줄을 바꾼다. 목업 닉네임이 짧아 글자로는 못 재므로
+     **칸 자체의 오른쪽 끝**을 잰다(칸은 좌우가 묶여 있어 닉네임 길이와 무관하다). */
+  testWidgets('인사말 칸은 「내 프로필」 앞에서 끝난다', (tester) async {
+    await _pumpLoggedIn(tester);
+    final band = tester.getRect(find.byKey(const Key('home-greeting')));
+    final profile = tester.getRect(find.text('내 프로필'));
+    expect(band.right, lessThanOrEqualTo(profile.left));
+  });
+
+  /* 🔴 **바탕이 밝아졌다**(2026-09-24 사용자 요청 + 색 견본). 판 안의 흰
+     글자가 사는 근거는 그 위가 다크 판이라는 것뿐이다.
+     ⚠️ 같은 날 **판 밖의 어두운 글자**(소개 두 줄)도 함께 봤는데, 그 두 줄이
+     영상 줄로 바뀌면서 **판 밖에 글자가 하나도 안 남았다.** */
+  testWidgets('바탕은 라이트그레이고, 판 안의 글자는 희다', (tester) async {
+    expect(ScreenTint.mintBase, const Color(0xFFE4E9E7));
+
+    await _pumpLoggedIn(tester);
+    for (final t in [find.text('안녕하세요,'), find.text('백성검 님')]) {
+      expect(tester.widget<Text>(t).style!.color, const Color(0xFFFFFFFF),
+          reason: '판 안: $t');
+    }
   });
 
   testWidgets('바 메뉴를 열면 로그아웃 칸이 선다', (tester) async {

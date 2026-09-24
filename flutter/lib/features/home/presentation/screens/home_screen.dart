@@ -32,6 +32,7 @@ import '../../../team/data/squad_repository.dart';
 import '../../../team/optimistic_squad.dart';
 import '../../../team/seats_from_squad.dart';
 import '../../../team/presentation/widgets/squad_board.dart';
+import '../widgets/home_video_strip.dart';
 
 /// 홈의 바탕 — **완전한 검정**이다(2026-09-22 사용자 요청: 「홈페이지의 전체
 /// 배경 색상 완전 검정으로」).
@@ -146,17 +147,22 @@ const String _kKoFont = 'PyeojinGothic';
 /// 인사말이 화면 왼쪽에서 떨어진 거리.
 const double _kGreetLeft = 20;
 
-/// 소개 두 줄이 **흰 판 윗변에서** 떨어진 거리(2026-09-23 사용자 요청:
-/// 「그 흰색 판 바로 위에 … 안녕하세요 바로 아래 말고」).
+/// 🔴 **인사말 칸이 오른쪽에서 끊기는 자리** (2026-09-24). 「내 프로필」 단추가
+/// 거기 서 있어서, 칸을 그 앞에서 끊어야 **긴 닉네임이 카드 위로 올라타지
+/// 않는다** — 끊어 두면 넘치는 대신 줄이 바뀐다.
 ///
-/// ⚠️ 22 → **10**(같은 날, 「흰 판 윗변에서 10px 위에 붙여」).
-const double _kTaglineGap = 10;
+/// 단추 폭([_kProfileCardWidth] + 둘레 4×2) + 화면 오른쪽 여백 16 + 틈 8.
+const double _kGreetRight = _kProfileCardWidth + 8 + 16 + 8;
 
-/// 소개 두 줄의 글자 크기 — 🔴 **인사말보다 크다**(사용자 요청).
-/// 인사말은 [_Greeting.fontSize] 26 이다.
+/// 「내 프로필」 단추가 차지하는 높이 — 둘레 4 + 카드 + 틈 5 + 글자 18 + 둘레 4.
 ///
-/// ⚠️ 30 → **35**(2026-09-23, 같은 날).
-const double _kTaglineSize = 35;
+/// 🔴 **카드 비율 4.1:3 은 `player_card_view.dart` 의 `_kBaseH / _kBaseW`
+/// 와 같은 값이다** — 거기가 정본이고 여기는 옮겨 적은 것이라, 그쪽이 바뀌면
+/// 같이 고친다. 이 값은 다크 판의 **최소 높이**를 정하는 데만 쓴다.
+const double _kProfileButtonH = 4 + _kProfileCardWidth * 4.1 / 3 + 5 + 18 + 4;
+
+/// 영상 줄이 다크 판·흰 판과 각각 띄우는 틈.
+const double _kVideoStripGap = 10;
 
 /// 워드마크(`SUPERSUB`)가 **화면 맨 위에서** 떨어진 거리.
 ///
@@ -213,12 +219,41 @@ const double _kShortcutTopPad = 14;
 /// 알약 셋 사이 틈.
 const double _kShortcutSpacing = 10;
 
-/// 지름길 알약의 면 — 🔴 **화면 바탕과 같은 딥그린이다**(2026-09-23 사용자
-/// 요청: 「똑같은 딥그린으로 바꾸자」).
+/// 지름길 알약의 면 — 🔴 **맨 위 다크 판과 같은 값이다**(2026-09-24).
 ///
-/// 🔴 **값을 여기 적지 않는다** — [ScreenTint.mintBase] 한 곳에 있다. 바탕을
-/// 또 갈면 알약도 같이 따라와야 「같은 딥그린」이라는 말이 유지된다.
-const Color _kPillFill = ScreenTint.mintBase;
+/// ⚠️ **바탕을 따라가던 것을 끊었다.** 2026-09-23 에는 「화면 바탕과 같은
+/// 딥그린」이라 [ScreenTint.mintBase] 를 그대로 썼는데, 바탕이 **밝은
+/// 회색으로 뒤집히면서** 그 규칙이 알약을 **흰 판 위의 밝은 회색 + 흰 글자**
+/// 로 만들어 통째로 사라지게 했다.
+///
+/// 🔴 **이제 「어두운 면」이 짝이다** — 화면에 어두운 것이 다크 판과 이 알약
+/// 둘뿐이라 같은 상수를 쓴다. 알약 색을 갈려면 [_kTopPanelColor] 를 본다.
+const Color _kPillFill = _kTopPanelColor;
+
+/// 화면 맨 위 **다크 헤더 판**의 면 (2026-09-24 사용자 요청 + 레퍼런스:
+/// 「내 프로필 글자 아래로 … 이 색상으로 판 하나 주자」, 색 견본 `#222021`).
+///
+/// 🔴 **이 판이 담는 것은 「안녕하세요, (닉네임)」과 「내 프로필」까지다**
+/// (사용자 정정: 「그 판은 거기 닉네임과 내 프로필까지만 담아야 해」).
+/// 소개 두 줄(「함께 뛸 팀을 만들고,…」)은 **판 밖 아래**에 남는다 —
+/// 판을 그 줄까지 내리지 말 것.
+///
+/// 🔴 **판 위의 글자가 흰색인 근거다.** 바탕이 밝은 회색으로 뒤집혔어도
+/// 인사말·「내 프로필」·로고가 흰색으로 남을 수 있는 것은 이 판 덕분이다.
+/// 이 판을 걷으면 그 셋의 색도 함께 정해야 한다.
+const Color _kTopPanelColor = Color(0xFF222021);
+
+/// 다크 판의 **아래 모서리** — 🔴 흰 판([_kWhiteSheetRadius])과 같은 값이다.
+/// 위는 화면 끝에 붙으므로 안 둥글린다. 둘이 화면 위아래에서 짝을 이룬다.
+const double _kTopPanelRadius = _kWhiteSheetRadius;
+
+/// 다크 판이 **「내 프로필」 글자 밑으로** 더 남기는 자리.
+///
+/// ⚠️ **20 → 6** (2026-09-24 사용자 요청: 「그 위에 판을 내 프로필 글자 바로
+/// 아래까지 좀 위치 올려」). 그 아래 **영상 줄**이 설 자리를 벌기 위한 것이다 —
+/// 판 아랫변이 225.9 → 212 로 올라가 영상 줄이 111 → 125px 을 갖는다.
+const double _kTopPanelPadBottom = 6;
+
 
 /// 알약 안의 글자·아이콘 — 🔴 **순백이다**(같은 요청). 면이 어두워졌으므로
 /// 검정에서 뒤집혔다.
@@ -729,8 +764,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                🔴 **`if (card?.style != null)` 도 같이 걷혔다** — 카드가 없거나
                아직 안 온 사람에게 **바탕이 통째로 검정으로 보이던** 자리다.
                이제 누구에게나 같은 바탕이 깔린다. */
+            /* 🔴 **상태 바 아이콘은 바탕이 아니라 다크 판이 정한다**
+               (2026-09-24). [ScreenTint] 는 `base` 의 광도로 아이콘 밝기를
+               스스로 고르는데, 바탕이 밝은 회색이 되면서 **어두운 아이콘**을
+               골랐다 — 그런데 상태 바가 실제로 얹히는 것은 그 바탕이 아니라
+               **맨 위의 다크 판**이라 시계·배터리가 안 보였다. */
             const Positioned.fill(
-              child: IgnorePointer(child: ScreenTint.mint()),
+              child: IgnorePointer(
+                child: ScreenTint.mint(topColor: _kTopPanelColor),
+              ),
             ),
             // 판을 펼칠수록 뒤가 조금 눌린다 — 시선이 판으로 모인다.
             Positioned.fill(
@@ -748,10 +790,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             _whiteSheet(context),
             _videoPanel(context),
             _shortcutPills(context),
+            /* 🔴 **로고·「내 프로필」보다 뒤, 스쿼드 판보다 앞이다.** 뒤라서
+               그 셋이 판 위에 얹히고, 앞이라서 판을 펼치면 **인사말과 똑같이
+               덮인다** — 따로 걷는 연출을 안 만들어도 되는 자리다. */
+            _topPanel(context, user?.nickname),
             // 로고는 화면 맨 위 가운데 — 판을 펼치면 그 판이 덮는다.
             _brandMark(context),
-            _greeting(context, user?.nickname),
-            _tagline(context),
+            _videoStrip(context),
             _squadSheet(context, card, squad, user?.ownedTeamId),
             // 「내 프로필」 — 화면 맨 위 오른쪽. 판보다 **뒤에 두지 않는다**.
             _profileButton(context, card),
@@ -984,54 +1029,106 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  /// 화면 **왼쪽 위**의 인사말 — 흔드는 손 + 「안녕하세요, (닉네임) 님」
-  /// (2026-09-23 사용자 요청 + 레퍼런스).
+  /// 화면 맨 위의 **다크 헤더 판**과 그 안의 인사말 (2026-09-24 사용자 요청 +
+  /// 레퍼런스: 「내 프로필 글자 아래로 … 이 색상으로 판 하나 주자」).
+  ///
+  /// 🔴 **판이 인사말을 「담는다」 — 나란히 두지 않는다.** 판 높이를 따로
+  /// 계산해서 맞추는 방법도 있었지만, **닉네임이 길어 줄이 하나 더 늘면**
+  /// 그 계산이 조용히 어긋나 글자가 판 밖으로 비어져 나온다. 자식으로 넣으면
+  /// 판이 **글자를 잰 만큼** 커지므로 그런 경우가 아예 없다.
+  ///
+  /// 🔴 **담는 것은 인사말과 「내 프로필」까지다** (사용자 정정: 「그 판은
+  /// 거기 닉네임과 내 프로필까지만 담아야 해」). 소개 두 줄은 판 **밖 아래**다
+  /// — 아랫변을 그 줄까지 내리지 말 것.
+  ///
+  /// 🔴 **로고·「내 프로필」은 이 판의 자식이 아니다.** [Stack] 에서 이 판
+  /// **뒤에** 그려져 판 위에 얹힐 뿐이다. 둘 다 `rowTop` 에서 시작해 판 안에
+  /// 들어오는데, 인사말이 없는 사람(로그인 전)에게도 그 둘은 덮여야 하므로
+  /// 판에 **최소 높이**를 준다.
   ///
   /// 🔴 **닉네임이 아직 없으면 줄을 안 세운다.** 세션이 오기 전에 「안녕하세요,
   /// 님」처럼 이름만 빠진 줄이 한 번 떴다 바뀌면 그것이 더 눈에 띈다.
-  ///
-  /// 🔴 **판이 덮는다** — [Stack] 에서 스쿼드 판보다 먼저 오므로, 판을 펼치면
-  /// 따로 걷지 않아도 가려진다.
-  Widget _greeting(BuildContext context, String? nickname) {
-    if (nickname == null || nickname.isEmpty) return const SizedBox.shrink();
+  Widget _topPanel(BuildContext context, String? nickname) {
     final geo = _sheetGeometry(context);
+    final hasName = nickname != null && nickname.isNotEmpty;
     return Positioned(
-      left: _kGreetLeft,
-      top: geo.rowTop + _kWordmarkTop + kBrandHomeSize + 18,
-      child: IgnorePointer(child: _Greeting(nickname: nickname)),
-    );
-  }
+      top: 0,
+      left: 0,
+      right: 0,
+      child: IgnorePointer(
+        child: ConstrainedBox(
+          // 인사말이 없어도 로고와 「내 프로필」은 덮는다.
+          /* 🔴 **「내 프로필」 바로 아래에서 끊는다** — 소개 두 줄은 판 밖이다
+             (2026-09-24 사용자 확정: 「그 판을 함께 내 프로필 아래쪽으로 해줘.
+             함께 뛸 팀을 만들고 여기까지 하지 말고」).
 
-  /// 흰 판 **바로 위**에 앉는 소개 두 줄(2026-09-23 사용자 요청).
-  ///
-  /// 🔴 **인사말 바로 아래가 아니다.** 사용자가 자리를 따로 골랐다 — 위쪽은
-  /// 인사말, 아래쪽은 이 줄로 비어 있는 공간을 나눠 쓴다.
-  ///
-  /// 🔴 **접힌 흰 판 윗변을 기준 삼는다.** 판을 펼치면 스쿼드 판이 이 줄을
-  /// 덮으므로 따라 올라갈 까닭이 없다 — 따라가게 만들면 덮이는 도중에
-  /// 글자가 판 위로 비어져 나온다.
-  Widget _tagline(BuildContext context) {
-    final geo = _sheetGeometry(context);
-    final size = MediaQuery.sizeOf(context);
-    return Positioned(
-      left: _kGreetLeft,
-      right: _kGreetLeft,
-      bottom: size.height - geo.whiteTopCollapsed + _kTaglineGap,
-      child: const IgnorePointer(
-        child: _FadeInOnSettled(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              /* ⚠️ **두 줄의 순서와 문장을 갈았다**(2026-09-23, 같은 날) —
-                 「영상으로 실력을 증명하고 / 함께 뛸 팀을 만드세요」가
-                 먼저였다. 팀을 앞세우는 쪽으로 사용자가 정했다. */
-              Text('함께 뛸 팀을 만들고,', style: _kTaglineStyle),
-              Text('영상으로 실력을 증명하세요.', style: _kTaglineStyle),
-            ],
+             🔴 **아랫변을 정하는 것은 인사말이 아니라 「내 프로필」 카드다**
+             (94폭 → 128 높이). 인사말을 줄여도 판이 안 줄어드는 이유이고,
+             판을 낮추려면 [_kProfileCardWidth] 를 봐야 한다.
+
+             ⚠️ **같은 날 「흰 판 바로 위까지 늘렸다」가 되돌아왔다.** 그때는
+             판이 소개 두 줄을 침범하는 줄 알았는데, **시험 화면에 상태 바
+             자리가 없어서** 나온 착시였다 — 실기기(411×891, 상태 바 33)에서
+             재면 판 아랫변 220.5, 소개 두 줄 윗변 238.9 로 **18px 남는다.**
+             🔴 그래서 시험도 상태 바 자리를 넣고 잰다(`_kDeviceTopInset`). */
+          constraints: BoxConstraints(
+            minHeight: geo.rowTop + _kProfileButtonH + _kTopPanelPadBottom,
+          ),
+          child: DecoratedBox(
+            key: const Key('home-top-panel'),
+            decoration: const BoxDecoration(
+              color: _kTopPanelColor,
+              // 위는 화면 끝에 붙으므로 안 둥글린다.
+              borderRadius: BorderRadius.vertical(
+                bottom: Radius.circular(_kTopPanelRadius),
+              ),
+            ),
+            child: Padding(
+              padding: EdgeInsets.only(
+                // 로고 줄 아래 — 인사말이 앉던 그 자리 그대로다.
+                top: geo.rowTop + _kWordmarkTop + kBrandHomeSize + 18,
+                left: _kGreetLeft,
+                right: _kGreetRight,
+                bottom: _kTopPanelPadBottom,
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                child: hasName
+                    ? KeyedSubtree(
+                        key: const Key('home-greeting'),
+                        child: _Greeting(nickname: nickname),
+                      )
+                    : const SizedBox.shrink(key: Key('home-greeting')),
+              ),
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  /// 다크 판과 흰 판 **사이**에 서는 공개 영상 줄 (2026-09-24 사용자 요청 +
+  /// 레퍼런스: 「그 글자를 없애고, 거기에 우리 실제로 업로드된 영상들 나오게」).
+  ///
+  /// ⛔ **여기 있던 소개 두 줄(「함께 뛸 팀을 만들고,…」)을 되살리지 말 것** —
+  /// 사용자가 **그 글자를 없애고** 이 줄로 바꾸라고 정했다. 그 두 줄은
+  /// 35pt 라 411 폭에 간신히 들어갔고, 좁은 폰에서는 각 줄이 접혀 네 줄이
+  /// 되는 문제도 안고 있었다(이번에 같이 없어졌다).
+  ///
+  /// 🔴 **자리를 재서 넘긴다.** 위는 다크 판 아랫변, 아래는 **접힌** 흰 판
+  /// 윗변이다. 판을 펼치면 스쿼드 판이 이 줄을 덮으므로 따라 올라갈 까닭이
+  /// 없다(소개 두 줄이 쓰던 규칙 그대로다).
+  Widget _videoStrip(BuildContext context) {
+    final geo = _sheetGeometry(context);
+    final top = geo.rowTop + _kProfileButtonH + _kTopPanelPadBottom;
+    final room = geo.whiteTopCollapsed - top;
+    final height = (room - _kVideoStripGap * 2).clamp(0.0, 240.0);
+    return Positioned(
+      top: top + _kVideoStripGap,
+      left: 0,
+      right: 0,
+      height: height,
+      child: HomeVideoStrip(height: height),
     );
   }
 
@@ -1607,84 +1704,30 @@ class _ShortcutPill extends StatelessWidget {
   }
 }
 
-/// 소개 두 줄의 글자 차림.
-const TextStyle _kTaglineStyle = TextStyle(
+/// 인사말 두 줄의 글자 차림 — 🔴 **다크 판 위**라 흰색이다.
+const TextStyle _kGreetStyle = TextStyle(
   fontFamily: _kKoFont,
   // 🔴 번들한 굵기가 Black 하나다 — [_kKoFont] 주석 참고.
   fontWeight: FontWeight.w900,
-  fontSize: _kTaglineSize,
-  height: 1.25,
+  fontSize: _Greeting.fontSize,
+  height: 1.2,
   color: _kOnDark,
 );
 
-/// **로고가 내려앉은 뒤에** 스며드는 껍데기.
+/// 인사말 한 덩이 — **화면 왼쪽 밖에서 미끄러져 들어오고**, 로고가 내려앉으면
+/// 그때 손을 흔든다 (2026-09-24 사용자 요청: 「글자랑 아이콘 supersub 도착할
+/// 때까지 안 나오는 거 하지 말고 처음부터 왼쪽 밖에서 들어오게 하고, 도착하면
+/// 그때 손 흔드는 애니메이션 나오게 해줘」).
 ///
-/// 🔴 **[kBrandSettled] 를 기다리는 까닭은 [_Greeting] 과 같다** — 인트로가
-/// 도는 동안 홈은 이미 그 아래에 지어져 있어서, 안 기다리면 잉크가 걷히는
-/// 순간 **이미 다 보이는 채로** 드러난다.
-class _FadeInOnSettled extends StatefulWidget {
-  const _FadeInOnSettled({required this.child});
-
-  final Widget child;
-
-  @override
-  State<_FadeInOnSettled> createState() => _FadeInOnSettledState();
-}
-
-class _FadeInOnSettledState extends State<_FadeInOnSettled>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _fade = AnimationController(
-    vsync: this,
-    duration: _Greeting.fadeIn,
-  );
-
-  @override
-  void initState() {
-    super.initState();
-    kBrandSettled.addListener(_onSettled);
-    _onSettled();
-  }
-
-  void _onSettled() {
-    if (kBrandSettled.value) _fade.forward();
-  }
-
-  @override
-  void dispose() {
-    kBrandSettled.removeListener(_onSettled);
-    _fade.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _fade,
-      child: widget.child,
-      builder: (context, child) {
-        final t = Curves.easeOut.transform(_fade.value);
-        return Opacity(
-          opacity: t,
-          child: Transform.translate(
-            offset: Offset(0, _Greeting.rise * (1 - t)),
-            child: child,
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// 인사말 한 덩이 — **로고가 내려앉은 뒤에** 스며 들고, 다 보이면 손을 흔든다
-/// (2026-09-23 사용자 요청: 「내려 앉기 전까지는 안보였다가 딱 내려 앉으면
-/// 자연스럽게 보여지기 시작하면서 다 보여지면 그때부터 한 4번 정도 손 흔들게」).
+/// ⚠️ **들어오는 것은 더 이상 [kBrandSettled] 를 안 기다린다** — 2026-09-23
+/// 에는 기다렸다(「내려 앉기 전까지는 안보였다가 딱 내려 앉으면…」). 그때
+/// 기다린 까닭은 **인트로가 도는 동안 홈이 이미 그 아래에 지어져 있어서**,
+/// 안 기다리면 잉크가 걷히는 순간 **이미 다 나타난 채로** 드러나기 때문이었다.
+/// 🔴 **지금은 그 문제가 안 생긴다** — 인트로 뒤에서 벌어지는 일이 「없던 것이
+/// 나타나는 것」이 아니라 **화면 밖에서 안으로 들어오는 것**이라, 잉크가 걷힐
+/// 때 이미 제자리에 있어도 어색하지 않다.
 ///
-/// 🔴 **[kBrandSettled] 를 기다린다.** 인트로가 도는 동안 홈은 **이미 그 아래에
-/// 지어져 있어서**, 화면이 뜨는 대로 스며들게 하면 **인트로 뒤에서 혼자 나타났다가**
-/// 잉크가 걷히는 순간 이미 다 보이는 채로 드러난다.
-///
-/// 🔴 **흔들기는 스며들기가 *끝난 뒤* 시작한다.** 겹치면 반쯤 보이는 손이
-/// 흔들려 「덜 그려진 것이 움직인다」로 읽힌다.
+/// 🔴 **흔들기만 [kBrandSettled] 를 기다린다** — 로고가 앉는 순간이 신호다.
 ///
 /// 🔴 **잦아들게 흔든다.** 같은 폭으로 흔들다 뚝 멈추면 「멈췄다」가 아니라
 /// 「끊겼다」로 보인다 — 진폭을 시간에 따라 0 으로 떨어뜨리면 손이 제자리에
@@ -1697,11 +1740,15 @@ class _Greeting extends StatefulWidget {
 
   final String nickname;
 
-  /// 스며드는 시간.
-  static const fadeIn = Duration(milliseconds: 650);
+  /// 왼쪽 밖에서 들어오는 시간.
+  static const enter = Duration(milliseconds: 700);
 
-  /// 스며들며 **살짝 올라온다** — 밑에서 떠오르면 「나타났다」가 한 동작으로 읽힌다.
-  static const rise = 10.0;
+  /// 🔴 **제 폭의 몇 배만큼 왼쪽에서 출발하는가.** 1 이면 제 상자 폭만큼
+  /// 왼쪽인데, 이 덩이의 상자는 **인사말 칸 전체 폭**(판 안쪽 좌우 여백을 뺀
+  /// 만큼)이라 1 만 해도 화면 밖이다. 🔴 **1.05 로 조금 더 민다** — 왼쪽
+  /// 여백([_kGreetLeft])만큼은 상자 밖이라, 1 이면 **글자 왼쪽 끝이 화면
+  /// 안에 걸친 채로** 출발한다.
+  static const enterFrom = 1.05;
 
   /// 몇 번 흔드는가(왕복 기준).
   static const waves = 4;
@@ -1720,38 +1767,38 @@ class _Greeting extends StatefulWidget {
 }
 
 class _GreetingState extends State<_Greeting> with TickerProviderStateMixin {
-  late final AnimationController _fade = AnimationController(
+  /// 왼쪽 밖에서 들어오는 것 — 🔴 **화면이 지어지는 대로 곧장 돈다.**
+  late final AnimationController _enter = AnimationController(
     vsync: this,
-    duration: _Greeting.fadeIn,
+    duration: _Greeting.enter,
   );
   late final AnimationController _wave = AnimationController(
     vsync: this,
     duration: _Greeting.wavePeriod,
   );
 
-  bool _started = false;
+  bool _waved = false;
 
   @override
   void initState() {
     super.initState();
+    _enter.forward();
     kBrandSettled.addListener(_onSettled);
     _onSettled();
   }
 
-  /// 🔴 **한 번만 시작한다.** [kBrandSettled] 는 인트로가 오갈 때 값이 여러 번
-  /// 바뀔 수 있는데, 그때마다 다시 걸면 인사말이 계속 처음부터 스며든다.
+  /// 🔴 **한 번만 흔든다.** [kBrandSettled] 는 인트로가 오갈 때 값이 여러 번
+  /// 바뀔 수 있는데, 그때마다 다시 걸면 손이 계속 처음부터 흔들린다.
   void _onSettled() {
-    if (!kBrandSettled.value || _started) return;
-    _started = true;
-    _fade.forward().whenComplete(() {
-      if (mounted) _wave.forward();
-    });
+    if (!kBrandSettled.value || _waved) return;
+    _waved = true;
+    _wave.forward();
   }
 
   @override
   void dispose() {
     kBrandSettled.removeListener(_onSettled);
-    _fade.dispose();
+    _enter.dispose();
     _wave.dispose();
     super.dispose();
   }
@@ -1759,48 +1806,64 @@ class _GreetingState extends State<_Greeting> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([_fade, _wave]),
+      animation: Listenable.merge([_enter, _wave]),
       builder: (context, _) {
-        final t = Curves.easeOut.transform(_fade.value);
+        final e = Curves.easeOutCubic.transform(_enter.value);
         final w = _wave.value;
-        // 진폭이 1 에서 0 으로 잦아든다.
+        // 진폭이 1 에서 0 으로 잦아든다. 안 흔드는 동안은 w = 0 이라 각도도 0.
         final amp = _Greeting.swing * (1 - w);
         final angle = amp * math.sin(2 * math.pi * _Greeting.waves * w);
 
-        return Opacity(
-          opacity: t,
-          child: Transform.translate(
-            offset: Offset(0, _Greeting.rise * (1 - t)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Transform.rotate(
-                  angle: angle,
-                  alignment: Alignment.bottomLeft,
-                  child: const Icon(
-                    Symbols.waving_hand,
-                    size: _Greeting.iconSize,
-                    color: _kOnDark,
-                    weight: 300,
-                    grade: 0,
-                    opticalSize: 24,
-                  ),
+        /* 🔴 **제 폭을 단위로 민다**([FractionalTranslation]). 화면 폭을 읽어
+           픽셀로 밀면 기기마다 「얼마나 밖인지」가 달라지는데, 이 덩이의 상자는
+           **인사말 칸 전체 폭**이라 제 폭의 1배만 밀어도 화면 밖이다. */
+        return FractionalTranslation(
+          translation: Offset(-_Greeting.enterFrom * (1 - e), 0),
+          /* 🔴 **손이 글자 위에 선다**(2026-09-24 사용자 확정). 손이 제 줄을
+             따로 쓰면 인사말 덩이가 44(손 38 + 틈 6) 높아지는데, 판 높이를
+             정하는 것은 **「내 프로필」 카드**(최소 225.9)라 **판은 안 커진다** —
+             필요한 높이 213.9 로 12 남는다(실기기에서 계산).
+
+             ⚠️ **같은 날 옆으로 옮겼다 돌아왔다.** 그때는 판이 흰 판 바로
+             위까지 늘어나 있어 그 44 가 모자랐다. 🔴 **여유가 12뿐이니**
+             카드를 줄이거나 인사말을 키우면 판이 자라 소개 두 줄과 부딪힌다. */
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Transform.rotate(
+                // 🔴 시험이 이 키로 각도를 읽는다 — 흔들기가 언제 시작하는지.
+                key: const Key('home-greeting-hand'),
+                angle: angle,
+                alignment: Alignment.bottomLeft,
+                child: const Icon(
+                  Symbols.waving_hand,
+                  size: _Greeting.iconSize,
+                  color: _kOnDark,
+                  weight: 300,
+                  grade: 0,
+                  opticalSize: 24,
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  '안녕하세요, ${widget.nickname} 님',
-                  style: const TextStyle(
-                    fontFamily: _kKoFont,
-                    // 🔴 번들한 굵기가 Black 하나다 — [_kKoFont] 주석 참고.
-                    fontWeight: FontWeight.w900,
-                    fontSize: _Greeting.fontSize,
-                    height: 1.2,
-                    color: _kOnDark,
-                  ),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 6),
+              /* 🔴 **닉네임은 다음 줄이다** (2026-09-24 사용자 요청:
+                 「안녕하세요, 다음에 나오는 닉네임은 다음줄로 내려버리자.
+                 길 수도 있으니까」).
+
+                 🔴 **한 [Text] 에 `\n` 을 넣지 않는다** — 시험과 다음 사람이
+                 글자로 집을 때 한 덩이 문자열이 되어, 어느 줄을 가리키는지
+                 못 고른다(자리를 재는 시험이 실제로 아랫줄을 집어야 했다).
+                 따로 두면 각 줄의 자리도 따로 잴 수 있다. */
+              const Text('안녕하세요,', style: _kGreetStyle),
+              Text(
+                '${widget.nickname} 님',
+                /* 🔴 **자르지 않고 줄을 바꾼다.** 칸이 [_kGreetRight] 에서
+                   끊겨 있으므로(「내 프로필」 앞), 아주 긴 이름은 여기서 또 한
+                   줄로 내려간다 — 판은 이 위젯을 **담고** 있어서 그만큼 같이
+                   커진다. */
+                style: _kGreetStyle,
+              ),
+            ],
           ),
         );
       },
