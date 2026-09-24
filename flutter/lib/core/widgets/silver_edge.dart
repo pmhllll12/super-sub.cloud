@@ -47,6 +47,18 @@ class SilverEdge extends StatelessWidget {
   static const Color barLine = Color(0x8CC9D4D8);
   static const double barLineWidth = 0.5;
 
+  /// 🔴 **흰 면 위에서 쓰는 은빛**(2026-09-23). [silver](`#C9D4D8`)는 **검은
+  /// 바탕**에서 경계를 내려고 고른 밝은 값이라, 흰 면 위에서는 흰색에 붙어
+  /// 사라진다 — 홈의 영상 분석 판에서 가장자리 픽셀을 재서 확인했다(`#fefefe`).
+  ///
+  /// 🔴 **홈의 영상 분석 판과 하단 바가 나눠 쓴다.** 둘 다 흰 면 위에 놓인
+  /// 같은 성격의 테라서, 값이 갈리면 한 화면에서 두 굵기·두 색이 보인다.
+  ///
+  /// ⚠️ **굵기는 [barLineWidth] 와 같은 0.5 다** — 사용자 요청의 「제일 얇은」
+  /// 이 그 값이다.
+  static const Color onWhite = Color(0xFF9AA7AD);
+  static const double onWhiteWidth = barLineWidth;
+
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(

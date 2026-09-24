@@ -22,6 +22,7 @@ from app.analysis.application.ports.input.video_use_cases import (
     GetCardGradeUseCase,
     GetFeaturedVideoUseCase,
     GetPlaybackUrlUseCase,
+    GetVideoPosterUseCase,
     KeepVideoUseCase,
     ListAdminVideosUseCase,
     ListMyVideosUseCase,
@@ -29,6 +30,8 @@ from app.analysis.application.ports.input.video_use_cases import (
     RegisterVideoUseCase,
     UpdateVideoUseCase,
 )
+from app.analysis.adapter.outbound.ffmpeg.poster_cache_fs import FsPosterCache
+from app.analysis.adapter.outbound.ffmpeg.poster_ffmpeg import FfmpegPoster
 from app.analysis.application.ports.output.report_read_port import ReportReadPort
 from app.analysis.application.ports.output.storage_port import StoragePort
 from app.analysis.application.ports.output.video_port import VideoPort
@@ -42,6 +45,7 @@ from app.analysis.application.use_cases.video_interactors import (
     GetCardGradeInteractor,
     GetFeaturedVideoInteractor,
     GetPlaybackUrlInteractor,
+    GetVideoPosterInteractor,
     KeepVideoInteractor,
     ListAdminVideosInteractor,
     ListMyVideosInteractor,
@@ -52,6 +56,12 @@ from app.analysis.application.use_cases.video_interactors import (
 from app.core.config import settings
 from app.core.database import get_session
 from app.core.errors import ApiError
+
+
+#: 🔴 **한 번만 만든다.** 둘 다 상태가 없어서 요청마다 새로 만들어도 되지만,
+#: 캐시 폴더를 한 곳으로 묶어 두는 편이 읽는 사람에게도 분명하다.
+_POSTER = FfmpegPoster()
+_POSTER_CACHE = FsPosterCache()
 
 
 def get_video_repository(
@@ -138,6 +148,15 @@ def get_playback_url_use_case(
     return GetPlaybackUrlInteractor(repository, storage)
 
 
+def get_video_poster_use_case(
+    repository: VideoRepositoryDep, storage: StorageDep
+) -> GetVideoPosterUseCase:
+    """🔴 **포스터 뜨는 것과 캐시는 여기서 한 번만 묶는다.** 캐시가 요청마다
+    새로 만들어져도 자리(폴더)가 같아서 동작은 같지만, 객체를 한 번만 만드는
+    편이 값싸다."""
+    return GetVideoPosterInteractor(repository, storage, _POSTER, _POSTER_CACHE)
+
+
 def get_featured_video_use_case(
     repository: VideoRepositoryDep, storage: StorageDep
 ) -> GetFeaturedVideoUseCase:
@@ -188,6 +207,9 @@ UpdateVideoUseCaseDep = Annotated[
 ]
 ListPublicVideosUseCaseDep = Annotated[
     ListPublicVideosUseCase, Depends(get_list_public_videos_use_case)
+]
+GetVideoPosterUseCaseDep = Annotated[
+    GetVideoPosterUseCase, Depends(get_video_poster_use_case)
 ]
 GetPlaybackUrlUseCaseDep = Annotated[
     GetPlaybackUrlUseCase, Depends(get_playback_url_use_case)

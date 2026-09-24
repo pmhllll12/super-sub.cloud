@@ -39,6 +39,61 @@ void runVideoRepositoryContract(
 
     const meta = ClipMeta(durationMs: 10200, width: 1920, height: 1080);
 
+    /* 🔴 **공개 목록은 「내 것」이 아니다** — 남이 공개한 것까지 온다
+       (계약 `GET /videos/public`). 구현체가 이걸 `myVideos()` 로 때우면
+       다른 사람 영상이 홈에서 통째로 빠지므로, 성질로 못 박는다. */
+    group('공개 목록', () {
+      test('최근 것이 앞에 온다', () async {
+        final videos = await repo.publicVideos();
+
+        expect(videos.length, greaterThan(1));
+        for (var i = 1; i < videos.length; i += 1) {
+          expect(
+            videos[i - 1].createdAt.isAfter(videos[i].createdAt) ||
+                videos[i - 1].createdAt.isAtSameMomentAs(videos[i].createdAt),
+            isTrue,
+            reason: '$i 번째가 앞의 것보다 최근이다',
+          );
+        }
+      });
+
+      /* 🔴 **「내 것이 아닌 것이 있다」로 잰다.** 「올린 사람이 여럿」으로
+         재면 구현체가 아니라 **시드의 모양**을 시험하게 되고, 목업 사용자
+         구성을 바꿀 때마다 계약이 흔들린다. 지키려는 성질은 이것 하나다 —
+         `myVideos()` 로 때우면 여기서 걸린다. */
+      test('내 것이 아닌 것도 온다', () async {
+        final mine = (await repo.myVideos()).map((v) => v.id).toSet();
+        final public = await repo.publicVideos();
+
+        expect(public, isNotEmpty);
+        expect(
+          public.any((v) => !mine.contains(v.id)),
+          isTrue,
+          reason: '공개 목록이 내 것만 담고 있다',
+        );
+      });
+
+      /* 🔴 **크기를 안 준 등록분이 있다** — 이 칸이 생기기 전 것들이다.
+         계약이 「그때는 16:9 로 본다」로 정했고, 화면이 칸을 미리 잡는 데
+         쓰므로 **`null` 이 그대로 새어 나가면 안 된다.** */
+      test('크기를 모르면 16:9 로 답한다', () async {
+        final videos = await repo.publicVideos();
+        for (final v in videos) {
+          expect(v.aspectRatio, greaterThan(0));
+          if (v.width == null || v.height == null) {
+            expect(v.aspectRatio, closeTo(16 / 9, 0.001));
+          }
+        }
+      });
+    });
+
+    /* 🔴 **없는 영상이면 `null` 이다 — 예외가 아니다.** 못 뜨는 영상(형식·길이)도,
+       서버에 `ffmpeg` 이 없는 배포도 같은 자리로 떨어진다. 화면이 할 일은 셋 다
+       같다(자리표시를 그린다) — 예외로 만들면 그 셋이 홈을 통째로 오류로 만든다. */
+    test('없는 영상의 장면은 null 이다', () async {
+      expect(await repo.poster('없는-영상'), isNull);
+    });
+
     test('목록은 최근 것이 앞에 온다', () async {
       final videos = await repo.myVideos();
 

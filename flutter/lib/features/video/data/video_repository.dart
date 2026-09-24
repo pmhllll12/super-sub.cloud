@@ -1,5 +1,8 @@
+import 'dart:typed_data';
+
 import 'clip_file.dart';
 import 'models/my_video.dart';
+import 'models/public_video.dart';
 import 'models/video_report.dart';
 
 /// 화면이 아는 유일한 영상 계약.
@@ -9,6 +12,28 @@ import 'models/video_report.dart';
 abstract class VideoRepository {
   /// 내 클립 목록. **최근 것이 앞에 온다.**
   Future<List<MyVideo>> myVideos();
+
+  /// 누군가 공개해 둔 클립 목록 — 🔴 **남의 것까지** 온다. 최근 것이 앞.
+  ///
+  /// 🔴 **[myVideos] 로 때우지 말 것.** 홈의 영상 줄이 이걸 쓰는데, 내 것만
+  /// 주면 「업로드된 영상들을 보여 준다」가 「내가 올린 것만 보여 준다」가 된다.
+  /// 계약 테스트가 **올린 사람이 여럿인지**로 그걸 잡는다.
+  ///
+  /// 🔴 **목록에 드는 조건은 서버가 정한다** — `is_public && kept`. 올리는
+  /// 것만으로는 안 뜬다(자세한 것은 [PublicVideo] 머리말).
+  ///
+  /// 🔴 **재생 주소는 안 실린다.** 영상마다 [playbackUrl] 로 따로 받는다.
+  Future<List<PublicVideo>> publicVideos();
+
+  /// 카드에 깔 **한 장면**(JPEG). **없으면 `null`.**
+  ///
+  /// 🔴 **[playbackUrl] 로 대신하지 말 것.** 그 주소로 영상을 열어 첫 프레임을
+  /// 뽑던 것이 **한 장에 1.9초**였다(실기기 실측). 이쪽은 서버가 미리 떠서
+  /// 캐시해 둔 작은 JPEG 이라 즉시 온다.
+  ///
+  /// 🔴 **`null` 은 정상이다** — 못 뜨는 영상(형식·길이)이 있고, 서버에
+  /// `ffmpeg` 이 없는 배포도 그렇다. 화면은 그때 자리표시를 그린다.
+  Future<Uint8List?> poster(String videoId);
 
   /// 재생용 사전 서명 주소. **없으면 `null`.**
   ///

@@ -1,23 +1,60 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:super_sub/core/mock/mock_db.dart';
+import 'package:super_sub/core/theme/app_theme.dart';
+import 'package:super_sub/core/widgets/screen_tint.dart';
+import 'package:super_sub/features/intro/presentation/brand_mark.dart';
 import 'package:super_sub/features/auth/data/auth_providers.dart';
 import 'package:super_sub/features/auth/data/auth_repository_mock.dart';
 import 'package:super_sub/core/dev/data_source.dart';
 import 'package:super_sub/features/auth/presentation/session_controller.dart';
 import 'package:super_sub/features/home/presentation/screens/home_screen.dart';
+import 'package:super_sub/features/home/presentation/widgets/home_video_strip.dart';
 import 'package:super_sub/features/team/data/squad_providers.dart';
 import 'package:super_sub/features/profile/presentation/widgets/player_card_view.dart';
 
-Future<ProviderContainer> _pumpLoggedIn(WidgetTester tester) async {
+/* 🔴 **자리를 재는 시험은 실기기를 그대로 흉내 낸다**(`device: true`).
+   아래 값은 2026-09-24 에 실기기에서 `MediaQuery` 를 찍어 온 것이다:
+
+       size=411.4×891.4  dpr=2.625  padding.top=38.5
+
+   기본값(1080×2340 @ dpr 3 = **360×780**, 인셋 0)과 갈리는 것이 셋이고,
+   **셋 다 실기기에 없는 겹침을 시험에서만 만든다.**
+
+   1\. **상태 바 자리가 없다** — 홈은 맨 위 것들을 전부 `safeTop + 8` 에서
+      시작하므로, 0 이면 판·인사말·「내 프로필」이 통째로 38px 위로 붙는다.
+   2\. **세로가 111 짧다** — 아래에서 올라오는 흰 판이 그만큼 위로 붙고,
+      그 위에 매달린 소개 두 줄도 같이 올라온다.
+   3\. 🔴 **가로가 51 좁다 — 이게 제일 고약하다.** 소개 두 줄(35)은 실기기
+      폭에 **간신히** 한 줄로 들어간다. 조금만 좁아도 각 줄이 두 줄로 접혀
+      덩이가 두 배가 된다. **411.0 과 411.4 도 갈린다** — 그래서 논리 폭을
+      맞추지 말고 `physicalSize`·`devicePixelRatio` 를 기기 값 그대로 준다.
+
+   ⚠️ 실제로 2026-09-24 에 1·2 때문에 「판이 소개 두 줄을 침범한다」고 잘못
+   읽고 판을 한 번 늘렸다 되돌렸다. **재는 시험은 기기와 같은 화면에서 잰다.** */
+const Size _kDevicePhysicalSize = Size(1080, 2340);
+const double _kDeviceDpr = 2.625;
+const double _kDeviceTopInset = 38.5 * _kDeviceDpr;
+
+Future<ProviderContainer> _pumpLoggedIn(
+  WidgetTester tester, {
+  bool device = false,
+  bool settle = true,
+}) async {
   // **폰 크기로 돌린다.** 홈은 판 · 영상 분석 · 하단 바가 세로로 꽉 차는
   // 화면이라 기본 800×600 에서는 판이 짜부라진다(app_router_test.dart 와 같다).
-  tester.view.physicalSize = const Size(1080, 2340);
-  tester.view.devicePixelRatio = 3;
+  tester.view.physicalSize =
+      device ? _kDevicePhysicalSize : const Size(1080, 2340);
+  tester.view.devicePixelRatio = device ? _kDeviceDpr : 3;
+  if (device) {
+    tester.view.padding = const FakeViewPadding(top: _kDeviceTopInset);
+    tester.view.viewPadding = const FakeViewPadding(top: _kDeviceTopInset);
+  }
   addTearDown(tester.view.reset);
 
   final container = ProviderContainer(
@@ -51,8 +88,13 @@ Future<ProviderContainer> _pumpLoggedIn(WidgetTester tester) async {
      로그인이 끝나야 `teams` 를 알아 스쿼드를 부르고, 스쿼드가 와야 그 안의
      팀원 카드를 부른다. 여기서 안 흘려보내면 시험이 「위젯 트리를 버린 뒤에도
      타이머가 남았다」로 깨진다 — 화면 잘못이 아니라 흘려보내기가 모자란 것이다. */
-  for (var i = 0; i < 3; i += 1) {
-    await tester.pump(const Duration(milliseconds: 500));
+  /* 🔴 **`settle: false` 는 들어오는 동작의 첫 프레임을 보려는 것이다.**
+     위 500ms 한 번으로 세션이 와서 인사말이 **막 세워진** 참이라, 여기서
+     더 흘려보내지 않으면 들어오기가 아직 0 이다. */
+  if (settle) {
+    for (var i = 0; i < 3; i += 1) {
+      await tester.pump(const Duration(milliseconds: 500));
+    }
   }
   // **pumpAndSettle을 쓰지 않는다.** 유리 조각의 테두리를 도는 빛이 무한
   // 반복이라 영영 안 멎는다.
@@ -96,6 +138,19 @@ double _opacityAbove(WidgetTester tester, Finder target) {
 /// ⚠️ `_opacityAbove` 로 재면 **감싼 `Opacity` 가 없어 늘 1** 이 나온다.
 double _hintAlpha(WidgetTester tester, String label) =>
     tester.widget<Text>(find.text(label)).style!.color!.a;
+
+/// 흔드는 손의 **지금 각도**(라디안) — 회전 행렬에서 되읽는다.
+/// 0 이면 안 흔드는 중이다.
+double _handAngle(WidgetTester tester) {
+  final m = tester
+      .widget<Transform>(find.byKey(const Key('home-greeting-hand')))
+      .transform;
+  return math.atan2(m.storage[1], m.storage[0]);
+}
+
+/// 인사말이 화면 왼쪽에서 떨어진 거리 — `home_screen.dart` 의 `_kGreetLeft`.
+/// 🔴 그쪽이 정본이고 여기는 옮겨 적은 것이다(비공개라 못 부른다).
+const double _kGreetLeft = 20;
 
 Finder _blankSeats() => find.byWidgetPredicate(
       (w) => w.key is ValueKey<String> &&
@@ -240,34 +295,11 @@ void main() {
       expect(_opacityAbove(tester, start), 1);
     });
 
-    /* 워드마크 — 판을 내리면 `SUPER` 는 왼쪽, `SUB` 는 오른쪽 화면 밖으로
-       나가고, 올리면 **제자리로** 돌아온다(2026-09-22 사용자 요청).
-
-       🔴 **「화면 밖」을 좌표로 잰다.** 투명도로 재면 안 된다 — 이 글자는
-       걷히는 것이 아니라 **나가는** 것이라, 흐려지지 않은 채로 화면을
-       벗어나는 것이 맞는 동작이다. */
-    testWidgets('판을 내리면 SUPER · SUB 가 양옆으로 나간다', (tester) async {
-      await _pumpLoggedIn(tester);
-      final superF = find.text('SUPER');
-      final subF = find.text('SUB');
-      final screen = tester.view.physicalSize.width / tester.view.devicePixelRatio;
-
-      // 접혀 있을 때 — 둘이 붙어 한 낱말로 서 있다.
-      final s0 = tester.getRect(superF);
-      final b0 = tester.getRect(subF);
-      expect(s0.right, closeTo(b0.left, 1), reason: '둘이 붙어 있어야 한 낱말로 읽힌다');
-      expect(s0.left, greaterThan(0));
-      expect(b0.right, lessThan(screen));
-
-      await _openSheet(tester);
-      // 펼치면 — 각각 반대쪽 화면 밖이다.
-      expect(tester.getRect(superF).right, lessThanOrEqualTo(0));
-      expect(tester.getRect(subF).left, greaterThanOrEqualTo(screen));
-
-      await _openSheet(tester); // 다시 올리면 역순으로 제자리.
-      expect(tester.getRect(superF).left, closeTo(s0.left, 1));
-      expect(tester.getRect(subF).left, closeTo(b0.left, 1));
-    });
+    /* 🔴 **`SUPER`/`SUB` 가 양옆으로 나가던 시험을 지웠다 (2026-09-23).**
+       그 순백 YatraOne 워드마크 자체가 없어졌다 — 하단 바에 있던 `SUPERSUB`
+       로고를 화면 맨 위로 올리면서 한 화면에 둘이던 것을 정리했다(사용자
+       결정). 지금 그 자리를 지키는 것은 아래 「로고가 화면 맨 위 가운데에
+       선다」이다. */
 
     /* 🔴 **큰 판에서는 판을 눌러도 안 간다 — 알약만 간다**(2026-09-22 사용자
        요청: 「영상분석 시작하기 버튼만 눌리게」). 판 귀퉁이를 눌러 확인한다 —
@@ -471,6 +503,372 @@ void main() {
       await tester.pump();
       expect(find.text('MY SQUAD'), findsOneWidget);
     });
+  });
+
+  /* 흰 판 · 알약 셋 — 2026-09-23 사용자 요청(「스쿼드판이랑 영상분석 판 아래에
+     흰색 판 하나」 · 「그 스쿼드판 위에 3개 가로로 나란히 알약 버튼」). */
+  group('흰 판 · 지름길 알약 셋', () {
+    Finder whiteSheet() => find.byKey(const Key('home-white-sheet'));
+
+    testWidgets('흰 판이 알약 줄과 판 둘을 다 감싼다', (tester) async {
+      await _pumpLoggedIn(tester);
+      final white = tester.getRect(whiteSheet());
+      final squad = tester.getRect(find.byKey(const Key('home-squad-sheet')));
+      final video = tester.getRect(find.byKey(const Key('home-video-analysis')));
+      final pills = tester.getRect(find.byKey(const Key('home-shortcut-market')));
+
+      for (final (name, r) in [('스쿼드', squad), ('영상 분석', video), ('알약', pills)]) {
+        expect(white.top, lessThanOrEqualTo(r.top), reason: '$name 윗변');
+        expect(white.bottom, greaterThanOrEqualTo(r.bottom), reason: '$name 아랫변');
+        expect(white.left, lessThanOrEqualTo(r.left), reason: '$name 왼변');
+        expect(white.right, greaterThanOrEqualTo(r.right), reason: '$name 오른변');
+      }
+    });
+
+    /* 🔴 **흰 판은 손짓을 안 받는다.** 판 둘보다 뒤에 있지만 겹치는 자리가
+       넓어서, 손짓을 받으면 판 가장자리·알약이 먹힌다. */
+    testWidgets('흰 판은 손짓을 안 받는다', (tester) async {
+      await _pumpLoggedIn(tester);
+      expect(
+        find.ancestor(of: whiteSheet(), matching: find.byType(IgnorePointer)),
+        findsWidgets,
+      );
+    });
+
+    testWidgets('알약 셋이 서고, 누르면 준비 중 안내가 뜬다', (tester) async {
+      await _pumpLoggedIn(tester);
+      for (final label in const ['레슨 · 상점', '경기장 예약', '알림']) {
+        expect(find.text(label), findsOneWidget, reason: label);
+      }
+      // 가로로 나란히 — 셋의 윗변이 같다.
+      final tops = const ['market', 'venue', 'alarm']
+          .map((k) => tester.getRect(find.byKey(Key('home-shortcut-$k'))).top)
+          .toList();
+      expect(tops[1], closeTo(tops[0], 0.5));
+      expect(tops[2], closeTo(tops[0], 0.5));
+
+      await tester.tap(find.byKey(const Key('home-shortcut-venue')));
+      await tester.pump();
+      expect(find.textContaining('경기장 예약 — 준비 중'), findsOneWidget);
+    });
+
+    /* 🔴 **제자리에서 걷힌다**(2026-09-23 정정). 한 번 오른쪽 화면 밖으로
+       미는 것으로 만들었다가 사용자가 되돌렸다 — 「사라지는 게 스쿼드판
+       올라갈 때 다 보이니까 눈아프다」. ⛔ 옆으로 미는 것을 되살리지 말 것. */
+    testWidgets('펼치면 알약이 제자리에서 걷히고, 접으면 돌아온다', (tester) async {
+      await _pumpLoggedIn(tester);
+      Rect at(String k) =>
+          tester.getRect(find.byKey(Key('home-shortcut-$k')));
+      const keys = ['market', 'venue', 'alarm'];
+      final home = {for (final k in keys) k: at(k)};
+
+      for (final k in keys) {
+        expect(_opacityAbove(tester, find.byKey(Key('home-shortcut-$k'))), 1,
+            reason: k);
+      }
+
+      await _openSheet(tester);
+      for (final k in keys) {
+        expect(_opacityAbove(tester, find.byKey(Key('home-shortcut-$k'))), 0,
+            reason: '$k 걷혔다');
+        // 🔴 **자리는 그대로다** — 걷히는 것이지 나가는 것이 아니다.
+        expect(at(k).left, closeTo(home[k]!.left, 0.5), reason: '$k 제자리');
+      }
+
+      await _openSheet(tester);
+      for (final k in keys) {
+        expect(_opacityAbove(tester, find.byKey(Key('home-shortcut-$k'))), 1,
+            reason: '$k 돌아왔다');
+      }
+    });
+
+    /* 🔴 **오른쪽 것이 먼저 걷힌다.**
+       🔴 **돌아오는 순서는 따로 안 잡는다** — 걷히는 정도가 판 진행도 하나의
+       함수라, 접으면 시간이 되감기며 저절로 왼쪽(레슨 · 상점)부터 돌아온다.
+       그 성질은 위 시험의 「접으면 돌아온다」가 지킨다. */
+    testWidgets('걷히는 순서는 오른쪽부터다', (tester) async {
+      await _pumpLoggedIn(tester);
+      double alpha(String k) =>
+          _opacityAbove(tester, find.byKey(Key('home-shortcut-$k')));
+
+      /* 🔴 **손가락을 든 채로 중간까지만 끈다.** 손잡이를 눌러 스프링에
+         맡기면 **한 프레임 만에 셋이 다 걷혀** 순서를 못 잰다. */
+      final g = await tester.startGesture(
+        tester.getCenter(find.byKey(const Key('home-squad-sheet'))),
+      );
+      await g.moveBy(const Offset(0, -60));
+      await tester.pump();
+
+      expect(alpha('alarm'), lessThan(alpha('venue')), reason: '알림이 앞선다');
+      expect(alpha('venue'), lessThanOrEqualTo(alpha('market')),
+          reason: '경기장이 레슨보다 앞선다');
+      expect(alpha('alarm'), lessThan(1), reason: '적어도 하나는 걷히기 시작했다');
+
+      await g.up();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1500));
+      await tester.pump(const Duration(milliseconds: 700));
+    });
+
+    /* 로고는 **화면 위 바깥으로** 나간다(같은 요청). */
+    testWidgets('펼치면 로고가 화면 위로 나가고, 접으면 돌아온다', (tester) async {
+      await _pumpLoggedIn(tester);
+      final brand = find.byKey(const Key('home-brand'));
+      final top0 = tester.getRect(brand).top;
+
+      await _openSheet(tester);
+      expect(tester.getRect(brand).bottom, lessThanOrEqualTo(0));
+
+      await _openSheet(tester);
+      expect(tester.getRect(brand).top, closeTo(top0, 1));
+    });
+  });
+
+  /* 🔴 **아무 단추도 아니다**(2026-09-23 사용자 요청). 눌리면 홈에서 홈으로
+     가는 길이 둘이 되고, 그 자리는 이제 하단 바의 홈 아이콘이 맡는다. */
+  testWidgets('로고가 화면 맨 위 가운데에 서고, 안 눌린다', (tester) async {
+    await _pumpLoggedIn(tester);
+    final logo = find.byKey(const Key('home-brand'));
+    expect(logo, findsOneWidget);
+
+    final r = tester.getRect(logo);
+    final screenW = tester.view.physicalSize.width / tester.view.devicePixelRatio;
+    expect(r.center.dx, closeTo(screenW / 2, 1));
+    expect(r.top, lessThan(120));
+
+    expect(
+      find.ancestor(of: logo, matching: find.byType(IgnorePointer)),
+      findsWidgets,
+    );
+  });
+
+  /* 🔴 **앉고 2초 뒤에 흰색으로 물든다**(2026-09-23 사용자 요청).
+     기다리는 시간을 「홈이 지어진 때」가 아니라 **`kBrandSettled`** 부터 재는 것이
+     이 기능의 핵심이다 — 인트로가 도는 동안 홈은 이미 그 아래에 지어져
+     있어서, 화면이 뜨는 대로 재면 로고가 날아오기 전에 흰색이 된다.
+
+     🔴 **`_pumpLoggedIn` 을 쓰지 않는다** — 그 도우미는 목업 지연을 흘리느라
+     가짜 시계를 2초 넘게 밀어서, 시험이 시작하자마자 **이미 흰색**을 본다.
+     여기서는 시계를 직접 몬다. */
+  testWidgets('로고가 1초 뒤 초록에서 흰색으로 물든다', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(home: HomeScreen()),
+    ));
+
+    Color colorNow() => tester
+        .widget<Text>(find.descendant(
+          of: find.byKey(const Key('home-brand')),
+          matching: find.byType(Text),
+        ))
+        .style!
+        .color!;
+
+    expect(colorNow(), AppTheme.seed, reason: '앉자마자는 초록이다');
+
+    // 1초가 되기 전에는 그대로다.
+    await tester.pump(const Duration(milliseconds: 900));
+    expect(colorNow(), AppTheme.seed, reason: '1초 전');
+
+    // 1초를 넘겨 물드는 도중 — 초록도 흰색도 아니다.
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 550));
+    final mid = colorNow();
+    expect(mid, isNot(AppTheme.seed), reason: '물드는 중');
+    expect(mid, isNot(Colors.white), reason: '물드는 중');
+
+    await tester.pump(const Duration(milliseconds: 700));
+    expect(colorNow(), Colors.white, reason: '다 물들면 흰색');
+
+    // 컨트롤러 복원 타이머(Mock 300ms)를 흘려보내고 끝낸다.
+    await tester.pump(const Duration(milliseconds: 500));
+  });
+
+  /* 화면 왼쪽 위 인사말(2026-09-23 사용자 요청 + 레퍼런스). */
+  testWidgets('왼쪽 위에 흔드는 손과 인사말이 선다', (tester) async {
+    await _pumpLoggedIn(tester);
+    final greet = find.textContaining('안녕하세요');
+    expect(greet, findsOneWidget);
+    /* 🔴 **닉네임은 다음 줄이다**(2026-09-24 사용자 요청: 「안녕하세요, 다음에
+       나오는 닉네임은 다음줄로 내려버리자. 길 수도 있으니까」). 한 덩이
+       문자열(`'안녕하세요, 백성검 님'`)로 찾으면 **아무것도 못 찾는다.** */
+    expect(find.text('안녕하세요,'), findsOneWidget);
+    expect(find.text('백성검 님'), findsOneWidget);
+
+    // 왼쪽 위다 — 화면 왼쪽 절반, 위쪽 1/4 안.
+    final r = tester.getRect(greet);
+    final view = tester.view;
+    expect(r.left, lessThan(view.physicalSize.width / view.devicePixelRatio / 2));
+    expect(r.top, lessThan(view.physicalSize.height / view.devicePixelRatio / 4));
+
+    /* 🔴 **번들한 굵기가 Black 하나뿐**이라 다른 값을 주면 엔진이 가짜로
+       굵게 그려 획이 뭉갠다 — 글꼴과 굵기를 함께 잡아 둔다. */
+    final style = tester.widget<Text>(greet).style!;
+    expect(style.fontFamily, 'PyeojinGothic');
+    expect(style.fontWeight, FontWeight.w900);
+  });
+
+  /* 🔴 **인사말은 로고를 안 기다리고 왼쪽 밖에서 들어온다. 흔들기만 기다린다**
+     (2026-09-24 사용자 요청: 「글자랑 아이콘 supersub 도착할 때까지 안 나오는
+     거 하지 말고 처음부터 왼쪽 밖에서 들어오게 하고, 도착하면 그때 손 흔드는
+     애니메이션 나오게 해줘」).
+
+     ⚠️ **2026-09-23 에는 반대였다** — 로고가 앉을 때까지 **안 보였다가**
+     스며들었다. 되살리지 말 것. */
+  testWidgets('인사말은 로고를 안 기다리고 왼쪽 밖에서 들어온다', (tester) async {
+    kBrandSettled.value = false;
+    addTearDown(() => kBrandSettled.value = true);
+
+    await _pumpLoggedIn(tester, device: true);
+    final greet = find.text('안녕하세요,');
+
+    // 🔴 로고가 아직 안 앉았는데도 **제자리에 다 들어와 있다**.
+    expect(tester.getRect(greet).left, closeTo(_kGreetLeft, 1));
+
+    // 🔴 그런데 손은 아직 안 흔든다 — 로고를 기다린다.
+    expect(_handAngle(tester), 0, reason: '아직 안 앉았다');
+
+    // 로고가 앉으면 그때 흔든다.
+    kBrandSettled.value = true;
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(_handAngle(tester), isNot(0), reason: '앉으면 흔든다');
+
+    // 흔들기가 끝나면 손이 제자리로 내려앉는다(진폭이 잦아든다).
+    await tester.pump(const Duration(milliseconds: 1700));
+    expect(_handAngle(tester), closeTo(0, 0.001), reason: '잦아들어 멎는다');
+  });
+
+  /* 들어오는 동작 자체 — 첫 프레임에는 **화면 왼쪽 밖**에 있다. */
+  testWidgets('인사말이 화면 왼쪽 밖에서 출발한다', (tester) async {
+    await _pumpLoggedIn(tester, device: true, settle: false);
+    expect(tester.getRect(find.text('안녕하세요,')).right, lessThan(0),
+        reason: '첫 프레임에는 화면 밖 왼쪽');
+
+    await tester.pump(const Duration(milliseconds: 800));
+    expect(tester.getRect(find.text('안녕하세요,')).left,
+        closeTo(_kGreetLeft, 1));
+    await tester.pump(const Duration(milliseconds: 1900));
+  });
+
+  /* 🔴 **닉네임이 없으면 줄을 아예 안 세운다** — 「안녕하세요, 님」처럼 이름만
+     빠진 줄이 한 번 떴다 바뀌면 그것이 더 눈에 띈다. */
+  testWidgets('로그인 전에는 인사말이 없다', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(home: HomeScreen()),
+    ));
+    expect(find.textContaining('안녕하세요'), findsNothing);
+    await tester.pump(const Duration(milliseconds: 500));
+  });
+
+  /* 🔴 **소개 두 줄이 있던 자리에 공개 영상 줄이 선다**(2026-09-24 사용자
+     요청: 「그 글자를 없애고, 거기에 우리 실제로 업로드된 영상들 나오게」).
+     ⛔ 그 두 줄을 되살리지 말 것 — 아래가 그것도 함께 지킨다. */
+  testWidgets('소개 두 줄이 없고, 그 자리에 영상 줄이 선다', (tester) async {
+    await _pumpLoggedIn(tester, device: true);
+
+    expect(find.text('함께 뛸 팀을 만들고,'), findsNothing);
+    expect(find.text('영상으로 실력을 증명하세요.'), findsNothing);
+
+    final strip = find.byType(HomeVideoStrip);
+    expect(strip, findsOneWidget);
+
+    // 다크 판 **아래**, 흰 판 **위**다.
+    final r = tester.getRect(strip);
+    final panel = tester.getRect(find.byKey(const Key('home-top-panel')));
+    final white = tester.getRect(find.byKey(const Key('home-white-sheet')));
+    expect(r.top, greaterThanOrEqualTo(panel.bottom));
+    expect(r.bottom, lessThanOrEqualTo(white.top));
+    expect(r.height, greaterThan(60), reason: '카드가 설 만한 높이는 된다');
+  });
+
+  /* 🔴 **맨 위 다크 판**(2026-09-24 사용자 요청 + 레퍼런스: 「내 프로필 글자
+     아래로 … 이 색상으로 판 하나 주자」). 판이 담는 것은 **인사말과 「내
+     프로필」까지만**이고, 소개 두 줄은 판 **밖 아래**에 남는다. */
+  testWidgets('맨 위 다크 판이 인사말과 「내 프로필」을 덮는다', (tester) async {
+    await _pumpLoggedIn(tester, device: true);
+    final panel = find.byKey(const Key('home-top-panel'));
+    expect(panel, findsOneWidget);
+
+    final p = tester.getRect(panel);
+    final view = tester.view;
+    final screenW = view.physicalSize.width / view.devicePixelRatio;
+
+    // 화면 맨 위에서 좌우 끝까지 — 흰 판과 같은 방식이다.
+    expect(p.top, 0);
+    expect(p.left, 0);
+    expect(p.right, screenW);
+
+    // 인사말 두 줄과 「내 프로필」이 **판 안**에 든다.
+    for (final inside in [
+      find.text('안녕하세요,'),
+      find.text('백성검 님'),
+      find.text('내 프로필'),
+    ]) {
+      final r = tester.getRect(inside);
+      expect(p.contains(r.topLeft), isTrue, reason: '$inside 이 판 밖이다');
+      expect(p.contains(r.bottomRight), isTrue, reason: '$inside 이 판 밖이다');
+    }
+
+    /* 🔴 **소개 두 줄이 들어설 자리가 판 아래에 남아 있다** — 사용자가 자리를
+       갈랐다(「그 판을 함께 내 프로필 아래쪽으로 해줘. 함께 뛸 팀을 만들고
+       여기까지 하지 말고」). 판이 그 자리를 먹으면 어두운 글자가 어두운 판에
+       얹혀 **그대로 사라진다.**
+
+       🔴 **렌더된 글자 상자를 재지 않는다 — 두 번 속았다.** 그 줄은 실기기
+       폭에 **간신히** 들어가서, 시험 환경의 글꼴 지표가 조금만 달라도 한 줄이
+       더 접히고 상자가 통째로 위로 올라온다(같은 폭·dpr 로 맞춰도 그랬다).
+       그래서 **자리를 계산해서** 잰다 — 소개 두 줄은 흰 판 윗변에서 10 위에
+       매달린 **2줄(35 × 1.25 × 2 = 87.5)** 덩이다.
+
+       실기기 실측(2026-09-24): 판 아랫변 225.94 · 소개 두 줄 윗변 239.74 —
+       **13.8 여유.** 아래 단언이 그 여유를 지킨다. */
+    const taglineBlockH = 35 * 1.25 * 2;
+    const taglineGap = 10;
+    final white = tester.getRect(find.byKey(const Key('home-white-sheet')));
+    expect(p.bottom, lessThan(white.top - taglineGap - taglineBlockH));
+
+    // 판 면은 어둡다 — 안의 흰 글자가 사는 근거다.
+    final deco =
+        tester.widget<DecoratedBox>(panel).decoration as BoxDecoration;
+    expect(deco.color!.computeLuminance(), lessThan(0.05));
+  });
+
+  /* 🔴 **닉네임이 길어도 「내 프로필」을 안 침범한다** — 인사말 칸을 그 앞에서
+     끊어 두고 넘치면 줄을 바꾼다. 목업 닉네임이 짧아 글자로는 못 재므로
+     **칸 자체의 오른쪽 끝**을 잰다(칸은 좌우가 묶여 있어 닉네임 길이와 무관하다). */
+  testWidgets('인사말 칸은 「내 프로필」 앞에서 끝난다', (tester) async {
+    await _pumpLoggedIn(tester);
+    final band = tester.getRect(find.byKey(const Key('home-greeting')));
+    final profile = tester.getRect(find.text('내 프로필'));
+    expect(band.right, lessThanOrEqualTo(profile.left));
+  });
+
+  /* 🔴 **바탕이 밝아졌다**(2026-09-24 사용자 요청 + 색 견본). 판 안의 흰
+     글자가 사는 근거는 그 위가 다크 판이라는 것뿐이다.
+     ⚠️ 같은 날 **판 밖의 어두운 글자**(소개 두 줄)도 함께 봤는데, 그 두 줄이
+     영상 줄로 바뀌면서 **판 밖에 글자가 하나도 안 남았다.** */
+  testWidgets('바탕은 라이트그레이고, 판 안의 글자는 희다', (tester) async {
+    expect(ScreenTint.mintBase, const Color(0xFFE4E9E7));
+
+    await _pumpLoggedIn(tester);
+    for (final t in [find.text('안녕하세요,'), find.text('백성검 님')]) {
+      expect(tester.widget<Text>(t).style!.color, const Color(0xFFFFFFFF),
+          reason: '판 안: $t');
+    }
   });
 
   testWidgets('바 메뉴를 열면 로그아웃 칸이 선다', (tester) async {

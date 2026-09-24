@@ -1,7 +1,10 @@
+import 'dart:typed_data';
+
 import '../../../core/mock/mock_db.dart';
 import '../../../core/network/api_client.dart';
 import 'clip_file.dart';
 import 'models/my_video.dart';
+import 'models/public_video.dart';
 import 'models/video_report.dart';
 import 'video_repository.dart';
 
@@ -35,6 +38,40 @@ class MockVideoRepository implements VideoRepository {
     final list = [..._mine]
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return list;
+  }
+
+  /* 🔴 **`_mine` 이 아니라 `_db.videos` 전체를 훑는다** — 공개 목록은 남의
+     것까지다. 서버 질의(`is_public && kept`)를 그대로 흉내 낸다. */
+  @override
+  Future<List<PublicVideo>> publicVideos() async {
+    await Future<void>.delayed(_delay);
+    final rows = [
+      for (final row in _db.videos)
+        if (row.video.isPublic && row.video.kept) row,
+    ]..sort((a, b) => b.video.createdAt.compareTo(a.video.createdAt));
+    return [
+      for (final row in rows)
+        PublicVideo(
+          id: row.video.id,
+          sportCode: row.video.sportCode,
+          durationMs: row.video.durationMs,
+          createdAt: row.video.createdAt,
+          title: row.video.title,
+          description: row.video.description,
+          uploaderNickname: _db.findUserById(row.userId)?.nickname,
+          /* ⚠️ **크기는 안 준다** — [MyVideo] 가 안 들고 있다. 계약이
+             「없으면 16:9」로 정했으므로 이것도 **있을 수 있는 상태**다. */
+        ),
+    ];
+  }
+
+  /* 🔴 **진짜 그림을 지어내지 않는다** — `playbackUrl` 과 같은 까닭이다.
+     Mock 에 없는 자산을 가리키면 화면이 「깨진 그림」을 그리게 되고, 그건
+     「아직 없음」과 다른 그림이라 목업으로 볼 값이 없다. */
+  @override
+  Future<Uint8List?> poster(String videoId) async {
+    await Future<void>.delayed(_delay);
+    return null;
   }
 
   @override
