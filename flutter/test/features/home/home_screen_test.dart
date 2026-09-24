@@ -681,12 +681,13 @@ void main() {
     await tester.pump(const Duration(milliseconds: 550));
     final mid = colorNow();
     expect(mid, isNot(AppTheme.seed), reason: '물드는 중');
-    expect(mid, isNot(const Color(0xFF222021)), reason: '물드는 중');
+    expect(mid, isNot(const Color(0xFFFFFFFF)), reason: '물드는 중');
 
     await tester.pump(const Duration(milliseconds: 700));
-    /* ⚠️ **흰색이었다** — 맨 위 판이 밝은 회색으로 뒤집히면서(2026-09-24,
-       사용자가 바탕과 판 색을 맞바꿨다) 흰 로고가 그 위에서 사라졌다. */
-    expect(colorNow(), const Color(0xFF222021), reason: '다 물들면 판 위 글자색');
+    /* ⚠️ **같은 날 세 번 갈렸다** — 흰색 → 맨 위 판이 밝은 회색으로 뒤집혀
+       `#222021` → 판이 다시 어두워져(바탕이 순검정) **흰색**. 로고는 늘
+       판 위 글자색(`_kOnPanel`)을 따라간다. */
+    expect(colorNow(), const Color(0xFFFFFFFF), reason: '다 물들면 판 위 글자색');
 
     // 컨트롤러 복원 타이머(Mock 300ms)를 흘려보내고 끝낸다.
     await tester.pump(const Duration(milliseconds: 500));
@@ -847,17 +848,18 @@ void main() {
     final white = tester.getRect(find.byKey(const Key('home-white-sheet')));
     expect(p.bottom, lessThan(white.top - taglineGap - taglineBlockH));
 
-    /* 🔴 **판과 바탕은 서로 다른 색이다 — 그게 판이 보이는 근거다.**
+    /* 🔴 **판은 바탕과 똑같은 순검정이다 — 경계가 없는 것이 맞다.**
        ⚠️ 둘을 맞바꿼 적이 있어서(2026-09-24) 「어둡다/밝다」로 못 박는다. */
     final deco =
         tester.widget<DecoratedBox>(panel).decoration as BoxDecoration;
-    expect(deco.color, isNot(ScreenTint.mintBase));
-    expect(
-      (deco.color!.computeLuminance() - ScreenTint.mintBase.computeLuminance())
-          .abs(),
-      greaterThan(0.3),
-      reason: '판과 바탕의 밝기 차이가 있어야 판으로 보인다',
-    );
+    /* ⚠️ **「판과 바탕은 다른 색」 단언을 걷었다** (2026-09-24 사용자 지시:
+       「그 맨 위에 있는 판도 빠르게 완전 검정색으로 바꾸고」). 같은 날 이
+       단언은 두 번 약해졌다 — 밝기 차 `> 0.3` → 「색이 다르다」 → **없음.**
+       지금은 판도 바탕도 `#000000` 이라 **경계가 아예 없는 것이 맞는 상태**고,
+       어떤 형태로든 되살리면 **사용자가 고른 색이 시험에 막힌다.**
+       🔴 **되살리지 말 것.** 판이 제 일을 하는지는 **자리**(위 단언들)와
+       **판 위 글자색**(아래 「바탕은 순검정」 시험)이 잡는다. */
+    expect(deco.color, const Color(0xFF000000));
   });
 
   /* 🔴 **닉네임이 길어도 「내 프로필」을 안 침범한다** — 인사말 칸을 그 앞에서
@@ -870,20 +872,89 @@ void main() {
     expect(band.right, lessThanOrEqualTo(profile.left));
   });
 
-  /* 🔴 **바탕과 판의 색을 맞바꿨다**(2026-09-24 사용자 요청).
-     바탕이 `#222021`, 판이 `#E4E9E7` 다. 판 위 글자는 그래서 **어둡다** —
-     판 색을 또 뒤집으면 이 시험이 먼저 깨져서 글자를 같이 안 돌렸다고 알려 준다. */
-  testWidgets('바탕과 판이 맞바뀜 있고, 판 위 글자는 어둡다', (tester) async {
-    expect(ScreenTint.mintBase, const Color(0xFF222021));
+  /* 🔴 **흰 판은 영상 줄·맨 위 판보다 앞에 그려진다** (2026-09-24 사용자 지시:
+     「스쿼드판 올릴때, 뒤에 있는 흰색판 영상이랑 위에 판보다 위에 있게 해줘」).
+
+     스쿼드 판을 펼치면 흰 판 윗변이 화면 맨 위까지 올라가는데, 화면 폭을 꽉
+     채우는 영상 줄이 앞에 있으면 **흰 테를 가로질러 덮는다.** 눈으로만 보이는
+     것이라 자리·색 단언으로는 안 잡혀서 **층 순서를 직접 읽는다.**
+
+     ⚠️ 흰 판은 여전히 **스쿼드 판·영상 분석 판보다는 뒤**다 — 그 둘을 받치는
+     것이 흰 판의 일이다. 아래가 그 경계 둘을 함께 못 박는다. */
+  testWidgets('흰 판은 영상 줄·맨 위 판보다 앞, 스쿼드 판보다 뒤다', (tester) async {
+    await _pumpLoggedIn(tester);
+
+    /* 흰 판을 감싸는 **가장 가까운** [Stack] 이 홈 본문이다. 그 자식들을
+       **그린 순서대로** 받아, 각 자식 아래에 그 키가 있는지 훑는다. */
+    final body = find
+        .ancestor(
+          of: find.byKey(const Key('home-white-sheet')),
+          matching: find.byType(Stack),
+        )
+        .first;
+    final layers = <Element>[];
+    tester.element(body).visitChildren(layers.add);
+
+    int layerOf(String key) {
+      for (var i = 0; i < layers.length; i++) {
+        var hit = false;
+        void walk(Element e) {
+          if (e.widget.key == Key(key)) hit = true;
+          if (!hit) e.visitChildren(walk);
+        }
+
+        walk(layers[i]);
+        if (hit) return i;
+      }
+      fail('$key 를 홈 본문 Stack 에서 못 찾았다');
+    }
+
+    final white = layerOf('home-white-sheet');
+    expect(white, greaterThan(layerOf('home-top-panel')), reason: '맨 위 판보다 앞');
+    expect(white, greaterThan(layerOf('home-video-strip')), reason: '영상 줄보다 앞');
+    expect(white, lessThan(layerOf('home-squad-sheet')), reason: '스쿼드 판보다 뒤');
+    expect(
+      white,
+      lessThan(layerOf('home-video-analysis')),
+      reason: '영상 분석 판보다 뒤',
+    );
+  });
+
+  /* 🔴 **층 순서만으로는 덜 가려진다 — 영상 줄은 펼치면 걷힌다** (2026-09-24,
+     실기기에서 잡았다). 이 줄은 `left: 0, right: 0` 로 화면 폭을 꽉 채우는데
+     흰 판은 양옆이 들어가 있어서, 판을 펼치면 **화면 가장자리로 영상 카드가
+     비어져 나왔다.** 위 층 순서 시험은 그 자리를 못 잡는다 — 여기서 잡는다. */
+  testWidgets('판을 펼치면 영상 줄이 걷힌다', (tester) async {
+    await _pumpLoggedIn(tester);
+    /* ⚠️ **`home-video-strip` 키로 재지 않는다** — 그 키는 바깥 [Positioned]
+       에 있고 걷는 [Opacity] 는 그 **안쪽**이라, [_opacityAbove] 가 찾는
+       「위에 겹친 것」에 안 걸려 **늘 1 로 읽힌다**(실제로 한 번 속았다).
+       줄 자체를 집으면 그 [Opacity] 가 조상이 된다. */
+    final strip = find.byType(HomeVideoStrip);
+    expect(_opacityAbove(tester, strip), 1, reason: '접혀 있을 땐 다 보인다');
+
+    await _openSheet(tester);
+    expect(_opacityAbove(tester, strip), 0, reason: '펼치면 하나도 안 보인다');
+  });
+
+  /* 🔴 **바탕도 맨 위 판도 순검정이다** (2026-09-24 사용자 지시 둘: 「배경색상
+     완전 검정으로 하고, 그 내 프로필 있는 맨 위 판의 색상을 지금 배경색상으로
+     다시 바꾸자」 → 「그 맨 위에 있는 판도 빠르게 완전 검정색으로」). 같은 날
+     앞선 회차에서는 반대였다(바탕 `#222021` · 판 `#E4E9E7` · 글자 어두움).
+
+     🔴 **판 위 글자는 그래서 흰색이다** — 판 색을 또 뒤집으면 이 시험이 먼저
+     깨져서 **글자 넷을 같이 안 돌렸다**고 알려 준다. 그게 이 시험의 전부다. */
+  testWidgets('바탕은 순검정, 판 위 글자는 희다', (tester) async {
+    expect(ScreenTint.mintBase, const Color(0xFF000000));
 
     await _pumpLoggedIn(tester);
     for (final t in [find.text('안녕하세요,'), find.text('백성검 님')]) {
-      expect(tester.widget<Text>(t).style!.color, const Color(0xFF222021),
+      expect(tester.widget<Text>(t).style!.color, const Color(0xFFFFFFFF),
           reason: '판 위: $t');
     }
     expect(
       tester.widget<Text>(find.text('내 프로필')).style!.color,
-      const Color(0xFF222021),
+      const Color(0xFFFFFFFF),
     );
   });
 

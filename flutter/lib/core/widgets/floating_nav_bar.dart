@@ -274,14 +274,20 @@ class _Divider extends StatelessWidget {
 
 /// 굵기·등급·광학크기를 **한 곳에서** 준다 — 아이콘마다 다르면 줄이
 /// 들쭉날쭉해진다.
-Widget _navGlyph(BuildContext context, IconData icon) => Icon(
-  icon,
-  color: kNavOnWhite,
-  size: context.d(76),
-  weight: 200,
-  grade: 0,
-  opticalSize: 20,
-);
+///
+/// 🔴 **고른 칸의 아이콘은 금빛이다** (2026-09-24 사용자 요청: 「하단바 선택된
+/// 아이콘도 똑같이 세련된 골드 색상으로」). **둘레를 도는 빛과 같은 값**
+/// ([kNavActiveSweep])을 쓴다 — 테는 금빛인데 글리프만 검정이면 한 칸 안에서
+/// 색이 갈린다. 🔴 **테 색을 갈면 여기도 같이 간다.**
+Widget _navGlyph(BuildContext context, IconData icon, {bool active = false}) =>
+    Icon(
+      icon,
+      color: active ? kNavActiveSweep : kNavOnWhite,
+      size: context.d(76),
+      weight: 200,
+      grade: 0,
+      opticalSize: 20,
+    );
 
 /// 가운데 칸의 아이콘.
 ///
@@ -329,7 +335,7 @@ class _NavIcon extends StatelessWidget {
                   child: const SizedBox.expand(),
                 ),
               ),
-            _navGlyph(context, icon),
+            _navGlyph(context, icon, active: active),
           ],
         ),
       ),

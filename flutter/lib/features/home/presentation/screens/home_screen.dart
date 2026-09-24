@@ -17,6 +17,7 @@ import '../../../../core/widgets/bar_menu.dart';
 import '../../../../core/widgets/floating_nav_bar.dart';
 import '../../../../core/widgets/glass_panel.dart';
 import '../../../../core/widgets/silver_edge.dart';
+import '../../../../core/widgets/raised_rim.dart';
 import '../../../../core/widgets/screen_tint.dart';
 import '../../../../core/widgets/silver_sweep_border.dart';
 import '../../../auth/presentation/session_controller.dart';
@@ -54,6 +55,10 @@ import '../widgets/home_video_strip.dart';
 /// 살구빛**으로 뒤집었다(`ScreenTint.warm`). 이 값은 [AuroraBackground] 가
 /// **하단 바 뒤까지** 칠하는 바탕이라, 여기만 검정으로 두면 화면 아래에
 /// **검은 띠**가 남는다 — 그래서 같은 값을 쓴다.
+///
+/// 🔴 **다시 순검정이 됐다 (2026-09-24 사용자 요청).** [ScreenTint.mintBase]
+/// 가 `#000000` 이다. ⚠️ 그래서 **맨 위 두 문단의 밴딩 경고가 되살아났다** —
+/// `kAuroraGlow` 를 켜는 날 이 값부터 볼 것.
 const Color _kHomeBg = ScreenTint.mintBase;
 
 /// 검은 바탕 위의 글자.
@@ -208,8 +213,11 @@ const double _kBoardTopInset = _kSheetHandleH + 4 + _kPillsRowH + 12;
 /// 둔다** — 부르는 자리(`_whiteSheet`·`home-white-sheet` 키·시험)가 그 이름을
 /// 쓰고, 색은 또 바뀔 수 있다.
 ///
-/// 🔴 **[_kTopPanelColor] 를 그대로 가리킨다.** 화면 위아래 판이 **한 색**이라는
-/// 것이 사용자 결정이므로, 값을 베껴 두면 한쪽만 바뀐다.
+/// 🔴 **[_kTopPanelColor] 를 따라가던 것을 끊었다 (2026-09-24, 사용자 지시:
+/// 「하단 바 위에 있는 판은 색상 바꾸지 마」).** 같은 날 바탕이 순검정이 되면서
+/// 맨 위 판이 `#222021` 로 돌아갔는데, **이 판은 그 자리에 안 따라간다.**
+/// 위 「위아래 판이 한 색」 결정은 여기서 끝났다 — 🔴 **다시 묶지 말 것.**
+/// 이제 화면은 **검은 바탕 · 어두운 머리 판 · 밝은 회색 아래 판** 세 층이다.
 ///
 /// 🔴 **판 둘 안이 비치지는 않는다.** 판 면([_kSheetColor])은 거의 투명하지만
 /// 그 위에 사진(`squad_cover.jpg` · `analysis_cover.jpg`)이 `BoxFit.cover` 로
@@ -217,7 +225,10 @@ const double _kBoardTopInset = _kSheetHandleH + 4 + _kPillsRowH + 12;
 ///
 /// ⚠️ **한 자리만 예외다** — 스쿼드 판을 펼치면 그 사진이 걷히고 스쿼드 그림이
 /// 드는데, 그때는 판 면 너머로 이 색이 비친다.
-const Color _kWhiteSheetColor = _kTopPanelColor;
+/// 🔴 **값이 [kSheetPaper] 로 옮겨 갔다** (2026-09-25) — 「영상 분석」 화면의
+/// 흰 판이 **같은 면**이어야 해서다. 여기서 숫자를 되살리면 두 화면이 조용히
+/// 갈린다.
+const Color _kWhiteSheetColor = kSheetPaper;
 
 /// 흰 판의 모서리.
 const double _kWhiteSheetRadius = 28;
@@ -242,16 +253,45 @@ const double _kShortcutTopPad = 14;
 /// 알약 셋 사이 틈.
 const double _kShortcutSpacing = 10;
 
-/// 지름길 알약의 면 — 🔴 **맨 위 다크 판과 같은 값이다**(2026-09-24).
+/* ⛔ **여기 있던 `_kPillFill`(= [_kInkDark], 불투명한 어두운 면)을 걷었다**
+   (2026-09-24 사용자 지시: 「3개 버튼들 안쪽 색상 빠르게 없애봐」 →
+   「1번으로 해줘」). 지름길 알약은 이제 **유리**다 —
+   면은 [_kShortcutGlassAlpha](흰 기), 글자는 [_kOnWhite](검정)다.
+
+   🔴 **되살린다면 [_kOnWhite] 를 같이 뒤집는다.** 어두운 면에는 흰 글자였다.
+   그 값 이력이 여기 남아 있다: 화면 바탕을 따라가던 것(2026-09-23, 바탕이
+   밝아지며 알약이 통째로 사라져서 끊었다) → 맨 위 판과 같은 `#222021`
+   → **유리**. 🔴 **어느 판도 기준이 아니다** — 알약의 기준은 **제가 앉은
+   판**([_kWhiteSheetColor], 밝은 회색)이고, 지금 유리가 성립하는 것도
+   그 판이 밝기 때문이다. */
+
+/// 지름길 알약의 모서리 — 🔴 **알약(`StadiumBorder`)이 아니라 둥근 네모다**
+/// (2026-09-24 사용자 요청 + 레퍼런스).
 ///
-/// ⚠️ **바탕을 따라가던 것을 끊었다.** 2026-09-23 에는 「화면 바탕과 같은
-/// 딥그린」이라 [ScreenTint.mintBase] 를 그대로 썼는데, 바탕이 **밝은
-/// 회색으로 뒤집히면서** 그 규칙이 알약을 **흰 판 위의 밝은 회색 + 흰 글자**
-/// 로 만들어 통째로 사라지게 했다.
+/// 🔴 **모서리가 있어야 [RaisedRim] 이 성립한다** — 레퍼런스의 「모서리 두 곳이
+/// 자연스럽게 안 보인다」는 **모서리가 있을 때만** 눈에 집힌다. 양 끝이 완전한
+/// 반원이면 그냥 한쪽만 밝은 테로 보인다. ⛔ [StadiumBorder] 로 되돌리지 말 것.
+const double _kShortcutRadius = 20;
+
+/// 지름길 알약의 흐림 — 🔴 **공용 알약 흐림([kPillBlur])의 30%다**
+/// (2026-09-24 사용자 요청: 「3개 버튼 글래스로 바꾸고 블러 30퍼만」).
 ///
-/// 🔴 **이제 「어두운 면」이 짝이다** — 화면에 어두운 것이 다크 판과 이 알약
-/// 둘뿐이라 같은 상수를 쓴다. 알약 색을 갈려면 [_kInkDark] 를 본다.
-const Color _kPillFill = _kInkDark;
+/// ⚠️ **값을 베껴 적지 않는다** — 공용 값이 또 바뀌면 여기도 따라와야 한다.
+const double _kShortcutBlur = kPillBlur * 0.3;
+
+/// 유리 면의 **흰 기** — 🔴 **공용 유리 알약과 같은 값**([kPillTint])이다.
+///
+/// 🔴 **어두운 면에서 흰 기로 뒤집혔다** (2026-09-24 사용자 지시: 「3개 버튼들
+/// 안쪽 색상 빠르게 없애봐」 → 「1번으로 해줘」). 하루에 셋을 거쳤다 —
+/// 어두운 면(`#222021` 불투명) → **0%**(면 없음) → **흰 기 16%**.
+///
+/// ⚠️ **0% 는 한 번 해 보고 버린 값이다.** 면을 아예 없애니 알약이 밝은 회색
+/// 판([_kWhiteSheetColor])에 묻혀 **모양도 글자도 안 읽혔다.** 판보다 한 톤
+/// 밝아야 알약이 떠 보인다 — 그게 이 값이 하는 일의 전부다.
+///
+/// 🔴 **이 값을 내리면 [_kOnWhite] 를 같이 본다.** 면이 밝아져서 글자가
+/// 어두워진 것이라, 면만 되돌리면 어두운 면에 어두운 글자가 된다.
+const double _kShortcutGlassAlpha = kPillTint;
 
 /// 화면 맨 위 **다크 헤더 판**의 면 (2026-09-24 사용자 요청 + 레퍼런스:
 /// 「내 프로필 글자 아래로 … 이 색상으로 판 하나 주자」, 색 견본 `#222021`).
@@ -261,24 +301,45 @@ const Color _kPillFill = _kInkDark;
 /// 소개 두 줄(「함께 뛸 팀을 만들고,…」)은 **판 밖 아래**에 남는다 —
 /// 판을 그 줄까지 내리지 말 것.
 ///
-/// ⚠️ **바탕과 색을 맞바꿨다 (2026-09-24, 사용자 요청: 「배경 색상이랑 내
-/// 프로필 쪽 위쪽 판 색상이랑 둘만 바꿔봐」).** 판이 `#222021`, 바탕이
-/// `#E4E9E7` 이던 것을 서로 뒤집었다.
+/// 🔴 **어두운 쪽으로 돌아왔다 (2026-09-24, 같은 날 세 번째. 사용자 요청:
+/// 「배경색상 완전 검정으로 하고, 그 내 프로필 있는 맨 위 판의 색상을 지금
+/// 배경색상으로 다시 바꾸자」).** 몇 시간 전 바탕과 맞바꿔 밝은 회색
+/// (`#E4E9E7`)이었던 것을, **직전 바탕값 `#222021`** 로 되돌렸다.
+/// 바탕은 그 자리에서 **순검정**이 됐다([ScreenTint.mintBase]).
 ///
-/// 🔴 **그래서 판 위의 글자가 전부 어두워졌다**([_kOnPanel]) — 인사말·손·
-/// 「내 프로필」·로고 넷이다. 이 판 색을 다시 어둡게 돌리면 **그 넷을 같이
+/// 🔴 **그래서 판 위의 글자가 전부 다시 희어졌다**([_kOnPanel]) — 인사말·손·
+/// 「내 프로필」·로고 넷이다. 이 판 색을 또 밝게 돌리면 **그 넷을 같이
 /// 되돌려야 한다.** 한쪽만 바꾸면 글자가 통째로 사라진다.
-const Color _kTopPanelColor = Color(0xFFE4E9E7);
+///
+/// 🔴 **바탕과 똑같은 순검정이 됐다 (2026-09-24, 같은 날 네 번째. 사용자 지시:
+/// 「그 맨 위에 있는 판도 빠르게 완전 검정색으로 바꾸고」).** `#222021` 로
+/// 되돌린 지 몇 분 만이다.
+///
+/// ⚠️ **그래서 이 판은 「보이는 판」이 아니다** — 바탕과 한 색이라 **경계가
+/// 아예 없다.** 눈에는 검은 화면 하나이고, 이 판은 **글자 넷을 담는 자리**와
+/// **상태 바 아이콘 밝기의 기준**으로만 남는다. 「판이 안 보인다」를 버그로
+/// 읽지 말 것 — 사용자가 그렇게 정했다.
+///
+/// 🔴 **그 탓에 [_kWhiteSheetColor] 와는 완전히 갈라섰다** — 아래 판은 밝은
+/// 회색에 그대로 남는다(사용자 지시: 「하단 바 위에 있는 판은 색상 바꾸지 마」).
+const Color _kTopPanelColor = Color(0xFF000000);
 
-/// 다크 판 위의 글자 — 🔴 **판이 밝아져서 어두운 색이다.** [_kOnDark] 와
-/// 갈라 둔 까닭: 그쪽은 **스쿼드 판·사진 위**처럼 여전히 어두운 자리에서 쓰이고,
-/// 이쪽만 판 색을 따라간다. 한 상수로 묶으면 판을 바꿀 때 엉뚱한 곳이 같이 뒤집힌다.
-const Color _kOnPanel = Color(0xFF222021);
+/// 다크 판 위의 글자 — 🔴 **판이 다시 어두워져서 흰색이다.**
+///
+/// ⚠️ **지금 [_kOnDark] 와 값이 같다. 그래도 합치지 말 것** — 그쪽은
+/// **스쿼드 판·사진 위**라 판 색과 무관하게 흰색이고, 이쪽만 판 색을 따라간다.
+/// 한 상수로 묶으면 판을 바꿀 때 엉뚱한 곳이 같이 뒤집힌다(실제로 판이 밝았던
+/// 몇 시간 동안 이 값만 `#222021` 이었다).
+const Color _kOnPanel = Color(0xFFFFFFFF);
 
 /// 지름길 알약처럼 **흰 판 위에 앉는 어두운 면.**
 ///
 /// 🔴 **[_kTopPanelColor] 를 따라가던 것을 끊었다** (2026-09-24). 판이 밝은
 /// 회색이 되면서 그대로 뒀으면 **알약이 흰 판 위에서 사라졌다.**
+///
+/// ⚠️ **끊어 두길 잘했다** — 같은 날 맨 위 판만 `#222021` 로 돌아가고
+/// [_kWhiteSheetColor] 는 밝은 회색에 남았다. 묶여 있었으면 알약이 판과
+/// 한 색이 됐을 것이다. 🔴 **다시 묶지 말 것.**
 const Color _kInkDark = Color(0xFF222021);
 
 /// 다크 판의 **아래 모서리** — 🔴 흰 판([_kWhiteSheetRadius])과 같은 값이다.
@@ -293,17 +354,26 @@ const double _kTopPanelRadius = _kWhiteSheetRadius;
 const double _kTopPanelPadBottom = 6;
 
 
-/// 알약 안의 글자·아이콘 — 🔴 **순백이다**(같은 요청). 면이 어두워졌으므로
-/// 검정에서 뒤집혔다.
+/// 알약 안의 글자·아이콘 — 🔴 **다시 검정이다** (2026-09-24, 알약이 유리가
+/// 되면서). 면이 흰 기([_kShortcutGlassAlpha])가 되어 순백에서 뒤집혔다.
 ///
 /// ⚠️ **알약이 흰 판 위에 있다는 것과는 무관하다** — 판이 아니라 **알약 제
-/// 면**을 기준으로 정한다. 앞서 판이 희다는 이유로 검정(`#111114`)이었다.
-const Color _kOnWhite = Color(0xFFFFFFFF);
+/// 면**을 기준으로 정한다. 🔴 **이 값은 면을 따라 두 번 뒤집혔다**:
+/// 검정(`#111114`, 면이 흴 때) → 순백(면이 어두울 때) → **검정**(면이 유리).
+/// 면을 또 갈면 여기도 같이 간다.
+const Color _kOnWhite = Color(0xFF111114);
 
-/// 알약의 테 — 🔴 **하단 바·영상 분석 판과 같은 값**([SilverEdge.onWhite])
-/// 이다. 셋이 같은 흰 판 위에 놓인 조각이라 테가 갈리면 한 화면에 두 굵기·
-/// 두 색이 보인다.
-const Color _kPillLineOnWhite = SilverEdge.onWhite;
+/* ⛔ **여기 있던 `_kPillLineOnWhite`([SilverEdge.onWhite])를 걷었다**
+   (2026-09-24 사용자 요청 + 레퍼런스 — 지름길 알약 셋이 [RaisedRim] 으로 갔다).
+
+   🔴 **그 상수의 규칙이 깨진 것을 알고 깨뜨렸다.** 그 자리엔 「하단 바·영상
+   분석 판과 **같은 값**이다 — 셋이 같은 흰 판 위에 놓인 조각이라 테가 갈리면
+   한 화면에 두 굵기·두 색이 보인다」고 적혀 있었다. 이제 **지름길 알약만**
+   대각선으로 밝기가 갈리는 테를 쓰고, 하단 바·영상 분석 판은 은빛 실선
+   ([_kSilverOnWhiteWidth] 쪽)에 남아 있다.
+
+   ⚠️ **그래서 한 화면에 테가 두 종류다.** 사용자가 그 모양을 콕 집어 골랐으니
+   「어긋났다」로 읽고 되돌리지 말 것. 되돌린다면 **셋을 같이** 옮긴다. */
 
 /// 흰 판 위에서 영상 분석 판을 가르는 **가장 얇은 은빛 선**(2026-09-23 사용자
 /// 요청: 「제일 얇은 세련된 실버 색상」).
@@ -823,18 +893,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 ),
               ),
             ),
-            /* 🔴 **판 둘보다 뒤다.** 받치는 것이지 덮는 것이 아니라서,
-               이 자리(영상 분석 판 **앞**)를 지켜야 한다. */
-            _whiteSheet(context),
-            _videoPanel(context),
-            _shortcutPills(context),
-            /* 🔴 **로고·「내 프로필」보다 뒤, 스쿼드 판보다 앞이다.** 뒤라서
-               그 셋이 판 위에 얹히고, 앞이라서 판을 펼치면 **인사말과 똑같이
-               덮인다** — 따로 걷는 연출을 안 만들어도 되는 자리다. */
+            /* 🔴 **여기 셋이 흰 판보다 뒤로 내려왔다** (2026-09-24 사용자 지시:
+               「스쿼드판 올릴때, 뒤에 있는 흰색판 영상이랑 위에 판보다 위에
+               있게 해줘」).
+
+               까닭: 스쿼드 판을 펼치면 **흰 판 윗변이 화면 맨 위까지 따라
+               올라간다**([_sheetGeometry] 의 `whiteTopExpanded`). 그런데 영상
+               줄은 `left: 0, right: 0` 로 **화면 폭을 꽉 채우는** 줄이라,
+               앞에 있으면 흰 판이 스쿼드 판 둘레로 남기는 **테를 가로질러
+               덮었다.** 맨 위 판도 같은 자리를 먹었다.
+
+               🔴 **되돌리지 말 것** — 앞으로 올리면 판을 펼칠 때 흰 테 위로
+               영상 줄이 다시 비친다. 접혀 있을 때는 흰 판이 한참 아래라
+               **셋 다 겹치지 않으므로**, 이 순서는 펼친 동안에만 뜻이 있다. */
             _topPanel(context, user?.nickname),
             // 로고는 화면 맨 위 가운데 — 판을 펼치면 그 판이 덮는다.
             _brandMark(context),
             _videoStrip(context),
+            /* 🔴 **판 둘보다 뒤다.** 받치는 것이지 덮는 것이 아니라서,
+               이 자리(영상 분석 판 **앞**)를 지켜야 한다.
+
+               ⚠️ **위 셋보다는 앞이다** — 바로 위 주석 참고. 「받치는 것」은
+               **스쿼드 판·영상 분석 판**에 대한 말이지 영상 줄·맨 위 판까지가
+               아니다. */
+            _whiteSheet(context),
+            _videoPanel(context),
+            _shortcutPills(context),
             _squadSheet(context, card, squad, user?.ownedTeamId),
             // 「내 프로필」 — 화면 맨 위 오른쪽. 판보다 **뒤에 두지 않는다**.
             _profileButton(context, card),
@@ -1162,11 +1246,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final room = geo.whiteTopCollapsed - top;
     final height = (room - _kVideoStripGap * 2).clamp(0.0, 240.0);
     return Positioned(
+      // 🔴 시험이 이 키로 **층 순서**를 읽는다 — 흰 판보다 뒤에 있어야 한다.
+      key: const Key('home-video-strip'),
       top: top + _kVideoStripGap,
       left: 0,
       right: 0,
       height: height,
-      child: HomeVideoStrip(height: height),
+      child: AnimatedBuilder(
+        animation: _sheet,
+        /* 🔴 **줄 자체는 `child` 로 한 번만 짓는다 — `builder` 안에서 짓지 말 것.**
+           이 줄은 손가락을 따라 **초당 60번** 다시 지어지는 자리이고, 그때마다
+           영상 플레이어가 만들어졌다 버려져 **앱이 네이티브에서 통째로 죽는다**
+           (`Fatal signal 6 in MediaCodec_loop`, 2026-09-24에 실제로 겪었다).
+           `child` 로 넘기면 [Opacity] 만 매 프레임 다시 지어진다. */
+        child: HomeVideoStrip(height: height),
+        builder: (context, child) {
+          /* 🔴 **판을 펼치면 걷힌다** (2026-09-24 사용자 지시의 뒷마무리:
+             「흰색판 영상이랑 위에 판보다 위에 있게」). 흰 판을 이 줄보다 앞에
+             두는 것만으로는 **덜 가려진다** — 이 줄은 `left: 0, right: 0` 로
+             화면 폭을 꽉 채우는데 흰 판은 양옆이 [_kWhiteSheetSideInset] 만큼
+             들어가 있어서, **화면 가장자리로 영상 카드가 비어져 나왔다**
+             (실기기에서 확인했다). 알약과 같은 처리다 — 판이 오기 전에 걷는다.
+
+             🔴 **절반(`* 2`)에서 이미 다 걷힌다** — 끝까지 끌어야 사라지면
+             스쿼드 판이 덮는 순간과 겹쳐 **깜빡이는 것처럼** 보인다. */
+          final fade = (1 - _sheetT * 2).clamp(0.0, 1.0);
+          return IgnorePointer(
+            ignoring: fade < 0.5,
+            child: Opacity(opacity: fade, child: child),
+          );
+        },
+      ),
     );
   }
 
@@ -1705,37 +1815,50 @@ class _ShortcutPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      /* 알약 모양은 [StadiumBorder] 가 낸다 — 반지름을 숫자로 주면 높이를
-         바꿀 때마다 같이 고쳐야 하고, 한 번 어긋나면 양 끝이 찌그러진다. */
-      color: _kPillFill,
-      shape: const StadiumBorder(
-        side: BorderSide(
-          color: _kPillLineOnWhite,
-          width: _kSilverOnWhiteWidth,
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 22, color: _kOnWhite),
-            const SizedBox(height: 5),
-            /* 🔴 한 줄로 묶는다 — 「경기장 예약」이 좁은 기기에서 두 줄로
-               접히면 알약 셋의 높이가 갈린다. */
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w600,
-                color: _kOnWhite,
+    return RaisedRim(
+      radius: _kShortcutRadius,
+      /* 🔴 **밝은 판 위라 그늘 쪽이 어둡다** (2026-09-24). 알약이 유리(흰 기)가
+         되면서 판([_kWhiteSheetColor])과 밝기가 거의 같아져, 실버 획 양쪽으로는
+         **모양 자체가 안 읽혔다.** 왼쪽 위 흰 하이라이트 + 오른쪽 아래 어두운
+         그림자라야 솟아 보인다 — [RaisedRim.shadeColor] 머리말 참고. */
+      shadeColor: _kInkDark,
+      lit: 0.9,
+      shade: 0.22,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(_kShortcutRadius),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(
+            sigmaX: _kShortcutBlur,
+            sigmaY: _kShortcutBlur,
+          ),
+          child: Material(
+            /* 🔴 **흰 기를 얹는 것이지 [_kPillFill] 을 옅게 하는 것이 아니다**
+               (2026-09-24). 어두운 색을 옅게 깔면 판보다 **어두워져** 유리가
+               아니라 「때 낀 자국」으로 보인다 — 판보다 **밝아야** 뜬다. */
+            color: Colors.white.withValues(alpha: _kShortcutGlassAlpha),
+            child: InkWell(
+              onTap: onTap,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 22, color: _kOnWhite),
+                  const SizedBox(height: 5),
+                  /* 🔴 한 줄로 묶는다 — 「경기장 예약」이 좁은 기기에서 두 줄로
+                     접히면 알약 셋의 높이가 갈린다. */
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: _kOnWhite,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -1749,7 +1872,7 @@ const TextStyle _kGreetStyle = TextStyle(
   fontWeight: FontWeight.w900,
   fontSize: _Greeting.fontSize,
   height: 1.2,
-  // 🔴 판이 밝아졌다 — [_kOnPanel] 머리말 참고.
+  // 🔴 판 색을 따라간다 — [_kOnPanel] 머리말 참고.
   color: _kOnPanel,
 );
 
@@ -1988,8 +2111,9 @@ class _BrandFadeState extends State<_BrandFade>
         fontSize: kBrandHomeSize,
         /* 🔴 **[Curves.easeInOut] 을 씌운다** — 선형이면 시작과 끝이 톡
            끊겨 보인다. 가운데가 빠르고 양 끝이 느려야 한 동작으로 읽힌다. */
-        /* 🔴 **흰색이 아니라 [_kOnPanel] 로 물든다** (2026-09-24). 판이 밝은
-           회색이 되면서 흰 로고가 그 위에서 사라졌다. 앉는 색만 바뀌고
+        /* 🔴 **[_kOnPanel] 로 물든다 — 판 색을 따라간다** (2026-09-24).
+           판이 밝은 회색이던 몇 시간 동안은 이 값이 어두웠다(흰 로고가 그 위에서
+           사라져서). 판이 다시 어두워져 지금은 흰색이다. 앉는 색만 판을 따라가고
            출발색(앱 초록)과 곡선은 그대로다. */
         color: Color.lerp(
           AppTheme.seed,
@@ -2764,7 +2888,7 @@ class _ProfileButton extends StatelessWidget {
                      🔴 **카드 폭과 배수를 맞추던 규칙은 여기서 끝난다** —
                      이제 글자는 **읽히는 크기**로, 카드는 **보이는 크기**로
                      따로 정한다. */
-                  // 🔴 판이 밝아졌다 — [_kOnPanel] 머리말 참고.
+                  // 🔴 판 색을 따라간다 — [_kOnPanel] 머리말 참고.
                   style: TextStyle(color: _kOnPanel, fontSize: 14),
                 ),
               ],
