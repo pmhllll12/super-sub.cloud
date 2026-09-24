@@ -11,6 +11,7 @@ import 'package:super_sub/features/auth/data/auth_providers.dart';
 import 'package:super_sub/features/auth/data/auth_repository_mock.dart';
 import 'package:super_sub/features/auth/presentation/session_controller.dart';
 import 'package:super_sub/features/intro/presentation/intro_gate.dart';
+import 'package:super_sub/features/video/presentation/screens/reels_screen.dart';
 
 // redirect는 앱의 내비게이션 정책 전체를 담고 있다 — 복원 중, 로그아웃,
 // 로그인 화면에 남은 로그인 사용자, 통과. 네 갈래를 모두 착지 화면으로
@@ -131,15 +132,49 @@ void main() {
     await tester.tap(find.byKey(const Key('home-video-start')));
     await _settle(tester);
 
-    expect(find.text('분석할 영상을 골라주세요'), findsOneWidget);
+    /* ⚠️ **화면이 통째로 갈렸다 (2026-09-24).** 전에는 「분석할 영상을
+       골라주세요」 판을 누르면 고르는 타일 둘이 펼쳐지는 `VideoAnalysisScreen`
+       이었는데, 그 화면은 **껍데기**였다(타일 둘 다 「준비 중입니다」). 이제
+       `AnalyzeScreen` 이고 고르는 단추가 **처음부터 보인다** — 한 단계 줄었다. */
+    expect(find.text('영상 분석'), findsOneWidget);
+    expect(find.byKey(const Key('analyze-pick-camera')), findsOneWidget);
+    expect(find.byKey(const Key('analyze-pick-gallery')), findsOneWidget);
+  });
 
-    // 판을 누르면 어디서 가져올지 둘로 펼쳐진다.
-    await tester.tap(find.byKey(const Key('video-pick')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+  /* 🔴 **홈 영상 줄의 가운데를 누르면 그 영상으로 간다** (2026-09-24 사용자
+     요청). 전에는 `go('/videos')` — 영상 **분석** 화면이었고 **어떤 영상인지가
+     전달되지 않았다.** 이 저장소의 **첫 파라미터 라우트**(`/videos/:id`)라
+     형제인 `/videos` 와 섞이지 않는 것까지 여기서 본다. */
+  testWidgets('영상 줄의 가운데를 누르면 그 영상의 전체화면으로 간다', (tester) async {
+    await _pumpHome(tester);
 
-    expect(find.byKey(const Key('video-pick-camera')), findsOneWidget);
-    expect(find.byKey(const Key('video-pick-gallery')), findsOneWidget);
+    /* 줄의 한가운데를 누른다 — 겹친 카드 중 **가운데 것**이 그 자리에 있다.
+       (자리 계산은 `home_video_strip.dart` 의 `_onTapUp`.) */
+    await tester.tap(find.byKey(const Key('home-video-strip')));
+    await _settle(tester);
+
+    expect(find.byType(ReelsScreen), findsOneWidget);
+    /* 🔴 **분석 화면이 아니다** — 둘이 `/videos` 앞머리를 나눠 쓰므로, 라우트
+       순서가 어긋나면 여기로 온다. */
+    expect(find.text('분석할 영상을 골라주세요'), findsNothing);
+  });
+
+  testWidgets('전체화면에서 뒤로 가면 홈으로 돌아온다', (tester) async {
+    await _pumpHome(tester);
+    await tester.tap(find.byKey(const Key('home-video-strip')));
+    await _settle(tester);
+    expect(find.byType(ReelsScreen), findsOneWidget);
+
+    /* 🔴 **`push` 로 얹었으므로 뒤로 가기가 산다**(`go` 였으면 스택이 갈린다).
+       홈이 살아 있다는 것은 「내 프로필」 단추로 본다.
+
+       ⚠️ **`tester.pageBack()` 은 못 쓴다** — 그쪽은 머리칸(`AppBar`)의
+       뒤로가기를 찾는데, 이 화면은 통째로 영상이라 머리칸이 없다. */
+    await tester.tap(find.byKey(const Key('reel-back')));
+    await _settle(tester);
+
+    expect(find.byType(ReelsScreen), findsNothing);
+    expect(find.byKey(const Key('home-profile')), findsOneWidget);
   });
 
   testWidgets('로그인 상태에서 다른 라우트는 그대로 통과한다', (tester) async {
