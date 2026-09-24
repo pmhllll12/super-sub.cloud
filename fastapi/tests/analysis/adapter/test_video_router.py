@@ -1308,3 +1308,85 @@ class TestVideoLimit:
             res = _register(client, user_id, key)
             assert res.status_code == 201, res.text
             assert res.json()["kept"] is False
+
+
+class TestVideoPoster:
+    """카드에 깔 **한 장면**(JPEG) — `GET /videos/{id}/poster`.
+
+    🔴 **`ffmpeg` 을 시험에서 돌리지 않는다.** 바깥 망으로 나가고 프로세스를
+    띄우는 일이라, 여기서 재는 것은 **권한·캐시·에러 코드**뿐이다.
+
+    🔴 **`conftest.py` 를 안 건드린다**(`fastapi/CLAUDE.md` 의 공유 파일).
+    대신 provider 모듈의 객체를 갈아끼운다 — 그 provider 가 호출 시점에 읽는다.
+    """
+
+    @pytest.fixture
+    def poster(self, monkeypatch):
+        from app.analysis.adapter.outbound.stub.poster_stub import (
+            MemoryPosterCache,
+            StubPoster,
+        )
+        from app.analysis.dependencies import video_providers
+
+        stub = StubPoster()
+        monkeypatch.setattr(video_providers, "_POSTER", stub)
+        monkeypatch.setattr(video_providers, "_POSTER_CACHE", MemoryPosterCache())
+        return stub
+
+    def test_인증이_필요하다(self, client, poster):
+        assert client.get(f"{V1}/videos/{uuid4()}/poster").status_code == 401
+
+    def test_공개_클립은_남도_장면을_받는다(self, client, poster):
+        owner, viewer = uuid4(), uuid4()
+        video_id = _register_clip(client, owner)
+        client.patch(
+            f"{V1}/videos/{video_id}", json={"is_public": True}, headers=_headers(owner)
+        )
+
+        res = client.get(f"{V1}/videos/{video_id}/poster", headers=_headers(viewer))
+
+        assert res.status_code == 200, res.text
+        assert res.headers["content-type"] == "image/jpeg"
+        assert res.content.startswith(b"\xff\xd8")  # JPEG 머리
+
+    def test_비공개_남의_클립은_404_다(self, client, poster):
+        """🔴 **캐시보다 권한이 먼저다.** 뒤에 두면 한 번 떠 둔 비공개 클립의
+        장면이 아무에게나 나간다."""
+        owner, viewer = uuid4(), uuid4()
+        video_id = _register_clip(client, owner)  # 비공개
+
+        res = client.get(f"{V1}/videos/{video_id}/poster", headers=_headers(viewer))
+
+        assert res.status_code == 404
+        assert res.json()["error"]["code"] == "VIDEO_NOT_FOUND"
+        assert poster.calls == 0, "권한이 없는데 떴다"
+
+    def test_두_번_불러도_한_번만_뜬다(self, client, poster):
+        """🔴 **이 캐시가 이 설계의 전부다** — 뜨는 일 자체는 여전히 비싸다."""
+        owner = uuid4()
+        video_id = _register_clip(client, owner)
+
+        for _ in range(3):
+            res = client.get(f"{V1}/videos/{video_id}/poster", headers=_headers(owner))
+            assert res.status_code == 200, res.text
+
+        assert poster.calls == 1
+
+    def test_장면을_못_뜨면_404_다(self, client, monkeypatch):
+        """형식을 못 읽거나 너무 짧은 영상이 있다 — 서버 오류가 아니다."""
+        from app.analysis.adapter.outbound.stub.poster_stub import (
+            MemoryPosterCache,
+            StubPoster,
+        )
+        from app.analysis.dependencies import video_providers
+
+        monkeypatch.setattr(video_providers, "_POSTER", StubPoster(jpeg=None))
+        monkeypatch.setattr(video_providers, "_POSTER_CACHE", MemoryPosterCache())
+
+        owner = uuid4()
+        video_id = _register_clip(client, owner)
+
+        res = client.get(f"{V1}/videos/{video_id}/poster", headers=_headers(owner))
+
+        assert res.status_code == 404
+        assert res.json()["error"]["code"] == "POSTER_NOT_AVAILABLE"

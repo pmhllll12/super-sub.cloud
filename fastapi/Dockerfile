@@ -12,6 +12,17 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
+# 🔴 **ffmpeg** — `GET /videos/{id}/poster` 가 영상에서 한 장면을 뜬다
+# (`app/analysis/adapter/outbound/ffmpeg/poster_ffmpeg.py`). 없으면 그 경로만
+# 404 로 떨어지고 나머지는 멀쩡하다 — 그래도 카드가 전부 빈 칸이 된다.
+#
+# ⚠️ **이미지가 커진다**(~100MB). `ffmpeg` 대신 `ffmpeg`-static 이나 별도
+# 서비스로 뺄 수도 있지만, 지금은 경로 하나가 쓰는 것이라 단순한 쪽을 골랐다.
+# 🔴 의존성 설치 **앞**에 둔다 — 앱 코드가 바뀔 때 이 레이어가 재사용된다.
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 # 의존성을 먼저 — 앱 코드만 바뀔 때 이 레이어가 재사용된다.
 # psycopg-binary·bcrypt·cryptography 는 manylinux 휠이 있어 빌드 도구가 필요 없다.
 COPY requirements.lock.txt ./

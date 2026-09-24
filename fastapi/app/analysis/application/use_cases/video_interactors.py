@@ -29,6 +29,7 @@ from app.analysis.application.dtos.video_dto import (
     GetCardGradeCommand,
     GetFeaturedVideoCommand,
     GetPlaybackUrlCommand,
+    GetVideoPosterCommand,
     KeepVideoCommand,
     MyVideosQuery,
     PlaybackUrlResult,
@@ -38,6 +39,7 @@ from app.analysis.application.dtos.video_dto import (
     UpdateVideoCommand,
     UploadUrlCommand,
     UploadUrlResult,
+    VideoPosterResult,
     VideoResult,
 )
 from app.analysis.application.ports.input.video_use_cases import (
@@ -47,6 +49,7 @@ from app.analysis.application.ports.input.video_use_cases import (
     GetCardGradeUseCase,
     GetFeaturedVideoUseCase,
     GetPlaybackUrlUseCase,
+    GetVideoPosterUseCase,
     KeepVideoUseCase,
     ListAdminVideosUseCase,
     ListMyVideosUseCase,
@@ -54,6 +57,8 @@ from app.analysis.application.ports.input.video_use_cases import (
     RegisterVideoUseCase,
     UpdateVideoUseCase,
 )
+from app.analysis.application.ports.output.poster_cache_port import PosterCachePort
+from app.analysis.application.ports.output.poster_port import PosterPort
 from app.analysis.application.ports.output.storage_port import StoragePort
 from app.analysis.application.ports.output.video_port import VideoPort
 from app.analysis.application.use_cases.video_assembler import (
@@ -387,6 +392,57 @@ class GetPlaybackUrlInteractor(GetPlaybackUrlUseCase):
             raise ApiError(404, "VIDEO_NOT_FOUND", "클립을 찾을 수 없습니다.")
         url, expires_in = self._storage.create_download_url(video.storage_key)
         return PlaybackUrlResult(url=url, expires_in=expires_in)
+
+
+class GetVideoPosterInteractor(GetVideoPosterUseCase):
+    """카드에 깔 **한 장면**(JPEG).
+
+    🔴 **왜 있나.** 목록이 썸네일을 안 실어서, 앱이 카드마다 **원본 MP4 를 열어**
+    첫 프레임을 뽑고 있었다 — 실기기에서 **한 장에 1.9초**가 걸렸고 다섯 장이면
+    화면이 한참 까맸다. 작은 JPEG 한 장으로 바꾸면 그 값이 사라진다.
+
+    🔴 **캐시가 이 설계의 전부다.** 뜨는 것 자체는 여전히 비싸다(원본을 읽어야
+    한다). 한 번 뜨면 그 뒤로는 **모두에게** 즉시 나간다.
+
+    ⚠️ **캐시는 컨테이너 안에 있다** — 재배포하면 비고, 그때 처음 부르는 사람이
+    다시 만든다. 🔴 **DB·S3 에 두지 않은 까닭이 있다**: DB 는 마이그레이션이
+    필요한데 `fastapi/CLAUDE.md` 가 **마이그레이션 체인을 공유 파일로 묶어 뒀고**,
+    S3 는 새 접두사에 쓰려면 **IAM 정책을 고쳐야 한다**(2026-09-18 에 `cards/`
+    로 똑같이 막혔다). 둘 다 이 작업 범위 밖이라 피했다.
+    """
+
+    def __init__(
+        self,
+        repository: VideoPort,
+        storage: StoragePort,
+        poster: PosterPort,
+        cache: PosterCachePort,
+    ) -> None:
+        self._repository = repository
+        self._storage = storage
+        self._poster = poster
+        self._cache = cache
+
+    def __call__(self, command: GetVideoPosterCommand) -> VideoPosterResult:
+        # 🔴 **권한을 먼저 본다 — 캐시보다 앞이다.** 뒤에 두면 한 번 떠 둔
+        #    비공개 클립의 장면이 **아무에게나** 나간다.
+        video = self._repository.get(command.video_id)
+        if video is None or not (
+            video.is_public or video.user_id == command.user_id
+        ):
+            raise ApiError(404, "VIDEO_NOT_FOUND", "클립을 찾을 수 없습니다.")
+
+        cached = self._cache.get(command.video_id)
+        if cached is not None:
+            return VideoPosterResult(jpeg=cached, cached=True)
+
+        url, _ = self._storage.create_download_url(video.storage_key)
+        jpeg = self._poster.capture(url)
+        if jpeg is None:
+            # 못 뜨는 영상이 있다(형식·길이). 화면은 자리표시를 그린다.
+            raise ApiError(404, "POSTER_NOT_AVAILABLE", "장면을 뜰 수 없습니다.")
+        self._cache.put(command.video_id, jpeg)
+        return VideoPosterResult(jpeg=jpeg, cached=False)
 
 
 class GetFeaturedVideoInteractor(GetFeaturedVideoUseCase):
