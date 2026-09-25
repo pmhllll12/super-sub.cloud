@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/sport/current_sport.dart';
 import '../data/auth_providers.dart';
+import '../data/auth_repository.dart';
 import '../data/google_id_token.dart';
 import '../data/models/app_user.dart';
 
@@ -39,6 +42,36 @@ class SessionController extends Notifier<SessionState> {
     state = session == null
         ? const SessionLoggedOut()
         : SessionLoggedIn(session.user);
+
+    /* 🔴 **기기에 남은 값으로 먼저 그리고, 서버 값은 뒤따라 온다**
+       (2026-09-25). 복원이 `GET /me` 를 기다리던 때는 인사말·손·카드가
+       서버 왕복만큼 비어 있었다 — 사용자가 짚은 그 증상이다.
+       ⚠️ **기다리지 않는다**(`await` 없음) — 기다리면 고친 의미가 없다. */
+    if (session != null) unawaited(_refreshInBackground());
+  }
+
+  /// 캐시로 띄운 뒤 서버 값으로 덮는다.
+  ///
+  /// 🔴 **여기가 「죽은 토큰이 드러나는」 자리다.** 저장한 사용자를 믿고 띄웠는데
+  /// 토큰이 만료·폐기됐으면, 이 호출이 `UNAUTHORIZED`·`INVALID_TOKEN` 을 받고
+  /// **그때 로그아웃시킨다.** 이것이 없으면 로그인된 것처럼 보이다가 모든 칸이
+  /// 조용히 비는 상태가 된다.
+  ///
+  /// 🔴 **그 둘이 아닌 실패로는 로그아웃하지 않는다** — 비행기 모드나 서버가
+  /// 잠깐 죽은 것으로 사람을 내보내면, 지하철에서 앱을 켰다는 이유로 다시
+  /// 로그인하게 만드는 셈이다(리포지토리의 같은 규칙과 짝이다).
+  Future<void> _refreshInBackground() async {
+    try {
+      await refreshMe();
+    } on AuthException catch (e) {
+      if (e.code != 'UNAUTHORIZED' && e.code != 'INVALID_TOKEN') return;
+      await ref.read(authRepositoryProvider).logout();
+      if (!ref.mounted) return;
+      ref.read(currentSportProvider.notifier).clear();
+      state = const SessionLoggedOut();
+    } catch (_) {
+      // 끊긴 것뿐이다 — 캐시로 띄운 화면을 그대로 둔다.
+    }
   }
 
   Future<void> login(String email, String password) async {

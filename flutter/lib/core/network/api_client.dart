@@ -88,8 +88,18 @@ class ApiClient {
     await _tokens.write(token);
   }
 
+  /// 마지막으로 받은 `GET /me` 본문 그대로 — 없으면 `null`.
+  ///
+  /// 🔴 **인사말이 서버를 안 기다리게 하려는 것이다**(2026-09-25). 자세한
+  /// 까닭은 [TokenStore.readProfile] 머리말.
+  Future<String?> loadProfile() => _tokens.readProfile();
+
+  /// 받은 본문을 기기에 남긴다. 🔴 **못 남겨도 실패로 만들지 않는다** —
+  /// 다음에 켤 때 한 번 더 기다릴 뿐이다.
+  Future<void> saveProfile(String json) => _tokens.writeProfile(json);
+
   /// 🔴 저장소에서도 지운다 — 안 지우면 다음에 켤 때 로그아웃한 계정으로
-  /// 되돌아간다.
+  /// 되돌아간다. ([TokenStore.clear] 가 **프로필까지** 함께 지운다.)
   Future<void> clearToken() async {
     _token = null;
     /* 🔴 캐시한 읽기도 버린다 — 안 버리면 로그아웃 뒤에도 [_ensureLoaded] 가
