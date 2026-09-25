@@ -1,6 +1,7 @@
 import '../match_prefs.dart';
 import '../match_prefs_server.dart';
 import 'models/match_candidate.dart';
+import 'models/open_match.dart';
 import 'models/review_option.dart';
 
 /// 팀 매칭 — 경기 조건(계약 3-13절) · 「맞는 상대」 · 팀 대 팀 신청(3-15절).
@@ -23,6 +24,26 @@ abstract class MatchRepository {
   /// 🔴 끝이 시작보다 빠르면 서버가 422 로 막는다 — 뒤집힌 시간은 겹침
   /// 계산에서 늘 거짓이라 **조용히 아무것도 안 걸리는** 사고가 난다.
   Future<void> saveTeamPrefs(String teamId, MatchPrefs prefs);
+
+  /// **내** 경기 조건 — `GET /me/match-preferences`. 아직 안 정했으면 `null`.
+  ///
+  /// 🔴 **팀 조건과 저장소가 다르다**(계약 3-13절) — 같은 사람이 팀장이면서
+  /// 팀원일 수 있어 **절대 안 섞는다.**
+  Future<MatchPrefs?> myPrefs();
+
+  /// 내 조건을 저장한다 — **통째로 교체**다.
+  ///
+  /// 🔴 **여기에만 포지션이 있다.** 여기 올린 자리가 곧 남의 AI 추천 판에
+  /// 뜨는 첫 하드 필터다 — 안 올리면 남의 추천에 안 뜬다(계약).
+  Future<void> saveMyPrefs(MatchPrefs prefs);
+
+  /// **사람을 찾는 경기들** — `GET /matches`.
+  ///
+  /// 🔴 **다가오는 것만, 이른 것이 앞에** 온다(계약).
+  /// 🔴 **없는 종목은 422 다** — 빈 배열로 답하면 오타와 「그 종목 경기가
+  /// 없다」가 같아 보여, 사용자가 없는 것을 계속 기다린다.
+  /// ⚠️ 지역은 자유 문자열이라 검증할 대상이 없다 — 안 걸리면 빈 목록이다.
+  Future<List<OpenMatch>> openMatches({String? sportCode, String? region});
 
   /// 「맞는 상대」 후보 — **서버가 이미 정렬한 순서 그대로**.
   Future<List<MatchCandidate>> candidates(String teamId);
@@ -47,6 +68,22 @@ abstract class MatchRepository {
   /// 답을 안 할 때 그 팀이 **영영 잠긴 채**로 남는다 — 실기기에서 실제로
   /// 셋이 그렇게 묶였다(2026-09-25).
   Future<void> cancelRequest(String teamId, {required String requestId});
+
+  /// **받은** 신청을 수락 — `POST …/match-requests/{id}/accept`.
+  ///
+  /// 🔴 **대상 팀 주장만.** 수락되는 순간 **두 팀 각각의 다른 `pending` 이
+  /// 전부 `cancelled` 로 정리된다**(계약 3-15절 「동시 확정 방지」) — 한 팀이
+  /// 여러 곳에 걸려 있다가 둘 다 수락되는 이중 예약을 막는다.
+  ///
+  /// 🔴 **웹과 앱을 잇는 자리다** — 앱에서 수락한 것이 웹에 뜨는 길이 이것
+  /// 하나뿐이다(2026-09-25 사용자 요청).
+  Future<TeamMatchRequest> acceptRequest(
+    String teamId, {
+    required String requestId,
+  });
+
+  /// **받은** 신청을 거절 — `POST …/match-requests/{id}/reject`.
+  Future<void> rejectRequest(String teamId, {required String requestId});
 
   /// 평가 항목 — `GET /review-options`.
   ///

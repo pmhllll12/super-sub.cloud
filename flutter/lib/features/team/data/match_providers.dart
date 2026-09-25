@@ -9,6 +9,7 @@ import 'match_repository.dart';
 import 'match_repository_api.dart';
 import 'match_repository_mock.dart';
 import 'models/match_candidate.dart';
+import 'models/open_match.dart';
 
 /// 🔴 **백엔드 교체 지점.**
 ///
@@ -56,6 +57,54 @@ final liveRequestsProvider =
           r.targetTeamId: r,
     };
   },
+  retry: (_, _) => null,
+);
+
+/* 🔴 **「지금 잡혀 있는 경기」는 여기 없다.** 알림함(`inbox_providers.dart`)이
+   같은 값을 들고 있고, **그 판단은 `isLiveConfirmed` 한 곳**이어야 한다 —
+   두 곳에서 따로 하면 한쪽이 끈 것을 다른 쪽이 켠다(웹이 세 번 신고받은
+   자리다). 한때 여기에도 뒀다가 걷었다. */
+
+/// **내** 경기 조건. 🔴 **팀 조건과 저장소가 다르다**(계약 3-13절) —
+/// 같은 사람이 팀장이면서 팀원일 수 있어 절대 안 섞는다.
+final myPrefsProvider = FutureProvider<MatchPrefs?>(
+  (ref) => ref.watch(matchRepositoryProvider).myPrefs(),
+  retry: (_, _) => null,
+);
+
+/// 포지션 목록(약칭 + id). 「내 자리」 칸이 쓴다.
+final matchPositionsProvider = FutureProvider<List<RefItem>>(
+  (ref) => ref.watch(matchRepositoryProvider).positions('football'),
+  retry: (_, _) => null,
+);
+
+/// 무엇으로 좁혀 보는가 — `null` 이면 전체다.
+class OpenMatchQuery {
+  const OpenMatchQuery({this.sportCode, this.region});
+
+  final String? sportCode;
+  final String? region;
+
+  @override
+  bool operator ==(Object other) =>
+      other is OpenMatchQuery &&
+      other.sportCode == sportCode &&
+      other.region == region;
+
+  @override
+  int get hashCode => Object.hash(sportCode, region);
+}
+
+/// **사람을 찾는 경기들.**
+///
+/// 🔴 **거르는 것은 서버다** — 받아 놓고 화면에서 거르면 다음 쪽을 못
+/// 가져온다(목록이 페이지로 온다). 그래서 조건이 열쇠에 들어간다.
+final openMatchesProvider =
+    FutureProvider.family<List<OpenMatch>, OpenMatchQuery>(
+  (ref, q) => ref.watch(matchRepositoryProvider).openMatches(
+        sportCode: q.sportCode,
+        region: q.region,
+      ),
   retry: (_, _) => null,
 );
 

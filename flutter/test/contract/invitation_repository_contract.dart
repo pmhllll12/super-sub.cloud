@@ -46,6 +46,41 @@ void runInvitationRepositoryContract(
       expect(inv.isPending, isTrue);
     });
 
+    /// 🔴 **받은 쪽에서 읽고 답할 수 있어야 한다** (2026-09-25 사용자:
+    /// 「웹이든 앱이든 알림오는거 똑같이 있어야 하고 ... 진짜로 서로
+    /// 연결되어있어야」). 이게 없으면 웹에서 보낸 초대를 앱에서 못 받는다.
+    test('나에게 온 초대를 읽는다', () async {
+      final mine = await repo.myInvitations();
+
+      expect(mine, isNotEmpty);
+      expect(mine.every((i) => i.isPending), isTrue,
+          reason: '아직 답 안 한 것만 온다(계약)');
+    });
+
+    /// 🔴 **팀 이름이 함께 와야 한다** — 팀 id 하나로는 어느 팀의 초대인지
+    /// 판단할 수가 없다(계약이 그래서 네 칸을 더 준다).
+    test('받은 초대에는 팀 이름이 실려 있다', () async {
+      final mine = await repo.myInvitations();
+
+      expect(mine.first.teamName, isNotEmpty);
+    });
+
+    test('받은 초대를 수락하면 목록에서 빠진다', () async {
+      final first = (await repo.myInvitations()).first;
+
+      await repo.acceptInvitation(first.id);
+
+      expect((await repo.myInvitations()).any((i) => i.id == first.id), isFalse);
+    });
+
+    test('받은 초대를 거절해도 목록에서 빠진다', () async {
+      final first = (await repo.myInvitations()).first;
+
+      await repo.rejectInvitation(first.id);
+
+      expect((await repo.myInvitations()).any((i) => i.id == first.id), isFalse);
+    });
+
     test('남의 팀 이름으로는 못 부른다', () async {
       await expectLater(
         repo.invite(foreignTeamId, userId: userId, positionCode: 'DF'),

@@ -43,6 +43,49 @@ class MockInvitationRepository implements InvitationRepository {
     );
   }
 
+  /* 🔴 **나에게 온 초대 하나를 둔다** — 목업으로 화면을 볼 때 「초대를
+     받았다」 갈래를 밟을 길이 그것뿐이다. */
+  final List<TeamInvitation> _mine = [
+    const TeamInvitation(
+      id: 'demo-recv-1',
+      teamId: 't-bears',
+      invitedUserId: 'u-me',
+      status: 'pending',
+      positionCode: 'MF',
+      positionLabel: '미드필더',
+      teamName: '베어스 (mock)',
+      teamRegion: '서울 송파구',
+    ),
+  ];
+
+  @override
+  Future<List<TeamInvitation>> myInvitations() async {
+    await Future<void>.delayed(_delay);
+    return List.of(_mine);
+  }
+
+  @override
+  Future<void> acceptInvitation(String invitationId) async {
+    await Future<void>.delayed(_delay);
+    _answer(invitationId);
+  }
+
+  @override
+  Future<void> rejectInvitation(String invitationId) async {
+    await Future<void>.delayed(_delay);
+    _answer(invitationId);
+  }
+
+  /// 🔴 **답한 것은 목록에서 빠진다**(계약: 아직 답 안 한 것만 온다).
+  void _answer(String id) {
+    final i = _mine.indexWhere((v) => v.id == id);
+    if (i < 0) {
+      throw const ApiException('없는 초대입니다',
+          code: 'INVITATION_NOT_FOUND', status: 404);
+    }
+    _mine.removeAt(i);
+  }
+
   static const _label = {
     'FW': '공격수',
     'MF': '미드필더',

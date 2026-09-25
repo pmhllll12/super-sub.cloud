@@ -94,4 +94,17 @@ class DemoInvitationRepository implements InvitationRepository {
       positionCode: positionCode,
     );
   }
+
+  /* 🔴 **받은 쪽은 흘려보낸다** — 가짜는 **부르는 쪽**만 가로챈다. 나에게
+     온 초대는 진짜 서버 것이어야 웹과 이어진다. */
+  @override
+  Future<List<TeamInvitation>> myInvitations() => _inner.myInvitations();
+
+  @override
+  Future<void> acceptInvitation(String invitationId) =>
+      _inner.acceptInvitation(invitationId);
+
+  @override
+  Future<void> rejectInvitation(String invitationId) =>
+      _inner.rejectInvitation(invitationId);
 }

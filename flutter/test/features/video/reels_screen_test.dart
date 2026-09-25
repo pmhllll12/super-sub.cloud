@@ -8,6 +8,7 @@ import 'package:super_sub/core/dev/data_source.dart';
 import 'package:super_sub/core/mock/mock_db.dart';
 import 'package:super_sub/core/router/app_router.dart';
 import 'package:super_sub/features/auth/data/auth_providers.dart';
+import 'package:super_sub/features/team/data/inbox_providers.dart';
 import 'package:super_sub/features/auth/data/auth_repository_mock.dart';
 import 'package:super_sub/features/auth/presentation/session_controller.dart';
 import 'package:super_sub/features/intro/presentation/intro_gate.dart';
@@ -46,6 +47,10 @@ Future<ProviderContainer> _pumpReel(WidgetTester tester, String videoId) async {
   final container = ProviderContainer(
     overrides: [
       introEnabledProvider.overrideWithValue(false),
+      /* 🔴 **알림함은 고정값으로 덮는다** — 진짜 것은 15초 타이머를 들고
+         있어서, 살려 두면 「위젯 트리를 버린 뒤에도 타이머가 남았다」로
+         깨진다(홈·라우터 시험과 같은 까닭). */
+      inboxProvider.overrideWith((ref) => Stream.value(const Inbox())),
       authRepositoryProvider.overrideWith(
         (ref) => MockAuthRepository(ref.watch(mockDbProvider)),
       ),

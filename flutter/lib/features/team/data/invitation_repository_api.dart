@@ -23,4 +23,22 @@ class ApiInvitationRepository implements InvitationRepository {
           'position_code': ?positionCode,
         }),
       );
+
+  @override
+  Future<List<TeamInvitation>> myInvitations() async =>
+      (await _api.getList('/me/invitations'))
+          .map(TeamInvitation.fromJson)
+          .toList();
+
+  @override
+  Future<void> acceptInvitation(String invitationId) => _api.post(
+        '/me/invitations/${Uri.encodeComponent(invitationId)}/accept',
+        null,
+      );
+
+  @override
+  Future<void> rejectInvitation(String invitationId) => _api.post(
+        '/me/invitations/${Uri.encodeComponent(invitationId)}/reject',
+        null,
+      );
 }

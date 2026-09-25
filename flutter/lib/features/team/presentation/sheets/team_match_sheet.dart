@@ -352,6 +352,10 @@ class _CandidateListState extends ConsumerState<_CandidateList> {
                       team: list[i],
                       request: live[list[i].teamId],
                       onCancel: _cancel,
+                      /* 🔴 **잡힌 경기는 거기서 끝이 아니다**(2026-09-25
+                         사용자 요청). 누르면 그 신청을 돌려주고, 부르는 쪽이
+                         경기 화면을 연다 — 신청 직후와 **같은 길**이다. */
+                      onOpenMatch: (r) => Navigator.of(context).pop(r),
                       open: _open == list[i].teamId,
                       proposals: proposals,
                       venues: venues,
@@ -429,6 +433,7 @@ class _CandidateRow extends StatelessWidget {
     required this.team,
     required this.request,
     required this.onCancel,
+    required this.onOpenMatch,
     required this.open,
     required this.proposals,
     required this.venues,
@@ -455,6 +460,9 @@ class _CandidateRow extends StatelessWidget {
 
   /// 걸어 둔 신청을 무른다.
   final ValueChanged<String> onCancel;
+
+  /// 이미 잡힌 경기를 연다.
+  final ValueChanged<TeamMatchRequest> onOpenMatch;
   final ValueChanged<Proposal> onWhen;
   final ValueChanged<Venue> onWhere;
   final VoidCallback onApply;
@@ -509,9 +517,14 @@ class _CandidateRow extends StatelessWidget {
                   final r when r.isAccepted => '경기가 잡혔습니다',
                   _ => '수락 대기중',
                 },
-                onTap: request == null ? onToggle : null,
+                onTap: switch (request) {
+                  null => onToggle,
+                  final r when r.isAccepted => () => onOpenMatch(r),
+                  // 아직 답을 기다리는 중 — 누를 것이 없다(아래 「신청 취소」).
+                  _ => null,
+                },
                 onBox: true,
-                dim: request != null,
+                dim: request != null && !request!.isAccepted,
               ),
               /* 🔴 **건 쪽이 무를 수 있어야 한다**(2026-09-25 사용자 요청).
                  상대가 답을 안 하면 그 팀이 **영영 잠긴 채**로 남는다.

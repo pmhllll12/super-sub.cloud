@@ -15,6 +15,9 @@ import 'package:super_sub/core/dev/data_source.dart';
 import 'package:super_sub/features/auth/presentation/session_controller.dart';
 import 'package:super_sub/features/home/presentation/screens/home_screen.dart';
 import 'package:super_sub/features/home/presentation/widgets/home_video_strip.dart';
+import 'package:super_sub/features/team/data/inbox_providers.dart';
+import 'package:super_sub/features/team/data/models/contact.dart';
+import 'package:super_sub/features/team/data/models/team_invitation.dart';
 import 'package:super_sub/features/team/data/squad_providers.dart';
 import 'package:super_sub/features/profile/presentation/widgets/player_card_view.dart';
 
@@ -67,6 +70,12 @@ Future<ProviderContainer> _pumpLoggedIn(
          따라 결과가 흔들린다. 교체 지점이 `useMockProvider` 하나라서 여기만
          덮으면 둘 다 따라온다. */
       useMockProvider.overrideWith(() => _AlwaysMock()),
+      /* 🔴 **알림함은 고정값으로 덮는다.** 진짜 것은 15초 타이머를 들고
+         있어서, 그걸 살려 두면 이 파일의 모든 시험이 「위젯 트리를 버린
+         뒤에도 타이머가 남았다」로 깨진다 — 여기서 볼 것은 **종이 값을
+         그리는가**이지 폴링이 도는가가 아니다(그쪽은
+         `inbox_sheet_test.dart`). */
+      inboxProvider.overrideWith((ref) => Stream.value(_kInboxSeed)),
     ],
   );
   addTearDown(container.dispose);
@@ -157,6 +166,20 @@ Finder _blankSeats() => find.byWidgetPredicate(
           (w.key! as ValueKey<String>).value.startsWith('squad-add-'),
     );
 
+/// 받은 것 둘 — 종에 수가 붙는 갈래를 밟는다.
+const _kInboxSeed = Inbox(
+  invitations: [
+    TeamInvitation(
+      id: 'inv-1',
+      teamId: 't-bears',
+      invitedUserId: 'u-me',
+      status: 'pending',
+      teamName: '베어스',
+    ),
+  ],
+  contactRequests: [ContactRequest(id: 'ct-1', requesterUserId: 'u-x')],
+);
+
 class _AlwaysMock extends DataSourceController {
   @override
   bool build() => true;
@@ -219,12 +242,12 @@ void main() {
       await _pumpLoggedIn(tester);
       await tester.tap(find.byKey(const Key('home-role-member')), warnIfMissed: false);
       await tester.pump();
-      expect(find.text('사람을 구하는 팀'), findsNothing);
+      expect(find.text('사람을 찾는 팀'), findsNothing);
 
       await openSheet(tester);
       await tester.tap(find.byKey(const Key('home-role-member')));
       await tester.pump();
-      expect(find.text('사람을 구하는 팀'), findsOneWidget);
+      expect(find.text('사람을 찾는 팀'), findsOneWidget);
     });
 
     testWidgets('접혀 있을 때는 판이 안 눌린다', (tester) async {
@@ -592,7 +615,54 @@ void main() {
       expect(find.textContaining('자리를 다 채워'), findsOneWidget);
     });
 
-    testWidgets('팀원을 고르면 판 자리에 팀 목록 자리가 선다', (tester) async {
+
+    /// 🔴 **받은 것은 화면 밖에서 온다** (2026-09-25 사용자: 「알림이라도
+    /// 다시 오든가 해야지 ... 진짜로 서로 연결되어있어야 한다고」). 어느
+    /// 화면을 열어 두고 있어야만 알 수 있으면, 닫고 나간 사이에 온 것을
+    /// 영영 모른다 — 웹에서 보낸 것도 마찬가지다.
+    /// 🔴 **알림은 이미 있던 지름길 알약이 연다** (2026-09-25 사용자:
+    /// 「내가 홈 페이지에 가운데 버튼 3개 중에 맨 오른쪽 알림 버튼
+    /// 만들었잖아. 거기에 뜨게 해야지 왜 따로 만들어」).
+    /// ⚠️ 머리칸에 따로 만들었던 종은 **걷었다** — 같은 것이 둘이면
+    /// 어느 쪽이 진짜인지 모른다.
+    testWidgets('머리칸에 따로 만든 종은 없다', (tester) async {
+      await _pumpLoggedIn(tester);
+      for (var i = 0; i < 4; i++) {
+        await tester.pump(const Duration(milliseconds: 500));
+      }
+
+      expect(find.byKey(const Key('home-inbox')), findsNothing);
+      expect(find.byKey(const Key('home-shortcut-alarm')), findsOneWidget);
+    });
+
+    /// 🔴 **답해야 할 것이 있으면 수를 적는다** — 종만 있으면 눌러 봐야 안다.
+    /// 🔴 **받은 것이 있으면 그 알약에 수가 붙는다** — 눌러 봐야 아는 것은
+    /// 알림이 아니다.
+    /// ⚠️ **판을 펼치지 않는다** — 지름길 알약은 판이 올라오면 걷힌다.
+    testWidgets('알림 알약에 수가 붙는다', (tester) async {
+      await _pumpLoggedIn(tester);
+
+      expect(find.byKey(const Key('home-inbox-count')), findsOneWidget);
+      // 시드는 초대 하나 + 지인 신청 하나다.
+      expect(find.text('2'), findsOneWidget);
+    });
+
+    testWidgets('알림 알약을 누르면 알림함이 열린다', (tester) async {
+      await _pumpLoggedIn(tester);
+
+      await tester.tap(find.byKey(const Key('home-shortcut-alarm')));
+      await tester.pump();
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 500));
+      }
+
+      expect(find.textContaining('베어스'), findsWidgets);
+    });
+
+    /// 🔴 **2026-09-25에 진짜가 됐다** — 전에는 「준비 중」 자리였다.
+    /// 누르면 `GET /matches`(팀 없이 갈 수 있는 유일한 경로)로 사람을 찾는
+    /// 팀들을 연다.
+    testWidgets('팀원을 고르면 사람을 찾는 팀 자리가 선다', (tester) async {
       await _pumpLoggedIn(tester);
       // 알약은 판을 펼쳐야 눌린다.
       await tester.tap(find.byKey(const Key('home-squad-handle')));
@@ -603,7 +673,7 @@ void main() {
       await tester.tap(find.byKey(const Key('home-role-member')));
       await tester.pump();
       expect(find.text('MY SQUAD'), findsNothing);
-      expect(find.text('사람을 구하는 팀'), findsOneWidget);
+      expect(find.text('사람을 찾는 팀'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('home-role-captain')));
       await tester.pump();

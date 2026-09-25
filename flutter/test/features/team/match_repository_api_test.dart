@@ -26,8 +26,21 @@ Map<String, dynamic> lastPrefsBody = {};
 ApiMatchRepository buildRepo() {
   // 팀별로 저장된 조건. t-bears 는 **비워 둔다**(「아직 안 정한 팀」 갈래).
   final prefs = <String, Map<String, dynamic>>{};
-  final requests = <Map<String, dynamic>>[];
+  final requests = <Map<String, dynamic>>[
+    // 🔴 나에게 온 신청 하나 — 받은 쪽에서 답하는 갈래.
+    {
+      'id': 'tmr-incoming',
+      'requester_team_id': 't-bears',
+      'target_team_id': 't-thunder',
+      'status': 'pending',
+      'proposed_played_at': '2026-10-05T11:00:00+09:00',
+      'proposed_place': '영등포공원 풋살경기장',
+      'match_id': null,
+      'requester_team_name': '베어스',
+    },
+  ];
   final reviewed = <String>{};
+  Map<String, dynamic>? minePrefs;
 
   final client = MockClient((req) async {
     final path = req.url.path;
@@ -46,6 +59,47 @@ ApiMatchRepository buildRepo() {
         {'id': 'p-mf', 'sport_code': 'football', 'code': 'MF', 'label': '미드필더'},
         {'id': 'p-gk', 'sport_code': 'football', 'code': 'GK', 'label': '골키퍼'},
       ]);
+    }
+
+    // 내 조건 — 🔴 팀 조건과 **다른 통**이다(계약: 절대 안 섞는다).
+    if (path.endsWith('/me/match-preferences')) {
+      if (req.method == 'PUT') {
+        minePrefs = body;
+        return ok(body);
+      }
+      return ok(minePrefs ??
+          const {'region_ids': [], 'slots': [], 'position_ids': []});
+    }
+
+    if (path.endsWith('/matches')) {
+      final sport = req.url.queryParameters['sport_code'];
+      if (sport != null && sport != 'football') {
+        return err('UNKNOWN_SPORT', 422);
+      }
+      final region = req.url.queryParameters['region'];
+      final rows = [
+        {
+          'id': 'om-1',
+          'team_id': 't-bears',
+          'team_name': '베어스',
+          'region': '서울 송파구',
+          'sport_code': 'football',
+          'played_at': '2026-10-02T19:00:00Z',
+          'place': '잠실 풋살장',
+          'needs': [
+            {'position_code': 'GK', 'position_label': '골키퍼', 'head_count': 1},
+          ],
+        },
+      ];
+      return ok({
+        'items': [
+          for (final r in rows)
+            if (region == null || (r['region']! as String).contains(region)) r,
+        ],
+        'total': 1,
+        'page': 1,
+        'size': 20,
+      });
     }
 
     if (path.contains('/match-preferences')) {
@@ -111,6 +165,21 @@ ApiMatchRepository buildRepo() {
     }
 
     if (path.contains('/match-requests')) {
+      for (final verb in ['accept', 'reject']) {
+        if (!path.endsWith('/$verb')) continue;
+        final id = path.split('/match-requests/')[1].replaceAll('/$verb', '');
+        final i = requests.indexWhere((r) => r['id'] == id);
+        if (i < 0) return err('TEAM_MATCH_REQUEST_NOT_FOUND', 404);
+        if (requests[i]['status'] != 'pending') {
+          return err('TEAM_MATCH_REQUEST_ALREADY_RESPONDED', 409);
+        }
+        requests[i] = {
+          ...requests[i],
+          'status': verb == 'accept' ? 'accepted' : 'rejected',
+          if (verb == 'accept') 'match_id': 'm-$id',
+        };
+        return ok(requests[i]);
+      }
       if (req.method == 'DELETE') {
         final id = path.split('/match-requests/')[1];
         final i = requests.indexWhere((r) => r['id'] == id);
@@ -159,6 +228,7 @@ void main() {
     myTeamId: 't-thunder',
     teamWithoutPrefs: 't-bears',
     knownRegion: '서울 강남구',
+    incomingId: 'tmr-incoming',
   );
 
   group('ApiMatchRepository 고유 규칙', () {

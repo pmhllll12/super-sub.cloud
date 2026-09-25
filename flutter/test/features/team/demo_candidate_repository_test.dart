@@ -29,6 +29,13 @@ class _RealInvites implements InvitationRepository {
   final sent = <String>[];
 
   @override
+  Future<List<TeamInvitation>> myInvitations() async => const [];
+  @override
+  Future<void> acceptInvitation(String id) async {}
+  @override
+  Future<void> rejectInvitation(String id) async {}
+
+  @override
   Future<TeamInvitation> invite(
     String teamId, {
     required String userId,

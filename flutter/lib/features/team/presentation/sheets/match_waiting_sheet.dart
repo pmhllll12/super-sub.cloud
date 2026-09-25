@@ -111,7 +111,13 @@ class _MatchWaitingSheetState extends ConsumerState<_MatchWaitingSheet> {
           : _reviewing
               ? _ReviewPane(
                   matchId: req.matchId!,
-                  opponents: _opponents(req),
+                  /* 🔴 **우리 팀도 평가한다**(2026-09-25 사용자 요청) —
+                     같이 뛴 사람은 상대만이 아니다. 나는 뺀다(자기 평가는
+                     계약도 422 `SELF_REVIEW` 로 막는다). */
+                  groups: [
+                    (widget.ourTeamName, _ourMates()),
+                    (req.targetTeamName, _opponents(req)),
+                  ],
                   onDone: () => Navigator.of(context).pop(),
                 )
               : _MatchPane(
@@ -148,6 +154,19 @@ class _MatchWaitingSheetState extends ConsumerState<_MatchWaitingSheet> {
       style: card.style,
       photoUrl: card.photoUrl,
     );
+  }
+
+  /// 우리 팀에서 **나 말고** 같이 뛴 사람들.
+  ///
+  /// 🔴 **나는 뺀다** — 자기 평가는 계약이 422 `SELF_REVIEW` 로 막는다.
+  List<String> _ourMates() {
+    final seats = seatsFromSquad(
+      widget.ourSquad,
+      squadSizeOf(widget.ourSquad?.formation),
+    );
+    return [
+      for (final s in seats.slots) ?seats.mates[s.area],
+    ];
   }
 
   /// 상대 팀 판 — 슬러그가 있으면 읽어 온다.
@@ -281,12 +300,14 @@ class _When extends StatelessWidget {
 class _ReviewPane extends ConsumerStatefulWidget {
   const _ReviewPane({
     required this.matchId,
-    required this.opponents,
+    required this.groups,
     required this.onDone,
   });
 
   final String matchId;
-  final List<String> opponents;
+
+  /// (팀 이름, 그 팀에서 같이 뛴 사람들) — 우리 팀이 먼저다.
+  final List<(String, List<String>)> groups;
   final VoidCallback onDone;
 
   @override
@@ -296,6 +317,12 @@ class _ReviewPane extends ConsumerStatefulWidget {
 class _ReviewPaneState extends ConsumerState<_ReviewPane> {
   /// 상대 한 명마다 고른 항목들.
   final Map<String, Set<String>> _picked = {};
+
+  /// 지금 **펼쳐 둔 사람.** 🔴 한 번에 하나만 연다 (2026-09-25 사용자 요청:
+  /// 「사람 판마다 리뷰 버튼 다 처음부터 보여주지말고」) — 다섯 명 × 아홉
+  /// 항목이 한꺼번에 펼쳐지면 무엇을 고르는 중인지 잃는다.
+  String? _open;
+
   List<ReviewOption>? _options;
   bool _sending = false;
 
@@ -322,20 +349,39 @@ class _ReviewPaneState extends ConsumerState<_ReviewPane> {
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Text(
-            '같이 뛴 사람을 골라 평가해 주세요.',
+            '같이 뛴 사람을 눌러 평가해 주세요.',
             style: TextStyle(color: kSheetOnDim, fontSize: 13),
           ),
         ),
-        for (final who in widget.opponents)
-          _ReviewRow(
-            who: who,
-            options: options,
-            picked: _picked[who] ?? const {},
-            onToggle: (code) => setState(() {
-              final set = _picked.putIfAbsent(who, () => <String>{});
-              set.contains(code) ? set.remove(code) : set.add(code);
-            }),
-          ),
+        for (final (team, people) in widget.groups) ...[
+          if (people.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.only(top: 4, bottom: 8, left: 4),
+              child: Text(
+                team,
+                style: TextStyle(
+                  color: kSheetOn.withValues(alpha: 0.55),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ),
+            for (final who in people)
+              _ReviewRow(
+                who: who,
+                options: options,
+                open: _open == who,
+                picked: _picked[who] ?? const {},
+                onToggleOpen: () =>
+                    setState(() => _open = _open == who ? null : who),
+                onToggle: (code) => setState(() {
+                  final set = _picked.putIfAbsent(who, () => <String>{});
+                  set.contains(code) ? set.remove(code) : set.add(code);
+                }),
+              ),
+          ],
+        ],
         const SizedBox(height: 6),
         _PrimaryButton(
           label: _sending ? '보내는 중…' : '평가 보내기',
@@ -375,18 +421,22 @@ class _ReviewRow extends StatelessWidget {
   const _ReviewRow({
     required this.who,
     required this.options,
+    required this.open,
     required this.picked,
+    required this.onToggleOpen,
     required this.onToggle,
   });
 
   final String who;
   final List<ReviewOption> options;
+  final bool open;
   final Set<String> picked;
+  final VoidCallback onToggleOpen;
   final ValueChanged<String> onToggle;
 
   @override
   Widget build(BuildContext context) => Container(
-        margin: const EdgeInsets.only(bottom: 10),
+        margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: kSheetBox,
@@ -395,28 +445,59 @@ class _ReviewRow extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              who,
-              style: const TextStyle(
-                color: kSheetBoxInk,
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
+            GestureDetector(
+              onTap: onToggleOpen,
+              behavior: HitTestBehavior.opaque,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      who,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: kSheetBoxInk,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  // 몇 개 골랐는지 — 접혀 있어도 고른 것이 있다는 게 보인다.
+                  if (picked.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Text(
+                        '${picked.length}개',
+                        style: const TextStyle(
+                          color: kSheetGreen,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  Icon(
+                    open ? Icons.expand_less : Icons.expand_more,
+                    size: 20,
+                    color: kSheetBoxInk.withValues(alpha: 0.5),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                // 🔴 **순서를 건드리지 않는다** — 서버가 준 그대로다(계약).
-                for (final o in options)
-                  _OptionChip(
-                    option: o,
-                    on: picked.contains(o.code),
-                    onTap: () => onToggle(o.code),
-                  ),
-              ],
-            ),
+            if (open) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  // 🔴 **순서를 건드리지 않는다** — 서버가 준 그대로다(계약).
+                  for (final o in options)
+                    _OptionChip(
+                      option: o,
+                      on: picked.contains(o.code),
+                      onTap: () => onToggle(o.code),
+                    ),
+                ],
+              ),
+            ],
           ],
         ),
       );

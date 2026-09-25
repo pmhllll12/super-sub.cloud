@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:super_sub/features/team/data/match_providers.dart';
 import 'package:super_sub/features/team/data/match_repository.dart';
 import 'package:super_sub/features/team/data/models/match_candidate.dart';
+import 'package:super_sub/features/team/data/models/open_match.dart';
 import 'package:super_sub/features/team/data/models/review_option.dart';
 import 'package:super_sub/features/team/match_prefs.dart';
 import 'package:super_sub/features/team/match_prefs_server.dart';
@@ -29,6 +30,16 @@ class _FakeMatch implements MatchRepository {
 
   @override
   Future<MatchPrefs?> teamPrefs(String teamId) async => prefs;
+
+  // 내 조건·경기 탐색 — 이 시험이 안 쓰는 것들.
+  @override
+  Future<MatchPrefs?> myPrefs() async => null;
+  @override
+  Future<void> saveMyPrefs(MatchPrefs p) async {}
+  @override
+  Future<List<OpenMatch>> openMatches({String? sportCode, String? region}) async =>
+      const [];
+
 
   @override
   Future<void> saveTeamPrefs(String teamId, MatchPrefs p) async {
@@ -88,6 +99,16 @@ class _FakeMatch implements MatchRepository {
   @override
   Future<List<TeamMatchRequest>> requests(String teamId) async => live;
 
+  // 받은 쪽 — 이 시험이 안 쓰는 것들.
+  @override
+  Future<TeamMatchRequest> acceptRequest(String teamId,
+          {required String requestId}) =>
+      throw UnimplementedError();
+  @override
+  Future<void> rejectRequest(String teamId,
+      {required String requestId}) async {}
+
+
   final cancelled = <String>[];
 
   @override
@@ -110,7 +131,11 @@ class _FakeMatch implements MatchRepository {
   }) async {}
 }
 
+/// 시트가 돌려준 신청 — 부르는 쪽이 그것으로 경기 화면을 연다.
+TeamMatchRequest? lastPick;
+
 Future<void> _open(WidgetTester tester, _FakeMatch repo) async {
+  lastPick = null;
   tester.view.physicalSize = const Size(1080, 2340);
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
@@ -122,7 +147,8 @@ Future<void> _open(WidgetTester tester, _FakeMatch repo) async {
         home: Scaffold(
           body: Builder(
             builder: (context) => ElevatedButton(
-              onPressed: () => showTeamMatchSheet(context, teamId: 't-thunder'),
+              onPressed: () async =>
+                  lastPick = await showTeamMatchSheet(context, teamId: 't-thunder'),
               child: const Text('열기'),
             ),
           ),
@@ -353,6 +379,30 @@ void _liveRequestTests() {
 
     expect(find.text('경기가 잡혔습니다'), findsOneWidget);
     expect(find.text('신청 취소'), findsNothing);
+  });
+
+  /// 🔴 **잡힌 경기는 거기서 끝이 아니다** (2026-09-25, 사용자: 「경기가
+  /// 잡혔다고 뜨는데, 뭐 그 다음 아무것도 없어?」). 누르면 그 경기 화면으로
+  /// 이어져야 한다 — 시트는 **그 신청을 돌려주고** 부르는 쪽이 연다.
+  testWidgets('잡힌 경기를 누르면 그 신청을 돌려준다', (tester) async {
+    final repo = _FakeMatch(prefs: _ready)
+      ..live = [
+        const TeamMatchRequest(
+          id: 'tmr-1',
+          requesterTeamId: 't-thunder',
+          targetTeamId: 't-gangnam',
+          status: 'accepted',
+          playedAt: '2026-10-03T11:00:00+09:00',
+          place: '강남 풋살장',
+          matchId: 'm-1',
+        ),
+      ];
+    await _open(tester, repo);
+
+    await tester.tap(find.text('경기가 잡혔습니다'));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(lastPick?.id, 'tmr-1');
   });
 
   /// 🔴 **거절·취소된 것은 안 센다** — 안 그러면 한 번 붙은 팀과 다시는 못 붙는다.

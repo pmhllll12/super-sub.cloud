@@ -3,6 +3,7 @@ import '../match_prefs.dart';
 import '../match_prefs_server.dart';
 import 'match_repository.dart';
 import 'models/match_candidate.dart';
+import 'models/open_match.dart';
 import 'models/review_option.dart';
 
 /// `fastapi/` 백엔드에 붙는 실제 구현.
@@ -57,6 +58,57 @@ class ApiMatchRepository implements MatchRepository {
   }
 
   @override
+  Future<MatchPrefs?> myPrefs() async {
+    final refs = await regions();
+    final codes = await positions('football');
+    try {
+      final body = await _api.get('/me/match-preferences');
+      final server = ServerPrefs.fromJson(body);
+      /* 🔴 **한 번도 안 정한 것과 빈 조건을 가른다** — 팀 조건과 같은 판단
+         이다(계약이 404 를 안 주고 빈 목록을 준다). */
+      if (server.regionIds.isEmpty &&
+          server.slots.isEmpty &&
+          server.positionIds.isEmpty) {
+        return null;
+      }
+      return toScreenPrefs(server, refs, positions: codes);
+    } on ApiException catch (e) {
+      if (e.status == 404) return null;
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> saveMyPrefs(MatchPrefs prefs) async {
+    final refs = await regions();
+    final codes = await positions('football');
+    await _api.put(
+      '/me/match-preferences',
+      toServerMemberPrefs(prefs, refs, codes).toJson(withPositions: true),
+    );
+  }
+
+  @override
+  Future<List<OpenMatch>> openMatches({
+    String? sportCode,
+    String? region,
+  }) async {
+    final q = Uri(queryParameters: {
+      'size': '20',
+      'sport_code': ?sportCode,
+      'region': ?region,
+    }).query;
+    /* 🔴 **`items` 로 한 겹 감싸여 온다**(페이지 형식). 배열로 읽으면
+       `type 'Map' is not a subtype of List` 로 터진다. */
+    final body = await _api.get('/matches?$q');
+    final items = (body['items'] as List?) ?? const [];
+    return items
+        .cast<Map<String, dynamic>>()
+        .map(OpenMatch.fromJson)
+        .toList();
+  }
+
+  @override
   Future<List<MatchCandidate>> candidates(String teamId) async =>
       (await _api.getList(
         '/teams/${Uri.encodeComponent(teamId)}/match-candidates',
@@ -87,6 +139,27 @@ class ApiMatchRepository implements MatchRepository {
       _api.delete(
         '/teams/${Uri.encodeComponent(teamId)}/match-requests/'
         '${Uri.encodeComponent(requestId)}',
+      );
+
+  @override
+  Future<TeamMatchRequest> acceptRequest(
+    String teamId, {
+    required String requestId,
+  }) async =>
+      TeamMatchRequest.fromJson(
+        await _api.post(
+          '/teams/${Uri.encodeComponent(teamId)}/match-requests/'
+          '${Uri.encodeComponent(requestId)}/accept',
+          null,
+        ),
+      );
+
+  @override
+  Future<void> rejectRequest(String teamId, {required String requestId}) =>
+      _api.post(
+        '/teams/${Uri.encodeComponent(teamId)}/match-requests/'
+        '${Uri.encodeComponent(requestId)}/reject',
+        null,
       );
 
   @override

@@ -13,7 +13,30 @@ import '../../contract/invitation_repository_contract.dart';
 Map<String, dynamic> lastBody = {};
 
 ApiInvitationRepository buildRepo() {
+  final mine = <Map<String, dynamic>>[
+    {
+      'id': 'recv-1',
+      'team_id': 't-bears',
+      'invited_user_id': 'u-me',
+      'status': 'pending',
+      'position_code': 'MF',
+      'position_label': '미드필더',
+      'team_name': '베어스',
+      'team_region': '서울 송파구',
+      'squad_public_slug': null,
+    },
+  ];
+
   final client = MockClient((req) async {
+    if (req.url.path.contains('/me/invitations')) {
+      final path = req.url.path;
+      if (path.endsWith('/accept') || path.endsWith('/reject')) {
+        final id = path.split('/me/invitations/')[1].split('/')[0];
+        mine.removeWhere((v) => v['id'] == id);
+        return http.Response.bytes(utf8.encode(jsonEncode({'ok': true})), 200);
+      }
+      return http.Response.bytes(utf8.encode(jsonEncode(mine)), 200);
+    }
     lastBody = req.body.isEmpty
         ? <String, dynamic>{}
         : jsonDecode(req.body) as Map<String, dynamic>;

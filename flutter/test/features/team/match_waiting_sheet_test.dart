@@ -7,6 +7,7 @@ import 'package:super_sub/features/team/data/match_repository.dart';
 import 'package:super_sub/features/team/data/squad_providers.dart';
 import 'package:super_sub/features/team/data/squad_repository.dart';
 import 'package:super_sub/features/team/data/models/match_candidate.dart';
+import 'package:super_sub/features/team/data/models/open_match.dart';
 import 'package:super_sub/features/team/data/models/review_option.dart';
 import 'package:super_sub/features/team/data/models/squad.dart';
 import 'package:super_sub/features/team/match_prefs.dart';
@@ -67,12 +68,32 @@ class _FakeMatch implements MatchRepository {
   // 이 화면이 안 쓰는 것들.
   @override
   Future<void> cancelRequest(String teamId, {required String requestId}) async {}
+
+  // 받은 쪽 — 이 시험이 안 쓰는 것들.
+  @override
+  Future<TeamMatchRequest> acceptRequest(String teamId,
+          {required String requestId}) =>
+      throw UnimplementedError();
+  @override
+  Future<void> rejectRequest(String teamId,
+      {required String requestId}) async {}
+
   @override
   Future<List<RefItem>> regions() async => const [];
   @override
   Future<List<RefItem>> positions(String s) async => const [];
   @override
   Future<MatchPrefs?> teamPrefs(String t) async => null;
+
+  // 내 조건·경기 탐색 — 이 시험이 안 쓰는 것들.
+  @override
+  Future<MatchPrefs?> myPrefs() async => null;
+  @override
+  Future<void> saveMyPrefs(MatchPrefs p) async {}
+  @override
+  Future<List<OpenMatch>> openMatches({String? sportCode, String? region}) async =>
+      const [];
+
   @override
   Future<void> saveTeamPrefs(String t, MatchPrefs p) async {}
   @override
@@ -253,6 +274,41 @@ void main() {
     expect(find.text('FW'), findsWidgets);
   });
 
+  /// 🔴 **우리 팀도 평가한다** (2026-09-25, 사용자: 「리뷰 페이지에서 우리
+  /// 팀들도 있어야 하고」). 같이 뛴 사람은 상대만이 아니다.
+  testWidgets('리뷰에 우리 팀원도 나온다', (tester) async {
+    await _open(tester, _FakeMatch());
+    await _tick(tester);
+    await tester.drag(find.byType(ListView).last, const Offset(0, -900));
+    await tester.pump();
+    await tester.tap(find.text('경기 완료'));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('정상호'), findsOneWidget);
+    expect(find.textContaining('FC 강남 선수'), findsWidgets);
+  });
+
+  /// 🔴 **항목은 그 사람을 눌러야 열린다** (같은 요청: 「사람 판마다 리뷰
+  /// 버튼 다 처음부터 보여주지말고, 그사람 누르면 리뷰 버튼 나오게」).
+  /// 다섯 명 × 아홉 항목이 한꺼번에 펼쳐지면 무엇을 고르는 중인지 잃는다.
+  testWidgets('사람을 눌러야 평가 항목이 열린다', (tester) async {
+    await _open(tester, _FakeMatch());
+    await _tick(tester);
+    await tester.drag(find.byType(ListView).last, const Offset(0, -900));
+    await tester.pump();
+    await tester.tap(find.text('경기 완료'));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('시간을 잘 지켰다'), findsNothing);
+
+    await tester.tap(find.text('정상호'));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('시간을 잘 지켰다'), findsOneWidget);
+  });
+
   testWidgets('경기 완료를 누르면 리뷰가 뜬다', (tester) async {
     await _open(tester, _FakeMatch());
     await _tick(tester);
@@ -266,7 +322,7 @@ void main() {
     // 하나 더 있다.
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.text('시간을 잘 지켰다'), findsWidgets);
+    expect(find.textContaining('평가해'), findsOneWidget);
   });
 
   /// 🔴 **하나도 안 고르면 못 낸다**(422 `NO_OPTION_SELECTED`) — 화면이 먼저
@@ -306,7 +362,9 @@ void main() {
     // 평가 항목은 그 화면이 뜬 뒤에 **비로소** 물어본다 — 답이 오는 프레임이
     // 하나 더 있다.
     await tester.pump(const Duration(milliseconds: 400));
-    await tester.tap(find.text('시간을 잘 지켰다').first);
+    await tester.tap(find.text('정상호'));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.text('시간을 잘 지켰다'));
     await tester.pump(const Duration(milliseconds: 400));
     // 상대가 다섯이라 보내기 단추는 아래에 있다 — 끌어 올려 누른다.
     await tester.drag(find.byType(ListView).last, const Offset(0, -600));

@@ -35,8 +35,11 @@ import '../../../team/data/squad_repository.dart';
 import '../../../team/optimistic_squad.dart';
 import '../../../team/seats_from_squad.dart';
 import '../../../team/presentation/sheets/seat_fill_sheet.dart';
+import '../../../team/data/inbox_providers.dart';
+import '../../../team/presentation/sheets/inbox_sheet.dart';
 import '../../../team/presentation/sheets/match_waiting_sheet.dart';
 import '../../../team/presentation/sheets/team_match_sheet.dart';
+import '../../../team/presentation/sheets/team_seek_sheet.dart';
 import '../../../team/presentation/widgets/squad_board.dart';
 import '../widgets/home_video_strip.dart';
 
@@ -400,12 +403,12 @@ const List<({Key key, IconData icon, String label})> _kShortcuts = [
     label: '레슨 · 상점',
   ),
   (key: Key('home-shortcut-venue'), icon: Symbols.stadium, label: '경기장 예약'),
-  (
-    key: Key('home-shortcut-alarm'),
-    icon: Symbols.notifications,
-    label: '알림',
-  ),
+  (key: _kAlarmKey, icon: Symbols.notifications, label: '알림'),
 ];
+
+/// 🔴 **셋 중 알림만 갈 곳이 생겼다**(2026-09-25) — 나머지 둘은 아직 웹에만
+/// 있다. 그 하나를 가려내는 열쇠다.
+const Key _kAlarmKey = Key('home-shortcut-alarm');
 
 /// 스쿼드 판 자리에 무엇을 세우는가 — 웹의 알약 「팀장」 · 「팀원」.
 enum _Role { captain, member }
@@ -1012,6 +1015,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     return '우리 팀';
   }
 
+  /// 「사람을 찾는 팀」을 연다 — 팀 없는 사람의 입구다.
+  ///
+  /// 🔴 **팀 id 를 안 쓴다.** `GET /matches` 는 팀 없이 갈 수 있는 유일한
+  /// 경로라(계약 3-4절), 팀이 없어도 여기서 경기를 찾을 수 있다.
+  void _openTeamSeek() => showTeamSeekSheet(context);
+
+  /// 답해야 할 것의 수 — 알림 알약에 붙는다.
+  int _inboxCount() => ref.watch(inboxProvider).value?.pending ?? 0;
+
+  /// 알림함을 연다 — 받은 초대·지인 신청·경기 신청에 답하는 자리.
+  void _openInbox() {
+    final session = ref.read(sessionControllerProvider);
+    showInboxSheet(
+      context,
+      teamId: session is SessionLoggedIn ? session.user.ownedTeamId : null,
+    );
+  }
+
   /// 맨 위 오른쪽의 「팀 매칭」 단추.
   ///
   /// 🔴 **팀이 없으면 아예 안 그린다** — 걸 팀이 없으면 누를 것도 없다.
@@ -1344,11 +1365,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                        내내 알약이 화면을 가로질러서 시선이 그쪽으로 끌린다. */
                     child: Opacity(
                       opacity: 1 - _shortcutExit(tc, i),
+                      /* 🔴 **알림 알약이 알림함을 연다** (2026-09-25 사용자:
+                         「가운데 버튼 3개 중에 맨 오른쪽 알림 버튼
+                         만들었잖아. 거기에 뜨게 해야지」). 이 줄의 머리말이
+                         적어 둔 「화면을 붙이는 날 `onTap` 만 갈면 된다」가
+                         이 자리다 — 나머지 둘은 아직 웹에만 있다. */
                       child: _ShortcutPill(
                         key: s.key,
                         icon: s.icon,
                         label: s.label,
-                        onTap: () => _notReady(s.label),
+                        badge: s.key == _kAlarmKey ? _inboxCount() : 0,
+                        onTap: s.key == _kAlarmKey
+                            ? _openInbox
+                            : () => _notReady(s.label),
                       ),
                     ),
                   ),
@@ -1413,6 +1442,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               opacity: fadeOut,
               child: Transform.translate(
                 offset: Offset((profileW + 24) * (1 - fadeOut), 0),
+                /* ⚠️ **여기 종을 따로 두지 않는다** (2026-09-25 정정).
+                   한 번 프로필 옆에 달았는데, 아래 지름길 줄에 **이미
+                   「알림」 알약이 있었다** — 같은 것이 둘이면 어느 쪽이
+                   진짜인지 모른다. 알림은 그 알약이 맡는다. */
                 child: _ProfileButton(card: card, onTap: _openProfile),
               ),
             ),
@@ -1787,7 +1820,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 ? (slot) => _fillSeat(ownedTeamId, slot)
                 : (_) => _notReady('선수 넣기'),
           )
-        : const _MemberPlaceholder();
+        : _MemberPanel(onOpen: _openTeamSeek);
 
     return AnimatedBuilder(
       animation: _sheet,
@@ -2141,11 +2174,16 @@ class _ShortcutPill extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.badge = 0,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+
+  /// 아이콘 위에 붙는 수. 🔴 **0 이면 아무것도 안 그린다** — 빈 배지가 더
+  /// 헷갈린다.
+  final int badge;
 
   @override
   Widget build(BuildContext context) {
@@ -2175,7 +2213,40 @@ class _ShortcutPill extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(icon, size: 22, color: _kOnWhite),
+                  /* 🔴 **수는 아이콘 오른쪽 위에 겹친다** — 줄을 따로 두면
+                     알약 셋의 높이가 갈린다(아래 「한 줄로 묶는다」와 같은
+                     까닭). */
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Icon(icon, size: 22, color: _kOnWhite),
+                      if (badge > 0)
+                        Positioned(
+                          top: -4,
+                          right: -8,
+                          child: Container(
+                            key: const Key('home-inbox-count'),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.seed,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              '$badge',
+                              style: const TextStyle(
+                                color: Color(0xFF0B0B0B),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                   const SizedBox(height: 5),
                   /* 🔴 한 줄로 묶는다 — 「경기장 예약」이 좁은 기기에서 두 줄로
                      접히면 알약 셋의 높이가 갈린다. */
@@ -2692,32 +2763,43 @@ class _TeamMatchButton extends StatelessWidget {
 
 /// 「팀원」을 골랐을 때 판 자리에 서는 것. 웹은 **사람을 구하는 팀 목록**
 /// (`TeamSeek`)이 스쿼드 판을 대신 선다 — 앱은 아직 자리만 잡아 둔다.
-class _MemberPlaceholder extends StatelessWidget {
-  const _MemberPlaceholder();
+class _MemberPanel extends StatelessWidget {
+  const _MemberPanel({required this.onOpen});
+
+  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
     return GlassPanel(
       radius: _kCardRadius,
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.groups_outlined, size: 36, color: AppTheme.seed),
-            const SizedBox(height: 10),
-            const Text(
-              '사람을 구하는 팀',
-              style: TextStyle(color: _kOnDark, fontSize: 16),
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          key: const Key('home-team-seek'),
+          borderRadius: BorderRadius.circular(_kCardRadius),
+          onTap: onOpen,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.groups_outlined,
+                    size: 36, color: AppTheme.seed),
+                const SizedBox(height: 10),
+                const Text(
+                  '사람을 찾는 팀',
+                  style: TextStyle(color: _kOnDark, fontSize: 16),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '눌러서 찾아보기',
+                  style: TextStyle(
+                    color: _kOnDark.withValues(alpha: 0.55),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 6),
-            Text(
-              '준비 중',
-              style: TextStyle(
-                color: _kOnDark.withValues(alpha: 0.55),
-                fontSize: 12,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

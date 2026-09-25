@@ -2,6 +2,7 @@ import '../match_prefs.dart';
 import '../match_prefs_server.dart';
 import 'match_repository.dart';
 import 'models/match_candidate.dart';
+import 'models/open_match.dart';
 import 'models/review_option.dart';
 
 /// 가짜 팀의 id. 🔴 **이 값은 서버에 없다** — 이것이 붙은 것은 무엇이든
@@ -141,6 +142,19 @@ class DemoMatchRepository implements MatchRepository {
     );
   }
 
+  /* 🔴 **받은 쪽은 흘려보낸다** — 가짜는 **내가 거는 쪽**만 가로챈다.
+     나에게 온 신청은 진짜 서버 것이어야 웹과 이어진다. */
+  @override
+  Future<TeamMatchRequest> acceptRequest(
+    String teamId, {
+    required String requestId,
+  }) =>
+      _inner.acceptRequest(teamId, requestId: requestId);
+
+  @override
+  Future<void> rejectRequest(String teamId, {required String requestId}) =>
+      _inner.rejectRequest(teamId, requestId: requestId);
+
   // ── 아래는 그대로 흘려보낸다 ──────────────────────────────────────────
 
   @override
@@ -152,6 +166,18 @@ class DemoMatchRepository implements MatchRepository {
 
   @override
   Future<MatchPrefs?> teamPrefs(String teamId) => _inner.teamPrefs(teamId);
+
+  /* 🔴 **내 조건과 경기 탐색은 그대로 흘려보낸다** — 가짜를 섞지 않는다.
+     「사람을 찾는 팀」은 **진짜 서버 것**이어야 웹과 이어진다. */
+  @override
+  Future<MatchPrefs?> myPrefs() => _inner.myPrefs();
+
+  @override
+  Future<void> saveMyPrefs(MatchPrefs prefs) => _inner.saveMyPrefs(prefs);
+
+  @override
+  Future<List<OpenMatch>> openMatches({String? sportCode, String? region}) =>
+      _inner.openMatches(sportCode: sportCode, region: region);
 
   @override
   Future<void> saveTeamPrefs(String teamId, MatchPrefs prefs) =>

@@ -10,6 +10,9 @@ class TeamInvitation {
     required this.status,
     this.positionCode,
     this.positionLabel,
+    this.teamName = '',
+    this.teamRegion = '',
+    this.squadPublicSlug,
   });
 
   factory TeamInvitation.fromJson(Map<String, dynamic> json) => TeamInvitation(
@@ -19,6 +22,12 @@ class TeamInvitation {
         status: json['status'] as String,
         positionCode: json['position_code'] as String?,
         positionLabel: json['position_label'] as String?,
+        /* 🔴 **`GET /me/invitations` 만 네 칸을 더 준다**(계약). 받는 사람은
+           아직 그 팀 소속이 아니라 **팀 id 하나로는 판단할 수가 없다.**
+           보낸 쪽 목록에는 없으므로 빈 값이 정상이다. */
+        teamName: json['team_name'] as String? ?? '',
+        teamRegion: json['team_region'] as String? ?? '',
+        squadPublicSlug: json['squad_public_slug'] as String?,
       );
 
   final String id;
@@ -33,6 +42,13 @@ class TeamInvitation {
   /// (「우리 팀에 오세요」)가 정상이다.
   final String? positionCode;
   final String? positionLabel;
+
+  /// 🔴 **받은 목록에만 실린다**(계약 3-3절) — 보낸 쪽에서는 빈 값이다.
+  final String teamName;
+  final String teamRegion;
+
+  /// 그 팀 판을 볼 수 있는 길. ⚠️ 스쿼드를 아직 안 만든 팀이면 `null` 이다.
+  final String? squadPublicSlug;
 
   bool get isPending => status == 'pending';
 }

@@ -13,6 +13,9 @@ void runMatchRepositoryContract(
   required String myTeamId,
   required String teamWithoutPrefs,
   required String knownRegion,
+
+  /// **나에게 온** 신청의 id — 받은 쪽에서 답하는 갈래를 밟는다.
+  required String incomingId,
 }) {
   group('$name — MatchRepository 계약', () {
     late MatchRepository repo;
@@ -142,6 +145,99 @@ void runMatchRepositoryContract(
             targetTeamId: target,
             playedAt: '2026-10-04T11:00:00+09:00',
             place: '강남 풋살장'),
+        throwsA(anything),
+      );
+    });
+
+    /// 🔴 **내 조건은 팀 조건과 저장소가 다르다**(계약 3-13절) — 같은 사람이
+    /// 팀장이면서 팀원일 수 있어 **절대 안 섞는다.**
+    test('내 조건을 안 정했으면 null 이다', () async {
+      expect(await repo.myPrefs(), isNull);
+    });
+
+    /// 🔴 **내 조건에만 포지션이 있다** — 여기 올린 자리가 곧 남의 AI 추천
+    /// 판에 뜨는 조건이다(계약).
+    test('내 조건은 자리까지 저장한다', () async {
+      final saved = MatchPrefs(
+        regions: [knownRegion],
+        times: const [TimeSlot(day: 6, from: '10:00', to: '12:00')],
+        positions: const ['MF'],
+      );
+
+      await repo.saveMyPrefs(saved);
+      final read = await repo.myPrefs();
+
+      expect(read!.positions, ['MF']);
+      expect(read.regions, [knownRegion]);
+      expect(read.times.single.day, 6);
+    });
+
+    /// 🔴 **팀 조건과 안 섞인다** — 한쪽을 저장해도 다른 쪽은 그대로다.
+    test('내 조건과 팀 조건이 안 섞인다', () async {
+      await repo.saveMyPrefs(MatchPrefs(
+        regions: [knownRegion],
+        times: const [TimeSlot(day: 1, from: '18:00', to: '20:00')],
+        positions: const ['GK'],
+      ));
+
+      expect(await repo.teamPrefs(teamWithoutPrefs), isNull);
+    });
+
+    /// 🔴 **팀 id 를 몰라도 되는 유일한 경로다**(계약) — 이것이 없으면 용병이
+    /// 지원할 경기를 찾을 방법이 아예 없다.
+    test('사람을 찾는 경기를 읽는다', () async {
+      final list = await repo.openMatches();
+
+      expect(list, isNotEmpty);
+      expect(list.every((m) => m.teamName.isNotEmpty), isTrue);
+    });
+
+    /// 🔴 **어느 자리를 몇 명 찾는지가 함께 온다** — 그게 없으면 지원할지
+    /// 판단할 수가 없다.
+    test('찾는 자리가 실려 있다', () async {
+      final list = await repo.openMatches();
+
+      expect(list.any((m) => m.needs.isNotEmpty), isTrue);
+    });
+
+    /// 🔴 **종목 코드가 틀리면 빈 배열이 아니라 예외다**(계약) — 빈 배열로
+    /// 답하면 오타와 「그 종목 경기가 없다」가 같아 보인다.
+    test('없는 종목은 예외다', () async {
+      await expectLater(
+        repo.openMatches(sportCode: '없는종목'),
+        throwsA(anything),
+      );
+    });
+
+    /// ⚠️ 지역은 자유 문자열이라 검증할 대상이 없다 — 안 걸리면 빈 목록이다.
+    test('안 걸리는 지역은 빈 목록이다', () async {
+      expect(await repo.openMatches(region: '없는동네'), isEmpty);
+    });
+
+    /// 🔴 **받은 신청에 답할 수 있어야 한다** (2026-09-25 사용자: 「진짜로
+    /// 서로 연결되어있어야 한다고」). 앱에서 수락한 것이 웹에 뜨는 길이
+    /// 이것뿐이다.
+    test('받은 신청을 수락하면 경기가 생긴다', () async {
+      final got = await repo.acceptRequest(myTeamId, requestId: incomingId);
+
+      expect(got.isAccepted, isTrue);
+      expect(got.matchId, isNotNull, reason: '수락되면 경기가 생긴다');
+    });
+
+    test('받은 신청을 거절할 수 있다', () async {
+      await repo.rejectRequest(myTeamId, requestId: incomingId);
+
+      final after = await repo.requests(myTeamId);
+      expect(after.where((r) => r.id == incomingId).every((r) => r.isPending),
+          isFalse);
+    });
+
+    /// 🔴 **이미 답한 것은 다시 못 답한다**(409 `ALREADY_RESPONDED`).
+    test('두 번 수락하지 못한다', () async {
+      await repo.acceptRequest(myTeamId, requestId: incomingId);
+
+      await expectLater(
+        repo.acceptRequest(myTeamId, requestId: incomingId),
         throwsA(anything),
       );
     });

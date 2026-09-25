@@ -10,6 +10,7 @@ void main() {
     myTeamId: 't-thunder',
     teamWithoutPrefs: 't-bears',
     knownRegion: '서울 강남구',
+    incomingId: 'tmr-incoming',
   );
 
   group('MockMatchRepository 고유 규칙', () {

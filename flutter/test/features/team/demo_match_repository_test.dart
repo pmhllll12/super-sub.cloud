@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:super_sub/features/team/data/demo_match_repository.dart';
 import 'package:super_sub/features/team/data/match_repository.dart';
 import 'package:super_sub/features/team/data/models/match_candidate.dart';
+import 'package:super_sub/features/team/data/models/open_match.dart';
 import 'package:super_sub/features/team/data/models/review_option.dart';
 import 'package:super_sub/features/team/match_prefs.dart';
 import 'package:super_sub/features/team/match_prefs_server.dart';
@@ -47,12 +48,31 @@ class _RealIsh implements MatchRepository {
   @override
   Future<List<TeamMatchRequest>> requests(String teamId) async => const [];
 
+  // 받은 쪽 — 이 시험이 안 쓰는 것들.
+  @override
+  Future<TeamMatchRequest> acceptRequest(String teamId,
+          {required String requestId}) =>
+      throw UnimplementedError();
+  @override
+  Future<void> rejectRequest(String teamId,
+      {required String requestId}) async {}
+
   @override
   Future<List<RefItem>> regions() async => const [];
   @override
   Future<List<RefItem>> positions(String s) async => const [];
   @override
   Future<MatchPrefs?> teamPrefs(String t) async => null;
+
+  // 내 조건·경기 탐색 — 이 시험이 안 쓰는 것들.
+  @override
+  Future<MatchPrefs?> myPrefs() async => null;
+  @override
+  Future<void> saveMyPrefs(MatchPrefs p) async {}
+  @override
+  Future<List<OpenMatch>> openMatches({String? sportCode, String? region}) async =>
+      const [];
+
   @override
   Future<void> saveTeamPrefs(String t, MatchPrefs p) async {}
   @override
