@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_sub/features/team/data/match_providers.dart';
 import 'package:super_sub/features/team/data/match_repository.dart';
+import 'package:super_sub/features/team/data/models/match_application.dart';
 import 'package:super_sub/features/team/data/models/match_candidate.dart';
 import 'package:super_sub/features/team/data/models/open_match.dart';
 import 'package:super_sub/features/team/data/models/review_option.dart';
@@ -86,6 +87,26 @@ class _Fake implements MatchRepository {
       throw UnimplementedError();
   @override
   Future<void> rejectRequest(String teamId, {required String requestId}) async {}
+  /// 지원한 경기 id — 시험이 「정말 서버로 갔나」를 본다.
+  final applied = <String>[];
+  final withdrawn = <String>[];
+
+  @override
+  Future<MatchApplication> apply(String m) async {
+    applied.add(m);
+    return MatchApplication(
+      id: 'app-1',
+      matchId: m,
+      userId: 'u',
+      nickname: '나',
+      confirmed: false,
+    );
+  }
+
+  @override
+  Future<void> withdraw(String m, {required String applicationId}) async =>
+      withdrawn.add(m);
+
   @override
   Future<List<ReviewOption>> reviewOptions() async => const [];
   @override
@@ -210,6 +231,40 @@ void main() {
     await _open(tester, _Fake(prefs: _ready));
 
     expect(find.text('한강 나이트'), findsOneWidget);
+  });
+
+  /* 🔴 **지원 단추가 있다** (2026-09-25 사용자 요청: 「사람을 찾는팀 지원
+     단추 하고」). 이 서비스가 하려던 일 자체인데 — 팀에 없는 사람이 용병으로
+     들어가는 길 — 앱에는 **길이 없었다.** 계약 3-5절은 진작 있었다. */
+  testWidgets('지원을 누르면 그 경기로 지원이 나간다', (tester) async {
+    final repo = _Fake(prefs: _ready);
+    await _open(tester, repo);
+
+    await tester.tap(find.byKey(const Key('seek-apply-om-1')));
+    for (var i = 0; i < 3; i++) {
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    expect(repo.applied, ['om-1']);
+    // 낸 뒤에는 **무를 길**이 보인다 — 안 그러면 되돌릴 수가 없다.
+    expect(find.byKey(const Key('seek-withdraw-om-1')), findsOneWidget);
+  });
+
+  testWidgets('무르면 다시 지원할 수 있다', (tester) async {
+    final repo = _Fake(prefs: _ready);
+    await _open(tester, repo);
+
+    await tester.tap(find.byKey(const Key('seek-apply-om-1')));
+    for (var i = 0; i < 3; i++) {
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+    await tester.tap(find.byKey(const Key('seek-withdraw-om-1')));
+    for (var i = 0; i < 3; i++) {
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    expect(repo.withdrawn, ['om-1']);
+    expect(find.byKey(const Key('seek-apply-om-1')), findsOneWidget);
   });
 
   /// 🔴 **지역은 서버로 보낸다** — 받아 놓고 화면에서 거르면 다음 쪽을

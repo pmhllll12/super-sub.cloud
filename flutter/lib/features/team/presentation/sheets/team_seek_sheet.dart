@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/network/api_client.dart';
 import '../../data/match_providers.dart';
 import '../../data/models/open_match.dart';
 import '../../data/regions.dart';
@@ -345,6 +346,7 @@ class _OpenMatchList extends ConsumerWidget {
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
                     itemCount: list.length,
                     itemBuilder: (_, i) => _MatchRow(match: list[i]),
+                    // 🔴 위 `_MatchRow` 가 제 지원 상태를 들고 있다.
                   ),
           ),
         ),
@@ -353,13 +355,84 @@ class _OpenMatchList extends ConsumerWidget {
   }
 }
 
-class _MatchRow extends StatelessWidget {
+/// 🔴 **지원 상태를 줄마다 들고 있다** (2026-09-25 사용자 요청: 「사람을
+/// 찾는팀 지원 단추 하고」).
+///
+/// ⚠️ **다시 열면 잊는다.** `GET /matches` 의 한 줄에는 **내가 지원했는지**가
+/// 안 실려 온다(계약 3-4절). 경기마다 `GET …/applications` 를 한 번씩 부르면
+/// 목록 하나에 왕복이 스무 번이라 그 길로 가지 않았다.
+/// 🔴 **서버가 `my_application` 을 실어 주면** 이 상태를 걷고 그 값을 쓴다 —
+/// 미결 항목에 올려 둔다.
+class _MatchRow extends ConsumerStatefulWidget {
   const _MatchRow({required this.match});
 
   final OpenMatch match;
 
   @override
+  ConsumerState<_MatchRow> createState() => _MatchRowState();
+}
+
+class _MatchRowState extends ConsumerState<_MatchRow> {
+  /// 낸 지원의 id — 있으면 「지원함」이다. 무르려면 이 값이 있어야 한다.
+  String? _applicationId;
+
+  /// 이미 지원한 것이 **확인됐지만 id 를 모를 때** 참(409 `ALREADY_APPLIED`).
+  /// 🔴 그때는 무를 길이 없다 — 지원 id 를 서버가 안 알려 주기 때문이다.
+  bool _alreadyApplied = false;
+
+  bool _busy = false;
+  String? _error;
+
+  Future<void> _apply() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final made =
+          await ref.read(matchRepositoryProvider).apply(widget.match.id);
+      if (mounted) setState(() => _applicationId = made.id);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        /* 🔴 **막힌 까닭을 그대로 말한다.** 셋이 아주 다른 상황이라
+           「지원하지 못했습니다」 하나로 뭉뚱그리면 무엇을 해야 할지 모른다. */
+        _error = switch (e.code) {
+          'ALREADY_APPLIED' => '이미 지원한 경기입니다.',
+          'TEAM_MEMBER_CANNOT_APPLY' => '내가 속한 팀의 경기입니다.',
+          'PAST_MATCH' => '이미 지난 경기입니다.',
+          _ => e.message,
+        };
+        if (e.code == 'ALREADY_APPLIED') _alreadyApplied = true;
+      });
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _withdraw() async {
+    final id = _applicationId;
+    if (id == null) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await ref
+          .read(matchRepositoryProvider)
+          .withdraw(widget.match.id, applicationId: id);
+      // 🔴 **행을 지운 것이라 다시 지원할 수 있다**(계약 A-1).
+      if (mounted) setState(() => _applicationId = null);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final match = widget.match;
     final at = DateTime.tryParse(match.playedAt);
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -410,10 +483,87 @@ class _MatchRow extends StatelessWidget {
                 ],
               ),
             ),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                _error!,
+                style: const TextStyle(color: Color(0xFFB42318), fontSize: 12),
+              ),
+            ),
+          const SizedBox(height: 10),
+          /* 🔴 **오른쪽 끝에 붙인다** — 줄의 내용은 왼쪽에서 읽고, 하는 일은
+             오른쪽에서 누른다(이 시트의 다른 줄들과 같은 자리다). */
+          Align(
+            alignment: Alignment.centerRight,
+            child: _applicationId != null
+                ? _ApplyPill(
+                    pillKey: Key('seek-withdraw-${match.id}'),
+                    label: _busy ? '무르는 중…' : '지원 취소',
+                    filled: false,
+                    onTap: _busy ? null : _withdraw,
+                  )
+                : _ApplyPill(
+                    pillKey: Key('seek-apply-${match.id}'),
+                    label: _alreadyApplied
+                        ? '지원함'
+                        : _busy
+                            ? '보내는 중…'
+                            : '지원하기',
+                    filled: true,
+                    // 🔴 이미 지원했으면 **누를 것이 없다**(무를 id 를 모른다).
+                    onTap: _busy || _alreadyApplied ? null : _apply,
+                  ),
+          ),
         ],
       ),
     );
   }
+}
+
+/// 줄 오른쪽의 작은 알약 — 지원 / 지원 취소.
+class _ApplyPill extends StatelessWidget {
+  const _ApplyPill({
+    required this.pillKey,
+    required this.label,
+    required this.filled,
+    required this.onTap,
+  });
+
+  final Key pillKey;
+  final String label;
+  final bool filled;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Opacity(
+        opacity: onTap == null ? 0.5 : 1,
+        child: GestureDetector(
+          key: pillKey,
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            height: 34,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: filled ? kSheetGreen : Colors.transparent,
+              border: Border.all(
+                color: filled ? kSheetGreen : kSheetBoxInk.withValues(alpha: 0.3),
+              ),
+              borderRadius: BorderRadius.circular(17),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: filled ? Colors.white : kSheetBoxInk,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ),
+      );
 }
 
 // ── 조각들 ────────────────────────────────────────────────────────────────

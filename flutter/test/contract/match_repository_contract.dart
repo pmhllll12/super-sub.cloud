@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:super_sub/core/network/api_client.dart';
 import 'package:super_sub/features/team/data/match_repository.dart';
 import 'package:super_sub/features/team/match_prefs.dart';
 
@@ -331,6 +332,43 @@ void runMatchRepositoryContract(
 
       final all = await repo.requests(myTeamId);
       expect(all.any((r) => r.id == made.id), isTrue);
+    });
+
+    /* 🔴 **사람을 찾는 경기에 지원한다** (계약 3-5절, 2026-09-25 사용자 요청:
+       「사람을 찾는팀 지원 단추 하고」). 이 서비스가 하려던 일 자체 — 팀에
+       없는 사람이 용병으로 들어가는 길 — 인데 앱에는 **길이 없었다.** */
+    test('사람을 찾는 경기에 지원한다', () async {
+      final open = await repo.openMatches();
+      final made = await repo.apply(open.first.id);
+
+      expect(made.matchId, open.first.id);
+      /* 🔴 **아직 확정이 아니다** — 지원은 한쪽만 찬 것이고, 주장이 수락해야
+         `confirmed` 가 참이 된다. 여기서 참이면 화면이 「자리를 얻었다」고
+         잘못 말한다. */
+      expect(made.confirmed, isFalse);
+    });
+
+    /// 🔴 **경기당 한 건이다**(계약 409 `ALREADY_APPLIED`).
+    test('같은 경기에 두 번 지원하면 막는다', () async {
+      final open = await repo.openMatches();
+      await repo.apply(open.first.id);
+
+      await expectLater(
+        repo.apply(open.first.id),
+        throwsA(
+          isA<ApiException>().having((e) => e.code, 'code', 'ALREADY_APPLIED'),
+        ),
+      );
+    });
+
+    /// 🔴 **무른 뒤에는 다시 지원할 수 있다** — 안 그러면 무르는 뜻이 없다.
+    test('지원을 무른 뒤 다시 지원한다', () async {
+      final open = await repo.openMatches();
+      final made = await repo.apply(open.first.id);
+
+      await repo.withdraw(open.first.id, applicationId: made.id);
+
+      await repo.apply(open.first.id);
     });
   });
 }

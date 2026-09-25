@@ -2,6 +2,7 @@ import '../../../core/network/api_client.dart';
 import '../match_prefs.dart';
 import '../match_prefs_server.dart';
 import 'match_repository.dart';
+import 'models/match_application.dart';
 import 'models/match_candidate.dart';
 import 'models/open_match.dart';
 import 'models/review_option.dart';
@@ -107,6 +108,24 @@ class ApiMatchRepository implements MatchRepository {
         .map(OpenMatch.fromJson)
         .toList();
   }
+
+  @override
+  Future<MatchApplication> apply(String matchId) async =>
+      MatchApplication.fromJson(
+        /* 🔴 **본문이 비어 있어야 「본인이 지원」이다** — `user_id` 를 담으면
+           주장이 남을 제안하는 뜻이 된다(인터페이스 머리말). */
+        await _api.post(
+          '/matches/${Uri.encodeComponent(matchId)}/applications',
+          null,
+        ),
+      );
+
+  @override
+  Future<void> withdraw(String matchId, {required String applicationId}) =>
+      _api.delete(
+        '/matches/${Uri.encodeComponent(matchId)}/applications/'
+        '${Uri.encodeComponent(applicationId)}',
+      );
 
   @override
   Future<List<MatchCandidate>> candidates(String teamId) async =>

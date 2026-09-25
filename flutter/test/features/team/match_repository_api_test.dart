@@ -40,6 +40,8 @@ ApiMatchRepository buildRepo() {
     },
   ];
   final reviewed = <String>{};
+  /// 낸 지원 — `경기 id` → `지원 id`. 🔴 경기당 하나(계약 409).
+  final applications = <String, String>{};
   Map<String, dynamic>? minePrefs;
 
   final client = MockClient((req) async {
@@ -162,6 +164,35 @@ ApiMatchRepository buildRepo() {
           'reasons': [],
         },
       ]);
+    }
+
+    /* 🔴 **`/match-requests` 보다 **먼저** 본다** — 아래 갈래가
+       `path.contains` 라 `/matches/…/applications` 도 삼키지는 않지만,
+       경로가 겹치는 갈래는 **좁은 것을 앞에** 두는 것이 안전하다. */
+    if (path.contains('/applications')) {
+      final matchId = path.split('/matches/')[1].split('/')[0];
+      if (req.method == 'DELETE') {
+        final id = path.split('/applications/')[1];
+        if (applications[matchId] != id) return err('APPLICATION_NOT_FOUND', 404);
+        // 🔴 **행을 지운다**(계약 A-1) — 그래서 다시 지원할 수 있다.
+        applications.remove(matchId);
+        return http.Response.bytes(const [], 204);
+      }
+      if (applications.containsKey(matchId)) return err('ALREADY_APPLIED', 409);
+      final id = 'app-${applications.length + 1}';
+      applications[matchId] = id;
+      return http.Response.bytes(
+        utf8.encode(jsonEncode({
+          'id': id,
+          'match_id': matchId,
+          'user_id': 'u-me',
+          'nickname': '나',
+          'team_accepted_at': null,
+          'user_accepted_at': '2026-09-25T05:00:00Z',
+          'confirmed': false,
+        })),
+        201,
+      );
     }
 
     if (path.contains('/match-requests')) {

@@ -1,5 +1,6 @@
 import '../match_prefs.dart';
 import '../match_prefs_server.dart';
+import 'models/match_application.dart';
 import 'models/match_candidate.dart';
 import 'models/open_match.dart';
 import 'models/review_option.dart';
@@ -44,6 +45,27 @@ abstract class MatchRepository {
   /// 없다」가 같아 보여, 사용자가 없는 것을 계속 기다린다.
   /// ⚠️ 지역은 자유 문자열이라 검증할 대상이 없다 — 안 걸리면 빈 목록이다.
   Future<List<OpenMatch>> openMatches({String? sportCode, String? region});
+
+  /// **그 경기에 내가 지원한다** — 계약 3-5절 `POST /matches/{id}/applications`.
+  ///
+  /// 🔴 **본문을 비워 보낸다** — 그것이 「본인이 지원」이다. `user_id` 를 담으면
+  /// **주장이 남을 제안**하는 뜻이 되어, 주장이 아니면 403 이 온다.
+  ///
+  /// 🔴 돌려주는 것은 「냈다」이지 「잡혔다」가 아니다
+  /// ([MatchApplication.confirmed] 머리말).
+  ///
+  /// | 막히는 자리 | code |
+  /// |---|---|
+  /// | 경기당 한 건 | `ALREADY_APPLIED` (409) |
+  /// | 그 팀 소속이다 | `TEAM_MEMBER_CANNOT_APPLY` (409) |
+  /// | 이미 지난 경기 | `PAST_MATCH` (422) |
+  Future<MatchApplication> apply(String matchId);
+
+  /// 낸 지원을 무른다 — `DELETE …/applications/{applicationId}`.
+  ///
+  /// 🔴 **행을 지운다**(계약이 A-1 로 정했다) — 그래서 무른 뒤에는 같은 경기에
+  /// 다시 지원할 수 있다.
+  Future<void> withdraw(String matchId, {required String applicationId});
 
   /// 「맞는 상대」 후보 — **서버가 이미 정렬한 순서 그대로**.
   Future<List<MatchCandidate>> candidates(String teamId);

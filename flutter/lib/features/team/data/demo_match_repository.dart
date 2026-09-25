@@ -1,6 +1,7 @@
 import '../match_prefs.dart';
 import '../match_prefs_server.dart';
 import 'match_repository.dart';
+import 'models/match_application.dart';
 import 'models/match_candidate.dart';
 import 'models/open_match.dart';
 import 'models/review_option.dart';
@@ -123,6 +124,16 @@ class DemoMatchRepository implements MatchRepository {
         ..._demoRequests,
         ...await _inner.requests(teamId),
       ];
+
+  @override
+  /* 🔴 **지원은 가짜를 안 끼운다** — 가짜 팀은 「맞는 상대」 쪽에만 있고,
+     「사람을 찾는 경기」 목록은 서버 것 그대로다. 그대로 흘려보낸다. */
+  @override
+  Future<MatchApplication> apply(String matchId) => _inner.apply(matchId);
+
+  @override
+  Future<void> withdraw(String matchId, {required String applicationId}) =>
+      _inner.withdraw(matchId, applicationId: applicationId);
 
   @override
   Future<void> cancelRequest(String teamId, {required String requestId}) async {

@@ -2,6 +2,7 @@ import '../../../core/network/api_client.dart';
 import '../match_prefs.dart';
 import '../match_prefs_server.dart';
 import 'match_repository.dart';
+import 'models/match_application.dart';
 import 'models/match_candidate.dart';
 import 'models/open_match.dart';
 import 'models/review_option.dart';
@@ -316,6 +317,10 @@ class MockMatchRepository implements MatchRepository {
   /// 이미 평가한 (경기, 상대) — 경기당 1회를 여기서도 막는다.
   final Set<String> _reviewed = {};
 
+  /// 낸 지원 — `경기 id` → `지원 id`. 🔴 **경기당 하나**(계약 409).
+  final Map<String, String> _applied = {};
+  int _applySeq = 0;
+
   @override
   Future<void> cancelRequest(String teamId, {required String requestId}) async {
     await Future<void>.delayed(_delay);
@@ -398,6 +403,40 @@ class MockMatchRepository implements MatchRepository {
           code: 'TEAM_MATCH_REQUEST_ALREADY_RESPONDED', status: 409);
     }
     return _requests[i];
+  }
+
+  @override
+  Future<MatchApplication> apply(String matchId) async {
+    await Future<void>.delayed(_delay);
+
+    // 🔴 경기당 한 건 — 서버는 DB 유일 제약으로 막는다(부록 D.7).
+    if (_applied.containsKey(matchId)) {
+      throw const ApiException('이미 지원했습니다',
+          code: 'ALREADY_APPLIED', status: 409);
+    }
+    final id = 'mock-app-${++_applySeq}';
+    _applied[matchId] = id;
+    return MatchApplication(
+      id: id,
+      matchId: matchId,
+      userId: 'mock-me',
+      nickname: '나',
+      /* 🔴 **거짓이다** — 지원은 한쪽만 찬 것이고 주장이 수락해야 확정이다.
+         여기서 참을 주면 화면이 「자리를 얻었다」고 잘못 말한다. */
+      confirmed: false,
+    );
+  }
+
+  @override
+  Future<void> withdraw(String matchId, {required String applicationId}) async {
+    await Future<void>.delayed(_delay);
+
+    if (_applied[matchId] != applicationId) {
+      throw const ApiException('없는 지원입니다',
+          code: 'APPLICATION_NOT_FOUND', status: 404);
+    }
+    // 🔴 **행을 지운다**(계약 A-1) — 그래서 다시 지원할 수 있다.
+    _applied.remove(matchId);
   }
 
   @override

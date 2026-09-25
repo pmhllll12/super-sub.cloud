@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_sub/features/team/data/match_providers.dart';
 import 'package:super_sub/features/team/data/match_repository.dart';
+import 'package:super_sub/features/team/data/models/match_application.dart';
 import 'package:super_sub/features/team/data/models/match_candidate.dart';
 import 'package:super_sub/features/team/data/models/open_match.dart';
 import 'package:super_sub/features/team/data/models/review_option.dart';
@@ -121,6 +122,11 @@ class _FakeMatch implements MatchRepository {
   }
 
   // 이 시트가 안 쓰는 것들.
+  @override
+  Future<MatchApplication> apply(String m) => throw UnimplementedError();
+  @override
+  Future<void> withdraw(String m, {required String applicationId}) async {}
+
   @override
   Future<List<ReviewOption>> reviewOptions() async => const [];
   @override
