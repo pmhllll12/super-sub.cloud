@@ -5,6 +5,7 @@ import '../../../core/network/api_client.dart';
 import 'clip_file.dart';
 import 'models/my_video.dart';
 import 'models/public_video.dart';
+import 'models/reference_player.dart';
 import 'models/skeleton.dart';
 import 'models/video_report.dart';
 import 'video_repository.dart';
@@ -225,6 +226,28 @@ class MockVideoRepository implements VideoRepository {
     if (v == null) return const SkeletonUnavailable('그 영상을 찾을 수 없습니다.');
     if (!v.analyzed) return const SkeletonUnavailable('분석하지 않은 영상입니다.');
     if (v.analysisStatus != 'succeeded') return const SkeletonNotReady();
+    return const SkeletonReady(Skeleton(known: false, why: '목업에는 관절이 없습니다.'));
+  }
+
+  /// 🔴 **이름은 진짜로, 관절은 안 지어낸다** — 바로 위 [skeleton] 과 같은 규칙.
+  /// 목록은 화면(선수 고르기)을 만드는 데 필요해서 주고, 관절은 실서버에서만
+  /// 온다. ⚠️ 그래서 **목 모드에서는 비교가 「관절을 읽지 못했습니다」로 끝난다.**
+  @override
+  Future<List<ReferencePlayer>> referencePlayers() async {
+    await Future<void>.delayed(_delay);
+    return const [
+      ReferencePlayer(id: 'rovelli', name: '에스테반 로벨리'),
+      ReferencePlayer(id: 'castanheira', name: '티아구 카스탄헤이라'),
+    ];
+  }
+
+  @override
+  Future<SkeletonResult> referencePlayerSkeleton(String playerId) async {
+    await Future<void>.delayed(_delay);
+    final known = await referencePlayers();
+    if (!known.any((p) => p.id == playerId)) {
+      return const SkeletonUnavailable('그 선수를 찾을 수 없습니다.');
+    }
     return const SkeletonReady(Skeleton(known: false, why: '목업에는 관절이 없습니다.'));
   }
 

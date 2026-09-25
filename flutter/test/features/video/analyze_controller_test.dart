@@ -188,6 +188,12 @@ void main() {
 
     final view = tester.widget<ReportView>(find.byType(ReportView));
     expect(view.onPaper, isTrue, reason: '흰 판 위라 글자가 어두워야 한다');
+
+    /* 🔴 **비교가 뒤에서 미리 받는다**(2026-09-25) — 리포트가 뜨는 순간
+       선수 목록·관절을 당겨 둔다. 목 저장소는 일부러 느려서(300ms) 그 타이머가
+       남고, 안 흘려 보내면 「위젯 트리를 버렸는데 타이머가 남았다」로 깨진다.
+       ⚠️ **미리 받기를 껐다고 보지 말 것** — 흘려 보내는 것뿐이다. */
+    await tester.pump(const Duration(seconds: 2));
   });
 
   testWidgets('고르면 미리보기 상태가 된다', (tester) async {

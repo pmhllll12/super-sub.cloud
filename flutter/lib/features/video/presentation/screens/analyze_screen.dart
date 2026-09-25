@@ -10,6 +10,7 @@ import 'package:video_player/video_player.dart';
 import '../../../../core/design_scale.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/floating_nav_bar.dart';
+import '../../data/models/reference_player.dart';
 import '../../data/models/video_report.dart';
 import '../../data/models/skeleton.dart';
 import '../../data/pick_clip.dart';
@@ -17,6 +18,10 @@ import '../../data/video_providers.dart';
 import '../widgets/skeleton_overlay.dart';
 import '../analyze_controller.dart';
 import '../analyze_steps.dart';
+import '../../domain/motion/motion.dart';
+import '../compare_controller.dart';
+import '../widgets/compare_moments.dart';
+import '../widgets/compare_stage.dart';
 import '../widgets/report_view.dart';
 
 /// **영상 분석** — 위는 영상, 아래는 글. 🔴 **두 칸이 끝까지 유지된다.**
@@ -137,6 +142,22 @@ class _Stage extends ConsumerWidget {
       AnalyzeIdle() => null,
     };
     if (clip == null) return const _Picker();
+
+    /* 🔴 **비교 중이면 이 칸이 반으로 갈린다** (2026-09-25). 아래 흰 판이
+       아니라 **여기**가 갈리는 것이 중요하다 — 두 영상이 위에 나란히 있어야
+       차는 순간을 동시에 본다(사용자가 고른 배치). */
+    final cmp = ref.watch(compareControllerProvider);
+    if (cmp is CompareShown) {
+      return CompareStage(
+        comparison: cmp.comparison,
+        playerAsset: cmp.player.clipAsset,
+        userClipPath: clip.path,
+        playerSkeleton: cmp.playerSkeleton,
+        userSkeleton: cmp.userSkeleton,
+        selected: cmp.selected,
+      );
+    }
+
     /* 🔴 **관절은 분석이 끝난 뒤에만 있다**(2026-09-25). 그 전에는 서버에 값이
        없다 — 분석 중에 물으면 `REPORT_NOT_READY` 만 온다. */
     /* 🔴 **저장용 id 가 아니라 「분석이 달린 id」다** — 중복이면 원본이다
@@ -251,7 +272,13 @@ class _Paper extends ConsumerWidget {
           _Stopped(title: '분석에 실패했습니다', body: reason, retry: false),
         AnalyzeError(:final message) =>
           _Stopped(title: '문제가 있었습니다', body: message),
-        AnalyzeDone(:final report, :final keep, :final keepNotice, :final borrowed) =>
+        AnalyzeDone(
+          :final report,
+          :final keep,
+          :final keepNotice,
+          :final borrowed,
+          :final analysisVideoId,
+        ) =>
           _Report(
             // 🔴 열쇠가 바뀌어야 [AnimatedSwitcher] 가 갈아 끼운다.
             key: ValueKey('done-$keep'),
@@ -259,6 +286,7 @@ class _Paper extends ConsumerWidget {
             keep: keep,
             notice: keepNotice,
             borrowed: borrowed,
+            analysisVideoId: analysisVideoId,
           ),
           },
         ),
@@ -868,9 +896,14 @@ class _Report extends ConsumerStatefulWidget {
     super.key,
     required this.report,
     required this.keep,
+    required this.analysisVideoId,
     this.notice,
     this.borrowed = false,
   });
+
+  /// 🔴 **저장용 id 가 아니라 「분석이 달린 id」다** — 중복이면 원본이다.
+  /// 비교가 관절을 물을 때 이 값을 쓴다(섞으면 관절만 영영 안 온다).
+  final String analysisVideoId;
 
   final VideoReport report;
   final KeepState keep;
@@ -960,6 +993,22 @@ class _ReportState extends ConsumerState<_Report> {
           curve: Curves.easeOut,
           child: _KeepBar(keep: keep, notice: notice, onTap: c.keep),
         ),
+        /* 🔴 **비교는 등급 바로 위다** (2026-09-25 사용자 요청: 「선수와
+           비교하기 버튼 아래에 두지 말고, 등급 위에 둬줘」).
+
+           ⚠️ 처음엔 리포트 **아래**에 뒀었다 — 「내 점수를 먼저 읽고 견준다」는
+           순서로 본 것이고 웹도 그렇다. 사용자가 **위**로 정했다: 끝까지
+           스크롤해야 보이면 있는 줄도 모른다(저장 단추를 위로 올린 것과 같은
+           까닭이다). */
+        AnimatedOpacity(
+          opacity: _bodyIn ? 1 : 0,
+          duration: const Duration(milliseconds: 380),
+          curve: Curves.easeOut,
+          child: _CompareSection(analysisVideoId: widget.analysisVideoId),
+        ),
+        /* 🔴 **얇은 검정 줄 하나** (2026-09-25 사용자 요청) — 비교 단추와
+           등급을 가른다. 흰 판이라 이 한 줄이 두 덩이를 나누는 전부다. */
+        const Divider(color: Color(0xFF000000), height: 1, thickness: 1),
         const SizedBox(height: 18),
         /* 🔴 **흰 판에 그대로 쓴다** (2026-09-24 사용자 결정: 「갈려져도
            괜찮지 않아? 그 흰색 판에 리포트가 쓰여야지」).
@@ -981,7 +1030,12 @@ class _ReportState extends ConsumerState<_Report> {
             icon: Symbols.refresh,
             label: '새 영상 분석',
             onPaper: true,
-            onTap: c.reset,
+            onTap: () {
+              // 🔴 새 영상을 고르면 **비교도 닫는다** — 안 닫으면 지난 영상의
+              //    비교가 새 분석 위에 그대로 떠 있다.
+              ref.read(compareControllerProvider.notifier).close();
+              c.reset();
+            },
           ),
         ),
       ],
@@ -1040,4 +1094,286 @@ class _KeepBar extends StatelessWidget {
       ],
     );
   }
+}
+
+/// 리포트 아래의 **「선수와 비교하기」** 절 (2026-09-25 사용자 요청:
+/// 「그 다른 영상이랑 비교하기 그거 웹이랑 똑같이」).
+///
+/// 🔴 **여기에는 셈이 한 줄도 없다** — 겹치기·각도·문장은 전부
+/// `domain/motion/` 이고, 그건 웹 `www/src/lib/motion/` 을 시험째 옮긴 것이다.
+/// 값이 갈리면 두 화면이 같은 영상에 다른 말을 하게 된다.
+class _CompareSection extends ConsumerStatefulWidget {
+  const _CompareSection({required this.analysisVideoId});
+
+  final String analysisVideoId;
+
+  @override
+  ConsumerState<_CompareSection> createState() => _CompareSectionState();
+}
+
+class _CompareSectionState extends ConsumerState<_CompareSection> {
+  @override
+  void initState() {
+    super.initState();
+    /* 🔴 **리포트가 뜨는 순간 뒤에서 당겨 둔다** (2026-09-25 사용자 지적:
+       「선수 누르고 비교하는것도 느려터졋는데?」). 누를 때 받으면 왕복을 세 번
+       기다린다 — 여기서 미리 받아 두면 누르는 순간이 즉시다.
+       ⚠️ `initState` 에서 `ref.read` 는 되지만 `watch` 는 안 된다. */
+    Future.microtask(() {
+      if (!mounted) return;
+      ref
+          .read(compareControllerProvider.notifier)
+          .prefetch(widget.analysisVideoId);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final analysisVideoId = widget.analysisVideoId;
+    final state = ref.watch(compareControllerProvider);
+    final c = ref.read(compareControllerProvider.notifier);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 4),
+        switch (state) {
+          CompareIdle() => Center(
+            child: _Button(
+              buttonKey: const Key('compare-open'),
+              icon: Symbols.compare_arrows,
+              label: '선수와 비교하기',
+              onPaper: true,
+              onTap: () => c.open(analysisVideoId),
+            ),
+          ),
+          CompareLoading() => const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 10),
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.8,
+                  color: _kMuted,
+                ),
+              ),
+            ),
+          ),
+          ComparePicking(:final players) => _Picking(players: players),
+          CompareFailed(:final reason) => _CompareFailedView(reason: reason),
+          CompareShown() => _Shown(state: state),
+        },
+        const SizedBox(height: 14),
+      ],
+    );
+  }
+}
+
+class _Picking extends ConsumerWidget {
+  const _Picking({required this.players});
+
+  final List<ReferencePlayer> players;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = ref.read(compareControllerProvider.notifier);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '누구와 비교할까요?',
+          style: TextStyle(
+            color: _kOnPaper,
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 10),
+        for (final p in players) ...[
+          _Button(
+            buttonKey: Key('compare-pick-${p.id}'),
+            icon: Symbols.sports_soccer,
+            label: p.name,
+            onPaper: true,
+            onTap: () => c.pick(p),
+          ),
+          const SizedBox(height: 8),
+        ],
+        const SizedBox(height: 2),
+        TextButton(
+          onPressed: c.close,
+          child: const Text('그만두기', style: TextStyle(color: _kMuted)),
+        ),
+      ],
+    );
+  }
+}
+
+class _CompareFailedView extends ConsumerWidget {
+  const _CompareFailedView({required this.reason});
+
+  final String reason;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = ref.read(compareControllerProvider.notifier);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        /* 🔴 **까닭을 그대로 보여 준다** — 「분석이 끝난 영상만 비교할 수
+           있습니다」 같은 문구라야 사용자가 다음에 무엇을 할지 안다. */
+        Text(
+          reason,
+          key: const Key('compare-failed'),
+          style: const TextStyle(color: _kBad, fontSize: 13, height: 1.45),
+        ),
+        const SizedBox(height: 8),
+        TextButton(
+          onPressed: c.close,
+          child: const Text('닫기', style: TextStyle(color: _kMuted)),
+        ),
+      ],
+    );
+  }
+}
+
+class _Shown extends ConsumerWidget {
+  const _Shown({required this.state});
+
+  final CompareShown state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = ref.read(compareControllerProvider.notifier);
+    final cmp = state.comparison;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                '${cmp.playerName}와 비교',
+                key: const Key('compare-title'),
+                style: const TextStyle(
+                  color: _kOnPaper,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            /* 🔴 **뒤집기 토글은 남겨 둔다** — 차는 방향 판별이 틀릴 수 있고,
+               틀리면 두 뼈대가 등을 맞대고 서서 비교가 통째로 무의미해진다.
+               사용자가 눈으로 보고 되돌릴 길이 있어야 한다(웹과 같다). */
+            IconButton(
+              key: const Key('compare-mirror'),
+              onPressed: c.toggleMirror,
+              icon: Icon(
+                Symbols.flip,
+                size: 20,
+                color: cmp.mirrored ? _kGood : _kMuted,
+              ),
+              tooltip: '선수 좌우 뒤집기',
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        /* 색 범례 — 🔴 카드가 둘 다 뼈대라 **어느 쪽이 나인지**를 글로도 말한다. */
+        Row(
+          children: [
+            _Legend(color: kPlayerColor, label: '선수'),
+            const SizedBox(width: 12),
+            _Legend(color: kUserColor, label: '나'),
+          ],
+        ),
+        const SizedBox(height: 12),
+        /* 🔴 세 순간 카드는 **어두운 바탕**이다 — 흰 판 위지만 뼈대는 어두운
+           데서 훨씬 잘 보인다(영상 위와 같은 색 규칙을 쓰려면 바탕도 같아야). */
+        CompareMoments(
+          comparison: cmp,
+          selected: state.selected,
+          onSelect: c.select,
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          '카드를 누르면 두 영상이 그 순간에 멈춥니다.',
+          style: TextStyle(color: _kMuted, fontSize: 11.5),
+        ),
+        const SizedBox(height: 14),
+        // 총평 한 줄 — 가장 큰 차이.
+        Text(
+          cmp.text.summary,
+          key: const Key('compare-summary'),
+          style: const TextStyle(
+            color: _kOnPaper,
+            fontSize: 13.5,
+            height: 1.5,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 12),
+        for (final m in cmp.text.moments) ...[
+          Text(
+            m.key.label,
+            style: const TextStyle(
+              color: _kOnPaper,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 3),
+          for (final line in m.lines)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 3),
+              child: Text(
+                line,
+                style: const TextStyle(
+                  color: _kMuted,
+                  fontSize: 12.5,
+                  height: 1.45,
+                ),
+              ),
+            ),
+          const SizedBox(height: 8),
+        ],
+        Row(
+          children: [
+            TextButton(
+              onPressed: c.back,
+              child: const Text('다른 선수', style: TextStyle(color: _kMuted)),
+            ),
+            TextButton(
+              onPressed: c.close,
+              child: const Text('닫기', style: TextStyle(color: _kMuted)),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _Legend extends StatelessWidget {
+  const _Legend({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 14,
+        height: 3,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+      const SizedBox(width: 5),
+      Text(label, style: const TextStyle(color: _kMuted, fontSize: 11.5)),
+    ],
+  );
 }

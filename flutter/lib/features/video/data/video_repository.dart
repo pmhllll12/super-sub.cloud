@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'clip_file.dart';
 import 'models/my_video.dart';
 import 'models/public_video.dart';
+import 'models/reference_player.dart';
 import 'models/skeleton.dart';
 import 'models/video_report.dart';
 
@@ -119,6 +120,18 @@ abstract class VideoRepository {
   /// 🔴 **옛 리포트는 `200` 으로 `{known:false}` 가 온다** — 404 가 아니다.
   /// 「관절이 없다」와 「리포트가 없다」는 다른 상태라서다.
   Future<SkeletonResult> skeleton(String videoId);
+
+  /// 견줄 **본보기 선수** 목록 (계약 3-14절).
+  ///
+  /// 🔴 **재생 주소는 안 온다** — 영상은 앱이 에셋으로 들고 다닌다
+  /// ([ReferencePlayer] 머리말). 서버가 주는 것은 `id` 와 `name` 뿐이다.
+  Future<List<ReferencePlayer>> referencePlayers();
+
+  /// 그 선수의 **관절 시계열** — [skeleton] 과 **모양이 같다**(계약).
+  ///
+  /// 🔴 **오류 셋이 다르다.** 영상 쪽은 「아직 안 끝남」이 있지만 선수는 미리
+  /// 계산되어 있어 없으면 그냥 `404 PLAYER_NOT_FOUND` 다 — 다시 물어도 안 바뀐다.
+  Future<SkeletonResult> referencePlayerSkeleton(String playerId);
 
   /// 그 영상의 분석 리포트.
   ///

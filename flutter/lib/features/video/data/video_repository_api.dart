@@ -5,6 +5,7 @@ import '../../../core/network/presigned_upload.dart';
 import 'clip_file.dart';
 import 'models/my_video.dart';
 import 'models/public_video.dart';
+import 'models/reference_player.dart';
 import 'models/skeleton.dart';
 import 'models/video_report.dart';
 import 'video_repository.dart';
@@ -162,6 +163,30 @@ class ApiVideoRepository implements VideoRepository {
           return const SkeletonUnavailable('그 영상을 찾을 수 없습니다.');
       }
       // 🔴 401 을 「관절 없음」으로 만들지 않는다 — `report` 와 같은 까닭.
+      if (e.status == 401 || e.status == 403) rethrow;
+      return SkeletonUnavailable(e.message);
+    }
+  }
+
+  @override
+  Future<List<ReferencePlayer>> referencePlayers() async {
+    final rows = await _api.getList('/reference-players');
+    return [for (final r in rows) ReferencePlayer.fromJson(r)];
+  }
+
+  @override
+  Future<SkeletonResult> referencePlayerSkeleton(String playerId) async {
+    try {
+      final body = await _api
+          .get('/reference-players/${Uri.encodeComponent(playerId)}/skeleton');
+      return SkeletonReady(Skeleton.fromJson(body));
+    } on ApiException catch (e) {
+      /* 🔴 선수 관절은 **미리 계산되어 있다** — 「아직 안 끝남」이 없다.
+         없으면 `PLAYER_NOT_FOUND` 이고 다시 물어도 안 바뀐다. */
+      if (e.code == 'PLAYER_NOT_FOUND') {
+        return const SkeletonUnavailable('그 선수를 찾을 수 없습니다.');
+      }
+      // 🔴 401 을 「선수 없음」으로 만들지 않는다 — `skeleton` 과 같은 까닭.
       if (e.status == 401 || e.status == 403) rethrow;
       return SkeletonUnavailable(e.message);
     }
