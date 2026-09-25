@@ -859,6 +859,11 @@ export default function SquadPanel({
    *
    * 🔴 **실제 배포에서는 걷어야 한다** — 진짜 수락 흐름을 가짜로 덮는
    * 코드다. 심사·시연 용도로만 켜 둔다.
+   *
+   * 🔴 **앱에도 같은 것이 있다**(2026-09-25) —
+   * `flutter/lib/features/home/presentation/screens/home_screen.dart` 의
+   * `_demoAcceptDelay`. 같은 기능이 두 화면에서 다르게 돌면 시연 중에
+   * 드러나므로 **여기 값을 바꾸면 그쪽도 함께 본다.** 걷어낼 때도 둘 다다.
    */
   const [demoAccepted, setDemoAccepted] = useState<Record<string, true>>({})
   const DEMO_ACCEPT_MS = 1500

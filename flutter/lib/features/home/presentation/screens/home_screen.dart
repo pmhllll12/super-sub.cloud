@@ -27,11 +27,14 @@ import '../../../card/data/models/player_card.dart';
 import '../../../card/presentation/mate_cards_controller.dart';
 import '../../../profile/presentation/widgets/player_card_view.dart';
 import '../../../team/auto_seat.dart';
+import '../../../team/board_geometry.dart';
+import '../../../team/data/candidate_providers.dart';
 import '../../../team/data/models/squad.dart';
 import '../../../team/data/squad_providers.dart';
 import '../../../team/data/squad_repository.dart';
 import '../../../team/optimistic_squad.dart';
 import '../../../team/seats_from_squad.dart';
+import '../../../team/presentation/sheets/seat_fill_sheet.dart';
 import '../../../team/presentation/widgets/squad_board.dart';
 import '../widgets/home_video_strip.dart';
 
@@ -703,6 +706,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   /// 카드를 다른 칸으로 옮긴다 — 서버에 남겨야 새로고침해도 그 자리다.
+  ///
+  /// 🔴 **옮기기 전에 보이는 칸을 전부 박는다** (2026-09-25, 사용자: 「내가
+  /// 바꾼 뒤에 나중에 혼자 다시 다른자리에 바껴」). 칸이 저장 안 된 등재는
+  /// 다시 그릴 때마다 「그때 비어 있는 자리」에 새로 앉아서, **내가 다른
+  /// 카드를 옮기면 손도 안 댄 사람이 딸려 움직인다.** 자세한 까닭은
+  /// `squadWithShownCellsPinned` 주석에 있다.
   Future<void> _moveSeat(
     String teamId,
     Squad squad,
@@ -710,22 +719,118 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     String positionCode,
     int col,
     int row,
-  ) => _write(
-    squadWithSeatMoved(
-      squad,
-      memberId: memberId,
-      positionCode: positionCode,
-      gridCol: col,
-      gridRow: row,
-    ),
-    (repo) => repo.moveSeat(
-      teamId,
-      memberId: memberId,
-      positionCode: positionCode,
-      gridCol: col,
-      gridRow: row,
-    ),
-  );
+  ) async {
+    final pinned = _pinned(squad);
+    await _write(
+      squadWithSeatMoved(
+        pinned,
+        memberId: memberId,
+        positionCode: positionCode,
+        gridCol: col,
+        gridRow: row,
+      ),
+      (repo) async {
+        await _persistPins(repo, teamId, squad, pinned);
+        return repo.moveSeat(
+          teamId,
+          memberId: memberId,
+          positionCode: positionCode,
+          gridCol: col,
+          gridRow: row,
+        );
+      },
+    );
+  }
+
+  /// 두 카드의 자리를 **맞바꾼다.**
+  ///
+  /// 🔴 **셋으로 나눠 보낸다** — 계약에 둘을 한 번에 고치는 경로가 없고,
+  /// 한쪽씩 보내면 중간에 **같은 칸에 둘**이 되어 서버가 막는다:
+  ///
+  /// 1. A 를 칸에서 **비운다**(등재는 남는다 — 계약 3-7절)
+  /// 2. B 를 A 가 있던 칸으로
+  /// 3. A 를 B 가 있던 칸으로
+  ///
+  /// 화면은 1번 상태(한쪽이 판에서 사라진 순간)를 **안 거친다** — 낙관적
+  /// 판은 이미 맞바꾼 결과다.
+  Future<void> _swapSeats(
+    String teamId,
+    Squad squad,
+    String aId,
+    String bId,
+  ) async {
+    final pinned = _pinned(squad);
+    final a = _memberOf(pinned, aId);
+    final b = _memberOf(pinned, bId);
+    if (a == null || b == null || !a.hasSeat || !b.hasSeat) return;
+
+    await _write(
+      squadWithSeatsSwapped(pinned, aId: aId, bId: bId),
+      (repo) async {
+        await _persistPins(repo, teamId, squad, pinned);
+        // 1) A 를 비운다 — 이 한 번 때문에 중간에 겹치지 않는다.
+        await repo.moveSeat(teamId,
+            memberId: aId, positionCode: a.positionCode);
+        // 2) B 를 A 자리로.
+        await repo.moveSeat(
+          teamId,
+          memberId: bId,
+          positionCode: positionOfRow(a.gridRow!),
+          gridCol: a.gridCol,
+          gridRow: a.gridRow,
+        );
+        // 3) A 를 B 자리로.
+        return repo.moveSeat(
+          teamId,
+          memberId: aId,
+          positionCode: positionOfRow(b.gridRow!),
+          gridCol: b.gridCol,
+          gridRow: b.gridRow,
+        );
+      },
+    );
+  }
+
+  Squad _pinned(Squad squad) => squadWithShownCellsPinned(
+        squad,
+        squadSizeOf(squad.formation),
+        mySlug: ref.read(myCardProvider).value?.publicSlug,
+      );
+
+  SquadMember? _memberOf(Squad squad, String id) {
+    for (final m in squad.members) {
+      if (m.id == id) return m;
+    }
+    return null;
+  }
+
+  /// 새로 박힌 칸들을 서버에도 남긴다 — 안 남기면 다음에 읽을 때 또 떠돈다.
+  ///
+  /// 🔴 **실패해도 멈추지 않는다.** 사람이 시킨 것은 「이 카드를 옮겨라」이고
+  /// 이것은 그것을 **유지되게 하는 덤**이다 — 여기서 던지면 정작 옮기기가
+  /// 안 나간다.
+  Future<void> _persistPins(
+    SquadRepository repo,
+    String teamId,
+    Squad before,
+    Squad pinned,
+  ) async {
+    for (final m in pinned.members) {
+      final was = _memberOf(before, m.id);
+      if (was == null || was.hasSeat || !m.hasSeat) continue;
+      try {
+        await repo.moveSeat(
+          teamId,
+          memberId: m.id,
+          positionCode: m.positionCode,
+          gridCol: m.gridCol,
+          gridRow: m.gridRow,
+        );
+      } catch (_) {
+        // 덤이다 — 못 남겨도 이번 옮기기는 그대로 나간다.
+      }
+    }
+  }
 
   /// 그 사람을 판에서 빼고 **팀에서도 내보낸다**.
   ///
@@ -760,6 +865,103 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       // 못 내보내도 판에서는 이미 빠졌다 — 화면을 멈추지 않는다.
     }
   }
+
+  /// 빈 자리를 눌렀다 — AI 추천·지인 시트를 열고, 고른 사람을 **초대한다**.
+  ///
+  /// 🔴 **바로 앉히지 않는다.** 동의 없이 팀에 넣는 길은 계약에 없다
+  /// (2026-09-10 박민호 결정) — 주장이 부르고 본인이 수락해야 소속이 된다.
+  /// 그래서 여기서 할 수 있는 것은 초대를 보내고 **보냈다고 알리는 것**까지다.
+  ///
+  /// 🔴 **부른 즉시 판에 세운다**(웹과 같다). 수락을 기다렸다 그리면 방금
+  /// 고른 사람이 **아무 데도 안 보이는** 몇 초가 생기고, 사용자는 자기가 뭘
+  /// 잘못 눌렀는지부터 의심한다. 카드 위에는 「수락 대기중」이 걸린다.
+  ///
+  /// ⚠️ **앱을 껐다 켜면 그 자리가 사라진다** — 계약의 초대 응답에
+  /// `grid_col`·`grid_row` 가 없어 어느 칸이었는지 되살릴 데가 없다(웹은
+  /// `localStorage` 에 따로 적어 둔다 — `inviteSeats.ts`). 그것과 수락을
+  /// 기다리는 폴링이 아직 안 옮긴 한 벌이다.
+  Future<void> _fillSeat(String teamId, SquadSlot slot) async {
+    final pick = await showSeatFillSheet(
+      context,
+      teamId: teamId,
+      positionCode: slot.position,
+      positionLabel: _positionLabel[slot.position] ?? slot.position,
+      placed: _placedNicknames(),
+    );
+    if (pick == null || !mounted) return;
+
+    final squad = _shownSquad;
+    if (squad == null) return;
+
+    try {
+      final invitation = await ref.read(invitationRepositoryProvider).invite(
+            teamId,
+            userId: pick.userId,
+            positionCode: slot.position,
+          );
+      if (!mounted) return;
+
+      setState(() {
+        _shownSquad = squadWithSeatInvited(
+          squad,
+          invitationId: invitation.id,
+          nickname: pick.nickname,
+          cardPublicSlug: pick.cardPublicSlug,
+          positionCode: slot.position,
+          gridCol: slot.col,
+          gridRow: slot.row,
+        );
+      });
+      /* 그 사람 카드는 따로 안 부른다 — `build` 가 판이 바뀔 때마다
+         `_wantMateCards` 를 부르고, `setState` 가 그 빌드를 일으킨다.
+         아직 안 왔으면 판이 이름표로 물러난다. */
+      _demoAccept(invitation.id);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
+  /// 🔴 **시연용 자동 수락.** 1.5초 뒤 그 자리를 스스로 수락함으로 바꾼다 —
+  /// 심사·시연에서 상대 기기로 수락을 눌러 줄 사람이 없기 때문이다.
+  ///
+  /// 🔴 **값의 출처는 웹이다** — `www/src/components/SquadPanel.tsx` 의
+  /// `DEMO_ACCEPT_MS`. 한쪽만 고치면 같은 기능이 두 화면에서 다르게 돌므로
+  /// 그쪽도 함께 본다(2026-09-25 사용자 확인: 「웹과 맞춤」).
+  ///
+  /// 🔴 **실제 배포에서는 걷어야 한다** — 진짜 수락 흐름을 가짜로 덮는
+  /// 코드다. 웹의 같은 자리에도 같은 경고가 달려 있다.
+  static const _demoAcceptDelay = Duration(milliseconds: 1500);
+
+  void _demoAccept(String invitationId) {
+    Future<void>.delayed(_demoAcceptDelay, () {
+      if (!mounted) return;
+      final squad = _shownSquad;
+      if (squad == null) return;
+      /* 🔴 ⊗ 로 이미 뺀 자리는 되살리지 않는다 — `squadWithSeatAccepted` 가
+         없는 id 를 만나면 아무것도 안 한다. */
+      setState(
+        () => _shownSquad = squadWithSeatAccepted(squad, memberId: invitationId),
+      );
+    });
+  }
+
+  /// 이미 판에 앉은 사람의 닉네임 → 그 자리.
+  ///
+  /// 🔴 닉네임으로 맞추는 까닭은 `showSeatFillSheet` 의 `placed` 주석에 있다.
+  Map<String, String> _placedNicknames() {
+    final squad = _shownSquad;
+    if (squad == null) return const {};
+    return {for (final m in squad.members) m.nickname: m.positionCode};
+  }
+
+  static const _positionLabel = {
+    'FW': '공격수',
+    'MF': '미드필더',
+    'DF': '수비수',
+    'GK': '골키퍼',
+  };
 
   /// 판에 앉은 팀원들의 카드를 **보이는 것만** 받아 둔다.
   ///
@@ -1442,6 +1644,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     row,
                   )
                 : null,
+            onSeatsSwapped: (ownedTeamId != null && squad?.teamId == ownedTeamId)
+                ? (a, b) => _swapSeats(ownedTeamId, squad!, a, b)
+                : null,
             onSeatRemoved: (ownedTeamId != null && squad?.teamId == ownedTeamId)
                 ? (memberId, slug) => _removeSeat(
                     ownedTeamId,
@@ -1451,7 +1656,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     card?.publicSlug,
                   )
                 : null,
-            onSeatTap: (_) => _notReady('선수 넣기'),
+            /* 🔴 **주장이고 그 팀의 판일 때만** 부를 수 있다 — 초대는 주장
+               전용이라(403), 시트를 열어 고르게 해 놓고 마지막에 막으면
+               고른 수고가 통째로 버려진다. 못 집게 하는 위 두 갈래와 같은
+               판단이다. */
+            onSeatTap: (ownedTeamId != null && squad?.teamId == ownedTeamId)
+                ? (slot) => _fillSeat(ownedTeamId, slot)
+                : (_) => _notReady('선수 넣기'),
           )
         : const _MemberPlaceholder();
 

@@ -28,6 +28,7 @@ class SquadBoard extends StatefulWidget {
     this.mateCardBuilder,
     this.onSeatMoved,
     this.onSeatRemoved,
+    this.onSeatsSwapped,
   });
 
   /// 내 카드. 🔴 **씨앗·슬러그·꾸미기가 전부 여기서 나온다** — 따로 받으면
@@ -63,6 +64,11 @@ class SquadBoard extends StatefulWidget {
   ///
   /// 🔴 **`null` 이면 ⊗ 를 안 그린다**(주장이 아니다).
   final void Function(String memberId, String? cardSlug)? onSeatRemoved;
+
+  /// 이미 사람이 있는 칸에 댔다 — **둘이 자리를 맞바꾼다.**
+  ///
+  /// 🔴 `null` 이면 맞바꾸지 않고 제자리로 돌려보낸다(주장이 아니다).
+  final void Function(String memberId, String otherMemberId)? onSeatsSwapped;
 
   @override
   State<SquadBoard> createState() => _SquadBoardState();
@@ -311,21 +317,29 @@ class _SquadBoardState extends State<SquadBoard> {
     if (target == null || memberId == null) return;
     // 제자리면 서버를 괜히 부르지 않는다.
     if (target.col == slot.col && target.row == slot.row) return;
-    /* 🔴 **이미 찬 칸에는 못 놓는다.** 서로 자리를 바꾸려면 등재 둘을 한 번에
-       고쳐야 하는데 계약에 그런 경로가 없다 — 한쪽씩 보내면 중간에 **같은 칸에
-       둘**이 되어 서버가 막는다. 제자리로 돌려보낸다. */
-    /* 🔴 **이미 사람이 있는 칸에는 못 놓는다.** 서로 자리를 바꾸려면 등재
-       둘을 한 번에 고쳐야 하는데 계약에 그런 경로가 없다 — 한쪽씩 보내면
-       중간에 같은 칸에 둘이 되어 서버가 막는다. */
-    final taken = seats.slots.any(
+    /* 🔴 **이미 사람이 있는 칸에 대면 둘이 맞바꾼다** (2026-09-25 사용자:
+       「거기에 대면 둘이 서로 바뀌는건 당연한 거고」).
+       ⚠️ **전에는 막았다.** 「계약에 등재 둘을 한 번에 고치는 경로가 없어서,
+       한쪽씩 보내면 중간에 같은 칸에 둘이 되어 서버가 막는다」가 그 까닭
+       이었다 — 맞는 진단이었지만 결론이 틀렸다. **셋으로 나눠 보내면**
+       중간에 겹치지 않는다(부르는 쪽 `_swapSeats` 가 그렇게 한다). */
+    final other = seats.slots.where(
       (s) =>
           s.area != slot.area &&
           s.col == target.col &&
           s.row == target.row &&
           (s.mine || seats.mates.containsKey(s.area)),
     );
-    if (taken) {
-      HapticFeedback.lightImpact();
+    if (other.isNotEmpty) {
+      final otherId = seats.memberIds[other.first.area];
+      /* 🔴 **내 카드와도 바꿀 수 있다** — 등재 id 만 있으면 된다. 그것이
+         없으면(아직 서버에 안 실린 자리) 제자리로 돌려보낸다. */
+      if (otherId == null || widget.onSeatsSwapped == null) {
+        HapticFeedback.lightImpact();
+        return;
+      }
+      HapticFeedback.selectionClick();
+      widget.onSeatsSwapped!(memberId, otherId);
       return;
     }
     widget.onSeatMoved!(
@@ -375,25 +389,43 @@ class _SquadBoardState extends State<SquadBoard> {
         widget.onSeatRemoved != null &&
         seats.memberIds.containsKey(slot.area);
 
+    /* 🔴 **부른 사람은 수락 전에도 판에 선다.** 그 사실을 카드 위에 적어야
+       「왜 아직 이 사람이 흐린지」가 드러난다 — 흐리기만 하면 카드가 덜
+       불러와진 것처럼 보인다(웹도 같은 자리에 같은 알약을 단다). */
+    final pending = seats.mates.containsKey(slot.area) &&
+        !(seats.ready[slot.area] ?? true);
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (removable)
+        if (removable || pending)
           Stack(
             clipBehavior: Clip.none,
             children: [
               card,
-              Positioned(
-                top: -6,
-                right: -6,
-                child: _RemoveButton(
-                  key: Key('squad-remove-${slot.area}'),
-                  onTap: () => widget.onSeatRemoved!(
-                    seats.memberIds[slot.area]!,
-                    seats.slugs[slot.area],
+              if (removable)
+                Positioned(
+                  top: -6,
+                  right: -6,
+                  child: _RemoveButton(
+                    key: Key('squad-remove-${slot.area}'),
+                    onTap: () => widget.onSeatRemoved!(
+                      seats.memberIds[slot.area]!,
+                      seats.slugs[slot.area],
+                    ),
                   ),
                 ),
-              ),
+              if (pending)
+                Positioned(
+                  top: -9,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: _PendingBadge(
+                      key: Key('squad-pending-${slot.area}'),
+                    ),
+                  ),
+                ),
             ],
           )
         else
@@ -440,6 +472,32 @@ class _SquadBoardState extends State<SquadBoard> {
       ),
     );
   }
+}
+
+/// 「수락 대기중」 — 아직 답이 안 온 사람의 카드 위에 걸치는 알약.
+///
+/// 🔴 **바탕이 있는 알약이다.** 카드가 밝은 초록이라 글자만 얹으면 읽히지
+/// 않는다(웹도 어두운 알약 위에 흰 글자다).
+class _PendingBadge extends StatelessWidget {
+  const _PendingBadge({super.key});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: _kInk.withValues(alpha: 0.82),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: const Text(
+          '수락 대기중',
+          style: TextStyle(
+            color: _kOnDark,
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            height: 1.2,
+          ),
+        ),
+      );
 }
 
 /// 카드를 판에서 빼는 ⊗ — 카드 오른쪽 위 모서리에 걸친다.

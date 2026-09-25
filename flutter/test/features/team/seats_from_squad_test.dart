@@ -32,6 +32,10 @@ Squad _squad(List<SquadMember> members, {String? formation = '5:5'}) => Squad(
     );
 
 void main() {
+  _cellLessMemberDrifts();
+
+  _onlyTheMovedCardMoves();
+
   test('스쿼드가 없으면 빈 포메이션 그대로다', () {
     final r = seatsFromSquad(null, SquadSize.five);
 
@@ -252,5 +256,97 @@ void main() {
       expect(squadSizeOf('11:11'), SquadSize.five);
       expect(squadSizeOf(''), SquadSize.five);
     });
+  });
+}
+
+/// 🔴 **내가 옮긴 카드 하나만 움직여야 한다** (2026-09-25, 사용자가 실기기에서
+/// 잡은 것: 「다른 사람들의 카드가 그 자리로 옮겨가지 않게」).
+void _onlyTheMovedCardMoves() {
+  /// 그 사람이 지금 서 있는 칸.
+  (int, int)? cellOf(SeatAssignment r, String nickname) {
+    for (final s in r.slots) {
+      if (r.mates[s.area] == nickname) return (s.col, s.row);
+    }
+    return null;
+  }
+
+  test('자리 없던 칸으로 옮겨도 남들은 제자리다', () {
+    /* 5:5 의 기본 칸은 fw1(1,0) · mf1(0,1) · mf2(2,1) · df1(1,2) · gk(1,3).
+       dtd 를 **자리가 없던 칸**(2,0)으로 옮긴 판이다 — 판은 그 칸에 놓는 것을
+       허락한다(자리 다섯은 격자 위를 돌아다닌다). */
+    final r = seatsFromSquad(
+      _squad([
+        _m(id: '1', slug: 'a', nickname: '정상호', pos: 'MF', col: 0, row: 1),
+        _m(id: '2', slug: 'b', nickname: 'dtd', pos: 'FW', col: 2, row: 0),
+        _m(id: '3', slug: 'c', nickname: '같이뛰실분', pos: 'DF', col: 1, row: 2),
+        _m(id: '4', slug: 'd', nickname: '새내기키퍼', pos: 'GK', col: 1, row: 3),
+      ]),
+      SquadSize.five,
+    );
+
+    expect(cellOf(r, 'dtd'), (2, 0), reason: '옮긴 사람은 옮긴 칸에');
+    expect(cellOf(r, '정상호'), (0, 1), reason: '남은 제자리여야 한다');
+    expect(cellOf(r, '같이뛰실분'), (1, 2), reason: '남은 제자리여야 한다');
+    expect(cellOf(r, '새내기키퍼'), (1, 3), reason: '남은 제자리여야 한다');
+  });
+
+  /// 🔴 서버가 주는 순서에 기대면 안 된다 — 같은 판인데 순서만 달라도 결과가
+  /// 같아야 한다.
+  test('서버 목록 순서가 달라도 같은 자리다', () {
+    final forward = seatsFromSquad(
+      _squad([
+        _m(id: '1', slug: 'a', nickname: '정상호', pos: 'MF', col: 0, row: 1),
+        _m(id: '2', slug: 'b', nickname: 'dtd', pos: 'FW', col: 2, row: 0),
+        _m(id: '3', slug: 'c', nickname: '같이뛰실분', pos: 'DF', col: 1, row: 2),
+      ]),
+      SquadSize.five,
+    );
+    final backward = seatsFromSquad(
+      _squad([
+        _m(id: '3', slug: 'c', nickname: '같이뛰실분', pos: 'DF', col: 1, row: 2),
+        _m(id: '2', slug: 'b', nickname: 'dtd', pos: 'FW', col: 2, row: 0),
+        _m(id: '1', slug: 'a', nickname: '정상호', pos: 'MF', col: 0, row: 1),
+      ]),
+      SquadSize.five,
+    );
+
+    for (final n in ['정상호', 'dtd', '같이뛰실분']) {
+      expect(cellOf(backward, n), cellOf(forward, n), reason: '$n 의 칸');
+    }
+  });
+}
+
+/// 🔴 **버그의 기전** (2026-09-25, 사용자: 「내가 바꾼 뒤에 나중에 혼자 다시
+/// 다른자리에 바껴」). 칸이 저장 안 된 등재는 **그때 비어 있는 자리**에 새로
+/// 앉으므로, 남이 움직여 빈 자리 구성이 바뀌면 **손도 안 댄 사람이 딸려
+/// 움직인다.**
+void _cellLessMemberDrifts() {
+  (int, int)? cellOf(SeatAssignment r, String nickname) {
+    for (final s in r.slots) {
+      if (r.mates[s.area] == nickname) return (s.col, s.row);
+    }
+    return null;
+  }
+
+  /// 🔴 **이것은 고침이 아니라 기록이다.** 이 함수는 **일부러** 이렇게 둔다 —
+  /// 칸이 없는 등재라도 판에서 사라지는 것보다는 어디든 앉히는 쪽이 낫다는
+  /// 판단(2단계 주석)이 먼저 있었다.
+  ///
+  /// 🔴 **막는 자리는 부르는 쪽이다** — 주장이 뭔가 옮길 때
+  /// `squadWithShownCellsPinned` 가 보이는 칸을 등재에 박아서, 이 갈래가 아예
+  /// 안 돌아가게 한다. 그쪽 시험이
+  /// `optimistic_squad_test.dart` 의 「박아 두면 남이 움직여도 안 따라간다」다.
+  test('칸 없는 등재는 남이 움직이면 따라 움직인다 (알려진 성질)', () {
+    SeatAssignment board(int bCol, int bRow) => seatsFromSquad(
+          _squad([
+            _m(id: 'A', slug: 'a', nickname: 'A', pos: 'MF'),
+            _m(id: 'B', slug: 'b', nickname: 'B', pos: 'MF', col: bCol, row: bRow),
+          ]),
+          SquadSize.five,
+        );
+
+    // B 만 (1,1) 로 옮겼는데 A 도 따라 움직인다 — 이것이 버그의 기전이다.
+    expect(cellOf(board(0, 1), 'A'), (2, 1));
+    expect(cellOf(board(1, 1), 'A'), (0, 1));
   });
 }

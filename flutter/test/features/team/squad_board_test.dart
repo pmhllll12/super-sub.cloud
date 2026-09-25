@@ -57,6 +57,8 @@ Finder _blankSeats() => find.byWidgetPredicate(
 const _myCard = PlayerCard(publicSlug: 'mine', nickname: '나');
 
 void main() {
+  _pendingSeatTests();
+
   testWidgets('서버 스쿼드의 사람이 판에 뜬다', (tester) async {
     await _pump(
       tester,
@@ -606,5 +608,40 @@ void main() {
 
     expect(tapped, isNotNull);
     expect(tapped!.position, 'GK');
+  });
+}
+
+/// 🔴 **부른 사람은 수락 전에도 판에 선다** — 수락을 기다렸다 그리면 방금
+/// 고른 사람이 아무 데도 안 보이는 몇 초가 생긴다(웹과 같은 판단).
+void _pendingSeatTests() {
+  testWidgets('수락 전인 사람 위에 「수락 대기중」이 뜬다', (tester) async {
+    await _pump(
+      tester,
+      SquadBoard(
+        myCard: null,
+        squad: _squad([
+          _m(id: 'inv-1', nickname: '라인세우기', pos: 'DF', col: 0, row: 2,
+              accepted: false),
+        ]),
+        onSeatTap: (_) {},
+      ),
+    );
+
+    expect(find.text('수락 대기중'), findsOneWidget);
+  });
+
+  testWidgets('수락한 사람에게는 안 뜬다', (tester) async {
+    await _pump(
+      tester,
+      SquadBoard(
+        myCard: null,
+        squad: _squad([
+          _m(id: 'm-1', nickname: '라인세우기', pos: 'DF', col: 0, row: 2),
+        ]),
+        onSeatTap: (_) {},
+      ),
+    );
+
+    expect(find.text('수락 대기중'), findsNothing);
   });
 }

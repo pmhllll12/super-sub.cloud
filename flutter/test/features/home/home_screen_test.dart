@@ -477,13 +477,29 @@ void main() {
       expect(mine.single.positionCode, 'FW');
     });
 
-    testWidgets('빈 자리를 누르면 준비 중 안내가 뜬다', (tester) async {
+    /// 🔴 2026-09-25 이전에는 여기가 「준비 중입니다」였다 — 그 안내가 곧
+    /// 이 기능이 없다는 뜻이었고, 이제 있다. 시트는 **어느 자리를 채우는지**
+    /// 를 머리말에 들고 열린다.
+    testWidgets('빈 자리를 누르면 사람 고르는 시트가 열린다', (tester) async {
       await _pumpLoggedIn(tester);
       await _openSheet(tester);
       // 🔴 FW 는 자동 착석이, GK 는 이감독이 앉았다 — 남은 빈 자리를 고른다.
       await tester.tap(find.byKey(const Key('squad-add-df1')));
       await tester.pump();
-      expect(find.textContaining('선수 넣기'), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.text('수비수 자리에 넣기'), findsOneWidget);
+      expect(find.byKey(const Key('seat-tab-ai')), findsOneWidget);
+      expect(find.byKey(const Key('seat-tab-friends')), findsOneWidget);
+
+      /* 🔴 여기서 멈추면 **Mock 의 지연이 타이머로 남아** 테스트가 「Pending
+         timers」로 깨진다. 썸네일은 후보 → 대표 영상 → 포스터로 **이어서**
+         묻고 Mock 은 단계마다 일부러 300ms 를 쓴다 — 단계 수만큼 흘려보낸다.
+         🔴 `pumpAndSettle` 은 못 쓴다: 그 사이 로딩 인디케이터가 **끝나지
+         않는 애니메이션**이라 10분 타임아웃까지 간다(이 폴더의 함정). */
+      for (var i = 0; i < 4; i++) {
+        await tester.pump(const Duration(milliseconds: 400));
+      }
     });
 
     testWidgets('팀원을 고르면 판 자리에 팀 목록 자리가 선다', (tester) async {
