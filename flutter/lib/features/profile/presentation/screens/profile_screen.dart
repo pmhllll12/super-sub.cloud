@@ -9,7 +9,6 @@ import '../../../auth/presentation/session_controller.dart';
 import '../../../card/data/card_providers.dart';
 import '../../../card/data/models/player_card.dart';
 import '../../../../core/widgets/glass_pill.dart';
-import '../../../../core/widgets/screen_tint.dart';
 import '../../../../core/widgets/floating_nav_bar.dart';
 import '../../../card/presentation/card_editor_screen.dart';
 import '../../../video/presentation/screens/my_videos_screen.dart';
@@ -48,31 +47,18 @@ class ProfileScreen extends ConsumerWidget {
        ⚠️ 아래 바탕색은 `.value` 를 써도 된다 — 못 읽으면 브랜드 민트로
        물러날 뿐이고, 사용자가 잘못 누를 것이 없다. */
     final cardAsync = ref.watch(myCardProvider);
-    final card = cardAsync.value;
 
-    /* 🔴 **배경이 내 카드의 색을 따른다**(2026-09-22, 사용자 요청). 홈의
-       빛무리와 같은 그림인데 색만 **카드 바탕색 + 자국색** 둘로 갈아 끼운다.
-       카드가 없으면 브랜드 민트 그대로다 — 「빈 카드」인데 배경만 요란하면
-       무엇을 보는 화면인지 흐려진다.
+    /* 🔴 **바탕이 순검정이다** (2026-09-25 사용자 요청: 「내 프로필
+       들어갔을때 전체 배경 색상 그냥 아예 검정으로」).
 
-       🔴 **카드 색을 고치고 돌아오면 부드럽게 건너간다** — 툭 갈리면 화면이
-       깜빡인 것처럼 보인다(`AnimatedAuroraBackground`). */
-    /// 카드가 없으면 브랜드 민트 한 쌍 — 「빈 카드」인데 배경만 요란하면
-    /// 무엇을 보는 화면인지 흐려진다.
-    const fallback = (a: Color(0xFF2EC4B6), b: Color(0xFF118AB2));
-    final tint = card?.style == null
-        ? fallback
-        : (a: card!.style!.bg, b: card.style!.brushColor);
-
-    /* 🔴 **홈과 같은 바탕이다**(2026-09-22 사용자 요청: 「내 프로필 화면에서도
-       그냥 배경 전체로 은은하게 색상 퍼지는거 홈페이지랑 똑같이」).
-       전에는 `AnimatedAuroraBackground`(빛무리)였다 — 두 화면의 바탕이 갈려
-       오갈 때 재질이 바뀌었다. */
+       ⛔ **[ScreenTint] 로 되돌리지 말 것.** 전에는 **내 카드의 색**(바탕색 +
+       자국색)으로 빛무리를 깔았는데, 카드마다 화면 전체가 파랗거나 붉어져서
+       **무엇을 보는 화면인지**가 카드 취향에 휘둘렸다. 그때 딸려 있던 값
+       셋(`card`·`fallback`·`tint`)도 같이 걷었다 — 되살리려면 2026-09-25
+       이전 커밋에서 꺼낸다. */
     return Stack(
       children: [
-        Positioned.fill(
-          child: ScreenTint(a: tint.a, b: tint.b),
-        ),
+        const Positioned.fill(child: ColoredBox(color: Color(0xFF000000))),
         Scaffold(
           // 🔴 **배경을 비운다** — 안 비우면 빛무리를 덮는다.
           backgroundColor: Colors.transparent,
@@ -145,11 +131,31 @@ class ProfileScreen extends ConsumerWidget {
                다섯이 세로로 줄줄이 서서 화면이 한참 길었다.
                「내 영상」만 한 줄을 다 쓴다 — 자주 들어가는 입구다. */
               children: [
-                _CardHero(cardAsync: cardAsync, nickname: user.nickname),
-                /* 🔴 **닉네임과 판 사이를 흰 선으로 가른다**(2026-09-22, 사용자
-                 요청: 「닉네임과 내 영상 판 가운데에 완전 흰색 선으로」).
-                 위아래 여백을 같게 줘서 선이 **둘의 한가운데**에 선다. */
-                const SizedBox(height: 14),
+                /* 🔴 **카드 자리는 완전한 흰 판 위다** (2026-09-25 사용자
+                   요청: 「그 내 분석/ 업로드 영상 버튼 위에 선 위로 그 위쪽에
+                   완전 흰색 판 두고, 양쪽 이랑 아래 선이랑 6픽셀 거리만 두고」).
+
+                   🔴 **양옆 6 은 목록이 이미 준다**([_kEdge]) — 여기서 또
+                   주면 12 가 된다. 아래 6 은 바로 아래 [SizedBox] 다.
+                   🔴 **판 위의 글자를 같이 뒤집었다**(`onWhite`) — 안 뒤집으면
+                   흰 글자가 흰 판에 얹혀 **통째로 사라진다.** */
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: const BoxDecoration(
+                    color: _kOn,
+                    borderRadius: BorderRadius.all(Radius.circular(16)),
+                  ),
+                  child: _CardHero(
+                    cardAsync: cardAsync,
+                    nickname: user.nickname,
+                    onWhite: true,
+                  ),
+                ),
+                /* 🔴 **흰 판과 선 사이는 6 이다**(사용자가 그 값을 짚었다).
+                   ⚠️ 아래 선의 위아래 14 짝과 다르다 — 그쪽은 「선이 두 판의
+                   한가운데」를 만드는 값이고, 이쪽은 **판이 선에 얼마나
+                   가까운가**라 다른 일을 한다. */
+                const SizedBox(height: _kGap),
                 const _Rule(),
                 const SizedBox(height: 14),
                 const _VideosBlock(),
@@ -214,6 +220,11 @@ const Color _kOnPanel = Color(0xFF000000);
 /// 휴대폰에서건」이라 비례하지 않는 값을 쓴다.
 const double _kEdge = 6;
 const double _kGap = 6;
+
+/// 흰 판 위의 글자·단추 — 🔴 **검은 바탕용 [_kOn] 의 짝이다**(2026-09-25,
+/// 카드 자리가 흰 판으로 올라가면서). 그 판에 들어가는 것은 **전부** 이 값을
+/// 써야 한다 — 하나라도 [_kOn] 으로 남으면 흰 판에서 통째로 사라진다.
+const Color _kOnWhitePanel = Color(0xFF111114);
 
 /// 되돌릴 수 없는 일의 빨강 — 탈퇴·해체가 나눠 쓴다.
 const Color _kDanger = Color(0xFFD32F2F);
@@ -351,7 +362,14 @@ class _Pair extends StatelessWidget {
 /// 카드 자체가 무엇인지 말하고 있어서 제목은 같은 말을 두 번 하는 자리였고,
 /// 상자는 카드 둘레에 테를 하나 더 둘러 **카드가 작아 보이게** 했다.
 class _CardHero extends ConsumerWidget {
-  const _CardHero({required this.cardAsync, required this.nickname});
+  const _CardHero({
+    required this.cardAsync,
+    required this.nickname,
+    this.onWhite = false,
+  });
+
+  /// 흰 판 위인가 — 🔴 **글자와 단추가 통째로 뒤집힌다**(2026-09-25).
+  final bool onWhite;
 
   /// 🔴 **`PlayerCard?` 가 아니라 `AsyncValue` 다**(2026-09-23). 아래
   /// [_cardAction] 이 「없다」와 「못 읽었다」를 갈라야 하는데, `null` 하나로는
@@ -361,7 +379,10 @@ class _CardHero extends ConsumerWidget {
 
   PlayerCard? get card => cardAsync.value;
 
-  static const double _cardWidth = 200;
+  /// 🔴 **200 → 192** (2026-09-25 사용자 요청: 「그 왼쪽 위 카드 진짜
+  /// 아주아주 살짝만 사이즈 줄이고」). 오른쪽 칸이 그만큼 넓어진다 —
+  /// [_GlassButton] 주석이 적어 둔 「틈이 거의 한계」가 조금 풀린다.
+  static const double _cardWidth = 192;
 
   /// 카드와 오른쪽 칸 사이.
   static const double _gap = 12;
@@ -409,8 +430,8 @@ class _CardHero extends ConsumerWidget {
                   Flexible(
                     child: Text(
                       nickname,
-                      style: const TextStyle(
-                        color: _kOn,
+                      style: TextStyle(
+                        color: onWhite ? _kOnWhitePanel : _kOn,
                         fontSize: 22,
                         fontWeight: FontWeight.w700,
                       ),
@@ -421,6 +442,7 @@ class _CardHero extends ConsumerWidget {
                     buttonKey: const Key('profile-edit'),
                     icon: Icons.edit,
                     tooltip: '닉네임 수정',
+                    onWhite: onWhite,
                     onTap: () => showNicknameSheet(context, nickname),
                   ),
                 ],
@@ -459,15 +481,17 @@ class _CardHero extends ConsumerWidget {
       return _GlassButton(
         buttonKey: const Key('profile-card-retry'),
         label: '불러오지 못했습니다 · 다시 시도',
+        onWhite: onWhite,
         onTap: () => ref.invalidate(myCardProvider),
       );
     }
     if (!cardAsync.hasValue) {
-      return const _GlassButton.disabled(label: '불러오는 중…');
+      return _GlassButton.disabled(label: '불러오는 중…', onWhite: onWhite);
     }
     final card = this.card;
     return _GlassButton(
       buttonKey: const Key('profile-card-edit'),
+      onWhite: onWhite,
       label: card == null ? '카드 만들기' : '프로필 카드 수정',
       onTap: () => card == null
           ? _createCard(context, ref)
@@ -502,12 +526,13 @@ class _GlassButton extends StatelessWidget {
     required this.buttonKey,
     required this.label,
     required this.onTap,
+    this.onWhite = false,
   });
 
   /// 눌리지 않는 같은 모양 — 「불러오는 중」처럼 **자리는 지키되 누를 수는
   /// 없어야 하는** 상태에 쓴다. 자리를 안 지키면 값이 도착할 때 옆 글자가
   /// 통째로 밀린다.
-  const _GlassButton.disabled({required this.label})
+  const _GlassButton.disabled({required this.label, this.onWhite = false})
     : buttonKey = const Key('profile-card-loading'),
       onTap = null;
 
@@ -515,10 +540,14 @@ class _GlassButton extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
 
+  /// 흰 판 위인가 — [_GlassShell.onWhite] 머리말.
+  final bool onWhite;
+
   @override
   Widget build(BuildContext context) {
     return _GlassShell(
       radius: BorderRadius.circular(999),
+      onWhite: onWhite,
       child: InkWell(
         key: buttonKey,
         onTap: onTap,
@@ -528,7 +557,13 @@ class _GlassButton extends StatelessWidget {
            줄바꿈되거나 카드를 덮는다. */
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          child: Text(label, style: const TextStyle(color: _kOn, fontSize: 14)),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: onWhite ? _kOnWhitePanel : _kOn,
+              fontSize: 14,
+            ),
+          ),
         ),
       ),
     );
@@ -542,6 +577,7 @@ class _GlassIconButton extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     required this.onTap,
+    this.onWhite = false,
   });
 
   final Key buttonKey;
@@ -549,19 +585,27 @@ class _GlassIconButton extends StatelessWidget {
   final String tooltip;
   final VoidCallback onTap;
 
+  /// 흰 판 위인가 — [_GlassShell.onWhite] 머리말.
+  final bool onWhite;
+
   @override
   Widget build(BuildContext context) {
     return Tooltip(
       message: tooltip,
       child: _GlassShell(
         radius: BorderRadius.circular(999),
+        onWhite: onWhite,
         child: InkWell(
           key: buttonKey,
           onTap: onTap,
           child: SizedBox(
             width: 28,
             height: 28,
-            child: Icon(icon, size: 14, color: _kOn),
+            child: Icon(
+              icon,
+              size: 14,
+              color: onWhite ? _kOnWhitePanel : _kOn,
+            ),
           ),
         ),
       ),
@@ -650,10 +694,18 @@ class _FoldState extends State<_Fold> with SingleTickerProviderStateMixin {
 /// 유리 + **제일 얇은 흰 테**./// 유리 + **제일 얇은 흰 테**. 두 단추가 재질을 나눠 쓴다 — 한쪽만 고치면
 /// 둘이 갈라진다.
 class _GlassShell extends StatelessWidget {
-  const _GlassShell({required this.radius, required this.child});
+  const _GlassShell({
+    required this.radius,
+    required this.child,
+    this.onWhite = false,
+  });
 
   final BorderRadius radius;
   final Widget child;
+
+  /// 흰 판 위인가 — 🔴 **면도 테도 뒤집힌다.** 흰 기 10% 면과 흰 테는
+  /// 흰 판에서 **아무것도 아닌 것**이 된다(모양 자체가 안 읽힌다).
+  final bool onWhite;
 
   @override
   Widget build(BuildContext context) {
@@ -674,9 +726,9 @@ class _GlassShell extends StatelessWidget {
 
            🔴 **연필 단추도 같이 바뀐다** — 둘이 이 틀을 나눠 쓴다. 한쪽만
            고치면 재질이 갈린다. */
-        color: _kOn.withValues(alpha: 0.10),
+        color: (onWhite ? _kOnWhitePanel : _kOn).withValues(alpha: 0.10),
         border: Border.all(
-          color: _kOn,
+          color: onWhite ? _kOnWhitePanel : _kOn,
           // 이 기기에서 그릴 수 있는 **가장 얇은 선**.
           width: 0.5,
         ),
