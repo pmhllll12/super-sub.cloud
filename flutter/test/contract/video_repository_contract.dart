@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_sub/features/video/data/clip_file.dart';
 import 'package:super_sub/features/video/data/video_repository.dart';
+import 'package:super_sub/features/video/data/models/skeleton.dart';
 import 'package:super_sub/features/video/data/models/video_report.dart';
 
 /// VideoRepository 의 모든 구현체가 지켜야 하는 계약.
@@ -221,6 +222,36 @@ void runVideoRepositoryContract(
     /// 「아직」으로 답하면 화면이 영영 오지 않을 결과를 기다리게 한다.
     test('반려된 클립의 리포트는 「아직」이 아니다', () async {
       expect(await repo.report(rejectedVideoId), isNot(isA<ReportReady>()));
+    });
+
+    /// 🔴 **이름과 id 만 온다** — 재생 주소는 계약에 없다(선수 영상이 S3 에
+    /// 없어서다). 화면은 영상을 에셋에서 찾으므로, 여기서 주소를 기대하기
+    /// 시작하면 두 구현체가 갈린다.
+    test('견줄 선수 목록이 온다', () async {
+      final players = await repo.referencePlayers();
+
+      expect(players, isNotEmpty);
+      expect(players.every((p) => p.id.isNotEmpty && p.name.isNotEmpty), isTrue);
+    });
+
+    /// 🔴 **없는 선수는 예외가 아니라 갈래다** — 영상 관절과 같은 규칙.
+    /// 예외로 던지면 화면이 통째로 오류 상태가 된다.
+    test('없는 선수의 관절은 예외가 아니라 unavailable 이다', () async {
+      expect(
+        await repo.referencePlayerSkeleton('no-such-player'),
+        isA<SkeletonUnavailable>(),
+      );
+    });
+
+    /// 🔴 **선수 관절에는 「아직」이 없다.** 미리 계산되어 있어 다시 물어도 안
+    /// 바뀐다 — 「아직」으로 답하면 화면이 영영 폴링한다.
+    test('있는 선수의 관절은 「아직」이 아니다', () async {
+      final id = (await repo.referencePlayers()).first.id;
+
+      expect(
+        await repo.referencePlayerSkeleton(id),
+        isNot(isA<SkeletonNotReady>()),
+      );
     });
   });
 }

@@ -13,10 +13,9 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../intro/presentation/brand_mark.dart';
 import '../../../../core/widgets/glass_pill.dart';
 import '../../../../core/widgets/aurora_background.dart';
-import '../../../../core/widgets/bar_menu.dart';
 import '../../../../core/widgets/floating_nav_bar.dart';
-import '../../../../core/widgets/glass_panel.dart';
 import '../../../../core/widgets/silver_edge.dart';
+import '../../../../core/widgets/raised_rim.dart';
 import '../../../../core/widgets/screen_tint.dart';
 import '../../../../core/widgets/silver_sweep_border.dart';
 import '../../../auth/presentation/session_controller.dart';
@@ -26,11 +25,19 @@ import '../../../card/data/models/player_card.dart';
 import '../../../card/presentation/mate_cards_controller.dart';
 import '../../../profile/presentation/widgets/player_card_view.dart';
 import '../../../team/auto_seat.dart';
+import '../../../team/board_geometry.dart';
+import '../../../team/data/candidate_providers.dart';
 import '../../../team/data/models/squad.dart';
 import '../../../team/data/squad_providers.dart';
 import '../../../team/data/squad_repository.dart';
 import '../../../team/optimistic_squad.dart';
 import '../../../team/seats_from_squad.dart';
+import '../../../team/presentation/sheets/seat_fill_sheet.dart';
+import '../../../team/data/inbox_providers.dart';
+import '../../../team/presentation/sheets/inbox_sheet.dart';
+import '../../../team/presentation/sheets/match_waiting_sheet.dart';
+import '../../../team/presentation/sheets/team_match_sheet.dart';
+import '../../../team/presentation/sheets/team_seek_sheet.dart';
 import '../../../team/presentation/widgets/squad_board.dart';
 import '../widgets/home_video_strip.dart';
 
@@ -54,23 +61,40 @@ import '../widgets/home_video_strip.dart';
 /// 살구빛**으로 뒤집었다(`ScreenTint.warm`). 이 값은 [AuroraBackground] 가
 /// **하단 바 뒤까지** 칠하는 바탕이라, 여기만 검정으로 두면 화면 아래에
 /// **검은 띠**가 남는다 — 그래서 같은 값을 쓴다.
+///
+/// 🔴 **다시 순검정이 됐다 (2026-09-24 사용자 요청).** [ScreenTint.mintBase]
+/// 가 `#000000` 이다. ⚠️ 그래서 **맨 위 두 문단의 밴딩 경고가 되살아났다** —
+/// `kAuroraGlow` 를 켜는 날 이 값부터 볼 것.
 const Color _kHomeBg = ScreenTint.mintBase;
 
 /// 검은 바탕 위의 글자.
 const Color _kOnDark = Color(0xFFFFFFFF);
 
-/// 유리 조각 모서리.
-const double _kCardRadius = 18;
 
 /// 오른쪽 위 「내 프로필」 단추의 카드 폭. 웹 헤더의 작은 카드(`.ss-pcard-mini`)
 /// 자리다 — 글자는 안 읽혀도 초록 카드와 인물로 「내 카드」임을 알아본다.
 ///
-/// 🔴 **두 번에 걸쳐 키웠다**(2026-09-22 사용자 요청) — 48 → 72(1.5배) →
-/// **94**(거기서 다시 1.3배). 스쿼드 판 밖 화면 맨 위로 나오면서 **옆에
-/// 견줄 것이 없어져** 작아 보였다.
-/// 아래 글자도 **같은 배수**로 키운다 — 카드만 키우면 글자가 상대적으로
-/// 쪼그라들어 균형이 깨진다.
-const double _kProfileCardWidth = 94;
+/// 🔴 **이 값이 판 아랫변과 영상 줄 높이를 같이 정한다.** 세 값이 한 줄로
+/// 엮여 있어서, 여기만 고치면 나머지가 따라온다:
+///
+/// | | |
+/// |---|---|
+/// | [_kProfileButtonH] | 카드 높이(4.1:3) + 글자 + 둘레 |
+/// | 판 아랫변 | `rowTop + _kProfileButtonH + _kTopPanelPadBottom` |
+/// | 영상 줄 높이 | 판 아랫변 ~ 흰 판 윗변의 남는 자리 |
+///
+/// ⚠️ **94 → 80** (2026-09-24 사용자 요청: 「내 프로필 카드 지금 살짝 줄이고
+/// 위에 판 그만큼 더 위로 옮기자. 영상 그만큼 크기 늘리자」). 판 아랫변이
+/// 212 → 193 으로 올라가고 영상 카드가 그만큼(약 19) 커진다.
+///
+/// ⚠️ 그 전에는 **두 번에 걸쳐 키웠었다**(2026-09-22) — 48 → 72(1.5배) →
+/// 94(거기서 다시 1.3배). 스쿼드 판 밖 화면 맨 위로 나오면서 **옆에 견줄
+/// 것이 없어져** 작아 보였기 때문이다. 이번에 줄인 것은 그 판단을 뒤집은
+/// 것이 아니라 **영상 줄에 자리를 내준 것**이다.
+///
+/// 아래 글자는 **같이 안 줄였다** — 14 는 이미 읽히는 최소에 가깝고,
+/// 2026-09-22 에 「카드 폭과 배수를 맞추던 규칙은 끝났다」로 정해 뒀다.
+const double _kProfileCardWidth = 80;
 
 /* ⛔ **`_kSheetCollapsedFactor`(0.5) · `_kCollapsedBoardShrink`(0.82) 를
    지웠다**(2026-09-22). 둘은 「위에서 내려오는 시트」가 **접혔을 때 화면의
@@ -185,16 +209,53 @@ const double _kSquadPhotoH = 180;
 /// (손잡이 + 알약 줄 + 틈).
 const double _kBoardTopInset = _kSheetHandleH + 4 + _kPillsRowH + 12;
 
-/// 판 둘과 지름길 알약 줄을 한 덩이로 받치는 **흰 판**(2026-09-23 사용자 요청:
+/// 판 둘과 지름길 알약 줄을 한 덩이로 받치는 **아래 판**(2026-09-23 사용자 요청:
 /// 「스쿼드판이랑 영상분석 판 아래에 흰색 판 하나」).
+///
+/// ⚠️ **순백이었다 → 맨 위 판과 같은 색으로**(2026-09-24 사용자 요청: 「하단 바
+/// 위에 있는 판도 내 프로필에 있는 판 색상으로 바꾸자」). 🔴 **이름은 그대로
+/// 둔다** — 부르는 자리(`_whiteSheet`·`home-white-sheet` 키·시험)가 그 이름을
+/// 쓰고, 색은 또 바뀔 수 있다.
+///
+/// 🔴 **[_kTopPanelColor] 를 따라가던 것을 끊었다 (2026-09-24, 사용자 지시:
+/// 「하단 바 위에 있는 판은 색상 바꾸지 마」).** 같은 날 바탕이 순검정이 되면서
+/// 맨 위 판이 `#222021` 로 돌아갔는데, **이 판은 그 자리에 안 따라간다.**
+/// 위 「위아래 판이 한 색」 결정은 여기서 끝났다 — 🔴 **다시 묶지 말 것.**
+/// 이제 화면은 **검은 바탕 · 어두운 머리 판 · 밝은 회색 아래 판** 세 층이다.
 ///
 /// 🔴 **판 둘 안이 비치지는 않는다.** 판 면([_kSheetColor])은 거의 투명하지만
 /// 그 위에 사진(`squad_cover.jpg` · `analysis_cover.jpg`)이 `BoxFit.cover` 로
-/// 꽉 차 있어서, 이 흰색은 **판을 두르는 테와 판 사이 틈**으로만 보인다.
+/// 꽉 차 있어서, 이 색은 **판을 두르는 테와 판 사이 틈**으로만 보인다.
 ///
 /// ⚠️ **한 자리만 예외다** — 스쿼드 판을 펼치면 그 사진이 걷히고 스쿼드 그림이
-/// 드는데, 그때는 판 면 너머로 이 흰색이 비친다.
-const Color _kWhiteSheetColor = Color(0xFFFFFFFF);
+/// 드는데, 그때는 판 면 너머로 이 색이 비친다.
+/// 🔴 **더는 흰 판이 아니다 — 거의 검정이다** (2026-09-25 사용자 요청:
+/// 「그 하단 바 바로 위 판의 전체 색상을 완전 검정의 85퍼센트만 준거로
+/// 바꾸자」).
+///
+/// 🔴 **알파가 아니라 밝기로 준다** (같은 날 정정, 사용자: 「배경 검정이랑
+/// 차이가 없는데? 아니면 검정 50퍼로 줘봐」).
+///
+/// ⚠️ **투명도로는 절대 안 보인다.** 바탕이 순검정([_kTopPanelColor] 과 같은
+/// `#000000`)이라 **검정 × 어떤 알파도 결국 검정**이다 — 85%든 50%든 화면에
+/// 찍히는 픽셀이 똑같다. 판이 보이려면 **바탕보다 밝아야** 한다. ⛔ 다시
+/// `Color(0x..000000)` 꼴로 되돌리지 말 것.
+///
+/// 값은 알약들이 이미 나눠 쓰는 면([SilverEdge.defaultFill])의 색이다 —
+/// 새 회색을 지어내면 한 화면에 거의 같은 검정이 둘 생긴다.
+/// 🔴 **더 밝게·어둡게는 이 한 줄이다.**
+///
+/// ⚠️ **이름과 이웃한 `_kWhiteSheet*` 들은 옛 이름이다** — 그 자리(모서리·
+/// 여백·기하)는 색과 무관해서 그대로 뒀다. 주석의 「흰 판」도 같은 자리를
+/// 가리킨다. 색만 갈렸다고 읽으면 된다.
+///
+/// 🔴 **[kSheetPaper] 에서 끊었다.** 잠시 「영상 분석」 화면의 밝은 판과 같은
+/// 값을 나눠 썼는데, 여기만 어두워졌으므로 묶여 있으면 **그 화면까지 검어진다.**
+/// ⛔ 다시 [kSheetPaper] 로 묶지 말 것.
+///
+/// 🔴 **판 위의 글자를 같이 뒤집었다**([_kOnSheet]) — 한쪽만 바꾸면 지름길
+/// 알약의 글자가 통째로 사라진다.
+const Color _kWhiteSheetColor = Color(0xFF1C1C1E);
 
 /// 흰 판의 모서리.
 const double _kWhiteSheetRadius = 28;
@@ -219,16 +280,43 @@ const double _kShortcutTopPad = 14;
 /// 알약 셋 사이 틈.
 const double _kShortcutSpacing = 10;
 
-/// 지름길 알약의 면 — 🔴 **맨 위 다크 판과 같은 값이다**(2026-09-24).
+/* ⛔ **여기 있던 `_kPillFill`(= [_kInkDark], 불투명한 어두운 면)을 걷었다**
+   (2026-09-24 사용자 지시: 「3개 버튼들 안쪽 색상 빠르게 없애봐」 →
+   「1번으로 해줘」). 지름길 알약은 이제 **유리**다 —
+   면은 [_kShortcutGlassAlpha](흰 기), 글자는 [_kOnSheet](지금은 흰색)다.
+
+   🔴 **되살린다면 [_kOnSheet] 를 같이 뒤집는다.** 어두운 면에는 흰 글자였다.
+   그 값 이력이 여기 남아 있다: 화면 바탕을 따라가던 것(2026-09-23, 바탕이
+   밝아지며 알약이 통째로 사라져서 끊었다) → 맨 위 판과 같은 `#222021`
+   → **유리**. 🔴 **어느 판도 기준이 아니다** — 알약의 기준은 **제가 앉은
+   판**([_kWhiteSheetColor], 밝은 회색)이고, 지금 유리가 성립하는 것도
+   그 판이 밝기 때문이다. */
+
+/// 지름길 알약의 모서리 — 🔴 **알약(`StadiumBorder`)이 아니라 둥근 네모다**
+/// (2026-09-24 사용자 요청 + 레퍼런스).
 ///
-/// ⚠️ **바탕을 따라가던 것을 끊었다.** 2026-09-23 에는 「화면 바탕과 같은
-/// 딥그린」이라 [ScreenTint.mintBase] 를 그대로 썼는데, 바탕이 **밝은
-/// 회색으로 뒤집히면서** 그 규칙이 알약을 **흰 판 위의 밝은 회색 + 흰 글자**
-/// 로 만들어 통째로 사라지게 했다.
+/// 🔴 **모서리가 있어야 [RaisedRim] 이 성립한다** — 레퍼런스의 「모서리 두 곳이
+/// 자연스럽게 안 보인다」는 **모서리가 있을 때만** 눈에 집힌다. 양 끝이 완전한
+/// 반원이면 그냥 한쪽만 밝은 테로 보인다. ⛔ [StadiumBorder] 로 되돌리지 말 것.
+const double _kShortcutRadius = 20;
+
+/* ⛔ **여기 있던 `_kShortcutBlur`(공용 흐림의 30%)와 `_kShortcutGlassAlpha`
+   (흰 기 [kPillTint])를 걷었다** (2026-09-25 — 알약이 유리를 버리고 **흰색
+   85%** 로 갔다). 면이 거의 불투명해서 **흐릴 뒤가 없다**(하단 바가 흰색이
+   되면서 흐림을 걷은 것과 같은 판단이다). 되살리려면 그날 이전 커밋을 본다. */
+
+/// 지름길 알약의 면 — 🔴 **완전한 흰색** (2026-09-25 사용자 요청: 「레슨 상점
+/// 경기장 예약 알림 버튼 안쪽 색상 완전 흰색으로」). 85%로 한 번 갔다가 같은
+/// 날 순백으로 올렸다 — 어두운 판 위에서 15%의 비침이 **면을 탁하게** 했다.
 ///
-/// 🔴 **이제 「어두운 면」이 짝이다** — 화면에 어두운 것이 다크 판과 이 알약
-/// 둘뿐이라 같은 상수를 쓴다. 알약 색을 갈려면 [_kTopPanelColor] 를 본다.
-const Color _kPillFill = _kTopPanelColor;
+/// 🔴 **판([_kWhiteSheetColor], `#1C1C1E`)보다 한참 밝다** — 그 대비가 알약을
+/// 알약으로 읽히게 하는 전부다. 판을 밝게 돌리면 여기와 [_kOnSheet] 를 같이
+/// 본다.
+///
+/// ⚠️ **알약의 면은 하루에 다섯 번 갈렸다**: 어두운 불투명(`#222021`) → 면
+/// 없음 → 흰 기 16%(유리) → 흰색 85% → **순백**. 그때마다 [_kOnSheet] 가
+/// 함께 뒤집혔다.
+const Color _kShortcutFill = Color(0xFFFFFFFF);
 
 /// 화면 맨 위 **다크 헤더 판**의 면 (2026-09-24 사용자 요청 + 레퍼런스:
 /// 「내 프로필 글자 아래로 … 이 색상으로 판 하나 주자」, 색 견본 `#222021`).
@@ -238,10 +326,41 @@ const Color _kPillFill = _kTopPanelColor;
 /// 소개 두 줄(「함께 뛸 팀을 만들고,…」)은 **판 밖 아래**에 남는다 —
 /// 판을 그 줄까지 내리지 말 것.
 ///
-/// 🔴 **판 위의 글자가 흰색인 근거다.** 바탕이 밝은 회색으로 뒤집혔어도
-/// 인사말·「내 프로필」·로고가 흰색으로 남을 수 있는 것은 이 판 덕분이다.
-/// 이 판을 걷으면 그 셋의 색도 함께 정해야 한다.
-const Color _kTopPanelColor = Color(0xFF222021);
+/// 🔴 **어두운 쪽으로 돌아왔다 (2026-09-24, 같은 날 세 번째. 사용자 요청:
+/// 「배경색상 완전 검정으로 하고, 그 내 프로필 있는 맨 위 판의 색상을 지금
+/// 배경색상으로 다시 바꾸자」).** 몇 시간 전 바탕과 맞바꿔 밝은 회색
+/// (`#E4E9E7`)이었던 것을, **직전 바탕값 `#222021`** 로 되돌렸다.
+/// 바탕은 그 자리에서 **순검정**이 됐다([ScreenTint.mintBase]).
+///
+/// 🔴 **그래서 판 위의 글자가 전부 다시 희어졌다**([_kOnPanel]) — 인사말·손·
+/// 「내 프로필」·로고 넷이다. 이 판 색을 또 밝게 돌리면 **그 넷을 같이
+/// 되돌려야 한다.** 한쪽만 바꾸면 글자가 통째로 사라진다.
+///
+/// 🔴 **바탕과 똑같은 순검정이 됐다 (2026-09-24, 같은 날 네 번째. 사용자 지시:
+/// 「그 맨 위에 있는 판도 빠르게 완전 검정색으로 바꾸고」).** `#222021` 로
+/// 되돌린 지 몇 분 만이다.
+///
+/// ⚠️ **그래서 이 판은 「보이는 판」이 아니다** — 바탕과 한 색이라 **경계가
+/// 아예 없다.** 눈에는 검은 화면 하나이고, 이 판은 **글자 넷을 담는 자리**와
+/// **상태 바 아이콘 밝기의 기준**으로만 남는다. 「판이 안 보인다」를 버그로
+/// 읽지 말 것 — 사용자가 그렇게 정했다.
+///
+/// 🔴 **그 탓에 [_kWhiteSheetColor] 와는 완전히 갈라섰다** — 아래 판은 밝은
+/// 회색에 그대로 남는다(사용자 지시: 「하단 바 위에 있는 판은 색상 바꾸지 마」).
+const Color _kTopPanelColor = Color(0xFF000000);
+
+/// 다크 판 위의 글자 — 🔴 **판이 다시 어두워져서 흰색이다.**
+///
+/// ⚠️ **지금 [_kOnDark] 와 값이 같다. 그래도 합치지 말 것** — 그쪽은
+/// **스쿼드 판·사진 위**라 판 색과 무관하게 흰색이고, 이쪽만 판 색을 따라간다.
+/// 한 상수로 묶으면 판을 바꿀 때 엉뚱한 곳이 같이 뒤집힌다(실제로 판이 밝았던
+/// 몇 시간 동안 이 값만 `#222021` 이었다).
+const Color _kOnPanel = Color(0xFFFFFFFF);
+
+/* ⛔ **여기 있던 `_kInkDark`(`#222021`, 「흰 판 위에 앉는 어두운 면」)를
+   걷었다** (2026-09-25 — 지름길 알약이 [RaisedRim] 을 버리면서 마지막 쓰임이
+   사라졌다). 그 상수는 **판이 밝다**는 전제 위에 있었고, 판이 85% 검정이 된
+   지금 그 전제가 없다. 되살리려면 2026-09-25 이전 커밋에서 꺼낸다. */
 
 /// 다크 판의 **아래 모서리** — 🔴 흰 판([_kWhiteSheetRadius])과 같은 값이다.
 /// 위는 화면 끝에 붙으므로 안 둥글린다. 둘이 화면 위아래에서 짝을 이룬다.
@@ -255,17 +374,27 @@ const double _kTopPanelRadius = _kWhiteSheetRadius;
 const double _kTopPanelPadBottom = 6;
 
 
-/// 알약 안의 글자·아이콘 — 🔴 **순백이다**(같은 요청). 면이 어두워졌으므로
-/// 검정에서 뒤집혔다.
+/// 알약 안의 글자·아이콘 — 🔴 **완전한 검정이다** (2026-09-25 사용자 요청:
+/// 「아이콘이랑 글자는 오나전 검정으로」). 면이 **흰색 85%**([_kShortcutFill])
+/// 라 그 위에서 가장 또렷한 값이다.
 ///
-/// ⚠️ **알약이 흰 판 위에 있다는 것과는 무관하다** — 판이 아니라 **알약 제
-/// 면**을 기준으로 정한다. 앞서 판이 희다는 이유로 검정(`#111114`)이었다.
-const Color _kOnWhite = Color(0xFFFFFFFF);
+/// 🔴 **기준은 판이 아니라 알약 제 면이다.** 판은 거의 검정인데 글자는
+/// 검정이다 — 어긋나 보여도 맞다. 🔴 **면을 갈면 여기도 같이 간다**:
+/// 검정(면이 흴 때) → 순백(면이 어두울 때) → 검정(유리 + 밝은 판) →
+/// 순백(판이 어두워짐) → **검정**(면이 흰색 85%).
+const Color _kOnSheet = Color(0xFF000000);
 
-/// 알약의 테 — 🔴 **하단 바·영상 분석 판과 같은 값**([SilverEdge.onWhite])
-/// 이다. 셋이 같은 흰 판 위에 놓인 조각이라 테가 갈리면 한 화면에 두 굵기·
-/// 두 색이 보인다.
-const Color _kPillLineOnWhite = SilverEdge.onWhite;
+/* ⛔ **여기 있던 `_kPillLineOnWhite`([SilverEdge.onWhite])를 걷었다**
+   (2026-09-24 사용자 요청 + 레퍼런스 — 지름길 알약 셋이 [RaisedRim] 으로 갔다).
+
+   🔴 **그 상수의 규칙이 깨진 것을 알고 깨뜨렸다.** 그 자리엔 「하단 바·영상
+   분석 판과 **같은 값**이다 — 셋이 같은 흰 판 위에 놓인 조각이라 테가 갈리면
+   한 화면에 두 굵기·두 색이 보인다」고 적혀 있었다. 이제 **지름길 알약만**
+   대각선으로 밝기가 갈리는 테를 쓰고, 하단 바·영상 분석 판은 은빛 실선
+   ([_kSilverOnWhiteWidth] 쪽)에 남아 있다.
+
+   ⚠️ **그래서 한 화면에 테가 두 종류다.** 사용자가 그 모양을 콕 집어 골랐으니
+   「어긋났다」로 읽고 되돌리지 말 것. 되돌린다면 **셋을 같이** 옮긴다. */
 
 /// 흰 판 위에서 영상 분석 판을 가르는 **가장 얇은 은빛 선**(2026-09-23 사용자
 /// 요청: 「제일 얇은 세련된 실버 색상」).
@@ -287,12 +416,12 @@ const List<({Key key, IconData icon, String label})> _kShortcuts = [
     label: '레슨 · 상점',
   ),
   (key: Key('home-shortcut-venue'), icon: Symbols.stadium, label: '경기장 예약'),
-  (
-    key: Key('home-shortcut-alarm'),
-    icon: Symbols.notifications,
-    label: '알림',
-  ),
+  (key: _kAlarmKey, icon: Symbols.notifications, label: '알림'),
 ];
+
+/// 🔴 **셋 중 알림만 갈 곳이 생겼다**(2026-09-25) — 나머지 둘은 아직 웹에만
+/// 있다. 그 하나를 가려내는 열쇠다.
+const Key _kAlarmKey = Key('home-shortcut-alarm');
 
 /// 스쿼드 판 자리에 무엇을 세우는가 — 웹의 알약 「팀장」 · 「팀원」.
 enum _Role { captain, member }
@@ -319,19 +448,11 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen>
     with TickerProviderStateMixin {
-  /// 바 넷째 아이콘에서 열리는 메뉴의 진행도.
-  late final AnimationController _menu = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 420),
-  );
-
   /// 테두리를 도는 빛의 위상. 유리 조각 전부가 이 하나를 나눠 쓴다.
   late final AnimationController _sheen = AnimationController(
     vsync: this,
     duration: const Duration(seconds: 7),
   )..repeat();
-
-  bool _menuOpen = false;
 
   _Role _role = _Role.captain;
 
@@ -366,7 +487,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   @override
   void dispose() {
-    _menu.dispose();
     _sheen.dispose();
     _sheet.dispose();
     _pills.dispose();
@@ -455,28 +575,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   void _toggleSheet() => _settleSheet(_sheet.value > 0.5 ? 0 : 1);
 
-  void _openProfile() {
-    _closeMenu();
-    context.push('/profile');
-  }
+  void _openProfile() => context.push('/profile');
 
-  void _toggleMenu() {
-    setState(() => _menuOpen = !_menuOpen);
-    _menuOpen ? _menu.forward() : _menu.reverse();
-  }
-
-  void _closeMenu() {
-    if (!_menuOpen) return;
-    setState(() => _menuOpen = false);
-    _menu.reverse();
-  }
-
+  /* 🔴 **맨 오른쪽(로그인/로그아웃) 칸은 여기로 안 온다** — 바가 그 자리에서
+     세션을 끝낸다(`floating_nav_bar.dart`). 어느 화면에서 눌러도 뜻이 하나라
+     화면마다 같은 줄을 적지 않는다. */
   void _onNavTap(int index) {
-    if (index == FloatingNavBar.menuIndex) {
-      _toggleMenu();
-      return;
-    }
-    _closeMenu();
     switch (index) {
       case 0:
         return; // 이미 홈이다.
@@ -489,25 +593,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       // 🔴 1번은 영상이다 — 3번과 **같은 종류의 누락**이었다(2026-09-22).
       case 1:
         context.go('/videos');
-      case 2:
-        _notReady('레슨 · 코치');
       default:
         _notReady();
-    }
-  }
-
-  void _onMenuPick(BarMenuItem item) {
-    _closeMenu();
-    switch (item) {
-      case BarMenuItem.logout:
-        ref.read(sessionControllerProvider.notifier).logout();
-      case BarMenuItem.login:
-        // 홈은 로그인한 뒤에만 보이는 화면이라 여기 설 일이 없다.
-        break;
-      case BarMenuItem.credits:
-      case BarMenuItem.coach:
-      case BarMenuItem.settings:
-        _notReady(item.label);
     }
   }
 
@@ -595,6 +682,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   /// 카드를 다른 칸으로 옮긴다 — 서버에 남겨야 새로고침해도 그 자리다.
+  ///
+  /// 🔴 **옮기기 전에 보이는 칸을 전부 박는다** (2026-09-25, 사용자: 「내가
+  /// 바꾼 뒤에 나중에 혼자 다시 다른자리에 바껴」). 칸이 저장 안 된 등재는
+  /// 다시 그릴 때마다 「그때 비어 있는 자리」에 새로 앉아서, **내가 다른
+  /// 카드를 옮기면 손도 안 댄 사람이 딸려 움직인다.** 자세한 까닭은
+  /// `squadWithShownCellsPinned` 주석에 있다.
   Future<void> _moveSeat(
     String teamId,
     Squad squad,
@@ -602,22 +695,134 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     String positionCode,
     int col,
     int row,
-  ) => _write(
-    squadWithSeatMoved(
-      squad,
-      memberId: memberId,
-      positionCode: positionCode,
-      gridCol: col,
-      gridRow: row,
-    ),
-    (repo) => repo.moveSeat(
-      teamId,
-      memberId: memberId,
-      positionCode: positionCode,
-      gridCol: col,
-      gridRow: row,
-    ),
-  );
+  ) async {
+    /* 🔴 **아직 서버 등재가 아니면 옮기지 않는다** — 404 가 난다. 화면에서만
+       옮겨 두면 새로고침에 되돌아가 더 헷갈린다. */
+    final m = _memberOf(squad, memberId);
+    if (m != null && m.isPendingInvite) {
+      _notReady('수락을 기다리는 중이라 아직 못 옮깁니다');
+      return;
+    }
+    final pinned = _pinned(squad);
+    await _write(
+      squadWithSeatMoved(
+        pinned,
+        memberId: memberId,
+        positionCode: positionCode,
+        gridCol: col,
+        gridRow: row,
+      ),
+      (repo) async {
+        await _persistPins(repo, teamId, squad, pinned);
+        return repo.moveSeat(
+          teamId,
+          memberId: memberId,
+          positionCode: positionCode,
+          gridCol: col,
+          gridRow: row,
+        );
+      },
+    );
+  }
+
+  /// 두 카드의 자리를 **맞바꾼다.**
+  ///
+  /// 🔴 **셋으로 나눠 보낸다** — 계약에 둘을 한 번에 고치는 경로가 없고,
+  /// 한쪽씩 보내면 중간에 **같은 칸에 둘**이 되어 서버가 막는다:
+  ///
+  /// 1. A 를 칸에서 **비운다**(등재는 남는다 — 계약 3-7절)
+  /// 2. B 를 A 가 있던 칸으로
+  /// 3. A 를 B 가 있던 칸으로
+  ///
+  /// 화면은 1번 상태(한쪽이 판에서 사라진 순간)를 **안 거친다** — 낙관적
+  /// 판은 이미 맞바꾼 결과다.
+  Future<void> _swapSeats(
+    String teamId,
+    Squad squad,
+    String aId,
+    String bId,
+  ) async {
+    final pinned = _pinned(squad);
+    final a = _memberOf(pinned, aId);
+    final b = _memberOf(pinned, bId);
+    if (a == null || b == null || !a.hasSeat || !b.hasSeat) return;
+    // 🔴 한쪽이라도 서버 등재가 아니면 맞바꿀 수 없다(위와 같은 까닭).
+    if (a.isPendingInvite || b.isPendingInvite) {
+      _notReady('수락을 기다리는 중이라 아직 못 옮깁니다');
+      return;
+    }
+
+    await _write(
+      squadWithSeatsSwapped(pinned, aId: aId, bId: bId),
+      (repo) async {
+        await _persistPins(repo, teamId, squad, pinned);
+        // 1) A 를 비운다 — 이 한 번 때문에 중간에 겹치지 않는다.
+        await repo.moveSeat(teamId,
+            memberId: aId, positionCode: a.positionCode);
+        // 2) B 를 A 자리로.
+        await repo.moveSeat(
+          teamId,
+          memberId: bId,
+          positionCode: positionOfRow(a.gridRow!),
+          gridCol: a.gridCol,
+          gridRow: a.gridRow,
+        );
+        // 3) A 를 B 자리로.
+        return repo.moveSeat(
+          teamId,
+          memberId: aId,
+          positionCode: positionOfRow(b.gridRow!),
+          gridCol: b.gridCol,
+          gridRow: b.gridRow,
+        );
+      },
+    );
+  }
+
+  Squad _pinned(Squad squad) => squadWithShownCellsPinned(
+        squad,
+        squadSizeOf(squad.formation),
+        mySlug: ref.read(myCardProvider).value?.publicSlug,
+      );
+
+  SquadMember? _memberOf(Squad squad, String id) {
+    for (final m in squad.members) {
+      if (m.id == id) return m;
+    }
+    return null;
+  }
+
+  /// 새로 박힌 칸들을 서버에도 남긴다 — 안 남기면 다음에 읽을 때 또 떠돈다.
+  ///
+  /// 🔴 **실패해도 멈추지 않는다.** 사람이 시킨 것은 「이 카드를 옮겨라」이고
+  /// 이것은 그것을 **유지되게 하는 덤**이다 — 여기서 던지면 정작 옮기기가
+  /// 안 나간다.
+  Future<void> _persistPins(
+    SquadRepository repo,
+    String teamId,
+    Squad before,
+    Squad pinned,
+  ) async {
+    for (final m in pinned.members) {
+      final was = _memberOf(before, m.id);
+      if (was == null || was.hasSeat || !m.hasSeat) continue;
+      /* 🔴 **초대만 보낸 자리는 서버에 없다** — 보내면 404 「등재를 찾을 수
+         없습니다」다(실기기에서 떴다). 수락되면 서버 스쿼드가 덮으면서
+         진짜 id 를 갖게 되고, 그때부터 저장된다. */
+      if (m.isPendingInvite) continue;
+      try {
+        await repo.moveSeat(
+          teamId,
+          memberId: m.id,
+          positionCode: m.positionCode,
+          gridCol: m.gridCol,
+          gridRow: m.gridRow,
+        );
+      } catch (_) {
+        // 덤이다 — 못 남겨도 이번 옮기기는 그대로 나간다.
+      }
+    }
+  }
 
   /// 그 사람을 판에서 빼고 **팀에서도 내보낸다**.
   ///
@@ -632,6 +837,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     String? cardSlug,
     String? mySlug,
   ) async {
+    /* 🔴 **초대만 보낸 자리는 판에서만 뺀다** (2026-09-25). 서버에 등재가
+       없어서 `removeSeat` 을 부르면 404 「등재를 찾을 수 없습니다」다.
+       ⚠️ **초대 자체는 아직 못 무른다** — 계약의
+       `DELETE /teams/{id}/invitations/{id}` 를 앱이 안 붙였다(1-B). 그래서
+       그 사람에게는 초대가 그대로 가 있다. */
+    final pending = _memberOf(squad, memberId)?.isPendingInvite ?? false;
+    if (pending) {
+      setState(() => _shownSquad = squadWithSeatRemoved(squad, memberId: memberId));
+      _notReady('판에서만 뺐습니다 — 보낸 초대는 그대로입니다');
+      return;
+    }
+
     final repo = ref.read(squadRepositoryProvider);
     await _write(
       squadWithSeatRemoved(squad, memberId: memberId),
@@ -652,6 +869,208 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       // 못 내보내도 판에서는 이미 빠졌다 — 화면을 멈추지 않는다.
     }
   }
+
+  /// 빈 자리를 눌렀다 — AI 추천·지인 시트를 열고, 고른 사람을 **초대한다**.
+  ///
+  /// 🔴 **바로 앉히지 않는다.** 동의 없이 팀에 넣는 길은 계약에 없다
+  /// (2026-09-10 박민호 결정) — 주장이 부르고 본인이 수락해야 소속이 된다.
+  /// 그래서 여기서 할 수 있는 것은 초대를 보내고 **보냈다고 알리는 것**까지다.
+  ///
+  /// 🔴 **부른 즉시 판에 세운다**(웹과 같다). 수락을 기다렸다 그리면 방금
+  /// 고른 사람이 **아무 데도 안 보이는** 몇 초가 생기고, 사용자는 자기가 뭘
+  /// 잘못 눌렀는지부터 의심한다. 카드 위에는 「수락 대기중」이 걸린다.
+  ///
+  /// ⚠️ **앱을 껐다 켜면 그 자리가 사라진다** — 계약의 초대 응답에
+  /// `grid_col`·`grid_row` 가 없어 어느 칸이었는지 되살릴 데가 없다(웹은
+  /// `localStorage` 에 따로 적어 둔다 — `inviteSeats.ts`). 그것과 수락을
+  /// 기다리는 폴링이 아직 안 옮긴 한 벌이다.
+  Future<void> _fillSeat(String teamId, SquadSlot slot) async {
+    final pick = await showSeatFillSheet(
+      context,
+      teamId: teamId,
+      positionCode: slot.position,
+      positionLabel: _positionLabel[slot.position] ?? slot.position,
+      placed: _placedNicknames(teamId),
+    );
+    if (pick == null || !mounted) return;
+
+    final squad = _currentSquad(teamId);
+    if (squad == null) return;
+
+    try {
+      final invitation = await ref.read(invitationRepositoryProvider).invite(
+            teamId,
+            userId: pick.userId,
+            positionCode: slot.position,
+          );
+      if (!mounted) return;
+
+      setState(() {
+        _shownSquad = squadWithSeatInvited(
+          squad,
+          invitationId: invitation.id,
+          nickname: pick.nickname,
+          cardPublicSlug: pick.cardPublicSlug,
+          positionCode: slot.position,
+          gridCol: slot.col,
+          gridRow: slot.row,
+        );
+      });
+      /* 그 사람 카드는 따로 안 부른다 — `build` 가 판이 바뀔 때마다
+         `_wantMateCards` 를 부르고, `setState` 가 그 빌드를 일으킨다.
+         아직 안 왔으면 판이 이름표로 물러난다. */
+      _demoAccept(invitation.id);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
+  /// 🔴 **시연용 자동 수락.** 1.5초 뒤 그 자리를 스스로 수락함으로 바꾼다 —
+  /// 심사·시연에서 상대 기기로 수락을 눌러 줄 사람이 없기 때문이다.
+  ///
+  /// 🔴 **값의 출처는 웹이다** — `www/src/components/SquadPanel.tsx` 의
+  /// `DEMO_ACCEPT_MS`. 한쪽만 고치면 같은 기능이 두 화면에서 다르게 돌므로
+  /// 그쪽도 함께 본다(2026-09-25 사용자 확인: 「웹과 맞춤」).
+  ///
+  /// 🔴 **실제 배포에서는 걷어야 한다** — 진짜 수락 흐름을 가짜로 덮는
+  /// 코드다. 웹의 같은 자리에도 같은 경고가 달려 있다.
+  static const _demoAcceptDelay = Duration(milliseconds: 1500);
+
+  void _demoAccept(String invitationId) {
+    /* 🔴 **진짜 초대에는 안 건다** (2026-09-25, 사용자가 실기기에서 잡았다:
+       「그 바로 수락되고」). 실제로 답하지 않은 사람이 **받은 것처럼** 보이고,
+       그 상태로 경기까지 걸리면 인원이 빈 채로 잡힌다.
+       가짜 후보를 부른 것만 `demo-inv-` 로 온다(`DemoInvitationRepository`). */
+    if (!invitationId.startsWith('demo-inv-')) return;
+    Future<void>.delayed(_demoAcceptDelay, () {
+      if (!mounted) return;
+      final squad = _shownSquad;
+      if (squad == null) return;
+      /* 🔴 ⊗ 로 이미 뺀 자리는 되살리지 않는다 — `squadWithSeatAccepted` 가
+         없는 id 를 만나면 아무것도 안 한다. */
+      setState(
+        () => _shownSquad = squadWithSeatAccepted(squad, memberId: invitationId),
+      );
+    });
+  }
+
+  /// 「팀 매칭」을 눌렀다 — 조건을 정하고 비슷한 팀에 경기를 건다.
+  ///
+  /// 🔴 **돌아온 것은 「걸었다」이지 「잡혔다」가 아니다.** 확정은 상대가
+  /// 수락하는 순간이라, 여기서는 걸렸다는 것만 알리고 기다린다.
+  Future<void> _openTeamMatch(String teamId) async {
+    final made = await showTeamMatchSheet(context, teamId: teamId);
+    if (made == null || !mounted) return;
+
+    /* 🔴 **곧바로 기다리는 화면으로 잇는다.** 스낵바만 띄우고 끝내면 사용자는
+       「걸린 건가?」를 확인할 데가 없다 — 수락도 여기서 이어받는다. */
+    await showMatchWaitingSheet(
+      context,
+      teamId: teamId,
+      requestId: made.id,
+      ourTeamName: _teamNameOf(teamId),
+      ourSquad: _shownSquad,
+    );
+  }
+
+  /// 그 팀의 이름. 🔴 **세션이 들고 있는 값을 쓴다** — 팀 이름만 보려고
+  /// `GET /teams/{id}` 를 따로 부르지 않는다.
+  String _teamNameOf(String teamId) {
+    final session = ref.read(sessionControllerProvider);
+    if (session is! SessionLoggedIn) return '우리 팀';
+    for (final t in session.user.teams) {
+      if (t.teamId == teamId) return t.name;
+    }
+    return '우리 팀';
+  }
+
+  /// 답해야 할 것의 수 — 알림 알약에 붙는다.
+  int _inboxCount() => ref.watch(inboxProvider).value?.pending ?? 0;
+
+  /// 알림함을 연다 — 받은 초대·지인 신청·경기 신청에 답하는 자리.
+  void _openInbox() {
+    final session = ref.read(sessionControllerProvider);
+    showInboxSheet(
+      context,
+      teamId: session is SessionLoggedIn ? session.user.ownedTeamId : null,
+    );
+  }
+
+  /// 맨 위 오른쪽의 「팀 매칭」 단추.
+  ///
+  /// 🔴 **팀이 없으면 아예 안 그린다** — 걸 팀이 없으면 누를 것도 없다.
+  Widget _teamMatchButton() {
+    final session = ref.watch(sessionControllerProvider);
+    final teamId =
+        session is SessionLoggedIn ? session.user.ownedTeamId : null;
+    if (teamId == null) return const SizedBox(height: 38, width: 54);
+
+    final ready = _squadReady(teamId);
+    return _TeamMatchButton(
+      ready: ready,
+      onTap: () {
+        if (!ready) {
+          /* 🔴 **왜 못 누르는지 말해 준다.** 흐린 단추만 두면 고장으로
+             읽힌다 — 무엇이 모자란지가 곧 다음에 할 일이다. */
+          _notReady('자리를 다 채워야 걸 수 있습니다');
+          return;
+        }
+        _openTeamMatch(teamId);
+      },
+    );
+  }
+
+  /// **경기를 걸 수 있는 판인가** — 자리가 다 차고 **전원이 수락**해야 한다
+  /// (웹 `SquadPanel` 의 `full` 과 같다).
+  ///
+  /// 🔴 **자리만 찬 것으로는 부족하다.** 아직 답을 안 한 사람을 데리고 경기를
+  /// 거는 셈이 되고, 그 사람이 거절하면 인원이 빈 채로 경기가 잡힌다.
+  bool _squadReady(String teamId) {
+    final squad = _currentSquad(teamId);
+    if (squad == null) return false;
+    final seats = seatsFromSquad(
+      squad,
+      squadSizeOf(squad.formation),
+      mySlug: ref.read(myCardProvider).value?.publicSlug,
+    );
+    for (final s in seats.slots) {
+      if (s.mine) continue;
+      if (!seats.mates.containsKey(s.area)) return false;
+      if (!(seats.ready[s.area] ?? true)) return false;
+    }
+    return true;
+  }
+
+  /// 지금 판에 그려지고 있는 스쿼드.
+  ///
+  /// 🔴 **`_shownSquad` 만 보면 안 된다** (2026-09-25, 사용자: 「눌렀는데 왜
+  /// 카드 바로 안채워지냐고」). 그 값은 **뭔가를 한 번 옮긴 뒤에야** 찬다 —
+  /// 갓 들어온 화면은 서버 값으로 그려지고 있어서 `null` 이다. 그걸 못 보고
+  /// 일찍 돌아가는 바람에 **초대가 아예 안 나갔고**, 같은 값을 읽던 「이미
+  /// 앉은 사람」 목록도 늘 비어 있었다.
+  ///
+  /// `build` 의 `_shownSquad ?? serverSquad` 와 **같은 규칙**이다 — 한쪽만
+  /// 고치면 화면과 동작이 서로 다른 판을 보게 된다.
+  Squad? _currentSquad(String teamId) =>
+      _shownSquad ?? ref.read(squadProvider(teamId)).value;
+
+  /// 이미 판에 앉은 사람의 닉네임 → 그 자리.
+  ///
+  /// 🔴 닉네임으로 맞추는 까닭은 `showSeatFillSheet` 의 `placed` 주석에 있다.
+  Map<String, String> _placedNicknames(String teamId) {
+    final squad = _currentSquad(teamId);
+    if (squad == null) return const {};
+    return {for (final m in squad.members) m.nickname: m.positionCode};
+  }
+
+  static const _positionLabel = {
+    'FW': '공격수',
+    'MF': '미드필더',
+    'DF': '수비수',
+    'GK': '골키퍼',
+  };
 
   /// 판에 앉은 팀원들의 카드를 **보이는 것만** 받아 둔다.
   ///
@@ -737,21 +1156,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
          Scaffold 가 색을 칠하면 그 위에 빛무리를 깔아도 **판·바 뒤로는 안
          비친다** — 층을 하나로 만들어야 화면 전체가 같은 빛을 받는다. */
         backgroundColor: Colors.transparent,
-        // 바는 SafeArea 밖에 떠 있다 — 안에 넣으면 홈 인디케이터 위에서 잘린다.
-        // 메뉴는 바 바로 위에 선다. 닫혀 있어도 자리를 잡아 두어 열릴 때
-        // 바가 밀리지 않는다.
-        bottomNavigationBar: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            BarMenu(
-              open: _menu,
-              loggedIn: session is SessionLoggedIn,
-              step: FloatingNavBar.iconStep(context),
-              onPick: _onMenuPick,
-            ),
-            FloatingNavBar(currentIndex: 0, onTap: _onNavTap),
-          ],
-        ),
+        /* 바는 SafeArea 밖에 떠 있다 — 안에 넣으면 홈 인디케이터 위에서
+           잘린다.
+
+           ⛔ **여기 있던 `BarMenu` 를 걷었다** (2026-09-25 — 바의 메뉴 칸이
+           로그인/로그아웃 칸으로 바뀌면서). 그 판이 펴던 넷 중 셋이 아직
+           「준비 중입니다」였고, 실제로 하는 일은 로그아웃 하나였다.
+           되살리려면 2026-09-25 이전 커밋을 본다. */
+        bottomNavigationBar: FloatingNavBar(currentIndex: 0, onTap: _onNavTap),
         extendBody: true,
         body: Stack(
           fit: StackFit.expand,
@@ -785,18 +1197,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 ),
               ),
             ),
-            /* 🔴 **판 둘보다 뒤다.** 받치는 것이지 덮는 것이 아니라서,
-               이 자리(영상 분석 판 **앞**)를 지켜야 한다. */
-            _whiteSheet(context),
-            _videoPanel(context),
-            _shortcutPills(context),
-            /* 🔴 **로고·「내 프로필」보다 뒤, 스쿼드 판보다 앞이다.** 뒤라서
-               그 셋이 판 위에 얹히고, 앞이라서 판을 펼치면 **인사말과 똑같이
-               덮인다** — 따로 걷는 연출을 안 만들어도 되는 자리다. */
+            /* 🔴 **여기 셋이 흰 판보다 뒤로 내려왔다** (2026-09-24 사용자 지시:
+               「스쿼드판 올릴때, 뒤에 있는 흰색판 영상이랑 위에 판보다 위에
+               있게 해줘」).
+
+               까닭: 스쿼드 판을 펼치면 **흰 판 윗변이 화면 맨 위까지 따라
+               올라간다**([_sheetGeometry] 의 `whiteTopExpanded`). 그런데 영상
+               줄은 `left: 0, right: 0` 로 **화면 폭을 꽉 채우는** 줄이라,
+               앞에 있으면 흰 판이 스쿼드 판 둘레로 남기는 **테를 가로질러
+               덮었다.** 맨 위 판도 같은 자리를 먹었다.
+
+               🔴 **되돌리지 말 것** — 앞으로 올리면 판을 펼칠 때 흰 테 위로
+               영상 줄이 다시 비친다. 접혀 있을 때는 흰 판이 한참 아래라
+               **셋 다 겹치지 않으므로**, 이 순서는 펼친 동안에만 뜻이 있다. */
             _topPanel(context, user?.nickname),
             // 로고는 화면 맨 위 가운데 — 판을 펼치면 그 판이 덮는다.
             _brandMark(context),
             _videoStrip(context),
+            /* 🔴 **판 둘보다 뒤다.** 받치는 것이지 덮는 것이 아니라서,
+               이 자리(영상 분석 판 **앞**)를 지켜야 한다.
+
+               ⚠️ **위 셋보다는 앞이다** — 바로 위 주석 참고. 「받치는 것」은
+               **스쿼드 판·영상 분석 판**에 대한 말이지 영상 줄·맨 위 판까지가
+               아니다. */
+            _whiteSheet(context),
+            _videoPanel(context),
+            _shortcutPills(context),
             _squadSheet(context, card, squad, user?.ownedTeamId),
             // 「내 프로필」 — 화면 맨 위 오른쪽. 판보다 **뒤에 두지 않는다**.
             _profileButton(context, card),
@@ -897,11 +1323,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                        내내 알약이 화면을 가로질러서 시선이 그쪽으로 끌린다. */
                     child: Opacity(
                       opacity: 1 - _shortcutExit(tc, i),
+                      /* 🔴 **알림 알약이 알림함을 연다** (2026-09-25 사용자:
+                         「가운데 버튼 3개 중에 맨 오른쪽 알림 버튼
+                         만들었잖아. 거기에 뜨게 해야지」). 이 줄의 머리말이
+                         적어 둔 「화면을 붙이는 날 `onTap` 만 갈면 된다」가
+                         이 자리다 — 나머지 둘은 아직 웹에만 있다. */
                       child: _ShortcutPill(
                         key: s.key,
                         icon: s.icon,
                         label: s.label,
-                        onTap: () => _notReady(s.label),
+                        badge: s.key == _kAlarmKey ? _inboxCount() : 0,
+                        onTap: s.key == _kAlarmKey
+                            ? _openInbox
+                            : () => _notReady(s.label),
                       ),
                     ),
                   ),
@@ -966,6 +1400,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               opacity: fadeOut,
               child: Transform.translate(
                 offset: Offset((profileW + 24) * (1 - fadeOut), 0),
+                /* ⚠️ **여기 종을 따로 두지 않는다** (2026-09-25 정정).
+                   한 번 프로필 옆에 달았는데, 아래 지름길 줄에 **이미
+                   「알림」 알약이 있었다** — 같은 것이 둘이면 어느 쪽이
+                   진짜인지 모른다. 알림은 그 알약이 맡는다. */
                 child: _ProfileButton(card: card, onTap: _openProfile),
               ),
             ),
@@ -1124,11 +1562,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final room = geo.whiteTopCollapsed - top;
     final height = (room - _kVideoStripGap * 2).clamp(0.0, 240.0);
     return Positioned(
+      // 🔴 시험이 이 키로 **층 순서**를 읽는다 — 흰 판보다 뒤에 있어야 한다.
+      key: const Key('home-video-strip'),
       top: top + _kVideoStripGap,
       left: 0,
       right: 0,
       height: height,
-      child: HomeVideoStrip(height: height),
+      child: AnimatedBuilder(
+        animation: _sheet,
+        /* 🔴 **줄 자체는 `child` 로 한 번만 짓는다 — `builder` 안에서 짓지 말 것.**
+           이 줄은 손가락을 따라 **초당 60번** 다시 지어지는 자리이고, 그때마다
+           영상 플레이어가 만들어졌다 버려져 **앱이 네이티브에서 통째로 죽는다**
+           (`Fatal signal 6 in MediaCodec_loop`, 2026-09-24에 실제로 겪었다).
+           `child` 로 넘기면 [Opacity] 만 매 프레임 다시 지어진다. */
+        child: HomeVideoStrip(height: height),
+        builder: (context, child) {
+          /* 🔴 **판을 펼치면 걷힌다** (2026-09-24 사용자 지시의 뒷마무리:
+             「흰색판 영상이랑 위에 판보다 위에 있게」). 흰 판을 이 줄보다 앞에
+             두는 것만으로는 **덜 가려진다** — 이 줄은 `left: 0, right: 0` 로
+             화면 폭을 꽉 채우는데 흰 판은 양옆이 [_kWhiteSheetSideInset] 만큼
+             들어가 있어서, **화면 가장자리로 영상 카드가 비어져 나왔다**
+             (실기기에서 확인했다). 알약과 같은 처리다 — 판이 오기 전에 걷는다.
+
+             🔴 **절반(`* 2`)에서 이미 다 걷힌다** — 끝까지 끌어야 사라지면
+             스쿼드 판이 덮는 순간과 겹쳐 **깜빡이는 것처럼** 보인다. */
+          final fade = (1 - _sheetT * 2).clamp(0.0, 1.0);
+          return IgnorePointer(
+            ignoring: fade < 0.5,
+            child: Opacity(opacity: fade, child: child),
+          );
+        },
+      ),
     );
   }
 
@@ -1158,12 +1622,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           right: _kVideoSideInset,
           bottom: bottomInset,
           top: openTop + (flatTop - openTop) * t,
-          child: _VideoAnalysisPanel(
-            flat: t,
-            onTap: () {
-              _closeMenu();
-              context.push('/videos');
-            },
+          /* 🔴 **판을 키우면 걷는다** (2026-09-25 사용자 요청: 「스쿼드판
+             키우면 아래에 영상분석 탭도 안보이게 해줘」). 전에는 하단 바 위에
+             납작한 띠로 남았다 — 그 자리는 이제 스쿼드 판이 쓴다.
+             🔴 **앞 6할 안에 걷는다** — 판이 다 올라온 뒤에 사라지면 그
+             순간이 눈에 띈다. */
+          child: IgnorePointer(
+            ignoring: t > 0.5,
+            child: Opacity(
+              opacity: (1 - t / 0.6).clamp(0.0, 1.0),
+              child: _VideoAnalysisPanel(
+                flat: t,
+                onTap: () => context.push('/videos'),
+              ),
+            ),
           ),
         );
       },
@@ -1188,6 +1660,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     double videoFlatTop,
     double squadTopCollapsed,
     double squadTopExpanded,
+    double squadBottomCollapsed,
+    double squadBottomExpanded,
     double shortcutTop,
     double whiteTopCollapsed,
     double whiteTopExpanded,
@@ -1211,7 +1685,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
        스쿼드 판을 펼치면 영상 분석이 띠로 내려가고 그만큼 스쿼드 판의 아랫변도
        따라 내려간다 — 둘 사이 틈이 **한 번도 안 벌어진다.** */
     final squadBottomCollapsed = videoOpenTop - _kVideoGap;
-    final squadBottomExpanded = videoFlatTop - _kVideoGap;
+    /* 🔴 **영상 분석이 걷히므로 그 자리까지 쓴다**(2026-09-25). 전에는
+       납작한 띠 위에서 멈췄는데, 띠가 사라지면 그만큼이 빈 검정으로 남는다. */
+    final squadBottomExpanded = bottom;
 
     // 접히면 사진 한 장 높이, 펼치면 워드마크 아래부터 꽉.
     final squadTopCollapsed = squadBottomCollapsed - _kSquadPhotoH;
@@ -1257,6 +1733,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       videoFlatTop: videoFlatTop,
       squadTopCollapsed: squadTopCollapsed,
       squadTopExpanded: squadTopExpanded,
+      squadBottomCollapsed: squadBottomCollapsed,
+      squadBottomExpanded: squadBottomExpanded,
       shortcutTop: shortcutTop,
       whiteTopCollapsed: whiteTopCollapsed,
       whiteTopExpanded: whiteTopExpanded,
@@ -1294,6 +1772,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     row,
                   )
                 : null,
+            onSeatsSwapped: (ownedTeamId != null && squad?.teamId == ownedTeamId)
+                ? (a, b) => _swapSeats(ownedTeamId, squad!, a, b)
+                : null,
             onSeatRemoved: (ownedTeamId != null && squad?.teamId == ownedTeamId)
                 ? (memberId, slug) => _removeSeat(
                     ownedTeamId,
@@ -1303,9 +1784,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     card?.publicSlug,
                   )
                 : null,
-            onSeatTap: (_) => _notReady('선수 넣기'),
+            /* 🔴 **주장이고 그 팀의 판일 때만** 부를 수 있다 — 초대는 주장
+               전용이라(403), 시트를 열어 고르게 해 놓고 마지막에 막으면
+               고른 수고가 통째로 버려진다. 못 집게 하는 위 두 갈래와 같은
+               판단이다. */
+            onSeatTap: (ownedTeamId != null && squad?.teamId == ownedTeamId)
+                ? (slot) => _fillSeat(ownedTeamId, slot)
+                : (_) => _notReady('선수 넣기'),
           )
-        : const _MemberPlaceholder();
+        /* 🔴 **한 번 더 안 누른다** (2026-09-25 사용자: 「굳이 한 번 더
+           눌러서 팀 찾아야 해?」). 「팀원」을 고르면 그 자리가 곧 조건 폼
+           (처음이면) 또는 사람을 찾는 팀 목록이다. */
+        : const TeamSeekPanel();
 
     return AnimatedBuilder(
       animation: _sheet,
@@ -1319,11 +1809,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         final top =
             geo.squadTopCollapsed +
             (geo.squadTopExpanded - geo.squadTopCollapsed) * raw;
-        /* 🔴 **아랫변은 「영상 분석」 판 윗변을 따라간다** — 그쪽과 **같은
-           식**이라 둘 사이 틈이 한 번도 안 벌어진다. */
-        final bottom =
-            (geo.videoOpenTop + (geo.videoFlatTop - geo.videoOpenTop) * raw) -
-            _kVideoGap;
+        /* 🔴 **아랫변은 자리 계산이 준 값 하나를 쓴다** (2026-09-25 정정).
+           전에는 여기서 「영상 분석 판 윗변」을 다시 재고, 경기장 높이는
+           `squadBottomExpanded` 를 따로 썼다 — 그 둘이 갈리자 **판은 그대로인데
+           경기장만 길어져 골키퍼 카드가 잘렸다**(사용자가 잡았다).
+           🔴 **한 값에서 온다** — 그래야 판과 그 안이 늘 같은 높이다. */
+        final bottom = geo.squadBottomCollapsed +
+            (geo.squadBottomExpanded - geo.squadBottomCollapsed) * raw;
         final radius = _kSheetRadius + 8 * tc;
         // 안내 글과 「내 프로필」은 펼치기 **시작하자마자** 걷힌다(앞 4할 안에).
         final fadeOut = (1 - tc / 0.4).clamp(0.0, 1.0);
@@ -1587,7 +2079,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ),
         Align(
           alignment: Alignment.centerRight,
-          child: _stagger(2, _AiButton(onTap: () => _notReady('AI 용병 찾기'))),
+          child: _stagger(2, _teamMatchButton()),
         ),
       ],
     );
@@ -1659,48 +2151,101 @@ class _ShortcutPill extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.badge = 0,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
 
+  /// 아이콘 위에 붙는 수. 🔴 **0 이면 아무것도 안 그린다** — 빈 배지가 더
+  /// 헷갈린다.
+  final int badge;
+
   @override
   Widget build(BuildContext context) {
-    return Material(
-      /* 알약 모양은 [StadiumBorder] 가 낸다 — 반지름을 숫자로 주면 높이를
-         바꿀 때마다 같이 고쳐야 하고, 한 번 어긋나면 양 끝이 찌그러진다. */
-      color: _kPillFill,
-      shape: const StadiumBorder(
-        side: BorderSide(
-          color: _kPillLineOnWhite,
-          width: _kSilverOnWhiteWidth,
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 22, color: _kOnWhite),
-            const SizedBox(height: 5),
-            /* 🔴 한 줄로 묶는다 — 「경기장 예약」이 좁은 기기에서 두 줄로
-               접히면 알약 셋의 높이가 갈린다. */
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w600,
-                color: _kOnWhite,
+    /* 🔴 **모서리 둘이 자연스럽게 사라지는 테다**([RaisedRim], 2026-09-25
+       사용자 요청: 「외곽선은 모서리 2군데는 자연스럽게 안보이게 해줘」).
+       같은 날 **실버 실선으로 갔다가 되돌아왔다** — 실선은 네 변을 고르게
+       둘러 「판에 그려 넣은 네모」가 된다.
+       ⛔ `Border.all` 실선으로 되돌리지 말 것.
+
+       🔴 **면이 희어서 두 색이 다 검정이다.** 이 위젯의 기본 조합(왼쪽 위
+       흰 하이라이트)은 **어두운 조각**용이라, 흰 면 위에서는 획이 통째로
+       묻힌다. 빛이 왼쪽 위에서 온다는 규칙은 지키되 **그늘 쪽(오른쪽 아래)을
+       더 진하게** 줘서 솟아 보이게 한다.
+       🔴 면을 다시 어둡게 돌리면 이 둘을 실버로 되돌린다. */
+    return RaisedRim(
+      radius: _kShortcutRadius,
+      litColor: _kOnSheet,
+      lit: 0.18,
+      shadeColor: _kOnSheet,
+      shade: 0.32,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(_kShortcutRadius),
+        child: Material(
+            /* 🔴 **판보다 밝아야 뜬다** — 그것이 이 면이 하는 일의 전부다
+               ([_kShortcutFill] 머리말). 한때 어두운 색을 옅게 깔아 봤는데
+               판보다 **어두워져** 「때 낀 자국」으로 보였다(2026-09-24). */
+            color: _kShortcutFill,
+            child: InkWell(
+              onTap: onTap,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  /* 🔴 **수는 아이콘 오른쪽 위에 겹친다** — 줄을 따로 두면
+                     알약 셋의 높이가 갈린다(아래 「한 줄로 묶는다」와 같은
+                     까닭). */
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Icon(icon, size: 22, color: _kOnSheet),
+                      if (badge > 0)
+                        Positioned(
+                          top: -4,
+                          right: -8,
+                          child: Container(
+                            key: const Key('home-inbox-count'),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.seed,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              '$badge',
+                              style: const TextStyle(
+                                color: Color(0xFF0B0B0B),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  /* 🔴 한 줄로 묶는다 — 「경기장 예약」이 좁은 기기에서 두 줄로
+                     접히면 알약 셋의 높이가 갈린다. */
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: _kOnSheet,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
-      ),
-    );
+      );
   }
 }
 
@@ -1711,7 +2256,8 @@ const TextStyle _kGreetStyle = TextStyle(
   fontWeight: FontWeight.w900,
   fontSize: _Greeting.fontSize,
   height: 1.2,
-  color: _kOnDark,
+  // 🔴 판 색을 따라간다 — [_kOnPanel] 머리말 참고.
+  color: _kOnPanel,
 );
 
 /// 인사말 한 덩이 — **화면 왼쪽 밖에서 미끄러져 들어오고**, 로고가 내려앉으면
@@ -1751,9 +2297,15 @@ class _Greeting extends StatefulWidget {
   static const enterFrom = 1.05;
 
   /// 몇 번 흔드는가(왕복 기준).
-  static const waves = 4;
+  ///
+  /// ⚠️ **4 → 6** (2026-09-24 사용자 요청. 잠깐 8이었다가 6으로 정했다).
+  /// 🔴 **[wavePeriod] 도 같은 배수로 늘린다** — 주기를 그대로 두면 같은
+  /// 1.8초 안에 여섯 번을 흔들게 되어 **속도가 1.5배**가 되고, 인사가 아니라
+  /// 허둥대는 것으로 보인다. 흔드는 **횟수만** 바꾸라는 뜻으로 읽었다.
+  /// 한 번 흔드는 데 걸리는 시간은 450ms 로 처음과 같다.
+  static const waves = 6;
 
-  static const wavePeriod = Duration(milliseconds: 1800);
+  static const wavePeriod = Duration(milliseconds: 2700);
 
   /// 최대 기울기(라디안).
   static const swing = 0.30;
@@ -1839,7 +2391,7 @@ class _GreetingState extends State<_Greeting> with TickerProviderStateMixin {
                 child: const Icon(
                   Symbols.waving_hand,
                   size: _Greeting.iconSize,
-                  color: _kOnDark,
+                  color: _kOnPanel,
                   weight: 300,
                   grade: 0,
                   opticalSize: 24,
@@ -1943,9 +2495,13 @@ class _BrandFadeState extends State<_BrandFade>
         fontSize: kBrandHomeSize,
         /* 🔴 **[Curves.easeInOut] 을 씌운다** — 선형이면 시작과 끝이 톡
            끊겨 보인다. 가운데가 빠르고 양 끝이 느려야 한 동작으로 읽힌다. */
+        /* 🔴 **[_kOnPanel] 로 물든다 — 판 색을 따라간다** (2026-09-24).
+           판이 밝은 회색이던 몇 시간 동안은 이 값이 어두웠다(흰 로고가 그 위에서
+           사라져서). 판이 다시 어두워져 지금은 흰색이다. 앉는 색만 판을 따라가고
+           출발색(앱 초록)과 곡선은 그대로다. */
         color: Color.lerp(
           AppTheme.seed,
-          Colors.white,
+          _kOnPanel,
           Curves.easeInOut.transform(_fade.value),
         )!,
       ),
@@ -2115,38 +2671,78 @@ class _RolePill extends StatelessWidget {
   }
 }
 
-/// AI 단추 — 웹과 같은 세리프 「AI」를 유리 알약에 얹었다.
+/// 「팀 매칭」 — 옛 AI 단추 자리(맨 위 오른쪽)에 선다.
 ///
-/// ⚠️ 아직 아무것도 안 연다. 웹은 추천 판 · 챗봇을 여는데, 🔴 **챗봇은 Gemini
-/// 키가 웹 서버에만 있어** 앱에서 부를 경로부터 정해야 한다(웹 `/api/chat` 을
-/// 부를지, 백엔드로 옮길지).
-class _AiButton extends StatelessWidget {
-  const _AiButton({required this.onTap});
+/// 🔴 **AI 단추를 걷고 그 자리를 넘겨받았다** (2026-09-25 사용자 요청:
+/// 「어차피 우리 AI 버튼 웹에서도 안쓰니까 ... 똑같은 크기와 위치에」).
+/// 전에는 판 머리의 크기 알약들 사이에 뒀는데 **있는 줄도 몰랐다.**
+///
+/// 🔴 **글자와 도는 테가 둘 다 로고 초록이다**(같은 요청). 다른 곳의 도는
+/// 빛은 실버·금빛이라 이것만 초록이면 「여기를 보라」가 분명해진다 —
+/// `silver_sweep_border.dart` 가 색으로 갈라 두라고 한 그대로다.
+///
+/// ⚠️ **자리가 덜 찼으면 흐리다.** 그래도 **숨기지는 않는다** — 안 보이면
+/// 그런 기능이 있다는 것조차 모른다(위 사용자 지적).
+class _TeamMatchButton extends StatelessWidget {
+  const _TeamMatchButton({required this.ready, required this.onTap});
 
+  final bool ready;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    /* 🔴 **글자가 알약을 넘지 않게 줄인다** (2026-09-25 실기기에서 좌우가
+       잘려 보였다). 54px 폭에 네 글자라 빠듯하다 — 알약을 넓히는 대신
+       글자를 줄인다(「AI 단추와 똑같은 크기」가 요청이었다). */
+    final label = Center(
+      child: Text(
+        '팀 매칭',
+        maxLines: 1,
+        softWrap: false,
+        style: TextStyle(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.2,
+          color: ready ? AppTheme.seed : AppTheme.seed.withValues(alpha: 0.42),
+        ),
+      ),
+    );
+
+    /* 🔴 **안을 채운다** (2026-09-25 사용자: 「팀 매칭 버튼 잘 안보인다.
+       안쪽 색상 그 팀장팀원 버튼처럼 색상 똑같은거 채워」). 테만 있으면
+       검은 바탕에 묻힌다 — 면은 `SilverEdge` 의 기본값과 **같은 값**이다
+       (팀장·팀원 알약이 쓰는 그것). 🔴 값을 베껴 적지 않는다. */
     return SizedBox(
       height: 38,
       width: 54,
-      child: GlassPanel(
-        radius: 19,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: SilverEdge.defaultFill,
+          borderRadius: BorderRadius.circular(19),
+        ),
         child: Material(
           type: MaterialType.transparency,
           child: InkWell(
-            key: const Key('home-ai'),
+            key: const Key('home-team-match'),
+            borderRadius: BorderRadius.circular(19),
             onTap: onTap,
-            child: const Center(
-              child: Text(
-                'AI',
-                style: TextStyle(
-                  fontFamily: 'YoungSerif',
-                  fontSize: 18,
-                  color: _kOnDark,
-                ),
-              ),
-            ),
+            child: ready
+                ? SilverSweepBorder(
+                    radius: 19,
+                    strokeWidth: 1.2,
+                    color: AppTheme.seed,
+                    baseColor: AppTheme.seed.withValues(alpha: 0.28),
+                    child: label,
+                  )
+                : DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(19),
+                      border: Border.all(
+                        color: AppTheme.seed.withValues(alpha: 0.24),
+                      ),
+                    ),
+                    child: label,
+                  ),
           ),
         ),
       ),
@@ -2156,38 +2752,6 @@ class _AiButton extends StatelessWidget {
 
 /// 「팀원」을 골랐을 때 판 자리에 서는 것. 웹은 **사람을 구하는 팀 목록**
 /// (`TeamSeek`)이 스쿼드 판을 대신 선다 — 앱은 아직 자리만 잡아 둔다.
-class _MemberPlaceholder extends StatelessWidget {
-  const _MemberPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassPanel(
-      radius: _kCardRadius,
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.groups_outlined, size: 36, color: AppTheme.seed),
-            const SizedBox(height: 10),
-            const Text(
-              '사람을 구하는 팀',
-              style: TextStyle(color: _kOnDark, fontSize: 16),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              '준비 중',
-              style: TextStyle(
-                color: _kOnDark.withValues(alpha: 0.55),
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 /// 「영상 분석」 판. [flat] 이 0 이면 사진이 깔린 큰 판, 1 이면 하단 바 위의
 /// 납작한 띠다(스쿼드 판을 펼친 정도 그대로).
 ///
@@ -2716,7 +3280,8 @@ class _ProfileButton extends StatelessWidget {
                      🔴 **카드 폭과 배수를 맞추던 규칙은 여기서 끝난다** —
                      이제 글자는 **읽히는 크기**로, 카드는 **보이는 크기**로
                      따로 정한다. */
-                  style: TextStyle(color: Colors.white, fontSize: 14),
+                  // 🔴 판 색을 따라간다 — [_kOnPanel] 머리말 참고.
+                  style: TextStyle(color: _kOnPanel, fontSize: 14),
                 ),
               ],
             ),

@@ -23,6 +23,19 @@ class ApiSquadRepository implements SquadRepository {
   }
 
   @override
+  Future<Squad?> squadBySlug(String publicSlug) async {
+    try {
+      return Squad.fromJson(
+        await _api.get('/squads/${Uri.encodeComponent(publicSlug)}'),
+      );
+    } on ApiException catch (e) {
+      // 🔴 404 만 null 로 — 아직 스쿼드를 안 만든 팀이 정상 상태다.
+      if (e.status == 404) return null;
+      rethrow;
+    }
+  }
+
+  @override
   Future<Squad> enlist(
     String teamId, {
     required String playerCardId,

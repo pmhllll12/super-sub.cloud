@@ -16,7 +16,7 @@ class SilverEdge extends StatelessWidget {
     super.key,
     required this.child,
     this.radius = 18,
-    this.fill = const Color(0xB31C1C1E),
+    this.fill = defaultFill,
     this.strong = false,
     this.padding,
     this.line,
@@ -39,6 +39,10 @@ class SilverEdge extends StatelessWidget {
   final double? lineWidth;
 
   /// 은빛 — 차갑게 기운 아주 옅은 회색.
+  /// 🔴 **알약들이 나눠 쓰는 면.** 팀장·팀원 알약과 「팀 매칭」이 같은 값을
+  /// 쓴다 — 한쪽만 바꾸면 나란히 선 것들이 다른 재질로 읽힌다.
+  static const Color defaultFill = Color(0xB31C1C1E);
+
   static const Color silver = Color(0xFFC9D4D8);
 
   /// 🔴 **하단 바 윤곽과 로고 알약이 나눠 쓰는 선**(2026-09-22, 사용자 요청:

@@ -43,8 +43,35 @@ def sqlalchemy_url() -> str:
 
 # `db_configured` 가 False 면 접속 대상이 없다는 뜻이라 엔진을 만들지 않는다.
 # 스텁만으로 도는 지금 상태에서도 앱이 뜨게 하기 위함이다.
+#: 🔴 **커넥션 풀을 명시한다** (2026-09-25, `paik`).
+#:
+#: SQLAlchemy 의 기본값은 `pool_size=5` · `max_overflow=10` · `pool_timeout=30`
+#: 이다. 그 **30초**가 실제로 사용자에게 보였다 — 앱 홈에서 영상 줄이 통째로
+#: 안 나와서 재 봤더니 `GET /videos/public` 이 **정확히 30.00초** 무응답이었고
+#: (`/regions` 는 같은 순간 0.4초에 답했다), 같은 경로가 0.4초 ~ 30초로
+#: 널뛰었다. 풀이 빈 채로 기다리다 그대로 시간이 다 간 것이다.
+#:
+#: 🔴 **빨리 실패하는 쪽이 낫다.** 30초를 기다리면 클라이언트는 「서버가
+#: 죽었나」로 읽고, 그 사이 요청은 워커를 쥐고 있어 **줄이 더 길어진다.**
+#: 5초면 오류로 돌아가고 사람이 다시 시킬 수 있다.
+#:
+#: ⚠️ **최댓값이 곧 Postgres 커넥션 수다** — `pool_size + max_overflow` 가
+#: 프로세스마다 열릴 수 있는 상한이라, 워커를 늘리면 여기를 같이 본다.
+_POOL_SIZE = 10
+_MAX_OVERFLOW = 20
+_POOL_TIMEOUT_SECONDS = 5
+
 _engine = (
-    create_engine(sqlalchemy_url(), pool_pre_ping=True, future=True)
+    create_engine(
+        sqlalchemy_url(),
+        pool_pre_ping=True,
+        pool_size=_POOL_SIZE,
+        max_overflow=_MAX_OVERFLOW,
+        pool_timeout=_POOL_TIMEOUT_SECONDS,
+        #: 오래 쉰 커넥션은 방화벽·프록시가 조용히 끊는다 — 30분마다 새로 연다.
+        pool_recycle=1800,
+        future=True,
+    )
     if settings.db_configured
     else None
 )

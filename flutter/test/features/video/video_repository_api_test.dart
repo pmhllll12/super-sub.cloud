@@ -157,6 +157,47 @@ ApiVideoRepository buildRepo() {
         },
       ], 200);
     }
+    /* 🔴 **선수 경로는 `/videos/` 검사보다 먼저 온다** — 아래 공용 분기가
+       경로에 `/videos/` 가 들었는지만 보므로, 순서가 밀리면 선수 관절 요청이
+       「그 영상을 찾을 수 없습니다」로 답한다. */
+    if (path.endsWith('/reference-players')) {
+      // 🔴 **id 와 name 뿐이다** — 재생 주소를 여기 넣으면 계약이 거짓이 된다.
+      return jsonRes([
+        {'id': 'rovelli', 'name': '에스테반 로벨리'},
+        {'id': 'castanheira', 'name': '티아구 카스탄헤이라'},
+      ], 200);
+    }
+    if (path.contains('/reference-players/')) {
+      final id = Uri.decodeComponent(
+        path.split('/reference-players/').last.split('/').first,
+      );
+      if (id != 'rovelli' && id != 'castanheira') {
+        return errRes('PLAYER_NOT_FOUND', 404);
+      }
+      /* 관절 두 장만 — 계약의 **모양**을 보는 자리이지 값을 보는 자리가 아니다.
+         🔴 못 잡은 프레임은 `null` 로 자리를 지킨다(계약). */
+      return jsonRes({
+        'known': true,
+        'fps': 30.0,
+        'frames': 2,
+        'frame_size': [1280, 726],
+        'swing_leg': 'right',
+        'direction': 1,
+        'keypoint_names': const [
+          'nose', 'left_eye', 'right_eye', 'left_ear', 'right_ear',
+          'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow',
+          'left_wrist', 'right_wrist', 'left_hip', 'right_hip',
+          'left_knee', 'right_knee', 'left_ankle', 'right_ankle',
+        ],
+        'joints': [
+          [for (var i = 0; i < 17; i += 1) [0.5, 0.5, 0.9]],
+          null,
+        ],
+        'moments': {'before': 0, 'impact': 0, 'after': 0},
+        'moments_seconds': {'before': 0.0, 'impact': 0.0, 'after': 0.0},
+        'after_clipped': false,
+      }, 200);
+    }
     if (path.endsWith('/videos') && req.method == 'POST') {
       final id = 'v-new-${rows.length}';
       // 🔴 `analyze: false` 면 작업을 안 만든다(계약 3-6절).

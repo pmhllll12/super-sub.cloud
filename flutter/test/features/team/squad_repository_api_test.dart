@@ -46,6 +46,16 @@ ApiSquadRepository buildRepo() {
 
   final client = MockClient((req) async {
     final path = req.url.path;
+
+    // 공개 슬러그로 읽는 경로 — 누구나 읽는다(SEC-005).
+    if (path.contains('/squads/')) {
+      final slug = path.split('/squads/')[1];
+      if (slug != 'aB3xK9mQ2pL7vN4t') {
+        return err('SQUAD_NOT_FOUND', '없습니다', 404);
+      }
+      return jsonRes(squadBody(), 200);
+    }
+
     if (!path.contains('/teams/t-thunder/squad')) {
       return err('SQUAD_NOT_FOUND', '스쿼드가 없습니다', 404);
     }

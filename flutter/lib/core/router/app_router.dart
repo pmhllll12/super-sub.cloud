@@ -9,7 +9,8 @@ import '../../features/intro/presentation/screens/glitch_intro_screen.dart'
     show kIntroInkColor;
 import '../widgets/ink_bleed.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
-import '../../features/video/presentation/screens/video_analysis_screen.dart';
+import '../../features/video/presentation/screens/analyze_screen.dart';
+import '../../features/video/presentation/screens/reels_screen.dart';
 
 /// GoRouter를 provider가 매번 다시 만들면 내비게이션 스택이 날아간다.
 /// 그래서 라우터는 한 번만 만들고, 세션 변화는 ValueNotifier로 흘려보내
@@ -55,6 +56,23 @@ CustomTransitionPage<void> _inkPage(GoRouterState state, Widget child) =>
       ),
     );
 
+/// 영상 전체화면으로 들어갈 때의 **짧은 페이드** (2026-09-24).
+///
+/// 🔴 **잉크([_inkPage])를 안 쓴다.** 그쪽은 1800ms 라 **영상 한 편을 열어
+/// 보는 동작에는 길다** — 홈 ↔ 분석 ↔ 프로필처럼 「화면을 갈아 끼우는」
+/// 자리에 맞춘 길이이고, 이건 그 위에 **얹히는**(`push`) 화면이다.
+///
+/// ⚠️ [_inkPage] 를 고쳐 길이를 인자로 받게 하는 길도 있었지만, 그러면 잉크가
+/// 아주 짧게 도는 것이 되어 **연출이 반쯤 걷히다 만 것처럼** 보인다.
+CustomTransitionPage<void> _fadePage(GoRouterState state, Widget child) =>
+    CustomTransitionPage<void>(
+      key: state.pageKey,
+      transitionDuration: const Duration(milliseconds: 220),
+      child: child,
+      transitionsBuilder: (_, animation, _, child) =>
+          FadeTransition(opacity: animation, child: child),
+    );
+
 /// **종목은 진입 조건이 아니다.** 예전에는 종목을 안 고르면 온보딩 화면으로
 /// 보냈는데, 첫 화면이 질문 하나로 채워지는 것이 이상해 홈의 칩으로 옮겼다.
 final routerProvider = Provider<GoRouter>((ref) {
@@ -95,7 +113,21 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/videos',
         pageBuilder: (context, state) =>
-            _inkPage(state, const VideoAnalysisScreen()),
+            _inkPage(state, const AnalyzeScreen()),
+      ),
+      /* 🔴 **이 저장소의 첫 파라미터 라우트다**(2026-09-24). 홈 영상 줄에서
+         가운데 카드를 누르면 **그 영상**으로 온다 — 전에는 `/videos`(분석
+         화면)로 가서 **어떤 영상인지가 전달되지 않았다.**
+
+         🔴 **`/videos` 의 뒤에 둔다.** go_router 는 먼저 맞는 것을 쓰는데,
+         `/videos` 는 여기 `:id` 에 안 걸리므로(빈 조각) 순서로 인한 사고는
+         없다. 그래도 형제 둘이 같은 앞머리를 쓰는 첫 사례라 적어 둔다. */
+      GoRoute(
+        path: '/videos/:id',
+        pageBuilder: (context, state) => _fadePage(
+          state,
+          ReelsScreen(videoId: state.pathParameters['id']!),
+        ),
       ),
       GoRoute(
         path: '/profile',

@@ -79,6 +79,13 @@ flutter:
     # 60fps · 21MB)을 960×512(16의 배수) · 30fps · 소리 없음으로 줄였다(약 1MB). 🔴 영상을 더
     # 늘리면 앱이 그만큼 무거워진다 — 웹 `www/public` 과 같은 주의.
     - assets/videos/
+    # 견줄 본보기 선수 영상 둘(6.6MB). 🔴 **서버가 안 준다** — 선수 원본이 S3 에
+    # 없어서(EC2 역할에 `videos/` 쓰기 권한 없음) 계약이 재생 주소를 빼 두었다.
+    # 웹 `www/public/compare/` 의 **같은 파일**이다(Pexels 무료 클립, 1280px).
+    # 🔴 이름이 곧 선수 id 다 — `reference_player.dart` 의 `_clips` 와 맞춰야
+    # 하고, 어긋나면 **빌드는 되고 재생만 안 된다.**
+    # ⚠️ 실존 선수 경기 영상으로 바꾸지 말 것(퍼블리시티권 · 미결 `paik` 28번).
+    - assets/compare/
 
   shaders:
     - shaders/ink_bleed.frag

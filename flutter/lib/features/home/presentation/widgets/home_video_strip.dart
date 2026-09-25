@@ -84,6 +84,21 @@ class _HomeVideoStripState extends ConsumerState<HomeVideoStrip>
   /// 않으려는 것이다**(사용자 결정: 「멈춘 뒤에만 재생」).
   bool _settled = true;
 
+  /// 전체화면 영상으로 **나가 있는 동안** 참 (2026-09-24 사용자 지적: 「다 보고
+  /// 뒤로 나와서 홈페이지 갔을때, 가운데 영상이 멈춘다」).
+  ///
+  /// 🔴 **고치는 일이 둘인데 한 값으로 된다.**
+  /// ⑴ **나가 있는 동안 홈의 재생기를 닫는다** — 안 닫으면 전체화면 재생기와
+  ///    **디코더를 놓고 다툰다**(안드로이드는 동시에 몇 개 못 연다). 홈 것은
+  ///    보이지도 않으면서 자리만 차지하고, 그 탓에 전체화면 쪽이 못 열리기도 한다.
+  /// ⑵ **돌아오면 저절로 다시 열린다** — 이 값이 거짓으로 돌아가면 `open` 이
+  ///    참이 되고, [_VideoCard] 의 `didUpdateWidget` 이 늘 하던 대로 연다.
+  ///    따로 「되살리기」 길을 안 만들어도 되는 것이 이 방식의 이점이다.
+  ///
+  /// ⚠️ **돌아왔을 때 포스터가 먼저 뜨고 영상이 뒤따른다** — 다시 여는 데
+  /// 시간이 걸려서다. 검은 칸은 안 보인다(포스터가 늘 깔려 있다).
+  bool _away = false;
+
   double get _cardWidth => widget.height * 16 / 9;
   double get _step => _cardWidth * HomeVideoStrip.stepRatio;
 
@@ -134,7 +149,7 @@ class _HomeVideoStripState extends ConsumerState<HomeVideoStrip>
   /// 화면에서 그 칸의 **중심 x**(줄 안에서의 좌표).
   double _dx(int i, double width) => width / 2 + (i - _pos) * _step;
 
-  void _onTapUp(TapUpDetails d, double width, int count) {
+  void _onTapUp(TapUpDetails d, double width, List<PublicVideo> videos) {
     /* 🔴 **가운데에서 가까운 것부터 맞춰 본다** — 겹쳐 있으므로 눈에 보이는
        층(가운데가 맨 위)과 같은 순서로 집어야 누른 대로 걸린다. */
     for (var k = 0; k <= HomeVideoStrip.side; k += 1) {
@@ -144,8 +159,18 @@ class _HomeVideoStripState extends ConsumerState<HomeVideoStrip>
         final cx = _dx(i, width);
         if ((d.localPosition.dx - cx).abs() <= w / 2) {
           if (i == _center) {
-            // 🔴 가운데를 누르면 **영상 모음**(하단 바 두 번째 칸)으로 간다.
-            context.go('/videos');
+            /* 🔴 **누른 그 영상으로 간다**(2026-09-24 사용자 요청: 「그 영상으로
+               영상페이지로 바로 나와야해」). 전에는 `go('/videos')` — 영상
+               **분석** 화면이었고 **어떤 영상인지가 전달되지 않았다.**
+
+               🔴 **`go` 가 아니라 `push` 다.** 얹어야 뒤로 가기로 홈에 돌아오고,
+               **돌아오는 시점을 여기서 알 수 있다**(아래 `then`). */
+            setState(() => _away = true);
+            /* 🔴 **돌아오면 다시 튼다** — [_away] 머리말의 ⑵. `push` 가 주는
+               Future 는 **어떻게 나왔든**(단추·시스템 뒤로 가기) 끝난다. */
+            context.push('/videos/${_videoAt(i, videos).id}').then((_) {
+              if (mounted) setState(() => _away = false);
+            });
           } else {
             _animateTo(i.toDouble());
           }
@@ -154,6 +179,11 @@ class _HomeVideoStripState extends ConsumerState<HomeVideoStrip>
       }
     }
   }
+
+  /// 그 칸에 서는 영상 — 🔴 **`_slot` 과 같은 식이어야 한다.** 다르면 **보이는
+  /// 것과 다른 영상**이 열린다.
+  PublicVideo _videoAt(int i, List<PublicVideo> videos) =>
+      videos[((i % videos.length) + videos.length) % videos.length];
 
   double _scaleOf(double d) =>
       math.pow(HomeVideoStrip.stepScale, d.clamp(0.0, 2.0)).toDouble();
@@ -178,8 +208,11 @@ class _HomeVideoStripState extends ConsumerState<HomeVideoStrip>
     final h = widget.height * scale;
     /* 🔴 **나머지로 영상을 고른다 — 여기가 「무한」의 전부다.** `%` 는 음수에서
        음수를 주므로 한 번 더 더해 준다. 목록 전체가 차례로 돌고, 끝에서 처음으로
-       이어진다(사용자 요청: 「올려져 있는 공개된 영상들이 다 무한으로」). */
-    final v = videos[((i % videos.length) + videos.length) % videos.length];
+       이어진다(사용자 요청: 「올려져 있는 공개된 영상들이 다 무한으로」).
+
+       🔴 **누를 때도 같은 식을 쓴다**([_videoAt]) — 둘이 갈라지면 **보이는 것과
+       다른 영상**이 열린다. */
+    final v = _videoAt(i, videos);
     return Positioned(
       key: ValueKey(i),
       left: _dx(i, width) - w / 2,
@@ -189,12 +222,12 @@ class _HomeVideoStripState extends ConsumerState<HomeVideoStrip>
       child: _VideoCard(
         video: v,
         dim: _dimOf(d),
-        // 🔴 **멈춰 선 그 한 칸만 튼다.**
-        playing: _settled && i == _center,
+        // 🔴 **멈춰 선 그 한 칸만 튼다.** 나가 있는 동안은 아무것도 안 튼다.
+        playing: !_away && _settled && i == _center,
         /* 🔴 **영상은 가운데 하나만 연다.** 나머지 넷은 포스터(작은 JPEG)로
            충분하고, 그 편이 훨씬 빠르다 — 원본을 여는 데 한 장에 1.9초가
            걸렸다(실기기 실측). 디코더도 하나만 쓴다. */
-        open: i == _center,
+        open: !_away && i == _center,
       ),
     );
   }
@@ -204,8 +237,41 @@ class _HomeVideoStripState extends ConsumerState<HomeVideoStrip>
     final async = ref.watch(publicVideosProvider);
     final videos = async.value ?? const <PublicVideo>[];
 
+    /* 🔴 **못 받은 것을 감추지 않는다** (2026-09-25, 사용자: 「아니 대체 왜
+       영상 홈페이지에서 안보이냐고」).
+
+       그날 실측으로 원인은 **서버**였다 — `/videos/public` 이 30초를 넘겨도
+       답이 없었고 `/regions` 는 0.5초에 답했다. 그런데 화면은 실패도 빈 자리로
+       그려서, **어느 쪽 문제인지 아무도 알 수 없었다.** `.value` 는 오류일 때도
+       `null` 이라 「아직 오는 중」과 「못 받았다」가 같아 보인다.
+
+       🔴 **[publicVideosProvider] 는 재시도를 안 한다**(그쪽 머리말 — 무한
+       재시도가 느린 서버를 더 때린다). 그래서 **사람이 다시 시킬 길**이 여기
+       있어야 한다. ⛔ 조용한 빈 자리로 되돌리지 말 것. */
+    if (async.hasError && videos.isEmpty) {
+      return SizedBox(
+        height: widget.height,
+        width: double.infinity,
+        child: Center(
+          child: GestureDetector(
+            key: const Key('home-videos-failed'),
+            behavior: HitTestBehavior.opaque,
+            onTap: () => ref.invalidate(publicVideosProvider),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Text(
+                '영상을 불러오지 못했습니다 · 눌러서 다시',
+                style: TextStyle(color: Color(0x99FFFFFF), fontSize: 12.5),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     /* 🔴 **자리는 늘 차지한다.** 아직 못 받았거나 한 편도 없을 때 접히면,
-       목록이 도착하는 순간 아래 것들이 통째로 밀려 **화면이 덜컥거린다.** */
+       목록이 도착하는 순간 아래 것들이 통째로 밀려 **화면이 덜컥거린다.**
+       ⚠️ **한 편도 없는 것은 오류가 아니다** — 그때는 조용히 자리만 지킨다. */
     if (videos.isEmpty) {
       return SizedBox(height: widget.height, width: double.infinity);
     }
@@ -230,7 +296,7 @@ class _HomeVideoStripState extends ConsumerState<HomeVideoStrip>
           onHorizontalDragStart: _onDragStart,
           onHorizontalDragUpdate: _onDragUpdate,
           onHorizontalDragEnd: _onDragEnd,
-          onTapUp: (d) => _onTapUp(d, width, videos.length),
+          onTapUp: (d) => _onTapUp(d, width, videos),
           child: SizedBox(
             height: widget.height,
             width: width,

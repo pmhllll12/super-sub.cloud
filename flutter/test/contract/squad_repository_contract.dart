@@ -182,6 +182,24 @@ void runSquadRepositoryContract(
       expect(again.members.any((m) => m.playerCardId == cardIdToEnlist), isTrue);
     });
 
+    /// 🔴 **공개 슬러그로 남의 판을 읽는다**(계약 3-7절, SEC-005 — 누구나
+    /// 읽는다). 대기 화면이 **상대 팀 판을 진짜로** 그리는 데 쓴다.
+    test('공개 슬러그로 판을 읽는다', () async {
+      final mine = (await repo.squadOf(teamWithSquad))!;
+
+      final read = await repo.squadBySlug(mine.publicSlug);
+
+      expect(read, isNotNull);
+      expect(read!.publicSlug, mine.publicSlug);
+      expect(read.members.length, mine.members.length);
+    });
+
+    /// 🔴 **없는 슬러그는 예외가 아니라 `null`** 이다 — 스쿼드를 아직 안 만든
+    /// 팀이 정상 상태라, 오류로 올리면 대기 화면이 통째로 오류가 된다.
+    test('없는 슬러그는 null 이다', () async {
+      expect(await repo.squadBySlug('없는슬러그'), isNull);
+    });
+
     test('없는 등재는 못 뺀다', () async {
       await expectLater(
         repo.removeSeat(teamWithSquad, memberId: 'sm-없는것-0000'),

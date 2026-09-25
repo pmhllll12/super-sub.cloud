@@ -30,6 +30,16 @@ class MockSquadRepository implements SquadRepository {
   }
 
   @override
+  Future<Squad?> squadBySlug(String publicSlug) async {
+    await Future<void>.delayed(_delay);
+    for (final t in _db.teams) {
+      final squad = _find(t.id);
+      if (squad != null && squad.publicSlug == publicSlug) return squad;
+    }
+    return null;
+  }
+
+  @override
   Future<Squad> enlist(
     String teamId, {
     required String playerCardId,
