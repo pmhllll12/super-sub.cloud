@@ -237,8 +237,41 @@ class _HomeVideoStripState extends ConsumerState<HomeVideoStrip>
     final async = ref.watch(publicVideosProvider);
     final videos = async.value ?? const <PublicVideo>[];
 
+    /* 🔴 **못 받은 것을 감추지 않는다** (2026-09-25, 사용자: 「아니 대체 왜
+       영상 홈페이지에서 안보이냐고」).
+
+       그날 실측으로 원인은 **서버**였다 — `/videos/public` 이 30초를 넘겨도
+       답이 없었고 `/regions` 는 0.5초에 답했다. 그런데 화면은 실패도 빈 자리로
+       그려서, **어느 쪽 문제인지 아무도 알 수 없었다.** `.value` 는 오류일 때도
+       `null` 이라 「아직 오는 중」과 「못 받았다」가 같아 보인다.
+
+       🔴 **[publicVideosProvider] 는 재시도를 안 한다**(그쪽 머리말 — 무한
+       재시도가 느린 서버를 더 때린다). 그래서 **사람이 다시 시킬 길**이 여기
+       있어야 한다. ⛔ 조용한 빈 자리로 되돌리지 말 것. */
+    if (async.hasError && videos.isEmpty) {
+      return SizedBox(
+        height: widget.height,
+        width: double.infinity,
+        child: Center(
+          child: GestureDetector(
+            key: const Key('home-videos-failed'),
+            behavior: HitTestBehavior.opaque,
+            onTap: () => ref.invalidate(publicVideosProvider),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Text(
+                '영상을 불러오지 못했습니다 · 눌러서 다시',
+                style: TextStyle(color: Color(0x99FFFFFF), fontSize: 12.5),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     /* 🔴 **자리는 늘 차지한다.** 아직 못 받았거나 한 편도 없을 때 접히면,
-       목록이 도착하는 순간 아래 것들이 통째로 밀려 **화면이 덜컥거린다.** */
+       목록이 도착하는 순간 아래 것들이 통째로 밀려 **화면이 덜컥거린다.**
+       ⚠️ **한 편도 없는 것은 오류가 아니다** — 그때는 조용히 자리만 지킨다. */
     if (videos.isEmpty) {
       return SizedBox(height: widget.height, width: double.infinity);
     }

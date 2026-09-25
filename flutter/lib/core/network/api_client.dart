@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -34,6 +35,18 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+/// 한 요청을 **기다려 주는 한계**.
+///
+/// 🔴 **없으면 화면이 영원히 빈다** (2026-09-25 실서버에서 겪었다 — `/regions`
+/// 가 20초를 넘겨도 답이 없었고, 앞서 같은 원인으로 Cloudflare 가 `error code:
+/// 522` HTML 을 줘 JSON 파싱에서 터졌다). 기다리기만 하면 사용자에게는 「그냥
+/// 안 나온다」로 보이고, **서버 탓인지 앱 탓인지도 안 드러난다.** 끊고
+/// 말해 주는 쪽이 낫다.
+///
+/// 🔴 **짧게 두지 않는다.** 분석·업로드처럼 서버가 원래 오래 무는 경로가 있고,
+/// 지하철 안 같은 느린 회선도 있다 — 너무 짧으면 **정상 요청을 끊는다.**
+const kApiTimeout = Duration(seconds: 20);
+
 /// 백엔드를 부르는 공통 창구 — 토큰 보관 · 헤더 · 디코딩 · 오류 변환.
 ///
 /// 🔴 **리포지토리마다 `http` 를 직접 부르지 않는다.** 아래 두 함정이 한 곳이라도
@@ -43,12 +56,18 @@ class ApiException implements Exception {
 /// 🔴 **앱은 FastAPI 를 직접 부른다**(웹은 Next BFF 를 거친다). 그래서 `Retry-After`
 /// 헤더도 프록시를 안 거치고 그대로 온다.
 class ApiClient {
-  ApiClient({TokenStore? tokens, http.Client? client})
-      : _tokens = tokens ?? const SecureTokenStore(),
+  ApiClient({
+    TokenStore? tokens,
+    http.Client? client,
+    this._timeout = kApiTimeout,
+  })  : _tokens = tokens ?? const SecureTokenStore(),
         _client = client ?? http.Client();
 
   final TokenStore _tokens;
   final http.Client _client;
+
+  /// 한 요청의 한계 — 시험이 짧게 줄여 쓴다. 기본값은 [kApiTimeout].
+  final Duration _timeout;
   String? _token;
 
   /// 저장소 읽기는 **한 번만** 한다 — 여러 요청이 동시에 나가도 같은 것을
@@ -245,7 +264,10 @@ class ApiClient {
   Future<http.Response> _send(Future<http.Response> Function() request) async {
     await _ensureLoaded();
     try {
-      return await request();
+      /* 🔴 **끊고 알린다** — 자세한 까닭은 [kApiTimeout]. */
+      return await request().timeout(_timeout);
+    } on TimeoutException {
+      throw const ApiException('서버 응답이 너무 늦습니다. 잠시 뒤 다시 시도해 주세요.');
     } on http.ClientException catch (e) {
       throw ApiException('서버에 연결할 수 없습니다: ${e.message}');
     }
