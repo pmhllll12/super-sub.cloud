@@ -15,7 +15,6 @@ import '../../../../core/widgets/glass_pill.dart';
 import '../../../../core/widgets/aurora_background.dart';
 import '../../../../core/widgets/bar_menu.dart';
 import '../../../../core/widgets/floating_nav_bar.dart';
-import '../../../../core/widgets/glass_panel.dart';
 import '../../../../core/widgets/silver_edge.dart';
 import '../../../../core/widgets/raised_rim.dart';
 import '../../../../core/widgets/screen_tint.dart';
@@ -72,8 +71,6 @@ const Color _kHomeBg = ScreenTint.mintBase;
 /// 검은 바탕 위의 글자.
 const Color _kOnDark = Color(0xFFFFFFFF);
 
-/// 유리 조각 모서리.
-const double _kCardRadius = 18;
 
 /// 오른쪽 위 「내 프로필」 단추의 카드 폭. 웹 헤더의 작은 카드(`.ss-pcard-mini`)
 /// 자리다 — 글자는 안 읽혀도 초록 카드와 인물로 「내 카드」임을 알아본다.
@@ -1015,12 +1012,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     return '우리 팀';
   }
 
-  /// 「사람을 찾는 팀」을 연다 — 팀 없는 사람의 입구다.
-  ///
-  /// 🔴 **팀 id 를 안 쓴다.** `GET /matches` 는 팀 없이 갈 수 있는 유일한
-  /// 경로라(계약 3-4절), 팀이 없어도 여기서 경기를 찾을 수 있다.
-  void _openTeamSeek() => showTeamSeekSheet(context);
-
   /// 답해야 할 것의 수 — 알림 알약에 붙는다.
   int _inboxCount() => ref.watch(inboxProvider).value?.pending ?? 0;
 
@@ -1664,12 +1655,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           right: _kVideoSideInset,
           bottom: bottomInset,
           top: openTop + (flatTop - openTop) * t,
-          child: _VideoAnalysisPanel(
-            flat: t,
-            onTap: () {
-              _closeMenu();
-              context.push('/videos');
-            },
+          /* 🔴 **판을 키우면 걷는다** (2026-09-25 사용자 요청: 「스쿼드판
+             키우면 아래에 영상분석 탭도 안보이게 해줘」). 전에는 하단 바 위에
+             납작한 띠로 남았다 — 그 자리는 이제 스쿼드 판이 쓴다.
+             🔴 **앞 6할 안에 걷는다** — 판이 다 올라온 뒤에 사라지면 그
+             순간이 눈에 띈다. */
+          child: IgnorePointer(
+            ignoring: t > 0.5,
+            child: Opacity(
+              opacity: (1 - t / 0.6).clamp(0.0, 1.0),
+              child: _VideoAnalysisPanel(
+                flat: t,
+                onTap: () {
+                  _closeMenu();
+                  context.push('/videos');
+                },
+              ),
+            ),
           ),
         );
       },
@@ -1717,7 +1719,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
        스쿼드 판을 펼치면 영상 분석이 띠로 내려가고 그만큼 스쿼드 판의 아랫변도
        따라 내려간다 — 둘 사이 틈이 **한 번도 안 벌어진다.** */
     final squadBottomCollapsed = videoOpenTop - _kVideoGap;
-    final squadBottomExpanded = videoFlatTop - _kVideoGap;
+    /* 🔴 **영상 분석이 걷히므로 그 자리까지 쓴다**(2026-09-25). 전에는
+       납작한 띠 위에서 멈췄는데, 띠가 사라지면 그만큼이 빈 검정으로 남는다. */
+    final squadBottomExpanded = bottom;
 
     // 접히면 사진 한 장 높이, 펼치면 워드마크 아래부터 꽉.
     final squadTopCollapsed = squadBottomCollapsed - _kSquadPhotoH;
@@ -1820,7 +1824,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 ? (slot) => _fillSeat(ownedTeamId, slot)
                 : (_) => _notReady('선수 넣기'),
           )
-        : _MemberPanel(onOpen: _openTeamSeek);
+        /* 🔴 **한 번 더 안 누른다** (2026-09-25 사용자: 「굳이 한 번 더
+           눌러서 팀 찾아야 해?」). 「팀원」을 고르면 그 자리가 곧 조건 폼
+           (처음이면) 또는 사람을 찾는 팀 목록이다. */
+        : const TeamSeekPanel();
 
     return AnimatedBuilder(
       animation: _sheet,
@@ -2729,32 +2736,42 @@ class _TeamMatchButton extends StatelessWidget {
       ),
     );
 
+    /* 🔴 **안을 채운다** (2026-09-25 사용자: 「팀 매칭 버튼 잘 안보인다.
+       안쪽 색상 그 팀장팀원 버튼처럼 색상 똑같은거 채워」). 테만 있으면
+       검은 바탕에 묻힌다 — 면은 `SilverEdge` 의 기본값과 **같은 값**이다
+       (팀장·팀원 알약이 쓰는 그것). 🔴 값을 베껴 적지 않는다. */
     return SizedBox(
       height: 38,
       width: 54,
-      child: Material(
-        type: MaterialType.transparency,
-        child: InkWell(
-          key: const Key('home-team-match'),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: SilverEdge.defaultFill,
           borderRadius: BorderRadius.circular(19),
-          onTap: onTap,
-          child: ready
-              ? SilverSweepBorder(
-                  radius: 19,
-                  strokeWidth: 1.2,
-                  color: AppTheme.seed,
-                  baseColor: AppTheme.seed.withValues(alpha: 0.28),
-                  child: label,
-                )
-              : DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(19),
-                    border: Border.all(
-                      color: AppTheme.seed.withValues(alpha: 0.24),
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            key: const Key('home-team-match'),
+            borderRadius: BorderRadius.circular(19),
+            onTap: onTap,
+            child: ready
+                ? SilverSweepBorder(
+                    radius: 19,
+                    strokeWidth: 1.2,
+                    color: AppTheme.seed,
+                    baseColor: AppTheme.seed.withValues(alpha: 0.28),
+                    child: label,
+                  )
+                : DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(19),
+                      border: Border.all(
+                        color: AppTheme.seed.withValues(alpha: 0.24),
+                      ),
                     ),
+                    child: label,
                   ),
-                  child: label,
-                ),
+          ),
         ),
       ),
     );
@@ -2763,49 +2780,6 @@ class _TeamMatchButton extends StatelessWidget {
 
 /// 「팀원」을 골랐을 때 판 자리에 서는 것. 웹은 **사람을 구하는 팀 목록**
 /// (`TeamSeek`)이 스쿼드 판을 대신 선다 — 앱은 아직 자리만 잡아 둔다.
-class _MemberPanel extends StatelessWidget {
-  const _MemberPanel({required this.onOpen});
-
-  final VoidCallback onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassPanel(
-      radius: _kCardRadius,
-      child: Material(
-        type: MaterialType.transparency,
-        child: InkWell(
-          key: const Key('home-team-seek'),
-          borderRadius: BorderRadius.circular(_kCardRadius),
-          onTap: onOpen,
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.groups_outlined,
-                    size: 36, color: AppTheme.seed),
-                const SizedBox(height: 10),
-                const Text(
-                  '사람을 찾는 팀',
-                  style: TextStyle(color: _kOnDark, fontSize: 16),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '눌러서 찾아보기',
-                  style: TextStyle(
-                    color: _kOnDark.withValues(alpha: 0.55),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// 「영상 분석」 판. [flat] 이 0 이면 사진이 깔린 큰 판, 1 이면 하단 바 위의
 /// 납작한 띠다(스쿼드 판을 펼친 정도 그대로).
 ///

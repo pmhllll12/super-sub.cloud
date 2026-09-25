@@ -9,6 +9,9 @@ import 'package:super_sub/features/team/data/models/team_invitation.dart';
 class _RealCandidates implements CandidateRepository {
   final asked = <String>[];
 
+  /// 서버가 죽은 상태를 흉내 낸다 — 522 는 HTML 을 돌려줘 파싱이 터진다.
+  bool down = false;
+
   @override
   Future<List<SquadCandidate>> candidates(
     String teamId, {
@@ -16,6 +19,7 @@ class _RealCandidates implements CandidateRepository {
     String? grade,
   }) async {
     asked.add(positionCode);
+    if (down) throw const FormatException('Unexpected character');
     return const [
       SquadCandidate(userId: 'u-real', nickname: '진짜사람', grade: 'B'),
     ];
@@ -76,6 +80,18 @@ void main() {
           .firstWhere((c) => c.userId == kDemoCandidateId);
 
       expect(demo.nickname, contains('mock'));
+    });
+
+    /// 🔴 **서버가 죽어도 가짜는 남는다** (2026-09-25, 실제로 522 가 났다).
+    /// 가짜는 **시험하라고** 넣은 것인데, 진짜 호출과 함께 죽으면 정작
+    /// 서버가 불안정할 때 못 쓴다 — 그때가 가장 필요한 때다.
+    test('서버가 죽어도 가짜 후보는 남는다', () async {
+      inner.down = true;
+
+      final list = await repo.candidates('t-1', positionCode: 'DF');
+
+      expect(list, hasLength(1));
+      expect(list.single.userId, kDemoCandidateId);
     });
 
     /// 🔴 **등급 필터는 그대로 서버로 간다** — 가짜를 끼우느라 진짜 검색을

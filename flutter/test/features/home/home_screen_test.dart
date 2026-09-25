@@ -248,6 +248,11 @@ void main() {
       await tester.tap(find.byKey(const Key('home-role-member')));
       await tester.pump();
       expect(find.text('사람을 찾는 팀'), findsOneWidget);
+
+      // 위와 같은 까닭 — 판이 서면서 띄운 Mock 지연을 흘려보낸다.
+      for (var i = 0; i < 4; i++) {
+        await tester.pump(const Duration(milliseconds: 500));
+      }
     });
 
     testWidgets('접혀 있을 때는 판이 안 눌린다', (tester) async {
@@ -662,6 +667,29 @@ void main() {
     /// 🔴 **2026-09-25에 진짜가 됐다** — 전에는 「준비 중」 자리였다.
     /// 누르면 `GET /matches`(팀 없이 갈 수 있는 유일한 경로)로 사람을 찾는
     /// 팀들을 연다.
+
+    /// 🔴 **판을 키우면 영상 분석도 걷힌다** (2026-09-25 사용자 요청:
+    /// 「스쿼드판 키우면 아래에 영상분석 탭도 안보이게 해줘」).
+    /// 전에는 하단 바 위에 **납작한 띠**로 남았다.
+    testWidgets('판을 펼치면 영상 분석이 걷힌다', (tester) async {
+      await _pumpLoggedIn(tester);
+      expect(
+        _opacityAbove(tester, find.byKey(const Key('home-video-analysis'))),
+        closeTo(1, 0.01),
+        reason: '접혔을 때는 보인다',
+      );
+
+      await _openSheet(tester);
+      expect(
+        _opacityAbove(tester, find.byKey(const Key('home-video-analysis'))),
+        closeTo(0, 0.01),
+        reason: '펼치면 걷힌다',
+      );
+      for (var i = 0; i < 4; i++) {
+        await tester.pump(const Duration(milliseconds: 500));
+      }
+    });
+
     testWidgets('팀원을 고르면 사람을 찾는 팀 자리가 선다', (tester) async {
       await _pumpLoggedIn(tester);
       // 알약은 판을 펼쳐야 눌린다.
@@ -678,6 +706,13 @@ void main() {
       await tester.tap(find.byKey(const Key('home-role-captain')));
       await tester.pump();
       expect(find.text('MY SQUAD'), findsOneWidget);
+
+      /* 🔴 「팀원」 판이 서면서 내 조건·경기 목록을 묻는다 — Mock 이 일부러
+         쓰는 지연이 타이머로 남아 「위젯 트리를 버린 뒤에도 타이머가
+         남았다」로 깨진다. 흘려보낸다. */
+      for (var i = 0; i < 4; i++) {
+        await tester.pump(const Duration(milliseconds: 500));
+      }
     });
   });
 

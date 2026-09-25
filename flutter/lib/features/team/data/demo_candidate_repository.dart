@@ -31,12 +31,22 @@ class DemoCandidateRepository implements CandidateRepository {
     String? grade,
   }) async {
     /* 🔴 **속 저장소를 그대로 부른다.** 가짜를 끼우느라 진짜 검색을
-       망가뜨리면 안 된다 — 등급 필터도 그대로 서버로 간다. */
-    final real = await _inner.candidates(
-      teamId,
-      positionCode: positionCode,
-      grade: grade,
-    );
+       망가뜨리면 안 된다 — 등급 필터도 그대로 서버로 간다.
+
+       🔴 **서버가 죽어도 가짜는 남긴다** (2026-09-25, 실서버가 522 를 냈다 —
+       Cloudflare 가 HTML 오류 쪽을 돌려줘 JSON 파싱까지 터졌다). 가짜는
+       **시험하라고** 넣은 것인데 진짜와 함께 죽으면 **정작 서버가 불안정할
+       때 못 쓴다** — 그때가 가장 필요한 때다. */
+    List<SquadCandidate> real;
+    try {
+      real = await _inner.candidates(
+        teamId,
+        positionCode: positionCode,
+        grade: grade,
+      );
+    } catch (_) {
+      real = const [];
+    }
 
     return [
       SquadCandidate(

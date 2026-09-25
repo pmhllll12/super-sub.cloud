@@ -5,6 +5,7 @@ import '../../data/match_providers.dart';
 import '../../data/models/open_match.dart';
 import '../../data/regions.dart';
 import '../../match_prefs.dart';
+import '../widgets/slot_editor.dart';
 import 'sheet_skin.dart';
 
 /// 「사람을 찾는 팀」 — 웹 `TeamSeek.tsx` 를 옮긴 것이다.
@@ -16,22 +17,17 @@ import 'sheet_skin.dart';
 /// 🔴 **조건은 내 것이다** — 팀 조건과 **저장소가 다르다**(계약 3-13절).
 /// 같은 사람이 팀장이면서 팀원일 수 있어 절대 안 섞는다. 여기에만 **내 자리**가
 /// 있고, 그 자리가 곧 남의 AI 추천 판에 뜨는 첫 하드 필터다.
-Future<void> showTeamSeekSheet(BuildContext context) =>
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const _TeamSeekSheet(),
-    );
-
-class _TeamSeekSheet extends ConsumerStatefulWidget {
-  const _TeamSeekSheet();
+/// 🔴 **시트가 아니라 판 안에 바로 선다** (2026-09-25 사용자: 「굳이 한 번
+/// 더 눌러서 팀 찾아야 해? 그냥 팀원 누르자마자 ... 그 판에 설정 할 수 있게」).
+/// 「팀원」을 누르면 그 자리가 곧 이 판이다 — 한 번 더 누르게 하지 않는다.
+class TeamSeekPanel extends ConsumerStatefulWidget {
+  const TeamSeekPanel({super.key});
 
   @override
-  ConsumerState<_TeamSeekSheet> createState() => _TeamSeekSheetState();
+  ConsumerState<TeamSeekPanel> createState() => _TeamSeekPanelState();
 }
 
-class _TeamSeekSheetState extends ConsumerState<_TeamSeekSheet> {
+class _TeamSeekPanelState extends ConsumerState<TeamSeekPanel> {
   bool? _editing;
   MatchPrefs? _prefs;
 
@@ -42,23 +38,49 @@ class _TeamSeekSheetState extends ConsumerState<_TeamSeekSheet> {
   Widget build(BuildContext context) {
     final async = ref.watch(myPrefsProvider);
     final prefs = _prefs ?? async.value;
-    // 🔴 `null` 과 빈 조건을 가른다 — 「처음이라 물어야 하는가」가 그 차이다.
-    final editing = _editing ?? (async.hasValue && prefs == null);
+    /* 🔴 **목록이 먼저다** (2026-09-25 정정 — 사용자: 「다 지우면 모든 팀들이
+       나와야지」). 조건은 **좁히는 것**이지 들어가는 문이 아니다.
 
-    return SheetShell(
-      title: editing ? '내 경기 조건' : '사람을 찾는 팀',
-      child: async.isLoading && _prefs == null
-          ? const Center(child: SheetSpinner())
-          : editing
-              ? _MyPrefsForm(
-                  initial: prefs ?? const MatchPrefs(),
-                  onDone: _save,
-                )
-              : _OpenMatchList(
-                  region: _region,
-                  onRegion: (r) => setState(() => _region = r),
-                  onEdit: () => setState(() => _editing = true),
-                ),
+       ⚠️ 전에는 조건이 없으면 폼을 먼저 띄웠는데, 그러면 **다 지운 사람이
+       목록을 못 본다.** 게다가 「셋 다 차야 저장」이라 지운 것을 저장할 길이
+       없어서, 다른 데 갔다 오면 옛 값이 되살아났다. */
+    final editing = _editing ?? false;
+
+    /* ⚠️ **검정 면을 깔지 않는다** (2026-09-25 정정 — 사용자: 「대체 검정
+       판은 또 왜 쳐 넣은거야?」). 이 자리는 홈의 유리 판 **안**이라 뒤가
+       이미 서 있다 — 한 겹 더 깔면 그 자리만 딴 재질로 읽힌다. */
+    return Padding(
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+            child: Text(
+              editing ? '내 경기 조건' : '사람을 찾는 팀',
+              style: const TextStyle(
+                color: kSheetOn,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Expanded(
+            child: async.isLoading && _prefs == null
+                ? const Center(child: SheetSpinner())
+                : editing
+                    ? _MyPrefsForm(
+                        initial: prefs ?? const MatchPrefs(),
+                        onDone: _save,
+                      )
+                    : _OpenMatchList(
+                        region: _region,
+                        onRegion: (r) => setState(() => _region = r),
+                        onEdit: () => setState(() => _editing = true),
+                      ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -70,6 +92,9 @@ class _TeamSeekSheetState extends ConsumerState<_TeamSeekSheet> {
         _prefs = next;
         _editing = false;
       });
+      /* 🔴 **provider 도 새로 읽게 둔다** — 지역 알약이 조건에서 오므로,
+         안 그러면 지운 지역이 알약으로 남는다. */
+      ref.invalidate(myPrefsProvider);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -102,11 +127,6 @@ class _MyPrefsFormState extends ConsumerState<_MyPrefsForm> {
     _region.dispose();
     super.dispose();
   }
-
-  /// 🔴 **셋 다 있어야 찾을 수 있다** — 자리를 안 고르면 어느 모집에 맞는지
-  /// 알 수가 없다(팀 조건은 둘만 본다 — 거기엔 자리가 없다).
-  bool get _ready =>
-      _regions.isNotEmpty && _times.isNotEmpty && _positions.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -167,6 +187,7 @@ class _MyPrefsFormState extends ConsumerState<_MyPrefsForm> {
                     children: [
                       for (final r in _regions)
                         _Chip(
+                          dropKey: Key('seek-drop-region-$r'),
                           label: r,
                           onRemove: () => setState(() => _regions.remove(r)),
                         ),
@@ -181,34 +202,22 @@ class _MyPrefsFormState extends ConsumerState<_MyPrefsForm> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              /* 🔴 **고르는 칸은 팀 조건 폼과 한 벌이다**(`slot_editor.dart`).
+                 여기엔 한때 **고를 칸이 아예 없었고** 토요일 09:00~11:00 이
+                 박혀 있었다 — 사용자가 「왜 토요일과 시간대가 고정이야」로
+                 잡았다(2026-09-25). */
               for (var i = 0; i < _times.length; i++)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _times[i].text,
-                          style: const TextStyle(
-                            color: kSheetBoxInk,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () => setState(() => _times.removeAt(i)),
-                        icon: const Icon(Icons.close,
-                            size: 18, color: kSheetBoxInk),
-                      ),
-                    ],
-                  ),
+                SlotEditor(
+                  removeKey: Key('seek-drop-time-$i'),
+                  slot: _times[i],
+                  onChanged: (v) => setState(() => _times[i] = v),
+                  onRemove: () => setState(() => _times.removeAt(i)),
                 ),
               _Outline(
                 key: const Key('seek-add-time'),
                 label: '+ 시간 추가',
-                // 토요일 09:00~11:00 — 팀 조건 폼과 같은 첫 값이다.
-                onTap: () => setState(() => _times
-                    .add(const TimeSlot(day: 6, from: '09:00', to: '11:00'))),
+                // 🔴 첫 값은 **오늘 요일 · 다음 칸**이다(요일을 안 박는다).
+                onTap: () => setState(() => _times.add(defaultSlot())),
               ),
             ],
           ),
@@ -237,9 +246,12 @@ class _MyPrefsFormState extends ConsumerState<_MyPrefsForm> {
           ),
         ),
         const SizedBox(height: 6),
+        /* 🔴 **비어 있어도 저장된다** (2026-09-25 사용자: 「설정 다 지웠어도
+           저장할 수 있게 해야지」). 전에는 셋이 다 차야 눌렸고, 그래서 **지운
+           것을 저장할 길이 없었다** — 다른 데 갔다 오면 옛 값이 되살아났다. */
         _Primary(
-          label: '팀 찾기',
-          enabled: _ready,
+          label: '저장',
+          enabled: true,
           onTap: () => widget.onDone(
             MatchPrefs(
               regions: _regions,
@@ -248,14 +260,13 @@ class _MyPrefsFormState extends ConsumerState<_MyPrefsForm> {
             ),
           ),
         ),
-        if (!_ready)
-          const Padding(
-            padding: EdgeInsets.only(top: 10),
-            child: Text(
-              '동네 · 시간 · 자리를 하나씩은 골라야 찾을 수 있습니다.',
-              style: TextStyle(color: kSheetOnDim, fontSize: 12.5),
-            ),
+        const Padding(
+          padding: EdgeInsets.only(top: 10),
+          child: Text(
+            '비워 두면 좁히지 않고 전부 보여 줍니다.',
+            style: TextStyle(color: kSheetOnDim, fontSize: 12.5),
           ),
+        ),
       ],
     );
   }
@@ -286,7 +297,7 @@ class _OpenMatchList extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
           child: Row(
             children: [
-              _Outline(label: '설정 수정', onTap: onEdit),
+              _Outline(label: '설정', onTap: onEdit),
               const SizedBox(width: 8),
               /* 🔴 **지역은 서버로 보낸다** — 받아 놓고 화면에서 거르면 다음
                  쪽을 못 가져온다(목록이 페이지로 온다). */
@@ -466,10 +477,18 @@ class _Field extends StatelessWidget {
 }
 
 class _Chip extends StatelessWidget {
-  const _Chip({required this.label, required this.onRemove});
+  const _Chip({
+    required this.label,
+    required this.onRemove,
+    this.dropKey,
+  });
 
   final String label;
   final VoidCallback onRemove;
+
+  /// 지우기 단추의 열쇠 — 🔴 **바깥 알약이 아니라 그 단추에 둔다**(둘 다
+  /// 같은 열쇠면 시험이 어느 쪽을 누를지 모른다).
+  final Key? dropKey;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -485,6 +504,7 @@ class _Chip extends StatelessWidget {
                 style: const TextStyle(color: kSheetBoxInk, fontSize: 12.5)),
             const SizedBox(width: 3),
             GestureDetector(
+              key: dropKey,
               onTap: onRemove,
               child: Icon(Icons.close,
                   size: 15, color: kSheetBoxInk.withValues(alpha: 0.55)),

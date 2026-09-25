@@ -55,7 +55,15 @@ class DemoMatchRepository implements MatchRepository {
 
   @override
   Future<List<MatchCandidate>> candidates(String teamId) async {
-    final real = await _inner.candidates(teamId);
+    /* 🔴 **서버가 죽어도 가짜는 남긴다** (2026-09-25, 실서버가 522 를 냈다).
+       가짜는 시험하라고 넣은 것인데 진짜와 함께 죽으면 정작 서버가 불안정할
+       때 못 쓴다 — 그때가 가장 필요한 때다. */
+    List<MatchCandidate> real;
+    try {
+      real = await _inner.candidates(teamId);
+    } catch (_) {
+      real = const [];
+    }
     /* 🔴 **진짜 목록을 가리지 않는다** — 섞는 것이지 대신하는 것이 아니다.
        맨 앞에 두는 이유는 시험할 때 스크롤하지 않고 닿게 하려는 것이다. */
     return [_demoTeam, ...real];

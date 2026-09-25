@@ -9,6 +9,7 @@ import '../../data/regions.dart';
 import '../../match_prefs.dart';
 import '../../match_proposal.dart';
 import '../../venues.dart';
+import '../widgets/slot_editor.dart';
 import 'sheet_skin.dart';
 
 /// 「팀 매칭」 — 조건을 정하고 **비슷한 팀**에 경기를 건다.
@@ -174,8 +175,11 @@ class _PrefsFormState extends State<_PrefsForm> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                /* 🔴 **고르는 칸은 한 벌이다**(`slot_editor.dart`) — 내 조건
+                   폼과 나눠 쓴다. 따로 그렸더니 한쪽에 고를 칸이 아예 안
+                   들어가 값이 박혀 있었다(2026-09-25 사용자가 잡았다). */
                 for (var i = 0; i < _times.length; i++)
-                  _SlotRow(
+                  SlotEditor(
                     slot: _times[i],
                     onChanged: (s) => setState(() => _times[i] = s),
                     onRemove: () => setState(() => _times.removeAt(i)),
@@ -186,10 +190,11 @@ class _PrefsFormState extends State<_PrefsForm> {
                     key: const Key('match-add-time'),
                     label: '+ 시간 추가',
                     onTap: () => setState(
-                      () => _times.add(
-                        // 토요일 09:00~11:00 — 웹과 같은 첫 값이다.
-                        const TimeSlot(day: 6, from: '09:00', to: '11:00'),
-                      ),
+                      /* 🔴 **오늘 요일에서 시작한다** — 토요일을 박아 두면
+                         「왜 토요일 고정이냐」가 된다(2026-09-25 사용자 지적).
+                         고르는 칸이 바로 옆에 있으니 첫 값은 **지금에 가까운
+                         쪽**이 손이 덜 간다. */
+                      () => _times.add(defaultSlot()),
                     ),
                   ),
                 ),
@@ -221,74 +226,6 @@ class _PrefsFormState extends State<_PrefsForm> {
       _region.clear();
       _query = '';
     });
-  }
-}
-
-class _SlotRow extends StatelessWidget {
-  const _SlotRow({
-    required this.slot,
-    required this.onChanged,
-    required this.onRemove,
-  });
-
-  final TimeSlot slot;
-  final ValueChanged<TimeSlot> onChanged;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Row(
-          children: [
-            _Picker<int>(
-              value: slot.day,
-              items: [for (var d = 0; d < 7; d++) (d, kDays[d])],
-              onChanged: (d) => onChanged(
-                TimeSlot(day: d, from: slot.from, to: slot.to),
-              ),
-            ),
-            const SizedBox(width: 6),
-            _Picker<String>(
-              value: slot.from,
-              items: [for (final h in kHours) (h, h)],
-              onChanged: (h) => onChanged(
-                TimeSlot(
-                  day: slot.day,
-                  from: h,
-                  // 🔴 시작이 끝을 넘으면 서버가 422 로 막는다 — 넘기 전에
-                  //    끝을 함께 민다.
-                  to: h.compareTo(slot.to) >= 0 ? _nextHour(h) : slot.to,
-                ),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 4),
-              child: Text('~', style: TextStyle(color: kSheetOnDim)),
-            ),
-            _Picker<String>(
-              value: slot.to,
-              // 끝은 시작보다 뒤만 고를 수 있다.
-              items: [
-                for (final h in kHours)
-                  if (h.compareTo(slot.from) > 0) (h, h),
-              ],
-              onChanged: (h) => onChanged(
-                TimeSlot(day: slot.day, from: slot.from, to: h),
-              ),
-            ),
-            const Spacer(),
-            IconButton(
-              tooltip: '지우기',
-              onPressed: onRemove,
-              icon: const Icon(Icons.close, size: 18, color: kSheetOnDim),
-            ),
-          ],
-        ),
-      );
-
-  static String _nextHour(String h) {
-    final i = kHours.indexOf(h);
-    return i < 0 || i + 1 >= kHours.length ? kHours.last : kHours[i + 1];
   }
 }
 

@@ -107,39 +107,75 @@ Future<void> _open(WidgetTester tester, _Fake repo) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [matchRepositoryProvider.overrideWithValue(repo)],
-      child: MaterialApp(
-        home: Scaffold(
-          body: Builder(
-            builder: (context) => ElevatedButton(
-              onPressed: () => showTeamSeekSheet(context),
-              child: const Text('열기'),
-            ),
-          ),
-        ),
+      /* 🔴 **시트가 아니라 판이다** — 홈의 「팀원」 자리에 바로 선다
+         (2026-09-25 사용자 요청). 한 번 더 누르게 하지 않는다. */
+      child: const MaterialApp(
+        home: Scaffold(body: SizedBox(height: 760, child: TeamSeekPanel())),
       ),
     ),
   );
 
-  await tester.tap(find.text('열기'));
   for (var i = 0; i < 4; i++) {
     await tester.pump(const Duration(milliseconds: 400));
   }
 }
 
 void main() {
-  /// 🔴 **내 조건을 한 번도 안 정했으면 먼저 묻는다** — 웹과 같다. 조건이
-  /// 없으면 어느 경기가 나에게 맞는지 판단할 근거가 없다.
-  testWidgets('조건이 없으면 조건부터 묻는다', (tester) async {
+  /// 🔴 **처음에도 목록이 먼저다** (2026-09-25 정정 — 사용자: 「다 지우면
+  /// 모든 팀들이 나와야지」). 조건은 **좁히는 것**이지 들어가는 문이 아니다 —
+  /// 안 정했으면 전부 보여 주고, 좁히고 싶을 때 「설정」을 누른다.
+  testWidgets('조건이 없어도 목록이 먼저 뜬다', (tester) async {
     await _open(tester, _Fake());
+
+    expect(find.text('사람을 찾는 팀'), findsOneWidget);
+    expect(find.text('베어스'), findsOneWidget);
+  });
+
+  testWidgets('설정을 누르면 조건 폼이 열린다', (tester) async {
+    await _open(tester, _Fake());
+
+    await tester.tap(find.text('설정'));
+    await tester.pump(const Duration(milliseconds: 400));
 
     expect(find.text('어떤 경기를 찾으세요?'), findsOneWidget);
     expect(find.textContaining('내 자리'), findsOneWidget);
+  });
+
+  /// 🔴 **다 비워도 저장된다** (같은 요청: 「설정 다 지웠어도 저장할 수 있게」).
+  /// 전에는 셋이 다 차야 단추가 눌렸는데, 그래서 **지운 것을 저장할 길이
+  /// 없었고** 다른 데 갔다 오면 옛 값이 되살아났다.
+  testWidgets('빈 조건도 저장된다', (tester) async {
+    final repo = _Fake(prefs: _ready);
+    await _open(tester, repo);
+
+    await tester.tap(find.text('설정'));
+    await tester.pump(const Duration(milliseconds: 400));
+    // 지역 · 시간 · 자리를 모두 지운다.
+    for (final k in ['seek-drop-region-서울 강남구', 'seek-drop-time-0']) {
+      await tester.tap(find.byKey(Key(k)));
+      await tester.pump(const Duration(milliseconds: 200));
+    }
+    await tester.tap(find.byKey(const Key('seek-pos-MF')));
+    await tester.pump(const Duration(milliseconds: 200));
+
+    await tester.tap(find.text('저장'));
+    for (var i = 0; i < 4; i++) {
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    expect(repo.saved, isNotNull, reason: '빈 조건도 저장되어야 한다');
+    expect(repo.saved!.regions, isEmpty);
+    expect(repo.saved!.times, isEmpty);
+    expect(repo.saved!.positions, isEmpty);
   });
 
   /// 🔴 **내 조건에만 자리가 있다**(계약) — 팀 조건 폼에는 없는 칸이다.
   testWidgets('내 자리를 고르면 조건에 실린다', (tester) async {
     final repo = _Fake();
     await _open(tester, repo);
+
+    await tester.tap(find.text('설정'));
+    await tester.pump(const Duration(milliseconds: 400));
 
     await tester.tap(find.byKey(const Key('seek-region-서울 강남구')));
     await tester.pump(const Duration(milliseconds: 400));
@@ -150,7 +186,7 @@ void main() {
     // 칸이 셋이라 폼이 길다 — 끌어 올려 누른다.
     await tester.drag(find.byType(ListView).last, const Offset(0, -400));
     await tester.pump();
-    await tester.tap(find.text('팀 찾기'));
+    await tester.tap(find.text('저장'));
     for (var i = 0; i < 4; i++) {
       await tester.pump(const Duration(milliseconds: 400));
     }
@@ -159,12 +195,7 @@ void main() {
     expect(repo.saved?.regions, ['서울 강남구']);
   });
 
-  testWidgets('조건이 있으면 사람을 찾는 팀이 뜬다', (tester) async {
-    await _open(tester, _Fake(prefs: _ready));
 
-    expect(find.text('사람을 찾는 팀'), findsOneWidget);
-    expect(find.text('베어스'), findsOneWidget);
-  });
 
   /// 🔴 **어느 자리를 몇 명 찾는지 적는다** — 그게 없으면 지원할지 판단할 수
   /// 없다. 서버가 준 이름(`position_label`)을 그대로 쓴다.

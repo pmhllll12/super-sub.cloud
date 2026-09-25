@@ -12,15 +12,21 @@ class _RealIsh implements MatchRepository {
   final requested = <String>[];
   final cancelled = <String>[];
 
+  /// 서버가 죽은 상태를 흉내 낸다.
+  bool down = false;
+
   @override
-  Future<List<MatchCandidate>> candidates(String teamId) async => const [
+  Future<List<MatchCandidate>> candidates(String teamId) async {
+    if (down) throw const FormatException('Unexpected character');
+    return const [
         MatchCandidate(
           teamId: 't-real',
           name: '한강 나이트라이더스',
           regionLabel: '서울 마포구',
           formation: '5:5',
         ),
-      ];
+    ];
+  }
 
   @override
   Future<TeamMatchRequest> requestMatch(
@@ -97,6 +103,16 @@ void main() {
 
     expect(list.any((t) => t.teamId == 't-real'), isTrue);
     expect(list.where((t) => t.teamId == kDemoTeamId), hasLength(1));
+  });
+
+  /// 🔴 **서버가 죽어도 가짜는 남는다** (2026-09-25, 실제로 522 가 났다).
+  test('서버가 죽어도 가짜 팀은 남는다', () async {
+    inner.down = true;
+
+    final list = await repo.candidates('t-thunder');
+
+    expect(list, hasLength(1));
+    expect(list.single.teamId, kDemoTeamId);
   });
 
   /// 🔴 **이름에 `(mock)` 이 있다** — 진짜와 섞이므로 한눈에 갈려야 한다.
