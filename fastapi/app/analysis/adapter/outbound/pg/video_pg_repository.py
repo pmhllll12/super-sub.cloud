@@ -53,6 +53,16 @@ class VideoPgRepository(VideoPort):
     def __init__(self, session: Session) -> None:
         self._session = session
 
+    def release(self) -> None:
+        """커넥션을 풀에 돌려준다 — `VideoPort.release` 머리말이 까닭이다.
+
+        🔴 **세션을 버리는 것이 아니다.** `Session.close()` 는 커넥션만
+        돌려주고 세션 자체는 그대로 쓸 수 있다(다시 질의하면 새로 꺼낸다).
+        그래서 이 뒤에 실수로 DB 를 써도 **틀린 값이 나오지는 않는다** —
+        다만 이 호출의 뜻이 없어질 뿐이다.
+        """
+        self._session.close()
+
     def sport_exists(self, sport_code: str) -> bool:
         stmt = select(_sport.c.code).where(_sport.c.code == sport_code)
         return self._session.execute(stmt).first() is not None

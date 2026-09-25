@@ -436,6 +436,15 @@ class GetVideoPosterInteractor(GetVideoPosterUseCase):
         if cached is not None:
             return VideoPosterResult(jpeg=cached, cached=True)
 
+        # 🔴 **여기서부터는 DB 를 안 쓴다 — 커넥션을 돌려준다.**
+        #
+        # 아래 `capture` 는 ffmpeg 이 원격 주소를 읽는 일이라 **최대 20초**
+        # 걸린다(`poster_ffmpeg.TIMEOUT_SECONDS`). 그동안 커넥션을 쥐고 있으면
+        # 홈이 카드 다섯 장을 한 번에 부를 때 풀이 비고, **상관없는 요청들이**
+        # 커넥션을 기다리다 멈춘다(`VideoPort.release` 머리말의 그 30초).
+        # ⛔ 이 줄을 지우지 말 것.
+        self._repository.release()
+
         url, _ = self._storage.create_download_url(video.storage_key)
         jpeg = self._poster.capture(url)
         if jpeg is None:
