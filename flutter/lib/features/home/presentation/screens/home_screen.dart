@@ -13,7 +13,6 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../intro/presentation/brand_mark.dart';
 import '../../../../core/widgets/glass_pill.dart';
 import '../../../../core/widgets/aurora_background.dart';
-import '../../../../core/widgets/bar_menu.dart';
 import '../../../../core/widgets/floating_nav_bar.dart';
 import '../../../../core/widgets/silver_edge.dart';
 import '../../../../core/widgets/raised_rim.dart';
@@ -230,10 +229,33 @@ const double _kBoardTopInset = _kSheetHandleH + 4 + _kPillsRowH + 12;
 ///
 /// ⚠️ **한 자리만 예외다** — 스쿼드 판을 펼치면 그 사진이 걷히고 스쿼드 그림이
 /// 드는데, 그때는 판 면 너머로 이 색이 비친다.
-/// 🔴 **값이 [kSheetPaper] 로 옮겨 갔다** (2026-09-25) — 「영상 분석」 화면의
-/// 흰 판이 **같은 면**이어야 해서다. 여기서 숫자를 되살리면 두 화면이 조용히
-/// 갈린다.
-const Color _kWhiteSheetColor = kSheetPaper;
+/// 🔴 **더는 흰 판이 아니다 — 거의 검정이다** (2026-09-25 사용자 요청:
+/// 「그 하단 바 바로 위 판의 전체 색상을 완전 검정의 85퍼센트만 준거로
+/// 바꾸자」).
+///
+/// 🔴 **알파가 아니라 밝기로 준다** (같은 날 정정, 사용자: 「배경 검정이랑
+/// 차이가 없는데? 아니면 검정 50퍼로 줘봐」).
+///
+/// ⚠️ **투명도로는 절대 안 보인다.** 바탕이 순검정([_kTopPanelColor] 과 같은
+/// `#000000`)이라 **검정 × 어떤 알파도 결국 검정**이다 — 85%든 50%든 화면에
+/// 찍히는 픽셀이 똑같다. 판이 보이려면 **바탕보다 밝아야** 한다. ⛔ 다시
+/// `Color(0x..000000)` 꼴로 되돌리지 말 것.
+///
+/// 값은 알약들이 이미 나눠 쓰는 면([SilverEdge.defaultFill])의 색이다 —
+/// 새 회색을 지어내면 한 화면에 거의 같은 검정이 둘 생긴다.
+/// 🔴 **더 밝게·어둡게는 이 한 줄이다.**
+///
+/// ⚠️ **이름과 이웃한 `_kWhiteSheet*` 들은 옛 이름이다** — 그 자리(모서리·
+/// 여백·기하)는 색과 무관해서 그대로 뒀다. 주석의 「흰 판」도 같은 자리를
+/// 가리킨다. 색만 갈렸다고 읽으면 된다.
+///
+/// 🔴 **[kSheetPaper] 에서 끊었다.** 잠시 「영상 분석」 화면의 밝은 판과 같은
+/// 값을 나눠 썼는데, 여기만 어두워졌으므로 묶여 있으면 **그 화면까지 검어진다.**
+/// ⛔ 다시 [kSheetPaper] 로 묶지 말 것.
+///
+/// 🔴 **판 위의 글자를 같이 뒤집었다**([_kOnSheet]) — 한쪽만 바꾸면 지름길
+/// 알약의 글자가 통째로 사라진다.
+const Color _kWhiteSheetColor = Color(0xFF1C1C1E);
 
 /// 흰 판의 모서리.
 const double _kWhiteSheetRadius = 28;
@@ -261,9 +283,9 @@ const double _kShortcutSpacing = 10;
 /* ⛔ **여기 있던 `_kPillFill`(= [_kInkDark], 불투명한 어두운 면)을 걷었다**
    (2026-09-24 사용자 지시: 「3개 버튼들 안쪽 색상 빠르게 없애봐」 →
    「1번으로 해줘」). 지름길 알약은 이제 **유리**다 —
-   면은 [_kShortcutGlassAlpha](흰 기), 글자는 [_kOnWhite](검정)다.
+   면은 [_kShortcutGlassAlpha](흰 기), 글자는 [_kOnSheet](지금은 흰색)다.
 
-   🔴 **되살린다면 [_kOnWhite] 를 같이 뒤집는다.** 어두운 면에는 흰 글자였다.
+   🔴 **되살린다면 [_kOnSheet] 를 같이 뒤집는다.** 어두운 면에는 흰 글자였다.
    그 값 이력이 여기 남아 있다: 화면 바탕을 따라가던 것(2026-09-23, 바탕이
    밝아지며 알약이 통째로 사라져서 끊었다) → 맨 위 판과 같은 `#222021`
    → **유리**. 🔴 **어느 판도 기준이 아니다** — 알약의 기준은 **제가 앉은
@@ -278,25 +300,23 @@ const double _kShortcutSpacing = 10;
 /// 반원이면 그냥 한쪽만 밝은 테로 보인다. ⛔ [StadiumBorder] 로 되돌리지 말 것.
 const double _kShortcutRadius = 20;
 
-/// 지름길 알약의 흐림 — 🔴 **공용 알약 흐림([kPillBlur])의 30%다**
-/// (2026-09-24 사용자 요청: 「3개 버튼 글래스로 바꾸고 블러 30퍼만」).
-///
-/// ⚠️ **값을 베껴 적지 않는다** — 공용 값이 또 바뀌면 여기도 따라와야 한다.
-const double _kShortcutBlur = kPillBlur * 0.3;
+/* ⛔ **여기 있던 `_kShortcutBlur`(공용 흐림의 30%)와 `_kShortcutGlassAlpha`
+   (흰 기 [kPillTint])를 걷었다** (2026-09-25 — 알약이 유리를 버리고 **흰색
+   85%** 로 갔다). 면이 거의 불투명해서 **흐릴 뒤가 없다**(하단 바가 흰색이
+   되면서 흐림을 걷은 것과 같은 판단이다). 되살리려면 그날 이전 커밋을 본다. */
 
-/// 유리 면의 **흰 기** — 🔴 **공용 유리 알약과 같은 값**([kPillTint])이다.
+/// 지름길 알약의 면 — 🔴 **완전한 흰색** (2026-09-25 사용자 요청: 「레슨 상점
+/// 경기장 예약 알림 버튼 안쪽 색상 완전 흰색으로」). 85%로 한 번 갔다가 같은
+/// 날 순백으로 올렸다 — 어두운 판 위에서 15%의 비침이 **면을 탁하게** 했다.
 ///
-/// 🔴 **어두운 면에서 흰 기로 뒤집혔다** (2026-09-24 사용자 지시: 「3개 버튼들
-/// 안쪽 색상 빠르게 없애봐」 → 「1번으로 해줘」). 하루에 셋을 거쳤다 —
-/// 어두운 면(`#222021` 불투명) → **0%**(면 없음) → **흰 기 16%**.
+/// 🔴 **판([_kWhiteSheetColor], `#1C1C1E`)보다 한참 밝다** — 그 대비가 알약을
+/// 알약으로 읽히게 하는 전부다. 판을 밝게 돌리면 여기와 [_kOnSheet] 를 같이
+/// 본다.
 ///
-/// ⚠️ **0% 는 한 번 해 보고 버린 값이다.** 면을 아예 없애니 알약이 밝은 회색
-/// 판([_kWhiteSheetColor])에 묻혀 **모양도 글자도 안 읽혔다.** 판보다 한 톤
-/// 밝아야 알약이 떠 보인다 — 그게 이 값이 하는 일의 전부다.
-///
-/// 🔴 **이 값을 내리면 [_kOnWhite] 를 같이 본다.** 면이 밝아져서 글자가
-/// 어두워진 것이라, 면만 되돌리면 어두운 면에 어두운 글자가 된다.
-const double _kShortcutGlassAlpha = kPillTint;
+/// ⚠️ **알약의 면은 하루에 다섯 번 갈렸다**: 어두운 불투명(`#222021`) → 면
+/// 없음 → 흰 기 16%(유리) → 흰색 85% → **순백**. 그때마다 [_kOnSheet] 가
+/// 함께 뒤집혔다.
+const Color _kShortcutFill = Color(0xFFFFFFFF);
 
 /// 화면 맨 위 **다크 헤더 판**의 면 (2026-09-24 사용자 요청 + 레퍼런스:
 /// 「내 프로필 글자 아래로 … 이 색상으로 판 하나 주자」, 색 견본 `#222021`).
@@ -337,15 +357,10 @@ const Color _kTopPanelColor = Color(0xFF000000);
 /// 몇 시간 동안 이 값만 `#222021` 이었다).
 const Color _kOnPanel = Color(0xFFFFFFFF);
 
-/// 지름길 알약처럼 **흰 판 위에 앉는 어두운 면.**
-///
-/// 🔴 **[_kTopPanelColor] 를 따라가던 것을 끊었다** (2026-09-24). 판이 밝은
-/// 회색이 되면서 그대로 뒀으면 **알약이 흰 판 위에서 사라졌다.**
-///
-/// ⚠️ **끊어 두길 잘했다** — 같은 날 맨 위 판만 `#222021` 로 돌아가고
-/// [_kWhiteSheetColor] 는 밝은 회색에 남았다. 묶여 있었으면 알약이 판과
-/// 한 색이 됐을 것이다. 🔴 **다시 묶지 말 것.**
-const Color _kInkDark = Color(0xFF222021);
+/* ⛔ **여기 있던 `_kInkDark`(`#222021`, 「흰 판 위에 앉는 어두운 면」)를
+   걷었다** (2026-09-25 — 지름길 알약이 [RaisedRim] 을 버리면서 마지막 쓰임이
+   사라졌다). 그 상수는 **판이 밝다**는 전제 위에 있었고, 판이 85% 검정이 된
+   지금 그 전제가 없다. 되살리려면 2026-09-25 이전 커밋에서 꺼낸다. */
 
 /// 다크 판의 **아래 모서리** — 🔴 흰 판([_kWhiteSheetRadius])과 같은 값이다.
 /// 위는 화면 끝에 붙으므로 안 둥글린다. 둘이 화면 위아래에서 짝을 이룬다.
@@ -359,14 +374,15 @@ const double _kTopPanelRadius = _kWhiteSheetRadius;
 const double _kTopPanelPadBottom = 6;
 
 
-/// 알약 안의 글자·아이콘 — 🔴 **다시 검정이다** (2026-09-24, 알약이 유리가
-/// 되면서). 면이 흰 기([_kShortcutGlassAlpha])가 되어 순백에서 뒤집혔다.
+/// 알약 안의 글자·아이콘 — 🔴 **완전한 검정이다** (2026-09-25 사용자 요청:
+/// 「아이콘이랑 글자는 오나전 검정으로」). 면이 **흰색 85%**([_kShortcutFill])
+/// 라 그 위에서 가장 또렷한 값이다.
 ///
-/// ⚠️ **알약이 흰 판 위에 있다는 것과는 무관하다** — 판이 아니라 **알약 제
-/// 면**을 기준으로 정한다. 🔴 **이 값은 면을 따라 두 번 뒤집혔다**:
-/// 검정(`#111114`, 면이 흴 때) → 순백(면이 어두울 때) → **검정**(면이 유리).
-/// 면을 또 갈면 여기도 같이 간다.
-const Color _kOnWhite = Color(0xFF111114);
+/// 🔴 **기준은 판이 아니라 알약 제 면이다.** 판은 거의 검정인데 글자는
+/// 검정이다 — 어긋나 보여도 맞다. 🔴 **면을 갈면 여기도 같이 간다**:
+/// 검정(면이 흴 때) → 순백(면이 어두울 때) → 검정(유리 + 밝은 판) →
+/// 순백(판이 어두워짐) → **검정**(면이 흰색 85%).
+const Color _kOnSheet = Color(0xFF000000);
 
 /* ⛔ **여기 있던 `_kPillLineOnWhite`([SilverEdge.onWhite])를 걷었다**
    (2026-09-24 사용자 요청 + 레퍼런스 — 지름길 알약 셋이 [RaisedRim] 으로 갔다).
@@ -432,19 +448,11 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen>
     with TickerProviderStateMixin {
-  /// 바 넷째 아이콘에서 열리는 메뉴의 진행도.
-  late final AnimationController _menu = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 420),
-  );
-
   /// 테두리를 도는 빛의 위상. 유리 조각 전부가 이 하나를 나눠 쓴다.
   late final AnimationController _sheen = AnimationController(
     vsync: this,
     duration: const Duration(seconds: 7),
   )..repeat();
-
-  bool _menuOpen = false;
 
   _Role _role = _Role.captain;
 
@@ -479,7 +487,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   @override
   void dispose() {
-    _menu.dispose();
     _sheen.dispose();
     _sheet.dispose();
     _pills.dispose();
@@ -568,28 +575,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   void _toggleSheet() => _settleSheet(_sheet.value > 0.5 ? 0 : 1);
 
-  void _openProfile() {
-    _closeMenu();
-    context.push('/profile');
-  }
+  void _openProfile() => context.push('/profile');
 
-  void _toggleMenu() {
-    setState(() => _menuOpen = !_menuOpen);
-    _menuOpen ? _menu.forward() : _menu.reverse();
-  }
-
-  void _closeMenu() {
-    if (!_menuOpen) return;
-    setState(() => _menuOpen = false);
-    _menu.reverse();
-  }
-
+  /* 🔴 **맨 오른쪽(로그인/로그아웃) 칸은 여기로 안 온다** — 바가 그 자리에서
+     세션을 끝낸다(`floating_nav_bar.dart`). 어느 화면에서 눌러도 뜻이 하나라
+     화면마다 같은 줄을 적지 않는다. */
   void _onNavTap(int index) {
-    if (index == FloatingNavBar.menuIndex) {
-      _toggleMenu();
-      return;
-    }
-    _closeMenu();
     switch (index) {
       case 0:
         return; // 이미 홈이다.
@@ -602,25 +593,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       // 🔴 1번은 영상이다 — 3번과 **같은 종류의 누락**이었다(2026-09-22).
       case 1:
         context.go('/videos');
-      case 2:
-        _notReady('레슨 · 코치');
       default:
         _notReady();
-    }
-  }
-
-  void _onMenuPick(BarMenuItem item) {
-    _closeMenu();
-    switch (item) {
-      case BarMenuItem.logout:
-        ref.read(sessionControllerProvider.notifier).logout();
-      case BarMenuItem.login:
-        // 홈은 로그인한 뒤에만 보이는 화면이라 여기 설 일이 없다.
-        break;
-      case BarMenuItem.credits:
-      case BarMenuItem.coach:
-      case BarMenuItem.settings:
-        _notReady(item.label);
     }
   }
 
@@ -1182,21 +1156,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
          Scaffold 가 색을 칠하면 그 위에 빛무리를 깔아도 **판·바 뒤로는 안
          비친다** — 층을 하나로 만들어야 화면 전체가 같은 빛을 받는다. */
         backgroundColor: Colors.transparent,
-        // 바는 SafeArea 밖에 떠 있다 — 안에 넣으면 홈 인디케이터 위에서 잘린다.
-        // 메뉴는 바 바로 위에 선다. 닫혀 있어도 자리를 잡아 두어 열릴 때
-        // 바가 밀리지 않는다.
-        bottomNavigationBar: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            BarMenu(
-              open: _menu,
-              loggedIn: session is SessionLoggedIn,
-              step: FloatingNavBar.iconStep(context),
-              onPick: _onMenuPick,
-            ),
-            FloatingNavBar(currentIndex: 0, onTap: _onNavTap),
-          ],
-        ),
+        /* 바는 SafeArea 밖에 떠 있다 — 안에 넣으면 홈 인디케이터 위에서
+           잘린다.
+
+           ⛔ **여기 있던 `BarMenu` 를 걷었다** (2026-09-25 — 바의 메뉴 칸이
+           로그인/로그아웃 칸으로 바뀌면서). 그 판이 펴던 넷 중 셋이 아직
+           「준비 중입니다」였고, 실제로 하는 일은 로그아웃 하나였다.
+           되살리려면 2026-09-25 이전 커밋을 본다. */
+        bottomNavigationBar: FloatingNavBar(currentIndex: 0, onTap: _onNavTap),
         extendBody: true,
         body: Stack(
           fit: StackFit.expand,
@@ -1666,10 +1633,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               opacity: (1 - t / 0.6).clamp(0.0, 1.0),
               child: _VideoAnalysisPanel(
                 flat: t,
-                onTap: () {
-                  _closeMenu();
-                  context.push('/videos');
-                },
+                onTap: () => context.push('/videos'),
               ),
             ),
           ),
@@ -1696,6 +1660,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     double videoFlatTop,
     double squadTopCollapsed,
     double squadTopExpanded,
+    double squadBottomCollapsed,
+    double squadBottomExpanded,
     double shortcutTop,
     double whiteTopCollapsed,
     double whiteTopExpanded,
@@ -1767,6 +1733,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       videoFlatTop: videoFlatTop,
       squadTopCollapsed: squadTopCollapsed,
       squadTopExpanded: squadTopExpanded,
+      squadBottomCollapsed: squadBottomCollapsed,
+      squadBottomExpanded: squadBottomExpanded,
       shortcutTop: shortcutTop,
       whiteTopCollapsed: whiteTopCollapsed,
       whiteTopExpanded: whiteTopExpanded,
@@ -1841,11 +1809,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         final top =
             geo.squadTopCollapsed +
             (geo.squadTopExpanded - geo.squadTopCollapsed) * raw;
-        /* 🔴 **아랫변은 「영상 분석」 판 윗변을 따라간다** — 그쪽과 **같은
-           식**이라 둘 사이 틈이 한 번도 안 벌어진다. */
-        final bottom =
-            (geo.videoOpenTop + (geo.videoFlatTop - geo.videoOpenTop) * raw) -
-            _kVideoGap;
+        /* 🔴 **아랫변은 자리 계산이 준 값 하나를 쓴다** (2026-09-25 정정).
+           전에는 여기서 「영상 분석 판 윗변」을 다시 재고, 경기장 높이는
+           `squadBottomExpanded` 를 따로 썼다 — 그 둘이 갈리자 **판은 그대로인데
+           경기장만 길어져 골키퍼 카드가 잘렸다**(사용자가 잡았다).
+           🔴 **한 값에서 온다** — 그래야 판과 그 안이 늘 같은 높이다. */
+        final bottom = geo.squadBottomCollapsed +
+            (geo.squadBottomExpanded - geo.squadBottomCollapsed) * raw;
         final radius = _kSheetRadius + 8 * tc;
         // 안내 글과 「내 프로필」은 펼치기 **시작하자마자** 걷힌다(앞 4할 안에).
         final fadeOut = (1 - tc / 0.4).clamp(0.0, 1.0);
@@ -2194,27 +2164,30 @@ class _ShortcutPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    /* 🔴 **모서리 둘이 자연스럽게 사라지는 테다**([RaisedRim], 2026-09-25
+       사용자 요청: 「외곽선은 모서리 2군데는 자연스럽게 안보이게 해줘」).
+       같은 날 **실버 실선으로 갔다가 되돌아왔다** — 실선은 네 변을 고르게
+       둘러 「판에 그려 넣은 네모」가 된다.
+       ⛔ `Border.all` 실선으로 되돌리지 말 것.
+
+       🔴 **면이 희어서 두 색이 다 검정이다.** 이 위젯의 기본 조합(왼쪽 위
+       흰 하이라이트)은 **어두운 조각**용이라, 흰 면 위에서는 획이 통째로
+       묻힌다. 빛이 왼쪽 위에서 온다는 규칙은 지키되 **그늘 쪽(오른쪽 아래)을
+       더 진하게** 줘서 솟아 보이게 한다.
+       🔴 면을 다시 어둡게 돌리면 이 둘을 실버로 되돌린다. */
     return RaisedRim(
       radius: _kShortcutRadius,
-      /* 🔴 **밝은 판 위라 그늘 쪽이 어둡다** (2026-09-24). 알약이 유리(흰 기)가
-         되면서 판([_kWhiteSheetColor])과 밝기가 거의 같아져, 실버 획 양쪽으로는
-         **모양 자체가 안 읽혔다.** 왼쪽 위 흰 하이라이트 + 오른쪽 아래 어두운
-         그림자라야 솟아 보인다 — [RaisedRim.shadeColor] 머리말 참고. */
-      shadeColor: _kInkDark,
-      lit: 0.9,
-      shade: 0.22,
+      litColor: _kOnSheet,
+      lit: 0.18,
+      shadeColor: _kOnSheet,
+      shade: 0.32,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(_kShortcutRadius),
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(
-            sigmaX: _kShortcutBlur,
-            sigmaY: _kShortcutBlur,
-          ),
-          child: Material(
-            /* 🔴 **흰 기를 얹는 것이지 [_kPillFill] 을 옅게 하는 것이 아니다**
-               (2026-09-24). 어두운 색을 옅게 깔면 판보다 **어두워져** 유리가
-               아니라 「때 낀 자국」으로 보인다 — 판보다 **밝아야** 뜬다. */
-            color: Colors.white.withValues(alpha: _kShortcutGlassAlpha),
+        child: Material(
+            /* 🔴 **판보다 밝아야 뜬다** — 그것이 이 면이 하는 일의 전부다
+               ([_kShortcutFill] 머리말). 한때 어두운 색을 옅게 깔아 봤는데
+               판보다 **어두워져** 「때 낀 자국」으로 보였다(2026-09-24). */
+            color: _kShortcutFill,
             child: InkWell(
               onTap: onTap,
               child: Column(
@@ -2226,7 +2199,7 @@ class _ShortcutPill extends StatelessWidget {
                   Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      Icon(icon, size: 22, color: _kOnWhite),
+                      Icon(icon, size: 22, color: _kOnSheet),
                       if (badge > 0)
                         Positioned(
                           top: -4,
@@ -2264,7 +2237,7 @@ class _ShortcutPill extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w600,
-                      color: _kOnWhite,
+                      color: _kOnSheet,
                     ),
                   ),
                 ],
@@ -2272,8 +2245,7 @@ class _ShortcutPill extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 }
 

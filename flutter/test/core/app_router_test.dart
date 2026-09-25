@@ -114,11 +114,10 @@ void main() {
   testWidgets('홈에서 로그아웃하면 로그인으로 돌아간다', (tester) async {
     await _pumpHome(tester);
 
-    // 로그아웃은 하단 바 넷째 아이콘에서 열리는 메뉴 안에 있다.
-    await tester.tap(find.byKey(const Key('navbar-icon-menu')));
-    await tester.pump();
-    await _settle(tester);
-    await tester.tap(find.byKey(const Key('barmenu-logout')));
+    /* 🔴 **한 번이면 된다** (2026-09-25) — 로그아웃이 하단 바 **맨 오른쪽
+       칸**으로 나왔다. 전에는 넷째 아이콘으로 메뉴를 열고 그 안의 칸을
+       눌러야 했다. */
+    await tester.tap(find.byKey(const Key('navbar-icon-auth')));
     await _settle(tester);
 
     expect(find.text('로그인'), findsWidgets);

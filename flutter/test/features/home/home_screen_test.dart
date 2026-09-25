@@ -1169,27 +1169,16 @@ void main() {
     );
   });
 
-  testWidgets('바 메뉴를 열면 로그아웃 칸이 선다', (tester) async {
-    await _pumpLoggedIn(tester);
-    // 닫혀 있을 때는 아무 칸도 세우지 않는다.
-    expect(find.byKey(const Key('barmenu-logout')), findsNothing);
+  /* ⛔ **여기 있던 「바 메뉴를 열면 로그아웃 칸이 선다」를 걷었다**
+     (2026-09-25 — 메뉴 칸이 로그인/로그아웃 칸으로 바뀌었다). 메뉴가 펴던
+     넷 중 셋이 「준비 중입니다」였고, 하는 일은 로그아웃 하나였다. */
 
-    await tester.tap(find.byKey(const Key('navbar-icon-menu')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
-
-    expect(find.byKey(const Key('barmenu-logout')), findsOneWidget);
-    // 로그인·로그아웃은 함께 설 수 없다.
-    expect(find.byKey(const Key('barmenu-login')), findsNothing);
-  });
-
-  testWidgets('바 메뉴의 로그아웃으로 세션이 끝난다', (tester) async {
+  /// 🔴 **하단 바 맨 오른쪽 칸이 곧 로그아웃이다** (2026-09-25) — 한 번이면
+  /// 끝난다. 메뉴를 열어 그 안의 칸을 누르던 두 단계가 사라졌다.
+  testWidgets('하단 바의 로그아웃으로 세션이 끝난다', (tester) async {
     final container = await _pumpLoggedIn(tester);
 
-    await tester.tap(find.byKey(const Key('navbar-icon-menu')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
-    await tester.tap(find.byKey(const Key('barmenu-logout')));
+    await tester.tap(find.byKey(const Key('navbar-icon-auth')));
     await tester.pump(const Duration(milliseconds: 500));
 
     expect(container.read(sessionControllerProvider), isA<SessionLoggedOut>());

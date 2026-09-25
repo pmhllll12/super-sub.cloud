@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../../features/auth/presentation/session_controller.dart';
 import '../design_scale.dart';
 import 'silver_edge.dart';
 import 'silver_sweep_border.dart';
@@ -84,7 +86,12 @@ const double kBottomBarHeight = 200;
 /// 되살리지 말 것.
 ///
 /// ⚠️ 54 → **118** 로 한 번 더 좁혔다(같은 날, 「바 자체가 좌우로 너무 길어」).
-const double kBarSideMargin = 118;
+///
+/// 🔴 **118 → 202 (2026-09-25).** 칸이 **다섯에서 넷으로** 줄면서 사용자가
+/// 그만큼 좁히라고 정했다: 「5개에서 4개로 줄였으니 가운데 없애고 그만큼
+/// 좌우 폭 줄이자」. 844 × 4/5 = 675 폭이 되도록 (1080 − 675) / 2 로 잡았다.
+/// 🔴 **칸 수를 또 바꾸면 이 값을 같이 본다.**
+const double kBarSideMargin = 202;
 
 /// 막대가 화면 아래(안전 영역 위)에서 뜨는 거리.
 const double kBarBottomGap = 18;
@@ -122,7 +129,11 @@ const double kBarDividerHeight = 78;
 ///
 /// 좌표는 시안 실측값이고 [DesignScale]이 화면 폭에 맞춰 환산한다.
 /// 아래로 화면 밖까지 번지므로 SafeArea *밖*에 놓아야 한다.
-class FloatingNavBar extends StatelessWidget {
+///
+/// 🔴 **세션을 스스로 본다 ([ConsumerWidget], 2026-09-25).** 맨 오른쪽 칸이
+/// **로그인이냐 로그아웃이냐**를 가르기 때문이다 — 그 한 가지 때문에 화면
+/// 넷에게 `loggedIn` 을 받아 오게 하면 넷이 다 같은 줄을 적어야 한다.
+class FloatingNavBar extends ConsumerWidget {
   const FloatingNavBar({
     super.key,
     required this.currentIndex,
@@ -143,18 +154,26 @@ class FloatingNavBar extends StatelessWidget {
   /// 로고 홈 복귀하는 버튼을 그냥 구글 폰트의 이걸로 해줘」 + `home_app_logo`
   /// 그림).** 그 자리에 있던 `SUPERSUB` 알약은 **화면 맨 위 가운데로 옮겼고**,
   /// 거기서는 아무 단추도 아니다 — 옮긴 자리는 홈의 `_brandMark` 다.
+  ///
+  /// ⛔ **2번(레슨 · 코치, `Symbols.school`)을 걷었다** (2026-09-25 사용자
+  /// 지시: 「하단 바의 중앙에 있는 레슨 버튼은 없애고」). 그 자리는 아직 어느
+  /// 화면에도 안 붙어 있어서 눌러도 「준비 중입니다」만 떴다.
+  /// 🔴 **번호를 다시 매기지 않았다** — 3번(프로필)이 그대로 3번이라, 화면
+  /// 넷의 `onTap` 갈래를 건드릴 일이 없다.
   static const _icons = {
     0: Symbols.home_app_logo,
     1: Symbols.videocam,
-    // 레슨 · 코치(2026-09-15 — 축구공을 대신한다). 홈의 「레슨 · 코치」 카드가
-    // 여기로 옮겨 왔다. 용병 매칭 · 내 팀은 홈의 스쿼드 판이 맡는다.
-    2: Symbols.school,
     3: Symbols.id_card,
   };
 
-  /// 탭이 아니라 메뉴를 여는 자리. 인덱스가 아니라 이 표로 가른다.
-  static const menuIndex = 4;
-  static const _menuIcon = Symbols.format_list_bulleted_add;
+  /// 맨 오른쪽 칸 — 🔴 **로그인 / 로그아웃이다** (2026-09-25 사용자 지시).
+  ///
+  /// ⛔ **여기 있던 「메뉴」 칸(`menuIndex` 4 · `format_list_bulleted_add`)을
+  /// 걷었다.** 그 칸은 바 위로 판을 띄워 크레딧 · 코치 · 설정 · 로그아웃 넷을
+  /// 폈는데, 그중 **셋이 아직 「준비 중입니다」**였다 — 실제로 하는 일은
+  /// 로그아웃 하나였고 그걸 **두 번 눌러야** 닿았다. 되살리려면 2026-09-25
+  /// 이전 커밋의 `bar_menu.dart` 를 꺼낸다.
+  static const _authIcons = (out: Symbols.logout, into: Symbols.login);
 
   static double iconWidth(BuildContext context) => context.d(160);
 
@@ -170,7 +189,8 @@ class FloatingNavBar extends StatelessWidget {
       context.d(kBottomBarHeight) + MediaQuery.paddingOf(context).bottom;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final loggedIn = ref.watch(sessionControllerProvider) is SessionLoggedIn;
     final barHeight = context.d(kBottomBarHeight);
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 
@@ -226,17 +246,26 @@ class FloatingNavBar extends StatelessWidget {
                     ),
                   ),
                 ],
-                _Divider(key: const Key('navbar-divider-menu')),
-                /* 마지막은 탭이 아니다 — 메뉴를 연다. 그래서 **늘 `active`
-                   가 아니다.** 🔴 한때 이 칸만 회색으로 채워 뒀는데, 사용자가
-                   「누르지도 않았는데 진한 사각형이 있다」고 짚었다 — 면은
-                   이제 고른 칸의 표시이지 이 칸의 차림이 아니다. */
+                _Divider(key: const Key('navbar-divider-auth')),
+                /* 🔴 **마지막은 탭이 아니라 그 자리에서 세션을 끝낸다.**
+                   어느 화면에서 눌러도 뜻이 하나라 [onTap] 으로 올려 보내지
+                   않는다 — 올려 보내면 화면 넷이 같은 줄을 적어야 한다.
+                   🔴 **늘 `active` 가 아니다** — 면은 「지금 보고 있는 칸」의
+                   표시이지 이 칸의 차림이 아니다.
+
+                   ⚠️ 로그아웃한 뒤 **어디로 갈지는 여기서 안 정한다** —
+                   `app_router.dart` 의 `redirect` 가 로그인 화면으로 보낸다. */
                 Expanded(
                   child: _NavIcon(
-                    key: const Key('navbar-icon-menu'),
-                    icon: _menuIcon,
+                    key: const Key('navbar-icon-auth'),
+                    icon: loggedIn ? _authIcons.out : _authIcons.into,
                     active: false,
-                    onTap: () => onTap(menuIndex),
+                    /* ⚠️ 로그아웃 상태에서는 **할 일이 없다** — 바가 있는
+                       화면은 전부 로그인 뒤에만 보이고, 라우터가 이미 로그인
+                       화면으로 보낸 뒤다. 아이콘만 제 뜻을 지킨다. */
+                    onTap: loggedIn
+                        ? ref.read(sessionControllerProvider.notifier).logout
+                        : () {},
                   ),
                 ),
               ],
