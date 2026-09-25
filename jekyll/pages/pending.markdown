@@ -12931,4 +12931,37 @@ grep -n "release()" app/analysis/application/use_cases/video_interactors.py
 배포 뒤에는 위 실측을 다시 돌려 주십시오 — `/videos/public` 이 30초로 멎는 일이
 없어야 합니다.
 
+### 51. **목록 응답에 칸이 빠져 화면이 한 건씩 다시 묻습니다** — 네 곳 (2026-09-25 신설)
+
+- **담당**: 정어진 · **제기**: 백성검 · **기한**: 급하지 않음 (지금 깨지는 것은 없습니다)
+
+넷 다 **한 줄씩 더 실어 주시면 되는** 것이고, 성격이 같아 한 항목으로 묶습니다.
+🔴 **하나씩 닫으셔도 됩니다** — 줄 끝에 `✅` 를 달아 주십시오.
+
+1. **`GET /me/contacts` 에 `card_public_slug` 가 없습니다.** 지인 목록에서 그 사람의
+   **선수 카드를 그릴 수가 없어** 이름만 보여 주고 있습니다. 웹은 이 칸을 읽는
+   코드가 이미 있는데 서버가 안 줍니다 (계약 3-12절의 그 예시 JSON)
+2. **`GET /me/contacts/requests` 에 신청자 닉네임이 없습니다.** `requester_user_id`
+   만 와서 **「누가 신청했는지」를 못 씁니다** — 화면이 사람마다 `GET /users/{id}`
+   를 또 부르거나, 지금처럼 id 를 그냥 감춥니다
+3. **`GET /users/search` 가 `q` 없이는 못 부릅니다**(`Query(min_length=1)`).
+   「지인 찾기」에서 **아무것도 안 친 상태의 첫 화면**을 채울 방법이 없어 빈 판으로
+   시작합니다. 최근 가입자든 같은 지역이든 **기본 목록**이 있으면 좋겠습니다
+4. **`GET /matches` 에 `my_application` 이 없습니다.** 「사람을 찾는 팀」에서 지원한
+   뒤 **다시 열면 지원한 것을 잊습니다**(2026-09-25 에 넣은 지원 단추, 커밋
+   `ca3e57c2`). 경기마다 `GET …/applications` 를 부르면 목록 하나에 왕복이 스무
+   번이라 그 길로 가지 않았습니다 — 한 줄에 `{"id", "confirmed"}` 만 있으면
+   화면이 들고 있는 상태를 걷어낼 수 있습니다
+
+**확인**:
+
+```bash
+grep -n "card_public_slug" fastapi/docs/api-contract.md   # 3-12절 contacts 에 있는가
+grep -n "min_length=1" fastapi/app/user/adapter/inbound/api/v1/user_search_router.py
+```
+
+⚠️ **알림 읽음 상태는 여기 안 넣었습니다** — `GET /me/notifications` 가 `read_at`
+을 이미 주고 있습니다. **앱이 안 쓰는 것**이라 서버 일이 아닙니다.
+
+
 
