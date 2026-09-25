@@ -6,6 +6,7 @@ import 'candidate_repository.dart';
 import 'candidate_repository_api.dart';
 import 'candidate_repository_mock.dart';
 import 'contact_repository.dart';
+import 'demo_candidate_repository.dart';
 import 'contact_repository_api.dart';
 import 'contact_repository_mock.dart';
 import 'invitation_repository.dart';
@@ -17,9 +18,17 @@ import 'models/squad_candidate.dart';
 /// 🔴 **백엔드 교체 지점.** 빈 자리를 채우는 세 저장소를 한 파일에 둔다 —
 /// 같은 시트가 셋을 함께 쓰므로 무효화 범위가 같다(`squad_providers.dart` 를
 /// 따로 둔 것과 반대되는 이유다).
+/// 🔴 **실서버 위에 가짜 후보 한 명을 얹는다**(2026-09-25 사용자 요청).
+/// 실서버 추천은 조건에 맞는 사람이 **실제로 있어야** 나와서, 시험할 때 목록이
+/// 비어 아무것도 못 눌러 보는 일이 잦다.
+///
+/// 🔴 **걷어낼 때는 이 `DemoCandidateRepository(...)` 감싸기 한 줄이다.**
+/// 팀 쪽 `DemoMatchRepository` 와 같은 결이고, 걷는 시점도 같다.
 final candidateRepositoryProvider = Provider<CandidateRepository>((ref) {
   if (ref.watch(useMockProvider)) return MockCandidateRepository();
-  return ApiCandidateRepository(ref.watch(apiClientProvider));
+  return DemoCandidateRepository(
+    ApiCandidateRepository(ref.watch(apiClientProvider)),
+  );
 });
 
 final contactRepositoryProvider = Provider<ContactRepository>((ref) {
@@ -29,7 +38,10 @@ final contactRepositoryProvider = Provider<ContactRepository>((ref) {
 
 final invitationRepositoryProvider = Provider<InvitationRepository>((ref) {
   if (ref.watch(useMockProvider)) return MockInvitationRepository();
-  return ApiInvitationRepository(ref.watch(apiClientProvider));
+  // 🔴 가짜 후보를 **부르는 것**만 가로챈다 — 위 감싸기와 짝이다.
+  return DemoInvitationRepository(
+    ApiInvitationRepository(ref.watch(apiClientProvider)),
+  );
 });
 
 /// 어느 팀의 어느 자리를, 어느 등급으로 찾는가.

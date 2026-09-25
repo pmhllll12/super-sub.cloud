@@ -14,6 +14,15 @@ abstract class SquadRepository {
   /// 훑는 것을 막는 자리라, 소속이 아니면 404 가 아니라 403 이 온다.
   Future<Squad?> squadOf(String teamId);
 
+  /// **공개 슬러그**로 판을 읽는다 — `GET /squads/{public_slug}`.
+  ///
+  /// 🔴 **소속이 아니어도 읽힌다**(SEC-005). 대기 화면이 **상대 팀 판**을
+  /// 진짜로 그리는 자리다 — 없으면 이름만 지어 채우게 되고, 그건 거짓이다.
+  ///
+  /// 🔴 **없으면 `null`** 이다(예외가 아니다). 스쿼드를 아직 안 만든 팀이
+  /// 정상 상태라, 오류로 올리면 대기 화면이 통째로 오류가 된다.
+  Future<Squad?> squadBySlug(String publicSlug);
+
   /// 카드를 판에 **앉힌다**(`POST /teams/{id}/squad/members`). 바뀐 스쿼드
   /// 전체가 돌아온다.
   ///

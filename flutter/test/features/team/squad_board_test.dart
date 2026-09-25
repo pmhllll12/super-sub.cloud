@@ -58,6 +58,7 @@ const _myCard = PlayerCard(publicSlug: 'mine', nickname: '나');
 
 void main() {
   _pendingSeatTests();
+  _emptySeatStaysTests();
 
   testWidgets('서버 스쿼드의 사람이 판에 뜬다', (tester) async {
     await _pump(
@@ -643,5 +644,64 @@ void _pendingSeatTests() {
     );
 
     expect(find.text('수락 대기중'), findsNothing);
+  });
+}
+
+/// 🔴 **선수를 빼도 그 자리는 그대로 있다** (2026-09-25, 사용자: 「그 포지션의
+/// 자리에서 선수 지우면 그 자리에 계속 있는게 자연스럽잖아」).
+///
+/// 자리(`SquadSlot`)는 포메이션 기본 칸에서 시작해 **사람이 앉으면 그 사람의
+/// 칸으로 옮겨진다.** 사람이 빠지면 옮겨 줄 근거가 사라져 기본 칸으로
+/// 돌아갔다 — 판에서는 「빈 자리가 저 혼자 날아가는」 것으로 보인다.
+void _emptySeatStaysTests() {
+  testWidgets('선수를 빼도 빈 자리는 그 칸에 남는다', (tester) async {
+    String? removed;
+    // fw1 의 기본 칸은 (1,0) — 사람은 (0,0) 으로 옮겨 둔 상태다.
+    await _pump(
+      tester,
+      SquadBoard(
+        myCard: null,
+        squad: _squad([
+          _m(id: 'm-1', nickname: '라인세우기', pos: 'FW', col: 0, row: 0),
+        ]),
+        onSeatTap: (_) {},
+        onSeatRemoved: (id, _) => removed = id,
+      ),
+    );
+
+    /* 사람이 서 있던 **카드**의 위치. 🔴 이름표 글자가 아니라 카드를 잰다 —
+       글자는 카드 안에서 조금 위에 있어 비교 대상이 안 된다. */
+    final was = tester.getCenter(
+      find.ancestor(
+        of: find.byKey(const Key('squad-mate-fw1')),
+        matching: find.byType(BlankPlayerCardView),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('squad-remove-fw1')));
+    await tester.pump();
+    expect(removed, 'm-1');
+
+    // 사람이 빠진 판으로 다시 그린다 — 화면이 하는 그대로다.
+    await _pump(
+      tester,
+      SquadBoard(
+        myCard: null,
+        squad: _squad(const []),
+        onSeatTap: (_) {},
+        onSeatRemoved: (_, _) {},
+      ),
+    );
+
+    expect(
+      tester.getCenter(
+        find.descendant(
+          of: find.byKey(const Key('squad-add-fw1')),
+          matching: find.byType(BlankPlayerCardView),
+        ),
+      ),
+      was,
+      reason: '🔴 빈 자리가 기본 칸으로 날아가면 안 된다',
+    );
   });
 }

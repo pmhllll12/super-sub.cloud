@@ -31,7 +31,10 @@ class MockInvitationRepository implements InvitationRepository {
     }
 
     return TeamInvitation(
-      id: 'inv-${++_seq}',
+      /* 🔴 **`demo-inv-` 로 시작한다** — 홈의 시연용 자동 수락이 **가짜
+         초대에만** 걸리게 하는 표시다(2026-09-25). 목업은 통째로 가짜라
+         여기서도 그 표시를 단다. */
+      id: 'demo-inv-${++_seq}',
       teamId: teamId,
       invitedUserId: userId,
       status: 'pending',

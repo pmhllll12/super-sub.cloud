@@ -27,6 +27,14 @@ final squadRepositoryProvider = Provider<SquadRepository>((ref) {
   return ApiSquadRepository(ref.watch(apiClientProvider));
 });
 
+/// **공개 슬러그**로 읽는 남의 판 — 대기 화면이 상대 팀을 그릴 때 쓴다.
+///
+/// 🔴 **`null` 은 정상**이다(스쿼드를 아직 안 만든 팀).
+final squadBySlugProvider = FutureProvider.family<Squad?, String>(
+  (ref, slug) => ref.watch(squadRepositoryProvider).squadBySlug(slug),
+  retry: (_, _) => null,
+);
+
 /// 팀 하나의 스쿼드. 🔴 **`null` 은 정상** — 아직 안 만든 것이다.
 ///
 /// retry 를 끈 이유는 `sportsProvider` 와 같다 — 자동 재시도가 돌면 화면이

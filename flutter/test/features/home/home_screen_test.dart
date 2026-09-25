@@ -191,11 +191,13 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
   });
 
-  testWidgets('맨 위에 팀장 · 팀원 · AI 와 내 프로필이 선다', (tester) async {
+  // 🔴 AI 단추는 2026-09-25에 걷혔다 — 그 자리는 「팀 매칭」이다(사용자 요청).
+  testWidgets('맨 위에 팀장 · 팀원 · 팀 매칭과 내 프로필이 선다', (tester) async {
     await _pumpLoggedIn(tester);
     expect(find.byKey(const Key('home-role-captain')), findsOneWidget);
     expect(find.byKey(const Key('home-role-member')), findsOneWidget);
-    expect(find.byKey(const Key('home-ai')), findsOneWidget);
+    expect(find.byKey(const Key('home-ai')), findsNothing);
+    expect(find.byKey(const Key('home-team-match')), findsOneWidget);
     expect(find.byKey(const Key('home-profile')), findsOneWidget);
     expect(find.text('내 프로필'), findsOneWidget);
   });
@@ -253,13 +255,14 @@ void main() {
       expect(tester.getTopLeft(profile).dx, closeTo(profileLeft, 0.5));
     });
 
-    testWidgets('펼치면 팀장 · 팀원은 가운데, AI 는 맨 오른쪽', (tester) async {
+    testWidgets('펼치면 팀장 · 팀원은 가운데, 팀 매칭은 맨 오른쪽', (tester) async {
       await _pumpLoggedIn(tester);
       await _openSheet(tester);
       final screenW = tester.view.physicalSize.width / tester.view.devicePixelRatio;
       final captain = tester.getRect(find.byKey(const Key('home-role-captain')));
       final member = tester.getRect(find.byKey(const Key('home-role-member')));
-      final ai = tester.getRect(find.byKey(const Key('home-ai')));
+      // 🔴 옛 AI 단추가 있던 **그 자리**다 — 크기도 위치도 그대로 물려받았다.
+      final ai = tester.getRect(find.byKey(const Key('home-team-match')));
       final pairCenter = (captain.left + member.right) / 2;
       expect(pairCenter, closeTo(screenW / 2, 2));
       expect(ai.right, closeTo(screenW - 16, 2));
@@ -500,6 +503,93 @@ void main() {
       for (var i = 0; i < 4; i++) {
         await tester.pump(const Duration(milliseconds: 400));
       }
+    });
+
+
+    /// 🔴 **고르면 그 자리가 바로 채워진다** (2026-09-25, 사용자: 「눌렀는데
+    /// 왜 카드 바로 안채워지냐고」).
+    ///
+    /// 전에는 자리 채우기가 `_shownSquad`(**뭔가를 한 번 옮기기 전까지
+    /// `null`**)만 보고 그 값이 없으면 **그냥 나가 버렸다** — 초대가 아예
+    /// 안 나갔다. 판은 서버 값으로도 그려지므로 그쪽도 함께 봐야 한다.
+    testWidgets('후보를 고르면 그 자리가 바로 채워진다', (tester) async {
+      await _pumpLoggedIn(tester);
+      await _openSheet(tester);
+      await tester.tap(find.byKey(const Key('squad-add-df1')));
+      await tester.pump();
+      for (var i = 0; i < 4; i++) {
+        await tester.pump(const Duration(milliseconds: 400));
+      }
+
+      // 🔴 Mock 후보는 이름에 `(mock)` 이 붙는다 — 진짜와 섞이지 않게 한 표시다.
+      await tester.tap(find.text('끝까지뛰는 (mock)'));
+      for (var i = 0; i < 4; i++) {
+        await tester.pump(const Duration(milliseconds: 400));
+      }
+
+      expect(find.text('수락 대기중'), findsOneWidget);
+      expect(find.byKey(const Key('squad-mate-df1')), findsOneWidget);
+
+      /* 🔴 **시연용 자동 수락(1.5초)이 타이머로 남는다** — 안 흘려보내면
+         「위젯 트리를 버린 뒤에도 타이머가 남았다」로 깨진다. 흘려보내면
+         그 자리가 수락됨으로 바뀌는 것까지 볼 수 있다. */
+      await tester.pump(const Duration(milliseconds: 1600));
+      expect(find.text('수락 대기중'), findsNothing,
+          reason: '1.5초 뒤 스스로 수락한다(시연용)');
+
+      // 시트가 띄워 둔 Mock 지연들(썸네일 · 지인)도 마저 흘려보낸다.
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 500));
+      }
+    });
+
+    /// 🔴 **이미 판에 있는 지인은 그 자리를 보여 준다** (같은 날 사용자
+    /// 지적). 같은 뿌리였다 — 「이미 앉은 사람」 목록도 `_shownSquad` 를
+    /// 읽어서 늘 비어 있었다.
+    testWidgets('이미 판에 있는 지인은 자리가 표시된다', (tester) async {
+      await _pumpLoggedIn(tester);
+      await _openSheet(tester);
+      await tester.tap(find.byKey(const Key('squad-add-df1')));
+      await tester.pump();
+      for (var i = 0; i < 4; i++) {
+        await tester.pump(const Duration(milliseconds: 400));
+      }
+
+      await tester.tap(find.byKey(const Key('seat-tab-friends')));
+      for (var i = 0; i < 4; i++) {
+        await tester.pump(const Duration(milliseconds: 400));
+      }
+
+      // 시드의 이감독은 GK 에 앉아 있다 — 지인 목록에서도 그렇게 보여야 한다.
+      expect(find.text('GK'), findsWidgets);
+    });
+
+
+    /// 🔴 **AI 단추를 걷고 그 자리에 팀 매칭을 둔다** (2026-09-25, 사용자:
+    /// 「팀 매칭 버튼 나 있는줄도 몰랐다 ... AI 버튼 처음부터 없애고」).
+    /// 판 머리에 있던 것은 **눈에 안 띄었다** — 자리 알약들 사이에 묻혔다.
+    testWidgets('AI 단추가 없고 그 자리에 팀 매칭이 선다', (tester) async {
+      await _pumpLoggedIn(tester);
+      await _openSheet(tester);
+
+      expect(find.byKey(const Key('home-ai')), findsNothing);
+      expect(find.byKey(const Key('home-team-match')), findsOneWidget);
+      expect(find.text('팀 매칭'), findsOneWidget);
+    });
+
+    /// 🔴 **자리가 다 차고 전원이 수락해야 걸 수 있다**(웹 `full`). 안 그러면
+    /// 아직 안 온 사람을 데리고 경기를 거는 셈이다 — 다만 **단추는 보인다**,
+    /// 안 보이면 그런 기능이 있다는 것조차 모른다(사용자 지적).
+    testWidgets('자리가 비었으면 팀 매칭이 흐리고 까닭을 알린다', (tester) async {
+      await _pumpLoggedIn(tester);
+      await _openSheet(tester);
+
+      // 시드는 DF 가 비어 있다.
+      await tester.tap(find.byKey(const Key('home-team-match')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.textContaining('자리를 다 채워'), findsOneWidget);
     });
 
     testWidgets('팀원을 고르면 판 자리에 팀 목록 자리가 선다', (tester) async {

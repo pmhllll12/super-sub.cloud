@@ -175,6 +175,25 @@ class ApiClient {
     return _decode(res);
   }
 
+  /// **통째로 교체**하는 경로 — 경기 조건(계약 3-13절)이 처음 쓴다.
+  ///
+  /// 🔴 [patch] 로 대신할 수 없다. 그쪽은 「보낸 칸만 바뀐다」이고 이쪽은
+  /// 「보낸 것이 곧 전체」다 — 조건에서 시간대 하나를 **지우는** 것이
+  /// `PATCH` 로는 표현이 안 된다.
+  Future<Map<String, dynamic>> put(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
+    final res = await _send(
+      () => _client.put(
+        _uri(path),
+        headers: _headers(),
+        body: jsonEncode(body),
+      ),
+    );
+    return _decode(res);
+  }
+
   /// 지우고 **바뀐 것을 돌려받는다** — 스쿼드 등재 빼기가 그렇다(계약이
   /// 바뀐 스쿼드 전체를 준다).
   Future<Map<String, dynamic>> deleteReturning(String path) async {

@@ -28,6 +28,16 @@ void main() {
       expect(sw.elapsedMilliseconds, greaterThanOrEqualTo(200));
     });
 
+    /// 🔴 **가짜인 것은 가짜라고 적는다**(2026-09-25 사용자 요청) — 진짜
+    /// 후보와 섞이면 무엇을 보고 있는지 모른다.
+    test('가짜 후보는 닉네임에 mock 이 붙는다', () async {
+      final list = await MockCandidateRepository()
+          .candidates('t-thunder', positionCode: 'DF');
+
+      expect(list.every((c) => c.nickname.contains('mock')), isTrue,
+          reason: list.map((c) => c.nickname).join(' · '));
+    });
+
     /// 🔴 화면이 세 갈래(등급 있음 · 등급 모름 · 카드 없음)를 다 그려 보게
     /// 시드를 섞어 둔다. 한 갈래만 있으면 나머지 둘은 실서버에서 처음 만난다.
     test('시드에 등급·검수 전·카드 없음이 모두 있다', () async {

@@ -72,6 +72,85 @@ void main() {
     });
   });
 
+  group('한 자리에 한 사람', () {
+    /// 🔴 **이미 사람이 있는 칸에는 안 앉힌다** (2026-09-25, 사용자: 「한 자리에
+    /// 한 선수만 들어가야 하는데 ... 몇 명씩 들어가있어서 x 눌렀는데도 다른
+    /// 카드가 또 있을 때도 있어」).
+    ///
+    /// 시트가 닫히기 전에 한 번 더 고르거나, 초대가 두 번 나가면 **같은 칸에
+    /// 둘**이 된다. 그러면 하나는 판에서 밀려 엉뚱한 자리에 서고, ⊗ 로 지워도
+    /// 뒤에 있던 것이 남는다.
+    test('이미 찬 칸에는 안 앉는다', () {
+      final first = squadWithSeatInvited(
+        _empty(),
+        invitationId: 'inv-1',
+        nickname: 'A',
+        positionCode: 'DF',
+        gridCol: 1,
+        gridRow: 2,
+      );
+
+      final second = squadWithSeatInvited(
+        first,
+        invitationId: 'inv-2',
+        nickname: 'B',
+        positionCode: 'DF',
+        gridCol: 1,
+        gridRow: 2,
+      );
+
+      expect(second.members, hasLength(1));
+      expect(second.members.single.nickname, 'A');
+    });
+
+    /// 🔴 **같은 사람을 두 번 부르지 않는다** — 다른 칸이어도 마찬가지다.
+    /// 판에 같은 사람이 둘이 서는 것이 더 이상하다.
+    test('같은 사람은 두 번 안 앉는다', () {
+      final first = squadWithSeatInvited(
+        _empty(),
+        invitationId: 'inv-1',
+        nickname: 'A',
+        cardPublicSlug: 'a-1',
+        positionCode: 'DF',
+        gridCol: 1,
+        gridRow: 2,
+      );
+
+      final second = squadWithSeatInvited(
+        first,
+        invitationId: 'inv-2',
+        nickname: 'A',
+        cardPublicSlug: 'a-1',
+        positionCode: 'MF',
+        gridCol: 0,
+        gridRow: 1,
+      );
+
+      expect(second.members, hasLength(1));
+    });
+
+    test('빈 칸에는 그대로 앉는다', () {
+      final first = squadWithSeatInvited(
+        _empty(),
+        invitationId: 'inv-1',
+        nickname: 'A',
+        positionCode: 'DF',
+        gridCol: 1,
+        gridRow: 2,
+      );
+      final second = squadWithSeatInvited(
+        first,
+        invitationId: 'inv-2',
+        nickname: 'B',
+        positionCode: 'MF',
+        gridCol: 0,
+        gridRow: 1,
+      );
+
+      expect(second.members, hasLength(2));
+    });
+  });
+
   group('squadWithSeatAccepted', () {
     /// 🔴 시연용 자동 수락이 부르는 자리 — 같은 사람을 **수락함**으로 바꾼다.
     test('그 자리를 수락함으로 바꾼다', () {

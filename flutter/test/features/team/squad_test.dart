@@ -31,6 +31,8 @@ Squad _squad({
     });
 
 void main() {
+  _pendingInviteTests();
+
   test('계약 응답을 읽는다', () {
     final squad = _squad(members: [_member()]);
 
@@ -99,5 +101,40 @@ void main() {
 
       expect(m.accepted, isTrue);
     });
+  });
+}
+
+/// 🔴 **초대만 보낸 자리는 서버 등재가 아니다** (2026-09-25, 실기기에서
+/// 「등재를 찾을 수 없습니다」가 떴다). 그 자리의 id 는 `squad_member.id` 가
+/// 아니라 **초대 id** 라, 그대로 서버로 보내면 404 다.
+void _pendingInviteTests() {
+  test('초대만 보낸 자리는 isPendingInvite 다', () {
+    const invited = SquadMember(
+      id: 'inv-1',
+      playerCardId: '',
+      nickname: 'A',
+      positionCode: 'DF',
+      positionLabel: 'DF',
+      gridCol: 1,
+      gridRow: 2,
+      accepted: false,
+    );
+
+    expect(invited.isPendingInvite, isTrue);
+  });
+
+  test('서버 등재는 아니다', () {
+    const real = SquadMember(
+      id: 'sm-1',
+      playerCardId: 'pc-1',
+      nickname: 'A',
+      positionCode: 'DF',
+      positionLabel: 'DF',
+      gridCol: 1,
+      gridRow: 2,
+      accepted: true,
+    );
+
+    expect(real.isPendingInvite, isFalse);
   });
 }

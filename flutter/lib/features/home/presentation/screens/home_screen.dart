@@ -35,6 +35,8 @@ import '../../../team/data/squad_repository.dart';
 import '../../../team/optimistic_squad.dart';
 import '../../../team/seats_from_squad.dart';
 import '../../../team/presentation/sheets/seat_fill_sheet.dart';
+import '../../../team/presentation/sheets/match_waiting_sheet.dart';
+import '../../../team/presentation/sheets/team_match_sheet.dart';
 import '../../../team/presentation/widgets/squad_board.dart';
 import '../widgets/home_video_strip.dart';
 
@@ -720,6 +722,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     int col,
     int row,
   ) async {
+    /* 🔴 **아직 서버 등재가 아니면 옮기지 않는다** — 404 가 난다. 화면에서만
+       옮겨 두면 새로고침에 되돌아가 더 헷갈린다. */
+    final m = _memberOf(squad, memberId);
+    if (m != null && m.isPendingInvite) {
+      _notReady('수락을 기다리는 중이라 아직 못 옮깁니다');
+      return;
+    }
     final pinned = _pinned(squad);
     await _write(
       squadWithSeatMoved(
@@ -763,6 +772,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final a = _memberOf(pinned, aId);
     final b = _memberOf(pinned, bId);
     if (a == null || b == null || !a.hasSeat || !b.hasSeat) return;
+    // 🔴 한쪽이라도 서버 등재가 아니면 맞바꿀 수 없다(위와 같은 까닭).
+    if (a.isPendingInvite || b.isPendingInvite) {
+      _notReady('수락을 기다리는 중이라 아직 못 옮깁니다');
+      return;
+    }
 
     await _write(
       squadWithSeatsSwapped(pinned, aId: aId, bId: bId),
@@ -818,6 +832,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     for (final m in pinned.members) {
       final was = _memberOf(before, m.id);
       if (was == null || was.hasSeat || !m.hasSeat) continue;
+      /* 🔴 **초대만 보낸 자리는 서버에 없다** — 보내면 404 「등재를 찾을 수
+         없습니다」다(실기기에서 떴다). 수락되면 서버 스쿼드가 덮으면서
+         진짜 id 를 갖게 되고, 그때부터 저장된다. */
+      if (m.isPendingInvite) continue;
       try {
         await repo.moveSeat(
           teamId,
@@ -845,6 +863,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     String? cardSlug,
     String? mySlug,
   ) async {
+    /* 🔴 **초대만 보낸 자리는 판에서만 뺀다** (2026-09-25). 서버에 등재가
+       없어서 `removeSeat` 을 부르면 404 「등재를 찾을 수 없습니다」다.
+       ⚠️ **초대 자체는 아직 못 무른다** — 계약의
+       `DELETE /teams/{id}/invitations/{id}` 를 앱이 안 붙였다(1-B). 그래서
+       그 사람에게는 초대가 그대로 가 있다. */
+    final pending = _memberOf(squad, memberId)?.isPendingInvite ?? false;
+    if (pending) {
+      setState(() => _shownSquad = squadWithSeatRemoved(squad, memberId: memberId));
+      _notReady('판에서만 뺐습니다 — 보낸 초대는 그대로입니다');
+      return;
+    }
+
     final repo = ref.read(squadRepositoryProvider);
     await _write(
       squadWithSeatRemoved(squad, memberId: memberId),
@@ -886,11 +916,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       teamId: teamId,
       positionCode: slot.position,
       positionLabel: _positionLabel[slot.position] ?? slot.position,
-      placed: _placedNicknames(),
+      placed: _placedNicknames(teamId),
     );
     if (pick == null || !mounted) return;
 
-    final squad = _shownSquad;
+    final squad = _currentSquad(teamId);
     if (squad == null) return;
 
     try {
@@ -935,6 +965,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   static const _demoAcceptDelay = Duration(milliseconds: 1500);
 
   void _demoAccept(String invitationId) {
+    /* 🔴 **진짜 초대에는 안 건다** (2026-09-25, 사용자가 실기기에서 잡았다:
+       「그 바로 수락되고」). 실제로 답하지 않은 사람이 **받은 것처럼** 보이고,
+       그 상태로 경기까지 걸리면 인원이 빈 채로 잡힌다.
+       가짜 후보를 부른 것만 `demo-inv-` 로 온다(`DemoInvitationRepository`). */
+    if (!invitationId.startsWith('demo-inv-')) return;
     Future<void>.delayed(_demoAcceptDelay, () {
       if (!mounted) return;
       final squad = _shownSquad;
@@ -947,11 +982,99 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     });
   }
 
+  /// 「팀 매칭」을 눌렀다 — 조건을 정하고 비슷한 팀에 경기를 건다.
+  ///
+  /// 🔴 **돌아온 것은 「걸었다」이지 「잡혔다」가 아니다.** 확정은 상대가
+  /// 수락하는 순간이라, 여기서는 걸렸다는 것만 알리고 기다린다.
+  Future<void> _openTeamMatch(String teamId) async {
+    final made = await showTeamMatchSheet(context, teamId: teamId);
+    if (made == null || !mounted) return;
+
+    /* 🔴 **곧바로 기다리는 화면으로 잇는다.** 스낵바만 띄우고 끝내면 사용자는
+       「걸린 건가?」를 확인할 데가 없다 — 수락도 여기서 이어받는다. */
+    await showMatchWaitingSheet(
+      context,
+      teamId: teamId,
+      requestId: made.id,
+      ourTeamName: _teamNameOf(teamId),
+      ourSquad: _shownSquad,
+    );
+  }
+
+  /// 그 팀의 이름. 🔴 **세션이 들고 있는 값을 쓴다** — 팀 이름만 보려고
+  /// `GET /teams/{id}` 를 따로 부르지 않는다.
+  String _teamNameOf(String teamId) {
+    final session = ref.read(sessionControllerProvider);
+    if (session is! SessionLoggedIn) return '우리 팀';
+    for (final t in session.user.teams) {
+      if (t.teamId == teamId) return t.name;
+    }
+    return '우리 팀';
+  }
+
+  /// 맨 위 오른쪽의 「팀 매칭」 단추.
+  ///
+  /// 🔴 **팀이 없으면 아예 안 그린다** — 걸 팀이 없으면 누를 것도 없다.
+  Widget _teamMatchButton() {
+    final session = ref.watch(sessionControllerProvider);
+    final teamId =
+        session is SessionLoggedIn ? session.user.ownedTeamId : null;
+    if (teamId == null) return const SizedBox(height: 38, width: 54);
+
+    final ready = _squadReady(teamId);
+    return _TeamMatchButton(
+      ready: ready,
+      onTap: () {
+        if (!ready) {
+          /* 🔴 **왜 못 누르는지 말해 준다.** 흐린 단추만 두면 고장으로
+             읽힌다 — 무엇이 모자란지가 곧 다음에 할 일이다. */
+          _notReady('자리를 다 채워야 걸 수 있습니다');
+          return;
+        }
+        _openTeamMatch(teamId);
+      },
+    );
+  }
+
+  /// **경기를 걸 수 있는 판인가** — 자리가 다 차고 **전원이 수락**해야 한다
+  /// (웹 `SquadPanel` 의 `full` 과 같다).
+  ///
+  /// 🔴 **자리만 찬 것으로는 부족하다.** 아직 답을 안 한 사람을 데리고 경기를
+  /// 거는 셈이 되고, 그 사람이 거절하면 인원이 빈 채로 경기가 잡힌다.
+  bool _squadReady(String teamId) {
+    final squad = _currentSquad(teamId);
+    if (squad == null) return false;
+    final seats = seatsFromSquad(
+      squad,
+      squadSizeOf(squad.formation),
+      mySlug: ref.read(myCardProvider).value?.publicSlug,
+    );
+    for (final s in seats.slots) {
+      if (s.mine) continue;
+      if (!seats.mates.containsKey(s.area)) return false;
+      if (!(seats.ready[s.area] ?? true)) return false;
+    }
+    return true;
+  }
+
+  /// 지금 판에 그려지고 있는 스쿼드.
+  ///
+  /// 🔴 **`_shownSquad` 만 보면 안 된다** (2026-09-25, 사용자: 「눌렀는데 왜
+  /// 카드 바로 안채워지냐고」). 그 값은 **뭔가를 한 번 옮긴 뒤에야** 찬다 —
+  /// 갓 들어온 화면은 서버 값으로 그려지고 있어서 `null` 이다. 그걸 못 보고
+  /// 일찍 돌아가는 바람에 **초대가 아예 안 나갔고**, 같은 값을 읽던 「이미
+  /// 앉은 사람」 목록도 늘 비어 있었다.
+  ///
+  /// `build` 의 `_shownSquad ?? serverSquad` 와 **같은 규칙**이다 — 한쪽만
+  /// 고치면 화면과 동작이 서로 다른 판을 보게 된다.
+  Squad? _currentSquad(String teamId) =>
+      _shownSquad ?? ref.read(squadProvider(teamId)).value;
+
   /// 이미 판에 앉은 사람의 닉네임 → 그 자리.
   ///
   /// 🔴 닉네임으로 맞추는 까닭은 `showSeatFillSheet` 의 `placed` 주석에 있다.
-  Map<String, String> _placedNicknames() {
-    final squad = _shownSquad;
+  Map<String, String> _placedNicknames(String teamId) {
+    final squad = _currentSquad(teamId);
     if (squad == null) return const {};
     return {for (final m in squad.members) m.nickname: m.positionCode};
   }
@@ -1946,7 +2069,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ),
         Align(
           alignment: Alignment.centerRight,
-          child: _stagger(2, _AiButton(onTap: () => _notReady('AI 용병 찾기'))),
+          child: _stagger(2, _teamMatchButton()),
         ),
       ],
     );
@@ -2498,39 +2621,69 @@ class _RolePill extends StatelessWidget {
   }
 }
 
-/// AI 단추 — 웹과 같은 세리프 「AI」를 유리 알약에 얹었다.
+/// 「팀 매칭」 — 옛 AI 단추 자리(맨 위 오른쪽)에 선다.
 ///
-/// ⚠️ 아직 아무것도 안 연다. 웹은 추천 판 · 챗봇을 여는데, 🔴 **챗봇은 Gemini
-/// 키가 웹 서버에만 있어** 앱에서 부를 경로부터 정해야 한다(웹 `/api/chat` 을
-/// 부를지, 백엔드로 옮길지).
-class _AiButton extends StatelessWidget {
-  const _AiButton({required this.onTap});
+/// 🔴 **AI 단추를 걷고 그 자리를 넘겨받았다** (2026-09-25 사용자 요청:
+/// 「어차피 우리 AI 버튼 웹에서도 안쓰니까 ... 똑같은 크기와 위치에」).
+/// 전에는 판 머리의 크기 알약들 사이에 뒀는데 **있는 줄도 몰랐다.**
+///
+/// 🔴 **글자와 도는 테가 둘 다 로고 초록이다**(같은 요청). 다른 곳의 도는
+/// 빛은 실버·금빛이라 이것만 초록이면 「여기를 보라」가 분명해진다 —
+/// `silver_sweep_border.dart` 가 색으로 갈라 두라고 한 그대로다.
+///
+/// ⚠️ **자리가 덜 찼으면 흐리다.** 그래도 **숨기지는 않는다** — 안 보이면
+/// 그런 기능이 있다는 것조차 모른다(위 사용자 지적).
+class _TeamMatchButton extends StatelessWidget {
+  const _TeamMatchButton({required this.ready, required this.onTap});
 
+  final bool ready;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    /* 🔴 **글자가 알약을 넘지 않게 줄인다** (2026-09-25 실기기에서 좌우가
+       잘려 보였다). 54px 폭에 네 글자라 빠듯하다 — 알약을 넓히는 대신
+       글자를 줄인다(「AI 단추와 똑같은 크기」가 요청이었다). */
+    final label = Center(
+      child: Text(
+        '팀 매칭',
+        maxLines: 1,
+        softWrap: false,
+        style: TextStyle(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.2,
+          color: ready ? AppTheme.seed : AppTheme.seed.withValues(alpha: 0.42),
+        ),
+      ),
+    );
+
     return SizedBox(
       height: 38,
       width: 54,
-      child: GlassPanel(
-        radius: 19,
-        child: Material(
-          type: MaterialType.transparency,
-          child: InkWell(
-            key: const Key('home-ai'),
-            onTap: onTap,
-            child: const Center(
-              child: Text(
-                'AI',
-                style: TextStyle(
-                  fontFamily: 'YoungSerif',
-                  fontSize: 18,
-                  color: _kOnDark,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          key: const Key('home-team-match'),
+          borderRadius: BorderRadius.circular(19),
+          onTap: onTap,
+          child: ready
+              ? SilverSweepBorder(
+                  radius: 19,
+                  strokeWidth: 1.2,
+                  color: AppTheme.seed,
+                  baseColor: AppTheme.seed.withValues(alpha: 0.28),
+                  child: label,
+                )
+              : DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(19),
+                    border: Border.all(
+                      color: AppTheme.seed.withValues(alpha: 0.24),
+                    ),
+                  ),
+                  child: label,
                 ),
-              ),
-            ),
-          ),
         ),
       ),
     );

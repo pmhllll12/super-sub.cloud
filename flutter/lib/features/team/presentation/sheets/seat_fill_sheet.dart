@@ -3,13 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/silver_edge.dart';
 import '../../../../core/widgets/silver_sweep_border.dart';
 import '../../../video/data/video_providers.dart';
 import '../../data/candidate_providers.dart';
 import '../../data/models/contact.dart';
 import '../../data/models/squad_candidate.dart';
+import 'sheet_skin.dart';
 
 /// 빈 자리에 앉힐 사람으로 고른 결과. 🔴 **여기서 초대까지 하지 않는다** —
 /// 시트는 「누구를 고를까」만 답하고, 초대와 낙관적 배치는 판을 들고 있는
@@ -63,33 +62,10 @@ Future<SeatPick?> showSeatFillSheet(
       ),
     );
 
-// ── 색 ───────────────────────────────────────────────────────────────────
-//
-// 🔴 **값을 새로 짓지 않는다** — 홈이 쓰는 것과 같은 토큰이다. 시트는 홈 위로
-// 올라오므로 조금만 달라도 다른 앱처럼 보인다.
-
-const Color _kInk = Color(0xFF0B0B0B);
-const Color _kOn = Color(0xFFFFFFFF);
-
-/// 🔴 **줄들이 앉는 면은 홈 아래 판과 같은 [kSheetPaper] 다**(2026-09-25
-/// 사용자 요청). 값을 베껴 적지 않는 이유는 그 토큰 주석에 있다 — 두 면이
-/// 조금만 달라도 다른 판처럼 보인다.
-const Color _kBox = kSheetPaper;
-
-/// 밝은 면 위의 글자. 🔴 **판이 밝아졌으므로 흰 글자를 그대로 두면 안 된다** —
-/// 1.27에서 흰 판에 초록 글자가 사라졌던 것과 같은 자리다.
-const Color _kBoxInk = Color(0xFF14161A);
-
-/// 🔴 **금빛을 걷었다** (2026-09-25 사용자 요청: 「눌렀을 때 노란색 빼고
-/// 실버로 다 해라」). 값은 `SilverEdge.silver` 하나에서 온다.
-const Color _kSilver = SilverEdge.silver;
-
-/// 안 고른 버튼의 테 — **아주 얇게**. 빛이 지나가지 않는 자리에도 남는다.
-const Color _kSilverFaint = Color(0x59C9D4D8);
-const double _kEdgeWidth = 0.6;
-
-/// 이미 앉은 지인의 `✓ 자리` — 밝은 면 위에서 읽히는 초록(1.27과 같은 값).
-const Color _kSeatedGreen = Color(0xFF1E7F45);
+/* 🔴 **색·틀은 `sheet_skin.dart` 한 곳에서 온다**(2026-09-25 사용자 요청:
+   「새로 만드는 것들 그 AI 추천판에 있는 거랑 스타일 똑같이 가져가」).
+   전에는 이 파일이 값을 따로 들고 있었다 — 그러면 새 시트가 생길 때마다
+   조용히 갈린다. */
 
 const List<String> _kGrades = ['S', 'A', 'B', 'C', 'D', 'F'];
 
@@ -125,7 +101,7 @@ class _SeatFillSheetState extends ConsumerState<_SeatFillSheet> {
     return Container(
       height: h * 0.86,
       decoration: const BoxDecoration(
-        color: _kInk,
+        color: kSheetInk,
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       /* 🔴 **유리 안에 유리를 넣지 않는다**(`refractive_glass.dart`). 시트는
@@ -163,7 +139,7 @@ class _Grip extends StatelessWidget {
         height: 4,
         margin: const EdgeInsets.only(top: 10, bottom: 6),
         decoration: BoxDecoration(
-          color: _kOn.withValues(alpha: 0.22),
+          color: kSheetOn.withValues(alpha: 0.22),
           borderRadius: BorderRadius.circular(2),
         ),
       );
@@ -183,7 +159,7 @@ class _Header extends StatelessWidget {
               child: Text(
                 '$label 자리에 넣기',
                 style: const TextStyle(
-                  color: _kOn,
+                  color: kSheetOn,
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                   letterSpacing: -0.2,
@@ -193,7 +169,7 @@ class _Header extends StatelessWidget {
             IconButton(
               tooltip: '닫기',
               onPressed: () => Navigator.of(context).pop(),
-              icon: Icon(Icons.close, color: _kOn.withValues(alpha: 0.7)),
+              icon: Icon(Icons.close, color: kSheetOn.withValues(alpha: 0.7)),
             ),
           ],
         ),
@@ -252,7 +228,7 @@ class _TabPill extends StatelessWidget {
             child: Text(
               label,
               style: TextStyle(
-                color: on ? _kOn : _kOn.withValues(alpha: 0.6),
+                color: on ? kSheetOn : kSheetOn.withValues(alpha: 0.6),
                 fontSize: 14,
                 fontWeight: on ? FontWeight.w600 : FontWeight.w500,
               ),
@@ -291,15 +267,15 @@ class _Edge extends StatelessWidget {
       return DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(radius),
-          border: Border.all(color: _kSilverFaint, width: _kEdgeWidth),
+          border: Border.all(color: kSheetEdge, width: kSheetEdgeWidth),
         ),
         child: child,
       );
     }
     return SilverSweepBorder(
       radius: radius,
-      color: _kSilver,
-      baseColor: _kSilverFaint,
+      color: kSheetSilver,
+      baseColor: kSheetEdge,
       strokeWidth: 1,
       child: child,
     );
@@ -341,23 +317,23 @@ class _SuggestTab extends ConsumerWidget {
               orElse: () => ' ',
             ),
             style: TextStyle(
-              color: _kOn.withValues(alpha: 0.5),
+              color: kSheetOn.withValues(alpha: 0.5),
               fontSize: 12.5,
             ),
           ),
         ),
         Expanded(
           child: async.when(
-            loading: () => const _Center(child: _Spinner()),
+            loading: () => const _Center(child: SheetSpinner()),
             error: (e, _) => _Center(
-              child: _Message(
+              child: SheetMessage(
                 title: '후보를 불러오지 못했습니다',
                 detail: '$e',
               ),
             ),
             data: (list) => list.isEmpty
                 ? _Center(
-                    child: _Message(
+                    child: SheetMessage(
                       title: grade == null
                           ? '이 자리에 맞는 사람이 아직 없습니다'
                           : '$grade 등급에는 맞는 사람이 없습니다',
@@ -443,7 +419,7 @@ class _GradeChip extends StatelessWidget {
                 child: Text(
                   label,
                   style: TextStyle(
-                    color: on ? _kOn : _kOn.withValues(alpha: 0.6),
+                    color: on ? kSheetOn : kSheetOn.withValues(alpha: 0.6),
                     fontSize: wide ? 12.5 : 13,
                     fontWeight: on ? FontWeight.w700 : FontWeight.w500,
                   ),
@@ -474,7 +450,7 @@ class _CandidateRow extends ConsumerWidget {
           child: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: _kBox,
+              color: kSheetBox,
               borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
@@ -523,12 +499,12 @@ class _ThumbBlank extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => DecoratedBox(
-        decoration: BoxDecoration(color: _kBoxInk.withValues(alpha: 0.07)),
+        decoration: BoxDecoration(color: kSheetBoxInk.withValues(alpha: 0.07)),
         child: Center(
           child: Icon(
             Icons.videocam_off_outlined,
             size: 18,
-            color: _kBoxInk.withValues(alpha: 0.3),
+            color: kSheetBoxInk.withValues(alpha: 0.3),
           ),
         ),
       );
@@ -550,7 +526,7 @@ class _CandidateText extends StatelessWidget {
                   candidate.nickname,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: _kBoxInk,
+                    color: kSheetBoxInk,
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
                   ),
@@ -584,7 +560,7 @@ class _CandidateText extends StatelessWidget {
                   Text(
                     '·',
                     style: TextStyle(
-                      color: _kBoxInk.withValues(alpha: 0.4),
+                      color: kSheetBoxInk.withValues(alpha: 0.4),
                       fontSize: 12.5,
                       height: 1.35,
                     ),
@@ -594,7 +570,7 @@ class _CandidateText extends StatelessWidget {
                     child: Text(
                       n,
                       style: TextStyle(
-                        color: _kBoxInk.withValues(alpha: 0.72),
+                        color: kSheetBoxInk.withValues(alpha: 0.72),
                         fontSize: 12.5,
                         height: 1.35,
                       ),
@@ -613,7 +589,7 @@ class _GradeBadge extends StatelessWidget {
   final String grade;
 
   /// 🔴 **경계는 서버가 긋는다** — 여기서는 받은 글자에 색만 입힌다.
-  /// 🔴 **밝은 면(`_kBox`) 위에서 쓰는 값이다.** 검은 화면용 밝은 색을 그대로
+  /// 🔴 **밝은 면(`kSheetBox`) 위에서 쓰는 값이다.** 검은 화면용 밝은 색을 그대로
   /// 두면 안 된다 — 1.27에서 초록(`#70ED88`)이 흰 판에서 대비 2:1 도 안 나와
   /// 글자가 사라진 그 자리와 같다. 거기서 내린 초록(`#1E7F45`)을 그대로 쓰고
   /// 나머지도 같은 만큼 내렸다.
@@ -628,7 +604,7 @@ class _GradeBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = _color[grade] ?? _kOn;
+    final c = _color[grade] ?? kSheetOn;
     return Container(
       width: 22,
       height: 22,
@@ -654,12 +630,12 @@ class _ProvisionalBadge extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: _kBoxInk.withValues(alpha: 0.3)),
+          border: Border.all(color: kSheetBoxInk.withValues(alpha: 0.3)),
         ),
         child: Text(
           '검수 전',
           style: TextStyle(
-            color: _kBoxInk.withValues(alpha: 0.62),
+            color: kSheetBoxInk.withValues(alpha: 0.62),
             fontSize: 10.5,
             fontWeight: FontWeight.w500,
           ),
@@ -729,6 +705,9 @@ class _FriendsTabState extends ConsumerState<_FriendsTab> {
         .where((c) => _query.isEmpty || c.nickname.contains(_query))
         .toList();
 
+    final others =
+        _found.where((f) => !mine.any((c) => c.userId == f.id)).toList();
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
       children: [
@@ -736,24 +715,62 @@ class _FriendsTabState extends ConsumerState<_FriendsTab> {
         const SizedBox(height: 12),
         for (final r in requests.value ?? const <ContactRequest>[])
           _RequestRow(request: r),
-        if (mine.isEmpty && _found.isEmpty && _query.isEmpty)
-          _Message(
+
+        /* 🔴 **지인이 위, 다른 사람이 아래** (2026-09-25 사용자 요청). 섞어
+           두면 이미 아는 사람과 처음 보는 사람이 구별이 안 된다. */
+        if (mine.isNotEmpty) const _GroupLabel('지인'),
+        for (final c in mine)
+          _ContactRow(contact: c, placedAt: widget.placed[c.nickname]),
+        if (mine.isEmpty && _query.isEmpty)
+          SheetMessage(
             title: '아직 지인이 없습니다',
             detail: '닉네임으로 찾아 지인 신청을 보내 보세요.',
           ),
-        for (final c in mine)
-          _ContactRow(contact: c, placedAt: widget.placed[c.nickname]),
-        // 이미 지인인 사람은 검색 결과에서 뺀다 — 같은 사람이 두 줄이 된다.
-        for (final f
-            in _found.where((f) => !mine.any((c) => c.userId == f.id)))
+
+        // 이미 지인인 사람은 아래 묶음에서 뺀다 — 같은 사람이 두 줄이 된다.
+        if (others.isNotEmpty) const _GroupLabel('다른 사람'),
+        for (final f in others)
           _FoundRow(
             found: f,
             sent: _requested.contains(f.id),
             onRequest: () => _request(f),
           ),
+
+        /* ⚠️ **아무것도 안 치면 아래가 빈다.** 서버의 `GET /users/search` 가
+           `q` 를 **최소 한 자** 받고(빈 값은 422), 「전체 사용자 목록」 경로가
+           계약에 없다 — 그 경로가 생기면 여기를 처음부터 채운다. */
+        if (_query.isEmpty && mine.isNotEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 14),
+            child: Text(
+              '닉네임을 한 자만 쳐도 다른 사람이 아래에 뜹니다.',
+              style: TextStyle(color: kSheetOnDim, fontSize: 12.5),
+            ),
+          ),
       ],
     );
   }
+}
+
+/// 묶음 이름 — 「지인」 / 「다른 사람」.
+class _GroupLabel extends StatelessWidget {
+  const _GroupLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 4, bottom: 8, left: 4),
+        child: Text(
+          text,
+          style: TextStyle(
+            color: kSheetOn.withValues(alpha: 0.55),
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.4,
+          ),
+        ),
+      );
 }
 
 class _SearchField extends StatelessWidget {
@@ -767,15 +784,15 @@ class _SearchField extends StatelessWidget {
         key: const Key('friend-search'),
         controller: controller,
         onChanged: onChanged,
-        style: const TextStyle(color: _kBoxInk, fontSize: 14.5),
-        cursorColor: _kBoxInk,
+        style: const TextStyle(color: kSheetBoxInk, fontSize: 14.5),
+        cursorColor: kSheetBoxInk,
         decoration: InputDecoration(
           hintText: '닉네임으로 찾기',
-          hintStyle: TextStyle(color: _kBoxInk.withValues(alpha: 0.42)),
+          hintStyle: TextStyle(color: kSheetBoxInk.withValues(alpha: 0.42)),
           prefixIcon: Icon(Icons.search,
-              color: _kBoxInk.withValues(alpha: 0.42), size: 20),
+              color: kSheetBoxInk.withValues(alpha: 0.42), size: 20),
           filled: true,
-          fillColor: _kBox,
+          fillColor: kSheetBox,
           contentPadding: const EdgeInsets.symmetric(vertical: 14),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
@@ -815,7 +832,7 @@ class _ContactRow extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
             decoration: BoxDecoration(
-              color: _kBox,
+              color: kSheetBox,
               borderRadius: BorderRadius.circular(14),
             ),
             child: Row(
@@ -825,7 +842,7 @@ class _ContactRow extends StatelessWidget {
                     contact.nickname,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: _kBoxInk,
+                      color: kSheetBoxInk,
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
                     ),
@@ -835,12 +852,12 @@ class _ContactRow extends StatelessWidget {
                   /* 🔴 **밝은 면용 초록이다.** `AppTheme.seed`(`#70ED88`)는
                      검은 화면용이라 이 면에서 대비가 2:1 도 안 나온다 —
                      1.27이 리포트에서 겪고 내린 값(`#1E7F45`)을 그대로 쓴다. */
-                  Icon(Icons.check, size: 16, color: _kSeatedGreen),
+                  Icon(Icons.check, size: 16, color: kSheetGreen),
                   const SizedBox(width: 5),
                   Text(
                     placedAt!,
                     style: TextStyle(
-                      color: _kSeatedGreen,
+                      color: kSheetGreen,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -866,7 +883,7 @@ class _RequestRow extends ConsumerWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
           decoration: BoxDecoration(
-            color: _kBox,
+            color: kSheetBox,
             borderRadius: BorderRadius.circular(14),
           ),
           child: Row(
@@ -874,7 +891,7 @@ class _RequestRow extends ConsumerWidget {
               const Expanded(
                 child: Text(
                   '지인 신청이 왔습니다',
-                  style: TextStyle(color: _kBoxInk, fontSize: 14),
+                  style: TextStyle(color: kSheetBoxInk, fontSize: 14),
                 ),
               ),
               _SmallButton(
@@ -910,7 +927,7 @@ class _FoundRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: _kOn.withValues(alpha: 0.12)),
+            border: Border.all(color: kSheetOn.withValues(alpha: 0.12)),
           ),
           child: Row(
             children: [
@@ -919,7 +936,7 @@ class _FoundRow extends StatelessWidget {
                   found.nickname,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: _kBoxInk.withValues(alpha: 0.85),
+                    color: kSheetBoxInk.withValues(alpha: 0.85),
                     fontSize: 15,
                   ),
                 ),
@@ -954,13 +971,13 @@ class _SmallButton extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
-              color: _kBoxInk.withValues(alpha: dim ? 0.18 : 0.45),
+              color: kSheetBoxInk.withValues(alpha: dim ? 0.18 : 0.45),
             ),
           ),
           child: Text(
             label,
             style: TextStyle(
-              color: _kBoxInk.withValues(alpha: dim ? 0.4 : 0.9),
+              color: kSheetBoxInk.withValues(alpha: dim ? 0.4 : 0.9),
               fontSize: 12.5,
               fontWeight: FontWeight.w600,
             ),
@@ -969,8 +986,7 @@ class _SmallButton extends StatelessWidget {
       );
 }
 
-// ── 공용 ─────────────────────────────────────────────────────────────────
-
+/// 가운데 한 조각 — 로딩·안내가 판 한가운데 서는 자리.
 class _Center extends StatelessWidget {
   const _Center({required this.child});
 
@@ -979,53 +995,4 @@ class _Center extends StatelessWidget {
   @override
   Widget build(BuildContext context) =>
       Center(child: Padding(padding: const EdgeInsets.all(32), child: child));
-}
-
-class _Spinner extends StatelessWidget {
-  const _Spinner();
-
-  @override
-  Widget build(BuildContext context) => SizedBox(
-        width: 22,
-        height: 22,
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          color: _kOn.withValues(alpha: 0.4),
-        ),
-      );
-}
-
-class _Message extends StatelessWidget {
-  const _Message({required this.title, required this.detail});
-
-  final String title;
-  final String detail;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 28),
-        child: Column(
-          children: [
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: _kOn,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 7),
-            Text(
-              detail,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: _kOn.withValues(alpha: 0.5),
-                fontSize: 13,
-                height: 1.4,
-              ),
-            ),
-          ],
-        ),
-      );
 }

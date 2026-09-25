@@ -109,6 +109,20 @@ class _SquadBoardState extends State<SquadBoard> {
      튄다.** 집을 때의 배치를 붙들고, 놓을 때 푼다. */
   SeatAssignment? _frozenSeats;
 
+  /* 🔴 **사람을 뺀 자리는 그 칸에 남는다** (2026-09-25, 사용자: 「그 포지션의
+     자리에서 선수 지우면 그 자리에 계속 있는게 자연스럽잖아」).
+
+     자리는 포메이션 기본 칸에서 시작해 **사람이 앉으면 그 사람의 칸으로**
+     옮겨진다. 사람이 빠지면 옮겨 줄 근거가 사라져 기본 칸으로 돌아갔다 —
+     판에서는 「빈 자리가 저 혼자 날아가는」 것으로 보인다.
+
+     🔴 **서버에 남기지 않는다.** 계약의 스쿼드는 **사람이 어디 있나**를 담지
+     빈 자리를 담지 않는다. 이건 순전히 보는 사람을 위한 것이라 이 화면이
+     살아 있는 동안만 기억한다.
+
+     🔴 **비었을 때만 쓴다** — 그 칸에 누가 앉으면 그 사람의 칸이 이긴다. */
+  final Map<String, ({int col, int row})> _emptiedCells = {};
+
   /* 🔴 **손끝을 판 좌표로 옮기려면 판의 상자가 필요하다** (2026-09-21).
      전에는 `localPosition`(카드 기준)에 칸의 왼쪽 위를 더해서 썼는데, 카드는
      칸 안에서 **가운데 정렬**이라 그 둘을 더해도 판 좌표가 아니다. 어긋난
@@ -141,10 +155,12 @@ class _SquadBoardState extends State<SquadBoard> {
         // 🔴 자리 계산은 순수 함수 한 곳이다 — 판이 스스로 배치를 정하면
         //    웹과 갈린다(`seats_from_squad.dart` 의 세 단계).
         final seats = _frozenSeats ??
-            seatsFromSquad(
-              widget.squad,
-              _size,
-              mySlug: widget.myCard?.publicSlug,
+            _withEmptiedCells(
+              seatsFromSquad(
+                widget.squad,
+                _size,
+                mySlug: widget.myCard?.publicSlug,
+              ),
             );
 
         final boardSize = Size(w, h);
@@ -178,7 +194,7 @@ class _SquadBoardState extends State<SquadBoard> {
               top: 12,
               left: 16,
               right: 12,
-              child: _head(),
+              child: _head(seats),
             ),
             for (final slot in seats.slots)
               Positioned(
@@ -196,9 +212,12 @@ class _SquadBoardState extends State<SquadBoard> {
     );
   }
 
-  Widget _head() {
+  Widget _head(SeatAssignment seats) {
     return Row(
       children: [
+        /* 🔴 **팀 매칭 단추는 여기 없다** (2026-09-25 사용자 요청). 판 머리의
+           자리 알약들 사이에 두었더니 **있는 줄도 몰랐다** — 홈 맨 위, 옛 AI
+           단추 자리로 옮겼다(`home_screen.dart` 의 `_TeamMatchButton`). */
         // 좁은 폰(폭 360)에서는 크기 알약 셋이 우선이다 — 머리글이 밀려나면
         // 흐리게 잘린다. 알약이 잘리면 무엇을 고르는지 모른다.
         const Expanded(
@@ -296,6 +315,29 @@ class _SquadBoardState extends State<SquadBoard> {
         ),
       ),
     );
+  }
+
+  /// 비어 있는 자리를 **사람이 빠지기 전 칸**으로 되돌려 놓는다.
+  ///
+  /// 🔴 **누가 앉은 자리는 안 건드린다.** 그리고 다른 자리가 이미 그 칸을
+  /// 쓰고 있으면 **포기한다** — 빈 자리 둘이 겹쳐 서는 것보다 하나가 기본
+  /// 칸으로 돌아가는 쪽이 낫다.
+  SeatAssignment _withEmptiedCells(SeatAssignment seats) {
+    if (_emptiedCells.isEmpty) return seats;
+
+    bool occupied(SquadSlot s) => s.mine || seats.mates.containsKey(s.area);
+
+    for (final s in seats.slots) {
+      final cell = _emptiedCells[s.area];
+      if (cell == null || occupied(s)) continue;
+      final clash = seats.slots.any(
+        (o) => o.area != s.area && o.col == cell.col && o.row == cell.row,
+      );
+      if (clash) continue;
+      s.col = cell.col;
+      s.row = cell.row;
+    }
+    return seats;
   }
 
   void _cancelDrag() {
@@ -409,10 +451,15 @@ class _SquadBoardState extends State<SquadBoard> {
                   right: -6,
                   child: _RemoveButton(
                     key: Key('squad-remove-${slot.area}'),
-                    onTap: () => widget.onSeatRemoved!(
-                      seats.memberIds[slot.area]!,
-                      seats.slugs[slot.area],
-                    ),
+                    onTap: () {
+                      /* 🔴 **뺀 칸을 기억해 둔다** — 안 하면 빈 자리가
+                         포메이션 기본 칸으로 날아간다(위 `_emptiedCells`). */
+                      _emptiedCells[slot.area] = (col: slot.col, row: slot.row);
+                      widget.onSeatRemoved!(
+                        seats.memberIds[slot.area]!,
+                        seats.slugs[slot.area],
+                      );
+                    },
                   ),
                 ),
               if (pending)

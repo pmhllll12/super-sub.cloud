@@ -17,6 +17,9 @@ class MockCandidateRepository implements CandidateRepository {
   /// 그 팀 종목(축구)의 포지션.
   static const _positions = {'FW', 'MF', 'DF', 'GK'};
 
+  /* 🔴 **닉네임에 `(mock)` 을 붙인다** (2026-09-25 사용자 요청). 진짜 후보와
+     섞이면 무엇을 보고 있는지 모른다 — 진짜 서버로 돌리면 이 저장소가 아예
+     안 쓰여 표시도 같이 사라진다. */
   /// 🔴 **세 갈래를 일부러 섞어 둔다** — 등급이 있는 사람 · 검수 전 · 카드가
   /// 아예 없는 사람. 한 갈래만 두면 나머지 둘을 그리는 코드를 실서버에서
   /// 처음 만나게 된다. GK 는 **비워 둔다**(「후보 없음」 갈래).
@@ -24,7 +27,7 @@ class MockCandidateRepository implements CandidateRepository {
     'DF': [
       SquadCandidate(
         userId: 'u-kim',
-        nickname: '끝까지뛰는',
+        nickname: '끝까지뛰는 (mock)',
         cardPublicSlug: 'kim-abc1',
         grade: 'C',
         provisional: false,
@@ -32,7 +35,7 @@ class MockCandidateRepository implements CandidateRepository {
       ),
       SquadCandidate(
         userId: 'u-futsal',
-        nickname: '풋살초보',
+        nickname: '풋살초보 (mock)',
         cardPublicSlug: 'futsal-7f21',
         grade: 'F',
         provisional: true,
@@ -40,30 +43,30 @@ class MockCandidateRepository implements CandidateRepository {
       ),
       SquadCandidate(
         userId: 'u-line',
-        nickname: '라인세우기',
+        nickname: '라인세우기 (mock)',
         cardPublicSlug: 'line-3a92',
         grade: 'A',
         provisional: false,
         notes: ['수비 라인을 먼저 올립니다'],
       ),
       // 🔴 카드도 등급도 없는 사람 — 목록에서 사라지지 않는다.
-      SquadCandidate(userId: 'u-newbie', nickname: '오재현'),
+      SquadCandidate(userId: 'u-newbie', nickname: '오재현 (mock)'),
     ],
     'MF': [
       SquadCandidate(
         userId: 'u-pass',
-        nickname: '한박자빠른패스',
+        nickname: '한박자빠른패스 (mock)',
         cardPublicSlug: 'pass-1b44',
         grade: 'B',
         provisional: false,
         notes: ['앞을 먼저 보고 받습니다'],
       ),
-      SquadCandidate(userId: 'u-quiet', nickname: '조용한중원'),
+      SquadCandidate(userId: 'u-quiet', nickname: '조용한중원 (mock)'),
     ],
     'FW': [
       SquadCandidate(
         userId: 'u-shot',
-        nickname: '왼발만',
+        nickname: '왼발만 (mock)',
         cardPublicSlug: 'shot-9c01',
         grade: 'A',
         provisional: true,

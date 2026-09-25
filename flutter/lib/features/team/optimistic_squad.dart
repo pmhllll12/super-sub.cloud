@@ -120,8 +120,29 @@ Squad squadWithSeatInvited(
   required int gridCol,
   required int gridRow,
   String? cardPublicSlug,
-}) =>
-    Squad(
+}) {
+  /* 🔴 **이미 사람이 있는 칸에는 안 앉힌다** (2026-09-25, 사용자가 실기기에서
+     잡았다: 「한 자리에 한 선수만 들어가야 하는데 ... 몇 명씩 들어가있어서
+     x 눌렀는데도 다른 카드가 또 있을 때도 있어」).
+
+     시트가 닫히기 전에 한 번 더 고르거나 초대가 두 번 나가면 같은 칸에 둘이
+     되는데, `seatsFromSquad` 는 그중 하나를 **다른 빈 자리로 밀어낸다** —
+     그래서 엉뚱한 데 서 있고, ⊗ 로 지워도 뒤엣것이 남는다. */
+  final taken = squad.members
+      .any((m) => m.gridCol == gridCol && m.gridRow == gridRow);
+  if (taken) return squad;
+
+  /* 🔴 **같은 사람을 두 번 부르지 않는다** — 다른 칸이어도 마찬가지다.
+     판에 같은 사람이 둘 서는 것이 더 이상하다. 카드가 없는 사람은 닉네임으로
+     견준다(그 둘 말고 견줄 값이 없다 — `placed` 주석과 같은 사정). */
+  final already = squad.members.any(
+    (m) => cardPublicSlug != null
+        ? m.cardPublicSlug == cardPublicSlug
+        : m.nickname == nickname,
+  );
+  if (already) return squad;
+
+  return Squad(
       id: squad.id,
       teamId: squad.teamId,
       publicSlug: squad.publicSlug,
@@ -143,7 +164,8 @@ Squad squadWithSeatInvited(
           accepted: false,
         ),
       ],
-    );
+  );
+}
 
 /// 그 자리를 **수락함**으로 바꾼 판.
 ///

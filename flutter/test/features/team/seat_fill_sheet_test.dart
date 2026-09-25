@@ -121,6 +121,8 @@ Future<void> _open(
 }
 
 void main() {
+  _friendGroupingTests();
+
   testWidgets('후보의 닉네임·등급·문구가 보인다', (tester) async {
     await _open(
       tester,
@@ -276,5 +278,39 @@ void main() {
 
     expect(contacts.requested, ['u-new']);
     expect(lastPick, isNull);
+  });
+}
+
+/// 🔴 **지인이 위, 다른 사람이 아래** (2026-09-25 사용자 요청: 「지인들만 위에
+/// 나오게 하고, 그 외에 실제 다른 사용자들 이름 아래로」).
+///
+/// ⚠️ **아무것도 안 친 상태에서는 아래가 빈다.** 서버의 `GET /users/search` 가
+/// `q` 를 **최소 한 자** 받고(빈 값은 422), 「전체 사용자 목록」 경로가 계약에
+/// 없다 — 그 경로가 생기면 아래 묶음을 처음부터 채운다.
+void _friendGroupingTests() {
+  testWidgets('지인과 다른 사람이 묶음으로 갈린다', (tester) async {
+    await _open(
+      tester,
+      candidates: _FakeCandidates(_rows),
+      contacts: _FakeContacts(const [
+        Contact(contactId: 'c1', userId: 'u-jin', nickname: '정어진'),
+      ]),
+    );
+
+    await tester.tap(find.byKey(const Key('seat-tab-friends')));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('지인'), findsWidgets);
+
+    /* 「정」은 지인(정어진)에도 걸리고, 가짜 서버는 아무 글자에나 「새사람」을
+       내준다 — 두 묶음이 함께 서는 상태를 만든다. */
+    await tester.enterText(find.byKey(const Key('friend-search')), '정');
+    await tester.pump(const Duration(milliseconds: 600));
+
+    final friends = tester.getRect(find.text('정어진'));
+    final others = tester.getRect(find.text('새사람'));
+    expect(others.top, greaterThan(friends.top), reason: '다른 사람이 아래다');
+    expect(find.text('다른 사람'), findsOneWidget);
   });
 }

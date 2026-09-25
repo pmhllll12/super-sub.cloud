@@ -33,6 +33,7 @@ Squad _squad(List<SquadMember> members, {String? formation = '5:5'}) => Squad(
 
 void main() {
   _cellLessMemberDrifts();
+  _noStackingTests();
 
   _onlyTheMovedCardMoves();
 
@@ -103,8 +104,10 @@ void main() {
     expect(r.slugs[seat.area], 's1');
   });
 
-  /// 🔴 같은 사람이 두 번 나오지 않게 하는 규칙이 여기서도 지켜져야 한다.
-  test('같은 칸에 둘이면 뒤엣것을 건너뛴다', () {
+  /// 🔴 **2026-09-25에 뒤집었다.** 전에는 뒤엣것을 **건너뛰어** 판에서
+  /// 사라지게 했는데, 사용자가 「같은 자리에 4개 카드가 있었는데」로 잡았다 —
+  /// 사라지는 쪽도 포개지는 쪽도 나쁘다. 이제 **빈 칸으로 비켜 앉힌다.**
+  test('같은 칸에 둘이면 뒤엣것이 빈 칸으로 비킨다', () {
     final r = seatsFromSquad(
       _squad([
         _m(id: '1', nickname: '먼저', pos: 'MF', col: 0, row: 1),
@@ -114,11 +117,17 @@ void main() {
     );
 
     expect(r.mates.values, contains('먼저'));
-    expect(r.mates.values, isNot(contains('나중')));
+    expect(r.mates.values, contains('나중'), reason: '아무도 안 사라진다');
+
+    final first = r.slots.firstWhere((s) => r.mates[s.area] == '먼저');
+    final later = r.slots.firstWhere((s) => r.mates[s.area] == '나중');
+    expect((first.col, first.row), (0, 1), reason: '먼저 온 쪽이 그 칸을 갖는다');
+    expect((later.col, later.row), isNot((0, 1)), reason: '겹치지 않는다');
   });
 
-  /// 🔴 내 자리와 겹치는 등재가 이 갈래로 들어온다.
-  test('내가 앉은 칸에 남이 또 있으면 남을 건너뛴다', () {
+  /// 🔴 내 자리와 겹치는 등재도 **안 사라진다** — 옆 빈 칸으로 비킨다.
+  /// (내 **중복 행**은 여전히 건너뛴다 — 아래 시험.)
+  test('내가 앉은 칸에 남이 또 있으면 남이 비킨다', () {
     final r = seatsFromSquad(
       _squad([
         _m(id: '1', slug: 'mine', nickname: '나', pos: 'DF', col: 1, row: 2),
@@ -129,7 +138,25 @@ void main() {
     );
 
     expect(r.slots.singleWhere((s) => s.mine).col, 1);
-    expect(r.mates.values, isNot(contains('남')));
+    expect(r.mates.values, contains('남'), reason: '남이 사라지면 안 된다');
+    final other = r.slots.firstWhere((s) => r.mates[s.area] == '남');
+    expect((other.col, other.row), isNot((1, 2)), reason: '내 칸을 안 덮는다');
+  });
+
+  /// 🔴 **내 중복 행은 건너뛴다** — 서버 목록에 내가 들어 있을 수 있고,
+  /// 내 카드는 0단계가 이미 세웠다. 같은 사람을 두 번 그리지 않는다.
+  test('내 중복 행은 안 그린다', () {
+    final r = seatsFromSquad(
+      _squad([
+        _m(id: '1', slug: 'mine', nickname: '나', pos: 'DF', col: 1, row: 2),
+        _m(id: '2', slug: 'mine', nickname: '나', pos: 'DF', col: 1, row: 2),
+      ]),
+      SquadSize.five,
+      mySlug: 'mine',
+    );
+
+    expect(r.mates.values, isEmpty);
+    expect(r.slots.where((s) => s.mine), hasLength(1));
   });
 
   /// 🔴 아무 빈 자리나 끌어다 옮기면 자리들이 통째로 뒤엉켜, 원래 그 칸에
@@ -348,5 +375,46 @@ void _cellLessMemberDrifts() {
     // B 만 (1,1) 로 옮겼는데 A 도 따라 움직인다 — 이것이 버그의 기전이다.
     expect(cellOf(board(0, 1), 'A'), (2, 1));
     expect(cellOf(board(1, 1), 'A'), (0, 1));
+  });
+}
+
+/// 🔴 **자리 둘이 같은 칸에 서지 않는다** (2026-09-25, 사용자: 「새로 빌드되면
+/// 같은 자리에 4개 카드가 있었는데」).
+///
+/// 서버에 같은 칸을 가진 등재가 여럿 있으면(옛 데이터·중복 등재), 1단계의
+/// 폴백이 **남는 자리를 끌어와 그 칸으로 옮겨** 그대로 겹쳐 쌓였다. 카드가
+/// 포개져 맨 위 것만 보이고, ⊗ 로 지우면 뒤엣것이 나온다.
+void _noStackingTests() {
+  test('같은 칸을 가진 등재가 여럿이어도 겹치지 않는다', () {
+    final r = seatsFromSquad(
+      _squad([
+        _m(id: '1', slug: 'a', nickname: 'A', pos: 'DF', col: 1, row: 2),
+        _m(id: '2', slug: 'b', nickname: 'B', pos: 'DF', col: 1, row: 2),
+        _m(id: '3', slug: 'c', nickname: 'C', pos: 'DF', col: 1, row: 2),
+        _m(id: '4', slug: 'd', nickname: 'D', pos: 'DF', col: 1, row: 2),
+      ]),
+      SquadSize.five,
+    );
+
+    final cells = <String>{};
+    for (final s in r.slots) {
+      expect(cells.add('${s.col},${s.row}'), isTrue,
+          reason: '(${s.col},${s.row}) 에 자리가 둘이다');
+    }
+  });
+
+  /// 🔴 **먼저 온 사람이 그 칸을 갖는다** — 나머지는 빈 칸으로 흩어진다.
+  test('첫 사람은 제 칸에 남는다', () {
+    final r = seatsFromSquad(
+      _squad([
+        _m(id: '1', slug: 'a', nickname: 'A', pos: 'DF', col: 1, row: 2),
+        _m(id: '2', slug: 'b', nickname: 'B', pos: 'DF', col: 1, row: 2),
+      ]),
+      SquadSize.five,
+    );
+
+    final a = r.slots.firstWhere((s) => r.mates[s.area] == 'A');
+    expect((a.col, a.row), (1, 2));
+    expect(r.mates.values, containsAll(['A', 'B']), reason: '아무도 안 사라진다');
   });
 }

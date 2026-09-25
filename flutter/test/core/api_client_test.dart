@@ -24,6 +24,8 @@ ApiClient clientWith(
     );
 
 void main() {
+  _putTests();
+
   test('본문을 UTF-8 로 푼다 — 서버가 charset 을 안 줘도', () async {
     final api = clientWith((_) async => jsonRes({'nickname': '홍길동'}, 200));
 
@@ -153,5 +155,24 @@ void main() {
     await api.get('/me');
 
     expect(seen, equals('Bearer tok-저장됨'));
+  });
+}
+
+/// 🔴 **`PUT` 은 경기 조건이 처음 쓴다**(계약 3-13절) — 그쪽은 **통째로
+/// 교체**라 `PATCH`(보낸 칸만 바뀜)로 대신할 수 없다.
+void _putTests() {
+  test('PUT 은 본문을 싣고 그 메서드로 나간다', () async {
+    String? method;
+    String? body;
+    final api = clientWith((req) async {
+      method = req.method;
+      body = req.body;
+      return jsonRes({'ok': true}, 200);
+    });
+
+    await api.put('/teams/t-1/match-preferences', {'region_ids': <String>[]});
+
+    expect(method, 'PUT');
+    expect(body, contains('region_ids'));
   });
 }
