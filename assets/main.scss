@@ -188,14 +188,15 @@ html[data-theme="dark"] {
     color: #a9a6ad;
   }
 
+  // 면·테두리는 다크 색 구성(_sass/color_schemes/dark.scss)의 값과 같게 — 2026-09-29 에 바탕을 더 짙은 무채색으로 바꿨다
   .stat-tile {
-    border-color: #44434d;
-    background: #302d36;
+    border-color: #37373d;
+    background: #242428;
   }
 
   // ERD 는 흰 바탕으로 그렸다 — 틀 전체를 흰 판으로 둬서 그림 옆 빈칸만 어둡게 뜨지 않게 한다
   .erd-frame {
-    border-color: #44434d;
+    border-color: #37373d;
     background: #fff;
   }
 
@@ -205,7 +206,7 @@ html[data-theme="dark"] {
   }
 
   .kanban-column {
-    background: #302d36;
+    background: #242428;
   }
 
   .kanban-column h4 {
@@ -213,8 +214,8 @@ html[data-theme="dark"] {
   }
 
   .kanban-card {
-    border-color: #44434d;
-    background: #27262b;
+    border-color: #37373d;
+    background: #19191c;
     box-shadow: none;
   }
 }
@@ -327,13 +328,15 @@ html[data-theme="dark"] #site-nav > .nav-list > .nav-list-item {
     color: #fff;
   }
 
+  // 선택되지 않은 페이지 단추 — 2026-09-29 에 보라빛 회색(#36333e)에서 무채색으로(사용자 요청). 더 짙어진
+  // 사이드바(#19191c)와의 구분은 옛 값과 같게(단추 1.23 · 테두리 1.88)
   .nav-list .nav-list-link {
-    border-color: #55505f;
-    background: #36333e;
-    color: #ebe7f0;
+    border-color: #46464e;
+    background: #2a2a30;
+    color: #ebebef;
 
     &:hover {
-      background: #403c49;
+      background: #33333a;
     }
 
     &.active { // 지금 페이지 — 채도를 낮춘 회파랑(라이트의 연파랑과 같은 색 계열)
