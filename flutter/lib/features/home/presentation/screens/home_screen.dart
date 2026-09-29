@@ -1149,6 +1149,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
        🔴 **다시 조사하지 말 것.** 여기를 `AsyncValue` 로 바꾸면 홈 전체가
        로딩·오류 두 그림을 더 갖게 되는데, 그 값을 치를 이유가 위 표에 없다. */
+    /* 🔴 **카드가 없으면 여기서 만들어진다**(2026-09-29 — [ensureMyCardProvider]).
+       처음 들어온 사람은 카드도 팀도 없어 판이 **빈 격자**였다.
+       🔴 **값은 안 읽는다** — 읽으면 홈이 그 흐름의 로딩·오류를 그려야 한다.
+       만들어지면 `myCardProvider` 가 무효화되어 아래 줄이 저절로 따라온다. */
+    ref.watch(ensureMyCardProvider);
     final card = ref.watch(myCardProvider).value;
     final cardSeed = card?.publicSlug;
     // 주장인 팀이 우선, 없으면 속한 첫 팀. 팀이 없으면 판을 안 부른다.
@@ -1812,9 +1817,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                전용이라(403), 시트를 열어 고르게 해 놓고 마지막에 막으면
                고른 수고가 통째로 버려진다. 못 집게 하는 위 두 갈래와 같은
                판단이다. */
+            /* 🔴 **팀이 없으면 「팀을 먼저 만들어 주세요」로 보낸다**
+               (2026-09-29 사용자 요청). ⚠️ 전에는 여기가 **「선수 넣기 —
+               준비 중입니다」**였다 — 기능이 준비 중인 것이 아니라 **팀이
+               없어서** 못 하는 것인데, 처음 온 사람은 앱이 미완성이라고
+               읽었다. 그것이 새 사용자가 **가장 먼저 만나는 문구**였다.
+
+               ⚠️ 팀은 있는데 **남의 판**을 보는 중이면 그대로 안내다 —
+               그때는 팀을 만들라는 말이 틀린 말이 된다. */
             onSeatTap: (ownedTeamId != null && squad?.teamId == ownedTeamId)
                 ? (slot) => _fillSeat(ownedTeamId, slot)
-                : (_) => _notReady('선수 넣기'),
+                : ownedTeamId == null
+                    ? (_) => context.push('/profile?needTeam=1')
+                    : (_) => _notReady('내 팀 판에서만 넣을 수 있습니다'),
           )
         /* 🔴 **한 번 더 안 누른다** (2026-09-25 사용자: 「굳이 한 번 더
            눌러서 팀 찾아야 해?」). 「팀원」을 고르면 그 자리가 곧 조건 폼

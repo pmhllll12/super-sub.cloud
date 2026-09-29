@@ -131,7 +131,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/profile',
-        pageBuilder: (context, state) => _inkPage(state, const ProfileScreen()),
+        /* 🔴 **`?needTeam=1` 로 「팀을 먼저 만들어 주세요」 상태로 연다**
+           (2026-09-29) — 홈에서 팀 없이 빈 자리를 누르면 그렇게 온다. */
+        pageBuilder: (context, state) => _inkPage(
+          state,
+          ProfileScreen(
+            needTeam: state.uri.queryParameters['needTeam'] == '1',
+          ),
+        ),
       ),
     ],
   );
