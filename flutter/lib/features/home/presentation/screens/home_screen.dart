@@ -277,8 +277,23 @@ const double _kShortcutGap = 12;
 /// 알약 줄 위로 흰 판이 더 남기는 자리.
 const double _kShortcutTopPad = 14;
 
-/// 알약 셋 사이 틈.
+/// 알약 사이 틈.
 const double _kShortcutSpacing = 10;
+
+/// 알약 한 칸의 폭 — 🔴 **셋이 서 있던 때의 폭 그대로다.**
+///
+/// 지름길이 하나로 줄었어도(2026-09-29) 알약 **크기는 안 바뀐다** — 요청이
+/// 「알림 버튼을 **왼쪽으로 위치해서** 가운데에 있게」라, 옮기라는 것이지
+/// 키우라는 것이 아니다. 그래서 폭은 여전히 **셋 기준**으로 재고, 줄이
+/// 가운데 정렬이라 하나만 남으면 저절로 한가운데 선다.
+///
+/// 🔴 **그래서 [_kShortcuts] 에 둘을 도로 넣으면 옛 모양이 정확히 돌아온다** —
+/// 셋 × 이 폭 + 틈 둘 = 줄 전체다. 레이아웃을 안 고쳐도 된다.
+double _kShortcutPillW(BuildContext context) {
+  final rowW =
+      MediaQuery.sizeOf(context).width - 2 * (_kVideoSideInset + _kWhiteSheetPad);
+  return (rowW - 2 * _kShortcutSpacing) / 3;
+}
 
 /* ⛔ **여기 있던 `_kPillFill`(= [_kInkDark], 불투명한 어두운 면)을 걷었다**
    (2026-09-24 사용자 지시: 「3개 버튼들 안쪽 색상 빠르게 없애봐」 →
@@ -404,23 +419,24 @@ const Color _kOnSheet = Color(0xFF000000);
 const Color _kSilverOnWhite = SilverEdge.onWhite;
 const double _kSilverOnWhiteWidth = SilverEdge.onWhiteWidth;
 
-/// 흰 판 맨 위 줄에 서는 지름길 셋(2026-09-23 사용자 요청).
+/// 흰 판 맨 위 줄에 서는 지름길 — 🔴 **지금은 「알림」 하나다**
+/// (2026-09-29 사용자 지시: 「경기장 예약 레슨 상점은 그냥 빼버리자」).
 ///
-/// 🔴 **아직 갈 곳이 없다** — 세 화면은 **웹에만** 있다(`www` 의 `/market` ·
-/// `/venues` · 알림함). 이번 회차는 사용자 판단으로 **자리와 모양만** 잡았고,
-/// 누르면 「준비 중입니다」다. 화면을 붙이는 날 `onTap` 만 갈면 된다.
+/// ⚠️ **셋이었다**(2026-09-23 ~ 09-29): 「레슨 · 상점」(`home-shortcut-market`,
+/// [Symbols.storefront]) · 「경기장 예약」(`home-shortcut-venue`,
+/// [Symbols.stadium]) · 「알림」. 앞의 둘은 **웹에만 있는 화면**(`/market` ·
+/// `/venues`)이라 누르면 「준비 중입니다」였고, 그 안내만 내미는 자리를
+/// 홈에 두지 않기로 했다.
+///
+/// 🔴 **되살릴 때는 자리와 폭이 이미 맞는다** — [_kShortcutPillW] 가 **셋
+/// 기준**으로 폭을 재고 줄은 가운데 정렬이라, 여기 둘을 도로 넣으면 셋이
+/// 줄을 꽉 채우며 예전 모양 그대로가 된다. 레이아웃은 손댈 것이 없다.
 const List<({Key key, IconData icon, String label})> _kShortcuts = [
-  (
-    key: Key('home-shortcut-market'),
-    icon: Symbols.storefront,
-    label: '레슨 · 상점',
-  ),
-  (key: Key('home-shortcut-venue'), icon: Symbols.stadium, label: '경기장 예약'),
   (key: _kAlarmKey, icon: Symbols.notifications, label: '알림'),
 ];
 
-/// 🔴 **셋 중 알림만 갈 곳이 생겼다**(2026-09-25) — 나머지 둘은 아직 웹에만
-/// 있다. 그 하나를 가려내는 열쇠다.
+/// 🔴 **갈 곳이 있는 유일한 지름길**(2026-09-25) — 알림함을 연다.
+/// 나머지가 걷힌 지금은 [_kShortcuts] 의 전부이기도 하다.
 const Key _kAlarmKey = Key('home-shortcut-alarm');
 
 /// 스쿼드 판 자리에 무엇을 세우는가 — 웹의 알약 「팀장」 · 「팀원」.
@@ -1312,10 +1328,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           child: IgnorePointer(
             ignoring: tc > 0.02,
             child: Row(
+              /* 🔴 **가운데 정렬**(2026-09-29 사용자 지시: 「알림 버튼을
+                 왼쪽으로 위치해서 가운데에 있게」). 알약이 하나로 줄면서
+                 오른쪽 끝에 홀로 서 있었다. 폭은 [_kShortcutPillW] 가 셋
+                 기준으로 붙잡으므로 **늘어나지 않고 자리만** 옮겨진다.
+                 ⛔ [Expanded] 로 되돌리지 말 것 — 하나뿐일 때 줄을 통째로
+                 차지해 알약이 아니라 띠가 된다. */
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 for (final (i, s) in _kShortcuts.indexed) ...[
                   if (i > 0) const SizedBox(width: _kShortcutSpacing),
-                  Expanded(
+                  SizedBox(
+                    width: _kShortcutPillW(context),
                     /* 🔴 **제자리에서 걷힌다**(2026-09-23 정정, 사용자:
                        「오른쪽으로 나가지 말고 그냥 제자리에서 … 사라지는 게
                        스쿼드판 올라갈 때 다 보이니까 눈아프다」).

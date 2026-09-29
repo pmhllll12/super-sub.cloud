@@ -726,7 +726,7 @@ void main() {
       final white = tester.getRect(whiteSheet());
       final squad = tester.getRect(find.byKey(const Key('home-squad-sheet')));
       final video = tester.getRect(find.byKey(const Key('home-video-analysis')));
-      final pills = tester.getRect(find.byKey(const Key('home-shortcut-market')));
+      final pills = tester.getRect(find.byKey(const Key('home-shortcut-alarm')));
 
       for (final (name, r) in [('스쿼드', squad), ('영상 분석', video), ('알약', pills)]) {
         expect(white.top, lessThanOrEqualTo(r.top), reason: '$name 윗변');
@@ -746,21 +746,44 @@ void main() {
       );
     });
 
-    testWidgets('알약 셋이 서고, 누르면 준비 중 안내가 뜬다', (tester) async {
+    /* 🔴 **셋에서 하나로 줄었다** (2026-09-29 사용자 지시: 「경기장 예약
+       레슨 상점은 그냥 빼버리자」). 둘은 누르면 「준비 중입니다」만 내밀던
+       자리였다 — 그 안내를 홈에 두지 않기로 했다. */
+    testWidgets('걷어낸 둘은 흔적도 없다', (tester) async {
       await _pumpLoggedIn(tester);
-      for (final label in const ['레슨 · 상점', '경기장 예약', '알림']) {
-        expect(find.text(label), findsOneWidget, reason: label);
+      for (final label in const ['레슨 · 상점', '경기장 예약']) {
+        expect(find.text(label), findsNothing, reason: label);
       }
-      // 가로로 나란히 — 셋의 윗변이 같다.
-      final tops = const ['market', 'venue', 'alarm']
-          .map((k) => tester.getRect(find.byKey(Key('home-shortcut-$k'))).top)
-          .toList();
-      expect(tops[1], closeTo(tops[0], 0.5));
-      expect(tops[2], closeTo(tops[0], 0.5));
+      for (final k in const ['market', 'venue']) {
+        expect(find.byKey(Key('home-shortcut-$k')), findsNothing, reason: k);
+      }
+      expect(find.text('알림'), findsOneWidget);
+    });
 
-      await tester.tap(find.byKey(const Key('home-shortcut-venue')));
-      await tester.pump();
-      expect(find.textContaining('경기장 예약 — 준비 중'), findsOneWidget);
+    /* 🔴 **하나 남은 알약은 줄 한가운데 선다** (같은 지시: 「알림 버튼을
+       왼쪽으로 위치해서 가운데에 있게」). 오른쪽 끝에 홀로 서 있던 것을
+       옮긴 것이다. */
+    testWidgets('알림 알약이 화면 한가운데 선다', (tester) async {
+      await _pumpLoggedIn(tester);
+      final r = tester.getRect(find.byKey(const Key('home-shortcut-alarm')));
+      final screenW =
+          tester.view.physicalSize.width / tester.view.devicePixelRatio;
+      expect(r.center.dx, closeTo(screenW / 2, 1));
+    });
+
+    /* 🔴 **폭은 셋이 서 있던 때 그대로다** — 요청이 「왼쪽으로 위치해서」라
+       옮기라는 것이지 키우라는 것이 아니었다. 셋 × 이 폭 + 틈 둘이 줄
+       전체가 되는 값이라, 둘을 되살리면 옛 모양이 그대로 돌아온다.
+       ⛔ 줄을 꽉 채우게 만들지 말 것 — 알약이 아니라 띠가 된다. */
+    testWidgets('알약 폭은 줄의 3분의 1이다', (tester) async {
+      await _pumpLoggedIn(tester);
+      final r = tester.getRect(find.byKey(const Key('home-shortcut-alarm')));
+      final white = tester.getRect(whiteSheet());
+      /* 알약 줄은 흰 판 양끝에서 `_kVideoSideInset + _kWhiteSheetPad`(6+6)
+         만큼 안쪽이고, 그 안에서 셋이 틈 `_kShortcutSpacing`(10) 둘을 두고
+         선다. 값이 바뀌면 여기가 먼저 깨지는 편이 낫다. */
+      final rowW = white.width - 2 * 12;
+      expect(r.width, closeTo((rowW - 2 * 10) / 3, 1));
     });
 
     /* 🔴 **제자리에서 걷힌다**(2026-09-23 정정). 한 번 오른쪽 화면 밖으로
@@ -770,7 +793,7 @@ void main() {
       await _pumpLoggedIn(tester);
       Rect at(String k) =>
           tester.getRect(find.byKey(Key('home-shortcut-$k')));
-      const keys = ['market', 'venue', 'alarm'];
+      const keys = ['alarm'];
       final home = {for (final k in keys) k: at(k)};
 
       for (final k in keys) {
@@ -793,11 +816,17 @@ void main() {
       }
     });
 
-    /* 🔴 **오른쪽 것이 먼저 걷힌다.**
-       🔴 **돌아오는 순서는 따로 안 잡는다** — 걷히는 정도가 판 진행도 하나의
-       함수라, 접으면 시간이 되감기며 저절로 왼쪽(레슨 · 상점)부터 돌아온다.
-       그 성질은 위 시험의 「접으면 돌아온다」가 지킨다. */
-    testWidgets('걷히는 순서는 오른쪽부터다', (tester) async {
+    /* ⚠️ **「걷히는 순서는 오른쪽부터다」였다** — 알약이 셋일 때 오른쪽
+       것부터 차례로 걷히는 것을 재던 시험이다. 2026-09-29에 알약이 하나로
+       줄면서 **잴 순서가 없어졌다.**
+
+       🔴 **시차 자체는 살아 있다** — `_shortcutExit` 이 `_kShortcuts.length`
+       로 시작점을 잡으므로, 둘을 되살리면 순서도 그대로 돌아온다. 그때
+       이 시험을 옛 모양(`alarm` < `venue` <= `market`)으로 되돌린다.
+
+       지금 지킬 수 있는 것은 **끄는 도중에 이미 걷히기 시작한다**는 것 하나다 —
+       손을 떼고 스프링에 맡긴 뒤가 아니라 **끄는 동안** 반응해야 한다. */
+    testWidgets('끄는 도중에 이미 걷히기 시작한다', (tester) async {
       await _pumpLoggedIn(tester);
       double alpha(String k) =>
           _opacityAbove(tester, find.byKey(Key('home-shortcut-$k')));
@@ -810,10 +839,7 @@ void main() {
       await g.moveBy(const Offset(0, -60));
       await tester.pump();
 
-      expect(alpha('alarm'), lessThan(alpha('venue')), reason: '알림이 앞선다');
-      expect(alpha('venue'), lessThanOrEqualTo(alpha('market')),
-          reason: '경기장이 레슨보다 앞선다');
-      expect(alpha('alarm'), lessThan(1), reason: '적어도 하나는 걷히기 시작했다');
+      expect(alpha('alarm'), lessThan(1), reason: '끄는 동안 이미 걷히기 시작했다');
 
       await g.up();
       await tester.pump();
