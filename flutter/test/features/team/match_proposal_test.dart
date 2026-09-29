@@ -85,6 +85,74 @@ void main() {
     });
   });
 
+  /* 🔴 **조건 밖의 날짜** (2026-09-29 사용자 지적: 「다음주일 수도 있고
+     다음달일 수도 있는거잖아」). 조건은 매주 반복이라 [proposalsFrom] 은
+     「다음에 오는 그 요일」 한 번만 만든다 — 2주 뒤·다음 달로 갈 길이 없었다. */
+  group('Proposal.custom', () {
+    test('고른 시각을 그대로 들고 있다', () {
+      final p = Proposal.custom(DateTime(2026, 11, 15, 14, 30));
+
+      expect(p.at, DateTime(2026, 11, 15, 14, 30));
+      expect(p.isCustom, isTrue);
+    });
+
+    /// 🔴 **끝 시각을 지어내지 않는다** — 계약이 `played_at` 하나만 받으므로
+    /// 끝은 어차피 안 나간다. 없는 값을 적으면 상대가 약속으로 읽는다.
+    test('이름에 끝 시각이 없다', () {
+      final p = Proposal.custom(DateTime(2026, 11, 15, 14, 30));
+
+      expect(p.label, '일 11/15 14:30');
+      expect(p.label, isNot(contains('~')));
+    });
+
+    /// 추천은 `isCustom` 이 거짓이라 화면이 둘을 가를 수 있다.
+    test('조건에서 나온 것과 구별된다', () {
+      final from = proposalsFrom(
+        const [TimeSlot(day: 6, from: '11:00', to: '13:00')],
+        _fri,
+      ).single;
+
+      expect(from.isCustom, isFalse);
+    });
+  });
+
+  group('withCustom', () {
+    final base = proposalsFrom(
+      const [TimeSlot(day: 6, from: '11:00', to: '13:00')], // 토 9/26
+      _fri,
+    );
+
+    test('고른 것이 없으면 추천 그대로다', () {
+      expect(withCustom(base, null), same(base));
+    });
+
+    /// 🔴 **고른 값이 목록 안에 있어야 `DropdownButton` 이 그린다.**
+    test('끼워 넣고 날짜 순으로 세운다', () {
+      final early = Proposal.custom(DateTime(2026, 9, 25, 20, 0)); // 오늘 밤
+      final list = withCustom(base, early);
+
+      expect(list.length, 2);
+      expect(list.first.at, early.at, reason: '이른 것이 앞이다');
+    });
+
+    test('다음 달도 들어간다', () {
+      final far = Proposal.custom(DateTime(2026, 11, 15, 14, 0));
+      final list = withCustom(base, far);
+
+      expect(list.last.at.month, 11);
+    });
+
+    /// 🔴 **같은 시각이면 추천 쪽을 남긴다** — 끝 시각까지 있어 더 많은 것을
+    /// 말해 준다. 둘 다 두면 같은 시각이 두 줄로 보인다.
+    test('같은 시각이면 추천이 이긴다', () {
+      final same_ = Proposal.custom(base.single.at);
+      final list = withCustom(base, same_);
+
+      expect(list.length, 1);
+      expect(list.single.isCustom, isFalse);
+    });
+  });
+
   group('toPlayedAt', () {
     /// 🔴 **UTC 로 바꾸지 않는다.** 사람이 고른 것은 **그 지역 시각의 11시**다 —
     /// UTC 로 보내면 「토 11:00」이 「토 02:00」으로 저장된다.
