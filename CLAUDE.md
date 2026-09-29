@@ -180,6 +180,12 @@ grep -rnE 'style="[^"]*(color|background|border)[^"]*#' jekyll/ _posts/   # 0건
 사이드바에 안 보이게 하려면 `nav_exclude: true`를 씁니다 (`index.markdown`, 구 `toc.markdown`,
 `_posts/`의 모든 글, `404.html`이 이렇게 되어 있음).
 
+🔴 **미결 항목(`pending.markdown`·`pending-archive.markdown`)은 사이드바와 사이트 검색에서 뺐습니다**
+(2026-09-29, `nav_exclude: true` + `search_exclude: true`, 그리고 **`parent` 없음** — 있으면 「팀 작업 공간」
+페이지 아래 자동 목록에 `nav_exclude` 와 상관없이 뜹니다) — 공개 사이트를 보는 사람에게 팀 작업 기록을 앞세우지
+않으려는 사용자 결정입니다. **되돌리지 마십시오.** 주소(`/pending/`)는 살아 있어 다른 페이지의 링크는 그대로 열리고,
+팀원은 여전히 파일을 `grep` 으로 읽습니다. 저장소가 공개라 GitHub 에서는 보입니다 — 숨김이지 비공개가 아닙니다.
+
 ## 페이지 작성 규칙
 
 ### 상위 그룹 랜딩 페이지 (`jekyll/pages/기획.markdown` 등)
@@ -412,9 +418,9 @@ awk '/^<details/{d++} /^<\/details>/{d--} d && /^- \*\*담당\*\*/{n++} END{prin
 
 본문을 줄여도 구역이 여전히 무거우면 **`jekyll/pages/pending-archive.markdown`**
 으로 해소된 항목을 통째로 옮깁니다(`jin` 구역에서 2026.09.15에 시험 적용).
-front matter는 `permalink: /pending-archive/`·`nav_exclude: true` — 사이드바엔
-안 뜨지만 사이트 검색(`search_enabled`)엔 걸리고, URL을 알면 누구나 볼 수
-있는 공개 페이지입니다(구 `toc.markdown`과 같은 처리).
+front matter는 `permalink: /pending-archive/`·`nav_exclude: true`·`search_exclude: true`
+— 사이드바에도 사이트 검색에도 안 뜨지만 URL을 알면 누구나 볼 수 있는 공개
+페이지입니다(2026-09-29 부터 `pending.markdown` 도 같은 처리 — 위 「테마」 절).
 
 **시점을 세션 시작 시로 보강합니다 (2026-09-16 정정).** 처음엔 "다른 파일로
 옮기는 것은 스프린트가 끝날 때 한 번에"만 정해 뒀는데, 그 사이 아무도 안

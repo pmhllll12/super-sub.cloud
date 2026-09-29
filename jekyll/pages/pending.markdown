@@ -2,8 +2,8 @@
 layout: default
 title: 미결 항목
 permalink: /pending/
-parent: 팀 작업 공간
-nav_order: 2
+nav_exclude: true
+search_exclude: true
 ---
 
 {::options toc_levels="2..3" /}
@@ -12973,6 +12973,19 @@ grep -n "release()" app/analysis/application/use_cases/video_interactors.py
 
 배포 뒤에는 위 실측을 다시 돌려 주십시오 — `/videos/public` 이 30초로 멎는 일이
 없어야 합니다.
+
+#### 회신 (2026-09-29, 정어진) — **값은 이대로 확정합니다** · 운영 실측은 아직입니다
+
+- **값**: `pool_size=10` · `max_overflow=20` · `pool_timeout=5` · `pool_recycle=1800` 그대로 확정합니다. 저도 09-23 에
+  운영 측정을 근거로 로컬에서 `15 + 넘침 5` 를 만들어 뒀는데 **버립니다** — 차이가 작고, 이쪽은 30초 멎음을 5초
+  실패로 바꾸는 것까지 담았습니다
+- **상한**: API 는 파드 하나(`replicas: 1`) · `strategy: Recreate`(배포 중 두 파드가 겹치지 않음) · `uvicorn` 프로세스
+  하나라 **API 가 여는 연결은 최대 30** 입니다. 쇼케이스 자동 수락 파드는 API 를 HTTP 로 부르므로 DB 를 직접 쓰지
+  않습니다. Postgres 기본 `max_connections` 100 안입니다 — 서버의 실제 값은 이번에 보지 못했습니다
+- **확인**: `main` 을 들인 `jin` 에서 `pytest -q` **1162 passed** · `pool_timeout` · `release()` 모두 있습니다
+- **배포**: 이 수정이 든 `3a576c2` 의 이미지 빌드는 09-25 에 성공했습니다. 운영 파드가 새 이미지로 도는지
+  (`engine_or_none().pool.size()` 가 10)와 `/videos/public` 실측은 **아직 못 봤습니다** — 확인하면 여기에 적고 닫겠습니다
+- 포스터 캐시 영구화는 49번에서 따로 봅니다
 
 ### 51. **목록 응답에 칸이 빠져 화면이 한 건씩 다시 묻습니다** — 네 곳 (2026-09-25 신설)
 
