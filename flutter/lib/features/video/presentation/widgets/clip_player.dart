@@ -15,11 +15,17 @@ import '../../data/video_providers.dart';
 /// 그렇다 — 비면 판이 접혀서 무엇이 잘못됐는지보다 **화면이 깨진 것처럼**
 /// 보인다.
 class ClipPlayer extends ConsumerStatefulWidget {
-  const ClipPlayer({super.key, required this.videoId});
+  const ClipPlayer({super.key, required this.videoId, this.fill = false});
 
   final String videoId;
 
-  /// 16:9 기준으로 잡은 고정 높이.
+  /// 주어진 자리를 **통째로** 쓰는가 (「내 영상」의 위 3분의 1).
+  ///
+  /// 🔴 **그때는 높이도 모서리도 없다** — 위 검은 칸과 맞물리는 자리라
+  /// 둥글리면 그 사이에 검은 초승달이 낀다(`analyze_screen.dart` 와 같은 판단).
+  final bool fill;
+
+  /// 16:9 기준으로 잡은 고정 높이. [fill] 이면 안 쓴다.
   static const double height = 200;
 
   @override
@@ -71,10 +77,11 @@ class _ClipPlayerState extends ConsumerState<ClipPlayer> {
     final ready = c != null && c.value.isInitialized;
 
     return Container(
-      height: ClipPlayer.height,
+      height: widget.fill ? null : ClipPlayer.height,
       decoration: BoxDecoration(
         color: Colors.black,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius:
+            widget.fill ? BorderRadius.zero : BorderRadius.circular(12),
       ),
       clipBehavior: Clip.antiAlias,
       child: Center(

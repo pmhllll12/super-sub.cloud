@@ -278,6 +278,34 @@ class MockDb {
           rejectReason: '길이가 상한을 넘습니다: 92초 (상한 60초)',
         ),
       ),
+      /* 🔴 **남이 공개한 것도 둔다** — 홈의 영상 줄(`GET /videos/public`)은
+         **내 것만이 아니다.** 한 사람 것만 시드하면 구현체가 그 목록을
+         `myVideos()` 로 때워도 시험이 안 걸린다. */
+      (
+        userId: managerId,
+        video: MyVideo(
+          id: 'v-public-manager',
+          sportCode: 'football',
+          storageKey: 'videos/$managerId/drill.mp4',
+          durationMs: 12000,
+          createdAt: DateTime(2026, 9, 21, 8, 0),
+          passed: true,
+          isPublic: true,
+          title: '코너킥 훈련',
+        ),
+      ),
+      (
+        userId: managerId,
+        video: MyVideo(
+          id: 'v-public-manager-2',
+          sportCode: 'football',
+          storageKey: 'videos/$managerId/keeper.mp4',
+          durationMs: 9000,
+          createdAt: DateTime(2026, 9, 16, 17, 20),
+          passed: true,
+          isPublic: true,
+        ),
+      ),
     ]);
     // 신규 가입자(newbieId)에게는 영상을 안 준다 — 「아직 올린 영상이
     // 없습니다」 빈 상태를 반드시 만들게 하는 장치다.

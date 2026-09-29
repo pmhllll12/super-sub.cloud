@@ -111,6 +111,8 @@ class MyVideo {
     bool clearTitle = false,
     String? description,
     bool clearDescription = false,
+    // 🔴 **프로필에 저장했는가** — `POST /videos/{id}/keep` 이 켜는 값이다.
+    bool? kept,
   }) =>
       MyVideo(
         id: id,
@@ -128,7 +130,7 @@ class MyVideo {
         title: clearTitle ? null : (title ?? this.title),
         description:
             clearDescription ? null : (description ?? this.description),
-        kept: kept,
+        kept: kept ?? this.kept,
         duplicateOfVideoId: duplicateOfVideoId,
         duplicateStatus: duplicateStatus,
         duplicateFailureReason: duplicateFailureReason,

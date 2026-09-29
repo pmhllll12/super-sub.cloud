@@ -5,6 +5,7 @@ import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../profile/presentation/widgets/player_card_view.dart';
 import '../data/card_providers.dart';
 import '../data/card_repository.dart';
@@ -107,9 +108,22 @@ class _CardEditorScreenState extends ConsumerState<CardEditorScreen> {
                     _localPhoto == null ? null : FileImage(File(_localPhoto!)),
               ),
             ),
+            /* 🔴 **조작 칸은 밝은 판 위에 앉는다** (2026-09-29) — 위 검은
+               칸(카드 미리보기)과 맞물리는 「영상 분석」의 짜임 그대로다.
+
+               🔴 [ClipRRect] 다([DecoratedBox] 가 아니라) — 안에서 목록이
+               구르므로, 안 자르면 **둥근 모서리 위로 글자가 삐져나간다.** */
             Expanded(
-              child: TabBarView(
-                children: [_colors(), _photo(), _text(), _mark()],
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(_kPaperRadius),
+                ),
+                child: ColoredBox(
+                  color: _kPaper,
+                  child: TabBarView(
+                    children: [_colors(), _photo(), _text(), _mark()],
+                  ),
+                ),
               ),
             ),
           ],
@@ -187,7 +201,7 @@ class _CardEditorScreenState extends ConsumerState<CardEditorScreen> {
           _style.mode == CardMode.cutout
               ? '배경을 지운 그림(PNG)이면 카드에 자연스럽게 섭니다.'
               : '오려 내지 않은 사진을 그대로 깝니다 — 로고와 PLAYER CARD 만 위에 얹힙니다.',
-          style: TextStyle(color: _kOn.withValues(alpha: 0.65), fontSize: 12),
+          style: const TextStyle(color: _kMuted, fontSize: 12),
         ),
         const SizedBox(height: 16),
         OutlinedButton.icon(
@@ -201,8 +215,8 @@ class _CardEditorScreenState extends ConsumerState<CardEditorScreen> {
                     : '사진 고르기',
           ),
           style: OutlinedButton.styleFrom(
-            foregroundColor: _kOn,
-            side: BorderSide(color: _kOn.withValues(alpha: 0.4)),
+            foregroundColor: _kOnPaper,
+            side: BorderSide(color: _kOnPaper.withValues(alpha: 0.35)),
             minimumSize: const Size.fromHeight(44),
           ),
           onPressed: _photoBusy ? null : _pickPhoto,
@@ -212,7 +226,7 @@ class _CardEditorScreenState extends ConsumerState<CardEditorScreen> {
           Text(
             _photoNote!,
             key: const Key('card-editor-photo-note'),
-            style: const TextStyle(color: Color(0xFFFFB4A9), fontSize: 12),
+            style: const TextStyle(color: _kBad, fontSize: 12),
           ),
         ],
         if (notUploaded) ...[
@@ -220,7 +234,7 @@ class _CardEditorScreenState extends ConsumerState<CardEditorScreen> {
           Text(
             '아직 안 올라갔습니다 — 다시 골라 주세요.',
             key: const Key('card-editor-photo-pending'),
-            style: TextStyle(color: _kOn.withValues(alpha: 0.65), fontSize: 12),
+            style: const TextStyle(color: _kMuted, fontSize: 12),
           ),
         ],
         if (hasPhoto) ...[
@@ -303,12 +317,24 @@ class _CardEditorScreenState extends ConsumerState<CardEditorScreen> {
             controller: _tagline,
             // 🔴 20자까지다 — 넘기면 서버가 422 다. 여기서 막아 준다.
             maxLength: 20,
-            style: const TextStyle(color: _kOn),
-            decoration: const InputDecoration(
+            style: const TextStyle(color: _kOnPaper),
+            /* 🔴 **테두리·커서까지 직접 준다.** 앱 테마가 어두운 바탕을
+               전제한 값이라, 밝은 판에 그대로 두면 밑줄과 글자 수 표시가
+               **판 색에 묻힌다**(색만 바꾸고 끝낼 수 없는 자리다). */
+            cursorColor: _kOnPaper,
+            decoration: InputDecoration(
               labelText: '카드에 넣을 한 줄',
               helperText: '비우면 글자 없이',
-              labelStyle: TextStyle(color: _kOn),
-              helperStyle: TextStyle(color: Color(0xB3FFFFFF)),
+              labelStyle: const TextStyle(color: _kMuted),
+              helperStyle: const TextStyle(color: _kMuted),
+              counterStyle: const TextStyle(color: _kMuted),
+              enabledBorder: UnderlineInputBorder(
+                borderSide:
+                    BorderSide(color: _kOnPaper.withValues(alpha: 0.35)),
+              ),
+              focusedBorder: const UnderlineInputBorder(
+                borderSide: BorderSide(color: _kOnPaper, width: 2),
+              ),
             ),
             onChanged: (_) => setState(() {}),
           ),
@@ -348,6 +374,7 @@ class _CardEditorScreenState extends ConsumerState<CardEditorScreen> {
                 index: n,
                 selected: picking == n,
                 color: _style.brushColor,
+                bg: _style.bg,
                 onTap: () =>
                     setState(() => _style = _style.copyWith(brush: n)),
               ),
@@ -413,9 +440,38 @@ class _CardEditorScreenState extends ConsumerState<CardEditorScreen> {
   }
 }
 
-const Color _kBg = Color(0xFF14201A);
+/* 🔴 **「영상 분석」·「내 영상」과 같은 골격으로 옮겼다** (2026-09-29 사용자
+   지적: 「카드 꾸미기 화면만 너무 초록색으로 혼자 노는것 같은데」).
+
+   ⚠️ **초록 팔레트였다**: 바탕 `#14201A` · 강조 `#70ED88`(= [AppTheme.seed]) ·
+   판 `#1E3029`. 앱의 다른 화면이 **검정 + 밝은 판**으로 넘어가는 동안 이
+   화면만 남아 있었다.
+
+   🔴 **강조색을 아예 안 쓴다** — 영상 화면들이 그렇다. 「고른 것」은 **색이
+   아니라 채움**으로 말한다(고르면 진하게 채우고, 안 고른 것은 테두리만).
+   ⛔ 초록을 강조색으로 되살리지 말 것 — 그러면 이 화면만 또 혼자 논다. */
+const Color _kBg = Color(0xFF000000);
 const Color _kOn = Color(0xFFFFFFFF);
-const Color _kSeed = Color(0xFF70ED88);
+
+/// 조작 칸이 앉는 밝은 판 — 🔴 **출처는 [kSheetPaper] 하나다.**
+/// 값을 베껴 적으면 영상 화면과 조용히 갈린다.
+const Color _kPaper = kSheetPaper;
+
+/// 밝은 판 **위**의 글자·테두리. 🔴 [_kOn] 과 짝이다 — 검은 자리(카드
+/// 미리보기·머리칸)는 [_kOn], 판 안쪽은 이것이다. 습관대로 [_kOn] 을 쓰면
+/// 밝은 판에서 **통째로 사라진다.**
+const Color _kOnPaper = Color(0xFF14161A);
+
+/// 판 위의 **거드는 글자** — 도움말·값 표시.
+const Color _kMuted = Color(0xFF6B7078);
+
+/// 판의 **아래** 모서리만 둥글다 — 위는 검은 칸과 맞물리는 자리라 각지다.
+/// 위까지 둥글리면 두 칸 사이에 **검은 초승달**이 낀다(영상 화면과 같은 까닭).
+const double _kPaperRadius = 16;
+
+/// 사진을 못 올렸을 때의 빨강 — 🔴 **밝은 판용이다.**
+/// ⚠️ `#FFB4A9`(어두운 바탕용 연한 빨강)였다 — 밝은 판에서는 거의 안 보인다.
+const Color _kBad = Color(0xFFB42318);
 
 /// 고를 수 있는 자국 번호.
 ///
@@ -449,8 +505,11 @@ class _ModeChip extends StatelessWidget {
     return Semantics(
       selected: on,
       button: true,
+      /* 🔴 **고른 것은 채운다**(2026-09-29) — 색이 아니라 **채움**으로
+         말한다. 영상 화면의 단추가 같은 규칙이고, 그래서 이 화면에만 있는
+         강조색이 필요 없다. ⛔ 초록 테두리로 되돌리지 말 것. */
       child: Material(
-        color: on ? _kSeed.withValues(alpha: 0.2) : Colors.transparent,
+        color: on ? _kOnPaper : Colors.transparent,
         borderRadius: BorderRadius.circular(999),
         child: InkWell(
           key: chipKey,
@@ -462,13 +521,14 @@ class _ModeChip extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(999),
               border: Border.all(
-                color: on ? _kSeed : _kOn.withValues(alpha: 0.25),
+                color: on ? _kOnPaper : _kOnPaper.withValues(alpha: 0.3),
               ),
             ),
             child: Text(
               label,
+              // 채운 칩 위에서는 **판 색**이 글자가 된다.
               style: TextStyle(
-                color: on ? _kSeed : _kOn.withValues(alpha: 0.7),
+                color: on ? _kPaper : _kOnPaper.withValues(alpha: 0.75),
                 fontSize: 13,
                 fontWeight: on ? FontWeight.w700 : FontWeight.w500,
               ),
@@ -486,17 +546,30 @@ class _MarkChip extends StatelessWidget {
     required this.index,
     required this.selected,
     required this.color,
+    required this.bg,
     required this.onTap,
   });
 
   final int index;
   final bool selected;
   final Color color;
+
+  /// 자국이 **실제로 앉을 바탕** — 카드의 바탕색이다.
+  ///
+  /// 🔴 **판 색으로 두면 안 된다**(2026-09-29). 자국은 알파 마스크라
+  /// [color] 로 칠해지는데, 그 색은 사람이 고른 **아무 색**이다 — 밝은 판
+  /// 위에 두면 흰 자국이 **통째로 사라진다**(전에는 칸이 어두운 초록이라
+  /// 가려져 있던 문제다). 카드 바탕을 그대로 깔면 **보일 것은 보이고 안
+  /// 보일 것은 안 보이는** 것이 카드에서와 같아진다.
+  final Color bg;
+
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final asset = markAssetFor(index);
+    /// 「없음」·「기본」 글자는 바탕 밝기를 보고 고른다 — 카드 바탕이 밝을 수 있다.
+    final ink = bg.computeLuminance() > 0.5 ? _kOnPaper : _kOn;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -504,19 +577,23 @@ class _MarkChip extends StatelessWidget {
         height: 64,
         padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
-          color: const Color(0xFF1E3029),
+          color: bg,
           borderRadius: BorderRadius.circular(10),
+          /* 🔴 **고른 표시는 판 위의 테다.** 칸 안은 카드 바탕(아무 색)이라
+             기준이 못 된다 — 테를 **판 쪽 잉크**로 두르면 어떤 바탕이든
+             읽힌다. 안 고른 것도 옅게 둘러 칸의 경계를 남긴다(전에는
+             `transparent` 였는데, 칸 색이 판과 가까우면 칸이 사라진다). */
           border: Border.all(
-            color: selected ? const Color(0xFF70ED88) : Colors.transparent,
-            width: 2,
+            color: selected ? _kOnPaper : _kOnPaper.withValues(alpha: 0.15),
+            width: selected ? 3 : 1,
           ),
         ),
         child: switch (index) {
-          1 => const Center(
-              child: Text('없음', style: TextStyle(color: _kOn, fontSize: 12)),
+          1 => Center(
+              child: Text('없음', style: TextStyle(color: ink, fontSize: 12)),
             ),
-          0 => const Center(
-              child: Text('기본', style: TextStyle(color: _kOn, fontSize: 12)),
+          0 => Center(
+              child: Text('기본', style: TextStyle(color: ink, fontSize: 12)),
             ),
           _ => asset == null
               ? const SizedBox.shrink()
@@ -571,7 +648,7 @@ class _ColorRow extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  style: const TextStyle(color: _kOn, fontSize: 13),
+                  style: const TextStyle(color: _kOnPaper, fontSize: 13),
                 ),
               ),
               /* 🔴 **지금 값을 글자로 보여 준다**(웹도 `#RRGGBB` 를 옆에
@@ -580,10 +657,10 @@ class _ColorRow extends StatelessWidget {
                  절반이다. */
               Text(
                 hexOf(value),
-                style: TextStyle(
-                  color: _kOn.withValues(alpha: 0.7),
+                style: const TextStyle(
+                  color: _kMuted,
                   fontSize: 12,
-                  fontFeatures: const [FontFeature.tabularFigures()],
+                  fontFeatures: [FontFeature.tabularFigures()],
                 ),
               ),
             ],
@@ -605,10 +682,13 @@ class _ColorRow extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: c,
                       shape: BoxShape.circle,
+                      /* 🔴 **고른 표시는 판 쪽 잉크다**(2026-09-29). 동그라미
+                         안은 고를 수 있는 **아무 색**이라 기준이 못 된다 —
+                         초록 테는 초록 견본(`#70ED88`) 위에서 사라졌다. */
                       border: Border.all(
                         color: c == value
-                            ? const Color(0xFF70ED88)
-                            : const Color(0x33FFFFFF),
+                            ? _kOnPaper
+                            : _kOnPaper.withValues(alpha: 0.2),
                         width: c == value ? 3 : 1,
                       ),
                     ),
@@ -667,17 +747,20 @@ class _FreePickButton extends StatelessWidget {
           color: custom ? value : Colors.transparent,
           shape: BoxShape.circle,
           border: Border.all(
-            color: custom ? const Color(0xFF70ED88) : const Color(0x55FFFFFF),
+            color: custom ? _kOnPaper : _kOnPaper.withValues(alpha: 0.3),
             width: custom ? 3 : 1,
           ),
         ),
         child: Icon(
           Icons.colorize,
           size: 18,
-          // 칠해진 위에 얹히므로 대비를 그 색의 밝기로 가른다.
-          color: custom && value.computeLuminance() > 0.5
-              ? const Color(0xFF0B0B0B)
-              : _kOn,
+          /* 칠해진 위에 얹히므로 대비를 그 색의 밝기로 가른다.
+             🔴 **안 칠해졌을 때는 판 위다** — 그때 흰색을 쓰면 사라진다. */
+          color: !custom
+              ? _kOnPaper
+              : value.computeLuminance() > 0.5
+                  ? _kOnPaper
+                  : _kOn,
         ),
       ),
     );
@@ -689,7 +772,8 @@ class _FreePickButton extends StatelessWidget {
   void _open(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF1E3029),
+      // 🔴 판과 **같은 면**이다 — 이 시트는 판에서 올라오는 것으로 읽혀야 한다.
+      backgroundColor: _kPaper,
       isScrollControlled: true,
       builder: (sheet) => SafeArea(
         child: Padding(
@@ -700,7 +784,7 @@ class _FreePickButton extends StatelessWidget {
               Text(
                 '$label 색',
                 style: const TextStyle(
-                  color: _kOn,
+                  color: _kOnPaper,
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                 ),
@@ -722,7 +806,7 @@ class _FreePickButton extends StatelessWidget {
               TextButton(
                 key: const Key('card-editor-free-color-done'),
                 onPressed: () => Navigator.of(sheet).pop(),
-                style: TextButton.styleFrom(foregroundColor: _kOn),
+                style: TextButton.styleFrom(foregroundColor: _kOnPaper),
                 child: const Text('닫기'),
               ),
             ],
@@ -754,7 +838,10 @@ class _Slider extends StatelessWidget {
       children: [
         SizedBox(
           width: 56,
-          child: Text(label, style: const TextStyle(color: _kOn, fontSize: 13)),
+          child: Text(
+            label,
+            style: const TextStyle(color: _kOnPaper, fontSize: 13),
+          ),
         ),
         Expanded(
           child: Slider(
@@ -762,7 +849,11 @@ class _Slider extends StatelessWidget {
             value: value.clamp(min, max),
             min: min,
             max: max,
-            activeColor: const Color(0xFF70ED88),
+            /* 🔴 **지나온 자리도 남은 자리도 직접 준다.** 테마 색에 맡기면
+               밝은 판에서 남은 자리가 **판과 같은 밝기**가 되어 막대가
+               어디까지 왔는지 안 보인다. */
+            activeColor: _kOnPaper,
+            inactiveColor: _kOnPaper.withValues(alpha: 0.2),
             onChanged: onChanged,
           ),
         ),
@@ -771,7 +862,7 @@ class _Slider extends StatelessWidget {
           child: Text(
             value.toStringAsFixed(max <= 2 ? 2 : 0),
             textAlign: TextAlign.right,
-            style: const TextStyle(color: _kOn, fontSize: 12),
+            style: const TextStyle(color: _kMuted, fontSize: 12),
           ),
         ),
       ],

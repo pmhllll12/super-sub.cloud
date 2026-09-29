@@ -45,6 +45,44 @@ final myCardProvider = FutureProvider<PlayerCard?>(
   retry: (_, _) => null,
 );
 
+/// 카드가 없는 사람에게 **첫 카드를 자동으로 만들어 준다** (2026-09-29 사용자
+/// 요청: 「굳이 새로 안만들더라도 바로 스쿼드판에 자기의 카드는 있도록」).
+///
+/// 🔴 **왜 필요한가.** 처음 들어온 사람은 카드도 팀도 없어서 스쿼드 판이
+/// **빈 격자**였다. 카드가 없으면 판에 **앉힐 것 자체가 없다**(등재는
+/// `player_card_id` 를 받는다). 이제 로그인하면 카드가 먼저 생긴다.
+///
+/// 🔴 **[myCardProvider] 를 `watch` 하지 않고 리포지토리를 직접 부른다.**
+/// 지켜보면 아래 `invalidate` 가 **이 provider 를 다시 돌려** 고리가 된다
+/// (서버가 방금 만든 카드를 아직 안 내주면 끝나지 않는 고리다). 직접 부르면
+/// 이 흐름은 **세션이 바뀔 때만** 다시 돈다.
+///
+/// 🔴 **실패해도 던지지 않는다** — 카드가 없는 것은 화면이 이미 감당하는
+/// 상태다(「카드 만들기」 단추가 선다). 여기서 던지면 **홈 전체가** 오류
+/// 화면이 된다.
+///
+/// ⚠️ **웹에는 없다**(2026-09-29 사용자 지시 — 해커톤 공개 도메인이라 안
+/// 건드린다). 그래서 **앱으로 처음 들어온 사람만** 카드가 미리 생긴다.
+/// 🔴 웹을 다시 만질 때, 또는 서버가 가입 시점에 만들어 주게 되면 여기를 건다.
+final ensureMyCardProvider = FutureProvider<PlayerCard?>((ref) async {
+  final session = ref.watch(sessionControllerProvider);
+  if (session is! SessionLoggedIn) return null;
+
+  final repo = ref.read(cardRepositoryProvider);
+  try {
+    final mine = await repo.myCard();
+    // 🔴 이미 있으면 **손대지 않는다** — 꾸며 둔 것을 덮으면 안 된다.
+    if (mine != null) return mine;
+
+    final made = await createCardWithFirstLook(repo);
+    // 화면이 새 카드를 읽게 한다. 위 머리말대로 이 흐름은 다시 안 돈다.
+    ref.invalidate(myCardProvider);
+    return made;
+  } catch (_) {
+    return null;
+  }
+});
+
 /// 카드를 만들고 **첫 모습까지 저장한다**(웹 `saveFirstLook`).
 ///
 /// 🔴 **첫 모습을 저장하지 않으면 앱에서 만든 카드가 웹에서 만든 것과 다르게

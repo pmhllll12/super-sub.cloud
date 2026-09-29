@@ -17,13 +17,19 @@ http.Response jsonRes(Map<String, dynamic> body, int status,
 ApiClient clientWith(
   Future<http.Response> Function(http.Request) handler, {
   TokenStore? tokens,
+  Duration? timeout,
 }) =>
     ApiClient(
       tokens: tokens ?? InMemoryTokenStore(),
       client: MockClient(handler),
+      // 🔴 시험은 **짧게** 준다 — 기본값(20초)으로 재면 시험이 20초를 쉰다.
+      timeout: timeout ?? kApiTimeout,
     );
 
 void main() {
+  _putTests();
+  _timeoutTests();
+
   test('본문을 UTF-8 로 푼다 — 서버가 charset 을 안 줘도', () async {
     final api = clientWith((_) async => jsonRes({'nickname': '홍길동'}, 200));
 
@@ -153,5 +159,61 @@ void main() {
     await api.get('/me');
 
     expect(seen, equals('Bearer tok-저장됨'));
+  });
+}
+
+/// 🔴 **`PUT` 은 경기 조건이 처음 쓴다**(계약 3-13절) — 그쪽은 **통째로
+/// 교체**라 `PATCH`(보낸 칸만 바뀜)로 대신할 수 없다.
+void _putTests() {
+  test('PUT 은 본문을 싣고 그 메서드로 나간다', () async {
+    String? method;
+    String? body;
+    final api = clientWith((req) async {
+      method = req.method;
+      body = req.body;
+      return jsonRes({'ok': true}, 200);
+    });
+
+    await api.put('/teams/t-1/match-preferences', {'region_ids': <String>[]});
+
+    expect(method, 'PUT');
+    expect(body, contains('region_ids'));
+  });
+}
+
+/// 🔴 **서버가 멈추면 앱도 멈춘다** (2026-09-25, 실서버에서 실제로 겪었다 —
+/// `/regions` 가 20초를 넘겨도 답이 없었다).
+///
+/// 제한 시간이 없으면 화면은 **영원히 기다리며 아무 오류도 안 낸다** —
+/// 사용자에게는 「그냥 안 나온다」로 보이고, 서버 탓인지 앱 탓인지도 안
+/// 드러난다. 끊고 **말해 주는** 것이 낫다.
+void _timeoutTests() {
+  test('오래 걸리면 끊고 알린다', () async {
+    final api = clientWith(
+      (_) async {
+        // 제한 시간보다 길게 끈다 — 영원히 안 오는 서버를 흉내낸다.
+        await Future<void>.delayed(const Duration(seconds: 5));
+        return jsonRes({}, 200);
+      },
+      timeout: const Duration(milliseconds: 50),
+    );
+
+    await expectLater(
+      api.get('/regions'),
+      throwsA(
+        isA<ApiException>().having(
+          (e) => e.message,
+          'message',
+          contains('응답'),
+        ),
+      ),
+    );
+  });
+
+  /// 🔴 **제때 오는 것은 그대로 통과한다** — 끊는 것이 목적이 아니다.
+  test('제때 오면 그대로 온다', () async {
+    final api = clientWith((_) async => jsonRes({'nickname': '홍길동'}, 200));
+
+    expect((await api.get('/me'))['nickname'], '홍길동');
   });
 }

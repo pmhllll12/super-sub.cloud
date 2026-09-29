@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
@@ -33,6 +35,18 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+/// 한 요청을 **기다려 주는 한계**.
+///
+/// 🔴 **없으면 화면이 영원히 빈다** (2026-09-25 실서버에서 겪었다 — `/regions`
+/// 가 20초를 넘겨도 답이 없었고, 앞서 같은 원인으로 Cloudflare 가 `error code:
+/// 522` HTML 을 줘 JSON 파싱에서 터졌다). 기다리기만 하면 사용자에게는 「그냥
+/// 안 나온다」로 보이고, **서버 탓인지 앱 탓인지도 안 드러난다.** 끊고
+/// 말해 주는 쪽이 낫다.
+///
+/// 🔴 **짧게 두지 않는다.** 분석·업로드처럼 서버가 원래 오래 무는 경로가 있고,
+/// 지하철 안 같은 느린 회선도 있다 — 너무 짧으면 **정상 요청을 끊는다.**
+const kApiTimeout = Duration(seconds: 20);
+
 /// 백엔드를 부르는 공통 창구 — 토큰 보관 · 헤더 · 디코딩 · 오류 변환.
 ///
 /// 🔴 **리포지토리마다 `http` 를 직접 부르지 않는다.** 아래 두 함정이 한 곳이라도
@@ -42,12 +56,18 @@ class ApiException implements Exception {
 /// 🔴 **앱은 FastAPI 를 직접 부른다**(웹은 Next BFF 를 거친다). 그래서 `Retry-After`
 /// 헤더도 프록시를 안 거치고 그대로 온다.
 class ApiClient {
-  ApiClient({TokenStore? tokens, http.Client? client})
-      : _tokens = tokens ?? const SecureTokenStore(),
+  ApiClient({
+    TokenStore? tokens,
+    http.Client? client,
+    this._timeout = kApiTimeout,
+  })  : _tokens = tokens ?? const SecureTokenStore(),
         _client = client ?? http.Client();
 
   final TokenStore _tokens;
   final http.Client _client;
+
+  /// 한 요청의 한계 — 시험이 짧게 줄여 쓴다. 기본값은 [kApiTimeout].
+  final Duration _timeout;
   String? _token;
 
   /// 저장소 읽기는 **한 번만** 한다 — 여러 요청이 동시에 나가도 같은 것을
@@ -87,8 +107,18 @@ class ApiClient {
     await _tokens.write(token);
   }
 
+  /// 마지막으로 받은 `GET /me` 본문 그대로 — 없으면 `null`.
+  ///
+  /// 🔴 **인사말이 서버를 안 기다리게 하려는 것이다**(2026-09-25). 자세한
+  /// 까닭은 [TokenStore.readProfile] 머리말.
+  Future<String?> loadProfile() => _tokens.readProfile();
+
+  /// 받은 본문을 기기에 남긴다. 🔴 **못 남겨도 실패로 만들지 않는다** —
+  /// 다음에 켤 때 한 번 더 기다릴 뿐이다.
+  Future<void> saveProfile(String json) => _tokens.writeProfile(json);
+
   /// 🔴 저장소에서도 지운다 — 안 지우면 다음에 켤 때 로그아웃한 계정으로
-  /// 되돌아간다.
+  /// 되돌아간다. ([TokenStore.clear] 가 **프로필까지** 함께 지운다.)
   Future<void> clearToken() async {
     _token = null;
     /* 🔴 캐시한 읽기도 버린다 — 안 버리면 로그아웃 뒤에도 [_ensureLoaded] 가
@@ -120,6 +150,22 @@ class ApiClient {
     return _decodeList(res);
   }
 
+  /// 본문이 **JSON 이 아닌** 경로 — 지금은 포스터 JPEG 하나다.
+  ///
+  /// 🔴 [get] 으로 못 받는다: 그쪽은 본문을 UTF-8 글자로 읽고 `jsonDecode` 를
+  /// 거는데, JPEG 바이트를 그렇게 다루면 **본문을 망가뜨리고** 터지는 자리도
+  /// 엉뚱하다(「JSON 이 아니다」가 아니라 「글자가 아니다」로 난다).
+  ///
+  /// 🔴 **실패는 그대로 올린다** — 404(없음·못 뜸)를 `null` 로 삼키는 판단은
+  /// 부르는 쪽(리포지토리)에서 한다. 여기서 삼키면 401·500 도 같이 묻힌다.
+  Future<Uint8List> getBytes(String path) async {
+    final res = await _send(
+      () => _client.get(_uri(path), headers: _headers()),
+    );
+    if (res.statusCode >= 400) _throwFor(res);
+    return res.bodyBytes;
+  }
+
   Future<Map<String, dynamic>> post(
     String path, [
     Map<String, dynamic>? body,
@@ -140,6 +186,25 @@ class ApiClient {
   ) async {
     final res = await _send(
       () => _client.patch(
+        _uri(path),
+        headers: _headers(),
+        body: jsonEncode(body),
+      ),
+    );
+    return _decode(res);
+  }
+
+  /// **통째로 교체**하는 경로 — 경기 조건(계약 3-13절)이 처음 쓴다.
+  ///
+  /// 🔴 [patch] 로 대신할 수 없다. 그쪽은 「보낸 칸만 바뀐다」이고 이쪽은
+  /// 「보낸 것이 곧 전체」다 — 조건에서 시간대 하나를 **지우는** 것이
+  /// `PATCH` 로는 표현이 안 된다.
+  Future<Map<String, dynamic>> put(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
+    final res = await _send(
+      () => _client.put(
         _uri(path),
         headers: _headers(),
         body: jsonEncode(body),
@@ -199,7 +264,10 @@ class ApiClient {
   Future<http.Response> _send(Future<http.Response> Function() request) async {
     await _ensureLoaded();
     try {
-      return await request();
+      /* 🔴 **끊고 알린다** — 자세한 까닭은 [kApiTimeout]. */
+      return await request().timeout(_timeout);
+    } on TimeoutException {
+      throw const ApiException('서버 응답이 너무 늦습니다. 잠시 뒤 다시 시도해 주세요.');
     } on http.ClientException catch (e) {
       throw ApiException('서버에 연결할 수 없습니다: ${e.message}');
     }
@@ -229,7 +297,26 @@ class ApiClient {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return decoded;
     }
-    final error = decoded['error'] as Map<String, dynamic>?;
+    _throwFor(response);
+  }
+
+  /// 실패 응답을 [ApiException] 으로 올린다.
+  ///
+  /// 🔴 **[_decode] 에서 떼어 낸 것이다**(2026-09-24). 본문이 JSON 이 아닌
+  /// 경로([getBytes])가 생기면서 **오류를 푸는 자리는 같아야** 했다 — 둘로
+  /// 나뉘면 한쪽만 `Retry-After` 를 읽거나 한쪽만 `code` 를 싣게 된다.
+  ///
+  /// 🔴 **오류 본문은 언제나 JSON 이다** — 성공 본문이 JPEG 이어도 그렇다.
+  Never _throwFor(http.Response response) {
+    Map<String, dynamic>? body;
+    try {
+      body = response.bodyBytes.isEmpty
+          ? null
+          : jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    } catch (_) {
+      body = null; // 오류 본문이 JSON 이 아닐 수도 있다(프록시·게이트웨이).
+    }
+    final error = body?['error'] as Map<String, dynamic>?;
     // 🔴 서버가 값을 안 주면 0 이 아니라 최소 1초 — 0 이면 잠금이 곧바로
     // 풀려 "429 직후 재요청이 안 나간다"가 깨진다(웹과 같은 판단).
     final rawRetryAfter = response.headers['retry-after'];

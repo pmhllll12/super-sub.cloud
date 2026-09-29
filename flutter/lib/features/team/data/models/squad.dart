@@ -57,6 +57,15 @@ class SquadMember {
 
   /// 판 칸에 올라가 있는가. 🔴 **둘은 함께 있거나 함께 없다**(계약).
   bool get hasSeat => gridCol != null && gridRow != null;
+
+  /// 🔴 **아직 서버의 등재가 아니다** — 초대만 보내고 화면이 먼저 앉혀 둔
+  /// 자리다(`squadWithSeatInvited`). [id] 는 `squad_member.id` 가 아니라
+  /// **초대 id** 이고, [playerCardId] 는 모르는 값이라 비어 있다.
+  ///
+  /// 🔴 **이런 등재를 서버로 보내면 404 「등재를 찾을 수 없습니다」다**
+  /// (2026-09-25 실기기에서 실제로 떴다) — 자리 박기·옮기기·빼기가 전부
+  /// 이 값을 먼저 본다.
+  bool get isPendingInvite => playerCardId.isEmpty;
 }
 
 /// 팀 하나의 스쿼드 — **팀 단위 카드 묶음**이다.

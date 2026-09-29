@@ -9,11 +9,12 @@ import '../../../auth/presentation/session_controller.dart';
 import '../../../card/data/card_providers.dart';
 import '../../../card/data/models/player_card.dart';
 import '../../../../core/widgets/glass_pill.dart';
-import '../../../../core/widgets/screen_tint.dart';
 import '../../../../core/widgets/floating_nav_bar.dart';
 import '../../../card/presentation/card_editor_screen.dart';
 import '../../../video/presentation/screens/my_videos_screen.dart';
 import '../widgets/player_card_view.dart';
+import '../../../team/data/match_providers.dart';
+import '../../../team/data/models/open_match.dart';
 import '../../../team/data/team_providers.dart';
 import 'delete_account_sheet.dart';
 import 'nickname_sheet.dart';
@@ -29,7 +30,16 @@ import 'titles_sheet.dart';
 /// 전용 화면이다(`MyVideosScreen`) — 플레이어·스트립·리포트를 이 목록 안에
 /// 다 쌓으면 프로필이 통째로 굴러야 하는 길이가 된다.
 class ProfileScreen extends ConsumerWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({super.key, this.needTeam = false});
+
+  /// 🔴 **팀 없이 스쿼드 판의 빈 자리를 눌러서 왔는가** (2026-09-29 사용자
+  /// 요청: 「내 프로필로 자동으로 들어가서 팀 만들기만 밝고, 다른 곳은 살짝
+  /// 어두워지면서 '팀을 먼저 만들어주세요.'」).
+  ///
+  /// ⚠️ **전에는 그 자리가 「선수 넣기 — 준비 중입니다」였다.** 기능이 준비
+  /// 중인 것이 아니라 **팀이 없어서** 못 하는 것인데, 처음 온 사람은 앱이
+  /// 미완성이라고 읽었다. 그것이 새 사용자가 가장 먼저 만나는 문구였다.
+  final bool needTeam;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -48,31 +58,18 @@ class ProfileScreen extends ConsumerWidget {
        ⚠️ 아래 바탕색은 `.value` 를 써도 된다 — 못 읽으면 브랜드 민트로
        물러날 뿐이고, 사용자가 잘못 누를 것이 없다. */
     final cardAsync = ref.watch(myCardProvider);
-    final card = cardAsync.value;
 
-    /* 🔴 **배경이 내 카드의 색을 따른다**(2026-09-22, 사용자 요청). 홈의
-       빛무리와 같은 그림인데 색만 **카드 바탕색 + 자국색** 둘로 갈아 끼운다.
-       카드가 없으면 브랜드 민트 그대로다 — 「빈 카드」인데 배경만 요란하면
-       무엇을 보는 화면인지 흐려진다.
+    /* 🔴 **바탕이 순검정이다** (2026-09-25 사용자 요청: 「내 프로필
+       들어갔을때 전체 배경 색상 그냥 아예 검정으로」).
 
-       🔴 **카드 색을 고치고 돌아오면 부드럽게 건너간다** — 툭 갈리면 화면이
-       깜빡인 것처럼 보인다(`AnimatedAuroraBackground`). */
-    /// 카드가 없으면 브랜드 민트 한 쌍 — 「빈 카드」인데 배경만 요란하면
-    /// 무엇을 보는 화면인지 흐려진다.
-    const fallback = (a: Color(0xFF2EC4B6), b: Color(0xFF118AB2));
-    final tint = card?.style == null
-        ? fallback
-        : (a: card!.style!.bg, b: card.style!.brushColor);
-
-    /* 🔴 **홈과 같은 바탕이다**(2026-09-22 사용자 요청: 「내 프로필 화면에서도
-       그냥 배경 전체로 은은하게 색상 퍼지는거 홈페이지랑 똑같이」).
-       전에는 `AnimatedAuroraBackground`(빛무리)였다 — 두 화면의 바탕이 갈려
-       오갈 때 재질이 바뀌었다. */
+       ⛔ **[ScreenTint] 로 되돌리지 말 것.** 전에는 **내 카드의 색**(바탕색 +
+       자국색)으로 빛무리를 깔았는데, 카드마다 화면 전체가 파랗거나 붉어져서
+       **무엇을 보는 화면인지**가 카드 취향에 휘둘렸다. 그때 딸려 있던 값
+       셋(`card`·`fallback`·`tint`)도 같이 걷었다 — 되살리려면 2026-09-25
+       이전 커밋에서 꺼낸다. */
     return Stack(
       children: [
-        Positioned.fill(
-          child: ScreenTint(a: tint.a, b: tint.b),
-        ),
+        const Positioned.fill(child: ColoredBox(color: Color(0xFF000000))),
         Scaffold(
           // 🔴 **배경을 비운다** — 안 비우면 빛무리를 덮는다.
           backgroundColor: Colors.transparent,
@@ -145,14 +142,49 @@ class ProfileScreen extends ConsumerWidget {
                다섯이 세로로 줄줄이 서서 화면이 한참 길었다.
                「내 영상」만 한 줄을 다 쓴다 — 자주 들어가는 입구다. */
               children: [
-                _CardHero(cardAsync: cardAsync, nickname: user.nickname),
-                /* 🔴 **닉네임과 판 사이를 흰 선으로 가른다**(2026-09-22, 사용자
-                 요청: 「닉네임과 내 영상 판 가운데에 완전 흰색 선으로」).
-                 위아래 여백을 같게 줘서 선이 **둘의 한가운데**에 선다. */
-                const SizedBox(height: 14),
+                /* 🔴 **팀이 먼저라고 말해 준다**(2026-09-29). 판의 빈 자리를
+                   눌러서 온 사람은 **왜 여기로 왔는지**를 모른다 — 안내가
+                   없으면 프로필이 그냥 열린 것으로 보인다. */
+                if (needTeam) ...[
+                  const _NeedTeamNotice(),
+                  const SizedBox(height: _kGap),
+                ],
+                /* 🔴 **카드 자리는 [_kCardSheet](어두운 판) 위다**
+                   (2026-09-29 사용자 요청: 「내 카드 있는 그 뒤에 흰색 판을
+                   … 스쿼드판 뒤에 있는 완전 검은색은 아닌 그 판 색상으로」).
+
+                   ⚠️ **순백([_kOn])이었다** (2026-09-25: 「완전 흰색 판 두고,
+                   양쪽 이랑 아래 선이랑 6픽셀 거리만 두고」). 자리·여백은
+                   그때 그대로고 **면 색만** 갈렸다.
+
+                   🔴 **양옆 6 은 목록이 이미 준다**([_kEdge]) — 여기서 또
+                   주면 12 가 된다. 아래 6 은 바로 아래 [SizedBox] 다.
+                   🔴 **판 위의 글자를 같이 뒤집었다**(`onWhite: false`) —
+                   안 뒤집으면 검은 글자([_kOnWhitePanel])가 어두운 판에 얹혀
+                   **통째로 사라진다.** 흰 판일 때 겪은 것의 정반대다. */
+                _Dim(
+                  on: needTeam,
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: const BoxDecoration(
+                      color: _kCardSheet,
+                      borderRadius: BorderRadius.all(Radius.circular(16)),
+                    ),
+                    child: _CardHero(
+                      cardAsync: cardAsync,
+                      nickname: user.nickname,
+                      onWhite: false,
+                    ),
+                  ),
+                ),
+                /* 🔴 **흰 판과 선 사이는 6 이다**(사용자가 그 값을 짚었다).
+                   ⚠️ 아래 선의 위아래 14 짝과 다르다 — 그쪽은 「선이 두 판의
+                   한가운데」를 만드는 값이고, 이쪽은 **판이 선에 얼마나
+                   가까운가**라 다른 일을 한다. */
+                const SizedBox(height: _kGap),
                 const _Rule(),
                 const SizedBox(height: 14),
-                const _VideosBlock(),
+                _Dim(on: needTeam, child: const _VideosBlock()),
                 /* 🔴 **두 번째 흰 선**(2026-09-22 사용자 요청: 「내 분석/업로드
                  영상 바로 아래에도 … 똑같이 거리 재서」). 위 선과 **같은
                  여백(14)** 을 위아래로 둬서 선이 두 판의 한가운데에 선다.
@@ -164,14 +196,24 @@ class ProfileScreen extends ConsumerWidget {
                 const SizedBox(height: 14),
                 const _Rule(),
                 const SizedBox(height: 14),
+                /* 🔴 **「팀 만들기」만 밝다**(2026-09-29 사용자 요청: 「팀
+                   만들기만 밝고, 다른 곳은 살짝 어두워지면서」).
+
+                   🔴 **[Opacity] 로 흐리게만 하고 **막지는 않는다** — 눌러서
+                   못 쓰게 하면 팀 말고 다른 일(로그아웃·닉네임)을 하러 온
+                   사람이 갇힌다. 「여기를 보라」는 **안내**지 **잠금**이
+                   아니다. */
                 _Pair(
                   left: [
-                    _TeamBlock(teams: user.teams),
-                    const _MatchesBlock(),
+                    _TeamBlock(teams: user.teams, autoOpenCreate: needTeam),
+                    _Dim(
+                      on: needTeam,
+                      child: _MatchesBlock(teamId: user.primaryTeamId),
+                    ),
                   ],
                   right: [
-                    _InfoBlock(user: user),
-                    _AccountBlock(user: user),
+                    _Dim(on: needTeam, child: _InfoBlock(user: user)),
+                    _Dim(on: needTeam, child: _AccountBlock(user: user)),
                   ],
                 ),
               ],
@@ -181,6 +223,59 @@ class ProfileScreen extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// 「팀 만들기」 말고는 **살짝 어둡게** 한다 (2026-09-29).
+///
+/// 🔴 **[IgnorePointer] 를 붙이지 않는다** — 흐린 것은 「여기 말고 저기를
+/// 보라」는 안내지 잠금이 아니다. 막으면 로그아웃하러 온 사람이 갇힌다.
+class _Dim extends StatelessWidget {
+  const _Dim({required this.on, required this.child});
+
+  final bool on;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => AnimatedOpacity(
+        // 읽히긴 해야 한다 — 0.4 면 「꺼졌다」로 보인다.
+        opacity: on ? 0.55 : 1,
+        duration: const Duration(milliseconds: 220),
+        child: child,
+      );
+}
+
+/// 판의 빈 자리를 눌러서 온 사람에게 **왜 여기로 왔는지**를 말해 준다.
+class _NeedTeamNotice extends StatelessWidget {
+  const _NeedTeamNotice();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        key: const Key('profile-need-team'),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: _kOn,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '팀을 먼저 만들어 주세요.',
+              style: TextStyle(
+                color: _kOnPanel,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              '팀이 있어야 스쿼드 판에 선수를 넣을 수 있습니다.',
+              style: TextStyle(color: _kOnPanel, fontSize: 12.5),
+            ),
+          ],
+        ),
+      );
 }
 
 /* ⛔ **`_kBg`(순검정)를 지웠다**(2026-09-22) — 바탕을 [ScreenTint] 가
@@ -214,6 +309,28 @@ const Color _kOnPanel = Color(0xFF000000);
 /// 휴대폰에서건」이라 비례하지 않는 값을 쓴다.
 const double _kEdge = 6;
 const double _kGap = 6;
+
+/// 흰 판 위의 글자·단추 — 🔴 **검은 바탕용 [_kOn] 의 짝이다**(2026-09-25,
+/// 카드 자리가 흰 판으로 올라가면서). 그 판에 들어가는 것은 **전부** 이 값을
+/// 써야 한다 — 하나라도 [_kOn] 으로 남으면 흰 판에서 통째로 사라진다.
+///
+/// ⚠️ **카드 자리는 더 이상 이 값을 안 쓴다**([_kCardSheet] 로 갈렸다,
+/// 2026-09-29). 이 화면의 **다른 흰 판들**(「내 영상」 아래 칸들)은 그대로다.
+const Color _kOnWhitePanel = Color(0xFF111114);
+
+/// 카드 자리의 판 — 🔴 **홈의 판과 같은 `#1C1C1E`** (2026-09-29 사용자 요청:
+/// 「스쿼드판 뒤에 있는 완전 검은색은 아닌 그 판 색상으로」). 이 화면 바탕이
+/// 순검정이라, 판은 **바탕보다 한 끗 밝아서** 자리로 읽힌다.
+///
+/// 🔴 **홈의 `_kWhiteSheetColor` 와 값이 같을 뿐 묶여 있지 않다** — 일부러
+/// 복사본이다. 두 화면이 토큰을 나눠 쓰다가 **한쪽만 어둡게 하려던 것이 다른
+/// 화면까지 검게 만든** 일이 있었고(`home_screen.dart` 의 「⛔ 다시
+/// [kSheetPaper] 로 묶지 말 것」), 그래서 홈도 제 값을 제 파일에 들고 있다.
+/// 한쪽을 바꿀 때 다른 쪽도 바꾸고 싶으면 **두 곳을 다 고친다.**
+///
+/// 🔴 **면을 갈면 그 위의 잉크를 같이 본다** — 판 위 글자·단추는
+/// `onWhite: false`([_kOn], 흰색)다.
+const Color _kCardSheet = Color(0xFF1C1C1E);
 
 /// 되돌릴 수 없는 일의 빨강 — 탈퇴·해체가 나눠 쓴다.
 const Color _kDanger = Color(0xFFD32F2F);
@@ -351,7 +468,14 @@ class _Pair extends StatelessWidget {
 /// 카드 자체가 무엇인지 말하고 있어서 제목은 같은 말을 두 번 하는 자리였고,
 /// 상자는 카드 둘레에 테를 하나 더 둘러 **카드가 작아 보이게** 했다.
 class _CardHero extends ConsumerWidget {
-  const _CardHero({required this.cardAsync, required this.nickname});
+  const _CardHero({
+    required this.cardAsync,
+    required this.nickname,
+    this.onWhite = false,
+  });
+
+  /// 흰 판 위인가 — 🔴 **글자와 단추가 통째로 뒤집힌다**(2026-09-25).
+  final bool onWhite;
 
   /// 🔴 **`PlayerCard?` 가 아니라 `AsyncValue` 다**(2026-09-23). 아래
   /// [_cardAction] 이 「없다」와 「못 읽었다」를 갈라야 하는데, `null` 하나로는
@@ -361,7 +485,10 @@ class _CardHero extends ConsumerWidget {
 
   PlayerCard? get card => cardAsync.value;
 
-  static const double _cardWidth = 200;
+  /// 🔴 **200 → 192** (2026-09-25 사용자 요청: 「그 왼쪽 위 카드 진짜
+  /// 아주아주 살짝만 사이즈 줄이고」). 오른쪽 칸이 그만큼 넓어진다 —
+  /// [_GlassButton] 주석이 적어 둔 「틈이 거의 한계」가 조금 풀린다.
+  static const double _cardWidth = 192;
 
   /// 카드와 오른쪽 칸 사이.
   static const double _gap = 12;
@@ -409,8 +536,8 @@ class _CardHero extends ConsumerWidget {
                   Flexible(
                     child: Text(
                       nickname,
-                      style: const TextStyle(
-                        color: _kOn,
+                      style: TextStyle(
+                        color: onWhite ? _kOnWhitePanel : _kOn,
                         fontSize: 22,
                         fontWeight: FontWeight.w700,
                       ),
@@ -421,6 +548,7 @@ class _CardHero extends ConsumerWidget {
                     buttonKey: const Key('profile-edit'),
                     icon: Icons.edit,
                     tooltip: '닉네임 수정',
+                    onWhite: onWhite,
                     onTap: () => showNicknameSheet(context, nickname),
                   ),
                 ],
@@ -459,15 +587,17 @@ class _CardHero extends ConsumerWidget {
       return _GlassButton(
         buttonKey: const Key('profile-card-retry'),
         label: '불러오지 못했습니다 · 다시 시도',
+        onWhite: onWhite,
         onTap: () => ref.invalidate(myCardProvider),
       );
     }
     if (!cardAsync.hasValue) {
-      return const _GlassButton.disabled(label: '불러오는 중…');
+      return _GlassButton.disabled(label: '불러오는 중…', onWhite: onWhite);
     }
     final card = this.card;
     return _GlassButton(
       buttonKey: const Key('profile-card-edit'),
+      onWhite: onWhite,
       label: card == null ? '카드 만들기' : '프로필 카드 수정',
       onTap: () => card == null
           ? _createCard(context, ref)
@@ -502,12 +632,13 @@ class _GlassButton extends StatelessWidget {
     required this.buttonKey,
     required this.label,
     required this.onTap,
+    this.onWhite = false,
   });
 
   /// 눌리지 않는 같은 모양 — 「불러오는 중」처럼 **자리는 지키되 누를 수는
   /// 없어야 하는** 상태에 쓴다. 자리를 안 지키면 값이 도착할 때 옆 글자가
   /// 통째로 밀린다.
-  const _GlassButton.disabled({required this.label})
+  const _GlassButton.disabled({required this.label, this.onWhite = false})
     : buttonKey = const Key('profile-card-loading'),
       onTap = null;
 
@@ -515,10 +646,14 @@ class _GlassButton extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
 
+  /// 흰 판 위인가 — [_GlassShell.onWhite] 머리말.
+  final bool onWhite;
+
   @override
   Widget build(BuildContext context) {
     return _GlassShell(
       radius: BorderRadius.circular(999),
+      onWhite: onWhite,
       child: InkWell(
         key: buttonKey,
         onTap: onTap,
@@ -528,7 +663,13 @@ class _GlassButton extends StatelessWidget {
            줄바꿈되거나 카드를 덮는다. */
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          child: Text(label, style: const TextStyle(color: _kOn, fontSize: 14)),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: onWhite ? _kOnWhitePanel : _kOn,
+              fontSize: 14,
+            ),
+          ),
         ),
       ),
     );
@@ -542,6 +683,7 @@ class _GlassIconButton extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     required this.onTap,
+    this.onWhite = false,
   });
 
   final Key buttonKey;
@@ -549,19 +691,27 @@ class _GlassIconButton extends StatelessWidget {
   final String tooltip;
   final VoidCallback onTap;
 
+  /// 흰 판 위인가 — [_GlassShell.onWhite] 머리말.
+  final bool onWhite;
+
   @override
   Widget build(BuildContext context) {
     return Tooltip(
       message: tooltip,
       child: _GlassShell(
         radius: BorderRadius.circular(999),
+        onWhite: onWhite,
         child: InkWell(
           key: buttonKey,
           onTap: onTap,
           child: SizedBox(
             width: 28,
             height: 28,
-            child: Icon(icon, size: 14, color: _kOn),
+            child: Icon(
+              icon,
+              size: 14,
+              color: onWhite ? _kOnWhitePanel : _kOn,
+            ),
           ),
         ),
       ),
@@ -650,10 +800,18 @@ class _FoldState extends State<_Fold> with SingleTickerProviderStateMixin {
 /// 유리 + **제일 얇은 흰 테**./// 유리 + **제일 얇은 흰 테**. 두 단추가 재질을 나눠 쓴다 — 한쪽만 고치면
 /// 둘이 갈라진다.
 class _GlassShell extends StatelessWidget {
-  const _GlassShell({required this.radius, required this.child});
+  const _GlassShell({
+    required this.radius,
+    required this.child,
+    this.onWhite = false,
+  });
 
   final BorderRadius radius;
   final Widget child;
+
+  /// 흰 판 위인가 — 🔴 **면도 테도 뒤집힌다.** 흰 기 10% 면과 흰 테는
+  /// 흰 판에서 **아무것도 아닌 것**이 된다(모양 자체가 안 읽힌다).
+  final bool onWhite;
 
   @override
   Widget build(BuildContext context) {
@@ -674,9 +832,9 @@ class _GlassShell extends StatelessWidget {
 
            🔴 **연필 단추도 같이 바뀐다** — 둘이 이 틀을 나눠 쓴다. 한쪽만
            고치면 재질이 갈린다. */
-        color: _kOn.withValues(alpha: 0.10),
+        color: (onWhite ? _kOnWhitePanel : _kOn).withValues(alpha: 0.10),
         border: Border.all(
-          color: _kOn,
+          color: onWhite ? _kOnWhitePanel : _kOn,
           // 이 기기에서 그릴 수 있는 **가장 얇은 선**.
           width: 0.5,
         ),
@@ -702,9 +860,15 @@ void _notReady(BuildContext context, String what) {
 /// 주장은 고치고 해체하고 **나갈 수 없다**(남은 사람들의 팀이 주인 없이
 /// 남는다). 팀원은 나가기만 한다.
 class _TeamBlock extends ConsumerStatefulWidget {
-  const _TeamBlock({required this.teams});
+  const _TeamBlock({required this.teams, this.autoOpenCreate = false});
 
   final List<TeamMembership> teams;
+
+  /// 만들기 폼을 **처음부터 펴 둔다** (2026-09-29, `needTeam` 으로 왔을 때).
+  ///
+  /// 🔴 **한 번만 편다** — `initState` 에서만 본다. 매 빌드마다 펴면 사람이
+  /// 접어도 **다시 열려서** 접을 수가 없다.
+  final bool autoOpenCreate;
 
   @override
   ConsumerState<_TeamBlock> createState() => _TeamBlockState();
@@ -717,6 +881,16 @@ class _TeamBlockState extends ConsumerState<_TeamBlock> {
   /// 🔴 **닫혀도 마지막 내용을 들고 있는다** — 접는 동안 폼이 사라지면
   /// 줄어들 것이 없어 툭 접힌다.
   String? _lastOpenFor;
+
+  @override
+  void initState() {
+    super.initState();
+    // 🔴 한 번만이다 — 머리말 참고. 매 빌드에서 보면 접을 수가 없어진다.
+    if (widget.autoOpenCreate) {
+      _openFor = '';
+      _lastOpenFor = '';
+    }
+  }
 
   void _toggle(String key) => setState(() {
     _openFor = _openFor == key ? null : key;
@@ -1274,16 +1448,91 @@ class _VideosBlock extends ConsumerWidget {
   }
 }
 
-class _MatchesBlock extends StatelessWidget {
-  const _MatchesBlock();
+/// 내 경기 — 🔴 **서버에서 읽는다** (2026-09-29, `GET /teams/{id}/matches`).
+///
+/// ⚠️ **글자가 박혀 있었다.** 늘 「다가오는 경기가 없습니다」라, 경기가
+/// 실제로 잡혀 있어도 없다고 나왔다. ⛔ 상수 문구로 되돌리지 말 것.
+///
+/// 🔴 **「없다」와 「못 읽었다」를 가른다** — 둘을 같은 문구로 두면 서버가
+/// 죽었을 때도 「경기가 없구나」로 읽힌다(이 화면이 카드에서 이미 데인
+/// 함정과 같다). 그래서 `.value` 로 납작하게 만들지 않는다.
+class _MatchesBlock extends ConsumerWidget {
+  const _MatchesBlock({required this.teamId});
+
+  /// 팀이 없으면 `null` — 그때는 부를 곳이 없다.
+  final String? teamId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    const ink = TextStyle(color: _kOnPanel);
+    final id = teamId;
+    if (id == null) {
+      return const _Block(
+        title: '내 경기',
+        // 팀이 없어서 없는 것이다 — 「경기가 없다」와 다른 말이라야 한다.
+        child: Text('팀을 만들면 여기에 경기가 뜹니다.', style: ink),
+      );
+    }
+
+    return _Block(
+      title: '내 경기',
+      child: ref.watch(teamMatchesProvider(id)).when(
+            loading: () => const Text('불러오는 중…', style: ink),
+            error: (_, _) => const Text('불러오지 못했습니다.', style: ink),
+            data: (list) => list.isEmpty
+                ? const Text('다가오는 경기가 없습니다.', style: ink)
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 🔴 **다 쌓지 않는다** — 반쪽 폭 칸이라 길어지면 옆 칸과 어긋난다.
+                      for (final m in list.take(3)) _MatchLine(match: m),
+                    ],
+                  ),
+          ),
+    );
+  }
+}
+
+/// 경기 한 줄 — 언제 · 어디서.
+class _MatchLine extends StatelessWidget {
+  const _MatchLine({required this.match});
+
+  final OpenMatch match;
 
   @override
   Widget build(BuildContext context) {
-    // ⚠️ 경기 경로(`GET /teams/{id}/matches`)는 아직 안 붙였다 — 웹도 팀이
-    //    없으면 같은 문구를 보여 준다.
-    return const _Block(
-      title: '내 경기',
-      child: Text('다가오는 경기가 없습니다.', style: TextStyle(color: _kOnPanel)),
+    final at = DateTime.tryParse(match.playedAt)?.toLocal();
+    String two(int n) => n.toString().padLeft(2, '0');
+    // 🔴 못 읽으면 **원문을 안 보여 준다** — ISO 문자열은 사람이 읽을 것이 아니다.
+    final when = at == null
+        ? '시각 미정'
+        : '${two(at.month)}/${two(at.day)} ${two(at.hour)}:${two(at.minute)}';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            when,
+            style: const TextStyle(
+              color: _kOnPanel,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (match.place.isNotEmpty)
+            Text(
+              match.place,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: _kOnPanel.withValues(alpha: 0.7),
+                fontSize: 12,
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

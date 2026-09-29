@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Response, status
 
 from app.analysis.adapter.inbound.api.schemas.job_schema import (
     DetectionResponse,
@@ -36,6 +36,7 @@ from app.analysis.application.dtos.video_dto import (
     GetCardGradeCommand,
     GetFeaturedVideoCommand,
     GetPlaybackUrlCommand,
+    GetVideoPosterCommand,
     KeepVideoCommand,
     MyVideosQuery,
     PlaybackUrlResult,
@@ -57,6 +58,7 @@ from app.analysis.dependencies.video_providers import (
     GetCardGradeUseCaseDep,
     GetFeaturedVideoUseCaseDep,
     GetPlaybackUrlUseCaseDep,
+    GetVideoPosterUseCaseDep,
     KeepVideoUseCaseDep,
     ListMyVideosUseCaseDep,
     ListPublicVideosUseCaseDep,
@@ -163,6 +165,39 @@ def get_playback_url(
     """
     return use_case(
         GetPlaybackUrlCommand(video_id=video_id, user_id=user_id)
+    )
+
+
+@video_router.get(
+    "/videos/{video_id}/poster",
+    response_class=Response,
+    responses={200: {"content": {"image/jpeg": {}}}},
+)
+def get_video_poster(
+    video_id: UUID,
+    user_id: CurrentUserId,
+    use_case: GetVideoPosterUseCaseDep,
+) -> Response:
+    """카드에 깔 **한 장면**(JPEG). 권한은 재생 주소와 같다.
+
+    🔴 **왜 있나.** 목록이 썸네일을 안 실어서 클라이언트가 카드마다 원본 MP4 를
+    열고 있었다 — 실기기에서 **한 장에 1.9초**였다. 작은 JPEG 하나로 바꾼다.
+
+    🔴 **영상마다 딱 한 번만 비싸다.** 처음 부른 사람에게서 뜨고 캐시되며, 그
+    뒤로는 모두에게 즉시 나간다. ⚠️ **캐시는 컨테이너 안이라 재배포하면 빈다** —
+    배포 뒤에 공개 목록을 한 번 훑어 미리 채워 두면 아무도 안 겪는다.
+
+    | 에러 | code |
+    |---|---|
+    | 404 | `VIDEO_NOT_FOUND` — 없거나 비공개 남의 클립 |
+    | 404 | `POSTER_NOT_AVAILABLE` — 장면을 못 떴다(형식·길이) |
+    """
+    result = use_case(GetVideoPosterCommand(video_id=video_id, user_id=user_id))
+    return Response(
+        content=result.jpeg,
+        media_type="image/jpeg",
+        # 🔴 **오래 캐시해도 된다** — 영상은 안 바뀌고 주소가 영상 id 로 고정이다.
+        headers={"Cache-Control": "public, max-age=86400"},
     )
 
 

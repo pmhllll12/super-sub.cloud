@@ -1,3 +1,4 @@
+import 'board_geometry.dart';
 import 'data/models/squad.dart';
 
 /// 판의 크기 — 3:3 · 5:5 · 7:7.
@@ -191,19 +192,39 @@ SeatAssignment seatsFromSquad(
   // 1) **칸이 저장된 등재 — 그 칸이 곧 자리다.**
   for (final m in squad.members) {
     if (identical(m, me) || !m.hasSeat) continue;
-    /* 🔴 그 칸이 이미 찼으면 **건너뛴다.** 내 자리와 겹치는 것이 이 갈래로
-       들어온다 — 서버 목록에 내가 들어 있어도 같은 사람이 두 번 나오지
-       않게 하는 것이 원래 규칙이고, 그 규칙을 여기서도 지킨다. */
-    if (slots.any((s) => taken(s) && s.col == m.gridCol && s.row == m.gridRow)) {
+    /* 🔴 **갈래가 셋이다** (2026-09-25에 다시 갈랐다 — 사용자: 「같은 자리에
+       4개 카드가 있었는데」).
+
+       ⑴ 그 칸의 자리가 **비어 있다** → 그 자리를 쓴다(가장 흔한 길).
+       ⑵ 그 칸에 **자리가 아예 없다**(골키퍼 줄 양옆·판이 작아진 경우)
+          → 남는 자리를 **그 칸으로 옮겨** 온다.
+       ⑶ 그 칸이 **이미 찼다** → 남는 자리를 **빈 칸으로** 옮겨 앉힌다.
+
+       ⚠️ 전에는 ⑶에서 **건너뛰어** 그 사람이 판에서 사라졌고, 그전에는 남는
+       자리를 **그 칸으로** 끌어와 카드를 포개 놓았다. 둘 다 나쁘다 — 사라지면
+       사람이 없어진 줄 알고, 포개지면 맨 위 것만 보이다가 ⊗ 로 지울 때마다
+       뒤엣것이 나온다. */
+    final atCell =
+        firstWhere((s) => s.col == m.gridCol && s.row == m.gridRow);
+
+    if (atCell != null && taken(atCell)) {
+      /* 🔴 **내 중복 행은 건너뛴다** — 서버 목록에 내가 들어 있을 수 있고,
+         내 카드는 0단계가 이미 세웠다. 같은 사람을 두 번 그리지 않는다. */
+      if (mySlug != null && m.cardPublicSlug == mySlug) continue;
+
+      final spare = firstWhere((s) => !taken(s));
+      if (spare == null) continue;
+      final free = _firstFreeCell(slots, spare);
+      // 옮길 빈 칸이 없으면 자리가 원래 있던 칸에 그대로 둔다.
+      if (free != null) {
+        spare.col = free.$1;
+        spare.row = free.$2;
+      }
+      _seat(spare, m, mates, slugs, memberIds, ready);
       continue;
     }
-    /* 🔴 **그 칸에 있는 자리를 먼저 쓴다.** 아무 빈 자리나 끌어다 옮기면
-       자리들이 통째로 뒤엉켜, 원래 그 칸에 있던 자리가 밀려나며 카드가
-       겹쳐 사라진다. 그 칸에 자리가 없을 때만(골키퍼 줄 양옆처럼 아예 없는
-       칸, 또는 판이 작아진 경우) 남는 자리를 옮겨 온다. */
-    final seat =
-        firstWhere((s) => !taken(s) && s.col == m.gridCol && s.row == m.gridRow) ??
-            firstWhere((s) => !taken(s));
+
+    final seat = atCell ?? firstWhere((s) => !taken(s));
     if (seat == null) continue;
     seat.col = m.gridCol!;
     seat.row = m.gridRow!;
@@ -242,4 +263,37 @@ SeatAssignment seatsFromSquad(
   }
 
   return result;
+}
+
+/// 그 자리에 그 사람을 앉힌다 — 배정 네 줄이 두 군데서 같아야 한다.
+void _seat(
+  SquadSlot seat,
+  SquadMember m,
+  Map<String, String> mates,
+  Map<String, String?> slugs,
+  Map<String, String> memberIds,
+  Map<String, bool> ready,
+) {
+  seat.positionCode = m.positionCode;
+  mates[seat.area] = m.nickname;
+  slugs[seat.area] = m.cardPublicSlug;
+  memberIds[seat.area] = m.id;
+  ready[seat.area] = m.accepted;
+}
+
+/// 격자(3열×4행)에서 **아무 자리도 안 쓰는 칸**을 찾는다.
+///
+/// 🔴 [exclude] 자신은 세지 않는다 — 지금 옮기려는 자리다.
+/// 🔴 골키퍼 줄은 가운데 칸만 있다(`canDropAt`).
+(int, int)? _firstFreeCell(List<SquadSlot> slots, SquadSlot exclude) {
+  for (var row = 0; row < 4; row++) {
+    for (var col = 0; col < 3; col++) {
+      if (!canDropAt(col, row)) continue;
+      final used = slots.any(
+        (s) => !identical(s, exclude) && s.col == col && s.row == row,
+      );
+      if (!used) return (col, row);
+    }
+  }
+  return null;
 }

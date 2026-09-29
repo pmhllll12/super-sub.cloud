@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_sub/features/video/data/clip_file.dart';
 import 'package:super_sub/features/video/data/video_repository.dart';
+import 'package:super_sub/features/video/data/models/skeleton.dart';
 import 'package:super_sub/features/video/data/models/video_report.dart';
 
 /// VideoRepository 의 모든 구현체가 지켜야 하는 계약.
@@ -38,6 +39,61 @@ void runVideoRepositoryContract(
         );
 
     const meta = ClipMeta(durationMs: 10200, width: 1920, height: 1080);
+
+    /* 🔴 **공개 목록은 「내 것」이 아니다** — 남이 공개한 것까지 온다
+       (계약 `GET /videos/public`). 구현체가 이걸 `myVideos()` 로 때우면
+       다른 사람 영상이 홈에서 통째로 빠지므로, 성질로 못 박는다. */
+    group('공개 목록', () {
+      test('최근 것이 앞에 온다', () async {
+        final videos = await repo.publicVideos();
+
+        expect(videos.length, greaterThan(1));
+        for (var i = 1; i < videos.length; i += 1) {
+          expect(
+            videos[i - 1].createdAt.isAfter(videos[i].createdAt) ||
+                videos[i - 1].createdAt.isAtSameMomentAs(videos[i].createdAt),
+            isTrue,
+            reason: '$i 번째가 앞의 것보다 최근이다',
+          );
+        }
+      });
+
+      /* 🔴 **「내 것이 아닌 것이 있다」로 잰다.** 「올린 사람이 여럿」으로
+         재면 구현체가 아니라 **시드의 모양**을 시험하게 되고, 목업 사용자
+         구성을 바꿀 때마다 계약이 흔들린다. 지키려는 성질은 이것 하나다 —
+         `myVideos()` 로 때우면 여기서 걸린다. */
+      test('내 것이 아닌 것도 온다', () async {
+        final mine = (await repo.myVideos()).map((v) => v.id).toSet();
+        final public = await repo.publicVideos();
+
+        expect(public, isNotEmpty);
+        expect(
+          public.any((v) => !mine.contains(v.id)),
+          isTrue,
+          reason: '공개 목록이 내 것만 담고 있다',
+        );
+      });
+
+      /* 🔴 **크기를 안 준 등록분이 있다** — 이 칸이 생기기 전 것들이다.
+         계약이 「그때는 16:9 로 본다」로 정했고, 화면이 칸을 미리 잡는 데
+         쓰므로 **`null` 이 그대로 새어 나가면 안 된다.** */
+      test('크기를 모르면 16:9 로 답한다', () async {
+        final videos = await repo.publicVideos();
+        for (final v in videos) {
+          expect(v.aspectRatio, greaterThan(0));
+          if (v.width == null || v.height == null) {
+            expect(v.aspectRatio, closeTo(16 / 9, 0.001));
+          }
+        }
+      });
+    });
+
+    /* 🔴 **없는 영상이면 `null` 이다 — 예외가 아니다.** 못 뜨는 영상(형식·길이)도,
+       서버에 `ffmpeg` 이 없는 배포도 같은 자리로 떨어진다. 화면이 할 일은 셋 다
+       같다(자리표시를 그린다) — 예외로 만들면 그 셋이 홈을 통째로 오류로 만든다. */
+    test('없는 영상의 장면은 null 이다', () async {
+      expect(await repo.poster('없는-영상'), isNull);
+    });
 
     test('목록은 최근 것이 앞에 온다', () async {
       final videos = await repo.myVideos();
@@ -166,6 +222,36 @@ void runVideoRepositoryContract(
     /// 「아직」으로 답하면 화면이 영영 오지 않을 결과를 기다리게 한다.
     test('반려된 클립의 리포트는 「아직」이 아니다', () async {
       expect(await repo.report(rejectedVideoId), isNot(isA<ReportReady>()));
+    });
+
+    /// 🔴 **이름과 id 만 온다** — 재생 주소는 계약에 없다(선수 영상이 S3 에
+    /// 없어서다). 화면은 영상을 에셋에서 찾으므로, 여기서 주소를 기대하기
+    /// 시작하면 두 구현체가 갈린다.
+    test('견줄 선수 목록이 온다', () async {
+      final players = await repo.referencePlayers();
+
+      expect(players, isNotEmpty);
+      expect(players.every((p) => p.id.isNotEmpty && p.name.isNotEmpty), isTrue);
+    });
+
+    /// 🔴 **없는 선수는 예외가 아니라 갈래다** — 영상 관절과 같은 규칙.
+    /// 예외로 던지면 화면이 통째로 오류 상태가 된다.
+    test('없는 선수의 관절은 예외가 아니라 unavailable 이다', () async {
+      expect(
+        await repo.referencePlayerSkeleton('no-such-player'),
+        isA<SkeletonUnavailable>(),
+      );
+    });
+
+    /// 🔴 **선수 관절에는 「아직」이 없다.** 미리 계산되어 있어 다시 물어도 안
+    /// 바뀐다 — 「아직」으로 답하면 화면이 영영 폴링한다.
+    test('있는 선수의 관절은 「아직」이 아니다', () async {
+      final id = (await repo.referencePlayers()).first.id;
+
+      expect(
+        await repo.referencePlayerSkeleton(id),
+        isNot(isA<SkeletonNotReady>()),
+      );
     });
   });
 }

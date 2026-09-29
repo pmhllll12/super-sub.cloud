@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:http/http.dart' as http;
 
 import '../../../core/network/api_client.dart';
@@ -19,10 +21,20 @@ import 'token_store.dart';
 /// 이제 **토큰을 [TokenStore] 에 남긴다**(기본은 Keystore·Keychain) — 앱을
 /// 완전히 종료했다 열어도 로그인 상태가 이어진다.
 ///
-/// 🔴 **남기는 것은 토큰뿐이고 사용자는 안 남긴다.** 켤 때마다 `/me` 로 다시
-/// 받는다 — 그래야 닉네임·프로필이 딴 데서 바뀌어도 낡은 값을 안 보여 주고,
-/// **토큰이 만료·폐기됐으면 그 자리에서 드러난다**(저장한 사용자를 믿으면
-/// 로그인된 것처럼 보이다가 첫 요청에서 튕긴다).
+/// 🔴 **정정 (2026-09-25).** 앞서 이 자리에 「남기는 것은 토큰뿐이고 사용자는
+/// 안 남긴다」고 적혀 있었다. **이제 사용자도 남긴다** — 사용자가
+/// 「안녕하세요, 닉네임 그거랑 손 아이콘도 왜 바로바로 안나오냐」고 짚었고,
+/// 원인이 바로 그 결정이었다. 켤 때마다 `GET /me` 를 기다리느라 인사말·손·
+/// 카드가 **서버 왕복(실서버 0.6~4.6초)만큼 통째로 비어 있었다.**
+///
+/// 그때 적어 둔 걱정 둘은 이렇게 푼다 — **버린 것이 아니다**:
+///
+/// - 「낡은 값을 보여 준다」 → 저장한 것을 **즉시 보여 주고 뒤에서 새로
+///   고친다**([restoreSession] 은 캐시를 돌려주고, 화면 쪽
+///   `SessionController` 가 이어서 [refreshMe] 를 돌린다)
+/// - 「죽은 토큰이 안 드러난다」 → 그 새로 고침이 `UNAUTHORIZED`·
+///   `INVALID_TOKEN` 을 만나면 **그때 로그아웃된다.** 드러나는 시점이
+///   첫 화면에서 1초 뒤로 옮겨질 뿐, 안 드러나는 것이 아니다
 /// 🔴 **HTTP 공통은 [ApiClient] 로 옮겼다 (2026-09-21).** 토큰 보관 · UTF-8
 /// 디코딩 · 에러 `code` · `Retry-After` 가 여기 갇혀 있었는데, 카드·스쿼드
 /// 리포지토리가 같은 것을 필요로 해서 복붙하면 세 벌이 된다. 특히 「`response.body`
@@ -136,8 +148,27 @@ class ApiAuthRepository implements AuthRepository {
   @override
   Future<Session?> restoreSession() async {
     if (_current != null) return _current;
-    // 토큰이 없으면 서버를 아예 안 부른다 — 부를 것이 없다.
+    /* 🔴 **토큰이 먼저다.** 토큰이 없으면 저장해 둔 사용자가 있어도 안 쓴다 —
+       아무 요청도 못 하는 **유령 세션**이 되어, 화면은 로그인된 것처럼 그려
+       놓고 모든 칸이 401 로 비어 버린다. */
     if (await _api.loadToken() == null) return null;
+
+    /* 🔴 **여기서 서버를 안 기다린다** (2026-09-25 — 위 머리말의 정정).
+       저장해 둔 본문이 있으면 그것으로 곧장 세션을 만든다. 새로 고치는 것은
+       화면 쪽(`SessionController`)이 이어서 한다 — 이 함수가 기다려 버리면
+       고친 의미가 없다. */
+    final cached = await _api.loadProfile();
+    if (cached != null) {
+      try {
+        return _current = Session(
+          user: _userFrom(jsonDecode(cached) as Map<String, dynamic>),
+        );
+      } catch (_) {
+        /* 🔴 **못 읽으면 그냥 서버로 간다.** 계약이 바뀌어 옛 본문이 안 읽힐
+           수 있고, 그때 앱이 못 켜지면 안 된다. */
+      }
+    }
+
     try {
       return _current = Session(user: await _fetchMe());
     } on AuthException catch (e) {
@@ -156,8 +187,13 @@ class ApiAuthRepository implements AuthRepository {
     }
   }
 
-  Future<AppUser> _fetchMe() async =>
-      _userFrom(await _call(() => _api.get('/me')));
+  Future<AppUser> _fetchMe() async {
+    final body = await _call(() => _api.get('/me'));
+    /* 🔴 **받은 본문을 그대로 남긴다** — 다음에 켤 때 이것을 [_userFrom] 에
+       그대로 물린다. 파서가 한 벌이라 계약이 늘어도 안 갈린다. */
+    await _api.saveProfile(jsonEncode(body));
+    return _userFrom(body);
+  }
 
   /// `GET /me` · `PATCH /me` 의 응답은 **완전히 같다** — 파서가 하나다.
   AppUser _userFrom(Map<String, dynamic> body) {

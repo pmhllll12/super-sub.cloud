@@ -12,12 +12,27 @@ import '../../data/models/video_report.dart';
 /// `summary` 문장 **안에** 숫자를 넣는 것뿐이다. 🔴 **카드 화면으로는 이
 /// 값들을 옮기지 않는다**(부록 D.5 — 카드에 수치를 안 그린다).
 class ReportView extends StatelessWidget {
-  const ReportView({super.key, required this.report});
+  const ReportView({super.key, required this.report, this.onPaper = false});
 
   final VideoReport report;
 
+  /// 🔴 **흰 바탕 위인가** (2026-09-24 사용자 결정: 「갈려져도 괜찮지 않아?
+  /// 그 흰색 판에 리포트가 쓰여야지」).
+  ///
+  /// ⚠️ **이 위젯은 원래 어두운 바탕 전용이었다** — 프로필의 리포트 화면
+  /// (`report_screen.dart`, 바탕 `#14201A`)과 웹이 그 전제를 나눠 쓴다.
+  /// 앱의 「영상 분석」 화면이 리포트를 **흰 판**에 쓰기로 하면서 갈래가
+  /// 생겼고, **사용자가 그 갈림을 알고 골랐다.**
+  ///
+  /// 🔴 **뒤집는 것은 글자색뿐이다** — 축 색([kAxisColors])은 그대로다. 그
+  /// 여섯은 색각 이상 검사를 통과한 한 벌이라 **바탕이 바뀌었다고 손대면
+  /// 그 검사를 다시 해야 한다.** 작은 글자에 쓰는 [axisInk] 만 방향을 바꾼다.
+  final bool onPaper;
+
   @override
   Widget build(BuildContext context) {
+    final ink = onPaper ? _inkPaper : _ink;
+    final seed = onPaper ? _seedPaper : _seed;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -27,13 +42,13 @@ class ReportView extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              _GradeChip(grade: report.overallGrade!),
+              _GradeChip(grade: report.overallGrade!, seed: seed),
               if (report.totalScore != null) ...[
                 const SizedBox(width: 10),
                 Text(
                   '${report.totalScore!.round()}점',
-                  style: const TextStyle(
-                    color: _ink,
+                  style: TextStyle(
+                    color: ink,
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
                   ),
@@ -46,7 +61,7 @@ class ReportView extends StatelessWidget {
 
         Text(
           report.summary,
-          style: const TextStyle(color: _ink, fontSize: 15, height: 1.5),
+          style: TextStyle(color: ink, fontSize: 15, height: 1.5),
         ),
 
         if (report.points.isNotEmpty) ...[
@@ -70,13 +85,13 @@ class ReportView extends StatelessWidget {
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: _seed.withValues(alpha: 0.18),
+                        color: seed.withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
                         p.title!,
-                        style: const TextStyle(
-                          color: _seed,
+                        style: TextStyle(
+                          color: seed,
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                         ),
@@ -85,7 +100,7 @@ class ReportView extends StatelessWidget {
                   Text(
                     p.evidence,
                     style: TextStyle(
-                      color: _ink.withValues(alpha: 0.85),
+                      color: ink.withValues(alpha: 0.85),
                       fontSize: 14,
                       height: 1.45,
                     ),
@@ -97,15 +112,15 @@ class ReportView extends StatelessWidget {
 
         if (report.radar.length >= 3) ...[
           const SizedBox(height: 8),
-          ReportRadar(axes: report.radar),
+          ReportRadar(axes: report.radar, onPaper: onPaper),
         ],
 
         if (report.scenes.isNotEmpty) ...[
           const SizedBox(height: 20),
-          const Text(
+          Text(
             '이렇게 본 장면',
             style: TextStyle(
-              color: _ink,
+              color: ink,
               fontSize: 15,
               fontWeight: FontWeight.w700,
             ),
@@ -121,8 +136,8 @@ class ReportView extends StatelessWidget {
                     width: 44,
                     child: Text(
                       s.at,
-                      style: const TextStyle(
-                        color: _seed,
+                      style: TextStyle(
+                        color: seed,
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                         fontFeatures: [FontFeature.tabularFigures()],
@@ -133,7 +148,7 @@ class ReportView extends StatelessWidget {
                     child: Text(
                       s.what,
                       style: TextStyle(
-                        color: _ink.withValues(alpha: 0.85),
+                        color: ink.withValues(alpha: 0.85),
                         fontSize: 13,
                       ),
                     ),
@@ -149,6 +164,11 @@ class ReportView extends StatelessWidget {
 
 const Color _ink = Color(0xFFFFFFFF);
 const Color _seed = Color(0xFF70ED88);
+
+/// 흰 바탕 짝 — 🔴 **초록을 그대로 못 쓴다.** `#70ED88` 은 흰 판 위에서 대비가
+/// 2:1 도 안 나와 **칭호와 장면 시각이 사라진다.** 같은 계열에서 어둡게 내린다.
+const Color _inkPaper = Color(0xFF14161A);
+const Color _seedPaper = Color(0xFF1E7F45);
 
 /// 축의 색 — **차례가 고정**이고 **돌려 쓰지 않는다**(웹 `--ss-axis-1~6`).
 ///
@@ -187,7 +207,14 @@ Color axisFill(int i) => Color.lerp(Colors.black, axisColor(i), 0.3)!;
 ///
 /// 🔴 계열 색을 작은 글자에 그대로 쓰면 대비가 무너진다(어두운 축일수록
 /// 심하다). 색은 살리되 읽히게 밝은 쪽으로 섞는다.
-Color axisInk(int i) => Color.lerp(axisColor(i), _ink, 0.38)!;
+/// 🔴 **흰 바탕에서는 방향이 뒤집힌다.** 어두운 바탕에서는 색을 **밝은 쪽**
+/// 으로 올려야 읽히고, 흰 바탕에서는 **어두운 쪽**으로 내려야 읽힌다 —
+/// 같은 식을 그대로 쓰면 노랑·주황 축의 숫자가 흰 판에서 사라진다.
+Color axisInk(int i, {bool onPaper = false}) => Color.lerp(
+      axisColor(i),
+      onPaper ? const Color(0xFF000000) : _ink,
+      onPaper ? 0.25 : 0.38,
+    )!;
 
 /// 오버롤 레이더 — 항목마다 `stat`(0~100)을 축 삼아 다각형을 그린다.
 ///
@@ -195,14 +222,18 @@ Color axisInk(int i) => Color.lerp(axisColor(i), _ink, 0.38)!;
 /// 6축에서 서로 파고든다. 대신 **번호로 잇고** 범례에 이름을 적는다. 번호는
 /// 한 글자라 길이가 일정해서 **겹침이 구조적으로 안 생긴다.**
 class ReportRadar extends StatelessWidget {
-  const ReportRadar({super.key, required this.axes});
+  const ReportRadar({super.key, required this.axes, this.onPaper = false});
 
   final List<RadarAxis> axes;
+
+  /// 흰 바탕 위인가 — [ReportView.onPaper] 머리말 참고.
+  final bool onPaper;
 
   @override
   Widget build(BuildContext context) {
     // 다각형이 안 되는 축 개수 — 그리지 않는다.
     if (axes.length < 3) return const SizedBox.shrink();
+    final ink = onPaper ? _inkPaper : _ink;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -213,7 +244,7 @@ class ReportRadar extends StatelessWidget {
           child: SizedBox(
             width: 220,
             height: 220,
-            child: CustomPaint(painter: _RadarPainter(axes)),
+            child: CustomPaint(painter: _RadarPainter(axes, onPaper: onPaper)),
           ),
         ),
         const SizedBox(height: 14),
@@ -230,7 +261,7 @@ class ReportRadar extends StatelessWidget {
                   child: Text(
                     axes[i].name,
                     style: TextStyle(
-                      color: _ink.withValues(alpha: 0.85),
+                      color: ink.withValues(alpha: 0.85),
                       fontSize: 13,
                     ),
                   ),
@@ -238,7 +269,7 @@ class ReportRadar extends StatelessWidget {
                 Text(
                   '${axes[i].stat.round()}',
                   style: TextStyle(
-                    color: axisInk(i),
+                    color: axisInk(i, onPaper: onPaper),
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                     fontFeatures: const [FontFeature.tabularFigures()],
@@ -253,7 +284,7 @@ class ReportRadar extends StatelessWidget {
         Text(
           '축은 항목별 측정값입니다 — 총점은 이 값들의 평균이 아니라 등급의 가중합입니다.',
           style: TextStyle(
-            color: _ink.withValues(alpha: 0.5),
+            color: ink.withValues(alpha: 0.55),
             fontSize: 11,
             height: 1.4,
           ),
@@ -265,9 +296,10 @@ class ReportRadar extends StatelessWidget {
 
 /// 오버롤 등급 칩 — `S`~`F`.
 class _GradeChip extends StatelessWidget {
-  const _GradeChip({required this.grade});
+  const _GradeChip({required this.grade, required this.seed});
 
   final String grade;
+  final Color seed;
 
   @override
   Widget build(BuildContext context) {
@@ -276,14 +308,14 @@ class _GradeChip extends StatelessWidget {
       height: 40,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: _seed.withValues(alpha: 0.18),
+        color: seed.withValues(alpha: 0.18),
         shape: BoxShape.circle,
-        border: Border.all(color: _seed, width: 2),
+        border: Border.all(color: seed, width: 2),
       ),
       child: Text(
         grade,
-        style: const TextStyle(
-          color: _seed,
+        style: TextStyle(
+          color: seed,
           fontSize: 19,
           fontWeight: FontWeight.w800,
           height: 1,
@@ -326,9 +358,15 @@ class _NumDot extends StatelessWidget {
 }
 
 class _RadarPainter extends CustomPainter {
-  _RadarPainter(this.axes);
+  _RadarPainter(this.axes, {this.onPaper = false});
 
   final List<RadarAxis> axes;
+
+  /// 흰 바탕 위인가 — 🔴 **격자와 채움만 뒤집는다.** 번호 원 안의 흰 글자는
+  /// 그대로다(원 속이 [axisFill] 로 **늘 어둡기** 때문이다).
+  final bool onPaper;
+
+  Color get _line => onPaper ? const Color(0xFF14161A) : _ink;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -348,7 +386,7 @@ class _RadarPainter extends CustomPainter {
 
     // 기준선 — 축마다 중심에서 바깥까지. 참고용이라 값은 없다(recessive).
     final axisLine = Paint()
-      ..color = _ink.withValues(alpha: 0.14)
+      ..color = _line.withValues(alpha: onPaper ? 0.18 : 0.14)
       ..strokeWidth = 1;
     for (var i = 0; i < n; i += 1) {
       canvas.drawLine(center, pointAt(i, maxRadius), axisLine);
@@ -365,7 +403,7 @@ class _RadarPainter extends CustomPainter {
     final path = Path()..addPolygon(verts, true);
     canvas.drawPath(
       path,
-      Paint()..color = _ink.withValues(alpha: 0.10),
+      Paint()..color = _line.withValues(alpha: onPaper ? 0.07 : 0.10),
     );
 
     // 변 — 이웃한 두 축 색 사이의 그러데이션.
@@ -416,5 +454,6 @@ class _RadarPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_RadarPainter old) => old.axes != axes;
+  bool shouldRepaint(_RadarPainter old) =>
+      old.axes != axes || old.onPaper != onPaper;
 }

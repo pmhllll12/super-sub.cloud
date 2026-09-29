@@ -124,6 +124,80 @@ ApiVideoRepository buildRepo() {
         'expires_in': 900,
       }, 200);
     }
+    /* 🔴 **`/videos` 검사보다 먼저 온다.** `/videos/public` 은 `/videos` 로
+       끝나지 않아 아래 GET 분기에는 안 걸리지만, 더 아래의
+       `path.contains('/videos/')`(재생·리포트 공용)에 걸려 엉뚱한 답을 준다. */
+    if (path.endsWith('/videos/public')) {
+      /* 🔴 **`rows`(내 목록)와 겹치지 않는 id 를 섞는다** — 계약이 「내 것이
+         아닌 것도 온다」를 보므로, 내 것만 되돌리면 그 시험이 통과해선 안 된다.
+         🔴 **`width`·`height` 를 안 준 줄도 하나 둔다** — 이 칸이 생기기 전
+         등록분이고, 계약이 「그때는 16:9」로 정했다. */
+      return jsonRes([
+        {
+          'id': 'v-other-1',
+          'sport_code': 'football',
+          'duration_ms': 12000,
+          'created_at': '2026-09-21T08:00:00Z',
+          'title': '코너킥 훈련',
+          'description': null,
+          'uploader_nickname': '이감독',
+          'uploader_card_slug': 'coach-lee-1a2b',
+          'width': 1920,
+          'height': 1080,
+        },
+        {
+          'id': 'v-other-2',
+          'sport_code': 'football',
+          'duration_ms': 9000,
+          'created_at': '2026-09-16T17:20:00Z',
+          'title': null,
+          'description': null,
+          'uploader_nickname': '박신입',
+          'uploader_card_slug': null,
+        },
+      ], 200);
+    }
+    /* 🔴 **선수 경로는 `/videos/` 검사보다 먼저 온다** — 아래 공용 분기가
+       경로에 `/videos/` 가 들었는지만 보므로, 순서가 밀리면 선수 관절 요청이
+       「그 영상을 찾을 수 없습니다」로 답한다. */
+    if (path.endsWith('/reference-players')) {
+      // 🔴 **id 와 name 뿐이다** — 재생 주소를 여기 넣으면 계약이 거짓이 된다.
+      return jsonRes([
+        {'id': 'rovelli', 'name': '에스테반 로벨리'},
+        {'id': 'castanheira', 'name': '티아구 카스탄헤이라'},
+      ], 200);
+    }
+    if (path.contains('/reference-players/')) {
+      final id = Uri.decodeComponent(
+        path.split('/reference-players/').last.split('/').first,
+      );
+      if (id != 'rovelli' && id != 'castanheira') {
+        return errRes('PLAYER_NOT_FOUND', 404);
+      }
+      /* 관절 두 장만 — 계약의 **모양**을 보는 자리이지 값을 보는 자리가 아니다.
+         🔴 못 잡은 프레임은 `null` 로 자리를 지킨다(계약). */
+      return jsonRes({
+        'known': true,
+        'fps': 30.0,
+        'frames': 2,
+        'frame_size': [1280, 726],
+        'swing_leg': 'right',
+        'direction': 1,
+        'keypoint_names': const [
+          'nose', 'left_eye', 'right_eye', 'left_ear', 'right_ear',
+          'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow',
+          'left_wrist', 'right_wrist', 'left_hip', 'right_hip',
+          'left_knee', 'right_knee', 'left_ankle', 'right_ankle',
+        ],
+        'joints': [
+          [for (var i = 0; i < 17; i += 1) [0.5, 0.5, 0.9]],
+          null,
+        ],
+        'moments': {'before': 0, 'impact': 0, 'after': 0},
+        'moments_seconds': {'before': 0.0, 'impact': 0.0, 'after': 0.0},
+        'after_clipped': false,
+      }, 200);
+    }
     if (path.endsWith('/videos') && req.method == 'POST') {
       final id = 'v-new-${rows.length}';
       // 🔴 `analyze: false` 면 작업을 안 만든다(계약 3-6절).

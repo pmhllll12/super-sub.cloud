@@ -16,7 +16,7 @@ class SilverEdge extends StatelessWidget {
     super.key,
     required this.child,
     this.radius = 18,
-    this.fill = const Color(0xB31C1C1E),
+    this.fill = defaultFill,
     this.strong = false,
     this.padding,
     this.line,
@@ -39,6 +39,10 @@ class SilverEdge extends StatelessWidget {
   final double? lineWidth;
 
   /// 은빛 — 차갑게 기운 아주 옅은 회색.
+  /// 🔴 **알약들이 나눠 쓰는 면.** 팀장·팀원 알약과 「팀 매칭」이 같은 값을
+  /// 쓴다 — 한쪽만 바꾸면 나란히 선 것들이 다른 재질로 읽힌다.
+  static const Color defaultFill = Color(0xB31C1C1E);
+
   static const Color silver = Color(0xFFC9D4D8);
 
   /// 🔴 **하단 바 윤곽과 로고 알약이 나눠 쓰는 선**(2026-09-22, 사용자 요청:
@@ -46,6 +50,18 @@ class SilverEdge extends StatelessWidget {
   /// 알약이 바에서 떠 보이거나 묻힌다.
   static const Color barLine = Color(0x8CC9D4D8);
   static const double barLineWidth = 0.5;
+
+  /// 🔴 **흰 면 위에서 쓰는 은빛**(2026-09-23). [silver](`#C9D4D8`)는 **검은
+  /// 바탕**에서 경계를 내려고 고른 밝은 값이라, 흰 면 위에서는 흰색에 붙어
+  /// 사라진다 — 홈의 영상 분석 판에서 가장자리 픽셀을 재서 확인했다(`#fefefe`).
+  ///
+  /// 🔴 **홈의 영상 분석 판과 하단 바가 나눠 쓴다.** 둘 다 흰 면 위에 놓인
+  /// 같은 성격의 테라서, 값이 갈리면 한 화면에서 두 굵기·두 색이 보인다.
+  ///
+  /// ⚠️ **굵기는 [barLineWidth] 와 같은 0.5 다** — 사용자 요청의 「제일 얇은」
+  /// 이 그 값이다.
+  static const Color onWhite = Color(0xFF9AA7AD);
+  static const double onWhiteWidth = barLineWidth;
 
   @override
   Widget build(BuildContext context) {

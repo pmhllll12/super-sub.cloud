@@ -95,6 +95,22 @@ class GetPlaybackUrlCommand:
 
 
 @dataclass(frozen=True)
+class GetVideoPosterCommand:
+    """카드에 깔 **한 장면**(JPEG). 권한은 재생 주소와 같다."""
+
+    video_id: UUID
+    user_id: UUID
+
+
+@dataclass(frozen=True)
+class VideoPosterResult:
+    """뜬 장면. [cached] 는 이번에 만든 것이 아니라 캐시에서 나왔다는 뜻이다."""
+
+    jpeg: bytes
+    cached: bool
+
+
+@dataclass(frozen=True)
 class PlaybackUrlResult:
     url: str
     expires_in: int

@@ -21,6 +21,25 @@ from app.analysis.domain.entities.video_entity import (
 
 
 class VideoPort(ABC):
+    def release(self) -> None:
+        """**이 요청에서 DB 를 더 안 쓴다**고 알린다 — 기본은 아무것도 안 한다.
+
+        🔴 **왜 포트에 있나** (2026-09-25, `paik`). 요청당 세션 하나(`get_session`)
+        라서, 요청이 살아 있는 동안 커넥션 하나가 계속 잡혀 있다. 그런데
+        포스터 뜨기는 **ffmpeg 이 최대 20초**(`poster_ffmpeg.TIMEOUT_SECONDS`)
+        를 쓰고, 그동안 그 커넥션이 **아무 일도 안 하면서 묶여 있다.**
+
+        홈이 카드 다섯 장을 한 번에 부르고 웹·앱이 겹치면 풀(`pool_size +
+        max_overflow`)이 금세 빈다. 그러면 **상관없는 요청들이** 커넥션을
+        기다리다 `pool_timeout` 만큼 멈춘다 — 앱 홈에서 영상 줄이 통째로 안
+        나오던 그것이고, 실측으로 `GET /videos/public` 이 정확히 30.00초
+        무응답이었다(그때 기본값이 30초였다).
+
+        🔴 **부른 뒤에는 그 요청에서 DB 를 다시 쓰지 않는다.** 쓰면 세션이
+        커넥션을 새로 꺼내므로 틀린 값이 나오지는 않지만, 이 호출의 뜻이
+        없어진다.
+        """
+
     @abstractmethod
     def sport_exists(self, sport_code: str) -> bool: ...
 
