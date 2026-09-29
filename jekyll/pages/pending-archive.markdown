@@ -3,6 +3,7 @@ layout: default
 title: 미결 항목 아카이브
 permalink: /pending-archive/
 nav_exclude: true
+search_exclude: true
 ---
 
 `jekyll/pages/pending.markdown`(미결 항목)에서 이미 해소된 항목을 옮겨 둔
