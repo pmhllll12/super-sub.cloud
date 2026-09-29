@@ -117,7 +117,7 @@ grep -n '담당.*<내 이름>' jekyll/pages/pending.markdown
 Jekyll 소스 루트는 **저장소 루트 자체**입니다 (`_config.yml`이 여기 있음). 사이트 인프라와 콘텐츠를 아래처럼 분리합니다.
 
 - **루트**: `_config.yml`, `Gemfile`, `Gemfile.lock`, `404.html`, `_layouts/`, `assets/main.scss`, `.github/workflows/pages.yml`, `supersub-preview.service`
-- **`tools/`**: 사이트 페이지·그림을 **만들어 내는** 스크립트 (`exclude:`에 등록되어 발행되지 않음). 🔴 **`jekyll/progress/`의 네 페이지(10·11·12·14번), `06-시스템설계`의 1절, `assets/erd/`의 ERD 9장, 제안서 장 안의 그림(`<!-- gen_figures:… -->` 사이 — 어느 장인지는 `grep -l 'gen_figures:' jekyll/chapters/*`)은 손으로 쓴 것이 아니라 여기서 나옵니다** — 그 그림·수치를 페이지에서 직접 고치면 다음 실행 때 조용히 덮입니다. 고치는 법·함정은 `tools/README.md` (2026-09-18 신설)
+- **`tools/`**: 사이트 페이지·그림을 **만들어 내는** 스크립트 (`exclude:`에 등록되어 발행되지 않음). 🔴 **`jekyll/progress/`의 네 페이지(10·11·12·14번), `06-시스템설계`의 1절, `assets/erd/`의 ERD 9장(과 `assets/erd/dark/`의 다크 판 9장), 제안서 장 안의 그림(`<!-- gen_figures:… -->` 사이 — 어느 장인지는 `grep -l 'gen_figures:' jekyll/chapters/*`)은 손으로 쓴 것이 아니라 여기서 나옵니다** — 그 그림·수치를 페이지에서 직접 고치면 다음 실행 때 조용히 덮입니다. 고치는 법·함정은 `tools/README.md` (2026-09-18 신설)
 - **`guide/`**: 개발환경 셋업 가이드 (7단계, 기존 자료 — 목차에는 연결되어 있지 않음)
 - **`demo/`**: 완전히 별개의 연습용 Jekyll 사이트(영상자료 디지털화 사업 RFP 템플릿). 자체 `_config.yml`/`Gemfile`/레이아웃을 가진 독립 사이트라 루트 `_config.yml`의 `exclude:`에 등록되어 이 사이트 빌드에 포함되지 않습니다. **이 프로젝트 작업 중에는 건드리지 않습니다.**
 - **`jekyll/`**: 계속 늘어나는 이 프로젝트의 콘텐츠 `.md` 파일 전용 폴더 (depth-2: `jekyll/<분류>/<파일>`)
@@ -165,7 +165,9 @@ Jekyll 소스 루트는 **저장소 루트 자체**입니다 (`_config.yml`이 �
 **다크 모드가 있습니다(2026-09-17).** 머리칸의 「다크 모드」 단추로 바꾸고, 고른 값은 그 브라우저에
 남습니다(고른 적이 없으면 운영체제 설정을 따릅니다). 전환은 `_includes/head_custom.html`(첫 화면 전에
 정함)·`_includes/header_custom.html`(단추)이고, 본문·표·코드·사이드바는 Just the Docs 의 dark 스킴이
-맡습니다. 🔴 **페이지 본문에 색을 인라인 `style="color:#…"` 로 박지 마십시오** — 테마별로 못 바꿔서
+맡습니다. 🔴 **다크 바탕·면·테두리 색만은 테마보다 짙은 무채색으로 덮어썼습니다**(2026-09-29,
+`_sass/color_schemes/dark.scss` — 테마의 같은 이름 파일을 대신합니다). 테마를 올리면 그 파일을 원본과 대조하고,
+색을 바꾸면 `assets/main.scss` 의 다크 절(숫자 카드·칸반·사이드바 단추)도 함께 맞춥니다. 🔴 **페이지 본문에 색을 인라인 `style="color:#…"` 로 박지 마십시오** — 테마별로 못 바꿔서
 다크 화면에서 글자가 안 보입니다. `assets/main.scss` 에 클래스로 두고 같은 파일의
 `html[data-theme="dark"]` 절에 다크 값도 함께 둡니다. 확인:
 
