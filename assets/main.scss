@@ -275,7 +275,8 @@ h3 {
     color: #fff;
   }
 
-  // 2·3단계(페이지) — 테두리 있는 흰 단추. 지금 보는 페이지는 연보라. 높이는 테마 기본(2rem)과
+  // 2·3단계(페이지) — 테두리 있는 흰 단추. 지금 보는 페이지는 연파랑(2026-09-29 — 보라 말고 다른 색으로,
+  // 묶음 단추의 보라는 그대로 두라는 사용자 요청. 파랑은 본문 그림의 강조색 계열). 높이는 테마 기본(2rem)과
   // 비슷하게 둬서 사이드바가 길어지지 않게 한다.
   .nav-list .nav-list-link {
     min-height: 0;
@@ -293,9 +294,9 @@ h3 {
     }
 
     &.active {
-      border-color: #c4b5f7;
-      background: #e4dcfd;
-      color: #5e41d0;
+      border-color: #8fb4e3;
+      background: #d6e5f8;
+      color: #1d5299; // 바탕과 명암비 6 이상
       font-weight: 600;
     }
   }
@@ -335,9 +336,9 @@ html[data-theme="dark"] #site-nav > .nav-list > .nav-list-item {
       background: #403c49;
     }
 
-    &.active {
-      border-color: #8a829c;
-      background: #4d4759;
+    &.active { // 지금 페이지 — 채도를 낮춘 회파랑(라이트의 연파랑과 같은 색 계열)
+      border-color: #5b7fae;
+      background: #2f4a6b;
       color: #fff;
     }
   }
