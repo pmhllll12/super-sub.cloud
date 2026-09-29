@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:super_sub/core/dev/data_source.dart';
 import 'package:super_sub/core/mock/mock_db.dart';
 import 'package:super_sub/features/auth/data/auth_providers.dart';
 import 'package:super_sub/features/auth/data/auth_repository.dart';
-import 'package:super_sub/features/auth/data/auth_repository_api.dart';
 import 'package:super_sub/features/auth/data/auth_repository_mock.dart';
 import 'package:super_sub/features/auth/data/google_id_token.dart';
 import 'package:super_sub/features/auth/data/models/app_user.dart';
@@ -124,35 +122,17 @@ void main() {
     expect(find.text('팀 관리자'), findsNothing);
   });
 
-  // 개발 빌드(시험도 개발 빌드다)에서만 서는 단추. 서버가 꺼진 곳에서 화면 작업을
-  // 잇는 용도다 — 데이터를 목업으로 바꾸고 목업 계정으로 들어간다.
-  testWidgets('「개발자 전용」은 목업으로 바꾼 뒤 들어간다', (tester) async {
-    // 인증을 덮어쓰지 않는다 — 실제 교체 지점이 스위치를 따라가는지 봐야 한다.
-    final container = ProviderContainer();
-    addTearDown(container.dispose);
-    await tester.pumpWidget(UncontrolledProviderScope(
-      container: container,
-      child: const MaterialApp(home: LoginScreen()),
-    ));
-    expect(container.read(useMockProvider), isFalse);
-    expect(container.read(authRepositoryProvider), isA<ApiAuthRepository>());
+  /* ⛔ **「개발자 전용」 시험 둘을 걷었다** (2026-09-29, 단추를 걷으면서).
+     걷은 까닭은 `login_screen.dart` 의 그 자리 주석에 있다 — 남에게 주는
+     디버그 APK 에서 뒷문으로 읽혔다.
 
-    final button = find.byKey(const Key('dev-only-login'));
-    expect(find.text('개발자 전용'), findsOneWidget);
-    await tester.ensureVisible(button);
-    await tester.pump();
-    await tester.tap(button);
-    await tester.pump(const Duration(milliseconds: 500));
-
-    expect(container.read(useMockProvider), isTrue);
-    expect(container.read(authRepositoryProvider), isA<MockAuthRepository>());
-    expect(container.read(sessionControllerProvider), isA<SessionLoggedIn>());
-  });
-
-  testWidgets('가입 모드에서는 「개발자 전용」을 안 보인다', (tester) async {
+     🔴 **대신 없다는 것을 지킨다** — 되살릴 때는 이 시험을 지우고 옛
+     시험(목업 교체 · 가입 모드에서 숨김) 둘을 되돌린다. */
+  testWidgets('「개발자 전용」 단추가 없다', (tester) async {
     await tester.pumpWidget(_wrap());
-    await _tapModeToggle(tester);
+
     expect(find.byKey(const Key('dev-only-login')), findsNothing);
+    expect(find.text('개발자 전용'), findsNothing);
   });
 
   testWidgets('눈 단추로 비밀번호를 보였다 숨긴다', (tester) async {

@@ -1,11 +1,8 @@
 import 'dart:ui' show ImageFilter;
 
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/dev/data_source.dart';
-import '../../../../core/mock/mock_db.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/refractive_glass.dart';
 import '../../../intro/presentation/brand_mark.dart';
@@ -399,39 +396,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ),
             ),
-            // 🔴 **개발 빌드에서만** 선다(`kDebugMode`). 릴리스 빌드에는 코드째
-            // 빠지므로 로그인 없이 들어오는 뒷문이 되지 않는다 — 같은 날 걷어낸
-            // 「바로 진입」 셋이 API 모드에서 예외만 던지던 것과 달리, 이것은
-            // **데이터를 목업으로 바꾼 뒤** 목업 계정으로 들어간다.
-            // 서버가 꺼진 곳(집 · 인스턴스를 내린 뒤)에서 화면 작업을 잇는 용도다.
-            if (kDebugMode && !_signingUp) ...[
-              const SizedBox(height: 4),
-              Center(
-                child: OutlinedButton(
-                  key: const Key('dev-only-login'),
-                  onPressed: _busy ? null : _enterWithMock,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _kOnPhoto.withValues(alpha: 0.7),
-                    side: BorderSide(color: _kOnPhoto.withValues(alpha: 0.3)),
-                    visualDensity: VisualDensity.compact,
-                    shape: const StadiumBorder(),
-                  ),
-                  child: const Text('개발자 전용', style: TextStyle(fontSize: 12)),
-                ),
-              ),
-            ],
+            /* ⛔ **「개발자 전용」 단추를 걷었다** (2026-09-29 사용자 지시).
+               `kDebugMode` 로 릴리스에서는 빠지고 있었지만, 남에게 주는
+               디버그 APK 에서는 그대로 보였다 — 처음 보는 사람에게는 뒷문이
+               열려 있는 것으로 읽힌다.
+
+               되살리려면 이 자리에 `_enterWithMock` 을 부르는 단추를 둔다
+               (그 메서드는 남겨 뒀다 — 목업으로 바꾼 뒤 목업 계정으로
+               들어가는 길이고, 서버가 꺼진 곳에서 화면 작업을 잇는 용도다). */
           ],
         ),
       ),
     );
   }
 
-  /// 데이터를 목업으로 바꾸고 목업의 개인 사용자로 들어간다. 이후로는 구글
-  /// 로그인 단추도 목업이 받는다(토큰 검증 없이 같은 목업 사용자).
-  void _enterWithMock() {
-    ref.read(useMockProvider.notifier).useMock();
-    _run(() => ref.read(sessionControllerProvider.notifier).loginAs(MockDb.playerId));
-  }
+  /* ⛔ **여기 있던 `_enterWithMock` 을 걷었다** (2026-09-29, 위 「개발자 전용」
+     단추와 함께). 데이터를 목업으로 바꾸고 목업 사용자로 들어가던 길이다:
+
+         ref.read(useMockProvider.notifier).useMock();
+         _run(() => ref.read(sessionControllerProvider.notifier)
+             .loginAs(MockDb.playerId));
+
+     되살리려면 이 넷을 그대로 두고 `foundation.dart`(`kDebugMode`) ·
+     `mock_db.dart` · `data_source.dart` import 를 다시 단다. */
 
   /// [revealable] 이면 눈 단추로 입력값을 잠깐 볼 수 있는 비밀번호 칸이다.
   Widget _field({
