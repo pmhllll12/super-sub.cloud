@@ -253,13 +253,19 @@ class _CandidateListState extends ConsumerState<_CandidateList> {
   Venue? _where;
   bool _sending = false;
 
+  /// 달력에서 직접 고른 시각 — 있으면 추천 목록에 끼어 든다.
+  ///
+  /// 🔴 **목록과 따로 들고 있어야 한다.** 추천은 매 빌드마다 새로 만들어지는데
+  /// 고른 값을 거기 섞어 두면 다음 빌드에 사라진다.
+  Proposal? _custom;
+
   @override
   Widget build(BuildContext context) {
     final async = ref.watch(matchCandidatesProvider(widget.teamId));
     /* 🔴 **이미 건 팀은 잠근다**(2026-09-25 사용자 요청). 계약도 같은 상대에
        겹쳐 거는 것을 409 로 막으므로, 눌리게 두면 오류만 보게 된다. */
     final live = ref.watch(liveRequestsProvider(widget.teamId)).value ?? const {};
-    final proposals = proposalsFrom(widget.prefs.times);
+    final proposals = withCustom(proposalsFrom(widget.prefs.times), _custom);
     final venues = venuesFor(widget.prefs.regions);
 
     return Column(
@@ -301,12 +307,18 @@ class _CandidateListState extends ConsumerState<_CandidateList> {
                       sending: _sending,
                       onToggle: () => setState(() {
                         _open = _open == list[i].teamId ? null : list[i].teamId;
-                        _when = proposals.isEmpty ? null : proposals.first;
+                        /* 🔴 **직접 고른 날짜는 그 줄의 것이다** — 다른 팀을
+                           펼치면 지운다. 안 그러면 A 팀에 고른 날짜가 B 팀
+                           칸에 그대로 얹혀 **고른 적 없는 값**으로 신청된다. */
+                        _custom = null;
+                        final base = proposalsFrom(widget.prefs.times);
+                        _when = base.isEmpty ? null : base.first;
                         _where = venues.isEmpty ? null : venues.first;
                       }),
                       onWhen: (p) => setState(() => _when = p),
                       onWhere: (v) => setState(() => _where = v),
                       onApply: () => _apply(list[i]),
+                      onPickDate: _pickDate,
                     ),
                   ),
           ),
@@ -320,6 +332,62 @@ class _CandidateListState extends ConsumerState<_CandidateList> {
         ),
       ],
     );
+  }
+
+  /// 달력 → 시계로 **조건 밖의 날짜·시각**을 고른다 (2026-09-29).
+  ///
+  /// 🔴 **오늘부터 6개월.** 사용자가 든 예가 「다음주일 수도 있고 다음달일
+  /// 수도 있는거잖아」라 **달 단위로 넘어갈 수 있어야** 한다. 위로 한계를
+  /// 두는 것은 달력을 무한정 넘기게 두지 않으려는 것뿐이다.
+  ///
+  /// 🔴 **지난 날짜는 못 고른다** — 지난 시각으로 신청하면 서버가 받아 줘도
+  /// 아무도 못 뛴다([nextOccurrence] 의 머리말과 같은 까닭이다).
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final seed = _when?.at ?? now;
+
+    final day = await showDatePicker(
+      context: context,
+      initialDate: seed.isAfter(now) ? seed : now,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: DateTime(now.year, now.month + 6, now.day),
+      helpText: '경기 날짜',
+      cancelText: '취소',
+      confirmText: '다음',
+    );
+    if (day == null || !mounted) return;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: seed.hour, minute: seed.minute),
+      helpText: '경기 시각',
+      cancelText: '취소',
+      confirmText: '정하기',
+    );
+    if (time == null || !mounted) return;
+
+    final at = DateTime(day.year, day.month, day.day, time.hour, time.minute);
+    /* 🔴 **오늘을 고르면 시각이 이미 지났을 수 있다.** 달력만으로는 못 막는다 —
+       날짜는 오늘이 맞고 시각만 지난 것이기 때문이다. */
+    if (!at.isAfter(now)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('이미 지난 시각입니다')),
+      );
+      return;
+    }
+
+    final picked = Proposal.custom(at);
+    setState(() {
+      _custom = picked;
+      /* 🔴 **고른 것을 그대로 「언제」에 앉힌다.** 목록에 끼워 넣기만 하고
+         고르지 않으면, 달력을 닫은 사람 눈에는 **아무 일도 안 일어난 것**이다.
+         같은 시각의 추천이 이미 있으면 [withCustom] 이 그쪽을 남기므로
+         목록에서 같은 `at` 을 찾아 앉힌다 — 그래야 `value` 가 `items` 안에
+         있다. */
+      _when = withCustom(proposalsFrom(widget.prefs.times), picked)
+          .firstWhere((p) => p.at == at, orElse: () => picked);
+    });
   }
 
   /// 걸어 둔 신청을 무른다 — 그 팀 판은 다시 「경기 신청」이 된다.
@@ -381,6 +449,7 @@ class _CandidateRow extends StatelessWidget {
     required this.onWhen,
     required this.onWhere,
     required this.onApply,
+    required this.onPickDate,
   });
 
   final MatchCandidate team;
@@ -403,6 +472,9 @@ class _CandidateRow extends StatelessWidget {
   final ValueChanged<Proposal> onWhen;
   final ValueChanged<Venue> onWhere;
   final VoidCallback onApply;
+
+  /// 달력·시계를 띄워 **조건 밖의 날짜**를 고른다.
+  final VoidCallback onPickDate;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -482,6 +554,21 @@ class _CandidateRow extends StatelessWidget {
                   value: when,
                   items: [for (final p in proposals) (p, p.label)],
                   onChanged: onWhen,
+                  onBox: true,
+                ),
+                /* 🔴 **조건 밖의 날짜도 고른다**(2026-09-29 사용자 지적:
+                   「다음주일 수도 있고 다음달일 수도 있는거잖아」).
+
+                   위 칸은 조건에서 만든 **「다음에 오는 그 요일」**뿐이라
+                   2주 뒤·다음 달로는 신청할 길이 없었다. 조건은 이제
+                   **추천**이고, 정하는 것은 사람이다.
+
+                   ⚠️ 조건 밖 시각을 고르면 상대가 못 뛸 수 있다 — 그래서
+                   추천을 **지우지 않고 그대로 위에 남긴다.** */
+                const SizedBox(height: 6),
+                _OutlineButton(
+                  label: '달력에서 고르기',
+                  onTap: onPickDate,
                   onBox: true,
                 ),
                 const SizedBox(height: 10),

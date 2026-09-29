@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_sub/core/network/api_client.dart';
+import 'package:super_sub/core/theme/app_theme.dart';
 import 'package:super_sub/core/network/upload_file.dart';
 import 'package:super_sub/features/card/data/card_providers.dart';
 import 'package:super_sub/features/card/data/card_repository.dart';
@@ -127,6 +128,50 @@ void main() {
     _tempPhoto = File(
       '${Directory.systemTemp.createTempSync('ss-card-photo').path}/p.png',
     )..writeAsBytesSync(base64Decode(_onePixelPng));
+  });
+
+  /* 🔴 **영상 화면과 같은 골격이다** (2026-09-29 사용자 지적: 「카드 꾸미기
+     화면만 너무 초록색으로 혼자 노는것 같은데」). 이 화면만 초록 팔레트
+     (바탕 `#14201A` · 강조 `#70ED88` · 판 `#1E3029`)에 남아 있었다.
+
+     🔴 **판 색은 [kSheetPaper] 에서 온다** — 값을 베껴 적으면 영상 화면과
+     조용히 갈린다. 그래서 토큰으로 견준다. */
+  group('영상 화면과 같은 골격', () {
+    testWidgets('바탕이 순검정이다', (tester) async {
+      await _pump(tester);
+
+      final s = tester.widget<Scaffold>(find.byType(Scaffold));
+      expect(s.backgroundColor, const Color(0xFF000000));
+    });
+
+    testWidgets('조작 칸이 밝은 판 위에 앉는다', (tester) async {
+      await _pump(tester);
+
+      expect(
+        find.byWidgetPredicate(
+          (w) => w is ColoredBox && w.color == kSheetPaper,
+        ),
+        findsWidgets,
+      );
+    });
+
+    /// ⛔ **초록을 강조색으로 되살리지 말 것** — 그러면 이 화면만 또 혼자 논다.
+    /// ⚠️ 카드 **견본색**(`#70ED88` 동그라미)은 예외다 — 그건 사람이 카드에
+    /// 고르는 색이지 화면의 강조색이 아니라서, 면(`color`)으로만 쓰인다.
+    testWidgets('초록을 강조색으로 쓰지 않는다', (tester) async {
+      await _pump(tester);
+
+      const seed = Color(0xFF70ED88);
+      // 테두리·글자에 초록이 쓰이면 걸린다.
+      expect(
+        find.byWidgetPredicate((w) =>
+            w is Text && w.style?.color == seed ||
+            w is Container &&
+                w.decoration is BoxDecoration &&
+                (w.decoration! as BoxDecoration).border?.top.color == seed),
+        findsNothing,
+      );
+    });
   });
 
   testWidgets('탭 넷이 선다', (tester) async {

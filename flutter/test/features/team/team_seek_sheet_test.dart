@@ -28,6 +28,9 @@ class _Fake implements MatchRepository {
   }
 
   @override
+  Future<List<OpenMatch>> teamMatches(String teamId) async => const [];
+
+  @override
   Future<List<OpenMatch>> openMatches({String? sportCode, String? region}) async {
     asked.add((sport: sportCode, region: region));
     return [

@@ -13,6 +13,8 @@ import '../../../../core/widgets/floating_nav_bar.dart';
 import '../../../card/presentation/card_editor_screen.dart';
 import '../../../video/presentation/screens/my_videos_screen.dart';
 import '../widgets/player_card_view.dart';
+import '../../../team/data/match_providers.dart';
+import '../../../team/data/models/open_match.dart';
 import '../../../team/data/team_providers.dart';
 import 'delete_account_sheet.dart';
 import 'nickname_sheet.dart';
@@ -28,7 +30,16 @@ import 'titles_sheet.dart';
 /// 전용 화면이다(`MyVideosScreen`) — 플레이어·스트립·리포트를 이 목록 안에
 /// 다 쌓으면 프로필이 통째로 굴러야 하는 길이가 된다.
 class ProfileScreen extends ConsumerWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({super.key, this.needTeam = false});
+
+  /// 🔴 **팀 없이 스쿼드 판의 빈 자리를 눌러서 왔는가** (2026-09-29 사용자
+  /// 요청: 「내 프로필로 자동으로 들어가서 팀 만들기만 밝고, 다른 곳은 살짝
+  /// 어두워지면서 '팀을 먼저 만들어주세요.'」).
+  ///
+  /// ⚠️ **전에는 그 자리가 「선수 넣기 — 준비 중입니다」였다.** 기능이 준비
+  /// 중인 것이 아니라 **팀이 없어서** 못 하는 것인데, 처음 온 사람은 앱이
+  /// 미완성이라고 읽었다. 그것이 새 사용자가 가장 먼저 만나는 문구였다.
+  final bool needTeam;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -131,24 +142,39 @@ class ProfileScreen extends ConsumerWidget {
                다섯이 세로로 줄줄이 서서 화면이 한참 길었다.
                「내 영상」만 한 줄을 다 쓴다 — 자주 들어가는 입구다. */
               children: [
-                /* 🔴 **카드 자리는 완전한 흰 판 위다** (2026-09-25 사용자
-                   요청: 「그 내 분석/ 업로드 영상 버튼 위에 선 위로 그 위쪽에
-                   완전 흰색 판 두고, 양쪽 이랑 아래 선이랑 6픽셀 거리만 두고」).
+                /* 🔴 **팀이 먼저라고 말해 준다**(2026-09-29). 판의 빈 자리를
+                   눌러서 온 사람은 **왜 여기로 왔는지**를 모른다 — 안내가
+                   없으면 프로필이 그냥 열린 것으로 보인다. */
+                if (needTeam) ...[
+                  const _NeedTeamNotice(),
+                  const SizedBox(height: _kGap),
+                ],
+                /* 🔴 **카드 자리는 [_kCardSheet](어두운 판) 위다**
+                   (2026-09-29 사용자 요청: 「내 카드 있는 그 뒤에 흰색 판을
+                   … 스쿼드판 뒤에 있는 완전 검은색은 아닌 그 판 색상으로」).
+
+                   ⚠️ **순백([_kOn])이었다** (2026-09-25: 「완전 흰색 판 두고,
+                   양쪽 이랑 아래 선이랑 6픽셀 거리만 두고」). 자리·여백은
+                   그때 그대로고 **면 색만** 갈렸다.
 
                    🔴 **양옆 6 은 목록이 이미 준다**([_kEdge]) — 여기서 또
                    주면 12 가 된다. 아래 6 은 바로 아래 [SizedBox] 다.
-                   🔴 **판 위의 글자를 같이 뒤집었다**(`onWhite`) — 안 뒤집으면
-                   흰 글자가 흰 판에 얹혀 **통째로 사라진다.** */
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: const BoxDecoration(
-                    color: _kOn,
-                    borderRadius: BorderRadius.all(Radius.circular(16)),
-                  ),
-                  child: _CardHero(
-                    cardAsync: cardAsync,
-                    nickname: user.nickname,
-                    onWhite: true,
+                   🔴 **판 위의 글자를 같이 뒤집었다**(`onWhite: false`) —
+                   안 뒤집으면 검은 글자([_kOnWhitePanel])가 어두운 판에 얹혀
+                   **통째로 사라진다.** 흰 판일 때 겪은 것의 정반대다. */
+                _Dim(
+                  on: needTeam,
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: const BoxDecoration(
+                      color: _kCardSheet,
+                      borderRadius: BorderRadius.all(Radius.circular(16)),
+                    ),
+                    child: _CardHero(
+                      cardAsync: cardAsync,
+                      nickname: user.nickname,
+                      onWhite: false,
+                    ),
                   ),
                 ),
                 /* 🔴 **흰 판과 선 사이는 6 이다**(사용자가 그 값을 짚었다).
@@ -158,7 +184,7 @@ class ProfileScreen extends ConsumerWidget {
                 const SizedBox(height: _kGap),
                 const _Rule(),
                 const SizedBox(height: 14),
-                const _VideosBlock(),
+                _Dim(on: needTeam, child: const _VideosBlock()),
                 /* 🔴 **두 번째 흰 선**(2026-09-22 사용자 요청: 「내 분석/업로드
                  영상 바로 아래에도 … 똑같이 거리 재서」). 위 선과 **같은
                  여백(14)** 을 위아래로 둬서 선이 두 판의 한가운데에 선다.
@@ -170,14 +196,24 @@ class ProfileScreen extends ConsumerWidget {
                 const SizedBox(height: 14),
                 const _Rule(),
                 const SizedBox(height: 14),
+                /* 🔴 **「팀 만들기」만 밝다**(2026-09-29 사용자 요청: 「팀
+                   만들기만 밝고, 다른 곳은 살짝 어두워지면서」).
+
+                   🔴 **[Opacity] 로 흐리게만 하고 **막지는 않는다** — 눌러서
+                   못 쓰게 하면 팀 말고 다른 일(로그아웃·닉네임)을 하러 온
+                   사람이 갇힌다. 「여기를 보라」는 **안내**지 **잠금**이
+                   아니다. */
                 _Pair(
                   left: [
-                    _TeamBlock(teams: user.teams),
-                    const _MatchesBlock(),
+                    _TeamBlock(teams: user.teams, autoOpenCreate: needTeam),
+                    _Dim(
+                      on: needTeam,
+                      child: _MatchesBlock(teamId: user.primaryTeamId),
+                    ),
                   ],
                   right: [
-                    _InfoBlock(user: user),
-                    _AccountBlock(user: user),
+                    _Dim(on: needTeam, child: _InfoBlock(user: user)),
+                    _Dim(on: needTeam, child: _AccountBlock(user: user)),
                   ],
                 ),
               ],
@@ -187,6 +223,59 @@ class ProfileScreen extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// 「팀 만들기」 말고는 **살짝 어둡게** 한다 (2026-09-29).
+///
+/// 🔴 **[IgnorePointer] 를 붙이지 않는다** — 흐린 것은 「여기 말고 저기를
+/// 보라」는 안내지 잠금이 아니다. 막으면 로그아웃하러 온 사람이 갇힌다.
+class _Dim extends StatelessWidget {
+  const _Dim({required this.on, required this.child});
+
+  final bool on;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => AnimatedOpacity(
+        // 읽히긴 해야 한다 — 0.4 면 「꺼졌다」로 보인다.
+        opacity: on ? 0.55 : 1,
+        duration: const Duration(milliseconds: 220),
+        child: child,
+      );
+}
+
+/// 판의 빈 자리를 눌러서 온 사람에게 **왜 여기로 왔는지**를 말해 준다.
+class _NeedTeamNotice extends StatelessWidget {
+  const _NeedTeamNotice();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        key: const Key('profile-need-team'),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: _kOn,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '팀을 먼저 만들어 주세요.',
+              style: TextStyle(
+                color: _kOnPanel,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              '팀이 있어야 스쿼드 판에 선수를 넣을 수 있습니다.',
+              style: TextStyle(color: _kOnPanel, fontSize: 12.5),
+            ),
+          ],
+        ),
+      );
 }
 
 /* ⛔ **`_kBg`(순검정)를 지웠다**(2026-09-22) — 바탕을 [ScreenTint] 가
@@ -224,7 +313,24 @@ const double _kGap = 6;
 /// 흰 판 위의 글자·단추 — 🔴 **검은 바탕용 [_kOn] 의 짝이다**(2026-09-25,
 /// 카드 자리가 흰 판으로 올라가면서). 그 판에 들어가는 것은 **전부** 이 값을
 /// 써야 한다 — 하나라도 [_kOn] 으로 남으면 흰 판에서 통째로 사라진다.
+///
+/// ⚠️ **카드 자리는 더 이상 이 값을 안 쓴다**([_kCardSheet] 로 갈렸다,
+/// 2026-09-29). 이 화면의 **다른 흰 판들**(「내 영상」 아래 칸들)은 그대로다.
 const Color _kOnWhitePanel = Color(0xFF111114);
+
+/// 카드 자리의 판 — 🔴 **홈의 판과 같은 `#1C1C1E`** (2026-09-29 사용자 요청:
+/// 「스쿼드판 뒤에 있는 완전 검은색은 아닌 그 판 색상으로」). 이 화면 바탕이
+/// 순검정이라, 판은 **바탕보다 한 끗 밝아서** 자리로 읽힌다.
+///
+/// 🔴 **홈의 `_kWhiteSheetColor` 와 값이 같을 뿐 묶여 있지 않다** — 일부러
+/// 복사본이다. 두 화면이 토큰을 나눠 쓰다가 **한쪽만 어둡게 하려던 것이 다른
+/// 화면까지 검게 만든** 일이 있었고(`home_screen.dart` 의 「⛔ 다시
+/// [kSheetPaper] 로 묶지 말 것」), 그래서 홈도 제 값을 제 파일에 들고 있다.
+/// 한쪽을 바꿀 때 다른 쪽도 바꾸고 싶으면 **두 곳을 다 고친다.**
+///
+/// 🔴 **면을 갈면 그 위의 잉크를 같이 본다** — 판 위 글자·단추는
+/// `onWhite: false`([_kOn], 흰색)다.
+const Color _kCardSheet = Color(0xFF1C1C1E);
 
 /// 되돌릴 수 없는 일의 빨강 — 탈퇴·해체가 나눠 쓴다.
 const Color _kDanger = Color(0xFFD32F2F);
@@ -754,9 +860,15 @@ void _notReady(BuildContext context, String what) {
 /// 주장은 고치고 해체하고 **나갈 수 없다**(남은 사람들의 팀이 주인 없이
 /// 남는다). 팀원은 나가기만 한다.
 class _TeamBlock extends ConsumerStatefulWidget {
-  const _TeamBlock({required this.teams});
+  const _TeamBlock({required this.teams, this.autoOpenCreate = false});
 
   final List<TeamMembership> teams;
+
+  /// 만들기 폼을 **처음부터 펴 둔다** (2026-09-29, `needTeam` 으로 왔을 때).
+  ///
+  /// 🔴 **한 번만 편다** — `initState` 에서만 본다. 매 빌드마다 펴면 사람이
+  /// 접어도 **다시 열려서** 접을 수가 없다.
+  final bool autoOpenCreate;
 
   @override
   ConsumerState<_TeamBlock> createState() => _TeamBlockState();
@@ -769,6 +881,16 @@ class _TeamBlockState extends ConsumerState<_TeamBlock> {
   /// 🔴 **닫혀도 마지막 내용을 들고 있는다** — 접는 동안 폼이 사라지면
   /// 줄어들 것이 없어 툭 접힌다.
   String? _lastOpenFor;
+
+  @override
+  void initState() {
+    super.initState();
+    // 🔴 한 번만이다 — 머리말 참고. 매 빌드에서 보면 접을 수가 없어진다.
+    if (widget.autoOpenCreate) {
+      _openFor = '';
+      _lastOpenFor = '';
+    }
+  }
 
   void _toggle(String key) => setState(() {
     _openFor = _openFor == key ? null : key;
@@ -1326,16 +1448,91 @@ class _VideosBlock extends ConsumerWidget {
   }
 }
 
-class _MatchesBlock extends StatelessWidget {
-  const _MatchesBlock();
+/// 내 경기 — 🔴 **서버에서 읽는다** (2026-09-29, `GET /teams/{id}/matches`).
+///
+/// ⚠️ **글자가 박혀 있었다.** 늘 「다가오는 경기가 없습니다」라, 경기가
+/// 실제로 잡혀 있어도 없다고 나왔다. ⛔ 상수 문구로 되돌리지 말 것.
+///
+/// 🔴 **「없다」와 「못 읽었다」를 가른다** — 둘을 같은 문구로 두면 서버가
+/// 죽었을 때도 「경기가 없구나」로 읽힌다(이 화면이 카드에서 이미 데인
+/// 함정과 같다). 그래서 `.value` 로 납작하게 만들지 않는다.
+class _MatchesBlock extends ConsumerWidget {
+  const _MatchesBlock({required this.teamId});
+
+  /// 팀이 없으면 `null` — 그때는 부를 곳이 없다.
+  final String? teamId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    const ink = TextStyle(color: _kOnPanel);
+    final id = teamId;
+    if (id == null) {
+      return const _Block(
+        title: '내 경기',
+        // 팀이 없어서 없는 것이다 — 「경기가 없다」와 다른 말이라야 한다.
+        child: Text('팀을 만들면 여기에 경기가 뜹니다.', style: ink),
+      );
+    }
+
+    return _Block(
+      title: '내 경기',
+      child: ref.watch(teamMatchesProvider(id)).when(
+            loading: () => const Text('불러오는 중…', style: ink),
+            error: (_, _) => const Text('불러오지 못했습니다.', style: ink),
+            data: (list) => list.isEmpty
+                ? const Text('다가오는 경기가 없습니다.', style: ink)
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 🔴 **다 쌓지 않는다** — 반쪽 폭 칸이라 길어지면 옆 칸과 어긋난다.
+                      for (final m in list.take(3)) _MatchLine(match: m),
+                    ],
+                  ),
+          ),
+    );
+  }
+}
+
+/// 경기 한 줄 — 언제 · 어디서.
+class _MatchLine extends StatelessWidget {
+  const _MatchLine({required this.match});
+
+  final OpenMatch match;
 
   @override
   Widget build(BuildContext context) {
-    // ⚠️ 경기 경로(`GET /teams/{id}/matches`)는 아직 안 붙였다 — 웹도 팀이
-    //    없으면 같은 문구를 보여 준다.
-    return const _Block(
-      title: '내 경기',
-      child: Text('다가오는 경기가 없습니다.', style: TextStyle(color: _kOnPanel)),
+    final at = DateTime.tryParse(match.playedAt)?.toLocal();
+    String two(int n) => n.toString().padLeft(2, '0');
+    // 🔴 못 읽으면 **원문을 안 보여 준다** — ISO 문자열은 사람이 읽을 것이 아니다.
+    final when = at == null
+        ? '시각 미정'
+        : '${two(at.month)}/${two(at.day)} ${two(at.hour)}:${two(at.minute)}';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            when,
+            style: const TextStyle(
+              color: _kOnPanel,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (match.place.isNotEmpty)
+            Text(
+              match.place,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: _kOnPanel.withValues(alpha: 0.7),
+                fontSize: 12,
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

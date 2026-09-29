@@ -43,3 +43,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# 🔴 릴리스 서명 — 이 저장소는 공개다. 절대 커밋하지 않는다 (2026-09-29).
+#    키스토어를 잃어버리면 같은 앱을 영영 업데이트할 수 없다 — 따로 백업한다.
+/android/key.properties
+*.jks
+*.keystore

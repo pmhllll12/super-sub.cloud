@@ -46,6 +46,18 @@ abstract class MatchRepository {
   /// ⚠️ 지역은 자유 문자열이라 검증할 대상이 없다 — 안 걸리면 빈 목록이다.
   Future<List<OpenMatch>> openMatches({String? sportCode, String? region});
 
+  /// **그 팀의 다가오는 경기** — `GET /teams/{id}/matches` (계약 1535행).
+  ///
+  /// 🔴 **[openMatches] 와 다르다.** 저쪽은 「사람을 찾는」 경기라 모집이
+  /// 걸린 것만 오고, 이쪽은 **그 팀에 잡힌 전부**다 — 팀 대 팀으로 확정된
+  /// 경기는 `needs` 가 빈 배열이라 저쪽 목록에 아예 안 뜬다.
+  ///
+  /// 🔴 **소속이 아니어도 읽는다**(계약) — 모집 글이라 지원할 사람이 봐야 한다.
+  /// 🔴 **지난 경기는 빠진다.** 다가오는 것만, 이른 것이 앞에 온다.
+  /// ⚠️ **없는 팀 id 는 404 `TEAM_NOT_FOUND` 이지 빈 배열이 아니다** — 오타를
+  /// 「경기가 없구나」로 읽으면 안 된다(계약이 못박아 둔 자리다).
+  Future<List<OpenMatch>> teamMatches(String teamId);
+
   /// **그 경기에 내가 지원한다** — 계약 3-5절 `POST /matches/{id}/applications`.
   ///
   /// 🔴 **본문을 비워 보낸다** — 그것이 「본인이 지원」이다. `user_id` 를 담으면

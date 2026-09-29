@@ -199,6 +199,10 @@ class DemoMatchRepository implements MatchRepository {
       _inner.openMatches(sportCode: sportCode, region: region);
 
   @override
+  Future<List<OpenMatch>> teamMatches(String teamId) =>
+      _inner.teamMatches(teamId);
+
+  @override
   Future<void> saveTeamPrefs(String teamId, MatchPrefs prefs) =>
       _inner.saveTeamPrefs(teamId, prefs);
 

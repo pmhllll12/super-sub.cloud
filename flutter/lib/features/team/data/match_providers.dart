@@ -108,6 +108,19 @@ final openMatchesProvider =
   retry: (_, _) => null,
 );
 
+/// **그 팀의 다가오는 경기** — 프로필 「내 경기」 칸이 읽는다 (2026-09-29).
+///
+/// ⚠️ **전에는 그 칸이 「다가오는 경기가 없습니다」를 박아 두고 있었다** —
+/// 경기가 실제로 잡혀 있어도 늘 없다고 나왔다.
+///
+/// 🔴 **retry 를 끈다** — 옆 provider 들과 같은 까닭이다(Riverpod 3 가
+/// 실패한 것을 백오프로 다시 부르는 동안 상태가 `AsyncLoading` 이라,
+/// 화면이 오류 대신 로딩만 계속 보여 준다).
+final teamMatchesProvider = FutureProvider.family<List<OpenMatch>, String>(
+  (ref, teamId) => ref.watch(matchRepositoryProvider).teamMatches(teamId),
+  retry: (_, _) => null,
+);
+
 /// 지역 목록(id + 이름). 참조 데이터라 한 번 받으면 그대로 쓴다.
 final matchRegionsProvider = FutureProvider<List<RefItem>>(
   (ref) => ref.watch(matchRepositoryProvider).regions(),

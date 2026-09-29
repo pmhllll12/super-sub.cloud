@@ -36,7 +36,11 @@ Future<void> scrollTo(WidgetTester tester, Finder target) async {
   await _settle(tester);
 }
 
-Future<ProviderContainer> _pump(WidgetTester tester, String userId) async {
+Future<ProviderContainer> _pump(
+  WidgetTester tester,
+  String userId, {
+  bool needTeam = false,
+}) async {
   final container = ProviderContainer(
     overrides: [
       authRepositoryProvider.overrideWith(
@@ -51,7 +55,7 @@ Future<ProviderContainer> _pump(WidgetTester tester, String userId) async {
 
   await tester.pumpWidget(UncontrolledProviderScope(
     container: container,
-    child: const MaterialApp(home: ProfileScreen()),
+    child: MaterialApp(home: ProfileScreen(needTeam: needTeam)),
   ));
 
   // MockAuthRepository는 300ms 지연을 흉내낸다. pumpWidget 이전에 이 Future를
@@ -222,6 +226,83 @@ void main() {
 
       final me = container.read(sessionControllerProvider) as SessionLoggedIn;
       expect(me.user.isNicknameSearchable, isFalse);
+    });
+  });
+
+  /* 🔴 **팀 없이 스쿼드 판의 빈 자리를 눌러 온 상태** (2026-09-29 사용자
+     요청). ⚠️ 전에는 그 자리가 「선수 넣기 — 준비 중입니다」였다 — 기능이
+     준비 중인 것이 아니라 팀이 없어서 못 하는 것인데, 처음 온 사람은 앱이
+     미완성이라고 읽었다. */
+  group('팀을 먼저 만들어 주세요', () {
+    testWidgets('안내가 맨 위에 선다', (tester) async {
+      await _pump(tester, MockDb.playerId, needTeam: true);
+
+      expect(find.byKey(const Key('profile-need-team')), findsOneWidget);
+      expect(find.text('팀을 먼저 만들어 주세요.'), findsOneWidget);
+    });
+
+    testWidgets('그냥 들어오면 안내가 없다', (tester) async {
+      await _pump(tester, MockDb.playerId);
+
+      expect(find.byKey(const Key('profile-need-team')), findsNothing);
+    });
+
+    /// 🔴 **만들기 폼이 이미 펴져 있다** — 한 번 더 누르게 하지 않는다.
+    testWidgets('팀 만들기 폼이 펴진 채로 열린다', (tester) async {
+      await _pump(tester, MockDb.playerId, needTeam: true);
+      await scrollTo(tester, find.byKey(const Key('profile-team-create')));
+
+      // 펴져 있으면 그 단추가 「닫기」다.
+      expect(find.text('닫기'), findsOneWidget);
+    });
+
+    /// 🔴 **흐릴 뿐 막지 않는다** — 막으면 로그아웃하러 온 사람이 갇힌다.
+    testWidgets('다른 칸은 흐려지되 눌린다', (tester) async {
+      await _pump(tester, MockDb.playerId, needTeam: true);
+
+      final dimmed = tester.widgetList<AnimatedOpacity>(
+        find.byType(AnimatedOpacity),
+      );
+      expect(dimmed.any((o) => o.opacity < 1), isTrue, reason: '흐려진 칸이 있다');
+      /* 🔴 **`IgnorePointer` 가 있는지가 아니라 막고 있는지**를 본다 —
+         트리에 원래 여럿 있고(테마·스크롤) 전부 `ignoring: false` 다. */
+      expect(
+        tester
+            .widgetList<IgnorePointer>(find.byType(IgnorePointer))
+            .every((w) => !w.ignoring),
+        isTrue,
+        reason: '막지 않는다',
+      );
+    });
+  });
+
+  /* 🔴 **「내 경기」는 서버에서 읽는다** (2026-09-29). ⚠️ 전에는 글자가
+     박혀 있어서, 경기가 실제로 잡혀 있어도 늘 「다가오는 경기가 없습니다」
+     였다. ⛔ 상수 문구로 되돌리지 말 것. */
+  group('내 경기', () {
+    testWidgets('팀이 없으면 팀부터 만들라고 한다', (tester) async {
+      // 🔴 `newbieId` 가 **팀 없는** 계정이다 — `playerId` 는 소속이 있다.
+      await _pump(tester, MockDb.newbieId);
+      await scrollTo(tester, find.text('내 경기'));
+
+      /* 🔴 **「경기가 없다」와 다른 말이라야 한다** — 팀이 없어서 없는 것과
+         팀은 있는데 경기가 없는 것은 할 일이 다르다. */
+      expect(find.text('팀을 만들면 여기에 경기가 뜹니다.'), findsOneWidget);
+      expect(find.text('다가오는 경기가 없습니다.'), findsNothing);
+    });
+
+    /// 🔴 **팀이 있으면 서버 값을 그린다** — 박힌 글자가 아니다.
+    testWidgets('팀이 있으면 잡힌 경기를 그린다', (tester) async {
+      await _pump(tester, MockDb.playerId);
+      await scrollTo(tester, find.text('내 경기'));
+
+      expect(find.text('팀을 만들면 여기에 경기가 뜹니다.'), findsNothing);
+      // 목업 시드의 경기가 있으면 장소가, 없으면 「없습니다」가 뜬다 —
+      // 어느 쪽이든 **박힌 글자만 나오는 상태**는 아니어야 한다.
+      final drew = find.textContaining('풋살').evaluate().isNotEmpty ||
+          find.text('다가오는 경기가 없습니다.').evaluate().isNotEmpty ||
+          find.text('불러오는 중…').evaluate().isNotEmpty;
+      expect(drew, isTrue);
     });
   });
 

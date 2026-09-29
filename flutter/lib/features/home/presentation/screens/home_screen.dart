@@ -277,8 +277,23 @@ const double _kShortcutGap = 12;
 /// 알약 줄 위로 흰 판이 더 남기는 자리.
 const double _kShortcutTopPad = 14;
 
-/// 알약 셋 사이 틈.
+/// 알약 사이 틈.
 const double _kShortcutSpacing = 10;
+
+/// 알약 한 칸의 폭 — 🔴 **셋이 서 있던 때의 폭 그대로다.**
+///
+/// 지름길이 하나로 줄었어도(2026-09-29) 알약 **크기는 안 바뀐다** — 요청이
+/// 「알림 버튼을 **왼쪽으로 위치해서** 가운데에 있게」라, 옮기라는 것이지
+/// 키우라는 것이 아니다. 그래서 폭은 여전히 **셋 기준**으로 재고, 줄이
+/// 가운데 정렬이라 하나만 남으면 저절로 한가운데 선다.
+///
+/// 🔴 **그래서 [_kShortcuts] 에 둘을 도로 넣으면 옛 모양이 정확히 돌아온다** —
+/// 셋 × 이 폭 + 틈 둘 = 줄 전체다. 레이아웃을 안 고쳐도 된다.
+double _kShortcutPillW(BuildContext context) {
+  final rowW =
+      MediaQuery.sizeOf(context).width - 2 * (_kVideoSideInset + _kWhiteSheetPad);
+  return (rowW - 2 * _kShortcutSpacing) / 3;
+}
 
 /* ⛔ **여기 있던 `_kPillFill`(= [_kInkDark], 불투명한 어두운 면)을 걷었다**
    (2026-09-24 사용자 지시: 「3개 버튼들 안쪽 색상 빠르게 없애봐」 →
@@ -404,23 +419,24 @@ const Color _kOnSheet = Color(0xFF000000);
 const Color _kSilverOnWhite = SilverEdge.onWhite;
 const double _kSilverOnWhiteWidth = SilverEdge.onWhiteWidth;
 
-/// 흰 판 맨 위 줄에 서는 지름길 셋(2026-09-23 사용자 요청).
+/// 흰 판 맨 위 줄에 서는 지름길 — 🔴 **지금은 「알림」 하나다**
+/// (2026-09-29 사용자 지시: 「경기장 예약 레슨 상점은 그냥 빼버리자」).
 ///
-/// 🔴 **아직 갈 곳이 없다** — 세 화면은 **웹에만** 있다(`www` 의 `/market` ·
-/// `/venues` · 알림함). 이번 회차는 사용자 판단으로 **자리와 모양만** 잡았고,
-/// 누르면 「준비 중입니다」다. 화면을 붙이는 날 `onTap` 만 갈면 된다.
+/// ⚠️ **셋이었다**(2026-09-23 ~ 09-29): 「레슨 · 상점」(`home-shortcut-market`,
+/// [Symbols.storefront]) · 「경기장 예약」(`home-shortcut-venue`,
+/// [Symbols.stadium]) · 「알림」. 앞의 둘은 **웹에만 있는 화면**(`/market` ·
+/// `/venues`)이라 누르면 「준비 중입니다」였고, 그 안내만 내미는 자리를
+/// 홈에 두지 않기로 했다.
+///
+/// 🔴 **되살릴 때는 자리와 폭이 이미 맞는다** — [_kShortcutPillW] 가 **셋
+/// 기준**으로 폭을 재고 줄은 가운데 정렬이라, 여기 둘을 도로 넣으면 셋이
+/// 줄을 꽉 채우며 예전 모양 그대로가 된다. 레이아웃은 손댈 것이 없다.
 const List<({Key key, IconData icon, String label})> _kShortcuts = [
-  (
-    key: Key('home-shortcut-market'),
-    icon: Symbols.storefront,
-    label: '레슨 · 상점',
-  ),
-  (key: Key('home-shortcut-venue'), icon: Symbols.stadium, label: '경기장 예약'),
   (key: _kAlarmKey, icon: Symbols.notifications, label: '알림'),
 ];
 
-/// 🔴 **셋 중 알림만 갈 곳이 생겼다**(2026-09-25) — 나머지 둘은 아직 웹에만
-/// 있다. 그 하나를 가려내는 열쇠다.
+/// 🔴 **갈 곳이 있는 유일한 지름길**(2026-09-25) — 알림함을 연다.
+/// 나머지가 걷힌 지금은 [_kShortcuts] 의 전부이기도 하다.
 const Key _kAlarmKey = Key('home-shortcut-alarm');
 
 /// 스쿼드 판 자리에 무엇을 세우는가 — 웹의 알약 「팀장」 · 「팀원」.
@@ -1133,6 +1149,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
        🔴 **다시 조사하지 말 것.** 여기를 `AsyncValue` 로 바꾸면 홈 전체가
        로딩·오류 두 그림을 더 갖게 되는데, 그 값을 치를 이유가 위 표에 없다. */
+    /* 🔴 **카드가 없으면 여기서 만들어진다**(2026-09-29 — [ensureMyCardProvider]).
+       처음 들어온 사람은 카드도 팀도 없어 판이 **빈 격자**였다.
+       🔴 **값은 안 읽는다** — 읽으면 홈이 그 흐름의 로딩·오류를 그려야 한다.
+       만들어지면 `myCardProvider` 가 무효화되어 아래 줄이 저절로 따라온다. */
+    ref.watch(ensureMyCardProvider);
     final card = ref.watch(myCardProvider).value;
     final cardSeed = card?.publicSlug;
     // 주장인 팀이 우선, 없으면 속한 첫 팀. 팀이 없으면 판을 안 부른다.
@@ -1312,10 +1333,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           child: IgnorePointer(
             ignoring: tc > 0.02,
             child: Row(
+              /* 🔴 **가운데 정렬**(2026-09-29 사용자 지시: 「알림 버튼을
+                 왼쪽으로 위치해서 가운데에 있게」). 알약이 하나로 줄면서
+                 오른쪽 끝에 홀로 서 있었다. 폭은 [_kShortcutPillW] 가 셋
+                 기준으로 붙잡으므로 **늘어나지 않고 자리만** 옮겨진다.
+                 ⛔ [Expanded] 로 되돌리지 말 것 — 하나뿐일 때 줄을 통째로
+                 차지해 알약이 아니라 띠가 된다. */
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 for (final (i, s) in _kShortcuts.indexed) ...[
                   if (i > 0) const SizedBox(width: _kShortcutSpacing),
-                  Expanded(
+                  SizedBox(
+                    width: _kShortcutPillW(context),
                     /* 🔴 **제자리에서 걷힌다**(2026-09-23 정정, 사용자:
                        「오른쪽으로 나가지 말고 그냥 제자리에서 … 사라지는 게
                        스쿼드판 올라갈 때 다 보이니까 눈아프다」).
@@ -1788,9 +1817,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                전용이라(403), 시트를 열어 고르게 해 놓고 마지막에 막으면
                고른 수고가 통째로 버려진다. 못 집게 하는 위 두 갈래와 같은
                판단이다. */
+            /* 🔴 **팀이 없으면 「팀을 먼저 만들어 주세요」로 보낸다**
+               (2026-09-29 사용자 요청). ⚠️ 전에는 여기가 **「선수 넣기 —
+               준비 중입니다」**였다 — 기능이 준비 중인 것이 아니라 **팀이
+               없어서** 못 하는 것인데, 처음 온 사람은 앱이 미완성이라고
+               읽었다. 그것이 새 사용자가 **가장 먼저 만나는 문구**였다.
+
+               ⚠️ 팀은 있는데 **남의 판**을 보는 중이면 그대로 안내다 —
+               그때는 팀을 만들라는 말이 틀린 말이 된다. */
             onSeatTap: (ownedTeamId != null && squad?.teamId == ownedTeamId)
                 ? (slot) => _fillSeat(ownedTeamId, slot)
-                : (_) => _notReady('선수 넣기'),
+                : ownedTeamId == null
+                    ? (_) => context.push('/profile?needTeam=1')
+                    : (_) => _notReady('내 팀 판에서만 넣을 수 있습니다'),
           )
         /* 🔴 **한 번 더 안 누른다** (2026-09-25 사용자: 「굳이 한 번 더
            눌러서 팀 찾아야 해?」). 「팀원」을 고르면 그 자리가 곧 조건 폼

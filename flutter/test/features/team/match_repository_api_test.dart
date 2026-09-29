@@ -73,6 +73,26 @@ ApiMatchRepository buildRepo() {
           const {'region_ids': [], 'slots': [], 'position_ids': []});
     }
 
+    /* 🔴 **`/matches` 보다 **먼저** 본다** — 아래 `endsWith('/matches')` 가
+       `/teams/{id}/matches` 까지 잡는다. 순서를 바꾸면 이 경로가 페이지
+       형식(`items`)으로 답해 버려서, 배열을 기대하는 쪽이 빈 목록을 받는다. */
+    if (path.contains('/teams/') && path.endsWith('/matches')) {
+      final teamId = path.split('/teams/')[1].split('/')[0];
+      // 🔴 없는 팀은 404 다 — 빈 배열이 아니다(계약).
+      if (!teamId.startsWith('t-')) return err('TEAM_NOT_FOUND', 404);
+      // ⚠️ 계약이 「`GET /matches/{id}` 와 같은 형태의 **배열**」이라 했다.
+      return ok([
+        {
+          'id': 'tm-1',
+          'team_id': teamId,
+          'played_at': '2026-10-05T10:00:00Z',
+          'place': '망원 풋살장',
+          'needs': <Map<String, dynamic>>[],
+          'opponent_team_id': null,
+        },
+      ]);
+    }
+
     if (path.endsWith('/matches')) {
       final sport = req.url.queryParameters['sport_code'];
       if (sport != null && sport != 'football') {
