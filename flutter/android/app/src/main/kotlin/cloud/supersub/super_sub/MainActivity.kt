@@ -7,7 +7,9 @@ import android.view.WindowInsetsController
 import io.flutter.embedding.android.FlutterActivity
 
 /**
- * 🔴 **하단 내비게이션 바만 감춘다 — 상단 상태 바는 남긴다** (2026-09-22).
+ * 🔴 **위·아래 시스템 바를 둘 다 감춘다** (2026-09-29 사용자 지시:
+ * 「위에 검은색 상단 바 그냥 없애라」). 전에는 하단만 감추고 상태
+ * 바는 남겼는데, 그 자리가 검은 띠로 남아 화면을 갉아먹었다.
  *
  * Flutter 의 `SystemChrome.setEnabledSystemUIMode` 로는 이 조합이 안 나온다:
  *
@@ -23,7 +25,7 @@ import io.flutter.embedding.android.FlutterActivity
 class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        hideNavigationBar()
+        hideSystemBars()
         clearStatusBarScrim()
     }
 
@@ -59,16 +61,16 @@ class MainActivity : FlutterActivity() {
      */
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) hideNavigationBar()
+        if (hasFocus) hideSystemBars()
     }
 
     @Suppress("DEPRECATION")
-    private fun hideNavigationBar() {
+    private fun hideSystemBars() {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
             window.insetsController?.let {
                 it.systemBarsBehavior =
                     WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                it.hide(WindowInsets.Type.navigationBars())
+                it.hide(WindowInsets.Type.systemBars())
             }
         } else {
             // API 30 미만 — 같은 뜻의 옛 플래그. `IMMERSIVE_STICKY` 가
@@ -76,6 +78,7 @@ class MainActivity : FlutterActivity() {
             // 안 넣었으므로 **상태 바는 그대로** 있다.
             window.decorView.systemUiVisibility =
                 View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_FULLSCREEN or
                 View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
                 View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
                 View.SYSTEM_UI_FLAG_LAYOUT_STABLE

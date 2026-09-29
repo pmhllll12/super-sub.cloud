@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 🔴 **아무것도 안 그리는 아이콘**(2026-09-29).
+     안드로이드 12+ 는 시스템 스플래시에 런처 아이콘을 **자동으로** 띄운다.
+     그러면 로고가 정지한 채 먼저 보이고, 곧바로 인트로가 같은 로고를 다시
+     그려서 **로고가 두 번** 나온다. 투명한 것을 물려 그 자리를 비운다. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@android:color/transparent" />
+</shape>

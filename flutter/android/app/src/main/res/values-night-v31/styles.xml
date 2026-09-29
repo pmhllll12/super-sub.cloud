@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 🔴 **안드로이드 12+ 시스템 스플래시**(2026-09-29 사용자 지적: 「인트로
+     나오기 전에 로고 나오는거 없애라」).
+
+     12 부터는 `windowBackground` 와 별개로 OS 가 **런처 아이콘을 띄우는**
+     스플래시를 강제한다. 그대로 두면 로고가 **정지한 채 먼저** 보이고,
+     이어서 인트로가 같은 로고를 다시 그린다.
+
+     ⛔ 아이콘을 되살리지 말 것 — 인트로의 「로고가 잉크에서 드러난다」는
+     연출이 통째로 죽는다. 바탕만 인트로와 같은 검정으로 둔다. -->
+<resources>
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowSplashScreenBackground">@android:color/black</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_nothing</item>
+        <item name="android:windowBackground">@drawable/launch_background</item>
+    </style>
+    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">?android:colorBackground</item>
+    </style>
+</resources>
