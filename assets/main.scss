@@ -102,6 +102,16 @@
   margin-top: 0.4rem;
 }
 
+// 추이 그래프의 날짜 칸(관리 지표) — 올리면 그 날짜가 옅게 떠서 십자선 역할을 하고, 값은 <title> 로 뜬다.
+// 그림은 다크 화면에서도 밝은 판 위에 있으므로 한 값으로 둔다.
+.doc-figure .hit {
+  fill: transparent;
+}
+
+.doc-figure .hit:hover {
+  fill: rgba(39, 38, 43, 0.07);
+}
+
 .stat-tiles {
   display: flex;
   flex-wrap: wrap;
@@ -214,4 +224,121 @@ html[data-theme="dark"] {
 .site-title {
   font-size: 1rem !important;
   line-height: 1.3 !important;
+  word-break: keep-all; // 한글이 단어 중간(「플 / 랫폼」)에서 접히지 않게 — 띄어쓰기에서만 줄을 바꾼다
+}
+
+// 본문 제목도 같다 — 표지 큰 제목이 「빈 자 / 리에」처럼 접혔다
+h1,
+h2,
+h3 {
+  word-break: keep-all;
+}
+
+// --- 사이드바 — 1단계를 단추로, 묶음은 늘 펼쳐 둔다 (2026-09-23) ------------------------
+// 묶음(1단계)이 접혀 있어 안에 무엇이 있는지 하나씩 눌러 봐야 했다(사용자 지적). 1단계 묶음의
+// 목록은 늘 펼치고, 1단계 이름(묶음 · 프로젝트 전체 그림)은 배경 안에 글이 든 단추로 보인다
+// (사용자 요청) — 누르면 여전히 그 페이지로 간다. 지금 페이지가 든 단추는 강조색.
+// 3단계(스프린트 일지 · QA 체크리스트)는 테마 기본대로 접힌다.
+// 🔴 여백을 늘리면 사이드바가 화면보다 길어져, 테마가 현재 페이지를 보이려고 사이드바를 내린다 —
+// 맨 위 항목이 가려진다(2026-09-23 에 겪었다).
+#site-nav > .nav-list > .nav-list-item {
+  > .nav-list {
+    display: block;
+    padding-left: 0;
+  }
+
+  > .nav-list-expander {
+    display: none; // 늘 펼쳐 있으니 화살표는 뜻이 없다
+  }
+
+  // 1단계 — 칠한 단추. 라이트 바탕(#f5f6fa)과 확실히 갈리게 진하게 — 처음 값 #e9e7ef 는 옅어서
+  // 구분이 어렵다고 했다(사용자). 지금 묶음은 보라 바탕에 흰 글씨.
+  > .nav-list-link {
+    min-height: 0;
+    margin: 0.55rem 0.6rem 0.2rem;
+    padding: 0.2rem 0.8rem;
+    border-radius: 6px;
+    background: #cdc7e2;
+    background-image: none;
+    font-size: 0.8rem !important;
+    font-weight: 600;
+    line-height: 1.4rem;
+    color: #27262b;
+
+    &:hover {
+      background: #c0b9da;
+    }
+  }
+
+  &.active > .nav-list-link {
+    background: #7253ed;
+    color: #fff;
+  }
+
+  // 2·3단계(페이지) — 테두리 있는 흰 단추. 지금 보는 페이지는 연보라. 높이는 테마 기본(2rem)과
+  // 비슷하게 둬서 사이드바가 길어지지 않게 한다.
+  .nav-list .nav-list-link {
+    min-height: 0;
+    margin: 0.12rem 0.6rem 0.12rem 1rem;
+    padding: 0.15rem 0.7rem;
+    border: 1px solid #dcd8e8;
+    border-radius: 6px;
+    background: #fff;
+    background-image: none;
+    line-height: 1.4rem;
+    color: #27262b;
+
+    &:hover {
+      background: #efedf6;
+    }
+
+    &.active {
+      border-color: #c4b5f7;
+      background: #e4dcfd;
+      color: #5e41d0;
+      font-weight: 600;
+    }
+  }
+
+  // 3단계를 거느린 페이지(개발 구현 계획 등)의 펼침 화살표를 단추 안쪽으로
+  .nav-list .nav-list-expander {
+    right: 0.6rem;
+    width: 1.9rem;
+    height: 1.9rem;
+    padding: 0.45rem;
+  }
+}
+
+// 다크 — 강조를 채도 높은 보라(#6a4fd8)로 했더니 눈이 아프다고 했다(사용자). 채도를 낮춘 회보라로
+// 두고, 하위 페이지는 바탕·테두리·글자를 한 단계씩 밝혀 잘 보이게 한다.
+html[data-theme="dark"] #site-nav > .nav-list > .nav-list-item {
+  > .nav-list-link {
+    background: #4a4556;
+    color: #f0edf5;
+
+    &:hover {
+      background: #554f63;
+    }
+  }
+
+  &.active > .nav-list-link {
+    background: #5e5670;
+    color: #fff;
+  }
+
+  .nav-list .nav-list-link {
+    border-color: #55505f;
+    background: #36333e;
+    color: #ebe7f0;
+
+    &:hover {
+      background: #403c49;
+    }
+
+    &.active {
+      border-color: #8a829c;
+      background: #4d4759;
+      color: #fff;
+    }
+  }
 }
