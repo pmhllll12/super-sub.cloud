@@ -97,6 +97,9 @@ class _FakeMatch implements MatchRepository {
   @override
   Future<void> saveMyPrefs(MatchPrefs p) async {}
   @override
+  Future<List<OpenMatch>> teamMatches(String teamId) async => const [];
+
+  @override
   Future<List<OpenMatch>> openMatches({String? sportCode, String? region}) async =>
       const [];
 

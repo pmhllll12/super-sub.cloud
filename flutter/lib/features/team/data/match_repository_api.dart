@@ -110,6 +110,15 @@ class ApiMatchRepository implements MatchRepository {
   }
 
   @override
+  Future<List<OpenMatch>> teamMatches(String teamId) async {
+    /* 🔴 **여기는 `items` 로 안 감싼다** — 계약이 「`GET /matches/{id}` 와
+       같은 형태의 **배열**」이라고 적어 뒀다. 위 [openMatches] 가 페이지
+       형식이라 습관대로 `body['items']` 를 읽으면 빈 목록이 된다. */
+    final body = await _api.getList('/teams/$teamId/matches');
+    return body.cast<Map<String, dynamic>>().map(OpenMatch.fromJson).toList();
+  }
+
+  @override
   Future<MatchApplication> apply(String matchId) async =>
       MatchApplication.fromJson(
         /* 🔴 **본문이 비어 있어야 「본인이 지원」이다** — `user_id` 를 담으면

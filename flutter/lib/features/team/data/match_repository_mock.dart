@@ -219,6 +219,26 @@ class MockMatchRepository implements MatchRepository {
   }
 
   @override
+  Future<List<OpenMatch>> teamMatches(String teamId) async {
+    await Future<void>.delayed(_delay);
+
+    /* 🔴 **없는 팀은 404 다 — 빈 배열이 아니다**(계약). Mock 이 빈 배열로
+       답하면 오타를 「경기가 없구나」로 읽게 되고, 진짜 서버에 붙는 날
+       그 차이가 드러난다. */
+    if (!teamId.startsWith('t-')) {
+      throw const ApiException('팀을 찾을 수 없습니다',
+          code: 'TEAM_NOT_FOUND', status: 404);
+    }
+
+    /* 그 팀에 잡힌 것만. ⚠️ **`needs` 가 빈 경기도 온다** — 팀 대 팀으로
+       확정된 경기라 모집이 필요 없을 뿐이지, 「내 경기」에는 떠야 한다. */
+    return [
+      for (final m in _openSeed)
+        if (m.teamId == teamId) m,
+    ];
+  }
+
+  @override
   Future<List<MatchCandidate>> candidates(String teamId) async {
     await Future<void>.delayed(_delay);
     return List.of(_seed);

@@ -215,6 +215,23 @@ void runMatchRepositoryContract(
       expect(await repo.openMatches(region: '없는동네'), isEmpty);
     });
 
+    /* 🔴 **그 팀의 다가오는 경기** (2026-09-29) — 프로필 「내 경기」가 읽는다.
+       ⚠️ 전에는 그 칸이 「다가오는 경기가 없습니다」를 **박아 두고** 있었다. */
+    test('그 팀의 경기를 읽는다', () async {
+      final open = await repo.openMatches();
+      final mine = await repo.teamMatches(open.first.teamId);
+
+      expect(mine, isNotEmpty);
+      expect(mine.every((m) => m.teamId == open.first.teamId), isTrue,
+          reason: '남의 팀 경기가 섞이지 않는다');
+    });
+
+    /// 🔴 **없는 팀은 빈 배열이 아니라 예외다**(계약 1544행) — 오타 난 id 를
+    /// 「경기가 없구나」로 읽으면 안 된다.
+    test('없는 팀은 예외다', () async {
+      await expectLater(repo.teamMatches('없는팀'), throwsA(anything));
+    });
+
     /// 🔴 **받은 신청에 답할 수 있어야 한다** (2026-09-25 사용자: 「진짜로
     /// 서로 연결되어있어야 한다고」). 앱에서 수락한 것이 웹에 뜨는 길이
     /// 이것뿐이다.
