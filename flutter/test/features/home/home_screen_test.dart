@@ -16,6 +16,7 @@ import 'package:super_sub/features/auth/presentation/session_controller.dart';
 import 'package:super_sub/features/home/presentation/screens/home_screen.dart';
 import 'package:super_sub/features/home/presentation/widgets/home_video_strip.dart';
 import 'package:super_sub/features/team/data/inbox_providers.dart';
+import 'package:super_sub/core/widgets/floating_nav_bar.dart';
 import 'package:super_sub/features/team/data/models/contact.dart';
 import 'package:super_sub/features/team/data/models/team_invitation.dart';
 import 'package:super_sub/features/team/data/squad_providers.dart';
@@ -625,37 +626,60 @@ void main() {
     /// 다시 오든가 해야지 ... 진짜로 서로 연결되어있어야 한다고」). 어느
     /// 화면을 열어 두고 있어야만 알 수 있으면, 닫고 나간 사이에 온 것을
     /// 영영 모른다 — 웹에서 보낸 것도 마찬가지다.
-    /// 🔴 **알림은 이미 있던 지름길 알약이 연다** (2026-09-25 사용자:
-    /// 「내가 홈 페이지에 가운데 버튼 3개 중에 맨 오른쪽 알림 버튼
-    /// 만들었잖아. 거기에 뜨게 해야지 왜 따로 만들어」).
-    /// ⚠️ 머리칸에 따로 만들었던 종은 **걷었다** — 같은 것이 둘이면
-    /// 어느 쪽이 진짜인지 모른다.
-    testWidgets('머리칸에 따로 만든 종은 없다', (tester) async {
+    /// 🔴 **알림은 하단 바의 칸이 연다** (2026-09-29 사용자 지시: 「알림을
+    /// 가운데에서 아예 빼버리고 하단바에서 홈 버튼 바로 오른쪽에 알림으로」).
+    ///
+    /// ⚠️ 이력: 머리칸의 종 → 흰 판 위 지름길 알약 → **하단 바**. 알약 줄에
+    /// 알림 하나만 남으니 판 한가운데 뜬금없이 서 있었다.
+    testWidgets('머리칸에도 판에도 따로 만든 종이 없다', (tester) async {
       await _pumpLoggedIn(tester);
       for (var i = 0; i < 4; i++) {
         await tester.pump(const Duration(milliseconds: 500));
       }
 
       expect(find.byKey(const Key('home-inbox')), findsNothing);
-      expect(find.byKey(const Key('home-shortcut-alarm')), findsOneWidget);
+      expect(find.byKey(const Key('home-shortcut-alarm')), findsNothing);
+      expect(
+        find.byKey(const Key('navbar-icon-$kNavAlarmIndex')),
+        findsOneWidget,
+      );
     });
 
-    /// 🔴 **답해야 할 것이 있으면 수를 적는다** — 종만 있으면 눌러 봐야 안다.
-    /// 🔴 **받은 것이 있으면 그 알약에 수가 붙는다** — 눌러 봐야 아는 것은
-    /// 알림이 아니다.
-    /// ⚠️ **판을 펼치지 않는다** — 지름길 알약은 판이 올라오면 걷힌다.
-    testWidgets('알림 알약에 수가 붙는다', (tester) async {
+    /* 🔴 **안 읽은 수가 빨간 동그라미로 붙고, 깜빡인다** (2026-09-29 사용자
+       요청: 「알림 1개면 숫자 1 떠있고 … 알림 읽기 전까지는 계속 그 빨간
+       동그라미가 계속 사라졌다가 나왔다가」).
+
+       🔴 **깜빡임은 투명도로만** 한다 — 크기를 흔들면 바의 이웃 칸까지
+       떨린다([_NavBadge] 머리말). */
+    testWidgets('알림 칸에 빨간 배지와 수가 붙는다', (tester) async {
       await _pumpLoggedIn(tester);
 
-      expect(find.byKey(const Key('home-inbox-count')), findsOneWidget);
+      expect(find.byKey(const Key('navbar-badge')), findsOneWidget);
       // 시드는 초대 하나 + 지인 신청 하나다.
       expect(find.text('2'), findsOneWidget);
     });
 
-    testWidgets('알림 알약을 누르면 알림함이 열린다', (tester) async {
+    /* 🔴 **깜빡이는 것을 시간으로 재지 않는다** — 무한 애니메이션이라
+       시험이 「틀을 버린 뒤에도 프레임이 남았다」로 깨진다(`flutter/CLAUDE.md`
+       의 그 함정이다). **[FadeTransition] 을 쓰는가**로 대신 본다 —
+       ⛔ 투명도 말고 크기로 깜빡이게 바꾸면 이 시험이 먼저 깨진다(크기를
+       흔들면 바의 이웃 칸까지 떨린다). */
+    testWidgets('배지는 투명도로 깜빡인다', (tester) async {
       await _pumpLoggedIn(tester);
 
-      await tester.tap(find.byKey(const Key('home-shortcut-alarm')));
+      expect(
+        find.ancestor(
+          of: find.byKey(const Key('navbar-badge')),
+          matching: find.byType(FadeTransition),
+        ),
+        findsWidgets,
+      );
+    });
+
+    testWidgets('알림 칸을 누르면 알림함이 열린다', (tester) async {
+      await _pumpLoggedIn(tester);
+
+      await tester.tap(find.byKey(const Key('navbar-icon-$kNavAlarmIndex')));
       await tester.pump();
       for (var i = 0; i < 3; i++) {
         await tester.pump(const Duration(milliseconds: 500));
@@ -721,14 +745,22 @@ void main() {
   group('흰 판 · 지름길 알약 셋', () {
     Finder whiteSheet() => find.byKey(const Key('home-white-sheet'));
 
-    testWidgets('흰 판이 알약 줄과 판 둘을 다 감싼다', (tester) async {
+    /* ⛔ **여기 있던 지름길 알약 시험 여섯을 걷었다** (2026-09-29, 알약이
+       하단 바로 내려가면서). 걷은 것: 「흰 판이 알약 줄과 판 둘을 다
+       감싼다」·「걷어낸 둘은 흔적도 없다」·「알림 알약이 화면 한가운데
+       선다」·「알약 폭은 줄의 3분의 1이다」·「펼치면 알약이 제자리에서
+       걷히고, 접으면 돌아온다」·「끄는 도중에 이미 걷히기 시작한다」.
+
+       🔴 **되살리려면** `_shortcutPills` 를 꺼내는 커밋에서 이 시험들도
+       함께 꺼낸다 — 그쪽 `home_screen.dart` 주석이 무엇을 꺼낼지 적어 뒀다. */
+
+    testWidgets('흰 판이 판 둘을 다 감싼다', (tester) async {
       await _pumpLoggedIn(tester);
       final white = tester.getRect(whiteSheet());
       final squad = tester.getRect(find.byKey(const Key('home-squad-sheet')));
       final video = tester.getRect(find.byKey(const Key('home-video-analysis')));
-      final pills = tester.getRect(find.byKey(const Key('home-shortcut-alarm')));
 
-      for (final (name, r) in [('스쿼드', squad), ('영상 분석', video), ('알약', pills)]) {
+      for (final (name, r) in [('스쿼드', squad), ('영상 분석', video)]) {
         expect(white.top, lessThanOrEqualTo(r.top), reason: '$name 윗변');
         expect(white.bottom, greaterThanOrEqualTo(r.bottom), reason: '$name 아랫변');
         expect(white.left, lessThanOrEqualTo(r.left), reason: '$name 왼변');
@@ -736,115 +768,31 @@ void main() {
       }
     });
 
-    /* 🔴 **흰 판은 손짓을 안 받는다.** 판 둘보다 뒤에 있지만 겹치는 자리가
-       넓어서, 손짓을 받으면 판 가장자리·알약이 먹힌다. */
-    testWidgets('흰 판은 손짓을 안 받는다', (tester) async {
+    /* 🔴 **흰 판 윗변이 스쿼드 판 바로 위다** (2026-09-29 사용자 지시:
+       「그만큼 판은 스쿼드판 바로 위 내리고」). ⚠️ 전에는 알약 줄까지
+       감싸느라 그만큼 더 위였고, 알약이 내려간 뒤엔 빈 띠만 남았다. */
+    testWidgets('흰 판 윗변이 스쿼드 판 바로 위다', (tester) async {
       await _pumpLoggedIn(tester);
-      expect(
-        find.ancestor(of: whiteSheet(), matching: find.byType(IgnorePointer)),
-        findsWidgets,
-      );
-    });
-
-    /* 🔴 **셋에서 하나로 줄었다** (2026-09-29 사용자 지시: 「경기장 예약
-       레슨 상점은 그냥 빼버리자」). 둘은 누르면 「준비 중입니다」만 내밀던
-       자리였다 — 그 안내를 홈에 두지 않기로 했다. */
-    testWidgets('걷어낸 둘은 흔적도 없다', (tester) async {
-      await _pumpLoggedIn(tester);
-      for (final label in const ['레슨 · 상점', '경기장 예약']) {
-        expect(find.text(label), findsNothing, reason: label);
-      }
-      for (final k in const ['market', 'venue']) {
-        expect(find.byKey(Key('home-shortcut-$k')), findsNothing, reason: k);
-      }
-      expect(find.text('알림'), findsOneWidget);
-    });
-
-    /* 🔴 **하나 남은 알약은 줄 한가운데 선다** (같은 지시: 「알림 버튼을
-       왼쪽으로 위치해서 가운데에 있게」). 오른쪽 끝에 홀로 서 있던 것을
-       옮긴 것이다. */
-    testWidgets('알림 알약이 화면 한가운데 선다', (tester) async {
-      await _pumpLoggedIn(tester);
-      final r = tester.getRect(find.byKey(const Key('home-shortcut-alarm')));
-      final screenW =
-          tester.view.physicalSize.width / tester.view.devicePixelRatio;
-      expect(r.center.dx, closeTo(screenW / 2, 1));
-    });
-
-    /* 🔴 **폭은 셋이 서 있던 때 그대로다** — 요청이 「왼쪽으로 위치해서」라
-       옮기라는 것이지 키우라는 것이 아니었다. 셋 × 이 폭 + 틈 둘이 줄
-       전체가 되는 값이라, 둘을 되살리면 옛 모양이 그대로 돌아온다.
-       ⛔ 줄을 꽉 채우게 만들지 말 것 — 알약이 아니라 띠가 된다. */
-    testWidgets('알약 폭은 줄의 3분의 1이다', (tester) async {
-      await _pumpLoggedIn(tester);
-      final r = tester.getRect(find.byKey(const Key('home-shortcut-alarm')));
       final white = tester.getRect(whiteSheet());
-      /* 알약 줄은 흰 판 양끝에서 `_kVideoSideInset + _kWhiteSheetPad`(6+6)
-         만큼 안쪽이고, 그 안에서 셋이 틈 `_kShortcutSpacing`(10) 둘을 두고
-         선다. 값이 바뀌면 여기가 먼저 깨지는 편이 낫다. */
-      final rowW = white.width - 2 * 12;
-      expect(r.width, closeTo((rowW - 2 * 10) / 3, 1));
+      final squad = tester.getRect(find.byKey(const Key('home-squad-sheet')));
+
+      // 둘 사이에 남는 것은 판이 두르는 테(6)뿐이다.
+      expect(squad.top - white.top, closeTo(6, 1.5));
     });
 
-    /* 🔴 **제자리에서 걷힌다**(2026-09-23 정정). 한 번 오른쪽 화면 밖으로
-       미는 것으로 만들었다가 사용자가 되돌렸다 — 「사라지는 게 스쿼드판
-       올라갈 때 다 보이니까 눈아프다」. ⛔ 옆으로 미는 것을 되살리지 말 것. */
-    testWidgets('펼치면 알약이 제자리에서 걷히고, 접으면 돌아온다', (tester) async {
+    /* 🔴 **영상 줄이 닉네임과 스쿼드 판 한가운데 선다** (2026-09-29 사용자
+       지시: 「영상줄을 좀 키워서 닉네임과 스쿼드판 딱 중간에 있게」). */
+    testWidgets('영상 줄이 위아래 한가운데 선다', (tester) async {
       await _pumpLoggedIn(tester);
-      Rect at(String k) =>
-          tester.getRect(find.byKey(Key('home-shortcut-$k')));
-      const keys = ['alarm'];
-      final home = {for (final k in keys) k: at(k)};
+      final strip = tester.getRect(find.byKey(const Key('home-video-strip')));
+      final panel = tester.getRect(find.byKey(const Key('home-top-panel')));
+      final white = tester.getRect(whiteSheet());
 
-      for (final k in keys) {
-        expect(_opacityAbove(tester, find.byKey(Key('home-shortcut-$k'))), 1,
-            reason: k);
-      }
-
-      await _openSheet(tester);
-      for (final k in keys) {
-        expect(_opacityAbove(tester, find.byKey(Key('home-shortcut-$k'))), 0,
-            reason: '$k 걷혔다');
-        // 🔴 **자리는 그대로다** — 걷히는 것이지 나가는 것이 아니다.
-        expect(at(k).left, closeTo(home[k]!.left, 0.5), reason: '$k 제자리');
-      }
-
-      await _openSheet(tester);
-      for (final k in keys) {
-        expect(_opacityAbove(tester, find.byKey(Key('home-shortcut-$k'))), 1,
-            reason: '$k 돌아왔다');
-      }
-    });
-
-    /* ⚠️ **「걷히는 순서는 오른쪽부터다」였다** — 알약이 셋일 때 오른쪽
-       것부터 차례로 걷히는 것을 재던 시험이다. 2026-09-29에 알약이 하나로
-       줄면서 **잴 순서가 없어졌다.**
-
-       🔴 **시차 자체는 살아 있다** — `_shortcutExit` 이 `_kShortcuts.length`
-       로 시작점을 잡으므로, 둘을 되살리면 순서도 그대로 돌아온다. 그때
-       이 시험을 옛 모양(`alarm` < `venue` <= `market`)으로 되돌린다.
-
-       지금 지킬 수 있는 것은 **끄는 도중에 이미 걷히기 시작한다**는 것 하나다 —
-       손을 떼고 스프링에 맡긴 뒤가 아니라 **끄는 동안** 반응해야 한다. */
-    testWidgets('끄는 도중에 이미 걷히기 시작한다', (tester) async {
-      await _pumpLoggedIn(tester);
-      double alpha(String k) =>
-          _opacityAbove(tester, find.byKey(Key('home-shortcut-$k')));
-
-      /* 🔴 **손가락을 든 채로 중간까지만 끈다.** 손잡이를 눌러 스프링에
-         맡기면 **한 프레임 만에 셋이 다 걷혀** 순서를 못 잰다. */
-      final g = await tester.startGesture(
-        tester.getCenter(find.byKey(const Key('home-squad-sheet'))),
-      );
-      await g.moveBy(const Offset(0, -60));
-      await tester.pump();
-
-      expect(alpha('alarm'), lessThan(1), reason: '끄는 동안 이미 걷히기 시작했다');
-
-      await g.up();
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 1500));
-      await tester.pump(const Duration(milliseconds: 700));
+      /* 🔴 **가운데 점으로 잰다** — 줄의 **그려진 높이**는 영상이 몇 편이냐에
+         따라 조금 달라지므로(위아래 여백을 직접 빼면 그 차이가 그대로 들어온다),
+         「한가운데에 있는가」는 **중심**으로 보는 것이 맞다. */
+      final want = (panel.bottom + white.top) / 2;
+      expect(strip.center.dy, closeTo(want, 8));
     });
 
     /* 로고는 **화면 위 바깥으로** 나간다(같은 요청). */

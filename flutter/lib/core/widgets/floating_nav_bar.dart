@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../features/auth/presentation/session_controller.dart';
+import '../../features/team/data/inbox_providers.dart';
+import '../../features/team/presentation/sheets/inbox_sheet.dart';
 import '../design_scale.dart';
 import 'silver_edge.dart';
 import 'silver_sweep_border.dart';
@@ -61,6 +64,10 @@ const double kNavActiveSide = 118;
 
 /// 흰 막대 위의 아이콘 — 바탕이 밝으므로 **검정**이다.
 const Color kNavOnWhite = Color(0xFF17181A);
+
+/// 🔴 **안 읽은 알림의 빨강** — 배지와 종 아이콘이 **나눠 쓴다**(2026-09-29).
+/// 갈리면 같은 알림이 두 가지 빨강으로 보인다.
+const Color kNavBadgeRed = Color(0xFFE5484D);
 
 /// 칸 사이 세로선.
 ///
@@ -133,6 +140,13 @@ const double kBarDividerHeight = 78;
 /// 🔴 **세션을 스스로 본다 ([ConsumerWidget], 2026-09-25).** 맨 오른쪽 칸이
 /// **로그인이냐 로그아웃이냐**를 가르기 때문이다 — 그 한 가지 때문에 화면
 /// 넷에게 `loggedIn` 을 받아 오게 하면 넷이 다 같은 줄을 적어야 한다.
+/// 하단 바에서 **알림 칸**의 번호 (2026-09-29 신설).
+///
+/// 🔴 **2 를 쓴다** — 걷어낸 「레슨 · 코치」가 쓰던 번호다. 남은 칸들(0 홈 ·
+/// 1 영상 · 3 프로필)의 번호를 안 건드리려고 빈 자리를 재사용한다.
+/// ⚠️ **화면을 바꾸는 칸이 아니다** — `onTap` 으로 안 올라가고 시트만 연다.
+const int kNavAlarmIndex = 2;
+
 class FloatingNavBar extends ConsumerWidget {
   const FloatingNavBar({
     super.key,
@@ -142,6 +156,16 @@ class FloatingNavBar extends ConsumerWidget {
 
   final int currentIndex;
   final ValueChanged<int> onTap;
+
+  /* 🔴 **알림은 바가 스스로 맡는다** (2026-09-29 정정).
+
+     ⚠️ **처음엔 화면이 `onAlarm`·`alarmBadge` 를 넘겨 주게 했다.** 그랬더니
+     홈에만 붙이고 나머지 셋을 빠뜨려 **다른 화면에서 알림 칸이 사라졌다**
+     (사용자: 「왜 다른 페이지 가면 하단바에 알림 아이콘 사라짐?」).
+
+     🔴 **바가 직접 읽고 직접 연다** — 화면이 할 일이 없으니 **빠뜨릴 수가
+     없다.** 알림함은 어느 화면에서 열든 뜻이 같다(로그인 화면 하나).
+     ⛔ 다시 화면이 넘겨 주는 방식으로 되돌리지 말 것. */
 
   /// **Material Symbols다.** Flutter가 안고 있는 `Icons`는 구형 Material
   /// Icons라 획이 두껍고 이 글리프들이 없다. 굵기·등급·광학크기는 [_navGlyph]가
@@ -162,6 +186,7 @@ class FloatingNavBar extends ConsumerWidget {
   /// 넷의 `onTap` 갈래를 건드릴 일이 없다.
   static const _icons = {
     0: Symbols.home_app_logo,
+    kNavAlarmIndex: Symbols.notifications,
     1: Symbols.videocam,
     3: Symbols.id_card,
   };
@@ -190,7 +215,24 @@ class FloatingNavBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final loggedIn = ref.watch(sessionControllerProvider) is SessionLoggedIn;
+    final session = ref.watch(sessionControllerProvider);
+    final loggedIn = session is SessionLoggedIn;
+
+    /* 🔴 **로그인 전에는 알림 칸이 없다** — 그때는 볼 것도 열 것도 없다.
+       [inboxProvider] 도 로그인 전에는 서버를 안 부른다. */
+    final shownIcons = loggedIn
+        ? _icons
+        : {
+            for (final e in _icons.entries)
+              if (e.key != kNavAlarmIndex) e.key: e.value,
+          };
+    final alarmBadge =
+        loggedIn ? (ref.watch(inboxProvider).value?.pending ?? 0) : 0;
+
+    void openInbox() => showInboxSheet(
+          context,
+          teamId: session is SessionLoggedIn ? session.user.ownedTeamId : null,
+        );
     final barHeight = context.d(kBottomBarHeight);
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 
@@ -235,14 +277,20 @@ class FloatingNavBar extends ConsumerWidget {
 
                    🔴 **구분선은 칸마다** 들어간다 — 레퍼런스가 그렇다. 앞서
                    가운데 둘에만 뒀던 것을 고쳤다. */
-                for (final (i, entry) in _icons.entries.indexed) ...[
+                for (final (i, entry) in shownIcons.entries.indexed) ...[
                   if (i > 0) _Divider(key: Key('navbar-divider-${entry.key}')),
                   Expanded(
                     child: _NavIcon(
                       key: Key('navbar-icon-${entry.key}'),
                       icon: entry.value,
-                      active: entry.key == currentIndex,
-                      onTap: () => onTap(entry.key),
+                      /* 🔴 **알림은 「지금 보고 있는 칸」이 아니다** — 시트를
+                         띄울 뿐 화면을 바꾸지 않으므로 금빛 테를 안 두른다. */
+                      active: entry.key != kNavAlarmIndex &&
+                          entry.key == currentIndex,
+                      badge: entry.key == kNavAlarmIndex ? alarmBadge : 0,
+                      onTap: entry.key == kNavAlarmIndex
+                          ? openInbox
+                          : () => onTap(entry.key),
                     ),
                   ),
                 ],
@@ -308,10 +356,15 @@ class _Divider extends StatelessWidget {
 /// 아이콘도 똑같이 세련된 골드 색상으로」). **둘레를 도는 빛과 같은 값**
 /// ([kNavActiveSweep])을 쓴다 — 테는 금빛인데 글리프만 검정이면 한 칸 안에서
 /// 색이 갈린다. 🔴 **테 색을 갈면 여기도 같이 간다.**
-Widget _navGlyph(BuildContext context, IconData icon, {bool active = false}) =>
+Widget _navGlyph(
+  BuildContext context,
+  IconData icon, {
+  bool active = false,
+  Color? color,
+}) =>
     Icon(
       icon,
-      color: active ? kNavActiveSweep : kNavOnWhite,
+      color: color ?? (active ? kNavActiveSweep : kNavOnWhite),
       size: context.d(76),
       weight: 200,
       grade: 0,
@@ -330,11 +383,15 @@ class _NavIcon extends StatelessWidget {
     required this.icon,
     required this.active,
     required this.onTap,
+    this.badge = 0,
   });
 
   final IconData icon;
   final bool active;
   final VoidCallback onTap;
+
+  /// 아이콘 오른쪽 위에 붙는 **안 읽은 것의 수**. 0 이면 안 붙는다.
+  final int badge;
 
   @override
   Widget build(BuildContext context) {
@@ -364,8 +421,124 @@ class _NavIcon extends StatelessWidget {
                   child: const SizedBox.expand(),
                 ),
               ),
-            _navGlyph(context, icon, active: active),
+            /* 🔴 **안 읽은 것이 있으면 종도 빨갛다** (2026-09-29 사용자 요청:
+               「알림 오면 알림 아이콘도 완전 빨간색으로 바뀌게」). 동그라미만
+               빨가면 바를 훑을 때 눈에 안 들어온다. */
+            _navGlyph(
+              context,
+              icon,
+              active: active,
+              color: badge > 0 ? kNavBadgeRed : null,
+            ),
+            if (badge > 0)
+              Positioned(
+                /* 🔴 **글리프와 안 겹친다** (2026-09-29 사용자 요청: 「알림
+                   아이콘이랑 겹치지 않도록」). 배지를 2.5 배로 키우면서
+                   종을 덮었다 — 오른쪽 위 **바깥**으로 뺀다. */
+                right: 0,
+                top: 0,
+                child: _NavBadge(count: badge),
+              ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 🔴 **안 읽은 알림의 빨간 동그라미** (2026-09-29 사용자 요청: 「알림오면 그
+/// 아이콘의 오른쪽위에 빨간색 작은 동그라미 뜨면서 알림 1개면 숫자 1 떠있고
+/// … 알림 읽기 전까지는 계속 그 빨간 동그라미가 계속 사라졌다가 나왔다가」).
+///
+/// 🔴 **깜빡임은 투명도로만 한다** — 크기를 흔들면 [Row] 가 매 프레임 다시
+/// 배치돼 **이웃 칸까지 떨린다**(바로 위 「고른 칸」 주석과 같은 까닭).
+///
+/// 🔴 **아예 사라졌다 나타난다**(0 ↔ 1, 2026-09-29 사용자 요청: 「확실히
+/// 아예 사라졌다가 나타나게」). ⚠️ 한 번 0.25 까지만 옅어지게 뒀는데
+/// 「깜빡이는 것 같지 않다」고 해서 0 으로 내렸다 — 종이 계속 빨가므로
+/// 배지가 잠깐 없어도 **누를 것이 있다는 신호는 안 끊긴다.**
+class _NavBadge extends StatefulWidget {
+  const _NavBadge({required this.count});
+
+  final int count;
+
+  @override
+  State<_NavBadge> createState() => _NavBadgeState();
+}
+
+class _NavBadgeState extends State<_NavBadge>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _blink = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  )..repeat(reverse: true);
+
+  /* 🔴 **새로 온 순간에만 울린다** (2026-09-29 사용자 요청: 「알림 올 때
+     휴대폰에 진동 몇 번 오게」).
+
+     🔴 **수가 늘었을 때만**이다. 0 보다 크기만 하면 울리게 두면 화면을
+     다시 그릴 때마다(홈은 판을 끌면 **초당 60번** 다시 짓는다) 폰이
+     끊임없이 떤다.
+
+     ⚠️ **처음 뜰 때는 안 울린다** — 앱을 켤 때마다 묵은 알림으로 울리면
+     「방금 왔다」는 뜻이 사라진다. */
+  int _lastCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _lastCount = widget.count;
+  }
+
+  @override
+  void didUpdateWidget(_NavBadge old) {
+    super.didUpdateWidget(old);
+    if (widget.count > _lastCount) _buzz();
+    _lastCount = widget.count;
+  }
+
+  /// 짧게 세 번 — 한 번이면 눌린 줄 알고, 길게 울리면 전화로 읽힌다.
+  Future<void> _buzz() async {
+    for (var i = 0; i < 3; i++) {
+      await HapticFeedback.mediumImpact();
+      await Future<void>.delayed(const Duration(milliseconds: 140));
+    }
+  }
+
+  @override
+  void dispose() {
+    _blink.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    /* 🔴 **99 를 넘으면 「99+」** — 세 자리가 되면 동그라미가 아이콘을 덮는다. */
+    final text = widget.count > 99 ? '99+' : '${widget.count}';
+    /* 🔴 **2.5 배로 키웠다** (2026-09-29 사용자: 「빨간 색 너무 작아서 보이지도
+       않아. 2.5배로 키워봐」). 18 → 45. ⛔ 다시 줄이지 말 것. */
+    final d = context.d(45);
+    return FadeTransition(
+      opacity: _blink.drive(Tween(begin: 1.0, end: 0.0)),
+      child: Container(
+        key: const Key('navbar-badge'),
+        constraints: BoxConstraints(minWidth: d, minHeight: d),
+        padding: EdgeInsets.symmetric(horizontal: context.d(10)),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: kNavBadgeRed,
+          borderRadius: BorderRadius.circular(d),
+          // 흰 바 위라 테가 없으면 동그라미가 바에 녹는다.
+          border: Border.all(color: kNavBarColor, width: context.d(5)),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            color: const Color(0xFFFFFFFF),
+            fontSize: context.d(27),
+            fontWeight: FontWeight.w700,
+            height: 1,
+          ),
         ),
       ),
     );

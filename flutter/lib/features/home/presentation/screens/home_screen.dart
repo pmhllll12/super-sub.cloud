@@ -15,7 +15,6 @@ import '../../../../core/widgets/glass_pill.dart';
 import '../../../../core/widgets/aurora_background.dart';
 import '../../../../core/widgets/floating_nav_bar.dart';
 import '../../../../core/widgets/silver_edge.dart';
-import '../../../../core/widgets/raised_rim.dart';
 import '../../../../core/widgets/screen_tint.dart';
 import '../../../../core/widgets/silver_sweep_border.dart';
 import '../../../auth/presentation/session_controller.dart';
@@ -33,8 +32,6 @@ import '../../../team/data/squad_repository.dart';
 import '../../../team/optimistic_squad.dart';
 import '../../../team/seats_from_squad.dart';
 import '../../../team/presentation/sheets/seat_fill_sheet.dart';
-import '../../../team/data/inbox_providers.dart';
-import '../../../team/presentation/sheets/inbox_sheet.dart';
 import '../../../team/presentation/sheets/match_waiting_sheet.dart';
 import '../../../team/presentation/sheets/team_match_sheet.dart';
 import '../../../team/presentation/sheets/team_seek_sheet.dart';
@@ -188,6 +185,13 @@ const double _kProfileButtonH = 4 + _kProfileCardWidth * 4.1 / 3 + 5 + 18 + 4;
 /// 영상 줄이 다크 판·흰 판과 각각 띄우는 틈.
 const double _kVideoStripGap = 10;
 
+/// 공개 영상 줄의 **위 한계** (2026-09-29).
+///
+/// ⚠️ **이력: 240 → 170 → 160.** 알약 줄이 하단 바로 내려가며 자리가 넓어지자
+/// 줄이 그 자리를 다 먹었고, 사용자가 「살짝만 크게」로 정정했다.
+/// ⛔ 다시 240 으로 올리지 말 것 — 줄이 아니라 판으로 보인다.
+const double _kVideoStripMaxH = 160;
+
 /// 워드마크(`SUPERSUB`)가 **화면 맨 위에서** 떨어진 거리.
 ///
 /// 🔴 **스쿼드 판 아랫변에 붙여 두던 것을 뗐다**(2026-09-22 정정, 사용자 요청:
@@ -268,32 +272,6 @@ const double _kWhiteSheetSideInset = 0;
 /// ([_kVideoSideInset])과 같은 값이다.** 다르면 테가 옆과 아래에서 어긋난다.
 const double _kWhiteSheetPad = _kVideoSideInset;
 
-/// 지름길 알약 줄(레슨 · 상점 · 경기장 예약 · 알림)의 높이.
-const double _kShortcutRowH = 62;
-
-/// 알약 줄과 스쿼드 판 사이 틈.
-const double _kShortcutGap = 12;
-
-/// 알약 줄 위로 흰 판이 더 남기는 자리.
-const double _kShortcutTopPad = 14;
-
-/// 알약 사이 틈.
-const double _kShortcutSpacing = 10;
-
-/// 알약 한 칸의 폭 — 🔴 **셋이 서 있던 때의 폭 그대로다.**
-///
-/// 지름길이 하나로 줄었어도(2026-09-29) 알약 **크기는 안 바뀐다** — 요청이
-/// 「알림 버튼을 **왼쪽으로 위치해서** 가운데에 있게」라, 옮기라는 것이지
-/// 키우라는 것이 아니다. 그래서 폭은 여전히 **셋 기준**으로 재고, 줄이
-/// 가운데 정렬이라 하나만 남으면 저절로 한가운데 선다.
-///
-/// 🔴 **그래서 [_kShortcuts] 에 둘을 도로 넣으면 옛 모양이 정확히 돌아온다** —
-/// 셋 × 이 폭 + 틈 둘 = 줄 전체다. 레이아웃을 안 고쳐도 된다.
-double _kShortcutPillW(BuildContext context) {
-  final rowW =
-      MediaQuery.sizeOf(context).width - 2 * (_kVideoSideInset + _kWhiteSheetPad);
-  return (rowW - 2 * _kShortcutSpacing) / 3;
-}
 
 /* ⛔ **여기 있던 `_kPillFill`(= [_kInkDark], 불투명한 어두운 면)을 걷었다**
    (2026-09-24 사용자 지시: 「3개 버튼들 안쪽 색상 빠르게 없애봐」 →
@@ -307,31 +285,10 @@ double _kShortcutPillW(BuildContext context) {
    판**([_kWhiteSheetColor], 밝은 회색)이고, 지금 유리가 성립하는 것도
    그 판이 밝기 때문이다. */
 
-/// 지름길 알약의 모서리 — 🔴 **알약(`StadiumBorder`)이 아니라 둥근 네모다**
-/// (2026-09-24 사용자 요청 + 레퍼런스).
-///
-/// 🔴 **모서리가 있어야 [RaisedRim] 이 성립한다** — 레퍼런스의 「모서리 두 곳이
-/// 자연스럽게 안 보인다」는 **모서리가 있을 때만** 눈에 집힌다. 양 끝이 완전한
-/// 반원이면 그냥 한쪽만 밝은 테로 보인다. ⛔ [StadiumBorder] 로 되돌리지 말 것.
-const double _kShortcutRadius = 20;
-
 /* ⛔ **여기 있던 `_kShortcutBlur`(공용 흐림의 30%)와 `_kShortcutGlassAlpha`
    (흰 기 [kPillTint])를 걷었다** (2026-09-25 — 알약이 유리를 버리고 **흰색
    85%** 로 갔다). 면이 거의 불투명해서 **흐릴 뒤가 없다**(하단 바가 흰색이
    되면서 흐림을 걷은 것과 같은 판단이다). 되살리려면 그날 이전 커밋을 본다. */
-
-/// 지름길 알약의 면 — 🔴 **완전한 흰색** (2026-09-25 사용자 요청: 「레슨 상점
-/// 경기장 예약 알림 버튼 안쪽 색상 완전 흰색으로」). 85%로 한 번 갔다가 같은
-/// 날 순백으로 올렸다 — 어두운 판 위에서 15%의 비침이 **면을 탁하게** 했다.
-///
-/// 🔴 **판([_kWhiteSheetColor], `#1C1C1E`)보다 한참 밝다** — 그 대비가 알약을
-/// 알약으로 읽히게 하는 전부다. 판을 밝게 돌리면 여기와 [_kOnSheet] 를 같이
-/// 본다.
-///
-/// ⚠️ **알약의 면은 하루에 다섯 번 갈렸다**: 어두운 불투명(`#222021`) → 면
-/// 없음 → 흰 기 16%(유리) → 흰색 85% → **순백**. 그때마다 [_kOnSheet] 가
-/// 함께 뒤집혔다.
-const Color _kShortcutFill = Color(0xFFFFFFFF);
 
 /// 화면 맨 위 **다크 헤더 판**의 면 (2026-09-24 사용자 요청 + 레퍼런스:
 /// 「내 프로필 글자 아래로 … 이 색상으로 판 하나 주자」, 색 견본 `#222021`).
@@ -388,17 +345,6 @@ const double _kTopPanelRadius = _kWhiteSheetRadius;
 /// 판 아랫변이 225.9 → 212 로 올라가 영상 줄이 111 → 125px 을 갖는다.
 const double _kTopPanelPadBottom = 6;
 
-
-/// 알약 안의 글자·아이콘 — 🔴 **완전한 검정이다** (2026-09-25 사용자 요청:
-/// 「아이콘이랑 글자는 오나전 검정으로」). 면이 **흰색 85%**([_kShortcutFill])
-/// 라 그 위에서 가장 또렷한 값이다.
-///
-/// 🔴 **기준은 판이 아니라 알약 제 면이다.** 판은 거의 검정인데 글자는
-/// 검정이다 — 어긋나 보여도 맞다. 🔴 **면을 갈면 여기도 같이 간다**:
-/// 검정(면이 흴 때) → 순백(면이 어두울 때) → 검정(유리 + 밝은 판) →
-/// 순백(판이 어두워짐) → **검정**(면이 흰색 85%).
-const Color _kOnSheet = Color(0xFF000000);
-
 /* ⛔ **여기 있던 `_kPillLineOnWhite`([SilverEdge.onWhite])를 걷었다**
    (2026-09-24 사용자 요청 + 레퍼런스 — 지름길 알약 셋이 [RaisedRim] 으로 갔다).
 
@@ -418,26 +364,6 @@ const Color _kOnSheet = Color(0xFF000000);
 /// 그 값인지도 거기 적혀 있다. 여기서 숫자를 다시 쓰면 둘이 갈린다.
 const Color _kSilverOnWhite = SilverEdge.onWhite;
 const double _kSilverOnWhiteWidth = SilverEdge.onWhiteWidth;
-
-/// 흰 판 맨 위 줄에 서는 지름길 — 🔴 **지금은 「알림」 하나다**
-/// (2026-09-29 사용자 지시: 「경기장 예약 레슨 상점은 그냥 빼버리자」).
-///
-/// ⚠️ **셋이었다**(2026-09-23 ~ 09-29): 「레슨 · 상점」(`home-shortcut-market`,
-/// [Symbols.storefront]) · 「경기장 예약」(`home-shortcut-venue`,
-/// [Symbols.stadium]) · 「알림」. 앞의 둘은 **웹에만 있는 화면**(`/market` ·
-/// `/venues`)이라 누르면 「준비 중입니다」였고, 그 안내만 내미는 자리를
-/// 홈에 두지 않기로 했다.
-///
-/// 🔴 **되살릴 때는 자리와 폭이 이미 맞는다** — [_kShortcutPillW] 가 **셋
-/// 기준**으로 폭을 재고 줄은 가운데 정렬이라, 여기 둘을 도로 넣으면 셋이
-/// 줄을 꽉 채우며 예전 모양 그대로가 된다. 레이아웃은 손댈 것이 없다.
-const List<({Key key, IconData icon, String label})> _kShortcuts = [
-  (key: _kAlarmKey, icon: Symbols.notifications, label: '알림'),
-];
-
-/// 🔴 **갈 곳이 있는 유일한 지름길**(2026-09-25) — 알림함을 연다.
-/// 나머지가 걷힌 지금은 [_kShortcuts] 의 전부이기도 하다.
-const Key _kAlarmKey = Key('home-shortcut-alarm');
 
 /// 스쿼드 판 자리에 무엇을 세우는가 — 웹의 알약 「팀장」 · 「팀원」.
 enum _Role { captain, member }
@@ -1002,17 +928,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     return '우리 팀';
   }
 
-  /// 답해야 할 것의 수 — 알림 알약에 붙는다.
-  int _inboxCount() => ref.watch(inboxProvider).value?.pending ?? 0;
-
-  /// 알림함을 연다 — 받은 초대·지인 신청·경기 신청에 답하는 자리.
-  void _openInbox() {
-    final session = ref.read(sessionControllerProvider);
-    showInboxSheet(
-      context,
-      teamId: session is SessionLoggedIn ? session.user.ownedTeamId : null,
-    );
-  }
+  /* ⛔ **여기 있던 `_inboxCount`·`_openInbox` 를 걷었다** (2026-09-29).
+     알림함을 여는 일도, 답해야 할 수를 세는 일도 이제 **하단 바가 직접**
+     한다([FloatingNavBar] 의 그 머리말) — 화면이 넘겨 주던 때 나머지 셋을
+     빠뜨려 알림 칸이 홈에만 있었다. */
 
   /// 맨 위 오른쪽의 「팀 매칭」 단추.
   ///
@@ -1184,7 +1103,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
            로그인/로그아웃 칸으로 바뀌면서). 그 판이 펴던 넷 중 셋이 아직
            「준비 중입니다」였고, 실제로 하는 일은 로그아웃 하나였다.
            되살리려면 2026-09-25 이전 커밋을 본다. */
-        bottomNavigationBar: FloatingNavBar(currentIndex: 0, onTap: _onNavTap),
+        /* 🔴 **알림이 하단 바로 내려왔다** (2026-09-29 사용자 지시: 「알림을
+           가운데에서 아예 빼버리고 하단바에서 홈 버튼 바로 오른쪽에 알림으로
+           넣어줘」). ⚠️ 전에는 흰 판 맨 위의 지름길 알약이었는데, 그 줄에
+           남은 것이 알림 하나뿐이라 **판 한가운데 뜬금없이** 서 있었다. */
+        /* 🔴 **알림 칸은 바가 스스로 맡는다** — 넘겨 줄 것이 없다
+           ([FloatingNavBar] 의 그 머리말 참고). 화면마다 붙이던 때
+           나머지 셋을 빠뜨려 알림이 홈에만 있었다. */
+        bottomNavigationBar: FloatingNavBar(
+          currentIndex: 0,
+          onTap: _onNavTap,
+        ),
         extendBody: true,
         body: Stack(
           fit: StackFit.expand,
@@ -1243,7 +1172,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                아니다. */
             _whiteSheet(context),
             _videoPanel(context),
-            _shortcutPills(context),
             _squadSheet(context, card, squad, user?.ownedTeamId),
             // 「내 프로필」 — 화면 맨 위 오른쪽. 판보다 **뒤에 두지 않는다**.
             _profileButton(context, card),
@@ -1311,98 +1239,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       },
     );
   }
+  /* ⛔ **여기 있던 지름길 알약 줄(`_shortcutPills`)을 걷었다**
+     (2026-09-29 사용자 지시: 「알림을 가운데에서 아예 빼버리고 하단바에서
+     홈 버튼 바로 오른쪽에 알림으로 넣어줘」).
 
-  /// 흰 판 맨 위의 지름길 알약 셋 — 가로로 나란히.
-  ///
-  /// 🔴 **「내 프로필」과 같은 방식으로 걷힌다**(앞 4할 안에). 스쿼드 판이
-  /// 위로 자라면서 이 줄 자리를 통째로 덮기 때문이다. 같은 식을 쓰므로
-  /// 한쪽만 고치면 둘이 어긋난다.
-  Widget _shortcutPills(BuildContext context) {
-    final geo = _sheetGeometry(context);
-    return AnimatedBuilder(
-      animation: _sheet,
-      builder: (context, _) {
-        final tc = _sheetT;
-        return Positioned(
-          top: geo.shortcutTop,
-          left: _kVideoSideInset + _kWhiteSheetPad,
-          right: _kVideoSideInset + _kWhiteSheetPad,
-          height: _kShortcutRowH,
-          /* 나가기 시작하면 더 안 눌린다 — 화면 밖으로 미끄러지는 단추를
-             누를 수 있으면 손가락이 판을 끌다 엉뚱한 곳으로 간다. */
-          child: IgnorePointer(
-            ignoring: tc > 0.02,
-            child: Row(
-              /* 🔴 **가운데 정렬**(2026-09-29 사용자 지시: 「알림 버튼을
-                 왼쪽으로 위치해서 가운데에 있게」). 알약이 하나로 줄면서
-                 오른쪽 끝에 홀로 서 있었다. 폭은 [_kShortcutPillW] 가 셋
-                 기준으로 붙잡으므로 **늘어나지 않고 자리만** 옮겨진다.
-                 ⛔ [Expanded] 로 되돌리지 말 것 — 하나뿐일 때 줄을 통째로
-                 차지해 알약이 아니라 띠가 된다. */
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                for (final (i, s) in _kShortcuts.indexed) ...[
-                  if (i > 0) const SizedBox(width: _kShortcutSpacing),
-                  SizedBox(
-                    width: _kShortcutPillW(context),
-                    /* 🔴 **제자리에서 걷힌다**(2026-09-23 정정, 사용자:
-                       「오른쪽으로 나가지 말고 그냥 제자리에서 … 사라지는 게
-                       스쿼드판 올라갈 때 다 보이니까 눈아프다」).
-                       ⛔ **옆으로 미는 것을 되살리지 말 것** — 판이 올라오는
-                       내내 알약이 화면을 가로질러서 시선이 그쪽으로 끌린다. */
-                    child: Opacity(
-                      opacity: 1 - _shortcutExit(tc, i),
-                      /* 🔴 **알림 알약이 알림함을 연다** (2026-09-25 사용자:
-                         「가운데 버튼 3개 중에 맨 오른쪽 알림 버튼
-                         만들었잖아. 거기에 뜨게 해야지」). 이 줄의 머리말이
-                         적어 둔 「화면을 붙이는 날 `onTap` 만 갈면 된다」가
-                         이 자리다 — 나머지 둘은 아직 웹에만 있다. */
-                      child: _ShortcutPill(
-                        key: s.key,
-                        icon: s.icon,
-                        label: s.label,
-                        badge: s.key == _kAlarmKey ? _inboxCount() : 0,
-                        onTap: s.key == _kAlarmKey
-                            ? _openInbox
-                            : () => _notReady(s.label),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
+     ⚠️ 이력: 셋(레슨 · 상점 / 경기장 예약 / 알림) → 알림 하나(2026-09-29
+     오전) → **없음**. 하나만 남으니 흰 판 한가운데 뜬금없이 서 있었다.
+     알림은 이제 하단 바의 칸이다([kNavAlarmIndex]).
 
-  /// 알약 [i](왼쪽부터 0)가 **걷힌 정도** 0~1. 1 이면 안 보인다.
-  ///
-  /// 🔴 **오른쪽 것부터 걷힌다**(2026-09-23 사용자 요청: 「오른쪽 꺼부터
-  /// 차례대로」). 그래서 시작 시각을 오른쪽일수록 이르게 준다.
-  ///
-  /// 🔴 **판이 올라오기 전에 다 걷힌다** — 구간을 앞쪽 절반 안에 몰아넣었다.
-  /// 늦게까지 남으면 올라오는 판과 겹쳐 보여 지저분하다.
-  ///
-  /// 🔴 **돌아오는 순서를 따로 두지 않는다.** 이 값이 판 진행도 하나의
-  /// **함수**라, 판을 접으면 시간이 되감기면서 **저절로 왼쪽(레슨 · 상점)
-  /// 부터** 돌아온다 — 사용자가 요청한 그 순서다. 🔴 나가는 길과 들어오는
-  /// 길을 나누면 손가락을 도중에 되돌렸을 때 알약이 제자리로 안 돌아온다
-  /// (워드마크가 같은 이유로 한 함수다).
-  ///
-  /// ⚠️ **걷어 내지(`Opacity`) 않는다** — 옆으로 나가면서 흐려지기까지 하면
-  /// 화면 밖에 닿기 전에 사라져 **나가는 것이 안 보인다.**
-  static double _shortcutExit(double tc, int i) {
-    /// 한 알약이 걷히는 데 쓰는 구간, 그리고 이웃과의 시차.
-    const span = 0.30;
-    const step = 0.10;
-    final start = (_kShortcuts.length - 1 - i) * step;
-    final p = ((tc - start) / span).clamp(0.0, 1.0);
-    /* 🔴 [Curves.easeInCubic] 에서 갈았다 — 그쪽은 **미는 데** 맞는 곡선이라
-       (처음엔 느리고 끝에 빠르다) 걷는 데 쓰면 마지막에 툭 사라진다. */
-    return Curves.easeInOut.transform(p);
-  }
+     🔴 **되살리려면** 이 커밋 이전에서 `_shortcutPills` · `_ShortcutPill` ·
+     `_kShortcuts` · `_kShortcutRowH` 넷을 함께 꺼낸다 — 자리 계산
+     (`shortcutTop`)도 [_sheetGeometry] 에서 같이 걷었다. */
 
   /// 「내 프로필」 — **화면 맨 위 오른쪽**(2026-09-22 사용자 요청).
   ///
@@ -1589,11 +1436,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final geo = _sheetGeometry(context);
     final top = geo.rowTop + _kProfileButtonH + _kTopPanelPadBottom;
     final room = geo.whiteTopCollapsed - top;
-    final height = (room - _kVideoStripGap * 2).clamp(0.0, 240.0);
+
+    /* 🔴 **닉네임과 스쿼드 판 딱 가운데에 선다** (2026-09-29 사용자 지시:
+       「영상줄을 좀 키워서 닉네임과 스쿼드판 딱 중간에 있게 해줘」).
+
+       ⚠️ **전에는 남는 자리를 통째로 먹었다**(`room - 틈*2`). 알약 줄이
+       하단 바로 내려가며 자리가 넓어지자 줄이 과하게 커졌고, 위아래 여백도
+       한쪽으로 몰렸다.
+
+       🔴 **위아래 여백이 같아야 「가운데」로 읽힌다** — 높이를 먼저 정하고
+       남는 자리를 **반씩** 나눈다.
+
+       🔴 **위 한계 [_kVideoStripMaxH]** — 한 번 240 으로 뒀다가 사용자가
+       「영상 너무 커졌어, 살짝만 크게 키우라는 소리야」로 되돌렸다. 그 이상은
+       줄이 아니라 **또 하나의 판**으로 보인다. */
+    final height = (room - _kVideoStripGap * 2).clamp(0.0, _kVideoStripMaxH);
+    final slack = ((room - height) / 2).clamp(0.0, double.infinity);
     return Positioned(
       // 🔴 시험이 이 키로 **층 순서**를 읽는다 — 흰 판보다 뒤에 있어야 한다.
       key: const Key('home-video-strip'),
-      top: top + _kVideoStripGap,
+      top: top + slack,
       left: 0,
       right: 0,
       height: height,
@@ -1691,7 +1553,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     double squadTopExpanded,
     double squadBottomCollapsed,
     double squadBottomExpanded,
-    double shortcutTop,
     double whiteTopCollapsed,
     double whiteTopExpanded,
     double whiteBottom,
@@ -1722,14 +1583,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final squadTopCollapsed = squadBottomCollapsed - _kSquadPhotoH;
     final squadTopExpanded = rowTop;
 
-    /* 지름길 알약 줄 — 스쿼드 판 **바로 위**다. 흰 판은 그 줄까지 감싸므로
-       윗변이 여기서 한 번 더 올라간다(사용자가 고른 배치).
+    /* 🔴 **흰 판 윗변이 스쿼드 판 바로 위다** (2026-09-29 사용자 지시:
+       「그만큼 판은 스쿼드판 바로 위 내리고」).
+
+       ⚠️ **전에는 지름길 알약 줄까지 감싸느라 그만큼 더 위였다.** 알약이
+       하단 바로 내려가면서(→ [kNavAlarmIndex]) 그 자리가 통째로 비었고,
+       남겨 두면 흰 판 위쪽에 **빈 띠**만 남는다.
 
        🔴 **펼치면 윗변이 스쿼드 판을 따라간다.** 스쿼드 판은 위로 자라
        화면 맨 위([rowTop])까지 가는데, 흰 판이 접힌 자리에 그대로 있으면
-       **판이 흰 판 위로 삐져나온다.** 알약은 그 전에 걷힌다. */
-    final shortcutTop = squadTopCollapsed - _kShortcutGap - _kShortcutRowH;
-    final whiteTopCollapsed = shortcutTop - _kShortcutTopPad;
+       **판이 흰 판 위로 삐져나온다.** */
+    final whiteTopCollapsed = squadTopCollapsed - _kWhiteSheetPad;
     final whiteTopExpanded = squadTopExpanded - _kWhiteSheetPad;
     /* 🔴 **아랫변은 영상 분석 판의 바닥 + 테다** — 그 판은 여닫이와 무관하게
        바닥이 늘 같으므로([bottom]) 이 값도 고정이다. */
@@ -1764,7 +1628,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       squadTopExpanded: squadTopExpanded,
       squadBottomCollapsed: squadBottomCollapsed,
       squadBottomExpanded: squadBottomExpanded,
-      shortcutTop: shortcutTop,
       whiteTopCollapsed: whiteTopCollapsed,
       whiteTopExpanded: whiteTopExpanded,
       whiteBottom: whiteBottom,
@@ -2151,140 +2014,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       },
       child: child,
     );
-  }
-}
-
-/// 접힌 스쿼드 판 위쪽의 **안내 알약** — 「위로 올려 내 팀 만들기」.
-///
-/// 🔴 **[_StartAnalysisPill] 과 같은 재질이다**(2026-09-22 사용자 요청:
-/// 「영상 분석 시작하기 버튼처럼 똑같이 글래스랑 블러」) — 유리 + 흐림 +
-/// 해그림자. 둘이 한 화면에 있으니 재질이 갈리면 따로 논다.
-///
-/// 🔴 **다만 외곽선은 없다**(사용자 요청). 도는 실버는 **「여기를 눌러라」는
-/// 표시**라 진짜 단추 하나에만 붙인다 — 이쪽은 안 눌린다.
-///
-/// ⛔ **화살표를 되살리지 말 것**(사용자 요청: 「화살표 그냥 빼고」).
-/// 알약이 되면서 **알약 자체가 「무엇을 하라」를 말하고** 화살표는 자리만
-/// 먹었다.
-///
-/// 🔴 **아주 미세하게 위아래로 떠다닌다**(2026-09-22 사용자 요청).
-/// ⚠️ 앞서 여기 「까닥이는 애니메이션을 없애서 `StatelessWidget` 이 됐다」고
-/// 적었던 것을 **정정한다** — 다시 움직이므로 다시 상태를 갖는다. 움직이는
-/// 것이 **화살표가 아니라 알약 전체**인 것이 그때와 다르다.
-///
-/// ⚠️ **안 눌린다.** 생김새는 단추인데 판 전체가 끄는 자리다 — 부르는 쪽이
-/// [IgnorePointer] 로 감싼다.
-/// 흰 판 맨 위 줄의 지름길 알약 하나 — 아이콘 위, 글자 아래
-/// (2026-09-23 사용자가 준 그림 배치).
-///
-/// 🔴 **유리가 아니다.** 흰 판 위라 흐릴 뒤가 없고, 이 화면의 다른 알약
-/// (`GlassPill`)을 그대로 가져오면 아무것도 안 보인다. 색 면 + 가는 테로
-/// 간다 — `flutter/CLAUDE.md` 의 「층을 쌓아야 하면 흐림 없이 색만 얹는다」와
-/// 같은 판단이다.
-///
-/// ⚠️ **흰 면이었다 (2026-09-23 정정)** — 사용자가 면을 화면 바탕과 같은
-/// 딥그린으로, 글자·아이콘을 순백으로 뒤집었다.
-class _ShortcutPill extends StatelessWidget {
-  const _ShortcutPill({
-    super.key,
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.badge = 0,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  /// 아이콘 위에 붙는 수. 🔴 **0 이면 아무것도 안 그린다** — 빈 배지가 더
-  /// 헷갈린다.
-  final int badge;
-
-  @override
-  Widget build(BuildContext context) {
-    /* 🔴 **모서리 둘이 자연스럽게 사라지는 테다**([RaisedRim], 2026-09-25
-       사용자 요청: 「외곽선은 모서리 2군데는 자연스럽게 안보이게 해줘」).
-       같은 날 **실버 실선으로 갔다가 되돌아왔다** — 실선은 네 변을 고르게
-       둘러 「판에 그려 넣은 네모」가 된다.
-       ⛔ `Border.all` 실선으로 되돌리지 말 것.
-
-       🔴 **면이 희어서 두 색이 다 검정이다.** 이 위젯의 기본 조합(왼쪽 위
-       흰 하이라이트)은 **어두운 조각**용이라, 흰 면 위에서는 획이 통째로
-       묻힌다. 빛이 왼쪽 위에서 온다는 규칙은 지키되 **그늘 쪽(오른쪽 아래)을
-       더 진하게** 줘서 솟아 보이게 한다.
-       🔴 면을 다시 어둡게 돌리면 이 둘을 실버로 되돌린다. */
-    return RaisedRim(
-      radius: _kShortcutRadius,
-      litColor: _kOnSheet,
-      lit: 0.18,
-      shadeColor: _kOnSheet,
-      shade: 0.32,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(_kShortcutRadius),
-        child: Material(
-            /* 🔴 **판보다 밝아야 뜬다** — 그것이 이 면이 하는 일의 전부다
-               ([_kShortcutFill] 머리말). 한때 어두운 색을 옅게 깔아 봤는데
-               판보다 **어두워져** 「때 낀 자국」으로 보였다(2026-09-24). */
-            color: _kShortcutFill,
-            child: InkWell(
-              onTap: onTap,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  /* 🔴 **수는 아이콘 오른쪽 위에 겹친다** — 줄을 따로 두면
-                     알약 셋의 높이가 갈린다(아래 「한 줄로 묶는다」와 같은
-                     까닭). */
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Icon(icon, size: 22, color: _kOnSheet),
-                      if (badge > 0)
-                        Positioned(
-                          top: -4,
-                          right: -8,
-                          child: Container(
-                            key: const Key('home-inbox-count'),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 5,
-                              vertical: 1,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppTheme.seed,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              '$badge',
-                              style: const TextStyle(
-                                color: Color(0xFF0B0B0B),
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                height: 1.3,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 5),
-                  /* 🔴 한 줄로 묶는다 — 「경기장 예약」이 좁은 기기에서 두 줄로
-                     접히면 알약 셋의 높이가 갈린다. */
-                  Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: _kOnSheet,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
   }
 }
 

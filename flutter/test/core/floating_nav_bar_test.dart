@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:super_sub/core/widgets/floating_nav_bar.dart';
+import 'package:super_sub/features/team/data/inbox_providers.dart';
+import 'package:super_sub/features/team/data/models/team_invitation.dart';
 import 'package:super_sub/features/auth/data/models/app_user.dart';
 import 'package:super_sub/features/auth/presentation/session_controller.dart';
 
@@ -40,6 +42,7 @@ Future<ProviderContainer> _pump(
   WidgetTester tester, {
   List<int>? taps,
   SessionState? session,
+  int pending = 0,
 }) async {
   tester.view.physicalSize = const Size(1080, 2340);
   tester.view.devicePixelRatio = 3;
@@ -49,6 +52,24 @@ Future<ProviderContainer> _pump(
     overrides: [
       sessionControllerProvider
           .overrideWith(() => _Session(session ?? _loggedIn())),
+      /* 🔴 **알림함을 고정한다** (2026-09-29, 바가 알림을 직접 맡으면서).
+         진짜 [inboxProvider] 는 **15초마다 도는 타이머**를 건다 — 그대로
+         두면 시험이 「틀을 버린 뒤에도 타이머가 남았다」로 깨진다. */
+      inboxProvider.overrideWith(
+        (ref) => Stream.value(
+          Inbox(
+            invitations: [
+              for (var i = 0; i < pending; i++)
+                TeamInvitation(
+                  id: 'inv-$i',
+                  teamId: 't-1',
+                  invitedUserId: 'u-1',
+                  status: 'pending',
+                ),
+            ],
+          ),
+        ),
+      ),
     ],
   );
   addTearDown(container.dispose);
@@ -117,12 +138,52 @@ void main() {
     expect(taps, [0]);
   });
 
-  /* 🔴 **레슨 칸(2번)을 걷었다** (2026-09-25 사용자 지시: 「하단 바의 중앙에
-     있는 레슨 버튼은 없애고」). 다섯 → 넷이다. */
-  testWidgets('레슨 칸은 없다', (tester) async {
+  /* ⚠️ **2번은 이제 알림 칸이다** (2026-09-29 사용자 지시: 「하단바에서 홈
+     버튼 바로 오른쪽에 알림으로 넣어줘」). 걷어낸 「레슨 · 코치」가 쓰던
+     번호를 **재사용했다** — 남은 칸(0 홈 · 1 영상 · 3 프로필)의 번호를
+     안 건드리려는 것이다([kNavAlarmIndex] 머리말). */
+  testWidgets('2번은 알림 칸이다', (tester) async {
     await _pump(tester);
 
-    expect(find.byKey(const Key('navbar-icon-2')), findsNothing);
+    expect(
+      find.byKey(const Key('navbar-icon-$kNavAlarmIndex')),
+      findsOneWidget,
+    );
+  });
+
+  /// 🔴 **로그인 전에는 알림 칸이 없다** — 볼 것도 열 것도 없다.
+  testWidgets('로그아웃 상태면 알림 칸이 없다', (tester) async {
+    await _pump(tester, session: const SessionLoggedOut());
+
+    expect(
+      find.byKey(const Key('navbar-icon-$kNavAlarmIndex')),
+      findsNothing,
+    );
+  });
+
+  /* 🔴 **안 읽은 것이 있으면 빨간 배지가 붙고 종도 빨개진다** (2026-09-29
+     사용자 요청). ⛔ 배지만 빨갛게 두지 말 것 — 바를 훑을 때 안 들어온다. */
+  testWidgets('안 읽은 것이 있으면 배지와 빨간 종', (tester) async {
+    await _pump(tester, pending: 2);
+    // 🔴 알림함은 스트림이라 첫 값이 한 프레임 뒤에 온다.
+    await tester.pump();
+
+    expect(find.byKey(const Key('navbar-badge')), findsOneWidget);
+    expect(find.text('2'), findsOneWidget);
+
+    final bell = tester.widget<Icon>(
+      find.descendant(
+        of: find.byKey(const Key('navbar-icon-$kNavAlarmIndex')),
+        matching: find.byType(Icon),
+      ),
+    );
+    expect(bell.color, kNavBadgeRed);
+  });
+
+  testWidgets('안 읽은 것이 없으면 배지가 없다', (tester) async {
+    await _pump(tester);
+
+    expect(find.byKey(const Key('navbar-badge')), findsNothing);
   });
 
   /* 🔴 **맨 오른쪽은 로그인/로그아웃이다** (같은 지시). 로그인했으면
@@ -162,7 +223,8 @@ void main() {
     expect(c.read(sessionControllerProvider), isA<SessionLoggedOut>());
   });
 
-  /* 칸이 넷이면 사이는 셋이다 — 레퍼런스가 칸마다 선을 긋는다. */
+  /* 칸이 다섯이면 사이는 넷이다 — 레퍼런스가 칸마다 선을 긋는다.
+     ⚠️ 알림 칸이 들어오며 넷 → 다섯이 됐다(2026-09-29). */
   testWidgets('칸과 칸 사이마다 세로선이 선다', (tester) async {
     await _pump(tester);
     final dividers = find.byWidgetPredicate(
@@ -170,7 +232,7 @@ void main() {
           w.key is ValueKey<String> &&
           (w.key! as ValueKey<String>).value.startsWith('navbar-divider'),
     );
-    expect(dividers, findsNWidgets(3));
+    expect(dividers, findsNWidgets(4));
 
     /* 🔴 **높이가 0 이 아니어야 한다 — 실제로 0 이었다(2026-09-23).**
        [SizedBox] 에 **폭만** 주었더니 [Row] 의 느슨한 세로 제약 아래

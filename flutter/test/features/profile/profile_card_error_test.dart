@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:super_sub/features/team/data/inbox_providers.dart';
 import 'package:super_sub/core/dev/data_source.dart';
 import 'package:super_sub/core/mock/mock_db.dart';
 import 'package:super_sub/core/network/upload_file.dart';
@@ -81,6 +82,10 @@ Future<ProviderContainer> _pump(
 ) async {
   final container = ProviderContainer(
     overrides: [
+      /* 🔴 **알림함을 고정한다** (2026-09-29, 하단 바가 알림을 직접 맡으면서).
+         진짜 [inboxProvider] 는 **15초마다 도는 타이머**를 건다 — 그대로
+         두면 시험이 「틀을 버린 뒤에도 타이머가 남았다」로 깨진다. */
+      inboxProvider.overrideWith((ref) => Stream.value(const Inbox())),
       authRepositoryProvider.overrideWith(
         (ref) => MockAuthRepository(ref.watch(mockDbProvider)),
       ),
