@@ -2,7 +2,7 @@
 
 여기 있는 것은 **공개 사이트에 커밋된 결과물을 생성한 원본**입니다.
 `jekyll/progress/` 의 네 페이지(10·11·12·14번), `06-시스템설계.markdown` 1절, `assets/erd/` 의
-ERD 그림 9장, 그리고 제안서 장 안의 그림(`<!-- gen_figures:… -->` 사이)은 **손으로 쓴 것이
+ERD 그림 9장(과 `dark/` 의 다크 판 9장), 그리고 제안서 장 안의 그림(`<!-- gen_figures:… -->` 사이)은 **손으로 쓴 것이
 아니라 여기서 나왔습니다.**
 
 🔴 **그래서 그 페이지들의 그림·수치는 페이지를 직접 고치지 마십시오.** 다음에
@@ -37,7 +37,8 @@ Jekyll 빌드에서는 빠져 있습니다(`_config.yml` 의 `exclude:`) — `fa
     | while read -r c; do grep -q "\"$c\"" assets/main.scss || echo "다크 색 표에 없음: $c"; done
   ```
 
-  부록 D 의 ERD(`assets/erd/*.svg`)는 `<img>` 로 넣은 파일이라 이 방식이 닿지 않습니다 — 다크에서도 흰 판 위에 그대로입니다.
+  부록 D 의 ERD(`assets/erd/*.svg`)는 `<img>` 로 넣은 파일이라 이 방식이 닿지 않습니다 — 대신 ERD 생성기가 다크 판을
+  따로 만듭니다(아래 `tools/erd/` 절).
 
 ## 돌리기 전에 — 지금 페이지를 그대로 재현하는지 먼저 봅니다
 
@@ -139,12 +140,17 @@ diff 가 숫자·날짜·그림 좌표뿐인지 봅니다 — 문장이 바뀌�
 # 1) ORM 메타데이터를 JSON 으로 뽑습니다 (DB 접속은 필요 없습니다)
 fastapi/.venv/bin/python tools/erd/dump_schema.py /tmp/schema.json
 
-# 2) assets/erd/ 의 SVG 9장을 다시 만듭니다
+# 2) assets/erd/ 의 SVG 9장과 assets/erd/dark/ 의 다크 판 9장을 다시 만듭니다
 python3 tools/erd/gen_erd.py /tmp/schema.json
 
-# 3) 🔴 무엇이 진짜로 바뀌었는지 봅니다 (아래 설명)
+# 3) 🔴 무엇이 진짜로 바뀌었는지 봅니다 (아래 설명) — 두 폴더 다
 python3 tools/erd/compare_svg.py <옛 그림 폴더> assets/erd
+python3 tools/erd/compare_svg.py <옛 그림 폴더>/dark assets/erd/dark
 ```
+
+**다크 판(2026-09-29)** — 부록 D 는 틀마다 라이트 판과 다크 판 이미지를 나란히 두고 사이트 모드에 따라 하나만
+보입니다(`assets/main.scss` 의 `.erd-light`·`.erd-dark`). 다크 판은 같은 실행에서 같은 그림의 색만 바꿔 쓰므로 둘이
+어긋나지 않습니다. 색 표는 `gen_erd.py` 의 `DARK` — 그림에 새 색을 쓰면 거기에도 넣습니다(빠지면 실행할 때 경고합니다).
 
 🔴 **`dump_schema.py` 만 `fastapi/.venv` 로 돌립니다** — SQLAlchemy 와 모든
 `*_orm.py` 를 임포트해야 하기 때문입니다. 나머지는 `python3` 로 충분합니다.
@@ -157,7 +163,8 @@ ORM 메타데이터 순회 순서가 실행마다 달라서, 내용이 같아도
 
 그래서 **바이트 diff 를 믿지 말고** `compare_svg.py` 로 내용을 비교합니다 —
 `<g>` 조각을 정렬해 집합으로 봅니다. `같음` 으로 나온 것은 되돌리고
-(`git checkout -- assets/erd/<파일>`), `다름` 으로 나온 것만 올립니다.
+(`git checkout -- assets/erd/<파일>` — 다크 판은 `assets/erd/dark/<파일>`), `다름` 으로 나온 것만 올립니다.
+라이트와 다크는 같은 그림이라 `다름` 도 같은 파일에서 함께 나옵니다.
 
 돌리기 전에 현재 그림을 어딘가로 복사해 두면 비교가 쉽습니다:
 
