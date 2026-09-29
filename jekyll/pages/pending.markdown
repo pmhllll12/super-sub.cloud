@@ -2,8 +2,8 @@
 layout: default
 title: 미결 항목
 permalink: /pending/
-parent: 팀 작업 공간
-nav_order: 2
+nav_exclude: true
+search_exclude: true
 ---
 
 {::options toc_levels="2..3" /}
