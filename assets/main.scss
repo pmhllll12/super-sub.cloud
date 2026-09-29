@@ -103,7 +103,7 @@
 }
 
 // 추이 그래프의 날짜 칸(관리 지표) — 올리면 그 날짜가 옅게 떠서 십자선 역할을 하고, 값은 <title> 로 뜬다.
-// 그림은 다크 화면에서도 밝은 판 위에 있으므로 한 값으로 둔다.
+// 다크 값은 아래 다크 절에 있다(2026-09-29 부터 그림을 다크 색으로 칠한다).
 .doc-figure .hit {
   fill: transparent;
 }
@@ -175,12 +175,51 @@ html[data-theme="dark"] {
     color: #6fa8fb;
   }
 
-  // 그림은 밝은 바탕에 맞춰 그렸다 — 선·글자가 어두운 색이라, 다크 화면에서는 밝은 판 위에 둔다.
+  // 그림 — 다크에서는 다크용 색으로 다시 칠한다(2026-09-29, 사용자 「다크 모드일 때 하얀 그림을 고칠 수 있어?」).
+  // 전에는 밝은 판(#f4f3ef) 위에 그대로 뒀다. 생성기(tools/pages/)는 밝은 바탕 기준 색을 속성(fill="…")으로 쓰고,
+  // CSS 는 속성보다 우선하므로 여기서 색만 바꾼다 — 생성기·페이지는 그대로다.
+  // 사람·계열 색은 dataviz 기본 팔레트의 다크 단계(다크 바탕에서 검증기 통과), 무채색은 사이트 다크 한 벌.
+  // 🔴 생성기에 새 색을 쓰면 여기에도 넣는다 — 안 넣으면 다크에서 그 색만 밝은 바탕 기준으로 남는다(확인: tools/README.md).
   .doc-figure svg {
-    box-sizing: border-box;
-    padding: 0.75rem;
-    border-radius: 8px;
-    background: #f4f3ef;
+    // 글자 · 선 · 화살표
+    [fill="#27262b"] { fill: #e6e1e8; }
+    [stroke="#27262b"] { stroke: #e6e1e8; }
+    [fill="#5c5962"] { fill: #a9a6ad; }
+    [stroke="#5c5962"] { stroke: #a9a6ad; }
+    // 바탕 역할 — 상자 면, 점 안쪽·점 둘레의 틈
+    [fill="#f6f5f1"] { fill: #242428; }
+    circle[fill="#fff"] { fill: #19191c; }
+    [stroke="#fff"] { stroke: #19191c; }
+    // 눈금 · 축 · 일정 막대
+    [stroke="#d9d7d0"], [stroke="#e3e1da"] { stroke: #37373d; }
+    [stroke="#c3c2b7"] { stroke: #45454c; }
+    [fill="#cfccc2"] { fill: #55555e; }
+    [fill="#efede7"] { fill: #2c2c32; }
+    // 요구사항 상태(순서 있는 파랑) — 다크에서는 「구현됨이 가장 밝게」로 뒤집는다. 강조 파랑(#256abf)도 같은 단계.
+    // 밝아진 구현됨·부분 칸 안의 흰 숫자는 어두운 글자로(명암비 8.3 · 4.8)
+    [fill="#104281"] { fill: #86b6ef; }
+    [fill="#256abf"] { fill: #3987e5; }
+    [stroke="#256abf"] { stroke: #3987e5; }
+    [fill="#6da7ec"] { fill: #1c5cab; }
+    [fill="#c3c2b7"] { fill: #55555e; }
+    text[fill="#fff"] { fill: #19191c; }
+    // 사람 색 · 빨강 — 팔레트의 다크 단계(정상호 님 보라 #4a3aa7 은 다크 바탕에서 2.05 라 안 보였다)
+    [fill="#2a78d6"] { fill: #3987e5; }
+    [stroke="#2a78d6"] { stroke: #3987e5; }
+    [fill="#eb6834"] { fill: #d95926; }
+    [stroke="#eb6834"] { stroke: #d95926; }
+    [fill="#1baf7a"] { fill: #199e70; }
+    [stroke="#1baf7a"] { stroke: #199e70; }
+    [fill="#4a3aa7"] { fill: #9085e9; }
+    [stroke="#4a3aa7"] { stroke: #9085e9; }
+    [fill="#d03b3b"] { fill: #e66767; }
+    [stroke="#d03b3b"] { stroke: #e66767; }
+    // "#898781"(흐린 계열) · "#008300"(해소)은 팔레트에서 다크도 같은 값이라 그대로 — 따옴표째 적어 둔 것은
+    // tools/README.md 의 「다크 색 표에 빠진 색」 검사가 이 둘을 「있다」로 세게 하려는 것이다
+  }
+
+  .doc-figure .hit:hover {
+    fill: rgba(255, 255, 255, 0.08);
   }
 
   .doc-figure-caption,
