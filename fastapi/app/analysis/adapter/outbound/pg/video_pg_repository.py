@@ -53,6 +53,16 @@ class VideoPgRepository(VideoPort):
     def __init__(self, session: Session) -> None:
         self._session = session
 
+    def release(self) -> None:
+        """커넥션을 풀에 돌려준다 — `VideoPort.release` 머리말이 까닭이다.
+
+        🔴 **세션을 버리는 것이 아니다.** `Session.close()` 는 커넥션만
+        돌려주고 세션 자체는 그대로 쓸 수 있다(다시 질의하면 새로 꺼낸다).
+        그래서 이 뒤에 실수로 DB 를 써도 **틀린 값이 나오지는 않는다** —
+        다만 이 호출의 뜻이 없어질 뿐이다.
+        """
+        self._session.close()
+
     def sport_exists(self, sport_code: str) -> bool:
         stmt = select(_sport.c.code).where(_sport.c.code == sport_code)
         return self._session.execute(stmt).first() is not None
@@ -137,6 +147,27 @@ class VideoPgRepository(VideoPort):
 
     def list_by_user(self, user_id: UUID) -> list[VideoEntity]:
         return self._by_user(user_id, kept_only=True)
+
+    def count_kept_by_user(self, user_id: UUID, *, analyzed: bool) -> int:
+        # `list_by_user` 와 **같은 조건**을 센다 — 행은 읽어 오지 않는다.
+        # 🔴 갈래는 화면과 같이 `analysis_job` 행의 유무로 가른다. 목록이
+        # 채우는 `analysis_job_id`(가장 최근 작업)와 같은 축이다.
+        has_job = (
+            select(AnalysisJobOrm.id)
+            .where(AnalysisJobOrm.video_id == VideoOrm.id)
+            .exists()
+        )
+        return int(
+            self._session.execute(
+                select(func.count())
+                .select_from(VideoOrm)
+                .where(
+                    VideoOrm.user_id == user_id,
+                    VideoOrm.kept.is_(True),
+                    has_job if analyzed else ~has_job,
+                )
+            ).scalar_one()
+        )
 
     def list_all_by_user(self, user_id: UUID) -> list[VideoEntity]:
         # 관리자는 아직 저장 안 한(`kept=false`) 임시분까지 본다.

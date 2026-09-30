@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/sport/current_sport.dart';
 import '../data/auth_providers.dart';
+import '../data/auth_repository.dart';
 import '../data/google_id_token.dart';
 import '../data/models/app_user.dart';
 
@@ -39,6 +42,36 @@ class SessionController extends Notifier<SessionState> {
     state = session == null
         ? const SessionLoggedOut()
         : SessionLoggedIn(session.user);
+
+    /* 🔴 **기기에 남은 값으로 먼저 그리고, 서버 값은 뒤따라 온다**
+       (2026-09-25). 복원이 `GET /me` 를 기다리던 때는 인사말·손·카드가
+       서버 왕복만큼 비어 있었다 — 사용자가 짚은 그 증상이다.
+       ⚠️ **기다리지 않는다**(`await` 없음) — 기다리면 고친 의미가 없다. */
+    if (session != null) unawaited(_refreshInBackground());
+  }
+
+  /// 캐시로 띄운 뒤 서버 값으로 덮는다.
+  ///
+  /// 🔴 **여기가 「죽은 토큰이 드러나는」 자리다.** 저장한 사용자를 믿고 띄웠는데
+  /// 토큰이 만료·폐기됐으면, 이 호출이 `UNAUTHORIZED`·`INVALID_TOKEN` 을 받고
+  /// **그때 로그아웃시킨다.** 이것이 없으면 로그인된 것처럼 보이다가 모든 칸이
+  /// 조용히 비는 상태가 된다.
+  ///
+  /// 🔴 **그 둘이 아닌 실패로는 로그아웃하지 않는다** — 비행기 모드나 서버가
+  /// 잠깐 죽은 것으로 사람을 내보내면, 지하철에서 앱을 켰다는 이유로 다시
+  /// 로그인하게 만드는 셈이다(리포지토리의 같은 규칙과 짝이다).
+  Future<void> _refreshInBackground() async {
+    try {
+      await refreshMe();
+    } on AuthException catch (e) {
+      if (e.code != 'UNAUTHORIZED' && e.code != 'INVALID_TOKEN') return;
+      await ref.read(authRepositoryProvider).logout();
+      if (!ref.mounted) return;
+      ref.read(currentSportProvider.notifier).clear();
+      state = const SessionLoggedOut();
+    } catch (_) {
+      // 끊긴 것뿐이다 — 캐시로 띄운 화면을 그대로 둔다.
+    }
   }
 
   Future<void> login(String email, String password) async {
@@ -86,10 +119,44 @@ class SessionController extends Notifier<SessionState> {
     state = const SessionLoggedOut();
   }
 
-  Future<void> updateNickname(String nickname) async {
-    final updated = await ref
-        .read(authRepositoryProvider)
-        .updateProfile(nickname: nickname);
+  /// **나를 다시 읽는다** — 팀을 만들거나 나간 뒤 「소속」이 따라오게 한다.
+  ///
+  /// 🔴 **로그인 상태일 때만 상태를 바꾼다.** 읽는 사이에 로그아웃했으면
+  /// 방금 나간 사람을 다시 로그인시키게 된다.
+  Future<void> refreshMe() async {
+    final user = await ref.read(authRepositoryProvider).refreshMe();
+    if (!ref.mounted || state is! SessionLoggedIn) return;
+    state = SessionLoggedIn(user);
+  }
+
+  /// **탈퇴한다** — 계정과 파생 데이터가 함께 지워진다. 되돌릴 수 없다.
+  ///
+  /// 🔴 **서버가 지운 뒤에 로그아웃 상태로 간다.** 먼저 상태를 바꾸면
+  /// 실패했을 때 **계정은 살아 있는데 로그인 화면에 서 있게** 된다 — 사람은
+  /// 탈퇴된 줄 안다. 실패는 그대로 올려 화면이 사유를 보여 준다.
+  ///
+  /// 🔴 [password] 가 비어 있으면 리포지토리가 **아예 안 보낸다** — 구글로만
+  /// 가입한 계정에는 확인할 비밀번호가 없다.
+  Future<void> deleteAccount({String? password}) async {
+    await ref.read(authRepositoryProvider).deleteAccount(password: password);
+    // 로그아웃과 같은 뒷정리 — 종목은 사용자에게 매달린 컨텍스트다.
+    ref.read(currentSportProvider.notifier).clear();
+    state = const SessionLoggedOut();
+  }
+
+  Future<void> updateNickname(String nickname) =>
+      _patch(nickname: nickname);
+
+  /// 🔴 **지인 검색 노출** — 닉네임으로 나를 찾을 수 있는가. 용병 매칭의
+  /// `is_searchable` 과는 **다른 값이다**(계약).
+  Future<void> setNicknameSearchable(bool value) =>
+      _patch(nicknameSearchable: value);
+
+  Future<void> _patch({String? nickname, bool? nicknameSearchable}) async {
+    final updated = await ref.read(authRepositoryProvider).updateProfile(
+          nickname: nickname,
+          nicknameSearchable: nicknameSearchable,
+        );
     if (!ref.mounted) return;
     // 보낸 값이 아니라 돌려받은 사용자로 상태를 채운다(스펙 4.1 규칙 3).
     state = SessionLoggedIn(updated);

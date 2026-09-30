@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-이 저장소는 **Super-Sub(멀티모달 용병 스카우팅 & RAG 검증 플랫폼)** 개발 제안서를 문서화하는 Jekyll 정적 사이트입니다. 아래 규칙을 따라 페이지를 작성/수정합니다.
+이 저장소는 **Super-Sub(멀티모달 용병 스카우팅 플랫폼)** 개발 제안서를 문서화하는 Jekyll 정적 사이트입니다. 아래 규칙을 따라 페이지를 작성/수정합니다.
 
 ## 🔴 작업을 시작할 때 — 나에게 온 요청이 있는지 먼저 봅니다
 
@@ -117,13 +117,13 @@ grep -n '담당.*<내 이름>' jekyll/pages/pending.markdown
 Jekyll 소스 루트는 **저장소 루트 자체**입니다 (`_config.yml`이 여기 있음). 사이트 인프라와 콘텐츠를 아래처럼 분리합니다.
 
 - **루트**: `_config.yml`, `Gemfile`, `Gemfile.lock`, `404.html`, `_layouts/`, `assets/main.scss`, `.github/workflows/pages.yml`, `supersub-preview.service`
-- **`tools/`**: 사이트 페이지·그림을 **만들어 내는** 스크립트 (`exclude:`에 등록되어 발행되지 않음). 🔴 **`jekyll/progress/`의 세 페이지, `06-시스템설계`의 1절, `assets/erd/`의 ERD 9장은 손으로 쓴 것이 아니라 여기서 나옵니다** — 그 그림·수치를 페이지에서 직접 고치면 다음 실행 때 조용히 덮입니다. 고치는 법·함정은 `tools/README.md` (2026-09-18 신설)
+- **`tools/`**: 사이트 페이지·그림을 **만들어 내는** 스크립트 (`exclude:`에 등록되어 발행되지 않음). 🔴 **`jekyll/progress/`의 네 페이지(10·11·12·14번), `06-시스템설계`의 1절, `assets/erd/`의 ERD 9장(과 `assets/erd/dark/`의 다크 판 9장), 제안서 장 안의 그림(`<!-- gen_figures:… -->` 사이 — 어느 장인지는 `grep -l 'gen_figures:' jekyll/chapters/*`)은 손으로 쓴 것이 아니라 여기서 나옵니다** — 그 그림·수치를 페이지에서 직접 고치면 다음 실행 때 조용히 덮입니다. 고치는 법·함정은 `tools/README.md` (2026-09-18 신설)
 - **`guide/`**: 개발환경 셋업 가이드 (7단계, 기존 자료 — 목차에는 연결되어 있지 않음)
 - **`demo/`**: 완전히 별개의 연습용 Jekyll 사이트(영상자료 디지털화 사업 RFP 템플릿). 자체 `_config.yml`/`Gemfile`/레이아웃을 가진 독립 사이트라 루트 `_config.yml`의 `exclude:`에 등록되어 이 사이트 빌드에 포함되지 않습니다. **이 프로젝트 작업 중에는 건드리지 않습니다.**
 - **`jekyll/`**: 계속 늘어나는 이 프로젝트의 콘텐츠 `.md` 파일 전용 폴더 (depth-2: `jekyll/<분류>/<파일>`)
   - `jekyll/pages/` — `index.markdown`(표지, `permalink: /`), `toc.markdown`(구 목차, 지금은 사이드바 대신 쓰이지 않는 레거시 링크용 — 아래 "목차" 절 참고), `devlog.markdown`(개발 로그 목록), `pending.markdown`(미결 항목), `기획`·`설계`·`기술`·`프로젝트-관리`·`팀-작업-공간`·`부록.markdown`(사이드바 상위 그룹 랜딩 페이지, `has_children: true` — 아래 「상위 그룹」 절)
   - `jekyll/chapters/` — 9개 챕터 + 부록 A~E 페이지 (`01-사업개요.markdown` ~ `09-산출물및향후계획.markdown`, `부록A-용어정의.markdown` ~ `부록E-결정기록.markdown`). 🔴 **파일 이름의 번호·「부록」은 옛 구조의 흔적**이고 사이드바 위치는 머리말이 정합니다 — 부록 D(ERD)는 「설계」, 부록 E(결정 기록)는 「기술」 아래에 있습니다
-  - `jekyll/progress/` — 실제 진행을 그림·수치로 보여 주는 페이지 (`10-프로젝트전체그림`·`11-백엔드파이프라인`·`12-진행현황`)
+  - `jekyll/progress/` — 실제 진행을 그림·수치로 보여 주는 페이지 (`10-프로젝트전체그림`·`11-백엔드파이프라인`·`12-진행현황`·`14-관리지표`)
   - `jekyll/sprints/` — 스프린트별 일자별 진행 로그 페이지 (`스프린트1.markdown`, `스프린트2.markdown`, …)
 
 새로운 종류의 콘텐츠가 생기면 `jekyll/` 아래 알맞은 하위 폴더를 만들어 넣습니다. **콘텐츠 md 파일을 저장소 루트나 `jekyll/` 최상단에 바로 만들지 않습니다.**
@@ -165,7 +165,9 @@ Jekyll 소스 루트는 **저장소 루트 자체**입니다 (`_config.yml`이 �
 **다크 모드가 있습니다(2026-09-17).** 머리칸의 「다크 모드」 단추로 바꾸고, 고른 값은 그 브라우저에
 남습니다(고른 적이 없으면 운영체제 설정을 따릅니다). 전환은 `_includes/head_custom.html`(첫 화면 전에
 정함)·`_includes/header_custom.html`(단추)이고, 본문·표·코드·사이드바는 Just the Docs 의 dark 스킴이
-맡습니다. 🔴 **페이지 본문에 색을 인라인 `style="color:#…"` 로 박지 마십시오** — 테마별로 못 바꿔서
+맡습니다. 🔴 **다크 바탕·면·테두리 색만은 테마보다 짙은 무채색으로 덮어썼습니다**(2026-09-29,
+`_sass/color_schemes/dark.scss` — 테마의 같은 이름 파일을 대신합니다). 테마를 올리면 그 파일을 원본과 대조하고,
+색을 바꾸면 `assets/main.scss` 의 다크 절(숫자 카드·칸반·사이드바 단추)도 함께 맞춥니다. 🔴 **페이지 본문에 색을 인라인 `style="color:#…"` 로 박지 마십시오** — 테마별로 못 바꿔서
 다크 화면에서 글자가 안 보입니다. `assets/main.scss` 에 클래스로 두고 같은 파일의
 `html[data-theme="dark"]` 절에 다크 값도 함께 둡니다. 확인:
 
@@ -177,6 +179,12 @@ grep -rnE 'style="[^"]*(color|background|border)[^"]*#' jekyll/ _posts/   # 0건
 3단계 중첩), `has_children: true`(하위 페이지를 거느리는 상위 페이지)로 자동 생성됩니다.
 사이드바에 안 보이게 하려면 `nav_exclude: true`를 씁니다 (`index.markdown`, 구 `toc.markdown`,
 `_posts/`의 모든 글, `404.html`이 이렇게 되어 있음).
+
+🔴 **미결 항목(`pending.markdown`·`pending-archive.markdown`)은 사이드바와 사이트 검색에서 뺐습니다**
+(2026-09-29, `nav_exclude: true` + `search_exclude: true`, 그리고 **`parent` 없음** — 있으면 「팀 작업 공간」
+페이지 아래 자동 목록에 `nav_exclude` 와 상관없이 뜹니다) — 공개 사이트를 보는 사람에게 팀 작업 기록을 앞세우지
+않으려는 사용자 결정입니다. **되돌리지 마십시오.** 주소(`/pending/`)는 살아 있어 다른 페이지의 링크는 그대로 열리고,
+팀원은 여전히 파일을 `grep` 으로 읽습니다. 저장소가 공개라 GitHub 에서는 보입니다 — 숨김이지 비공개가 아닙니다.
 
 ## 페이지 작성 규칙
 
@@ -410,9 +418,9 @@ awk '/^<details/{d++} /^<\/details>/{d--} d && /^- \*\*담당\*\*/{n++} END{prin
 
 본문을 줄여도 구역이 여전히 무거우면 **`jekyll/pages/pending-archive.markdown`**
 으로 해소된 항목을 통째로 옮깁니다(`jin` 구역에서 2026.09.15에 시험 적용).
-front matter는 `permalink: /pending-archive/`·`nav_exclude: true` — 사이드바엔
-안 뜨지만 사이트 검색(`search_enabled`)엔 걸리고, URL을 알면 누구나 볼 수
-있는 공개 페이지입니다(구 `toc.markdown`과 같은 처리).
+front matter는 `permalink: /pending-archive/`·`nav_exclude: true`·`search_exclude: true`
+— 사이드바에도 사이트 검색에도 안 뜨지만 URL을 알면 누구나 볼 수 있는 공개
+페이지입니다(2026-09-29 부터 `pending.markdown` 도 같은 처리 — 위 「테마」 절).
 
 **시점을 세션 시작 시로 보강합니다 (2026-09-16 정정).** 처음엔 "다른 파일로
 옮기는 것은 스프린트가 끝날 때 한 번에"만 정해 뒀는데, 그 사이 아무도 안
@@ -491,9 +499,22 @@ front matter는 `permalink: /pending-archive/`·`nav_exclude: true` — 사이�
 않는다"는 다릅니다.
 
 ```bash
-git diff --cached --name-only -- jekyll/ _posts/ guide/ agent/ fastapi/ \
-  | xargs grep -nE 'arn:aws:[a-z]+::[0-9]{12}|[0-9]{4}-[0-9]{4}-[0-9]{4}|(vpc|subnet|sg|eipalloc)-[0-9a-f]{8,}|\bi-0[0-9a-f]{16}\b|\b(3|13|15|43|52|54)\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\b|api\.[a-z0-9-]+\.[a-z]+' 2>/dev/null
+git diff --cached --name-only -z --diff-filter=d -- jekyll/ _posts/ guide/ agent/ fastapi/ \
+  | xargs -0 grep -HnE 'arn:aws:[a-z]+::[0-9]{12}|[0-9]{4}-[0-9]{4}-[0-9]{4}|(vpc|subnet|sg|eipalloc)-[0-9a-f]{8,}|\bi-0[0-9a-f]{16}\b|\b(3|13|15|43|52|54)\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\b|api\.[a-z0-9-]+\.[a-z]+'
 ```
+
+🔴 **`-z`·`-0` 을 빼지 마십시오** (2026-09-23 정정). 앞서 적었던 명령(`-z` 없이
+`xargs grep … 2>/dev/null`)은 **한글 이름 파일을 검사하지 못했습니다** — git 이 한글
+경로를 `"jekyll/progress/14-\352…"` 처럼 따옴표와 8진수로 감싸 내보내서 grep 이 파일을
+못 찾고, 그 오류를 `2>/dev/null` 이 삼켜 **「걸린 것 없음」으로 통과**했습니다. 공개 영역
+102개 중 88개가 한글 이름입니다. 한글 이름 파일에 가짜 식별자를 넣어 보니 옛 명령은
+놓치고 이 명령은 잡았습니다.
+
+- `-z`(NUL 로 구분, 경로를 감싸지 않음)와 `xargs -0` 은 macOS 에서도 돕니다(`xargs -d` 는 GNU 전용)
+- 지운 파일은 `--diff-filter=d` 로 빼므로 오류를 숨길 이유가 없습니다 — **`2>/dev/null` 을 다시 붙이지 않습니다**
+- `-H` 는 파일이 하나뿐일 때도 어느 파일인지 찍게 합니다
+- 2026-09-23 에 이 방식으로 공개 영역 전체를 훑었고 누출은 없었습니다(오탐 2건 — GitHub 의
+  공개 API 주소, 0 으로 채운 UUID)
 
 이미 배포된 값은 콘텐츠에서 지워도 **git 히스토리·검색 캐시에는 남습니다.** 그래서
 계정 ID처럼 회수가 안 되는 것은 애초에 안 쓰는 것이 유일한 방어입니다. 노출된 것을
@@ -503,3 +524,12 @@ git diff --cached --name-only -- jekyll/ _posts/ guide/ agent/ fastapi/ \
 
 - kramdown은 `- ` 불릿 항목 텍스트가 `1. `, `2. `처럼 시작하면 이를 **중첩 순서 리스트로 잘못 해석**할 수 있습니다. 불릿 안에 번호 텍스트를 그대로 쓰고 싶다면 `1\.`처럼 이스케이프하거나 `1)` 형식을 씁니다. (단, `toc.markdown`의 하위 목록처럼 **의도적으로 실제 순서 리스트**를 쓰는 곳은 이스케이프하지 않습니다 — 위 "목차" 규칙 참고.)
 - 표지(`index.markdown`)의 개발기간/팀명/링크 등이 바뀌면 `_config.yml`의 `title`도 함께 갱신합니다.
+- 🔴 **표 앞에는 빈 줄을 둡니다.** 제목(`## …`)이나 글 바로 다음 줄에 표를 붙이면 kramdown이 표로 읽지 못해
+  `| 가치 | 설명 | |—|—| …` 한 문단의 날 글자로 나옵니다 — 2026-09-29에 공개 사이트에서 1·2·4·8·9장 표 다섯 개가
+  그렇게 나오고 있었습니다. 확인:
+
+  ```bash
+  awk 'FNR==1{p="";c=0} /^[`][`][`]/{c=!c} !c && /^\|/ && p !~ /^\|/ && p !~ /^[ \t]*$/ {print FILENAME":"FNR": "$0} {p=$0}' jekyll/*/*.markdown _posts/*.markdown   # 0건이어야 합니다
+  ```
+
+  고치기 전 판(`1c39efa`)에 돌리면 그 다섯 곳을 정확히 잡습니다 — 판별이 되는 검사입니다.

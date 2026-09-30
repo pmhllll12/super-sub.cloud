@@ -102,6 +102,16 @@
   margin-top: 0.4rem;
 }
 
+// 추이 그래프의 날짜 칸(관리 지표) — 올리면 그 날짜가 옅게 떠서 십자선 역할을 하고, 값은 <title> 로 뜬다.
+// 다크 값은 아래 다크 절에 있다(2026-09-29 부터 그림을 다크 색으로 칠한다).
+.doc-figure .hit {
+  fill: transparent;
+}
+
+.doc-figure .hit:hover {
+  fill: rgba(39, 38, 43, 0.07);
+}
+
 .stat-tiles {
   display: flex;
   flex-wrap: wrap;
@@ -144,6 +154,12 @@
   border-radius: 6px;
 }
 
+// 틀마다 라이트 판과 다크 판(assets/erd/dark/, 2026-09-29) 이미지가 나란히 있고 모드에 따라 하나만 보인다.
+// 숨은 쪽은 loading="lazy" 라 받지 않는다.
+.erd-dark {
+  display: none;
+}
+
 // --- 다크 모드 (2026-09-17) --------------------------------------------------
 // 테마 전환은 _includes/head_custom.html · header_custom.html. 테마 기본 요소(본문·표·코드·
 // 사이드바)는 Just the Docs 의 dark 스킴이 맡고, 여기서는 우리가 직접 색을 준 것만 고친다.
@@ -165,12 +181,51 @@ html[data-theme="dark"] {
     color: #6fa8fb;
   }
 
-  // 그림은 밝은 바탕에 맞춰 그렸다 — 선·글자가 어두운 색이라, 다크 화면에서는 밝은 판 위에 둔다.
+  // 그림 — 다크에서는 다크용 색으로 다시 칠한다(2026-09-29, 사용자 「다크 모드일 때 하얀 그림을 고칠 수 있어?」).
+  // 전에는 밝은 판(#f4f3ef) 위에 그대로 뒀다. 생성기(tools/pages/)는 밝은 바탕 기준 색을 속성(fill="…")으로 쓰고,
+  // CSS 는 속성보다 우선하므로 여기서 색만 바꾼다 — 생성기·페이지는 그대로다.
+  // 사람·계열 색은 dataviz 기본 팔레트의 다크 단계(다크 바탕에서 검증기 통과), 무채색은 사이트 다크 한 벌.
+  // 🔴 생성기에 새 색을 쓰면 여기에도 넣는다 — 안 넣으면 다크에서 그 색만 밝은 바탕 기준으로 남는다(확인: tools/README.md).
   .doc-figure svg {
-    box-sizing: border-box;
-    padding: 0.75rem;
-    border-radius: 8px;
-    background: #f4f3ef;
+    // 글자 · 선 · 화살표
+    [fill="#27262b"] { fill: #e6e1e8; }
+    [stroke="#27262b"] { stroke: #e6e1e8; }
+    [fill="#5c5962"] { fill: #a9a6ad; }
+    [stroke="#5c5962"] { stroke: #a9a6ad; }
+    // 바탕 역할 — 상자 면, 점 안쪽·점 둘레의 틈
+    [fill="#f6f5f1"] { fill: #242428; }
+    circle[fill="#fff"] { fill: #19191c; }
+    [stroke="#fff"] { stroke: #19191c; }
+    // 눈금 · 축 · 일정 막대
+    [stroke="#d9d7d0"], [stroke="#e3e1da"] { stroke: #37373d; }
+    [stroke="#c3c2b7"] { stroke: #45454c; }
+    [fill="#cfccc2"] { fill: #55555e; }
+    [fill="#efede7"] { fill: #2c2c32; }
+    // 요구사항 상태(순서 있는 파랑) — 다크에서는 「구현됨이 가장 밝게」로 뒤집는다. 강조 파랑(#256abf)도 같은 단계.
+    // 밝아진 구현됨·부분 칸 안의 흰 숫자는 어두운 글자로(명암비 8.3 · 4.8)
+    [fill="#104281"] { fill: #86b6ef; }
+    [fill="#256abf"] { fill: #3987e5; }
+    [stroke="#256abf"] { stroke: #3987e5; }
+    [fill="#6da7ec"] { fill: #1c5cab; }
+    [fill="#c3c2b7"] { fill: #55555e; }
+    text[fill="#fff"] { fill: #19191c; }
+    // 사람 색 · 빨강 — 팔레트의 다크 단계(정상호 님 보라 #4a3aa7 은 다크 바탕에서 2.05 라 안 보였다)
+    [fill="#2a78d6"] { fill: #3987e5; }
+    [stroke="#2a78d6"] { stroke: #3987e5; }
+    [fill="#eb6834"] { fill: #d95926; }
+    [stroke="#eb6834"] { stroke: #d95926; }
+    [fill="#1baf7a"] { fill: #199e70; }
+    [stroke="#1baf7a"] { stroke: #199e70; }
+    [fill="#4a3aa7"] { fill: #9085e9; }
+    [stroke="#4a3aa7"] { stroke: #9085e9; }
+    [fill="#d03b3b"] { fill: #e66767; }
+    [stroke="#d03b3b"] { stroke: #e66767; }
+    // "#898781"(흐린 계열) · "#008300"(해소)은 팔레트에서 다크도 같은 값이라 그대로 — 따옴표째 적어 둔 것은
+    // tools/README.md 의 「다크 색 표에 빠진 색」 검사가 이 둘을 「있다」로 세게 하려는 것이다
+  }
+
+  .doc-figure .hit:hover {
+    fill: rgba(255, 255, 255, 0.08);
   }
 
   .doc-figure-caption,
@@ -178,15 +233,25 @@ html[data-theme="dark"] {
     color: #a9a6ad;
   }
 
+  // 면·테두리는 다크 색 구성(_sass/color_schemes/dark.scss)의 값과 같게 — 2026-09-29 에 바탕을 더 짙은 무채색으로 바꿨다
   .stat-tile {
-    border-color: #44434d;
-    background: #302d36;
+    border-color: #37373d;
+    background: #242428;
   }
 
-  // ERD 는 흰 바탕으로 그렸다 — 틀 전체를 흰 판으로 둬서 그림 옆 빈칸만 어둡게 뜨지 않게 한다
+  // ERD — 다크에서는 다크 판을 보인다(생성기가 같은 그림을 다크 색으로 한 벌 더 쓴다). 틀 바탕도 그림 바탕(#19191c)과 같게
+  // 둬서 그림 옆 빈칸이 따로 뜨지 않게 한다. 전에는 라이트 판을 흰 판 위에 그대로 뒀다.
   .erd-frame {
-    border-color: #44434d;
-    background: #fff;
+    border-color: #37373d;
+    background: #19191c;
+  }
+
+  .erd-light {
+    display: none;
+  }
+
+  .erd-dark {
+    display: inline;
   }
 
   .stat-value,
@@ -195,7 +260,7 @@ html[data-theme="dark"] {
   }
 
   .kanban-column {
-    background: #302d36;
+    background: #242428;
   }
 
   .kanban-column h4 {
@@ -203,8 +268,8 @@ html[data-theme="dark"] {
   }
 
   .kanban-card {
-    border-color: #44434d;
-    background: #27262b;
+    border-color: #37373d;
+    background: #19191c;
     box-shadow: none;
   }
 }
@@ -214,4 +279,124 @@ html[data-theme="dark"] {
 .site-title {
   font-size: 1rem !important;
   line-height: 1.3 !important;
+  word-break: keep-all; // 한글이 단어 중간(「플 / 랫폼」)에서 접히지 않게 — 띄어쓰기에서만 줄을 바꾼다
+}
+
+// 본문 제목도 같다 — 표지 큰 제목이 「빈 자 / 리에」처럼 접혔다
+h1,
+h2,
+h3 {
+  word-break: keep-all;
+}
+
+// --- 사이드바 — 1단계를 단추로, 묶음은 늘 펼쳐 둔다 (2026-09-23) ------------------------
+// 묶음(1단계)이 접혀 있어 안에 무엇이 있는지 하나씩 눌러 봐야 했다(사용자 지적). 1단계 묶음의
+// 목록은 늘 펼치고, 1단계 이름(묶음 · 프로젝트 전체 그림)은 배경 안에 글이 든 단추로 보인다
+// (사용자 요청) — 누르면 여전히 그 페이지로 간다. 지금 페이지가 든 단추는 강조색.
+// 3단계(스프린트 일지 · QA 체크리스트)는 테마 기본대로 접힌다.
+// 🔴 여백을 늘리면 사이드바가 화면보다 길어져, 테마가 현재 페이지를 보이려고 사이드바를 내린다 —
+// 맨 위 항목이 가려진다(2026-09-23 에 겪었다).
+#site-nav > .nav-list > .nav-list-item {
+  > .nav-list {
+    display: block;
+    padding-left: 0;
+  }
+
+  > .nav-list-expander {
+    display: none; // 늘 펼쳐 있으니 화살표는 뜻이 없다
+  }
+
+  // 1단계 — 칠한 단추. 라이트 바탕(#f5f6fa)과 확실히 갈리게 진하게 — 처음 값 #e9e7ef 는 옅어서
+  // 구분이 어렵다고 했다(사용자). 2026-09-29 에 보라에서 녹색으로(사용자 요청) — 바탕과의 명암비를 옛 보라
+  // (#cdc7e2, 1.51)와 비슷하게(1.48) 맞췄다. 지금 묶음은 진한 녹색 바탕에 흰 글씨(5.3).
+  > .nav-list-link {
+    min-height: 0;
+    margin: 0.55rem 0.6rem 0.2rem;
+    padding: 0.2rem 0.8rem;
+    border-radius: 6px;
+    background: #b1d5bd;
+    background-image: none;
+    font-size: 0.8rem !important;
+    font-weight: 600;
+    line-height: 1.4rem;
+    color: #27262b;
+
+    &:hover {
+      background: #a2cbb0;
+    }
+  }
+
+  &.active > .nav-list-link {
+    background: #1f7a4d;
+    color: #fff;
+  }
+
+  // 2·3단계(페이지) — 테두리 있는 흰 단추. 지금 보는 페이지는 연파랑(2026-09-29 — 보라 말고 다른 색으로라는
+  // 사용자 요청. 파랑은 본문 그림의 강조색 계열). 높이는 테마 기본(2rem)과 비슷하게 둬서 사이드바가 길어지지 않게 한다.
+  .nav-list .nav-list-link {
+    min-height: 0;
+    margin: 0.12rem 0.6rem 0.12rem 1rem;
+    padding: 0.15rem 0.7rem;
+    border: 1px solid #dcd8e8;
+    border-radius: 6px;
+    background: #fff;
+    background-image: none;
+    line-height: 1.4rem;
+    color: #27262b;
+
+    &:hover {
+      background: #efedf6;
+    }
+
+    &.active {
+      border-color: #8fb4e3;
+      background: #d6e5f8;
+      color: #1d5299; // 바탕과 명암비 6 이상
+      font-weight: 600;
+    }
+  }
+
+  // 3단계를 거느린 페이지(개발 구현 계획 등)의 펼침 화살표를 단추 안쪽으로
+  .nav-list .nav-list-expander {
+    right: 0.6rem;
+    width: 1.9rem;
+    height: 1.9rem;
+    padding: 0.45rem;
+  }
+}
+
+// 다크 — 강조를 채도 높은 보라(#6a4fd8)로 했더니 눈이 아프다고 했다(사용자). 채도를 낮춘 색으로
+// 두고(2026-09-29 부터 묶음은 회녹색), 하위 페이지는 바탕·테두리·글자를 한 단계씩 밝혀 잘 보이게 한다.
+html[data-theme="dark"] #site-nav > .nav-list > .nav-list-item {
+  > .nav-list-link {
+    background: #3f5147;
+    color: #eef4f0;
+
+    &:hover {
+      background: #4a5e53;
+    }
+  }
+
+  &.active > .nav-list-link {
+    background: #3b6e55;
+    color: #fff;
+  }
+
+  // 선택되지 않은 페이지 단추 — 2026-09-29 에 보라빛 회색(#36333e)에서 무채색으로(사용자 요청). 더 짙어진
+  // 사이드바(#19191c)와의 구분은 옛 값과 같게(단추 1.23 · 테두리 1.88)
+  .nav-list .nav-list-link {
+    border-color: #46464e;
+    background: #2a2a30;
+    color: #ebebef;
+
+    &:hover {
+      background: #33333a;
+    }
+
+    &.active { // 지금 페이지 — 채도를 낮춘 회파랑(라이트의 연파랑과 같은 색 계열)
+      border-color: #5b7fae;
+      background: #2f4a6b;
+      color: #fff;
+    }
+  }
 }

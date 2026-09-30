@@ -1,4 +1,6 @@
-import 'dart:io' show Platform;
+import 'dart:async';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
@@ -6,47 +8,133 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:video_player/video_player.dart';
 
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/bar_menu.dart';
+import '../../../intro/presentation/brand_mark.dart';
+import '../../../../core/widgets/glass_pill.dart';
+import '../../../../core/widgets/aurora_background.dart';
 import '../../../../core/widgets/floating_nav_bar.dart';
-import '../../../../core/widgets/glass_panel.dart';
+import '../../../../core/widgets/silver_edge.dart';
+import '../../../../core/widgets/raised_rim.dart';
+import '../../../../core/widgets/screen_tint.dart';
+import '../../../../core/widgets/silver_sweep_border.dart';
 import '../../../auth/presentation/session_controller.dart';
+import '../../../../core/network/api_client.dart';
+import '../../../card/data/card_providers.dart';
+import '../../../card/data/models/player_card.dart';
+import '../../../card/presentation/mate_cards_controller.dart';
 import '../../../profile/presentation/widgets/player_card_view.dart';
+import '../../../team/auto_seat.dart';
+import '../../../team/board_geometry.dart';
+import '../../../team/data/candidate_providers.dart';
+import '../../../team/data/models/squad.dart';
+import '../../../team/data/squad_providers.dart';
+import '../../../team/data/squad_repository.dart';
+import '../../../team/optimistic_squad.dart';
+import '../../../team/seats_from_squad.dart';
+import '../../../team/presentation/sheets/seat_fill_sheet.dart';
+import '../../../team/data/inbox_providers.dart';
+import '../../../team/presentation/sheets/inbox_sheet.dart';
+import '../../../team/presentation/sheets/match_waiting_sheet.dart';
+import '../../../team/presentation/sheets/team_match_sheet.dart';
+import '../../../team/presentation/sheets/team_seek_sheet.dart';
 import '../../../team/presentation/widgets/squad_board.dart';
+import '../widgets/home_video_strip.dart';
 
-/// 홈의 바탕 — **완전한 검정**(2026-09-16 사용자 요청. 하루 동안 흰색이었다).
-/// 사진은 안 깐다(`assets/images/home_silhouette.jpg` 는 지금 안 쓴다).
+/// 홈의 바탕 — **완전한 검정**이다(2026-09-22 사용자 요청: 「홈페이지의 전체
+/// 배경 색상 완전 검정으로」).
 ///
-/// 🔴 판(`_kSheetColor`)·하단 바(`kNavBarColor`)는 이 바탕보다 **한 단 밝은**
-/// 진회색이다 — 바탕과 판을 밝기로만 가른다. 둘을 같은 검정으로 되돌리면
-/// 판의 경계가 사라진다.
-const Color _kHomeBg = Color(0xFF000000);
+/// 🔴 **옅은 초록을 섞어 두던 것을 되돌렸다.** 2026-09-21 에 빛무리
+/// (`AuroraBackground`)를 깔면서 `0xFF07100B` 로 바꿨었는데, 이유는
+/// **완전한 검정 위에 빛을 얹으면 글로우 가장자리가 띠로 드러나기**(밴딩)
+/// 때문이었다. 🔴 **그 이유가 지금은 없다** — `kAuroraGlow` 가 `false` 라
+/// 빛무리가 아무것도 안 그리고 이 색만 칠한다.
+///
+/// ⚠️ **빛무리를 다시 켜는 날 이 값을 같이 봐야 한다** — 켜는 순간 밴딩이
+/// 돌아온다. 그때는 여기에 같은 계열의 아주 옅은 색을 도로 섞는다.
+///
+/// ⚠️ **판·하단 바를 밝기로 가르던 것은 2026-09-21 에 끝났다** — 이제 둘 다
+/// 거의 투명하고 **은빛 테두리**로 갈린다(`SilverEdge`).
+///
+/// 🔴 **더 이상 검정이 아니다 (2026-09-23 정정).** 위 「완전한 검정」은
+/// 2026-09-22 사용자 요청이었는데, 이번에 바탕을 통째로 **밝은 크림 →
+/// 살구빛**으로 뒤집었다(`ScreenTint.warm`). 이 값은 [AuroraBackground] 가
+/// **하단 바 뒤까지** 칠하는 바탕이라, 여기만 검정으로 두면 화면 아래에
+/// **검은 띠**가 남는다 — 그래서 같은 값을 쓴다.
+///
+/// 🔴 **다시 순검정이 됐다 (2026-09-24 사용자 요청).** [ScreenTint.mintBase]
+/// 가 `#000000` 이다. ⚠️ 그래서 **맨 위 두 문단의 밴딩 경고가 되살아났다** —
+/// `kAuroraGlow` 를 켜는 날 이 값부터 볼 것.
+const Color _kHomeBg = ScreenTint.mintBase;
 
 /// 검은 바탕 위의 글자.
 const Color _kOnDark = Color(0xFFFFFFFF);
 
-/// 유리 조각 모서리.
-const double _kCardRadius = 18;
 
 /// 오른쪽 위 「내 프로필」 단추의 카드 폭. 웹 헤더의 작은 카드(`.ss-pcard-mini`)
 /// 자리다 — 글자는 안 읽혀도 초록 카드와 인물로 「내 카드」임을 알아본다.
-const double _kProfileCardWidth = 48;
+///
+/// 🔴 **이 값이 판 아랫변과 영상 줄 높이를 같이 정한다.** 세 값이 한 줄로
+/// 엮여 있어서, 여기만 고치면 나머지가 따라온다:
+///
+/// | | |
+/// |---|---|
+/// | [_kProfileButtonH] | 카드 높이(4.1:3) + 글자 + 둘레 |
+/// | 판 아랫변 | `rowTop + _kProfileButtonH + _kTopPanelPadBottom` |
+/// | 영상 줄 높이 | 판 아랫변 ~ 흰 판 윗변의 남는 자리 |
+///
+/// ⚠️ **94 → 80** (2026-09-24 사용자 요청: 「내 프로필 카드 지금 살짝 줄이고
+/// 위에 판 그만큼 더 위로 옮기자. 영상 그만큼 크기 늘리자」). 판 아랫변이
+/// 212 → 193 으로 올라가고 영상 카드가 그만큼(약 19) 커진다.
+///
+/// ⚠️ 그 전에는 **두 번에 걸쳐 키웠었다**(2026-09-22) — 48 → 72(1.5배) →
+/// 94(거기서 다시 1.3배). 스쿼드 판 밖 화면 맨 위로 나오면서 **옆에 견줄
+/// 것이 없어져** 작아 보였기 때문이다. 이번에 줄인 것은 그 판단을 뒤집은
+/// 것이 아니라 **영상 줄에 자리를 내준 것**이다.
+///
+/// 아래 글자는 **같이 안 줄였다** — 14 는 이미 읽히는 최소에 가깝고,
+/// 2026-09-22 에 「카드 폭과 배수를 맞추던 규칙은 끝났다」로 정해 뒀다.
+const double _kProfileCardWidth = 80;
 
-/// 위에서 내려오는 스쿼드 판 — 접혔을 때 판이 화면 높이의 몇 할까지 오는가.
-const double _kSheetCollapsedFactor = 0.5;
+/* ⛔ **`_kSheetCollapsedFactor`(0.5) · `_kCollapsedBoardShrink`(0.82) 를
+   지웠다**(2026-09-22). 둘은 「위에서 내려오는 시트」가 **접혔을 때 화면의
+   몇 할까지 오는가」를 정하던 값이다. 판이 영상 분석 판 위에 뜬 카드가
+   되면서 접힌 높이는 [_kSquadPhotoH] 하나로 정해진다 — 되살리지 말 것. */
 
-/// 접힌 스쿼드 판을 「들어가는 최대 크기」보다 더 줄이는 비율.
-const double _kCollapsedBoardShrink = 0.82;
-
-/// 판 아래 손잡이 줄의 높이. 판을 끌어내리는 자리라는 표식이다.
+/// 판 손잡이 줄의 높이. 판을 끄는 자리라는 표식이다.
 const double _kSheetHandleH = 28;
 
-/// 스쿼드 판 · 영상 분석 판의 면 색 — **진회색**(2026-09-16 사용자 지정).
-/// 검은 바탕(`_kHomeBg`)보다 한 단 밝아서 판이 층으로 읽힌다.
-/// 하단 바 · 로고 알약(`kNavBarColor`)과 **같은 값이어야 한다** — 넷이 한 켜다.
-const Color _kSheetColor = Color(0xFF1C1C1E);
+/// 스쿼드 판 · 영상 분석 판의 면 — **거의 투명하다**(2026-09-21).
+///
+/// 🔴 **면 색을 뺐다**(사용자 요청 「판 자체의 검정 색을 없애면 안 돼?」).
+/// 판 둘이 화면의 95%를 덮어서, 면이 조금만 불투명해도 뒤의 빛무리
+/// (`AuroraBackground`)가 통째로 가려졌다. 이제 **경계는 은빛 테두리**
+/// (`SilverEdge`)가 맡고, 면은 글자가 읽힐 만큼만 깐다.
+///
+/// 🔴 **흐림(blur)은 안 쓴다.** 판을 유리로 만들면 판 **안에 든 알약**
+/// (팀장·팀원·AI)과 겹쳐 「유리 안에 유리」가 되고, 그러면 알약이 **프레임째
+/// 사라진다**(`flutter/CLAUDE.md`). 같은 문서가 적어 둔 방법이 「층을 쌓아야
+/// 하면 흐림 없이 색만 얹는다」이고, 여기에 테두리를 더한 것이다.
+const Color _kSheetColor = Color(0x2E1C1C1E);
+
+/// 🔴 **판을 다 펼쳤을 때의 면 — 흰 서리 유리다**(2026-09-23 사용자 요청:
+/// 「스쿼드판 열었을때 기본값을 흰색 블러로」). 접힌 [_kSheetColor] 에서
+/// 판이 열리는 만큼 이 값으로 건너간다.
+///
+/// ⚠️ 70%(`0xB3`) → **30%**(`0x4D`) 로 내렸다(2026-09-23 사용자 요청:
+/// 「흰색 30퍼로 줄여봐」). 흐림([_kSheetBlur])은 그대로다.
+const Color _kSheetColorOpen = Color(0x4DFFFFFF);
+
+/// 펼친 판의 흐림 세기.
+///
+/// 🔴 **판이 거의 다 펼쳐진 뒤에만 켠다**([_kSheetBlurFrom]). 접혔을 때
+/// 판 안에 있는 **안내 알약이 제 흐림을 갖고 있어서**, 둘이 겹치면
+/// 「유리 안에 유리」가 되어 알약이 **프레임째 사라진다**(`flutter/CLAUDE.md`).
+/// 안내 알약은 진행도 0.4 에 이미 다 걷히므로 그 뒤에서 켜면 겹치지 않는다.
+const double _kSheetBlur = 14;
+
+/// 흐림이 들기 시작하는 판 진행도 — 위 주석의 그 까닭이다.
+const double _kSheetBlurFrom = 0.45;
 
 /// 판 아래 모서리. 음악 앱의 앨범 판처럼 아래만 둥글다.
 const double _kSheetRadius = 28;
@@ -64,6 +152,292 @@ const double _kVideoFlatH = 56;
 
 /// 「영상 분석」 판과 위아래 이웃(스쿼드 판 · 하단 바) 사이 틈.
 const double _kVideoGap = 12;
+
+/// 「영상 분석」 판이 화면 **양옆 끝에서** 떨어진 거리(2026-09-22 사용자 요청).
+const double _kVideoSideInset = 6;
+
+/// 알약이 제 판의 변에서 떨어지는 거리 — 🔴 **스쿼드 판의 안내 알약과
+/// 「영상 분석 시작하기」 알약이 나눠 쓴다**(2026-09-22 사용자 요청:
+/// 「영상 분석 시작하기 버튼과 같이 판과의 거리 똑같이」).
+/// 한쪽만 고치면 둘이 어긋나므로 값은 **여기 하나**다.
+const double _kPillInset = 12;
+
+/// 인사말 줄의 글꼴 — 눈누의 **펴진고딕**, 번들한 것은 제일 굵은 Black 뿐이다.
+///
+/// ⚠️ **굵기를 `w900` 외의 값으로 주지 말 것** — 한 벌만 번들해서, 다른 굵기를
+/// 부르면 엔진이 **가짜로 굵게/가늘게** 그려 획이 뭉갠다(YatraOne 에서 겪었다).
+const String _kKoFont = 'PyeojinGothic';
+
+/// 인사말이 화면 왼쪽에서 떨어진 거리.
+const double _kGreetLeft = 20;
+
+/// 🔴 **인사말 칸이 오른쪽에서 끊기는 자리** (2026-09-24). 「내 프로필」 단추가
+/// 거기 서 있어서, 칸을 그 앞에서 끊어야 **긴 닉네임이 카드 위로 올라타지
+/// 않는다** — 끊어 두면 넘치는 대신 줄이 바뀐다.
+///
+/// 단추 폭([_kProfileCardWidth] + 둘레 4×2) + 화면 오른쪽 여백 16 + 틈 8.
+const double _kGreetRight = _kProfileCardWidth + 8 + 16 + 8;
+
+/// 「내 프로필」 단추가 차지하는 높이 — 둘레 4 + 카드 + 틈 5 + 글자 18 + 둘레 4.
+///
+/// 🔴 **카드 비율 4.1:3 은 `player_card_view.dart` 의 `_kBaseH / _kBaseW`
+/// 와 같은 값이다** — 거기가 정본이고 여기는 옮겨 적은 것이라, 그쪽이 바뀌면
+/// 같이 고친다. 이 값은 다크 판의 **최소 높이**를 정하는 데만 쓴다.
+const double _kProfileButtonH = 4 + _kProfileCardWidth * 4.1 / 3 + 5 + 18 + 4;
+
+/// 영상 줄이 다크 판·흰 판과 각각 띄우는 틈.
+const double _kVideoStripGap = 10;
+
+/// 워드마크(`SUPERSUB`)가 **화면 맨 위에서** 떨어진 거리.
+///
+/// 🔴 **스쿼드 판 아랫변에 붙여 두던 것을 뗐다**(2026-09-22 정정, 사용자 요청:
+/// 「처음 SUPERSUB 글자를 맨 위에 두고」). 판이 맨 위에 매달린 시트가 아니게
+/// 되면서 「판 아래」라는 자리 자체가 없어졌다.
+const double _kWordmarkTop = 6;
+
+/// 「영상 분석」 판이 펼쳐져 있을 때의 높이.
+///
+/// 🔴 **고정값이 됐다**(2026-09-22). 전에는 스쿼드 판의 아랫변에서 거꾸로
+/// 재서 「남는 자리의 절반」이었는데, 이제 **스쿼드 판이 이 판을 기준으로**
+/// 자리를 잡는다 — 서로를 기준 삼으면 순환이 된다. 둘 중 **아래쪽이 기준**이다.
+const double _kVideoOpenH = 190;
+
+/// 접혀 있을 때 스쿼드 판(사진 판)의 높이.
+const double _kSquadPhotoH = 180;
+
+/// 스쿼드 판 안에서 손잡이 아래 · 스쿼드 그림 위로 비워 두는 높이
+/// (손잡이 + 알약 줄 + 틈).
+const double _kBoardTopInset = _kSheetHandleH + 4 + _kPillsRowH + 12;
+
+/// 판 둘과 지름길 알약 줄을 한 덩이로 받치는 **아래 판**(2026-09-23 사용자 요청:
+/// 「스쿼드판이랑 영상분석 판 아래에 흰색 판 하나」).
+///
+/// ⚠️ **순백이었다 → 맨 위 판과 같은 색으로**(2026-09-24 사용자 요청: 「하단 바
+/// 위에 있는 판도 내 프로필에 있는 판 색상으로 바꾸자」). 🔴 **이름은 그대로
+/// 둔다** — 부르는 자리(`_whiteSheet`·`home-white-sheet` 키·시험)가 그 이름을
+/// 쓰고, 색은 또 바뀔 수 있다.
+///
+/// 🔴 **[_kTopPanelColor] 를 따라가던 것을 끊었다 (2026-09-24, 사용자 지시:
+/// 「하단 바 위에 있는 판은 색상 바꾸지 마」).** 같은 날 바탕이 순검정이 되면서
+/// 맨 위 판이 `#222021` 로 돌아갔는데, **이 판은 그 자리에 안 따라간다.**
+/// 위 「위아래 판이 한 색」 결정은 여기서 끝났다 — 🔴 **다시 묶지 말 것.**
+/// 이제 화면은 **검은 바탕 · 어두운 머리 판 · 밝은 회색 아래 판** 세 층이다.
+///
+/// 🔴 **판 둘 안이 비치지는 않는다.** 판 면([_kSheetColor])은 거의 투명하지만
+/// 그 위에 사진(`squad_cover.jpg` · `analysis_cover.jpg`)이 `BoxFit.cover` 로
+/// 꽉 차 있어서, 이 색은 **판을 두르는 테와 판 사이 틈**으로만 보인다.
+///
+/// ⚠️ **한 자리만 예외다** — 스쿼드 판을 펼치면 그 사진이 걷히고 스쿼드 그림이
+/// 드는데, 그때는 판 면 너머로 이 색이 비친다.
+/// 🔴 **더는 흰 판이 아니다 — 거의 검정이다** (2026-09-25 사용자 요청:
+/// 「그 하단 바 바로 위 판의 전체 색상을 완전 검정의 85퍼센트만 준거로
+/// 바꾸자」).
+///
+/// 🔴 **알파가 아니라 밝기로 준다** (같은 날 정정, 사용자: 「배경 검정이랑
+/// 차이가 없는데? 아니면 검정 50퍼로 줘봐」).
+///
+/// ⚠️ **투명도로는 절대 안 보인다.** 바탕이 순검정([_kTopPanelColor] 과 같은
+/// `#000000`)이라 **검정 × 어떤 알파도 결국 검정**이다 — 85%든 50%든 화면에
+/// 찍히는 픽셀이 똑같다. 판이 보이려면 **바탕보다 밝아야** 한다. ⛔ 다시
+/// `Color(0x..000000)` 꼴로 되돌리지 말 것.
+///
+/// 값은 알약들이 이미 나눠 쓰는 면([SilverEdge.defaultFill])의 색이다 —
+/// 새 회색을 지어내면 한 화면에 거의 같은 검정이 둘 생긴다.
+/// 🔴 **더 밝게·어둡게는 이 한 줄이다.**
+///
+/// ⚠️ **이름과 이웃한 `_kWhiteSheet*` 들은 옛 이름이다** — 그 자리(모서리·
+/// 여백·기하)는 색과 무관해서 그대로 뒀다. 주석의 「흰 판」도 같은 자리를
+/// 가리킨다. 색만 갈렸다고 읽으면 된다.
+///
+/// 🔴 **[kSheetPaper] 에서 끊었다.** 잠시 「영상 분석」 화면의 밝은 판과 같은
+/// 값을 나눠 썼는데, 여기만 어두워졌으므로 묶여 있으면 **그 화면까지 검어진다.**
+/// ⛔ 다시 [kSheetPaper] 로 묶지 말 것.
+///
+/// 🔴 **판 위의 글자를 같이 뒤집었다**([_kOnSheet]) — 한쪽만 바꾸면 지름길
+/// 알약의 글자가 통째로 사라진다.
+const Color _kWhiteSheetColor = Color(0xFF1C1C1E);
+
+/// 흰 판의 모서리.
+const double _kWhiteSheetRadius = 28;
+
+/// 흰 판이 **화면 양끝에서** 떨어진 거리 — 0, 즉 끝까지 편다. 판 둘이
+/// [_kVideoSideInset] 만큼 안쪽이라 그 차이가 그대로 흰 테가 된다.
+const double _kWhiteSheetSideInset = 0;
+
+/// 흰 판이 판 둘 바깥으로 남기는 테의 두께 — 🔴 **판 둘의 옆 여백
+/// ([_kVideoSideInset])과 같은 값이다.** 다르면 테가 옆과 아래에서 어긋난다.
+const double _kWhiteSheetPad = _kVideoSideInset;
+
+/// 지름길 알약 줄(레슨 · 상점 · 경기장 예약 · 알림)의 높이.
+const double _kShortcutRowH = 62;
+
+/// 알약 줄과 스쿼드 판 사이 틈.
+const double _kShortcutGap = 12;
+
+/// 알약 줄 위로 흰 판이 더 남기는 자리.
+const double _kShortcutTopPad = 14;
+
+/// 알약 사이 틈.
+const double _kShortcutSpacing = 10;
+
+/// 알약 한 칸의 폭 — 🔴 **셋이 서 있던 때의 폭 그대로다.**
+///
+/// 지름길이 하나로 줄었어도(2026-09-29) 알약 **크기는 안 바뀐다** — 요청이
+/// 「알림 버튼을 **왼쪽으로 위치해서** 가운데에 있게」라, 옮기라는 것이지
+/// 키우라는 것이 아니다. 그래서 폭은 여전히 **셋 기준**으로 재고, 줄이
+/// 가운데 정렬이라 하나만 남으면 저절로 한가운데 선다.
+///
+/// 🔴 **그래서 [_kShortcuts] 에 둘을 도로 넣으면 옛 모양이 정확히 돌아온다** —
+/// 셋 × 이 폭 + 틈 둘 = 줄 전체다. 레이아웃을 안 고쳐도 된다.
+double _kShortcutPillW(BuildContext context) {
+  final rowW =
+      MediaQuery.sizeOf(context).width - 2 * (_kVideoSideInset + _kWhiteSheetPad);
+  return (rowW - 2 * _kShortcutSpacing) / 3;
+}
+
+/* ⛔ **여기 있던 `_kPillFill`(= [_kInkDark], 불투명한 어두운 면)을 걷었다**
+   (2026-09-24 사용자 지시: 「3개 버튼들 안쪽 색상 빠르게 없애봐」 →
+   「1번으로 해줘」). 지름길 알약은 이제 **유리**다 —
+   면은 [_kShortcutGlassAlpha](흰 기), 글자는 [_kOnSheet](지금은 흰색)다.
+
+   🔴 **되살린다면 [_kOnSheet] 를 같이 뒤집는다.** 어두운 면에는 흰 글자였다.
+   그 값 이력이 여기 남아 있다: 화면 바탕을 따라가던 것(2026-09-23, 바탕이
+   밝아지며 알약이 통째로 사라져서 끊었다) → 맨 위 판과 같은 `#222021`
+   → **유리**. 🔴 **어느 판도 기준이 아니다** — 알약의 기준은 **제가 앉은
+   판**([_kWhiteSheetColor], 밝은 회색)이고, 지금 유리가 성립하는 것도
+   그 판이 밝기 때문이다. */
+
+/// 지름길 알약의 모서리 — 🔴 **알약(`StadiumBorder`)이 아니라 둥근 네모다**
+/// (2026-09-24 사용자 요청 + 레퍼런스).
+///
+/// 🔴 **모서리가 있어야 [RaisedRim] 이 성립한다** — 레퍼런스의 「모서리 두 곳이
+/// 자연스럽게 안 보인다」는 **모서리가 있을 때만** 눈에 집힌다. 양 끝이 완전한
+/// 반원이면 그냥 한쪽만 밝은 테로 보인다. ⛔ [StadiumBorder] 로 되돌리지 말 것.
+const double _kShortcutRadius = 20;
+
+/* ⛔ **여기 있던 `_kShortcutBlur`(공용 흐림의 30%)와 `_kShortcutGlassAlpha`
+   (흰 기 [kPillTint])를 걷었다** (2026-09-25 — 알약이 유리를 버리고 **흰색
+   85%** 로 갔다). 면이 거의 불투명해서 **흐릴 뒤가 없다**(하단 바가 흰색이
+   되면서 흐림을 걷은 것과 같은 판단이다). 되살리려면 그날 이전 커밋을 본다. */
+
+/// 지름길 알약의 면 — 🔴 **완전한 흰색** (2026-09-25 사용자 요청: 「레슨 상점
+/// 경기장 예약 알림 버튼 안쪽 색상 완전 흰색으로」). 85%로 한 번 갔다가 같은
+/// 날 순백으로 올렸다 — 어두운 판 위에서 15%의 비침이 **면을 탁하게** 했다.
+///
+/// 🔴 **판([_kWhiteSheetColor], `#1C1C1E`)보다 한참 밝다** — 그 대비가 알약을
+/// 알약으로 읽히게 하는 전부다. 판을 밝게 돌리면 여기와 [_kOnSheet] 를 같이
+/// 본다.
+///
+/// ⚠️ **알약의 면은 하루에 다섯 번 갈렸다**: 어두운 불투명(`#222021`) → 면
+/// 없음 → 흰 기 16%(유리) → 흰색 85% → **순백**. 그때마다 [_kOnSheet] 가
+/// 함께 뒤집혔다.
+const Color _kShortcutFill = Color(0xFFFFFFFF);
+
+/// 화면 맨 위 **다크 헤더 판**의 면 (2026-09-24 사용자 요청 + 레퍼런스:
+/// 「내 프로필 글자 아래로 … 이 색상으로 판 하나 주자」, 색 견본 `#222021`).
+///
+/// 🔴 **이 판이 담는 것은 「안녕하세요, (닉네임)」과 「내 프로필」까지다**
+/// (사용자 정정: 「그 판은 거기 닉네임과 내 프로필까지만 담아야 해」).
+/// 소개 두 줄(「함께 뛸 팀을 만들고,…」)은 **판 밖 아래**에 남는다 —
+/// 판을 그 줄까지 내리지 말 것.
+///
+/// 🔴 **어두운 쪽으로 돌아왔다 (2026-09-24, 같은 날 세 번째. 사용자 요청:
+/// 「배경색상 완전 검정으로 하고, 그 내 프로필 있는 맨 위 판의 색상을 지금
+/// 배경색상으로 다시 바꾸자」).** 몇 시간 전 바탕과 맞바꿔 밝은 회색
+/// (`#E4E9E7`)이었던 것을, **직전 바탕값 `#222021`** 로 되돌렸다.
+/// 바탕은 그 자리에서 **순검정**이 됐다([ScreenTint.mintBase]).
+///
+/// 🔴 **그래서 판 위의 글자가 전부 다시 희어졌다**([_kOnPanel]) — 인사말·손·
+/// 「내 프로필」·로고 넷이다. 이 판 색을 또 밝게 돌리면 **그 넷을 같이
+/// 되돌려야 한다.** 한쪽만 바꾸면 글자가 통째로 사라진다.
+///
+/// 🔴 **바탕과 똑같은 순검정이 됐다 (2026-09-24, 같은 날 네 번째. 사용자 지시:
+/// 「그 맨 위에 있는 판도 빠르게 완전 검정색으로 바꾸고」).** `#222021` 로
+/// 되돌린 지 몇 분 만이다.
+///
+/// ⚠️ **그래서 이 판은 「보이는 판」이 아니다** — 바탕과 한 색이라 **경계가
+/// 아예 없다.** 눈에는 검은 화면 하나이고, 이 판은 **글자 넷을 담는 자리**와
+/// **상태 바 아이콘 밝기의 기준**으로만 남는다. 「판이 안 보인다」를 버그로
+/// 읽지 말 것 — 사용자가 그렇게 정했다.
+///
+/// 🔴 **그 탓에 [_kWhiteSheetColor] 와는 완전히 갈라섰다** — 아래 판은 밝은
+/// 회색에 그대로 남는다(사용자 지시: 「하단 바 위에 있는 판은 색상 바꾸지 마」).
+const Color _kTopPanelColor = Color(0xFF000000);
+
+/// 다크 판 위의 글자 — 🔴 **판이 다시 어두워져서 흰색이다.**
+///
+/// ⚠️ **지금 [_kOnDark] 와 값이 같다. 그래도 합치지 말 것** — 그쪽은
+/// **스쿼드 판·사진 위**라 판 색과 무관하게 흰색이고, 이쪽만 판 색을 따라간다.
+/// 한 상수로 묶으면 판을 바꿀 때 엉뚱한 곳이 같이 뒤집힌다(실제로 판이 밝았던
+/// 몇 시간 동안 이 값만 `#222021` 이었다).
+const Color _kOnPanel = Color(0xFFFFFFFF);
+
+/* ⛔ **여기 있던 `_kInkDark`(`#222021`, 「흰 판 위에 앉는 어두운 면」)를
+   걷었다** (2026-09-25 — 지름길 알약이 [RaisedRim] 을 버리면서 마지막 쓰임이
+   사라졌다). 그 상수는 **판이 밝다**는 전제 위에 있었고, 판이 85% 검정이 된
+   지금 그 전제가 없다. 되살리려면 2026-09-25 이전 커밋에서 꺼낸다. */
+
+/// 다크 판의 **아래 모서리** — 🔴 흰 판([_kWhiteSheetRadius])과 같은 값이다.
+/// 위는 화면 끝에 붙으므로 안 둥글린다. 둘이 화면 위아래에서 짝을 이룬다.
+const double _kTopPanelRadius = _kWhiteSheetRadius;
+
+/// 다크 판이 **「내 프로필」 글자 밑으로** 더 남기는 자리.
+///
+/// ⚠️ **20 → 6** (2026-09-24 사용자 요청: 「그 위에 판을 내 프로필 글자 바로
+/// 아래까지 좀 위치 올려」). 그 아래 **영상 줄**이 설 자리를 벌기 위한 것이다 —
+/// 판 아랫변이 225.9 → 212 로 올라가 영상 줄이 111 → 125px 을 갖는다.
+const double _kTopPanelPadBottom = 6;
+
+
+/// 알약 안의 글자·아이콘 — 🔴 **완전한 검정이다** (2026-09-25 사용자 요청:
+/// 「아이콘이랑 글자는 오나전 검정으로」). 면이 **흰색 85%**([_kShortcutFill])
+/// 라 그 위에서 가장 또렷한 값이다.
+///
+/// 🔴 **기준은 판이 아니라 알약 제 면이다.** 판은 거의 검정인데 글자는
+/// 검정이다 — 어긋나 보여도 맞다. 🔴 **면을 갈면 여기도 같이 간다**:
+/// 검정(면이 흴 때) → 순백(면이 어두울 때) → 검정(유리 + 밝은 판) →
+/// 순백(판이 어두워짐) → **검정**(면이 흰색 85%).
+const Color _kOnSheet = Color(0xFF000000);
+
+/* ⛔ **여기 있던 `_kPillLineOnWhite`([SilverEdge.onWhite])를 걷었다**
+   (2026-09-24 사용자 요청 + 레퍼런스 — 지름길 알약 셋이 [RaisedRim] 으로 갔다).
+
+   🔴 **그 상수의 규칙이 깨진 것을 알고 깨뜨렸다.** 그 자리엔 「하단 바·영상
+   분석 판과 **같은 값**이다 — 셋이 같은 흰 판 위에 놓인 조각이라 테가 갈리면
+   한 화면에 두 굵기·두 색이 보인다」고 적혀 있었다. 이제 **지름길 알약만**
+   대각선으로 밝기가 갈리는 테를 쓰고, 하단 바·영상 분석 판은 은빛 실선
+   ([_kSilverOnWhiteWidth] 쪽)에 남아 있다.
+
+   ⚠️ **그래서 한 화면에 테가 두 종류다.** 사용자가 그 모양을 콕 집어 골랐으니
+   「어긋났다」로 읽고 되돌리지 말 것. 되돌린다면 **셋을 같이** 옮긴다. */
+
+/// 흰 판 위에서 영상 분석 판을 가르는 **가장 얇은 은빛 선**(2026-09-23 사용자
+/// 요청: 「제일 얇은 세련된 실버 색상」).
+///
+/// 🔴 **하단 바와 나눠 쓴다** — 값은 [SilverEdge.onWhite] 한 곳에 있고 왜
+/// 그 값인지도 거기 적혀 있다. 여기서 숫자를 다시 쓰면 둘이 갈린다.
+const Color _kSilverOnWhite = SilverEdge.onWhite;
+const double _kSilverOnWhiteWidth = SilverEdge.onWhiteWidth;
+
+/// 흰 판 맨 위 줄에 서는 지름길 — 🔴 **지금은 「알림」 하나다**
+/// (2026-09-29 사용자 지시: 「경기장 예약 레슨 상점은 그냥 빼버리자」).
+///
+/// ⚠️ **셋이었다**(2026-09-23 ~ 09-29): 「레슨 · 상점」(`home-shortcut-market`,
+/// [Symbols.storefront]) · 「경기장 예약」(`home-shortcut-venue`,
+/// [Symbols.stadium]) · 「알림」. 앞의 둘은 **웹에만 있는 화면**(`/market` ·
+/// `/venues`)이라 누르면 「준비 중입니다」였고, 그 안내만 내미는 자리를
+/// 홈에 두지 않기로 했다.
+///
+/// 🔴 **되살릴 때는 자리와 폭이 이미 맞는다** — [_kShortcutPillW] 가 **셋
+/// 기준**으로 폭을 재고 줄은 가운데 정렬이라, 여기 둘을 도로 넣으면 셋이
+/// 줄을 꽉 채우며 예전 모양 그대로가 된다. 레이아웃은 손댈 것이 없다.
+const List<({Key key, IconData icon, String label})> _kShortcuts = [
+  (key: _kAlarmKey, icon: Symbols.notifications, label: '알림'),
+];
+
+/// 🔴 **갈 곳이 있는 유일한 지름길**(2026-09-25) — 알림함을 연다.
+/// 나머지가 걷힌 지금은 [_kShortcuts] 의 전부이기도 하다.
+const Key _kAlarmKey = Key('home-shortcut-alarm');
 
 /// 스쿼드 판 자리에 무엇을 세우는가 — 웹의 알약 「팀장」 · 「팀원」.
 enum _Role { captain, member }
@@ -90,19 +464,11 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen>
     with TickerProviderStateMixin {
-  /// 바 넷째 아이콘에서 열리는 메뉴의 진행도.
-  late final AnimationController _menu = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 420),
-  );
-
   /// 테두리를 도는 빛의 위상. 유리 조각 전부가 이 하나를 나눠 쓴다.
   late final AnimationController _sheen = AnimationController(
     vsync: this,
     duration: const Duration(seconds: 7),
   )..repeat();
-
-  bool _menuOpen = false;
 
   _Role _role = _Role.captain;
 
@@ -137,7 +503,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   @override
   void dispose() {
-    _menu.dispose();
     _sheen.dispose();
     _sheet.dispose();
     _pills.dispose();
@@ -175,12 +540,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   /// 지금 끝(0 또는 1) 너머에 걸려 있는가.
   bool _atEdge = false;
 
-  /// 손가락을 따라 판이 내려오고 올라간다. [travel] 은 접힘 ↔ 펼침 사이 거리.
+  /// 손가락을 따라 판이 자라고 줄어든다. [travel] 은 접힘 ↔ 펼침 사이 거리.
   /// 끝을 넘어 더 끌면 **고무줄처럼 뻑뻑해진다**(끄는 만큼의 3할만 따라온다).
+  ///
+  /// 🔴 **부호가 뒤집혔다**(2026-09-22, 판이 **위로** 자라게 바뀌면서).
+  /// 화면 좌표는 아래가 `+` 인데 이제 **위로 끄는 것이 펼치는 것**이라,
+  /// `primaryDelta` 에 `-` 를 붙여야 손가락과 판이 같이 간다.
+  /// ⚠️ 여기만 뒤집으면 안 된다 — [_releaseSheet] 의 **속도 부호**도 같이
+  /// 뒤집어야 튕겼을 때 엉뚱한 쪽으로 붙지 않는다.
   void _dragSheet(DragUpdateDetails d, double travel) {
     if (travel <= 0) return;
     _sheet.stop();
-    var delta = d.primaryDelta! / travel;
+    var delta = -d.primaryDelta! / travel;
     final v = _sheet.value;
     final beyond = (v >= 1 && delta > 0) || (v <= 0 && delta < 0);
     if (beyond) delta *= 0.3;
@@ -198,8 +569,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   /// 놓으면 가까운 쪽으로 스프링을 탄다. 빠르게 튕겼으면 튕긴 쪽으로, 그 속도로.
+  ///
+  /// 🔴 **부호가 뒤집혔다** — [_dragSheet] 와 같은 이유다. **위로**(음수)
+  /// 튕기면 펼치는 쪽이다.
   void _releaseSheet(DragEndDetails d, double travel) {
-    final pxPerSec = d.primaryVelocity ?? 0;
+    final pxPerSec = -(d.primaryVelocity ?? 0);
     final open = pxPerSec > 300
         ? true
         : (pxPerSec < -300 ? false : _sheet.value > 0.5);
@@ -217,51 +591,537 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   void _toggleSheet() => _settleSheet(_sheet.value > 0.5 ? 0 : 1);
 
-  void _openProfile() {
-    _closeMenu();
-    context.push('/profile');
-  }
+  void _openProfile() => context.push('/profile');
 
-  void _toggleMenu() {
-    setState(() => _menuOpen = !_menuOpen);
-    _menuOpen ? _menu.forward() : _menu.reverse();
-  }
-
-  void _closeMenu() {
-    if (!_menuOpen) return;
-    setState(() => _menuOpen = false);
-    _menu.reverse();
-  }
-
+  /* 🔴 **맨 오른쪽(로그인/로그아웃) 칸은 여기로 안 온다** — 바가 그 자리에서
+     세션을 끝낸다(`floating_nav_bar.dart`). 어느 화면에서 눌러도 뜻이 하나라
+     화면마다 같은 줄을 적지 않는다. */
   void _onNavTap(int index) {
-    if (index == FloatingNavBar.menuIndex) {
-      _toggleMenu();
-      return;
-    }
-    _closeMenu();
     switch (index) {
       case 0:
         return; // 이미 홈이다.
-      case 2:
-        _notReady('레슨 · 코치');
+      /* 🔴 **3번은 내 프로필이다**(2026-09-22, 사용자 지적: 「아래 3번째꺼
+         아이콘 누르면 똑같이 내 프로필 화면 나와야 하는거 아님?」).
+         아이콘(신분증)은 처음부터 프로필이었는데 **누르면 「준비 중입니다」**
+         가 떴다 — 아래 `default` 로 떨어지고 있었다. */
+      case 3:
+        context.go('/profile');
+      // 🔴 1번은 영상이다 — 3번과 **같은 종류의 누락**이었다(2026-09-22).
+      case 1:
+        context.go('/videos');
       default:
         _notReady();
     }
   }
 
-  void _onMenuPick(BarMenuItem item) {
-    _closeMenu();
-    switch (item) {
-      case BarMenuItem.logout:
-        ref.read(sessionControllerProvider.notifier).logout();
-      case BarMenuItem.login:
-        // 홈은 로그인한 뒤에만 보이는 화면이라 여기 설 일이 없다.
-        break;
-      case BarMenuItem.credits:
-      case BarMenuItem.coach:
-      case BarMenuItem.settings:
-        _notReady(item.label);
+  /* 🔴 **세션 안 한 번만.** 판이 비는 다른 길(크기 바꾸기 · 늦게 온 응답)에서
+     이 효과가 다시 돌면 **같은 등재가 서버로 두 번** 나간다(웹과 같은 장치). */
+  bool _autoSeated = false;
+
+  /// 카드를 만든 사람을 **판에 먼저 앉힌다**(`flutter/lib/features/team/auto_seat.dart`).
+  ///
+  /// 🔴 **주장만** 한다 — 등재는 주장 전용이라 팀원이 부르면 403 이고, 판에만
+  /// 섰다가 새로고침에 사라진다. 팀원의 카드는 팀장이 등재해 주었을 때 선다.
+  void _autoSeatOnce(
+    Squad? squad,
+    String? myCardId,
+    String? myCardSlug,
+    String? ownedTeamId,
+  ) {
+    if (_autoSeated) return;
+    if (squad == null || myCardId == null || ownedTeamId == null) return;
+    if (squad.teamId != ownedTeamId) return;
+
+    final choice = pickAutoSeat(
+      squad: squad,
+      myCardSlug: myCardSlug,
+      size: squadSizeOf(squad.formation),
+    );
+    if (choice == null) return;
+
+    _autoSeated = true;
+    // 🔴 빌드 중에 서버를 부르지 않는다 — provider 상태를 건드려 Riverpod 이
+    //    던진다. 프레임이 끝난 뒤로 미룬다(`_wantMateCards` 와 같은 이유).
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      try {
+        await ref
+            .read(squadRepositoryProvider)
+            .enlist(
+              ownedTeamId,
+              playerCardId: myCardId,
+              positionCode: choice.positionCode,
+              gridCol: choice.col,
+              gridRow: choice.row,
+            );
+        // 판을 다시 읽어 방금 생긴 등재를 그린다.
+        ref.invalidate(squadProvider(ownedTeamId));
+      } catch (_) {
+        /* 🔴 **조용히 넘어간다.** 자동 착석은 사람이 시킨 일이 아니라 판을
+           처음 여는 사람을 위한 편의다 — 실패했다고 오류 창을 띄우면 무엇
+           때문인지 모르는 알림이 뜬다. 다음에 켤 때 다시 시도한다. */
+      }
+    });
+  }
+
+  /* 🔴 **화면이 먼저 보여 주는 판.** `null` 이면 서버 값을 그대로 쓴다.
+     쓰기가 끝나면 서버가 준 **바뀐 스쿼드 전체**로 덮고, 실패하면 `null` 로
+     되돌려 서버 값으로 복귀한다. */
+  Squad? _shownSquad;
+
+  /// 쓰기 하나를 **화면 먼저** 반영하고 서버에 보낸다.
+  ///
+  /// 🔴 `invalidate` 로 다시 읽지 않는다 — 다시 읽는 동안 값이 비면 판이
+  /// 통째로 깜빡인다. 계약이 **바뀐 스쿼드 전체**를 주므로 그것으로 덮는다.
+  Future<void> _write(
+    Squad shown,
+    Future<Squad> Function(SquadRepository repo) call,
+  ) async {
+    setState(() => _shownSquad = shown);
+    try {
+      final next = await call(ref.read(squadRepositoryProvider));
+      if (!mounted) return;
+      setState(() => _shownSquad = next);
+      /* 🔴 **provider 도 새로 읽게 둔다.** 화면은 `_shownSquad` 로 이미
+         맞지만, provider 는 한 번 읽은 값을 들고 있어서 **홈을 떠났다
+         돌아오면 옛 자리**가 보인다. 깜빡임은 없다 — 보여 주는 것은
+         `_shownSquad` 이고 이것은 그대로 남는다. */
+      final teamId = next.teamId;
+      ref.invalidate(squadProvider(teamId));
+    } on ApiException catch (e) {
+      /* 🔴 **되돌리고 알린다.** 사람이 시킨 일이라 조용히 넘어가면 「옮겼는데
+         안 옮겨졌다」가 된다. 화면만 옮겨 두면 새로고침에 사라져 더 나쁘다. */
+      if (!mounted) return;
+      setState(() => _shownSquad = null);
+      _notReady(e.message);
     }
+  }
+
+  /// 카드를 다른 칸으로 옮긴다 — 서버에 남겨야 새로고침해도 그 자리다.
+  ///
+  /// 🔴 **옮기기 전에 보이는 칸을 전부 박는다** (2026-09-25, 사용자: 「내가
+  /// 바꾼 뒤에 나중에 혼자 다시 다른자리에 바껴」). 칸이 저장 안 된 등재는
+  /// 다시 그릴 때마다 「그때 비어 있는 자리」에 새로 앉아서, **내가 다른
+  /// 카드를 옮기면 손도 안 댄 사람이 딸려 움직인다.** 자세한 까닭은
+  /// `squadWithShownCellsPinned` 주석에 있다.
+  Future<void> _moveSeat(
+    String teamId,
+    Squad squad,
+    String memberId,
+    String positionCode,
+    int col,
+    int row,
+  ) async {
+    /* 🔴 **아직 서버 등재가 아니면 옮기지 않는다** — 404 가 난다. 화면에서만
+       옮겨 두면 새로고침에 되돌아가 더 헷갈린다. */
+    final m = _memberOf(squad, memberId);
+    if (m != null && m.isPendingInvite) {
+      _notReady('수락을 기다리는 중이라 아직 못 옮깁니다');
+      return;
+    }
+    final pinned = _pinned(squad);
+    await _write(
+      squadWithSeatMoved(
+        pinned,
+        memberId: memberId,
+        positionCode: positionCode,
+        gridCol: col,
+        gridRow: row,
+      ),
+      (repo) async {
+        await _persistPins(repo, teamId, squad, pinned);
+        return repo.moveSeat(
+          teamId,
+          memberId: memberId,
+          positionCode: positionCode,
+          gridCol: col,
+          gridRow: row,
+        );
+      },
+    );
+  }
+
+  /// 두 카드의 자리를 **맞바꾼다.**
+  ///
+  /// 🔴 **셋으로 나눠 보낸다** — 계약에 둘을 한 번에 고치는 경로가 없고,
+  /// 한쪽씩 보내면 중간에 **같은 칸에 둘**이 되어 서버가 막는다:
+  ///
+  /// 1. A 를 칸에서 **비운다**(등재는 남는다 — 계약 3-7절)
+  /// 2. B 를 A 가 있던 칸으로
+  /// 3. A 를 B 가 있던 칸으로
+  ///
+  /// 화면은 1번 상태(한쪽이 판에서 사라진 순간)를 **안 거친다** — 낙관적
+  /// 판은 이미 맞바꾼 결과다.
+  Future<void> _swapSeats(
+    String teamId,
+    Squad squad,
+    String aId,
+    String bId,
+  ) async {
+    final pinned = _pinned(squad);
+    final a = _memberOf(pinned, aId);
+    final b = _memberOf(pinned, bId);
+    if (a == null || b == null || !a.hasSeat || !b.hasSeat) return;
+    // 🔴 한쪽이라도 서버 등재가 아니면 맞바꿀 수 없다(위와 같은 까닭).
+    if (a.isPendingInvite || b.isPendingInvite) {
+      _notReady('수락을 기다리는 중이라 아직 못 옮깁니다');
+      return;
+    }
+
+    await _write(
+      squadWithSeatsSwapped(pinned, aId: aId, bId: bId),
+      (repo) async {
+        await _persistPins(repo, teamId, squad, pinned);
+        // 1) A 를 비운다 — 이 한 번 때문에 중간에 겹치지 않는다.
+        await repo.moveSeat(teamId,
+            memberId: aId, positionCode: a.positionCode);
+        // 2) B 를 A 자리로.
+        await repo.moveSeat(
+          teamId,
+          memberId: bId,
+          positionCode: positionOfRow(a.gridRow!),
+          gridCol: a.gridCol,
+          gridRow: a.gridRow,
+        );
+        // 3) A 를 B 자리로.
+        return repo.moveSeat(
+          teamId,
+          memberId: aId,
+          positionCode: positionOfRow(b.gridRow!),
+          gridCol: b.gridCol,
+          gridRow: b.gridRow,
+        );
+      },
+    );
+  }
+
+  Squad _pinned(Squad squad) => squadWithShownCellsPinned(
+        squad,
+        squadSizeOf(squad.formation),
+        mySlug: ref.read(myCardProvider).value?.publicSlug,
+      );
+
+  SquadMember? _memberOf(Squad squad, String id) {
+    for (final m in squad.members) {
+      if (m.id == id) return m;
+    }
+    return null;
+  }
+
+  /// 새로 박힌 칸들을 서버에도 남긴다 — 안 남기면 다음에 읽을 때 또 떠돈다.
+  ///
+  /// 🔴 **실패해도 멈추지 않는다.** 사람이 시킨 것은 「이 카드를 옮겨라」이고
+  /// 이것은 그것을 **유지되게 하는 덤**이다 — 여기서 던지면 정작 옮기기가
+  /// 안 나간다.
+  Future<void> _persistPins(
+    SquadRepository repo,
+    String teamId,
+    Squad before,
+    Squad pinned,
+  ) async {
+    for (final m in pinned.members) {
+      final was = _memberOf(before, m.id);
+      if (was == null || was.hasSeat || !m.hasSeat) continue;
+      /* 🔴 **초대만 보낸 자리는 서버에 없다** — 보내면 404 「등재를 찾을 수
+         없습니다」다(실기기에서 떴다). 수락되면 서버 스쿼드가 덮으면서
+         진짜 id 를 갖게 되고, 그때부터 저장된다. */
+      if (m.isPendingInvite) continue;
+      try {
+        await repo.moveSeat(
+          teamId,
+          memberId: m.id,
+          positionCode: m.positionCode,
+          gridCol: m.gridCol,
+          gridRow: m.gridRow,
+        );
+      } catch (_) {
+        // 덤이다 — 못 남겨도 이번 옮기기는 그대로 나간다.
+      }
+    }
+  }
+
+  /// 그 사람을 판에서 빼고 **팀에서도 내보낸다**.
+  ///
+  /// 🔴 **둘 다 해야 한다**(웹, 2026-09-18 사용자 결정: 「x 가 팀에서도
+  /// 빠지는 것」). 판에서 내리는 것만으로는 그 사람이 여전히 팀원이라
+  /// **AI 추천 후보에서 계속 빠진다**(추천은 그 팀 소속을 뺀다) — 웹 운영에서
+  /// 그렇게 12명이 쌓여 추천 목록이 말랐다.
+  Future<void> _removeSeat(
+    String teamId,
+    Squad squad,
+    String memberId,
+    String? cardSlug,
+    String? mySlug,
+  ) async {
+    /* 🔴 **초대만 보낸 자리는 판에서만 뺀다** (2026-09-25). 서버에 등재가
+       없어서 `removeSeat` 을 부르면 404 「등재를 찾을 수 없습니다」다.
+       ⚠️ **초대 자체는 아직 못 무른다** — 계약의
+       `DELETE /teams/{id}/invitations/{id}` 를 앱이 안 붙였다(1-B). 그래서
+       그 사람에게는 초대가 그대로 가 있다. */
+    final pending = _memberOf(squad, memberId)?.isPendingInvite ?? false;
+    if (pending) {
+      setState(() => _shownSquad = squadWithSeatRemoved(squad, memberId: memberId));
+      _notReady('판에서만 뺐습니다 — 보낸 초대는 그대로입니다');
+      return;
+    }
+
+    final repo = ref.read(squadRepositoryProvider);
+    await _write(
+      squadWithSeatRemoved(squad, memberId: memberId),
+      (r) => r.removeSeat(teamId, memberId: memberId),
+    );
+
+    // 여기서부터는 **덤**이다 — 판에서는 이미 빠졌으므로 실패해도 안 알린다.
+    if (cardSlug == null || cardSlug == mySlug) return;
+    try {
+      /* 🔴 **카드를 한 번 읽어 주인을 알아낸다.** 판이 들고 있는 것은 카드
+         슬러그뿐인데, 팀에서 내보내는 경로는 **사용자 id** 를 받는다. */
+      final owner = await ref.read(cardRepositoryProvider).cardBySlug(cardSlug);
+      final userId = owner?.userId;
+      // 🔴 나는 안 내보낸다 — 주장이 스스로 나가면 팀이 주인을 잃는다.
+      if (userId == null) return;
+      await repo.removeTeamMember(teamId, userId: userId);
+    } catch (_) {
+      // 못 내보내도 판에서는 이미 빠졌다 — 화면을 멈추지 않는다.
+    }
+  }
+
+  /// 빈 자리를 눌렀다 — AI 추천·지인 시트를 열고, 고른 사람을 **초대한다**.
+  ///
+  /// 🔴 **바로 앉히지 않는다.** 동의 없이 팀에 넣는 길은 계약에 없다
+  /// (2026-09-10 박민호 결정) — 주장이 부르고 본인이 수락해야 소속이 된다.
+  /// 그래서 여기서 할 수 있는 것은 초대를 보내고 **보냈다고 알리는 것**까지다.
+  ///
+  /// 🔴 **부른 즉시 판에 세운다**(웹과 같다). 수락을 기다렸다 그리면 방금
+  /// 고른 사람이 **아무 데도 안 보이는** 몇 초가 생기고, 사용자는 자기가 뭘
+  /// 잘못 눌렀는지부터 의심한다. 카드 위에는 「수락 대기중」이 걸린다.
+  ///
+  /// ⚠️ **앱을 껐다 켜면 그 자리가 사라진다** — 계약의 초대 응답에
+  /// `grid_col`·`grid_row` 가 없어 어느 칸이었는지 되살릴 데가 없다(웹은
+  /// `localStorage` 에 따로 적어 둔다 — `inviteSeats.ts`). 그것과 수락을
+  /// 기다리는 폴링이 아직 안 옮긴 한 벌이다.
+  Future<void> _fillSeat(String teamId, SquadSlot slot) async {
+    final pick = await showSeatFillSheet(
+      context,
+      teamId: teamId,
+      positionCode: slot.position,
+      positionLabel: _positionLabel[slot.position] ?? slot.position,
+      placed: _placedNicknames(teamId),
+    );
+    if (pick == null || !mounted) return;
+
+    final squad = _currentSquad(teamId);
+    if (squad == null) return;
+
+    try {
+      final invitation = await ref.read(invitationRepositoryProvider).invite(
+            teamId,
+            userId: pick.userId,
+            positionCode: slot.position,
+          );
+      if (!mounted) return;
+
+      setState(() {
+        _shownSquad = squadWithSeatInvited(
+          squad,
+          invitationId: invitation.id,
+          nickname: pick.nickname,
+          cardPublicSlug: pick.cardPublicSlug,
+          positionCode: slot.position,
+          gridCol: slot.col,
+          gridRow: slot.row,
+        );
+      });
+      /* 그 사람 카드는 따로 안 부른다 — `build` 가 판이 바뀔 때마다
+         `_wantMateCards` 를 부르고, `setState` 가 그 빌드를 일으킨다.
+         아직 안 왔으면 판이 이름표로 물러난다. */
+      _demoAccept(invitation.id);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
+  /// 🔴 **시연용 자동 수락.** 1.5초 뒤 그 자리를 스스로 수락함으로 바꾼다 —
+  /// 심사·시연에서 상대 기기로 수락을 눌러 줄 사람이 없기 때문이다.
+  ///
+  /// 🔴 **값의 출처는 웹이다** — `www/src/components/SquadPanel.tsx` 의
+  /// `DEMO_ACCEPT_MS`. 한쪽만 고치면 같은 기능이 두 화면에서 다르게 돌므로
+  /// 그쪽도 함께 본다(2026-09-25 사용자 확인: 「웹과 맞춤」).
+  ///
+  /// 🔴 **실제 배포에서는 걷어야 한다** — 진짜 수락 흐름을 가짜로 덮는
+  /// 코드다. 웹의 같은 자리에도 같은 경고가 달려 있다.
+  static const _demoAcceptDelay = Duration(milliseconds: 1500);
+
+  void _demoAccept(String invitationId) {
+    /* 🔴 **진짜 초대에는 안 건다** (2026-09-25, 사용자가 실기기에서 잡았다:
+       「그 바로 수락되고」). 실제로 답하지 않은 사람이 **받은 것처럼** 보이고,
+       그 상태로 경기까지 걸리면 인원이 빈 채로 잡힌다.
+       가짜 후보를 부른 것만 `demo-inv-` 로 온다(`DemoInvitationRepository`). */
+    if (!invitationId.startsWith('demo-inv-')) return;
+    Future<void>.delayed(_demoAcceptDelay, () {
+      if (!mounted) return;
+      final squad = _shownSquad;
+      if (squad == null) return;
+      /* 🔴 ⊗ 로 이미 뺀 자리는 되살리지 않는다 — `squadWithSeatAccepted` 가
+         없는 id 를 만나면 아무것도 안 한다. */
+      setState(
+        () => _shownSquad = squadWithSeatAccepted(squad, memberId: invitationId),
+      );
+    });
+  }
+
+  /// 「팀 매칭」을 눌렀다 — 조건을 정하고 비슷한 팀에 경기를 건다.
+  ///
+  /// 🔴 **돌아온 것은 「걸었다」이지 「잡혔다」가 아니다.** 확정은 상대가
+  /// 수락하는 순간이라, 여기서는 걸렸다는 것만 알리고 기다린다.
+  Future<void> _openTeamMatch(String teamId) async {
+    final made = await showTeamMatchSheet(context, teamId: teamId);
+    if (made == null || !mounted) return;
+
+    /* 🔴 **곧바로 기다리는 화면으로 잇는다.** 스낵바만 띄우고 끝내면 사용자는
+       「걸린 건가?」를 확인할 데가 없다 — 수락도 여기서 이어받는다. */
+    await showMatchWaitingSheet(
+      context,
+      teamId: teamId,
+      requestId: made.id,
+      ourTeamName: _teamNameOf(teamId),
+      ourSquad: _shownSquad,
+    );
+  }
+
+  /// 그 팀의 이름. 🔴 **세션이 들고 있는 값을 쓴다** — 팀 이름만 보려고
+  /// `GET /teams/{id}` 를 따로 부르지 않는다.
+  String _teamNameOf(String teamId) {
+    final session = ref.read(sessionControllerProvider);
+    if (session is! SessionLoggedIn) return '우리 팀';
+    for (final t in session.user.teams) {
+      if (t.teamId == teamId) return t.name;
+    }
+    return '우리 팀';
+  }
+
+  /// 답해야 할 것의 수 — 알림 알약에 붙는다.
+  int _inboxCount() => ref.watch(inboxProvider).value?.pending ?? 0;
+
+  /// 알림함을 연다 — 받은 초대·지인 신청·경기 신청에 답하는 자리.
+  void _openInbox() {
+    final session = ref.read(sessionControllerProvider);
+    showInboxSheet(
+      context,
+      teamId: session is SessionLoggedIn ? session.user.ownedTeamId : null,
+    );
+  }
+
+  /// 맨 위 오른쪽의 「팀 매칭」 단추.
+  ///
+  /// 🔴 **팀이 없으면 아예 안 그린다** — 걸 팀이 없으면 누를 것도 없다.
+  Widget _teamMatchButton() {
+    final session = ref.watch(sessionControllerProvider);
+    final teamId =
+        session is SessionLoggedIn ? session.user.ownedTeamId : null;
+    if (teamId == null) return const SizedBox(height: 38, width: 54);
+
+    final ready = _squadReady(teamId);
+    return _TeamMatchButton(
+      ready: ready,
+      onTap: () {
+        if (!ready) {
+          /* 🔴 **왜 못 누르는지 말해 준다.** 흐린 단추만 두면 고장으로
+             읽힌다 — 무엇이 모자란지가 곧 다음에 할 일이다. */
+          _notReady('자리를 다 채워야 걸 수 있습니다');
+          return;
+        }
+        _openTeamMatch(teamId);
+      },
+    );
+  }
+
+  /// **경기를 걸 수 있는 판인가** — 자리가 다 차고 **전원이 수락**해야 한다
+  /// (웹 `SquadPanel` 의 `full` 과 같다).
+  ///
+  /// 🔴 **자리만 찬 것으로는 부족하다.** 아직 답을 안 한 사람을 데리고 경기를
+  /// 거는 셈이 되고, 그 사람이 거절하면 인원이 빈 채로 경기가 잡힌다.
+  bool _squadReady(String teamId) {
+    final squad = _currentSquad(teamId);
+    if (squad == null) return false;
+    final seats = seatsFromSquad(
+      squad,
+      squadSizeOf(squad.formation),
+      mySlug: ref.read(myCardProvider).value?.publicSlug,
+    );
+    for (final s in seats.slots) {
+      if (s.mine) continue;
+      if (!seats.mates.containsKey(s.area)) return false;
+      if (!(seats.ready[s.area] ?? true)) return false;
+    }
+    return true;
+  }
+
+  /// 지금 판에 그려지고 있는 스쿼드.
+  ///
+  /// 🔴 **`_shownSquad` 만 보면 안 된다** (2026-09-25, 사용자: 「눌렀는데 왜
+  /// 카드 바로 안채워지냐고」). 그 값은 **뭔가를 한 번 옮긴 뒤에야** 찬다 —
+  /// 갓 들어온 화면은 서버 값으로 그려지고 있어서 `null` 이다. 그걸 못 보고
+  /// 일찍 돌아가는 바람에 **초대가 아예 안 나갔고**, 같은 값을 읽던 「이미
+  /// 앉은 사람」 목록도 늘 비어 있었다.
+  ///
+  /// `build` 의 `_shownSquad ?? serverSquad` 와 **같은 규칙**이다 — 한쪽만
+  /// 고치면 화면과 동작이 서로 다른 판을 보게 된다.
+  Squad? _currentSquad(String teamId) =>
+      _shownSquad ?? ref.read(squadProvider(teamId)).value;
+
+  /// 이미 판에 앉은 사람의 닉네임 → 그 자리.
+  ///
+  /// 🔴 닉네임으로 맞추는 까닭은 `showSeatFillSheet` 의 `placed` 주석에 있다.
+  Map<String, String> _placedNicknames(String teamId) {
+    final squad = _currentSquad(teamId);
+    if (squad == null) return const {};
+    return {for (final m in squad.members) m.nickname: m.positionCode};
+  }
+
+  static const _positionLabel = {
+    'FW': '공격수',
+    'MF': '미드필더',
+    'DF': '수비수',
+    'GK': '골키퍼',
+  };
+
+  /// 판에 앉은 팀원들의 카드를 **보이는 것만** 받아 둔다.
+  ///
+  /// 🔴 **빌드 중에 상태를 바꾸지 않는다** — `want()` 가 provider 상태를 건드려
+  /// 빌드 도중에 부르면 Riverpod 이 던진다. 프레임이 끝난 뒤로 미룬다.
+  void _wantMateCards(Squad? squad, String? mySlug) {
+    if (squad == null) return;
+    final slugs = <String>[];
+    for (final m in squad.members) {
+      final slug = m.cardPublicSlug;
+      // 내 카드는 내가 이미 들고 있다 — 다시 받지 않는다.
+      if (slug == null || slug == mySlug) continue;
+      slugs.add(slug);
+    }
+    if (slugs.isEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(mateCardsProvider.notifier).want(slugs);
+    });
+  }
+
+  /// 그 슬러그의 카드가 **이미 와 있으면** 그린다. 아직이면 `null` —
+  /// 판이 이름표로 물러난다.
+  Widget? _mateCard(String slug, double width) {
+    final card = ref.watch(mateCardsProvider)[slug];
+    if (card == null) return null;
+    // 🔴 팀원 카드도 꾸민 대로 그린다 — 웹에서 꾸민 카드가 앱에서 기본
+    //    모습으로 나오면 같은 카드로 안 보인다.
+    return PlayerCardView(
+      width: width,
+      seed: card.publicSlug,
+      alias: aliasOf(card),
+      style: card.style,
+      photoUrl: card.photoUrl,
+    );
   }
 
   void _notReady([String? what]) {
@@ -273,46 +1133,122 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(sessionControllerProvider);
-    // ⚠️ 카드 서버 연결(`GET /me/card`) 전이라 슬러그가 없다 — 그동안은 사용자
-    // id 를 씨앗으로 쓴다. 🔴 그래서 **지금은 웹과 붓자국 무늬가 다르다.**
-    // 연결되면 `public_slug` 로 바꾼다(그래야 웹과 같은 무늬).
-    final cardSeed = session is SessionLoggedIn ? session.user.id : '';
+    final user = session is SessionLoggedIn ? session.user : null;
+    // 🔴 붓자국 씨앗은 **카드의 공개 슬러그**다 — 이래야 웹과 같은 무늬가
+    //    나온다. 카드가 아직 없으면 `null` 이고 판은 빈 자리만 그린다.
+    /* ⚠️ **여기는 `.value` 로 둔다 — 조사하고 내린 결론이다**(2026-09-23).
+       프로필은 같은 `.value` 때문에 「못 읽음」에 「카드 만들기」를 내밀어
+       고쳤는데(`profile_screen.dart` 의 `_cardAction`), **홈은 그 자리에
+       누를 것이 없다.** 실패하면 일어나는 일 셋을 전부 짚어 봤다:
 
-    return Scaffold(
-      backgroundColor: _kHomeBg,
-      // 바는 SafeArea 밖에 떠 있다 — 안에 넣으면 홈 인디케이터 위에서 잘린다.
-      // 메뉴는 바 바로 위에 선다. 닫혀 있어도 자리를 잡아 두어 열릴 때
-      // 바가 밀리지 않는다.
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          BarMenu(
-            open: _menu,
-            loggedIn: session is SessionLoggedIn,
-            step: FloatingNavBar.iconStep(context),
-            onPick: _onMenuPick,
-          ),
-          FloatingNavBar(currentIndex: 0, onTap: _onNavTap),
-        ],
-      ),
-      extendBody: true,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // 판을 펼칠수록 뒤가 조금 눌린다 — 시선이 판으로 모인다.
-          Positioned.fill(
-            child: IgnorePointer(
-              child: AnimatedBuilder(
-                animation: _sheet,
-                builder: (context, _) => ColoredBox(
-                  color: Colors.black.withValues(alpha: 0.18 * _sheetT),
+       | 쓰는 자리 | `null` 일 때 | 위험 |
+       |---|---|---|
+       | `ScreenTint`(587·992) | 사선 색을 안 칠한다 | 없음 — 보기만 밋밋 |
+       | `_ProfileButton`(1962) | 빈 카드를 그린다 | 없음 — **단추는 프로필로 갈 뿐** 만들지 않는다 |
+       | `_autoSeatOnce`(554) | `myCardId == null` 이라 **그냥 빠져나간다**(366) | 없음 — 서버를 안 부른다 |
+
+       🔴 **다시 조사하지 말 것.** 여기를 `AsyncValue` 로 바꾸면 홈 전체가
+       로딩·오류 두 그림을 더 갖게 되는데, 그 값을 치를 이유가 위 표에 없다. */
+    /* 🔴 **카드가 없으면 여기서 만들어진다**(2026-09-29 — [ensureMyCardProvider]).
+       처음 들어온 사람은 카드도 팀도 없어 판이 **빈 격자**였다.
+       🔴 **값은 안 읽는다** — 읽으면 홈이 그 흐름의 로딩·오류를 그려야 한다.
+       만들어지면 `myCardProvider` 가 무효화되어 아래 줄이 저절로 따라온다. */
+    ref.watch(ensureMyCardProvider);
+    final card = ref.watch(myCardProvider).value;
+    final cardSeed = card?.publicSlug;
+    // 주장인 팀이 우선, 없으면 속한 첫 팀. 팀이 없으면 판을 안 부른다.
+    final teamId = user?.primaryTeamId;
+    /* 🔴 **낙관적 판이 서버 값을 이긴다** (2026-09-21, 사용자가 실기기에서
+       잡은 것). 옮긴 뒤 서버 왕복 300ms 동안 옛 자리로 되돌아가 **「제자리로
+       갔다가 옮겨진다」**가 됐고, 다시 읽는 사이 값이 비면 **카드가 사라져**
+       보였다. 이제 화면이 그 자리에서 바뀌고, 서버 응답이 오면 덮는다. */
+    final serverSquad = teamId == null
+        ? null
+        : ref.watch(squadProvider(teamId)).value;
+    final squad = _shownSquad ?? serverSquad;
+    _wantMateCards(squad, cardSeed);
+    _autoSeatOnce(squad, card?.id, cardSeed, user?.ownedTeamId);
+
+    // 🔴 **Scaffold 를 감싼다** — 하단 바·메뉴 뒤까지 같은 빛이 이어져야 한다.
+    return AuroraBackground(
+      base: _kHomeBg,
+      child: Scaffold(
+        /* 🔴 **바탕은 투명으로 두고 빛무리가 칠한다**(`AuroraBackground`).
+         Scaffold 가 색을 칠하면 그 위에 빛무리를 깔아도 **판·바 뒤로는 안
+         비친다** — 층을 하나로 만들어야 화면 전체가 같은 빛을 받는다. */
+        backgroundColor: Colors.transparent,
+        /* 바는 SafeArea 밖에 떠 있다 — 안에 넣으면 홈 인디케이터 위에서
+           잘린다.
+
+           ⛔ **여기 있던 `BarMenu` 를 걷었다** (2026-09-25 — 바의 메뉴 칸이
+           로그인/로그아웃 칸으로 바뀌면서). 그 판이 펴던 넷 중 셋이 아직
+           「준비 중입니다」였고, 실제로 하는 일은 로그아웃 하나였다.
+           되살리려면 2026-09-25 이전 커밋을 본다. */
+        bottomNavigationBar: FloatingNavBar(currentIndex: 0, onTap: _onNavTap),
+        extendBody: true,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            /* 🔴 **카드의 두 색을 안 쓴다**(2026-09-23 정정, 사용자 요청:
+               「그냥 홈페이지는 카드에서 뽑아낸 2가지 색상 말고 저
+               레퍼런스처럼」). 2026-09-22 에는 `card.style` 의 바탕색·자국색을
+               넘겼는데, 이제 **고정된 크림→살구빛 한 벌**이다.
+
+               🔴 **`if (card?.style != null)` 도 같이 걷혔다** — 카드가 없거나
+               아직 안 온 사람에게 **바탕이 통째로 검정으로 보이던** 자리다.
+               이제 누구에게나 같은 바탕이 깔린다. */
+            /* 🔴 **상태 바 아이콘은 바탕이 아니라 다크 판이 정한다**
+               (2026-09-24). [ScreenTint] 는 `base` 의 광도로 아이콘 밝기를
+               스스로 고르는데, 바탕이 밝은 회색이 되면서 **어두운 아이콘**을
+               골랐다 — 그런데 상태 바가 실제로 얹히는 것은 그 바탕이 아니라
+               **맨 위의 다크 판**이라 시계·배터리가 안 보였다. */
+            const Positioned.fill(
+              child: IgnorePointer(
+                child: ScreenTint.mint(topColor: _kTopPanelColor),
+              ),
+            ),
+            // 판을 펼칠수록 뒤가 조금 눌린다 — 시선이 판으로 모인다.
+            Positioned.fill(
+              child: IgnorePointer(
+                child: AnimatedBuilder(
+                  animation: _sheet,
+                  builder: (context, _) => ColoredBox(
+                    color: Colors.black.withValues(alpha: 0.18 * _sheetT),
+                  ),
                 ),
               ),
             ),
-          ),
-          _videoPanel(context),
-          _squadSheet(context, cardSeed),
-        ],
+            /* 🔴 **여기 셋이 흰 판보다 뒤로 내려왔다** (2026-09-24 사용자 지시:
+               「스쿼드판 올릴때, 뒤에 있는 흰색판 영상이랑 위에 판보다 위에
+               있게 해줘」).
+
+               까닭: 스쿼드 판을 펼치면 **흰 판 윗변이 화면 맨 위까지 따라
+               올라간다**([_sheetGeometry] 의 `whiteTopExpanded`). 그런데 영상
+               줄은 `left: 0, right: 0` 로 **화면 폭을 꽉 채우는** 줄이라,
+               앞에 있으면 흰 판이 스쿼드 판 둘레로 남기는 **테를 가로질러
+               덮었다.** 맨 위 판도 같은 자리를 먹었다.
+
+               🔴 **되돌리지 말 것** — 앞으로 올리면 판을 펼칠 때 흰 테 위로
+               영상 줄이 다시 비친다. 접혀 있을 때는 흰 판이 한참 아래라
+               **셋 다 겹치지 않으므로**, 이 순서는 펼친 동안에만 뜻이 있다. */
+            _topPanel(context, user?.nickname),
+            // 로고는 화면 맨 위 가운데 — 판을 펼치면 그 판이 덮는다.
+            _brandMark(context),
+            _videoStrip(context),
+            /* 🔴 **판 둘보다 뒤다.** 받치는 것이지 덮는 것이 아니라서,
+               이 자리(영상 분석 판 **앞**)를 지켜야 한다.
+
+               ⚠️ **위 셋보다는 앞이다** — 바로 위 주석 참고. 「받치는 것」은
+               **스쿼드 판·영상 분석 판**에 대한 말이지 영상 줄·맨 위 판까지가
+               아니다. */
+            _whiteSheet(context),
+            _videoPanel(context),
+            _shortcutPills(context),
+            _squadSheet(context, card, squad, user?.ownedTeamId),
+            // 「내 프로필」 — 화면 맨 위 오른쪽. 판보다 **뒤에 두지 않는다**.
+            _profileButton(context, card),
+          ],
+        ),
       ),
     );
   }
@@ -340,32 +1276,395 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   double _videoBottomInset(BuildContext context) =>
       FloatingNavBar.heightOf(context) + 8;
 
-  /// 「영상 분석」 — 접혔을 때는 스쿼드 판 **바로 아래부터 하단 바 위까지** 채우는
-  /// 네모 판이고 안에서 소개 영상이 되풀이된다. 스쿼드 판을 펼치면 그만큼 밀려
-  /// 내려가 **하단 바 바로 위의 납작한 띠**가 되고, 영상은 걷히고 글자만 남는다
+  /// 판 둘과 지름길 알약 줄을 받치는 **흰 판**(2026-09-23 사용자 요청).
+  ///
+  /// 🔴 **[IgnorePointer] 다.** 판 둘보다 뒤에 있어도 겹치는 넓이가 커서,
+  /// 손짓을 받으면 판 가장자리와 알약이 여기서 먹힌다.
+  Widget _whiteSheet(BuildContext context) {
+    final geo = _sheetGeometry(context);
+    return AnimatedBuilder(
+      animation: _sheet,
+      builder: (context, _) {
+        /* 🔴 **묶은 값으로 잰다.** 스프링이 넘친 값을 그대로 쓰면 흰 판
+           윗변이 화면 위로 튀어 나갔다 돌아온다 — 판 둘과 달리 이쪽은
+           그 출렁임이 **테 두께의 흔들림**으로 보여서 지저분하다. */
+        final top =
+            geo.whiteTopCollapsed +
+            (geo.whiteTopExpanded - geo.whiteTopCollapsed) * _sheetT;
+        return Positioned(
+          top: top,
+          left: _kWhiteSheetSideInset,
+          right: _kWhiteSheetSideInset,
+          height: (geo.whiteBottom - top).clamp(0.0, double.infinity),
+          child: const IgnorePointer(
+            key: Key('home-white-sheet'),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: _kWhiteSheetColor,
+                borderRadius: BorderRadius.all(
+                  Radius.circular(_kWhiteSheetRadius),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// 흰 판 맨 위의 지름길 알약 셋 — 가로로 나란히.
+  ///
+  /// 🔴 **「내 프로필」과 같은 방식으로 걷힌다**(앞 4할 안에). 스쿼드 판이
+  /// 위로 자라면서 이 줄 자리를 통째로 덮기 때문이다. 같은 식을 쓰므로
+  /// 한쪽만 고치면 둘이 어긋난다.
+  Widget _shortcutPills(BuildContext context) {
+    final geo = _sheetGeometry(context);
+    return AnimatedBuilder(
+      animation: _sheet,
+      builder: (context, _) {
+        final tc = _sheetT;
+        return Positioned(
+          top: geo.shortcutTop,
+          left: _kVideoSideInset + _kWhiteSheetPad,
+          right: _kVideoSideInset + _kWhiteSheetPad,
+          height: _kShortcutRowH,
+          /* 나가기 시작하면 더 안 눌린다 — 화면 밖으로 미끄러지는 단추를
+             누를 수 있으면 손가락이 판을 끌다 엉뚱한 곳으로 간다. */
+          child: IgnorePointer(
+            ignoring: tc > 0.02,
+            child: Row(
+              /* 🔴 **가운데 정렬**(2026-09-29 사용자 지시: 「알림 버튼을
+                 왼쪽으로 위치해서 가운데에 있게」). 알약이 하나로 줄면서
+                 오른쪽 끝에 홀로 서 있었다. 폭은 [_kShortcutPillW] 가 셋
+                 기준으로 붙잡으므로 **늘어나지 않고 자리만** 옮겨진다.
+                 ⛔ [Expanded] 로 되돌리지 말 것 — 하나뿐일 때 줄을 통째로
+                 차지해 알약이 아니라 띠가 된다. */
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                for (final (i, s) in _kShortcuts.indexed) ...[
+                  if (i > 0) const SizedBox(width: _kShortcutSpacing),
+                  SizedBox(
+                    width: _kShortcutPillW(context),
+                    /* 🔴 **제자리에서 걷힌다**(2026-09-23 정정, 사용자:
+                       「오른쪽으로 나가지 말고 그냥 제자리에서 … 사라지는 게
+                       스쿼드판 올라갈 때 다 보이니까 눈아프다」).
+                       ⛔ **옆으로 미는 것을 되살리지 말 것** — 판이 올라오는
+                       내내 알약이 화면을 가로질러서 시선이 그쪽으로 끌린다. */
+                    child: Opacity(
+                      opacity: 1 - _shortcutExit(tc, i),
+                      /* 🔴 **알림 알약이 알림함을 연다** (2026-09-25 사용자:
+                         「가운데 버튼 3개 중에 맨 오른쪽 알림 버튼
+                         만들었잖아. 거기에 뜨게 해야지」). 이 줄의 머리말이
+                         적어 둔 「화면을 붙이는 날 `onTap` 만 갈면 된다」가
+                         이 자리다 — 나머지 둘은 아직 웹에만 있다. */
+                      child: _ShortcutPill(
+                        key: s.key,
+                        icon: s.icon,
+                        label: s.label,
+                        badge: s.key == _kAlarmKey ? _inboxCount() : 0,
+                        onTap: s.key == _kAlarmKey
+                            ? _openInbox
+                            : () => _notReady(s.label),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// 알약 [i](왼쪽부터 0)가 **걷힌 정도** 0~1. 1 이면 안 보인다.
+  ///
+  /// 🔴 **오른쪽 것부터 걷힌다**(2026-09-23 사용자 요청: 「오른쪽 꺼부터
+  /// 차례대로」). 그래서 시작 시각을 오른쪽일수록 이르게 준다.
+  ///
+  /// 🔴 **판이 올라오기 전에 다 걷힌다** — 구간을 앞쪽 절반 안에 몰아넣었다.
+  /// 늦게까지 남으면 올라오는 판과 겹쳐 보여 지저분하다.
+  ///
+  /// 🔴 **돌아오는 순서를 따로 두지 않는다.** 이 값이 판 진행도 하나의
+  /// **함수**라, 판을 접으면 시간이 되감기면서 **저절로 왼쪽(레슨 · 상점)
+  /// 부터** 돌아온다 — 사용자가 요청한 그 순서다. 🔴 나가는 길과 들어오는
+  /// 길을 나누면 손가락을 도중에 되돌렸을 때 알약이 제자리로 안 돌아온다
+  /// (워드마크가 같은 이유로 한 함수다).
+  ///
+  /// ⚠️ **걷어 내지(`Opacity`) 않는다** — 옆으로 나가면서 흐려지기까지 하면
+  /// 화면 밖에 닿기 전에 사라져 **나가는 것이 안 보인다.**
+  static double _shortcutExit(double tc, int i) {
+    /// 한 알약이 걷히는 데 쓰는 구간, 그리고 이웃과의 시차.
+    const span = 0.30;
+    const step = 0.10;
+    final start = (_kShortcuts.length - 1 - i) * step;
+    final p = ((tc - start) / span).clamp(0.0, 1.0);
+    /* 🔴 [Curves.easeInCubic] 에서 갈았다 — 그쪽은 **미는 데** 맞는 곡선이라
+       (처음엔 느리고 끝에 빠르다) 걷는 데 쓰면 마지막에 툭 사라진다. */
+    return Curves.easeInOut.transform(p);
+  }
+
+  /// 「내 프로필」 — **화면 맨 위 오른쪽**(2026-09-22 사용자 요청).
+  ///
+  /// 🔴 **스쿼드 판 밖으로 나왔다.** 판이 사진 얼굴을 갖게 되면서 카드가
+  /// 사진 위에서 부딪혔다 — 「내 프로필」 글자가 판 밖으로 삐져나가고 사진 속
+  /// 선수와 겹쳤다. 워드마크와 **같은 줄**에 선다(워드마크는 가운데, 이건
+  /// 오른쪽 끝이라 안 부딪힌다).
+  ///
+  /// 🔴 **판을 펼치면 오른쪽으로 빠져나간다** — 그 자리를 판 맨 위의 `AI`
+  /// 알약이 쓴다. 옛 동작 그대로다.
+  Widget _profileButton(BuildContext context, PlayerCard? card) {
+    final geo = _sheetGeometry(context);
+    const profileW = _kProfileCardWidth + 8;
+    return AnimatedBuilder(
+      animation: _sheet,
+      builder: (context, _) {
+        final fadeOut = (1 - _sheetT / 0.4).clamp(0.0, 1.0);
+        return Positioned(
+          top: geo.rowTop,
+          right: 16,
+          child: IgnorePointer(
+            ignoring: fadeOut < 0.5,
+            child: Opacity(
+              opacity: fadeOut,
+              child: Transform.translate(
+                offset: Offset((profileW + 24) * (1 - fadeOut), 0),
+                /* ⚠️ **여기 종을 따로 두지 않는다** (2026-09-25 정정).
+                   한 번 프로필 옆에 달았는데, 아래 지름길 줄에 **이미
+                   「알림」 알약이 있었다** — 같은 것이 둘이면 어느 쪽이
+                   진짜인지 모른다. 알림은 그 알약이 맡는다. */
+                child: _ProfileButton(card: card, onTap: _openProfile),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// 화면 맨 위 가운데의 `SUPERSUB` — 🔴 **아무 단추도 아니다.**
+  ///
+  /// 🔴 **하단 바에 있던 그 로고를 여기로 옮겼다 (2026-09-23 사용자 요청:
+  /// 「supersub 의 로고는 그냥 화면 위쪽 가운데에 그냥 두고, 그거는 아무런
+  /// 버튼이 아니게」).** 그래서 **로그인에서 날아오는 로고가 여기 착지한다**
+  /// (`brandHero`) — 글꼴·색이 비행 글자와 같아서 착지가 안 튄다.
+  ///
+  /// ⛔ **되살리지 말 것 — 여기 있던 순백 `SUPER`/`SUB` 두 쪽.** YatraOne 로
+  /// 쓴 다른 워드마크였고, 판을 펼치면 양옆 화면 밖으로 갈라져 나갔다
+  /// (`_WordmarkHalf`). 사용자가 **그 글자는 없애고** 하단 바의 로고를
+  /// 올리라고 정했다 — 같은 화면에 `SUPERSUB` 가 둘이던 것이 정리된 것이다.
+  /// 2026-09-23 이전 커밋에서 꺼낸다.
+  ///
+  /// 🔴 **나가는 연출이 없어도 된다** — 판을 펼치면 스쿼드 판이 이 글자를
+  /// **덮는다**([Stack] 에서 판이 뒤에 온다). 갈라져 나가던 것은 그 시절
+  /// 판이 위에서 내려오는 시트라 덮지 못해서 필요했던 것이다.
+  Widget _brandMark(BuildContext context) {
+    final geo = _sheetGeometry(context);
+    final size = MediaQuery.sizeOf(context);
+    return AnimatedBuilder(
+      animation: _sheet,
+      builder: (context, _) {
+        /* 🔴 **묶은 값으로 잰다.** 넘친 값으로 재면 글자가 화면 밖에서 한 번
+           더 튀는데, 안 보이는 곳에서 나는 일이라 계산만 버린다. */
+        final exit = Curves.easeInCubic.transform(_sheetT);
+        return Positioned(
+          left: 0,
+          right: 0,
+          top: geo.rowTop + _kWordmarkTop,
+          child: IgnorePointer(
+            child: Center(
+              /* 🔴 **화면 위 바깥으로 나간다**(2026-09-23 사용자 요청).
+                 판을 펼치면 스쿼드 판이 이 자리를 덮지만, 덮이는 것과
+                 **나가는 것은 다르게 보인다** — 사용자가 나가는 쪽을 골랐다.
+
+                 🔴 **넉넉히 민다.** 글자 높이를 재서 「딱 맞게」 밀면 기기마다
+                 글꼴 렌더링이 달라 한 획이 남는다(워드마크에서 겪었다).
+                 [Stack] 이 화면 밖을 잘라 내므로 넉넉한 쪽이 안전하다. */
+              child: Transform.translate(
+                offset: Offset(0, -size.height * 0.25 * exit),
+                /* 🔴 **키로 찾는다** — 글자로 찾으면 판 위의 선수 카드마다
+                   박힌 `SUPERSUB` 워터마크까지 걸린다(시험이 7개를 찾았다). */
+                child: const KeyedSubtree(
+                  key: Key('home-brand'),
+                  child: _BrandFade(),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// 화면 맨 위의 **다크 헤더 판**과 그 안의 인사말 (2026-09-24 사용자 요청 +
+  /// 레퍼런스: 「내 프로필 글자 아래로 … 이 색상으로 판 하나 주자」).
+  ///
+  /// 🔴 **판이 인사말을 「담는다」 — 나란히 두지 않는다.** 판 높이를 따로
+  /// 계산해서 맞추는 방법도 있었지만, **닉네임이 길어 줄이 하나 더 늘면**
+  /// 그 계산이 조용히 어긋나 글자가 판 밖으로 비어져 나온다. 자식으로 넣으면
+  /// 판이 **글자를 잰 만큼** 커지므로 그런 경우가 아예 없다.
+  ///
+  /// 🔴 **담는 것은 인사말과 「내 프로필」까지다** (사용자 정정: 「그 판은
+  /// 거기 닉네임과 내 프로필까지만 담아야 해」). 소개 두 줄은 판 **밖 아래**다
+  /// — 아랫변을 그 줄까지 내리지 말 것.
+  ///
+  /// 🔴 **로고·「내 프로필」은 이 판의 자식이 아니다.** [Stack] 에서 이 판
+  /// **뒤에** 그려져 판 위에 얹힐 뿐이다. 둘 다 `rowTop` 에서 시작해 판 안에
+  /// 들어오는데, 인사말이 없는 사람(로그인 전)에게도 그 둘은 덮여야 하므로
+  /// 판에 **최소 높이**를 준다.
+  ///
+  /// 🔴 **닉네임이 아직 없으면 줄을 안 세운다.** 세션이 오기 전에 「안녕하세요,
+  /// 님」처럼 이름만 빠진 줄이 한 번 떴다 바뀌면 그것이 더 눈에 띈다.
+  Widget _topPanel(BuildContext context, String? nickname) {
+    final geo = _sheetGeometry(context);
+    final hasName = nickname != null && nickname.isNotEmpty;
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: IgnorePointer(
+        child: ConstrainedBox(
+          // 인사말이 없어도 로고와 「내 프로필」은 덮는다.
+          /* 🔴 **「내 프로필」 바로 아래에서 끊는다** — 소개 두 줄은 판 밖이다
+             (2026-09-24 사용자 확정: 「그 판을 함께 내 프로필 아래쪽으로 해줘.
+             함께 뛸 팀을 만들고 여기까지 하지 말고」).
+
+             🔴 **아랫변을 정하는 것은 인사말이 아니라 「내 프로필」 카드다**
+             (94폭 → 128 높이). 인사말을 줄여도 판이 안 줄어드는 이유이고,
+             판을 낮추려면 [_kProfileCardWidth] 를 봐야 한다.
+
+             ⚠️ **같은 날 「흰 판 바로 위까지 늘렸다」가 되돌아왔다.** 그때는
+             판이 소개 두 줄을 침범하는 줄 알았는데, **시험 화면에 상태 바
+             자리가 없어서** 나온 착시였다 — 실기기(411×891, 상태 바 33)에서
+             재면 판 아랫변 220.5, 소개 두 줄 윗변 238.9 로 **18px 남는다.**
+             🔴 그래서 시험도 상태 바 자리를 넣고 잰다(`_kDeviceTopInset`). */
+          constraints: BoxConstraints(
+            minHeight: geo.rowTop + _kProfileButtonH + _kTopPanelPadBottom,
+          ),
+          child: DecoratedBox(
+            key: const Key('home-top-panel'),
+            decoration: const BoxDecoration(
+              color: _kTopPanelColor,
+              // 위는 화면 끝에 붙으므로 안 둥글린다.
+              borderRadius: BorderRadius.vertical(
+                bottom: Radius.circular(_kTopPanelRadius),
+              ),
+            ),
+            child: Padding(
+              padding: EdgeInsets.only(
+                // 로고 줄 아래 — 인사말이 앉던 그 자리 그대로다.
+                top: geo.rowTop + _kWordmarkTop + kBrandHomeSize + 18,
+                left: _kGreetLeft,
+                right: _kGreetRight,
+                bottom: _kTopPanelPadBottom,
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                child: hasName
+                    ? KeyedSubtree(
+                        key: const Key('home-greeting'),
+                        child: _Greeting(nickname: nickname),
+                      )
+                    : const SizedBox.shrink(key: Key('home-greeting')),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 다크 판과 흰 판 **사이**에 서는 공개 영상 줄 (2026-09-24 사용자 요청 +
+  /// 레퍼런스: 「그 글자를 없애고, 거기에 우리 실제로 업로드된 영상들 나오게」).
+  ///
+  /// ⛔ **여기 있던 소개 두 줄(「함께 뛸 팀을 만들고,…」)을 되살리지 말 것** —
+  /// 사용자가 **그 글자를 없애고** 이 줄로 바꾸라고 정했다. 그 두 줄은
+  /// 35pt 라 411 폭에 간신히 들어갔고, 좁은 폰에서는 각 줄이 접혀 네 줄이
+  /// 되는 문제도 안고 있었다(이번에 같이 없어졌다).
+  ///
+  /// 🔴 **자리를 재서 넘긴다.** 위는 다크 판 아랫변, 아래는 **접힌** 흰 판
+  /// 윗변이다. 판을 펼치면 스쿼드 판이 이 줄을 덮으므로 따라 올라갈 까닭이
+  /// 없다(소개 두 줄이 쓰던 규칙 그대로다).
+  Widget _videoStrip(BuildContext context) {
+    final geo = _sheetGeometry(context);
+    final top = geo.rowTop + _kProfileButtonH + _kTopPanelPadBottom;
+    final room = geo.whiteTopCollapsed - top;
+    final height = (room - _kVideoStripGap * 2).clamp(0.0, 240.0);
+    return Positioned(
+      // 🔴 시험이 이 키로 **층 순서**를 읽는다 — 흰 판보다 뒤에 있어야 한다.
+      key: const Key('home-video-strip'),
+      top: top + _kVideoStripGap,
+      left: 0,
+      right: 0,
+      height: height,
+      child: AnimatedBuilder(
+        animation: _sheet,
+        /* 🔴 **줄 자체는 `child` 로 한 번만 짓는다 — `builder` 안에서 짓지 말 것.**
+           이 줄은 손가락을 따라 **초당 60번** 다시 지어지는 자리이고, 그때마다
+           영상 플레이어가 만들어졌다 버려져 **앱이 네이티브에서 통째로 죽는다**
+           (`Fatal signal 6 in MediaCodec_loop`, 2026-09-24에 실제로 겪었다).
+           `child` 로 넘기면 [Opacity] 만 매 프레임 다시 지어진다. */
+        child: HomeVideoStrip(height: height),
+        builder: (context, child) {
+          /* 🔴 **판을 펼치면 걷힌다** (2026-09-24 사용자 지시의 뒷마무리:
+             「흰색판 영상이랑 위에 판보다 위에 있게」). 흰 판을 이 줄보다 앞에
+             두는 것만으로는 **덜 가려진다** — 이 줄은 `left: 0, right: 0` 로
+             화면 폭을 꽉 채우는데 흰 판은 양옆이 [_kWhiteSheetSideInset] 만큼
+             들어가 있어서, **화면 가장자리로 영상 카드가 비어져 나왔다**
+             (실기기에서 확인했다). 알약과 같은 처리다 — 판이 오기 전에 걷는다.
+
+             🔴 **절반(`* 2`)에서 이미 다 걷힌다** — 끝까지 끌어야 사라지면
+             스쿼드 판이 덮는 순간과 겹쳐 **깜빡이는 것처럼** 보인다. */
+          final fade = (1 - _sheetT * 2).clamp(0.0, 1.0);
+          return IgnorePointer(
+            ignoring: fade < 0.5,
+            child: Opacity(opacity: fade, child: child),
+          );
+        },
+      ),
+    );
+  }
+
+  /// 「영상 분석」 — 접혔을 때는 스쿼드 판 **아래에서 하단 바 위까지의 절반**을
+  /// 차지하는 네모 판이고 안에 사진이 깔린다. 스쿼드 판을 펼치면 그만큼 밀려
+  /// 내려가 **하단 바 바로 위의 납작한 띠**가 되고, 사진은 걷히고 글자만 남는다
   /// (2026-09-15 사용자 요청). 둘 사이는 판을 끄는 손가락을 그대로 따라간다.
   Widget _videoPanel(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
     final bottomInset = _videoBottomInset(context);
     final geo = _sheetGeometry(context);
-    final openTop = geo.collapsedBottom + _kVideoGap;
-    final flatTop = size.height - bottomInset - _kVideoFlatH;
+    /* 🔴 **이 판이 이제 레이아웃의 기준이다**(2026-09-22, 사용자 요청:
+       「영상 분석 판 위에 바로 스쿼드판」). 화면 바닥에 붙어 제 높이
+       (`_kVideoOpenH`)를 가지고, **스쿼드 판이 이 판 위에** 자리를 잡는다.
+       전에는 반대로 스쿼드 판이 먼저였다 — 둘 다 상대를 기준 삼으면 순환이다. */
+    final openTop = geo.videoOpenTop;
+    final flatTop = geo.videoFlatTop;
     return AnimatedBuilder(
       animation: _sheet,
       builder: (context, _) {
         final t = _sheetT;
-        // 🔴 스쿼드 판처럼 **양쪽 끝까지** 편다(2026-09-15 사용자 요청).
+        /* 🔴 **양옆을 6 띄운다**(2026-09-22 정정, 사용자 요청: 「판의 양옆
+           화면 끝이랑 6픽셀 거리」). 2026-09-15 에는 스쿼드 판처럼 화면
+           양끝까지 폈었는데, 사진이 들어오면서 판이 **화면에 붙은 띠**가
+           아니라 **얹힌 카드**로 읽혀야 해서 갈랐다. */
         return Positioned(
-          left: 0,
-          right: 0,
+          left: _kVideoSideInset,
+          right: _kVideoSideInset,
           bottom: bottomInset,
           top: openTop + (flatTop - openTop) * t,
-          child: _VideoAnalysisPanel(
-            flat: t,
-            onTap: () {
-              _closeMenu();
-              context.push('/videos');
-            },
+          /* 🔴 **판을 키우면 걷는다** (2026-09-25 사용자 요청: 「스쿼드판
+             키우면 아래에 영상분석 탭도 안보이게 해줘」). 전에는 하단 바 위에
+             납작한 띠로 남았다 — 그 자리는 이제 스쿼드 판이 쓴다.
+             🔴 **앞 6할 안에 걷는다** — 판이 다 올라온 뒤에 사라지면 그
+             순간이 눈에 띈다. */
+          child: IgnorePointer(
+            ignoring: t > 0.5,
+            child: Opacity(
+              opacity: (1 - t / 0.6).clamp(0.0, 1.0),
+              child: _VideoAnalysisPanel(
+                flat: t,
+                onTap: () => context.push('/videos'),
+              ),
+            ),
           ),
         );
       },
@@ -373,240 +1672,410 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   /// 판 · 영상 분석이 함께 쓰는 자리 계산. 둘이 따로 재면 틈이 어긋난다.
+  ///
+  /// 🔴 **기준이 뒤집혔다**(2026-09-22, 사용자 요청: 「스쿼드판 자체를 맨
+  /// 위에서부터 이어지게 하지 말고 … 영상 분석 판 위에 바로」).
+  ///
+  /// | | 전 | 지금 |
+  /// |---|---|---|
+  /// | 스쿼드 판 | 화면 **맨 위에 매달린 시트**. 아래로 끌어 펼친다 | 영상 분석 판 **바로 위에 뜬 카드**. **위로** 끌어 펼친다 |
+  /// | 기준 | 스쿼드 판이 먼저, 영상 분석이 그 아래 남은 자리 | **영상 분석이 먼저**, 스쿼드 판이 그 위 |
+  ///
+  /// 🔴 **서로를 기준 삼지 않는다.** 둘 다 상대에게서 자리를 재면 순환이
+  /// 된다 — 아래쪽(영상 분석)이 화면 바닥에 붙어 있으므로 **그쪽이 기준**이다.
   ({
     double rowTop,
-    double openBoardTop,
-    double closedBoardTop,
+    double videoOpenTop,
+    double videoFlatTop,
+    double squadTopCollapsed,
+    double squadTopExpanded,
+    double squadBottomCollapsed,
+    double squadBottomExpanded,
+    double shortcutTop,
+    double whiteTopCollapsed,
+    double whiteTopExpanded,
+    double whiteBottom,
     double boardW,
     double boardH,
     double minScale,
-    double collapsedBottom,
-    double expandedBottom,
+    double travel,
   })
   _sheetGeometry(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final safeTop = MediaQuery.paddingOf(context).top;
-    // 펼쳤을 때 판은 납작해진 「영상 분석」 띠 바로 위까지 온다.
-    final bottomReserve =
-        _videoBottomInset(context) + _kVideoFlatH + _kVideoGap;
-
     final rowTop = safeTop + 8;
-    // 펼쳤을 때 판은 알약 줄 **바로 아래**에 선다. 🔴 예전에는 「내 프로필」
-    // 높이(92)만큼 줄을 잡아 알약과 판 사이가 너무 벌어졌다(2026-09-15 사용자
-    // 지적) — 펼치면 그 단추는 빠져나가므로 알약 높이만 잡는다.
-    final openBoardTop = rowTop + _kPillsRowH + 12;
-    // 접혔을 때는 알약이 숨어 그 줄이 비므로 판을 끌어올려 **「내 프로필」 카드
-    // 윗변에 맞춘다**(2026-09-15 사용자 요청). 4 는 단추 안쪽 여백이다.
-    final closedBoardTop = rowTop + 4;
-    final expandedBottom = size.height - bottomReserve;
-    final boardW = size.width - 32;
-    final boardH = (expandedBottom - _kSheetHandleH - openBoardTop).clamp(
-      0.0,
-      double.infinity,
-    );
+    final bottom = size.height - _videoBottomInset(context);
 
-    // 접혔을 때의 축소 — 화면 절반쯤에 판이 끝나는 크기. 🔴 다만 **「내 프로필」과
-    // 옆으로 겹치지 않는 크기**를 넘지 않는다. 판은 가운데 기준으로 줄어서, 크면
-    // 오른쪽 변이 단추 밑으로 파고든다.
-    final byHalf = boardH <= 0
+    // 「영상 분석」 — 펼쳤을 때 제 높이, 접으면 납작한 띠. 바닥은 늘 같다.
+    final videoOpenTop = bottom - _kVideoOpenH;
+    final videoFlatTop = bottom - _kVideoFlatH;
+
+    /* 🔴 **스쿼드 판의 아랫변은 늘 「영상 분석」 판 윗변 바로 위다.** 그래서
+       스쿼드 판을 펼치면 영상 분석이 띠로 내려가고 그만큼 스쿼드 판의 아랫변도
+       따라 내려간다 — 둘 사이 틈이 **한 번도 안 벌어진다.** */
+    final squadBottomCollapsed = videoOpenTop - _kVideoGap;
+    /* 🔴 **영상 분석이 걷히므로 그 자리까지 쓴다**(2026-09-25). 전에는
+       납작한 띠 위에서 멈췄는데, 띠가 사라지면 그만큼이 빈 검정으로 남는다. */
+    final squadBottomExpanded = bottom;
+
+    // 접히면 사진 한 장 높이, 펼치면 워드마크 아래부터 꽉.
+    final squadTopCollapsed = squadBottomCollapsed - _kSquadPhotoH;
+    final squadTopExpanded = rowTop;
+
+    /* 지름길 알약 줄 — 스쿼드 판 **바로 위**다. 흰 판은 그 줄까지 감싸므로
+       윗변이 여기서 한 번 더 올라간다(사용자가 고른 배치).
+
+       🔴 **펼치면 윗변이 스쿼드 판을 따라간다.** 스쿼드 판은 위로 자라
+       화면 맨 위([rowTop])까지 가는데, 흰 판이 접힌 자리에 그대로 있으면
+       **판이 흰 판 위로 삐져나온다.** 알약은 그 전에 걷힌다. */
+    final shortcutTop = squadTopCollapsed - _kShortcutGap - _kShortcutRowH;
+    final whiteTopCollapsed = shortcutTop - _kShortcutTopPad;
+    final whiteTopExpanded = squadTopExpanded - _kWhiteSheetPad;
+    /* 🔴 **아랫변은 영상 분석 판의 바닥 + 테다** — 그 판은 여닫이와 무관하게
+       바닥이 늘 같으므로([bottom]) 이 값도 고정이다. */
+    final whiteBottom = bottom + _kWhiteSheetPad;
+
+    final panelW = size.width - _kVideoSideInset * 2;
+    final boardW = panelW - 20;
+    final boardH =
+        (squadBottomExpanded -
+                squadTopExpanded -
+                _kBoardTopInset -
+                _kSheetHintH)
+            .clamp(0.0, double.infinity);
+
+    /* 스쿼드 그림이 **접힌 사진 판만 한 크기**에서 자라난다 — 사진이 그대로
+       판으로 바뀌는 것처럼 보이게 하려는 것이다(사용자: 「늘리면 스쿼드판으로
+       자연스럽게 변하게」). 🔴 접혀 있을 때 그림은 **안 보이므로**(투명도 0)
+       이 값이 정확할 필요는 없고, **자라나는 출발점**만 정한다. */
+    final minScale = boardH <= 0
         ? 1.0
-        : (size.height * _kSheetCollapsedFactor -
-                  _kSheetHandleH -
-                  openBoardTop) /
-              boardH;
-    const profileW = _kProfileCardWidth + 8;
-    final profileLeft = size.width - 16 - profileW;
-    final byProfile = (2 * (profileLeft - 8 - 16) - boardW) / boardW;
-    // 거기에 **한 번 더 줄인다**(×0.82, 2026-09-15 사용자 요청) — 접힌 판은 「무엇이
-    // 있는지」만 보이면 되고, 펼쳤을 때 커지는 차이가 클수록 끌어내리는 맛이 난다.
-    final minScale =
-        ([byHalf, byProfile, 1.0].reduce((a, b) => a < b ? a : b) *
-                _kCollapsedBoardShrink)
-            .clamp(0.2, 1.0);
+        : (_kSquadPhotoH / boardH).clamp(0.25, 1.0);
 
-    // 접힌 판 면은 줄어든 스쿼드 판 · 안내 한 줄 · 손잡이만큼만 — 판을 올린 만큼
-    // 같이 짧아진다.
-    final collapsedBottom =
-        (closedBoardTop + boardH * minScale + _kSheetHintH + _kSheetHandleH)
-            .clamp(0.0, expandedBottom);
+    /* 🔴 **끄는 거리는 판 윗변이 움직이는 거리다.** 전에는 아랫변이 움직여서
+       그쪽으로 쟀다 — 지금 그 식을 쓰면 손가락보다 판이 느리거나 빠르다. */
+    final travel = squadTopCollapsed - squadTopExpanded;
+
     return (
       rowTop: rowTop,
-      openBoardTop: openBoardTop,
-      closedBoardTop: closedBoardTop,
+      videoOpenTop: videoOpenTop,
+      videoFlatTop: videoFlatTop,
+      squadTopCollapsed: squadTopCollapsed,
+      squadTopExpanded: squadTopExpanded,
+      squadBottomCollapsed: squadBottomCollapsed,
+      squadBottomExpanded: squadBottomExpanded,
+      shortcutTop: shortcutTop,
+      whiteTopCollapsed: whiteTopCollapsed,
+      whiteTopExpanded: whiteTopExpanded,
+      whiteBottom: whiteBottom,
       boardW: boardW,
       boardH: boardH,
       minScale: minScale,
-      collapsedBottom: collapsedBottom,
-      expandedBottom: expandedBottom,
+      travel: travel,
     );
   }
 
-  Widget _squadSheet(BuildContext context, String cardSeed) {
+  Widget _squadSheet(
+    BuildContext context,
+    PlayerCard? card,
+    Squad? squad,
+    String? ownedTeamId,
+  ) {
     final geo = _sheetGeometry(context);
-    final rowTop = geo.rowTop;
-    final openBoardTop = geo.openBoardTop;
-    final closedBoardTop = geo.closedBoardTop;
-    final boardW = geo.boardW;
-    final boardH = geo.boardH;
-    final minScale = geo.minScale;
-    final collapsedBottom = geo.collapsedBottom;
-    final expandedBottom = geo.expandedBottom;
-    const profileW = _kProfileCardWidth + 8;
-    final travel = expandedBottom - collapsedBottom;
 
     final board = _role == _Role.captain
-        ? SquadBoard(cardSeed: cardSeed, onSeatTap: (_) => _notReady('선수 넣기'))
-        : const _MemberPlaceholder();
+        ? SquadBoard(
+            myCard: card,
+            squad: squad,
+            mateCardBuilder: _mateCard,
+            /* 🔴 **주장이 아니면 `null` 이다 — 아예 못 집는다.** 옮겨도 403 이라
+               끌린 뒤 되돌아가는 것보다 못 집게 하는 편이 낫다. 판이 그 팀의
+               것이 아닐 때도 마찬가지다. */
+            onSeatMoved: (ownedTeamId != null && squad?.teamId == ownedTeamId)
+                ? (memberId, positionCode, col, row) => _moveSeat(
+                    ownedTeamId,
+                    squad!,
+                    memberId,
+                    positionCode,
+                    col,
+                    row,
+                  )
+                : null,
+            onSeatsSwapped: (ownedTeamId != null && squad?.teamId == ownedTeamId)
+                ? (a, b) => _swapSeats(ownedTeamId, squad!, a, b)
+                : null,
+            onSeatRemoved: (ownedTeamId != null && squad?.teamId == ownedTeamId)
+                ? (memberId, slug) => _removeSeat(
+                    ownedTeamId,
+                    squad!,
+                    memberId,
+                    slug,
+                    card?.publicSlug,
+                  )
+                : null,
+            /* 🔴 **주장이고 그 팀의 판일 때만** 부를 수 있다 — 초대는 주장
+               전용이라(403), 시트를 열어 고르게 해 놓고 마지막에 막으면
+               고른 수고가 통째로 버려진다. 못 집게 하는 위 두 갈래와 같은
+               판단이다. */
+            /* 🔴 **팀이 없으면 「팀을 먼저 만들어 주세요」로 보낸다**
+               (2026-09-29 사용자 요청). ⚠️ 전에는 여기가 **「선수 넣기 —
+               준비 중입니다」**였다 — 기능이 준비 중인 것이 아니라 **팀이
+               없어서** 못 하는 것인데, 처음 온 사람은 앱이 미완성이라고
+               읽었다. 그것이 새 사용자가 **가장 먼저 만나는 문구**였다.
+
+               ⚠️ 팀은 있는데 **남의 판**을 보는 중이면 그대로 안내다 —
+               그때는 팀을 만들라는 말이 틀린 말이 된다. */
+            onSeatTap: (ownedTeamId != null && squad?.teamId == ownedTeamId)
+                ? (slot) => _fillSeat(ownedTeamId, slot)
+                : ownedTeamId == null
+                    ? (_) => context.push('/profile?needTeam=1')
+                    : (_) => _notReady('내 팀 판에서만 넣을 수 있습니다'),
+          )
+        /* 🔴 **한 번 더 안 누른다** (2026-09-25 사용자: 「굳이 한 번 더
+           눌러서 팀 찾아야 해?」). 「팀원」을 고르면 그 자리가 곧 조건 폼
+           (처음이면) 또는 사람을 찾는 팀 목록이다. */
+        : const TeamSeekPanel();
 
     return AnimatedBuilder(
       animation: _sheet,
       builder: (context, _) {
-        // 판 면의 아래 끝은 **넘친 값 그대로** 따라간다 — 스프링이 살짝 더 늘었다
-        // 돌아오는 것이 이 움직임의 맛이다. 판의 크기 · 자리는 조금만 넘치게 묶는다.
+        /* 판의 자리는 **넘친 값 그대로** 따라간다 — 스프링이 살짝 더 늘었다
+           돌아오는 것이 이 움직임의 맛이다. 크기는 조금만 넘치게 묶는다. */
         final raw = _sheet.value;
         final t = raw.clamp(-0.04, 1.04);
         final tc = _sheetT;
-        final bottom =
-            collapsedBottom + (expandedBottom - collapsedBottom) * raw;
-        final scale = minScale + (1 - minScale) * t;
-        final boardTop = closedBoardTop + (openBoardTop - closedBoardTop) * tc;
-        // 펼칠수록 모서리가 조금 더 둥글고, 손잡이는 좁아진다.
+
+        final top =
+            geo.squadTopCollapsed +
+            (geo.squadTopExpanded - geo.squadTopCollapsed) * raw;
+        /* 🔴 **아랫변은 자리 계산이 준 값 하나를 쓴다** (2026-09-25 정정).
+           전에는 여기서 「영상 분석 판 윗변」을 다시 재고, 경기장 높이는
+           `squadBottomExpanded` 를 따로 썼다 — 그 둘이 갈리자 **판은 그대로인데
+           경기장만 길어져 골키퍼 카드가 잘렸다**(사용자가 잡았다).
+           🔴 **한 값에서 온다** — 그래야 판과 그 안이 늘 같은 높이다. */
+        final bottom = geo.squadBottomCollapsed +
+            (geo.squadBottomExpanded - geo.squadBottomCollapsed) * raw;
         final radius = _kSheetRadius + 8 * tc;
         // 안내 글과 「내 프로필」은 펼치기 **시작하자마자** 걷힌다(앞 4할 안에).
         final fadeOut = (1 - tc / 0.4).clamp(0.0, 1.0);
+        /* 🔴 **사진 ↔ 스쿼드 그림은 합이 늘 1인 크로스디졸브다**
+           (2026-09-22 정정, 사용자: 「몇 번씩 사라졌다 나타났다 왔다갔다 해」).
+
+           처음엔 둘의 구간을 **어긋나게** 뒀다(사진 0~0.6, 그림 0.4~1.0).
+           「가운데에 둘 다 옅은 구간이 있어야 바뀌는 것으로 보인다」고 봤는데
+           **정반대였다** — 그 구간에서 둘 다 반투명이라 판이 **한 번 텅 비고**,
+           그 뒤 그림이 들어오니 「사라졌다 나타났다」로 보였다. 여닫을 때마다
+           그 골짜기를 지나므로 **오갈 때마다** 반복된다.
+
+           🔴 **둘의 투명도를 더하면 반드시 1이어야 한다.** 한쪽이 걷히는
+           만큼 다른 쪽이 정확히 차야 빈 순간이 없다.
+
+           🔴 **[Curves.easeInOut] 을 씌운다** — 선형이면 양 끝에서 톡 시작해
+           톡 멈춘다. 가운데가 빠르고 양 끝이 느려야 「바뀐다」가 한 동작으로
+           읽힌다. */
+        final morph = Curves.easeInOut.transform(tc);
+        /* 흐림이 드는 정도 — 판이 [_kSheetBlurFrom] 을 넘긴 뒤부터 1 까지.
+           🔴 **0 일 때 [BackdropFilter] 는 아무것도 안 흐린다** — 위젯을
+           넣었다 뺐다 하지 않는 편이 낫다(트리가 바뀔 때마다 한 번 깜빡인다). */
+        final glass = ((tc - _kSheetBlurFrom) / (1 - _kSheetBlurFrom))
+            .clamp(0.0, 1.0);
+        final scale = geo.minScale + (1 - geo.minScale) * t;
+
         return Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          height: bottom,
+          top: top,
+          left: _kVideoSideInset,
+          right: _kVideoSideInset,
+          height: (bottom - top).clamp(0.0, double.infinity),
           child: GestureDetector(
             key: const Key('home-squad-sheet'),
             behavior: HitTestBehavior.opaque,
-            onVerticalDragUpdate: (d) => _dragSheet(d, travel),
-            onVerticalDragEnd: (d) => _releaseSheet(d, travel),
-            child: Stack(
-              clipBehavior: Clip.hardEdge,
-              children: [
-                // 판 면.
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      // 🔴 **반투명으로 되돌리지 않는다**(2026-09-15 사용자 요청).
-                      // 흰 바탕 위에서 비치면 판이 뿌옇게 뜬다. 색은 `_kSheetColor`.
-                      color: _kSheetColor,
-                      borderRadius: BorderRadius.vertical(
-                        bottom: Radius.circular(radius),
-                      ),
-                      border: Border(
-                        bottom: BorderSide(
-                          color: _kOnDark.withValues(alpha: 0.14),
-                        ),
-                      ),
-                      // 판 아래로 옅은 그림자 — 판이 홈 위에 떠 있는 층으로 읽힌다.
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.45 * tc),
-                          blurRadius: 30,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                  ),
+            onVerticalDragUpdate: (d) => _dragSheet(d, geo.travel),
+            onVerticalDragEnd: (d) => _releaseSheet(d, geo.travel),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(radius),
+                /* 🔴 **네 모서리가 다 둥글다.** 맨 위에 매달려 있을 때는 아래
+                   두 곳만 둥글렸는데, 이제 떠 있는 카드라 위도 둥글어야 한다 —
+                   윗변이 각지면 화면에 붙어 있는 것처럼 보인다. */
+                border: Border.all(
+                  color: SilverEdge.silver.withValues(alpha: 0.42),
                 ),
-                // 스쿼드 판 — 제 크기로 짜서 위 가운데 기준으로 줄인다.
-                // 🔴 **다 펼치기 전에는 판이 안 눌린다**(2026-09-15 사용자 요청). 작게
-                // 줄어 있을 때 빈 자리(+)가 눌리면 판을 끌어내리려던 손가락이 엉뚱한
-                // 안내를 띄운다. 판을 끄는 손짓은 바깥 GestureDetector 가 받으므로
-                // 그대로 된다.
-                Positioned(
-                  top: boardTop,
-                  left: 16,
-                  width: boardW,
-                  height: boardH,
-                  child: IgnorePointer(
-                    key: const Key('home-squad-board-lock'),
-                    ignoring: tc < 0.98,
-                    child: Transform.scale(
-                      scale: scale,
-                      alignment: Alignment.topCenter,
-                      child: board,
-                    ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.45 * tc),
+                    blurRadius: 30,
+                    offset: const Offset(0, 10),
                   ),
-                ),
-                // 접혔을 때 판 바로 아래 안내. 펼치기 시작하면 걷히고, 다 올리면 돌아온다.
-                Positioned(
-                  top: boardTop + boardH * scale,
-                  left: 0,
-                  right: 0,
-                  height: _kSheetHintH,
-                  child: IgnorePointer(
-                    child: Opacity(
-                      opacity: fadeOut,
-                      child: Transform.translate(
-                        offset: Offset(0, 8 * (1 - fadeOut)),
-                        child: const _PullHint(label: '아래로 내려 내 팀 만들기'),
-                      ),
-                    ),
-                  ),
-                ),
-                // 팀장 · 팀원 · AI — 판이 다 나온 뒤 차례로 떠오른다([_pills]).
-                // 덜 떠올랐으면 안 눌린다(보이지 않는 단추가 눌리는 것을 막는다).
-                Positioned(
-                  top: rowTop,
-                  left: 16,
-                  right: 16,
-                  height: _kPillsRowH,
-                  child: AnimatedBuilder(
-                    animation: _pills,
-                    builder: (context, child) => IgnorePointer(
-                      ignoring: _pills.value < 0.6,
-                      child: child,
-                    ),
-                    child: _rolePills(),
-                  ),
-                ),
-                // 「내 프로필」 — 접혀 있을 때만 선다. 펼치면 **오른쪽으로 미끄러져
-                // 나가고**(그 자리를 AI 가 쓴다), 다 올리면 돌아온다.
-                Positioned(
-                  top: rowTop,
-                  right: 16,
-                  child: IgnorePointer(
-                    ignoring: fadeOut < 0.5,
-                    child: Opacity(
-                      opacity: fadeOut,
-                      child: Transform.translate(
-                        offset: Offset((profileW + 24) * (1 - fadeOut), 0),
-                        child: _ProfileButton(
-                          seed: cardSeed,
-                          onTap: _openProfile,
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(radius),
+                child: Stack(
+                  clipBehavior: Clip.hardEdge,
+                  children: [
+                    /* 판 면 — 접혔을 때는 거의 투명하고, 펼치면 **흰 서리
+                       유리**로 건너간다(2026-09-23 사용자 요청).
+                       🔴 흐림은 [_kSheetBlurFrom] 뒤에서만 든다 — 까닭은 그
+                       상수 주석에(「유리 안에 유리」). */
+                    Positioned.fill(
+                      child: ClipRect(
+                        child: BackdropFilter(
+                          filter: ui.ImageFilter.blur(
+                            sigmaX: _kSheetBlur * glass,
+                            sigmaY: _kSheetBlur * glass,
+                          ),
+                          child: ColoredBox(
+                            color: Color.lerp(
+                              _kSheetColor,
+                              _kSheetColorOpen,
+                              morph,
+                            )!,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ),
-                // 손잡이 — 끌어내리는 자리라는 표식. 눌러도 여닫힌다.
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  height: _kSheetHandleH,
-                  child: GestureDetector(
-                    key: const Key('home-squad-handle'),
-                    behavior: HitTestBehavior.opaque,
-                    onTap: _toggleSheet,
-                    child: Center(
-                      child: Container(
-                        width: 40 - 12 * tc,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: _kOnDark.withValues(alpha: 0.45 - 0.15 * tc),
-                          borderRadius: BorderRadius.circular(2),
+                    /* 🔴 **접혀 있을 때의 얼굴은 사진이다**(2026-09-22 사용자
+                       요청). 판을 늘리면 이 사진이 걷히고 그 자리에 스쿼드
+                       그림이 자라 든다. */
+                    /* 🔴 **`if` 로 넣었다 뺐다 하지 않는다**(2026-09-22
+                       정정). 투명도가 0 이 되는 순간 [Image] 를 트리에서
+                       빼고 있었는데, 경계를 넘나들 때마다 **다시 붙으면서 한
+                       번 더 깜빡였다.** 늘 붙여 두고 투명도만 바꾼다 —
+                       투명도 0 이면 어차피 안 그린다. */
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: Opacity(
+                          opacity: 1 - morph,
+                          child: Image.asset(
+                            'assets/images/squad_cover.jpg',
+                            fit: BoxFit.cover,
+                            alignment: Alignment.center,
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                    /* ⛔ **카드의 두 색을 판에 퍼뜨리던 것을 걷었다**
+                       (2026-09-23 사용자 요청: 「판 카드에서 2가지 색상 추출해서
+                       하는 거 그냥 빼자. 색상 없애고」).
+
+                       2026-09-22 에 사용자 요청으로 넣었던 것이다 — 사진이
+                       걷히는 만큼 `CardSideSmoke` 가 `card.style` 의 바탕색·
+                       자국색으로 들었다. 되살릴 일이 있으면 그 커밋에서 꺼낸다.
+                       🔴 **판 면([_kSheetColor])은 그대로 둔다** — 그것까지
+                       걷으면 스쿼드 그림 뒤가 통째로 비어 글자가 안 읽힌다. */
+                    /* 스쿼드 그림 — 사진이 걷힌 자리에서 자라 든다.
+                       🔴 **다 펼치기 전에는 안 눌린다**(2026-09-15 사용자
+                       요청). 작게 줄어 있을 때 빈 자리(+)가 눌리면 판을 끌려던
+                       손가락이 엉뚱한 안내를 띄운다. */
+                    Positioned(
+                      top: _kBoardTopInset,
+                      left: 10,
+                      width: geo.boardW,
+                      height: geo.boardH,
+                      child: IgnorePointer(
+                        key: const Key('home-squad-board-lock'),
+                        ignoring: tc < 0.98,
+                        child: Opacity(
+                          opacity: morph,
+                          child: Transform.scale(
+                            scale: scale,
+                            alignment: Alignment.topCenter,
+                            child: board,
+                          ),
+                        ),
+                      ),
+                    ),
+                    /* 접혔을 때의 안내. 펼치기 시작하면 걷힌다.
+                       🔴 **판 위쪽이다** — 끄는 방향(위)과 같은 쪽에 있어야
+                       「이쪽으로 올려라」가 읽힌다.
+
+                       🔴 **판 윗변에서 정확히 [_kPillInset] 이다**(2026-09-22
+                       정정, 사용자: 「영상 분석 시작하기 버튼과 같이 판과의
+                       거리 똑같이」).
+
+                       ⚠️ **높이를 주지 않는다.** 전에는 손잡이(28) 아래에
+                       [_kSheetHintH](40)짜리 칸을 두고 그 안에 가운데
+                       맞춤이었다 — 알약이 **칸 한가운데로 내려앉아** 윗변에서
+                       48 이나 떨어져 있었고, 그게 「너무 멀다」의 정체였다.
+                       자리를 안 주면 알약이 제 높이만 차지한다. */
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      top: _kPillInset,
+                      /* 🔴 **[Opacity] 로 감싸지 않는다 — 알약이 제 알파를
+                         받는다**(2026-09-22 정정, 사용자: 「올리거나 내릴 때
+                         몇 번씩 사라졌다 나타났다 해」).
+
+                         알약 안에 `BackdropFilter`(유리)가 있는데, 그것을
+                         [Opacity] 안에 넣으면 **흐림이 읽을 뒤가 없어진다** —
+                         `Opacity` 가 제 레이어를 따로 뜨고 `BackdropFilter`
+                         는 그 레이어 안을 뒤로 보기 때문이다. 프레임마다
+                         레이어가 생겼다 없어졌다 하면서 **알약이 깜빡인다.**
+
+                         🔴 **유리를 쓰는 것은 [Opacity] 로 걷지 말 것.**
+                         면·글자·그림자의 **알파를 직접** 움직인다. */
+                      child: IgnorePointer(
+                        child: _PullHint(label: '위로 올려 내 팀 만들기', show: fadeOut),
+                      ),
+                    ),
+                    // 팀장 · 팀원 · AI — 판이 다 나온 뒤 차례로 떠오른다([_pills]).
+                    // 덜 떠올랐으면 안 눌린다(보이지 않는 단추가 눌리는 것을 막는다).
+                    Positioned(
+                      top: _kSheetHandleH + 4,
+                      left: 10,
+                      right: 10,
+                      height: _kPillsRowH,
+                      child: AnimatedBuilder(
+                        animation: _pills,
+                        builder: (context, child) => IgnorePointer(
+                          ignoring: _pills.value < 0.6,
+                          child: child,
+                        ),
+                        child: _rolePills(),
+                      ),
+                    ),
+                    /* ⛔ **「내 프로필」은 이제 여기 없다**(2026-09-22, 사용자
+                       요청: 「내 프로필 맨 오른쪽 위로 옮기고」). 판이 사진
+                       얼굴을 갖게 되면서 카드가 **사진 위에서 부딪혔다** —
+                       글자가 판 밖으로 삐져나가고 사진 속 선수와 겹쳤다.
+                       화면 맨 위 오른쪽([_profileButton])으로 나갔다. */
+                    /* 손잡이 — 🔴 **판 윗변으로 옮겼다**(2026-09-22). 판이
+                       위로 늘어나므로 잡는 자리도 위여야 한다. 아래에 두면
+                       「아래를 잡아 위로 민다」가 되어 손이 헷갈린다. */
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      top: 0,
+                      height: _kSheetHandleH,
+                      child: GestureDetector(
+                        key: const Key('home-squad-handle'),
+                        behavior: HitTestBehavior.opaque,
+                        onTap: _toggleSheet,
+                        child: Center(
+                          /* 🔴 **접혀 있는 동안은 안 보인다**(2026-09-22).
+                             안내 알약을 판 윗변까지 올리면서 손잡이 줄과
+                             **자리가 겹쳤다.** 접혔을 때 무엇을 하라는지는
+                             알약이 이미 말하므로 줄은 물러나고, 펼치면
+                             (알약이 걷힌 뒤) 도로 나온다.
+                             ⚠️ **누르는 자리는 그대로다** — 사라지는 것은
+                             줄(그림)뿐이고 바깥 `GestureDetector` 는 산다. */
+                          child: Opacity(
+                            opacity: tc,
+                            child: Container(
+                              width: 40 - 12 * tc,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: _kOnDark.withValues(alpha: 0.7),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         );
@@ -649,7 +2118,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ),
         Align(
           alignment: Alignment.centerRight,
-          child: _stagger(2, _AiButton(onTap: () => _notReady('AI 용병 찾기'))),
+          child: _stagger(2, _teamMatchButton()),
         ),
       ],
     );
@@ -685,17 +2154,410 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 }
 
-/// 「내리면 무엇이 나오는지」 미리 말하는 한 줄 — 웹 홈 · 상점의 안내
-/// (`.ss-market-scroll`)와 같은 모양이다. 흰 글자 왼쪽에 **초록 이중 화살표**가
-/// 붙고, 화살표만 위아래로 흔들리며 옅어졌다 진해진다(1.5초, -5 ↔ +7, 45% ↔ 100%
-/// — 웹 `ss-market-scroll-nudge` 값 그대로).
+/// 접힌 스쿼드 판 위쪽의 **안내 알약** — 「위로 올려 내 팀 만들기」.
 ///
-/// 글자가 가운데에 오도록 오른쪽에 화살표만큼 빈자리를 둔다(웹과 같은 장치).
-/// 기기에서 움직임 줄이기를 켰으면 흔들지 않는다.
+/// 🔴 **[_StartAnalysisPill] 과 같은 재질이다**(2026-09-22 사용자 요청:
+/// 「영상 분석 시작하기 버튼처럼 똑같이 글래스랑 블러」) — 유리 + 흐림 +
+/// 해그림자. 둘이 한 화면에 있으니 재질이 갈리면 따로 논다.
+///
+/// 🔴 **다만 외곽선은 없다**(사용자 요청). 도는 실버는 **「여기를 눌러라」는
+/// 표시**라 진짜 단추 하나에만 붙인다 — 이쪽은 안 눌린다.
+///
+/// ⛔ **화살표를 되살리지 말 것**(사용자 요청: 「화살표 그냥 빼고」).
+/// 알약이 되면서 **알약 자체가 「무엇을 하라」를 말하고** 화살표는 자리만
+/// 먹었다.
+///
+/// 🔴 **아주 미세하게 위아래로 떠다닌다**(2026-09-22 사용자 요청).
+/// ⚠️ 앞서 여기 「까닥이는 애니메이션을 없애서 `StatelessWidget` 이 됐다」고
+/// 적었던 것을 **정정한다** — 다시 움직이므로 다시 상태를 갖는다. 움직이는
+/// 것이 **화살표가 아니라 알약 전체**인 것이 그때와 다르다.
+///
+/// ⚠️ **안 눌린다.** 생김새는 단추인데 판 전체가 끄는 자리다 — 부르는 쪽이
+/// [IgnorePointer] 로 감싼다.
+/// 흰 판 맨 위 줄의 지름길 알약 하나 — 아이콘 위, 글자 아래
+/// (2026-09-23 사용자가 준 그림 배치).
+///
+/// 🔴 **유리가 아니다.** 흰 판 위라 흐릴 뒤가 없고, 이 화면의 다른 알약
+/// (`GlassPill`)을 그대로 가져오면 아무것도 안 보인다. 색 면 + 가는 테로
+/// 간다 — `flutter/CLAUDE.md` 의 「층을 쌓아야 하면 흐림 없이 색만 얹는다」와
+/// 같은 판단이다.
+///
+/// ⚠️ **흰 면이었다 (2026-09-23 정정)** — 사용자가 면을 화면 바탕과 같은
+/// 딥그린으로, 글자·아이콘을 순백으로 뒤집었다.
+class _ShortcutPill extends StatelessWidget {
+  const _ShortcutPill({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.badge = 0,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  /// 아이콘 위에 붙는 수. 🔴 **0 이면 아무것도 안 그린다** — 빈 배지가 더
+  /// 헷갈린다.
+  final int badge;
+
+  @override
+  Widget build(BuildContext context) {
+    /* 🔴 **모서리 둘이 자연스럽게 사라지는 테다**([RaisedRim], 2026-09-25
+       사용자 요청: 「외곽선은 모서리 2군데는 자연스럽게 안보이게 해줘」).
+       같은 날 **실버 실선으로 갔다가 되돌아왔다** — 실선은 네 변을 고르게
+       둘러 「판에 그려 넣은 네모」가 된다.
+       ⛔ `Border.all` 실선으로 되돌리지 말 것.
+
+       🔴 **면이 희어서 두 색이 다 검정이다.** 이 위젯의 기본 조합(왼쪽 위
+       흰 하이라이트)은 **어두운 조각**용이라, 흰 면 위에서는 획이 통째로
+       묻힌다. 빛이 왼쪽 위에서 온다는 규칙은 지키되 **그늘 쪽(오른쪽 아래)을
+       더 진하게** 줘서 솟아 보이게 한다.
+       🔴 면을 다시 어둡게 돌리면 이 둘을 실버로 되돌린다. */
+    return RaisedRim(
+      radius: _kShortcutRadius,
+      litColor: _kOnSheet,
+      lit: 0.18,
+      shadeColor: _kOnSheet,
+      shade: 0.32,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(_kShortcutRadius),
+        child: Material(
+            /* 🔴 **판보다 밝아야 뜬다** — 그것이 이 면이 하는 일의 전부다
+               ([_kShortcutFill] 머리말). 한때 어두운 색을 옅게 깔아 봤는데
+               판보다 **어두워져** 「때 낀 자국」으로 보였다(2026-09-24). */
+            color: _kShortcutFill,
+            child: InkWell(
+              onTap: onTap,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  /* 🔴 **수는 아이콘 오른쪽 위에 겹친다** — 줄을 따로 두면
+                     알약 셋의 높이가 갈린다(아래 「한 줄로 묶는다」와 같은
+                     까닭). */
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Icon(icon, size: 22, color: _kOnSheet),
+                      if (badge > 0)
+                        Positioned(
+                          top: -4,
+                          right: -8,
+                          child: Container(
+                            key: const Key('home-inbox-count'),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.seed,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              '$badge',
+                              style: const TextStyle(
+                                color: Color(0xFF0B0B0B),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  /* 🔴 한 줄로 묶는다 — 「경기장 예약」이 좁은 기기에서 두 줄로
+                     접히면 알약 셋의 높이가 갈린다. */
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: _kOnSheet,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+  }
+}
+
+/// 인사말 두 줄의 글자 차림 — 🔴 **다크 판 위**라 흰색이다.
+const TextStyle _kGreetStyle = TextStyle(
+  fontFamily: _kKoFont,
+  // 🔴 번들한 굵기가 Black 하나다 — [_kKoFont] 주석 참고.
+  fontWeight: FontWeight.w900,
+  fontSize: _Greeting.fontSize,
+  height: 1.2,
+  // 🔴 판 색을 따라간다 — [_kOnPanel] 머리말 참고.
+  color: _kOnPanel,
+);
+
+/// 인사말 한 덩이 — **화면 왼쪽 밖에서 미끄러져 들어오고**, 로고가 내려앉으면
+/// 그때 손을 흔든다 (2026-09-24 사용자 요청: 「글자랑 아이콘 supersub 도착할
+/// 때까지 안 나오는 거 하지 말고 처음부터 왼쪽 밖에서 들어오게 하고, 도착하면
+/// 그때 손 흔드는 애니메이션 나오게 해줘」).
+///
+/// ⚠️ **들어오는 것은 더 이상 [kBrandSettled] 를 안 기다린다** — 2026-09-23
+/// 에는 기다렸다(「내려 앉기 전까지는 안보였다가 딱 내려 앉으면…」). 그때
+/// 기다린 까닭은 **인트로가 도는 동안 홈이 이미 그 아래에 지어져 있어서**,
+/// 안 기다리면 잉크가 걷히는 순간 **이미 다 나타난 채로** 드러나기 때문이었다.
+/// 🔴 **지금은 그 문제가 안 생긴다** — 인트로 뒤에서 벌어지는 일이 「없던 것이
+/// 나타나는 것」이 아니라 **화면 밖에서 안으로 들어오는 것**이라, 잉크가 걷힐
+/// 때 이미 제자리에 있어도 어색하지 않다.
+///
+/// 🔴 **흔들기만 [kBrandSettled] 를 기다린다** — 로고가 앉는 순간이 신호다.
+///
+/// 🔴 **잦아들게 흔든다.** 같은 폭으로 흔들다 뚝 멈추면 「멈췄다」가 아니라
+/// 「끊겼다」로 보인다 — 진폭을 시간에 따라 0 으로 떨어뜨리면 손이 제자리에
+/// 내려앉는다.
+///
+/// 🔴 **회전 중심을 손목 쪽(왼쪽 아래)에 둔다.** 한가운데를 중심으로 돌리면
+/// 손이 **제자리에서 빙글거려** 흔드는 것으로 안 읽힌다.
+class _Greeting extends StatefulWidget {
+  const _Greeting({required this.nickname});
+
+  final String nickname;
+
+  /// 왼쪽 밖에서 들어오는 시간.
+  static const enter = Duration(milliseconds: 700);
+
+  /// 🔴 **제 폭의 몇 배만큼 왼쪽에서 출발하는가.** 1 이면 제 상자 폭만큼
+  /// 왼쪽인데, 이 덩이의 상자는 **인사말 칸 전체 폭**(판 안쪽 좌우 여백을 뺀
+  /// 만큼)이라 1 만 해도 화면 밖이다. 🔴 **1.05 로 조금 더 민다** — 왼쪽
+  /// 여백([_kGreetLeft])만큼은 상자 밖이라, 1 이면 **글자 왼쪽 끝이 화면
+  /// 안에 걸친 채로** 출발한다.
+  static const enterFrom = 1.05;
+
+  /// 몇 번 흔드는가(왕복 기준).
+  ///
+  /// ⚠️ **4 → 6** (2026-09-24 사용자 요청. 잠깐 8이었다가 6으로 정했다).
+  /// 🔴 **[wavePeriod] 도 같은 배수로 늘린다** — 주기를 그대로 두면 같은
+  /// 1.8초 안에 여섯 번을 흔들게 되어 **속도가 1.5배**가 되고, 인사가 아니라
+  /// 허둥대는 것으로 보인다. 흔드는 **횟수만** 바꾸라는 뜻으로 읽었다.
+  /// 한 번 흔드는 데 걸리는 시간은 450ms 로 처음과 같다.
+  static const waves = 6;
+
+  static const wavePeriod = Duration(milliseconds: 2700);
+
+  /// 최대 기울기(라디안).
+  static const swing = 0.30;
+
+  /// 글자·아이콘 크기(2026-09-23 사용자 요청: 「글자 살짝 더 키우자」).
+  static const fontSize = 26.0;
+  static const iconSize = 38.0;
+
+  @override
+  State<_Greeting> createState() => _GreetingState();
+}
+
+class _GreetingState extends State<_Greeting> with TickerProviderStateMixin {
+  /// 왼쪽 밖에서 들어오는 것 — 🔴 **화면이 지어지는 대로 곧장 돈다.**
+  late final AnimationController _enter = AnimationController(
+    vsync: this,
+    duration: _Greeting.enter,
+  );
+  late final AnimationController _wave = AnimationController(
+    vsync: this,
+    duration: _Greeting.wavePeriod,
+  );
+
+  bool _waved = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _enter.forward();
+    kBrandSettled.addListener(_onSettled);
+    _onSettled();
+  }
+
+  /// 🔴 **한 번만 흔든다.** [kBrandSettled] 는 인트로가 오갈 때 값이 여러 번
+  /// 바뀔 수 있는데, 그때마다 다시 걸면 손이 계속 처음부터 흔들린다.
+  void _onSettled() {
+    if (!kBrandSettled.value || _waved) return;
+    _waved = true;
+    _wave.forward();
+  }
+
+  @override
+  void dispose() {
+    kBrandSettled.removeListener(_onSettled);
+    _enter.dispose();
+    _wave.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: Listenable.merge([_enter, _wave]),
+      builder: (context, _) {
+        final e = Curves.easeOutCubic.transform(_enter.value);
+        final w = _wave.value;
+        // 진폭이 1 에서 0 으로 잦아든다. 안 흔드는 동안은 w = 0 이라 각도도 0.
+        final amp = _Greeting.swing * (1 - w);
+        final angle = amp * math.sin(2 * math.pi * _Greeting.waves * w);
+
+        /* 🔴 **제 폭을 단위로 민다**([FractionalTranslation]). 화면 폭을 읽어
+           픽셀로 밀면 기기마다 「얼마나 밖인지」가 달라지는데, 이 덩이의 상자는
+           **인사말 칸 전체 폭**이라 제 폭의 1배만 밀어도 화면 밖이다. */
+        return FractionalTranslation(
+          translation: Offset(-_Greeting.enterFrom * (1 - e), 0),
+          /* 🔴 **손이 글자 위에 선다**(2026-09-24 사용자 확정). 손이 제 줄을
+             따로 쓰면 인사말 덩이가 44(손 38 + 틈 6) 높아지는데, 판 높이를
+             정하는 것은 **「내 프로필」 카드**(최소 225.9)라 **판은 안 커진다** —
+             필요한 높이 213.9 로 12 남는다(실기기에서 계산).
+
+             ⚠️ **같은 날 옆으로 옮겼다 돌아왔다.** 그때는 판이 흰 판 바로
+             위까지 늘어나 있어 그 44 가 모자랐다. 🔴 **여유가 12뿐이니**
+             카드를 줄이거나 인사말을 키우면 판이 자라 소개 두 줄과 부딪힌다. */
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Transform.rotate(
+                // 🔴 시험이 이 키로 각도를 읽는다 — 흔들기가 언제 시작하는지.
+                key: const Key('home-greeting-hand'),
+                angle: angle,
+                alignment: Alignment.bottomLeft,
+                child: const Icon(
+                  Symbols.waving_hand,
+                  size: _Greeting.iconSize,
+                  color: _kOnPanel,
+                  weight: 300,
+                  grade: 0,
+                  opticalSize: 24,
+                ),
+              ),
+              const SizedBox(height: 6),
+              /* 🔴 **닉네임은 다음 줄이다** (2026-09-24 사용자 요청:
+                 「안녕하세요, 다음에 나오는 닉네임은 다음줄로 내려버리자.
+                 길 수도 있으니까」).
+
+                 🔴 **한 [Text] 에 `\n` 을 넣지 않는다** — 시험과 다음 사람이
+                 글자로 집을 때 한 덩이 문자열이 되어, 어느 줄을 가리키는지
+                 못 고른다(자리를 재는 시험이 실제로 아랫줄을 집어야 했다).
+                 따로 두면 각 줄의 자리도 따로 잴 수 있다. */
+              const Text('안녕하세요,', style: _kGreetStyle),
+              Text(
+                '${widget.nickname} 님',
+                /* 🔴 **자르지 않고 줄을 바꾼다.** 칸이 [_kGreetRight] 에서
+                   끊겨 있으므로(「내 프로필」 앞), 아주 긴 이름은 여기서 또 한
+                   줄로 내려간다 — 판은 이 위젯을 **담고** 있어서 그만큼 같이
+                   커진다. */
+                style: _kGreetStyle,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// 로고가 **앉고 2초 뒤에 초록에서 흰색으로 물든다**(2026-09-23 사용자 요청:
+/// 「홈페이지에 도착하면 2초 뒤에 흰색으로 바뀌게 … 부드럽고 아주 자연스럽게」).
+///
+/// 🔴 **2초는 「홈이 지어진 때」가 아니라 「로고가 앉은 때」부터 잰다.**
+/// 인트로가 도는 동안 홈은 **이미 그 아래에 지어져 있다**(`intro_gate` 가
+/// 착지점의 화면 좌표를 읽으려고 일부러 그렇게 해 둔 것이다). 화면이 뜨는
+/// 대로 재면 **로고가 날아오기도 전에 흰색이 되고**, 착지하는 순간 비행
+/// 글자(초록)로 **되돌아간 것처럼** 보인다. 그래서 [kBrandSettled] 를 기다린다.
+///
+/// 🔴 **[BrandMark] 를 그대로 쓴다** — 색만 바깥에서 준다. 그 위젯이 비행 중에
+/// 제 글자를 감추는 일([kBrandFlightInProgress])을 맡고 있어서, 맨 [Text] 로
+/// 바꾸면 날아오는 글자와 여기 글자가 동시에 보인다.
+class _BrandFade extends StatefulWidget {
+  const _BrandFade();
+
+  /// 앉은 뒤 기다리는 시간.
+  ///
+  /// ⚠️ **2초 → 1초 (2026-09-23 사용자 요청: 「1초 더 줄여도 돼? 도착하고
+  /// 변하기까지 시간이 너무 길다」).** 물드는 시간([fade])은 그대로 뒀다 —
+  /// 길다고 한 것은 **기다리는 쪽**이지 변하는 속도가 아니다.
+  static const delay = Duration(seconds: 1);
+
+  /// 물드는 데 걸리는 시간 — 🔴 **넉넉히 준다.** 짧으면 「툭 바뀐다」가 되어
+  /// 「부드럽고 아주 자연스럽게」와 반대가 된다.
+  static const fade = Duration(milliseconds: 1100);
+
+  @override
+  State<_BrandFade> createState() => _BrandFadeState();
+}
+
+class _BrandFadeState extends State<_BrandFade>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _fade = AnimationController(
+    vsync: this,
+    duration: _BrandFade.fade,
+  );
+
+  Timer? _wait;
+
+  @override
+  void initState() {
+    super.initState();
+    kBrandSettled.addListener(_onSettled);
+    _onSettled();
+  }
+
+  /// 🔴 **한 번만 건다.** [kBrandSettled] 는 인트로가 오갈 때 값이 여러 번
+  /// 바뀔 수 있는데, 그때마다 타이머를 새로 걸면 2초가 계속 미뤄진다.
+  void _onSettled() {
+    if (!kBrandSettled.value || _wait != null) return;
+    _wait = Timer(_BrandFade.delay, () {
+      if (mounted) _fade.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    kBrandSettled.removeListener(_onSettled);
+    _wait?.cancel();
+    _fade.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _fade,
+      builder: (context, _) => BrandMark(
+        key: kBrandLandingKeyHome,
+        fontSize: kBrandHomeSize,
+        /* 🔴 **[Curves.easeInOut] 을 씌운다** — 선형이면 시작과 끝이 톡
+           끊겨 보인다. 가운데가 빠르고 양 끝이 느려야 한 동작으로 읽힌다. */
+        /* 🔴 **[_kOnPanel] 로 물든다 — 판 색을 따라간다** (2026-09-24).
+           판이 밝은 회색이던 몇 시간 동안은 이 값이 어두웠다(흰 로고가 그 위에서
+           사라져서). 판이 다시 어두워져 지금은 흰색이다. 앉는 색만 판을 따라가고
+           출발색(앱 초록)과 곡선은 그대로다. */
+        color: Color.lerp(
+          AppTheme.seed,
+          _kOnPanel,
+          Curves.easeInOut.transform(_fade.value),
+        )!,
+      ),
+    );
+  }
+}
+
 class _PullHint extends StatefulWidget {
-  const _PullHint({required this.label});
+  const _PullHint({required this.label, required this.show});
 
   final String label;
+
+  /// 0 이면 없는 것처럼, 1 이면 다 보이게.
+  ///
+  /// 🔴 **부르는 쪽이 [Opacity] 를 쓰지 않고 이 값을 준다** — 위 호출부 주석
+  /// 참고(유리를 `Opacity` 로 걷으면 깜빡인다).
+  final double show;
 
   @override
   State<_PullHint> createState() => _PullHintState();
@@ -703,67 +2565,92 @@ class _PullHint extends StatefulWidget {
 
 class _PullHintState extends State<_PullHint>
     with SingleTickerProviderStateMixin {
-  // 웹(30)보다 조금 작다 — 폰 폭에서 글자에 비해 화살표가 커 보였다(사용자 요청).
-  static const double _iconSize = 26;
-  static const double _gap = 4;
+  /// 🔴 **아주 느리고 아주 작다.** 빠르거나 크면 「떠 있다」가 아니라
+  /// 「흔들린다」가 되어 사진에서 눈이 끌려간다.
+  static const double _floatPx = 3;
 
-  late final AnimationController _nudge = AnimationController(
+  late final AnimationController _float = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 750),
+    duration: const Duration(milliseconds: 2600),
   );
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // 「애니메이션 줄이기」를 켠 사람에게는 제자리에 선다.
     if (MediaQuery.disableAnimationsOf(context)) {
-      _nudge
+      _float
         ..stop()
-        ..value = 1;
-    } else if (!_nudge.isAnimating) {
-      _nudge.repeat(reverse: true);
+        ..value = 0;
+    } else if (!_float.isAnimating) {
+      _float.repeat(reverse: true);
     }
   }
 
   @override
   void dispose() {
-    _nudge.dispose();
+    _float.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final eased = CurvedAnimation(parent: _nudge, curve: Curves.easeInOut);
-    return Center(
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AnimatedBuilder(
-            animation: eased,
-            builder: (context, child) => Opacity(
-              opacity: 0.45 + 0.55 * eased.value,
-              child: Transform.translate(
-                offset: Offset(0, -5 + 12 * eased.value),
-                child: child,
+    const r = Radius.circular(_StartAnalysisPill.radius);
+    final show = widget.show.clamp(0.0, 1.0);
+    return AnimatedBuilder(
+      animation: _float,
+      builder: (context, child) {
+        final e = Curves.easeInOut.transform(_float.value);
+        return Transform.translate(
+          // 떠다니는 것 + 걷힐 때 위로 물러나는 것을 **한 번에** 더한다.
+          offset: Offset(0, -_floatPx + 2 * _floatPx * e - 8 * (1 - show)),
+          child: child,
+        );
+      },
+      child: Center(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: const BorderRadius.all(r),
+            boxShadow: sunShadow(show),
+          ),
+          child: ClipRRect(
+            borderRadius: const BorderRadius.all(r),
+            child: BackdropFilter(
+              // 🔴 흐림도 [show] 를 탄다 — 걷힐 때 흐림만 남으면 **유령 같은
+              //    네모**가 보인다.
+              filter: ui.ImageFilter.blur(
+                sigmaX: kPillBlur * show,
+                sigmaY: kPillBlur * show,
+              ),
+              child: ColoredBox(
+                // 시작하기 알약과 **같은 값** — 둘이 한 재질로 읽힌다.
+                color: Colors.white.withValues(alpha: 0.16 * show),
+                child: Padding(
+                  /* 🔴 **왼쪽을 줄였다**(2026-09-22 사용자 요청: 「컴팩트하게
+                     왼쪽 패딩 줄이고」). 화살표가 있던 자리라 넉넉했는데
+                     화살표를 빼면서 그만큼 비었다 — 좌우를 같게 맞췄다. */
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 9,
+                  ),
+                  child: Text(
+                    widget.label,
+                    style: TextStyle(
+                      /* 🔴 **흰 글자다**(2026-09-22 정정). 흰 면일 때는
+                         검정이었는데 면을 걷어 유리가 되면서 **뒤의 사진이
+                         비친다** — 판을 끌면 어두운 자리가 올라와서 검정으로
+                         두면 그때 묻힌다. 시작하기 알약과도 같은 색이 된다. */
+                      color: Colors.white.withValues(alpha: show),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ),
               ),
             ),
-            child: const Icon(
-              Symbols.keyboard_double_arrow_down,
-              size: _iconSize,
-              weight: 300,
-              color: AppTheme.seed,
-            ),
           ),
-          const SizedBox(width: _gap),
-          Text(
-            widget.label,
-            style: const TextStyle(
-              color: _kOnDark,
-              fontSize: 14,
-              letterSpacing: 0.2,
-            ),
-          ),
-          const SizedBox(width: _iconSize + _gap),
-        ],
+        ),
       ),
     );
   }
@@ -789,31 +2676,28 @@ class _RolePill extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
+      /* 🔴 **유리에서 실버 테두리로 바꿨다**(2026-09-21, 사용자 제안). 알약이
+         유리 판 **안에** 들어가면 「유리 안에 유리」가 되어 프레임째 사라진다.
+         가는 은빛 선 하나로 경계를 내면 그 문제가 없고, 뒤의 빛무리도 비친다. */
       child: SizedBox(
         height: 38,
-        child: GlassPanel(
+        child: SilverEdge(
           radius: 19,
+          strong: selected,
           child: Material(
             type: MaterialType.transparency,
             child: InkWell(
+              borderRadius: BorderRadius.circular(19),
               onTap: onTap,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(19),
-                  border: selected
-                      ? Border.all(color: _kOnDark, width: 1.5)
-                      : null,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                  child: Center(
-                    widthFactor: 1,
-                    child: Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: selected ? AppTheme.seed : _kOnDark,
-                      ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: Center(
+                  widthFactor: 1,
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: selected ? AppTheme.seed : _kOnDark,
                     ),
                   ),
                 ),
@@ -826,38 +2710,78 @@ class _RolePill extends StatelessWidget {
   }
 }
 
-/// AI 단추 — 웹과 같은 세리프 「AI」를 유리 알약에 얹었다.
+/// 「팀 매칭」 — 옛 AI 단추 자리(맨 위 오른쪽)에 선다.
 ///
-/// ⚠️ 아직 아무것도 안 연다. 웹은 추천 판 · 챗봇을 여는데, 🔴 **챗봇은 Gemini
-/// 키가 웹 서버에만 있어** 앱에서 부를 경로부터 정해야 한다(웹 `/api/chat` 을
-/// 부를지, 백엔드로 옮길지).
-class _AiButton extends StatelessWidget {
-  const _AiButton({required this.onTap});
+/// 🔴 **AI 단추를 걷고 그 자리를 넘겨받았다** (2026-09-25 사용자 요청:
+/// 「어차피 우리 AI 버튼 웹에서도 안쓰니까 ... 똑같은 크기와 위치에」).
+/// 전에는 판 머리의 크기 알약들 사이에 뒀는데 **있는 줄도 몰랐다.**
+///
+/// 🔴 **글자와 도는 테가 둘 다 로고 초록이다**(같은 요청). 다른 곳의 도는
+/// 빛은 실버·금빛이라 이것만 초록이면 「여기를 보라」가 분명해진다 —
+/// `silver_sweep_border.dart` 가 색으로 갈라 두라고 한 그대로다.
+///
+/// ⚠️ **자리가 덜 찼으면 흐리다.** 그래도 **숨기지는 않는다** — 안 보이면
+/// 그런 기능이 있다는 것조차 모른다(위 사용자 지적).
+class _TeamMatchButton extends StatelessWidget {
+  const _TeamMatchButton({required this.ready, required this.onTap});
 
+  final bool ready;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    /* 🔴 **글자가 알약을 넘지 않게 줄인다** (2026-09-25 실기기에서 좌우가
+       잘려 보였다). 54px 폭에 네 글자라 빠듯하다 — 알약을 넓히는 대신
+       글자를 줄인다(「AI 단추와 똑같은 크기」가 요청이었다). */
+    final label = Center(
+      child: Text(
+        '팀 매칭',
+        maxLines: 1,
+        softWrap: false,
+        style: TextStyle(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.2,
+          color: ready ? AppTheme.seed : AppTheme.seed.withValues(alpha: 0.42),
+        ),
+      ),
+    );
+
+    /* 🔴 **안을 채운다** (2026-09-25 사용자: 「팀 매칭 버튼 잘 안보인다.
+       안쪽 색상 그 팀장팀원 버튼처럼 색상 똑같은거 채워」). 테만 있으면
+       검은 바탕에 묻힌다 — 면은 `SilverEdge` 의 기본값과 **같은 값**이다
+       (팀장·팀원 알약이 쓰는 그것). 🔴 값을 베껴 적지 않는다. */
     return SizedBox(
       height: 38,
       width: 54,
-      child: GlassPanel(
-        radius: 19,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: SilverEdge.defaultFill,
+          borderRadius: BorderRadius.circular(19),
+        ),
         child: Material(
           type: MaterialType.transparency,
           child: InkWell(
-            key: const Key('home-ai'),
+            key: const Key('home-team-match'),
+            borderRadius: BorderRadius.circular(19),
             onTap: onTap,
-            child: const Center(
-              child: Text(
-                'AI',
-                style: TextStyle(
-                  fontFamily: 'YoungSerif',
-                  fontSize: 18,
-                  color: _kOnDark,
-                ),
-              ),
-            ),
+            child: ready
+                ? SilverSweepBorder(
+                    radius: 19,
+                    strokeWidth: 1.2,
+                    color: AppTheme.seed,
+                    baseColor: AppTheme.seed.withValues(alpha: 0.28),
+                    child: label,
+                  )
+                : DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(19),
+                      border: Border.all(
+                        color: AppTheme.seed.withValues(alpha: 0.24),
+                      ),
+                    ),
+                    child: label,
+                  ),
           ),
         ),
       ),
@@ -867,50 +2791,34 @@ class _AiButton extends StatelessWidget {
 
 /// 「팀원」을 골랐을 때 판 자리에 서는 것. 웹은 **사람을 구하는 팀 목록**
 /// (`TeamSeek`)이 스쿼드 판을 대신 선다 — 앱은 아직 자리만 잡아 둔다.
-class _MemberPlaceholder extends StatelessWidget {
-  const _MemberPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassPanel(
-      radius: _kCardRadius,
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.groups_outlined, size: 36, color: AppTheme.seed),
-            const SizedBox(height: 10),
-            const Text(
-              '사람을 구하는 팀',
-              style: TextStyle(color: _kOnDark, fontSize: 16),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              '준비 중',
-              style: TextStyle(
-                color: _kOnDark.withValues(alpha: 0.55),
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// 「영상 분석」 판. [flat] 이 0 이면 소개 영상이 도는 큰 판, 1 이면 하단 바 위의
+/// 「영상 분석」 판. [flat] 이 0 이면 사진이 깔린 큰 판, 1 이면 하단 바 위의
 /// 납작한 띠다(스쿼드 판을 펼친 정도 그대로).
 ///
-/// - 큰 판: 영상이 판을 채우며 **소리 없이 끝없이 되풀이**되고, 그 위에 웹과 같은
-///   아이콘(`camera_video`) · 「영상 분석」 · 긴 설명이 가운데 선다.
-/// - 띠: 영상 · 설명은 걷히고 아이콘 · 「영상 분석」 · 화살표만 한 줄로 남는다.
+/// - 큰 판: 사진이 판을 **통째로** 채우고 그 위에 웹과 같은 아이콘
+///   (`camera_video`) · 「영상 분석」 · 긴 설명이 가운데 선다.
+/// - 띠: 사진 · 설명은 걷히고 아이콘 · 「영상 분석」 · 화살표만 한 줄로 남는다.
 /// - 사이: 앞 절반 동안 큰 판의 글이 걷히고, 뒤 절반 동안 띠의 글이 들어온다 —
 ///   둘이 동시에 보이면 글이 겹쳐 지저분하다.
 ///
-/// 🔴 띠가 되면 **영상을 멈춘다** — 안 보이는 영상이 계속 돌면 배터리만 먹는다.
-/// ⚠️ 위젯 시험(`flutter test`)에서는 영상을 만들지 않는다 — 시험 환경에는 영상
-/// 재생기가 없어 초기화가 실패한다.
+/// 🔴 **소개 영상을 걷었다**(2026-09-22, 사용자 요청: 「아래 영상은 아예 빼고
+/// … 사진을 원래 영상이 있던 자리에」). 전에는 판을 위아래로 갈라 **위 절반은
+/// 글, 아래 절반은 되풀이되는 영상**이었다. 지금은 판 하나에 사진 한 장이다.
+///
+/// ⚠️ `assets/videos/analysis_showcase.mp4`(약 1MB)가 **이제 아무 데서도
+/// 안 쓰인다.** `pubspec.yaml` 이 `assets/videos/` 를 통째로 싣고 있어 앱에는
+/// 계속 들어간다 — 지울지는 따로 정한다.
+///
+/// 🔴 **누르는 자리가 둘로 갈린다**(2026-09-22 사용자 요청: 「영상분석
+/// 시작하기 버튼만 눌리게」).
+///
+/// | 상태 | 누르는 곳 |
+/// |---|---|
+/// | 큰 판 | 사진 한가운데의 **「영상 분석 시작하기」 알약 하나뿐** |
+/// | 납작한 띠 | 띠 **전체**(한 줄짜리 이동 줄이라 알약을 세울 자리가 없다) |
+///
+/// 🔴 **`home-video-analysis` 키는 판 바깥 테두리에 둔다.** 시험이 이 키로
+/// 판의 **크기·자리를 잰다**(`home_screen_test.dart`) — 누르는 위젯으로
+/// 옮기면 큰 판에서 알약 크기가 잡혀 그 시험이 엉뚱한 것을 재게 된다.
 class _VideoAnalysisPanel extends StatefulWidget {
   const _VideoAnalysisPanel({required this.flat, required this.onTap});
 
@@ -921,57 +2829,65 @@ class _VideoAnalysisPanel extends StatefulWidget {
   State<_VideoAnalysisPanel> createState() => _VideoAnalysisPanelState();
 }
 
-class _VideoAnalysisPanelState extends State<_VideoAnalysisPanel> {
-  static const String _asset = 'assets/videos/analysis_showcase.mp4';
+class _VideoAnalysisPanelState extends State<_VideoAnalysisPanel>
+    with SingleTickerProviderStateMixin {
+  /// 떠나면서 사진이 흐려지는 시간(2026-09-22 사용자 요청: 「누르면 FUTSAL
+  /// 사진만 블러처리로 흐려지면서 영상 분석 페이지로」).
+  ///
+  /// 🔴 **짧게 둔다.** 화면을 떠나기 전에 손을 붙잡는 연출이라, 길면 「눌렀는데
+  /// 안 간다」가 된다.
+  /// 떠나는 연출의 길이.
+  ///
+  /// 🔴 **잉크가 화면을 덮는 시간에 맞춘다**(2026-09-22 정정). 라우트 전환은
+  /// `_kHomeTransition` = 1800ms 짜리 `InkPeel` 이고 `coverUntil: 0.35` 라
+  /// **630ms 에 화면이 다 덮인다.** 그 안에 끝나야 「사진이 물러나는 것」과
+  /// 「잉크가 덮는 것」이 **한 동작**으로 읽힌다.
+  static const Duration _leaveMs = Duration(milliseconds: 620);
 
-  VideoPlayerController? _video;
-  bool _ready = false;
+  late final AnimationController _leave = AnimationController(
+    vsync: this,
+    duration: _leaveMs,
+  );
 
-  @override
-  void initState() {
-    super.initState();
-    if (Platform.environment.containsKey('FLUTTER_TEST')) return;
-    final video = VideoPlayerController.asset(
-      _asset,
-      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
-    );
-    _video = video;
-    video
-        .initialize()
-        .then((_) {
-          if (!mounted) return;
-          video
-            ..setLooping(true)
-            ..setVolume(0);
-          setState(() => _ready = true);
-          _syncPlayback();
-        })
-        .catchError((Object _) {
-          // 영상을 못 열어도 판은 글자와 어두운 면으로 그대로 선다.
-        });
-  }
-
-  @override
-  void didUpdateWidget(_VideoAnalysisPanel old) {
-    super.didUpdateWidget(old);
-    _syncPlayback();
-  }
-
-  void _syncPlayback() {
-    final video = _video;
-    if (video == null || !_ready) return;
-    final hidden = widget.flat >= 0.99;
-    if (hidden && video.value.isPlaying) {
-      video.pause();
-    } else if (!hidden && !video.value.isPlaying) {
-      video.play();
-    }
-  }
+  /// 멎는 쪽이 느린 곡선 — 처음엔 빠르게 풀리고 끝에서 잦아든다.
+  ///
+  /// 🔴 **선형으로 두지 말 것.** 흐림이 일정한 속도로 세지면 **기계가 값을
+  /// 올리는 것**처럼 보인다(앞 회차에 사용자가 「부자연스럽다」고 한 것의
+  /// 절반이 이것이다).
+  late final Animation<double> _leaveCurve = CurvedAnimation(
+    parent: _leave,
+    curve: Curves.easeOutCubic,
+  );
 
   @override
   void dispose() {
-    _video?.dispose();
+    _leave.dispose();
     super.dispose();
+  }
+
+  /// 🔴 **흐림과 화면 이동을 **동시에** 시작한다**(2026-09-22 정정, 사용자:
+  /// 「블러처리되는거 진짜 너무 부자연스럽고 이상해」).
+  ///
+  /// 전에는 `await _leave.forward()` 로 **흐림이 다 끝난 뒤에** 옮겨 갔다.
+  /// 그러면 260ms 짜리 흐림 한 동작이 끝나고 **그 다음에** 1800ms 짜리 잉크
+  /// 전환이 새로 시작해서, 서로 관계없는 동작 **둘**로 보였다 — 게다가 260ms
+  /// 안에 시그마를 0→14 로 밀어 올리니 **툭 튀었다.**
+  ///
+  /// 지금은 잉크가 덮는 동안 그 **아래에서** 사진이 물러난다. 보이는 것은
+  /// 「눌렀다 → 사진이 멀어지며 잉크가 덮는다」 하나다.
+  ///
+  /// 🔴 **두 번 눌리지 않게 막는다** — 떠나는 동안 또 누르면 화면이 두 장
+  /// 쌓인다(뒤로 가기가 두 번 필요해진다).
+  Future<void> _start() async {
+    if (_leave.isAnimating || _leave.isCompleted) return;
+    _leave.forward();
+    widget.onTap();
+    /* 🔴 **되돌려 놓는다.** 이 화면은 뒤로 왔을 때 **그대로 살아 있으므로**
+       (`push` 는 홈을 안 버린다) 흐림을 안 풀면 돌아왔을 때 사진이 흐린 채다.
+       🔴 **잉크가 다 덮은 뒤에**(630ms) 푼다 — 그 전에 풀면 사용자가 보는
+       앞에서 사진이 **도로 선명해졌다가** 덮인다. */
+    await Future<void>.delayed(const Duration(milliseconds: 900));
+    if (mounted) _leave.value = 0;
   }
 
   @override
@@ -979,76 +2895,73 @@ class _VideoAnalysisPanelState extends State<_VideoAnalysisPanel> {
     final t = widget.flat;
     final bigText = (1 - t * 2).clamp(0.0, 1.0);
     final flatText = ((t - 0.5) * 2).clamp(0.0, 1.0);
-    final videoOpacity = (1 - t * 1.4).clamp(0.0, 1.0);
     final radius = 28 - 10 * t;
-    final video = _video;
 
-    // 🔴 **가운데로 나눈다**(2026-09-15 사용자 요청) — 위 절반은 아이콘 · 글,
-    // 아래 절반에만 영상. 영상 위에 글을 얹으면 움직이는 화면 위라 글이 흔들려
-    // 읽혔다. 판이 납작해지는 동안 영상 칸은 아래 절반 그대로 같이 줄어든다.
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: Material(
-        color: _kSheetColor,
-        child: InkWell(
-          key: const Key('home-video-analysis'),
-          onTap: widget.onTap,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Column(
-                children: [
-                  // 위 절반 — 아이콘 · 「영상 분석」 · 설명. 걷힐 때 살짝 위로 뜬다.
-                  Expanded(
-                    child: IgnorePointer(
-                      child: Opacity(
-                        opacity: bigText,
-                        child: Transform.translate(
-                          offset: Offset(0, -12 * (1 - bigText)),
-                          child: const _VideoPanelCopy(),
-                        ),
-                      ),
-                    ),
-                  ),
-                  // 아래 절반 — 영상만. 판 폭을 채우고 넘치는 위아래는 자른다.
-                  Expanded(
-                    child: Opacity(
-                      opacity: videoOpacity,
-                      child: video != null && _ready
-                          // 🔴 판 **끝까지** 채운다(사용자 요청 — 잘려도 된다). `cover`
-                          // 에 3% 더 키워, 기기 디코더가 가장자리를 한 줄씩 비우는
-                          // 경우에도 판 끝에 검은 틈이 안 남게 한다.
-                          ? ClipRect(
-                              child: Transform.scale(
-                                scale: 1.03,
-                                child: SizedBox.expand(
-                                  child: FittedBox(
-                                    fit: BoxFit.cover,
-                                    child: SizedBox(
-                                      width: video.value.size.width,
-                                      height: video.value.size.height,
-                                      child: VideoPlayer(video),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            )
-                          : const SizedBox.expand(),
-                    ),
-                  ),
-                ],
-              ),
-              // 띠의 글 — 한 줄. 들어올 때 살짝 아래에서 올라온다.
-              IgnorePointer(
-                child: Opacity(
-                  opacity: flatText,
+    /* 🔴 **스쿼드 판과 같은 차림**(2026-09-21, 사용자 요청 「영상분석 쪽 판도
+       같이」) — 면 색은 거의 없고 **은빛 테두리**가 경계를 낸다. 면을 깔면
+       뒤의 빛무리가 여기서 끊겨 화면 아래쪽만 검게 죽는다.
+
+       🔴 **테 값을 갈았다**(2026-09-23 사용자 요청: 「외곽선에 제일 얇은
+       세련된 실버 색상」). 뒤에 흰 판이 깔리면서 옛 값
+       (`SilverEdge.silver` 알파 0.28 · 1px)이 **흰 바탕에 붙어 사라졌다** —
+       그 값은 검은 바탕용이다. 왜 이 색·이 굵기인지는 [_kSilverOnWhite]. */
+    return DecoratedBox(
+      key: const Key('home-video-analysis'),
+      /* 🔴 **자식 「앞」에 그린다**(2026-09-23). 기본값(뒤)으로 두면 아래
+         [ClipRRect] 가 **같은 모서리로 판을 꽉 채워 테를 통째로 덮는다** —
+         가장자리 픽셀을 재서 잡았다(`#fefefe`, 흰색과 1단 차이). 검은
+         바탕일 때는 사진이 어두워 테가 있는 것처럼 보였을 뿐이다.
+         🔴 **되돌리지 말 것** — 뒤로 옮기면 선이 조용히 사라진다. */
+      position: DecorationPosition.foreground,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(
+          color: _kSilverOnWhite,
+          width: _kSilverOnWhiteWidth,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: Material(
+          // 반투명이라 뒤의 빛무리가 비친다(위 `_kSheetColor` 주석).
+          color: _kSheetColor,
+          child: InkWell(
+            /* 🔴 **띠일 때만 판 전체가 눌린다** — 큰 판에서는 `null` 이라
+               아무 데나 눌러도 안 간다(위 표). `null` 이면 `InkWell` 이
+               손짓을 아예 안 받으므로 아래의 알약이 그대로 받는다. */
+            onTap: t > 0.5 ? widget.onTap : null,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                /* 사진 · 가운데 알약. 걷힐 때 살짝 위로 뜬다.
+                   🔴 **글과 같은 [Opacity] 안에 둔다.** 판이 납작한 띠가 될 때
+                   글만 걷히고 사진이 남으면, 띠 한 줄짜리 글 뒤에서 사진이
+                   **가로로 짓눌린 채** 비친다.
+
+                   🔴 **[IgnorePointer] 로 감싸지 않는다** — 안에 눌러야 하는
+                   알약이 들어 있다(전에는 글자뿐이라 감쌌다). */
+                Opacity(
+                  opacity: bigText,
                   child: Transform.translate(
-                    offset: Offset(0, 10 * (1 - flatText)),
-                    child: const _VideoFlatCopy(),
+                    offset: Offset(0, -12 * (1 - bigText)),
+                    child: _VideoPanelCover(
+                      leave: _leaveCurve,
+                      onStart: _start,
+                    ),
                   ),
                 ),
-              ),
-            ],
+                // 띠의 글 — 한 줄. 들어올 때 살짝 아래에서 올라온다.
+                IgnorePointer(
+                  child: Opacity(
+                    opacity: flatText,
+                    child: Transform.translate(
+                      offset: Offset(0, 10 * (1 - flatText)),
+                      child: const _VideoFlatCopy(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1056,74 +2969,263 @@ class _VideoAnalysisPanelState extends State<_VideoAnalysisPanel> {
   }
 }
 
-/// 큰 판의 글. 웹 목적지 카드(`www/src/lib/destinations.ts`)와 같은 아이콘이고,
-/// 설명은 앱에 맞춰 길게 풀었다.
+/// 큰 판을 채우는 사진과 그 위의 **「영상 분석 시작하기」 알약 하나**.
 ///
-/// 🔴 「AI 가 판정한다」고 쓰지 않는다 — 등급은 정해진 기준표로 결정론적 코드가
-/// 매기고, 모델은 자세를 재고 근거 문장을 쓴다(`agent/CLAUDE.md` 「무엇이 무엇을
-/// 정하는가」). 설명이 그 경계를 흐리면 제안서 · 발표와도 어긋난다.
-class _VideoPanelCopy extends StatelessWidget {
-  const _VideoPanelCopy();
+/// 🔴 **긴 설명을 걷었다**(2026-09-22 사용자 요청: 「사진 안에 긴 내용들 다
+/// 삭제」). 아이콘·제목·두 줄 설명이 사진 위에 얹혀 있었는데, 사진이 주인공이
+/// 되면서 글이 사진을 가렸다. 제목은 **걷혔고**(판이 무엇인지는
+/// 사진이 말한다), 여기 남는 것은 **누를 것 하나**뿐이다.
+class _VideoPanelCover extends StatelessWidget {
+  const _VideoPanelCover({required this.leave, required this.onStart});
+
+  /// 떠나는 흐림의 진행도(0~1).
+  final Animation<double> leave;
+  final VoidCallback onStart;
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, box) {
-        // 판이 좁아지는 도중(높이가 모자랄 때)에는 설명부터, 더 좁으면 아이콘도
-        // 뺀다 — 넘치면 줄이 깨진다. 위 절반만 쓰므로 판 전체의 절반 높이다.
-        final roomy = box.maxHeight >= 150;
-        final showIcon = box.maxHeight >= 70;
-        // 줄어드는 도중 몇 픽셀 모자라는 순간이 있다 — 넘치게 두지 않고 그만큼만
-        // 통째로 줄인다(`scaleDown` 은 자리가 넉넉하면 제 크기 그대로다).
-        return Center(
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: SizedBox(
-              width: box.maxWidth,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 22),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (showIcon) ...[
-                      const Icon(
-                        Symbols.camera_video,
-                        size: 36,
-                        weight: 250,
-                        color: _kOnDark,
-                      ),
-                      const SizedBox(height: 8),
-                    ],
-                    const Text(
-                      '영상 분석',
-                      style: TextStyle(
-                        color: _kOnDark,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    if (roomy) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        '경기 영상을 올리면 영상 속 내 움직임을 따라가며 자세를 재고,\n'
-                        '정해진 기준으로 실력을 판정해 근거와 함께 리포트로 보여 드려요.',
-                        textAlign: TextAlign.center,
-                        maxLines: 4,
-                        overflow: TextOverflow.fade,
-                        style: TextStyle(
-                          color: _kOnDark.withValues(alpha: 0.88),
-                          fontSize: 13.5,
-                          height: 1.45,
+    return ClipRect(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          /* 🔴 **사진만 흐려진다**(사용자 요청: 「그 FUTSAL 사진만 블러처리로
+             흐려지면서」). 그래서 흐림이 판 전체가 아니라 [Image] **한 장을**
+             감싼다 — 위의 알약은 또렷한 채로 남아 「내가 방금 누른 것」이
+             끝까지 보인다.
+
+             🔴 **`ImageFiltered` 를 쓴다(`BackdropFilter` 가 아니다).**
+             `BackdropFilter` 는 **뒤에 이미 그려진 것**을 흐리므로 판 뒤의
+             바탕까지 같이 먹는다. 여기서 흐릴 것은 이 한 장이다.
+
+             🔴 **시그마가 0 이면 감싸지 않는다** — `sigma: 0` 은 기기에 따라
+             그리지 않거나 경고를 낸다. 평소(안 떠날 때)가 그 상태다. */
+          AnimatedBuilder(
+            animation: leave,
+            builder: (context, child) {
+              final v = leave.value;
+              if (v < 0.001) return child!;
+              /* 🔴 **흐림 혼자 두지 않는다 — 살짝 밀어 넣는다**(2026-09-22
+                 정정). 제자리에서 흐리기만 하면 **초점이 나간 사진**이지
+                 움직임이 아니다. 아주 조금(4%) 키우면 「안으로 들어간다」로
+                 읽혀서, 다음 화면으로 가는 것과 뜻이 맞는다.
+
+                 ⚠️ 배율을 더 키우지 말 것 — 판이 작아서 6% 만 넘어가도
+                 「사진이 튀어나온다」가 된다. */
+              return Transform.scale(
+                scale: 1 + 0.04 * v,
+                child: ImageFiltered(
+                  /* 🔴 **`TileMode.clamp` 이다 — `decal` 이 아니다**(정정).
+                     `decal` 은 그림 **바깥을 투명으로** 보고 섞어서, 흐려질수록
+                     네 변이 **투명하게 녹아** 판의 검은 면이 비쳤다. 사진이
+                     흐려지는 게 아니라 **가장자리부터 사라지는** 것처럼 보인
+                     것이 그 때문이다. `clamp` 는 가장자리 색을 늘려 잡으므로
+                     변이 끝까지 제 색이다. */
+                  imageFilter: ui.ImageFilter.blur(
+                    sigmaX: 9 * v,
+                    sigmaY: 9 * v,
+                    tileMode: TileMode.clamp,
+                  ),
+                  child: child,
+                ),
+              );
+            },
+            /* 🔴 **`cover` + 가운데 정렬**(2026-09-22 정정 — 사진이 바뀌면서
+               정렬도 같이 바뀌었다).
+
+               옛 사진(FUTSAL)은 **제목이 맨 위**에 있어 가운데로 두면 글자가
+               한가운데서 잘렸고, 그래서 **위쪽 정렬**이었다. 지금 사진
+               (`VIDEO AGENT`)은 제목도 선수도 **세로 한가운데**에 있어 위쪽을
+               맞추면 오히려 **발과 신발이 잘린다.**
+               🔴 **사진을 바꾸면 정렬도 다시 본다** — 정렬은 사진의 성질이지
+               이 판의 성질이 아니다.
+
+               ⚠️ 판의 비율은 손가락을 따라 **계속 변한다**(스쿼드 판을
+               펼칠수록 납작해진다). 그래서 어느 한 비율에 맞춘 고정 크롭을
+               원본에 구워 넣지 않았다 — `cover` 가 그때그때 맞춘다. */
+            child: Image.asset(
+              'assets/images/analysis_cover.jpg',
+              fit: BoxFit.cover,
+              alignment: Alignment.center,
+            ),
+          ),
+          /* ⛔ **어둡게 까는 겹을 두지 않는다**(2026-09-22, 사용자 요청:
+             「글자 뒤에 있는 검정 그라데이션 빼」). 한 번 넣었다가 뺀 것이다 —
+             사진이 주인공이고, 눌러 놓으면 「FUTSAL」과 선수가 죽는다.
+
+             ⚠️ 흰 글자가 사진에 묻히는 문제는 이제 **알약이 대신 푼다** —
+             흰 면에 검은 글자라 사진이 밝든 어둡든 똑같이 읽힌다. 막을
+             다시 깔지 말 것. */
+          /* 🔴 **알약도 같이 물러난다.** 사진만 멀어지고 알약이 제자리에
+             또렷하면 **알약만 화면에 붙어 있는 것**처럼 보여 층이 갈라진다.
+             사진보다 **빨리** 걷혀서(×1.6) 마지막엔 사진만 남는다. */
+          /* 🔴 **사진 한가운데다 (2026-09-23 사용자 요청: 「사진의 가운데에
+             두고」).**
+
+             ⚠️ **오른쪽 아래 구석이었다** — 2026-09-22 에 사용자가 그리로
+             빼라고 한 자리다. 까닭은 「사진이 `VIDEO AGENT` 로 바뀌면서
+             제목 글자 위에 얹혔다」였고, 가운데로 돌아온 지금 **그 겹침은
+             다시 난다.** 사용자에게 알리고 진행한 것이니, 겹쳐 보인다는
+             지적이 오면 이 자리부터 본다. */
+          Align(
+            alignment: Alignment.center,
+            child: Padding(
+              padding: const EdgeInsets.all(_kPillInset),
+              child: AnimatedBuilder(
+                animation: leave,
+                builder: (context, child) => Opacity(
+                  opacity: (1 - leave.value * 1.6).clamp(0.0, 1.0),
+                  child: child,
+                ),
+                child: _StartAnalysisPill(onTap: onStart),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 워드마크의 **반쪽** — `SUPER` 와 `SUB` 가 같은 차림을 나눠 쓴다.
+///
+/// 🔴 **둘을 한 [Text] 로 합치지 않는다.** 판을 내릴 때 **서로 반대쪽으로**
+/// 나가야 해서 각자 움직일 수 있어야 한다.
+///
+/// ⚠️ **`letterSpacing` 덕분에 갈라도 글자 사이가 안 벌어진다** —
+/// `letterSpacing` 은 글자마다 **뒤에** 붙으므로 `SUPER` 의 `R` 뒤에도 같은
+/// 간격이 이미 있다. 그래서 붙여 놓으면 `SUPERSUB` 한 낱말과 **같은 폭**이다.
+/* 🔴 **알약 재질 값(`kSunShadow` · `sunShadow()` · `kPillBlur`)을
+   `core/widgets/glass_pill.dart` 로 옮겼다**(2026-09-22). 프로필의 「내
+   분석/업로드 영상」 알약이 **같은 재질**이어야 해서다 — 값을 양쪽에 적어
+   두면 한쪽만 고쳤을 때 말없이 갈린다. */
+
+/// 사진 오른쪽 아래의 **유일한 단추** — 아이콘 + 「영상 분석 시작하기」.
+///
+/// 🔴 **면이 없다 — 유리와 도는 실버 선뿐이다**(2026-09-22 사용자 요청:
+/// 「외곽선만 진짜 얇은 세련된 실버 색상 돌아가게, 안쪽은 그냥 글래스로
+/// 블러만 살짝」). 흰색 → 스카이블루로 갔다가 **면 자체를 걷었다.**
+///
+/// 🔴 **[SilverSweepBorder] 를 프로필의 「내 영상」 판과 나눠 쓴다.** 서로
+/// 다른 화면이라 같이 보이는 일이 없다 — 그쪽 머리말의 「한 화면에 하나」가
+/// 지켜진다.
+///
+/// 🔴 **누르면 촉감 + 살짝 커졌다 돌아온다**(사용자 요청). 흔한 「눌리면
+/// 작아진다」의 **반대**이니 되돌리지 말 것.
+class _StartAnalysisPill extends StatefulWidget {
+  const _StartAnalysisPill({required this.onTap});
+
+  final VoidCallback onTap;
+
+  /// 알약의 모서리 — 공용 [kPillRadius] 다. [SilverSweepBorder] 에도 **같은
+  /// 값**을 줘야 도는 선이 면의 모서리를 벗어나지 않는다.
+  static const double radius = kPillRadius;
+
+  @override
+  State<_StartAnalysisPill> createState() => _StartAnalysisPillState();
+}
+
+class _StartAnalysisPillState extends State<_StartAnalysisPill>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _press = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 110),
+    reverseDuration: const Duration(milliseconds: 220),
+  );
+
+  @override
+  void dispose() {
+    _press.dispose();
+    super.dispose();
+  }
+
+  void _down() {
+    /* 🔴 **손끝 촉감은 누르는 순간**에 준다 — 떼는 순간에 주면 **이미 일어난
+       일에 대한 알림**이 되어 반 박자 늦게 느껴진다. */
+    HapticFeedback.lightImpact();
+    _press.forward();
+  }
+
+  void _up() => _press.reverse();
+
+  @override
+  Widget build(BuildContext context) {
+    const r = Radius.circular(_StartAnalysisPill.radius);
+    return AnimatedBuilder(
+      animation: _press,
+      builder: (context, child) => Transform.scale(
+        // 커지는 폭은 **아주 작다** — 크면 알약이 튀어나와 장난스러워진다.
+        scale: 1 + 0.06 * Curves.easeOut.transform(_press.value),
+        child: child,
+      ),
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          borderRadius: BorderRadius.all(r),
+          boxShadow: kSunShadow,
+        ),
+        child: ClipRRect(
+          borderRadius: const BorderRadius.all(r),
+          /* 🔴 **뒤를 흐린다 — 면을 깔지 않는다.** 사진이 그대로 비치되
+             흐려져서 글자가 읽힌다.
+
+             ⚠️ **흐림은 굴러가는 목록 위에서 쓰지 말 것.** 프로필 판이
+             그것 때문에 **흰 직선**이 나왔다(`profile_screen.dart` 의
+             `_Block`) — 흐림은 가장자리에서 퍼 올 것이 없어 가장자리 값을
+             늘려 쓰는데, 뒤가 구르면 그 띠가 매 프레임 달라진다.
+             여기 뒤는 **움직이지 않는 사진**이라 괜찮다. */
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: kPillBlur, sigmaY: kPillBlur),
+            child: SilverSweepBorder(
+              radius: _StartAnalysisPill.radius,
+              child: Material(
+                // 유리에 아주 옅은 흰 기 — 0 으로 두면 흐림만 남아 밋밋하다.
+                color: Colors.white.withValues(alpha: 0.16),
+                child: InkWell(
+                  key: const Key('home-video-start'),
+                  onTap: widget.onTap,
+                  onTapDown: (_) => _down(),
+                  onTapUp: (_) => _up(),
+                  /* 🔴 **취소도 받는다** — 누른 채 손가락을 끌어 벗어나면
+                     `onTapUp` 이 안 온다. 안 받으면 알약이 **커진 채로
+                     굳는다.** */
+                  onTapCancel: _up,
+                  child: const Padding(
+                    /* 위아래를 살짝 넓혔다(9 → 12, 2026-09-22 사용자 요청).
+                       ⚠️ **한 번 더 키웠다**(2026-09-23: 「살짝만 좀 더 크기
+                       키우자」) — 안여백 16/12 → **20/15**, 글자 14 → 15,
+                       아이콘 18 → 20. 🔴 **넷을 같이 올린다** — 하나만 키우면
+                       알약이 길쭉해지거나 글자만 떠 보인다. */
+                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Symbols.camera_video,
+                          size: 20,
+                          weight: 500,
+                          color: Colors.white,
                         ),
-                      ),
-                    ],
-                  ],
+                        SizedBox(width: 8),
+                        Text(
+                          '영상 분석 시작하기',
+                          style: TextStyle(
+                            /* 🔴 **흰 글자다.** 면을 걷어 유리가 되면서
+                               뒤의 사진이 비친다 — 검은 글자는 사진의 어두운
+                               자리(선수 · 신발)에서 묻힌다. */
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
@@ -1168,9 +3270,11 @@ class _VideoFlatCopy extends StatelessWidget {
 /// 오른쪽 위 「내 프로필」 단추 — 작은 선수 카드 + 글자. 웹 헤더 오른쪽의
 /// 짜임(`SiteHeader` 의 카드 + 「내 프로필」)과 같다.
 class _ProfileButton extends StatelessWidget {
-  const _ProfileButton({required this.seed, required this.onTap});
+  const _ProfileButton({required this.card, required this.onTap});
 
-  final String seed;
+  /// 🔴 **`null` 이면 아직 카드를 안 만든 것**이라 빈 카드를 그린다
+  /// (웹도 헤더·프로필 모두 빈 카드로 둔다).
+  final PlayerCard? card;
   final VoidCallback onTap;
 
   @override
@@ -1190,11 +3294,33 @@ class _ProfileButton extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                PlayerCardView(width: _kProfileCardWidth, seed: seed),
-                const SizedBox(height: 4),
+                if (card == null)
+                  const BlankPlayerCardView(width: _kProfileCardWidth)
+                else
+                  PlayerCardView(
+                    width: _kProfileCardWidth,
+                    seed: card!.publicSlug,
+                    alias: aliasOf(card!),
+                    style: card!.style,
+                    photoUrl: card!.photoUrl,
+                  ),
+                const SizedBox(height: 5),
                 const Text(
                   '내 프로필',
-                  style: TextStyle(color: _kOnDark, fontSize: 11),
+                  /* 🔴 **흰색으로 되돌리고 작게 줄였다**(2026-09-22 정정,
+                     사용자 요청: 「내 프로필 색상 흰색으로 바꾸고 글자 크기
+                     좀 더 줄이자」). 18 → 14.
+
+                     ⚠️ 바로 앞 회차에 **검정으로 바꿨던 것을 되돌린 것**이다.
+                     바탕([ScreenTint])이 흰색이 되면서 흰 글자가 사라질까
+                     봐 검정으로 돌렸는데, 실기기에서는 이 자리가 **색이 번져
+                     든 쪽**이라 흰 글자가 읽힌다고 사용자가 판단했다.
+
+                     🔴 **카드 폭과 배수를 맞추던 규칙은 여기서 끝난다** —
+                     이제 글자는 **읽히는 크기**로, 카드는 **보이는 크기**로
+                     따로 정한다. */
+                  // 🔴 판 색을 따라간다 — [_kOnPanel] 머리말 참고.
+                  style: TextStyle(color: _kOnPanel, fontSize: 14),
                 ),
               ],
             ),
