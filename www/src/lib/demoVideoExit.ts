@@ -17,7 +17,7 @@ export type DemoExitDetail = { done: () => void }
  * 붙은 단추가 가장 가까운 가장자리로 빠져나간 뒤에 풀린다 — 그다음 홈으로 가면
  * 영상이 같은 가장자리에서 들어와 로그인 화면에서의 자리·크기 그대로 앉는다.
  *
- * 로그인 길(이메일·원티드 테스트용·구글)마다 `router.push('/home')` 앞에 둔다.
+ * 로그인 길(이메일·심사위원용·구글)마다 `router.push('/home')` 앞에 둔다.
  */
 export function leaveDemoVideo(): Promise<void> {
   if (typeof window === 'undefined') return Promise.resolve()
