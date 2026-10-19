@@ -151,7 +151,7 @@ export default function LoginPage() {
             // (사용자 요청). 바닥 줄의 gap-3(12px) + mt-5(20px).
             className="mt-5 w-full"
           >
-            원티드 테스트용 로그인{seat ? ` (${seat}번)` : ''}
+            심사위원용 로그인{seat ? ` (${seat}번)` : ''}
           </PillButton>
           {/* 🔴 **번호를 직접 고른다**(사용자 요청, 2026-09-18). 전에는
               「바꾸기」가 **무작위로 다른 번호**를 집어서, 원하는 자리를
@@ -163,7 +163,7 @@ export default function LoginPage() {
               한쪽이 옮긴다. */}
           <div className="text-xs" style={{ color: MUTED }}>
             <SeatPicker
-              label="테스트 번호"
+              label="심사위원 번호"
               seat={seat}
               seats={judgeSeats()}
               onPick={(n) => {
