@@ -50,7 +50,30 @@ abstract class AuthRepository {
   ///
   /// 호출부는 자기가 보낸 값이 아니라 돌려받은 값을 쓴다 — id·생성 시각 같은
   /// 서버 소유 필드가 응답에만 있기 때문이다(스펙 4.1 규칙 3).
-  Future<AppUser> updateProfile({required String nickname});
+  /// 프로필을 고치고 **서버가 확정한 사용자**를 돌려준다(`PATCH /me`).
+  ///
+  /// 🔴 **보낸 칸만 바뀐다** — 둘 다 선택이고, 안 보내면 그대로다.
+  /// 닉네임이 겹치면 409 `NICKNAME_ALREADY_EXISTS` 다.
+  Future<AppUser> updateProfile({String? nickname, bool? nicknameSearchable});
+
+  /// **탈퇴한다** — 계정과 파생 데이터가 함께 지워진다(`DELETE /me`, SEC-006).
+  /// 되돌릴 수 없다.
+  ///
+  /// 🔴 **[password] 는 선택이다.** 구글로만 가입한 계정에는 확인할 비밀번호가
+  /// **없어서**, 요구하면 그 사람은 탈퇴할 방법이 사라진다(계약 2장).
+  /// 그래서 **빈 값이면 아예 안 보낸다** — 빈 문자열을 보내면 서버가 그것을
+  /// 「틀린 비밀번호」로 읽는다.
+  ///
+  /// 🔴 **끝나면 토큰을 지운다** — 안 지우면 다음에 켤 때 **없는 계정의
+  /// 토큰으로** 되돌아가 401 만 돈다.
+  Future<void> deleteAccount({String? password});
+
+  /// **나를 다시 읽는다**(`GET /me`).
+  ///
+  /// 🔴 [restoreSession] 과 다르다 — 그쪽은 **캐시된 것을 그대로** 돌려준다
+  /// (앱을 켤 때 한 번 쓰는 길이다). 팀을 만들거나 나간 뒤처럼 `teams[]` 가
+  /// 바뀌었을 때는 **서버에 다시 물어야** 프로필의 「소속」이 따라온다.
+  Future<AppUser> refreshMe();
 
   Future<Session?> restoreSession();
 }

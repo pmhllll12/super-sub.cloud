@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -22,29 +21,16 @@ Future<void> main() async {
   unawaited(InkBleedShader.load());
   unawaited(GlassShader.load());
 
-  await _hideNavigationBar();
-  runApp(const ProviderScope(child: SuperSubApp()));
-}
+  /* 🔴 **시스템 바는 Dart 가 안 건드린다**(2026-09-22 정정).
+     `SystemChrome.setEnabledSystemUIMode` 로는 「하단만 감추되, 쓸어 올리면
+     **겹쳐서** 잠깐 나왔다 저절로 사라진다」가 안 나온다:
 
-/// 기기의 하단 내비게이션 바를 감춘다. 상태 바(시계·배터리)는 남긴다.
-///
-/// 인트로의 잉크도, 로그인의 사진도 화면 끝까지 간다. 그 아래에 시스템 바가
-/// 띠로 남아 있으면 화면이 잘려 보인다.
-///
-/// **감추기만 하면 한 번 올린 뒤 계속 떠 있다.** 사용자가 아래에서 쓸어
-/// 올리면 안드로이드가 바를 되돌려 놓고 그대로 두기 때문이다. 그래서 그
-/// 변화를 듣고 잠시 뒤 다시 감춘다.
-Future<void> _hideNavigationBar() async {
-  await SystemChrome.setEnabledSystemUIMode(
-    SystemUiMode.manual,
-    overlays: [SystemUiOverlay.top],
-  );
-  SystemChrome.setSystemUIChangeCallback((visible) async {
-    if (!visible) return;
-    await Future<void>.delayed(const Duration(seconds: 3));
-    await SystemChrome.setEnabledSystemUIMode(
-      SystemUiMode.manual,
-      overlays: [SystemUiOverlay.top],
-    );
-  });
+       · `manual` + `overlays: [top]` — 하단만 감추지만 바가 **자리를
+         차지해서** 화면 아래가 밀린다(사용자가 실기기에서 잡았다)
+       · `immersiveSticky` — 겹치고 저절로 사라지지만 **상태 바까지** 감춘다
+
+     그래서 `MainActivity.kt` 가 안드로이드 쪽에서 직접 잡는다
+     (`BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`). 여기서 또 부르면 그것을
+     덮어써서 도로 원래 문제로 돌아간다. */
+  runApp(const ProviderScope(child: SuperSubApp()));
 }

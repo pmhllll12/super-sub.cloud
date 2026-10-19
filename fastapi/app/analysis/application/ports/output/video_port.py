@@ -21,6 +21,25 @@ from app.analysis.domain.entities.video_entity import (
 
 
 class VideoPort(ABC):
+    def release(self) -> None:
+        """**이 요청에서 DB 를 더 안 쓴다**고 알린다 — 기본은 아무것도 안 한다.
+
+        🔴 **왜 포트에 있나** (2026-09-25, `paik`). 요청당 세션 하나(`get_session`)
+        라서, 요청이 살아 있는 동안 커넥션 하나가 계속 잡혀 있다. 그런데
+        포스터 뜨기는 **ffmpeg 이 최대 20초**(`poster_ffmpeg.TIMEOUT_SECONDS`)
+        를 쓰고, 그동안 그 커넥션이 **아무 일도 안 하면서 묶여 있다.**
+
+        홈이 카드 다섯 장을 한 번에 부르고 웹·앱이 겹치면 풀(`pool_size +
+        max_overflow`)이 금세 빈다. 그러면 **상관없는 요청들이** 커넥션을
+        기다리다 `pool_timeout` 만큼 멈춘다 — 앱 홈에서 영상 줄이 통째로 안
+        나오던 그것이고, 실측으로 `GET /videos/public` 이 정확히 30.00초
+        무응답이었다(그때 기본값이 30초였다).
+
+        🔴 **부른 뒤에는 그 요청에서 DB 를 다시 쓰지 않는다.** 쓰면 세션이
+        커넥션을 새로 꺼내므로 틀린 값이 나오지는 않지만, 이 호출의 뜻이
+        없어진다.
+        """
+
     @abstractmethod
     def sport_exists(self, sport_code: str) -> bool: ...
 
@@ -58,6 +77,28 @@ class VideoPort(ABC):
 
         검사 결과와 **가장 최근** 분석 작업의 상태를 함께 채운다 — `/videos`
         화면 한 줄이 그 셋을 같이 보여주기 때문이다.
+        """
+
+    @abstractmethod
+    def count_kept_by_user(self, user_id: UUID, *, analyzed: bool) -> int:
+        """그 사람의 **저장된**(`kept=true`) 영상 수 — 개수 상한
+        (`MAX_VIDEOS_PER_GROUP`) 판정에 쓴다.
+
+        🔴 **갈래마다 따로 센다.** `analyzed=True` 면 분석 작업이 걸린 클립만,
+        `False` 면 안 걸린 것만(기록용 업로드·반려·중복 재사용). **가르는
+        기준은 화면과 같은 `analysis_job` 행의 유무**다 — `www` 의 「내 영상」이
+        `analysis_job_id` 로 두 탭을 가르므로, 여기서 다르게 세면 사용자가 보는
+        숫자와 서버가 막는 숫자가 어긋난다.
+
+        🔴 `list_by_user` 와 **같은 집합을 센다**(반려된 클립도 `kept=true` 라
+        한 자리를 차지한다 — 업로드 갈래에서). 목록을 세지 않고 따로 두는
+        이유는 상한 판정이 업로드 URL 발급처럼 **목록이 필요 없는 자리**에서도
+        일어나서다 — 행을 다 읽어 오는 대신 개수만 묻는다.
+
+        🔴 **임시(`kept=false`) 클립은 안 센다.** 분석 중이라 화면에도 안
+        보이고, 화면을 벗어나면 지워지거나 `provisional_video_ttl_hours`
+        스윕이 걷어 간다 — 세면 브라우저가 죽은 사람이 최대 하루 동안
+        자리를 잃는다.
         """
 
     @abstractmethod

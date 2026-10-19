@@ -80,7 +80,47 @@ class MockAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<AppUser> updateProfile({required String nickname}) async {
+  Future<AppUser> refreshMe() async {
+    await Future<void>.delayed(_delay);
+    final session = _current;
+    if (session == null) {
+      throw const AuthException('로그인이 필요합니다');
+    }
+    /* 🔴 **소속을 다시 엮는다.** `AppUser.teams` 는 `teamMembers` 에서
+       만들어지는 파생값이라, 팀을 만든 뒤 다시 안 엮으면 **방금 만든 팀이
+       프로필에 안 뜬다.** */
+    _db.attachTeams();
+    final user = _db.findUserById(session.user.id);
+    if (user == null) {
+      throw const AuthException('존재하지 않는 사용자입니다');
+    }
+    _current = Session(user: user);
+    return user;
+  }
+
+  @override
+  Future<void> deleteAccount({String? password}) async {
+    await Future<void>.delayed(_delay);
+    final session = _current;
+    if (session == null) {
+      throw const AuthException('로그인이 필요합니다');
+    }
+    /* 🔴 **계정과 파생 데이터가 함께 사라진다**(SEC-006). Mock 이 사용자만
+       지우고 카드·영상을 남기면, 탈퇴 뒤 화면이 「없는 사람의 카드」를 그리는
+       상태를 앱에서 밟을 수가 없다. */
+    final id = session.user.id;
+    _db.users.removeWhere((u) => u.id == id);
+    _db.cards.removeWhere((c) => c.id == 'pc-$id');
+    _db.videos.removeWhere((row) => row.userId == id);
+    _db.teamMembers.removeWhere((m) => m.userId == id);
+    _current = null;
+  }
+
+  @override
+  Future<AppUser> updateProfile({
+    String? nickname,
+    bool? nicknameSearchable,
+  }) async {
     await Future<void>.delayed(_delay);
     final session = _current;
     if (session == null) {
@@ -90,9 +130,22 @@ class MockAuthRepository implements AuthRepository {
     if (index < 0) {
       throw const AuthException('존재하지 않는 사용자입니다');
     }
+    /* 🔴 **겹치는 닉네임은 거절한다** — 서버가 409 NICKNAME_ALREADY_EXISTS
+       를 낸다(유일 제약). Mock 이 받아 주면 그 화면을 안 만들게 된다. */
+    if (nickname != null &&
+        _db.users.any((u) => u.id != session.user.id && u.nickname == nickname)) {
+      throw const AuthException(
+        '이미 쓰는 닉네임입니다',
+        code: 'NICKNAME_ALREADY_EXISTS',
+      );
+    }
     // 저장소에 실제로 써넣는다. 세션 상태만 바꾸면 로그아웃 후 다시
     // 로그인했을 때 이전 닉네임이 돌아온다.
-    final updated = _db.users[index].copyWith(nickname: nickname);
+    // 🔴 보낸 칸만 바뀐다 — copyWith 가 null 을 「안 바꿈」으로 다룬다.
+    final updated = _db.users[index].copyWith(
+      nickname: nickname,
+      isNicknameSearchable: nicknameSearchable,
+    );
     _db.users[index] = updated;
     _current = Session(user: updated);
     return updated;

@@ -1,0 +1,26 @@
+// 다크 색 구성 — 테마(just-the-docs 0.12.0)의 _sass/color_schemes/dark.scss 를 덮어쓴다(2026-09-29).
+// 사이트의 _sass 가 테마의 _sass 보다 먼저 검색되므로, 같은 이름의 이 파일이 다크 CSS 에 쓰인다.
+// 라이트(just-the-docs-default·light)에는 영향이 없다.
+//
+// 바꾼 것 — 사용자 요청 「다크 모드를 조금 더 짙은 검은색으로」: 바탕·사이드바를 테마의 #27262b(보라빛 도는
+// 짙은 회색)에서 무채색 #19191c 로(밝기 절반), 그 위의 면·테두리도 같은 무채색 한 벌로. 나머지 줄은 테마 원본
+// 그대로다 — 🔴 테마를 올리면 원본과 대조해 이 파일을 다시 맞춘다(원본에 새 변수가 생겼을 수 있다).
+// 우리 CSS(assets/main.scss 의 html[data-theme="dark"] 절)에 이 값들에 맞춘 색이 있다 — 바꾸면 거기도 함께.
+$color-scheme: dark;
+$body-background-color: #19191c;   // 테마: $grey-dk-300 (#27262b)
+$body-heading-color: $grey-lt-000;
+$body-text-color: $grey-lt-300;
+$link-color: lighten($blue-000, 10%);
+$nav-child-link-color: $grey-dk-000;
+$sidebar-color: #19191c;           // 테마: $grey-dk-300
+$base-button-color: #242428;       // 테마: $grey-dk-250 (#302d36)
+$btn-primary-color: $blue-200;
+$code-background-color: #0d1117; // github-dark bg color
+$code-linenumber-color: #e6edf3; // github-dark line number color
+$feedback-color: darken($sidebar-color, 3%);
+$table-background-color: #242428;  // 테마: $grey-dk-250
+$search-background-color: #242428; // 테마: $grey-dk-250
+$search-result-preview-color: $grey-lt-300;
+$border-color: #37373d;            // 테마: $grey-dk-200 (#44434d)
+
+@import "./vendor/accessible-pygments/github-dark";

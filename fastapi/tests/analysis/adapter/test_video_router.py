@@ -22,7 +22,11 @@ from app.analysis.adapter.outbound.stub.video_stub_repository import (
     reset_videos,
 )
 from app.analysis.domain.entities.video_entity import VideoEntity
-from app.analysis.domain.rules.video_rules import MAX_BYTES, MAX_DURATION_MS
+from app.analysis.domain.rules.video_rules import (
+    MAX_BYTES,
+    MAX_DURATION_MS,
+    MAX_VIDEOS_PER_GROUP,
+)
 from app.core.security import issue_access_token
 from tests.conftest import V1, error_code
 
@@ -1083,3 +1087,306 @@ class TestKeepVideo:
         )
         assert res.status_code == 404
         assert error_code(res) == "VIDEO_NOT_FOUND"
+
+
+class TestVideoLimit:
+    """**갈래마다** 저장된(`kept=true`) 영상 개수 상한 — 2026-09-22, 사용자 요청.
+
+    갈래는 화면의 두 탭과 같다 — 분석 영상(`analysis_job_id` 있음) / 업로드
+    영상(없음). **합쳐서 3개가 아니라 3+3 이다.** 그 경계를 여기서 고정한다.
+    """
+
+    def _fill_uploaded(self, client, user_id, *, n=1):
+        """업로드 갈래를 채운다. `analyze=False` 는 작업이 안 생겨 **등록하는
+        순간 `kept=true`** 이고 `analysis_job_id` 가 없다.
+        """
+        ids = []
+        for _ in range(n):
+            key = _issue(client, user_id)
+            put_object(key, SIZE_OK)
+            res = _register(client, user_id, key, analyze=False)
+            assert res.status_code == 201, res.text
+            assert res.json()["kept"] is True
+            assert res.json()["analysis_job_id"] is None
+            ids.append(res.json()["id"])
+        return ids
+
+    def _fill_analyzed(self, client, user_id, *, n=1):
+        """분석 갈래를 채운다. 등록만으로는 `kept=false` 라 `keep` 까지 부른다."""
+        ids = []
+        for _ in range(n):
+            key = _issue(client, user_id)
+            put_object(key, SIZE_OK)
+            res = _register(client, user_id, key)
+            assert res.status_code == 201, res.text
+            assert res.json()["analysis_job_id"] is not None
+            video_id = res.json()["id"]
+            kept = client.post(
+                f"{V1}/videos/{video_id}/keep", headers=_headers(user_id)
+            )
+            assert kept.status_code == 200, kept.text
+            ids.append(video_id)
+        return ids
+
+    def _upload_url(self, client, user_id, **kw):
+        body = {
+            "content_type": "video/mp4",
+            "size_bytes": SIZE_OK,
+            "filename": "c.mp4",
+        }
+        body.update(kw)
+        return client.post(
+            f"{V1}/videos/upload-url", json=body, headers=_headers(user_id)
+        )
+
+    # --- 갈래가 서로를 안 막는다 (이 항목의 핵심) ---
+
+    def test_분석_갈래가_차도_업로드는_된다(self, client):
+        user_id = uuid4()
+        self._fill_analyzed(client, user_id, n=MAX_VIDEOS_PER_GROUP)
+        assert len(self._fill_uploaded(client, user_id, n=1)) == 1
+
+    def test_업로드_갈래가_차도_분석은_된다(self, client):
+        user_id = uuid4()
+        self._fill_uploaded(client, user_id, n=MAX_VIDEOS_PER_GROUP)
+        assert len(self._fill_analyzed(client, user_id, n=1)) == 1
+
+    def test_한_계정이_갈래마다_상한까지_가질_수_있다(self, client):
+        """합치면 3 + 3 = 6 이다."""
+        user_id = uuid4()
+        self._fill_analyzed(client, user_id, n=MAX_VIDEOS_PER_GROUP)
+        self._fill_uploaded(client, user_id, n=MAX_VIDEOS_PER_GROUP)
+        mine = client.get(f"{V1}/videos", headers=_headers(user_id)).json()
+        assert len(mine) == MAX_VIDEOS_PER_GROUP * 2
+        analyzed = [v for v in mine if v["analysis_job_id"] is not None]
+        assert len(analyzed) == MAX_VIDEOS_PER_GROUP
+
+    # --- 갈래마다 실제로 막힌다 ---
+
+    def test_업로드_갈래가_차면_등록이_막힌다(self, client):
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+        self._fill_uploaded(client, user_id, n=MAX_VIDEOS_PER_GROUP)
+
+        res = _register(client, user_id, key, analyze=False)
+        assert res.status_code == 422
+        assert error_code(res) == "VIDEO_LIMIT_EXCEEDED"
+        assert "업로드 영상" in res.json()["error"]["message"]
+
+    def test_분석_갈래가_차면_등록이_막힌다(self, client):
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+        self._fill_analyzed(client, user_id, n=MAX_VIDEOS_PER_GROUP)
+
+        res = _register(client, user_id, key)
+        assert res.status_code == 422
+        assert error_code(res) == "VIDEO_LIMIT_EXCEEDED"
+        assert "분석 영상" in res.json()["error"]["message"]
+
+    def test_반려된_클립은_업로드_갈래를_차지한다(self, client):
+        """반려는 분석 작업이 안 생기므로 업로드 탭에 선다(화면과 같은 기준)."""
+        user_id = uuid4()
+        for _ in range(MAX_VIDEOS_PER_GROUP):
+            key = _issue(client, user_id)
+            put_object(key, SIZE_OK)
+            res = _register(client, user_id, key, duration_ms=MAX_DURATION_MS + 1)
+            assert res.status_code == 201
+            assert res.json()["passed"] is False
+            assert res.json()["analysis_job_id"] is None
+
+        # 업로드 갈래는 찼고 —
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+        blocked = _register(client, user_id, key, analyze=False)
+        assert blocked.status_code == 422
+        assert error_code(blocked) == "VIDEO_LIMIT_EXCEEDED"
+        # — 분석 갈래는 비어 있다
+        assert len(self._fill_analyzed(client, user_id, n=1)) == 1
+
+    def test_상한이어도_반려로_기록하지_않는다(self, client):
+        """반려로 남기면 그 행이 **또 한 자리**를 차지한다."""
+        user_id = uuid4()
+        key = _issue(client, user_id)
+        put_object(key, SIZE_OK)
+        self._fill_uploaded(client, user_id, n=MAX_VIDEOS_PER_GROUP)
+
+        res = _register(client, user_id, key, duration_ms=MAX_DURATION_MS + 1)
+        assert res.status_code == 422
+        assert error_code(res) == "VIDEO_LIMIT_EXCEEDED"
+
+        mine = client.get(f"{V1}/videos", headers=_headers(user_id)).json()
+        assert len(mine) == MAX_VIDEOS_PER_GROUP
+
+    # --- 업로드 URL 발급 (헛걸음 줄이기) ---
+
+    def test_analyze_를_주면_그_갈래로_미리_막는다(self, client):
+        user_id = uuid4()
+        self._fill_analyzed(client, user_id, n=MAX_VIDEOS_PER_GROUP)
+
+        blocked = self._upload_url(client, user_id, analyze=True)
+        assert blocked.status_code == 422
+        assert error_code(blocked) == "VIDEO_LIMIT_EXCEEDED"
+        # 안 찬 갈래를 주면 그대로 내준다
+        assert self._upload_url(client, user_id, analyze=False).status_code == 200
+
+    def test_analyze_를_안_주면_한쪽만_찼을_때는_안_막는다(self, client):
+        """🔴 모를 때 막으면 **안 찬 갈래로 올리려는 사람을 잘못 막는다.**"""
+        user_id = uuid4()
+        self._fill_analyzed(client, user_id, n=MAX_VIDEOS_PER_GROUP)
+        assert self._upload_url(client, user_id).status_code == 200
+
+    def test_analyze_를_안_줘도_양쪽이_다_차면_막는다(self, client):
+        user_id = uuid4()
+        self._fill_analyzed(client, user_id, n=MAX_VIDEOS_PER_GROUP)
+        self._fill_uploaded(client, user_id, n=MAX_VIDEOS_PER_GROUP)
+
+        res = self._upload_url(client, user_id)
+        assert res.status_code == 422
+        assert error_code(res) == "VIDEO_LIMIT_EXCEEDED"
+
+    # --- 저장(keep) 관문 ---
+
+    def test_저장할_때도_갈래마다_막는다(self, client):
+        """🔴 불변식 자리다. 자리가 있을 때 등록된 임시 클립 여럿이 **나중에
+        한꺼번에** 저장되면 앞의 두 관문을 다 통과하고도 상한을 넘는다.
+        """
+        user_id = uuid4()
+        ids = []
+        for _ in range(MAX_VIDEOS_PER_GROUP + 1):
+            key = _issue(client, user_id)
+            put_object(key, SIZE_OK)
+            ids.append(_register(client, user_id, key).json()["id"])
+
+        for video_id in ids[:MAX_VIDEOS_PER_GROUP]:
+            res = client.post(
+                f"{V1}/videos/{video_id}/keep", headers=_headers(user_id)
+            )
+            assert res.status_code == 200, res.text
+
+        res = client.post(f"{V1}/videos/{ids[-1]}/keep", headers=_headers(user_id))
+        assert res.status_code == 422
+        assert error_code(res) == "VIDEO_LIMIT_EXCEEDED"
+        assert "분석 영상" in res.json()["error"]["message"]
+
+    def test_상한이어도_이미_저장된_것을_다시_저장하면_200_이다(self, client):
+        """`keep` 은 멱등이다 — 자기 자신 때문에 막히면 안 된다."""
+        user_id = uuid4()
+        ids = self._fill_analyzed(client, user_id, n=MAX_VIDEOS_PER_GROUP)
+        res = client.post(f"{V1}/videos/{ids[0]}/keep", headers=_headers(user_id))
+        assert res.status_code == 200, res.text
+        assert res.json()["kept"] is True
+
+    # --- 자리를 비우는 길 ---
+
+    def test_지우면_그_갈래의_자리가_빈다(self, client):
+        user_id = uuid4()
+        ids = self._fill_uploaded(client, user_id, n=MAX_VIDEOS_PER_GROUP)
+        assert (
+            client.delete(
+                f"{V1}/videos/{ids[0]}", headers=_headers(user_id)
+            ).status_code
+            == 204
+        )
+        assert len(self._fill_uploaded(client, user_id, n=1)) == 1
+
+    def test_남의_영상은_내_자리를_안_차지한다(self, client):
+        other = uuid4()
+        self._fill_uploaded(client, other, n=MAX_VIDEOS_PER_GROUP)
+        self._fill_analyzed(client, other, n=MAX_VIDEOS_PER_GROUP)
+
+        mine = uuid4()
+        assert len(self._fill_uploaded(client, mine, n=1)) == 1
+
+    def test_임시_클립은_자리를_안_차지한다(self, client):
+        """분석 중(`kept=false`)인 클립은 화면에도 안 보이고 스윕이 걷어 간다."""
+        user_id = uuid4()
+        for _ in range(MAX_VIDEOS_PER_GROUP + 2):
+            key = _issue(client, user_id)
+            put_object(key, SIZE_OK)
+            res = _register(client, user_id, key)
+            assert res.status_code == 201, res.text
+            assert res.json()["kept"] is False
+
+
+class TestVideoPoster:
+    """카드에 깔 **한 장면**(JPEG) — `GET /videos/{id}/poster`.
+
+    🔴 **`ffmpeg` 을 시험에서 돌리지 않는다.** 바깥 망으로 나가고 프로세스를
+    띄우는 일이라, 여기서 재는 것은 **권한·캐시·에러 코드**뿐이다.
+
+    🔴 **`conftest.py` 를 안 건드린다**(`fastapi/CLAUDE.md` 의 공유 파일).
+    대신 provider 모듈의 객체를 갈아끼운다 — 그 provider 가 호출 시점에 읽는다.
+    """
+
+    @pytest.fixture
+    def poster(self, monkeypatch):
+        from app.analysis.adapter.outbound.stub.poster_stub import (
+            MemoryPosterCache,
+            StubPoster,
+        )
+        from app.analysis.dependencies import video_providers
+
+        stub = StubPoster()
+        monkeypatch.setattr(video_providers, "_POSTER", stub)
+        monkeypatch.setattr(video_providers, "_POSTER_CACHE", MemoryPosterCache())
+        return stub
+
+    def test_인증이_필요하다(self, client, poster):
+        assert client.get(f"{V1}/videos/{uuid4()}/poster").status_code == 401
+
+    def test_공개_클립은_남도_장면을_받는다(self, client, poster):
+        owner, viewer = uuid4(), uuid4()
+        video_id = _register_clip(client, owner)
+        client.patch(
+            f"{V1}/videos/{video_id}", json={"is_public": True}, headers=_headers(owner)
+        )
+
+        res = client.get(f"{V1}/videos/{video_id}/poster", headers=_headers(viewer))
+
+        assert res.status_code == 200, res.text
+        assert res.headers["content-type"] == "image/jpeg"
+        assert res.content.startswith(b"\xff\xd8")  # JPEG 머리
+
+    def test_비공개_남의_클립은_404_다(self, client, poster):
+        """🔴 **캐시보다 권한이 먼저다.** 뒤에 두면 한 번 떠 둔 비공개 클립의
+        장면이 아무에게나 나간다."""
+        owner, viewer = uuid4(), uuid4()
+        video_id = _register_clip(client, owner)  # 비공개
+
+        res = client.get(f"{V1}/videos/{video_id}/poster", headers=_headers(viewer))
+
+        assert res.status_code == 404
+        assert res.json()["error"]["code"] == "VIDEO_NOT_FOUND"
+        assert poster.calls == 0, "권한이 없는데 떴다"
+
+    def test_두_번_불러도_한_번만_뜬다(self, client, poster):
+        """🔴 **이 캐시가 이 설계의 전부다** — 뜨는 일 자체는 여전히 비싸다."""
+        owner = uuid4()
+        video_id = _register_clip(client, owner)
+
+        for _ in range(3):
+            res = client.get(f"{V1}/videos/{video_id}/poster", headers=_headers(owner))
+            assert res.status_code == 200, res.text
+
+        assert poster.calls == 1
+
+    def test_장면을_못_뜨면_404_다(self, client, monkeypatch):
+        """형식을 못 읽거나 너무 짧은 영상이 있다 — 서버 오류가 아니다."""
+        from app.analysis.adapter.outbound.stub.poster_stub import (
+            MemoryPosterCache,
+            StubPoster,
+        )
+        from app.analysis.dependencies import video_providers
+
+        monkeypatch.setattr(video_providers, "_POSTER", StubPoster(jpeg=None))
+        monkeypatch.setattr(video_providers, "_POSTER_CACHE", MemoryPosterCache())
+
+        owner = uuid4()
+        video_id = _register_clip(client, owner)
+
+        res = client.get(f"{V1}/videos/{video_id}/poster", headers=_headers(owner))
+
+        assert res.status_code == 404
+        assert res.json()["error"]["code"] == "POSTER_NOT_AVAILABLE"

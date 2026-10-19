@@ -1,13 +1,15 @@
 """부록 D 의 ERD 그림을 **실제 스키마에서** 만든다.
 
 입력: dump_schema.py 가 fastapi/.venv 로 뽑은 schema.json (ORM 메타데이터).
-출력: assets/erd/ 의 도메인별 SVG 7장 + 한눈에 보기 + 삭제 연쇄.
+출력: assets/erd/ 의 도메인별 SVG 7장 + 한눈에 보기 + 삭제 연쇄, 그리고 assets/erd/dark/ 에 같은 9장의
+다크 색 판(2026-09-29 — 부록 D 가 사이트의 다크 모드일 때 이쪽을 보인다).
 
 그림은 손으로 고치지 않는다 — 스키마가 바뀌면 두 스크립트를 다시 돌린다.
 """
 
 import collections
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -17,6 +19,11 @@ OUT = ROOT / "assets/erd"
 schema = json.load(open(sys.argv[1], encoding="utf-8"))
 
 INK, INK2, LINE, HEAD, BG = "#27262b", "#5c5962", "#8f8a7e", "#ebe8df", "#ffffff"
+# 다크 판(2026-09-29) — 같은 그림에서 색만 바꿔 assets/erd/dark/ 에 쓴다. 값은 사이트 다크(바탕 #19191c · 면 #242428,
+# `_sass/color_schemes/dark.scss`)와 본문 그림의 다크 색 표(`assets/main.scss`)에 맞췄다.
+# 🔴 그림에 새 색을 쓰면 여기에도 넣는다 — 없으면 그 색만 다크 판에 밝게 남는다(to_dark 가 경고한다).
+DARK = {INK: "#e6e1e8", INK2: "#a9a6ad", LINE: "#807d86", HEAD: "#2e2e34", BG: "#19191c",
+        "#f7f6f2": "#232327", "#f6f5f1": "#242428"}
 SANS = "-apple-system,BlinkMacSystemFont,'Segoe UI','Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif"
 MONO = "ui-monospace,SFMono-Regular,Menlo,Consolas,'D2Coding',monospace"
 
@@ -37,6 +44,22 @@ COL_GAP, ROW_GAP = 96, 24
 
 def esc(s):
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def to_dark(svg):
+    for light, dark in DARK.items():
+        svg = svg.replace(f'"{light}"', f'"{dark}"')
+    left = set(re.findall(r'(?:fill|stroke)="(#[0-9a-fA-F]{3,6})"', svg)) - set(DARK.values())
+    if left:
+        print(f"경고: 다크 표에 없는 색 {sorted(left)} — gen_erd.py 의 DARK 에 넣는다", file=sys.stderr)
+    return svg
+
+
+def write_svg(name, svg):
+    """라이트는 assets/erd/, 다크는 assets/erd/dark/ 에 같은 이름으로 — 두 판이 늘 같은 실행에서 나온다."""
+    (OUT / name).write_text(svg, encoding="utf-8", newline="\n")
+    (OUT / "dark").mkdir(exist_ok=True)
+    (OUT / "dark" / name).write_text(to_dark(svg), encoding="utf-8", newline="\n")
 
 
 def txt_w(s, size):
@@ -273,7 +296,7 @@ def domain_svg(ctx):
     body.append(legend(height - 22))
     svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width:.0f} {height:.0f}" width="{width:.0f}" height="{height:.0f}" '
            f'role="img" aria-label="{num} {dname} 도메인 ERD — 테이블 {len(owned)}개">' + "".join(body) + "</svg>")
-    (OUT / DOMAINS[ctx][2]).write_text(svg, encoding="utf-8", newline="\n")
+    write_svg(DOMAINS[ctx][2], svg)
     return int(width), int(height), len(owned), stubs
 
 
@@ -324,7 +347,7 @@ def overview_svg():
     body.append(f'<text x="24" y="410" font-family="{SANS}" font-size="12" fill="{INK}">도메인을 넘는 외래키 {total}개 중 {to_user}개가 ① 사용자·팀을 향한다</text>')
     svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 740 420" width="740" height="420" role="img" '
            f'aria-label="도메인 7개와 도메인을 넘는 외래키. 대부분이 사용자·팀 도메인을 향한다.">' + "".join(body) + "</svg>")
-    (OUT / "d1-overview.svg").write_text(svg, encoding="utf-8", newline="\n")
+    write_svg("d1-overview.svg", svg)
     return total, to_user, pair
 
 
@@ -397,7 +420,7 @@ def cascade_svg():
     svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 740 {h}" width="740" height="{h}" role="img" '
            f'aria-label="계정을 지우면 함께 지워지는 테이블의 나무, 비우는 외래키, 삭제를 막는 기록.">'
            f'<rect x="0" y="0" width="740" height="{h}" fill="{BG}"/>' + "".join(body) + "</svg>")
-    (OUT / "d6-cascade.svg").write_text(svg, encoding="utf-8", newline="\n")
+    write_svg("d6-cascade.svg", svg)
     return rows, setnull, dict(block)
 
 

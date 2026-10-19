@@ -11,6 +11,10 @@ const String kBrandText = 'SUPERSUB';
 /// 크기가 안 튄다.
 const double kBrandLandedSize = 34;
 
+/// 홈에서의 크기 — 🔴 **로그인의 절반이다**(2026-09-23 사용자 요청:
+/// 「SUPERSUB 홈페이지서는 지금의 사이즈의 절반으로 줄여」).
+const double kBrandHomeSize = kBrandLandedSize / 2;
+
 /// 인트로 글자가 날아와 앉는 자리.
 ///
 /// 로그인 화면의 [BrandMark]가 이 키를 단다. 인트로를 라우트가 아니라 겹으로
@@ -18,11 +22,41 @@ const double kBrandLandedSize = 34;
 /// 직접 날린다.
 final GlobalKey kBrandLandingKey = GlobalKey();
 
+/// 홈의 착지점 — 🔴 **로그인과 키를 나눠 쓰지 않는다.** 라우트가 바뀌는 순간
+/// 두 화면이 함께 트리에 있을 수 있고, 그러면 같은 [GlobalKey] 가 겹쳐 앱이
+/// 죽는다.
+final GlobalKey kBrandLandingKeyHome = GlobalKey();
+
+/// 인트로 글자가 앉을 자리 후보 — **앞에서부터 찾아 처음 붙어 있는 것**을 쓴다.
+///
+/// 🔴 **홈이 추가됐다 (2026-09-23, 사용자 지적: 「로그인 했을 때는 왜 인트로
+/// 후에 홈페이지 위로 SUPERSUB 왜 안옮겨져?」).** 착지점이 **로그인 화면에만**
+/// 있어서, 이미 로그인된 사람은 인트로 → 홈으로 **로그인을 건너뛰고** 그러면
+/// `intro_gate` 가 「착지점을 못 찾았다」로 빠져 **아예 안 날렸다.**
+///
+/// 🔴 **크기도 함께 든다** — 화면마다 글자 크기가 달라서(홈은 절반이다) 비행이
+/// 어느 크기로 내려앉을지 여기서 읽어야 한다. 한 값으로 박아 두면 착지하는
+/// 순간 글자가 **한 번 튄다.**
+final List<({GlobalKey key, double fontSize})> kBrandLandings = [
+  (key: kBrandLandingKey, fontSize: kBrandLandedSize),
+  (key: kBrandLandingKeyHome, fontSize: kBrandHomeSize),
+];
+
 /// 비행 중인지. 참이면 착지점의 글자를 감춘다.
 ///
 /// 안 감추면 날아가는 글자와 착지점의 글자가 동시에 보인다. 착지하는 순간
 /// 둘이 정확히 겹치므로, 그때 이 값을 내리면 바뀌는 게 안 보인다.
 final ValueNotifier<bool> kBrandFlightInProgress = ValueNotifier<bool>(false);
+
+/// 로고가 **제자리에 앉았는가.**
+///
+/// 🔴 **기본이 참이다** — 인트로 겹이 없으면 앉아 있는 것이다(`introEnabled`
+/// 가 거짓인 시험, 그리고 홈에 다시 들어오는 모든 경우). [IntroGate] 가 겹을
+/// 올리는 동안에만 거짓으로 내렸다가 비행이 끝나면 되올린다.
+///
+/// 🔴 **거짓을 기본으로 두지 말 것** — 인트로를 끄면 영영 거짓에 머물러,
+/// 이 값을 기다리는 쪽(홈 로고의 색 변화)이 **조용히 아무 일도 안 한다.**
+final ValueNotifier<bool> kBrandSettled = ValueNotifier<bool>(true);
 
 /// 인트로가 남기고 간 글자.
 ///

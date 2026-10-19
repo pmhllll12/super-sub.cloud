@@ -142,6 +142,10 @@ class TestOpenApi:
             V1 + "/videos/{video_id}",
             V1 + "/videos/{video_id}/keep",
             V1 + "/videos/{video_id}/playback-url",
+            # 카드에 깔 한 장면 (2026-09-24, 백성검 — 사용자 허락).
+            # 목록이 썸네일을 안 실어서 앱이 카드마다 원본 MP4 를 열고 있었다
+            # (실기기에서 한 장에 1.9초). 작은 JPEG 하나로 바꾼다.
+            V1 + "/videos/{video_id}/poster",
             V1 + "/videos/{video_id}/report",
             V1 + "/videos/{video_id}/detect",
             V1 + "/videos/{video_id}/skeleton",

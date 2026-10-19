@@ -1,0 +1,225 @@
+---
+layout: default
+title: 관리 지표
+permalink: /관리-지표/
+parent: 프로젝트 관리
+nav_order: 5
+---
+
+# 관리 지표
+
+> 2026-09-23 기준(세는 대상의 마지막 커밋 `4f8563b`) · 스프린트 3 진행 중.
+> **이 페이지의 숫자는 손으로 적지 않았다** — 생성기가 저장소 기록에서 센다. 절마다 「재는 법」을
+> 펼치면 그 숫자를 뽑는 명령이 있다. 지나온 길은 [진행 현황]({{ "/진행-현황/" | relative_url }})에, 일정 계획은
+> [개발 구현 계획]({{ "/07-개발구현계획/" | relative_url }}) 4절에 있다.
+
+<div class="stat-tiles"><div class="stat-tile"><div class="stat-value">3 / 5</div><div class="stat-label">스프린트</div><div class="stat-note">개발 기간 35일째 · 전체 69일</div></div><div class="stat-tile"><div class="stat-value">111 / 175</div><div class="stat-label">미결 항목 해소</div><div class="stat-note">열린 항목 64 · 해소율 63%</div></div><div class="stat-tile"><div class="stat-value">10 / 28</div><div class="stat-label">요구사항 구현됨</div><div class="stat-note">부분 12 · 미구현 5 · 미측정 1</div></div><div class="stat-tile"><div class="stat-value">3,076</div><div class="stat-label">테스트</div><div class="stat-note">코드에 정의된 수 · 영역 네 곳</div></div><div class="stat-tile"><div class="stat-value">100</div><div class="stat-label">API 엔드포인트</div><div class="stat-note">서버 단위 7개로 나눔</div></div><div class="stat-tile"><div class="stat-value">48</div><div class="stat-label">DB 스키마 변경</div><div class="stat-note">마이그레이션 이력 · 머리 1개</div></div></div>
+
+## 1) 요청과 결정 — 미결 항목
+
+팀원 사이의 요청과 결정은 [미결 항목]({{ "/pending/" | relative_url }}) 한 곳으로 오간다. 올린 사람이 자기 구역에
+적고, 담당과 기한을 달고, 처리하면 제목에 ✅ 를 단다. 닫힌 항목도 지우지 않는다.
+
+<figure class="doc-figure"><svg viewBox="0 0 860 300" width="860" role="img" aria-label="미결 항목 누적 추이. 08-20부터 09-23까지 올라온 항목은 175개, 그중 해소된 항목은 111개다." font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Apple SD Gothic Neo','Noto Sans KR',sans-serif" style="max-width:100%;height:auto;display:block"><line x1="20" y1="14" x2="38" y2="14" stroke="#898781" stroke-width="2" stroke-linecap="round"/><text x="44" y="18" font-size="12" fill="#27262b">올라온 항목 (누적)</text><line x1="190" y1="14" x2="208" y2="14" stroke="#008300" stroke-width="2" stroke-linecap="round"/><text x="214" y="18" font-size="12" fill="#27262b">해소된 항목 (누적)</text><line x1="52" y1="262.0" x2="752" y2="262.0" stroke="#c3c2b7" stroke-width="1"/><text x="44" y="266.0" text-anchor="end" font-size="10.5" fill="#5c5962">0</text><line x1="52" y1="211.0" x2="752" y2="211.0" stroke="#d9d7d0" stroke-width="1"/><text x="44" y="215.0" text-anchor="end" font-size="10.5" fill="#5c5962">50</text><line x1="52" y1="160.0" x2="752" y2="160.0" stroke="#d9d7d0" stroke-width="1"/><text x="44" y="164.0" text-anchor="end" font-size="10.5" fill="#5c5962">100</text><line x1="52" y1="109.0" x2="752" y2="109.0" stroke="#d9d7d0" stroke-width="1"/><text x="44" y="113.0" text-anchor="end" font-size="10.5" fill="#5c5962">150</text><line x1="52" y1="58.0" x2="752" y2="58.0" stroke="#d9d7d0" stroke-width="1"/><text x="44" y="62.0" text-anchor="end" font-size="10.5" fill="#5c5962">200</text><text x="57.0" y="50" font-size="10.5" fill="#5c5962">스프린트 1</text><line x1="299.1" y1="40" x2="299.1" y2="262" stroke="#d9d7d0" stroke-width="1"/><text x="304.1" y="50" font-size="10.5" fill="#5c5962">스프린트 2</text><line x1="587.3" y1="40" x2="587.3" y2="262" stroke="#d9d7d0" stroke-width="1"/><text x="592.3" y="50" font-size="10.5" fill="#5c5962">스프린트 3</text><text x="52.0" y="280" text-anchor="start" font-size="10.5" fill="#5c5962">08-20</text><text x="299.1" y="280" text-anchor="middle" font-size="10.5" fill="#5c5962">09-01</text><text x="587.3" y="280" text-anchor="middle" font-size="10.5" fill="#5c5962">09-15</text><text x="752.0" y="280" text-anchor="end" font-size="10.5" fill="#5c5962">09-23</text><polyline points="52.0,262.0 72.6,262.0 93.2,262.0 113.8,262.0 134.4,262.0 154.9,255.9 175.5,254.9 196.1,254.9 216.7,252.8 237.3,252.8 257.9,252.8 278.5,251.8 299.1,243.6 319.6,234.5 340.2,219.2 360.8,204.9 381.4,204.9 402.0,204.9 422.6,200.8 443.2,181.4 463.8,169.2 484.4,147.8 504.9,131.4 525.5,131.4 546.1,131.4 566.7,122.3 587.3,119.2 607.9,107.0 628.5,93.7 649.1,88.6 669.6,87.6 690.2,87.6 710.8,85.5 731.4,84.5 752.0,83.5" fill="none" stroke="#898781" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="752.0" cy="83.5" r="4" fill="#898781" stroke="#fff" stroke-width="2"/><polyline points="52.0,262.0 72.6,262.0 93.2,262.0 113.8,262.0 134.4,262.0 154.9,262.0 175.5,258.9 196.1,258.9 216.7,258.9 237.3,258.9 257.9,258.9 278.5,258.9 299.1,258.9 319.6,257.9 340.2,246.7 360.8,240.6 381.4,240.6 402.0,240.6 422.6,239.6 443.2,225.3 463.8,212.0 484.4,200.8 504.9,188.6 525.5,188.6 546.1,188.6 566.7,186.5 587.3,172.2 607.9,162.0 628.5,155.9 649.1,151.8 669.6,150.8 690.2,150.8 710.8,150.8 731.4,149.8 752.0,148.8" fill="none" stroke="#008300" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="752.0" cy="148.8" r="4" fill="#008300" stroke="#fff" stroke-width="2"/><text x="762" y="87.5" font-size="12" font-weight="600" fill="#27262b">올라온 175</text><text x="762" y="152.8" font-size="12" font-weight="600" fill="#27262b">해소 111</text><text x="762" y="120.15" font-size="11" fill="#5c5962">열림 64</text><rect class="hit" x="52" y="58" width="10.3" height="204" fill="transparent"><title>08-20 · 올라온 0 · 해소 0 · 열림 0</title></rect><rect class="hit" x="62.3" y="58" width="20.6" height="204" fill="transparent"><title>08-21 · 올라온 0 · 해소 0 · 열림 0</title></rect><rect class="hit" x="82.9" y="58" width="20.6" height="204" fill="transparent"><title>08-22 · 올라온 0 · 해소 0 · 열림 0</title></rect><rect class="hit" x="103.5" y="58" width="20.6" height="204" fill="transparent"><title>08-23 · 올라온 0 · 해소 0 · 열림 0</title></rect><rect class="hit" x="124.1" y="58" width="20.6" height="204" fill="transparent"><title>08-24 · 올라온 0 · 해소 0 · 열림 0</title></rect><rect class="hit" x="144.6" y="58" width="20.6" height="204" fill="transparent"><title>08-25 · 올라온 6 · 해소 0 · 열림 6</title></rect><rect class="hit" x="165.2" y="58" width="20.6" height="204" fill="transparent"><title>08-26 · 올라온 7 · 해소 3 · 열림 4</title></rect><rect class="hit" x="185.8" y="58" width="20.6" height="204" fill="transparent"><title>08-27 · 올라온 7 · 해소 3 · 열림 4</title></rect><rect class="hit" x="206.4" y="58" width="20.6" height="204" fill="transparent"><title>08-28 · 올라온 9 · 해소 3 · 열림 6</title></rect><rect class="hit" x="227.0" y="58" width="20.6" height="204" fill="transparent"><title>08-29 · 올라온 9 · 해소 3 · 열림 6</title></rect><rect class="hit" x="247.6" y="58" width="20.6" height="204" fill="transparent"><title>08-30 · 올라온 9 · 해소 3 · 열림 6</title></rect><rect class="hit" x="268.2" y="58" width="20.6" height="204" fill="transparent"><title>08-31 · 올라온 10 · 해소 3 · 열림 7</title></rect><rect class="hit" x="288.8" y="58" width="20.6" height="204" fill="transparent"><title>09-01 · 올라온 18 · 해소 3 · 열림 15</title></rect><rect class="hit" x="309.3" y="58" width="20.6" height="204" fill="transparent"><title>09-02 · 올라온 27 · 해소 4 · 열림 23</title></rect><rect class="hit" x="329.9" y="58" width="20.6" height="204" fill="transparent"><title>09-03 · 올라온 42 · 해소 15 · 열림 27</title></rect><rect class="hit" x="350.5" y="58" width="20.6" height="204" fill="transparent"><title>09-04 · 올라온 56 · 해소 21 · 열림 35</title></rect><rect class="hit" x="371.1" y="58" width="20.6" height="204" fill="transparent"><title>09-05 · 올라온 56 · 해소 21 · 열림 35</title></rect><rect class="hit" x="391.7" y="58" width="20.6" height="204" fill="transparent"><title>09-06 · 올라온 56 · 해소 21 · 열림 35</title></rect><rect class="hit" x="412.3" y="58" width="20.6" height="204" fill="transparent"><title>09-07 · 올라온 60 · 해소 22 · 열림 38</title></rect><rect class="hit" x="432.9" y="58" width="20.6" height="204" fill="transparent"><title>09-08 · 올라온 79 · 해소 36 · 열림 43</title></rect><rect class="hit" x="453.5" y="58" width="20.6" height="204" fill="transparent"><title>09-09 · 올라온 91 · 해소 49 · 열림 42</title></rect><rect class="hit" x="474.1" y="58" width="20.6" height="204" fill="transparent"><title>09-10 · 올라온 112 · 해소 60 · 열림 52</title></rect><rect class="hit" x="494.6" y="58" width="20.6" height="204" fill="transparent"><title>09-11 · 올라온 128 · 해소 72 · 열림 56</title></rect><rect class="hit" x="515.2" y="58" width="20.6" height="204" fill="transparent"><title>09-12 · 올라온 128 · 해소 72 · 열림 56</title></rect><rect class="hit" x="535.8" y="58" width="20.6" height="204" fill="transparent"><title>09-13 · 올라온 128 · 해소 72 · 열림 56</title></rect><rect class="hit" x="556.4" y="58" width="20.6" height="204" fill="transparent"><title>09-14 · 올라온 137 · 해소 74 · 열림 63</title></rect><rect class="hit" x="577.0" y="58" width="20.6" height="204" fill="transparent"><title>09-15 · 올라온 140 · 해소 88 · 열림 52</title></rect><rect class="hit" x="597.6" y="58" width="20.6" height="204" fill="transparent"><title>09-16 · 올라온 152 · 해소 98 · 열림 54</title></rect><rect class="hit" x="618.2" y="58" width="20.6" height="204" fill="transparent"><title>09-17 · 올라온 165 · 해소 104 · 열림 61</title></rect><rect class="hit" x="638.8" y="58" width="20.6" height="204" fill="transparent"><title>09-18 · 올라온 170 · 해소 108 · 열림 62</title></rect><rect class="hit" x="659.3" y="58" width="20.6" height="204" fill="transparent"><title>09-19 · 올라온 171 · 해소 109 · 열림 62</title></rect><rect class="hit" x="679.9" y="58" width="20.6" height="204" fill="transparent"><title>09-20 · 올라온 171 · 해소 109 · 열림 62</title></rect><rect class="hit" x="700.5" y="58" width="20.6" height="204" fill="transparent"><title>09-21 · 올라온 173 · 해소 109 · 열림 64</title></rect><rect class="hit" x="721.1" y="58" width="20.6" height="204" fill="transparent"><title>09-22 · 올라온 174 · 해소 110 · 열림 64</title></rect><rect class="hit" x="741.7" y="58" width="10.3" height="204" fill="transparent"><title>09-23 · 올라온 175 · 해소 111 · 열림 64</title></rect></svg><figcaption class="doc-figure-caption">그림 1. 날마다 올라온 항목과 해소된 항목의 누적(~09-23). 두 선 사이가 그날 열려 있던 항목이다. 날짜에 마우스를 올리면 그날 값이 보이고, 아래 「표로 보기」에 같은 값이 있다. 올라온 날은 제목이 처음 생긴 커밋, 해소된 날은 제목에 ✅ 가 처음 붙은 커밋의 날짜다.</figcaption></figure>
+
+**누가 올리고 누가 맡았나.** 구역은 올린 사람의 것이다. 굵은 칸(대각선)은 자기 할 일로 올린 것이고,
+나머지는 다른 사람에게 요청한 것이다. 한 항목에 담당이 여럿이면 칸마다 하나씩 센다.
+
+| 구역 (올린 사람) | 올린 항목 | 해소 | 열림 | 해소율 |
+|---|---:|---:|---:|---:|
+| `min` 박민호 | 27 | 20 | 7 | 74% |
+| `paik` 백성검 | 48 | 36 | 12 | 75% |
+| `jin` 정어진 | 45 | 32 | 13 | 71% |
+| `ho` 정상호 | 55 | 23 | 32 | 42% |
+
+| 올린 사람 ↓ · 맡은 사람 → | 박민호 | 백성검 | 정어진 | 정상호 |
+|---|---:|---:|---:|---:|
+| 박민호 | **13** | 7 | 12 | 4 |
+| 백성검 | 5 | **14** | 40 | 10 |
+| 정어진 | 18 | 16 | **13** | 19 |
+| 정상호 | 15 | 8 | 17 | **27** |
+| **맡은 항목 중 아직 열린 것** | 25 | 17 | 33 | 31 |
+
+담당이 「미정」「없음」인 항목 5개와 담당 줄이 없는 항목 8개는 이 표에서 뺐다.
+
+<details markdown="block">
+<summary>표로 보기 — 날짜별 누적 (값이 바뀐 날만)</summary>
+
+| 날짜 | 올라온 (누적) | 해소 (누적) | 열림 |
+|---|---:|---:|---:|
+| 08-20 | 0 | 0 | 0 |
+| 08-25 | 6 | 0 | 6 |
+| 08-26 | 7 | 3 | 4 |
+| 08-28 | 9 | 3 | 6 |
+| 08-31 | 10 | 3 | 7 |
+| 09-01 | 18 | 3 | 15 |
+| 09-02 | 27 | 4 | 23 |
+| 09-03 | 42 | 15 | 27 |
+| 09-04 | 56 | 21 | 35 |
+| 09-07 | 60 | 22 | 38 |
+| 09-08 | 79 | 36 | 43 |
+| 09-09 | 91 | 49 | 42 |
+| 09-10 | 112 | 60 | 52 |
+| 09-11 | 128 | 72 | 56 |
+| 09-14 | 137 | 74 | 63 |
+| 09-15 | 140 | 88 | 52 |
+| 09-16 | 152 | 98 | 54 |
+| 09-17 | 165 | 104 | 61 |
+| 09-18 | 170 | 108 | 62 |
+| 09-19 | 171 | 109 | 62 |
+| 09-21 | 173 | 109 | 64 |
+| 09-22 | 174 | 110 | 64 |
+| 09-23 | 175 | 111 | 64 |
+
+</details>
+
+<details markdown="block">
+<summary>재는 법</summary>
+
+```bash
+grep -c '^### ' jekyll/pages/pending.markdown              # 올라온 항목
+grep -c '^### .*✅' jekyll/pages/pending.markdown          # 그중 해소(제목에 ✅)
+awk '/^## [a-z]+ \(/{z=$2} /^### /{n[z]++; if(/✅/) d[z]++}
+     END{for(k in n) print k, n[k], d[k]+0}' jekyll/pages/pending.markdown   # 구역별
+```
+
+날짜별 추이는 git 이력에서 항목 제목이 **처음 생긴 커밋**과 제목에 ✅ 가 **처음 붙은 커밋**을 찾아
+센다(`python3 tools/pages/gen_metrics.py`). 날짜별 파일 사본으로 세지 않는 것은, 사람마다 자기
+브랜치에서 일해서 같은 날의 사본이 브랜치마다 다르기 때문이다. 아카이브로 옮긴 항목은 원래
+자리에 제목이 남아 있어 함께 센다.
+
+</details>
+
+## 2) 요구사항 — 약속한 것과 된 것
+
+<figure class="doc-figure"><svg viewBox="0 0 860 196" width="860" role="img" aria-label="요구사항 28개의 상태: 구현됨 10, 부분 12, 미구현 5, 미측정 1." font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Apple SD Gothic Neo','Noto Sans KR',sans-serif" style="max-width:100%;height:auto;display:block"><rect x="20" y="8" width="12" height="12" rx="3" fill="#104281"/><text x="38" y="18" font-size="12" fill="#27262b">✅ 구현됨 10</text><rect x="131.6" y="8" width="12" height="12" rx="3" fill="#256abf"/><text x="149.6" y="18" font-size="12" fill="#27262b">🟡 부분 12</text><rect x="231.8" y="8" width="12" height="12" rx="3" fill="#6da7ec"/><text x="249.8" y="18" font-size="12" fill="#27262b">❌ 미구현 5</text><rect x="336.44" y="8" width="12" height="12" rx="3" fill="#c3c2b7"/><text x="354.44" y="18" font-size="12" fill="#27262b">⚪ 미측정 1</text><text x="20" y="59" font-size="12.5" fill="#27262b">기능</text><text x="118" y="59" text-anchor="end" font-size="10.5" fill="#5c5962">SFR</text><rect x="130" y="44" width="78" height="22" fill="#104281"><title>기능 · 구현됨 2개 — SFR-001, SFR-010</title></rect><text x="169.0" y="59" text-anchor="middle" font-size="11.5" font-weight="600" fill="#fff" pointer-events="none">2</text><rect x="210" y="44" width="198" height="22" fill="#256abf"><title>기능 · 부분 5개 — SFR-002, SFR-003, SFR-006, SFR-008, SFR-009</title></rect><text x="309.0" y="59" text-anchor="middle" font-size="11.5" font-weight="600" fill="#fff" pointer-events="none">5</text><path d="M410,44 h116 q4,0 4,4 v14 q0,4 -4,4 h-116 z" fill="#6da7ec"><title>기능 · 미구현 3개 — SFR-004, SFR-005, SFR-007</title></path><text x="470.0" y="59" text-anchor="middle" font-size="11.5" font-weight="600" fill="#27262b" pointer-events="none">3</text><text x="538" y="59" font-size="12" fill="#5c5962">10개</text><text x="20" y="99" font-size="12.5" fill="#27262b">보안</text><text x="118" y="99" text-anchor="end" font-size="10.5" fill="#5c5962">SEC</text><rect x="130" y="84" width="198" height="22" fill="#104281"><title>보안 · 구현됨 5개 — SEC-002, SEC-003, SEC-004, SEC-010, SEC-011</title></rect><text x="229.0" y="99" text-anchor="middle" font-size="11.5" font-weight="600" fill="#fff" pointer-events="none">5</text><rect x="330" y="84" width="198" height="22" fill="#256abf"><title>보안 · 부분 5개 — SEC-005, SEC-006, SEC-008, SEC-009, SEC-012</title></rect><text x="429.0" y="99" text-anchor="middle" font-size="11.5" font-weight="600" fill="#fff" pointer-events="none">5</text><path d="M530,84 h76 q4,0 4,4 v14 q0,4 -4,4 h-76 z" fill="#6da7ec"><title>보안 · 미구현 2개 — SEC-001, SEC-007</title></path><text x="570.0" y="99" text-anchor="middle" font-size="11.5" font-weight="600" fill="#27262b" pointer-events="none">2</text><text x="618" y="99" font-size="12" fill="#5c5962">12개</text><text x="20" y="139" font-size="12.5" fill="#27262b">성능</text><text x="118" y="139" text-anchor="end" font-size="10.5" fill="#5c5962">PER</text><rect x="130" y="124" width="78" height="22" fill="#256abf"><title>성능 · 부분 2개 — PER-001, PER-002</title></rect><text x="169.0" y="139" text-anchor="middle" font-size="11.5" font-weight="600" fill="#fff" pointer-events="none">2</text><path d="M210,124 h36 q4,0 4,4 v14 q0,4 -4,4 h-36 z" fill="#c3c2b7"><title>성능 · 미측정 1개 — PER-003</title></path><text x="230.0" y="139" text-anchor="middle" font-size="11.5" font-weight="600" fill="#27262b" pointer-events="none">1</text><text x="258" y="139" font-size="12" fill="#5c5962">3개</text><text x="20" y="179" font-size="12.5" fill="#27262b">품질</text><text x="118" y="179" text-anchor="end" font-size="10.5" fill="#5c5962">QUA</text><path d="M130,164 h116 q4,0 4,4 v14 q0,4 -4,4 h-116 z" fill="#104281"><title>품질 · 구현됨 3개 — QUA-001, QUA-002, QUA-003</title></path><text x="190.0" y="179" text-anchor="middle" font-size="11.5" font-weight="600" fill="#fff" pointer-events="none">3</text><text x="258" y="179" font-size="12" fill="#5c5962">3개</text></svg><figcaption class="doc-figure-caption">그림 2. 요구사항 분석(5장)의 요구사항 28개를 분류마다 상태별로 쌓았다. 칸에 마우스를 올리면 요구사항 번호가 보인다. <strong>상태는 5장 표를 그대로 읽는다</strong> — 5장이 마지막으로 바뀐 날은 2026-09-23이고, 표가 낡으면 이 그림도 같이 낡는다.</figcaption></figure>
+
+요구사항과 별도로 제약 9개와 전제 7개를 5장에서 관리한다(상태 없음).
+
+<details markdown="block">
+<summary>표로 보기</summary>
+
+| 분류 | ✅ 구현됨 | 🟡 부분 | ❌ 미구현 | ⚪ 미측정 | 합계 |
+|---|---|---|---|---|---:|
+| 기능 `SFR` | 2 (SFR-001, SFR-010) | 5 (SFR-002, SFR-003, SFR-006, SFR-008, SFR-009) | 3 (SFR-004, SFR-005, SFR-007) | 0 | 10 |
+| 보안 `SEC` | 5 (SEC-002, SEC-003, SEC-004, SEC-010, SEC-011) | 5 (SEC-005, SEC-006, SEC-008, SEC-009, SEC-012) | 2 (SEC-001, SEC-007) | 0 | 12 |
+| 성능 `PER` | 0 | 2 (PER-001, PER-002) | 0 | 1 (PER-003) | 3 |
+| 품질 `QUA` | 3 (QUA-001, QUA-002, QUA-003) | 0 | 0 | 0 | 3 |
+
+</details>
+
+<details markdown="block">
+<summary>재는 법</summary>
+
+```bash
+grep -E '^\| *(SFR|SEC|PER|QUA)-[0-9]{3} .*\| *(✅|🟡|❌|⚪) *\|$' \
+  jekyll/chapters/05-요구사항분석.markdown | awk -F'|' '{s=$(NF-1); gsub(/ /,"",s); print s}' | sort | uniq -c
+```
+
+5장은 분류마다 요약표(상태 기호)와 상세표(확인 방법)를 둔다. 요약표만 센다 — 둘 다 세면 두 번 센다.
+
+</details>
+
+## 3) 테스트 — 영역마다 지키고 있는 것
+
+<figure class="doc-figure"><svg viewBox="0 0 860 320" width="860" role="img" aria-label="영역별 테스트 수 추이(작은 그래프 네 개). 09-23 기준 백엔드 1,126, AI 에이전트 446, 웹 1,085, 앱 419." font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Apple SD Gothic Neo','Noto Sans KR',sans-serif" style="max-width:100%;height:auto;display:block"><text x="0" y="14" font-size="13" font-weight="600" fill="#27262b">백엔드</text><line x1="0" y1="29" x2="16" y2="29" stroke="#1baf7a" stroke-width="2" stroke-linecap="round"/><text x="22" y="33" font-size="11" fill="#5c5962">정어진 · fastapi/</text><line x1="44" y1="122.0" x2="354" y2="122.0" stroke="#c3c2b7" stroke-width="1"/><text x="38" y="126.0" text-anchor="end" font-size="10" fill="#5c5962">0</text><line x1="44" y1="48.0" x2="354" y2="48.0" stroke="#d9d7d0" stroke-width="1"/><text x="38" y="52.0" text-anchor="end" font-size="10" fill="#5c5962">1,500</text><polyline points="44.0,122.0 53.1,122.0 62.2,122.0 71.4,122.0 80.5,122.0 89.6,118.9 98.7,116.1 107.8,116.1 116.9,114.3 126.1,114.3 135.2,114.3 144.3,113.9 153.4,112.4 162.5,106.8 171.6,100.8 180.8,95.9 189.9,95.9 199.0,95.9 208.1,95.9 217.2,91.5 226.4,88.6 235.5,86.0 244.6,84.6 253.7,84.6 262.8,84.6 271.9,84.6 281.1,79.1 290.2,72.8 299.3,69.7 308.4,67.7 317.5,67.4 326.6,67.4 335.8,67.4 344.9,66.5 354.0,66.5" fill="none" stroke="#1baf7a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="354.0" cy="66.5" r="4" fill="#1baf7a" stroke="#fff" stroke-width="2"/><text x="364" y="70.5" font-size="12" font-weight="600" fill="#27262b">1,126</text><text x="44" y="138" font-size="10" fill="#5c5962">08-20</text><text x="354" y="138" text-anchor="end" font-size="10" fill="#5c5962">09-23</text><rect class="hit" x="44" y="48" width="4.6" height="74" fill="transparent"><title>백엔드 · 08-20 · 0개</title></rect><rect class="hit" x="48.5" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 08-21 · 0개</title></rect><rect class="hit" x="57.6" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 08-22 · 0개</title></rect><rect class="hit" x="66.8" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 08-23 · 0개</title></rect><rect class="hit" x="75.9" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 08-24 · 0개</title></rect><rect class="hit" x="85.0" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 08-25 · 63개</title></rect><rect class="hit" x="94.1" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 08-26 · 119개</title></rect><rect class="hit" x="103.2" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 08-27 · 119개</title></rect><rect class="hit" x="112.3" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 08-28 · 157개</title></rect><rect class="hit" x="121.5" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 08-29 · 157개</title></rect><rect class="hit" x="130.6" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 08-30 · 157개</title></rect><rect class="hit" x="139.7" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 08-31 · 165개</title></rect><rect class="hit" x="148.8" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 09-01 · 195개</title></rect><rect class="hit" x="157.9" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 09-02 · 309개</title></rect><rect class="hit" x="167.0" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 09-03 · 430개</title></rect><rect class="hit" x="176.2" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 09-04 · 529개</title></rect><rect class="hit" x="185.3" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 09-05 · 529개</title></rect><rect class="hit" x="194.4" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 09-06 · 529개</title></rect><rect class="hit" x="203.5" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 09-07 · 529개</title></rect><rect class="hit" x="212.6" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 09-08 · 618개</title></rect><rect class="hit" x="221.8" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 09-09 · 678개</title></rect><rect class="hit" x="230.9" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 09-10 · 730개</title></rect><rect class="hit" x="240.0" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 09-11 · 758개</title></rect><rect class="hit" x="249.1" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 09-12 · 758개</title></rect><rect class="hit" x="258.2" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 09-13 · 758개</title></rect><rect class="hit" x="267.3" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 09-14 · 758개</title></rect><rect class="hit" x="276.5" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 09-15 · 869개</title></rect><rect class="hit" x="285.6" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 09-16 · 998개</title></rect><rect class="hit" x="294.7" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 09-17 · 1,060개</title></rect><rect class="hit" x="303.8" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 09-18 · 1,100개</title></rect><rect class="hit" x="312.9" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 09-19 · 1,106개</title></rect><rect class="hit" x="322.0" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 09-20 · 1,106개</title></rect><rect class="hit" x="331.2" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 09-21 · 1,106개</title></rect><rect class="hit" x="340.3" y="48" width="9.1" height="74" fill="transparent"><title>백엔드 · 09-22 · 1,125개</title></rect><rect class="hit" x="349.4" y="48" width="4.6" height="74" fill="transparent"><title>백엔드 · 09-23 · 1,126개</title></rect><text x="440" y="14" font-size="13" font-weight="600" fill="#27262b">AI 에이전트</text><line x1="440" y1="29" x2="456" y2="29" stroke="#4a3aa7" stroke-width="2" stroke-linecap="round"/><text x="462" y="33" font-size="11" fill="#5c5962">정상호 · agent/</text><line x1="484" y1="122.0" x2="794" y2="122.0" stroke="#c3c2b7" stroke-width="1"/><text x="478" y="126.0" text-anchor="end" font-size="10" fill="#5c5962">0</text><line x1="484" y1="48.0" x2="794" y2="48.0" stroke="#d9d7d0" stroke-width="1"/><text x="478" y="52.0" text-anchor="end" font-size="10" fill="#5c5962">600</text><polyline points="484.0,122.0 493.1,122.0 502.2,122.0 511.4,122.0 520.5,122.0 529.6,115.8 538.7,113.9 547.8,113.9 556.9,110.2 566.1,110.2 575.2,110.2 584.3,110.2 593.4,109.5 602.5,106.7 611.6,104.9 620.8,98.9 629.9,98.9 639.0,98.9 648.1,94.7 657.2,92.3 666.4,87.0 675.5,84.1 684.6,80.1 693.7,80.1 702.8,80.1 711.9,79.7 721.1,75.8 730.2,70.6 739.3,68.1 748.4,67.0 757.5,67.0 766.6,67.0 775.8,67.0 784.9,67.0 794.0,67.0" fill="none" stroke="#4a3aa7" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="794.0" cy="67.0" r="4" fill="#4a3aa7" stroke="#fff" stroke-width="2"/><text x="804" y="71.0" font-size="12" font-weight="600" fill="#27262b">446</text><text x="484" y="138" font-size="10" fill="#5c5962">08-20</text><text x="794" y="138" text-anchor="end" font-size="10" fill="#5c5962">09-23</text><rect class="hit" x="484" y="48" width="4.6" height="74" fill="transparent"><title>AI 에이전트 · 08-20 · 0개</title></rect><rect class="hit" x="488.5" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 08-21 · 0개</title></rect><rect class="hit" x="497.6" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 08-22 · 0개</title></rect><rect class="hit" x="506.8" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 08-23 · 0개</title></rect><rect class="hit" x="515.9" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 08-24 · 0개</title></rect><rect class="hit" x="525.0" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 08-25 · 50개</title></rect><rect class="hit" x="534.1" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 08-26 · 66개</title></rect><rect class="hit" x="543.2" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 08-27 · 66개</title></rect><rect class="hit" x="552.3" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 08-28 · 96개</title></rect><rect class="hit" x="561.5" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 08-29 · 96개</title></rect><rect class="hit" x="570.6" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 08-30 · 96개</title></rect><rect class="hit" x="579.7" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 08-31 · 96개</title></rect><rect class="hit" x="588.8" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 09-01 · 101개</title></rect><rect class="hit" x="597.9" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 09-02 · 124개</title></rect><rect class="hit" x="607.0" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 09-03 · 139개</title></rect><rect class="hit" x="616.2" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 09-04 · 187개</title></rect><rect class="hit" x="625.3" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 09-05 · 187개</title></rect><rect class="hit" x="634.4" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 09-06 · 187개</title></rect><rect class="hit" x="643.5" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 09-07 · 221개</title></rect><rect class="hit" x="652.6" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 09-08 · 241개</title></rect><rect class="hit" x="661.8" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 09-09 · 284개</title></rect><rect class="hit" x="670.9" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 09-10 · 307개</title></rect><rect class="hit" x="680.0" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 09-11 · 340개</title></rect><rect class="hit" x="689.1" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 09-12 · 340개</title></rect><rect class="hit" x="698.2" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 09-13 · 340개</title></rect><rect class="hit" x="707.3" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 09-14 · 343개</title></rect><rect class="hit" x="716.5" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 09-15 · 375개</title></rect><rect class="hit" x="725.6" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 09-16 · 417개</title></rect><rect class="hit" x="734.7" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 09-17 · 437개</title></rect><rect class="hit" x="743.8" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 09-18 · 446개</title></rect><rect class="hit" x="752.9" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 09-19 · 446개</title></rect><rect class="hit" x="762.0" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 09-20 · 446개</title></rect><rect class="hit" x="771.2" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 09-21 · 446개</title></rect><rect class="hit" x="780.3" y="48" width="9.1" height="74" fill="transparent"><title>AI 에이전트 · 09-22 · 446개</title></rect><rect class="hit" x="789.4" y="48" width="4.6" height="74" fill="transparent"><title>AI 에이전트 · 09-23 · 446개</title></rect><text x="0" y="184" font-size="13" font-weight="600" fill="#27262b">웹</text><line x1="0" y1="199" x2="16" y2="199" stroke="#eb6834" stroke-width="2" stroke-linecap="round"/><text x="22" y="203" font-size="11" fill="#5c5962">백성검 · www/</text><line x1="44" y1="292.0" x2="354" y2="292.0" stroke="#c3c2b7" stroke-width="1"/><text x="38" y="296.0" text-anchor="end" font-size="10" fill="#5c5962">0</text><line x1="44" y1="218.0" x2="354" y2="218.0" stroke="#d9d7d0" stroke-width="1"/><text x="38" y="222.0" text-anchor="end" font-size="10" fill="#5c5962">1,500</text><polyline points="44.0,292.0 53.1,292.0 62.2,292.0 71.4,292.0 80.5,292.0 89.6,292.0 98.7,292.0 107.8,292.0 116.9,287.2 126.1,287.2 135.2,285.6 144.3,283.4 153.4,280.4 162.5,280.4 171.6,280.3 180.8,275.4 189.9,275.4 199.0,275.4 208.1,275.3 217.2,272.1 226.4,272.1 235.5,264.8 244.6,263.4 253.7,263.4 262.8,263.4 271.9,260.0 281.1,258.9 290.2,255.6 299.3,247.6 308.4,239.9 317.5,238.6 326.6,238.6 335.8,238.6 344.9,238.5 354.0,238.5" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="354.0" cy="238.5" r="4" fill="#eb6834" stroke="#fff" stroke-width="2"/><text x="364" y="242.5" font-size="12" font-weight="600" fill="#27262b">1,085</text><text x="44" y="308" font-size="10" fill="#5c5962">08-20</text><text x="354" y="308" text-anchor="end" font-size="10" fill="#5c5962">09-23</text><rect class="hit" x="44" y="218" width="4.6" height="74" fill="transparent"><title>웹 · 08-20 · 0개</title></rect><rect class="hit" x="48.5" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 08-21 · 0개</title></rect><rect class="hit" x="57.6" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 08-22 · 0개</title></rect><rect class="hit" x="66.8" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 08-23 · 0개</title></rect><rect class="hit" x="75.9" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 08-24 · 0개</title></rect><rect class="hit" x="85.0" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 08-25 · 0개</title></rect><rect class="hit" x="94.1" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 08-26 · 0개</title></rect><rect class="hit" x="103.2" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 08-27 · 0개</title></rect><rect class="hit" x="112.3" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 08-28 · 97개</title></rect><rect class="hit" x="121.5" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 08-29 · 97개</title></rect><rect class="hit" x="130.6" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 08-30 · 129개</title></rect><rect class="hit" x="139.7" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 08-31 · 174개</title></rect><rect class="hit" x="148.8" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 09-01 · 235개</title></rect><rect class="hit" x="157.9" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 09-02 · 235개</title></rect><rect class="hit" x="167.0" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 09-03 · 237개</title></rect><rect class="hit" x="176.2" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 09-04 · 336개</title></rect><rect class="hit" x="185.3" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 09-05 · 336개</title></rect><rect class="hit" x="194.4" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 09-06 · 336개</title></rect><rect class="hit" x="203.5" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 09-07 · 339개</title></rect><rect class="hit" x="212.6" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 09-08 · 404개</title></rect><rect class="hit" x="221.8" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 09-09 · 404개</title></rect><rect class="hit" x="230.9" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 09-10 · 551개</title></rect><rect class="hit" x="240.0" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 09-11 · 579개</title></rect><rect class="hit" x="249.1" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 09-12 · 579개</title></rect><rect class="hit" x="258.2" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 09-13 · 579개</title></rect><rect class="hit" x="267.3" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 09-14 · 649개</title></rect><rect class="hit" x="276.5" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 09-15 · 670개</title></rect><rect class="hit" x="285.6" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 09-16 · 737개</title></rect><rect class="hit" x="294.7" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 09-17 · 899개</title></rect><rect class="hit" x="303.8" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 09-18 · 1,057개</title></rect><rect class="hit" x="312.9" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 09-19 · 1,082개</title></rect><rect class="hit" x="322.0" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 09-20 · 1,082개</title></rect><rect class="hit" x="331.2" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 09-21 · 1,082개</title></rect><rect class="hit" x="340.3" y="218" width="9.1" height="74" fill="transparent"><title>웹 · 09-22 · 1,085개</title></rect><rect class="hit" x="349.4" y="218" width="4.6" height="74" fill="transparent"><title>웹 · 09-23 · 1,085개</title></rect><text x="440" y="184" font-size="13" font-weight="600" fill="#27262b">앱</text><line x1="440" y1="199" x2="456" y2="199" stroke="#eb6834" stroke-width="2" stroke-linecap="round"/><text x="462" y="203" font-size="11" fill="#5c5962">백성검 · flutter/</text><line x1="484" y1="292.0" x2="794" y2="292.0" stroke="#c3c2b7" stroke-width="1"/><text x="478" y="296.0" text-anchor="end" font-size="10" fill="#5c5962">0</text><line x1="484" y1="218.0" x2="794" y2="218.0" stroke="#d9d7d0" stroke-width="1"/><text x="478" y="222.0" text-anchor="end" font-size="10" fill="#5c5962">600</text><polyline points="484.0,292.0 493.1,292.0 502.2,292.0 511.4,292.0 520.5,292.0 529.6,283.7 538.7,283.7 547.8,283.7 556.9,283.7 566.1,283.7 575.2,283.7 584.3,283.7 593.4,283.7 602.5,283.7 611.6,283.7 620.8,283.7 629.9,283.7 639.0,283.7 648.1,283.7 657.2,283.7 666.4,283.7 675.5,282.8 684.6,282.8 693.7,282.8 702.8,282.8 711.9,282.0 721.1,279.8 730.2,279.8 739.3,278.9 748.4,278.9 757.5,278.9 766.6,278.9 775.8,256.4 784.9,241.7 794.0,240.3" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="794.0" cy="240.3" r="4" fill="#eb6834" stroke="#fff" stroke-width="2"/><text x="804" y="244.3" font-size="12" font-weight="600" fill="#27262b">419</text><text x="484" y="308" font-size="10" fill="#5c5962">08-20</text><text x="794" y="308" text-anchor="end" font-size="10" fill="#5c5962">09-23</text><rect class="hit" x="484" y="218" width="4.6" height="74" fill="transparent"><title>앱 · 08-20 · 0개</title></rect><rect class="hit" x="488.5" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 08-21 · 0개</title></rect><rect class="hit" x="497.6" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 08-22 · 0개</title></rect><rect class="hit" x="506.8" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 08-23 · 0개</title></rect><rect class="hit" x="515.9" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 08-24 · 0개</title></rect><rect class="hit" x="525.0" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 08-25 · 67개</title></rect><rect class="hit" x="534.1" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 08-26 · 67개</title></rect><rect class="hit" x="543.2" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 08-27 · 67개</title></rect><rect class="hit" x="552.3" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 08-28 · 67개</title></rect><rect class="hit" x="561.5" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 08-29 · 67개</title></rect><rect class="hit" x="570.6" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 08-30 · 67개</title></rect><rect class="hit" x="579.7" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 08-31 · 67개</title></rect><rect class="hit" x="588.8" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 09-01 · 67개</title></rect><rect class="hit" x="597.9" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 09-02 · 67개</title></rect><rect class="hit" x="607.0" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 09-03 · 67개</title></rect><rect class="hit" x="616.2" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 09-04 · 67개</title></rect><rect class="hit" x="625.3" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 09-05 · 67개</title></rect><rect class="hit" x="634.4" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 09-06 · 67개</title></rect><rect class="hit" x="643.5" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 09-07 · 67개</title></rect><rect class="hit" x="652.6" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 09-08 · 67개</title></rect><rect class="hit" x="661.8" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 09-09 · 67개</title></rect><rect class="hit" x="670.9" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 09-10 · 75개</title></rect><rect class="hit" x="680.0" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 09-11 · 75개</title></rect><rect class="hit" x="689.1" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 09-12 · 75개</title></rect><rect class="hit" x="698.2" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 09-13 · 75개</title></rect><rect class="hit" x="707.3" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 09-14 · 81개</title></rect><rect class="hit" x="716.5" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 09-15 · 99개</title></rect><rect class="hit" x="725.6" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 09-16 · 99개</title></rect><rect class="hit" x="734.7" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 09-17 · 106개</title></rect><rect class="hit" x="743.8" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 09-18 · 106개</title></rect><rect class="hit" x="752.9" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 09-19 · 106개</title></rect><rect class="hit" x="762.0" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 09-20 · 106개</title></rect><rect class="hit" x="771.2" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 09-21 · 289개</title></rect><rect class="hit" x="780.3" y="218" width="9.1" height="74" fill="transparent"><title>앱 · 09-22 · 408개</title></rect><rect class="hit" x="789.4" y="218" width="4.6" height="74" fill="transparent"><title>앱 · 09-23 · 419개</title></rect></svg><figcaption class="doc-figure-caption">그림 3. 영역마다 코드에 정의된 테스트 수의 추이. 색은 그 영역을 맡은 사람이다(진행 현황과 같은 색). <strong>칸마다 세로 눈금이 다르다</strong> — 영역 사이의 크기가 아니라 각 영역이 늘어 온 모양을 보는 그림이다. 날짜에 마우스를 올리면 그날 값이 보인다.</figcaption></figure>
+
+코드에 정의된 테스트를 센다. 러너가 매개변수로 늘리는 수는 넣지 않는다 — 백엔드는 pytest 가
+1,154건을 모은다(2026-09-23). 올릴 때마다 GitHub Actions 가 돌리는 테스트는
+백엔드 · 앱 2곳이고, AI 에이전트 · 웹 테스트는
+아직 워크플로가 없다.
+
+<details markdown="block">
+<summary>표로 보기 — 날짜별 (값이 바뀐 날만)</summary>
+
+| 날짜 | 백엔드 | AI 에이전트 | 웹 | 앱 |
+|---|---:|---:|---:|---:|
+| 08-20 | 0 | 0 | 0 | 0 |
+| 08-25 | 63 | 50 | 0 | 67 |
+| 08-26 | 119 | 66 | 0 | 67 |
+| 08-28 | 157 | 96 | 97 | 67 |
+| 08-30 | 157 | 96 | 129 | 67 |
+| 08-31 | 165 | 96 | 174 | 67 |
+| 09-01 | 195 | 101 | 235 | 67 |
+| 09-02 | 309 | 124 | 235 | 67 |
+| 09-03 | 430 | 139 | 237 | 67 |
+| 09-04 | 529 | 187 | 336 | 67 |
+| 09-07 | 529 | 221 | 339 | 67 |
+| 09-08 | 618 | 241 | 404 | 67 |
+| 09-09 | 678 | 284 | 404 | 67 |
+| 09-10 | 730 | 307 | 551 | 75 |
+| 09-11 | 758 | 340 | 579 | 75 |
+| 09-14 | 758 | 343 | 649 | 81 |
+| 09-15 | 869 | 375 | 670 | 99 |
+| 09-16 | 998 | 417 | 737 | 99 |
+| 09-17 | 1,060 | 437 | 899 | 106 |
+| 09-18 | 1,100 | 446 | 1,057 | 106 |
+| 09-19 | 1,106 | 446 | 1,082 | 106 |
+| 09-21 | 1,106 | 446 | 1,082 | 289 |
+| 09-22 | 1,125 | 446 | 1,085 | 408 |
+| 09-23 | 1,126 | 446 | 1,085 | 419 |
+
+</details>
+
+<details markdown="block">
+<summary>재는 법</summary>
+
+```bash
+git grep -c -E '^[[:space:]]*(async[[:space:]]+)?def[[:space:]]+test_' HEAD -- ':(glob)fastapi/tests/**/*.py' \
+  | awk -F: '{s+=$NF} END{print s}'          # 백엔드
+git grep -c -E '^[[:space:]]*(async[[:space:]]+)?def[[:space:]]+test_' HEAD -- ':(glob)agent/tests/**/*.py' \
+  | awk -F: '{s+=$NF} END{print s}'          # AI 에이전트
+git grep -c -E '^[[:space:]]*(it|test)(\.(each|skip|only|todo|concurrent))?[[:space:]]*\(' HEAD -- ':(glob)www/**/*.test.ts' ':(glob)www/**/*.test.tsx' ':(glob)www/**/*.spec.ts' ':(glob)www/**/*.spec.tsx' \
+  | awk -F: '{s+=$NF} END{print s}'          # 웹
+git grep -c -E '^[[:space:]]*(test|testWidgets)[[:space:]]*\(' HEAD -- ':(glob)flutter/test/**/*_test.dart' \
+  | awk -F: '{s+=$NF} END{print s}'          # 앱
+cd fastapi && uv run pytest --collect-only -q | tail -1     # pytest 가 모으는 수
+```
+
+날짜별 추이는 그날까지의 마지막 커밋에서 같은 명령으로 센다.
+
+</details>
+
+## 4) 규모
+
+| 무엇 | 지금 |
+|---|---|
+| API 엔드포인트 | 100 |
+| 서버를 나눈 단위 (서로의 코드를 가져다 쓰지 못하게 검사로 막음) | 7 — user · card · analysis · match · review · billing · notification |
+| DB 스키마 변경 (마이그레이션) | 48 · 머리 1개 |
+| 자동 워크플로 | 4 — 백엔드 이미지 빌드·Docker Hub push · 백엔드 테스트 · Flutter 테스트 · Deploy Jekyll site to Pages |
+| 개발 로그 | 60편 |
+
+<details markdown="block">
+<summary>재는 법</summary>
+
+```bash
+grep -rhoE '@[a-z_]*router\.(get|post|put|patch|delete)\(' fastapi/app | wc -l   # API 엔드포인트
+grep -m1 '^CONTEXTS' fastapi/tests/test_architecture.py                          # 서버 단위
+ls fastapi/alembic/versions/*.py | wc -l                                         # 스키마 변경
+cd fastapi && uv run alembic heads                                               # 머리
+grep -h '^name:' .github/workflows/*.yml                                         # 자동 워크플로
+ls _posts/ | wc -l                                                               # 개발 로그
+```
+
+</details>
+
+## 5) 목표 대비 — 잰 것과 아직 안 잰 것
+
+**잰 적 없는 숫자는 쓰지 않는다.** 안 잰 것은 안 쟀다고 적고, 언제 잴지를 함께 둔다.
+
+| 지표 | 목표 | 지금 | 잰 날 | 근거 |
+|---|---|---|---|---|
+| 채점 재현성 — 같은 영상을 5번 넣은 총점의 표준편차 | 3점 이내 | ✅ 0.00 (4편 모두) | 2026-09-09 | [미결 항목 보관]({{ "/pending-archive/" | relative_url }}) |
+| 분석 한 편에 걸리는 시간 — 개발 GPU(8GB) | 서비스 목표로 쓰지 않음 | 72~125초 (100·300프레임) | 2026-09-15 | [시스템 설계 4절]({{ "/06-시스템설계/" | relative_url }}) |
+| 추천 정확도 — Hit Rate · Recall@5 | 90% (09-11 결정) | ⚪ 안 잼 — 측정 코드가 아직 없다 | 스프린트 4 계획 | [개발 구현 계획]({{ "/07-개발구현계획/" | relative_url }}) |
+| 조회 API 응답 P95 (요구사항 PER-003) | 500ms 이내 | ⚪ 안 잼 — 서버가 지표를 내보내지만 모으는 곳이 없다 | — | [요구사항 분석]({{ "/05-요구사항분석/" | relative_url }}) |
+| 매칭 성사율 · 노쇼율 · 재사용률 | 60% 이상 · 10% 이하 · 40% 이상 | ⚪ 안 잼 — 실제 매칭이 쌓여야 잴 수 있다 | — | [테스트 및 검증 계획]({{ "/08-테스트및검증계획/" | relative_url }}) |
+| 채점 fps 불변성 — 프레임레이트만 바꿨을 때 등급 변동 | 1등급 이내 | 🟡 개선 중 (스프린트 3 과제, 정상호) | — | [개발 구현 계획]({{ "/07-개발구현계획/" | relative_url }}) |
+| 채점 지표 타당성 — 코치급 평가와 일치율 | 80% 이상 | ⚪ 잴 수 없음 — 지도자 검수 없이 가기로 했다(09-17) | — | [진행 현황]({{ "/진행-현황/" | relative_url }}) |
+
+---
+
+[← 진행 현황]({{ "/진행-현황/" | relative_url }}) · 이 페이지는 `tools/pages/gen_metrics.py` 가 만든다 — 손으로 고치면 다음 실행 때 덮인다.
+
+[← 목차로](/toc/)

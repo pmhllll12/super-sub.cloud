@@ -16,6 +16,13 @@ import 'package:super_sub/features/auth/presentation/session_controller.dart';
 /// `POST /auth/login` 이 429 를 준 상황만 흉내낸다 — [MockAuthRepository]는
 /// 서버가 없어 요청 제한을 모르므로, 화면의 잠금 배선만 따로 검증한다.
 class _TooManyRequestsAuthRepository implements AuthRepository {
+  // 이 대역은 429 잠금만 잰다 — 탈퇴·다시 읽기는 안 쓴다.
+  @override
+  Future<void> deleteAccount({String? password}) => throw UnimplementedError();
+
+  @override
+  Future<AppUser> refreshMe() => throw UnimplementedError();
+
   @override
   Future<Session> login({required String email, required String password}) {
     throw const AuthException(
@@ -57,7 +64,7 @@ class _TooManyRequestsAuthRepository implements AuthRepository {
   Future<Session?> restoreSession() async => null;
 
   @override
-  Future<AppUser> updateProfile({required String nickname}) =>
+  Future<AppUser> updateProfile({String? nickname, bool? nicknameSearchable}) =>
       throw UnimplementedError();
 }
 

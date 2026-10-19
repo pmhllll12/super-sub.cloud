@@ -269,3 +269,36 @@ describe('카드 사진은 브라우저가 끌어가지 못한다', () => {
     expect(CSS.slice(i, CSS.indexOf('\n}', i))).toMatch(/-webkit-user-drag:\s*none/)
   })
 })
+
+/**
+ * 🔴 **미결 `paik` 48번** (2026-09-22 해소).
+ *
+ * `data-photo='full'` 은 「인물 칸이 **카드 전체**를 덮는다」고 주석에 적혀
+ * 있었는데, `top`·`bottom` 만 0 으로 풀고 기본 규칙의 `inset-inline: 16%` 를
+ * 안 풀어서 실제로는 **폭 68% 짜리 띠**였다. 키우거나 옮겨도 그 띠 안에서만
+ * 움직였다 — 앱 실기기에서 사용자가 잡아 줬다(앱이 이 CSS 를 픽셀 동일로
+ * 옮겨 왔다).
+ *
+ * 🔴 **앱과 짝이다** — `flutter/.../player_card_style_test.dart` 의
+ * 「full 은 카드 전체를 덮는다」가 같은 것을 반대편에서 붙든다.
+ */
+describe('사진을 통째로 까는 모드는 카드 전체를 덮는다', () => {
+  const rule = CSS.match(
+    /\.ss-pcard\[data-photo='full'\]\s+\.ss-pcard-figure\s*\{([^}]*)\}/,
+  )
+
+  it('그 규칙이 있다', () => {
+    expect(rule).not.toBeNull()
+  })
+
+  it.each(['top', 'bottom', 'inset-inline'])('%s 를 0 으로 푼다', (prop) => {
+    expect(rule![1]).toMatch(new RegExp(`${prop}:\\s*0`))
+  })
+
+  /* 기본 규칙은 여전히 16% 여야 한다 — cutout 은 **일부러 좁다**(글자가
+     위에 앉을 자리). 같이 0 으로 밀면 사진이 별명·머리글을 덮는다. */
+  it('기본(cutout) 칸은 좌우 16% 그대로다', () => {
+    const base = CSS.match(/\n\.ss-pcard-figure\s*\{([^}]*)\}/)
+    expect(base![1]).toMatch(/inset-inline:\s*16%/)
+  })
+})

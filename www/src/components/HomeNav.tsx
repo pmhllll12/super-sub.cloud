@@ -232,8 +232,27 @@ export default function HomeNav({
               //   글자 줄 — 맨 **왼쪽**('영상 분석')이 0번
               //   알약    — 맨 **오른쪽**('팀 찾기')이 0번
               style={{ '--ss-nav-i': pill ? destinations.length - 1 - i : i } as CSSProperties}
-              onMouseEnter={clicky ? undefined : () => show(d.title)}
-              onMouseLeave={clicky ? undefined : () => show(null)}
+              /* 🔴 **`mouse` 포인터에서만 연다**(2026-09-20, 사용자 지적 —
+                 "한 번 눌러도 안 넘어간다"). `onMouseEnter` 로는 터치 화면도
+                 걸린다 — 손가락으로 첫 탭을 하면 그걸 "가리켰다"로 받아
+                 카드부터 띄우고, 실제 이동(클릭)은 **두 번째 탭**에야
+                 일어난다(터치를 마우스 이벤트로도 흉내 내는 브라우저의
+                 관례). `PointerEvent.pointerType` 으로 실제 마우스인지
+                 갈라야 터치에서는 첫 탭이 곧장 링크를 탄다. */
+              onPointerEnter={
+                clicky
+                  ? undefined
+                  : (e) => {
+                      if (e.pointerType === 'mouse') show(d.title)
+                    }
+              }
+              onPointerLeave={
+                clicky
+                  ? undefined
+                  : (e) => {
+                      if (e.pointerType === 'mouse') show(null)
+                    }
+              }
               // 포커스가 이 항목(글자 + 떠오른 카드) 밖으로 나갈 때만 닫는다 —
               // 글자에서 카드 링크로 Tab 하는 사이에 닫히면 카드를 누를 수 없다.
               // 🔴 눌러서 연 판은 **포커스가 나가도 안 닫는다** — 닫는 길은

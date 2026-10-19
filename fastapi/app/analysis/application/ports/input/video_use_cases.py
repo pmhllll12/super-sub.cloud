@@ -14,6 +14,7 @@ from app.analysis.application.dtos.video_dto import (
     GetCardGradeCommand,
     GetFeaturedVideoCommand,
     GetPlaybackUrlCommand,
+    GetVideoPosterCommand,
     KeepVideoCommand,
     MyVideosQuery,
     PlaybackUrlResult,
@@ -23,6 +24,7 @@ from app.analysis.application.dtos.video_dto import (
     UpdateVideoCommand,
     UploadUrlCommand,
     UploadUrlResult,
+    VideoPosterResult,
     VideoResult,
 )
 
@@ -61,6 +63,12 @@ class GetPlaybackUrlUseCase(ABC):
     @abstractmethod
     def __call__(self, command: GetPlaybackUrlCommand) -> PlaybackUrlResult:
         """재생용 사전 서명 URL. 공개 클립이거나 자기 클립일 때만, 아니면 404."""
+
+
+class GetVideoPosterUseCase(ABC):
+    @abstractmethod
+    def __call__(self, command: GetVideoPosterCommand) -> VideoPosterResult:
+        """카드에 깔 한 장면(JPEG). 권한은 재생 주소와 같고, 못 뜨면 404."""
 
 
 class GetFeaturedVideoUseCase(ABC):

@@ -2,10 +2,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/dev/data_source.dart';
 import '../../../core/mock/mock_db.dart';
+import '../../../core/network/api_client.dart';
 import 'auth_repository.dart';
 import 'auth_repository_api.dart';
 import 'auth_repository_mock.dart';
-import 'token_store.dart';
+
+/// `tokenStoreProvider` 는 `core/network/api_client.dart` 로 옮겼다
+/// (2026-09-23, 공유 [ApiClient] 가 같은 저장소를 읽어야 해서). 부르는 쪽이
+/// 안 고쳐도 되도록 여기서 그대로 다시 내보낸다.
+export '../../../core/network/api_client.dart' show tokenStoreProvider;
 
 /// 백엔드 교체 지점.
 ///
@@ -15,15 +20,10 @@ import 'token_store.dart';
 final authRepositoryProvider = Provider<AuthRepository>(
   (ref) => ref.watch(useMockProvider)
       ? MockAuthRepository(ref.watch(mockDbProvider))
-      : ApiAuthRepository(tokens: ref.watch(tokenStoreProvider)),
+      /* 🔴 **공유 [apiClientProvider] 를 넘긴다.** 안 넘기면
+         `ApiAuthRepository` 가 자기 [ApiClient] 를 만들어, 로그인이 저장한
+         토큰이 카드·영상·스쿼드 쪽에 **안 건너간다** — 2026-09-23 에 실서버에서
+         전부 401 이었다. 시험: `test/core/shared_api_client_test.dart`. */
+      : ApiAuthRepository(api: ref.watch(apiClientProvider)),
 );
 
-/// 로그인 토큰을 어디에 남길지 — 기본은 Keystore·Keychain(미결 `min` 25번).
-///
-/// 🔴 **위젯 시험은 이것을 갈아 끼운다.** 진짜 저장소는 플랫폼 채널로 오가는데
-/// 위젯 시험의 **가짜 시계에서는 그 응답이 영영 안 온다** — 세션 복원이 안
-/// 끝나서 라우터가 첫 화면에 멈춘다(2026-09-17에 스모크 시험이 그렇게 깨졌다).
-/// 예외가 아니라 **안 오는 것**이라 `try/catch` 로는 못 푼다.
-final tokenStoreProvider = Provider<TokenStore>(
-  (ref) => const SecureTokenStore(),
-);

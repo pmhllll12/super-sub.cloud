@@ -32,6 +32,13 @@ nav_order: 2
   서빙 환경에서 재측정해 확정(PER-001)
 
 ## 검증 지표 (KPI 예시)
+
+<!-- gen_figures:kpi-targets — tools/pages/gen_figures.py 가 만든다. 이 사이를 손으로 고치면 다음 실행 때 덮인다 -->
+
+<figure class="doc-figure"><div class="stat-tiles"><div class="stat-tile"><div class="stat-value">60% 이상</div><div class="stat-label">매칭 성사율</div><div class="stat-note">등록 공고 대비 매칭 완료 비율</div></div><div class="stat-tile"><div class="stat-value">10% 이하</div><div class="stat-label">노쇼율</div><div class="stat-note">매칭 후 미참여 비율</div></div><div class="stat-tile"><div class="stat-value">미정</div><div class="stat-label">실력분석 신뢰도</div><div class="stat-note">사용자 만족도 설문 기준</div></div><div class="stat-tile"><div class="stat-value">40% 이상</div><div class="stat-label">재사용률</div><div class="stat-note">첫 매칭 이후 재이용 비율</div></div></div><div class="stat-tiles"><div class="stat-tile"><div class="stat-value">3점 이내</div><div class="stat-label">채점 재현성</div><div class="stat-note">동일 영상 5회 반복 시 총점 표준편차 (3장 「검증 기준」)</div></div><div class="stat-tile"><div class="stat-value">1등급 이내</div><div class="stat-label">채점 fps 불변성</div><div class="stat-note">동일 장면을 다른 프레임레이트로 넣었을 때 최종 등급 변동폭</div></div><div class="stat-tile"><div class="stat-value">80% 이상</div><div class="stat-label">채점 지표 타당성</div><div class="stat-note">전문가(코치급) 평가와 일치율 — 근거 지표가 측정 대상 동작을 실제로 포착하는 정도</div></div></div><figcaption class="doc-figure-caption">그림 8-1. 검증 지표의 목표치 — 아래 표의 목표치 칸을 카드로 옮겼다. 잰 값이 아니라 목표(예시)다. 윗줄은 서비스 지표 4개, 아랫줄은 채점 지표 3개다.</figcaption></figure>
+
+<!-- /gen_figures:kpi-targets -->
+
 | 지표 | 설명 | 목표치 |
 |---|---|---|
 | 매칭 성사율 | 등록 공고 대비 매칭 완료 비율 | 60% 이상 |
@@ -48,6 +55,13 @@ nav_order: 2
 - 버그 트래킹: [TBD — 예: GitHub Issues]
 
 ## QA 프로세스
+
+<!-- gen_figures:qa-process — tools/pages/gen_figures.py 가 만든다. 이 사이를 손으로 고치면 다음 실행 때 덮인다 -->
+
+<figure class="doc-figure"><svg viewBox="0 0 860 124" width="860" role="img" aria-label="QA 4단계: 기능 구현 → 개발자 자체 테스트 → QA 담당자 시나리오 테스트 → 베타 사용자 테스트 → 이슈 수정 및 재검증. 마지막 단계의 재검증은 2단계로 되돌아간다." font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Apple SD Gothic Neo','Noto Sans KR',sans-serif" style="max-width:100%;height:auto;display:block"><defs><marker id="fa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5c5962"/></marker></defs><text x="8.0" y="20" text-anchor="start" font-size="11" fill="#5c5962">1단계</text><g><title>기능 구현 → 개발자 자체 테스트</title><rect x="8.0" y="30" width="191.5" height="60" rx="6" fill="#f6f5f1" stroke="#5c5962" stroke-width="1.5"/><text x="103.8" y="55.8" text-anchor="middle" font-size="12.5" fill="#27262b" font-weight="600">기능 구현 → 개발자 자체</text><text x="103.8" y="72.2" text-anchor="middle" font-size="12.5" fill="#27262b" font-weight="600">테스트</text></g><text x="225.5" y="20" text-anchor="start" font-size="11" fill="#27262b" font-weight="600">2단계 · QA 체크리스트로 확인</text><path d="M199.5,60.0 L224.5,60.0" fill="none" stroke="#5c5962" stroke-width="1.5" marker-end="url(#fa)"/><g><title>QA 담당자 시나리오 테스트</title><rect x="225.5" y="30" width="191.5" height="60" rx="6" fill="#f6f5f1" stroke="#5c5962" stroke-width="1.5"/><text x="321.2" y="64.0" text-anchor="middle" font-size="12.5" fill="#27262b" font-weight="600">QA 담당자 시나리오 테스트</text></g><text x="443.0" y="20" text-anchor="start" font-size="11" fill="#5c5962">3단계</text><path d="M417.0,60.0 L442.0,60.0" fill="none" stroke="#5c5962" stroke-width="1.5" marker-end="url(#fa)"/><g><title>베타 사용자 테스트</title><rect x="443.0" y="30" width="191.5" height="60" rx="6" fill="#f6f5f1" stroke="#5c5962" stroke-width="1.5"/><text x="538.8" y="64.0" text-anchor="middle" font-size="12.5" fill="#27262b" font-weight="600">베타 사용자 테스트</text></g><text x="660.5" y="20" text-anchor="start" font-size="11" fill="#5c5962">4단계</text><path d="M634.5,60.0 L659.5,60.0" fill="none" stroke="#5c5962" stroke-width="1.5" marker-end="url(#fa)"/><g><title>이슈 수정 및 재검증</title><rect x="660.5" y="30" width="191.5" height="60" rx="6" fill="#f6f5f1" stroke="#5c5962" stroke-width="1.5"/><text x="756.2" y="64.0" text-anchor="middle" font-size="12.5" fill="#27262b" font-weight="600">이슈 수정 및 재검증</text></g><path d="M756.2,90 L756.2,112 L321.2,112 L321.2,92" fill="none" stroke="#5c5962" stroke-width="1.5" marker-end="url(#fa)"/><text x="538.7" y="106" text-anchor="middle" font-size="11" fill="#5c5962">재검증 — 고친 것을 다시 확인한다</text></svg><figcaption class="doc-figure-caption">그림 8-2. QA 4단계 — 아래 목록을 옮겼다. 4단계의 재검증은 2단계로 되돌아가는 화살표로 그렸다. 2단계에서 쓰는 문서가 QA 체크리스트다.</figcaption></figure>
+
+<!-- /gen_figures:qa-process -->
+
 1. 기능 구현 → 개발자 자체 테스트
 2. QA 담당자 시나리오 테스트
 3. 베타 사용자 테스트
